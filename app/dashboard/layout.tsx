@@ -1,0 +1,28 @@
+import type React from "react"
+import { AuthProvider } from "@/contexts/auth-context"
+import { Navigation, ObsidianBackground } from "@/components/ui/obsidian"
+
+export const metadata = {
+  title: "Dashboard - IP内容工厂",
+  description: "IP内容工厂控制面板",
+}
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <AuthProvider>
+      <div className="min-h-screen bg-background text-foreground-secondary font-sans selection:bg-purple-500/30 dark:selection:text-purple-200 selection:text-purple-700 transition-colors duration-300">
+      <ObsidianBackground />
+
+      {/* Navigation Sidebar - Now uses usePathname() for dynamic active state */}
+      <Navigation />
+
+      {/* Main Content Area - Account for 84px sidebar (increased from 72px) */}
+      <div className="pl-[84px] min-h-screen">{children}</div>
+      </div>
+    </AuthProvider>
+  )
+}
