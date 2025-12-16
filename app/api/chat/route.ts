@@ -173,22 +173,54 @@ export async function POST(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
+    // 处理 profile 查询错误
+    let userProfile = profile
     if (profileError || !profile) {
-      console.error('Profile error:', profileError?.message, profileError?.code, profileError?.details)
-      if (isCreditsSchemaMissing(profileError?.message)) {
+      console.error('Profile error:', profileError?.message, profileError?.code, profileError?.details, 'User ID:', user.id)
+
+      // PGRST116 = single row not found (RLS 阻止或行不存在)
+      if (profileError?.code === 'PGRST116') {
+        // 用户没有 profile 记录，尝试创建一个
+        const { data: newProfile, error: createError } = await supabase
+          .from('profiles')
+          .insert({
+            id: user.id,
+            email: user.email,
+            nickname: user.email?.split('@')[0] || 'User',
+            plan: 'free',
+            credits_balance: 30, // 给新用户初始积分
+            credits_unlimited: false,
+          })
+          .select('plan, credits_balance, credits_unlimited, trial_granted_at')
+          .single()
+
+        if (createError) {
+          console.error('Failed to create profile:', createError.message, createError.code)
+          // 如果插入也失败，可能是 RLS 问题或者 profile 已存在但 RLS 阻止读取
+          return jsonError(500, `无法访问用户档案，请尝试重新登录。错误: ${createError.message}`)
+        }
+
+        userProfile = newProfile
+      } else if (isCreditsSchemaMissing(profileError?.message)) {
         return jsonError(
           500,
-          '\u79ef\u5206\u7cfb\u7edf\u5c1a\u672a\u521d\u59cb\u5316\uff0c\u8bf7\u5728 Supabase \u6267\u884c `lib/supabase/schema.sql` \u540e\u91cd\u8bd5\u3002'
+          '积分系统尚未初始化，请在 Supabase 执行 `lib/supabase/schema.sql` 后重试。'
         )
+      } else {
+        return jsonError(500, `获取用户信息失败: ${profileError?.message || 'profile not found'}`)
       }
-      return jsonError(500, `\u83b7\u53d6\u7528\u6237\u4fe1\u606f\u5931\u8d25: ${profileError?.message || 'profile not found'}`)
     }
 
-    if (!isPlanSufficient(profile.plan, requiredPlan)) {
-      const currentPlan = normalizePlan(profile.plan)
+    // 确保 userProfile 存在
+    if (!userProfile) {
+      return jsonError(500, '无法获取用户档案信息')
+    }
+
+    if (!isPlanSufficient(userProfile.plan, requiredPlan)) {
+      const currentPlan = normalizePlan(userProfile.plan)
       return jsonError(
         403,
-        `\u5f53\u524d\u5957\u9910\uff08${PLAN_LABELS[currentPlan]}\uff09\u672a\u89e3\u9501\u6b64\u6b65\u9aa4\uff0c\u9700\u8981\u5347\u7ea7\u81f3\uff1a${PLAN_LABELS[requiredPlan]}`,
+        `当前套餐（${PLAN_LABELS[currentPlan]}）未解锁此步骤，需要升级至：${PLAN_LABELS[requiredPlan]}`,
         {
           code: 'plan_required',
           required_plan: requiredPlan,
@@ -201,11 +233,11 @@ export async function POST(request: NextRequest) {
     const ip = getClientIp(request)
     const ipHash = ip ? hashIp(ip) : null
 
-    let creditsBalance = Number(profile.credits_balance || 0)
-    let creditsUnlimited = Boolean(profile.credits_unlimited) || normalizePlan(profile.plan) === 'vip'
+    let creditsBalance = Number(userProfile.credits_balance || 0)
+    let creditsUnlimited = Boolean(userProfile.credits_unlimited) || normalizePlan(userProfile.plan) === 'vip'
 
     // First-time trial grant (device + IP throttling)
-    if (!creditsUnlimited && !profile.trial_granted_at && creditsBalance <= 0) {
+    if (!creditsUnlimited && !userProfile.trial_granted_at && creditsBalance <= 0) {
       if (!deviceId || deviceId.trim().length < 8) {
         return jsonError(400, '\u7f3a\u5c11\u8bbe\u5907\u6807\u8bc6\uff0c\u8bf7\u5237\u65b0\u9875\u9762\u540e\u91cd\u8bd5', {
           code: 'device_id_required',
