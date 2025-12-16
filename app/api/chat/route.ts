@@ -102,15 +102,14 @@ function hashIp(ip: string): string {
 function isCreditsSchemaMissing(message: string | undefined): boolean {
   if (!message) return false
   const m = message.toLowerCase()
-  return (
-    m.includes('credits_balance') ||
-    m.includes('credits_unlimited') ||
-    m.includes('trial_granted_at') ||
-    m.includes('trial_grants') ||
-    m.includes('credit_transactions') ||
-    m.includes('grant_trial_credits') ||
-    m.includes('consume_credits')
-  )
+  // 只检测真正的 schema 缺失错误（列不存在、表不存在、函数不存在）
+  const schemaKeywords = ['does not exist', 'column', 'relation', 'function', 'undefined_column', 'undefined_table', 'undefined_function']
+  const creditKeywords = ['credits_balance', 'credits_unlimited', 'trial_granted_at', 'trial_grants', 'credit_transactions', 'grant_trial_credits', 'consume_credits']
+
+  const hasSchemaError = schemaKeywords.some(k => m.includes(k))
+  const hasCreditKeyword = creditKeywords.some(k => m.includes(k))
+
+  return hasSchemaError && hasCreditKeyword
 }
 
 function truncateText(input: string, maxChars: number): { text: string; truncated: boolean } {
@@ -175,13 +174,14 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (profileError || !profile) {
+      console.error('Profile error:', profileError?.message, profileError?.code, profileError?.details)
       if (isCreditsSchemaMissing(profileError?.message)) {
         return jsonError(
           500,
           '\u79ef\u5206\u7cfb\u7edf\u5c1a\u672a\u521d\u59cb\u5316\uff0c\u8bf7\u5728 Supabase \u6267\u884c `lib/supabase/schema.sql` \u540e\u91cd\u8bd5\u3002'
         )
       }
-      return jsonError(500, '\u83b7\u53d6\u7528\u6237\u4fe1\u606f\u5931\u8d25')
+      return jsonError(500, `\u83b7\u53d6\u7528\u6237\u4fe1\u606f\u5931\u8d25: ${profileError?.message || 'profile not found'}`)
     }
 
     if (!isPlanSufficient(profile.plan, requiredPlan)) {
