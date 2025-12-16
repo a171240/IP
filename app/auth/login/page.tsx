@@ -43,16 +43,21 @@ function LoginPageInner() {
         } else {
           setError(error.message)
         }
+        setLoading(false)
         return
       }
 
       if (data.user) {
+        // 登录成功，刷新并跳转
+        router.refresh()
         router.push(redirectTo)
+      } else {
+        setError("登录失败，请重试")
+        setLoading(false)
       }
     } catch (err) {
       setError("登录失败，请稍后重试")
       console.error(err)
-    } finally {
       setLoading(false)
     }
   }
