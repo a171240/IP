@@ -137,10 +137,6 @@ export default function DashboardPage() {
         setCompletedSteps(done)
         setReportPreviews(userReports)
         setReportCount(reportTotal)
-
-        if (done.length === 0 && userReports.length === 0 && completedSteps.length === 0 && reportTotal === 0) {
-          setLoadError("部分数据加载失败，但您仍可继续使用")
-        }
       } catch (error) {
         console.error("Failed to load dashboard data:", error)
         setLoadError("工作台数据加载失败，请检查网络连接后重试")
