@@ -178,7 +178,14 @@ export default function ReportsPage() {
 
   useEffect(() => {
     const loadReports = async () => {
-      if (!user || authLoading) return
+      // 如果还在验证登录状态，等待
+      if (authLoading) return
+
+      // 如果用户未登录，停止加载
+      if (!user) {
+        setIsLoading(false)
+        return
+      }
 
       setIsLoading(true)
       try {
