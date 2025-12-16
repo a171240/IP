@@ -102,14 +102,20 @@ function hashIp(ip: string): string {
 function isCreditsSchemaMissing(message: string | undefined): boolean {
   if (!message) return false
   const m = message.toLowerCase()
-  // 只检测真正的 schema 缺失错误（列不存在、表不存在、函数不存在）
-  const schemaKeywords = ['does not exist', 'column', 'relation', 'function', 'undefined_column', 'undefined_table', 'undefined_function']
-  const creditKeywords = ['credits_balance', 'credits_unlimited', 'trial_granted_at', 'trial_grants', 'credit_transactions', 'grant_trial_credits', 'consume_credits']
 
-  const hasSchemaError = schemaKeywords.some(k => m.includes(k))
-  const hasCreditKeyword = creditKeywords.some(k => m.includes(k))
+  // 只检测真正的 schema 缺失错误（列不存在、表不存在）
+  // 注意：不包括函数不存在，因为函数不存在时我们有备用处理逻辑
+  const columnTableKeywords = ['column', 'relation', 'undefined_column', 'undefined_table']
+  const existKeywords = ['does not exist']
+  const creditColumnKeywords = ['credits_balance', 'credits_unlimited', 'trial_granted_at']
 
-  return hasSchemaError && hasCreditKeyword
+  // 检查是否是列或表不存在的错误
+  const hasColumnTableError = columnTableKeywords.some(k => m.includes(k))
+  const hasExistError = existKeywords.some(k => m.includes(k))
+  const hasCreditColumn = creditColumnKeywords.some(k => m.includes(k))
+
+  // 只有当是列/表不存在且涉及积分相关列时才返回 true
+  return hasColumnTableError && hasExistError && hasCreditColumn
 }
 
 function truncateText(input: string, maxChars: number): { text: string; truncated: boolean } {
@@ -250,19 +256,28 @@ export async function POST(request: NextRequest) {
       })
 
       if (grantError) {
-        if (isCreditsSchemaMissing(grantError.message)) {
+        console.error('grant_trial_credits RPC error:', grantError.message, grantError.code, grantError.details)
+        // 如果是函数不存在的错误，跳过试用积分发放，继续执行
+        if (grantError.message?.includes('function') && grantError.message?.includes('does not exist')) {
+          console.warn('grant_trial_credits function not found, skipping trial grant')
+          // 不返回错误，继续执行
+        } else if (isCreditsSchemaMissing(grantError.message)) {
           return jsonError(
             500,
-            '\u79ef\u5206\u7cfb\u7edf\u5c1a\u672a\u521d\u59cb\u5316\uff0c\u8bf7\u5728 Supabase \u6267\u884c `lib/supabase/schema.sql` \u540e\u91cd\u8bd5\u3002'
+            '积分系统尚未初始化，请在 Supabase 执行 `lib/supabase/schema.sql` 后重试。'
           )
+        } else {
+          return jsonError(500, '试用积分发放失败', { details: grantError.message })
         }
-        return jsonError(500, '\u8bd5\u7528\u79ef\u5206\u53d1\u653e\u5931\u8d25', { details: grantError.message })
       }
 
-      const grant = Array.isArray(grantRows) ? grantRows[0] : grantRows
-      if (grant) {
-        creditsBalance = Number(grant.credits_balance ?? creditsBalance)
-        creditsUnlimited = Boolean(grant.credits_unlimited ?? creditsUnlimited)
+      // 处理成功的 grant 结果
+      if (!grantError) {
+        const grant = Array.isArray(grantRows) ? grantRows[0] : grantRows
+        if (grant) {
+          creditsBalance = Number(grant.credits_balance ?? creditsBalance)
+          creditsUnlimited = Boolean(grant.credits_unlimited ?? creditsUnlimited)
+        }
       }
     }
 
@@ -276,6 +291,8 @@ export async function POST(request: NextRequest) {
       })
 
       if (consumeError) {
+        console.error('consume_credits RPC error:', consumeError.message, consumeError.code, consumeError.details)
+
         if (consumeError.message?.includes('insufficient_credits')) {
           const { data: latest } = await supabase
             .from('profiles')
@@ -284,27 +301,42 @@ export async function POST(request: NextRequest) {
             .single()
 
           const latestBalance = Number(latest?.credits_balance ?? creditsBalance)
-          return jsonError(402, `\u79ef\u5206\u4e0d\u8db3\uff1a\u672c\u6b21\u9700\u6d88\u8017 ${creditCost}\uff0c\u5f53\u524d\u5269\u4f59 ${latestBalance}\u3002`, {
+          return jsonError(402, `积分不足：本次需消耗 ${creditCost}，当前剩余 ${latestBalance}。`, {
             code: 'insufficient_credits',
             required: creditCost,
             balance: latestBalance,
           })
         }
 
-        if (isCreditsSchemaMissing(consumeError.message)) {
+        // 如果 consume_credits 函数不存在，尝试直接扣减积分
+        if (consumeError.message?.includes('function') && consumeError.message?.includes('does not exist')) {
+          console.warn('consume_credits function not found, trying direct update')
+          // 直接更新 profiles 表扣减积分
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ credits_balance: creditsBalance - creditCost })
+            .eq('id', user.id)
+            .gte('credits_balance', creditCost)
+
+          if (updateError) {
+            console.error('Direct credits update failed:', updateError.message)
+            return jsonError(500, '积分扣减失败，请稍后重试', { details: updateError.message })
+          }
+          creditsRemaining = creditsBalance - creditCost
+        } else if (isCreditsSchemaMissing(consumeError.message)) {
           return jsonError(
             500,
-            '\u79ef\u5206\u7cfb\u7edf\u5c1a\u672a\u521d\u59cb\u5316\uff0c\u8bf7\u5728 Supabase \u6267\u884c `lib/supabase/schema.sql` \u540e\u91cd\u8bd5\u3002'
+            '积分系统尚未初始化，请在 Supabase 执行 `lib/supabase/schema.sql` 后重试。'
           )
+        } else {
+          return jsonError(500, '积分扣减失败', { details: consumeError.message })
         }
-
-        return jsonError(500, '\u79ef\u5206\u6263\u51cf\u5931\u8d25', { details: consumeError.message })
-      }
-
-      const consumed = Array.isArray(consumeRows) ? consumeRows[0] : consumeRows
-      if (consumed) {
-        creditsRemaining = Number(consumed.credits_balance ?? creditsRemaining)
-        creditsUnlimited = Boolean(consumed.credits_unlimited ?? creditsUnlimited)
+      } else {
+        const consumed = Array.isArray(consumeRows) ? consumeRows[0] : consumeRows
+        if (consumed) {
+          creditsRemaining = Number(consumed.credits_balance ?? creditsRemaining)
+          creditsUnlimited = Boolean(consumed.credits_unlimited ?? creditsUnlimited)
+        }
       }
     }
 
