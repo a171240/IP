@@ -279,14 +279,14 @@ export function ReportCanvas({
                 placeholder="报告内容..."
               />
             ) : (
-              <div className="prose prose-invert prose-sm max-w-none">
+              <div className="max-w-none">
                 {content ? (
-                  <pre className="whitespace-pre-wrap text-sm dark:text-zinc-300 text-zinc-700 leading-relaxed font-sans">
+                  <div className="whitespace-pre-wrap text-sm leading-relaxed font-sans text-zinc-900 dark:text-zinc-100">
                     {content}
                     {isGenerating && (
                       <span className="inline-block w-2 h-4 ml-1 bg-purple-400 animate-pulse" />
                     )}
-                  </pre>
+                  </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-20 text-zinc-500">
                     <Loader2 size={32} className="animate-spin mb-4 text-purple-400" />

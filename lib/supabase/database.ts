@@ -421,16 +421,13 @@ export async function getLatestReportByConversation(conversationId: string, user
     .eq('conversation_id', conversationId)
     .order('created_at', { ascending: false })
     .limit(1)
-    .single()
 
-  // PGRST116: Row not found
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  if (error && (error as any).code !== 'PGRST116') {
+  if (error) {
     console.error('Error getting latest report by conversation:', error)
     return null
   }
 
-  return data || null
+  return (data && data[0]) || null
 }
 
 
@@ -455,14 +452,14 @@ export async function getLatestReport(stepId: string, projectId?: string, userId
     query = query.eq('project_id', projectId)
   }
 
-  const { data, error } = await query.single()
+  const { data, error } = await query
 
-  if (error && error.code !== 'PGRST116') {
+  if (error) {
     console.error('Error getting latest report:', error)
     return null
   }
 
-  return data || null
+  return (data && data[0]) || null
 }
 
 /**
