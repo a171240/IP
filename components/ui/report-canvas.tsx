@@ -254,11 +254,11 @@ export function ReportCanvas({
         </div>
 
         {/* 内容区域 */}
-        <div className="flex-1 relative overflow-hidden">
+        <div className="flex-1 min-h-0 relative overflow-hidden">
           <div
             ref={contentRef}
             onScroll={updatePinnedState}
-            className="h-full overflow-y-auto p-6"
+            className="absolute inset-0 overflow-y-auto p-6"
           >
             {isEditing ? (
               <textarea
