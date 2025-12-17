@@ -281,7 +281,7 @@ export function ReportCanvas({
             ) : (
               <div className="max-w-none">
                 {content ? (
-                  <div className="whitespace-pre-wrap text-sm leading-relaxed font-sans text-zinc-900 dark:text-zinc-100">
+                  <div className="whitespace-pre-wrap text-sm leading-relaxed font-sans text-zinc-100">
                     {content}
                     {isGenerating && (
                       <span className="inline-block w-2 h-4 ml-1 bg-purple-400 animate-pulse" />

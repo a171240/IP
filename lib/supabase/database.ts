@@ -430,10 +430,6 @@ export async function getLatestReportByConversation(conversationId: string, user
   return (data && data[0]) || null
 }
 
-
-/**
- * 获取用户某步骤的最新报告
- */
 export async function getLatestReport(stepId: string, projectId?: string, userId?: string): Promise<Report | null> {
   const supabase = getSupabaseClient()
   const resolvedUserId = await resolveUserId(supabase, userId)
@@ -462,9 +458,6 @@ export async function getLatestReport(stepId: string, projectId?: string, userId
   return (data && data[0]) || null
 }
 
-/**
- * 获取用户所有报告
- */
 export async function getUserReports(projectId?: string, userId?: string): Promise<Report[]> {
   const supabase = getSupabaseClient()
   const resolvedUserId = await resolveUserId(supabase, userId)
