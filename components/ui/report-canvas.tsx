@@ -58,14 +58,27 @@ export function ReportCanvas({
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
+  const prevIsOpenRef = useRef(isOpen)
 
-  // 当流式内容更新时，更新显示内容
+  // 当画布打开时，初始化内容
   useEffect(() => {
+    // 检测从关闭到打开的转换
+    if (isOpen && !prevIsOpenRef.current) {
+      // 优先使用 streamingContent，其次使用 initialContent
+      const contentToShow = streamingContent || initialContent || ""
+      setContent(contentToShow)
+    }
+    prevIsOpenRef.current = isOpen
+  }, [isOpen, initialContent, streamingContent])
+
+  // 当流式内容更新时，更新显示内容（仅在画布打开时）
+  useEffect(() => {
+    if (!isOpen) return
     if (streamingContent) {
       setContent(streamingContent)
       if (isGenerating && !isPinnedToBottom) setHasNewContent(true)
     }
-  }, [streamingContent, isGenerating, isPinnedToBottom])
+  }, [isOpen, streamingContent, isGenerating, isPinnedToBottom])
 
   // 自动跟随到底部（仅在用户位于底部时）
   useEffect(() => {
@@ -74,12 +87,13 @@ export function ReportCanvas({
     contentRef.current.scrollTop = contentRef.current.scrollHeight
   }, [content, isGenerating, isPinnedToBottom])
 
-  // 初始内容变化时更新（当非流式状态且有初始内容时）
+  // 初始内容变化时更新（仅在画布打开且非流式状态时）
   useEffect(() => {
+    if (!isOpen) return
     if (initialContent && !isGenerating && !streamingContent) {
       setContent(initialContent)
     }
-  }, [initialContent, isGenerating, streamingContent])
+  }, [isOpen, initialContent, isGenerating, streamingContent])
 
   // 复制内容
   const handleCopy = async () => {
