@@ -1,4 +1,4 @@
-﻿import Link from "next/link"
+import Link from "next/link"
 import { ArrowRight, Check, Clock, Gift, Sparkles, X, Zap } from "lucide-react"
 import { GlassCard, GlowButton } from "@/components/ui/obsidian-primitives"
 
@@ -12,7 +12,7 @@ const START_HREF = "/auth/register?redirect=/dashboard/quick-start"
 
 // Marketing Navigation
 const MarketingNav = () => (
-  <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4">
+  <nav className="fixed top-0 left-0 right-0 z-50 px-4 sm:px-6 pb-3 pt-[calc(var(--safe-area-top)+0.75rem)]">
     <div className="max-w-7xl mx-auto flex items-center justify-between">
       <Link href="/" className="flex items-center gap-3 group">
         <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold shadow-lg shadow-purple-500/30 group-hover:scale-105 transition-transform">
@@ -207,7 +207,7 @@ const PricingCard = ({
 )
 
 const PlanMatrix = () => (
-  <section className="pb-24 px-6">
+  <section className="pb-24 px-4 sm:px-6">
     <div className="max-w-6xl mx-auto">
       <div className="text-center mb-10">
         <p className="text-xs font-mono uppercase tracking-widest text-zinc-500 mb-3">WORKFLOW ACCESS</p>
@@ -276,7 +276,7 @@ const creditCostCatalog = [
 ] as const
 
 const CreditsSection = () => (
-  <section className="pb-24 px-6">
+  <section className="pb-24 px-4 sm:px-6">
     <div className="max-w-6xl mx-auto">
       <div className="text-center mb-10">
         <p className="text-xs font-mono uppercase tracking-widest text-zinc-500 mb-3">CREDITS</p>
@@ -367,7 +367,7 @@ const faqs = [
 ]
 
 const FAQSection = () => (
-  <section className="py-16 px-6">
+  <section className="py-16 px-4 sm:px-6">
     <div className="max-w-3xl mx-auto">
       <h2 className="text-2xl font-bold text-white text-center mb-12">常见问题</h2>
       <div className="space-y-4">
@@ -383,7 +383,7 @@ const FAQSection = () => (
 )
 
 const ContactSection = () => (
-  <section id="contact" className="pb-24 px-6">
+  <section id="contact" className="pb-24 px-4 sm:px-6">
     <div className="max-w-3xl mx-auto">
       <GlassCard className="p-8">
         <div className="flex items-start gap-4">
@@ -419,7 +419,7 @@ const ContactSection = () => (
 
 // Footer
 const Footer = () => (
-  <footer className="py-12 px-6 border-t border-white/10">
+  <footer className="py-12 px-4 sm:px-6 border-t border-white/10">
     <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center text-white text-sm font-bold">
@@ -449,7 +449,7 @@ export default function PricingPage() {
       <MarketingNav />
 
       {/* Promo Banner */}
-      <section className="pt-28 pb-6 px-6">
+      <section className="pt-28 pb-6 px-4 sm:px-6">
         <div className="max-w-4xl mx-auto">
           <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-yellow-500/20 via-orange-500/20 to-red-500/20 border border-yellow-500/30 p-6">
             <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-500/10 rounded-full blur-3xl" />
@@ -498,7 +498,7 @@ export default function PricingPage() {
       </section>
 
       {/* Header */}
-      <section className="pt-8 pb-16 px-6 text-center relative">
+      <section className="pt-8 pb-16 px-4 sm:px-6 text-center relative">
 
         <div className="relative">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 mb-6">
@@ -513,7 +513,7 @@ export default function PricingPage() {
       </section>
 
       {/* Pricing Cards */}
-      <section className="pb-20 px-6">
+      <section className="pb-20 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto grid md:grid-cols-2 lg:grid-cols-4 gap-5 items-stretch">
           {plans.map((plan) => (
             <PricingCard key={plan.id} plan={plan} />

@@ -486,7 +486,7 @@ export async function getUserReports(projectId?: string, userId?: string): Promi
 
 
 /**
- * ??????????? content??? payload?
+ * NOTE: comment removed (encoding)
  */
 export async function getUserReportList(projectId?: string, userId?: string): Promise<ReportListItem[]> {
   const supabase = getSupabaseClient()

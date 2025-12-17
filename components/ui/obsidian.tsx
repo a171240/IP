@@ -130,11 +130,11 @@ export const GlowButton = ({
 // NAVIGATION CONFIG
 // ============================================
 export const navItems = [
-  { id: "home", icon: Home, label: "主页", href: "/dashboard" },
+  { id: "home", icon: Home, label: "首页", href: "/dashboard" },
   { id: "quick-start", icon: Zap, label: "快速体验", href: "/dashboard/quick-start" },
-  { id: "agents", icon: Bot, label: "智能体", href: "/dashboard/profiles" },
-  { id: "content", icon: BookOpen, label: "报告", href: "/dashboard/reports" },
-  { id: "layers", icon: Layers, label: "工坊", href: "/dashboard/workflow" },
+  { id: "agents", icon: Bot, label: "智能体库", href: "/dashboard/profiles" },
+  { id: "content", icon: BookOpen, label: "报告库", href: "/dashboard/reports" },
+  { id: "layers", icon: Layers, label: "内容工坊", href: "/dashboard/workflow" },
   { id: "settings", icon: Settings, label: "设置", href: "/dashboard/settings" },
 ]
 
@@ -163,7 +163,8 @@ export const Navigation = () => {
   }
 
   return (
-    <nav className="fixed left-0 top-0 bottom-0 w-[84px] flex flex-col items-center dark:bg-zinc-950/80 bg-white/80 backdrop-blur-none md:backdrop-blur-xl border-r dark:border-white/10 border-black/[0.08] py-6 z-50 transition-colors duration-300">
+    <>
+      <nav className="fixed left-0 top-0 bottom-0 w-[84px] hidden md:flex flex-col items-center dark:bg-zinc-950/80 bg-white/80 backdrop-blur-none md:backdrop-blur-xl border-r dark:border-white/10 border-black/[0.08] py-6 z-50 transition-colors duration-300">
       {/* Logo */}
       <Link href="/" className="mb-8">
         <div className="w-11 h-11 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 hover:scale-105 transition-all duration-200 select-none">
@@ -344,6 +345,35 @@ export const Navigation = () => {
         </div>
       )}
     </nav>
+      <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden dark:bg-zinc-950/85 bg-white/90 backdrop-blur-xl border-t dark:border-white/10 border-black/[0.08]">
+        <div className="mx-auto max-w-lg px-2 pt-2 pb-[calc(var(--safe-area-bottom)+0.5rem)]">
+          <div className="grid grid-cols-6 gap-1">
+            {navItems.map((item) => {
+              const isActive = isItemActive(item.href)
+              return (
+                <Link
+                  key={item.id}
+                  href={item.href}
+                  aria-current={isActive ? "page" : undefined}
+                  className={`
+                    flex flex-col items-center justify-center gap-1 rounded-xl py-2
+                    text-[10px] font-medium
+                    transition-colors duration-150
+                    ${isActive
+                      ? "dark:text-purple-400 text-purple-700 bg-purple-500/10"
+                      : "dark:text-zinc-400 text-zinc-500 hover:bg-purple-500/10 hover:dark:text-purple-300 hover:text-purple-700"
+                    }
+                  `}
+                >
+                  <item.icon size={18} strokeWidth={isActive ? 2.25 : 1.75} />
+                  <span className="leading-none">{item.label}</span>
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+      </nav>
+    </>
   )
 }
 
@@ -357,7 +387,7 @@ export const Header = ({
   breadcrumbs: Array<{ label: string; href?: string }>
 }) => {
   return (
-    <header className="h-14 flex items-center justify-between px-6 dark:bg-zinc-950/80 bg-white/80 backdrop-blur-none md:backdrop-blur-xl border-b dark:border-white/10 border-black/[0.08] sticky top-0 z-40 transition-colors duration-300">
+    <header className="h-[calc(3.5rem+var(--safe-area-top))] pt-[var(--safe-area-top)] flex items-center justify-between px-4 sm:px-6 dark:bg-zinc-950/80 bg-white/80 backdrop-blur-none md:backdrop-blur-xl border-b dark:border-white/10 border-black/[0.08] sticky top-0 z-40 transition-colors duration-300">
       {/* Breadcrumbs */}
       <div className="flex items-center gap-1.5">
         {breadcrumbs.map((item, index) => (
@@ -529,3 +559,4 @@ export const MetricCard = ({
     </GlassCard>
   )
 }
+

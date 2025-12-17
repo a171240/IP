@@ -1,10 +1,10 @@
-﻿import Link from "next/link"
+import Link from "next/link"
 import { ArrowRight, Sparkles, Shield, Zap, BarChart3, Users, Globe, ChevronRight, Play } from "lucide-react"
 import { GlassCard, GlowButton } from "@/components/ui/obsidian-primitives"
 
 // Marketing Navigation
 const MarketingNav = () => (
-  <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4">
+  <nav className="fixed top-0 left-0 right-0 z-50 px-4 sm:px-6 pb-3 pt-[calc(var(--safe-area-top)+0.75rem)]">
     <div className="max-w-7xl mx-auto flex items-center justify-between">
       {/* Logo */}
       <Link href="/" className="flex items-center gap-3 group">
@@ -44,7 +44,7 @@ const MarketingNav = () => (
 
 // Hero Section
 const HeroSection = () => (
-  <section className="relative pt-32 pb-20 px-6">
+  <section className="relative pt-32 pb-20 px-4 sm:px-6">
     {/* Glowing orb behind hero */}
 
     <div className="max-w-5xl mx-auto text-center relative">
@@ -75,7 +75,7 @@ const HeroSection = () => (
             <ArrowRight size={18} className="ml-2" />
           </GlowButton>
         </Link>
-        <button className="flex items-center gap-2 px-6 py-4 text-zinc-400 hover:text-white transition-colors group">
+        <button className="flex items-center gap-2 px-4 sm:px-6 py-4 text-zinc-400 hover:text-white transition-colors group">
           <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-white/10 transition-colors">
             <Play size={16} fill="currentColor" />
           </div>
@@ -139,7 +139,7 @@ const features = [
 ]
 
 const FeaturesSection = () => (
-  <section id="features" className="py-24 px-6">
+  <section id="features" className="py-24 px-4 sm:px-6">
     <div className="max-w-6xl mx-auto">
       {/* Section Header */}
       <div className="text-center mb-16">
@@ -175,7 +175,7 @@ const stats = [
 ]
 
 const StatsSection = () => (
-  <section className="py-16 px-6 border-y border-white/5">
+  <section className="py-16 px-4 sm:px-6 border-y border-white/5">
     <div className="max-w-6xl mx-auto">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
         {stats.map((stat) => (
@@ -191,7 +191,7 @@ const StatsSection = () => (
 
 // CTA Section
 const CTASection = () => (
-  <section className="py-24 px-6">
+  <section className="py-24 px-4 sm:px-6">
     <div className="max-w-4xl mx-auto">
       <GlassCard className="p-12 text-center relative overflow-hidden">
         {/* Background glow */}
@@ -224,7 +224,7 @@ const CTASection = () => (
 
 // Footer
 const Footer = () => (
-  <footer className="py-12 px-6 border-t border-white/5">
+  <footer className="py-12 px-4 sm:px-6 border-t border-white/5">
     <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 bg-gradient-to-tr from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center text-white text-sm font-bold">

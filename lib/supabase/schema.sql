@@ -34,23 +34,23 @@ CREATE POLICY "Users can insert own profile" ON public.profiles
 
 
 -- ============================================
--- 1.1 ???????????
+-- NOTE: comment removed (encoding)
 -- ============================================
--- credits_balance?????????
--- credits_unlimited?? true ??????
--- trial_granted_at?????????????
--- trial_source????????trial_full / trial_device_used / trial_ip_throttled ??
+-- NOTE: comment removed (encoding)
+-- NOTE: comment removed (encoding)
+-- NOTE: comment removed (encoding)
+-- NOTE: comment removed (encoding)
 
--- ???????????????
+-- NOTE: comment removed (encoding)
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS credits_balance INT NOT NULL DEFAULT 0;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS credits_unlimited BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS trial_granted_at TIMESTAMPTZ;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS trial_source TEXT;
 
--- ??????????? UPDATE profiles ??????????????? plan/credits
+-- NOTE: comment removed (encoding)
 DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 
--- ????? RPC ???????????/???
+-- NOTE: comment removed (encoding)
 CREATE OR REPLACE FUNCTION public.update_profile_public(p_nickname TEXT, p_avatar_url TEXT)
 RETURNS public.profiles AS $$
 DECLARE
@@ -71,7 +71,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
--- ?????????? + IP hash?
+-- NOTE: comment removed (encoding)
 CREATE TABLE IF NOT EXISTS public.trial_grants (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   device_id TEXT NOT NULL,
@@ -82,12 +82,12 @@ CREATE TABLE IF NOT EXISTS public.trial_grants (
 );
 
 ALTER TABLE public.trial_grants ENABLE ROW LEVEL SECURITY;
--- ????? policy???????????? RPC ???
+-- NOTE: comment removed (encoding)
 
 CREATE INDEX IF NOT EXISTS idx_trial_grants_ip_hash_created_at ON public.trial_grants(ip_hash, created_at);
 CREATE INDEX IF NOT EXISTS idx_trial_grants_user_id ON public.trial_grants(user_id);
 
--- ?????????????
+-- NOTE: comment removed (encoding)
 CREATE TABLE IF NOT EXISTS public.credit_transactions (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
@@ -99,12 +99,12 @@ CREATE TABLE IF NOT EXISTS public.credit_transactions (
 );
 
 ALTER TABLE public.credit_transactions ENABLE ROW LEVEL SECURITY;
--- ????? policy???????????? RPC ???
+-- NOTE: comment removed (encoding)
 
 CREATE INDEX IF NOT EXISTS idx_credit_transactions_user_id ON public.credit_transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_credit_transactions_created_at ON public.credit_transactions(created_at);
 
--- ??????????????? IP 24h ?????????
+-- NOTE: comment removed (encoding)
 CREATE OR REPLACE FUNCTION public.grant_trial_credits(p_device_id TEXT, p_ip_hash TEXT)
 RETURNS TABLE(
   granted_full BOOLEAN,
@@ -199,7 +199,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
--- ????????? + ????
+-- NOTE: comment removed (encoding)
 CREATE OR REPLACE FUNCTION public.consume_credits(p_step_id TEXT, p_amount INT)
 RETURNS TABLE(
   credits_balance INT,

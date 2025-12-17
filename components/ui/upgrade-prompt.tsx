@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import * as React from "react"
 import Link from "next/link"
@@ -15,13 +15,12 @@ const PLAN_LABELS: Record<PlanId, string> = {
 }
 
 const PLAN_FEATURES: Record<PlanId, string> = {
-  free: "P1-P2 研究定位",
-  basic: "P3-P5 人设构建 + IP传记",
-  pro: "P6-P10 内容生产循环",
+  free: "P1–P2 研究定位",
+  basic: "P3–P5 人设构建 + IP传记",
+  pro: "P6–P10 内容生产循环",
   vip: "全功能 + 定制服务",
 }
 
-// 积分余额低提醒组件
 export function CreditsLowWarning({
   balance,
   onViewPricing,
@@ -53,7 +52,6 @@ export function CreditsLowWarning({
   )
 }
 
-// 生成完成后的升级引导
 export function UpgradePromptAfterGeneration({
   currentPlan,
   currentStepId,
@@ -63,29 +61,26 @@ export function UpgradePromptAfterGeneration({
   currentStepId: string
   onDismiss?: () => void
 }) {
-  // 根据当前套餐和步骤决定是否显示以及显示什么
   const getUpgradeInfo = () => {
     if (currentPlan === "vip") return null
 
-    // free 用户完成 P1/P2 后引导升级到 basic
     if (currentPlan === "free" && (currentStepId === "P1" || currentStepId === "P2")) {
       return {
         targetPlan: "basic" as PlanId,
-        title: "解锁更多能力",
-        description: "升级创作者版可解锁 P3-P5 人设构建 + IP传记，让IP定位更完整",
+        title: "解锁定位与人设资产",
+        description: "升级创作者版可解锁 P3–P5 人设构建 + IP传记，形成可复用的定位资产。",
         highlight: "￥199/月",
       }
     }
 
-    // basic 用户完成 P3-P5 或 IP传记 后引导升级到 pro
     if (
       currentPlan === "basic" &&
       (currentStepId === "P3" || currentStepId === "P4" || currentStepId === "P5" || currentStepId === "IP传记")
     ) {
       return {
         targetPlan: "pro" as PlanId,
-        title: "进入内容生产",
-        description: "升级团队版可解锁 P6-P10 内容生产循环，批量产出高质量内容",
+        title: "进入内容生产循环",
+        description: "升级团队版可解锁 P6–P10 内容生产循环，批量产出与沉淀复用。",
         highlight: "￥599/月",
       }
     }
@@ -108,11 +103,11 @@ export function UpgradePromptAfterGeneration({
             <p className="text-xs text-purple-400">{upgradeInfo.highlight}</p>
           </div>
         </div>
-        {onDismiss && (
+        {onDismiss ? (
           <button onClick={onDismiss} className="text-zinc-500 hover:text-zinc-400">
             <X size={14} />
           </button>
-        )}
+        ) : null}
       </div>
       <p className="text-xs text-zinc-400 mt-3 leading-relaxed">{upgradeInfo.description}</p>
       <div className="flex gap-2 mt-4">
@@ -127,7 +122,6 @@ export function UpgradePromptAfterGeneration({
   )
 }
 
-// 积分不足弹窗
 export function InsufficientCreditsModal({
   required,
   balance,
@@ -161,9 +155,7 @@ export function InsufficientCreditsModal({
           </div>
         </div>
 
-        <p className="text-xs text-zinc-500 mb-4">
-          升级套餐可获得更多积分，创作者版每月赠送300积分，团队版每月赠送1200积分。
-        </p>
+        <p className="text-xs text-zinc-500 mb-4">升级套餐可获得更多积分，或补充积分（内测期人工开通）。</p>
 
         <div className="flex gap-3">
           <button
@@ -183,16 +175,21 @@ export function InsufficientCreditsModal({
   )
 }
 
-// 套餐不足弹窗
 export function PlanRequiredModal({
   requiredPlan,
   currentPlan,
   stepTitle,
+  creditCost,
+  balance,
+  onUseCredits,
   onClose,
 }: {
   requiredPlan: PlanId
   currentPlan: PlanId
   stepTitle: string
+  creditCost?: number
+  balance?: number
+  onUseCredits?: () => void
   onClose: () => void
 }) {
   return (
@@ -204,22 +201,18 @@ export function PlanRequiredModal({
           </div>
           <div>
             <h3 className="text-lg font-semibold text-white">需要升级套餐</h3>
-            <p className="text-sm text-zinc-400">解锁更多功能</p>
+            <p className="text-sm text-zinc-400">解锁更多能力</p>
           </div>
         </div>
 
         <div className="p-4 rounded-xl bg-zinc-800/50 border border-zinc-700/50 mb-4">
           <p className="text-sm text-zinc-300 mb-3">
-            <span className="text-white font-medium">{stepTitle}</span> 需要「{PLAN_LABELS[requiredPlan]}」才能使用
+            <span className="text-white font-medium">{stepTitle}</span> 需要「{PLAN_LABELS[requiredPlan]}」才可使用
           </p>
           <div className="flex items-center gap-2 text-xs">
-            <span className="px-2 py-1 rounded-full bg-zinc-700/50 text-zinc-400">
-              当前：{PLAN_LABELS[currentPlan]}
-            </span>
+            <span className="px-2 py-1 rounded-full bg-zinc-700/50 text-zinc-400">当前：{PLAN_LABELS[currentPlan]}</span>
             <ArrowRight size={12} className="text-zinc-600" />
-            <span className="px-2 py-1 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30">
-              需要：{PLAN_LABELS[requiredPlan]}
-            </span>
+            <span className="px-2 py-1 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30">需要：{PLAN_LABELS[requiredPlan]}</span>
           </div>
         </div>
 
@@ -229,6 +222,13 @@ export function PlanRequiredModal({
           </p>
         </div>
 
+        {typeof creditCost === "number" ? (
+          <div className="text-xs text-zinc-500 mb-4">
+            或使用积分按次解锁：<span className="text-amber-400 font-medium">{creditCost}</span> 积分
+            {typeof balance === "number" ? <span>（当前 {balance}）</span> : null}
+          </div>
+        ) : null}
+
         <div className="flex gap-3">
           <button
             onClick={onClose}
@@ -236,6 +236,13 @@ export function PlanRequiredModal({
           >
             返回
           </button>
+
+          {onUseCredits && typeof creditCost === "number" ? (
+            <GlowButton primary className="flex-1" onClick={onUseCredits}>
+              使用 {creditCost} 积分继续
+            </GlowButton>
+          ) : null}
+
           <Link href="/pricing" className="flex-1">
             <GlowButton primary className="w-full">
               查看套餐对比

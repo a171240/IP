@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
@@ -424,7 +424,7 @@ export default function DashboardPage() {
                   <Bot size={20} className="text-white" />
                 </div>
                 <h3 className="text-sm font-medium dark:text-white text-zinc-900 mb-1">智能体</h3>
-                <p className="text-xs dark:text-zinc-400 text-zinc-500">100+AI智能体与解决方案包</p>
+                <p className="text-xs dark:text-zinc-400 text-zinc-500">100+AI智能体与提示词库</p>
               </GlassCard>
             </Link>
           </div>
@@ -507,3 +507,4 @@ export default function DashboardPage() {
     </div>
   )
 }
+

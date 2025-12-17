@@ -142,7 +142,7 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
   const [showInsufficientCredits, setShowInsufficientCredits] = useState(false)
   const [insufficientCreditsData, setInsufficientCreditsData] = useState<{ required: number; balance: number } | null>(null)
   const [showPlanRequired, setShowPlanRequired] = useState(false)
-  const [planRequiredData, setPlanRequiredData] = useState<{ requiredPlan: "free" | "basic" | "pro" | "vip"; currentPlan: "free" | "basic" | "pro" | "vip" } | null>(null)
+  const [planRequiredData, setPlanRequiredData] = useState<{ requiredPlan: "free" | "basic" | "pro" | "vip"; currentPlan: "free" | "basic" | "pro" | "vip"; creditCost?: number; balance?: number } | null>(null)
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(true)
 
   // Refs
@@ -438,13 +438,15 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
   const StepIcon = workflowIconMap[step.icon]
 
   // 发送消息
-  const handleSend = async () => {
+  const handleSend = async (opts?: { allowCreditsOverride?: boolean }) => {
     if (step.id === 'P8' && !selectedP8AgentId) {
       alert('请先选择一个脚本创作智能体')
       return
     }
 
     if (!inputValue.trim() || isLoading || !currentConversation) return
+
+    const userContent = inputValue.trim()
 
     let activeConversation = currentConversation
     if (activeConversation.status !== 'in_progress') {
@@ -462,7 +464,7 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: inputValue.trim(),
+      content: userContent,
       timestamp: new Date()
     }
 
@@ -497,6 +499,7 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
           messages: messagesForApi,
           stepId: step.id,
           ...(step.id === "P8" && selectedP8AgentId ? { agentId: selectedP8AgentId } : {}),
+          ...(opts?.allowCreditsOverride ? { allowCreditsOverride: true } : {}),
         })
       })
 
@@ -518,13 +521,17 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
         if (response.status === 403 && errorData.code === 'plan_required') {
           setPlanRequiredData({
             requiredPlan: errorData.required_plan || 'basic',
-            currentPlan: errorData.current_plan || 'free'
+            currentPlan: errorData.current_plan || 'free',
+            creditCost: typeof errorData.credit_cost === 'number' ? errorData.credit_cost : undefined,
+            balance: typeof errorData.balance === 'number' ? errorData.balance : undefined,
           })
           setShowPlanRequired(true)
-          setMessages(prev => prev.filter(m => m.id !== assistantMessageId))
+          setMessages((prev) => prev.filter((m) => m.id !== assistantMessageId && m.id !== userMessage.id))
+          setInputValue(userContent)
           setIsLoading(false)
           return
         }
+
 
         throw new Error(errorData.error || '请求失败')
       }
@@ -693,7 +700,6 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
   const handleGenerateReport = async () => {
     if (isGeneratingReport) return
 
-    setIsCanvasOpen(true)
     setIsGeneratingReport(true)
     setCanvasStreamContent("")
 
@@ -714,6 +720,7 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
           messages: messagesForApi,
           stepId: step.id,
           ...(step.id === "P8" && selectedP8AgentId ? { agentId: selectedP8AgentId } : {}),
+          ...(opts?.allowCreditsOverride ? { allowCreditsOverride: true } : {}),
           mode: 'report',
         })
       })
@@ -1022,7 +1029,7 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
   }
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
+    <div className="h-[calc(100svh-(4.5rem+var(--safe-area-bottom)))] md:h-svh flex flex-col overflow-hidden">
       <Header breadcrumbs={[
         { label: "首页", href: "/dashboard" },
         { label: "内容工坊", href: "/dashboard/workflow" },
@@ -1663,6 +1670,13 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
           requiredPlan={planRequiredData.requiredPlan}
           currentPlan={planRequiredData.currentPlan}
           stepTitle={step.title}
+          creditCost={planRequiredData.creditCost}
+          balance={planRequiredData.balance}
+          onUseCredits={planRequiredData.creditCost != null ? () => {
+            setShowPlanRequired(false)
+            setPlanRequiredData(null)
+            void handleSend({ allowCreditsOverride: true })
+          } : undefined}
           onClose={() => {
             setShowPlanRequired(false)
             setPlanRequiredData(null)

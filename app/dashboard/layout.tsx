@@ -21,7 +21,7 @@ export default function DashboardLayout({
       <Navigation />
 
       {/* Main Content Area - Account for 84px sidebar (increased from 72px) */}
-      <div className="pl-[84px] min-h-screen">{children}</div>
+      <div className="md:pl-[84px] min-h-screen pb-[calc(4.5rem+var(--safe-area-bottom))] md:pb-0">{children}</div>
       </div>
     </AuthProvider>
   )

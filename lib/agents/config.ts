@@ -1,4 +1,4 @@
-// 智能体配置文件
+﻿// 智能体配置文件
 // 定义智能体和解决方案包的数据结构
 
 // 使用场景类型
@@ -36,6 +36,7 @@ export interface SolutionPackConfig {
   moduleCount: number
   downloadable: boolean
   memberOnly: boolean
+  sourcePath?: string
 }
 
 // 场景配置
@@ -67,11 +68,11 @@ export const agentsConfig: AgentConfig[] = [
   { id: "p10-iteration-manager", name: "迭代管理器", description: "闭环反馈持续优化内容", scene: "workflow", icon: "RefreshCw", promptFile: "P10-迭代管理器v1.0.md", workflowStepId: "P10" },
   // 研究分析
   { id: "mx-product-research", name: "MX产品调研记者", description: "深度产品调研与市场分析", scene: "research", icon: "Newspaper", promptFile: "1. MX产品调研记者智能体.md" },
-  { id: "competitor-analysis", name: "竞品视频拉片分析", description: "深度分析竞品视频的结构和技巧", scene: "research", icon: "Video", promptFile: "2. 摸象竞品视频拉片分析智能体.md" },
+  { id: "competitor-analysis", name: "摸象竞品视频拉片分析", description: "深度分析竞品视频的结构和技巧", scene: "research", icon: "Video", promptFile: "实体店营销全家桶/2. 摸象竞品视频拉片分析智能体.md" },
   { id: "4x4-competitor", name: "4X4竞品分析专家", description: "多维度竞品对比分析", scene: "research", icon: "Grid3X3", promptFile: "4X4竞品分析专家.md" },
   { id: "viral-template", name: "短视频爆款模板分析", description: "从逐字稿提取可复制的内容模板", scene: "research", icon: "Sparkles", promptFile: "短视频爆款模板分析和内容输出智能体.md" },
   { id: "ip-style-extract", name: "IP辩论风格提取", description: "分析辩论型IP的表达风格特征", scene: "research", icon: "Mic", promptFile: "IP辩论风格提取分析智能体.md" },
-  { id: "ip-concept-generator", name: "IP概念生成器", description: "输出差异化定位与人设框架", scene: "research", icon: "Lightbulb", promptFile: "IP概念生成器智能体（1.0）.md" },
+  { id: "ip-concept-generator", name: "IP概念生成器", description: "输出差异化定位与人设框架", scene: "research", icon: "Lightbulb", promptFile: "IP概念生成器智能体（2.0）.md" },
   { id: "ip-emotion-story", name: "IP情绪张力故事提取", description: "提取可复用的张力故事片段", scene: "research", icon: "Heart", promptFile: "IP情绪张力故事片段提取器.md" },
   { id: "ip-biography-basic", name: "IP传记采访（基础版）", description: "深度访谈挖掘人物故事", scene: "research", icon: "BookOpen", promptFile: "IP传记采访机器人v1.1（基础版）.md" },
   { id: "ip-biography-deep", name: "IP传记采访（情绪深挖）", description: "情绪深挖版深度访谈", scene: "research", icon: "BookHeart", promptFile: "IP传记采访机器人v1.3（情绪深挖版）.md" },
@@ -102,7 +103,7 @@ export const agentsConfig: AgentConfig[] = [
   { id: "retail-batch-content", name: "门店短视频批量生成", description: "批量生成门店营销文案", scene: "creation", icon: "Layers", promptFile: "实体门店短视频营销文案批量生成专家.md" },
   { id: "xiaohongshu-retail", name: "门店小红书图文", description: "实体门店小红书营销笔记", scene: "creation", icon: "Image", promptFile: "实体门店小红书图文笔记营销专家.md" },
   { id: "my-friend-script", name: "我有一个朋友", description: "用朋友故事引发共鸣", scene: "creation", icon: "UserPlus", promptFile: "我有一个朋友.txt" },
-  { id: "course-from-text", name: "文案变课程", description: "将文案内容转化为课程", scene: "creation", icon: "GraduationCap", promptFile: "外部奇奇怪的文案变课程智能体.md" },
+  { id: "course-from-text", name: "文案变课程", description: "将文案内容转化为课程", scene: "creation", icon: "GraduationCap", promptFile: "外部奇奇怪怪的文案变课程智能体.md" },
   { id: "empathy-scripts", name: "共情内容生成智能体", description: "多种共情类型脚本模板", scene: "creation", icon: "HeartHandshake", isCollection: true, collectionCount: 8, collectionPath: "共情内容生成智能体提示词" },
   { id: "trust-case-scripts", name: "MX信任场景案例脚本", description: "信任建立型案例脚本集", scene: "creation", icon: "Shield", isCollection: true, collectionCount: 6, collectionPath: "MX信任场景案例型脚本智能体" },
   { id: "xiaohongshu-generator", name: "小红书图文智能生成", description: "小红书爆款图文生成工具", scene: "creation", icon: "Palette", isCollection: true, collectionCount: 5, collectionPath: "小红书图文智能生成智能体" },
@@ -110,9 +111,9 @@ export const agentsConfig: AgentConfig[] = [
   // 选题策划
   { id: "hot-topic", name: "热点引流选题", description: "借助热点流量快速获取曝光", scene: "topic", icon: "Flame", promptFile: "热点引流选题智能体.md" },
   { id: "emotion-topic", name: "行业情绪选题分析", description: "8大类别正反观点选题", scene: "topic", icon: "Heart", promptFile: "行业情绪化正反观点选题分析.md" },
-  { id: "pain-point", name: "策略痛点挖掘", description: "挖掘目标受众核心痛点", scene: "topic", icon: "Target", promptFile: "策略痛点挖掘与情绪分点设计智能体v3.0.md" },
+  { id: "pain-point", name: "策略痛点挖掘", description: "挖掘目标受众核心痛点", scene: "topic", icon: "Target", promptFile: "策略痛点挖掘与情绪爆点设计智能体v3.0.md" },
   { id: "hook-front", name: "爆点前置", description: "将内容爆点前置吸引注意", scene: "topic", icon: "Zap", promptFile: "爆点前置智能体提示词.md" },
-  { id: "xinghe-7ip", name: "星盒7大IP策划画布", description: "7大维度IP策划方法论", scene: "topic", icon: "LayoutDashboard", promptFile: "星盒7大IP策划画布IP策划大师.md" },
+  { id: "xinghe-7ip", name: "IP内容工厂7大IP策划画布", description: "7大维度IP策划方法论", scene: "topic", icon: "LayoutDashboard", promptFile: "星盒7大IP策划画布IP策划大师.md" },
   { id: "commercial-matrix", name: "商业赛道内容矩阵", description: "商业赛道内容营销参考", scene: "topic", icon: "Grid2X2", promptFile: "商业赛道参考内容营销矩阵智能体.md" },
   { id: "platform-select", name: "内容营销平台选择", description: "选择最佳内容分发平台", scene: "topic", icon: "Share2", promptFile: "内容营销平台选择策划大师.md" },
   { id: "industry-topics", name: "垂类行业选题生成器", description: "覆盖46个行业的专属选题生成", scene: "topic", icon: "Factory", isCollection: true, collectionCount: 46, collectionPath: "各垂类正反观点情绪选题生成器" },
@@ -127,9 +128,12 @@ export const agentsConfig: AgentConfig[] = [
   { id: "art-wechat", name: "少儿艺术培训朋友圈", description: "艺术培训机构朋友圈运营", scene: "marketing", icon: "Palette", promptFile: "少儿综合艺术培训机构朋友圈运营智能体提示词v12.md" },
   { id: "cyber-ip-clone", name: "赛博IP复刻", description: "12个名人IP风格复刻智能体", scene: "marketing", icon: "Users", isCollection: true, collectionCount: 12, collectionPath: "赛博IP复刻" },
   { id: "ip-presentation", name: "IP呈现方式策划", description: "11种IP内容呈现风格模板", scene: "marketing", icon: "Presentation", isCollection: true, collectionCount: 11, collectionPath: "商业IP呈现方式策划助手v1.3" },
+  // 内部用：提示词执行器（用于运行任意提示词文件，智能体库不直接展示）
+  { id: "prompt-runner", name: "提示词执行器", description: "用单个提示词文件直接执行对话", scene: "efficiency", icon: "FileEdit" },
+
   // 效率优化
-  { id: "colloquial-optimize-v12", name: "口语化风格优化v1.2", description: "基础版口语化优化", scene: "efficiency", icon: "MessageSquare", promptFile: "口语化风格优化指令v1.2.md" },
-  { id: "colloquial-optimize-v14", name: "口语化风格优化v1.4", description: "细节和逻辑增强版", scene: "efficiency", icon: "MessageSquareMore", promptFile: "口语化风格优化指令v1.4（细节和逻辑）.md" },
+  { id: "colloquial-optimize-v12", name: "口语化风格优化v1.2", description: "基础版口语化优化", scene: "efficiency", icon: "MessageSquare", promptFile: "口语化风格优化指南v1.2.md" },
+  { id: "colloquial-optimize-v14", name: "口语化风格优化v1.4", description: "细节和逻辑增强版", scene: "efficiency", icon: "MessageSquareMore", promptFile: "口语化风格优化指南v1.4（细节和逻辑）.md" },
   { id: "script-scoring", name: "脚本批改打分", description: "专业评分和改进建议", scene: "efficiency", icon: "ClipboardCheck", promptFile: "脚本批改打分器.txt" },
   { id: "ai-style-audit", name: "AI风格审核员", description: "检测AI生成痕迹", scene: "efficiency", icon: "Bot", promptFile: "AI风格最终审核员.md" },
   { id: "ai-style-audit-v13", name: "AI风格审核员v1.3", description: "增强版AI痕迹检测", scene: "efficiency", icon: "BotMessageSquare", promptFile: "AI风格最终审核员v1.3.md" },
@@ -137,17 +141,18 @@ export const agentsConfig: AgentConfig[] = [
   { id: "beauty-knowledge", name: "美业干货知识提取", description: "美业行业知识点提取", scene: "efficiency", icon: "Sparkles", promptFile: "美业干货知识提取助手.txt" },
   { id: "slice-style", name: "切片化风格定义", description: "定义切片化内容风格", scene: "efficiency", icon: "Scissors", promptFile: "切片化风格的定义.txt" },
   { id: "safety-distance", name: "安全距离原则", description: "内容合规安全检查", scene: "efficiency", icon: "ShieldAlert", promptFile: "安全距离原则.md" },
-  { id: "night-market-hook", name: "夜市版黄金三秒优化", description: "夜市场景短视频开头优化", scene: "efficiency", icon: "Moon", promptFile: "夜市版 短视频脚本黄金三秒适度优化提示词.md" },
+  { id: "night-market-hook", name: "夜市版黄金三秒优化", description: "夜市场景短视频开头优化", scene: "efficiency", icon: "Moon", promptFile: "夜市版-短视频脚本黄金三秒适度优化提示词.md" },
   { id: "fortune-telling", name: "奇门遁甲算命", description: "传统文化算命智能体", scene: "efficiency", icon: "Compass", promptFile: "奇门遁甲算命智能体提示词.md" },
   { id: "ai-keyword-tool", name: "AI挖词工具", description: "关键词挖掘分析工具集", scene: "efficiency", icon: "KeyRound", isCollection: true, collectionCount: 5, collectionPath: "Ai挖词工具" },
-  { id: "text-formatter", name: "文章排版生成器", description: "文档排版格式化工具", scene: "efficiency", icon: "AlignLeft", isCollection: true, collectionCount: 3, collectionPath: "文章排版生成器" },
-  { id: "prompt-analysis", name: "提示词分析（操盘手视角）", description: "分析优秀提示词的亮点", scene: "efficiency", icon: "Eye", isCollection: true, collectionCount: 5, collectionPath: "这个提示词好在哪？操盘手视角" },
+  { id: "text-formatter", name: "文章排版生成器", description: "文档排版格式化工具", scene: "efficiency", icon: "AlignLeft", isCollection: true, collectionCount: 3, collectionPath: "文稿排版生成器" },
+  { id: "prompt-analysis", name: "提示词分析（操盘手视角）", description: "分析优秀提示词的亮点", scene: "efficiency", icon: "Eye", isCollection: true, collectionCount: 5, collectionPath: "\u8fd9\u4e2a\u63d0\u793a\u8bcd\u597d\u5728\u54ea\uff1f(\u64cd\u76d8\u624b\u89c6\u89d2)" },
 ]
 
 // 解决方案包配置
 export const solutionPacksConfig: SolutionPackConfig[] = [
   {
     id: "retail-marketing",
+    sourcePath: "\u5b9e\u4f53\u5e97\u8425\u9500\u5168\u5bb6\u6876",
     name: "实体店营销全套桉",
     title: "实体店营销全套桉",
     description: "覆盖实体店全链路营销的13个场景模块",
@@ -158,9 +163,8 @@ export const solutionPacksConfig: SolutionPackConfig[] = [
     downloadable: true,
     memberOnly: true
   },
-  {
-    id: "industry-topics",
-    name: "44行业选题生成器",
+  { id: "industry-topics",
+    sourcePath: "\u5404\u5782\u7c7b\u6b63\u53cd\u89c2\u70b9\u60c5\u7eea\u9009\u9898\u751f\u6210\u5668", name: "44行业选题生成器",
     title: "44行业选题生成器",
     description: "覆盖44个热门行业的专属选题生成",
     icon: "Factory",
@@ -172,6 +176,7 @@ export const solutionPacksConfig: SolutionPackConfig[] = [
   },
   {
     id: "cyber-ip",
+    sourcePath: "\u8d5b\u535aIP\u590d\u523b",
     name: "12赛博IP人设模板",
     title: "12赛博IP人设模板",
     description: "12个名人IP风格复刻智能体",
@@ -184,6 +189,7 @@ export const solutionPacksConfig: SolutionPackConfig[] = [
   },
   {
     id: "content-matrix",
+    sourcePath: "\u540c\u884c\u4e1a1\u6bd41\u62c6\u89e3\u98ce\u683c\u6a21\u677f",
     name: "内容矩阵规划工具包",
     title: "内容矩阵规划工具包",
     description: "系统化的内容矩阵规划方法论",
@@ -224,3 +230,5 @@ export function getTotalAgentCount(): number {
   })
   return count
 }
+
+

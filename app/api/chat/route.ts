@@ -1,34 +1,19 @@
 ﻿import { NextRequest } from 'next/server'
 import { createHash } from 'crypto'
 import { getStepPrompt } from '@/lib/prompts/step-prompts'
+import { readPromptFile } from '@/lib/prompts/prompts.server'
 import { getAgentPrompt } from '@/lib/agents/prompt.server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
-type PlanId = 'free' | 'basic' | 'pro' | 'vip'
-type ContextReportRef = {
-  report_id: string
-  step_id?: string
-  title?: string
-}
-
-type ContextInlineReport = {
-  step_id: string
-  title?: string
-  content: string
-}
-
-type ChatContextPayload = {
-  reports?: ContextReportRef[]
-  inline_reports?: ContextInlineReport[]
-}
-
-const PLAN_ORDER: PlanId[] = ['free', 'basic', 'pro', 'vip']
-const PLAN_LABELS: Record<PlanId, string> = {
-  free: '\u4f53\u9a8c\u7248',
-  basic: '\u521b\u4f5c\u8005\u7248',
-  pro: '\u56e2\u961f\u7248',
-  vip: '\u4f01\u4e1a\u7248',
-}
+import {
+  getCreditCostForUseWithPlanRule,
+  getRequiredPlanForAgent,
+  getRequiredPlanForWorkflowStep,
+  isPlanSufficient,
+  normalizePlan,
+  PLAN_LABELS,
+  type PlanId,
+} from '@/lib/pricing/rules'
 
 function jsonError(status: number, error: string, extra?: Record<string, unknown>) {
   return new Response(JSON.stringify({ error, ...extra }), {
@@ -37,66 +22,13 @@ function jsonError(status: number, error: string, extra?: Record<string, unknown
   })
 }
 
-function normalizePlan(plan: string | null | undefined): PlanId {
-  return plan === 'free' || plan === 'basic' || plan === 'pro' || plan === 'vip' ? plan : 'free'
-}
-
-function getRequiredPlan(stepId: string | undefined): PlanId {
+function getRequiredPlan(stepId: string | undefined, agentId: string | undefined, promptFile: string | undefined): PlanId {
   if (!stepId) return 'free'
-  if (stepId.startsWith('quick-')) return 'free'
-
-  if (stepId === 'P1' || stepId === 'P2') return 'free'
-  if (stepId === 'P3' || stepId === 'IP\u4f20\u8bb0' || stepId === 'P4' || stepId === 'P5') return 'basic'
-  if (/^P(6|7|8|9|10)$/.test(stepId)) return 'pro'
-
-  return 'pro'
-}
-
-function isPlanSufficient(current: string | null | undefined, required: PlanId) {
-  const currentPlan = normalizePlan(current)
-  return PLAN_ORDER.indexOf(currentPlan) >= PLAN_ORDER.indexOf(required)
-}
-
-function getCreditCost(stepId: string | undefined, mode: string | undefined): number {
-  if (!stepId) return 1
-
-  let base = 3
-
-  if (stepId.startsWith('quick-')) base = 1
-  else if (stepId === 'P1' || stepId === 'P2') base = 2
-  else if (stepId === 'P3' || stepId === 'P4' || stepId === 'P5') base = 2
-  else if (stepId === 'IP\u4f20\u8bb0') base = 6
-  else if (stepId === 'P6') base = 3
-  else if (/^P(7|8|9|10)$/.test(stepId)) base = 3
-
-  // 报告/优化模式不再额外收费
-  // if (mode === 'report') base += 1
-  // if (mode === 'optimize') base += 1
-
-  return base
-}
-
-function getClientIp(request: NextRequest): string | null {
-  const xff = request.headers.get('x-forwarded-for')
-  if (xff) {
-    const first = xff.split(',')[0]?.trim()
-    return first || null
+  if (stepId.startsWith('agent:')) {
+    const id = (agentId || stepId.slice('agent:'.length)).trim()
+    return getRequiredPlanForAgent(id, promptFile)
   }
-
-  const realIp = request.headers.get('x-real-ip')
-  if (realIp) return realIp.trim()
-
-  // NextRequest.ip exists in some runtimes
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const reqAny = request as any
-  if (typeof reqAny.ip === 'string' && reqAny.ip) return reqAny.ip
-
-  return null
-}
-
-function hashIp(ip: string): string {
-  const salt = process.env.CREDITS_IP_SALT || 'ipcf-default-salt'
-  return createHash('sha256').update(`${salt}:${ip}`).digest('hex')
+  return getRequiredPlanForWorkflowStep(stepId)
 }
 
 function isCreditsSchemaMissing(message: string | undefined): boolean {
@@ -141,13 +73,15 @@ export async function POST(request: NextRequest) {
       return jsonError(400, '\u65e0\u6548\u7684\u8bf7\u6c42\u4f53')
     }
 
-    const { messages, stepId, systemPrompt, mode, context, agentId } = body as {
+    const { messages, stepId, systemPrompt, mode, context, agentId, promptFile, allowCreditsOverride } = body as {
       messages?: Array<{ role: string; content: string }>
       stepId?: string
       systemPrompt?: string
       mode?: string
       context?: ChatContextPayload
       agentId?: string
+      promptFile?: string
+      allowCreditsOverride?: boolean
     }
 
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -171,7 +105,7 @@ export async function POST(request: NextRequest) {
       return jsonError(401, '\u8bf7\u5148\u767b\u5f55')
     }
 
-    const requiredPlan = getRequiredPlan(stepId)
+    const requiredPlan = getRequiredPlan(stepId, agentId, promptFile)
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
@@ -222,15 +156,26 @@ export async function POST(request: NextRequest) {
       return jsonError(500, '无法获取用户档案信息')
     }
 
-    if (!isPlanSufficient(userProfile.plan, requiredPlan)) {
+    const planOk = isPlanSufficient(userProfile.plan, requiredPlan)
+
+    if (!planOk && !allowCreditsOverride) {
       const currentPlan = normalizePlan(userProfile.plan)
+      const creditCostQuote = getCreditCostForUseWithPlanRule({
+        stepId,
+        mode,
+        planOk: false,
+        allowCreditsOverride: true,
+      })
+      const balanceQuote = Number(userProfile.credits_balance || 0)
       return jsonError(
         403,
-        `当前套餐（${PLAN_LABELS[currentPlan]}）未解锁此步骤，需要升级至：${PLAN_LABELS[requiredPlan]}`,
+        `?????${PLAN_LABELS[currentPlan]}?????????????${PLAN_LABELS[requiredPlan]}?????????${creditCostQuote} ??/??`,
         {
           code: 'plan_required',
           required_plan: requiredPlan,
           current_plan: currentPlan,
+          credit_cost: creditCostQuote,
+          balance: balanceQuote,
         }
       )
     }
@@ -281,7 +226,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const creditCost = getCreditCost(stepId, mode)
+    const creditCost = getCreditCostForUseWithPlanRule({ stepId, mode, planOk, allowCreditsOverride: Boolean(allowCreditsOverride) })
     let creditsRemaining = creditsBalance
 
     if (!creditsUnlimited) {
@@ -367,6 +312,35 @@ export async function POST(request: NextRequest) {
           `\u3010P8 \u5b50\u667a\u80fd\u4f53\u9009\u62e9\u3011\u7528\u6237\u5df2\u9009\u62e9\uff1a${agentPrompt.name}\uff08${agentPrompt.id}\uff09\u3002\n` +
           `\u8bf7\u4e25\u683c\u6309\u4e0b\u65b9\u63d0\u793a\u8bcd\u6267\u884c\uff1b\u5982\u7f3a\u5c11\u9009\u9898/\u5185\u5bb9\u7c7b\u578b/\u80cc\u666f\u4fe1\u606f\uff0c\u5148\u7528\u6700\u5c11\u95ee\u9898\u8865\u9f50\u518d\u8f93\u51fa\u3002\n\n---\n\n` +
           agentPrompt.prompt
+      }
+    }
+
+
+    // General agent calls: load prompt server-side so the client never sees the prompt text
+    if ((!finalSystemPrompt || (stepId && stepId.startsWith('agent:'))) && typeof agentId === 'string' && agentId.trim()) {
+      const agentPrompt = getAgentPrompt(agentId.trim())
+      if (agentPrompt?.prompt) {
+        finalSystemPrompt = agentPrompt.prompt
+      }
+    }
+
+    
+
+    // Allow client to run a specific prompt file under `提示词/` (for collection packs / sub-categories)
+    if (typeof promptFile === 'string' && promptFile.trim()) {
+      try {
+        const { content, fileName } = await readPromptFile(promptFile.trim())
+        const promptText = content.toString('utf8').trim()
+        if (!promptText) {
+          return jsonError(400, '\u63d0\u793a\u8bcd\u6587\u4ef6\u4e3a\u7a7a')
+        }
+        finalSystemPrompt = `\u3010\u63d0\u793a\u8bcd\u6587\u4ef6\u3011${fileName}
+
+---
+
+` + promptText
+      } catch (e) {
+        return jsonError(400, e instanceof Error ? e.message : '\u63d0\u793a\u8bcd\u6587\u4ef6\u8bfb\u53d6\u5931\u8d25')
       }
     }
 
