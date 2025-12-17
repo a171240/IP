@@ -59,23 +59,30 @@ export function ReportCanvas({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
 
-  // 核心逻辑：确定要显示的内容
-  // 优先级：streamingContent > initialContent
+  // 核心逻辑：当画布打开/关闭或内容变化时，同步显示内容
   useEffect(() => {
+    // 画布关闭时不做任何处理
     if (!isOpen) return
 
-    // 如果有流式内容，使用流式内容
-    if (streamingContent) {
-      setContent(streamingContent)
-      if (isGenerating && !isPinnedToBottom) setHasNewContent(true)
-      return
-    }
-
-    // 否则使用初始内容
-    if (initialContent) {
-      setContent(initialContent)
+    // 画布打开时，确定要显示的内容
+    // 优先级：streamingContent > initialContent
+    const contentToShow = streamingContent || initialContent || ""
+    setContent(contentToShow)
+    if (isGenerating && !isPinnedToBottom && contentToShow) {
+      setHasNewContent(true)
     }
   }, [isOpen, streamingContent, initialContent, isGenerating, isPinnedToBottom])
+
+  // 当 isOpen 变为 true 时，强制同步一次内容（处理 React 批处理问题）
+  const prevIsOpenRef = useRef(false)
+  useEffect(() => {
+    if (isOpen && !prevIsOpenRef.current) {
+      // 从关闭到打开的转换
+      const contentToShow = streamingContent || initialContent || ""
+      setContent(contentToShow)
+    }
+    prevIsOpenRef.current = isOpen
+  }, [isOpen, streamingContent, initialContent])
 
   // 自动跟随到底部（仅在用户位于底部时）
   useEffect(() => {
