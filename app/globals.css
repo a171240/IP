@@ -3,10 +3,30 @@
 
 @custom-variant dark (&:is(.dark *));
 
+html, body {
+  height: 100%;
+}
+
+
 /* ============================================
    LIGHT THEME - Clean & Professional
    ============================================ */
 :root {
+  /* Safe-area insets (iOS / WeChat) */
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+
+  /* Prevent iOS/WeChat auto text resizing */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+
+  /* Better tap behavior */
+  -webkit-tap-highlight-color: transparent;
+
+  color-scheme: light;
+
   /* Base Colors - Clean White */
   --background: #FAFAFA;
   --background-secondary: #F5F5F7;
@@ -96,6 +116,7 @@
    DARK THEME - Premium Obsidian
    ============================================ */
 .dark {
+  color-scheme: dark;
   /* Base Colors - Deep Obsidian */
   --background: #030304;
   --background-secondary: #0A0A0B;
@@ -291,6 +312,31 @@
   animation: shimmer 2s infinite;
 }
 
+
+@keyframes marquee-track {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.marquee-track {
+  animation: marquee-track 40s linear infinite;
+  will-change: transform;
+}
+
+.marquee-track:hover {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track {
+    animation: none;
+    transform: translateX(0);
+  }
+}
 /* Stagger children animations */
 .stagger-children > *:nth-child(1) { animation-delay: 0ms; }
 .stagger-children > *:nth-child(2) { animation-delay: 50ms; }

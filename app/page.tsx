@@ -1,4 +1,4 @@
-﻿import Link from "next/link"
+import Link from "next/link"
 import {
   ArrowRight,
   ChevronRight,
@@ -182,7 +182,7 @@ export default function LandingPage() {
       <ObsidianBackgroundLite />
 
             {/* ============ Navigation ============ */}
-      <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4 bg-[#030304]/90 border-b border-white/[0.02]">
+      <nav className="fixed top-0 left-0 right-0 z-50 px-4 sm:px-6 pb-3 pt-[calc(var(--safe-area-top)+0.75rem)] bg-[#030304]/90 border-b border-white/[0.02]">
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-6">
           <Link href="/" className="flex items-center gap-2.5 group">
             <div className="w-9 h-9 bg-gradient-to-br from-purple-500 to-violet-600 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-purple-500/20 group-hover:shadow-purple-500/40 transition-shadow cursor-pointer">
@@ -217,7 +217,7 @@ export default function LandingPage() {
             <Link href="/dashboard/quick-start">
             <GlowButton
               primary
-              className="px-6 py-2.5 text-sm"
+              className="px-4 sm:px-6 py-2.5 text-sm"
             >
               <Zap size={16} />
               免费生成脚本
@@ -229,7 +229,7 @@ export default function LandingPage() {
       </nav>
 
       {/* ============ Hero Section ============ */}
-      <section className="relative min-h-[100dvh] flex flex-col items-center justify-center px-6 pt-24 pb-12">
+      <section className="relative min-h-[100dvh] flex flex-col items-center justify-center px-4 sm:px-6 pt-24 pb-12">
         {/* 背景光效 */}
 
         <div className="relative w-full max-w-4xl mx-auto text-center">
@@ -331,7 +331,7 @@ export default function LandingPage() {
 
 
       {/* ============ 交付产物 ============ */}
-      <section className="py-24 md:py-32 px-6 content-visibility-auto">
+      <section className="py-24 md:py-32 px-4 sm:px-6 content-visibility-auto">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.06] mb-6">
@@ -442,7 +442,7 @@ export default function LandingPage() {
 
         <div className="relative">
           {/* 标题 */}
-          <div className="text-center mb-16 px-6">
+          <div className="text-center mb-16 px-4 sm:px-6">
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-4 tracking-tight">
               典型场景：内容团队这样规模化交付
             </h2>
@@ -452,56 +452,59 @@ export default function LandingPage() {
           </div>
 
           {/* 案例滚动容器 */}
-          <div
-            className="flex gap-6 overflow-x-auto scrollbar-hide px-6 pb-4"
-          >
-            {/* 复制两份实现无限滚动效果 */}
-            {testimonials.map((t, idx) => (
-              <div
-                key={idx}
-                className="flex-shrink-0 w-[340px] md:w-[400px] p-8 rounded-2xl bg-gradient-to-br from-zinc-900/90 to-zinc-900/50 border border-white/[0.04] hover:border-white/10 transition-colors group"
-              >
-                <Quote size={24} className="text-white/5 mb-6" />
+                    <div className="relative overflow-hidden px-4 sm:px-6 pb-4">
+            <div className="flex w-max marquee-track">
+              {Array.from({ length: 2 }).map((_, copyIndex) =>
+                testimonials.map((t, idx) => (
+                  <div
+                    key={`${copyIndex}-${idx}`}
+                    className="flex-shrink-0 w-[340px] md:w-[400px] p-8 mr-6 rounded-2xl bg-gradient-to-br from-zinc-900/90 to-zinc-900/50 border border-white/[0.04] hover:border-white/10 transition-colors group"
+                  >
+                    <Quote size={24} className="text-white/5 mb-6" />
 
-                {/* 用户信息 */}
-                <div className="flex items-center gap-4 mb-6">
-                  <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${t.avatarGradient} flex items-center justify-center text-lg text-white font-semibold`}>
-                    {t.avatar}
+                    {/* 用户信息 */}
+                    <div className="flex items-center gap-4 mb-6">
+                      <div
+                        className={`w-12 h-12 rounded-full bg-gradient-to-br ${t.avatarGradient} flex items-center justify-center text-lg text-white font-semibold`}
+                      >
+                        {t.avatar}
+                      </div>
+                      <div>
+                        <p className="text-white font-medium">{t.name}</p>
+                        <p className="text-zinc-500 text-sm">{t.role}</p>
+                      </div>
+                    </div>
+
+                    {/* 引用 */}
+                    <p className="text-zinc-300 text-[15px] leading-relaxed mb-6 min-h-[72px]">
+                      "{t.quote}"
+                    </p>
+
+                    {/* 效果标签 */}
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={`px-3 py-1.5 rounded-full text-sm border ${highlightColors[t.highlightColor]}`}
+                      >
+                        {t.highlight}
+                      </span>
+                      <span className="text-zinc-600 text-sm">{t.duration}</span>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-white font-medium">{t.name}</p>
-                    <p className="text-zinc-500 text-sm">{t.role}</p>
-                  </div>
-                </div>
-
-                {/* 引用 */}
-                <p className="text-zinc-300 text-[15px] leading-relaxed mb-6 min-h-[72px]">
-                  "{t.quote}"
-                </p>
-
-                {/* 效果标签 */}
-                <div className="flex items-center justify-between">
-                  <span className={`px-3 py-1.5 rounded-full text-sm border ${highlightColors[t.highlightColor]}`}>
-                    {t.highlight}
-                  </span>
-                  <span className="text-zinc-600 text-sm">{t.duration}</span>
-                </div>
-              </div>
-            ))}
+                ))
+              )}
+            </div>
           </div>
-
-          {/* 渐变遮罩 */}
           <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-[#030304] to-transparent pointer-events-none" />
           <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-[#030304] to-transparent pointer-events-none" />
         </div>
 
-        <p className="text-center text-xs text-zinc-700 mt-8 px-6">
+        <p className="text-center text-xs text-zinc-700 mt-8 px-4 sm:px-6">
           * 以下为典型使用场景示意，效果因行业与执行而异
         </p>
       </section>
 
       {/* ============ 4X4方法论可视化 ============ */}
-      <section className="py-24 md:py-32 px-6 content-visibility-auto">
+      <section className="py-24 md:py-32 px-4 sm:px-6 content-visibility-auto">
         <div className="max-w-4xl mx-auto">
           {/* 标题 */}
           <div className="text-center mb-16">
@@ -610,7 +613,7 @@ export default function LandingPage() {
       </section>
 
       {/* ============ 核心智能体展示区 ============ */}
-      <section id="workflow" className="scroll-mt-24 py-24 md:py-32 px-6 relative overflow-hidden content-visibility-auto">
+      <section id="workflow" className="scroll-mt-24 py-24 md:py-32 px-4 sm:px-6 relative overflow-hidden content-visibility-auto">
         {/* 背景光效 */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-gradient-to-r from-purple-600/10 via-blue-600/10 to-emerald-600/10 rounded-full blur-[100px] pointer-events-none" />
 
@@ -691,7 +694,7 @@ export default function LandingPage() {
       </section>
 
       {/* ============ 智能体矩阵展示 - 卡片墙 ============ */}
-      <section id="features" className="scroll-mt-24 py-24 md:py-32 px-6 relative overflow-hidden content-visibility-auto">
+      <section id="features" className="scroll-mt-24 py-24 md:py-32 px-4 sm:px-6 relative overflow-hidden content-visibility-auto">
         {/* 背景 */}
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-purple-950/5 to-transparent" />
 
@@ -747,7 +750,7 @@ export default function LandingPage() {
       </section>
 
             {/* ============ 交付对比 - 工作流化 ============ */}
-      <section className="py-28 md:py-40 px-6 relative overflow-hidden content-visibility-auto">
+      <section className="py-28 md:py-40 px-4 sm:px-6 relative overflow-hidden content-visibility-auto">
         {/* 背景光效 */}
         <div className="absolute inset-0">
           <div className="absolute top-0 left-0 w-1/2 h-full bg-gradient-to-br from-red-950/20 via-transparent to-transparent" />
@@ -758,7 +761,7 @@ export default function LandingPage() {
         <div className="relative max-w-6xl mx-auto">
           {/* 标题区 */}
           <div className="text-center mb-16 md:mb-20">
-            <div className="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border border-emerald-500/20 mb-8">
+            <div className="inline-flex items-center gap-3 px-4 sm:px-6 py-3 rounded-full bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border border-emerald-500/20 mb-8">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
@@ -846,7 +849,7 @@ export default function LandingPage() {
 
           {/* 免责声明 */}
           <div className="flex justify-center mt-12">
-            <div className="inline-flex items-center gap-4 px-6 py-3 rounded-full bg-white/[0.02] border border-white/5 text-sm text-zinc-400">
+            <div className="inline-flex items-center gap-4 px-4 sm:px-6 py-3 rounded-full bg-white/[0.02] border border-white/5 text-sm text-zinc-400">
               <Shield size={16} className="text-zinc-500" />
               <span>示例为典型流程对比，不构成效果承诺</span>
             </div>
@@ -855,7 +858,7 @@ export default function LandingPage() {
       </section>
 
       {/* ============ 企业级服务 ============ */}
-      <section className="py-20 px-6 content-visibility-auto">
+      <section className="py-20 px-4 sm:px-6 content-visibility-auto">
         <div className="max-w-2xl mx-auto">
           <div className="relative p-10 md:p-14 rounded-3xl overflow-hidden">
             {/* 背景 */}
@@ -918,7 +921,7 @@ export default function LandingPage() {
       </section>
 
       {/* ============ 最终 CTA - 强化系统价值 ============ */}
-      <section className="py-32 md:py-40 px-6 content-visibility-auto">
+      <section className="py-32 md:py-40 px-4 sm:px-6 content-visibility-auto">
         <div className="max-w-3xl mx-auto text-center">
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-6 leading-tight tracking-tight">
             把内容交付跑成一条线
@@ -957,7 +960,7 @@ export default function LandingPage() {
       </section>
 
       {/* ============ Footer ============ */}
-      <footer className="py-10 px-6 border-t border-white/[0.02]">
+      <footer className="py-10 px-4 sm:px-6 border-t border-white/[0.02]">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity cursor-pointer">
             <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-violet-600 rounded-lg flex items-center justify-center text-white font-bold text-xs">
