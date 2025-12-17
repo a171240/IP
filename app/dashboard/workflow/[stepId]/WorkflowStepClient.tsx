@@ -53,7 +53,7 @@ import {
   setConversationStatus,
   saveReport,
   getLatestReport,
-  getReport,
+  getLatestReportByConversation,
   getUserReportsPreview,
   getStepConversations,
   updateStepProgress,
@@ -1552,7 +1552,7 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
 
                         // 尝试加载该对话关联的报告
                         try {
-                          const existingReport = await getReport(c.id)
+                          const existingReport = await getLatestReportByConversation(c.id, user?.id)
                           if (existingReport) {
                             setGeneratedDoc(existingReport.content)
                             setConversationProgress(100)

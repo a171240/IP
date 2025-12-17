@@ -406,6 +406,35 @@ export async function getReport(reportId: string): Promise<Report | null> {
 }
 
 /**
+ * Get latest report for a conversation (created_at desc)
+ */
+export async function getLatestReportByConversation(conversationId: string, userId?: string): Promise<Report | null> {
+  const supabase = getSupabaseClient()
+  const resolvedUserId = await resolveUserId(supabase, userId)
+
+  if (!resolvedUserId) return null
+
+  const { data, error } = await supabase
+    .from('reports')
+    .select('*')
+    .eq('user_id', resolvedUserId)
+    .eq('conversation_id', conversationId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single()
+
+  // PGRST116: Row not found
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if (error && (error as any).code !== 'PGRST116') {
+    console.error('Error getting latest report by conversation:', error)
+    return null
+  }
+
+  return data || null
+}
+
+
+/**
  * 获取用户某步骤的最新报告
  */
 export async function getLatestReport(stepId: string, projectId?: string, userId?: string): Promise<Report | null> {

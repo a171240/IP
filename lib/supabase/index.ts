@@ -33,6 +33,7 @@ export {
   // 报告
   saveReport,
   getReport,
+  getLatestReportByConversation,
   getLatestReport,
   getUserReports,
   getUserReportList,

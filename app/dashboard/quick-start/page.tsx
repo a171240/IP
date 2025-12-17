@@ -454,7 +454,7 @@ export default function QuickStartPage() {
             cyberIpId: context?.cyberIpId,
             topic: context?.topic,
           },
-        }, user?.id
+        }, profile?.id
       )
 
       if (!report) throw new Error("保存失败")
