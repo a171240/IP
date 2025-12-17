@@ -1551,20 +1551,41 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
                         }
 
                         // 尝试加载该对话关联的报告
+                        const fallbackReportFromMessages = (() => {
+                          const reversed = Array.isArray(c.messages) ? [...c.messages].reverse() : []
+                          for (const m of reversed) {
+                            if (m.role !== 'assistant') continue
+                            const content = typeof m.content === 'string' ? m.content : ''
+                            if (!content) continue
+                            const detection = detectReportInContent(content, step.id)
+                            if (detection.isReport && detection.reportContent) {
+                              const trimmed = detection.reportContent.trim()
+                              if (trimmed.startsWith('#')) return trimmed
+                              return `# ${step.output}\n\n${trimmed}`
+                            }
+                          }
+                          return null
+                        })()
+
                         try {
                           const existingReport = await getLatestReportByConversation(c.id, user?.id)
-                          if (existingReport) {
-                            setGeneratedDoc(existingReport.content)
+                          const reportContent = existingReport?.content || fallbackReportFromMessages
+
+                          if (reportContent) {
+                            setGeneratedDoc(reportContent)
+                            setCanvasStreamContent(reportContent)
                             setConversationProgress(100)
+                            setCanGenerateReport(true)
                           } else {
                             setGeneratedDoc(null)
+                            setCanvasStreamContent("")
                           }
                         } catch {
-                          setGeneratedDoc(null)
+                          setGeneratedDoc(fallbackReportFromMessages)
+                          setCanvasStreamContent(fallbackReportFromMessages || "")
                         }
 
-                        // 重置其他状态
-                        setCanvasStreamContent("")
+                        // Reset other state
                         setIsSaved(false)
                       }}
                       disabled={isLoading}
