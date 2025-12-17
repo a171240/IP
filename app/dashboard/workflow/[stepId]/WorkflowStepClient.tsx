@@ -1478,18 +1478,82 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
                   const updated = formatRelativeTime(c.updated_at || c.created_at)
                   const msgCount = Array.isArray(c.messages) ? c.messages.length : 0
                   const topic = deriveConversationTopic(c, step?.title || "")
+                  const isCurrentConversation = currentConversation?.id === c.id
 
                   return (
-                    <div
+                    <button
                       key={c.id}
-                      className="w-full text-left px-3 py-2 rounded-xl border dark:bg-zinc-900/30 bg-zinc-100 border-black/5 dark:border-white/5"
+                      onClick={async () => {
+                        if (isCurrentConversation) return
+
+                        // 加载选中的历史对话
+                        setCurrentConversation(c)
+
+                        // 恢复消息列表
+                        const msgs: Message[] = [{
+                          id: "initial",
+                          role: "assistant",
+                          content: generateInitialPromptWithReports(step.initialPrompt, previousReports),
+                          timestamp: new Date()
+                        }]
+                        c.messages.forEach((m, idx) => {
+                          msgs.push({
+                            id: `db-${idx}`,
+                            role: m.role,
+                            content: m.content,
+                            reasoning: m.reasoning,
+                            timestamp: new Date(m.timestamp)
+                          })
+                        })
+                        setMessages(msgs)
+
+                        // 更新进度
+                        const userMsgCount = c.messages.filter(m => m.role === 'user').length
+                        const totalRounds = step.id === 'P1' ? 8 : step.id === 'IP传记' ? 15 : 6
+                        const progress = Math.min(Math.round((userMsgCount / totalRounds) * 100), 100)
+                        setConversationProgress(progress)
+
+                        // 检查是否可以生成报告
+                        const minRounds = step.id === 'IP传记' ? 10 : 5
+                        if (userMsgCount >= minRounds && userMsgCount >= Math.floor(totalRounds * 0.8)) {
+                          setCanGenerateReport(true)
+                        } else {
+                          setCanGenerateReport(false)
+                        }
+
+                        // 尝试加载该对话关联的报告
+                        try {
+                          const existingReport = await getReport(c.id)
+                          if (existingReport) {
+                            setGeneratedDoc(existingReport.content)
+                            setConversationProgress(100)
+                          } else {
+                            setGeneratedDoc(null)
+                          }
+                        } catch {
+                          setGeneratedDoc(null)
+                        }
+
+                        // 重置其他状态
+                        setCanvasStreamContent("")
+                        setIsSaved(false)
+                      }}
+                      disabled={isLoading}
+                      className={`w-full text-left px-3 py-2 rounded-xl border transition-all ${
+                        isCurrentConversation
+                          ? 'dark:bg-purple-500/10 bg-purple-50 border-purple-500/30 ring-1 ring-purple-500/20'
+                          : 'dark:bg-zinc-900/30 bg-zinc-100 border-black/5 dark:border-white/5 hover:dark:bg-zinc-800/50 hover:bg-zinc-200 cursor-pointer'
+                      } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-sm font-medium dark:text-white text-zinc-900 truncate">{topic}</span>
                         <span className={`text-xs font-semibold ${statusClass}`}>{statusLabel}</span>
                       </div>
-                      <div className="text-xs text-zinc-500 mt-1">{updated} · {msgCount} 条消息</div>
-                    </div>
+                      <div className="text-xs text-zinc-500 mt-1">
+                        {updated} · {msgCount} 条消息
+                        {isCurrentConversation && <span className="ml-2 text-purple-400">当前</span>}
+                      </div>
+                    </button>
                   )
                 })}
               </div>
