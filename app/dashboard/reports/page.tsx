@@ -16,10 +16,12 @@ import {
   Loader2,
   PenTool,
   Plus,
+  RefreshCw,
   Search,
   Sparkles,
   Target,
   Trash2,
+  MessageSquare,
   Users,
   X
 } from "lucide-react"
@@ -35,7 +37,7 @@ import {
   type ReportListItem
 } from "@/lib/supabase"
 
-type ContentType = "all" | "P1" | "P2" | "P3" | "IP传记" | "P4" | "P5" | "P6"
+type ContentType = "all" | "P1" | "P2" | "P3" | "IP传记" | "P4" | "P5" | "P6" | "P7" | "P8" | "P9" | "P10"
 
 type StepConfig = {
   icon: React.ElementType
@@ -102,6 +104,38 @@ const stepConfig: Record<string, StepConfig> = {
     border: "border-blue-500/20",
     label: "4X4内容规划",
     phase: "人设构建"
+  },
+  P7: {
+    icon: Target,
+    color: "text-emerald-400",
+    bg: "bg-emerald-500/10",
+    border: "border-emerald-500/20",
+    label: "选题库生成",
+    phase: "内容生产"
+  },
+  P8: {
+    icon: PenTool,
+    color: "text-emerald-400",
+    bg: "bg-emerald-500/10",
+    border: "border-emerald-500/20",
+    label: "脚本创作中心",
+    phase: "内容生产"
+  },
+  P9: {
+    icon: MessageSquare,
+    color: "text-emerald-400",
+    bg: "bg-emerald-500/10",
+    border: "border-emerald-500/20",
+    label: "口语化优化",
+    phase: "内容生产"
+  },
+  P10: {
+    icon: RefreshCw,
+    color: "text-emerald-400",
+    bg: "bg-emerald-500/10",
+    border: "border-emerald-500/20",
+    label: "迭代管理",
+    phase: "内容生产"
   }
 }
 
@@ -113,7 +147,11 @@ const filterOptions: Array<{ value: ContentType; label: string }> = [
   { value: "IP传记", label: "IP传记" },
   { value: "P4", label: "IP概念生成" },
   { value: "P5", label: "IP类型定位" },
-  { value: "P6", label: "4X4内容规划" }
+  { value: "P6", label: "4X4内容规划" },
+  { value: "P7", label: "选题库生成" },
+  { value: "P8", label: "脚本创作中心" },
+  { value: "P9", label: "口语化优化" },
+  { value: "P10", label: "迭代管理" }
 ]
 
 function formatRelativeDate(dateString: string) {
@@ -253,18 +291,22 @@ export default function ReportsPage() {
   const phaseStats = useMemo(() => {
     const researchSteps = new Set(["P1", "P2", "P3", "IP传记"])
     const personaSteps = new Set(["P4", "P5", "P6"])
+    const contentSteps = new Set(["P7", "P8", "P9", "P10"])
 
     let research = 0
     let persona = 0
+    let content = 0
 
     for (const report of reports) {
       if (researchSteps.has(report.step_id)) research += 1
       if (personaSteps.has(report.step_id)) persona += 1
+      if (contentSteps.has(report.step_id)) content += 1
     }
 
     return {
       research,
       persona,
+      content,
       total: reports.length
     }
   }, [reports])
@@ -393,7 +435,7 @@ export default function ReportsPage() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <GlassCard className="p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
@@ -420,6 +462,17 @@ export default function ReportsPage() {
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
                 <FileText size={18} className="text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold dark:text-white text-zinc-900">{phaseStats.content}</p>
+                <p className="text-xs dark:text-zinc-400 text-zinc-500">内容生产报告</p>
+              </div>
+            </div>
+          </GlassCard>
+          <GlassCard className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-zinc-500/10 border border-zinc-500/20 flex items-center justify-center">
+                <FileText size={18} className="text-zinc-400" />
               </div>
               <div>
                 <p className="text-2xl font-bold dark:text-white text-zinc-900">{phaseStats.total}</p>

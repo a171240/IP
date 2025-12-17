@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import {
   ArrowLeft,
+  ArrowDown,
   Send,
   Sparkles,
   FileText,
@@ -146,12 +147,34 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const initKeyRef = useRef<string | null>(null)
   const streamContentRef = useRef("")
   const streamReasoningRef = useRef("")
   const rafIdRef = useRef<number | null>(null)
+
+  // Chat scroll: pin/unpin
+  const [isPinnedToBottom, setIsPinnedToBottom] = useState(true)
+  const [hasNewMessages, setHasNewMessages] = useState(false)
+
+  const updatePinnedState = useCallback(() => {
+    const el = messagesContainerRef.current
+    if (!el) return
+
+    const threshold = 80
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    const atBottom = distanceFromBottom <= threshold
+    setIsPinnedToBottom(atBottom)
+    if (atBottom) setHasNewMessages(false)
+  }, [])
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
+    const el = messagesContainerRef.current
+    if (!el) return
+    el.scrollTo({ top: el.scrollHeight, behavior })
+  }, [])
 
   // P8智能体本地存储
   useEffect(() => {
@@ -352,8 +375,15 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
 
   // 自动滚动到底部
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "auto", block: "end" })
-  }, [messages])
+    if (isPinnedToBottom) {
+      scrollToBottom("auto")
+      messagesEndRef.current?.scrollIntoView({ behavior: "auto", block: "end" })
+    } else if (messages.length > 1) {
+      setHasNewMessages(true)
+    }
+  }, [messages, isPinnedToBottom, scrollToBottom])
+
+  
 
   // 计时器
   useEffect(() => {
@@ -1035,7 +1065,7 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
           </div>
 
           {/* 消息列表 */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          <div ref={messagesContainerRef} onScroll={updatePinnedState} className="flex-1 overflow-y-auto p-6 space-y-4 relative">
             {messages.map((message) => (
               <div
                 key={message.id}
@@ -1120,6 +1150,19 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
                     </span>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {!isPinnedToBottom && hasNewMessages && (
+              <div className="sticky bottom-4 flex justify-end pointer-events-none">
+                <button
+                  onClick={() => scrollToBottom("smooth")}
+                  className="pointer-events-auto flex items-center gap-2 px-3 py-2 rounded-full text-sm dark:bg-zinc-900/80 bg-white/90 border dark:border-white/10 border-black/10 dark:text-white text-zinc-900 shadow-lg"
+                  title="Jump to latest"
+                >
+                  <ArrowDown size={16} className="text-purple-400" />
+                  <span>New messages</span>
+                </button>
               </div>
             )}
 
