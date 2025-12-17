@@ -618,8 +618,19 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
       // 报告检测
       const reportDetection = detectReportInContent(fullContent, step.id)
       if (reportDetection.isReport && reportDetection.reportContent) {
-        const formattedReport = `# ${step.output}\n\n${reportDetection.reportContent}\n\n---\n*报告生成时间: ${new Date().toLocaleString()}*`
-        setGeneratedDoc(formattedReport)
+        // 使用函数式更新，追加新内容到已有报告
+        setGeneratedDoc(prevDoc => {
+          const newContent = reportDetection.reportContent
+          const timestamp = `*报告生成时间: ${new Date().toLocaleString()}*`
+
+          if (prevDoc) {
+            // 移除旧的时间戳和分隔线，追加新内容
+            const cleanedPrev = prevDoc.replace(/\n\n---\n\*报告生成时间:.*\*$/, '')
+            return `${cleanedPrev}\n\n---\n\n**【续】**\n\n${newContent}\n\n---\n${timestamp}`
+          } else {
+            return `# ${step.output}\n\n${newContent}\n\n---\n${timestamp}`
+          }
+        })
         setConversationProgress(100)
         setCanGenerateReport(true)
       } else {
@@ -1112,18 +1123,36 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
                       {message.timestamp.toLocaleTimeString()}
                     </p>
                     {message.role === "assistant" && message.content && (
-                      <button
-                        onClick={() => {
-                          setGeneratedDoc(message.content)
-                          setCanvasStreamContent(message.content)
-                          setIsCanvasOpen(true)
-                        }}
-                        className="flex items-center gap-1 px-2 py-1 text-xs rounded-md dark:bg-purple-500/10 bg-purple-50 dark:text-purple-400 text-purple-600 hover:bg-purple-100 transition-colors border dark:border-purple-500/20 border-purple-200"
-                        title="发送到画布"
-                      >
-                        <FileText size={12} />
-                        <span>发送到画布</span>
-                      </button>
+                      <>
+                        <button
+                          onClick={() => {
+                            setGeneratedDoc(message.content)
+                            setCanvasStreamContent(message.content)
+                            setIsCanvasOpen(true)
+                          }}
+                          className="flex items-center gap-1 px-2 py-1 text-xs rounded-md dark:bg-purple-500/10 bg-purple-50 dark:text-purple-400 text-purple-600 hover:bg-purple-100 transition-colors border dark:border-purple-500/20 border-purple-200"
+                          title="发送到画布（覆盖）"
+                        >
+                          <FileText size={12} />
+                          <span>发送到画布</span>
+                        </button>
+                        {generatedDoc && (
+                          <button
+                            onClick={() => {
+                              const timestamp = `*追加时间: ${new Date().toLocaleString()}*`
+                              const appendedContent = `${generatedDoc}\n\n---\n\n**【续】**\n\n${message.content}\n\n---\n${timestamp}`
+                              setGeneratedDoc(appendedContent)
+                              setCanvasStreamContent(appendedContent)
+                              setIsCanvasOpen(true)
+                            }}
+                            className="flex items-center gap-1 px-2 py-1 text-xs rounded-md dark:bg-emerald-500/10 bg-emerald-50 dark:text-emerald-400 text-emerald-600 hover:bg-emerald-100 transition-colors border dark:border-emerald-500/20 border-emerald-200"
+                            title="追加到画布"
+                          >
+                            <Layers size={12} />
+                            <span>+追加</span>
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
