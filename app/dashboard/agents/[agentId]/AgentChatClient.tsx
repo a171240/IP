@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { AlertCircle, ArrowDown, FolderOpen, Loader2, Paperclip, Search, Send, X } from "lucide-react"
@@ -7,6 +7,7 @@ import { GlassCard, GlowButton } from "@/components/ui/obsidian"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { InsufficientCreditsModal, PlanRequiredModal } from "@/components/ui/upgrade-prompt"
 import { getReport, getUserReportList, type ReportListItem } from "@/lib/supabase"
+import { getOrCreateDeviceId } from "@/lib/device"
 
 type ChatMessage = {
   id: string
@@ -119,9 +120,10 @@ export default function AgentChatClient({
     setIsLoading(true)
 
     try {
+      const deviceId = getOrCreateDeviceId()
       const resp = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(deviceId ? { "x-device-id": deviceId } : {}) },
         body: JSON.stringify({
           ...(opts?.allowCreditsOverride ? { allowCreditsOverride: true } : {}),
           stepId: `agent:${agentId}`,

@@ -1,116 +1,190 @@
-﻿import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 
 import { listPromptFiles, readPromptFile } from "@/lib/prompts/prompts.server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import {
-  getCreditCostForPromptDownload,
-  getPromptPreviewMaxChars,
-  normalizePlan,
-} from "@/lib/pricing/rules"
+import { getCreditCostForPromptDownload, getPromptPreviewMaxChars, normalizePlan } from "@/lib/pricing/rules"
 import { consumeCredits, ensureTrialCreditsIfNeeded, getClientIp, hashIp } from "@/lib/pricing/profile.server"
 
+type CreditsProfile = {
+  plan?: string | null
+  credits_balance?: number | null
+  credits_unlimited?: boolean | null
+  trial_granted_at?: string | null
+}
+
+function jsonError(status: number, error: string, extra?: Record<string, unknown>) {
+  return NextResponse.json({ error, ...(extra || {}) }, { status })
+}
+
+function isProfilesSchemaMissing(message: string | undefined): boolean {
+  if (!message) return false
+  const m = message.toLowerCase()
+
+  const hasMissingRelation = m.includes("relation") && m.includes("does not exist") && m.includes("profiles")
+  const hasMissingColumn =
+    (m.includes("column") || m.includes("undefined_column")) &&
+    m.includes("does not exist") &&
+    (m.includes("credits_balance") ||
+      m.includes("credits_unlimited") ||
+      m.includes("trial_granted_at") ||
+      m.includes("plan"))
+
+  return hasMissingRelation || hasMissingColumn
+}
+
 export async function GET(request: NextRequest) {
-  const url = new URL(request.url)
-  const dir = url.searchParams.get("dir")
-  const file = url.searchParams.get("file")
-  const download = url.searchParams.get("download") === "1"
-
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return NextResponse.json({ error: "请先登录" }, { status: 401 })
-  }
-
   try {
+    const url = new URL(request.url)
+    const dir = url.searchParams.get("dir")
+    const file = url.searchParams.get("file")
+    const download = url.searchParams.get("download") === "1"
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return jsonError(500, "Supabase 未配置（请检查 .env.local）")
+    }
+
+    const supabase = await createServerSupabaseClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return jsonError(401, "请先登录")
+    }
+
     if (dir) {
       const files = await listPromptFiles(dir)
       return NextResponse.json({ dir, files })
     }
 
     if (!file) {
-      return NextResponse.json({ error: "Missing `file` or `dir`" }, { status: 400 })
+      return jsonError(400, "Missing `file` or `dir`")
     }
 
     const { content, fileName } = await readPromptFile(file)
 
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("plan, credits_balance, credits_unlimited, trial_granted_at")
-      .eq("id", user.id)
-      .single()
+    let creditsAvailable = true
+    let currentPlan = normalizePlan("free")
+    let creditsBalance = 0
+    let creditsUnlimited = false
+    let trialGrantedAt: string | null = null
 
-    let userProfile = profile
-    if (profileError || !profile) {
-      if (profileError?.code === "PGRST116") {
-        const { data: created, error: createError } = await supabase
-          .from("profiles")
-          .insert({
-            id: user.id,
-            email: user.email,
-            nickname: user.email?.split("@")[0] || "User",
-            plan: "free",
-            credits_balance: 30,
-            credits_unlimited: false,
-          })
-          .select("plan, credits_balance, credits_unlimited, trial_granted_at")
-          .single()
+    try {
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("plan, credits_balance, credits_unlimited, trial_granted_at")
+        .eq("id", user.id)
+        .single()
 
-        if (createError || !created) {
-          return NextResponse.json({ error: createError?.message || "profile create failed" }, { status: 500 })
+      if (profileError || !profile) {
+        if (profileError?.code === "PGRST116") {
+          const { data: created, error: createError } = await supabase
+            .from("profiles")
+            .insert({
+              id: user.id,
+              email: user.email,
+              nickname: user.email?.split("@")[0] || "User",
+              plan: "free",
+              credits_balance: 30,
+              credits_unlimited: false,
+            })
+            .select("plan, credits_balance, credits_unlimited, trial_granted_at")
+            .single()
+
+          if (createError || !created) {
+            if (isProfilesSchemaMissing(createError?.message)) {
+              creditsAvailable = false
+            } else {
+              return jsonError(500, createError?.message || "profile create failed")
+            }
+          } else {
+            currentPlan = normalizePlan(created.plan)
+            creditsBalance = Number(created.credits_balance || 0)
+            creditsUnlimited = Boolean(created.credits_unlimited) || currentPlan === "vip"
+            trialGrantedAt = (created.trial_granted_at as string | null) ?? null
+          }
+        } else if (isProfilesSchemaMissing(profileError?.message)) {
+          creditsAvailable = false
+        } else {
+          return jsonError(500, profileError?.message || "profile not found")
         }
-        userProfile = created
       } else {
-        return NextResponse.json({ error: profileError?.message || "profile not found" }, { status: 500 })
+        currentPlan = normalizePlan(profile.plan)
+        creditsBalance = Number((profile as CreditsProfile).credits_balance || 0)
+        creditsUnlimited = Boolean((profile as CreditsProfile).credits_unlimited) || currentPlan === "vip"
+        trialGrantedAt = ((profile as CreditsProfile).trial_granted_at as string | null) ?? null
       }
+    } catch (e) {
+      console.warn("profiles read failed, credit logic disabled:", e instanceof Error ? e.message : e)
+      creditsAvailable = false
     }
 
-    const currentPlan = normalizePlan(userProfile?.plan)
-    let creditsBalance = Number(userProfile?.credits_balance || 0)
-    let creditsUnlimited = Boolean(userProfile?.credits_unlimited) || currentPlan === "vip"
-
     if (download) {
-      const cost = getCreditCostForPromptDownload(file, currentPlan)
+      let cost = 0
 
-      if (!creditsUnlimited && cost > 0) {
-        const deviceId = request.headers.get("x-device-id") || ""
-        const ip = getClientIp(request)
-        const ipHash = ip ? hashIp(ip) : null
+      try {
+        cost = getCreditCostForPromptDownload(file, currentPlan)
 
-        if (!userProfile?.trial_granted_at && creditsBalance <= 0 && deviceId.trim().length >= 8) {
-          const updated = await ensureTrialCreditsIfNeeded({
+        if (creditsAvailable && !creditsUnlimited && cost > 0) {
+          const deviceId = request.headers.get("x-device-id") || ""
+          const ip = getClientIp(request)
+          const ipHash = ip ? hashIp(ip) : null
+
+          if (!trialGrantedAt && creditsBalance <= 0 && deviceId.trim().length >= 8) {
+            const updated = await ensureTrialCreditsIfNeeded({
+              supabase,
+              userId: user.id,
+              profile: {
+                plan: currentPlan,
+                credits_balance: creditsBalance,
+                credits_unlimited: creditsUnlimited,
+                trial_granted_at: trialGrantedAt,
+              },
+              deviceId,
+              ipHash,
+            })
+            creditsBalance = updated.credits_balance
+            creditsUnlimited = updated.credits_unlimited
+            trialGrantedAt = updated.trial_granted_at
+          }
+
+          const consumed = await consumeCredits({
             supabase,
             userId: user.id,
-            profile: {
-              plan: currentPlan,
-              credits_balance: creditsBalance,
-              credits_unlimited: creditsUnlimited,
-              trial_granted_at: (userProfile?.trial_granted_at as string | null) ?? null,
-            },
-            deviceId,
-            ipHash,
+            currentBalance: creditsBalance,
+            amount: cost,
+            stepId: `download:prompt:${file}`,
           })
-          creditsBalance = updated.credits_balance
-          creditsUnlimited = updated.credits_unlimited
+          creditsBalance = consumed.credits_balance
+        } else if (!creditsAvailable) {
+          cost = 0
+        }
+      } catch (e) {
+        if (e instanceof Error && e.message === "insufficient_credits") {
+          const meta = (e as unknown as { meta?: { required?: number; balance?: number } }).meta
+          return jsonError(402, `积分不足：本次需消耗 ${meta?.required ?? 0}，当前剩余 ${meta?.balance ?? 0}。`, {
+            code: "insufficient_credits",
+            required: meta?.required ?? 0,
+            balance: meta?.balance ?? 0,
+          })
         }
 
-        const consumed = await consumeCredits({
-          supabase,
-          userId: user.id,
-          currentBalance: creditsBalance,
-          amount: cost,
-          stepId: `download:prompt:${file}`,
-        })
-        creditsBalance = consumed.credits_balance
+        if (e instanceof Error && isProfilesSchemaMissing(e.message)) {
+          creditsAvailable = false
+          cost = 0
+        } else {
+          console.warn("prompt download credit check failed, skipping:", e instanceof Error ? e.message : e)
+          cost = 0
+        }
       }
 
       const body = new Uint8Array(content)
       return new Response(body, {
         headers: {
           "Content-Type": "application/octet-stream",
-          "Content-Disposition": `attachment; filename="${encodeURIComponent(fileName)}"`,
+          "Content-Disposition": `attachment; filename=\"${encodeURIComponent(fileName)}\"`,
           "Cache-Control": "no-cache",
           "X-Credits-Cost": String(cost),
           "X-Credits-Remaining": creditsUnlimited ? "inf" : String(creditsBalance),
@@ -133,19 +207,23 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     if (error instanceof Error && error.message === "insufficient_credits") {
-      // consumeCredits ?? meta ??? required/balance
       const meta = (error as unknown as { meta?: { required?: number; balance?: number } }).meta
-      return NextResponse.json(
-        {
-          error: `?????????? ${meta?.required ?? 0}????? ${meta?.balance ?? 0}?`,
-          code: "insufficient_credits",
-          required: meta?.required ?? 0,
-          balance: meta?.balance ?? 0,
-        },
-        { status: 402 }
-      )
+      return jsonError(402, `积分不足：本次需消耗 ${meta?.required ?? 0}，当前剩余 ${meta?.balance ?? 0}。`, {
+        code: "insufficient_credits",
+        required: meta?.required ?? 0,
+        balance: meta?.balance ?? 0,
+      })
     }
 
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 400 })
+    const message = error instanceof Error ? error.message : "Unknown error"
+    if (message === "Invalid prompts path" || message === "File type not allowed") {
+      return jsonError(400, message)
+    }
+    if (message.includes("ENOENT") || message.toLowerCase().includes("no such file")) {
+      return jsonError(404, "提示词文件不存在")
+    }
+
+    console.error("/api/prompts error:", error)
+    return jsonError(500, message)
   }
 }

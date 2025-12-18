@@ -1,9 +1,9 @@
-﻿import { NextRequest } from 'next/server'
-import { createHash } from 'crypto'
+import { NextRequest } from 'next/server'
 import { getStepPrompt } from '@/lib/prompts/step-prompts'
 import { readPromptFile } from '@/lib/prompts/prompts.server'
 import { getAgentPrompt } from '@/lib/agents/prompt.server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { getClientIp, hashIp } from '@/lib/pricing/profile.server'
 
 import {
   getCreditCostForUseWithPlanRule,
