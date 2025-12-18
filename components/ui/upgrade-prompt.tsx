@@ -9,16 +9,16 @@ type PlanId = "free" | "basic" | "pro" | "vip"
 
 const PLAN_LABELS: Record<PlanId, string> = {
   free: "体验版",
-  basic: "创作者版",
-  pro: "团队版",
+  basic: "Plus",
+  pro: "Pro",
   vip: "企业版",
 }
 
 const PLAN_FEATURES: Record<PlanId, string> = {
-  free: "P1–P2 研究定位",
-  basic: "P3–P5 人设构建 + IP传记",
-  pro: "P6–P10 内容生产循环",
-  vip: "全功能 + 定制服务",
+  free: "P1–P2 研究定位 + 积分体验智能体",
+  basic: "P3–P5 人设构建 + 100+专属智能体",
+  pro: "P6–P10 内容生产 + 全部智能体 + 下载",
+  vip: "全功能 + 定制服务 + 积分不限量",
 }
 
 export function CreditsLowWarning({
@@ -67,8 +67,8 @@ export function UpgradePromptAfterGeneration({
     if (currentPlan === "free" && (currentStepId === "P1" || currentStepId === "P2")) {
       return {
         targetPlan: "basic" as PlanId,
-        title: "解锁定位与人设资产",
-        description: "升级创作者版可解锁 P3–P5 人设构建 + IP传记，形成可复用的定位资产。",
+        title: "解锁定位与人设 + 100+专属智能体",
+        description: "升级Plus可解锁 P3–P5 人设构建 + 实体营销全家桶（13模块100+智能体）+ 46行业选题生成器，价值超￥3000。",
         highlight: "￥199/月",
       }
     }
@@ -79,8 +79,8 @@ export function UpgradePromptAfterGeneration({
     ) {
       return {
         targetPlan: "pro" as PlanId,
-        title: "进入内容生产循环",
-        description: "升级团队版可解锁 P6–P10 内容生产循环，批量产出与沉淀复用。",
+        title: "解锁全部80+智能体 + 下载权限",
+        description: "升级Pro可解锁 P6–P10 内容生产循环 + 赛博IP人设模板 + 内容矩阵规划包，并支持资源下载。",
         highlight: "￥599/月",
       }
     }

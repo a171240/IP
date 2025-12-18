@@ -7,16 +7,34 @@ import {
   BookOpen,
   ChevronDown,
   ChevronRight,
+  Crown,
   Factory,
   FileText,
+  Gift,
   Lightbulb,
   Search,
+  Sparkles,
   Store,
 } from "lucide-react"
 
 import { GlassCard, Header } from "@/components/ui/obsidian"
-import type { AgentConfig, AgentScene } from "@/lib/agents/config"
-import { agentsConfig, sceneConfig } from "@/lib/agents/config"
+import type { AgentConfig, AgentScene, AgentTier } from "@/lib/agents/config"
+import { agentsConfig, sceneConfig, solutionPacksConfig } from "@/lib/agents/config"
+
+// 智能体等级标识配置
+const tierBadgeConfig: Record<AgentTier, { label: string; color: string; icon: typeof Gift }> = {
+  free: { label: "免费", color: "text-zinc-400 bg-zinc-500/10 border-zinc-500/20", icon: Sparkles },
+  member: { label: "Plus", color: "text-amber-400 bg-amber-500/10 border-amber-500/20", icon: Gift },
+  pro_benefit: { label: "Pro", color: "text-purple-400 bg-purple-500/10 border-purple-500/20", icon: Crown },
+  normal: { label: "通用", color: "text-zinc-400 bg-zinc-500/10 border-zinc-500/20", icon: Sparkles },
+  premium: { label: "高级", color: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20", icon: Crown },
+}
+
+// 获取解决方案包的等级
+function getPackTier(packId: string): AgentTier {
+  const pack = solutionPacksConfig.find(p => p.id === packId || p.sourcePath.includes(packId))
+  return pack?.tier || "normal"
+}
 
 import { PromptPreviewSheet } from "./PromptPreviewSheet"
 
@@ -306,7 +324,13 @@ export default function ProfilesPage() {
                   <Store size={18} className="text-orange-300" />
                 </div>
                 <div className="text-left">
-                  <h3 className="text-sm font-medium dark:text-white text-zinc-900">{"实体店营销全家桶"}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-medium dark:text-white text-zinc-900">{"实体店营销全家桶"}</h3>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded border bg-amber-500/10 border-amber-500/20 text-amber-400 flex items-center gap-1">
+                      <Gift size={10} />
+                      Plus专属
+                    </span>
+                  </div>
                   <p className="text-xs dark:text-zinc-400 text-zinc-500">{retailFiles.length} {"个智能体"}</p>
                 </div>
               </div>
@@ -413,7 +437,13 @@ export default function ProfilesPage() {
                   <Factory size={18} className="text-cyan-300" />
                 </div>
                 <div className="text-left">
-                  <h3 className="text-sm font-medium dark:text-white text-zinc-900">{"垂直行业情绪选题"}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-medium dark:text-white text-zinc-900">{"垂直行业情绪选题"}</h3>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded border bg-amber-500/10 border-amber-500/20 text-amber-400 flex items-center gap-1">
+                      <Gift size={10} />
+                      Plus专属
+                    </span>
+                  </div>
                   <p className="text-xs dark:text-zinc-400 text-zinc-500">{verticalFiles.length} {"个行业模板"}</p>
                 </div>
               </div>

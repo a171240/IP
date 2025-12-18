@@ -10,6 +10,14 @@ export type AgentScene =
   | "efficiency"
   | "workflow"
 
+// 智能体等级类型
+// free: 免费使用（P1-P2相关）
+// member: Plus会员赠送（实体营销全家桶、垂类选题）
+// pro_benefit: Pro会员赠送（赛博IP人设、内容矩阵）
+// normal: 普通智能体（research、efficiency场景）- 2积分基础
+// premium: 高级智能体（creation、topic、marketing场景）- 4积分基础
+export type AgentTier = "free" | "member" | "pro_benefit" | "normal" | "premium"
+
 // 智能体配置
 export interface AgentConfig {
   id: string
@@ -22,6 +30,7 @@ export interface AgentConfig {
   isCollection?: boolean
   collectionCount?: number
   collectionPath?: string
+  tier?: AgentTier  // 智能体等级
 }
 
 // 解决方案包配置
@@ -37,6 +46,7 @@ export interface SolutionPackConfig {
   downloadable: boolean
   memberOnly: boolean
   sourcePath?: string
+  tier?: AgentTier  // 解决方案包所属等级
 }
 
 // 场景配置
@@ -68,7 +78,7 @@ export const agentsConfig: AgentConfig[] = [
   { id: "p10-iteration-manager", name: "迭代管理器", description: "闭环反馈持续优化内容", scene: "workflow", icon: "RefreshCw", promptFile: "P10-迭代管理器v1.0.md", workflowStepId: "P10" },
   // 研究分析
   { id: "mx-product-research", name: "MX产品调研记者", description: "深度产品调研与市场分析", scene: "research", icon: "Newspaper", promptFile: "1. MX产品调研记者智能体.md" },
-  { id: "competitor-analysis", name: "摸象竞品视频拉片分析", description: "深度分析竞品视频的结构和技巧", scene: "research", icon: "Video", promptFile: "实体店营销全家桶/2. 摸象竞品视频拉片分析智能体.md" },
+  { id: "competitor-analysis", name: "摸象竞品视频拉片分析", description: "深度分析竞品视频的结构和技巧", scene: "research", icon: "Video", promptFile: "实体店营销全家桶/2. 摸象竞品视频拉片分析智能体.md", tier: "member" },
   { id: "4x4-competitor", name: "4X4竞品分析专家", description: "多维度竞品对比分析", scene: "research", icon: "Grid3X3", promptFile: "4X4竞品分析专家.md" },
   { id: "viral-template", name: "短视频爆款模板分析", description: "从逐字稿提取可复制的内容模板", scene: "research", icon: "Sparkles", promptFile: "短视频爆款模板分析和内容输出智能体.md" },
   { id: "ip-style-extract", name: "IP辩论风格提取", description: "分析辩论型IP的表达风格特征", scene: "research", icon: "Mic", promptFile: "IP辩论风格提取分析智能体.md" },
@@ -107,7 +117,7 @@ export const agentsConfig: AgentConfig[] = [
   { id: "empathy-scripts", name: "共情内容生成智能体", description: "多种共情类型脚本模板", scene: "creation", icon: "HeartHandshake", isCollection: true, collectionCount: 8, collectionPath: "共情内容生成智能体提示词" },
   { id: "trust-case-scripts", name: "MX信任场景案例脚本", description: "信任建立型案例脚本集", scene: "creation", icon: "Shield", isCollection: true, collectionCount: 6, collectionPath: "MX信任场景案例型脚本智能体" },
   { id: "xiaohongshu-generator", name: "小红书图文智能生成", description: "小红书爆款图文生成工具", scene: "creation", icon: "Palette", isCollection: true, collectionCount: 5, collectionPath: "小红书图文智能生成智能体" },
-  { id: "same-industry-clone", name: "同行业1:1风格拆解", description: "同行业爆款风格复刻模板", scene: "creation", icon: "Copy", isCollection: true, collectionCount: 10, collectionPath: "同行业1比1拆解风格模板" },
+  { id: "same-industry-clone", name: "同行业1:1风格拆解", description: "同行业爆款风格复刻模板", scene: "creation", icon: "Copy", isCollection: true, collectionCount: 10, collectionPath: "同行业1比1拆解风格模板", tier: "pro_benefit" },
   // 选题策划
   { id: "hot-topic", name: "热点引流选题", description: "借助热点流量快速获取曝光", scene: "topic", icon: "Flame", promptFile: "热点引流选题智能体.md" },
   { id: "emotion-topic", name: "行业情绪选题分析", description: "8大类别正反观点选题", scene: "topic", icon: "Heart", promptFile: "行业情绪化正反观点选题分析.md" },
@@ -116,7 +126,7 @@ export const agentsConfig: AgentConfig[] = [
   { id: "xinghe-7ip", name: "IP内容工厂7大IP策划画布", description: "7大维度IP策划方法论", scene: "topic", icon: "LayoutDashboard", promptFile: "星盒7大IP策划画布IP策划大师.md" },
   { id: "commercial-matrix", name: "商业赛道内容矩阵", description: "商业赛道内容营销参考", scene: "topic", icon: "Grid2X2", promptFile: "商业赛道参考内容营销矩阵智能体.md" },
   { id: "platform-select", name: "内容营销平台选择", description: "选择最佳内容分发平台", scene: "topic", icon: "Share2", promptFile: "内容营销平台选择策划大师.md" },
-  { id: "industry-topics", name: "垂类行业选题生成器", description: "覆盖46个行业的专属选题生成", scene: "topic", icon: "Factory", isCollection: true, collectionCount: 46, collectionPath: "各垂类正反观点情绪选题生成器" },
+  { id: "industry-topics", name: "垂类行业选题生成器", description: "覆盖46个行业的专属选题生成", scene: "topic", icon: "Factory", isCollection: true, collectionCount: 46, collectionPath: "各垂类正反观点情绪选题生成器", tier: "member" },
   // 营销转化
   { id: "marketing-diagnosis", name: "新媒体营销诊断", description: "全面诊断新媒体营销策略", scene: "marketing", icon: "Stethoscope", promptFile: "新媒体营销策略诊断大师.md" },
   { id: "investment-planning", name: "招商策划大师", description: "专业招商策划和方案设计", scene: "marketing", icon: "Handshake", promptFile: "招商策划大师.md" },
@@ -126,7 +136,7 @@ export const agentsConfig: AgentConfig[] = [
   { id: "ai-seo-analysis", name: "AI SEO数据分析", description: "SEO效果数据分析优化", scene: "marketing", icon: "TrendingUp", promptFile: "AI.SEO数据分析.md" },
   { id: "music-wechat", name: "少儿音乐培训朋友圈", description: "音乐培训机构朋友圈运营", scene: "marketing", icon: "Music", promptFile: "少儿音乐培训机构知识主播朋友圈运营智能体提示词 v12.md" },
   { id: "art-wechat", name: "少儿艺术培训朋友圈", description: "艺术培训机构朋友圈运营", scene: "marketing", icon: "Palette", promptFile: "少儿综合艺术培训机构朋友圈运营智能体提示词v12.md" },
-  { id: "cyber-ip-clone", name: "赛博IP复刻", description: "12个名人IP风格复刻智能体", scene: "marketing", icon: "Users", isCollection: true, collectionCount: 12, collectionPath: "赛博IP复刻" },
+  { id: "cyber-ip-clone", name: "赛博IP复刻", description: "12个名人IP风格复刻智能体", scene: "marketing", icon: "Users", isCollection: true, collectionCount: 12, collectionPath: "赛博IP复刻", tier: "pro_benefit" },
   { id: "ip-presentation", name: "IP呈现方式策划", description: "11种IP内容呈现风格模板", scene: "marketing", icon: "Presentation", isCollection: true, collectionCount: 11, collectionPath: "商业IP呈现方式策划助手v1.3" },
   // 内部用：提示词执行器（用于运行任意提示词文件，智能体库不直接展示）
   { id: "prompt-runner", name: "提示词执行器", description: "用单个提示词文件直接执行对话", scene: "efficiency", icon: "FileEdit" },
@@ -161,10 +171,13 @@ export const solutionPacksConfig: SolutionPackConfig[] = [
     modules: ["场景营销", "精细化运营", "客户服务", "内容创作", "内容种草", "品牌建设", "数据分析", "文案优化", "特色服务", "引流获客", "营销推广", "运营管理", "智能工具"],
     moduleCount: 13,
     downloadable: true,
-    memberOnly: true
+    memberOnly: true,
+    tier: "member"  // Plus会员赠送
   },
-  { id: "industry-topics",
-    sourcePath: "\u5404\u5782\u7c7b\u6b63\u53cd\u89c2\u70b9\u60c5\u7eea\u9009\u9898\u751f\u6210\u5668", name: "44行业选题生成器",
+  {
+    id: "industry-topics",
+    sourcePath: "\u5404\u5782\u7c7b\u6b63\u53cd\u89c2\u70b9\u60c5\u7eea\u9009\u9898\u751f\u6210\u5668",
+    name: "44行业选题生成器",
     title: "44行业选题生成器",
     description: "覆盖44个热门行业的专属选题生成",
     icon: "Factory",
@@ -172,7 +185,8 @@ export const solutionPacksConfig: SolutionPackConfig[] = [
     modules: ["金融理财", "房产行业", "餐饮美食", "教育培训", "医疗健康", "美业护肤", "健身运动", "母婴育儿", "法律咨询", "心理咨询", "跨境电商", "直播电商", "服装行业", "珠宝玉石", "宠物行业", "旅游出行", "装修建材", "二手车", "保险行业", "养老服务"],
     moduleCount: 44,
     downloadable: true,
-    memberOnly: true
+    memberOnly: true,
+    tier: "member"  // Plus会员赠送
   },
   {
     id: "cyber-ip",
@@ -185,7 +199,8 @@ export const solutionPacksConfig: SolutionPackConfig[] = [
     modules: ["赛博张雪峰", "赛博房琪", "赛博北哥", "赛博口罩哥", "赛博小五郎", "赛博薛辉", "赛博纳爷的收纳研究所", "赛博范爸爸和范姐姐", "赛博金枪大叔", "赛博金盛的解法", "赛博日站君说设计", "赛博直男财经"],
     moduleCount: 12,
     downloadable: true,
-    memberOnly: true
+    memberOnly: true,
+    tier: "pro_benefit"  // Pro会员赠送
   },
   {
     id: "content-matrix",
@@ -198,7 +213,8 @@ export const solutionPacksConfig: SolutionPackConfig[] = [
     modules: ["内容金字塔模型", "4X4内容矩阵", "内容日历模板", "平台分发策略", "内容生产SOP"],
     moduleCount: 5,
     downloadable: true,
-    memberOnly: true
+    memberOnly: true,
+    tier: "pro_benefit"  // Pro会员赠送
   },
 ]
 

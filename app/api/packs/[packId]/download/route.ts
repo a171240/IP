@@ -2,7 +2,7 @@
 
 import { readPackFileForDownload } from "@/lib/packs/packs.server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { getCreditCostForPackFileDownload, normalizePlan } from "@/lib/pricing/rules"
+import { canDownloadPack, getCreditCostForPackFileDownload, getDownloadPermissionMessage, normalizePlan, PLAN_LABELS } from "@/lib/pricing/rules"
 import { consumeCredits, ensureTrialCreditsIfNeeded, getClientIp, hashIp } from "@/lib/pricing/profile.server"
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ packId: string }> }) {
@@ -59,6 +59,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const currentPlan = normalizePlan(userProfile?.plan)
     let creditsBalance = Number(userProfile?.credits_balance || 0)
     const creditsUnlimited = Boolean(userProfile?.credits_unlimited) || currentPlan === "vip"
+
+    // 检查下载权限
+    if (!canDownloadPack(packId, currentPlan)) {
+      const message = getDownloadPermissionMessage(packId, currentPlan)
+      return NextResponse.json(
+        {
+          error: message || `此资源需要更高级别会员才能下载`,
+          code: "download_forbidden",
+          current_plan: currentPlan,
+          current_plan_label: PLAN_LABELS[currentPlan],
+        },
+        { status: 403 }
+      )
+    }
 
     const cost = getCreditCostForPackFileDownload(packId, currentPlan)
 

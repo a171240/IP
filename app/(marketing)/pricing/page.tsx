@@ -1,12 +1,12 @@
 import Link from "next/link"
-import { ArrowRight, Check, Clock, Gift, Sparkles, X, Zap } from "lucide-react"
+import { ArrowRight, Check, Clock, Gift, MessageCircle, Sparkles, X, Zap, Bot, Store, Factory, Palette, LayoutGrid } from "lucide-react"
 import { GlassCard, GlowButton } from "@/components/ui/obsidian-primitives"
 
 type PlanId = "free" | "basic" | "pro" | "vip"
 
 const PLAN_ORDER: PlanId[] = ["free", "basic", "pro", "vip"]
 
-const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL || "support@example.com"
+const WECHAT_ID = "like171240"
 
 const START_HREF = "/auth/register?redirect=/dashboard/quick-start"
 
@@ -57,10 +57,10 @@ const plans = [
       { text: "工坊：研究定位（P1–P2）", included: true },
       { text: "报告沉淀：可保存到「报告」", included: true },
       { text: "新手试用：最高 30 积分（同设备仅一次）", included: true },
-      { text: "每次生成消耗积分（不同步骤不同）", included: true },
+      { text: "智能体库：可消耗积分体验", included: true },
       { text: "定位与人设（P3–P5 + IP传记）", included: false },
-      { text: "内容生产循环（P6–P10）", included: false },
-      { text: "企业定制 / 私有化（可选）", included: false },
+      { text: "Plus专属智能体（100+个）", included: false },
+      { text: "Pro专属智能体与下载", included: false },
     ],
     highlighted: false,
     badge: undefined as string | undefined,
@@ -69,42 +69,44 @@ const plans = [
   },
   {
     id: "basic" as const,
-    name: "创作者版",
+    name: "Plus",
     price: "￥199",
     period: "/月",
-    description: "完成定位与人设资产：解锁 P3–P5 + IP传记，适合单账号长期运营。",
+    description: "完成定位与人设资产：解锁 P3–P5 + IP传记 + 100+专属智能体。",
     features: [
       { text: "包含体验版全部能力", included: true },
       { text: "工坊：情绪价值分析（P3）", included: true },
-      { text: "工坊：IP传记采访（IP传记）", included: true },
+      { text: "工坊：IP传记采访", included: true },
       { text: "工坊：IP概念 + 文风（P4–P5）", included: true },
-      { text: "每月赠送 300 积分（内测期人工发放）", included: true },
-      { text: "内容生产循环（P6–P10）", included: false },
-      { text: "企业定制 / 私有化（可选）", included: false },
+      { text: "🎁 实体营销全家桶 13模块100+智能体", included: true, highlight: true },
+      { text: "🎁 46行业情绪选题生成器", included: true, highlight: true },
+      { text: "每月赠送 300 积分", included: true },
+      { text: "Pro专属智能体与下载", included: false },
     ],
     highlighted: false,
-    badge: undefined as string | undefined,
-    cta: "从体验版开始",
+    badge: "超值" as string | undefined,
+    cta: "升级Plus",
     ctaHref: START_HREF,
   },
   {
     id: "pro" as const,
-    name: "团队版",
+    name: "Pro",
     price: "￥599",
     period: "/月",
-    description: "解锁内容生产循环：P6–P10 批量产出，适合代运营 / 小团队持续交付。",
+    description: "解锁全部智能体 + 内容生产循环（P6–P10）+ 资源下载权限。",
     features: [
-      { text: "包含创作者版全部能力", included: true },
+      { text: "包含Plus全部能力", included: true },
       { text: "工坊：4X4内容规划（P6）", included: true },
-      { text: "工坊：引流/理性/产品/情绪内容（P7–P10）", included: true },
-      { text: "按工作流沉淀：可复用报告资产", included: true },
-      { text: "每月赠送 1200 积分（内测期人工发放）", included: true },
+      { text: "工坊：内容生产循环（P7–P10）", included: true },
+      { text: "🎁 12赛博IP人设模板", included: true, highlight: true },
+      { text: "🎁 内容矩阵规划工具包", included: true, highlight: true },
+      { text: "🎁 全部智能体资源可下载", included: true, highlight: true },
+      { text: "每月赠送 1200 积分", included: true },
       { text: "团队协作/权限（规划中）", included: false },
-      { text: "企业定制 / 私有化（可选）", included: false },
     ],
     highlighted: true,
     badge: "推荐",
-    cta: "从体验版开始",
+    cta: "升级Pro",
     ctaHref: START_HREF,
   },
   {
@@ -114,7 +116,7 @@ const plans = [
     period: "",
     description: "适合品牌中台 / MCN：培训、权限与定制工作流，支持私有化（可选）。",
     features: [
-      { text: "包含团队版全部能力", included: true },
+      { text: "包含Pro全部能力", included: true },
       { text: "专属实施与培训（可选）", included: true },
       { text: "权限/多团队管理（可选）", included: true },
       { text: "定制工作流与交付标准（可选）", included: true },
@@ -175,45 +177,59 @@ const PricingCard = ({
 
       <p className="text-sm text-zinc-400 mb-5 leading-relaxed min-h-[44px]">{plan.description}</p>
 
-      <Link href={plan.ctaHref}>
-        <GlowButton primary={plan.highlighted} className="w-full mb-6">
-          {plan.cta}
-          <ArrowRight size={16} className="ml-2" />
-        </GlowButton>
-      </Link>
+      <div className="mb-6">
+        <Link href={plan.ctaHref}>
+          <GlowButton primary={plan.highlighted} className="w-full">
+            {plan.cta}
+            <ArrowRight size={16} className="ml-2" />
+          </GlowButton>
+        </Link>
+      </div>
 
       <ul className="space-y-2.5 flex-1">
-        {plan.features.map((feature) => (
-          <li key={feature.text} className="flex items-start gap-2.5">
-            <div
-              className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                feature.included
-                  ? "bg-purple-500/10 border border-purple-500/20"
-                  : "bg-zinc-800/50 border border-zinc-700/50"
-              }`}
-            >
-              {feature.included ? (
-                <Check size={10} className="text-purple-400" />
-              ) : (
-                <X size={10} className="text-zinc-600" />
-              )}
-            </div>
-            <span className={`text-sm ${feature.included ? "text-zinc-300" : "text-zinc-600"}`}>{feature.text}</span>
-          </li>
-        ))}
+        {plan.features.map((feature) => {
+          const isHighlight = "highlight" in feature && feature.highlight
+          return (
+            <li key={feature.text} className="flex items-start gap-2.5">
+              <div
+                className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                  isHighlight
+                    ? "bg-amber-500/10 border border-amber-500/20"
+                    : feature.included
+                      ? "bg-purple-500/10 border border-purple-500/20"
+                      : "bg-zinc-800/50 border border-zinc-700/50"
+                }`}
+              >
+                {isHighlight ? (
+                  <Gift size={10} className="text-amber-400" />
+                ) : feature.included ? (
+                  <Check size={10} className="text-purple-400" />
+                ) : (
+                  <X size={10} className="text-zinc-600" />
+                )}
+              </div>
+              <span className={`text-xs ${isHighlight ? "text-amber-300" : feature.included ? "text-zinc-300" : "text-zinc-600"}`}>
+                {feature.text}
+              </span>
+            </li>
+          )
+        })}
       </ul>
     </GlassCard>
   </div>
 )
 
+// 显示的套餐（不包含企业版）
+const displayPlans = plans.filter(plan => plan.id !== "vip")
+
 const PlanMatrix = () => (
   <section className="pb-24 px-4 sm:px-6">
-    <div className="max-w-6xl mx-auto">
+    <div className="max-w-5xl mx-auto">
       <div className="text-center mb-10">
         <p className="text-xs font-mono uppercase tracking-widest text-zinc-500 mb-3">WORKFLOW ACCESS</p>
         <h2 className="text-2xl md:text-3xl font-bold text-white">每个套餐解锁哪些工作流步骤？</h2>
         <p className="text-zinc-400 mt-3 max-w-2xl mx-auto">
-          你的付费不是为“次数”，而是为“阶段解锁 + 团队可复用的交付资产”。
+          你的付费不是为"次数"，而是为"阶段解锁 + 团队可复用的交付资产"。
         </p>
       </div>
 
@@ -223,7 +239,7 @@ const PlanMatrix = () => (
             <thead className="bg-white/[0.02]">
               <tr className="text-left">
                 <th className="px-5 py-4 text-zinc-400 font-medium whitespace-nowrap">步骤</th>
-                {plans.map((plan) => (
+                {displayPlans.map((plan) => (
                   <th key={plan.id} className="px-5 py-4 text-zinc-200 font-medium whitespace-nowrap">
                     {plan.name}
                   </th>
@@ -237,7 +253,7 @@ const PlanMatrix = () => (
                     <div className="text-white font-medium">{step.id}</div>
                     <div className="text-xs text-zinc-500 mt-0.5">{step.title}</div>
                   </td>
-                  {plans.map((plan) => {
+                  {displayPlans.map((plan) => {
                     const ok = isStepIncluded(plan.id, step.requiredPlan)
                     return (
                       <td key={`${step.id}-${plan.id}`} className="px-5 py-4">
@@ -264,7 +280,130 @@ const PlanMatrix = () => (
   </section>
 )
 
+// Agent Benefits Section
+const agentBenefits = [
+  {
+    name: "实体营销全家桶",
+    icon: Store,
+    color: "orange",
+    countLabel: "13模块100+智能体",
+    value: "价值￥1999",
+    free: "12积分/次",
+    plus: "免费",
+    pro: "免费",
+    vip: "免费",
+  },
+  {
+    name: "46行业选题生成器",
+    icon: Factory,
+    color: "cyan",
+    countLabel: "46个智能体",
+    value: "价值￥999",
+    free: "12积分/次",
+    plus: "免费",
+    pro: "免费",
+    vip: "免费",
+  },
+  {
+    name: "赛博IP人设模板",
+    icon: Palette,
+    color: "pink",
+    countLabel: "12个智能体",
+    value: "价值￥599",
+    free: "16积分/次",
+    plus: "8积分/次",
+    pro: "免费",
+    vip: "免费",
+  },
+  {
+    name: "内容矩阵规划包",
+    icon: LayoutGrid,
+    color: "indigo",
+    countLabel: "5个智能体",
+    value: "价值￥499",
+    free: "16积分/次",
+    plus: "8积分/次",
+    pro: "免费",
+    vip: "免费",
+  },
+  {
+    name: "资源下载权限",
+    icon: Bot,
+    color: "purple",
+    countLabel: null,
+    value: null,
+    free: "不可下载",
+    plus: "Plus专属包可下载",
+    pro: "全部可下载",
+    vip: "全部可下载",
+  },
+]
 
+const AgentBenefitsSection = () => (
+  <section className="pb-24 px-4 sm:px-6">
+    <div className="max-w-6xl mx-auto">
+      <div className="text-center mb-10">
+        <p className="text-xs font-mono uppercase tracking-widest text-zinc-500 mb-3">AGENT BENEFITS</p>
+        <h2 className="text-2xl md:text-3xl font-bold text-white">智能体权益对比</h2>
+        <p className="text-zinc-400 mt-3 max-w-2xl mx-auto">
+          80+专业智能体，不同会员等级享有不同权益。低级会员可消耗积分体验高级智能体。
+        </p>
+      </div>
+
+      <GlassCard className="p-0 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-white/[0.02]">
+              <tr className="text-left">
+                <th className="px-5 py-4 text-zinc-400 font-medium">智能体包</th>
+                <th className="px-5 py-4 text-zinc-200 font-medium">体验版</th>
+                <th className="px-5 py-4 text-zinc-200 font-medium">Plus</th>
+                <th className="px-5 py-4 text-zinc-200 font-medium">Pro</th>
+              </tr>
+            </thead>
+            <tbody>
+              {agentBenefits.map((benefit) => (
+                <tr key={benefit.name} className="border-t border-white/5">
+                  <td className="px-5 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-lg bg-${benefit.color}-500/10 border border-${benefit.color}-500/20 flex items-center justify-center`}>
+                        <benefit.icon size={16} className={`text-${benefit.color}-400`} />
+                      </div>
+                      <div>
+                        <div className="text-white font-medium text-sm">{benefit.name}</div>
+                        {benefit.countLabel && <div className="text-[10px] text-zinc-500">{benefit.countLabel}</div>}
+                        {benefit.value && <div className="text-[10px] text-amber-400 font-medium">{benefit.value}</div>}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-5 py-4">
+                    <span className={`text-xs px-2 py-1 rounded ${benefit.free === "不可下载" ? "bg-zinc-800 text-zinc-500" : "bg-zinc-800 text-zinc-400"}`}>
+                      {benefit.free}
+                    </span>
+                  </td>
+                  <td className="px-5 py-4">
+                    <span className={`text-xs px-2 py-1 rounded ${benefit.plus === "免费" ? "bg-amber-500/10 text-amber-400" : "bg-zinc-800 text-zinc-400"}`}>
+                      {benefit.plus}
+                    </span>
+                  </td>
+                  <td className="px-5 py-4">
+                    <span className={`text-xs px-2 py-1 rounded ${benefit.pro === "免费" || benefit.pro === "全部可下载" ? "bg-purple-500/10 text-purple-400" : "bg-zinc-800 text-zinc-400"}`}>
+                      {benefit.pro}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </GlassCard>
+
+      <div className="mt-4 text-center text-sm text-zinc-500">
+        <p>低级会员使用高级智能体时，积分消耗会相应增加（跨1级2倍，跨2级4倍）</p>
+      </div>
+    </div>
+  </section>
+)
 
 // Credits Section
 const creditCostCatalog = [
@@ -385,32 +524,28 @@ const FAQSection = () => (
 const ContactSection = () => (
   <section id="contact" className="pb-24 px-4 sm:px-6">
     <div className="max-w-3xl mx-auto">
-      <GlassCard className="p-8">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center flex-shrink-0">
-            <Gift size={20} className="text-purple-400" />
-          </div>
-          <div className="flex-1">
-            <h2 className="text-xl font-bold text-white mb-2">企业版 / 开通咨询</h2>
-            <p className="text-sm text-zinc-400 leading-relaxed">
-              如果你需要企业版（培训、权限、定制工作流、私有化等），请将你的行业、城市、目标受众、团队规模与交付目标发送至：
-              <a className="text-purple-300 hover:text-purple-200 underline underline-offset-4 ml-1" href={`mailto:${SUPPORT_EMAIL}`}>
-                {SUPPORT_EMAIL}
-              </a>
-            </p>
-            <div className="mt-5 flex flex-col sm:flex-row gap-3">
-              <Link href={START_HREF} className="flex-1">
-                <GlowButton primary className="w-full">
-                  <Zap size={16} />
-                  先免费体验
-                  <ArrowRight size={16} />
-                </GlowButton>
-              </Link>
-              <a href={`mailto:${SUPPORT_EMAIL}`} className="flex-1">
-                <GlowButton className="w-full">发送邮件咨询</GlowButton>
-              </a>
+      <GlassCard className="p-6 sm:p-8">
+        <div className="text-center mb-6">
+          <h2 className="text-xl font-bold text-white mb-2">联系客服 / 开通咨询</h2>
+          <p className="text-sm text-zinc-400">
+            如需升级套餐、企业定制、或有任何问题，欢迎添加客服微信咨询。
+          </p>
+        </div>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <div className="flex items-center gap-3 px-5 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+            <MessageCircle size={20} className="text-emerald-400" />
+            <div>
+              <p className="text-[10px] text-zinc-500 leading-tight">客服微信</p>
+              <p className="text-base font-semibold text-emerald-300 select-all">{WECHAT_ID}</p>
             </div>
           </div>
+          <Link href={START_HREF}>
+            <GlowButton primary className="px-6 py-3">
+              <Zap size={16} />
+              免费体验
+              <ArrowRight size={16} />
+            </GlowButton>
+          </Link>
         </div>
       </GlassCard>
     </div>
@@ -468,7 +603,7 @@ export default function PricingPage() {
                       内测
                     </span>
                   </div>
-                  <p className="text-zinc-400 text-sm">7天团队版体验 + 150积分（解锁 P6–P10 内容生产循环）</p>
+                  <p className="text-zinc-400 text-sm">7天Pro体验 + 150积分（解锁全部80+智能体 + P6–P10内容生产）</p>
                 </div>
               </div>
 
@@ -481,7 +616,7 @@ export default function PricingPage() {
                   <p className="text-xs text-yellow-400 mt-1">先跑通一次“批量交付”</p>
                 </div>
                 <Link href={`${START_HREF}&promo=trial`}>
-                  <GlowButton primary className="px-8 py-3 text-base">
+                  <GlowButton primary className="px-8 py-3 text-base whitespace-nowrap">
                     <Zap size={18} />
                     立即领取
                     <ArrowRight size={16} />
@@ -507,21 +642,22 @@ export default function PricingPage() {
           </div>
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">选择适合你的方案</h1>
           <p className="text-zinc-400 max-w-2xl mx-auto">
-            体验版先跑通交付；创作者版沉淀定位与人设；团队版进入内容生产循环。每次生成消耗积分，减少反复注册薅羊毛。
+            体验版先跑通交付；Plus解锁100+专属智能体；Pro畅享全部智能体+资源下载权限。
           </p>
         </div>
       </section>
 
       {/* Pricing Cards */}
       <section className="pb-20 px-4 sm:px-6">
-        <div className="max-w-6xl mx-auto grid md:grid-cols-2 lg:grid-cols-4 gap-5 items-stretch">
-          {plans.map((plan) => (
+        <div className="max-w-5xl mx-auto grid md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch">
+          {plans.filter(plan => plan.id !== "vip").map((plan) => (
             <PricingCard key={plan.id} plan={plan} />
           ))}
         </div>
       </section>
 
 
+      <AgentBenefitsSection />
       <CreditsSection />
       <PlanMatrix />
       <FAQSection />

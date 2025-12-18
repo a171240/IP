@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { solutionPacksConfig } from "@/lib/agents/config"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { getCreditCostForPackMarkdownDownload, normalizePlan } from "@/lib/pricing/rules"
+import { canDownloadPack, getCreditCostForPackMarkdownDownload, getDownloadPermissionMessage, normalizePlan, PLAN_LABELS } from "@/lib/pricing/rules"
 import { consumeCredits, ensureTrialCreditsIfNeeded, getClientIp, hashIp } from "@/lib/pricing/profile.server"
 
 // 解决方案包的详细内容
@@ -451,6 +451,20 @@ export async function GET(
   const currentPlan = normalizePlan(userProfile?.plan)
   let creditsBalance = Number(userProfile?.credits_balance || 0)
   const creditsUnlimited = Boolean(userProfile?.credits_unlimited) || currentPlan === "vip"
+
+  // 检查下载权限
+  if (!canDownloadPack(packId, currentPlan)) {
+    const message = getDownloadPermissionMessage(packId, currentPlan)
+    return NextResponse.json(
+      {
+        error: message || `此资源需要更高级别会员才能下载`,
+        code: "download_forbidden",
+        current_plan: currentPlan,
+        current_plan_label: PLAN_LABELS[currentPlan],
+      },
+      { status: 403 }
+    )
+  }
 
   const cost = getCreditCostForPackMarkdownDownload(packId, currentPlan)
 

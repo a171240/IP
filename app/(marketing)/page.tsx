@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { ArrowRight, Sparkles, Shield, Zap, BarChart3, Users, Globe, ChevronRight, Play } from "lucide-react"
+import { ArrowRight, Sparkles, Shield, Zap, BarChart3, Users, Globe, ChevronRight, Play, Store, Factory, Palette, LayoutGrid, Gift } from "lucide-react"
 import { GlassCard, GlowButton } from "@/components/ui/obsidian-primitives"
 
 // Marketing Navigation
@@ -128,8 +128,8 @@ const features = [
   },
   {
     icon: Globe,
-    title: "45+行业情绪库",
-    description: "覆盖餐饮、教育、医美、法律等45+行业的情绪价值模板，精准触达目标客户痛点。",
+    title: "46行业情绪选题",
+    description: "覆盖餐饮、教育、医美、法律等46个行业的正反观点情绪选题，Plus会员专属免费使用。",
   },
   {
     icon: Sparkles,
@@ -168,10 +168,10 @@ const FeaturesSection = () => (
 
 // Stats Section
 const stats = [
-  { value: "10+", label: "智能步骤" },
-  { value: "45+", label: "行业模板" },
-  { value: "60+", label: "内容矩阵" },
-  { value: "4X4", label: "方法论体系" },
+  { value: "80+", label: "AI智能体" },
+  { value: "46", label: "行业覆盖" },
+  { value: "4大", label: "解决方案包" },
+  { value: "10步", label: "工作流程" },
 ]
 
 const StatsSection = () => (
@@ -189,6 +189,75 @@ const StatsSection = () => (
   </section>
 )
 
+// Agent Solutions Section
+const solutionPacks = [
+  { name: "实体营销全家桶", count: 13, icon: Store, color: "orange", badge: "Plus专属", badgeColor: "amber" },
+  { name: "46行业选题生成器", count: 46, icon: Factory, color: "cyan", badge: "Plus专属", badgeColor: "amber" },
+  { name: "赛博IP人设模板", count: 12, icon: Palette, color: "pink", badge: "Pro专属", badgeColor: "purple" },
+  { name: "内容矩阵规划包", count: 5, icon: LayoutGrid, color: "indigo", badge: "Pro专属", badgeColor: "purple" },
+]
+
+const AgentShowcaseSection = () => (
+  <section className="py-24 px-4 sm:px-6">
+    <div className="max-w-6xl mx-auto">
+      {/* Section Header */}
+      <div className="text-center mb-16">
+        <p className="text-xs font-mono uppercase tracking-widest text-indigo-400 mb-4">智能体解决方案</p>
+        <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">80+专业智能体，覆盖内容创作全场景</h2>
+        <p className="text-zinc-400 max-w-xl mx-auto">
+          从行业分析到脚本创作，从人设定位到营销转化，一站式解决商业IP内容创作需求
+        </p>
+      </div>
+
+      {/* Solution Packs Grid */}
+      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+        {solutionPacks.map((pack) => (
+          <GlassCard key={pack.name} hover className="p-6 group relative">
+            {/* Badge */}
+            <div className={`absolute top-4 right-4 px-2 py-1 rounded-full text-xs font-medium ${
+              pack.badgeColor === "amber"
+                ? "bg-amber-500/10 border border-amber-500/20 text-amber-400"
+                : "bg-purple-500/10 border border-purple-500/20 text-purple-400"
+            }`}>
+              {pack.badge}
+            </div>
+
+            <div className={`w-12 h-12 rounded-xl bg-${pack.color}-500/10 border border-${pack.color}-500/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
+              <pack.icon size={24} className={`text-${pack.color}-400`} />
+            </div>
+            <h3 className="text-lg font-semibold text-white mb-2">{pack.name}</h3>
+            <p className="text-sm text-zinc-500">
+              <span className="text-2xl font-bold text-white">{pack.count}</span> 个智能体
+            </p>
+          </GlassCard>
+        ))}
+      </div>
+
+      {/* Value Proposition */}
+      <div className="text-center">
+        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/20 mb-6">
+          <Gift size={16} className="text-amber-400" />
+          <span className="text-sm text-amber-300">升级Plus立享100+专属智能体，价值超过￥3000</span>
+        </div>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <Link href="/pricing">
+            <GlowButton className="text-base px-6 py-3">
+              查看会员权益
+              <ChevronRight size={16} className="ml-1" />
+            </GlowButton>
+          </Link>
+          <Link href="/dashboard/profiles">
+            <GlowButton primary className="text-base px-6 py-3">
+              浏览智能体库
+              <ArrowRight size={16} className="ml-2" />
+            </GlowButton>
+          </Link>
+        </div>
+      </div>
+    </div>
+  </section>
+)
+
 // CTA Section
 const CTASection = () => (
   <section className="py-24 px-4 sm:px-6">
@@ -199,8 +268,11 @@ const CTASection = () => (
 
         <div className="relative">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">准备好打造你的商业IP了吗？</h2>
-          <p className="text-zinc-400 mb-8 max-w-xl mx-auto">
-            立即开始使用IP内容工厂，让AI帮你完成从定位到变现的全流程内容创作
+          <p className="text-zinc-400 mb-4 max-w-xl mx-auto">
+            立即开始使用IP内容工厂，新用户赠送30积分体验
+          </p>
+          <p className="text-indigo-400 text-sm mb-8">
+            升级Plus解锁100+专属智能体 · 升级Pro畅享全部智能体+下载权限
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link href="/auth/register?redirect=/dashboard/quick-start">
@@ -255,6 +327,7 @@ export default function LandingPage() {
       <HeroSection />
       <StatsSection />
       <FeaturesSection />
+      <AgentShowcaseSection />
       <CTASection />
       <Footer />
     </main>

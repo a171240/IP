@@ -219,8 +219,8 @@ const workflowPhases = [
 // 会员等级对应关系
 const planLabels: Record<string, { label: string; color: string }> = {
   free: { label: "体验版", color: "zinc" },
-  basic: { label: "创作者版", color: "blue" },
-  pro: { label: "团队版", color: "purple" },
+  basic: { label: "Plus", color: "blue" },
+  pro: { label: "Pro", color: "purple" },
   vip: { label: "企业版", color: "amber" },
 }
 

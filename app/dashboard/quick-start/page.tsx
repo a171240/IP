@@ -62,8 +62,8 @@ interface InputField {
 
 const planLabels: Record<string, string> = {
   free: "体验版",
-  basic: "创作者版",
-  pro: "团队版",
+  basic: "Plus",
+  pro: "Pro",
   vip: "企业版",
 }
 
@@ -859,10 +859,10 @@ export default function QuickStartPage() {
                     <div>
                       <div className="flex items-center gap-2 mb-2">
                         <Gift className="w-4 h-4 text-yellow-400" />
-                        <h3 className="text-sm font-semibold dark:text-white text-zinc-900">新用户体验计划：7天团队版体验</h3>
+                        <h3 className="text-sm font-semibold dark:text-white text-zinc-900">新用户体验计划：7天Pro体验</h3>
                       </div>
                       <p className="text-xs dark:text-zinc-400 text-zinc-500 leading-relaxed">
-                        体验版让你“先跑通一条”，团队版帮你“批量产出 + 60期规划 + 多人设管理”。
+                        体验版让你"先跑通一条"，Pro帮你解锁全部80+智能体 + 批量产出 + 资源下载。
                       </p>
                     </div>
 
@@ -871,7 +871,7 @@ export default function QuickStartPage() {
                         <span className="text-2xl font-bold dark:text-white text-zinc-900">￥9.9</span>
                         <span className="text-xs text-zinc-500 line-through">￥599</span>
                       </div>
-                      <p className="text-[10px] text-zinc-500">体验 7 天团队版</p>
+                      <p className="text-[10px] text-zinc-500">体验 7 天Pro</p>
                     </div>
                   </div>
 
@@ -896,7 +896,7 @@ export default function QuickStartPage() {
             <div className="text-center py-6">
               <p className="text-zinc-500 text-sm">选择交付物 → 填写信息 → 点击生成 → 保存到报告 → 进入工坊体系化沉淀</p>
               <p className="mt-2 text-[10px] text-zinc-600">
-                体验版更适合“先跑通一条”，想批量产出和规划内容日历，建议升级团队版。
+                体验版更适合"先跑通一条"，想解锁全部智能体和下载权限，建议升级Plus/Pro。
               </p>
               <div className="mt-4 flex items-center justify-center gap-3 text-xs text-zinc-500">
                 <Link href="/dashboard/workflow" className="hover:text-purple-300 transition-colors">

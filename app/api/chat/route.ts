@@ -4,9 +4,11 @@ import { readPromptFile } from '@/lib/prompts/prompts.server'
 import { getAgentPrompt } from '@/lib/agents/prompt.server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getClientIp, hashIp } from '@/lib/pricing/profile.server'
+import { agentsConfig } from '@/lib/agents/config'
 
 import {
   getCreditCostForUseWithPlanRule,
+  getAgentCreditCost,
   getRequiredPlanForAgent,
   getRequiredPlanForWorkflowStep,
   isPlanSufficient,
@@ -29,6 +31,36 @@ function getRequiredPlan(stepId: string | undefined, agentId: string | undefined
     return getRequiredPlanForAgent(id, promptFile)
   }
   return getRequiredPlanForWorkflowStep(stepId)
+}
+
+// 计算实际积分消耗（智能体或工作流步骤）
+function calculateCreditCost(opts: {
+  stepId: string | undefined
+  agentId: string | undefined
+  mode: string | undefined
+  currentPlan: PlanId
+  planOk: boolean
+  allowCreditsOverride: boolean
+}): number {
+  const { stepId, agentId, mode, currentPlan, planOk, allowCreditsOverride } = opts
+
+  // 智能体调用：使用智能体专属积分计算
+  if (stepId?.startsWith('agent:') || (agentId && !stepId?.match(/^P\d+$/))) {
+    const id = agentId || (stepId?.startsWith('agent:') ? stepId.slice('agent:'.length) : '')
+    if (id) {
+      const agent = agentsConfig.find(a => a.id === id.trim())
+      return getAgentCreditCost(agent?.tier, currentPlan)
+    }
+  }
+
+  // 工作流步骤：使用原有逻辑（含跨级倍率）
+  return getCreditCostForUseWithPlanRule({
+    stepId,
+    mode,
+    planOk,
+    allowCreditsOverride,
+    currentPlan,
+  })
 }
 
 function isCreditsSchemaMissing(message: string | undefined): boolean {
@@ -159,21 +191,23 @@ export async function POST(request: NextRequest) {
     const planOk = isPlanSufficient(userProfile.plan, requiredPlan)
 
     if (!planOk && !allowCreditsOverride) {
-      const currentPlan = normalizePlan(userProfile.plan)
-      const creditCostQuote = getCreditCostForUseWithPlanRule({
+      const curPlan = normalizePlan(userProfile.plan)
+      const creditCostQuote = calculateCreditCost({
         stepId,
+        agentId,
         mode,
+        currentPlan: curPlan,
         planOk: false,
         allowCreditsOverride: true,
       })
       const balanceQuote = Number(userProfile.credits_balance || 0)
       return jsonError(
         403,
-        `?????${PLAN_LABELS[currentPlan]}?????????????${PLAN_LABELS[requiredPlan]}?????????${creditCostQuote} ??/??`,
+        `您当前是${PLAN_LABELS[curPlan]}，此功能需要${PLAN_LABELS[requiredPlan]}。或消耗${creditCostQuote}积分/次`,
         {
           code: 'plan_required',
           required_plan: requiredPlan,
-          current_plan: currentPlan,
+          current_plan: curPlan,
           credit_cost: creditCostQuote,
           balance: balanceQuote,
         }
@@ -226,7 +260,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const creditCost = getCreditCostForUseWithPlanRule({ stepId, mode, planOk, allowCreditsOverride: Boolean(allowCreditsOverride) })
+    const currentPlan = normalizePlan(userProfile.plan)
+    const creditCost = calculateCreditCost({
+      stepId,
+      agentId,
+      mode,
+      currentPlan,
+      planOk,
+      allowCreditsOverride: Boolean(allowCreditsOverride),
+    })
     let creditsRemaining = creditsBalance
 
     if (!creditsUnlimited) {

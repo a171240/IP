@@ -32,8 +32,8 @@ const WORKFLOW_STEPS: StepDefinition[] = [
 
 const planLabels: Record<string, string> = {
   free: "体验版",
-  basic: "创作者版",
-  pro: "团队版",
+  basic: "Plus",
+  pro: "Pro",
   vip: "企业版",
 }
 
