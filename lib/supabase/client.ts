@@ -1,45 +1,53 @@
-import { createBrowserClient } from '@supabase/ssr'
+import { createBrowserClient } from "@supabase/ssr"
 
-export function createClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+function getSupabaseUrl(): string {
+  const url =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    process.env.NEXT_PUBLIC_IPgongchang_SUPABASE_URL ||
+    process.env.IPgongchang_SUPABASE_URL
 
-  // 验证环境变量
-  if (!url || !key) {
-    console.error('Supabase 配置缺失:', {
-      url: url ? '已配置' : '未配置',
-      key: key ? '已配置' : '未配置'
-    })
-    throw new Error('Supabase 环境变量未配置，请检查 .env.local 文件')
+  if (!url) {
+    throw new Error("Supabase env missing: NEXT_PUBLIC_SUPABASE_URL (or NEXT_PUBLIC_IPgongchang_SUPABASE_URL)")
   }
 
-  // 验证 URL 格式
+  return url
+}
+
+function getSupabaseAnonKey(): string {
+  const key =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.NEXT_PUBLIC_IPgongchang_SUPABASE_ANON_KEY ||
+    process.env.NEXT_PUBLIC_IPgongchang_SUPABASE_PUBLISHABLE_KEY
+
+  if (!key) {
+    throw new Error("Supabase env missing: NEXT_PUBLIC_SUPABASE_ANON_KEY (or NEXT_PUBLIC_IPgongchang_SUPABASE_ANON_KEY)")
+  }
+
+  return key
+}
+
+export function createClient() {
+  const url = getSupabaseUrl()
+  const key = getSupabaseAnonKey()
+
   try {
     new URL(url)
   } catch {
-    console.error('Supabase URL 格式无效:', url)
-    throw new Error('Supabase URL 格式无效')
+    throw new Error("Supabase URL format invalid")
   }
 
   return createBrowserClient(url, key)
 }
 
-// 导出单例客户端，用于客户端组件
 let supabaseClient: ReturnType<typeof createClient> | null = null
 
 export function getSupabaseClient() {
   if (!supabaseClient) {
-    try {
-      supabaseClient = createClient()
-    } catch (error) {
-      console.error('创建 Supabase 客户端失败:', error)
-      throw error
-    }
+    supabaseClient = createClient()
   }
   return supabaseClient
 }
 
-// 重置客户端（用于测试或重新连接）
 export function resetSupabaseClient() {
   supabaseClient = null
 }
