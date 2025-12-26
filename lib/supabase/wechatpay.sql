@@ -1,0 +1,41 @@
+﻿-- 微信支付 Native 订单表
+-- 在 Supabase 的 SQL Editor 执行本文件
+
+CREATE TABLE IF NOT EXISTS public.wechatpay_orders (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  out_trade_no TEXT NOT NULL UNIQUE,
+  client_secret TEXT NOT NULL,
+  description TEXT NOT NULL,
+  amount_total INT NOT NULL CHECK (amount_total > 0),
+  currency TEXT NOT NULL DEFAULT 'CNY',
+  status TEXT NOT NULL DEFAULT 'created' CHECK (status IN ('created', 'paid', 'closed', 'failed')),
+  code_url TEXT,
+  wx_transaction_id TEXT,
+  paid_at TIMESTAMPTZ,
+  claimed_at TIMESTAMPTZ,
+  raw_notify JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.wechatpay_orders ENABLE ROW LEVEL SECURITY;
+
+-- 登录用户只能查询自己的订单；未登录用户通过后端接口（带 client_secret）查询
+DROP POLICY IF EXISTS "Users can select own wechatpay_orders" ON public.wechatpay_orders;
+CREATE POLICY "Users can select own wechatpay_orders" ON public.wechatpay_orders
+  FOR SELECT USING (auth.uid() = user_id);
+
+-- 通常订单由服务端使用 service_role 写入；此策略仅用于兼容需要用户直写的场景
+DROP POLICY IF EXISTS "Users can insert own wechatpay_orders" ON public.wechatpay_orders;
+CREATE POLICY "Users can insert own wechatpay_orders" ON public.wechatpay_orders
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE INDEX IF NOT EXISTS idx_wechatpay_orders_user_id ON public.wechatpay_orders(user_id);
+CREATE INDEX IF NOT EXISTS idx_wechatpay_orders_status_created_at ON public.wechatpay_orders(status, created_at);
+CREATE INDEX IF NOT EXISTS idx_wechatpay_orders_out_trade_no_secret ON public.wechatpay_orders(out_trade_no, client_secret);
+
+DROP TRIGGER IF EXISTS update_wechatpay_orders_updated_at ON public.wechatpay_orders;
+CREATE TRIGGER update_wechatpay_orders_updated_at
+  BEFORE UPDATE ON public.wechatpay_orders
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

@@ -1,4 +1,4 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
@@ -345,7 +345,7 @@ html, body {
 .stagger-children > *:nth-child(5) { animation-delay: 200ms; }
 .stagger-children > *:nth-child(6) { animation-delay: 250ms; }
 
-/* 流式输出打字机效果 */
+/* 娴佸紡杈撳嚭鎵撳瓧鏈烘晥鏋?*/
 @keyframes cursor-blink {
   0%, 50% { opacity: 1; }
   51%, 100% { opacity: 0; }
@@ -356,7 +356,7 @@ html, body {
 }
 
 .streaming-text::after {
-  content: '▊';
+  content: '|';
   display: inline-block;
   margin-left: 2px;
   animation: cursor-blink 0.8s ease-in-out infinite;
@@ -364,7 +364,7 @@ html, body {
   opacity: 0.7;
 }
 
-/* 新文字淡入效果 */
+/* 鏂版枃瀛楁贰鍏ユ晥鏋?*/
 @keyframes text-fade-in {
   from {
     opacity: 0.3;
@@ -378,13 +378,13 @@ html, body {
   animation: text-fade-in 0.15s ease-out forwards;
 }
 
-/* 流式输出容器的平滑滚动 */
+/* 娴佸紡杈撳嚭瀹瑰櫒鐨勫钩婊戞粴鍔?*/
 .streaming-container {
   scroll-behavior: smooth;
 }
 
 @theme inline {
-  /* 优化字体栈：DM Sans（英文）+ 中文字体栈 */
+  /* 浼樺寲瀛椾綋鏍堬細DM Sans锛堣嫳鏂囷級+ 涓枃瀛椾綋鏍?*/
   --font-sans: var(--font-dm-sans), "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", system-ui, sans-serif;
   --font-mono: var(--font-mono), "SF Mono", ui-monospace, monospace;
   --color-background: var(--background);
@@ -463,3 +463,5 @@ html, body {
   content-visibility: auto;
   contain-intrinsic-size: 1px 900px;
 }
+
+

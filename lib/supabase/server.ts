@@ -27,3 +27,10 @@ export async function createServerSupabaseClient() {
     }
   )
 }
+
+
+// Back-compat alias for older imports
+export async function createClient() {
+  return createServerSupabaseClient()
+}
+
