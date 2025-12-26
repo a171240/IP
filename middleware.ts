@@ -55,7 +55,9 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   const protectedRoutes = ["/dashboard"]
-  const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
+  const publicRoutes = ["/dashboard/quick-start"]
+  const isPublicRoute = publicRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`))
+  const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route)) && !isPublicRoute
 
   const authRoutes = ["/auth/login", "/auth/register"]
   const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route))

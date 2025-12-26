@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import {
   ArrowRight,
   BookmarkPlus,
@@ -10,6 +10,7 @@ import {
   ChevronDown,
   Copy,
   Crown,
+  Download,
   Gift,
   Layers,
   Lightbulb,
@@ -59,6 +60,9 @@ interface InputField {
   required?: boolean
   helper?: string
 }
+
+const QUICK_START_RESUME_KEY = "quickStartResume"
+type PendingAction = "copy" | "download" | "save"
 
 const planLabels: Record<string, string> = {
   free: "体验版",
@@ -185,7 +189,8 @@ const agents: AgentConfig[] = [
 
 export default function QuickStartPage() {
   const router = useRouter()
-  const { profile, loading: authLoading, refreshProfile } = useAuth()
+  const pathname = usePathname()
+  const { user, profile, loading: authLoading, refreshProfile } = useAuth()
 
   const [selectedAgent, setSelectedAgent] = useState<AgentType>("quick-script")
   const [formData, setFormData] = useState<Record<string, string>>({})
@@ -199,6 +204,7 @@ export default function QuickStartPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
 
   const resultRef = useRef<HTMLDivElement>(null)
 
@@ -207,11 +213,85 @@ export default function QuickStartPage() {
 
   const currentAgent = useMemo(() => agents.find((a) => a.id === selectedAgent)!, [selectedAgent])
 
+  const ensureAuthed = (action: PendingAction) => {
+    if (user) return true
+
+    try {
+      sessionStorage.setItem(
+        QUICK_START_RESUME_KEY,
+        JSON.stringify({
+          action,
+          result,
+          generationContext,
+          selectedAgent,
+          formData,
+          customInputs,
+        })
+      )
+    } catch {
+      // ignore storage errors
+    }
+
+    const redirectTo = `${pathname}?resume=1`
+    router.push(`/auth/login?redirect=${encodeURIComponent(redirectTo)}`)
+    return false
+  }
+
+  const handleDownload = () => {
+    if (!result) return
+
+    const date = new Date().toISOString().slice(0, 10)
+    const blob = new Blob([result], { type: "text/markdown;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `快速体验_${date}.md`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  }
+
   // 读取使用次数（仅本地统计，用于提示用户复用）
   useEffect(() => {
     const count = localStorage.getItem("quickStartUsageCount")
     if (count) setUsageCount(parseInt(count))
   }, [])
+
+  // Resume a pending action after login (copy/download/save).
+  useEffect(() => {
+    if (!user) return
+    if (typeof window === "undefined") return
+
+    const params = new URLSearchParams(window.location.search)
+    if (params.get("resume") !== "1") return
+
+    try {
+      const raw = sessionStorage.getItem(QUICK_START_RESUME_KEY)
+      if (!raw) return
+
+      const parsed = JSON.parse(raw) as {
+        action?: PendingAction
+        result?: string
+        generationContext?: GenerationContext | null
+        selectedAgent?: AgentType
+        formData?: Record<string, string>
+        customInputs?: Record<string, string>
+      }
+
+      if (parsed.selectedAgent) setSelectedAgent(parsed.selectedAgent)
+      if (parsed.formData) setFormData(parsed.formData)
+      if (parsed.customInputs) setCustomInputs(parsed.customInputs)
+      if (parsed.generationContext) setGenerationContext(parsed.generationContext)
+      if (parsed.result) setResult(parsed.result)
+
+      if (parsed.action) setPendingAction(parsed.action)
+      sessionStorage.removeItem(QUICK_START_RESUME_KEY)
+    } catch {
+      // ignore resume errors
+    }
+  }, [user])
 
   // 切换智能体时清空表单
   useEffect(() => {
@@ -467,11 +547,24 @@ export default function QuickStartPage() {
     }
   }
 
+  useEffect(() => {
+    if (!user) return
+    if (!pendingAction) return
+    if (!result) return
+
+    if (pendingAction === "save") {
+      handleSaveToReports()
+    }
+
+    setPendingAction(null)
+  }, [user, pendingAction, result])
+
   const showUpgrade = !authLoading && currentPlan === "free"
+  const homeHref = user ? "/dashboard" : "/"
 
   return (
     <div className="min-h-screen">
-      <Header breadcrumbs={[{ label: "主页", href: "/dashboard" }, { label: "快速体验" }]} />
+      <Header breadcrumbs={[{ label: "主页", href: homeHref }, { label: "快速体验" }]} />
 
       <main className="p-6 lg:p-8">
         <div className="max-w-5xl mx-auto space-y-6">
@@ -788,7 +881,23 @@ export default function QuickStartPage() {
                       <RefreshCw className="w-3 h-3" />
                       重新生成
                     </GlowButton>
-                    <GlowButton onClick={handleCopy} className="text-xs py-2 px-3">
+                    <GlowButton
+                      onClick={() => {
+                        if (!ensureAuthed("download")) return
+                        handleDownload()
+                      }}
+                      className="text-xs py-2 px-3"
+                    >
+                      <Download className="w-3 h-3" />
+                      下载
+                    </GlowButton>
+                    <GlowButton
+                      onClick={() => {
+                        if (!ensureAuthed("copy")) return
+                        handleCopy()
+                      }}
+                      className="text-xs py-2 px-3"
+                    >
                       {copied ? (
                         <>
                           <Check className="w-3 h-3" />
@@ -816,6 +925,7 @@ export default function QuickStartPage() {
                         router.push("/dashboard/reports")
                         return
                       }
+                      if (!ensureAuthed("save")) return
                       handleSaveToReports()
                     }}
                     disabled={isSaving}
