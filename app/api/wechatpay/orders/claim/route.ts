@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     .update({ user_id: user.id, claimed_at: new Date().toISOString() })
     .eq("out_trade_no", outTradeNo)
     .eq("client_secret", secret)
-    .select("out_trade_no,status,amount_total,currency,description,paid_at,wx_transaction_id,created_at")
+    .select("out_trade_no,status,amount_total,currency,description,paid_at,wx_transaction_id,claimed_at,created_at")
     .single()
 
   if (error || !updated) {
@@ -42,3 +42,4 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json(updated)
 }
+
