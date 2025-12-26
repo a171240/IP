@@ -214,13 +214,13 @@ export default function LandingPage() {
             <Link href="/auth/login" className="px-4 py-2 text-sm text-zinc-500 hover:text-white transition-colors">
               登录
             </Link>
-            <Link href="/dashboard/quick-start">
+            <Link href="/diagnosis">
             <GlowButton
               primary
               className="px-4 sm:px-6 py-2.5 text-sm"
             >
               <Zap size={16} />
-              免费生成脚本
+              免费快速诊断
               <ArrowRight size={14} />
             </GlowButton>
             </Link>
@@ -272,13 +272,13 @@ export default function LandingPage() {
                     {/* CTA */}
           <div className="flex flex-col items-center gap-6">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link href="/dashboard/quick-start">
+              <Link href="/diagnosis">
               <GlowButton
                 primary
                 className="px-12 py-5 text-lg font-medium"
               >
                 <Zap size={20} />
-                免费生成脚本（体验版）
+                免费快速诊断IP健康（体验版）
                 <ArrowRight size={18} />
               </GlowButton>
               </Link>
@@ -292,7 +292,7 @@ export default function LandingPage() {
             </div>
 
             <span className="text-sm text-zinc-500">
-              30秒生成：10个选题 + 1条完整脚本（体验版）
+              3分钟测完：8道题 + 五维评分 + 改进建议（体验版）
             </span>
           </div>
         </div>
@@ -421,13 +421,13 @@ export default function LandingPage() {
           </div>
 
           <div className="flex justify-center mt-10">
-            <Link href="/dashboard/quick-start">
+            <Link href="/diagnosis">
             <GlowButton
               primary
               className="px-10 py-4 text-base"
             >
               <Zap size={18} />
-              免费生成脚本（体验版）
+              免费快速诊断IP健康（体验版）
               <ArrowRight size={16} />
             </GlowButton>
             </Link>
@@ -679,13 +679,13 @@ export default function LandingPage() {
 
           {/* CTA */}
           <div className="flex justify-center">
-            <Link href="/dashboard/quick-start">
+            <Link href="/diagnosis">
             <GlowButton
               primary
               className="px-10 py-4 text-base"
             >
               <Zap size={18} />
-              免费生成脚本，体验交付流程
+              免费快速诊断IP健康，先测再优化
               <ArrowRight size={16} />
             </GlowButton>
             </Link>
@@ -935,13 +935,13 @@ export default function LandingPage() {
 
           {/* 双CTA */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-            <Link href="/dashboard/quick-start">
+            <Link href="/diagnosis">
             <GlowButton
               primary
               className="px-10 py-5 text-lg font-medium"
             >
               <Zap size={20} />
-              免费生成脚本（体验版）
+              免费快速诊断IP健康（体验版）
               <ArrowRight size={18} />
             </GlowButton>
             </Link>

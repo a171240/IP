@@ -32,9 +32,9 @@ const MarketingNav = () => (
         <Link href="/auth/login">
           <button className="text-zinc-400 hover:text-white transition-colors text-sm px-4 py-2">登录</button>
         </Link>
-        <Link href="/auth/register?redirect=/dashboard/quick-start">
+        <Link href="/diagnosis">
           <GlowButton primary className="text-sm px-5 py-2.5">
-            免费体验
+            免费快速诊断
           </GlowButton>
         </Link>
       </div>
@@ -69,9 +69,9 @@ const HeroSection = () => (
 
       {/* CTAs */}
       <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
-        <Link href="/auth/register?redirect=/dashboard/quick-start">
+        <Link href="/diagnosis">
           <GlowButton primary className="text-base px-8 py-4">
-            免费开始体验
+            免费快速诊断IP健康
             <ArrowRight size={18} className="ml-2" />
           </GlowButton>
         </Link>
@@ -275,9 +275,9 @@ const CTASection = () => (
             升级Plus解锁100+专属智能体 · 升级Pro畅享全部智能体+下载权限
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href="/auth/register?redirect=/dashboard/quick-start">
+            <Link href="/diagnosis">
               <GlowButton primary className="text-base px-8 py-4">
-                免费开始体验
+                免费快速诊断IP健康
                 <ArrowRight size={18} className="ml-2" />
               </GlowButton>
             </Link>
