@@ -86,7 +86,7 @@ const plans = [
     highlighted: false,
     badge: "超值" as string | undefined,
     cta: "升级Plus",
-    ctaHref: START_HREF,
+    ctaHref: "/pay?product=basic_month",
   },
   {
     id: "pro" as const,
@@ -107,7 +107,7 @@ const plans = [
     highlighted: true,
     badge: "推荐",
     cta: "升级Pro",
-    ctaHref: START_HREF,
+    ctaHref: "/pay?product=pro_month",
   },
   {
     id: "vip" as const,

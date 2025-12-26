@@ -1,6 +1,7 @@
 ﻿"use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import QRCode from "qrcode"
 
 import { useAuth } from "@/contexts/auth-context"
@@ -15,15 +16,29 @@ type UnifiedOrderResponse = {
   code_url: string
 }
 
+type Product = {
+  id: string
+  name: string
+  plan: "free" | "basic" | "pro" | "vip"
+  amount_total: number
+  currency: string
+  description: string
+  credits_grant: number
+}
+
 type OrderStatusResponse = {
   out_trade_no: string
   status: "created" | "paid" | "closed" | "failed"
   amount_total: number
   currency: string
   description: string
+  product_id?: string | null
   paid_at: string | null
   wx_transaction_id: string | null
   claimed_at?: string | null
+  grant_status?: string | null
+  granted_at?: string | null
+  grant_error?: string | null
   created_at: string
 }
 
@@ -31,6 +46,7 @@ type StoredOrder = {
   out_trade_no: string
   client_secret: string
   code_url?: string
+  product_id?: string | null
 }
 
 const STORAGE_KEY = "wechatpay:last_order"
@@ -42,7 +58,15 @@ function centsFromYuan(input: string): number {
 }
 
 export function PayPageClient() {
+  const searchParams = useSearchParams()
   const { user, loading: authLoading } = useAuth()
+
+  const productFromUrl = searchParams.get("product")
+  const allowCustom = searchParams.get("mode") === "custom"
+
+  const [products, setProducts] = useState<Product[]>([])
+  const [productsLoading, setProductsLoading] = useState(true)
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(productFromUrl)
 
   const [amountYuan, setAmountYuan] = useState("0.01")
   const [description, setDescription] = useState("测试支付")
@@ -59,6 +83,43 @@ export function PayPageClient() {
   const pollTimer = useRef<number | null>(null)
 
   const amountTotal = useMemo(() => centsFromYuan(amountYuan), [amountYuan])
+  const selectedProduct = useMemo(
+    () => (selectedProductId ? products.find((p) => p.id === selectedProductId) || null : null),
+    [products, selectedProductId]
+  )
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      setProductsLoading(true)
+      try {
+        const res = await fetch("/api/wechatpay/products")
+        const data = (await res.json()) as { products?: Product[]; error?: string }
+        if (!res.ok) throw new Error(data.error || "获取套餐失败")
+        const list = Array.isArray(data.products) ? data.products : []
+        if (!cancelled) setProducts(list)
+      } catch {
+        if (!cancelled) setProducts([])
+      } finally {
+        if (!cancelled) setProductsLoading(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (productFromUrl) setSelectedProductId(productFromUrl)
+  }, [productFromUrl])
+
+  useEffect(() => {
+    if (allowCustom) return
+    if (selectedProductId) return
+    if (productsLoading) return
+    if (products.length > 0) setSelectedProductId(products[0]!.id)
+  }, [allowCustom, products, productsLoading, selectedProductId])
 
   useEffect(() => {
     try {
@@ -67,6 +128,7 @@ export function PayPageClient() {
       const parsed = JSON.parse(raw) as StoredOrder
       if (parsed?.out_trade_no && parsed?.client_secret) {
         setOrder(parsed)
+        if (parsed.product_id && !productFromUrl) setSelectedProductId(parsed.product_id)
       }
     } catch {
       // ignore
@@ -152,15 +214,24 @@ export function PayPageClient() {
   async function createOrder() {
     setError(null)
 
-    if (!Number.isInteger(amountTotal) || amountTotal <= 0) {
-      setError("请输入正确金额（单位：元）")
+    const usingProduct = Boolean(selectedProduct)
+
+    if (!usingProduct && !allowCustom) {
+      setError("请从定价页面进入购买，或使用 /pay?mode=custom 测试自定义金额")
       return
     }
 
-    const desc = description.trim()
-    if (!desc) {
-      setError("请输入商品描述")
-      return
+    if (!usingProduct) {
+      if (!Number.isInteger(amountTotal) || amountTotal <= 0) {
+        setError("请输入正确金额（单位：元）")
+        return
+      }
+
+      const desc = description.trim()
+      if (!desc) {
+        setError("请输入商品描述")
+        return
+      }
     }
 
     setCreating(true)
@@ -168,7 +239,9 @@ export function PayPageClient() {
       const res = await fetch("/api/wechatpay/native/unified-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount_total: amountTotal, description: desc }),
+        body: JSON.stringify(
+          usingProduct ? { product_id: selectedProduct!.id } : { amount_total: amountTotal, description: description.trim() }
+        ),
       })
 
       const data = (await res.json()) as UnifiedOrderResponse | { error: string }
@@ -180,6 +253,7 @@ export function PayPageClient() {
         out_trade_no: (data as UnifiedOrderResponse).out_trade_no,
         client_secret: (data as UnifiedOrderResponse).client_secret,
         code_url: (data as UnifiedOrderResponse).code_url,
+        product_id: usingProduct ? selectedProduct!.id : null,
       }
 
       setOrder(nextOrder)
@@ -209,10 +283,7 @@ export function PayPageClient() {
         throw new Error("error" in data ? data.error : "绑定失败")
       }
       setClaimed(true)
-      setOrderStatus((prev) => ({
-        ...(prev || (data as OrderStatusResponse)),
-        claimed_at: new Date().toISOString(),
-      }))
+      setOrderStatus(data as OrderStatusResponse)
     } catch (e) {
       setError(e instanceof Error ? e.message : "绑定失败")
     } finally {
@@ -233,19 +304,58 @@ export function PayPageClient() {
         <Card>
           <CardHeader>
             <CardTitle>创建订单</CardTitle>
-            <CardDescription>金额单位是元（自动换算为分）。</CardDescription>
+            <CardDescription>选择套餐后生成二维码，用微信扫一扫支付。</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-2">
-              <Label htmlFor="amount">金额（元）</Label>
-              <Input id="amount" value={amountYuan} onChange={(e) => setAmountYuan(e.target.value)} placeholder="例如 9.9" />
-              <div className="text-xs text-muted-foreground">将以 {Number.isFinite(amountTotal) ? amountTotal : "-"} 分下单</div>
+              <Label>套餐</Label>
+              {productsLoading ? (
+                <div className="text-sm text-muted-foreground">加载中...</div>
+              ) : products.length === 0 ? (
+                <div className="text-sm text-red-500">套餐加载失败，请刷新重试</div>
+              ) : (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {products.map((p) => {
+                    const active = p.id === selectedProductId
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setSelectedProductId(p.id)}
+                        className={`rounded-xl border p-4 text-left transition-colors ${
+                          active ? "border-emerald-500/40 bg-emerald-500/10" : "hover:bg-muted/50"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="font-semibold">{p.name}</div>
+                          <div className="font-mono text-sm">¥{(p.amount_total / 100).toFixed(2)}</div>
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">赠送 {p.credits_grant} 积分</div>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
             </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="desc">描述</Label>
-              <Input id="desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="例如：会员充值" />
-            </div>
+            {allowCustom && (
+              <div className="grid gap-3 rounded-xl border p-4">
+                <div className="text-sm font-medium">自定义金额（测试模式）</div>
+                <div className="grid gap-2">
+                  <Label htmlFor="amount">金额（元）</Label>
+                  <Input id="amount" value={amountYuan} onChange={(e) => setAmountYuan(e.target.value)} placeholder="例如 9.9" />
+                  <div className="text-xs text-muted-foreground">将以 {Number.isFinite(amountTotal) ? amountTotal : "-"} 分下单</div>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="desc">描述</Label>
+                  <Input id="desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="例如：会员充值" />
+                </div>
+                <div className="text-xs text-muted-foreground">测试下单不会自动开通权限与积分</div>
+                <Button variant="outline" onClick={() => setSelectedProductId(null)}>
+                  使用自定义金额下单
+                </Button>
+              </div>
+            )}
 
             <div className="flex flex-wrap gap-2">
               <Button onClick={createOrder} disabled={creating}>
@@ -297,6 +407,14 @@ export function PayPageClient() {
                   <div className="font-medium">{orderStatus?.status || "-"}</div>
                 </div>
                 <div className="flex items-center justify-between gap-3">
+                  <div className="text-muted-foreground">套餐</div>
+                  <div className="font-mono text-xs">{orderStatus?.product_id || order.product_id || "-"}</div>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-muted-foreground">开通</div>
+                  <div className="font-medium">{orderStatus?.grant_status || "-"}</div>
+                </div>
+                <div className="flex items-center justify-between gap-3">
                   <div className="text-muted-foreground">微信交易号</div>
                   <div className="font-mono text-xs break-all">{orderStatus?.wx_transaction_id || "-"}</div>
                 </div>
@@ -309,7 +427,15 @@ export function PayPageClient() {
               {orderStatus?.status === "paid" && (
                 <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm">
                   <div className="font-semibold text-emerald-400">支付成功</div>
-                  <div className="mt-1 text-muted-foreground">你可以继续注册/登录，然后把订单绑定到账号。</div>
+                  {orderStatus?.grant_status === "granted" ? (
+                    <div className="mt-1 text-muted-foreground">已自动开通权限与积分，可直接进入产品使用。</div>
+                  ) : orderStatus?.grant_status === "failed" ? (
+                    <div className="mt-1 text-red-500">自动开通失败：{orderStatus?.grant_error || "请联系客服处理"}</div>
+                  ) : !claimed && (orderStatus?.grant_status === "pending" || !orderStatus?.grant_status) ? (
+                    <div className="mt-1 text-muted-foreground">支付成功。请先登录并绑定订单，系统会自动开通权限与积分。</div>
+                  ) : (
+                    <div className="mt-1 text-muted-foreground">正在为你开通权限与积分（可能需要几秒）。</div>
+                  )}
                   <div className="mt-3 flex flex-wrap gap-2">
                     {canClaim ? (
                       <Button onClick={claimOrder} disabled={claiming || authLoading}>
@@ -322,6 +448,11 @@ export function PayPageClient() {
                     ) : (
                       <Button variant="secondary" disabled>
                         {authLoading ? "登录状态读取中..." : "登录后可绑定"}
+                      </Button>
+                    )}
+                    {orderStatus?.grant_status === "granted" && (
+                      <Button asChild variant="secondary">
+                        <a href="/dashboard">进入控制台</a>
                       </Button>
                     )}
                     {!user && (
