@@ -1,7 +1,6 @@
 import { Suspense } from "react"
 
 import { PayPageClient } from "./pay-page-client"
-import { Suspense } from "react"
 
 export default function PayPage() {
   return (
