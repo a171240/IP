@@ -163,6 +163,8 @@ export async function wechatpayCreateNativeOrder(params: WechatpayOrderParams): 
       Authorization: authorization,
       Accept: "application/json",
       "Content-Type": "application/json",
+      // When using public key mode, Wechatpay-Serial should be public key ID.
+      "Wechatpay-Serial": env.platformVerify.id,
     },
     body: bodyString,
   })
@@ -178,6 +180,43 @@ export async function wechatpayCreateNativeOrder(params: WechatpayOrderParams): 
   }
 
   return { codeUrl: data.code_url }
+}
+
+export async function wechatpayQueryByOutTradeNo(outTradeNo: string): Promise<{
+  trade_state: string
+  transaction_id?: string
+  success_time?: string
+}> {
+  const env = getWechatpayEnv()
+  const encoded = encodeURIComponent(outTradeNo)
+  const pathWithQuery = `/v3/pay/transactions/out-trade-no/${encoded}?mchid=${env.mchId}`
+
+  const nonce = randomNonce()
+  const timestamp = Math.floor(Date.now() / 1000)
+  const authorization = buildAuthorizationHeader({
+    env,
+    method: "GET",
+    pathWithQuery,
+    bodyString: "",
+    nonce,
+    timestamp,
+  })
+
+  const res = await fetch(`https://api.mch.weixin.qq.com${pathWithQuery}`, {
+    method: "GET",
+    headers: {
+      Authorization: authorization,
+      Accept: "application/json",
+      "Wechatpay-Serial": env.platformVerify.id,
+    },
+  })
+
+  const text = await res.text()
+  if (!res.ok) {
+    throw new Error(`Wechatpay query failed: ${res.status} ${text}`)
+  }
+
+  return JSON.parse(text) as { trade_state: string; transaction_id?: string; success_time?: string }
 }
 
 export function verifyWechatpayCallbackSignature(opts: { headers: Headers; bodyText: string }): boolean {

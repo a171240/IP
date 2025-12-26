@@ -10,6 +10,12 @@ export async function POST(request: NextRequest) {
 
   const verified = verifyWechatpayCallbackSignature({ headers: request.headers, bodyText })
   if (!verified) {
+    console.error("wechatpay notify invalid signature", {
+      serial: request.headers.get("wechatpay-serial"),
+      timestamp: request.headers.get("wechatpay-timestamp"),
+      nonce: request.headers.get("wechatpay-nonce"),
+      hasSignature: Boolean(request.headers.get("wechatpay-signature")),
+    })
     return new Response("invalid signature", { status: 401 })
   }
 
@@ -34,6 +40,7 @@ export async function POST(request: NextRequest) {
   const outTradeNo = typeof decrypted.out_trade_no === "string" ? decrypted.out_trade_no : ""
   const tradeState = typeof decrypted.trade_state === "string" ? decrypted.trade_state : ""
   const transactionId = typeof decrypted.transaction_id === "string" ? decrypted.transaction_id : null
+  const successTime = typeof decrypted.success_time === "string" ? decrypted.success_time : null
 
   if (!outTradeNo) {
     return new Response("missing out_trade_no", { status: 400 })
@@ -49,10 +56,14 @@ export async function POST(request: NextRequest) {
   }
 
   if (tradeState === "SUCCESS") {
-    update.paid_at = new Date().toISOString()
+    update.paid_at = successTime || new Date().toISOString()
   }
 
-  await admin.from("wechatpay_orders").update(update).eq("out_trade_no", outTradeNo)
+  const { error } = await admin.from("wechatpay_orders").update(update).eq("out_trade_no", outTradeNo)
+  if (error) {
+    console.error("wechatpay notify db update failed", { outTradeNo, message: error.message })
+    return new Response("db update failed", { status: 500 })
+  }
 
   return NextResponse.json({ code: "SUCCESS", message: "成功" })
 }
