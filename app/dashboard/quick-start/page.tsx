@@ -555,6 +555,30 @@ export default function QuickStartPage() {
             </div>
           </GlassCard>
 
+          {/* Quick Diagnosis entry */}
+          <GlassCard className="p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center flex-shrink-0">
+                  <Target className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold dark:text-white text-zinc-900">快速诊断：IP健康诊断</h2>
+                  <p className="text-sm dark:text-zinc-400 text-zinc-500 mt-1">
+                    8道题快速定位你的内容瓶颈，生成综合评分与可执行改进建议。
+                  </p>
+                </div>
+              </div>
+
+              <Link href="/diagnosis" className="shrink-0">
+                <GlowButton primary className="w-full sm:w-auto">
+                  开始诊断
+                  <ArrowRight className="w-4 h-4" />
+                </GlowButton>
+              </Link>
+            </div>
+          </GlassCard>
+
           {/* Choose + Form */}
           <div className="grid lg:grid-cols-5 gap-6">
             <GlassCard className="lg:col-span-2 p-6">
