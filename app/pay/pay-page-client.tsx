@@ -87,6 +87,7 @@ export function PayPageClient() {
   const [claiming, setClaiming] = useState(false)
   const [claimed, setClaimed] = useState(false)
   const [autoCreateAttempted, setAutoCreateAttempted] = useState(false)
+  const [localStorageLoaded, setLocalStorageLoaded] = useState(false)
 
   const pollTimer = useRef<number | null>(null)
   const pollAttempts = useRef(0)
@@ -133,14 +134,17 @@ export function PayPageClient() {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY)
-      if (!raw) return
-      const parsed = JSON.parse(raw) as StoredOrder
-      if (parsed?.out_trade_no && parsed?.client_secret) {
-        setOrder(parsed)
-        if (parsed.product_id && !productFromUrl) setSelectedProductId(parsed.product_id)
+      if (raw) {
+        const parsed = JSON.parse(raw) as StoredOrder
+        if (parsed?.out_trade_no && parsed?.client_secret) {
+          setOrder(parsed)
+          if (parsed.product_id && !productFromUrl) setSelectedProductId(parsed.product_id)
+        }
       }
     } catch {
       // ignore
+    } finally {
+      setLocalStorageLoaded(true)
     }
   }, [])
 
@@ -318,6 +322,8 @@ export function PayPageClient() {
   useEffect(() => {
     // 只在从定价页跳转过来时自动创建（有 product 参数）
     if (!productFromUrl) return
+    // 等待 localStorage 加载完成，避免竞态条件
+    if (!localStorageLoaded) return
     // 产品列表还在加载
     if (productsLoading) return
     // 选中的产品不存在
@@ -327,19 +333,20 @@ export function PayPageClient() {
     // 已经尝试过自动创建
     if (autoCreateAttempted) return
 
-    // 如果已有未支付订单且产品相同，不重新创建
-    if (order && order.product_id === selectedProductId) {
+    // 如果已有未支付订单且产品相同，复用旧订单（二维码会通过 order.code_url 自动生成）
+    if (order && order.product_id === selectedProductId && order.code_url) {
       if (!orderStatus || orderStatus.status === "created") {
         setAutoCreateAttempted(true)
+        // 不需要创建新订单，旧订单的二维码会自动显示
         return
       }
     }
 
-    // 如果已有订单但产品不同，或者订单已完成，则创建新订单
+    // 如果已有订单但产品不同，或者订单已完成，或者没有 code_url，则创建新订单
     setAutoCreateAttempted(true)
     createOrder()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productFromUrl, productsLoading, selectedProduct, creating, autoCreateAttempted])
+  }, [productFromUrl, localStorageLoaded, productsLoading, selectedProduct, creating, autoCreateAttempted, order])
 
   // 自动绑定：当支付成功且用户已登录时
   useEffect(() => {
@@ -425,7 +432,7 @@ export function PayPageClient() {
 
             <div className="flex flex-wrap gap-2">
               {/* 从定价页跳转时显示加载状态，否则显示手动按钮 */}
-              {productFromUrl && !order && creating ? (
+              {productFromUrl && !order && (creating || !localStorageLoaded || productsLoading) ? (
                 <Button disabled>
                   <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                   正在创建订单...
