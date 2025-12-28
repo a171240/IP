@@ -18,7 +18,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const admin = createAdminSupabaseClient()
   const { data, error } = await admin
     .from("wechatpay_orders")
-    .select("out_trade_no,status,amount_total,currency,description,paid_at,wx_transaction_id,claimed_at,created_at")
+    .select("out_trade_no,status,amount_total,currency,description,product_id,paid_at,wx_transaction_id,claimed_at,grant_status,granted_at,grant_error,created_at")
     .eq("out_trade_no", outTradeNo)
     .eq("client_secret", secret)
     .single()
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           .from("wechatpay_orders")
           .update({ status: "paid", paid_at: paidAt, wx_transaction_id: transactionId })
           .eq("out_trade_no", outTradeNo)
-          .select("out_trade_no,status,amount_total,currency,description,paid_at,wx_transaction_id,claimed_at,created_at")
+          .select("out_trade_no,status,amount_total,currency,description,product_id,paid_at,wx_transaction_id,claimed_at,grant_status,granted_at,grant_error,created_at")
           .single()
 
         if (updated) {

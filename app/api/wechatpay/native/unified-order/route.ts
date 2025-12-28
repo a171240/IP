@@ -4,6 +4,7 @@ import crypto from "node:crypto"
 
 import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
 import { wechatpayCreateNativeOrder } from "@/lib/wechatpay/wechatpay.server"
+import { getWechatpayProduct } from "@/lib/wechatpay/products"
 
 export const runtime = "nodejs"
 
@@ -47,16 +48,31 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => null)
     if (!body || typeof body !== "object") return jsonError(400, "无效的请求体")
 
-    const amountTotal = Number((body as { amount_total?: unknown }).amount_total)
-    const descriptionRaw = (body as { description?: unknown }).description
+    // 支持 product_id 模式和自定义金额模式
+    const productIdRaw = (body as { product_id?: unknown }).product_id
+    const productId = typeof productIdRaw === "string" ? productIdRaw : null
+    const product = getWechatpayProduct(productId)
 
-    if (!Number.isInteger(amountTotal) || amountTotal <= 0) {
-      return jsonError(400, "amount_total 必须是 > 0 的整数（单位：分）")
-    }
+    let amountTotal: number
+    let description: string
 
-    const description = typeof descriptionRaw === "string" ? descriptionRaw.trim() : ""
-    if (!description) {
-      return jsonError(400, "缺少 description")
+    if (product) {
+      // 使用产品配置的金额和描述
+      amountTotal = product.amount_total
+      description = product.description
+    } else {
+      // 自定义金额模式
+      amountTotal = Number((body as { amount_total?: unknown }).amount_total)
+      const descriptionRaw = (body as { description?: unknown }).description
+
+      if (!Number.isInteger(amountTotal) || amountTotal <= 0) {
+        return jsonError(400, "amount_total 必须是 > 0 的整数（单位：分）")
+      }
+
+      description = typeof descriptionRaw === "string" ? descriptionRaw.trim() : ""
+      if (!description) {
+        return jsonError(400, "缺少 description")
+      }
     }
 
     const notifyUrl = process.env.WECHATPAY_NOTIFY_URL
@@ -77,6 +93,7 @@ export async function POST(request: NextRequest) {
       amount_total: amountTotal,
       currency: "CNY",
       status: "created",
+      product_id: product?.id || null,
     })
 
     if (insertError) {

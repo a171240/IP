@@ -15,6 +15,12 @@ CREATE TABLE IF NOT EXISTS public.wechatpay_orders (
   paid_at TIMESTAMPTZ,
   claimed_at TIMESTAMPTZ,
   raw_notify JSONB DEFAULT '{}'::jsonb,
+  -- 权限开通相关字段
+  product_id TEXT,
+  grant_status TEXT DEFAULT 'pending' CHECK (grant_status IN ('pending', 'granting', 'granted', 'failed')),
+  grant_attempts INT DEFAULT 0,
+  granted_at TIMESTAMPTZ,
+  grant_error TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -34,8 +40,43 @@ CREATE POLICY "Users can insert own wechatpay_orders" ON public.wechatpay_orders
 CREATE INDEX IF NOT EXISTS idx_wechatpay_orders_user_id ON public.wechatpay_orders(user_id);
 CREATE INDEX IF NOT EXISTS idx_wechatpay_orders_status_created_at ON public.wechatpay_orders(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_wechatpay_orders_out_trade_no_secret ON public.wechatpay_orders(out_trade_no, client_secret);
+CREATE INDEX IF NOT EXISTS idx_wechatpay_orders_product_id ON public.wechatpay_orders(product_id);
+CREATE INDEX IF NOT EXISTS idx_wechatpay_orders_grant_status ON public.wechatpay_orders(grant_status);
 
 DROP TRIGGER IF EXISTS update_wechatpay_orders_updated_at ON public.wechatpay_orders;
 CREATE TRIGGER update_wechatpay_orders_updated_at
   BEFORE UPDATE ON public.wechatpay_orders
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- =============================================================================
+-- 数据库迁移脚本（已有表时执行）
+-- =============================================================================
+-- 如果表已存在，需要单独执行以下 ALTER 语句添加新字段：
+--
+-- ALTER TABLE public.wechatpay_orders ADD COLUMN IF NOT EXISTS product_id TEXT;
+-- ALTER TABLE public.wechatpay_orders ADD COLUMN IF NOT EXISTS grant_status TEXT DEFAULT 'pending';
+-- ALTER TABLE public.wechatpay_orders ADD COLUMN IF NOT EXISTS grant_attempts INT DEFAULT 0;
+-- ALTER TABLE public.wechatpay_orders ADD COLUMN IF NOT EXISTS granted_at TIMESTAMPTZ;
+-- ALTER TABLE public.wechatpay_orders ADD COLUMN IF NOT EXISTS grant_error TEXT;
+--
+-- 注意：Supabase 的 ADD COLUMN IF NOT EXISTS 可能需要先检查版本支持
+-- 如果不支持，可以使用以下方式：
+--
+-- DO $$
+-- BEGIN
+--   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='wechatpay_orders' AND column_name='product_id') THEN
+--     ALTER TABLE public.wechatpay_orders ADD COLUMN product_id TEXT;
+--   END IF;
+--   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='wechatpay_orders' AND column_name='grant_status') THEN
+--     ALTER TABLE public.wechatpay_orders ADD COLUMN grant_status TEXT DEFAULT 'pending';
+--   END IF;
+--   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='wechatpay_orders' AND column_name='grant_attempts') THEN
+--     ALTER TABLE public.wechatpay_orders ADD COLUMN grant_attempts INT DEFAULT 0;
+--   END IF;
+--   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='wechatpay_orders' AND column_name='granted_at') THEN
+--     ALTER TABLE public.wechatpay_orders ADD COLUMN granted_at TIMESTAMPTZ;
+--   END IF;
+--   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='wechatpay_orders' AND column_name='grant_error') THEN
+--     ALTER TABLE public.wechatpay_orders ADD COLUMN grant_error TEXT;
+--   END IF;
+-- END $$;

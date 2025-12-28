@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
 import QRCode from "qrcode"
 
@@ -9,6 +9,13 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+
+// 智能轮询配置
+const POLL_CONFIG = {
+  initialInterval: 1500,    // 初始轮询间隔 1.5 秒
+  maxInterval: 8000,        // 最大轮询间隔 8 秒
+  fastPollCount: 10,        // 前 N 次快速轮询
+}
 
 type UnifiedOrderResponse = {
   out_trade_no: string
@@ -79,8 +86,10 @@ export function PayPageClient() {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
   const [claiming, setClaiming] = useState(false)
   const [claimed, setClaimed] = useState(false)
+  const [autoCreateAttempted, setAutoCreateAttempted] = useState(false)
 
   const pollTimer = useRef<number | null>(null)
+  const pollAttempts = useRef(0)
 
   const amountTotal = useMemo(() => centsFromYuan(amountYuan), [amountYuan])
   const selectedProduct = useMemo(
@@ -171,40 +180,52 @@ export function PayPageClient() {
     if (claimedAt) setClaimed(true)
   }
 
+  // 智能轮询：前 10 次快速轮询，之后逐渐退避
   useEffect(() => {
     if (!order?.out_trade_no || !order?.client_secret) return
 
     let stopped = false
+    pollAttempts.current = 0
 
-    const start = async () => {
+    const poll = async () => {
+      if (stopped) return
+
+      // 如果订单已完成，停止轮询
+      if (orderStatus?.status === "paid" || orderStatus?.status === "closed" || orderStatus?.status === "failed") {
+        return
+      }
+
       try {
         await refreshStatus()
       } catch {
         // ignore
       }
 
-      if (pollTimer.current) {
-        window.clearInterval(pollTimer.current)
-        pollTimer.current = null
+      pollAttempts.current++
+
+      // 计算下次轮询间隔
+      let nextInterval = POLL_CONFIG.initialInterval
+      if (pollAttempts.current > POLL_CONFIG.fastPollCount) {
+        // 快速轮询结束后，逐渐增加间隔
+        const factor = Math.min(pollAttempts.current - POLL_CONFIG.fastPollCount, 10)
+        nextInterval = Math.min(
+          POLL_CONFIG.initialInterval + factor * 500,
+          POLL_CONFIG.maxInterval
+        )
       }
 
-      pollTimer.current = window.setInterval(async () => {
-        if (stopped) return
-        if (orderStatus?.status === "paid" || orderStatus?.status === "closed" || orderStatus?.status === "failed") return
-        try {
-          await refreshStatus()
-        } catch {
-          // ignore
-        }
-      }, 2500)
+      if (!stopped) {
+        pollTimer.current = window.setTimeout(poll, nextInterval)
+      }
     }
 
-    start()
+    // 立即执行一次查询
+    poll()
 
     return () => {
       stopped = true
       if (pollTimer.current) {
-        window.clearInterval(pollTimer.current)
+        window.clearTimeout(pollTimer.current)
         pollTimer.current = null
       }
     }
@@ -293,18 +314,63 @@ export function PayPageClient() {
 
   const canClaim = Boolean(user) && orderStatus?.status === "paid" && !claimed
 
+  // 自动创建订单：当从 URL 带有 product 参数且产品加载完成时
+  useEffect(() => {
+    // 只在从定价页跳转过来时自动创建（有 product 参数）
+    if (!productFromUrl) return
+    // 产品列表还在加载
+    if (productsLoading) return
+    // 选中的产品不存在
+    if (!selectedProduct) return
+    // 已经在创建中
+    if (creating) return
+    // 已经尝试过自动创建
+    if (autoCreateAttempted) return
+
+    // 如果已有未支付订单且产品相同，不重新创建
+    if (order && order.product_id === selectedProductId) {
+      if (!orderStatus || orderStatus.status === "created") {
+        setAutoCreateAttempted(true)
+        return
+      }
+    }
+
+    // 如果已有订单但产品不同，或者订单已完成，则创建新订单
+    setAutoCreateAttempted(true)
+    createOrder()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productFromUrl, productsLoading, selectedProduct, creating, autoCreateAttempted])
+
+  // 自动绑定：当支付成功且用户已登录时
+  useEffect(() => {
+    // 必须是已支付状态
+    if (orderStatus?.status !== "paid") return
+    // 用户必须已登录
+    if (!user) return
+    // 已经绑定过或正在绑定
+    if (claimed || claiming) return
+    // 如果订单已有 claimed_at，说明已绑定
+    if (orderStatus?.claimed_at) return
+
+    // 自动触发绑定
+    claimOrder()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderStatus?.status, user, claimed, claiming, orderStatus?.claimed_at])
+
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-10">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">微信支付（扫码）</h1>
-        <p className="mt-2 text-sm text-muted-foreground">下单生成二维码，用微信扫一扫支付。支付成功后页面会自动刷新状态。</p>
+        <h1 className="text-2xl font-semibold tracking-tight">微信支付</h1>
+        <p className="mt-2 text-sm text-muted-foreground">用微信扫一扫完成支付，支付成功后会自动开通权限。</p>
       </div>
 
       <div className="grid gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>创建订单</CardTitle>
-            <CardDescription>选择套餐后生成二维码，用微信扫一扫支付。</CardDescription>
+            <CardTitle>{productFromUrl ? "确认订单" : "创建订单"}</CardTitle>
+            <CardDescription>
+              {productFromUrl ? "正在为您准备支付二维码..." : "选择套餐后生成二维码，用微信扫一扫支付。"}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-2">
@@ -358,9 +424,17 @@ export function PayPageClient() {
             )}
 
             <div className="flex flex-wrap gap-2">
-              <Button onClick={createOrder} disabled={creating}>
-                {creating ? "下单中..." : "生成二维码"}
-              </Button>
+              {/* 从定价页跳转时显示加载状态，否则显示手动按钮 */}
+              {productFromUrl && !order && creating ? (
+                <Button disabled>
+                  <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  正在创建订单...
+                </Button>
+              ) : (
+                <Button onClick={createOrder} disabled={creating}>
+                  {creating ? "下单中..." : order ? "重新生成二维码" : "生成二维码"}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 onClick={() => {
@@ -370,6 +444,7 @@ export function PayPageClient() {
                   setQrDataUrl(null)
                   setClaimed(false)
                   setError(null)
+                  setAutoCreateAttempted(false)
                 }}
               >
                 清空本地订单
@@ -431,38 +506,40 @@ export function PayPageClient() {
                     <div className="mt-1 text-muted-foreground">已自动开通权限与积分，可直接进入产品使用。</div>
                   ) : orderStatus?.grant_status === "failed" ? (
                     <div className="mt-1 text-red-500">自动开通失败：{orderStatus?.grant_error || "请联系客服处理"}</div>
-                  ) : !claimed && (orderStatus?.grant_status === "pending" || !orderStatus?.grant_status) ? (
-                    <div className="mt-1 text-muted-foreground">支付成功。请先登录并绑定订单，系统会自动开通权限与积分。</div>
+                  ) : claiming ? (
+                    <div className="mt-1 text-muted-foreground flex items-center gap-2">
+                      <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      正在绑定并开通权限...
+                    </div>
+                  ) : !user ? (
+                    <div className="mt-1 text-muted-foreground">支付成功！请登录后自动绑定并开通权限。</div>
+                  ) : claimed ? (
+                    <div className="mt-1 text-muted-foreground flex items-center gap-2">
+                      <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      正在开通权限与积分...
+                    </div>
                   ) : (
-                    <div className="mt-1 text-muted-foreground">正在为你开通权限与积分（可能需要几秒）。</div>
+                    <div className="mt-1 text-muted-foreground">正在处理订单...</div>
                   )}
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {canClaim ? (
-                      <Button onClick={claimOrder} disabled={claiming || authLoading}>
-                        {claiming ? "绑定中..." : "绑定到当前账号"}
-                      </Button>
-                    ) : claimed ? (
-                      <Button variant="secondary" disabled>
-                        已绑定
-                      </Button>
-                    ) : (
-                      <Button variant="secondary" disabled>
-                        {authLoading ? "登录状态读取中..." : "登录后可绑定"}
-                      </Button>
-                    )}
                     {orderStatus?.grant_status === "granted" && (
-                      <Button asChild variant="secondary">
+                      <Button asChild>
                         <a href="/dashboard">进入控制台</a>
                       </Button>
                     )}
                     {!user && (
-                      <Button asChild variant="outline">
-                        <a href="/auth/register">去注册</a>
-                      </Button>
+                      <>
+                        <Button asChild>
+                          <a href="/auth/login">去登录</a>
+                        </Button>
+                        <Button asChild variant="outline">
+                          <a href="/auth/register">去注册</a>
+                        </Button>
+                      </>
                     )}
-                    {!user && (
-                      <Button asChild variant="outline">
-                        <a href="/auth/login">去登录</a>
+                    {canClaim && (
+                      <Button onClick={claimOrder} disabled={claiming || authLoading}>
+                        {claiming ? "绑定中..." : "手动绑定"}
                       </Button>
                     )}
                   </div>

@@ -2,6 +2,7 @@
 
 import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
 import { decryptWechatpayResource, verifyWechatpayCallbackSignature } from "@/lib/wechatpay/wechatpay.server"
+import { tryFulfillWechatpayOrder } from "@/lib/wechatpay/fulfill.server"
 
 export const runtime = "nodejs"
 
@@ -63,6 +64,16 @@ export async function POST(request: NextRequest) {
   if (error) {
     console.error("wechatpay notify db update failed", { outTradeNo, message: error.message })
     return new Response("db update failed", { status: 500 })
+  }
+
+  // 支付成功后，尝试自动开通权限（如果订单已绑定用户）
+  if (tradeState === "SUCCESS") {
+    try {
+      await tryFulfillWechatpayOrder(outTradeNo)
+    } catch (e) {
+      // 开通失败不影响回调响应，记录日志即可
+      console.error("wechatpay notify fulfill failed", { outTradeNo, error: e })
+    }
   }
 
   return NextResponse.json({ code: "SUCCESS", message: "成功" })
