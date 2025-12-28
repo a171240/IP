@@ -1,9 +1,11 @@
-﻿"use client"
+"use client"
 
 import * as React from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { AlertTriangle, ArrowRight, Crown, Sparkles, X, Zap } from "lucide-react"
 import { GlassCard, GlowButton } from "./obsidian-primitives"
+import { usePay } from "@/contexts/pay-context"
 
 type PlanId = "free" | "basic" | "pro" | "vip"
 
@@ -19,6 +21,13 @@ const PLAN_FEATURES: Record<PlanId, string> = {
   basic: "P3–P5 人设构建 + 100+专属智能体",
   pro: "P6–P10 内容生产 + 全部智能体 + 下载",
   vip: "全功能 + 定制服务 + 积分不限量",
+}
+
+const PLAN_PRODUCT_IDS: Record<PlanId, string | null> = {
+  free: null,
+  basic: "basic_month",
+  pro: "pro_month",
+  vip: null,
 }
 
 export function CreditsLowWarning({
@@ -192,6 +201,18 @@ export function PlanRequiredModal({
   onUseCredits?: () => void
   onClose: () => void
 }) {
+  const pathname = usePathname()
+  const { openPayDialog } = usePay()
+
+  const productId = PLAN_PRODUCT_IDS[requiredPlan]
+
+  const handleUpgrade = () => {
+    if (productId) {
+      onClose()
+      openPayDialog(productId, pathname)
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <GlassCard className="w-full max-w-sm p-6">
@@ -243,11 +264,17 @@ export function PlanRequiredModal({
             </GlowButton>
           ) : null}
 
-          <Link href="/pricing" className="flex-1">
-            <GlowButton primary className="w-full">
-              查看套餐对比
+          {productId ? (
+            <GlowButton primary className="flex-1" onClick={handleUpgrade}>
+              立即升级 {PLAN_LABELS[requiredPlan]}
             </GlowButton>
-          </Link>
+          ) : (
+            <Link href="/pricing" className="flex-1">
+              <GlowButton primary className="w-full">
+                查看套餐对比
+              </GlowButton>
+            </Link>
+          )}
         </div>
       </GlassCard>
     </div>

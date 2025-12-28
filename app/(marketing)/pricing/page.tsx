@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { ArrowRight, Check, Clock, Gift, MessageCircle, Sparkles, X, Zap, Bot, Store, Factory, Palette, LayoutGrid } from "lucide-react"
 import { GlassCard, GlowButton } from "@/components/ui/obsidian-primitives"
+import { PricingPayButton } from "@/components/pricing-pay-button"
 
 type PlanId = "free" | "basic" | "pro" | "vip"
 
@@ -66,6 +67,7 @@ const plans = [
     badge: undefined as string | undefined,
     cta: "免费开始",
     ctaHref: START_HREF,
+    productId: null as string | null,
   },
   {
     id: "basic" as const,
@@ -87,6 +89,7 @@ const plans = [
     badge: "超值" as string | undefined,
     cta: "升级Plus",
     ctaHref: "/pay?product=basic_month",
+    productId: "basic_month" as string | null,
   },
   {
     id: "pro" as const,
@@ -108,6 +111,7 @@ const plans = [
     badge: "推荐",
     cta: "升级Pro",
     ctaHref: "/pay?product=pro_month",
+    productId: "pro_month" as string | null,
   },
   {
     id: "vip" as const,
@@ -128,6 +132,7 @@ const plans = [
     badge: undefined as string | undefined,
     cta: "联系开通",
     ctaHref: "#contact",
+    productId: null as string | null,
   },
 ]
 
@@ -178,12 +183,18 @@ const PricingCard = ({
       <p className="text-sm text-zinc-400 mb-5 leading-relaxed min-h-[44px]">{plan.description}</p>
 
       <div className="mb-6">
-        <Link href={plan.ctaHref}>
-          <GlowButton primary={plan.highlighted} className="w-full">
+        {plan.productId ? (
+          <PricingPayButton productId={plan.productId} highlighted={plan.highlighted} className="w-full">
             {plan.cta}
-            <ArrowRight size={16} className="ml-2" />
-          </GlowButton>
-        </Link>
+          </PricingPayButton>
+        ) : (
+          <Link href={plan.ctaHref}>
+            <GlowButton primary={plan.highlighted} className="w-full">
+              {plan.cta}
+              <ArrowRight size={16} className="ml-2" />
+            </GlowButton>
+          </Link>
+        )}
       </div>
 
       <ul className="space-y-2.5 flex-1">
