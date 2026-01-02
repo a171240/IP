@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
   ArrowRight,
   BookmarkPlus,
@@ -26,6 +26,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { saveReport } from "@/lib/supabase"
 import { getOrCreateDeviceId } from "@/lib/device"
 import { CYBER_IP_PROFILES } from "@/lib/cyber-ip-profiles"
+import { MARKETING_METRICS } from "@/lib/marketing/content"
 
 // 智能体类型定义
 type AgentType = "quick-script" | "reverse-thinking" | "industry-emotion" | "ip-style"
@@ -190,6 +191,7 @@ const agents: AgentConfig[] = [
 export default function QuickStartPage() {
   const router = useRouter()
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { user, profile, loading: authLoading, refreshProfile } = useAuth()
 
   const [selectedAgent, setSelectedAgent] = useState<AgentType>("quick-script")
@@ -207,6 +209,8 @@ export default function QuickStartPage() {
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
 
   const resultRef = useRef<HTMLDivElement>(null)
+  const suppressReset = useRef(false)
+  const prefillApplied = useRef(false)
 
   const currentPlan = profile?.plan || "free"
   const planLabel = planLabels[currentPlan] || currentPlan
@@ -295,6 +299,10 @@ export default function QuickStartPage() {
 
   // 切换智能体时清空表单
   useEffect(() => {
+    if (suppressReset.current) {
+      suppressReset.current = false
+      return
+    }
     setFormData({})
     setCustomInputs({})
     setResult("")
@@ -303,6 +311,52 @@ export default function QuickStartPage() {
     setIsSaved(false)
     setSaveError(null)
   }, [selectedAgent])
+
+  // URL 预填（从诊断页直达时减少填写成本）
+  useEffect(() => {
+    if (prefillApplied.current) return
+    if (!searchParams) return
+
+    const agentParam = searchParams.get("agent")
+    const industryParam = searchParams.get("industry")
+    const audienceParam = searchParams.get("audience")
+    const cityParam = searchParams.get("city")
+
+    if (!agentParam && !industryParam && !audienceParam && !cityParam) return
+
+    const nextFormData: Record<string, string> = {}
+    const nextCustomInputs: Record<string, string> = {}
+
+    if (industryParam) {
+      const isKnownIndustry = industries.some((item) => item.value === industryParam)
+      if (isKnownIndustry) {
+        nextFormData.industry = industryParam
+      } else {
+        nextFormData.industry = "其他"
+        nextCustomInputs.industry = industryParam
+      }
+    }
+
+    if (audienceParam) nextFormData.audience = audienceParam
+    if (cityParam) nextFormData.city = cityParam
+
+    if (Object.keys(nextCustomInputs).length > 0) {
+      setCustomInputs((prev) => ({ ...prev, ...nextCustomInputs }))
+    }
+    if (Object.keys(nextFormData).length > 0) {
+      setFormData((prev) => ({ ...prev, ...nextFormData }))
+    }
+
+    if (agentParam) {
+      const isAgentParam = agents.some((agent) => agent.id === agentParam)
+      if (isAgentParam && agentParam !== selectedAgent) {
+        suppressReset.current = true
+        setSelectedAgent(agentParam as AgentType)
+      }
+    }
+
+    prefillApplied.current = true
+  }, [searchParams, selectedAgent])
 
   const handleInputChange = (fieldId: string, value: string) => {
     setFormData((prev) => ({ ...prev, [fieldId]: value }))
@@ -996,7 +1050,7 @@ export default function QuickStartPage() {
                         <h3 className="text-sm font-semibold dark:text-white text-zinc-900">新用户体验计划：7天Pro体验</h3>
                       </div>
                       <p className="text-xs dark:text-zinc-400 text-zinc-500 leading-relaxed">
-                        体验版让你"先跑通一条"，Pro帮你解锁全部80+智能体 + 批量产出 + 资源下载。
+                        体验版让你"先跑通一条"，Pro帮你解锁全部{MARKETING_METRICS.workflowTemplates}个智能体模板 + 批量产出 + 资源下载。
                       </p>
                     </div>
 

@@ -2,12 +2,11 @@ import Link from "next/link"
 import { ArrowRight, Check, Clock, Gift, MessageCircle, Sparkles, X, Zap, Bot, Store, Factory, Palette, LayoutGrid } from "lucide-react"
 import { GlassCard, GlowButton } from "@/components/ui/obsidian-primitives"
 import { PricingPayButton } from "@/components/pricing-pay-button"
+import { MARKETING_METRICS, WECHAT_ID } from "@/lib/marketing/content"
 
 type PlanId = "free" | "basic" | "pro" | "vip"
 
 const PLAN_ORDER: PlanId[] = ["free", "basic", "pro", "vip"]
-
-const WECHAT_ID = "like171240"
 
 const START_HREF = "/auth/register?redirect=/dashboard/quick-start"
 
@@ -81,7 +80,7 @@ const plans = [
       { text: "工坊：IP传记采访", included: true },
       { text: "工坊：IP概念 + 文风（P4–P5）", included: true },
       { text: "🎁 实体营销全家桶 13模块100+智能体", included: true, highlight: true },
-      { text: "🎁 46行业情绪选题生成器", included: true, highlight: true },
+      { text: `🎁 ${MARKETING_METRICS.industryTemplates}行业情绪选题生成器`, included: true, highlight: true },
       { text: "每月赠送 300 积分", included: true },
       { text: "Pro专属智能体与下载", included: false },
     ],
@@ -305,10 +304,10 @@ const agentBenefits = [
     vip: "免费",
   },
   {
-    name: "46行业选题生成器",
+    name: `${MARKETING_METRICS.industryTemplates}行业选题生成器`,
     icon: Factory,
     color: "cyan",
-    countLabel: "46个智能体",
+    countLabel: `${MARKETING_METRICS.industryTemplates}个智能体`,
     value: "价值￥999",
     free: "12积分/次",
     plus: "免费",
@@ -357,7 +356,7 @@ const AgentBenefitsSection = () => (
         <p className="text-xs font-mono uppercase tracking-widest text-zinc-500 mb-3">AGENT BENEFITS</p>
         <h2 className="text-2xl md:text-3xl font-bold text-white">智能体权益对比</h2>
         <p className="text-zinc-400 mt-3 max-w-2xl mx-auto">
-          80+专业智能体，不同会员等级享有不同权益。低级会员可消耗积分体验高级智能体。
+          {MARKETING_METRICS.workflowTemplates}个工作流智能体模板，不同会员等级享有不同权益。低级会员可消耗积分体验高级智能体。
         </p>
       </div>
 
@@ -539,7 +538,7 @@ const ContactSection = () => (
         <div className="text-center mb-6">
           <h2 className="text-xl font-bold text-white mb-2">联系客服 / 开通咨询</h2>
           <p className="text-sm text-zinc-400">
-            如需升级套餐、企业定制、或有任何问题，欢迎添加客服微信咨询。
+            如需升级套餐、企业定制、或想领取1V1诊断解读，欢迎添加客服微信咨询。
           </p>
         </div>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -614,7 +613,9 @@ export default function PricingPage() {
                       内测
                     </span>
                   </div>
-                  <p className="text-zinc-400 text-sm">7天Pro体验 + 150积分（解锁全部80+智能体 + P6–P10内容生产）</p>
+                  <p className="text-zinc-400 text-sm">
+                    7天Pro体验 + 150积分（解锁全部{MARKETING_METRICS.workflowTemplates}个智能体模板 + P6–P10内容生产）
+                  </p>
                 </div>
               </div>
 
@@ -677,4 +678,3 @@ export default function PricingPage() {
     </main>
   )
 }
-

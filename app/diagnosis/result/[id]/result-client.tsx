@@ -19,6 +19,7 @@ import { DIMENSIONS } from '@/lib/diagnosis/scoring'
 import { Dimension } from '@/lib/diagnosis/questions'
 import { AIReportDisplay, ExclusiveBenefitsCard, GrowthPathCard } from '@/components/diagnosis'
 import { AIReport, parseAIReport } from '@/lib/diagnosis/ai-prompt'
+import { WECHAT_ID } from '@/lib/marketing/content'
 import {
   Radar,
   RadarChart,
@@ -76,6 +77,11 @@ export function ResultClient({ result, industry, createdAt, diagnosisId, answers
     score: dim.percentage,
     fullMark: 100
   }))
+
+  const quickStartParams = new URLSearchParams()
+  quickStartParams.set("agent", "quick-script")
+  if (industry) quickStartParams.set("industry", industry)
+  const quickStartHref = `/dashboard/quick-start?${quickStartParams.toString()}`
 
   const handleDownloadMarkdown = () => {
     try {
@@ -232,7 +238,7 @@ export function ResultClient({ result, industry, createdAt, diagnosisId, answers
   return (
     <div className="min-h-screen">
       <Header breadcrumbs={[
-        { label: "主页", href: "/dashboard" },
+        { label: "主页", href: "/" },
         { label: "IP健康诊断", href: "/diagnosis" },
         { label: "诊断报告" }
       ]} />
@@ -426,13 +432,9 @@ export function ResultClient({ result, industry, createdAt, diagnosisId, answers
         <div className="max-w-4xl mx-auto mt-6">
           <GlassCard className="p-6">
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <GlowButton
-                primary
-                onClick={handleDownloadMarkdown}
-                className="w-full"
-              >
+              <GlowButton primary onClick={handleDownloadMarkdown} className="w-full">
                 <Download className="w-4 h-4" />
-                下载诊断报告
+                下载诊断报告（Markdown）
               </GlowButton>
 
               <GlowButton onClick={handleShare} className="w-full">
@@ -445,10 +447,33 @@ export function ResultClient({ result, industry, createdAt, diagnosisId, answers
                 重新诊断
               </GlowButton>
 
-              <GlowButton onClick={() => router.push('/dashboard/quick-start')} className="w-full">
+              <GlowButton onClick={() => router.push(quickStartHref)} className="w-full">
                 <ArrowRight className="w-4 h-4" />
-                去快速体验
+                进入交付脚本生成
               </GlowButton>
+            </div>
+            <p className="mt-3 text-xs dark:text-zinc-500 text-zinc-400">报告保存30天，可随时下载与分享</p>
+          </GlassCard>
+        </div>
+
+        <div className="max-w-4xl mx-auto mt-6">
+          <GlassCard className="p-6">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div>
+                <h3 className="text-sm font-medium dark:text-white text-zinc-900">需要1V1诊断解读？</h3>
+                <p className="text-xs dark:text-zinc-500 text-zinc-400 mt-1">
+                  添加微信领取专属解读与落地建议
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="px-3 py-2 rounded-lg dark:bg-emerald-500/10 bg-emerald-50 border dark:border-emerald-500/20 border-emerald-200 text-sm font-medium text-emerald-500 select-all">
+                  {WECHAT_ID}
+                </span>
+                <GlowButton onClick={() => router.push('/pricing#contact')}>
+                  预约顾问演示
+                  <ArrowRight className="w-4 h-4" />
+                </GlowButton>
+              </div>
             </div>
           </GlassCard>
         </div>

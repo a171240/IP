@@ -177,13 +177,13 @@ export const solutionPacksConfig: SolutionPackConfig[] = [
   {
     id: "industry-topics",
     sourcePath: "\u5404\u5782\u7c7b\u6b63\u53cd\u89c2\u70b9\u60c5\u7eea\u9009\u9898\u751f\u6210\u5668",
-    name: "44行业选题生成器",
-    title: "44行业选题生成器",
-    description: "覆盖44个热门行业的专属选题生成",
+    name: "46行业选题生成器",
+    title: "46行业选题生成器",
+    description: "覆盖46个热门行业的专属选题生成",
     icon: "Factory",
     color: "cyan",
     modules: ["金融理财", "房产行业", "餐饮美食", "教育培训", "医疗健康", "美业护肤", "健身运动", "母婴育儿", "法律咨询", "心理咨询", "跨境电商", "直播电商", "服装行业", "珠宝玉石", "宠物行业", "旅游出行", "装修建材", "二手车", "保险行业", "养老服务"],
-    moduleCount: 44,
+    moduleCount: 46,
     downloadable: true,
     memberOnly: true,
     tier: "member"  // Plus会员赠送
@@ -246,5 +246,4 @@ export function getTotalAgentCount(): number {
   })
   return count
 }
-
 

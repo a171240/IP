@@ -23,7 +23,7 @@ function envInt(name: string): number | null {
 
 function priceCentsFor(productId: WechatpayProductId): number {
   if (productId === "basic_month") return envInt("WECHATPAY_PRICE_BASIC_CENTS") ?? 19900
-  if (productId === "pro_month") return envInt("WECHATPAY_PRICE_PRO_CENTS") ?? 39900
+  if (productId === "pro_month") return envInt("WECHATPAY_PRICE_PRO_CENTS") ?? 59900
   return 1
 }
 

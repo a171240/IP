@@ -16,12 +16,13 @@ import {
   DollarSign,
   RotateCcw
 } from 'lucide-react'
+import { WECHAT_ID } from '@/lib/marketing/content'
 
 const features = [
   { icon: Clock, text: '约5分钟', desc: '8道精准问题' },
   { icon: FileText, text: '专属报告', desc: '五维能力分析' },
-  { icon: Gift, text: '免费领取', desc: '行业选题包' },
-  { icon: CheckCircle, text: '即时生成', desc: '可下载PDF' }
+  { icon: Gift, text: '行动清单', desc: '30天改进建议' },
+  { icon: CheckCircle, text: '即时生成', desc: '可下载报告' }
 ]
 
 const dimensions = [
@@ -37,7 +38,7 @@ export default function DiagnosisPage() {
 
   return (
     <div className="min-h-screen">
-      <Header breadcrumbs={[{ label: "主页", href: "/dashboard" }, { label: "IP健康诊断" }]} />
+      <Header breadcrumbs={[{ label: "主页", href: "/" }, { label: "IP健康诊断" }]} />
 
       <main className="p-6 lg:p-8">
         <div className="max-w-4xl mx-auto space-y-6">
@@ -139,6 +140,10 @@ export default function DiagnosisPage() {
             <p className="text-xs dark:text-zinc-500 text-zinc-400 mt-3">
               已有 <span className="font-medium dark:text-emerald-400 text-emerald-600">1,234</span> 人完成诊断
             </p>
+            <div className="mt-3 text-xs dark:text-zinc-500 text-zinc-400">
+              添加微信领取1V1诊断解读：<span className="font-medium text-emerald-500 select-all">{WECHAT_ID}</span>
+            </div>
+            <p className="text-[10px] dark:text-zinc-500 text-zinc-400 mt-2">报告保存30天，可随时下载</p>
           </GlassCard>
         </div>
       </main>

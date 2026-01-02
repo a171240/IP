@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { WECHAT_ID } from "@/lib/marketing/content"
 
 // 智能轮询配置
 const POLL_CONFIG = {
@@ -555,6 +556,19 @@ export function PayPageClient() {
             </CardContent>
           </Card>
         )}
+
+        <Card>
+          <CardHeader>
+            <CardTitle>支付遇到问题？</CardTitle>
+            <CardDescription>添加微信获取人工支持与开通协助</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="inline-flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm">
+              <span className="text-muted-foreground">客服微信</span>
+              <span className="font-semibold text-emerald-400 select-all">{WECHAT_ID}</span>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </main>
   )

@@ -146,7 +146,7 @@ export default function QuizPage() {
   return (
     <div className="min-h-screen">
       <Header breadcrumbs={[
-        { label: "主页", href: "/dashboard" },
+        { label: "主页", href: "/" },
         { label: "IP健康诊断", href: "/diagnosis" },
         { label: "问卷" }
       ]} />

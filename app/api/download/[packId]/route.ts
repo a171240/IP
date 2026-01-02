@@ -111,9 +111,9 @@ const packContents: Record<string, string> = {
 © IP超级个体 - 会员专属资源
 `,
 
-  "industry-topics": `# 44行业选题生成器
+  "industry-topics": `# 46行业选题生成器
 
-> 覆盖44个热门行业的AI选题生成器，帮您快速产出高质量内容选题
+> 覆盖46个热门行业的AI选题生成器，帮您快速产出高质量内容选题
 
 ## 行业列表
 
@@ -178,6 +178,8 @@ const packContents: Record<string, string> = {
 42. 跨境电商
 43. 直播带货
 44. 知识付费
+45. 创业人群
+46. 高净值人群
 
 ---
 

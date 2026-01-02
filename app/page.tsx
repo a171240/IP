@@ -21,6 +21,7 @@ import {
 } from "lucide-react"
 import { ObsidianBackgroundLite } from "@/components/ui/obsidian-background-lite"
 import { GlowButton } from "@/components/ui/obsidian-primitives"
+import { HERO_TRUST_TAGS, INDUSTRY_TAGS, MARKETING_METRICS, WECHAT_ID } from "@/lib/marketing/content"
 
 // 典型使用场景 - 代运营 / MCN / 企业内容团队
 const testimonials = [
@@ -29,7 +30,8 @@ const testimonials = [
     role: "多账号矩阵",
     avatar: "妆",
     avatarGradient: "from-pink-500 to-rose-500",
-    quote: "以前选题、脚本、改稿散在各个群里，项目一多就乱。现在把定位→选题→日历→脚本→质检跑成工作流，新人也能按SOP稳定交付。",
+    quote: "以前选题、脚本、改稿散在各个群里，项目一多就乱。现在把定位→选题→日历→脚本→质检跑成工作流，新人也能按SOP更快上手。",
+    result: "新人也能按SOP更快上手，交付节奏更稳",
     highlight: "交付更稳定",
     highlightColor: "emerald",
     duration: "适用：多账号矩阵"
@@ -40,9 +42,10 @@ const testimonials = [
     avatar: "代",
     avatarGradient: "from-blue-500 to-cyan-500",
     quote: "每个客户的调性、禁词、卖点都不一样，最怕反复返工。用行业分析+风格复刻+最终审核把口径统一起来，交付边界清晰，改稿更少。",
+    result: "口径统一后，返工与改稿更少",
     highlight: "口径更一致",
     highlightColor: "blue",
-    duration: "适用：多客户并行"
+    duration: "适用：多客户协作"
   },
   {
     name: "企业内容中台",
@@ -50,6 +53,7 @@ const testimonials = [
     avatar: "企",
     avatarGradient: "from-purple-500 to-violet-500",
     quote: "把行业认知（道法术器势）、情绪价值点全景图和选题记录沉淀成资产，项目换人也能接得住，复盘有据可查。",
+    result: "资产可追溯，项目换人也能接得住",
     highlight: "资产可复用",
     highlightColor: "purple",
     duration: "适用：内容中台"
@@ -60,6 +64,7 @@ const testimonials = [
     avatar: "课",
     avatarGradient: "from-amber-500 to-orange-500",
     quote: "用双轨策略把内容拆成情绪价值与专业价值两条线：一条负责泛流量，一条负责建立信任与转化，节奏排好后就能持续输出。",
+    result: "双轨节奏更清晰，持续输出更稳定",
     highlight: "双轨可复制",
     highlightColor: "amber",
     duration: "适用：内容节奏"
@@ -70,11 +75,13 @@ const testimonials = [
     avatar: "店",
     avatarGradient: "from-teal-500 to-emerald-500",
     quote: "不同门店同一套打法，关键是模板与SOP统一。用行业模板库+去重归档把内容做成可复制的“门店增长手册”。",
+    result: "门店模板统一，复制落地更快",
     highlight: "模板化交付",
     highlightColor: "teal",
     duration: "适用：连锁门店"
   }
 ]
+
 
 // 高亮颜色映射
 const highlightColors: Record<string, string> = {
@@ -110,9 +117,9 @@ const coreAgents = [
     fullName: "4X4内容运营总监",
     icon: Calendar,
     color: "emerald",
-    tagline: "生成60期内容日历",
+    tagline: `生成${MARKETING_METRICS.contentCalendar}期内容日历`,
     description: "科学配比，完整内容日历",
-    output: "60期规划表"
+    output: `${MARKETING_METRICS.contentCalendar}期规划表`
   },
   {
     name: "脚本生成器",
@@ -125,43 +132,43 @@ const coreAgents = [
   }
 ]
 
-// 智能体矩阵数据 - 完整版216个
+// 智能体矩阵数据 - 以 agentsConfig 统计为准
 const agentMatrix: Record<string, { icon: LucideIcon; color: string; count: number; agents: string[] }> = {
-  "IP定位": {
-    icon: Target,
+  "核心工作流": {
+    icon: Bot,
     color: "purple",
+    count: 6,
+    agents: ["行业分析", "IP传记", "4X4内容规划", "脚本创作中心"]
+  },
+  "研究分析": {
+    icon: Search,
+    color: "blue",
     count: 27,
-    agents: ["IP概念生成器", "IP传记采访", "人设构建器", "竞品4X4分析", "辩论风格提取", "跨赛道文风提炼", "IP分析工作台"]
+    agents: ["行业分析工作台", "竞品分析", "风格提取", "内容去重"]
   },
-  "选题创作": {
-    icon: Lightbulb,
-    color: "amber",
-    count: 45,
-    agents: ["热点引流选题", "情绪选题生成", "反向爆款选题", "张口就来选题", "AI挖词工具", "搜索热点分析", "传记采访深挖"]
-  },
-  "脚本生成": {
+  "内容创作": {
     icon: FileText,
     color: "emerald",
-    count: 32,
-    agents: ["金句型脚本", "共情内容生成", "IP风格复刻", "促销钩子脚本", "人生故事脚本", "分镜头脚本", "口语化优化"]
+    count: 47,
+    agents: ["金句脚本", "共情内容", "故事脚本", "分镜脚本"]
   },
-  "内容规划": {
-    icon: Calendar,
-    color: "blue",
-    count: 16,
-    agents: ["4X4运营总监", "60期内容规划", "产品调研记者", "营销策略诊断", "平台选择策划", "评论区运营"]
+  "选题策划": {
+    icon: Lightbulb,
+    color: "amber",
+    count: 53,
+    agents: ["热点选题", "情绪选题", "平台选择", "爆点前置"]
   },
-  "行业模板": {
+  "营销转化": {
     icon: TrendingUp,
-    color: "cyan",
-    count: 45,
-    agents: ["餐饮", "房产", "美业", "教育", "法律", "金融", "医疗", "大健康", "珠宝玉石", "二手车", "服装", "旅游"]
-  },
-  "运营增长": {
-    icon: Mic,
     color: "rose",
-    count: 51,
-    agents: ["品牌建设", "内容创作", "营销推广", "客户服务", "数据分析", "场景营销", "引流获客", "精细化运营"]
+    count: 31,
+    agents: ["营销诊断", "引流获客", "评论区运营", "信息流策略"]
+  },
+  "效率优化": {
+    icon: Zap,
+    color: "cyan",
+    count: 25,
+    agents: ["口语化优化", "脚本批改", "风格质检", "格式转换"]
   }
 }
 
@@ -235,65 +242,101 @@ export default function LandingPage() {
         <div className="relative w-full max-w-4xl mx-auto text-center">
           {/* 品类定义 */}
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.06] mb-8">
-            <span className="text-sm text-zinc-400">为代运营 / MCN / 企业内容中台打造</span>
+            <span className="text-sm text-zinc-400">面向代运营 / MCN / 内容中台交付团队</span>
           </div>
 
           <h1 className="text-[2.5rem] sm:text-5xl md:text-6xl font-bold text-white mb-6 leading-[1.1] tracking-tight">
-            把商业IP内容交付
+            交付周期可控
             <br />
             <span className="bg-gradient-to-r from-purple-400 via-violet-400 to-purple-500 bg-clip-text text-transparent">
-              做成团队可复制的工作流
+              把商业IP内容交付做成团队可复制的工作流
             </span>
           </h1>
 
           {/* 核心价值主张 */}
           <p className="text-xl md:text-2xl text-zinc-400 mb-10 max-w-2xl mx-auto">
-            情绪/专业双轨 × 4X4配比 × <span className="text-white">216+ 工作流智能体模板库</span>
+            统一口径与质检，返工更少，交付更稳
             <br className="hidden sm:block" />
-            让定位、选题、内容日历、脚本、质检在同一条流程里完成
+            把定位 → 选题 → 日历 → 脚本 → 质检写进一条工作流
           </p>
 
-          {/* 价值标签组 - MCN视角 */}
+          {/* 价值标签组 - 结果导向 */}
           <div className="flex flex-wrap items-center justify-center gap-3 mb-12">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/10 border border-purple-500/20">
-              <span className="text-sm text-purple-400">情绪/专业双轨</span>
+              <span className="text-sm text-purple-400">交付周期可控</span>
             </div>
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/20">
-              <span className="text-sm text-blue-400">4X4配比</span>
+              <span className="text-sm text-blue-400">改稿更少</span>
             </div>
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-              <span className="text-sm text-emerald-400">风格质检</span>
+              <span className="text-sm text-emerald-400">口径一致</span>
             </div>
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/20">
-              <span className="text-sm text-amber-400">去重归档</span>
+              <span className="text-sm text-amber-400">资产可复用</span>
             </div>
           </div>
 
                     {/* CTA */}
           <div className="flex flex-col items-center gap-6">
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link href="/diagnosis">
-              <GlowButton
-                primary
-                className="px-12 py-5 text-lg font-medium"
-              >
-                <Zap size={20} />
-                免费快速诊断IP健康（体验版）
-                <ArrowRight size={18} />
-              </GlowButton>
-              </Link>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+              <div className="flex flex-col items-center gap-2">
+                <Link href="/diagnosis">
+                <GlowButton
+                  primary
+                  className="px-12 py-5 text-lg font-medium"
+                >
+                  <Zap size={20} />
+                  免费快速诊断
+                  <ArrowRight size={18} />
+                </GlowButton>
+                </Link>
+                <span className="text-xs text-zinc-500">
+                  约5分钟 · 8道题 · 五维评分 + 行动清单
+                </span>
+              </div>
 
-              <Link
-                href="/pricing"
-                className="px-12 py-5 text-lg font-medium text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-700 rounded-xl transition-colors"
-              >
+              <div className="flex flex-col items-center gap-2">
+                <Link
+                  href="/pricing#contact"
+                  className="px-12 py-5 text-lg font-medium text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-700 rounded-xl transition-colors"
+                >
+                  预约顾问演示
+                </Link>
+                <span className="text-xs text-zinc-500">
+                  适合准备采购团队版 / 私有化的团队
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-zinc-600">
+              <span className="px-3 py-1 rounded-full bg-white/[0.02] border border-white/5">无需注册</span>
+              <span className="px-3 py-1 rounded-full bg-white/[0.02] border border-white/5">可下载诊断报告</span>
+              <Link href="#report-sample" className="px-3 py-1 rounded-full bg-white/[0.02] border border-white/5 hover:text-white transition-colors">
+                查看样本预览
+              </Link>
+              <Link href="/pricing" className="px-3 py-1 rounded-full bg-white/[0.02] border border-white/5 hover:text-white transition-colors">
                 查看定价
               </Link>
             </div>
 
-            <span className="text-sm text-zinc-500">
-              3分钟测完：8道题 + 五维评分 + 改进建议（体验版）
-            </span>
+            <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-zinc-500">
+              <span>添加微信领取1V1诊断：</span>
+              <span className="text-emerald-300 font-medium select-all">{WECHAT_ID}</span>
+            </div>
+          </div>
+
+          <div className="mt-12">
+            <p className="text-xs text-zinc-600 mb-3">已在这些场景跑通</p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {HERO_TRUST_TAGS.map((label) => (
+                <span
+                  key={label}
+                  className="px-3 py-1.5 rounded-lg bg-white/[0.02] border border-white/5 text-xs text-zinc-500"
+                >
+                  {label}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -302,20 +345,32 @@ export default function LandingPage() {
           <div className="flex items-center justify-center">
             <div className="grid grid-cols-4 gap-6 md:gap-12">
               <div className="text-center">
-                <p className="text-3xl md:text-4xl font-bold text-purple-400 tracking-tight font-mono tabular-nums">216+</p>
+                <p className="text-3xl md:text-4xl font-bold text-purple-400 tracking-tight font-mono tabular-nums">
+                  {MARKETING_METRICS.workflowTemplates}
+                </p>
                 <p className="text-xs md:text-sm text-zinc-500 mt-2">工作流智能体模板</p>
+                <p className="text-[10px] text-zinc-600 mt-1">减少重复搭建</p>
               </div>
               <div className="text-center">
-                <p className="text-3xl md:text-4xl font-bold text-blue-400 tracking-tight font-mono tabular-nums">4步</p>
+                <p className="text-3xl md:text-4xl font-bold text-blue-400 tracking-tight font-mono tabular-nums">
+                  {MARKETING_METRICS.workflowSteps}步
+                </p>
                 <p className="text-xs md:text-sm text-zinc-500 mt-2">交付闭环</p>
+                <p className="text-[10px] text-zinc-600 mt-1">流程可追溯</p>
               </div>
               <div className="text-center">
-                <p className="text-3xl md:text-4xl font-bold text-emerald-400 tracking-tight font-mono tabular-nums">60期</p>
+                <p className="text-3xl md:text-4xl font-bold text-emerald-400 tracking-tight font-mono tabular-nums">
+                  {MARKETING_METRICS.contentCalendar}期
+                </p>
                 <p className="text-xs md:text-sm text-zinc-500 mt-2">内容日历</p>
+                <p className="text-[10px] text-zinc-600 mt-1">节奏可落地</p>
               </div>
               <div className="text-center">
-                <p className="text-3xl md:text-4xl font-bold text-amber-400 tracking-tight font-mono tabular-nums">45+</p>
+                <p className="text-3xl md:text-4xl font-bold text-amber-400 tracking-tight font-mono tabular-nums">
+                  {MARKETING_METRICS.industryTemplates}
+                </p>
                 <p className="text-xs md:text-sm text-zinc-500 mt-2">行业模板</p>
+                <p className="text-[10px] text-zinc-600 mt-1">跨行业快速复用</p>
               </div>
             </div>
           </div>
@@ -355,7 +410,7 @@ export default function LandingPage() {
                 <h3 className="text-white font-semibold">行业目标分析报告</h3>
               </div>
               <p className="text-sm text-zinc-500 leading-relaxed">
-                行业定位、受众画像、竞争格局与价值链一页看清，避免方向跑偏。
+                行业定位、受众画像、竞争格局与价值链一页看清，减少方向跑偏与试错成本。
               </p>
             </div>
 
@@ -367,7 +422,7 @@ export default function LandingPage() {
                 <h3 className="text-white font-semibold">认知切入点（道法术器势）</h3>
               </div>
               <p className="text-sm text-zinc-500 leading-relaxed">
-                判断用户目前认知层级，选对内容入口，先涨粉再建信更顺。
+                判断用户认知层级，选对内容入口，缩短“种草→信任→转化”的路径。
               </p>
             </div>
 
@@ -379,7 +434,7 @@ export default function LandingPage() {
                 <h3 className="text-white font-semibold">情绪价值点全景图</h3>
               </div>
               <p className="text-sm text-zinc-500 leading-relaxed">
-                穷举行业内与向上延展的情绪触点，用双轨内容覆盖泛流量与精准转化。
+                穷举行业内与向上延展的情绪触点，降低选题重复与撞题风险。
               </p>
             </div>
 
@@ -388,10 +443,10 @@ export default function LandingPage() {
                 <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
                   <Calendar size={20} className="text-emerald-400" />
                 </div>
-                <h3 className="text-white font-semibold">60期内容日历（4X4配比）</h3>
+                <h3 className="text-white font-semibold">{MARKETING_METRICS.contentCalendar}期内容日历（4X4配比）</h3>
               </div>
               <p className="text-sm text-zinc-500 leading-relaxed">
-                按“拉新/建信/转化/留存”配比排好节奏，减少临时抱佛脚与断更。
+                按“拉新/建信/转化/留存”配比排好节奏，交付周期更可控。
               </p>
             </div>
 
@@ -403,7 +458,7 @@ export default function LandingPage() {
                 <h3 className="text-white font-semibold">可拍脚本（口播/分镜/标题）</h3>
               </div>
               <p className="text-sm text-zinc-500 leading-relaxed">
-                从选题到结构、金句、镜头与标题，一次性出到“能直接拍”的版本。
+                从选题到结构、金句、镜头与标题，一次性出到“能直接拍”的版本，减少反复沟通。
               </p>
             </div>
 
@@ -415,7 +470,7 @@ export default function LandingPage() {
                 <h3 className="text-white font-semibold">风格质检 + 去重归档</h3>
               </div>
               <p className="text-sm text-zinc-500 leading-relaxed">
-                用统一检查清单保障口吻一致，选题记录与归档避免同质化与重复劳动。
+                用统一检查清单保障口吻一致，选题记录与归档减少同质化与返工。
               </p>
             </div>
           </div>
@@ -427,11 +482,182 @@ export default function LandingPage() {
               className="px-10 py-4 text-base"
             >
               <Zap size={18} />
-              免费快速诊断IP健康（体验版）
+              免费快速诊断，领取专属报告
               <ArrowRight size={16} />
             </GlowButton>
             </Link>
           </div>
+        </div>
+      </section>
+
+      {/* ============ 交付样本预览 ============ */}
+      <section id="report-sample" className="py-20 md:py-28 px-4 sm:px-6 content-visibility-auto">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.06] mb-6">
+              <FileText size={16} className="text-emerald-400" />
+              <span className="text-sm text-zinc-400">交付样本预览</span>
+            </div>
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4 tracking-tight">
+              诊断完成后你会拿到什么
+            </h2>
+            <p className="text-zinc-500 text-lg max-w-2xl mx-auto">
+              不是“方法论”，而是可执行的交付输出与行动清单（示例为格式展示）
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="p-6 rounded-2xl bg-zinc-900/40 border border-white/5">
+              <h3 className="text-white font-semibold mb-3">诊断报告包含</h3>
+              <ul className="space-y-2 text-sm text-zinc-400">
+                {[
+                  "五维评分与短板定位",
+                  "关键卡点与改进优先级",
+                  "30天行动清单与里程碑",
+                  "适配的工作流与模板建议"
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2">
+                    <CheckCircle size={16} className="text-emerald-400 mt-0.5 flex-shrink-0" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-zinc-500 mt-4">可下载报告，方便转交团队对齐口径</p>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-zinc-900/40 border border-white/5">
+              <h3 className="text-white font-semibold mb-3">交付SOP包示例</h3>
+              <ul className="space-y-2 text-sm text-zinc-400">
+                {[
+                  "行业目标分析报告（定位与受众）",
+                  `${MARKETING_METRICS.contentCalendar}期内容日历（4X4配比）`,
+                  "可拍脚本清单（口播/分镜/标题）",
+                  "风格质检清单 + 去重归档规范"
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2">
+                    <CheckCircle size={16} className="text-emerald-400 mt-0.5 flex-shrink-0" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-5 flex flex-wrap items-center gap-3">
+                <Link href="/diagnosis">
+                  <GlowButton primary className="px-6 py-3 text-sm">
+                    领取专属诊断报告
+                    <ArrowRight size={16} />
+                  </GlowButton>
+                </Link>
+                <Link href="/pricing#contact" className="text-sm text-zinc-400 hover:text-white transition-colors">
+                  预约顾问演示
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6 mt-8">
+            <div className="p-6 rounded-2xl bg-zinc-900/40 border border-white/5">
+              <h3 className="text-white font-semibold mb-4">诊断报告片段（示例）</h3>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-zinc-500">定位清晰度</p>
+                    <p className="text-xl font-semibold text-white">62/100</p>
+                  </div>
+                  <span className="px-2.5 py-1 text-xs rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300">
+                    需强化差异化
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  {[
+                    { label: "定位", width: "62%", color: "bg-purple-500/70" },
+                    { label: "内容", width: "54%", color: "bg-blue-500/70" },
+                    { label: "情绪", width: "71%", color: "bg-rose-500/70" },
+                    { label: "转化", width: "48%", color: "bg-emerald-500/70" },
+                    { label: "运营", width: "57%", color: "bg-amber-500/70" }
+                  ].map((item) => (
+                    <div key={item.label} className="flex items-center gap-3">
+                      <span className="text-[10px] text-zinc-500 w-8">{item.label}</span>
+                      <div className="h-2 flex-1 bg-zinc-800 rounded-full overflow-hidden">
+                        <div className={`h-full ${item.color}`} style={{ width: item.width }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="rounded-lg bg-white/[0.03] border border-white/5 p-3 text-xs text-zinc-400">
+                  关键卡点：定位描述过泛，客户难记
+                </div>
+
+                <div className="flex flex-wrap gap-2 text-[10px] text-zinc-500">
+                  <span className="px-2 py-1 rounded-md bg-white/[0.03] border border-white/5">第1周：统一口径</span>
+                  <span className="px-2 py-1 rounded-md bg-white/[0.03] border border-white/5">第2周：选题日历</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-zinc-900/40 border border-white/5">
+              <h3 className="text-white font-semibold mb-4">脚本交付包片段（示例）</h3>
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-xs text-zinc-400">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                  标题：上班族3分钟轻食怎么做？
+                </div>
+                <div className="rounded-lg bg-white/[0.03] border border-white/5 p-3 text-xs text-zinc-400">
+                  3秒钩子：今天不教你减脂，我教你省时间
+                </div>
+                <div>
+                  <p className="text-[10px] text-zinc-500 mb-2">分镜结构</p>
+                  <div className="grid grid-cols-3 gap-2 text-[10px] text-zinc-500">
+                    {["镜头1 开场", "镜头2 痛点", "镜头3 方法"].map((item) => (
+                      <div key={item} className="rounded-md bg-white/[0.03] border border-white/5 px-2 py-1">
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-[10px] text-zinc-500">
+                  <span className="w-2 h-2 rounded-full bg-amber-400" />
+                  口播：开场 → 痛点 → 方法 → 收尾
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-zinc-900/40 border border-white/5">
+              <h3 className="text-white font-semibold mb-4">内容日历片段（示例）</h3>
+              <div className="space-y-4">
+                <div className="grid grid-cols-4 gap-2">
+                  {Array.from({ length: 12 }).map((_, idx) => (
+                    <div
+                      key={idx}
+                      className={`h-8 rounded-md border border-white/5 ${
+                        idx % 4 === 0
+                          ? "bg-amber-500/20"
+                          : idx % 4 === 1
+                            ? "bg-blue-500/20"
+                            : idx % 4 === 2
+                              ? "bg-purple-500/20"
+                              : "bg-emerald-500/20"
+                      }`}
+                    />
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2 text-[10px] text-zinc-500">
+                  <span className="px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/20">引流</span>
+                  <span className="px-2 py-1 rounded-md bg-blue-500/10 border border-blue-500/20">建信</span>
+                  <span className="px-2 py-1 rounded-md bg-purple-500/10 border border-purple-500/20">转化</span>
+                  <span className="px-2 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20">留存</span>
+                </div>
+                <div className="text-[10px] text-zinc-500">
+                  周一 引流｜同城轻食踩坑 · 周三 建信｜热量&分量 · 周五 转化｜3分钟套餐
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <p className="text-center text-xs text-zinc-600 mt-6">
+            * 样本为格式示意，具体内容将基于你的行业与诊断结果生成
+          </p>
         </div>
       </section>
 
@@ -447,7 +673,7 @@ export default function LandingPage() {
               典型场景：内容团队这样规模化交付
             </h2>
             <p className="text-zinc-500 text-lg">
-              把个人经验沉淀成SOP，多项目并行也能保持口径一致
+              把个人经验沉淀成SOP，多项目并行也能更好对齐口径
             </p>
           </div>
 
@@ -476,8 +702,13 @@ export default function LandingPage() {
                     </div>
 
                     {/* 引用 */}
-                    <p className="text-zinc-300 text-[15px] leading-relaxed mb-6 min-h-[72px]">
+                    <p className="text-zinc-300 text-[15px] leading-relaxed mb-4 min-h-[72px]">
                       "{t.quote}"
+                    </p>
+
+                    <p className="text-xs text-zinc-500 mb-6">
+                      <span className="text-zinc-600">结果：</span>
+                      {t.result}
                     </p>
 
                     {/* 效果标签 */}
@@ -512,10 +743,10 @@ export default function LandingPage() {
               <span className="text-sm text-emerald-400 font-medium">情绪/专业双轨 × 4X4 方法论</span>
             </div>
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-4 tracking-tight">
-              内容不是灵感，是配比与节奏
+              交付稳定来自配比与节奏
             </h2>
             <p className="text-zinc-500 text-lg max-w-2xl mx-auto">
-              4类内容跑通拉新 / 建信 / 转化 / 留存，比例可按账号阶段与行业微调
+              把4类内容写进日历，减少断更与返工，比例可按阶段与行业微调
             </p>
           </div>
 
@@ -628,7 +859,7 @@ export default function LandingPage() {
               4步跑通交付闭环：定位 → 选题 → 日历 → 脚本
             </h2>
             <p className="text-zinc-500 text-lg max-w-2xl mx-auto">
-              每一步都有明确产物：定位方案 / 素材库 / 60期内容日历 / 可拍脚本
+              每一步都有明确产物：定位方案 / 素材库 / {MARKETING_METRICS.contentCalendar}期内容日历 / 可拍脚本，用于对齐口径与减少返工
             </p>
           </div>
 
@@ -685,7 +916,7 @@ export default function LandingPage() {
               className="px-10 py-4 text-base"
             >
               <Zap size={18} />
-              免费快速诊断IP健康，先测再优化
+              免费快速诊断，5分钟拿到评分与行动清单
               <ArrowRight size={16} />
             </GlowButton>
             </Link>
@@ -706,12 +937,13 @@ export default function LandingPage() {
               <span className="text-sm text-white font-medium">工作流模板库</span>
             </div>
             <h2 className="text-3xl md:text-5xl font-bold text-white mb-4 tracking-tight">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-blue-400 to-emerald-400 font-mono">216</span>
-              <span className="text-white">+</span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-blue-400 to-emerald-400 font-mono">
+                {MARKETING_METRICS.workflowTemplates}
+              </span>
               <span className="text-white ml-3">工作流智能体模板</span>
             </h2>
             <p className="text-zinc-400 text-lg max-w-2xl mx-auto">
-              覆盖45+行业模板，覆盖行业分析、选题、脚本、风格质检与去重归档等关键环节
+              覆盖{MARKETING_METRICS.industryTemplates}行业模板，从行业分析到脚本与质检，帮助新赛道更快落地
             </p>
           </div>
 
@@ -737,13 +969,13 @@ export default function LandingPage() {
 
           {/* 行业覆盖 - 精简版 */}
           <div className="flex flex-wrap justify-center gap-2 max-w-3xl mx-auto">
-            {["餐饮", "房产", "美业", "教育", "法律", "金融", "医疗", "珠宝", "汽修", "服装", "旅游", "家政"].map((industry) => (
+            {INDUSTRY_TAGS.map((industry) => (
               <span key={industry} className="px-3 py-1.5 rounded-lg bg-white/[0.02] border border-white/5 text-xs text-zinc-400">
                 {industry}
               </span>
             ))}
             <span className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400">
-              +33 行业模板
+              +{MARKETING_METRICS.industryTemplates - INDUSTRY_TAGS.length} 行业模板
             </span>
           </div>
         </div>
@@ -774,7 +1006,7 @@ export default function LandingPage() {
             </h2>
 
             <p className="text-zinc-500 text-lg max-w-3xl mx-auto">
-              把定位、选题、内容日历、脚本、质检与去重归档串成一条线，让团队多项目并行也能交付稳定。
+              把定位、选题、内容日历、脚本、质检与去重归档串成一条线，让团队多项目并行也能更好对齐口径与节奏。
             </p>
           </div>
 
@@ -834,7 +1066,7 @@ export default function LandingPage() {
                       "行业目标分析 + 认知深度（道法术器势）+ 情绪价值全景图，先把底层打透",
                       "风格复刻 + 最终审核：统一口吻、结构、节奏，减少返工",
                       "去重归档 + 选题记录：内容资产沉淀，可追溯、可复用",
-                      "团队协作交付：同一套标准，多项目并行不掉链"
+                      "团队协作交付：同一套标准，多项目并行也能对齐口径"
                     ].map((item) => (
                       <div key={item} className="flex gap-3">
                         <CheckCircle size={18} className="text-emerald-400 mt-0.5 flex-shrink-0" />
@@ -845,6 +1077,19 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
+          </div>
+
+          <div className="flex flex-col items-center gap-3 mt-10">
+            <Link href="/diagnosis">
+              <GlowButton primary className="px-10 py-4 text-base">
+                把我的流程改成“右侧”
+                <ArrowRight size={16} />
+              </GlowButton>
+            </Link>
+            <Link href="/pricing#contact" className="text-sm text-zinc-500 hover:text-white transition-colors">
+              预约顾问演示
+            </Link>
+            <p className="text-xs text-zinc-600">诊断完成后可获得流程卡点与交付SOP建议</p>
           </div>
 
           {/* 免责声明 */}
@@ -879,7 +1124,7 @@ export default function LandingPage() {
               </h3>
 
               <p className="text-zinc-400 text-lg mb-8 max-w-md mx-auto">
-                从小团队到内容中台，把方法论、模板与交付SOP跑通（可选私有化部署）
+                从小团队到内容中台，把方法论、模板与交付SOP跑通，支持陪跑顾问与私有化部署（可选）
               </p>
 
               {/* 服务亮点 */}
@@ -890,7 +1135,7 @@ export default function LandingPage() {
                 </div>
                 <div className="text-center">
                   <p className="text-2xl font-bold text-blue-400">协作</p>
-                  <p className="text-xs text-zinc-500 mt-1">多人多项目</p>
+                  <p className="text-xs text-zinc-500 mt-1">多项目协作</p>
                 </div>
                 <div className="text-center">
                   <p className="text-2xl font-bold text-emerald-400">7天</p>
@@ -924,13 +1169,13 @@ export default function LandingPage() {
       <section className="py-32 md:py-40 px-4 sm:px-6 content-visibility-auto">
         <div className="max-w-3xl mx-auto text-center">
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-6 leading-tight tracking-tight">
-            把内容交付跑成一条线
+            把交付周期从不确定变成可量化
             <br />
-            <span className="text-emerald-400">让团队多项目并行更稳</span>
+            <span className="text-emerald-400">让团队多项目并行更易对齐</span>
           </h2>
 
           <p className="text-xl text-zinc-400 mb-10">
-            双轨内容 × 4X4日历 × 216+模板库，定位/选题/脚本/质检/归档一次跑通
+            完成诊断即可获得五维评分 + 行动清单 + 交付SOP建议
           </p>
 
           {/* 双CTA */}
@@ -941,20 +1186,23 @@ export default function LandingPage() {
               className="px-10 py-5 text-lg font-medium"
             >
               <Zap size={20} />
-              免费快速诊断IP健康（体验版）
+              领取专属诊断报告
               <ArrowRight size={18} />
             </GlowButton>
             </Link>
                         <Link
-              href="/pricing"
+              href="/pricing#contact"
               className="px-10 py-5 text-lg font-medium text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-700 rounded-xl transition-colors"
             >
-              查看定价
+              预约顾问演示
             </Link>
           </div>
 
           <p className="text-sm text-zinc-600">
-            为代运营 / MCN / 企业内容中台打造
+            无需注册 · 可下载诊断报告 · <Link href="/pricing" className="hover:text-white transition-colors">查看定价与团队方案</Link>
+          </p>
+          <p className="text-sm text-zinc-600 mt-4">
+            添加微信领取1V1诊断解读：<span className="text-emerald-300 font-medium select-all">{WECHAT_ID}</span>
           </p>
         </div>
       </section>
@@ -982,8 +1230,3 @@ export default function LandingPage() {
     </div>
   )
 }
-
-
-
-
-
