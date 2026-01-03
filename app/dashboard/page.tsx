@@ -52,7 +52,7 @@ function formatRelativeTime(dateString: string) {
 
 function LoadingState() {
   return (
-    <div className="min-h-screen">
+    <div className="min-h-[100dvh]">
       <Header breadcrumbs={[{ label: "主页" }]} />
       <div className="flex-1 flex items-center justify-center p-8">
         <GlassCard className="p-8 text-center">
@@ -197,10 +197,10 @@ export default function DashboardPage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen">
-        <Header breadcrumbs={[{ label: "主页" }]} />
-        <div className="flex-1 flex items-center justify-center p-8">
-          <GlassCard className="p-8 text-center max-w-md">
+    <div className="min-h-[100dvh]">
+      <Header breadcrumbs={[{ label: "主页" }]} />
+      <div className="flex-1 flex items-center justify-center p-8">
+        <GlassCard className="p-8 text-center max-w-md">
             <h2 className="text-lg font-medium dark:text-white text-zinc-900 mb-2">未登录</h2>
             <p className="text-sm dark:text-zinc-400 text-zinc-500 mb-5">请先登录后再进入工作台</p>
                         <GlowButton primary className="w-full" onClick={() => router.push("/auth/login")}>
@@ -214,10 +214,10 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-[100dvh]">
       <Header breadcrumbs={[{ label: "主页" }]} />
 
-      <main className="p-6 lg:p-8 space-y-6">
+      <main className="p-4 sm:p-6 lg:p-8 space-y-5 sm:space-y-6">
         <div className="grid lg:grid-cols-5 gap-6">
           <GlassCard className="lg:col-span-3 p-7 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-purple-600/10 to-transparent rounded-full blur-3xl" />
@@ -257,7 +257,7 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              <div className="mt-5 grid grid-cols-3 gap-3">
+              <div className="mt-5 grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div className="p-3 rounded-xl dark:bg-zinc-900/40 bg-zinc-50 border dark:border-white/5 border-black/5">
                   <p className="text-[10px] dark:text-zinc-400 text-zinc-500">工作流进度</p>
                   <p className="mt-1 text-lg font-bold dark:text-white text-zinc-900">
@@ -301,19 +301,19 @@ export default function DashboardPage() {
               </div>
 
               <div className="mt-6 flex flex-wrap gap-3">
-                <GlowButton primary onClick={() => router.push("/dashboard/quick-start")}>
+                <GlowButton primary onClick={() => router.push("/dashboard/quick-start")} className="w-full sm:w-auto">
                   <Zap size={16} />
                   快速体验
                 </GlowButton>
-                <GlowButton onClick={() => router.push("/dashboard/workflow")}>
+                <GlowButton onClick={() => router.push("/dashboard/workflow")} className="w-full sm:w-auto">
                   <Layers size={16} />
                   进入工坊
                 </GlowButton>
-                <GlowButton onClick={() => router.push("/dashboard/reports")}>
+                <GlowButton onClick={() => router.push("/dashboard/reports")} className="w-full sm:w-auto">
                   <FileText size={16} />
                   查看报告
                 </GlowButton>
-                <GlowButton onClick={() => router.push("/dashboard/profiles")}>
+                <GlowButton onClick={() => router.push("/dashboard/profiles")} className="w-full sm:w-auto">
                   <Bot size={16} />
                   智能体库
                 </GlowButton>

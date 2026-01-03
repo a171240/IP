@@ -353,10 +353,10 @@ export default function WorkflowPage() {
   const kbTotal = knowledgeBase.length || knowledgeBaseConfig.length
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-[100dvh]">
       <Header breadcrumbs={[{ label: "首页", href: "/dashboard" }, { label: "内容工坊" }]} />
 
-      <main className="p-6 lg:p-8">
+      <main className="p-4 sm:p-6 lg:p-8">
         {/* Page Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
@@ -704,4 +704,3 @@ export default function WorkflowPage() {
     </div>
   )
 }
-

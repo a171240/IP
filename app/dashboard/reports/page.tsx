@@ -384,7 +384,7 @@ export default function ReportsPage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen">
+      <div className="min-h-[100dvh]">
         <Header breadcrumbs={[{ label: "首页", href: "/dashboard" }, { label: "报告库" }]} />
         <div className="flex-1 flex items-center justify-center p-8">
           <GlassCard className="p-8 text-center">
@@ -399,7 +399,7 @@ export default function ReportsPage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen">
+      <div className="min-h-[100dvh]">
         <Header breadcrumbs={[{ label: "首页", href: "/dashboard" }, { label: "报告库" }]} />
         <div className="flex-1 flex items-center justify-center p-8">
           <GlassCard className="p-8 text-center max-w-md">
@@ -418,10 +418,10 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-[100dvh]">
       <Header breadcrumbs={[{ label: "首页", href: "/dashboard" }, { label: "报告库" }]} />
 
-      <main className="p-6 lg:p-8">
+      <main className="p-4 sm:p-6 lg:p-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="text-2xl font-medium dark:text-white text-zinc-900 tracking-tight mb-2">报告库</h1>

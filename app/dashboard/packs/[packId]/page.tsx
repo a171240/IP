@@ -24,7 +24,7 @@ export default async function PackDetailPage({ params }: { params: Promise<{ pac
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-[100dvh]">
       <Header
         breadcrumbs={[
           { label: "首页", href: "/dashboard" },
@@ -34,7 +34,7 @@ export default async function PackDetailPage({ params }: { params: Promise<{ pac
         ]}
       />
 
-      <main className="p-6 lg:p-8 space-y-6">
+      <main className="p-4 sm:p-6 lg:p-8 space-y-6">
         <div>
           <h1 className="text-2xl font-medium dark:text-white text-zinc-900 tracking-tight">{pack.name}</h1>
           <p className="text-sm dark:text-zinc-400 text-zinc-500 mt-2">{pack.description}</p>
@@ -42,7 +42,7 @@ export default async function PackDetailPage({ params }: { params: Promise<{ pac
         </div>
 
         <GlassCard className="p-4">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div className="text-sm dark:text-white text-zinc-900 font-medium">文件列表</div>
             <div className="text-xs dark:text-zinc-400 text-zinc-500">共 {files.length} 个</div>
           </div>
@@ -57,7 +57,7 @@ export default async function PackDetailPage({ params }: { params: Promise<{ pac
 
           {files.map((f) => (
             <GlassCard key={f.relativePath} className="p-4">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-sm dark:text-white text-zinc-900 truncate">{f.fileName}</div>
                   <div className="text-xs dark:text-zinc-500 text-zinc-500 truncate">{f.relativePath}</div>
@@ -65,8 +65,9 @@ export default async function PackDetailPage({ params }: { params: Promise<{ pac
                 <Link
                   href={`/api/packs/${encodeURIComponent(packId)}/download?file=${encodeURIComponent(f.relativePath)}`}
                   prefetch={false}
+                  className="w-full sm:w-auto"
                 >
-                  <GlowButton className="text-xs">下载</GlowButton>
+                  <GlowButton className="w-full sm:w-auto text-xs">下载</GlowButton>
                 </Link>
               </div>
             </GlassCard>

@@ -12,7 +12,7 @@ export default function MarketingLayout({
   return (
     <AuthProvider>
       <PayProvider>
-        <div className="relative min-h-screen bg-background text-foreground-secondary font-sans selection:bg-violet-500/30 dark:selection:text-violet-200 selection:text-violet-700 transition-colors duration-300">
+        <div className="relative min-h-[100dvh] bg-background text-foreground-secondary font-sans selection:bg-violet-500/30 dark:selection:text-violet-200 selection:text-violet-700 transition-colors duration-300">
           <ObsidianBackgroundLite />
           <div className="relative z-10">{children}</div>
         </div>
@@ -21,5 +21,4 @@ export default function MarketingLayout({
     </AuthProvider>
   )
 }
-
 

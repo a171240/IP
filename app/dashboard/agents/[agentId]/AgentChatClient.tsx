@@ -255,10 +255,10 @@ export default function AgentChatClient({
   }, [reportQuery, reports])
 
   return (
-    <main className="p-6 lg:p-8">
+    <main className="p-4 sm:p-6 lg:p-8">
       <div className="max-w-5xl mx-auto w-full">
         <div className="mb-6">
-          <h1 className="text-2xl font-medium dark:text-white text-zinc-900 tracking-tight">{agentName}</h1>
+          <h1 className="text-xl sm:text-2xl font-medium dark:text-white text-zinc-900 tracking-tight">{agentName}</h1>
           <p className="text-sm dark:text-zinc-400 text-zinc-500 mt-2">{agentDescription}</p>
 
           <div className="mt-3 flex flex-wrap items-center gap-4">
@@ -295,7 +295,7 @@ export default function AgentChatClient({
               {"附加资料（可选）"}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -315,12 +315,12 @@ export default function AgentChatClient({
                 }}
               />
 
-              <GlowButton className="text-xs" onClick={() => fileInputRef.current?.click()}>
+              <GlowButton className="text-xs w-full sm:w-auto" onClick={() => fileInputRef.current?.click()}>
                 <Paperclip size={14} />
                 {"上传文件"}
               </GlowButton>
 
-              <GlowButton className="text-xs" onClick={openImport}>
+              <GlowButton className="text-xs w-full sm:w-auto" onClick={openImport}>
                 <FolderOpen size={14} />
                 {"从文档导入"}
               </GlowButton>
@@ -417,8 +417,13 @@ export default function AgentChatClient({
           </Dialog>
         </GlassCard>
 
-        <GlassCard className="p-4">
-          <div ref={containerRef} className="h-[65vh] overflow-y-auto pr-2 space-y-3" onScroll={updatePinnedState}>
+        <GlassCard className="p-4 flex flex-col min-h-[60vh] sm:min-h-[65vh]">
+          <div
+            ref={containerRef}
+            className="flex-1 min-h-0 overflow-y-auto pr-0 sm:pr-2 space-y-3"
+            style={{ WebkitOverflowScrolling: "touch" }}
+            onScroll={updatePinnedState}
+          >
             {messages.length === 0 ? (
               <div className="text-sm dark:text-zinc-400 text-zinc-500 space-y-2">
                 <div>
@@ -437,8 +442,8 @@ export default function AgentChatClient({
                   <div
                     className={
                       m.role === "user"
-                        ? "max-w-[92%] rounded-2xl px-4 py-2 bg-purple-500/15 border border-purple-500/30 text-zinc-100"
-                        : "max-w-[92%] rounded-2xl px-4 py-2 dark:bg-zinc-900/60 bg-white/80 border dark:border-white/10 border-black/10 dark:text-zinc-100 text-zinc-900"
+                        ? "max-w-[96%] sm:max-w-[92%] rounded-2xl px-4 py-2 bg-purple-500/15 border border-purple-500/30 text-zinc-100"
+                        : "max-w-[96%] sm:max-w-[92%] rounded-2xl px-4 py-2 dark:bg-zinc-900/60 bg-white/80 border dark:border-white/10 border-black/10 dark:text-zinc-100 text-zinc-900"
                     }
                   >
                     {m.role === "assistant" && showReasoning && m.reasoning ? (
@@ -485,12 +490,12 @@ export default function AgentChatClient({
                 }
               }}
             />
-            <GlowButton disabled={!canSend} onClick={send} className="h-[46px]">
+            <GlowButton disabled={!canSend} onClick={send} className="h-[46px] px-4">
               <Send size={16} />
-              {"发送"}
+              <span className="hidden sm:inline">{"发送"}</span>
             </GlowButton>
           </div>
-          <div className="mt-2 text-xs dark:text-zinc-500 text-zinc-500">Ctrl/⌘ + Enter {"发送"}</div>
+          <div className="mt-2 text-xs dark:text-zinc-500 text-zinc-500 hidden sm:block">Ctrl/⌘ + Enter {"发送"}</div>
         </GlassCard>
       </div>
 
@@ -527,4 +532,3 @@ export default function AgentChatClient({
     </main>
   )
 }
-

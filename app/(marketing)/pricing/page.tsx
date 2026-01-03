@@ -12,13 +12,13 @@ const START_HREF = "/auth/register?redirect=/dashboard/quick-start"
 
 // Marketing Navigation
 const MarketingNav = () => (
-  <nav className="fixed top-0 left-0 right-0 z-50 px-4 sm:px-6 pb-3 pt-[calc(var(--safe-area-top)+0.75rem)]">
-    <div className="max-w-7xl mx-auto flex items-center justify-between">
-      <Link href="/" className="flex items-center gap-3 group">
-        <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold shadow-lg shadow-purple-500/30 group-hover:scale-105 transition-transform">
+  <nav className="fixed top-0 left-0 right-0 z-50 px-3 sm:px-6 pb-3 pt-[calc(var(--safe-area-top)+0.6rem)] bg-[#030304]/90 backdrop-blur border-b border-white/[0.06]">
+    <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
+      <Link href="/" className="flex items-center gap-2.5 sm:gap-3 group">
+        <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold shadow-lg shadow-purple-500/30 group-hover:scale-105 transition-transform">
           IP
         </div>
-        <span className="text-xl font-bold text-white">IP内容工厂</span>
+        <span className="text-base sm:text-xl font-bold text-white">IP内容工厂</span>
       </Link>
       <div className="hidden md:flex items-center gap-8">
         <Link href="/pricing" className="text-white text-sm">
@@ -31,12 +31,14 @@ const MarketingNav = () => (
           工作流程
         </Link>
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2.5 sm:gap-4">
         <Link href="/auth/login">
-          <button className="text-zinc-400 hover:text-white transition-colors text-sm px-4 py-2">登录</button>
+          <button className="text-zinc-400 hover:text-white transition-colors text-[11px] sm:text-sm px-2.5 py-2 sm:px-4">
+            登录
+          </button>
         </Link>
         <Link href={START_HREF}>
-          <GlowButton primary className="text-sm px-5 py-2.5">
+          <GlowButton primary className="text-xs sm:text-sm px-3.5 py-2 sm:px-5 sm:py-2.5 whitespace-nowrap">
             免费体验
           </GlowButton>
         </Link>
@@ -243,8 +245,40 @@ const PlanMatrix = () => (
         </p>
       </div>
 
-      <GlassCard className="p-0 overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="md:hidden space-y-3">
+        {stepCatalog.map((step) => (
+          <GlassCard key={step.id} className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium text-white">{step.id}</div>
+                <div className="text-xs text-zinc-500 mt-0.5">{step.title}</div>
+              </div>
+              <span className="text-[10px] text-zinc-500">流程解锁</span>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {displayPlans.map((plan) => {
+                const ok = isStepIncluded(plan.id, step.requiredPlan)
+                return (
+                  <div
+                    key={`${step.id}-${plan.id}-mobile`}
+                    className={`rounded-lg border px-2.5 py-2 text-center ${
+                      ok ? "bg-emerald-500/10 border-emerald-500/20" : "bg-zinc-900/40 border-white/5"
+                    }`}
+                  >
+                    <div className="text-[10px] text-zinc-500">{plan.name}</div>
+                    <div className={`text-xs font-semibold ${ok ? "text-emerald-300" : "text-zinc-500"}`}>
+                      {ok ? "包含" : "需升级"}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </GlassCard>
+        ))}
+      </div>
+
+      <GlassCard className="p-0 overflow-hidden hidden md:block">
+        <div className="overflow-x-auto scrollbar-hidden" style={{ WebkitOverflowScrolling: "touch" }}>
           <table className="w-full text-sm">
             <thead className="bg-white/[0.02]">
               <tr className="text-left">
@@ -382,8 +416,54 @@ const AgentBenefitsSection = () => (
         </p>
       </div>
 
-      <GlassCard className="p-0 overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="md:hidden space-y-3">
+        {agentBenefits.map((benefit) => {
+          const tone = benefitToneStyles[benefit.color]
+          return (
+            <GlassCard key={`${benefit.name}-mobile`} className="p-4">
+              <div className="flex items-start gap-3">
+                <div className={`w-9 h-9 rounded-lg ${tone.frame} flex items-center justify-center`}>
+                  <benefit.icon size={16} className={tone.icon} />
+                </div>
+                <div>
+                  <div className="text-white font-medium text-sm">{benefit.name}</div>
+                  {benefit.countLabel && <div className="text-[10px] text-zinc-500">{benefit.countLabel}</div>}
+                  {benefit.value && <div className="text-[10px] text-amber-400 font-medium">{benefit.value}</div>}
+                </div>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                <div className="rounded-lg border bg-zinc-900/40 border-white/5 px-2.5 py-2 text-center">
+                  <div className="text-[10px] text-zinc-500">体验版</div>
+                  <div className="text-xs text-zinc-400">{benefit.free}</div>
+                </div>
+                <div
+                  className={`rounded-lg border px-2.5 py-2 text-center ${
+                    benefit.plus === "免费"
+                      ? "bg-amber-500/10 text-amber-300 border-amber-500/20"
+                      : "bg-zinc-900/40 text-zinc-400 border-white/5"
+                  }`}
+                >
+                  <div className="text-[10px] text-zinc-500">Plus</div>
+                  <div className="text-xs">{benefit.plus}</div>
+                </div>
+                <div
+                  className={`rounded-lg border px-2.5 py-2 text-center ${
+                    benefit.pro === "免费" || benefit.pro === "全部可下载"
+                      ? "bg-purple-500/10 text-purple-300 border-purple-500/20"
+                      : "bg-zinc-900/40 text-zinc-400 border-white/5"
+                  }`}
+                >
+                  <div className="text-[10px] text-zinc-500">Pro</div>
+                  <div className="text-xs">{benefit.pro}</div>
+                </div>
+              </div>
+            </GlassCard>
+          )
+        })}
+      </div>
+
+      <GlassCard className="p-0 overflow-hidden hidden md:block">
+        <div className="overflow-x-auto scrollbar-hidden" style={{ WebkitOverflowScrolling: "touch" }}>
           <table className="w-full text-sm">
             <thead className="bg-white/[0.02]">
               <tr className="text-left">
@@ -476,8 +556,22 @@ const CreditsSection = () => (
         </p>
       </div>
 
-      <GlassCard className="p-0 overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="md:hidden space-y-3">
+        {creditCostCatalog.map((row) => (
+          <GlassCard key={`${row.label}-mobile`} className="p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-sm text-zinc-200">{row.label}</div>
+              <span className="inline-flex items-center px-2 py-1 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-300 text-xs font-semibold">
+                {row.cost}
+              </span>
+            </div>
+            <p className="text-xs text-zinc-500 mt-2">{row.note}</p>
+          </GlassCard>
+        ))}
+      </div>
+
+      <GlassCard className="p-0 overflow-hidden hidden md:block">
+        <div className="overflow-x-auto scrollbar-hidden" style={{ WebkitOverflowScrolling: "touch" }}>
           <table className="w-full text-sm">
             <thead className="bg-white/[0.02]">
               <tr className="text-left">
@@ -573,7 +667,7 @@ const FAQSection = () => (
 )
 
 const ContactSection = () => (
-  <section id="contact" className="pb-24 px-4 sm:px-6">
+  <section id="contact" className="pb-24 px-4 sm:px-6 scroll-mt-24">
     <div className="max-w-3xl mx-auto">
       <GlassCard className="p-6 sm:p-8">
         <div className="text-center mb-6">
@@ -583,15 +677,15 @@ const ContactSection = () => (
           </p>
         </div>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-          <div className="flex items-center gap-3 px-5 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+          <div className="flex items-center gap-3 px-5 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 w-full sm:w-auto">
             <MessageCircle size={20} className="text-emerald-400" />
             <div>
               <p className="text-[10px] text-zinc-500 leading-tight">客服微信</p>
               <p className="text-base font-semibold text-emerald-300 select-all">{WECHAT_ID}</p>
             </div>
           </div>
-          <Link href={START_HREF}>
-            <GlowButton primary className="px-6 py-3">
+          <Link href={START_HREF} className="w-full sm:w-auto">
+            <GlowButton primary className="w-full sm:w-auto px-6 py-3">
               <Zap size={16} />
               免费体验
               <ArrowRight size={16} />
@@ -631,7 +725,7 @@ const Footer = () => (
 
 export default function PricingPage() {
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen min-h-[100dvh]">
       <MarketingNav />
 
       {/* Promo Banner */}
@@ -642,7 +736,7 @@ export default function PricingPage() {
             <div className="absolute bottom-0 left-0 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl" />
 
             <div className="relative flex flex-col md:flex-row items-center justify-between gap-6">
-              <div className="flex items-center gap-4">
+              <div className="flex items-start sm:items-center gap-3 sm:gap-4">
                 <div className="w-14 h-14 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shadow-lg shadow-amber-500/20">
                   <Gift size={28} className="text-amber-300" />
                 </div>
@@ -660,16 +754,16 @@ export default function PricingPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-6">
-                <div className="text-center">
+              <div className="flex flex-col sm:flex-row items-center sm:items-end gap-4 sm:gap-6 w-full sm:w-auto">
+                <div className="text-center sm:text-right">
                   <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-bold text-white">￥9.9</span>
+                    <span className="text-3xl sm:text-4xl font-bold text-white">￥9.9</span>
                     <span className="text-sm text-zinc-500 line-through">￥599/月</span>
                   </div>
                   <p className="text-xs text-amber-400 mt-1">先跑通一次“批量交付”</p>
                 </div>
-                <Link href={`${START_HREF}&promo=trial`}>
-                  <GlowButton primary className="px-8 py-3 text-base whitespace-nowrap">
+                <Link href={`${START_HREF}&promo=trial`} className="w-full sm:w-auto">
+                  <GlowButton primary className="w-full sm:w-auto px-6 sm:px-8 py-3 text-sm sm:text-base whitespace-nowrap">
                     <Zap size={18} />
                     立即领取
                     <ArrowRight size={16} />
@@ -693,8 +787,8 @@ export default function PricingPage() {
             <Sparkles size={14} className="text-purple-400" />
             <span className="text-xs font-mono uppercase tracking-wider text-zinc-400">按阶段解锁 · 更清晰的价值梯度</span>
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">选择适合你的方案</h1>
-          <p className="text-zinc-400 max-w-2xl mx-auto">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4">选择适合你的方案</h1>
+          <p className="text-sm sm:text-base text-zinc-400 max-w-2xl mx-auto">
             体验版先跑通交付；Plus解锁100+专属智能体；Pro畅享全部智能体+资源下载权限。
           </p>
         </div>

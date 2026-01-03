@@ -79,10 +79,10 @@ export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState("profile")
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-[100dvh]">
       <Header breadcrumbs={[{ label: "首页", href: "/dashboard" }, { label: "设置" }]} />
 
-      <main className="p-6">
+      <main className="p-4 sm:p-6">
         <div className="mb-8">
           <h1 className="text-2xl font-bold dark:text-white text-zinc-900 mb-1">设置</h1>
           <p className="dark:text-zinc-400 text-zinc-500 text-sm">管理您的账户和应用偏好设置</p>

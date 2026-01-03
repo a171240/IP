@@ -617,10 +617,10 @@ function QuickStartPageContent() {
   const homeHref = user ? "/dashboard" : "/"
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-[100dvh]">
       <Header breadcrumbs={[{ label: "主页", href: homeHref }, { label: "快速体验" }]} />
 
-      <main className="p-6 lg:p-8">
+      <main className="p-4 sm:p-6 lg:p-8">
         <div className="max-w-5xl mx-auto space-y-6">
           {/* Hero */}
           <GlassCard className="p-6 relative overflow-hidden">
@@ -1107,7 +1107,7 @@ export default function QuickStartPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center text-zinc-500">
+        <div className="min-h-[100dvh] flex items-center justify-center text-zinc-500">
           加载中...
         </div>
       }

@@ -1009,7 +1009,7 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
   // 加载中
   if (isInitializing || authLoading) {
     return (
-      <div className="min-h-screen flex flex-col">
+      <div className="min-h-[100dvh] flex flex-col">
         <Header breadcrumbs={[
           { label: "首页", href: "/dashboard" },
           { label: "内容工坊", href: "/dashboard/workflow" },
@@ -1029,7 +1029,7 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
   }
 
   return (
-    <div className="h-[calc(100svh-(4.5rem+var(--safe-area-bottom)))] md:h-svh flex flex-col overflow-hidden">
+    <div className="h-[calc(100dvh-(4.5rem+var(--safe-area-bottom)))] md:h-[100dvh] flex flex-col overflow-hidden">
       <Header breadcrumbs={[
         { label: "首页", href: "/dashboard" },
         { label: "内容工坊", href: "/dashboard/workflow" },
@@ -1040,8 +1040,8 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
         {/* 左侧：对话区域 */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           {/* 步骤信息条 */}
-          <div className={`shrink-0 px-6 py-3 ${colors.light} border-b border-white/5`}>
-            <div className="flex items-center justify-between">
+          <div className={`shrink-0 px-4 sm:px-6 py-2.5 sm:py-3 ${colors.light} border-b border-white/5`}>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div className="flex items-center gap-3">
                 <div className={`w-8 h-8 rounded-lg ${colors.bg} ${colors.border} border flex items-center justify-center`}>
                   <StepIcon size={16} className={colors.text} />
@@ -1052,28 +1052,28 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
                       {step.phaseName} · {step.id}
                     </span>
                   </div>
-                  <h1 className="text-base font-medium dark:text-white text-zinc-900">{step.title}</h1>
+                  <h1 className="text-sm sm:text-base font-medium dark:text-white text-zinc-900">{step.title}</h1>
                 </div>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
                 {user && (
                   <div className="flex items-center gap-1.5">
                     {syncStatus === 'syncing' && (
                       <>
                         <Loader2 size={12} className="animate-spin text-blue-400" />
-                        <span className="text-xs text-blue-400">同步中</span>
+                        <span className="hidden sm:inline text-xs text-blue-400">同步中</span>
                       </>
                     )}
                     {syncStatus === 'synced' && (
                       <>
                         <Database size={12} className="text-emerald-400" />
-                        <span className="text-xs text-emerald-400">已同步</span>
+                        <span className="hidden sm:inline text-xs text-emerald-400">已同步</span>
                       </>
                     )}
                     {syncStatus === 'error' && (
                       <>
                         <Database size={12} className="text-red-400" />
-                        <span className="text-xs text-red-400">同步失败</span>
+                        <span className="hidden sm:inline text-xs text-red-400">同步失败</span>
                       </>
                     )}
                   </div>
@@ -1083,7 +1083,7 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
           </div>
 
           {/* 消息列表 */}
-          <div ref={messagesContainerRef} onScroll={updatePinnedState} className="flex-1 overflow-y-auto p-6 space-y-4 relative">
+          <div ref={messagesContainerRef} onScroll={updatePinnedState} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 relative">
             {messages.map((message) => (
               <div
                 key={message.id}
@@ -1101,16 +1101,16 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
                   )}
                 </div>
 
-                <div className={`max-w-[80%] ${message.role === "user" ? "text-right" : ""}`}>
+                <div className={`max-w-[92%] sm:max-w-[80%] ${message.role === "user" ? "text-right" : ""}`}>
                   {message.role === "assistant" && message.reasoning && step.id !== 'IP传记' && (
                     <details className="mb-2 group" open>
-                      <summary className="cursor-pointer text-sm dark:text-amber-500/70 text-amber-600 flex items-center gap-1 py-1">
+                      <summary className="cursor-pointer text-xs sm:text-sm dark:text-amber-500/70 text-amber-600 flex items-center gap-1 py-1">
                         <Lightbulb size={14} />
                         <span>思考过程</span>
                         <ChevronRight size={14} className="group-open:rotate-90 transition-transform" />
                       </summary>
                       <div className="mt-2 px-3 py-2 dark:bg-amber-500/5 bg-amber-50 border dark:border-amber-500/20 border-amber-200 rounded-lg">
-                        <p className="text-sm dark:text-amber-200/60 text-amber-700 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
+                        <p className="text-xs sm:text-sm dark:text-amber-200/60 text-amber-700 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
                           {message.reasoning}
                         </p>
                       </div>
@@ -1121,7 +1121,7 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
                       ? "dark:bg-zinc-900/50 bg-zinc-100 border dark:border-white/5 border-black/5 text-left"
                       : `${colors.bg} ${colors.border} border`
                   }`}>
-                    <p className="text-base dark:text-zinc-300 text-zinc-700 whitespace-pre-wrap leading-relaxed">
+                    <p className="text-sm sm:text-base dark:text-zinc-300 text-zinc-700 whitespace-pre-wrap leading-relaxed">
                       {message.content}
                     </p>
                   </div>
@@ -1141,7 +1141,7 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
                           title="发送到画布（覆盖）"
                         >
                           <FileText size={12} />
-                          <span>发送到画布</span>
+                          <span className="hidden sm:inline">发送到画布</span>
                         </button>
                         {generatedDoc && (
                           <button
@@ -1156,7 +1156,7 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
                             title="追加到画布"
                           >
                             <Layers size={12} />
-                            <span>+追加</span>
+                            <span className="hidden sm:inline">+追加</span>
                           </button>
                         )}
                       </>
@@ -1178,10 +1178,10 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
                 }`}>
                   <div className="flex items-center gap-2">
                     <Loader2 size={16} className={`animate-spin ${isThinking ? "text-amber-500" : "text-zinc-500"}`} />
-                    <span className={`text-base ${isThinking ? "text-amber-400" : "text-zinc-500"}`}>
+                    <span className={`text-sm sm:text-base ${isThinking ? "text-amber-400" : "text-zinc-500"}`}>
                       {isThinking ? "正在深度思考..." : "正在生成回复..."}
                     </span>
-                    <span className="text-sm text-zinc-600 ml-2">
+                    <span className="text-xs sm:text-sm text-zinc-600 ml-2">
                       {Math.floor(elapsedTime / 60)}:{(elapsedTime % 60).toString().padStart(2, '0')}
                     </span>
                   </div>
@@ -1206,10 +1206,10 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
           </div>
 
           {/* 输入区域 */}
-          <div className="shrink-0 p-4 border-t border-white/5 dark:bg-zinc-950/90 bg-white/90 backdrop-blur-sm">
+          <div className="shrink-0 p-3 sm:p-4 border-t border-white/5 dark:bg-zinc-950/90 bg-white/90 backdrop-blur-sm">
             {step.id === "P8" && (
               <div className="mb-3">
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
                   <span className="text-xs dark:text-zinc-400 text-zinc-600 whitespace-nowrap">选择智能体</span>
                   <select
                     value={selectedP8AgentId ?? ""}
@@ -1230,7 +1230,7 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
                 )}
               </div>
             )}
-            <div className="flex gap-3">
+            <div className="flex gap-2 sm:gap-3">
               <div className="flex-1 relative">
                 <textarea
                   ref={inputRef}
@@ -1240,7 +1240,7 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
                   disabled={!currentConversation || isLoading || (step.id === "P8" && !selectedP8AgentId)}
                   placeholder={currentConversation && currentConversation.status !== "in_progress" ? "继续此历史对话（发送时会自动恢复为可写）" : "输入你的回答..."}
                   rows={1}
-                  className="w-full px-4 py-3 dark:bg-zinc-900/50 bg-white border dark:border-white/10 border-black/10 rounded-xl text-base dark:text-white text-zinc-900 dark:placeholder:text-zinc-600 placeholder:text-zinc-400 focus:outline-none dark:focus:border-purple-500/50 focus:border-purple-400 resize-none"
+                  className="w-full px-4 py-3 dark:bg-zinc-900/50 bg-white border dark:border-white/10 border-black/10 rounded-xl text-sm sm:text-base dark:text-white text-zinc-900 dark:placeholder:text-zinc-600 placeholder:text-zinc-400 focus:outline-none dark:focus:border-purple-500/50 focus:border-purple-400 resize-none"
                   style={{ minHeight: "48px", maxHeight: "120px" }}
                 />
               </div>
@@ -1257,8 +1257,8 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
               </button>
             </div>
             <div className="flex items-center justify-between mt-2 px-1">
-              <span className="text-xs dark:text-zinc-600 text-zinc-400">Enter 发送 · Shift+Enter 换行</span>
-              <span className="text-xs dark:text-zinc-600 text-zinc-400">预计时间: {step.estimatedTime}</span>
+              <span className="text-xs dark:text-zinc-600 text-zinc-400 hidden sm:inline">Enter 发送 · Shift+Enter 换行</span>
+              <span className="text-xs dark:text-zinc-600 text-zinc-400 hidden sm:inline">预计时间: {step.estimatedTime}</span>
             </div>
           </div>
         </div>

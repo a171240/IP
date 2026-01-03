@@ -40,7 +40,7 @@ export default async function AgentPage({
       : replaceBrand(agent.description)
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-[100dvh]">
       <Header
         breadcrumbs={[
           { label: "首页", href: "/dashboard" },

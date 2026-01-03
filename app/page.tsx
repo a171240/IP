@@ -185,7 +185,7 @@ const agentColorMap: Record<string, { bg: string; border: string; text: string; 
 export default function LandingPage() {
 
   return (
-    <div className="relative min-h-screen bg-[#030304] text-zinc-200 font-sans selection:bg-purple-500/30 selection:text-purple-200 overflow-x-hidden">
+    <div className="relative min-h-[100dvh] bg-[#030304] text-zinc-200 font-sans selection:bg-purple-500/30 selection:text-purple-200 overflow-x-hidden">
       <ObsidianBackgroundLite />
 
             {/* ============ Navigation ============ */}
@@ -211,20 +211,20 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <Link
               href="/pricing"
-              className="hidden sm:block md:hidden px-4 py-2 text-sm text-zinc-500 hover:text-white transition-colors"
+              className="hidden sm:block md:hidden px-3 py-2 text-xs sm:text-sm text-zinc-500 hover:text-white transition-colors"
             >
               定价
             </Link>
-            <Link href="/auth/login" className="px-4 py-2 text-sm text-zinc-500 hover:text-white transition-colors">
+            <Link href="/auth/login" className="px-2.5 sm:px-4 py-2 text-xs sm:text-sm text-zinc-500 hover:text-white transition-colors">
               登录
             </Link>
             <Link href="/diagnosis">
             <GlowButton
               primary
-              className="px-4 sm:px-6 py-2.5 text-sm"
+              className="px-3 sm:px-6 py-2.5 text-xs sm:text-sm whitespace-nowrap"
             >
               <Zap size={16} />
               免费快速诊断
@@ -241,11 +241,11 @@ export default function LandingPage() {
 
         <div className="relative w-full max-w-4xl mx-auto text-center">
           {/* 品类定义 */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.06] mb-8">
-            <span className="text-sm text-zinc-400">面向代运营 / MCN / 内容中台交付团队</span>
+          <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.06] mb-8">
+            <span className="text-[11px] sm:text-sm text-zinc-400">面向代运营 / MCN / 内容中台交付团队</span>
           </div>
 
-          <h1 className="text-[2.5rem] sm:text-5xl md:text-6xl font-bold text-white mb-6 leading-[1.1] tracking-tight">
+          <h1 className="text-[2.05rem] sm:text-5xl md:text-6xl font-bold text-white mb-6 leading-[1.1] tracking-tight">
             交付周期可控
             <br />
             <span className="bg-gradient-to-r from-purple-400 via-violet-400 to-purple-500 bg-clip-text text-transparent">
@@ -254,7 +254,7 @@ export default function LandingPage() {
           </h1>
 
           {/* 核心价值主张 */}
-          <p className="text-xl md:text-2xl text-zinc-400 mb-10 max-w-2xl mx-auto">
+          <p className="text-base sm:text-xl md:text-2xl text-zinc-400 mb-10 max-w-2xl mx-auto">
             统一口径与质检，返工更少，交付更稳
             <br className="hidden sm:block" />
             把定位 → 选题 → 日历 → 脚本 → 质检写进一条工作流
@@ -263,27 +263,27 @@ export default function LandingPage() {
           {/* 价值标签组 - 结果导向 */}
           <div className="flex flex-wrap items-center justify-center gap-3 mb-12">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/10 border border-purple-500/20">
-              <span className="text-sm text-purple-400">交付周期可控</span>
+              <span className="text-xs sm:text-sm text-purple-400">交付周期可控</span>
             </div>
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/20">
-              <span className="text-sm text-blue-400">改稿更少</span>
+              <span className="text-xs sm:text-sm text-blue-400">改稿更少</span>
             </div>
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-              <span className="text-sm text-emerald-400">口径一致</span>
+              <span className="text-xs sm:text-sm text-emerald-400">口径一致</span>
             </div>
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/20">
-              <span className="text-sm text-amber-400">资产可复用</span>
+              <span className="text-xs sm:text-sm text-amber-400">资产可复用</span>
             </div>
           </div>
 
                     {/* CTA */}
           <div className="flex flex-col items-center gap-6">
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-              <div className="flex flex-col items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-6 w-full">
+              <div className="flex flex-col items-center gap-2 w-full sm:w-auto">
                 <Link href="/diagnosis">
                 <GlowButton
                   primary
-                  className="px-12 py-5 text-lg font-medium"
+                  className="w-full sm:w-auto px-8 sm:px-12 py-4 sm:py-5 text-base sm:text-lg font-medium"
                 >
                   <Zap size={20} />
                   免费快速诊断
@@ -295,10 +295,10 @@ export default function LandingPage() {
                 </span>
               </div>
 
-              <div className="flex flex-col items-center gap-2">
+              <div className="flex flex-col items-center gap-2 w-full sm:w-auto">
                 <Link
                   href="/pricing#contact"
-                  className="px-12 py-5 text-lg font-medium text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-700 rounded-xl transition-colors"
+                  className="w-full sm:w-auto px-8 sm:px-12 py-4 sm:py-5 text-base sm:text-lg font-medium text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-700 rounded-xl transition-colors text-center"
                 >
                   预约顾问演示
                 </Link>
@@ -343,30 +343,30 @@ export default function LandingPage() {
         {/* 数据指标 */}
         <div className="relative w-full max-w-4xl mx-auto mt-20">
           <div className="flex items-center justify-center">
-            <div className="grid grid-cols-4 gap-6 md:gap-12">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 md:gap-12">
               <div className="text-center">
-                <p className="text-3xl md:text-4xl font-bold text-purple-400 tracking-tight font-mono tabular-nums">
+                <p className="text-2xl sm:text-3xl md:text-4xl font-bold text-purple-400 tracking-tight font-mono tabular-nums">
                   {MARKETING_METRICS.workflowTemplates}
                 </p>
                 <p className="text-xs md:text-sm text-zinc-500 mt-2">工作流智能体模板</p>
                 <p className="text-[10px] text-zinc-600 mt-1">减少重复搭建</p>
               </div>
               <div className="text-center">
-                <p className="text-3xl md:text-4xl font-bold text-blue-400 tracking-tight font-mono tabular-nums">
+                <p className="text-2xl sm:text-3xl md:text-4xl font-bold text-blue-400 tracking-tight font-mono tabular-nums">
                   {MARKETING_METRICS.workflowSteps}步
                 </p>
                 <p className="text-xs md:text-sm text-zinc-500 mt-2">交付闭环</p>
                 <p className="text-[10px] text-zinc-600 mt-1">流程可追溯</p>
               </div>
               <div className="text-center">
-                <p className="text-3xl md:text-4xl font-bold text-emerald-400 tracking-tight font-mono tabular-nums">
+                <p className="text-2xl sm:text-3xl md:text-4xl font-bold text-emerald-400 tracking-tight font-mono tabular-nums">
                   {MARKETING_METRICS.contentCalendar}期
                 </p>
                 <p className="text-xs md:text-sm text-zinc-500 mt-2">内容日历</p>
                 <p className="text-[10px] text-zinc-600 mt-1">节奏可落地</p>
               </div>
               <div className="text-center">
-                <p className="text-3xl md:text-4xl font-bold text-amber-400 tracking-tight font-mono tabular-nums">
+                <p className="text-2xl sm:text-3xl md:text-4xl font-bold text-amber-400 tracking-tight font-mono tabular-nums">
                   {MARKETING_METRICS.industryTemplates}
                 </p>
                 <p className="text-xs md:text-sm text-zinc-500 mt-2">行业模板</p>
@@ -393,10 +393,10 @@ export default function LandingPage() {
               <FileText size={16} className="text-emerald-400" />
               <span className="text-sm text-zinc-400">交付产物</span>
             </div>
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4 tracking-tight">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-4 tracking-tight">
               每一次产出都能沉淀为可复用资产
             </h2>
-            <p className="text-zinc-500 text-lg max-w-2xl mx-auto">
+            <p className="text-zinc-500 text-base sm:text-lg max-w-2xl mx-auto">
               把策略、口径、脚本与质检标准固化下来，新人按SOP也能稳定交付。
             </p>
           </div>

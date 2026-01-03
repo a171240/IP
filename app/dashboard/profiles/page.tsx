@@ -276,10 +276,10 @@ export default function ProfilesPage() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-[100dvh]">
       <Header breadcrumbs={[{ label: "首页", href: "/dashboard" }, { label: "智能体库" }]} />
 
-      <main className="p-6 lg:p-8">
+      <main className="p-4 sm:p-6 lg:p-8">
         <div className="max-w-6xl mx-auto w-full space-y-6">
           <GlassCard className="relative overflow-hidden p-6">
             <div className="absolute inset-0 bg-gradient-to-br from-purple-500/15 via-cyan-500/10 to-transparent" />
