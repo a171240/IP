@@ -44,30 +44,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // 初始化用户状态
   useEffect(() => {
+    let active = true
+
     const initAuth = async () => {
+      const supabase = getSupabaseClient()
+      let sessionUserId: string | null = null
+
       try {
-        const supabase = getSupabaseClient()
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!active) return
+        const sessionUser = session?.user ?? null
+        sessionUserId = sessionUser?.id ?? null
+        setUser(sessionUser)
 
-        // 带超时的用户认证检查
-        const { data: { user } } = await withTimeout(
-          supabase.auth.getUser(),
-          10000,
-          '认证检查超时，请检查网络连接'
-        )
-
-        setUser(user)
-
-        if (user) {
+        if (sessionUser) {
           // 异步获取档案，不阻塞认证流程
           fetchProfile()
+        } else {
+          setProfile(null)
         }
       } catch (error) {
+        if (!active) return
         console.error('认证初始化失败:', error)
         setUser(null)
         setProfile(null)
       } finally {
-        // 确保 loading 状态总是会被设置为 false
-        setLoading(false)
+        // 先基于本地会话解锁 UI，再后台校验
+        if (active) setLoading(false)
+      }
+
+      // 后台校验用户状态，避免首屏被网络阻塞
+      try {
+        const { data: { user } } = await withTimeout(
+          supabase.auth.getUser(),
+          4000,
+          '认证检查超时，请检查网络连接'
+        )
+        if (!active) return
+        const verifiedUserId = user?.id ?? null
+        if (verifiedUserId !== sessionUserId) {
+          setUser(user)
+          if (user) {
+            fetchProfile()
+          } else {
+            setProfile(null)
+          }
+        }
+      } catch (error) {
+        if (!active) return
+        console.warn('认证校验失败:', error)
       }
     }
 
@@ -85,6 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
 
     return () => {
+      active = false
       subscription.unsubscribe()
     }
   }, [])

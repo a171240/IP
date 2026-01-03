@@ -72,7 +72,7 @@ export default function DashboardPage() {
   const [completedSteps, setCompletedSteps] = useState<string[]>([])
   const [reportPreviews, setReportPreviews] = useState<ReportPreview[]>([])
   const [reportCount, setReportCount] = useState(0)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isDataLoading, setIsDataLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [reloadNonce, setReloadNonce] = useState(0)
 
@@ -83,12 +83,12 @@ export default function DashboardPage() {
       setCompletedSteps([])
       setReportPreviews([])
       setReportCount(0)
-      setIsLoading(false)
+      setIsDataLoading(false)
       return
     }
 
     const load = async () => {
-      setIsLoading(true)
+      setIsDataLoading(true)
       setLoadError(null)
 
       try {
@@ -141,7 +141,7 @@ export default function DashboardPage() {
         console.error("Failed to load dashboard data:", error)
         setLoadError("工作台数据加载失败，请检查网络连接后重试")
       } finally {
-        setIsLoading(false)
+        setIsDataLoading(false)
       }
 
     }
@@ -191,7 +191,7 @@ export default function DashboardPage() {
 
   const latestReports = reportPreviews.slice(0, 5)
 
-  if (authLoading || isLoading) {
+  if (authLoading) {
     return <LoadingState />
   }
 
@@ -261,23 +261,29 @@ export default function DashboardPage() {
                 <div className="p-3 rounded-xl dark:bg-zinc-900/40 bg-zinc-50 border dark:border-white/5 border-black/5">
                   <p className="text-[10px] dark:text-zinc-400 text-zinc-500">工作流进度</p>
                   <p className="mt-1 text-lg font-bold dark:text-white text-zinc-900">
-                    {completedCount}/{totalCount}
+                    {isDataLoading ? "…" : `${completedCount}/${totalCount}`}
                   </p>
                 </div>
                 <div className="p-3 rounded-xl dark:bg-zinc-900/40 bg-zinc-50 border dark:border-white/5 border-black/5">
                   <p className="text-[10px] dark:text-zinc-400 text-zinc-500">已生成报告</p>
-                  <p className="mt-1 text-lg font-bold dark:text-white text-zinc-900">{reportCount}</p>
+                  <p className="mt-1 text-lg font-bold dark:text-white text-zinc-900">
+                    {isDataLoading ? "…" : reportCount}
+                  </p>
                 </div>
                 <div className="p-3 rounded-xl dark:bg-zinc-900/40 bg-zinc-50 border dark:border-white/5 border-black/5">
                   <p className="text-[10px] dark:text-zinc-400 text-zinc-500">完成度</p>
-                  <p className="mt-1 text-lg font-bold dark:text-white text-zinc-900">{progressPercent}%</p>
+                  <p className="mt-1 text-lg font-bold dark:text-white text-zinc-900">
+                    {isDataLoading ? "…" : `${progressPercent}%`}
+                  </p>
                 </div>
               </div>
 
               <div className="mt-4">
                 <div className="w-full h-2 rounded-full dark:bg-zinc-800 bg-zinc-200 overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-purple-500 to-violet-600"
+                    className={`h-full bg-gradient-to-r from-purple-500 to-violet-600 ${
+                      isDataLoading ? "opacity-50 animate-pulse" : ""
+                    }`}
                     style={{ width: `${progressPercent}%` }}
                   />
                 </div>
@@ -442,7 +448,22 @@ export default function DashboardPage() {
               </Link>
             </div>
 
-            {latestReports.length > 0 ? (
+            {isDataLoading && latestReports.length === 0 ? (
+              <div className="space-y-2">
+                {Array.from({ length: 3 }).map((_, idx) => (
+                  <div
+                    key={`report-skeleton-${idx}`}
+                    className="flex items-center gap-3 p-3 rounded-xl dark:bg-zinc-900/30 bg-zinc-50 border dark:border-white/5 border-black/5 animate-pulse"
+                  >
+                    <div className="w-9 h-9 rounded-lg dark:bg-zinc-800/60 bg-zinc-200/60" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-3 w-2/3 rounded bg-zinc-700/40" />
+                      <div className="h-2 w-1/3 rounded bg-zinc-700/30" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : latestReports.length > 0 ? (
               <div className="space-y-2">
                 {latestReports.map((report) => (
                   <div
@@ -507,4 +528,3 @@ export default function DashboardPage() {
     </div>
   )
 }
-

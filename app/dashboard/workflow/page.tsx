@@ -352,21 +352,6 @@ export default function WorkflowPage() {
   const kbCompleted = knowledgeBase.filter(d => d.status === "completed").length
   const kbTotal = knowledgeBase.length || knowledgeBaseConfig.length
 
-  // 显示加载状态
-  if (isLoading) {
-    return (
-      <div className="min-h-screen">
-        <Header breadcrumbs={[{ label: "首页", href: "/dashboard" }, { label: "内容工坊" }]} />
-        <main className="p-6 lg:p-8 flex items-center justify-center min-h-[60vh]">
-          <div className="flex flex-col items-center gap-4">
-            <Loader2 size={32} className="animate-spin text-purple-400" />
-            <p className="text-sm text-zinc-400">正在加载工作流进度...</p>
-          </div>
-        </main>
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen">
       <Header breadcrumbs={[{ label: "首页", href: "/dashboard" }, { label: "内容工坊" }]} />
@@ -385,6 +370,12 @@ export default function WorkflowPage() {
             </span>
           </div>
         </div>
+        {isLoading && (
+          <div className="flex items-center gap-2 text-xs text-zinc-500 mb-4">
+            <Loader2 size={14} className="animate-spin text-purple-400" />
+            正在同步工作流进度...
+          </div>
+        )}
 
         {/* 新手引导卡片 - 当没有完成任何步骤时显示（加载完成后） */}
         {!isLoading && completedSteps.length === 0 && (
@@ -713,5 +704,4 @@ export default function WorkflowPage() {
     </div>
   )
 }
-
 

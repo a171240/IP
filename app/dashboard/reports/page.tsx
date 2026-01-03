@@ -382,7 +382,7 @@ export default function ReportsPage() {
     }
   }
 
-  if (authLoading || isLoading) {
+  if (authLoading) {
     return (
       <div className="min-h-screen">
         <Header breadcrumbs={[{ label: "首页", href: "/dashboard" }, { label: "报告库" }]} />
@@ -442,7 +442,9 @@ export default function ReportsPage() {
                 <Target size={18} className="text-purple-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold dark:text-white text-zinc-900">{phaseStats.research}</p>
+                <p className="text-2xl font-bold dark:text-white text-zinc-900">
+                  {isLoading ? "…" : phaseStats.research}
+                </p>
                 <p className="text-xs dark:text-zinc-400 text-zinc-500">研究定位报告</p>
               </div>
             </div>
@@ -453,7 +455,9 @@ export default function ReportsPage() {
                 <Users size={18} className="text-blue-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold dark:text-white text-zinc-900">{phaseStats.persona}</p>
+                <p className="text-2xl font-bold dark:text-white text-zinc-900">
+                  {isLoading ? "…" : phaseStats.persona}
+                </p>
                 <p className="text-xs dark:text-zinc-400 text-zinc-500">人设构建报告</p>
               </div>
             </div>
@@ -464,7 +468,9 @@ export default function ReportsPage() {
                 <FileText size={18} className="text-emerald-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold dark:text-white text-zinc-900">{phaseStats.content}</p>
+                <p className="text-2xl font-bold dark:text-white text-zinc-900">
+                  {isLoading ? "…" : phaseStats.content}
+                </p>
                 <p className="text-xs dark:text-zinc-400 text-zinc-500">内容生产报告</p>
               </div>
             </div>
@@ -475,7 +481,9 @@ export default function ReportsPage() {
                 <FileText size={18} className="text-zinc-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold dark:text-white text-zinc-900">{phaseStats.total}</p>
+                <p className="text-2xl font-bold dark:text-white text-zinc-900">
+                  {isLoading ? "…" : phaseStats.total}
+                </p>
                 <p className="text-xs dark:text-zinc-400 text-zinc-500">报告总数</p>
               </div>
             </div>
@@ -539,7 +547,27 @@ export default function ReportsPage() {
           </div>
         </GlassCard>
 
-        {filteredReports.length > 0 ? (
+        {isLoading ? (
+          <div className={viewMode === "grid" ? "grid md:grid-cols-2 lg:grid-cols-3 gap-4" : "space-y-3"}>
+            {Array.from({ length: viewMode === "grid" ? 6 : 5 }).map((_, idx) => (
+              <GlassCard
+                key={`report-skeleton-${idx}`}
+                className={`${viewMode === "grid" ? "p-5" : "p-4"} animate-pulse`}
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="w-11 h-11 rounded-xl dark:bg-zinc-800/50 bg-zinc-200/70" />
+                  <div className="flex items-center gap-2">
+                    <div className="h-3 w-8 rounded dark:bg-zinc-700/40 bg-zinc-200/60" />
+                    <div className="h-3 w-12 rounded dark:bg-zinc-700/40 bg-zinc-200/60" />
+                  </div>
+                </div>
+                <div className="h-4 w-2/3 rounded dark:bg-zinc-700/40 bg-zinc-200/60 mb-2" />
+                <div className="h-3 w-full rounded dark:bg-zinc-700/30 bg-zinc-200/50 mb-4" />
+                <div className="h-3 w-1/3 rounded dark:bg-zinc-700/30 bg-zinc-200/50" />
+              </GlassCard>
+            ))}
+          </div>
+        ) : filteredReports.length > 0 ? (
           <div className={viewMode === "grid" ? "grid md:grid-cols-2 lg:grid-cols-3 gap-4" : "space-y-3"}>
             {filteredReports.map((report) => {
               const config = stepConfig[report.step_id] || {
