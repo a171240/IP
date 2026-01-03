@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { Suspense, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
@@ -188,7 +188,7 @@ const agents: AgentConfig[] = [
   },
 ]
 
-export default function QuickStartPage() {
+function QuickStartPageContent() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -1100,5 +1100,19 @@ export default function QuickStartPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function QuickStartPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center text-zinc-500">
+          加载中...
+        </div>
+      }
+    >
+      <QuickStartPageContent />
+    </Suspense>
   )
 }
