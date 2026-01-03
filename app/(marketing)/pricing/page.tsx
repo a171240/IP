@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { ArrowRight, Check, Clock, Gift, MessageCircle, Sparkles, X, Zap, Bot, Store, Factory, Palette, LayoutGrid } from "lucide-react"
+import { ArrowRight, Check, Clock, Gift, MessageCircle, Sparkles, X, Zap, Bot, Store, Factory, Palette, LayoutGrid, type LucideIcon } from "lucide-react"
 import { GlassCard, GlowButton } from "@/components/ui/obsidian-primitives"
 import { PricingPayButton } from "@/components/pricing-pay-button"
 import { MARKETING_METRICS, WECHAT_ID } from "@/lib/marketing/content"
@@ -291,7 +291,29 @@ const PlanMatrix = () => (
 )
 
 // Agent Benefits Section
-const agentBenefits = [
+const benefitToneStyles = {
+  orange: { frame: "bg-amber-500/10 border border-amber-500/20", icon: "text-amber-400" },
+  cyan: { frame: "bg-cyan-500/10 border border-cyan-500/20", icon: "text-cyan-400" },
+  pink: { frame: "bg-rose-500/10 border border-rose-500/20", icon: "text-rose-400" },
+  indigo: { frame: "bg-violet-500/10 border border-violet-500/20", icon: "text-violet-400" },
+  purple: { frame: "bg-purple-500/10 border border-purple-500/20", icon: "text-purple-400" },
+} as const
+
+type BenefitTone = keyof typeof benefitToneStyles
+
+type AgentBenefit = {
+  name: string
+  icon: LucideIcon
+  color: BenefitTone
+  countLabel: string | null
+  value: string | null
+  free: string
+  plus: string
+  pro: string
+  vip: string
+}
+
+const agentBenefits: AgentBenefit[] = [
   {
     name: "实体营销全家桶",
     icon: Store,
@@ -351,7 +373,7 @@ const agentBenefits = [
 
 const AgentBenefitsSection = () => (
   <section className="pb-24 px-4 sm:px-6">
-    <div className="max-w-6xl mx-auto">
+    <div className="max-w-5xl mx-auto">
       <div className="text-center mb-10">
         <p className="text-xs font-mono uppercase tracking-widest text-zinc-500 mb-3">AGENT BENEFITS</p>
         <h2 className="text-2xl md:text-3xl font-bold text-white">智能体权益对比</h2>
@@ -372,37 +394,56 @@ const AgentBenefitsSection = () => (
               </tr>
             </thead>
             <tbody>
-              {agentBenefits.map((benefit) => (
-                <tr key={benefit.name} className="border-t border-white/5">
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-lg bg-${benefit.color}-500/10 border border-${benefit.color}-500/20 flex items-center justify-center`}>
-                        <benefit.icon size={16} className={`text-${benefit.color}-400`} />
+              {agentBenefits.map((benefit) => {
+                const tone = benefitToneStyles[benefit.color]
+                return (
+                  <tr key={benefit.name} className="border-t border-white/5">
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-lg ${tone.frame} flex items-center justify-center`}>
+                          <benefit.icon size={16} className={tone.icon} />
+                        </div>
+                        <div>
+                          <div className="text-white font-medium text-sm">{benefit.name}</div>
+                          {benefit.countLabel && <div className="text-[10px] text-zinc-500">{benefit.countLabel}</div>}
+                          {benefit.value && <div className="text-[10px] text-amber-400 font-medium">{benefit.value}</div>}
+                        </div>
                       </div>
-                      <div>
-                        <div className="text-white font-medium text-sm">{benefit.name}</div>
-                        {benefit.countLabel && <div className="text-[10px] text-zinc-500">{benefit.countLabel}</div>}
-                        {benefit.value && <div className="text-[10px] text-amber-400 font-medium">{benefit.value}</div>}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-5 py-4">
-                    <span className={`text-xs px-2 py-1 rounded ${benefit.free === "不可下载" ? "bg-zinc-800 text-zinc-500" : "bg-zinc-800 text-zinc-400"}`}>
-                      {benefit.free}
-                    </span>
-                  </td>
-                  <td className="px-5 py-4">
-                    <span className={`text-xs px-2 py-1 rounded ${benefit.plus === "免费" ? "bg-amber-500/10 text-amber-400" : "bg-zinc-800 text-zinc-400"}`}>
-                      {benefit.plus}
-                    </span>
-                  </td>
-                  <td className="px-5 py-4">
-                    <span className={`text-xs px-2 py-1 rounded ${benefit.pro === "免费" || benefit.pro === "全部可下载" ? "bg-purple-500/10 text-purple-400" : "bg-zinc-800 text-zinc-400"}`}>
-                      {benefit.pro}
-                    </span>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-5 py-4">
+                      <span
+                        className={`text-xs px-2.5 py-1 rounded-full border bg-zinc-900/40 border-white/5 ${
+                          benefit.free === "不可下载" ? "text-zinc-500" : "text-zinc-400"
+                        }`}
+                      >
+                        {benefit.free}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4">
+                      <span
+                        className={`text-xs px-2.5 py-1 rounded-full border ${
+                          benefit.plus === "免费"
+                            ? "bg-amber-500/10 text-amber-300 border-amber-500/20"
+                            : "bg-zinc-900/40 text-zinc-400 border-white/5"
+                        }`}
+                      >
+                        {benefit.plus}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4">
+                      <span
+                        className={`text-xs px-2.5 py-1 rounded-full border ${
+                          benefit.pro === "免费" || benefit.pro === "全部可下载"
+                            ? "bg-purple-500/10 text-purple-300 border-purple-500/20"
+                            : "bg-zinc-900/40 text-zinc-400 border-white/5"
+                        }`}
+                      >
+                        {benefit.pro}
+                      </span>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -426,7 +467,7 @@ const creditCostCatalog = [
 
 const CreditsSection = () => (
   <section className="pb-24 px-4 sm:px-6">
-    <div className="max-w-6xl mx-auto">
+    <div className="max-w-5xl mx-auto">
       <div className="text-center mb-10">
         <p className="text-xs font-mono uppercase tracking-widest text-zinc-500 mb-3">CREDITS</p>
         <h2 className="text-2xl md:text-3xl font-bold text-white">积分怎么消耗？</h2>
@@ -595,20 +636,20 @@ export default function PricingPage() {
 
       {/* Promo Banner */}
       <section className="pt-28 pb-6 px-4 sm:px-6">
-        <div className="max-w-4xl mx-auto">
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-yellow-500/20 via-orange-500/20 to-red-500/20 border border-yellow-500/30 p-6">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-500/10 rounded-full blur-3xl" />
-            <div className="absolute bottom-0 left-0 w-48 h-48 bg-orange-500/10 rounded-full blur-3xl" />
+        <div className="max-w-5xl mx-auto">
+          <GlassCard className="relative overflow-hidden p-6 border-amber-500/20 bg-gradient-to-br from-purple-500/10 via-purple-500/5 to-transparent">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl" />
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl" />
 
             <div className="relative flex flex-col md:flex-row items-center justify-between gap-6">
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-yellow-500 to-orange-500 flex items-center justify-center shadow-lg shadow-orange-500/30">
-                  <Gift size={28} className="text-white" />
+                <div className="w-14 h-14 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shadow-lg shadow-amber-500/20">
+                  <Gift size={28} className="text-amber-300" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="text-xl font-bold text-white">新用户体验计划</h3>
-                    <span className="px-2 py-0.5 rounded-full bg-red-500/20 border border-red-500/30 text-xs text-red-400 font-medium flex items-center gap-1">
+                    <span className="px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-xs text-amber-300 font-medium flex items-center gap-1">
                       <Clock size={10} />
                       内测
                     </span>
@@ -625,7 +666,7 @@ export default function PricingPage() {
                     <span className="text-4xl font-bold text-white">￥9.9</span>
                     <span className="text-sm text-zinc-500 line-through">￥599/月</span>
                   </div>
-                  <p className="text-xs text-yellow-400 mt-1">先跑通一次“批量交付”</p>
+                  <p className="text-xs text-amber-400 mt-1">先跑通一次“批量交付”</p>
                 </div>
                 <Link href={`${START_HREF}&promo=trial`}>
                   <GlowButton primary className="px-8 py-3 text-base whitespace-nowrap">
@@ -640,7 +681,7 @@ export default function PricingPage() {
             <div className="relative mt-4 pt-4 border-t border-white/10 text-center text-xs text-zinc-500">
               提示：当前处于内测阶段，付费开通与发票能力将陆续上线。
             </div>
-          </div>
+          </GlassCard>
         </div>
       </section>
 
