@@ -1,7 +1,5 @@
-"use client"
-
-import { useRouter } from 'next/navigation'
-import { GlassCard, GlowButton, Header } from "@/components/ui/obsidian"
+import type { ReactNode } from "react"
+import Link from "next/link"
 import {
   Activity,
   ArrowRight,
@@ -15,35 +13,56 @@ import {
   Heart,
   DollarSign,
   RotateCcw
-} from 'lucide-react'
-import { WECHAT_ID } from '@/lib/marketing/content'
+} from "lucide-react"
+import { WECHAT_ID } from "@/lib/marketing/content"
+import { MarketingHeader } from "@/components/ui/marketing-header"
 
 const features = [
-  { icon: Clock, text: '约5分钟', desc: '8道精准问题' },
-  { icon: FileText, text: '专属报告', desc: '五维能力分析' },
-  { icon: Gift, text: '行动清单', desc: '30天改进建议' },
-  { icon: CheckCircle, text: '即时生成', desc: '可下载报告' }
+  { icon: Clock, text: "约5分钟", desc: "8道精准问题" },
+  { icon: FileText, text: "专属报告", desc: "五维能力分析" },
+  { icon: Gift, text: "行动清单", desc: "30天改进建议" },
+  { icon: CheckCircle, text: "即时生成", desc: "可下载报告" }
 ]
 
 const dimensions = [
-  { icon: Target, name: '定位清晰度', desc: '你的IP人设是否精准', color: 'from-blue-500 to-cyan-500' },
-  { icon: Zap, name: '内容生产力', desc: '选题与产出效率', color: 'from-yellow-500 to-orange-500' },
-  { icon: Heart, name: '情绪共鸣度', desc: '内容是否打动人心', color: 'from-pink-500 to-rose-500' },
-  { icon: DollarSign, name: '变现转化力', desc: '内容转化效率', color: 'from-emerald-500 to-teal-500' },
-  { icon: RotateCcw, name: '运营持续性', desc: '长期运营能力', color: 'from-purple-500 to-violet-500' }
+  { icon: Target, name: "定位清晰度", desc: "你的IP人设是否精准", color: "from-blue-500 to-cyan-500" },
+  { icon: Zap, name: "内容生产力", desc: "选题与产出效率", color: "from-yellow-500 to-orange-500" },
+  { icon: Heart, name: "情绪共鸣度", desc: "内容是否打动人心", color: "from-pink-500 to-rose-500" },
+  { icon: DollarSign, name: "变现转化力", desc: "内容转化效率", color: "from-emerald-500 to-teal-500" },
+  { icon: RotateCcw, name: "运营持续性", desc: "长期运营能力", color: "from-purple-500 to-violet-500" }
 ]
 
-export default function DiagnosisPage() {
-  const router = useRouter()
+const cardBase =
+  "relative backdrop-blur-none md:backdrop-blur-xl border rounded-2xl transition-all duration-300 ease-out dark:bg-zinc-900/50 bg-white/80 dark:border-white/10 border-black/[0.08] dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)] shadow-[0_1px_3px_rgba(0,0,0,0.05),inset_0_1px_0_0_rgba(255,255,255,0.5)]"
 
+const glowCard = `${cardBase} dark:shadow-[0_0_60px_-15px_rgba(168,85,247,0.3),inset_0_0_30px_rgba(168,85,247,0.08)] shadow-[0_0_60px_-15px_rgba(124,58,237,0.2),inset_0_0_30px_rgba(124,58,237,0.05)]`
+
+const primaryButton =
+  "relative px-5 py-3 rounded-xl font-semibold text-sm transition-all duration-200 ease-out overflow-hidden group flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-[0_0_0_1px_rgba(147,51,234,0.3),0_4px_16px_-4px_rgba(147,51,234,0.4)] hover:from-purple-400 hover:to-purple-500 hover:shadow-[0_0_0_1px_rgba(147,51,234,0.5),0_0_30px_-4px_rgba(147,51,234,0.6)] active:scale-[0.98] active:shadow-[0_0_0_1px_rgba(147,51,234,0.6),0_0_40px_-4px_rgba(147,51,234,0.7)]"
+
+const GlowLink = ({
+  href,
+  className,
+  children
+}: {
+  href: string
+  className?: string
+  children: ReactNode
+}) => (
+  <Link href={href} className={[primaryButton, className].filter(Boolean).join(" ")}>
+    <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+    <span className="relative flex items-center gap-2">{children}</span>
+  </Link>
+)
+
+export default function DiagnosisPage() {
   return (
     <div className="min-h-screen">
-      <Header breadcrumbs={[{ label: "主页", href: "/" }, { label: "IP健康诊断" }]} />
+      <MarketingHeader breadcrumbs={[{ label: "主页", href: "/" }, { label: "IP健康诊断" }]} />
 
-      <main className="p-6 lg:p-8">
+      <main className="p-6 lg:p-8 pb-28 md:pb-8">
         <div className="max-w-4xl mx-auto space-y-6">
-          {/* Hero */}
-          <GlassCard className="p-8 relative overflow-hidden">
+          <section className={`${cardBase} p-8 relative overflow-hidden`}>
             <div className="absolute top-0 right-0 w-72 h-72 bg-gradient-to-br from-emerald-600/10 to-transparent rounded-full blur-3xl" />
             <div className="relative text-center">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 mb-4">
@@ -55,6 +74,17 @@ export default function DiagnosisPage() {
               <p className="text-lg dark:text-zinc-400 text-zinc-500 max-w-xl mx-auto">
                 约5分钟测试，找到你的内容瓶颈，获取专属提升方案
               </p>
+
+              <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+                <GlowLink href="/diagnosis/quiz" className="px-10 py-3 text-base sm:text-lg w-full sm:w-auto">
+                  <Activity className="w-5 h-5" />
+                  开始诊断
+                  <ArrowRight className="w-5 h-5" />
+                </GlowLink>
+                <span className="text-xs sm:text-sm dark:text-zinc-500 text-zinc-400">
+                  无需注册 · 约5分钟 · 可下载报告
+                </span>
+              </div>
 
               <div className="mt-6 flex flex-wrap justify-center gap-3">
                 {features.map((feature, index) => (
@@ -71,10 +101,9 @@ export default function DiagnosisPage() {
                 ))}
               </div>
             </div>
-          </GlassCard>
+          </section>
 
-          {/* 五维诊断介绍 */}
-          <GlassCard className="p-6">
+          <section className={`${cardBase} p-6 content-visibility-auto`}>
             <div className="flex items-center gap-2 mb-4">
               <TrendingUp className="w-5 h-5 text-emerald-400" />
               <h2 className="text-lg font-semibold dark:text-white text-zinc-900">五维能力诊断</h2>
@@ -97,19 +126,18 @@ export default function DiagnosisPage() {
                 </div>
               ))}
             </div>
-          </GlassCard>
+          </section>
 
-          {/* 为什么需要诊断 */}
-          <GlassCard className="p-6">
+          <section className={`${cardBase} p-6 content-visibility-auto`}>
             <h2 className="text-lg font-semibold dark:text-white text-zinc-900 mb-4">为什么需要诊断？</h2>
             <div className="space-y-3">
               <p className="text-sm dark:text-zinc-400 text-zinc-500">90%的内容创作者都在盲目努力：</p>
               <div className="grid sm:grid-cols-2 gap-3">
                 {[
-                  '不知道自己的IP定位是否清晰',
-                  '不知道选题方向是否正确',
-                  '不知道内容配比是否合理',
-                  '不知道为什么内容没有效果'
+                  "不知道自己的IP定位是否清晰",
+                  "不知道选题方向是否正确",
+                  "不知道内容配比是否合理",
+                  "不知道为什么内容没有效果"
                 ].map((item, index) => (
                   <div
                     key={index}
@@ -124,19 +152,14 @@ export default function DiagnosisPage() {
                 这套诊断由IP内容工厂团队设计，帮你精准定位问题，给出可落地的改进方案。
               </p>
             </div>
-          </GlassCard>
+          </section>
 
-          {/* CTA */}
-          <GlassCard className="p-6 text-center" glow>
-            <GlowButton
-              primary
-              className="px-12 py-4 text-lg"
-              onClick={() => router.push('/diagnosis/quiz')}
-            >
+          <section className={`${glowCard} p-6 text-center`}>
+            <GlowLink href="/diagnosis/quiz" className="px-12 py-4 text-lg w-full sm:w-auto">
               <Activity className="w-5 h-5" />
               开始诊断
               <ArrowRight className="w-5 h-5" />
-            </GlowButton>
+            </GlowLink>
             <p className="text-xs dark:text-zinc-500 text-zinc-400 mt-3">
               已有 <span className="font-medium dark:text-emerald-400 text-emerald-600">1,234</span> 人完成诊断
             </p>
@@ -144,9 +167,24 @@ export default function DiagnosisPage() {
               添加微信领取1V1诊断解读：<span className="font-medium text-emerald-500 select-all">{WECHAT_ID}</span>
             </div>
             <p className="text-[10px] dark:text-zinc-500 text-zinc-400 mt-2">报告保存30天，可随时下载</p>
-          </GlassCard>
+          </section>
         </div>
       </main>
+
+      <div className="fixed bottom-0 left-0 right-0 z-50 md:hidden">
+        <div className="border-t dark:border-white/10 border-black/[0.08] bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl">
+          <div className="mx-auto max-w-4xl px-4 pt-2 pb-[calc(var(--safe-area-bottom)+0.75rem)]">
+            <GlowLink href="/diagnosis/quiz" className="w-full px-6 py-3 text-base">
+              <Activity className="w-5 h-5" />
+              开始诊断
+              <ArrowRight className="w-5 h-5" />
+            </GlowLink>
+            <p className="mt-2 text-[10px] text-center dark:text-zinc-500 text-zinc-400">
+              无需注册 · 可下载诊断报告
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
