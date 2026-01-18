@@ -1082,7 +1082,7 @@ export default function LandingPage() {
           <div className="flex flex-col items-center gap-3 mt-10">
             <Link href="/diagnosis">
               <GlowButton primary className="px-10 py-4 text-base">
-                把我的流程改成“右侧”
+                免费快速诊断
                 <ArrowRight size={16} />
               </GlowButton>
             </Link>
@@ -1179,20 +1179,20 @@ export default function LandingPage() {
           </p>
 
           {/* 双CTA */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-            <Link href="/diagnosis">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8 w-full">
+            <Link href="/diagnosis" className="w-full sm:w-auto">
             <GlowButton
               primary
-              className="px-10 py-5 text-lg font-medium"
+              className="w-full sm:w-auto px-10 py-5 text-lg font-medium"
             >
               <Zap size={20} />
               领取专属诊断报告
               <ArrowRight size={18} />
             </GlowButton>
             </Link>
-                        <Link
+            <Link
               href="/pricing#contact"
-              className="px-10 py-5 text-lg font-medium text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-700 rounded-xl transition-colors"
+              className="w-full sm:w-auto inline-flex items-center justify-center px-10 py-5 text-lg font-medium text-white bg-white/5 border border-white/15 rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.08)] hover:bg-white/10 hover:border-white/30 transition-colors"
             >
               预约顾问演示
             </Link>
