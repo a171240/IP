@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "supabase_admin_env_missing" }, { status: 500 })
   }
 
-  let createError: { message?: string } | null = null
+  let createErrorMessage = ""
   await admin.auth.admin
     .createUser({
       email,
@@ -109,7 +109,9 @@ export async function POST(request: NextRequest) {
     })
     .then(({ error }) => {
       if (error) {
-        createError = error
+        const message =
+          typeof error === "object" && error && "message" in error ? String((error as { message?: string }).message || "") : ""
+        createErrorMessage = message || "create_failed"
       }
     })
 
@@ -129,9 +131,9 @@ export async function POST(request: NextRequest) {
   })
 
   if (signInError || !sessionData.session) {
-    if (createError) {
+    if (createErrorMessage) {
       return NextResponse.json(
-        { error: "user_create_failed", message: createError.message || "create_failed" },
+        { error: "user_create_failed", message: createErrorMessage },
         { status: 500 }
       )
     }
