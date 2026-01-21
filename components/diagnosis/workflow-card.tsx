@@ -523,7 +523,7 @@ export function GrowthPathCard({ currentScore, level }: GrowthPathCardProps) {
                     : isPast
                       ? 'bg-emerald-500/20 border-2 border-emerald-500'
                       : isActive
-                        ? `bg-gradient-to-br ${planColors[stage.plan]}`
+                        ? `bg-gradient-to-br ${planColors[stage.plan as keyof typeof planColors]}`
                         : 'dark:bg-zinc-800 bg-zinc-200'
                 }`}>
                   {stage.isCurrent && (
@@ -547,7 +547,7 @@ export function GrowthPathCard({ currentScore, level }: GrowthPathCardProps) {
                     <span className="text-sm dark:text-zinc-500 text-zinc-400">
                       {stage.scoreRange}
                     </span>
-                    {stage.plan !== 'current' && planLabels[stage.plan] && (
+                    {stage.plan !== 'current' && planLabels[stage.plan as keyof typeof planLabels] && (
                       <span className={`px-2 py-0.5 text-xs rounded-full ${
                         stage.plan === 'free'
                           ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
@@ -555,7 +555,7 @@ export function GrowthPathCard({ currentScore, level }: GrowthPathCardProps) {
                             ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
                             : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
                       }`}>
-                        {planLabels[stage.plan]}
+                        {planLabels[stage.plan as keyof typeof planLabels]}
                       </span>
                     )}
                   </div>

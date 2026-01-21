@@ -9,6 +9,7 @@ export {
   signOut,
   getCurrentUser,
   getSession,
+  ensureSessionFromUrl,
   getProfile,
   updateProfile,
   onAuthStateChange,

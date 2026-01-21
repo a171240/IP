@@ -459,7 +459,7 @@ export async function GET(
     const message = getDownloadPermissionMessage(packId, currentPlan)
     return NextResponse.json(
       {
-        error: message || `姝よ祫婧愰渶瑕佹洿楂樼骇鍒細鍛樻墠鑳戒笅杞絗,
+        error: message || "此资源需要更高级别会员才能下载",
         code: "download_forbidden",
         current_plan: currentPlan,
         current_plan_label: PLAN_LABELS[currentPlan],
@@ -501,28 +501,28 @@ export async function GET(
     creditsBalance = consumed.credits_balance
   }
 
-    // 鏌ユ壘瑙ｅ喅鏂规鍖呴厤缃?
-    const pack = solutionPacksConfig.find(p => p.id === packId)
+  // Find solution pack config
+  const pack = solutionPacksConfig.find((p) => p.id === packId)
 
-    if (!pack) {
-      return NextResponse.json(
-        { error: "瑙ｅ喅鏂规鍖呬笉瀛樺湪" },
-        { status: 404 }
-      )
-    }
+  if (!pack) {
+    return NextResponse.json(
+      { error: "Solution pack not found" },
+      { status: 404 }
+    )
+  }
 
-    // 鑾峰彇鍐呭
-    const content = packContents[packId]
+  // Load pack content
+  const content = packContents[packId]
 
-    if (!content) {
-      return NextResponse.json(
-        { error: "鍐呭鏆傛湭鍑嗗濂? },
-        { status: 404 }
-      )
-    }
+  if (!content) {
+    return NextResponse.json(
+      { error: "Pack content missing" },
+      { status: 404 }
+    )
+  }
 
-    // 鐢熸垚鏂囦欢鍚?
-    const fileName = `${pack.title}.md`
+  // Generate file name
+  const fileName = `${pack.title}.md`
 
     // 鍒涘缓鍝嶅簲锛岃缃负涓嬭浇鏂囦欢
     const response = new NextResponse(content, {
@@ -542,7 +542,7 @@ export async function GET(
       const meta = (error as unknown as { meta?: { required?: number; balance?: number } }).meta
       return NextResponse.json(
         {
-          error: `?????????? ${meta?.required ?? 0}????? ${meta?.balance ?? 0}?`,
+          error: `Insufficient credits: required ${meta?.required ?? 0}, remaining ${meta?.balance ?? 0}.`,
           code: "insufficient_credits",
           required: meta?.required ?? 0,
           balance: meta?.balance ?? 0,
@@ -552,8 +552,9 @@ export async function GET(
     }
 
     console.error("Download error:", error)
-    return NextResponse.json({ error: "????????" }, { status: 500 })
+    return NextResponse.json({ error: "Download failed." }, { status: 500 })
   }
 }
+
 
 

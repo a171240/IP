@@ -88,12 +88,12 @@ export async function POST(request: NextRequest) {
   const password = buildWechatPassword(openid)
 
   const admin = createAdminSupabaseClient()
-  const { data: found, error: lookupError } = await admin.auth.admin.getUserByEmail(email)
-  if (lookupError) {
+  const { data: listData, error: listError } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
+  if (listError) {
     return NextResponse.json({ error: "user_lookup_failed" }, { status: 500 })
   }
 
-  let user = found?.user || null
+  let user = listData.users.find((item) => item.email === email) || null
   if (!user) {
     const { data: created, error: createError } = await admin.auth.admin.createUser({
       email,

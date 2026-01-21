@@ -1,4 +1,5 @@
 import Link from "next/link"
+import type { Metadata } from "next"
 import {
   ArrowRight,
   ChevronRight,
@@ -21,7 +22,41 @@ import {
 } from "lucide-react"
 import { ObsidianBackgroundLite } from "@/components/ui/obsidian-background-lite"
 import { GlowButton } from "@/components/ui/obsidian-primitives"
+import { MobileStickyCta } from "@/components/marketing/mobile-sticky-cta"
 import { HERO_TRUST_TAGS, INDUSTRY_TAGS, MARKETING_METRICS, WECHAT_ID } from "@/lib/marketing/content"
+
+export const metadata: Metadata = {
+  title: "IP内容工厂 | 交付可控的内容工作流",
+  description:
+    "面向代运营、MCN、企业内容团队的交付工作流与智能体模板，提供免费诊断、样本预览与团队方案演示。",
+  openGraph: {
+    title: "IP内容工厂 | 交付可控的内容工作流",
+    description:
+      "面向代运营、MCN、企业内容团队的交付工作流与智能体模板，提供免费诊断、样本预览与团队方案演示。",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "IP内容工厂 | 交付可控的内容工作流",
+    description:
+      "面向代运营、MCN、企业内容团队的交付工作流与智能体模板，提供免费诊断、样本预览与团队方案演示。",
+  },
+}
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "IP内容工厂",
+  applicationCategory: "BusinessApplication",
+  operatingSystem: "Web",
+  description: "面向代运营、MCN、企业内容团队的交付工作流与智能体模板。",
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "CNY",
+    description: "提供免费诊断与团队方案演示。",
+  },
+}
 
 // 典型使用场景 - 代运营 / MCN / 企业内容团队
 const testimonials = [
@@ -185,8 +220,12 @@ const agentColorMap: Record<string, { bg: string; border: string; text: string; 
 export default function LandingPage() {
 
   return (
-    <div className="relative min-h-[100dvh] bg-[#030304] text-zinc-200 font-sans selection:bg-purple-500/30 selection:text-purple-200 overflow-x-hidden">
+      <div className="relative min-h-[100dvh] bg-[#030304] text-zinc-200 font-sans selection:bg-purple-500/30 selection:text-purple-200 overflow-x-hidden">
       <ObsidianBackgroundLite />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
 
             {/* ============ Navigation ============ */}
       <nav className="fixed top-0 left-0 right-0 z-50 px-4 sm:px-6 pb-3 pt-[calc(var(--safe-area-top)+0.75rem)] bg-[#030304]/90 border-b border-white/[0.02]">
@@ -276,34 +315,34 @@ export default function LandingPage() {
             </div>
           </div>
 
-                    {/* CTA */}
+                              {/* CTA */}
           <div className="flex flex-col items-center gap-6">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-6 w-full">
               <div className="flex flex-col items-center gap-2 w-full sm:w-auto">
                 <Link href="/diagnosis">
-                <GlowButton
-                  primary
-                  className="w-full sm:w-auto px-8 sm:px-12 py-4 sm:py-5 text-base sm:text-lg font-medium"
-                >
-                  <Zap size={20} />
-                  免费快速诊断
-                  <ArrowRight size={18} />
-                </GlowButton>
+                  <GlowButton
+                    primary
+                    className="w-full sm:w-auto px-8 sm:px-12 py-4 sm:py-5 text-base sm:text-lg font-medium"
+                  >
+                    <Zap size={20} />
+                    免费快速诊断
+                    <ArrowRight size={18} />
+                  </GlowButton>
                 </Link>
                 <span className="text-xs text-zinc-500">
-                  约5分钟 · 8道题 · 五维评分 + 行动清单
+                  5分钟 · 8道题 · 五维评分 + 行动清单
                 </span>
               </div>
 
               <div className="flex flex-col items-center gap-2 w-full sm:w-auto">
                 <Link
-                  href="/pricing#contact"
+                  href="#report-sample"
                   className="w-full sm:w-auto px-8 sm:px-12 py-4 sm:py-5 text-base sm:text-lg font-medium text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-700 rounded-xl transition-colors text-center"
                 >
-                  预约顾问演示
+                  查看样本预览
                 </Link>
                 <span className="text-xs text-zinc-500">
-                  适合准备采购团队版 / 私有化的团队
+                  先看输出样本，了解交付格式与字段
                 </span>
               </div>
             </div>
@@ -314,16 +353,9 @@ export default function LandingPage() {
               <Link href="#report-sample" className="px-3 py-1 rounded-full bg-white/[0.02] border border-white/5 hover:text-white transition-colors">
                 查看样本预览
               </Link>
-              <Link href="/pricing" className="px-3 py-1 rounded-full bg-white/[0.02] border border-white/5 hover:text-white transition-colors">
-                查看定价
-              </Link>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-zinc-500">
-              <span>添加微信领取1V1诊断：</span>
-              <span className="text-emerald-300 font-medium select-all">{WECHAT_ID}</span>
             </div>
           </div>
+
 
           <div className="mt-12">
             <p className="text-xs text-zinc-600 mb-3">已在这些场景跑通</p>
@@ -547,7 +579,7 @@ export default function LandingPage() {
                     <ArrowRight size={16} />
                   </GlowButton>
                 </Link>
-                <Link href="/pricing#contact" className="text-sm text-zinc-400 hover:text-white transition-colors">
+                <Link href="/demo" className="text-sm text-zinc-400 hover:text-white transition-colors">
                   预约顾问演示
                 </Link>
               </div>
@@ -684,6 +716,7 @@ export default function LandingPage() {
                 testimonials.map((t, idx) => (
                   <div
                     key={`${copyIndex}-${idx}`}
+                    aria-hidden={copyIndex === 1}
                     className="flex-shrink-0 w-[340px] md:w-[400px] p-8 mr-6 rounded-2xl bg-gradient-to-br from-zinc-900/90 to-zinc-900/50 border border-white/[0.04] hover:border-white/10 transition-colors group"
                   >
                     <Quote size={24} className="text-white/5 mb-6" />
@@ -1086,7 +1119,7 @@ export default function LandingPage() {
                 <ArrowRight size={16} />
               </GlowButton>
             </Link>
-            <Link href="/pricing#contact" className="text-sm text-zinc-500 hover:text-white transition-colors">
+            <Link href="/demo" className="text-sm text-zinc-500 hover:text-white transition-colors">
               预约顾问演示
             </Link>
             <p className="text-xs text-zinc-600">诊断完成后可获得流程卡点与交付SOP建议</p>
@@ -1166,7 +1199,7 @@ export default function LandingPage() {
       </section>
 
       {/* ============ 最终 CTA - 强化系统价值 ============ */}
-      <section className="py-32 md:py-40 px-4 sm:px-6 content-visibility-auto">
+      <section id="final-cta" className="py-32 md:py-40 px-4 sm:px-6 content-visibility-auto">
         <div className="max-w-3xl mx-auto text-center">
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-6 leading-tight tracking-tight">
             把交付周期从不确定变成可量化
@@ -1191,8 +1224,8 @@ export default function LandingPage() {
             </GlowButton>
             </Link>
             <Link
-              href="/pricing#contact"
-              className="w-full sm:w-auto inline-flex items-center justify-center px-10 py-5 text-lg font-medium text-white bg-white/5 border border-white/15 rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.08)] hover:bg-white/10 hover:border-white/30 transition-colors"
+              href="/demo"
+              className="px-10 py-5 text-lg font-medium text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-700 rounded-xl transition-colors"
             >
               预约顾问演示
             </Link>
@@ -1208,6 +1241,8 @@ export default function LandingPage() {
       </section>
 
       {/* ============ Footer ============ */}
+      <MobileStickyCta />
+
       <footer className="py-10 px-4 sm:px-6 border-t border-white/[0.02]">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity cursor-pointer">

@@ -17,6 +17,21 @@ import {
   type PlanId,
 } from '@/lib/pricing/rules'
 
+type ContextReportRef = {
+  report_id?: string
+}
+
+type ContextInlineReport = {
+  step_id?: string
+  title?: string
+  content?: string
+}
+
+type ChatContextPayload = {
+  reports?: ContextReportRef[]
+  inline_reports?: ContextInlineReport[]
+}
+
 function jsonError(status: number, error: string, extra?: Record<string, unknown>) {
   return new Response(JSON.stringify({ error, ...extra }), {
     status,
@@ -176,7 +191,7 @@ export async function POST(request: NextRequest) {
       } else if (isCreditsSchemaMissing(profileError?.message)) {
         return jsonError(
           500,
-          '绉垎绯荤粺灏氭湭鍒濆鍖栵紝璇峰湪 Supabase 鎵ц `lib/supabase/schema.sql` 鍚庨噸璇曘€?
+          "Credits system not initialized. Run lib/supabase/schema.sql in Supabase and retry."
         )
       } else {
         return jsonError(500, `鑾峰彇鐢ㄦ埛淇℃伅澶辫触: ${profileError?.message || 'profile not found'}`)
@@ -203,7 +218,7 @@ export async function POST(request: NextRequest) {
       const balanceQuote = Number(userProfile.credits_balance || 0)
       return jsonError(
         403,
-        `鎮ㄥ綋鍓嶆槸${PLAN_LABELS[curPlan]}锛屾鍔熻兘闇€瑕?{PLAN_LABELS[requiredPlan]}銆傛垨娑堣€?{creditCostQuote}绉垎/娆,
+        `您当前是${PLAN_LABELS[curPlan]}，此功能需要 ${PLAN_LABELS[requiredPlan]}。或消耗 ${creditCostQuote} 积分/次。`,
         {
           code: 'plan_required',
           required_plan: requiredPlan,
@@ -243,7 +258,7 @@ export async function POST(request: NextRequest) {
         } else if (isCreditsSchemaMissing(grantError.message)) {
           return jsonError(
             500,
-            '绉垎绯荤粺灏氭湭鍒濆鍖栵紝璇峰湪 Supabase 鎵ц `lib/supabase/schema.sql` 鍚庨噸璇曘€?
+            "Credits system not initialized. Run lib/supabase/schema.sql in Supabase and retry."
           )
         } else {
           return jsonError(500, '璇曠敤绉垎鍙戞斁澶辫触', { details: grantError.message })
@@ -288,11 +303,15 @@ export async function POST(request: NextRequest) {
             .single()
 
           const latestBalance = Number(latest?.credits_balance ?? creditsBalance)
-          return jsonError(402, `绉垎涓嶈冻锛氭湰娆￠渶娑堣€?${creditCost}锛屽綋鍓嶅墿浣?${latestBalance}銆俙, {
-            code: 'insufficient_credits',
-            required: creditCost,
-            balance: latestBalance,
-          })
+          return jsonError(
+            402,
+            `积分不足：本次需消耗 ${creditCost}，当前余额 ${latestBalance}。`,
+            {
+              code: "insufficient_credits",
+              required: creditCost,
+              balance: latestBalance,
+            }
+          )
         }
 
         // 濡傛灉 consume_credits 鍑芥暟涓嶅瓨鍦紝灏濊瘯鐩存帴鎵ｅ噺绉垎
@@ -313,7 +332,7 @@ export async function POST(request: NextRequest) {
         } else if (isCreditsSchemaMissing(consumeError.message)) {
           return jsonError(
             500,
-            '绉垎绯荤粺灏氭湭鍒濆鍖栵紝璇峰湪 Supabase 鎵ц `lib/supabase/schema.sql` 鍚庨噸璇曘€?
+            "Credits system not initialized. Run lib/supabase/schema.sql in Supabase and retry."
           )
         } else {
           return jsonError(500, '绉垎鎵ｅ噺澶辫触', { details: consumeError.message })
@@ -343,36 +362,10 @@ export async function POST(request: NextRequest) {
     const apiMessages: Array<{ role: string; content: string }> = []
 
     let finalSystemPrompt: string | null = null
-    if (stepId) {
-      finalSystemPrompt = getStepPrompt(stepId)
-    }
-    // P8: allow user-selected sub-agent prompt override
-    if (stepId === 'P8' && typeof agentId === 'string' && agentId.trim()) {
-      const agentPrompt = getAgentPrompt(agentId.trim())
-      if (agentPrompt?.prompt) {
-        finalSystemPrompt =
-          `\u3010P8 \u5b50\u667a\u80fd\u4f53\u9009\u62e9\u3011\u7528\u6237\u5df2\u9009\u62e9\uff1a${agentPrompt.name}\uff08${agentPrompt.id}\uff09\u3002\n` +
-          `\u8bf7\u4e25\u683c\u6309\u4e0b\u65b9\u63d0\u793a\u8bcd\u6267\u884c\uff1b\u5982\u7f3a\u5c11\u9009\u9898/\u5185\u5bb9\u7c7b\u578b/\u80cc\u666f\u4fe1\u606f\uff0c\u5148\u7528\u6700\u5c11\u95ee\u9898\u8865\u9f50\u518d\u8f93\u51fa\u3002\n\n---\n\n` +
-          agentPrompt.prompt
-      }
-    }
-
-
-    // General agent calls: load prompt server-side so the client never sees the prompt text
-    if ((!finalSystemPrompt || (stepId && stepId.startsWith('agent:'))) && typeof agentId === 'string' && agentId.trim()) {
-      const agentPrompt = getAgentPrompt(agentId.trim())
-      if (agentPrompt?.prompt) {
-        finalSystemPrompt = agentPrompt.prompt
-      }
-    }
-
-    
-
-    // Allow client to run a specific prompt file under `鎻愮ず璇?` (for collection packs / sub-categories)
-    if (typeof promptFile === 'string' && promptFile.trim()) {
+    if (promptFile && promptFile.trim()) {
       try {
-        const { content, fileName } = await readPromptFile(promptFile.trim())
-        const promptText = content.toString('utf8').trim()
+        const { content, fileName } = await readPromptFile(promptFile)
+        const promptText = content.toString('utf-8').trim()
         if (!promptText) {
           return jsonError(400, '\u63d0\u793a\u8bcd\u6587\u4ef6\u4e3a\u7a7a')
         }
@@ -380,9 +373,27 @@ export async function POST(request: NextRequest) {
 
 ---
 
-` + promptText
+${promptText}`
       } catch (e) {
         return jsonError(400, e instanceof Error ? e.message : '\u63d0\u793a\u8bcd\u6587\u4ef6\u8bfb\u53d6\u5931\u8d25')
+      }
+    } else if (agentId || stepId?.startsWith('agent:')) {
+      const id = (agentId || stepId?.slice('agent:'.length) || '').trim()
+      if (id) {
+        const agentPrompt = getAgentPrompt(id)
+        if (!agentPrompt?.prompt) {
+          return jsonError(400, '\u672a\u627e\u5230\u667a\u80fd\u4f53\u63d0\u793a\u8bcd')
+        }
+        finalSystemPrompt = `\u3010\u667a\u80fd\u4f53\u3011${agentPrompt.name}
+
+---
+
+${agentPrompt.prompt}`
+      }
+    } else if (stepId) {
+      const stepPrompt = getStepPrompt(stepId)
+      if (stepPrompt) {
+        finalSystemPrompt = stepPrompt
       }
     }
 
@@ -573,6 +584,7 @@ ${truncated.text}
     return jsonError(500, '\u670d\u52a1\u5668\u9519\u8bef')
   }
 }
+
 
 
 

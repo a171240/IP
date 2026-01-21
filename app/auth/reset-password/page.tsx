@@ -1,20 +1,12 @@
 "use client"
 
-import { Suspense, useState, useEffect } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Lock, Eye, EyeOff, Loader2, Sparkles, CheckCircle, ArrowLeft } from "lucide-react"
-import { updatePassword, getSession } from "@/lib/supabase"
+import { updatePassword, getSession, ensureSessionFromUrl } from "@/lib/supabase"
 
 export default function ResetPasswordPage() {
-  return (
-    <Suspense fallback={<div className="min-h-screen bg-zinc-950" />}>
-      <ResetPasswordPageInner />
-    </Suspense>
-  )
-}
-
-function ResetPasswordPageInner() {
   const router = useRouter()
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -37,8 +29,9 @@ function ResetPasswordPageInner() {
   useEffect(() => {
     const checkSession = async () => {
       try {
+        const recoveredSession = await ensureSessionFromUrl()
         const session = await getSession()
-        if (session) {
+        if (session || recoveredSession) {
           setHasSession(true)
         } else {
           setError("无效或已过期的重置链接。请重新申请密码重置。")

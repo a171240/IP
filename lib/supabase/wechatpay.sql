@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS public.wechatpay_orders (
   user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   out_trade_no TEXT NOT NULL UNIQUE,
   client_secret TEXT NOT NULL,
+  idempotency_key TEXT,
   description TEXT NOT NULL,
   amount_total INT NOT NULL CHECK (amount_total > 0),
   currency TEXT NOT NULL DEFAULT 'CNY',
@@ -15,6 +16,9 @@ CREATE TABLE IF NOT EXISTS public.wechatpay_orders (
   paid_at TIMESTAMPTZ,
   claimed_at TIMESTAMPTZ,
   raw_notify JSONB DEFAULT '{}'::jsonb,
+  ip_address TEXT,
+  user_agent TEXT,
+  origin TEXT,
   -- 权限开通相关字段
   product_id TEXT,
   grant_status TEXT DEFAULT 'pending' CHECK (grant_status IN ('pending', 'granting', 'granted', 'failed')),
@@ -42,6 +46,7 @@ CREATE INDEX IF NOT EXISTS idx_wechatpay_orders_status_created_at ON public.wech
 CREATE INDEX IF NOT EXISTS idx_wechatpay_orders_out_trade_no_secret ON public.wechatpay_orders(out_trade_no, client_secret);
 CREATE INDEX IF NOT EXISTS idx_wechatpay_orders_product_id ON public.wechatpay_orders(product_id);
 CREATE INDEX IF NOT EXISTS idx_wechatpay_orders_grant_status ON public.wechatpay_orders(grant_status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_wechatpay_orders_idempotency_key ON public.wechatpay_orders(idempotency_key);
 
 DROP TRIGGER IF EXISTS update_wechatpay_orders_updated_at ON public.wechatpay_orders;
 CREATE TRIGGER update_wechatpay_orders_updated_at
@@ -58,6 +63,11 @@ CREATE TRIGGER update_wechatpay_orders_updated_at
 -- ALTER TABLE public.wechatpay_orders ADD COLUMN IF NOT EXISTS grant_attempts INT DEFAULT 0;
 -- ALTER TABLE public.wechatpay_orders ADD COLUMN IF NOT EXISTS granted_at TIMESTAMPTZ;
 -- ALTER TABLE public.wechatpay_orders ADD COLUMN IF NOT EXISTS grant_error TEXT;
+-- ALTER TABLE public.wechatpay_orders ADD COLUMN IF NOT EXISTS idempotency_key TEXT;
+-- ALTER TABLE public.wechatpay_orders ADD COLUMN IF NOT EXISTS ip_address TEXT;
+-- ALTER TABLE public.wechatpay_orders ADD COLUMN IF NOT EXISTS user_agent TEXT;
+-- ALTER TABLE public.wechatpay_orders ADD COLUMN IF NOT EXISTS origin TEXT;
+-- CREATE UNIQUE INDEX IF NOT EXISTS idx_wechatpay_orders_idempotency_key ON public.wechatpay_orders(idempotency_key);
 --
 -- 注意：Supabase 的 ADD COLUMN IF NOT EXISTS 可能需要先检查版本支持
 -- 如果不支持，可以使用以下方式：
@@ -78,5 +88,17 @@ CREATE TRIGGER update_wechatpay_orders_updated_at
 --   END IF;
 --   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='wechatpay_orders' AND column_name='grant_error') THEN
 --     ALTER TABLE public.wechatpay_orders ADD COLUMN grant_error TEXT;
+--   END IF;
+--   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='wechatpay_orders' AND column_name='idempotency_key') THEN
+--     ALTER TABLE public.wechatpay_orders ADD COLUMN idempotency_key TEXT;
+--   END IF;
+--   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='wechatpay_orders' AND column_name='ip_address') THEN
+--     ALTER TABLE public.wechatpay_orders ADD COLUMN ip_address TEXT;
+--   END IF;
+--   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='wechatpay_orders' AND column_name='user_agent') THEN
+--     ALTER TABLE public.wechatpay_orders ADD COLUMN user_agent TEXT;
+--   END IF;
+--   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='wechatpay_orders' AND column_name='origin') THEN
+--     ALTER TABLE public.wechatpay_orders ADD COLUMN origin TEXT;
 --   END IF;
 -- END $$;

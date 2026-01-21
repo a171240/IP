@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
+import { safeRedirect } from "@/lib/safe-redirect"
 
 function getSupabaseUrl(): string | null {
   return (
@@ -22,15 +23,39 @@ function getSupabaseAnonKey(): string | null {
 }
 
 export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
-  })
+  const { pathname } = request.nextUrl
+
+  const protectedRoutes = ["/dashboard"]
+  const publicRoutes = ["/dashboard/quick-start"]
+  const isPublicRoute = publicRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`))
+  const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route)) && !isPublicRoute
+
+  const authRoutes = ["/auth/login", "/auth/register"]
+  const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route))
+
+  if (isPublicRoute) {
+    return NextResponse.next()
+  }
+
+  if (!isProtectedRoute && !isAuthRoute) {
+    return NextResponse.next()
+  }
 
   const supabaseUrl = getSupabaseUrl()
   const supabaseAnonKey = getSupabaseAnonKey()
   if (!supabaseUrl || !supabaseAnonKey) {
-    return supabaseResponse
+    if (isProtectedRoute) {
+      const url = request.nextUrl.clone()
+      url.pathname = "/auth/login"
+      url.searchParams.set("redirect", `${request.nextUrl.pathname}${request.nextUrl.search}`)
+      return NextResponse.redirect(url)
+    }
+    return NextResponse.next()
   }
+
+  let supabaseResponse = NextResponse.next({
+    request,
+  })
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
@@ -52,16 +77,6 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getSession()
   const user = session?.user
 
-  const { pathname } = request.nextUrl
-
-  const protectedRoutes = ["/dashboard"]
-  const publicRoutes = ["/dashboard/quick-start"]
-  const isPublicRoute = publicRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`))
-  const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route)) && !isPublicRoute
-
-  const authRoutes = ["/auth/login", "/auth/register"]
-  const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route))
-
   if (isProtectedRoute && !user) {
     const url = request.nextUrl.clone()
     url.pathname = "/auth/login"
@@ -72,19 +87,9 @@ export async function middleware(request: NextRequest) {
   if (isAuthRoute && user) {
     const url = request.nextUrl.clone()
     const redirectParam = request.nextUrl.searchParams.get("redirect")
-
-    if (redirectParam && redirectParam.startsWith("/") && !redirectParam.startsWith("//")) {
-      const [redirectPathname, redirectSearch = ""] = redirectParam.split("?")
-
-      if (!redirectPathname.startsWith("/auth")) {
-        url.pathname = redirectPathname
-        url.search = redirectSearch ? `?${redirectSearch}` : ""
-        return NextResponse.redirect(url)
-      }
-    }
-
-    url.pathname = "/dashboard"
-    url.search = ""
+    const { pathname, search } = safeRedirect(redirectParam)
+    url.pathname = pathname
+    url.search = search
     return NextResponse.redirect(url)
   }
 
@@ -92,7 +97,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$|api).*)",
-  ],
+  matcher: ["/dashboard/:path*", "/auth/:path*"],
 }

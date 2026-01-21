@@ -32,7 +32,7 @@ const tierBadgeConfig: Record<AgentTier, { label: string; color: string; icon: t
 
 // 获取解决方案包的等级
 function getPackTier(packId: string): AgentTier {
-  const pack = solutionPacksConfig.find(p => p.id === packId || p.sourcePath.includes(packId))
+  const pack = solutionPacksConfig.find((p) => p.id === packId || p.sourcePath?.includes(packId))
   return pack?.tier || "normal"
 }
 

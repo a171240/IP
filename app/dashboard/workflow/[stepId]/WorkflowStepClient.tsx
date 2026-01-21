@@ -720,7 +720,6 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
           messages: messagesForApi,
           stepId: step.id,
           ...(step.id === "P8" && selectedP8AgentId ? { agentId: selectedP8AgentId } : {}),
-          ...(opts?.allowCreditsOverride ? { allowCreditsOverride: true } : {}),
           mode: 'report',
         })
       })
@@ -1245,7 +1244,7 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
                 />
               </div>
               <button
-                onClick={handleSend}
+                onClick={() => handleSend()}
                 disabled={!inputValue.trim() || isLoading || !currentConversation || (step.id === "P8" && !selectedP8AgentId)}
                 className={`px-4 rounded-xl transition-all ${
                   inputValue.trim() && !isLoading

@@ -75,6 +75,51 @@ export async function getSession(): Promise<Session | null> {
   return session
 }
 
+export async function ensureSessionFromUrl(): Promise<Session | null> {
+  if (typeof window === "undefined") return null
+
+  const supabase = getSupabaseClient()
+  let session: Session | null = null
+
+  try {
+    const hash = window.location.hash ? window.location.hash.slice(1) : ""
+    if (hash) {
+      const params = new URLSearchParams(hash)
+      const accessToken = params.get("access_token")
+      const refreshToken = params.get("refresh_token")
+      if (accessToken && refreshToken) {
+        const { data, error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        })
+        if (!error) {
+          session = data.session ?? session
+        }
+      }
+    }
+  } catch {
+    // ignore hash parsing errors
+  }
+
+  try {
+    const search = window.location.search
+    if (search) {
+      const params = new URLSearchParams(search)
+      const code = params.get("code")
+      if (code) {
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+        if (!error) {
+          session = data.session ?? session
+        }
+      }
+    }
+  } catch {
+    // ignore search parsing errors
+  }
+
+  return session
+}
+
 /**
  * 获取用户档案
  */

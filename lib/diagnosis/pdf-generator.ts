@@ -9,10 +9,10 @@ marked.setOptions({
 
 export interface PDFOptions {
   filename?: string
-  margin?: number
-  image?: { type: string; quality: number }
-  html2canvas?: { scale: number }
-  jsPDF?: { unit: string; format: string; orientation: string }
+  margin?: number | [number, number] | [number, number, number, number]
+  image?: { type?: 'jpeg' | 'png' | 'webp'; quality?: number }
+  html2canvas?: object
+  jsPDF?: { unit?: string; format?: string | [number, number]; orientation?: 'portrait' | 'landscape' }
 }
 
 // Markdown PDF 样式
@@ -229,8 +229,8 @@ export async function generatePDFFromMarkdown(
 
   const options = {
     filename: filename || defaultFilename,
-    margin: [15, 15, 15, 15],
-    image: { type: 'jpeg', quality: 0.98 },
+    margin: [15, 15, 15, 15] as [number, number, number, number],
+    image: { type: 'jpeg' as const, quality: 0.98 },
     html2canvas: {
       scale: 2,
       useCORS: true,
@@ -238,9 +238,9 @@ export async function generatePDFFromMarkdown(
       logging: true
     },
     jsPDF: {
-      unit: 'mm',
-      format: 'a4',
-      orientation: 'portrait'
+      unit: 'mm' as const,
+      format: 'a4' as const,
+      orientation: 'portrait' as const
     },
     pagebreak: {
       mode: ['avoid-all', 'css', 'legacy']
@@ -278,7 +278,7 @@ export async function generatePDF(
 
   const defaultFilename = `IP内容诊断报告_${new Date().toISOString().split('T')[0]}.pdf`
 
-  const defaultOptions = {
+  const defaultOptions: PDFOptions = {
     filename: filename || defaultFilename,
     margin: 10,
     image: { type: 'jpeg', quality: 0.98 },
@@ -286,7 +286,7 @@ export async function generatePDF(
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
   }
 
-  const mergedOptions = { ...defaultOptions, ...options }
+  const mergedOptions: PDFOptions = { ...defaultOptions, ...options }
 
   await html2pdf()
     .set(mergedOptions)

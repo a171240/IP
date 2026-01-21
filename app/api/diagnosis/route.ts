@@ -23,6 +23,14 @@ export async function POST(request: NextRequest) {
     }
 
     const { answers, industry } = validationResult.data
+    const normalizedAnswers: Record<string, string | string[]> = Object.fromEntries(
+      Object.entries(answers).map(([key, value]) => {
+        if (Array.isArray(value)) {
+          return [key, value.map((item) => String(item))]
+        }
+        return [key, String(value)]
+      })
+    )
 
     // 验证所有必答题是否已回答
     const requiredQuestions = QUESTIONS.filter(q => !q.isClassification)
@@ -40,7 +48,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 计算评分
-    const scoreResult = calculateScore(answers)
+    const scoreResult = calculateScore(normalizedAnswers)
 
     // 保存到数据库
     const supabase = await createClient()

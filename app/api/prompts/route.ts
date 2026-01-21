@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     if (!supabaseUrl || !supabaseAnonKey) {
-      return jsonError(500, "Supabase 鏈厤缃紙璇锋鏌?.env.local锛?)
+      return jsonError(500, "Supabase not configured. Check .env.local.")
     }
 
     const supabase = await createServerSupabaseClientForRequest(request)
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return jsonError(401, "璇峰厛鐧诲綍")
+      return jsonError(401, "请先登录")
     }
 
     if (dir) {
@@ -164,11 +164,15 @@ export async function GET(request: NextRequest) {
       } catch (e) {
         if (e instanceof Error && e.message === "insufficient_credits") {
           const meta = (e as unknown as { meta?: { required?: number; balance?: number } }).meta
-          return jsonError(402, `绉垎涓嶈冻锛氭湰娆￠渶娑堣€?${meta?.required ?? 0}锛屽綋鍓嶅墿浣?${meta?.balance ?? 0}銆俙, {
+          return jsonError(
+            402,
+            `积分不足：本次需消耗 ${meta?.required ?? 0}，当前余额 ${meta?.balance ?? 0}。`,
+            {
             code: "insufficient_credits",
             required: meta?.required ?? 0,
             balance: meta?.balance ?? 0,
-          })
+            }
+          )
         }
 
         if (e instanceof Error && isProfilesSchemaMissing(e.message)) {
@@ -208,7 +212,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     if (error instanceof Error && error.message === "insufficient_credits") {
       const meta = (error as unknown as { meta?: { required?: number; balance?: number } }).meta
-      return jsonError(402, `绉垎涓嶈冻锛氭湰娆￠渶娑堣€?${meta?.required ?? 0}锛屽綋鍓嶅墿浣?${meta?.balance ?? 0}銆俙, {
+      return jsonError(402, `\u79ef\u5206\u4e0d\u8db3\uff1a\u672c\u6b21\u9700\u6d88\u8017 ${meta?.required ?? 0}\uff0c\u5f53\u524d\u4f59\u989d ${meta?.balance ?? 0}\u3002`, {
         code: "insufficient_credits",
         required: meta?.required ?? 0,
         balance: meta?.balance ?? 0,
@@ -227,6 +231,7 @@ export async function GET(request: NextRequest) {
     return jsonError(500, message)
   }
 }
+
 
 
 
