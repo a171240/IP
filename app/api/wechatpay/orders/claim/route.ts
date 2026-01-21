@@ -1,6 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server"
 
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
 import { tryFulfillWechatpayOrder } from "@/lib/wechatpay/fulfill.server"
 
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "缺少 out_trade_no / client_secret" }, { status: 400 })
   }
 
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerSupabaseClientForRequest(request)
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -59,4 +59,8 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json(updated)
 }
+
+
+
+
 

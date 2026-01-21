@@ -1,0 +1,11 @@
+﻿<view class="page page-auth">
+  <view class="container">
+    <view class="hero fade-up">
+      <text class="eyebrow">登录</text>
+      <text class="title">微信一键登录</text>
+      <text class="subtitle">连接账号与积分体系，自动同步权益</text>
+      <button class="btn-primary" bindtap="handleLogin" loading="{{loading}}">微信一键登录</button>
+      <text class="muted small">首次登录将自动创建账号</text>
+    </view>
+  </view>
+</view>

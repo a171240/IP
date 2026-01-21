@@ -1,7 +1,7 @@
 ﻿import { NextRequest, NextResponse } from "next/server"
 
 import { readPackFileForDownload } from "@/lib/packs/packs.server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 import { canDownloadPack, getCreditCostForPackFileDownload, getDownloadPermissionMessage, normalizePlan, PLAN_LABELS } from "@/lib/pricing/rules"
 import { consumeCredits, ensureTrialCreditsIfNeeded, getClientIp, hashIp } from "@/lib/pricing/profile.server"
 
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: "缺少 file 参数" }, { status: 400 })
   }
 
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerSupabaseClientForRequest(request)
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -140,3 +140,5 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: message }, { status: 404 })
   }
 }
+
+

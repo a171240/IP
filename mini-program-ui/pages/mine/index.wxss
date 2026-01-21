@@ -1,0 +1,21 @@
+
+.profile-card {
+  margin-top: 20rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.avatar {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 60rpx;
+  border: 1px solid rgba(229, 211, 179, 0.35);
+  box-shadow: 0 14rpx 30rpx rgba(0, 0, 0, 0.45);
+}
+
+.profile-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}

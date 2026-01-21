@@ -1,0 +1,46 @@
+﻿<view class="page page-mine">
+  <view class="container">
+    <view class="hero fade-up">
+      <view class="row space-between">
+        <view>
+          <text class="title">我的</text>
+          <text class="subtitle">账号与订阅</text>
+        </view>
+        <view class="chip" wx:if="{{isLoggedIn}}">已登录</view>
+        <view class="chip" wx:else>未登录</view>
+      </view>
+
+      <view class="profile-card" wx:if="{{isLoggedIn}}">
+        <image class="avatar" src="{{avatarUrl}}" mode="aspectFill" wx:if="{{avatarUrl}}" />
+        <view class="profile-info">
+          <text class="card-title">{{displayName}}</text>
+          <text class="muted small">微信已绑定</text>
+        </view>
+        <button class="btn-outline" bindtap="handleLogout">退出登录</button>
+      </view>
+
+      <view class="profile-card" wx:else>
+        <text class="muted small">登录后可同步积分与订阅状态</text>
+        <button class="btn-primary" bindtap="handleLoginTap">微信一键登录</button>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-1">
+      <text class="section-title">订阅与积分</text>
+      <view class="card">
+        <text class="card-title">当前套餐</text>
+        <text class="muted small">登录后展示实时权益与积分</text>
+        <button class="btn-primary">升级套餐</button>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-2">
+      <text class="section-title">订单</text>
+      <view class="card">
+        <text class="card-title">暂无订单</text>
+        <text class="muted small">支付开通后自动同步</text>
+        <button class="btn-outline">查看详情</button>
+      </view>
+    </view>
+  </view>
+</view>

@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server"
+﻿import { NextRequest, NextResponse } from "next/server"
 
 import { listPromptFiles, readPromptFile } from "@/lib/prompts/prompts.server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 import { getCreditCostForPromptDownload, getPromptPreviewMaxChars, normalizePlan } from "@/lib/pricing/rules"
 import { consumeCredits, ensureTrialCreditsIfNeeded, getClientIp, hashIp } from "@/lib/pricing/profile.server"
 
@@ -42,16 +42,16 @@ export async function GET(request: NextRequest) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     if (!supabaseUrl || !supabaseAnonKey) {
-      return jsonError(500, "Supabase 未配置（请检查 .env.local）")
+      return jsonError(500, "Supabase 鏈厤缃紙璇锋鏌?.env.local锛?)
     }
 
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerSupabaseClientForRequest(request)
     const {
       data: { user },
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return jsonError(401, "请先登录")
+      return jsonError(401, "璇峰厛鐧诲綍")
     }
 
     if (dir) {
@@ -164,7 +164,7 @@ export async function GET(request: NextRequest) {
       } catch (e) {
         if (e instanceof Error && e.message === "insufficient_credits") {
           const meta = (e as unknown as { meta?: { required?: number; balance?: number } }).meta
-          return jsonError(402, `积分不足：本次需消耗 ${meta?.required ?? 0}，当前剩余 ${meta?.balance ?? 0}。`, {
+          return jsonError(402, `绉垎涓嶈冻锛氭湰娆￠渶娑堣€?${meta?.required ?? 0}锛屽綋鍓嶅墿浣?${meta?.balance ?? 0}銆俙, {
             code: "insufficient_credits",
             required: meta?.required ?? 0,
             balance: meta?.balance ?? 0,
@@ -208,7 +208,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     if (error instanceof Error && error.message === "insufficient_credits") {
       const meta = (error as unknown as { meta?: { required?: number; balance?: number } }).meta
-      return jsonError(402, `积分不足：本次需消耗 ${meta?.required ?? 0}，当前剩余 ${meta?.balance ?? 0}。`, {
+      return jsonError(402, `绉垎涓嶈冻锛氭湰娆￠渶娑堣€?${meta?.required ?? 0}锛屽綋鍓嶅墿浣?${meta?.balance ?? 0}銆俙, {
         code: "insufficient_credits",
         required: meta?.required ?? 0,
         balance: meta?.balance ?? 0,
@@ -220,10 +220,13 @@ export async function GET(request: NextRequest) {
       return jsonError(400, message)
     }
     if (message.includes("ENOENT") || message.toLowerCase().includes("no such file")) {
-      return jsonError(404, "提示词文件不存在")
+      return jsonError(404, "鎻愮ず璇嶆枃浠朵笉瀛樺湪")
     }
 
     console.error("/api/prompts error:", error)
     return jsonError(500, message)
   }
 }
+
+
+

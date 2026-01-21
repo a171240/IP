@@ -1,5 +1,7 @@
 ﻿import { createServerClient } from "@supabase/ssr"
+import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { cookies } from "next/headers"
+import type { NextRequest } from "next/server"
 
 function getSupabaseUrl(): string {
   return (
@@ -61,7 +63,44 @@ export async function createServerSupabaseClient() {
   })
 }
 
+function getBearerToken(request: NextRequest): string | null {
+  const authHeader = request.headers.get("authorization")
+  if (!authHeader) return null
+  const match = authHeader.match(/^Bearer\s+(.+)$/i)
+  return match ? match[1].trim() : null
+}
+
+export async function createServerSupabaseClientForRequest(request: NextRequest) {
+  const token = getBearerToken(request)
+  if (!token) {
+    return createServerSupabaseClient()
+  }
+
+  const url = getSupabaseUrl()
+  const anonKey = getSupabaseAnonKey()
+  if (!url || !anonKey) {
+    throw new Error(
+      "Supabase env missing: set NEXT_PUBLIC_SUPABASE_URL + NEXT_PUBLIC_SUPABASE_ANON_KEY (or keep your existing NEXT_PUBLIC_IPgongchang_SUPABASE_URL + NEXT_PUBLIC_IPgongchang_SUPABASE_ANON_KEY)"
+    )
+  }
+
+  return createSupabaseClient(url, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  })
+}
+
 // Back-compat alias for older imports
 export async function createClient() {
   return createServerSupabaseClient()
 }
+
+
+
+
+
+
