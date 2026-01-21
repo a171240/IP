@@ -87,15 +87,16 @@ export async function POST(request: NextRequest) {
   const email = buildWechatEmail(openid)
   const password = buildWechatPassword(openid)
 
-  const admin = createAdminSupabaseClient()
-  const { data: listData, error: listError } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
-  if (listError) {
-    return NextResponse.json({ error: "user_lookup_failed" }, { status: 500 })
+  let admin
+  try {
+    admin = createAdminSupabaseClient()
+  } catch {
+    return NextResponse.json({ error: "supabase_admin_env_missing" }, { status: 500 })
   }
 
-  let user = listData.users.find((item) => item.email === email) || null
-  if (!user) {
-    const { data: created, error: createError } = await admin.auth.admin.createUser({
+  let createError: { message?: string } | null = null
+  await admin.auth.admin
+    .createUser({
       email,
       password,
       email_confirm: true,
@@ -106,36 +107,11 @@ export async function POST(request: NextRequest) {
         wechat_unionid: unionid || null,
       },
     })
-
-    if (createError || !created?.user) {
-      return NextResponse.json({ error: "user_create_failed" }, { status: 500 })
-    }
-
-    user = created.user
-  } else if (nickname || avatarUrl || unionid) {
-    await admin.auth.admin.updateUserById(user.id, {
-      user_metadata: {
-        ...(user.user_metadata || {}),
-        ...(nickname ? { nickname } : {}),
-        ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
-        ...(unionid ? { wechat_unionid: unionid } : {}),
-      },
+    .then(({ error }) => {
+      if (error) {
+        createError = error
+      }
     })
-  }
-
-  if (user && (nickname || avatarUrl)) {
-    await admin
-      .from("profiles")
-      .upsert(
-        {
-          id: user.id,
-          email,
-          nickname: nickname || "WeChat User",
-          avatar_url: avatarUrl || null,
-        },
-        { onConflict: "id" }
-      )
-  }
 
   const supabaseUrl = getSupabaseUrl()
   const supabaseAnonKey = getSupabaseAnonKey()
@@ -153,7 +129,42 @@ export async function POST(request: NextRequest) {
   })
 
   if (signInError || !sessionData.session) {
-    return NextResponse.json({ error: "sign_in_failed" }, { status: 500 })
+    if (createError) {
+      return NextResponse.json(
+        { error: "user_create_failed", message: createError.message || "create_failed" },
+        { status: 500 }
+      )
+    }
+    return NextResponse.json(
+      { error: "sign_in_failed", message: signInError?.message || "missing_session" },
+      { status: 500 }
+    )
+  }
+
+  const user = sessionData.session.user
+  if (nickname || avatarUrl || unionid) {
+    await admin.auth.admin.updateUserById(user.id, {
+      user_metadata: {
+        ...(user.user_metadata || {}),
+        ...(nickname ? { nickname } : {}),
+        ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
+        ...(unionid ? { wechat_unionid: unionid } : {}),
+      },
+    })
+  }
+
+  if (nickname || avatarUrl) {
+    await admin
+      .from("profiles")
+      .upsert(
+        {
+          id: user.id,
+          email,
+          nickname: nickname || "WeChat User",
+          avatar_url: avatarUrl || null,
+        },
+        { onConflict: "id" }
+      )
   }
 
   return NextResponse.json({
