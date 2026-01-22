@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next"
 import { Analytics } from "@vercel/analytics/next"
 import { ThemeProvider } from "@/components/theme-provider"
 import { MARKETING_METRICS } from "@/lib/marketing/content"
+import { UtmPersist } from "@/components/analytics/utm-persist"
 import "./globals.css"
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
@@ -62,6 +63,7 @@ export default function RootLayout({
     <html lang="zh-CN" suppressHydrationWarning>
       <body className="font-sans antialiased">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange={false}>
+          <UtmPersist />
           {children}
         </ThemeProvider>
         <Analytics />

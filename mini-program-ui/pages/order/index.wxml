@@ -1,0 +1,19 @@
+﻿<view class="page page-order">
+  <view class="container">
+    <view class="hero fade-up">
+      <text class="title">订单</text>
+      <text class="subtitle">最近支付</text>
+    </view>
+    <view class="section fade-up delay-1">
+      <view class="card">
+        <view class="row space-between">
+          <text class="card-title">订单 #202501</text>
+          <text class="tag tag-success">已支付</text>
+        </view>
+        <text class="muted small">专业版 · 299 元</text>
+        <button class="btn-outline">详情</button>
+      </view>
+    </view>
+  </view>
+</view>
+

@@ -1,0 +1,64 @@
+{
+    "pages":  [
+                  "pages/home/index",
+                  "pages/workspace/index",
+                  "pages/ip-factory/index",
+                  "pages/xiaohongshu/index",
+                  "pages/mine/index",
+                  "pages/login/index",
+                  "pages/diagnosis/index",
+                  "pages/diagnosis-quiz/index",
+                  "pages/diagnosis-result/index",
+                  "pages/pay/index",
+                  "pages/order/index"
+              ],
+    "window":  {
+                   "navigationBarBackgroundColor":  "#050507",
+                   "navigationBarTextStyle":  "white",
+                   "backgroundColor":  "#050507",
+                   "backgroundTextStyle":  "light",
+                   "navigationBarTitleText":  "IP内容工厂"
+               },
+    "networkTimeout":  {
+                            "request":  60000,
+                            "downloadFile":  60000
+                        },
+    "tabBar":  {
+                   "color":  "#8E8796",
+                   "selectedColor":  "#E5D3B3",
+                   "backgroundColor":  "#050506",
+                   "borderStyle":  "black",
+                   "list":  [
+                                {
+                                    "pagePath":  "pages/home/index",
+                                    "text":  "首页",
+                                    "iconPath":  "assets/tabbar/home.png",
+                                    "selectedIconPath":  "assets/tabbar/home-active.png"
+                                },
+                                {
+                                    "pagePath":  "pages/workspace/index",
+                                    "text":  "工作台",
+                                    "iconPath":  "assets/tabbar/workspace.png",
+                                    "selectedIconPath":  "assets/tabbar/workspace-active.png"
+                                },
+                                {
+                                    "pagePath":  "pages/ip-factory/index",
+                                    "text":  "IP工厂",
+                                    "iconPath":  "assets/tabbar/factory.png",
+                                    "selectedIconPath":  "assets/tabbar/factory-active.png"
+                                },
+                                {
+                                    "pagePath":  "pages/xiaohongshu/index",
+                                    "text":  "小红书",
+                                    "iconPath":  "assets/tabbar/xhs.png",
+                                    "selectedIconPath":  "assets/tabbar/xhs-active.png"
+                                },
+                                {
+                                    "pagePath":  "pages/mine/index",
+                                    "text":  "我的",
+                                    "iconPath":  "assets/tabbar/mine.png",
+                                    "selectedIconPath":  "assets/tabbar/mine-active.png"
+                                }
+                            ]
+               }
+}

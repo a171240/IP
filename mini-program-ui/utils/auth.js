@@ -3,6 +3,7 @@ const { IP_FACTORY_BASE_URL } = require("./config")
 const ACCESS_TOKEN_KEY = "auth_access_token"
 const REFRESH_TOKEN_KEY = "auth_refresh_token"
 const USER_KEY = "auth_user"
+const PROFILE_KEY = "auth_profile"
 
 function getAccessToken() {
   return wx.getStorageSync(ACCESS_TOKEN_KEY) || ""
@@ -16,22 +17,53 @@ function isLoggedIn() {
   return Boolean(getAccessToken())
 }
 
-function saveSession(payload) {
+function normalizeProfile(profile) {
+  if (!profile || typeof profile !== "object") return null
+  const nickname = profile.nickName || profile.nickname || ""
+  const avatarUrl = profile.avatarUrl || profile.avatar_url || ""
+  return { nickname, avatarUrl }
+}
+
+function mergeUserProfile(user, profile) {
+  if (!user && !profile) return null
+  if (!user) {
+    return {
+      user_metadata: {
+        nickname: profile?.nickname || "",
+        avatar_url: profile?.avatarUrl || "",
+      },
+    }
+  }
+
+  if (!profile) return user
+
+  const metadata = user.user_metadata ? { ...user.user_metadata } : {}
+  if (!metadata.nickname && profile.nickname) metadata.nickname = profile.nickname
+  if (!metadata.avatar_url && profile.avatarUrl) metadata.avatar_url = profile.avatarUrl
+
+  return { ...user, user_metadata: metadata }
+}
+
+function saveSession(payload, profileInput) {
   if (!payload || typeof payload !== "object") return
 
   const accessToken = payload.access_token || ""
   const refreshToken = payload.refresh_token || ""
   const user = payload.user || null
+  const profile = normalizeProfile(profileInput)
+  const mergedUser = mergeUserProfile(user, profile)
 
   if (accessToken) wx.setStorageSync(ACCESS_TOKEN_KEY, accessToken)
   if (refreshToken) wx.setStorageSync(REFRESH_TOKEN_KEY, refreshToken)
-  if (user) wx.setStorageSync(USER_KEY, user)
+  if (mergedUser) wx.setStorageSync(USER_KEY, mergedUser)
+  if (profile) wx.setStorageSync(PROFILE_KEY, profile)
 }
 
 function clearSession() {
   wx.removeStorageSync(ACCESS_TOKEN_KEY)
   wx.removeStorageSync(REFRESH_TOKEN_KEY)
   wx.removeStorageSync(USER_KEY)
+  wx.removeStorageSync(PROFILE_KEY)
 }
 
 function requestWechatLogin(code, profile) {
@@ -74,7 +106,7 @@ function loginWithProfile() {
             }
             requestWechatLogin(loginRes.code, profileRes.userInfo)
               .then((payload) => {
-                saveSession(payload)
+                saveSession(payload, profileRes.userInfo)
                 resolve(payload)
               })
               .catch(reject)
@@ -121,6 +153,9 @@ module.exports = {
   getAccessToken,
   getUser,
   isLoggedIn,
+  getProfile() {
+    return wx.getStorageSync(PROFILE_KEY) || null
+  },
   loginWithProfile,
   loginSilent,
   logout,

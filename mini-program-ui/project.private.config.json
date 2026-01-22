@@ -1,0 +1,7 @@
+{
+  "description": "椤圭洰绉佹湁閰嶇疆鏂囦欢銆傛鏂囦欢涓殑鍐呭灏嗚鐩?project.config.json 涓殑鐩稿悓瀛楁銆傞」鐩殑鏀瑰姩浼樺厛鍚屾鍒版鏂囦欢涓€傝瑙佹枃妗ｏ細https://developers.weixin.qq.com/miniprogram/dev/devtools/projectconfig.html",
+  "projectname": "mini-program-ui",
+  "setting": {
+    "compileHotReLoad": true
+  }
+}

@@ -1,0 +1,53 @@
+<view class="page page-factory">
+  <view class="container">
+    <view class="hero fade-up">
+      <text class="title">IP 工厂</text>
+      <text class="subtitle">工作流、智能体、报告</text>
+    </view>
+
+    <view class="section fade-up delay-1">
+      <text class="section-title">工作流阶段</text>
+      <view class="card">
+        <view class="row space-between">
+          <text class="card-title">阶段一 · 研究定位</text>
+          <text class="tag tag-accent">进行中</text>
+        </view>
+        <view class="divider"></view>
+        <view class="row space-between">
+          <text class="small">P1 行业目标分析</text>
+          <text class="tag">完成</text>
+        </view>
+        <view class="row space-between" style="margin-top: 12rpx;">
+          <text class="small">P2 认知深度</text>
+          <text class="tag">下一步</text>
+        </view>
+        <button class="btn-primary">进入步骤</button>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-2">
+      <text class="section-title">智能体库</text>
+      <view class="grid-2">
+        <view class="card">
+          <text class="card-title">选题生成器</text>
+          <text class="muted small">快速产出高质选题</text>
+          <button class="btn-outline">进入对话</button>
+        </view>
+        <view class="card">
+          <text class="card-title">脚本工作室</text>
+          <text class="muted small">短视频脚本一键生成</text>
+          <button class="btn-outline">进入对话</button>
+        </view>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-2">
+      <text class="section-title">报告与素材</text>
+      <view class="card">
+        <text class="card-title">内容报告包</text>
+        <text class="muted small">最新导出已就绪</text>
+        <button class="btn-outline">下载</button>
+      </view>
+    </view>
+  </view>
+</view>

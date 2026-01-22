@@ -1,0 +1,68 @@
+﻿<view class="page page-xhs">
+  <view class="container">
+    <view class="hero fade-up">
+      <text class="title">小红书工坊</text>
+      <text class="subtitle">文案、封面、发布</text>
+    </view>
+
+    <view class="section fade-up delay-1">
+      <text class="section-title">创作</text>
+      <view class="card">
+        <text class="card-title">内容类型</text>
+        <view class="grid-2" style="margin-top: 12rpx;">
+          <view
+            wx:for="{{contentTypes}}"
+            wx:key="id"
+            class="tag {{contentType === item.id ? 'tag-accent' : ''}}"
+            data-type="{{item.id}}"
+            bindtap="onSelectType"
+          >
+            {{item.label}}
+          </view>
+        </view>
+        <text class="muted small" style="margin-top: 16rpx;">主题</text>
+        <input class="input" placeholder="输入主题或服务" value="{{topic}}" bindinput="onTopicInput" />
+        <text class="muted small">关键词</text>
+        <input class="input" placeholder="关键词 / 标签" value="{{keywords}}" bindinput="onKeywordsInput" />
+        <text class="muted small">门店信息</text>
+        <input class="input" placeholder="门店名称 / 区域" value="{{shopName}}" bindinput="onShopInput" />
+        <button class="btn-primary" loading="{{isGenerating}}" disabled="{{isGenerating}}" bindtap="handleGenerate">一键生成草稿</button>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-2">
+      <text class="section-title">结果</text>
+      <view class="card">
+        <text class="card-title">标题：{{resultTitle ? resultTitle : "等待生成"}}</text>
+        <text class="muted small" style="margin-top: 8rpx;">正文预览</text>
+        <text class="small" style="margin-top: 8rpx; line-height: 1.6;">
+          {{resultContent ? resultContent : "生成后展示完整文案"}}
+        </text>
+        <view class="divider"></view>
+        <view class="row space-between">
+          <text class="tag {{dangerStatusClass}}">{{dangerStatusText}}</text>
+          <text class="tag">{{coverImageUrl ? "封面已生成" : "封面未生成"}}</text>
+        </view>
+        <view class="row" style="margin-top: 12rpx;" wx:if="{{resultTags.length}}">
+          <text class="tag" wx:for="{{resultTags}}" wx:key="*this">{{item}}</text>
+        </view>
+        <image wx:if="{{coverImageUrl}}" src="{{coverImageUrl}}" mode="widthFix" class="cover-image" />
+        <button class="btn-outline" bindtap="handleCopy" disabled="{{!resultContent}}">复制文案</button>
+        <button class="btn-primary" loading="{{isCoverLoading}}" disabled="{{!resultContent || isCoverLoading}}" bindtap="handleGenerateCover">生成封面</button>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-2">
+      <text class="section-title">发布</text>
+      <view class="card">
+        <text class="muted small">预览后发布到小红书。</text>
+        <button class="btn-primary" loading="{{isPublishing}}" disabled="{{!resultContent || !coverImageUrl || isPublishing}}" bindtap="handlePublish">立即发布</button>
+        <view wx:if="{{publishResult}}" style="margin-top: 12rpx;">
+          <text class="muted small">发布链接：{{publishResult.publishUrl}}</text>
+          <image wx:if="{{publishResult.qrImageUrl}}" src="{{publishResult.qrImageUrl}}" mode="widthFix" class="cover-image" />
+        </view>
+      </view>
+    </view>
+  </view>
+</view>
+

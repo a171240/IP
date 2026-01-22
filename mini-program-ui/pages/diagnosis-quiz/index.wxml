@@ -1,0 +1,34 @@
+﻿<view class="page page-diagnosis">
+  <view class="container">
+    <view class="hero fade-up">
+      <text class="title">诊断问卷</text>
+      <text class="subtitle">第 {{currentIndex + 1}}/{{total}} 题</text>
+      <view class="progress-bar">
+        <view class="progress-fill" style="width: {{progressPercent}}%;"></view>
+      </view>
+    </view>
+    <view class="section fade-up delay-1">
+      <view class="card">
+        <text class="card-title">{{currentQuestion.question}}</text>
+        <text class="muted small" wx:if="{{currentQuestion.description}}" style="margin-top: 6rpx;">
+          {{currentQuestion.description}}
+        </text>
+        <view class="divider"></view>
+        <view
+          wx:for="{{currentQuestion.options}}"
+          wx:key="value"
+          class="tag {{selectedValues.indexOf(item.value) > -1 ? 'tag-accent' : ''}}"
+          style="margin-bottom: 10rpx;"
+          data-value="{{item.value}}"
+          bindtap="handleSelect"
+        >
+          {{item.label}}
+        </view>
+        <button class="btn-primary" loading="{{isSubmitting}}" disabled="{{isSubmitting}}" bindtap="handleNext">
+          {{isLast ? "提交" : "下一题"}}
+        </button>
+      </view>
+    </view>
+  </view>
+</view>
+

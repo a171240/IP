@@ -1,0 +1,16 @@
+﻿<view class="page page-diagnosis">
+  <view class="container">
+    <view class="hero fade-up">
+      <text class="title">IP 诊断</text>
+      <text class="subtitle">5 分钟快速评估</text>
+      <button class="btn-primary" bindtap="handleStart">开始问卷</button>
+    </view>
+    <view class="section fade-up delay-1">
+      <view class="card">
+        <text class="card-title">你将获得</text>
+        <text class="muted small">评分、行动清单、诊断报告</text>
+      </view>
+    </view>
+  </view>
+</view>
+

@@ -1,0 +1,28 @@
+﻿<view class="page page-diagnosis">
+  <view class="container">
+    <view class="hero fade-up">
+      <text class="title">诊断结果</text>
+      <text class="subtitle">评分 {{scoreText}}/100</text>
+      <text class="muted small" style="margin-top: 6rpx;" wx:if="{{result.levelLabel}}">
+        {{result.levelLabel}}
+      </text>
+      <button class="btn-primary" bindtap="handleDownload">下载报告</button>
+    </view>
+    <view class="section fade-up delay-1">
+      <text class="section-title">维度得分</text>
+      <view class="grid-2">
+        <view class="card" wx:for="{{dimensionCards}}" wx:key="name">
+          <text class="card-title">{{item.name}}</text>
+          <text class="muted small">{{item.status}} · {{item.percentage}}%</text>
+        </view>
+      </view>
+    </view>
+    <view class="section fade-up delay-2" wx:if="{{actionPlan.length}}">
+      <text class="section-title">行动清单</text>
+      <view class="card" wx:for="{{actionPlan}}" wx:key="*this">
+        <text class="muted small">{{item}}</text>
+      </view>
+    </view>
+  </view>
+</view>
+

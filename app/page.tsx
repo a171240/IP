@@ -23,6 +23,8 @@ import {
 import { ObsidianBackgroundLite } from "@/components/ui/obsidian-background-lite"
 import { GlowButton } from "@/components/ui/obsidian-primitives"
 import { MobileStickyCta } from "@/components/marketing/mobile-sticky-cta"
+import { PageView } from "@/components/analytics/page-view"
+import { TrackedLink } from "@/components/analytics/tracked-link"
 import { HERO_TRUST_TAGS, INDUSTRY_TAGS, MARKETING_METRICS, WECHAT_ID } from "@/lib/marketing/content"
 
 export const metadata: Metadata = {
@@ -226,6 +228,7 @@ export default function LandingPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
+      <PageView eventName="view_home" />
 
             {/* ============ Navigation ============ */}
       <nav className="fixed top-0 left-0 right-0 z-50 px-4 sm:px-6 pb-3 pt-[calc(var(--safe-area-top)+0.75rem)] bg-[#030304]/90 border-b border-white/[0.02]">
@@ -319,7 +322,7 @@ export default function LandingPage() {
           <div className="flex flex-col items-center gap-6">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-6 w-full">
               <div className="flex flex-col items-center gap-2 w-full sm:w-auto">
-                <Link href="/diagnosis">
+                <TrackedLink href="/diagnosis" eventName="click_home_primary_diagnosis">
                   <GlowButton
                     primary
                     className="w-full sm:w-auto px-8 sm:px-12 py-4 sm:py-5 text-base sm:text-lg font-medium"
@@ -328,19 +331,20 @@ export default function LandingPage() {
                     免费快速诊断
                     <ArrowRight size={18} />
                   </GlowButton>
-                </Link>
+                </TrackedLink>
                 <span className="text-xs text-zinc-500">
                   5分钟 · 8道题 · 五维评分 + 行动清单
                 </span>
               </div>
 
               <div className="flex flex-col items-center gap-2 w-full sm:w-auto">
-                <Link
+                <TrackedLink
                   href="#report-sample"
+                  eventName="click_home_secondary_sample"
                   className="w-full sm:w-auto px-8 sm:px-12 py-4 sm:py-5 text-base sm:text-lg font-medium text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-700 rounded-xl transition-colors text-center"
                 >
                   查看样本预览
-                </Link>
+                </TrackedLink>
                 <span className="text-xs text-zinc-500">
                   先看输出样本，了解交付格式与字段
                 </span>
@@ -579,9 +583,9 @@ export default function LandingPage() {
                     <ArrowRight size={16} />
                   </GlowButton>
                 </Link>
-                <Link href="/demo" className="text-sm text-zinc-400 hover:text-white transition-colors">
+                <TrackedLink href="/demo" eventName="click_home_demo" className="text-sm text-zinc-400 hover:text-white transition-colors">
                   预约顾问演示
-                </Link>
+                </TrackedLink>
               </div>
             </div>
           </div>
@@ -1119,9 +1123,9 @@ export default function LandingPage() {
                 <ArrowRight size={16} />
               </GlowButton>
             </Link>
-            <Link href="/demo" className="text-sm text-zinc-500 hover:text-white transition-colors">
+            <TrackedLink href="/demo" eventName="click_home_demo" className="text-sm text-zinc-500 hover:text-white transition-colors">
               预约顾问演示
-            </Link>
+            </TrackedLink>
             <p className="text-xs text-zinc-600">诊断完成后可获得流程卡点与交付SOP建议</p>
           </div>
 
@@ -1172,21 +1176,21 @@ export default function LandingPage() {
                 </div>
                 <div className="text-center">
                   <p className="text-2xl font-bold text-emerald-400">7天</p>
-                  <p className="text-xs text-zinc-500 mt-1">免费试用</p>
+                  <p className="text-xs text-zinc-500 mt-1">体验期</p>
                 </div>
               </div>
 
               {/* CTA */}
               <div className="flex justify-center">
-                <Link href="/pricing">
-                <GlowButton
-                  primary
-                  className="px-10 py-4 text-lg"
-                >
-                  查看团队方案
-                  <ArrowRight size={18} />
-                </GlowButton>
-                </Link>
+                <TrackedLink href="/demo" eventName="click_home_demo">
+                  <GlowButton
+                    primary
+                    className="px-10 py-4 text-lg"
+                  >
+                    查看团队方案
+                    <ArrowRight size={18} />
+                  </GlowButton>
+                </TrackedLink>
               </div>
 
               {/* 已服务客户 */}
@@ -1223,12 +1227,13 @@ export default function LandingPage() {
               <ArrowRight size={18} />
             </GlowButton>
             </Link>
-            <Link
+            <TrackedLink
               href="/demo"
+              eventName="click_home_demo"
               className="px-10 py-5 text-lg font-medium text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-700 rounded-xl transition-colors"
             >
               预约顾问演示
-            </Link>
+            </TrackedLink>
           </div>
 
           <p className="text-sm text-zinc-600">

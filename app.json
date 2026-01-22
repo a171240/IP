@@ -1,0 +1,73 @@
+{
+  "pages": [
+    "pages/workbench/index",
+    "pages/ip-factory/index",
+    "pages/xiaohongshu/index",
+    "pages/mine/index",
+    "pages/auth/login",
+    "pages/diagnosis/intro",
+    "pages/diagnosis/questionnaire",
+    "pages/diagnosis/result",
+    "pages/ip-factory/workflow/list",
+    "pages/ip-factory/workflow/detail",
+    "pages/ip-factory/agent/list",
+    "pages/ip-factory/agent/chat",
+    "pages/ip-factory/report/list",
+    "pages/ip-factory/report/detail",
+    "pages/ip-factory/download/index",
+    "pages/xiaohongshu/create",
+    "pages/xiaohongshu/result",
+    "pages/xiaohongshu/cover",
+    "pages/xiaohongshu/publish",
+    "pages/xiaohongshu/history",
+    "pages/mine/subscription",
+    "pages/mine/orders",
+    "pages/mine/settings",
+    "pages/pay/index",
+    "pages/pay/result"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTitleText": "美业IP工厂",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#F8F8F8"
+  },
+  "tabBar": {
+    "color": "#999999",
+    "selectedColor": "#FF2442",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/workbench/index",
+        "text": "工作台",
+        "iconPath": "assets/icons/tab-workbench.png",
+        "selectedIconPath": "assets/icons/tab-workbench-active.png"
+      },
+      {
+        "pagePath": "pages/ip-factory/index",
+        "text": "IP工厂",
+        "iconPath": "assets/icons/tab-factory.png",
+        "selectedIconPath": "assets/icons/tab-factory-active.png"
+      },
+      {
+        "pagePath": "pages/xiaohongshu/index",
+        "text": "小红书",
+        "iconPath": "assets/icons/tab-xhs.png",
+        "selectedIconPath": "assets/icons/tab-xhs-active.png"
+      },
+      {
+        "pagePath": "pages/mine/index",
+        "text": "我的",
+        "iconPath": "assets/icons/tab-mine.png",
+        "selectedIconPath": "assets/icons/tab-mine-active.png"
+      }
+    ]
+  },
+  "networkTimeout": {
+    "request": 10000,
+    "downloadFile": 10000
+  },
+  "debug": true
+}

@@ -1,4 +1,4 @@
-const { getUser, isLoggedIn, logout } = require("../../utils/auth")
+const { getProfile, getUser, isLoggedIn, logout } = require("../../utils/auth")
 
 Page({
   data: {
@@ -15,8 +15,15 @@ Page({
   refreshUser() {
     const user = getUser()
     const metadata = user && user.user_metadata ? user.user_metadata : {}
-    const displayName = metadata.nickname || metadata.nickName || "微信用户"
-    const avatarUrl = metadata.avatar_url || metadata.avatarUrl || ""
+    const profile = getProfile()
+    const displayName =
+      metadata.nickname ||
+      metadata.nickName ||
+      profile?.nickname ||
+      profile?.nickName ||
+      user?.email ||
+      "WeChat User"
+    const avatarUrl = metadata.avatar_url || metadata.avatarUrl || profile?.avatarUrl || ""
     this.setData({
       isLoggedIn: isLoggedIn(),
       user: user || null,

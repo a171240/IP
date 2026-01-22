@@ -1,0 +1,33 @@
+﻿<view class="page page-pay">
+  <view class="container">
+    <view class="hero fade-up">
+      <text class="title">订阅支付</text>
+      <text class="subtitle">选择套餐</text>
+    </view>
+    <view class="section fade-up delay-1">
+      <view class="card" wx:for="{{products}}" wx:key="id">
+        <view class="row space-between">
+          <text class="card-title">{{item.name}}</text>
+          <text class="tag {{item.isPro ? 'tag-accent' : ''}}">{{item.priceLabel}}</text>
+        </view>
+        <text class="muted small">{{item.description}}</text>
+        <text class="muted small" style="margin-top: 6rpx;">含 {{item.credits_grant}} 积分</text>
+        <button
+          class="btn-primary"
+          bindtap="handlePay"
+          data-id="{{item.id}}"
+          loading="{{payingId === item.id}}"
+          disabled="{{payingId === item.id}}"
+        >
+          立即支付
+        </button>
+      </view>
+    </view>
+    <view class="section fade-up delay-2" wx:if="{{!products.length}}">
+      <view class="card">
+        <text class="muted small">暂无套餐，请稍后刷新。</text>
+      </view>
+    </view>
+  </view>
+</view>
+

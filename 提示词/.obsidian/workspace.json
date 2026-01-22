@@ -1,0 +1,215 @@
+{
+  "main": {
+    "id": "0e89189b0f8896e5",
+    "type": "split",
+    "children": [
+      {
+        "id": "121a2418a4732259",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "94263990b387f6e4",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "P5-IP类型定位大师v2.0.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "P5-IP类型定位大师v2.0"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "233f3039289bf436",
+    "type": "split",
+    "children": [
+      {
+        "id": "c4a4da862b61f800",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "cc033bd6aa10bced",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "文件列表"
+            }
+          },
+          {
+            "id": "88b1262c2c9865bd",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "搜索"
+            }
+          },
+          {
+            "id": "8400dff3c1d5f246",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "书签"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 328.5
+  },
+  "right": {
+    "id": "614ba67351c1e2d1",
+    "type": "split",
+    "children": [
+      {
+        "id": "579336c952458cbd",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "fe7cc6c3638ab495",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "通用分镜头脚本生成器v1.3.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "通用分镜头脚本生成器v1.3 的反向链接列表"
+            }
+          },
+          {
+            "id": "34076654a9fd7527",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "通用分镜头脚本生成器v1.3.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "通用分镜头脚本生成器v1.3 的出链列表"
+            }
+          },
+          {
+            "id": "a82485759c04677f",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "标签"
+            }
+          },
+          {
+            "id": "054cbe3f84562b36",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "添加笔记属性"
+            }
+          },
+          {
+            "id": "204f2f1a61c7398f",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "通用分镜头脚本生成器v1.3.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "通用分镜头脚本生成器v1.3 的大纲"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "bases:新建数据库": false,
+      "switcher:打开快速切换": false,
+      "graph:查看关系图谱": false,
+      "canvas:新建白板": false,
+      "daily-notes:打开/创建今天的日记": false,
+      "templates:插入模板": false,
+      "command-palette:打开命令面板": false
+    }
+  },
+  "active": "94263990b387f6e4",
+  "lastOpenFiles": [
+    "IP情绪张力故事片段提取器.md",
+    "IPB案例拆解短视频创作助手v1.4.md",
+    "P5-IP类型定位大师v2.0.md",
+    "P6-商业IP4X4内容运营总监v2.0.md",
+    "P8-脚本创作中心v1.0.md",
+    "P10-迭代管理器v1.0.md",
+    "PDF-Word格式互转智能体.md",
+    "SEO知识型问答软文生成智能体提示词.md",
+    "城市话题短视频脚本创作智能体提示词.md",
+    "7大IP策划画布IP策划大师.md",
+    "爆点前置智能体提示词.md",
+    "MX信任场景案例型脚本智能体/P2.md",
+    "MX信任场景案例型脚本智能体/P1.md",
+    "MX信任场景案例型脚本智能体/P3.md",
+    "MX信任场景案例型脚本智能体/C1.md",
+    "1. MX产品调研记者智能体.md",
+    "策略痛点挖掘与情绪爆点设计智能体v3.0.md",
+    "口语化风格优化指南v1.4（细节和逻辑）.md",
+    "口语化风格优化指南v1.2.md",
+    "视频拉片指令.md",
+    "行业情绪化正反观点选题分析.md",
+    "文风分析与创作专家.md",
+    "信息源网站分析与SEO规划智能体.md",
+    "外部奇奇怪怪的文案变课程智能体.md",
+    "实体门店引流文案直播循环话术.md",
+    "深度共鸣短视频脚本创作智能体v1.4.md"
+  ]
+}

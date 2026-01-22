@@ -1,0 +1,49 @@
+﻿<view class="page page-workspace">
+  <view class="container">
+    <view class="hero fade-up">
+      <view class="row space-between">
+        <view>
+          <text class="title">工作台</text>
+          <text class="subtitle">美业内容控制中心</text>
+        </view>
+        <view class="chip">积分 120</view>
+      </view>
+      <view class="progress-bar">
+        <view class="progress-fill" style="width: 45%;"></view>
+      </view>
+      <view class="row space-between">
+        <text class="muted small">工作流进度</text>
+        <text class="small">45%</text>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-1">
+      <text class="section-title">快捷操作</text>
+      <view class="grid-2">
+        <view class="card">
+          <text class="card-title">继续工作流</text>
+          <text class="muted small">下一步：P3 情绪价值</text>
+          <button class="btn-primary">开始</button>
+        </view>
+        <view class="card">
+          <text class="card-title">小红书一键创作</text>
+          <text class="muted small">草稿 + 封面自动生成</text>
+          <button class="btn-primary">生成</button>
+        </view>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-2">
+      <text class="section-title">最近报告</text>
+      <view class="card">
+        <view class="row space-between">
+          <text class="card-title">品牌诊断报告</text>
+          <text class="tag tag-success">已生成</text>
+        </view>
+        <text class="muted small">更新于 2 小时前</text>
+        <button class="btn-outline">查看报告</button>
+      </view>
+    </view>
+  </view>
+</view>
+
