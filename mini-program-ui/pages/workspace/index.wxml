@@ -12,7 +12,7 @@
         <view class="progress-fill" style="width: 45%;"></view>
       </view>
       <view class="row space-between">
-        <text class="muted small">工作流进度</text>
+        <text class="muted small">任务进度</text>
         <text class="small">45%</text>
       </view>
     </view>
@@ -21,13 +21,13 @@
       <text class="section-title">快捷操作</text>
       <view class="grid-2">
         <view class="card">
-          <text class="card-title">继续工作流</text>
-          <text class="muted small">下一步：P3 情绪价值</text>
+          <text class="card-title">继续任务</text>
+          <text class="muted small">下一步：内容优化</text>
           <button class="btn-primary">开始</button>
         </view>
         <view class="card">
-          <text class="card-title">小红书一键创作</text>
-          <text class="muted small">草稿 + 封面自动生成</text>
+          <text class="card-title">内容灵感生成</text>
+          <text class="muted small">标题建议 + 文案方向</text>
           <button class="btn-primary">生成</button>
         </view>
       </view>

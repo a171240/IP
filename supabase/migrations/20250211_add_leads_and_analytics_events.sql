@@ -3,6 +3,7 @@ create extension if not exists "pgcrypto";
 create table if not exists public.leads (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default now(),
+  created_day date generated always as ((created_at at time zone 'UTC')::date) stored,
   team_size text not null,
   current_status text not null,
   contact text not null,
@@ -23,7 +24,7 @@ create table if not exists public.leads (
 create index if not exists leads_created_at_idx on public.leads (created_at);
 create index if not exists leads_contact_idx on public.leads (contact);
 create unique index if not exists leads_contact_hash_day_key
-  on public.leads (contact_hash, (date_trunc('day', created_at)));
+  on public.leads (contact_hash, created_day);
 
 alter table public.leads enable row level security;
 

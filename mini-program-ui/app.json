@@ -17,7 +17,7 @@
                    "navigationBarTextStyle":  "white",
                    "backgroundColor":  "#050507",
                    "backgroundTextStyle":  "light",
-                   "navigationBarTitleText":  "IP内容工厂"
+                   "navigationBarTitleText":  "美业内容助手"
                },
     "networkTimeout":  {
                             "request":  60000,
@@ -40,18 +40,6 @@
                                     "text":  "工作台",
                                     "iconPath":  "assets/tabbar/workspace.png",
                                     "selectedIconPath":  "assets/tabbar/workspace-active.png"
-                                },
-                                {
-                                    "pagePath":  "pages/ip-factory/index",
-                                    "text":  "IP工厂",
-                                    "iconPath":  "assets/tabbar/factory.png",
-                                    "selectedIconPath":  "assets/tabbar/factory-active.png"
-                                },
-                                {
-                                    "pagePath":  "pages/xiaohongshu/index",
-                                    "text":  "小红书",
-                                    "iconPath":  "assets/tabbar/xhs.png",
-                                    "selectedIconPath":  "assets/tabbar/xhs-active.png"
                                 },
                                 {
                                     "pagePath":  "pages/mine/index",
