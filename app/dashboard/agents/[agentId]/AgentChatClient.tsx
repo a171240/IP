@@ -169,7 +169,7 @@ export default function AgentChatClient({
           return
         }
 
-        throw new Error(payload?.error || `?????${resp.status}?`)
+        throw new Error(payload?.error || `请求失败（状态 ${resp.status}）`)
       }
 
       const remaining = resp.headers.get("X-Credits-Remaining")

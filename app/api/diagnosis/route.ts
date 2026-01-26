@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     )
 
     // 验证所有必答题是否已回答
-    const requiredQuestions = QUESTIONS.filter(q => !q.isClassification)
+    const requiredQuestions = QUESTIONS
     const answeredIds = Object.keys(answers)
     const missingQuestions = requiredQuestions.filter(q => !answeredIds.includes(q.id))
 
@@ -57,11 +57,11 @@ export async function POST(request: NextRequest) {
       .from('diagnostic_results')
       .insert({
         answers,
-        industry: industry || answers['q1'] || 'unknown',
+        industry: industry || answers['industry'] || 'unknown',
         total_score: scoreResult.total,
         level: scoreResult.level,
         scores: scoreResult.dimensions,
-        recommendations: scoreResult.recommendations,
+        recommendations: scoreResult.topActions,
         action_plan: scoreResult.actionPlan,
         expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30天后过期
       })

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { ArrowRight, CheckCircle, MessageSquare, Users, Workflow } from "lucide-react"
 import { ObsidianBackgroundLite } from "@/components/ui/obsidian-background-lite"
@@ -55,12 +55,14 @@ export default function DemoClient({ utm, calendlyUrl }: DemoClientProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copyStatus, setCopyStatus] = useState<string | null>(null)
+  const formStartRef = useRef<number | null>(null)
 
   const mergedUtm = useMemo(() => ({ ...getStoredUtm(), ...utm }), [utm])
   const calendlyHref = calendlyUrl?.trim() || "#"
 
   useEffect(() => {
     persistUtmValues(utm)
+    formStartRef.current = performance.now()
     track("view_demo")
   }, [utm])
 
@@ -143,7 +145,7 @@ export default function DemoClient({ utm, calendlyUrl }: DemoClientProps) {
                     const honeypot = String(formData.get("website") || "").trim()
 
                     if (honeypot) {
-                      track("submit_demo_fail", { reason: "honeypot" })
+                      track("demo_submit_fail", { reason: "honeypot" })
                       setSubmitted(true)
                       setLoading(false)
                       return
@@ -154,25 +156,37 @@ export default function DemoClient({ utm, calendlyUrl }: DemoClientProps) {
                     const contact = String(formData.get("contact") || "").trim()
 
                     try {
+                      const elapsedMs = formStartRef.current
+                        ? Math.round(performance.now() - formStartRef.current)
+                        : undefined
+
                       const response = await fetch("/api/leads", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
-                          team_size: teamSize,
-                          current_status: currentStatus,
+                          teamSize,
+                          currentStatus,
                           contact,
-                          landing_path: "/demo",
-                          utm: mergedUtm,
+                          landingPath: `${window.location.pathname}${window.location.search}`,
+                          referrer: document.referrer || undefined,
+                          userAgent: navigator.userAgent || undefined,
+                          source: "demo",
+                          elapsedMs,
+                          utmSource: mergedUtm.utm_source,
+                          utmMedium: mergedUtm.utm_medium,
+                          utmCampaign: mergedUtm.utm_campaign,
+                          utmContent: mergedUtm.utm_content,
+                          utmTerm: mergedUtm.utm_term,
                         }),
                       })
 
                       const data = (await response.json()) as { ok: boolean; error?: string; lead_id?: string }
 
                       if (response.ok && data.ok) {
-                        track("submit_demo_success", { lead_id: data.lead_id })
+                        track("demo_submit_success", { lead_id: data.lead_id })
                         setSubmitted(true)
                       } else {
-                        track("submit_demo_fail", { status: response.status, error: data.error })
+                        track("demo_submit_fail", { status: response.status, error: data.error })
                         if (response.status === 429) {
                           setError("提交过于频繁，请稍后再试。")
                         } else if (data.error === "invalid_contact") {
@@ -184,7 +198,7 @@ export default function DemoClient({ utm, calendlyUrl }: DemoClientProps) {
                         }
                       }
                     } catch (submitError) {
-                      track("submit_demo_fail", { error: "network_error" })
+                      track("demo_submit_fail", { error: "network_error" })
                       setError("网络异常，请稍后再试。")
                     } finally {
                       setLoading(false)

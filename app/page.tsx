@@ -322,7 +322,11 @@ export default function LandingPage() {
           <div className="flex flex-col items-center gap-6">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-6 w-full">
               <div className="flex flex-col items-center gap-2 w-full sm:w-auto">
-                <TrackedLink href="/diagnosis" eventName="click_home_primary_diagnosis">
+                <TrackedLink
+                  href="/diagnosis"
+                  eventName="cta_click"
+                  eventProps={{ source: "hero_diagnosis" }}
+                >
                   <GlowButton
                     primary
                     className="w-full sm:w-auto px-8 sm:px-12 py-4 sm:py-5 text-base sm:text-lg font-medium"
@@ -340,7 +344,8 @@ export default function LandingPage() {
               <div className="flex flex-col items-center gap-2 w-full sm:w-auto">
                 <TrackedLink
                   href="#report-sample"
-                  eventName="click_home_secondary_sample"
+                  eventName="cta_click"
+                  eventProps={{ source: "hero_sample" }}
                   className="w-full sm:w-auto px-8 sm:px-12 py-4 sm:py-5 text-base sm:text-lg font-medium text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-700 rounded-xl transition-colors text-center"
                 >
                   查看样本预览
@@ -583,7 +588,12 @@ export default function LandingPage() {
                     <ArrowRight size={16} />
                   </GlowButton>
                 </Link>
-                <TrackedLink href="/demo" eventName="click_home_demo" className="text-sm text-zinc-400 hover:text-white transition-colors">
+                <TrackedLink
+                  href="/demo"
+                  eventName="cta_click"
+                  eventProps={{ source: "sample_demo" }}
+                  className="text-sm text-zinc-400 hover:text-white transition-colors"
+                >
                   预约顾问演示
                 </TrackedLink>
               </div>
@@ -1123,7 +1133,12 @@ export default function LandingPage() {
                 <ArrowRight size={16} />
               </GlowButton>
             </Link>
-            <TrackedLink href="/demo" eventName="click_home_demo" className="text-sm text-zinc-500 hover:text-white transition-colors">
+            <TrackedLink
+              href="/demo"
+              eventName="cta_click"
+              eventProps={{ source: "workflow_demo" }}
+              className="text-sm text-zinc-500 hover:text-white transition-colors"
+            >
               预约顾问演示
             </TrackedLink>
             <p className="text-xs text-zinc-600">诊断完成后可获得流程卡点与交付SOP建议</p>
@@ -1182,7 +1197,7 @@ export default function LandingPage() {
 
               {/* CTA */}
               <div className="flex justify-center">
-                <TrackedLink href="/demo" eventName="click_home_demo">
+                <TrackedLink href="/demo" eventName="cta_click" eventProps={{ source: "team_demo" }}>
                   <GlowButton
                     primary
                     className="px-10 py-4 text-lg"
@@ -1229,7 +1244,8 @@ export default function LandingPage() {
             </Link>
             <TrackedLink
               href="/demo"
-              eventName="click_home_demo"
+              eventName="cta_click"
+              eventProps={{ source: "final_demo" }}
               className="px-10 py-5 text-lg font-medium text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-700 rounded-xl transition-colors"
             >
               预约顾问演示

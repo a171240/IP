@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { calculatePercentile, DIMENSIONS } from '@/lib/diagnosis/scoring'
+import { DIMENSIONS } from '@/lib/diagnosis/scoring'
 import { Dimension } from '@/lib/diagnosis/questions'
 import { ResultClient } from './result-client'
 
@@ -22,16 +22,58 @@ export default async function ResultPage({ params }: PageProps) {
     notFound()
   }
 
+  let isPro = false
+  let proExpiresAt: string | null = null
+  let userId: string | null = null
+
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (user) {
+      userId = user.id
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('plan')
+        .eq('id', user.id)
+        .limit(1)
+
+      const plan = profiles?.[0]?.plan as string | undefined
+
+      const { data: entitlements } = await supabase
+        .from('entitlements')
+        .select('plan, pro_expires_at')
+        .eq('user_id', user.id)
+        .limit(1)
+
+      const entitlement = entitlements?.[0]
+      proExpiresAt = entitlement?.pro_expires_at ?? null
+
+      const now = new Date()
+      if (proExpiresAt) {
+        const expiry = new Date(proExpiresAt)
+        if (expiry > now) {
+          isPro = true
+        }
+      }
+
+      if (plan === 'pro' || plan === 'vip' || plan === 'trial_pro') {
+        isPro = true
+      }
+    }
+  } catch {
+    isPro = false
+  }
+
   // 构造 ScoreResult 对象
   const scoreResult = {
     total: result.total_score,
     level: result.level as 'excellent' | 'good' | 'pass' | 'needs_improvement',
     levelLabel: getLevelLabel(result.level),
-    percentile: calculatePercentile(result.total_score),
     dimensions: result.scores as Record<Dimension, {
       score: number
       maxScore: number
-      percentage: number
       status: 'strong' | 'normal' | 'weak'
       insight: string
     }>,
@@ -47,7 +89,9 @@ export default async function ResultPage({ params }: PageProps) {
       createdAt={result.created_at}
       diagnosisId={id}
       answers={result.answers || {}}
-      cachedAiReport={result.ai_report || null}
+      isPro={isPro}
+      proExpiresAt={proExpiresAt}
+      userId={userId}
     />
   )
 }
@@ -62,8 +106,15 @@ function getLevelLabel(level: string): string {
   return labels[level] || level
 }
 
-function generateInsightsFromScores(scores: Record<string, any>) {
-  const insights: any[] = []
+function generateInsightsFromScores(
+  scores: Record<string, { status: 'strong' | 'normal' | 'weak'; insight: string }>
+) {
+  const insights: Array<{
+    dimension: string
+    title: string
+    description: string
+    severity: 'high' | 'medium'
+  }> = []
 
   Object.entries(scores).forEach(([key, dim]) => {
     if (dim.status === 'weak') {

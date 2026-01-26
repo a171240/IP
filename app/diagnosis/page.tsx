@@ -1,54 +1,34 @@
 import type { ReactNode } from "react"
 import Link from "next/link"
-import {
-  Activity,
-  ArrowRight,
-  CheckCircle,
-  Clock,
-  FileText,
-  Gift,
-  Target,
-  Zap,
-  TrendingUp,
-  Heart,
-  DollarSign,
-  RotateCcw
-} from "lucide-react"
-import { WECHAT_ID } from "@/lib/marketing/content"
+import { Activity, ArrowRight, CheckCircle, ClipboardList, FileText, Calendar, Target, Zap } from "lucide-react"
 import { MarketingHeader } from "@/components/ui/marketing-header"
 
-const features = [
-  { icon: Clock, text: "约5分钟", desc: "8道精准问题" },
-  { icon: FileText, text: "专属报告", desc: "五维能力分析" },
-  { icon: Gift, text: "行动清单", desc: "30天改进建议" },
-  { icon: CheckCircle, text: "即时生成", desc: "可下载报告" }
+const deliverables = [
+  { icon: Target, text: "五维评分（0-10）", desc: "交付系统体检单" },
+  { icon: CheckCircle, text: "Top3 优先级动作", desc: "下一步怎么做" },
+  { icon: Calendar, text: "7天成交排产（PDF）", desc: "排产节奏" },
+  { icon: FileText, text: "10条高意图选题（PDF）", desc: "可直接执行" },
+  { icon: ClipboardList, text: "3条成交脚本（PDF）", desc: "可直接交付" },
+  { icon: Zap, text: "质检清单（PDF）", desc: "减少返工" },
 ]
 
 const dimensions = [
-  { icon: Target, name: "定位清晰度", desc: "你的IP人设是否精准", color: "from-blue-500 to-cyan-500" },
-  { icon: Zap, name: "内容生产力", desc: "选题与产出效率", color: "from-yellow-500 to-orange-500" },
-  { icon: Heart, name: "情绪共鸣度", desc: "内容是否打动人心", color: "from-pink-500 to-rose-500" },
-  { icon: DollarSign, name: "变现转化力", desc: "内容转化效率", color: "from-emerald-500 to-teal-500" },
-  { icon: RotateCcw, name: "运营持续性", desc: "长期运营能力", color: "from-purple-500 to-violet-500" }
+  { name: "交付定位", desc: "团队角色与方向清晰度" },
+  { name: "内容供给", desc: "选题与脚本体系" },
+  { name: "产能效率", desc: "团队协作与产出节奏" },
+  { name: "质检复盘", desc: "质量口径与复盘能力" },
+  { name: "成交转化", desc: "内容到成交链路" },
 ]
 
 const cardBase =
   "relative backdrop-blur-none md:backdrop-blur-xl border rounded-2xl transition-all duration-300 ease-out dark:bg-zinc-900/50 bg-white/80 dark:border-white/10 border-black/[0.08] dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)] shadow-[0_1px_3px_rgba(0,0,0,0.05),inset_0_1px_0_0_rgba(255,255,255,0.5)]"
 
-const glowCard = `${cardBase} dark:shadow-[0_0_60px_-15px_rgba(168,85,247,0.3),inset_0_0_30px_rgba(168,85,247,0.08)] shadow-[0_0_60px_-15px_rgba(124,58,237,0.2),inset_0_0_30px_rgba(124,58,237,0.05)]`
+const glowCard = `${cardBase} dark:shadow-[0_0_60px_-15px_rgba(16,185,129,0.25),inset_0_0_30px_rgba(16,185,129,0.08)] shadow-[0_0_60px_-15px_rgba(16,185,129,0.18),inset_0_0_30px_rgba(16,185,129,0.05)]`
 
 const primaryButton =
-  "relative px-5 py-3 rounded-xl font-semibold text-sm transition-all duration-200 ease-out overflow-hidden group flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-[0_0_0_1px_rgba(147,51,234,0.3),0_4px_16px_-4px_rgba(147,51,234,0.4)] hover:from-purple-400 hover:to-purple-500 hover:shadow-[0_0_0_1px_rgba(147,51,234,0.5),0_0_30px_-4px_rgba(147,51,234,0.6)] active:scale-[0.98] active:shadow-[0_0_0_1px_rgba(147,51,234,0.6),0_0_40px_-4px_rgba(147,51,234,0.7)]"
+  "relative px-5 py-3 rounded-xl font-semibold text-sm transition-all duration-200 ease-out overflow-hidden group flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-[0_0_0_1px_rgba(16,185,129,0.3),0_4px_16px_-4px_rgba(16,185,129,0.4)] hover:from-emerald-400 hover:to-teal-500 hover:shadow-[0_0_0_1px_rgba(16,185,129,0.5),0_0_30px_-4px_rgba(16,185,129,0.6)] active:scale-[0.98] active:shadow-[0_0_0_1px_rgba(16,185,129,0.6),0_0_40px_-4px_rgba(16,185,129,0.7)]"
 
-const GlowLink = ({
-  href,
-  className,
-  children
-}: {
-  href: string
-  className?: string
-  children: ReactNode
-}) => (
+const GlowLink = ({ href, className, children }: { href: string; className?: string; children: ReactNode }) => (
   <Link href={href} className={[primaryButton, className].filter(Boolean).join(" ")}>
     <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
     <span className="relative flex items-center gap-2">{children}</span>
@@ -58,7 +38,7 @@ const GlowLink = ({
 export default function DiagnosisPage() {
   return (
     <div className="min-h-screen">
-      <MarketingHeader breadcrumbs={[{ label: "主页", href: "/" }, { label: "IP健康诊断" }]} />
+      <MarketingHeader breadcrumbs={[{ label: "主页", href: "/" }, { label: "内容交付系统诊断" }]} />
 
       <main className="p-6 lg:p-8 pb-28 md:pb-8">
         <div className="max-w-4xl mx-auto space-y-6">
@@ -69,10 +49,10 @@ export default function DiagnosisPage() {
                 <Activity className="w-8 h-8 text-white" />
               </div>
               <h1 className="text-3xl font-bold dark:text-white text-zinc-900 mb-2">
-                商业IP内容健康诊断
+                内容交付系统诊断（5分钟）
               </h1>
               <p className="text-lg dark:text-zinc-400 text-zinc-500 max-w-xl mx-auto">
-                约5分钟测试，找到你的内容瓶颈，获取专属提升方案
+                找出你团队交付卡点，直接生成 7 天排产 + 脚本 + 质检清单
               </p>
 
               <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -82,21 +62,21 @@ export default function DiagnosisPage() {
                   <ArrowRight className="w-5 h-5" />
                 </GlowLink>
                 <span className="text-xs sm:text-sm dark:text-zinc-500 text-zinc-400">
-                  无需注册 · 约5分钟 · 可下载报告
+                  无需注册 · 8 题 · 交付包可下载
                 </span>
               </div>
 
-              <div className="mt-6 flex flex-wrap justify-center gap-3">
-                {features.map((feature, index) => (
+              <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-3 text-left">
+                {deliverables.map((item) => (
                   <div
-                    key={index}
-                    className="px-4 py-2 rounded-xl dark:bg-zinc-900/40 bg-zinc-50 border dark:border-white/5 border-black/5"
+                    key={item.text}
+                    className="px-4 py-3 rounded-xl dark:bg-zinc-900/40 bg-zinc-50 border dark:border-white/5 border-black/5"
                   >
                     <div className="flex items-center gap-2">
-                      <feature.icon className="w-4 h-4 text-emerald-400" />
-                      <span className="text-sm font-medium dark:text-white text-zinc-900">{feature.text}</span>
+                      <item.icon className="w-4 h-4 text-emerald-400" />
+                      <span className="text-sm font-medium dark:text-white text-zinc-900">{item.text}</span>
                     </div>
-                    <p className="text-[10px] dark:text-zinc-500 text-zinc-400 mt-0.5">{feature.desc}</p>
+                    <p className="text-[10px] dark:text-zinc-500 text-zinc-400 mt-0.5">{item.desc}</p>
                   </div>
                 ))}
               </div>
@@ -105,52 +85,23 @@ export default function DiagnosisPage() {
 
           <section className={`${cardBase} p-6 content-visibility-auto`}>
             <div className="flex items-center gap-2 mb-4">
-              <TrendingUp className="w-5 h-5 text-emerald-400" />
-              <h2 className="text-lg font-semibold dark:text-white text-zinc-900">五维能力诊断</h2>
+              <Target className="w-5 h-5 text-emerald-400" />
+              <h2 className="text-lg font-semibold dark:text-white text-zinc-900">五维评分结构</h2>
             </div>
             <p className="text-sm dark:text-zinc-400 text-zinc-500 mb-6">
-              基于200+企业IP打造经验，从5个核心维度精准诊断你的内容健康度
+              评分全部以 0-10 呈现，避免虚假排名或不可验证指标。
             </p>
 
             <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
-              {dimensions.map((dim, index) => (
+              {dimensions.map((dim) => (
                 <div
-                  key={index}
+                  key={dim.name}
                   className="p-4 rounded-xl dark:bg-zinc-900/40 bg-zinc-50 border dark:border-white/5 border-black/5 text-center"
                 >
-                  <div className={`inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br ${dim.color} mb-3`}>
-                    <dim.icon className="w-5 h-5 text-white" />
-                  </div>
                   <h3 className="font-medium dark:text-white text-zinc-900 text-sm">{dim.name}</h3>
                   <p className="text-[10px] dark:text-zinc-500 text-zinc-400 mt-1">{dim.desc}</p>
                 </div>
               ))}
-            </div>
-          </section>
-
-          <section className={`${cardBase} p-6 content-visibility-auto`}>
-            <h2 className="text-lg font-semibold dark:text-white text-zinc-900 mb-4">为什么需要诊断？</h2>
-            <div className="space-y-3">
-              <p className="text-sm dark:text-zinc-400 text-zinc-500">90%的内容创作者都在盲目努力：</p>
-              <div className="grid sm:grid-cols-2 gap-3">
-                {[
-                  "不知道自己的IP定位是否清晰",
-                  "不知道选题方向是否正确",
-                  "不知道内容配比是否合理",
-                  "不知道为什么内容没有效果"
-                ].map((item, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center gap-2 px-4 py-3 rounded-xl dark:bg-zinc-900/40 bg-zinc-50 border dark:border-white/5 border-black/5"
-                  >
-                    <div className="w-1.5 h-1.5 rounded-full bg-red-400" />
-                    <span className="text-sm dark:text-zinc-300 text-zinc-600">{item}</span>
-                  </div>
-                ))}
-              </div>
-              <p className="text-sm font-medium dark:text-emerald-400 text-emerald-600 mt-4">
-                这套诊断由IP内容工厂团队设计，帮你精准定位问题，给出可落地的改进方案。
-              </p>
             </div>
           </section>
 
@@ -161,12 +112,8 @@ export default function DiagnosisPage() {
               <ArrowRight className="w-5 h-5" />
             </GlowLink>
             <p className="text-xs dark:text-zinc-500 text-zinc-400 mt-3">
-              已有 <span className="font-medium dark:text-emerald-400 text-emerald-600">1,234</span> 人完成诊断
+              诊断完成后可直接生成交付包
             </p>
-            <div className="mt-3 text-xs dark:text-zinc-500 text-zinc-400">
-              添加微信领取1V1诊断解读：<span className="font-medium text-emerald-500 select-all">{WECHAT_ID}</span>
-            </div>
-            <p className="text-[10px] dark:text-zinc-500 text-zinc-400 mt-2">报告保存30天，可随时下载</p>
           </section>
         </div>
       </main>
@@ -180,7 +127,7 @@ export default function DiagnosisPage() {
               <ArrowRight className="w-5 h-5" />
             </GlowLink>
             <p className="mt-2 text-[10px] text-center dark:text-zinc-500 text-zinc-400">
-              无需注册 · 可下载诊断报告
+              交付包可下载 · 站内闭环
             </p>
           </div>
         </div>

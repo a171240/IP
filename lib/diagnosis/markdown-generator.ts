@@ -6,11 +6,9 @@ interface DiagnosisResult {
   total: number
   level: 'excellent' | 'good' | 'pass' | 'needs_improvement'
   levelLabel: string
-  percentile: number
   dimensions: Record<Dimension, {
     score: number
     maxScore: number
-    percentage: number
     status: 'strong' | 'normal' | 'weak'
     insight: string
   }>
@@ -71,8 +69,6 @@ export function generateReportMarkdown(
   lines.push('')
   lines.push(`**等级评定**：${result.levelLabel}`)
   lines.push('')
-  lines.push(`**行业排名**：击败了约 **${result.percentile}%** 的同行业账号`)
-  lines.push('')
 
   // 五维能力概览
   lines.push('### 五维能力一览')
@@ -84,7 +80,7 @@ export function generateReportMarkdown(
     const dimName = DIMENSIONS[key as Dimension]?.name || key
     const statusText = dim.status === 'strong' ? '✅ 优势' :
                        dim.status === 'weak' ? '⚠️ 待改进' : '➖ 正常'
-    lines.push(`| ${dimName} | ${dim.percentage}% | ${statusText} |`)
+    lines.push(`| ${dimName} | ${dim.score}/10 | ${statusText} |`)
   })
   lines.push('')
 
@@ -113,9 +109,6 @@ export function generateReportMarkdown(
         lines.push(`#### ${index + 1}. ${achievement.title}`)
         lines.push('')
         lines.push(`**所属维度**：${dimName}`)
-        if (achievement.percentile) {
-          lines.push(`**行业位置**：${achievement.percentile}`)
-        }
         lines.push('')
         lines.push(achievement.content)
         lines.push('')
@@ -203,7 +196,7 @@ export function generateReportMarkdown(
 
     lines.push(`### ${dimName}`)
     lines.push('')
-    lines.push(`**得分**：${dim.percentage}% | **状态**：${statusText}`)
+    lines.push(`**得分**：${dim.score}/10 | **状态**：${statusText}`)
     lines.push('')
     if (dimInfo?.description) {
       lines.push(`**说明**：${dimInfo.description}`)

@@ -416,7 +416,7 @@ export async function GET(
   } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: "????" }, { status: 401 })
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 })
   }
 
   const { data: profile, error: profileError } = await supabase

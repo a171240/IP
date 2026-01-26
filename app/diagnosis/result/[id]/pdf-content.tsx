@@ -9,15 +9,13 @@ interface PDFContentProps {
     total: number
     level: 'excellent' | 'good' | 'pass' | 'needs_improvement'
     levelLabel: string
-    percentile: number
     dimensions: Record<Dimension, {
       score: number
       maxScore: number
-      percentage: number
       status: 'strong' | 'normal' | 'weak'
       insight: string
     }>
-    insights: any[]
+    insights: unknown[]
   }
   industry: string
   createdAt: string
@@ -102,9 +100,6 @@ export function PDFContent({ result, industry, createdAt, aiReport }: PDFContent
         }}>
           {result.levelLabel}
         </div>
-        <p style={{ fontSize: '14px', color: '#71717a', marginTop: '12px', marginBottom: 0 }}>
-          击败了约 <span style={{ fontWeight: 'bold', color: '#10b981' }}>{result.percentile}%</span> 的同行业账号（预估）
-        </p>
       </div>
 
       {/* AI 深度分析 */}
@@ -295,7 +290,7 @@ export function PDFContent({ result, industry, createdAt, aiReport }: PDFContent
                 </span>
               </div>
               <span style={{ fontWeight: 'bold', fontSize: '18px' }}>
-                {dim.percentage}%
+                {dim.score}/10
               </span>
             </div>
             <div style={{
@@ -307,7 +302,7 @@ export function PDFContent({ result, industry, createdAt, aiReport }: PDFContent
             }}>
               <div style={{
                 height: '100%',
-                width: `${dim.percentage}%`,
+                width: `${(dim.score / dim.maxScore) * 100}%`,
                 backgroundColor: dimensionColors[key] || '#6b7280',
                 borderRadius: '4px'
               }} />

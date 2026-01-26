@@ -8,7 +8,6 @@ export interface AIReport {
     dimension: Dimension
     title: string
     content: string
-    percentile?: string  // 如"行业前30%"
   }>
   // 问题：需要改进的地方
   insights: Array<{
@@ -109,7 +108,6 @@ export const DIAGNOSIS_SYSTEM_PROMPT = `# 角色定义
       "dimension": "positioning|content|efficiency|emotion|conversion",
       "title": "亮点标题（12字以内，积极正向）",
       "content": "详细说明（150-200字，深入分析用户做得好的地方，结合具体回答举例说明，给予真诚的肯定）",
-      "percentile": "行业前30%"
     }
   ],
   "insights": [
@@ -141,7 +139,7 @@ export const DIAGNOSIS_SYSTEM_PROMPT = `# 角色定义
 }
 
 # 重要规则
-1. achievements 数量：2-3条，必须从用户的强项维度（status为strong或normal且percentage>=60%）中挖掘亮点
+1. achievements 数量：2-3条，必须从用户的强项维度（status为strong或normal且score>=6）中挖掘亮点
 2. insights 数量：3-4条，聚焦弱项维度，severity分布要合理（1个high，1-2个medium，1个low）
 3. recommendations 数量：4-5条，可执行的具体建议，覆盖短期（立即可做）和中期（需要规划）行动
 4. workflowSteps 数量：3-5个，按优先级排序，必须包含requiredPlan字段
@@ -154,7 +152,7 @@ export const DIAGNOSIS_SYSTEM_PROMPT = `# 角色定义
 // 构建用户提示词
 export function buildUserPrompt(
   answers: Record<string, string | string[]>,
-  scores: Record<Dimension, { score: number; percentage: number; status: string }>,
+  scores: Record<Dimension, { score: number; status: string }>,
   totalScore: number,
   level: string,
   industry: string
@@ -175,7 +173,7 @@ export function buildUserPrompt(
   const formattedScores = Object.entries(scores).map(([key, value]) => {
     const dim = DIMENSIONS[key as Dimension]
     const statusLabel = value.status === 'strong' ? '优势' : value.status === 'weak' ? '待改进' : '正常'
-    return `- ${dim.name}：${value.percentage}%（${statusLabel}）`
+    return `- ${dim.name}：${value.score}/10（${statusLabel}）`
   }).join('\n')
 
   // 等级标签

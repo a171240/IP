@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     const systemPrompt = DIAGNOSIS_SYSTEM_PROMPT
     const userPrompt = buildUserPrompt(
       answers,
-      scores as Record<Dimension, { score: number; percentage: number; status: string }>,
+      scores as Record<Dimension, { score: number; status: string }>,
       totalScore,
       level,
       industry || ''

@@ -29,6 +29,17 @@ CREATE TABLE IF NOT EXISTS public.wechatpay_orders (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+ALTER TABLE IF EXISTS public.wechatpay_orders
+  ADD COLUMN IF NOT EXISTS product_id TEXT,
+  ADD COLUMN IF NOT EXISTS grant_status TEXT DEFAULT 'pending' CHECK (grant_status IN ('pending', 'granting', 'granted', 'failed')),
+  ADD COLUMN IF NOT EXISTS grant_attempts INT DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS granted_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS grant_error TEXT,
+  ADD COLUMN IF NOT EXISTS idempotency_key TEXT,
+  ADD COLUMN IF NOT EXISTS ip_address TEXT,
+  ADD COLUMN IF NOT EXISTS user_agent TEXT,
+  ADD COLUMN IF NOT EXISTS origin TEXT;
+
 ALTER TABLE public.wechatpay_orders ENABLE ROW LEVEL SECURITY;
 
 -- 登录用户只能查询自己的订单；未登录用户通过后端接口（带 client_secret）查询
@@ -52,53 +63,3 @@ DROP TRIGGER IF EXISTS update_wechatpay_orders_updated_at ON public.wechatpay_or
 CREATE TRIGGER update_wechatpay_orders_updated_at
   BEFORE UPDATE ON public.wechatpay_orders
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
--- =============================================================================
--- 数据库迁移脚本（已有表时执行）
--- =============================================================================
--- 如果表已存在，需要单独执行以下 ALTER 语句添加新字段：
---
--- ALTER TABLE public.wechatpay_orders ADD COLUMN IF NOT EXISTS product_id TEXT;
--- ALTER TABLE public.wechatpay_orders ADD COLUMN IF NOT EXISTS grant_status TEXT DEFAULT 'pending';
--- ALTER TABLE public.wechatpay_orders ADD COLUMN IF NOT EXISTS grant_attempts INT DEFAULT 0;
--- ALTER TABLE public.wechatpay_orders ADD COLUMN IF NOT EXISTS granted_at TIMESTAMPTZ;
--- ALTER TABLE public.wechatpay_orders ADD COLUMN IF NOT EXISTS grant_error TEXT;
--- ALTER TABLE public.wechatpay_orders ADD COLUMN IF NOT EXISTS idempotency_key TEXT;
--- ALTER TABLE public.wechatpay_orders ADD COLUMN IF NOT EXISTS ip_address TEXT;
--- ALTER TABLE public.wechatpay_orders ADD COLUMN IF NOT EXISTS user_agent TEXT;
--- ALTER TABLE public.wechatpay_orders ADD COLUMN IF NOT EXISTS origin TEXT;
--- CREATE UNIQUE INDEX IF NOT EXISTS idx_wechatpay_orders_idempotency_key ON public.wechatpay_orders(idempotency_key);
---
--- 注意：Supabase 的 ADD COLUMN IF NOT EXISTS 可能需要先检查版本支持
--- 如果不支持，可以使用以下方式：
---
--- DO $$
--- BEGIN
---   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='wechatpay_orders' AND column_name='product_id') THEN
---     ALTER TABLE public.wechatpay_orders ADD COLUMN product_id TEXT;
---   END IF;
---   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='wechatpay_orders' AND column_name='grant_status') THEN
---     ALTER TABLE public.wechatpay_orders ADD COLUMN grant_status TEXT DEFAULT 'pending';
---   END IF;
---   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='wechatpay_orders' AND column_name='grant_attempts') THEN
---     ALTER TABLE public.wechatpay_orders ADD COLUMN grant_attempts INT DEFAULT 0;
---   END IF;
---   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='wechatpay_orders' AND column_name='granted_at') THEN
---     ALTER TABLE public.wechatpay_orders ADD COLUMN granted_at TIMESTAMPTZ;
---   END IF;
---   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='wechatpay_orders' AND column_name='grant_error') THEN
---     ALTER TABLE public.wechatpay_orders ADD COLUMN grant_error TEXT;
---   END IF;
---   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='wechatpay_orders' AND column_name='idempotency_key') THEN
---     ALTER TABLE public.wechatpay_orders ADD COLUMN idempotency_key TEXT;
---   END IF;
---   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='wechatpay_orders' AND column_name='ip_address') THEN
---     ALTER TABLE public.wechatpay_orders ADD COLUMN ip_address TEXT;
---   END IF;
---   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='wechatpay_orders' AND column_name='user_agent') THEN
---     ALTER TABLE public.wechatpay_orders ADD COLUMN user_agent TEXT;
---   END IF;
---   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='wechatpay_orders' AND column_name='origin') THEN
---     ALTER TABLE public.wechatpay_orders ADD COLUMN origin TEXT;
---   END IF;
--- END $$;

@@ -1,0 +1,95 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DeliveryPackV2",
+  "type": "object",
+  "required": [
+    "scorecard",
+    "calendar_7d",
+    "topic_bank_10",
+    "scripts_3",
+    "qc_checklist_10"
+  ],
+  "properties": {
+    "scorecard": {
+      "type": "object",
+      "required": ["dimensions", "core_bottleneck", "top_actions"],
+      "properties": {
+        "dimensions": {
+          "type": "array",
+          "minItems": 5,
+          "items": {
+            "type": "object",
+            "required": ["name", "score", "insight"],
+            "properties": {
+              "name": { "type": "string" },
+              "score": { "type": "number", "minimum": 0, "maximum": 10 },
+              "insight": { "type": "string" }
+            }
+          }
+        },
+        "core_bottleneck": { "type": "string" },
+        "top_actions": {
+          "type": "array",
+          "minItems": 3,
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "calendar_7d": {
+      "type": "array",
+      "minItems": 7,
+      "items": {
+        "type": "object",
+        "required": ["day", "theme", "deliverable"],
+        "properties": {
+          "day": { "type": "string" },
+          "theme": { "type": "string" },
+          "deliverable": { "type": "string" },
+          "notes": { "type": "string" }
+        }
+      }
+    },
+    "topic_bank_10": {
+      "type": "array",
+      "minItems": 10,
+      "items": {
+        "type": "object",
+        "required": ["title", "intent", "hook"],
+        "properties": {
+          "title": { "type": "string" },
+          "intent": { "type": "string" },
+          "hook": { "type": "string" }
+        }
+      }
+    },
+    "scripts_3": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "required": ["title", "hook", "outline", "cta"],
+        "properties": {
+          "title": { "type": "string" },
+          "hook": { "type": "string" },
+          "outline": {
+            "type": "array",
+            "minItems": 3,
+            "items": { "type": "string" }
+          },
+          "cta": { "type": "string" }
+        }
+      }
+    },
+    "qc_checklist_10": {
+      "type": "array",
+      "minItems": 10,
+      "items": { "type": "string" }
+    },
+    "thinking_summary": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 6,
+      "items": { "type": "string" }
+    }
+  }
+}

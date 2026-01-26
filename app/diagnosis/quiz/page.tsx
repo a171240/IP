@@ -28,7 +28,7 @@ export default function QuizPage() {
         setCurrentStep(step)
         setAnswers(savedAnswers)
         if (savedCustomIndustry) setCustomIndustry(savedCustomIndustry)
-      } catch (e) {
+      } catch {
         localStorage.removeItem(STORAGE_KEY)
       }
     }
@@ -87,9 +87,9 @@ export default function QuizPage() {
       const result = calculateScore(answers)
 
       // 如果选择了"其他行业"，使用自定义行业名称
-      const industryValue = answers.q1 === 'other' && customIndustry.trim()
+      const industryValue = answers.industry === 'other' && customIndustry.trim()
         ? customIndustry.trim()
-        : answers.q1
+        : answers.industry
 
       const response = await fetch('/api/diagnosis', {
         method: 'POST',
@@ -121,7 +121,7 @@ export default function QuizPage() {
   }
 
   // 检查是否是行业选择题
-  const isIndustryQuestion = currentQuestion.id === 'q1'
+  const isIndustryQuestion = currentQuestion.id === 'industry'
   const isOtherSelected = currentAnswer === 'other'
 
   // 对于行业选择题，如果选了"其他"且没有填写自定义行业，则视为未回答
@@ -147,7 +147,7 @@ export default function QuizPage() {
     <div className="min-h-screen">
       <Header breadcrumbs={[
         { label: "主页", href: "/" },
-        { label: "IP健康诊断", href: "/diagnosis" },
+        { label: "内容交付系统诊断", href: "/diagnosis" },
         { label: "问卷" }
       ]} />
 

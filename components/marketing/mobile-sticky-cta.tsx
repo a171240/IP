@@ -36,7 +36,12 @@ export function MobileStickyCta({ targetId = "final-cta" }: MobileStickyCtaProps
     >
       <div className="bg-[#030304]/95 border-t border-white/10 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur">
         <div className="max-w-md mx-auto flex items-center gap-2">
-          <TrackedLink href="/diagnosis" eventName="click_sticky_diagnosis" className="flex-1">
+          <TrackedLink
+            href="/diagnosis"
+            eventName="cta_click"
+            eventProps={{ source: "sticky_diagnosis" }}
+            className="flex-1"
+          >
             <GlowButton primary className="w-full py-3 text-sm">
               <Zap size={16} />
               免费诊断
@@ -45,7 +50,8 @@ export function MobileStickyCta({ targetId = "final-cta" }: MobileStickyCtaProps
           </TrackedLink>
           <TrackedLink
             href="/demo"
-            eventName="click_sticky_demo"
+            eventName="cta_click"
+            eventProps={{ source: "sticky_demo" }}
             className="px-4 py-3 text-sm text-zinc-300 hover:text-white border border-white/10 rounded-xl transition-colors text-center"
           >
             预约演示

@@ -1,481 +1,545 @@
-'use client'
+"use client"
 
-import { useRouter } from 'next/navigation'
-import { GlassCard, GlowButton, Header } from '@/components/ui/obsidian'
-import {
-  Activity,
-  ArrowRight,
-  Download,
-  Share2,
-  RotateCcw,
-  TrendingUp,
-  AlertCircle,
-  Sparkles,
-  Loader2
-} from 'lucide-react'
-import { useState, useCallback, useEffect, useRef } from 'react'
-import { generateReportMarkdown, downloadMarkdown } from '@/lib/diagnosis/markdown-generator'
-import { DIMENSIONS } from '@/lib/diagnosis/scoring'
-import { Dimension } from '@/lib/diagnosis/questions'
-import { AIReportDisplay, ExclusiveBenefitsCard, GrowthPathCard } from '@/components/diagnosis'
-import { AIReport, parseAIReport } from '@/lib/diagnosis/ai-prompt'
-import { WECHAT_ID } from '@/lib/marketing/content'
-import {
-  Radar,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  ResponsiveContainer
-} from 'recharts'
+import { useCallback, useEffect, useMemo, useState } from "react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { GlassCard, GlowButton, Header } from "@/components/ui/obsidian"
+import { ArrowRight, Download, Loader2, Sparkles } from "lucide-react"
+import { DIMENSIONS } from "@/lib/diagnosis/scoring"
+import { Dimension, INDUSTRY_LABELS } from "@/lib/diagnosis/questions"
+import { track } from "@/lib/analytics/client"
 
 interface ResultClientProps {
   result: {
     total: number
-    level: 'excellent' | 'good' | 'pass' | 'needs_improvement'
+    level: "excellent" | "good" | "pass" | "needs_improvement"
     levelLabel: string
-    percentile: number
-    dimensions: Record<Dimension, {
-      score: number
-      maxScore: number
-      percentage: number
-      status: 'strong' | 'normal' | 'weak'
-      insight: string
-    }>
-    insights: any[]
+    dimensions: Record<
+      Dimension,
+      {
+        score: number
+        maxScore: number
+        status: "strong" | "normal" | "weak"
+        insight: string
+      }
+    >
     recommendations: string[]
-    actionPlan: string[]
+    actionPlan: unknown[]
   }
   industry: string
   createdAt: string
   diagnosisId?: string
   answers?: Record<string, string | string[]>
-  cachedAiReport?: AIReport | null
+  isPro?: boolean
+  proExpiresAt?: string | null
+  userId?: string | null
 }
 
-export function ResultClient({ result, industry, createdAt, diagnosisId, answers, cachedAiReport }: ResultClientProps) {
+const problemLabels: Record<string, string> = {
+  topic_system_missing: "选题体系缺失",
+  calendar_blocked: "内容日历排不出来",
+  script_slow: "脚本产出慢/质量不稳",
+  qc_missing: "返工多口径乱（缺质检标准）",
+  conversion_weak: "转化链路不清",
+  archive_weak: "素材/知识不沉淀",
+}
+
+const problemActions: Record<string, string> = {
+  topic_system_missing: "先搭建选题体系，整理高意图场景清单",
+  calendar_blocked: "先做 7 天内容日历，锁定节奏与负责人",
+  script_slow: "固定 3 套脚本模板，减少反复沟通",
+  qc_missing: "建立 10 项质检清单，减少返工",
+  conversion_weak: "补齐成交链路，明确 CTA 与承接动作",
+  archive_weak: "制定归档规则，保证素材可复用",
+}
+
+const paywallCopy = {
+  title: "解锁「7天交付包」",
+  bullets: [
+    "7天成交排产（PDF）",
+    "10条高意图选题（PDF）",
+    "3条成交脚本（PDF）",
+    "质检清单（PDF）",
+    "成交结论 + 行动清单（PDF）",
+  ],
+  ctaActivate: "/activate",
+  ctaDemo: "/demo",
+}
+
+export function ResultClient({
+  result,
+  industry,
+  createdAt,
+  diagnosisId,
+  answers,
+  isPro,
+  proExpiresAt,
+  userId,
+}: ResultClientProps) {
   const router = useRouter()
-  const [shareSuccess, setShareSuccess] = useState(false)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [packId, setPackId] = useState<string | null>(null)
+  const [generateError, setGenerateError] = useState<string | null>(null)
+  const [thinkingSummary, setThinkingSummary] = useState<string[] | null>(null)
+  const [isDownloading, setIsDownloading] = useState(false)
+  const [progressStep, setProgressStep] = useState(0)
+  const [progressValue, setProgressValue] = useState(0)
 
-  // AI 报告状态
-  const [aiReport, setAiReport] = useState<AIReport | null>(cachedAiReport || null)
-  const [isGeneratingAI, setIsGeneratingAI] = useState(false)
-  const [aiError, setAiError] = useState<string | null>(null)
-  const [aiStreamContent, setAiStreamContent] = useState('')
-  const [thinkingContent, setThinkingContent] = useState('')
-  const hasStartedGeneration = useRef(false)
+  const isProUser = Boolean(isPro)
+  const industryLabel = INDUSTRY_LABELS[industry] || industry || "当前行业"
+  const progressSteps = useMemo(
+    () => ["校验权益与配额", "生成成交内容", "生成脚本与选题", "渲染PDF交付包", "上传文件并就绪"],
+    []
+  )
 
-  const levelConfig = {
-    excellent: { color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' },
-    good: { color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' },
-    pass: { color: 'text-yellow-400', bg: 'bg-yellow-500/10 border-yellow-500/20' },
-    needs_improvement: { color: 'text-red-400', bg: 'bg-red-500/10 border-red-500/20' }
-  }
-
-  const radarData = Object.entries(result.dimensions).map(([key, dim]) => ({
-    dimension: DIMENSIONS[key as Dimension]?.name || key,
-    score: dim.percentage,
-    fullMark: 100
-  }))
-
-  const quickStartParams = new URLSearchParams()
-  quickStartParams.set("agent", "quick-script")
-  if (industry) quickStartParams.set("industry", industry)
-  const quickStartHref = `/dashboard/quick-start?${quickStartParams.toString()}`
-
-  const handleDownloadMarkdown = () => {
-    try {
-      const markdown = generateReportMarkdown(result, industry, createdAt, aiReport)
-      downloadMarkdown(markdown)
-    } catch (error) {
-      console.error('Markdown生成失败:', error)
-      alert('下载失败，请重试')
-    }
-  }
-
-  const handleShare = async () => {
-    const url = window.location.href
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'IP内容健康度诊断报告',
-          text: `我的IP内容健康度得分是${result.total}分，来测测你的吧！`,
-          url
-        })
-      } catch (error) {
-        if ((error as Error).name !== 'AbortError') {
-          console.error('分享失败:', error)
-        }
-      }
-    } else {
-      try {
-        await navigator.clipboard.writeText(url)
-        setShareSuccess(true)
-        setTimeout(() => setShareSuccess(false), 2000)
-      } catch (error) {
-        console.error('复制链接失败:', error)
-      }
-    }
-  }
-
-  // 保存 AI 报告到数据库
-  const saveAiReport = useCallback(async (report: AIReport) => {
-    if (!diagnosisId) return
-    try {
-      await fetch('/api/diagnosis/generate', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ diagnosisId, aiReport: report })
-      })
-    } catch (error) {
-      console.error('保存AI报告失败:', error)
-    }
-  }, [diagnosisId])
-
-  // 生成 AI 报告
-  const handleGenerateAIReport = useCallback(async () => {
-    if (isGeneratingAI) return
-
-    setIsGeneratingAI(true)
-    setAiError(null)
-    setAiStreamContent('')
-    setThinkingContent('')
-
-    try {
-      // 构建评分数据
-      const scores: Record<string, { score: number; percentage: number; status: string }> = {}
-      Object.entries(result.dimensions).forEach(([key, dim]) => {
-        scores[key] = {
-          score: dim.score,
-          percentage: dim.percentage,
-          status: dim.status
-        }
-      })
-
-      const response = await fetch('/api/diagnosis/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          diagnosisId,
-          answers: answers || {},
-          scores,
-          totalScore: result.total,
-          level: result.level,
-          industry
-        })
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || '生成失败')
-      }
-
-      // 处理流式响应
-      const reader = response.body?.getReader()
-      if (!reader) throw new Error('无法读取响应')
-
-      const decoder = new TextDecoder()
-      let fullContent = ''
-      let thinkingText = ''
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        const chunk = decoder.decode(value, { stream: true })
-        const lines = chunk.split('\n')
-
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue
-          const data = line.slice(6)
-
-          if (data === '[DONE]') {
-            // 解析完整内容
-            const parsed = parseAIReport(fullContent)
-            if (parsed) {
-              setAiReport(parsed)
-              // 保存到数据库
-              saveAiReport(parsed)
-            } else {
-              setAiError('AI报告格式解析失败，请重试')
-            }
-            break
-          }
-
-          try {
-            const json = JSON.parse(data)
-            // 处理思考内容
-            if (json.reasoning) {
-              thinkingText += json.reasoning
-              setThinkingContent(thinkingText)
-            }
-            // 处理正常内容
-            if (json.content) {
-              fullContent += json.content
-              setAiStreamContent(fullContent)
-            }
-          } catch {
-            // 忽略解析错误
-          }
-        }
-      }
-    } catch (error) {
-      console.error('AI报告生成失败:', error)
-      setAiError(error instanceof Error ? error.message : '生成失败，请稍后重试')
-    } finally {
-      setIsGeneratingAI(false)
-    }
-  }, [isGeneratingAI, result, diagnosisId, answers, industry, saveAiReport])
-
-  // 自动生成 AI 报告（只在没有缓存时）
   useEffect(() => {
-    if (!cachedAiReport && !hasStartedGeneration.current) {
-      hasStartedGeneration.current = true
-      handleGenerateAIReport()
+    if (!isGenerating) {
+      setProgressStep(0)
+      setProgressValue(0)
+      return
     }
-  }, [cachedAiReport, handleGenerateAIReport])
+    setProgressValue(10)
+    const interval = setInterval(() => {
+      setProgressStep((prev) => (prev + 1) % progressSteps.length)
+      setProgressValue((prev) => (prev >= 90 ? 90 : prev + 10))
+    }, 1600)
+    return () => clearInterval(interval)
+  }, [isGenerating, progressSteps.length])
+
+  const dimensionCards = useMemo(
+    () =>
+      Object.entries(result.dimensions).map(([key, dim]) => {
+        const name = DIMENSIONS[key as Dimension]?.name || key
+        const percentage = Math.round((dim.score / dim.maxScore) * 100)
+        return {
+          key,
+          name,
+          score: dim.score,
+          percentage,
+        }
+      }),
+    [result.dimensions]
+  )
+
+  const coreBottleneck = useMemo(() => {
+    const problems = Array.isArray(answers?.current_problem) ? answers?.current_problem : []
+    if (problems?.length) {
+      return problemLabels[problems[0]] || problems[0]
+    }
+    const lowest = dimensionCards.slice().sort((a, b) => a.score - b.score)[0]
+    return lowest ? `${lowest.name}偏弱` : "交付体系需要补齐"
+  }, [answers, dimensionCards])
+
+  const topActions = useMemo(() => {
+    const actions = new Set<string>()
+    const problems = Array.isArray(answers?.current_problem) ? answers?.current_problem : []
+    problems.forEach((problem) => {
+      const action = problemActions[problem]
+      if (action) actions.add(action)
+    })
+    const defaults = [
+      "明确本周交付目标，拆成可执行动作",
+      "为每个岗位定义交付口径与检查项",
+      "安排一次复盘，沉淀可复用模板",
+    ]
+    defaults.forEach((item) => actions.add(item))
+    return Array.from(actions).slice(0, 3)
+  }, [answers])
+
+  const previewCalendar = [
+    { day: "Day1", theme: "交付定位与目标拆解", deliverable: "目标画像 + 承接口径" },
+    { day: "Day2", theme: "高意图选题池", deliverable: "10条选题清单" },
+    { day: "Day3", theme: "脚本模板搭建", deliverable: "3条可拍脚本" },
+  ]
+
+  const previewScripts = [
+    "客户为什么迟迟不转化？先拆掉 3 个隐性漏斗",
+    "7 天排产怎么排：3 个动作锁住节奏",
+    "一页纸 SOP：把交付口径写清楚",
+  ]
+
+  const previewChecklist = ["选题是否直指痛点", "脚本是否有明确开场钩子", "CTA 是否清晰可执行"]
+
+  useEffect(() => {
+    if (!isProUser) {
+      track("paywall_view", {
+        diagnosisId,
+        source: answers?.platform,
+        userId,
+        landingPath: window.location.pathname,
+      })
+    }
+  }, [answers?.platform, diagnosisId, isProUser, userId])
+
+  const handleGeneratePack = useCallback(async () => {
+    setGenerateError(null)
+    setThinkingSummary(null)
+    setIsGenerating(true)
+    setProgressStep(0)
+    setProgressValue(10)
+    track("delivery_pack_generate_start", {
+      diagnosisId,
+      source: answers?.platform,
+      userId,
+      landingPath: window.location.pathname,
+    })
+
+    try {
+      const payload = {
+        industry: String(industry || "other"),
+        platform: String(answers?.platform || "xiaohongshu"),
+        account_type: String(answers?.account_type || "unknown"),
+        team_size: String(answers?.team_size || "unknown"),
+        delivery_mode: String(answers?.delivery_mode || "unknown"),
+        weekly_output: String(answers?.weekly_output || "unknown"),
+        goal: String(answers?.goal || "unknown"),
+        current_problem: Array.isArray(answers?.current_problem) ? answers?.current_problem : [],
+      }
+
+      const response = await fetch("/api/delivery-pack/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+
+      if (response.status === 401) {
+        router.push(`/auth/login?redirect=${encodeURIComponent(window.location.pathname)}`)
+        return
+      }
+
+      const data = (await response.json()) as {
+        ok: boolean
+        packId?: string
+        error?: string
+        thinkingSummary?: string[]
+      }
+
+      if (!response.ok || !data.ok) {
+        track("delivery_pack_generate_fail", {
+          diagnosisId,
+          source: answers?.platform,
+          userId,
+          landingPath: window.location.pathname,
+          error: data.error || response.status,
+        })
+        if (response.status === 429) {
+          setGenerateError("今日生成次数已经用完")
+          return
+        }
+        if (response.status === 403) {
+          setGenerateError("需要先激活体验卡或升级权限。")
+          return
+        }
+        if (response.status === 504 || data.error === "llm_timeout") {
+          setGenerateError("模型响应超时，请稍后再试。")
+          return
+        }
+        setGenerateError("生成失败，请稍后再试。")
+        return
+      }
+
+      setPackId(data.packId || null)
+      setThinkingSummary(data.thinkingSummary?.length ? data.thinkingSummary : null)
+      setProgressStep(progressSteps.length - 1)
+      setProgressValue(100)
+      track("delivery_pack_generate_success", {
+        diagnosisId,
+        source: answers?.platform,
+        userId,
+        landingPath: window.location.pathname,
+        packId: data.packId,
+      })
+    } catch {
+      track("delivery_pack_generate_fail", {
+        diagnosisId,
+        source: answers?.platform,
+        userId,
+        landingPath: window.location.pathname,
+        error: "network_error",
+      })
+      setGenerateError("网络异常，请稍后再试。")
+    } finally {
+      setIsGenerating(false)
+    }
+  }, [answers, diagnosisId, industry, progressSteps.length, router, userId])
+
+  const handleDownload = useCallback(async () => {
+    if (!packId) {
+      setGenerateError("请先生成交付包")
+      return
+    }
+    setGenerateError(null)
+    setIsDownloading(true)
+    track("delivery_pack_download", {
+      diagnosisId,
+      source: answers?.platform,
+      userId,
+      landingPath: window.location.pathname,
+      packId,
+    })
+    try {
+      const downloadResp = await fetch(`/api/delivery-pack/${packId}/download`, { redirect: "manual" })
+      if (downloadResp.type === "opaqueredirect") {
+        window.location.href = `/api/delivery-pack/${packId}/download`
+        return
+      }
+      if (downloadResp.status === 401) {
+        router.push(`/auth/login?redirect=${encodeURIComponent(window.location.pathname)}`)
+        return
+      }
+      if (downloadResp.status === 409) {
+        setGenerateError("交付包还在生成，请稍后再试。")
+        return
+      }
+      if (downloadResp.status === 429) {
+        setGenerateError("今日生成次数已经用完")
+        return
+      }
+      if (downloadResp.status >= 400) {
+        setGenerateError("下载失败，请稍后再试。")
+        return
+      }
+      const location = downloadResp.headers.get("Location")
+      if (location) {
+        window.location.href = location
+        return
+      }
+      window.location.href = `/api/delivery-pack/${packId}/download`
+    } catch {
+      setGenerateError("下载失败，请稍后再试。")
+    } finally {
+      setIsDownloading(false)
+    }
+  }, [answers?.platform, diagnosisId, packId, router, userId])
 
   return (
     <div className="min-h-screen">
-      <Header breadcrumbs={[
-        { label: "主页", href: "/" },
-        { label: "IP健康诊断", href: "/diagnosis" },
-        { label: "诊断报告" }
-      ]} />
+      <Header
+        breadcrumbs={[
+          { label: "主页", href: "/" },
+          { label: "内容交付系统诊断", href: "/diagnosis" },
+          { label: "诊断结果" },
+        ]}
+      />
 
       <main className="p-6 lg:p-8">
-        <div id="report-content" className="max-w-4xl mx-auto space-y-6">
-          {/* 总分卡片 */}
-          <GlassCard className="p-8 relative overflow-hidden" glow>
-            <div className="absolute top-0 right-0 w-72 h-72 bg-gradient-to-br from-emerald-600/10 to-transparent rounded-full blur-3xl" />
-            <div className="relative text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 mb-4">
-                <Activity className="w-8 h-8 text-white" />
-              </div>
-              <h1 className="text-2xl font-bold dark:text-white text-zinc-900 mb-2">
-                你的IP内容诊断报告
-              </h1>
-              <p className="text-sm dark:text-zinc-400 text-zinc-500 mb-6">
-                生成于 {new Date(createdAt).toLocaleDateString('zh-CN')}
-                {industry && ` · ${industry}行业`}
-              </p>
-
-              <div className="text-7xl font-bold bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent mb-2">
-                {result.total}
-              </div>
-              <div className="text-lg dark:text-zinc-400 text-zinc-500 mb-3">
-                综合健康度评分
-              </div>
-
-              <div className="flex items-center justify-center gap-4 mb-4">
-                <span className={`px-4 py-1.5 rounded-full text-sm font-medium border ${levelConfig[result.level].bg} ${levelConfig[result.level].color}`}>
-                  {result.levelLabel}
-                </span>
-              </div>
-
-              <p className="text-sm dark:text-zinc-400 text-zinc-500">
-                击败了约 <span className="font-bold text-emerald-400">{result.percentile}%</span> 的同行业账号
-                <span className="text-xs dark:text-zinc-500 text-zinc-400 ml-1">（基于1,234份诊断数据）</span>
-              </p>
-            </div>
-          </GlassCard>
-
-          {/* 五维雷达图 */}
+        <div className="max-w-5xl mx-auto space-y-6">
           <GlassCard className="p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <TrendingUp className="w-5 h-5 text-emerald-400" />
-              <h2 className="text-lg font-semibold dark:text-white text-zinc-900">五维能力分析</h2>
-            </div>
-
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <RadarChart data={radarData}>
-                  <PolarGrid stroke="rgba(255,255,255,0.1)" />
-                  <PolarAngleAxis
-                    dataKey="dimension"
-                    tick={{ fill: '#a1a1aa', fontSize: 12 }}
-                  />
-                  <PolarRadiusAxis
-                    angle={30}
-                    domain={[0, 100]}
-                    tick={{ fill: '#71717a', fontSize: 10 }}
-                  />
-                  <Radar
-                    name="得分"
-                    dataKey="score"
-                    stroke="#10b981"
-                    fill="#10b981"
-                    fillOpacity={0.3}
-                  />
-                </RadarChart>
-              </ResponsiveContainer>
-            </div>
-          </GlassCard>
-
-          {/* AI 深度分析 */}
-          <GlassCard className="p-6 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-br from-purple-600/10 to-transparent rounded-full blur-3xl" />
-            <div className="relative">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-purple-400" />
-                  <h2 className="text-lg font-semibold dark:text-white text-zinc-900">AI 深度分析</h2>
-                  <span className="px-2 py-0.5 text-xs rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                    免费
-                  </span>
-                </div>
-                {/* 重新生成按钮 */}
-                {aiReport && !isGeneratingAI && (
-                  <GlowButton onClick={handleGenerateAIReport} className="text-xs">
-                    <RotateCcw className="w-3 h-3" />
-                    重新生成
-                  </GlowButton>
-                )}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h1 className="text-2xl font-semibold dark:text-white text-zinc-900">
+                  交付系统诊断结果
+                </h1>
+                <p className="text-sm dark:text-zinc-400 text-zinc-500">
+                  {new Date(createdAt).toLocaleDateString("zh-CN")} · {industryLabel}
+                </p>
               </div>
-
-              {/* 生成中状态 */}
-              {isGeneratingAI && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="w-5 h-5 text-purple-400 animate-spin" />
-                    <span className="text-sm dark:text-zinc-300 text-zinc-600">
-                      {thinkingContent ? 'AI 正在深度思考...' : 'AI 正在分析你的诊断数据...'}
-                    </span>
-                  </div>
-
-                  {/* 思考过程显示 */}
-                  {thinkingContent && (
-                    <div className="p-4 rounded-xl dark:bg-purple-500/5 bg-purple-50 border dark:border-purple-500/20 border-purple-200">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-xs font-medium text-purple-400">思考过程</span>
-                      </div>
-                      <div className="max-h-40 overflow-auto">
-                        <p className="text-xs dark:text-purple-300/70 text-purple-600/70 whitespace-pre-wrap leading-relaxed">
-                          {thinkingContent}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 输出内容显示 - 隐藏原始JSON */}
-                  {aiStreamContent && !thinkingContent && (
-                    <div className="p-4 rounded-xl dark:bg-zinc-900/60 bg-zinc-50 border dark:border-white/5 border-zinc-200">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="text-xs dark:text-zinc-400 text-zinc-500">正在生成报告内容...</span>
-                      </div>
-                    </div>
-                  )}
+              {isProUser && proExpiresAt ? (
+                <div className="text-xs text-emerald-400">
+                  体验权益有效期至 {new Date(proExpiresAt).toLocaleDateString("zh-CN")}
                 </div>
-              )}
-
-              {/* 错误状态 */}
-              {aiError && !isGeneratingAI && (
-                <div className="py-4">
-                  <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-center">
-                    <p className="text-red-400 text-sm mb-3">{aiError}</p>
-                    <GlowButton onClick={handleGenerateAIReport}>
-                      <RotateCcw className="w-4 h-4" />
-                      重新生成
-                    </GlowButton>
-                  </div>
-                </div>
-              )}
-
-              {/* AI 报告内容 */}
-              {aiReport && !isGeneratingAI && (
-                <AIReportDisplay report={aiReport} />
-              )}
+              ) : null}
             </div>
           </GlassCard>
 
-          {/* 改进建议（仅在没有AI报告时显示） */}
-          {!aiReport && result.insights.length > 0 && (
+          <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-6">
             <GlassCard className="p-6">
               <div className="flex items-center gap-2 mb-4">
-                <AlertCircle className="w-5 h-5 text-yellow-400" />
-                <h2 className="text-lg font-semibold dark:text-white text-zinc-900">重点改进建议</h2>
+                <Sparkles className="w-4 h-4 text-emerald-400" />
+                <h2 className="text-lg font-semibold dark:text-white text-zinc-900">五维评分（0-10）</h2>
               </div>
-
-              <div className="space-y-3">
-                {result.insights.map((insight, index) => (
-                  <div
-                    key={index}
-                    className={`p-4 rounded-xl border ${
-                      insight.severity === 'high'
-                        ? 'dark:bg-red-500/5 bg-red-50 dark:border-red-500/20 border-red-200'
-                        : 'dark:bg-yellow-500/5 bg-yellow-50 dark:border-yellow-500/20 border-yellow-200'
-                    }`}
-                  >
-                    <h3 className={`font-medium mb-1 ${
-                      insight.severity === 'high' ? 'text-red-400' : 'text-yellow-400'
-                    }`}>
-                      {insight.title}
-                    </h3>
-                    <p className="text-sm dark:text-zinc-400 text-zinc-500">
-                      {insight.description}
-                    </p>
+              <div className="grid sm:grid-cols-2 gap-4">
+                {dimensionCards.map((dim) => (
+                  <div key={dim.key} className="rounded-xl border border-white/10 bg-white/5 p-4">
+                    <div className="flex items-center justify-between text-sm text-zinc-300">
+                      <span>{dim.name}</span>
+                      <span className="font-semibold text-white">{dim.score}</span>
+                    </div>
+                    <div className="mt-3 h-2 rounded-full bg-white/10 overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-emerald-500 to-teal-400"
+                        style={{ width: `${dim.percentage}%` }}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
             </GlassCard>
-          )}
-        </div>
 
-        {/* 专属权益卡片 + 成长路径图 */}
-        <div className="max-w-4xl mx-auto mt-6 grid md:grid-cols-2 gap-6">
-          <ExclusiveBenefitsCard industry={industry} createdAt={createdAt} />
-          <GrowthPathCard currentScore={result.total} level={result.level} />
-        </div>
+            <GlassCard className="p-6">
+              <h2 className="text-lg font-semibold dark:text-white text-zinc-900">核心瓶颈</h2>
+              <p className="mt-3 text-sm text-zinc-300">{coreBottleneck}</p>
 
-        {/* 操作按钮 */}
-        <div className="max-w-4xl mx-auto mt-6">
-          <GlassCard className="p-6">
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <GlowButton primary onClick={handleDownloadMarkdown} className="w-full">
-                <Download className="w-4 h-4" />
-                下载诊断报告（Markdown）
-              </GlowButton>
-
-              <GlowButton onClick={handleShare} className="w-full">
-                <Share2 className="w-4 h-4" />
-                {shareSuccess ? '已复制链接' : '分享结果'}
-              </GlowButton>
-
-              <GlowButton onClick={() => router.push('/diagnosis')} className="w-full">
-                <RotateCcw className="w-4 h-4" />
-                重新诊断
-              </GlowButton>
-
-              <GlowButton onClick={() => router.push(quickStartHref)} className="w-full">
-                <ArrowRight className="w-4 h-4" />
-                进入交付脚本生成
-              </GlowButton>
-            </div>
-            <p className="mt-3 text-xs dark:text-zinc-500 text-zinc-400">报告保存30天，可随时下载与分享</p>
-          </GlassCard>
-        </div>
-
-        <div className="max-w-4xl mx-auto mt-6">
-          <GlassCard className="p-6">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div>
-                <h3 className="text-sm font-medium dark:text-white text-zinc-900">需要1V1诊断解读？</h3>
-                <p className="text-xs dark:text-zinc-500 text-zinc-400 mt-1">
-                  添加微信领取专属解读与落地建议
-                </p>
+              <div className="mt-6">
+                <h3 className="text-sm font-semibold text-zinc-200">Top3 优先级动作</h3>
+                <ul className="mt-3 space-y-2 text-sm text-zinc-400 list-disc list-inside">
+                  {topActions.map((action) => (
+                    <li key={action}>{action}</li>
+                  ))}
+                </ul>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="px-3 py-2 rounded-lg dark:bg-emerald-500/10 bg-emerald-50 border dark:border-emerald-500/20 border-emerald-200 text-sm font-medium text-emerald-500 select-all">
-                  {WECHAT_ID}
-                </span>
-                <GlowButton onClick={() => router.push('/pricing#contact')}>
+            </GlassCard>
+          </div>
+
+          <GlassCard className="p-6">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <h2 className="text-lg font-semibold dark:text-white text-zinc-900">交付包预览</h2>
+              <span className="text-xs text-zinc-500">
+                {isProUser ? "已解锁" : "未解锁"} · 单份PDF交付包
+              </span>
+            </div>
+
+            <div className="mt-4 grid lg:grid-cols-3 gap-4">
+              <div className={`rounded-xl border border-white/10 bg-white/5 p-4 ${isProUser ? "" : "blur-sm"}`}>
+                <h3 className="text-sm font-semibold text-zinc-200 mb-2">PDF封面 + 目录</h3>
+                <ul className="space-y-2 text-xs text-zinc-400 list-disc list-inside">
+                  <li>成交结论摘要</li>
+                  <li>7天排产目录</li>
+                  <li>脚本与选题索引</li>
+                </ul>
+              </div>
+
+              <div className={`rounded-xl border border-white/10 bg-white/5 p-4 ${isProUser ? "" : "blur-sm"}`}>
+                <h3 className="text-sm font-semibold text-zinc-200 mb-2">成交脚本</h3>
+                <ul className="space-y-2 text-xs text-zinc-400 list-disc list-inside">
+                  <li>成交导向脚本</li>
+                  <li>共鸣信任脚本</li>
+                  <li>专业观点脚本</li>
+                </ul>
+              </div>
+
+              <div className={`rounded-xl border border-white/10 bg-white/5 p-4 ${isProUser ? "" : "blur-sm"}`}>
+                <h3 className="text-sm font-semibold text-zinc-200 mb-2">排产与质检</h3>
+                <ul className="space-y-2 text-xs text-zinc-400 list-disc list-inside">
+                  <li>7天成交排产</li>
+                  <li>10条高意图选题</li>
+                  <li>质检清单（可判定）</li>
+                </ul>
+              </div>
+            </div>
+          </GlassCard>
+
+          {isProUser ? (
+            <GlassCard className="p-6">
+              <div className="flex flex-col gap-4">
+                {isGenerating ? (
+                  <div className="rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent px-5 py-4 text-sm text-emerald-100 shadow-[0_0_40px_-20px_rgba(16,185,129,0.5)]">
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium">后台处理中…</div>
+                      <span className="text-xs text-emerald-200/70">预计 60-120 秒</span>
+                    </div>
+                    <div className="mt-3 h-2 w-full rounded-full bg-emerald-900/40 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-300 transition-all duration-500"
+                        style={{ width: `${progressValue}%` }}
+                      />
+                    </div>
+                    <div className="mt-3 space-y-1 text-xs text-emerald-200/80">
+                      {progressSteps.map((step, index) => (
+                        <div key={step} className="flex items-center gap-2">
+                          <span
+                            className={[
+                              "inline-flex h-2 w-2 rounded-full",
+                              index < progressStep
+                                ? "bg-emerald-300"
+                                : index === progressStep
+                                  ? "bg-emerald-400 animate-pulse"
+                                  : "bg-emerald-400/30",
+                            ].join(" ")}
+                          />
+                          <span className={index === progressStep ? "text-emerald-50" : ""}>{step}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                {thinkingSummary?.length ? (
+                  <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-sm text-zinc-200">
+                    <div className="text-sm font-semibold text-white">思考摘要（可读版本）</div>
+                    <ul className="mt-3 space-y-2 text-sm text-zinc-300 list-disc list-inside">
+                      {thinkingSummary.map((item, index) => (
+                        <li key={`${item}-${index}`}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
+
+                {generateError ? <p className="text-sm text-rose-400">{generateError}</p> : null}
+
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <GlowButton primary onClick={handleGeneratePack} disabled={isGenerating}>
+                    {isGenerating ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        生成中...
+                      </>
+                    ) : (
+                      <>
+                        生成交付包
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </GlowButton>
+                  <GlowButton onClick={handleDownload} disabled={!packId || isDownloading}>
+                    {isDownloading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        准备下载...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-4 h-4" />
+                        下载PDF
+                      </>
+                    )}
+                  </GlowButton>
+                </div>
+              </div>
+            </GlassCard>
+          ) : (
+            <GlassCard className="p-6">
+              <h2 className="text-lg font-semibold dark:text-white text-zinc-900">{paywallCopy.title}</h2>
+              <ul className="mt-4 space-y-2 text-sm text-zinc-400 list-disc list-inside">
+                {paywallCopy.bullets.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+              <div className="mt-5 flex flex-col sm:flex-row gap-3">
+                <Link
+                  href={paywallCopy.ctaActivate}
+                  onClick={() =>
+                    track("paywall_cta_click", {
+                      diagnosisId,
+                      source: answers?.platform,
+                      userId,
+                      landingPath: window.location.pathname,
+                      target: "activate",
+                    })
+                  }
+                  className="inline-flex items-center justify-center px-5 py-2 rounded-xl bg-emerald-500 text-white text-sm font-semibold"
+                >
+                  去激活体验卡
+                </Link>
+                <Link
+                  href={paywallCopy.ctaDemo}
+                  onClick={() =>
+                    track("paywall_cta_click", {
+                      diagnosisId,
+                      source: answers?.platform,
+                      userId,
+                      landingPath: window.location.pathname,
+                      target: "demo",
+                    })
+                  }
+                  className="inline-flex items-center justify-center px-5 py-2 rounded-xl border border-white/10 text-sm text-zinc-300 hover:text-white"
+                >
                   预约顾问演示
-                  <ArrowRight className="w-4 h-4" />
-                </GlowButton>
+                </Link>
               </div>
-            </div>
-          </GlassCard>
+            </GlassCard>
+          )}
         </div>
       </main>
     </div>

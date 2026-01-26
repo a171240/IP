@@ -17,6 +17,8 @@ create table if not exists public.leads (
   utm_term text,
   user_agent text,
   ip_address text,
+  ip_hash text,
+  source text,
   status text not null default 'new',
   notes text
 );

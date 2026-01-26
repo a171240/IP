@@ -166,7 +166,7 @@ export function PromptPreviewSheet({
       a.remove()
       URL.revokeObjectURL(url)
     } catch (e) {
-      setError(e instanceof Error ? e.message : '????')
+      setError(e instanceof Error ? e.message : '发生错误')
     } finally {
       setDownloadLoading(false)
     }
