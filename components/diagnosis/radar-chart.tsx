@@ -18,7 +18,7 @@ interface RadarChartProps {
 export function DiagnosisRadarChart({ dimensions }: RadarChartProps) {
   const data = Object.entries(dimensions).map(([key, dim]) => ({
     dimension: DIMENSIONS[key as Dimension].name,
-    score: dim.percentage,
+    score: Math.round((dim.score / dim.maxScore) * 100),
     fullMark: 100
   }))
 

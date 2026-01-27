@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
-import { createClient } from "@supabase/supabase-js"
+import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import { createHmac } from "crypto"
 import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
@@ -81,6 +81,12 @@ function normalizeCode(value: string): string {
   return value.replace(/\s+/g, "").toUpperCase()
 }
 
+async function findUserIdByEmail(admin: SupabaseClient, email: string): Promise<string | null> {
+  const { data, error } = await admin.schema("auth").from("users").select("id").eq("email", email).maybeSingle()
+  if (error) return null
+  return data?.id ?? null
+}
+
 export async function POST(request: NextRequest) {
   const ipAddress = getClientIp(request)
   if (!checkRateLimit(ipAddress)) {
@@ -147,11 +153,11 @@ export async function POST(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  let targetUser = user
+  let targetUserId = user?.id ?? null
   let sessionTokens: { access_token: string; refresh_token: string; expires_in: number } | null = null
   let loginRequired = false
 
-  if (!targetUser) {
+  if (!targetUserId) {
     if (!email) {
       return NextResponse.json({ ok: false, error: "email_required" }, { status: 400 })
     }
@@ -163,33 +169,28 @@ export async function POST(request: NextRequest) {
 
     const password = buildRedeemPassword(secret, email)
 
-    let createErrorMessage = ""
-    await admin.auth.admin
-      .createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: {
-          source: "redeem",
-        },
-      })
-      .then(({ error }) => {
-        if (error) {
-          const message =
-            typeof error === "object" && error && "message" in error ? String((error as { message?: string }).message || "") : ""
-          createErrorMessage = message || "create_failed"
-        }
-      })
+    const { data: createdUser, error: createError } = await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        source: "redeem",
+      },
+    })
 
-    const { data: userByEmail, error: userFetchError } = await admin.auth.admin.getUserByEmail(email)
-    if (userFetchError || !userByEmail?.user) {
-      return NextResponse.json(
-        { ok: false, error: createErrorMessage || "user_create_failed" },
-        { status: 500 }
-      )
+    if (createdUser?.user?.id) {
+      targetUserId = createdUser.user.id
+    } else {
+      const existingId = await findUserIdByEmail(admin, email)
+      if (!existingId) {
+        const message =
+          createError && typeof createError === "object" && "message" in createError
+            ? String((createError as { message?: string }).message || "")
+            : "user_create_failed"
+        return NextResponse.json({ ok: false, error: message }, { status: 500 })
+      }
+      targetUserId = existingId
     }
-
-    targetUser = userByEmail.user
 
     const supabaseUrl = getSupabaseUrl()
     const supabaseAnonKey = getSupabaseAnonKey()
@@ -217,13 +218,13 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  if (!targetUser) {
+  if (!targetUserId) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 })
   }
 
   const { data: updatedRows, error: updateError } = await admin
     .from("redemption_codes")
-    .update({ status: "used", used_by: targetUser.id, used_at: nowIso })
+    .update({ status: "used", used_by: targetUserId, used_at: nowIso })
     .eq("code", code)
     .eq("status", "unused")
     .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
@@ -265,7 +266,7 @@ export async function POST(request: NextRequest) {
   const { data: entitlements } = await admin
     .from("entitlements")
     .select("plan, pro_expires_at")
-    .eq("user_id", targetUser.id)
+    .eq("user_id", targetUserId)
     .limit(1)
 
   const current = entitlements?.[0]
@@ -278,7 +279,7 @@ export async function POST(request: NextRequest) {
     : planFromCode
 
   const { error: upsertError } = await admin.from("entitlements").upsert({
-    user_id: targetUser.id,
+    user_id: targetUserId,
     plan: nextPlan,
     pro_expires_at: newExpires.toISOString(),
     updated_at: nowIso,
@@ -289,7 +290,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (email) {
-    await admin.from("profiles").upsert({ id: targetUser.id, email }, { onConflict: "id" })
+    await admin.from("profiles").upsert({ id: targetUserId, email }, { onConflict: "id" })
   }
 
   return NextResponse.json({

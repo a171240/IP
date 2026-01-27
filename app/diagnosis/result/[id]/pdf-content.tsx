@@ -320,30 +320,37 @@ export function PDFContent({ result, industry, createdAt, aiReport }: PDFContent
           <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px' }}>
             重点改进建议
           </h2>
-          {result.insights.map((insight, index) => (
-            <div
-              key={index}
-              style={{
-                padding: '16px',
-                marginBottom: '12px',
-                border: `1px solid ${insight.severity === 'high' ? '#fecaca' : '#fef08a'}`,
-                backgroundColor: insight.severity === 'high' ? '#fef2f2' : '#fefce8',
-                borderRadius: '8px'
-              }}
-            >
-              <h3 style={{
-                fontWeight: '600',
-                marginBottom: '4px',
-                color: insight.severity === 'high' ? '#dc2626' : '#ca8a04',
-                margin: '0 0 4px 0'
-              }}>
-                {insight.title}
-              </h3>
-              <p style={{ fontSize: '13px', color: '#52525b', margin: 0 }}>
-                {insight.description}
-              </p>
-            </div>
-          ))}
+          {result.insights.map((insight, index) => {
+            const item = insight as { severity?: string; title?: string; description?: string }
+            const isHigh = item.severity === 'high'
+            const borderColor = isHigh ? '#fecaca' : '#fef08a'
+            const bgColor = isHigh ? '#fef2f2' : '#fefce8'
+            const textColor = isHigh ? '#dc2626' : '#ca8a04'
+            return (
+              <div
+                key={index}
+                style={{
+                  padding: '16px',
+                  marginBottom: '12px',
+                  border: `1px solid ${borderColor}`,
+                  backgroundColor: bgColor,
+                  borderRadius: '8px'
+                }}
+              >
+                <h3 style={{
+                  fontWeight: '600',
+                  marginBottom: '4px',
+                  color: textColor,
+                  margin: '0 0 4px 0'
+                }}>
+                  {item.title || '重点问题'}
+                </h3>
+                <p style={{ fontSize: '13px', color: '#52525b', margin: 0 }}>
+                  {item.description || ''}
+                </p>
+              </div>
+            )
+          })}
         </div>
       )}
 

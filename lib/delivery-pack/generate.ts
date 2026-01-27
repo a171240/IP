@@ -320,14 +320,18 @@ async function callLLM(
         content?: string
         reasoning_content?: string
         tool_calls?: Array<{ function?: { arguments?: string } }>
+        function_call?: { arguments?: string }
       }
     }>
   }
   const message = json.choices?.[0]?.message
-    const toolArgs = coerceToolArgs(message?.tool_calls?.[0]?.function?.arguments || message?.function_call?.arguments)
+  const toolArgs = coerceToolArgs(
+    message?.tool_calls?.[0]?.function?.arguments || message?.function_call?.arguments
+  )
   if (toolArgs.trim()) {
     return toolArgs
-  }  const content = message?.content?.trim() || ""
+  }
+  const content = message?.content?.trim() || ""
   if (!content) {
     throw new Error("LLM response empty")
   }

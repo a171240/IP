@@ -11,6 +11,8 @@ interface ReportPreviewProps {
 
 export function ReportPreview({ result, industry, createdAt }: ReportPreviewProps) {
   const industryLabel = INDUSTRY_LABELS[industry] || industry
+  const MAX_TOTAL = 50
+  const totalPercent = Math.max(0, Math.min(100, Math.round((result.total / MAX_TOTAL) * 100)))
 
   return (
     <div id="pdf-content" className="bg-white p-8 max-w-2xl mx-auto print:p-4">
@@ -27,17 +29,14 @@ export function ReportPreview({ result, industry, createdAt }: ReportPreviewProp
         <div className="text-center">
           <div className="text-5xl font-bold text-primary">{result.total}</div>
           <div className="text-lg text-muted-foreground mt-1">综合健康度评分</div>
-          <div className="mt-2 text-sm">
-            击败了约 <span className="font-bold text-primary">{result.percentile}%</span> 的同行业账号
-            <span className="text-xs text-muted-foreground ml-1">（预估）</span>
-          </div>
+          <div className="mt-2 text-sm text-muted-foreground">{result.levelLabel}</div>
         </div>
 
         {/* 进度条 */}
         <div className="mt-4 h-3 bg-gray-200 rounded-full overflow-hidden">
           <div
             className="h-full bg-primary transition-all duration-500"
-            style={{ width: `${result.total}%` }}
+            style={{ width: `${totalPercent}%` }}
           />
         </div>
       </div>
@@ -57,7 +56,7 @@ export function ReportPreview({ result, industry, createdAt }: ReportPreviewProp
                     dim.status === 'strong' ? 'bg-green-500' :
                     dim.status === 'normal' ? 'bg-yellow-500' : 'bg-red-500'
                   }`}
-                  style={{ width: `${dim.percentage}%` }}
+                  style={{ width: `${Math.round((dim.score / dim.maxScore) * 100)}%` }}
                 />
               </div>
               <div className="w-16 text-sm text-right">
@@ -96,13 +95,7 @@ export function ReportPreview({ result, industry, createdAt }: ReportPreviewProp
         <div className="space-y-3">
           {result.recommendations.slice(0, 3).map((rec, index) => (
             <div key={index} className="p-4 bg-primary/5 rounded-lg">
-              <div className="font-medium">{rec.title}</div>
-              <div className="text-sm text-muted-foreground mt-1">
-                {rec.description}
-              </div>
-              <div className="text-xs text-primary mt-2">
-                立即体验 → {rec.link}
-              </div>
+              <div className="font-medium">{rec}</div>
             </div>
           ))}
         </div>
@@ -113,20 +106,8 @@ export function ReportPreview({ result, industry, createdAt }: ReportPreviewProp
         <h2 className="text-lg font-bold mb-4">30天行动计划</h2>
         <div className="space-y-4">
           {result.actionPlan.map((item, index) => (
-            <div key={index} className="flex gap-4">
-              <div className="w-16 h-16 bg-primary text-white rounded-lg flex flex-col items-center justify-center shrink-0">
-                <div className="text-xs">第</div>
-                <div className="text-xl font-bold">{item.week}</div>
-                <div className="text-xs">周</div>
-              </div>
-              <div className="flex-1">
-                <div className="font-medium">{item.title}</div>
-                <ul className="text-sm text-muted-foreground mt-1 list-disc list-inside">
-                  {item.tasks.map((task, i) => (
-                    <li key={i}>{task}</li>
-                  ))}
-                </ul>
-              </div>
+            <div key={index} className="p-4 border rounded-lg bg-white">
+              <div className="font-medium">{index + 1}. {item}</div>
             </div>
           ))}
         </div>
