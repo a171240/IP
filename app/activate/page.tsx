@@ -24,7 +24,6 @@ export default async function ActivatePage({ searchParams }: ActivatePageProps) 
   }
 
   let userInfo: { id?: string; email?: string } | null = null
-  let activationStatus: string | null = null
   let isPro = false
 
   try {
@@ -53,19 +52,10 @@ export default async function ActivatePage({ searchParams }: ActivatePageProps) 
           isPro = true
         }
       }
-
-      const { data: activations } = await supabase
-        .from("activation_requests")
-        .select("status")
-        .or(`user_id.eq.${user.id},email.eq.${user.email ?? ""}`)
-        .order("created_at", { ascending: false })
-        .limit(1)
-
-      activationStatus = activations?.[0]?.status ?? null
     }
   } catch {
     userInfo = null
   }
 
-  return <ActivateClient utm={utm} user={userInfo} activationStatus={activationStatus} isPro={isPro} />
+  return <ActivateClient utm={utm} user={userInfo} isPro={isPro} />
 }

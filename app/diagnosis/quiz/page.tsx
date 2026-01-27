@@ -111,6 +111,9 @@ export default function QuizPage() {
 
       const data = await response.json()
       localStorage.removeItem(STORAGE_KEY)
+      if (data?.id) {
+        localStorage.setItem("latestDiagnosisId", data.id)
+      }
       router.push(`/diagnosis/result/${data.id}`)
     } catch (error) {
       console.error('Failed to submit diagnosis:', error)

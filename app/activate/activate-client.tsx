@@ -6,6 +6,7 @@ import { ArrowRight, CheckCircle } from "lucide-react"
 import { ObsidianBackgroundLite } from "@/components/ui/obsidian-background-lite"
 import { GlowButton } from "@/components/ui/obsidian-primitives"
 import { getStoredUtm, track } from "@/lib/analytics/client"
+import { getSupabaseClient } from "@/lib/supabase"
 
 type ActivateClientProps = {
   utm: {
@@ -20,45 +21,52 @@ type ActivateClientProps = {
   isPro?: boolean
 }
 
-const platformValue = "xiaohongshu"
+type RedeemInfo = {
+  plan?: string
+  expiresAt?: string
+  loginRequired?: boolean
+  email?: string
+}
 
 const steps = [
   {
-    title: "登录/注册",
-    description: "未登录请先登录，已登录会自动填充邮箱",
+    title: "填写邮箱 / 登录",
+    description: "未登录可直接填写邮箱，系统会自动创建账号",
   },
   {
-    title: "提交激活",
-    description: "填写邮箱与订单信息",
+    title: "输入兑换码",
+    description: "输入完整兑换码，系统会自动开通 7 天 Pro",
   },
   {
     title: "生成交付包",
-    description: "激活成功后生成单份PDF交付包",
+    description: "开通后完成诊断并下载单份 PDF 交付包",
   },
 ]
 
-export default function ActivateClient({ utm, user, activationStatus, isPro }: ActivateClientProps) {
+export default function ActivateClient({ utm, user, isPro }: ActivateClientProps) {
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [redeemInfo, setRedeemInfo] = useState<RedeemInfo | null>(null)
 
   const mergedUtm = useMemo(() => ({ ...getStoredUtm(), ...utm }), [utm])
   const emailValue = user?.email?.trim() || ""
-  const isUnlocked = Boolean(isPro)
-  const statusLabel =
-    (isUnlocked && "已解锁") ||
-    (activationStatus === "pending" && "待审核") ||
-    (activationStatus === "approved" && "已解锁") ||
-    (activationStatus === "rejected" && "已拒绝") ||
-    null
+  const isUnlocked = Boolean(isPro) || submitted
+  const needsEmail = !user?.id
 
   useEffect(() => {
-    track("activation_open", {
-      source: platformValue,
+    track("redeem_open", {
       userId: user?.id,
       landingPath: window.location.pathname,
     })
   }, [user?.id])
+
+  const formatDate = (value?: string | null) => {
+    if (!value) return null
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return null
+    return date.toLocaleDateString("zh-CN")
+  }
 
   return (
     <div className="relative min-h-[100dvh] bg-[#030304] text-zinc-200 font-sans selection:bg-emerald-500/30 selection:text-emerald-200 overflow-x-hidden">
@@ -83,14 +91,14 @@ export default function ActivateClient({ utm, user, activationStatus, isPro }: A
           <section>
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-sm text-emerald-300 mb-6">
               <span className="inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-              体验卡激活
+              兑换码激活
             </div>
 
             <h1 className="text-3xl sm:text-5xl font-bold text-white leading-tight">
-              你已购买「7天Pro体验卡」
+              输入兑换码，自动开通 Pro 体验
             </h1>
             <p className="text-lg text-zinc-400 mt-4 max-w-2xl">
-              请在此提交激活申请，我们将在 1 个工作日内完成开通并通知你。
+              无需订单后四位，也无需人工审核。未登录也可直接填写邮箱完成兑换。
             </p>
 
             <div className="mt-8 space-y-4 text-sm text-zinc-400">
@@ -107,9 +115,9 @@ export default function ActivateClient({ utm, user, activationStatus, isPro }: A
               ))}
             </div>
 
-            {!emailValue ? (
+            {needsEmail ? (
               <div className="mt-8 text-sm text-zinc-400">
-                还未登录？
+                已有账号？
                 <Link href="/auth/login?redirect=/activate" className="ml-2 text-emerald-300 hover:text-emerald-200">
                   去登录
                 </Link>
@@ -117,134 +125,154 @@ export default function ActivateClient({ utm, user, activationStatus, isPro }: A
                 <Link href="/auth/register?redirect=/activate" className="text-emerald-300 hover:text-emerald-200">
                   注册新账号
                 </Link>
+                <div className="mt-2 text-xs text-zinc-500">未登录也可以直接填写邮箱自动创建账号。</div>
               </div>
             ) : (
-              <div className="mt-8 text-sm text-emerald-300">
-                已登录，邮箱已自动填充：{emailValue}
-              </div>
+              <div className="mt-8 text-sm text-emerald-300">已登录：{emailValue}</div>
             )}
-
-            {statusLabel ? (
-              <div className="mt-4 text-sm text-emerald-300">
-                当前状态：{statusLabel}
-              </div>
-            ) : null}
           </section>
 
           <section className="relative">
             <div className="absolute -inset-4 bg-gradient-to-br from-emerald-500/20 via-transparent to-transparent rounded-3xl blur-2xl opacity-70" />
             <div className="relative rounded-3xl border border-white/10 bg-zinc-950/60 backdrop-blur-xl p-8 sm:p-10">
-              {!submitted && !isUnlocked ? (
+              {!isUnlocked ? (
                 <form
                   onSubmit={async (event) => {
                     event.preventDefault()
                     setError(null)
                     setLoading(true)
-                    track("activation_submit", {
-                      source: platformValue,
+                    track("redeem_submit", {
                       userId: user?.id,
                       landingPath: window.location.pathname,
                     })
 
                     const formData = new FormData(event.currentTarget)
-                    const email = String(formData.get("email") || emailValue).trim()
-                    const orderTail = String(formData.get("order-tail") || "").trim()
-                    const note = String(formData.get("note") || "").trim()
+                    const rawCode = String(formData.get("redeem-code") || "")
+                    const code = rawCode.replace(/\s+/g, "").toUpperCase()
+                    const inputEmail = needsEmail
+                      ? String(formData.get("redeem-email") || "").trim().toLowerCase()
+                      : ""
+
+                    if (!code) {
+                      setError("请输入完整兑换码")
+                      setLoading(false)
+                      return
+                    }
+
+                    if (needsEmail) {
+                      if (!inputEmail) {
+                        setError("请输入邮箱")
+                        setLoading(false)
+                        return
+                      }
+                      if (!/^\S+@\S+\.\S+$/.test(inputEmail)) {
+                        setError("邮箱格式不正确")
+                        setLoading(false)
+                        return
+                      }
+                    }
 
                     try {
-                      const response = await fetch("/api/activation", {
+                      const response = await fetch("/api/redeem", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          email,
-                          platform: platformValue,
-                          orderTail,
-                          note: note || undefined,
-                          source: platformValue,
-                          landingPath: `${window.location.pathname}${window.location.search}`,
-                          referrer: document.referrer || undefined,
-                          userAgent: navigator.userAgent || undefined,
-                          utm: mergedUtm,
-                        }),
+                        body: JSON.stringify({ code, email: inputEmail || undefined, utm: mergedUtm }),
                       })
 
-                      const data = (await response.json()) as { ok: boolean; error?: string }
+                      const data = (await response.json()) as {
+                        ok?: boolean
+                        error?: string
+                        plan?: string
+                        expiresAt?: string
+                        loginRequired?: boolean
+                        session?: {
+                          access_token?: string
+                          refresh_token?: string
+                          expires_in?: number
+                        }
+                      }
 
                       if (response.ok && data.ok) {
-                        track("activation_submit_success", {
-                          source: platformValue,
+                        if (data.session?.access_token && data.session?.refresh_token) {
+                          const supabase = getSupabaseClient()
+                          await supabase.auth.setSession({
+                            access_token: data.session.access_token,
+                            refresh_token: data.session.refresh_token,
+                          })
+                        }
+
+                        track("redeem_success", {
                           userId: user?.id,
                           landingPath: window.location.pathname,
                         })
+                        setRedeemInfo({
+                          plan: data.plan,
+                          expiresAt: data.expiresAt,
+                          loginRequired: data.loginRequired,
+                          email: inputEmail || emailValue,
+                        })
                         setSubmitted(true)
+                      } else if (response.status === 404) {
+                        setError("兑换码无效，请检查后重试")
+                      } else if (response.status === 409) {
+                        setError("兑换码已使用，请更换新的兑换码")
+                      } else if (response.status === 410) {
+                        setError("兑换码已过期，请联系工作人员")
                       } else if (response.status === 429) {
-                        setError("操作太频繁，请稍后再试。")
+                        setError("操作过于频繁，请稍后再试")
+                      } else if (response.status === 400 && data.error === "email_required") {
+                        setError("请输入邮箱")
                       } else {
-                        setError("提交失败，请检查信息后重试。")
+                        setError(data.error || "兑换失败，请稍后再试")
                       }
                     } catch {
-                      setError("网络异常，请稍后再试。")
+                      setError("网络异常，请稍后再试")
                     } finally {
                       setLoading(false)
                     }
                   }}
                   className="space-y-6"
                 >
-                  <div>
-                    <label htmlFor="email" className="block text-sm text-zinc-300 mb-2">
-                      登录邮箱
-                    </label>
-                    <input
-                      id="email"
-                      name="email"
-                      type="email"
-                      required
-                      defaultValue={emailValue}
-                      placeholder="填写用于登录的邮箱"
-                      className="w-full rounded-xl bg-zinc-900/60 border border-white/10 px-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/40"
-                    />
-                  </div>
+                  {needsEmail ? (
+                    <div>
+                      <label htmlFor="redeem-email" className="block text-sm text-zinc-300 mb-2">
+                        邮箱
+                      </label>
+                      <input
+                        id="redeem-email"
+                        name="redeem-email"
+                        type="email"
+                        required
+                        placeholder="填写你的邮箱"
+                        className="w-full rounded-xl bg-zinc-900/60 border border-white/10 px-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/40"
+                      />
+                      <p className="mt-2 text-xs text-zinc-500">用于创建账号并绑定权益</p>
+                    </div>
+                  ) : null}
 
                   <div>
-                    <label htmlFor="order-tail" className="block text-sm text-zinc-300 mb-2">
-                      订单号后 4 位
+                    <label htmlFor="redeem-code" className="block text-sm text-zinc-300 mb-2">
+                      兑换码
                     </label>
                     <input
-                      id="order-tail"
-                      name="order-tail"
+                      id="redeem-code"
+                      name="redeem-code"
                       type="text"
                       required
-                      inputMode="numeric"
-                      maxLength={4}
-                      minLength={4}
-                      placeholder="例如 1234"
+                      placeholder="输入完整兑换码"
                       className="w-full rounded-xl bg-zinc-900/60 border border-white/10 px-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/40"
                     />
-                  </div>
-
-                  <div>
-                    <label htmlFor="note" className="block text-sm text-zinc-300 mb-2">
-                      备注（可选）
-                    </label>
-                    <textarea
-                      id="note"
-                      name="note"
-                      rows={3}
-                      placeholder="可填写订单信息补充说明"
-                      className="w-full rounded-xl bg-zinc-900/60 border border-white/10 px-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/40"
-                    />
+                    <p className="mt-2 text-xs text-zinc-500">支持粘贴，系统会自动去空格并转大写</p>
                   </div>
 
                   {error ? <p className="text-sm text-rose-400">{error}</p> : null}
 
                   <GlowButton primary className="w-full py-4 text-base" type="submit" disabled={loading}>
-                    {loading ? "提交中..." : "提交激活申请"}
+                    {loading ? "提交中..." : "立即兑换开通"}
                     <ArrowRight size={16} />
                   </GlowButton>
 
-                  <p className="text-xs text-zinc-500 text-center">
-                    平台默认：小红书 · 体验卡权益开通后可生成交付包
-                  </p>
+                  <p className="text-xs text-zinc-500 text-center">兑换成功后可直接生成交付包</p>
                 </form>
               ) : (
                 <div className="text-center space-y-5 py-6">
@@ -252,19 +280,49 @@ export default function ActivateClient({ utm, user, activationStatus, isPro }: A
                     <CheckCircle size={28} className="text-emerald-400" />
                   </div>
                   <h2 className="text-2xl font-semibold text-white">
-                    {isUnlocked ? "你已解锁体验权益" : "已收到，我们将在 1 个工作日内开通"}
+                    {isPro ? "已开通 Pro 权益" : "兑换成功，已开通 Pro 体验"}
                   </h2>
                   <p className="text-sm text-zinc-400">
-                    {isUnlocked ? "现在可以直接生成交付包。" : "权益开通后可直接生成交付包，你也可以先完成诊断。"}
+                    {redeemInfo?.loginRequired
+                      ? `已为 ${redeemInfo?.email || "该邮箱"} 开通，请登录后继续`
+                      : formatDate(redeemInfo?.expiresAt)
+                        ? `有效期至 ${formatDate(redeemInfo?.expiresAt)}`
+                        : "现在可以直接生成交付包"}
                   </p>
 
-                  <Link
-                    href="/diagnosis"
-                    className="inline-flex items-center justify-center px-6 py-3 text-sm font-semibold rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-[0_0_0_1px_rgba(16,185,129,0.3),0_4px_16px_-4px_rgba(16,185,129,0.4)] hover:from-emerald-400 hover:to-teal-400 transition-colors"
-                  >
-                    去生成交付包
-                    <ArrowRight size={16} className="ml-2" />
-                  </Link>
+                  {redeemInfo?.loginRequired ? (
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                      <Link
+                        href="/auth/login?redirect=/start"
+                        className="inline-flex items-center justify-center px-6 py-3 text-sm font-semibold rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-[0_0_0_1px_rgba(16,185,129,0.3),0_4px_16px_-4px_rgba(16,185,129,0.4)] hover:from-emerald-400 hover:to-teal-400 transition-colors"
+                      >
+                        登录继续
+                        <ArrowRight size={16} className="ml-2" />
+                      </Link>
+                      <Link
+                        href="/diagnosis/quiz"
+                        className="inline-flex items-center justify-center px-6 py-3 text-sm font-semibold rounded-xl border border-white/10 text-zinc-200 hover:text-white hover:border-white/20 transition-colors"
+                      >
+                        先看看诊断
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                      <Link
+                        href="/start"
+                        className="inline-flex items-center justify-center px-6 py-3 text-sm font-semibold rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-[0_0_0_1px_rgba(16,185,129,0.3),0_4px_16px_-4px_rgba(16,185,129,0.4)] hover:from-emerald-400 hover:to-teal-400 transition-colors"
+                      >
+                        去开始交付计划
+                        <ArrowRight size={16} className="ml-2" />
+                      </Link>
+                      <Link
+                        href="/diagnosis/quiz"
+                        className="inline-flex items-center justify-center px-6 py-3 text-sm font-semibold rounded-xl border border-white/10 text-zinc-200 hover:text-white hover:border-white/20 transition-colors"
+                      >
+                        先完成诊断
+                      </Link>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
