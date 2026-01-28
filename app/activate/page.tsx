@@ -1,11 +1,13 @@
 import ActivateClient from "./activate-client"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 
+type ActivateSearchParams = Record<string, string | string[] | undefined>
+
 type ActivatePageProps = {
-  searchParams?: Record<string, string | string[] | undefined> | Promise<Record<string, string | string[] | undefined>>
+  searchParams?: ActivateSearchParams | Promise<ActivateSearchParams>
 }
 
-function getParam(searchParams: ActivatePageProps["searchParams"], key: string): string | undefined {
+function getParam(searchParams: ActivateSearchParams | undefined, key: string): string | undefined {
   const value = searchParams?.[key]
   if (Array.isArray(value)) return value[0]
   return value
