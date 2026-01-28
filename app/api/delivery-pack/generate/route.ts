@@ -115,10 +115,6 @@ async function checkEntitlement(
 
 export async function POST(request: NextRequest) {
   const ipAddress = getClientIp(request)
-  if (!checkRateLimit(ipAddress)) {
-    return NextResponse.json({ ok: false, error: "rate_limited" }, { status: 429 })
-  }
-
   let body: Record<string, unknown>
   try {
     body = (await request.json()) as Record<string, unknown>
@@ -141,6 +137,11 @@ export async function POST(request: NextRequest) {
 
   if (!user) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 })
+  }
+
+  const allowExtra = user.email ? DAILY_LIMIT_ALLOWLIST.has(user.email) : false
+  if (!allowExtra && !checkRateLimit(ipAddress)) {
+    return NextResponse.json({ ok: false, error: "rate_limited" }, { status: 429 })
   }
 
   const entitled = await checkEntitlement(supabase, user.id)
@@ -169,20 +170,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "count_failed" }, { status: 500 })
   }
 
-  const allowExtra = user.email ? DAILY_LIMIT_ALLOWLIST.has(user.email) : false
   if (!allowExtra && (count ?? 0) >= DAILY_LIMIT) {
     return NextResponse.json({ ok: false, error: "daily_limit" }, { status: 429 })
   }
 
   const input = validation.data
   const ipHash = hashIp(ipAddress)
+  const safeJson = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T
 
   const { data: created, error: insertError } = await admin
     .from("delivery_packs")
     .insert({
       user_id: user.id,
       status: "pending",
-      input_json: { ...input, ip_hash: ipHash },
+      input_json: safeJson({ ...input, ip_hash: ipHash }),
     })
     .select("id")
     .single()
@@ -194,7 +195,8 @@ export async function POST(request: NextRequest) {
 
   try {
     const output = await generateDeliveryPackV2(input)
-    const pdfBuffer = await renderDeliveryPackPdf(input, output)
+    const safeOutput = safeJson(output)
+    const pdfBuffer = await renderDeliveryPackPdf(input, safeOutput)
 
     const date = new Date()
     const dateStr = date.toISOString().slice(0, 10).replace(/-/g, "")
@@ -213,7 +215,7 @@ export async function POST(request: NextRequest) {
       .from("delivery_packs")
       .update({
         status: "done",
-        output_json: output,
+        output_json: safeOutput,
         zip_path: pdfPath,
       })
       .eq("id", packId)
