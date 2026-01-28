@@ -61,8 +61,8 @@ function drawWrappedText(params: {
   y: number
   size: number
   maxWidth: number
-  lineHeight-: number
-  color-: ReturnType<typeof rgb>
+  lineHeight?: number
+  color?: ReturnType<typeof rgb>
 }): number {
   const { page, font, text, x, y, size, maxWidth, lineHeight = size + 6, color = COLOR_TEXT } = params
   const lines = wrapText(text, font, size, maxWidth)
@@ -78,7 +78,7 @@ function clampLines(lines: string[], maxLines: number): string[] {
   if (lines.length <= maxLines) return lines
   const clipped = lines.slice(0, maxLines)
   const lastIndex = clipped.length - 1
-  const last = clipped[lastIndex] -- ""
+  const last = clipped[lastIndex] ?? ""
   const ellipsis = "..."
   clipped[lastIndex] = last.length > 1 - `${last.slice(0, last.length - 1)}${ellipsis}` : ellipsis
   return clipped
@@ -93,8 +93,8 @@ function drawWrappedTextClamped(params: {
   size: number
   maxWidth: number
   maxLines: number
-  lineHeight-: number
-  color-: ReturnType<typeof rgb>
+  lineHeight?: number
+  color?: ReturnType<typeof rgb>
 }): number {
   const { page, font, text, x, y, size, maxWidth, maxLines, lineHeight = size + 6, color = COLOR_TEXT } = params
   const lines = clampLines(wrapText(text, font, size, maxWidth), maxLines)
