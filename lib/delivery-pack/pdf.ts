@@ -371,7 +371,7 @@ function addSummaryPage(cursor: PdfCursor, input: DeliveryPackInput, output: Del
       y,
       size: 12,
       maxWidth: CONTENT_WIDTH,
-      maxLines: 1,
+      maxLines: 3,
       lineHeight: 18,
       color: COLOR_PRIMARY_DARK,
     })
@@ -383,7 +383,7 @@ function addSummaryPage(cursor: PdfCursor, input: DeliveryPackInput, output: Del
       y,
       size: 10,
       maxWidth: CONTENT_WIDTH - 16,
-      maxLines: 2,
+      maxLines: 3,
       lineHeight: 16,
       color: COLOR_MUTED,
     })
@@ -393,7 +393,7 @@ function addSummaryPage(cursor: PdfCursor, input: DeliveryPackInput, output: Del
   y = drawSectionTitle(page, cursor.font, "明天第一条发什么", y)
   y -= 6
   const tomorrow = buildTomorrowBlock(output)
-  const cardHeight = 170
+  const cardHeight = 190
   drawCard(page, MARGIN_X, y - cardHeight + 8, CONTENT_WIDTH, cardHeight)
   let cardY = y - 24
   cardY = drawWrappedTextClamped({
@@ -404,7 +404,7 @@ function addSummaryPage(cursor: PdfCursor, input: DeliveryPackInput, output: Del
     y: cardY,
     size: 12,
     maxWidth: CONTENT_WIDTH - 32,
-    maxLines: 2,
+    maxLines: 3,
     lineHeight: 18,
   })
   cardY = drawWrappedTextClamped({
@@ -415,7 +415,7 @@ function addSummaryPage(cursor: PdfCursor, input: DeliveryPackInput, output: Del
     y: cardY,
     size: 11,
     maxWidth: CONTENT_WIDTH - 32,
-    maxLines: 2,
+    maxLines: 3,
     lineHeight: 16,
   })
   cardY = drawWrappedTextClamped({
@@ -426,7 +426,7 @@ function addSummaryPage(cursor: PdfCursor, input: DeliveryPackInput, output: Del
     y: cardY,
     size: 10,
     maxWidth: CONTENT_WIDTH - 32,
-    maxLines: 2,
+    maxLines: 3,
     lineHeight: 14,
     color: COLOR_MUTED,
   })
@@ -438,7 +438,7 @@ function addSummaryPage(cursor: PdfCursor, input: DeliveryPackInput, output: Del
     y: cardY,
     size: 11,
     maxWidth: CONTENT_WIDTH - 32,
-    maxLines: 1,
+    maxLines: 3,
     lineHeight: 16,
     color: COLOR_PRIMARY_DARK,
   })
@@ -497,17 +497,23 @@ function addCalendarPages(cursor: PdfCursor, output: DeliveryPackOutput) {
     const start = pageIndex * perPage
     const slice = items.slice(start, start + perPage)
     slice.forEach((item) => {
-      const cardHeight = 160
+      const cardHeight = 180
       drawCard(page, MARGIN_X, y - cardHeight + 8, CONTENT_WIDTH, cardHeight)
       drawPill(page, cursor.font, item.type, MARGIN_X + 16, y - 28)
-      page.drawText(`Day ${item.day} - ${item.title}`, {
-        x: MARGIN_X + 90,
-        y: y - 26,
-        size: 12,
+      let titleY = y - 26
+      titleY = drawWrappedTextClamped({
+        page,
         font: cursor.font,
+        text: `Day ${item.day} - ${item.title}` ,
+        x: MARGIN_X + 90,
+        y: titleY,
+        size: 12,
+        maxWidth: CONTENT_WIDTH - 110,
+        maxLines: 2,
+        lineHeight: 16,
         color: COLOR_TEXT,
       })
-      let lineY = y - 48
+      let lineY = titleY - 6
       lineY = drawWrappedTextClamped({
         page,
         font: cursor.font,
@@ -516,7 +522,7 @@ function addCalendarPages(cursor: PdfCursor, output: DeliveryPackOutput) {
         y: lineY,
         size: 10,
         maxWidth: CONTENT_WIDTH - 32,
-        maxLines: 2,
+        maxLines: 3,
         lineHeight: 14,
       })
       lineY -= 2
@@ -528,7 +534,7 @@ function addCalendarPages(cursor: PdfCursor, output: DeliveryPackOutput) {
         y: lineY,
         size: 10,
         maxWidth: CONTENT_WIDTH - 32,
-        maxLines: 2,
+        maxLines: 3,
         lineHeight: 14,
         color: COLOR_MUTED,
       })
@@ -541,7 +547,7 @@ function addCalendarPages(cursor: PdfCursor, output: DeliveryPackOutput) {
         y: lineY,
         size: 10,
         maxWidth: CONTENT_WIDTH - 32,
-        maxLines: 1,
+        maxLines: 2,
         lineHeight: 14,
         color: COLOR_PRIMARY_DARK,
       })
@@ -559,17 +565,23 @@ function addTopicsPages(cursor: PdfCursor, output: DeliveryPackOutput) {
     y = drawSectionTitle(page, cursor.font, "10条高意图选题", y)
     const slice = items.slice(pageIndex * perPage, pageIndex * perPage + perPage)
     slice.forEach((item, index) => {
-      const cardHeight = 120
+      const cardHeight = 135
       drawCard(page, MARGIN_X, y - cardHeight + 8, CONTENT_WIDTH, cardHeight)
       drawPill(page, cursor.font, item.type, MARGIN_X + 16, y - 26)
-      page.drawText(`${pageIndex * perPage + index + 1}. ${item.title}`, {
-        x: MARGIN_X + 86,
-        y: y - 26,
-        size: 12,
+      let titleY = y - 26
+      titleY = drawWrappedTextClamped({
+        page,
         font: cursor.font,
+        text: `${pageIndex * perPage + index + 1}. ${item.title}` ,
+        x: MARGIN_X + 86,
+        y: titleY,
+        size: 12,
+        maxWidth: CONTENT_WIDTH - 110,
+        maxLines: 2,
+        lineHeight: 16,
         color: COLOR_TEXT,
       })
-      let lineY = y - 48
+      let lineY = titleY - 6
       lineY = drawWrappedTextClamped({
         page,
         font: cursor.font,
@@ -578,7 +590,7 @@ function addTopicsPages(cursor: PdfCursor, output: DeliveryPackOutput) {
         y: lineY,
         size: 10,
         maxWidth: CONTENT_WIDTH - 32,
-        maxLines: 1,
+        maxLines: 3,
         lineHeight: 14,
         color: COLOR_MUTED,
       })
@@ -591,7 +603,7 @@ function addTopicsPages(cursor: PdfCursor, output: DeliveryPackOutput) {
         y: lineY,
         size: 10,
         maxWidth: CONTENT_WIDTH - 32,
-        maxLines: 2,
+        maxLines: 3,
         lineHeight: 14,
       })
       lineY -= 2
@@ -603,7 +615,7 @@ function addTopicsPages(cursor: PdfCursor, output: DeliveryPackOutput) {
         y: lineY,
         size: 10,
         maxWidth: CONTENT_WIDTH - 32,
-        maxLines: 2,
+        maxLines: 3,
         lineHeight: 14,
         color: COLOR_PRIMARY_DARK,
       })
