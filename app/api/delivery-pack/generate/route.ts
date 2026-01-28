@@ -13,6 +13,12 @@ type RateEntry = { count: number; resetAt: number }
 const RATE_LIMIT_WINDOW_MS = 60_000
 const RATE_LIMIT_MAX = 3
 const DAILY_LIMIT = 3
+const DAILY_LIMIT_ALLOWLIST = new Set(
+  (process.env.DELIVERY_PACK_DAILY_ALLOWLIST ?? "630788685@qq.com")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+)
 
 const rateLimitMap: Map<string, RateEntry> = (() => {
   const globalAny = globalThis as typeof globalThis & { __deliveryPackRateLimit?: Map<string, RateEntry> }
@@ -163,7 +169,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "count_failed" }, { status: 500 })
   }
 
-  if ((count ?? 0) >= DAILY_LIMIT) {
+  const allowExtra = user.email ? DAILY_LIMIT_ALLOWLIST.has(user.email) : false
+  if (!allowExtra && (count ?? 0) >= DAILY_LIMIT) {
     return NextResponse.json({ ok: false, error: "daily_limit" }, { status: 429 })
   }
 
