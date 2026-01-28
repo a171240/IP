@@ -1,11 +1,13 @@
 import RedeemClient from "./redeem-client"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 
+type RedeemSearchParams = Record<string, string | string[] | undefined>
+
 type RedeemPageProps = {
-  searchParams?: Record<string, string | string[] | undefined> | Promise<Record<string, string | string[] | undefined>>
+  searchParams?: RedeemSearchParams | Promise<RedeemSearchParams>
 }
 
-function getParam(searchParams: RedeemPageProps["searchParams"], key: string): string | undefined {
+function getParam(searchParams: RedeemSearchParams | undefined, key: string): string | undefined {
   const value = searchParams?.[key]
   if (Array.isArray(value)) return value[0]
   return value
