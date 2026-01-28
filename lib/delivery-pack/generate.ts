@@ -11,6 +11,7 @@ const APIMART_QUICK_MODEL = process.env.APIMART_QUICK_MODEL || "kimi-k2-thinking
 const LLM_TIMEOUT_MS = Number(process.env.APIMART_TIMEOUT_MS || 240000)
 const USE_FUNCTION_CALLING = process.env.APIMART_USE_TOOL !== "false"
 const USE_SPLIT_GENERATION = process.env.APIMART_USE_SPLIT !== "false"
+const USE_RESPONSE_FORMAT = process.env.APIMART_USE_RESPONSE_FORMAT === "true"
 const LLM_MAX_RETRIES = 2
 
 const TEAM_TYPE_LABELS: Record<string, string> = {
@@ -856,50 +857,64 @@ function normalizeScriptsOutput(value: any) {
 function normalizeChecklistOutput(value: any) {
   const fallback = {
     qc_checklist: {
-      title: ["??????", "??????", "??????"],
-      body: ["??????", "??????", "??????"],
-      cta_and_compliance: ["CTA????", "????????", "????????"],
+      title: ["标题是否清晰", "是否点出痛点", "是否含关键词"],
+      body: ["结构是否完整", "要点是否清楚", "节奏是否紧凑"],
+      cta_and_compliance: [
+        "CTA是否明确",
+        "是否避免违规引导",
+        "是否引导站内动作",
+      ],
     },
     archive_rules: {
-      naming: "??_??_??_???",
-      tags: ["??", "??", "??"],
-      dedupe: ["?????3?", "??????5?", "?????7?"],
+      naming: "日期_平台_选题_负责人",
+      tags: ["引流", "建信", "转化"],
+      dedupe: [
+        "同主题间隔3天",
+        "同关键词间隔5天",
+        "同脚本间隔7天",
+      ],
     },
     upsell: {
-      when_to_upgrade: ["??????2???", "???????????"],
-      cta: "??Pro???????????",
+      when_to_upgrade: ["需要连续交付2周以上", "团队多人协同需要模板化"],
+      cta: "开通Pro获取持续交付与更多模板",
     },
-  };
+  }
 
-  const qc = value?.qc_checklist ?? {};
-  const archive = value?.archive_rules ?? {};
-  const upsell = value?.upsell ?? {};
+  const qc = value?.qc_checklist ?? {}
+  const archive = value?.archive_rules ?? {}
+  const upsell = value?.upsell ?? {}
+
+  const cleanText = (value: unknown, fallbackText: string) => {
+    if (typeof value !== "string") return fallbackText
+    const trimmed = value.trim()
+    if (!trimmed) return fallbackText
+    if (/^\?+$/.test(trimmed)) return fallbackText
+    if (trimmed.replace(/\?/g, "").length < 2) return fallbackText
+    return trimmed
+  }
+
+  const cleanList = (items: unknown, fallbackList: string[]) => {
+    if (!Array.isArray(items) || items.length === 0) return fallbackList
+    const cleaned = items.map((item, index) => cleanText(item, fallbackList[index] ?? fallbackList[0]))
+    return cleaned.filter(Boolean).length ? cleaned : fallbackList
+  }
 
   return {
     qc_checklist: {
-      title: Array.isArray(qc.title) && qc.title.length ? qc.title.slice(0, 10) : fallback.qc_checklist.title,
-      body: Array.isArray(qc.body) && qc.body.length ? qc.body.slice(0, 10) : fallback.qc_checklist.body,
-      cta_and_compliance:
-        Array.isArray(qc.cta_and_compliance) && qc.cta_and_compliance.length
-          ? qc.cta_and_compliance.slice(0, 10)
-          : fallback.qc_checklist.cta_and_compliance,
+      title: cleanList(qc.title, fallback.qc_checklist.title).slice(0, 10),
+      body: cleanList(qc.body, fallback.qc_checklist.body).slice(0, 10),
+      cta_and_compliance: cleanList(qc.cta_and_compliance, fallback.qc_checklist.cta_and_compliance).slice(0, 10),
     },
     archive_rules: {
-      naming: archive.naming || fallback.archive_rules.naming,
-      tags: Array.isArray(archive.tags) && archive.tags.length ? archive.tags.slice(0, 6) : fallback.archive_rules.tags,
-      dedupe:
-        Array.isArray(archive.dedupe) && archive.dedupe.length
-          ? archive.dedupe.slice(0, 6)
-          : fallback.archive_rules.dedupe,
+      naming: cleanText(archive.naming, fallback.archive_rules.naming),
+      tags: cleanList(archive.tags, fallback.archive_rules.tags).slice(0, 6),
+      dedupe: cleanList(archive.dedupe, fallback.archive_rules.dedupe).slice(0, 6),
     },
     upsell: {
-      when_to_upgrade:
-        Array.isArray(upsell.when_to_upgrade) && upsell.when_to_upgrade.length
-          ? upsell.when_to_upgrade.slice(0, 6)
-          : fallback.upsell.when_to_upgrade,
-      cta: upsell.cta || fallback.upsell.cta,
+      when_to_upgrade: cleanList(upsell.when_to_upgrade, fallback.upsell.when_to_upgrade).slice(0, 6),
+      cta: cleanText(upsell.cta, fallback.upsell.cta),
     },
-  };
+  }
 }
 
 function validateDeliveryPackRules(output: DeliveryPackOutput, input: DeliveryPackInput): string[] {
@@ -984,7 +999,6 @@ async function callLLM(
     ],
     temperature,
     max_tokens: maxTokens,
-    response_format: { type: "json_object" },
   }
 
   if (options?.useFunctionCalling ?? USE_FUNCTION_CALLING) {
@@ -993,7 +1007,8 @@ async function callLLM(
       type: "function",
       function: { name: "GenerateDeliveryPackV2" },
     }
-    delete payload.response_format
+  } else if (USE_RESPONSE_FORMAT) {
+    payload.response_format = { type: "json_object" }
   }
 
   const isRetryableStatus = (status: number) => [429, 500, 502, 503, 504].includes(status)
