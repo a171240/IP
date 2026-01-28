@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
 
 export const runtime = "nodejs"
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ packId: string }> }
 ) {
   const { packId } = await params
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerSupabaseClientForRequest(request)
   const {
     data: { user },
   } = await supabase.auth.getUser()

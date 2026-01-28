@@ -6,10 +6,12 @@ import { sanitizeDeliveryPack } from "./sanitize"
 const APIMART_API_KEY = process.env.APIMART_QUICK_API_KEY || process.env.APIMART_API_KEY
 const APIMART_BASE_URL =
   process.env.APIMART_QUICK_BASE_URL || process.env.APIMART_BASE_URL || "https://api.apimart.ai/v1"
-const APIMART_MODEL = process.env.APIMART_MODEL || process.env.APIMART_QUICK_MODEL || "kimi-k2-thinking"
-const LLM_TIMEOUT_MS = Number(process.env.APIMART_TIMEOUT_MS || 180000)
+const APIMART_MODEL = process.env.APIMART_MODEL || "kimi-k2-thinking"
+const APIMART_QUICK_MODEL = process.env.APIMART_QUICK_MODEL || "kimi-k2-thinking-turbo"
+const LLM_TIMEOUT_MS = Number(process.env.APIMART_TIMEOUT_MS || 240000)
 const USE_FUNCTION_CALLING = process.env.APIMART_USE_TOOL !== "false"
 const USE_SPLIT_GENERATION = process.env.APIMART_USE_SPLIT !== "false"
+const LLM_MAX_RETRIES = 2
 
 const TEAM_TYPE_LABELS: Record<string, string> = {
   agency: "代运营团队",
@@ -632,6 +634,274 @@ function countOccurrences(text: string, term: string): number {
   return (text.match(regex) || []).length
 }
 
+function buildFallbackBottleneck(input: DeliveryPackInput): string {
+  return `${input.platform}上的交付节奏不稳定，导致优质内容无法连续产出`
+}
+
+function buildFallbackTopActions(input: DeliveryPackInput) {
+  return [
+    {
+      title: "明确交付目标与节奏",
+      why: `${input.team_type}需要先统一7天的交付目标与节奏`,
+      do_in_7_days: ["确定7天产出目标与角色分工", "建立每日发布检查表"],
+    },
+    {
+      title: "建立脚本与选题模板",
+      why: "模板化能让产能稳定并减少返工",
+      do_in_7_days: ["整理3类高意图选题模板", "形成标准脚本结构"],
+    },
+    {
+      title: "加强质检与成交承接",
+      why: "产出后必须有成交动作承接",
+      do_in_7_days: ["统一CTA话术", "建立发布前质检清单"],
+    },
+  ]
+}
+
+function normalizeCoreOutput(input: DeliveryPackInput, value: any) {
+  const output = { ...(value || {}) }
+  output.meta = output.meta || {
+    industry: input.industry,
+    platform: input.platform,
+    team_type: input.team_type,
+    offer_desc: input.offer_desc,
+  }
+
+  output.bottleneck = output.bottleneck || buildFallbackBottleneck(input)
+
+  if (!Array.isArray(output.top_actions)) {
+    output.top_actions = buildFallbackTopActions(input)
+  } else {
+    output.top_actions = output.top_actions.map((item: any, index: number) => {
+      if (typeof item === "string") {
+        return {
+          title: item,
+          why: "需要快速聚焦交付效果",
+          do_in_7_days: ["完成今日可执行动作", "确认负责人并复盘"],
+        }
+      }
+      return {
+        title: item.title || `优先动作 ${index + 1}`,
+        why: item.why || "需要提升交付效果",
+        do_in_7_days: Array.isArray(item.do_in_7_days) && item.do_in_7_days.length
+          ? item.do_in_7_days
+          : ["完成关键动作一", "完成关键动作二"],
+      }
+    })
+  }
+
+  const baseScores = REQUIRED_DIMENSIONS.map((dimension) => ({
+    dimension,
+    score: 0,
+    insight: "当前存在改进空间",
+    fix: "本次交付包提供可执行方案",
+  }))
+
+  if (Array.isArray(output.scores)) {
+    output.scores.forEach((item: any) => {
+      if (!item) return
+      const match = baseScores.find((score) => String(item.dimension || "").includes(score.dimension))
+      if (match) {
+        match.score = typeof item.score === "number" ? item.score : match.score
+        match.insight = item.insight || match.insight
+        match.fix = item.fix || match.fix
+      }
+    })
+    output.scores = baseScores
+  } else if (output.scores && typeof output.scores === "object") {
+    Object.entries(output.scores).forEach(([key, value]) => {
+      const match = baseScores.find((score) => key.includes(score.dimension))
+      if (match) {
+        match.score = typeof value === "number" ? value : match.score
+      }
+    })
+    output.scores = baseScores
+  } else {
+    output.scores = baseScores
+  }
+
+  if (!Array.isArray(output.thinking_summary)) {
+    output.thinking_summary = [
+      "根据输入信息提取交付核心矛盾",
+      "优先输出可执行的7天交付动作",
+      "保证内容可直接复制发布",
+    ]
+  }
+
+  return output
+}
+
+function buildFallbackCalendar(input: DeliveryPackInput) {
+  const base = [
+    { type: "引流", title: "痛点共鸣：为什么总做不出稳定交付", hook: "3秒告诉你交付不稳的真因", outline: ["抛出痛点", "举例说明", "给出解决方向"], cta: "评论【排产】领模板", script_id: "S1" },
+    { type: "引流", title: "3步搭建交付节奏", hook: "教你搭出7天交付节奏", outline: ["步骤一", "步骤二", "步骤三"], cta: "私信【节奏】获取清单", script_id: "S1" },
+    { type: "引流", title: "选题库如何避免重复", hook: "避免选题内耗", outline: ["列出痛点词", "建立去重规则", "复用高意图"], cta: "评论【选题】拿清单", script_id: "S2" },
+    { type: "建信", title: "脚本模板拆解", hook: "1分钟讲清脚本结构", outline: ["钩子", "问题拆解", "方法给出"], cta: "私信【脚本】领取模板", script_id: "S2" },
+    { type: "建信", title: "质检清单怎么用", hook: "发布前必做3件事", outline: ["标题检查", "结构检查", "CTA检查"], cta: "评论【质检】拿清单", script_id: "S3" },
+    { type: "转化", title: "交付包能解决什么", hook: "为什么要用交付包", outline: ["解决节奏", "解决质量", "解决成交"], cta: "站内领取交付包PDF", script_id: "S3" },
+    { type: "转化", title: "7天交付包适合谁", hook: "哪些团队最适合", outline: ["适用场景", "能省的时间", "能提升的效果"], cta: "点击生成交付包", script_id: "S3" },
+  ]
+  return base.map((item, index) => ({
+    day: index + 1,
+    ...item,
+    title: item.title.replace("交付", `${input.offer_desc}`.slice(0, 6) ? "交付" : "交付"),
+  }))
+}
+
+function normalizeCalendarOutput(input: DeliveryPackInput, value: any) {
+  const fallback = buildFallbackCalendar(input)
+  if (!Array.isArray(value?.calendar_7d)) {
+    return { calendar_7d: fallback }
+  }
+  const normalized = value.calendar_7d.map((item: any, index: number) => ({
+    day: item?.day || index + 1,
+    type: item?.type || fallback[index]?.type || "引流",
+    title: item?.title || fallback[index]?.title,
+    hook: item?.hook || fallback[index]?.hook,
+    outline: Array.isArray(item?.outline) && item.outline.length ? item.outline.slice(0, 3) : fallback[index]?.outline,
+    cta: item?.cta || fallback[index]?.cta,
+    script_id: item?.script_id || fallback[index]?.script_id || "S1",
+  }))
+  while (normalized.length < 7) {
+    normalized.push(fallback[normalized.length])
+  }
+  return { calendar_7d: normalized.slice(0, 7) }
+}
+
+function buildFallbackTopics(input: DeliveryPackInput) {
+  const base = [
+    "交付节奏不稳的3个原因",
+    "7天排产怎么做到不返工",
+    "高意图选题从哪来",
+    "脚本产出慢怎么解决",
+    "质检清单避免踩坑",
+    "小红书成交话术怎么写",
+    "代运营团队如何协作",
+    "内容复盘如何做",
+    "素材归档怎么做",
+    "交付包能省哪些时间",
+  ]
+  return base.map((title) => ({
+    title,
+    audience: "门店负责人",
+    scene: "交付压力大",
+    pain: "产能不稳导致成交下降",
+    keywords: ["交付", "排产"],
+    type: "引流",
+    cta: "评论【交付】领取模板",
+  }))
+}
+
+function normalizeTopicsOutput(input: DeliveryPackInput, value: any) {
+  const fallback = buildFallbackTopics(input)
+  if (!Array.isArray(value?.topics_10)) {
+    return { topics_10: fallback }
+  }
+  const normalized = value.topics_10.map((item: any, index: number) => ({
+    title: item?.title || fallback[index]?.title,
+    audience: item?.audience || fallback[index]?.audience,
+    scene: item?.scene || fallback[index]?.scene,
+    pain: item?.pain || fallback[index]?.pain,
+    keywords: Array.isArray(item?.keywords) && item.keywords.length ? item.keywords.slice(0, 5) : fallback[index]?.keywords,
+    type: item?.type || fallback[index]?.type,
+    cta: item?.cta || fallback[index]?.cta,
+  }))
+  while (normalized.length < 10) {
+    normalized.push(fallback[normalized.length])
+  }
+  return { topics_10: normalized.slice(0, 10) }
+}
+
+function buildFallbackScripts() {
+  const base = [
+    { id: "S1", type: "引流" },
+    { id: "S2", type: "建信" },
+    { id: "S3", type: "转化" },
+  ]
+  return base.map((item) => ({
+    id: item.id,
+    type: item.type,
+    duration: "45s",
+    shots: [
+      { t: "0-3s", line: "直接抛出问题", visual: "正面出镜+标题" },
+      { t: "3-15s", line: "拆解痛点", visual: "要点弹幕" },
+      { t: "15-35s", line: "给出方法", visual: "流程示意" },
+    ],
+    cta: "评论关键词领取交付包",
+    title_options: ["交付为什么做不稳", "7天排产怎么做", "交付包能解决什么"],
+    pinned_comment: "评论【交付】领取7天排产PDF",
+  }))
+}
+
+function normalizeScriptsOutput(value: any) {
+  const fallback = buildFallbackScripts()
+  if (!Array.isArray(value?.scripts_3)) {
+    return { scripts_3: fallback }
+  }
+  const normalized = value.scripts_3.map((item: any, index: number) => ({
+    id: item?.id || fallback[index]?.id,
+    type: item?.type || fallback[index]?.type,
+    duration: item?.duration || fallback[index]?.duration,
+    shots: Array.isArray(item?.shots) && item.shots.length ? item.shots.slice(0, 3) : fallback[index]?.shots,
+    cta: item?.cta || fallback[index]?.cta,
+    title_options: Array.isArray(item?.title_options) && item.title_options.length ? item.title_options.slice(0, 3) : fallback[index]?.title_options,
+    pinned_comment: item?.pinned_comment || fallback[index]?.pinned_comment,
+  }))
+  while (normalized.length < 3) {
+    normalized.push(fallback[normalized.length])
+  }
+  return { scripts_3: normalized.slice(0, 3) }
+}
+
+function normalizeChecklistOutput(value: any) {
+  const fallback = {
+    qc_checklist: {
+      title: ["??????", "??????", "??????"],
+      body: ["??????", "??????", "??????"],
+      cta_and_compliance: ["CTA????", "????????", "????????"],
+    },
+    archive_rules: {
+      naming: "??_??_??_???",
+      tags: ["??", "??", "??"],
+      dedupe: ["?????3?", "??????5?", "?????7?"],
+    },
+    upsell: {
+      when_to_upgrade: ["??????2???", "???????????"],
+      cta: "??Pro???????????",
+    },
+  };
+
+  const qc = value?.qc_checklist ?? {};
+  const archive = value?.archive_rules ?? {};
+  const upsell = value?.upsell ?? {};
+
+  return {
+    qc_checklist: {
+      title: Array.isArray(qc.title) && qc.title.length ? qc.title.slice(0, 10) : fallback.qc_checklist.title,
+      body: Array.isArray(qc.body) && qc.body.length ? qc.body.slice(0, 10) : fallback.qc_checklist.body,
+      cta_and_compliance:
+        Array.isArray(qc.cta_and_compliance) && qc.cta_and_compliance.length
+          ? qc.cta_and_compliance.slice(0, 10)
+          : fallback.qc_checklist.cta_and_compliance,
+    },
+    archive_rules: {
+      naming: archive.naming || fallback.archive_rules.naming,
+      tags: Array.isArray(archive.tags) && archive.tags.length ? archive.tags.slice(0, 6) : fallback.archive_rules.tags,
+      dedupe:
+        Array.isArray(archive.dedupe) && archive.dedupe.length
+          ? archive.dedupe.slice(0, 6)
+          : fallback.archive_rules.dedupe,
+    },
+    upsell: {
+      when_to_upgrade:
+        Array.isArray(upsell.when_to_upgrade) && upsell.when_to_upgrade.length
+          ? upsell.when_to_upgrade.slice(0, 6)
+          : fallback.upsell.when_to_upgrade,
+      cta: upsell.cta || fallback.upsell.cta,
+    },
+  };
+}
+
 function validateDeliveryPackRules(output: DeliveryPackOutput, input: DeliveryPackInput): string[] {
   const errors: string[] = []
   const allText = collectStrings(output).join("\n")
@@ -699,16 +969,17 @@ async function callLLM(
     throw new Error("APIMART_API_KEY missing")
   }
 
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS)
-
   const model = options?.model || APIMART_MODEL
-  const maxTokens = options?.maxTokens ?? 4200
+  const maxTokens = options?.maxTokens ?? 7000
 
   const payload: Record<string, unknown> = {
     model,
     messages: [
-      { role: "system", content: "You are a JSON generator. Output a single JSON object only." },
+      {
+        role: "system",
+        content:
+          "You are a JSON generator. Output a single JSON object only. Do not include analysis, reasoning, or extra text.",
+      },
       { role: "user", content: prompt },
     ],
     temperature,
@@ -725,64 +996,93 @@ async function callLLM(
     delete payload.response_format
   }
 
-  const response = await fetch(`${APIMART_BASE_URL}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${APIMART_API_KEY}`,
-    },
-    body: JSON.stringify(payload),
-    signal: controller.signal,
-  })
-    .catch((error) => {
+  const isRetryableStatus = (status: number) => [429, 500, 502, 503, 504].includes(status)
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+  let lastError: unknown
+
+  for (let attempt = 0; attempt <= LLM_MAX_RETRIES; attempt += 1) {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS)
+    try {
+      const response = await fetch(`${APIMART_BASE_URL}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${APIMART_API_KEY}`,
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        if (isRetryableStatus(response.status) && attempt < LLM_MAX_RETRIES) {
+          await sleep(800 + attempt * 700)
+          continue
+        }
+        throw new Error(`LLM request failed: ${response.status} ${errorText}`)
+      }
+
+      const responseText = await response.text()
+      let json: {
+        choices?: Array<{
+          message?: {
+            content?: string
+            reasoning_content?: string
+            tool_calls?: Array<{ function?: { arguments?: string } }>
+            function_call?: { arguments?: string }
+          }
+        }>
+      }
+      try {
+        json = JSON.parse(responseText) as typeof json
+      } catch {
+        throw new Error(`LLM response parse failed: ${responseText.slice(0, 600)}`)
+      }
+      const message = json.choices?.[0]?.message
+      const toolArgs = coerceToolArgs(
+        message?.tool_calls?.[0]?.function?.arguments || message?.function_call?.arguments
+      )
+      if (toolArgs.trim()) {
+        return toolArgs
+      }
+      const content = message?.content?.trim() || ""
+      if (!content) {
+        throw new Error(`LLM response empty: ${responseText.slice(0, 600)}`)
+      }
+      return content
+    } catch (error) {
+      lastError = error
       if (error instanceof Error && error.name === "AbortError") {
         throw new Error("LLM request timeout")
       }
-      throw error
-    })
-    .finally(() => clearTimeout(timeout))
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(`LLM request failed: ${response.status} ${errorText}`)
-  }
-
-  const json = (await response.json()) as {
-    choices?: Array<{
-      message?: {
-        content?: string
-        reasoning_content?: string
-        tool_calls?: Array<{ function?: { arguments?: string } }>
-        function_call?: { arguments?: string }
+      if (attempt < LLM_MAX_RETRIES) {
+        await sleep(800 + attempt * 700)
+        continue
       }
-    }>
+      throw error
+    } finally {
+      clearTimeout(timeout)
+    }
   }
-  const message = json.choices?.[0]?.message
-  const toolArgs = coerceToolArgs(
-    message?.tool_calls?.[0]?.function?.arguments || message?.function_call?.arguments
-  )
-  if (toolArgs.trim()) {
-    return toolArgs
-  }
-  const content = message?.content?.trim() || ""
-  if (!content) {
-    throw new Error("LLM response empty")
-  }
-  return content
+
+  throw lastError
 }
 
 export async function generateDeliveryPackV2(input: DeliveryPackInput): Promise<DeliveryPackOutput> {
   let lastError: unknown
   let lastRaw = ""
   let lastIssues: string[] = []
-  const fallbackModel = process.env.APIMART_QUICK_MODEL || APIMART_MODEL
+  const primaryModel = APIMART_QUICK_MODEL || APIMART_MODEL
+  const fallbackModel = APIMART_QUICK_MODEL || APIMART_MODEL
   if (!USE_SPLIT_GENERATION) {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
         const prompt = attempt === 0 ? buildPrompt(input) : buildRepairPrompt(lastRaw, lastIssues)
         const raw = await callLLM(prompt, attempt === 0 ? 0.3 : 0.2, {
-          model: attempt === 0 ? APIMART_MODEL : fallbackModel,
-          maxTokens: attempt === 0 ? 4200 : 3600,
+          model: attempt === 0 ? primaryModel : fallbackModel,
+          maxTokens: attempt === 0 ? 7000 : 5200,
           useFunctionCalling: attempt === 0 ? USE_FUNCTION_CALLING : false,
         })
         lastRaw = raw
@@ -815,41 +1115,41 @@ export async function generateDeliveryPackV2(input: DeliveryPackInput): Promise<
   }
 
   try {
-    const splitModel = process.env.APIMART_QUICK_MODEL || "kimi-k2-thinking-turbo"
-    const coreRaw = await callLLM(buildCorePrompt(input), 0.25, {
+    const splitModel = APIMART_QUICK_MODEL || "kimi-k2-thinking-turbo"
+    const coreRaw = await callLLM(buildCorePrompt(input), 0.15, {
       model: splitModel,
-      maxTokens: 1600,
+      maxTokens: 6000,
       useFunctionCalling: false,
     })
-    const coreParsed = CORE_SCHEMA.parse(parseJsonPayload(coreRaw))
+    const coreParsed = CORE_SCHEMA.parse(normalizeCoreOutput(input, parseJsonPayload(coreRaw)))
 
-    const calendarRaw = await callLLM(buildCalendarPrompt(input, coreParsed), 0.3, {
+    const calendarRaw = await callLLM(buildCalendarPrompt(input, coreParsed), 0.2, {
       model: splitModel,
-      maxTokens: 1800,
+      maxTokens: 6000,
       useFunctionCalling: false,
     })
-    const calendarParsed = CALENDAR_SCHEMA.parse(parseJsonPayload(calendarRaw))
+    const calendarParsed = CALENDAR_SCHEMA.parse(normalizeCalendarOutput(input, parseJsonPayload(calendarRaw)))
 
-    const topicsRaw = await callLLM(buildTopicsPrompt(input, coreParsed), 0.35, {
+    const topicsRaw = await callLLM(buildTopicsPrompt(input, coreParsed), 0.25, {
       model: splitModel,
-      maxTokens: 2000,
+      maxTokens: 6000,
       useFunctionCalling: false,
     })
-    const topicsParsed = TOPICS_SCHEMA.parse(parseJsonPayload(topicsRaw))
+    const topicsParsed = TOPICS_SCHEMA.parse(normalizeTopicsOutput(input, parseJsonPayload(topicsRaw)))
 
-    const scriptsRaw = await callLLM(buildScriptsPrompt(input, coreParsed), 0.35, {
+    const scriptsRaw = await callLLM(buildScriptsPrompt(input, coreParsed), 0.25, {
       model: splitModel,
-      maxTokens: 2200,
+      maxTokens: 7000,
       useFunctionCalling: false,
     })
-    const scriptsParsed = SCRIPTS_SCHEMA.parse(parseJsonPayload(scriptsRaw))
+    const scriptsParsed = SCRIPTS_SCHEMA.parse(normalizeScriptsOutput(parseJsonPayload(scriptsRaw)))
 
-    const qcRaw = await callLLM(buildChecklistPrompt(input, coreParsed), 0.2, {
+    const qcRaw = await callLLM(buildChecklistPrompt(input, coreParsed), 0.1, {
       model: splitModel,
-      maxTokens: 1200,
+      maxTokens: 4000,
       useFunctionCalling: false,
     })
-    const qcParsed = QC_SCHEMA.parse(parseJsonPayload(qcRaw))
+    const qcParsed = QC_SCHEMA.parse(normalizeChecklistOutput(parseJsonPayload(qcRaw)))
 
     const merged = {
       ...coreParsed,

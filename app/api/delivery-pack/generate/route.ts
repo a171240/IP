@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import crypto from "crypto"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
 import { deliveryPackInputSchema } from "@/lib/delivery-pack/schema"
 import { generateDeliveryPackV2 } from "@/lib/delivery-pack/generate"
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerSupabaseClientForRequest(request)
   const {
     data: { user },
   } = await supabase.auth.getUser()
