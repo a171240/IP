@@ -26,22 +26,20 @@ export interface Insight {
   severity: "high" | "medium" | "low"
 }
 
-const PROBLEM_LABELS: Record<string, string> = {
-  topic_system_missing: "选题体系缺失",
-  calendar_blocked: "内容日历排不出来",
-  script_slow: "脚本产出慢/质量不稳",
-  qc_missing: "返工多口径乱（缺质检标准）",
-  conversion_weak: "转化链路不清",
-  archive_weak: "素材/知识不沉淀",
+const DIMENSION_BOTTLENECKS: Record<Dimension, string> = {
+  positioning: "交付定位不清晰，导致内容方向反复",
+  content: "内容供给不足，选题与脚本无法稳定产出",
+  efficiency: "排产节奏不稳，团队协作效率偏低",
+  emotion: "质检复盘薄弱，交付质量不稳定",
+  conversion: "成交路径不清，内容承接弱",
 }
 
-const PROBLEM_ACTIONS: Record<string, string> = {
-  topic_system_missing: "先搭建选题体系，整理高意图场景清单",
-  calendar_blocked: "先做 7 天内容日历，锁定节奏与负责人",
-  script_slow: "固定 3 套脚本模板，减少反复沟通",
-  qc_missing: "建立 10 项质检清单，减少返工",
-  conversion_weak: "补齐成交链路，明确 CTA 与承接动作",
-  archive_weak: "制定归档规则，保证素材可复用",
+const DIMENSION_ACTIONS: Record<Dimension, string[]> = {
+  positioning: ["统一口径与风格规范", "明确团队角色与交付边界", "绑定核心成交场景"],
+  content: ["建立可复用选题库", "固定7天排产节奏", "脚本模板化输出"],
+  efficiency: ["锁定每周排产节奏", "明确责任人+交付口径", "每周复盘输出清单"],
+  emotion: ["建立发布质检清单", "脚本多轮审核机制", "发布后复盘归档"],
+  conversion: ["明确成交路径与承接动作", "CTA统一成一句话", "提升成交型内容占比"],
 }
 
 export function calculateScore(answers: Record<string, string | string[]>): ScoreResult {
@@ -53,26 +51,26 @@ export function calculateScore(answers: Record<string, string | string[]>): Scor
     conversion: { weighted: 0, totalWeight: 0 },
   }
 
-  QUESTIONS.forEach((q) => {
-    if (q.isClassification || !q.dimension) return
+  QUESTIONS.forEach((question) => {
+    if (question.isClassification || !question.dimension) return
 
-    const answer = answers[q.id]
+    const answer = answers[question.id]
     if (!answer) return
 
     let score = 0
-    if (q.type === "multiple" && Array.isArray(answer)) {
-      const selectedOptions = q.options.filter((o) => answer.includes(o.value))
+    if (question.type === "multiple" && Array.isArray(answer)) {
+      const selectedOptions = (question.options || []).filter((option) => answer.includes(option.value))
       if (selectedOptions.length > 0) {
-        score = Math.min(...selectedOptions.map((o) => o.score ?? 0))
+        score = Math.min(...selectedOptions.map((option) => option.score ?? 0))
       }
     } else {
-      const selectedOption = q.options.find((o) => o.value === answer)
+      const selectedOption = (question.options || []).find((option) => option.value === answer)
       score = selectedOption?.score ?? 0
     }
 
-    const weight = q.weight ?? 1
-    dimensionScores[q.dimension].weighted += score * weight
-    dimensionScores[q.dimension].totalWeight += weight
+    const weight = question.weight ?? 1
+    dimensionScores[question.dimension].weighted += score * weight
+    dimensionScores[question.dimension].totalWeight += weight
   })
 
   const dimensions = {} as Record<Dimension, DimensionScore>
@@ -90,10 +88,10 @@ export function calculateScore(answers: Record<string, string | string[]>): Scor
 
     const insight =
       status === "strong"
-        ? `你的${dim.name}较为稳健`
+        ? `你的${dim.name}表现稳定，可复制扩展`
         : status === "normal"
-          ? `你的${dim.name}还有可优化空间`
-          : `你的${dim.name}是当前主要瓶颈`
+          ? `你的${dim.name}仍有提升空间`
+          : `你的${dim.name}是当前主要短板`
 
     dimensions[key as Dimension] = {
       score: normalized,
@@ -107,7 +105,15 @@ export function calculateScore(answers: Record<string, string | string[]>): Scor
   const levelLabel = getLevelLabel(level)
   const insights = generateInsights(dimensions)
 
-  const { coreBottleneck, topActions } = deriveBottleneckAndActions(answers, dimensions)
+  const lowestDimension = getLowestDimension(dimensions)
+  const coreBottleneck = DIMENSION_BOTTLENECKS[lowestDimension]
+
+  const topActions = [
+    ...new Set([
+      ...DIMENSION_ACTIONS[lowestDimension],
+      ...DIMENSION_ACTIONS[getSecondLowestDimension(dimensions, lowestDimension)],
+    ]),
+  ].slice(0, 3)
 
   return {
     total: totalScore,
@@ -134,7 +140,7 @@ function getLevelLabel(level: ScoreResult["level"]): string {
     excellent: "优秀",
     good: "良好",
     pass: "及格",
-    needs_improvement: "需改进",
+    needs_improvement: "待提升",
   }
   return labels[level]
 }
@@ -154,7 +160,7 @@ function generateInsights(dimensions: Record<Dimension, DimensionScore>): Insigh
     } else if (dim.status === "normal") {
       insights.push({
         dimension: key as Dimension,
-        title: `${DIMENSIONS[key as Dimension].name}可以提升`,
+        title: `${DIMENSIONS[key as Dimension].name}可继续提升`,
         description: dim.insight,
         severity: "medium",
       })
@@ -164,43 +170,17 @@ function generateInsights(dimensions: Record<Dimension, DimensionScore>): Insigh
   return insights
 }
 
-function deriveBottleneckAndActions(
-  answers: Record<string, string | string[]>,
-  dimensions: Record<Dimension, DimensionScore>
-) {
-  const problems = Array.isArray(answers.current_problem) ? answers.current_problem : []
-  const coreProblem = problems[0]
-  const coreBottleneck =
-    (coreProblem && PROBLEM_LABELS[coreProblem]) ||
-    DIMENSIONS[getLowestDimension(dimensions)].name
-
-  const actionCandidates = problems
-    .map((problem) => PROBLEM_ACTIONS[problem])
-    .filter(Boolean)
-
-  const topActions = [...new Set(actionCandidates)]
-
-  while (topActions.length < 3) {
-    topActions.push(getFallbackAction(topActions.length))
-  }
-
-  return {
-    coreBottleneck,
-    topActions: topActions.slice(0, 3),
-  }
-}
-
 function getLowestDimension(dimensions: Record<Dimension, DimensionScore>): Dimension {
   return Object.entries(dimensions).sort((a, b) => a[1].score - b[1].score)[0]?.[0] as Dimension
 }
 
-function getFallbackAction(index: number): string {
-  const defaults = [
-    "明确本周交付目标，拆成可执行动作",
-    "为每个岗位定义交付口径与检查项",
-    "安排一次复盘，沉淀可复用模板",
-  ]
-  return defaults[index] || defaults[defaults.length - 1]
+function getSecondLowestDimension(
+  dimensions: Record<Dimension, DimensionScore>,
+  lowest: Dimension
+): Dimension {
+  const sorted = Object.entries(dimensions).sort((a, b) => a[1].score - b[1].score)
+  const second = sorted.find(([key]) => key !== lowest)?.[0]
+  return (second || lowest) as Dimension
 }
 
 export { DIMENSIONS }

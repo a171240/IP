@@ -37,7 +37,7 @@ export async function GET(
     packId: data.id,
     status: data.status,
     createdAt: data.created_at,
-    zipPath: data.zip_path,
+    pdfPath: data.zip_path,
     errorMessage: data.error_message,
     thinkingSummary,
   })

@@ -49,5 +49,14 @@ export async function GET(
     return NextResponse.json({ ok: false, error: "sign_failed" }, { status: 500 })
   }
 
-  return NextResponse.redirect(signed.signedUrl)
+  const match = data.zip_path.match(/(\\d{8})\\.pdf$/)
+  const displayDate = match?.[1]
+  const displayName = displayDate
+    ? `交付包_内容交付系统诊断_${displayDate}.pdf`
+    : "交付包_内容交付系统诊断.pdf"
+
+  const separator = signed.signedUrl.includes("?") ? "&" : "?"
+  const signedUrl = `${signed.signedUrl}${separator}download=${encodeURIComponent(displayName)}`
+
+  return NextResponse.redirect(signedUrl)
 }

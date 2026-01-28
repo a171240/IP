@@ -1,3 +1,5 @@
+import { ZodError } from "zod"
+import { jsonrepair } from "jsonrepair"
 import { deliveryPackOutputSchema, DeliveryPackInput, DeliveryPackOutput } from "./schema"
 import { sanitizeDeliveryPack } from "./sanitize"
 
@@ -5,50 +7,103 @@ const APIMART_API_KEY = process.env.APIMART_QUICK_API_KEY || process.env.APIMART
 const APIMART_BASE_URL =
   process.env.APIMART_QUICK_BASE_URL || process.env.APIMART_BASE_URL || "https://api.apimart.ai/v1"
 const APIMART_MODEL = process.env.APIMART_MODEL || process.env.APIMART_QUICK_MODEL || "kimi-k2-thinking"
-const LLM_TIMEOUT_MS = Number(process.env.APIMART_TIMEOUT_MS || 120000)
+const LLM_TIMEOUT_MS = Number(process.env.APIMART_TIMEOUT_MS || 180000)
+const USE_FUNCTION_CALLING = process.env.APIMART_USE_TOOL !== "false"
+const USE_SPLIT_GENERATION = process.env.APIMART_USE_SPLIT !== "false"
+
+const TEAM_TYPE_LABELS: Record<string, string> = {
+  agency: "代运营团队",
+  mcn: "MCN矩阵",
+  brand_team: "品牌内容部",
+  local_store: "本地生活门店",
+  creator: "个人",
+}
+
+const PLATFORM_LABELS: Record<string, string> = {
+  xiaohongshu: "小红书",
+  douyin: "抖音",
+  video_account: "视频号",
+  wechat: "公众号",
+}
+
+const OFFER_TYPE_LABELS: Record<string, string> = {
+  service: "服务交付",
+  course: "课程",
+  ecommerce_product: "产品电商",
+  saas: "SaaS工具",
+  other: "其他",
+}
+
+const REQUIRED_DIMENSIONS = ["交付定位", "内容供给", "产能效率", "质检复盘", "成交转化"] as const
+
+const bannedPattern =
+  /(击败|超过|行业排名|同行百分比|前\s*\d+%|top\s*\d+%|领先\s*\d+%|超过\s*\d+%)/i
 
 const DELIVERY_PACK_TOOL = {
   type: "function",
   function: {
     name: "GenerateDeliveryPackV2",
-    description: "Generate delivery pack v2 JSON",
+    description: "Generate delivery pack v2 JSON for PDF delivery",
     parameters: {
       type: "object",
       additionalProperties: false,
       required: [
-        "scorecard",
+        "meta",
+        "bottleneck",
+        "top_actions",
+        "scores",
         "calendar_7d",
-        "topic_bank_10",
+        "topics_10",
         "scripts_3",
-        "qc_checklist_10",
+        "qc_checklist",
+        "archive_rules",
+        "upsell",
       ],
       properties: {
-        scorecard: {
+        meta: {
           type: "object",
           additionalProperties: false,
-          required: ["dimensions", "core_bottleneck", "top_actions"],
+          required: ["industry", "platform", "team_type", "offer_desc"],
           properties: {
-            dimensions: {
-              type: "array",
-              minItems: 5,
-              maxItems: 5,
-              items: {
-                type: "object",
-                additionalProperties: false,
-                required: ["name", "score", "insight"],
-                properties: {
-                  name: { type: "string" },
-                  score: { type: "number", minimum: 0, maximum: 10 },
-                  insight: { type: "string" },
-                },
+            industry: { type: "string" },
+            platform: { type: "string" },
+            team_type: { type: "string" },
+            offer_desc: { type: "string" },
+          },
+        },
+        bottleneck: { type: "string" },
+        top_actions: {
+          type: "array",
+          minItems: 3,
+          maxItems: 3,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["title", "why", "do_in_7_days"],
+            properties: {
+              title: { type: "string" },
+              why: { type: "string" },
+              do_in_7_days: {
+                type: "array",
+                minItems: 2,
+                items: { type: "string" },
               },
             },
-            core_bottleneck: { type: "string" },
-            top_actions: {
-              type: "array",
-              minItems: 3,
-              maxItems: 3,
-              items: { type: "string" },
+          },
+        },
+        scores: {
+          type: "array",
+          minItems: 5,
+          maxItems: 5,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["dimension", "score", "insight", "fix"],
+            properties: {
+              dimension: { type: "string" },
+              score: { type: "number", minimum: 0, maximum: 10 },
+              insight: { type: "string" },
+              fix: { type: "string" },
             },
           },
         },
@@ -59,27 +114,44 @@ const DELIVERY_PACK_TOOL = {
           items: {
             type: "object",
             additionalProperties: false,
-            required: ["day", "theme", "deliverable", "notes"],
+            required: ["day", "type", "title", "hook", "outline", "cta", "script_id"],
             properties: {
-              day: { type: "string" },
-              theme: { type: "string" },
-              deliverable: { type: "string" },
-              notes: { type: "string" },
+              day: { type: "integer", minimum: 1, maximum: 7 },
+              type: { type: "string" },
+              title: { type: "string" },
+              hook: { type: "string" },
+              outline: {
+                type: "array",
+                minItems: 3,
+                maxItems: 3,
+                items: { type: "string" },
+              },
+              cta: { type: "string" },
+              script_id: { type: "string" },
             },
           },
         },
-        topic_bank_10: {
+        topics_10: {
           type: "array",
           minItems: 10,
           maxItems: 10,
           items: {
             type: "object",
             additionalProperties: false,
-            required: ["title", "intent", "hook"],
+            required: ["title", "audience", "scene", "pain", "keywords", "type", "cta"],
             properties: {
               title: { type: "string" },
-              intent: { type: "string" },
-              hook: { type: "string" },
+              audience: { type: "string" },
+              scene: { type: "string" },
+              pain: { type: "string" },
+              keywords: {
+                type: "array",
+                minItems: 2,
+                maxItems: 5,
+                items: { type: "string" },
+              },
+              type: { type: "string" },
+              cta: { type: "string" },
             },
           },
         },
@@ -90,25 +162,59 @@ const DELIVERY_PACK_TOOL = {
           items: {
             type: "object",
             additionalProperties: false,
-            required: ["title", "hook", "outline", "cta"],
+            required: ["id", "type", "duration", "shots", "cta", "title_options", "pinned_comment"],
             properties: {
-              title: { type: "string" },
-              hook: { type: "string" },
-              outline: {
+              id: { type: "string" },
+              type: { type: "string" },
+              duration: { type: "string" },
+              shots: {
                 type: "array",
                 minItems: 3,
-                maxItems: 3,
-                items: { type: "string" },
+                items: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["t", "line", "visual"],
+                  properties: {
+                    t: { type: "string" },
+                    line: { type: "string" },
+                    visual: { type: "string" },
+                  },
+                },
               },
               cta: { type: "string" },
+              title_options: { type: "array", minItems: 3, maxItems: 3, items: { type: "string" } },
+              pinned_comment: { type: "string" },
             },
           },
         },
-        qc_checklist_10: {
-          type: "array",
-          minItems: 10,
-          maxItems: 10,
-          items: { type: "string" },
+        qc_checklist: {
+          type: "object",
+          additionalProperties: false,
+          required: ["title", "body", "cta_and_compliance"],
+          properties: {
+            title: { type: "array", minItems: 3, items: { type: "string" } },
+            body: { type: "array", minItems: 3, items: { type: "string" } },
+            cta_and_compliance: { type: "array", minItems: 3, items: { type: "string" } },
+          },
+        },
+        archive_rules: {
+          type: "object",
+          additionalProperties: false,
+          required: ["naming", "tags", "dedupe"],
+          properties: {
+            naming: { type: "string" },
+            tags: { type: "array", minItems: 3, items: { type: "string" } },
+            dedupe: { type: "array", minItems: 3, items: { type: "string" } },
+          },
+        },
+        upsell: {
+          type: "object",
+          additionalProperties: false,
+          required: ["when_to_upgrade", "cta"],
+          properties: {
+            when_to_upgrade: { type: "array", minItems: 2, items: { type: "string" } },
+            cta: { type: "string" },
+          },
         },
         thinking_summary: {
           type: "array",
@@ -121,53 +227,276 @@ const DELIVERY_PACK_TOOL = {
   },
 } as const
 
+const OUTPUT_TEMPLATE = `{
+  "meta": { "industry": "", "platform": "", "team_type": "", "offer_desc": "" },
+  "bottleneck": "",
+  "top_actions": [
+    { "title": "", "why": "", "do_in_7_days": ["", ""] },
+    { "title": "", "why": "", "do_in_7_days": ["", ""] },
+    { "title": "", "why": "", "do_in_7_days": ["", ""] }
+  ],
+  "scores": [
+    { "dimension": "交付定位", "score": 0, "insight": "", "fix": "" },
+    { "dimension": "内容供给", "score": 0, "insight": "", "fix": "" },
+    { "dimension": "产能效率", "score": 0, "insight": "", "fix": "" },
+    { "dimension": "质检复盘", "score": 0, "insight": "", "fix": "" },
+    { "dimension": "成交转化", "score": 0, "insight": "", "fix": "" }
+  ],
+  "calendar_7d": [
+    { "day": 1, "type": "引流", "title": "", "hook": "", "outline": ["", "", ""], "cta": "", "script_id": "S1" },
+    { "day": 2, "type": "引流", "title": "", "hook": "", "outline": ["", "", ""], "cta": "", "script_id": "S1" },
+    { "day": 3, "type": "引流", "title": "", "hook": "", "outline": ["", "", ""], "cta": "", "script_id": "S2" },
+    { "day": 4, "type": "建信", "title": "", "hook": "", "outline": ["", "", ""], "cta": "", "script_id": "S2" },
+    { "day": 5, "type": "建信", "title": "", "hook": "", "outline": ["", "", ""], "cta": "", "script_id": "S3" },
+    { "day": 6, "type": "转化", "title": "", "hook": "", "outline": ["", "", ""], "cta": "", "script_id": "S3" },
+    { "day": 7, "type": "转化", "title": "", "hook": "", "outline": ["", "", ""], "cta": "", "script_id": "S3" }
+  ],
+  "topics_10": [
+    { "title": "", "audience": "", "scene": "", "pain": "", "keywords": ["", ""], "type": "引流", "cta": "" }
+  ],
+  "scripts_3": [
+    {
+      "id": "S1",
+      "type": "引流",
+      "duration": "45s",
+      "shots": [
+        { "t": "0-3s", "line": "", "visual": "" },
+        { "t": "3-15s", "line": "", "visual": "" },
+        { "t": "15-35s", "line": "", "visual": "" }
+      ],
+      "cta": "",
+      "title_options": ["", "", ""],
+      "pinned_comment": ""
+    }
+  ],
+  "qc_checklist": {
+    "title": ["", "", ""],
+    "body": ["", "", ""],
+    "cta_and_compliance": ["", "", ""]
+  },
+  "archive_rules": { "naming": "", "tags": ["", "", ""], "dedupe": ["", "", ""] },
+  "upsell": { "when_to_upgrade": ["", ""], "cta": "" },
+  "thinking_summary": ["", "", ""]
+}`
+
+
+const CORE_SCHEMA = deliveryPackOutputSchema.pick({
+  meta: true,
+  bottleneck: true,
+  top_actions: true,
+  scores: true,
+  thinking_summary: true,
+})
+
+const CALENDAR_SCHEMA = deliveryPackOutputSchema.pick({ calendar_7d: true })
+const TOPICS_SCHEMA = deliveryPackOutputSchema.pick({ topics_10: true })
+const SCRIPTS_SCHEMA = deliveryPackOutputSchema.pick({ scripts_3: true })
+const QC_SCHEMA = deliveryPackOutputSchema.pick({ qc_checklist: true, archive_rules: true, upsell: true })
+
 function buildPrompt(input: DeliveryPackInput): string {
-  return `You must call function GenerateDeliveryPackV2 and return ONLY valid JSON arguments. No extra text.` +
-    `
+  const teamTypeLabel = TEAM_TYPE_LABELS[input.team_type] || input.team_type
+  const platformLabel = PLATFORM_LABELS[input.platform] || input.platform
+  const offerTypeLabel = OFFER_TYPE_LABELS[input.offer_type] || input.offer_type
 
-Input:
-${JSON.stringify(input, null, 2)}
+  const payload = {
+    team_type: input.team_type,
+    team_type_label: teamTypeLabel,
+    team_size: input.team_size,
+    industry: input.industry,
+    platform: input.platform,
+    platform_label: platformLabel,
+    offer_type: input.offer_type,
+    offer_type_label: offerTypeLabel,
+    offer_desc: input.offer_desc,
+    sop_level: input.sop_level,
+    guideline_level: input.guideline_level,
+    topic_library: input.topic_library,
+    multi_project: input.multi_project,
+    script_review: input.script_review,
+    qc_process: input.qc_process,
+    conversion_path: input.conversion_path,
+    review_frequency: input.review_frequency,
+    product_or_service: input.product_or_service,
+    target_audience: input.target_audience,
+    price_range: input.price_range,
+    tone: input.tone,
+  }
 
-Schema:
+  return `
+只输出合法 JSON，不要 Markdown，不要解释说明。
 
-- scorecard.dimensions[]: name, score(0-10), insight
+输入：
+${JSON.stringify(payload, null, 2)}
 
-- scorecard.core_bottleneck: string
+硬性规则：
+1) 输出只用简体中文。
+2) 禁止出现：击败、超过、行业排名、前XX%、top% 等不可验证表述。
+3) scores 维度必须严格包含：交付定位 / 内容供给 / 产能效率 / 质检复盘 / 成交转化（各1条）。
+4) 标题长度上限：calendar_7d.title、topics_10.title、top_actions.title、scripts_3.title_options ≤ 24 字。
+5) calendar_7d.type 只能是 引流 / 建信 / 转化，比例至少 引流>=3、建信>=2、转化>=2。
+6) scripts_3 必须包含 shots（镜头时间段t + 台词line + 画面visual），且每条脚本必须有 CTA。
+7) 至少引用 ${teamTypeLabel}、${platformLabel}、"${input.offer_desc}" 各>=2次（可出现在不同字段）。
+8) calendar_7d.day=1 必须给出“明天第一条”可直接发布的标题+钩子+结构+CTA。
+9) thinking_summary 为 3-5 条“思考摘要”，不得暴露推理过程。
+10) 必须输出完整结构，严禁缺失 scripts_3 / qc_checklist / archive_rules / upsell。
 
-- scorecard.top_actions: string[3]
+结构说明（字段必须存在）：
+- meta: { industry, platform, team_type, offer_desc }
+- bottleneck: 1条核心瓶颈
+- top_actions: 3条，每条包含 title / why / do_in_7_days[]
+- scores: 5条维度分数（0-10）
+- calendar_7d: 7天排产（day/type/title/hook/outline[3]/cta/script_id）
+- topics_10: 10条高意图选题（title/audience/scene/pain/keywords/type/cta）
+- scripts_3: 3条脚本（id=S1/S2/S3, type, duration, shots[], cta, title_options[3], pinned_comment）
+- qc_checklist: title/body/cta_and_compliance 三块清单
+- archive_rules: naming/tags/dedupe
+- upsell: when_to_upgrade[], cta
 
-- calendar_7d[]: day, theme, deliverable (format + title), notes (format: "Hook:... | CTA:...")
+`.trim()
+}
 
-- topic_bank_10[]: title, intent (target person + buying motive), hook (opening line + CTA)
+function buildCorePrompt(input: DeliveryPackInput): string {
+  const teamTypeLabel = TEAM_TYPE_LABELS[input.team_type] || input.team_type
+  const platformLabel = PLATFORM_LABELS[input.platform] || input.platform
+  const offerTypeLabel = OFFER_TYPE_LABELS[input.offer_type] || input.offer_type
 
-- scripts_3[]: title, hook, outline(string[3]), cta (as 成交话术模板)
+  const payload = {
+    team_type: input.team_type,
+    team_type_label: teamTypeLabel,
+    team_size: input.team_size,
+    industry: input.industry,
+    platform: input.platform,
+    platform_label: platformLabel,
+    offer_type: input.offer_type,
+    offer_type_label: offerTypeLabel,
+    offer_desc: input.offer_desc,
+  }
 
-- qc_checklist_10: string[10]
+  return `
+只输出合法 JSON，不要 Markdown，不要解释说明。
 
-- thinking_summary: string[3-5] (summary of reasoning, no chain-of-thought)
+输入：
+${JSON.stringify(payload, null, 2)}
 
+硬性规则：
+1) 输出只用简体中文。
+2) 禁止出现：击败、超过、行业排名、前XX%、top% 等不可验证表述。
+3) scores 维度必须严格包含：交付定位 / 内容供给 / 产能效率 / 质检复盘 / 成交转化（各1条）。
+4) top_actions 3条，每条必须具体可执行。
+5) thinking_summary 3-5条摘要，不暴露推理过程。
+6) 至少引用 ${teamTypeLabel}、${platformLabel}、"${input.offer_desc}" 各>=2次。
+`.trim()
+}
 
-Hard rules:
+function buildCalendarPrompt(
+  input: DeliveryPackInput,
+  core: Pick<DeliveryPackOutput, "meta" | "bottleneck" | "top_actions">
+): string {
+  const payload = {
+    meta: core.meta,
+    bottleneck: core.bottleneck,
+    top_actions: core.top_actions,
+    offer_desc: input.offer_desc,
+    platform: input.platform,
+  }
 
-1) Scores must be 0-10.
+  return `
+只输出合法 JSON，不要 Markdown，不要解释说明。
 
-2) No unverifiable claims like ranking/top%/beating peers.
+已确认的核心信息（必须保持一致）：
+${JSON.stringify(payload, null, 2)}
 
-3) Copy must be conversion-focused for agency operators.
+仅输出字段：calendar_7d（7条）。
 
-4) Script 1 = conversion script, Script 2 = resonance script, Script 3 = professional viewpoint.
+硬性规则：
+1) 输出只用简体中文。
+2) calendar_7d.type 只能是 引流 / 建信 / 转化，比例至少 引流>=3、建信>=2、转化>=2。
+3) 每条包含 day/title/hook/outline[3]/cta/script_id。
+4) day=1 必须给出“明天第一条”可直接发布的标题+钩子+结构+CTA。
+`.trim()
+}
 
-5) CTA must follow: 动作 + 价值 + 低门槛 (e.g. "私信关键词领取清单").
+function buildTopicsPrompt(
+  input: DeliveryPackInput,
+  core: Pick<DeliveryPackOutput, "meta" | "bottleneck" | "top_actions">
+): string {
+  const payload = {
+    meta: core.meta,
+    bottleneck: core.bottleneck,
+    top_actions: core.top_actions,
+    offer_desc: input.offer_desc,
+    platform: input.platform,
+  }
 
-6) Script outline must follow: 痛点与结果承诺 → 方法/案例证明 → 成交引导+风险消除.
+  return `
+只输出合法 JSON，不要 Markdown，不要解释说明。
 
-7) Output in concise Simplified Chinese.
+已确认的核心信息（必须保持一致）：
+${JSON.stringify(payload, null, 2)}
 
-8) QC checklist must be binary and testable.
+仅输出字段：topics_10（10条）。
 
-9) Keep each field concise (<=24 chars; outline item <=14 chars).
+硬性规则：
+1) 输出只用简体中文。
+2) 每条包含 title/audience/scene/pain/keywords(>=2)/type/cta。
+3) 必须明确人群+场景+痛点+关键词，确保可直接使用。
+`.trim()
+}
 
-10) thinking_summary must be 3-5 bullets, summarizing rationale without revealing chain-of-thought.`
+function buildScriptsPrompt(
+  input: DeliveryPackInput,
+  core: Pick<DeliveryPackOutput, "meta" | "bottleneck" | "top_actions">
+): string {
+  const payload = {
+    meta: core.meta,
+    bottleneck: core.bottleneck,
+    top_actions: core.top_actions,
+    offer_desc: input.offer_desc,
+    platform: input.platform,
+  }
+
+  return `
+只输出合法 JSON，不要 Markdown，不要解释说明。
+
+已确认的核心信息（必须保持一致）：
+${JSON.stringify(payload, null, 2)}
+
+仅输出字段：scripts_3（3条）。
+
+硬性规则：
+1) 输出只用简体中文。
+2) 每条脚本必须包含 shots（t/line/visual）至少3段，并包含 CTA。
+3) title_options 给出3个可直接用的标题。
+4) pinned_comment 给出可直接用的置顶评论话术。
+`.trim()
+}
+
+function buildChecklistPrompt(
+  input: DeliveryPackInput,
+  core: Pick<DeliveryPackOutput, "meta" | "bottleneck" | "top_actions">
+): string {
+  const payload = {
+    meta: core.meta,
+    bottleneck: core.bottleneck,
+    top_actions: core.top_actions,
+    offer_desc: input.offer_desc,
+    platform: input.platform,
+  }
+
+  return `
+只输出合法 JSON，不要 Markdown，不要解释说明。
+
+已确认的核心信息（必须保持一致）：
+${JSON.stringify(payload, null, 2)}
+
+仅输出字段：qc_checklist / archive_rules / upsell。
+
+硬性规则：
+1) 输出只用简体中文。
+2) qc_checklist 三块清单，每块>=3条。
+3) archive_rules 包含命名/标签/去重规则。
+4) upsell 给出升级时机+CTA（不强引导微信）。
+`.trim()
 }
 
 function extractJson(content: string): string {
@@ -190,6 +519,19 @@ function extractJson(content: string): string {
   cleaned = cleaned.replace(/,(\s*[}\]])/g, "$1")
   cleaned = cleaned.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
   return escapeNewlinesInStrings(cleaned)
+}
+
+function parseJsonPayload(raw: string): unknown {
+  const cleaned = extractJson(raw)
+  try {
+    return JSON.parse(cleaned)
+  } catch (error) {
+    try {
+      return JSON.parse(jsonrepair(cleaned))
+    } catch {
+      throw error
+    }
+  }
 }
 
 function escapeNewlinesInStrings(input: string): string {
@@ -255,17 +597,103 @@ function coerceToolArgs(value: unknown): string {
   }
 }
 
-function buildRepairPrompt(raw: string): string {
-  return `You must call function GenerateDeliveryPackV2 and return ONLY valid JSON arguments. Fix from raw below.
+function buildRepairPrompt(raw: string, issues?: string[]): string {
+  const issueLine = issues?.length ? `\n缺失/错误字段：${issues.join(", ")}` : ""
+  return `
+只输出合法 JSON，不要 Markdown，不要解释说明。请根据下方原始输出修复为合法结构。${issueLine}
 
-Raw:
-${raw}`
+输出模板（必须填满所有字段，不能保留示例内容）：
+${OUTPUT_TEMPLATE}
+
+原始输出：
+${raw}
+`.trim()
+}
+
+function collectStrings(value: unknown, bucket: string[] = []): string[] {
+  if (typeof value === "string") {
+    bucket.push(value)
+    return bucket
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectStrings(item, bucket))
+    return bucket
+  }
+  if (value && typeof value === "object") {
+    Object.values(value as Record<string, unknown>).forEach((item) => collectStrings(item, bucket))
+  }
+  return bucket
+}
+
+function countOccurrences(text: string, term: string): number {
+  if (!term) return 0
+  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  const regex = new RegExp(escaped, "g")
+  return (text.match(regex) || []).length
+}
+
+function validateDeliveryPackRules(output: DeliveryPackOutput, input: DeliveryPackInput): string[] {
+  const errors: string[] = []
+  const allText = collectStrings(output).join("\n")
+
+  if (bannedPattern.test(allText)) {
+    errors.push("contains_banned_phrases")
+  }
+
+  const teamLabel = TEAM_TYPE_LABELS[input.team_type] || input.team_type
+  const platformLabel = PLATFORM_LABELS[input.platform] || input.platform
+  const offerDesc = input.offer_desc
+
+  if (countOccurrences(allText, teamLabel) < 2) {
+    errors.push("team_type_mention")
+  }
+  if (countOccurrences(allText, platformLabel) < 2) {
+    errors.push("platform_mention")
+  }
+  if (countOccurrences(allText, offerDesc) < 1) {
+    errors.push("offer_desc_mention")
+  }
+
+  const dimensionNames = output.scores.map((item) => item.dimension)
+  REQUIRED_DIMENSIONS.forEach((name) => {
+    if (!dimensionNames.some((value) => value.includes(name))) {
+      errors.push(`missing_dimension_${name}`)
+    }
+  })
+
+  const titleViolations = [
+    ...output.calendar_7d.map((item) => item.title),
+    ...output.topics_10.map((item) => item.title),
+    ...output.top_actions.map((item) => item.title),
+    ...output.scripts_3.flatMap((item) => item.title_options),
+  ].filter((title) => title.length > 24)
+
+  if (titleViolations.length) {
+    errors.push("title_too_long")
+  }
+
+  const typeCounts = output.calendar_7d.reduce(
+    (acc, item) => {
+      const label = item.type
+      if (label.includes("引流") || label.includes("获客")) acc.lead += 1
+      else if (label.includes("建信") || label.includes("信任")) acc.trust += 1
+      else if (label.includes("转化") || label.includes("成交")) acc.convert += 1
+      return acc
+    },
+    { lead: 0, trust: 0, convert: 0 }
+  )
+
+  if (typeCounts.lead < 3 || typeCounts.trust < 2 || typeCounts.convert < 2) {
+    errors.push("calendar_type_ratio")
+  }
+
+  return errors
 }
 
 async function callLLM(
   prompt: string,
   temperature = 0.6,
-  options?: { model?: string; maxTokens?: number }
+  options?: { model?: string; maxTokens?: number; useFunctionCalling?: boolean }
 ): Promise<string> {
   if (!APIMART_API_KEY) {
     throw new Error("APIMART_API_KEY missing")
@@ -275,21 +703,26 @@ async function callLLM(
   const timeout = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS)
 
   const model = options?.model || APIMART_MODEL
-  const maxTokens = options?.maxTokens ?? 1600
+  const maxTokens = options?.maxTokens ?? 4200
 
   const payload: Record<string, unknown> = {
     model,
     messages: [
-      { role: "system", content: "Call GenerateDeliveryPackV2 and output only JSON arguments." },
+      { role: "system", content: "You are a JSON generator. Output a single JSON object only." },
       { role: "user", content: prompt },
     ],
     temperature,
     max_tokens: maxTokens,
-    tools: [DELIVERY_PACK_TOOL],
-    tool_choice: {
+    response_format: { type: "json_object" },
+  }
+
+  if (options?.useFunctionCalling ?? USE_FUNCTION_CALLING) {
+    payload.tools = [DELIVERY_PACK_TOOL]
+    payload.tool_choice = {
       type: "function",
       function: { name: "GenerateDeliveryPackV2" },
-    },
+    }
+    delete payload.response_format
   }
 
   const response = await fetch(`${APIMART_BASE_URL}/chat/completions`, {
@@ -341,26 +774,99 @@ async function callLLM(
 export async function generateDeliveryPackV2(input: DeliveryPackInput): Promise<DeliveryPackOutput> {
   let lastError: unknown
   let lastRaw = ""
+  let lastIssues: string[] = []
   const fallbackModel = process.env.APIMART_QUICK_MODEL || APIMART_MODEL
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    try {
-      const prompt = attempt === 0 ? buildPrompt(input) : buildRepairPrompt(lastRaw)
-      const raw = await callLLM(prompt, attempt === 0 ? 0.2 : 0.1, {
-        model: attempt === 0 ? APIMART_MODEL : fallbackModel,
-        maxTokens: attempt === 0 ? 1600 : 1200,
-      })
-      lastRaw = raw
-      const jsonText = extractJson(raw)
-      const parsed = JSON.parse(jsonText)
-      const validated = deliveryPackOutputSchema.parse(parsed)
-      return sanitizeDeliveryPack(validated)
-    } catch (error) {
-      lastError = error
-      if (lastRaw) {
-        console.warn("[delivery-pack] raw snippet:", lastRaw.slice(0, 500))
+  if (!USE_SPLIT_GENERATION) {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const prompt = attempt === 0 ? buildPrompt(input) : buildRepairPrompt(lastRaw, lastIssues)
+        const raw = await callLLM(prompt, attempt === 0 ? 0.3 : 0.2, {
+          model: attempt === 0 ? APIMART_MODEL : fallbackModel,
+          maxTokens: attempt === 0 ? 4200 : 3600,
+          useFunctionCalling: attempt === 0 ? USE_FUNCTION_CALLING : false,
+        })
+        lastRaw = raw
+        const parsed = parseJsonPayload(raw)
+        const validated = deliveryPackOutputSchema.parse(parsed)
+        const sanitized = sanitizeDeliveryPack(input, validated)
+
+        const ruleErrors = validateDeliveryPackRules(sanitized, input)
+        if (ruleErrors.length && attempt === 0) {
+          throw new Error(`rule_violation:${ruleErrors.join("|")}`)
+        }
+        if (ruleErrors.length) {
+          console.warn("[delivery-pack] rule warnings:", ruleErrors)
+        }
+
+        return sanitized
+      } catch (error) {
+        lastError = error
+        if (error instanceof ZodError) {
+          lastIssues = error.issues.map((issue) => issue.path.join(".") || issue.message).slice(0, 8)
+        } else {
+          lastIssues = []
+        }
+        if (lastRaw) {
+          console.warn("[delivery-pack] raw snippet:", lastRaw.slice(0, 600))
+        }
+        console.warn(`[delivery-pack] parse failed on attempt ${attempt + 1}`, error)
       }
-      console.warn(`[delivery-pack] parse failed on attempt ${attempt + 1}`, error)
     }
+  }
+
+  try {
+    const splitModel = process.env.APIMART_QUICK_MODEL || APIMART_MODEL
+    const coreRaw = await callLLM(buildCorePrompt(input), 0.25, {
+      model: splitModel,
+      maxTokens: 1600,
+      useFunctionCalling: false,
+    })
+    const coreParsed = CORE_SCHEMA.parse(parseJsonPayload(coreRaw))
+
+    const calendarRaw = await callLLM(buildCalendarPrompt(input, coreParsed), 0.3, {
+      model: splitModel,
+      maxTokens: 1800,
+      useFunctionCalling: false,
+    })
+    const calendarParsed = CALENDAR_SCHEMA.parse(parseJsonPayload(calendarRaw))
+
+    const topicsRaw = await callLLM(buildTopicsPrompt(input, coreParsed), 0.35, {
+      model: splitModel,
+      maxTokens: 2000,
+      useFunctionCalling: false,
+    })
+    const topicsParsed = TOPICS_SCHEMA.parse(parseJsonPayload(topicsRaw))
+
+    const scriptsRaw = await callLLM(buildScriptsPrompt(input, coreParsed), 0.35, {
+      model: splitModel,
+      maxTokens: 2200,
+      useFunctionCalling: false,
+    })
+    const scriptsParsed = SCRIPTS_SCHEMA.parse(parseJsonPayload(scriptsRaw))
+
+    const qcRaw = await callLLM(buildChecklistPrompt(input, coreParsed), 0.2, {
+      model: splitModel,
+      maxTokens: 1200,
+      useFunctionCalling: false,
+    })
+    const qcParsed = QC_SCHEMA.parse(parseJsonPayload(qcRaw))
+
+    const merged = {
+      ...coreParsed,
+      ...calendarParsed,
+      ...topicsParsed,
+      ...scriptsParsed,
+      ...qcParsed,
+    } as DeliveryPackOutput
+    const sanitized = sanitizeDeliveryPack(input, merged)
+    const ruleErrors = validateDeliveryPackRules(sanitized, input)
+    if (ruleErrors.length) {
+      console.warn("[delivery-pack] rule warnings:", ruleErrors)
+    }
+    return sanitized
+  } catch (error) {
+    lastError = error
+    console.warn("[delivery-pack] split generation failed", error)
   }
   throw lastError
 }

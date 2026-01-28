@@ -5,19 +5,19 @@ import { MarketingHeader } from "@/components/ui/marketing-header"
 
 const deliverables = [
   { icon: Target, text: "五维评分（0-10）", desc: "交付系统体检单" },
-  { icon: CheckCircle, text: "Top3 优先级动作", desc: "下一步怎么做" },
-  { icon: Calendar, text: "7天成交排产（PDF）", desc: "排产节奏" },
-  { icon: FileText, text: "10条高意图选题（PDF）", desc: "可直接执行" },
-  { icon: ClipboardList, text: "3条成交脚本（PDF）", desc: "可直接交付" },
-  { icon: Zap, text: "质检清单（PDF）", desc: "减少返工" },
+  { icon: CheckCircle, text: "Top3 优先动作", desc: "7天只做3件事" },
+  { icon: Calendar, text: "7天成交排产（PDF）", desc: "可直接执行" },
+  { icon: FileText, text: "10条高意图选题（PDF）", desc: "标题/钩子/CTA" },
+  { icon: ClipboardList, text: "3条成交脚本（PDF）", desc: "结构+话术" },
+  { icon: Zap, text: "质检清单与归档规则（PDF）", desc: "减少返工" },
 ]
 
 const dimensions = [
-  { name: "交付定位", desc: "团队角色与方向清晰度" },
-  { name: "内容供给", desc: "选题与脚本体系" },
-  { name: "产能效率", desc: "团队协作与产出节奏" },
-  { name: "质检复盘", desc: "质量口径与复盘能力" },
-  { name: "成交转化", desc: "内容到成交链路" },
+  { name: "交付定位", desc: "团队角色与交付方向" },
+  { name: "内容供给", desc: "选题与脚本产出" },
+  { name: "产能效率", desc: "协作节奏与排产" },
+  { name: "质检复盘", desc: "口径与质量稳定" },
+  { name: "成交转化", desc: "内容到成交承接" },
 ]
 
 const cardBase =
@@ -38,7 +38,7 @@ const GlowLink = ({ href, className, children }: { href: string; className?: str
 export default function DiagnosisPage() {
   return (
     <div className="min-h-screen">
-      <MarketingHeader breadcrumbs={[{ label: "主页", href: "/" }, { label: "内容交付系统诊断" }]} />
+      <MarketingHeader breadcrumbs={[{ label: "首页", href: "/" }, { label: "内容交付系统诊断" }]} />
 
       <main className="p-6 lg:p-8 pb-28 md:pb-8">
         <div className="max-w-4xl mx-auto space-y-6">
@@ -52,7 +52,7 @@ export default function DiagnosisPage() {
                 内容交付系统诊断（5分钟）
               </h1>
               <p className="text-lg dark:text-zinc-400 text-zinc-500 max-w-xl mx-auto">
-                找出你团队交付卡点，直接生成 7 天排产 + 脚本 + 质检清单
+                找出交付卡点，直接生成 7 天排产 + 脚本 + 质检清单，一份 PDF 可执行
               </p>
 
               <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -62,7 +62,7 @@ export default function DiagnosisPage() {
                   <ArrowRight className="w-5 h-5" />
                 </GlowLink>
                 <span className="text-xs sm:text-sm dark:text-zinc-500 text-zinc-400">
-                  无需注册 · 8 题 · 交付包可下载
+                  无需注册 · 14 题 · 一份 PDF 交付包
                 </span>
               </div>
 
@@ -89,7 +89,7 @@ export default function DiagnosisPage() {
               <h2 className="text-lg font-semibold dark:text-white text-zinc-900">五维评分结构</h2>
             </div>
             <p className="text-sm dark:text-zinc-400 text-zinc-500 mb-6">
-              评分全部以 0-10 呈现，避免虚假排名或不可验证指标。
+              评分全部以 0-10 呈现，不使用同行排名或不可验证百分比。
             </p>
 
             <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -112,7 +112,7 @@ export default function DiagnosisPage() {
               <ArrowRight className="w-5 h-5" />
             </GlowLink>
             <p className="text-xs dark:text-zinc-500 text-zinc-400 mt-3">
-              诊断完成后可直接生成交付包
+              诊断完成后即可生成可下载的 PDF 交付包
             </p>
           </section>
         </div>
@@ -127,7 +127,7 @@ export default function DiagnosisPage() {
               <ArrowRight className="w-5 h-5" />
             </GlowLink>
             <p className="mt-2 text-[10px] text-center dark:text-zinc-500 text-zinc-400">
-              交付包可下载 · 站内闭环
+              一份 PDF · 手机可直接打开
             </p>
           </div>
         </div>

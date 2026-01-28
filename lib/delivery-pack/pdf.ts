@@ -4,25 +4,25 @@ import fs from "fs/promises"
 import path from "path"
 import { DeliveryPackInput, DeliveryPackOutput } from "./schema"
 
-type PdfCursor = {
-  doc: PDFDocument
-  page: ReturnType<PDFDocument["addPage"]>
-  font: Awaited<ReturnType<PDFDocument["embedFont"]>>
-  y: number
-}
-
 const PAGE_WIDTH = 595.28
 const PAGE_HEIGHT = 841.89
-const MARGIN_X = 48
+const MARGIN_X = 44
 const MARGIN_Y = 56
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN_X * 2
 
 const COLOR_TEXT = rgb(0.12, 0.12, 0.14)
 const COLOR_MUTED = rgb(0.45, 0.48, 0.52)
-const COLOR_ACCENT = rgb(0.08, 0.72, 0.55)
-const COLOR_ACCENT_DARK = rgb(0.02, 0.48, 0.36)
-const COLOR_BLOCK = rgb(0.94, 0.98, 0.96)
-const COLOR_LINE = rgb(0.9, 0.9, 0.92)
+const COLOR_PRIMARY = rgb(0.05, 0.65, 0.55)
+const COLOR_PRIMARY_DARK = rgb(0.02, 0.45, 0.38)
+const COLOR_CARD = rgb(0.96, 0.98, 0.99)
+const COLOR_BORDER = rgb(0.9, 0.92, 0.94)
+const COLOR_DARK = rgb(0.05, 0.06, 0.07)
+const COLOR_ACCENT = rgb(0.1, 0.75, 0.6)
+
+type PdfCursor = {
+  doc: PDFDocument
+  font: Awaited<ReturnType<PDFDocument["embedFont"]>>
+}
 
 function wrapText(text: string, font: PdfCursor["font"], size: number, maxWidth: number): string[] {
   const lines: string[] = []
@@ -46,227 +46,719 @@ function wrapText(text: string, font: PdfCursor["font"], size: number, maxWidth:
   return lines
 }
 
-function ensureSpace(cursor: PdfCursor, height: number) {
-  if (cursor.y - height < MARGIN_Y) {
-    cursor.page = cursor.doc.addPage([PAGE_WIDTH, PAGE_HEIGHT])
-    cursor.y = PAGE_HEIGHT - MARGIN_Y
-  }
+function formatDate(value = new Date()): string {
+  const year = value.getFullYear()
+  const month = `${value.getMonth() + 1}`.padStart(2, "0")
+  const day = `${value.getDate()}`.padStart(2, "0")
+  return `${year}.${month}.${day}`
 }
 
-function drawCenteredText(
-  page: PdfCursor["page"],
+function drawWrappedText(params: {
+  page: ReturnType<PDFDocument["addPage"]>
+  font: PdfCursor["font"]
+  text: string
+  x: number
+  y: number
+  size: number
+  maxWidth: number
+  lineHeight?: number
+  color?: ReturnType<typeof rgb>
+}): number {
+  const { page, font, text, x, y, size, maxWidth, lineHeight = size + 6, color = COLOR_TEXT } = params
+  const lines = wrapText(text, font, size, maxWidth)
+  let cursorY = y
+  lines.forEach((line) => {
+    page.drawText(line, { x, y: cursorY, size, font, color })
+    cursorY -= lineHeight
+  })
+  return cursorY
+}
+
+function drawSectionTitle(
+  page: ReturnType<PDFDocument["addPage"]>,
   font: PdfCursor["font"],
   text: string,
-  y: number,
-  size: number,
-  color = COLOR_TEXT
-) {
-  const width = font.widthOfTextAtSize(text, size)
-  const x = Math.max(MARGIN_X, (PAGE_WIDTH - width) / 2)
-  page.drawText(text, { x, y, size, font, color })
-}
-
-function drawDivider(cursor: PdfCursor) {
-  ensureSpace(cursor, 12)
-  cursor.page.drawLine({
-    start: { x: MARGIN_X, y: cursor.y },
-    end: { x: PAGE_WIDTH - MARGIN_X, y: cursor.y },
-    thickness: 1,
-    color: COLOR_LINE,
-  })
-  cursor.y -= 12
-}
-
-function drawLines(
-  cursor: PdfCursor,
-  lines: string[],
-  size: number,
-  indent = 0,
-  color = COLOR_TEXT,
-  lineGap = 4
-) {
-  for (const line of lines) {
-    ensureSpace(cursor, size + lineGap)
-    cursor.page.drawText(line, {
-      x: MARGIN_X + indent,
-      y: cursor.y,
-      size,
-      font: cursor.font,
-      color,
-    })
-    cursor.y -= size + lineGap
-  }
-}
-
-function drawParagraph(
-  cursor: PdfCursor,
-  text: string,
-  size = 11,
-  indent = 0,
-  color = COLOR_TEXT,
-  spacing = 8
-) {
-  const lines = wrapText(text, cursor.font, size, CONTENT_WIDTH - indent)
-  drawLines(cursor, lines, size, indent, color)
-  cursor.y -= spacing
-}
-
-function drawHeading(cursor: PdfCursor, text: string, size = 16) {
-  cursor.y -= 6
-  drawLines(cursor, [text], size, 0, COLOR_TEXT, 6)
-  cursor.y -= 2
-  cursor.page.drawLine({
-    start: { x: MARGIN_X, y: cursor.y },
-    end: { x: MARGIN_X + 120, y: cursor.y },
+  y: number
+): number {
+  page.drawText(text, { x: MARGIN_X, y, size: 16, font, color: COLOR_TEXT })
+  page.drawLine({
+    start: { x: MARGIN_X, y: y - 8 },
+    end: { x: MARGIN_X + 140, y: y - 8 },
     thickness: 2,
-    color: COLOR_ACCENT,
+    color: COLOR_PRIMARY,
   })
-  cursor.y -= 12
+  return y - 26
 }
 
-function drawSubheading(cursor: PdfCursor, text: string, size = 13) {
-  cursor.y -= 2
-  drawLines(cursor, [text], size, 0, COLOR_ACCENT_DARK, 4)
-}
-
-function drawBullets(cursor: PdfCursor, items: string[], size = 11, indent = 14) {
-  items.forEach((item) => {
-    const bullet = "• "
-    const lines = wrapText(item, cursor.font, size, CONTENT_WIDTH - indent)
-    if (!lines.length) return
-    ensureSpace(cursor, size + 4)
-    cursor.page.drawText(bullet, {
-      x: MARGIN_X,
-      y: cursor.y,
-      size,
-      font: cursor.font,
-      color: COLOR_TEXT,
-    })
-    cursor.page.drawText(lines[0], {
-      x: MARGIN_X + indent,
-      y: cursor.y,
-      size,
-      font: cursor.font,
-      color: COLOR_TEXT,
-    })
-    cursor.y -= size + 4
-    for (const line of lines.slice(1)) {
-      ensureSpace(cursor, size + 4)
-      cursor.page.drawText(line, {
-        x: MARGIN_X + indent,
-        y: cursor.y,
-        size,
-        font: cursor.font,
-        color: COLOR_TEXT,
-      })
-      cursor.y -= size + 4
-    }
-  })
-  cursor.y -= 6
-}
-
-function drawHighlightBox(
-  page: PdfCursor["page"],
-  font: PdfCursor["font"],
+function drawCard(
+  page: ReturnType<PDFDocument["addPage"]>,
   x: number,
   y: number,
   width: number,
-  height: number,
-  title: string,
-  content: string
+  height: number
 ) {
   page.drawRectangle({
     x,
     y,
     width,
     height,
-    color: COLOR_BLOCK,
-    borderColor: COLOR_ACCENT,
+    color: COLOR_CARD,
+    borderColor: COLOR_BORDER,
     borderWidth: 1,
   })
-  page.drawText(title, { x: x + 12, y: y + height - 24, size: 12, font, color: COLOR_ACCENT_DARK })
-  const lines = wrapText(content, font, 11, width - 24)
-  let textY = y + height - 42
-  for (const line of lines.slice(0, 3)) {
-    page.drawText(line, { x: x + 12, y: textY, size: 11, font, color: COLOR_TEXT })
-    textY -= 16
+}
+
+function drawPill(
+  page: ReturnType<PDFDocument["addPage"]>,
+  font: PdfCursor["font"],
+  text: string,
+  x: number,
+  y: number
+) {
+  const paddingX = 8
+  const paddingY = 4
+  const fontSize = 10
+  const textWidth = font.widthOfTextAtSize(text, fontSize)
+  const width = textWidth + paddingX * 2
+  const height = fontSize + paddingY * 2
+  page.drawRectangle({
+    x,
+    y,
+    width,
+    height,
+    color: rgb(0.9, 0.98, 0.96),
+    borderColor: COLOR_PRIMARY,
+    borderWidth: 1,
+  })
+  page.drawText(text, {
+    x: x + paddingX,
+    y: y + paddingY,
+    size: fontSize,
+    font,
+    color: COLOR_PRIMARY_DARK,
+  })
+}
+
+function addFooter(page: ReturnType<PDFDocument["addPage"]>, font: PdfCursor["font"], index: number, total: number) {
+  const label = `IP内容工厂 · 第 ${index + 1} / ${total} 页`
+  const width = font.widthOfTextAtSize(label, 9)
+  page.drawText(label, {
+    x: PAGE_WIDTH - MARGIN_X - width,
+    y: 26,
+    size: 9,
+    font,
+    color: COLOR_MUTED,
+  })
+}
+
+function buildTomorrowBlock(output: DeliveryPackOutput) {
+  const dayOne = output.calendar_7d[0]
+  return {
+    title: dayOne.title,
+    hook: dayOne.hook,
+    outline: dayOne.outline,
+    cta: dayOne.cta,
   }
 }
 
-function buildStoryboardLines(script: DeliveryPackOutput["scripts_3"][number]): string[] {
-  const shot2 = [script.outline[0], script.outline[1]].filter(Boolean).join(" / ")
-  return [
-    `镜头1：${script.hook}`,
-    `镜头2：${shot2 || script.outline[0]}`,
-    `镜头3：${script.outline[2]} / CTA:${script.cta}`,
+function addCoverPage(cursor: PdfCursor, input: DeliveryPackInput, output: DeliveryPackOutput) {
+  const page = cursor.doc.addPage([PAGE_WIDTH, PAGE_HEIGHT])
+  page.drawRectangle({ x: 0, y: 0, width: PAGE_WIDTH, height: PAGE_HEIGHT, color: rgb(0.98, 0.99, 1) })
+  page.drawRectangle({ x: 0, y: PAGE_HEIGHT - 240, width: PAGE_WIDTH, height: 240, color: COLOR_DARK })
+  page.drawRectangle({ x: 0, y: PAGE_HEIGHT - 240, width: PAGE_WIDTH, height: 6, color: COLOR_ACCENT })
+
+  page.drawText("内容交付系统诊断", {
+    x: MARGIN_X,
+    y: PAGE_HEIGHT - 110,
+    size: 30,
+    font: cursor.font,
+    color: rgb(1, 1, 1),
+  })
+  page.drawText("7天高价值交付包（PDF）", {
+    x: MARGIN_X,
+    y: PAGE_HEIGHT - 150,
+    size: 18,
+    font: cursor.font,
+    color: rgb(0.85, 0.88, 0.9),
+  })
+  page.drawText("移动端优先 · 一份PDF即可执行", {
+    x: MARGIN_X,
+    y: PAGE_HEIGHT - 176,
+    size: 12,
+    font: cursor.font,
+    color: rgb(0.7, 0.74, 0.78),
+  })
+
+  const metaLine = [
+    `团队：${output.meta.team_type || input.team_type}`,
+    `平台：${output.meta.platform || input.platform}`,
+    `行业：${output.meta.industry || input.industry}`,
   ]
-}
+  page.drawText(metaLine.join("  ·  "), {
+    x: MARGIN_X,
+    y: PAGE_HEIGHT - 210,
+    size: 10,
+    font: cursor.font,
+    color: rgb(0.7, 0.74, 0.78),
+  })
 
-function addCoverPage(doc: PDFDocument, font: PdfCursor["font"], input: DeliveryPackInput, output: DeliveryPackOutput) {
-  const page = doc.addPage([PAGE_WIDTH, PAGE_HEIGHT])
-  page.drawRectangle({ x: 0, y: PAGE_HEIGHT - 120, width: PAGE_WIDTH, height: 120, color: COLOR_BLOCK })
-  drawCenteredText(page, font, "7天成交交付包", PAGE_HEIGHT - 80, 28, COLOR_TEXT)
-  drawCenteredText(page, font, "代运营成交版 · 可直接执行", PAGE_HEIGHT - 110, 12, COLOR_MUTED)
+  page.drawText(`生成日期：${formatDate()}`, {
+    x: MARGIN_X,
+    y: 90,
+    size: 10,
+    font: cursor.font,
+    color: COLOR_MUTED,
+  })
 
-  const meta = `行业：${input.industry}  ｜  平台：${input.platform}  ｜  账号类型：${input.account_type}`
-  drawCenteredText(page, font, meta, PAGE_HEIGHT - 150, 11, COLOR_MUTED)
-
-  drawCenteredText(page, font, `生成日期：${new Date().toLocaleDateString("zh-CN")}`, PAGE_HEIGHT - 170, 10, COLOR_MUTED)
-
-  const boxY = PAGE_HEIGHT - 330
-  drawHighlightBox(page, font, MARGIN_X, boxY, CONTENT_WIDTH, 86, "核心瓶颈", output.scorecard.core_bottleneck)
-
-  const actions = output.scorecard.top_actions.slice(0, 3).join(" / ")
-  drawHighlightBox(page, font, MARGIN_X, boxY - 110, CONTENT_WIDTH, 86, "Top3 优先动作", actions)
-
-  const listY = boxY - 210
-  page.drawText("本包包含", { x: MARGIN_X, y: listY, size: 12, font, color: COLOR_ACCENT_DARK })
-  const items = ["7天成交排产", "3条成交脚本", "10条高意图选题", "质检清单"]
-  let bulletY = listY - 18
-  items.forEach((item) => {
-    page.drawText("•", { x: MARGIN_X, y: bulletY, size: 11, font, color: COLOR_TEXT })
-    page.drawText(item, { x: MARGIN_X + 12, y: bulletY, size: 11, font, color: COLOR_TEXT })
-    bulletY -= 18
+  page.drawText("IP内容工厂", {
+    x: MARGIN_X,
+    y: 64,
+    size: 12,
+    font: cursor.font,
+    color: COLOR_TEXT,
   })
 }
 
-function addTocPage(doc: PDFDocument, font: PdfCursor["font"]) {
-  const page = doc.addPage([PAGE_WIDTH, PAGE_HEIGHT])
-  drawCenteredText(page, font, "目录", PAGE_HEIGHT - 90, 20, COLOR_TEXT)
-  const tocItems = [
-    "一、成交结论",
-    "二、7天成交排产",
-    "三、成交脚本（3条）",
-    "四、10条高意图选题",
-    "五、交付质检清单",
-    "六、下一步（可选）",
+function addTocPage(cursor: PdfCursor, input: DeliveryPackInput, output: DeliveryPackOutput) {
+  const page = cursor.doc.addPage([PAGE_WIDTH, PAGE_HEIGHT])
+  page.drawText("目录", {
+    x: MARGIN_X,
+    y: PAGE_HEIGHT - 90,
+    size: 22,
+    font: cursor.font,
+    color: COLOR_TEXT,
+  })
+  page.drawText("快速定位每一页交付内容", {
+    x: MARGIN_X,
+    y: PAGE_HEIGHT - 120,
+    size: 11,
+    font: cursor.font,
+    color: COLOR_MUTED,
+  })
+  page.drawRectangle({ x: MARGIN_X, y: PAGE_HEIGHT - 138, width: 48, height: 4, color: COLOR_ACCENT })
+
+  const meta = [
+    `团队：${output.meta.team_type || input.team_type}`,
+    `平台：${output.meta.platform || input.platform}`,
+    `行业：${output.meta.industry || input.industry}`,
   ]
-  let y = PAGE_HEIGHT - 150
-  tocItems.forEach((item) => {
-    page.drawText(item, { x: MARGIN_X, y, size: 12, font, color: COLOR_TEXT })
-    page.drawLine({
-      start: { x: MARGIN_X, y: y - 6 },
-      end: { x: PAGE_WIDTH - MARGIN_X, y: y - 6 },
-      thickness: 0.5,
-      color: COLOR_LINE,
+  page.drawText(meta.join("  ·  "), {
+    x: MARGIN_X,
+    y: PAGE_HEIGHT - 165,
+    size: 10,
+    font: cursor.font,
+    color: COLOR_MUTED,
+  })
+
+  return page
+}
+
+function fillTocPage(
+  page: ReturnType<PDFDocument["addPage"]>,
+  font: PdfCursor["font"],
+  sections: { title: string; pageIndex: number }[]
+) {
+  let y = PAGE_HEIGHT - 210
+  sections.forEach((section) => {
+    const pageNumber = `${section.pageIndex + 1}`
+    const numberWidth = font.widthOfTextAtSize(pageNumber, 11)
+    const dotStart = MARGIN_X + 120
+    const dotEnd = PAGE_WIDTH - MARGIN_X - numberWidth - 8
+
+    page.drawText(section.title, {
+      x: MARGIN_X,
+      y,
+      size: 12,
+      font,
+      color: COLOR_TEXT,
     })
-    y -= 28
-  })
-}
 
-function addFooters(doc: PDFDocument, font: PdfCursor["font"]) {
-  const pages = doc.getPages()
-  const total = pages.length
-  pages.forEach((page, index) => {
-    const label = `IP内容工厂 · 第 ${index + 1} / ${total} 页`
-    const width = font.widthOfTextAtSize(label, 9)
-    page.drawText(label, {
-      x: PAGE_WIDTH - MARGIN_X - width,
-      y: 28,
-      size: 9,
+    page.drawLine({
+      start: { x: dotStart, y: y + 4 },
+      end: { x: dotEnd, y: y + 4 },
+      thickness: 1,
+      color: COLOR_BORDER,
+    })
+
+    page.drawText(pageNumber, {
+      x: PAGE_WIDTH - MARGIN_X - numberWidth,
+      y,
+      size: 11,
       font,
       color: COLOR_MUTED,
     })
+
+    y -= 24
+  })
+}
+
+function addSummaryPage(cursor: PdfCursor, input: DeliveryPackInput, output: DeliveryPackOutput) {
+  const page = cursor.doc.addPage([PAGE_WIDTH, PAGE_HEIGHT])
+
+  let y = PAGE_HEIGHT - MARGIN_Y
+  page.drawText("一页结论", { x: MARGIN_X, y, size: 20, font: cursor.font, color: COLOR_TEXT })
+  page.drawText(`生成日期：${formatDate()}`, {
+    x: PAGE_WIDTH - MARGIN_X - 90,
+    y: y + 2,
+    size: 9,
+    font: cursor.font,
+    color: COLOR_MUTED,
+  })
+  y -= 22
+  page.drawLine({
+    start: { x: MARGIN_X, y },
+    end: { x: MARGIN_X + 120, y },
+    thickness: 3,
+    color: COLOR_PRIMARY,
+  })
+  y -= 24
+
+  drawSectionTitle(page, cursor.font, "核心瓶颈", y)
+  y -= 4
+  y = drawWrappedText({
+    page,
+    font: cursor.font,
+    text: output.bottleneck,
+    x: MARGIN_X,
+    y,
+    size: 12,
+    maxWidth: CONTENT_WIDTH,
+    lineHeight: 18,
+  })
+
+  y -= 10
+  drawSectionTitle(page, cursor.font, "7天只做3件事", y)
+  y -= 6
+  output.top_actions.forEach((item, index) => {
+    const title = `${index + 1}. ${item.title}`
+    y = drawWrappedText({
+      page,
+      font: cursor.font,
+      text: title,
+      x: MARGIN_X,
+      y,
+      size: 12,
+      maxWidth: CONTENT_WIDTH,
+      lineHeight: 18,
+      color: COLOR_PRIMARY_DARK,
+    })
+    y = drawWrappedText({
+      page,
+      font: cursor.font,
+      text: `原因：${item.why}`,
+      x: MARGIN_X + 16,
+      y,
+      size: 10,
+      maxWidth: CONTENT_WIDTH - 16,
+      lineHeight: 16,
+      color: COLOR_MUTED,
+    })
+  })
+
+  y -= 6
+  drawSectionTitle(page, cursor.font, "明天第一条发什么", y)
+  y -= 6
+  const tomorrow = buildTomorrowBlock(output)
+  drawCard(page, MARGIN_X, y - 150, CONTENT_WIDTH, 150)
+  let cardY = y - 28
+  cardY = drawWrappedText({
+    page,
+    font: cursor.font,
+    text: `标题：${tomorrow.title}`,
+    x: MARGIN_X + 16,
+    y: cardY,
+    size: 12,
+    maxWidth: CONTENT_WIDTH - 32,
+    lineHeight: 18,
+  })
+  cardY = drawWrappedText({
+    page,
+    font: cursor.font,
+    text: `3秒钩子：${tomorrow.hook}`,
+    x: MARGIN_X + 16,
+    y: cardY,
+    size: 11,
+    maxWidth: CONTENT_WIDTH - 32,
+    lineHeight: 16,
+  })
+  cardY = drawWrappedText({
+    page,
+    font: cursor.font,
+    text: `结构：${tomorrow.outline.join(" / ")}`,
+    x: MARGIN_X + 16,
+    y: cardY,
+    size: 11,
+    maxWidth: CONTENT_WIDTH - 32,
+    lineHeight: 16,
+  })
+  drawWrappedText({
+    page,
+    font: cursor.font,
+    text: `CTA：${tomorrow.cta}`,
+    x: MARGIN_X + 16,
+    y: cardY,
+    size: 11,
+    maxWidth: CONTENT_WIDTH - 32,
+    lineHeight: 16,
+    color: COLOR_PRIMARY_DARK,
+  })
+}
+
+function addScorePage(cursor: PdfCursor, output: DeliveryPackOutput) {
+  const page = cursor.doc.addPage([PAGE_WIDTH, PAGE_HEIGHT])
+  let y = PAGE_HEIGHT - MARGIN_Y
+  y = drawSectionTitle(page, cursor.font, "五维评分（0-10）", y)
+
+  output.scores.forEach((item) => {
+    const cardHeight = 88
+    drawCard(page, MARGIN_X, y - cardHeight + 10, CONTENT_WIDTH, cardHeight)
+    page.drawText(`${item.dimension} · ${item.score}/10`, {
+      x: MARGIN_X + 16,
+      y: y - 18,
+      size: 12,
+      font: cursor.font,
+      color: COLOR_TEXT,
+    })
+    drawWrappedText({
+      page,
+      font: cursor.font,
+      text: `现状：${item.insight}`,
+      x: MARGIN_X + 16,
+      y: y - 38,
+      size: 10,
+      maxWidth: CONTENT_WIDTH - 32,
+      lineHeight: 14,
+      color: COLOR_MUTED,
+    })
+    drawWrappedText({
+      page,
+      font: cursor.font,
+      text: `解决：${item.fix}`,
+      x: MARGIN_X + 16,
+      y: y - 62,
+      size: 10,
+      maxWidth: CONTENT_WIDTH - 32,
+      lineHeight: 14,
+      color: COLOR_PRIMARY_DARK,
+    })
+    y -= cardHeight + 8
+  })
+}
+
+function addCalendarPages(cursor: PdfCursor, output: DeliveryPackOutput) {
+  const items = output.calendar_7d
+  const perPage = 4
+  for (let pageIndex = 0; pageIndex < 2; pageIndex += 1) {
+    const page = cursor.doc.addPage([PAGE_WIDTH, PAGE_HEIGHT])
+    let y = PAGE_HEIGHT - MARGIN_Y
+    y = drawSectionTitle(page, cursor.font, "7天成交排产", y)
+    const start = pageIndex * perPage
+    const slice = items.slice(start, start + perPage)
+    slice.forEach((item) => {
+      const cardHeight = 140
+      drawCard(page, MARGIN_X, y - cardHeight + 8, CONTENT_WIDTH, cardHeight)
+      drawPill(page, cursor.font, item.type, MARGIN_X + 16, y - 28)
+      page.drawText(`Day ${item.day} · ${item.title}`, {
+        x: MARGIN_X + 90,
+        y: y - 26,
+        size: 12,
+        font: cursor.font,
+        color: COLOR_TEXT,
+      })
+      drawWrappedText({
+        page,
+        font: cursor.font,
+        text: `3秒钩子：${item.hook}`,
+        x: MARGIN_X + 16,
+        y: y - 48,
+        size: 10,
+        maxWidth: CONTENT_WIDTH - 32,
+        lineHeight: 14,
+      })
+      drawWrappedText({
+        page,
+        font: cursor.font,
+        text: `结构：${item.outline.join(" / ")}`,
+        x: MARGIN_X + 16,
+        y: y - 68,
+        size: 10,
+        maxWidth: CONTENT_WIDTH - 32,
+        lineHeight: 14,
+        color: COLOR_MUTED,
+      })
+      drawWrappedText({
+        page,
+        font: cursor.font,
+        text: `CTA：${item.cta} · 脚本 ${item.script_id}`,
+        x: MARGIN_X + 16,
+        y: y - 88,
+        size: 10,
+        maxWidth: CONTENT_WIDTH - 32,
+        lineHeight: 14,
+        color: COLOR_PRIMARY_DARK,
+      })
+      y -= cardHeight + 10
+    })
+  }
+}
+
+function addTopicsPages(cursor: PdfCursor, output: DeliveryPackOutput) {
+  const items = output.topics_10
+  const perPage = 5
+  for (let pageIndex = 0; pageIndex < 2; pageIndex += 1) {
+    const page = cursor.doc.addPage([PAGE_WIDTH, PAGE_HEIGHT])
+    let y = PAGE_HEIGHT - MARGIN_Y
+    y = drawSectionTitle(page, cursor.font, "10条高意图选题", y)
+    const slice = items.slice(pageIndex * perPage, pageIndex * perPage + perPage)
+    slice.forEach((item, index) => {
+      const cardHeight = 110
+      drawCard(page, MARGIN_X, y - cardHeight + 8, CONTENT_WIDTH, cardHeight)
+      drawPill(page, cursor.font, item.type, MARGIN_X + 16, y - 26)
+      page.drawText(`${pageIndex * perPage + index + 1}. ${item.title}`, {
+        x: MARGIN_X + 86,
+        y: y - 26,
+        size: 12,
+        font: cursor.font,
+        color: COLOR_TEXT,
+      })
+      drawWrappedText({
+        page,
+        font: cursor.font,
+        text: `${item.audience} · ${item.scene}`,
+        x: MARGIN_X + 16,
+        y: y - 48,
+        size: 10,
+        maxWidth: CONTENT_WIDTH - 32,
+        lineHeight: 14,
+        color: COLOR_MUTED,
+      })
+      drawWrappedText({
+        page,
+        font: cursor.font,
+        text: `痛点：${item.pain}`,
+        x: MARGIN_X + 16,
+        y: y - 66,
+        size: 10,
+        maxWidth: CONTENT_WIDTH - 32,
+        lineHeight: 14,
+      })
+      drawWrappedText({
+        page,
+        font: cursor.font,
+        text: `关键词：${item.keywords.join(" / ")} · CTA：${item.cta}`,
+        x: MARGIN_X + 16,
+        y: y - 84,
+        size: 10,
+        maxWidth: CONTENT_WIDTH - 32,
+        lineHeight: 14,
+        color: COLOR_PRIMARY_DARK,
+      })
+      y -= cardHeight + 10
+    })
+  }
+}
+
+function addScriptsPages(cursor: PdfCursor, output: DeliveryPackOutput) {
+  output.scripts_3.forEach((script) => {
+    const page = cursor.doc.addPage([PAGE_WIDTH, PAGE_HEIGHT])
+    let y = PAGE_HEIGHT - MARGIN_Y
+    y = drawSectionTitle(page, cursor.font, `${script.id} 脚本 · ${script.type}`, y)
+    page.drawText(`时长：${script.duration}`, {
+      x: MARGIN_X,
+      y: y,
+      size: 10,
+      font: cursor.font,
+      color: COLOR_MUTED,
+    })
+    y -= 20
+
+    drawCard(page, MARGIN_X, y - 170, CONTENT_WIDTH, 170)
+    let cardY = y - 20
+    script.shots.forEach((shot) => {
+      cardY = drawWrappedText({
+        page,
+        font: cursor.font,
+        text: `${shot.t}｜${shot.line}`,
+        x: MARGIN_X + 16,
+        y: cardY,
+        size: 11,
+        maxWidth: CONTENT_WIDTH - 32,
+        lineHeight: 16,
+      })
+      cardY = drawWrappedText({
+        page,
+        font: cursor.font,
+        text: `画面：${shot.visual}`,
+        x: MARGIN_X + 28,
+        y: cardY,
+        size: 10,
+        maxWidth: CONTENT_WIDTH - 44,
+        lineHeight: 14,
+        color: COLOR_MUTED,
+      })
+    })
+
+    y -= 190
+    y = drawWrappedText({
+      page,
+      font: cursor.font,
+      text: `成交话术（CTA）：${script.cta}`,
+      x: MARGIN_X,
+      y,
+      size: 11,
+      maxWidth: CONTENT_WIDTH,
+      lineHeight: 16,
+      color: COLOR_PRIMARY_DARK,
+    })
+    y -= 10
+
+    drawWrappedText({
+      page,
+      font: cursor.font,
+      text: `标题备选：${script.title_options.join(" / ")}`,
+      x: MARGIN_X,
+      y,
+      size: 10,
+      maxWidth: CONTENT_WIDTH,
+      lineHeight: 14,
+      color: COLOR_MUTED,
+    })
+
+    y -= 22
+    drawWrappedText({
+      page,
+      font: cursor.font,
+      text: `置顶评论：${script.pinned_comment}`,
+      x: MARGIN_X,
+      y,
+      size: 10,
+      maxWidth: CONTENT_WIDTH,
+      lineHeight: 14,
+    })
+  })
+}
+
+function addChecklistPage(cursor: PdfCursor, output: DeliveryPackOutput) {
+  const page = cursor.doc.addPage([PAGE_WIDTH, PAGE_HEIGHT])
+  let y = PAGE_HEIGHT - MARGIN_Y
+  y = drawSectionTitle(page, cursor.font, "发布质检清单（可打勾）", y)
+
+  const blocks = [
+    { title: "标题检查", items: output.qc_checklist.title },
+    { title: "结构检查", items: output.qc_checklist.body },
+    { title: "CTA与合规", items: output.qc_checklist.cta_and_compliance },
+  ]
+
+  blocks.forEach((block) => {
+    const cardHeight = 120
+    drawCard(page, MARGIN_X, y - cardHeight + 8, CONTENT_WIDTH, cardHeight)
+    page.drawText(block.title, {
+      x: MARGIN_X + 16,
+      y: y - 24,
+      size: 12,
+      font: cursor.font,
+      color: COLOR_TEXT,
+    })
+    let listY = y - 44
+    block.items.slice(0, 4).forEach((item) => {
+      page.drawText("□", {
+        x: MARGIN_X + 16,
+        y: listY,
+        size: 11,
+        font: cursor.font,
+        color: COLOR_PRIMARY_DARK,
+      })
+      listY = drawWrappedText({
+        page,
+        font: cursor.font,
+        text: item,
+        x: MARGIN_X + 32,
+        y: listY,
+        size: 10,
+        maxWidth: CONTENT_WIDTH - 48,
+        lineHeight: 14,
+      })
+    })
+    y -= cardHeight + 10
+  })
+}
+
+function addArchivePage(cursor: PdfCursor, output: DeliveryPackOutput) {
+  const page = cursor.doc.addPage([PAGE_WIDTH, PAGE_HEIGHT])
+  let y = PAGE_HEIGHT - MARGIN_Y
+  y = drawSectionTitle(page, cursor.font, "归档与去重规则", y)
+
+  drawCard(page, MARGIN_X, y - 110, CONTENT_WIDTH, 110)
+  drawWrappedText({
+    page,
+    font: cursor.font,
+    text: `命名规范：${output.archive_rules.naming}`,
+    x: MARGIN_X + 16,
+    y: y - 28,
+    size: 11,
+    maxWidth: CONTENT_WIDTH - 32,
+    lineHeight: 16,
+  })
+  drawWrappedText({
+    page,
+    font: cursor.font,
+    text: `标签体系：${output.archive_rules.tags.join(" / ")}`,
+    x: MARGIN_X + 16,
+    y: y - 52,
+    size: 10,
+    maxWidth: CONTENT_WIDTH - 32,
+    lineHeight: 14,
+    color: COLOR_MUTED,
+  })
+  drawWrappedText({
+    page,
+    font: cursor.font,
+    text: `去重规则：${output.archive_rules.dedupe.join(" / ")}`,
+    x: MARGIN_X + 16,
+    y: y - 74,
+    size: 10,
+    maxWidth: CONTENT_WIDTH - 32,
+    lineHeight: 14,
+    color: COLOR_MUTED,
+  })
+}
+
+function addUpsellPage(cursor: PdfCursor, output: DeliveryPackOutput) {
+  const page = cursor.doc.addPage([PAGE_WIDTH, PAGE_HEIGHT])
+  let y = PAGE_HEIGHT - MARGIN_Y
+  y = drawSectionTitle(page, cursor.font, "升级建议", y)
+  drawCard(page, MARGIN_X, y - 170, CONTENT_WIDTH, 170)
+  let listY = y - 32
+  output.upsell.when_to_upgrade.forEach((item) => {
+    page.drawText("•", {
+      x: MARGIN_X + 16,
+      y: listY,
+      size: 12,
+      font: cursor.font,
+      color: COLOR_PRIMARY_DARK,
+    })
+    listY = drawWrappedText({
+      page,
+      font: cursor.font,
+      text: item,
+      x: MARGIN_X + 32,
+      y: listY,
+      size: 11,
+      maxWidth: CONTENT_WIDTH - 48,
+      lineHeight: 16,
+    })
+  })
+
+  drawWrappedText({
+    page,
+    font: cursor.font,
+    text: output.upsell.cta,
+    x: MARGIN_X + 16,
+    y: y - 130,
+    size: 12,
+    maxWidth: CONTENT_WIDTH - 32,
+    lineHeight: 18,
+    color: COLOR_PRIMARY_DARK,
   })
 }
 
@@ -281,61 +773,51 @@ export async function renderDeliveryPackPdf(
   const fontBytes = await fs.readFile(fontPath)
   const font = await pdfDoc.embedFont(fontBytes, { subset: true })
 
-  addCoverPage(pdfDoc, font, input, output)
-  addTocPage(pdfDoc, font)
+  const cursor: PdfCursor = { doc: pdfDoc, font }
+  const sections: { title: string; pageIndex: number }[] = []
 
-  const cursor: PdfCursor = {
-    doc: pdfDoc,
-    page: pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]),
-    font,
-    y: PAGE_HEIGHT - MARGIN_Y,
-  }
+  addCoverPage(cursor, input, output)
+  const tocPage = addTocPage(cursor, input, output)
 
-  drawHeading(cursor, "一、成交结论")
-  drawParagraph(cursor, `核心瓶颈：${output.scorecard.core_bottleneck}`, 12)
-  drawLines(cursor, ["Top3 优先动作："], 12, 0, COLOR_TEXT, 6)
-  drawBullets(cursor, output.scorecard.top_actions, 11)
-  drawDivider(cursor)
+  const summaryStart = pdfDoc.getPageCount()
+  addSummaryPage(cursor, input, output)
+  sections.push({ title: "一页结论", pageIndex: summaryStart })
 
-  drawHeading(cursor, "二、7天成交排产")
-  output.calendar_7d.forEach((item, index) => {
-    drawSubheading(cursor, `Day ${index + 1}｜${item.theme}`)
-    drawParagraph(cursor, `交付物：${item.deliverable}`, 11, 0, COLOR_TEXT, 4)
-    if (item.notes) {
-      drawParagraph(cursor, `Hook/CTA：${item.notes}`, 11, 0, COLOR_TEXT, 8)
-    } else {
-      cursor.y -= 6
-    }
+  const scoreStart = pdfDoc.getPageCount()
+  addScorePage(cursor, output)
+  sections.push({ title: "五维评分（0-10）", pageIndex: scoreStart })
+
+  const calendarStart = pdfDoc.getPageCount()
+  addCalendarPages(cursor, output)
+  sections.push({ title: "7天成交排产", pageIndex: calendarStart })
+
+  const topicsStart = pdfDoc.getPageCount()
+  addTopicsPages(cursor, output)
+  sections.push({ title: "10条高意图选题", pageIndex: topicsStart })
+
+  const scriptsStart = pdfDoc.getPageCount()
+  addScriptsPages(cursor, output)
+  sections.push({ title: "成交脚本（S1-S3）", pageIndex: scriptsStart })
+
+  const checklistStart = pdfDoc.getPageCount()
+  addChecklistPage(cursor, output)
+  sections.push({ title: "发布质检清单", pageIndex: checklistStart })
+
+  const archiveStart = pdfDoc.getPageCount()
+  addArchivePage(cursor, output)
+  sections.push({ title: "归档与去重规则", pageIndex: archiveStart })
+
+  const upsellStart = pdfDoc.getPageCount()
+  addUpsellPage(cursor, output)
+  sections.push({ title: "升级建议", pageIndex: upsellStart })
+
+  fillTocPage(tocPage, font, sections)
+
+  const pages = pdfDoc.getPages()
+  pages.forEach((page, index) => {
+    if (index < 2) return
+    addFooter(page, font, index, pages.length)
   })
-  drawDivider(cursor)
-
-  drawHeading(cursor, "三、成交脚本（3条）")
-  output.scripts_3.forEach((script, index) => {
-    drawSubheading(cursor, `脚本${index + 1}｜${script.title}`)
-    drawParagraph(cursor, `开场钩子：${script.hook}`, 11, 0, COLOR_TEXT, 4)
-    drawLines(cursor, ["结构："], 11, 0, COLOR_TEXT, 4)
-    drawBullets(cursor, script.outline, 11)
-    drawParagraph(cursor, `成交话术模板：${script.cta}`, 11, 0, COLOR_TEXT, 4)
-    drawLines(cursor, ["极简分镜（3镜头）："], 11, 0, COLOR_TEXT, 4)
-    drawBullets(cursor, buildStoryboardLines(script), 11)
-  })
-  drawDivider(cursor)
-
-  drawHeading(cursor, "四、10条高意图选题")
-  output.topic_bank_10.forEach((topic, index) => {
-    drawSubheading(cursor, `${index + 1}. ${topic.title}`, 12)
-    drawParagraph(cursor, `目标/意图：${topic.intent}`, 11, 0, COLOR_TEXT, 4)
-    drawParagraph(cursor, `开场钩子：${topic.hook}`, 11, 0, COLOR_TEXT, 8)
-  })
-  drawDivider(cursor)
-
-  drawHeading(cursor, "五、交付质检清单（10条）")
-  drawBullets(cursor, output.qc_checklist_10, 11)
-
-  drawHeading(cursor, "六、下一步（可选）")
-  drawBullets(cursor, ["把脚本1今日发布并截图数据", "按排产执行7天并复盘转化"], 11)
-
-  addFooters(pdfDoc, font)
 
   const pdfBytes = await pdfDoc.save()
   return Buffer.from(pdfBytes)

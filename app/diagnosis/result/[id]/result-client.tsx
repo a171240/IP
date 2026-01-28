@@ -33,24 +33,8 @@ interface ResultClientProps {
   isPro?: boolean
   proExpiresAt?: string | null
   userId?: string | null
-}
-
-const problemLabels: Record<string, string> = {
-  topic_system_missing: "选题体系缺失",
-  calendar_blocked: "内容日历排不出来",
-  script_slow: "脚本产出慢/质量不稳",
-  qc_missing: "返工多口径乱（缺质检标准）",
-  conversion_weak: "转化链路不清",
-  archive_weak: "素材/知识不沉淀",
-}
-
-const problemActions: Record<string, string> = {
-  topic_system_missing: "先搭建选题体系，整理高意图场景清单",
-  calendar_blocked: "先做 7 天内容日历，锁定节奏与负责人",
-  script_slow: "固定 3 套脚本模板，减少反复沟通",
-  qc_missing: "建立 10 项质检清单，减少返工",
-  conversion_weak: "补齐成交链路，明确 CTA 与承接动作",
-  archive_weak: "制定归档规则，保证素材可复用",
+  coreBottleneck?: string
+  topActions?: string[]
 }
 
 const paywallCopy = {
@@ -60,7 +44,7 @@ const paywallCopy = {
     "10条高意图选题（PDF）",
     "3条成交脚本（PDF）",
     "质检清单（PDF）",
-    "成交结论 + 行动清单（PDF）",
+    "归档规则与升级建议（PDF）",
   ],
   ctaActivate: "/activate",
   ctaDemo: "/demo",
@@ -75,6 +59,8 @@ export function ResultClient({
   isPro,
   proExpiresAt,
   userId,
+  coreBottleneck,
+  topActions,
 }: ResultClientProps) {
   const router = useRouter()
   const [isGenerating, setIsGenerating] = useState(false)
@@ -88,7 +74,7 @@ export function ResultClient({
   const isProUser = Boolean(isPro)
   const industryLabel = INDUSTRY_LABELS[industry] || industry || "当前行业"
   const progressSteps = useMemo(
-    () => ["校验权益与配额", "生成成交内容", "生成脚本与选题", "渲染PDF交付包", "上传文件并就绪"],
+    () => ["校验权益", "生成结论", "生成排产与脚本", "渲染PDF", "上传完成"],
     []
   )
 
@@ -121,44 +107,16 @@ export function ResultClient({
     [result.dimensions]
   )
 
-  const coreBottleneck = useMemo(() => {
-    const problems = Array.isArray(answers?.current_problem) ? answers?.current_problem : []
-    if (problems?.length) {
-      return problemLabels[problems[0]] || problems[0]
-    }
+  const fallbackBottleneck = useMemo(() => {
     const lowest = dimensionCards.slice().sort((a, b) => a.score - b.score)[0]
-    return lowest ? `${lowest.name}偏弱` : "交付体系需要补齐"
-  }, [answers, dimensionCards])
+    return lowest ? `${lowest.name}偏弱` : "交付系统需要补齐"
+  }, [dimensionCards])
 
-  const topActions = useMemo(() => {
-    const actions = new Set<string>()
-    const problems = Array.isArray(answers?.current_problem) ? answers?.current_problem : []
-    problems.forEach((problem) => {
-      const action = problemActions[problem]
-      if (action) actions.add(action)
-    })
-    const defaults = [
-      "明确本周交付目标，拆成可执行动作",
-      "为每个岗位定义交付口径与检查项",
-      "安排一次复盘，沉淀可复用模板",
-    ]
-    defaults.forEach((item) => actions.add(item))
-    return Array.from(actions).slice(0, 3)
-  }, [answers])
-
-  const previewCalendar = [
-    { day: "Day1", theme: "交付定位与目标拆解", deliverable: "目标画像 + 承接口径" },
-    { day: "Day2", theme: "高意图选题池", deliverable: "10条选题清单" },
-    { day: "Day3", theme: "脚本模板搭建", deliverable: "3条可拍脚本" },
-  ]
-
-  const previewScripts = [
-    "客户为什么迟迟不转化？先拆掉 3 个隐性漏斗",
-    "7 天排产怎么排：3 个动作锁住节奏",
-    "一页纸 SOP：把交付口径写清楚",
-  ]
-
-  const previewChecklist = ["选题是否直指痛点", "脚本是否有明确开场钩子", "CTA 是否清晰可执行"]
+  const coreBottleneckText = coreBottleneck || fallbackBottleneck
+  const fallbackActions = ["明确本周交付目标", "固定7天排产节奏", "建立发布质检清单"]
+  const topActionsList = (
+    topActions?.length ? topActions : result.recommendations?.length ? result.recommendations : fallbackActions
+  ).slice(0, 3)
 
   useEffect(() => {
     if (!isProUser) {
@@ -183,17 +141,32 @@ export function ResultClient({
       userId,
       landingPath: window.location.pathname,
     })
+    track("pdf_generate_start", {
+      diagnosisId,
+      source: answers?.platform,
+      userId,
+      landingPath: window.location.pathname,
+    })
 
     try {
+      const resolvedIndustry =
+        answers?.industry === "other" ? industry : String(answers?.industry || industry || "other")
+
       const payload = {
-        industry: String(industry || "other"),
-        platform: String(answers?.platform || "xiaohongshu"),
-        account_type: String(answers?.account_type || "unknown"),
+        team_type: String(answers?.team_type || "unknown"),
         team_size: String(answers?.team_size || "unknown"),
-        delivery_mode: String(answers?.delivery_mode || "unknown"),
-        weekly_output: String(answers?.weekly_output || "unknown"),
-        goal: String(answers?.goal || "unknown"),
-        current_problem: Array.isArray(answers?.current_problem) ? answers?.current_problem : [],
+        industry: String(resolvedIndustry),
+        platform: String(answers?.platform || "xiaohongshu"),
+        offer_type: String(answers?.offer_type || "service"),
+        offer_desc: String(answers?.offer_desc || "暂未填写"),
+        sop_level: String(answers?.sop_level || ""),
+        guideline_level: String(answers?.guideline_level || ""),
+        topic_library: String(answers?.topic_library || ""),
+        multi_project: String(answers?.multi_project || ""),
+        script_review: String(answers?.script_review || ""),
+        qc_process: String(answers?.qc_process || ""),
+        conversion_path: String(answers?.conversion_path || ""),
+        review_frequency: String(answers?.review_frequency || ""),
       }
 
       const response = await fetch("/api/delivery-pack/generate", {
@@ -222,19 +195,26 @@ export function ResultClient({
           landingPath: window.location.pathname,
           error: data.error || response.status,
         })
+        track("pdf_generate_fail", {
+          diagnosisId,
+          source: answers?.platform,
+          userId,
+          landingPath: window.location.pathname,
+          error: data.error || response.status,
+        })
         if (response.status === 429) {
-          setGenerateError("今日生成次数已经用完")
+          setGenerateError("今日生成次数已用完")
           return
         }
         if (response.status === 403) {
-          setGenerateError("需要先激活体验卡或升级权限。")
+          setGenerateError("需要先激活体验卡或升级权限")
           return
         }
         if (response.status === 504 || data.error === "llm_timeout") {
-          setGenerateError("模型响应超时，请稍后再试。")
+          setGenerateError("模型响应超时，请稍后再试")
           return
         }
-        setGenerateError("生成失败，请稍后再试。")
+        setGenerateError("生成失败，请稍后再试")
         return
       }
 
@@ -249,6 +229,13 @@ export function ResultClient({
         landingPath: window.location.pathname,
         packId: data.packId,
       })
+      track("pdf_generate_success", {
+        diagnosisId,
+        source: answers?.platform,
+        userId,
+        landingPath: window.location.pathname,
+        packId: data.packId,
+      })
     } catch {
       track("delivery_pack_generate_fail", {
         diagnosisId,
@@ -257,7 +244,14 @@ export function ResultClient({
         landingPath: window.location.pathname,
         error: "network_error",
       })
-      setGenerateError("网络异常，请稍后再试。")
+      track("pdf_generate_fail", {
+        diagnosisId,
+        source: answers?.platform,
+        userId,
+        landingPath: window.location.pathname,
+        error: "network_error",
+      })
+      setGenerateError("网络异常，请稍后再试")
     } finally {
       setIsGenerating(false)
     }
@@ -277,6 +271,13 @@ export function ResultClient({
       landingPath: window.location.pathname,
       packId,
     })
+    track("pdf_download", {
+      diagnosisId,
+      source: answers?.platform,
+      userId,
+      landingPath: window.location.pathname,
+      packId,
+    })
     try {
       const downloadResp = await fetch(`/api/delivery-pack/${packId}/download`, { redirect: "manual" })
       if (downloadResp.type === "opaqueredirect") {
@@ -288,15 +289,15 @@ export function ResultClient({
         return
       }
       if (downloadResp.status === 409) {
-        setGenerateError("交付包还在生成，请稍后再试。")
+        setGenerateError("交付包仍在生成中，请稍后再试")
         return
       }
       if (downloadResp.status === 429) {
-        setGenerateError("今日生成次数已经用完")
+        setGenerateError("今日生成次数已用完")
         return
       }
       if (downloadResp.status >= 400) {
-        setGenerateError("下载失败，请稍后再试。")
+        setGenerateError("下载失败，请稍后再试")
         return
       }
       const location = downloadResp.headers.get("Location")
@@ -306,7 +307,7 @@ export function ResultClient({
       }
       window.location.href = `/api/delivery-pack/${packId}/download`
     } catch {
-      setGenerateError("下载失败，请稍后再试。")
+      setGenerateError("下载失败，请稍后再试")
     } finally {
       setIsDownloading(false)
     }
@@ -316,7 +317,7 @@ export function ResultClient({
     <div className="min-h-screen">
       <Header
         breadcrumbs={[
-          { label: "主页", href: "/" },
+          { label: "首页", href: "/" },
           { label: "内容交付系统诊断", href: "/diagnosis" },
           { label: "诊断结果" },
         ]}
@@ -327,9 +328,7 @@ export function ResultClient({
           <GlassCard className="p-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h1 className="text-2xl font-semibold dark:text-white text-zinc-900">
-                  交付系统诊断结果
-                </h1>
+                <h1 className="text-2xl font-semibold dark:text-white text-zinc-900">交付系统诊断结果</h1>
                 <p className="text-sm dark:text-zinc-400 text-zinc-500">
                   {new Date(createdAt).toLocaleDateString("zh-CN")} · {industryLabel}
                 </p>
@@ -368,12 +367,12 @@ export function ResultClient({
 
             <GlassCard className="p-6">
               <h2 className="text-lg font-semibold dark:text-white text-zinc-900">核心瓶颈</h2>
-              <p className="mt-3 text-sm text-zinc-300">{coreBottleneck}</p>
+              <p className="mt-3 text-sm text-zinc-300">{coreBottleneckText}</p>
 
               <div className="mt-6">
-                <h3 className="text-sm font-semibold text-zinc-200">Top3 优先级动作</h3>
+                <h3 className="text-sm font-semibold text-zinc-200">Top3 优先动作</h3>
                 <ul className="mt-3 space-y-2 text-sm text-zinc-400 list-disc list-inside">
-                  {topActions.map((action) => (
+                  {topActionsList.map((action) => (
                     <li key={action}>{action}</li>
                   ))}
                 </ul>
@@ -384,27 +383,25 @@ export function ResultClient({
           <GlassCard className="p-6">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <h2 className="text-lg font-semibold dark:text-white text-zinc-900">交付包预览</h2>
-              <span className="text-xs text-zinc-500">
-                {isProUser ? "已解锁" : "未解锁"} · 单份PDF交付包
-              </span>
+              <span className="text-xs text-zinc-500">{isProUser ? "已解锁" : "未解锁"} · 一份PDF</span>
             </div>
 
             <div className="mt-4 grid lg:grid-cols-3 gap-4">
               <div className={`rounded-xl border border-white/10 bg-white/5 p-4 ${isProUser ? "" : "blur-sm"}`}>
-                <h3 className="text-sm font-semibold text-zinc-200 mb-2">PDF封面 + 目录</h3>
+                <h3 className="text-sm font-semibold text-zinc-200 mb-2">一页结论 + 目录</h3>
                 <ul className="space-y-2 text-xs text-zinc-400 list-disc list-inside">
-                  <li>成交结论摘要</li>
-                  <li>7天排产目录</li>
-                  <li>脚本与选题索引</li>
+                  <li>核心瓶颈与Top3动作</li>
+                  <li>明天第一条可直接发布</li>
+                  <li>行动清单指引</li>
                 </ul>
               </div>
 
               <div className={`rounded-xl border border-white/10 bg-white/5 p-4 ${isProUser ? "" : "blur-sm"}`}>
                 <h3 className="text-sm font-semibold text-zinc-200 mb-2">成交脚本</h3>
                 <ul className="space-y-2 text-xs text-zinc-400 list-disc list-inside">
-                  <li>成交导向脚本</li>
-                  <li>共鸣信任脚本</li>
-                  <li>专业观点脚本</li>
+                  <li>镜头+台词+画面</li>
+                  <li>标题备选+置顶评论</li>
+                  <li>成交话术模板</li>
                 </ul>
               </div>
 
@@ -413,7 +410,7 @@ export function ResultClient({
                 <ul className="space-y-2 text-xs text-zinc-400 list-disc list-inside">
                   <li>7天成交排产</li>
                   <li>10条高意图选题</li>
-                  <li>质检清单（可判定）</li>
+                  <li>质检清单与归档规则</li>
                 </ul>
               </div>
             </div>
@@ -456,7 +453,7 @@ export function ResultClient({
 
                 {thinkingSummary?.length ? (
                   <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-sm text-zinc-200">
-                    <div className="text-sm font-semibold text-white">思考摘要（可读版本）</div>
+                    <div className="text-sm font-semibold text-white">思考摘要（可读版）</div>
                     <ul className="mt-3 space-y-2 text-sm text-zinc-300 list-disc list-inside">
                       {thinkingSummary.map((item, index) => (
                         <li key={`${item}-${index}`}>{item}</li>
@@ -464,7 +461,6 @@ export function ResultClient({
                     </ul>
                   </div>
                 ) : null}
-
 
                 {generateError ? <p className="text-sm text-rose-400">{generateError}</p> : null}
 

@@ -1,8 +1,8 @@
-import { notFound } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
-import { DIMENSIONS } from '@/lib/diagnosis/scoring'
-import { Dimension } from '@/lib/diagnosis/questions'
-import { ResultClient } from './result-client'
+import { notFound } from "next/navigation"
+import { createClient } from "@/lib/supabase/server"
+import { DIMENSIONS, calculateScore } from "@/lib/diagnosis/scoring"
+import { Dimension } from "@/lib/diagnosis/questions"
+import { ResultClient } from "./result-client"
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -13,9 +13,9 @@ export default async function ResultPage({ params }: PageProps) {
   const supabase = await createClient()
 
   const { data: result, error } = await supabase
-    .from('diagnostic_results')
-    .select('*')
-    .eq('id', id)
+    .from("diagnostic_results")
+    .select("*")
+    .eq("id", id)
     .single()
 
   if (error || !result) {
@@ -33,18 +33,14 @@ export default async function ResultPage({ params }: PageProps) {
 
     if (user) {
       userId = user.id
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('plan')
-        .eq('id', user.id)
-        .limit(1)
+      const { data: profiles } = await supabase.from("profiles").select("plan").eq("id", user.id).limit(1)
 
       const plan = profiles?.[0]?.plan as string | undefined
 
       const { data: entitlements } = await supabase
-        .from('entitlements')
-        .select('plan, pro_expires_at')
-        .eq('user_id', user.id)
+        .from("entitlements")
+        .select("plan, pro_expires_at")
+        .eq("user_id", user.id)
         .limit(1)
 
       const entitlement = entitlements?.[0]
@@ -58,7 +54,7 @@ export default async function ResultPage({ params }: PageProps) {
         }
       }
 
-      if (plan === 'pro' || plan === 'vip' || plan === 'trial_pro') {
+      if (plan === "pro" || plan === "vip" || plan === "trial_pro") {
         isPro = true
       }
     }
@@ -66,21 +62,25 @@ export default async function ResultPage({ params }: PageProps) {
     isPro = false
   }
 
-  // 构造 ScoreResult 对象
   const scoreResult = {
     total: result.total_score,
-    level: result.level as 'excellent' | 'good' | 'pass' | 'needs_improvement',
+    level: result.level as "excellent" | "good" | "pass" | "needs_improvement",
     levelLabel: getLevelLabel(result.level),
-    dimensions: result.scores as Record<Dimension, {
-      score: number
-      maxScore: number
-      status: 'strong' | 'normal' | 'weak'
-      insight: string
-    }>,
+    dimensions: result.scores as Record<
+      Dimension,
+      {
+        score: number
+        maxScore: number
+        status: "strong" | "normal" | "weak"
+        insight: string
+      }
+    >,
     insights: generateInsightsFromScores(result.scores),
     recommendations: result.recommendations || [],
-    actionPlan: result.action_plan || []
+    actionPlan: result.action_plan || [],
   }
+
+  const calculated = calculateScore((result.answers as Record<string, string | string[]>) || {})
 
   return (
     <ResultClient
@@ -92,44 +92,46 @@ export default async function ResultPage({ params }: PageProps) {
       isPro={isPro}
       proExpiresAt={proExpiresAt}
       userId={userId}
+      coreBottleneck={calculated.coreBottleneck}
+      topActions={calculated.topActions}
     />
   )
 }
 
 function getLevelLabel(level: string): string {
   const labels: Record<string, string> = {
-    excellent: '优秀',
-    good: '良好',
-    pass: '及格',
-    needs_improvement: '需改进'
+    excellent: "优秀",
+    good: "良好",
+    pass: "及格",
+    needs_improvement: "待提升",
   }
   return labels[level] || level
 }
 
 function generateInsightsFromScores(
-  scores: Record<string, { status: 'strong' | 'normal' | 'weak'; insight: string }>
+  scores: Record<string, { status: "strong" | "normal" | "weak"; insight: string }>
 ) {
   const insights: Array<{
     dimension: string
     title: string
     description: string
-    severity: 'high' | 'medium'
+    severity: "high" | "medium"
   }> = []
 
   Object.entries(scores).forEach(([key, dim]) => {
-    if (dim.status === 'weak') {
+    if (dim.status === "weak") {
       insights.push({
         dimension: key,
         title: `${DIMENSIONS[key as Dimension]?.name || key}需要重点改进`,
         description: dim.insight,
-        severity: 'high'
+        severity: "high",
       })
-    } else if (dim.status === 'normal') {
+    } else if (dim.status === "normal") {
       insights.push({
         dimension: key,
-        title: `${DIMENSIONS[key as Dimension]?.name || key}有提升空间`,
+        title: `${DIMENSIONS[key as Dimension]?.name || key}还有提升空间`,
         description: dim.insight,
-        severity: 'medium'
+        severity: "medium",
       })
     }
   })

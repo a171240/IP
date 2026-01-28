@@ -59,7 +59,7 @@ function buildPaywall() {
       "10条高意图选题（PDF）",
       "3条成交脚本（PDF）",
       "质检清单（PDF）",
-      "成交结论 + 行动清单（PDF）",
+      "归档规则与升级建议（PDF）",
     ],
     cta: {
       activate: "/activate",
@@ -68,15 +68,10 @@ function buildPaywall() {
   }
 }
 
-function sanitizePathSegment(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[\\\/]/g, "-")
-    .replace(/\s+/g, "")
-    .replace(/[^a-z0-9_-]/g, "")
-}
-
-async function checkEntitlement(supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>, userId: string) {
+async function checkEntitlement(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  userId: string
+) {
   const now = new Date()
   let isPro = false
 
@@ -196,8 +191,7 @@ export async function POST(request: NextRequest) {
 
     const date = new Date()
     const dateStr = date.toISOString().slice(0, 10).replace(/-/g, "")
-    const industrySafe = sanitizePathSegment(input.industry) || "pack"
-    const pdfName = `delivery_pack_${industrySafe}_${dateStr}.pdf`
+    const pdfName = `delivery_pack_${dateStr}.pdf`
     const pdfPath = `${user.id}/${packId}/${pdfName}`
 
     const { error: uploadError } = await admin.storage

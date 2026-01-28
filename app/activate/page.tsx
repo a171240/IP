@@ -2,29 +2,28 @@ import ActivateClient from "./activate-client"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 
 type ActivatePageProps = {
-  searchParams?: Record<string, string | string[] | undefined>
+  searchParams?: Record<string, string | string[] | undefined> | Promise<Record<string, string | string[] | undefined>>
 }
 
-function getParam(
-  searchParams: ActivatePageProps["searchParams"],
-  key: string
-): string | undefined {
+function getParam(searchParams: ActivatePageProps["searchParams"], key: string): string | undefined {
   const value = searchParams?.[key]
   if (Array.isArray(value)) return value[0]
   return value
 }
 
 export default async function ActivatePage({ searchParams }: ActivatePageProps) {
+  const resolvedParams = await Promise.resolve(searchParams)
   const utm = {
-    utm_source: getParam(searchParams, "utm_source"),
-    utm_medium: getParam(searchParams, "utm_medium"),
-    utm_campaign: getParam(searchParams, "utm_campaign"),
-    utm_content: getParam(searchParams, "utm_content"),
-    utm_term: getParam(searchParams, "utm_term"),
+    utm_source: getParam(resolvedParams, "utm_source"),
+    utm_medium: getParam(resolvedParams, "utm_medium"),
+    utm_campaign: getParam(resolvedParams, "utm_campaign"),
+    utm_content: getParam(resolvedParams, "utm_content"),
+    utm_term: getParam(resolvedParams, "utm_term"),
   }
 
   let userInfo: { id?: string; email?: string } | null = null
   let isPro = false
+  let proExpiresAt: string | null = null
 
   try {
     const supabase = await createServerSupabaseClient()
@@ -42,13 +41,16 @@ export default async function ActivatePage({ searchParams }: ActivatePageProps) 
         .limit(1)
 
       const entitlement = entitlements?.[0]
-      const proExpiresAt = entitlement?.pro_expires_at ? new Date(entitlement.pro_expires_at) : null
+      proExpiresAt = entitlement?.pro_expires_at ?? null
       const now = new Date()
-      if (proExpiresAt && proExpiresAt > now) {
-        isPro = true
+      if (proExpiresAt) {
+        const expiry = new Date(proExpiresAt)
+        if (expiry > now) {
+          isPro = true
+        }
       }
       if (entitlement?.plan && ["pro", "vip", "trial_pro"].includes(entitlement.plan)) {
-        if (proExpiresAt ? proExpiresAt > now : entitlement.plan !== "trial_pro") {
+        if (proExpiresAt ? new Date(proExpiresAt) > now : entitlement.plan !== "trial_pro") {
           isPro = true
         }
       }
@@ -57,5 +59,5 @@ export default async function ActivatePage({ searchParams }: ActivatePageProps) 
     userInfo = null
   }
 
-  return <ActivateClient utm={utm} user={userInfo} isPro={isPro} />
+  return <ActivateClient utm={utm} user={userInfo} isPro={isPro} proExpiresAt={proExpiresAt} />
 }

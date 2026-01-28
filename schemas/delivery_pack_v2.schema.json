@@ -3,72 +3,72 @@
   "title": "DeliveryPackV2",
   "type": "object",
   "required": [
-    "scorecard",
+    "meta",
+    "bottleneck",
+    "top_actions",
+    "scores",
     "calendar_7d",
-    "topic_bank_10",
+    "topics_10",
     "scripts_3",
-    "qc_checklist_10"
+    "qc_checklist",
+    "archive_rules",
+    "upsell"
   ],
   "properties": {
-    "scorecard": {
+    "meta": {
       "type": "object",
-      "required": ["dimensions", "core_bottleneck", "top_actions"],
+      "required": ["industry", "platform", "team_type", "offer_desc"],
       "properties": {
-        "dimensions": {
-          "type": "array",
-          "minItems": 5,
-          "items": {
-            "type": "object",
-            "required": ["name", "score", "insight"],
-            "properties": {
-              "name": { "type": "string" },
-              "score": { "type": "number", "minimum": 0, "maximum": 10 },
-              "insight": { "type": "string" }
-            }
+        "industry": { "type": "string" },
+        "platform": { "type": "string" },
+        "team_type": { "type": "string" },
+        "offer_desc": { "type": "string" }
+      }
+    },
+    "bottleneck": { "type": "string" },
+    "top_actions": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "required": ["title", "why", "do_in_7_days"],
+        "properties": {
+          "title": { "type": "string" },
+          "why": { "type": "string" },
+          "do_in_7_days": {
+            "type": "array",
+            "minItems": 2,
+            "items": { "type": "string" }
           }
-        },
-        "core_bottleneck": { "type": "string" },
-        "top_actions": {
-          "type": "array",
-          "minItems": 3,
-          "items": { "type": "string" }
+        }
+      }
+    },
+    "scores": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "required": ["dimension", "score", "insight", "fix"],
+        "properties": {
+          "dimension": { "type": "string" },
+          "score": { "type": "number", "minimum": 0, "maximum": 100 },
+          "insight": { "type": "string" },
+          "fix": { "type": "string" }
         }
       }
     },
     "calendar_7d": {
       "type": "array",
       "minItems": 7,
+      "maxItems": 7,
       "items": {
         "type": "object",
-        "required": ["day", "theme", "deliverable"],
+        "required": ["day", "type", "title", "hook", "outline", "cta", "script_id"],
         "properties": {
-          "day": { "type": "string" },
-          "theme": { "type": "string" },
-          "deliverable": { "type": "string" },
-          "notes": { "type": "string" }
-        }
-      }
-    },
-    "topic_bank_10": {
-      "type": "array",
-      "minItems": 10,
-      "items": {
-        "type": "object",
-        "required": ["title", "intent", "hook"],
-        "properties": {
-          "title": { "type": "string" },
-          "intent": { "type": "string" },
-          "hook": { "type": "string" }
-        }
-      }
-    },
-    "scripts_3": {
-      "type": "array",
-      "minItems": 3,
-      "items": {
-        "type": "object",
-        "required": ["title", "hook", "outline", "cta"],
-        "properties": {
+          "day": { "type": "integer", "minimum": 1, "maximum": 7 },
+          "type": { "type": "string" },
           "title": { "type": "string" },
           "hook": { "type": "string" },
           "outline": {
@@ -76,14 +76,93 @@
             "minItems": 3,
             "items": { "type": "string" }
           },
+          "cta": { "type": "string" },
+          "script_id": { "type": "string" }
+        }
+      }
+    },
+    "topics_10": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "required": ["title", "audience", "scene", "pain", "keywords", "type", "cta"],
+        "properties": {
+          "title": { "type": "string" },
+          "audience": { "type": "string" },
+          "scene": { "type": "string" },
+          "pain": { "type": "string" },
+          "keywords": {
+            "type": "array",
+            "minItems": 2,
+            "items": { "type": "string" }
+          },
+          "type": { "type": "string" },
           "cta": { "type": "string" }
         }
       }
     },
-    "qc_checklist_10": {
+    "scripts_3": {
       "type": "array",
-      "minItems": 10,
-      "items": { "type": "string" }
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "duration", "shots", "cta", "title_options", "pinned_comment"],
+        "properties": {
+          "id": { "type": "string" },
+          "type": { "type": "string" },
+          "duration": { "type": "string" },
+          "shots": {
+            "type": "array",
+            "minItems": 3,
+            "items": {
+              "type": "object",
+              "required": ["t", "line", "visual"],
+              "properties": {
+                "t": { "type": "string" },
+                "line": { "type": "string" },
+                "visual": { "type": "string" }
+              }
+            }
+          },
+          "cta": { "type": "string" },
+          "title_options": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": { "type": "string" }
+          },
+          "pinned_comment": { "type": "string" }
+        }
+      }
+    },
+    "qc_checklist": {
+      "type": "object",
+      "required": ["title", "body", "cta_and_compliance"],
+      "properties": {
+        "title": { "type": "array", "minItems": 3, "items": { "type": "string" } },
+        "body": { "type": "array", "minItems": 3, "items": { "type": "string" } },
+        "cta_and_compliance": { "type": "array", "minItems": 3, "items": { "type": "string" } }
+      }
+    },
+    "archive_rules": {
+      "type": "object",
+      "required": ["naming", "tags", "dedupe"],
+      "properties": {
+        "naming": { "type": "string" },
+        "tags": { "type": "array", "minItems": 3, "items": { "type": "string" } },
+        "dedupe": { "type": "array", "minItems": 3, "items": { "type": "string" } }
+      }
+    },
+    "upsell": {
+      "type": "object",
+      "required": ["when_to_upgrade", "cta"],
+      "properties": {
+        "when_to_upgrade": { "type": "array", "minItems": 2, "items": { "type": "string" } },
+        "cta": { "type": "string" }
+      }
     },
     "thinking_summary": {
       "type": "array",

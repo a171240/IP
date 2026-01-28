@@ -1,24 +1,23 @@
-'use client'
+"use client"
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { QUESTIONS } from '@/lib/diagnosis/questions'
-import { calculateScore } from '@/lib/diagnosis/scoring'
-import { GlassCard, GlowButton, Header } from '@/components/ui/obsidian'
-import { ArrowLeft, ArrowRight, Activity, RefreshCw, Check } from 'lucide-react'
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { QUESTIONS } from "@/lib/diagnosis/questions"
+import { calculateScore } from "@/lib/diagnosis/scoring"
+import { GlassCard, GlowButton, Header } from "@/components/ui/obsidian"
+import { ArrowLeft, ArrowRight, Activity, RefreshCw, Check } from "lucide-react"
+import { track } from "@/lib/analytics/client"
 
-// localStorage key for progress persistence
-const STORAGE_KEY = 'diagnosis_progress'
+const STORAGE_KEY = "diagnosis_progress"
 
 export default function QuizPage() {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(0)
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({})
-  const [customIndustry, setCustomIndustry] = useState('')
+  const [customIndustry, setCustomIndustry] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isHydrated, setIsHydrated] = useState(false)
 
-  // 从 localStorage 恢复进度
   useEffect(() => {
     setIsHydrated(true)
     const saved = localStorage.getItem(STORAGE_KEY)
@@ -34,14 +33,22 @@ export default function QuizPage() {
     }
   }, [])
 
-  // 保存进度到 localStorage
+  useEffect(() => {
+    track("diagnosis_start", {
+      landingPath: window.location.pathname,
+    })
+  }, [])
+
   useEffect(() => {
     if (isHydrated && Object.keys(answers).length > 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        step: currentStep,
-        answers,
-        customIndustry
-      }))
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          step: currentStep,
+          answers,
+          customIndustry,
+        })
+      )
     }
   }, [currentStep, answers, customIndustry, isHydrated])
 
@@ -50,17 +57,17 @@ export default function QuizPage() {
   const currentAnswer = answers[currentQuestion.id]
 
   const handleAnswer = (value: string | string[]) => {
-    setAnswers(prev => ({
+    setAnswers((prev) => ({
       ...prev,
-      [currentQuestion.id]: value
+      [currentQuestion.id]: value,
     }))
   }
 
   const handleOptionClick = (optionValue: string) => {
-    if (currentQuestion.type === 'multiple') {
+    if (currentQuestion.type === "multiple") {
       const current = (currentAnswer as string[]) || []
       if (current.includes(optionValue)) {
-        handleAnswer(current.filter(v => v !== optionValue))
+        handleAnswer(current.filter((value) => value !== optionValue))
       } else {
         handleAnswer([...current, optionValue])
       }
@@ -71,13 +78,13 @@ export default function QuizPage() {
 
   const handleNext = () => {
     if (currentStep < QUESTIONS.length - 1) {
-      setCurrentStep(prev => prev + 1)
+      setCurrentStep((prev) => prev + 1)
     }
   }
 
   const handlePrev = () => {
     if (currentStep > 0) {
-      setCurrentStep(prev => prev - 1)
+      setCurrentStep((prev) => prev - 1)
     }
   }
 
@@ -86,14 +93,16 @@ export default function QuizPage() {
     try {
       const result = calculateScore(answers)
 
-      // 如果选择了"其他行业"，使用自定义行业名称
-      const industryValue = answers.industry === 'other' && customIndustry.trim()
-        ? customIndustry.trim()
-        : answers.industry
+      track("diagnosis_submit", {
+        landingPath: window.location.pathname,
+      })
 
-      const response = await fetch('/api/diagnosis', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const industryValue =
+        answers.industry === "other" && customIndustry.trim() ? customIndustry.trim() : answers.industry
+
+      const response = await fetch("/api/diagnosis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           answers,
           scores: result.dimensions,
@@ -101,12 +110,12 @@ export default function QuizPage() {
           level: result.level,
           recommendations: result.recommendations,
           actionPlan: result.actionPlan,
-          industry: industryValue
-        })
+          industry: industryValue,
+        }),
       })
 
       if (!response.ok) {
-        throw new Error('Failed to save diagnosis')
+        throw new Error("Failed to save diagnosis")
       }
 
       const data = await response.json()
@@ -114,27 +123,36 @@ export default function QuizPage() {
       if (data?.id) {
         localStorage.setItem("latestDiagnosisId", data.id)
       }
+      track("diagnosis_complete", {
+        landingPath: window.location.pathname,
+        diagnosisId: data?.id,
+      })
       router.push(`/diagnosis/result/${data.id}`)
     } catch (error) {
-      console.error('Failed to submit diagnosis:', error)
-      alert('提交失败，请重试')
+      console.error("Failed to submit diagnosis:", error)
+      alert("提交失败，请重试")
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  // 检查是否是行业选择题
-  const isIndustryQuestion = currentQuestion.id === 'industry'
-  const isOtherSelected = currentAnswer === 'other'
+  const isIndustryQuestion = currentQuestion.id === "industry"
+  const isOtherSelected = currentAnswer === "other"
 
-  // 对于行业选择题，如果选了"其他"且没有填写自定义行业，则视为未回答
-  const isAnswered = currentQuestion.type === 'multiple'
-    ? (currentAnswer as string[])?.length > 0
-    : isIndustryQuestion && isOtherSelected
-      ? !!customIndustry.trim()
-      : !!currentAnswer
+  const isAnswered = (() => {
+    if (currentQuestion.type === "text") {
+      const text = String(currentAnswer || "")
+      return text.trim().length > 0
+    }
+    if (currentQuestion.type === "multiple") {
+      return Array.isArray(currentAnswer) && currentAnswer.length > 0
+    }
+    if (isIndustryQuestion && isOtherSelected) {
+      return !!customIndustry.trim()
+    }
+    return !!currentAnswer
+  })()
 
-  // 防止 hydration 不匹配
   if (!isHydrated) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -148,15 +166,16 @@ export default function QuizPage() {
 
   return (
     <div className="min-h-screen">
-      <Header breadcrumbs={[
-        { label: "主页", href: "/" },
-        { label: "内容交付系统诊断", href: "/diagnosis" },
-        { label: "问卷" }
-      ]} />
+      <Header
+        breadcrumbs={[
+          { label: "首页", href: "/" },
+          { label: "内容交付系统诊断", href: "/diagnosis" },
+          { label: "问卷" },
+        ]}
+      />
 
       <main className="p-6 lg:p-8">
         <div className="max-w-2xl mx-auto space-y-6">
-          {/* 进度条 */}
           <GlassCard className="p-4">
             <div className="flex items-center justify-between text-sm mb-2">
               <div className="flex items-center gap-2">
@@ -173,17 +192,12 @@ export default function QuizPage() {
                 style={{ width: `${progress}%` }}
               />
             </div>
-            {/* 进度激励文案 */}
             <div className="mt-2 text-center">
               {progress >= 50 && progress < 75 && (
-                <span className="text-xs text-emerald-400">
-                  已经过半，加油！
-                </span>
+                <span className="text-xs text-emerald-400">已经过半，继续保持</span>
               )}
               {progress >= 75 && progress < 100 && (
-                <span className="text-xs text-emerald-400">
-                  马上就能看到你的专属报告了
-                </span>
+                <span className="text-xs text-emerald-400">马上就能生成你的交付包</span>
               )}
               {progress < 50 && currentStep > 0 && (
                 <span className="text-xs dark:text-zinc-500 text-zinc-400">
@@ -193,7 +207,6 @@ export default function QuizPage() {
             </div>
           </GlassCard>
 
-          {/* 问题卡片 */}
           <GlassCard className="p-6">
             <div className="mb-6">
               <div className="flex items-start gap-3 mb-4">
@@ -212,70 +225,82 @@ export default function QuizPage() {
                 </div>
               </div>
 
-              {currentQuestion.type === 'multiple' && (
-                <p className="text-xs dark:text-zinc-500 text-zinc-400 mb-4">
-                  可多选
-                </p>
+              {currentQuestion.type === "multiple" && (
+                <p className="text-xs dark:text-zinc-500 text-zinc-400 mb-4">可多选</p>
               )}
             </div>
 
-            {/* 选项列表 */}
-            <div className="space-y-3">
-              {currentQuestion.options.map((option) => {
-                const isSelected = currentQuestion.type === 'multiple'
-                  ? (currentAnswer as string[])?.includes(option.value)
-                  : currentAnswer === option.value
+            {currentQuestion.type === "text" ? (
+              <div className="space-y-3">
+                <textarea
+                  value={String(currentAnswer || "")}
+                  onChange={(event) => handleAnswer(event.target.value)}
+                  placeholder={currentQuestion.placeholder || "请填写"}
+                  maxLength={currentQuestion.maxLength}
+                  rows={3}
+                  className="w-full rounded-xl dark:bg-zinc-900/60 bg-zinc-50 border dark:border-white/10 border-black/10 px-4 py-3 text-sm dark:text-white text-zinc-900 placeholder:dark:text-zinc-500 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                />
+                {currentQuestion.maxLength ? (
+                  <div className="text-xs text-zinc-500 text-right">
+                    {String(currentAnswer || "").length}/{currentQuestion.maxLength}
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {(currentQuestion.options || []).map((option) => {
+                  const isSelected =
+                    currentQuestion.type === "multiple"
+                      ? (currentAnswer as string[])?.includes(option.value)
+                      : currentAnswer === option.value
 
-                return (
-                  <button
-                    key={option.value}
-                    onClick={() => handleOptionClick(option.value)}
-                    className={`w-full p-4 rounded-xl border text-left transition-all ${
-                      isSelected
-                        ? 'dark:bg-emerald-500/10 bg-emerald-50 border-emerald-500/50 dark:border-emerald-500/30'
-                        : 'dark:bg-zinc-900/40 bg-zinc-50 dark:border-white/5 border-black/5 hover:dark:border-white/10 hover:border-black/10'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className={`font-medium ${
+                  return (
+                    <button
+                      key={option.value}
+                      onClick={() => handleOptionClick(option.value)}
+                      className={`w-full p-4 rounded-xl border text-left transition-all ${
                         isSelected
-                          ? 'dark:text-emerald-400 text-emerald-600'
-                          : 'dark:text-white text-zinc-900'
-                      }`}>
-                        {option.label}
-                      </span>
-                      {isSelected && (
-                        <Check className="w-5 h-5 text-emerald-500" />
-                      )}
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
+                          ? "dark:bg-emerald-500/10 bg-emerald-50 border-emerald-500/50 dark:border-emerald-500/30"
+                          : "dark:bg-zinc-900/40 bg-zinc-50 dark:border-white/5 border-black/5 hover:dark:border-white/10 hover:border-black/10"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span
+                          className={`font-medium ${
+                            isSelected ? "dark:text-emerald-400 text-emerald-600" : "dark:text-white text-zinc-900"
+                          }`}
+                        >
+                          {option.label}
+                        </span>
+                        {isSelected && <Check className="w-5 h-5 text-emerald-500" />}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
 
-            {/* 自定义行业输入框 */}
             {isIndustryQuestion && isOtherSelected && (
               <div className="mt-4 p-4 rounded-xl dark:bg-zinc-900/60 bg-zinc-100 border dark:border-emerald-500/20 border-emerald-500/30">
                 <label className="block text-sm font-medium dark:text-zinc-300 text-zinc-700 mb-2">
-                  请输入你的行业：
+                  请填写你的行业：
                 </label>
                 <input
                   type="text"
-                  placeholder="例如：宠物服务、法律咨询、旅游..."
+                  placeholder="例如：宠物服务、法律咨询、文旅..."
                   value={customIndustry}
-                  onChange={(e) => setCustomIndustry(e.target.value)}
+                  onChange={(event) => setCustomIndustry(event.target.value)}
                   className="w-full px-4 py-3 rounded-lg dark:bg-zinc-800 bg-white border dark:border-white/10 border-black/10 dark:text-white text-zinc-900 placeholder:dark:text-zinc-500 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                 />
               </div>
             )}
           </GlassCard>
 
-          {/* 导航按钮 */}
           <div className="flex items-center justify-between gap-4">
             <GlowButton
               onClick={handlePrev}
               disabled={currentStep === 0}
-              className={currentStep === 0 ? 'opacity-50 cursor-not-allowed' : ''}
+              className={currentStep === 0 ? "opacity-50 cursor-not-allowed" : ""}
             >
               <ArrowLeft className="w-4 h-4" />
               上一题
@@ -286,7 +311,7 @@ export default function QuizPage() {
                 primary
                 onClick={handleSubmit}
                 disabled={!isAnswered || isSubmitting}
-                className={!isAnswered ? 'opacity-50 cursor-not-allowed' : ''}
+                className={!isAnswered ? "opacity-50 cursor-not-allowed" : ""}
               >
                 {isSubmitting ? (
                   <>
@@ -295,7 +320,7 @@ export default function QuizPage() {
                   </>
                 ) : (
                   <>
-                    生成报告
+                    生成诊断结果
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
@@ -305,7 +330,7 @@ export default function QuizPage() {
                 primary
                 onClick={handleNext}
                 disabled={!isAnswered}
-                className={!isAnswered ? 'opacity-50 cursor-not-allowed' : ''}
+                className={!isAnswered ? "opacity-50 cursor-not-allowed" : ""}
               >
                 下一题
                 <ArrowRight className="w-4 h-4" />
@@ -313,7 +338,6 @@ export default function QuizPage() {
             )}
           </div>
 
-          {/* 提示 */}
           <p className="text-center text-xs dark:text-zinc-500 text-zinc-400">
             进度自动保存，可随时返回继续
           </p>
