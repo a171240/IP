@@ -1,6 +1,7 @@
 import { ZodError } from "zod"
 import { jsonrepair } from "jsonrepair"
 import { deliveryPackOutputSchema, DeliveryPackInput, DeliveryPackOutput } from "./schema"
+import { calculateScore } from "../diagnosis/scoring"
 import { sanitizeDeliveryPack } from "./sanitize"
 
 const APIMART_API_KEY = process.env.APIMART_QUICK_API_KEY || process.env.APIMART_API_KEY
@@ -38,6 +39,39 @@ const OFFER_TYPE_LABELS: Record<string, string> = {
 }
 
 const REQUIRED_DIMENSIONS = ["交付定位", "内容供给", "产能效率", "质检复盘", "成交转化"] as const
+
+const SCORE_DIMENSION_MAP = {
+  positioning: "交付定位",
+  content: "内容供给",
+  efficiency: "产能效率",
+  emotion: "质检复盘",
+  conversion: "成交转化",
+} as const
+
+function buildFallbackScores(input: DeliveryPackInput) {
+  const answers: Record<string, string> = {
+    sop_level: input.sop_level || "",
+    guideline_level: input.guideline_level || "",
+    topic_library: input.topic_library || "",
+    multi_project: input.multi_project || "",
+    script_review: input.script_review || "",
+    qc_process: input.qc_process || "",
+    conversion_path: input.conversion_path || "",
+    review_frequency: input.review_frequency || "",
+  }
+  const result = calculateScore(answers)
+  return Object.entries(SCORE_DIMENSION_MAP).map(([key, name]) => {
+    const dim = result.dimensions[key as keyof typeof result.dimensions]
+    const rawScore = typeof dim?.score === "number" ? dim.score : 0
+    const safeScore = rawScore > 0 ? Math.min(10, Math.max(1, Math.round(rawScore))) : 5
+    return {
+      dimension: name,
+      score: safeScore,
+      insight: dim?.insight || "当前存在改进空间",
+      fix: "本次交付包提供可执行方案",
+    }
+  })
+}
 
 const bannedPattern =
   /(击败|超过|行业排名|同行百分比|前\s*\d+%|top\s*\d+%|领先\s*\d+%|超过\s*\d+%)/i
@@ -691,11 +725,11 @@ function normalizeCoreOutput(input: DeliveryPackInput, value: any) {
     })
   }
 
-  const baseScores = REQUIRED_DIMENSIONS.map((dimension) => ({
-    dimension,
-    score: 0,
-    insight: "当前存在改进空间",
-    fix: "本次交付包提供可执行方案",
+  const baseScores = buildFallbackScores(input).map((item) => ({
+    dimension: item.dimension,
+    score: item.score,
+    insight: item.insight,
+    fix: item.fix,
   }))
 
   if (Array.isArray(output.scores)) {
@@ -703,7 +737,9 @@ function normalizeCoreOutput(input: DeliveryPackInput, value: any) {
       if (!item) return
       const match = baseScores.find((score) => String(item.dimension || "").includes(score.dimension))
       if (match) {
-        match.score = typeof item.score === "number" ? item.score : match.score
+        if (typeof item.score === "number" && item.score > 0) {
+          match.score = Math.min(10, Math.max(1, Math.round(item.score)))
+        }
         match.insight = item.insight || match.insight
         match.fix = item.fix || match.fix
       }
@@ -713,7 +749,9 @@ function normalizeCoreOutput(input: DeliveryPackInput, value: any) {
     Object.entries(output.scores).forEach(([key, value]) => {
       const match = baseScores.find((score) => key.includes(score.dimension))
       if (match) {
-        match.score = typeof value === "number" ? value : match.score
+        if (typeof value === "number" && value > 0) {
+          match.score = Math.min(10, Math.max(1, Math.round(value)))
+        }
       }
     })
     output.scores = baseScores
@@ -754,15 +792,19 @@ function normalizeCalendarOutput(input: DeliveryPackInput, value: any) {
   if (!Array.isArray(value?.calendar_7d)) {
     return { calendar_7d: fallback }
   }
-  const normalized = value.calendar_7d.map((item: any, index: number) => ({
-    day: item?.day || index + 1,
+  const normalized = value.calendar_7d.map((item: any, index: number) => {
+    const parsedDay = Number(item?.day)
+    const safeDay = Number.isFinite(parsedDay) && parsedDay > 0 ? Math.round(parsedDay) : index + 1
+    return {
+      day: safeDay,
     type: item?.type || fallback[index]?.type || "引流",
     title: item?.title || fallback[index]?.title,
     hook: item?.hook || fallback[index]?.hook,
     outline: Array.isArray(item?.outline) && item.outline.length ? item.outline.slice(0, 3) : fallback[index]?.outline,
     cta: item?.cta || fallback[index]?.cta,
     script_id: item?.script_id || fallback[index]?.script_id || "S1",
-  }))
+    }
+  })
   while (normalized.length < 7) {
     normalized.push(fallback[normalized.length])
   }
