@@ -69,7 +69,7 @@ function buildPaywall() {
 }
 
 async function checkEntitlement(
-  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClientForRequest>>,
   userId: string
 ) {
   const now = new Date()
