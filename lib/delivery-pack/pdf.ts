@@ -80,7 +80,7 @@ function clampLines(lines: string[], maxLines: number): string[] {
   const lastIndex = clipped.length - 1
   const last = clipped[lastIndex] ?? ""
   const ellipsis = "..."
-  clipped[lastIndex] = last.length > 1 - `${last.slice(0, last.length - 1)}${ellipsis}` : ellipsis
+  clipped[lastIndex] = last.length > 1 ? `${last.slice(0, last.length - 1)}${ellipsis}` : ellipsis
   return clipped
 }
 
