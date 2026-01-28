@@ -815,7 +815,7 @@ export async function generateDeliveryPackV2(input: DeliveryPackInput): Promise<
   }
 
   try {
-    const splitModel = process.env.APIMART_QUICK_MODEL || APIMART_MODEL
+    const splitModel = process.env.APIMART_QUICK_MODEL || "kimi-k2-thinking-turbo"
     const coreRaw = await callLLM(buildCorePrompt(input), 0.25, {
       model: splitModel,
       maxTokens: 1600,
