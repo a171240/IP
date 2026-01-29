@@ -193,55 +193,52 @@ export async function POST(request: NextRequest) {
   }
   const packId = created.id
 
-  try {
-    const output = await generateDeliveryPackV2(input)
-    const safeOutput = safeJson(output)
-    const pdfBuffer = await renderDeliveryPackPdf(input, safeOutput)
+  const runGeneration = async () => {
+    try {
+      const output = await generateDeliveryPackV2(input)
+      const safeOutput = safeJson(output)
+      const pdfBuffer = await renderDeliveryPackPdf(input, safeOutput)
 
-    const date = new Date()
-    const dateStr = date.toISOString().slice(0, 10).replace(/-/g, "")
-    const pdfName = `delivery_pack_${dateStr}.pdf`
-    const pdfPath = `${user.id}/${packId}/${pdfName}`
+      const date = new Date()
+      const dateStr = date.toISOString().slice(0, 10).replace(/-/g, "")
+      const pdfName = `delivery_pack_${dateStr}.pdf`
+      const pdfPath = `${user.id}/${packId}/${pdfName}`
 
-    const { error: uploadError } = await admin.storage
-      .from("delivery-packs")
-      .upload(pdfPath, pdfBuffer, { contentType: "application/pdf", upsert: true })
+      const { error: uploadError } = await admin.storage
+        .from("delivery-packs")
+        .upload(pdfPath, pdfBuffer, { contentType: "application/pdf", upsert: true })
 
-    if (uploadError) {
-      throw uploadError
+      if (uploadError) {
+        throw uploadError
+      }
+
+      const { error: updateError } = await admin
+        .from("delivery_packs")
+        .update({
+          status: "done",
+          output_json: safeOutput,
+          zip_path: pdfPath,
+        })
+        .eq("id", packId)
+
+      if (updateError) {
+        throw updateError
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "generate_failed"
+      console.error("[delivery-pack] generate failed", error)
+      await admin
+        .from("delivery_packs")
+        .update({ status: "failed", error_message: message })
+        .eq("id", packId)
     }
-
-    const { error: updateError } = await admin
-      .from("delivery_packs")
-      .update({
-        status: "done",
-        output_json: safeOutput,
-        zip_path: pdfPath,
-      })
-      .eq("id", packId)
-
-    if (updateError) {
-      throw updateError
-    }
-
-    return NextResponse.json({
-      ok: true,
-      packId,
-      status: "done",
-      thinkingSummary: output.thinking_summary ?? null,
-    })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "generate_failed"
-    console.error("[delivery-pack] generate failed", error)
-    await admin
-      .from("delivery_packs")
-      .update({ status: "failed", error_message: message })
-      .eq("id", packId)
-
-    if (message.toLowerCase().includes("timeout")) {
-      return NextResponse.json({ ok: false, error: "llm_timeout" }, { status: 504 })
-    }
-
-    return NextResponse.json({ ok: false, error: "generate_failed" }, { status: 500 })
   }
+
+  void runGeneration()
+
+  return NextResponse.json({
+    ok: true,
+    packId,
+    status: "pending",
+  })
 }

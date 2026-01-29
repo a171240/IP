@@ -42,6 +42,44 @@ const DIMENSION_ACTIONS: Record<Dimension, string[]> = {
   conversion: ["明确成交路径与承接动作", "CTA统一成一句话", "提升成交型内容占比"],
 }
 
+const PROBLEM_SCORE_ADJUSTMENTS: Record<string, Partial<Record<Dimension, number>>> = {
+  topic_system_missing: { content: -3 },
+  calendar_blocked: { content: -2, efficiency: -1 },
+  script_slow: { efficiency: -2, content: -1 },
+  qc_missing: { emotion: -3, efficiency: -1 },
+  conversion_unclear: { conversion: -3 },
+  archive_weak: { content: -1, efficiency: -1 },
+}
+
+function deriveScoresFromProblems(answers: Record<string, string | string[]>): Partial<Record<Dimension, number>> {
+  const problems = answers.current_problem
+  if (!problems) return {}
+  const list = Array.isArray(problems) ? problems : [problems]
+  if (!list.length) return {}
+
+  const base: Record<Dimension, number> = {
+    positioning: 7,
+    content: 7,
+    efficiency: 7,
+    emotion: 7,
+    conversion: 7,
+  }
+
+  list.forEach((problem) => {
+    const adjustment = PROBLEM_SCORE_ADJUSTMENTS[problem]
+    if (!adjustment) return
+    ;(Object.keys(adjustment) as Dimension[]).forEach((dimension) => {
+      base[dimension] += adjustment[dimension] ?? 0
+    })
+  })
+
+  ;(Object.keys(base) as Dimension[]).forEach((dimension) => {
+    base[dimension] = Math.max(3, Math.min(9, Math.round(base[dimension])))
+  })
+
+  return base
+}
+
 export function calculateScore(answers: Record<string, string | string[]>): ScoreResult {
   const dimensionScores: Record<Dimension, { weighted: number; totalWeight: number }> = {
     positioning: { weighted: 0, totalWeight: 0 },
@@ -76,10 +114,13 @@ export function calculateScore(answers: Record<string, string | string[]>): Scor
   const dimensions = {} as Record<Dimension, DimensionScore>
   let totalScore = 0
 
+  const derivedScores = deriveScoresFromProblems(answers)
+
   Object.entries(DIMENSIONS).forEach(([key, dim]) => {
     const { weighted, totalWeight } = dimensionScores[key as Dimension]
-    const avg = totalWeight > 0 ? weighted / totalWeight : 0
-    const normalized = Math.max(0, Math.min(10, Math.round(avg)))
+    const fallback = derivedScores[key as Dimension] ?? 6
+    const avg = totalWeight > 0 ? weighted / totalWeight : fallback
+    const normalized = Math.max(1, Math.min(10, Math.round(avg)))
     totalScore += normalized
 
     let status: "strong" | "normal" | "weak" = "normal"

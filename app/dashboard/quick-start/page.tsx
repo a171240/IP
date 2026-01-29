@@ -712,7 +712,7 @@ function QuickStartPageContent() {
                 <div>
                   <h2 className="text-lg font-semibold dark:text-white text-zinc-900">快速诊断：IP健康诊断</h2>
                   <p className="text-sm dark:text-zinc-400 text-zinc-500 mt-1">
-                    8道题快速定位你的内容瓶颈，生成综合评分与可执行改进建议。
+                    14道题快速定位你的内容瓶颈，生成综合评分与可执行改进建议。
                   </p>
                 </div>
               </div>

@@ -1,12 +1,13 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ArrowRight, CheckCircle } from "lucide-react"
 import { ObsidianBackgroundLite } from "@/components/ui/obsidian-background-lite"
 import { GlowButton } from "@/components/ui/obsidian-primitives"
-import { track } from "@/lib/analytics/client"
+import { getStoredUtm, track } from "@/lib/analytics/client"
+import { getSupabaseClient } from "@/lib/supabase"
 
 type ActivateClientProps = {
   utm: {
@@ -28,8 +29,18 @@ const benefits = [
   "质检清单 + 归档规则（PDF）",
 ]
 
-export default function ActivateClient({ user, isPro, proExpiresAt }: ActivateClientProps) {
+export default function ActivateClient({ utm, user, isPro, proExpiresAt }: ActivateClientProps) {
   const router = useRouter()
+  const [redeemCode, setRedeemCode] = useState("")
+  const [redeemEmail, setRedeemEmail] = useState(user?.email || "")
+  const [redeemLoading, setRedeemLoading] = useState(false)
+  const [redeemError, setRedeemError] = useState<string | null>(null)
+  const [redeemSuccess, setRedeemSuccess] = useState(false)
+  const [redeemLoginRequired, setRedeemLoginRequired] = useState(false)
+  const [redeemExpiresAt, setRedeemExpiresAt] = useState<string | null>(null)
+  const [redeemPlan, setRedeemPlan] = useState<string | null>(null)
+
+  const mergedUtm = useMemo(() => ({ ...getStoredUtm(), ...utm }), [utm])
 
   useEffect(() => {
     track("activation_open", {
@@ -170,6 +181,197 @@ export default function ActivateClient({ user, isPro, proExpiresAt }: ActivateCl
             </div>
           </section>
         </div>
+
+        {!isPro ? (
+          <section className="max-w-4xl mx-auto mt-8">
+            <div className="relative rounded-3xl border border-white/10 bg-zinc-950/60 backdrop-blur-xl p-8 sm:p-10">
+              <h2 className="text-2xl font-semibold text-white">没有权益？这里直接兑换</h2>
+              <p className="text-sm text-zinc-400 mt-2">
+                输入兑换码即可自动开通 7 天 Pro，未登录也可填写邮箱完成兑换。
+              </p>
+
+              {!redeemSuccess ? (
+                <form
+                  className="mt-6 grid gap-4"
+                  onSubmit={async (event) => {
+                    event.preventDefault()
+                    setRedeemError(null)
+                    setRedeemLoading(true)
+
+                    track("redeem_submit", {
+                      userId: user?.id,
+                      landingPath: window.location.pathname,
+                    })
+
+                    const normalizedCode = redeemCode.replace(/\s+/g, "").toUpperCase()
+                    const normalizedEmail = redeemEmail.trim().toLowerCase()
+                    const needsEmail = !user?.id
+
+                    if (!normalizedCode) {
+                      setRedeemError("请输入完整兑换码")
+                      setRedeemLoading(false)
+                      return
+                    }
+
+                    if (needsEmail) {
+                      if (!normalizedEmail) {
+                        setRedeemError("请输入邮箱")
+                        setRedeemLoading(false)
+                        return
+                      }
+                      if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+                        setRedeemError("邮箱格式不正确")
+                        setRedeemLoading(false)
+                        return
+                      }
+                    }
+
+                    try {
+                      const response = await fetch("/api/redeem", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          code: normalizedCode,
+                          email: needsEmail ? normalizedEmail : undefined,
+                          utm: mergedUtm,
+                        }),
+                      })
+
+                      const data = (await response.json()) as {
+                        ok?: boolean
+                        error?: string
+                        plan?: string
+                        expiresAt?: string
+                        loginRequired?: boolean
+                        session?: {
+                          access_token?: string
+                          refresh_token?: string
+                        }
+                      }
+
+                      if (response.ok && data.ok) {
+                        if (data.session?.access_token && data.session?.refresh_token) {
+                          const supabase = getSupabaseClient()
+                          await supabase.auth.setSession({
+                            access_token: data.session.access_token,
+                            refresh_token: data.session.refresh_token,
+                          })
+                        }
+
+                        track("redeem_success", {
+                          userId: user?.id,
+                          landingPath: window.location.pathname,
+                        })
+
+                        setRedeemPlan(data.plan ?? null)
+                        setRedeemExpiresAt(data.expiresAt ?? null)
+                        setRedeemLoginRequired(Boolean(data.loginRequired))
+                        setRedeemSuccess(true)
+
+                        if (!data.loginRequired) {
+                          setTimeout(() => router.refresh(), 600)
+                        }
+                      } else {
+                        track("redeem_fail", {
+                          userId: user?.id,
+                          landingPath: window.location.pathname,
+                          error: data.error || response.status,
+                        })
+                        if (response.status === 404) {
+                          setRedeemError("兑换码无效，请检查后重试")
+                        } else if (response.status === 409) {
+                          setRedeemError("兑换码已使用，请更换新的兑换码")
+                        } else if (response.status === 410) {
+                          setRedeemError("兑换码已过期，请联系工作人员")
+                        } else if (response.status === 429) {
+                          setRedeemError("操作过于频繁，请稍后再试")
+                        } else {
+                          setRedeemError(data.error || "兑换失败，请稍后再试")
+                        }
+                      }
+                    } catch {
+                      track("redeem_fail", {
+                        userId: user?.id,
+                        landingPath: window.location.pathname,
+                        error: "network_error",
+                      })
+                      setRedeemError("网络异常，请稍后再试")
+                    } finally {
+                      setRedeemLoading(false)
+                    }
+                  }}
+                >
+                  {!user?.id ? (
+                    <div>
+                      <label className="block text-sm text-zinc-300 mb-2">邮箱</label>
+                      <input
+                        type="email"
+                        value={redeemEmail}
+                        onChange={(event) => setRedeemEmail(event.target.value)}
+                        placeholder="填写你的邮箱"
+                        className="w-full rounded-xl bg-zinc-900/60 border border-white/10 px-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/40"
+                      />
+                      <p className="mt-2 text-xs text-zinc-500">用于创建账号并绑定权益</p>
+                    </div>
+                  ) : null}
+
+                  <div>
+                    <label className="block text-sm text-zinc-300 mb-2">兑换码</label>
+                    <input
+                      type="text"
+                      value={redeemCode}
+                      onChange={(event) => setRedeemCode(event.target.value)}
+                      placeholder="输入完整兑换码"
+                      className="w-full rounded-xl bg-zinc-900/60 border border-white/10 px-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/40"
+                    />
+                    <p className="mt-2 text-xs text-zinc-500">支持粘贴，系统会自动去空格并转大写</p>
+                  </div>
+
+                  {redeemError ? <p className="text-sm text-rose-400">{redeemError}</p> : null}
+
+                  <GlowButton primary className="w-full py-3 text-base" type="submit" disabled={redeemLoading}>
+                    {redeemLoading ? "提交中..." : "立即兑换开通"}
+                    <ArrowRight className="w-4 h-4" />
+                  </GlowButton>
+                </form>
+              ) : (
+                <div className="mt-6 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-5 text-sm text-emerald-100">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5 text-emerald-300" />
+                    <span>兑换成功，已开通 {redeemPlan || "Pro"} 权益</span>
+                  </div>
+                  <p className="mt-2 text-xs text-emerald-200">
+                    {redeemLoginRequired
+                      ? "已为该邮箱开通权益，请登录后继续"
+                      : formatDate(redeemExpiresAt)
+                        ? `有效期至 ${formatDate(redeemExpiresAt)}`
+                        : "现在可以直接开始诊断"}
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    {redeemLoginRequired ? (
+                      <Link
+                        href="/auth/login?redirect=/activate"
+                        className="inline-flex items-center justify-center px-4 py-2 text-xs font-semibold rounded-lg bg-emerald-500 text-white"
+                      >
+                        登录继续
+                        <ArrowRight className="w-4 h-4 ml-1" />
+                      </Link>
+                    ) : (
+                      <GlowButton
+                        primary
+                        className="px-4 py-2 text-xs"
+                        onClick={() => router.push("/diagnosis/quiz")}
+                      >
+                        立即开始诊断
+                        <ArrowRight className="w-4 h-4" />
+                      </GlowButton>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        ) : null}
       </main>
     </div>
   )

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { GlassCard, GlowButton, Header } from "@/components/ui/obsidian"
-import { ArrowRight, Download, Loader2, Sparkles } from "lucide-react"
+import { ArrowRight, Copy, Download, Loader2, Sparkles } from "lucide-react"
 import { DIMENSIONS } from "@/lib/diagnosis/scoring"
 import { Dimension, INDUSTRY_LABELS } from "@/lib/diagnosis/questions"
 import { track } from "@/lib/analytics/client"
@@ -70,6 +70,37 @@ export function ResultClient({
   const [isDownloading, setIsDownloading] = useState(false)
   const [progressStep, setProgressStep] = useState(0)
   const [progressValue, setProgressValue] = useState(0)
+  const recoverLatestPack = useCallback(async () => {
+    let keepGenerating = false
+    try {
+      const response = await fetch("/api/delivery-pack/latest")
+      if (!response.ok) return null
+      const data = (await response.json()) as { ok?: boolean; packId?: string; status?: string }
+      if (data?.ok && data.packId && data.status === "done") {
+        return data.packId
+      }
+    } catch {
+      return null
+    }
+    return null
+  }, [])
+  const pollPackStatus = useCallback(async (id: string) => {
+    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+    for (let attempt = 0; attempt < 80; attempt += 1) {
+      await sleep(3000)
+      const response = await fetch(`/api/delivery-pack/${id}`)
+      if (!response.ok) continue
+      const data = (await response.json()) as { status?: string; errorMessage?: string }
+      if (data.status === "done") {
+        return { status: "done" as const }
+      }
+      if (data.status === "failed") {
+        return { status: "failed" as const, errorMessage: data.errorMessage }
+      }
+    }
+    return { status: "timeout" as const }
+  }, [])
+
 
   const isProUser = Boolean(isPro)
   const industryLabel = INDUSTRY_LABELS[industry] || industry || "当前行业"
@@ -114,9 +145,7 @@ export function ResultClient({
 
   const coreBottleneckText = coreBottleneck || fallbackBottleneck
   const fallbackActions = ["明确本周交付目标", "固定7天排产节奏", "建立发布质检清单"]
-  const topActionsList = (
-    topActions?.length ? topActions : result.recommendations?.length ? result.recommendations : fallbackActions
-  ).slice(0, 3)
+  const topActionsList = (topActions?.length ? topActions : fallbackActions).slice(0, 3)
 
   useEffect(() => {
     if (!isProUser) {
@@ -128,6 +157,34 @@ export function ResultClient({
       })
     }
   }, [answers?.platform, diagnosisId, isProUser, userId])
+
+  useEffect(() => {
+    if (packId) return
+    if (typeof window === "undefined") return
+    const stored = window.localStorage.getItem("latestDeliveryPackId")
+    if (stored) {
+      setPackId(stored)
+      return
+    }
+    ;(async () => {
+      const latest = await recoverLatestPack()
+      if (latest) {
+        setPackId(latest)
+        try {
+          window.localStorage.setItem("latestDeliveryPackId", latest)
+        } catch {}
+      }
+    })()
+  }, [packId, recoverLatestPack])
+
+  useEffect(() => {
+    if (!packId || isGenerating) return
+    if (typeof window === "undefined") return
+    const redirectedKey = `previewRedirected:${packId}`
+    if (window.sessionStorage.getItem(redirectedKey)) return
+    window.sessionStorage.setItem(redirectedKey, "1")
+    router.replace(`/delivery-pack/${packId}`)
+  }, [packId, isGenerating, router])
 
   const handleGeneratePack = useCallback(async () => {
     setGenerateError(null)
@@ -159,14 +216,17 @@ export function ResultClient({
         platform: String(answers?.platform || "xiaohongshu"),
         offer_type: String(answers?.offer_type || "service"),
         offer_desc: String(answers?.offer_desc || "暂未填写"),
-        sop_level: String(answers?.sop_level || ""),
+        delivery_mode: String(answers?.delivery_mode || ""),
         guideline_level: String(answers?.guideline_level || ""),
-        topic_library: String(answers?.topic_library || ""),
-        multi_project: String(answers?.multi_project || ""),
-        script_review: String(answers?.script_review || ""),
         qc_process: String(answers?.qc_process || ""),
         conversion_path: String(answers?.conversion_path || ""),
-        review_frequency: String(answers?.review_frequency || ""),
+        current_problem:
+          Array.isArray(answers?.current_problem) && answers.current_problem.length
+            ? answers.current_problem
+            : undefined,
+        target_audience: String(answers?.target_audience || ""),
+        price_range: String(answers?.price_range || ""),
+        tone: String(answers?.tone || ""),
       }
 
       const response = await fetch("/api/delivery-pack/generate", {
@@ -185,6 +245,7 @@ export function ResultClient({
         packId?: string
         error?: string
         thinkingSummary?: string[]
+        status?: string
       }
 
       if (!response.ok || !data.ok) {
@@ -202,6 +263,16 @@ export function ResultClient({
           landingPath: window.location.pathname,
           error: data.error || response.status,
         })
+        const recovered = await recoverLatestPack()
+        if (recovered) {
+          setPackId(recovered)
+          try {
+            window.localStorage.setItem("latestDeliveryPackId", recovered)
+          } catch {}
+          setProgressStep(progressSteps.length - 1)
+          setProgressValue(100)
+          return
+        }
         if (response.status === 429) {
           setGenerateError("今日生成次数已用完")
           return
@@ -219,7 +290,42 @@ export function ResultClient({
       }
 
       setPackId(data.packId || null)
+      if (data.packId && typeof window !== "undefined") {
+        try {
+          window.localStorage.setItem("latestDeliveryPackId", data.packId)
+        } catch {}
+      }
       setThinkingSummary(data.thinkingSummary?.length ? data.thinkingSummary : null)
+
+      if (data.status === "pending" && data.packId) {
+        keepGenerating = true
+        const pollResult = await pollPackStatus(data.packId)
+        if (pollResult.status === "done") {
+          setProgressStep(progressSteps.length - 1)
+          setProgressValue(100)
+          track("delivery_pack_generate_success", {
+            diagnosisId,
+            source: answers?.platform,
+            userId,
+            landingPath: window.location.pathname,
+            packId: data.packId,
+          })
+          track("pdf_generate_success", {
+            diagnosisId,
+            source: answers?.platform,
+            userId,
+            landingPath: window.location.pathname,
+            packId: data.packId,
+          })
+        } else if (pollResult.status === "failed") {
+          setGenerateError("鐢熸垚澶辫触锛岃绋嶅悗鍐嶈瘯")
+        } else {
+          setGenerateError("鐢熸垚瓒呮椂锛岃绋嶅悗鍐嶈瘯")
+        }
+        keepGenerating = false
+        return
+      }
+
       setProgressStep(progressSteps.length - 1)
       setProgressValue(100)
       track("delivery_pack_generate_success", {
@@ -251,11 +357,23 @@ export function ResultClient({
         landingPath: window.location.pathname,
         error: "network_error",
       })
+      const recovered = await recoverLatestPack()
+      if (recovered) {
+        setPackId(recovered)
+        try {
+          window.localStorage.setItem("latestDeliveryPackId", recovered)
+        } catch {}
+        setProgressStep(progressSteps.length - 1)
+        setProgressValue(100)
+        return
+      }
       setGenerateError("网络异常，请稍后再试")
     } finally {
-      setIsGenerating(false)
+      if (!keepGenerating) {
+        setIsGenerating(false)
+      }
     }
-  }, [answers, diagnosisId, industry, progressSteps.length, router, userId])
+  }, [answers, diagnosisId, industry, pollPackStatus, progressSteps.length, recoverLatestPack, router, userId])
 
   const handleDownload = useCallback(async () => {
     if (!packId) {
@@ -462,7 +580,11 @@ export function ResultClient({
                   </div>
                 ) : null}
 
-                {generateError ? <p className="text-sm text-rose-400">{generateError}</p> : null}
+                {isGenerating ? (
+                  <p className="text-sm text-emerald-200">???????? 1-2 ????????????????</p>
+                ) : null}
+
+                {generateError && !isGenerating ? <p className="text-sm text-rose-400">{generateError}</p> : null}
 
                 <div className="flex flex-col sm:flex-row gap-3">
                   <GlowButton primary onClick={handleGeneratePack} disabled={isGenerating}>
@@ -478,7 +600,14 @@ export function ResultClient({
                       </>
                     )}
                   </GlowButton>
-                  <GlowButton onClick={handleDownload} disabled={!packId || isDownloading}>
+                  <GlowButton
+                    onClick={() => packId && router.push(`/delivery-pack/${packId}`)}
+                    disabled={!packId || isGenerating}
+                  >
+                    <Copy className="w-4 h-4" />
+                    在线预览
+                  </GlowButton>
+                  <GlowButton onClick={handleDownload} disabled={!packId || isDownloading || isGenerating}>
                     {isDownloading ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />

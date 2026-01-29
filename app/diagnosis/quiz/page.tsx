@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { QUESTIONS } from "@/lib/diagnosis/questions"
 import { calculateScore } from "@/lib/diagnosis/scoring"
 import { GlassCard, GlowButton, Header } from "@/components/ui/obsidian"
@@ -12,6 +12,9 @@ const STORAGE_KEY = "diagnosis_progress"
 
 export default function QuizPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const force = searchParams?.get("force")
+  const shouldSkip = force === "1" || force === "true"
   const [currentStep, setCurrentStep] = useState(0)
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({})
   const [customIndustry, setCustomIndustry] = useState("")
@@ -20,6 +23,18 @@ export default function QuizPage() {
 
   useEffect(() => {
     setIsHydrated(true)
+    if (!shouldSkip) {
+      const latestPack = localStorage.getItem("latestDeliveryPackId")
+      if (latestPack) {
+        router.replace(`/delivery-pack/${latestPack}`)
+        return
+      }
+      const latest = localStorage.getItem("latestDiagnosisId")
+      if (latest) {
+        router.replace(`/diagnosis/result/${latest}`)
+        return
+      }
+    }
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved) {
       try {
@@ -31,7 +46,7 @@ export default function QuizPage() {
         localStorage.removeItem(STORAGE_KEY)
       }
     }
-  }, [])
+  }, [router, shouldSkip])
 
   useEffect(() => {
     track("diagnosis_start", {

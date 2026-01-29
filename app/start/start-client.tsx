@@ -1,12 +1,13 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { ArrowRight, ClipboardCheck, Sparkles, Target } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { ArrowRight, CheckCircle, ClipboardCheck, Sparkles, Target } from "lucide-react"
 import { ObsidianBackgroundLite } from "@/components/ui/obsidian-background-lite"
 import { GlowButton } from "@/components/ui/obsidian-primitives"
-import { track } from "@/lib/analytics/client"
+import { getStoredUtm, track } from "@/lib/analytics/client"
+import { getSupabaseClient } from "@/lib/supabase"
 
 type StartClientProps = {
   user: { id: string; email?: string } | null
@@ -18,7 +19,31 @@ const LAST_RESULT_KEY = "latestDiagnosisId"
 
 export default function StartClient({ user, remainingDays, isPro }: StartClientProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [latestResultId, setLatestResultId] = useState<string | null>(null)
+  const [redeemCode, setRedeemCode] = useState("")
+  const [redeemEmail, setRedeemEmail] = useState("")
+  const [redeemLoading, setRedeemLoading] = useState(false)
+  const [redeemError, setRedeemError] = useState<string | null>(null)
+  const [redeemSuccess, setRedeemSuccess] = useState(false)
+  const [redeemLoginRequired, setRedeemLoginRequired] = useState(false)
+  const [redeemExpiresAt, setRedeemExpiresAt] = useState<string | null>(null)
+  const [redeemPlan, setRedeemPlan] = useState<string | null>(null)
+
+  const codeFromQuery = searchParams?.get("code") ?? ""
+  const emailFromQuery = searchParams?.get("email") ?? ""
+  const sourceFromQuery = searchParams?.get("from") ?? "start"
+  const mergedUtm = useMemo(
+    () => ({
+      ...getStoredUtm(),
+      utm_source: searchParams?.get("utm_source") ?? undefined,
+      utm_medium: searchParams?.get("utm_medium") ?? undefined,
+      utm_campaign: searchParams?.get("utm_campaign") ?? undefined,
+      utm_content: searchParams?.get("utm_content") ?? undefined,
+      utm_term: searchParams?.get("utm_term") ?? undefined,
+    }),
+    [searchParams]
+  )
 
   useEffect(() => {
     track("trial_view", { remaining_days: remainingDays, is_pro: isPro })
@@ -32,6 +57,22 @@ export default function StartClient({ user, remainingDays, isPro }: StartClientP
     }
   }, [])
 
+  useEffect(() => {
+    if (redeemCode || !codeFromQuery) return
+    setRedeemCode(codeFromQuery)
+  }, [codeFromQuery, redeemCode])
+
+  useEffect(() => {
+    if (redeemEmail || !emailFromQuery) return
+    setRedeemEmail(emailFromQuery)
+  }, [emailFromQuery, redeemEmail])
+
+  useEffect(() => {
+    if (!user?.email) return
+    if (redeemEmail) return
+    setRedeemEmail(user.email)
+  }, [user?.email, redeemEmail])
+
   const proLabel = isPro
     ? remainingDays > 0
       ? `Pro 体验剩余 ${remainingDays} 天`
@@ -40,6 +81,14 @@ export default function StartClient({ user, remainingDays, isPro }: StartClientP
 
   const resultHref = latestResultId ? `/diagnosis/result/${latestResultId}` : "/diagnosis/quiz"
   const resultHint = latestResultId ? "继续查看上次诊断结果" : "先完成诊断后解锁"
+  const needsEmail = !user?.id
+
+  const formatDate = (value?: string | null) => {
+    if (!value) return null
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return null
+    return date.toLocaleDateString("zh-CN")
+  }
 
   return (
     <div className="relative min-h-[100dvh] bg-[#030304] text-zinc-200 font-sans selection:bg-purple-500/30 selection:text-purple-200 overflow-x-hidden">
@@ -91,6 +140,204 @@ export default function StartClient({ user, remainingDays, isPro }: StartClientP
               </div>
             ) : null}
           </section>
+
+          {!isPro ? (
+            <section className="rounded-2xl border border-white/10 bg-zinc-950/60 p-6 sm:p-8">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <h2 className="text-xl font-semibold text-white">Step 0：兑换码快速激活</h2>
+                  <p className="text-sm text-zinc-400 mt-1">输入兑换码后立即开通 7 天 Pro，然后直接开始诊断。</p>
+                </div>
+                <span className="text-xs text-emerald-300">来源：{sourceFromQuery || "start"}</span>
+              </div>
+
+              {!redeemSuccess ? (
+                <form
+                  className="mt-6 grid gap-4"
+                  onSubmit={async (event) => {
+                    event.preventDefault()
+                    setRedeemError(null)
+                    setRedeemLoading(true)
+
+                    track("redeem_submit", {
+                      landingPath: window.location.pathname,
+                      source: sourceFromQuery,
+                      code_present: Boolean(redeemCode),
+                      email_present: Boolean(redeemEmail),
+                    })
+
+                    const normalizedCode = redeemCode.replace(/\s+/g, "").toUpperCase()
+                    const normalizedEmail = redeemEmail.trim().toLowerCase()
+
+                    if (!normalizedCode) {
+                      setRedeemError("请输入完整兑换码")
+                      setRedeemLoading(false)
+                      return
+                    }
+
+                    if (needsEmail) {
+                      if (!normalizedEmail) {
+                        setRedeemError("请输入邮箱")
+                        setRedeemLoading(false)
+                        return
+                      }
+                      if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+                        setRedeemError("邮箱格式不正确")
+                        setRedeemLoading(false)
+                        return
+                      }
+                    }
+
+                    try {
+                      const response = await fetch("/api/redeem", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          code: normalizedCode,
+                          email: needsEmail ? normalizedEmail : undefined,
+                          utm: mergedUtm,
+                        }),
+                      })
+
+                      const data = (await response.json()) as {
+                        ok?: boolean
+                        error?: string
+                        plan?: string
+                        expiresAt?: string
+                        loginRequired?: boolean
+                        session?: {
+                          access_token?: string
+                          refresh_token?: string
+                        }
+                      }
+
+                      if (response.ok && data.ok) {
+                        if (data.session?.access_token && data.session?.refresh_token) {
+                          const supabase = getSupabaseClient()
+                          await supabase.auth.setSession({
+                            access_token: data.session.access_token,
+                            refresh_token: data.session.refresh_token,
+                          })
+                        }
+
+                        track("redeem_success", {
+                          landingPath: window.location.pathname,
+                          source: sourceFromQuery,
+                        })
+
+                        setRedeemPlan(data.plan ?? null)
+                        setRedeemExpiresAt(data.expiresAt ?? null)
+                        setRedeemLoginRequired(Boolean(data.loginRequired))
+                        setRedeemSuccess(true)
+
+                        if (!data.loginRequired) {
+                          setTimeout(() => router.push("/diagnosis/quiz?from=start"), 800)
+                        }
+                      } else {
+                        track("redeem_fail", {
+                          landingPath: window.location.pathname,
+                          source: sourceFromQuery,
+                          error: data.error || response.status,
+                        })
+                        if (response.status === 404) {
+                          setRedeemError("兑换码无效，请检查后重试")
+                        } else if (response.status === 409) {
+                          setRedeemError("兑换码已使用，请更换新的兑换码")
+                        } else if (response.status === 410) {
+                          setRedeemError("兑换码已过期，请联系工作人员")
+                        } else if (response.status === 429) {
+                          setRedeemError("操作过于频繁，请稍后再试")
+                        } else {
+                          setRedeemError(data.error || "兑换失败，请稍后再试")
+                        }
+                      }
+                    } catch {
+                      track("redeem_fail", {
+                        landingPath: window.location.pathname,
+                        source: sourceFromQuery,
+                        error: "network_error",
+                      })
+                      setRedeemError("网络异常，请稍后再试")
+                    } finally {
+                      setRedeemLoading(false)
+                    }
+                  }}
+                >
+                  {needsEmail ? (
+                    <div>
+                      <label className="block text-sm text-zinc-300 mb-2">邮箱</label>
+                      <input
+                        type="email"
+                        value={redeemEmail}
+                        onChange={(event) => setRedeemEmail(event.target.value)}
+                        placeholder="填写你的邮箱"
+                        className="w-full rounded-xl bg-zinc-900/60 border border-white/10 px-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/40"
+                      />
+                      <p className="mt-2 text-xs text-zinc-500">用于创建账号并绑定权益</p>
+                    </div>
+                  ) : null}
+
+                  <div>
+                    <label className="block text-sm text-zinc-300 mb-2">兑换码</label>
+                    <input
+                      type="text"
+                      value={redeemCode}
+                      onChange={(event) => setRedeemCode(event.target.value)}
+                      placeholder="输入完整兑换码"
+                      className="w-full rounded-xl bg-zinc-900/60 border border-white/10 px-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/40"
+                    />
+                    <p className="mt-2 text-xs text-zinc-500">支持粘贴，系统会自动去空格并转大写</p>
+                  </div>
+
+                  {redeemError ? <p className="text-sm text-rose-400">{redeemError}</p> : null}
+
+                  <GlowButton primary className="w-full py-3 text-base" type="submit" disabled={redeemLoading}>
+                    {redeemLoading ? "提交中..." : "立即兑换开通"}
+                    <ArrowRight className="w-4 h-4" />
+                  </GlowButton>
+                </form>
+              ) : (
+                <div className="mt-6 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-5 text-sm text-emerald-100">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5 text-emerald-300" />
+                    <span>兑换成功，已开通 {redeemPlan || "Pro"} 权益</span>
+                  </div>
+                  <p className="mt-2 text-xs text-emerald-200">
+                    {redeemLoginRequired
+                      ? "已为该邮箱开通权益，请登录后继续"
+                      : formatDate(redeemExpiresAt)
+                        ? `有效期至 ${formatDate(redeemExpiresAt)}`
+                        : "现在可以直接开始诊断"}
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    {redeemLoginRequired ? (
+                      <Link
+                        href="/auth/login?redirect=/activate"
+                        className="inline-flex items-center justify-center px-4 py-2 text-xs font-semibold rounded-lg bg-emerald-500 text-white"
+                      >
+                        登录继续
+                        <ArrowRight className="w-4 h-4 ml-1" />
+                      </Link>
+                    ) : (
+                      <Link
+                        href="/diagnosis/quiz?from=start"
+                        className="inline-flex items-center justify-center px-4 py-2 text-xs font-semibold rounded-lg bg-emerald-500 text-white"
+                      >
+                        立即开始诊断
+                        <ArrowRight className="w-4 h-4 ml-1" />
+                      </Link>
+                    )}
+                    <Link
+                      href="/activate"
+                      className="inline-flex items-center justify-center px-4 py-2 text-xs font-semibold rounded-lg border border-white/10 text-zinc-200"
+                    >
+                      查看权益详情
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </section>
+          ) : null}
 
           <section className="grid md:grid-cols-3 gap-5">
             <div className="rounded-2xl border border-white/10 bg-zinc-950/60 p-6">

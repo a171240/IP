@@ -49,15 +49,12 @@ const SCORE_DIMENSION_MAP = {
 } as const
 
 function buildFallbackScores(input: DeliveryPackInput) {
-  const answers: Record<string, string> = {
-    sop_level: input.sop_level || "",
+  const answers: Record<string, string | string[]> = {
+    delivery_mode: input.delivery_mode || input.sop_level || "",
     guideline_level: input.guideline_level || "",
-    topic_library: input.topic_library || "",
-    multi_project: input.multi_project || "",
-    script_review: input.script_review || "",
     qc_process: input.qc_process || "",
     conversion_path: input.conversion_path || "",
-    review_frequency: input.review_frequency || "",
+    current_problem: input.current_problem || [],
   }
   const result = calculateScore(answers)
   return Object.entries(SCORE_DIMENSION_MAP).map(([key, name]) => {
@@ -345,15 +342,11 @@ function buildPrompt(input: DeliveryPackInput): string {
     offer_type: input.offer_type,
     offer_type_label: offerTypeLabel,
     offer_desc: input.offer_desc,
-    sop_level: input.sop_level,
+    delivery_mode: input.delivery_mode || input.sop_level,
     guideline_level: input.guideline_level,
-    topic_library: input.topic_library,
-    multi_project: input.multi_project,
-    script_review: input.script_review,
     qc_process: input.qc_process,
     conversion_path: input.conversion_path,
-    review_frequency: input.review_frequency,
-    product_or_service: input.product_or_service,
+    current_problem: input.current_problem,
     target_audience: input.target_audience,
     price_range: input.price_range,
     tone: input.tone,
@@ -369,10 +362,10 @@ ${JSON.stringify(payload, null, 2)}
 1) 输出只用简体中文。
 2) 禁止出现：击败、超过、行业排名、前XX%、top% 等不可验证表述。
 3) scores 维度必须严格包含：交付定位 / 内容供给 / 产能效率 / 质检复盘 / 成交转化（各1条）。
-4) 标题长度上限：calendar_7d.title、topics_10.title、top_actions.title、scripts_3.title_options ≤ 24 字。
+4) 标题长度上限：calendar_7d.title、topics_10.title、top_actions.title、scripts_3.title_options ≤ 36 字。
 5) calendar_7d.type 只能是 引流 / 建信 / 转化，比例至少 引流>=3、建信>=2、转化>=2。
 6) scripts_3 必须包含 shots（镜头时间段t + 台词line + 画面visual），且每条脚本必须有 CTA。
-7) 至少引用 ${teamTypeLabel}、${platformLabel}、"${input.offer_desc}" 各>=2次（可出现在不同字段）。
+7) 至少引用 ${teamTypeLabel}、${platformLabel}、"${input.offer_desc}" 各>=2次，且必须至少引用 target_audience 与 price_range 各>=1次。
 8) calendar_7d.day=1 必须给出“明天第一条”可直接发布的标题+钩子+结构+CTA。
 9) thinking_summary 为 3-5 条“思考摘要”，不得暴露推理过程。
 10) 必须输出完整结构，严禁缺失 scripts_3 / qc_checklist / archive_rules / upsell。
@@ -407,6 +400,11 @@ function buildCorePrompt(input: DeliveryPackInput): string {
     offer_type: input.offer_type,
     offer_type_label: offerTypeLabel,
     offer_desc: input.offer_desc,
+    target_audience: input.target_audience,
+    price_range: input.price_range,
+    tone: input.tone,
+    current_problem: input.current_problem,
+    delivery_mode: input.delivery_mode || input.sop_level,
   }
 
   return `
@@ -421,7 +419,7 @@ ${JSON.stringify(payload, null, 2)}
 3) scores 维度必须严格包含：交付定位 / 内容供给 / 产能效率 / 质检复盘 / 成交转化（各1条）。
 4) top_actions 3条，每条必须具体可执行。
 5) thinking_summary 3-5条摘要，不暴露推理过程。
-6) 至少引用 ${teamTypeLabel}、${platformLabel}、"${input.offer_desc}" 各>=2次。
+6) 至少引用 ${teamTypeLabel}、${platformLabel}、"${input.offer_desc}" 各>=2次，且至少引用 target_audience 与 price_range 各>=1次。
 `.trim()
 }
 
@@ -435,6 +433,10 @@ function buildCalendarPrompt(
     top_actions: core.top_actions,
     offer_desc: input.offer_desc,
     platform: input.platform,
+    target_audience: input.target_audience,
+    price_range: input.price_range,
+    tone: input.tone,
+    current_problem: input.current_problem,
   }
 
   return `
@@ -463,6 +465,10 @@ function buildTopicsPrompt(
     top_actions: core.top_actions,
     offer_desc: input.offer_desc,
     platform: input.platform,
+    target_audience: input.target_audience,
+    price_range: input.price_range,
+    tone: input.tone,
+    current_problem: input.current_problem,
   }
 
   return `
@@ -490,6 +496,10 @@ function buildScriptsPrompt(
     top_actions: core.top_actions,
     offer_desc: input.offer_desc,
     platform: input.platform,
+    target_audience: input.target_audience,
+    price_range: input.price_range,
+    tone: input.tone,
+    current_problem: input.current_problem,
   }
 
   return `
@@ -518,6 +528,10 @@ function buildChecklistPrompt(
     top_actions: core.top_actions,
     offer_desc: input.offer_desc,
     platform: input.platform,
+    target_audience: input.target_audience,
+    price_range: input.price_range,
+    tone: input.tone,
+    current_problem: input.current_problem,
   }
 
   return `
@@ -970,6 +984,8 @@ function validateDeliveryPackRules(output: DeliveryPackOutput, input: DeliveryPa
   const teamLabel = TEAM_TYPE_LABELS[input.team_type] || input.team_type
   const platformLabel = PLATFORM_LABELS[input.platform] || input.platform
   const offerDesc = input.offer_desc
+  const targetAudience = input.target_audience
+  const priceRange = input.price_range
 
   if (countOccurrences(allText, teamLabel) < 2) {
     errors.push("team_type_mention")
@@ -979,6 +995,12 @@ function validateDeliveryPackRules(output: DeliveryPackOutput, input: DeliveryPa
   }
   if (countOccurrences(allText, offerDesc) < 1) {
     errors.push("offer_desc_mention")
+  }
+  if (targetAudience && countOccurrences(allText, targetAudience) < 1) {
+    errors.push("target_audience_mention")
+  }
+  if (priceRange && countOccurrences(allText, priceRange) < 1) {
+    errors.push("price_range_mention")
   }
 
   const dimensionNames = output.scores.map((item) => item.dimension)
@@ -993,7 +1015,7 @@ function validateDeliveryPackRules(output: DeliveryPackOutput, input: DeliveryPa
     ...output.topics_10.map((item) => item.title),
     ...output.top_actions.map((item) => item.title),
     ...output.scripts_3.flatMap((item) => item.title_options),
-  ].filter((title) => title.length > 24)
+  ].filter((title) => title.length > 36)
 
   if (titleViolations.length) {
     errors.push("title_too_long")
@@ -1180,32 +1202,32 @@ export async function generateDeliveryPackV2(input: DeliveryPackInput): Promise<
     })
     const coreParsed = CORE_SCHEMA.parse(normalizeCoreOutput(input, parseJsonPayload(coreRaw)))
 
-    const calendarRaw = await callLLM(buildCalendarPrompt(input, coreParsed), 0.2, {
-      model: splitModel,
-      maxTokens: 6000,
-      useFunctionCalling: false,
-    })
+    const [calendarRaw, topicsRaw, scriptsRaw, qcRaw] = await Promise.all([
+      callLLM(buildCalendarPrompt(input, coreParsed), 0.2, {
+        model: splitModel,
+        maxTokens: 3200,
+        useFunctionCalling: false,
+      }),
+      callLLM(buildTopicsPrompt(input, coreParsed), 0.25, {
+        model: splitModel,
+        maxTokens: 3200,
+        useFunctionCalling: false,
+      }),
+      callLLM(buildScriptsPrompt(input, coreParsed), 0.25, {
+        model: splitModel,
+        maxTokens: 4200,
+        useFunctionCalling: false,
+      }),
+      callLLM(buildChecklistPrompt(input, coreParsed), 0.1, {
+        model: splitModel,
+        maxTokens: 2000,
+        useFunctionCalling: false,
+      }),
+    ])
+
     const calendarParsed = CALENDAR_SCHEMA.parse(normalizeCalendarOutput(input, parseJsonPayload(calendarRaw)))
-
-    const topicsRaw = await callLLM(buildTopicsPrompt(input, coreParsed), 0.25, {
-      model: splitModel,
-      maxTokens: 6000,
-      useFunctionCalling: false,
-    })
     const topicsParsed = TOPICS_SCHEMA.parse(normalizeTopicsOutput(input, parseJsonPayload(topicsRaw)))
-
-    const scriptsRaw = await callLLM(buildScriptsPrompt(input, coreParsed), 0.25, {
-      model: splitModel,
-      maxTokens: 7000,
-      useFunctionCalling: false,
-    })
     const scriptsParsed = SCRIPTS_SCHEMA.parse(normalizeScriptsOutput(parseJsonPayload(scriptsRaw)))
-
-    const qcRaw = await callLLM(buildChecklistPrompt(input, coreParsed), 0.1, {
-      model: splitModel,
-      maxTokens: 4000,
-      useFunctionCalling: false,
-    })
     const qcParsed = QC_SCHEMA.parse(normalizeChecklistOutput(parseJsonPayload(qcRaw)))
 
     const merged = {

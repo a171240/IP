@@ -84,6 +84,14 @@ function clampLines(lines: string[], maxLines: number): string[] {
   return clipped
 }
 
+
+function clipText(text: string, maxLength: number): string {
+  if (!text) return ""
+  if (text.length <= maxLength) return text
+  const keep = Math.max(0, maxLength - 3)
+  return `${text.slice(0, keep)}...`
+}
+
 function drawWrappedTextClamped(params: {
   page: ReturnType<PDFDocument["addPage"]>
   font: PdfCursor["font"]
@@ -354,8 +362,8 @@ function addSummaryPage(cursor: PdfCursor, input: DeliveryPackInput, output: Del
     y,
     size: 12,
     maxWidth: CONTENT_WIDTH,
-    maxLines: 3,
-    lineHeight: 18,
+    maxLines: 6,
+    lineHeight: 17,
   })
 
   y -= 10
@@ -371,7 +379,7 @@ function addSummaryPage(cursor: PdfCursor, input: DeliveryPackInput, output: Del
       y,
       size: 12,
       maxWidth: CONTENT_WIDTH,
-      maxLines: 3,
+      maxLines: 5,
       lineHeight: 18,
       color: COLOR_PRIMARY_DARK,
     })
@@ -383,8 +391,8 @@ function addSummaryPage(cursor: PdfCursor, input: DeliveryPackInput, output: Del
       y,
       size: 10,
       maxWidth: CONTENT_WIDTH - 16,
-      maxLines: 3,
-      lineHeight: 16,
+      maxLines: 6,
+      lineHeight: 14,
       color: COLOR_MUTED,
     })
     y -= 6
@@ -393,7 +401,7 @@ function addSummaryPage(cursor: PdfCursor, input: DeliveryPackInput, output: Del
   y = drawSectionTitle(page, cursor.font, "明天第一条发什么", y)
   y -= 6
   const tomorrow = buildTomorrowBlock(output)
-  const cardHeight = 190
+  const cardHeight = 260
   drawCard(page, MARGIN_X, y - cardHeight + 8, CONTENT_WIDTH, cardHeight)
   let cardY = y - 24
   cardY = drawWrappedTextClamped({
@@ -404,7 +412,7 @@ function addSummaryPage(cursor: PdfCursor, input: DeliveryPackInput, output: Del
     y: cardY,
     size: 12,
     maxWidth: CONTENT_WIDTH - 32,
-    maxLines: 3,
+    maxLines: 5,
     lineHeight: 18,
   })
   cardY = drawWrappedTextClamped({
@@ -415,7 +423,7 @@ function addSummaryPage(cursor: PdfCursor, input: DeliveryPackInput, output: Del
     y: cardY,
     size: 11,
     maxWidth: CONTENT_WIDTH - 32,
-    maxLines: 3,
+    maxLines: 4,
     lineHeight: 16,
   })
   cardY = drawWrappedTextClamped({
@@ -426,19 +434,19 @@ function addSummaryPage(cursor: PdfCursor, input: DeliveryPackInput, output: Del
     y: cardY,
     size: 10,
     maxWidth: CONTENT_WIDTH - 32,
-    maxLines: 3,
+    maxLines: 6,
     lineHeight: 14,
     color: COLOR_MUTED,
   })
-  drawWrappedTextClamped({
+  cardY = drawWrappedTextClamped({
     page,
     font: cursor.font,
-    text: `CTA-${tomorrow.cta}`,
+    text: `CTA：${tomorrow.cta}`,
     x: MARGIN_X + 16,
     y: cardY,
     size: 11,
     maxWidth: CONTENT_WIDTH - 32,
-    maxLines: 3,
+    maxLines: 4,
     lineHeight: 16,
     color: COLOR_PRIMARY_DARK,
   })
@@ -489,30 +497,31 @@ function addScorePage(cursor: PdfCursor, output: DeliveryPackOutput) {
 
 function addCalendarPages(cursor: PdfCursor, output: DeliveryPackOutput) {
   const items = output.calendar_7d
-  const perPage = 4
-  for (let pageIndex = 0; pageIndex < 2; pageIndex += 1) {
+  const perPage = 2
+  for (let start = 0; start < items.length; start += perPage) {
     const page = cursor.doc.addPage([PAGE_WIDTH, PAGE_HEIGHT])
     let y = PAGE_HEIGHT - MARGIN_Y
     y = drawSectionTitle(page, cursor.font, "7天成交排产", y)
-    const start = pageIndex * perPage
     const slice = items.slice(start, start + perPage)
     slice.forEach((item) => {
-      const cardHeight = 180
+      const cardHeight = 320
       drawCard(page, MARGIN_X, y - cardHeight + 8, CONTENT_WIDTH, cardHeight)
       drawPill(page, cursor.font, item.type, MARGIN_X + 16, y - 28)
+
       let titleY = y - 26
       titleY = drawWrappedTextClamped({
         page,
         font: cursor.font,
-        text: `Day ${item.day} - ${item.title}` ,
+        text: `第${item.day}天 - ${item.title}`,
         x: MARGIN_X + 90,
         y: titleY,
         size: 12,
         maxWidth: CONTENT_WIDTH - 110,
-        maxLines: 2,
+        maxLines: 4,
         lineHeight: 16,
         color: COLOR_TEXT,
       })
+
       let lineY = titleY - 6
       lineY = drawWrappedTextClamped({
         page,
@@ -522,22 +531,40 @@ function addCalendarPages(cursor: PdfCursor, output: DeliveryPackOutput) {
         y: lineY,
         size: 10,
         maxWidth: CONTENT_WIDTH - 32,
-        maxLines: 3,
+        maxLines: 4,
         lineHeight: 14,
       })
+
       lineY -= 2
       lineY = drawWrappedTextClamped({
         page,
         font: cursor.font,
-        text: `结构：${item.outline.join(" / ")}`,
+        text: "结构要点：",
         x: MARGIN_X + 16,
         y: lineY,
-        size: 10,
+        size: 9,
         maxWidth: CONTENT_WIDTH - 32,
-        maxLines: 3,
-        lineHeight: 14,
+        maxLines: 1,
+        lineHeight: 13,
         color: COLOR_MUTED,
       })
+      const outlineList = Array.isArray(item.outline) ? item.outline.slice(0, 3) : []
+      outlineList.forEach((point) => {
+        lineY = drawWrappedTextClamped({
+          page,
+          font: cursor.font,
+          text: `- ${point}`,
+          x: MARGIN_X + 28,
+          y: lineY,
+          size: 9,
+          maxWidth: CONTENT_WIDTH - 44,
+          maxLines: 2,
+          lineHeight: 12,
+          color: COLOR_MUTED,
+        })
+        lineY -= 2
+      })
+
       lineY -= 2
       drawWrappedTextClamped({
         page,
@@ -547,7 +574,7 @@ function addCalendarPages(cursor: PdfCursor, output: DeliveryPackOutput) {
         y: lineY,
         size: 10,
         maxWidth: CONTENT_WIDTH - 32,
-        maxLines: 2,
+        maxLines: 4,
         lineHeight: 14,
         color: COLOR_PRIMARY_DARK,
       })
@@ -558,26 +585,26 @@ function addCalendarPages(cursor: PdfCursor, output: DeliveryPackOutput) {
 
 function addTopicsPages(cursor: PdfCursor, output: DeliveryPackOutput) {
   const items = output.topics_10
-  const perPage = 5
-  for (let pageIndex = 0; pageIndex < 2; pageIndex += 1) {
+  const perPage = 2
+  for (let pageIndex = 0; pageIndex < Math.ceil(items.length / perPage); pageIndex += 1) {
     const page = cursor.doc.addPage([PAGE_WIDTH, PAGE_HEIGHT])
     let y = PAGE_HEIGHT - MARGIN_Y
     y = drawSectionTitle(page, cursor.font, "10条高意图选题", y)
     const slice = items.slice(pageIndex * perPage, pageIndex * perPage + perPage)
     slice.forEach((item, index) => {
-      const cardHeight = 135
+      const cardHeight = 240
       drawCard(page, MARGIN_X, y - cardHeight + 8, CONTENT_WIDTH, cardHeight)
       drawPill(page, cursor.font, item.type, MARGIN_X + 16, y - 26)
       let titleY = y - 26
       titleY = drawWrappedTextClamped({
         page,
         font: cursor.font,
-        text: `${pageIndex * perPage + index + 1}. ${item.title}` ,
+        text: `${pageIndex * perPage + index + 1}. ${item.title}`,
         x: MARGIN_X + 86,
         y: titleY,
         size: 12,
         maxWidth: CONTENT_WIDTH - 110,
-        maxLines: 2,
+        maxLines: 5,
         lineHeight: 16,
         color: COLOR_TEXT,
       })
@@ -585,12 +612,12 @@ function addTopicsPages(cursor: PdfCursor, output: DeliveryPackOutput) {
       lineY = drawWrappedTextClamped({
         page,
         font: cursor.font,
-        text: `${item.audience} - ${item.scene}`,
+        text: `人群：${item.audience} | 场景：${item.scene}`,
         x: MARGIN_X + 16,
         y: lineY,
         size: 10,
         maxWidth: CONTENT_WIDTH - 32,
-        maxLines: 3,
+        maxLines: 2,
         lineHeight: 14,
         color: COLOR_MUTED,
       })
@@ -607,10 +634,10 @@ function addTopicsPages(cursor: PdfCursor, output: DeliveryPackOutput) {
         lineHeight: 14,
       })
       lineY -= 2
-      drawWrappedTextClamped({
+      lineY = drawWrappedTextClamped({
         page,
         font: cursor.font,
-        text: `关键词：${item.keywords.join(" / ")} - CTA：${item.cta}`,
+        text: `关键词：${item.keywords.join(" / ")}`,
         x: MARGIN_X + 16,
         y: lineY,
         size: 10,
@@ -619,7 +646,20 @@ function addTopicsPages(cursor: PdfCursor, output: DeliveryPackOutput) {
         lineHeight: 14,
         color: COLOR_PRIMARY_DARK,
       })
-      y -= cardHeight + 10
+      lineY -= 2
+      drawWrappedTextClamped({
+        page,
+        font: cursor.font,
+        text: `CTA：${item.cta}`,
+        x: MARGIN_X + 16,
+        y: lineY,
+        size: 10,
+        maxWidth: CONTENT_WIDTH - 32,
+        maxLines: 3,
+        lineHeight: 14,
+        color: COLOR_PRIMARY_DARK,
+      })
+      y -= cardHeight + 12
     })
   }
 }
@@ -638,7 +678,7 @@ function addScriptsPages(cursor: PdfCursor, output: DeliveryPackOutput) {
     })
     y -= 20
 
-    const cardHeight = 260
+    const cardHeight = 320
     drawCard(page, MARGIN_X, y - cardHeight + 8, CONTENT_WIDTH, cardHeight)
     let cardY = y - 24
     script.shots.slice(0, 3).forEach((shot) => {
@@ -650,7 +690,7 @@ function addScriptsPages(cursor: PdfCursor, output: DeliveryPackOutput) {
         y: cardY,
         size: 11,
         maxWidth: CONTENT_WIDTH - 32,
-        maxLines: 4,
+        maxLines: 5,
         lineHeight: 16,
       })
       cardY = drawWrappedTextClamped({
@@ -661,7 +701,7 @@ function addScriptsPages(cursor: PdfCursor, output: DeliveryPackOutput) {
         y: cardY,
         size: 10,
         maxWidth: CONTENT_WIDTH - 44,
-        maxLines: 3,
+        maxLines: 4,
         lineHeight: 14,
         color: COLOR_MUTED,
       })
@@ -677,7 +717,7 @@ function addScriptsPages(cursor: PdfCursor, output: DeliveryPackOutput) {
       y,
       size: 11,
       maxWidth: CONTENT_WIDTH,
-      maxLines: 3,
+      maxLines: 5,
       lineHeight: 16,
       color: COLOR_PRIMARY_DARK,
     })
@@ -691,7 +731,7 @@ function addScriptsPages(cursor: PdfCursor, output: DeliveryPackOutput) {
       y,
       size: 10,
       maxWidth: CONTENT_WIDTH,
-      maxLines: 3,
+      maxLines: 5,
       lineHeight: 14,
       color: COLOR_MUTED,
     })
@@ -705,7 +745,7 @@ function addScriptsPages(cursor: PdfCursor, output: DeliveryPackOutput) {
       y,
       size: 10,
       maxWidth: CONTENT_WIDTH,
-      maxLines: 3,
+      maxLines: 5,
       lineHeight: 14,
     })
   })
@@ -723,7 +763,7 @@ function addChecklistPage(cursor: PdfCursor, output: DeliveryPackOutput) {
   ]
 
   blocks.forEach((block) => {
-    const cardHeight = 130
+    const cardHeight = 150
     drawCard(page, MARGIN_X, y - cardHeight + 8, CONTENT_WIDTH, cardHeight)
     page.drawText(block.title, {
       x: MARGIN_X + 16,
@@ -749,7 +789,7 @@ function addChecklistPage(cursor: PdfCursor, output: DeliveryPackOutput) {
         y: listY,
         size: 10,
         maxWidth: CONTENT_WIDTH - 48,
-        maxLines: 2,
+        maxLines: 3,
         lineHeight: 14,
       })
       listY -= 2
@@ -763,7 +803,7 @@ function addArchivePage(cursor: PdfCursor, output: DeliveryPackOutput) {
   let y = PAGE_HEIGHT - MARGIN_Y
   y = drawSectionTitle(page, cursor.font, "归档与去重规则", y)
 
-  const cardHeight = 130
+  const cardHeight = 150
   drawCard(page, MARGIN_X, y - cardHeight + 8, CONTENT_WIDTH, cardHeight)
   drawWrappedTextClamped({
     page,
@@ -773,7 +813,7 @@ function addArchivePage(cursor: PdfCursor, output: DeliveryPackOutput) {
     y: y - 28,
     size: 11,
     maxWidth: CONTENT_WIDTH - 32,
-    maxLines: 2,
+    maxLines: 3,
     lineHeight: 16,
   })
   drawWrappedTextClamped({
@@ -784,7 +824,7 @@ function addArchivePage(cursor: PdfCursor, output: DeliveryPackOutput) {
     y: y - 56,
     size: 10,
     maxWidth: CONTENT_WIDTH - 32,
-    maxLines: 2,
+    maxLines: 3,
     lineHeight: 14,
     color: COLOR_MUTED,
   })
@@ -796,7 +836,7 @@ function addArchivePage(cursor: PdfCursor, output: DeliveryPackOutput) {
     y: y - 84,
     size: 10,
     maxWidth: CONTENT_WIDTH - 32,
-    maxLines: 2,
+    maxLines: 3,
     lineHeight: 14,
     color: COLOR_MUTED,
   })
@@ -806,7 +846,7 @@ function addUpsellPage(cursor: PdfCursor, output: DeliveryPackOutput) {
   const page = cursor.doc.addPage([PAGE_WIDTH, PAGE_HEIGHT])
   let y = PAGE_HEIGHT - MARGIN_Y
   y = drawSectionTitle(page, cursor.font, "升级建议", y)
-  const cardHeight = 180
+  const cardHeight = 200
   drawCard(page, MARGIN_X, y - cardHeight + 8, CONTENT_WIDTH, cardHeight)
   let listY = y - 32
   output.upsell.when_to_upgrade.slice(0, 4).forEach((item) => {
@@ -825,7 +865,7 @@ function addUpsellPage(cursor: PdfCursor, output: DeliveryPackOutput) {
       y: listY,
       size: 11,
       maxWidth: CONTENT_WIDTH - 48,
-      maxLines: 2,
+      maxLines: 3,
       lineHeight: 16,
     })
     listY -= 2
@@ -839,7 +879,7 @@ function addUpsellPage(cursor: PdfCursor, output: DeliveryPackOutput) {
     y: y - 140,
     size: 12,
     maxWidth: CONTENT_WIDTH - 32,
-    maxLines: 2,
+    maxLines: 3,
     lineHeight: 18,
     color: COLOR_PRIMARY_DARK,
   })

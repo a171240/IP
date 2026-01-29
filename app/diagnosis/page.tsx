@@ -2,6 +2,7 @@ import type { ReactNode } from "react"
 import Link from "next/link"
 import { Activity, ArrowRight, CheckCircle, ClipboardList, FileText, Calendar, Target, Zap } from "lucide-react"
 import { MarketingHeader } from "@/components/ui/marketing-header"
+import DiagnosisRedirect from "./redirect-client"
 
 const deliverables = [
   { icon: Target, text: "五维评分（0-10）", desc: "交付系统体检单" },
@@ -38,6 +39,7 @@ const GlowLink = ({ href, className, children }: { href: string; className?: str
 export default function DiagnosisPage() {
   return (
     <div className="min-h-screen">
+      <DiagnosisRedirect />
       <MarketingHeader breadcrumbs={[{ label: "首页", href: "/" }, { label: "内容交付系统诊断" }]} />
 
       <main className="p-6 lg:p-8 pb-28 md:pb-8">

@@ -18,9 +18,46 @@ const PLATFORM_LABELS: Record<string, string> = {
   wechat: "公众号",
 }
 
+const PLATFORM_TOKEN_MAP: Record<string, string> = {
+  xiaohongshu: "小红书",
+  douyin: "抖音",
+  video_account: "视频号",
+  wechat: "公众号",
+}
+
+const TITLE_MAX = 36
+const HOOK_MAX = 32
+const OUTLINE_MAX = 36
+const CTA_MAX = 40
+const ACTION_TITLE_MAX = 36
+const ACTION_DO_MAX = 42
+const TOPIC_TITLE_MAX = 36
+const KEYWORD_MAX = 12
+const SCRIPT_TITLE_MAX = 36
+const SCRIPT_CTA_MAX = 42
+const PINNED_MAX = 60
+
+function stripDayPrefix(text: string): string {
+  return text.replace(/^\s*(day|Day)\s*\d+\s*[-–—·:：]?\s*/i, "").trim()
+}
+
+function normalizeTokens(text: string): string {
+  let normalized = text
+  Object.entries(PLATFORM_TOKEN_MAP).forEach(([key, label]) => {
+    normalized = normalized.replace(new RegExp(key, "gi"), label)
+  })
+  return normalized
+}
+
 function sanitizeText(value: string, path: string): string {
   const trimmed = value.trim()
-  if (!bannedPattern.test(trimmed)) return trimmed
+  const cleaned = trimmed
+    .replace(/^[?？·•\-—–]+/g, "")
+    .replace(/\?/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+  const normalized = normalizeTokens(cleaned)
+  if (!bannedPattern.test(normalized)) return normalized
   console.warn(`[delivery-pack] sanitized banned phrasing at ${path}`)
   return "基于输入的推断"
 }
@@ -44,9 +81,9 @@ function normalizeScriptId(value: string, index: number): string {
 }
 
 function normalizeScore(value: number): number {
-  if (!Number.isFinite(value)) return 0
+  if (!Number.isFinite(value)) return 5
   const scaled = value > 10 ? value / 10 : value
-  const clamped = Math.min(10, Math.max(0, scaled))
+  const clamped = Math.min(10, Math.max(1, scaled))
   return Math.round(clamped * 10) / 10
 }
 
@@ -76,12 +113,15 @@ export function sanitizeDeliveryPack(
     ...item,
     day: item.day || index + 1,
     type: normalizeCalendarType(item.type),
-    title: truncateText(sanitizeText(item.title, `calendar_7d.${index}.title`), 24),
-    hook: truncateText(sanitizeText(item.hook, `calendar_7d.${index}.hook`), 20),
-    outline: item.outline.slice(0, 3).map((line, lineIndex) =>
-      truncateText(sanitizeText(line, `calendar_7d.${index}.outline.${lineIndex}`), 18)
+    title: truncateText(
+      stripDayPrefix(sanitizeText(item.title, `calendar_7d.${index}.title`)),
+      TITLE_MAX
     ),
-    cta: truncateText(sanitizeText(item.cta, `calendar_7d.${index}.cta`), 24),
+    hook: truncateText(sanitizeText(item.hook, `calendar_7d.${index}.hook`), HOOK_MAX),
+    outline: item.outline.slice(0, 3).map((line, lineIndex) =>
+      truncateText(sanitizeText(line, `calendar_7d.${index}.outline.${lineIndex}`), OUTLINE_MAX)
+    ),
+    cta: truncateText(sanitizeText(item.cta, `calendar_7d.${index}.cta`), CTA_MAX),
     script_id: normalizeScriptId(item.script_id, index),
   }))
 
@@ -141,15 +181,15 @@ export function sanitizeDeliveryPack(
       type: sanitizeText(script.type, `scripts_3.${index}.type`),
       duration: sanitizeText(script.duration, `scripts_3.${index}.duration`),
       shots: normalizedShots,
-      cta: truncateText(sanitizeText(script.cta, `scripts_3.${index}.cta`), 24),
+      cta: truncateText(sanitizeText(script.cta, `scripts_3.${index}.cta`), SCRIPT_CTA_MAX),
       title_options: script.title_options
         .slice(0, 3)
         .map((title, optionIndex) =>
-          truncateText(sanitizeText(title, `scripts_3.${index}.title_options.${optionIndex}`), 24)
+          truncateText(sanitizeText(title, `scripts_3.${index}.title_options.${optionIndex}`), SCRIPT_TITLE_MAX)
         ),
       pinned_comment: truncateText(
         sanitizeText(script.pinned_comment, `scripts_3.${index}.pinned_comment`),
-        30
+        PINNED_MAX
       ),
     }
   })
@@ -163,10 +203,10 @@ export function sanitizeDeliveryPack(
     },
     bottleneck: sanitizeText(output.bottleneck, "bottleneck"),
     top_actions: output.top_actions.map((item, index) => ({
-      title: truncateText(sanitizeText(item.title, `top_actions.${index}.title`), 24),
+      title: truncateText(sanitizeText(item.title, `top_actions.${index}.title`), ACTION_TITLE_MAX),
       why: sanitizeText(item.why, `top_actions.${index}.why`),
       do_in_7_days: item.do_in_7_days.slice(0, 4).map((line, lineIndex) =>
-        truncateText(sanitizeText(line, `top_actions.${index}.do_in_7_days.${lineIndex}`), 28)
+        truncateText(sanitizeText(line, `top_actions.${index}.do_in_7_days.${lineIndex}`), ACTION_DO_MAX)
       ),
     })),
     scores: output.scores.map((item, index) => ({
@@ -177,15 +217,15 @@ export function sanitizeDeliveryPack(
     })),
     calendar_7d: normalizedCalendar,
     topics_10: output.topics_10.map((item, index) => ({
-      title: truncateText(sanitizeText(item.title, `topics_10.${index}.title`), 24),
+      title: truncateText(sanitizeText(item.title, `topics_10.${index}.title`), TOPIC_TITLE_MAX),
       audience: sanitizeText(item.audience, `topics_10.${index}.audience`),
       scene: sanitizeText(item.scene, `topics_10.${index}.scene`),
       pain: sanitizeText(item.pain, `topics_10.${index}.pain`),
       keywords: item.keywords.slice(0, 5).map((keyword, keywordIndex) =>
-        truncateText(sanitizeText(keyword, `topics_10.${index}.keywords.${keywordIndex}`), 10)
+        truncateText(sanitizeText(keyword, `topics_10.${index}.keywords.${keywordIndex}`), KEYWORD_MAX)
       ),
       type: normalizeCalendarType(item.type),
-      cta: truncateText(sanitizeText(item.cta, `topics_10.${index}.cta`), 24),
+      cta: truncateText(sanitizeText(item.cta, `topics_10.${index}.cta`), CTA_MAX),
     })),
     scripts_3: normalizedScripts,
     qc_checklist: {
