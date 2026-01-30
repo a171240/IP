@@ -8,6 +8,7 @@ import { ArrowRight, Copy, Download, Loader2, Sparkles } from "lucide-react"
 import { DIMENSIONS } from "@/lib/diagnosis/scoring"
 import { Dimension, INDUSTRY_LABELS } from "@/lib/diagnosis/questions"
 import { track } from "@/lib/analytics/client"
+import type { DeliveryPackOutput } from "@/lib/delivery-pack/schema"
 
 interface ResultClientProps {
   result: {
@@ -67,6 +68,7 @@ export function ResultClient({
   const [packId, setPackId] = useState<string | null>(null)
   const [generateError, setGenerateError] = useState<string | null>(null)
   const [thinkingSummary, setThinkingSummary] = useState<string[] | null>(null)
+  const [packOutput, setPackOutput] = useState<DeliveryPackOutput | null>(null)
   const [isDownloading, setIsDownloading] = useState(false)
   const [progressStep, setProgressStep] = useState(0)
   const [progressValue, setProgressValue] = useState(0)
@@ -147,6 +149,50 @@ export function ResultClient({
   const fallbackActions = ["明确本周交付目标", "固定7天排产节奏", "建立发布质检清单"]
   const topActionsList = (topActions?.length ? topActions : fallbackActions).slice(0, 3)
 
+  const problemLabels: Record<string, string> = {
+    topic_system_missing: "选题体系缺失",
+    calendar_blocked: "排产卡住",
+    script_slow: "脚本产出慢",
+    qc_missing: "质检标准缺失",
+    conversion_unclear: "转化链路不清",
+    archive_weak: "素材沉淀弱",
+  }
+
+  const fallbackTomorrow = useMemo(() => {
+    const offer = String(answers?.offer_desc || "你的项目")
+    const audience = String(answers?.target_audience || "目标用户")
+    const problems = Array.isArray(answers?.current_problem) ? answers?.current_problem : []
+    const problem = problems[0] ? problemLabels[problems[0]] || "交付卡点" : "交付卡点"
+    const platform = String(answers?.platform || "站内")
+    const title = `${offer}：${audience}最关心的3个问题`
+    const hook = `${audience}是不是也被“${problem}”困住？用3个点讲清楚。`
+    const outline = [
+      `痛点拆解：${audience}为什么会遇到${problem}`,
+      "方法路径：3步解决/对齐口径/降返工",
+      "证据/行动：给一个可复制动作或模板",
+    ]
+    const cta = platform === "xiaohongshu" ? "评论区回复“方案”领取排产" : "私信关键词“方案”获取排产"
+    return { title, hook, outline, cta }
+  }, [answers])
+
+  const tomorrowFromPack = useMemo(() => {
+    const dayOne = packOutput?.calendar_7d?.[0]
+    if (!dayOne) return null
+    return {
+      title: dayOne.title,
+      hook: dayOne.hook,
+      outline: dayOne.outline,
+      cta: dayOne.cta,
+    }
+  }, [packOutput])
+
+  const tomorrow = tomorrowFromPack || fallbackTomorrow
+  const tomorrowText = useMemo(
+    () =>
+      `标题：${tomorrow.title}\n3秒钩子：${tomorrow.hook}\n结构：${tomorrow.outline.join(" / ")}\nCTA：${tomorrow.cta}`,
+    [tomorrow]
+  )
+
   useEffect(() => {
     if (!isProUser) {
       track("paywall_view", {
@@ -185,6 +231,27 @@ export function ResultClient({
     window.sessionStorage.setItem(redirectedKey, "1")
     router.replace(`/delivery-pack/${packId}`)
   }, [packId, isGenerating, router])
+
+  useEffect(() => {
+    if (!packId) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const response = await fetch(`/api/delivery-pack/${packId}`)
+        if (!response.ok) return
+        const data = (await response.json()) as { output?: DeliveryPackOutput }
+        if (cancelled) return
+        if (data.output) {
+          setPackOutput(data.output)
+        }
+      } catch {
+        // ignore
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [packId])
 
   const handleGeneratePack = useCallback(async () => {
     setGenerateError(null)
@@ -459,6 +526,27 @@ export function ResultClient({
             </div>
           </GlassCard>
 
+          <GlassCard className="p-6">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-lg font-semibold dark:text-white text-zinc-900">明天第一条发什么</h2>
+              <button
+                className="inline-flex items-center gap-2 rounded-full border border-emerald-400/40 px-3 py-1 text-xs text-emerald-200 hover:bg-emerald-500/10"
+                onClick={() => {
+                  navigator.clipboard.writeText(tomorrowText)
+                  track("copy_script", { diagnosisId, userId, landingPath: window.location.pathname })
+                }}
+              >
+                一键复制
+              </button>
+            </div>
+            <div className="mt-4 space-y-2 text-sm text-zinc-300">
+              <div>标题：{tomorrow.title}</div>
+              <div>3秒钩子：{tomorrow.hook}</div>
+              <div>结构：{tomorrow.outline.join(" / ")}</div>
+              <div className="text-emerald-400">CTA：{tomorrow.cta}</div>
+            </div>
+          </GlassCard>
+
           <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-6">
             <GlassCard className="p-6">
               <div className="flex items-center gap-2 mb-4">
@@ -665,6 +753,34 @@ export function ResultClient({
               </div>
             </GlassCard>
           )}
+
+          <GlassCard className="p-6">
+            <h2 className="text-lg font-semibold dark:text-white text-zinc-900">用交付包直接开始产出</h2>
+            <p className="mt-2 text-sm text-zinc-400">
+              你刚拿到的是诊断版交付包；内容工坊是持续生产版本（每天能用）。
+            </p>
+            <div className="mt-4 flex flex-col sm:flex-row gap-3">
+              <GlowButton
+                primary
+                onClick={() => {
+                  track("workshop_enter", { stepId: "P7", diagnosisId, userId })
+                  router.push("/dashboard/workflow/P7")
+                }}
+              >
+                进入内容工坊：生成7天日历
+                <ArrowRight className="w-4 h-4" />
+              </GlowButton>
+              <GlowButton
+                onClick={() => {
+                  track("workshop_enter", { stepId: "P8", diagnosisId, userId })
+                  router.push("/dashboard/workflow/P8")
+                }}
+              >
+                进入内容工坊：生成3条脚本
+                <ArrowRight className="w-4 h-4" />
+              </GlowButton>
+            </div>
+          </GlassCard>
         </div>
       </main>
     </div>

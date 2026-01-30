@@ -215,9 +215,9 @@ export async function POST(request: NextRequest) {
       const { error: updateError } = await admin
         .from("delivery_packs")
         .update({
-          status: "done",
-          output_json: safeOutput,
-          zip_path: pdfPath,
+        status: "done",
+        output_json: safeOutput,
+        pdf_path: pdfPath,
         })
         .eq("id", packId)
 

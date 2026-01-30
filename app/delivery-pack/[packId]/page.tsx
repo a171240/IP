@@ -22,7 +22,7 @@ export default async function DeliveryPackPage({ params }: PageProps) {
 
   const { data, error } = await supabase
     .from("delivery_packs")
-    .select("id, status, created_at, zip_path, output_json, error_message")
+    .select("id, status, created_at, pdf_path, output_json, error_message")
     .eq("id", packId)
     .eq("user_id", user.id)
     .single()

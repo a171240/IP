@@ -337,7 +337,7 @@ export default function LandingPage() {
                   </GlowButton>
                 </TrackedLink>
                 <span className="text-xs text-zinc-500">
-                  5分钟 · 14道题 · 五维评分 + 行动清单
+                  5分钟 · 10道题 · 五维评分 + 行动清单
                 </span>
               </div>
 

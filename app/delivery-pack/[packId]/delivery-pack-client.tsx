@@ -103,6 +103,10 @@ export default function DeliveryPackClient({
   const topics = useMemo(() => safeArray(output?.topics_10), [output])
   const scripts = useMemo(() => safeArray(output?.scripts_3), [output])
   const topActions = useMemo(() => safeArray(output?.top_actions), [output])
+  const topActionTitles = useMemo(() => {
+    if (topActions.length) return topActions.map((item) => item.title)
+    return ["明确本周交付目标", "固定7天排产节奏", "建立发布质检清单"]
+  }, [topActions])
 
   const dayOne = calendar[0]
   const tomorrowText = dayOne
@@ -160,8 +164,8 @@ export default function DeliveryPackClient({
             <div className="mt-5">
               <h3 className="text-sm font-semibold text-zinc-200">Top3 动作</h3>
               <ul className="mt-2 space-y-2 text-sm text-zinc-400 list-disc list-inside">
-                {topActions.map((item) => (
-                  <li key={item.title}>{item.title}</li>
+                {topActionTitles.map((item) => (
+                  <li key={item}>{item}</li>
                 ))}
               </ul>
             </div>
@@ -303,12 +307,27 @@ export default function DeliveryPackClient({
           </GlassCard>
 
           <GlassCard className="p-6">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <GlowButton primary onClick={() => (window.location.href = "/dashboard/workflow")}>
-                进入内容工坊继续生成
+            <h2 className="text-lg font-semibold text-white">用交付包直接开始产出</h2>
+            <p className="mt-2 text-sm text-zinc-400">
+              你刚拿到的是诊断版交付包；内容工坊是持续生产版本（每天能用）。
+            </p>
+            <div className="mt-4 flex flex-col sm:flex-row gap-3">
+              <GlowButton
+                primary
+                onClick={() => {
+                  track("workshop_enter", { packId, stepId: "P7", landingPath: window.location.pathname })
+                  window.location.href = "/dashboard/workflow/P7"
+                }}
+              >
+                进入内容工坊：生成7天日历
               </GlowButton>
-              <GlowButton onClick={() => (window.location.href = "/dashboard/quick-start")}>
-                继续诊断流程
+              <GlowButton
+                onClick={() => {
+                  track("workshop_enter", { packId, stepId: "P8", landingPath: window.location.pathname })
+                  window.location.href = "/dashboard/workflow/P8"
+                }}
+              >
+                进入内容工坊：生成3条脚本
               </GlowButton>
             </div>
           </GlassCard>

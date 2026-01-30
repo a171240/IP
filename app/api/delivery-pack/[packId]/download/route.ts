@@ -20,7 +20,7 @@ export async function GET(
 
   const { data, error } = await supabase
     .from("delivery_packs")
-    .select("id, status, zip_path")
+    .select("id, status, pdf_path")
     .eq("id", packId)
     .eq("user_id", user.id)
     .single()
@@ -29,7 +29,7 @@ export async function GET(
     return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 })
   }
 
-  if (data.status !== "done" || !data.zip_path) {
+  if (data.status !== "done" || !data.pdf_path) {
     return NextResponse.json({ ok: false, error: "not_ready" }, { status: 409 })
   }
 
@@ -43,13 +43,13 @@ export async function GET(
 
   const { data: signed, error: signError } = await admin.storage
     .from("delivery-packs")
-    .createSignedUrl(data.zip_path, 60 * 10)
+    .createSignedUrl(data.pdf_path, 60 * 10)
 
   if (signError || !signed?.signedUrl) {
     return NextResponse.json({ ok: false, error: "sign_failed" }, { status: 500 })
   }
 
-  const match = data.zip_path.match(/(\\d{8})\\.pdf$/)
+  const match = data.pdf_path.match(/(\\d{8})\\.pdf$/)
   const displayDate = match?.[1]
   const displayName = displayDate
     ? `交付包_内容交付系统诊断_${displayDate}.pdf`

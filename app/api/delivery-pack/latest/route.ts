@@ -15,7 +15,7 @@ export async function GET(_request: NextRequest) {
 
   const { data, error } = await supabase
     .from("delivery_packs")
-    .select("id, status, created_at, zip_path, error_message")
+    .select("id, status, created_at, pdf_path, error_message")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -30,7 +30,7 @@ export async function GET(_request: NextRequest) {
     packId: data.id,
     status: data.status,
     createdAt: data.created_at,
-    pdfPath: data.zip_path,
+    pdfPath: data.pdf_path,
     errorMessage: data.error_message,
   })
 }

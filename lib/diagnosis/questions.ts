@@ -1,4 +1,4 @@
-export interface Question {
+﻿export interface Question {
   id: string
   type: "single" | "multiple" | "text"
   question: string
@@ -101,8 +101,8 @@ export const QUESTIONS: Question[] = [
     id: "target_audience",
     type: "text",
     question: "你主要卖给谁",
-    description: "写清目标人群/场景（例如：25-35岁白领、宝妈、小微老板）",
-    placeholder: "例如：25-35岁通勤白领，午休有护肤需求",
+    description: "写清目标人群/场景（如：25-35岁白领、宝妈、小微老板）",
+    placeholder: "例如：25-35岁通勤白领，午休时间有护肤需求",
     maxLength: 50,
     isClassification: true,
   },
@@ -144,55 +144,6 @@ export const QUESTIONS: Question[] = [
       { value: "qc_missing", label: "返工多口径乱（缺质检标准）" },
       { value: "conversion_unclear", label: "转化链路不清（内容有了但成交弱）" },
       { value: "archive_weak", label: "素材/知识不沉淀（复用差）" },
-    ],
-  },
-  {
-    id: "delivery_mode",
-    type: "single",
-    question: "目前交付形态",
-    dimension: "efficiency",
-    weight: 1,
-    options: [
-      { value: "ad_hoc", label: "靠经验口头对齐", score: 3 },
-      { value: "partial_sop", label: "有部分 SOP", score: 6 },
-      { value: "sop_unstable", label: "SOP 完整但执行不稳", score: 7 },
-      { value: "sop_stable", label: "SOP 完整且可复盘", score: 9 },
-    ],
-  },
-  {
-    id: "guideline_level",
-    type: "single",
-    question: "是否有统一口径/禁词/风格指南",
-    dimension: "positioning",
-    weight: 1,
-    options: [
-      { value: "none", label: "没有", score: 3 },
-      { value: "partial", label: "部分有规范", score: 6 },
-      { value: "clear", label: "口径清晰且能执行", score: 9 },
-    ],
-  },
-  {
-    id: "qc_process",
-    type: "single",
-    question: "质检有没有清单",
-    dimension: "emotion",
-    weight: 1,
-    options: [
-      { value: "none", label: "没有", score: 3 },
-      { value: "partial", label: "有部分清单", score: 6 },
-      { value: "clear", label: "清单完整可执行", score: 9 },
-    ],
-  },
-  {
-    id: "conversion_path",
-    type: "single",
-    question: "成交路径是什么",
-    dimension: "conversion",
-    weight: 1,
-    options: [
-      { value: "unclear", label: "不清楚", score: 3 },
-      { value: "basic", label: "有简单路径", score: 6 },
-      { value: "clear", label: "路径清晰可复用", score: 9 },
     ],
   },
 ]

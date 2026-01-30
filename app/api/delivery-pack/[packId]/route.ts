@@ -19,7 +19,7 @@ export async function GET(
 
   const { data, error } = await supabase
     .from("delivery_packs")
-    .select("id, status, created_at, zip_path, error_message, output_json")
+    .select("id, status, created_at, pdf_path, error_message, output_json")
     .eq("id", packId)
     .eq("user_id", user.id)
     .single()
@@ -37,7 +37,7 @@ export async function GET(
     packId: data.id,
     status: data.status,
     createdAt: data.created_at,
-    pdfPath: data.zip_path,
+    pdfPath: data.pdf_path,
     errorMessage: data.error_message,
     thinkingSummary,
   })

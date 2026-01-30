@@ -223,7 +223,7 @@ PDF 必须支持中文字体（字体文件放在 `public/fonts/` 或 `assets/fo
 
 ### 6.7 数据表（最小实现）
 `delivery_packs`：
-- `id, user_id, created_at, status(pending|done|failed), input_json, output_json, zip_path, error_message`
+- `id, user_id, created_at, status(pending|done|failed), input_json, output_json, pdf_path, error_message`
 
 RLS：用户仅能访问自己的 pack。
 
