@@ -116,6 +116,17 @@ export default function DeliveryPackClient({
   const tomorrowText = dayOne
     ? `标题：${dayOne.title}\n3秒钩子：${dayOne.hook}\n结构：${dayOne.outline.join(" / ")}\nCTA：${dayOne.cta}`
     : ""
+  const calendarText = useMemo(() => {
+    if (!calendar.length) return ""
+    return calendar
+      .map(
+        (item) =>
+          `Day ${item.day}（${item.type}）\n标题：${item.title}\n3秒钩子：${item.hook}\n结构：${item.outline.join(
+            " / "
+          )}\nCTA：${item.cta}\n脚本：${item.script_id}`
+      )
+      .join("\n\n")
+  }, [calendar])
 
   if (!output) {
     return (
@@ -197,7 +208,17 @@ export default function DeliveryPackClient({
           ) : null}
 
           <GlassCard className="p-6">
-            <h2 className="text-lg font-semibold text-white">7 天成交排产</h2>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="text-lg font-semibold text-white">7 天成交排产</h2>
+              <button
+                className="inline-flex items-center gap-2 rounded-full border border-emerald-400/40 px-3 py-1 text-xs text-emerald-200 hover:bg-emerald-500/10 self-start sm:self-auto"
+                onClick={() => copyText(calendarText, "calendar", "copy_calendar")}
+                disabled={!calendarText}
+              >
+                <Copy className="w-3.5 h-3.5" />
+                {copyingKey === "calendar" ? "已复制" : "复制排产"}
+              </button>
+            </div>
             <div className="mt-4 space-y-4">
               {calendar.map((item) => (
                 <div key={`${item.day}-${item.title}`} className="rounded-xl border border-white/10 bg-white/5 p-4">
