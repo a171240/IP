@@ -64,7 +64,7 @@ export default function DiagnosisPage() {
                   <ArrowRight className="w-5 h-5" />
                 </GlowLink>
                 <span className="text-xs sm:text-sm dark:text-zinc-500 text-zinc-400">
-                  无需注册 · 14 题 · 一份 PDF 交付包
+                  无需注册 · 10 题 · 一份 PDF 交付包
                 </span>
               </div>
 
