@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { ArrowRight, CheckCircle } from "lucide-react"
 import { ObsidianBackgroundLite } from "@/components/ui/obsidian-background-lite"
 import { GlowButton } from "@/components/ui/obsidian-primitives"
@@ -29,11 +29,14 @@ type RedeemInfo = {
 
 export default function RedeemClient({ utm, user }: RedeemClientProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [redeemInfo, setRedeemInfo] = useState<RedeemInfo | null>(null)
   const [redirectCountdown, setRedirectCountdown] = useState<number | null>(null)
+  const [redeemCode, setRedeemCode] = useState("")
+  const [redeemEmail, setRedeemEmail] = useState(user?.email?.trim() || "")
 
   const mergedUtm = useMemo(() => ({ ...getStoredUtm(), ...utm }), [utm])
   const emailValue = user?.email?.trim() || ""
@@ -45,6 +48,19 @@ export default function RedeemClient({ utm, user }: RedeemClientProps) {
       landingPath: window.location.pathname,
     })
   }, [user?.id])
+
+  useEffect(() => {
+    const code = searchParams?.get("code") || ""
+    const email = searchParams?.get("email") || ""
+    if (code && !redeemCode) setRedeemCode(code)
+    if (email && !redeemEmail) setRedeemEmail(email)
+  }, [searchParams, redeemCode, redeemEmail])
+
+  useEffect(() => {
+    if (user?.email && !redeemEmail) {
+      setRedeemEmail(user.email)
+    }
+  }, [redeemEmail, user?.email])
 
   useEffect(() => {
     if (!submitted || redeemInfo?.loginRequired) return
@@ -163,12 +179,8 @@ export default function RedeemClient({ utm, user }: RedeemClientProps) {
                       landingPath: window.location.pathname,
                     })
 
-                    const formData = new FormData(event.currentTarget)
-                    const rawCode = String(formData.get("redeem-code") || "")
-                    const code = rawCode.replace(/\s+/g, "").toUpperCase()
-                    const inputEmail = needsEmail
-                      ? String(formData.get("redeem-email") || "").trim().toLowerCase()
-                      : ""
+                    const code = redeemCode.replace(/\s+/g, "").toUpperCase()
+                    const inputEmail = needsEmail ? redeemEmail.trim().toLowerCase() : ""
 
                     if (!code) {
                       setError("请输入完整兑换码")
@@ -273,6 +285,8 @@ export default function RedeemClient({ utm, user }: RedeemClientProps) {
                         type="email"
                         required
                         placeholder="填写你的邮箱"
+                        value={redeemEmail}
+                        onChange={(event) => setRedeemEmail(event.target.value)}
                         className="w-full rounded-xl bg-zinc-900/60 border border-white/10 px-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/40"
                       />
                       <p className="mt-2 text-xs text-zinc-500">用于创建账号并绑定权益</p>
@@ -289,6 +303,8 @@ export default function RedeemClient({ utm, user }: RedeemClientProps) {
                       type="text"
                       required
                       placeholder="输入完整兑换码"
+                      value={redeemCode}
+                      onChange={(event) => setRedeemCode(event.target.value)}
                       className="w-full rounded-xl bg-zinc-900/60 border border-white/10 px-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/40"
                     />
                     <p className="mt-2 text-xs text-zinc-500">支持粘贴，系统会自动去空格并转大写</p>
