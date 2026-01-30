@@ -34,6 +34,22 @@ export default function QuizPage() {
         router.replace(`/diagnosis/result/${latest}`)
         return
       }
+      let cancelled = false
+      ;(async () => {
+        try {
+          const response = await fetch("/api/delivery-pack/latest")
+          if (!response.ok) return
+          const data = (await response.json()) as { ok?: boolean; packId?: string }
+          if (!data?.ok || !data.packId || cancelled) return
+          localStorage.setItem("latestDeliveryPackId", data.packId)
+          router.replace(`/delivery-pack/${data.packId}`)
+        } catch {
+          // ignore
+        }
+      })()
+      return () => {
+        cancelled = true
+      }
     }
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved) {

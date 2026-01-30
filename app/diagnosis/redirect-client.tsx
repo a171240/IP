@@ -23,6 +23,25 @@ export default function DiagnosisRedirect() {
     const stored = window.localStorage.getItem(LAST_RESULT_KEY)
     if (stored) {
       router.replace(`/diagnosis/result/${stored}`)
+      return
+    }
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const response = await fetch("/api/delivery-pack/latest")
+        if (!response.ok) return
+        const data = (await response.json()) as { ok?: boolean; packId?: string }
+        if (!data?.ok || !data.packId || cancelled) return
+        window.localStorage.setItem(LAST_PACK_KEY, data.packId)
+        router.replace(`/delivery-pack/${data.packId}`)
+      } catch {
+        // ignore
+      }
+    })()
+
+    return () => {
+      cancelled = true
     }
   }, [router, shouldSkip])
 
