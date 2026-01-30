@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Copy, Download } from "lucide-react"
+import { Copy, Download, FileText } from "lucide-react"
 import { Header, GlassCard, GlowButton } from "@/components/ui/obsidian"
 import { track } from "@/lib/analytics/client"
 import type { DeliveryPackOutput } from "@/lib/delivery-pack/schema"
@@ -161,6 +161,16 @@ export default function DeliveryPackClient({
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3">
+                <GlowButton
+                  onClick={() => {
+                    track("delivery_pack_download", { packId, landingPath: window.location.pathname, mode: "open" })
+                    window.open(`/api/delivery-pack/${packId}/download`, "_blank")
+                  }}
+                  disabled={isDownloading}
+                >
+                  <FileText className="w-4 h-4" />
+                  打开 PDF
+                </GlowButton>
                 <GlowButton onClick={handleDownload} disabled={isDownloading}>
                   <Download className="w-4 h-4" />
                   {isDownloading ? "准备下载..." : "下载 PDF"}
