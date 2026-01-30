@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Download } from "lucide-react"
+import { Copy, Download } from "lucide-react"
 import { Header, GlassCard, GlowButton } from "@/components/ui/obsidian"
 import { track } from "@/lib/analytics/client"
 import type { DeliveryPackOutput } from "@/lib/delivery-pack/schema"
@@ -62,7 +62,14 @@ export default function DeliveryPackClient({
   const handleDownload = useCallback(async () => {
     setDownloadError(null)
     setIsDownloading(true)
-    const attemptDownload = async (): Promise<void> => {
+
+    if (status === "done") {
+      window.location.href = `/api/delivery-pack/${packId}/download`
+      setTimeout(() => setIsDownloading(false), 800)
+      return
+    }
+
+    try {
       const downloadResp = await fetch(`/api/delivery-pack/${packId}/download`, { redirect: "manual" })
       if (downloadResp.type === "opaqueredirect") {
         window.location.href = `/api/delivery-pack/${packId}/download`
@@ -71,7 +78,7 @@ export default function DeliveryPackClient({
       if (downloadResp.status === 409) {
         const pollResult = await pollPackStatus()
         if (pollResult.status === "done") {
-          await attemptDownload()
+          window.location.href = `/api/delivery-pack/${packId}/download`
           return
         }
         if (pollResult.status === "failed") {
@@ -91,13 +98,10 @@ export default function DeliveryPackClient({
         return
       }
       window.location.href = `/api/delivery-pack/${packId}/download`
-    }
-    try {
-      await attemptDownload()
     } finally {
       setIsDownloading(false)
     }
-  }, [packId, pollPackStatus])
+  }, [packId, pollPackStatus, status])
 
   const calendar = useMemo(() => safeArray(output?.calendar_7d), [output])
   const topics = useMemo(() => safeArray(output?.topics_10), [output])
@@ -173,12 +177,13 @@ export default function DeliveryPackClient({
 
           {dayOne ? (
             <GlassCard className="p-6">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-lg font-semibold text-white">明天第一条发什么</h2>
                 <button
-                  className="inline-flex items-center gap-2 rounded-full border border-emerald-400/40 px-3 py-1 text-xs text-emerald-200 hover:bg-emerald-500/10"
+                  className="inline-flex items-center gap-2 rounded-full border border-emerald-400/40 px-3 py-1 text-xs text-emerald-200 hover:bg-emerald-500/10 self-start sm:self-auto"
                   onClick={() => copyText(tomorrowText, "tomorrow", "copy_script")}
                 >
+                  <Copy className="w-3.5 h-3.5" />
                   {copyingKey === "tomorrow" ? "已复制" : "一键复制"}
                 </button>
               </div>
@@ -225,25 +230,29 @@ export default function DeliveryPackClient({
           <GlassCard className="p-6">
             <h2 className="text-lg font-semibold text-white">3 条成交脚本</h2>
             <div className="mt-4 space-y-5">
-              {scripts.map((script) => (
-                <div key={script.id} className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="text-sm font-semibold text-white">
-                      {script.id} · {script.type} · {script.duration}
+              {scripts.map((script, index) => {
+                const scriptLabel = script.id || `S${index + 1}`
+                const copyKey = `script-${scriptLabel}-${index}`
+                return (
+                  <div key={copyKey} className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-2">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="text-sm font-semibold text-white">
+                        {scriptLabel} · {script.type} · {script.duration}
+                      </div>
+                      <button
+                        className="inline-flex items-center gap-2 rounded-full border border-emerald-400/40 px-3 py-1 text-xs text-emerald-200 hover:bg-emerald-500/10 self-start sm:self-auto"
+                        onClick={() =>
+                          copyText(
+                            script.shots.map((shot) => `${shot.t} ${shot.line}`).join("\n"),
+                            copyKey,
+                            "copy_script"
+                          )
+                        }
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                        {copyingKey === copyKey ? "已复制" : "复制脚本"}
+                      </button>
                     </div>
-                    <button
-                      className="inline-flex items-center gap-2 rounded-full border border-emerald-400/40 px-3 py-1 text-xs text-emerald-200 hover:bg-emerald-500/10"
-                      onClick={() =>
-                        copyText(
-                          script.shots.map((shot) => `${shot.t} ${shot.line}`).join("\n"),
-                          `script-${script.id}`,
-                          "copy_script"
-                        )
-                      }
-                    >
-                      {copyingKey === `script-${script.id}` ? "已复制" : "复制脚本"}
-                    </button>
-                  </div>
                   {script.shots.map((shot, index) => (
                     <div key={`${script.id}-${index}`} className="text-xs text-zinc-400">
                       {shot.t}：{shot.line}（画面：{shot.visual}）
@@ -252,8 +261,9 @@ export default function DeliveryPackClient({
                   <div className="text-xs text-emerald-400">CTA：{script.cta}</div>
                   <div className="text-xs text-zinc-400">标题备选：{script.title_options.join(" / ")}</div>
                   <div className="text-xs text-zinc-400">置顶评论：{script.pinned_comment}</div>
-                </div>
-              ))}
+                  </div>
+                )
+              })}
             </div>
           </GlassCard>
 
