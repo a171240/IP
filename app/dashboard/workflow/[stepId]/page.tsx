@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation"
-import { use } from "react"
+import { Suspense, use } from "react"
 
 import WorkflowStepClient from "./WorkflowStepClient"
 import { getWorkflowStepConfig } from "@/lib/workflow/steps.server"
@@ -19,5 +19,9 @@ export default function StepExecutionPage({ params }: { params: Promise<{ stepId
 
   if (!step) notFound()
 
-  return <WorkflowStepClient stepId={stepId} step={step} />
+  return (
+    <Suspense fallback={null}>
+      <WorkflowStepClient stepId={stepId} step={step} />
+    </Suspense>
+  )
 }

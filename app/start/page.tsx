@@ -1,3 +1,5 @@
+import { Suspense } from "react"
+
 import StartClient from "./start-client"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 
@@ -50,10 +52,12 @@ export default async function StartPage() {
   }
 
   return (
-    <StartClient
-      user={userInfo}
-      remainingDays={remainingDays}
-      isPro={isPro}
-    />
+    <Suspense fallback={null}>
+      <StartClient
+        user={userInfo}
+        remainingDays={remainingDays}
+        isPro={isPro}
+      />
+    </Suspense>
   )
 }

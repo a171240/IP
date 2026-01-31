@@ -138,8 +138,7 @@ export default function ProfilesPage() {
   const [verticalExpanded, setVerticalExpanded] = useState(false)
   const [expandedScenes, setExpandedScenes] = useState<Set<AgentScene>>(() => new Set<AgentScene>(sceneOrder))
 
-  const [expandedRetailSubs, setExpandedRetailSubs] = useState<Set<string>>(() => new Set<string>())
-  const [didInitRetailSubs, setDidInitRetailSubs] = useState(false)
+  const [expandedRetailSubs, setExpandedRetailSubs] = useState<Set<string> | null>(null)
 
   const [retailFiles, setRetailFiles] = useState<PromptFileEntry[]>([])
   const [verticalFiles, setVerticalFiles] = useState<PromptFileEntry[]>([])
@@ -237,12 +236,11 @@ export default function ProfilesPage() {
     return out
   }, [query, retailGroups])
 
-  useEffect(() => {
-    if (didInitRetailSubs) return
-    if (retailGroups.length === 0) return
-    setExpandedRetailSubs(new Set([retailGroups[0][0]]))
-    setDidInitRetailSubs(true)
-  }, [didInitRetailSubs, retailGroups])
+  const defaultExpandedRetailSubs = useMemo(() => {
+    if (retailGroups.length === 0) return new Set<string>()
+    return new Set([retailGroups[0][0]])
+  }, [retailGroups])
+  const activeExpandedRetailSubs = expandedRetailSubs ?? defaultExpandedRetailSubs
 
   const filteredVerticalFiles = useMemo(() => {
     if (!query) return verticalFiles
@@ -260,7 +258,7 @@ export default function ProfilesPage() {
 
   const toggleRetailSub = (sub: string) => {
     setExpandedRetailSubs((prev) => {
-      const next = new Set(prev)
+      const next = new Set(prev ?? defaultExpandedRetailSubs)
       if (next.has(sub)) next.delete(sub)
       else next.add(sub)
       return next
@@ -361,7 +359,7 @@ export default function ProfilesPage() {
                 </div>
 
                 {filteredRetailGroups.map(([sub, list]) => {
-                  const expanded = expandedRetailSubs.has(sub)
+                  const expanded = activeExpandedRetailSubs.has(sub)
                   return (
                     <div key={sub} className="rounded-2xl border border-white/10 bg-black/10 overflow-hidden">
                       <button

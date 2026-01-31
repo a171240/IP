@@ -51,6 +51,15 @@ const paywallCopy = {
   ctaDemo: "/demo",
 }
 
+const PROBLEM_LABELS: Record<string, string> = {
+  topic_system_missing: "选题体系缺失",
+  calendar_blocked: "排产卡住",
+  script_slow: "脚本产出慢",
+  qc_missing: "质检标准缺失",
+  conversion_unclear: "转化链路不清",
+  archive_weak: "素材沉淀弱",
+}
+
 export function ResultClient({
   result,
   industry,
@@ -73,7 +82,6 @@ export function ResultClient({
   const [progressStep, setProgressStep] = useState(0)
   const [progressValue, setProgressValue] = useState(0)
   const recoverLatestPack = useCallback(async () => {
-    let keepGenerating = false
     try {
       const response = await fetch("/api/delivery-pack/latest")
       if (!response.ok) return null
@@ -103,12 +111,23 @@ export function ResultClient({
     return { status: "timeout" as const }
   }, [])
 
-
   const isProUser = Boolean(isPro)
   const industryLabel = INDUSTRY_LABELS[industry] || industry || "当前行业"
   const progressSteps = useMemo(
     () => ["校验权益", "生成结论", "生成排产与脚本", "渲染PDF", "上传完成"],
     []
+  )
+  const goToWorkshop = useCallback(
+    (stepId: "P7" | "P8") => {
+      track("workshop_enter", { stepId, diagnosisId, userId, landingPath: window.location.pathname })
+      const shouldOnboard = typeof window !== "undefined" && !localStorage.getItem("workshop_onboarding_done")
+      if (shouldOnboard) {
+        router.push(`/dashboard/workflow/onboarding?target=${stepId}`)
+        return
+      }
+      router.push(`/dashboard/workflow/${stepId}`)
+    },
+    [diagnosisId, router, userId]
   )
 
   useEffect(() => {
@@ -149,20 +168,11 @@ export function ResultClient({
   const fallbackActions = ["明确本周交付目标", "固定7天排产节奏", "建立发布质检清单"]
   const topActionsList = (topActions?.length ? topActions : fallbackActions).slice(0, 3)
 
-  const problemLabels: Record<string, string> = {
-    topic_system_missing: "选题体系缺失",
-    calendar_blocked: "排产卡住",
-    script_slow: "脚本产出慢",
-    qc_missing: "质检标准缺失",
-    conversion_unclear: "转化链路不清",
-    archive_weak: "素材沉淀弱",
-  }
-
   const fallbackTomorrow = useMemo(() => {
     const offer = String(answers?.offer_desc || "你的项目")
     const audience = String(answers?.target_audience || "目标用户")
     const problems = Array.isArray(answers?.current_problem) ? answers?.current_problem : []
-    const problem = problems[0] ? problemLabels[problems[0]] || "交付卡点" : "交付卡点"
+    const problem = problems[0] ? PROBLEM_LABELS[problems[0]] || "交付卡点" : "交付卡点"
     const platform = String(answers?.platform || "站内")
     const title = `${offer}：${audience}最关心的3个问题`
     const hook = `${audience}是不是也被“${problem}”困住？用3个点讲清楚。`
@@ -365,7 +375,6 @@ export function ResultClient({
       setThinkingSummary(data.thinkingSummary?.length ? data.thinkingSummary : null)
 
       if (data.status === "pending" && data.packId) {
-        keepGenerating = true
         const pollResult = await pollPackStatus(data.packId)
         if (pollResult.status === "done") {
           setProgressStep(progressSteps.length - 1)
@@ -389,7 +398,6 @@ export function ResultClient({
         } else {
           setGenerateError("生成超时，请稍后再试")
         }
-        keepGenerating = false
         return
       }
 
@@ -436,9 +444,7 @@ export function ResultClient({
       }
       setGenerateError("网络异常，请稍后再试")
     } finally {
-      if (!keepGenerating) {
-        setIsGenerating(false)
-      }
+      setIsGenerating(false)
     }
   }, [answers, diagnosisId, industry, pollPackStatus, progressSteps.length, recoverLatestPack, router, userId])
 
@@ -771,19 +777,13 @@ export function ResultClient({
             <div className="mt-4 flex flex-col sm:flex-row gap-3">
               <GlowButton
                 primary
-                onClick={() => {
-                  track("workshop_enter", { stepId: "P7", diagnosisId, userId })
-                  router.push("/dashboard/workflow/P7")
-                }}
+                onClick={() => goToWorkshop("P7")}
               >
                 进入内容工坊：生成7天日历
                 <ArrowRight className="w-4 h-4" />
               </GlowButton>
               <GlowButton
-                onClick={() => {
-                  track("workshop_enter", { stepId: "P8", diagnosisId, userId })
-                  router.push("/dashboard/workflow/P8")
-                }}
+                onClick={() => goToWorkshop("P8")}
               >
                 进入内容工坊：生成3条脚本
                 <ArrowRight className="w-4 h-4" />

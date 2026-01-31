@@ -1,7 +1,7 @@
 ﻿"use client"
 
 import Link from "next/link"
-import { useEffect, useState } from "react"
+import { useEffect, useSyncExternalStore } from "react"
 import { ArrowRight, CheckCircle, ClipboardList, DownloadCloud } from "lucide-react"
 import { ObsidianBackgroundLite } from "@/components/ui/obsidian-background-lite"
 import { GlowButton } from "@/components/ui/obsidian-primitives"
@@ -10,12 +10,23 @@ import { track } from "@/lib/analytics/client"
 const LAST_RESULT_KEY = "latestDiagnosisId"
 
 export default function ExecuteGuidePage() {
-  const [latestResultId, setLatestResultId] = useState<string | null>(null)
+  const latestResultId = useSyncExternalStore(
+    (onStoreChange) => {
+      if (typeof window === "undefined") return () => {}
+      const handleStorage = (event: StorageEvent) => {
+        if (!event.key || event.key === LAST_RESULT_KEY) {
+          onStoreChange()
+        }
+      }
+      window.addEventListener("storage", handleStorage)
+      return () => window.removeEventListener("storage", handleStorage)
+    },
+    () => (typeof window === "undefined" ? null : window.localStorage.getItem(LAST_RESULT_KEY)),
+    () => null
+  )
 
   useEffect(() => {
     track("execution_guide_open", { landingPath: window.location.pathname })
-    const stored = window.localStorage.getItem(LAST_RESULT_KEY)
-    if (stored) setLatestResultId(stored)
   }, [])
 
   const resultHref = latestResultId ? `/diagnosis/result/${latestResultId}` : "/diagnosis/quiz"

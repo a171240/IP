@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import {
   ArrowLeft,
@@ -74,6 +74,19 @@ import {
   messagesToDbFormat
 } from "./utils"
 
+type OnboardingContext = {
+  platform_label?: string
+  industry_label?: string
+  offer_desc?: string
+  target_audience?: string
+  tone_label?: string
+  price_range_label?: string
+  day?: number
+  topic?: string
+}
+
+const ONBOARDING_STORAGE_KEY = "workshop_onboarding"
+
 // 图标映射
 const workflowIconMap: Record<WorkflowIconId, LucideIcon> = {
   Target,
@@ -96,8 +109,47 @@ const colorVariants: Record<string, { bg: string; border: string; text: string; 
   emerald: { bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-400", light: "bg-emerald-500/5" },
 }
 
+function buildOnboardingPrompt(stepId: string, onboarding: OnboardingContext) {
+  const details = [
+    onboarding.platform_label ? `平台：${onboarding.platform_label}` : null,
+    onboarding.industry_label ? `行业：${onboarding.industry_label}` : null,
+    onboarding.offer_desc ? `卖什么：${onboarding.offer_desc}` : null,
+    onboarding.target_audience ? `卖给谁：${onboarding.target_audience}` : null,
+    onboarding.tone_label ? `口吻：${onboarding.tone_label}` : null,
+    onboarding.price_range_label ? `客单价：${onboarding.price_range_label}` : null,
+  ].filter(Boolean)
+
+  if (!details.length) return null
+
+  if (stepId === "P7") {
+    return [
+      "请基于以下信息生成 7 天内容日历，并给出 10-20 个备选选题。",
+      ...details,
+      "输出格式：Day1~Day7，每天包含 标题/类型(引流/建信/转化)/一句话钩子/CTA。随后给出备选选题清单。",
+    ].join("\n")
+  }
+
+  if (stepId === "P8") {
+    const dayLabel = onboarding.day ? `第${onboarding.day}天` : "Day1"
+    const topicLine = onboarding.topic ? `选题提示：${onboarding.topic}` : null
+    return [
+      "请基于以下信息生成一条可直接发布的短视频脚本。",
+      ...details,
+      `日历选择：${dayLabel}`,
+      topicLine,
+      "输出结构：0-3秒钩子 / 正文分点 / 结尾CTA / 置顶评论。",
+    ]
+      .filter(Boolean)
+      .join("\n")
+  }
+
+  return null
+}
+
 export default function WorkflowStepClient({ stepId, step }: { stepId: string; step: WorkflowStepConfig }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const onboardingFlag = searchParams?.get("onboarding") === "1"
   const { user, profile, loading: authLoading, refreshProfile } = useAuth()
 
   // 基础状态
@@ -119,6 +171,7 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
   const [previousReports, setPreviousReports] = useState<Record<string, string>>({})
   const [isCanvasOpen, setIsCanvasOpen] = useState(false)
   const [canvasStreamContent, setCanvasStreamContent] = useState("")
+  const [onboardingContext, setOnboardingContext] = useState<OnboardingContext | null>(null)
 
   // P8智能体选择
   const P8_AGENT_IDS = useMemo(() => ([
@@ -154,6 +207,7 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
   const streamContentRef = useRef("")
   const streamReasoningRef = useRef("")
   const rafIdRef = useRef<number | null>(null)
+  const onboardingSentRef = useRef(false)
 
   // Chat scroll: pin/unpin
   const [isPinnedToBottom, setIsPinnedToBottom] = useState(true)
@@ -192,6 +246,27 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
       else window.localStorage.removeItem("p8:selectedAgentId")
     } catch { /* ignore */ }
   }, [step?.id, selectedP8AgentId])
+
+  useEffect(() => {
+    if (!onboardingFlag) return
+    try {
+      const stored = window.localStorage.getItem(ONBOARDING_STORAGE_KEY)
+      if (!stored) return
+      const parsed = JSON.parse(stored) as OnboardingContext
+      setOnboardingContext(parsed)
+    } catch {
+      // ignore onboarding parse errors
+    }
+  }, [onboardingFlag])
+
+  useEffect(() => {
+    if (step?.id !== "P8") return
+    if (!onboardingFlag) return
+    if (selectedP8AgentId) return
+    if (p8Agents.length > 0) {
+      setSelectedP8AgentId(p8Agents[0].id)
+    }
+  }, [step?.id, onboardingFlag, p8Agents, selectedP8AgentId])
 
   // 合并报告
   const combinedReports = useMemo(() => ({
@@ -413,40 +488,15 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
     }
   }, [])
 
-  // 步骤不存在
-  if (!step) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <GlassCard className="p-8 text-center max-w-md">
-          <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-4">
-            <Info size={28} className="text-red-400" />
-          </div>
-          <h2 className="text-xl font-semibold dark:text-white text-zinc-900 mb-2">步骤不存在</h2>
-          <p className="dark:text-zinc-400 text-zinc-500 mb-6">请返回工作流页面选择正确的步骤</p>
-          <Link href="/dashboard/workflow">
-            <GlowButton primary>
-              <ArrowLeft size={16} />
-              返回工作流
-            </GlowButton>
-          </Link>
-        </GlassCard>
-      </div>
-    )
-  }
-
-  const colors = colorVariants[step.phaseColor]
-  const StepIcon = workflowIconMap[step.icon]
-
   // 发送消息
-  const handleSend = async (opts?: { allowCreditsOverride?: boolean }) => {
+  const handleSend = async (opts?: { allowCreditsOverride?: boolean; overrideContent?: string }) => {
     if (step.id === 'P8' && !selectedP8AgentId) {
       alert('请先选择一个脚本创作智能体')
       return
     }
 
-    if (!inputValue.trim() || isLoading || !currentConversation) return
-
-    const userContent = inputValue.trim()
+    const userContent = (opts?.overrideContent ?? inputValue).trim()
+    if (!userContent || isLoading || !currentConversation) return
 
     let activeConversation = currentConversation
     if (activeConversation.status !== 'in_progress') {
@@ -687,6 +737,33 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
       setIsThinking(false)
     }
   }
+
+  useEffect(() => {
+    onboardingSentRef.current = false
+  }, [step?.id, onboardingFlag])
+
+  useEffect(() => {
+    if (!onboardingFlag) return
+    if (!step || !currentConversation) return
+    if (isInitializing || isLoading) return
+    if (!onboardingContext) return
+    if (!["P7", "P8"].includes(step.id)) return
+    if (onboardingSentRef.current) return
+    if (messages.some((message) => message.role === "user")) return
+    const prompt = buildOnboardingPrompt(step.id, onboardingContext)
+    if (!prompt) return
+    onboardingSentRef.current = true
+    void handleSend({ overrideContent: prompt })
+  }, [
+    onboardingFlag,
+    step,
+    currentConversation,
+    isInitializing,
+    isLoading,
+    onboardingContext,
+    messages,
+    handleSend,
+  ])
 
   // 键盘事件
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -1005,6 +1082,27 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
     }
   }
 
+  // 步骤不存在
+  if (!step) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <GlassCard className="p-8 text-center max-w-md">
+          <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-4">
+            <Info size={28} className="text-red-400" />
+          </div>
+          <h2 className="text-xl font-semibold dark:text-white text-zinc-900 mb-2">步骤不存在</h2>
+          <p className="dark:text-zinc-400 text-zinc-500 mb-6">请返回工作流页面选择正确的步骤</p>
+          <Link href="/dashboard/workflow">
+            <GlowButton primary>
+              <ArrowLeft size={16} />
+              返回工作流
+            </GlowButton>
+          </Link>
+        </GlassCard>
+      </div>
+    )
+  }
+
   // 加载中
   if (isInitializing || authLoading) {
     return (
@@ -1026,6 +1124,9 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
       </div>
     )
   }
+
+  const colors = colorVariants[step.phaseColor]
+  const StepIcon = workflowIconMap[step.icon]
 
   return (
     <div className="h-[calc(100dvh-(4.5rem+var(--safe-area-bottom)))] md:h-[100dvh] flex flex-col overflow-hidden">

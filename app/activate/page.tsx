@@ -1,3 +1,5 @@
+import { Suspense } from "react"
+
 import ActivateClient from "./activate-client"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 
@@ -61,5 +63,9 @@ export default async function ActivatePage({ searchParams }: ActivatePageProps) 
     userInfo = null
   }
 
-  return <ActivateClient utm={utm} user={userInfo} isPro={isPro} proExpiresAt={proExpiresAt} />
+  return (
+    <Suspense fallback={null}>
+      <ActivateClient utm={utm} user={userInfo} isPro={isPro} proExpiresAt={proExpiresAt} />
+    </Suspense>
+  )
 }
