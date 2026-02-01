@@ -6,6 +6,7 @@
     "build": "node ./scripts/strict-build.mjs",
     "dev": "next dev",
     "lint": "eslint .",
+    "regress:delivery-pack": "node scripts/regress-delivery-pack.js",
     "regress:p5p10": "node scripts/regress-p5-p10-context.js",
     "start": "next start"
   },
