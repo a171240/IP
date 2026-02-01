@@ -213,6 +213,7 @@ export default function RedeemClient({ utm, user }: RedeemClientProps) {
                         error?: string
                         plan?: string
                         expiresAt?: string
+                        isRenewal?: boolean
                         loginRequired?: boolean
                         session?: {
                           access_token?: string
@@ -234,6 +235,12 @@ export default function RedeemClient({ utm, user }: RedeemClientProps) {
                           userId: user?.id,
                           landingPath: window.location.pathname,
                         })
+                        if (data.isRenewal) {
+                          track("redeem_renew_success", {
+                            userId: user?.id,
+                            landingPath: window.location.pathname,
+                          })
+                        }
                         setRedeemInfo({
                           plan: data.plan,
                           expiresAt: data.expiresAt,

@@ -38,6 +38,7 @@ import type { LucideIcon } from "lucide-react"
 import { GlassCard, Header, GlowButton } from "@/components/ui/obsidian"
 import { ReportCanvas } from "@/components/ui/report-canvas"
 import { useAuth } from "@/contexts/auth-context"
+import { track } from "@/lib/analytics/client"
 import {
   CreditsLowWarning,
   UpgradePromptAfterGeneration,
@@ -169,6 +170,7 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
   const [isInitializing, setIsInitializing] = useState(true)
   const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'error'>('synced')
   const [previousReports, setPreviousReports] = useState<Record<string, string>>({})
+  const [previousReportRefs, setPreviousReportRefs] = useState<Record<string, { id: string; title: string }>>({})
   const [isCanvasOpen, setIsCanvasOpen] = useState(false)
   const [canvasStreamContent, setCanvasStreamContent] = useState("")
   const [onboardingContext, setOnboardingContext] = useState<OnboardingContext | null>(null)
@@ -273,6 +275,36 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
     ...previousReports
   }), [previousReports])
 
+  const contextPayload = useMemo(() => {
+    if (!step) return null
+    const dependencies = stepDependencies[step.id] || []
+    if (dependencies.length === 0) return null
+
+    const reportRefs = dependencies
+      .map((depStepId) => previousReportRefs[depStepId]?.id)
+      .filter((id): id is string => Boolean(id))
+      .map((id) => ({ report_id: id }))
+
+    const inlineReports = dependencies
+      .map((depStepId) => {
+        if (previousReportRefs[depStepId]?.id) return null
+        const content = combinedReports[depStepId]
+        if (!content) return null
+        return {
+          step_id: depStepId,
+          title: reportTitles[depStepId] || depStepId,
+          content,
+        }
+      })
+      .filter((report): report is { step_id: string; title: string; content: string } => Boolean(report))
+
+    if (reportRefs.length === 0 && inlineReports.length === 0) return null
+    return {
+      ...(reportRefs.length > 0 ? { reports: reportRefs } : {}),
+      ...(inlineReports.length > 0 ? { inline_reports: inlineReports } : {}),
+    }
+  }, [step, combinedReports, previousReportRefs])
+
   // 缺失报告
   const derivedMissingReports = step ? (stepDependencies[step.id] || []).filter(dep => !combinedReports[dep]) : []
 
@@ -324,9 +356,14 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
   }, [currentConversation, user, upsertStepConversation])
 
   // 加载前置报告
-  const loadPreviousReports = async (stepId: string): Promise<{ reports: Record<string, string>; missing: string[] }> => {
+  const loadPreviousReports = async (stepId: string): Promise<{
+    reports: Record<string, string>
+    reportRefs: Record<string, { id: string; title: string }>
+    missing: string[]
+  }> => {
     const dependencies = stepDependencies[stepId] || []
     const reports: Record<string, string> = {}
+    const reportRefs: Record<string, { id: string; title: string }> = {}
 
     if (user && dependencies.length > 0) {
       const results = await Promise.allSettled(
@@ -338,12 +375,18 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
         const res = results[i]
         if (res.status === 'fulfilled' && res.value?.content) {
           reports[depStepId] = res.value.content
+          if (res.value?.id) {
+            reportRefs[depStepId] = {
+              id: res.value.id,
+              title: res.value.title || reportTitles[depStepId] || depStepId,
+            }
+          }
         }
       }
     }
 
     const missing = dependencies.filter((depStepId) => !reports[depStepId])
-    return { reports, missing }
+    return { reports, reportRefs, missing }
   }
 
   // 加载历史对话
@@ -372,11 +415,12 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
       setIsInitializing(true)
 
       try {
-        const [{ reports }, existingConversation] = await Promise.all([
+        const [{ reports, reportRefs }, existingConversation] = await Promise.all([
           loadPreviousReports(step.id),
           user ? getLatestConversation(step.id, undefined, user?.id) : Promise.resolve(null)
         ])
         setPreviousReports(reports)
+        setPreviousReportRefs(reportRefs)
 
         if (existingConversation && existingConversation.status === 'in_progress') {
           setCurrentConversation(existingConversation)
@@ -522,6 +566,13 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
     setMessages(newMessages)
     setInputValue("")
     setIsLoading(true)
+    track("workflow_run", {
+      stepId: step.id,
+      userId: user?.id,
+      conversationId: currentConversation.id,
+      landingPath: window.location.pathname,
+      mode: opts?.overrideContent ? "auto" : "chat",
+    })
 
     const assistantMessageId = (Date.now() + 1).toString()
     const assistantMessage: Message = {
@@ -548,6 +599,7 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
         body: JSON.stringify({
           messages: messagesForApi,
           stepId: step.id,
+          ...(contextPayload ? { context: contextPayload } : {}),
           ...(step.id === "P8" && selectedP8AgentId ? { agentId: selectedP8AgentId } : {}),
           ...(opts?.allowCreditsOverride ? { allowCreditsOverride: true } : {}),
         })
@@ -779,6 +831,13 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
 
     setIsGeneratingReport(true)
     setCanvasStreamContent("")
+    track("workflow_run", {
+      stepId: step.id,
+      userId: user?.id,
+      conversationId: currentConversation?.id,
+      landingPath: window.location.pathname,
+      mode: "report",
+    })
 
     try {
       const messagesForApi = messages
@@ -796,6 +855,7 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
         body: JSON.stringify({
           messages: messagesForApi,
           stepId: step.id,
+          ...(contextPayload ? { context: contextPayload } : {}),
           ...(step.id === "P8" && selectedP8AgentId ? { agentId: selectedP8AgentId } : {}),
           mode: 'report',
         })
@@ -916,6 +976,7 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
             { role: 'user', content: `请根据以下指示优化这份报告：\n\n优化指示：${instruction}\n\n原报告内容：\n${content}` }
           ],
           stepId: step.id,
+          ...(contextPayload ? { context: contextPayload } : {}),
           mode: 'optimize'
         })
       })

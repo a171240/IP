@@ -234,11 +234,16 @@ function addCoverPage(cursor: PdfCursor, input: DeliveryPackInput, output: Deliv
     `平台：${output.meta.platform || input.platform}`,
     `行业：${output.meta.industry || input.industry}`,
   ]
-  page.drawText(metaLine.join("  -  "), {
+  drawWrappedTextClamped({
+    page,
+    font: cursor.font,
+    text: metaLine.join("  -  "),
     x: MARGIN_X,
     y: PAGE_HEIGHT - 210,
     size: 10,
-    font: cursor.font,
+    maxWidth: CONTENT_WIDTH,
+    maxLines: 2,
+    lineHeight: 14,
     color: rgb(0.7, 0.74, 0.78),
   })
 
@@ -282,11 +287,16 @@ function addTocPage(cursor: PdfCursor, input: DeliveryPackInput, output: Deliver
     `平台：${output.meta.platform || input.platform}`,
     `行业：${output.meta.industry || input.industry}`,
   ]
-  page.drawText(meta.join("  -  "), {
+  drawWrappedTextClamped({
+    page,
+    font: cursor.font,
+    text: meta.join("  -  "),
     x: MARGIN_X,
     y: PAGE_HEIGHT - 165,
     size: 10,
-    font: cursor.font,
+    maxWidth: CONTENT_WIDTH,
+    maxLines: 2,
+    lineHeight: 14,
     color: COLOR_MUTED,
   })
 
@@ -412,7 +422,7 @@ function addSummaryPage(cursor: PdfCursor, input: DeliveryPackInput, output: Del
     y: cardY,
     size: 12,
     maxWidth: CONTENT_WIDTH - 32,
-    maxLines: 5,
+    maxLines: 4,
     lineHeight: 18,
   })
   cardY = drawWrappedTextClamped({
@@ -423,7 +433,7 @@ function addSummaryPage(cursor: PdfCursor, input: DeliveryPackInput, output: Del
     y: cardY,
     size: 11,
     maxWidth: CONTENT_WIDTH - 32,
-    maxLines: 4,
+    maxLines: 3,
     lineHeight: 16,
   })
   cardY = drawWrappedTextClamped({
@@ -434,7 +444,7 @@ function addSummaryPage(cursor: PdfCursor, input: DeliveryPackInput, output: Del
     y: cardY,
     size: 10,
     maxWidth: CONTENT_WIDTH - 32,
-    maxLines: 6,
+    maxLines: 4,
     lineHeight: 14,
     color: COLOR_MUTED,
   })
@@ -446,7 +456,69 @@ function addSummaryPage(cursor: PdfCursor, input: DeliveryPackInput, output: Del
     y: cardY,
     size: 11,
     maxWidth: CONTENT_WIDTH - 32,
-    maxLines: 4,
+    maxLines: 2,
+    lineHeight: 16,
+    color: COLOR_PRIMARY_DARK,
+  })
+}
+
+function addTomorrowPostPage(cursor: PdfCursor, output: DeliveryPackOutput) {
+  const page = cursor.doc.addPage([PAGE_WIDTH, PAGE_HEIGHT])
+  let y = PAGE_HEIGHT - MARGIN_Y
+  y = drawSectionTitle(page, cursor.font, "明天第一条完整文案", y)
+  y -= 6
+
+  const post = output.tomorrow_post
+  const cardHeight = 520
+  drawCard(page, MARGIN_X, y - cardHeight + 8, CONTENT_WIDTH, cardHeight)
+
+  let cardY = y - 24
+  cardY = drawWrappedTextClamped({
+    page,
+    font: cursor.font,
+    text: `标题：${post.title}`,
+    x: MARGIN_X + 16,
+    y: cardY,
+    size: 12,
+    maxWidth: CONTENT_WIDTH - 32,
+    maxLines: 3,
+    lineHeight: 18,
+  })
+  cardY -= 6
+  cardY = drawWrappedTextClamped({
+    page,
+    font: cursor.font,
+    text: `封面文字：${post.cover_text}`,
+    x: MARGIN_X + 16,
+    y: cardY,
+    size: 11,
+    maxWidth: CONTENT_WIDTH - 32,
+    maxLines: 2,
+    lineHeight: 16,
+    color: COLOR_MUTED,
+  })
+  cardY -= 6
+  cardY = drawWrappedTextClamped({
+    page,
+    font: cursor.font,
+    text: `正文：${post.body}`,
+    x: MARGIN_X + 16,
+    y: cardY,
+    size: 11,
+    maxWidth: CONTENT_WIDTH - 32,
+    maxLines: 12,
+    lineHeight: 16,
+  })
+  cardY -= 6
+  drawWrappedTextClamped({
+    page,
+    font: cursor.font,
+    text: `置顶评论：${post.pinned_comment}`,
+    x: MARGIN_X + 16,
+    y: cardY,
+    size: 11,
+    maxWidth: CONTENT_WIDTH - 32,
+    maxLines: 3,
     lineHeight: 16,
     color: COLOR_PRIMARY_DARK,
   })
@@ -531,7 +603,7 @@ function addCalendarPages(cursor: PdfCursor, output: DeliveryPackOutput) {
         y: lineY,
         size: 10,
         maxWidth: CONTENT_WIDTH - 32,
-        maxLines: 4,
+        maxLines: 3,
         lineHeight: 14,
       })
 
@@ -604,7 +676,7 @@ function addTopicsPages(cursor: PdfCursor, output: DeliveryPackOutput) {
         y: titleY,
         size: 12,
         maxWidth: CONTENT_WIDTH - 110,
-        maxLines: 5,
+        maxLines: 4,
         lineHeight: 16,
         color: COLOR_TEXT,
       })
@@ -630,7 +702,7 @@ function addTopicsPages(cursor: PdfCursor, output: DeliveryPackOutput) {
         y: lineY,
         size: 10,
         maxWidth: CONTENT_WIDTH - 32,
-        maxLines: 3,
+        maxLines: 2,
         lineHeight: 14,
       })
       lineY -= 2
@@ -642,7 +714,7 @@ function addTopicsPages(cursor: PdfCursor, output: DeliveryPackOutput) {
         y: lineY,
         size: 10,
         maxWidth: CONTENT_WIDTH - 32,
-        maxLines: 3,
+        maxLines: 2,
         lineHeight: 14,
         color: COLOR_PRIMARY_DARK,
       })
@@ -655,7 +727,7 @@ function addTopicsPages(cursor: PdfCursor, output: DeliveryPackOutput) {
         y: lineY,
         size: 10,
         maxWidth: CONTENT_WIDTH - 32,
-        maxLines: 3,
+        maxLines: 2,
         lineHeight: 14,
         color: COLOR_PRIMARY_DARK,
       })
@@ -690,7 +762,7 @@ function addScriptsPages(cursor: PdfCursor, output: DeliveryPackOutput) {
         y: cardY,
         size: 11,
         maxWidth: CONTENT_WIDTH - 32,
-        maxLines: 5,
+        maxLines: 3,
         lineHeight: 16,
       })
       cardY = drawWrappedTextClamped({
@@ -701,7 +773,7 @@ function addScriptsPages(cursor: PdfCursor, output: DeliveryPackOutput) {
         y: cardY,
         size: 10,
         maxWidth: CONTENT_WIDTH - 44,
-        maxLines: 4,
+        maxLines: 2,
         lineHeight: 14,
         color: COLOR_MUTED,
       })
@@ -789,7 +861,7 @@ function addChecklistPage(cursor: PdfCursor, output: DeliveryPackOutput) {
         y: listY,
         size: 10,
         maxWidth: CONTENT_WIDTH - 48,
-        maxLines: 3,
+        maxLines: 2,
         lineHeight: 14,
       })
       listY -= 2
@@ -813,7 +885,7 @@ function addArchivePage(cursor: PdfCursor, output: DeliveryPackOutput) {
     y: y - 28,
     size: 11,
     maxWidth: CONTENT_WIDTH - 32,
-    maxLines: 3,
+    maxLines: 2,
     lineHeight: 16,
   })
   drawWrappedTextClamped({
@@ -824,7 +896,7 @@ function addArchivePage(cursor: PdfCursor, output: DeliveryPackOutput) {
     y: y - 56,
     size: 10,
     maxWidth: CONTENT_WIDTH - 32,
-    maxLines: 3,
+    maxLines: 2,
     lineHeight: 14,
     color: COLOR_MUTED,
   })
@@ -836,7 +908,7 @@ function addArchivePage(cursor: PdfCursor, output: DeliveryPackOutput) {
     y: y - 84,
     size: 10,
     maxWidth: CONTENT_WIDTH - 32,
-    maxLines: 3,
+    maxLines: 2,
     lineHeight: 14,
     color: COLOR_MUTED,
   })
@@ -849,7 +921,7 @@ function addUpsellPage(cursor: PdfCursor, output: DeliveryPackOutput) {
   const cardHeight = 200
   drawCard(page, MARGIN_X, y - cardHeight + 8, CONTENT_WIDTH, cardHeight)
   let listY = y - 32
-  output.upsell.when_to_upgrade.slice(0, 4).forEach((item) => {
+  output.upsell.when_to_upgrade.slice(0, 3).forEach((item) => {
     page.drawText("-", {
       x: MARGIN_X + 16,
       y: listY,
@@ -865,21 +937,23 @@ function addUpsellPage(cursor: PdfCursor, output: DeliveryPackOutput) {
       y: listY,
       size: 11,
       maxWidth: CONTENT_WIDTH - 48,
-      maxLines: 3,
+      maxLines: 2,
       lineHeight: 16,
     })
     listY -= 2
   })
 
+  const cardBottom = y - cardHeight + 20
+  const ctaY = Math.max(listY - 6, cardBottom)
   drawWrappedTextClamped({
     page,
     font: cursor.font,
     text: output.upsell.cta,
     x: MARGIN_X + 16,
-    y: y - 140,
+    y: ctaY,
     size: 12,
     maxWidth: CONTENT_WIDTH - 32,
-    maxLines: 3,
+    maxLines: 2,
     lineHeight: 18,
     color: COLOR_PRIMARY_DARK,
   })
@@ -905,6 +979,10 @@ export async function renderDeliveryPackPdf(
   const summaryStart = pdfDoc.getPageCount()
   addSummaryPage(cursor, input, output)
   sections.push({ title: "一页结论", pageIndex: summaryStart })
+
+  const tomorrowStart = pdfDoc.getPageCount()
+  addTomorrowPostPage(cursor, output)
+  sections.push({ title: "明天第一条完整文案", pageIndex: tomorrowStart })
 
   const scoreStart = pdfDoc.getPageCount()
   addScorePage(cursor, output)

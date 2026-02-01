@@ -86,6 +86,7 @@ const DELIVERY_PACK_TOOL = {
         "bottleneck",
         "top_actions",
         "scores",
+        "tomorrow_post",
         "calendar_7d",
         "topics_10",
         "scripts_3",
@@ -139,6 +140,17 @@ const DELIVERY_PACK_TOOL = {
               insight: { type: "string" },
               fix: { type: "string" },
             },
+          },
+        },
+        tomorrow_post: {
+          type: "object",
+          additionalProperties: false,
+          required: ["title", "body", "pinned_comment", "cover_text"],
+          properties: {
+            title: { type: "string" },
+            body: { type: "string" },
+            pinned_comment: { type: "string" },
+            cover_text: { type: "string" },
           },
         },
         calendar_7d: {
@@ -276,6 +288,12 @@ const OUTPUT_TEMPLATE = `{
     { "dimension": "质检复盘", "score": 0, "insight": "", "fix": "" },
     { "dimension": "成交转化", "score": 0, "insight": "", "fix": "" }
   ],
+  "tomorrow_post": {
+    "title": "",
+    "body": "",
+    "pinned_comment": "",
+    "cover_text": ""
+  },
   "calendar_7d": [
     { "day": 1, "type": "引流", "title": "", "hook": "", "outline": ["", "", ""], "cta": "", "script_id": "S1" },
     { "day": 2, "type": "引流", "title": "", "hook": "", "outline": ["", "", ""], "cta": "", "script_id": "S1" },
@@ -319,6 +337,7 @@ const CORE_SCHEMA = deliveryPackOutputSchema.pick({
   bottleneck: true,
   top_actions: true,
   scores: true,
+  tomorrow_post: true,
   thinking_summary: true,
 })
 
@@ -367,14 +386,16 @@ ${JSON.stringify(payload, null, 2)}
 6) scripts_3 必须包含 shots（镜头时间段t + 台词line + 画面visual），且每条脚本必须有 CTA。
 7) 至少引用 ${teamTypeLabel}、${platformLabel}、"${input.offer_desc}" 各>=2次，且必须至少引用 target_audience 与 price_range 各>=1次。
 8) calendar_7d.day=1 必须给出“明天第一条”可直接发布的标题+钩子+结构+CTA。
-9) thinking_summary 为 3-5 条“思考摘要”，不得暴露推理过程。
-10) 必须输出完整结构，严禁缺失 scripts_3 / qc_checklist / archive_rules / upsell。
+9) tomorrow_post 必须包含 title/body/pinned_comment/cover_text，且正文为可直接发布的完整文案（不少于 120 字）。
+10) thinking_summary 为 3-5 条“思考摘要”，不得暴露推理过程。
+11) 必须输出完整结构，严禁缺失 scripts_3 / qc_checklist / archive_rules / upsell。
 
 结构说明（字段必须存在）：
 - meta: { industry, platform, team_type, offer_desc }
 - bottleneck: 1条核心瓶颈
 - top_actions: 3条，每条包含 title / why / do_in_7_days[]
 - scores: 5条维度分数（0-10）
+- tomorrow_post: { title, body, pinned_comment, cover_text }
 - calendar_7d: 7天排产（day/type/title/hook/outline[3]/cta/script_id）
 - topics_10: 10条高意图选题（title/audience/scene/pain/keywords/type/cta）
 - scripts_3: 3条脚本（id=S1/S2/S3, type, duration, shots[], cta, title_options[3], pinned_comment）
@@ -418,8 +439,9 @@ ${JSON.stringify(payload, null, 2)}
 2) 禁止出现：击败、超过、行业排名、前XX%、top% 等不可验证表述。
 3) scores 维度必须严格包含：交付定位 / 内容供给 / 产能效率 / 质检复盘 / 成交转化（各1条）。
 4) top_actions 3条，每条必须具体可执行。
-5) thinking_summary 3-5条摘要，不暴露推理过程。
-6) 至少引用 ${teamTypeLabel}、${platformLabel}、"${input.offer_desc}" 各>=2次，且至少引用 target_audience 与 price_range 各>=1次。
+5) tomorrow_post 必须包含 title/body/pinned_comment/cover_text，且正文为可直接发布的完整文案（不少于 120 字）。
+6) thinking_summary 3-5条摘要，不暴露推理过程。
+7) 至少引用 ${teamTypeLabel}、${platformLabel}、"${input.offer_desc}" 各>=2次，且至少引用 target_audience 与 price_range 各>=1次。
 `.trim()
 }
 
@@ -451,7 +473,7 @@ ${JSON.stringify(payload, null, 2)}
 1) 输出只用简体中文。
 2) calendar_7d.type 只能是 引流 / 建信 / 转化，比例至少 引流>=3、建信>=2、转化>=2。
 3) 每条包含 day/title/hook/outline[3]/cta/script_id。
-4) day=1 必须给出“明天第一条”可直接发布的标题+钩子+结构+CTA。
+4) day=1 必须给出“明天第一条”可直接发布的标题+钩子+结构+CTA，并与 tomorrow_post.title 保持一致风格。
 `.trim()
 }
 
@@ -661,6 +683,29 @@ ${raw}
 `.trim()
 }
 
+function buildStrengthenPrompt(
+  output: DeliveryPackOutput,
+  input: DeliveryPackInput,
+  issues?: string[]
+): string {
+  const issueLine = issues?.length ? `问题：${issues.join(", ")}` : ""
+  return `
+只输出合法 JSON，不要 Markdown，不要解释说明。请在保持结构完整的前提下强化内容价值密度与站内闭环 CTA。
+${issueLine}
+
+必须满足：
+1) 标题/钩子/CTA/明天完整文案 至少多次出现以下信息：团队类型“${input.team_type}”、平台“${input.platform}”、卖什么“${input.offer_desc}”、卖给谁“${input.target_audience || ""}”、客单价“${input.price_range || ""}”。
+2) CTA 必须是站内闭环（评论关键词/站内领取/站内生成/下载 PDF），禁止出现微信/手机号/外链引导。
+3) 保持 JSON 结构与字段不变。
+
+输出模板（必须填满所有字段，不能保留示例内容）：
+${OUTPUT_TEMPLATE}
+
+现有输出（请在此基础上增强）：
+${JSON.stringify(output)}
+`.trim()
+}
+
 function collectStrings(value: unknown, bucket: string[] = []): string[] {
   if (typeof value === "string") {
     bucket.push(value)
@@ -705,6 +750,26 @@ function buildFallbackTopActions(input: DeliveryPackInput) {
       do_in_7_days: ["统一CTA话术", "建立发布前质检清单"],
     },
   ]
+}
+
+function buildFallbackTomorrowPost(input: DeliveryPackInput) {
+  const platformLabel = PLATFORM_LABELS[input.platform] || input.platform
+  const offerDesc = input.offer_desc || "你的项目"
+  const audience = input.target_audience || "目标用户"
+  const title = `${offerDesc}：${audience}最关心的3个问题`
+  const coverText = `${offerDesc}`.slice(0, 14) || "明天第一条"
+  const cta = "评论区回复【方案】领取模板"
+  const body = [
+    `如果你是${audience}，正在考虑${offerDesc}，最怕的是投入了时间却看不到效果。`,
+    `今天用3步讲清楚：①先把“卖什么/卖给谁/价格区间”说清；②用一个可执行动作证明你能解决问题；③给出下一步动作，引导对方在${platformLabel}内领取方案。`,
+    `照这套结构发第一条，就能让用户知道你能解决什么、为什么信你、下一步怎么做。${cta}`,
+  ].join("")
+  return {
+    title,
+    body,
+    pinned_comment: cta,
+    cover_text: coverText,
+  }
 }
 
 function normalizeCoreOutput(input: DeliveryPackInput, value: any) {
@@ -779,6 +844,18 @@ function normalizeCoreOutput(input: DeliveryPackInput, value: any) {
       "优先输出可执行的7天交付动作",
       "保证内容可直接复制发布",
     ]
+  }
+
+  if (!output.tomorrow_post || typeof output.tomorrow_post !== "object") {
+    output.tomorrow_post = buildFallbackTomorrowPost(input)
+  } else {
+    const fallback = buildFallbackTomorrowPost(input)
+    output.tomorrow_post = {
+      title: output.tomorrow_post.title || fallback.title,
+      body: output.tomorrow_post.body || fallback.body,
+      pinned_comment: output.tomorrow_post.pinned_comment || fallback.pinned_comment,
+      cover_text: output.tomorrow_post.cover_text || fallback.cover_text,
+    }
   }
 
   return output
@@ -1015,10 +1092,15 @@ function validateDeliveryPackRules(output: DeliveryPackOutput, input: DeliveryPa
     ...output.topics_10.map((item) => item.title),
     ...output.top_actions.map((item) => item.title),
     ...output.scripts_3.flatMap((item) => item.title_options),
+    output.tomorrow_post?.title,
   ].filter((title) => title.length > 36)
 
   if (titleViolations.length) {
     errors.push("title_too_long")
+  }
+
+  if (output.tomorrow_post?.body && output.tomorrow_post.body.length < 120) {
+    errors.push("tomorrow_post_body_short")
   }
 
   const typeCounts = output.calendar_7d.reduce(
@@ -1182,6 +1264,8 @@ export async function generateDeliveryPackV2(input: DeliveryPackInput): Promise<
         lastError = error
         if (error instanceof ZodError) {
           lastIssues = error.issues.map((issue) => issue.path.join(".") || issue.message).slice(0, 8)
+        } else if (error instanceof Error && error.message.startsWith("rule_violation:")) {
+          lastIssues = error.message.replace("rule_violation:", "").split("|").filter(Boolean).slice(0, 8)
         } else {
           lastIssues = []
         }
@@ -1241,6 +1325,18 @@ export async function generateDeliveryPackV2(input: DeliveryPackInput): Promise<
     const ruleErrors = validateDeliveryPackRules(sanitized, input)
     if (ruleErrors.length) {
       console.warn("[delivery-pack] rule warnings:", ruleErrors)
+      const strengthenedRaw = await callLLM(buildStrengthenPrompt(sanitized, input, ruleErrors), 0.25, {
+        model: splitModel,
+        maxTokens: 6400,
+        useFunctionCalling: false,
+      })
+      const strengthenedParsed = deliveryPackOutputSchema.parse(parseJsonPayload(strengthenedRaw))
+      const strengthened = sanitizeDeliveryPack(input, strengthenedParsed)
+      const strengthenedErrors = validateDeliveryPackRules(strengthened, input)
+      if (strengthenedErrors.length) {
+        console.warn("[delivery-pack] strengthen warnings:", strengthenedErrors)
+      }
+      return strengthened
     }
     return sanitized
   } catch (error) {

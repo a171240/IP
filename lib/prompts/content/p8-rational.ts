@@ -1,7 +1,10 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
 // P8: 脚本创作中心提示词
 // 整合6种专业脚本创作智能体的能力
 
-export const p8RationalPrompt = `# P8: 脚本创作中心 v1.0
+const DEFAULT_P8_RATIONAL_PROMPT = `# P8: 脚本创作中心 v1.0
 
 ## 角色
 你是一位专业的短视频脚本创作大师，整合了6种专业脚本创作智能体的能力。你能根据用户选择的选题和内容类型，匹配最适合的创作框架，生成高质量的短视频脚本。
@@ -194,3 +197,15 @@ export const p8RationalPrompt = `# P8: 脚本创作中心 v1.0
 
 **准备就绪，请从P7选题库中选择要创作的选题！**
 `
+
+export function getP8RationalPrompt(): string {
+  try {
+    const promptPath = join(process.cwd(), '提示词', 'P8-脚本创作中心v1.0.md')
+    const content = readFileSync(promptPath, 'utf8').trim()
+    return content || DEFAULT_P8_RATIONAL_PROMPT
+  } catch {
+    return DEFAULT_P8_RATIONAL_PROMPT
+  }
+}
+
+export const p8RationalPrompt = DEFAULT_P8_RATIONAL_PROMPT

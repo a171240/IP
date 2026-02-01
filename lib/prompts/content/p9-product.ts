@@ -1,7 +1,10 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
 // P9: 口语化优化大师提示词
 // 将AI生成的文案转化为自然、真实的口语表达
 
-export const p9ProductPrompt = `# P9: 口语化优化大师 v1.0
+const DEFAULT_P9_PRODUCT_PROMPT = `# P9: 口语化优化大师 v1.0
 
 ## 角色
 你是一位专业的口语化文案优化专家，精通将AI生成的文案转化为自然、真实、有感染力的口语表达。你深谙人类说话的节奏、语气和习惯，能够精准识别并消除"AI味"，让文案读起来像真人在真实地分享。
@@ -179,3 +182,15 @@ export const p9ProductPrompt = `# P9: 口语化优化大师 v1.0
 
 **准备就绪，请提供P8生成的脚本开始口语化优化！**
 `
+
+export function getP9ProductPrompt(): string {
+  try {
+    const promptPath = join(process.cwd(), '提示词', 'P9-口语化优化大师v1.0.md')
+    const content = readFileSync(promptPath, 'utf8').trim()
+    return content || DEFAULT_P9_PRODUCT_PROMPT
+  } catch {
+    return DEFAULT_P9_PRODUCT_PROMPT
+  }
+}
+
+export const p9ProductPrompt = DEFAULT_P9_PRODUCT_PROMPT

@@ -25,6 +25,9 @@ const PLATFORM_TOKEN_MAP: Record<string, string> = {
   wechat: "公众号",
 }
 
+const CTA_BLOCK_PATTERN =
+  /(微信|加V|加微|加我|私信加|微信号|VX|wx|WeChat|二维码|电话|手机号|手机|添加.*微信|加.*微信)/i
+
 const TITLE_MAX = 36
 const HOOK_MAX = 32
 const OUTLINE_MAX = 36
@@ -36,6 +39,11 @@ const KEYWORD_MAX = 12
 const SCRIPT_TITLE_MAX = 36
 const SCRIPT_CTA_MAX = 42
 const PINNED_MAX = 60
+const POST_TITLE_MAX = 36
+const POST_BODY_MAX = 240
+const POST_COVER_MAX = 20
+const POST_PINNED_MAX = 60
+const DENSITY_SNIPPET_MAX = 8
 
 function stripDayPrefix(text: string): string {
   return text.replace(/^\s*(day|Day)\s*\d+\s*[-–—·:：]?\s*/i, "").trim()
@@ -65,6 +73,48 @@ function sanitizeText(value: string, path: string): string {
 function truncateText(value: string, maxLength: number): string {
   if (value.length <= maxLength) return value
   return value.slice(0, maxLength)
+}
+
+function buildDensityTokens(input: DeliveryPackInput, platformLabel: string): string[] {
+  const tokens = [input.offer_desc, input.target_audience, input.price_range, platformLabel]
+    .map((item) => (item || "").trim())
+    .filter(Boolean)
+  return tokens.map((token) => (token.length > DENSITY_SNIPPET_MAX ? token.slice(0, DENSITY_SNIPPET_MAX) : token))
+}
+
+function countTokenMatches(text: string, tokens: string[]): number {
+  const normalized = text.trim()
+  return tokens.reduce((count, token) => {
+    if (!token) return count
+    return normalized.includes(token) ? count + 1 : count
+  }, 0)
+}
+
+function ensureTitleDensity(value: string, tokens: string[], maxLength: number): string {
+  const trimmed = value.trim()
+  if (!tokens.length) return truncateText(trimmed, maxLength)
+  const hits = countTokenMatches(trimmed, tokens)
+  if (hits >= 2) return truncateText(trimmed, maxLength)
+
+  const missing = tokens.filter((token) => !trimmed.includes(token))
+  const prefix = missing.slice(0, 2).join("·")
+  if (!prefix) return truncateText(trimmed, maxLength)
+  const merged = `${prefix}｜${trimmed}`
+  return truncateText(merged, maxLength)
+}
+
+function sanitizeCta(value: string, path: string, fallback: string): string {
+  const cleaned = truncateText(sanitizeText(value, path), CTA_MAX)
+  if (!CTA_BLOCK_PATTERN.test(cleaned)) return cleaned
+  console.warn(`[delivery-pack] sanitized cta at ${path}`)
+  return fallback
+}
+
+function sanitizePostText(value: string, path: string, fallback: string, maxLength: number): string {
+  const cleaned = truncateText(sanitizeText(value, path), maxLength)
+  if (!CTA_BLOCK_PATTERN.test(cleaned)) return cleaned
+  console.warn(`[delivery-pack] sanitized cta at ${path}`)
+  return truncateText(fallback, maxLength)
 }
 
 function normalizeCalendarType(value: string): "引流" | "建信" | "转化" {
@@ -99,12 +149,35 @@ function buildFallbackSummary(output: DeliveryPackOutput): string[] {
   return summary.filter(Boolean).slice(0, 4)
 }
 
+function buildTomorrowPostFallback(
+  input: DeliveryPackInput,
+  platformLabel: string,
+  dayOne?: DeliveryPackOutput["calendar_7d"][number]
+) {
+  const offerDesc = input.offer_desc || "你的项目"
+  const audience = input.target_audience || "目标用户"
+  const title = dayOne?.title || `${offerDesc}：${audience}最关心的3个问题`
+  const coverText = title.slice(0, POST_COVER_MAX)
+  const cta = platformLabel.includes("小红书") ? "评论区回复【方案】领取模板" : "评论【方案】领取模板"
+  const hook = dayOne?.hook ? `${dayOne.hook}。` : ""
+  const outline = dayOne?.outline?.length ? `重点：${dayOne.outline.join("；")}。` : ""
+  const body = `${hook}${outline}${dayOne?.cta || cta}`
+  return {
+    title,
+    body,
+    pinned_comment: cta,
+    cover_text: coverText,
+  }
+}
+
 export function sanitizeDeliveryPack(
   input: DeliveryPackInput,
   output: DeliveryPackOutput
 ): DeliveryPackOutput {
   const teamTypeLabel = TEAM_TYPE_LABELS[input.team_type] || input.team_type
   const platformLabel = PLATFORM_LABELS[input.platform] || input.platform
+  const densityTokens = buildDensityTokens(input, platformLabel)
+  const ctaFallback = platformLabel.includes("小红书") ? "评论区回复【方案】领取模板" : "评论【方案】领取模板"
   const thinkingSummary = output.thinking_summary?.length
     ? output.thinking_summary
     : buildFallbackSummary(output)
@@ -113,15 +186,16 @@ export function sanitizeDeliveryPack(
     ...item,
     day: item.day || index + 1,
     type: normalizeCalendarType(item.type),
-    title: truncateText(
+    title: ensureTitleDensity(
       stripDayPrefix(sanitizeText(item.title, `calendar_7d.${index}.title`)),
+      densityTokens,
       TITLE_MAX
     ),
     hook: truncateText(sanitizeText(item.hook, `calendar_7d.${index}.hook`), HOOK_MAX),
     outline: item.outline.slice(0, 3).map((line, lineIndex) =>
       truncateText(sanitizeText(line, `calendar_7d.${index}.outline.${lineIndex}`), OUTLINE_MAX)
     ),
-    cta: truncateText(sanitizeText(item.cta, `calendar_7d.${index}.cta`), CTA_MAX),
+    cta: sanitizeCta(item.cta, `calendar_7d.${index}.cta`, ctaFallback),
     script_id: normalizeScriptId(item.script_id, index),
   }))
 
@@ -181,11 +255,15 @@ export function sanitizeDeliveryPack(
       type: sanitizeText(script.type, `scripts_3.${index}.type`),
       duration: sanitizeText(script.duration, `scripts_3.${index}.duration`),
       shots: normalizedShots,
-      cta: truncateText(sanitizeText(script.cta, `scripts_3.${index}.cta`), SCRIPT_CTA_MAX),
+      cta: sanitizeCta(script.cta, `scripts_3.${index}.cta`, ctaFallback),
       title_options: script.title_options
         .slice(0, 3)
         .map((title, optionIndex) =>
-          truncateText(sanitizeText(title, `scripts_3.${index}.title_options.${optionIndex}`), SCRIPT_TITLE_MAX)
+          ensureTitleDensity(
+            sanitizeText(title, `scripts_3.${index}.title_options.${optionIndex}`),
+            densityTokens,
+            SCRIPT_TITLE_MAX
+          )
         ),
       pinned_comment: truncateText(
         sanitizeText(script.pinned_comment, `scripts_3.${index}.pinned_comment`),
@@ -193,6 +271,32 @@ export function sanitizeDeliveryPack(
       ),
     }
   })
+
+  const tomorrowFallback = buildTomorrowPostFallback(input, platformLabel, normalizedCalendar[0])
+  const rawTomorrow = output.tomorrow_post || {}
+  const normalizedTomorrow = {
+    title: ensureTitleDensity(
+      sanitizeText(rawTomorrow.title || tomorrowFallback.title, "tomorrow_post.title"),
+      densityTokens,
+      POST_TITLE_MAX
+    ),
+    body: sanitizePostText(
+      rawTomorrow.body || tomorrowFallback.body,
+      "tomorrow_post.body",
+      tomorrowFallback.body,
+      POST_BODY_MAX
+    ),
+    pinned_comment: sanitizePostText(
+      rawTomorrow.pinned_comment || tomorrowFallback.pinned_comment,
+      "tomorrow_post.pinned_comment",
+      tomorrowFallback.pinned_comment,
+      POST_PINNED_MAX
+    ),
+    cover_text: truncateText(
+      sanitizeText(rawTomorrow.cover_text || tomorrowFallback.cover_text, "tomorrow_post.cover_text"),
+      POST_COVER_MAX
+    ),
+  }
 
   return {
     meta: {
@@ -215,9 +319,14 @@ export function sanitizeDeliveryPack(
       insight: sanitizeText(item.insight, `scores.${index}.insight`),
       fix: sanitizeText(item.fix, `scores.${index}.fix`),
     })),
+    tomorrow_post: normalizedTomorrow,
     calendar_7d: normalizedCalendar,
     topics_10: output.topics_10.map((item, index) => ({
-      title: truncateText(sanitizeText(item.title, `topics_10.${index}.title`), TOPIC_TITLE_MAX),
+      title: ensureTitleDensity(
+        sanitizeText(item.title, `topics_10.${index}.title`),
+        densityTokens,
+        TOPIC_TITLE_MAX
+      ),
       audience: sanitizeText(item.audience, `topics_10.${index}.audience`),
       scene: sanitizeText(item.scene, `topics_10.${index}.scene`),
       pain: sanitizeText(item.pain, `topics_10.${index}.pain`),
@@ -225,7 +334,7 @@ export function sanitizeDeliveryPack(
         truncateText(sanitizeText(keyword, `topics_10.${index}.keywords.${keywordIndex}`), KEYWORD_MAX)
       ),
       type: normalizeCalendarType(item.type),
-      cta: truncateText(sanitizeText(item.cta, `topics_10.${index}.cta`), CTA_MAX),
+      cta: sanitizeCta(item.cta, `topics_10.${index}.cta`, ctaFallback),
     })),
     scripts_3: normalizedScripts,
     qc_checklist: {

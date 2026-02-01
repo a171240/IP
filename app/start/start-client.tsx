@@ -160,6 +160,7 @@ export default function StartClient({ user, remainingDays, isPro }: StartClientP
                     setRedeemLoading(true)
 
                     track("redeem_submit", {
+                      userId: user?.id,
                       landingPath: window.location.pathname,
                       source: sourceFromQuery,
                       code_present: Boolean(redeemCode),
@@ -204,6 +205,7 @@ export default function StartClient({ user, remainingDays, isPro }: StartClientP
                         error?: string
                         plan?: string
                         expiresAt?: string
+                        isRenewal?: boolean
                         loginRequired?: boolean
                         session?: {
                           access_token?: string
@@ -221,9 +223,17 @@ export default function StartClient({ user, remainingDays, isPro }: StartClientP
                         }
 
                         track("redeem_success", {
+                          userId: user?.id,
                           landingPath: window.location.pathname,
                           source: sourceFromQuery,
                         })
+                        if (data.isRenewal) {
+                          track("redeem_renew_success", {
+                            userId: user?.id,
+                            landingPath: window.location.pathname,
+                            source: sourceFromQuery,
+                          })
+                        }
 
                         setRedeemPlan(data.plan ?? null)
                         setRedeemExpiresAt(data.expiresAt ?? null)
@@ -235,6 +245,7 @@ export default function StartClient({ user, remainingDays, isPro }: StartClientP
                         }
                       } else {
                         track("redeem_fail", {
+                          userId: user?.id,
                           landingPath: window.location.pathname,
                           source: sourceFromQuery,
                           error: data.error || response.status,
@@ -253,6 +264,7 @@ export default function StartClient({ user, remainingDays, isPro }: StartClientP
                       }
                     } catch {
                       track("redeem_fail", {
+                        userId: user?.id,
                         landingPath: window.location.pathname,
                         source: sourceFromQuery,
                         error: "network_error",

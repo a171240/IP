@@ -63,7 +63,7 @@ BEGIN
   PERFORM 1 FROM public.profiles WHERE id = uid FOR UPDATE;
 
   -- If already granted, return current status
-  IF EXISTS (SELECT 1 FROM public.profiles WHERE id = uid AND trial_granted_at IS NOT NULL) THEN
+  IF EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = uid AND p.trial_granted_at IS NOT NULL) THEN
     RETURN QUERY
     SELECT false, COALESCE(p.trial_source, 'already_granted'), p.credits_balance, p.credits_unlimited, p.trial_granted_at
     FROM public.profiles p
@@ -73,7 +73,10 @@ BEGIN
 
   SELECT p.credits_unlimited INTO unlimited FROM public.profiles p WHERE p.id = uid;
   IF unlimited THEN
-    UPDATE public.profiles SET trial_granted_at = NOW(), trial_source = 'unlimited' WHERE id = uid;
+    UPDATE public.profiles AS p
+      SET trial_granted_at = NOW(),
+          trial_source = 'unlimited'
+      WHERE p.id = uid;
     RETURN QUERY
     SELECT true, 'unlimited', p.credits_balance, p.credits_unlimited, p.trial_granted_at
     FROM public.profiles p
@@ -117,11 +120,11 @@ BEGIN
     source := 'trial_limited';
   END IF;
 
-  UPDATE public.profiles
-    SET credits_balance = credits_balance + grant_amount,
+  UPDATE public.profiles AS p
+    SET credits_balance = p.credits_balance + grant_amount,
         trial_granted_at = NOW(),
         trial_source = source
-    WHERE id = uid;
+    WHERE p.id = uid;
 
   INSERT INTO public.credit_transactions(user_id, delta, reason, metadata)
     VALUES (uid, grant_amount, 'trial_grant', jsonb_build_object('source', source, 'device_claimed', device_claimed, 'ip_count_24h', ip_count));

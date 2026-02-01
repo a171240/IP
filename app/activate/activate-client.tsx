@@ -204,6 +204,7 @@ export default function ActivateClient({ utm, user, isPro, proExpiresAt }: Activ
                             error?: string
                             plan?: string
                             expiresAt?: string
+                            isRenewal?: boolean
                             loginRequired?: boolean
                             session?: {
                               access_token?: string
@@ -224,6 +225,12 @@ export default function ActivateClient({ utm, user, isPro, proExpiresAt }: Activ
                               userId: user?.id,
                               landingPath: window.location.pathname,
                             })
+                            if (data.isRenewal) {
+                              track("redeem_renew_success", {
+                                userId: user?.id,
+                                landingPath: window.location.pathname,
+                              })
+                            }
 
                             setRedeemPlan(data.plan ?? null)
                             setRedeemExpiresAt(data.expiresAt ?? null)
@@ -286,7 +293,12 @@ export default function ActivateClient({ utm, user, isPro, proExpiresAt }: Activ
 
                       {redeemError ? <p className="text-xs text-rose-400">{redeemError}</p> : null}
 
-                      <GlowButton primary className="w-full px-6 py-3 text-sm" disabled={redeemLoading}>
+                      <GlowButton
+                        primary
+                        className="w-full px-6 py-3 text-sm"
+                        type="submit"
+                        disabled={redeemLoading}
+                      >
                         {redeemLoading ? "提交中..." : "提交兑换并开通"}
                         <ArrowRight size={16} />
                       </GlowButton>

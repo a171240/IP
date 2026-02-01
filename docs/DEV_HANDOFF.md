@@ -1,6 +1,6 @@
 ﻿# IP内容工厂 · 开发文档与进度梳理（P0/P1）
 
-更新时间：2026-01-30
+更新时间：2026-02-01
 
 本文件用于“换机继续开发”。它把你给的开发文档要求完整梳理成：
 - 已完成什么
@@ -44,12 +44,14 @@
 **已完成：**
 - 问卷改为 10 题，全部映射到 DeliveryPackInput（高信号字段：offer_desc / target_audience / price_range / tone / current_problem）。
 - 首页文案已同步为“5分钟 · 10道题”。
+- 修复 `/diagnosis/quiz` 在未包 AuthProvider 时的报错：改用 Supabase `auth.getUser` 拉取 `userId`。
 
 **实现位置：**
 - 题库：`lib/diagnosis/questions.ts`
 - 评分映射：`lib/diagnosis/scoring.ts`
 - 首页口径：`app/page.tsx`
 - 诊断入口标题：`app/diagnosis/page.tsx`
+- 诊断问卷客户端：`app/diagnosis/quiz/quiz-client.tsx`
 
 ---
 
@@ -59,6 +61,7 @@
 - 校验规则已内置：7 天排产长度、3 条脚本完整度、禁用“同行排名/击败”等。
 - **仅输出 PDF**，已移除 zip。
 - storage 字段已改名为 `pdf_path`。
+- 新增“明天第一条完整文案”（标题/正文/封面文字/置顶评论）并写入 PDF + 在线预览。
 
 **实现位置：**
 - 生成：`lib/delivery-pack/generate.ts`
@@ -75,6 +78,7 @@
 - 结果页首屏包含「明天第一条」模块（标题 + 钩子 + 结构 + CTA）。
 - 核心瓶颈 + Top3 动作展示。
 - 增加“用交付包直接开始产出”承接模块，引导进入内容工坊 P7/P8。
+- 诊断后可一键直达 P7/P8（自动写入 onboarding，上屏即自动生成）。
 
 **实现位置：**
 - `app/diagnosis/result/[id]/result-client.tsx`
@@ -85,42 +89,83 @@
 **已完成：**
 - `/delivery-pack/[packId]` 支持在线预览（输出 JSON 渲染成卡片）。
 - 支持打开/下载 PDF。
+- 预览页埋点补齐：`delivery_pack_view / delivery_pack_download / copy_script / copy_calendar / workshop_enter`（带 `packId / userId`）。
+- 质检清单/归档规则支持一键复制（事件：`copy_qc / copy_archive`）。
 
 **实现位置：**
 - `app/delivery-pack/[packId]/page.tsx`
+
+### 1.6 数据埋点补齐（漏斗可闭环）
+**已完成：**
+- 内容工坊运行埋点：`workflow_run`（带 `stepId / conversationId`）。
+- 续费兑换埋点：`redeem_renew_success`（与 `redeem_success` 并行上报）。
+
+**实现位置：**
+- `app/dashboard/workflow/[stepId]/WorkflowStepClient.tsx`
+- `app/api/redeem/route.ts`
+- `app/start/start-client.tsx`
+- `app/activate/activate-client.tsx`
+- `app/redeem/redeem-client.tsx`
+
+### 1.7 积分 RPC 与乱码修复
+**已完成：**
+- 修复 Supabase `grant_trial_credits / consume_credits` 的列名歧义（避免 42702），并已更新线上函数。
+- 修复 `P7/P8` 自动运行时的“报错乱码”显示；同时修复解决方案包下载内容与小程序私有配置说明的乱码。
+
+**实现位置：**
+- SQL：`lib/supabase/fix-credits.sql`，`lib/supabase/schema.sql`
+- API 文案：`app/api/chat/route.ts`，`app/api/prompts/route.ts`，`app/api/download/[packId]/route.ts`
+- 小程序配置：`mini-program-ui/project.private.config.json`
+
+### 1.8 工坊质量升级（P5-P10）
+**已完成：**
+- P7-P10 工作流提示词改为“优先读取提示词文件”，保证与 `提示词/` 目录同步；文件缺失时自动回退到内置默认提示词。
+- 工作流对话请求加入依赖报告上下文（优先 `context.reports`，无 id 时回退 `context.inline_reports`），P5-P10 能直接读取 P1-P4 / P7-P9 等前置报告，提高输出一致性与可用性。
+- 新增 P5-P10 上下文回归脚本（默认走 report_id），用于快速验证上下文注入链路。
+- ✅ 2026-02-01 回归：脚本 `report_id` / `inline` 两种模式均通过（P5-P10 标识命中）。
+
+**实现位置：**
+- 提示词加载：`lib/prompts/content/p7-attraction.ts`，`lib/prompts/content/p8-rational.ts`，`lib/prompts/content/p9-product.ts`，`lib/prompts/content/p10-emotion.ts`
+- 动态映射：`lib/prompts/step-prompts.ts`
+- 上下文注入：`app/dashboard/workflow/[stepId]/WorkflowStepClient.tsx`
+- 回归脚本：`scripts/regress-p5-p10-context.js`
 
 ---
 
 ## 2. 当前已知问题 / 待回归（P0）
 > 这些问题需换机后继续验证并修复。
 
-1) **兑换已有邮箱时**偶现失败（依赖 Supabase Auth 权限），需回归 `app/api/redeem/route.ts`。
-2) **兑换按钮是否真正 submit**（GlowButton type），需回归 `/activate` / `/start`。
-3) **PDF 排版**仍可能出现截断/重叠，需回归 `lib/delivery-pack/pdf.ts`。
-4) **在线预览复制按钮/下载按钮体验**需回归（点击一次多处提示、下载需多次触发等）。
+1) **兑换已有邮箱时**偶现失败 → 已修复（`createUser` 失败时改用 `auth.admin.listUsers` 回退查找用户）。
+2) **兑换按钮是否真正 submit** → 已修复（`/activate` 已补 `type="submit"`；`/start`/`/redeem` 已有）。
+3) **PDF 排版**可能出现截断/重叠 → 已收敛（收紧 `maxLines`，避免卡片溢出；仍建议人工视觉回归）。
+4) **在线预览复制/下载体验** → 已优化（复制仅成功提示，下载加 401 提示；建议人工回归）。
+5) **Next.js 16 searchParams 警告**（/admin/funnel、/auth/login）→ 已修复（改为 await Promise.resolve(searchParams)）。
+6) **内容价值密度与CTA合规** → 已补（标题自动补入 offer/人群/价格/平台要素；CTA 过滤微信/手机号等外链引导，回落站内评论领取）。
+7) **价值密度“加强版”重生成** → 已补（split 生成若触发规则警告，走一次强化 prompt 再生成）。
+8) **UI 控制台偶发 Failed to load resource（reports/conversations 406）** → 已修复（getReport/getConversation/getLatestConversation/use maybeSingle；不再因空数据 406 报错）。
 
 ---
 
 ## 3. 接下来要完成什么（P0 未完成项）
 
 ### 3.1 结果页稳定呈现“明天第一条”
-- 确保首屏稳定展示；数据为空时 fallback 不要出现 placeholder。
+- ✅ 已完成（首屏 fallback 已接入）。
 
 ### 3.2 交付包生成性能优化（按你的要求）
-- 并行拆分（核心 + 4 项并行）
-- 降 token
-- 异步轮询
+- ✅ 已完成（核心 + 4 项并行拆分；token 收敛；异步轮询已接）。
 
 ### 3.3 体验闭环 E2E 回归
-- 跑一遍：`redeem → activate → diagnosis → generate → PDF → preview`
-- 确认埋点写入 `analytics_events`
+- ✅ 已完成（`redeem → activate → diagnosis → generate → PDF → preview` 已跑通；`analytics_events` 已验证写入）。
+- ✅ 2026-01-31 回归：新交付包 `0986d40a-6a7a-4a8a-b9ad-80669a9f0465` 标题密度/CTA 合规通过；预览页复制清单/规则可用；`analytics_events` 已写入 `delivery_pack_generate_success / pdf_generate_success / delivery_pack_view / copy_qc / copy_archive`。
+- ✅ 2026-02-01 回归：新交付包 `43ff091d-dd58-4bd1-82fe-fef2d1b9851c` 预览页已出现“明天第一条完整文案”；PDF 已包含新页面（本地打开验证）；结果页/预览页进入内容工坊直达 `P7/P8` 并自动触发生成（积分修复后 /api/chat 200）。
+- ✅ 2026-02-01 UI 回归：Playwright MCP 跑 `P5 → P10`，每步首屏“前置报告”显示为“已有”，且对话中能提取对应标识（`P5: 概念标识`、`P6: 行业/认知/情绪/传记/概念/类型`、`P7: 行业/情绪/规划/传记`、`P8: 选题`、`P9: 脚本`、`P10: 口语`）。
 
 ---
 
 ## 4. P1 事项（后续）
-- 兑换码管理后台（生成/作废/导出）
-- 内容工坊新手引导（3步）
-- 漏斗看板（Supabase View / 简易管理页）
+- ✅ 兑换码管理后台（生成/作废/导出）：`/admin/redemption-codes` + `/api/admin/redemption-codes`
+- ✅ 内容工坊新手引导（3步）：`/dashboard/workflow/onboarding`（入口优先跳引导；完成写入 `workshop_onboarding_done`；P7/P8 支持 `?onboarding=1` 自动注入提示）
+- ✅ 漏斗看板（简易管理页）：`/admin/funnel`（近 7/14/30 天事件统计）
 
 ---
 
@@ -159,6 +204,9 @@ Copy-Item .env.example .env.local
 - 生成逻辑：`lib/delivery-pack/generate.ts`
 - PDF：`lib/delivery-pack/pdf.ts`
 - 预览页：`app/delivery-pack/[packId]/page.tsx`
+- 兑换码后台：`/admin/redemption-codes`
+- 漏斗看板：`/admin/funnel`
+- 工坊新手引导：`/dashboard/workflow/onboarding`
 
 ---
 

@@ -82,9 +82,35 @@ function normalizeCode(value: string): string {
 }
 
 async function findUserIdByEmail(admin: SupabaseClient, email: string): Promise<string | null> {
-  const { data, error } = await admin.schema("auth").from("users").select("id").eq("email", email).maybeSingle()
-  if (error) return null
-  return data?.id ?? null
+  const normalizedEmail = email.toLowerCase()
+  const { data, error } = await admin
+    .schema("auth")
+    .from("users")
+    .select("id, email")
+    .eq("email", normalizedEmail)
+    .maybeSingle()
+
+  if (!error && data?.id) {
+    return data.id
+  }
+
+  // Fallback: some Supabase projects do not expose auth schema via PostgREST.
+  try {
+    let page = 1
+    const perPage = 200
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const { data: list, error: listError } = await admin.auth.admin.listUsers({ page, perPage })
+      if (listError) return null
+      const match = list.users.find((user) => user.email?.toLowerCase() === normalizedEmail)
+      if (match?.id) return match.id
+      if (!list.nextPage) break
+      page = list.nextPage
+    }
+  } catch {
+    // ignore and fall through
+  }
+
+  return null
 }
 
 export async function POST(request: NextRequest) {
@@ -273,6 +299,7 @@ export async function POST(request: NextRequest) {
   const currentExpiry = current?.pro_expires_at ? new Date(current.pro_expires_at) : null
   const base = currentExpiry && currentExpiry > now ? currentExpiry : now
   const newExpires = new Date(base.getTime() + days * 24 * 60 * 60 * 1000)
+  const isRenewal = Boolean(current?.plan || current?.pro_expires_at)
 
   const nextPlan = current?.plan && ["pro", "vip"].includes(current.plan)
     ? current.plan
@@ -297,6 +324,7 @@ export async function POST(request: NextRequest) {
     ok: true,
     plan: nextPlan,
     expiresAt: newExpires.toISOString(),
+    isRenewal,
     session: sessionTokens,
     loginRequired,
   })

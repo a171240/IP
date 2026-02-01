@@ -224,7 +224,7 @@ export async function GET(request: NextRequest) {
       return jsonError(400, message)
     }
     if (message.includes("ENOENT") || message.toLowerCase().includes("no such file")) {
-      return jsonError(404, "鎻愮ず璇嶆枃浠朵笉瀛樺湪")
+      return jsonError(404, "提示词文件不存在")
     }
 
     console.error("/api/prompts error:", error)

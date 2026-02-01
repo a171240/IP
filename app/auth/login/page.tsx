@@ -4,12 +4,11 @@ import { safeRedirect } from "@/lib/safe-redirect"
 export const dynamic = "force-dynamic"
 
 type LoginPageProps = {
-  searchParams?: {
-    redirect?: string | string[]
-  }
+  searchParams?: Promise<{ redirect?: string | string[] }> | { redirect?: string | string[] }
 }
 
-export default function Page({ searchParams }: LoginPageProps) {
-  const redirectTo = safeRedirect(searchParams?.redirect).href
+export default async function Page({ searchParams }: LoginPageProps) {
+  const resolvedSearchParams = await Promise.resolve(searchParams)
+  const redirectTo = safeRedirect(resolvedSearchParams?.redirect).href
   return <LoginClient redirectTo={redirectTo} />
 }

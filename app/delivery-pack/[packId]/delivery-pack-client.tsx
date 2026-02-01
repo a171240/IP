@@ -6,19 +6,48 @@ import { Copy, Download, FileText } from "lucide-react"
 import { Header, GlassCard, GlowButton } from "@/components/ui/obsidian"
 import { track } from "@/lib/analytics/client"
 import type { DeliveryPackOutput } from "@/lib/delivery-pack/schema"
+import { QUESTIONS, INDUSTRY_LABELS } from "@/lib/diagnosis/questions"
 
 const safeArray = <T,>(value: T[] | null | undefined): T[] => (Array.isArray(value) ? value : [])
 
 type DeliveryPackClientProps = {
   packId: string
+  userId?: string | null
   status: string
   createdAt: string
   errorMessage?: string | null
   output: DeliveryPackOutput | null
 }
 
+type OnboardingPayload = {
+  platform?: string
+  platform_label?: string
+  industry?: string
+  industry_label?: string
+  offer_desc?: string
+  target_audience?: string
+  tone?: string
+  tone_label?: string
+  price_range?: string
+  price_range_label?: string
+  current_problem?: string[]
+  day?: number
+  topic?: string
+}
+
+const PLATFORM_OPTIONS = QUESTIONS.find((q) => q.id === "platform")?.options ?? []
+const INDUSTRY_OPTIONS = QUESTIONS.find((q) => q.id === "industry")?.options ?? []
+const TONE_OPTIONS = QUESTIONS.find((q) => q.id === "tone")?.options ?? []
+const PRICE_OPTIONS = QUESTIONS.find((q) => q.id === "price_range")?.options ?? []
+
+function resolveLabel(options: Array<{ value: string; label: string }>, value: string | undefined) {
+  if (!value) return ""
+  return options.find((opt) => opt.value === value)?.label || value
+}
+
 export default function DeliveryPackClient({
   packId,
+  userId,
   status,
   createdAt,
   errorMessage,
@@ -29,21 +58,111 @@ export default function DeliveryPackClient({
   const [downloadError, setDownloadError] = useState<string | null>(null)
 
   useEffect(() => {
-    track("delivery_pack_view", { packId, landingPath: window.location.pathname })
-  }, [packId])
+    track("delivery_pack_view", { packId, userId, landingPath: window.location.pathname })
+  }, [packId, userId])
 
   const copyText = useCallback(
-    async (value: string, key: string, eventName: string) => {
+    async (value: string, key: string, eventName: string, extraProps?: Record<string, unknown>) => {
       if (!value) return
-      setCopyingKey(key)
       try {
         await navigator.clipboard.writeText(value)
-        track(eventName, { packId, landingPath: window.location.pathname })
+        setCopyingKey(key)
+        track(eventName, { packId, userId, landingPath: window.location.pathname, ...(extraProps || {}) })
       } finally {
         setTimeout(() => setCopyingKey(null), 800)
       }
     },
-    [packId]
+    [packId, userId]
+  )
+
+  const calendar = useMemo(() => safeArray(output?.calendar_7d), [output])
+
+  const buildOnboardingPayload = useCallback((): OnboardingPayload | null => {
+    if (typeof window === "undefined") return null
+    const dayOne = calendar[0]
+    try {
+      const saved = window.localStorage.getItem("latestDiagnosisAnswers")
+      if (saved) {
+        const parsed = JSON.parse(saved) as {
+          answers?: Record<string, string | string[]>
+          customIndustry?: string
+        }
+        const answers = parsed.answers || {}
+        const platform = String(answers.platform || "")
+        const industry = String(answers.industry || "")
+        const offerDesc = String(answers.offer_desc || "")
+        const targetAudience = String(answers.target_audience || "")
+        if (platform && industry && offerDesc && targetAudience) {
+          const industryLabel =
+            industry === "other"
+              ? String(parsed.customIndustry || "")
+              : INDUSTRY_LABELS[industry] || resolveLabel(INDUSTRY_OPTIONS, industry)
+          return {
+            platform,
+            platform_label: resolveLabel(PLATFORM_OPTIONS, platform),
+            industry,
+            industry_label: industryLabel || industry,
+            offer_desc: offerDesc,
+            target_audience: targetAudience,
+            tone: String(answers.tone || ""),
+            tone_label: resolveLabel(TONE_OPTIONS, String(answers.tone || "")),
+            price_range: String(answers.price_range || ""),
+            price_range_label: resolveLabel(PRICE_OPTIONS, String(answers.price_range || "")),
+            current_problem: Array.isArray(answers.current_problem) ? answers.current_problem.map(String) : undefined,
+            day: dayOne?.day || 1,
+            topic: dayOne?.title || "",
+          }
+        }
+      }
+    } catch {
+      // ignore parse errors
+    }
+
+    if (output?.meta) {
+      const industryLabel =
+        INDUSTRY_LABELS[output.meta.industry] ||
+        resolveLabel(INDUSTRY_OPTIONS, output.meta.industry) ||
+        output.meta.industry
+      return {
+        platform_label: output.meta.platform || "",
+        industry_label: industryLabel,
+        offer_desc: output.meta.offer_desc || "",
+        day: dayOne?.day || 1,
+        topic: dayOne?.title || "",
+      }
+    }
+
+    return null
+  }, [calendar, output])
+
+  const goToWorkshop = useCallback(
+    (stepId: "P7" | "P8") => {
+      const payload = buildOnboardingPayload()
+      track("workshop_enter", {
+        packId,
+        stepId,
+        userId,
+        landingPath: window.location.pathname,
+        mode: payload ? "one_click" : "default",
+      })
+      if (typeof window !== "undefined" && payload) {
+        try {
+          localStorage.setItem("workshop_onboarding", JSON.stringify(payload))
+          localStorage.setItem("workshop_onboarding_done", "1")
+        } catch {
+          // ignore storage errors
+        }
+        window.location.href = `/dashboard/workflow/${stepId}?onboarding=1`
+        return
+      }
+      const shouldOnboard = typeof window !== "undefined" && !localStorage.getItem("workshop_onboarding_done")
+      if (shouldOnboard) {
+        window.location.href = `/dashboard/workflow/onboarding?target=${stepId}`
+        return
+      }
+      window.location.href = `/dashboard/workflow/${stepId}`
+    },
+    [buildOnboardingPayload, packId, userId]
   )
 
   const pollPackStatus = useCallback(async () => {
@@ -60,8 +179,15 @@ export default function DeliveryPackClient({
   }, [packId])
 
   const handleDownload = useCallback(async () => {
+    if (isDownloading) return
     setDownloadError(null)
     setIsDownloading(true)
+    track("delivery_pack_download", {
+      packId,
+      userId,
+      landingPath: window.location.pathname,
+      mode: "download",
+    })
 
     if (status === "done") {
       window.location.href = `/api/delivery-pack/${packId}/download`
@@ -88,6 +214,10 @@ export default function DeliveryPackClient({
         setDownloadError("仍在生成中，请稍后再试")
         return
       }
+      if (downloadResp.status === 401) {
+        setDownloadError("请先登录后再下载")
+        return
+      }
       if (downloadResp.status >= 400) {
         setDownloadError("下载失败，请稍后再试")
         return
@@ -101,9 +231,8 @@ export default function DeliveryPackClient({
     } finally {
       setIsDownloading(false)
     }
-  }, [packId, pollPackStatus, status])
+  }, [isDownloading, packId, pollPackStatus, status, userId])
 
-  const calendar = useMemo(() => safeArray(output?.calendar_7d), [output])
   const topics = useMemo(() => safeArray(output?.topics_10), [output])
   const scripts = useMemo(() => safeArray(output?.scripts_3), [output])
   const topActions = useMemo(() => safeArray(output?.top_actions), [output])
@@ -116,6 +245,10 @@ export default function DeliveryPackClient({
   const tomorrowText = dayOne
     ? `标题：${dayOne.title}\n3秒钩子：${dayOne.hook}\n结构：${dayOne.outline.join(" / ")}\nCTA：${dayOne.cta}`
     : ""
+  const tomorrowPost = output?.tomorrow_post
+  const tomorrowPostText = tomorrowPost
+    ? `标题：${tomorrowPost.title}\n封面文字：${tomorrowPost.cover_text}\n正文：${tomorrowPost.body}\n置顶评论：${tomorrowPost.pinned_comment}`
+    : ""
   const calendarText = useMemo(() => {
     if (!calendar.length) return ""
     return calendar
@@ -127,6 +260,33 @@ export default function DeliveryPackClient({
       )
       .join("\n\n")
   }, [calendar])
+  const qcText = useMemo(() => {
+    if (!output?.qc_checklist) return ""
+    const { title, body, cta_and_compliance } = output.qc_checklist
+    return [
+      "标题检查",
+      ...(title || []),
+      "",
+      "结构检查",
+      ...(body || []),
+      "",
+      "CTA 与合规",
+      ...(cta_and_compliance || []),
+    ]
+      .filter(Boolean)
+      .join("\n")
+  }, [output])
+  const archiveText = useMemo(() => {
+    if (!output?.archive_rules) return ""
+    const { naming, tags, dedupe } = output.archive_rules
+    return [
+      `命名规范：${naming}`,
+      `标签体系：${(tags || []).join(" / ")}`,
+      `去重规则：${(dedupe || []).join(" / ")}`,
+    ]
+      .filter(Boolean)
+      .join("\n")
+  }, [output])
 
   if (!output) {
     return (
@@ -163,7 +323,12 @@ export default function DeliveryPackClient({
               <div className="flex flex-col sm:flex-row gap-3">
                 <GlowButton
                   onClick={() => {
-                    track("delivery_pack_download", { packId, landingPath: window.location.pathname, mode: "open" })
+                    track("delivery_pack_download", {
+                      packId,
+                      userId,
+                      landingPath: window.location.pathname,
+                      mode: "open",
+                    })
                     window.open(`/api/delivery-pack/${packId}/download`, "_blank")
                   }}
                   disabled={isDownloading}
@@ -213,6 +378,28 @@ export default function DeliveryPackClient({
                 <div>3秒钩子：{dayOne.hook}</div>
                 <div>结构：{dayOne.outline.join(" / ")}</div>
                 <div className="text-emerald-400">CTA：{dayOne.cta}</div>
+              </div>
+            </GlassCard>
+          ) : null}
+
+          {tomorrowPost ? (
+            <GlassCard className="p-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <h2 className="text-lg font-semibold text-white">明天第一条完整文案</h2>
+                <button
+                  className="inline-flex items-center gap-2 rounded-full border border-emerald-400/40 px-3 py-1 text-xs text-emerald-200 hover:bg-emerald-500/10 self-start sm:self-auto"
+                  onClick={() => copyText(tomorrowPostText, "tomorrow-full", "copy_script", { target: "full_post" })}
+                  disabled={!tomorrowPostText}
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  {copyingKey === "tomorrow-full" ? "已复制" : "复制完整文案"}
+                </button>
+              </div>
+              <div className="mt-4 space-y-2 text-sm text-zinc-300">
+                <div>标题：{tomorrowPost.title}</div>
+                <div className="text-zinc-400">封面文字：{tomorrowPost.cover_text}</div>
+                <div className="text-zinc-400 whitespace-pre-wrap">正文：{tomorrowPost.body}</div>
+                <div className="text-emerald-400">置顶评论：{tomorrowPost.pinned_comment}</div>
               </div>
             </GlassCard>
           ) : null}
@@ -299,7 +486,16 @@ export default function DeliveryPackClient({
           </GlassCard>
 
           <GlassCard className="p-6">
-            <h2 className="text-lg font-semibold text-white">发布质检清单</h2>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="text-lg font-semibold text-white">发布质检清单</h2>
+              <button
+                className="inline-flex items-center gap-2 rounded-full border border-emerald-400/40 px-3 py-1 text-xs text-emerald-200 hover:bg-emerald-500/10 self-start sm:self-auto"
+                onClick={() => copyText(qcText, "qc", "copy_qc")}
+              >
+                <Copy className="w-3.5 h-3.5" />
+                {copyingKey === "qc" ? "已复制" : "复制清单"}
+              </button>
+            </div>
             <div className="mt-4 grid sm:grid-cols-3 gap-4">
               <div className="rounded-xl border border-white/10 bg-white/5 p-4">
                 <div className="text-sm font-semibold text-white">标题检查</div>
@@ -329,7 +525,16 @@ export default function DeliveryPackClient({
           </GlassCard>
 
           <GlassCard className="p-6">
-            <h2 className="text-lg font-semibold text-white">归档与去重规则</h2>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="text-lg font-semibold text-white">归档与去重规则</h2>
+              <button
+                className="inline-flex items-center gap-2 rounded-full border border-emerald-400/40 px-3 py-1 text-xs text-emerald-200 hover:bg-emerald-500/10 self-start sm:self-auto"
+                onClick={() => copyText(archiveText, "archive", "copy_archive")}
+              >
+                <Copy className="w-3.5 h-3.5" />
+                {copyingKey === "archive" ? "已复制" : "复制规则"}
+              </button>
+            </div>
             <div className="mt-4 space-y-2 text-sm text-zinc-300">
               <div>命名规范：{output.archive_rules.naming}</div>
               <div>标签体系：{output.archive_rules.tags.join(" / ")}</div>
@@ -355,18 +560,12 @@ export default function DeliveryPackClient({
             <div className="mt-4 flex flex-col sm:flex-row gap-3">
               <GlowButton
                 primary
-                onClick={() => {
-                  track("workshop_enter", { packId, stepId: "P7", landingPath: window.location.pathname })
-                  window.location.href = "/dashboard/workflow/P7"
-                }}
+                onClick={() => goToWorkshop("P7")}
               >
                 进入内容工坊：生成7天日历
               </GlowButton>
               <GlowButton
-                onClick={() => {
-                  track("workshop_enter", { packId, stepId: "P8", landingPath: window.location.pathname })
-                  window.location.href = "/dashboard/workflow/P8"
-                }}
+                onClick={() => goToWorkshop("P8")}
               >
                 进入内容工坊：生成3条脚本
               </GlowButton>

@@ -52,6 +52,12 @@ export const deliveryPackOutputSchema = z.object({
       })
     )
     .length(5),
+  tomorrow_post: z.object({
+    title: z.string().min(1),
+    body: z.string().min(1),
+    pinned_comment: z.string().min(1),
+    cover_text: z.string().min(1),
+  }),
   calendar_7d: z
     .array(
       z.object({

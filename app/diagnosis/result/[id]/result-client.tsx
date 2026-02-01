@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { GlassCard, GlowButton, Header } from "@/components/ui/obsidian"
 import { ArrowRight, Copy, Download, Loader2, Sparkles } from "lucide-react"
 import { DIMENSIONS } from "@/lib/diagnosis/scoring"
-import { Dimension, INDUSTRY_LABELS } from "@/lib/diagnosis/questions"
+import { Dimension, INDUSTRY_LABELS, QUESTIONS } from "@/lib/diagnosis/questions"
 import { track } from "@/lib/analytics/client"
 import type { DeliveryPackOutput } from "@/lib/delivery-pack/schema"
 
@@ -58,6 +58,16 @@ const PROBLEM_LABELS: Record<string, string> = {
   qc_missing: "质检标准缺失",
   conversion_unclear: "转化链路不清",
   archive_weak: "素材沉淀弱",
+}
+
+const PLATFORM_OPTIONS = QUESTIONS.find((q) => q.id === "platform")?.options ?? []
+const INDUSTRY_OPTIONS = QUESTIONS.find((q) => q.id === "industry")?.options ?? []
+const TONE_OPTIONS = QUESTIONS.find((q) => q.id === "tone")?.options ?? []
+const PRICE_OPTIONS = QUESTIONS.find((q) => q.id === "price_range")?.options ?? []
+
+function resolveLabel(options: Array<{ value: string; label: string }>, value: string | undefined) {
+  if (!value) return ""
+  return options.find((opt) => opt.value === value)?.label || value
 }
 
 export function ResultClient({
@@ -119,7 +129,55 @@ export function ResultClient({
   )
   const goToWorkshop = useCallback(
     (stepId: "P7" | "P8") => {
-      track("workshop_enter", { stepId, diagnosisId, userId, landingPath: window.location.pathname })
+      const dayOne = packOutput?.calendar_7d?.[0]
+      const platform = String(answers?.platform || "")
+      const industryValue = String(answers?.industry || industry || "")
+      const offerDesc = String(answers?.offer_desc || "")
+      const targetAudience = String(answers?.target_audience || "")
+      const payloadReady = platform && industryValue && offerDesc && targetAudience
+      const industryLabel =
+        industryValue === "other"
+          ? String(industry || "")
+          : INDUSTRY_LABELS[industryValue] || resolveLabel(INDUSTRY_OPTIONS, industryValue)
+      const payload = payloadReady
+        ? {
+            platform,
+            platform_label: resolveLabel(PLATFORM_OPTIONS, platform),
+            industry: industryValue,
+            industry_label: industryLabel || industryValue,
+            offer_desc: offerDesc,
+            target_audience: targetAudience,
+            tone: String(answers?.tone || ""),
+            tone_label: resolveLabel(TONE_OPTIONS, String(answers?.tone || "")),
+            price_range: String(answers?.price_range || ""),
+            price_range_label: resolveLabel(PRICE_OPTIONS, String(answers?.price_range || "")),
+            current_problem: Array.isArray(answers?.current_problem)
+              ? answers?.current_problem.map(String)
+              : undefined,
+            day: dayOne?.day || 1,
+            topic: dayOne?.title || "",
+          }
+        : null
+
+      track("workshop_enter", {
+        stepId,
+        diagnosisId,
+        userId,
+        landingPath: window.location.pathname,
+        mode: payload ? "one_click" : "default",
+      })
+
+      if (typeof window !== "undefined" && payload) {
+        try {
+          localStorage.setItem("workshop_onboarding", JSON.stringify(payload))
+          localStorage.setItem("workshop_onboarding_done", "1")
+        } catch {
+          // ignore storage errors
+        }
+        router.push(`/dashboard/workflow/${stepId}?onboarding=1`)
+        return
+      }
+
       const shouldOnboard = typeof window !== "undefined" && !localStorage.getItem("workshop_onboarding_done")
       if (shouldOnboard) {
         router.push(`/dashboard/workflow/onboarding?target=${stepId}`)
@@ -127,7 +185,7 @@ export function ResultClient({
       }
       router.push(`/dashboard/workflow/${stepId}`)
     },
-    [diagnosisId, router, userId]
+    [answers, diagnosisId, industry, packOutput, router, userId]
   )
 
   useEffect(() => {

@@ -1,18 +1,22 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { QUESTIONS } from "@/lib/diagnosis/questions"
 import { calculateScore } from "@/lib/diagnosis/scoring"
 import { GlassCard, GlowButton, Header } from "@/components/ui/obsidian"
 import { ArrowLeft, ArrowRight, Activity, RefreshCw, Check } from "lucide-react"
 import { track } from "@/lib/analytics/client"
+import { getSupabaseClient } from "@/lib/supabase/client"
 
 const STORAGE_KEY = "diagnosis_progress"
 
 export default function QuizPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const [userId, setUserId] = useState<string | undefined>(undefined)
+  const [authChecked, setAuthChecked] = useState(false)
+  const trackedStartRef = useRef(false)
   const force = searchParams?.get("force")
   const shouldSkip = force === "1" || force === "true"
   const [currentStep, setCurrentStep] = useState(0)
@@ -65,10 +69,31 @@ export default function QuizPage() {
   }, [router, shouldSkip])
 
   useEffect(() => {
+    let active = true
+    ;(async () => {
+      try {
+        const { data } = await getSupabaseClient().auth.getUser()
+        if (!active) return
+        setUserId(data?.user?.id)
+      } catch {
+        // ignore auth lookup failures
+      } finally {
+        if (active) setAuthChecked(true)
+      }
+    })()
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!authChecked || trackedStartRef.current) return
+    trackedStartRef.current = true
     track("diagnosis_start", {
+      userId,
       landingPath: window.location.pathname,
     })
-  }, [])
+  }, [authChecked, userId])
 
   useEffect(() => {
     if (isHydrated && Object.keys(answers).length > 0) {
@@ -125,6 +150,7 @@ export default function QuizPage() {
       const result = calculateScore(answers)
 
       track("diagnosis_submit", {
+        userId,
         landingPath: window.location.pathname,
       })
 
@@ -166,6 +192,7 @@ export default function QuizPage() {
         // ignore storage errors
       }
       track("diagnosis_complete", {
+        userId,
         landingPath: window.location.pathname,
         diagnosisId: data?.id,
       })

@@ -1,7 +1,10 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
 // P10: 迭代管理器提示词
 // 管理脚本版本、记录迭代日志、生成迭代建议
 
-export const p10EmotionPrompt = `# P10: 迭代管理器 v1.0
+const DEFAULT_P10_EMOTION_PROMPT = `# P10: 迭代管理器 v1.0
 
 ## 角色
 你是一位专业的内容迭代管理专家，负责管理短视频脚本的版本历史、记录迭代日志、分析改进方向，并基于历史数据提供智能化的迭代建议。你帮助创作者建立系统化的内容优化流程，让每一次迭代都有据可循。
@@ -189,3 +192,15 @@ P10在完成迭代管理后，会自动生成反馈数据供其他步骤参考�
 
 **准备就绪，请提供P9优化后的终稿开始迭代管理！**
 `
+
+export function getP10EmotionPrompt(): string {
+  try {
+    const promptPath = join(process.cwd(), '提示词', 'P10-迭代管理器v1.0.md')
+    const content = readFileSync(promptPath, 'utf8').trim()
+    return content || DEFAULT_P10_EMOTION_PROMPT
+  } catch {
+    return DEFAULT_P10_EMOTION_PROMPT
+  }
+}
+
+export const p10EmotionPrompt = DEFAULT_P10_EMOTION_PROMPT

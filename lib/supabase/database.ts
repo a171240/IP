@@ -140,14 +140,14 @@ export async function getConversation(conversationId: string): Promise<Conversat
     .from('conversations')
     .select('*')
     .eq('id', conversationId)
-    .single()
+    .maybeSingle()
 
   if (error) {
     console.error('Error getting conversation:', error)
     return null
   }
 
-  return data
+  return data || null
 }
 
 /**
@@ -175,9 +175,9 @@ export async function getLatestConversation(
     query = query.eq('project_id', projectId)
   }
 
-  const { data, error } = await query.single()
+  const { data, error } = await query.maybeSingle()
 
-  if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+  if (error) {
     console.error('Error getting latest conversation:', error)
     return null
   }
@@ -395,14 +395,14 @@ export async function getReport(reportId: string): Promise<Report | null> {
     .from('reports')
     .select('*')
     .eq('id', reportId)
-    .single()
+    .maybeSingle()
 
   if (error) {
     console.error('Error getting report:', error)
     return null
   }
 
-  return data
+  return data || null
 }
 
 /**
@@ -619,7 +619,7 @@ export async function saveKnowledgeDoc(
     .eq('project_id', projectId || null)
     .order('version', { ascending: false })
     .limit(1)
-    .single()
+    .maybeSingle()
 
   const newVersion = (latestDoc?.version || 0) + 1
 
@@ -672,9 +672,9 @@ export async function getActiveKnowledgeDoc(
     query = query.is('project_id', null)
   }
 
-  const { data, error } = await query.single()
+  const { data, error } = await query.maybeSingle()
 
-  if (error && error.code !== 'PGRST116') {
+  if (error) {
     console.error('Error getting knowledge doc:', error)
     return null
   }
@@ -744,7 +744,12 @@ export async function updateStepProgress(
     query = query.is('project_id', null)
   }
 
-  const { data: existing } = await query.single()
+  const { data: existing, error: existingError } = await query.maybeSingle()
+
+  if (existingError) {
+    console.error('Error checking step progress:', existingError)
+    return null
+  }
 
   // 若已有 completed 且 status 不是 completed，则保持旧记录
   if (existing && existing.status === 'completed' && status !== 'completed') {

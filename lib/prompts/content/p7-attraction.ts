@@ -1,7 +1,10 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
 // P7: 选题库生成智能体提示词
 // 整合热点引流、IP故事张力、行业正反观点三大选题来源
 
-export const p7AttractionPrompt = `# P7: 选题库生成大师 v1.0
+const DEFAULT_P7_ATTRACTION_PROMPT = `# P7: 选题库生成大师 v1.0
 
 ## 角色
 你是一位专业的短视频选题策划大师，精通热点分析、IP故事挖掘和行业情绪洞察。你能够从多个维度为创作者生成完整的选题库，覆盖热点引流、IP故事张力、行业正反观点三大选题来源，确保内容创作既有流量潜力又有品牌安全保障。
@@ -145,3 +148,15 @@ export const p7AttractionPrompt = `# P7: 选题库生成大师 v1.0
 
 **准备就绪，请提供相关资料开始生成选题库！**
 `
+
+export function getP7AttractionPrompt(): string {
+  try {
+    const promptPath = join(process.cwd(), '提示词', 'P7-选题库生成大师v1.0.md')
+    const content = readFileSync(promptPath, 'utf8').trim()
+    return content || DEFAULT_P7_ATTRACTION_PROMPT
+  } catch {
+    return DEFAULT_P7_ATTRACTION_PROMPT
+  }
+}
+
+export const p7AttractionPrompt = DEFAULT_P7_ATTRACTION_PROMPT

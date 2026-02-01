@@ -36,6 +36,7 @@ export default async function DeliveryPackPage({ params }: PageProps) {
   return (
     <DeliveryPackClient
       packId={data.id}
+      userId={user.id}
       status={data.status}
       createdAt={data.created_at}
       errorMessage={data.error_message}

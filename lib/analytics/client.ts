@@ -36,12 +36,22 @@ export function getStoredUtm(): UtmValues {
 export function track(event: string, props?: Record<string, unknown>) {
   if (typeof window === "undefined") return
 
+  const utm = getStoredUtm()
+  const landingPath = window.location.pathname
+  const mergedProps = { ...(props ?? {}) } as Record<string, unknown>
+  if (mergedProps.landingPath == null) {
+    mergedProps.landingPath = landingPath
+  }
+  if (mergedProps.source == null && utm.utm_source) {
+    mergedProps.source = utm.utm_source
+  }
+
   const payload = {
     event,
-    props,
-    path: window.location.pathname,
+    props: mergedProps,
+    path: landingPath,
     referrer: document.referrer || undefined,
-    utm: getStoredUtm(),
+    utm,
   }
 
   const body = JSON.stringify(payload)
