@@ -91,9 +91,12 @@
 - 支持打开/下载 PDF。
 - 预览页埋点补齐：`delivery_pack_view / delivery_pack_download / copy_script / copy_calendar / workshop_enter`（带 `packId / userId`）。
 - 质检清单/归档规则支持一键复制（事件：`copy_qc / copy_archive`）。
+- 新增样本交付包预览页 `/delivery-pack/sample`，非 Pro 可直接查看样本 PDF（下载路由 `/api/delivery-pack/sample/download`）。
 
 **实现位置：**
 - `app/delivery-pack/[packId]/page.tsx`
+- `app/delivery-pack/sample/page.tsx`
+- `app/api/delivery-pack/sample/download/route.ts`
 
 ### 1.6 数据埋点补齐（漏斗可闭环）
 **已完成：**

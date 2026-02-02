@@ -49,6 +49,7 @@ const paywallCopy = {
   ],
   ctaActivate: "/activate",
   ctaDemo: "/demo",
+  ctaSample: "/delivery-pack/sample",
 }
 
 const PROBLEM_LABELS: Record<string, string> = {
@@ -807,6 +808,21 @@ export function ResultClient({
                   className="inline-flex items-center justify-center px-5 py-2 rounded-xl bg-emerald-500 text-white text-sm font-semibold"
                 >
                   去激活体验卡
+                </Link>
+                <Link
+                  href={paywallCopy.ctaSample}
+                  onClick={() =>
+                    track("paywall_cta_click", {
+                      diagnosisId,
+                      source: answers?.platform,
+                      userId,
+                      landingPath: window.location.pathname,
+                      target: "sample",
+                    })
+                  }
+                  className="inline-flex items-center justify-center px-5 py-2 rounded-xl border border-white/10 text-sm text-zinc-300 hover:text-white"
+                >
+                  看样本PDF
                 </Link>
                 <Link
                   href={paywallCopy.ctaDemo}

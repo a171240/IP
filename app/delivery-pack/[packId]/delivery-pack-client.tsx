@@ -13,6 +13,7 @@ const safeArray = <T,>(value: T[] | null | undefined): T[] => (Array.isArray(val
 type DeliveryPackClientProps = {
   packId: string
   userId?: string | null
+  downloadUrl?: string
   status: string
   createdAt: string
   errorMessage?: string | null
@@ -48,6 +49,7 @@ function resolveLabel(options: Array<{ value: string; label: string }>, value: s
 export default function DeliveryPackClient({
   packId,
   userId,
+  downloadUrl,
   status,
   createdAt,
   errorMessage,
@@ -189,6 +191,12 @@ export default function DeliveryPackClient({
       mode: "download",
     })
 
+    if (downloadUrl) {
+      window.location.href = downloadUrl
+      setTimeout(() => setIsDownloading(false), 800)
+      return
+    }
+
     if (status === "done") {
       window.location.href = `/api/delivery-pack/${packId}/download`
       setTimeout(() => setIsDownloading(false), 800)
@@ -231,7 +239,7 @@ export default function DeliveryPackClient({
     } finally {
       setIsDownloading(false)
     }
-  }, [isDownloading, packId, pollPackStatus, status, userId])
+  }, [downloadUrl, isDownloading, packId, pollPackStatus, status, userId])
 
   const topics = useMemo(() => safeArray(output?.topics_10), [output])
   const scripts = useMemo(() => safeArray(output?.scripts_3), [output])
