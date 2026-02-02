@@ -1,4 +1,6 @@
 import { ZodError } from "zod"
+import fs from "fs"
+import path from "path"
 import { jsonrepair } from "jsonrepair"
 import { deliveryPackOutputSchema, DeliveryPackInput, DeliveryPackOutput } from "./schema"
 import { calculateScore } from "../diagnosis/scoring"
@@ -47,6 +49,87 @@ const SCORE_DIMENSION_MAP = {
   emotion: "质检复盘",
   conversion: "成交转化",
 } as const
+
+type Playbook = {
+  industry?: string
+  offer_type?: string
+  high_intent_keywords?: string[]
+  pain_points?: string[]
+  scenes?: string[]
+  hook_patterns?: string[]
+  cta_templates?: string[]
+  script_structures?: string[]
+  compliance_notes?: string[]
+}
+
+const PLAYBOOK_DIR = path.join(process.cwd(), "playbooks")
+let playbookCache: Playbook[] | null = null
+
+function loadPlaybooks(): Playbook[] {
+  if (playbookCache) return playbookCache
+  try {
+    const files = fs.existsSync(PLAYBOOK_DIR) ? fs.readdirSync(PLAYBOOK_DIR) : []
+    const playbooks: Playbook[] = []
+    files
+      .filter((file) => file.endsWith(".json"))
+      .forEach((file) => {
+        try {
+          const content = fs.readFileSync(path.join(PLAYBOOK_DIR, file), "utf8")
+          const parsed = JSON.parse(content) as Playbook
+          playbooks.push(parsed)
+        } catch {
+          // ignore invalid file
+        }
+      })
+    playbookCache = playbooks
+    return playbooks
+  } catch {
+    playbookCache = []
+    return []
+  }
+}
+
+function selectPlaybook(input: DeliveryPackInput): Playbook | null {
+  const playbooks = loadPlaybooks()
+  if (!playbooks.length) return null
+  const industry = String(input.industry || "").toLowerCase()
+  const offerType = String(input.offer_type || "").toLowerCase()
+  const exact = playbooks.find(
+    (item) =>
+      String(item.industry || "").toLowerCase() === industry &&
+      (!item.offer_type || String(item.offer_type).toLowerCase() === offerType)
+  )
+  if (exact) return exact
+  const byIndustry = playbooks.find(
+    (item) => String(item.industry || "").toLowerCase() === industry && !item.offer_type
+  )
+  if (byIndustry) return byIndustry
+  const fallback = playbooks.find((item) => String(item.industry || "").toLowerCase() === "default")
+  return fallback || playbooks[0] || null
+}
+
+function buildPlaybookHint(playbook: Playbook | null): string {
+  if (!playbook) return ""
+  const pick = (list: string[] | undefined, count = 6) =>
+    Array.isArray(list) ? list.filter(Boolean).slice(0, count) : []
+  const format = (label: string, list: string[]) =>
+    list.length ? `- ${label}：${list.join(" / ")}` : ""
+
+  const lines = [
+    `Playbook参考（必须命中关键词/场景，至少引用2项）：`,
+    playbook.industry ? `- 行业：${playbook.industry}` : "",
+    playbook.offer_type ? `- 成交类型：${playbook.offer_type}` : "",
+    format("高意图关键词", pick(playbook.high_intent_keywords)),
+    format("典型痛点", pick(playbook.pain_points)),
+    format("典型场景", pick(playbook.scenes)),
+    format("Hook模板", pick(playbook.hook_patterns)),
+    format("CTA模板", pick(playbook.cta_templates)),
+    format("脚本结构", pick(playbook.script_structures)),
+    format("合规注意", pick(playbook.compliance_notes, 4)),
+  ].filter(Boolean)
+
+  return lines.join("\n")
+}
 
 function buildFallbackScores(input: DeliveryPackInput) {
   const answers: Record<string, string | string[]> = {
@@ -350,6 +433,7 @@ function buildPrompt(input: DeliveryPackInput): string {
   const teamTypeLabel = TEAM_TYPE_LABELS[input.team_type] || input.team_type
   const platformLabel = PLATFORM_LABELS[input.platform] || input.platform
   const offerTypeLabel = OFFER_TYPE_LABELS[input.offer_type] || input.offer_type
+  const playbookHint = buildPlaybookHint(selectPlaybook(input))
 
   const payload = {
     team_type: input.team_type,
@@ -376,6 +460,8 @@ function buildPrompt(input: DeliveryPackInput): string {
 
 输入：
 ${JSON.stringify(payload, null, 2)}
+
+${playbookHint ? `${playbookHint}\n` : ""}
 
 硬性规则：
 1) 输出只用简体中文。
@@ -410,6 +496,7 @@ function buildCorePrompt(input: DeliveryPackInput): string {
   const teamTypeLabel = TEAM_TYPE_LABELS[input.team_type] || input.team_type
   const platformLabel = PLATFORM_LABELS[input.platform] || input.platform
   const offerTypeLabel = OFFER_TYPE_LABELS[input.offer_type] || input.offer_type
+  const playbookHint = buildPlaybookHint(selectPlaybook(input))
 
   const payload = {
     team_type: input.team_type,
@@ -434,6 +521,8 @@ function buildCorePrompt(input: DeliveryPackInput): string {
 输入：
 ${JSON.stringify(payload, null, 2)}
 
+${playbookHint ? `${playbookHint}\n` : ""}
+
 硬性规则：
 1) 输出只用简体中文。
 2) 禁止出现：击败、超过、行业排名、前XX%、top% 等不可验证表述。
@@ -449,6 +538,7 @@ function buildCalendarPrompt(
   input: DeliveryPackInput,
   core: Pick<DeliveryPackOutput, "meta" | "bottleneck" | "top_actions">
 ): string {
+  const playbookHint = buildPlaybookHint(selectPlaybook(input))
   const payload = {
     meta: core.meta,
     bottleneck: core.bottleneck,
@@ -466,6 +556,8 @@ function buildCalendarPrompt(
 
 已确认的核心信息（必须保持一致）：
 ${JSON.stringify(payload, null, 2)}
+
+${playbookHint ? `${playbookHint}\n` : ""}
 
 仅输出字段：calendar_7d（7条）。
 
@@ -481,6 +573,7 @@ function buildTopicsPrompt(
   input: DeliveryPackInput,
   core: Pick<DeliveryPackOutput, "meta" | "bottleneck" | "top_actions">
 ): string {
+  const playbookHint = buildPlaybookHint(selectPlaybook(input))
   const payload = {
     meta: core.meta,
     bottleneck: core.bottleneck,
@@ -498,6 +591,8 @@ function buildTopicsPrompt(
 
 已确认的核心信息（必须保持一致）：
 ${JSON.stringify(payload, null, 2)}
+
+${playbookHint ? `${playbookHint}\n` : ""}
 
 仅输出字段：topics_10（10条）。
 
@@ -512,6 +607,7 @@ function buildScriptsPrompt(
   input: DeliveryPackInput,
   core: Pick<DeliveryPackOutput, "meta" | "bottleneck" | "top_actions">
 ): string {
+  const playbookHint = buildPlaybookHint(selectPlaybook(input))
   const payload = {
     meta: core.meta,
     bottleneck: core.bottleneck,
@@ -529,6 +625,8 @@ function buildScriptsPrompt(
 
 已确认的核心信息（必须保持一致）：
 ${JSON.stringify(payload, null, 2)}
+
+${playbookHint ? `${playbookHint}\n` : ""}
 
 仅输出字段：scripts_3（3条）。
 
@@ -1232,12 +1330,13 @@ async function callLLM(
 }
 
 export async function generateDeliveryPackV2(input: DeliveryPackInput): Promise<DeliveryPackOutput> {
-  let lastError: unknown
-  let lastRaw = ""
-  let lastIssues: string[] = []
   const primaryModel = APIMART_QUICK_MODEL || APIMART_MODEL
   const fallbackModel = APIMART_QUICK_MODEL || APIMART_MODEL
-  if (!USE_SPLIT_GENERATION) {
+  const generateMonolithic = async (): Promise<DeliveryPackOutput> => {
+    let lastError: unknown
+    let lastRaw = ""
+    let lastIssues: string[] = []
+
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
         const prompt = attempt === 0 ? buildPrompt(input) : buildRepairPrompt(lastRaw, lastIssues)
@@ -1275,6 +1374,12 @@ export async function generateDeliveryPackV2(input: DeliveryPackInput): Promise<
         console.warn(`[delivery-pack] parse failed on attempt ${attempt + 1}`, error)
       }
     }
+
+    throw lastError
+  }
+
+  if (!USE_SPLIT_GENERATION) {
+    return generateMonolithic()
   }
 
   try {
@@ -1340,8 +1445,7 @@ export async function generateDeliveryPackV2(input: DeliveryPackInput): Promise<
     }
     return sanitized
   } catch (error) {
-    lastError = error
     console.warn("[delivery-pack] split generation failed", error)
   }
-  throw lastError
+  return generateMonolithic()
 }

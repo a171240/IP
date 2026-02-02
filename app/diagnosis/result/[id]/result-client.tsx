@@ -160,7 +160,7 @@ export function ResultClient({
           }
         : null
 
-      track("workshop_enter", {
+      track("workshop_open", {
         stepId,
         diagnosisId,
         userId,
@@ -328,7 +328,7 @@ export function ResultClient({
     setIsGenerating(true)
     setProgressStep(0)
     setProgressValue(10)
-    track("delivery_pack_generate_start", {
+    track("pack_generate_start", {
       diagnosisId,
       source: answers?.platform,
       userId,
@@ -385,7 +385,7 @@ export function ResultClient({
       }
 
       if (!response.ok || !data.ok) {
-        track("delivery_pack_generate_fail", {
+        track("pack_generate_fail", {
           diagnosisId,
           source: answers?.platform,
           userId,
@@ -438,7 +438,7 @@ export function ResultClient({
         if (pollResult.status === "done") {
           setProgressStep(progressSteps.length - 1)
           setProgressValue(100)
-          track("delivery_pack_generate_success", {
+          track("pack_generate_success", {
             diagnosisId,
             source: answers?.platform,
             userId,
@@ -462,7 +462,7 @@ export function ResultClient({
 
       setProgressStep(progressSteps.length - 1)
       setProgressValue(100)
-      track("delivery_pack_generate_success", {
+      track("pack_generate_success", {
         diagnosisId,
         source: answers?.platform,
         userId,
@@ -477,7 +477,7 @@ export function ResultClient({
         packId: data.packId,
       })
     } catch {
-      track("delivery_pack_generate_fail", {
+      track("pack_generate_fail", {
         diagnosisId,
         source: answers?.platform,
         userId,
@@ -514,7 +514,7 @@ export function ResultClient({
     }
     setGenerateError(null)
     setIsDownloading(true)
-    track("delivery_pack_download", {
+    track("pack_download", {
       diagnosisId,
       source: answers?.platform,
       userId,

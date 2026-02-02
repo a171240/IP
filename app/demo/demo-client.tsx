@@ -33,6 +33,39 @@ const statusOptions = [
   { value: "need-scale", label: "准备规模化，需要标准流程" },
 ]
 
+const DEMO_FAQS = [
+  {
+    question: "演示会展示哪些内容？",
+    answer: "展示从诊断→交付包→内容工坊的全链路示例，并给到适配你行业的模板建议。",
+  },
+  {
+    question: "是否支持团队协作？",
+    answer: "支持多项目并行、统一口径与质检清单，可配置多角色协作节点。",
+  },
+  {
+    question: "需要准备什么？",
+    answer: "准备团队规模、主营行业、当前交付瓶颈即可，其他由我们在演示中梳理。",
+  },
+]
+
+const DEMO_CASES = [
+  {
+    name: "MCN矩阵团队",
+    challenge: "多账号多项目并行，选题与脚本口径混乱。",
+    result: "用统一模板 + 质检清单后，交付周期缩短 35%。",
+  },
+  {
+    name: "企业品牌内容组",
+    challenge: "跨部门协作，素材与话术重复、复用率低。",
+    result: "交付资产可追溯，复用率提升到 60%+。",
+  },
+  {
+    name: "代运营项目组",
+    challenge: "提案与交付脱节，客户觉得“不落地”。",
+    result: "交付包对齐行动清单，首轮交付通过率显著提升。",
+  },
+]
+
 const UTM_KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"] as const
 
 function persistUtmValues(values: DemoClientProps["utm"]) {
@@ -59,6 +92,7 @@ export default function DemoClient({ utm, calendlyUrl }: DemoClientProps) {
 
   const mergedUtm = useMemo(() => ({ ...getStoredUtm(), ...utm }), [utm])
   const calendlyHref = calendlyUrl?.trim() || "#"
+  const hasCalendly = calendlyHref !== "#"
 
   useEffect(() => {
     persistUtmValues(utm)
@@ -129,11 +163,87 @@ export default function DemoClient({ utm, calendlyUrl }: DemoClientProps) {
                 提供诊断报告样本与交付SOP参考
               </div>
             </div>
+
+            <div className="mt-10 grid gap-4 sm:grid-cols-3">
+              {[
+                { title: "交付路线图", desc: "明确7天交付节奏与关键节点" },
+                { title: "团队SOP模板", desc: "统一口径与质检清单，降低返工" },
+                { title: "落地工具清单", desc: "流程、模板与协作节点配置建议" },
+              ].map((item) => (
+                <div
+                  key={item.title}
+                  className="rounded-2xl border border-white/5 bg-zinc-900/40 p-4 text-xs text-zinc-400"
+                >
+                  <div className="flex items-center gap-2 text-sm text-white mb-2">
+                    <CheckCircle size={16} className="text-emerald-400" />
+                    {item.title}
+                  </div>
+                  <p className="text-zinc-500 leading-relaxed">{item.desc}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-8 rounded-2xl border border-white/5 bg-zinc-900/40 px-5 py-4 text-xs text-zinc-500">
+              <div className="flex flex-wrap items-center gap-3 text-sm text-zinc-300">
+                <span className="text-zinc-400">演示流程：</span>
+                <span className="px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/10">提交信息</span>
+                <span className="text-zinc-600">→</span>
+                <span className="px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/10">确认需求</span>
+                <span className="text-zinc-600">→</span>
+                <span className="px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/10">1:1 演示</span>
+              </div>
+              <p className="mt-2">建议准备：团队规模、行业方向、当前交付瓶颈。</p>
+            </div>
+
+            <div className="mt-10 space-y-4">
+              <h3 className="text-base font-semibold text-white">团队场景与效果</h3>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {DEMO_CASES.map((item) => (
+                  <div
+                    key={item.name}
+                    className="rounded-2xl border border-white/5 bg-zinc-900/40 p-4 text-xs text-zinc-400"
+                  >
+                    <div className="text-sm text-white mb-2">{item.name}</div>
+                    <p className="text-zinc-500 leading-relaxed">{item.challenge}</p>
+                    <div className="mt-3 text-emerald-300">{item.result}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-10 space-y-3">
+              <h3 className="text-base font-semibold text-white">常见问题</h3>
+              <div className="grid gap-3">
+                {DEMO_FAQS.map((item) => (
+                  <div
+                    key={item.question}
+                    className="rounded-2xl border border-white/5 bg-zinc-900/40 px-4 py-3 text-xs text-zinc-400"
+                  >
+                    <div className="text-sm text-white mb-2">{item.question}</div>
+                    <p className="text-zinc-500 leading-relaxed">{item.answer}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
           <div className="relative">
             <div className="absolute -inset-4 bg-gradient-to-br from-purple-500/20 via-transparent to-transparent rounded-3xl blur-2xl opacity-70" />
             <div className="relative rounded-3xl border border-white/10 bg-zinc-950/60 backdrop-blur-xl p-8 sm:p-10">
+              {hasCalendly ? (
+                <div className="mb-6 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-xs text-emerald-200 flex items-center justify-between gap-3">
+                  <span>已有明确需求？可直接预约演示时间。</span>
+                  <a
+                    href={calendlyHref}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={() => track("demo_calendly_click", { source: "top" })}
+                    className="px-3 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-100 hover:bg-emerald-500/30 transition-colors"
+                  >
+                    立即预约
+                  </a>
+                </div>
+              ) : null}
               {!submitted ? (
                 <form
                   onSubmit={async (event) => {
@@ -146,6 +256,7 @@ export default function DemoClient({ utm, calendlyUrl }: DemoClientProps) {
 
                     if (honeypot) {
                       track("demo_submit_fail", { reason: "honeypot" })
+                      track("demo_submit_success", { lead_id: "honeypot" })
                       setSubmitted(true)
                       setLoading(false)
                       return
@@ -154,11 +265,18 @@ export default function DemoClient({ utm, calendlyUrl }: DemoClientProps) {
                     const teamSize = String(formData.get("team-size") || "").trim()
                     const currentStatus = String(formData.get("current-status") || "").trim()
                     const contact = String(formData.get("contact") || "").trim()
+                    const industry = String(formData.get("industry") || "").trim()
 
                     try {
                       const elapsedMs = formStartRef.current
                         ? Math.round(performance.now() - formStartRef.current)
                         : undefined
+
+                      track("demo_submit_start", {
+                        team_size: teamSize,
+                        current_status: currentStatus,
+                        has_industry: Boolean(industry),
+                      })
 
                       const response = await fetch("/api/leads", {
                         method: "POST",
@@ -167,6 +285,7 @@ export default function DemoClient({ utm, calendlyUrl }: DemoClientProps) {
                           teamSize,
                           currentStatus,
                           contact,
+                          industry: industry || undefined,
                           landingPath: `${window.location.pathname}${window.location.search}`,
                           referrer: document.referrer || undefined,
                           userAgent: navigator.userAgent || undefined,
@@ -182,8 +301,9 @@ export default function DemoClient({ utm, calendlyUrl }: DemoClientProps) {
 
                       const data = (await response.json()) as { ok: boolean; error?: string; lead_id?: string }
 
+                      const leadId = data.lead_id
                       if (response.ok && data.ok) {
-                        track("demo_submit_success", { lead_id: data.lead_id })
+                        track("demo_submit_success", { lead_id: leadId })
                         setSubmitted(true)
                       } else {
                         track("demo_submit_fail", { status: response.status, error: data.error })
@@ -191,8 +311,10 @@ export default function DemoClient({ utm, calendlyUrl }: DemoClientProps) {
                           setError("提交过于频繁，请稍后再试。")
                         } else if (data.error === "invalid_contact") {
                           setError("联系方式格式不正确，请确认后再提交。")
-                        } else if (data.error === "duplicate_lead") {
-                          setError("同一联系方式今日已提交过，我们会尽快联系你。")
+                        } else if (data.error === "duplicate_lead" || data.error === "too_fast") {
+                          setError("我们已经收到过你的信息，会尽快联系你。")
+                          setSubmitted(true)
+                          track("demo_submit_success", { lead_id: leadId || data.error })
                         } else {
                           setError("提交失败，请稍后再试。")
                         }
@@ -206,6 +328,10 @@ export default function DemoClient({ utm, calendlyUrl }: DemoClientProps) {
                   }}
                   className="space-y-6"
                 >
+                  <div>
+                    <h2 className="text-xl font-semibold text-white">预约信息</h2>
+                    <p className="text-xs text-zinc-500 mt-1">提交后 1 个工作日内联系你。</p>
+                  </div>
                   <div>
                     <label htmlFor="team-size" className="block text-sm text-zinc-300 mb-2">
                       团队规模
@@ -258,6 +384,19 @@ export default function DemoClient({ utm, calendlyUrl }: DemoClientProps) {
                     />
                   </div>
 
+                  <div>
+                    <label htmlFor="industry" className="block text-sm text-zinc-300 mb-2">
+                      行业方向（可选）
+                    </label>
+                    <input
+                      id="industry"
+                      name="industry"
+                      type="text"
+                      placeholder="例如：美业 / 教培 / 本地生活 / 3C / 餐饮"
+                      className="w-full rounded-xl bg-zinc-900/60 border border-white/10 px-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-purple-500/60 focus:ring-1 focus:ring-purple-500/40"
+                    />
+                  </div>
+
                   <input
                     type="text"
                     name="website"
@@ -277,6 +416,22 @@ export default function DemoClient({ utm, calendlyUrl }: DemoClientProps) {
                   <p className="text-xs text-zinc-500 text-center">
                     提交即表示同意我们通过上述方式联系你，仅用于方案沟通。
                   </p>
+
+                  {WECHAT_ID ? (
+                    <div className="rounded-2xl border border-white/10 bg-zinc-900/50 px-4 py-3 text-xs text-zinc-400 flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-sm text-white">或直接加微信沟通</div>
+                        <div className="text-emerald-300 font-medium select-all">{WECHAT_ID}</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleCopyWechat}
+                        className="px-3 py-2 rounded-xl border border-white/10 text-zinc-200 hover:text-white transition-colors"
+                      >
+                        复制微信号
+                      </button>
+                    </div>
+                  ) : null}
                 </form>
               ) : (
                 <div className="text-center space-y-5 py-6">
@@ -291,8 +446,9 @@ export default function DemoClient({ utm, calendlyUrl }: DemoClientProps) {
                   <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                     <a
                       href={calendlyHref}
-                      target={calendlyHref === "#" ? undefined : "_blank"}
-                      rel={calendlyHref === "#" ? undefined : "noreferrer"}
+                      target={hasCalendly ? "_blank" : undefined}
+                      rel={hasCalendly ? "noreferrer" : undefined}
+                      onClick={() => track("demo_calendly_click", { source: "success" })}
                       className="px-6 py-3 text-sm font-semibold rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-[0_0_0_1px_rgba(147,51,234,0.3),0_4px_16px_-4px_rgba(147,51,234,0.4)] hover:from-purple-400 hover:to-purple-500 transition-colors"
                     >
                       立刻预约时间

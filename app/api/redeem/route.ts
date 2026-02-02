@@ -152,7 +152,9 @@ export async function POST(request: NextRequest) {
 
   const { data: precheckRows, error: precheckError } = await admin
     .from("redemption_codes")
-    .select("code, status, expires_at")
+    .select(
+      "code, status, expires_at, duration_days, plan, sku, plan_grant, credits_grant, max_uses, used_count"
+    )
     .eq("code", code)
     .limit(1)
 
@@ -170,7 +172,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "expired" }, { status: 410 })
   }
 
-  if (precheck.status && precheck.status !== "unused") {
+  const maxUses = Math.max(1, Number(precheck.max_uses ?? 1))
+  const usedCount = Number(precheck.used_count ?? (precheck.status && precheck.status !== "unused" ? 1 : 0))
+  if (precheck.status === "disabled") {
+    return NextResponse.json({ ok: false, error: "disabled" }, { status: 409 })
+  }
+  if (precheck.status === "used" || usedCount >= maxUses) {
     return NextResponse.json({ ok: false, error: "used" }, { status: 409 })
   }
 
@@ -248,13 +255,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 })
   }
 
+  const nextUsedCount = usedCount + 1
+  const nextStatus = nextUsedCount >= maxUses ? "used" : "unused"
+
   const { data: updatedRows, error: updateError } = await admin
     .from("redemption_codes")
-    .update({ status: "used", used_by: targetUserId, used_at: nowIso })
+    .update({ status: nextStatus, used_by: targetUserId, used_at: nowIso, used_count: nextUsedCount })
     .eq("code", code)
-    .eq("status", "unused")
+    .or("status.eq.unused,status.is.null")
     .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
-    .select("code, plan, duration_days, expires_at")
+    .or(`used_count.is.null,used_count.lt.${maxUses}`)
+    .select("code, plan, duration_days, expires_at, sku, plan_grant, credits_grant, max_uses, used_count")
 
   if (updateError) {
     return NextResponse.json({ ok: false, error: "redeem_failed" }, { status: 500 })
@@ -265,7 +276,7 @@ export async function POST(request: NextRequest) {
   if (!updated) {
     const { data: existingRows } = await admin
       .from("redemption_codes")
-      .select("status, used_at, expires_at")
+      .select("status, used_at, expires_at, max_uses, used_count")
       .eq("code", code)
       .limit(1)
 
@@ -279,51 +290,94 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: "expired" }, { status: 410 })
     }
 
-    if (existing.status && existing.status !== "unused") {
+    const existingMax = Math.max(1, Number(existing.max_uses ?? 1))
+    const existingUsed = Number(existing.used_count ?? (existing.status && existing.status !== "unused" ? 1 : 0))
+    if (existing.status === "disabled") {
+      return NextResponse.json({ ok: false, error: "disabled" }, { status: 409 })
+    }
+    if (existing.status === "used" || existingUsed >= existingMax) {
       return NextResponse.json({ ok: false, error: "used" }, { status: 409 })
     }
 
     return NextResponse.json({ ok: false, error: "redeem_failed" }, { status: 400 })
   }
 
-  const planFromCode = updated.plan || "trial_pro"
-  const days = Math.max(1, Number(updated.duration_days || 7))
+  const planGrantRaw = updated.plan_grant ?? null
+  const fallbackPlan = updated.plan || "trial_pro"
+  const planFromCode =
+    planGrantRaw !== null && planGrantRaw !== undefined ? planGrantRaw : fallbackPlan
+  const normalizedPlan = planFromCode && planFromCode !== "none" ? planFromCode : null
+  const days = Math.max(0, Number(updated.duration_days || 0))
+  const creditsGrant = Math.max(0, Number(updated.credits_grant || 0))
 
-  const { data: entitlements } = await admin
-    .from("entitlements")
-    .select("plan, pro_expires_at")
-    .eq("user_id", targetUserId)
-    .limit(1)
+  let nextPlan = normalizedPlan || ""
+  let newExpires: string | null = null
+  let isRenewal = false
 
-  const current = entitlements?.[0]
-  const currentExpiry = current?.pro_expires_at ? new Date(current.pro_expires_at) : null
-  const base = currentExpiry && currentExpiry > now ? currentExpiry : now
-  const newExpires = new Date(base.getTime() + days * 24 * 60 * 60 * 1000)
-  const isRenewal = Boolean(current?.plan || current?.pro_expires_at)
+  if (normalizedPlan) {
+    const { data: entitlements } = await admin
+      .from("entitlements")
+      .select("plan, pro_expires_at")
+      .eq("user_id", targetUserId)
+      .limit(1)
 
-  const nextPlan = current?.plan && ["pro", "vip"].includes(current.plan)
-    ? current.plan
-    : planFromCode
+    const current = entitlements?.[0]
+    const currentExpiry = current?.pro_expires_at ? new Date(current.pro_expires_at) : null
+    const base = currentExpiry && currentExpiry > now ? currentExpiry : now
+    newExpires = days > 0 ? new Date(base.getTime() + days * 24 * 60 * 60 * 1000).toISOString() : current?.pro_expires_at || null
+    isRenewal = Boolean(current?.plan || current?.pro_expires_at)
 
-  const { error: upsertError } = await admin.from("entitlements").upsert({
-    user_id: targetUserId,
-    plan: nextPlan,
-    pro_expires_at: newExpires.toISOString(),
-    updated_at: nowIso,
-  })
+    nextPlan = current?.plan && ["pro", "vip"].includes(current.plan)
+      ? current.plan
+      : normalizedPlan
 
-  if (upsertError) {
-    return NextResponse.json({ ok: false, error: "entitlement_update_failed" }, { status: 500 })
+    const { error: upsertError } = await admin.from("entitlements").upsert({
+      user_id: targetUserId,
+      plan: nextPlan,
+      pro_expires_at: newExpires,
+      updated_at: nowIso,
+    })
+
+    if (upsertError) {
+      return NextResponse.json({ ok: false, error: "entitlement_update_failed" }, { status: 500 })
+    }
   }
 
-  if (email) {
-    await admin.from("profiles").upsert({ id: targetUserId, email }, { onConflict: "id" })
+  let creditsDelta = 0
+  let nextCreditsBalance: number | null = null
+  if (creditsGrant > 0) {
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("credits_balance, credits_unlimited")
+      .eq("id", targetUserId)
+      .maybeSingle()
+
+    const creditsUnlimited = Boolean(profile?.credits_unlimited)
+    if (!creditsUnlimited) {
+      const currentBalance = Number(profile?.credits_balance || 0)
+      creditsDelta = creditsGrant
+      nextCreditsBalance = currentBalance + creditsGrant
+    }
+  }
+
+  if (email || normalizedPlan || nextCreditsBalance !== null) {
+    const profilePatch: Record<string, unknown> = { id: targetUserId }
+    if (email) profilePatch.email = email
+    if (normalizedPlan) profilePatch.plan = normalizedPlan
+    if (nextCreditsBalance !== null) {
+      profilePatch.credits_balance = nextCreditsBalance
+    }
+    const { error: profileError } = await admin.from("profiles").upsert(profilePatch, { onConflict: "id" })
+    if (profileError) {
+      return NextResponse.json({ ok: false, error: "profile_update_failed" }, { status: 500 })
+    }
   }
 
   return NextResponse.json({
     ok: true,
-    plan: nextPlan,
-    expiresAt: newExpires.toISOString(),
+    plan: normalizedPlan || (creditsGrant > 0 ? "credits" : fallbackPlan),
+    expiresAt: newExpires || undefined,
+    creditsGrant,
     isRenewal,
     session: sessionTokens,
     loginRequired,

@@ -7,7 +7,13 @@ type CodeRow = {
   code: string
   status: string
   plan: string
+  plan_grant?: string | null
+  sku?: string | null
+  credits_grant?: number | null
   duration_days: number
+  max_uses?: number | null
+  used_count?: number | null
+  source?: string | null
   created_at: string
   used_at: string | null
   used_by: string | null
@@ -62,8 +68,12 @@ export default function AdminRedemptionCodesClient() {
   const [createCount, setCreateCount] = useState(20)
   const [createPlan, setCreatePlan] = useState("trial_pro")
   const [createDuration, setCreateDuration] = useState(7)
+  const [createSku, setCreateSku] = useState("")
+  const [createCreditsGrant, setCreateCreditsGrant] = useState(0)
+  const [createMaxUses, setCreateMaxUses] = useState(1)
   const [createBatch, setCreateBatch] = useState("")
   const [createExpiresAt, setCreateExpiresAt] = useState("")
+  const [createSource, setCreateSource] = useState("")
   const [creating, setCreating] = useState(false)
   const [createdCodes, setCreatedCodes] = useState<string[]>([])
 
@@ -140,9 +150,14 @@ export default function AdminRedemptionCodesClient() {
           action: "create",
           count: createCount,
           plan: createPlan,
+          plan_grant: createPlan,
+          sku: createSku || undefined,
+          credits_grant: createCreditsGrant,
           duration_days: createDuration,
+          max_uses: createMaxUses,
           batch: createBatch || undefined,
           expires_at: createExpiresAt || undefined,
+          source: createSource || undefined,
         }),
       })
       const data = (await response.json()) as { ok: boolean; rows?: Array<{ code: string }>; error?: string }
@@ -288,7 +303,7 @@ export default function AdminRedemptionCodesClient() {
           <h2 className="text-lg font-semibold text-white">生成兑换码</h2>
           <p className="text-xs text-zinc-400 mt-1">支持批量生成，默认 7 天 trial_pro。</p>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <label className="block text-xs text-zinc-400 mb-2">数量</label>
             <input
@@ -301,11 +316,20 @@ export default function AdminRedemptionCodesClient() {
             />
           </div>
           <div>
-            <label className="block text-xs text-zinc-400 mb-2">方案</label>
+            <label className="block text-xs text-zinc-400 mb-2">计划/Plan</label>
             <input
               value={createPlan}
               onChange={(event) => setCreatePlan(event.target.value)}
               placeholder="trial_pro"
+              className="w-full rounded-lg border border-white/10 bg-zinc-900/60 px-3 py-2 text-sm text-white"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-400 mb-2">SKU（可选）</label>
+            <input
+              value={createSku}
+              onChange={(event) => setCreateSku(event.target.value)}
+              placeholder="trial_7d_pro"
               className="w-full rounded-lg border border-white/10 bg-zinc-900/60 px-3 py-2 text-sm text-white"
             />
           </div>
@@ -321,11 +345,41 @@ export default function AdminRedemptionCodesClient() {
             />
           </div>
           <div>
+            <label className="block text-xs text-zinc-400 mb-2">赠送积分</label>
+            <input
+              type="number"
+              min={0}
+              value={createCreditsGrant}
+              onChange={(event) => setCreateCreditsGrant(Number(event.target.value))}
+              className="w-full rounded-lg border border-white/10 bg-zinc-900/60 px-3 py-2 text-sm text-white"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-400 mb-2">最大使用次数</label>
+            <input
+              type="number"
+              min={1}
+              max={100}
+              value={createMaxUses}
+              onChange={(event) => setCreateMaxUses(Number(event.target.value))}
+              className="w-full rounded-lg border border-white/10 bg-zinc-900/60 px-3 py-2 text-sm text-white"
+            />
+          </div>
+          <div>
             <label className="block text-xs text-zinc-400 mb-2">批次标识</label>
             <input
               value={createBatch}
               onChange={(event) => setCreateBatch(event.target.value)}
               placeholder="可选"
+              className="w-full rounded-lg border border-white/10 bg-zinc-900/60 px-3 py-2 text-sm text-white"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-400 mb-2">来源</label>
+            <input
+              value={createSource}
+              onChange={(event) => setCreateSource(event.target.value)}
+              placeholder="xiaohongshu / manual"
               className="w-full rounded-lg border border-white/10 bg-zinc-900/60 px-3 py-2 text-sm text-white"
             />
           </div>
@@ -362,8 +416,11 @@ export default function AdminRedemptionCodesClient() {
             <tr>
               <th className="px-4 py-3 text-left font-medium">兑换码</th>
               <th className="px-4 py-3 text-left font-medium">状态</th>
-              <th className="px-4 py-3 text-left font-medium">方案</th>
+              <th className="px-4 py-3 text-left font-medium">SKU</th>
+              <th className="px-4 py-3 text-left font-medium">权益/积分</th>
               <th className="px-4 py-3 text-left font-medium">天数</th>
+              <th className="px-4 py-3 text-left font-medium">使用次数</th>
+              <th className="px-4 py-3 text-left font-medium">来源</th>
               <th className="px-4 py-3 text-left font-medium">批次</th>
               <th className="px-4 py-3 text-left font-medium">创建时间</th>
               <th className="px-4 py-3 text-left font-medium">使用时间</th>
@@ -374,7 +431,7 @@ export default function AdminRedemptionCodesClient() {
           <tbody className="divide-y divide-white/5">
             {!hasRows ? (
               <tr>
-                <td colSpan={9} className="px-4 py-6 text-center text-zinc-500">
+                <td colSpan={12} className="px-4 py-6 text-center text-zinc-500">
                   暂无数据
                 </td>
               </tr>
@@ -382,12 +439,20 @@ export default function AdminRedemptionCodesClient() {
               rows.map((row) => {
                 const status = formatStatus(row.status, row.expires_at)
                 const label = STATUS_LABELS[status] || row.status
+                const planLabel = row.plan_grant || row.plan
+                const creditsLabel =
+                  row.credits_grant && row.credits_grant > 0 ? `+${row.credits_grant}积分` : "-"
+                const maxUses = row.max_uses ?? 1
+                const usedCount = row.used_count ?? (status === "used" ? 1 : 0)
                 return (
                   <tr key={row.code}>
                     <td className="px-4 py-3 text-zinc-200 font-mono text-xs">{row.code}</td>
                     <td className="px-4 py-3 text-zinc-300">{label}</td>
-                    <td className="px-4 py-3 text-zinc-300">{row.plan}</td>
+                    <td className="px-4 py-3 text-zinc-300">{row.sku || "-"}</td>
+                    <td className="px-4 py-3 text-zinc-300">{planLabel || "-"} · {creditsLabel}</td>
                     <td className="px-4 py-3 text-zinc-300">{row.duration_days}</td>
+                    <td className="px-4 py-3 text-zinc-300">{usedCount}/{maxUses}</td>
+                    <td className="px-4 py-3 text-zinc-400">{row.source || "-"}</td>
                     <td className="px-4 py-3 text-zinc-400">{row.batch || "-"}</td>
                     <td className="px-4 py-3 text-zinc-400">{formatDate(row.created_at)}</td>
                     <td className="px-4 py-3 text-zinc-400">{formatDate(row.used_at)}</td>

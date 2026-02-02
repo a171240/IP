@@ -3,13 +3,59 @@ import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
 import { ObsidianBackgroundLite } from "@/components/ui/obsidian-background-lite"
 
-const FUNNEL_STEPS = [
-  { event: "cta_click", label: "购买入口" },
-  { event: "redeem_success", label: "兑换成功" },
-  { event: "diagnosis_complete", label: "诊断完成" },
-  { event: "delivery_pack_generate_success", label: "生成PDF成功" },
-  { event: "workshop_enter", label: "进入内容工坊" },
-  { event: "redeem_renew_success", label: "续费成功" },
+const EVENT_STEPS = [
+  { event: "activate_view", label: "激活页曝光", aliases: [] },
+  { event: "activate_submit", label: "激活提交", aliases: [] },
+  { event: "activate_success", label: "激活成功", aliases: [] },
+  { event: "diagnosis_start", label: "诊断开始", aliases: [] },
+  { event: "diagnosis_complete", label: "诊断完成", aliases: [] },
+  { event: "pack_generate_start", label: "交付包生成开始", aliases: ["delivery_pack_generate_start"] },
+  { event: "pack_generate_success", label: "交付包生成成功", aliases: ["delivery_pack_generate_success"] },
+  { event: "pack_view", label: "查看交付包", aliases: ["delivery_pack_view"] },
+  { event: "pack_download", label: "下载交付包", aliases: ["delivery_pack_download"] },
+  { event: "workshop_open", label: "打开内容工坊", aliases: ["workshop_enter"] },
+  { event: "first_generation_success", label: "首次生成成功", aliases: [] },
+  { event: "upgrade_click", label: "点击升级", aliases: [] },
+  { event: "redeem_success", label: "兑换成功", aliases: [] },
+]
+
+const CONVERSION_STEPS = [
+  {
+    label: "激活提交率",
+    numerator: "activate_submit",
+    denominator: "activate_view",
+  },
+  {
+    label: "激活后生成成功率",
+    numerator: "pack_generate_success",
+    denominator: "activate_success",
+  },
+  {
+    label: "首产出率",
+    numerator: "first_generation_success",
+    denominator: "pack_view",
+  },
+  {
+    label: "升级点击兑付率",
+    numerator: "redeem_success",
+    denominator: "upgrade_click",
+  },
+]
+
+const TREND_EVENTS = [
+  { event: "activate_view", label: "激活页曝光", aliases: [] },
+  { event: "activate_submit", label: "激活提交", aliases: [] },
+  { event: "activate_success", label: "激活成功", aliases: [] },
+  {
+    event: "pack_generate_success",
+    label: "交付包生成成功",
+    aliases: ["delivery_pack_generate_success"],
+  },
+  { event: "pack_view", label: "查看交付包", aliases: ["delivery_pack_view"] },
+  { event: "pack_download", label: "下载交付包", aliases: ["delivery_pack_download"] },
+  { event: "first_generation_success", label: "首次生成成功", aliases: [] },
+  { event: "upgrade_click", label: "点击升级", aliases: [] },
+  { event: "redeem_success", label: "兑换成功", aliases: [] },
 ]
 
 function parseAdminList(value: string | undefined): string[] {
@@ -94,24 +140,78 @@ export default async function AdminFunnelPage({ searchParams }: AdminFunnelPageP
   startAt.setDate(endAt.getDate() - days + 1)
   startAt.setHours(0, 0, 0, 0)
 
+  const trendDays = Array.from({ length: days }, (_, index) => {
+    const date = new Date(startAt)
+    date.setDate(startAt.getDate() + index)
+    return {
+      key: date.toISOString().slice(0, 10),
+      label: date.toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" }),
+    }
+  })
+  const labelStep = days <= 10 ? 1 : days <= 20 ? 2 : 5
+
   const counts = await Promise.all(
-    FUNNEL_STEPS.map(async (step) => {
+    EVENT_STEPS.map(async (step) => {
+      const eventsToCount = [step.event, ...(step.aliases || [])]
       const { count } = await admin
         .from("analytics_events")
         .select("id", { count: "exact", head: true })
-        .eq("event", step.event)
+        .in("event", eventsToCount)
         .gte("created_at", startAt.toISOString())
         .lte("created_at", endAt.toISOString())
       return count || 0
     })
   )
 
-  const rows = FUNNEL_STEPS.map((step, index) => {
+  const rows = EVENT_STEPS.map((step, index) => {
     const count = counts[index] || 0
-    const prev = index > 0 ? counts[index - 1] || 0 : null
-    const rate = prev && prev > 0 ? (count / prev) * 100 : null
-    return { ...step, count, rate }
+    return { ...step, count }
   })
+
+  const countMap = rows.reduce<Record<string, number>>((acc, row) => {
+    acc[row.event] = row.count
+    return acc
+  }, {})
+
+  const conversionRows = CONVERSION_STEPS.map((step) => {
+    const numerator = countMap[step.numerator] || 0
+    const denominator = countMap[step.denominator] || 0
+    const rate = denominator > 0 ? (numerator / denominator) * 100 : null
+    return { ...step, numerator, denominator, rate }
+  })
+
+  const trendEventNames = TREND_EVENTS.flatMap((item) => [item.event, ...(item.aliases || [])])
+  const trendAliasMap = TREND_EVENTS.reduce<Record<string, string>>((acc, item) => {
+    acc[item.event] = item.event
+    item.aliases?.forEach((alias) => {
+      acc[alias] = item.event
+    })
+    return acc
+  }, {})
+  const { data: trendEvents } = await admin
+    .from("analytics_events")
+    .select("event, created_at")
+    .in("event", trendEventNames)
+    .gte("created_at", startAt.toISOString())
+    .lte("created_at", endAt.toISOString())
+
+  const trendMatrix = trendEventNames.reduce<Record<string, Record<string, number>>>((acc, event) => {
+    acc[event] = trendDays.reduce<Record<string, number>>((dayAcc, day) => {
+      dayAcc[day.key] = 0
+      return dayAcc
+    }, {})
+    return acc
+  }, {})
+
+  if (trendEvents) {
+    trendEvents.forEach((item) => {
+      const key = new Date(item.created_at).toISOString().slice(0, 10)
+      const canonical = trendAliasMap[item.event] || item.event
+      if (trendMatrix[canonical] && key in trendMatrix[canonical]) {
+        trendMatrix[canonical][key] += 1
+      }
+    })
+  }
 
   return (
     <div className="relative min-h-screen bg-[#030304] text-zinc-200 px-6 py-10">
@@ -138,28 +238,91 @@ export default async function AdminFunnelPage({ searchParams }: AdminFunnelPageP
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-zinc-950/60 overflow-hidden">
-          <table className="min-w-full text-sm">
-            <thead className="text-xs uppercase text-zinc-500 border-b border-white/5">
-              <tr>
-                <th className="px-4 py-3 text-left font-medium">阶段</th>
-                <th className="px-4 py-3 text-left font-medium">事件名</th>
-                <th className="px-4 py-3 text-left font-medium">数量</th>
-                <th className="px-4 py-3 text-left font-medium">转化率</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {rows.map((row) => (
-                <tr key={row.event}>
-                  <td className="px-4 py-3 text-zinc-200">{row.label}</td>
-                  <td className="px-4 py-3 text-zinc-400 font-mono text-xs">{row.event}</td>
-                  <td className="px-4 py-3 text-zinc-200">{row.count}</td>
-                  <td className="px-4 py-3 text-zinc-400">
-                    {row.rate === null ? "-" : `${row.rate.toFixed(1)}%`}
-                  </td>
+          <div className="px-6 py-4 border-b border-white/10">
+            <h2 className="text-lg font-semibold text-white">每日趋势</h2>
+            <p className="text-xs text-zinc-500 mt-1">近 {days} 天关键事件走势。</p>
+          </div>
+          <div className="p-6 space-y-6">
+            {TREND_EVENTS.map((item) => {
+              const dayCounts = trendDays.map((day) => trendMatrix[item.event]?.[day.key] || 0)
+              const maxCount = Math.max(1, ...dayCounts)
+              return (
+                <div key={item.event} className="space-y-2">
+                  <div className="flex items-center justify-between text-sm text-zinc-300">
+                    <span>{item.label}</span>
+                    <span className="text-xs text-zinc-500">{item.event}</span>
+                  </div>
+                  <div className="flex items-end gap-1 h-16">
+                    {dayCounts.map((count, index) => {
+                      const height = Math.round((count / maxCount) * 100)
+                      const barHeight = count === 0 ? 2 : Math.max(6, height)
+                      return (
+                        <div key={`${item.event}-${trendDays[index].key}`} className="flex-1 flex flex-col items-center gap-1">
+                          <div
+                            className="w-full rounded-sm bg-gradient-to-t from-emerald-500/70 to-emerald-200/60"
+                            style={{ height: `${barHeight}%` }}
+                            title={`${trendDays[index].label}：${count}`}
+                          />
+                          <div className="text-[10px] text-zinc-600">
+                            {index % labelStep === 0 || index === dayCounts.length - 1 ? trendDays[index].label : ""}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
+          <div className="rounded-2xl border border-white/10 bg-zinc-950/60 overflow-hidden">
+            <table className="min-w-full text-sm">
+              <thead className="text-xs uppercase text-zinc-500 border-b border-white/5">
+                <tr>
+                  <th className="px-4 py-3 text-left font-medium">阶段</th>
+                  <th className="px-4 py-3 text-left font-medium">事件名</th>
+                  <th className="px-4 py-3 text-left font-medium">数量</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {rows.map((row) => (
+                  <tr key={row.event}>
+                    <td className="px-4 py-3 text-zinc-200">{row.label}</td>
+                    <td className="px-4 py-3 text-zinc-400 font-mono text-xs">{row.event}</td>
+                    <td className="px-4 py-3 text-zinc-200">{row.count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-zinc-950/60 overflow-hidden">
+            <table className="min-w-full text-sm">
+              <thead className="text-xs uppercase text-zinc-500 border-b border-white/5">
+                <tr>
+                  <th className="px-4 py-3 text-left font-medium">关键转化</th>
+                  <th className="px-4 py-3 text-left font-medium">比例</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {conversionRows.map((row) => (
+                  <tr key={row.label}>
+                    <td className="px-4 py-3 text-zinc-200">
+                      <div className="text-sm">{row.label}</div>
+                      <div className="text-xs text-zinc-500 mt-1">
+                        {row.numerator} / {row.denominator}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-zinc-200">
+                      {row.rate === null ? "-" : `${row.rate.toFixed(1)}%`}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

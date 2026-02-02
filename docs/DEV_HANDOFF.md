@@ -9,6 +9,7 @@
 
 ## 文档位置
 - 全量开发文档：`docs/DEV_SPEC_FULL.md`
+- vNext 开发文档：`docs/DEV_SPEC_VNEXT.md`
 - 当前进度文档：`docs/DEV_HANDOFF.md`
 
 ---
@@ -90,7 +91,7 @@
 **已完成：**
 - `/delivery-pack/[packId]` 支持在线预览（输出 JSON 渲染成卡片）。
 - 支持打开/下载 PDF。
-- 预览页埋点补齐：`delivery_pack_view / delivery_pack_download / copy_script / copy_calendar / workshop_enter`（带 `packId / userId`）。
+- 预览页埋点补齐：`pack_view / pack_download / copy_script / copy_calendar / workshop_open`（带 `packId / userId`）。
 - 质检清单/归档规则支持一键复制（事件：`copy_qc / copy_archive`）。
 - 新增样本交付包预览页 `/delivery-pack/sample`，非 Pro 可直接查看样本 PDF（下载路由 `/api/delivery-pack/sample/download`）。
 - 结果页/预览页移动端新增底部粘性主 CTA（品牌紫 + 金色提示，主按钮更强）。
@@ -161,6 +162,7 @@
 7) **价值密度“加强版”重生成** → 已补（split 生成若触发规则警告，走一次强化 prompt 再生成）。
 8) **UI 控制台偶发 Failed to load resource（reports/conversations 406）** → 已修复（getReport/getConversation/getLatestConversation/use maybeSingle；不再因空数据 406 报错）。
 9) **/api/delivery-pack/latest 404**（无交付包时控制台报错）→ 已修复（返回 200 + `{ ok:false }`）。
+10) **交付包 JSON 解析偶发失败** → 已修复（split 生成失败自动回退单段生成）。
 
 ---
 
@@ -179,6 +181,8 @@
 - ✅ 2026-02-01 UI 回归：Playwright MCP 跑 `P5 → P10`，每步首屏“前置报告”显示为“已有”，且对话中能提取对应标识（`P5: 概念标识`、`P6: 行业/认知/情绪/传记/概念/类型`、`P7: 行业/情绪/规划/传记`、`P8: 选题`、`P9: 脚本`、`P10: 口语`）。
 - ✅ 2026-02-02 回归：新交付包 `6f124f1f-7a18-4f58-92b2-a109ac4f1a30` 预览页“明天第一条完整文案”可见；PDF 文本检索包含“明天第一条完整文案”；结果页/预览页进入内容工坊直达 `P7/P8` 并自动触发生成（更新 Pro 权益后 /api/chat 200）。
 - ✅ 2026-02-02 脚本回归：`regress:delivery-pack` 生成 `326e29d8-f2e4-4907-a7b7-d92e6fe23b32`，事件写入 `delivery_pack_generate_success / pdf_generate_success / delivery_pack_view / copy_qc / copy_archive`。
+- ✅ 2026-02-02 回归：`regress:delivery-pack` 生成 `11a599fe-84c8-4cfa-ad96-83be492529e2`（split 失败回退验证通过）。
+- ✅ 2026-02-02 回归：`regress:p5p10` 上下文注入全部命中（P5→P10）。
 
 ---
 
@@ -186,6 +190,22 @@
 - ✅ 兑换码管理后台（生成/作废/导出）：`/admin/redemption-codes` + `/api/admin/redemption-codes`
 - ✅ 内容工坊新手引导（3步）：`/dashboard/workflow/onboarding`（入口优先跳引导；完成写入 `workshop_onboarding_done`；P7/P8 支持 `?onboarding=1` 自动注入提示）
 - ✅ 漏斗看板（简易管理页）：`/admin/funnel`（近 7/14/30 天事件统计）
+- ✅ 首页 CTA 分流（冷流量/团队）：Hero 与中段 CTA 补 “团队/企业演示” 入口（/demo）。
+- ✅ /demo 承接优化：补充演示交付物、流程说明与快速预约入口。
+- ✅ /demo 闭环增强：案例/FAQ/行业方向收集 + 微信备用联系入口；新增 leads.industry 字段。
+- ✅ 新增 /admin/leads：查看最近线索（含行业/来源/UTM/落地页）。
+
+---
+
+## 8. vNext 进行中（2026-02-02）
+- ✅ 新增激活成功强制主线页：`/activate/success`（自动生成交付包、轮询状态、下载/打开可复制报告、直达内容工坊）。
+- ✅ `/activate` 激活成功后跳转到 `/activate/success`；`/diagnosis/quiz?from=activate-success` 完成后回到主线。
+- ✅ 新增可复制报告别名页：`/pack/[packId]`（同交付包输出，顶部固定“明天第一条”卡片）。
+- ✅ 交付包预览增强：明天第一条按字段复制、脚本追加“复制置顶评论”、选题支持“复制标题”。 
+- ✅ 兑换码 SKU 化（表结构升级 + 兑换逻辑支持 plan_grant / credits_grant / max_uses）。
+- ✅ Playbook 轻量模板库接入（`/playbooks/*.json` + 生成 prompt 自动注入关键词/场景）。
+- ✅ 漏斗事件统一命名 & 看板升级：`/admin/funnel` 展示 vNext 事件 + 关键转化率（激活提交、生成成功、首产出、升级兑付）+ 近 N 天趋势（兼容旧事件别名统计）。
+- ✅ 内容工坊首产出埋点：首次生成成功写入 `first_generation_success`。
 
 ---
 

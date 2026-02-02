@@ -543,6 +543,11 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
     const userContent = (opts?.overrideContent ?? inputValue).trim()
     if (!userContent || isLoading || !currentConversation) return
 
+    const isFirstGeneration = !messages.some(
+      (message) =>
+        message.role === "assistant" && message.id !== "initial" && message.content.trim().length > 0
+    )
+
     let activeConversation = currentConversation
     if (activeConversation.status !== 'in_progress') {
       const ok = await setConversationStatus(activeConversation.id, 'in_progress')
@@ -724,6 +729,16 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
       }
 
       const fullContent = streamContentRef.current
+
+      if (isFirstGeneration && fullContent.trim().length > 0) {
+        track("first_generation_success", {
+          stepId: step.id,
+          userId: user?.id,
+          conversationId: currentConversation.id,
+          landingPath: window.location.pathname,
+          mode: opts?.overrideContent ? "auto" : "chat",
+        })
+      }
 
       // 报告检测
       const reportDetection = detectReportInContent(fullContent, step.id)

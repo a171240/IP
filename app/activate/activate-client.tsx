@@ -44,17 +44,11 @@ export default function ActivateClient({ utm, user, isPro, proExpiresAt }: Activ
   const mergedUtm = useMemo(() => ({ ...getStoredUtm(), ...utm }), [utm])
 
   useEffect(() => {
-    track("activation_open", {
+    track("activate_view", {
       userId: user?.id,
       landingPath: window.location.pathname,
     })
-    if (isPro) {
-      track("activate_success", {
-        userId: user?.id,
-        landingPath: window.location.pathname,
-      })
-    }
-  }, [isPro, user?.id])
+  }, [user?.id])
 
   useEffect(() => {
     const code = searchParams?.get("code") || ""
@@ -139,10 +133,10 @@ export default function ActivateClient({ utm, user, isPro, proExpiresAt }: Activ
                         userId: user?.id,
                         landingPath: window.location.pathname,
                       })
-                      router.push("/diagnosis/quiz")
+                      router.push("/activate/success")
                     }}
                   >
-                    开始内容交付系统诊断
+                    进入交付包主线
                     <ArrowRight size={16} />
                   </GlowButton>
                 </div>
@@ -162,6 +156,10 @@ export default function ActivateClient({ utm, user, isPro, proExpiresAt }: Activ
                         setRedeemLoading(true)
 
                         track("redeem_submit", {
+                          userId: user?.id,
+                          landingPath: window.location.pathname,
+                        })
+                        track("activate_submit", {
                           userId: user?.id,
                           landingPath: window.location.pathname,
                         })
@@ -238,7 +236,7 @@ export default function ActivateClient({ utm, user, isPro, proExpiresAt }: Activ
                             setRedeemSuccess(true)
 
                             if (!data.loginRequired) {
-                              setTimeout(() => router.push("/diagnosis/quiz"), 800)
+                              setTimeout(() => router.push("/activate/success"), 800)
                             }
                           } else {
                             track("redeem_fail", {
@@ -314,19 +312,19 @@ export default function ActivateClient({ utm, user, isPro, proExpiresAt }: Activ
                       </p>
                       {redeemLoginRequired ? (
                         <Link
-                          href="/auth/login?redirect=/diagnosis/quiz"
+                          href="/auth/login?redirect=/activate/success"
                           className="inline-flex items-center justify-center px-6 py-3 text-sm font-semibold rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white"
                         >
-                          去登录继续诊断
+                          去登录继续主线
                           <ArrowRight size={16} className="ml-2" />
                         </Link>
                       ) : (
                         <GlowButton
                           primary
                           className="w-full px-6 py-3 text-sm"
-                          onClick={() => router.push("/diagnosis/quiz")}
+                          onClick={() => router.push("/activate/success")}
                         >
-                          开始内容交付系统诊断
+                          进入交付包主线
                           <ArrowRight size={16} />
                         </GlowButton>
                       )}

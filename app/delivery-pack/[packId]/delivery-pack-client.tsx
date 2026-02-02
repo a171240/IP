@@ -18,6 +18,7 @@ type DeliveryPackClientProps = {
   createdAt: string
   errorMessage?: string | null
   output: DeliveryPackOutput | null
+  variant?: "delivery" | "pack"
 }
 
 type OnboardingPayload = {
@@ -54,6 +55,7 @@ export default function DeliveryPackClient({
   createdAt,
   errorMessage,
   output,
+  variant = "delivery",
 }: DeliveryPackClientProps) {
   const [copyingKey, setCopyingKey] = useState<string | null>(null)
   const [isDownloading, setIsDownloading] = useState(false)
@@ -61,6 +63,7 @@ export default function DeliveryPackClient({
 
   useEffect(() => {
     track("delivery_pack_view", { packId, userId, landingPath: window.location.pathname })
+    track("pack_view", { packId, userId, landingPath: window.location.pathname })
   }, [packId, userId])
 
   const copyText = useCallback(
@@ -140,7 +143,7 @@ export default function DeliveryPackClient({
   const goToWorkshop = useCallback(
     (stepId: "P7" | "P8") => {
       const payload = buildOnboardingPayload()
-      track("workshop_enter", {
+      track("workshop_open", {
         packId,
         stepId,
         userId,
@@ -184,11 +187,10 @@ export default function DeliveryPackClient({
     if (isDownloading) return
     setDownloadError(null)
     setIsDownloading(true)
-    track("delivery_pack_download", {
+    track("pack_download", {
       packId,
       userId,
       landingPath: window.location.pathname,
-      mode: "download",
     })
 
     if (downloadUrl) {
@@ -250,6 +252,10 @@ export default function DeliveryPackClient({
   }, [topActions])
 
   const dayOne = calendar[0]
+  const tomorrowTitle = dayOne?.title || ""
+  const tomorrowHook = dayOne?.hook || ""
+  const tomorrowOutline = dayOne?.outline?.join(" / ") || ""
+  const tomorrowCta = dayOne?.cta || ""
   const tomorrowText = dayOne
     ? `标题：${dayOne.title}\n3秒钩子：${dayOne.hook}\n结构：${dayOne.outline.join(" / ")}\nCTA：${dayOne.cta}`
     : ""
@@ -320,6 +326,24 @@ export default function DeliveryPackClient({
       <Header breadcrumbs={[{ label: "首页", href: "/" }, { label: "交付包预览" }]} />
       <main className="p-6 lg:p-8 pb-28 lg:pb-8">
         <div className="max-w-5xl mx-auto space-y-6">
+          {variant === "pack" && dayOne ? (
+            <div className="sticky top-[calc(3.5rem+var(--safe-area-top))] z-30">
+              <GlassCard className="p-4 border-purple-500/40 dark:bg-zinc-950/90 bg-white/90">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-sm font-semibold text-white">明天第一条（可直接发）</div>
+                  <button
+                    className="inline-flex items-center gap-2 rounded-full border border-emerald-400/40 px-3 py-1 text-xs text-emerald-200 hover:bg-emerald-500/10"
+                    onClick={() => copyText(tomorrowText, "tomorrow-sticky", "copy_script", { target: "sticky" })}
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    {copyingKey === "tomorrow-sticky" ? "已复制" : "一键复制"}
+                  </button>
+                </div>
+                <div className="mt-3 text-sm text-zinc-200 line-clamp-2">标题：{tomorrowTitle}</div>
+                <div className="mt-1 text-xs text-emerald-400">CTA：{tomorrowCta}</div>
+              </GlassCard>
+            </div>
+          ) : null}
           <GlassCard className="p-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -337,11 +361,10 @@ export default function DeliveryPackClient({
                   <GlowButton
                     primary
                     onClick={() => {
-                      track("delivery_pack_download", {
+                      track("pack_download", {
                         packId,
                         userId,
                         landingPath: window.location.pathname,
-                        mode: "open",
                       })
                       window.open(`/api/delivery-pack/${packId}/download`, "_blank")
                     }}
@@ -393,11 +416,47 @@ export default function DeliveryPackClient({
                   {copyingKey === "tomorrow" ? "已复制" : "一键复制"}
                 </button>
               </div>
-              <div className="mt-4 space-y-2 text-sm text-zinc-300">
-                <div>标题：{dayOne.title}</div>
-                <div>3秒钩子：{dayOne.hook}</div>
-                <div>结构：{dayOne.outline.join(" / ")}</div>
-                <div className="text-emerald-400">CTA：{dayOne.cta}</div>
+              <div className="mt-4 space-y-3 text-sm text-zinc-300">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">标题：{tomorrowTitle}</div>
+                  <button
+                    className="inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-1 text-[11px] text-zinc-400 hover:text-emerald-200"
+                    onClick={() => copyText(tomorrowTitle, "tomorrow-title", "copy_script", { field: "title" })}
+                  >
+                    <Copy className="w-3 h-3" />
+                    {copyingKey === "tomorrow-title" ? "已复制" : "复制标题"}
+                  </button>
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">3秒钩子：{tomorrowHook}</div>
+                  <button
+                    className="inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-1 text-[11px] text-zinc-400 hover:text-emerald-200"
+                    onClick={() => copyText(tomorrowHook, "tomorrow-hook", "copy_script", { field: "hook" })}
+                  >
+                    <Copy className="w-3 h-3" />
+                    {copyingKey === "tomorrow-hook" ? "已复制" : "复制钩子"}
+                  </button>
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">结构：{tomorrowOutline}</div>
+                  <button
+                    className="inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-1 text-[11px] text-zinc-400 hover:text-emerald-200"
+                    onClick={() => copyText(tomorrowOutline, "tomorrow-outline", "copy_script", { field: "outline" })}
+                  >
+                    <Copy className="w-3 h-3" />
+                    {copyingKey === "tomorrow-outline" ? "已复制" : "复制结构"}
+                  </button>
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 text-emerald-400">CTA：{tomorrowCta}</div>
+                  <button
+                    className="inline-flex items-center gap-1 rounded-full border border-emerald-400/40 px-2 py-1 text-[11px] text-emerald-200 hover:bg-emerald-500/10"
+                    onClick={() => copyText(tomorrowCta, "tomorrow-cta", "copy_script", { field: "cta" })}
+                  >
+                    <Copy className="w-3 h-3" />
+                    {copyingKey === "tomorrow-cta" ? "已复制" : "复制CTA"}
+                  </button>
+                </div>
               </div>
             </GlassCard>
           ) : null}
@@ -455,7 +514,16 @@ export default function DeliveryPackClient({
               {topics.map((item, index) => (
                 <div key={`${item.title}-${index}`} className="rounded-xl border border-white/10 bg-white/5 p-4">
                   <div className="text-xs text-emerald-400">{item.type}</div>
-                  <div className="mt-1 text-sm font-semibold text-white">{index + 1}. {item.title}</div>
+                  <div className="mt-1 flex items-start justify-between gap-3">
+                    <div className="text-sm font-semibold text-white">{index + 1}. {item.title}</div>
+                    <button
+                      className="inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-1 text-[11px] text-zinc-400 hover:text-emerald-200"
+                      onClick={() => copyText(item.title, `topic-${index}`, "copy_topic", { index: index + 1 })}
+                    >
+                      <Copy className="w-3 h-3" />
+                      {copyingKey === `topic-${index}` ? "已复制" : "复制标题"}
+                    </button>
+                  </div>
                   <div className="mt-2 text-xs text-zinc-400">人群：{item.audience} · 场景：{item.scene}</div>
                   <div className="mt-2 text-xs text-zinc-400">痛点：{item.pain}</div>
                   <div className="mt-2 text-xs text-emerald-400">关键词：{item.keywords.join(" / ")}</div>
@@ -471,25 +539,43 @@ export default function DeliveryPackClient({
               {scripts.map((script, index) => {
                 const scriptLabel = script.id || `S${index + 1}`
                 const copyKey = `script-${scriptLabel}-${index}`
+                const pinnedKey = `script-pinned-${scriptLabel}-${index}`
                 return (
                   <div key={copyKey} className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-2">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="text-sm font-semibold text-white">
                         {scriptLabel} · {script.type} · {script.duration}
                       </div>
-                      <button
-                        className="inline-flex items-center gap-2 rounded-full border border-emerald-400/40 px-3 py-1 text-xs text-emerald-200 hover:bg-emerald-500/10 self-start sm:self-auto"
-                        onClick={() =>
-                          copyText(
-                            script.shots.map((shot) => `${shot.t} ${shot.line}`).join("\n"),
-                            copyKey,
-                            "copy_script"
-                          )
-                        }
-                      >
-                        <Copy className="w-3.5 h-3.5" />
-                        {copyingKey === copyKey ? "已复制" : "复制脚本"}
-                      </button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          className="inline-flex items-center gap-2 rounded-full border border-emerald-400/40 px-3 py-1 text-xs text-emerald-200 hover:bg-emerald-500/10"
+                          onClick={() =>
+                            copyText(
+                              script.shots.map((shot) => `${shot.t} ${shot.line}`).join("\n"),
+                              copyKey,
+                              "copy_script",
+                              { target: "full_script" }
+                            )
+                          }
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                          {copyingKey === copyKey ? "已复制" : "复制整条台词"}
+                        </button>
+                        <button
+                          className="inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1 text-xs text-zinc-300 hover:text-emerald-200"
+                          onClick={() =>
+                            copyText(
+                              script.pinned_comment || "",
+                              pinnedKey,
+                              "copy_script",
+                              { target: "pinned_comment" }
+                            )
+                          }
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                          {copyingKey === pinnedKey ? "已复制" : "复制置顶评论"}
+                        </button>
+                      </div>
                     </div>
                   {script.shots.map((shot, index) => (
                     <div key={`${script.id}-${index}`} className="text-xs text-zinc-400">

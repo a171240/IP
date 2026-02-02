@@ -99,9 +99,12 @@ export async function GET(request: NextRequest) {
   const nowIso = new Date().toISOString()
   let listQuery = admin
     .from("redemption_codes")
-    .select("code, status, plan, duration_days, created_at, used_at, used_by, expires_at, batch", {
+    .select(
+      "code, status, plan, plan_grant, sku, credits_grant, duration_days, max_uses, used_count, source, created_at, used_at, used_by, expires_at, batch",
+      {
       count: "exact",
-    })
+      }
+    )
     .order("created_at", { ascending: false })
 
   if (status && status !== "all") {
@@ -136,8 +139,14 @@ export async function GET(request: NextRequest) {
     const rows = (data || []).map((row) => ({
       code: row.code,
       status: row.status,
+      sku: row.sku,
       plan: row.plan,
+      plan_grant: row.plan_grant,
+      credits_grant: row.credits_grant,
       duration_days: row.duration_days,
+      max_uses: row.max_uses,
+      used_count: row.used_count,
+      source: row.source,
       created_at: row.created_at,
       used_at: row.used_at,
       used_by: row.used_by,
@@ -147,8 +156,14 @@ export async function GET(request: NextRequest) {
     const csv = toCsv(rows, [
       "code",
       "status",
+      "sku",
       "plan",
+      "plan_grant",
+      "credits_grant",
       "duration_days",
+      "max_uses",
+      "used_count",
+      "source",
       "created_at",
       "used_at",
       "used_by",
@@ -207,9 +222,14 @@ const createSchema = z.object({
   action: z.literal("create"),
   count: z.number().int().min(1).max(MAX_CREATE_COUNT),
   plan: z.string().trim().min(1).max(40).optional(),
+  sku: z.string().trim().max(120).optional(),
+  plan_grant: z.string().trim().max(40).optional(),
+  credits_grant: z.number().int().min(0).max(100000).optional(),
   duration_days: z.number().int().min(1).max(365).optional(),
+  max_uses: z.number().int().min(1).max(100).optional(),
   batch: z.string().trim().max(120).optional(),
   expires_at: z.string().trim().optional(),
+  source: z.string().trim().max(80).optional(),
 })
 
 const updateSchema = z.object({
@@ -253,10 +273,20 @@ export async function POST(request: NextRequest) {
     const count = validation.data.count
     const plan = validation.data.plan || "trial_pro"
     const durationDays = validation.data.duration_days || 7
+    const rawPlanGrant = validation.data.plan_grant
+    const planGrant = rawPlanGrant !== undefined ? rawPlanGrant : plan
+    const creditsGrant = validation.data.credits_grant ?? 0
+    const maxUses = validation.data.max_uses ?? 1
     const batch = validation.data.batch || null
     const expiresAtRaw = validation.data.expires_at
     const expiresAt =
       expiresAtRaw && Number.isFinite(Date.parse(expiresAtRaw)) ? new Date(expiresAtRaw).toISOString() : null
+    const sku =
+      validation.data.sku ||
+      (creditsGrant > 0 && (!planGrant || planGrant === "none")
+        ? `credits_${creditsGrant}`
+        : `${planGrant || plan}_${durationDays}d`)
+    const source = validation.data.source || null
 
     const createdRows: Array<Record<string, unknown>> = []
     let remaining = count
@@ -268,15 +298,23 @@ export async function POST(request: NextRequest) {
         code: generateCode(),
         status: "unused",
         plan,
+        plan_grant: planGrant,
+        sku,
+        credits_grant: creditsGrant,
         duration_days: durationDays,
+        max_uses: maxUses,
+        used_count: 0,
         batch,
         expires_at: expiresAt,
+        source,
       }))
 
       const { data, error } = await admin
         .from("redemption_codes")
         .upsert(payload, { onConflict: "code", ignoreDuplicates: true })
-        .select("code, status, plan, duration_days, created_at, expires_at, batch")
+        .select(
+          "code, status, sku, plan, plan_grant, credits_grant, duration_days, max_uses, used_count, created_at, expires_at, batch, source"
+        )
 
       if (error) {
         return NextResponse.json({ ok: false, error: "insert_failed" }, { status: 500 })

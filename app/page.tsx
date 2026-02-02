@@ -248,6 +248,9 @@ export default function LandingPage() {
             <a href="#features" className="hover:text-white transition-colors">
               核心功能
             </a>
+            <Link href="/demo" className="hover:text-white transition-colors">
+              团队演示
+            </Link>
             <Link href="/pricing" className="hover:text-white transition-colors">
               定价
             </Link>
@@ -343,15 +346,15 @@ export default function LandingPage() {
 
               <div className="flex flex-col items-center gap-2 w-full sm:w-auto">
                 <TrackedLink
-                  href="#report-sample"
+                  href="/demo"
                   eventName="cta_click"
-                  eventProps={{ source: "hero_sample" }}
+                  eventProps={{ source: "hero_demo" }}
                   className="w-full sm:w-auto px-8 sm:px-12 py-4 sm:py-5 text-base sm:text-lg font-medium text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-700 rounded-xl transition-colors text-center"
                 >
-                  查看样本预览
+                  团队/企业演示
                 </TrackedLink>
                 <span className="text-xs text-zinc-500">
-                  先看输出样本，了解交付格式与字段
+                  团队方案演示 · 协作交付流程
                 </span>
               </div>
             </div>
@@ -517,16 +520,26 @@ export default function LandingPage() {
           </div>
 
           <div className="flex justify-center mt-10">
-            <Link href="/diagnosis">
-            <GlowButton
-              primary
-              className="px-10 py-4 text-base"
-            >
-              <Zap size={18} />
-              免费快速诊断，领取专属报告
-              <ArrowRight size={16} />
-            </GlowButton>
-            </Link>
+            <div className="flex flex-col sm:flex-row items-center gap-3">
+              <Link href="/diagnosis">
+                <GlowButton
+                  primary
+                  className="px-10 py-4 text-base"
+                >
+                  <Zap size={18} />
+                  免费快速诊断，领取专属报告
+                  <ArrowRight size={16} />
+                </GlowButton>
+              </Link>
+              <TrackedLink
+                href="/demo"
+                eventName="cta_click"
+                eventProps={{ source: "mid_demo" }}
+                className="px-6 py-3 text-sm font-medium text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-700 rounded-xl transition-colors"
+              >
+                团队/企业演示
+              </TrackedLink>
+            </div>
           </div>
         </div>
       </section>

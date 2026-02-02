@@ -14,11 +14,12 @@ const STORAGE_KEY = "diagnosis_progress"
 export default function QuizPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const fromActivateSuccess = searchParams?.get("from") === "activate-success"
   const [userId, setUserId] = useState<string | undefined>(undefined)
   const [authChecked, setAuthChecked] = useState(false)
   const trackedStartRef = useRef(false)
   const force = searchParams?.get("force")
-  const shouldSkip = force === "1" || force === "true"
+  const shouldSkip = force === "1" || force === "true" || fromActivateSuccess
   const [currentStep, setCurrentStep] = useState(0)
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({})
   const [customIndustry, setCustomIndustry] = useState("")
@@ -196,6 +197,10 @@ export default function QuizPage() {
         landingPath: window.location.pathname,
         diagnosisId: data?.id,
       })
+      if (fromActivateSuccess) {
+        router.replace("/activate/success")
+        return
+      }
       router.push(`/diagnosis/result/${data.id}`)
     } catch (error) {
       console.error("Failed to submit diagnosis:", error)
