@@ -589,6 +589,14 @@ export default function LandingPage() {
                   </GlowButton>
                 </Link>
                 <TrackedLink
+                  href="/delivery-pack/sample"
+                  eventName="cta_click"
+                  eventProps={{ source: "sample_pdf" }}
+                  className="text-sm text-zinc-400 hover:text-white transition-colors"
+                >
+                  查看样本PDF
+                </TrackedLink>
+                <TrackedLink
                   href="/demo"
                   eventName="cta_click"
                   eventProps={{ source: "sample_demo" }}
