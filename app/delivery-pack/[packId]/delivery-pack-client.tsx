@@ -318,7 +318,7 @@ export default function DeliveryPackClient({
   return (
     <div className="min-h-screen">
       <Header breadcrumbs={[{ label: "首页", href: "/" }, { label: "交付包预览" }]} />
-      <main className="p-6 lg:p-8">
+      <main className="p-6 lg:p-8 pb-28 lg:pb-8">
         <div className="max-w-5xl mx-auto space-y-6">
           <GlassCard className="p-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -595,6 +595,27 @@ export default function DeliveryPackClient({
           </GlassCard>
         </div>
       </main>
+
+      <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden">
+        <div className="mx-auto max-w-5xl px-4 pb-[calc(env(safe-area-inset-bottom)+12px)]">
+          <div className="rounded-2xl border border-purple-500/30 bg-zinc-950/90 backdrop-blur shadow-[0_0_30px_-12px_rgba(168,85,247,0.45)]">
+            <div className="flex items-center gap-3 p-3">
+              <button
+                onClick={() => goToWorkshop("P7")}
+                className="flex-1 inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-base font-semibold text-white bg-gradient-to-r from-purple-500 via-fuchsia-500 to-amber-400 shadow-xl shadow-purple-500/40 hover:brightness-110 disabled:opacity-60"
+              >
+                进入内容工坊：生成7天日历
+              </button>
+              <button
+                onClick={() => goToWorkshop("P8")}
+                className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-medium border border-purple-500/40 text-purple-100 hover:border-purple-400/70 hover:shadow-md disabled:opacity-60"
+              >
+                生成3条脚本
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
