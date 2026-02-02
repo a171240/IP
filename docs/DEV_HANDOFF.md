@@ -1,6 +1,6 @@
 ﻿# IP内容工厂 · 开发文档与进度梳理（P0/P1）
 
-更新时间：2026-02-01
+更新时间：2026-02-02
 
 本文件用于“换机继续开发”。它把你给的开发文档要求完整梳理成：
 - 已完成什么
@@ -92,6 +92,7 @@
 - 预览页埋点补齐：`delivery_pack_view / delivery_pack_download / copy_script / copy_calendar / workshop_enter`（带 `packId / userId`）。
 - 质检清单/归档规则支持一键复制（事件：`copy_qc / copy_archive`）。
 - 新增样本交付包预览页 `/delivery-pack/sample`，非 Pro 可直接查看样本 PDF（下载路由 `/api/delivery-pack/sample/download`）。
+- 结果页/预览页移动端新增底部粘性主 CTA（品牌紫 + 金色提示，主按钮更强）。
 
 **实现位置：**
 - `app/delivery-pack/[packId]/page.tsx`
@@ -125,6 +126,7 @@
 - P7-P10 工作流提示词改为“优先读取提示词文件”，保证与 `提示词/` 目录同步；文件缺失时自动回退到内置默认提示词。
 - 工作流对话请求加入依赖报告上下文（优先 `context.reports`，无 id 时回退 `context.inline_reports`），P5-P10 能直接读取 P1-P4 / P7-P9 等前置报告，提高输出一致性与可用性。
 - 新增 P5-P10 上下文回归脚本（默认走 report_id），用于快速验证上下文注入链路。
+- 移除 P10 / IP 传记提示词中的“行业排名/份额”等不可验证口径，避免输出排名类文案。
 - ✅ 2026-02-01 回归：脚本 `report_id` / `inline` 两种模式均通过（P5-P10 标识命中）。
 
 **实现位置：**
