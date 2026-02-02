@@ -71,6 +71,21 @@ export function WorkflowSidebar({
         <CreditsLowWarning balance={profile.credits_balance || 0} />
       )}
 
+      <div className="flex items-center justify-between px-1">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg border border-purple-500/30 bg-purple-500/15 flex items-center justify-center">
+            <Sparkles size={14} className="text-purple-400" />
+          </div>
+          <div>
+            <div className="text-sm font-semibold dark:text-white text-zinc-900">操作区</div>
+            <div className="text-[11px] text-zinc-500">主操作优先，辅助功能在下方</div>
+          </div>
+        </div>
+        <span className="text-[10px] px-2 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300">
+          品牌紫 + 金色提示
+        </span>
+      </div>
+
       <GlassCard
         glow={!!generatedDoc}
         className={`p-4 ${
@@ -121,27 +136,36 @@ export function WorkflowSidebar({
           )}
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-zinc-500">
+            <span className="w-2 h-2 rounded-full bg-purple-400" />
+            核心操作
+          </div>
           <button
             onClick={onOpenCanvas}
             disabled={!generatedDoc}
-            className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
+            className={`w-full flex items-center justify-center gap-2 px-5 py-4 rounded-2xl text-base font-semibold transition-all ${
               generatedDoc
-                ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:opacity-90 shadow-lg shadow-emerald-500/20"
+                ? "bg-gradient-to-r from-purple-500 via-fuchsia-500 to-amber-400 text-white shadow-xl shadow-purple-500/40 hover:brightness-110"
                 : "bg-zinc-700/30 text-zinc-500 cursor-not-allowed"
             }`}
           >
-            <Eye size={16} />
-            重新开始对话
+            <Eye size={18} />
+            在画布中查看
           </button>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-zinc-500 mt-1">
+            <span className="w-2 h-2 rounded-full bg-amber-400" />
+            快速工具
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
             <button
               onClick={onCopy}
               disabled={!generatedDoc}
-              className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm transition-colors ${
+              className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl border text-sm font-medium transition-all ${
                 generatedDoc
-                  ? "dark:bg-zinc-800/50 bg-zinc-200 dark:border-white/10 border-black/10 text-zinc-400 hover:text-white"
+                  ? "dark:bg-zinc-900/70 bg-white/90 dark:border-purple-500/30 border-purple-200 dark:text-zinc-100 text-zinc-900 hover:shadow-md hover:dark:border-purple-400/60 hover:border-purple-400/60"
                   : "bg-zinc-800/20 border-zinc-700/30 text-zinc-600 cursor-not-allowed"
               }`}
             >
@@ -152,9 +176,9 @@ export function WorkflowSidebar({
             <button
               onClick={onDownload}
               disabled={!generatedDoc}
-              className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm transition-colors ${
+              className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl border text-sm font-medium transition-all ${
                 generatedDoc
-                  ? "dark:bg-zinc-800/50 bg-zinc-200 dark:border-white/10 border-black/10 text-zinc-400 hover:text-white"
+                  ? "dark:bg-zinc-900/70 bg-white/90 dark:border-purple-500/30 border-purple-200 dark:text-zinc-100 text-zinc-900 hover:shadow-md hover:dark:border-purple-400/60 hover:border-purple-400/60"
                   : "bg-zinc-800/20 border-zinc-700/30 text-zinc-600 cursor-not-allowed"
               }`}
             >
@@ -166,9 +190,9 @@ export function WorkflowSidebar({
           <button
             onClick={onSaveAndContinue}
             disabled={isSaved || !generatedDoc}
-            className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm transition-colors ${
+            className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
               generatedDoc
-                ? "bg-purple-500/10 border border-purple-500/30 text-purple-400 hover:bg-purple-500/20 disabled:opacity-50"
+                ? "bg-purple-500/20 border border-purple-500/50 dark:text-purple-200 text-purple-800 hover:bg-purple-500/30 disabled:opacity-50"
                 : "bg-zinc-800/20 border border-zinc-700/30 text-zinc-600 cursor-not-allowed"
             }`}
           >
@@ -180,7 +204,7 @@ export function WorkflowSidebar({
             ) : (
               <>
                 <Save size={14} />
-                保存并返回
+                保存并返回工作流
               </>
             )}
           </button>
@@ -197,31 +221,31 @@ export function WorkflowSidebar({
 
       {canGenerateReport && !generatedDoc && (
         <GlassCard glow className="p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Sparkles size={16} className="text-amber-400" />
-            <h3 className="text-base font-medium dark:text-white text-zinc-900">一键生成报告</h3>
-          </div>
-          <p className="text-sm dark:text-zinc-400 text-zinc-500 mb-4">
-            保存并返回保存并返回重新开始对话
-          </p>
-          <button
-            onClick={onGenerateReport}
-            disabled={isGeneratingReport}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-purple-500 to-blue-500 text-white text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
-          >
-            {isGeneratingReport ? (
-              <>
-                <Loader2 size={14} className="animate-spin" />
-                生成中...
-              </>
-            ) : (
-              <>
-                <Sparkles size={14} />
-                保存并返回
-              </>
-            )}
-          </button>
-        </GlassCard>
+        <div className="flex items-center gap-2 mb-3">
+          <Sparkles size={16} className="text-purple-400" />
+          <h3 className="text-base font-medium dark:text-white text-zinc-900">一键生成报告</h3>
+        </div>
+        <p className="text-sm dark:text-zinc-400 text-zinc-500 mb-4">
+          整理当前对话并生成报告，支持画布查看与下载保存。
+        </p>
+        <button
+          onClick={onGenerateReport}
+          disabled={isGeneratingReport}
+          className="w-full flex items-center justify-center gap-2 px-5 py-4 rounded-2xl bg-gradient-to-r from-purple-500 via-fuchsia-500 to-amber-400 text-white text-base font-semibold hover:brightness-110 transition-all disabled:opacity-50 shadow-xl shadow-purple-500/40"
+        >
+          {isGeneratingReport ? (
+            <>
+              <Loader2 size={14} className="animate-spin" />
+              生成中...
+            </>
+          ) : (
+            <>
+              <Sparkles size={14} />
+              一键生成报告
+            </>
+          )}
+        </button>
+      </GlassCard>
       )}
 
       <GlassCard className="p-4">
@@ -276,14 +300,14 @@ export function WorkflowSidebar({
 
       <button
         onClick={onRestartConversation}
-        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border dark:border-amber-500/30 border-amber-400/30 dark:bg-amber-500/5 bg-amber-50 text-amber-500 text-sm dark:hover:bg-amber-500/10 hover:bg-amber-100 transition-colors"
+        className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border dark:border-amber-500/40 border-amber-400/40 dark:bg-amber-500/10 bg-amber-50 dark:text-amber-300 text-amber-700 text-sm font-medium dark:hover:bg-amber-500/20 hover:bg-amber-100 transition-all shadow-sm"
       >
         <RefreshCw size={14} />
         重新开始对话
       </button>
 
       <Link href="/dashboard/workflow">
-        <button className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border dark:border-white/10 border-black/10 text-zinc-500 text-sm dark:hover:text-white hover:text-zinc-900 dark:hover:border-white/20 hover:border-black/20 transition-colors">
+        <button className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border dark:border-white/15 border-black/10 dark:text-zinc-200 text-zinc-800 text-sm font-medium dark:bg-zinc-900/60 bg-white/90 dark:hover:border-white/30 hover:border-black/20 transition-all shadow-sm">
           <ArrowLeft size={14} />
           返回步骤列表
         </button>

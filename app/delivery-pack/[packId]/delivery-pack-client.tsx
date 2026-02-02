@@ -328,26 +328,38 @@ export default function DeliveryPackClient({
                   {new Date(createdAt).toLocaleDateString("zh-CN")} · 状态：{status}
                 </p>
               </div>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <GlowButton
-                  onClick={() => {
-                    track("delivery_pack_download", {
-                      packId,
-                      userId,
-                      landingPath: window.location.pathname,
-                      mode: "open",
-                    })
-                    window.open(`/api/delivery-pack/${packId}/download`, "_blank")
-                  }}
-                  disabled={isDownloading}
-                >
-                  <FileText className="w-4 h-4" />
-                  打开 PDF
-                </GlowButton>
-                <GlowButton onClick={handleDownload} disabled={isDownloading}>
-                  <Download className="w-4 h-4" />
-                  {isDownloading ? "准备下载..." : "下载 PDF"}
-                </GlowButton>
+              <div className="flex flex-col gap-2 sm:items-end">
+                <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-zinc-500">
+                  <span className="w-2 h-2 rounded-full bg-purple-400" />
+                  PDF 操作
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <GlowButton
+                    primary
+                    onClick={() => {
+                      track("delivery_pack_download", {
+                        packId,
+                        userId,
+                        landingPath: window.location.pathname,
+                        mode: "open",
+                      })
+                      window.open(`/api/delivery-pack/${packId}/download`, "_blank")
+                    }}
+                    disabled={isDownloading}
+                    className="px-6 py-3.5 rounded-2xl text-base bg-gradient-to-r from-purple-500 via-fuchsia-500 to-amber-400 shadow-xl shadow-purple-500/40 hover:brightness-110"
+                  >
+                    <FileText className="w-4 h-4" />
+                    打开 PDF
+                  </GlowButton>
+                  <GlowButton
+                    onClick={handleDownload}
+                    disabled={isDownloading}
+                    className="px-5 py-3 rounded-xl border border-purple-500/40 dark:bg-zinc-900/60 bg-white/90 dark:text-zinc-100 text-zinc-900 hover:border-purple-400/60 hover:shadow-md"
+                  >
+                    <Download className="w-4 h-4" />
+                    {isDownloading ? "准备下载..." : "下载 PDF"}
+                  </GlowButton>
+                </div>
               </div>
             </div>
             {status !== "done" ? (
@@ -569,11 +581,13 @@ export default function DeliveryPackClient({
               <GlowButton
                 primary
                 onClick={() => goToWorkshop("P7")}
+                className="px-6 py-4 rounded-2xl text-base bg-gradient-to-r from-purple-500 via-fuchsia-500 to-amber-400 shadow-xl shadow-purple-500/40 hover:brightness-110"
               >
                 进入内容工坊：生成7天日历
               </GlowButton>
               <GlowButton
                 onClick={() => goToWorkshop("P8")}
+                className="px-5 py-3 rounded-xl border border-purple-500/40 dark:bg-zinc-900/60 bg-white/90 dark:text-zinc-100 text-zinc-900 hover:border-purple-400/60 hover:shadow-md"
               >
                 进入内容工坊：生成3条脚本
               </GlowButton>

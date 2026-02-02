@@ -20,6 +20,7 @@ import {
   MessageSquare,
   RefreshCw,
   ChevronRight,
+  ChevronDown,
   Copy,
   Download,
   CheckCircle2,
@@ -1369,14 +1370,22 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
           {/* 输入区域 */}
           <div className="shrink-0 p-3 sm:p-4 border-t border-white/5 dark:bg-zinc-950/90 bg-white/90 backdrop-blur-sm">
             {step.id === "P8" && (
-              <div className="mb-3">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                  <span className="text-xs dark:text-zinc-400 text-zinc-600 whitespace-nowrap">选择智能体</span>
+              <div className="mb-4 rounded-xl border dark:border-purple-500/25 border-purple-200/60 dark:bg-purple-500/5 bg-purple-50/60 p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2 text-xs dark:text-zinc-200 text-zinc-700">
+                    <Sparkles size={14} className="text-purple-400" />
+                    <span className="font-medium">选择智能体</span>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300">
+                    P8 必选
+                  </span>
+                </div>
+                <div className="relative">
                   <select
                     value={selectedP8AgentId ?? ""}
                     onChange={(e) => setSelectedP8AgentId(e.target.value ? e.target.value : null)}
                     disabled={isLoading}
-                    className="flex-1 px-3 py-2 rounded-lg border dark:bg-zinc-900/50 bg-white dark:border-white/10 border-black/10 text-sm dark:text-white text-zinc-900 focus:outline-none"
+                    className="w-full appearance-none px-3 py-2.5 pr-10 rounded-lg border dark:bg-zinc-900/60 bg-white dark:border-white/10 border-black/10 text-sm dark:text-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-purple-500/30"
                   >
                     <option value="">请选择（P8 必选）</option>
                     {p8Agents.map((agent) => (
@@ -1385,9 +1394,13 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
                       </option>
                     ))}
                   </select>
+                  <ChevronDown
+                    size={16}
+                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400"
+                  />
                 </div>
                 {selectedP8Agent && (
-                  <div className="mt-1 text-xs dark:text-zinc-600 text-zinc-500">{selectedP8Agent.description}</div>
+                  <div className="mt-2 text-xs dark:text-zinc-400 text-zinc-500">{selectedP8Agent.description}</div>
                 )}
               </div>
             )}

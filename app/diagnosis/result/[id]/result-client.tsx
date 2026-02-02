@@ -748,40 +748,62 @@ export function ResultClient({
 
                 {generateError && !isGenerating ? <p className="text-sm text-rose-400">{generateError}</p> : null}
 
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <GlowButton primary onClick={handleGeneratePack} disabled={isGenerating}>
-                    {isGenerating ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        生成中...
-                      </>
-                    ) : (
-                      <>
-                        生成交付包
-                        <ArrowRight className="w-4 h-4" />
-                      </>
-                    )}
-                  </GlowButton>
-                  <GlowButton
-                    onClick={() => packId && router.push(`/delivery-pack/${packId}`)}
-                    disabled={!packId || isGenerating}
-                  >
-                    <Copy className="w-4 h-4" />
-                    在线预览
-                  </GlowButton>
-                  <GlowButton onClick={handleDownload} disabled={!packId || isDownloading || isGenerating}>
-                    {isDownloading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        准备下载...
-                      </>
-                    ) : (
-                      <>
-                        <Download className="w-4 h-4" />
-                        下载PDF
-                      </>
-                    )}
-                  </GlowButton>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-zinc-500">
+                    <span className="w-2 h-2 rounded-full bg-purple-400" />
+                    核心操作
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <GlowButton
+                      primary
+                      onClick={handleGeneratePack}
+                      disabled={isGenerating}
+                      className="px-6 py-4 rounded-2xl text-base bg-gradient-to-r from-purple-500 via-fuchsia-500 to-amber-400 shadow-xl shadow-purple-500/40 hover:brightness-110"
+                    >
+                      {isGenerating ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          生成中...
+                        </>
+                      ) : (
+                        <>
+                          生成交付包
+                          <ArrowRight className="w-4 h-4" />
+                        </>
+                      )}
+                    </GlowButton>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-zinc-500">
+                    <span className="w-2 h-2 rounded-full bg-amber-400" />
+                    快速工具
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <GlowButton
+                      onClick={() => packId && router.push(`/delivery-pack/${packId}`)}
+                      disabled={!packId || isGenerating}
+                      className="px-5 py-3 rounded-xl border border-purple-500/40 dark:bg-zinc-900/60 bg-white/90 dark:text-zinc-100 text-zinc-900 hover:border-purple-400/60 hover:shadow-md"
+                    >
+                      <Copy className="w-4 h-4" />
+                      在线预览
+                    </GlowButton>
+                    <GlowButton
+                      onClick={handleDownload}
+                      disabled={!packId || isDownloading || isGenerating}
+                      className="px-5 py-3 rounded-xl border border-purple-500/40 dark:bg-zinc-900/60 bg-white/90 dark:text-zinc-100 text-zinc-900 hover:border-purple-400/60 hover:shadow-md"
+                    >
+                      {isDownloading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          准备下载...
+                        </>
+                      ) : (
+                        <>
+                          <Download className="w-4 h-4" />
+                          下载PDF
+                        </>
+                      )}
+                    </GlowButton>
+                  </div>
                 </div>
               </div>
             </GlassCard>
@@ -805,7 +827,7 @@ export function ResultClient({
                       target: "activate",
                     })
                   }
-                  className="inline-flex items-center justify-center px-5 py-2 rounded-xl bg-emerald-500 text-white text-sm font-semibold"
+                  className="inline-flex items-center justify-center px-6 py-3 rounded-2xl bg-gradient-to-r from-purple-500 via-fuchsia-500 to-amber-400 text-white text-sm font-semibold shadow-xl shadow-purple-500/30 hover:brightness-110"
                 >
                   去激活体验卡
                 </Link>
@@ -820,7 +842,7 @@ export function ResultClient({
                       target: "sample",
                     })
                   }
-                  className="inline-flex items-center justify-center px-5 py-2 rounded-xl border border-white/10 text-sm text-zinc-300 hover:text-white"
+                  className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl border border-purple-500/40 text-sm text-zinc-200 hover:text-white hover:border-purple-400/60"
                 >
                   看样本PDF
                 </Link>
@@ -835,7 +857,7 @@ export function ResultClient({
                       target: "demo",
                     })
                   }
-                  className="inline-flex items-center justify-center px-5 py-2 rounded-xl border border-white/10 text-sm text-zinc-300 hover:text-white"
+                  className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl border border-purple-500/30 text-sm text-zinc-300 hover:text-white hover:border-purple-400/60"
                 >
                   预约顾问演示
                 </Link>
