@@ -157,6 +157,7 @@
 6) **内容价值密度与CTA合规** → 已补（标题自动补入 offer/人群/价格/平台要素；CTA 过滤微信/手机号等外链引导，回落站内评论领取）。
 7) **价值密度“加强版”重生成** → 已补（split 生成若触发规则警告，走一次强化 prompt 再生成）。
 8) **UI 控制台偶发 Failed to load resource（reports/conversations 406）** → 已修复（getReport/getConversation/getLatestConversation/use maybeSingle；不再因空数据 406 报错）。
+9) **/api/delivery-pack/latest 404**（无交付包时控制台报错）→ 已修复（返回 200 + `{ ok:false }`）。
 
 ---
 
@@ -173,6 +174,8 @@
 - ✅ 2026-01-31 回归：新交付包 `0986d40a-6a7a-4a8a-b9ad-80669a9f0465` 标题密度/CTA 合规通过；预览页复制清单/规则可用；`analytics_events` 已写入 `delivery_pack_generate_success / pdf_generate_success / delivery_pack_view / copy_qc / copy_archive`。
 - ✅ 2026-02-01 回归：新交付包 `43ff091d-dd58-4bd1-82fe-fef2d1b9851c` 预览页已出现“明天第一条完整文案”；PDF 已包含新页面（本地打开验证）；结果页/预览页进入内容工坊直达 `P7/P8` 并自动触发生成（积分修复后 /api/chat 200）。
 - ✅ 2026-02-01 UI 回归：Playwright MCP 跑 `P5 → P10`，每步首屏“前置报告”显示为“已有”，且对话中能提取对应标识（`P5: 概念标识`、`P6: 行业/认知/情绪/传记/概念/类型`、`P7: 行业/情绪/规划/传记`、`P8: 选题`、`P9: 脚本`、`P10: 口语`）。
+- ✅ 2026-02-02 回归：新交付包 `6f124f1f-7a18-4f58-92b2-a109ac4f1a30` 预览页“明天第一条完整文案”可见；PDF 文本检索包含“明天第一条完整文案”；结果页/预览页进入内容工坊直达 `P7/P8` 并自动触发生成（更新 Pro 权益后 /api/chat 200）。
+- ✅ 2026-02-02 脚本回归：`regress:delivery-pack` 生成 `326e29d8-f2e4-4907-a7b7-d92e6fe23b32`，事件写入 `delivery_pack_generate_success / pdf_generate_success / delivery_pack_view / copy_qc / copy_archive`。
 
 ---
 
