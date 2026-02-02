@@ -82,6 +82,10 @@ export default function StartClient({ user, remainingDays, isPro }: StartClientP
   const resultHref = latestResultId ? `/diagnosis/result/${latestResultId}` : "/diagnosis/quiz"
   const resultHint = latestResultId ? "继续查看上次诊断结果" : "先完成诊断后解锁"
   const needsEmail = !user?.id
+  const shouldShowSticky = isPro || redeemSuccess || redeemLoginRequired
+  const stickyCta = redeemLoginRequired
+    ? { href: "/auth/login?redirect=/activate", label: "登录继续" }
+    : { href: "/diagnosis/quiz?from=start", label: "开始诊断" }
 
   const formatDate = (value?: string | null) => {
     if (!value) return null
@@ -113,7 +117,7 @@ export default function StartClient({ user, remainingDays, isPro }: StartClientP
         </div>
       </nav>
 
-      <main className="relative pt-28 pb-24 px-4 sm:px-6">
+      <main className="relative pt-28 pb-32 px-4 sm:px-6">
         <div className="max-w-5xl mx-auto space-y-10">
           <section className="rounded-3xl border border-white/10 bg-zinc-950/60 backdrop-blur-xl p-8 sm:p-10">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -351,7 +355,26 @@ export default function StartClient({ user, remainingDays, isPro }: StartClientP
             </section>
           ) : null}
 
-          <section className="grid md:grid-cols-3 gap-5">
+          <section className="md:hidden rounded-2xl border border-white/10 bg-zinc-950/60 p-6">
+            <h3 className="text-lg font-semibold text-white">3 步开始</h3>
+            <p className="text-sm text-zinc-400 mt-1">用最短路径拿到第一条可发布内容。</p>
+            <ol className="mt-4 space-y-3 text-sm text-zinc-300">
+              <li className="flex items-start gap-3">
+                <span className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-purple-500/20 text-purple-200 text-xs font-semibold">1</span>
+                完成 5 分钟诊断，拿到瓶颈与优先级。
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-purple-500/20 text-purple-200 text-xs font-semibold">2</span>
+                生成交付包（排产 + 脚本 + 质检）。
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-purple-500/20 text-purple-200 text-xs font-semibold">3</span>
+                复制第一条脚本，当天发布。
+              </li>
+            </ol>
+          </section>
+
+          <section className="hidden md:grid md:grid-cols-3 gap-5">
             <div className="rounded-2xl border border-white/10 bg-zinc-950/60 p-6">
               <Target className="w-6 h-6 text-purple-300" />
               <h3 className="text-lg font-semibold text-white mt-4">Step 1：完成诊断</h3>
@@ -381,7 +404,7 @@ export default function StartClient({ user, remainingDays, isPro }: StartClientP
             </div>
           </section>
 
-          <section className="rounded-2xl border border-white/10 bg-zinc-950/60 p-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <section className="hidden md:flex rounded-2xl border border-white/10 bg-zinc-950/60 p-6 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h3 className="text-lg font-semibold text-white">需要长期 Pro 权益？</h3>
               <p className="text-sm text-zinc-400 mt-1">升级即可持续使用交付包与下载功能。</p>
@@ -401,6 +424,24 @@ export default function StartClient({ user, remainingDays, isPro }: StartClientP
           </section>
         </div>
       </main>
+
+      {shouldShowSticky ? (
+        <div className="fixed bottom-0 left-0 right-0 z-50 md:hidden">
+          <div className="mx-auto max-w-5xl px-4 pb-[calc(env(safe-area-inset-bottom)+12px)]">
+            <div className="rounded-2xl border border-purple-500/30 bg-zinc-950/90 backdrop-blur shadow-[0_0_30px_-12px_rgba(168,85,247,0.45)]">
+              <div className="p-3">
+                <Link
+                  href={stickyCta.href}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-2xl px-6 py-4 text-base font-semibold text-white bg-gradient-to-r from-purple-500 via-fuchsia-500 to-amber-400 shadow-xl shadow-purple-500/40 hover:brightness-110"
+                >
+                  {stickyCta.label}
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

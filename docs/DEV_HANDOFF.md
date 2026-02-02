@@ -28,6 +28,7 @@
 ### 1.1 兑换 / 激活链路（核心入口已具备）
 **已完成：**
 - `/start` 支持兑换码激活（小红书体验卡入口），支持 query 自动填 `code / email`，支持未登录邮箱兑换。
+- `/start` 移动端补齐“3 步开始 + 底部粘性 CTA”，首屏更聚焦“兑换 → 诊断”。
 - `/activate` 页面内置兑换表单，成功后显示有效期并引导进入诊断。
 - `/redeem` 页面保留兜底，并支持 query 自动填与前端归一化（去空格、转大写）。
 - 埋点：`redeem_view / redeem_submit / redeem_success / redeem_fail`（前端已接）。
