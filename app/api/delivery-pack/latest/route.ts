@@ -10,7 +10,7 @@ export async function GET(_request: NextRequest) {
   } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 })
+    return NextResponse.json({ ok: false, error: "unauthorized" })
   }
 
   const { data, error } = await supabase
@@ -22,7 +22,7 @@ export async function GET(_request: NextRequest) {
     .maybeSingle()
 
   if (error || !data) {
-    return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 })
+    return NextResponse.json({ ok: false, error: "not_found" })
   }
 
   return NextResponse.json({
