@@ -163,6 +163,7 @@
 8) **UI 控制台偶发 Failed to load resource（reports/conversations 406）** → 已修复（getReport/getConversation/getLatestConversation/use maybeSingle；不再因空数据 406 报错）。
 9) **/api/delivery-pack/latest 404**（无交付包时控制台报错）→ 已修复（返回 200 + `{ ok:false }`）。
 10) **交付包 JSON 解析偶发失败** → 已修复（split 生成失败自动回退单段生成）。
+11) **/start 兑换接口 500** → 已修复（`redemption_codes` 迁移已执行，接口恢复正常）。
 
 ---
 
@@ -183,6 +184,7 @@
 - ✅ 2026-02-02 脚本回归：`regress:delivery-pack` 生成 `326e29d8-f2e4-4907-a7b7-d92e6fe23b32`，事件写入 `delivery_pack_generate_success / pdf_generate_success / delivery_pack_view / copy_qc / copy_archive`。
 - ✅ 2026-02-02 回归：`regress:delivery-pack` 生成 `11a599fe-84c8-4cfa-ad96-83be492529e2`（split 失败回退验证通过）。
 - ✅ 2026-02-02 回归：`regress:p5p10` 上下文注入全部命中（P5→P10）。
+- ✅ 2026-02-03 UI 回归：`/activate → /activate/success → /pack` 正常，PDF 可下载；P7 onboarding 自动触发生成。
 
 ---
 
