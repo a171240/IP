@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Header, GlassCard, GlowButton } from "@/components/ui/obsidian"
 import { QUESTIONS, INDUSTRY_LABELS } from "@/lib/diagnosis/questions"
@@ -35,6 +35,65 @@ const PROBLEM_LABELS: Record<string, string> = {
   archive_weak: "素材沉淀弱",
 }
 
+const DEFAULT_ONBOARDING_STATE = {
+  platform: "",
+  industry: "",
+  industryText: "",
+  offerDesc: "",
+  targetAudience: "",
+  tone: "",
+  priceRange: "",
+  currentProblem: [] as string[],
+  selectedDay: 1,
+  topicHint: "",
+}
+
+function getInitialOnboardingState() {
+  if (typeof window === "undefined") return { ...DEFAULT_ONBOARDING_STATE }
+
+  try {
+    const savedOnboarding = localStorage.getItem("workshop_onboarding")
+    if (savedOnboarding) {
+      const parsed = JSON.parse(savedOnboarding) as OnboardingPayload
+      return {
+        platform: parsed.platform || "",
+        industry: parsed.industry || "",
+        industryText: parsed.industry_label && parsed.industry === "other" ? parsed.industry_label : "",
+        offerDesc: parsed.offer_desc || "",
+        targetAudience: parsed.target_audience || "",
+        tone: parsed.tone || "",
+        priceRange: parsed.price_range || "",
+        currentProblem: parsed.current_problem || [],
+        selectedDay: parsed.day || 1,
+        topicHint: parsed.topic || "",
+      }
+    }
+
+    const saved = localStorage.getItem("latestDiagnosisAnswers")
+    if (!saved) return { ...DEFAULT_ONBOARDING_STATE }
+    const parsed = JSON.parse(saved) as {
+      answers?: Record<string, string | string[]>
+      customIndustry?: string
+    }
+    const answers = parsed.answers || {}
+
+    return {
+      platform: String(answers.platform || ""),
+      industry: String(answers.industry || ""),
+      industryText: answers.industry === "other" ? String(parsed.customIndustry || "") : "",
+      offerDesc: String(answers.offer_desc || ""),
+      targetAudience: String(answers.target_audience || ""),
+      tone: String(answers.tone || ""),
+      priceRange: String(answers.price_range || ""),
+      currentProblem: Array.isArray(answers.current_problem) ? answers.current_problem.map(String) : [],
+      selectedDay: 1,
+      topicHint: "",
+    }
+  } catch {
+    return { ...DEFAULT_ONBOARDING_STATE }
+  }
+}
+
 function resolveLabel(options: Array<{ value: string; label: string }>, value: string | undefined) {
   if (!value) return ""
   return options.find((opt) => opt.value === value)?.label || value
@@ -42,59 +101,20 @@ function resolveLabel(options: Array<{ value: string; label: string }>, value: s
 
 export default function WorkshopOnboardingPage() {
   const router = useRouter()
+  const initialState = useMemo(() => getInitialOnboardingState(), [])
   const [step, setStep] = useState(1)
 
-  const [platform, setPlatform] = useState("")
-  const [industry, setIndustry] = useState("")
-  const [industryText, setIndustryText] = useState("")
-  const [offerDesc, setOfferDesc] = useState("")
-  const [targetAudience, setTargetAudience] = useState("")
-  const [tone, setTone] = useState("")
-  const [priceRange, setPriceRange] = useState("")
-  const [currentProblem, setCurrentProblem] = useState<string[]>([])
+  const [platform, setPlatform] = useState(initialState.platform)
+  const [industry, setIndustry] = useState(initialState.industry)
+  const [industryText, setIndustryText] = useState(initialState.industryText)
+  const [offerDesc, setOfferDesc] = useState(initialState.offerDesc)
+  const [targetAudience, setTargetAudience] = useState(initialState.targetAudience)
+  const tone = initialState.tone
+  const priceRange = initialState.priceRange
+  const currentProblem = initialState.currentProblem
 
-  const [selectedDay, setSelectedDay] = useState(1)
-  const [topicHint, setTopicHint] = useState("")
-
-  useEffect(() => {
-    try {
-      const savedOnboarding = localStorage.getItem("workshop_onboarding")
-      if (savedOnboarding) {
-        const parsed = JSON.parse(savedOnboarding) as OnboardingPayload
-        setPlatform(parsed.platform || "")
-        setIndustry(parsed.industry || "")
-        setIndustryText(parsed.industry_label && parsed.industry === "other" ? parsed.industry_label : "")
-        setOfferDesc(parsed.offer_desc || "")
-        setTargetAudience(parsed.target_audience || "")
-        setTone(parsed.tone || "")
-        setPriceRange(parsed.price_range || "")
-        setCurrentProblem(parsed.current_problem || [])
-        setSelectedDay(parsed.day || 1)
-        setTopicHint(parsed.topic || "")
-        return
-      }
-
-      const saved = localStorage.getItem("latestDiagnosisAnswers")
-      if (!saved) return
-      const parsed = JSON.parse(saved) as {
-        answers?: Record<string, string | string[]>
-        customIndustry?: string
-      }
-      const answers = parsed.answers || {}
-      setPlatform(String(answers.platform || ""))
-      setIndustry(String(answers.industry || ""))
-      if (answers.industry === "other") {
-        setIndustryText(String(parsed.customIndustry || ""))
-      }
-      setOfferDesc(String(answers.offer_desc || ""))
-      setTargetAudience(String(answers.target_audience || ""))
-      setTone(String(answers.tone || ""))
-      setPriceRange(String(answers.price_range || ""))
-      setCurrentProblem(Array.isArray(answers.current_problem) ? answers.current_problem.map(String) : [])
-    } catch {
-      // ignore parse errors
-    }
-  }, [])
+  const [selectedDay, setSelectedDay] = useState(initialState.selectedDay)
+  const [topicHint, setTopicHint] = useState(initialState.topicHint)
 
   const isStep1Valid = useMemo(() => {
     if (!platform) return false

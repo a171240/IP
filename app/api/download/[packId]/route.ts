@@ -345,33 +345,129 @@ const packContents: Record<string, string> = {
 
 ---
 
-© IP超级个体 - 会员专属资源`,
-    })
-    creditsBalance = consumed.credits_balance
-  }
+© IP超级个体 - 会员专属资源`
+}
 
-  // Find solution pack config
-  const pack = solutionPacksConfig.find((p) => p.id === packId)
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ packId: string }> }
+) {
+  try {
+    const { packId } = await params
 
-  if (!pack) {
-    return NextResponse.json(
-      { error: "Solution pack not found" },
-      { status: 404 }
-    )
-  }
+    const supabase = await createServerSupabaseClientForRequest(request)
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
-  // Load pack content
-  const content = packContents[packId]
+    if (!user) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 })
+    }
 
-  if (!content) {
-    return NextResponse.json(
-      { error: "Pack content missing" },
-      { status: 404 }
-    )
-  }
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("plan, credits_balance, credits_unlimited, trial_granted_at")
+      .eq("id", user.id)
+      .single()
 
-  // Generate file name
-  const fileName = `${pack.title}.md`
+    let userProfile = profile
+    if (profileError || !profile) {
+      if (profileError?.code === "PGRST116") {
+        const { data: created, error: createError } = await supabase
+          .from("profiles")
+          .insert({
+            id: user.id,
+            email: user.email,
+            nickname: user.email?.split("@")[0] || "User",
+            plan: "free",
+            credits_balance: 30,
+            credits_unlimited: false,
+          })
+          .select("plan, credits_balance, credits_unlimited, trial_granted_at")
+          .single()
+
+        if (createError || !created) {
+          return NextResponse.json({ error: createError?.message || "profile create failed" }, { status: 500 })
+        }
+        userProfile = created
+      } else {
+        return NextResponse.json({ error: profileError?.message || "profile not found" }, { status: 500 })
+      }
+    }
+
+    const currentPlan = normalizePlan(userProfile?.plan)
+    let creditsBalance = Number(userProfile?.credits_balance || 0)
+    const creditsUnlimited = Boolean(userProfile?.credits_unlimited) || currentPlan === "vip"
+
+    // 检查下载权限
+    if (!canDownloadPack(packId, currentPlan)) {
+      const message = getDownloadPermissionMessage(packId, currentPlan)
+      return NextResponse.json(
+        {
+          error: message || "此资源需要更高级别会员才能下载",
+          code: "download_forbidden",
+          current_plan: currentPlan,
+          current_plan_label: PLAN_LABELS[currentPlan],
+        },
+        { status: 403 }
+      )
+    }
+
+    const cost = getCreditCostForPackMarkdownDownload(packId, currentPlan)
+
+    if (!creditsUnlimited && cost > 0) {
+      const deviceId = request.headers.get("x-device-id") || ""
+      const ip = getClientIp(request)
+      const ipHash = ip ? hashIp(ip) : null
+
+      if (!userProfile?.trial_granted_at && creditsBalance <= 0 && deviceId.trim().length >= 8) {
+        const updated = await ensureTrialCreditsIfNeeded({
+          supabase,
+          userId: user.id,
+          profile: {
+            plan: currentPlan,
+            credits_balance: creditsBalance,
+            credits_unlimited: creditsUnlimited,
+            trial_granted_at: (userProfile?.trial_granted_at as string | null) ?? null,
+          },
+          deviceId,
+          ipHash,
+        })
+        creditsBalance = updated.credits_balance
+      }
+
+      const consumed = await consumeCredits({
+        supabase,
+        userId: user.id,
+        currentBalance: creditsBalance,
+        amount: cost,
+        stepId: `download:pack_markdown:${packId}`,
+      })
+      creditsBalance = consumed.credits_balance
+    }
+
+    // Find solution pack config
+    const pack = solutionPacksConfig.find((p) => p.id === packId)
+
+    if (!pack) {
+      return NextResponse.json(
+        { error: "Solution pack not found" },
+        { status: 404 }
+      )
+    }
+
+    // Load pack content
+    const content = packContents[packId]
+
+    if (!content) {
+      return NextResponse.json(
+        { error: "Pack content missing" },
+        { status: 404 }
+      )
+    }
+
+    // Generate file name
+    const fileName = `${pack.title}.md`
 
     // 创建响应，设置为下载文件
     const response = new NextResponse(content, {
@@ -381,8 +477,8 @@ const packContents: Record<string, string> = {
         "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`,
         "Cache-Control": "no-cache",
         "X-Credits-Cost": String(cost),
-        "X-Credits-Remaining": creditsUnlimited ? "inf" : String(creditsBalance)
-      }
+        "X-Credits-Remaining": creditsUnlimited ? "inf" : String(creditsBalance),
+      },
     })
 
     return response
@@ -404,6 +500,3 @@ const packContents: Record<string, string> = {
     return NextResponse.json({ error: "Download failed." }, { status: 500 })
   }
 }
-
-
-
