@@ -241,7 +241,7 @@ const PlanMatrix = () => (
         <p className="text-xs font-mono uppercase tracking-widest text-zinc-500 mb-3">WORKFLOW ACCESS</p>
         <h2 className="text-2xl md:text-3xl font-bold text-white">每个套餐解锁哪些工作流步骤？</h2>
         <p className="text-zinc-400 mt-3 max-w-2xl mx-auto">
-          你的付费不是为"次数"，而是为"阶段解锁 + 团队可复用的交付资产"。
+          你的付费不是为&quot;次数&quot;，而是为&quot;阶段解锁 + 团队可复用的交付资产&quot;。
         </p>
       </div>
 

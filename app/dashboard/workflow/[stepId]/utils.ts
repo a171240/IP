@@ -1,6 +1,5 @@
 // 工作流步骤工具函数
 
-import type { WorkflowStepConfig } from "@/lib/workflow/types"
 import type { Conversation, Message as DbMessage } from "@/lib/supabase"
 
 // 消息类型

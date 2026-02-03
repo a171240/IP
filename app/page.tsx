@@ -16,7 +16,6 @@ import {
   FileText,
   Lightbulb,
   TrendingUp,
-  Mic,
   CheckCircle,
   type LucideIcon
 } from "lucide-react"
@@ -771,7 +770,7 @@ export default function LandingPage() {
 
                     {/* 引用 */}
                     <p className="text-zinc-300 text-[15px] leading-relaxed mb-4 min-h-[72px]">
-                      "{t.quote}"
+                      &ldquo;{t.quote}&rdquo;
                     </p>
 
                     <p className="text-xs text-zinc-500 mb-6">

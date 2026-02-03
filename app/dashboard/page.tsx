@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowRight, Bot, FileText, Layers, Loader2, Play, Sparkles, Users, Zap } from "lucide-react"
+import { ArrowRight, Bot, FileText, Layers, Loader2, Play, Sparkles, Zap } from "lucide-react"
 import { GlassCard, GlowButton, Header } from "@/components/ui/obsidian"
 import { useAuth } from "@/contexts/auth-context"
 import { getCompletedSteps, getUserReportCount, getUserReportsPreview, type ReportPreview } from "@/lib/supabase"

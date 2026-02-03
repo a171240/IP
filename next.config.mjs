@@ -1,4 +1,7 @@
 /** @type {import('next').NextConfig} */
+process.env.BASELINE_BROWSER_MAPPING_IGNORE_OLD_DATA = "true"
+process.env.BROWSERSLIST_IGNORE_OLD_DATA = "true"
+
 const isProduction = process.env.NODE_ENV === "production"
 const isStrictBuild = isProduction || process.env.NEXT_STRICT_BUILD !== "false"
 

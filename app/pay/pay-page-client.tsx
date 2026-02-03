@@ -1,6 +1,7 @@
 ﻿"use client"
+/* eslint-disable @next/next/no-img-element */
 
-import { useEffect, useMemo, useRef, useState, useCallback } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import QRCode from "qrcode"
 
@@ -119,7 +120,7 @@ export function PayPageClient() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [productFromUrl])
 
   useEffect(() => {
     if (productFromUrl) setSelectedProductId(productFromUrl)
@@ -147,7 +148,7 @@ export function PayPageClient() {
     } finally {
       setLocalStorageLoaded(true)
     }
-  }, [])
+  }, [productFromUrl])
 
   useEffect(() => {
     if (!order?.code_url) {
@@ -160,7 +161,7 @@ export function PayPageClient() {
       try {
         const url = await QRCode.toDataURL(order.code_url!, { margin: 1, width: 280 })
         if (!cancelled) setQrDataUrl(url)
-      } catch (e) {
+      } catch {
         if (!cancelled) setQrDataUrl(null)
       }
     })()

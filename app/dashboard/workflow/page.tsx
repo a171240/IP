@@ -9,7 +9,6 @@ import {
   FileText,
   Target,
   User,
-  Lightbulb,
   ArrowRight,
   Check,
   Clock,
@@ -19,14 +18,13 @@ import {
   Layers,
   PenTool,
   MessageSquare,
-  Zap,
   RefreshCw,
   ChevronRight,
   AlertCircle,
   Database,
   Loader2
 } from "lucide-react"
-import { GlassCard, GlowButton, Header } from "@/components/ui/obsidian"
+import { GlassCard, Header } from "@/components/ui/obsidian"
 import { useAuth } from "@/contexts/auth-context"
 import { getCompletedSteps } from "@/lib/supabase"
 
@@ -341,11 +339,6 @@ export default function WorkflowPage() {
   const getPhaseProgress = (phase: typeof workflowPhases[0]) => {
     const completed = phase.steps.filter(s => isStepCompleted(s.id)).length
     return { completed, total: phase.steps.length }
-  }
-
-  // 获取知识库文档状态
-  const getDocStatus = (docId: string) => {
-    return knowledgeBase.find(d => d.id === docId)?.status || "pending"
   }
 
   // 知识库完成度

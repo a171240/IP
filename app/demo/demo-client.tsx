@@ -319,7 +319,7 @@ export default function DemoClient({ utm, calendlyUrl }: DemoClientProps) {
                           setError("提交失败，请稍后再试。")
                         }
                       }
-                    } catch (submitError) {
+                    } catch {
                       track("demo_submit_fail", { error: "network_error" })
                       setError("网络异常，请稍后再试。")
                     } finally {

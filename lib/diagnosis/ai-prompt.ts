@@ -135,6 +135,7 @@ export function parseAIReport(content: string): AIReport | null {
       parsed.achievements = []
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     parsed.workflowSteps = parsed.workflowSteps.map((step: any) => ({
       ...step,
       estimatedTime: step.estimatedTime || "约15分钟",

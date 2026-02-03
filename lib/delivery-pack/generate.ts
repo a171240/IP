@@ -870,6 +870,7 @@ function buildFallbackTomorrowPost(input: DeliveryPackInput) {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function normalizeCoreOutput(input: DeliveryPackInput, value: any) {
   const output = { ...(value || {}) }
   output.meta = output.meta || {
@@ -884,6 +885,7 @@ function normalizeCoreOutput(input: DeliveryPackInput, value: any) {
   if (!Array.isArray(output.top_actions)) {
     output.top_actions = buildFallbackTopActions(input)
   } else {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     output.top_actions = output.top_actions.map((item: any, index: number) => {
       if (typeof item === "string") {
         return {
@@ -910,6 +912,7 @@ function normalizeCoreOutput(input: DeliveryPackInput, value: any) {
   }))
 
   if (Array.isArray(output.scores)) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     output.scores.forEach((item: any) => {
       if (!item) return
       const match = baseScores.find((score) => String(item.dimension || "").includes(score.dimension))
@@ -976,11 +979,13 @@ function buildFallbackCalendar(input: DeliveryPackInput) {
   }))
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function normalizeCalendarOutput(input: DeliveryPackInput, value: any) {
   const fallback = buildFallbackCalendar(input)
   if (!Array.isArray(value?.calendar_7d)) {
     return { calendar_7d: fallback }
   }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const normalized = value.calendar_7d.map((item: any, index: number) => {
     const parsedDay = Number(item?.day)
     const safeDay = Number.isFinite(parsedDay) && parsedDay > 0 ? Math.round(parsedDay) : index + 1
@@ -1000,7 +1005,7 @@ function normalizeCalendarOutput(input: DeliveryPackInput, value: any) {
   return { calendar_7d: normalized.slice(0, 7) }
 }
 
-function buildFallbackTopics(input: DeliveryPackInput) {
+function buildFallbackTopics() {
   const base = [
     "交付节奏不稳的3个原因",
     "7天排产怎么做到不返工",
@@ -1024,11 +1029,13 @@ function buildFallbackTopics(input: DeliveryPackInput) {
   }))
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function normalizeTopicsOutput(input: DeliveryPackInput, value: any) {
-  const fallback = buildFallbackTopics(input)
+  const fallback = buildFallbackTopics()
   if (!Array.isArray(value?.topics_10)) {
     return { topics_10: fallback }
   }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const normalized = value.topics_10.map((item: any, index: number) => ({
     title: item?.title || fallback[index]?.title,
     audience: item?.audience || fallback[index]?.audience,
@@ -1065,11 +1072,13 @@ function buildFallbackScripts() {
   }))
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function normalizeScriptsOutput(value: any) {
   const fallback = buildFallbackScripts()
   if (!Array.isArray(value?.scripts_3)) {
     return { scripts_3: fallback }
   }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const normalized = value.scripts_3.map((item: any, index: number) => ({
     id: item?.id || fallback[index]?.id,
     type: item?.type || fallback[index]?.type,
@@ -1085,6 +1094,7 @@ function normalizeScriptsOutput(value: any) {
   return { scripts_3: normalized.slice(0, 3) }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function normalizeChecklistOutput(value: any) {
   const fallback = {
     qc_checklist: {

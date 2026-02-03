@@ -273,7 +273,7 @@ export default function ReportsPage() {
     return () => {
       cancelled = true
     }
-  }, [selectedReportMeta?.id])
+  }, [selectedReportMeta])
 
   const filteredReports = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()

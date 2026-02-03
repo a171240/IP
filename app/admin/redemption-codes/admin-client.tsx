@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { GlowButton } from "@/components/ui/obsidian-primitives"
 
 type CodeRow = {
@@ -79,7 +79,7 @@ export default function AdminRedemptionCodesClient() {
 
   const hasRows = useMemo(() => rows.length > 0, [rows.length])
 
-  const fetchList = async () => {
+  const fetchList = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
@@ -110,11 +110,11 @@ export default function AdminRedemptionCodesClient() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [batchFilter, limit, query, statusFilter])
 
   useEffect(() => {
     fetchList()
-  }, [])
+  }, [fetchList])
 
   const handleAction = async (code: string, action: "disable" | "restore") => {
     setActionBusy(code)

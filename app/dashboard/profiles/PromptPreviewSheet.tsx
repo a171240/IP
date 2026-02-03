@@ -111,7 +111,7 @@ export function PromptPreviewSheet({
     }
 
     run()
-  }, [open, promptTarget?.kind, promptTarget?.value])
+  }, [open, promptTarget])
 
   useEffect(() => {
     if (!open || !selectedFile) return
@@ -136,7 +136,7 @@ export function PromptPreviewSheet({
     }
 
     run()
-  }, [open, selectedFile, promptTarget?.kind])
+  }, [open, selectedFile, promptTarget])
   const downloadHref = selectedFile ? `/api/prompts?file=${encodeURIComponent(selectedFile)}&download=1` : null
 
   const handleDownload = async () => {
@@ -182,14 +182,21 @@ export function PromptPreviewSheet({
           </SheetTitle>
           <SheetDescription className="flex flex-wrap gap-3">
             {downloadHref ? (
-              <a
-                className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200"
-                href={downloadHref}
+              <button
+                type="button"
+                onClick={handleDownload}
+                disabled={downloadLoading}
+                className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200 disabled:opacity-60"
               >
-                <Download className="size-3" />
+                {downloadLoading ? <Loader2 className="size-3 animate-spin" /> : <Download className="size-3" />}
                 {"下载智能体（提示词）"}
-              </a>
+              </button>
             ) : null}
+            {previewTruncated ? <span className="text-xs text-amber-300">预览已截断</span> : null}
+            {typeof downloadCost === "number" ? (
+              <span className="text-xs text-zinc-500">下载消耗 {downloadCost} 积分</span>
+            ) : null}
+            {plan ? <span className="text-xs text-zinc-500">计划：{plan}</span> : null}
           </SheetDescription>
         </SheetHeader>
 

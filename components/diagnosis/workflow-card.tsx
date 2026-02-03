@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { GlassCard, GlowButton } from '@/components/ui/obsidian'
+import { GlassCard } from '@/components/ui/obsidian'
 import { ArrowRight, Sparkles } from 'lucide-react'
 import { WORKFLOW_STEPS } from '@/lib/diagnosis/ai-prompt'
 
@@ -440,10 +440,9 @@ export function ExclusiveBenefitsCard({ industry, createdAt }: ExclusiveBenefits
 // 成长路径图组件
 interface GrowthPathCardProps {
   currentScore: number
-  level: string
 }
 
-export function GrowthPathCard({ currentScore, level }: GrowthPathCardProps) {
+export function GrowthPathCard({ currentScore }: GrowthPathCardProps) {
   const router = useRouter()
 
   // 成长阶段定义
