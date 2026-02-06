@@ -112,8 +112,9 @@
 ### Phase 4: Verification
 - Ran `npm run lint` (pass).
 - Ran `npm run build` (pass).
-- Ran `node scripts/regress-mp-p7p8-topics.js` (blocked): Supabase schema missing `public.xhs_drafts`.
-  - Fix: apply migration `supabase/migrations/20260206_add_xhs_drafts.sql`, then rerun the regression script.
+- Ran `node scripts/regress-mp-p7p8-topics.js`:
+  - First run: blocked (Supabase schema missing `public.xhs_drafts`).
+  - After migration applied in Supabase (2026-02-06): pass (2026-02-06 17:42).
 
 ## Test Results
 <!-- 
@@ -128,7 +129,7 @@
 |------|-------|----------|--------|--------|
 | Lint | `npm run lint` | Pass | Pass | PASS |
 | Build | `npm run build` | Pass | Pass | PASS |
-| MP regress (P7/P8/topics/XHS draft) | `node scripts/regress-mp-p7p8-topics.js` | Pass | Failed: missing `public.xhs_drafts` | FAIL |
+| MP regress (P7/P8/topics/XHS draft) | `node scripts/regress-mp-p7p8-topics.js` | Pass | Pass (after applying `20260206_add_xhs_drafts.sql`) | PASS |
 
 ## Error Log
 <!-- 
@@ -148,7 +149,7 @@
 | 2026-01-16 23:00 | PowerShell parser errors while quoting WXML class replacement / rg search | 1 | Switched to single-quote literals and string concatenation |
 | 2026-01-16 23:23 | WXSS compile error `unexpected token *` | 1 | Replaced universal selector with tag list for `box-sizing` |
 | 2026-01-17 00:05 | apply_patch failed to match WXML due to BOM | 1 | Updated file via PowerShell and rewrote UTF-8 without BOM |
-| 2026-02-06 17:25 | Regression blocked: `public.xhs_drafts` missing in Supabase | 1 | Added migration `supabase/migrations/20260206_add_xhs_drafts.sql`; need to apply it in the target Supabase project |
+| 2026-02-06 17:25 | Regression blocked: `public.xhs_drafts` missing in Supabase | 1 | Applied migration `supabase/migrations/20260206_add_xhs_drafts.sql`; regression passes (2026-02-06 17:42) |
 
 ## 5-Question Reboot Check
 <!-- 
