@@ -1,7 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server"
 
 import { buildXhsUpstreamUrl, chargeCredits, resolveBillingContext, trackServerEvent } from "@/lib/xhs/proxy.server"
-import { uploadRemoteAsset } from "@/lib/xhs/assets.server"
 
 export const runtime = "nodejs"
 
@@ -96,28 +95,9 @@ export async function POST(request: NextRequest) {
         .eq("user_id", billing.ctx.userId)
 
       if (qrImageUrl) {
-        try {
-          const uploaded = await uploadRemoteAsset({
-            userId: billing.ctx.userId,
-            draftId,
-            kind: "qr",
-            url: qrImageUrl,
-          })
-
-          await billing.ctx.supabase
-            .from("xhs_drafts")
-            .update({
-              publish_qr_storage_path: uploaded.path,
-              publish_qr_content_type: uploaded.contentType,
-              updated_at: now,
-            })
-            .eq("id", draftId)
-            .eq("user_id", billing.ctx.userId)
-        } catch {
-          // ignore upload errors; qrs endpoint can proxy publish_qr_url as fallback
-        }
-
         // Always return a single-domain QR URL.
+        // IMPORTANT: Do not block the publish response waiting for asset uploads.
+        // The `qrs` endpoint can proxy `publish_qr_url` under the single domain.
         data.qrImageUrl = `/api/mp/xhs/qrs/${draftId}`
         json.data = data
       }

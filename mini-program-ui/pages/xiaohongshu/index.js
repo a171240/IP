@@ -55,6 +55,11 @@ function handleBillingError(err) {
   return true
 }
 
+function isTimeoutError(err) {
+  const msg = String(err?.errMsg || err?.message || "").toLowerCase()
+  return msg.includes("timeout")
+}
+
 Page({
   data: {
     draftId: "",
@@ -79,6 +84,10 @@ Page({
     dangerStatusClass: "",
     coverImageUrl: "",
     publishResult: null,
+  },
+
+  onUnload() {
+    this._stopPublishPoll = true
   },
 
   onLoad(query) {
@@ -397,6 +406,54 @@ Page({
       wx.showToast({ title: "发布成功", icon: "success" })
     } catch (error) {
       if (handleBillingError(error)) return
+
+      if (draftId && isTimeoutError(error)) {
+        wx.showToast({ title: "发布耗时较长，正在后台处理…", icon: "none" })
+
+        // Poll draft status so users can still get the QR code after client-side timeout (60s limit).
+        this._stopPublishPoll = false
+        const startedAt = Date.now()
+        const timeoutMs = 2 * 60 * 1000
+        const intervalMs = 4000
+
+        while (!this._stopPublishPoll && Date.now() - startedAt < timeoutMs) {
+          await new Promise((resolve) => setTimeout(resolve, intervalMs))
+          try {
+            const res = await request({
+              baseUrl: IP_FACTORY_BASE_URL,
+              url: `/api/mp/xhs/drafts/${encodeURIComponent(draftId)}`,
+            })
+
+            const d = res?.draft
+            if (res?.ok && d && (d.publish_url || d.qr_url || d.status === "published")) {
+              this.setData({
+                publishResult: {
+                  publishUrl: d.publish_url || "",
+                  qrImageUrl: d.qr_url ? toAbsoluteUrl(d.qr_url) : "",
+                },
+              })
+              wx.showToast({ title: "发布结果已更新", icon: "success" })
+              return
+            }
+          } catch (_) {
+            // ignore and keep polling
+          }
+        }
+
+        wx.showModal({
+          title: "仍在发布中",
+          content: "发布可能需要更久时间。你可以稍后在草稿库查看发布二维码。",
+          confirmText: "打开草稿库",
+          cancelText: "知道了",
+          success: (res) => {
+            if (res.confirm) {
+              wx.navigateTo({ url: "/pages/xhs-drafts/index" })
+            }
+          },
+        })
+        return
+      }
+
       wx.showToast({ title: error.message || "发布失败", icon: "none" })
     } finally {
       this.setData({ isPublishing: false })
