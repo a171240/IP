@@ -2,6 +2,7 @@
 
 ## 文档位置（从这里开始）
 - **全量开发文档**：`docs/DEV_SPEC_FULL.md`
+- **小程序开发文档**：`docs/DEV_SPEC_MINIPROGRAM.md`
 - **当前进度/交接文档**：`docs/DEV_HANDOFF.md`
 
 > 新电脑一眼指引：先看 `docs/DEV_HANDOFF.md` 的“接下来要完成什么（P0 未完成项）”。
@@ -62,3 +63,5 @@ pnpm start
 ## 你现在应该做什么？
 - 先打开：`docs/DEV_HANDOFF.md`
 - 从“接下来要完成什么（P0 未完成项）”开始
+
+
