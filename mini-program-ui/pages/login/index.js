@@ -1,4 +1,5 @@
-const { loginWithProfile } = require("../../utils/auth")
+﻿const { loginWithProfile } = require("../../utils/auth")
+const { track } = require("../../utils/track")
 
 Page({
   data: {
@@ -11,6 +12,7 @@ Page({
 
     loginWithProfile()
       .then(() => {
+        track("mp_login_with_profile_success")
         wx.showToast({ title: "登录成功", icon: "success" })
         const pages = getCurrentPages()
         if (pages.length > 1) {
@@ -20,6 +22,7 @@ Page({
         }
       })
       .catch(() => {
+        track("mp_login_with_profile_fail")
         wx.showToast({ title: "登录失败", icon: "none" })
       })
       .finally(() => {
@@ -27,4 +30,3 @@ Page({
       })
   },
 })
-

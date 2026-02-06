@@ -1,0 +1,63 @@
+<view class="page page-factory">
+  <view class="container">
+    <view class="hero fade-up">
+      <text class="title">P7 选题库生成</text>
+      <text class="subtitle">把前置报告转成可执行的选题库</text>
+      <view class="hero-badges" style="margin-top: 16rpx;">
+        <view class="chip">TOP20</view>
+        <view class="chip">7天日历</view>
+        <view class="chip">风险标注</view>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-1">
+      <text class="section-title">前置资料</text>
+      <view class="card">
+        <text class="muted small" wx:if="{{loadingContext}}">加载中...</text>
+        <view wx:else>
+          <view class="row" wx:if="{{contextReports.length}}">
+            <text class="tag tag-success" wx:for="{{contextReports}}" wx:key="report_id">{{item.step_id}}</text>
+          </view>
+          <text class="tag" wx:if="{{!contextReports.length}}">暂无可用报告</text>
+          <text class="muted small" wx:if="{{missingRequiredLabel}}" style="margin-top: 12rpx;">{{missingRequiredLabel}}</text>
+          <text class="muted small" wx:if="{{missingOptionalLabel}}" style="margin-top: 6rpx;">{{missingOptionalLabel}}</text>
+          <button class="btn-outline" bindtap="loadContext">刷新</button>
+        </view>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-2">
+      <text class="section-title">输入信息</text>
+      <view class="card">
+        <text class="muted small">行业</text>
+        <input class="input" placeholder="例如：美业/轻医美/皮肤管理" value="{{industry}}" bindinput="onIndustryInput" />
+        <text class="muted small">卖什么</text>
+        <input class="input" placeholder="例如：祛痘项目/抗衰套餐/会员卡" value="{{offerDesc}}" bindinput="onOfferInput" />
+        <text class="muted small">卖给谁（可选）</text>
+        <input class="input" placeholder="例如：28-40岁职场女性" value="{{targetAudience}}" bindinput="onAudienceInput" />
+        <text class="muted small">口吻（可选）</text>
+        <input class="input" placeholder="例如：专业但口语化" value="{{tone}}" bindinput="onToneInput" />
+        <text class="muted small">补充（可选）</text>
+        <textarea class="input textarea" placeholder="例如：本周主推项目/活动/限制词" value="{{extra}}" bindinput="onExtraInput" />
+        <button class="btn-primary" loading="{{isGenerating}}" disabled="{{isGenerating}}" bindtap="handleGenerate">生成选题库</button>
+        <text class="muted small" wx:if="{{creditsHint}}" style="margin-top: 12rpx; display: block;">{{creditsHint}}</text>
+        <text class="muted small" wx:if="{{lastCreditsHint}}" style="margin-top: 6rpx; display: block;">{{lastCreditsHint}}</text>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-2">
+      <text class="section-title">结果</text>
+      <view class="card">
+        <textarea class="input textarea" value="{{resultContent}}" disabled="true" placeholder="生成后这里会出现完整选题库"></textarea>
+        <view class="row" style="gap: 12rpx; margin-top: 12rpx;">
+          <button class="btn-outline" size="mini" disabled="{{!resultContent}}" bindtap="handleCopy">复制</button>
+          <button class="btn-primary" size="mini" disabled="{{!resultContent}}" bindtap="handleSave">保存到素材库</button>
+        </view>
+        <view class="row" style="gap: 12rpx; margin-top: 12rpx;">
+          <button class="btn-outline" size="mini" bindtap="handleGoLibrary">打开素材库</button>
+          <button class="btn-primary" size="mini" disabled="{{!resultContent}}" bindtap="handleGoP8">用它写脚本(P8)</button>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

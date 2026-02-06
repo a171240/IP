@@ -2,51 +2,57 @@
   <view class="container">
     <view class="hero fade-up">
       <text class="title">IP 工厂</text>
-      <text class="subtitle">工作流、智能体、报告</text>
+      <text class="subtitle">P7选题库 → P8脚本 → 小红书工坊 → 素材库沉淀</text>
+      <view class="hero-actions">
+        <button class="btn-primary" bindtap="handleGoP7">生成选题(P7)</button>
+        <button class="btn-outline" bindtap="handleGoP8">写脚本(P8)</button>
+      </view>
+      <view class="hero-actions">
+        <button class="btn-outline" bindtap="handleGoXhs">去小红书工坊</button>
+        <button class="btn-outline" bindtap="handleGoLibrary">打开素材库</button>
+      </view>
     </view>
 
     <view class="section fade-up delay-1">
-      <text class="section-title">工作流阶段</text>
+      <text class="section-title">推荐流程</text>
       <view class="card">
-        <view class="row space-between">
-          <text class="card-title">阶段一 · 研究定位</text>
-          <text class="tag tag-accent">进行中</text>
-        </view>
-        <view class="divider"></view>
-        <view class="row space-between">
-          <text class="small">P1 行业目标分析</text>
-          <text class="tag">完成</text>
-        </view>
-        <view class="row space-between" style="margin-top: 12rpx;">
-          <text class="small">P2 认知深度</text>
-          <text class="tag">下一步</text>
-        </view>
-        <button class="btn-primary">进入步骤</button>
-      </view>
-    </view>
+        <view class="flow">
+          <view class="flow-item">
+            <view class="flow-index">1</view>
+            <view class="flow-body">
+              <text class="card-title">P7 选题库</text>
+              <text class="muted small">生成 TOP20 + 7天日历，沉淀到素材库。</text>
+              <button class="btn-outline" bindtap="handleGoP7">开始 P7</button>
+            </view>
+          </view>
 
-    <view class="section fade-up delay-2">
-      <text class="section-title">智能体库</text>
-      <view class="grid-2">
-        <view class="card">
-          <text class="card-title">选题生成器</text>
-          <text class="muted small">快速产出高质选题</text>
-          <button class="btn-outline">进入对话</button>
-        </view>
-        <view class="card">
-          <text class="card-title">脚本工作室</text>
-          <text class="muted small">短视频脚本一键生成</text>
-          <button class="btn-outline">进入对话</button>
-        </view>
-      </view>
-    </view>
+          <view class="flow-item">
+            <view class="flow-index">2</view>
+            <view class="flow-body">
+              <text class="card-title">P8 脚本创作</text>
+              <text class="muted small">从 P7 里挑选题，选风格智能体输出脚本。</text>
+              <button class="btn-outline" bindtap="handleGoP8">开始 P8</button>
+            </view>
+          </view>
 
-    <view class="section fade-up delay-2">
-      <text class="section-title">报告与素材</text>
-      <view class="card">
-        <text class="card-title">内容报告包</text>
-        <text class="muted small">最新导出已就绪</text>
-        <button class="btn-outline">下载</button>
+          <view class="flow-item">
+            <view class="flow-index">3</view>
+            <view class="flow-body">
+              <text class="card-title">小红书工坊</text>
+              <text class="muted small">用脚本生成文案、封面、风控与发布。</text>
+              <button class="btn-outline" bindtap="handleGoXhs">进入工坊</button>
+            </view>
+          </view>
+
+          <view class="flow-item">
+            <view class="flow-index">4</view>
+            <view class="flow-body">
+              <text class="card-title">素材库</text>
+              <text class="muted small">统一查看：选题/脚本/草稿/交付包。</text>
+              <button class="btn-outline" bindtap="handleGoLibrary">打开素材库</button>
+            </view>
+          </view>
+        </view>
       </view>
     </view>
   </view>

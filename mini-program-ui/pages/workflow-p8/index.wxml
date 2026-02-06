@@ -1,0 +1,104 @@
+<view class="page page-factory">
+  <view class="container">
+    <view class="hero fade-up">
+      <text class="title">P8 脚本创作</text>
+      <text class="subtitle">选题 → 一条可直接发布的脚本</text>
+      <view class="hero-badges" style="margin-top: 16rpx;">
+        <view class="chip">钩子</view>
+        <view class="chip">分点</view>
+        <view class="chip">置顶评论</view>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-1">
+      <text class="section-title">前置资料</text>
+      <view class="card">
+        <text class="muted small" wx:if="{{loadingContext}}">加载中...</text>
+        <view wx:else>
+          <view class="row" wx:if="{{contextReports.length}}">
+            <text class="tag tag-success" wx:for="{{contextReports}}" wx:key="report_id">{{item.step_id}}</text>
+          </view>
+          <text class="tag" wx:if="{{!contextReports.length}}">暂无可用报告</text>
+          <text class="muted small" wx:if="{{missingRequiredLabel}}" style="margin-top: 12rpx;">{{missingRequiredLabel}}</text>
+          <view class="row" style="gap: 12rpx; margin-top: 12rpx;">
+            <button class="btn-outline" size="mini" bindtap="loadContext">刷新</button>
+            <button class="btn-primary" size="mini" bindtap="handleGoP7">去生成P7</button>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-2">
+      <text class="section-title">选择风格</text>
+      <view class="card">
+        <view class="grid-2" style="margin-top: 6rpx;">
+          <view
+            wx:for="{{agents}}"
+            wx:key="id"
+            class="tag {{agentId === item.id ? 'tag-accent' : ''}}"
+            data-id="{{item.id}}"
+            bindtap="onSelectAgent"
+          >
+            {{item.label}}
+          </view>
+        </view>
+        <text class="muted small" style="margin-top: 10rpx;">提示：不同风格对应不同脚本框架，建议都试一遍。</text>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-2">
+      <text class="section-title">选题</text>
+      <view class="card">
+        <text class="muted small">从《选题库》(P7)快速选一个</text>
+        <view class="row" style="margin-top: 12rpx;" wx:if="{{topicCandidates.length}}">
+          <text
+            class="tag"
+            wx:for="{{topicCandidates}}"
+            wx:key="*this"
+            data-topic="{{item}}"
+            bindtap="handlePickTopic"
+          >
+            {{item}}
+          </text>
+        </view>
+        <text class="muted small" wx:if="{{!topicCandidates.length}}" style="margin-top: 12rpx;">暂无可提取选题，可手动填写。</text>
+
+        <text class="muted small" style="margin-top: 16rpx;">选题（必填）</text>
+        <input class="input" placeholder="例如：为什么你做抗衰一直没效果？" value="{{topic}}" bindinput="onTopicInput" />
+
+        <text class="muted small">行业（可选）</text>
+        <input class="input" placeholder="例如：美业/轻医美/皮肤管理" value="{{industry}}" bindinput="onIndustryInput" />
+        <text class="muted small">卖什么（可选）</text>
+        <input class="input" placeholder="例如：祛痘项目/抗衰套餐/会员卡" value="{{offerDesc}}" bindinput="onOfferInput" />
+        <text class="muted small">卖给谁（可选）</text>
+        <input class="input" placeholder="例如：28-40岁职场女性" value="{{targetAudience}}" bindinput="onAudienceInput" />
+        <text class="muted small">口吻（可选）</text>
+        <input class="input" placeholder="例如：专业但口语化" value="{{tone}}" bindinput="onToneInput" />
+        <text class="muted small">补充（可选）</text>
+        <textarea class="input textarea" placeholder="例如：活动/价格区间/禁用词" value="{{extra}}" bindinput="onExtraInput" />
+
+        <button class="btn-primary" loading="{{isGenerating}}" disabled="{{isGenerating}}" bindtap="handleGenerate">生成脚本</button>
+        <text class="muted small" wx:if="{{creditsHint}}" style="margin-top: 12rpx; display: block;">{{creditsHint}}</text>
+        <text class="muted small" wx:if="{{lastCreditsHint}}" style="margin-top: 6rpx; display: block;">{{lastCreditsHint}}</text>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-2">
+      <text class="section-title">结果</text>
+      <view class="card">
+        <textarea class="input textarea" value="{{resultContent}}" disabled="true" placeholder="生成后这里会出现完整脚本"></textarea>
+        <view class="row" style="gap: 12rpx; margin-top: 12rpx;">
+          <button class="btn-outline" size="mini" disabled="{{!resultContent}}" bindtap="handleCopy">复制</button>
+          <button class="btn-primary" size="mini" disabled="{{!resultContent}}" bindtap="handleSave">保存到素材库</button>
+        </view>
+        <view class="row" style="gap: 12rpx; margin-top: 12rpx;">
+          <button class="btn-primary" size="mini" disabled="{{!resultContent}}" bindtap="handleConvertToXhsDraft">转为小红书草稿</button>
+        </view>
+        <view class="row" style="gap: 12rpx; margin-top: 12rpx;">
+          <button class="btn-outline" size="mini" bindtap="handleGoLibrary">打开素材库</button>
+          <button class="btn-primary" size="mini" bindtap="handleGoXhs">去小红书工坊</button>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

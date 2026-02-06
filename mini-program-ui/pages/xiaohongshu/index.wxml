@@ -3,6 +3,9 @@
     <view class="hero fade-up">
       <text class="title">小红书工坊</text>
       <text class="subtitle">文案、封面、发布</text>
+      <view style="margin-top: 18rpx;">
+        <button class="btn-outline" size="mini" bindtap="handleOpenDrafts">草稿库</button>
+      </view>
     </view>
 
     <view class="section fade-up delay-1">

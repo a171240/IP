@@ -1,32 +1,63 @@
-const { XHS_BASE_URL } = require("../../utils/config")
+﻿const { IP_FACTORY_BASE_URL } = require("../../utils/config")
 const { request, requestText } = require("../../utils/request")
 
+function toAbsoluteUrl(url) {
+  const v = String(url || "").trim()
+  if (!v) return ""
+  if (v.startsWith("http://") || v.startsWith("https://")) return v
+  if (v.startsWith("/")) return `${IP_FACTORY_BASE_URL}${v}`
+  return v
+}
 function parseSsePayload(rawText) {
   if (!rawText || typeof rawText !== "string") return null
 
   const lines = rawText.split("\n")
   let lastEvent = null
 
-  lines.forEach((line) => {
+  for (const line of lines) {
     const trimmed = line.trim()
-    if (!trimmed.startsWith("data:")) return
+    if (!trimmed.startsWith("data:")) continue
 
     const payload = trimmed.replace(/^data:\s*/, "")
-    if (!payload || payload === "[DONE]") return
+    if (!payload || payload === "[DONE]") continue
 
     try {
-      const parsed = JSON.parse(payload)
-      lastEvent = parsed
-    } catch (error) {
-      // Ignore partial JSON chunks
+      lastEvent = JSON.parse(payload)
+    } catch (_) {
+      // Ignore partial JSON chunks.
     }
-  })
+  }
 
   return lastEvent
 }
 
+function isBillingError(err) {
+  const code = err?.data?.code || err?.code
+  return code === "insufficient_credits" || code === "plan_required"
+}
+
+function handleBillingError(err) {
+  if (!isBillingError(err)) return false
+
+  const message = err?.message || err?.data?.error || "需要升级套餐或购买积分才能继续使用。"
+  wx.showModal({
+    title: "需要升级/积分",
+    content: message,
+    confirmText: "去购买",
+    cancelText: "取消",
+    success(res) {
+      if (res.confirm) {
+        wx.navigateTo({ url: "/pages/pay/index" })
+      }
+    },
+  })
+
+  return true
+}
+
 Page({
   data: {
+    draftId: "",
     contentTypes: [
       { id: "treatment", label: "攻略" },
       { id: "education", label: "科普" },
@@ -50,6 +81,84 @@ Page({
     publishResult: null,
   },
 
+  onLoad(query) {
+    const draftId = (query && (query.draftId || query.draft_id)) ? String(query.draftId || query.draft_id).trim() : ""
+    if (draftId) {
+      this.loadDraft(draftId)
+    }
+  },
+
+  async loadDraft(draftId) {
+    try {
+      const res = await request({
+        baseUrl: IP_FACTORY_BASE_URL,
+        url: `/api/mp/xhs/drafts/${encodeURIComponent(draftId)}`,
+      })
+
+      if (!res?.ok || !res?.draft) {
+        throw new Error(res?.error || "加载草稿失败")
+      }
+
+      const d = res.draft || {}
+      const tags = Array.isArray(d.tags) ? d.tags : []
+
+      const riskLevel = d.danger_risk_level
+      const dangerCount = Number(d.danger_count || 0)
+
+      let dangerStatusText = "未检测"
+      let dangerStatusClass = ""
+
+      if (riskLevel === "high" || riskLevel === "critical") {
+        dangerStatusText = `高风险 ${dangerCount} 处`
+        dangerStatusClass = ""
+      } else if (riskLevel === "medium") {
+        dangerStatusText = `需优化 ${dangerCount} 处`
+        dangerStatusClass = "tag-accent"
+      } else if (riskLevel) {
+        dangerStatusText = "风控通过"
+        dangerStatusClass = "tag-success"
+      }
+
+      const coverImageUrl = d.cover_url ? toAbsoluteUrl(d.cover_url) : ""
+
+      let publishResult = null
+      if (d.publish_url || d.qr_url || d.status === "published") {
+        publishResult = {
+          publishUrl: d.publish_url || "",
+          qrImageUrl: d.qr_url ? toAbsoluteUrl(d.qr_url) : "",
+        }
+      }
+
+      this.setData({
+        draftId: d.id || draftId,
+        contentType: d.content_type || this.data.contentType,
+        topic: d.topic || "",
+        keywords: d.keywords || "",
+        shopName: d.shop_name || "",
+        resultTitle: d.result_title || "",
+        resultContent: d.result_content || "",
+        coverTitle: d.cover_title || "",
+        resultTags: tags,
+        dangerStatusText,
+        dangerStatusClass,
+        coverImageUrl,
+        publishResult,
+      })
+
+      // For drafts created from other sources (e.g. P8 script conversion), auto run danger-check once.
+      if (d.result_content && !riskLevel) {
+        this.setData({ dangerStatusText: "检测中...", dangerStatusClass: "" })
+        await this.handleDangerCheck(d.result_content)
+      }
+    } catch (error) {
+      wx.showToast({ title: error.message || "加载失败", icon: "none" })
+    }
+  },
+
+  handleOpenDrafts() {
+    wx.navigateTo({ url: "/pages/xhs-drafts/index" })
+  },
+
   onSelectType(e) {
     this.setData({ contentType: e.currentTarget.dataset.type })
   },
@@ -68,6 +177,7 @@ Page({
 
   async handleGenerate() {
     const { topic, keywords, shopName, contentType } = this.data
+
     if (!topic.trim()) {
       wx.showToast({ title: "请先填写主题", icon: "none" })
       return
@@ -75,6 +185,7 @@ Page({
 
     this.setData({
       isGenerating: true,
+      draftId: "",
       resultTitle: "",
       resultContent: "",
       coverTitle: "",
@@ -86,30 +197,47 @@ Page({
     })
 
     try {
+      const draft = await request({
+        baseUrl: IP_FACTORY_BASE_URL,
+        url: "/api/mp/xhs/drafts",
+        method: "POST",
+        data: {
+          contentType,
+          topic: topic.trim(),
+          keywords: keywords.trim(),
+          shopName: shopName.trim(),
+          source: "mp",
+        },
+      })
+
+      if (!draft?.ok || !draft?.draft?.id) {
+        throw new Error(draft?.error || "创建草稿失败")
+      }
+
+      const draftId = draft.draft.id
+      this.setData({ draftId })
+
       const payload = {
         topic: topic.trim(),
         keywords: keywords.trim(),
         shopName: shopName.trim(),
         contentType,
+        draft_id: draftId,
       }
 
       const raw = await requestText({
-        baseUrl: XHS_BASE_URL,
-        url: "/api/rewrite-premium",
+        baseUrl: IP_FACTORY_BASE_URL,
+        url: "/api/xhs/rewrite-premium",
         method: "POST",
         data: payload,
       })
 
-      let result = null
-      if (typeof raw === "string") {
-        const parsed = parseSsePayload(raw)
-        if (parsed?.step === "error") {
-          throw new Error(parsed.error || "生成失败")
-        }
-        result = parsed?.data || parsed
-      } else {
-        result = raw?.data || raw
+      const parsed = typeof raw === "string" ? parseSsePayload(raw) : raw
+      if (parsed?.step === "error") {
+        throw new Error(parsed.error || "生成失败")
       }
+
+      const result = parsed?.data || parsed
       if (!result?.content) {
         throw new Error("未获取到文案结果")
       }
@@ -124,6 +252,8 @@ Page({
       await this.handleDangerCheck(result.content)
       wx.showToast({ title: "文案已生成", icon: "success" })
     } catch (error) {
+      if (handleBillingError(error)) return
+
       this.setData({
         dangerStatusText: "未检测",
         dangerStatusClass: "",
@@ -138,11 +268,12 @@ Page({
     if (!content) return
 
     try {
+      const { draftId } = this.data
       const result = await request({
-        baseUrl: XHS_BASE_URL,
-        url: "/api/content/danger-check",
+        baseUrl: IP_FACTORY_BASE_URL,
+        url: "/api/xhs/content/danger-check",
         method: "POST",
-        data: { content },
+        data: { content, ...(draftId ? { draft_id: draftId } : {}) },
       })
 
       if (result?.success === false) {
@@ -167,7 +298,7 @@ Page({
         dangerStatusText: statusText,
         dangerStatusClass: statusClass,
       })
-    } catch (error) {
+    } catch (_) {
       this.setData({
         dangerStatusText: "检测失败",
         dangerStatusClass: "",
@@ -176,7 +307,8 @@ Page({
   },
 
   async handleGenerateCover() {
-    const { resultContent, contentType, coverTitle, resultTitle, resultTags } = this.data
+    const { resultContent, contentType, coverTitle, resultTitle, resultTags, draftId } = this.data
+
     if (!resultContent) {
       wx.showToast({ title: "请先生成文案", icon: "none" })
       return
@@ -186,12 +318,13 @@ Page({
 
     try {
       const response = await request({
-        baseUrl: XHS_BASE_URL,
-        url: "/api/generate-cover-image",
+        baseUrl: IP_FACTORY_BASE_URL,
+        url: "/api/xhs/generate-cover-image",
         method: "POST",
         data: {
           content: resultContent,
           contentType,
+          ...(draftId ? { draft_id: draftId } : {}),
           preExtracted: {
             title: coverTitle || resultTitle,
             keywords: resultTags,
@@ -208,9 +341,10 @@ Page({
         throw new Error("封面生成失败")
       }
 
-      this.setData({ coverImageUrl: imageUrl })
+      this.setData({ coverImageUrl: toAbsoluteUrl(imageUrl) })
       wx.showToast({ title: "封面已生成", icon: "success" })
     } catch (error) {
+      if (handleBillingError(error)) return
       wx.showToast({ title: error.message || "封面生成失败", icon: "none" })
     } finally {
       this.setData({ isCoverLoading: false })
@@ -230,7 +364,8 @@ Page({
   },
 
   async handlePublish() {
-    const { resultTitle, resultContent, coverImageUrl, resultTags } = this.data
+    const { resultTitle, resultContent, coverImageUrl, resultTags, draftId } = this.data
+
     if (!resultContent || !coverImageUrl) {
       wx.showToast({ title: "请先生成文案与封面", icon: "none" })
       return
@@ -240,14 +375,15 @@ Page({
 
     try {
       const response = await request({
-        baseUrl: XHS_BASE_URL,
-        url: "/api/publish-note",
+        baseUrl: IP_FACTORY_BASE_URL,
+        url: "/api/xhs/publish-note",
         method: "POST",
         data: {
           title: resultTitle,
           content: resultContent,
           coverImageUrl,
           tags: resultTags || [],
+          ...(draftId ? { draft_id: draftId } : {}),
         },
       })
 
@@ -255,12 +391,16 @@ Page({
         throw new Error(response?.error || "发布失败")
       }
 
-      this.setData({ publishResult: response.data || null })
+      const data = response.data ? { ...response.data } : null
+      if (data && data.qrImageUrl) data.qrImageUrl = toAbsoluteUrl(data.qrImageUrl)
+      this.setData({ publishResult: data })
       wx.showToast({ title: "发布成功", icon: "success" })
     } catch (error) {
+      if (handleBillingError(error)) return
       wx.showToast({ title: error.message || "发布失败", icon: "none" })
     } finally {
       this.setData({ isPublishing: false })
     }
   },
 })
+
