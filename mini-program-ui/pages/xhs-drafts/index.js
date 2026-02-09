@@ -94,11 +94,13 @@ Page({
     if (!draftId) return
     const draft = (this.data.drafts || []).find((d) => d.id === draftId) || null
     track("xhs_draft_open", { draftId, status: draft ? draft.status : null })
-    wx.navigateTo({ url: `/pages/xiaohongshu/index?draftId=${encodeURIComponent(draftId)}` })
+    // xiaohongshu is a tab page, cannot navigateTo with query params.
+    wx.setStorageSync("xhs_pending_draft_id", String(draftId))
+    wx.switchTab({ url: "/pages/xiaohongshu/index" })
   },
 
   handleGoWorkshop() {
-    wx.navigateTo({ url: "/pages/xiaohongshu/index" })
+    wx.switchTab({ url: "/pages/xiaohongshu/index" })
   },
 
   async handleCopyContent(e) {

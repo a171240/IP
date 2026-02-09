@@ -91,6 +91,14 @@ Page({
     wx.navigateTo({ url: "/pages/order/index" })
   },
 
+  handleStoreProfiles() {
+    wx.navigateTo({ url: "/pages/store-profiles/index" })
+  },
+
+  handleAdvanced() {
+    wx.navigateTo({ url: "/pages/workflow/index" })
+  },
+
   handleLoginTap() {
     wx.navigateTo({ url: "/pages/login/index" })
   },

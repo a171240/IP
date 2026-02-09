@@ -47,6 +47,12 @@ create index if not exists xhs_drafts_user_created_at_idx
 
 alter table public.xhs_drafts enable row level security;
 
+-- Re-runnable: if you pasted this SQL before, policies may already exist.
+drop policy if exists "xhs_drafts_select_own" on public.xhs_drafts;
+drop policy if exists "xhs_drafts_insert_own" on public.xhs_drafts;
+drop policy if exists "xhs_drafts_update_own" on public.xhs_drafts;
+drop policy if exists "xhs_drafts_service_role_all" on public.xhs_drafts;
+
 create policy "xhs_drafts_select_own"
   on public.xhs_drafts
   for select

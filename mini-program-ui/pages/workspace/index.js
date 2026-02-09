@@ -3,6 +3,7 @@ const { request } = require("../../utils/request")
 const { getAccessToken } = require("../../utils/auth")
 const { getDeviceId } = require("../../utils/device")
 const { track } = require("../../utils/track")
+const { openXhsCompose, openXhsDrafts } = require("../../utils/nav")
 
 function formatMoneyFen(fen) {
   const n = Number(fen || 0)
@@ -95,12 +96,17 @@ Page({
 
   handleGoXhs() {
     track("workspace_go_xhs")
-    wx.navigateTo({ url: "/pages/xiaohongshu/index" })
+    openXhsCompose()
   },
 
   handleGoIpFactory() {
     track("workspace_go_ip_factory")
     wx.navigateTo({ url: "/pages/ip-factory/index" })
+  },
+
+  handleGoWorkflow() {
+    track("workspace_go_workflow")
+    wx.navigateTo({ url: "/pages/workflow/index" })
   },
 
   handleGoLibrary() {
@@ -110,7 +116,7 @@ Page({
 
   handleGoDrafts() {
     track("workspace_go_drafts")
-    wx.navigateTo({ url: "/pages/xhs-drafts/index" })
+    openXhsDrafts()
   },
 
   handleOpenDraft(e) {
@@ -120,7 +126,7 @@ Page({
       return
     }
 
-    wx.navigateTo({ url: `/pages/xiaohongshu/index?draftId=${encodeURIComponent(draftId)}` })
+    openXhsCompose(draftId)
   },
 
   handleGoDiagnosis() {

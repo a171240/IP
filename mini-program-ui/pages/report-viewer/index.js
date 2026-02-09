@@ -1,6 +1,7 @@
 const { IP_FACTORY_BASE_URL } = require("../../utils/config")
 const { request } = require("../../utils/request")
 const { track } = require("../../utils/track")
+const { openXhsCompose } = require("../../utils/nav")
 
 function formatTime(value) {
   const iso = String(value || "").trim()
@@ -72,7 +73,6 @@ Page({
   },
 
   handleGoXhs() {
-    wx.navigateTo({ url: "/pages/xiaohongshu/index" })
+    openXhsCompose()
   },
 })
-

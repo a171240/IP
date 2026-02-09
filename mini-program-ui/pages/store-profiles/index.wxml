@@ -1,0 +1,44 @@
+<view class="page page-xhs">
+  <view class="container">
+    <view class="hero fade-up">
+      <text class="title">门店档案</text>
+      <text class="subtitle">一次配置，反复复用</text>
+      <view style="margin-top: 18rpx;">
+        <button class="btn-primary" size="mini" bindtap="handleCreate">新建档案</button>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-1">
+      <text class="section-title">我的档案</text>
+
+      <view wx:if="{{loading}}" class="card">
+        <text class="muted small">加载中...</text>
+      </view>
+
+      <view wx:if="{{!loading && !profiles.length}}" class="card">
+        <text class="muted small">暂无门店档案。建议先建一个，后续发文会更稳。</text>
+        <button class="btn-primary" bindtap="handleCreate">去新建</button>
+      </view>
+
+      <view
+        wx:for="{{profiles}}"
+        wx:key="id"
+        class="card"
+        style="margin-top: 16rpx;"
+      >
+        <view class="row space-between">
+          <text class="card-title">{{item.name}}</text>
+          <text class="tag tag-accent" wx:if="{{item.placeLabel}}">{{item.placeLabel}}</text>
+        </view>
+        <text class="muted small" wx:if="{{item.metaLabel}}" style="margin-top: 8rpx; display: block;">
+          {{item.metaLabel}}
+        </text>
+        <view class="row" style="margin-top: 12rpx;">
+          <button class="btn-primary" size="mini" data-id="{{item.id}}" catchtap="handleUse">选用</button>
+          <button class="btn-outline" size="mini" data-id="{{item.id}}" catchtap="handleEdit" style="margin-left: 12rpx;">编辑</button>
+          <button class="btn-outline" size="mini" data-id="{{item.id}}" catchtap="handleDelete" style="margin-left: 12rpx;">删除</button>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

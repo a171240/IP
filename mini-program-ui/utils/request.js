@@ -42,6 +42,12 @@ function extractErrorMessage(data, fallback) {
   if (typeof data === "string") {
     const trimmed = data.trim()
     if (trimmed) {
+      const lower = trimmed.slice(0, 64).toLowerCase()
+      // If the backend returns a Next.js/HTML error page (404/500/WAF), do not show raw HTML in toasts.
+      if (lower.startsWith("<!doctype html") || lower.startsWith("<html")) {
+        return fallback
+      }
+
       try {
         const parsed = JSON.parse(trimmed)
         if (parsed && typeof parsed === "object") {
@@ -56,6 +62,14 @@ function extractErrorMessage(data, fallback) {
   }
 
   return fallback
+}
+
+function looksLikeHtml(data) {
+  if (typeof data !== "string") return false
+  const trimmed = data.trim()
+  if (!trimmed) return false
+  const lower = trimmed.slice(0, 64).toLowerCase()
+  return lower.startsWith("<!doctype html") || lower.startsWith("<html")
 }
 
 function normalizeTextResponseData(data) {
@@ -99,9 +113,15 @@ function request(opts) {
           }
         }
 
+        const isHtml = looksLikeHtml(res.data)
+        const fallback =
+          res.statusCode === 404 && isHtml
+            ? "接口不存在（后端未部署最新版），请更新后端后重试"
+            : res.errMsg || "Request failed"
+
         reject({
           statusCode: res.statusCode,
-          message: extractErrorMessage(res.data, res.errMsg || "Request failed"),
+          message: extractErrorMessage(res.data, fallback),
           data: res.data,
         })
       },
@@ -143,9 +163,15 @@ function requestText(opts) {
           }
         }
 
+        const isHtml = looksLikeHtml(res.data)
+        const fallback =
+          res.statusCode === 404 && isHtml
+            ? "接口不存在（后端未部署最新版），请更新后端后重试"
+            : res.errMsg || "Request failed"
+
         reject({
           statusCode: res.statusCode,
-          message: extractErrorMessage(normalizedData, res.errMsg || "Request failed"),
+          message: extractErrorMessage(normalizedData, fallback),
           data: normalizedData,
         })
       },
@@ -187,9 +213,15 @@ function requestTextWithMeta(opts) {
           }
         }
 
+        const isHtml = looksLikeHtml(res.data)
+        const fallback =
+          res.statusCode === 404 && isHtml
+            ? "接口不存在（后端未部署最新版），请更新后端后重试"
+            : res.errMsg || "Request failed"
+
         reject({
           statusCode: res.statusCode,
-          message: extractErrorMessage(normalizedData, res.errMsg || "Request failed"),
+          message: extractErrorMessage(normalizedData, fallback),
           data: normalizedData,
           headers: res.header || {},
         })

@@ -35,7 +35,7 @@
       <text class="section-title">搜索与筛选</text>
       <view class="card">
         <input class="input" placeholder="搜索选题/脚本/草稿/交付包" value="{{query}}" bindinput="onQueryInput" />
-        <view class="row" style="gap: 12rpx; margin-top: 12rpx;">
+        <view class="row" style="margin-top: 12rpx;">
           <view class="tag {{filter === 'all' ? 'tag-accent' : ''}}" data-filter="all" bindtap="onSelectFilter">全部</view>
           <view class="tag {{filter === 'topic' ? 'tag-accent' : ''}}" data-filter="topic" bindtap="onSelectFilter">选题</view>
           <view class="tag {{filter === 'script' ? 'tag-accent' : ''}}" data-filter="script" bindtap="onSelectFilter">脚本</view>
@@ -67,7 +67,7 @@
 
         <image wx:if="{{item.coverAbs}}" src="{{item.coverAbs}}" mode="widthFix" class="cover-image" />
 
-        <view class="row" style="gap: 12rpx; margin-top: 12rpx;">
+        <view class="row" style="margin-top: 12rpx;">
           <button
             class="btn-outline"
             size="mini"

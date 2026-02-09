@@ -3,6 +3,7 @@ const { request, requestTextWithMeta } = require("../../utils/request")
 const { parseChatSse } = require("../../utils/sse")
 const { track } = require("../../utils/track")
 const { estimateWorkflowCreditsCost, parseCreditsFromHeaders, normalizePlan } = require("../../utils/credits")
+const { openXhsCompose } = require("../../utils/nav")
 
 const AGENTS = [
   { id: "deep-resonance", label: "深度共鸣" },
@@ -498,7 +499,7 @@ Page({
         track("workflow_p8_convert_to_xhs_success", { draftId, reportId: reportId || null })
 
         wx.hideLoading()
-        wx.navigateTo({ url: `/pages/xiaohongshu/index?draftId=${encodeURIComponent(draftId)}` })
+        openXhsCompose(draftId)
       } catch (error) {
         wx.hideLoading()
         track("workflow_p8_convert_to_xhs_fail", { message: error.message || "failed" })
@@ -526,7 +527,30 @@ Page({
     wx.navigateTo({ url: "/pages/library/index" })
   },
 
+  async handleGoP9() {
+    const content = String(this.data.resultContent || "")
+    if (!content.trim()) return
+
+    wx.showLoading({ title: "准备中" })
+    try {
+      // Ensure the latest script is saved so P9 can load it as context.
+      const reportId = await this.ensureSavedReportId()
+      if (!reportId) {
+        wx.hideLoading()
+        wx.showToast({ title: "请先保存脚本到素材库", icon: "none" })
+        return
+      }
+
+      track("workflow_p8_go_p9", { reportId })
+      wx.hideLoading()
+      wx.navigateTo({ url: "/pages/workflow-p9/index" })
+    } catch (error) {
+      wx.hideLoading()
+      wx.showToast({ title: error.message || "跳转失败", icon: "none" })
+    }
+  },
+
   handleGoXhs() {
-    wx.navigateTo({ url: "/pages/xiaohongshu/index" })
+    openXhsCompose()
   },
 })

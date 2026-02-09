@@ -1,15 +1,27 @@
 {
     "pages":  [
-                  "pages/home/index",
-                  "pages/workspace/index",
-                  "pages/ip-factory/index",
                   "pages/xiaohongshu/index",
                   "pages/xhs-drafts/index",
+                  "pages/mine/index",
+                  "pages/store-profiles/index",
+                  "pages/store-profile-editor/index",
+
+                  "pages/home/index",
+                  "pages/workspace/index",
+                  "pages/workflow/index",
+                  "pages/ip-factory/index",
+                  "pages/workflow-p1/index",
+                  "pages/workflow-p2/index",
+                  "pages/workflow-p3/index",
+                  "pages/workflow-p4/index",
+                  "pages/workflow-p5/index",
+                  "pages/workflow-p6/index",
                   "pages/workflow-p7/index",
                   "pages/workflow-p8/index",
+                  "pages/workflow-p9/index",
+                  "pages/workflow-p10/index",
                   "pages/library/index",
                   "pages/report-viewer/index",
-                  "pages/mine/index",
                   "pages/login/index",
                   "pages/diagnosis/index",
                   "pages/diagnosis-quiz/index",
@@ -35,14 +47,14 @@
                    "borderStyle":  "black",
                    "list":  [
                                 {
-                                    "pagePath":  "pages/home/index",
-                                    "text":  "首页",
-                                    "iconPath":  "assets/tabbar/home.png",
-                                    "selectedIconPath":  "assets/tabbar/home-active.png"
+                                    "pagePath":  "pages/xiaohongshu/index",
+                                    "text":  "发文",
+                                    "iconPath":  "assets/tabbar/xhs.png",
+                                    "selectedIconPath":  "assets/tabbar/xhs-active.png"
                                 },
                                 {
-                                    "pagePath":  "pages/workspace/index",
-                                    "text":  "工作台",
+                                    "pagePath":  "pages/xhs-drafts/index",
+                                    "text":  "草稿",
                                     "iconPath":  "assets/tabbar/workspace.png",
                                     "selectedIconPath":  "assets/tabbar/workspace-active.png"
                                 },

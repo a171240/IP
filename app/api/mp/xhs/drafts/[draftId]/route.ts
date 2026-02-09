@@ -22,9 +22,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const { data, error } = await supabase
     .from("xhs_drafts")
-    .select(
-      "id, created_at, updated_at, status, content_type, topic, keywords, shop_name, result_title, result_content, cover_title, tags, danger_risk_level, danger_count, cover_storage_path, publish_qr_url, publish_qr_storage_path, publish_url, published_at"
-    )
+    .select("*")
     .eq("id", id)
     .eq("user_id", user.id)
     .maybeSingle()
@@ -42,4 +40,3 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   return NextResponse.json({ ok: true, draft: { ...data, cover_url: coverUrl, qr_url: qrUrl } })
 }
-

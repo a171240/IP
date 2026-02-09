@@ -4,6 +4,7 @@ const { getAccessToken } = require("../../utils/auth")
 const { getDeviceId } = require("../../utils/device")
 const { track } = require("../../utils/track")
 const { normalizePlan } = require("../../utils/credits")
+const { openXhsCompose } = require("../../utils/nav")
 
 function shortId(value) {
   const s = String(value || "")
@@ -400,7 +401,7 @@ Page({
     const draftId = e.currentTarget.dataset.id
     if (!draftId) return
     track("library_open_draft", { draftId })
-    wx.navigateTo({ url: `/pages/xiaohongshu/index?draftId=${encodeURIComponent(draftId)}` })
+    openXhsCompose(draftId)
   },
 
   handleCopyUrl(e) {
@@ -459,7 +460,7 @@ Page({
 
       // Reload to update "已转草稿/已发布" tags, then jump into workshop.
       await this.loadLibrary()
-      wx.navigateTo({ url: `/pages/xiaohongshu/index?draftId=${encodeURIComponent(draftId)}` })
+      openXhsCompose(draftId)
     } catch (error) {
       wx.hideLoading()
       wx.showToast({ title: error.message || "创建草稿失败", icon: "none" })

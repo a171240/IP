@@ -70,15 +70,20 @@ Page({
       { id: "comparison", label: "对比" },
     ],
     contentType: "treatment",
+    conflictLevel: "standard",
     topic: "",
     keywords: "",
     shopName: "",
+    storeProfileId: "",
+    storeProfileLabel: "未设置（建议补齐）",
     isGenerating: false,
     isCoverLoading: false,
     isPublishing: false,
     resultTitle: "",
     resultContent: "",
     coverTitle: "",
+    coverPrompt: "",
+    pinnedComment: "",
     resultTags: [],
     dangerStatusText: "未检测",
     dangerStatusClass: "",
@@ -92,8 +97,25 @@ Page({
 
   onLoad(query) {
     const draftId = (query && (query.draftId || query.draft_id)) ? String(query.draftId || query.draft_id).trim() : ""
-    if (draftId) {
-      this.loadDraft(draftId)
+    if (draftId) this.loadDraft(draftId)
+  },
+
+  onShow() {
+    // Allow opening draft from tab page via storage (switchTab can't pass query).
+    const pending = String(wx.getStorageSync("xhs_pending_draft_id") || "").trim()
+    if (pending) {
+      wx.removeStorageSync("xhs_pending_draft_id")
+      this.loadDraft(pending)
+    }
+
+    // Refresh store profile label if set.
+    const spid = String(wx.getStorageSync("xhs_store_profile_id") || "").trim()
+    const splabel = String(wx.getStorageSync("xhs_store_profile_label") || "").trim()
+    if (spid) {
+      this.setData({
+        storeProfileId: spid,
+        storeProfileLabel: splabel || "已选择门店档案",
+      })
     }
   },
 
@@ -141,12 +163,15 @@ Page({
       this.setData({
         draftId: d.id || draftId,
         contentType: d.content_type || this.data.contentType,
+        conflictLevel: d.conflict_level || this.data.conflictLevel,
         topic: d.topic || "",
         keywords: d.keywords || "",
         shopName: d.shop_name || "",
         resultTitle: d.result_title || "",
         resultContent: d.result_content || "",
         coverTitle: d.cover_title || "",
+        pinnedComment: d.pinned_comment || "",
+        coverPrompt: d.cover_prompt || "",
         resultTags: tags,
         dangerStatusText,
         dangerStatusClass,
@@ -165,11 +190,17 @@ Page({
   },
 
   handleOpenDrafts() {
-    wx.navigateTo({ url: "/pages/xhs-drafts/index" })
+    wx.switchTab({ url: "/pages/xhs-drafts/index" })
   },
 
   onSelectType(e) {
     this.setData({ contentType: e.currentTarget.dataset.type })
+  },
+
+  onSelectConflict(e) {
+    const level = String(e.currentTarget.dataset.level || "").trim()
+    if (!level) return
+    this.setData({ conflictLevel: level })
   },
 
   onTopicInput(e) {
@@ -180,12 +211,12 @@ Page({
     this.setData({ keywords: e.detail.value })
   },
 
-  onShopInput(e) {
-    this.setData({ shopName: e.detail.value })
+  handleOpenStoreProfiles() {
+    wx.navigateTo({ url: "/pages/store-profiles/index" })
   },
 
   async handleGenerate() {
-    const { topic, keywords, shopName, contentType } = this.data
+    const { topic, keywords, contentType, conflictLevel, storeProfileId } = this.data
 
     if (!topic.trim()) {
       wx.showToast({ title: "请先填写主题", icon: "none" })
@@ -194,10 +225,12 @@ Page({
 
     this.setData({
       isGenerating: true,
-      draftId: "",
+      // keep draftId if editing an existing draft; otherwise server will create.
       resultTitle: "",
       resultContent: "",
       coverTitle: "",
+      pinnedComment: "",
+      coverPrompt: "",
       resultTags: [],
       dangerStatusText: "检测中...",
       dangerStatusClass: "",
@@ -206,60 +239,70 @@ Page({
     })
 
     try {
-      const draft = await request({
-        baseUrl: IP_FACTORY_BASE_URL,
-        url: "/api/mp/xhs/drafts",
-        method: "POST",
-        data: {
-          contentType,
-          topic: topic.trim(),
-          keywords: keywords.trim(),
-          shopName: shopName.trim(),
-          source: "mp",
-        },
-      })
-
-      if (!draft?.ok || !draft?.draft?.id) {
-        throw new Error(draft?.error || "创建草稿失败")
-      }
-
-      const draftId = draft.draft.id
-      this.setData({ draftId })
-
       const payload = {
+        draft_id: this.data.draftId ? this.data.draftId : undefined,
+        contentType,
         topic: topic.trim(),
         keywords: keywords.trim(),
-        shopName: shopName.trim(),
-        contentType,
-        draft_id: draftId,
+        conflictLevel,
+        store_profile_id: storeProfileId ? storeProfileId : undefined,
       }
 
-      const raw = await requestText({
+      const res = await request({
         baseUrl: IP_FACTORY_BASE_URL,
-        url: "/api/xhs/rewrite-premium",
+        url: "/api/mp/xhs/generate-v4",
         method: "POST",
         data: payload,
       })
 
-      const parsed = typeof raw === "string" ? parseSsePayload(raw) : raw
-      if (parsed?.step === "error") {
-        throw new Error(parsed.error || "生成失败")
+      if (!res?.ok || !res?.draft?.id || !res?.result) {
+        throw new Error(res?.error || "生成失败")
       }
 
-      const result = parsed?.data || parsed
-      if (!result?.content) {
-        throw new Error("未获取到文案结果")
-      }
+      const r = res.result
 
       this.setData({
-        resultTitle: result.title || "未命名标题",
-        resultContent: result.content || "",
-        coverTitle: result.coverTitle || "",
-        resultTags: Array.isArray(result.tags) ? result.tags : [],
+        draftId: res.draft.id,
+        resultTitle: r.title || "未命名标题",
+        resultContent: r.body || "",
+        coverTitle: (r.coverText && r.coverText.main) ? r.coverText.main : "",
+        pinnedComment: r.pinnedComment || "",
+        coverPrompt: r.coverPrompt || "",
+        resultTags: Array.isArray(r.tags) ? r.tags : [],
       })
 
-      await this.handleDangerCheck(result.content)
-      wx.showToast({ title: "文案已生成", icon: "success" })
+      const gr = res.guardrails || null
+      if (gr && gr.riskLevel) {
+        // Map to the same UI badges
+        const level = gr.riskLevel
+        const count = Number(gr.dangerCount || 0)
+        if (level === "high" || level === "critical") {
+          this.setData({ dangerStatusText: `高风险 ${count} 处`, dangerStatusClass: "" })
+        } else if (level === "medium") {
+          this.setData({ dangerStatusText: `需优化 ${count} 处`, dangerStatusClass: "tag-accent" })
+        } else {
+          this.setData({ dangerStatusText: "风控通过", dangerStatusClass: "tag-success" })
+        }
+      } else {
+        // Fallback: run danger-check if server didn't provide.
+        await this.handleDangerCheck(r.body)
+      }
+
+      wx.showToast({ title: "已生成", icon: "success" })
+
+      if (res.followup && res.followup.needProfile) {
+        wx.showModal({
+          title: "建议补齐门店档案",
+          content: "补齐后可生成更本地、更可信的“门店定制版”。",
+          confirmText: "去补齐",
+          cancelText: "暂不",
+          success: (m) => {
+            if (m.confirm) {
+              wx.navigateTo({ url: `/pages/store-profile-editor/index?draftId=${encodeURIComponent(res.draft.id)}` })
+            }
+          },
+        })
+      }
     } catch (error) {
       if (handleBillingError(error)) return
 
@@ -372,6 +415,24 @@ Page({
     })
   },
 
+  handleCopyPinned() {
+    const { pinnedComment } = this.data
+    if (!pinnedComment) return
+    wx.setClipboardData({
+      data: pinnedComment,
+      success: () => wx.showToast({ title: "已复制", icon: "success" }),
+    })
+  },
+
+  handleCopyCoverPrompt() {
+    const { coverPrompt } = this.data
+    if (!coverPrompt) return
+    wx.setClipboardData({
+      data: coverPrompt,
+      success: () => wx.showToast({ title: "已复制", icon: "success" }),
+    })
+  },
+
   async handlePublish() {
     const { resultTitle, resultContent, coverImageUrl, resultTags, draftId } = this.data
 
@@ -447,7 +508,7 @@ Page({
           cancelText: "知道了",
           success: (res) => {
             if (res.confirm) {
-              wx.navigateTo({ url: "/pages/xhs-drafts/index" })
+              wx.switchTab({ url: "/pages/xhs-drafts/index" })
             }
           },
         })

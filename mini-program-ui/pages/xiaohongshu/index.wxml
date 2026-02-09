@@ -2,7 +2,7 @@
   <view class="container">
     <view class="hero fade-up">
       <text class="title">小红书工坊</text>
-      <text class="subtitle">文案、封面、发布</text>
+      <text class="subtitle">文案、首图、发布</text>
       <view style="margin-top: 18rpx;">
         <button class="btn-outline" size="mini" bindtap="handleOpenDrafts">草稿库</button>
       </view>
@@ -27,27 +27,66 @@
         <input class="input" placeholder="输入主题或服务" value="{{topic}}" bindinput="onTopicInput" />
         <text class="muted small">关键词</text>
         <input class="input" placeholder="关键词 / 标签" value="{{keywords}}" bindinput="onKeywordsInput" />
-        <text class="muted small">门店信息</text>
-        <input class="input" placeholder="门店名称 / 区域" value="{{shopName}}" bindinput="onShopInput" />
-        <button class="btn-primary" loading="{{isGenerating}}" disabled="{{isGenerating}}" bindtap="handleGenerate">一键生成草稿</button>
+        <text class="muted small">冲突强度</text>
+        <view class="row" style="margin-top: 10rpx;">
+          <view
+            class="tag {{conflictLevel === 'safe' ? 'tag-accent' : ''}}"
+            data-level="safe"
+            bindtap="onSelectConflict"
+          >稳健</view>
+          <view
+            class="tag {{conflictLevel === 'standard' ? 'tag-accent' : ''}}"
+            data-level="standard"
+            bindtap="onSelectConflict"
+            style="margin-left: 12rpx;"
+          >标准</view>
+          <view
+            class="tag {{conflictLevel === 'hard' ? 'tag-accent' : ''}}"
+            data-level="hard"
+            bindtap="onSelectConflict"
+            style="margin-left: 12rpx;"
+          >狠</view>
+        </view>
+        <text class="muted small" style="margin-top: 16rpx;">门店档案</text>
+        <view class="row space-between" style="margin-top: 10rpx;">
+          <text class="muted small">{{storeProfileLabel}}</text>
+          <button class="btn-outline" size="mini" bindtap="handleOpenStoreProfiles">去设置</button>
+        </view>
+        <button class="btn-primary" loading="{{isGenerating}}" disabled="{{isGenerating}}" bindtap="handleGenerate">一键生成</button>
       </view>
     </view>
 
     <view class="section fade-up delay-2">
-      <text class="section-title">结果</text>
+        <text class="section-title">结果</text>
       <view class="card">
         <text class="card-title">标题：{{resultTitle ? resultTitle : "等待生成"}}</text>
         <text class="muted small" style="margin-top: 8rpx;">正文预览</text>
-        <text class="small" style="margin-top: 8rpx; line-height: 1.6;">
-          {{resultContent ? resultContent : "生成后展示完整文案"}}
-        </text>
+        <textarea
+          class="input textarea"
+          value="{{resultContent ? resultContent : ''}}"
+          disabled="true"
+          placeholder="生成后展示完整文案"
+        ></textarea>
         <view class="divider"></view>
         <view class="row space-between">
           <text class="tag {{dangerStatusClass}}">{{dangerStatusText}}</text>
           <text class="tag">{{coverImageUrl ? "封面已生成" : "封面未生成"}}</text>
         </view>
+        <view class="row" style="margin-top: 12rpx;" wx:if="{{pinnedComment}}">
+          <text class="tag tag-accent">置顶评论已生成</text>
+        </view>
         <view class="row" style="margin-top: 12rpx;" wx:if="{{resultTags.length}}">
           <text class="tag" wx:for="{{resultTags}}" wx:key="*this">{{item}}</text>
+        </view>
+        <view wx:if="{{pinnedComment}}" style="margin-top: 14rpx;">
+          <text class="muted small">置顶评论（可复制）</text>
+          <textarea class="input textarea" value="{{pinnedComment}}" disabled="true"></textarea>
+          <button class="btn-outline" bindtap="handleCopyPinned">复制置顶评论</button>
+        </view>
+        <view wx:if="{{coverPrompt}}" style="margin-top: 14rpx;">
+          <text class="muted small">首图提示词（香蕉2）</text>
+          <textarea class="input textarea" value="{{coverPrompt}}" disabled="true"></textarea>
+          <button class="btn-outline" bindtap="handleCopyCoverPrompt">复制首图提示词</button>
         </view>
         <image wx:if="{{coverImageUrl}}" src="{{coverImageUrl}}" mode="widthFix" class="cover-image" />
         <button class="btn-outline" bindtap="handleCopy" disabled="{{!resultContent}}">复制文案</button>

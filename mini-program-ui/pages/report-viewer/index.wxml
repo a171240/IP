@@ -16,7 +16,7 @@
           disabled="true"
           placeholder="无内容"
         ></textarea>
-        <view class="row" style="gap: 12rpx; margin-top: 12rpx;">
+        <view class="row" style="margin-top: 12rpx;">
           <button class="btn-outline" size="mini" disabled="{{!report}}" bindtap="handleCopy">复制</button>
           <button class="btn-primary" size="mini" bindtap="handleGoXhs">去小红书工坊</button>
         </view>
@@ -24,4 +24,3 @@
     </view>
   </view>
 </view>
-

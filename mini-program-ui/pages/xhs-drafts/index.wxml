@@ -34,7 +34,7 @@
 
         <image wx:if="{{item.coverAbs}}" src="{{item.coverAbs}}" mode="widthFix" class="cover-image" />
 
-        <view class="row" style="gap: 12rpx; margin-top: 12rpx;">
+        <view class="row" style="margin-top: 12rpx;">
           <button class="btn-outline" size="mini" data-id="{{item.id}}" catchtap="handleCopyContent">复制文案</button>
           <button class="btn-primary" size="mini" data-id="{{item.id}}" catchtap="handleOpenDraft">继续编辑</button>
         </view>
@@ -42,7 +42,7 @@
         <view wx:if="{{item.publish_url}}" style="margin-top: 12rpx;">
           <text class="muted small">发布链接</text>
           <text class="small" style="margin-top: 6rpx; display: block;">{{item.publish_url}}</text>
-          <view class="row" style="gap: 12rpx; margin-top: 10rpx;">
+          <view class="row" style="margin-top: 10rpx;">
             <button class="btn-outline" size="mini" data-url="{{item.publish_url}}" catchtap="handleCopyUrl">复制链接</button>
           </view>
           <image wx:if="{{item.qrAbs}}" src="{{item.qrAbs}}" mode="widthFix" class="cover-image" />

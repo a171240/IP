@@ -2,7 +2,10 @@
   <view class="container">
     <view class="hero fade-up">
       <text class="title">IP 工厂</text>
-      <text class="subtitle">P7选题库 → P8脚本 → 小红书工坊 → 素材库沉淀</text>
+      <text class="subtitle">P1-P10 工作流 → 小红书工坊 → 素材库沉淀</text>
+      <view class="hero-actions">
+        <button class="btn-primary" bindtap="handleGoWorkflow">进入 P1-P10 工作流</button>
+      </view>
       <view class="hero-actions">
         <button class="btn-primary" bindtap="handleGoP7">生成选题(P7)</button>
         <button class="btn-outline" bindtap="handleGoP8">写脚本(P8)</button>
