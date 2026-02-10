@@ -14,6 +14,8 @@ function formatDateLabel() {
 
 function isBillingError(err) {
   const code = err?.data?.code || err?.code
+  const status = Number(err?.statusCode || err?.status || 0)
+  if (status === 402) return true
   return code === "insufficient_credits" || code === "plan_required"
 }
 

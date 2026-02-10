@@ -33,6 +33,8 @@ function parseSsePayload(rawText) {
 
 function isBillingError(err) {
   const code = err?.data?.code || err?.code
+  const status = Number(err?.statusCode || err?.status || 0)
+  if (status === 402) return true
   return code === "insufficient_credits" || code === "plan_required"
 }
 
@@ -75,7 +77,7 @@ Page({
     keywords: "",
     shopName: "",
     storeProfileId: "",
-    storeProfileLabel: "未设置（建议补齐）",
+    storeProfileLabel: "未设置（可选）",
     isGenerating: false,
     isCoverLoading: false,
     isPublishing: false,
@@ -289,20 +291,6 @@ Page({
       }
 
       wx.showToast({ title: "已生成", icon: "success" })
-
-      if (res.followup && res.followup.needProfile) {
-        wx.showModal({
-          title: "建议补齐门店档案",
-          content: "补齐后可生成更本地、更可信的“门店定制版”。",
-          confirmText: "去补齐",
-          cancelText: "暂不",
-          success: (m) => {
-            if (m.confirm) {
-              wx.navigateTo({ url: `/pages/store-profile-editor/index?draftId=${encodeURIComponent(res.draft.id)}` })
-            }
-          },
-        })
-      }
     } catch (error) {
       if (handleBillingError(error)) return
 

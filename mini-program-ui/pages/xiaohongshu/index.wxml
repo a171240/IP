@@ -64,6 +64,8 @@
         <textarea
           class="input textarea"
           value="{{resultContent ? resultContent : ''}}"
+          maxlength="-1"
+          auto-height="true"
           disabled="true"
           placeholder="生成后展示完整文案"
         ></textarea>
@@ -80,12 +82,12 @@
         </view>
         <view wx:if="{{pinnedComment}}" style="margin-top: 14rpx;">
           <text class="muted small">置顶评论（可复制）</text>
-          <textarea class="input textarea" value="{{pinnedComment}}" disabled="true"></textarea>
+          <textarea class="input textarea" value="{{pinnedComment}}" maxlength="-1" auto-height="true" disabled="true"></textarea>
           <button class="btn-outline" bindtap="handleCopyPinned">复制置顶评论</button>
         </view>
         <view wx:if="{{coverPrompt}}" style="margin-top: 14rpx;">
           <text class="muted small">首图提示词（香蕉2）</text>
-          <textarea class="input textarea" value="{{coverPrompt}}" disabled="true"></textarea>
+          <textarea class="input textarea" value="{{coverPrompt}}" maxlength="-1" auto-height="true" disabled="true"></textarea>
           <button class="btn-outline" bindtap="handleCopyCoverPrompt">复制首图提示词</button>
         </view>
         <image wx:if="{{coverImageUrl}}" src="{{coverImageUrl}}" mode="widthFix" class="cover-image" />
