@@ -162,7 +162,8 @@ export async function POST(request: NextRequest) {
         conflictLevel: input.conflictLevel as ConflictLevel,
         storeProfile,
         seedReviews: input.seed_reviews || [],
-        maxRounds: 2,
+        // Mini program client timeout is 60s; keep to a single pass + one danger-check to stay within budget.
+        maxRounds: 1,
       },
     })
 
@@ -266,4 +267,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "生成失败" }, { status: 500 })
   }
 }
-

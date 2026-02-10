@@ -146,52 +146,143 @@ function safeJsonParse(text: string): unknown {
 }
 
 async function callApimartJson(opts: { messages: Array<{ role: string; content: string }>; maxTokens: number }) {
-  const apiKey = process.env.APIMART_API_KEY
-  const baseUrl = process.env.APIMART_BASE_URL || "https://api.apimart.ai/v1"
-  const model = process.env.APIMART_MODEL || "gpt-4o"
+  const quickKey = process.env.APIMART_QUICK_API_KEY
+  const quickBaseUrl = process.env.APIMART_QUICK_BASE_URL
+  const quickModel = process.env.APIMART_QUICK_MODEL
+
+  const apiKey = (quickKey && quickKey !== "your-api-key-here" ? quickKey : process.env.APIMART_API_KEY) || ""
+  const baseUrl =
+    (quickBaseUrl && quickBaseUrl.trim().length ? quickBaseUrl : process.env.APIMART_BASE_URL || "https://api.apimart.ai/v1").trim()
+  const model = (quickModel && quickModel.trim().length ? quickModel : process.env.APIMART_MODEL || "gpt-4o").trim()
 
   if (!apiKey || apiKey === "your-api-key-here") {
     throw new Error("APIMART_API_KEY 未配置")
   }
 
-  const upstream = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
+  const toolName = "emit_xhs_v4_json"
+  const tools = [
+    {
+      type: "function",
+      function: {
+        name: toolName,
+        description: "输出一条可直接发布的小红书图文笔记内容，严格以 JSON 返回，不要输出任何额外文字。",
+        parameters: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            title: { type: "string", minLength: 1, maxLength: 60 },
+            body: { type: "string", minLength: 120, maxLength: 8000 },
+            cover_main: { type: "string", minLength: 2, maxLength: 20 },
+            cover_sub: { type: "string", minLength: 2, maxLength: 28 },
+            pinned_comment: { type: "string", minLength: 60, maxLength: 2000 },
+            reply_templates: {
+              type: "array",
+              items: { type: "string", minLength: 10, maxLength: 400 },
+              minItems: 3,
+              maxItems: 5,
+            },
+            tags: {
+              type: "array",
+              items: { type: "string", minLength: 1, maxLength: 40 },
+              minItems: 3,
+              maxItems: 20,
+            },
+          },
+          required: ["title", "body", "cover_main", "cover_sub", "pinned_comment"],
+        },
+      },
     },
-    body: JSON.stringify({
-      model,
-      messages: opts.messages,
-      temperature: 0.7,
-      max_tokens: opts.maxTokens,
-      stream: false,
-    }),
-  })
+  ] as const
 
-  const jsonText = await upstream.text().catch(() => "")
-  if (!upstream.ok) {
-    throw new Error(`上游 LLM 错误: ${upstream.status} ${jsonText.slice(0, 200)}`)
+  async function doRequest(payload: Record<string, unknown>) {
+    const upstream = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(payload),
+    })
+
+    const jsonText = await upstream.text().catch(() => "")
+    return { ok: upstream.ok, status: upstream.status, text: jsonText }
   }
 
-  const parsed = safeJsonParse(jsonText)
-  const content = (() => {
-    if (!parsed || typeof parsed !== "object") return ""
+  // Prefer tool-calling: some thinking models return empty `message.content` but provide JSON in tool_calls.
+  let res = await doRequest({
+    model,
+    messages: opts.messages,
+    temperature: 0.7,
+    max_tokens: opts.maxTokens,
+    stream: false,
+    tools,
+    tool_choice: { type: "function", function: { name: toolName } },
+  })
+
+  // Compat fallback: if upstream doesn't support tools/tool_choice, retry without them.
+  if (!res.ok && res.status === 400) {
+    const lower = res.text.slice(0, 400).toLowerCase()
+    if (lower.includes("tool") || lower.includes("tools") || lower.includes("tool_choice")) {
+      res = await doRequest({
+        model,
+        messages: opts.messages,
+        temperature: 0.7,
+        max_tokens: opts.maxTokens,
+        stream: false,
+      })
+    }
+  }
+
+  if (!res.ok) {
+    throw new Error(`上游 LLM 错误: ${res.status} ${res.text.slice(0, 200)}`)
+  }
+
+  const parsed = safeJsonParse(res.text)
+
+  const extracted = (() => {
+    if (!parsed || typeof parsed !== "object") return null
     const choices = (parsed as Record<string, unknown>).choices
-    if (!Array.isArray(choices) || choices.length === 0) return ""
+    if (!Array.isArray(choices) || choices.length === 0) return null
     const first = choices[0]
-    if (!first || typeof first !== "object") return ""
+    if (!first || typeof first !== "object") return null
     const message = (first as Record<string, unknown>).message
-    if (!message || typeof message !== "object") return ""
-    const c = (message as Record<string, unknown>).content
-    return typeof c === "string" ? c : ""
+    if (!message || typeof message !== "object") return null
+
+    const toolCalls = (message as Record<string, unknown>).tool_calls
+    if (Array.isArray(toolCalls) && toolCalls.length) {
+      const call0 = toolCalls[0]
+      if (call0 && typeof call0 === "object") {
+        const fn = (call0 as Record<string, unknown>).function
+        if (fn && typeof fn === "object") {
+          const args = (fn as Record<string, unknown>).arguments
+          if (typeof args === "string" && args.trim()) {
+            const v = safeJsonParse(args)
+            if (v) return v
+          }
+        }
+      }
+    }
+
+    const content = (message as Record<string, unknown>).content
+    if (typeof content === "string" && content.trim()) {
+      const v = safeJsonParse(content)
+      if (v) return v
+    }
+
+    const reasoning = (message as Record<string, unknown>).reasoning_content
+    if (typeof reasoning === "string" && reasoning.trim()) {
+      const v = safeJsonParse(reasoning)
+      if (v) return v
+    }
+
+    return null
   })()
-  if (typeof content !== "string" || !content.trim()) {
+
+  if (!extracted) {
     throw new Error("LLM 未返回有效内容")
   }
 
-  const data = safeJsonParse(content)
-  return data
+  return extracted
 }
 
 async function callDangerCheck(opts: { content: string; draftId?: string; billing: BillingContext }) {
