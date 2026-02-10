@@ -1,0 +1,82 @@
+<view class="page">
+  <view class="topbar">
+    <view class="top-left" bindtap="openEndModal">结束</view>
+    <view class="top-right"></view>
+  </view>
+
+  <scroll-view class="chat" scroll-y="true" scroll-with-animation="true" scroll-into-view="{{scrollIntoView}}">
+    <block wx:for="{{turns}}" wx:key="id">
+      <view id="turn-{{item.id}}" class="row {{item.role === 'customer' ? 'left' : 'right'}}">
+        <view wx:if="{{item.role === 'customer'}}" class="avatar avatar-customer">客</view>
+
+        <view class="bubble {{item.role === 'customer' ? 'bubble-customer' : 'bubble-beautician'}}">
+          <view class="voice" wx:if="{{item.audio_url}}">
+            <view class="voice-bar" bindtap="onPlay" data-id="{{item.id}}" data-url="{{item.audio_url}}">
+              <text class="voice-label">播放</text>
+              <text class="voice-dur">{{item.audio_seconds_text}}</text>
+            </view>
+          </view>
+
+          <view class="msg-text">{{item.text}}</view>
+
+          <view wx:if="{{item.role === 'beautician'}}" class="msg-actions">
+            <button class="mini-btn" size="mini" bindtap="toggleSuggest" data-id="{{item.id}}">改进建议</button>
+            <button class="mini-btn ghost" size="mini" bindtap="onRerecord" data-id="{{item.id}}">重录</button>
+          </view>
+
+          <view wx:if="{{item.role === 'beautician' && item.showSuggestions && item.analysis}}" class="suggest-box">
+            <view class="suggest-title">改进建议：</view>
+            <view class="suggest-item">1. {{item.analysis.suggestions[0]}}</view>
+            <view class="suggest-item">2. {{item.analysis.suggestions[1]}}</view>
+            <view class="suggest-item">3. {{item.analysis.suggestions[2]}}</view>
+
+            <view class="polished-title">润色表达：</view>
+            <view class="polished">{{item.analysis.polished}}</view>
+          </view>
+        </view>
+
+        <view wx:if="{{item.role === 'beautician'}}" class="avatar avatar-beautician">我</view>
+      </view>
+    </block>
+
+    <view class="typing" wx:if="{{loading}}">
+      <view class="typing-pill">生成中...</view>
+    </view>
+  </scroll-view>
+
+  <view class="footer">
+    <button class="hint-btn" bindtap="openHint">对话灵感</button>
+    <button
+      class="record-btn"
+      bindtouchstart="onRecordStart"
+      bindtouchend="onRecordEnd"
+      bindtouchcancel="onRecordCancel"
+    >
+      {{recording ? "松开结束" : "点击说话"}}
+    </button>
+  </view>
+
+  <!-- 结束对话弹窗 -->
+  <view class="modal-mask" wx:if="{{endModalVisible}}" bindtap="closeEndModal"></view>
+  <view class="end-modal" wx:if="{{endModalVisible}}">
+    <view class="end-title">你确定要结束这次练习吗？</view>
+    <button class="end-primary" bindtap="endAndViewReport">结束对话，并查看测评报告</button>
+    <button class="end-secondary" bindtap="endOnly">结束对话</button>
+  </view>
+
+  <!-- 对话灵感弹层 -->
+  <view class="modal-mask" wx:if="{{hintVisible}}" bindtap="closeHint"></view>
+  <view class="hint-sheet" wx:if="{{hintVisible}}">
+    <view class="hint-header">
+      <view class="hint-title">对话灵感</view>
+      <view class="hint-sub">用自己的话说出来效果更佳~</view>
+    </view>
+    <view class="hint-body">
+      <view class="hint-text">{{hintText}}</view>
+      <view class="hint-points" wx:if="{{hintPoints.length}}">
+        <view class="hint-point" wx:for="{{hintPoints}}" wx:key="*this">• {{item}}</view>
+      </view>
+    </view>
+    <button class="hint-close" bindtap="closeHint">关闭</button>
+  </view>
+</view>

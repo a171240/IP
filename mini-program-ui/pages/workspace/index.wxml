@@ -30,6 +30,11 @@
           <text class="muted small">标题建议 + 文案方向</text>
           <button class="btn-primary">生成</button>
         </view>
+        <view class="card">
+          <text class="card-title">销售话术练习</text>
+          <text class="muted small">语音对话 + 逐句点评 + 练后报告</text>
+          <button class="btn-primary" bindtap="goVoiceCoach">开始练习</button>
+        </view>
       </view>
     </view>
 
@@ -46,4 +51,3 @@
     </view>
   </view>
 </view>
-

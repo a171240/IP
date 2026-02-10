@@ -5,6 +5,8 @@
                   "pages/ip-factory/index",
                   "pages/xiaohongshu/index",
                   "pages/mine/index",
+                  "pages/voice-coach/chat",
+                  "pages/voice-coach/report",
                   "pages/login/index",
                   "pages/diagnosis/index",
                   "pages/diagnosis-quiz/index",

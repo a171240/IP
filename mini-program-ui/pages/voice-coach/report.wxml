@@ -1,0 +1,225 @@
+<view class="page">
+  <view class="seg">
+    <view class="seg-item {{activeSegment === 'report' ? 'active' : ''}}" data-seg="report" bindtap="setSegment">
+      报告
+    </view>
+    <view class="seg-item {{activeSegment === 'chat' ? 'active' : ''}}" data-seg="chat" bindtap="setSegment">
+      对话
+    </view>
+  </view>
+
+  <scroll-view class="content" scroll-y="true">
+    <view wx:if="{{activeSegment === 'report'}}">
+      <view class="headline">恭喜完成练习，这是为您生成的评测报告：</view>
+
+      <view class="score-card">
+        <view class="score-left">
+          <view class="score-label">总得分</view>
+          <view class="score-line">
+            <text class="score">{{report.total_score}}</text>
+            <text class="score-suffix">/100</text>
+          </view>
+        </view>
+        <canvas
+          canvas-id="radarCanvas"
+          class="radar"
+          style="width: 280px; height: 280px;"
+          width="280"
+          height="280"
+        ></canvas>
+      </view>
+
+      <view class="dims">
+        <block wx:for="{{report.dimension}}" wx:key="id">
+          <view class="dim-row">
+            <view class="dim-name">{{item.name}}</view>
+            <view class="dim-stars">{{item.stars_text}}</view>
+          </view>
+        </block>
+      </view>
+
+      <view class="summary">
+        <block wx:for="{{report.summary_blocks}}" wx:key="*this">
+          <view class="summary-line">{{item}}</view>
+        </block>
+      </view>
+
+      <scroll-view class="tabs" scroll-x="true">
+        <view class="tab {{activeTab === 'persuasion' ? 'active' : ''}}" data-tab="persuasion" bindtap="setTab">说服力</view>
+        <view class="tab {{activeTab === 'fluency' ? 'active' : ''}}" data-tab="fluency" bindtap="setTab">流利度</view>
+        <view class="tab {{activeTab === 'expression' ? 'active' : ''}}" data-tab="expression" bindtap="setTab">语言表达</view>
+        <view class="tab {{activeTab === 'pronunciation' ? 'active' : ''}}" data-tab="pronunciation" bindtap="setTab">发音准确度</view>
+        <view class="tab {{activeTab === 'organization' ? 'active' : ''}}" data-tab="organization" bindtap="setTab">语言组织</view>
+      </scroll-view>
+
+      <view class="tab-body">
+        <!-- 说服力 -->
+        <view wx:if="{{activeTab === 'persuasion'}}">
+          <view class="tab-title">说服力</view>
+          <view class="metric-card">
+            <view class="metric-row">
+              <view class="metric-name">异议处理</view>
+              <view class="metric-status">{{report.tabs.persuasion.submetrics[0].status}}</view>
+            </view>
+            <view class="metric-text">{{report.tabs.persuasion.submetrics[0].advice_paragraph}}</view>
+            <view class="tag-row">
+              <view class="tag" wx:for="{{report.tabs.persuasion.tags}}" wx:key="*this">{{item}}</view>
+            </view>
+          </view>
+
+          <view class="qa-card">
+            <view class="qa-title">客户异议</view>
+            <view class="qa-text">{{report.tabs.persuasion.customer_objection}}</view>
+            <view class="qa-title">你的应对</view>
+            <view class="qa-text">{{report.tabs.persuasion.your_response}}</view>
+            <view class="qa-title">改进润色</view>
+            <view class="qa-text">{{report.tabs.persuasion.improved_response}}</view>
+          </view>
+        </view>
+
+        <!-- 流利度 -->
+        <view wx:if="{{activeTab === 'fluency'}}">
+          <view class="tab-title">流利度</view>
+
+          <view class="metric-card">
+            <view class="metric-row">
+              <view class="metric-name">语速</view>
+              <view class="metric-status">{{report.tabs.fluency.submetrics[0].status}}</view>
+            </view>
+            <view class="metric-text">{{report.tabs.fluency.submetrics[0].advice_paragraph}}</view>
+          </view>
+
+          <canvas
+            canvas-id="fluencyChart1"
+            class="linechart"
+            style="width: 330px; height: 160px;"
+            width="330"
+            height="160"
+          ></canvas>
+
+          <view class="metric-card">
+            <view class="metric-row">
+              <view class="metric-name">停顿</view>
+              <view class="metric-status">{{report.tabs.fluency.submetrics[1].status}}</view>
+            </view>
+            <view class="metric-text">{{report.tabs.fluency.submetrics[1].advice_paragraph}}</view>
+          </view>
+
+          <canvas
+            canvas-id="fluencyChart2"
+            class="linechart"
+            style="width: 330px; height: 160px;"
+            width="330"
+            height="160"
+          ></canvas>
+        </view>
+
+        <!-- 语言表达 -->
+        <view wx:if="{{activeTab === 'expression'}}">
+          <view class="tab-title">语言表达</view>
+
+          <view class="metric-card">
+            <view class="metric-row">
+              <view class="metric-name">冗余词</view>
+              <view class="metric-status">{{report.tabs.expression.submetrics[0].status}}</view>
+            </view>
+            <view class="metric-text">{{report.tabs.expression.submetrics[0].advice_paragraph}}</view>
+          </view>
+
+          <view class="metric-card">
+            <view class="metric-row">
+              <view class="metric-name">语调</view>
+              <view class="metric-status">{{report.tabs.expression.submetrics[1].status}}</view>
+            </view>
+            <view class="metric-text">{{report.tabs.expression.submetrics[1].advice_paragraph}}</view>
+          </view>
+
+          <canvas
+            canvas-id="expressionChart1"
+            class="linechart"
+            style="width: 330px; height: 160px;"
+            width="330"
+            height="160"
+          ></canvas>
+        </view>
+
+        <!-- 发音准确度 -->
+        <view wx:if="{{activeTab === 'pronunciation'}}">
+          <view class="tab-title">发音准确度</view>
+
+          <view class="metric-card">
+            <view class="metric-row">
+              <view class="metric-name">清晰度</view>
+              <view class="metric-status">{{report.tabs.pronunciation.submetrics[0].status}}</view>
+            </view>
+            <view class="metric-text">{{report.tabs.pronunciation.submetrics[0].advice_paragraph}}</view>
+          </view>
+
+          <canvas
+            canvas-id="pronunciationChart1"
+            class="linechart"
+            style="width: 330px; height: 160px;"
+            width="330"
+            height="160"
+          ></canvas>
+        </view>
+
+        <!-- 语言组织 -->
+        <view wx:if="{{activeTab === 'organization'}}">
+          <view class="tab-title">语言组织能力</view>
+
+          <view class="metric-card">
+            <view class="metric-row">
+              <view class="metric-name">逻辑性</view>
+              <view class="metric-status">{{report.tabs.organization.submetrics[0].status}}</view>
+            </view>
+            <view class="metric-text">{{report.tabs.organization.submetrics[0].advice_paragraph}}</view>
+          </view>
+
+          <view class="metric-card">
+            <view class="metric-text">{{report.tabs.organization.advice_paragraph}}</view>
+          </view>
+
+          <view class="audio-list" wx:if="{{report.tabs.organization.audio_examples.length}}">
+            <view class="audio-title">自己录制的音频</view>
+            <block wx:for="{{report.tabs.organization.audio_examples}}" wx:key="turn_id">
+              <view class="audio-item">
+                <button class="audio-play" size="mini" bindtap="playExample" data-url="{{item.audio_url}}" data-id="{{item.turn_id}}">
+                  播放
+                </button>
+                <view class="audio-meta">{{item.audio_seconds_text}}</view>
+              </view>
+            </block>
+          </view>
+        </view>
+      </view>
+
+      <view class="bottom-space"></view>
+    </view>
+
+    <!-- 对话回放 -->
+    <view wx:if="{{activeSegment === 'chat'}}" class="chat-view">
+      <block wx:for="{{turns}}" wx:key="id">
+        <view class="row {{item.role === 'customer' ? 'left' : 'right'}}">
+          <view wx:if="{{item.role === 'customer'}}" class="avatar avatar-customer">客</view>
+          <view class="bubble {{item.role === 'customer' ? 'bubble-customer' : 'bubble-beautician'}}">
+            <view class="voice" wx:if="{{item.audio_url}}">
+              <view class="voice-bar" bindtap="onPlay" data-id="{{item.id}}" data-url="{{item.audio_url}}">
+                <text class="voice-label">播放</text>
+                <text class="voice-dur">{{item.audio_seconds_text}}</text>
+              </view>
+            </view>
+            <view class="msg-text">{{item.text}}</view>
+          </view>
+          <view wx:if="{{item.role === 'beautician'}}" class="avatar avatar-beautician">我</view>
+        </view>
+      </block>
+      <view class="bottom-space"></view>
+    </view>
+  </scroll-view>
+
+  <view class="cta">
+    <button class="again-btn" bindtap="startAgain">再来一次</button>
+  </view>
+</view>
+
