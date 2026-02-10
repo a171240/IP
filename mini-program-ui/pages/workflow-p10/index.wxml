@@ -1,0 +1,67 @@
+<view class="page page-factory">
+  <view class="container">
+    <view class="hero fade-up">
+      <text class="title">{{pageTitle}}</text>
+      <text class="subtitle">{{pageSubtitle}}</text>
+      <view class="hero-badges" style="margin-top: 16rpx;">
+        <view class="chip">{{stepId}}</view>
+        <view class="chip">{{outputTitle}}</view>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-1">
+      <text class="section-title">前置资料</text>
+      <view class="card">
+        <text class="muted small" wx:if="{{loadingContext}}">加载中...</text>
+        <view wx:else>
+          <view class="row" wx:if="{{contextReports.length}}">
+            <text class="tag tag-success" wx:for="{{contextReports}}" wx:key="report_id">{{item.step_id}}</text>
+          </view>
+          <text class="tag" wx:if="{{!contextReports.length}}">暂无可用报告</text>
+          <text class="muted small" wx:if="{{missingRequiredLabel}}" style="margin-top: 12rpx;">{{missingRequiredLabel}}</text>
+          <text class="muted small" wx:if="{{missingOptionalLabel}}" style="margin-top: 6rpx;">{{missingOptionalLabel}}</text>
+          <view class="row" style="margin-top: 12rpx;">
+            <button class="btn-outline" size="mini" bindtap="loadContext">刷新</button>
+            <button class="btn-primary" size="mini" wx:if="{{importFromStepId}}" bindtap="handleImportFromPrev">
+              导入上一步
+            </button>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-2">
+      <text class="section-title">输入</text>
+      <view class="card">
+        <textarea
+          class="input textarea"
+          placeholder="{{inputPlaceholder}}"
+          value="{{inputText}}"
+          bindinput="onInput"
+        ></textarea>
+        <button class="btn-primary" loading="{{isGenerating}}" disabled="{{isGenerating}}" bindtap="handleGenerate">生成</button>
+        <text class="muted small" wx:if="{{creditsHint}}" style="margin-top: 12rpx; display: block;">{{creditsHint}}</text>
+        <text class="muted small" wx:if="{{lastCreditsHint}}" style="margin-top: 6rpx; display: block;">{{lastCreditsHint}}</text>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-2">
+      <text class="section-title">结果</text>
+      <view class="card">
+        <textarea class="input textarea" value="{{resultContent}}" disabled="true" placeholder="生成后这里会出现结果"></textarea>
+        <view class="row" style="margin-top: 12rpx;">
+          <button class="btn-outline" size="mini" disabled="{{!resultContent}}" bindtap="handleCopy">复制</button>
+          <button class="btn-primary" size="mini" disabled="{{!resultContent}}" bindtap="handleSave">保存到素材库</button>
+          <button class="btn-outline" size="mini" wx:if="{{savedReportId}}" bindtap="handleOpenSaved">查看报告</button>
+        </view>
+        <view class="row" style="margin-top: 12rpx;">
+          <button class="btn-outline" size="mini" bindtap="handleGoLibrary">打开素材库</button>
+          <button class="btn-primary" size="mini" wx:if="{{nextStepId}}" bindtap="handleGoNext">
+            下一步：{{nextStepId}}
+          </button>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>
+

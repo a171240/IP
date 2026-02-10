@@ -343,7 +343,6 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  let creditsDelta = 0
   let nextCreditsBalance: number | null = null
   if (creditsGrant > 0) {
     const { data: profile } = await admin
@@ -355,7 +354,6 @@ export async function POST(request: NextRequest) {
     const creditsUnlimited = Boolean(profile?.credits_unlimited)
     if (!creditsUnlimited) {
       const currentBalance = Number(profile?.credits_balance || 0)
-      creditsDelta = creditsGrant
       nextCreditsBalance = currentBalance + creditsGrant
     }
   }

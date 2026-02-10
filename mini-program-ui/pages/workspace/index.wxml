@@ -4,49 +4,156 @@
       <view class="row space-between">
         <view>
           <text class="title">工作台</text>
-          <text class="subtitle">美业内容控制中心</text>
+          <text class="subtitle">内容控制中心</text>
         </view>
-        <view class="chip">积分 120</view>
+        <view class="chip">{{creditsLabel || "积分 --"}}</view>
       </view>
+
       <view class="progress-bar">
-        <view class="progress-fill" style="width: 45%;"></view>
+        <view class="progress-fill" style="width: {{progressPercent}}%;"></view>
       </view>
       <view class="row space-between">
-        <text class="muted small">任务进度</text>
-        <text class="small">45%</text>
+        <text class="muted small">进度</text>
+        <text class="small">{{progressPercent}}%</text>
       </view>
     </view>
 
     <view class="section fade-up delay-1">
       <text class="section-title">快捷操作</text>
       <view class="grid-2">
-        <view class="card">
-          <text class="card-title">继续任务</text>
-          <text class="muted small">下一步：内容优化</text>
-          <button class="btn-primary">开始</button>
+        <view class="card action-card">
+          <view class="row action-row">
+            <view class="action-icon">01</view>
+            <view class="action-meta">
+              <text class="card-title">IP 工作流</text>
+              <text class="muted small">P1-P10 全流程</text>
+            </view>
+          </view>
+          <button class="btn-primary" bindtap="handleGoWorkflow">进入</button>
         </view>
-        <view class="card">
-          <text class="card-title">内容灵感生成</text>
-          <text class="muted small">标题建议 + 文案方向</text>
-          <button class="btn-primary">生成</button>
+        <view class="card action-card">
+          <view class="row action-row">
+            <view class="action-icon">02</view>
+            <view class="action-meta">
+              <text class="card-title">素材库</text>
+              <text class="muted small">沉淀选题/脚本/草稿/交付包</text>
+            </view>
+          </view>
+          <button class="btn-outline" bindtap="handleGoLibrary">打开</button>
         </view>
-        <view class="card">
-          <text class="card-title">销售话术练习</text>
-          <text class="muted small">语音对话 + 逐句点评 + 练后报告</text>
+        <view class="card action-card">
+          <view class="row action-row">
+            <view class="action-icon">03</view>
+            <view class="action-meta">
+              <text class="card-title">小红书工坊</text>
+              <text class="muted small">文案、封面、发布</text>
+            </view>
+          </view>
+          <button class="btn-primary" bindtap="handleGoXhs">开始</button>
+        </view>
+        <view class="card action-card">
+          <view class="row action-row">
+            <view class="action-icon">04</view>
+            <view class="action-meta">
+              <text class="card-title">内容诊断</text>
+              <text class="muted small">问卷评估与建议</text>
+            </view>
+          </view>
+          <button class="btn-primary" bindtap="handleGoDiagnosis">去诊断</button>
+        </view>
+        <view class="card action-card">
+          <view class="row action-row">
+            <view class="action-icon">05</view>
+            <view class="action-meta">
+              <text class="card-title">升级套餐</text>
+              <text class="muted small">解锁更多权益</text>
+            </view>
+          </view>
+          <button class="btn-outline" bindtap="handleGoPay">去购买</button>
+        </view>
+        <view class="card action-card">
+          <view class="row action-row">
+            <view class="action-icon">06</view>
+            <view class="action-meta">
+              <text class="card-title">订单</text>
+              <text class="muted small">开通记录与状态</text>
+            </view>
+          </view>
+          <button class="btn-outline" bindtap="handleGoOrders">查看</button>
+        </view>
+        <view class="card action-card">
+          <view class="row action-row">
+            <view class="action-icon">07</view>
+            <view class="action-meta">
+              <text class="card-title">销售话术练习</text>
+              <text class="muted small">语音对话 + 逐句点评 + 练后报告</text>
+            </view>
+          </view>
           <button class="btn-primary" bindtap="goVoiceCoach">开始练习</button>
         </view>
       </view>
     </view>
 
     <view class="section fade-up delay-2">
-      <text class="section-title">最近报告</text>
-      <view class="card">
-        <view class="row space-between">
-          <text class="card-title">品牌诊断报告</text>
-          <text class="tag tag-success">已生成</text>
+      <view class="row space-between">
+        <text class="section-title">最近草稿</text>
+        <button class="btn-outline" size="mini" bindtap="handleGoDrafts">全部</button>
+      </view>
+
+      <view wx:if="{{recentXhsDrafts.length}}">
+        <view class="card" wx:for="{{recentXhsDrafts}}" wx:key="id">
+          <view class="row space-between">
+            <text class="card-title">{{item.result_title || "未命名草稿"}}</text>
+            <text class="tag {{item.status === 'published' ? 'tag-success' : ''}}">{{item.status === "published" ? "已发布" : "草稿"}}</text>
+          </view>
+          <image wx:if="{{item.coverUrl}}" src="{{item.coverUrl}}" mode="widthFix" class="cover-image" />
+          <view class="row" style="margin-top: 10rpx;" wx:if="{{item.danger_risk_level}}">
+            <text class="tag">风控：{{item.danger_risk_level}}</text>
+          </view>
+          <button class="btn-outline" bindtap="handleOpenDraft" data-id="{{item.id}}">继续创作</button>
         </view>
-        <text class="muted small">更新于 2 小时前</text>
-        <button class="btn-outline">查看报告</button>
+      </view>
+
+      <view wx:else class="card">
+        <text class="muted small">暂无草稿，去小红书工坊生成第一条。</text>
+        <button class="btn-primary" bindtap="handleGoXhs">去生成</button>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-2">
+      <text class="section-title">最近交付包</text>
+
+      <view wx:if="{{recentDeliveryPacks.length}}">
+        <view class="card" wx:for="{{recentDeliveryPacks}}" wx:key="id">
+          <view class="row space-between">
+            <text class="card-title">交付包 {{item.shortId}}</text>
+            <text class="tag {{item.status === 'done' ? 'tag-success' : ''}}">{{item.statusText}}</text>
+          </view>
+          <text class="muted small">{{item.created_at}}</text>
+          <button
+            class="btn-outline"
+            bindtap="handleOpenPack"
+            data-id="{{item.id}}"
+            wx:if="{{item.status === 'done'}}"
+          >
+            打开 PDF
+          </button>
+        </view>
+      </view>
+
+      <view wx:else class="card">
+        <text class="muted small">暂无交付包记录。</text>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-2" wx:if="{{recentOrders.length}}">
+      <text class="section-title">最近支付</text>
+      <view class="card" wx:for="{{recentOrders}}" wx:key="out_trade_no">
+        <view class="row space-between">
+          <text class="card-title">订单 {{item.shortId}}</text>
+          <text class="tag {{item.status === 'paid' ? 'tag-success' : ''}}">{{item.status}}</text>
+        </view>
+        <text class="muted small">{{item.amountLabel}}</text>
       </view>
     </view>
   </view>

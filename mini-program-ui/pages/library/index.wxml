@@ -1,0 +1,162 @@
+<view class="page page-workspace">
+  <view class="container">
+    <view class="hero fade-up">
+      <view class="row space-between">
+        <view>
+          <text class="title">素材库</text>
+          <text class="subtitle">统一沉淀：选题、脚本、小红书草稿、交付包</text>
+        </view>
+        <view class="chip">{{creditsLabel || "积分 --"}}</view>
+      </view>
+
+      <view class="hero-badges">
+        <view class="tag tag-accent">{{planLabel || "未登录"}}</view>
+        <view class="tag">高级 agent</view>
+        <view class="tag">发布</view>
+        <view class="tag">批量生成</view>
+      </view>
+
+      <view class="hero-actions">
+        <button class="btn-primary" bindtap="handleGoP7">生成选题(P7)</button>
+        <button class="btn-outline" bindtap="handleGoP8">写脚本(P8)</button>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-1" wx:if="{{showUpgrade}}">
+      <text class="section-title">解锁更多</text>
+      <view class="card">
+        <text class="card-title">升级 Pro，发布更省积分</text>
+        <text class="muted small">当前也可用积分解锁，但跨级会更贵。升级后：发布/批量/工作流更划算。</text>
+        <button class="btn-primary" bindtap="handleUpgrade">去购买</button>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-1">
+      <text class="section-title">搜索与筛选</text>
+      <view class="card">
+        <input class="input" placeholder="搜索选题/脚本/草稿/交付包" value="{{query}}" bindinput="onQueryInput" />
+        <view class="row" style="margin-top: 12rpx;">
+          <view class="tag {{filter === 'all' ? 'tag-accent' : ''}}" data-filter="all" bindtap="onSelectFilter">全部</view>
+          <view class="tag {{filter === 'topic' ? 'tag-accent' : ''}}" data-filter="topic" bindtap="onSelectFilter">选题</view>
+          <view class="tag {{filter === 'script' ? 'tag-accent' : ''}}" data-filter="script" bindtap="onSelectFilter">脚本</view>
+          <view class="tag {{filter === 'xhs' ? 'tag-accent' : ''}}" data-filter="xhs" bindtap="onSelectFilter">小红书</view>
+          <view class="tag {{filter === 'pack' ? 'tag-accent' : ''}}" data-filter="pack" bindtap="onSelectFilter">交付包</view>
+          <view class="tag {{filter === 'report' ? 'tag-accent' : ''}}" data-filter="report" bindtap="onSelectFilter">报告</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-2">
+      <text class="section-title">全部资产</text>
+
+      <view wx:if="{{loading}}" class="card">
+        <text class="muted small">加载中...</text>
+      </view>
+
+      <view wx:if="{{!loading && !visibleAssets.length}}" class="card">
+        <text class="muted small">暂无数据。先做 P7/P8 或去小红书工坊生成草稿。</text>
+      </view>
+
+      <view wx:for="{{visibleAssets}}" wx:key="id" class="card" style="margin-top: 16rpx;">
+        <view class="row space-between">
+          <text class="card-title">{{item.title}}</text>
+          <text class="tag {{item.statusClass}}">{{item.statusLabel}}</text>
+        </view>
+        <text class="muted small">{{item.kindLabel}} · {{item.createdAtLabel}}</text>
+        <text class="muted small" wx:if="{{item.subtitle}}" style="margin-top: 8rpx; display: block;">{{item.subtitle}}</text>
+
+        <image wx:if="{{item.coverAbs}}" src="{{item.coverAbs}}" mode="widthFix" class="cover-image" />
+
+        <view class="row" style="margin-top: 12rpx;">
+          <button
+            class="btn-outline"
+            size="mini"
+            wx:if="{{item.kind === 'topic'}}"
+            bindtap="handleOpenReport"
+            data-id="{{item.p7ReportId}}"
+          >
+            查看批次
+          </button>
+          <button
+            class="btn-primary"
+            size="mini"
+            wx:if="{{item.kind === 'topic'}}"
+            bindtap="handleGoP8WithTopic"
+            data-p7="{{item.p7ReportId}}"
+            data-topic="{{item.topic}}"
+          >
+            去写脚本
+          </button>
+          <button
+            class="btn-outline"
+            size="mini"
+            wx:if="{{item.kind === 'topic'}}"
+            bindtap="handleToggleTopicUsed"
+            data-p7="{{item.p7ReportId}}"
+            data-topic="{{item.topic}}"
+            data-used="{{item.used ? 1 : 0}}"
+          >
+            {{item.used ? "标记未用" : "标记已用"}}
+          </button>
+
+          <button
+            class="btn-outline"
+            size="mini"
+            wx:if="{{item.kind === 'script' || item.kind === 'report'}}"
+            bindtap="handleOpenReport"
+            data-id="{{item.reportId}}"
+          >
+            查看
+          </button>
+          <button
+            class="btn-primary"
+            size="mini"
+            wx:if="{{item.kind === 'script' && item.linkedDraftId}}"
+            bindtap="handleOpenDraft"
+            data-id="{{item.linkedDraftId}}"
+          >
+            打开草稿
+          </button>
+          <button
+            class="btn-primary"
+            size="mini"
+            wx:if="{{item.kind === 'script' && !item.linkedDraftId}}"
+            bindtap="handleConvertReportToDraft"
+            data-id="{{item.reportId}}"
+          >
+            转为草稿
+          </button>
+
+          <button
+            class="btn-primary"
+            size="mini"
+            wx:if="{{item.kind === 'xhs'}}"
+            bindtap="handleOpenDraft"
+            data-id="{{item.draftId}}"
+          >
+            打开
+          </button>
+          <button
+            class="btn-outline"
+            size="mini"
+            wx:if="{{item.kind === 'xhs' && item.publishUrl}}"
+            bindtap="handleCopyUrl"
+            data-url="{{item.publishUrl}}"
+          >
+            复制链接
+          </button>
+
+          <button
+            class="btn-outline"
+            size="mini"
+            wx:if="{{item.kind === 'pack' && item.packStatus === 'done'}}"
+            bindtap="handleOpenPack"
+            data-id="{{item.packId}}"
+          >
+            打开 PDF
+          </button>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

@@ -3,7 +3,20 @@
   margin-top: 20rpx;
   display: flex;
   flex-direction: column;
-  gap: 12rpx;
+}
+
+.profile-card > view,
+.profile-card > text,
+.profile-card > image,
+.profile-card > button {
+  margin-top: 12rpx;
+}
+
+.profile-card > view:first-child,
+.profile-card > text:first-child,
+.profile-card > image:first-child,
+.profile-card > button:first-child {
+  margin-top: 0;
 }
 
 .avatar {
@@ -17,5 +30,12 @@
 .profile-info {
   display: flex;
   flex-direction: column;
-  gap: 6rpx;
+}
+
+.profile-info text {
+  display: block;
+}
+
+.profile-info text + text {
+  margin-top: 6rpx;
 }

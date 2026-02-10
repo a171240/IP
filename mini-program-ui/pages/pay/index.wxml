@@ -5,13 +5,24 @@
       <text class="subtitle">选择套餐</text>
     </view>
     <view class="section fade-up delay-1">
-      <view class="card" wx:for="{{products}}" wx:key="id">
+      <view
+        class="card plan-card {{item.isPro ? 'plan-card-pro' : ''}}"
+        wx:for="{{products}}"
+        wx:key="id"
+        style="margin-top: {{index === 0 ? 0 : 16}}rpx;"
+      >
         <view class="row space-between">
           <text class="card-title">{{item.name}}</text>
-          <text class="tag {{item.isPro ? 'tag-accent' : ''}}">{{item.priceLabel}}</text>
+          <view class="row action-row">
+            <text wx:if="{{item.isPro}}" class="tag tag-accent">推荐</text>
+            <text class="tag {{item.isPro ? 'tag-accent' : ''}}">{{item.priceLabel}}</text>
+          </view>
         </view>
         <text class="muted small">{{item.description}}</text>
-        <text class="muted small" style="margin-top: 6rpx;">含 {{item.credits_grant}} 积分</text>
+        <view class="row" style="margin-top: 12rpx;">
+          <text class="tag">含 {{item.credits_grant}} 积分</text>
+          <text wx:if="{{item.isPro}}" class="tag tag-accent">Pro 权益</text>
+        </view>
         <button
           class="btn-primary"
           bindtap="handlePay"

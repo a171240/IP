@@ -6,7 +6,7 @@
       <text class="subtitle">用诊断与内容工作台，建立可复用的内容产线。</text>
       <view class="hero-actions">
         <navigator url="/pages/diagnosis/index" class="btn-primary">先做诊断</navigator>
-        <navigator url="/pages/workspace/index" open-type="switchTab" class="btn-outline">进入工作台</navigator>
+        <navigator url="/pages/workspace/index" class="btn-outline">进入工作台</navigator>
       </view>
       <view class="hero-badges">
         <view class="chip">7分钟诊断</view>
@@ -16,17 +16,50 @@
     </view>
 
     <view class="section fade-up delay-1">
-      <text class="section-title">从哪里开始</text>
+      <text class="section-title">快速入口</text>
       <view class="grid-2">
         <view class="card action-card">
-          <view class="row">
+          <view class="row action-row">
             <view class="action-icon">01</view>
-            <view>
-              <text class="card-title">系统化路径</text>
-              <text class="muted small">先诊断，再规划方向，逐步产出</text>
+            <view class="action-meta">
+              <text class="card-title">IP诊断</text>
+              <text class="muted small">5分钟评估 + 行动清单</text>
             </view>
           </view>
-          <navigator url="/pages/diagnosis/index" class="btn-outline">开始诊断</navigator>
+          <navigator url="/pages/diagnosis/index" class="btn-primary">开始诊断</navigator>
+        </view>
+
+        <view class="card action-card">
+          <view class="row action-row">
+            <view class="action-icon">02</view>
+            <view class="action-meta">
+              <text class="card-title">工作台</text>
+              <text class="muted small">快捷操作与最近资产</text>
+            </view>
+          </view>
+          <navigator url="/pages/workspace/index" class="btn-outline">进入工作台</navigator>
+        </view>
+
+        <view class="card action-card">
+          <view class="row action-row">
+            <view class="action-icon">03</view>
+            <view class="action-meta">
+              <text class="card-title">IP 工作流</text>
+              <text class="muted small">P1-P10 全流程</text>
+            </view>
+          </view>
+          <navigator url="/pages/workflow/index" class="btn-primary">去工作流</navigator>
+        </view>
+
+        <view class="card action-card">
+          <view class="row action-row">
+            <view class="action-icon">04</view>
+            <view class="action-meta">
+              <text class="card-title">小红书工坊</text>
+              <text class="muted small">文案、封面、发布</text>
+            </view>
+          </view>
+          <navigator url="/pages/xiaohongshu/index" open-type="switchTab" class="btn-outline">去工坊</navigator>
         </view>
       </view>
     </view>
@@ -39,7 +72,35 @@
             <view class="flow-index">1</view>
             <view class="flow-body">
               <text class="card-title">IP诊断</text>
-              <text class="muted small">5分钟定位问题与改进方向</text>
+              <text class="muted small">快速评估，拿到行动清单</text>
+            </view>
+          </view>
+          <view class="flow-item">
+            <view class="flow-index">2</view>
+            <view class="flow-body">
+              <text class="card-title">P7 选题库</text>
+              <text class="muted small">TOP20 + 7天日历，直接可拍</text>
+            </view>
+          </view>
+          <view class="flow-item">
+            <view class="flow-index">3</view>
+            <view class="flow-body">
+              <text class="card-title">P8 脚本创作</text>
+              <text class="muted small">一条脚本，结构完整</text>
+            </view>
+          </view>
+          <view class="flow-item">
+            <view class="flow-index">4</view>
+            <view class="flow-body">
+              <text class="card-title">小红书发布</text>
+              <text class="muted small">文案 + 封面 + 风控提示</text>
+            </view>
+          </view>
+          <view class="flow-item">
+            <view class="flow-index">5</view>
+            <view class="flow-body">
+              <text class="card-title">素材库沉淀</text>
+              <text class="muted small">统一管理：选题/脚本/草稿/交付包</text>
             </view>
           </view>
         </view>
@@ -49,14 +110,14 @@
     <view class="section fade-up delay-2">
       <text class="section-title">核心模块</text>
       <view class="grid-2">
-        <view class="card">
-          <text class="card-title">IP诊断</text>
-          <text class="muted small">定位瓶颈与行动清单</text>
-        </view>
-        <view class="card">
+        <navigator url="/pages/library/index" class="card">
+          <text class="card-title">素材库</text>
+          <text class="muted small">选题/脚本/草稿/交付包，一站沉淀</text>
+        </navigator>
+        <navigator url="/pages/pay/index" class="card">
           <text class="card-title">订阅与积分</text>
-          <text class="muted small">购买套餐即刻开工</text>
-        </view>
+          <text class="muted small">升级套餐，发布更省积分</text>
+        </navigator>
       </view>
     </view>
   </view>

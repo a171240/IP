@@ -48,7 +48,9 @@ textarea::placeholder {
 }
 
 .container {
-  padding: 30rpx 24rpx 160rpx;
+  padding: 30rpx 24rpx 180rpx;
+  /* Keep content above the tab bar + iOS safe area. */
+  padding-bottom: calc(160rpx + env(safe-area-inset-bottom));
   position: relative;
   z-index: 1;
 }
@@ -155,7 +157,6 @@ textarea::placeholder {
   text-transform: uppercase;
   display: inline-flex;
   align-items: center;
-  gap: 10rpx;
   padding: 6rpx 16rpx;
   border-radius: 999rpx;
   background: rgba(229, 211, 179, 0.12);
@@ -180,16 +181,36 @@ textarea::placeholder {
 
 .hero-actions {
   margin-top: 20rpx;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16rpx;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.hero-actions > button,
+.hero-actions > navigator {
+  width: 48%;
+  margin-bottom: 16rpx;
+}
+
+.hero-actions .btn-primary,
+.hero-actions .btn-outline {
+  margin-top: 0;
+}
+
+.hero-actions > button:only-child,
+.hero-actions > navigator:only-child {
+  width: 100%;
 }
 
 .hero-badges {
   margin-top: 18rpx;
   display: flex;
   flex-wrap: wrap;
-  gap: 10rpx;
+}
+
+.hero-badges > view {
+  margin-right: 10rpx;
+  margin-bottom: 10rpx;
 }
 
 .action-card {
@@ -211,16 +232,28 @@ textarea::placeholder {
   flex-shrink: 0;
 }
 
+.action-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.action-meta text {
+  display: block;
+}
+
 .flow {
   display: flex;
   flex-direction: column;
-  gap: 14rpx;
 }
 
 .flow-item {
   display: flex;
   align-items: flex-start;
-  gap: 14rpx;
+  margin-bottom: 14rpx;
+}
+
+.flow-item:last-child {
+  margin-bottom: 0;
 }
 
 .flow-index {
@@ -236,13 +269,13 @@ textarea::placeholder {
   background: linear-gradient(135deg, #E5D3B3 0%, #FFF 50%, #C6A87C 100%);
   box-shadow: 0 10rpx 20rpx rgba(229, 211, 179, 0.22);
   flex-shrink: 0;
+  margin-right: 14rpx;
 }
 
 .flow-body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 6rpx;
 }
 
 .card {
@@ -256,10 +289,21 @@ textarea::placeholder {
   padding: 22rpx;
   display: flex;
   flex-direction: column;
-  gap: 10rpx;
   box-shadow: var(--shadow-soft), inset 0 1rpx 0 rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+}
+
+.card > view,
+.card > text,
+.card > image {
+  margin-top: 10rpx;
+}
+
+.card > view:first-child,
+.card > text:first-child,
+.card > image:first-child {
+  margin-top: 0;
 }
 
 .card-title {
@@ -284,7 +328,6 @@ textarea::placeholder {
 .row {
   display: flex;
   align-items: center;
-  gap: 12rpx;
   flex-wrap: wrap;
 }
 
@@ -292,16 +335,75 @@ textarea::placeholder {
   justify-content: space-between;
 }
 
+.row > view,
+.row > text,
+.row > button,
+.row > navigator,
+.row > image {
+  margin-right: 12rpx;
+  margin-bottom: 12rpx;
+}
+
+.row > view:last-child,
+.row > text:last-child,
+.row > button:last-child,
+.row > navigator:last-child,
+.row > image:last-child {
+  margin-right: 0;
+}
+
+.row.space-between > view,
+.row.space-between > text,
+.row.space-between > button,
+.row.space-between > navigator,
+.row.space-between > image {
+  margin-right: 0;
+  margin-bottom: 0;
+}
+
+.row.action-row {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.row.action-row > view,
+.row.action-row > text,
+.row.action-row > button,
+.row.action-row > navigator,
+.row.action-row > image {
+  margin-bottom: 0;
+}
+
 .grid-2 {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18rpx;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.grid-2 > view,
+.grid-2 > navigator,
+.grid-2 > button {
+  width: 48%;
+  margin-bottom: 18rpx;
+}
+
+.grid-2 > view:only-child,
+.grid-2 > navigator:only-child,
+.grid-2 > button:only-child {
+  width: 100%;
 }
 
 .grid-3 {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14rpx;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.grid-3 > view,
+.grid-3 > navigator,
+.grid-3 > button {
+  width: 31%;
+  margin-bottom: 14rpx;
 }
 
 .chip {
@@ -314,6 +416,7 @@ textarea::placeholder {
   box-shadow: 0 10rpx 22rpx rgba(229, 211, 179, 0.2), inset 0 1rpx 0 rgba(255, 255, 255, 0.08);
   display: inline-block;
   line-height: 1.4;
+  transition: opacity 140ms ease, transform 140ms ease;
 }
 
 .tag {
@@ -328,6 +431,7 @@ textarea::placeholder {
   box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.08);
   display: inline-block;
   line-height: 1.4;
+  transition: opacity 140ms ease, transform 140ms ease;
 }
 
 .tag-accent {
@@ -340,6 +444,17 @@ textarea::placeholder {
   color: #9FECCB;
   border-color: rgba(34, 197, 94, 0.4);
   background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(34, 197, 94, 0.08));
+}
+
+.tag:active,
+.chip:active {
+  opacity: 0.92;
+  transform: translateY(1rpx);
+}
+
+.plan-card-pro {
+  border-color: rgba(229, 211, 179, 0.42);
+  box-shadow: var(--shadow-soft), var(--shadow-glow), inset 0 1rpx 0 rgba(255, 255, 255, 0.1);
 }
 
 .btn-primary {
@@ -360,6 +475,10 @@ textarea::placeholder {
   width: 100%;
 }
 
+.btn-primary:active {
+  opacity: 0.92;
+}
+
 .btn-outline {
   margin-top: 12rpx;
   background: rgba(255, 255, 255, 0.02);
@@ -377,6 +496,33 @@ textarea::placeholder {
   align-items: center;
   justify-content: center;
   width: 100%;
+}
+
+.btn-outline:active {
+  opacity: 0.9;
+}
+
+.btn-primary[disabled],
+.btn-outline[disabled] {
+  opacity: 0.55;
+}
+
+button[size="mini"].btn-primary,
+button[size="mini"].btn-outline {
+  width: auto;
+  min-height: 64rpx;
+  padding: 0 18rpx;
+  font-size: 22rpx;
+  border-radius: 16rpx;
+  margin-top: 0;
+}
+
+button[size="mini"].btn-primary {
+  box-shadow: 0 8rpx 16rpx rgba(229, 211, 179, 0.14), 0 4rpx 12rpx rgba(0, 0, 0, 0.55);
+}
+
+button[size="mini"].btn-outline {
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.45), inset 0 1rpx 0 rgba(255, 255, 255, 0.05);
 }
 
 button::after {

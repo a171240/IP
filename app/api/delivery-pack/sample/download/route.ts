@@ -6,7 +6,8 @@ export const runtime = "nodejs"
 
 export async function GET() {
   const pdfBuffer = await renderDeliveryPackPdf(sampleDeliveryPackInput, sampleDeliveryPackOutput)
-  return new NextResponse(pdfBuffer, {
+  const body = new Uint8Array(pdfBuffer).buffer
+  return new NextResponse(body, {
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": 'attachment; filename="delivery_pack_sample.pdf"',

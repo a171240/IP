@@ -89,7 +89,8 @@ export function PayQRDialog() {
             <>
               {qrDataUrl ? (
                 <div className="rounded-xl border bg-white p-2">
-                  <img
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
                     src={qrDataUrl}
                     alt="微信支付二维码"
                     className="h-[200px] w-[200px]"

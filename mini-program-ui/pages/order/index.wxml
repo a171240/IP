@@ -4,16 +4,25 @@
       <text class="title">订单</text>
       <text class="subtitle">最近支付</text>
     </view>
-    <view class="section fade-up delay-1">
-      <view class="card">
+
+    <view class="section fade-up delay-1" wx:if="{{orders.length}}">
+      <view class="card" wx:for="{{orders}}" wx:key="out_trade_no">
         <view class="row space-between">
-          <text class="card-title">订单 #202501</text>
-          <text class="tag tag-success">已支付</text>
+          <text class="card-title">订单 {{item.shortId}}</text>
+          <text class="tag {{item.statusClass}}">{{item.statusText}}</text>
         </view>
-        <text class="muted small">专业版 · 299 元</text>
-        <button class="btn-outline">详情</button>
+        <text class="muted small">{{item.description}}</text>
+        <text class="muted small" style="margin-top: 6rpx;">{{item.amountLabel}}</text>
+        <text class="muted small" style="margin-top: 6rpx;" wx:if="{{item.grantText}}">{{item.grantText}}</text>
+        <button class="btn-outline" bindtap="handleOrderTap" data-out="{{item.out_trade_no}}">详情</button>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-1" wx:else>
+      <view class="card">
+        <text class="card-title">暂无订单</text>
+        <text class="muted small">完成支付后会自动同步</text>
       </view>
     </view>
   </view>
 </view>
-

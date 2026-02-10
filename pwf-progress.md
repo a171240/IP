@@ -81,6 +81,41 @@
   - mini-program-ui/design-system-colors.md (created)
   - mini-program-ui/pages/home (created)
 
+## Session: 2026-02-06
+
+### Scope (This Session)
+- **Status:** complete
+- Focused on items **2/3** and **3/3** first (P7/P8 + asset library + XHS drafts + credits + upsell). Item **1/3** (one-click publish stability) is still pending.
+
+### Key Work Completed
+- Enforced **single-domain** mini program dependency: all mini program requests go through `https://ip.ipgongchang.xin` (备案域名).
+- Implemented/extended MP backend APIs under `app/api/mp/*` for shared auth/plan/credits:
+  - `GET /api/mp/profile` (plan + credits snapshot)
+  - `GET /api/mp/workbench` (workspace aggregation)
+  - `GET /api/mp/orders` (order list)
+  - `GET /api/mp/library` (unified asset library feed)
+  - `GET/POST /api/mp/reports`, `GET/PATCH /api/mp/reports/[reportId]` (P7/P8 reports + topic tracking)
+- Added **P7 topic extraction** and per-topic reuse tracking:
+  - Extract topics into `reports.metadata.p7_topics`
+  - Track usage in `reports.metadata.p7_topics_used` (auto-mark when saving a P8 referencing `p7ReportId + topic`)
+  - Added PATCH ops to mark topic used/un-used from the asset library.
+- Added **P8 script → one-click XHS draft** path:
+  - `POST /api/mp/xhs/drafts` supports `sourceReportId` (idempotent reuse) and links back to `reports.metadata.xhs_draft_id`.
+  - `pages/workflow-p8` can directly create a draft and jump to `pages/xiaohongshu` to continue cover/risk/publish.
+- Upgraded **asset library** into a unified “asset feed” view:
+  - Search + status + category filters
+  - Unified “asset ID” card structure across `reports / xhs_drafts / delivery_packs`
+  - “Next action” buttons (go publish / generate cover / open report / create P8 from topic)
+  - Upsell locks and upgrade guidance for “高级 agent / 发布 / 批量生成”.
+- Added **credits preview** on P7/P8 pages (estimated cost + remaining balance; post-run actual cost can be surfaced from API response/headers).
+
+### Phase 4: Verification
+- Ran `npm run lint` (pass).
+- Ran `npm run build` (pass).
+- Ran `node scripts/regress-mp-p7p8-topics.js`:
+  - First run: blocked (Supabase schema missing `public.xhs_drafts`).
+  - After migration applied in Supabase (2026-02-06): pass (2026-02-06 17:42).
+
 ## Test Results
 <!-- 
   WHAT: Table of tests you ran, what you expected, what actually happened.
@@ -92,7 +127,9 @@
 -->
 | Test | Input | Expected | Actual | Status |
 |------|-------|----------|--------|--------|
-|      |       |          |        |        |
+| Lint | `npm run lint` | Pass | Pass | PASS |
+| Build | `npm run build` | Pass | Pass | PASS |
+| MP regress (P7/P8/topics/XHS draft) | `node scripts/regress-mp-p7p8-topics.js` | Pass | Pass (after applying `20260206_add_xhs_drafts.sql`) | PASS |
 
 ## Error Log
 <!-- 
@@ -112,6 +149,7 @@
 | 2026-01-16 23:00 | PowerShell parser errors while quoting WXML class replacement / rg search | 1 | Switched to single-quote literals and string concatenation |
 | 2026-01-16 23:23 | WXSS compile error `unexpected token *` | 1 | Replaced universal selector with tag list for `box-sizing` |
 | 2026-01-17 00:05 | apply_patch failed to match WXML due to BOM | 1 | Updated file via PowerShell and rewrote UTF-8 without BOM |
+| 2026-02-06 17:25 | Regression blocked: `public.xhs_drafts` missing in Supabase | 1 | Applied migration `supabase/migrations/20260206_add_xhs_drafts.sql`; regression passes (2026-02-06 17:42) |
 
 ## 5-Question Reboot Check
 <!-- 
@@ -129,8 +167,8 @@
 <!-- If you can answer these, context is solid -->
 | Question | Answer |
 |----------|--------|
-| Where am I? | Phase 2: Planning & Structure |
-| Where am I going? | Phase 3-5 (Implementation, Testing, Delivery) |
+| Where am I? | Phase 3: Implementation (MVP) + Phase 4: Testing (in progress) |
+| Where am I going? | Finish Phase 4-5 (verification + delivery/roadmap), then address 1/3 (one-click publish) issues |
 | What's the goal? | Deliver a WeChat mini program that reuses the IP factory + Xiaohongshu generation, with future video support. |
 | What have I learned? | See pwf-findings.md |
 | What have I done? | See above |

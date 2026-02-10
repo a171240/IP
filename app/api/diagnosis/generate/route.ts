@@ -22,7 +22,7 @@ function jsonError(status: number, error: string, extra?: Record<string, unknown
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { diagnosisId, answers, scores, totalScore, level, industry } = body
+    const { answers, scores, totalScore, level, industry } = body
 
     // 验证必要参数
     if (!answers || !scores || totalScore === undefined || !level) {

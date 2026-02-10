@@ -53,27 +53,6 @@ function formatDate(value = new Date()): string {
   return `${year}.${month}.${day}`
 }
 
-function drawWrappedText(params: {
-  page: ReturnType<PDFDocument["addPage"]>
-  font: PdfCursor["font"]
-  text: string
-  x: number
-  y: number
-  size: number
-  maxWidth: number
-  lineHeight?: number
-  color?: ReturnType<typeof rgb>
-}): number {
-  const { page, font, text, x, y, size, maxWidth, lineHeight = size + 6, color = COLOR_TEXT } = params
-  const lines = wrapText(text, font, size, maxWidth)
-  let cursorY = y
-  lines.forEach((line) => {
-    page.drawText(line, { x, y: cursorY, size, font, color })
-    cursorY -= lineHeight
-  })
-  return cursorY
-}
-
 function clampLines(lines: string[], maxLines: number): string[] {
   if (lines.length <= maxLines) return lines
   const clipped = lines.slice(0, maxLines)
@@ -82,14 +61,6 @@ function clampLines(lines: string[], maxLines: number): string[] {
   const ellipsis = "..."
   clipped[lastIndex] = last.length > 1 ? `${last.slice(0, last.length - 1)}${ellipsis}` : ellipsis
   return clipped
-}
-
-
-function clipText(text: string, maxLength: number): string {
-  if (!text) return ""
-  if (text.length <= maxLength) return text
-  const keep = Math.max(0, maxLength - 3)
-  return `${text.slice(0, keep)}...`
 }
 
 function drawWrappedTextClamped(params: {
@@ -414,7 +385,7 @@ function addSummaryPage(cursor: PdfCursor, input: DeliveryPackInput, output: Del
   const cardHeight = 260
   drawCard(page, MARGIN_X, y - cardHeight + 8, CONTENT_WIDTH, cardHeight)
   let cardY = y - 24
-  cardY = drawWrappedTextClamped({
+  drawWrappedTextClamped({
     page,
     font: cursor.font,
     text: `标题：${tomorrow.title}`,

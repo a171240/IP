@@ -1,6 +1,6 @@
 import { DIMENSIONS } from './scoring'
 import { Dimension } from './questions'
-import { AIReport, WORKFLOW_STEPS } from './ai-prompt'
+import { AIReport } from './ai-prompt'
 
 interface DiagnosisResult {
   total: number
@@ -12,7 +12,7 @@ interface DiagnosisResult {
     status: 'strong' | 'normal' | 'weak'
     insight: string
   }>
-  insights: any[]
+  insights: unknown[]
 }
 
 const LEVEL_EMOJIS: Record<string, string> = {
@@ -159,7 +159,6 @@ export function generateReportMarkdown(
 
       const sortedSteps = [...aiReport.workflowSteps].sort((a, b) => a.priority - b.priority)
       sortedSteps.forEach((step, index) => {
-        const stepInfo = WORKFLOW_STEPS[step.stepId]
         const planLabel = PLAN_LABELS[step.requiredPlan || 'free'] || step.requiredPlan
 
         lines.push(`#### ${index + 1}. ${step.stepId}：${step.title}`)

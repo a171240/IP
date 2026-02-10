@@ -21,7 +21,7 @@ export default function StepExecutionPage({ params }: { params: Promise<{ stepId
 
   return (
     <Suspense fallback={null}>
-      <WorkflowStepClient stepId={stepId} step={step} />
+      <WorkflowStepClient step={step} />
     </Suspense>
   )
 }

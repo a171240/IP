@@ -10,6 +10,10 @@ export type WechatpayOrderParams = {
   notifyUrl: string
 }
 
+export type WechatpayJsapiOrderParams = WechatpayOrderParams & {
+  payerOpenid: string
+}
+
 type PlatformVerifyConfig =
   | {
       mode: "cert"
@@ -180,6 +184,89 @@ export async function wechatpayCreateNativeOrder(params: WechatpayOrderParams): 
   }
 
   return { codeUrl: data.code_url }
+}
+
+export async function wechatpayCreateJsapiOrder(params: WechatpayJsapiOrderParams): Promise<{ prepayId: string }> {
+  const env = getWechatpayEnv()
+
+  const body = {
+    appid: env.appId,
+    mchid: env.mchId,
+    description: params.description,
+    out_trade_no: params.outTradeNo,
+    notify_url: params.notifyUrl,
+    amount: {
+      total: params.amountTotal,
+      currency: params.currency || "CNY",
+    },
+    payer: {
+      openid: params.payerOpenid,
+    },
+  }
+
+  const bodyString = JSON.stringify(body)
+  const pathWithQuery = "/v3/pay/transactions/jsapi"
+  const nonce = randomNonce()
+  const timestamp = Math.floor(Date.now() / 1000)
+
+  const authorization = buildAuthorizationHeader({
+    env,
+    method: "POST",
+    pathWithQuery,
+    bodyString,
+    nonce,
+    timestamp,
+  })
+
+  const res = await fetch(`https://api.mch.weixin.qq.com${pathWithQuery}`, {
+    method: "POST",
+    headers: {
+      Authorization: authorization,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "Wechatpay-Serial": env.platformVerify.id,
+    },
+    body: bodyString,
+  })
+
+  const text = await res.text()
+  if (!res.ok) {
+    throw new Error(`Wechatpay create jsapi order failed: ${res.status} ${text}`)
+  }
+
+  const data = JSON.parse(text) as { prepay_id?: string }
+  if (!data?.prepay_id) {
+    throw new Error("Wechatpay response missing prepay_id")
+  }
+
+  return { prepayId: data.prepay_id }
+}
+
+export function wechatpayBuildJsapiPayParams(opts: { prepayId: string }): {
+  timeStamp: string
+  nonceStr: string
+  package: string
+  signType: "RSA"
+  paySign: string
+} {
+  const env = getWechatpayEnv()
+
+  const timeStamp = String(Math.floor(Date.now() / 1000))
+  const nonceStr = randomNonce(16)
+  const pkg = `prepay_id=${opts.prepayId}`
+
+  // https://pay.weixin.qq.com/wiki/doc/apiv3/apis/chapter3_5_4.shtml
+  // appId\n timeStamp\n nonceStr\n package\n
+  const message = `${env.appId}\n${timeStamp}\n${nonceStr}\n${pkg}\n`
+  const paySign = signMessage(env.merchantPrivateKeyPem, message)
+
+  return {
+    timeStamp,
+    nonceStr,
+    package: pkg,
+    signType: "RSA",
+    paySign,
+  }
 }
 
 export async function wechatpayQueryByOutTradeNo(outTradeNo: string): Promise<{

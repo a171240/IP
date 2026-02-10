@@ -235,10 +235,11 @@ BEGIN
     RAISE EXCEPTION 'insufficient_credits';
   END IF;
 
+  -- Qualify columns to avoid ambiguity with RETURNS TABLE output params.
   UPDATE public.profiles
-    SET credits_balance = credits_balance - p_amount
+    SET credits_balance = public.profiles.credits_balance - p_amount
     WHERE id = uid
-    RETURNING credits_balance, credits_unlimited INTO bal, unlimited;
+    RETURNING public.profiles.credits_balance, public.profiles.credits_unlimited INTO bal, unlimited;
 
   INSERT INTO public.credit_transactions(user_id, step_id, delta, reason, metadata)
     VALUES (uid, p_step_id, -p_amount, 'consume', jsonb_build_object('amount', p_amount));

@@ -1,6 +1,7 @@
 ﻿"use client"
+/* eslint-disable @next/next/no-img-element */
 import * as React from "react"
-import { Home, Users, BookOpen, Layers, Settings, ChevronRight, Zap, LogOut, User, Bot } from "lucide-react"
+import { Home, BookOpen, Layers, Settings, ChevronRight, Zap, LogOut, User, Bot } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"

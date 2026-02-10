@@ -1,0 +1,70 @@
+<view class="page page-xhs">
+  <view class="container">
+    <view class="hero fade-up">
+      <text class="title">门店档案</text>
+      <text class="subtitle">用于生成更本地、更可信的文案</text>
+    </view>
+
+    <view class="section fade-up delay-1">
+      <text class="section-title">基础信息</text>
+      <view class="card">
+        <text class="muted small">门店昵称</text>
+        <input class="input" placeholder="例如：椿舍·做脸" value="{{name}}" bindinput="onName" />
+
+        <text class="muted small">城市</text>
+        <input class="input" placeholder="例如：苏州" value="{{city}}" bindinput="onCity" />
+
+        <text class="muted small">区县</text>
+        <input class="input" placeholder="例如：吴江" value="{{district}}" bindinput="onDistrict" />
+
+        <text class="muted small">地标/商圈（可选）</text>
+        <input class="input" placeholder="例如：江兴西路地铁站附近" value="{{landmark}}" bindinput="onLandmark" />
+
+        <text class="muted small">门店类型（可选）</text>
+        <input class="input" placeholder="皮肤管理 / SPA / 美甲..." value="{{shopType}}" bindinput="onShopType" />
+      </view>
+    </view>
+
+    <view class="section fade-up delay-2">
+      <text class="section-title">引流品（可选）</text>
+      <view class="card">
+        <text class="muted small">主推项目名称</text>
+        <input class="input" placeholder="例如：面部清洁+头肩颈放松" value="{{mainOfferName}}" bindinput="onMainOfferName" />
+
+        <text class="muted small">主推时长（分钟）</text>
+        <input class="input" type="number" placeholder="例如：70" value="{{mainOfferDurationMin}}" bindinput="onMainOfferDurationMin" />
+      </view>
+    </view>
+
+    <view class="section fade-up delay-2">
+      <text class="section-title">三条承诺</text>
+      <view class="card">
+        <view class="row space-between" style="margin-top: 8rpx;">
+          <text class="muted small">团购不加价</text>
+          <switch checked="{{promiseNoExtraFee}}" bindchange="onPromiseNoExtraFee" />
+        </view>
+        <view class="row space-between" style="margin-top: 12rpx;">
+          <text class="muted small">流程不缩水</text>
+          <switch checked="{{promiseNoShrink}}" bindchange="onPromiseNoShrink" />
+        </view>
+        <view class="row space-between" style="margin-top: 12rpx;">
+          <text class="muted small">可拒绝不尴尬（不硬推销）</text>
+          <switch checked="{{promiseCanRefuse}}" bindchange="onPromiseCanRefuse" />
+        </view>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-2">
+      <text class="section-title">保存</text>
+      <view class="card">
+        <text class="muted small" wx:if="{{draftId}}">
+          你正在补齐档案，保存后可基于当前草稿生成“门店定制版”。
+        </text>
+        <button class="btn-primary" loading="{{saving}}" disabled="{{saving}}" bindtap="handleSave">
+          {{draftId ? "保存并生成定制版" : "保存"}}
+        </button>
+      </view>
+    </view>
+  </view>
+</view>
+

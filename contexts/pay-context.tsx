@@ -193,6 +193,42 @@ export function PayProvider({ children }: { children: ReactNode }) {
     return data as OrderStatusResponse
   }, [order?.out_trade_no, order?.client_secret])
 
+  // 绑定订单（内部方法）
+  const claimOrderInternal = useCallback(async () => {
+    if (!order?.out_trade_no || !order?.client_secret) return
+
+    setPayState("claiming")
+
+    try {
+      const res = await fetch("/api/wechatpay/orders/claim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          out_trade_no: order.out_trade_no,
+          client_secret: order.client_secret,
+        }),
+      })
+      const data = (await res.json()) as OrderStatusResponse | { error: string }
+      if (!res.ok) {
+        throw new Error("error" in data ? data.error : "绑定失败")
+      }
+
+      setOrderStatus(data as OrderStatusResponse)
+
+      if ((data as OrderStatusResponse).grant_status === "granted") {
+        setPayState("granted")
+        // 清除本地存储
+        localStorage.removeItem(STORAGE_KEY)
+      } else if ((data as OrderStatusResponse).grant_status === "failed") {
+        setPayState("error")
+        setError((data as OrderStatusResponse).grant_error || "开通失败")
+      }
+    } catch (e) {
+      setPayState("error")
+      setError(e instanceof Error ? e.message : "绑定失败")
+    }
+  }, [order?.out_trade_no, order?.client_secret])
+
   // 智能轮询
   useEffect(() => {
     if (!order?.out_trade_no || !order?.client_secret) return
@@ -249,43 +285,8 @@ export function PayProvider({ children }: { children: ReactNode }) {
         pollTimer.current = null
       }
     }
-  }, [order?.out_trade_no, order?.client_secret, payState, refreshStatus, user])
+  }, [order?.out_trade_no, order?.client_secret, payState, refreshStatus, user, claimOrderInternal])
 
-  // 绑定订单（内部方法）
-  const claimOrderInternal = useCallback(async () => {
-    if (!order?.out_trade_no || !order?.client_secret) return
-
-    setPayState("claiming")
-
-    try {
-      const res = await fetch("/api/wechatpay/orders/claim", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          out_trade_no: order.out_trade_no,
-          client_secret: order.client_secret,
-        }),
-      })
-      const data = (await res.json()) as OrderStatusResponse | { error: string }
-      if (!res.ok) {
-        throw new Error("error" in data ? data.error : "绑定失败")
-      }
-
-      setOrderStatus(data as OrderStatusResponse)
-
-      if ((data as OrderStatusResponse).grant_status === "granted") {
-        setPayState("granted")
-        // 清除本地存储
-        localStorage.removeItem(STORAGE_KEY)
-      } else if ((data as OrderStatusResponse).grant_status === "failed") {
-        setPayState("error")
-        setError((data as OrderStatusResponse).grant_error || "开通失败")
-      }
-    } catch (e) {
-      setPayState("error")
-      setError(e instanceof Error ? e.message : "绑定失败")
-    }
-  }, [order?.out_trade_no, order?.client_secret])
 
   // 用户登录后自动绑定待支付订单
   useEffect(() => {

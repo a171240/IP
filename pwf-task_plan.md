@@ -18,7 +18,7 @@ Define a practical technical approach to deliver a beauty-industry mini program 
   WHAT: Which phase you're currently working on (e.g., "Phase 1", "Phase 3").
   WHY: Quick reference for where you are in the task. Update this as you progress.
 -->
-Phase 2
+Phase 4
 
 ## Phases
 <!-- 
@@ -49,32 +49,32 @@ Phase 2
   WHAT: Decide how you'll approach the problem and what structure you'll use.
   WHY: Good planning prevents rework. Document decisions so you remember why you chose them.
 -->
-- [ ] Define technical approach (native mini program vs cross-platform vs H5 embed)
-- [ ] Define backend integration strategy (reuse Next.js/Supabase APIs or add BFF)
+- [x] Define technical approach (WeChat native mini program; single-domain backend/BFF)
+- [x] Define backend integration strategy (reuse Next.js/Supabase APIs + MP-prefixed BFF routes)
 - [x] Consolidate mini program flows into TabBar + page list
 - [x] Produce UI brief for frontend (Gemini)
-- [ ] Document decisions with rationale
-- **Status:** in_progress
+- [x] Document decisions with rationale (see docs/DEV_SPEC_MINIPROGRAM.md)
+- **Status:** complete
 
 ### Phase 3: Implementation (MVP)
 <!-- 
   WHAT: Actually build/create/write the solution.
   WHY: This is where the work happens. Break into smaller sub-tasks if needed.
 -->
-- [ ] Build MVP for IP content factory + Xiaohongshu content/image generation
-- [ ] Implement auth, usage quotas, and billing hooks if needed
-- [ ] Test incrementally
-- **Status:** pending
+- [x] Build MVP for IP content factory (P7/P8) + Xiaohongshu drafts/library integration
+- [x] Implement auth, usage quotas, and billing hooks (shared Supabase Bearer token + credits snapshot)
+- [x] Test incrementally (lint/build; MP regress pending DB migration)
+- **Status:** in_progress
 
 ### Phase 4: Testing & Verification
 <!-- 
   WHAT: Verify everything works and meets requirements.
   WHY: Catching issues early saves time. Document test results in pwf-progress.md.
 -->
-- [ ] Verify requirements met on mobile devices
-- [ ] Document test results in pwf-progress.md
-- [ ] Fix any issues found
-- **Status:** pending
+- [ ] Verify requirements met on mobile devices (WeChat DevTools + real device)
+- [x] Document test results in pwf-progress.md
+- [ ] Fix any issues found (blocked: apply xhs_drafts migration)
+- **Status:** in_progress
 
 ### Phase 5: Delivery & Roadmap
 <!-- 
@@ -116,7 +116,7 @@ Phase 2
 | Plan for async generation pipeline | Supports future scaling and video generation. |
 | Reuse `/api/chat`, `/api/prompts`, `/api/diagnosis`, and pack download APIs | Existing endpoints already handle auth/credits and content workflows. |
 | Add mini program payment flow (JSAPI) while reusing order/fulfillment tables | Current endpoints are Native QR; mini program needs JSAPI. |
-| Use https://www.ai-meirong.com/ as Xiaohongshu backend base | User specified deployment domain. |
+| Single domain for mini program: https://ip.ipgongchang.xin | ICP备案约束; mini program request domain whitelist. |
 | Include publish feature in MVP flow | User explicitly requested publish. |
 | Switch Xiaohongshu generation endpoints to APIMART_* config | Aligns with IP factory API settings and Evolink base. |
 

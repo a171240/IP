@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
@@ -492,8 +492,8 @@ function QuickStartPageContent() {
       })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => null)
-        const message = (errorData as any)?.error || "\u751f\u6210\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5"
+        const errorData = (await response.json().catch(() => null)) as { error?: string } | null
+        const message = errorData?.error || "\u751f\u6210\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5"
         setResult(message)
         return
       }
@@ -560,7 +560,7 @@ function QuickStartPageContent() {
     }
   }
 
-  const handleSaveToReports = async () => {
+  const handleSaveToReports = useCallback(async () => {
     if (!result || isSaving || isSaved) return
 
     setIsSaving(true)
@@ -599,7 +599,15 @@ function QuickStartPageContent() {
     } finally {
       setIsSaving(false)
     }
-  }
+  }, [
+    currentAgent,
+    generationContext,
+    isSaved,
+    isSaving,
+    profile?.id,
+    result,
+    selectedAgent,
+  ])
 
   useEffect(() => {
     if (!user) return
@@ -611,7 +619,7 @@ function QuickStartPageContent() {
     }
 
     setPendingAction(null)
-  }, [user, pendingAction, result])
+  }, [user, pendingAction, result, handleSaveToReports])
 
   const showUpgrade = !authLoading && currentPlan === "free"
   const homeHref = user ? "/dashboard" : "/"
@@ -1050,7 +1058,7 @@ function QuickStartPageContent() {
                         <h3 className="text-sm font-semibold dark:text-white text-zinc-900">新用户体验计划：7天Pro体验</h3>
                       </div>
                       <p className="text-xs dark:text-zinc-400 text-zinc-500 leading-relaxed">
-                        体验版让你"先跑通一条"，Pro帮你解锁全部{MARKETING_METRICS.workflowTemplates}个智能体模板 + 批量产出 + 资源下载。
+                        体验版让你&quot;先跑通一条&quot;，Pro帮你解锁全部{MARKETING_METRICS.workflowTemplates}个智能体模板 + 批量产出 + 资源下载。
                       </p>
                     </div>
 
@@ -1084,7 +1092,7 @@ function QuickStartPageContent() {
             <div className="text-center py-6">
               <p className="text-zinc-500 text-sm">选择交付物 → 填写信息 → 点击生成 → 保存到报告 → 进入工坊体系化沉淀</p>
               <p className="mt-2 text-[10px] text-zinc-600">
-                体验版更适合"先跑通一条"，想解锁全部智能体和下载权限，建议升级Plus/Pro。
+                体验版更适合&quot;先跑通一条&quot;，想解锁全部智能体和下载权限，建议升级Plus/Pro。
               </p>
               <div className="mt-4 flex items-center justify-center gap-3 text-xs text-zinc-500">
                 <Link href="/dashboard/workflow" className="hover:text-purple-300 transition-colors">

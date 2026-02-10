@@ -41,7 +41,7 @@ const Navigation = () => {
 
       {/* Nav Items */}
       <div className="flex-1 flex flex-col space-y-4 w-full px-2">
-        {navItems.map((item, index) => (
+        {navItems.map((item) => (
           <button
             key={item.id}
             className="group relative w-full aspect-square rounded-2xl flex items-center justify-center transition-all duration-300 text-zinc-600 hover:text-zinc-400 hover:bg-white/5 cursor-not-allowed opacity-50"

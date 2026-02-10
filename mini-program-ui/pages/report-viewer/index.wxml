@@ -1,0 +1,26 @@
+<view class="page page-workspace">
+  <view class="container">
+    <view class="hero fade-up">
+      <text class="title">{{report ? report.title : "报告"}}</text>
+      <text class="subtitle">{{report ? (report.step_id + " · " + createdAtLabel) : ""}}</text>
+    </view>
+
+    <view class="section fade-up delay-1">
+      <text class="section-title">内容</text>
+      <view class="card">
+        <text class="muted small" wx:if="{{loading}}">加载中...</text>
+        <textarea
+          wx:else
+          class="input textarea"
+          value="{{report ? report.content : ''}}"
+          disabled="true"
+          placeholder="无内容"
+        ></textarea>
+        <view class="row" style="margin-top: 12rpx;">
+          <button class="btn-outline" size="mini" disabled="{{!report}}" bindtap="handleCopy">复制</button>
+          <button class="btn-primary" size="mini" bindtap="handleGoXhs">去小红书工坊</button>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

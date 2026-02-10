@@ -62,7 +62,7 @@ function toCsv(rows: Array<Record<string, unknown>>, headers: string[]): string 
   return [headerLine, ...lines].join("\n")
 }
 
-async function requireAdmin(request: NextRequest) {
+async function requireAdmin() {
   const supabaseAuth = await createServerSupabaseClient()
   const {
     data: { user },
@@ -76,7 +76,7 @@ async function requireAdmin(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const auth = await requireAdmin(request)
+  const auth = await requireAdmin()
   if (!auth.ok) return auth.response
 
   const { searchParams } = new URL(request.url)
@@ -238,7 +238,7 @@ const updateSchema = z.object({
 })
 
 export async function POST(request: NextRequest) {
-  const auth = await requireAdmin(request)
+  const auth = await requireAdmin()
   if (!auth.ok) return auth.response
 
   let body: Record<string, unknown>

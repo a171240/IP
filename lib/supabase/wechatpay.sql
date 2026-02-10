@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS public.wechatpay_orders (
   currency TEXT NOT NULL DEFAULT 'CNY',
   status TEXT NOT NULL DEFAULT 'created' CHECK (status IN ('created', 'paid', 'closed', 'failed')),
   code_url TEXT,
+  prepay_id TEXT,
   wx_transaction_id TEXT,
   paid_at TIMESTAMPTZ,
   claimed_at TIMESTAMPTZ,
@@ -39,6 +40,9 @@ ALTER TABLE IF EXISTS public.wechatpay_orders
   ADD COLUMN IF NOT EXISTS ip_address TEXT,
   ADD COLUMN IF NOT EXISTS user_agent TEXT,
   ADD COLUMN IF NOT EXISTS origin TEXT;
+
+ALTER TABLE IF EXISTS public.wechatpay_orders
+  ADD COLUMN IF NOT EXISTS prepay_id TEXT;
 
 ALTER TABLE public.wechatpay_orders ENABLE ROW LEVEL SECURITY;
 

@@ -56,12 +56,9 @@ import {
   saveReport,
   getLatestReport,
   getLatestReportByConversation,
-  getUserReportsPreview,
   getStepConversations,
   updateStepProgress,
-  type Message as DbMessage,
   type Conversation,
-  type ReportPreview
 } from "@/lib/supabase"
 import { getOrCreateDeviceId } from "@/lib/device"
 import { agentsConfig } from "@/lib/agents/config"
@@ -148,7 +145,7 @@ function buildOnboardingPrompt(stepId: string, onboarding: OnboardingContext) {
   return null
 }
 
-export default function WorkflowStepClient({ stepId, step }: { stepId: string; step: WorkflowStepConfig }) {
+export default function WorkflowStepClient({ step }: { step: WorkflowStepConfig }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const onboardingFlag = searchParams?.get("onboarding") === "1"
@@ -160,13 +157,13 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
   const [isLoading, setIsLoading] = useState(false)
   const [isThinking, setIsThinking] = useState(false)
   const [generatedDoc, setGeneratedDoc] = useState<string | null>(null)
-  const [conversationProgress, setConversationProgress] = useState(0)
   const [isGeneratingReport, setIsGeneratingReport] = useState(false)
   const [canGenerateReport, setCanGenerateReport] = useState(false)
   const [isCopied, setIsCopied] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
   const [elapsedTime, setElapsedTime] = useState(0)
   const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null)
+  const [, setConversationProgress] = useState(0)
   const [stepConversations, setStepConversations] = useState<Conversation[]>([])
   const [isInitializing, setIsInitializing] = useState(true)
   const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'error'>('synced')
@@ -491,7 +488,9 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
     }
 
     initConversation()
-  }, [step, user, authLoading])
+  },
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [step, user, authLoading])
 
   // 自动滚动到底部
   useEffect(() => {
@@ -534,6 +533,7 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
   }, [])
 
   // 发送消息
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleSend = async (opts?: { allowCreditsOverride?: boolean; overrideContent?: string }) => {
     if (step.id === 'P8' && !selectedP8AgentId) {
       alert('请先选择一个脚本创作智能体')
@@ -822,7 +822,8 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
     if (!prompt) return
     onboardingSentRef.current = true
     void handleSend({ overrideContent: prompt })
-  }, [
+  },
+  [
     onboardingFlag,
     step,
     currentConversation,
@@ -998,8 +999,8 @@ export default function WorkflowStepClient({ stepId, step }: { stepId: string; s
       })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => null)
-        const message = (errorData as any)?.error || '优化失败'
+        const errorData = (await response.json().catch(() => null)) as { error?: string } | null
+        const message = errorData?.error || '优化失败'
         throw new Error(message)
       }
 

@@ -7,34 +7,17 @@ import {
   BookOpen,
   ChevronDown,
   ChevronRight,
-  Crown,
   Factory,
   FileText,
   Gift,
   Lightbulb,
   Search,
-  Sparkles,
   Store,
 } from "lucide-react"
 
 import { GlassCard, Header } from "@/components/ui/obsidian"
-import type { AgentConfig, AgentScene, AgentTier } from "@/lib/agents/config"
-import { agentsConfig, sceneConfig, solutionPacksConfig } from "@/lib/agents/config"
-
-// 智能体等级标识配置
-const tierBadgeConfig: Record<AgentTier, { label: string; color: string; icon: typeof Gift }> = {
-  free: { label: "免费", color: "text-zinc-400 bg-zinc-500/10 border-zinc-500/20", icon: Sparkles },
-  member: { label: "Plus", color: "text-amber-400 bg-amber-500/10 border-amber-500/20", icon: Gift },
-  pro_benefit: { label: "Pro", color: "text-purple-400 bg-purple-500/10 border-purple-500/20", icon: Crown },
-  normal: { label: "通用", color: "text-zinc-400 bg-zinc-500/10 border-zinc-500/20", icon: Sparkles },
-  premium: { label: "高级", color: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20", icon: Crown },
-}
-
-// 获取解决方案包的等级
-function getPackTier(packId: string): AgentTier {
-  const pack = solutionPacksConfig.find((p) => p.id === packId || p.sourcePath?.includes(packId))
-  return pack?.tier || "normal"
-}
+import type { AgentConfig, AgentScene } from "@/lib/agents/config"
+import { agentsConfig, sceneConfig } from "@/lib/agents/config"
 
 import { PromptPreviewSheet } from "./PromptPreviewSheet"
 

@@ -2,6 +2,7 @@
 
 import type { User } from "@supabase/supabase-js"
 import { createHash } from "crypto"
+import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { normalizePlan, type PlanId } from "@/lib/pricing/rules"
 
@@ -174,15 +175,87 @@ export async function consumeCredits(opts: {
       throw err
     }
 
-    if (consumeError.message?.includes("function") && consumeError.message?.includes("does not exist")) {
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({ credits_balance: currentBalance - amount })
-        .eq("id", userId)
-        .gte("credits_balance", amount)
+    const isFunctionMissing =
+      consumeError.message?.includes("function") && consumeError.message?.includes("does not exist")
+    const isAmbiguousCreditsColumn = (() => {
+      const code = String(consumeError.code || "").trim()
+      const msg = String(consumeError.message || "").toLowerCase()
+      return code === "42702" || (msg.includes("credits_balance") && msg.includes("ambiguous"))
+    })()
 
-      if (updateError) throw new Error(updateError.message || "积分扣减失败")
-      return { credits_balance: currentBalance - amount, credits_unlimited: false }
+    if (isFunctionMissing || isAmbiguousCreditsColumn) {
+      // Fallback: RPC is missing/broken. Decrement via service role to avoid profiles RLS.
+      try {
+        const admin = createAdminSupabaseClient()
+
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const { data: profileRow, error: profileError } = await admin
+            .from("profiles")
+            .select("credits_balance, credits_unlimited")
+            .eq("id", userId)
+            .single()
+
+          if (profileError || !profileRow) {
+            throw new Error(profileError?.message || "无法读取积分余额")
+          }
+
+          const latestBalance = Number(profileRow.credits_balance ?? currentBalance)
+          const latestUnlimited = Boolean(profileRow.credits_unlimited)
+
+          if (latestUnlimited) {
+            return { credits_balance: latestBalance, credits_unlimited: true }
+          }
+
+          if (latestBalance < amount) {
+            const err = new Error("insufficient_credits")
+            ;(err as unknown as { meta?: Record<string, unknown> }).meta = { required: amount, balance: latestBalance }
+            throw err
+          }
+
+          const { data: updatedRows, error: updateError } = await admin
+            .from("profiles")
+            .update({ credits_balance: latestBalance - amount })
+            .eq("id", userId)
+            .eq("credits_balance", latestBalance)
+            .gte("credits_balance", amount)
+            .select("credits_balance, credits_unlimited")
+
+          if (updateError) {
+            throw new Error(updateError.message || "积分扣减失败")
+          }
+
+          const updated = Array.isArray(updatedRows) ? updatedRows[0] : updatedRows
+          if (!updated) {
+            // Race condition; retry.
+            continue
+          }
+
+          // Best-effort transaction log (non-atomic, but better than nothing if RPC is broken).
+          try {
+            await admin.from("credit_transactions").insert({
+              user_id: userId,
+              step_id: stepId,
+              delta: -amount,
+              reason: "consume",
+              metadata: { amount },
+            })
+          } catch {
+            // ignore
+          }
+
+          return {
+            credits_balance: Number(
+              (updated as { credits_balance?: number | null }).credits_balance ?? latestBalance - amount
+            ),
+            credits_unlimited: Boolean((updated as { credits_unlimited?: boolean | null }).credits_unlimited ?? false),
+          }
+        }
+
+        throw new Error("积分扣减失败，请重试")
+      } catch (e) {
+        // If admin fallback isn't available, keep the original failure.
+        throw new Error(e instanceof Error ? e.message : consumeError.message || "积分扣减失败")
+      }
     }
 
     throw new Error(consumeError.message || "积分扣减失败")
