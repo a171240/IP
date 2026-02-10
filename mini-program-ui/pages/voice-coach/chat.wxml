@@ -9,29 +9,76 @@
       <view id="turn-{{item.id}}" class="row {{item.role === 'customer' ? 'left' : 'right'}}">
         <view wx:if="{{item.role === 'customer'}}" class="avatar avatar-customer">客</view>
 
-        <view class="bubble {{item.role === 'customer' ? 'bubble-customer' : 'bubble-beautician'}}">
-          <view class="voice" wx:if="{{item.audio_url}}">
-            <view class="voice-bar" bindtap="onPlay" data-id="{{item.id}}" data-url="{{item.audio_url}}">
-              <text class="voice-label">播放</text>
-              <text class="voice-dur">{{item.audio_seconds_text}}</text>
+        <view class="msg {{item.role === 'customer' ? 'msg-left' : 'msg-right'}}">
+          <!-- 主气泡：只保留语音（更接近微信语音消息） -->
+          <view class="bubble {{item.role === 'customer' ? 'bubble-customer' : 'bubble-beautician'}}">
+            <view class="voice" wx:if="{{item.audio_url}}">
+              <view
+                class="voice-bar {{playingTurnId === item.id ? 'voice-playing' : ''}}"
+                bindtap="onPlay"
+                data-id="{{item.id}}"
+                data-url="{{item.audio_url}}"
+              >
+                <text class="voice-label">{{playingTurnId === item.id ? "播放中" : "播放"}}</text>
+                <text class="voice-dur">{{item.audio_seconds_text}}</text>
+              </view>
             </view>
+
+            <view wx:else class="msg-text">{{item.text}}</view>
           </view>
 
-          <view class="msg-text">{{item.text}}</view>
+          <!-- 微信式：文字/建议/重录都在气泡下面 -->
+          <view class="meta-row">
+            <view class="meta-actions">
+              <text
+                wx:if="{{item.audio_url && item.text}}"
+                class="meta-action"
+                bindtap="toggleText"
+                data-id="{{item.id}}"
+              >
+                {{item.showText ? "收起文字" : "点击查看文字"}}
+              </text>
 
-          <view wx:if="{{item.role === 'beautician'}}" class="msg-actions">
-            <button class="mini-btn" size="mini" bindtap="toggleSuggest" data-id="{{item.id}}">改进建议</button>
-            <button class="mini-btn ghost" size="mini" bindtap="onRerecord" data-id="{{item.id}}">重录</button>
+              <text
+                wx:if="{{item.role === 'beautician'}}"
+                class="meta-action"
+                bindtap="toggleSuggest"
+                data-id="{{item.id}}"
+              >
+                {{item.showSuggestions ? "收起建议" : "改进建议"}}
+              </text>
+
+              <text
+                wx:if="{{item.role === 'beautician' && !item.pending}}"
+                class="meta-action meta-danger"
+                bindtap="onRerecord"
+                data-id="{{item.id}}"
+              >
+                重录
+              </text>
+            </view>
+
+            <text wx:if="{{item.pending}}" class="meta-hint">识别中...</text>
           </view>
 
-          <view wx:if="{{item.role === 'beautician' && item.showSuggestions && item.analysis}}" class="suggest-box">
-            <view class="suggest-title">改进建议：</view>
-            <view class="suggest-item">1. {{item.analysis.suggestions[0]}}</view>
-            <view class="suggest-item">2. {{item.analysis.suggestions[1]}}</view>
-            <view class="suggest-item">3. {{item.analysis.suggestions[2]}}</view>
+          <view
+            wx:if="{{item.audio_url && item.text && item.showText}}"
+            class="text-card {{item.role === 'customer' ? 'card-customer' : 'card-beautician'}}"
+          >
+            {{item.text}}
+          </view>
 
-            <view class="polished-title">润色表达：</view>
-            <view class="polished">{{item.analysis.polished}}</view>
+          <view wx:if="{{item.role === 'beautician' && item.showSuggestions}}" class="suggest-card">
+            <view wx:if="{{item.analysis}}">
+              <view class="suggest-title">改进建议：</view>
+              <view class="suggest-item">1. {{item.analysis.suggestions[0]}}</view>
+              <view class="suggest-item">2. {{item.analysis.suggestions[1]}}</view>
+              <view class="suggest-item">3. {{item.analysis.suggestions[2]}}</view>
+
+              <view class="polished-title">润色表达：</view>
+              <view class="polished">{{item.analysis.polished}}</view>
+            </view>
+            <view wx:else class="suggest-loading">建议生成中...</view>
           </view>
         </view>
 

@@ -11,6 +11,8 @@ function formatSeconds(seconds) {
 
 function normalizeTurn(raw) {
   const role = raw.role === "beautician" ? "beautician" : "customer"
+  const hasAudio = Boolean(raw.audio_url || raw.audioUrl || raw.audio_path)
+  const showTextDefault = hasAudio ? false : true
   return {
     id: raw.id || raw.turn_id,
     role,
@@ -21,6 +23,25 @@ function normalizeTurn(raw) {
     audio_seconds_text: formatSeconds(raw.audio_seconds),
     analysis: raw.analysis || raw.analysis_json || null,
     showSuggestions: false,
+    showText: showTextDefault,
+    pending: Boolean(raw.pending),
+  }
+}
+
+function makeLocalBeauticianTurn(filePath, durationSec) {
+  const id = `local_${Date.now()}_${Math.random().toString(16).slice(2)}`
+  return {
+    id,
+    role: "beautician",
+    text: "",
+    emotion: "",
+    audio_url: filePath,
+    audio_seconds: durationSec || 0,
+    audio_seconds_text: formatSeconds(durationSec),
+    analysis: null,
+    showSuggestions: false,
+    showText: false,
+    pending: true,
   }
 }
 
@@ -43,6 +64,12 @@ Page({
     this.audioCtx = wx.createInnerAudioContext()
     this.audioCtx.onEnded(() => {
       this.setData({ playingTurnId: "" })
+    })
+    this.hasShownAudioError = false
+    this.audioCtx.onError(() => {
+      if (this.hasShownAudioError) return
+      this.hasShownAudioError = true
+      wx.showToast({ title: "音频播放失败，请检查 downloadFile 合法域名", icon: "none" })
     })
 
     this.recorder.onStop((res) => {
@@ -98,6 +125,7 @@ Page({
         loading: false,
         scrollIntoView: `turn-${first.id}`,
       })
+      this.autoPlayTurn(first)
     } catch (err) {
       this.setData({ loading: false })
       wx.showToast({ title: err.message || "创建会话失败", icon: "none" })
@@ -191,6 +219,10 @@ Page({
       this.recordIntent = "send"
       this.setData({ recording: true })
       try {
+        if (this.audioCtx) this.audioCtx.stop()
+        this.setData({ playingTurnId: "" })
+      } catch {}
+      try {
         this.recorder.start({
           duration: 30000,
           format: "mp3",
@@ -258,6 +290,16 @@ Page({
       return
     }
 
+    // Add a local "sent" bubble immediately (WeChat-like), then replace it with server result.
+    const localTurn = makeLocalBeauticianTurn(filePath, durationSec)
+    const turnsNow = (this.data.turns || []).slice()
+    turnsNow.push(localTurn)
+    this.pendingLocalTurnId = localTurn.id
+    this.setData({
+      turns: turnsNow,
+      scrollIntoView: `turn-${localTurn.id}`,
+    })
+
     const token = getAccessToken()
     const deviceId = getDeviceId()
 
@@ -284,6 +326,10 @@ Page({
         if (!payload || payload.error) {
           this.setData({ loading: false })
           wx.showToast({ title: payload?.error || "上传失败", icon: "none" })
+          // Remove pending local bubble on failure.
+          const turns = (this.data.turns || []).filter((t) => t.id !== this.pendingLocalTurnId)
+          this.pendingLocalTurnId = ""
+          this.setData({ turns })
           return
         }
 
@@ -296,7 +342,12 @@ Page({
           audio_seconds: payload.beautician_turn.audio_seconds,
           analysis: payload.analysis,
         })
-        turns.push(beautician)
+        // Replace pending local bubble if present.
+        const pendingId = this.pendingLocalTurnId
+        this.pendingLocalTurnId = ""
+        const idx = pendingId ? turns.findIndex((t) => t.id === pendingId) : -1
+        if (idx >= 0) turns.splice(idx, 1, beautician)
+        else turns.push(beautician)
 
         if (payload.next_customer_turn) {
           const customer = normalizeTurn({
@@ -308,6 +359,8 @@ Page({
             audio_seconds: payload.next_customer_turn.audio_seconds,
           })
           turns.push(customer)
+          // Auto-play the customer reply as soon as it arrives.
+          this.autoPlayTurn(customer)
         }
 
         const last = turns[turns.length - 1]
@@ -325,8 +378,21 @@ Page({
       fail: () => {
         this.setData({ loading: false })
         wx.showToast({ title: "上传失败", icon: "none" })
+        const turns = (this.data.turns || []).filter((t) => t.id !== this.pendingLocalTurnId)
+        this.pendingLocalTurnId = ""
+        this.setData({ turns })
       },
     })
+  },
+
+  toggleText(e) {
+    const id = e && e.currentTarget ? String(e.currentTarget.dataset.id) : ""
+    if (!id) return
+    const turns = (this.data.turns || []).map((t) => {
+      if (t.id !== id) return t
+      return { ...t, showText: !t.showText }
+    })
+    this.setData({ turns })
   },
 
   toggleSuggest(e) {
@@ -427,6 +493,18 @@ Page({
       this.setData({ playingTurnId: id })
     } catch (err) {
       wx.showToast({ title: "播放失败", icon: "none" })
+    }
+  },
+
+  autoPlayTurn(turn) {
+    if (!turn || !turn.audio_url || !turn.id) return
+    try {
+      this.audioCtx.stop()
+      this.audioCtx.src = turn.audio_url
+      this.audioCtx.play()
+      this.setData({ playingTurnId: turn.id })
+    } catch (_) {
+      // Ignore autoplay failures (some devices block autoplay).
     }
   },
 })

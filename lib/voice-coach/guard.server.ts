@@ -12,7 +12,9 @@ function parseCsv(input: string): string[] {
 }
 
 export function checkVoiceCoachAccess(userId: string): VoiceCoachAccessResult {
-  const enabled = (process.env.VOICE_COACH_ENABLED || "").toLowerCase()
+  const enabled = String(process.env.VOICE_COACH_ENABLED ?? "")
+    .trim()
+    .toLowerCase()
   if (enabled !== "true") {
     return { ok: false, status: 404, error: "voice_coach_disabled" }
   }
@@ -28,4 +30,3 @@ export function checkVoiceCoachAccess(userId: string): VoiceCoachAccessResult {
   const maxTurns = Math.max(1, Number(process.env.VOICE_COACH_MAX_TURNS || 10) || 10)
   return { ok: true, maxTurns }
 }
-

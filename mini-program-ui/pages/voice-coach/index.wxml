@@ -1,0 +1,39 @@
+<view class="page page-voice-coach">
+  <view class="container">
+    <view class="hero fade-up">
+      <text class="eyebrow">销售话术练习</text>
+      <text class="title">练练：成交话术陪练</text>
+      <text class="subtitle">语音对话 + 逐句点评 + 练后报告</text>
+
+      <view class="hero-actions">
+        <button class="btn-primary" bindtap="handleStart">开始练习</button>
+      </view>
+
+      <view class="hero-badges">
+        <view class="chip">首次进入会申请录音权限</view>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-1">
+      <text class="section-title">练习亮点</text>
+      <view class="grid-2">
+        <view class="card">
+          <text class="card-title">顾客扮演</text>
+          <text class="muted small">模拟真实异议与犹豫点</text>
+        </view>
+        <view class="card">
+          <text class="card-title">逐句点评</text>
+          <text class="muted small">指出更自然的表达方式</text>
+        </view>
+        <view class="card">
+          <text class="card-title">润色表达</text>
+          <text class="muted small">给出可直接复用的说法</text>
+        </view>
+        <view class="card">
+          <text class="card-title">练后报告</text>
+          <text class="muted small">维度评分 + 下一步建议</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>
