@@ -1,2 +1,3 @@
-export { runtime, POST } from "@/app/api/track/route"
+export const runtime = "nodejs"
 
+export { POST } from "@/app/api/track/route"
