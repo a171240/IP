@@ -1,6 +1,7 @@
 ﻿const { IP_FACTORY_BASE_URL } = require("../../utils/config")
 const { request } = require("../../utils/request")
 const { getProfile, getUser, isLoggedIn, logout } = require("../../utils/auth")
+const { track } = require("../../utils/track")
 
 Page({
   data: {
@@ -93,6 +94,11 @@ Page({
 
   handleStoreProfiles() {
     wx.navigateTo({ url: "/pages/store-profiles/index" })
+  },
+
+  handleVoiceCoach() {
+    track("mine_go_voice_coach")
+    wx.navigateTo({ url: "/pages/voice-coach/chat" })
   },
 
   handleAdvanced() {

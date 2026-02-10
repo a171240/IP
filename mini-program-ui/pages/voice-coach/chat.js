@@ -163,7 +163,13 @@ Page({
         method: "POST",
         data: { mode: "end_only" },
       })
-      wx.switchTab({ url: "/pages/workspace/index" })
+      // Prefer going back to where user came from. If not possible, fall back to a tab page.
+      wx.navigateBack({
+        delta: 1,
+        fail: () => {
+          wx.switchTab({ url: "/pages/mine/index" })
+        },
+      })
     } catch (err) {
       this.setData({ loading: false })
       wx.showToast({ title: err.message || "结束失败", icon: "none" })

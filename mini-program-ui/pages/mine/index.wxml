@@ -64,6 +64,12 @@
       </view>
 
       <view class="card" style="margin-top: 16rpx;">
+        <text class="card-title">销售话术练习</text>
+        <text class="muted small">语音对话 + 逐句点评 + 练后报告</text>
+        <button class="btn-primary" bindtap="handleVoiceCoach">开始练习</button>
+      </view>
+
+      <view class="card" style="margin-top: 16rpx;">
         <text class="card-title">进阶工具</text>
         <text class="muted small">P1-P10 工作流等能力（默认隐藏）</text>
         <button class="btn-outline" bindtap="handleAdvanced">打开进阶</button>

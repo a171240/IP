@@ -67,29 +67,42 @@ function clearSession() {
 }
 
 function requestWechatLogin(code, profile) {
-  return new Promise((resolve, reject) => {
-    wx.request({
-      url: `${IP_FACTORY_BASE_URL}/api/wechat/login`,
-      method: "POST",
-      data: {
-        code,
-        nickname: profile?.nickName || "",
-        avatar_url: profile?.avatarUrl || "",
-      },
-      header: {
-        "Content-Type": "application/json",
-      },
-      success(res) {
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          resolve(res.data)
-          return
-        }
-        reject(res.data || { error: "login_failed" })
-      },
-      fail(err) {
-        reject(err)
-      },
+  const payload = {
+    code,
+    nickname: profile?.nickName || "",
+    avatar_url: profile?.avatarUrl || "",
+  }
+
+  const doRequest = (url) =>
+    new Promise((resolve, reject) => {
+      wx.request({
+        url,
+        method: "POST",
+        data: payload,
+        header: {
+          "Content-Type": "application/json",
+        },
+        success(res) {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve(res.data)
+            return
+          }
+          reject({ statusCode: res.statusCode, data: res.data })
+        },
+        fail(err) {
+          reject(err)
+        },
+      })
     })
+
+  // Prefer /api/mp/* routes (we sometimes firewall /api/wechat/* in devtools).
+  return doRequest(`${IP_FACTORY_BASE_URL}/api/mp/wechat/login`).catch((err) => {
+    const statusCode = err && typeof err.statusCode === "number" ? err.statusCode : 0
+    // Fallback for older deployments.
+    if (statusCode === 404 || statusCode === 405 || statusCode === 403) {
+      return doRequest(`${IP_FACTORY_BASE_URL}/api/wechat/login`)
+    }
+    return Promise.reject(err?.data || err || { error: "login_failed" })
   })
 }
 

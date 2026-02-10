@@ -30,19 +30,31 @@ function track(event, props = {}, options = {}) {
     },
   }
 
-  wx.request({
-    url: `${IP_FACTORY_BASE_URL}/api/track`,
-    method: "POST",
-    data: payload,
-    header: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(deviceId ? { "x-device-id": deviceId } : {}),
-    },
-    success() {},
-    fail() {},
-  })
+  const send = (url) =>
+    wx.request({
+      url,
+      method: "POST",
+      data: payload,
+      header: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(deviceId ? { "x-device-id": deviceId } : {}),
+      },
+      success(res) {
+        // Some deployments may protect /api/track from devtools; fallback to /api/mp/track.
+        if (res.statusCode === 403 || res.statusCode === 404 || res.statusCode === 405) {
+          if (url.includes("/api/track")) {
+            send(`${IP_FACTORY_BASE_URL}/api/mp/track`)
+          } else if (url.includes("/api/mp/track")) {
+            send(`${IP_FACTORY_BASE_URL}/api/track`)
+          }
+        }
+      },
+      fail() {},
+    })
+
+  // Prefer /api/mp/* routes first.
+  send(`${IP_FACTORY_BASE_URL}/api/mp/track`)
 }
 
 module.exports = { track }
-
