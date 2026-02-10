@@ -9,21 +9,33 @@ function formatSeconds(seconds) {
   return `${Math.round(n)}''`
 }
 
+function voiceWidthRpx(seconds) {
+  const s = Math.max(1, Math.min(60, Number(seconds || 0) || 1))
+  const min = 180
+  const max = 420
+  // Log curve feels closer to WeChat than linear.
+  const w = min + (max - min) * (Math.log1p(s) / Math.log1p(60))
+  return Math.round(w)
+}
+
 function normalizeTurn(raw) {
   const role = raw.role === "beautician" ? "beautician" : "customer"
   const hasAudio = Boolean(raw.audio_url || raw.audioUrl || raw.audio_path)
   const showTextDefault = hasAudio ? false : true
+  const audioSeconds = Number(raw.audio_seconds || raw.audioSeconds || 0) || 0
   return {
     id: raw.id || raw.turn_id,
     role,
     text: raw.text || "",
     emotion: raw.emotion || "",
     audio_url: raw.audio_url || null,
-    audio_seconds: raw.audio_seconds || null,
-    audio_seconds_text: formatSeconds(raw.audio_seconds),
+    audio_seconds: audioSeconds || null,
+    audio_seconds_text: formatSeconds(audioSeconds),
+    voice_width_rpx: hasAudio ? voiceWidthRpx(audioSeconds) : 0,
     analysis: raw.analysis || raw.analysis_json || null,
     showSuggestions: false,
     showText: showTextDefault,
+    textOpenedOnce: false,
     pending: Boolean(raw.pending),
   }
 }
@@ -38,9 +50,11 @@ function makeLocalBeauticianTurn(filePath, durationSec) {
     audio_url: filePath,
     audio_seconds: durationSec || 0,
     audio_seconds_text: formatSeconds(durationSec),
+    voice_width_rpx: voiceWidthRpx(durationSec || 0),
     analysis: null,
     showSuggestions: false,
     showText: false,
+    textOpenedOnce: false,
     pending: true,
   }
 }
@@ -392,7 +406,8 @@ Page({
     if (!id) return
     const turns = (this.data.turns || []).map((t) => {
       if (t.id !== id) return t
-      return { ...t, showText: !t.showText }
+      const willShow = !t.showText
+      return { ...t, showText: willShow, textOpenedOnce: t.textOpenedOnce || willShow }
     })
     this.setData({ turns })
   },
