@@ -57,11 +57,13 @@ Page({
     hintPoints: [],
     scrollIntoView: "",
     playingTurnId: "",
+    downloadingTurnId: "",
   },
 
   onLoad(options) {
     this.recorder = wx.getRecorderManager()
     this.audioCtx = wx.createInnerAudioContext()
+    this.audioCache = new Map()
     this.audioCtx.onEnded(() => {
       this.setData({ playingTurnId: "" })
     })
@@ -481,30 +483,66 @@ Page({
     const id = e && e.currentTarget ? String(e.currentTarget.dataset.id || "") : ""
     if (!url) return
 
-    try {
-      if (this.data.playingTurnId === id) {
+    if (this.data.playingTurnId === id) {
+      try {
         this.audioCtx.stop()
-        this.setData({ playingTurnId: "" })
-        return
-      }
-      this.audioCtx.stop()
-      this.audioCtx.src = url
-      this.audioCtx.play()
-      this.setData({ playingTurnId: id })
-    } catch (err) {
-      wx.showToast({ title: "播放失败", icon: "none" })
+      } catch {}
+      this.setData({ playingTurnId: "" })
+      return
     }
+
+    this.playAudio(id, url)
   },
 
   autoPlayTurn(turn) {
     if (!turn || !turn.audio_url || !turn.id) return
-    try {
-      this.audioCtx.stop()
-      this.audioCtx.src = turn.audio_url
-      this.audioCtx.play()
-      this.setData({ playingTurnId: turn.id })
-    } catch (_) {
-      // Ignore autoplay failures (some devices block autoplay).
+    this.playAudio(turn.id, turn.audio_url, { autoplay: true })
+  },
+
+  playAudio(turnId, url, opts = {}) {
+    const autoplay = Boolean(opts.autoplay)
+
+    const doPlay = (src) => {
+      try {
+        this.audioCtx.stop()
+        this.audioCtx.src = src
+        this.audioCtx.play()
+        this.setData({ playingTurnId: turnId })
+      } catch (err) {
+        if (!autoplay) wx.showToast({ title: "播放失败", icon: "none" })
+      }
     }
+
+    // Local temp file (recorded) can be played directly.
+    if (!/^https?:\/\//.test(url)) {
+      doPlay(url)
+      return
+    }
+
+    const cached = this.audioCache.get(turnId)
+    if (cached) {
+      doPlay(cached)
+      return
+    }
+
+    this.setData({ downloadingTurnId: turnId })
+    wx.downloadFile({
+      url,
+      success: (res) => {
+        this.setData({ downloadingTurnId: "" })
+        if (!res || res.statusCode !== 200 || !res.tempFilePath) {
+          // Fall back to remote URL if download failed.
+          doPlay(url)
+          return
+        }
+        this.audioCache.set(turnId, res.tempFilePath)
+        doPlay(res.tempFilePath)
+      },
+      fail: () => {
+        this.setData({ downloadingTurnId: "" })
+        // Fall back to remote URL if download failed.
+        doPlay(url)
+      },
+    })
   },
 })

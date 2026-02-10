@@ -19,7 +19,9 @@
                 data-id="{{item.id}}"
                 data-url="{{item.audio_url}}"
               >
-                <text class="voice-label">{{playingTurnId === item.id ? "播放中" : "播放"}}</text>
+                <text class="voice-label">
+                  {{downloadingTurnId === item.id ? "加载中" : (playingTurnId === item.id ? "播放中" : "播放")}}
+                </text>
                 <text class="voice-dur">{{item.audio_seconds_text}}</text>
               </view>
             </view>
