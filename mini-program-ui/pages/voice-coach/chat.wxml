@@ -120,7 +120,11 @@
   <view class="footer">
     <button class="hint-btn-icon" bindtap="openHint">
       <view class="hint-icon-inner">
-        <text class="hint-icon-bolt">⚡</text>
+        <view class="bulb-icon">
+          <view class="bulb-head"></view>
+          <view class="bulb-neck"></view>
+          <view class="bulb-base"></view>
+        </view>
       </view>
     </button>
     <button

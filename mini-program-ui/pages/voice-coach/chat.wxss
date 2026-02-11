@@ -370,8 +370,8 @@
   min-height: 86rpx;
   padding: 0;
   border-radius: 43rpx;
-  background: #edf5ef;
-  border: 2rpx solid rgba(24, 127, 73, 0.2);
+  background: #e7f3eb;
+  border: 2rpx solid #b9d9c7;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -385,18 +385,45 @@
   width: 54rpx;
   height: 54rpx;
   border-radius: 27rpx;
-  background: #118d52;
+  background: #149457;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: inset 0 -3rpx 8rpx rgba(0, 0, 0, 0.18);
+  box-shadow: inset 0 -3rpx 8rpx rgba(0, 0, 0, 0.15);
 }
 
-.hint-icon-bolt {
-  font-size: 28rpx;
-  line-height: 1;
-  color: #ffffff;
-  transform: translateY(-1rpx);
+.bulb-icon {
+  width: 28rpx;
+  height: 34rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.bulb-head {
+  width: 24rpx;
+  height: 20rpx;
+  border: 3rpx solid #ffffff;
+  border-bottom: 0;
+  border-radius: 14rpx 14rpx 8rpx 8rpx;
+  box-sizing: border-box;
+}
+
+.bulb-neck {
+  width: 12rpx;
+  height: 5rpx;
+  margin-top: 1rpx;
+  background: #ffffff;
+  border-radius: 3rpx;
+}
+
+.bulb-base {
+  width: 14rpx;
+  height: 7rpx;
+  margin-top: 2rpx;
+  border-radius: 3rpx;
+  background: #ffffff;
 }
 
 .record-btn {
