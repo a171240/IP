@@ -118,7 +118,11 @@
   </scroll-view>
 
   <view class="footer">
-    <button class="hint-btn" bindtap="openHint">对话灵感</button>
+    <button class="hint-btn-icon" bindtap="openHint">
+      <view class="hint-icon-inner">
+        <text class="hint-icon-bolt">⚡</text>
+      </view>
+    </button>
     <button
       class="record-btn"
       bindtouchstart="onRecordStart"

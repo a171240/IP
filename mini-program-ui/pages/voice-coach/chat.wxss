@@ -364,13 +364,39 @@
   gap: 14rpx;
 }
 
-.hint-btn {
-  width: 180rpx;
-  border-radius: 999rpx;
-  background: rgba(32, 168, 94, 0.14);
-  color: #187f49;
-  border: 2rpx solid rgba(32, 168, 94, 0.22);
+.hint-btn-icon {
+  width: 86rpx;
+  height: 86rpx;
+  min-height: 86rpx;
+  padding: 0;
+  border-radius: 43rpx;
+  background: #edf5ef;
+  border: 2rpx solid rgba(24, 127, 73, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hint-btn-icon::after {
+  border: none;
+}
+
+.hint-icon-inner {
+  width: 54rpx;
+  height: 54rpx;
+  border-radius: 27rpx;
+  background: #118d52;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 -3rpx 8rpx rgba(0, 0, 0, 0.18);
+}
+
+.hint-icon-bolt {
   font-size: 28rpx;
+  line-height: 1;
+  color: #ffffff;
+  transform: translateY(-1rpx);
 }
 
 .record-btn {
