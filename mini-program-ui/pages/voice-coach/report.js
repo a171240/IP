@@ -1,6 +1,16 @@
 const { API_BASE_URL } = require("../../utils/config")
 const { request } = require("../../utils/request")
 
+const CHART_COLORS = {
+  grid: "rgba(229, 211, 179, 0.16)",
+  label: "#b9b3c2",
+  axis: "rgba(229, 211, 179, 0.2)",
+  line: "rgba(149,236,105,0.96)",
+  area: "rgba(149,236,105,0.22)",
+  canvasBg: "#15151D",
+  targetBg: "rgba(149,236,105,0.14)",
+}
+
 function formatSeconds(seconds) {
   const n = Number(seconds || 0)
   if (!n || n <= 0) return ""
@@ -175,7 +185,9 @@ Page({
     const n = dims.length
 
     ctx.clearRect(0, 0, w, h)
-    ctx.setStrokeStyle("rgba(0,0,0,0.08)")
+    ctx.setFillStyle(CHART_COLORS.canvasBg)
+    ctx.fillRect(0, 0, w, h)
+    ctx.setStrokeStyle(CHART_COLORS.grid)
     ctx.setLineWidth(1)
 
     // grid rings
@@ -195,7 +207,7 @@ Page({
 
     // axes + labels
     ctx.setFontSize(10)
-    ctx.setFillStyle("rgba(0,0,0,0.55)")
+    ctx.setFillStyle(CHART_COLORS.label)
     for (let i = 0; i < n; i++) {
       const a = (-Math.PI / 2) + (i * 2 * Math.PI) / n
       const x = cx + radius * Math.cos(a)
@@ -212,9 +224,9 @@ Page({
     }
 
     // data polygon
-    ctx.setStrokeStyle("rgba(32,168,94,0.9)")
+    ctx.setStrokeStyle(CHART_COLORS.line)
     ctx.setLineWidth(2)
-    ctx.setFillStyle("rgba(32,168,94,0.22)")
+    ctx.setFillStyle(CHART_COLORS.area)
     ctx.beginPath()
     for (let i = 0; i < n; i++) {
       const score = Number(dims[i].score || 0)
@@ -296,19 +308,19 @@ Page({
     }
 
     ctx.clearRect(0, 0, w, h)
-    ctx.setFillStyle("#ffffff")
+    ctx.setFillStyle(CHART_COLORS.canvasBg)
     ctx.fillRect(0, 0, w, h)
 
     // target range background
     if (tr && tr.length === 2) {
       const y1 = yToPx(tr[0])
       const y2 = yToPx(tr[1])
-      ctx.setFillStyle("rgba(32,168,94,0.10)")
+      ctx.setFillStyle(CHART_COLORS.targetBg)
       ctx.fillRect(padL, Math.min(y1, y2), cw, Math.abs(y2 - y1))
     }
 
     // axes
-    ctx.setStrokeStyle("rgba(0,0,0,0.08)")
+    ctx.setStrokeStyle(CHART_COLORS.axis)
     ctx.setLineWidth(1)
     ctx.beginPath()
     ctx.moveTo(padL, padT)
@@ -317,7 +329,7 @@ Page({
     ctx.stroke()
 
     // line
-    ctx.setStrokeStyle("rgba(32,168,94,0.95)")
+    ctx.setStrokeStyle(CHART_COLORS.line)
     ctx.setLineWidth(2)
     ctx.beginPath()
     points.forEach((p, idx) => {
@@ -329,11 +341,10 @@ Page({
     ctx.stroke()
 
     // labels
-    ctx.setFillStyle("rgba(0,0,0,0.45)")
+    ctx.setFillStyle(CHART_COLORS.label)
     ctx.setFontSize(10)
     ctx.fillText(String(chart.label || ""), padL, 12)
 
     ctx.draw()
   },
 })
-

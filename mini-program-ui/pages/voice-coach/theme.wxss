@@ -1,0 +1,21 @@
+page,
+.vc-theme {
+  --vc-bg: #050507;
+  --vc-bg-soft: #0d0d12;
+  --vc-surface: #15151d;
+  --vc-surface-2: #1b1b24;
+  --vc-border: rgba(229, 211, 179, 0.2);
+  --vc-border-strong: rgba(229, 211, 179, 0.34);
+  --vc-text: #f5f5f5;
+  --vc-text-muted: #b9b3c2;
+  --vc-text-subtle: #8e8796;
+  --vc-gold: #e5d3b3;
+  --vc-success: #95ec69;
+  --vc-success-text: #1e2a12;
+  --vc-bubble-self: #95ec69;
+  --vc-bubble-self-text: #1e2a12;
+  --vc-bubble-other: #2a2a35;
+  --vc-bubble-other-text: #f2f3f7;
+  --vc-trans-pill: #1b1b24;
+  --vc-trans-dot: #ff4d4f;
+}
