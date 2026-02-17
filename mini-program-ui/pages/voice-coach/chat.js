@@ -82,6 +82,7 @@ Page({
       this.setData({ playingTurnId: "" })
     })
     this.hasShownAudioError = false
+    this.hasShownTtsFallbackToast = false
     this.audioCtx.onError(() => {
       if (this.hasShownAudioError) return
       this.hasShownAudioError = true
@@ -98,6 +99,11 @@ Page({
       const durationSec = res && res.duration ? Math.round(res.duration / 1000) : 0
       if (!res || !res.tempFilePath) {
         wx.showToast({ title: "录音失败", icon: "none" })
+        this.setData({ recording: false, loading: false })
+        return
+      }
+      if (!durationSec || durationSec < 1) {
+        wx.showToast({ title: "录音太短，请至少说1秒", icon: "none" })
         this.setData({ recording: false, loading: false })
         return
       }
@@ -141,6 +147,9 @@ Page({
         loading: false,
         scrollIntoView: `turn-${first.id}`,
       })
+      if (!first.audio_url || res.first_customer_turn.tts_failed) {
+        this.notifyTtsFallback()
+      }
       this.autoPlayTurn(first)
     } catch (err) {
       this.setData({ loading: false })
@@ -341,7 +350,7 @@ Page({
 
         if (!payload || payload.error) {
           this.setData({ loading: false })
-          wx.showToast({ title: payload?.error || "上传失败", icon: "none" })
+          wx.showToast({ title: payload?.message || payload?.error || "上传失败", icon: "none" })
           // Remove pending local bubble on failure.
           const turns = (this.data.turns || []).filter((t) => t.id !== this.pendingLocalTurnId)
           this.pendingLocalTurnId = ""
@@ -375,6 +384,9 @@ Page({
             audio_seconds: payload.next_customer_turn.audio_seconds,
           })
           turns.push(customer)
+          if (!payload.next_customer_turn.audio_url || payload.next_customer_turn.tts_failed) {
+            this.notifyTtsFallback()
+          }
           // Auto-play the customer reply as soon as it arrives.
           this.autoPlayTurn(customer)
         }
@@ -514,6 +526,12 @@ Page({
     this.playAudio(turn.id, turn.audio_url, { autoplay: true })
   },
 
+  notifyTtsFallback() {
+    if (this.hasShownTtsFallbackToast) return
+    this.hasShownTtsFallbackToast = true
+    wx.showToast({ title: "顾客语音生成失败，先看文字继续练习", icon: "none" })
+  },
+
   playAudio(turnId, url, opts = {}) {
     const autoplay = Boolean(opts.autoplay)
 
@@ -531,6 +549,22 @@ Page({
     // Local temp file (recorded) can be played directly.
     if (!/^https?:\/\//.test(url)) {
       doPlay(url)
+      return
+    }
+
+    // Auto-play should be instant. Play remote URL first, then cache lazily.
+    if (autoplay) {
+      doPlay(url)
+      if (!this.audioCache.get(turnId)) {
+        wx.downloadFile({
+          url,
+          success: (res) => {
+            if (res && res.statusCode === 200 && res.tempFilePath) {
+              this.audioCache.set(turnId, res.tempFilePath)
+            }
+          },
+        })
+      }
       return
     }
 

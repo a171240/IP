@@ -2,5 +2,6 @@
   "navigationBarTitleText": "练练",
   "navigationBarBackgroundColor": "#050507",
   "navigationBarTextStyle": "white",
-  "backgroundColor": "#050507"
+  "backgroundColor": "#050507",
+  "disableScroll": true
 }

@@ -5,7 +5,13 @@ import { checkVoiceCoachAccess } from "@/lib/voice-coach/guard.server"
 import { llmAnalyzeBeauticianAndGenerateNext } from "@/lib/voice-coach/llm.server"
 import { calcFillerRatio, calcWpm } from "@/lib/voice-coach/metrics"
 import { getScenario, type VoiceCoachEmotion } from "@/lib/voice-coach/scenarios"
-import { doubaoAsrAuc, doubaoTts, type DoubaoTtsEmotion } from "@/lib/voice-coach/speech/doubao.server"
+import {
+  doubaoAsrAuc,
+  doubaoAsrFlash,
+  doubaoTts,
+  type DoubaoAsrResult,
+  type DoubaoTtsEmotion,
+} from "@/lib/voice-coach/speech/doubao.server"
 import { signVoiceCoachAudio, uploadVoiceCoachAudio } from "@/lib/voice-coach/storage.server"
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 
@@ -42,6 +48,16 @@ function detectFormat(file: File): { format: "mp3" | "wav" | "ogg"; ext: string;
   if (type.includes("aac") || name.endsWith(".aac") || name.endsWith(".m4a")) return null
   // If the client doesn't send a useful file name/type, assume mp3 (our mini program records in mp3).
   return { format: "mp3", ext: "mp3", contentType: "audio/mpeg" }
+}
+
+function isAsrSilenceError(err: unknown): boolean {
+  const msg = typeof err === "string" ? err : err instanceof Error ? err.message : ""
+  return msg.includes("asr_auc_silence") || msg.includes("asr_silence")
+}
+
+function shouldUseFlashAsr(): boolean {
+  // Flash ASR requires an explicitly granted resource id.
+  return Boolean((process.env.VOLC_ASR_FLASH_RESOURCE_ID || "").trim())
 }
 
 export async function POST(request: NextRequest, context: { params: Promise<{ sessionId: string }> }) {
@@ -116,30 +132,77 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
 
     if (lastTurnError) return jsonError(500, "turn_index_query_failed", { message: lastTurnError.message })
     const nextTurnIndex = (lastTurnRows?.[0]?.turn_index ?? -1) + 1
+    const beauticianTurnNo = Math.floor((nextTurnIndex + 1) / 2)
+    const reachedMax = beauticianTurnNo >= access.maxTurns
+
+    // Read recent history in parallel with ASR/TTS pipeline.
+    const historyQueryPromise = supabase
+      .from("voice_coach_turns")
+      .select("role, text, emotion")
+      .eq("session_id", sessionId)
+      .order("turn_index", { ascending: false })
+      .limit(6)
 
     const beauticianTurnId = randomUUID()
     const beauticianAudioPath = `${user.id}/${sessionId}/${beauticianTurnId}.${detected.ext}`
-    await uploadVoiceCoachAudio({
-      path: beauticianAudioPath,
-      data: audioBuf,
-      contentType: detected.contentType,
-    })
-    const beauticianAudioUrl = await signVoiceCoachAudio(beauticianAudioPath)
+    const beauticianAudioUrlPromise = (async () => {
+      await uploadVoiceCoachAudio({
+        path: beauticianAudioPath,
+        data: audioBuf,
+        contentType: detected.contentType,
+      })
+      return signVoiceCoachAudio(beauticianAudioPath)
+    })()
 
-    const asr = await doubaoAsrAuc({ audioUrl: beauticianAudioUrl, format: detected.format, uid: user.id })
-    if (!asr.text) return jsonError(400, "asr_empty", { request_id: asr.requestId })
+    let asr: DoubaoAsrResult | null = null
+    if (shouldUseFlashAsr()) {
+      try {
+        // Fast path: avoid AUC polling when flash can return directly.
+        const flashAsr = await doubaoAsrFlash({
+          audio: audioBuf,
+          format: detected.format,
+          uid: user.id,
+        })
+        if (flashAsr.text) asr = flashAsr
+      } catch {
+        // Ignore flash failures and fallback to AUC below.
+      }
+    }
+
+    if (!asr) {
+      const beauticianAudioUrl = await beauticianAudioUrlPromise
+      try {
+        asr = await doubaoAsrAuc({
+          audioUrl: beauticianAudioUrl,
+          format: detected.format,
+          uid: user.id,
+        })
+      } catch (err) {
+        if (isAsrSilenceError(err)) {
+          return jsonError(400, "asr_silence", {
+            message: "没有识别到有效语音，请重录并靠近麦克风。",
+          })
+        }
+        throw err
+      }
+    }
+
+    if (!asr || !asr.text) {
+      return jsonError(400, "asr_silence", {
+        message: "没有识别到有效语音，请重录并靠近麦克风。",
+        request_id: asr?.requestId,
+      })
+    }
+
+    const beauticianAudioUrl = await beauticianAudioUrlPromise
 
     const audioSeconds = asr.durationSeconds || (clientAudioSeconds && clientAudioSeconds > 0 ? clientAudioSeconds : null)
     const wpm = calcWpm(asr.text, audioSeconds)
     const fillerRatio = calcFillerRatio(asr.text)
 
     const scenario = getScenario(session.scenario_id)
-    const { data: historyRows } = await supabase
-      .from("voice_coach_turns")
-      .select("role, text, emotion")
-      .eq("session_id", sessionId)
-      .order("turn_index", { ascending: false })
-      .limit(6)
+    const { data: historyRows, error: historyRowsError } = await historyQueryPromise
+    if (historyRowsError) return jsonError(500, "history_query_failed", { message: historyRowsError.message })
 
     const history = (historyRows || [])
       .slice()
@@ -160,7 +223,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
       beauticianText: asr.text,
     })
 
-    const { error: insertBeauticianError } = await supabase.from("voice_coach_turns").insert({
+    const insertBeauticianPromise = supabase.from("voice_coach_turns").insert({
       id: beauticianTurnId,
       session_id: sessionId,
       turn_index: nextTurnIndex,
@@ -176,18 +239,6 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
       },
     })
 
-    if (insertBeauticianError) {
-      return jsonError(500, "insert_beautician_failed", { message: insertBeauticianError.message })
-    }
-
-    // Max turns guard (beautician turns only).
-    const { count: beauticianCount } = await supabase
-      .from("voice_coach_turns")
-      .select("id", { count: "exact", head: true })
-      .eq("session_id", sessionId)
-      .eq("role", "beautician")
-    const reachedMax = (beauticianCount || 0) >= access.maxTurns
-
     // Generate next customer turn (unless reached max turns).
     const nextCustomer = analyzed.next_customer
     const nextCustomerTurnId = randomUUID()
@@ -195,6 +246,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
     let nextCustomerAudioPath: string | null = null
     let nextCustomerAudioUrl: string | null = null
     let nextCustomerAudioSeconds: number | null = null
+    let nextCustomerTtsFailed = false
 
     if (!reachedMax) {
       try {
@@ -217,8 +269,16 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
         nextCustomerAudioPath = null
         nextCustomerAudioUrl = null
         nextCustomerAudioSeconds = null
+        nextCustomerTtsFailed = true
       }
+    }
 
+    const { error: insertBeauticianError } = await insertBeauticianPromise
+    if (insertBeauticianError) {
+      return jsonError(500, "insert_beautician_failed", { message: insertBeauticianError.message })
+    }
+
+    if (!reachedMax) {
       const { error: insertCustomerError } = await supabase.from("voice_coach_turns").insert({
         id: nextCustomerTurnId,
         session_id: sessionId,
@@ -252,6 +312,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
             emotion: nextCustomer.emotion,
             audio_url: nextCustomerAudioUrl,
             audio_seconds: nextCustomerAudioSeconds,
+            tts_failed: nextCustomerTtsFailed,
           },
       reached_max_turns: reachedMax,
     })

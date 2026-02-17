@@ -4,7 +4,15 @@
     <view class="top-right"></view>
   </view>
 
-  <scroll-view class="chat" scroll-y="true" scroll-with-animation="true" scroll-into-view="{{scrollIntoView}}">
+  <scroll-view
+    class="chat"
+    scroll-y="true"
+    scroll-with-animation="true"
+    scroll-into-view="{{scrollIntoView}}"
+    enhanced="true"
+    bounces="false"
+    show-scrollbar="false"
+  >
     <block wx:for="{{turns}}" wx:key="id">
       <view id="turn-{{item.id}}" class="row {{item.role === 'customer' ? 'left' : 'right'}}">
         <view wx:if="{{item.role === 'customer'}}" class="avatar avatar-customer">客</view>

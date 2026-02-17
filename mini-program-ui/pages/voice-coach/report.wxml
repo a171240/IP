@@ -8,7 +8,7 @@
     </view>
   </view>
 
-  <scroll-view class="content" scroll-y="true">
+  <scroll-view class="content" scroll-y="true" enhanced="true" bounces="false" show-scrollbar="false">
     <view wx:if="{{activeSegment === 'report'}}">
       <view class="headline">恭喜完成练习，这是为您生成的评测报告：</view>
 
@@ -222,4 +222,3 @@
     <button class="again-btn" bindtap="startAgain">再来一次</button>
   </view>
 </view>
-

@@ -41,11 +41,16 @@ export async function doubaoTts(opts: {
   const appid = getEnvOrThrow("VOLC_SPEECH_APP_ID")
   const accessToken = getEnvOrThrow("VOLC_SPEECH_ACCESS_TOKEN")
   const cluster = (process.env.VOLC_TTS_CLUSTER || "volcano_tts").trim()
-  const voiceType = (process.env.VOLC_TTS_VOICE_TYPE || "BV700_streaming").trim()
+  const configuredVoiceType = (process.env.VOLC_TTS_VOICE_TYPE || "BV700_streaming").trim()
+  const fallbackVoiceTypes = String(process.env.VOLC_TTS_FALLBACK_VOICES || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+  const voiceTypeCandidates = Array.from(new Set([configuredVoiceType, ...fallbackVoiceTypes])).filter(Boolean)
   const language = (process.env.VOLC_TTS_LANGUAGE || "cn").trim()
 
   const requestId = randomUUID()
-  const bodyBase: Record<string, unknown> = {
+  const bodyBase = {
     app: {
       appid,
       // Per official doc: can be any non-empty string; keep consistent for debugging.
@@ -56,7 +61,7 @@ export async function doubaoTts(opts: {
       uid: opts.uid || "voice_coach",
     },
     audio: {
-      voice_type: voiceType,
+      voice_type: configuredVoiceType,
       encoding: "mp3",
       speed_ratio: 1.0,
       volume_ratio: 1.0,
@@ -72,7 +77,7 @@ export async function doubaoTts(opts: {
     },
   }
 
-  async function doRequest(body: Record<string, unknown>) {
+  async function doRequestOnce(body: Record<string, unknown>) {
     const res = await fetch("https://openspeech.bytedance.com/api/v1/tts", {
       method: "POST",
       headers: {
@@ -107,19 +112,59 @@ export async function doubaoTts(opts: {
     return { audio, durationSeconds: durationMs ? durationMs / 1000 : null }
   }
 
-  // Emotion is optional and voice-type dependent; if it fails, retry without emotion.
-  try {
-    const { audio, durationSeconds } = await doRequest(bodyBase)
-    return { audio, encoding: "mp3", durationSeconds, requestId }
-  } catch (err) {
-    if (!opts.emotion) throw err
-    const bodyNoEmotion = { ...bodyBase, audio: { ...(bodyBase.audio as object) } }
-    if (bodyNoEmotion.audio && typeof bodyNoEmotion.audio === "object") {
-      delete (bodyNoEmotion.audio as Record<string, unknown>).emotion
+  async function doRequestWithRetry(body: Record<string, unknown>, maxRetry = 1) {
+    let lastErr: unknown = null
+    for (let attempt = 0; attempt <= maxRetry; attempt++) {
+      try {
+        return await doRequestOnce(body)
+      } catch (err) {
+        lastErr = err
+        if (attempt >= maxRetry) break
+        await sleep(120 * (attempt + 1))
+      }
     }
-    const { audio, durationSeconds } = await doRequest(bodyNoEmotion)
-    return { audio, encoding: "mp3", durationSeconds, requestId }
+    throw lastErr instanceof Error ? lastErr : new Error("tts_request_failed")
   }
+
+  let lastError: unknown = null
+
+  for (const voiceType of voiceTypeCandidates) {
+    const withEmotion = {
+      ...bodyBase,
+      audio: {
+        ...bodyBase.audio,
+        voice_type: voiceType,
+        ...(opts.emotion ? { emotion: opts.emotion } : {}),
+      },
+    }
+
+    try {
+      const { audio, durationSeconds } = await doRequestWithRetry(withEmotion, 1)
+      return { audio, encoding: "mp3", durationSeconds, requestId }
+    } catch (err) {
+      lastError = err
+    }
+
+    // Emotion is optional and voice-type dependent; retry once without emotion.
+    if (opts.emotion) {
+      const withoutEmotion = {
+        ...bodyBase,
+        audio: {
+          ...bodyBase.audio,
+          voice_type: voiceType,
+        },
+      }
+
+      try {
+        const { audio, durationSeconds } = await doRequestWithRetry(withoutEmotion, 1)
+        return { audio, encoding: "mp3", durationSeconds, requestId }
+      } catch (err) {
+        lastError = err
+      }
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("tts_all_fallback_failed")
 }
 
 export async function doubaoAsrFlash(opts: {
@@ -129,7 +174,8 @@ export async function doubaoAsrFlash(opts: {
 }): Promise<DoubaoAsrResult> {
   const appid = getEnvOrThrow("VOLC_SPEECH_APP_ID")
   const accessToken = getEnvOrThrow("VOLC_SPEECH_ACCESS_TOKEN")
-  const resourceId = (process.env.VOLC_ASR_RESOURCE_ID || "volc.bigasr.auc_turbo").trim()
+  const resourceId = (process.env.VOLC_ASR_FLASH_RESOURCE_ID || "").trim()
+  if (!resourceId) throw new Error("asr_flash_resource_missing")
 
   const requestId = randomUUID()
   const body = {
@@ -238,8 +284,8 @@ export async function doubaoAsrAuc(opts: {
 
   // Poll query until done. Typical latency is a few seconds for short audios.
   for (let attempt = 0; attempt < 12; attempt++) {
-    // 0.8s, 1.0s, ..., ~3.0s
-    await sleep(800 + attempt * 200)
+    // Faster polling for short utterances.
+    await sleep(350 + attempt * 120)
 
     const qRes = await fetch("https://openspeech.bytedance.com/api/v3/auc/bigmodel/query", {
       method: "POST",

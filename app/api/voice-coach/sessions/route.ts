@@ -70,6 +70,7 @@ export async function POST(request: NextRequest) {
     let audioPath: string | null = null
     let audioUrl: string | null = null
     let audioSeconds: number | null = null
+    let ttsFailed = false
 
     try {
       const tts = await doubaoTts({
@@ -92,6 +93,7 @@ export async function POST(request: NextRequest) {
       audioPath = null
       audioUrl = null
       audioSeconds = null
+      ttsFailed = true
     }
 
     const { error: turnError } = await supabase.from("voice_coach_turns").insert({
@@ -124,6 +126,7 @@ export async function POST(request: NextRequest) {
         emotion: first.emotion,
         audio_url: audioUrl,
         audio_seconds: audioSeconds,
+        tts_failed: ttsFailed,
       },
     })
   } catch (err: any) {
