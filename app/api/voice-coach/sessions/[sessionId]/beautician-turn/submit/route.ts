@@ -35,6 +35,16 @@ function formatDuration(seconds: number | null) {
   return Math.round(n)
 }
 
+async function latestEventCursor(supabase: any, sessionId: string): Promise<number> {
+  const { data } = await supabase
+    .from("voice_coach_events")
+    .select("id")
+    .eq("session_id", sessionId)
+    .order("id", { ascending: false })
+    .limit(1)
+  return data?.[0]?.id ? Number(data[0].id) : 0
+}
+
 export async function POST(request: NextRequest, context: { params: Promise<{ sessionId: string }> }) {
   try {
     const { sessionId } = await context.params
@@ -70,6 +80,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
     const audioFile = form.get("audio")
     const replyToTurnId = String(form.get("reply_to_turn_id") || "").trim()
     const clientAudioSecondsRaw = form.get("client_audio_seconds")
+    const clientAttemptId = String(form.get("client_attempt_id") || "").trim()
 
     if (!(audioFile instanceof File)) return jsonError(400, "missing_audio")
     if (!replyToTurnId) return jsonError(400, "missing_reply_to_turn_id")
@@ -90,6 +101,56 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
       .single()
     if (replyError || !replyTurn) return jsonError(400, "invalid_reply_to_turn_id")
     if (replyTurn.role !== "customer") return jsonError(400, "reply_to_not_customer")
+
+    if (clientAttemptId) {
+      const { data: existingJobs } = await supabase
+        .from("voice_coach_jobs")
+        .select("id, turn_id, payload_json")
+        .eq("session_id", sessionId)
+        .eq("user_id", user.id)
+        .contains("payload_json", { client_attempt_id: clientAttemptId })
+        .order("created_at", { ascending: false })
+        .limit(1)
+
+      const existing = existingJobs?.[0]
+      if (existing?.turn_id) {
+        const existingTurnId = String(existing.turn_id)
+        const { data: existingTurn } = await supabase
+          .from("voice_coach_turns")
+          .select("id, audio_path, audio_seconds")
+          .eq("id", existingTurnId)
+          .eq("session_id", sessionId)
+          .single()
+
+        let existingAudioUrl: string | null = null
+        if (existingTurn?.audio_path) {
+          try {
+            existingAudioUrl = await signVoiceCoachAudio(String(existingTurn.audio_path))
+          } catch {
+            existingAudioUrl = null
+          }
+        }
+
+        return NextResponse.json({
+          turn_id: existingTurnId,
+          job_id: String(existing.id),
+          client_attempt_id: clientAttemptId || null,
+          next_cursor: await latestEventCursor(supabase, sessionId),
+          reached_max_turns: false,
+          deduped: true,
+          beautician_turn: {
+            turn_id: existingTurnId,
+            role: "beautician",
+            text: "",
+            audio_url: existingAudioUrl,
+            audio_seconds: formatDuration(
+              existingTurn?.audio_seconds ? Number(existingTurn.audio_seconds) : Number(clientAudioSecondsRaw || 0) || null,
+            ),
+            pending: true,
+          },
+        })
+      }
+    }
 
     const { data: lastTurnRows, error: lastTurnError } = await supabase
       .from("voice_coach_turns")
@@ -137,11 +198,12 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
       user_id: user.id,
       turn_id: turnId,
       status: "queued",
-      stage: "accepted",
+      stage: "main_pending",
       payload_json: {
         reply_to_turn_id: replyToTurnId,
         audio_format: detected.format,
         client_audio_seconds: clientAudioSeconds,
+        ...(clientAttemptId ? { client_attempt_id: clientAttemptId } : {}),
       },
     })
     if (jobInsertError) return jsonError(500, "insert_job_failed", { message: jobInsertError.message })
@@ -163,11 +225,12 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
     })
 
     // Best-effort kick-off to shorten first event wait.
-    void pumpVoiceCoachQueuedJobs({ sessionId, userId: user.id, maxJobs: 1 }).catch(() => {})
+    void pumpVoiceCoachQueuedJobs({ sessionId, userId: user.id, maxJobs: 2 }).catch(() => {})
 
     return NextResponse.json({
       turn_id: turnId,
       job_id: jobId,
+      client_attempt_id: clientAttemptId || null,
       next_cursor: cursor,
       reached_max_turns: reachedMax,
       beautician_turn: {

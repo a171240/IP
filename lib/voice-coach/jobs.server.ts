@@ -569,6 +569,7 @@ async function processMainStage(args: {
     type: "customer.text_ready",
     data: {
       turn_id: nextCustomerTurnId,
+      beautician_turn_id: args.turnId,
       text: nextCustomer.text,
       emotion: nextCustomer.emotion,
       stage_elapsed_ms: Date.now() - pipelineStartedAt,
@@ -686,6 +687,7 @@ async function processTtsStage(args: {
     type: "customer.audio_ready",
     data: {
       turn_id: nextCustomerTurnId,
+      beautician_turn_id: args.turnId,
       audio_url: audioUrl,
       audio_seconds: audioSeconds,
       tts_failed: ttsFailed || !audioUrl,

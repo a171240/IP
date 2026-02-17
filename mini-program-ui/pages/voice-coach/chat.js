@@ -2,6 +2,7 @@ const { API_BASE_URL } = require("../../utils/config")
 const { request } = require("../../utils/request")
 const { getAccessToken } = require("../../utils/auth")
 const { getDeviceId } = require("../../utils/device")
+const { track } = require("../../utils/track")
 
 const TURN_PENDING_STATUSES = {
   accepted: true,
@@ -77,6 +78,11 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+function makeClientAttemptId() {
+  const rand = Math.random().toString(36).slice(2, 10)
+  return `mp_${Date.now()}_${rand}`
+}
+
 Page({
   data: {
     sessionId: "",
@@ -115,6 +121,9 @@ Page({
     this.pollingEvents = false
     this.lastAutoPlayedCustomerTurnId = ""
     this.pendingLocalTurnId = ""
+    this.turnLatency = new Map()
+    this.turnTtsRetried = new Set()
+    this.sessionCreatedAt = 0
 
     this.audioCtx.onError(() => {
       if (this.hasShownAudioError) return
@@ -159,6 +168,8 @@ Page({
   },
 
   async createSession() {
+    const startedAt = Date.now()
+    this.sessionCreatedAt = startedAt
     this.setData({ loading: true })
     try {
       const res = await request({
@@ -187,10 +198,18 @@ Page({
         scrollIntoView: `turn-${first.id}`,
       })
 
-      if (!first.audio_url || res.first_customer_turn.tts_failed) {
+      track("voicecoach_enter", {
+        sessionId: res.session_id,
+        createSessionMs: Date.now() - startedAt,
+      })
+
+      if (first.audio_url) {
+        this.autoPlayTurn(first)
+      } else if (first.text) {
+        this.requestTurnTts(first.id, { autoplay: true })
+      } else if (res.first_customer_turn && res.first_customer_turn.tts_failed) {
         this.notifyTtsFallback()
       }
-      this.autoPlayTurn(first)
       this.ensureEventsPolling()
     } catch (err) {
       this.setData({ loading: false })
@@ -217,6 +236,14 @@ Page({
         waitingCustomer,
         scrollIntoView: last ? `turn-${last.id}` : "",
       })
+      track("voicecoach_enter", {
+        sessionId,
+        resumed: true,
+        turnCount: turns.length,
+      })
+      if (last && last.role === "customer" && last.text && !last.audio_url) {
+        this.requestTurnTts(last.id, { autoplay: false })
+      }
       this.ensureEventsPolling()
     } catch (err) {
       this.setData({ loading: false })
@@ -295,6 +322,44 @@ Page({
     })
   },
 
+  startTurnLatency(turnId, meta = {}) {
+    if (!turnId) return
+    const now = Date.now()
+    this.turnLatency.set(turnId, {
+      startedAt: now,
+      ...meta,
+    })
+  },
+
+  moveTurnLatency(fromTurnId, toTurnId) {
+    if (!fromTurnId || !toTurnId || fromTurnId === toTurnId) return
+    const entry = this.turnLatency.get(fromTurnId)
+    if (!entry) return
+    this.turnLatency.delete(fromTurnId)
+    this.turnLatency.set(toTurnId, entry)
+  },
+
+  markTurnLatency(turnId, stage, extra = {}) {
+    if (!turnId || !stage) return
+    const entry = this.turnLatency.get(turnId)
+    if (!entry) return
+    if (entry[stage]) return
+
+    const now = Date.now()
+    const elapsedMs = Math.max(0, now - Number(entry.startedAt || now))
+    entry[stage] = now
+    this.turnLatency.set(turnId, entry)
+
+    track("voicecoach_turn_latency", {
+      sessionId: this.data.sessionId || "",
+      turnId,
+      stage,
+      elapsedMs,
+      ...(entry.clientAttemptId ? { clientAttemptId: entry.clientAttemptId } : {}),
+      ...extra,
+    })
+  },
+
   applyServerEvents(events) {
     let latestCursor = Number(this.data.eventCursor || 0) || 0
 
@@ -308,6 +373,10 @@ Page({
       const turnId = String(data.turn_id || ev.turn_id || "")
 
       if (type === "turn.accepted" && turnId) {
+        this.markTurnLatency(turnId, "accepted", {
+          stageElapsedMs: Number(data.stage_elapsed_ms || 0) || null,
+          jobId: data.job_id || ev.job_id || "",
+        })
         const updated = this.patchTurn(turnId, {
           status: "accepted",
           pending: true,
@@ -329,6 +398,9 @@ Page({
         }
         this.setData({ waitingCustomer: !data.reached_max_turns })
       } else if (type === "beautician.asr_ready" && turnId) {
+        this.markTurnLatency(turnId, "asr_ready", {
+          stageElapsedMs: Number(data.stage_elapsed_ms || 0) || null,
+        })
         const seconds = Number(data.audio_seconds || 0) || 0
         const hasAudio = Boolean(data.audio_url)
         const patch = {
@@ -361,6 +433,13 @@ Page({
           this.openEndModal()
         }
       } else if (type === "customer.text_ready" && turnId) {
+        const parentTurnId = String(data.beautician_turn_id || "")
+        if (parentTurnId) {
+          this.markTurnLatency(parentTurnId, "customer_text_ready", {
+            customerTurnId: turnId,
+            stageElapsedMs: Number(data.stage_elapsed_ms || 0) || null,
+          })
+        }
         const updated = this.patchTurn(turnId, {
           status: "text_ready",
           pending: false,
@@ -381,9 +460,21 @@ Page({
         }
         this.setData({ waitingCustomer: false })
       } else if (type === "customer.audio_ready" && turnId) {
+        const parentTurnId = String(data.beautician_turn_id || "")
+        if (parentTurnId) {
+          this.markTurnLatency(parentTurnId, "customer_audio_ready", {
+            customerTurnId: turnId,
+            stageElapsedMs: Number(data.stage_elapsed_ms || 0) || null,
+            ttsFailed: Boolean(data.tts_failed),
+          })
+        }
         if (!data.audio_url || data.tts_failed) {
           this.notifyTtsFallback()
           this.patchTurn(turnId, { status: "text_ready", pending: false, showText: true })
+          if (!this.turnTtsRetried.has(turnId)) {
+            this.turnTtsRetried.add(turnId)
+            this.requestTurnTts(turnId, { autoplay: false })
+          }
         } else {
           const seconds = Number(data.audio_seconds || 0) || 0
           const updated = this.patchTurn(turnId, {
@@ -417,14 +508,19 @@ Page({
           }
         }
       } else if (type === "beautician.analysis_ready" && turnId) {
+        this.markTurnLatency(turnId, "analysis_ready", {
+          stageElapsedMs: Number(data.stage_elapsed_ms || 0) || null,
+        })
         this.patchTurn(turnId, {
           status: "analysis_ready",
           pending: false,
           analysis: data.analysis || null,
         })
+        this.turnLatency.delete(turnId)
       } else if (type === "turn.error") {
         if (turnId) {
           this.patchTurn(turnId, { pending: false, status: "error" })
+          this.turnLatency.delete(turnId)
         }
         this.setData({ waitingCustomer: false })
         const code = String(data.code || "")
@@ -441,6 +537,49 @@ Page({
     }
   },
 
+  async requestTurnTts(turnId, opts = {}) {
+    const sessionId = this.data.sessionId
+    if (!sessionId || !turnId) return
+    const idx = this.findTurnIndex(turnId)
+    if (idx >= 0 && this.data.turns[idx] && this.data.turns[idx].audio_url) return
+
+    try {
+      const res = await request({
+        baseUrl: API_BASE_URL,
+        url: `/api/voice-coach/sessions/${sessionId}/turns/${turnId}/tts`,
+        method: "POST",
+        data: {},
+      })
+
+      if (!res || res.error) return
+      if (!res.audio_url || res.tts_failed) {
+        this.notifyTtsFallback()
+        return
+      }
+
+      const seconds = Number(res.audio_seconds || 0) || 0
+      this.patchTurn(turnId, {
+        status: "audio_ready",
+        audio_url: res.audio_url,
+        audio_seconds: seconds || null,
+        audio_seconds_text: formatSeconds(seconds),
+        voice_width_rpx: voiceWidthRpx(seconds || 3),
+        showText: false,
+      })
+
+      if (opts && opts.autoplay) {
+        this.autoPlayTurn({
+          id: turnId,
+          audio_url: res.audio_url,
+        })
+      }
+    } catch (_err) {
+      if (!(opts && opts.silent)) {
+        this.notifyTtsFallback()
+      }
+    }
+  },
+
   openEndModal() {
     this.setData({ endModalVisible: true })
   },
@@ -454,6 +593,10 @@ Page({
     if (!sessionId) return
     this.stopEvents = true
     this.setData({ loading: true, endModalVisible: false })
+    track("voicecoach_end", {
+      sessionId,
+      mode: "view_report",
+    })
     try {
       await request({
         baseUrl: API_BASE_URL,
@@ -475,6 +618,10 @@ Page({
     if (!sessionId) return
     this.stopEvents = true
     this.setData({ loading: true, endModalVisible: false })
+    track("voicecoach_end", {
+      sessionId,
+      mode: "end_only",
+    })
     try {
       await request({
         baseUrl: API_BASE_URL,
@@ -605,7 +752,15 @@ Page({
 
     const localTurn = makeLocalBeauticianTurn(filePath, durationSec)
     this.pendingLocalTurnId = localTurn.id
+    const clientAttemptId = makeClientAttemptId()
+    this.startTurnLatency(localTurn.id, { clientAttemptId })
     this.appendTurn(localTurn)
+    track("voicecoach_turn_submit", {
+      sessionId,
+      role: "beautician",
+      clientAttemptId,
+      audioSeconds: durationSec || 0,
+    })
 
     const token = getAccessToken()
     const deviceId = getDeviceId()
@@ -617,6 +772,7 @@ Page({
       formData: {
         reply_to_turn_id: replyToTurnId,
         client_audio_seconds: String(durationSec || ""),
+        client_attempt_id: clientAttemptId,
       },
       header: {
         Authorization: token ? `Bearer ${token}` : "",
@@ -633,6 +789,7 @@ Page({
         if (!payload || payload.error) {
           this.setData({ loading: false, waitingCustomer: false })
           wx.showToast({ title: payload?.message || payload?.error || "上传失败", icon: "none" })
+          if (this.pendingLocalTurnId) this.turnLatency.delete(this.pendingLocalTurnId)
           const turns = (this.data.turns || []).filter((t) => t.id !== this.pendingLocalTurnId)
           this.pendingLocalTurnId = ""
           this.setData({ turns })
@@ -653,7 +810,19 @@ Page({
         this.pendingLocalTurnId = ""
         if (!this.replaceTurn(pendingId, accepted)) {
           this.appendTurn(accepted)
+          const stale = pendingId ? this.turnLatency.get(pendingId) : null
+          if (stale) {
+            this.turnLatency.delete(pendingId)
+            this.turnLatency.set(accepted.id, stale)
+          }
+        } else {
+          this.moveTurnLatency(pendingId, accepted.id)
         }
+
+        this.markTurnLatency(accepted.id, "submit_ack", {
+          deduped: Boolean(payload.deduped),
+          acceptedByServer: true,
+        })
 
         const nextCursor = Number(payload.next_cursor || 0) || 0
         this.setData({
@@ -666,6 +835,7 @@ Page({
       fail: () => {
         this.setData({ loading: false, waitingCustomer: false })
         wx.showToast({ title: "上传失败", icon: "none" })
+        if (this.pendingLocalTurnId) this.turnLatency.delete(this.pendingLocalTurnId)
         const turns = (this.data.turns || []).filter((t) => t.id !== this.pendingLocalTurnId)
         this.pendingLocalTurnId = ""
         this.setData({ turns })
@@ -687,11 +857,20 @@ Page({
   toggleSuggest(e) {
     const id = e && e.currentTarget ? String(e.currentTarget.dataset.id) : ""
     if (!id) return
+    const idx = this.findTurnIndex(id)
+    const current = idx >= 0 ? this.data.turns[idx] : null
+    const willOpen = current ? !current.showSuggestions : false
     const turns = (this.data.turns || []).map((t) => {
       if (t.id !== id) return t
       return { ...t, showSuggestions: !t.showSuggestions }
     })
     this.setData({ turns })
+    if (willOpen) {
+      track("voicecoach_suggestion_open", {
+        sessionId: this.data.sessionId || "",
+        turnId: id,
+      })
+    }
   },
 
   onRerecord(e) {
@@ -705,6 +884,10 @@ Page({
       cancelText: "取消",
       success: (res) => {
         if (!res.confirm) return
+        track("voicecoach_rerecord", {
+          sessionId: this.data.sessionId || "",
+          turnId: id,
+        })
         this.rollbackFrom(id)
       },
     })
@@ -755,6 +938,10 @@ Page({
           hintVisible: true,
           hintText: res.hint_text || "",
           hintPoints: res.hint_points || [],
+        })
+        track("voicecoach_hint_open", {
+          sessionId: sessionId || "",
+          customerTurnId,
         })
       })
       .catch((err) => {

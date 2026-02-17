@@ -37,6 +37,13 @@ function fallbackFirstCustomerTurn() {
   }
 }
 
+function shouldGenerateFirstTurnTtsSynchronously(): boolean {
+  const raw = String(process.env.VOICE_COACH_FIRST_TTS_MODE || "async")
+    .trim()
+    .toLowerCase()
+  return raw === "sync"
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json().catch(() => null)) as { scenario_id?: unknown } | null
@@ -86,28 +93,33 @@ export async function POST(request: NextRequest) {
     let audioSeconds: number | null = null
     let ttsFailed = false
 
-    try {
-      const tts = await doubaoTts({
-        text: first.text,
-        emotion: mapEmotionToTts(first.emotion),
-        uid: user.id,
-      })
-      audioSeconds = tts.durationSeconds ?? null
-      if (tts.audio) {
-        audioPath = `${user.id}/${session.id}/${turnId}.mp3`
-        await uploadVoiceCoachAudio({
-          path: audioPath,
-          data: tts.audio,
-          contentType: "audio/mpeg",
+    // Default fast-path: create session immediately, first-turn voice is generated on-demand.
+    if (shouldGenerateFirstTurnTtsSynchronously()) {
+      try {
+        const tts = await doubaoTts({
+          text: first.text,
+          emotion: mapEmotionToTts(first.emotion),
+          uid: user.id,
         })
-        audioUrl = await signVoiceCoachAudio(audioPath)
+        audioSeconds = tts.durationSeconds ?? null
+        if (tts.audio) {
+          audioPath = `${user.id}/${session.id}/${turnId}.mp3`
+          await uploadVoiceCoachAudio({
+            path: audioPath,
+            data: tts.audio,
+            contentType: "audio/mpeg",
+          })
+          audioUrl = await signVoiceCoachAudio(audioPath)
+        } else {
+          ttsFailed = true
+        }
+      } catch {
+        // TTS is optional; the UI can still show text-only customer turns.
+        audioPath = null
+        audioUrl = null
+        audioSeconds = null
+        ttsFailed = true
       }
-    } catch {
-      // TTS is optional; the UI can still show text-only customer turns.
-      audioPath = null
-      audioUrl = null
-      audioSeconds = null
-      ttsFailed = true
     }
 
     const { error: turnError } = await supabase.from("voice_coach_turns").insert({
@@ -119,6 +131,7 @@ export async function POST(request: NextRequest) {
       emotion: first.emotion,
       audio_path: audioPath,
       audio_seconds: audioSeconds,
+      status: audioUrl ? "audio_ready" : "text_ready",
       features_json: { tag: first.tag },
     })
 
@@ -141,6 +154,7 @@ export async function POST(request: NextRequest) {
         audio_url: audioUrl,
         audio_seconds: audioSeconds,
         tts_failed: ttsFailed,
+        tts_pending: !audioUrl,
       },
     })
   } catch (err: any) {

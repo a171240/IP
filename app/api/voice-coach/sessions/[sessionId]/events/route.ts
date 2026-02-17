@@ -47,7 +47,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ ses
 
     while (true) {
       // Drive queue processing while client is polling.
-      await pumpVoiceCoachQueuedJobs({ sessionId, userId: user.id, maxJobs: 1 })
+      await pumpVoiceCoachQueuedJobs({ sessionId, userId: user.id, maxJobs: 2 })
 
       const { data: events, error: eventsError } = await supabase
         .from("voice_coach_events")
