@@ -18,8 +18,26 @@ export type DoubaoAsrResult = {
   requestId: string
 }
 
+const DEFAULT_TTS_VOICE_TYPE = "zh_female_vv_uranus_bigtts"
+const LEGACY_TTS_VOICE_ALIASES = new Set(["bv700_streaming", "bv700"])
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function timeoutMs(name: string, fallback: number): number {
+  const raw = Number(process.env[name] || fallback)
+  if (!Number.isFinite(raw)) return fallback
+  return Math.max(1000, Math.round(raw))
+}
+
+function normalizeTtsVoiceType(input: string): string {
+  const normalized = input.trim()
+  if (!normalized) return DEFAULT_TTS_VOICE_TYPE
+  const lower = normalized.toLowerCase()
+  if (LEGACY_TTS_VOICE_ALIASES.has(lower)) return DEFAULT_TTS_VOICE_TYPE
+  if (/^bv\d+(_streaming)?$/i.test(normalized)) return DEFAULT_TTS_VOICE_TYPE
+  return normalized
 }
 
 function getEnvOrThrow(name: string): string {
@@ -33,6 +51,19 @@ function safeNumber(v: unknown): number | null {
   return Number.isFinite(n) ? n : null
 }
 
+async function fetchWithTimeout(url: string, init: RequestInit, timeout: number, timeoutError: string): Promise<Response> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeout)
+  try {
+    return await fetch(url, { ...init, signal: controller.signal })
+  } catch (err: any) {
+    if (err?.name === "AbortError") throw new Error(timeoutError)
+    throw err
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 export async function doubaoTts(opts: {
   text: string
   emotion?: DoubaoTtsEmotion
@@ -41,13 +72,14 @@ export async function doubaoTts(opts: {
   const appid = getEnvOrThrow("VOLC_SPEECH_APP_ID")
   const accessToken = getEnvOrThrow("VOLC_SPEECH_ACCESS_TOKEN")
   const cluster = (process.env.VOLC_TTS_CLUSTER || "volcano_tts").trim()
-  const configuredVoiceType = (process.env.VOLC_TTS_VOICE_TYPE || "BV700_streaming").trim()
+  const configuredVoiceType = normalizeTtsVoiceType(process.env.VOLC_TTS_VOICE_TYPE || DEFAULT_TTS_VOICE_TYPE)
   const fallbackVoiceTypes = String(process.env.VOLC_TTS_FALLBACK_VOICES || "")
     .split(",")
-    .map((s) => s.trim())
+    .map((s) => normalizeTtsVoiceType(s))
     .filter(Boolean)
   const voiceTypeCandidates = Array.from(new Set([configuredVoiceType, ...fallbackVoiceTypes])).filter(Boolean)
   const language = (process.env.VOLC_TTS_LANGUAGE || "cn").trim()
+  const ttsTimeout = timeoutMs("VOLC_TTS_TIMEOUT_MS", 12000)
 
   const requestId = randomUUID()
   const bodyBase = {
@@ -78,14 +110,19 @@ export async function doubaoTts(opts: {
   }
 
   async function doRequestOnce(body: Record<string, unknown>) {
-    const res = await fetch("https://openspeech.bytedance.com/api/v1/tts", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer;${accessToken}`,
+    const res = await fetchWithTimeout(
+      "https://openspeech.bytedance.com/api/v1/tts",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer;${accessToken}`,
+        },
+        body: JSON.stringify(body),
       },
-      body: JSON.stringify(body),
-    })
+      ttsTimeout,
+      "tts_timeout",
+    )
 
     const json = (await res.json().catch(() => null)) as
       | { code?: number; message?: string; data?: string; addition?: unknown }
@@ -176,6 +213,7 @@ export async function doubaoAsrFlash(opts: {
   const accessToken = getEnvOrThrow("VOLC_SPEECH_ACCESS_TOKEN")
   const resourceId = (process.env.VOLC_ASR_FLASH_RESOURCE_ID || "").trim()
   if (!resourceId) throw new Error("asr_flash_resource_missing")
+  const flashTimeout = timeoutMs("VOLC_ASR_FLASH_TIMEOUT_MS", 12000)
 
   const requestId = randomUUID()
   const body = {
@@ -197,18 +235,23 @@ export async function doubaoAsrFlash(opts: {
     },
   }
 
-  const res = await fetch("https://openspeech.bytedance.com/api/v3/auc/bigmodel/recognize/flash", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Api-App-Key": appid,
-      "X-Api-Access-Key": accessToken,
-      "X-Api-Resource-Id": resourceId,
-      "X-Api-Request-Id": requestId,
-      "X-Api-Sequence": "-1",
+  const res = await fetchWithTimeout(
+    "https://openspeech.bytedance.com/api/v3/auc/bigmodel/recognize/flash",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Api-App-Key": appid,
+        "X-Api-Access-Key": accessToken,
+        "X-Api-Resource-Id": resourceId,
+        "X-Api-Request-Id": requestId,
+        "X-Api-Sequence": "-1",
+      },
+      body: JSON.stringify(body),
     },
-    body: JSON.stringify(body),
-  })
+    flashTimeout,
+    "asr_flash_timeout",
+  )
 
   const statusCodeHeader = res.headers.get("X-Api-Status-Code") || res.headers.get("x-api-status-code") || ""
   if (statusCodeHeader && statusCodeHeader !== "20000000" && statusCodeHeader !== "20000003") {
@@ -250,25 +293,32 @@ export async function doubaoAsrAuc(opts: {
   // - volc.bigasr.auc (model 1.0)
   // - volc.seedasr.auc (model 2.0)
   const resourceId = (process.env.VOLC_ASR_RESOURCE_ID || "volc.seedasr.auc").trim()
+  const submitTimeout = timeoutMs("VOLC_ASR_AUC_SUBMIT_TIMEOUT_MS", 8000)
+  const queryTimeout = timeoutMs("VOLC_ASR_AUC_QUERY_TIMEOUT_MS", 8000)
 
   const requestId = randomUUID()
 
-  const submitRes = await fetch("https://openspeech.bytedance.com/api/v3/auc/bigmodel/submit", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Api-App-Key": appid,
-      "X-Api-Access-Key": accessToken,
-      "X-Api-Resource-Id": resourceId,
-      "X-Api-Request-Id": requestId,
-      "X-Api-Sequence": "-1",
+  const submitRes = await fetchWithTimeout(
+    "https://openspeech.bytedance.com/api/v3/auc/bigmodel/submit",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Api-App-Key": appid,
+        "X-Api-Access-Key": accessToken,
+        "X-Api-Resource-Id": resourceId,
+        "X-Api-Request-Id": requestId,
+        "X-Api-Sequence": "-1",
+      },
+      body: JSON.stringify({
+        user: { uid: opts.uid || "voice_coach" },
+        audio: { format: opts.format, url: opts.audioUrl },
+        request: { model_name: "bigmodel", enable_itn: true },
+      }),
     },
-    body: JSON.stringify({
-      user: { uid: opts.uid || "voice_coach" },
-      audio: { format: opts.format, url: opts.audioUrl },
-      request: { model_name: "bigmodel", enable_itn: true },
-    }),
-  })
+    submitTimeout,
+    "asr_auc_submit_timeout",
+  )
 
   const submitStatus = submitRes.headers.get("X-Api-Status-Code") || submitRes.headers.get("x-api-status-code") || ""
   const submitMsg = submitRes.headers.get("X-Api-Message") || submitRes.headers.get("x-api-message") || ""
@@ -287,18 +337,23 @@ export async function doubaoAsrAuc(opts: {
     // Faster polling for short utterances.
     await sleep(350 + attempt * 120)
 
-    const qRes = await fetch("https://openspeech.bytedance.com/api/v3/auc/bigmodel/query", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Api-App-Key": appid,
-        "X-Api-Access-Key": accessToken,
-        "X-Api-Resource-Id": resourceId,
-        "X-Api-Request-Id": requestId,
-        "X-Api-Sequence": "-1",
+    const qRes = await fetchWithTimeout(
+      "https://openspeech.bytedance.com/api/v3/auc/bigmodel/query",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Api-App-Key": appid,
+          "X-Api-Access-Key": accessToken,
+          "X-Api-Resource-Id": resourceId,
+          "X-Api-Request-Id": requestId,
+          "X-Api-Sequence": "-1",
+        },
+        body: "{}",
       },
-      body: "{}",
-    })
+      queryTimeout,
+      "asr_auc_query_timeout",
+    )
 
     const qStatus = qRes.headers.get("X-Api-Status-Code") || qRes.headers.get("x-api-status-code") || ""
     const qMsg = qRes.headers.get("X-Api-Message") || qRes.headers.get("x-api-message") || ""

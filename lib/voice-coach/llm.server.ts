@@ -11,7 +11,12 @@ const APIMART_API_KEY = process.env.APIMART_QUICK_API_KEY || process.env.APIMART
 const APIMART_BASE_URL =
   process.env.APIMART_QUICK_BASE_URL || process.env.APIMART_BASE_URL || "https://api.apimart.ai/v1"
 const APIMART_MODEL = process.env.APIMART_QUICK_MODEL || process.env.APIMART_MODEL || "kimi-k2-thinking-turbo"
-const LLM_TIMEOUT_MS = Number(process.env.APIMART_TIMEOUT_MS || 240000)
+const APIMART_FAST_MODEL = process.env.APIMART_VOICE_COACH_FAST_MODEL || process.env.APIMART_QUICK_MODEL || APIMART_MODEL
+const APIMART_ANALYSIS_MODEL = process.env.APIMART_VOICE_COACH_ANALYSIS_MODEL || APIMART_MODEL
+const APIMART_DEFAULT_TIMEOUT_MS = Number(process.env.APIMART_TIMEOUT_MS || 60000)
+const APIMART_FAST_TIMEOUT_MS = Number(process.env.APIMART_FAST_TIMEOUT_MS || 12000)
+const APIMART_ANALYSIS_TIMEOUT_MS = Number(process.env.APIMART_ANALYSIS_TIMEOUT_MS || 22000)
+const APIMART_HINT_TIMEOUT_MS = Number(process.env.APIMART_HINT_TIMEOUT_MS || 12000)
 const USE_RESPONSE_FORMAT = process.env.APIMART_USE_RESPONSE_FORMAT === "true"
 
 function formatHistory(history: Array<{ role: "customer" | "beautician"; text: string; emotion?: string }>): string {
@@ -30,13 +35,15 @@ async function apimartChatJson<T>(opts: {
   schema: z.ZodType<T>
   temperature?: number
   model?: string
+  timeoutMs?: number
 }): Promise<T> {
   if (!APIMART_API_KEY) {
     throw new Error("APIMART_API_KEY_missing")
   }
 
+  const timeoutMs = Math.max(3000, Number(opts.timeoutMs || APIMART_DEFAULT_TIMEOUT_MS) || APIMART_DEFAULT_TIMEOUT_MS)
   const controller = new AbortController()
-  const t = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS)
+  const t = setTimeout(() => controller.abort(), timeoutMs)
 
   try {
     const res = await fetch(`${APIMART_BASE_URL.replace(/\/$/, "")}/chat/completions`, {
@@ -141,8 +148,10 @@ export async function llmGenerateCustomerTurn(opts: {
       { role: "system", content: system },
       { role: "user", content: user },
     ],
+    model: APIMART_FAST_MODEL,
     schema: CustomerTurnSchema,
     temperature: 0.7,
+    timeoutMs: APIMART_FAST_TIMEOUT_MS,
   })
 }
 
@@ -190,8 +199,10 @@ export async function llmAnalyzeBeauticianAndGenerateNext(opts: {
       { role: "system", content: system },
       { role: "user", content: user },
     ],
+    model: APIMART_ANALYSIS_MODEL,
     schema: AnalyzeAndNextSchema,
     temperature: 0.6,
+    timeoutMs: APIMART_ANALYSIS_TIMEOUT_MS,
   })
 }
 
@@ -233,8 +244,10 @@ export async function llmAnalyzeBeauticianTurn(opts: {
       { role: "system", content: system },
       { role: "user", content: user },
     ],
+    model: APIMART_ANALYSIS_MODEL,
     schema: TurnAnalysisSchema,
     temperature: 0.5,
+    timeoutMs: APIMART_ANALYSIS_TIMEOUT_MS,
   })
 }
 
@@ -265,7 +278,9 @@ export async function llmGenerateHint(opts: {
       { role: "system", content: system },
       { role: "user", content: user },
     ],
+    model: APIMART_FAST_MODEL,
     schema: HintSchema,
     temperature: 0.5,
+    timeoutMs: APIMART_HINT_TIMEOUT_MS,
   })
 }

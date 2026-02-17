@@ -29,6 +29,14 @@ function mapEmotionToTts(emotion: VoiceCoachEmotion): DoubaoTtsEmotion | undefin
   }
 }
 
+function fallbackFirstCustomerTurn() {
+  return {
+    text: "医生说美容院不能按胸，这安全吗？",
+    emotion: "worried" as VoiceCoachEmotion,
+    tag: "胸部安全",
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json().catch(() => null)) as { scenario_id?: unknown } | null
@@ -59,11 +67,17 @@ export async function POST(request: NextRequest) {
       return jsonError(500, "create_session_failed", { message: sessionError?.message })
     }
 
-    const first = await llmGenerateCustomerTurn({
-      scenario,
-      history: [],
-      target: "提出对安全性的担忧并追问是否安全",
-    })
+    let first = fallbackFirstCustomerTurn()
+    try {
+      first = await llmGenerateCustomerTurn({
+        scenario,
+        history: [],
+        target: "提出对安全性的担忧并追问是否安全",
+      })
+    } catch {
+      // Keep session creation fast and available even when LLM is slow.
+      first = fallbackFirstCustomerTurn()
+    }
 
     const turnId = randomUUID()
 
@@ -88,7 +102,7 @@ export async function POST(request: NextRequest) {
         })
         audioUrl = await signVoiceCoachAudio(audioPath)
       }
-    } catch (_err) {
+    } catch {
       // TTS is optional; the UI can still show text-only customer turns.
       audioPath = null
       audioUrl = null

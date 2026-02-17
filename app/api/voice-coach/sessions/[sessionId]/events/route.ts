@@ -83,7 +83,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ ses
         })
       }
 
-      await sleep(450)
+      await sleep(220)
     }
   } catch (err: any) {
     return jsonError(500, "voice_coach_error", { message: err?.message || String(err) })

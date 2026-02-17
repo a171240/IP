@@ -96,8 +96,15 @@ Page({
 
   onLoad(options) {
     this.recorder = wx.getRecorderManager()
-    this.audioCtx = wx.createInnerAudioContext()
+    try {
+      this.audioCtx = wx.createInnerAudioContext({ useWebAudioImplement: true })
+    } catch (_err) {
+      this.audioCtx = wx.createInnerAudioContext()
+    }
     this.audioCache = new Map()
+    try {
+      this.audioCtx.obeyMuteSwitch = false
+    } catch (_err) {}
     this.audioCtx.onEnded(() => {
       this.setData({ playingTurnId: "" })
     })
@@ -511,13 +518,28 @@ Page({
       } catch {}
 
       try {
-        this.recorder.start({
+        const preferredOptions = {
           duration: 30000,
           format: "mp3",
           sampleRate: 16000,
           numberOfChannels: 1,
-          encodeBitRate: 48000,
-        })
+          encodeBitRate: 64000,
+          audioSource: "voice_recognition",
+        }
+
+        const fallbackOptions = {
+          duration: 30000,
+          format: "mp3",
+          sampleRate: 16000,
+          numberOfChannels: 1,
+          encodeBitRate: 64000,
+        }
+
+        try {
+          this.recorder.start(preferredOptions)
+        } catch (_startErr) {
+          this.recorder.start(fallbackOptions)
+        }
       } catch (_err) {
         this.setData({ recording: false })
         wx.showToast({ title: "无法开始录音", icon: "none" })
