@@ -120,8 +120,8 @@
       </view>
     </block>
 
-    <view class="typing" wx:if="{{loading}}">
-      <view class="typing-pill">生成中...</view>
+    <view class="typing" wx:if="{{loading || waitingCustomer}}">
+      <view class="typing-pill">{{loading ? "处理中..." : "对方正在回复..."}}</view>
     </view>
   </scroll-view>
 

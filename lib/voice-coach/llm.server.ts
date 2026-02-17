@@ -195,6 +195,49 @@ export async function llmAnalyzeBeauticianAndGenerateNext(opts: {
   })
 }
 
+export async function llmAnalyzeBeauticianTurn(opts: {
+  scenario: VoiceCoachScenario
+  history: Array<{ role: "customer" | "beautician"; text: string; emotion?: VoiceCoachEmotion }>
+  customerTurn: { text: string; emotion?: VoiceCoachEmotion }
+  beauticianText: string
+}): Promise<TurnAnalysis> {
+  const system = [
+    "你是美业销售话术教练。",
+    `场景：${opts.scenario.name}`,
+    `商家背景：${opts.scenario.businessContext}`,
+    "任务：评价美容师这一句回复，输出严格 JSON。",
+    "只输出严格 JSON，不要任何多余文字。",
+    "JSON 结构：",
+    "{",
+    '  "suggestions": [string,string,string],',
+    '  "polished": string,',
+    '  "highlights": [{ "start": number, "end": number, "label": string, "severity": "info|warn|bad" }],',
+    '  "risk_notes": string[]',
+    "}",
+    "约束：",
+    "1) suggestions 必须是 3 条、可执行、具体。",
+    "2) polished 要可直接照读，长度 40-220 字。",
+    "3) 合规：不要给医疗诊断/疗效承诺/虚假数据。",
+  ].join("\n")
+
+  const user = [
+    "对话历史（最近信息更重要）：",
+    formatHistory(opts.history),
+    "",
+    `顾客本句：${opts.customerTurn.text}`,
+    `美容师本句：${opts.beauticianText}`,
+  ].join("\n")
+
+  return apimartChatJson({
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+    schema: TurnAnalysisSchema,
+    temperature: 0.5,
+  })
+}
+
 export async function llmGenerateHint(opts: {
   scenario: VoiceCoachScenario
   history: Array<{ role: "customer" | "beautician"; text: string; emotion?: VoiceCoachEmotion }>

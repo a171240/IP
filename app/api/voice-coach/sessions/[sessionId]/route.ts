@@ -41,13 +41,20 @@ export async function GET(request: NextRequest, context: { params: Promise<{ ses
 
     const { data: turns, error: turnsError } = await supabase
       .from("voice_coach_turns")
-      .select("id, turn_index, role, text, emotion, audio_path, audio_seconds, analysis_json, features_json")
+      .select("id, turn_index, role, status, text, emotion, audio_path, audio_seconds, analysis_json, features_json")
       .eq("session_id", sessionId)
       .order("turn_index", { ascending: true })
     if (turnsError) return jsonError(500, "turns_query_failed", { message: turnsError.message })
 
     const enriched = await Promise.all((turns || []).map(attachSignedUrl))
     const scenario = getScenario(session.scenario_id)
+    const { data: latestEventRows } = await supabase
+      .from("voice_coach_events")
+      .select("id")
+      .eq("session_id", sessionId)
+      .order("id", { ascending: false })
+      .limit(1)
+    const lastEventCursor = latestEventRows?.[0]?.id ? Number(latestEventRows[0].id) : 0
 
     return NextResponse.json({
       session: {
@@ -61,6 +68,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ ses
         },
       },
       turns: enriched,
+      last_event_cursor: lastEventCursor,
     })
   } catch (err: any) {
     return jsonError(500, "voice_coach_error", { message: err?.message || String(err) })

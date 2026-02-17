@@ -3,6 +3,11 @@ const { request } = require("../../utils/request")
 const { getAccessToken } = require("../../utils/auth")
 const { getDeviceId } = require("../../utils/device")
 
+const TURN_PENDING_STATUSES = {
+  accepted: true,
+  processing: true,
+}
+
 function formatSeconds(seconds) {
   const n = Number(seconds || 0)
   if (!n || n <= 0) return ""
@@ -13,19 +18,27 @@ function voiceWidthRpx(seconds) {
   const s = Math.max(1, Math.min(60, Number(seconds || 0) || 1))
   const min = 180
   const max = 420
-  // Log curve feels closer to WeChat than linear.
   const w = min + (max - min) * (Math.log1p(s) / Math.log1p(60))
   return Math.round(w)
 }
 
+function isPendingByStatus(status) {
+  const key = String(status || "").trim()
+  return Boolean(TURN_PENDING_STATUSES[key])
+}
+
 function normalizeTurn(raw) {
   const role = raw.role === "beautician" ? "beautician" : "customer"
+  const status = String(raw.status || "")
   const hasAudio = Boolean(raw.audio_url || raw.audioUrl || raw.audio_path)
   const showTextDefault = hasAudio ? false : true
   const audioSeconds = Number(raw.audio_seconds || raw.audioSeconds || 0) || 0
+  const pending = typeof raw.pending === "boolean" ? raw.pending : isPendingByStatus(status)
+
   return {
     id: raw.id || raw.turn_id,
     role,
+    status,
     text: raw.text || "",
     emotion: raw.emotion || "",
     audio_url: raw.audio_url || null,
@@ -36,7 +49,7 @@ function normalizeTurn(raw) {
     showSuggestions: false,
     showText: showTextDefault,
     textOpenedOnce: false,
-    pending: Boolean(raw.pending),
+    pending,
   }
 }
 
@@ -45,6 +58,7 @@ function makeLocalBeauticianTurn(filePath, durationSec) {
   return {
     id,
     role: "beautician",
+    status: "accepted",
     text: "",
     emotion: "",
     audio_url: filePath,
@@ -59,11 +73,17 @@ function makeLocalBeauticianTurn(filePath, durationSec) {
   }
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 Page({
   data: {
     sessionId: "",
     turns: [],
     loading: false,
+    waitingCustomer: false,
+    eventCursor: 0,
     recording: false,
     endModalVisible: false,
     hintVisible: false,
@@ -81,8 +101,14 @@ Page({
     this.audioCtx.onEnded(() => {
       this.setData({ playingTurnId: "" })
     })
+
     this.hasShownAudioError = false
     this.hasShownTtsFallbackToast = false
+    this.stopEvents = false
+    this.pollingEvents = false
+    this.lastAutoPlayedCustomerTurnId = ""
+    this.pendingLocalTurnId = ""
+
     this.audioCtx.onError(() => {
       if (this.hasShownAudioError) return
       this.hasShownAudioError = true
@@ -119,6 +145,7 @@ Page({
   },
 
   onUnload() {
+    this.stopEvents = true
     try {
       if (this.audioCtx) this.audioCtx.destroy()
     } catch {}
@@ -133,24 +160,31 @@ Page({
         method: "POST",
         data: { scenario_id: "objection_safety" },
       })
+
       const first = normalizeTurn({
         turn_id: res.first_customer_turn.turn_id,
         role: "customer",
+        status: "audio_ready",
         text: res.first_customer_turn.text,
         emotion: res.first_customer_turn.emotion,
         audio_url: res.first_customer_turn.audio_url,
         audio_seconds: res.first_customer_turn.audio_seconds,
       })
+
       this.setData({
         sessionId: res.session_id,
         turns: [first],
+        eventCursor: 0,
         loading: false,
+        waitingCustomer: false,
         scrollIntoView: `turn-${first.id}`,
       })
+
       if (!first.audio_url || res.first_customer_turn.tts_failed) {
         this.notifyTtsFallback()
       }
       this.autoPlayTurn(first)
+      this.ensureEventsPolling()
     } catch (err) {
       this.setData({ loading: false })
       wx.showToast({ title: err.message || "创建会话失败", icon: "none" })
@@ -167,15 +201,236 @@ Page({
       })
       const turns = (res.turns || []).map(normalizeTurn)
       const last = turns[turns.length - 1]
+      const waitingCustomer = turns.some((t) => t.role === "beautician" && t.pending)
       this.setData({
         sessionId,
         turns,
+        eventCursor: Number(res.last_event_cursor || 0) || 0,
         loading: false,
+        waitingCustomer,
         scrollIntoView: last ? `turn-${last.id}` : "",
       })
+      this.ensureEventsPolling()
     } catch (err) {
       this.setData({ loading: false })
       wx.showToast({ title: err.message || "加载会话失败", icon: "none" })
+    }
+  },
+
+  ensureEventsPolling() {
+    if (this.pollingEvents || this.stopEvents) return
+    if (!this.data.sessionId) return
+    this.pollingEvents = true
+    this.pollEventsLoop()
+  },
+
+  async pollEventsLoop() {
+    while (!this.stopEvents && this.data.sessionId) {
+      const sessionId = this.data.sessionId
+      const cursor = Number(this.data.eventCursor || 0) || 0
+      try {
+        const res = await request({
+          baseUrl: API_BASE_URL,
+          url: `/api/voice-coach/sessions/${sessionId}/events?cursor=${cursor}&timeout_ms=12000`,
+          method: "GET",
+        })
+        if (this.stopEvents) break
+
+        if (res && Array.isArray(res.events) && res.events.length) {
+          this.applyServerEvents(res.events)
+        }
+
+        const nextCursor = Number(res && res.next_cursor ? res.next_cursor : cursor) || cursor
+        if (nextCursor !== cursor) {
+          this.setData({ eventCursor: nextCursor })
+        }
+      } catch (_err) {
+        if (this.stopEvents) break
+        await sleep(800)
+      }
+    }
+
+    this.pollingEvents = false
+  },
+
+  findTurnIndex(turnId) {
+    const turns = this.data.turns || []
+    return turns.findIndex((t) => t.id === turnId)
+  },
+
+  patchTurn(turnId, patch) {
+    const idx = this.findTurnIndex(turnId)
+    if (idx < 0) return false
+    const payload = {}
+    Object.keys(patch || {}).forEach((key) => {
+      payload[`turns[${idx}].${key}`] = patch[key]
+    })
+    this.setData(payload)
+    return true
+  },
+
+  replaceTurn(turnId, turn) {
+    const idx = this.findTurnIndex(turnId)
+    if (idx < 0) return false
+    this.setData({
+      [`turns[${idx}]`]: turn,
+      scrollIntoView: `turn-${turn.id}`,
+    })
+    return true
+  },
+
+  appendTurn(turn) {
+    const turns = (this.data.turns || []).slice()
+    turns.push(turn)
+    this.setData({
+      turns,
+      scrollIntoView: `turn-${turn.id}`,
+    })
+  },
+
+  applyServerEvents(events) {
+    let latestCursor = Number(this.data.eventCursor || 0) || 0
+
+    for (let i = 0; i < events.length; i++) {
+      const ev = events[i] || {}
+      const eventId = Number(ev.id || 0) || 0
+      if (eventId && eventId <= latestCursor) continue
+
+      const type = String(ev.type || "")
+      const data = ev && typeof ev.data === "object" && ev.data ? ev.data : {}
+      const turnId = String(data.turn_id || ev.turn_id || "")
+
+      if (type === "turn.accepted" && turnId) {
+        const updated = this.patchTurn(turnId, {
+          status: "accepted",
+          pending: true,
+          audio_url: data.audio_url || null,
+          audio_seconds: Number(data.audio_seconds || 0) || null,
+          audio_seconds_text: formatSeconds(Number(data.audio_seconds || 0) || 0),
+        })
+        if (!updated) {
+          this.appendTurn(
+            normalizeTurn({
+              turn_id: turnId,
+              role: "beautician",
+              status: "accepted",
+              audio_url: data.audio_url || null,
+              audio_seconds: Number(data.audio_seconds || 0) || null,
+              pending: true,
+            }),
+          )
+        }
+        this.setData({ waitingCustomer: !data.reached_max_turns })
+      } else if (type === "beautician.asr_ready" && turnId) {
+        const seconds = Number(data.audio_seconds || 0) || 0
+        const hasAudio = Boolean(data.audio_url)
+        const patch = {
+          status: "asr_ready",
+          pending: false,
+          text: String(data.text || ""),
+          audio_url: data.audio_url || null,
+          audio_seconds: seconds || null,
+          audio_seconds_text: formatSeconds(seconds),
+          voice_width_rpx: hasAudio ? voiceWidthRpx(seconds || 3) : 0,
+          showText: hasAudio ? false : true,
+        }
+
+        const updated = this.patchTurn(turnId, patch)
+        if (!updated) {
+          this.appendTurn(
+            normalizeTurn({
+              turn_id: turnId,
+              role: "beautician",
+              status: "asr_ready",
+              text: data.text || "",
+              audio_url: data.audio_url || null,
+              audio_seconds: seconds || null,
+            }),
+          )
+        }
+
+        if (data.reached_max_turns) {
+          this.setData({ waitingCustomer: false })
+          this.openEndModal()
+        }
+      } else if (type === "customer.text_ready" && turnId) {
+        const updated = this.patchTurn(turnId, {
+          status: "text_ready",
+          pending: false,
+          text: String(data.text || ""),
+          emotion: String(data.emotion || ""),
+          showText: true,
+        })
+        if (!updated) {
+          this.appendTurn(
+            normalizeTurn({
+              turn_id: turnId,
+              role: "customer",
+              status: "text_ready",
+              text: data.text || "",
+              emotion: data.emotion || "",
+            }),
+          )
+        }
+        this.setData({ waitingCustomer: false })
+      } else if (type === "customer.audio_ready" && turnId) {
+        if (!data.audio_url || data.tts_failed) {
+          this.notifyTtsFallback()
+          this.patchTurn(turnId, { status: "text_ready", pending: false, showText: true })
+        } else {
+          const seconds = Number(data.audio_seconds || 0) || 0
+          const updated = this.patchTurn(turnId, {
+            status: "audio_ready",
+            pending: false,
+            audio_url: data.audio_url,
+            audio_seconds: seconds || null,
+            audio_seconds_text: formatSeconds(seconds),
+            voice_width_rpx: voiceWidthRpx(seconds || 3),
+            showText: false,
+          })
+          if (!updated) {
+            this.appendTurn(
+              normalizeTurn({
+                turn_id: turnId,
+                role: "customer",
+                status: "audio_ready",
+                text: data.text || "",
+                audio_url: data.audio_url,
+                audio_seconds: seconds || null,
+              }),
+            )
+          }
+
+          if (this.lastAutoPlayedCustomerTurnId !== turnId) {
+            this.lastAutoPlayedCustomerTurnId = turnId
+            this.autoPlayTurn({
+              id: turnId,
+              audio_url: data.audio_url,
+            })
+          }
+        }
+      } else if (type === "beautician.analysis_ready" && turnId) {
+        this.patchTurn(turnId, {
+          status: "analysis_ready",
+          pending: false,
+          analysis: data.analysis || null,
+        })
+      } else if (type === "turn.error") {
+        if (turnId) {
+          this.patchTurn(turnId, { pending: false, status: "error" })
+        }
+        this.setData({ waitingCustomer: false })
+        const code = String(data.code || "")
+        if (code !== "analysis_failed") {
+          wx.showToast({ title: String(data.message || "处理失败，请重试"), icon: "none" })
+        }
+      }
+
+      if (eventId > latestCursor) latestCursor = eventId
+    }
+
+    if (latestCursor !== this.data.eventCursor) {
+      this.setData({ eventCursor: latestCursor })
     }
   },
 
@@ -190,6 +445,7 @@ Page({
   async endAndViewReport() {
     const sessionId = this.data.sessionId
     if (!sessionId) return
+    this.stopEvents = true
     this.setData({ loading: true, endModalVisible: false })
     try {
       await request({
@@ -200,6 +456,8 @@ Page({
       })
       wx.navigateTo({ url: `/pages/voice-coach/report?sessionId=${sessionId}` })
     } catch (err) {
+      this.stopEvents = false
+      this.ensureEventsPolling()
       this.setData({ loading: false })
       wx.showToast({ title: err.message || "生成报告失败", icon: "none" })
     }
@@ -208,6 +466,7 @@ Page({
   async endOnly() {
     const sessionId = this.data.sessionId
     if (!sessionId) return
+    this.stopEvents = true
     this.setData({ loading: true, endModalVisible: false })
     try {
       await request({
@@ -216,7 +475,6 @@ Page({
         method: "POST",
         data: { mode: "end_only" },
       })
-      // Prefer going back to where user came from. If not possible, fall back to a tab page.
       wx.navigateBack({
         delta: 1,
         fail: () => {
@@ -224,6 +482,8 @@ Page({
         },
       })
     } catch (err) {
+      this.stopEvents = false
+      this.ensureEventsPolling()
       this.setData({ loading: false })
       wx.showToast({ title: err.message || "结束失败", icon: "none" })
     }
@@ -239,7 +499,9 @@ Page({
 
   onRecordStart() {
     if (this.data.loading) return
+    if (this.data.waitingCustomer) return
     if (!this.data.sessionId) return
+
     const start = () => {
       this.recordIntent = "send"
       this.setData({ recording: true })
@@ -247,12 +509,16 @@ Page({
         if (this.audioCtx) this.audioCtx.stop()
         this.setData({ playingTurnId: "" })
       } catch {}
+
       try {
         this.recorder.start({
           duration: 30000,
           format: "mp3",
+          sampleRate: 16000,
+          numberOfChannels: 1,
+          encodeBitRate: 48000,
         })
-      } catch (err) {
+      } catch (_err) {
         this.setData({ recording: false })
         wx.showToast({ title: "无法开始录音", icon: "none" })
       }
@@ -291,7 +557,7 @@ Page({
     this.setData({ recording: false, loading: true })
     try {
       this.recorder.stop()
-    } catch (err) {
+    } catch (_err) {
       this.setData({ loading: false })
       wx.showToast({ title: "录音停止失败", icon: "none" })
     }
@@ -315,21 +581,15 @@ Page({
       return
     }
 
-    // Add a local "sent" bubble immediately (WeChat-like), then replace it with server result.
     const localTurn = makeLocalBeauticianTurn(filePath, durationSec)
-    const turnsNow = (this.data.turns || []).slice()
-    turnsNow.push(localTurn)
     this.pendingLocalTurnId = localTurn.id
-    this.setData({
-      turns: turnsNow,
-      scrollIntoView: `turn-${localTurn.id}`,
-    })
+    this.appendTurn(localTurn)
 
     const token = getAccessToken()
     const deviceId = getDeviceId()
 
     wx.uploadFile({
-      url: `${API_BASE_URL}/api/voice-coach/sessions/${sessionId}/beautician-turn`,
+      url: `${API_BASE_URL}/api/voice-coach/sessions/${sessionId}/beautician-turn/submit`,
       filePath,
       name: "audio",
       formData: {
@@ -344,67 +604,45 @@ Page({
         let payload = null
         try {
           payload = JSON.parse(res.data)
-        } catch (err) {
+        } catch (_err) {
           payload = null
         }
 
         if (!payload || payload.error) {
-          this.setData({ loading: false })
+          this.setData({ loading: false, waitingCustomer: false })
           wx.showToast({ title: payload?.message || payload?.error || "上传失败", icon: "none" })
-          // Remove pending local bubble on failure.
           const turns = (this.data.turns || []).filter((t) => t.id !== this.pendingLocalTurnId)
           this.pendingLocalTurnId = ""
           this.setData({ turns })
           return
         }
 
-        const turns = (this.data.turns || []).slice()
-        const beautician = normalizeTurn({
+        const accepted = normalizeTurn({
           turn_id: payload.beautician_turn.turn_id,
           role: "beautician",
+          status: "accepted",
           text: payload.beautician_turn.text,
           audio_url: payload.beautician_turn.audio_url,
           audio_seconds: payload.beautician_turn.audio_seconds,
-          analysis: payload.analysis,
+          pending: true,
         })
-        // Replace pending local bubble if present.
+
         const pendingId = this.pendingLocalTurnId
         this.pendingLocalTurnId = ""
-        const idx = pendingId ? turns.findIndex((t) => t.id === pendingId) : -1
-        if (idx >= 0) turns.splice(idx, 1, beautician)
-        else turns.push(beautician)
-
-        if (payload.next_customer_turn) {
-          const customer = normalizeTurn({
-            turn_id: payload.next_customer_turn.turn_id,
-            role: "customer",
-            text: payload.next_customer_turn.text,
-            emotion: payload.next_customer_turn.emotion,
-            audio_url: payload.next_customer_turn.audio_url,
-            audio_seconds: payload.next_customer_turn.audio_seconds,
-          })
-          turns.push(customer)
-          if (!payload.next_customer_turn.audio_url || payload.next_customer_turn.tts_failed) {
-            this.notifyTtsFallback()
-          }
-          // Auto-play the customer reply as soon as it arrives.
-          this.autoPlayTurn(customer)
+        if (!this.replaceTurn(pendingId, accepted)) {
+          this.appendTurn(accepted)
         }
 
-        const last = turns[turns.length - 1]
+        const nextCursor = Number(payload.next_cursor || 0) || 0
         this.setData({
-          turns,
           loading: false,
-          scrollIntoView: last ? `turn-${last.id}` : "",
+          waitingCustomer: !payload.reached_max_turns,
+          eventCursor: nextCursor > (this.data.eventCursor || 0) ? nextCursor : this.data.eventCursor,
         })
-
-        if (payload.reached_max_turns) {
-          wx.showToast({ title: "已达到最大轮数，建议结束查看报告", icon: "none" })
-          this.openEndModal()
-        }
+        this.ensureEventsPolling()
       },
       fail: () => {
-        this.setData({ loading: false })
+        this.setData({ loading: false, waitingCustomer: false })
         wx.showToast({ title: "上传失败", icon: "none" })
         const turns = (this.data.turns || []).filter((t) => t.id !== this.pendingLocalTurnId)
         this.pendingLocalTurnId = ""
@@ -453,7 +691,7 @@ Page({
   async rollbackFrom(turnId) {
     const sessionId = this.data.sessionId
     if (!sessionId) return
-    this.setData({ loading: true })
+    this.setData({ loading: true, waitingCustomer: false })
     try {
       const res = await request({
         baseUrl: API_BASE_URL,
@@ -465,7 +703,9 @@ Page({
       const last = turns[turns.length - 1]
       this.setData({
         turns,
+        eventCursor: Number(res.last_event_cursor || this.data.eventCursor || 0) || 0,
         loading: false,
+        waitingCustomer: false,
         scrollIntoView: last ? `turn-${last.id}` : "",
       })
     } catch (err) {
@@ -541,18 +781,16 @@ Page({
         this.audioCtx.src = src
         this.audioCtx.play()
         this.setData({ playingTurnId: turnId })
-      } catch (err) {
+      } catch (_err) {
         if (!autoplay) wx.showToast({ title: "播放失败", icon: "none" })
       }
     }
 
-    // Local temp file (recorded) can be played directly.
     if (!/^https?:\/\//.test(url)) {
       doPlay(url)
       return
     }
 
-    // Auto-play should be instant. Play remote URL first, then cache lazily.
     if (autoplay) {
       doPlay(url)
       if (!this.audioCache.get(turnId)) {
@@ -580,7 +818,6 @@ Page({
       success: (res) => {
         this.setData({ downloadingTurnId: "" })
         if (!res || res.statusCode !== 200 || !res.tempFilePath) {
-          // Fall back to remote URL if download failed.
           doPlay(url)
           return
         }
@@ -589,7 +826,6 @@ Page({
       },
       fail: () => {
         this.setData({ downloadingTurnId: "" })
-        // Fall back to remote URL if download failed.
         doPlay(url)
       },
     })

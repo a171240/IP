@@ -24,3 +24,10 @@ export async function signVoiceCoachAudio(path: string, expiresInSeconds = 3600)
   return data.signedUrl
 }
 
+export async function downloadVoiceCoachAudio(path: string): Promise<Buffer> {
+  const admin = createAdminSupabaseClient()
+  const { data, error } = await admin.storage.from(VOICE_COACH_AUDIO_BUCKET).download(path)
+  if (error || !data) throw new Error(error?.message || "storage_download_failed")
+  const arrayBuffer = await data.arrayBuffer()
+  return Buffer.from(arrayBuffer)
+}
