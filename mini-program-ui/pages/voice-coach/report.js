@@ -11,6 +11,14 @@ const CHART_COLORS = {
   targetBg: "rgba(149,236,105,0.14)",
 }
 
+const TAB_TITLE_MAP = {
+  persuasion: "说服力",
+  fluency: "流利度",
+  expression: "语言表达",
+  pronunciation: "发音准确度",
+  organization: "语言组织",
+}
+
 function formatSeconds(seconds) {
   const n = Number(seconds || 0)
   if (!n || n <= 0) return ""
@@ -65,6 +73,9 @@ Page({
     sessionId: "",
     activeSegment: "report",
     activeTab: "persuasion",
+    currentTabTitle: TAB_TITLE_MAP.persuasion,
+    reportScrollIntoView: "",
+    reportScrollTop: 0,
     report: null,
     turns: [],
     playingId: "",
@@ -124,14 +135,46 @@ Page({
   setSegment(e) {
     const seg = e && e.currentTarget ? String(e.currentTarget.dataset.seg || "") : ""
     if (!seg) return
-    this.setData({ activeSegment: seg })
+    this.setData({
+      activeSegment: seg,
+      reportScrollIntoView: seg === "report" ? "report-tab-anchor" : "",
+    })
+    if (seg === "report") {
+      this.scrollReportToTop()
+      setTimeout(() => {
+        this.setData({ reportScrollIntoView: "" })
+      }, 80)
+      wx.nextTick(() => {
+        this.drawRadar()
+        this.drawChartsForTab(this.data.activeTab)
+      })
+    }
   },
 
   setTab(e) {
     const tab = e && e.currentTarget ? String(e.currentTarget.dataset.tab || "") : ""
     if (!tab) return
-    this.setData({ activeTab: tab })
-    wx.nextTick(() => this.drawChartsForTab(tab))
+    if (tab === this.data.activeTab) {
+      this.scrollReportToTop()
+      return
+    }
+    this.setData({
+      activeTab: tab,
+      currentTabTitle: TAB_TITLE_MAP[tab] || "",
+      reportScrollIntoView: "report-tab-anchor",
+    })
+    this.scrollReportToTop()
+    wx.nextTick(() => {
+      this.drawChartsForTab(tab)
+      setTimeout(() => this.setData({ reportScrollIntoView: "" }), 80)
+    })
+  },
+
+  scrollReportToTop() {
+    this.setData({ reportScrollTop: 1 })
+    setTimeout(() => {
+      this.setData({ reportScrollTop: 0 })
+    }, 16)
   },
 
   startAgain() {

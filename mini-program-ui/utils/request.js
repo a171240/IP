@@ -1,6 +1,8 @@
 const { IP_FACTORY_BASE_URL, REQUEST_TIMEOUT } = require("./config")
-const { getAccessToken } = require("./auth")
+const { getAccessToken, loginSilent } = require("./auth")
 const { getDeviceId } = require("./device")
+
+let silentLoginPromise = null
 
 function shouldAttachAuth(baseUrl) {
   if (!baseUrl) return false
@@ -28,6 +30,28 @@ function buildHeaders(baseUrl, extraHeaders) {
   }
 
   return headers
+}
+
+function clearAuthAndRedirect() {
+  wx.removeStorageSync("auth_access_token")
+  wx.removeStorageSync("auth_refresh_token")
+  wx.removeStorageSync("auth_user")
+  const pages = getCurrentPages()
+  const current = pages[pages.length - 1]
+  if (current && current.route !== "pages/login/index") {
+    wx.navigateTo({ url: "/pages/login/index" })
+  }
+}
+
+function trySilentLoginOnce() {
+  if (silentLoginPromise) return silentLoginPromise
+  silentLoginPromise = loginSilent()
+    .then(() => true)
+    .catch(() => false)
+    .finally(() => {
+      silentLoginPromise = null
+    })
+  return silentLoginPromise
 }
 
 function extractErrorMessage(data, fallback) {
@@ -86,8 +110,9 @@ function normalizeTextResponseData(data) {
 }
 
 function request(opts) {
-  const { baseUrl, url, method = "GET", data, header } = opts
+  const { baseUrl, url, method = "GET", data, header, __retried401 } = opts
   const normalizedBase = baseUrl.replace(/\/$/, "")
+  const canRetry401 = !__retried401 && shouldAttachAuth(normalizedBase)
 
   return new Promise((resolve, reject) => {
     wx.request({
@@ -102,15 +127,24 @@ function request(opts) {
           return
         }
 
+        if (res.statusCode === 401 && canRetry401) {
+          trySilentLoginOnce().then((ok) => {
+            if (ok) {
+              request({ ...opts, __retried401: true }).then(resolve).catch(reject)
+              return
+            }
+            clearAuthAndRedirect()
+            reject({
+              statusCode: 401,
+              message: "登录已过期，请重新登录",
+              data: res.data,
+            })
+          })
+          return
+        }
+
         if (res.statusCode === 401) {
-          wx.removeStorageSync("auth_access_token")
-          wx.removeStorageSync("auth_refresh_token")
-          wx.removeStorageSync("auth_user")
-          const pages = getCurrentPages()
-          const current = pages[pages.length - 1]
-          if (current && current.route !== "pages/login/index") {
-            wx.navigateTo({ url: "/pages/login/index" })
-          }
+          clearAuthAndRedirect()
         }
 
         const isHtml = looksLikeHtml(res.data)
@@ -133,8 +167,9 @@ function request(opts) {
 }
 
 function requestText(opts) {
-  const { baseUrl, url, method = "GET", data, header } = opts
+  const { baseUrl, url, method = "GET", data, header, __retried401 } = opts
   const normalizedBase = baseUrl.replace(/\/$/, "")
+  const canRetry401 = !__retried401 && shouldAttachAuth(normalizedBase)
 
   return new Promise((resolve, reject) => {
     wx.request({
@@ -152,15 +187,24 @@ function requestText(opts) {
 
         const normalizedData = normalizeTextResponseData(res.data)
 
+        if (res.statusCode === 401 && canRetry401) {
+          trySilentLoginOnce().then((ok) => {
+            if (ok) {
+              requestText({ ...opts, __retried401: true }).then(resolve).catch(reject)
+              return
+            }
+            clearAuthAndRedirect()
+            reject({
+              statusCode: 401,
+              message: "登录已过期，请重新登录",
+              data: normalizedData,
+            })
+          })
+          return
+        }
+
         if (res.statusCode === 401) {
-          wx.removeStorageSync("auth_access_token")
-          wx.removeStorageSync("auth_refresh_token")
-          wx.removeStorageSync("auth_user")
-          const pages = getCurrentPages()
-          const current = pages[pages.length - 1]
-          if (current && current.route !== "pages/login/index") {
-            wx.navigateTo({ url: "/pages/login/index" })
-          }
+          clearAuthAndRedirect()
         }
 
         const isHtml = looksLikeHtml(res.data)
@@ -183,8 +227,9 @@ function requestText(opts) {
 }
 
 function requestTextWithMeta(opts) {
-  const { baseUrl, url, method = "GET", data, header } = opts
+  const { baseUrl, url, method = "GET", data, header, __retried401 } = opts
   const normalizedBase = baseUrl.replace(/\/$/, "")
+  const canRetry401 = !__retried401 && shouldAttachAuth(normalizedBase)
 
   return new Promise((resolve, reject) => {
     wx.request({
@@ -202,15 +247,25 @@ function requestTextWithMeta(opts) {
 
         const normalizedData = normalizeTextResponseData(res.data)
 
+        if (res.statusCode === 401 && canRetry401) {
+          trySilentLoginOnce().then((ok) => {
+            if (ok) {
+              requestTextWithMeta({ ...opts, __retried401: true }).then(resolve).catch(reject)
+              return
+            }
+            clearAuthAndRedirect()
+            reject({
+              statusCode: 401,
+              message: "登录已过期，请重新登录",
+              data: normalizedData,
+              headers: res.header || {},
+            })
+          })
+          return
+        }
+
         if (res.statusCode === 401) {
-          wx.removeStorageSync("auth_access_token")
-          wx.removeStorageSync("auth_refresh_token")
-          wx.removeStorageSync("auth_user")
-          const pages = getCurrentPages()
-          const current = pages[pages.length - 1]
-          if (current && current.route !== "pages/login/index") {
-            wx.navigateTo({ url: "/pages/login/index" })
-          }
+          clearAuthAndRedirect()
         }
 
         const isHtml = looksLikeHtml(res.data)

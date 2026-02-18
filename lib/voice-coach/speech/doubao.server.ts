@@ -31,6 +31,13 @@ function timeoutMs(name: string, fallback: number): number {
   return Math.max(1000, Math.round(raw))
 }
 
+function ttsProfile(): "fast" | "balanced" {
+  const raw = String(process.env.VOICE_COACH_TTS_PROFILE || "fast")
+    .trim()
+    .toLowerCase()
+  return raw === "fast" ? "fast" : "balanced"
+}
+
 function normalizeTtsVoiceType(input: string): string {
   const normalized = input.trim()
   if (!normalized) return DEFAULT_TTS_VOICE_TYPE
@@ -71,15 +78,21 @@ export async function doubaoTts(opts: {
 }): Promise<DoubaoTtsResult> {
   const appid = getEnvOrThrow("VOLC_SPEECH_APP_ID")
   const accessToken = getEnvOrThrow("VOLC_SPEECH_ACCESS_TOKEN")
+  const profile = ttsProfile()
+  const isFastProfile = profile === "fast"
   const cluster = (process.env.VOLC_TTS_CLUSTER || "volcano_tts").trim()
   const configuredVoiceType = normalizeTtsVoiceType(process.env.VOLC_TTS_VOICE_TYPE || DEFAULT_TTS_VOICE_TYPE)
-  const fallbackVoiceTypes = String(process.env.VOLC_TTS_FALLBACK_VOICES || "")
-    .split(",")
-    .map((s) => normalizeTtsVoiceType(s))
-    .filter(Boolean)
+  const fallbackVoiceTypes = isFastProfile
+    ? []
+    : String(process.env.VOLC_TTS_FALLBACK_VOICES || "")
+        .split(",")
+        .map((s) => normalizeTtsVoiceType(s))
+        .filter(Boolean)
   const voiceTypeCandidates = Array.from(new Set([configuredVoiceType, ...fallbackVoiceTypes])).filter(Boolean)
   const language = (process.env.VOLC_TTS_LANGUAGE || "cn").trim()
-  const ttsTimeout = timeoutMs("VOLC_TTS_TIMEOUT_MS", 12000)
+  const ttsTimeout = timeoutMs("VOLC_TTS_TIMEOUT_MS", isFastProfile ? 6500 : 12000)
+  const maxRetry = isFastProfile ? 0 : 1
+  const allowEmotionFallback = !isFastProfile
 
   const requestId = randomUUID()
   const bodyBase = {
@@ -176,14 +189,14 @@ export async function doubaoTts(opts: {
     }
 
     try {
-      const { audio, durationSeconds } = await doRequestWithRetry(withEmotion, 1)
+      const { audio, durationSeconds } = await doRequestWithRetry(withEmotion, maxRetry)
       return { audio, encoding: "mp3", durationSeconds, requestId }
     } catch (err) {
       lastError = err
     }
 
     // Emotion is optional and voice-type dependent; retry once without emotion.
-    if (opts.emotion) {
+    if (opts.emotion && allowEmotionFallback) {
       const withoutEmotion = {
         ...bodyBase,
         audio: {
@@ -193,7 +206,7 @@ export async function doubaoTts(opts: {
       }
 
       try {
-        const { audio, durationSeconds } = await doRequestWithRetry(withoutEmotion, 1)
+        const { audio, durationSeconds } = await doRequestWithRetry(withoutEmotion, maxRetry)
         return { audio, encoding: "mp3", durationSeconds, requestId }
       } catch (err) {
         lastError = err
@@ -292,7 +305,12 @@ export async function doubaoAsrAuc(opts: {
   // Per official doc, resource id is either:
   // - volc.bigasr.auc (model 1.0)
   // - volc.seedasr.auc (model 2.0)
-  const resourceId = (process.env.VOLC_ASR_RESOURCE_ID || "volc.seedasr.auc").trim()
+  const configuredResourceId = (process.env.VOLC_ASR_RESOURCE_ID || "volc.seedasr.auc").trim()
+  // Avoid idle resource in realtime coaching flow.
+  const resourceId =
+    configuredResourceId === "volc.bigasr.auc_idle" || configuredResourceId === "volc.seedasr.auc_idle"
+      ? "volc.seedasr.auc"
+      : configuredResourceId
   const submitTimeout = timeoutMs("VOLC_ASR_AUC_SUBMIT_TIMEOUT_MS", 8000)
   const queryTimeout = timeoutMs("VOLC_ASR_AUC_QUERY_TIMEOUT_MS", 8000)
 

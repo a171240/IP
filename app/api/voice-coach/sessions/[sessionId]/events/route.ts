@@ -47,7 +47,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ ses
 
     while (true) {
       // Drive queue processing while client is polling.
-      await pumpVoiceCoachQueuedJobs({ sessionId, userId: user.id, maxJobs: 2 })
+      await pumpVoiceCoachQueuedJobs({ sessionId, userId: user.id, maxJobs: 3 })
 
       const { data: events, error: eventsError } = await supabase
         .from("voice_coach_events")
@@ -68,6 +68,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ ses
             turn_id: e.turn_id || null,
             job_id: e.job_id || null,
             data: e.data_json || {},
+            stage_elapsed_ms: Number((e.data_json || {}).stage_elapsed_ms || 0) || null,
           })),
           next_cursor: nextCursor,
           has_more: events.length >= 50,

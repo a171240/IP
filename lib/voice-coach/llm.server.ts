@@ -13,10 +13,10 @@ const APIMART_BASE_URL =
 const APIMART_MODEL = process.env.APIMART_QUICK_MODEL || process.env.APIMART_MODEL || "kimi-k2-thinking-turbo"
 const APIMART_FAST_MODEL = process.env.APIMART_VOICE_COACH_FAST_MODEL || process.env.APIMART_QUICK_MODEL || APIMART_MODEL
 const APIMART_ANALYSIS_MODEL = process.env.APIMART_VOICE_COACH_ANALYSIS_MODEL || APIMART_MODEL
-const APIMART_DEFAULT_TIMEOUT_MS = Number(process.env.APIMART_TIMEOUT_MS || 60000)
-const APIMART_FAST_TIMEOUT_MS = Number(process.env.APIMART_FAST_TIMEOUT_MS || 12000)
-const APIMART_ANALYSIS_TIMEOUT_MS = Number(process.env.APIMART_ANALYSIS_TIMEOUT_MS || 22000)
-const APIMART_HINT_TIMEOUT_MS = Number(process.env.APIMART_HINT_TIMEOUT_MS || 12000)
+const APIMART_DEFAULT_TIMEOUT_MS = Number(process.env.APIMART_TIMEOUT_MS || 30000)
+const APIMART_FAST_TIMEOUT_MS = Number(process.env.APIMART_FAST_TIMEOUT_MS || 6000)
+const APIMART_ANALYSIS_TIMEOUT_MS = Number(process.env.APIMART_ANALYSIS_TIMEOUT_MS || 12000)
+const APIMART_HINT_TIMEOUT_MS = Number(process.env.APIMART_HINT_TIMEOUT_MS || 6000)
 const USE_RESPONSE_FORMAT = process.env.APIMART_USE_RESPONSE_FORMAT === "true"
 
 function formatHistory(history: Array<{ role: "customer" | "beautician"; text: string; emotion?: string }>): string {

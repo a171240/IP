@@ -108,6 +108,19 @@ function shouldUseFlashAsr(): boolean {
   return Boolean((process.env.VOLC_ASR_FLASH_RESOURCE_ID || "").trim())
 }
 
+function shouldAllowAucFallbackWhenFlashEnabled(): boolean {
+  const raw = String(process.env.VOICE_COACH_ASR_ALLOW_AUC_FALLBACK || "false")
+    .trim()
+    .toLowerCase()
+  return ["1", "true", "yes", "on"].includes(raw)
+}
+
+function processingStaleMs(): number {
+  const n = Number(process.env.VOICE_COACH_PROCESSING_STALE_MS || 20000)
+  if (!Number.isFinite(n) || n < 5000) return 20000
+  return Math.round(n)
+}
+
 function asNumber(value: unknown): number | null {
   const n = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN
   return Number.isFinite(n) ? n : null
@@ -132,15 +145,125 @@ function normalizeJobStage(raw: unknown): VoiceCoachJobStage {
   return "main_pending"
 }
 
-function fallbackCustomerTurn(tag = "产品信任"): {
+function fallbackTagFromBeauticianText(text: string, defaultTag: string) {
+  const s = String(text || "")
+  if (/价格|贵|优惠|折扣|套餐|会员/.test(s)) return "价格贵"
+  if (/证书|资质|认证|安全|风险|规范|卫生/.test(s)) return "胸部安全"
+  if (/品牌|产品|院线|材料|成分|进口/.test(s)) return "产品信任"
+  if (/案例|照片|前后|反馈|对比|见证/.test(s)) return "真实案例"
+  return defaultTag
+}
+
+function fallbackTopicPool(tag: string): string[] {
+  if (tag === "胸部安全") {
+    return [
+      "你说安全我理解，但具体有哪些资质和操作规范可以给我看吗？",
+      "如果我有些敏感体质，这个项目怎么确保安全？",
+      "能不能说下你们在安全方面最关键的两三条保障？",
+    ]
+  }
+  if (tag === "价格贵") {
+    return [
+      "价格我还是觉得偏高，你能具体说说和普通项目差在哪吗？",
+      "如果按你这个价格，我能拿到哪些更确定的价值？",
+      "我在意性价比，你能给我一个更清晰的价格理由吗？",
+    ]
+  }
+  if (tag === "真实案例") {
+    return [
+      "我更想看真实的前后对比，最好是和我情况接近的案例。",
+      "除了口头介绍，有没有可验证的案例或顾客反馈？",
+      "你方便先给我看一两个具体案例吗？",
+    ]
+  }
+  return [
+    "你说得有道理，但我还是想听更具体、可验证的信息。",
+    "我能理解你的意思，不过我希望你给我更落地的依据。",
+    "可以继续说，但我更关心具体证据而不是笼统描述。",
+  ]
+}
+
+function quickHash(input: string): number {
+  const s = String(input || "")
+  let h = 0
+  for (let i = 0; i < s.length; i++) {
+    h = (h * 131 + s.charCodeAt(i)) >>> 0
+  }
+  return h
+}
+
+function detectFocusKeyword(text: string): string {
+  const s = String(text || "")
+  const checks: Array<[RegExp, string]> = [
+    [/证书|资质|认证|合规|规范/, "资质和规范"],
+    [/安全|风险|卫生|敏感|保障/, "安全保障"],
+    [/案例|照片|前后对比|反馈|见证/, "案例证明"],
+    [/品牌|产品|院线|成分|材料/, "产品和品牌"],
+    [/价格|贵|优惠|折扣|套餐|会员/, "价格和价值"],
+    [/门店|连锁|顾客|复购|口碑/, "门店口碑"],
+  ]
+
+  for (let i = 0; i < checks.length; i++) {
+    const [pattern, label] = checks[i]
+    if (pattern.test(s)) return label
+  }
+  return "具体证据"
+}
+
+function dynamicFallbackLines(tag: string, focus: string): string[] {
+  if (tag === "胸部安全") {
+    return [
+      `你提到${focus}，可以给我看下具体标准和执行流程吗？`,
+      `我最担心的是安全风险，围绕${focus}你能说得再具体一点吗？`,
+    ]
+  }
+  if (tag === "价格贵") {
+    return [
+      `你说了不少优势，但围绕${focus}，我想听到更清晰的价值对比。`,
+      `如果按这个价格，关于${focus}你能给我更明确的承诺范围吗？`,
+    ]
+  }
+  if (tag === "真实案例") {
+    return [
+      `你提到${focus}，能先给我一个和我情况相近的真实案例吗？`,
+      `关于${focus}，有没有可验证的前后对比或顾客反馈？`,
+    ]
+  }
+  return [
+    `你提到${focus}，我希望看到更具体、可验证的信息。`,
+    `我理解你的意思，不过围绕${focus}还需要更落地的依据。`,
+  ]
+}
+
+function fallbackCustomerTurn(opts: {
+  scenario: { seedTopics: string[] }
+  history: Array<{ role: "customer" | "beautician"; text: string }>
+  beauticianText: string
+}): {
   text: string
   emotion: VoiceCoachEmotion
   tag: string
 } {
+  const defaultTag = String(opts.scenario.seedTopics?.[0] || "产品信任")
+  const inferredTag = fallbackTagFromBeauticianText(opts.beauticianText, defaultTag)
+  const focus = detectFocusKeyword(opts.beauticianText)
+  const pool = Array.from(new Set([...dynamicFallbackLines(inferredTag, focus), ...fallbackTopicPool(inferredTag)]))
+
+  const beauticianTurns = opts.history.filter((h) => h.role === "beautician").length
+  const lastCustomer = [...opts.history].reverse().find((h) => h.role === "customer")
+  const seedText = `${opts.beauticianText}|${lastCustomer?.text || ""}|${beauticianTurns}|${inferredTag}`
+  let idx = quickHash(seedText) % pool.length
+  let picked = pool[idx]
+
+  if (lastCustomer && lastCustomer.text && lastCustomer.text.trim() === picked && pool.length > 1) {
+    idx = (idx + 1) % pool.length
+    picked = pool[idx]
+  }
+
   return {
-    text: "这个我能理解，不过我还是想看更具体一点的案例和依据。",
+    text: picked,
     emotion: "skeptical",
-    tag,
+    tag: inferredTag,
   }
 }
 
@@ -393,19 +516,26 @@ async function processMainStage(args: {
   }
 
   let asr: DoubaoAsrResult | null = null
-  if (shouldUseFlashAsr() && format !== "raw") {
+  let flashAttempted = false
+  let flashErrorMessage = ""
+  const flashEnabled = shouldUseFlashAsr()
+  const allowAucFallback = !flashEnabled || shouldAllowAucFallbackWhenFlashEnabled()
+
+  if (flashEnabled && format !== "raw") {
+    flashAttempted = true
     try {
       asr = await doubaoAsrFlash({
         audio: audioBuf,
         format: format as "mp3" | "wav" | "ogg" | "flac",
         uid: args.userId,
       })
-    } catch {
+    } catch (err: any) {
+      flashErrorMessage = String(err?.message || err || "")
       asr = null
     }
   }
 
-  if (!asr || !asr.text) {
+  if ((!asr || !asr.text) && allowAucFallback) {
     const signed = await signVoiceCoachAudio(audioPath)
     try {
       asr = await doubaoAsrAuc({
@@ -427,6 +557,21 @@ async function processMainStage(args: {
       }
       throw err
     }
+  }
+
+  if ((!asr || !asr.text) && flashAttempted && !allowAucFallback) {
+    const asrMsg = flashErrorMessage.includes("timeout")
+      ? "语音识别超时，请重录并靠近麦克风。"
+      : "未识别到有效语音，请重录。"
+    await markJobError({
+      jobId: args.jobId,
+      sessionId: args.sessionId,
+      userId: args.userId,
+      turnId: args.turnId,
+      code: flashErrorMessage.includes("timeout") ? "asr_flash_timeout" : "asr_empty",
+      message: asrMsg,
+    })
+    return { processed: true, done: true, jobId: args.jobId, turnId: args.turnId }
   }
 
   if (!asr || !asr.text) {
@@ -501,15 +646,27 @@ async function processMainStage(args: {
   const scenario = getScenario(String(loaded.session.scenario_id || "objection_safety"))
   const history = await buildHistory(args.sessionId, Number(loaded.turn.turn_index))
 
-  let nextCustomer = fallbackCustomerTurn(scenario.seedTopics[0] || "产品信任")
+  let nextCustomer = fallbackCustomerTurn({
+    scenario,
+    history,
+    beauticianText: asr.text,
+  })
+  let llmFallbackUsed = false
+  let llmFallbackReason = ""
   try {
     nextCustomer = await llmGenerateCustomerTurn({
       scenario,
       history,
       target: "继续追问并要求更具体证据，推动美容师给出可验证信息",
     })
-  } catch {
-    nextCustomer = fallbackCustomerTurn(scenario.seedTopics[0] || "产品信任")
+  } catch (err: any) {
+    llmFallbackUsed = true
+    llmFallbackReason = err?.message || String(err || "")
+    nextCustomer = fallbackCustomerTurn({
+      scenario,
+      history,
+      beauticianText: asr.text,
+    })
   }
 
   const customerTurnIndex = Number(loaded.turn.turn_index) + 1
@@ -572,6 +729,8 @@ async function processMainStage(args: {
       beautician_turn_id: args.turnId,
       text: nextCustomer.text,
       emotion: nextCustomer.emotion,
+      llm_fallback_used: llmFallbackUsed,
+      llm_fallback_reason: llmFallbackReason || null,
       stage_elapsed_ms: Date.now() - pipelineStartedAt,
       ts: nowIso(),
     },
@@ -940,6 +1099,36 @@ export async function pumpVoiceCoachQueuedJobs(args: {
 }): Promise<number> {
   const admin = createAdminSupabaseClient()
   const maxJobs = Math.max(1, Math.min(5, Number(args.maxJobs || 1) || 1))
+  const staleBeforeIso = new Date(Date.now() - processingStaleMs()).toISOString()
+
+  // Recover stale processing jobs so polling won't wait forever when a previous invocation was interrupted.
+  const { data: staleJobs } = await admin
+    .from("voice_coach_jobs")
+    .select("id, stage")
+    .eq("session_id", args.sessionId)
+    .eq("user_id", args.userId)
+    .eq("status", "processing")
+    .lt("updated_at", staleBeforeIso)
+    .order("updated_at", { ascending: true })
+    .limit(5)
+
+  if (staleJobs && staleJobs.length > 0) {
+    for (let i = 0; i < staleJobs.length; i++) {
+      const stale = staleJobs[i]
+      if (!stale?.id) continue
+      const staleStage = normalizeJobStage(stale.stage)
+      await admin
+        .from("voice_coach_jobs")
+        .update({
+          status: "queued",
+          stage: staleStage,
+          last_error: "requeued_stale_processing",
+          updated_at: nowIso(),
+        })
+        .eq("id", String(stale.id))
+        .eq("status", "processing")
+    }
+  }
 
   let processed = 0
   for (let i = 0; i < maxJobs; i++) {

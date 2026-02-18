@@ -54,9 +54,14 @@ export async function GET(request: NextRequest, context: { params: Promise<{ ses
 
         const push = (event: string, payload: Record<string, unknown>) => {
           if (closed) return
-          const body = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`
+          // Keep stream payload ASCII-only for better Mini Program chunk parsing compatibility.
+          const encoded = encodeURIComponent(JSON.stringify(payload))
+          const body = `event: ${event}\ndata: ${encoded}\n\n`
           controller.enqueue(encoder.encode(body))
         }
+
+        // Force an early chunk flush on some mobile proxies/runtimes.
+        controller.enqueue(encoder.encode(`:${" ".repeat(2048)}\n\n`))
 
         push("ready", {
           next_cursor: latestCursor,
@@ -69,7 +74,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ ses
             break
           }
 
-          await pumpVoiceCoachQueuedJobs({ sessionId, userId: user.id, maxJobs: 2 })
+          await pumpVoiceCoachQueuedJobs({ sessionId, userId: user.id, maxJobs: 3 })
 
           const { data: events, error: eventsError } = await supabase
             .from("voice_coach_events")
@@ -95,6 +100,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ ses
                 turn_id: e.turn_id || null,
                 job_id: e.job_id || null,
                 data: e.data_json || {},
+                stage_elapsed_ms: Number((e.data_json || {}).stage_elapsed_ms || 0) || null,
               })),
               next_cursor: latestCursor,
               has_more: events.length >= 50,

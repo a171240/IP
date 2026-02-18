@@ -17,104 +17,107 @@
       <view id="turn-{{item.id}}" class="row {{item.role === 'customer' ? 'left' : 'right'}}">
         <view wx:if="{{item.role === 'customer'}}" class="avatar avatar-customer">客</view>
 
-        <view class="msg {{item.role === 'customer' ? 'msg-left' : 'msg-right'}}">
-          <!-- 语音消息（参照微信语音消息 + 转文字按钮） -->
-          <view wx:if="{{item.audio_url}}" class="voice-row">
-            <!-- 右侧消息：转文字在左边 -->
-            <view
-              wx:if="{{item.role === 'beautician' && item.text}}"
-              class="trans-btn"
-              bindtap="toggleText"
-              data-id="{{item.id}}"
-            >
-              <view class="trans-btn-inner">
-                <view wx:if="{{!item.textOpenedOnce}}" class="trans-dot"></view>
-                <text class="trans-text">{{item.showText ? "收起" : "转文字"}}</text>
-              </view>
-            </view>
-
-            <view
-              class="voice-bubble {{item.role === 'customer' ? 'voice-customer' : 'voice-beautician'}} {{playingTurnId === item.id ? 'voice-playing' : ''}}"
-              style="width: {{item.voice_width_rpx}}rpx;"
-              bindtap="onPlay"
-              data-id="{{item.id}}"
-              data-url="{{item.audio_url}}"
-            >
-              <view class="voice-tail {{item.role === 'customer' ? 'tail-left' : 'tail-right'}}"></view>
-              <view class="voice-content {{item.role === 'customer' ? 'content-left' : 'content-right'}}">
-                <view class="voice-icon">
-                  <view class="wave w1"></view>
-                  <view class="wave w2"></view>
-                  <view class="wave w3"></view>
+          <view class="msg {{item.role === 'customer' ? 'msg-left' : 'msg-right'}}">
+            <view wx:if="{{item.audio_url}}" class="voice-row">
+              <view
+                class="voice-bubble {{item.role === 'customer' ? 'voice-customer' : 'voice-beautician'}} {{playingTurnId === item.id ? 'voice-playing' : ''}}"
+                style="width: {{item.voice_width_rpx}}rpx;"
+                bindtap="onPlay"
+                data-id="{{item.id}}"
+                data-url="{{item.audio_url}}"
+              >
+                <view class="voice-tail {{item.role === 'customer' ? 'tail-left' : 'tail-right'}}"></view>
+                <view class="voice-content {{item.role === 'customer' ? 'content-left' : 'content-right'}}">
+                  <view class="voice-icon">
+                    <view class="wave w1"></view>
+                    <view class="wave w2"></view>
+                    <view class="wave w3"></view>
+                  </view>
+                  <text class="voice-dur-text">{{item.audio_seconds_text}}</text>
                 </view>
-                <text class="voice-dur-text">{{item.audio_seconds_text}}</text>
               </view>
             </view>
 
-            <!-- 左侧消息：转文字在右边 -->
             <view
-              wx:if="{{item.role === 'customer' && item.text}}"
-              class="trans-btn"
-              bindtap="toggleText"
-              data-id="{{item.id}}"
+              wx:elif="{{item.role === 'customer'}}"
+              class="voice-bubble voice-customer voice-empty {{item.ttsFailed ? 'voice-empty-failed' : ''}}"
             >
-              <view class="trans-btn-inner">
-                <view wx:if="{{!item.textOpenedOnce}}" class="trans-dot"></view>
-                <text class="trans-text">{{item.showText ? "收起" : "转文字"}}</text>
+              <view class="voice-tail tail-left"></view>
+              <view class="voice-empty-text">{{item.ttsFailed ? "语音暂不可用" : "语音生成中..."}}</view>
+            </view>
+
+            <view wx:else class="bubble bubble-beautician">
+              <view class="msg-text">{{item.text}}</view>
+            </view>
+
+            <view
+              class="op-row"
+              wx:if="{{item.pending || item.role === 'beautician' || item.ttsFailed || (item.text && item.audio_url)}}"
+            >
+              <view class="op-actions {{item.role === 'customer' ? 'op-actions-left' : 'op-actions-right'}}">
+                <view
+                  wx:if="{{item.role === 'customer' ? (item.text && (item.audio_url || item.ttsFailed)) : (item.text && item.audio_url)}}"
+                  class="trans-btn"
+                  bindtap="toggleText"
+                  data-id="{{item.id}}"
+                >
+                  <view class="trans-btn-inner">
+                    <view wx:if="{{!item.textOpenedOnce}}" class="trans-dot"></view>
+                    <text class="trans-text">{{item.showText ? "收起" : "转文字"}}</text>
+                  </view>
+                </view>
+
+                <text
+                  wx:if="{{item.role === 'beautician' && !item.pending}}"
+                  class="meta-action"
+                  bindtap="toggleSuggest"
+                  data-id="{{item.id}}"
+                >
+                  {{item.showSuggestions ? "收起建议" : "改进建议"}}
+                </text>
+
+                <text
+                  wx:if="{{item.role === 'beautician' && !item.pending}}"
+                  class="meta-action meta-danger"
+                  bindtap="onRerecord"
+                  data-id="{{item.id}}"
+                >
+                  重录
+                </text>
+
+                <text
+                  wx:if="{{item.role === 'customer' && item.ttsFailed}}"
+                  class="meta-action meta-retry"
+                  bindtap="onRetryTts"
+                  data-id="{{item.id}}"
+                >
+                  重试语音
+                </text>
               </view>
-            </view>
-          </view>
 
-          <!-- 纯文字消息（少数兜底） -->
-          <view wx:else class="bubble {{item.role === 'customer' ? 'bubble-customer' : 'bubble-beautician'}}">
-            <view class="msg-text">{{item.text}}</view>
-          </view>
-
-          <view
-            wx:if="{{item.audio_url && item.text && item.showText}}"
-            class="text-card {{item.role === 'customer' ? 'card-customer' : 'card-beautician'}}"
-          >
-            {{item.text}}
-          </view>
-
-          <!-- 微信式：文字/建议/重录都在气泡下面 -->
-          <view class="meta-row" wx:if="{{item.role === 'beautician' || item.pending}}">
-            <view class="meta-actions">
-              <text
-                wx:if="{{item.role === 'beautician'}}"
-                class="meta-action"
-                bindtap="toggleSuggest"
-                data-id="{{item.id}}"
-              >
-                {{item.showSuggestions ? "收起建议" : "改进建议"}}
-              </text>
-
-              <text
-                wx:if="{{item.role === 'beautician' && !item.pending}}"
-                class="meta-action meta-danger"
-                bindtap="onRerecord"
-                data-id="{{item.id}}"
-              >
-                重录
-              </text>
+              <text wx:if="{{item.pending}}" class="meta-hint">识别中...</text>
             </view>
 
-            <text wx:if="{{item.pending}}" class="meta-hint">识别中...</text>
-          </view>
-
-          <view wx:if="{{item.role === 'beautician' && item.showSuggestions}}" class="suggest-card">
-            <view wx:if="{{item.analysis}}">
-              <view class="suggest-title">改进建议：</view>
-              <view class="suggest-item">1. {{item.analysis.suggestions[0]}}</view>
-              <view class="suggest-item">2. {{item.analysis.suggestions[1]}}</view>
-              <view class="suggest-item">3. {{item.analysis.suggestions[2]}}</view>
-
-              <view class="polished-title">润色表达：</view>
-              <view class="polished">{{item.analysis.polished}}</view>
+            <view
+              wx:if="{{item.text && item.showText}}"
+              class="text-card {{item.role === 'customer' ? 'card-customer' : 'card-beautician'}}"
+            >
+              {{item.text}}
             </view>
-            <view wx:else class="suggest-loading">建议生成中...</view>
+
+            <view wx:if="{{item.role === 'beautician' && item.showSuggestions}}" class="suggest-card">
+              <view wx:if="{{item.analysis}}">
+                <view class="suggest-title">改进建议：</view>
+                <view class="suggest-item">1. {{item.analysis.suggestions[0]}}</view>
+                <view class="suggest-item">2. {{item.analysis.suggestions[1]}}</view>
+                <view class="suggest-item">3. {{item.analysis.suggestions[2]}}</view>
+
+                <view class="polished-title">润色表达：</view>
+                <view class="polished">{{item.analysis.polished}}</view>
+              </view>
+              <view wx:else class="suggest-loading">建议生成中...</view>
+            </view>
           </view>
-        </view>
 
         <view wx:if="{{item.role === 'beautician'}}" class="avatar avatar-beautician">我</view>
       </view>
@@ -136,13 +139,18 @@
       </view>
     </button>
     <button
-      class="record-btn"
+      class="record-btn {{recording ? 'is-recording' : ''}} {{recordCanceling ? 'is-canceling' : ''}}"
       bindtouchstart="onRecordStart"
+      catchtouchmove="onRecordMove"
       bindtouchend="onRecordEnd"
       bindtouchcancel="onRecordCancel"
+      hover-class="none"
     >
-      {{recording ? "松开结束" : "点击说话"}}
+      {{recording ? (recordCanceling ? "松开取消" : "松开发送") : "按住说话"}}
     </button>
+  </view>
+  <view class="record-preview" wx:if="{{recording}}">
+    {{recordingPreviewText || "录音中..."}}
   </view>
 
   <!-- 结束对话弹窗 -->

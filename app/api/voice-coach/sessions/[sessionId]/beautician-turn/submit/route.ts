@@ -2,7 +2,7 @@ import { randomUUID } from "crypto"
 import { NextRequest, NextResponse } from "next/server"
 
 import { checkVoiceCoachAccess } from "@/lib/voice-coach/guard.server"
-import { emitVoiceCoachEvent, pumpVoiceCoachQueuedJobs } from "@/lib/voice-coach/jobs.server"
+import { emitVoiceCoachEvent, processVoiceCoachJobById, pumpVoiceCoachQueuedJobs } from "@/lib/voice-coach/jobs.server"
 import { signVoiceCoachAudio, uploadVoiceCoachAudio } from "@/lib/voice-coach/storage.server"
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 
@@ -33,6 +33,69 @@ function formatDuration(seconds: number | null) {
   const n = Number(seconds || 0)
   if (!n || n <= 0) return null
   return Math.round(n)
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function readJobProgress(supabase: any, jobId: string): Promise<{ status: string; stage: string } | null> {
+  const { data } = await supabase.from("voice_coach_jobs").select("status, stage").eq("id", jobId).single()
+  if (!data) return null
+  return {
+    status: String(data.status || ""),
+    stage: String(data.stage || ""),
+  }
+}
+
+async function advanceJobWithinBudget(opts: {
+  supabase: any
+  sessionId: string
+  userId: string
+  jobId: string
+  budgetMs?: number
+}): Promise<{ advanced: boolean; status: string; stage: string }> {
+  const budgetMs = Math.max(500, Number(opts.budgetMs || 2500))
+  const deadline = Date.now() + budgetMs
+  let advanced = false
+  let ranCount = 0
+
+  while (Date.now() < deadline && ranCount < 2) {
+    const remaining = deadline - Date.now()
+    if (remaining < 150) break
+
+    const timeoutMs = Math.max(150, Math.min(remaining, 1800))
+    const raced = await Promise.race([
+      processVoiceCoachJobById({
+        sessionId: opts.sessionId,
+        userId: opts.userId,
+        jobId: opts.jobId,
+      })
+        .then((result) => ({ timedOut: false, result }))
+        .catch(() => ({ timedOut: false, result: null as any })),
+      sleep(timeoutMs).then(() => ({ timedOut: true, result: null as any })),
+    ])
+
+    if (raced.timedOut) break
+    if (raced.result && raced.result.processed) {
+      advanced = true
+      ranCount += 1
+    } else {
+      break
+    }
+
+    const progress = await readJobProgress(opts.supabase, opts.jobId)
+    if (!progress) break
+    if (progress.status !== "queued") break
+    if (progress.stage !== "tts_pending") break
+  }
+
+  const finalProgress = await readJobProgress(opts.supabase, opts.jobId)
+  return {
+    advanced,
+    status: finalProgress?.status || "queued",
+    stage: finalProgress?.stage || "main_pending",
+  }
 }
 
 async function latestEventCursor(supabase: any, sessionId: string): Promise<number> {
@@ -138,6 +201,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
           next_cursor: await latestEventCursor(supabase, sessionId),
           reached_max_turns: false,
           deduped: true,
+          server_advanced: false,
+          server_advanced_stage: null,
           beautician_turn: {
             turn_id: existingTurnId,
             role: "beautician",
@@ -225,7 +290,20 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
     })
 
     // Best-effort kick-off to shorten first event wait.
-    void pumpVoiceCoachQueuedJobs({ sessionId, userId: user.id, maxJobs: 2 }).catch(() => {})
+    void pumpVoiceCoachQueuedJobs({ sessionId, userId: user.id, maxJobs: 3 }).catch(() => {})
+
+    // Fast-path: try to advance to ASR/text (and optionally TTS) before returning.
+    const advanced = await advanceJobWithinBudget({
+      supabase,
+      sessionId,
+      userId: user.id,
+      jobId,
+      budgetMs: 2500,
+    }).catch(() => ({
+      advanced: false,
+      status: "queued",
+      stage: "main_pending",
+    }))
 
     return NextResponse.json({
       turn_id: turnId,
@@ -233,6 +311,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
       client_attempt_id: clientAttemptId || null,
       next_cursor: cursor,
       reached_max_turns: reachedMax,
+      server_advanced: advanced.advanced,
+      server_advanced_stage: advanced.stage,
       beautician_turn: {
         turn_id: turnId,
         role: "beautician",

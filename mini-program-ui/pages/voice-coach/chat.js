@@ -9,6 +9,10 @@ const TURN_PENDING_STATUSES = {
   processing: true,
 }
 
+// Preview ASR currently uses short chunks with flash endpoint, which is not a compatible path.
+// Keep it disabled by default until realtime streaming ASR is enabled.
+const CLIENT_ASR_PREVIEW_ENABLED = false
+
 function formatSeconds(seconds) {
   const n = Number(seconds || 0)
   if (!n || n <= 0) return ""
@@ -32,7 +36,7 @@ function normalizeTurn(raw) {
   const role = raw.role === "beautician" ? "beautician" : "customer"
   const status = String(raw.status || "")
   const hasAudio = Boolean(raw.audio_url || raw.audioUrl || raw.audio_path)
-  const showTextDefault = hasAudio ? false : true
+  const showTextDefault = role === "customer" ? false : !hasAudio
   const audioSeconds = Number(raw.audio_seconds || raw.audioSeconds || 0) || 0
   const pending = typeof raw.pending === "boolean" ? raw.pending : isPendingByStatus(status)
 
@@ -47,6 +51,7 @@ function normalizeTurn(raw) {
     audio_seconds_text: formatSeconds(audioSeconds),
     voice_width_rpx: hasAudio ? voiceWidthRpx(audioSeconds) : 0,
     analysis: raw.analysis || raw.analysis_json || null,
+    ttsFailed: Boolean(raw.tts_failed || raw.ttsFailed),
     showSuggestions: false,
     showText: showTextDefault,
     textOpenedOnce: false,
@@ -83,6 +88,46 @@ function makeClientAttemptId() {
   return `mp_${Date.now()}_${rand}`
 }
 
+function canUseChunkedRequest() {
+  try {
+    return typeof wx.canIUse === "function" && wx.canIUse("request.enableChunked")
+  } catch (_err) {
+    return false
+  }
+}
+
+function arrayBufferToAsciiText(input) {
+  if (typeof input === "string") return input
+  if (!input) return ""
+
+  try {
+    if (typeof ArrayBuffer !== "undefined" && ArrayBuffer.isView && ArrayBuffer.isView(input)) {
+      const view = input
+      input = view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength)
+    }
+  } catch (_err) {}
+
+  try {
+    if (typeof TextDecoder === "function" && input instanceof ArrayBuffer) {
+      return new TextDecoder("utf-8").decode(input)
+    }
+  } catch (_err) {}
+
+  try {
+    if (input instanceof ArrayBuffer) {
+      const u8 = new Uint8Array(input)
+      let out = ""
+      for (let i = 0; i < u8.length; i += 4096) {
+        const chunk = u8.subarray(i, Math.min(i + 4096, u8.length))
+        out += String.fromCharCode.apply(null, chunk)
+      }
+      return out
+    }
+  } catch (_err) {}
+
+  return ""
+}
+
 Page({
   data: {
     sessionId: "",
@@ -98,6 +143,8 @@ Page({
     scrollIntoView: "",
     playingTurnId: "",
     downloadingTurnId: "",
+    recordingPreviewText: "",
+    recordCanceling: false,
   },
 
   onLoad(options) {
@@ -119,11 +166,19 @@ Page({
     this.hasShownTtsFallbackToast = false
     this.stopEvents = false
     this.pollingEvents = false
+    // Always try stream at least once on real devices; wx.canIUse can be conservative.
+    this.streamEventsDisabled = false
+    this.streamNoChunkCount = 0
+    this.streamBuffer = ""
     this.lastAutoPlayedCustomerTurnId = ""
     this.pendingLocalTurnId = ""
     this.turnLatency = new Map()
-    this.turnTtsRetried = new Set()
     this.sessionCreatedAt = 0
+    this.previewDisabled = !CLIENT_ASR_PREVIEW_ENABLED
+    this.previewInFlight = false
+    this.lastPreviewAt = 0
+    this.recordingChunkSeq = 0
+    this.recordTouchStartY = 0
 
     this.audioCtx.onError(() => {
       if (this.hasShownAudioError) return
@@ -152,6 +207,12 @@ Page({
       this.uploadBeauticianTurn(res.tempFilePath, durationSec)
     })
 
+    if (CLIENT_ASR_PREVIEW_ENABLED && typeof this.recorder.onFrameRecorded === "function") {
+      this.recorder.onFrameRecorded((frame) => {
+        this.onRecordFrame(frame)
+      })
+    }
+
     const sessionId = options && options.sessionId ? String(options.sessionId) : ""
     if (sessionId) {
       this.loadSession(sessionId)
@@ -162,6 +223,9 @@ Page({
 
   onUnload() {
     this.stopEvents = true
+    try {
+      if (this.streamTask && typeof this.streamTask.abort === "function") this.streamTask.abort()
+    } catch (_err) {}
     try {
       if (this.audioCtx) this.audioCtx.destroy()
     } catch {}
@@ -255,41 +319,238 @@ Page({
     if (this.pollingEvents || this.stopEvents) return
     if (!this.data.sessionId) return
     this.pollingEvents = true
+    this.streamBuffer = ""
     this.pollEventsLoop()
   },
 
   async pollEventsLoop() {
     while (!this.stopEvents && this.data.sessionId) {
-      const sessionId = this.data.sessionId
-      const cursor = Number(this.data.eventCursor || 0) || 0
-      try {
-        const res = await request({
-          baseUrl: API_BASE_URL,
-          url: `/api/voice-coach/sessions/${sessionId}/events?cursor=${cursor}&timeout_ms=12000`,
-          method: "GET",
-        })
-        if (this.stopEvents) break
-
-        if (res && Array.isArray(res.events) && res.events.length) {
-          this.applyServerEvents(res.events)
+      const usedStream = await this.pollEventsStreamOnce()
+      if (!usedStream) {
+        const ok = await this.pollEventsOnce()
+        if (!ok) {
+          if (this.stopEvents) break
+          await sleep(400)
         }
-
-        const nextCursor = Number(res && res.next_cursor ? res.next_cursor : cursor) || cursor
-        if (nextCursor !== cursor) {
-          this.setData({ eventCursor: nextCursor })
-        }
-      } catch (_err) {
-        if (this.stopEvents) break
-        await sleep(800)
       }
     }
 
     this.pollingEvents = false
   },
 
+  async pollEventsOnce() {
+    const sessionId = this.data.sessionId
+    const cursor = Number(this.data.eventCursor || 0) || 0
+    if (!sessionId) return false
+
+    try {
+      const res = await request({
+        baseUrl: API_BASE_URL,
+        url: `/api/voice-coach/sessions/${sessionId}/events?cursor=${cursor}&timeout_ms=1200`,
+        method: "GET",
+      })
+      if (this.stopEvents) return true
+
+      if (res && Array.isArray(res.events) && res.events.length) {
+        this.applyServerEvents(res.events)
+      }
+
+      const nextCursor = Number(res && res.next_cursor ? res.next_cursor : cursor) || cursor
+      if (nextCursor !== cursor) {
+        this.setData({ eventCursor: nextCursor })
+      }
+      return true
+    } catch (_err) {
+      return false
+    }
+  },
+
+  async pollEventsStreamOnce() {
+    if (this.streamEventsDisabled) return false
+    const sessionId = this.data.sessionId
+    if (!sessionId) return false
+    const cursor = Number(this.data.eventCursor || 0) || 0
+    const token = getAccessToken()
+    const deviceId = getDeviceId()
+
+    return new Promise((resolve) => {
+      let resolved = false
+      let streamUsable = true
+      let firstChunkReceived = false
+      let firstEventReceived = false
+      let watchdogTimer = null
+      let noEventTimer = null
+
+      const done = (ok) => {
+        if (resolved) return
+        resolved = true
+        if (watchdogTimer) {
+          clearTimeout(watchdogTimer)
+          watchdogTimer = null
+        }
+        if (noEventTimer) {
+          clearTimeout(noEventTimer)
+          noEventTimer = null
+        }
+        resolve(ok)
+      }
+
+      const markChunk = (text) => {
+        if (!text) return
+        const consumed = this.consumeStreamText(text)
+        if (consumed.hasEvents) {
+          firstEventReceived = true
+        }
+        if (consumed.useful && !firstChunkReceived) {
+          firstChunkReceived = true
+          this.streamNoChunkCount = 0
+        }
+      }
+
+      const task = wx.request({
+        url: `${API_BASE_URL}/api/voice-coach/sessions/${sessionId}/events/stream?cursor=${cursor}&timeout_ms=22000`,
+        method: "GET",
+        timeout: 26000,
+        enableChunked: true,
+        responseType: "text",
+        header: {
+          Authorization: token ? `Bearer ${token}` : "",
+          "x-device-id": deviceId || "",
+        },
+        success: (res) => {
+          if (res.statusCode === 404 || res.statusCode === 405) {
+            this.streamEventsDisabled = true
+            streamUsable = false
+          } else if (res.statusCode < 200 || res.statusCode >= 300) {
+            streamUsable = false
+          }
+
+          const tail = arrayBufferToAsciiText(res.data)
+          if (tail) markChunk(tail)
+        },
+        fail: () => {
+          streamUsable = false
+        },
+        complete: () => {
+          done(streamUsable)
+        },
+      })
+
+      this.streamTask = task
+
+      if (!task || typeof task.onChunkReceived !== "function") {
+        try {
+          if (task && typeof task.abort === "function") task.abort()
+        } catch (_err) {}
+        this.streamEventsDisabled = true
+        done(false)
+        return
+      }
+
+      watchdogTimer = setTimeout(() => {
+        if (resolved || firstChunkReceived) return
+        streamUsable = false
+        this.streamNoChunkCount = Number(this.streamNoChunkCount || 0) + 1
+        this.streamEventsDisabled = true
+        try {
+          if (task && typeof task.abort === "function") task.abort()
+        } catch (_err) {}
+        done(false)
+      }, 900)
+
+      noEventTimer = setTimeout(() => {
+        if (resolved || firstEventReceived) return
+        if (!this.data.waitingCustomer) return
+        streamUsable = false
+        this.streamNoChunkCount = Number(this.streamNoChunkCount || 0) + 1
+        this.streamEventsDisabled = true
+        try {
+          if (task && typeof task.abort === "function") task.abort()
+        } catch (_err) {}
+        done(false)
+      }, 1800)
+
+      task.onChunkReceived((chunk) => {
+        const text = arrayBufferToAsciiText(chunk && chunk.data)
+        if (text) markChunk(text)
+      })
+    })
+  },
+
+  consumeStreamText(textChunk) {
+    if (!textChunk) return { useful: false, hasEvents: false }
+    this.streamBuffer = `${this.streamBuffer || ""}${textChunk}`
+    let useful = false
+    let hasEvents = false
+
+    while (true) {
+      const sep = this.streamBuffer.indexOf("\n\n")
+      if (sep < 0) break
+      const rawBlock = this.streamBuffer.slice(0, sep)
+      this.streamBuffer = this.streamBuffer.slice(sep + 2)
+      const consumed = this.consumeStreamBlock(rawBlock)
+      useful = consumed.useful || useful
+      hasEvents = consumed.hasEvents || hasEvents
+    }
+    return { useful, hasEvents }
+  },
+
+  consumeStreamBlock(rawBlock) {
+    if (!rawBlock) return { useful: false, hasEvents: false }
+    const lines = rawBlock.split("\n")
+    let eventName = ""
+    let dataEncoded = ""
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = String(lines[i] || "")
+      if (line.startsWith("event:")) {
+        eventName = line.slice(6).trim()
+      } else if (line.startsWith("data:")) {
+        dataEncoded += line.slice(5).trim()
+      }
+    }
+
+    if (!eventName || !dataEncoded) return { useful: false, hasEvents: false }
+
+    let payload = null
+    try {
+      payload = JSON.parse(decodeURIComponent(dataEncoded))
+    } catch (_err) {
+      try {
+        payload = JSON.parse(dataEncoded)
+      } catch (_err2) {
+        return { useful: false, hasEvents: false }
+      }
+    }
+
+    if (eventName === "events" && payload && Array.isArray(payload.events)) {
+      this.applyServerEvents(payload.events)
+      const nextCursor = Number(payload.next_cursor || this.data.eventCursor || 0) || 0
+      if (nextCursor && nextCursor !== this.data.eventCursor) {
+        this.setData({ eventCursor: nextCursor })
+      }
+      return { useful: true, hasEvents: payload.events.length > 0 }
+    }
+    if (eventName === "ready") {
+      return { useful: true, hasEvents: false }
+    } else if (eventName === "error") {
+      this.streamEventsDisabled = true
+    }
+    return { useful: false, hasEvents: false }
+  },
+
   findTurnIndex(turnId) {
     const turns = this.data.turns || []
     return turns.findIndex((t) => t.id === turnId)
+  },
+
+  isLatestCustomerTurn(turnId) {
+    if (!turnId) return false
+    const turns = this.data.turns || []
+    for (let i = turns.length - 1; i >= 0; i--) {
+      if (turns[i].role === "customer") return turns[i].id === turnId
+    }
+    return false
   },
 
   patchTurn(turnId, patch) {
@@ -371,10 +632,11 @@ Page({
       const type = String(ev.type || "")
       const data = ev && typeof ev.data === "object" && ev.data ? ev.data : {}
       const turnId = String(data.turn_id || ev.turn_id || "")
+      const stageElapsedMs = Number(ev.stage_elapsed_ms || data.stage_elapsed_ms || 0) || null
 
       if (type === "turn.accepted" && turnId) {
         this.markTurnLatency(turnId, "accepted", {
-          stageElapsedMs: Number(data.stage_elapsed_ms || 0) || null,
+          stageElapsedMs,
           jobId: data.job_id || ev.job_id || "",
         })
         const updated = this.patchTurn(turnId, {
@@ -399,7 +661,7 @@ Page({
         this.setData({ waitingCustomer: !data.reached_max_turns })
       } else if (type === "beautician.asr_ready" && turnId) {
         this.markTurnLatency(turnId, "asr_ready", {
-          stageElapsedMs: Number(data.stage_elapsed_ms || 0) || null,
+          stageElapsedMs,
         })
         const seconds = Number(data.audio_seconds || 0) || 0
         const hasAudio = Boolean(data.audio_url)
@@ -437,7 +699,7 @@ Page({
         if (parentTurnId) {
           this.markTurnLatency(parentTurnId, "customer_text_ready", {
             customerTurnId: turnId,
-            stageElapsedMs: Number(data.stage_elapsed_ms || 0) || null,
+            stageElapsedMs,
           })
         }
         const updated = this.patchTurn(turnId, {
@@ -445,7 +707,8 @@ Page({
           pending: false,
           text: String(data.text || ""),
           emotion: String(data.emotion || ""),
-          showText: true,
+          showText: false,
+          ttsFailed: false,
         })
         if (!updated) {
           this.appendTurn(
@@ -458,23 +721,25 @@ Page({
             }),
           )
         }
-        this.setData({ waitingCustomer: false })
+        this.setData({ waitingCustomer: true })
       } else if (type === "customer.audio_ready" && turnId) {
         const parentTurnId = String(data.beautician_turn_id || "")
         if (parentTurnId) {
           this.markTurnLatency(parentTurnId, "customer_audio_ready", {
             customerTurnId: turnId,
-            stageElapsedMs: Number(data.stage_elapsed_ms || 0) || null,
+            stageElapsedMs,
             ttsFailed: Boolean(data.tts_failed),
           })
         }
         if (!data.audio_url || data.tts_failed) {
           this.notifyTtsFallback()
-          this.patchTurn(turnId, { status: "text_ready", pending: false, showText: true })
-          if (!this.turnTtsRetried.has(turnId)) {
-            this.turnTtsRetried.add(turnId)
-            this.requestTurnTts(turnId, { autoplay: false })
-          }
+          this.patchTurn(turnId, {
+            status: "text_ready",
+            pending: false,
+            showText: false,
+            ttsFailed: true,
+          })
+          this.setData({ waitingCustomer: false })
         } else {
           const seconds = Number(data.audio_seconds || 0) || 0
           const updated = this.patchTurn(turnId, {
@@ -485,6 +750,7 @@ Page({
             audio_seconds_text: formatSeconds(seconds),
             voice_width_rpx: voiceWidthRpx(seconds || 3),
             showText: false,
+            ttsFailed: false,
           })
           if (!updated) {
             this.appendTurn(
@@ -506,10 +772,11 @@ Page({
               audio_url: data.audio_url,
             })
           }
+          this.setData({ waitingCustomer: false })
         }
       } else if (type === "beautician.analysis_ready" && turnId) {
         this.markTurnLatency(turnId, "analysis_ready", {
-          stageElapsedMs: Number(data.stage_elapsed_ms || 0) || null,
+          stageElapsedMs,
         })
         this.patchTurn(turnId, {
           status: "analysis_ready",
@@ -542,6 +809,12 @@ Page({
     if (!sessionId || !turnId) return
     const idx = this.findTurnIndex(turnId)
     if (idx >= 0 && this.data.turns[idx] && this.data.turns[idx].audio_url) return
+    const latestCustomer = this.isLatestCustomerTurn(turnId)
+    if (latestCustomer) this.setData({ waitingCustomer: true })
+    this.patchTurn(turnId, {
+      status: "text_ready",
+      ttsFailed: false,
+    })
 
     try {
       const res = await request({
@@ -551,8 +824,20 @@ Page({
         data: {},
       })
 
-      if (!res || res.error) return
+      if (!res || res.error) {
+        this.patchTurn(turnId, {
+          status: "text_ready",
+          ttsFailed: true,
+        })
+        if (latestCustomer) this.setData({ waitingCustomer: false })
+        return
+      }
       if (!res.audio_url || res.tts_failed) {
+        this.patchTurn(turnId, {
+          status: "text_ready",
+          ttsFailed: true,
+        })
+        if (latestCustomer) this.setData({ waitingCustomer: false })
         this.notifyTtsFallback()
         return
       }
@@ -573,7 +858,13 @@ Page({
           audio_url: res.audio_url,
         })
       }
+      if (latestCustomer) this.setData({ waitingCustomer: false })
     } catch (_err) {
+      this.patchTurn(turnId, {
+        status: "text_ready",
+        ttsFailed: true,
+      })
+      if (latestCustomer) this.setData({ waitingCustomer: false })
       if (!(opts && opts.silent)) {
         this.notifyTtsFallback()
       }
@@ -651,14 +942,87 @@ Page({
     return ""
   },
 
-  onRecordStart() {
+  onRecordFrame(frame) {
+    if (!frame || this.previewDisabled || this.previewInFlight) return
+    if (!this.data.recording || !this.data.sessionId) return
+
+    const now = Date.now()
+    if (now - this.lastPreviewAt < 1200) return
+
+    const frameBuffer = frame.frameBuffer
+    if (!(frameBuffer instanceof ArrayBuffer)) return
+    if (frameBuffer.byteLength < 4096 || frameBuffer.byteLength > 512 * 1024) return
+
+    if (typeof wx.arrayBufferToBase64 !== "function") return
+
+    let audioB64 = ""
+    try {
+      audioB64 = wx.arrayBufferToBase64(frameBuffer)
+    } catch (_err) {
+      return
+    }
+    if (!audioB64) return
+
+    this.previewInFlight = true
+    this.lastPreviewAt = now
+    this.recordingChunkSeq += 1
+
+    const sessionId = this.data.sessionId
+    request({
+      baseUrl: API_BASE_URL,
+      url: `/api/voice-coach/sessions/${sessionId}/asr-preview`,
+      method: "POST",
+      data: {
+        audio_b64: audioB64,
+        format: "mp3",
+        seq: this.recordingChunkSeq,
+      },
+    })
+      .then((res) => {
+        if (res && (res.degraded || res.error === "preview_unavailable")) {
+          this.previewDisabled = true
+          return
+        }
+        const text = String(res && res.text ? res.text : "").trim()
+        if (text) {
+          this.setData({
+            recordingPreviewText: text.slice(0, 48),
+          })
+        }
+      })
+      .catch((err) => {
+        const status = Number(err && err.statusCode ? err.statusCode : 0)
+        const code = String(err && err.message ? err.message : "")
+        if (
+          status === 404 ||
+          status >= 500 ||
+          code.includes("voice_coach_stream_preview_disabled") ||
+          code.includes("asr_flash_resource_missing")
+        ) {
+          this.previewDisabled = true
+        }
+      })
+      .finally(() => {
+        this.previewInFlight = false
+      })
+  },
+
+  onRecordStart(e) {
+    if (this.data.recording) return
     if (this.data.loading) return
     if (this.data.waitingCustomer) return
     if (!this.data.sessionId) return
+    this.recordTouchStartY = 0
+    const startTouchY = Number(
+      (e && e.touches && e.touches[0] && e.touches[0].clientY) ||
+        (e && e.changedTouches && e.changedTouches[0] && e.changedTouches[0].clientY) ||
+        0,
+    )
 
-    const start = () => {
+    const start = (touchY = 0) => {
+      this.recordTouchStartY = Number(touchY || 0)
       this.recordIntent = "send"
-      this.setData({ recording: true })
+      this.setData({ recording: true, recordCanceling: false, recordingPreviewText: "录音中..." })
       try {
         if (this.audioCtx) this.audioCtx.stop()
         this.setData({ playingTurnId: "" })
@@ -672,6 +1036,7 @@ Page({
           numberOfChannels: 1,
           encodeBitRate: 64000,
           audioSource: "voice_recognition",
+          frameSize: 16,
         }
 
         const fallbackOptions = {
@@ -680,6 +1045,7 @@ Page({
           sampleRate: 16000,
           numberOfChannels: 1,
           encodeBitRate: 64000,
+          frameSize: 16,
         }
 
         try {
@@ -696,12 +1062,12 @@ Page({
     wx.getSetting({
       success: (setting) => {
         if (setting && setting.authSetting && setting.authSetting["scope.record"]) {
-          start()
+          start(startTouchY)
           return
         }
         wx.authorize({
           scope: "scope.record",
-          success: start,
+          success: () => start(startTouchY),
           fail: () => {
             wx.showModal({
               title: "需要录音权限",
@@ -716,14 +1082,29 @@ Page({
           },
         })
       },
-      fail: start,
+      fail: () => start(startTouchY),
     })
+  },
+
+  onRecordMove(e) {
+    if (!this.data.recording) return
+    const y = Number((e && e.touches && e.touches[0] && e.touches[0].clientY) || 0)
+    if (!y || !this.recordTouchStartY) return
+    const movedUp = this.recordTouchStartY - y
+    const willCancel = movedUp > 70
+    if (willCancel !== Boolean(this.data.recordCanceling)) {
+      this.setData({ recordCanceling: willCancel })
+    }
   },
 
   onRecordEnd() {
     if (!this.data.recording) return
+    if (this.data.recordCanceling) {
+      this.onRecordCancel()
+      return
+    }
     this.recordIntent = "send"
-    this.setData({ recording: false, loading: true })
+    this.setData({ recording: false, recordCanceling: false, loading: true, recordingPreviewText: "" })
     try {
       this.recorder.stop()
     } catch (_err) {
@@ -735,7 +1116,7 @@ Page({
   onRecordCancel() {
     if (!this.data.recording) return
     this.recordIntent = "cancel"
-    this.setData({ recording: false, loading: false })
+    this.setData({ recording: false, recordCanceling: false, loading: false, recordingPreviewText: "" })
     try {
       this.recorder.stop()
     } catch {}
@@ -846,12 +1227,14 @@ Page({
   toggleText(e) {
     const id = e && e.currentTarget ? String(e.currentTarget.dataset.id) : ""
     if (!id) return
-    const turns = (this.data.turns || []).map((t) => {
-      if (t.id !== id) return t
-      const willShow = !t.showText
-      return { ...t, showText: willShow, textOpenedOnce: t.textOpenedOnce || willShow }
+    const idx = this.findTurnIndex(id)
+    if (idx < 0) return
+    const turn = this.data.turns[idx] || {}
+    const willShow = !turn.showText
+    this.setData({
+      [`turns[${idx}].showText`]: willShow,
+      [`turns[${idx}].textOpenedOnce`]: Boolean(turn.textOpenedOnce || willShow),
     })
-    this.setData({ turns })
   },
 
   toggleSuggest(e) {
@@ -860,11 +1243,10 @@ Page({
     const idx = this.findTurnIndex(id)
     const current = idx >= 0 ? this.data.turns[idx] : null
     const willOpen = current ? !current.showSuggestions : false
-    const turns = (this.data.turns || []).map((t) => {
-      if (t.id !== id) return t
-      return { ...t, showSuggestions: !t.showSuggestions }
+    if (idx < 0) return
+    this.setData({
+      [`turns[${idx}].showSuggestions`]: willOpen,
     })
-    this.setData({ turns })
     if (willOpen) {
       track("voicecoach_suggestion_open", {
         sessionId: this.data.sessionId || "",
@@ -954,6 +1336,12 @@ Page({
     this.setData({ hintVisible: false })
   },
 
+  onRetryTts(e) {
+    const id = e && e.currentTarget ? String(e.currentTarget.dataset.id || "") : ""
+    if (!id) return
+    this.requestTurnTts(id, { autoplay: true })
+  },
+
   onPlay(e) {
     const url = e && e.currentTarget ? String(e.currentTarget.dataset.url || "") : ""
     const id = e && e.currentTarget ? String(e.currentTarget.dataset.id || "") : ""
@@ -978,7 +1366,7 @@ Page({
   notifyTtsFallback() {
     if (this.hasShownTtsFallbackToast) return
     this.hasShownTtsFallbackToast = true
-    wx.showToast({ title: "顾客语音生成失败，先看文字继续练习", icon: "none" })
+    wx.showToast({ title: "顾客语音生成失败，请重试语音", icon: "none" })
   },
 
   playAudio(turnId, url, opts = {}) {

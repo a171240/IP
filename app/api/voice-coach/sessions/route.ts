@@ -37,11 +37,40 @@ function fallbackFirstCustomerTurn() {
   }
 }
 
+function shouldUseLlmForFirstTurn(): boolean {
+  const raw = String(process.env.VOICE_COACH_FIRST_TURN_MODE || "preset")
+    .trim()
+    .toLowerCase()
+  return raw === "llm"
+}
+
 function shouldGenerateFirstTurnTtsSynchronously(): boolean {
   const raw = String(process.env.VOICE_COACH_FIRST_TTS_MODE || "async")
     .trim()
     .toLowerCase()
   return raw === "sync"
+}
+
+function getSeedOpeningAudioPath(scenarioId: string): string {
+  const fromEnv = (process.env.VOICE_COACH_SEED_OPENING_AUDIO_PATH || "").trim()
+  if (fromEnv) return fromEnv
+  if (scenarioId === "objection_safety") return "seed/opening/objection_safety_v1.mp3"
+  return ""
+}
+
+function getSeedOpeningAudioSeconds(): number | null {
+  const n = Number(process.env.VOICE_COACH_SEED_OPENING_SECONDS || 3)
+  if (!Number.isFinite(n) || n <= 0) return null
+  return Math.round(n)
+}
+
+async function trySignSeedAudio(path: string): Promise<string | null> {
+  if (!path) return null
+  try {
+    return await signVoiceCoachAudio(path)
+  } catch {
+    return null
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -75,26 +104,36 @@ export async function POST(request: NextRequest) {
     }
 
     let first = fallbackFirstCustomerTurn()
-    try {
-      first = await llmGenerateCustomerTurn({
-        scenario,
-        history: [],
-        target: "提出对安全性的担忧并追问是否安全",
-      })
-    } catch {
-      // Keep session creation fast and available even when LLM is slow.
-      first = fallbackFirstCustomerTurn()
+    if (shouldUseLlmForFirstTurn()) {
+      try {
+        first = await llmGenerateCustomerTurn({
+          scenario,
+          history: [],
+          target: "提出对安全性的担忧并追问是否安全",
+        })
+      } catch {
+        first = fallbackFirstCustomerTurn()
+      }
     }
 
     const turnId = randomUUID()
 
     let audioPath: string | null = null
     let audioUrl: string | null = null
-    let audioSeconds: number | null = null
+    let audioSeconds: number | null = getSeedOpeningAudioSeconds()
     let ttsFailed = false
 
-    // Default fast-path: create session immediately, first-turn voice is generated on-demand.
-    if (shouldGenerateFirstTurnTtsSynchronously()) {
+    // Fast path: use pre-generated seed audio to avoid blocking session creation.
+    const seedAudioPath = getSeedOpeningAudioPath(scenario.id)
+    if (seedAudioPath) {
+      const signed = await trySignSeedAudio(seedAudioPath)
+      if (signed) {
+        audioPath = seedAudioPath
+        audioUrl = signed
+      }
+    }
+
+    if (!audioUrl && shouldGenerateFirstTurnTtsSynchronously()) {
       try {
         const tts = await doubaoTts({
           text: first.text,
@@ -114,12 +153,15 @@ export async function POST(request: NextRequest) {
           ttsFailed = true
         }
       } catch {
-        // TTS is optional; the UI can still show text-only customer turns.
         audioPath = null
         audioUrl = null
         audioSeconds = null
         ttsFailed = true
       }
+    }
+
+    if (!audioUrl) {
+      audioSeconds = null
     }
 
     const { error: turnError } = await supabase.from("voice_coach_turns").insert({

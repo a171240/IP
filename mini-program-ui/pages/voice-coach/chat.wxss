@@ -1,6 +1,8 @@
 @import "theme.wxss";
 
 page {
+  position: fixed;
+  inset: 0;
   height: 100vh;
   overflow: hidden;
 }
@@ -61,9 +63,10 @@ page {
 }
 
 .msg {
-  max-width: 560rpx;
+  max-width: 620rpx;
   display: flex;
   flex-direction: column;
+  gap: 10rpx;
 }
 
 .msg-left {
@@ -123,9 +126,8 @@ page {
 
 /* Voice bubble row */
 .voice-row {
+  width: 100%;
   display: flex;
-  align-items: center;
-  gap: 14rpx;
 }
 
 .voice-bubble {
@@ -141,11 +143,13 @@ page {
 .voice-customer {
   background: var(--vc-bubble-other);
   border: 1rpx solid rgba(255, 255, 255, 0.07);
+  margin-right: auto;
 }
 
 .voice-beautician {
   background: var(--vc-bubble-self);
   border: 1rpx solid rgba(94, 170, 60, 0.35);
+  margin-left: auto;
 }
 
 .voice-tail {
@@ -230,6 +234,23 @@ page {
   animation-delay: 0.24s;
 }
 
+.voice-empty {
+  min-width: 220rpx;
+  width: auto !important;
+}
+
+.voice-empty-text {
+  font-size: 28rpx;
+  color: var(--vc-bubble-other-text);
+  opacity: 0.92;
+  line-height: 1;
+}
+
+.voice-empty-failed {
+  border-color: rgba(255, 126, 126, 0.4);
+  box-shadow: 0 10rpx 24rpx rgba(255, 70, 70, 0.12);
+}
+
 @keyframes voiceWave {
   0% {
     height: 8rpx;
@@ -254,6 +275,7 @@ page {
   border: 2rpx solid rgba(255, 255, 255, 0.1);
   display: flex;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .trans-btn:active {
@@ -285,18 +307,36 @@ page {
   white-space: pre-wrap;
 }
 
-.meta-row {
-  margin-top: 10rpx;
+.bubble-customer .msg-text {
+  color: var(--vc-bubble-other-text);
+}
+
+.bubble-beautician .msg-text {
+  color: var(--vc-bubble-self-text);
+}
+
+.op-row {
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12rpx;
 }
 
-.meta-actions {
+.op-actions {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   gap: 10rpx;
+  flex-wrap: wrap;
+}
+
+.op-actions-left {
+  justify-content: flex-start;
+}
+
+.op-actions-right {
+  justify-content: flex-end;
+  margin-left: auto;
 }
 
 .meta-action {
@@ -319,18 +359,25 @@ page {
   color: #ffb3b3;
 }
 
+.meta-retry {
+  border-color: rgba(149, 236, 105, 0.35);
+  color: #b9f39c;
+}
+
 .meta-hint {
   font-size: 26rpx;
   color: var(--vc-text-muted);
+  white-space: nowrap;
 }
 
 .text-card {
-  margin-top: 10rpx;
+  width: 100%;
   padding: 16rpx;
   border-radius: 18rpx;
   box-shadow: 0 10rpx 28rpx rgba(0, 0, 0, 0.28);
   font-size: 28rpx;
-  line-height: 40rpx;
+  line-height: 44rpx;
+  word-break: break-word;
   white-space: pre-wrap;
   border: 1rpx solid rgba(255, 255, 255, 0.06);
 }
@@ -477,6 +524,27 @@ page {
   font-size: 32rpx;
   height: 86rpx;
   line-height: 86rpx;
+}
+
+.record-btn.is-recording {
+  background: rgba(30, 38, 24, 0.98);
+  border-color: rgba(149, 236, 105, 0.45);
+  color: #e8ffd8;
+}
+
+.record-btn.is-canceling {
+  background: rgba(57, 24, 24, 0.98);
+  border-color: rgba(255, 95, 95, 0.45);
+  color: #ffd9d9;
+}
+
+.record-preview {
+  padding: 8rpx 24rpx 12rpx;
+  font-size: 24rpx;
+  line-height: 32rpx;
+  color: var(--vc-text-muted);
+  border-top: 1rpx solid rgba(229, 211, 179, 0.08);
+  background: rgba(10, 10, 14, 0.92);
 }
 
 .modal-mask {

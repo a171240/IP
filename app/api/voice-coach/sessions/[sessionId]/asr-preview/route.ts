@@ -23,8 +23,19 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
     const { sessionId } = await context.params
     if (!sessionId) return jsonError(400, "missing_session_id")
 
-    if (!(process.env.VOICE_COACH_STREAMING_PREVIEW_ENABLED || "").trim()) {
-      return jsonError(404, "voice_coach_stream_preview_disabled")
+    const previewEnabledRaw = String(process.env.VOICE_COACH_STREAMING_PREVIEW_ENABLED ?? "false")
+      .trim()
+      .toLowerCase()
+    const previewEnabled = !["0", "false", "off", "no"].includes(previewEnabledRaw)
+    if (!previewEnabled) {
+      return NextResponse.json({
+        text: "",
+        confidence: null,
+        audio_seconds: null,
+        request_id: null,
+        degraded: true,
+        error: "voice_coach_stream_preview_disabled",
+      })
     }
 
     const supabase = await createServerSupabaseClientForRequest(request)
@@ -45,7 +56,14 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
     if (session.status !== "active") return jsonError(400, "session_not_active")
 
     if (!(process.env.VOLC_ASR_FLASH_RESOURCE_ID || "").trim()) {
-      return jsonError(400, "asr_flash_resource_missing")
+      return NextResponse.json({
+        text: "",
+        confidence: null,
+        audio_seconds: null,
+        request_id: null,
+        degraded: true,
+        error: "asr_flash_resource_missing",
+      })
     }
 
     const body = (await request.json().catch(() => null)) as
@@ -79,6 +97,15 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
       request_id: asr.requestId,
     })
   } catch (err: any) {
-    return jsonError(500, "voice_coach_error", { message: err?.message || String(err) })
+    // Preview is a best-effort optimization. Never block the main flow on preview failure.
+    return NextResponse.json({
+      text: "",
+      confidence: null,
+      audio_seconds: null,
+      request_id: null,
+      degraded: true,
+      error: "preview_unavailable",
+      message: err?.message || String(err),
+    })
   }
 }

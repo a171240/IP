@@ -8,8 +8,16 @@
     </view>
   </view>
 
-  <scroll-view class="content" scroll-y="true" enhanced="true" bounces="false" show-scrollbar="false">
-    <view wx:if="{{activeSegment === 'report'}}">
+  <scroll-view
+    class="content"
+    scroll-y="true"
+    scroll-top="{{reportScrollTop}}"
+    scroll-into-view="{{reportScrollIntoView}}"
+    enhanced="true"
+    bounces="false"
+    show-scrollbar="false"
+  >
+    <view wx:if="{{activeSegment === 'report' && report}}">
       <view class="headline">恭喜完成练习，这是为您生成的评测报告：</view>
 
       <view class="score-card">
@@ -44,13 +52,17 @@
         </block>
       </view>
 
-      <scroll-view class="tabs" scroll-x="true">
-        <view class="tab {{activeTab === 'persuasion' ? 'active' : ''}}" data-tab="persuasion" bindtap="setTab">说服力</view>
-        <view class="tab {{activeTab === 'fluency' ? 'active' : ''}}" data-tab="fluency" bindtap="setTab">流利度</view>
-        <view class="tab {{activeTab === 'expression' ? 'active' : ''}}" data-tab="expression" bindtap="setTab">语言表达</view>
-        <view class="tab {{activeTab === 'pronunciation' ? 'active' : ''}}" data-tab="pronunciation" bindtap="setTab">发音准确度</view>
-        <view class="tab {{activeTab === 'organization' ? 'active' : ''}}" data-tab="organization" bindtap="setTab">语言组织</view>
-      </scroll-view>
+      <view id="report-tab-anchor"></view>
+      <view class="tabs-wrap">
+        <scroll-view class="tabs" scroll-x="true">
+          <view class="tab {{activeTab === 'persuasion' ? 'active' : ''}}" data-tab="persuasion" bindtap="setTab">说服力</view>
+          <view class="tab {{activeTab === 'fluency' ? 'active' : ''}}" data-tab="fluency" bindtap="setTab">流利度</view>
+          <view class="tab {{activeTab === 'expression' ? 'active' : ''}}" data-tab="expression" bindtap="setTab">语言表达</view>
+          <view class="tab {{activeTab === 'pronunciation' ? 'active' : ''}}" data-tab="pronunciation" bindtap="setTab">发音准确度</view>
+          <view class="tab {{activeTab === 'organization' ? 'active' : ''}}" data-tab="organization" bindtap="setTab">语言组织</view>
+        </scroll-view>
+        <view class="current-tab-title">当前：{{currentTabTitle}}</view>
+      </view>
 
       <view class="tab-body">
         <!-- 说服力 -->
@@ -195,6 +207,9 @@
       </view>
 
       <view class="bottom-space"></view>
+    </view>
+    <view wx:if="{{activeSegment === 'report' && !report}}" class="loading-empty">
+      报告生成中，请稍候...
     </view>
 
     <!-- 对话回放 -->
