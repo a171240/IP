@@ -29,7 +29,9 @@ export async function GET(
 
     const { data: turn, error: turnError } = await supabase
       .from("voice_coach_turns")
-      .select("id, session_id, turn_index, role, status, text, emotion, audio_path, audio_seconds, analysis_json, features_json")
+      .select(
+        "id, session_id, turn_index, role, status, text, emotion, audio_path, audio_seconds, analysis_json, features_json, line_id, intent_id, angle_id, reply_source",
+      )
       .eq("id", turnId)
       .eq("session_id", sessionId)
       .single()
@@ -55,6 +57,10 @@ export async function GET(
         emotion: turn.emotion,
         audio_url: audioUrl,
         audio_seconds: turn.audio_seconds,
+        line_id: turn.line_id || null,
+        intent_id: turn.intent_id || null,
+        angle_id: turn.angle_id || null,
+        reply_source: turn.reply_source || null,
         analysis: turn.analysis_json || null,
         features: turn.features_json || null,
       },

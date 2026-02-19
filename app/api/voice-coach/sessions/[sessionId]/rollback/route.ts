@@ -54,7 +54,9 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
 
     const { data: turns, error: turnsError } = await supabase
       .from("voice_coach_turns")
-      .select("id, turn_index, role, status, text, emotion, audio_path, audio_seconds, analysis_json, features_json")
+      .select(
+        "id, turn_index, role, status, text, emotion, audio_path, audio_seconds, analysis_json, features_json, line_id, intent_id, angle_id, reply_source",
+      )
       .eq("session_id", sessionId)
       .order("turn_index", { ascending: true })
     if (turnsError) return jsonError(500, "turns_query_failed", { message: turnsError.message })

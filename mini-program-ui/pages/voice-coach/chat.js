@@ -1,6 +1,6 @@
 const { API_BASE_URL } = require("../../utils/config")
 const { request } = require("../../utils/request")
-const { getAccessToken } = require("../../utils/auth")
+const { getAccessToken, loginSilent } = require("../../utils/auth")
 const { getDeviceId } = require("../../utils/device")
 const { track } = require("../../utils/track")
 
@@ -8,6 +8,11 @@ const TURN_PENDING_STATUSES = {
   accepted: true,
   processing: true,
 }
+
+// Default to short-polling on Mini Program for stability.
+const MP_STREAM_ENABLED = false
+const LOCAL_SILENCE_MIN_SECONDS = 1.2
+const LOCAL_SILENCE_MIN_ENERGY_FRAMES = 2
 
 // Preview ASR currently uses short chunks with flash endpoint, which is not a compatible path.
 // Keep it disabled by default until realtime streaming ASR is enabled.
@@ -46,6 +51,10 @@ function normalizeTurn(raw) {
     status,
     text: raw.text || "",
     emotion: raw.emotion || "",
+    line_id: raw.line_id || null,
+    intent_id: raw.intent_id || null,
+    angle_id: raw.angle_id || null,
+    reply_source: raw.reply_source || null,
     audio_url: raw.audio_url || null,
     audio_seconds: audioSeconds || null,
     audio_seconds_text: formatSeconds(audioSeconds),
@@ -56,6 +65,7 @@ function normalizeTurn(raw) {
     showText: showTextDefault,
     textOpenedOnce: false,
     pending,
+    analysisLoading: false,
   }
 }
 
@@ -76,6 +86,7 @@ function makeLocalBeauticianTurn(filePath, durationSec) {
     showText: false,
     textOpenedOnce: false,
     pending: true,
+    analysisLoading: false,
   }
 }
 
@@ -94,6 +105,35 @@ function canUseChunkedRequest() {
   } catch (_err) {
     return false
   }
+}
+
+function maybeDecodeJwtExp(token) {
+  if (!token || typeof token !== "string") return 0
+  const parts = token.split(".")
+  if (parts.length < 2) return 0
+  try {
+    let payload = parts[1].replace(/-/g, "+").replace(/_/g, "/")
+    while (payload.length % 4 !== 0) payload += "="
+    if (typeof wx.base64ToArrayBuffer !== "function") return 0
+    const arr = wx.base64ToArrayBuffer(payload)
+    const u8 = new Uint8Array(arr)
+    let text = ""
+    for (let i = 0; i < u8.length; i++) {
+      text += String.fromCharCode(u8[i])
+    }
+    const json = JSON.parse(text)
+    return Number(json && json.exp ? json.exp : 0) || 0
+  } catch (_err) {
+    return 0
+  }
+}
+
+function shouldWarmupLogin(token) {
+  if (!token) return true
+  const exp = maybeDecodeJwtExp(token)
+  if (!exp) return false
+  const nowSec = Math.floor(Date.now() / 1000)
+  return exp - nowSec <= 120
 }
 
 function arrayBufferToAsciiText(input) {
@@ -131,6 +171,10 @@ function arrayBufferToAsciiText(input) {
 Page({
   data: {
     sessionId: "",
+    categoryId: "sale",
+    goalTemplateId: "",
+    goalCustom: "",
+    recommendation: null,
     turns: [],
     loading: false,
     waitingCustomer: false,
@@ -166,8 +210,7 @@ Page({
     this.hasShownTtsFallbackToast = false
     this.stopEvents = false
     this.pollingEvents = false
-    // Always try stream at least once on real devices; wx.canIUse can be conservative.
-    this.streamEventsDisabled = false
+    this.streamEventsDisabled = !MP_STREAM_ENABLED
     this.streamNoChunkCount = 0
     this.streamBuffer = ""
     this.lastAutoPlayedCustomerTurnId = ""
@@ -179,6 +222,8 @@ Page({
     this.lastPreviewAt = 0
     this.recordingChunkSeq = 0
     this.recordTouchStartY = 0
+    this.recordEnergyFrames = 0
+    this.recordFrameCount = 0
 
     this.audioCtx.onError(() => {
       if (this.hasShownAudioError) return
@@ -204,21 +249,48 @@ Page({
         this.setData({ recording: false, loading: false })
         return
       }
+      const fileSize = Number(res && res.fileSize ? res.fileSize : 0) || 0
+      const lowEnergy = Number(this.recordEnergyFrames || 0) < LOCAL_SILENCE_MIN_ENERGY_FRAMES
+      if (durationSec < LOCAL_SILENCE_MIN_SECONDS && lowEnergy && fileSize < 4096) {
+        wx.showToast({ title: "未检测到有效语音，请重录", icon: "none" })
+        this.setData({ recording: false, loading: false })
+        return
+      }
       this.uploadBeauticianTurn(res.tempFilePath, durationSec)
     })
 
-    if (CLIENT_ASR_PREVIEW_ENABLED && typeof this.recorder.onFrameRecorded === "function") {
+    if (typeof this.recorder.onFrameRecorded === "function") {
       this.recorder.onFrameRecorded((frame) => {
         this.onRecordFrame(frame)
       })
     }
 
     const sessionId = options && options.sessionId ? String(options.sessionId) : ""
+    const categoryId =
+      options && (options.categoryId || options.category_id) ? String(options.categoryId || options.category_id) : ""
+    const goalTemplateId =
+      options && (options.goalTemplateId || options.goal_template_id)
+        ? String(options.goalTemplateId || options.goal_template_id)
+        : ""
+    const goalCustom = options && options.goalCustom ? String(options.goalCustom) : ""
+
+    if (categoryId || goalTemplateId || goalCustom) {
+      this.setData({
+        categoryId: categoryId || this.data.categoryId,
+        goalTemplateId: goalTemplateId || "",
+        goalCustom: goalCustom || "",
+      })
+    }
+
     if (sessionId) {
       this.loadSession(sessionId)
       return
     }
-    this.createSession()
+    this.createSession({
+      categoryId: categoryId || this.data.categoryId,
+      goalTemplateId,
+      goalCustom,
+    })
   },
 
   onUnload() {
@@ -231,20 +303,41 @@ Page({
     } catch {}
   },
 
-  async createSession() {
+  async createSession(createOpts = {}) {
     const startedAt = Date.now()
     this.sessionCreatedAt = startedAt
     this.setData({ loading: true })
     try {
+      const token = getAccessToken()
+      if (shouldWarmupLogin(token)) {
+        try {
+          await loginSilent()
+        } catch (_err) {}
+      }
+
+      const categoryId = String(createOpts.categoryId || this.data.categoryId || "sale")
+      const goalTemplateId = String(createOpts.goalTemplateId || this.data.goalTemplateId || "")
+      const goalCustom = String(createOpts.goalCustom || this.data.goalCustom || "").trim()
+
+      const reqData = {
+        category_id: categoryId,
+      }
+      if (goalTemplateId) reqData.goal_template_id = goalTemplateId
+      if (goalCustom) reqData.goal_custom = goalCustom
+
       const res = await request({
         baseUrl: API_BASE_URL,
         url: "/api/voice-coach/sessions",
         method: "POST",
-        data: { scenario_id: "objection_safety" },
+        data: reqData,
       })
 
       const first = normalizeTurn({
         turn_id: res.first_customer_turn.turn_id,
+        line_id: res.first_customer_turn.line_id || null,
+        intent_id: res.first_customer_turn.intent_id || null,
+        angle_id: res.first_customer_turn.angle_id || null,
+        reply_source: "fixed",
         role: "customer",
         status: "audio_ready",
         text: res.first_customer_turn.text,
@@ -255,6 +348,8 @@ Page({
 
       this.setData({
         sessionId: res.session_id,
+        categoryId: (res.scenario && res.scenario.category_id) || categoryId || "sale",
+        recommendation: res.recommendation || null,
         turns: [first],
         eventCursor: 0,
         loading: false,
@@ -264,7 +359,10 @@ Page({
 
       track("voicecoach_enter", {
         sessionId: res.session_id,
+        categoryId: (res.scenario && res.scenario.category_id) || categoryId || "sale",
         createSessionMs: Date.now() - startedAt,
+        firstTurnSource:
+          (res && res.first_customer_turn && res.first_customer_turn.first_turn_source) || (first.audio_url ? "unknown" : "text_only"),
       })
 
       if (first.audio_url) {
@@ -294,6 +392,8 @@ Page({
       const waitingCustomer = turns.some((t) => t.role === "beautician" && t.pending)
       this.setData({
         sessionId,
+        categoryId:
+          (res && res.session && (res.session.category_id || (res.session.scenario && res.session.scenario.id))) || this.data.categoryId,
         turns,
         eventCursor: Number(res.last_event_cursor || 0) || 0,
         loading: false,
@@ -662,6 +762,8 @@ Page({
       } else if (type === "beautician.asr_ready" && turnId) {
         this.markTurnLatency(turnId, "asr_ready", {
           stageElapsedMs,
+          asrProvider: data.asr_provider || "",
+          asrFallbackUsed: Boolean(data.asr_fallback_used),
         })
         const seconds = Number(data.audio_seconds || 0) || 0
         const hasAudio = Boolean(data.audio_url)
@@ -707,6 +809,10 @@ Page({
           pending: false,
           text: String(data.text || ""),
           emotion: String(data.emotion || ""),
+          line_id: data.line_id || null,
+          intent_id: data.intent_id || null,
+          angle_id: data.angle_id || null,
+          reply_source: data.reply_source || null,
           showText: false,
           ttsFailed: false,
         })
@@ -714,6 +820,10 @@ Page({
           this.appendTurn(
             normalizeTurn({
               turn_id: turnId,
+              line_id: data.line_id || null,
+              intent_id: data.intent_id || null,
+              angle_id: data.angle_id || null,
+              reply_source: data.reply_source || null,
               role: "customer",
               status: "text_ready",
               text: data.text || "",
@@ -749,6 +859,10 @@ Page({
             audio_seconds: seconds || null,
             audio_seconds_text: formatSeconds(seconds),
             voice_width_rpx: voiceWidthRpx(seconds || 3),
+            line_id: data.line_id || null,
+            intent_id: data.intent_id || null,
+            angle_id: data.angle_id || null,
+            reply_source: data.reply_source || null,
             showText: false,
             ttsFailed: false,
           })
@@ -756,6 +870,10 @@ Page({
             this.appendTurn(
               normalizeTurn({
                 turn_id: turnId,
+                line_id: data.line_id || null,
+                intent_id: data.intent_id || null,
+                angle_id: data.angle_id || null,
+                reply_source: data.reply_source || null,
                 role: "customer",
                 status: "audio_ready",
                 text: data.text || "",
@@ -782,11 +900,12 @@ Page({
           status: "analysis_ready",
           pending: false,
           analysis: data.analysis || null,
+          analysisLoading: false,
         })
         this.turnLatency.delete(turnId)
       } else if (type === "turn.error") {
         if (turnId) {
-          this.patchTurn(turnId, { pending: false, status: "error" })
+          this.patchTurn(turnId, { pending: false, status: "error", analysisLoading: false })
           this.turnLatency.delete(turnId)
         }
         this.setData({ waitingCustomer: false })
@@ -943,68 +1062,30 @@ Page({
   },
 
   onRecordFrame(frame) {
-    if (!frame || this.previewDisabled || this.previewInFlight) return
-    if (!this.data.recording || !this.data.sessionId) return
-
-    const now = Date.now()
-    if (now - this.lastPreviewAt < 1200) return
-
+    if (!frame || !this.data.recording) return
     const frameBuffer = frame.frameBuffer
     if (!(frameBuffer instanceof ArrayBuffer)) return
-    if (frameBuffer.byteLength < 4096 || frameBuffer.byteLength > 512 * 1024) return
+    if (frameBuffer.byteLength < 256) return
 
-    if (typeof wx.arrayBufferToBase64 !== "function") return
+    this.recordFrameCount = Number(this.recordFrameCount || 0) + 1
 
-    let audioB64 = ""
+    let energyHit = false
     try {
-      audioB64 = wx.arrayBufferToBase64(frameBuffer)
-    } catch (_err) {
-      return
+      const bytes = new Uint8Array(frameBuffer)
+      const step = Math.max(1, Math.floor(bytes.length / 64))
+      let energy = 0
+      let samples = 0
+      for (let i = 0; i < bytes.length; i += step) {
+        energy += Math.abs(bytes[i] - 128)
+        samples += 1
+      }
+      const avg = samples > 0 ? energy / samples : 0
+      if (avg > 9) energyHit = true
+    } catch (_err) {}
+
+    if (energyHit) {
+      this.recordEnergyFrames = Number(this.recordEnergyFrames || 0) + 1
     }
-    if (!audioB64) return
-
-    this.previewInFlight = true
-    this.lastPreviewAt = now
-    this.recordingChunkSeq += 1
-
-    const sessionId = this.data.sessionId
-    request({
-      baseUrl: API_BASE_URL,
-      url: `/api/voice-coach/sessions/${sessionId}/asr-preview`,
-      method: "POST",
-      data: {
-        audio_b64: audioB64,
-        format: "mp3",
-        seq: this.recordingChunkSeq,
-      },
-    })
-      .then((res) => {
-        if (res && (res.degraded || res.error === "preview_unavailable")) {
-          this.previewDisabled = true
-          return
-        }
-        const text = String(res && res.text ? res.text : "").trim()
-        if (text) {
-          this.setData({
-            recordingPreviewText: text.slice(0, 48),
-          })
-        }
-      })
-      .catch((err) => {
-        const status = Number(err && err.statusCode ? err.statusCode : 0)
-        const code = String(err && err.message ? err.message : "")
-        if (
-          status === 404 ||
-          status >= 500 ||
-          code.includes("voice_coach_stream_preview_disabled") ||
-          code.includes("asr_flash_resource_missing")
-        ) {
-          this.previewDisabled = true
-        }
-      })
-      .finally(() => {
-        this.previewInFlight = false
-      })
   },
 
   onRecordStart(e) {
@@ -1022,6 +1103,8 @@ Page({
     const start = (touchY = 0) => {
       this.recordTouchStartY = Number(touchY || 0)
       this.recordIntent = "send"
+      this.recordEnergyFrames = 0
+      this.recordFrameCount = 0
       this.setData({ recording: true, recordCanceling: false, recordingPreviewText: "录音中..." })
       try {
         if (this.audioCtx) this.audioCtx.stop()
@@ -1252,6 +1335,36 @@ Page({
         sessionId: this.data.sessionId || "",
         turnId: id,
       })
+
+      if (!current.analysis && !current.pending) {
+        this.setData({
+          [`turns[${idx}].analysisLoading`]: true,
+        })
+        request({
+          baseUrl: API_BASE_URL,
+          url: `/api/voice-coach/sessions/${this.data.sessionId}/turns/${id}/analysis`,
+          method: "POST",
+          data: {},
+        })
+          .then((res) => {
+            const turnIdx = this.findTurnIndex(id)
+            if (turnIdx < 0) return
+            this.setData({
+              [`turns[${turnIdx}].analysis`]: (res && res.analysis) || null,
+              [`turns[${turnIdx}].analysisLoading`]: false,
+              [`turns[${turnIdx}].status`]: "analysis_ready",
+            })
+          })
+          .catch((err) => {
+            const turnIdx = this.findTurnIndex(id)
+            if (turnIdx >= 0) {
+              this.setData({
+                [`turns[${turnIdx}].analysisLoading`]: false,
+              })
+            }
+            wx.showToast({ title: (err && err.message) || "建议生成失败", icon: "none" })
+          })
+      }
     }
   },
 
