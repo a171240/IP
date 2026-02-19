@@ -36,6 +36,13 @@ export const stepPrompts: Record<string, string> = {
   'P10': p10EmotionPrompt,
 }
 
+// 内容改写（V2）提示词文件映射，仅用于 API 侧按 target 选择模板
+export const rewritePromptFileMap = {
+  'REWRITE_BASE': '链接内容提取与重构v1.md',
+  'REWRITE_DOUYIN_VIDEO': '抖音脚本复刻改写v1.md',
+  'REWRITE_XHS_NOTE': '小红书图文改写再创作v1.md',
+} as const
+
 /**
  * 根据步骤ID获取对应的提示词
  * @param stepId 步骤ID (例如: 'P1', 'P2', 'P3', 'IP传记', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10')
