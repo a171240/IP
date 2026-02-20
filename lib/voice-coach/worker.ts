@@ -47,11 +47,12 @@ const workerConcurrency = Math.max(
     40,
   ),
 )
-const legacyIdleSleepMs = parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MS", 300, 50, 5000)
-const idleSleepMinMs = Math.max(50, parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MIN_MS", 200, 50, 5000))
+const claimBurst = Math.max(1, parseNumberEnv("VOICE_COACH_WORKER_CLAIM_BURST", 4, 1, 40))
+const legacyIdleSleepMs = parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MS", 90, 20, 5000)
+const idleSleepMinMs = Math.max(20, parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MIN_MS", 40, 20, 5000))
 const idleSleepMaxMs = Math.max(
   idleSleepMinMs,
-  parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MAX_MS", 500, idleSleepMinMs, 5000),
+  parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MAX_MS", 120, idleSleepMinMs, 5000),
   legacyIdleSleepMs,
 )
 const errorSleepMs = parseNumberEnv("VOICE_COACH_WORKER_ERROR_SLEEP_MS", 1200, 100, 10000)
@@ -64,7 +65,7 @@ const staleRecoverMaxJobs = parseNumberEnv("VOICE_COACH_WORKER_RECOVER_MAX_JOBS"
 const maxQueueAgeMs = 0
 const runOnce = parseBoolEnv("VOICE_COACH_WORKER_RUN_ONCE", false)
 const workerId = String(process.env.VOICE_COACH_WORKER_ID || `${hostname()}#${process.pid}`).slice(0, 120)
-const chainMainToTtsInWorker = true
+const chainMainToTtsInWorker = parseBoolEnv("VOICE_COACH_WORKER_CHAIN_MAIN_TO_TTS", true)
 
 let shuttingDown = false
 let lastRecoverAt = 0
@@ -216,7 +217,7 @@ async function runRound(): Promise<RoundResult> {
 
   const refillQueueBuffer = async (maxJobs: number) => {
     const queued = await listVoiceCoachQueuedJobs({
-      maxJobs: Math.max(2, Math.min(maxJobs * 2, 40)),
+      maxJobs: Math.max(2, Math.min(maxJobs * 2, 12)),
       allowedStages: ACTIVE_STAGES,
       newestFirst: true,
       maxQueueAgeMs,
@@ -260,7 +261,7 @@ async function runRound(): Promise<RoundResult> {
     if (roundElapsedMs >= maxWallMsPerRound) break
 
     const remainingBudget = maxJobsPerRound - (processed + inFlight.length)
-    const slots = Math.max(0, Math.min(workerConcurrency - inFlight.length, remainingBudget))
+    const slots = Math.max(0, Math.min(claimBurst, workerConcurrency - inFlight.length, remainingBudget))
     if (slots > 0 && queuedBuffer.length < slots) {
       await refillQueueBuffer(Math.max(slots, workerConcurrency))
     }
@@ -300,7 +301,7 @@ async function runRound(): Promise<RoundResult> {
     }
 
     if (!settled.result.timedOut && !claimedAny) {
-      await sleep(80)
+      await sleep(40)
     }
   }
 
@@ -319,7 +320,7 @@ async function runRound(): Promise<RoundResult> {
 
 async function main() {
   console.log(
-    `[voicecoach-worker] started id=${workerId} max_jobs=${maxJobsPerRound} concurrency=${workerConcurrency} wall_ms=${maxWallMsPerRound} timeout_ms=${perJobTimeoutMs} idle_ms=${idleSleepMinMs}-${idleSleepMaxMs} max_queue_age_ms=${maxQueueAgeMs} chain_main_to_tts=${chainMainToTtsInWorker ? "true" : "false"}`,
+    `[voicecoach-worker] started id=${workerId} max_jobs=${maxJobsPerRound} concurrency=${workerConcurrency} claim_burst=${claimBurst} wall_ms=${maxWallMsPerRound} timeout_ms=${perJobTimeoutMs} idle_ms=${idleSleepMinMs}-${idleSleepMaxMs} max_queue_age_ms=${maxQueueAgeMs} chain_main_to_tts=${chainMainToTtsInWorker ? "true" : "false"}`,
   )
   await touchHeartbeat("started", { force: true, processed: 0, recovered: 0 })
 

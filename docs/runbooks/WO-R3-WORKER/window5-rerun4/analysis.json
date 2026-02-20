@@ -1,0 +1,247 @@
+{
+  "generated_at": "2026-02-20T13:59:05.636Z",
+  "work_order": "WO-R3-WORKER/window5-rerun4",
+  "inputs": {
+    "A": "docs/runbooks/WO-R3-WORKER/window5-rerun4/bench_A.json",
+    "B": "docs/runbooks/WO-R3-WORKER/window5-rerun4/bench_B.json",
+    "C": "docs/runbooks/WO-R3-WORKER/window5-rerun4/bench_C.json",
+    "selfcheck": "docs/runbooks/WO-R3-WORKER/window5-rerun4/selfcheck.log"
+  },
+  "groups": {
+    "A": {
+      "bench_label": "WO-R3-WORKER-A-CHAINTRUE-TEST",
+      "require_flash": false,
+      "rounds": 3,
+      "sample_events": 9,
+      "missing_required_count": 0,
+      "executor_distribution": {
+        "worker": 9
+      },
+      "executor_worker_ratio": 1,
+      "submit_pump_count": 0,
+      "asr_provider_attempted_distribution": {
+        "flash": 3
+      },
+      "asr_provider_final_distribution": {
+        "flash": 3
+      },
+      "asr_provider_final_flash_ratio": 1,
+      "audio_ready_ms": {
+        "p50": 9220,
+        "p95": 9695
+      },
+      "llm_ms": {
+        "p50": 0,
+        "p95": 0
+      },
+      "tts_ms": {
+        "p50": 295,
+        "p95": 297
+      },
+      "asr_ms": {
+        "p50": 780,
+        "p95": 825
+      },
+      "queue_wait_before_main_ms": {
+        "p50": 209,
+        "p95": 424,
+        "source": "beautician.asr_ready"
+      },
+      "queue_wait_before_tts_ms": {
+        "p50": 596,
+        "p95": 610,
+        "source": "customer.audio_ready(valid=true)",
+        "invalid_rate": 0
+      },
+      "queue_wait_before_tts_invalid_rate": 0,
+      "queue_wait_before_tts_p95_ms": 610,
+      "tts_cache_hit_rate": 1,
+      "audit_samples": [
+        {
+          "trace_id": "569c09d7-d3d6-4c11-be67-9a04a43568a2",
+          "client_build": "bench-1771595519933",
+          "server_build": "0.1.0",
+          "executor": "worker",
+          "type": "beautician.asr_ready",
+          "flash_logid": "20260220215215A53F4C17A78EABAE606D"
+        },
+        {
+          "trace_id": "569c09d7-d3d6-4c11-be67-9a04a43568a2",
+          "client_build": "bench-1771595519933",
+          "server_build": "0.1.0",
+          "executor": "worker",
+          "type": "customer.text_ready",
+          "flash_logid": null
+        }
+      ]
+    },
+    "B": {
+      "bench_label": "WO-R3-WORKER-B-R4E",
+      "require_flash": true,
+      "rounds": 3,
+      "sample_events": 9,
+      "missing_required_count": 0,
+      "executor_distribution": {
+        "worker": 9
+      },
+      "executor_worker_ratio": 1,
+      "submit_pump_count": 0,
+      "asr_provider_attempted_distribution": {
+        "flash": 3
+      },
+      "asr_provider_final_distribution": {
+        "flash": 3
+      },
+      "asr_provider_final_flash_ratio": 1,
+      "audio_ready_ms": {
+        "p50": 9367,
+        "p95": 9687
+      },
+      "llm_ms": {
+        "p50": 0,
+        "p95": 0
+      },
+      "tts_ms": {
+        "p50": 0,
+        "p95": 1
+      },
+      "asr_ms": {
+        "p50": 753,
+        "p95": 830
+      },
+      "queue_wait_before_main_ms": {
+        "p50": 362,
+        "p95": 377,
+        "source": "beautician.asr_ready"
+      },
+      "queue_wait_before_tts_ms": {
+        "p50": 603,
+        "p95": 666,
+        "source": "customer.audio_ready(valid=true)",
+        "invalid_rate": 0
+      },
+      "queue_wait_before_tts_invalid_rate": 0,
+      "queue_wait_before_tts_p95_ms": 666,
+      "tts_cache_hit_rate": 1,
+      "audit_samples": [
+        {
+          "trace_id": "c9190dee-78d6-4219-ab5c-f182e463eaf5",
+          "client_build": "bench-1771595639436",
+          "server_build": "0.1.0",
+          "executor": "worker",
+          "type": "beautician.asr_ready",
+          "flash_logid": "2026022021541448AD1DD3D52417155328"
+        },
+        {
+          "trace_id": "c9190dee-78d6-4219-ab5c-f182e463eaf5",
+          "client_build": "bench-1771595639436",
+          "server_build": "0.1.0",
+          "executor": "worker",
+          "type": "customer.text_ready",
+          "flash_logid": null
+        }
+      ]
+    },
+    "C": {
+      "bench_label": "WO-R3-WORKER-C-R4F",
+      "require_flash": true,
+      "rounds": 3,
+      "sample_events": 9,
+      "missing_required_count": 0,
+      "executor_distribution": {
+        "worker": 9
+      },
+      "executor_worker_ratio": 1,
+      "submit_pump_count": 0,
+      "asr_provider_attempted_distribution": {
+        "flash": 3
+      },
+      "asr_provider_final_distribution": {
+        "flash": 3
+      },
+      "asr_provider_final_flash_ratio": 1,
+      "audio_ready_ms": {
+        "p50": 9765,
+        "p95": 9923
+      },
+      "llm_ms": {
+        "p50": 0,
+        "p95": 0
+      },
+      "tts_ms": {
+        "p50": 330,
+        "p95": 365
+      },
+      "asr_ms": {
+        "p50": 868,
+        "p95": 884
+      },
+      "queue_wait_before_main_ms": {
+        "p50": 267,
+        "p95": 296,
+        "source": "beautician.asr_ready"
+      },
+      "queue_wait_before_tts_ms": {
+        "p50": 616,
+        "p95": 617,
+        "source": "customer.audio_ready(valid=true)",
+        "invalid_rate": 0
+      },
+      "queue_wait_before_tts_invalid_rate": 0,
+      "queue_wait_before_tts_p95_ms": 617,
+      "tts_cache_hit_rate": 1,
+      "audit_samples": [
+        {
+          "trace_id": "1b5a315e-b175-4846-8b50-4b299d465b45",
+          "client_build": "bench-1771595885312",
+          "server_build": "0.1.0",
+          "executor": "worker",
+          "type": "beautician.asr_ready",
+          "flash_logid": "202602202158202F8AA87DC433E6F1803B"
+        },
+        {
+          "trace_id": "1b5a315e-b175-4846-8b50-4b299d465b45",
+          "client_build": "bench-1771595885312",
+          "server_build": "0.1.0",
+          "executor": "worker",
+          "type": "customer.text_ready",
+          "flash_logid": null
+        }
+      ]
+    }
+  },
+  "metrics": {
+    "executor_worker_ratio": 1,
+    "submit_pump_count": 0,
+    "queue_wait_before_main_ms_p50": 267,
+    "queue_wait_before_main_ms_p95": 424,
+    "queue_wait_before_tts_p95_ms": 666,
+    "queue_wait_before_tts_invalid_rate": 0,
+    "asr_provider_final_flash_ratio": 1,
+    "audio_ready_ms_B_p50": 9367,
+    "audio_ready_ms_B_p95": 9687,
+    "audio_ready_ms_C_p50": 9765,
+    "audio_ready_ms_C_p95": 9923,
+    "llm_ms_p50": 0,
+    "llm_ms_p95": 0,
+    "tts_ms_p50": 296,
+    "tts_ms_p95": 356,
+    "tts_cache_hit_rate": 1,
+    "asr_provider_A": {
+      "flash": 3
+    },
+    "asr_provider_B": {
+      "flash": 3
+    },
+    "asr_provider_C": {
+      "flash": 3
+    }
+  },
+  "gates": {
+    "G0": "PASS: missing_required_count_total=0",
+    "G1": "PASS: queue_wait_before_main_ms_p95=424",
+    "G2": "PASS: queue_wait_before_tts_invalid_rate=0, queue_wait_before_tts_p95_ms=666",
+    "G3": "PASS: selfcheck_pass=true, asr_provider_final_flash_ratio=1",
+    "submit_pump_guard": "PASS: submit_pump_count=0"
+  }
+}

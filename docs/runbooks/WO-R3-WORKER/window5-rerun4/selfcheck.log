@@ -1,0 +1,7 @@
+
+> my-v0-project@0.1.0 selfcheck:asr
+> node scripts/asr_selfcheck.mjs
+
+[ASR-SELFCHECK] PASS flash_request_id=0c0f9590-92fb-4561-b684-c7128a731635 flash_logid=20260220215602BBCBBFC906D3CA621B0B error_code=none
+{"status":"PASS","error_code":null,"flash_request_id":"0c0f9590-92fb-4561-b684-c7128a731635","flash_logid":"20260220215602BBCBBFC906D3CA621B0B","appid_last4":"8764","resource_id":"volc.bigasr.auc_turbo","occurred_at":"2026-02-20T13:56:02.590Z","environment":"unknown","http_status":200,"api_status":"20000003","api_code":null,"message":"[Normal silence audio] no valid speech in audio","operation_hint":null}
+[ASR-HEALTH] {"check":"asr_flash_selfcheck","status":"PASS","flash_request_id":"0c0f9590-92fb-4561-b684-c7128a731635","flash_logid":"20260220215602BBCBBFC906D3CA621B0B","resource_id":"volc.bigasr.auc_turbo","occurred_at":"2026-02-20T13:56:02.590Z","environment":"unknown"}

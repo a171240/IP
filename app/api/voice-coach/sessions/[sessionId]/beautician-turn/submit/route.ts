@@ -2,7 +2,7 @@ import { randomUUID } from "crypto"
 import { NextRequest } from "next/server"
 
 import { checkVoiceCoachAccess } from "@/lib/voice-coach/guard.server"
-import { emitVoiceCoachEvent, processVoiceCoachJobById } from "@/lib/voice-coach/jobs.server"
+import { emitVoiceCoachEvent } from "@/lib/voice-coach/jobs.server"
 import { signVoiceCoachAudio, uploadVoiceCoachAudio } from "@/lib/voice-coach/storage.server"
 import { createVoiceCoachTrace, type VoiceCoachTrace, voiceCoachJson } from "@/lib/voice-coach/trace.server"
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
@@ -33,24 +33,6 @@ function shouldUseFlashAsr(): boolean {
   return !["0", "false", "off", "no"].includes(raw)
 }
 
-function shouldUseSubmitQueuePump(): boolean {
-  const raw = String(process.env.VOICE_COACH_SUBMIT_QUEUE_PUMP || "true")
-    .trim()
-    .toLowerCase()
-  // Keep submit kickoff on by default; disable only with explicit hard-off values.
-  return !["force_off", "disabled"].includes(raw)
-}
-
-function submitQueuePumpWallMs(): number {
-  const n = Number(process.env.VOICE_COACH_SUBMIT_QUEUE_PUMP_WALL_MS || 900)
-  if (!Number.isFinite(n)) return 900
-  return Math.max(320, Math.min(3200, Math.round(n)))
-}
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
 function detectFormat(
   file: File,
   uploadedAudioFormat: UploadedAudioFormat,
@@ -70,11 +52,6 @@ function formatDuration(seconds: number | null) {
   const n = Number(seconds || 0)
   if (!n || n <= 0) return null
   return Math.round(n)
-}
-
-function clamp(n: number, min: number, max: number) {
-  if (Number.isNaN(n)) return min
-  return Math.max(min, Math.min(max, n))
 }
 
 async function latestEventCursor(supabase: any, sessionId: string): Promise<number> {
@@ -289,13 +266,12 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
     }
     const initialResultState = {
       pipeline_started_at_ms: pipelineStartedAtMs,
-      stage_entered_at_ms: pipelineStartedAtMs,
       submit_ack_ms: submitAckMs,
       upload_ms: uploadMs,
       client_build: trace.clientBuild,
       server_build: trace.serverBuild,
       trace_id: trace.traceId,
-      executor: "submit_pump",
+      executor: "worker",
     }
 
     const { data: insertedJob, error: jobInsertError } = await supabase
@@ -317,61 +293,10 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
     }
     mark("job_inserted")
 
-    let advanced = {
+    const advanced = {
       advanced: false,
       status: "queued",
       stage: "main_pending",
-    }
-
-    if (shouldUseSubmitQueuePump()) {
-      const wallMs = submitQueuePumpWallMs()
-      const lockOwner = `submit:${process.pid}:${jobId}`
-      try {
-        const kickoff = await Promise.race([
-          processVoiceCoachJobById({
-            sessionId,
-            userId: user.id,
-            jobId,
-            executor: "submit_pump",
-            lockOwner,
-            chainMainToTts: true,
-            queuedHint: {
-              turnId: String(insertedJob.turn_id || turnId),
-              stage: String(insertedJob.stage || "main_pending"),
-              attemptCount: Number(insertedJob.attempt_count || 0),
-              payload: (insertedJob.payload_json || initialPayload) as any,
-              resultState: (insertedJob.result_json || initialResultState) as any,
-              createdAt: String(insertedJob.created_at || ""),
-              updatedAt: String(insertedJob.updated_at || ""),
-            },
-          })
-            .then((result) => ({ timedOut: false, processed: Boolean(result?.processed) }))
-            .catch((kickoffError: any) => {
-              console.error("[voice-coach][submit-kickoff] process_failed", {
-                session_id: sessionId,
-                turn_id: turnId,
-                job_id: jobId,
-                message: kickoffError?.message || String(kickoffError),
-              })
-              return { timedOut: false, processed: false }
-            }),
-          sleep(wallMs).then(() => ({ timedOut: true, processed: false })),
-        ])
-        if (kickoff.timedOut || kickoff.processed) {
-          advanced = {
-            advanced: true,
-            status: "processing",
-            stage: "main_pending",
-          }
-        }
-      } catch (kickoffError: any) {
-        console.error("[voice-coach][submit-kickoff] failed", {
-          session_id: sessionId,
-          turn_id: turnId,
-          job_id: jobId,
-          message: kickoffError?.message || String(kickoffError),
-        })
-      }
     }
 
     const cursor = await emitVoiceCoachEvent({
