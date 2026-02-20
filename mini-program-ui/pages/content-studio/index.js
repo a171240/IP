@@ -76,6 +76,7 @@ Page({
     sourceAuthor: "",
 
     rewriteId: "",
+    contentId: "",
     rewriteTitle: "",
     rewriteBody: "",
     rewriteScript: "",
@@ -110,6 +111,7 @@ Page({
       scheduleTime: seed.time,
       sourceId: String(query?.sourceId || query?.source_id || "").trim(),
       rewriteId: String(query?.rewriteId || query?.rewrite_id || "").trim(),
+      contentId: String(query?.contentId || query?.content_id || "").trim(),
       videoJobId: String(query?.videoJobId || query?.video_job_id || "").trim(),
       avatarProfileId: String(wx.getStorageSync("xhs_store_profile_id") || "").trim(),
     })
@@ -152,7 +154,7 @@ Page({
   },
 
   resolvedContentId() {
-    return this.data.videoJobId || this.data.rewriteId || ""
+    return this.data.videoJobId || this.data.rewriteId || this.data.contentId || ""
   },
 
   async handleIngest() {
@@ -224,6 +226,7 @@ Page({
 
       this.setData({
         rewriteId: rewrite.id,
+        contentId: rewrite.id,
         rewriteTitle: rewrite.title,
         rewriteBody: rewrite.body,
         rewriteScript: rewrite.script,
@@ -348,8 +351,9 @@ Page({
   handleOpenVideoJobs() {
     const jobId = String(this.data.distributeJobId || "").trim()
     const videoJobId = String(this.data.videoJobId || "").trim()
+    const contentId = String(this.resolvedContentId() || "").trim()
 
-    if (!jobId && !videoJobId) {
+    if (!jobId && !videoJobId && !contentId) {
       wx.showToast({ title: "暂无可查看任务", icon: "none" })
       return
     }
@@ -357,6 +361,7 @@ Page({
     const query = []
     if (jobId) query.push(`jobId=${encodeURIComponent(jobId)}`)
     if (videoJobId) query.push(`videoJobId=${encodeURIComponent(videoJobId)}`)
+    if (contentId) query.push(`contentId=${encodeURIComponent(contentId)}`)
     wx.navigateTo({ url: `/pages/video-jobs/index?${query.join("&")}` })
   },
 })
