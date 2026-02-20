@@ -1,0 +1,104 @@
+{
+  "generated_at": "2026-02-20T14:36:08.694Z",
+  "label": "A",
+  "path_mode": "flash_required",
+  "source_file": "/tmp/voicecoach_e2e_1771597400658.json",
+  "session_id": "62078dc2-f8cf-41b9-b12d-75f08dff52a1",
+  "client_build": "bench-1771597306776",
+  "server_build": "0.1.0",
+  "rounds": 3,
+  "sample_events": 9,
+  "audit_sample_count": 5,
+  "audit_samples": [
+    {
+      "trace_id": "8cd1f320-fa84-494c-8c40-3a7b57065fbf",
+      "client_build": "bench-1771597306776",
+      "server_build": "0.1.0",
+      "executor": "worker",
+      "event_type": "beautician.asr_ready"
+    },
+    {
+      "trace_id": "8cd1f320-fa84-494c-8c40-3a7b57065fbf",
+      "client_build": "bench-1771597306776",
+      "server_build": "0.1.0",
+      "executor": "worker",
+      "event_type": "customer.text_ready"
+    },
+    {
+      "trace_id": "8cd1f320-fa84-494c-8c40-3a7b57065fbf",
+      "client_build": "bench-1771597306776",
+      "server_build": "0.1.0",
+      "executor": "worker",
+      "event_type": "customer.audio_ready"
+    },
+    {
+      "trace_id": "b9d73b0f-92b1-4e2a-b2d8-09859df89306",
+      "client_build": "bench-1771597306776",
+      "server_build": "0.1.0",
+      "executor": "worker",
+      "event_type": "beautician.asr_ready"
+    },
+    {
+      "trace_id": "b9d73b0f-92b1-4e2a-b2d8-09859df89306",
+      "client_build": "bench-1771597306776",
+      "server_build": "0.1.0",
+      "executor": "worker",
+      "event_type": "customer.text_ready"
+    }
+  ],
+  "asr_provider_distribution": {
+    "flash": 3
+  },
+  "asr_flash_ratio": 1,
+  "submit_ack_ms": {
+    "p50": 4283,
+    "p95": 5298
+  },
+  "audio_ready_ms": {
+    "p50": 21183,
+    "p95": 34876
+  },
+  "llm_ms": {
+    "p50": 0,
+    "p95": 0
+  },
+  "tts_ms": {
+    "p50": 0,
+    "p95": 299
+  },
+  "queue_wait_before_main_ms": {
+    "p50": 10131,
+    "p95": 24973
+  },
+  "queue_wait_before_tts_ms_raw": {
+    "p50": 588,
+    "p95": 599
+  },
+  "queue_wait_before_tts_ms_corrected": {
+    "p50": 588,
+    "p95": 599,
+    "rule": "valid_only_then_fallback_raw"
+  },
+  "queue_wait_before_tts_invalid_rate": 0,
+  "tts_cache_hit_rate": 1,
+  "executor_distribution": {
+    "worker": 9
+  },
+  "executor_worker_ratio": 1,
+  "submit_pump_count": 0,
+  "events_pump_count": 0,
+  "counts": {
+    "asr_ready": 3,
+    "text_ready": 3,
+    "audio_ready": 3,
+    "turn_error": 0
+  },
+  "usable": true,
+  "client_probe": {
+    "record_format": "mp3",
+    "record_sample_rate": 16000,
+    "record_channels": 1,
+    "ui_feedback_p95_ms": 42,
+    "source": "latest_real_device_probe"
+  }
+}

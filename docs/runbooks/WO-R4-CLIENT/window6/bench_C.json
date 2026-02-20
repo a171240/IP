@@ -1,0 +1,97 @@
+{
+  "generated_at": "2026-02-20T14:36:08.695Z",
+  "label": "C",
+  "path_mode": "slow_path_degraded",
+  "source_file": "/tmp/voicecoach_e2e_1771597697029.json",
+  "session_id": "d9849cc2-0a5b-41d1-98b9-a75a56c9dd14",
+  "client_build": "bench-1771597589335",
+  "server_build": "0.1.0",
+  "rounds": 3,
+  "sample_events": 4,
+  "audit_sample_count": 4,
+  "audit_samples": [
+    {
+      "trace_id": "4ed511ba-f1ba-4f4d-b4b7-ca9a8beb053b",
+      "client_build": "bench-1771597589335",
+      "server_build": "0.1.0",
+      "executor": "worker",
+      "event_type": "turn.error"
+    },
+    {
+      "trace_id": "d33f550c-405e-4617-8906-f54c4900a924",
+      "client_build": "bench-1771597589335",
+      "server_build": "0.1.0",
+      "executor": "worker",
+      "event_type": "beautician.asr_ready"
+    },
+    {
+      "trace_id": "d33f550c-405e-4617-8906-f54c4900a924",
+      "client_build": "bench-1771597589335",
+      "server_build": "0.1.0",
+      "executor": "worker",
+      "event_type": "customer.text_ready"
+    },
+    {
+      "trace_id": "d33f550c-405e-4617-8906-f54c4900a924",
+      "client_build": "bench-1771597589335",
+      "server_build": "0.1.0",
+      "executor": "worker",
+      "event_type": "customer.audio_ready"
+    }
+  ],
+  "asr_provider_distribution": {
+    "auc": 1
+  },
+  "asr_flash_ratio": 0,
+  "submit_ack_ms": {
+    "p50": 4289,
+    "p95": 4934
+  },
+  "audio_ready_ms": {
+    "p50": 14879,
+    "p95": 14879
+  },
+  "llm_ms": {
+    "p50": 0,
+    "p95": 0
+  },
+  "tts_ms": {
+    "p50": 1,
+    "p95": 1
+  },
+  "queue_wait_before_main_ms": {
+    "p50": 378,
+    "p95": 378
+  },
+  "queue_wait_before_tts_ms_raw": {
+    "p50": 695,
+    "p95": 695
+  },
+  "queue_wait_before_tts_ms_corrected": {
+    "p50": 695,
+    "p95": 695,
+    "rule": "valid_only_then_fallback_raw"
+  },
+  "queue_wait_before_tts_invalid_rate": 0,
+  "tts_cache_hit_rate": 1,
+  "executor_distribution": {
+    "worker": 4
+  },
+  "executor_worker_ratio": 1,
+  "submit_pump_count": 0,
+  "events_pump_count": 0,
+  "counts": {
+    "asr_ready": 1,
+    "text_ready": 1,
+    "audio_ready": 1,
+    "turn_error": 1
+  },
+  "usable": false,
+  "client_probe": {
+    "record_format": "mp3",
+    "record_sample_rate": 16000,
+    "record_channels": 1,
+    "ui_feedback_p95_ms": 42,
+    "source": "latest_real_device_probe"
+  }
+}
