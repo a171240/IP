@@ -1,0 +1,67 @@
+{
+  "wo_id": "WO-R5-WORKER",
+  "generated_at": "2026-02-20T16:09:27.170Z",
+  "evidence_files": {
+    "A": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R5-WORKER/window4/bench_A.json",
+    "B": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R5-WORKER/window4/bench_B.json",
+    "C": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R5-WORKER/window4/bench_C.json"
+  },
+  "bench_labels": {
+    "A": "WO-R5-WORKER-A-4",
+    "B": "WO-R5-WORKER-B-1",
+    "C": "WO-R5-WORKER-C-5"
+  },
+  "asr_provider": {
+    "A": {
+      "flash": 1
+    },
+    "B": {
+      "flash": 1
+    },
+    "C": {
+      "auc": 1
+    },
+    "all": {
+      "flash": 2,
+      "auc": 1
+    }
+  },
+  "counts": {
+    "total_events": 9,
+    "executor_total": 9,
+    "worker_events": 9,
+    "submit_pump_events": 0,
+    "events_pump_events": 0
+  },
+  "metrics": {
+    "audio_ready_ms_B_p50": 7575,
+    "audio_ready_ms_B_p95": 7575,
+    "audio_ready_ms_C_p50": 12844,
+    "audio_ready_ms_C_p95": 12844,
+    "llm_ms_p50": 0,
+    "llm_ms_p95": 0,
+    "tts_ms_p50": 0,
+    "tts_ms_p95": 0,
+    "queue_wait_before_main_ms_p50": 311,
+    "queue_wait_before_main_ms_p95": 326,
+    "queue_wait_before_tts_ms_p50": 2,
+    "queue_wait_before_tts_ms_p95": 2,
+    "tts_cache_hit_rate": 1,
+    "executor_worker_ratio": 1,
+    "submit_pump_count": 0,
+    "events_pump_count": 0,
+    "asr_provider_final_flash_ratio": 0.6666666666666666,
+    "queue_wait_before_tts_invalid_rate": 0
+  },
+  "gate": {
+    "G0_required_fields_present": true,
+    "G1_queue_wait_before_main_ms_p95_le_350": true,
+    "G2_queue_wait_before_tts_ms_p95_le_650": true,
+    "G3_worker_only": true,
+    "G4_audio_ready_ms_B_p50_le_8000": true
+  },
+  "audit_samples": [
+    "1d370f40-cd1c-439e-bf84-9a64cc72f6fc|bench-1771603583077|dev|worker",
+    "708ebf48-dae0-4a4b-87ba-be80eae9195c|bench-1771603470704|dev|worker"
+  ]
+}

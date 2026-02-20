@@ -945,6 +945,29 @@ async function calcAudioRoundStatsBySession(opts: {
       ttsSourceDistribution: emptyTtsSourceDistribution(),
     }
   }
+  const historyLimitRaw = Number(process.env.VOICE_COACH_TTS_STATS_HISTORY_LIMIT || 0)
+  const historyLimit = Number.isFinite(historyLimitRaw) ? Math.max(0, Math.min(300, Math.round(historyLimitRaw))) : 0
+  const currentSource = normalizeStableTtsSource(opts.currentSource)
+  if (historyLimit <= 0) {
+    const currentDist = emptyTtsSourceDistribution()
+    currentDist[currentSource] = 1
+    const currentCacheHitRounds = isTtsCacheHitSource(currentSource) ? 1 : 0
+    const currentScriptHitRounds = opts.currentScriptHit ? 1 : 0
+    const currentLineCacheHitRounds = currentSource === "line_cache" ? 1 : 0
+    const currentLlmUsedWhenScriptHitCount = opts.currentScriptHit && opts.currentLlmUsed ? 1 : 0
+    return {
+      ttsCacheHitRate: Number((currentCacheHitRounds / 1).toFixed(4)),
+      ttsCacheHitRounds: currentCacheHitRounds,
+      totalRounds: 1,
+      scriptHitRate: Number((currentScriptHitRounds / 1).toFixed(4)),
+      scriptHitRounds: currentScriptHitRounds,
+      ttsLineCacheHitRate: Number((currentLineCacheHitRounds / 1).toFixed(4)),
+      ttsLineCacheHitRounds: currentLineCacheHitRounds,
+      llmUsedWhenScriptHitCount: currentLlmUsedWhenScriptHitCount,
+      ttsSourceDistribution: currentDist,
+    }
+  }
+
   const admin = createAdminSupabaseClient()
   const { data } = await admin
     .from("voice_coach_events")
@@ -952,7 +975,7 @@ async function calcAudioRoundStatsBySession(opts: {
     .eq("session_id", sessionId)
     .eq("type", "customer.audio_ready")
     .order("id", { ascending: false })
-    .limit(300)
+    .limit(historyLimit)
 
   let ttsCacheHitRounds = 0
   let totalRounds = 0
@@ -977,7 +1000,6 @@ async function calcAudioRoundStatsBySession(opts: {
   }
 
   totalRounds += 1
-  const currentSource = normalizeStableTtsSource(opts.currentSource)
   ttsSourceDistribution[currentSource] += 1
   if (isTtsCacheHitSource(currentSource)) {
     ttsCacheHitRounds += 1
@@ -1282,31 +1304,6 @@ async function processMainStage(args: {
     return { processed: true, done: true, jobId: args.jobId, turnId: args.turnId }
   }
 
-  await admin.from("voice_coach_turns").update({ status: "processing" }).eq("id", args.turnId)
-
-  const { data: replyTurn } = await admin
-    .from("voice_coach_turns")
-    .select("id, text, emotion, intent_id, angle_id, line_id, turn_index")
-    .eq("id", args.payload.reply_to_turn_id)
-    .eq("session_id", args.sessionId)
-    .single()
-
-  if (!replyTurn) {
-    await markJobError({
-      jobId: args.jobId,
-      sessionId: args.sessionId,
-      userId: args.userId,
-      turnId: args.turnId,
-      code: "reply_turn_not_found",
-      message: "顾客回合不存在，无法继续识别",
-      traceId: auditMeta.traceId,
-      clientBuild: auditMeta.clientBuild,
-      serverBuild: auditMeta.serverBuild,
-      executor: auditMeta.executor,
-    })
-    return { processed: true, done: true, jobId: args.jobId, turnId: args.turnId }
-  }
-
   const audioPath = loaded.turn.audio_path ? String(loaded.turn.audio_path) : null
   if (!audioPath) {
     await markJobError({
@@ -1324,7 +1321,6 @@ async function processMainStage(args: {
     return { processed: true, done: true, jobId: args.jobId, turnId: args.turnId }
   }
 
-  const audioBuf = await downloadVoiceCoachAudio(audioPath)
   const format = (args.payload.audio_format || "mp3") as "mp3" | "wav" | "ogg" | "raw" | "flac"
 
   if (format === "flac" && !shouldUseFlashAsr()) {
@@ -1335,6 +1331,33 @@ async function processMainStage(args: {
       turnId: args.turnId,
       code: "unsupported_audio_format",
       message: "当前仅支持 mp3/wav/ogg 录音，请调整录音格式后重试。",
+      traceId: auditMeta.traceId,
+      clientBuild: auditMeta.clientBuild,
+      serverBuild: auditMeta.serverBuild,
+      executor: auditMeta.executor,
+    })
+    return { processed: true, done: true, jobId: args.jobId, turnId: args.turnId }
+  }
+
+  const [replyTurnRes, audioBuf] = await Promise.all([
+    admin
+      .from("voice_coach_turns")
+      .select("id, text, emotion, intent_id, angle_id, line_id, turn_index")
+      .eq("id", args.payload.reply_to_turn_id)
+      .eq("session_id", args.sessionId)
+      .single(),
+    downloadVoiceCoachAudio(audioPath),
+    admin.from("voice_coach_turns").update({ status: "processing" }).eq("id", args.turnId),
+  ])
+  const replyTurn = replyTurnRes.data
+  if (!replyTurn) {
+    await markJobError({
+      jobId: args.jobId,
+      sessionId: args.sessionId,
+      userId: args.userId,
+      turnId: args.turnId,
+      code: "reply_turn_not_found",
+      message: "顾客回合不存在，无法继续识别",
       traceId: auditMeta.traceId,
       clientBuild: auditMeta.clientBuild,
       serverBuild: auditMeta.serverBuild,
@@ -1708,13 +1731,17 @@ async function processMainStage(args: {
     loop_guard_triggered: selection.loop_guard_triggered,
   }
 
-  await admin
-    .from("voice_coach_sessions")
-    .update({
-      policy_state_json: selection.policy_state,
-      category_id: categoryId,
-    })
-    .eq("id", args.sessionId)
+  void (async () => {
+    try {
+      await admin
+        .from("voice_coach_sessions")
+        .update({
+          policy_state_json: selection.policy_state,
+          category_id: categoryId,
+        })
+        .eq("id", args.sessionId)
+    } catch {}
+  })()
 
   const customerTurnIndex = Number(loaded.turn.turn_index) + 1
   const { data: existingCustomerAtIndex } = await admin
@@ -1802,13 +1829,17 @@ async function processMainStage(args: {
       risk_notes: [],
       source: "fixed",
     }
-    await admin
-      .from("voice_coach_turns")
-      .update({
-        analysis_json: fixedAnalysis,
-      })
-      .eq("id", args.turnId)
-      .eq("session_id", args.sessionId)
+    void (async () => {
+      try {
+        await admin
+          .from("voice_coach_turns")
+          .update({
+            analysis_json: fixedAnalysis,
+          })
+          .eq("id", args.turnId)
+          .eq("session_id", args.sessionId)
+      } catch {}
+    })()
   }
 
   await emitVoiceCoachEvent({
@@ -1872,13 +1903,15 @@ async function processMainStage(args: {
     text_ready_ms: textReadyMs,
   })
 
-  await queueNextStage({
-    jobId: args.jobId,
-    stage: "tts_pending",
-    result: nextStageResult,
-    keepProcessing: Boolean(args.chainTtsInSameLock),
-    lockOwner: args.lockOwner || null,
-  })
+  if (!args.chainTtsInSameLock) {
+    await queueNextStage({
+      jobId: args.jobId,
+      stage: "tts_pending",
+      result: nextStageResult,
+      keepProcessing: false,
+      lockOwner: args.lockOwner || null,
+    })
+  }
 
   return {
     processed: true,
@@ -1897,6 +1930,7 @@ async function processTtsStage(args: {
   turnId: string
   resultState: VoiceCoachJobResultState
   executor?: VoiceCoachJobExecutor
+  assumeFreshCustomerTurn?: boolean
 }): Promise<ProcessJobResult> {
   const admin = createAdminSupabaseClient()
   const auditMeta = buildAuditMeta(args.resultState, args.executor)
@@ -1917,12 +1951,54 @@ async function processTtsStage(args: {
     return { processed: true, done: true, jobId: args.jobId, turnId: args.turnId }
   }
 
-  const { data: customerTurn } = await admin
-    .from("voice_coach_turns")
-    .select("id, text, emotion, audio_path, audio_seconds, line_id, reply_source")
-    .eq("id", nextCustomerTurnId)
-    .eq("session_id", args.sessionId)
-    .single()
+  const ttsStartedAt = Date.now()
+  const ttsQueuedAtMs = asNumber(resultState.tts_queued_at_ms)
+  const stageEnteredAtMs = asNumber(resultState.stage_entered_at_ms)
+  const queueWaitBeforeTts = calcQueueWaitBeforeTts({
+    nowMs: ttsStartedAt,
+    ttsQueuedAtMs,
+    stageEnteredAtMs,
+  })
+  const queueWaitBeforeTtsMs = queueWaitBeforeTts.valueMs
+  const queueWaitBeforeTtsValid = queueWaitBeforeTts.valid
+  const queueWaitBeforeTtsSource = queueWaitBeforeTts.source
+
+  let customerTurn:
+    | {
+        id: string
+        text: string | null
+        emotion: string | null
+        audio_path: string | null
+        audio_seconds: number | null
+        line_id: string | null
+        reply_source: string | null
+      }
+    | null = null
+
+  if (args.assumeFreshCustomerTurn) {
+    const nextText = String(resultState.next_customer_text || "").trim()
+    if (nextText) {
+      customerTurn = {
+        id: nextCustomerTurnId,
+        text: nextText,
+        emotion: resultState.next_customer_emotion ? String(resultState.next_customer_emotion) : "neutral",
+        audio_path: null,
+        audio_seconds: null,
+        line_id: resultState.next_customer_line_id ? String(resultState.next_customer_line_id) : null,
+        reply_source: resultState.reply_source ? String(resultState.reply_source) : null,
+      }
+    }
+  }
+
+  if (!customerTurn) {
+    const { data } = await admin
+      .from("voice_coach_turns")
+      .select("id, text, emotion, audio_path, audio_seconds, line_id, reply_source")
+      .eq("id", nextCustomerTurnId)
+      .eq("session_id", args.sessionId)
+      .single()
+    customerTurn = data
+  }
 
   if (!customerTurn) {
     await markJobError({
@@ -1945,17 +2021,6 @@ async function processTtsStage(args: {
   let audioPath: string | null = customerTurn.audio_path ? String(customerTurn.audio_path) : null
   let ttsFailed = false
   let ttsSource: VoiceCoachStableTtsSource = audioPath ? "text_cache" : "runtime"
-  const ttsStartedAt = Date.now()
-  const ttsQueuedAtMs = asNumber(resultState.tts_queued_at_ms)
-  const stageEnteredAtMs = asNumber(resultState.stage_entered_at_ms)
-  const queueWaitBeforeTts = calcQueueWaitBeforeTts({
-    nowMs: ttsStartedAt,
-    ttsQueuedAtMs,
-    stageEnteredAtMs,
-  })
-  const queueWaitBeforeTtsMs = queueWaitBeforeTts.valueMs
-  const queueWaitBeforeTtsValid = queueWaitBeforeTts.valid
-  const queueWaitBeforeTtsSource = queueWaitBeforeTts.source
 
   if (audioPath) {
     audioUrl = await getSignedAudio(audioPath)
@@ -1979,6 +2044,20 @@ async function processTtsStage(args: {
       ttsSource = "runtime"
     } else {
       try {
+        // Fast path for scripted lines: directly sign pre-generated seed audio before cache-table lookups.
+        if (!audioPath && preferLineSource && lineSeedPath) {
+          const seedSigned = await getSignedAudio(lineSeedPath)
+          if (seedSigned) {
+            audioPath = lineSeedPath
+            audioUrl = seedSigned
+            ttsSource = "line_cache"
+            setRuntimeTtsSignedUrl(cacheKey, lineSeedPath, seedSigned)
+            if (lineCacheCandidate) {
+              setRuntimeTtsSignedUrl(lineCacheCandidate.key, lineSeedPath, seedSigned)
+            }
+          }
+        }
+
         // 0) In-process L1 cache for signed URLs. Avoids extra network hops on repeated hot phrases.
         if (runtimeLineSignedHit) {
           audioPath = runtimeLineSignedHit.audioPath
@@ -2742,6 +2821,7 @@ export async function processVoiceCoachJobById(args: {
           turnId,
           resultState: mainResult.nextResultState,
           executor,
+          assumeFreshCustomerTurn: true,
         })
       }
 

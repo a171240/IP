@@ -56,11 +56,11 @@ const claimBurst = Math.max(
     40,
   ),
 )
-const legacyIdleSleepMs = parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MS", 90, 20, 5000)
-const idleSleepMinMs = Math.max(20, parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MIN_MS", 40, 20, 5000))
+const legacyIdleSleepMs = parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MS", 60, 20, 5000)
+const idleSleepMinMs = Math.max(20, parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MIN_MS", 20, 20, 5000))
 const idleSleepMaxMs = Math.max(
   idleSleepMinMs,
-  parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MAX_MS", 120, idleSleepMinMs, 5000),
+  parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MAX_MS", 60, idleSleepMinMs, 5000),
   legacyIdleSleepMs,
 )
 const errorSleepMs = parseNumberEnv("VOICE_COACH_WORKER_ERROR_SLEEP_MS", 1200, 100, 10000)
@@ -309,7 +309,7 @@ async function runRound(): Promise<RoundResult> {
     }
 
     if (!settled.result.timedOut && !claimedAny) {
-      await sleep(40)
+      await sleep(20)
     }
   }
 

@@ -1,0 +1,216 @@
+{
+  "startedAt": "2026-02-20T16:04:30.705Z",
+  "benchLabel": "WO-R5-WORKER-B-1",
+  "clientBuild": "bench-1771603470704",
+  "runAnalysis": false,
+  "client_build": "bench-1771603470704",
+  "models": {
+    "llmProvider": "doubao",
+    "textModel": "doubao-seed-1-6-flash-250828",
+    "fastModel": "doubao-seed-1-6-flash-250828",
+    "analysisModel": "doubao-seed-1-6-flash-250828",
+    "ttsVoiceType": "zh_female_vv_uranus_bigtts",
+    "asrFlashResourceId": "volc.bigasr.auc_turbo",
+    "asrAucResourceId": "volc.seedasr.auc"
+  },
+  "rounds": [
+    {
+      "roundNo": 1,
+      "inputText": "我理解您的顾虑，关于安全我们会先做评估，再根据体质调整手法。",
+      "ttsInputElapsedMs": 1256,
+      "ttsVoiceType": "zh_female_vv_uranus_bigtts",
+      "submitStatus": 200,
+      "submitElapsedMs": 4489,
+      "submitJobId": "7e2ddb2d-ba2d-4e55-8323-c15e48096e28",
+      "submitAcceptedTurnId": "83085f35-20ee-4e6f-9304-2abf2e926735",
+      "serverAdvanced": false,
+      "serverAdvancedStage": "main_pending",
+      "events": [
+        {
+          "id": 3314,
+          "type": "beautician.asr_ready",
+          "turn_id": "83085f35-20ee-4e6f-9304-2abf2e926735",
+          "stage_elapsed_ms": 5267,
+          "asr_provider": "flash",
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_outcome": "success",
+          "asr_fallback_used": false,
+          "asr_ms": 699,
+          "asr_ready_ms": 970,
+          "asr_queue_wait_ms": 271,
+          "script_select_ms": null,
+          "llm_ms": null,
+          "text_ready_ms": null,
+          "tts_ms": null,
+          "queue_wait_before_main_ms": 271,
+          "queue_wait_before_tts_ms": null,
+          "queue_wait_before_tts_valid": null,
+          "queue_wait_before_tts_source": null,
+          "tts_source": null,
+          "tts_cache_hit": null,
+          "tts_failed": null,
+          "trace_id": "708ebf48-dae0-4a4b-87ba-be80eae9195c",
+          "executor": "worker",
+          "client_build": "bench-1771603470704",
+          "server_build": "dev",
+          "flash_logid": "20260221000442C43A52ED33C40AC3F1B7",
+          "code": null,
+          "message": null
+        },
+        {
+          "id": 3315,
+          "type": "customer.text_ready",
+          "turn_id": "2e938ebc-f6e4-4550-8c36-e2804197ed36",
+          "stage_elapsed_ms": 6635,
+          "asr_provider": null,
+          "asr_provider_attempted": null,
+          "asr_provider_final": null,
+          "asr_outcome": null,
+          "asr_fallback_used": null,
+          "asr_ms": 699,
+          "asr_ready_ms": null,
+          "asr_queue_wait_ms": null,
+          "script_select_ms": 304,
+          "llm_ms": 0,
+          "text_ready_ms": 304,
+          "tts_ms": null,
+          "queue_wait_before_main_ms": 271,
+          "queue_wait_before_tts_ms": null,
+          "queue_wait_before_tts_valid": null,
+          "queue_wait_before_tts_source": null,
+          "tts_source": null,
+          "tts_cache_hit": null,
+          "tts_failed": null,
+          "trace_id": "708ebf48-dae0-4a4b-87ba-be80eae9195c",
+          "executor": "worker",
+          "client_build": "bench-1771603470704",
+          "server_build": "dev",
+          "flash_logid": null,
+          "code": null,
+          "message": null
+        },
+        {
+          "id": 3316,
+          "type": "customer.audio_ready",
+          "turn_id": "2e938ebc-f6e4-4550-8c36-e2804197ed36",
+          "stage_elapsed_ms": 7575,
+          "asr_provider": null,
+          "asr_provider_attempted": null,
+          "asr_provider_final": null,
+          "asr_outcome": null,
+          "asr_fallback_used": null,
+          "asr_ms": 699,
+          "asr_ready_ms": null,
+          "asr_queue_wait_ms": null,
+          "script_select_ms": null,
+          "llm_ms": 0,
+          "text_ready_ms": null,
+          "tts_ms": 0,
+          "queue_wait_before_main_ms": null,
+          "queue_wait_before_tts_ms": 2,
+          "queue_wait_before_tts_valid": true,
+          "queue_wait_before_tts_source": "tts_queued_at_ms",
+          "tts_source": "line_cache",
+          "tts_cache_hit": true,
+          "tts_failed": false,
+          "trace_id": "708ebf48-dae0-4a4b-87ba-be80eae9195c",
+          "executor": "worker",
+          "client_build": "bench-1771603470704",
+          "server_build": "dev",
+          "flash_logid": null,
+          "code": null,
+          "message": null
+        }
+      ],
+      "polls": [
+        {
+          "atMs": 1840,
+          "elapsedMs": 1840,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 3313,
+          "cursorAfter": 3313
+        },
+        {
+          "atMs": 3677,
+          "elapsedMs": 1837,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 3313,
+          "cursorAfter": 3313
+        },
+        {
+          "atMs": 5017,
+          "elapsedMs": 1340,
+          "status": 200,
+          "eventsCount": 1,
+          "cursorBefore": 3313,
+          "cursorAfter": 3314
+        },
+        {
+          "atMs": 6394,
+          "elapsedMs": 1376,
+          "status": 200,
+          "eventsCount": 1,
+          "cursorBefore": 3314,
+          "cursorAfter": 3315
+        },
+        {
+          "atMs": 7740,
+          "elapsedMs": 1346,
+          "status": 200,
+          "eventsCount": 1,
+          "cursorBefore": 3315,
+          "cursorAfter": 3316
+        }
+      ],
+      "errors": [],
+      "analysis": null
+    }
+  ],
+  "warnings": [],
+  "serverBuilds": [
+    "dev"
+  ],
+  "worker_heartbeat": {
+    "source": "file",
+    "worker_id": "wo-r5-worker-B4-1",
+    "host": "001deMacBook-Air.local",
+    "pid": 56002,
+    "status": "started",
+    "heartbeat_at": "2026-02-20T16:04:30.674Z",
+    "heartbeat_age_ms": 31,
+    "file": "/tmp/voicecoach_worker_heartbeat_r5_b4.json"
+  },
+  "user": {
+    "id": "e91acedb-9e75-4138-a913-687d9524d824",
+    "email": "voicecoach.bench.1771603470707.cf01731f@ipgongchang.xin",
+    "createElapsedMs": 539,
+    "loginElapsedMs": 406
+  },
+  "createSession": {
+    "status": 200,
+    "elapsedMs": 1745,
+    "firstTurnSource": "seed_fixed",
+    "firstTurnHasAudio": true,
+    "firstTurnAudioSeconds": 3,
+    "sessionId": "0274c6f3-2caf-4cf6-9353-f445c9b4d34c",
+    "responseError": null
+  },
+  "server_build": "dev",
+  "metrics": {
+    "executor_worker_ratio": 1,
+    "queue_wait_before_main_p95_ms": 271,
+    "submit_pump_count": 0
+  },
+  "gates": {
+    "submit_pump_absent": {
+      "pass": true,
+      "submit_pump_count": 0
+    }
+  },
+  "finishedAt": "2026-02-20T16:04:46.885Z"
+}
