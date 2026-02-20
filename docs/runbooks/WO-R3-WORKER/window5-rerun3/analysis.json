@@ -1,10 +1,6 @@
 {
-  "generated_at": "2026-02-20T13:11:44.479Z",
+  "generated_at": "2026-02-20T13:14:38.264Z",
   "work_order": "WO-R3-WORKER/window5-rerun3",
-  "metric_calibration": {
-    "queue_wait_before_main_ms_source": "beautician.asr_ready",
-    "queue_wait_before_tts_ms_source": "customer.audio_ready where queue_wait_before_tts_valid=true"
-  },
   "inputs": {
     "A": "docs/runbooks/WO-R3-WORKER/window5-rerun3/bench_A.json",
     "B": "docs/runbooks/WO-R3-WORKER/window5-rerun3/bench_B.json",
@@ -12,214 +8,213 @@
   },
   "groups": {
     "A": {
-      "require_flash": false,
-      "sample_events": 9,
+      "bench_label": "WO-R3-WORKER-A",
       "rounds": 3,
-      "client_builds": [
-        "bench-1771592874638"
-      ],
-      "server_builds": [
-        "dev"
-      ],
+      "sample_events": 9,
+      "missing_required_count": 0,
       "executor_distribution": {
-        "submit_pump": 9
+        "worker": 9
       },
+      "executor_worker_ratio": 1,
+      "submit_pump_count": 0,
       "asr_provider_attempted_distribution": {
         "flash": 3
       },
       "asr_provider_final_distribution": {
         "flash": 3
       },
-      "asr_outcome_distribution": {
-        "success": 3
-      },
       "asr_provider_final_flash_ratio": 1,
       "audio_ready_ms": {
-        "p50": 9180,
-        "p95": 9280
+        "p50": 9001,
+        "p95": 9001
       },
       "llm_ms": {
         "p50": 0,
         "p95": 0
       },
       "tts_ms": {
-        "p50": 303,
-        "p95": 328
+        "p50": 297,
+        "p95": 297
       },
       "asr_ms": {
-        "p50": 806,
-        "p95": 923
-      },
-      "asr_queue_wait_ms": {
-        "p50": 22,
-        "p95": 36
+        "p50": 799,
+        "p95": 799
       },
       "queue_wait_before_main_ms": {
-        "p50": 22,
-        "p95": 36,
+        "p50": 217,
+        "p95": 217,
         "source": "beautician.asr_ready"
       },
-      "queue_wait_before_tts_invalid_rate": 0,
-      "queue_wait_before_tts_p95_ms": 612,
+      "queue_wait_before_tts_ms": {
+        "p50": 597,
+        "p95": 597,
+        "source": "customer.audio_ready(valid=true)"
+      },
       "tts_cache_hit_rate": 1,
       "audit_samples": [
         {
-          "trace_id": "12565f15-64fa-4886-a69a-d77314ce2a43",
-          "client_build": "bench-1771592874638",
+          "trace_id": "3049c877-ded2-4417-b7a5-98ad942c7c65",
+          "client_build": "bench-1771593067634",
           "server_build": "dev",
-          "executor": "submit_pump",
-          "flash_logid": "20260220210807B5CD8F7F92013F38C70B",
+          "executor": "worker",
           "type": "beautician.asr_ready"
         },
         {
-          "trace_id": "12565f15-64fa-4886-a69a-d77314ce2a43",
-          "client_build": "bench-1771592874638",
+          "trace_id": "3049c877-ded2-4417-b7a5-98ad942c7c65",
+          "client_build": "bench-1771593067634",
           "server_build": "dev",
-          "executor": "submit_pump",
-          "flash_logid": null,
+          "executor": "worker",
           "type": "customer.text_ready"
         }
       ]
     },
     "B": {
-      "require_flash": true,
-      "sample_events": 9,
+      "bench_label": "WO-R3-WORKER-B",
       "rounds": 3,
-      "client_builds": [
-        "bench-1771592955314"
-      ],
-      "server_builds": [
-        "dev"
-      ],
+      "sample_events": 9,
+      "missing_required_count": 0,
       "executor_distribution": {
-        "submit_pump": 9
+        "worker": 9
       },
+      "executor_worker_ratio": 1,
+      "submit_pump_count": 0,
       "asr_provider_attempted_distribution": {
         "flash": 3
       },
       "asr_provider_final_distribution": {
         "flash": 3
       },
-      "asr_outcome_distribution": {
-        "success": 3
-      },
       "asr_provider_final_flash_ratio": 1,
       "audio_ready_ms": {
-        "p50": 9250,
-        "p95": 9891
+        "p50": 9030,
+        "p95": 9030
       },
       "llm_ms": {
         "p50": 0,
         "p95": 0
       },
       "tts_ms": {
-        "p50": 299,
-        "p95": 304
+        "p50": 0,
+        "p95": 0
       },
       "asr_ms": {
-        "p50": 905,
-        "p95": 1000
-      },
-      "asr_queue_wait_ms": {
-        "p50": 20,
-        "p95": 22
+        "p50": 724,
+        "p95": 724
       },
       "queue_wait_before_main_ms": {
-        "p50": 20,
-        "p95": 22,
+        "p50": 286,
+        "p95": 286,
         "source": "beautician.asr_ready"
       },
-      "queue_wait_before_tts_invalid_rate": 0,
-      "queue_wait_before_tts_p95_ms": 733,
+      "queue_wait_before_tts_ms": {
+        "p50": 616,
+        "p95": 616,
+        "source": "customer.audio_ready(valid=true)"
+      },
       "tts_cache_hit_rate": 1,
       "audit_samples": [
         {
-          "trace_id": "74049236-dcec-4e72-996e-79d14ebed698",
-          "client_build": "bench-1771592955314",
+          "trace_id": "673f2f9d-4ae8-46e5-9811-3c4c940d55a4",
+          "client_build": "bench-1771593121939",
           "server_build": "dev",
-          "executor": "submit_pump",
-          "flash_logid": "20260220210928FF2A4F2DE68B3C396BBA",
+          "executor": "worker",
           "type": "beautician.asr_ready"
         },
         {
-          "trace_id": "74049236-dcec-4e72-996e-79d14ebed698",
-          "client_build": "bench-1771592955314",
+          "trace_id": "673f2f9d-4ae8-46e5-9811-3c4c940d55a4",
+          "client_build": "bench-1771593121939",
           "server_build": "dev",
-          "executor": "submit_pump",
-          "flash_logid": null,
+          "executor": "worker",
           "type": "customer.text_ready"
         }
       ]
     },
     "C": {
-      "require_flash": true,
-      "sample_events": 9,
+      "bench_label": "WO-R3-WORKER-C",
       "rounds": 3,
-      "client_builds": [
-        "bench-1771593010498"
-      ],
-      "server_builds": [
-        "dev"
-      ],
+      "sample_events": 9,
+      "missing_required_count": 0,
       "executor_distribution": {
-        "submit_pump": 9
+        "worker": 9
       },
+      "executor_worker_ratio": 1,
+      "submit_pump_count": 0,
       "asr_provider_attempted_distribution": {
         "flash": 3
       },
       "asr_provider_final_distribution": {
         "flash": 3
       },
-      "asr_outcome_distribution": {
-        "success": 3
-      },
       "asr_provider_final_flash_ratio": 1,
       "audio_ready_ms": {
-        "p50": 9078,
-        "p95": 9276
+        "p50": 9504,
+        "p95": 9504
       },
       "llm_ms": {
         "p50": 0,
         "p95": 0
       },
       "tts_ms": {
-        "p50": 0,
-        "p95": 1
+        "p50": 298,
+        "p95": 298
       },
       "asr_ms": {
-        "p50": 825,
-        "p95": 841
-      },
-      "asr_queue_wait_ms": {
-        "p50": 22,
-        "p95": 26
+        "p50": 802,
+        "p95": 802
       },
       "queue_wait_before_main_ms": {
-        "p50": 22,
-        "p95": 26,
+        "p50": 470,
+        "p95": 470,
         "source": "beautician.asr_ready"
       },
-      "queue_wait_before_tts_invalid_rate": 0,
-      "queue_wait_before_tts_p95_ms": 605,
+      "queue_wait_before_tts_ms": {
+        "p50": 609,
+        "p95": 609,
+        "source": "customer.audio_ready(valid=true)"
+      },
       "tts_cache_hit_rate": 1,
       "audit_samples": [
         {
-          "trace_id": "e6f17491-17a5-484c-911b-17373dac4fee",
-          "client_build": "bench-1771593010498",
+          "trace_id": "f8ab657a-45d5-4526-8890-26273cb70eaa",
+          "client_build": "bench-1771593175982",
           "server_build": "dev",
-          "executor": "submit_pump",
-          "flash_logid": "2026022021102264E5B58469E1589805EF",
+          "executor": "worker",
           "type": "beautician.asr_ready"
         },
         {
-          "trace_id": "e6f17491-17a5-484c-911b-17373dac4fee",
-          "client_build": "bench-1771593010498",
+          "trace_id": "f8ab657a-45d5-4526-8890-26273cb70eaa",
+          "client_build": "bench-1771593175982",
           "server_build": "dev",
-          "executor": "submit_pump",
-          "flash_logid": null,
+          "executor": "worker",
           "type": "customer.text_ready"
         }
       ]
     }
+  },
+  "metrics": {
+    "executor_worker_ratio": 1,
+    "submit_pump_count": 0,
+    "queue_wait_before_main_p95_ms": 470,
+    "queue_wait_before_main_ms_p50": 286,
+    "queue_wait_before_tts_ms_p95": 616,
+    "tts_ms_p50": 297,
+    "llm_ms_p50": 0,
+    "llm_ms_p95": 0,
+    "asr_provider_A": {
+      "flash": 3
+    },
+    "asr_provider_B": {
+      "flash": 3
+    },
+    "asr_provider_C": {
+      "flash": 3
+    }
+  },
+  "gates": {
+    "G0": "PASS: missing_required_count_total=0",
+    "G1": "PASS: queue_wait_before_main_ms_p95=470",
+    "G2": "PASS: queue_wait_before_tts_ms_p95=616, tts_ms_p50=297",
+    "G3": "PASS: flash_ratio_B=1, flash_ratio_C=1",
+    "submit_pump_guard": "PASS: submit_pump_count=0"
   }
 }
