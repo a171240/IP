@@ -2,6 +2,8 @@
     "pages":  [
                   "pages/xiaohongshu/index",
                   "pages/xhs-drafts/index",
+                  "pages/content-studio/index",
+                  "pages/video-jobs/index",
                   "pages/mine/index",
                   "pages/store-profiles/index",
                   "pages/store-profile-editor/index",
