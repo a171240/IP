@@ -48,6 +48,12 @@ function normalizeVideoJob(res) {
   }
 }
 
+function hasRequiredAvatarAssets(profile) {
+  const driveVideo = String(profile?.boss_drive_video_path || "").trim()
+  const portrait = String(profile?.boss_portrait_path || "").trim()
+  return Boolean(driveVideo && portrait)
+}
+
 function buildScheduleAt(data) {
   if (data.distributionMode !== "scheduled") return undefined
   const d = String(data.scheduleDate || "").trim()
@@ -255,6 +261,26 @@ Page({
     const avatarProfileId = String(this.data.avatarProfileId || "").trim()
     if (!avatarProfileId) {
       wx.showToast({ title: "请填写头像档案ID", icon: "none" })
+      return
+    }
+
+    try {
+      const profileRes = await request({
+        baseUrl: IP_FACTORY_BASE_URL,
+        url: `/api/mp/store-profiles/${encodeURIComponent(avatarProfileId)}`,
+      })
+
+      const profile = profileRes?.profile || null
+      if (!profileRes?.ok || !profile || !hasRequiredAvatarAssets(profile)) {
+        const message = "先补老板驱动视频/头像素材"
+        this.setData({ lastError: message })
+        wx.showToast({ title: message, icon: "none" })
+        return
+      }
+    } catch (_) {
+      const message = "先补老板驱动视频/头像素材"
+      this.setData({ lastError: message })
+      wx.showToast({ title: message, icon: "none" })
       return
     }
 
