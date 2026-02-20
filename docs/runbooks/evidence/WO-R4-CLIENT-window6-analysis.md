@@ -19,6 +19,23 @@
 - B worker-only retries p50(ms): 9885, 9996, 9333, 9185, 8760, 8626, 9230, 8931; best=8626 (>8000).
 - C worker-only after restarting worker with flash=false: usable=true, turn_error=0, asr_provider=auc.
 
+## Retry Evidence (2026-02-20, G1-only rerun)
+- B worker-only retries p50(ms): 10055, 9833, 9283, 9800, 9659, 9052, 9483, 9742, 9485, 9234, 9247, 9109.
+- B rerun best sample: `/tmp/voicecoach_e2e_1771601406706.json` (`p50=9052`, `p95=9318`, flash_ratio=1.0, executor=worker-only).
+- B rerun logs:
+  - `/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R4-CLIENT/window6/bench_B.rerun_1.run.log`
+  - `/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R4-CLIENT/window6/bench_B.rerun_2.run.log`
+  - `/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R4-CLIENT/window6/bench_B.rerun_3.run.log`
+  - `/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R4-CLIENT/window6/bench_B.rerun_4.run.log`
+  - `/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R4-CLIENT/window6/bench_B.rerun_5.run.log`
+  - `/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R4-CLIENT/window6/bench_B.rerun_6.run.log`
+  - `/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R4-CLIENT/window6/bench_B.rerun_7.run.log`
+  - `/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R4-CLIENT/window6/bench_B.rerun_8.run.log`
+  - `/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R4-CLIENT/window6/bench_B.rerun_9.run.log`
+  - `/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R4-CLIENT/window6/bench_B.rerun_10.run.log`
+  - `/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R4-CLIENT/window6/bench_B.rerun_11.run.log`
+  - `/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R4-CLIENT/window6/bench_B.rerun_12.run.log`
+
 ## Notes
 - executor cleaned to worker-only for B/C (submit_pump_count=0, events_pump_count=0).
 - Remaining fail item is G1 latency threshold.
