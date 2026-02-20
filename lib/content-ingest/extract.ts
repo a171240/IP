@@ -453,20 +453,57 @@ function dedupeAndClampUrls(urls: string[], limit: number): string[] {
   return out
 }
 
-function discoverDouyinLinksFromHtml(profileUrl: string, html: string, limit: number): string[] {
-  const fullMatches = collectUrlsByRegex(html, /https?:\/\/(?:www\.)?douyin\.com\/video\/\d+/gi)
-  const shortMatches = collectUrlsByRegex(html, /https?:\/\/v\.douyin\.com\/[a-zA-Z0-9]+\/?/gi)
+function collectNumericIdsFromHtml(html: string): string[] {
+  const out = new Set<string>()
+  const idPatterns = [
+    /"(?:aweme_id|awemeId|item_id|itemId|group_id|groupId)"\s*:\s*"(\d{8,})"/g,
+    /"(?:aweme_id|awemeId|item_id|itemId|group_id|groupId)"\s*:\s*(\d{8,})/g,
+    /\\u002Fvideo\\u002F(\d{8,})/g,
+    /\\\/video\\\/(\d{8,})/g,
+  ]
 
-  const awemeIds = Array.from(html.matchAll(/"aweme_id"\s*:\s*"(\d+)"/g)).map((m) => m[1])
-  const byAweme = awemeIds.map((id) => `https://www.douyin.com/video/${id}`)
+  for (const pattern of idPatterns) {
+    for (const match of html.matchAll(pattern)) {
+      const id = String(match[1] || "").trim()
+      if (id) out.add(id)
+    }
+  }
+
+  return Array.from(out)
+}
+
+function canonicalizeDouyinContentUrl(url: string): string {
+  const normalized = String(url || "").trim()
+  const shareVideoMatch = normalized.match(/\/share\/video\/(\d+)/)
+  if (shareVideoMatch?.[1]) {
+    return `https://www.douyin.com/video/${shareVideoMatch[1]}`
+  }
+  return normalized
+}
+
+function discoverDouyinLinksFromHtml(html: string, limit: number): string[] {
+  const fullMatches = collectUrlsByRegex(html, /https?:\/\/(?:www\.)?douyin\.com\/(?:video|share\/video)\/\d+/gi)
+  const escapedFullMatches = collectUrlsByRegex(html, /https?:\\\/\\\/(?:www\.)?douyin\.com\\\/(?:video|share\\\/video)\\\/\d+/gi)
+  const shortMatches = collectUrlsByRegex(html, /https?:\/\/v\.douyin\.com\/[a-zA-Z0-9]+\/?/gi)
+  const escapedShortMatches = collectUrlsByRegex(html, /https?:\\\/\\\/v\.douyin\.com\\\/[a-zA-Z0-9]+\\\/?/gi)
+
+  const numericIds = collectNumericIdsFromHtml(html)
+  const byNumericId = numericIds.map((id) => `https://www.douyin.com/video/${id}`)
 
   const pathIds = Array.from(html.matchAll(/\/video\/(\d+)/g)).map((m) => `https://www.douyin.com/video/${m[1]}`)
+  const sharePathIds = Array.from(html.matchAll(/\/share\/video\/(\d+)/g)).map(
+    (m) => `https://www.douyin.com/video/${m[1]}`
+  )
 
-  const merged = [...fullMatches, ...shortMatches, ...byAweme, ...pathIds]
-  if (merged.length === 0 && /share\/user\//.test(profileUrl)) {
-    const fallback = profileUrl.replace(/\/share\/user\//, "/user/")
-    merged.push(fallback)
-  }
+  const merged = [
+    ...fullMatches,
+    ...escapedFullMatches,
+    ...shortMatches,
+    ...escapedShortMatches,
+    ...byNumericId,
+    ...pathIds,
+    ...sharePathIds,
+  ].map(canonicalizeDouyinContentUrl)
 
   return dedupeAndClampUrls(merged, limit)
 }
@@ -553,14 +590,37 @@ export async function extractDouyinProfileItemsFromNormalized(
       throw new IngestError("private_or_deleted_content", "主页内容不可访问")
     }
 
-    discoveredUrls = discoverDouyinLinksFromHtml(normalized.normalized_url, text, clampedLimit)
+    discoveredUrls = discoverDouyinLinksFromHtml(text, clampedLimit)
   } catch (error) {
     if (isIngestError(error)) throw error
     throw new IngestError("extract_failed", "主页抓取失败")
   }
 
   if (discoveredUrls.length === 0) {
-    throw new IngestError("extract_failed", "未从主页解析到作品链接")
+    if (results.length > 0) {
+      return results.slice(0, clampedLimit)
+    }
+
+    return [
+      {
+        source_url: normalized.normalized_url,
+        extracted: null,
+        raw_payload: {
+          source: "profile_fallback_discovery",
+          profile_url: normalized.normalized_url,
+          attempted_strategies: [
+            "upstream_profile_items",
+            "html_full_video_links",
+            "html_short_links",
+            "html_aweme_id",
+            "html_embedded_json",
+          ],
+          discovered_url_count: 0,
+        },
+        error_code: "extract_failed",
+        message: "未从主页解析到作品链接",
+      },
+    ]
   }
 
   const remaining = Math.max(0, clampedLimit - results.length)
