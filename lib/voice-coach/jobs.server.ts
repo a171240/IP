@@ -33,6 +33,9 @@ import {
 } from "@/lib/voice-coach/storage.server"
 import { resolveVoiceCoachServerBuild } from "@/lib/voice-coach/trace.server"
 
+const resolveSeedAudioPathForLineId: (lineId: string | null | undefined) => string | null =
+  typeof getSeedAudioPathForLineId === "function" ? getSeedAudioPathForLineId : () => null
+
 export type VoiceCoachEventType =
   | "turn.accepted"
   | "beautician.asr_ready"
@@ -1885,7 +1888,7 @@ async function processTtsStage(args: {
       voiceType: ttsVoiceType,
       lineId,
     })
-    const lineSeedPath = getSeedAudioPathForLineId(String((customerTurn as any).line_id || lineId || ""))
+    const lineSeedPath = resolveSeedAudioPathForLineId(String((customerTurn as any).line_id || lineId || ""))
     const runtimeCachePath = toVoiceCoachTtsStoragePath(cacheKey, ttsVoiceType)
     const runtimeLineSignedHit = lineCacheCandidate ? getRuntimeTtsSignedUrl(lineCacheCandidate.key) : null
     const runtimeTextSignedHit = getRuntimeTtsSignedUrl(cacheKey)

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-02-20T12:37:17.321Z",
+  "generated_at": "2026-02-20T12:53:05.696Z",
   "voice_type": "zh_female_vv_uranus_bigtts",
   "library_items": 50,
   "tts_cache_rows": 99,
@@ -34,16 +34,16 @@
   "require_flash": true,
   "audit_samples": [
     {
-      "id": 1339,
-      "trace_id": "5f1ef543-06a0-4cba-aacb-a66898cc059a",
-      "client_build": "wo-r3-worker-window5-1771590656365",
+      "id": 1594,
+      "trace_id": "2081aeb0-62d9-4f4f-932f-09dfa5a1577b",
+      "client_build": "wo-r3-worker-window5-1771591905229",
       "server_build": "0.1.0",
       "executor": "worker"
     },
     {
-      "id": 1347,
-      "trace_id": "7f43a86b-bdd5-4781-842b-f547ba0c0ef6",
-      "client_build": "wo-r3-worker-window5-1771590656365",
+      "id": 1600,
+      "trace_id": "22449832-db30-41b5-ad90-58797e50fee6",
+      "client_build": "wo-r3-worker-window5-1771591905229",
       "server_build": "0.1.0",
       "executor": "worker"
     }

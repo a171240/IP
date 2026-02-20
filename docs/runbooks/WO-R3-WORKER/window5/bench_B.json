@@ -1,84 +1,86 @@
 {
-  "generated_at": "2026-02-20T12:37:28.738Z",
-  "bench_tag": "wo-r3-worker-window5-1771590986493",
-  "session_id": "e3cbc22e-b79d-4371-acfa-59d77638ff58",
+  "generated_at": "2026-02-20T12:52:33.696Z",
+  "bench_tag": "wo-r3-worker-window5-1771591905229",
+  "session_id": "832d841c-16a2-4b51-8b0d-4c2f9e5ea17a",
   "rounds_requested": 8,
   "rounds_planned": 4,
-  "rounds_queued": 4,
-  "round_errors": [],
+  "rounds_queued": 3,
+  "round_errors": [
+    "round_4:turn_limit_reached"
+  ],
   "sample_counts": {
-    "audio_ready_raw": 4,
-    "asr_ready_raw": 4,
-    "audio_ready_dedup": 4,
-    "asr_ready_dedup": 4
+    "audio_ready_raw": 3,
+    "asr_ready_raw": 3,
+    "audio_ready_dedup": 3,
+    "asr_ready_dedup": 3
   },
   "executor_worker_ratio_audio": 1,
   "script_hit_rate": 1,
   "tts_line_cache_hit_rate": 1,
   "tts_cache_hit_rate": 1,
   "tts_source_distribution": {
-    "line_cache": 4,
+    "line_cache": 3,
     "text_cache": 0,
     "runtime": 0
   },
   "llm_used_when_script_hit_count": 0,
   "tts_ms": {
-    "count": 4,
+    "count": 3,
     "p50": 291,
-    "p95": 294,
-    "avg": 294.25,
-    "max": 310
+    "p95": 291,
+    "avg": 292.33,
+    "max": 298
   },
   "queue_wait_before_tts_ms": {
-    "count": 4,
-    "p50": 581,
-    "p95": 588,
-    "avg": 585.75,
-    "max": 603
+    "count": 3,
+    "p50": 1776,
+    "p95": 1776,
+    "avg": 2022.33,
+    "max": 2672
   },
   "queue_wait_before_main_ms": {
-    "count": 4,
-    "p50": 803,
-    "p95": 806,
-    "avg": 2747.5,
-    "max": 8730
+    "count": 3,
+    "p50": 439,
+    "p95": 439,
+    "avg": 450.67,
+    "max": 555
   },
   "audio_ready_ms": {
-    "count": 4,
-    "p50": 7627,
-    "p95": 8549,
-    "avg": 9687.5,
-    "max": 15214
+    "count": 3,
+    "p50": 8164,
+    "p95": 8164,
+    "avg": 8477,
+    "max": 9228
   },
   "llm_ms": {
-    "count": 4,
+    "count": 3,
     "p50": 0,
     "p95": 0,
     "avg": 0,
     "max": 0
   },
   "asr_provider": {
-    "flash": 4
+    "flash": 3
   },
   "asr_provider_final": {
-    "flash": 4
+    "flash": 3
   },
   "asr_outcome": {
-    "success": 4
+    "success": 3
   },
   "asr_flash_ratio": 1,
   "audit_samples": [
     {
-      "id": 1381,
-      "trace_id": "18e9b28d-4f3c-420a-b23a-0dd862e46c87",
-      "client_build": "wo-r3-worker-window5-1771590986493",
+      "id": 1594,
+      "trace_id": "2081aeb0-62d9-4f4f-932f-09dfa5a1577b",
+      "client_build": "wo-r3-worker-window5-1771591905229",
       "server_build": "0.1.0",
       "executor": "worker"
     },
     {
-      "id": 1385,
-      "trace_id": "c2a366c1-21f8-40b0-b18c-16cb17efd198",
-      "client_build": "wo-r3-worker-window5-1771590986493",
+      "id": 1600,
+      "trace_id": "22449832-db30-41b5-ad90-58797e50fee6",
+      "client_build": "wo-r3-worker-window5-1771591905229",
       "server_build": "0.1.0",
       "executor": "worker"
     }

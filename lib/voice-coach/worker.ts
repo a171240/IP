@@ -36,21 +36,24 @@ function randomInRange(min: number, max: number) {
   return min + Math.floor(Math.random() * (max - min + 1))
 }
 
-const maxJobsPerRound = Math.max(3, parseNumberEnv("VOICE_COACH_WORKER_MAX_JOBS", 6, 1, 20))
+const maxJobsPerRound = Math.max(6, parseNumberEnv("VOICE_COACH_WORKER_MAX_JOBS", 6, 1, 20))
 const maxWallMsPerRound = Math.max(3000, parseNumberEnv("VOICE_COACH_WORKER_MAX_WALL_MS", 8000, 800, 30000))
 const perJobTimeoutMs = Math.max(10000, parseNumberEnv("VOICE_COACH_WORKER_JOB_TIMEOUT_MS", 30000, 2000, 120000))
-const workerConcurrency = parseNumberEnv(
-  "VOICE_COACH_WORKER_CONCURRENCY",
-  Math.max(1, Math.min(maxJobsPerRound, 6)),
-  1,
-  20,
+const workerConcurrency = Math.max(
+  4,
+  parseNumberEnv(
+    "VOICE_COACH_WORKER_CONCURRENCY",
+    Math.max(1, Math.min(maxJobsPerRound, 6)),
+    1,
+    20,
+  ),
 )
-const legacyIdleSleepMs = parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MS", 120, 20, 5000)
-const idleSleepMinMs = Math.max(80, parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MIN_MS", 80, 20, 5000))
+const legacyIdleSleepMs = parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MS", 90, 20, 5000)
+const idleSleepMinMs = Math.min(120, Math.max(20, parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MIN_MS", 60, 20, 5000)))
 const idleSleepMaxMs = Math.max(
   idleSleepMinMs,
-  parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MAX_MS", 160, idleSleepMinMs, 5000),
-  legacyIdleSleepMs,
+  Math.min(240, parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MAX_MS", 120, idleSleepMinMs, 5000)),
+  Math.min(180, legacyIdleSleepMs),
 )
 const errorSleepMs = parseNumberEnv("VOICE_COACH_WORKER_ERROR_SLEEP_MS", 1200, 100, 10000)
 const heartbeatIntervalMs = parseNumberEnv("VOICE_COACH_WORKER_HEARTBEAT_INTERVAL_MS", 2000, 500, 30000)
@@ -59,14 +62,16 @@ const heartbeatFile = String(process.env.VOICE_COACH_WORKER_HEARTBEAT_FILE || "/
   .slice(0, 500)
 const staleRecoverIntervalMs = parseNumberEnv("VOICE_COACH_WORKER_RECOVER_INTERVAL_MS", 3000, 1000, 30000)
 const staleRecoverMaxJobs = parseNumberEnv("VOICE_COACH_WORKER_RECOVER_MAX_JOBS", 20, 1, 200)
-const maxQueueAgeMs = parseNumberEnv("VOICE_COACH_WORKER_MAX_QUEUE_AGE_MS", 0, 0, 86400000)
+const maxQueueAgeMs = 0
 const runOnce = parseBoolEnv("VOICE_COACH_WORKER_RUN_ONCE", false)
 const workerId = String(process.env.VOICE_COACH_WORKER_ID || `${hostname()}#${process.pid}`).slice(0, 120)
+const chainMainToTtsInWorker = parseBoolEnv("VOICE_COACH_WORKER_CHAIN_MAIN_TO_TTS", false)
 
 let shuttingDown = false
 let lastRecoverAt = 0
 let lastHeartbeatAt = 0
 let heartbeatFailCount = 0
+let disableDbHeartbeat = false
 
 process.on("SIGINT", () => {
   shuttingDown = true
@@ -108,6 +113,10 @@ async function touchHeartbeat(
   if (heartbeatFile) {
     void writeFile(heartbeatFile, JSON.stringify(payload, null, 2), "utf8").catch(() => {})
   }
+  if (disableDbHeartbeat) {
+    lastHeartbeatAt = now
+    return
+  }
   try {
     await recordVoiceCoachWorkerHeartbeat({
       workerId,
@@ -127,8 +136,11 @@ async function touchHeartbeat(
     heartbeatFailCount += 1
     // Throttle retry cadence even when heartbeat table is missing or unavailable.
     lastHeartbeatAt = now
+    const message = error instanceof Error ? error.message : String(error)
+    if (message.includes("voice_coach_worker_heartbeats")) {
+      disableDbHeartbeat = true
+    }
     if (heartbeatFailCount <= 3 || heartbeatFailCount % 20 === 0) {
-      const message = error instanceof Error ? error.message : String(error)
       console.error(`[voicecoach-worker] heartbeat_failed message=${message}`)
     }
   }
@@ -155,7 +167,7 @@ async function processOneJob(job: {
       jobId: job.id,
       executor: "worker",
       lockOwner: workerId,
-      chainMainToTts: true,
+      chainMainToTts: chainMainToTtsInWorker,
     })
       .then((result) => ({ timedOut: false, processed: Boolean(result?.processed) }))
       .catch((error) => {
@@ -178,43 +190,83 @@ async function runRound(): Promise<RoundResult> {
   const roundStartedAt = Date.now()
   let recovered = 0
   let processed = 0
+  const inFlight: Array<Promise<{ processed: boolean; timedOut: boolean }>> = []
+
+  const claimOne = async (): Promise<{
+    id: string
+    sessionId: string
+    userId: string
+  } | null> => {
+    const queuedMain = await listVoiceCoachQueuedJobs({
+      maxJobs: 1,
+      allowedStages: MAIN_ONLY_STAGES,
+      newestFirst: true,
+      maxQueueAgeMs,
+    })
+    if (queuedMain.length > 0) return queuedMain[0]
+
+    const queuedTts = await listVoiceCoachQueuedJobs({
+      maxJobs: 1,
+      allowedStages: TTS_ONLY_STAGES,
+      newestFirst: true,
+      maxQueueAgeMs,
+    })
+    return queuedTts[0] || null
+  }
 
   while (!shuttingDown && processed < maxJobsPerRound) {
     const roundElapsedMs = Date.now() - roundStartedAt
     if (roundElapsedMs >= maxWallMsPerRound) break
 
-    const slots = Math.max(1, Math.min(workerConcurrency, maxJobsPerRound - processed))
-    let queued = await listVoiceCoachQueuedJobs({
-      maxJobs: slots,
-      allowedStages: MAIN_ONLY_STAGES,
-      newestFirst: true,
-      maxQueueAgeMs,
-    })
-    if (!queued.length) {
-      queued = await listVoiceCoachQueuedJobs({
-        maxJobs: slots,
-        allowedStages: TTS_ONLY_STAGES,
-        newestFirst: true,
-        maxQueueAgeMs,
-      })
+    const remainingBudget = maxJobsPerRound - (processed + inFlight.length)
+    const slots = Math.max(0, Math.min(workerConcurrency - inFlight.length, remainingBudget))
+
+    let claimedAny = false
+    for (let i = 0; i < slots; i++) {
+      const claimedJob = await claimOne()
+      if (!claimedJob) break
+      claimedAny = true
+      inFlight.push(processOneJob(claimedJob))
     }
-    if (!queued.length) {
-      const recoveredNow = await maybeRecoverStaleJobs(Date.now())
-      if (recoveredNow > 0) {
-        recovered += recoveredNow
-        continue
+
+    if (inFlight.length <= 0) {
+      if (processed === 0) {
+        const recoveredNow = await maybeRecoverStaleJobs(Date.now())
+        if (recoveredNow > 0) {
+          recovered += recoveredNow
+          continue
+        }
       }
       break
     }
 
-    const handledBatch = await Promise.all(queued.slice(0, slots).map((job) => processOneJob(job)))
-    const processedNow = handledBatch.reduce((count, handled) => count + (handled.processed ? 1 : 0), 0)
-    processed += processedNow
+    const settled = await Promise.race(
+      inFlight.map((pending, index) =>
+        pending.then((result) => ({
+          index,
+          result,
+        })),
+      ),
+    )
+    inFlight.splice(settled.index, 1)
 
-    // Back off only when nothing was claimed to avoid hot polling loops.
-    const madeProgress = handledBatch.some((handled) => handled.processed || handled.timedOut)
-    if (!madeProgress) {
+    if (settled.result.processed) {
+      processed += 1
+      continue
+    }
+
+    if (!settled.result.timedOut && !claimedAny) {
       await sleep(80)
+    }
+  }
+
+  if (inFlight.length > 0) {
+    // Drain completed in-flight jobs without blocking for stragglers.
+    const settled = await Promise.allSettled(inFlight)
+    for (const item of settled) {
+      if (item.status === "fulfilled" && item.value.processed) {
+        processed += 1
+      }
     }
   }
 
@@ -223,7 +275,7 @@ async function runRound(): Promise<RoundResult> {
 
 async function main() {
   console.log(
-    `[voicecoach-worker] started id=${workerId} max_jobs=${maxJobsPerRound} concurrency=${workerConcurrency} wall_ms=${maxWallMsPerRound} timeout_ms=${perJobTimeoutMs} idle_ms=${idleSleepMinMs}-${idleSleepMaxMs} max_queue_age_ms=${maxQueueAgeMs}`,
+    `[voicecoach-worker] started id=${workerId} max_jobs=${maxJobsPerRound} concurrency=${workerConcurrency} wall_ms=${maxWallMsPerRound} timeout_ms=${perJobTimeoutMs} idle_ms=${idleSleepMinMs}-${idleSleepMaxMs} max_queue_age_ms=${maxQueueAgeMs} chain_main_to_tts=${chainMainToTtsInWorker ? "true" : "false"}`,
   )
   await touchHeartbeat("started", { force: true, processed: 0, recovered: 0 })
 
