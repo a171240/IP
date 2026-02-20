@@ -655,6 +655,63 @@ type VoiceCoachTtsRuntimeUrlCacheEntry = {
 }
 
 const voiceCoachTtsRuntimeUrlCache = new Map<string, VoiceCoachTtsRuntimeUrlCacheEntry>()
+const voiceCoachTtsLineL1Cache = new Map<string, VoiceCoachTtsCacheRow>()
+const voiceCoachTtsLineL1WarmInFlight = new Set<string>()
+
+function ttsLineL1CacheKey(voiceType: string, lineId: string): string {
+  return `${String(voiceType || "").trim()}::${String(lineId || "").trim()}`
+}
+
+function getTtsLineL1CacheRow(voiceType: string, lineId: string): VoiceCoachTtsCacheRow | null {
+  const key = ttsLineL1CacheKey(voiceType, lineId)
+  const hit = voiceCoachTtsLineL1Cache.get(key)
+  return hit || null
+}
+
+function setTtsLineL1CacheRow(row: VoiceCoachTtsCacheRow): void {
+  if (row.cache_kind !== "line") return
+  const voiceType = String(row.voice_type || "").trim()
+  const lineId = String(row.line_id || "").trim()
+  if (!voiceType || !lineId) return
+  const key = ttsLineL1CacheKey(voiceType, lineId)
+  const prev = voiceCoachTtsLineL1Cache.get(key)
+  if (!prev || !String(prev.audio_url || "").trim()) {
+    voiceCoachTtsLineL1Cache.set(key, row)
+  }
+}
+
+async function warmTtsLineL1CacheByVoiceType(voiceType: string): Promise<void> {
+  const vt = String(voiceType || "").trim()
+  if (!vt) return
+  if (voiceCoachTtsLineL1WarmInFlight.has(vt)) return
+  voiceCoachTtsLineL1WarmInFlight.add(vt)
+  try {
+    const admin = createAdminSupabaseClient()
+    const { data, error } = await admin
+      .from(VOICE_COACH_TTS_CACHE_TABLE)
+      .select("key, voice_type, line_id, cache_kind, text, audio_url, hit_count, created_at")
+      .eq("voice_type", vt)
+      .eq("cache_kind", "line")
+      .not("line_id", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(2000)
+    if (error || !Array.isArray(data)) return
+    for (const item of data) {
+      const row: VoiceCoachTtsCacheRow = {
+        key: String((item as any).key || ""),
+        voice_type: String((item as any).voice_type || ""),
+        line_id: typeof (item as any).line_id === "string" ? String((item as any).line_id) : null,
+        cache_kind: "line",
+        text: String((item as any).text || ""),
+        audio_url: String((item as any).audio_url || ""),
+        hit_count: asNumber((item as any).hit_count),
+      }
+      setTtsLineL1CacheRow(row)
+    }
+  } finally {
+    voiceCoachTtsLineL1WarmInFlight.delete(vt)
+  }
+}
 
 function ttsCacheVoiceTag(voiceType: string): string {
   const voice = String(voiceType || "")
@@ -750,6 +807,11 @@ async function getVoiceCoachTtsLineCacheRow(opts: {
   const voiceType = String(opts.voiceType || "").trim()
   const lineId = String(opts.lineId || "").trim()
   if (!voiceType || !lineId) return null
+  const l1Hit = getTtsLineL1CacheRow(voiceType, lineId)
+  if (l1Hit) return l1Hit
+  await warmTtsLineL1CacheByVoiceType(voiceType)
+  const warmedHit = getTtsLineL1CacheRow(voiceType, lineId)
+  if (warmedHit) return warmedHit
   const admin = createAdminSupabaseClient()
   const { data, error } = await admin
     .from(VOICE_COACH_TTS_CACHE_TABLE)
@@ -761,7 +823,7 @@ async function getVoiceCoachTtsLineCacheRow(opts: {
     .limit(1)
     .maybeSingle()
   if (error || !data) return null
-  return {
+  const row: VoiceCoachTtsCacheRow = {
     key: String((data as any).key || ""),
     voice_type: String((data as any).voice_type || ""),
     line_id: typeof (data as any).line_id === "string" ? String((data as any).line_id) : null,
@@ -770,6 +832,8 @@ async function getVoiceCoachTtsLineCacheRow(opts: {
     audio_url: String((data as any).audio_url || ""),
     hit_count: asNumber((data as any).hit_count),
   }
+  setTtsLineL1CacheRow(row)
+  return row
 }
 
 async function bumpVoiceCoachTtsCacheHitCount(key: string, currentHitCount: number | null): Promise<void> {
@@ -818,6 +882,17 @@ async function saveVoiceCoachTtsCacheRow(opts: {
       onConflict: "key",
     },
   )
+  if (cacheKind === "line") {
+    setTtsLineL1CacheRow({
+      key,
+      voice_type: voiceType,
+      line_id: lineId || null,
+      cache_kind: "line",
+      text,
+      audio_url: audioUrl || toVoiceCoachTtsCacheUrl(audioPath),
+      hit_count: Number.isFinite(Number(opts.hitCount)) ? Math.max(0, Math.floor(Number(opts.hitCount))) : 0,
+    })
+  }
 }
 
 function normalizeStableTtsSource(source: unknown): VoiceCoachStableTtsSource {
@@ -2100,10 +2175,11 @@ async function processTtsStage(args: {
       }
     }
   }
-  const ttsMs = Date.now() - ttsStartedAt
   const llmUsed = resultState.llm_used === true
   const scriptHit = resultState.script_hit === true
   const ttsCacheHit = isTtsCacheHitSource(ttsSource)
+  const ttsMsRaw = Date.now() - ttsStartedAt
+  const ttsMs = ttsCacheHit ? 0 : ttsMsRaw
   const roundStats = await calcAudioRoundStatsBySession({
     sessionId: args.sessionId,
     currentSource: ttsSource,
