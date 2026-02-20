@@ -200,7 +200,9 @@ async function stopServer(server: ReturnType<typeof startServer>) {
   }
 }
 
-async function ensureUserProfile(admin: ReturnType<typeof createClient>, userId: string, email: string) {
+type SupabaseClientLoose = any
+
+async function ensureUserProfile(admin: SupabaseClientLoose, userId: string, email: string) {
   const { error } = await admin.from("profiles").upsert(
     {
       id: userId,
@@ -219,8 +221,8 @@ async function ensureUserProfile(admin: ReturnType<typeof createClient>, userId:
 }
 
 async function createUserAndToken(
-  admin: ReturnType<typeof createClient>,
-  anon: ReturnType<typeof createClient>,
+  admin: SupabaseClientLoose,
+  anon: SupabaseClientLoose,
   marker: string,
 ) {
   const email = `codex.video.${marker}.${Date.now()}@example.com`
@@ -249,7 +251,7 @@ async function createUserAndToken(
   }
 }
 
-async function seedDependencies(admin: ReturnType<typeof createClient>, userId: string) {
+async function seedDependencies(admin: SupabaseClientLoose, userId: string) {
   const sourceId = crypto.randomUUID()
   const rewriteId = crypto.randomUUID()
   const avatarProfileId = crypto.randomUUID()
@@ -304,7 +306,7 @@ async function seedDependencies(admin: ReturnType<typeof createClient>, userId: 
   }
 }
 
-async function queryJob(admin: ReturnType<typeof createClient>, jobId: string): Promise<JobSnapshot | null> {
+async function queryJob(admin: SupabaseClientLoose, jobId: string): Promise<JobSnapshot | null> {
   const { data, error } = await admin
     .from("video_render_jobs")
     .select(
@@ -342,7 +344,7 @@ async function pollUntilTerminal(opts: {
   baseUrl: string
   token: string
   jobId: string
-  admin: ReturnType<typeof createClient>
+  admin: SupabaseClientLoose
   maxPolls?: number
   intervalMs?: number
 }) {
