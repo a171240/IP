@@ -227,7 +227,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
 
     const nextTurnIndex = (lastTurnRows?.[0]?.turn_index ?? -1) + 1
     const beauticianTurnNo = Math.floor((nextTurnIndex + 1) / 2)
-    const reachedMax = beauticianTurnNo >= access.maxTurns
+    const reachedMax = access.maxTurns > 0 && beauticianTurnNo >= access.maxTurns
 
     const turnId = randomUUID()
     const audioPath = `${user.id}/${sessionId}/${turnId}.${detected.ext}`
@@ -290,7 +290,13 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
     })
 
     // Best-effort kick-off to shorten first event wait.
-    void pumpVoiceCoachQueuedJobs({ sessionId, userId: user.id, maxJobs: 3 }).catch(() => {})
+    void pumpVoiceCoachQueuedJobs({
+      sessionId,
+      userId: user.id,
+      maxJobs: 1,
+      allowedStages: ["main_pending", "tts_pending"],
+      maxWallMs: 700,
+    }).catch(() => {})
 
     // Fast-path: try to advance to ASR/text (and optionally TTS) before returning.
     const advanced = await advanceJobWithinBudget({

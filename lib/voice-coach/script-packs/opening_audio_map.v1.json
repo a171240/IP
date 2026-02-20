@@ -1,0 +1,133 @@
+{
+  "version": "v1",
+  "openings": {
+    "presale": [
+      {
+        "line_id": "opening_presale_01",
+        "intent_id": "need_diagnosis",
+        "angle_id": "budget_probe",
+        "text": "我第一次来，先不着急办卡。你能先帮我判断适合做什么吗？",
+        "emotion": "neutral",
+        "tag": "需求预算",
+        "audio_seed_path": "seed/opening/presale_opening_v1.mp3",
+        "audio_seconds": 3
+      },
+      {
+        "line_id": "opening_presale_02",
+        "intent_id": "trust_building",
+        "angle_id": "trust_source",
+        "text": "我想先听真实一点的建议，不想被硬推项目。",
+        "emotion": "skeptical",
+        "tag": "专业信任",
+        "audio_seed_path": "seed/opening/presale_opening_v2.mp3",
+        "audio_seconds": 4
+      },
+      {
+        "line_id": "opening_presale_03",
+        "intent_id": "need_diagnosis",
+        "angle_id": "time_probe",
+        "text": "我时间比较紧，想先知道最省时间的方案。",
+        "emotion": "neutral",
+        "tag": "时间安排",
+        "audio_seed_path": "seed/opening/presale_opening_v3.mp3",
+        "audio_seconds": 3
+      }
+    ],
+    "sale": [
+      {
+        "line_id": "opening_sale_01",
+        "intent_id": "safety_objection",
+        "angle_id": "doctor_warning",
+        "text": "医生说美容院不能按胸，这安全吗？",
+        "emotion": "worried",
+        "tag": "胸部安全",
+        "audio_seed_path": "seed/opening/objection_safety_v1.mp3",
+        "audio_seconds": 3
+      },
+      {
+        "line_id": "opening_sale_02",
+        "intent_id": "price_objection",
+        "angle_id": "value_gap",
+        "text": "你们价格比外面贵不少，我想知道差别到底在哪。",
+        "emotion": "skeptical",
+        "tag": "价格贵",
+        "audio_seed_path": "seed/opening/sale_opening_price_v1.mp3",
+        "audio_seconds": 4
+      },
+      {
+        "line_id": "opening_sale_03",
+        "intent_id": "proof_request",
+        "angle_id": "case_photo",
+        "text": "先别讲太多，我更想看真实案例和效果证据。",
+        "emotion": "skeptical",
+        "tag": "效果证据",
+        "audio_seed_path": "seed/opening/sale_opening_proof_v1.mp3",
+        "audio_seconds": 4
+      }
+    ],
+    "postsale": [
+      {
+        "line_id": "opening_postsale_01",
+        "intent_id": "effect_followup",
+        "angle_id": "result_review",
+        "text": "这次做完感觉还行，接下来我怎么判断效果是不是稳定？",
+        "emotion": "neutral",
+        "tag": "效果复盘",
+        "audio_seed_path": "seed/opening/postsale_opening_v1.mp3",
+        "audio_seconds": 4
+      },
+      {
+        "line_id": "opening_postsale_02",
+        "intent_id": "maintenance_plan",
+        "angle_id": "maintenance_schedule",
+        "text": "后续维护我不想太复杂，你给我一个简单可执行的节奏吧。",
+        "emotion": "neutral",
+        "tag": "维护计划",
+        "audio_seed_path": "seed/opening/postsale_opening_v2.mp3",
+        "audio_seconds": 4
+      },
+      {
+        "line_id": "opening_postsale_03",
+        "intent_id": "referral_probe",
+        "angle_id": "upgrade_value",
+        "text": "如果我复购或带朋友来，你们的服务升级点是什么？",
+        "emotion": "skeptical",
+        "tag": "复购裂变",
+        "audio_seed_path": "seed/opening/postsale_opening_v3.mp3",
+        "audio_seconds": 4
+      }
+    ],
+    "crisis": [
+      {
+        "line_id": "opening_crisis_01",
+        "intent_id": "emotion_stabilize",
+        "angle_id": "venting",
+        "text": "我现在很不满意，先别推项目，先说你们准备怎么处理。",
+        "emotion": "impatient",
+        "tag": "情绪急救",
+        "audio_seed_path": "seed/opening/crisis_opening_v1.mp3",
+        "audio_seconds": 4
+      },
+      {
+        "line_id": "opening_crisis_02",
+        "intent_id": "compensation_request",
+        "angle_id": "solution_request",
+        "text": "我需要一个明确补救方案和时间点，不要模糊回复。",
+        "emotion": "impatient",
+        "tag": "补救方案",
+        "audio_seed_path": "seed/opening/crisis_opening_v2.mp3",
+        "audio_seconds": 4
+      },
+      {
+        "line_id": "opening_crisis_03",
+        "intent_id": "transfer_aftercare",
+        "angle_id": "handoff",
+        "text": "这件事我要尽快进入售后处理流程，今天就要明确下一步。",
+        "emotion": "skeptical",
+        "tag": "售后转交",
+        "audio_seed_path": "seed/opening/crisis_opening_v3.mp3",
+        "audio_seconds": 4
+      }
+    ]
+  }
+}

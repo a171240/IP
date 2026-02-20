@@ -155,6 +155,47 @@ export async function llmGenerateCustomerTurn(opts: {
   })
 }
 
+export async function llmRewriteCustomerLine(opts: {
+  scenario: VoiceCoachScenario
+  history: Array<{ role: "customer" | "beautician"; text: string; emotion?: VoiceCoachEmotion }>
+  baseText: string
+  intent: string
+  angle: string
+  category: string
+}): Promise<CustomerTurn> {
+  const system = [
+    "你在一个微信小程序里扮演“顾客”，用于训练美容师销售话术。",
+    `场景：${opts.scenario.name}`,
+    `顾客人设：${opts.scenario.customerPersona}`,
+    "任务：在不改变原意图的前提下，改写顾客一句话，让表达更自然但仍保持追问力度。",
+    "你必须保持同一意图，不可跨话题，不可突然结束对话。",
+    "只输出严格 JSON，不要任何多余文字。",
+    "JSON：{ \"text\": string, \"emotion\": \"neutral|worried|skeptical|impatient|pleased\", \"tag\": string }",
+    "约束：长度 10-35 字，口语化，禁止医疗结论与绝对承诺。",
+  ].join("\n")
+
+  const user = [
+    `类目：${opts.category}`,
+    `意图：${opts.intent}`,
+    `角度：${opts.angle}`,
+    `原句：${opts.baseText}`,
+    "",
+    "最近对话：",
+    formatHistory(opts.history),
+  ].join("\n")
+
+  return apimartChatJson({
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+    model: APIMART_FAST_MODEL,
+    schema: CustomerTurnSchema,
+    temperature: 0.65,
+    timeoutMs: APIMART_FAST_TIMEOUT_MS,
+  })
+}
+
 export async function llmAnalyzeBeauticianAndGenerateNext(opts: {
   scenario: VoiceCoachScenario
   history: Array<{ role: "customer" | "beautician"; text: string; emotion?: VoiceCoachEmotion }>

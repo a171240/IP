@@ -178,7 +178,7 @@ Page({
   },
 
   startAgain() {
-    wx.redirectTo({ url: "/pages/voice-coach/chat" })
+    wx.redirectTo({ url: "/pages/voice-coach/index" })
   },
 
   onPlay(e) {
