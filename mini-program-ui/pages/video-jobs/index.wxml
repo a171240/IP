@@ -1,0 +1,113 @@
+<view class="page page-workspace">
+  <view class="container">
+    <view class="hero fade-up">
+      <text class="title">任务中心</text>
+      <text class="subtitle">分发任务状态与失败重试</text>
+      <text wx:if="{{jobId}}" class="muted small" style="margin-top: 10rpx; display: block;">Job ID：{{jobId}}</text>
+      <text wx:if="{{videoJobId}}" class="muted small" style="margin-top: 6rpx; display: block;">Video Job ID：{{videoJobId}}</text>
+    </view>
+
+    <view class="section fade-up delay-1" wx:if="{{videoJobId}}">
+      <view class="card">
+        <view class="row space-between">
+          <text class="card-title">视频任务进度</text>
+          <text class="tag {{videoJob && videoJob.status === 'done' ? 'tag-success' : videoJob && videoJob.status === 'failed' ? 'tag-accent' : ''}}">
+            {{videoJob ? videoJob.status : "unknown"}}
+          </text>
+        </view>
+        <view class="progress-bar">
+          <view class="progress-fill" style="width: {{videoJob ? videoJob.progress : 0}}%;"></view>
+        </view>
+        <text class="muted small">{{videoJob ? videoJob.progress : 0}}%</text>
+        <text wx:if="{{videoJob && videoJob.error}}" class="muted small" style="margin-top: 8rpx; display: block;">
+          失败原因：{{videoJob.error}}
+        </text>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-1" wx:if="{{jobId}}">
+      <view class="card">
+        <view class="row space-between">
+          <text class="card-title">分发全局进度</text>
+          <text class="tag {{job && job.status === 'done' ? 'tag-success' : job && job.status === 'failed' ? 'tag-accent' : ''}}">
+            {{job ? job.status : "unknown"}}
+          </text>
+        </view>
+        <view class="progress-bar">
+          <view class="progress-fill" style="width: {{progressPercent}}%;"></view>
+        </view>
+        <text class="muted small">{{progressPercent}}%</text>
+        <text wx:if="{{job && job.error}}" class="muted small" style="margin-top: 8rpx; display: block;">失败原因：{{job.error}}</text>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-1" wx:if="{{jobId}}">
+      <text class="section-title">平台任务</text>
+
+      <view wx:if="{{!tasks.length}}" class="card">
+        <text class="muted small">暂无任务数据。</text>
+      </view>
+
+      <view wx:for="{{tasks}}" wx:key="platform" class="card" style="margin-top: 14rpx;">
+        <view class="row space-between">
+          <text class="card-title">{{item.platform}}</text>
+          <text class="tag {{item.status === 'done' ? 'tag-success' : item.status === 'failed' ? 'tag-accent' : ''}}">
+            {{item.status}}
+          </text>
+        </view>
+
+        <view class="row">
+          <text class="tag">mode: {{item.mode}}</text>
+          <text class="tag">retry: {{item.retry_count || 0}}</text>
+        </view>
+
+        <text wx:if="{{item.error}}" class="muted small" style="display: block; margin-top: 8rpx;">
+          失败原因：{{item.error}}
+        </text>
+        <text wx:if="{{item.publish_url}}" class="muted small" style="display: block; margin-top: 8rpx;">
+          发布链接：{{item.publish_url}}
+        </text>
+
+        <button
+          wx:if="{{item.status === 'failed'}}"
+          class="btn-outline"
+          size="mini"
+          data-platform="{{item.platform}}"
+          bindtap="handleRetryTask"
+          loading="{{retryingPlatform === item.platform}}"
+        >
+          失败重试
+        </button>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-2">
+      <view class="card">
+        <text class="card-title">成片预览</text>
+        <video
+          wx:if="{{previewUrl}}"
+          src="{{previewUrl}}"
+          controls
+          show-center-play-btn
+          style="width: 100%; margin-top: 12rpx; border-radius: 16rpx;"
+        />
+        <text wx:else class="muted small">暂无可预览成片，完成发布后会显示。</text>
+        <button class="btn-outline" bindtap="handleCopyPreviewUrl">
+          复制预览链接
+        </button>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-2">
+      <button class="btn-primary" bindtap="handleBackToDistribute">
+        回跳分发工作台
+      </button>
+    </view>
+
+    <view wx:if="{{lastError}}" class="section">
+      <view class="card">
+        <text class="muted small">最近错误：{{lastError}}</text>
+      </view>
+    </view>
+  </view>
+</view>
