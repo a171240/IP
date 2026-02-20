@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server"
 
 import { checkVoiceCoachAccess } from "@/lib/voice-coach/guard.server"
+import { pumpVoiceCoachQueuedJobs } from "@/lib/voice-coach/jobs.server"
 import { createVoiceCoachTrace, type VoiceCoachTrace, voiceCoachJson } from "@/lib/voice-coach/trace.server"
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 
@@ -17,6 +18,19 @@ function sleep(ms: number) {
 function clamp(n: number, min: number, max: number) {
   if (Number.isNaN(n)) return min
   return Math.max(min, Math.min(max, n))
+}
+
+function shouldUseEventsQueuePump(): boolean {
+  const raw = String(process.env.VOICE_COACH_EVENTS_QUEUE_PUMP || "true")
+    .trim()
+    .toLowerCase()
+  return !["force_off", "disabled"].includes(raw)
+}
+
+function eventsQueuePumpWallMs(): number {
+  const n = Number(process.env.VOICE_COACH_EVENTS_QUEUE_PUMP_WALL_MS || 420)
+  if (!Number.isFinite(n)) return 420
+  return Math.max(160, Math.min(2200, Math.round(n)))
 }
 
 export async function GET(request: NextRequest, context: { params: Promise<{ sessionId: string }> }) {
@@ -45,8 +59,28 @@ export async function GET(request: NextRequest, context: { params: Promise<{ ses
     const cursor = Math.max(0, Number(search.get("cursor") || 0) || 0)
     const timeoutMs = clamp(Number(search.get("timeout_ms") || 10000), 800, 15000)
     const started = Date.now()
+    const pumpEnabled = shouldUseEventsQueuePump()
+    const pumpWallMs = eventsQueuePumpWallMs()
 
     while (true) {
+      if (pumpEnabled) {
+        try {
+          await pumpVoiceCoachQueuedJobs({
+            sessionId,
+            userId: user.id,
+            maxJobs: 1,
+            allowedStages: ["main_pending", "tts_pending"],
+            maxWallMs: pumpWallMs,
+            jobTimeoutMs: pumpWallMs,
+            skipStaleRecovery: true,
+            executor: "events_pump",
+            lockOwner: `events:${process.pid}`,
+          })
+        } catch {
+          // best effort acceleration only
+        }
+      }
+
       const { data: events, error: eventsError } = await supabase
         .from("voice_coach_events")
         .select("id, created_at, type, turn_id, job_id, data_json")

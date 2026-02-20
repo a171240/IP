@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { checkVoiceCoachAccess } from "@/lib/voice-coach/guard.server"
+import { pumpVoiceCoachQueuedJobs } from "@/lib/voice-coach/jobs.server"
 import {
   createVoiceCoachTrace,
   type VoiceCoachTrace,
@@ -22,6 +23,19 @@ function sleep(ms: number) {
 function clamp(n: number, min: number, max: number) {
   if (Number.isNaN(n)) return min
   return Math.max(min, Math.min(max, n))
+}
+
+function shouldUseEventsQueuePump(): boolean {
+  const raw = String(process.env.VOICE_COACH_EVENTS_QUEUE_PUMP || "true")
+    .trim()
+    .toLowerCase()
+  return !["force_off", "disabled"].includes(raw)
+}
+
+function eventsQueuePumpWallMs(): number {
+  const n = Number(process.env.VOICE_COACH_EVENTS_QUEUE_PUMP_WALL_MS || 420)
+  if (!Number.isFinite(n)) return 420
+  return Math.max(160, Math.min(2200, Math.round(n)))
 }
 
 export async function GET(request: NextRequest, context: { params: Promise<{ sessionId: string }> }) {
@@ -49,6 +63,8 @@ export async function GET(request: NextRequest, context: { params: Promise<{ ses
     const search = request.nextUrl.searchParams
     const cursor = Math.max(0, Number(search.get("cursor") || 0) || 0)
     const timeoutMs = clamp(Number(search.get("timeout_ms") || 25000), 5000, 30000)
+    const pumpEnabled = shouldUseEventsQueuePump()
+    const pumpWallMs = eventsQueuePumpWallMs()
 
     const encoder = new TextEncoder()
 
@@ -81,6 +97,24 @@ export async function GET(request: NextRequest, context: { params: Promise<{ ses
           if (request.signal.aborted) {
             closed = true
             break
+          }
+
+          if (pumpEnabled) {
+            try {
+              await pumpVoiceCoachQueuedJobs({
+                sessionId,
+                userId: user.id,
+                maxJobs: 1,
+                allowedStages: ["main_pending", "tts_pending"],
+                maxWallMs: pumpWallMs,
+                jobTimeoutMs: pumpWallMs,
+                skipStaleRecovery: true,
+                executor: "events_pump",
+                lockOwner: `events-stream:${process.pid}`,
+              })
+            } catch {
+              // best effort only
+            }
           }
 
           const { data: events, error: eventsError } = await supabase

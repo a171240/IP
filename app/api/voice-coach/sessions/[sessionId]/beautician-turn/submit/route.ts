@@ -34,10 +34,11 @@ function shouldUseFlashAsr(): boolean {
 }
 
 function shouldUseSubmitQueuePump(): boolean {
-  const raw = String(process.env.VOICE_COACH_SUBMIT_QUEUE_PUMP || "false")
+  const raw = String(process.env.VOICE_COACH_SUBMIT_QUEUE_PUMP || "true")
     .trim()
     .toLowerCase()
-  return ["1", "true", "yes", "on"].includes(raw)
+  // Keep submit kickoff on by default; disable only with explicit hard-off values.
+  return !["force_off", "disabled"].includes(raw)
 }
 
 function submitQueuePumpWallMs(): number {
@@ -288,12 +289,13 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
     }
     const initialResultState = {
       pipeline_started_at_ms: pipelineStartedAtMs,
+      stage_entered_at_ms: pipelineStartedAtMs,
       submit_ack_ms: submitAckMs,
       upload_ms: uploadMs,
       client_build: trace.clientBuild,
       server_build: trace.serverBuild,
       trace_id: trace.traceId,
-      executor: "worker",
+      executor: "submit_pump",
     }
 
     const { data: insertedJob, error: jobInsertError } = await supabase
@@ -332,7 +334,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
             jobId,
             executor: "submit_pump",
             lockOwner,
-            chainMainToTts: false,
+            chainMainToTts: true,
             queuedHint: {
               turnId: String(insertedJob.turn_id || turnId),
               stage: String(insertedJob.stage || "main_pending"),
@@ -342,7 +344,17 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
               createdAt: String(insertedJob.created_at || ""),
               updatedAt: String(insertedJob.updated_at || ""),
             },
-          }).then((result) => ({ timedOut: false, processed: Boolean(result?.processed) })),
+          })
+            .then((result) => ({ timedOut: false, processed: Boolean(result?.processed) }))
+            .catch((kickoffError: any) => {
+              console.error("[voice-coach][submit-kickoff] process_failed", {
+                session_id: sessionId,
+                turn_id: turnId,
+                job_id: jobId,
+                message: kickoffError?.message || String(kickoffError),
+              })
+              return { timedOut: false, processed: false }
+            }),
           sleep(wallMs).then(() => ({ timedOut: true, processed: false })),
         ])
         if (kickoff.timedOut || kickoff.processed) {
@@ -352,8 +364,13 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
             stage: "main_pending",
           }
         }
-      } catch {
-        // best effort kickoff: fallback to worker/events pump
+      } catch (kickoffError: any) {
+        console.error("[voice-coach][submit-kickoff] failed", {
+          session_id: sessionId,
+          turn_id: turnId,
+          job_id: jobId,
+          message: kickoffError?.message || String(kickoffError),
+        })
       }
     }
 

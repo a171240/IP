@@ -165,6 +165,11 @@ export type VoiceCoachQueuedJobRecord = {
   userId: string
   stage: VoiceCoachJobStage
   createdAt: string
+  turnId?: string
+  attemptCount?: number
+  payload?: VoiceCoachJobPayload
+  resultState?: VoiceCoachJobResultState
+  updatedAt?: string
 }
 
 type SessionRow = {
@@ -2352,19 +2357,25 @@ export async function listVoiceCoachQueuedJobs(args?: {
   allowedStages?: Array<VoiceCoachJobStage>
   newestFirst?: boolean
   maxQueueAgeMs?: number
+  includeClaimHint?: boolean
 }): Promise<VoiceCoachQueuedJobRecord[]> {
   const admin = createAdminSupabaseClient()
   const maxJobs = Math.max(1, Math.min(50, Number(args?.maxJobs || 10) || 10))
   const allowedStagesSet =
     Array.isArray(args?.allowedStages) && args.allowedStages.length ? new Set(args.allowedStages) : null
   const newestFirst = Boolean(args?.newestFirst)
+  const includeClaimHint = Boolean(args?.includeClaimHint)
   const maxQueueAgeMsRaw = Number(args?.maxQueueAgeMs || 0)
   const maxQueueAgeMs = Number.isFinite(maxQueueAgeMsRaw) ? Math.max(0, Math.round(maxQueueAgeMsRaw)) : 0
   const queuedAfterIso = maxQueueAgeMs > 0 ? new Date(Date.now() - maxQueueAgeMs).toISOString() : null
 
+  const selectCols = includeClaimHint
+    ? "id, session_id, user_id, turn_id, stage, attempt_count, payload_json, result_json, created_at, updated_at"
+    : "id, session_id, user_id, stage, created_at"
+
   let query = admin
     .from("voice_coach_jobs")
-    .select("id, session_id, user_id, stage, created_at")
+    .select(selectCols)
     .eq("status", "queued")
     .order("created_at", { ascending: !newestFirst })
     .limit(maxJobs)
@@ -2386,6 +2397,11 @@ export async function listVoiceCoachQueuedJobs(args?: {
       userId: String(row.user_id || ""),
       stage: normalizeJobStage(row.stage),
       createdAt: String(row.created_at || ""),
+      turnId: includeClaimHint ? String(row.turn_id || "") || undefined : undefined,
+      attemptCount: includeClaimHint ? Math.max(0, Number(row.attempt_count || 0) || 0) : undefined,
+      payload: includeClaimHint ? ((row.payload_json || {}) as VoiceCoachJobPayload) : undefined,
+      resultState: includeClaimHint ? ((row.result_json || {}) as VoiceCoachJobResultState) : undefined,
+      updatedAt: includeClaimHint ? String(row.updated_at || "") || undefined : undefined,
     }))
     .filter((row) => row.id && row.sessionId && row.userId)
 }
