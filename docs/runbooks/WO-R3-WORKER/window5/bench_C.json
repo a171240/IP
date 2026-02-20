@@ -1,0 +1,42 @@
+{
+  "generated_at": "2026-02-20T12:37:46.755Z",
+  "voice_type": "zh_female_vv_uranus_bigtts",
+  "rounds": 100,
+  "line_ids": 32,
+  "db_direct_url_ratio": 1,
+  "db_tts_ms_avg": 294.2812,
+  "db_tts_ms_p50": 290.2448,
+  "db_tts_ms_p95": 304.1473,
+  "l1_direct_url_ratio": 1,
+  "l1_tts_ms_avg": 0.0011,
+  "l1_tts_ms_p50": 0.0009,
+  "l1_tts_ms_p95": 0.0015,
+  "script_hit_rate": 1,
+  "tts_line_cache_hit_rate": 1,
+  "tts_source_distribution": {
+    "line_cache": 4,
+    "text_cache": 0,
+    "runtime": 0
+  },
+  "llm_used_when_script_hit_count": 0,
+  "asr_provider": {
+    "flash": 4
+  },
+  "asr_flash_ratio": 1,
+  "audit_samples": [
+    {
+      "id": 1339,
+      "trace_id": "5f1ef543-06a0-4cba-aacb-a66898cc059a",
+      "client_build": "wo-r3-worker-window5-1771590656365",
+      "server_build": "0.1.0",
+      "executor": "worker"
+    },
+    {
+      "id": 1347,
+      "trace_id": "7f43a86b-bdd5-4781-842b-f547ba0c0ef6",
+      "client_build": "wo-r3-worker-window5-1771590656365",
+      "server_build": "0.1.0",
+      "executor": "worker"
+    }
+  ]
+}

@@ -2478,18 +2478,53 @@ export async function processVoiceCoachJobById(args: {
   executor?: VoiceCoachJobExecutor
   lockOwner?: string | null
   chainMainToTts?: boolean
+  queuedHint?: {
+    turnId?: string | null
+    stage?: VoiceCoachJobStage | string | null
+    attemptCount?: number | null
+    payload?: VoiceCoachJobPayload | null
+    resultState?: VoiceCoachJobResultState | null
+    createdAt?: string | null
+    updatedAt?: string | null
+  }
 }): Promise<ProcessJobResult> {
   const admin = createAdminSupabaseClient()
 
-  const { data: job, error: jobError } = await admin
-    .from("voice_coach_jobs")
-    .select(
-      "id, session_id, user_id, turn_id, status, stage, attempt_count, payload_json, result_json, created_at, updated_at",
-    )
-    .eq("id", args.jobId)
-    .eq("session_id", args.sessionId)
-    .eq("user_id", args.userId)
-    .single()
+  const hintedStage = normalizeJobStage(args.queuedHint?.stage)
+  const hintedTurnId = String(args.queuedHint?.turnId || "").trim()
+  const hasQueuedHint = Boolean(args.queuedHint && hintedTurnId)
+
+  const hintedJob = hasQueuedHint
+    ? ({
+        id: args.jobId,
+        session_id: args.sessionId,
+        user_id: args.userId,
+        turn_id: hintedTurnId,
+        status: "queued",
+        stage: hintedStage,
+        attempt_count: Math.max(0, Number(args.queuedHint?.attemptCount || 0) || 0),
+        payload_json: (args.queuedHint?.payload || {}) as VoiceCoachJobPayload,
+        result_json: (args.queuedHint?.resultState || {}) as VoiceCoachJobResultState,
+        created_at: args.queuedHint?.createdAt || null,
+        updated_at: args.queuedHint?.updatedAt || null,
+      } as any)
+    : null
+
+  let job = hintedJob
+  let jobError: any = null
+  if (!job) {
+    const queried = await admin
+      .from("voice_coach_jobs")
+      .select(
+        "id, session_id, user_id, turn_id, status, stage, attempt_count, payload_json, result_json, created_at, updated_at",
+      )
+      .eq("id", args.jobId)
+      .eq("session_id", args.sessionId)
+      .eq("user_id", args.userId)
+      .single()
+    job = queried.data
+    jobError = queried.error
+  }
 
   if (jobError || !job) return { processed: false, done: false }
   if (job.status !== "queued") return { processed: false, done: job.status === "done" }
