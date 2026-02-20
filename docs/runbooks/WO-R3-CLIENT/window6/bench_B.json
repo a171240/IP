@@ -1,76 +1,77 @@
 {
-  "generated_at": "2026-02-20T11:17:13.297Z",
+  "generated_at": "2026-02-20T11:46:14.378Z",
   "label": "B",
-  "source_file": "/tmp/voicecoach_e2e_1771586233297.json",
-  "session_id": "b9bb3a04-3d97-4cc6-9896-12a317e9ece1",
-  "client_build": "bench-1771586182720",
-  "server_build": "0.1.0",
+  "source_file": "/tmp/voicecoach_e2e_1771587974378.json",
+  "session_id": "2f2f3f3b-45df-4287-8f1f-676bad57c1ca",
+  "client_build": "bench-1771587915810",
+  "server_build": "dev",
   "rounds": 3,
-  "sample_events": 7,
-  "audit_sample_count": 7,
+  "sample_events": 9,
+  "audit_sample_count": 9,
   "audit_samples": [
     {
-      "trace_id": "ed68eb46-c18c-4c23-8944-def61c998cff",
-      "client_build": "bench-1771586182720",
-      "server_build": "0.1.0",
+      "trace_id": "4b7dc43c-373f-4041-a438-00457c843831",
+      "client_build": "bench-1771587915810",
+      "server_build": "dev",
       "executor": "worker",
       "event_type": "beautician.asr_ready"
     },
     {
-      "trace_id": "ed68eb46-c18c-4c23-8944-def61c998cff",
-      "client_build": "bench-1771586182720",
-      "server_build": "0.1.0",
+      "trace_id": "4b7dc43c-373f-4041-a438-00457c843831",
+      "client_build": "bench-1771587915810",
+      "server_build": "dev",
       "executor": "worker",
       "event_type": "customer.text_ready"
     },
     {
-      "trace_id": "ed68eb46-c18c-4c23-8944-def61c998cff",
-      "client_build": "bench-1771586182720",
-      "server_build": "0.1.0",
+      "trace_id": "4b7dc43c-373f-4041-a438-00457c843831",
+      "client_build": "bench-1771587915810",
+      "server_build": "dev",
       "executor": "worker",
       "event_type": "customer.audio_ready"
     },
     {
-      "trace_id": "5ef44707-5412-4d36-9270-3542e82462eb",
-      "client_build": "bench-1771586182720",
-      "server_build": "0.1.0",
+      "trace_id": "acf5348e-7a81-46fc-a566-304d70ef7deb",
+      "client_build": "bench-1771587915810",
+      "server_build": "dev",
       "executor": "worker",
       "event_type": "beautician.asr_ready"
     },
     {
-      "trace_id": "5ef44707-5412-4d36-9270-3542e82462eb",
-      "client_build": "bench-1771586182720",
-      "server_build": "0.1.0",
+      "trace_id": "acf5348e-7a81-46fc-a566-304d70ef7deb",
+      "client_build": "bench-1771587915810",
+      "server_build": "dev",
       "executor": "worker",
       "event_type": "customer.text_ready"
     }
   ],
   "asr_provider_distribution": {
-    "auc": 2
+    "flash": 3
   },
+  "asr_flash_ratio": 1.0,
   "audio_ready_ms": {
-    "p50": 5799,
-    "p95": 6461
+    "p50": 1766,
+    "p95": 6724
   },
   "llm_ms": {
     "p50": 0,
     "p95": 0
   },
   "tts_ms": {
-    "p50": 316,
-    "p95": 353
+    "p50": 0,
+    "p95": 0
   },
   "queue_wait_before_main_ms": {
-    "p50": 702,
-    "p95": 1025
+    "p50": 913,
+    "p95": 5926
   },
   "queue_wait_before_tts_ms_raw": {
-    "p50": 584,
-    "p95": 717
+    "p50": 589,
+    "p95": 1041
   },
   "queue_wait_before_tts_ms_corrected": {
-    "p50": 584,
-    "p95": 717,
+    "p50": 589,
+    "p95": 1041,
     "rule": "valid_only_then_fallback_raw"
   },
   "tts_cache_hit_rate": 1.0
