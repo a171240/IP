@@ -189,6 +189,37 @@ function boolEnv(name: string, fallback = false) {
   return value === "1" || value === "true" || value === "yes" || value === "on"
 }
 
+function missingRequiredEnv(names: string[]) {
+  return names.filter((name) => !safeString(process.env[name]).trim())
+}
+
+type ProviderPreflight = {
+  mockVideoUrl: string | null
+}
+
+function resolveProviderPreflight(): ProviderPreflight {
+  const missingSpeech = missingRequiredEnv(["VOLC_SPEECH_APP_ID", "VOLC_SPEECH_ACCESS_TOKEN"])
+  if (missingSpeech.length > 0) {
+    throw new VideoPipelineError(
+      "video_render_failed",
+      `volc_speech_env_missing(missing:${missingSpeech.join(",")})`,
+    )
+  }
+
+  const mockVideoUrl = safeNullableString(process.env.VIDEO_PIPELINE_MOCK_VIDEO_URL)
+  const allowAudioOnlySuccess = boolEnv("VIDEO_PIPELINE_ALLOW_AUDIO_ONLY_SUCCESS", false)
+  if (!mockVideoUrl && !allowAudioOnlySuccess) {
+    throw new VideoPipelineError(
+      "video_render_failed",
+      "volc_video_provider_not_configured(set:VIDEO_PIPELINE_MOCK_VIDEO_URL_or_VIDEO_PIPELINE_ALLOW_AUDIO_ONLY_SUCCESS=true)",
+    )
+  }
+
+  return {
+    mockVideoUrl,
+  }
+}
+
 function convertErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     const text = error.message.trim()
@@ -315,11 +346,7 @@ async function runSingleRenderAttempt(opts: {
     avatarProfileId,
   })
 
-  const appId = safeString(process.env.VOLC_SPEECH_APP_ID).trim()
-  const speechToken = safeString(process.env.VOLC_SPEECH_ACCESS_TOKEN).trim()
-  if (!appId || !speechToken) {
-    throw new VideoPipelineError("video_render_failed", "volc_speech_env_missing")
-  }
+  const providerConfig = resolveProviderPreflight()
 
   const narration = extractNarrationText(rewrite)
   const tts = await doubaoTts({
@@ -338,13 +365,7 @@ async function runSingleRenderAttempt(opts: {
     contentType: "audio/mpeg",
   })
 
-  const configuredVideoUrl = safeString(process.env.VIDEO_PIPELINE_MOCK_VIDEO_URL).trim()
-  const allowAudioOnlySuccess = boolEnv("VIDEO_PIPELINE_ALLOW_AUDIO_ONLY_SUCCESS", false)
-  if (!configuredVideoUrl && !allowAudioOnlySuccess) {
-    throw new RenderAttemptError("video_render_failed", "volc_video_provider_not_configured", audioPath)
-  }
-
-  const videoPath = configuredVideoUrl || audioPath
+  const videoPath = providerConfig.mockVideoUrl || audioPath
   return {
     audioStoragePath: audioPath,
     videoStoragePath: videoPath,
