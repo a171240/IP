@@ -1,0 +1,106 @@
+{
+  "generated_at": "2026-02-20T11:22:37.942Z",
+  "work_order": "WO-R3-ASR/window3",
+  "bench_files": {
+    "A": "docs/runbooks/WO-R3-ASR/window3/bench_A.json",
+    "B": "docs/runbooks/WO-R3-ASR/window3/bench_B.json",
+    "C": "docs/runbooks/WO-R3-ASR/window3/bench_C.json"
+  },
+  "selfcheck": {
+    "status": "FAIL",
+    "error_code": "asr_flash_permission_denied",
+    "flash_request_id": "71ea84b4-8994-4bd8-aecf-6da7b6b50918",
+    "flash_logid": "202602201921278F8C5E022192C28F560F",
+    "occurred_at": "2026-02-20T11:21:26.895Z"
+  },
+  "metrics": {
+    "asr_provider_A": {
+      "auc": 3
+    },
+    "asr_provider_B": {
+      "auc": 3,
+      "unknown": 2
+    },
+    "asr_provider_C": {
+      "auc": 3,
+      "unknown": 4
+    },
+    "audio_ready_ms_B_p50": 14763,
+    "audio_ready_ms_B_p95": 14763,
+    "audio_ready_ms_C_p50": 15473,
+    "audio_ready_ms_C_p95": 25146,
+    "llm_ms_p50": 0,
+    "llm_ms_p95": 0,
+    "tts_ms_p50": 0,
+    "tts_ms_p95": 320,
+    "queue_wait_before_main_ms_p50": 1515,
+    "queue_wait_before_main_ms_p95": 12585,
+    "queue_wait_before_tts_ms_p50": 592,
+    "queue_wait_before_tts_ms_p95": 598,
+    "executor_worker_ratio": 1,
+    "tts_cache_hit_rate": 1,
+    "selfcheck_status": "FAIL",
+    "uploaded_audio_format_distribution": {
+      "mp3": 9
+    },
+    "flash_permission_denied_count": 1
+  },
+  "audit_samples": [
+    {
+      "trace_id": "47b87f2a-28eb-4dae-baca-8ff212d94937",
+      "client_build": "bench-1771586273216",
+      "server_build": "0.1.0",
+      "executor": "manual",
+      "session_id": "b61e5deb-e738-4026-96e6-64a93066daf3",
+      "event_type": "turn.accepted"
+    },
+    {
+      "trace_id": "f7eaab2b-132b-4cf6-929d-01ea28439a6e",
+      "client_build": "bench-1771586273216",
+      "server_build": "0.1.0",
+      "executor": "manual",
+      "session_id": "b61e5deb-e738-4026-96e6-64a93066daf3",
+      "event_type": "turn.accepted"
+    },
+    {
+      "trace_id": "2fece716-a113-4237-acf3-57426133b7f4",
+      "client_build": "bench-1771586273216",
+      "server_build": "0.1.0",
+      "executor": "manual",
+      "session_id": "b61e5deb-e738-4026-96e6-64a93066daf3",
+      "event_type": "turn.accepted"
+    },
+    {
+      "trace_id": "b57a2f96-5e66-41d5-b3c9-e6c37bbb4ee0",
+      "client_build": "bench-1771586331599",
+      "server_build": "0.1.0",
+      "executor": "manual",
+      "session_id": "2ca7a617-57dd-43cb-8cca-7f378bbc3bdd",
+      "event_type": "turn.accepted"
+    },
+    {
+      "trace_id": "47b87f2a-28eb-4dae-baca-8ff212d94937",
+      "client_build": "bench-1771586273216",
+      "server_build": "0.1.0",
+      "executor": "worker",
+      "session_id": "b61e5deb-e738-4026-96e6-64a93066daf3",
+      "event_type": "turn.error",
+      "code": "asr_timeout"
+    },
+    {
+      "trace_id": "f7eaab2b-132b-4cf6-929d-01ea28439a6e",
+      "client_build": "bench-1771586273216",
+      "server_build": "0.1.0",
+      "executor": "worker",
+      "session_id": "b61e5deb-e738-4026-96e6-64a93066daf3",
+      "event_type": "turn.error",
+      "code": "asr_timeout"
+    }
+  ],
+  "gate_notes": {
+    "G0": "PASS: bench events include trace_id/client_build/server_build/executor; uploaded_audio_format captured in turn.accepted rows.",
+    "G1": "PASS: queue_wait_before_main_ms count=4",
+    "G2": "PASS: queue_wait_before_tts_ms count=2, tts_ms count=2",
+    "G3": "BLOCKED: selfcheck remains FAIL with 403/45000030 (asr_flash_permission_denied), no flash>=95% proof possible before permission grant."
+  }
+}

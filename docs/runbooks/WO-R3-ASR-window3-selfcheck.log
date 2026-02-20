@@ -1,0 +1,4 @@
+[ASR-SELFCHECK] FAIL flash_request_id=71ea84b4-8994-4bd8-aecf-6da7b6b50918 flash_logid=202602201921278F8C5E022192C28F560F error_code=asr_flash_permission_denied
+{"status":"FAIL","error_code":"asr_flash_permission_denied","flash_request_id":"71ea84b4-8994-4bd8-aecf-6da7b6b50918","flash_logid":"202602201921278F8C5E022192C28F560F","appid_last4":"8764","resource_id":"volc.bigasr.auc_turbo","occurred_at":"2026-02-20T11:21:26.895Z","environment":"unknown","http_status":403,"api_status":"45000030","api_code":null,"message":"[resource_id=volc.bigasr.auc_turbo] requested resource not granted","operation_hint":"需要在控制台开通 volc.bigasr.auc_turbo 权限"}
+[ASR-HEALTH] {"check":"asr_flash_selfcheck","status":"FAIL","flash_request_id":"71ea84b4-8994-4bd8-aecf-6da7b6b50918","flash_logid":"202602201921278F8C5E022192C28F560F","resource_id":"volc.bigasr.auc_turbo","occurred_at":"2026-02-20T11:21:26.895Z","environment":"unknown"}
+操作提示：需要在控制台开通 volc.bigasr.auc_turbo 权限

@@ -1,0 +1,73 @@
+{
+  "generated_at": "2026-02-20T11:22:37.209Z",
+  "bench_label": "WO-R3-ASR-A",
+  "client_build": "bench-1771586273216",
+  "server_build": "0.1.0",
+  "session_id": "b61e5deb-e738-4026-96e6-64a93066daf3",
+  "rounds": 3,
+  "events_count": 3,
+  "events_type_distribution": {
+    "turn.error": 3
+  },
+  "asr_provider_distribution": {
+    "auc": 3
+  },
+  "error_code_distribution": {
+    "asr_timeout": 3
+  },
+  "audio_ready_ms": {
+    "count": 0,
+    "p50": null,
+    "p95": null
+  },
+  "llm_ms": {
+    "count": 0,
+    "p50": null,
+    "p95": null
+  },
+  "tts_ms": {
+    "count": 0,
+    "p50": null,
+    "p95": null
+  },
+  "queue_wait_before_main_ms": {
+    "count": 0,
+    "p50": null,
+    "p95": null
+  },
+  "queue_wait_before_tts_ms": {
+    "count": 0,
+    "p50": null,
+    "p95": null
+  },
+  "tts_cache_hit_rate": null,
+  "audit_samples": [
+    {
+      "type": "turn.error",
+      "trace_id": "47b87f2a-28eb-4dae-baca-8ff212d94937",
+      "client_build": "bench-1771586273216",
+      "server_build": "0.1.0",
+      "executor": "worker",
+      "code": "asr_timeout",
+      "flash_logid": null
+    },
+    {
+      "type": "turn.error",
+      "trace_id": "f7eaab2b-132b-4cf6-929d-01ea28439a6e",
+      "client_build": "bench-1771586273216",
+      "server_build": "0.1.0",
+      "executor": "worker",
+      "code": "asr_timeout",
+      "flash_logid": null
+    },
+    {
+      "type": "turn.error",
+      "trace_id": "f7eaab2b-132b-4cf6-929d-01ea28439a6e",
+      "client_build": "bench-1771586273216",
+      "server_build": "0.1.0",
+      "executor": "worker",
+      "code": "asr_timeout",
+      "flash_logid": null
+    }
+  ]
+}

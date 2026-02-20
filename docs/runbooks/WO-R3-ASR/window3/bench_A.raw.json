@@ -1,0 +1,347 @@
+{
+  "startedAt": "2026-02-20T11:17:53.217Z",
+  "benchLabel": "WO-R3-ASR-A",
+  "clientBuild": "bench-1771586273216",
+  "runAnalysis": false,
+  "client_build": "bench-1771586273216",
+  "models": {
+    "llmProvider": "doubao",
+    "textModel": "doubao-seed-1-6-flash-250828",
+    "fastModel": "doubao-seed-1-6-flash-250828",
+    "analysisModel": "doubao-seed-1-6-flash-250828",
+    "ttsVoiceType": "zh_female_vv_uranus_bigtts",
+    "asrFlashResourceId": "volc.bigasr.auc_turbo",
+    "asrAucResourceId": "volc.seedasr.auc"
+  },
+  "rounds": [
+    {
+      "roundNo": 1,
+      "inputText": "我理解您的顾虑，关于安全我们会先做评估，再根据体质调整手法。",
+      "ttsInputElapsedMs": 1512,
+      "ttsVoiceType": "zh_female_vv_uranus_bigtts",
+      "submitStatus": 200,
+      "submitElapsedMs": 3877,
+      "submitJobId": "2cf241c5-0acb-4ff5-9627-b2bdffdaf1ed",
+      "submitAcceptedTurnId": "4ffdecf0-2694-4ea0-b8c4-5246c380ed0e",
+      "serverAdvanced": false,
+      "serverAdvancedStage": "main_pending",
+      "events": [
+        {
+          "id": 468,
+          "type": "turn.error",
+          "turn_id": "4ffdecf0-2694-4ea0-b8c4-5246c380ed0e",
+          "stage_elapsed_ms": null,
+          "asr_provider": "auc",
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_outcome": "failed",
+          "asr_fallback_used": null,
+          "asr_ms": null,
+          "asr_ready_ms": null,
+          "asr_queue_wait_ms": null,
+          "script_select_ms": null,
+          "llm_ms": null,
+          "text_ready_ms": null,
+          "tts_ms": null,
+          "queue_wait_before_main_ms": null,
+          "queue_wait_before_tts_ms": null,
+          "queue_wait_before_tts_valid": null,
+          "queue_wait_before_tts_source": null,
+          "tts_source": null,
+          "tts_cache_hit": null,
+          "tts_failed": null,
+          "trace_id": "47b87f2a-28eb-4dae-baca-8ff212d94937",
+          "executor": "worker",
+          "client_build": "bench-1771586273216",
+          "server_build": "0.1.0",
+          "flash_logid": null,
+          "code": "asr_timeout",
+          "message": "语音识别超时，请重录并靠近麦克风。"
+        }
+      ],
+      "polls": [
+        {
+          "atMs": 1875,
+          "elapsedMs": 1875,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 462,
+          "cursorAfter": 462
+        },
+        {
+          "atMs": 3736,
+          "elapsedMs": 1861,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 462,
+          "cursorAfter": 462
+        },
+        {
+          "atMs": 5634,
+          "elapsedMs": 1898,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 462,
+          "cursorAfter": 462
+        },
+        {
+          "atMs": 7961,
+          "elapsedMs": 2327,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 462,
+          "cursorAfter": 462
+        },
+        {
+          "atMs": 9867,
+          "elapsedMs": 1906,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 462,
+          "cursorAfter": 462
+        },
+        {
+          "atMs": 11719,
+          "elapsedMs": 1851,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 462,
+          "cursorAfter": 462
+        },
+        {
+          "atMs": 13557,
+          "elapsedMs": 1838,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 462,
+          "cursorAfter": 462
+        },
+        {
+          "atMs": 15408,
+          "elapsedMs": 1851,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 462,
+          "cursorAfter": 462
+        },
+        {
+          "atMs": 17277,
+          "elapsedMs": 1869,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 462,
+          "cursorAfter": 462
+        },
+        {
+          "atMs": 18184,
+          "elapsedMs": 907,
+          "status": 200,
+          "eventsCount": 1,
+          "cursorBefore": 462,
+          "cursorAfter": 468
+        }
+      ],
+      "errors": [],
+      "analysis": null
+    },
+    {
+      "roundNo": 2,
+      "inputText": "价格方面我可以给您拆解价值：资质流程、产品等级和后续跟踪服务。",
+      "ttsInputElapsedMs": 1587,
+      "ttsVoiceType": "zh_female_vv_uranus_bigtts",
+      "submitStatus": 200,
+      "submitElapsedMs": 4893,
+      "submitJobId": "1a98dd45-8660-42d1-88eb-1591cf32e20a",
+      "submitAcceptedTurnId": "3b6a26bd-989d-4b1c-8e41-ec5619116365",
+      "serverAdvanced": false,
+      "serverAdvancedStage": "main_pending",
+      "events": [
+        {
+          "id": 479,
+          "type": "turn.error",
+          "turn_id": "3b6a26bd-989d-4b1c-8e41-ec5619116365",
+          "stage_elapsed_ms": null,
+          "asr_provider": "auc",
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_outcome": "failed",
+          "asr_fallback_used": null,
+          "asr_ms": null,
+          "asr_ready_ms": null,
+          "asr_queue_wait_ms": null,
+          "script_select_ms": null,
+          "llm_ms": null,
+          "text_ready_ms": null,
+          "tts_ms": null,
+          "queue_wait_before_main_ms": null,
+          "queue_wait_before_tts_ms": null,
+          "queue_wait_before_tts_valid": null,
+          "queue_wait_before_tts_source": null,
+          "tts_source": null,
+          "tts_cache_hit": null,
+          "tts_failed": null,
+          "trace_id": "f7eaab2b-132b-4cf6-929d-01ea28439a6e",
+          "executor": "worker",
+          "client_build": "bench-1771586273216",
+          "server_build": "0.1.0",
+          "flash_logid": null,
+          "code": "asr_timeout",
+          "message": "语音识别超时，请重录并靠近麦克风。"
+        }
+      ],
+      "polls": [
+        {
+          "atMs": 1878,
+          "elapsedMs": 1878,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 473,
+          "cursorAfter": 473
+        },
+        {
+          "atMs": 3742,
+          "elapsedMs": 1864,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 473,
+          "cursorAfter": 473
+        },
+        {
+          "atMs": 5594,
+          "elapsedMs": 1852,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 473,
+          "cursorAfter": 473
+        },
+        {
+          "atMs": 7472,
+          "elapsedMs": 1878,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 473,
+          "cursorAfter": 473
+        },
+        {
+          "atMs": 9310,
+          "elapsedMs": 1838,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 473,
+          "cursorAfter": 473
+        },
+        {
+          "atMs": 11169,
+          "elapsedMs": 1859,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 473,
+          "cursorAfter": 473
+        },
+        {
+          "atMs": 13035,
+          "elapsedMs": 1866,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 473,
+          "cursorAfter": 473
+        },
+        {
+          "atMs": 13947,
+          "elapsedMs": 912,
+          "status": 200,
+          "eventsCount": 1,
+          "cursorBefore": 473,
+          "cursorAfter": 479
+        }
+      ],
+      "errors": [],
+      "analysis": null
+    },
+    {
+      "roundNo": 3,
+      "inputText": "如果您愿意，我先给您看和您情况接近的真实案例，再决定下一步。",
+      "ttsInputElapsedMs": 1236,
+      "ttsVoiceType": "zh_female_vv_uranus_bigtts",
+      "submitStatus": 200,
+      "submitElapsedMs": 4279,
+      "submitJobId": "c530a079-2955-4bb4-969e-e679ac3c97bb",
+      "submitAcceptedTurnId": "779c4a2a-42cf-4b08-b911-58f940304d79",
+      "serverAdvanced": false,
+      "serverAdvancedStage": "main_pending",
+      "events": [
+        {
+          "id": 481,
+          "type": "turn.error",
+          "turn_id": "3b6a26bd-989d-4b1c-8e41-ec5619116365",
+          "stage_elapsed_ms": null,
+          "asr_provider": "auc",
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_outcome": "failed",
+          "asr_fallback_used": null,
+          "asr_ms": null,
+          "asr_ready_ms": null,
+          "asr_queue_wait_ms": null,
+          "script_select_ms": null,
+          "llm_ms": null,
+          "text_ready_ms": null,
+          "tts_ms": null,
+          "queue_wait_before_main_ms": null,
+          "queue_wait_before_tts_ms": null,
+          "queue_wait_before_tts_valid": null,
+          "queue_wait_before_tts_source": null,
+          "tts_source": null,
+          "tts_cache_hit": null,
+          "tts_failed": null,
+          "trace_id": "f7eaab2b-132b-4cf6-929d-01ea28439a6e",
+          "executor": "worker",
+          "client_build": "bench-1771586273216",
+          "server_build": "0.1.0",
+          "flash_logid": null,
+          "code": "asr_timeout",
+          "message": "语音识别超时，请重录并靠近麦克风。"
+        }
+      ],
+      "polls": [
+        {
+          "atMs": 888,
+          "elapsedMs": 888,
+          "status": 200,
+          "eventsCount": 1,
+          "cursorBefore": 480,
+          "cursorAfter": 481
+        }
+      ],
+      "errors": [],
+      "analysis": null
+    }
+  ],
+  "warnings": [],
+  "serverBuilds": [
+    "0.1.0"
+  ],
+  "user": {
+    "id": "1ffb65d1-278e-45e5-949f-63145dff6d3d",
+    "email": "voicecoach.bench.1771586273217.e826d77e@ipgongchang.xin",
+    "createElapsedMs": 561,
+    "loginElapsedMs": 388
+  },
+  "createSession": {
+    "status": 200,
+    "elapsedMs": 2082,
+    "firstTurnSource": "seed_fixed",
+    "firstTurnHasAudio": true,
+    "firstTurnAudioSeconds": 4,
+    "sessionId": "b61e5deb-e738-4026-96e6-64a93066daf3",
+    "responseError": null
+  },
+  "server_build": "0.1.0",
+  "finishedAt": "2026-02-20T11:18:46.655Z"
+}

@@ -1,0 +1,459 @@
+{
+  "startedAt": "2026-02-20T11:18:51.600Z",
+  "benchLabel": "WO-R3-ASR-B",
+  "clientBuild": "bench-1771586331599",
+  "runAnalysis": false,
+  "client_build": "bench-1771586331599",
+  "models": {
+    "llmProvider": "doubao",
+    "textModel": "doubao-seed-1-6-flash-250828",
+    "fastModel": "doubao-seed-1-6-flash-250828",
+    "analysisModel": "doubao-seed-1-6-flash-250828",
+    "ttsVoiceType": "zh_female_vv_uranus_bigtts",
+    "asrFlashResourceId": "volc.bigasr.auc_turbo",
+    "asrAucResourceId": "volc.seedasr.auc"
+  },
+  "rounds": [
+    {
+      "roundNo": 1,
+      "inputText": "我理解您的顾虑，关于安全我们会先做评估，再根据体质调整手法。",
+      "ttsInputElapsedMs": 1424,
+      "ttsVoiceType": "zh_female_vv_uranus_bigtts",
+      "submitStatus": 200,
+      "submitElapsedMs": 4496,
+      "submitJobId": "24d9bd4e-ce90-4127-bb5c-b13fc7d0ec5d",
+      "submitAcceptedTurnId": "f5d6b46e-063c-46e0-804a-86b99628eecc",
+      "serverAdvanced": false,
+      "serverAdvancedStage": "main_pending",
+      "events": [
+        {
+          "id": 492,
+          "type": "turn.error",
+          "turn_id": "f5d6b46e-063c-46e0-804a-86b99628eecc",
+          "stage_elapsed_ms": null,
+          "asr_provider": "auc",
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_outcome": "failed",
+          "asr_fallback_used": null,
+          "asr_ms": null,
+          "asr_ready_ms": null,
+          "asr_queue_wait_ms": null,
+          "script_select_ms": null,
+          "llm_ms": null,
+          "text_ready_ms": null,
+          "tts_ms": null,
+          "queue_wait_before_main_ms": null,
+          "queue_wait_before_tts_ms": null,
+          "queue_wait_before_tts_valid": null,
+          "queue_wait_before_tts_source": null,
+          "tts_source": null,
+          "tts_cache_hit": null,
+          "tts_failed": null,
+          "trace_id": "de2abfc8-63f7-4703-94b7-137ed903bdb3",
+          "executor": "worker",
+          "client_build": "bench-1771586331599",
+          "server_build": "0.1.0",
+          "flash_logid": null,
+          "code": "asr_timeout",
+          "message": "语音识别超时，请重录并靠近麦克风。"
+        }
+      ],
+      "polls": [
+        {
+          "atMs": 1932,
+          "elapsedMs": 1932,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 485,
+          "cursorAfter": 485
+        },
+        {
+          "atMs": 3758,
+          "elapsedMs": 1826,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 485,
+          "cursorAfter": 485
+        },
+        {
+          "atMs": 5608,
+          "elapsedMs": 1850,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 485,
+          "cursorAfter": 485
+        },
+        {
+          "atMs": 7432,
+          "elapsedMs": 1824,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 485,
+          "cursorAfter": 485
+        },
+        {
+          "atMs": 9363,
+          "elapsedMs": 1931,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 485,
+          "cursorAfter": 485
+        },
+        {
+          "atMs": 11210,
+          "elapsedMs": 1847,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 485,
+          "cursorAfter": 485
+        },
+        {
+          "atMs": 13075,
+          "elapsedMs": 1865,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 485,
+          "cursorAfter": 485
+        },
+        {
+          "atMs": 14967,
+          "elapsedMs": 1892,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 485,
+          "cursorAfter": 485
+        },
+        {
+          "atMs": 15868,
+          "elapsedMs": 901,
+          "status": 200,
+          "eventsCount": 1,
+          "cursorBefore": 485,
+          "cursorAfter": 492
+        }
+      ],
+      "errors": [],
+      "analysis": null
+    },
+    {
+      "roundNo": 2,
+      "inputText": "价格方面我可以给您拆解价值：资质流程、产品等级和后续跟踪服务。",
+      "ttsInputElapsedMs": 1556,
+      "ttsVoiceType": "zh_female_vv_uranus_bigtts",
+      "submitStatus": 200,
+      "submitElapsedMs": 4523,
+      "submitJobId": "928dd3c8-1c05-41f7-8ce8-cc60ade90829",
+      "submitAcceptedTurnId": "5f3b34c2-b8a2-40e4-998f-63ed905530f4",
+      "serverAdvanced": false,
+      "serverAdvancedStage": "main_pending",
+      "events": [
+        {
+          "id": 498,
+          "type": "turn.error",
+          "turn_id": "5f3b34c2-b8a2-40e4-998f-63ed905530f4",
+          "stage_elapsed_ms": null,
+          "asr_provider": "auc",
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_outcome": "failed",
+          "asr_fallback_used": null,
+          "asr_ms": null,
+          "asr_ready_ms": null,
+          "asr_queue_wait_ms": null,
+          "script_select_ms": null,
+          "llm_ms": null,
+          "text_ready_ms": null,
+          "tts_ms": null,
+          "queue_wait_before_main_ms": null,
+          "queue_wait_before_tts_ms": null,
+          "queue_wait_before_tts_valid": null,
+          "queue_wait_before_tts_source": null,
+          "tts_source": null,
+          "tts_cache_hit": null,
+          "tts_failed": null,
+          "trace_id": "b6293d85-86e5-4c94-9862-11dfa49ebc56",
+          "executor": "worker",
+          "client_build": "bench-1771586331599",
+          "server_build": "0.1.0",
+          "flash_logid": null,
+          "code": "asr_timeout",
+          "message": "语音识别超时，请重录并靠近麦克风。"
+        }
+      ],
+      "polls": [
+        {
+          "atMs": 1833,
+          "elapsedMs": 1833,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 494,
+          "cursorAfter": 494
+        },
+        {
+          "atMs": 3706,
+          "elapsedMs": 1873,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 494,
+          "cursorAfter": 494
+        },
+        {
+          "atMs": 5538,
+          "elapsedMs": 1832,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 494,
+          "cursorAfter": 494
+        },
+        {
+          "atMs": 7391,
+          "elapsedMs": 1853,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 494,
+          "cursorAfter": 494
+        },
+        {
+          "atMs": 9208,
+          "elapsedMs": 1817,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 494,
+          "cursorAfter": 494
+        },
+        {
+          "atMs": 11041,
+          "elapsedMs": 1833,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 494,
+          "cursorAfter": 494
+        },
+        {
+          "atMs": 11934,
+          "elapsedMs": 893,
+          "status": 200,
+          "eventsCount": 1,
+          "cursorBefore": 494,
+          "cursorAfter": 498
+        }
+      ],
+      "errors": [],
+      "analysis": null
+    },
+    {
+      "roundNo": 3,
+      "inputText": "如果您愿意，我先给您看和您情况接近的真实案例，再决定下一步。",
+      "ttsInputElapsedMs": 1810,
+      "ttsVoiceType": "zh_female_vv_uranus_bigtts",
+      "submitStatus": 200,
+      "submitElapsedMs": 4120,
+      "submitJobId": "b51ca7b8-e2ad-4dce-9391-f5b309e8e64c",
+      "submitAcceptedTurnId": "e7a55e45-85cc-4f85-8e13-e15f5a5a5251",
+      "serverAdvanced": false,
+      "serverAdvancedStage": "main_pending",
+      "events": [
+        {
+          "id": 506,
+          "type": "beautician.asr_ready",
+          "turn_id": "e7a55e45-85cc-4f85-8e13-e15f5a5a5251",
+          "stage_elapsed_ms": 11437,
+          "asr_provider": "auc",
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_outcome": "fallback_success",
+          "asr_fallback_used": true,
+          "asr_ms": 5229,
+          "asr_ready_ms": 7106,
+          "asr_queue_wait_ms": 1877,
+          "script_select_ms": null,
+          "llm_ms": null,
+          "text_ready_ms": null,
+          "tts_ms": null,
+          "queue_wait_before_main_ms": 1877,
+          "queue_wait_before_tts_ms": null,
+          "queue_wait_before_tts_valid": null,
+          "queue_wait_before_tts_source": null,
+          "tts_source": null,
+          "tts_cache_hit": null,
+          "tts_failed": null,
+          "trace_id": "f7e1076d-9616-44b8-9002-703270bab1a3",
+          "executor": "worker",
+          "client_build": "bench-1771586331599",
+          "server_build": "0.1.0",
+          "flash_logid": null,
+          "code": null,
+          "message": null
+        },
+        {
+          "id": 508,
+          "type": "customer.text_ready",
+          "turn_id": "dab63fbf-d1bd-41e5-95a0-215293478f38",
+          "stage_elapsed_ms": 13288,
+          "asr_provider": null,
+          "asr_provider_attempted": null,
+          "asr_provider_final": null,
+          "asr_outcome": null,
+          "asr_fallback_used": null,
+          "asr_ms": 5229,
+          "asr_ready_ms": null,
+          "asr_queue_wait_ms": null,
+          "script_select_ms": 295,
+          "llm_ms": 0,
+          "text_ready_ms": 295,
+          "tts_ms": null,
+          "queue_wait_before_main_ms": 1877,
+          "queue_wait_before_tts_ms": null,
+          "queue_wait_before_tts_valid": null,
+          "queue_wait_before_tts_source": null,
+          "tts_source": null,
+          "tts_cache_hit": null,
+          "tts_failed": null,
+          "trace_id": "f7e1076d-9616-44b8-9002-703270bab1a3",
+          "executor": "worker",
+          "client_build": "bench-1771586331599",
+          "server_build": "0.1.0",
+          "flash_logid": null,
+          "code": null,
+          "message": null
+        },
+        {
+          "id": 509,
+          "type": "customer.audio_ready",
+          "turn_id": "dab63fbf-d1bd-41e5-95a0-215293478f38",
+          "stage_elapsed_ms": 14763,
+          "asr_provider": null,
+          "asr_provider_attempted": null,
+          "asr_provider_final": null,
+          "asr_outcome": null,
+          "asr_fallback_used": null,
+          "asr_ms": 5229,
+          "asr_ready_ms": null,
+          "asr_queue_wait_ms": null,
+          "script_select_ms": null,
+          "llm_ms": 0,
+          "text_ready_ms": null,
+          "tts_ms": 0,
+          "queue_wait_before_main_ms": null,
+          "queue_wait_before_tts_ms": 585,
+          "queue_wait_before_tts_valid": true,
+          "queue_wait_before_tts_source": "tts_queued_at_ms",
+          "tts_source": "line_cache",
+          "tts_cache_hit": true,
+          "tts_failed": false,
+          "trace_id": "f7e1076d-9616-44b8-9002-703270bab1a3",
+          "executor": "worker",
+          "client_build": "bench-1771586331599",
+          "server_build": "0.1.0",
+          "flash_logid": null,
+          "code": null,
+          "message": null
+        }
+      ],
+      "polls": [
+        {
+          "atMs": 1832,
+          "elapsedMs": 1832,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 502,
+          "cursorAfter": 502
+        },
+        {
+          "atMs": 3668,
+          "elapsedMs": 1835,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 502,
+          "cursorAfter": 502
+        },
+        {
+          "atMs": 5512,
+          "elapsedMs": 1844,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 502,
+          "cursorAfter": 502
+        },
+        {
+          "atMs": 7368,
+          "elapsedMs": 1856,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 502,
+          "cursorAfter": 502
+        },
+        {
+          "atMs": 9224,
+          "elapsedMs": 1856,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 502,
+          "cursorAfter": 502
+        },
+        {
+          "atMs": 11073,
+          "elapsedMs": 1848,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 502,
+          "cursorAfter": 502
+        },
+        {
+          "atMs": 11958,
+          "elapsedMs": 885,
+          "status": 200,
+          "eventsCount": 1,
+          "cursorBefore": 502,
+          "cursorAfter": 506
+        },
+        {
+          "atMs": 13328,
+          "elapsedMs": 1370,
+          "status": 200,
+          "eventsCount": 1,
+          "cursorBefore": 506,
+          "cursorAfter": 508
+        },
+        {
+          "atMs": 14722,
+          "elapsedMs": 1393,
+          "status": 200,
+          "eventsCount": 1,
+          "cursorBefore": 508,
+          "cursorAfter": 509
+        }
+      ],
+      "errors": [],
+      "analysis": null
+    }
+  ],
+  "warnings": [],
+  "serverBuilds": [
+    "0.1.0"
+  ],
+  "user": {
+    "id": "1c83c7da-4440-4200-b44a-a1478eb8195b",
+    "email": "voicecoach.bench.1771586331601.8ddee2a9@ipgongchang.xin",
+    "createElapsedMs": 575,
+    "loginElapsedMs": 401
+  },
+  "createSession": {
+    "status": 200,
+    "elapsedMs": 1655,
+    "firstTurnSource": "seed_fixed",
+    "firstTurnHasAudio": true,
+    "firstTurnAudioSeconds": 3,
+    "sessionId": "b5c8264d-03cb-48e2-bb1a-02de2fe965cd",
+    "responseError": null
+  },
+  "server_build": "0.1.0",
+  "finishedAt": "2026-02-20T11:19:54.688Z"
+}
