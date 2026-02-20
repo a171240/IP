@@ -2504,9 +2504,16 @@ export async function processVoiceCoachJobById(args: {
   const claimStartedAtMs = parseIsoToMs(claimedAt) || Date.now()
   const resultStateBeforeClaim = ((job as any).result_json || {}) as VoiceCoachJobResultState
   const stageEnteredAtMsFromResult = asNumber(resultStateBeforeClaim.stage_entered_at_ms)
-  const stageEnteredAtMsForMain = stageEnteredAtMsFromResult ?? updatedAtMs ?? createdAtMs ?? Date.now()
+  // On retry/requeue, result_json.stage_entered_at_ms may be stale.
+  // Use the freshest queued timestamp as the main-stage queue anchor.
+  const queueAnchorCandidates = [stageEnteredAtMsFromResult, updatedAtMs, createdAtMs].filter(
+    (value): value is number => typeof value === "number" && Number.isFinite(value),
+  )
+  const stageEnteredAtMsForMain =
+    queueAnchorCandidates.length > 0 ? Math.max(...queueAnchorCandidates) : Date.now()
+  const stageEnteredAtMsForClaim = stage === "main_pending" ? stageEnteredAtMsForMain : stageEnteredAtMsFromResult
   const claimedResultState = mergeResult(resultStateBeforeClaim, {
-    stage_entered_at_ms: stageEnteredAtMsFromResult ?? stageEnteredAtMsForMain,
+    stage_entered_at_ms: stageEnteredAtMsForClaim ?? undefined,
     picked_at_ms: claimStartedAtMs,
     picked_at: claimedAt,
     executor,
@@ -2534,11 +2541,12 @@ export async function processVoiceCoachJobById(args: {
   const payload = (claimed.payload_json || {}) as VoiceCoachJobPayload
   const resultStateRaw = (claimed.result_json || claimedResultState || {}) as VoiceCoachJobResultState
   const claimedAtMs = claimStartedAtMs
-  const claimedStageEnteredAtMs = asNumber(resultStateRaw.stage_entered_at_ms) ?? stageEnteredAtMsForMain
+  const claimedStageEnteredAtMs =
+    asNumber(resultStateRaw.stage_entered_at_ms) ?? (stage === "main_pending" ? stageEnteredAtMsForMain : null)
   const claimQueueBaseMs = claimedStageEnteredAtMs
   const queueWaitBeforeMainMs =
     stage === "main_pending"
-      ? nonNegativeMs(claimedAtMs - claimQueueBaseMs)
+      ? nonNegativeMs(claimedAtMs - (claimQueueBaseMs ?? stageEnteredAtMsForMain))
       : nonNegativeMs(resultStateRaw.queue_wait_before_main_ms)
   const queueWaitBeforeTtsRaw = asNumber(resultStateRaw.queue_wait_before_tts_ms)
   const queueWaitBeforeTtsValidRaw =
