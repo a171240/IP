@@ -26,6 +26,12 @@ type BatchRunResult = {
       }
 }
 
+type FailureProbe = {
+  profile_url: string
+  limit: number
+  expected_error_code: string
+}
+
 function loadEnvFile(filePath: string): EnvMap {
   if (!fs.existsSync(filePath)) return {}
   const text = fs.readFileSync(filePath, "utf8")
@@ -48,7 +54,7 @@ function unwrapEnvValue(value: string): string {
   const trimmed = String(value || "").trim()
   if (!trimmed) return ""
   if (
-    (trimmed.startsWith("\"") && trimmed.endsWith("\"")) ||
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
     (trimmed.startsWith("'") && trimmed.endsWith("'"))
   ) {
     return trimmed.slice(1, -1)
@@ -63,6 +69,7 @@ function getEnv(name: string, fileEnv: EnvMap): string {
 function parseQaUrls(fileEnv: EnvMap): string[] {
   const sampleSizeRaw = Number(unwrapEnvValue(getEnv("INGEST_PROFILE_QA_SAMPLE_SIZE", fileEnv)) || "20")
   const sampleSize = Number.isFinite(sampleSizeRaw) ? Math.max(1, Math.min(100, sampleSizeRaw)) : 20
+
   const configured = unwrapEnvValue(getEnv("INGEST_PROFILE_QA_URLS", fileEnv))
   if (configured) {
     const urls = configured
@@ -72,27 +79,28 @@ function parseQaUrls(fileEnv: EnvMap): string[] {
     if (urls.length > 0) return urls.slice(0, sampleSize)
   }
 
+  // Real public profile links fallback.
   const defaults = [
-    "https://www.douyin.com/user/test_profile?modal_id=7153921902181301518",
-    "https://www.douyin.com/user/test_profile?aweme_id=7153921902181301518",
-    "https://www.douyin.com/user/test_profile?item_id=7153921902181301518",
-    "https://www.douyin.com/user/test_profile?group_id=7153921902181301518",
-    "https://www.douyin.com/user/test_profile",
-    "https://www.douyin.com/user/test_profile_2",
-    "https://www.douyin.com/user/test_profile_3",
-    "https://www.douyin.com/user/test_profile_4",
-    "https://www.douyin.com/user/test_profile_5",
-    "https://www.douyin.com/user/test_profile_6",
-    "https://www.douyin.com/user/test_profile_7",
-    "https://www.douyin.com/user/test_profile_8",
-    "https://www.douyin.com/user/test_profile_9",
-    "https://www.douyin.com/user/test_profile_10",
-    "https://www.douyin.com/user/test_profile_11",
-    "https://www.douyin.com/user/test_profile_12",
-    "https://www.douyin.com/user/test_profile_13",
-    "https://www.douyin.com/user/test_profile_14",
-    "https://www.douyin.com/user/test_profile_15",
-    "https://www.douyin.com/user/test_profile_16",
+    "https://www.douyin.com/share/user/104782115595",
+    "https://www.douyin.com/share/user/105986267876",
+    "https://www.douyin.com/share/user/108772418543",
+    "https://www.douyin.com/share/user/110541851171",
+    "https://www.douyin.com/share/user/12793315340956",
+    "https://www.douyin.com/share/user/1305874926407576",
+    "https://www.douyin.com/share/user/1754419881327491",
+    "https://www.douyin.com/share/user/1789631294342340",
+    "https://www.douyin.com/share/user/2159036820883779",
+    "https://www.douyin.com/share/user/2176643190240316",
+    "https://www.douyin.com/share/user/3003490773245207",
+    "https://www.douyin.com/share/user/3091417318308827",
+    "https://www.douyin.com/share/user/3170636073283755",
+    "https://www.douyin.com/share/user/3276184030811763",
+    "https://www.douyin.com/share/user/50103056417",
+    "https://www.douyin.com/share/user/52898476419",
+    "https://www.douyin.com/share/user/53002716926",
+    "https://www.douyin.com/share/user/57428192654",
+    "https://www.douyin.com/share/user/57499270847",
+    "https://www.douyin.com/share/user/57551123330",
   ]
 
   return defaults.slice(0, sampleSize)
@@ -184,24 +192,27 @@ async function run() {
     }
   }
 
-  const failureProbes = [
+  const failureProbes: FailureProbe[] = [
     {
       profile_url: "https://www.douyin.com/video/7153921902181301518",
       limit: 20,
+      expected_error_code: "invalid_link",
     },
     {
       profile_url: "https://www.xiaohongshu.com/explore/6412f918000000001203e260",
       limit: 20,
+      expected_error_code: "unsupported_platform",
     },
     {
       profile_url: "not-a-valid-url",
       limit: 20,
+      expected_error_code: "invalid_link",
     },
   ]
 
   const failureProbeResults: Array<{
-    request: { profile_url: string; limit: number }
-    response: { ok: false; error_code: string; message: string }
+    request: FailureProbe
+    response: { ok: false; error_code: string; message: string; expected_error_code: string; matches_expected: boolean }
   }> = []
 
   for (const probe of failureProbes) {
@@ -218,15 +229,20 @@ async function run() {
           ok: false,
           error_code: "extract_failed",
           message: "unexpected_success",
+          expected_error_code: probe.expected_error_code,
+          matches_expected: false,
         },
       })
     } catch (error) {
+      const actual = (error as { code?: string })?.code || "extract_failed"
       failureProbeResults.push({
         request: probe,
         response: {
           ok: false,
-          error_code: (error as { code?: string })?.code || "extract_failed",
+          error_code: actual,
           message: (error as { message?: string })?.message || "ingest_failed",
+          expected_error_code: probe.expected_error_code,
+          matches_expected: actual === probe.expected_error_code,
         },
       })
     }
@@ -263,7 +279,7 @@ async function run() {
   }
 
   const okRuns = batchRuns.filter((run) => run.response.ok)
-  const batchSuccessRate = Number(((okRuns.length / qaUrls.length) * 100).toFixed(1))
+  const batchSuccessRate = qaUrls.length > 0 ? Number(((okRuns.length / qaUrls.length) * 100).toFixed(1)) : 0
 
   const totalReadyItems = Array.from(batchStats.values()).reduce((sum, item) => sum + item.ready, 0)
   const totalFailedItems = Array.from(batchStats.values()).reduce((sum, item) => sum + item.failed, 0)
@@ -296,7 +312,6 @@ async function run() {
     const stat = batchStats.get(run.response.batch_id)
     return (stat?.ready || 0) === 0
   })
-
   const failureSample = failureProbeResults[0] || null
 
   const { data: readyRows, error: readyError } = await admin
@@ -305,7 +320,7 @@ async function run() {
     .eq("user_id", userId)
     .eq("status", "ready")
     .order("created_at", { ascending: false })
-    .limit(5)
+    .limit(10)
 
   if (readyError) {
     throw new Error(readyError.message || "ready_rows_query_failed")
@@ -317,7 +332,7 @@ async function run() {
     .eq("user_id", userId)
     .eq("status", "failed")
     .order("created_at", { ascending: false })
-    .limit(5)
+    .limit(10)
 
   if (failedError) {
     throw new Error(failedError.message || "failed_rows_query_failed")

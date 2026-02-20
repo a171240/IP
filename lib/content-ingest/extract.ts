@@ -468,7 +468,8 @@ function hasChallengeMarker(text: string): boolean {
 
 function buildDouyinProfileFallbackExtracted(normalized: NormalizedSource, html: string): ExtractedPayload {
   const parsed = new URL(normalized.normalized_url)
-  const profileTokenRaw = parsed.pathname.match(/\/user\/([^/?#]+)/)?.[1] || parsed.pathname.match(/\/share\/user\/([^/?#]+)/)?.[1] || ""
+  const profileTokenRaw =
+    parsed.pathname.match(/\/user\/([^/?#]+)/)?.[1] || parsed.pathname.match(/\/share\/user\/([^/?#]+)/)?.[1] || ""
   const profileToken = decodeURIComponent(profileTokenRaw)
   const profileAlias = profileToken ? profileToken.slice(0, 16) : "unknown"
 
