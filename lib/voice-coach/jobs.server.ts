@@ -1885,6 +1885,7 @@ async function processTtsStage(args: {
     const runtimeCachePath = toVoiceCoachTtsStoragePath(cacheKey, ttsVoiceType)
     const runtimeLineSignedHit = lineCacheCandidate ? getRuntimeTtsSignedUrl(lineCacheCandidate.key) : null
     const runtimeTextSignedHit = getRuntimeTtsSignedUrl(cacheKey)
+    const preferLineSource = resultState.script_hit === true && Boolean(lineCacheCandidate)
 
     if (!normalizedText) {
       ttsFailed = true
@@ -1899,7 +1900,10 @@ async function processTtsStage(args: {
         } else if (runtimeTextSignedHit) {
           audioPath = runtimeTextSignedHit.audioPath
           audioUrl = runtimeTextSignedHit.audioUrl
-          ttsSource = "text_cache"
+          ttsSource = preferLineSource ? "line_cache" : "text_cache"
+          if (preferLineSource && lineCacheCandidate) {
+            setRuntimeTtsSignedUrl(lineCacheCandidate.key, runtimeTextSignedHit.audioPath, runtimeTextSignedHit.audioUrl)
+          }
         }
 
         // 1) line_id direct cache: same (voice_type + line_id) returns URL even if text rewritten by LLM.
@@ -1938,16 +1942,22 @@ async function processTtsStage(args: {
           if (/^https?:\/\//i.test(cachedDirectUrl)) {
             audioPath = cachedPath
             audioUrl = cachedDirectUrl
-            ttsSource = "text_cache"
+            ttsSource = preferLineSource ? "line_cache" : "text_cache"
             setRuntimeTtsSignedUrl(cacheKey, cachedPath, cachedDirectUrl)
+            if (preferLineSource && lineCacheCandidate) {
+              setRuntimeTtsSignedUrl(lineCacheCandidate.key, cachedPath, cachedDirectUrl)
+            }
             void bumpVoiceCoachTtsCacheHitCount(cacheKey, cacheRow?.hit_count || 0)
           } else {
             const signed = await getSignedAudio(cachedPath)
             if (signed) {
               audioPath = cachedPath
               audioUrl = signed
-              ttsSource = "text_cache"
+              ttsSource = preferLineSource ? "line_cache" : "text_cache"
               setRuntimeTtsSignedUrl(cacheKey, cachedPath, signed)
+              if (preferLineSource && lineCacheCandidate) {
+                setRuntimeTtsSignedUrl(lineCacheCandidate.key, cachedPath, signed)
+              }
               void bumpVoiceCoachTtsCacheHitCount(cacheKey, cacheRow?.hit_count || 0)
             }
           }
@@ -1958,7 +1968,7 @@ async function processTtsStage(args: {
           audioPath = lineSeedPath
           audioUrl = await getSignedAudio(lineSeedPath)
           if (audioUrl) {
-            ttsSource = "text_cache"
+            ttsSource = preferLineSource ? "line_cache" : "text_cache"
             setRuntimeTtsSignedUrl(cacheKey, lineSeedPath, audioUrl)
             if (lineCacheCandidate) {
               setRuntimeTtsSignedUrl(lineCacheCandidate.key, lineSeedPath, audioUrl)
@@ -1993,7 +2003,7 @@ async function processTtsStage(args: {
           audioPath = runtimeCachePath
           audioUrl = await getSignedAudio(runtimeCachePath)
           if (audioUrl) {
-            ttsSource = "text_cache"
+            ttsSource = preferLineSource ? "line_cache" : "text_cache"
             setRuntimeTtsSignedUrl(cacheKey, runtimeCachePath, audioUrl)
             if (lineCacheCandidate) {
               setRuntimeTtsSignedUrl(lineCacheCandidate.key, runtimeCachePath, audioUrl)
@@ -2116,6 +2126,7 @@ async function processTtsStage(args: {
       audio_seconds: audioSeconds,
       tts_failed: ttsFailed || !audioUrl,
       text: resultState.next_customer_text || String(customerTurn.text || ""),
+      line_id: String((customerTurn as any).line_id || resultState.next_customer_line_id || "").trim() || null,
       category_id: resultState.category_id || null,
       intent_id: resultState.intent_id || null,
       angle_id: resultState.angle_id || null,

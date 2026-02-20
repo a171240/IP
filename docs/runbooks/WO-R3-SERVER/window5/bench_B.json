@@ -1,0 +1,68 @@
+{
+  "generated_at": "2026-02-20T11:33:25.748Z",
+  "bench_tag": "wo-r3-server-window5-1771587105205",
+  "rounds_requested": 8,
+  "rounds_processed": 8,
+  "errors": [],
+  "sample_counts": {
+    "audio_ready_raw": 6,
+    "asr_ready_raw": 6,
+    "audio_ready_dedup": 5,
+    "asr_ready_dedup": 5
+  },
+  "executor_worker_ratio_audio": 1,
+  "script_hit_rate": 1,
+  "tts_line_cache_hit_rate": 1,
+  "tts_cache_hit_rate": 1,
+  "tts_source_distribution": {
+    "line_cache": 5,
+    "text_cache": 0,
+    "runtime": 0
+  },
+  "llm_used_when_script_hit_count": 0,
+  "tts_ms": {
+    "p50": 293,
+    "p95": 313
+  },
+  "queue_wait_before_tts_ms": {
+    "p50": 595,
+    "p95": 622
+  },
+  "queue_wait_before_main_ms": {
+    "p50": 588,
+    "p95": 610
+  },
+  "audio_ready_ms": {
+    "p50": 12918,
+    "p95": 13913
+  },
+  "llm_ms": {
+    "p50": 0,
+    "p95": 0
+  },
+  "asr_provider": {
+    "auc": 5
+  },
+  "asr_provider_final": {
+    "auc": 5
+  },
+  "asr_outcome": {
+    "fallback_success": 5
+  },
+  "audit_samples": [
+    {
+      "id": 631,
+      "trace_id": "e76e43bd-72f4-4f4e-b68d-4dc59f5b7629",
+      "client_build": "wo-r3-server-window5-1771587105205",
+      "server_build": "0.1.0",
+      "executor": "worker"
+    },
+    {
+      "id": 636,
+      "trace_id": "993cb7c2-4ae2-4a67-87f4-94af65e594cb",
+      "client_build": "wo-r3-server-window5-1771587105205",
+      "server_build": "0.1.0",
+      "executor": "worker"
+    }
+  ]
+}

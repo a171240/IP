@@ -1,0 +1,18 @@
+{
+  "generated_at": "2026-02-20T11:34:21.845Z",
+  "library_items": 50,
+  "tts_cache_rows": 99,
+  "tts_cache_line_rows": 49,
+  "tts_cache_text_rows": 50,
+  "customer_line_ids": 32,
+  "customer_line_cache_cover": 32,
+  "customer_line_cache_cover_ratio": 1,
+  "asr_flash_selfcheck": {
+    "status": "FAIL",
+    "error_code": "asr_flash_permission_denied",
+    "flash_request_id": "0dc3aec1-f21b-4b0b-88f1-1b195d12770e",
+    "flash_logid": "20260220193421B1095B051DDAC9AF036E",
+    "appid_last4": "8764",
+    "resource_id": "volc.bigasr.auc_turbo"
+  }
+}
