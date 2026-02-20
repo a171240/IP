@@ -10,6 +10,7 @@ import {
 import { persistContentSource } from "@/lib/content-ingest/storage"
 import type { IngestErrorCode } from "@/lib/content-ingest/types"
 import { inferPlatformFromLooseUrl, normalizeSourceUrl } from "@/lib/content-ingest/url"
+import type { ExtractedPayload } from "@/lib/types/content-pipeline"
 
 type SupabaseClientForRequest = {
   from: (table: string) => {
@@ -28,6 +29,45 @@ function normalizeFailureSourceUrl(input: string): string {
   } catch {
     return "https://www.douyin.com/"
   }
+}
+
+function buildProfileAnalysisSeed(params: {
+  successfulExtracted: ExtractedPayload[]
+  fallbackItems: Array<{ source_url: string; message: string | null; error_code: IngestErrorCode | null }>
+  normalizedUrl: string
+}): ExtractedPayload[] {
+  const { successfulExtracted, fallbackItems, normalizedUrl } = params
+  if (successfulExtracted.length > 0) return successfulExtracted
+
+  const failedSeed = fallbackItems.slice(0, 20).map((item, index) => ({
+    title: `提取失败样本${index + 1}`,
+    text: item.message || "未从主页解析到作品链接",
+    images: [],
+    video_url: null,
+    author: null,
+    meta: {
+      failed: true,
+      source_url: item.source_url,
+      error_code: item.error_code || "extract_failed",
+    },
+  }))
+
+  if (failedSeed.length > 0) return failedSeed
+
+  return [
+    {
+      title: "主页导入失败样本",
+      text: "主页作品解析失败",
+      images: [],
+      video_url: null,
+      author: null,
+      meta: {
+        failed: true,
+        source_url: normalizedUrl,
+        error_code: "extract_failed",
+      },
+    },
+  ]
 }
 
 async function persistFailedRecord(opts: {
@@ -250,11 +290,16 @@ export async function ingestDouyinProfileToSources(opts: {
       hasPersistedRows = true
     }
 
-    if (successfulExtracted.length === 0) {
-      throw new IngestError("extract_failed", "主页内容提取失败")
-    }
-
-    const analysis = buildProfileAnalysis(successfulExtracted)
+    const analysisSeed = buildProfileAnalysisSeed({
+      successfulExtracted,
+      fallbackItems: extractedItems.map((item) => ({
+        source_url: normalizeFailureSourceUrl(item.source_url || normalizedUrl),
+        message: item.message,
+        error_code: item.error_code,
+      })),
+      normalizedUrl,
+    })
+    const analysis = buildProfileAnalysis(analysisSeed)
 
     return {
       batch_id: batchId,
