@@ -1,18 +1,75 @@
 {
-  "generated_at": "2026-02-20T12:10:00.000Z",
-  "scope": "client_round3_recorder_and_ui_feedback",
-  "recorder_config": {
-    "format_priority": ["mp3", "wav", "aac"],
-    "sample_rate": 16000,
-    "channels": 1
+  "generated_at": "2026-02-20T11:16:15.550Z",
+  "label": "A",
+  "source_file": "/tmp/voicecoach_e2e_1771586175550.json",
+  "session_id": "39b9254c-02d9-4fbc-a92d-41d9a75a2f7b",
+  "client_build": "bench-1771586077072",
+  "server_build": "0.1.0",
+  "rounds": 3,
+  "sample_events": 4,
+  "audit_sample_count": 4,
+  "audit_samples": [
+    {
+      "trace_id": "efca4176-c1ea-4933-a548-767dd93f3059",
+      "client_build": "bench-1771586077072",
+      "server_build": "0.1.0",
+      "executor": "worker",
+      "event_type": "beautician.asr_ready"
+    },
+    {
+      "trace_id": "efca4176-c1ea-4933-a548-767dd93f3059",
+      "client_build": "bench-1771586077072",
+      "server_build": "0.1.0",
+      "executor": "worker",
+      "event_type": "customer.text_ready"
+    },
+    {
+      "trace_id": "efca4176-c1ea-4933-a548-767dd93f3059",
+      "client_build": "bench-1771586077072",
+      "server_build": "0.1.0",
+      "executor": "worker",
+      "event_type": "customer.audio_ready"
+    },
+    {
+      "trace_id": "efca4176-c1ea-4933-a548-767dd93f3059",
+      "client_build": "bench-1771586077072",
+      "server_build": "0.1.0",
+      "executor": "worker",
+      "event_type": "customer.audio_ready"
+    }
+  ],
+  "asr_provider_distribution": {
+    "auc": 1
   },
-  "record_probe": {
+  "audio_ready_ms": {
+    "p50": 25183,
+    "p95": 25183
+  },
+  "llm_ms": {
+    "p50": 0,
+    "p95": 0
+  },
+  "tts_ms": {
+    "p50": 300,
+    "p95": 408
+  },
+  "queue_wait_before_main_ms": {
+    "p50": 20183,
+    "p95": 20183
+  },
+  "queue_wait_before_tts_ms_raw": {
+    "p50": 581,
+    "p95": 606
+  },
+  "queue_wait_before_tts_ms_corrected": {
+    "p50": 581,
+    "p95": 606,
+    "rule": "valid_only_then_fallback_raw"
+  },
+  "tts_cache_hit_rate": 1.0,
+  "client_probe": {
     "record_format": "mp3",
     "record_sample_rate": 16000,
-    "record_channels": 1
-  },
-  "ui_feedback_probe": {
-    "samples_ms": [28, 31, 29, 36, 41, 33, 27, 35, 30, 38, 42, 34],
-    "p95_ms": 42
+    "ui_feedback_p95_ms": 42
   }
 }

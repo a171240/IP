@@ -1,37 +1,77 @@
 {
-  "generated_at": "2026-02-20T11:09:48.273Z",
-  "sample_events": 60,
-  "script_hit_rate": 0,
-  "tts_line_cache_hit_rate": 0.2667,
-  "tts_cache_hit_rate": 0.45,
-  "tts_source_distribution": {
-    "line_cache": 16,
-    "text_cache": 11,
-    "runtime": 33
-  },
-  "llm_used_when_script_hit_count": 0,
-  "tts_ms": {
-    "p50": 338,
-    "p95": 2983
+  "generated_at": "2026-02-20T11:17:13.297Z",
+  "label": "B",
+  "source_file": "/tmp/voicecoach_e2e_1771586233297.json",
+  "session_id": "b9bb3a04-3d97-4cc6-9896-12a317e9ece1",
+  "client_build": "bench-1771586182720",
+  "server_build": "0.1.0",
+  "rounds": 3,
+  "sample_events": 7,
+  "audit_sample_count": 7,
+  "audit_samples": [
+    {
+      "trace_id": "ed68eb46-c18c-4c23-8944-def61c998cff",
+      "client_build": "bench-1771586182720",
+      "server_build": "0.1.0",
+      "executor": "worker",
+      "event_type": "beautician.asr_ready"
+    },
+    {
+      "trace_id": "ed68eb46-c18c-4c23-8944-def61c998cff",
+      "client_build": "bench-1771586182720",
+      "server_build": "0.1.0",
+      "executor": "worker",
+      "event_type": "customer.text_ready"
+    },
+    {
+      "trace_id": "ed68eb46-c18c-4c23-8944-def61c998cff",
+      "client_build": "bench-1771586182720",
+      "server_build": "0.1.0",
+      "executor": "worker",
+      "event_type": "customer.audio_ready"
+    },
+    {
+      "trace_id": "5ef44707-5412-4d36-9270-3542e82462eb",
+      "client_build": "bench-1771586182720",
+      "server_build": "0.1.0",
+      "executor": "worker",
+      "event_type": "beautician.asr_ready"
+    },
+    {
+      "trace_id": "5ef44707-5412-4d36-9270-3542e82462eb",
+      "client_build": "bench-1771586182720",
+      "server_build": "0.1.0",
+      "executor": "worker",
+      "event_type": "customer.text_ready"
+    }
+  ],
+  "asr_provider_distribution": {
+    "auc": 2
   },
   "audio_ready_ms": {
-    "p50": 24398,
-    "p95": 26968146
+    "p50": 5799,
+    "p95": 6461
   },
   "llm_ms": {
     "p50": 0,
-    "p95": 6003
+    "p95": 0
+  },
+  "tts_ms": {
+    "p50": 316,
+    "p95": 353
   },
   "queue_wait_before_main_ms": {
-    "p50": 5357,
-    "p95": 5647
+    "p50": 702,
+    "p95": 1025
   },
-  "queue_wait_before_tts_ms": {
-    "p50": 1496,
-    "p95": 27237291
+  "queue_wait_before_tts_ms_raw": {
+    "p50": 584,
+    "p95": 717
   },
-  "asr_provider_distribution": {
-    "auc": 57,
-    "unknown": 7
-  }
+  "queue_wait_before_tts_ms_corrected": {
+    "p50": 584,
+    "p95": 717,
+    "rule": "valid_only_then_fallback_raw"
+  },
+  "tts_cache_hit_rate": 1.0
 }

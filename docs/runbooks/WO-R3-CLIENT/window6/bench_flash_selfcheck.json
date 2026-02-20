@@ -1,0 +1,15 @@
+{
+  "status": "FAIL",
+  "error_code": "asr_flash_permission_denied",
+  "flash_request_id": "eabc1822-96c0-489f-9a11-de19ad6e6307",
+  "flash_logid": "20260220192005AB47F5E7CBFF0809282C",
+  "appid_last4": "8764",
+  "resource_id": "volc.bigasr.auc_turbo",
+  "occurred_at": "2026-02-20T11:20:05.478Z",
+  "environment": "unknown",
+  "http_status": 403,
+  "api_status": "45000030",
+  "api_code": null,
+  "message": "[resource_id=volc.bigasr.auc_turbo] requested resource not granted",
+  "operation_hint": "需要在控制台开通 volc.bigasr.auc_turbo 权限"
+}
