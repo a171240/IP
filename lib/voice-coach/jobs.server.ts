@@ -2477,8 +2477,8 @@ export async function processVoiceCoachJobById(args: {
   const lockOwner = args.lockOwner ? String(args.lockOwner).slice(0, 120) : null
   const createdAtMs = parseIsoToMs((job as any).created_at)
   const updatedAtMs = parseIsoToMs((job as any).updated_at)
-  const stageEnteredAtMs =
-    asNumber(((job as any).result_json || {})?.stage_entered_at_ms) || updatedAtMs || createdAtMs || Date.now()
+  const stageEnteredAtMsFromResult = asNumber(((job as any).result_json || {})?.stage_entered_at_ms)
+  const stageEnteredAtMsForMain = stageEnteredAtMsFromResult ?? updatedAtMs ?? createdAtMs ?? Date.now()
 
   const { data: claimed, error: claimError } = await admin
     .from("voice_coach_jobs")
@@ -2499,8 +2499,8 @@ export async function processVoiceCoachJobById(args: {
   const payload = (claimed.payload_json || {}) as VoiceCoachJobPayload
   const resultStateRaw = (claimed.result_json || {}) as VoiceCoachJobResultState
   const claimedAtMs = parseIsoToMs(claimedAt) || Date.now()
-  const claimedStageEnteredAtMs = stageEnteredAtMs || createdAtMs || updatedAtMs || claimedAtMs
-  const claimQueueBaseMs = claimedStageEnteredAtMs
+  const claimedStageEnteredAtMs = stageEnteredAtMsFromResult
+  const claimQueueBaseMs = stageEnteredAtMsForMain
   const queueWaitBeforeMainMs =
     stage === "main_pending"
       ? nonNegativeMs(claimedAtMs - claimQueueBaseMs)
@@ -2519,7 +2519,7 @@ export async function processVoiceCoachJobById(args: {
       ? calcQueueWaitBeforeTts({
           nowMs: claimedAtMs,
           ttsQueuedAtMs: asNumber(resultStateRaw.tts_queued_at_ms),
-          stageEnteredAtMs: claimedStageEnteredAtMs,
+          stageEnteredAtMs: claimedStageEnteredAtMs ?? null,
         })
       : {
           valueMs: queueWaitBeforeTtsRaw,
@@ -2532,7 +2532,7 @@ export async function processVoiceCoachJobById(args: {
     client_build: auditMeta.clientBuild,
     server_build: auditMeta.serverBuild,
     executor: auditMeta.executor,
-    stage_entered_at_ms: claimedStageEnteredAtMs,
+    stage_entered_at_ms: claimedStageEnteredAtMs ?? undefined,
     queue_wait_before_main_ms: queueWaitBeforeMainMs ?? undefined,
     queue_wait_before_tts_ms: queueWaitBeforeTts.valueMs,
     queue_wait_before_tts_valid: queueWaitBeforeTts.valid,

@@ -266,7 +266,6 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
       turn_id: turnId,
       status: "queued",
       stage: "main_pending",
-      stage_entered_at: stageEnteredAt,
       payload_json: {
         reply_to_turn_id: replyToTurnId,
         audio_format: detected.format,
