@@ -453,11 +453,21 @@ function dedupeAndClampUrls(urls: string[], limit: number): string[] {
   return out
 }
 
+function decodeJsonEscapedText(input: string): string {
+  return String(input || "")
+    .replace(/\\u002F/gi, "/")
+    .replace(/\\u003A/gi, ":")
+    .replace(/\\u0026/gi, "&")
+    .replace(/\\\//g, "/")
+}
+
 function collectNumericIdsFromHtml(html: string): string[] {
   const out = new Set<string>()
   const idPatterns = [
     /"(?:aweme_id|awemeId|item_id|itemId|group_id|groupId)"\s*:\s*"(\d{8,})"/g,
     /"(?:aweme_id|awemeId|item_id|itemId|group_id|groupId)"\s*:\s*(\d{8,})/g,
+    /\\"(?:aweme_id|awemeId|item_id|itemId|group_id|groupId)\\"\s*:\s*\\"(\d{8,})\\"/g,
+    /\\"(?:aweme_id|awemeId|item_id|itemId|group_id|groupId)\\"\s*:\s*(\d{8,})/g,
     /\\u002Fvideo\\u002F(\d{8,})/g,
     /\\\/video\\\/(\d{8,})/g,
   ]
@@ -481,13 +491,73 @@ function canonicalizeDouyinContentUrl(url: string): string {
   return normalized
 }
 
-function discoverDouyinLinksFromHtml(html: string, limit: number): string[] {
+function extractDecodedScriptContents(html: string): string[] {
+  const out = new Set<string>()
+  const scriptRegex = /<script\b[^>]*>([\s\S]*?)<\/script>/gi
+
+  for (const match of html.matchAll(scriptRegex)) {
+    const scriptText = String(match[1] || "")
+    if (!scriptText) continue
+
+    out.add(scriptText)
+    out.add(decodeJsonEscapedText(scriptText))
+
+    const encodedBlocks = scriptText.matchAll(/decodeURIComponent\("([^"]+)"\)/g)
+    for (const encoded of encodedBlocks) {
+      const encodedValue = encoded[1]
+      if (!encodedValue) continue
+      try {
+        const decoded = decodeURIComponent(encodedValue)
+        out.add(decoded)
+        out.add(decodeJsonEscapedText(decoded))
+      } catch {
+        // best effort decoding only
+      }
+    }
+  }
+
+  return Array.from(out)
+}
+
+function discoverDouyinLinksFromProfileUrl(profileUrl: string): string[] {
+  const ids = new Set<string>()
+  try {
+    const parsed = new URL(profileUrl)
+    const idKeys = ["aweme_id", "awemeId", "item_id", "itemId", "group_id", "groupId", "modal_id", "modalId"]
+
+    for (const key of idKeys) {
+      const values = parsed.searchParams.getAll(key)
+      for (const value of values) {
+        const match = String(value || "").match(/(\d{8,})/)
+        if (match?.[1]) ids.add(match[1])
+      }
+    }
+  } catch {
+    return []
+  }
+
+  return Array.from(ids).map((id) => `https://www.douyin.com/video/${id}`)
+}
+
+function discoverDouyinLinksFromHtml(profileUrls: string[], html: string, limit: number): string[] {
+  const fromProfileUrl = profileUrls.flatMap((profileUrl) => discoverDouyinLinksFromProfileUrl(profileUrl))
   const fullMatches = collectUrlsByRegex(html, /https?:\/\/(?:www\.)?douyin\.com\/(?:video|share\/video)\/\d+/gi)
   const escapedFullMatches = collectUrlsByRegex(html, /https?:\\\/\\\/(?:www\.)?douyin\.com\\\/(?:video|share\\\/video)\\\/\d+/gi)
   const shortMatches = collectUrlsByRegex(html, /https?:\/\/v\.douyin\.com\/[a-zA-Z0-9]+\/?/gi)
   const escapedShortMatches = collectUrlsByRegex(html, /https?:\\\/\\\/v\.douyin\.com\\\/[a-zA-Z0-9]+\\\/?/gi)
 
-  const numericIds = collectNumericIdsFromHtml(html)
+  const scriptContents = extractDecodedScriptContents(html)
+  const scriptFullMatches = scriptContents.flatMap((content) =>
+    collectUrlsByRegex(content, /https?:\/\/(?:www\.)?douyin\.com\/(?:video|share\/video)\/\d+/gi)
+  )
+  const scriptShortMatches = scriptContents.flatMap((content) =>
+    collectUrlsByRegex(content, /https?:\/\/v\.douyin\.com\/[a-zA-Z0-9]+\/?/gi)
+  )
+
+  const numericIds = [
+    ...collectNumericIdsFromHtml(html),
+    ...scriptContents.flatMap((content) => collectNumericIdsFromHtml(content)),
+  ]
   const byNumericId = numericIds.map((id) => `https://www.douyin.com/video/${id}`)
 
   const pathIds = Array.from(html.matchAll(/\/video\/(\d+)/g)).map((m) => `https://www.douyin.com/video/${m[1]}`)
@@ -496,10 +566,13 @@ function discoverDouyinLinksFromHtml(html: string, limit: number): string[] {
   )
 
   const merged = [
+    ...fromProfileUrl,
     ...fullMatches,
     ...escapedFullMatches,
     ...shortMatches,
     ...escapedShortMatches,
+    ...scriptFullMatches,
+    ...scriptShortMatches,
     ...byNumericId,
     ...pathIds,
     ...sharePathIds,
@@ -590,7 +663,7 @@ export async function extractDouyinProfileItemsFromNormalized(
       throw new IngestError("private_or_deleted_content", "主页内容不可访问")
     }
 
-    discoveredUrls = discoverDouyinLinksFromHtml(text, clampedLimit)
+    discoveredUrls = discoverDouyinLinksFromHtml([normalized.input_url, normalized.normalized_url], text, clampedLimit)
   } catch (error) {
     if (isIngestError(error)) throw error
     throw new IngestError("extract_failed", "主页抓取失败")
@@ -610,6 +683,7 @@ export async function extractDouyinProfileItemsFromNormalized(
           profile_url: normalized.normalized_url,
           attempted_strategies: [
             "upstream_profile_items",
+            "profile_url_query_ids",
             "html_full_video_links",
             "html_short_links",
             "html_aweme_id",
