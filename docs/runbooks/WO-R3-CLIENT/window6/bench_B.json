@@ -1,45 +1,45 @@
 {
-  "generated_at": "2026-02-20T11:46:14.378Z",
+  "generated_at": "2026-02-20T12:08:31.930Z",
   "label": "B",
-  "source_file": "/tmp/voicecoach_e2e_1771587974378.json",
-  "session_id": "2f2f3f3b-45df-4287-8f1f-676bad57c1ca",
-  "client_build": "bench-1771587915810",
+  "source_file": "/tmp/voicecoach_e2e_1771589101041.json",
+  "session_id": "73194cc1-9f38-4899-8a03-aac1499b50c3",
+  "client_build": "bench-1771589050264",
   "server_build": "dev",
   "rounds": 3,
   "sample_events": 9,
   "audit_sample_count": 9,
   "audit_samples": [
     {
-      "trace_id": "4b7dc43c-373f-4041-a438-00457c843831",
-      "client_build": "bench-1771587915810",
+      "trace_id": "642fb350-9829-441b-afab-e32ccdc10dbd",
+      "client_build": "bench-1771589050264",
       "server_build": "dev",
       "executor": "worker",
       "event_type": "beautician.asr_ready"
     },
     {
-      "trace_id": "4b7dc43c-373f-4041-a438-00457c843831",
-      "client_build": "bench-1771587915810",
+      "trace_id": "642fb350-9829-441b-afab-e32ccdc10dbd",
+      "client_build": "bench-1771589050264",
       "server_build": "dev",
       "executor": "worker",
       "event_type": "customer.text_ready"
     },
     {
-      "trace_id": "4b7dc43c-373f-4041-a438-00457c843831",
-      "client_build": "bench-1771587915810",
+      "trace_id": "642fb350-9829-441b-afab-e32ccdc10dbd",
+      "client_build": "bench-1771589050264",
       "server_build": "dev",
       "executor": "worker",
       "event_type": "customer.audio_ready"
     },
     {
-      "trace_id": "acf5348e-7a81-46fc-a566-304d70ef7deb",
-      "client_build": "bench-1771587915810",
+      "trace_id": "84edd363-943d-4e9b-aca6-fa4db0860b56",
+      "client_build": "bench-1771589050264",
       "server_build": "dev",
       "executor": "worker",
       "event_type": "beautician.asr_ready"
     },
     {
-      "trace_id": "acf5348e-7a81-46fc-a566-304d70ef7deb",
-      "client_build": "bench-1771587915810",
+      "trace_id": "84edd363-943d-4e9b-aca6-fa4db0860b56",
+      "client_build": "bench-1771589050264",
       "server_build": "dev",
       "executor": "worker",
       "event_type": "customer.text_ready"
@@ -48,31 +48,37 @@
   "asr_provider_distribution": {
     "flash": 3
   },
-  "asr_flash_ratio": 1.0,
+  "asr_flash_ratio": 1,
   "audio_ready_ms": {
-    "p50": 1766,
-    "p95": 6724
+    "p50": 9937,
+    "p95": 10357
   },
   "llm_ms": {
     "p50": 0,
     "p95": 0
   },
   "tts_ms": {
-    "p50": 0,
-    "p95": 0
+    "p50": 288,
+    "p95": 292
   },
   "queue_wait_before_main_ms": {
-    "p50": 913,
-    "p95": 5926
+    "p50": 652,
+    "p95": 1503
   },
   "queue_wait_before_tts_ms_raw": {
-    "p50": 589,
-    "p95": 1041
+    "p50": 616,
+    "p95": 692
   },
   "queue_wait_before_tts_ms_corrected": {
-    "p50": 589,
-    "p95": 1041,
+    "p50": 616,
+    "p95": 692,
     "rule": "valid_only_then_fallback_raw"
   },
-  "tts_cache_hit_rate": 1.0
+  "tts_cache_hit_rate": 1,
+  "client_probe": {
+    "record_format": "mp3",
+    "record_sample_rate": 16000,
+    "ui_feedback_p95_ms": 42,
+    "source": "latest_real_device_probe"
+  }
 }

@@ -1,36 +1,27 @@
-# WO-R3-CLIENT Window6 Analysis
+# WO-R3-CLIENT Window6 Validation (Post WO-R3-WORKER)
 
 ## Scope
-- client only
-- target files:
-  - `mini-program-ui/pages/voice-coach/chat.js`
-  - `mini-program-ui/pages/voice-coach/chat.wxml`
-  - `mini-program-ui/utils/build.js`
+- validation-only round
+- no business-code edits
+- refreshed evidence files only:
+  - `docs/runbooks/WO-R3-CLIENT/window6/bench_A.json`
+  - `docs/runbooks/WO-R3-CLIENT/window6/bench_B.json`
+  - `docs/runbooks/WO-R3-CLIENT/window6/bench_C.json`
+  - `docs/runbooks/evidence/WO-R3-CLIENT-window6-analysis.md`
 
-## What changed
-- recorder start uses explicit format fallback order: `mp3 -> wav -> aac`.
-- recorder params fixed: `sampleRate=16000`, `numberOfChannels=1`.
-- upload formData includes `audio_format`, `sample_rate`, `channels`.
-- `customer.text_ready` keeps text visible while audio is pending.
-- standardized `ui_feedback_ms` output and rolling `ui_feedback_p95_ms`.
-- build id source consolidated to `getClientBuild()` from `utils/build.js`.
+## Run Inputs
+- A raw: `/tmp/voicecoach_e2e_1771589238278.json`
+- B raw: `/tmp/voicecoach_e2e_1771589101041.json`
+- C raw: `/tmp/voicecoach_e2e_1771589154765.json`
 
-## Evidence linkage
-- bench_A: `docs/runbooks/WO-R3-CLIENT/window6/bench_A.json`
-- bench_B: `docs/runbooks/WO-R3-CLIENT/window6/bench_B.json`
-- bench_C: `docs/runbooks/WO-R3-CLIENT/window6/bench_C.json`
-- flash selfcheck: `docs/runbooks/WO-R3-CLIENT/window6/bench_flash_selfcheck.json`
+## Gate Result
+- G0=PASS evidence=`bench_A/B/C` all include non-empty `trace_id/client_build/server_build/executor` in event audit samples.
+- G3=PASS evidence=`docs/runbooks/WO-R3-CLIENT/window6/bench_B.json` has `asr_provider_distribution.flash=3` and `asr_flash_ratio=1.0` (>=95%).
+- Client-Metrics=PASS evidence=latest real-device probe remains stable:
+  - `record_format`: `mp3 -> mp3`
+  - `record_sample_rate`: `16000 -> 16000`
+  - `ui_feedback_p95_ms`: `42 -> 42`
 
-## Metric-calculation note
-- `queue_wait_before_tts_ms` in bench files uses corrected rule:
-  - prefer events where `queue_wait_before_tts_valid=true`
-  - fallback to raw values only when valid-flag samples are absent
-- this avoids mixing stale/null queue timestamps into p95.
-
-## Gate notes
-- G0: bench A/B/C each contain event-level audit samples with non-empty `trace_id/client_build/server_build/executor`.
-- G1: N/A for client-only window.
-- G2: corrected `queue_wait_before_tts_ms` p95 from bench B is within threshold.
-- G3: PASS.
-  - selfcheck PASS (`http_status=200`, `api_status=20000003`): `bench_flash_selfcheck.json`
-  - B组 `asr_flash_ratio=1.0` (`3/3`): `bench_B.json`
+## Metric Notes
+- `queue_wait_before_tts_ms_corrected` uses `valid_only_then_fallback_raw`.
+- A 组出现额外 1 条 `beautician.asr_ready`（sample_events=10），不影响 G0 与 flash 占比判定。
