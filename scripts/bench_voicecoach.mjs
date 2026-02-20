@@ -9,6 +9,7 @@ const DEVICE_ID = `bench_${BENCH_TS}`
 const CLIENT_BUILD = `bench-${BENCH_TS}`
 const BENCH_LABEL = String(process.env.BENCH_LABEL || 'default').trim() || 'default'
 const BENCH_ROUNDS = Math.max(1, Math.min(3, Number(process.env.BENCH_ROUNDS || 3) || 3))
+const EVENTS_TIMEOUT_MS = Math.max(40000, Number(process.env.BENCH_EVENTS_TIMEOUT_MS || 120000) || 120000)
 
 function loadEnv(file) {
   const raw = fs.readFileSync(file, 'utf8')
@@ -236,7 +237,7 @@ async function pollEventsUntil({ accessToken, sessionId, cursor, stopWhen, onPol
   const polls = []
   const events = []
   const started = nowMs()
-  const hardTimeoutMs = 40000
+  const hardTimeoutMs = EVENTS_TIMEOUT_MS
 
   while (nowMs() - started < hardTimeoutMs) {
     const t0 = nowMs()

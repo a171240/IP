@@ -1,0 +1,383 @@
+{
+  "generated_at": "2026-02-20T14:49:34.157Z",
+  "work_order": "WO-R4-OBS/window2",
+  "inputs": {
+    "bench_A": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R4-OBS/window2/bench_A.json",
+    "bench_B": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R4-OBS/window2/bench_B.json",
+    "bench_C": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R4-OBS/window2/bench_C.json"
+  },
+  "groups": {
+    "A": {
+      "group": "A",
+      "require_flash": true,
+      "path_mode": "flash_required",
+      "bench_label": "WO-R4-OBS-A",
+      "client_build": "bench-1771598541741",
+      "server_build": "0.1.0",
+      "rounds": 3,
+      "sample_events": 7,
+      "missing_required_count": 0,
+      "executor_distribution": {
+        "worker": 7
+      },
+      "executor_worker_ratio": 1,
+      "submit_pump_count": 0,
+      "events_pump_count": 0,
+      "asr_provider_attempted": {
+        "auc": 2
+      },
+      "asr_provider_final": {
+        "auc": 2
+      },
+      "asr_provider_final_flash_ratio": 0,
+      "queue_wait_before_tts_invalid_rate": 0,
+      "tts_cache_hit_rate": 1,
+      "stage_metrics": {
+        "submit_ack_ms": {
+          "count": 3,
+          "p50": 4817,
+          "p95": 4863
+        },
+        "asr_ready_ms": {
+          "count": 2,
+          "p50": 10842,
+          "p95": 11926
+        },
+        "text_ready_ms": {
+          "count": 2,
+          "p50": 12821,
+          "p95": 14024
+        },
+        "audio_ready_ms": {
+          "count": 2,
+          "p50": 14416,
+          "p95": 15626
+        },
+        "queue_wait_before_main_ms": {
+          "count": 2,
+          "p50": 122,
+          "p95": 154
+        },
+        "queue_wait_before_tts_ms": {
+          "count": 2,
+          "p50": 594,
+          "p95": 609
+        },
+        "llm_ms": {
+          "count": 2,
+          "p50": 0,
+          "p95": 0
+        },
+        "tts_ms": {
+          "count": 2,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "counts": {
+        "asr_ready": 2,
+        "text_ready": 2,
+        "audio_ready": 2,
+        "turn_error": 1
+      },
+      "usable": false,
+      "require_flash_pass": false,
+      "stage_metrics_complete": true,
+      "audit_samples": [
+        {
+          "trace_id": "97c83771-33d2-4fbc-8073-8adb480368a9",
+          "client_build": "bench-1771598541741",
+          "server_build": "0.1.0",
+          "executor": "worker",
+          "type": "beautician.asr_ready",
+          "flash_logid": null
+        },
+        {
+          "trace_id": "97c83771-33d2-4fbc-8073-8adb480368a9",
+          "client_build": "bench-1771598541741",
+          "server_build": "0.1.0",
+          "executor": "worker",
+          "type": "customer.text_ready",
+          "flash_logid": null
+        }
+      ]
+    },
+    "B": {
+      "group": "B",
+      "require_flash": true,
+      "path_mode": "flash_primary",
+      "bench_label": "WO-R4-OBS-B",
+      "client_build": "bench-1771598677209",
+      "server_build": "0.1.0",
+      "rounds": 3,
+      "sample_events": 5,
+      "missing_required_count": 0,
+      "executor_distribution": {
+        "worker": 5
+      },
+      "executor_worker_ratio": 1,
+      "submit_pump_count": 0,
+      "events_pump_count": 0,
+      "asr_provider_attempted": {
+        "auc": 2
+      },
+      "asr_provider_final": {
+        "auc": 2
+      },
+      "asr_provider_final_flash_ratio": 0,
+      "queue_wait_before_tts_invalid_rate": 0,
+      "tts_cache_hit_rate": 1,
+      "stage_metrics": {
+        "submit_ack_ms": {
+          "count": 3,
+          "p50": 4253,
+          "p95": 4388
+        },
+        "asr_ready_ms": {
+          "count": 2,
+          "p50": 79158,
+          "p95": 130745
+        },
+        "text_ready_ms": {
+          "count": 1,
+          "p50": 23678,
+          "p95": 23678
+        },
+        "audio_ready_ms": {
+          "count": 1,
+          "p50": 25128,
+          "p95": 25128
+        },
+        "queue_wait_before_main_ms": {
+          "count": 2,
+          "p50": 67690,
+          "p95": 120222
+        },
+        "queue_wait_before_tts_ms": {
+          "count": 1,
+          "p50": 575,
+          "p95": 575
+        },
+        "llm_ms": {
+          "count": 1,
+          "p50": 0,
+          "p95": 0
+        },
+        "tts_ms": {
+          "count": 1,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "counts": {
+        "asr_ready": 2,
+        "text_ready": 1,
+        "audio_ready": 1,
+        "turn_error": 1
+      },
+      "usable": false,
+      "require_flash_pass": false,
+      "stage_metrics_complete": true,
+      "audit_samples": [
+        {
+          "trace_id": "be60987d-109d-4d79-a6ce-9515f258af32",
+          "client_build": "bench-1771598677209",
+          "server_build": "0.1.0",
+          "executor": "worker",
+          "type": "beautician.asr_ready",
+          "flash_logid": null
+        },
+        {
+          "trace_id": "c5a1a74d-b3d3-4a7c-a8ba-88a98c37949a",
+          "client_build": "bench-1771598677209",
+          "server_build": "0.1.0",
+          "executor": "worker",
+          "type": "turn.error",
+          "flash_logid": null
+        }
+      ]
+    },
+    "C": {
+      "group": "C",
+      "require_flash": false,
+      "path_mode": "slow_path_degraded",
+      "bench_label": "WO-R4-OBS-C",
+      "client_build": "bench-1771598880871",
+      "server_build": "0.1.0",
+      "rounds": 3,
+      "sample_events": 7,
+      "missing_required_count": 0,
+      "executor_distribution": {
+        "worker": 7
+      },
+      "executor_worker_ratio": 1,
+      "submit_pump_count": 0,
+      "events_pump_count": 0,
+      "asr_provider_attempted": {
+        "auc": 2
+      },
+      "asr_provider_final": {
+        "auc": 2
+      },
+      "asr_provider_final_flash_ratio": 0,
+      "queue_wait_before_tts_invalid_rate": 0,
+      "tts_cache_hit_rate": 1,
+      "stage_metrics": {
+        "submit_ack_ms": {
+          "count": 3,
+          "p50": 4279,
+          "p95": 4782
+        },
+        "asr_ready_ms": {
+          "count": 2,
+          "p50": 18273,
+          "p95": 20491
+        },
+        "text_ready_ms": {
+          "count": 2,
+          "p50": 20044,
+          "p95": 22266
+        },
+        "audio_ready_ms": {
+          "count": 2,
+          "p50": 21532,
+          "p95": 23754
+        },
+        "queue_wait_before_main_ms": {
+          "count": 2,
+          "p50": 7006,
+          "p95": 9783
+        },
+        "queue_wait_before_tts_ms": {
+          "count": 2,
+          "p50": 599,
+          "p95": 604
+        },
+        "llm_ms": {
+          "count": 2,
+          "p50": 0,
+          "p95": 0
+        },
+        "tts_ms": {
+          "count": 2,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "counts": {
+        "asr_ready": 2,
+        "text_ready": 2,
+        "audio_ready": 2,
+        "turn_error": 1
+      },
+      "usable": false,
+      "require_flash_pass": true,
+      "stage_metrics_complete": true,
+      "audit_samples": [
+        {
+          "trace_id": "b8a58556-4853-46fa-9848-9bcca063906a",
+          "client_build": "bench-1771598880871",
+          "server_build": "0.1.0",
+          "executor": "worker",
+          "type": "beautician.asr_ready",
+          "flash_logid": null
+        },
+        {
+          "trace_id": "b8a58556-4853-46fa-9848-9bcca063906a",
+          "client_build": "bench-1771598880871",
+          "server_build": "0.1.0",
+          "executor": "worker",
+          "type": "customer.text_ready",
+          "flash_logid": null
+        }
+      ]
+    }
+  },
+  "summary": {
+    "missing_required_count_total": 0,
+    "submit_pump_count": 0,
+    "events_pump_count": 0,
+    "executor_worker_ratio": 1,
+    "asr_provider_final_flash_ratio": 0,
+    "queue_wait_before_tts_invalid_rate": 0,
+    "stage_metrics": {
+      "submit_ack_ms": {
+        "p50": 4279,
+        "p95": 4863
+      },
+      "asr_ready_ms": {
+        "p50": 18273,
+        "p95": 130745
+      },
+      "text_ready_ms": {
+        "p50": 20044,
+        "p95": 23678
+      },
+      "audio_ready_ms": {
+        "p50": 21532,
+        "p95": 25128
+      },
+      "queue_wait_before_main_ms": {
+        "p50": 7006,
+        "p95": 120222
+      },
+      "queue_wait_before_tts_ms": {
+        "p50": 594,
+        "p95": 609
+      },
+      "llm_ms": {
+        "p50": 0,
+        "p95": 0
+      },
+      "tts_ms": {
+        "p50": 0,
+        "p95": 0
+      }
+    },
+    "b_audio_ready_p50_target_ms": 8000,
+    "b_audio_ready_p50_actual_ms": 25128
+  },
+  "gates": {
+    "G0": "PASS: missing_required_count_total=0, submit_pump_count=0",
+    "G1": "FAIL: audio_ready_ms_B_p50=25128 target<=8000",
+    "G2": "PASS: stage_metric_fields_complete=true",
+    "G3": "FAIL: A_require_flash_pass=false, C_usable=false, C_path_mode=slow_path_degraded"
+  },
+  "metrics": {
+    "asr_provider_A": {
+      "auc": 2
+    },
+    "asr_provider_B": {
+      "auc": 2
+    },
+    "asr_provider_C": {
+      "auc": 2
+    },
+    "audio_ready_ms_B_p50": 25128,
+    "audio_ready_ms_B_p95": 25128,
+    "audio_ready_ms_C_p50": 21532,
+    "audio_ready_ms_C_p95": 23754,
+    "llm_ms_p50": 0,
+    "llm_ms_p95": 0,
+    "tts_ms_p50": 0,
+    "tts_ms_p95": 0,
+    "queue_wait_before_main_ms_p50": 7006,
+    "queue_wait_before_main_ms_p95": 120222,
+    "queue_wait_before_tts_ms_p50": 594,
+    "queue_wait_before_tts_ms_p95": 609,
+    "tts_cache_hit_rate": 1,
+    "executor_worker_ratio": 1,
+    "submit_pump_count": 0,
+    "events_pump_count": 0,
+    "asr_provider_final_flash_ratio": 0,
+    "queue_wait_before_tts_invalid_rate": 0,
+    "submit_ack_ms_p50": 4279,
+    "submit_ack_ms_p95": 4863,
+    "asr_ready_ms_p50": 18273,
+    "asr_ready_ms_p95": 130745,
+    "text_ready_ms_p50": 20044,
+    "text_ready_ms_p95": 23678,
+    "audio_ready_ms_p50": 21532,
+    "audio_ready_ms_p95": 25128
+  }
+}

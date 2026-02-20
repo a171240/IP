@@ -1,0 +1,715 @@
+{
+  "startedAt": "2026-02-20T14:42:21.742Z",
+  "benchLabel": "WO-R4-OBS-A",
+  "clientBuild": "bench-1771598541741",
+  "runAnalysis": false,
+  "client_build": "bench-1771598541741",
+  "models": {
+    "llmProvider": "doubao",
+    "textModel": "doubao-seed-1-6-flash-250828",
+    "fastModel": "doubao-seed-1-6-flash-250828",
+    "analysisModel": "doubao-seed-1-6-flash-250828",
+    "ttsVoiceType": "zh_female_vv_uranus_bigtts",
+    "asrFlashResourceId": "volc.bigasr.auc_turbo",
+    "asrAucResourceId": "volc.seedasr.auc"
+  },
+  "rounds": [
+    {
+      "roundNo": 1,
+      "inputText": "我理解您的顾虑，关于安全我们会先做评估，再根据体质调整手法。",
+      "ttsInputElapsedMs": 1468,
+      "ttsVoiceType": "zh_female_vv_uranus_bigtts",
+      "submitStatus": 200,
+      "submitElapsedMs": 4817,
+      "submitJobId": "f8222dfb-d057-46e4-95e2-bed655e25e01",
+      "submitAcceptedTurnId": "1d508927-e51f-49e6-a349-27281205f3cd",
+      "serverAdvanced": false,
+      "serverAdvancedStage": "main_pending",
+      "events": [
+        {
+          "id": 2489,
+          "type": "beautician.asr_ready",
+          "turn_id": "1d508927-e51f-49e6-a349-27281205f3cd",
+          "stage_elapsed_ms": 9637,
+          "asr_provider": "auc",
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_outcome": "fallback_success",
+          "asr_fallback_used": true,
+          "asr_ms": 5333,
+          "asr_ready_ms": 5419,
+          "asr_queue_wait_ms": 86,
+          "script_select_ms": null,
+          "llm_ms": null,
+          "text_ready_ms": null,
+          "tts_ms": null,
+          "queue_wait_before_main_ms": 86,
+          "queue_wait_before_tts_ms": null,
+          "queue_wait_before_tts_valid": null,
+          "queue_wait_before_tts_source": null,
+          "tts_source": null,
+          "tts_cache_hit": null,
+          "tts_failed": null,
+          "trace_id": "97c83771-33d2-4fbc-8073-8adb480368a9",
+          "executor": "worker",
+          "client_build": "bench-1771598541741",
+          "server_build": "0.1.0",
+          "flash_logid": null,
+          "code": null,
+          "message": null
+        },
+        {
+          "id": 2491,
+          "type": "customer.text_ready",
+          "turn_id": "3c7115e1-f7e6-4392-82de-b968817a6079",
+          "stage_elapsed_ms": 11483,
+          "asr_provider": null,
+          "asr_provider_attempted": null,
+          "asr_provider_final": null,
+          "asr_outcome": null,
+          "asr_fallback_used": null,
+          "asr_ms": 5333,
+          "asr_ready_ms": null,
+          "asr_queue_wait_ms": null,
+          "script_select_ms": 309,
+          "llm_ms": 0,
+          "text_ready_ms": 309,
+          "tts_ms": null,
+          "queue_wait_before_main_ms": 86,
+          "queue_wait_before_tts_ms": null,
+          "queue_wait_before_tts_valid": null,
+          "queue_wait_before_tts_source": null,
+          "tts_source": null,
+          "tts_cache_hit": null,
+          "tts_failed": null,
+          "trace_id": "97c83771-33d2-4fbc-8073-8adb480368a9",
+          "executor": "worker",
+          "client_build": "bench-1771598541741",
+          "server_build": "0.1.0",
+          "flash_logid": null,
+          "code": null,
+          "message": null
+        },
+        {
+          "id": 2492,
+          "type": "customer.audio_ready",
+          "turn_id": "3c7115e1-f7e6-4392-82de-b968817a6079",
+          "stage_elapsed_ms": 13070,
+          "asr_provider": null,
+          "asr_provider_attempted": null,
+          "asr_provider_final": null,
+          "asr_outcome": null,
+          "asr_fallback_used": null,
+          "asr_ms": 5333,
+          "asr_ready_ms": null,
+          "asr_queue_wait_ms": null,
+          "script_select_ms": null,
+          "llm_ms": 0,
+          "text_ready_ms": null,
+          "tts_ms": 0,
+          "queue_wait_before_main_ms": null,
+          "queue_wait_before_tts_ms": 577,
+          "queue_wait_before_tts_valid": true,
+          "queue_wait_before_tts_source": "tts_queued_at_ms",
+          "tts_source": "line_cache",
+          "tts_cache_hit": true,
+          "tts_failed": false,
+          "trace_id": "97c83771-33d2-4fbc-8073-8adb480368a9",
+          "executor": "worker",
+          "client_build": "bench-1771598541741",
+          "server_build": "0.1.0",
+          "flash_logid": null,
+          "code": null,
+          "message": null
+        }
+      ],
+      "polls": [
+        {
+          "atMs": 2392,
+          "elapsedMs": 2392,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2483,
+          "cursorAfter": 2483
+        },
+        {
+          "atMs": 4240,
+          "elapsedMs": 1848,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2483,
+          "cursorAfter": 2483
+        },
+        {
+          "atMs": 6147,
+          "elapsedMs": 1907,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2483,
+          "cursorAfter": 2483
+        },
+        {
+          "atMs": 8090,
+          "elapsedMs": 1943,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2483,
+          "cursorAfter": 2483
+        },
+        {
+          "atMs": 9496,
+          "elapsedMs": 1405,
+          "status": 200,
+          "eventsCount": 1,
+          "cursorBefore": 2483,
+          "cursorAfter": 2489
+        },
+        {
+          "atMs": 11386,
+          "elapsedMs": 1890,
+          "status": 200,
+          "eventsCount": 1,
+          "cursorBefore": 2489,
+          "cursorAfter": 2491
+        },
+        {
+          "atMs": 12790,
+          "elapsedMs": 1404,
+          "status": 200,
+          "eventsCount": 1,
+          "cursorBefore": 2491,
+          "cursorAfter": 2492
+        }
+      ],
+      "errors": [],
+      "analysis": null
+    },
+    {
+      "roundNo": 2,
+      "inputText": "价格方面我可以给您拆解价值：资质流程、产品等级和后续跟踪服务。",
+      "ttsInputElapsedMs": 1706,
+      "ttsVoiceType": "zh_female_vv_uranus_bigtts",
+      "submitStatus": 200,
+      "submitElapsedMs": 4305,
+      "submitJobId": "ee2351da-21a9-4280-bd39-c5da9bc434dc",
+      "submitAcceptedTurnId": "8ed568db-9169-4841-9e80-9a7a363cee1b",
+      "serverAdvanced": false,
+      "serverAdvancedStage": "main_pending",
+      "events": [
+        {
+          "id": 2520,
+          "type": "turn.error",
+          "turn_id": "8ed568db-9169-4841-9e80-9a7a363cee1b",
+          "stage_elapsed_ms": null,
+          "asr_provider": "auc",
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_outcome": "failed",
+          "asr_fallback_used": null,
+          "asr_ms": null,
+          "asr_ready_ms": null,
+          "asr_queue_wait_ms": null,
+          "script_select_ms": null,
+          "llm_ms": null,
+          "text_ready_ms": null,
+          "tts_ms": null,
+          "queue_wait_before_main_ms": null,
+          "queue_wait_before_tts_ms": null,
+          "queue_wait_before_tts_valid": null,
+          "queue_wait_before_tts_source": null,
+          "tts_source": null,
+          "tts_cache_hit": null,
+          "tts_failed": null,
+          "trace_id": "a7a84e48-3626-4854-8661-feea76bd0983",
+          "executor": "worker",
+          "client_build": "bench-1771598541741",
+          "server_build": "0.1.0",
+          "flash_logid": null,
+          "code": "asr_timeout",
+          "message": "语音识别超时，请重录并靠近麦克风。"
+        }
+      ],
+      "polls": [
+        {
+          "atMs": 1866,
+          "elapsedMs": 1866,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 3735,
+          "elapsedMs": 1869,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 5594,
+          "elapsedMs": 1859,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 7519,
+          "elapsedMs": 1925,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 9628,
+          "elapsedMs": 2108,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 11474,
+          "elapsedMs": 1846,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 13331,
+          "elapsedMs": 1857,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 15224,
+          "elapsedMs": 1893,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 17083,
+          "elapsedMs": 1859,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 19017,
+          "elapsedMs": 1934,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 20903,
+          "elapsedMs": 1886,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 22825,
+          "elapsedMs": 1922,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 24735,
+          "elapsedMs": 1910,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 26623,
+          "elapsedMs": 1888,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 28495,
+          "elapsedMs": 1872,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 30352,
+          "elapsedMs": 1856,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 32249,
+          "elapsedMs": 1897,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 34102,
+          "elapsedMs": 1853,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 36010,
+          "elapsedMs": 1907,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 38022,
+          "elapsedMs": 2012,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 39918,
+          "elapsedMs": 1896,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 41758,
+          "elapsedMs": 1840,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 43643,
+          "elapsedMs": 1885,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 45518,
+          "elapsedMs": 1875,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 47459,
+          "elapsedMs": 1941,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 49307,
+          "elapsedMs": 1848,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 51199,
+          "elapsedMs": 1892,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 53102,
+          "elapsedMs": 1903,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 54963,
+          "elapsedMs": 1861,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 56836,
+          "elapsedMs": 1873,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 58725,
+          "elapsedMs": 1889,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 60598,
+          "elapsedMs": 1873,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2499,
+          "cursorAfter": 2499
+        },
+        {
+          "atMs": 61493,
+          "elapsedMs": 895,
+          "status": 200,
+          "eventsCount": 1,
+          "cursorBefore": 2499,
+          "cursorAfter": 2520
+        }
+      ],
+      "errors": [],
+      "analysis": null
+    },
+    {
+      "roundNo": 3,
+      "inputText": "如果您愿意，我先给您看和您情况接近的真实案例，再决定下一步。",
+      "ttsInputElapsedMs": 1434,
+      "ttsVoiceType": "zh_female_vv_uranus_bigtts",
+      "submitStatus": 200,
+      "submitElapsedMs": 4868,
+      "submitJobId": "9e316e26-a18f-43fd-bd15-40d99e44ca1a",
+      "submitAcceptedTurnId": "666caebb-d506-4837-886b-610973d28e23",
+      "serverAdvanced": false,
+      "serverAdvancedStage": "main_pending",
+      "events": [
+        {
+          "id": 2532,
+          "type": "beautician.asr_ready",
+          "turn_id": "666caebb-d506-4837-886b-610973d28e23",
+          "stage_elapsed_ms": 12046,
+          "asr_provider": "auc",
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_outcome": "fallback_success",
+          "asr_fallback_used": true,
+          "asr_ms": 6413,
+          "asr_ready_ms": 6571,
+          "asr_queue_wait_ms": 158,
+          "script_select_ms": null,
+          "llm_ms": null,
+          "text_ready_ms": null,
+          "tts_ms": null,
+          "queue_wait_before_main_ms": 158,
+          "queue_wait_before_tts_ms": null,
+          "queue_wait_before_tts_valid": null,
+          "queue_wait_before_tts_source": null,
+          "tts_source": null,
+          "tts_cache_hit": null,
+          "tts_failed": null,
+          "trace_id": "c1cb0e47-58fb-4e80-b969-1ff7dc74a09c",
+          "executor": "worker",
+          "client_build": "bench-1771598541741",
+          "server_build": "0.1.0",
+          "flash_logid": null,
+          "code": null,
+          "message": null
+        },
+        {
+          "id": 2533,
+          "type": "customer.text_ready",
+          "turn_id": "31ed8053-b0dc-4dd1-bb3c-60e15fefa373",
+          "stage_elapsed_ms": 14158,
+          "asr_provider": null,
+          "asr_provider_attempted": null,
+          "asr_provider_final": null,
+          "asr_outcome": null,
+          "asr_fallback_used": null,
+          "asr_ms": 6413,
+          "asr_ready_ms": null,
+          "asr_queue_wait_ms": null,
+          "script_select_ms": 315,
+          "llm_ms": 0,
+          "text_ready_ms": 315,
+          "tts_ms": null,
+          "queue_wait_before_main_ms": 158,
+          "queue_wait_before_tts_ms": null,
+          "queue_wait_before_tts_valid": null,
+          "queue_wait_before_tts_source": null,
+          "tts_source": null,
+          "tts_cache_hit": null,
+          "tts_failed": null,
+          "trace_id": "c1cb0e47-58fb-4e80-b969-1ff7dc74a09c",
+          "executor": "worker",
+          "client_build": "bench-1771598541741",
+          "server_build": "0.1.0",
+          "flash_logid": null,
+          "code": null,
+          "message": null
+        },
+        {
+          "id": 2534,
+          "type": "customer.audio_ready",
+          "turn_id": "31ed8053-b0dc-4dd1-bb3c-60e15fefa373",
+          "stage_elapsed_ms": 15761,
+          "asr_provider": null,
+          "asr_provider_attempted": null,
+          "asr_provider_final": null,
+          "asr_outcome": null,
+          "asr_fallback_used": null,
+          "asr_ms": 6413,
+          "asr_ready_ms": null,
+          "asr_queue_wait_ms": null,
+          "script_select_ms": null,
+          "llm_ms": 0,
+          "text_ready_ms": null,
+          "tts_ms": 0,
+          "queue_wait_before_main_ms": null,
+          "queue_wait_before_tts_ms": 611,
+          "queue_wait_before_tts_valid": true,
+          "queue_wait_before_tts_source": "tts_queued_at_ms",
+          "tts_source": "line_cache",
+          "tts_cache_hit": true,
+          "tts_failed": false,
+          "trace_id": "c1cb0e47-58fb-4e80-b969-1ff7dc74a09c",
+          "executor": "worker",
+          "client_build": "bench-1771598541741",
+          "server_build": "0.1.0",
+          "flash_logid": null,
+          "code": null,
+          "message": null
+        }
+      ],
+      "polls": [
+        {
+          "atMs": 1902,
+          "elapsedMs": 1902,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2526,
+          "cursorAfter": 2526
+        },
+        {
+          "atMs": 3780,
+          "elapsedMs": 1878,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2526,
+          "cursorAfter": 2526
+        },
+        {
+          "atMs": 5663,
+          "elapsedMs": 1883,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2526,
+          "cursorAfter": 2526
+        },
+        {
+          "atMs": 7560,
+          "elapsedMs": 1897,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2526,
+          "cursorAfter": 2526
+        },
+        {
+          "atMs": 9469,
+          "elapsedMs": 1909,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2526,
+          "cursorAfter": 2526
+        },
+        {
+          "atMs": 11398,
+          "elapsedMs": 1929,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2526,
+          "cursorAfter": 2526
+        },
+        {
+          "atMs": 12289,
+          "elapsedMs": 891,
+          "status": 200,
+          "eventsCount": 1,
+          "cursorBefore": 2526,
+          "cursorAfter": 2532
+        },
+        {
+          "atMs": 14162,
+          "elapsedMs": 1873,
+          "status": 200,
+          "eventsCount": 1,
+          "cursorBefore": 2532,
+          "cursorAfter": 2533
+        },
+        {
+          "atMs": 15665,
+          "elapsedMs": 1503,
+          "status": 200,
+          "eventsCount": 1,
+          "cursorBefore": 2533,
+          "cursorAfter": 2534
+        }
+      ],
+      "errors": [],
+      "analysis": null
+    }
+  ],
+  "warnings": [],
+  "serverBuilds": [
+    "0.1.0"
+  ],
+  "user": {
+    "id": "85b1ac9c-822e-41ee-9d21-70c54472123d",
+    "email": "voicecoach.bench.1771598541743.0a19d89c@ipgongchang.xin",
+    "createElapsedMs": 539,
+    "loginElapsedMs": 385
+  },
+  "createSession": {
+    "status": 200,
+    "elapsedMs": 2524,
+    "firstTurnSource": "seed_fixed",
+    "firstTurnHasAudio": true,
+    "firstTurnAudioSeconds": 4,
+    "sessionId": "1cf5fadc-9791-4903-93ee-65c03f260ddb",
+    "responseError": null
+  },
+  "server_build": "0.1.0",
+  "finishedAt": "2026-02-20T14:44:13.740Z"
+}

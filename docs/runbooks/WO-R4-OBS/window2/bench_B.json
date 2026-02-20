@@ -1,0 +1,943 @@
+{
+  "startedAt": "2026-02-20T14:44:37.210Z",
+  "benchLabel": "WO-R4-OBS-B",
+  "clientBuild": "bench-1771598677209",
+  "runAnalysis": false,
+  "client_build": "bench-1771598677209",
+  "models": {
+    "llmProvider": "doubao",
+    "textModel": "doubao-seed-1-6-flash-250828",
+    "fastModel": "doubao-seed-1-6-flash-250828",
+    "analysisModel": "doubao-seed-1-6-flash-250828",
+    "ttsVoiceType": "zh_female_vv_uranus_bigtts",
+    "asrFlashResourceId": "volc.bigasr.auc_turbo",
+    "asrAucResourceId": "volc.seedasr.auc"
+  },
+  "rounds": [
+    {
+      "roundNo": 1,
+      "inputText": "我理解您的顾虑，关于安全我们会先做评估，再根据体质调整手法。",
+      "ttsInputElapsedMs": 1428,
+      "ttsVoiceType": "zh_female_vv_uranus_bigtts",
+      "submitStatus": 200,
+      "submitElapsedMs": 4403,
+      "submitJobId": "8a7be5bf-ff20-45a7-a916-303f120f4419",
+      "submitAcceptedTurnId": "b6806cd2-e80c-4661-949f-e73d057216c6",
+      "serverAdvanced": false,
+      "serverAdvancedStage": "main_pending",
+      "events": [],
+      "polls": [
+        {
+          "atMs": 1870,
+          "elapsedMs": 1870,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 3733,
+          "elapsedMs": 1863,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 5596,
+          "elapsedMs": 1863,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 7416,
+          "elapsedMs": 1820,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 9294,
+          "elapsedMs": 1878,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 11238,
+          "elapsedMs": 1943,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 13120,
+          "elapsedMs": 1882,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 15004,
+          "elapsedMs": 1884,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 16913,
+          "elapsedMs": 1909,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 18846,
+          "elapsedMs": 1933,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 20843,
+          "elapsedMs": 1997,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 22707,
+          "elapsedMs": 1864,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 24584,
+          "elapsedMs": 1877,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 26459,
+          "elapsedMs": 1875,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 28374,
+          "elapsedMs": 1915,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 30376,
+          "elapsedMs": 2002,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 32319,
+          "elapsedMs": 1943,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 34163,
+          "elapsedMs": 1844,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 36036,
+          "elapsedMs": 1873,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 37899,
+          "elapsedMs": 1863,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 39792,
+          "elapsedMs": 1893,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 41717,
+          "elapsedMs": 1924,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 43668,
+          "elapsedMs": 1951,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 45533,
+          "elapsedMs": 1865,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 47408,
+          "elapsedMs": 1875,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 49282,
+          "elapsedMs": 1874,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 51148,
+          "elapsedMs": 1866,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 53007,
+          "elapsedMs": 1859,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 54845,
+          "elapsedMs": 1838,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 56744,
+          "elapsedMs": 1899,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 58588,
+          "elapsedMs": 1844,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 60490,
+          "elapsedMs": 1902,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 62330,
+          "elapsedMs": 1840,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 64186,
+          "elapsedMs": 1856,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 66059,
+          "elapsedMs": 1873,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 67907,
+          "elapsedMs": 1848,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 69794,
+          "elapsedMs": 1887,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 71648,
+          "elapsedMs": 1853,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 73518,
+          "elapsedMs": 1870,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 75407,
+          "elapsedMs": 1889,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 77240,
+          "elapsedMs": 1833,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 79081,
+          "elapsedMs": 1841,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 80945,
+          "elapsedMs": 1864,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 82806,
+          "elapsedMs": 1861,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 84637,
+          "elapsedMs": 1831,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 86496,
+          "elapsedMs": 1858,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 88362,
+          "elapsedMs": 1866,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 90226,
+          "elapsedMs": 1864,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 92083,
+          "elapsedMs": 1857,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 93950,
+          "elapsedMs": 1866,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 95818,
+          "elapsedMs": 1868,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 97676,
+          "elapsedMs": 1858,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 99499,
+          "elapsedMs": 1823,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 101339,
+          "elapsedMs": 1840,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 103170,
+          "elapsedMs": 1830,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 105007,
+          "elapsedMs": 1837,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 106849,
+          "elapsedMs": 1842,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 108722,
+          "elapsedMs": 1873,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 110602,
+          "elapsedMs": 1880,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 112461,
+          "elapsedMs": 1859,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 114423,
+          "elapsedMs": 1962,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 116339,
+          "elapsedMs": 1916,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 118248,
+          "elapsedMs": 1909,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        },
+        {
+          "atMs": 120156,
+          "elapsedMs": 1908,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2544,
+          "cursorAfter": 2544
+        }
+      ],
+      "errors": [
+        {
+          "phase": "events",
+          "reason": "events_timeout"
+        }
+      ],
+      "analysis": null
+    },
+    {
+      "roundNo": 2,
+      "inputText": "价格方面我可以给您拆解价值：资质流程、产品等级和后续跟踪服务。",
+      "ttsInputElapsedMs": 1473,
+      "ttsVoiceType": "zh_female_vv_uranus_bigtts",
+      "submitStatus": 200,
+      "submitElapsedMs": 4027,
+      "submitJobId": "96a4f08c-25a6-4886-bfa2-7647be3c2f49",
+      "submitAcceptedTurnId": "461a1c0d-87e0-4ad4-ab09-4035830bf4f7",
+      "serverAdvanced": false,
+      "serverAdvancedStage": "main_pending",
+      "events": [
+        {
+          "id": 2574,
+          "type": "beautician.asr_ready",
+          "turn_id": "b6806cd2-e80c-4661-949f-e73d057216c6",
+          "stage_elapsed_ms": 136477,
+          "asr_provider": "auc",
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_outcome": "fallback_success",
+          "asr_fallback_used": true,
+          "asr_ms": 5399,
+          "asr_ready_ms": 131458,
+          "asr_queue_wait_ms": 126059,
+          "script_select_ms": null,
+          "llm_ms": null,
+          "text_ready_ms": null,
+          "tts_ms": null,
+          "queue_wait_before_main_ms": 126059,
+          "queue_wait_before_tts_ms": null,
+          "queue_wait_before_tts_valid": null,
+          "queue_wait_before_tts_source": null,
+          "tts_source": null,
+          "tts_cache_hit": null,
+          "tts_failed": null,
+          "trace_id": "be60987d-109d-4d79-a6ce-9515f258af32",
+          "executor": "worker",
+          "client_build": "bench-1771598677209",
+          "server_build": "0.1.0",
+          "flash_logid": null,
+          "code": null,
+          "message": null
+        },
+        {
+          "id": 2575,
+          "type": "turn.error",
+          "turn_id": "461a1c0d-87e0-4ad4-ab09-4035830bf4f7",
+          "stage_elapsed_ms": null,
+          "asr_provider": "auc",
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_outcome": "failed",
+          "asr_fallback_used": null,
+          "asr_ms": null,
+          "asr_ready_ms": null,
+          "asr_queue_wait_ms": null,
+          "script_select_ms": null,
+          "llm_ms": null,
+          "text_ready_ms": null,
+          "tts_ms": null,
+          "queue_wait_before_main_ms": null,
+          "queue_wait_before_tts_ms": null,
+          "queue_wait_before_tts_valid": null,
+          "queue_wait_before_tts_source": null,
+          "tts_source": null,
+          "tts_cache_hit": null,
+          "tts_failed": null,
+          "trace_id": "c5a1a74d-b3d3-4a7c-a8ba-88a98c37949a",
+          "executor": "worker",
+          "client_build": "bench-1771598677209",
+          "server_build": "0.1.0",
+          "flash_logid": null,
+          "code": "asr_timeout",
+          "message": "语音识别超时，请重录并靠近麦克风。"
+        }
+      ],
+      "polls": [
+        {
+          "atMs": 1882,
+          "elapsedMs": 1882,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2572,
+          "cursorAfter": 2572
+        },
+        {
+          "atMs": 3750,
+          "elapsedMs": 1868,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2572,
+          "cursorAfter": 2572
+        },
+        {
+          "atMs": 5622,
+          "elapsedMs": 1872,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2572,
+          "cursorAfter": 2572
+        },
+        {
+          "atMs": 7474,
+          "elapsedMs": 1852,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2572,
+          "cursorAfter": 2572
+        },
+        {
+          "atMs": 9330,
+          "elapsedMs": 1856,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2572,
+          "cursorAfter": 2572
+        },
+        {
+          "atMs": 10747,
+          "elapsedMs": 1417,
+          "status": 200,
+          "eventsCount": 1,
+          "cursorBefore": 2572,
+          "cursorAfter": 2574
+        },
+        {
+          "atMs": 11645,
+          "elapsedMs": 897,
+          "status": 200,
+          "eventsCount": 1,
+          "cursorBefore": 2574,
+          "cursorAfter": 2575
+        }
+      ],
+      "errors": [],
+      "analysis": null
+    },
+    {
+      "roundNo": 3,
+      "inputText": "如果您愿意，我先给您看和您情况接近的真实案例，再决定下一步。",
+      "ttsInputElapsedMs": 1411,
+      "ttsVoiceType": "zh_female_vv_uranus_bigtts",
+      "submitStatus": 200,
+      "submitElapsedMs": 4253,
+      "submitJobId": "1da2c06d-2773-436e-affd-89553eec7aab",
+      "submitAcceptedTurnId": "33d4e801-8d13-44c7-9753-8defdd7bf316",
+      "serverAdvanced": false,
+      "serverAdvancedStage": "main_pending",
+      "events": [
+        {
+          "id": 2587,
+          "type": "beautician.asr_ready",
+          "turn_id": "33d4e801-8d13-44c7-9753-8defdd7bf316",
+          "stage_elapsed_ms": 21839,
+          "asr_provider": "auc",
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_outcome": "fallback_success",
+          "asr_fallback_used": true,
+          "asr_ms": 7382,
+          "asr_ready_ms": 16702,
+          "asr_queue_wait_ms": 9320,
+          "script_select_ms": null,
+          "llm_ms": null,
+          "text_ready_ms": null,
+          "tts_ms": null,
+          "queue_wait_before_main_ms": 9320,
+          "queue_wait_before_tts_ms": null,
+          "queue_wait_before_tts_valid": null,
+          "queue_wait_before_tts_source": null,
+          "tts_source": null,
+          "tts_cache_hit": null,
+          "tts_failed": null,
+          "trace_id": "9e88c47c-8c95-405e-8be7-d244cc528a20",
+          "executor": "worker",
+          "client_build": "bench-1771598677209",
+          "server_build": "0.1.0",
+          "flash_logid": null,
+          "code": null,
+          "message": null
+        },
+        {
+          "id": 2588,
+          "type": "customer.text_ready",
+          "turn_id": "1509695a-3b83-4020-8403-b7f8e1aa9619",
+          "stage_elapsed_ms": 23678,
+          "asr_provider": null,
+          "asr_provider_attempted": null,
+          "asr_provider_final": null,
+          "asr_outcome": null,
+          "asr_fallback_used": null,
+          "asr_ms": 7382,
+          "asr_ready_ms": null,
+          "asr_queue_wait_ms": null,
+          "script_select_ms": 287,
+          "llm_ms": 0,
+          "text_ready_ms": 287,
+          "tts_ms": null,
+          "queue_wait_before_main_ms": 9320,
+          "queue_wait_before_tts_ms": null,
+          "queue_wait_before_tts_valid": null,
+          "queue_wait_before_tts_source": null,
+          "tts_source": null,
+          "tts_cache_hit": null,
+          "tts_failed": null,
+          "trace_id": "9e88c47c-8c95-405e-8be7-d244cc528a20",
+          "executor": "worker",
+          "client_build": "bench-1771598677209",
+          "server_build": "0.1.0",
+          "flash_logid": null,
+          "code": null,
+          "message": null
+        },
+        {
+          "id": 2589,
+          "type": "customer.audio_ready",
+          "turn_id": "1509695a-3b83-4020-8403-b7f8e1aa9619",
+          "stage_elapsed_ms": 25128,
+          "asr_provider": null,
+          "asr_provider_attempted": null,
+          "asr_provider_final": null,
+          "asr_outcome": null,
+          "asr_fallback_used": null,
+          "asr_ms": 7382,
+          "asr_ready_ms": null,
+          "asr_queue_wait_ms": null,
+          "script_select_ms": null,
+          "llm_ms": 0,
+          "text_ready_ms": null,
+          "tts_ms": 0,
+          "queue_wait_before_main_ms": null,
+          "queue_wait_before_tts_ms": 575,
+          "queue_wait_before_tts_valid": true,
+          "queue_wait_before_tts_source": "tts_queued_at_ms",
+          "tts_source": "line_cache",
+          "tts_cache_hit": true,
+          "tts_failed": false,
+          "trace_id": "9e88c47c-8c95-405e-8be7-d244cc528a20",
+          "executor": "worker",
+          "client_build": "bench-1771598677209",
+          "server_build": "0.1.0",
+          "flash_logid": null,
+          "code": null,
+          "message": null
+        }
+      ],
+      "polls": [
+        {
+          "atMs": 2002,
+          "elapsedMs": 2002,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2578,
+          "cursorAfter": 2578
+        },
+        {
+          "atMs": 3943,
+          "elapsedMs": 1940,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2578,
+          "cursorAfter": 2578
+        },
+        {
+          "atMs": 5860,
+          "elapsedMs": 1917,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2578,
+          "cursorAfter": 2578
+        },
+        {
+          "atMs": 7730,
+          "elapsedMs": 1870,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2578,
+          "cursorAfter": 2578
+        },
+        {
+          "atMs": 9578,
+          "elapsedMs": 1847,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2578,
+          "cursorAfter": 2578
+        },
+        {
+          "atMs": 11437,
+          "elapsedMs": 1859,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2578,
+          "cursorAfter": 2578
+        },
+        {
+          "atMs": 13268,
+          "elapsedMs": 1831,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2578,
+          "cursorAfter": 2578
+        },
+        {
+          "atMs": 15330,
+          "elapsedMs": 2062,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2578,
+          "cursorAfter": 2578
+        },
+        {
+          "atMs": 17343,
+          "elapsedMs": 2013,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2578,
+          "cursorAfter": 2578
+        },
+        {
+          "atMs": 19190,
+          "elapsedMs": 1847,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2578,
+          "cursorAfter": 2578
+        },
+        {
+          "atMs": 21024,
+          "elapsedMs": 1834,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 2578,
+          "cursorAfter": 2578
+        },
+        {
+          "atMs": 21934,
+          "elapsedMs": 910,
+          "status": 200,
+          "eventsCount": 1,
+          "cursorBefore": 2578,
+          "cursorAfter": 2587
+        },
+        {
+          "atMs": 23767,
+          "elapsedMs": 1833,
+          "status": 200,
+          "eventsCount": 1,
+          "cursorBefore": 2587,
+          "cursorAfter": 2588
+        },
+        {
+          "atMs": 25143,
+          "elapsedMs": 1376,
+          "status": 200,
+          "eventsCount": 1,
+          "cursorBefore": 2588,
+          "cursorAfter": 2589
+        }
+      ],
+      "errors": [],
+      "analysis": null
+    }
+  ],
+  "warnings": [],
+  "serverBuilds": [
+    "0.1.0"
+  ],
+  "user": {
+    "id": "11b01834-fd21-4793-9015-fc2786f9e551",
+    "email": "voicecoach.bench.1771598677211.39a65276@ipgongchang.xin",
+    "createElapsedMs": 526,
+    "loginElapsedMs": 391
+  },
+  "createSession": {
+    "status": 200,
+    "elapsedMs": 1712,
+    "firstTurnSource": "seed_fixed",
+    "firstTurnHasAudio": true,
+    "firstTurnAudioSeconds": 4,
+    "sessionId": "12a4aea0-99f5-4ec4-ac53-c8ddfdbc5ddf",
+    "responseError": null
+  },
+  "server_build": "0.1.0",
+  "finishedAt": "2026-02-20T14:47:33.781Z"
+}
