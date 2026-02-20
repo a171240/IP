@@ -1,0 +1,34 @@
+{
+  "generated_at": "2026-02-20T11:09:30.276Z",
+  "library_items": 50,
+  "tts_cache_rows": 99,
+  "tts_cache_line_rows": 49,
+  "tts_cache_text_rows": 50,
+  "customer_line_ids": 32,
+  "customer_line_cache_cover": 32,
+  "customer_line_cache_cover_ratio": 1,
+  "bench_db": {
+    "rounds": 100,
+    "direct_url_ratio": 1,
+    "tts_ms_avg": 299.71,
+    "tts_ms_p50": 296.44,
+    "tts_ms_p95": 316.57
+  },
+  "bench_l1": {
+    "rounds": 100,
+    "direct_url_ratio": 1,
+    "tts_ms_avg": 0.0003,
+    "tts_ms_p50": 0.0001,
+    "tts_ms_p95": 0.0033
+  },
+  "projected_main_chain": {
+    "script_hit_rate": 1,
+    "tts_line_cache_hit_rate": 1,
+    "tts_source_distribution": {
+      "line_cache": 32,
+      "text_cache": 0,
+      "runtime": 0
+    },
+    "llm_used_when_script_hit_count": 0
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "generated_at": "2026-02-20T11:10:30.115Z",
+  "simulated_rounds": 100,
+  "assumptions": {
+    "script_hit_always_true_for_line_id": true,
+    "llm_used_forced_false_on_script_hit": true
+  },
+  "script_hit_rate": 1,
+  "tts_line_cache_hit_rate": 1,
+  "tts_source_distribution": {
+    "line_cache": 100,
+    "text_cache": 0,
+    "runtime": 0
+  },
+  "llm_used_when_script_hit_count": 0
+}

@@ -998,8 +998,6 @@ async function markJobError(args: {
       last_error: args.message,
       finished_at: updatedAt,
       updated_at: updatedAt,
-      executor,
-      lock_owner: null,
     })
     .eq("id", args.jobId)
 
@@ -1064,7 +1062,6 @@ async function queueNextStage(args: {
   const keepProcessing = Boolean(args.keepProcessing)
   const updatedAt = nowIso()
   const stageEnteredAtMs = parseIsoToMs(updatedAt) || Date.now()
-  const nextLockOwner = keepProcessing && args.lockOwner ? String(args.lockOwner).slice(0, 120) : null
   const executor = normalizeExecutor(args.result?.executor || "worker")
   const nextResult = mergeResult(args.result, {
     stage_entered_at_ms: stageEnteredAtMs,
@@ -1076,9 +1073,6 @@ async function queueNextStage(args: {
       status: keepProcessing ? "processing" : "queued",
       stage: args.stage,
       updated_at: updatedAt,
-      stage_entered_at: updatedAt,
-      executor,
-      lock_owner: nextLockOwner,
       result_json: nextResult,
     })
     .eq("id", args.jobId)
@@ -1090,7 +1084,6 @@ async function finishJob(args: {
 }) {
   const admin = createAdminSupabaseClient()
   const updatedAt = nowIso()
-  const executor = normalizeExecutor(args.result?.executor || "worker")
   await admin
     .from("voice_coach_jobs")
     .update({
@@ -1098,8 +1091,6 @@ async function finishJob(args: {
       stage: "done",
       finished_at: updatedAt,
       updated_at: updatedAt,
-      executor,
-      lock_owner: null,
       result_json: args.result,
     })
     .eq("id", args.jobId)
@@ -2349,9 +2340,8 @@ export async function listVoiceCoachQueuedJobs(args?: {
 
   let query = admin
     .from("voice_coach_jobs")
-    .select("id, session_id, user_id, stage, created_at, stage_entered_at")
+    .select("id, session_id, user_id, stage, created_at")
     .eq("status", "queued")
-    .order("stage_entered_at", { ascending: true, nullsFirst: true })
     .order("created_at", { ascending: true })
     .limit(maxJobs)
 
@@ -2413,8 +2403,6 @@ export async function recoverStaleVoiceCoachProcessingJobs(args?: {
         stage: staleStage,
         last_error: "requeued_stale_processing",
         updated_at: recoveredAt,
-        stage_entered_at: recoveredAt,
-        lock_owner: null,
       })
       .eq("id", String(stale.id))
       .eq("status", "processing")
@@ -2423,6 +2411,40 @@ export async function recoverStaleVoiceCoachProcessingJobs(args?: {
   }
 
   return recovered
+}
+
+export async function recordVoiceCoachWorkerHeartbeat(args: {
+  workerId: string
+  host?: string | null
+  pid?: number | null
+  status?: "started" | "alive" | "stopped" | string
+  meta?: Record<string, unknown> | null
+}): Promise<void> {
+  const workerId = String(args.workerId || "").trim().slice(0, 120)
+  if (!workerId) return
+  const admin = createAdminSupabaseClient()
+  const heartbeatAt = nowIso()
+  const host = args.host ? String(args.host).trim().slice(0, 120) : null
+  const pid = typeof args.pid === "number" && Number.isFinite(args.pid) ? Math.max(0, Math.round(args.pid)) : null
+  const status = String(args.status || "alive").trim().slice(0, 32) || "alive"
+  const meta =
+    args.meta && typeof args.meta === "object" && !Array.isArray(args.meta) ? { ...(args.meta as Record<string, unknown>) } : {}
+  const { error } = await admin.from("voice_coach_worker_heartbeats").upsert(
+    {
+      worker_id: workerId,
+      heartbeat_at: heartbeatAt,
+      updated_at: heartbeatAt,
+      host,
+      pid,
+      status,
+      meta_json: meta,
+    },
+    {
+      onConflict: "worker_id",
+      ignoreDuplicates: false,
+    },
+  )
+  if (error) throw new Error(error.message || "voice_coach_worker_heartbeat_failed")
 }
 
 export async function processVoiceCoachJobById(args: {
@@ -2438,7 +2460,7 @@ export async function processVoiceCoachJobById(args: {
   const { data: job, error: jobError } = await admin
     .from("voice_coach_jobs")
     .select(
-      "id, session_id, user_id, turn_id, status, stage, attempt_count, payload_json, result_json, created_at, updated_at, stage_entered_at",
+      "id, session_id, user_id, turn_id, status, stage, attempt_count, payload_json, result_json, created_at, updated_at",
     )
     .eq("id", args.jobId)
     .eq("session_id", args.sessionId)
@@ -2456,12 +2478,7 @@ export async function processVoiceCoachJobById(args: {
   const createdAtMs = parseIsoToMs((job as any).created_at)
   const updatedAtMs = parseIsoToMs((job as any).updated_at)
   const stageEnteredAtMs =
-    parseIsoToMs((job as any).stage_entered_at) ||
-    asNumber(((job as any).result_json || {})?.stage_entered_at_ms) ||
-    updatedAtMs ||
-    createdAtMs ||
-    Date.now()
-  const stageEnteredAtIso = new Date(stageEnteredAtMs).toISOString()
+    asNumber(((job as any).result_json || {})?.stage_entered_at_ms) || updatedAtMs || createdAtMs || Date.now()
 
   const { data: claimed, error: claimError } = await admin
     .from("voice_coach_jobs")
@@ -2470,16 +2487,11 @@ export async function processVoiceCoachJobById(args: {
       stage,
       attempt_count: nextAttempt,
       updated_at: claimedAt,
-      picked_at: claimedAt,
-      last_picked_at: claimedAt,
-      stage_entered_at: stageEnteredAtIso,
-      executor,
-      lock_owner: lockOwner,
       last_error: null,
     })
     .eq("id", job.id)
     .eq("status", "queued")
-    .select("id, turn_id, stage, payload_json, result_json, stage_entered_at")
+    .select("id, turn_id, stage, payload_json, result_json")
     .single()
 
   if (claimError || !claimed) return { processed: false, done: false }
@@ -2487,8 +2499,7 @@ export async function processVoiceCoachJobById(args: {
   const payload = (claimed.payload_json || {}) as VoiceCoachJobPayload
   const resultStateRaw = (claimed.result_json || {}) as VoiceCoachJobResultState
   const claimedAtMs = parseIsoToMs(claimedAt) || Date.now()
-  const claimedStageEnteredAtMs =
-    parseIsoToMs((claimed as any).stage_entered_at) || stageEnteredAtMs || createdAtMs || updatedAtMs || claimedAtMs
+  const claimedStageEnteredAtMs = stageEnteredAtMs || createdAtMs || updatedAtMs || claimedAtMs
   const claimQueueBaseMs = claimedStageEnteredAtMs
   const queueWaitBeforeMainMs =
     stage === "main_pending"
