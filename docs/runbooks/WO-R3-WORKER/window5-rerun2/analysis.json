@@ -1,0 +1,225 @@
+{
+  "generated_at": "2026-02-20T12:30:57.255Z",
+  "work_order": "WO-R3-WORKER/window5-rerun2",
+  "metric_calibration": {
+    "queue_wait_before_main_ms_source": "beautician.asr_ready",
+    "queue_wait_before_tts_ms_source": "customer.audio_ready where queue_wait_before_tts_valid=true"
+  },
+  "inputs": {
+    "A": "docs/runbooks/WO-R3-WORKER/window5-rerun2/bench_A.json",
+    "B": "docs/runbooks/WO-R3-WORKER/window5-rerun2/bench_B.json",
+    "C": "docs/runbooks/WO-R3-WORKER/window5-rerun2/bench_C.json"
+  },
+  "groups": {
+    "A": {
+      "require_flash": false,
+      "sample_events": 8,
+      "rounds": 3,
+      "client_builds": [
+        "bench-1771589957524"
+      ],
+      "server_builds": [
+        "dev"
+      ],
+      "executor_distribution": {
+        "worker": 8
+      },
+      "asr_provider_attempted_distribution": {
+        "flash": 3
+      },
+      "asr_provider_final_distribution": {
+        "flash": 3
+      },
+      "asr_outcome_distribution": {
+        "success": 3
+      },
+      "asr_provider_final_flash_ratio": 1,
+      "audio_ready_ms": {
+        "p50": 8731,
+        "p95": 9431
+      },
+      "llm_ms": {
+        "p50": 0,
+        "p95": 0
+      },
+      "tts_ms": {
+        "p50": 0,
+        "p95": 1
+      },
+      "asr_ms": {
+        "p50": 826,
+        "p95": 926
+      },
+      "asr_queue_wait_ms": {
+        "p50": 894,
+        "p95": 960
+      },
+      "queue_wait_before_main_ms": {
+        "p50": 894,
+        "p95": 960,
+        "source": "beautician.asr_ready"
+      },
+      "queue_wait_before_tts_invalid_rate": 0,
+      "queue_wait_before_tts_p95_ms": 592,
+      "tts_cache_hit_rate": 1,
+      "audit_samples": [
+        {
+          "trace_id": "6893bf80-ccdc-4180-a321-5e8c04ad6c8c",
+          "client_build": "bench-1771589957524",
+          "server_build": "dev",
+          "executor": "worker",
+          "flash_logid": "20260220201929FA26338E8009D58D74E1",
+          "type": "beautician.asr_ready"
+        },
+        {
+          "trace_id": "6893bf80-ccdc-4180-a321-5e8c04ad6c8c",
+          "client_build": "bench-1771589957524",
+          "server_build": "dev",
+          "executor": "worker",
+          "flash_logid": null,
+          "type": "customer.text_ready"
+        }
+      ]
+    },
+    "B": {
+      "require_flash": true,
+      "sample_events": 8,
+      "rounds": 3,
+      "client_builds": [
+        "bench-1771590139051"
+      ],
+      "server_builds": [
+        "dev"
+      ],
+      "executor_distribution": {
+        "worker": 8
+      },
+      "asr_provider_attempted_distribution": {
+        "flash": 3
+      },
+      "asr_provider_final_distribution": {
+        "flash": 3
+      },
+      "asr_outcome_distribution": {
+        "success": 3
+      },
+      "asr_provider_final_flash_ratio": 1,
+      "audio_ready_ms": {
+        "p50": 9950,
+        "p95": 10334
+      },
+      "llm_ms": {
+        "p50": 0,
+        "p95": 0
+      },
+      "tts_ms": {
+        "p50": 297,
+        "p95": 301
+      },
+      "asr_ms": {
+        "p50": 860,
+        "p95": 860
+      },
+      "asr_queue_wait_ms": {
+        "p50": 1102,
+        "p95": 1191
+      },
+      "queue_wait_before_main_ms": {
+        "p50": 1102,
+        "p95": 1191,
+        "source": "beautician.asr_ready"
+      },
+      "queue_wait_before_tts_invalid_rate": 0,
+      "queue_wait_before_tts_p95_ms": 595,
+      "tts_cache_hit_rate": 1,
+      "audit_samples": [
+        {
+          "trace_id": "ba6666db-1619-44f5-80d6-55d9466f3ac9",
+          "client_build": "bench-1771590139051",
+          "server_build": "dev",
+          "executor": "worker",
+          "flash_logid": "20260220202234C1400F5FAC1C9B2E433D",
+          "type": "beautician.asr_ready"
+        },
+        {
+          "trace_id": "ba6666db-1619-44f5-80d6-55d9466f3ac9",
+          "client_build": "bench-1771590139051",
+          "server_build": "dev",
+          "executor": "worker",
+          "flash_logid": null,
+          "type": "customer.text_ready"
+        }
+      ]
+    },
+    "C": {
+      "require_flash": true,
+      "sample_events": 6,
+      "rounds": 3,
+      "client_builds": [
+        "bench-1771590193023"
+      ],
+      "server_builds": [
+        "dev"
+      ],
+      "executor_distribution": {
+        "worker": 6
+      },
+      "asr_provider_attempted_distribution": {
+        "flash": 2
+      },
+      "asr_provider_final_distribution": {
+        "flash": 2
+      },
+      "asr_outcome_distribution": {
+        "success": 2
+      },
+      "asr_provider_final_flash_ratio": 1,
+      "audio_ready_ms": {
+        "p50": 9214,
+        "p95": 9422
+      },
+      "llm_ms": {
+        "p50": 0,
+        "p95": 0
+      },
+      "tts_ms": {
+        "p50": 291,
+        "p95": 299
+      },
+      "asr_ms": {
+        "p50": 726,
+        "p95": 852
+      },
+      "asr_queue_wait_ms": {
+        "p50": 741,
+        "p95": 951
+      },
+      "queue_wait_before_main_ms": {
+        "p50": 741,
+        "p95": 951,
+        "source": "beautician.asr_ready"
+      },
+      "queue_wait_before_tts_invalid_rate": 0,
+      "queue_wait_before_tts_p95_ms": 580,
+      "tts_cache_hit_rate": 1,
+      "audit_samples": [
+        {
+          "trace_id": "0c5355d9-ea5e-4155-ae52-ee47f9cb1e07",
+          "client_build": "bench-1771590193023",
+          "server_build": "dev",
+          "executor": "worker",
+          "flash_logid": "202602202023254387D1F81B397339695F",
+          "type": "beautician.asr_ready"
+        },
+        {
+          "trace_id": "0c5355d9-ea5e-4155-ae52-ee47f9cb1e07",
+          "client_build": "bench-1771590193023",
+          "server_build": "dev",
+          "executor": "worker",
+          "flash_logid": null,
+          "type": "customer.text_ready"
+        }
+      ]
+    }
+  }
+}
