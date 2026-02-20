@@ -47,7 +47,15 @@ const workerConcurrency = Math.max(
     40,
   ),
 )
-const claimBurst = Math.max(1, parseNumberEnv("VOICE_COACH_WORKER_CLAIM_BURST", 4, 1, 40))
+const claimBurst = Math.max(
+  1,
+  parseNumberEnv(
+    "VOICE_COACH_WORKER_CLAIM_BURST",
+    Math.max(1, Math.min(workerConcurrency, 40)),
+    1,
+    40,
+  ),
+)
 const legacyIdleSleepMs = parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MS", 90, 20, 5000)
 const idleSleepMinMs = Math.max(20, parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MIN_MS", 40, 20, 5000))
 const idleSleepMaxMs = Math.max(
@@ -62,7 +70,7 @@ const heartbeatFile = String(process.env.VOICE_COACH_WORKER_HEARTBEAT_FILE || "/
   .slice(0, 500)
 const staleRecoverIntervalMs = parseNumberEnv("VOICE_COACH_WORKER_RECOVER_INTERVAL_MS", 3000, 1000, 30000)
 const staleRecoverMaxJobs = parseNumberEnv("VOICE_COACH_WORKER_RECOVER_MAX_JOBS", 20, 1, 200)
-const maxQueueAgeMs = 0
+const maxQueueAgeMs = Math.max(0, parseNumberEnv("VOICE_COACH_WORKER_MAX_QUEUE_AGE_MS", 0, 0, 600000))
 const runOnce = parseBoolEnv("VOICE_COACH_WORKER_RUN_ONCE", false)
 const workerId = String(process.env.VOICE_COACH_WORKER_ID || `${hostname()}#${process.pid}`).slice(0, 120)
 const chainMainToTtsInWorker = parseBoolEnv("VOICE_COACH_WORKER_CHAIN_MAIN_TO_TTS", true)
@@ -217,7 +225,7 @@ async function runRound(): Promise<RoundResult> {
 
   const refillQueueBuffer = async (maxJobs: number) => {
     const queued = await listVoiceCoachQueuedJobs({
-      maxJobs: Math.max(2, Math.min(maxJobs * 2, 12)),
+      maxJobs: Math.max(2, Math.min(maxJobs * 2, 40)),
       allowedStages: ACTIVE_STAGES,
       newestFirst: true,
       maxQueueAgeMs,
