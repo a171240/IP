@@ -225,12 +225,15 @@ function mapJobRow(job: DistributionJobRow): DistributionJobView {
 
 export function normalizeDistributionError(error: unknown): DistributionError {
   if (error instanceof DistributionError) return error
-  if (error instanceof Error && isDistributionErrorCode((error as { code?: unknown }).code)) {
-    return new DistributionError({
-      code: (error as { code: DistributionErrorCode }).code,
-      status: Number((error as { status?: unknown }).status || 500),
-      message: error.message || "distribution_failed",
-    })
+  if (error instanceof Error) {
+    const errLike = error as unknown as { code?: unknown; status?: unknown }
+    if (isDistributionErrorCode(errLike.code)) {
+      return new DistributionError({
+        code: errLike.code,
+        status: Number(errLike.status || 500),
+        message: error.message || "distribution_failed",
+      })
+    }
   }
 
   return new DistributionError({
