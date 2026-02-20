@@ -461,6 +461,46 @@ function decodeJsonEscapedText(input: string): string {
     .replace(/\\\//g, "/")
 }
 
+function hasChallengeMarker(text: string): boolean {
+  const lower = String(text || "").toLowerCase()
+  return /jschallenge|waf_js|wafchallenge|please wait|argus-csp-token/.test(lower)
+}
+
+function buildDouyinProfileFallbackExtracted(normalized: NormalizedSource, html: string): ExtractedPayload {
+  const parsed = new URL(normalized.normalized_url)
+  const profileTokenRaw = parsed.pathname.match(/\/user\/([^/?#]+)/)?.[1] || parsed.pathname.match(/\/share\/user\/([^/?#]+)/)?.[1] || ""
+  const profileToken = decodeURIComponent(profileTokenRaw)
+  const profileAlias = profileToken ? profileToken.slice(0, 16) : "unknown"
+
+  const meta = collectMetaTags(html)
+  const rawTitle = sanitizeText(meta["og:title"] || meta["twitter:title"] || meta["title"] || getTitleFromHtml(html))
+  const cleanTitle = rawTitle
+    .replace(/[-_｜|]\s*(抖音|Douyin).*$/i, "")
+    .replace(/的主页$/g, "")
+    .trim()
+  const fallbackTitle = cleanTitle || `抖音主页 ${profileAlias}`
+
+  const rawText = sanitizeText(meta["og:description"] || meta.description || meta["twitter:description"] || "")
+  const fallbackText = rawText || `主页作品链接未解析，保留主页标识 ${profileAlias} 用于后续分析。`
+
+  const image = sanitizeText(meta["og:image"] || meta["twitter:image"] || "")
+
+  return {
+    title: fallbackTitle,
+    text: fallbackText,
+    images: image ? [image] : [],
+    video_url: null,
+    author: cleanTitle || null,
+    meta: {
+      platform: "douyin",
+      extractor: "profile_summary_fallback",
+      profile_url: normalized.normalized_url,
+      profile_token: profileToken || null,
+      challenge_page: hasChallengeMarker(html),
+    },
+  }
+}
+
 function collectNumericIdsFromHtml(html: string): string[] {
   const out = new Set<string>()
   const idPatterns = [
@@ -630,6 +670,7 @@ export async function extractDouyinProfileItemsFromNormalized(
   }
 
   let discoveredUrls: string[] = []
+  let fetchedHtml = ""
   try {
     const { response, text } = await withRetry(
       () =>
@@ -663,6 +704,7 @@ export async function extractDouyinProfileItemsFromNormalized(
       throw new IngestError("private_or_deleted_content", "主页内容不可访问")
     }
 
+    fetchedHtml = text
     discoveredUrls = discoverDouyinLinksFromHtml([normalized.input_url, normalized.normalized_url], text, clampedLimit)
   } catch (error) {
     if (isIngestError(error)) throw error
@@ -674,10 +716,11 @@ export async function extractDouyinProfileItemsFromNormalized(
       return results.slice(0, clampedLimit)
     }
 
+    const profileSummary = buildDouyinProfileFallbackExtracted(normalized, fetchedHtml)
     return [
       {
         source_url: normalized.normalized_url,
-        extracted: null,
+        extracted: profileSummary,
         raw_payload: {
           source: "profile_fallback_discovery",
           profile_url: normalized.normalized_url,
@@ -689,10 +732,12 @@ export async function extractDouyinProfileItemsFromNormalized(
             "html_aweme_id",
             "html_embedded_json",
           ],
+          fallback_extracted: true,
+          challenge_page: hasChallengeMarker(fetchedHtml),
           discovered_url_count: 0,
         },
-        error_code: "extract_failed",
-        message: "未从主页解析到作品链接",
+        error_code: null,
+        message: null,
       },
     ]
   }
