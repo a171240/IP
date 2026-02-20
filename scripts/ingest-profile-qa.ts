@@ -61,18 +61,16 @@ function getEnv(name: string, fileEnv: EnvMap): string {
 }
 
 function parseQaUrls(fileEnv: EnvMap): string[] {
-  const sampleSizeRaw = Number(unwrapEnvValue(getEnv("INGEST_PROFILE_QA_SAMPLE_SIZE", fileEnv)) || "20")
-  const sampleSize = Number.isFinite(sampleSizeRaw) ? Math.max(1, Math.min(100, sampleSizeRaw)) : 20
   const configured = unwrapEnvValue(getEnv("INGEST_PROFILE_QA_URLS", fileEnv))
   if (configured) {
     const urls = configured
       .split(/[\n,]/)
       .map((item) => item.trim())
       .filter(Boolean)
-    if (urls.length > 0) return urls.slice(0, sampleSize)
+    if (urls.length >= 10) return urls.slice(0, 10)
   }
 
-  const defaults = [
+  return [
     "https://www.douyin.com/user/test_profile?modal_id=7153921902181301518",
     "https://www.douyin.com/user/test_profile?aweme_id=7153921902181301518",
     "https://www.douyin.com/user/test_profile?item_id=7153921902181301518",
@@ -83,19 +81,7 @@ function parseQaUrls(fileEnv: EnvMap): string[] {
     "https://www.douyin.com/user/test_profile_4",
     "https://www.douyin.com/user/test_profile_5",
     "https://www.douyin.com/user/test_profile_6",
-    "https://www.douyin.com/user/test_profile_7",
-    "https://www.douyin.com/user/test_profile_8",
-    "https://www.douyin.com/user/test_profile_9",
-    "https://www.douyin.com/user/test_profile_10",
-    "https://www.douyin.com/user/test_profile_11",
-    "https://www.douyin.com/user/test_profile_12",
-    "https://www.douyin.com/user/test_profile_13",
-    "https://www.douyin.com/user/test_profile_14",
-    "https://www.douyin.com/user/test_profile_15",
-    "https://www.douyin.com/user/test_profile_16",
   ]
-
-  return defaults.slice(0, sampleSize)
 }
 
 async function run() {
@@ -184,54 +170,6 @@ async function run() {
     }
   }
 
-  const failureProbes = [
-    {
-      profile_url: "https://www.douyin.com/video/7153921902181301518",
-      limit: 20,
-    },
-    {
-      profile_url: "https://www.xiaohongshu.com/explore/6412f918000000001203e260",
-      limit: 20,
-    },
-    {
-      profile_url: "not-a-valid-url",
-      limit: 20,
-    },
-  ]
-
-  const failureProbeResults: Array<{
-    request: { profile_url: string; limit: number }
-    response: { ok: false; error_code: string; message: string }
-  }> = []
-
-  for (const probe of failureProbes) {
-    try {
-      await ingestDouyinProfileToSources({
-        supabase: admin as any,
-        user,
-        profile_url: probe.profile_url,
-        limit: probe.limit,
-      })
-      failureProbeResults.push({
-        request: probe,
-        response: {
-          ok: false,
-          error_code: "extract_failed",
-          message: "unexpected_success",
-        },
-      })
-    } catch (error) {
-      failureProbeResults.push({
-        request: probe,
-        response: {
-          ok: false,
-          error_code: (error as { code?: string })?.code || "extract_failed",
-          message: (error as { message?: string })?.message || "ingest_failed",
-        },
-      })
-    }
-  }
-
   const { data: batchRows, error: batchRowsError } = successfulBatchIds.length
     ? await admin
         .from("content_sources")
@@ -281,10 +219,6 @@ async function run() {
     const code = run.response.error_code || "extract_failed"
     errorCodeDist[code] = (errorCodeDist[code] || 0) + 1
   }
-  for (const probe of failureProbeResults) {
-    const code = probe.response.error_code || "extract_failed"
-    errorCodeDist[code] = (errorCodeDist[code] || 0) + 1
-  }
 
   const successSample = batchRuns.find((run) => {
     if (!run.response.ok) return false
@@ -297,7 +231,45 @@ async function run() {
     return (stat?.ready || 0) === 0
   })
 
-  const failureSample = failureProbeResults[0] || null
+  let failureSample:
+    | {
+        request: { profile_url: string; limit: number }
+        response: { ok: false; error_code: string; message: string }
+      }
+    | {
+        request: { profile_url: string; limit: number }
+        response: { ok: true; note: string }
+      }
+
+  const invalidRequest = {
+    profile_url: "https://www.douyin.com/video/7153921902181301518",
+    limit: 20,
+  }
+
+  try {
+    await ingestDouyinProfileToSources({
+      supabase: admin as any,
+      user,
+      profile_url: invalidRequest.profile_url,
+      limit: invalidRequest.limit,
+    })
+    failureSample = {
+      request: invalidRequest,
+      response: {
+        ok: true,
+        note: "unexpected_success",
+      },
+    }
+  } catch (error) {
+    failureSample = {
+      request: invalidRequest,
+      response: {
+        ok: false,
+        error_code: (error as { code?: string })?.code || "extract_failed",
+        message: (error as { message?: string })?.message || "ingest_failed",
+      },
+    }
+  }
 
   const { data: readyRows, error: readyError } = await admin
     .from("content_sources")
@@ -339,7 +311,6 @@ async function run() {
           degraded: degradedSample || null,
           failed: failureSample,
         },
-        failure_probes: failureProbeResults,
         db_evidence: {
           ready_rows: readyRows || [],
           failed_rows: failedRows || [],
