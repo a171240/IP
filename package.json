@@ -4,11 +4,16 @@
   "private": true,
   "scripts": {
     "build": "node ./scripts/strict-build.mjs",
-    "dev": "next dev",
+    "dev": "node scripts/with-asr-startup-gate.mjs next dev",
     "lint": "eslint .",
+    "seed:voice-lines": "node scripts/generate-voice-customer-line-seeds.mjs --write-json",
+    "seed:voice-openings": "node scripts/generate-voice-opening-seeds.mjs",
+    "seed:voice-tts-cache": "node scripts/tts_pregen.mjs --limit=50",
+    "selfcheck:asr": "node scripts/asr_selfcheck.mjs",
     "regress:delivery-pack": "node scripts/regress-delivery-pack.js",
     "regress:p5p10": "node scripts/regress-p5-p10-context.js",
-    "start": "next start"
+    "voicecoach:worker": "node --conditions=react-server --env-file-if-exists=.env.local --import tsx ./lib/voice-coach/worker.ts",
+    "start": "node scripts/with-asr-startup-gate.mjs next start"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -66,9 +71,11 @@
     "react-hook-form": "^7.60.0",
     "react-resizable-panels": "^2.1.7",
     "recharts": "2.15.4",
+    "server-only": "^0.0.1",
     "sonner": "^1.7.4",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
+    "tsx": "^4.21.0",
     "vaul": "^1.1.2",
     "zod": "3.25.76"
   },

@@ -1,31 +1,50 @@
 import { randomUUID } from "crypto"
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest } from "next/server"
 
 import { checkVoiceCoachAccess } from "@/lib/voice-coach/guard.server"
-import { emitVoiceCoachEvent, processVoiceCoachJobById, pumpVoiceCoachQueuedJobs } from "@/lib/voice-coach/jobs.server"
+import { emitVoiceCoachEvent } from "@/lib/voice-coach/jobs.server"
 import { signVoiceCoachAudio, uploadVoiceCoachAudio } from "@/lib/voice-coach/storage.server"
+import { createVoiceCoachTrace, type VoiceCoachTrace, voiceCoachJson } from "@/lib/voice-coach/trace.server"
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
 
-function jsonError(status: number, error: string, extra?: Record<string, unknown>) {
-  return NextResponse.json({ error, ...extra }, { status })
+function jsonError(trace: VoiceCoachTrace, status: number, error: string, extra?: Record<string, unknown>) {
+  return voiceCoachJson(trace, { error, ...extra }, status)
+}
+
+type UploadedAudioFormat = "mp3" | "wav" | "ogg" | "aac" | "flac" | "unknown"
+
+function detectUploadedAudioFormat(file: File): UploadedAudioFormat {
+  const name = (file.name || "").toLowerCase()
+  const type = (file.type || "").toLowerCase()
+  if (type.includes("mpeg") || name.endsWith(".mp3")) return "mp3"
+  if (type.includes("wav") || name.endsWith(".wav")) return "wav"
+  if (type.includes("ogg") || name.endsWith(".ogg")) return "ogg"
+  if (type.includes("aac") || name.endsWith(".aac") || name.endsWith(".m4a")) return "aac"
+  if (type.includes("flac") || name.endsWith(".flac")) return "flac"
+  return "unknown"
+}
+
+function shouldUseFlashAsr(): boolean {
+  const raw = String(process.env.VOICE_COACH_ASR_ENABLE_FLASH || "true")
+    .trim()
+    .toLowerCase()
+  return !["0", "false", "off", "no"].includes(raw)
 }
 
 function detectFormat(
   file: File,
+  uploadedAudioFormat: UploadedAudioFormat,
   opts: { flashEnabled: boolean },
 ): { format: "mp3" | "wav" | "ogg" | "raw" | "flac"; ext: string; contentType: string } | null {
-  const name = (file.name || "").toLowerCase()
-  const type = (file.type || "").toLowerCase()
-
-  if (type.includes("mpeg") || name.endsWith(".mp3")) return { format: "mp3", ext: "mp3", contentType: "audio/mpeg" }
-  if (type.includes("wav") || name.endsWith(".wav")) return { format: "wav", ext: "wav", contentType: "audio/wav" }
-  if (type.includes("ogg") || name.endsWith(".ogg")) return { format: "ogg", ext: "ogg", contentType: "audio/ogg" }
-  if (type.includes("flac") || name.endsWith(".flac")) {
+  if (uploadedAudioFormat === "mp3") return { format: "mp3", ext: "mp3", contentType: "audio/mpeg" }
+  if (uploadedAudioFormat === "wav") return { format: "wav", ext: "wav", contentType: "audio/wav" }
+  if (uploadedAudioFormat === "ogg") return { format: "ogg", ext: "ogg", contentType: "audio/ogg" }
+  if (uploadedAudioFormat === "flac") {
     return opts.flashEnabled ? { format: "flac", ext: "flac", contentType: "audio/flac" } : null
   }
-  if (type.includes("aac") || name.endsWith(".aac") || name.endsWith(".m4a")) return null
+  if (uploadedAudioFormat === "aac") return null
   return { format: "mp3", ext: "mp3", contentType: "audio/mpeg" }
 }
 
@@ -33,69 +52,6 @@ function formatDuration(seconds: number | null) {
   const n = Number(seconds || 0)
   if (!n || n <= 0) return null
   return Math.round(n)
-}
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-async function readJobProgress(supabase: any, jobId: string): Promise<{ status: string; stage: string } | null> {
-  const { data } = await supabase.from("voice_coach_jobs").select("status, stage").eq("id", jobId).single()
-  if (!data) return null
-  return {
-    status: String(data.status || ""),
-    stage: String(data.stage || ""),
-  }
-}
-
-async function advanceJobWithinBudget(opts: {
-  supabase: any
-  sessionId: string
-  userId: string
-  jobId: string
-  budgetMs?: number
-}): Promise<{ advanced: boolean; status: string; stage: string }> {
-  const budgetMs = Math.max(500, Number(opts.budgetMs || 2500))
-  const deadline = Date.now() + budgetMs
-  let advanced = false
-  let ranCount = 0
-
-  while (Date.now() < deadline && ranCount < 2) {
-    const remaining = deadline - Date.now()
-    if (remaining < 150) break
-
-    const timeoutMs = Math.max(150, Math.min(remaining, 1800))
-    const raced = await Promise.race([
-      processVoiceCoachJobById({
-        sessionId: opts.sessionId,
-        userId: opts.userId,
-        jobId: opts.jobId,
-      })
-        .then((result) => ({ timedOut: false, result }))
-        .catch(() => ({ timedOut: false, result: null as any })),
-      sleep(timeoutMs).then(() => ({ timedOut: true, result: null as any })),
-    ])
-
-    if (raced.timedOut) break
-    if (raced.result && raced.result.processed) {
-      advanced = true
-      ranCount += 1
-    } else {
-      break
-    }
-
-    const progress = await readJobProgress(opts.supabase, opts.jobId)
-    if (!progress) break
-    if (progress.status !== "queued") break
-    if (progress.stage !== "tts_pending") break
-  }
-
-  const finalProgress = await readJobProgress(opts.supabase, opts.jobId)
-  return {
-    advanced,
-    status: finalProgress?.status || "queued",
-    stage: finalProgress?.stage || "main_pending",
-  }
 }
 
 async function latestEventCursor(supabase: any, sessionId: string): Promise<number> {
@@ -109,26 +65,35 @@ async function latestEventCursor(supabase: any, sessionId: string): Promise<numb
 }
 
 export async function POST(request: NextRequest, context: { params: Promise<{ sessionId: string }> }) {
+  const trace = createVoiceCoachTrace(request)
   try {
+    const startedAt = Date.now()
+    const debugTimings: Record<string, number> = {}
+    const mark = (name: string) => {
+      debugTimings[name] = Date.now() - startedAt
+    }
+
     const { sessionId } = await context.params
-    if (!sessionId) return jsonError(400, "missing_session_id")
+    if (!sessionId) return jsonError(trace, 400, "missing_session_id")
 
     const supabase = await createServerSupabaseClientForRequest(request)
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    if (!user) return jsonError(401, "请先登录")
+    if (!user) return jsonError(trace, 401, "请先登录")
 
     const access = checkVoiceCoachAccess(user.id)
-    if (!access.ok) return jsonError(access.status, access.error)
+    if (!access.ok) return jsonError(trace, access.status, access.error)
+    mark("auth_ok")
 
     const { data: session, error: sessionError } = await supabase
       .from("voice_coach_sessions")
       .select("id, status")
       .eq("id", sessionId)
       .single()
-    if (sessionError || !session) return jsonError(404, "session_not_found")
-    if (session.status !== "active") return jsonError(400, "session_not_active")
+    if (sessionError || !session) return jsonError(trace, 404, "session_not_found")
+    if (session.status !== "active") return jsonError(trace, 400, "session_not_active")
+    mark("session_checked")
 
     const oneMinAgo = new Date(Date.now() - 60_000).toISOString()
     const { count: recentCount } = await supabase
@@ -137,7 +102,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
       .eq("session_id", sessionId)
       .eq("role", "beautician")
       .gte("created_at", oneMinAgo)
-    if ((recentCount || 0) >= 10) return jsonError(429, "rate_limited")
+    if ((recentCount || 0) >= 10) return jsonError(trace, 429, "rate_limited")
+    mark("rate_limited_checked")
 
     const form = await request.formData()
     const audioFile = form.get("audio")
@@ -145,14 +111,34 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
     const clientAudioSecondsRaw = form.get("client_audio_seconds")
     const clientAttemptId = String(form.get("client_attempt_id") || "").trim()
 
-    if (!(audioFile instanceof File)) return jsonError(400, "missing_audio")
-    if (!replyToTurnId) return jsonError(400, "missing_reply_to_turn_id")
+    if (!(audioFile instanceof File)) return jsonError(trace, 400, "missing_audio")
+    if (!replyToTurnId) return jsonError(trace, 400, "missing_reply_to_turn_id")
 
-    const flashEnabled = Boolean((process.env.VOLC_ASR_FLASH_RESOURCE_ID || "").trim())
-    const detected = detectFormat(audioFile, { flashEnabled })
+    const flashEnabled = shouldUseFlashAsr()
+    const uploadedAudioFormat = detectUploadedAudioFormat(audioFile)
+    const detected = detectFormat(audioFile, uploadedAudioFormat, { flashEnabled })
     if (!detected) {
-      return jsonError(400, "unsupported_audio_format", {
+      await emitVoiceCoachEvent({
+        sessionId,
+        userId: user.id,
+        traceId: trace.traceId,
+        clientBuild: trace.clientBuild,
+        serverBuild: trace.serverBuild,
+        executor: "manual",
+        type: "turn.error",
+        data: {
+          code: "unsupported_audio_format",
+          message: "上传音频格式不支持",
+          uploaded_audio_format: uploadedAudioFormat,
+          uploaded_audio_mime: String(audioFile.type || "").trim().toLowerCase() || null,
+          uploaded_audio_name: String(audioFile.name || "").trim() || null,
+          flash_enabled: flashEnabled,
+          ts: new Date().toISOString(),
+        },
+      }).catch(() => {})
+      return jsonError(trace, 400, "unsupported_audio_format", {
         hint: flashEnabled ? "请使用 mp3/wav/ogg/flac（推荐 mp3）" : "请使用 mp3/wav/ogg（推荐 mp3）",
+        uploaded_audio_format: uploadedAudioFormat,
       })
     }
 
@@ -162,8 +148,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
       .eq("id", replyToTurnId)
       .eq("session_id", sessionId)
       .single()
-    if (replyError || !replyTurn) return jsonError(400, "invalid_reply_to_turn_id")
-    if (replyTurn.role !== "customer") return jsonError(400, "reply_to_not_customer")
+    if (replyError || !replyTurn) return jsonError(trace, 400, "invalid_reply_to_turn_id")
+    if (replyTurn.role !== "customer") return jsonError(trace, 400, "reply_to_not_customer")
 
     if (clientAttemptId) {
       const { data: existingJobs } = await supabase
@@ -194,7 +180,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
           }
         }
 
-        return NextResponse.json({
+        return voiceCoachJson(trace, {
           turn_id: existingTurnId,
           job_id: String(existing.id),
           client_attempt_id: clientAttemptId || null,
@@ -213,6 +199,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
             ),
             pending: true,
           },
+          trace_id: trace.traceId,
+          client_build: trace.clientBuild,
         })
       }
     }
@@ -223,7 +211,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
       .eq("session_id", sessionId)
       .order("turn_index", { ascending: false })
       .limit(1)
-    if (lastTurnError) return jsonError(500, "turn_index_query_failed", { message: lastTurnError.message })
+    if (lastTurnError) return jsonError(trace, 500, "turn_index_query_failed", { message: lastTurnError.message })
 
     const nextTurnIndex = (lastTurnRows?.[0]?.turn_index ?? -1) + 1
     const beauticianTurnNo = Math.floor((nextTurnIndex + 1) / 2)
@@ -232,7 +220,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
     const turnId = randomUUID()
     const audioPath = `${user.id}/${sessionId}/${turnId}.${detected.ext}`
     const audioBuf = Buffer.from(await audioFile.arrayBuffer())
-    if (!audioBuf.length) return jsonError(400, "empty_audio")
+    if (!audioBuf.length) return jsonError(trace, 400, "empty_audio")
 
     await uploadVoiceCoachAudio({
       path: audioPath,
@@ -240,6 +228,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
       contentType: detected.contentType,
     })
     const audioUrl = await signVoiceCoachAudio(audioPath)
+    mark("audio_uploaded")
 
     const clientAudioSeconds =
       typeof clientAudioSecondsRaw === "string" && clientAudioSecondsRaw.trim() ? Number(clientAudioSecondsRaw) : null
@@ -254,9 +243,22 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
       audio_seconds: clientAudioSeconds,
       status: "accepted",
     })
-    if (insertTurnError) return jsonError(500, "insert_beautician_failed", { message: insertTurnError.message })
+    if (insertTurnError) return jsonError(trace, 500, "insert_beautician_failed", { message: insertTurnError.message })
+    mark("beautician_turn_inserted")
+
+    const submitAckMs = Date.now() - startedAt
+    const uploadMs = Math.max(
+      0,
+      (debugTimings.audio_uploaded || submitAckMs) -
+        (debugTimings.rate_limited_checked ||
+          debugTimings.session_checked ||
+          debugTimings.auth_ok ||
+          0),
+    )
+    const pipelineStartedAtMs = Date.now()
 
     const jobId = randomUUID()
+    const stageEnteredAt = new Date().toISOString()
     const { error: jobInsertError } = await supabase.from("voice_coach_jobs").insert({
       id: jobId,
       session_id: sessionId,
@@ -264,54 +266,69 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
       turn_id: turnId,
       status: "queued",
       stage: "main_pending",
+      stage_entered_at: stageEnteredAt,
       payload_json: {
         reply_to_turn_id: replyToTurnId,
         audio_format: detected.format,
         client_audio_seconds: clientAudioSeconds,
         ...(clientAttemptId ? { client_attempt_id: clientAttemptId } : {}),
       },
+      result_json: {
+        pipeline_started_at_ms: pipelineStartedAtMs,
+        submit_ack_ms: submitAckMs,
+        upload_ms: uploadMs,
+        client_build: trace.clientBuild,
+        server_build: trace.serverBuild,
+        trace_id: trace.traceId,
+        executor: "worker",
+        stage_entered_at_ms: Date.parse(stageEnteredAt),
+      },
     })
-    if (jobInsertError) return jsonError(500, "insert_job_failed", { message: jobInsertError.message })
+    if (jobInsertError) return jsonError(trace, 500, "insert_job_failed", { message: jobInsertError.message })
+    mark("job_inserted")
 
     const cursor = await emitVoiceCoachEvent({
       sessionId,
       userId: user.id,
       turnId,
       jobId,
+      traceId: trace.traceId,
+      clientBuild: trace.clientBuild,
+      serverBuild: trace.serverBuild,
+      executor: "manual",
       type: "turn.accepted",
       data: {
         turn_id: turnId,
         job_id: jobId,
         audio_url: audioUrl,
         audio_seconds: formatDuration(clientAudioSeconds),
+        uploaded_audio_format: uploadedAudioFormat,
+        uploaded_audio_mime: String(audioFile.type || "").trim().toLowerCase() || null,
+        uploaded_audio_name: String(audioFile.name || "").trim() || null,
         reached_max_turns: reachedMax,
+        submit_ack_ms: submitAckMs,
+        upload_ms: uploadMs,
+        trace_id: trace.traceId,
+        client_build: trace.clientBuild,
+        server_build: trace.serverBuild,
+        executor: "manual",
         ts: new Date().toISOString(),
       },
     })
+    mark("accepted_event_emitted")
 
-    // Best-effort kick-off to shorten first event wait.
-    void pumpVoiceCoachQueuedJobs({
-      sessionId,
-      userId: user.id,
-      maxJobs: 1,
-      allowedStages: ["main_pending", "tts_pending"],
-      maxWallMs: 700,
-    }).catch(() => {})
-
-    // Fast-path: try to advance to ASR/text (and optionally TTS) before returning.
-    const advanced = await advanceJobWithinBudget({
-      supabase,
-      sessionId,
-      userId: user.id,
-      jobId,
-      budgetMs: 2500,
-    }).catch(() => ({
+    const advanced = {
       advanced: false,
       status: "queued",
       stage: "main_pending",
-    }))
+    }
+    mark("advance_done")
 
-    return NextResponse.json({
+    const debugTimingEnabled = String(process.env.VOICE_COACH_DEBUG_TIMING || "false")
+      .trim()
+      .toLowerCase() === "true"
+
+    return voiceCoachJson(trace, {
       turn_id: turnId,
       job_id: jobId,
       client_attempt_id: clientAttemptId || null,
@@ -327,8 +344,19 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
         audio_seconds: formatDuration(clientAudioSeconds),
         pending: true,
       },
+      trace_id: trace.traceId,
+      client_build: trace.clientBuild,
+      server_build: trace.serverBuild,
+      ...(debugTimingEnabled
+        ? {
+            debug_timing_ms: {
+              ...debugTimings,
+              total: Date.now() - startedAt,
+            },
+          }
+        : {}),
     })
   } catch (err: any) {
-    return jsonError(500, "voice_coach_error", { message: err?.message || String(err) })
+    return jsonError(trace, 500, "voice_coach_error", { message: err?.message || String(err) })
   }
 }

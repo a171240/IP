@@ -8,6 +8,7 @@ import { calcFillerRatio, calcWpm } from "@/lib/voice-coach/metrics"
 import {
   createInitialPolicyState,
   getAnalysisTemplate,
+  getSeedAudioPathForLineId,
   maybeRewriteCustomerLine,
   normalizeVoiceCoachCategoryId,
   selectNextCustomerLine,
@@ -15,6 +16,8 @@ import {
 } from "@/lib/voice-coach/script-packs"
 import { getScenario, type VoiceCoachEmotion } from "@/lib/voice-coach/scenarios"
 import {
+  buildTtsCacheKey,
+  buildTtsLineCacheKey,
   doubaoAsrAuc,
   doubaoAsrFlash,
   doubaoTts,
@@ -22,10 +25,13 @@ import {
   type DoubaoTtsEmotion,
 } from "@/lib/voice-coach/speech/doubao.server"
 import {
+  VOICE_COACH_AUDIO_BUCKET,
   downloadVoiceCoachAudio,
   signVoiceCoachAudio,
   uploadVoiceCoachAudio,
+  voiceCoachAudioExists,
 } from "@/lib/voice-coach/storage.server"
+import { resolveVoiceCoachServerBuild } from "@/lib/voice-coach/trace.server"
 
 export type VoiceCoachEventType =
   | "turn.accepted"
@@ -41,10 +47,52 @@ type VoiceCoachJobPayload = {
   client_audio_seconds?: number | null
 }
 
-type VoiceCoachJobStage = "main_pending" | "tts_pending" | "analysis_pending" | "done" | "error"
+export type VoiceCoachJobStage = "main_pending" | "tts_pending" | "analysis_pending" | "done" | "error"
+export type VoiceCoachJobExecutor = "events_pump" | "submit_pump" | "worker" | "manual"
+type VoiceCoachStableTtsSource = "line_cache" | "text_cache" | "runtime"
+type VoiceCoachTtsSourceDistribution = {
+  line_cache: number
+  text_cache: number
+  runtime: number
+}
 
 type VoiceCoachJobResultState = {
   pipeline_started_at_ms?: number
+  tts_queued_at_ms?: number
+  stage_entered_at_ms?: number
+  trace_id?: string
+  client_build?: string
+  server_build?: string
+  executor?: VoiceCoachJobExecutor
+  submit_ack_ms?: number
+  upload_ms?: number
+  asr_ms?: number
+  asr_ready_ms?: number
+  asr_queue_wait_ms?: number
+  asr_provider_attempted?: Array<"flash" | "auc">
+  asr_provider_final?: "flash" | "auc" | null
+  asr_outcome?: "success" | "fallback_success" | "failed"
+  queue_wait_before_main_ms?: number
+  queue_wait_before_tts_ms?: number | null
+  queue_wait_before_tts_valid?: boolean
+  queue_wait_before_tts_source?: "tts_queued_at_ms" | "stage_entered_at_ms" | "missing_anchor"
+  script_select_ms?: number
+  llm_ms?: number
+  text_ready_ms?: number
+  tts_ms?: number
+  tts_cache_hit?: boolean
+  tts_cache_hit_rate?: number
+  tts_cache_hit_rounds?: number
+  tts_rounds_total?: number
+  llm_used?: boolean
+  script_hit?: boolean
+  script_hit_rate?: number
+  script_hit_rounds?: number
+  tts_line_cache_hit_rate?: number
+  tts_line_cache_hit_rounds?: number
+  tts_source_distribution?: VoiceCoachTtsSourceDistribution
+  llm_used_when_script_hit_count?: number
+  end_to_end_ms?: number
   reached_max_turns?: boolean
   reply_turn_id?: string
   beautician_turn_index?: number
@@ -52,17 +100,34 @@ type VoiceCoachJobResultState = {
   beautician_audio_url?: string | null
   beautician_audio_seconds?: number | null
   beautician_asr_confidence?: number | null
+  flash_request_id?: string | null
+  flash_logid?: string | null
+  auc_request_id?: string | null
+  auc_logid?: string | null
   category_id?: string
   intent_id?: string
   angle_id?: string
   reply_source?: string
   loop_guard_triggered?: boolean
   next_customer_turn_id?: string
+  next_customer_line_id?: string
   next_customer_text?: string
   next_customer_emotion?: VoiceCoachEmotion
   next_customer_tag?: string
   customer_text_elapsed_ms?: number
   customer_audio_elapsed_ms?: number
+  asr_error?: {
+    provider: "flash" | "auc"
+    code: string
+    message?: string
+    http_status?: number | null
+    api_status?: string | null
+    api_code?: string | null
+    api_message?: string | null
+    appid_last4?: string | null
+    resource_id?: string | null
+    operation_hint?: string | null
+  } | null
 }
 
 type EmitEventArgs = {
@@ -72,9 +137,28 @@ type EmitEventArgs = {
   turnId?: string | null
   jobId?: string | null
   data?: Record<string, unknown> | null
+  traceId?: string | null
+  clientBuild?: string | null
+  serverBuild?: string | null
+  executor?: VoiceCoachJobExecutor
 }
 
-type ProcessJobResult = { processed: boolean; done: boolean; jobId?: string; turnId?: string }
+type ProcessJobResult = {
+  processed: boolean
+  done: boolean
+  jobId?: string
+  turnId?: string
+  nextStage?: VoiceCoachJobStage
+  nextResultState?: VoiceCoachJobResultState
+}
+
+export type VoiceCoachQueuedJobRecord = {
+  id: string
+  sessionId: string
+  userId: string
+  stage: VoiceCoachJobStage
+  createdAt: string
+}
 
 type SessionRow = {
   id: string
@@ -124,7 +208,28 @@ function mapEmotionToTts(emotion: VoiceCoachEmotion): DoubaoTtsEmotion | undefin
 }
 
 function shouldUseFlashAsr(): boolean {
-  return Boolean((process.env.VOLC_ASR_FLASH_RESOURCE_ID || "").trim())
+  const raw = String(process.env.VOICE_COACH_ASR_ENABLE_FLASH || "true")
+    .trim()
+    .toLowerCase()
+  return !["0", "false", "off", "no"].includes(raw)
+}
+
+let flashResourcePermissionDenied = false
+
+function isAsrFlashPermissionDenied(err: unknown): boolean {
+  const anyErr = (err || {}) as Record<string, unknown>
+  const code = typeof anyErr.code === "string" ? anyErr.code : ""
+  const apiStatus = typeof anyErr.api_status === "string" ? anyErr.api_status : ""
+  const apiCode = typeof anyErr.api_code === "string" ? anyErr.api_code : ""
+  const apiMessage = typeof anyErr.api_message === "string" ? anyErr.api_message : ""
+  const msg = typeof err === "string" ? err : err instanceof Error ? err.message : ""
+  if (code === "asr_flash_http_403") {
+    return apiStatus === "45000030" || apiCode === "45000030" || apiMessage.includes("45000030")
+  }
+  if (code === "asr_flash_permission_denied") return true
+  if (apiStatus === "45000030" || apiCode === "45000030") return true
+  if (!msg) return false
+  return msg.includes("45000030") || msg.includes("requested resource not granted")
 }
 
 function shouldAllowAucFallbackWhenFlashEnabled(): boolean {
@@ -134,15 +239,75 @@ function shouldAllowAucFallbackWhenFlashEnabled(): boolean {
   return ["1", "true", "yes", "on"].includes(raw)
 }
 
+function shouldRequireFlashAsr(): boolean {
+  const raw = String(process.env.VOICE_COACH_REQUIRE_FLASH || "false")
+    .trim()
+    .toLowerCase()
+  return ["1", "true", "yes", "on"].includes(raw)
+}
+
+function asrAucTotalTimeoutMs(): number {
+  const n = Number(process.env.VOICE_COACH_ASR_AUC_TOTAL_TIMEOUT_MS || 9000)
+  if (!Number.isFinite(n)) return 9000
+  return Math.max(3500, Math.min(15000, Math.round(n)))
+}
+
 function processingStaleMs(): number {
-  const n = Number(process.env.VOICE_COACH_PROCESSING_STALE_MS || 20000)
-  if (!Number.isFinite(n) || n < 5000) return 20000
+  const n = Number(process.env.VOICE_COACH_PROCESSING_STALE_MS || 6000)
+  if (!Number.isFinite(n) || n < 3000) return 6000
   return Math.round(n)
 }
 
 function asNumber(value: unknown): number | null {
   const n = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN
   return Number.isFinite(n) ? n : null
+}
+
+function asBoolean(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null
+}
+
+function normalizeInlineText(value: unknown): string {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+}
+
+function parseIsoToMs(value: unknown): number | null {
+  const raw = String(value || "").trim()
+  if (!raw) return null
+  const ms = Date.parse(raw)
+  return Number.isFinite(ms) ? ms : null
+}
+
+function nonNegativeMs(value: unknown): number | null {
+  const n = asNumber(value)
+  if (n === null) return null
+  return Math.max(0, Math.round(n))
+}
+
+function calcQueueWaitBeforeTts(args: {
+  nowMs: number
+  ttsQueuedAtMs: number | null
+  stageEnteredAtMs: number | null
+}): {
+  valueMs: number | null
+  valid: boolean
+  source: "tts_queued_at_ms" | "stage_entered_at_ms" | "missing_anchor"
+} {
+  const anchorMs = args.ttsQueuedAtMs ?? args.stageEnteredAtMs
+  if (anchorMs === null) {
+    return {
+      valueMs: null,
+      valid: false,
+      source: "missing_anchor",
+    }
+  }
+  return {
+    valueMs: nonNegativeMs(args.nowMs - anchorMs),
+    valid: true,
+    source: args.ttsQueuedAtMs !== null ? "tts_queued_at_ms" : "stage_entered_at_ms",
+  }
 }
 
 function isAsrSilenceError(err: unknown): boolean {
@@ -164,6 +329,13 @@ function normalizeAsrFailure(err: unknown): { code: "asr_silence" | "asr_timeout
     }
   }
 
+  if (isAsrFlashPermissionDenied(err)) {
+    return {
+      code: "asr_failed",
+      message: "Flash ASR 权限未开通，请联系管理员处理权限后重试。",
+    }
+  }
+
   if (isAsrTimeoutError(err)) {
     return {
       code: "asr_timeout",
@@ -177,8 +349,123 @@ function normalizeAsrFailure(err: unknown): { code: "asr_silence" | "asr_timeout
   }
 }
 
+type AsrErrorMeta = {
+  provider: "flash" | "auc"
+  code: string
+  message: string
+  http_status: number | null
+  api_status: string | null
+  api_code: string | null
+  api_message: string | null
+  request_id: string | null
+  logid: string | null
+  submit_logid: string | null
+  query_logid: string | null
+  appid_last4: string | null
+  resource_id: string | null
+  operation_hint: string | null
+}
+
+function asrErrorMeta(err: unknown, provider: "flash" | "auc"): AsrErrorMeta {
+  const anyErr = (err || {}) as Record<string, unknown>
+  const message = typeof anyErr.message === "string" ? anyErr.message : String(err || "")
+  const rawCode =
+    typeof anyErr.code === "string"
+      ? String(anyErr.code)
+      : typeof anyErr.name === "string" && anyErr.name.startsWith("asr_")
+        ? String(anyErr.name)
+        : provider === "flash"
+          ? "asr_flash_failed"
+          : "asr_auc_failed"
+  const httpStatus = typeof anyErr.http_status === "number" ? Number(anyErr.http_status) : null
+  const apiStatus = typeof anyErr.api_status === "string" ? String(anyErr.api_status) : null
+  const apiCode = typeof anyErr.api_code === "string" ? String(anyErr.api_code) : null
+  const apiMessage = typeof anyErr.api_message === "string" ? String(anyErr.api_message) : null
+  const requestId =
+    typeof anyErr.request_id === "string"
+      ? String(anyErr.request_id)
+      : typeof anyErr.flash_request_id === "string"
+        ? String(anyErr.flash_request_id)
+        : null
+  const logid =
+    typeof anyErr.logid === "string"
+      ? String(anyErr.logid)
+      : typeof anyErr.flash_logid === "string"
+        ? String(anyErr.flash_logid)
+        : null
+  const submitLogid = typeof anyErr.submit_logid === "string" ? String(anyErr.submit_logid) : null
+  const queryLogid = typeof anyErr.query_logid === "string" ? String(anyErr.query_logid) : null
+  const appidLast4 = typeof anyErr.appid_last4 === "string" ? String(anyErr.appid_last4) : null
+  const resourceId = typeof anyErr.resource_id === "string" ? String(anyErr.resource_id) : null
+  let operationHint = typeof anyErr.operation_hint === "string" ? String(anyErr.operation_hint) : null
+  let code = rawCode
+  if (
+    provider === "flash" &&
+    (rawCode === "asr_flash_http_403" || httpStatus === 403) &&
+    (apiStatus === "45000030" || apiCode === "45000030" || String(apiMessage || "").includes("45000030"))
+  ) {
+    code = "asr_flash_permission_denied"
+    if (!operationHint) operationHint = "需要在控制台开通 volc.bigasr.auc_turbo 权限"
+  }
+
+  return {
+    provider,
+    code,
+    message: message || code,
+    http_status: httpStatus,
+    api_status: apiStatus,
+    api_code: apiCode,
+    api_message: apiMessage,
+    request_id: requestId,
+    logid,
+    submit_logid: submitLogid,
+    query_logid: queryLogid,
+    appid_last4: appidLast4,
+    resource_id: resourceId,
+    operation_hint: operationHint,
+  }
+}
+
+function asrAucFallbackWhitelist(): Set<string> {
+  const raw = String(
+    process.env.VOICE_COACH_ASR_AUC_FALLBACK_WHITELIST ||
+      "asr_flash_empty,asr_flash_timeout,asr_flash_http_5xx,asr_flash_http_403,asr_flash_status_5xx,asr_flash_network,asr_flash_permission_denied",
+  )
+  return new Set(
+    raw
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean),
+  )
+}
+
+function shouldFallbackToAuc(meta: AsrErrorMeta | null): boolean {
+  if (!meta || meta.provider !== "flash") return true
+  const whitelist = asrAucFallbackWhitelist()
+  if (whitelist.has(meta.code)) return true
+
+  if (meta.http_status && meta.http_status >= 500 && whitelist.has("asr_flash_http_5xx")) return true
+  if (meta.api_status && /^5/.test(meta.api_status) && whitelist.has("asr_flash_status_5xx")) return true
+  return false
+}
+
 function nowIso(): string {
   return new Date().toISOString()
+}
+
+function sanitizeForEvent(value: unknown, fallback: string): string {
+  const out = String(value || "")
+    .trim()
+    .replace(/[^a-zA-Z0-9._:-]/g, "_")
+  return out || fallback
+}
+
+function normalizeExecutor(raw?: string | null): VoiceCoachJobExecutor {
+  const v = String(raw || "").trim()
+  if (v === "events_pump") return "events_pump"
+  if (v === "submit_pump") return "submit_pump"
+  if (v === "manual") return "manual"
+  return "worker"
 }
 
 function normalizeJobStage(raw: unknown): VoiceCoachJobStage {
@@ -323,8 +610,354 @@ function mergeResult(
   }
 }
 
+function buildAuditMeta(resultState: VoiceCoachJobResultState | null | undefined, executor?: VoiceCoachJobExecutor) {
+  const traceId = sanitizeForEvent(resultState?.trace_id || randomUUID(), randomUUID())
+  const clientBuild = sanitizeForEvent(resultState?.client_build || "unknown", "unknown")
+  const serverBuild = sanitizeForEvent(resultState?.server_build || resolveVoiceCoachServerBuild(), "dev")
+  const resolvedExecutor = normalizeExecutor(resultState?.executor || executor || "worker")
+  return {
+    traceId,
+    clientBuild,
+    serverBuild,
+    executor: resolvedExecutor,
+  }
+}
+
+const VOICE_COACH_TTS_CACHE_TABLE = "voice_coach_tts_cache"
+const VOICE_COACH_TTS_CACHE_URL_PREFIX = `storage://${VOICE_COACH_AUDIO_BUCKET}/`
+
+type VoiceCoachTtsCacheRow = {
+  key: string
+  voice_type: string
+  line_id: string | null
+  cache_kind: "text" | "line"
+  text: string
+  audio_url: string
+  hit_count: number | null
+}
+
+type VoiceCoachTtsRuntimeUrlCacheEntry = {
+  audioPath: string
+  audioUrl: string
+  expiresAtMs: number
+}
+
+const voiceCoachTtsRuntimeUrlCache = new Map<string, VoiceCoachTtsRuntimeUrlCacheEntry>()
+
+function ttsCacheVoiceTag(voiceType: string): string {
+  const voice = String(voiceType || "")
+    .trim()
+    .toLowerCase()
+  return voice.replace(/[^a-z0-9_-]/g, "_") || "default"
+}
+
+function toVoiceCoachTtsStoragePath(cacheKey: string, voiceType: string): string {
+  return `seed/reply-cache/${ttsCacheVoiceTag(voiceType)}/${cacheKey}.mp3`
+}
+
+function toVoiceCoachTtsCacheUrl(path: string): string {
+  const normalized = String(path || "").trim().replace(/^\/+/, "")
+  return `${VOICE_COACH_TTS_CACHE_URL_PREFIX}${normalized}`
+}
+
+function parseVoiceCoachTtsCacheUrl(audioUrl: string | null | undefined): string | null {
+  const raw = String(audioUrl || "").trim()
+  if (!raw) return null
+  if (raw.startsWith(VOICE_COACH_TTS_CACHE_URL_PREFIX)) {
+    return raw.slice(VOICE_COACH_TTS_CACHE_URL_PREFIX.length) || null
+  }
+  // Backward compatibility: tolerate signed/public URLs persisted by historical scripts.
+  const m = raw.match(/\/voice-coach-audio\/([^?]+)(\?|$)/)
+  if (m?.[1]) {
+    try {
+      return decodeURIComponent(m[1])
+    } catch {
+      return m[1]
+    }
+  }
+  return raw.replace(/^\/+/, "") || null
+}
+
+function ttsSignedUrlTtlSeconds(): number {
+  const n = Number(process.env.VOICE_COACH_TTS_SIGNED_URL_TTL_SECONDS || 3600)
+  if (!Number.isFinite(n)) return 3600
+  return Math.max(60, Math.min(24 * 3600, Math.round(n)))
+}
+
+function getRuntimeTtsSignedUrl(cacheKey: string): VoiceCoachTtsRuntimeUrlCacheEntry | null {
+  const key = String(cacheKey || "").trim()
+  if (!key) return null
+  const hit = voiceCoachTtsRuntimeUrlCache.get(key)
+  if (!hit) return null
+  if (hit.expiresAtMs <= Date.now()) {
+    voiceCoachTtsRuntimeUrlCache.delete(key)
+    return null
+  }
+  return hit
+}
+
+function setRuntimeTtsSignedUrl(cacheKey: string, audioPath: string, audioUrl: string): void {
+  const key = String(cacheKey || "").trim()
+  const path = String(audioPath || "").trim()
+  const url = String(audioUrl || "").trim()
+  if (!key || !path || !url) return
+  const ttlMs = ttsSignedUrlTtlSeconds() * 1000
+  voiceCoachTtsRuntimeUrlCache.set(key, {
+    audioPath: path,
+    audioUrl: url,
+    expiresAtMs: Date.now() + ttlMs - 3000,
+  })
+}
+
+async function getVoiceCoachTtsCacheRow(key: string): Promise<VoiceCoachTtsCacheRow | null> {
+  const cacheKey = String(key || "").trim()
+  if (!cacheKey) return null
+  const admin = createAdminSupabaseClient()
+  const { data, error } = await admin
+    .from(VOICE_COACH_TTS_CACHE_TABLE)
+    .select("key, voice_type, line_id, cache_kind, text, audio_url, hit_count")
+    .eq("key", cacheKey)
+    .maybeSingle()
+
+  if (error || !data) return null
+  return {
+    key: String((data as any).key || ""),
+    voice_type: String((data as any).voice_type || ""),
+    line_id: typeof (data as any).line_id === "string" ? String((data as any).line_id) : null,
+    cache_kind: String((data as any).cache_kind || "text") === "line" ? "line" : "text",
+    text: String((data as any).text || ""),
+    audio_url: String((data as any).audio_url || ""),
+    hit_count: asNumber((data as any).hit_count),
+  }
+}
+
+async function getVoiceCoachTtsLineCacheRow(opts: {
+  voiceType: string
+  lineId: string
+}): Promise<VoiceCoachTtsCacheRow | null> {
+  const voiceType = String(opts.voiceType || "").trim()
+  const lineId = String(opts.lineId || "").trim()
+  if (!voiceType || !lineId) return null
+  const admin = createAdminSupabaseClient()
+  const { data, error } = await admin
+    .from(VOICE_COACH_TTS_CACHE_TABLE)
+    .select("key, voice_type, line_id, cache_kind, text, audio_url, hit_count, created_at")
+    .eq("voice_type", voiceType)
+    .eq("line_id", lineId)
+    .eq("cache_kind", "line")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error || !data) return null
+  return {
+    key: String((data as any).key || ""),
+    voice_type: String((data as any).voice_type || ""),
+    line_id: typeof (data as any).line_id === "string" ? String((data as any).line_id) : null,
+    cache_kind: "line",
+    text: String((data as any).text || ""),
+    audio_url: String((data as any).audio_url || ""),
+    hit_count: asNumber((data as any).hit_count),
+  }
+}
+
+async function bumpVoiceCoachTtsCacheHitCount(key: string, currentHitCount: number | null): Promise<void> {
+  const cacheKey = String(key || "").trim()
+  if (!cacheKey) return
+  const current = Number.isFinite(Number(currentHitCount)) ? Math.max(0, Math.floor(Number(currentHitCount))) : 0
+  const admin = createAdminSupabaseClient()
+  await admin
+    .from(VOICE_COACH_TTS_CACHE_TABLE)
+    .update({
+      hit_count: current + 1,
+    })
+    .eq("key", cacheKey)
+}
+
+async function saveVoiceCoachTtsCacheRow(opts: {
+  key: string
+  voiceType: string
+  text: string
+  audioPath: string
+  cacheKind?: "text" | "line"
+  lineId?: string | null
+  audioUrl?: string | null
+  hitCount?: number
+}): Promise<void> {
+  const key = String(opts.key || "").trim()
+  const voiceType = String(opts.voiceType || "").trim()
+  const text = String(opts.text || "").trim()
+  const audioPath = String(opts.audioPath || "").trim()
+  const lineId = String(opts.lineId || "").trim()
+  const audioUrl = String(opts.audioUrl || "").trim()
+  const cacheKind = opts.cacheKind === "line" ? "line" : "text"
+  if (!key || !voiceType || !text || !audioPath) return
+  const admin = createAdminSupabaseClient()
+  await admin.from(VOICE_COACH_TTS_CACHE_TABLE).upsert(
+    {
+      key,
+      voice_type: voiceType,
+      line_id: cacheKind === "line" ? lineId || null : null,
+      cache_kind: cacheKind,
+      text,
+      audio_url: audioUrl || toVoiceCoachTtsCacheUrl(audioPath),
+      hit_count: Number.isFinite(Number(opts.hitCount)) ? Math.max(0, Math.floor(Number(opts.hitCount))) : 0,
+    },
+    {
+      onConflict: "key",
+    },
+  )
+}
+
+function normalizeStableTtsSource(source: unknown): VoiceCoachStableTtsSource {
+  const raw = String(source || "").trim()
+  if (raw === "line_cache") return "line_cache"
+  if (raw === "text_cache" || raw === "existing" || raw === "seed_cache" || raw === "tts_cache") return "text_cache"
+  return "runtime"
+}
+
+function emptyTtsSourceDistribution(): VoiceCoachTtsSourceDistribution {
+  return {
+    line_cache: 0,
+    text_cache: 0,
+    runtime: 0,
+  }
+}
+
+function isTtsCacheHitSource(source: VoiceCoachStableTtsSource | string): boolean {
+  const normalized = normalizeStableTtsSource(source)
+  return normalized === "line_cache" || normalized === "text_cache"
+}
+
+async function calcAudioRoundStatsBySession(opts: {
+  sessionId: string
+  currentSource: VoiceCoachStableTtsSource
+  currentScriptHit: boolean
+  currentLlmUsed: boolean
+}): Promise<{
+  ttsCacheHitRate: number
+  ttsCacheHitRounds: number
+  totalRounds: number
+  scriptHitRate: number
+  scriptHitRounds: number
+  ttsLineCacheHitRate: number
+  ttsLineCacheHitRounds: number
+  llmUsedWhenScriptHitCount: number
+  ttsSourceDistribution: VoiceCoachTtsSourceDistribution
+}> {
+  const sessionId = String(opts.sessionId || "").trim()
+  if (!sessionId) {
+    return {
+      ttsCacheHitRate: 0,
+      ttsCacheHitRounds: 0,
+      totalRounds: 0,
+      scriptHitRate: 0,
+      scriptHitRounds: 0,
+      ttsLineCacheHitRate: 0,
+      ttsLineCacheHitRounds: 0,
+      llmUsedWhenScriptHitCount: 0,
+      ttsSourceDistribution: emptyTtsSourceDistribution(),
+    }
+  }
+  const admin = createAdminSupabaseClient()
+  const { data } = await admin
+    .from("voice_coach_events")
+    .select("data_json")
+    .eq("session_id", sessionId)
+    .eq("type", "customer.audio_ready")
+    .order("id", { ascending: false })
+    .limit(300)
+
+  let ttsCacheHitRounds = 0
+  let totalRounds = 0
+  let scriptHitRounds = 0
+  let ttsLineCacheHitRounds = 0
+  let llmUsedWhenScriptHitCount = 0
+  const ttsSourceDistribution = emptyTtsSourceDistribution()
+
+  for (const row of data || []) {
+    const payload = (row as any)?.data_json || {}
+    const source = normalizeStableTtsSource(payload?.tts_source)
+    const scriptHit =
+      payload?.script_hit === true || (Boolean(String(payload?.line_id || "").trim()) && payload?.llm_used !== true)
+    const llmUsed = payload?.llm_used === true
+
+    totalRounds += 1
+    ttsSourceDistribution[source] += 1
+    if (isTtsCacheHitSource(source)) ttsCacheHitRounds += 1
+    if (source === "line_cache") ttsLineCacheHitRounds += 1
+    if (scriptHit) scriptHitRounds += 1
+    if (scriptHit && llmUsed) llmUsedWhenScriptHitCount += 1
+  }
+
+  totalRounds += 1
+  const currentSource = normalizeStableTtsSource(opts.currentSource)
+  ttsSourceDistribution[currentSource] += 1
+  if (isTtsCacheHitSource(currentSource)) {
+    ttsCacheHitRounds += 1
+  }
+  if (currentSource === "line_cache") ttsLineCacheHitRounds += 1
+  if (opts.currentScriptHit) scriptHitRounds += 1
+  if (opts.currentScriptHit && opts.currentLlmUsed) llmUsedWhenScriptHitCount += 1
+
+  const ttsCacheHitRate = totalRounds > 0 ? Number((ttsCacheHitRounds / totalRounds).toFixed(4)) : 0
+  const scriptHitRate = totalRounds > 0 ? Number((scriptHitRounds / totalRounds).toFixed(4)) : 0
+  const ttsLineCacheHitRate = totalRounds > 0 ? Number((ttsLineCacheHitRounds / totalRounds).toFixed(4)) : 0
+  return {
+    ttsCacheHitRate,
+    ttsCacheHitRounds,
+    totalRounds,
+    scriptHitRate,
+    scriptHitRounds,
+    ttsLineCacheHitRate,
+    ttsLineCacheHitRounds,
+    llmUsedWhenScriptHitCount,
+    ttsSourceDistribution,
+  }
+}
+
 export async function emitVoiceCoachEvent(args: EmitEventArgs): Promise<number> {
   const admin = createAdminSupabaseClient()
+  const rawData =
+    args.data && typeof args.data === "object" && !Array.isArray(args.data) ? { ...(args.data as Record<string, unknown>) } : {}
+  const rawMeta =
+    rawData.meta && typeof rawData.meta === "object" && !Array.isArray(rawData.meta)
+      ? { ...(rawData.meta as Record<string, unknown>) }
+      : {}
+  const traceId = sanitizeForEvent(
+    args.traceId || (rawData.trace_id as string) || (rawMeta.trace_id as string) || randomUUID(),
+    randomUUID(),
+  )
+  const clientBuild = sanitizeForEvent(
+    args.clientBuild || (rawData.client_build as string) || (rawMeta.client_build as string) || "unknown",
+    "unknown",
+  )
+  const serverBuild = sanitizeForEvent(
+    args.serverBuild || (rawData.server_build as string) || (rawMeta.server_build as string) || resolveVoiceCoachServerBuild(),
+    "dev",
+  )
+  const executor = normalizeExecutor(
+    (typeof args.executor === "string"
+      ? args.executor
+      : typeof rawData.executor === "string"
+        ? rawData.executor
+        : typeof rawMeta.executor === "string"
+          ? rawMeta.executor
+          : "worker") || "worker",
+  )
+  const dataJson = {
+    ...rawData,
+    trace_id: traceId,
+    client_build: clientBuild,
+    server_build: serverBuild,
+    executor,
+    meta: {
+      ...rawMeta,
+      trace_id: traceId,
+      client_build: clientBuild,
+      server_build: serverBuild,
+      executor,
+    },
+  }
   const { data, error } = await admin
     .from("voice_coach_events")
     .insert({
@@ -333,7 +966,7 @@ export async function emitVoiceCoachEvent(args: EmitEventArgs): Promise<number> 
       turn_id: args.turnId || null,
       job_id: args.jobId || null,
       type: args.type,
-      data_json: args.data || {},
+      data_json: dataJson,
     })
     .select("id")
     .single()
@@ -348,16 +981,25 @@ async function markJobError(args: {
   turnId: string
   code: string
   message: string
+  extraData?: Record<string, unknown>
+  traceId?: string | null
+  clientBuild?: string | null
+  serverBuild?: string | null
+  executor?: VoiceCoachJobExecutor
 }) {
   const admin = createAdminSupabaseClient()
+  const updatedAt = nowIso()
+  const executor = normalizeExecutor(args.executor || "worker")
   await admin
     .from("voice_coach_jobs")
     .update({
       status: "error",
       stage: "error",
       last_error: args.message,
-      finished_at: nowIso(),
-      updated_at: nowIso(),
+      finished_at: updatedAt,
+      updated_at: updatedAt,
+      executor,
+      lock_owner: null,
     })
     .eq("id", args.jobId)
 
@@ -368,10 +1010,15 @@ async function markJobError(args: {
     userId: args.userId,
     turnId: args.turnId,
     jobId: args.jobId,
+    traceId: args.traceId,
+    clientBuild: args.clientBuild,
+    serverBuild: args.serverBuild,
+    executor,
     type: "turn.error",
     data: {
       code: args.code,
       message: args.message,
+      ...(args.extraData || {}),
       ts: nowIso(),
     },
   })
@@ -410,15 +1057,29 @@ async function queueNextStage(args: {
   jobId: string
   stage: Exclude<VoiceCoachJobStage, "done" | "error">
   result: VoiceCoachJobResultState
+  keepProcessing?: boolean
+  lockOwner?: string | null
 }) {
   const admin = createAdminSupabaseClient()
+  const keepProcessing = Boolean(args.keepProcessing)
+  const updatedAt = nowIso()
+  const stageEnteredAtMs = parseIsoToMs(updatedAt) || Date.now()
+  const nextLockOwner = keepProcessing && args.lockOwner ? String(args.lockOwner).slice(0, 120) : null
+  const executor = normalizeExecutor(args.result?.executor || "worker")
+  const nextResult = mergeResult(args.result, {
+    stage_entered_at_ms: stageEnteredAtMs,
+    executor,
+  })
   await admin
     .from("voice_coach_jobs")
     .update({
-      status: "queued",
+      status: keepProcessing ? "processing" : "queued",
       stage: args.stage,
-      updated_at: nowIso(),
-      result_json: args.result,
+      updated_at: updatedAt,
+      stage_entered_at: updatedAt,
+      executor,
+      lock_owner: nextLockOwner,
+      result_json: nextResult,
     })
     .eq("id", args.jobId)
 }
@@ -428,13 +1089,17 @@ async function finishJob(args: {
   result: VoiceCoachJobResultState
 }) {
   const admin = createAdminSupabaseClient()
+  const updatedAt = nowIso()
+  const executor = normalizeExecutor(args.result?.executor || "worker")
   await admin
     .from("voice_coach_jobs")
     .update({
       status: "done",
       stage: "done",
-      finished_at: nowIso(),
-      updated_at: nowIso(),
+      finished_at: updatedAt,
+      updated_at: updatedAt,
+      executor,
+      lock_owner: null,
       result_json: args.result,
     })
     .eq("id", args.jobId)
@@ -491,9 +1156,20 @@ async function processMainStage(args: {
   turnId: string
   payload: VoiceCoachJobPayload
   resultState: VoiceCoachJobResultState
+  executor?: VoiceCoachJobExecutor
+  chainTtsInSameLock?: boolean
+  lockOwner?: string | null
 }): Promise<ProcessJobResult> {
   const admin = createAdminSupabaseClient()
-  const pipelineStartedAt = Number(args.resultState.pipeline_started_at_ms || Date.now())
+  const auditMeta = buildAuditMeta(args.resultState, args.executor)
+  const resultState = mergeResult(args.resultState, {
+    trace_id: auditMeta.traceId,
+    client_build: auditMeta.clientBuild,
+    server_build: auditMeta.serverBuild,
+    executor: auditMeta.executor,
+  })
+  const pipelineStartedAt = Number(resultState.pipeline_started_at_ms || Date.now())
+  const queueWaitBeforeMainMs = nonNegativeMs(resultState.queue_wait_before_main_ms)
 
   const loaded = await loadSessionAndTurn({ sessionId: args.sessionId, turnId: args.turnId })
   if (!loaded || loaded.session.status !== "active") {
@@ -504,6 +1180,10 @@ async function processMainStage(args: {
       turnId: args.turnId,
       code: "session_not_active",
       message: "会话已结束或不存在",
+      traceId: auditMeta.traceId,
+      clientBuild: auditMeta.clientBuild,
+      serverBuild: auditMeta.serverBuild,
+      executor: auditMeta.executor,
     })
     return { processed: true, done: true, jobId: args.jobId, turnId: args.turnId }
   }
@@ -516,6 +1196,10 @@ async function processMainStage(args: {
       turnId: args.turnId,
       code: "turn_not_found",
       message: "未找到待处理的美容师回合",
+      traceId: auditMeta.traceId,
+      clientBuild: auditMeta.clientBuild,
+      serverBuild: auditMeta.serverBuild,
+      executor: auditMeta.executor,
     })
     return { processed: true, done: true, jobId: args.jobId, turnId: args.turnId }
   }
@@ -537,6 +1221,10 @@ async function processMainStage(args: {
       turnId: args.turnId,
       code: "reply_turn_not_found",
       message: "顾客回合不存在，无法继续识别",
+      traceId: auditMeta.traceId,
+      clientBuild: auditMeta.clientBuild,
+      serverBuild: auditMeta.serverBuild,
+      executor: auditMeta.executor,
     })
     return { processed: true, done: true, jobId: args.jobId, turnId: args.turnId }
   }
@@ -550,6 +1238,10 @@ async function processMainStage(args: {
       turnId: args.turnId,
       code: "audio_missing",
       message: "录音文件缺失，请重录",
+      traceId: auditMeta.traceId,
+      clientBuild: auditMeta.clientBuild,
+      serverBuild: auditMeta.serverBuild,
+      executor: auditMeta.executor,
     })
     return { processed: true, done: true, jobId: args.jobId, turnId: args.turnId }
   }
@@ -565,20 +1257,30 @@ async function processMainStage(args: {
       turnId: args.turnId,
       code: "unsupported_audio_format",
       message: "当前仅支持 mp3/wav/ogg 录音，请调整录音格式后重试。",
+      traceId: auditMeta.traceId,
+      clientBuild: auditMeta.clientBuild,
+      serverBuild: auditMeta.serverBuild,
+      executor: auditMeta.executor,
     })
     return { processed: true, done: true, jobId: args.jobId, turnId: args.turnId }
   }
 
   let asr: DoubaoAsrResult | null = null
   let asrProvider: "flash" | "auc" = "flash"
+  const asrProviderAttempted: Array<"flash" | "auc"> = []
   let asrFallbackUsed = false
-  const flashEnabled = shouldUseFlashAsr()
-  const allowAucFallback = !flashEnabled || shouldAllowAucFallbackWhenFlashEnabled()
+  const requireFlash = shouldRequireFlashAsr()
+  const flashEnabled = requireFlash || (shouldUseFlashAsr() && !flashResourcePermissionDenied)
+  const allowAucFallbackByConfig = !flashEnabled || shouldAllowAucFallbackWhenFlashEnabled()
   const estimatedAudioSeconds = asNumber(args.payload.client_audio_seconds) || loaded.turn.audio_seconds || null
   const canUseAucFallbackByDuration = !estimatedAudioSeconds || estimatedAudioSeconds >= 1.2
   let latestAsrError: unknown = null
+  let latestAsrMeta: AsrErrorMeta | null = null
+  let flashFailureMeta: AsrErrorMeta | null = null
+  const asrStartedAt = Date.now()
 
   if (flashEnabled && format !== "raw") {
+    asrProviderAttempted.push("flash")
     try {
       const flashRes = await doubaoAsrFlash({
         audio: audioBuf,
@@ -588,18 +1290,70 @@ async function processMainStage(args: {
       if (flashRes.text) {
         asr = flashRes
         asrProvider = "flash"
+        flashResourcePermissionDenied = false
+        latestAsrMeta = null
+        flashFailureMeta = null
       } else {
-        latestAsrError = new Error("asr_flash_empty")
+        latestAsrError = Object.assign(new Error("asr_flash_empty"), {
+          code: "asr_flash_empty",
+          provider: "flash",
+        })
+        flashFailureMeta = asrErrorMeta(latestAsrError, "flash")
+        latestAsrMeta = flashFailureMeta
       }
     } catch (err: any) {
       latestAsrError = err
+      if (isAsrFlashPermissionDenied(err)) {
+        // Cache permission denial in-process to avoid repeated slow/failed flash attempts.
+        flashResourcePermissionDenied = true
+        if (typeof (err as any)?.code !== "string") {
+          ;(err as any).code = "asr_flash_permission_denied"
+        }
+      }
+      flashFailureMeta = asrErrorMeta(err, "flash")
+      latestAsrMeta = flashFailureMeta
       asr = null
     }
   }
 
-  if ((!asr || !asr.text) && allowAucFallback && canUseAucFallbackByDuration) {
+  const flashPermissionDeniedMeta = [flashFailureMeta, latestAsrMeta].find(
+    (meta) => meta?.provider === "flash" && meta?.code === "asr_flash_permission_denied",
+  )
+  const hardStopOnPermissionDenied = Boolean(requireFlash && flashPermissionDeniedMeta)
+  if (hardStopOnPermissionDenied) {
+    const denied = flashPermissionDeniedMeta as AsrErrorMeta
+    latestAsrError = Object.assign(new Error(denied.message || "asr_flash_permission_denied"), {
+      code: "asr_flash_permission_denied",
+      provider: "flash",
+      http_status: denied.http_status,
+      api_status: denied.api_status,
+      api_code: denied.api_code,
+      api_message: denied.api_message,
+      request_id: denied.request_id,
+      logid: denied.logid,
+      appid_last4: denied.appid_last4,
+      resource_id: denied.resource_id,
+      operation_hint: denied.operation_hint,
+    })
+    latestAsrMeta = denied
+    console.error("[voice-coach][asr][flash] require_flash hard-stop", {
+      asr_error_code: denied.code,
+      operation_hint: denied.operation_hint,
+      flash_request_id: denied.request_id,
+      flash_logid: denied.logid,
+      appid_last4: denied.appid_last4,
+      resource_id: denied.resource_id,
+    })
+  }
+
+  const allowFallbackByReason =
+    !hardStopOnPermissionDenied && (!flashEnabled || shouldFallbackToAuc(flashFailureMeta || latestAsrMeta))
+  const allowAucFallback =
+    !hardStopOnPermissionDenied && allowAucFallbackByConfig && canUseAucFallbackByDuration && allowFallbackByReason
+  if ((!asr || !asr.text) && allowAucFallback) {
     asrFallbackUsed = true
     asrProvider = "auc"
+    asrProviderAttempted.push("auc")
     const signed = await signVoiceCoachAudio(audioPath)
     try {
       asr = (await Promise.race([
@@ -608,17 +1362,21 @@ async function processMainStage(args: {
           format: format as "mp3" | "wav" | "ogg" | "raw",
           uid: args.userId,
         }),
-        sleep(3500).then(() => {
+        sleep(asrAucTotalTimeoutMs()).then(() => {
           throw new Error("asr_timeout")
         }),
       ])) as DoubaoAsrResult
+      latestAsrMeta = null
     } catch (err) {
       latestAsrError = err
+      latestAsrMeta = asrErrorMeta(err, "auc")
       asr = null
     }
   }
 
   if (!asr || !asr.text) {
+    const asrProviderFinalOnError =
+      latestAsrMeta?.provider || (asrProviderAttempted.length > 0 ? asrProviderAttempted[asrProviderAttempted.length - 1] : null)
     const normalized = normalizeAsrFailure(latestAsrError)
     await markJobError({
       jobId: args.jobId,
@@ -627,9 +1385,40 @@ async function processMainStage(args: {
       turnId: args.turnId,
       code: normalized.code,
       message: normalized.message,
+      traceId: auditMeta.traceId,
+      clientBuild: auditMeta.clientBuild,
+      serverBuild: auditMeta.serverBuild,
+      executor: auditMeta.executor,
+      extraData: {
+        asr_provider: asrProviderFinalOnError,
+        asr_provider_attempted: asrProviderAttempted,
+        asr_provider_final: asrProviderFinalOnError,
+        asr_outcome: "failed",
+        asr_error_code: latestAsrMeta?.code || null,
+        asr_http_status: latestAsrMeta?.http_status || null,
+        asr_api_status: latestAsrMeta?.api_status || null,
+        asr_api_code: latestAsrMeta?.api_code || null,
+        asr_api_message: latestAsrMeta?.api_message || null,
+        asr_request_id: latestAsrMeta?.request_id || null,
+        asr_logid: latestAsrMeta?.logid || null,
+        asr_submit_logid: latestAsrMeta?.submit_logid || null,
+        asr_query_logid: latestAsrMeta?.query_logid || null,
+        flash_request_id: latestAsrMeta?.provider === "flash" ? latestAsrMeta.request_id : null,
+        flash_logid: latestAsrMeta?.provider === "flash" ? latestAsrMeta.logid : null,
+        appid_last4: latestAsrMeta?.appid_last4 || null,
+        resource_id: latestAsrMeta?.resource_id || null,
+        operation_hint: latestAsrMeta?.operation_hint || null,
+        require_flash: requireFlash,
+      },
     })
     return { processed: true, done: true, jobId: args.jobId, turnId: args.turnId }
   }
+
+  const asrMs = Date.now() - asrStartedAt
+  const asrQueueWaitMs = queueWaitBeforeMainMs
+  const asrReadyMs = asrMs + (asrQueueWaitMs || 0)
+  const asrProviderFinal: "flash" | "auc" = asrProvider
+  const asrOutcome: "success" | "fallback_success" = asrFallbackUsed ? "fallback_success" : "success"
 
   const audioSeconds = asr.durationSeconds || asNumber(args.payload.client_audio_seconds) || loaded.turn.audio_seconds || null
   const wpm = calcWpm(asr.text, audioSeconds)
@@ -639,6 +1428,19 @@ async function processMainStage(args: {
   const beauticianTurnNo = Math.floor((Number(loaded.turn.turn_index) + 1) / 2)
   const hardMax = hardMaxTurns()
   const reachedMax = hardMax > 0 && beauticianTurnNo >= hardMax
+  const flashRequestId = asrProvider === "flash" ? asr.requestId : flashFailureMeta?.request_id || null
+  const flashLogid = asrProvider === "flash" ? asr.logid || null : flashFailureMeta?.logid || null
+  const flashAppidLast4 = flashFailureMeta?.appid_last4 || null
+  const flashResourceId = flashFailureMeta?.resource_id || (asrProvider === "flash" ? asr.resourceId || null : null)
+  const flashOperationHint = flashFailureMeta?.operation_hint || null
+  const aucRequestId =
+    asrProvider === "auc" ? asr.requestId : latestAsrMeta?.provider === "auc" ? latestAsrMeta.request_id : null
+  const aucLogid =
+    asrProvider === "auc"
+      ? asr.logid || asr.queryLogid || asr.submitLogid || null
+      : latestAsrMeta?.provider === "auc"
+        ? latestAsrMeta.logid || latestAsrMeta.query_logid || latestAsrMeta.submit_logid || null
+        : null
 
   await admin
     .from("voice_coach_turns")
@@ -658,6 +1460,10 @@ async function processMainStage(args: {
     userId: args.userId,
     turnId: args.turnId,
     jobId: args.jobId,
+    traceId: auditMeta.traceId,
+    clientBuild: auditMeta.clientBuild,
+    serverBuild: auditMeta.serverBuild,
+    executor: auditMeta.executor,
     type: "beautician.asr_ready",
     data: {
       turn_id: args.turnId,
@@ -666,14 +1472,46 @@ async function processMainStage(args: {
       audio_seconds: audioSeconds,
       audio_url: beauticianAudioUrl,
       asr_provider: asrProvider,
+      asr_provider_attempted: asrProviderAttempted,
+      asr_provider_final: asrProviderFinal,
+      asr_outcome: asrOutcome,
+      asr_resource_id: asr.resourceId || null,
       asr_fallback_used: asrFallbackUsed,
+      asr_error_code: latestAsrMeta?.code || flashFailureMeta?.code || null,
+      asr_http_status: latestAsrMeta?.http_status || flashFailureMeta?.http_status || null,
+      asr_api_status: latestAsrMeta?.api_status || flashFailureMeta?.api_status || null,
+      asr_api_code: latestAsrMeta?.api_code || flashFailureMeta?.api_code || null,
+      asr_api_message: latestAsrMeta?.api_message || flashFailureMeta?.api_message || null,
+      flash_error_code: flashFailureMeta?.code || null,
+      flash_http_status: flashFailureMeta?.http_status || null,
+      flash_api_status: flashFailureMeta?.api_status || null,
+      flash_api_code: flashFailureMeta?.api_code || null,
+      flash_api_message: flashFailureMeta?.api_message || null,
+      flash_request_id: flashRequestId,
+      flash_logid: flashLogid,
+      appid_last4: flashAppidLast4,
+      resource_id: flashResourceId,
+      operation_hint: flashOperationHint,
+      require_flash: requireFlash,
+      auc_request_id: aucRequestId,
+      auc_logid: aucLogid,
+      submit_ack_ms: asNumber(resultState.submit_ack_ms),
+      upload_ms: asNumber(resultState.upload_ms),
+      asr_ms: asrMs,
+      asr_ready_ms: asrReadyMs,
+      asr_queue_wait_ms: asrQueueWaitMs,
+      queue_wait_before_main_ms: queueWaitBeforeMainMs,
       reached_max_turns: reachedMax,
+      trace_id: resultState.trace_id || null,
+      client_build: resultState.client_build || null,
+      server_build: resultState.server_build || auditMeta.serverBuild,
+      executor: resultState.executor || auditMeta.executor,
       stage_elapsed_ms: Date.now() - pipelineStartedAt,
       ts: nowIso(),
     },
   })
 
-  const stageResultBase = mergeResult(args.resultState, {
+  const stageResultBase = mergeResult(resultState, {
     pipeline_started_at_ms: pipelineStartedAt,
     reached_max_turns: reachedMax,
     reply_turn_id: String(replyTurn.id),
@@ -682,6 +1520,32 @@ async function processMainStage(args: {
     beautician_audio_url: beauticianAudioUrl,
     beautician_audio_seconds: audioSeconds,
     beautician_asr_confidence: asr.confidence,
+    flash_request_id: flashRequestId,
+    flash_logid: flashLogid,
+    auc_request_id: aucRequestId,
+    auc_logid: aucLogid,
+    asr_ms: asrMs,
+    asr_ready_ms: asrReadyMs,
+    asr_queue_wait_ms: asrQueueWaitMs ?? undefined,
+    asr_provider_attempted: asrProviderAttempted,
+    asr_provider_final: asrProviderFinal,
+    asr_outcome: asrOutcome,
+    queue_wait_before_main_ms: queueWaitBeforeMainMs ?? undefined,
+    asr_error:
+      latestAsrMeta || flashFailureMeta
+        ? {
+            provider: (latestAsrMeta || flashFailureMeta)?.provider || "flash",
+            code: (latestAsrMeta || flashFailureMeta)?.code || "asr_failed",
+            message: (latestAsrMeta || flashFailureMeta)?.message || "",
+            http_status: (latestAsrMeta || flashFailureMeta)?.http_status || null,
+            api_status: (latestAsrMeta || flashFailureMeta)?.api_status || null,
+            api_code: (latestAsrMeta || flashFailureMeta)?.api_code || null,
+            api_message: (latestAsrMeta || flashFailureMeta)?.api_message || null,
+            appid_last4: (latestAsrMeta || flashFailureMeta)?.appid_last4 || null,
+            resource_id: (latestAsrMeta || flashFailureMeta)?.resource_id || null,
+            operation_hint: (latestAsrMeta || flashFailureMeta)?.operation_hint || null,
+          }
+        : null,
   })
 
   if (reachedMax) {
@@ -696,6 +1560,7 @@ async function processMainStage(args: {
 
   const scenario = getScenario(String(loaded.session.scenario_id || "sale"))
   const categoryId = normalizeVoiceCoachCategoryId(String(loaded.session.category_id || scenario.categoryId))
+  const scriptSelectStartedAt = Date.now()
   const history = await buildHistory(args.sessionId, Number(loaded.turn.turn_index))
   const policyState = loaded.session.policy_state_json || createInitialPolicyState({ categoryId })
   const selection = selectNextCustomerLine({
@@ -704,31 +1569,53 @@ async function processMainStage(args: {
     beauticianText: asr.text,
     history: history.map((item) => ({ role: item.role, text: item.text })),
   })
+  const scriptSelectMs = Date.now() - scriptSelectStartedAt
 
-  const modelRewriteEnabled = String(process.env.VOICE_COACH_MODEL_REWRITE_ENABLED || "true")
+  const modelRewriteEnabledByConfig = String(process.env.VOICE_COACH_MODEL_REWRITE_ENABLED || "true")
     .trim()
     .toLowerCase() !== "false"
   const modelRewriteRatio = Number(process.env.VOICE_COACH_MODEL_REWRITE_RATIO || 0.3)
+  const selectedLineId = String(selection.line.line_id || "").trim()
+  const baseLine = {
+    text: selection.line.text,
+    emotion: (selection.line.emotion || "skeptical") as VoiceCoachEmotion,
+    tag: String(selection.line.tag || selection.line.intent_id || "跟进追问"),
+  }
+  const shouldForceDisableLlmRewrite = Boolean(selectedLineId)
+  const modelRewriteEnabled = modelRewriteEnabledByConfig && !shouldForceDisableLlmRewrite
 
-  const rewritten = await maybeRewriteCustomerLine({
-    enabled: modelRewriteEnabled,
-    probability: Number.isFinite(modelRewriteRatio) ? modelRewriteRatio : 0.3,
-    base: {
-      text: selection.line.text,
-      emotion: (selection.line.emotion || "skeptical") as VoiceCoachEmotion,
-      tag: String(selection.line.tag || selection.line.intent_id || "跟进追问"),
-    },
-    rewrite: async () => {
-      return llmRewriteCustomerLine({
-        scenario,
-        history,
-        baseText: selection.line.text,
-        intent: selection.intent_id,
-        angle: selection.angle_id,
-        category: categoryId,
-      })
-    },
-  })
+  let llmMs = 0
+  const rewritten = shouldForceDisableLlmRewrite
+    ? {
+        ...baseLine,
+        reply_source: "fixed" as const,
+      }
+    : await (async () => {
+        const llmStartedAt = Date.now()
+        const result = await maybeRewriteCustomerLine({
+          enabled: modelRewriteEnabled,
+          probability: Number.isFinite(modelRewriteRatio) ? modelRewriteRatio : 0.3,
+          base: baseLine,
+          rewrite: async () => {
+            return llmRewriteCustomerLine({
+              scenario,
+              history,
+              baseText: selection.line.text,
+              intent: selection.intent_id,
+              angle: selection.angle_id,
+              category: categoryId,
+            })
+          },
+        })
+        llmMs = Date.now() - llmStartedAt
+        return result
+      })()
+  const llmUsed = rewritten.reply_source === "mixed"
+  const scriptHit =
+    Boolean(selectedLineId) &&
+    !llmUsed &&
+    normalizeInlineText(rewritten.text) === normalizeInlineText(baseLine.text)
+  const textReadyMs = scriptSelectMs + llmMs
 
   const nextCustomer = {
     text: rewritten.text,
@@ -738,6 +1625,8 @@ async function processMainStage(args: {
     intent_id: selection.intent_id,
     angle_id: selection.angle_id,
     reply_source: rewritten.reply_source,
+    llm_used: llmUsed,
+    script_hit: scriptHit,
     loop_guard_triggered: selection.loop_guard_triggered,
   }
 
@@ -757,7 +1646,7 @@ async function processMainStage(args: {
     .eq("turn_index", customerTurnIndex)
     .maybeSingle()
 
-  let nextCustomerTurnId = args.resultState.next_customer_turn_id || randomUUID()
+  let nextCustomerTurnId = resultState.next_customer_turn_id || randomUUID()
   if (existingCustomerAtIndex?.id) {
     if (String(existingCustomerAtIndex.role || "") !== "customer") {
       await markJobError({
@@ -767,6 +1656,10 @@ async function processMainStage(args: {
         turnId: args.turnId,
         code: "customer_turn_conflict",
         message: "对话状态冲突，请重试",
+        traceId: auditMeta.traceId,
+        clientBuild: auditMeta.clientBuild,
+        serverBuild: auditMeta.serverBuild,
+        executor: auditMeta.executor,
       })
       return { processed: true, done: true, jobId: args.jobId, turnId: args.turnId }
     }
@@ -787,6 +1680,8 @@ async function processMainStage(args: {
           category_id: categoryId,
           intent_id: nextCustomer.intent_id,
           angle_id: nextCustomer.angle_id,
+          llm_used: nextCustomer.llm_used,
+          script_hit: nextCustomer.script_hit,
           loop_guard_triggered: nextCustomer.loop_guard_triggered,
         },
       })
@@ -809,6 +1704,8 @@ async function processMainStage(args: {
         category_id: categoryId,
         intent_id: nextCustomer.intent_id,
         angle_id: nextCustomer.angle_id,
+        llm_used: nextCustomer.llm_used,
+        script_hit: nextCustomer.script_hit,
         loop_guard_triggered: nextCustomer.loop_guard_triggered,
       },
     })
@@ -841,6 +1738,10 @@ async function processMainStage(args: {
     userId: args.userId,
     turnId: nextCustomerTurnId,
     jobId: args.jobId,
+    traceId: auditMeta.traceId,
+    clientBuild: auditMeta.clientBuild,
+    serverBuild: auditMeta.serverBuild,
+    executor: auditMeta.executor,
     type: "customer.text_ready",
     data: {
       turn_id: nextCustomerTurnId,
@@ -852,30 +1753,63 @@ async function processMainStage(args: {
       angle_id: nextCustomer.angle_id,
       line_id: nextCustomer.line_id,
       reply_source: nextCustomer.reply_source,
+      llm_used: nextCustomer.llm_used,
+      script_hit: nextCustomer.script_hit,
       loop_guard_triggered: nextCustomer.loop_guard_triggered,
+      submit_ack_ms: asNumber(resultState.submit_ack_ms),
+      upload_ms: asNumber(resultState.upload_ms),
+      asr_ms: asNumber(stageResultBase.asr_ms),
+      queue_wait_before_main_ms: asNumber(stageResultBase.queue_wait_before_main_ms),
+      script_select_ms: scriptSelectMs,
+      llm_ms: llmMs,
+      text_ready_ms: textReadyMs,
+      trace_id: resultState.trace_id || null,
+      client_build: resultState.client_build || null,
+      server_build: resultState.server_build || auditMeta.serverBuild,
+      executor: resultState.executor || auditMeta.executor,
       stage_elapsed_ms: Date.now() - pipelineStartedAt,
       ts: nowIso(),
     },
   })
 
+  const ttsQueuedAtMs = Date.now()
+  const nextStageResult = mergeResult(stageResultBase, {
+    next_customer_turn_id: nextCustomerTurnId,
+    next_customer_line_id: nextCustomer.line_id,
+    next_customer_text: nextCustomer.text,
+    next_customer_emotion: nextCustomer.emotion,
+    next_customer_tag: nextCustomer.tag,
+    category_id: categoryId,
+    intent_id: nextCustomer.intent_id,
+    angle_id: nextCustomer.angle_id,
+    reply_source: nextCustomer.reply_source,
+    llm_used: nextCustomer.llm_used,
+    script_hit: nextCustomer.script_hit,
+    loop_guard_triggered: nextCustomer.loop_guard_triggered,
+    customer_text_elapsed_ms: Date.now() - pipelineStartedAt,
+    tts_queued_at_ms: ttsQueuedAtMs,
+    stage_entered_at_ms: ttsQueuedAtMs,
+    script_select_ms: scriptSelectMs,
+    llm_ms: llmMs,
+    text_ready_ms: textReadyMs,
+  })
+
   await queueNextStage({
     jobId: args.jobId,
     stage: "tts_pending",
-    result: mergeResult(stageResultBase, {
-      next_customer_turn_id: nextCustomerTurnId,
-      next_customer_text: nextCustomer.text,
-      next_customer_emotion: nextCustomer.emotion,
-      next_customer_tag: nextCustomer.tag,
-      category_id: categoryId,
-      intent_id: nextCustomer.intent_id,
-      angle_id: nextCustomer.angle_id,
-      reply_source: nextCustomer.reply_source,
-      loop_guard_triggered: nextCustomer.loop_guard_triggered,
-      customer_text_elapsed_ms: Date.now() - pipelineStartedAt,
-    }),
+    result: nextStageResult,
+    keepProcessing: Boolean(args.chainTtsInSameLock),
+    lockOwner: args.lockOwner || null,
   })
 
-  return { processed: true, done: false, jobId: args.jobId, turnId: args.turnId }
+  return {
+    processed: true,
+    done: false,
+    jobId: args.jobId,
+    turnId: args.turnId,
+    nextStage: "tts_pending",
+    nextResultState: nextStageResult,
+  }
 }
 
 async function processTtsStage(args: {
@@ -884,22 +1818,30 @@ async function processTtsStage(args: {
   jobId: string
   turnId: string
   resultState: VoiceCoachJobResultState
+  executor?: VoiceCoachJobExecutor
 }): Promise<ProcessJobResult> {
   const admin = createAdminSupabaseClient()
-  const pipelineStartedAt = Number(args.resultState.pipeline_started_at_ms || Date.now())
+  const auditMeta = buildAuditMeta(args.resultState, args.executor)
+  const resultState = mergeResult(args.resultState, {
+    trace_id: auditMeta.traceId,
+    client_build: auditMeta.clientBuild,
+    server_build: auditMeta.serverBuild,
+    executor: auditMeta.executor,
+  })
+  const pipelineStartedAt = Number(resultState.pipeline_started_at_ms || Date.now())
 
-  const nextCustomerTurnId = String(args.resultState.next_customer_turn_id || "")
+  const nextCustomerTurnId = String(resultState.next_customer_turn_id || "")
   if (!nextCustomerTurnId) {
     await finishJob({
       jobId: args.jobId,
-      result: mergeResult(args.resultState, { pipeline_started_at_ms: pipelineStartedAt }),
+      result: mergeResult(resultState, { pipeline_started_at_ms: pipelineStartedAt }),
     })
     return { processed: true, done: true, jobId: args.jobId, turnId: args.turnId }
   }
 
   const { data: customerTurn } = await admin
     .from("voice_coach_turns")
-    .select("id, text, emotion, audio_path, audio_seconds")
+    .select("id, text, emotion, audio_path, audio_seconds, line_id, reply_source")
     .eq("id", nextCustomerTurnId)
     .eq("session_id", args.sessionId)
     .single()
@@ -912,6 +1854,10 @@ async function processTtsStage(args: {
       turnId: args.turnId,
       code: "customer_turn_missing",
       message: "顾客回合不存在，无法生成语音",
+      traceId: auditMeta.traceId,
+      clientBuild: auditMeta.clientBuild,
+      serverBuild: auditMeta.serverBuild,
+      executor: auditMeta.executor,
     })
     return { processed: true, done: true, jobId: args.jobId, turnId: args.turnId }
   }
@@ -920,40 +1866,237 @@ async function processTtsStage(args: {
   let audioSeconds: number | null = asNumber(customerTurn.audio_seconds)
   let audioPath: string | null = customerTurn.audio_path ? String(customerTurn.audio_path) : null
   let ttsFailed = false
+  let ttsSource: VoiceCoachStableTtsSource = audioPath ? "text_cache" : "runtime"
+  const ttsStartedAt = Date.now()
+  const ttsQueuedAtMs = asNumber(resultState.tts_queued_at_ms)
+  const stageEnteredAtMs = asNumber(resultState.stage_entered_at_ms)
+  const queueWaitBeforeTts = calcQueueWaitBeforeTts({
+    nowMs: ttsStartedAt,
+    ttsQueuedAtMs,
+    stageEnteredAtMs,
+  })
+  const queueWaitBeforeTtsMs = queueWaitBeforeTts.valueMs
+  const queueWaitBeforeTtsValid = queueWaitBeforeTts.valid
+  const queueWaitBeforeTtsSource = queueWaitBeforeTts.source
 
   if (audioPath) {
     audioUrl = await getSignedAudio(audioPath)
   } else {
-    const text = String(args.resultState.next_customer_text || customerTurn.text || "").trim()
-    const emotion = (args.resultState.next_customer_emotion || customerTurn.emotion || "neutral") as VoiceCoachEmotion
+    const text = String(resultState.next_customer_text || customerTurn.text || "").trim()
+    const emotion = (resultState.next_customer_emotion || customerTurn.emotion || "neutral") as VoiceCoachEmotion
+    const lineId = String((customerTurn as any).line_id || resultState.next_customer_line_id || "").trim()
+    const { key: cacheKey, voiceType: ttsVoiceType, normalizedText } = buildTtsCacheKey({ text })
+    const lineCacheCandidate = buildTtsLineCacheKey({
+      voiceType: ttsVoiceType,
+      lineId,
+    })
+    const lineSeedPath = getSeedAudioPathForLineId(String((customerTurn as any).line_id || lineId || ""))
+    const runtimeCachePath = toVoiceCoachTtsStoragePath(cacheKey, ttsVoiceType)
+    const runtimeLineSignedHit = lineCacheCandidate ? getRuntimeTtsSignedUrl(lineCacheCandidate.key) : null
+    const runtimeTextSignedHit = getRuntimeTtsSignedUrl(cacheKey)
 
-    if (!text) {
+    if (!normalizedText) {
       ttsFailed = true
+      ttsSource = "runtime"
     } else {
       try {
-        const tts = await doubaoTts({
-          text,
-          emotion: mapEmotionToTts(emotion),
-          uid: args.userId,
-        })
+        // 0) In-process L1 cache for signed URLs. Avoids extra network hops on repeated hot phrases.
+        if (runtimeLineSignedHit) {
+          audioPath = runtimeLineSignedHit.audioPath
+          audioUrl = runtimeLineSignedHit.audioUrl
+          ttsSource = "line_cache"
+        } else if (runtimeTextSignedHit) {
+          audioPath = runtimeTextSignedHit.audioPath
+          audioUrl = runtimeTextSignedHit.audioUrl
+          ttsSource = "text_cache"
+        }
 
-        audioSeconds = tts.durationSeconds ?? null
-        if (tts.audio) {
-          audioPath = `${args.userId}/${args.sessionId}/${nextCustomerTurnId}.mp3`
-          await uploadVoiceCoachAudio({
-            path: audioPath,
-            data: tts.audio,
-            contentType: "audio/mpeg",
+        // 1) line_id direct cache: same (voice_type + line_id) returns URL even if text rewritten by LLM.
+        const lineCacheRow =
+          !audioPath && lineCacheCandidate
+            ? await getVoiceCoachTtsLineCacheRow({
+                voiceType: lineCacheCandidate.voiceType,
+                lineId: lineCacheCandidate.lineId,
+              })
+            : null
+
+        if (!audioPath && lineCacheRow) {
+          const cachedDirectUrl = String(lineCacheRow.audio_url || "").trim()
+          const cachedPath = parseVoiceCoachTtsCacheUrl(lineCacheRow.audio_url)
+          if (cachedPath) {
+            if (/^https?:\/\//i.test(cachedDirectUrl)) {
+              audioPath = cachedPath
+              audioUrl = cachedDirectUrl
+            } else {
+              audioUrl = await getSignedAudio(cachedPath)
+              audioPath = audioUrl ? cachedPath : null
+            }
+            if (audioPath && audioUrl && lineCacheCandidate) {
+              ttsSource = "line_cache"
+              setRuntimeTtsSignedUrl(lineCacheCandidate.key, audioPath, audioUrl)
+              void bumpVoiceCoachTtsCacheHitCount(lineCacheRow.key, lineCacheRow.hit_count || 0)
+            }
+          }
+        }
+
+        // 2) text cache by normalized text.
+        const cacheRow = audioPath ? null : await getVoiceCoachTtsCacheRow(cacheKey)
+        const cachedDirectUrl = String(cacheRow?.audio_url || "").trim()
+        const cachedPath = parseVoiceCoachTtsCacheUrl(cacheRow?.audio_url)
+        if (!audioPath && cachedPath) {
+          if (/^https?:\/\//i.test(cachedDirectUrl)) {
+            audioPath = cachedPath
+            audioUrl = cachedDirectUrl
+            ttsSource = "text_cache"
+            setRuntimeTtsSignedUrl(cacheKey, cachedPath, cachedDirectUrl)
+            void bumpVoiceCoachTtsCacheHitCount(cacheKey, cacheRow?.hit_count || 0)
+          } else {
+            const signed = await getSignedAudio(cachedPath)
+            if (signed) {
+              audioPath = cachedPath
+              audioUrl = signed
+              ttsSource = "text_cache"
+              setRuntimeTtsSignedUrl(cacheKey, cachedPath, signed)
+              void bumpVoiceCoachTtsCacheHitCount(cacheKey, cacheRow?.hit_count || 0)
+            }
+          }
+        }
+
+        // 3) Existing fixed seed in storage (legacy path), then backfill cache rows.
+        if (!audioPath && lineSeedPath && (await voiceCoachAudioExists(lineSeedPath))) {
+          audioPath = lineSeedPath
+          audioUrl = await getSignedAudio(lineSeedPath)
+          if (audioUrl) {
+            ttsSource = "text_cache"
+            setRuntimeTtsSignedUrl(cacheKey, lineSeedPath, audioUrl)
+            if (lineCacheCandidate) {
+              setRuntimeTtsSignedUrl(lineCacheCandidate.key, lineSeedPath, audioUrl)
+            }
+            await saveVoiceCoachTtsCacheRow({
+              key: cacheKey,
+              voiceType: ttsVoiceType,
+              text: normalizedText,
+              audioPath: lineSeedPath,
+              cacheKind: "text",
+              lineId: null,
+              audioUrl,
+              hitCount: cacheRow?.hit_count || 0,
+            })
+            if (lineCacheCandidate) {
+              await saveVoiceCoachTtsCacheRow({
+                key: lineCacheCandidate.key,
+                voiceType: lineCacheCandidate.voiceType,
+                text: normalizedText,
+                audioPath: lineSeedPath,
+                cacheKind: "line",
+                lineId: lineCacheCandidate.lineId,
+                audioUrl,
+                hitCount: 0,
+              })
+            }
+          }
+        }
+
+        // 4) Storage-level cache fallback by deterministic key path (backward compat if DB row absent).
+        if (!audioPath && (await voiceCoachAudioExists(runtimeCachePath))) {
+          audioPath = runtimeCachePath
+          audioUrl = await getSignedAudio(runtimeCachePath)
+          if (audioUrl) {
+            ttsSource = "text_cache"
+            setRuntimeTtsSignedUrl(cacheKey, runtimeCachePath, audioUrl)
+            if (lineCacheCandidate) {
+              setRuntimeTtsSignedUrl(lineCacheCandidate.key, runtimeCachePath, audioUrl)
+            }
+            await saveVoiceCoachTtsCacheRow({
+              key: cacheKey,
+              voiceType: ttsVoiceType,
+              text: normalizedText,
+              audioPath: runtimeCachePath,
+              cacheKind: "text",
+              lineId: null,
+              audioUrl,
+              hitCount: cacheRow?.hit_count || 0,
+            })
+            if (lineCacheCandidate) {
+              await saveVoiceCoachTtsCacheRow({
+                key: lineCacheCandidate.key,
+                voiceType: lineCacheCandidate.voiceType,
+                text: normalizedText,
+                audioPath: runtimeCachePath,
+                cacheKind: "line",
+                lineId: lineCacheCandidate.lineId,
+                audioUrl,
+                hitCount: 0,
+              })
+            }
+          }
+        }
+
+        // 5) Runtime synthesis on miss, then upload + save cache rows.
+        if (!audioPath) {
+          const tts = await doubaoTts({
+            text: normalizedText,
+            emotion: mapEmotionToTts(emotion),
+            uid: args.userId,
           })
-          audioUrl = await signVoiceCoachAudio(audioPath)
-        } else {
-          ttsFailed = true
+
+          audioSeconds = tts.durationSeconds ?? null
+          if (tts.audio) {
+            audioPath = runtimeCachePath
+            await uploadVoiceCoachAudio({
+              path: runtimeCachePath,
+              data: tts.audio,
+              contentType: "audio/mpeg",
+            })
+            audioUrl = await signVoiceCoachAudio(runtimeCachePath)
+            ttsSource = "runtime"
+            setRuntimeTtsSignedUrl(cacheKey, runtimeCachePath, audioUrl)
+            if (lineCacheCandidate) {
+              setRuntimeTtsSignedUrl(lineCacheCandidate.key, runtimeCachePath, audioUrl)
+            }
+            await saveVoiceCoachTtsCacheRow({
+              key: cacheKey,
+              voiceType: ttsVoiceType,
+              text: normalizedText,
+              audioPath: runtimeCachePath,
+              cacheKind: "text",
+              lineId: null,
+              audioUrl,
+              hitCount: cacheRow?.hit_count || 0,
+            })
+            if (lineCacheCandidate) {
+              await saveVoiceCoachTtsCacheRow({
+                key: lineCacheCandidate.key,
+                voiceType: lineCacheCandidate.voiceType,
+                text: normalizedText,
+                audioPath: runtimeCachePath,
+                cacheKind: "line",
+                lineId: lineCacheCandidate.lineId,
+                audioUrl,
+                hitCount: 0,
+              })
+            }
+          } else {
+            ttsFailed = true
+            ttsSource = "runtime"
+          }
         }
       } catch {
         ttsFailed = true
+        ttsSource = "runtime"
       }
     }
   }
+  const ttsMs = Date.now() - ttsStartedAt
+  const llmUsed = resultState.llm_used === true
+  const scriptHit = resultState.script_hit === true
+  const ttsCacheHit = isTtsCacheHitSource(ttsSource)
+  const roundStats = await calcAudioRoundStatsBySession({
+    sessionId: args.sessionId,
+    currentSource: ttsSource,
+    currentScriptHit: scriptHit,
+    currentLlmUsed: llmUsed,
+  })
 
   await admin
     .from("voice_coach_turns")
@@ -961,7 +2104,7 @@ async function processTtsStage(args: {
       audio_path: audioPath,
       audio_seconds: audioSeconds,
       status: audioPath ? "audio_ready" : "text_ready",
-      reply_source: args.resultState.reply_source || null,
+      reply_source: resultState.reply_source || null,
     })
     .eq("id", nextCustomerTurnId)
 
@@ -970,6 +2113,10 @@ async function processTtsStage(args: {
     userId: args.userId,
     turnId: nextCustomerTurnId,
     jobId: args.jobId,
+    traceId: auditMeta.traceId,
+    clientBuild: auditMeta.clientBuild,
+    serverBuild: auditMeta.serverBuild,
+    executor: auditMeta.executor,
     type: "customer.audio_ready",
     data: {
       turn_id: nextCustomerTurnId,
@@ -977,12 +2124,37 @@ async function processTtsStage(args: {
       audio_url: audioUrl,
       audio_seconds: audioSeconds,
       tts_failed: ttsFailed || !audioUrl,
-      text: args.resultState.next_customer_text || String(customerTurn.text || ""),
-      category_id: args.resultState.category_id || null,
-      intent_id: args.resultState.intent_id || null,
-      angle_id: args.resultState.angle_id || null,
-      reply_source: args.resultState.reply_source || "fixed",
-      loop_guard_triggered: Boolean(args.resultState.loop_guard_triggered),
+      text: resultState.next_customer_text || String(customerTurn.text || ""),
+      category_id: resultState.category_id || null,
+      intent_id: resultState.intent_id || null,
+      angle_id: resultState.angle_id || null,
+      reply_source: resultState.reply_source || "fixed",
+      llm_used: llmUsed,
+      script_hit: scriptHit,
+      loop_guard_triggered: Boolean(resultState.loop_guard_triggered),
+      submit_ack_ms: asNumber(resultState.submit_ack_ms),
+      upload_ms: asNumber(resultState.upload_ms),
+      asr_ms: asNumber(resultState.asr_ms),
+      llm_ms: asNumber(resultState.llm_ms),
+      tts_ms: ttsMs,
+      queue_wait_before_tts_ms: queueWaitBeforeTtsMs,
+      queue_wait_before_tts_valid: queueWaitBeforeTtsValid,
+      queue_wait_before_tts_source: queueWaitBeforeTtsSource,
+      tts_source: ttsSource,
+      tts_cache_hit: ttsCacheHit,
+      tts_cache_hit_rate: roundStats.ttsCacheHitRate,
+      tts_cache_hit_rounds: roundStats.ttsCacheHitRounds,
+      tts_rounds_total: roundStats.totalRounds,
+      script_hit_rate: roundStats.scriptHitRate,
+      script_hit_rounds: roundStats.scriptHitRounds,
+      tts_line_cache_hit_rate: roundStats.ttsLineCacheHitRate,
+      tts_line_cache_hit_rounds: roundStats.ttsLineCacheHitRounds,
+      tts_source_distribution: roundStats.ttsSourceDistribution,
+      llm_used_when_script_hit_count: roundStats.llmUsedWhenScriptHitCount,
+      trace_id: resultState.trace_id || null,
+      client_build: resultState.client_build || null,
+      server_build: resultState.server_build || auditMeta.serverBuild,
+      executor: resultState.executor || auditMeta.executor,
       stage_elapsed_ms: Date.now() - pipelineStartedAt,
       ts: nowIso(),
     },
@@ -990,8 +2162,25 @@ async function processTtsStage(args: {
 
   await finishJob({
     jobId: args.jobId,
-    result: mergeResult(args.resultState, {
+    result: mergeResult(resultState, {
       pipeline_started_at_ms: pipelineStartedAt,
+      tts_ms: ttsMs,
+      queue_wait_before_tts_ms: queueWaitBeforeTtsMs,
+      queue_wait_before_tts_valid: queueWaitBeforeTtsValid,
+      queue_wait_before_tts_source: queueWaitBeforeTtsSource,
+      tts_cache_hit: ttsCacheHit,
+      tts_cache_hit_rate: roundStats.ttsCacheHitRate,
+      tts_cache_hit_rounds: roundStats.ttsCacheHitRounds,
+      tts_rounds_total: roundStats.totalRounds,
+      script_hit: scriptHit,
+      llm_used: llmUsed,
+      script_hit_rate: roundStats.scriptHitRate,
+      script_hit_rounds: roundStats.scriptHitRounds,
+      tts_line_cache_hit_rate: roundStats.ttsLineCacheHitRate,
+      tts_line_cache_hit_rounds: roundStats.ttsLineCacheHitRounds,
+      tts_source_distribution: roundStats.ttsSourceDistribution,
+      llm_used_when_script_hit_count: roundStats.llmUsedWhenScriptHitCount,
+      end_to_end_ms: Date.now() - pipelineStartedAt,
       customer_audio_elapsed_ms: Date.now() - pipelineStartedAt,
     }),
   })
@@ -1006,9 +2195,17 @@ async function processAnalysisStage(args: {
   turnId: string
   payload: VoiceCoachJobPayload
   resultState: VoiceCoachJobResultState
+  executor?: VoiceCoachJobExecutor
 }): Promise<ProcessJobResult> {
   const admin = createAdminSupabaseClient()
-  const pipelineStartedAt = Number(args.resultState.pipeline_started_at_ms || Date.now())
+  const auditMeta = buildAuditMeta(args.resultState, args.executor)
+  const resultState = mergeResult(args.resultState, {
+    trace_id: auditMeta.traceId,
+    client_build: auditMeta.clientBuild,
+    server_build: auditMeta.serverBuild,
+    executor: auditMeta.executor,
+  })
+  const pipelineStartedAt = Number(resultState.pipeline_started_at_ms || Date.now())
 
   const loaded = await loadSessionAndTurn({ sessionId: args.sessionId, turnId: args.turnId })
   if (!loaded || loaded.turn.role !== "beautician") {
@@ -1019,6 +2216,10 @@ async function processAnalysisStage(args: {
       turnId: args.turnId,
       code: "turn_not_found",
       message: "未找到待分析的美容师回合",
+      traceId: auditMeta.traceId,
+      clientBuild: auditMeta.clientBuild,
+      serverBuild: auditMeta.serverBuild,
+      executor: auditMeta.executor,
     })
     return { processed: true, done: true, jobId: args.jobId, turnId: args.turnId }
   }
@@ -1026,18 +2227,18 @@ async function processAnalysisStage(args: {
   if (loaded.turn.analysis_json) {
     await finishJob({
       jobId: args.jobId,
-      result: mergeResult(args.resultState, {
+      result: mergeResult(resultState, {
         pipeline_started_at_ms: pipelineStartedAt,
       }),
     })
     return { processed: true, done: true, jobId: args.jobId, turnId: args.turnId }
   }
 
-  const replyTurnId = String(args.payload.reply_to_turn_id || args.resultState.reply_turn_id || "")
+  const replyTurnId = String(args.payload.reply_to_turn_id || resultState.reply_turn_id || "")
   if (!replyTurnId) {
     await finishJob({
       jobId: args.jobId,
-      result: mergeResult(args.resultState, {
+      result: mergeResult(resultState, {
         pipeline_started_at_ms: pipelineStartedAt,
       }),
     })
@@ -1054,7 +2255,7 @@ async function processAnalysisStage(args: {
   if (!replyTurn) {
     await finishJob({
       jobId: args.jobId,
-      result: mergeResult(args.resultState, {
+      result: mergeResult(resultState, {
         pipeline_started_at_ms: pipelineStartedAt,
       }),
     })
@@ -1072,7 +2273,7 @@ async function processAnalysisStage(args: {
         text: String(replyTurn.text || ""),
         emotion: replyTurn.emotion ? (String(replyTurn.emotion) as VoiceCoachEmotion) : undefined,
       },
-      beauticianText: String(loaded.turn.text || args.resultState.beautician_text || ""),
+      beauticianText: String(loaded.turn.text || resultState.beautician_text || ""),
     })
 
     await admin
@@ -1088,10 +2289,18 @@ async function processAnalysisStage(args: {
       userId: args.userId,
       turnId: args.turnId,
       jobId: args.jobId,
+      traceId: auditMeta.traceId,
+      clientBuild: auditMeta.clientBuild,
+      serverBuild: auditMeta.serverBuild,
+      executor: auditMeta.executor,
       type: "beautician.analysis_ready",
       data: {
         turn_id: args.turnId,
         analysis,
+        trace_id: resultState.trace_id || null,
+        client_build: resultState.client_build || null,
+        server_build: resultState.server_build || auditMeta.serverBuild,
+        executor: resultState.executor || auditMeta.executor,
         stage_elapsed_ms: Date.now() - pipelineStartedAt,
         ts: nowIso(),
       },
@@ -1102,10 +2311,18 @@ async function processAnalysisStage(args: {
       userId: args.userId,
       turnId: args.turnId,
       jobId: args.jobId,
+      traceId: auditMeta.traceId,
+      clientBuild: auditMeta.clientBuild,
+      serverBuild: auditMeta.serverBuild,
+      executor: auditMeta.executor,
       type: "turn.error",
       data: {
         code: "analysis_failed",
         message: "建议生成稍慢，已跳过本次建议。",
+        trace_id: resultState.trace_id || null,
+        client_build: resultState.client_build || null,
+        server_build: resultState.server_build || auditMeta.serverBuild,
+        executor: resultState.executor || auditMeta.executor,
         ts: nowIso(),
       },
     })
@@ -1113,7 +2330,7 @@ async function processAnalysisStage(args: {
 
   await finishJob({
     jobId: args.jobId,
-    result: mergeResult(args.resultState, {
+    result: mergeResult(resultState, {
       pipeline_started_at_ms: pipelineStartedAt,
     }),
   })
@@ -1121,16 +2338,108 @@ async function processAnalysisStage(args: {
   return { processed: true, done: true, jobId: args.jobId, turnId: args.turnId }
 }
 
+export async function listVoiceCoachQueuedJobs(args?: {
+  maxJobs?: number
+  allowedStages?: Array<VoiceCoachJobStage>
+}): Promise<VoiceCoachQueuedJobRecord[]> {
+  const admin = createAdminSupabaseClient()
+  const maxJobs = Math.max(1, Math.min(50, Number(args?.maxJobs || 10) || 10))
+  const allowedStagesSet =
+    Array.isArray(args?.allowedStages) && args.allowedStages.length ? new Set(args.allowedStages) : null
+
+  let query = admin
+    .from("voice_coach_jobs")
+    .select("id, session_id, user_id, stage, created_at, stage_entered_at")
+    .eq("status", "queued")
+    .order("stage_entered_at", { ascending: true, nullsFirst: true })
+    .order("created_at", { ascending: true })
+    .limit(maxJobs)
+
+  if (allowedStagesSet) {
+    query = query.in("stage", Array.from(allowedStagesSet))
+  }
+
+  const { data, error } = await query
+  if (error || !data || data.length <= 0) return []
+
+  return data
+    .map((row: any) => ({
+      id: String(row.id || ""),
+      sessionId: String(row.session_id || ""),
+      userId: String(row.user_id || ""),
+      stage: normalizeJobStage(row.stage),
+      createdAt: String(row.created_at || ""),
+    }))
+    .filter((row) => row.id && row.sessionId && row.userId)
+}
+
+export async function recoverStaleVoiceCoachProcessingJobs(args?: {
+  staleMs?: number
+  maxJobs?: number
+  allowedStages?: Array<VoiceCoachJobStage>
+}): Promise<number> {
+  const admin = createAdminSupabaseClient()
+  const staleMs = Math.max(3000, Number(args?.staleMs || processingStaleMs()) || processingStaleMs())
+  const maxJobs = Math.max(1, Math.min(100, Number(args?.maxJobs || 20) || 20))
+  const staleBeforeIso = new Date(Date.now() - staleMs).toISOString()
+  const allowedStagesSet =
+    Array.isArray(args?.allowedStages) && args.allowedStages.length ? new Set(args.allowedStages) : null
+
+  let staleQuery = admin
+    .from("voice_coach_jobs")
+    .select("id, stage")
+    .eq("status", "processing")
+    .lt("updated_at", staleBeforeIso)
+    .order("updated_at", { ascending: true })
+    .limit(maxJobs)
+
+  if (allowedStagesSet) {
+    staleQuery = staleQuery.in("stage", Array.from(allowedStagesSet))
+  }
+
+  const { data: staleJobs } = await staleQuery
+  if (!staleJobs || staleJobs.length <= 0) return 0
+
+  let recovered = 0
+  for (let i = 0; i < staleJobs.length; i++) {
+    const stale = staleJobs[i]
+    if (!stale?.id) continue
+    const staleStage = normalizeJobStage(stale.stage)
+    const recoveredAt = nowIso()
+    const { error } = await admin
+      .from("voice_coach_jobs")
+      .update({
+        status: "queued",
+        stage: staleStage,
+        last_error: "requeued_stale_processing",
+        updated_at: recoveredAt,
+        stage_entered_at: recoveredAt,
+        lock_owner: null,
+      })
+      .eq("id", String(stale.id))
+      .eq("status", "processing")
+
+    if (!error) recovered += 1
+  }
+
+  return recovered
+}
+
 export async function processVoiceCoachJobById(args: {
   sessionId: string
   userId: string
   jobId: string
+  executor?: VoiceCoachJobExecutor
+  lockOwner?: string | null
+  chainMainToTts?: boolean
 }): Promise<ProcessJobResult> {
   const admin = createAdminSupabaseClient()
 
   const { data: job, error: jobError } = await admin
     .from("voice_coach_jobs")
-    .select("id, session_id, user_id, turn_id, status, stage, attempt_count, payload_json, result_json")
+    .select(
+      "id, session_id, user_id, turn_id, status, stage, attempt_count, payload_json, result_json, created_at, updated_at, stage_entered_at",
+    )
     .eq("id", args.jobId)
     .eq("session_id", args.sessionId)
     .eq("user_id", args.userId)
@@ -1141,6 +2450,18 @@ export async function processVoiceCoachJobById(args: {
 
   const stage = normalizeJobStage(job.stage)
   const nextAttempt = (job.attempt_count || 0) + 1
+  const claimedAt = nowIso()
+  const executor = normalizeExecutor(args.executor)
+  const lockOwner = args.lockOwner ? String(args.lockOwner).slice(0, 120) : null
+  const createdAtMs = parseIsoToMs((job as any).created_at)
+  const updatedAtMs = parseIsoToMs((job as any).updated_at)
+  const stageEnteredAtMs =
+    parseIsoToMs((job as any).stage_entered_at) ||
+    asNumber(((job as any).result_json || {})?.stage_entered_at_ms) ||
+    updatedAtMs ||
+    createdAtMs ||
+    Date.now()
+  const stageEnteredAtIso = new Date(stageEnteredAtMs).toISOString()
 
   const { data: claimed, error: claimError } = await admin
     .from("voice_coach_jobs")
@@ -1148,31 +2469,99 @@ export async function processVoiceCoachJobById(args: {
       status: "processing",
       stage,
       attempt_count: nextAttempt,
-      updated_at: nowIso(),
+      updated_at: claimedAt,
+      picked_at: claimedAt,
+      last_picked_at: claimedAt,
+      stage_entered_at: stageEnteredAtIso,
+      executor,
+      lock_owner: lockOwner,
       last_error: null,
     })
     .eq("id", job.id)
     .eq("status", "queued")
-    .select("id, turn_id, stage, payload_json, result_json")
+    .select("id, turn_id, stage, payload_json, result_json, stage_entered_at")
     .single()
 
   if (claimError || !claimed) return { processed: false, done: false }
 
   const payload = (claimed.payload_json || {}) as VoiceCoachJobPayload
-  const resultState = (claimed.result_json || {}) as VoiceCoachJobResultState
+  const resultStateRaw = (claimed.result_json || {}) as VoiceCoachJobResultState
+  const claimedAtMs = parseIsoToMs(claimedAt) || Date.now()
+  const claimedStageEnteredAtMs =
+    parseIsoToMs((claimed as any).stage_entered_at) || stageEnteredAtMs || createdAtMs || updatedAtMs || claimedAtMs
+  const claimQueueBaseMs = claimedStageEnteredAtMs
+  const queueWaitBeforeMainMs =
+    stage === "main_pending"
+      ? nonNegativeMs(claimedAtMs - claimQueueBaseMs)
+      : nonNegativeMs(resultStateRaw.queue_wait_before_main_ms)
+  const queueWaitBeforeTtsRaw = asNumber(resultStateRaw.queue_wait_before_tts_ms)
+  const queueWaitBeforeTtsValidRaw =
+    asBoolean(resultStateRaw.queue_wait_before_tts_valid) ?? (queueWaitBeforeTtsRaw !== null && queueWaitBeforeTtsRaw >= 0)
+  const queueWaitBeforeTtsSourceRaw =
+    resultStateRaw.queue_wait_before_tts_source === "tts_queued_at_ms" ||
+    resultStateRaw.queue_wait_before_tts_source === "stage_entered_at_ms" ||
+    resultStateRaw.queue_wait_before_tts_source === "missing_anchor"
+      ? resultStateRaw.queue_wait_before_tts_source
+      : undefined
+  const queueWaitBeforeTts =
+    stage === "tts_pending"
+      ? calcQueueWaitBeforeTts({
+          nowMs: claimedAtMs,
+          ttsQueuedAtMs: asNumber(resultStateRaw.tts_queued_at_ms),
+          stageEnteredAtMs: claimedStageEnteredAtMs,
+        })
+      : {
+          valueMs: queueWaitBeforeTtsRaw,
+          valid: queueWaitBeforeTtsValidRaw,
+          source: queueWaitBeforeTtsSourceRaw || (queueWaitBeforeTtsRaw === null ? "missing_anchor" : "tts_queued_at_ms"),
+        }
+  const auditMeta = buildAuditMeta(resultStateRaw, executor)
+  const resultState = mergeResult(resultStateRaw, {
+    trace_id: auditMeta.traceId,
+    client_build: auditMeta.clientBuild,
+    server_build: auditMeta.serverBuild,
+    executor: auditMeta.executor,
+    stage_entered_at_ms: claimedStageEnteredAtMs,
+    queue_wait_before_main_ms: queueWaitBeforeMainMs ?? undefined,
+    queue_wait_before_tts_ms: queueWaitBeforeTts.valueMs,
+    queue_wait_before_tts_valid: queueWaitBeforeTts.valid,
+    queue_wait_before_tts_source: queueWaitBeforeTts.source,
+  })
   const turnId = String(claimed.turn_id)
   const jobId = String(claimed.id)
 
   try {
     if (stage === "main_pending") {
-      return await processMainStage({
+      const mainResult = await processMainStage({
         sessionId: args.sessionId,
         userId: args.userId,
         jobId,
         turnId,
         payload,
         resultState,
+        executor,
+        chainTtsInSameLock: Boolean(args.chainMainToTts),
+        lockOwner,
       })
+
+      if (
+        args.chainMainToTts &&
+        mainResult.processed &&
+        !mainResult.done &&
+        mainResult.nextStage === "tts_pending" &&
+        mainResult.nextResultState
+      ) {
+        return await processTtsStage({
+          sessionId: args.sessionId,
+          userId: args.userId,
+          jobId,
+          turnId,
+          resultState: mainResult.nextResultState,
+          executor,
+        })
+      }
+
+      return mainResult
     }
 
     if (stage === "tts_pending") {
@@ -1182,6 +2571,7 @@ export async function processVoiceCoachJobById(args: {
         jobId,
         turnId,
         resultState,
+        executor,
       })
     }
 
@@ -1193,6 +2583,7 @@ export async function processVoiceCoachJobById(args: {
         turnId,
         payload,
         resultState,
+        executor,
       })
     }
 
@@ -1208,6 +2599,10 @@ export async function processVoiceCoachJobById(args: {
       turnId,
       code: "invalid_job_stage",
       message: `未知任务阶段: ${String(job.stage || "")}`,
+      traceId: auditMeta.traceId,
+      clientBuild: auditMeta.clientBuild,
+      serverBuild: auditMeta.serverBuild,
+      executor: auditMeta.executor,
     })
     return { processed: true, done: true, jobId, turnId }
   } catch (err: any) {
@@ -1218,6 +2613,10 @@ export async function processVoiceCoachJobById(args: {
       turnId,
       code: "voice_coach_error",
       message: err?.message || String(err),
+      traceId: auditMeta.traceId,
+      clientBuild: auditMeta.clientBuild,
+      serverBuild: auditMeta.serverBuild,
+      executor: auditMeta.executor,
     })
     return { processed: true, done: true, jobId, turnId }
   }
@@ -1229,40 +2628,59 @@ export async function pumpVoiceCoachQueuedJobs(args: {
   maxJobs?: number
   allowedStages?: Array<VoiceCoachJobStage>
   maxWallMs?: number
+  jobTimeoutMs?: number
+  skipStaleRecovery?: boolean
+  executor?: VoiceCoachJobExecutor
+  lockOwner?: string | null
 }): Promise<number> {
   const admin = createAdminSupabaseClient()
   const maxJobs = Math.max(1, Math.min(5, Number(args.maxJobs || 1) || 1))
   const maxWallMs = Math.max(200, Number(args.maxWallMs || 1200) || 1200)
+  const jobTimeoutMs = Math.max(200, Math.min(8000, Number(args.jobTimeoutMs || Math.min(maxWallMs, 900)) || 900))
+  const mainStageTimeoutMs = Math.max(
+    jobTimeoutMs,
+    Math.min(9000, Number(process.env.VOICE_COACH_PUMP_MAIN_JOB_TIMEOUT_MS || 7000) || 7000),
+  )
+  const ttsStageTimeoutMs = Math.max(
+    jobTimeoutMs,
+    Math.min(12000, Number(process.env.VOICE_COACH_PUMP_TTS_JOB_TIMEOUT_MS || 7000) || 7000),
+  )
   const allowedStagesSet = Array.isArray(args.allowedStages) && args.allowedStages.length ? new Set(args.allowedStages) : null
-  const staleBeforeIso = new Date(Date.now() - processingStaleMs()).toISOString()
   const deadline = Date.now() + maxWallMs
+  const executor = normalizeExecutor(args.executor || "worker")
 
-  // Recover stale processing jobs so polling won't wait forever when a previous invocation was interrupted.
-  const { data: staleJobs } = await admin
-    .from("voice_coach_jobs")
-    .select("id, stage")
-    .eq("session_id", args.sessionId)
-    .eq("user_id", args.userId)
-    .eq("status", "processing")
-    .lt("updated_at", staleBeforeIso)
-    .order("updated_at", { ascending: true })
-    .limit(5)
+  if (!args.skipStaleRecovery) {
+    const staleBeforeIso = new Date(Date.now() - processingStaleMs()).toISOString()
+    // Recover stale processing jobs so polling won't wait forever when a previous invocation was interrupted.
+    const { data: staleJobs } = await admin
+      .from("voice_coach_jobs")
+      .select("id, stage")
+      .eq("session_id", args.sessionId)
+      .eq("user_id", args.userId)
+      .eq("status", "processing")
+      .lt("updated_at", staleBeforeIso)
+      .order("updated_at", { ascending: true })
+      .limit(5)
 
-  if (staleJobs && staleJobs.length > 0) {
-    for (let i = 0; i < staleJobs.length; i++) {
-      const stale = staleJobs[i]
-      if (!stale?.id) continue
-      const staleStage = normalizeJobStage(stale.stage)
-      await admin
-        .from("voice_coach_jobs")
-        .update({
-          status: "queued",
-          stage: staleStage,
-          last_error: "requeued_stale_processing",
-          updated_at: nowIso(),
-        })
-        .eq("id", String(stale.id))
-        .eq("status", "processing")
+    if (staleJobs && staleJobs.length > 0) {
+      for (let i = 0; i < staleJobs.length; i++) {
+        const stale = staleJobs[i]
+        if (!stale?.id) continue
+        const staleStage = normalizeJobStage(stale.stage)
+        const recoveredAt = nowIso()
+        await admin
+          .from("voice_coach_jobs")
+          .update({
+            status: "queued",
+            stage: staleStage,
+            last_error: "requeued_stale_processing",
+            updated_at: recoveredAt,
+            stage_entered_at: recoveredAt,
+            lock_owner: null,
+          })
+          .eq("id", String(stale.id))
+          .eq("status", "processing")
+      }
     }
   }
 
@@ -1272,10 +2690,11 @@ export async function pumpVoiceCoachQueuedJobs(args: {
 
     let queuedQuery = admin
       .from("voice_coach_jobs")
-      .select("id, stage")
+      .select("id, stage, stage_entered_at")
       .eq("session_id", args.sessionId)
       .eq("user_id", args.userId)
       .eq("status", "queued")
+      .order("stage_entered_at", { ascending: true, nullsFirst: true })
       .order("created_at", { ascending: true })
       .limit(1)
 
@@ -1285,14 +2704,47 @@ export async function pumpVoiceCoachQueuedJobs(args: {
 
     const { data: queued } = await queuedQuery
 
+    const queuedStage = normalizeJobStage(queued?.[0]?.stage)
     const jobId = queued?.[0]?.id ? String(queued[0].id) : ""
     if (!jobId) break
 
-    const result = await processVoiceCoachJobById({
-      sessionId: args.sessionId,
-      userId: args.userId,
-      jobId,
-    })
+    const remainingMs = deadline - Date.now()
+    if (remainingMs < 40) break
+    const effectiveTimeoutMs = Math.max(
+      200,
+      Math.min(
+        remainingMs,
+        queuedStage === "tts_pending"
+          ? ttsStageTimeoutMs
+          : queuedStage === "main_pending"
+            ? mainStageTimeoutMs
+            : jobTimeoutMs,
+      ),
+    )
+
+    const resultWrap = await Promise.race([
+      processVoiceCoachJobById({
+        sessionId: args.sessionId,
+        userId: args.userId,
+        jobId,
+        executor,
+        lockOwner: args.lockOwner || null,
+        chainMainToTts: executor === "worker",
+      })
+        .then((result) => ({ timedOut: false, result }))
+        .catch(() => ({ timedOut: false, result: { processed: false, done: false } as ProcessJobResult })),
+      sleep(effectiveTimeoutMs).then(() => ({
+        timedOut: true,
+        result: { processed: false, done: false } as ProcessJobResult,
+      })),
+    ])
+
+    if (resultWrap.timedOut) {
+      // Let the long-running processing continue in background, but don't block caller.
+      break
+    }
+
+    const result = resultWrap.result
 
     if (!result.processed) {
       // Avoid hot loop when another request claimed it.

@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto"
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest } from "next/server"
 
 import { checkVoiceCoachAccess } from "@/lib/voice-coach/guard.server"
 import { llmAnalyzeBeauticianAndGenerateNext } from "@/lib/voice-coach/llm.server"
@@ -13,13 +13,10 @@ import {
   type DoubaoTtsEmotion,
 } from "@/lib/voice-coach/speech/doubao.server"
 import { signVoiceCoachAudio, uploadVoiceCoachAudio } from "@/lib/voice-coach/storage.server"
+import { createVoiceCoachTrace, voiceCoachJson } from "@/lib/voice-coach/trace.server"
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
-
-function jsonError(status: number, error: string, extra?: Record<string, unknown>) {
-  return NextResponse.json({ error, ...extra }, { status })
-}
 
 function mapEmotionToTts(emotion: VoiceCoachEmotion): DoubaoTtsEmotion | undefined {
   switch (emotion) {
@@ -56,11 +53,59 @@ function isAsrSilenceError(err: unknown): boolean {
 }
 
 function shouldUseFlashAsr(): boolean {
-  // Flash ASR requires an explicitly granted resource id.
-  return Boolean((process.env.VOLC_ASR_FLASH_RESOURCE_ID || "").trim())
+  const raw = String(process.env.VOICE_COACH_ASR_ENABLE_FLASH || "true")
+    .trim()
+    .toLowerCase()
+  return !["0", "false", "off", "no"].includes(raw)
+}
+
+function shouldRequireFlashAsr(): boolean {
+  const raw = String(process.env.VOICE_COACH_REQUIRE_FLASH || "false")
+    .trim()
+    .toLowerCase()
+  return ["1", "true", "yes", "on"].includes(raw)
+}
+
+function isFlashPermissionDenied(err: unknown): boolean {
+  const anyErr = (err || {}) as Record<string, unknown>
+  const code = typeof anyErr.code === "string" ? String(anyErr.code) : ""
+  const httpStatus = typeof anyErr.http_status === "number" ? Number(anyErr.http_status) : null
+  const apiStatus = typeof anyErr.api_status === "string" ? String(anyErr.api_status) : ""
+  const apiCode = typeof anyErr.api_code === "string" ? String(anyErr.api_code) : ""
+  const apiMessage = typeof anyErr.api_message === "string" ? String(anyErr.api_message) : ""
+  return (
+    code === "asr_flash_permission_denied" ||
+    ((code === "asr_flash_http_403" || httpStatus === 403) &&
+      (apiStatus === "45000030" || apiCode === "45000030" || apiMessage.includes("45000030")))
+  )
+}
+
+function flashErrorPayload(err: unknown): Record<string, unknown> {
+  const anyErr = (err || {}) as Record<string, unknown>
+  return {
+    operation_hint:
+      typeof anyErr.operation_hint === "string" ? String(anyErr.operation_hint) : "需要在控制台开通 volc.bigasr.auc_turbo 权限",
+    flash_request_id:
+      typeof anyErr.flash_request_id === "string"
+        ? String(anyErr.flash_request_id)
+        : typeof anyErr.request_id === "string"
+          ? String(anyErr.request_id)
+          : null,
+    flash_logid:
+      typeof anyErr.flash_logid === "string"
+        ? String(anyErr.flash_logid)
+        : typeof anyErr.logid === "string"
+          ? String(anyErr.logid)
+          : null,
+    appid_last4: typeof anyErr.appid_last4 === "string" ? String(anyErr.appid_last4) : null,
+    resource_id: typeof anyErr.resource_id === "string" ? String(anyErr.resource_id) : "volc.bigasr.auc_turbo",
+  }
 }
 
 export async function POST(request: NextRequest, context: { params: Promise<{ sessionId: string }> }) {
+  const trace = createVoiceCoachTrace(request)
+  const jsonError = (status: number, error: string, extra?: Record<string, unknown>) =>
+    voiceCoachJson(trace, { error, ...extra }, status)
   try {
     const { sessionId } = await context.params
     if (!sessionId) return jsonError(400, "missing_session_id")
@@ -155,7 +200,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
     })()
 
     let asr: DoubaoAsrResult | null = null
-    if (shouldUseFlashAsr()) {
+    const requireFlash = shouldRequireFlashAsr()
+    if (requireFlash || shouldUseFlashAsr()) {
       try {
         // Fast path: avoid AUC polling when flash can return directly.
         const flashAsr = await doubaoAsrFlash({
@@ -164,7 +210,10 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
           uid: user.id,
         })
         if (flashAsr.text) asr = flashAsr
-      } catch {
+      } catch (err) {
+        if (requireFlash && isFlashPermissionDenied(err)) {
+          return jsonError(503, "asr_flash_permission_denied", flashErrorPayload(err))
+        }
         // Ignore flash failures and fallback to AUC below.
       }
     }
@@ -296,7 +345,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
       }
     }
 
-    return NextResponse.json({
+    return voiceCoachJson(trace, {
       beautician_turn: {
         turn_id: beauticianTurnId,
         text: asr.text,

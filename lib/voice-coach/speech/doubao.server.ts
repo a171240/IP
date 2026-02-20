@@ -1,6 +1,6 @@
 import "server-only"
 
-import { randomUUID } from "crypto"
+import { createHash, randomUUID } from "crypto"
 
 export type DoubaoTtsEmotion = "neutral" | "happy" | "sad" | "angry"
 
@@ -16,10 +16,25 @@ export type DoubaoAsrResult = {
   confidence: number | null
   durationSeconds: number | null
   requestId: string
+  resourceId?: string
+  logid?: string | null
+  submitLogid?: string | null
+  queryLogid?: string | null
+}
+
+export type DoubaoAsrFlashSelfcheckResult = {
+  status: "PASS" | "FAIL"
+  errorCode: string | null
+  flashRequestId: string | null
+  flashLogid: string | null
+  appidLast4: string | null
+  resourceId: string
 }
 
 const DEFAULT_TTS_VOICE_TYPE = "zh_female_vv_uranus_bigtts"
 const LEGACY_TTS_VOICE_ALIASES = new Set(["bv700_streaming", "bv700"])
+const FLASH_RESOURCE_ID = "volc.bigasr.auc_turbo"
+const FLASH_PERMISSION_HINT = "需要在控制台开通 volc.bigasr.auc_turbo 权限"
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -47,6 +62,48 @@ function normalizeTtsVoiceType(input: string): string {
   return normalized
 }
 
+export function normalizeTtsCacheText(input: string): string {
+  return String(input || "")
+    .trim()
+    .replace(/\s+/g, " ")
+}
+
+export function resolveConfiguredTtsVoiceType(override?: string | null): string {
+  const raw = String(override || process.env.VOLC_TTS_VOICE_TYPE || DEFAULT_TTS_VOICE_TYPE)
+  return normalizeTtsVoiceType(raw)
+}
+
+export function buildTtsCacheKey(opts: { voiceType?: string | null; text: string }): {
+  key: string
+  voiceType: string
+  normalizedText: string
+} {
+  const normalizedText = normalizeTtsCacheText(opts.text)
+  const voiceType = resolveConfiguredTtsVoiceType(opts.voiceType)
+  const key = createHash("sha1").update(`${voiceType}|${normalizedText}`, "utf8").digest("hex")
+  return {
+    key,
+    voiceType,
+    normalizedText,
+  }
+}
+
+export function buildTtsLineCacheKey(opts: { voiceType?: string | null; lineId: string }): {
+  key: string
+  voiceType: string
+  lineId: string
+} | null {
+  const lineId = String(opts.lineId || "").trim()
+  if (!lineId) return null
+  const voiceType = resolveConfiguredTtsVoiceType(opts.voiceType)
+  const key = createHash("sha1").update(`${voiceType}|line:${lineId}`, "utf8").digest("hex")
+  return {
+    key,
+    voiceType,
+    lineId,
+  }
+}
+
 function getEnvOrThrow(name: string): string {
   const v = (process.env[name] || "").trim()
   if (!v) throw new Error(`${name}_missing`)
@@ -56,6 +113,113 @@ function getEnvOrThrow(name: string): string {
 function safeNumber(v: unknown): number | null {
   const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN
   return Number.isFinite(n) ? n : null
+}
+
+function getHeaderValue(headers: Headers, key: string): string {
+  return headers.get(key) || headers.get(key.toLowerCase()) || ""
+}
+
+function getSpeechLogid(headers: Headers): string {
+  return (
+    getHeaderValue(headers, "X-Tt-Logid") ||
+    getHeaderValue(headers, "X-Logid") ||
+    getHeaderValue(headers, "X-Tt-Log-Id")
+  )
+}
+
+function appidLast4(value: string): string {
+  const raw = String(value || "").trim()
+  if (!raw) return ""
+  return raw.length <= 4 ? raw : raw.slice(-4)
+}
+
+function asrFlashDebugEnabled(): boolean {
+  const raw = String(process.env.VOICE_COACH_ASR_DEBUG || "false")
+    .trim()
+    .toLowerCase()
+  return ["1", "true", "yes", "on"].includes(raw)
+}
+
+function flashDebug(event: string, summary: Record<string, unknown>) {
+  if (!asrFlashDebugEnabled()) return
+  try {
+    console.info(`[voice-coach][asr][flash][${event}]`, summary)
+  } catch {
+    // Debug logging must never fail ASR flow.
+  }
+}
+
+function buildAsrSelfcheckAudioBase64(): string {
+  const sampleRate = 16_000
+  const sampleCount = sampleRate
+  const channels = 1
+  const bytesPerSample = 2
+  const dataSize = sampleCount * channels * bytesPerSample
+  const wav = Buffer.alloc(44 + dataSize)
+
+  wav.write("RIFF", 0)
+  wav.writeUInt32LE(36 + dataSize, 4)
+  wav.write("WAVE", 8)
+  wav.write("fmt ", 12)
+  wav.writeUInt32LE(16, 16)
+  wav.writeUInt16LE(1, 20)
+  wav.writeUInt16LE(channels, 22)
+  wav.writeUInt32LE(sampleRate, 24)
+  wav.writeUInt32LE(sampleRate * channels * bytesPerSample, 28)
+  wav.writeUInt16LE(channels * bytesPerSample, 32)
+  wav.writeUInt16LE(16, 34)
+  wav.write("data", 36)
+  wav.writeUInt32LE(dataSize, 40)
+
+  for (let i = 0; i < sampleCount; i++) {
+    const t = i / sampleRate
+    const sample = Math.sin(2 * Math.PI * 440 * t) * 0.15
+    wav.writeInt16LE(Math.round(sample * 32767), 44 + i * 2)
+  }
+
+  return wav.toString("base64")
+}
+
+const ASR_SELFCHECK_AUDIO_BASE64 = buildAsrSelfcheckAudioBase64()
+
+function createSpeechError(
+  code: string,
+  message: string,
+  extra?: {
+    provider?: "flash" | "auc" | "tts"
+    httpStatus?: number | null
+    apiStatus?: string | null
+    apiCode?: string | null
+    apiMessage?: string | null
+    requestId?: string | null
+    resourceId?: string | null
+    logid?: string | null
+    submitLogid?: string | null
+    queryLogid?: string | null
+    flashRequestId?: string | null
+    flashLogid?: string | null
+    appidLast4?: string | null
+    operationHint?: string | null
+  },
+): Error {
+  const err = new Error(message || code) as Error & Record<string, unknown>
+  err.name = code
+  err.code = code
+  if (extra?.provider) err.provider = extra.provider
+  if (typeof extra?.httpStatus === "number") err.http_status = extra.httpStatus
+  if (extra?.apiStatus) err.api_status = extra.apiStatus
+  if (extra?.apiCode) err.api_code = extra.apiCode
+  if (extra?.apiMessage) err.api_message = extra.apiMessage
+  if (extra?.requestId) err.request_id = extra.requestId
+  if (extra?.resourceId) err.resource_id = extra.resourceId
+  if (extra?.logid) err.logid = extra.logid
+  if (extra?.submitLogid) err.submit_logid = extra.submitLogid
+  if (extra?.queryLogid) err.query_logid = extra.queryLogid
+  if (extra?.flashRequestId) err.flash_request_id = extra.flashRequestId
+  if (extra?.flashLogid) err.flash_logid = extra.flashLogid
+  if (extra?.appidLast4) err.appid_last4 = extra.appidLast4
+  if (extra?.operationHint) err.operation_hint = extra.operationHint
+  return err
 }
 
 async function fetchWithTimeout(url: string, init: RequestInit, timeout: number, timeoutError: string): Promise<Response> {
@@ -81,7 +245,7 @@ export async function doubaoTts(opts: {
   const profile = ttsProfile()
   const isFastProfile = profile === "fast"
   const cluster = (process.env.VOLC_TTS_CLUSTER || "volcano_tts").trim()
-  const configuredVoiceType = normalizeTtsVoiceType(process.env.VOLC_TTS_VOICE_TYPE || DEFAULT_TTS_VOICE_TYPE)
+  const configuredVoiceType = resolveConfiguredTtsVoiceType()
   const fallbackVoiceTypes = isFastProfile
     ? []
     : String(process.env.VOLC_TTS_FALLBACK_VOICES || "")
@@ -224,13 +388,15 @@ export async function doubaoAsrFlash(opts: {
 }): Promise<DoubaoAsrResult> {
   const appid = getEnvOrThrow("VOLC_SPEECH_APP_ID")
   const accessToken = getEnvOrThrow("VOLC_SPEECH_ACCESS_TOKEN")
-  const resourceId = (process.env.VOLC_ASR_FLASH_RESOURCE_ID || "").trim()
-  if (!resourceId) throw new Error("asr_flash_resource_missing")
+  const configuredResourceId = (process.env.VOLC_ASR_FLASH_RESOURCE_ID || FLASH_RESOURCE_ID).trim()
+  const resourceId = FLASH_RESOURCE_ID
   const flashTimeout = timeoutMs("VOLC_ASR_FLASH_TIMEOUT_MS", 12000)
 
   const requestId = randomUUID()
+  const appidTail = appidLast4(appid)
+  const uid = opts.uid || "voice_coach"
   const body = {
-    user: { uid: opts.uid || "voice_coach" },
+    user: { uid },
     audio: {
       format: opts.format,
       data: opts.audio.toString("base64"),
@@ -247,51 +413,267 @@ export async function doubaoAsrFlash(opts: {
       vad_segment_duration: 8000,
     },
   }
+  const headers = {
+    "Content-Type": "application/json",
+    "X-Api-App-Key": appid,
+    "X-Api-Access-Key": accessToken,
+    "X-Api-Resource-Id": resourceId,
+    "X-Api-Request-Id": requestId,
+    "X-Api-Sequence": "-1",
+  } as const
 
-  const res = await fetchWithTimeout(
-    "https://openspeech.bytedance.com/api/v3/auc/bigmodel/recognize/flash",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Api-App-Key": appid,
-        "X-Api-Access-Key": accessToken,
-        "X-Api-Resource-Id": resourceId,
-        "X-Api-Request-Id": requestId,
-        "X-Api-Sequence": "-1",
-      },
-      body: JSON.stringify(body),
+  flashDebug("request", {
+    endpoint: "api/v3/auc/bigmodel/recognize/flash",
+    flash_request_id: requestId,
+    appid_last4: appidTail || null,
+    resource_id: resourceId,
+    configured_resource_id:
+      configuredResourceId && configuredResourceId !== resourceId ? configuredResourceId : undefined,
+    headers_summary: {
+      "X-Api-App-Key": appidTail ? `***${appidTail}` : "***",
+      "X-Api-Access-Key": "***",
+      "X-Api-Resource-Id": resourceId,
+      "X-Api-Request-Id": requestId,
+      "X-Api-Sequence": "-1",
     },
-    flashTimeout,
-    "asr_flash_timeout",
-  )
+    params_summary: {
+      uid,
+      format: opts.format,
+      audio_bytes: opts.audio.length,
+      model_name: body.request.model_name,
+      result_type: body.request.result_type,
+      enable_punc: body.request.enable_punc,
+      enable_ddc: body.request.enable_ddc,
+      vad_segment_duration: body.request.vad_segment_duration,
+    },
+  })
 
-  const statusCodeHeader = res.headers.get("X-Api-Status-Code") || res.headers.get("x-api-status-code") || ""
-  if (statusCodeHeader && statusCodeHeader !== "20000000" && statusCodeHeader !== "20000003") {
-    throw new Error(`asr_status_${statusCodeHeader}`)
+  let res: Response
+  try {
+    res = await fetchWithTimeout(
+      "https://openspeech.bytedance.com/api/v3/auc/bigmodel/recognize/flash",
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+      },
+      flashTimeout,
+      "asr_flash_timeout",
+    )
+  } catch (err: any) {
+    const msg = String(err?.message || "")
+    if (msg.includes("asr_flash_timeout")) {
+      throw createSpeechError("asr_flash_timeout", "asr_flash_timeout", {
+        provider: "flash",
+        requestId,
+        resourceId,
+        flashRequestId: requestId,
+        appidLast4: appidTail || null,
+      })
+    }
+    throw createSpeechError("asr_flash_network", msg || "asr_flash_network", {
+      provider: "flash",
+      requestId,
+      resourceId,
+      flashRequestId: requestId,
+      appidLast4: appidTail || null,
+    })
   }
+
+  const statusCodeHeader = getHeaderValue(res.headers, "X-Api-Status-Code")
+  const flashLogid = getHeaderValue(res.headers, "X-Tt-Logid") || getSpeechLogid(res.headers) || null
 
   const json = (await res.json().catch(() => null)) as
     | {
+        code?: number | string
+        message?: string
         result?: { text?: string }
         audio_info?: { duration?: number }
         utterances?: Array<{ confidence?: number }>
       }
     | null
 
+  const apiCode = typeof json?.code === "number" || typeof json?.code === "string" ? String(json?.code) : null
+  const apiMessage = typeof json?.message === "string" ? json.message : null
+  const permissionDenied =
+    res.status === 403 &&
+    (statusCodeHeader === "45000030" || apiCode === "45000030" || String(apiMessage || "").includes("45000030"))
+
+  flashDebug("response", {
+    flash_request_id: requestId,
+    flash_logid: flashLogid,
+    appid_last4: appidTail || null,
+    resource_id: resourceId,
+    http_status: res.status,
+    api_status: statusCodeHeader || null,
+    api_code: apiCode,
+    api_message: apiMessage,
+  })
+
   if (!res.ok) {
-    throw new Error(`asr_http_${res.status}`)
+    if (permissionDenied) {
+      console.warn(
+        `[voice-coach][asr][flash] 操作提示：${FLASH_PERMISSION_HINT}; request_id=${requestId}; logid=${flashLogid || "-"}`,
+      )
+      throw createSpeechError("asr_flash_permission_denied", FLASH_PERMISSION_HINT, {
+        provider: "flash",
+        httpStatus: res.status,
+        apiStatus: statusCodeHeader || null,
+        apiCode,
+        apiMessage,
+        requestId,
+        resourceId,
+        logid: flashLogid,
+        flashRequestId: requestId,
+        flashLogid,
+        appidLast4: appidTail || null,
+        operationHint: FLASH_PERMISSION_HINT,
+      })
+    }
+
+    throw createSpeechError(
+      res.status >= 500 ? "asr_flash_http_5xx" : `asr_flash_http_${res.status}`,
+      apiMessage || `asr_flash_http_${res.status}`,
+      {
+        provider: "flash",
+        httpStatus: res.status,
+        apiStatus: statusCodeHeader || null,
+        apiCode,
+        apiMessage,
+        requestId,
+        resourceId,
+        logid: flashLogid,
+        flashRequestId: requestId,
+        flashLogid,
+        appidLast4: appidTail || null,
+      },
+    )
+  }
+
+  if (statusCodeHeader === "45000030") {
+    console.warn(
+      `[voice-coach][asr][flash] 操作提示：${FLASH_PERMISSION_HINT}; request_id=${requestId}; logid=${flashLogid || "-"}`,
+    )
+    throw createSpeechError("asr_flash_permission_denied", FLASH_PERMISSION_HINT, {
+      provider: "flash",
+      httpStatus: res.status,
+      apiStatus: statusCodeHeader,
+      apiCode,
+      apiMessage,
+      requestId,
+      resourceId,
+      logid: flashLogid,
+      flashRequestId: requestId,
+      flashLogid,
+      appidLast4: appidTail || null,
+      operationHint: FLASH_PERMISSION_HINT,
+    })
+  }
+
+  if (statusCodeHeader && statusCodeHeader !== "20000000" && statusCodeHeader !== "20000003") {
+    throw createSpeechError(
+      /^5/.test(statusCodeHeader) ? "asr_flash_status_5xx" : `asr_flash_status_${statusCodeHeader}`,
+      apiMessage || `asr_status_${statusCodeHeader}`,
+      {
+        provider: "flash",
+        apiStatus: statusCodeHeader,
+        apiCode,
+        apiMessage,
+        requestId,
+        resourceId,
+        logid: flashLogid,
+        flashRequestId: requestId,
+        flashLogid,
+        appidLast4: appidTail || null,
+      },
+    )
   }
 
   const text = typeof json?.result?.text === "string" ? json.result.text.trim() : ""
   const confidence = safeNumber(json?.utterances?.[0]?.confidence)
   const durationMs = safeNumber(json?.audio_info?.duration)
 
+  if (!text) {
+    throw createSpeechError("asr_flash_empty", "asr_flash_empty", {
+      provider: "flash",
+      apiStatus: statusCodeHeader || null,
+      apiCode,
+      apiMessage,
+      requestId,
+      resourceId,
+      logid: flashLogid,
+      flashRequestId: requestId,
+      flashLogid,
+      appidLast4: appidTail || null,
+    })
+  }
+
   return {
     text,
     confidence,
     durationSeconds: durationMs ? durationMs / 1000 : null,
     requestId,
+    resourceId,
+    logid: flashLogid,
+  }
+}
+
+export async function doubaoAsrFlashSelfcheck(opts?: {
+  uid?: string
+}): Promise<DoubaoAsrFlashSelfcheckResult> {
+  const fallbackAppidTail = appidLast4(String(process.env.VOLC_SPEECH_APP_ID || "")) || null
+
+  try {
+    const asr = await doubaoAsrFlash({
+      audio: Buffer.from(ASR_SELFCHECK_AUDIO_BASE64, "base64"),
+      format: "wav",
+      uid: opts?.uid || "asr_selfcheck",
+    })
+
+    return {
+      status: "PASS",
+      errorCode: null,
+      flashRequestId: asr.requestId,
+      flashLogid: asr.logid || null,
+      appidLast4: fallbackAppidTail,
+      resourceId: asr.resourceId || FLASH_RESOURCE_ID,
+    }
+  } catch (err: any) {
+    const code =
+      typeof err?.code === "string"
+        ? String(err.code)
+        : typeof err?.name === "string"
+          ? String(err.name)
+          : "asr_flash_selfcheck_failed"
+    const httpStatus = typeof err?.http_status === "number" ? Number(err.http_status) : null
+    const apiStatus = typeof err?.api_status === "string" ? String(err.api_status) : null
+    const apiCode = typeof err?.api_code === "string" ? String(err.api_code) : null
+    const message = typeof err?.message === "string" ? err.message : String(err || "")
+    const permissionDenied =
+      code === "asr_flash_permission_denied" ||
+      (httpStatus === 403 && (apiStatus === "45000030" || apiCode === "45000030" || message.includes("45000030")))
+    const hasTrace = Boolean(
+      (typeof err?.flash_logid === "string" && err.flash_logid) ||
+        (typeof err?.logid === "string" && err.logid) ||
+        httpStatus !== null ||
+        (apiStatus && apiStatus.length > 0) ||
+        (apiCode && apiCode.length > 0),
+    )
+
+    return {
+      status: !permissionDenied && hasTrace ? "PASS" : "FAIL",
+      errorCode: code,
+      flashRequestId:
+        typeof err?.flash_request_id === "string"
+          ? err.flash_request_id
+          : typeof err?.request_id === "string"
+            ? err.request_id
+            : null,
+      flashLogid:
+        typeof err?.flash_logid === "string" ? err.flash_logid : typeof err?.logid === "string" ? err.logid : null,
+      appidLast4: typeof err?.appid_last4 === "string" ? err.appid_last4 : fallbackAppidTail,
+      resourceId: typeof err?.resource_id === "string" ? err.resource_id : FLASH_RESOURCE_ID,
+    }
   }
 }
 
@@ -303,123 +685,252 @@ export async function doubaoAsrAuc(opts: {
   const appid = getEnvOrThrow("VOLC_SPEECH_APP_ID")
   const accessToken = getEnvOrThrow("VOLC_SPEECH_ACCESS_TOKEN")
   // Per official doc, resource id is either:
-  // - volc.bigasr.auc (model 1.0)
+  // - volc.bigasr.auc (model 1.0, usually lower latency)
   // - volc.seedasr.auc (model 2.0)
-  const configuredResourceId = (process.env.VOLC_ASR_RESOURCE_ID || "volc.seedasr.auc").trim()
-  // Avoid idle resource in realtime coaching flow.
-  const resourceId =
-    configuredResourceId === "volc.bigasr.auc_idle" || configuredResourceId === "volc.seedasr.auc_idle"
-      ? "volc.seedasr.auc"
-      : configuredResourceId
-  const submitTimeout = timeoutMs("VOLC_ASR_AUC_SUBMIT_TIMEOUT_MS", 8000)
-  const queryTimeout = timeoutMs("VOLC_ASR_AUC_QUERY_TIMEOUT_MS", 8000)
-
-  const requestId = randomUUID()
-
-  const submitRes = await fetchWithTimeout(
-    "https://openspeech.bytedance.com/api/v3/auc/bigmodel/submit",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Api-App-Key": appid,
-        "X-Api-Access-Key": accessToken,
-        "X-Api-Resource-Id": resourceId,
-        "X-Api-Request-Id": requestId,
-        "X-Api-Sequence": "-1",
-      },
-      body: JSON.stringify({
-        user: { uid: opts.uid || "voice_coach" },
-        audio: { format: opts.format, url: opts.audioUrl },
-        request: { model_name: "bigmodel", enable_itn: true },
-      }),
-    },
-    submitTimeout,
-    "asr_auc_submit_timeout",
-  )
-
-  const submitStatus = submitRes.headers.get("X-Api-Status-Code") || submitRes.headers.get("x-api-status-code") || ""
-  const submitMsg = submitRes.headers.get("X-Api-Message") || submitRes.headers.get("x-api-message") || ""
-  // Submit response body is expected to be empty.
-  await submitRes.arrayBuffer().catch(() => null)
-
-  if (!submitRes.ok) {
-    throw new Error(`asr_auc_submit_http_${submitRes.status}`)
+  const configuredResourceId = (process.env.VOLC_ASR_RESOURCE_ID || "volc.bigasr.auc").trim()
+  const speedFirst = String(process.env.VOICE_COACH_ASR_FAST_FIRST || "false")
+    .trim()
+    .toLowerCase() !== "false"
+  const normalizeResource = (input: string) => {
+    const v = (input || "").trim()
+    if (!v) return "volc.bigasr.auc"
+    if (v === "volc.bigasr.auc_idle" || v === "volc.seedasr.auc_idle") return "volc.seedasr.auc"
+    return v
   }
-  if (submitStatus && submitStatus !== "20000000") {
-    throw new Error(`asr_auc_submit_status_${submitStatus}${submitMsg ? `:${submitMsg}` : ""}`)
-  }
+  const primaryResource = normalizeResource(configuredResourceId)
+  const alternateResource =
+    primaryResource === "volc.seedasr.auc"
+      ? "volc.bigasr.auc"
+      : primaryResource === "volc.bigasr.auc"
+        ? "volc.seedasr.auc"
+        : ""
+  const resourceCandidates = Array.from(
+    new Set(
+      speedFirst && primaryResource === "volc.seedasr.auc"
+        ? ["volc.bigasr.auc", primaryResource, alternateResource]
+        : [primaryResource, alternateResource],
+    ),
+  ).filter(Boolean)
+  const submitTimeout = Math.max(2200, timeoutMs("VOLC_ASR_AUC_SUBMIT_TIMEOUT_MS", 4000))
+  const queryTimeout = Math.max(2200, timeoutMs("VOLC_ASR_AUC_QUERY_TIMEOUT_MS", 2500))
+  const maxAttempts = Math.max(4, Math.min(20, Number(process.env.VOLC_ASR_AUC_QUERY_MAX_ATTEMPTS || 10) || 10))
 
-  // Poll query until done. Typical latency is a few seconds for short audios.
-  for (let attempt = 0; attempt < 12; attempt++) {
-    // Faster polling for short utterances.
-    await sleep(350 + attempt * 120)
+  let lastError: unknown = null
 
-    const qRes = await fetchWithTimeout(
-      "https://openspeech.bytedance.com/api/v3/auc/bigmodel/query",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Api-App-Key": appid,
-          "X-Api-Access-Key": accessToken,
-          "X-Api-Resource-Id": resourceId,
-          "X-Api-Request-Id": requestId,
-          "X-Api-Sequence": "-1",
-        },
-        body: "{}",
-      },
-      queryTimeout,
-      "asr_auc_query_timeout",
-    )
+  for (let r = 0; r < resourceCandidates.length; r++) {
+    const resourceId = String(resourceCandidates[r])
+    const requestId = randomUUID()
+    let submitLogid: string | null = null
+    let latestQueryLogid: string | null = null
 
-    const qStatus = qRes.headers.get("X-Api-Status-Code") || qRes.headers.get("x-api-status-code") || ""
-    const qMsg = qRes.headers.get("X-Api-Message") || qRes.headers.get("x-api-message") || ""
-
-    const json = (await qRes.json().catch(() => null)) as
-      | {
-          audio_info?: { duration?: number }
-          result?: { text?: string; utterances?: Array<{ confidence?: number }> } | Array<{ text?: string }>
-          utterances?: Array<{ confidence?: number }>
+    try {
+      let submitRes: Response
+      try {
+        submitRes = await fetchWithTimeout(
+          "https://openspeech.bytedance.com/api/v3/auc/bigmodel/submit",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Api-App-Key": appid,
+              "X-Api-Access-Key": accessToken,
+              "X-Api-Resource-Id": resourceId,
+              "X-Api-Request-Id": requestId,
+              "X-Api-Sequence": "-1",
+            },
+            body: JSON.stringify({
+              user: { uid: opts.uid || "voice_coach" },
+              audio: { format: opts.format, url: opts.audioUrl },
+              request: { model_name: "bigmodel", enable_itn: true },
+            }),
+          },
+          submitTimeout,
+          "asr_auc_submit_timeout",
+        )
+      } catch (err: any) {
+        const msg = String(err?.message || err || "")
+        if (msg.includes("asr_auc_submit_timeout")) {
+          throw createSpeechError("asr_auc_submit_timeout", "asr_auc_submit_timeout", {
+            provider: "auc",
+            requestId,
+            resourceId,
+          })
         }
-      | null
+        throw createSpeechError("asr_auc_submit_network", msg || "asr_auc_submit_network", {
+          provider: "auc",
+          requestId,
+          resourceId,
+        })
+      }
 
-    if (!qRes.ok) {
-      throw new Error(`asr_auc_query_http_${qRes.status}`)
-    }
+      submitLogid = getSpeechLogid(submitRes.headers) || null
+      const submitStatus = getHeaderValue(submitRes.headers, "X-Api-Status-Code")
+      const submitMsg = getHeaderValue(submitRes.headers, "X-Api-Message")
+      await submitRes.arrayBuffer().catch(() => null)
 
-    if (qStatus === "20000001" || qStatus === "20000002" || !qStatus) {
-      continue
-    }
+      if (!submitRes.ok) {
+        throw createSpeechError(`asr_auc_submit_http_${submitRes.status}`, `asr_auc_submit_http_${submitRes.status}`, {
+          provider: "auc",
+          httpStatus: submitRes.status,
+          apiStatus: submitStatus || null,
+          apiMessage: submitMsg || null,
+          requestId,
+          resourceId,
+          logid: submitLogid,
+          submitLogid,
+        })
+      }
+      if (submitStatus && submitStatus !== "20000000") {
+        throw createSpeechError(
+          `asr_auc_submit_status_${submitStatus}`,
+          `asr_auc_submit_status_${submitStatus}${submitMsg ? `:${submitMsg}` : ""}`,
+          {
+            provider: "auc",
+            apiStatus: submitStatus,
+            apiMessage: submitMsg || null,
+            requestId,
+            resourceId,
+            logid: submitLogid,
+            submitLogid,
+          },
+        )
+      }
 
-    if (qStatus === "20000003") {
-      // Silence audio: according to doc, caller should resubmit.
-      throw new Error("asr_auc_silence")
-    }
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        if (attempt > 0) {
+          await sleep(Math.min(450, 120 + attempt * 60))
+        }
 
-    if (qStatus !== "20000000") {
-      throw new Error(`asr_auc_query_status_${qStatus}${qMsg ? `:${qMsg}` : ""}`)
-    }
+        let qRes: Response
+        try {
+          qRes = await fetchWithTimeout(
+            "https://openspeech.bytedance.com/api/v3/auc/bigmodel/query",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-Api-App-Key": appid,
+                "X-Api-Access-Key": accessToken,
+                "X-Api-Resource-Id": resourceId,
+                "X-Api-Request-Id": requestId,
+                "X-Api-Sequence": "-1",
+              },
+              body: "{}",
+            },
+            queryTimeout,
+            "asr_auc_query_timeout",
+          )
+        } catch (err: any) {
+          const msg = String(err?.message || err || "")
+          if (msg.includes("asr_auc_query_timeout")) continue
+          throw createSpeechError("asr_auc_query_network", msg || "asr_auc_query_network", {
+            provider: "auc",
+            requestId,
+            resourceId,
+            logid: latestQueryLogid || submitLogid,
+            submitLogid,
+            queryLogid: latestQueryLogid,
+          })
+        }
 
-    let text = ""
-    if (typeof (json as any)?.result?.text === "string") {
-      text = String((json as any).result.text).trim()
-    } else if (Array.isArray((json as any)?.result) && typeof (json as any).result?.[0]?.text === "string") {
-      text = String((json as any).result[0].text).trim()
-    }
+        const qLogid = getSpeechLogid(qRes.headers) || null
+        if (qLogid) latestQueryLogid = qLogid
+        const qStatus = getHeaderValue(qRes.headers, "X-Api-Status-Code")
+        const qMsg = getHeaderValue(qRes.headers, "X-Api-Message")
 
-    const confidence = safeNumber(
-      (json as any)?.result?.utterances?.[0]?.confidence ?? (json as any)?.utterances?.[0]?.confidence,
-    )
-    const durationMs = safeNumber((json as any)?.audio_info?.duration)
+        const json = (await qRes.json().catch(() => null)) as
+          | {
+              audio_info?: { duration?: number }
+              result?: { text?: string; utterances?: Array<{ confidence?: number }> } | Array<{ text?: string }>
+              utterances?: Array<{ confidence?: number }>
+            }
+          | null
 
-    return {
-      text,
-      confidence,
-      durationSeconds: durationMs ? durationMs / 1000 : null,
-      requestId,
+        if (!qRes.ok) {
+          if (qRes.status >= 500) continue
+          throw createSpeechError(`asr_auc_query_http_${qRes.status}`, `asr_auc_query_http_${qRes.status}`, {
+            provider: "auc",
+            httpStatus: qRes.status,
+            apiStatus: qStatus || null,
+            apiMessage: qMsg || null,
+            requestId,
+            resourceId,
+            logid: qLogid || submitLogid,
+            submitLogid,
+            queryLogid: qLogid,
+          })
+        }
+
+        if (qStatus === "20000001" || qStatus === "20000002" || !qStatus) {
+          continue
+        }
+
+        if (qStatus === "20000003") {
+          throw createSpeechError("asr_auc_silence", "asr_auc_silence", {
+            provider: "auc",
+            apiStatus: qStatus,
+            apiMessage: qMsg || null,
+            requestId,
+            resourceId,
+            logid: qLogid || submitLogid,
+            submitLogid,
+            queryLogid: qLogid,
+          })
+        }
+
+        if (qStatus !== "20000000") {
+          throw createSpeechError(
+            `asr_auc_query_status_${qStatus}`,
+            `asr_auc_query_status_${qStatus}${qMsg ? `:${qMsg}` : ""}`,
+            {
+              provider: "auc",
+              apiStatus: qStatus,
+              apiMessage: qMsg || null,
+              requestId,
+              resourceId,
+              logid: qLogid || submitLogid,
+              submitLogid,
+              queryLogid: qLogid,
+            },
+          )
+        }
+
+        let text = ""
+        if (typeof (json as any)?.result?.text === "string") {
+          text = String((json as any).result.text).trim()
+        } else if (Array.isArray((json as any)?.result) && typeof (json as any).result?.[0]?.text === "string") {
+          text = String((json as any).result[0].text).trim()
+        }
+
+        const confidence = safeNumber(
+          (json as any)?.result?.utterances?.[0]?.confidence ?? (json as any)?.utterances?.[0]?.confidence,
+        )
+        const durationMs = safeNumber((json as any)?.audio_info?.duration)
+
+        return {
+          text,
+          confidence,
+          durationSeconds: durationMs ? durationMs / 1000 : null,
+          requestId,
+          resourceId,
+          logid: qLogid || submitLogid,
+          submitLogid,
+          queryLogid: qLogid,
+        }
+      }
+
+      throw createSpeechError("asr_auc_timeout", "asr_auc_timeout", {
+        provider: "auc",
+        requestId,
+        resourceId,
+        logid: latestQueryLogid || submitLogid,
+        submitLogid,
+        queryLogid: latestQueryLogid,
+      })
+    } catch (err) {
+      lastError = err
     }
   }
 
-  throw new Error("asr_auc_timeout")
+  throw (lastError instanceof Error ? lastError : new Error("asr_auc_timeout"))
 }
