@@ -1,0 +1,6 @@
+attempt=1 {"file":"/tmp/voicecoach_e2e_1771603888033.json","asr_ms":762,"provider":"flash","error":null}
+attempt=2 {"file":"/tmp/voicecoach_e2e_1771603910052.json","asr_ms":586,"provider":"flash","error":null}
+attempt=3 {"file":"/tmp/voicecoach_e2e_1771603931065.json","asr_ms":609,"provider":"flash","error":null}
+attempt=4 {"file":"/tmp/voicecoach_e2e_1771603951627.json","asr_ms":580,"provider":"flash","error":null}
+attempt=5 {"file":"/tmp/voicecoach_e2e_1771603973646.json","asr_ms":641,"provider":"flash","error":null}
+attempt=6 {"file":"/tmp/voicecoach_e2e_1771603995186.json","asr_ms":519,"provider":"flash","error":null}

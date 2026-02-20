@@ -1,0 +1,51 @@
+{
+  "generated_at": "2026-02-20T16:32:39.908Z",
+  "wo_id": "WO-R6-ASR",
+  "strategy": "R5 evidence backfill to main repo path",
+  "baseline_commit": "d08f1fee97138079f6a0080a77e8ae0aaa18f2b8",
+  "evidence_root": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R6-ASR/window3",
+  "sources": {
+    "bench_A": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R6-ASR/window3/bench_A.json",
+    "bench_B": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R6-ASR/window3/bench_B.json",
+    "bench_C": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R6-ASR/window3/bench_C.json",
+    "selfcheck": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R6-ASR/window3/selfcheck.log",
+    "startup_gate": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R6-ASR/window3/startup_gate.log",
+    "bench_B_attempts": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R6-ASR/window3/bench_B_single_attempts.log"
+  },
+  "gate_requirements": {
+    "flash_ratio_B_min": 0.98,
+    "asr_ms_B_p95_max": 1000,
+    "selfcheck_startup_gate": "PASS"
+  },
+  "observed": {
+    "asr_provider_final_flash_ratio_B": 1,
+    "asr_ms_B_p50": 586,
+    "asr_ms_B_p95": 762,
+    "selfcheck_status": "PASS",
+    "startup_gate_status": "PASS",
+    "flash_permission_denied_count": 0,
+    "uploaded_audio_format_distribution": {
+      "mp3": 6
+    },
+    "audit_samples": [
+      {
+        "trace_id": "5fc5b386-4281-425d-9f3e-8d8fda260553",
+        "client_build": "bench-1771603866295",
+        "server_build": "0.1.0",
+        "executor": "worker"
+      },
+      {
+        "trace_id": "5fc5b386-4281-425d-9f3e-8d8fda260553",
+        "client_build": "bench-1771603866295",
+        "server_build": "0.1.0",
+        "executor": "worker"
+      }
+    ]
+  },
+  "gates": {
+    "flash_ratio_B": "PASS",
+    "asr_ms_B_p95": "PASS",
+    "selfcheck_startup_gate": "PASS"
+  },
+  "gate_result": "PASS"
+}

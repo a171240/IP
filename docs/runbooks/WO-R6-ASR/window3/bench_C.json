@@ -1,0 +1,71 @@
+{
+  "generated_at": "2026-02-20T16:14:23.139Z",
+  "mode": "N/A_for_WO-R5-ASR",
+  "note": "WO-R5-ASR gate only requires A(selfcheck/startup) and B(flash ratio + asr latency).",
+  "asr_provider": {},
+  "asr_provider_final": {},
+  "asr_outcome": {},
+  "asr_ms": {
+    "count": 0,
+    "p50": null,
+    "p95": null,
+    "avg": null,
+    "max": null
+  },
+  "audio_ready_ms": {
+    "count": 0,
+    "p50": null,
+    "p95": null,
+    "avg": null,
+    "max": null
+  },
+  "llm_ms": {
+    "count": 0,
+    "p50": null,
+    "p95": null,
+    "avg": null,
+    "max": null
+  },
+  "tts_ms": {
+    "count": 0,
+    "p50": null,
+    "p95": null,
+    "avg": null,
+    "max": null
+  },
+  "queue_wait_before_main_ms": {
+    "count": 0,
+    "p50": null,
+    "p95": null,
+    "avg": null,
+    "max": null
+  },
+  "queue_wait_before_tts_ms": {
+    "count": 0,
+    "p50": null,
+    "p95": null,
+    "avg": null,
+    "max": null
+  },
+  "queue_wait_before_tts_invalid_rate": null,
+  "executor_worker_ratio": null,
+  "submit_pump_count": null,
+  "events_pump_count": null,
+  "asr_provider_final_flash_ratio": null,
+  "flash_permission_denied_count": 0,
+  "uploaded_audio_format_distribution": {},
+  "audit_samples": [
+    {
+      "trace_id": "5fc5b386-4281-425d-9f3e-8d8fda260553",
+      "client_build": "bench-1771603866295",
+      "server_build": "0.1.0",
+      "executor": "worker"
+    },
+    {
+      "trace_id": "5fc5b386-4281-425d-9f3e-8d8fda260553",
+      "client_build": "bench-1771603866295",
+      "server_build": "0.1.0",
+      "executor": "worker"
+    }
+  ]
+}
