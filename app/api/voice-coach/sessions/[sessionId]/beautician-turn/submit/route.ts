@@ -54,6 +54,11 @@ function formatDuration(seconds: number | null) {
   return Math.round(n)
 }
 
+function clamp(n: number, min: number, max: number) {
+  if (Number.isNaN(n)) return min
+  return Math.max(min, Math.min(max, n))
+}
+
 async function latestEventCursor(supabase: any, sessionId: string): Promise<number> {
   const { data } = await supabase
     .from("voice_coach_events")

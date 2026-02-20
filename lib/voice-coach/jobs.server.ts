@@ -60,6 +60,10 @@ type VoiceCoachJobResultState = {
   pipeline_started_at_ms?: number
   tts_queued_at_ms?: number
   stage_entered_at_ms?: number
+  picked_at_ms?: number
+  picked_at?: string
+  claim_attempt_count?: number
+  lock_owner?: string
   trace_id?: string
   client_build?: string
   server_build?: string
@@ -253,8 +257,8 @@ function asrAucTotalTimeoutMs(): number {
 }
 
 function processingStaleMs(): number {
-  const n = Number(process.env.VOICE_COACH_PROCESSING_STALE_MS || 6000)
-  if (!Number.isFinite(n) || n < 3000) return 6000
+  const n = Number(process.env.VOICE_COACH_PROCESSING_STALE_MS || 45000)
+  if (!Number.isFinite(n) || n < 10000) return 45000
   return Math.round(n)
 }
 
@@ -2343,21 +2347,30 @@ async function processAnalysisStage(args: {
 export async function listVoiceCoachQueuedJobs(args?: {
   maxJobs?: number
   allowedStages?: Array<VoiceCoachJobStage>
+  newestFirst?: boolean
+  maxQueueAgeMs?: number
 }): Promise<VoiceCoachQueuedJobRecord[]> {
   const admin = createAdminSupabaseClient()
   const maxJobs = Math.max(1, Math.min(50, Number(args?.maxJobs || 10) || 10))
   const allowedStagesSet =
     Array.isArray(args?.allowedStages) && args.allowedStages.length ? new Set(args.allowedStages) : null
+  const newestFirst = Boolean(args?.newestFirst)
+  const maxQueueAgeMsRaw = Number(args?.maxQueueAgeMs || 0)
+  const maxQueueAgeMs = Number.isFinite(maxQueueAgeMsRaw) ? Math.max(0, Math.round(maxQueueAgeMsRaw)) : 0
+  const queuedAfterIso = maxQueueAgeMs > 0 ? new Date(Date.now() - maxQueueAgeMs).toISOString() : null
 
   let query = admin
     .from("voice_coach_jobs")
     .select("id, session_id, user_id, stage, created_at")
     .eq("status", "queued")
-    .order("created_at", { ascending: true })
+    .order("created_at", { ascending: !newestFirst })
     .limit(maxJobs)
 
   if (allowedStagesSet) {
     query = query.in("stage", Array.from(allowedStagesSet))
+  }
+  if (queuedAfterIso) {
+    query = query.gte("created_at", queuedAfterIso)
   }
 
   const { data, error } = await query
@@ -2488,8 +2501,18 @@ export async function processVoiceCoachJobById(args: {
   const lockOwner = args.lockOwner ? String(args.lockOwner).slice(0, 120) : null
   const createdAtMs = parseIsoToMs((job as any).created_at)
   const updatedAtMs = parseIsoToMs((job as any).updated_at)
-  const stageEnteredAtMsFromResult = asNumber(((job as any).result_json || {})?.stage_entered_at_ms)
+  const claimStartedAtMs = parseIsoToMs(claimedAt) || Date.now()
+  const resultStateBeforeClaim = ((job as any).result_json || {}) as VoiceCoachJobResultState
+  const stageEnteredAtMsFromResult = asNumber(resultStateBeforeClaim.stage_entered_at_ms)
   const stageEnteredAtMsForMain = stageEnteredAtMsFromResult ?? updatedAtMs ?? createdAtMs ?? Date.now()
+  const claimedResultState = mergeResult(resultStateBeforeClaim, {
+    stage_entered_at_ms: stageEnteredAtMsFromResult ?? stageEnteredAtMsForMain,
+    picked_at_ms: claimStartedAtMs,
+    picked_at: claimedAt,
+    executor,
+    claim_attempt_count: nextAttempt,
+    lock_owner: lockOwner || undefined,
+  })
 
   const { data: claimed, error: claimError } = await admin
     .from("voice_coach_jobs")
@@ -2499,6 +2522,7 @@ export async function processVoiceCoachJobById(args: {
       attempt_count: nextAttempt,
       updated_at: claimedAt,
       last_error: null,
+      result_json: claimedResultState,
     })
     .eq("id", job.id)
     .eq("status", "queued")
@@ -2508,10 +2532,10 @@ export async function processVoiceCoachJobById(args: {
   if (claimError || !claimed) return { processed: false, done: false }
 
   const payload = (claimed.payload_json || {}) as VoiceCoachJobPayload
-  const resultStateRaw = (claimed.result_json || {}) as VoiceCoachJobResultState
-  const claimedAtMs = parseIsoToMs(claimedAt) || Date.now()
-  const claimedStageEnteredAtMs = stageEnteredAtMsFromResult
-  const claimQueueBaseMs = stageEnteredAtMsForMain
+  const resultStateRaw = (claimed.result_json || claimedResultState || {}) as VoiceCoachJobResultState
+  const claimedAtMs = claimStartedAtMs
+  const claimedStageEnteredAtMs = asNumber(resultStateRaw.stage_entered_at_ms) ?? stageEnteredAtMsForMain
+  const claimQueueBaseMs = claimedStageEnteredAtMs
   const queueWaitBeforeMainMs =
     stage === "main_pending"
       ? nonNegativeMs(claimedAtMs - claimQueueBaseMs)
@@ -2697,8 +2721,6 @@ export async function pumpVoiceCoachQueuedJobs(args: {
             stage: staleStage,
             last_error: "requeued_stale_processing",
             updated_at: recoveredAt,
-            stage_entered_at: recoveredAt,
-            lock_owner: null,
           })
           .eq("id", String(stale.id))
           .eq("status", "processing")
@@ -2712,12 +2734,11 @@ export async function pumpVoiceCoachQueuedJobs(args: {
 
     let queuedQuery = admin
       .from("voice_coach_jobs")
-      .select("id, stage, stage_entered_at")
+      .select("id, stage")
       .eq("session_id", args.sessionId)
       .eq("user_id", args.userId)
       .eq("status", "queued")
-      .order("stage_entered_at", { ascending: true, nullsFirst: true })
-      .order("created_at", { ascending: true })
+      .order("created_at", { ascending: false })
       .limit(1)
 
     if (allowedStagesSet) {
