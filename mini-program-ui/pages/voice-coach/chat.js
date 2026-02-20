@@ -1,6 +1,7 @@
-const { API_BASE_URL } = require("../../utils/config")
+const { API_BASE_URL, VOICE_COACH_MP_STREAM_ENABLED } = require("../../utils/config")
 const { request } = require("../../utils/request")
 const { getAccessToken, loginSilent } = require("../../utils/auth")
+const { getClientBuild } = require("../../utils/build")
 const { getDeviceId } = require("../../utils/device")
 const { track } = require("../../utils/track")
 
@@ -10,9 +11,12 @@ const TURN_PENDING_STATUSES = {
 }
 
 // Default to short-polling on Mini Program for stability.
-const MP_STREAM_ENABLED = false
+const MP_STREAM_ENABLED = Boolean(VOICE_COACH_MP_STREAM_ENABLED)
 const LOCAL_SILENCE_MIN_SECONDS = 1.2
 const LOCAL_SILENCE_MIN_ENERGY_FRAMES = 2
+const POLL_BACKOFF_BASE_MS = 250
+const POLL_BACKOFF_MAX_MS = 2500
+const BUILD_ID = getClientBuild()
 
 // Preview ASR currently uses short chunks with flash endpoint, which is not a compatible path.
 // Keep it disabled by default until realtime streaming ASR is enabled.
@@ -41,7 +45,7 @@ function normalizeTurn(raw) {
   const role = raw.role === "beautician" ? "beautician" : "customer"
   const status = String(raw.status || "")
   const hasAudio = Boolean(raw.audio_url || raw.audioUrl || raw.audio_path)
-  const showTextDefault = role === "customer" ? false : !hasAudio
+  const showTextDefault = role === "customer" ? !hasAudio && status === "text_ready" : !hasAudio
   const audioSeconds = Number(raw.audio_seconds || raw.audioSeconds || 0) || 0
   const pending = typeof raw.pending === "boolean" ? raw.pending : isPendingByStatus(status)
 
@@ -97,6 +101,24 @@ function sleep(ms) {
 function makeClientAttemptId() {
   const rand = Math.random().toString(36).slice(2, 10)
   return `mp_${Date.now()}_${rand}`
+}
+
+function detectAudioFormatFromPath(filePath, fallbackFormat = "") {
+  const fallback = String(fallbackFormat || "").trim().toLowerCase()
+  const input = String(filePath || "").trim().toLowerCase()
+  if (input.endsWith(".mp3")) return "mp3"
+  if (input.endsWith(".wav")) return "wav"
+  if (input.endsWith(".aac")) return "aac"
+  return fallback || "unknown"
+}
+
+function calcPercentile(values, percentile) {
+  const p = Math.max(0, Math.min(100, Number(percentile || 0) || 0))
+  const list = Array.isArray(values) ? values.filter((v) => Number.isFinite(Number(v))) : []
+  if (!list.length) return 0
+  const sorted = list.slice().sort((a, b) => a - b)
+  const index = Math.max(0, Math.min(sorted.length - 1, Math.ceil((p / 100) * sorted.length) - 1))
+  return Number(sorted[index] || 0)
 }
 
 function canUseChunkedRequest() {
@@ -208,8 +230,10 @@ Page({
 
     this.hasShownAudioError = false
     this.hasShownTtsFallbackToast = false
+    this.hasShownLoginExpiredToast = false
     this.stopEvents = false
     this.pollingEvents = false
+    this.pollBackoffMs = 0
     this.streamEventsDisabled = !MP_STREAM_ENABLED
     this.streamNoChunkCount = 0
     this.streamBuffer = ""
@@ -224,6 +248,15 @@ Page({
     this.recordTouchStartY = 0
     this.recordEnergyFrames = 0
     this.recordFrameCount = 0
+    this.recordStartedAt = 0
+    this.lastRecordMeta = {
+      format: "unknown",
+      sampleRate: 16000,
+      channels: 1,
+    }
+    this.uiFeedbackSamples = []
+
+    console.log("[voice-coach] page load", { build_id: BUILD_ID })
 
     this.audioCtx.onError(() => {
       if (this.hasShownAudioError) return
@@ -234,29 +267,50 @@ Page({
     this.recorder.onStop((res) => {
       if (this.recordIntent === "cancel") {
         this.recordIntent = ""
-        this.setData({ loading: false, recording: false })
+        this.recordStartedAt = 0
+        this.setData({ loading: false, recording: false, recordingPreviewText: "" })
         return
       }
       this.recordIntent = ""
       const durationSec = res && res.duration ? Math.round(res.duration / 1000) : 0
+      const fallbackRecordMs = Math.max(0, Date.now() - Number(this.recordStartedAt || Date.now()))
+      const recordMs = Math.max(0, Number((res && res.duration) || fallbackRecordMs) || 0)
+      const recordFormat = detectAudioFormatFromPath(
+        res && res.tempFilePath,
+        this.lastRecordMeta && this.lastRecordMeta.format,
+      )
+      const recordSampleRate = Number((this.lastRecordMeta && this.lastRecordMeta.sampleRate) || 16000) || 16000
+      const recordChannels = Number((this.lastRecordMeta && this.lastRecordMeta.channels) || 1) || 1
+      this.recordStartedAt = 0
       if (!res || !res.tempFilePath) {
         wx.showToast({ title: "录音失败", icon: "none" })
-        this.setData({ recording: false, loading: false })
+        this.setData({ recording: false, loading: false, recordingPreviewText: "" })
         return
       }
       if (!durationSec || durationSec < 1) {
         wx.showToast({ title: "录音太短，请至少说1秒", icon: "none" })
-        this.setData({ recording: false, loading: false })
+        this.setData({ recording: false, loading: false, recordingPreviewText: "" })
         return
       }
       const fileSize = Number(res && res.fileSize ? res.fileSize : 0) || 0
       const lowEnergy = Number(this.recordEnergyFrames || 0) < LOCAL_SILENCE_MIN_ENERGY_FRAMES
       if (durationSec < LOCAL_SILENCE_MIN_SECONDS && lowEnergy && fileSize < 4096) {
         wx.showToast({ title: "未检测到有效语音，请重录", icon: "none" })
-        this.setData({ recording: false, loading: false })
+        this.setData({ recording: false, loading: false, recordingPreviewText: "" })
         return
       }
-      this.uploadBeauticianTurn(res.tempFilePath, durationSec)
+      console.log("[voice-coach] recorder stop", {
+        build_id: BUILD_ID,
+        record_format: recordFormat,
+        record_sample_rate: recordSampleRate,
+        record_channels: recordChannels,
+      })
+      this.uploadBeauticianTurn(res.tempFilePath, durationSec, {
+        recordMs,
+        recordFormat,
+        recordSampleRate,
+        recordChannels,
+      })
     })
 
     if (typeof this.recorder.onFrameRecorded === "function") {
@@ -303,13 +357,114 @@ Page({
     } catch {}
   },
 
+  withBuildHeader(header = {}) {
+    const next = { ...(header || {}) }
+    next["X-Client-Build"] = BUILD_ID
+    next["x-client-build"] = BUILD_ID
+    return next
+  },
+
+  requestWithBuild(opts = {}) {
+    return request({
+      ...opts,
+      header: this.withBuildHeader((opts && opts.header) || {}),
+    })
+  },
+
+  buildAuthHeaders(extra = {}) {
+    const token = getAccessToken()
+    const deviceId = getDeviceId()
+    return this.withBuildHeader({
+      Authorization: token ? `Bearer ${token}` : "",
+      "x-device-id": deviceId || "",
+      ...(extra || {}),
+    })
+  },
+
+  async refreshAuthOnce(scene = "") {
+    try {
+      await loginSilent()
+      console.warn("[voice-coach] 401 recovered", { scene, build_id: BUILD_ID })
+      return true
+    } catch (err) {
+      console.warn("[voice-coach] 401 refresh failed", {
+        scene,
+        build_id: BUILD_ID,
+        err_msg: err && err.errMsg ? err.errMsg : "",
+      })
+      return false
+    }
+  },
+
+  handleLoginExpired(scene = "", opts = {}) {
+    if (opts && opts.stopPolling) {
+      this.stopEvents = true
+    }
+    if (this.hasShownLoginExpiredToast) return
+    this.hasShownLoginExpiredToast = true
+    console.warn("[voice-coach] login expired", { scene, build_id: BUILD_ID })
+    wx.showToast({ title: "登录失效，请重新登录", icon: "none" })
+  },
+
+  getNextPollDelay(hasEvents, ok, source = "poll") {
+    if (hasEvents) {
+      if (this.pollBackoffMs) {
+        console.log("[voice-coach] poll backoff reset", { source, build_id: BUILD_ID })
+      }
+      this.pollBackoffMs = 0
+      return 0
+    }
+
+    const prev = Number(this.pollBackoffMs || 0) || 0
+    const next = prev > 0 ? Math.min(POLL_BACKOFF_MAX_MS, prev * 2) : POLL_BACKOFF_BASE_MS
+    this.pollBackoffMs = next
+    console.log("[voice-coach] poll backoff", {
+      source,
+      reason: ok ? "no_events" : "request_failed",
+      next_delay_ms: next,
+      build_id: BUILD_ID,
+    })
+    return next
+  },
+
+  notifyRecordSubmitted() {
+    try {
+      wx.vibrateShort({ type: "light" })
+    } catch (_err) {}
+    console.log("[voice-coach] record submitted feedback", { build_id: BUILD_ID })
+  },
+
+  recordUiFeedbackMetric(uiFeedbackMs, extra = {}) {
+    const ms = Math.max(0, Number(uiFeedbackMs || 0) || 0)
+    const samples = Array.isArray(this.uiFeedbackSamples) ? this.uiFeedbackSamples.slice() : []
+    samples.push(ms)
+    while (samples.length > 80) samples.shift()
+    this.uiFeedbackSamples = samples
+    const p95 = calcPercentile(samples, 95)
+
+    const payload = {
+      build_id: BUILD_ID,
+      ui_feedback_ms: ms,
+      ui_feedback_p95_ms: p95,
+      sample_size: samples.length,
+      ...extra,
+    }
+    console.log("[voice-coach][metric] ui_feedback", payload)
+    track("voicecoach_ui_feedback", {
+      sessionId: this.data.sessionId || "",
+      ...payload,
+    })
+  },
+
   async createSession(createOpts = {}) {
     const startedAt = Date.now()
     this.sessionCreatedAt = startedAt
     this.setData({ loading: true })
     try {
       const token = getAccessToken()
-      if (shouldWarmupLogin(token)) {
+      if (!token) {
+        await loginSilent()
+      } else if (shouldWarmupLogin(token)) {
         try {
           await loginSilent()
         } catch (_err) {}
@@ -325,7 +480,7 @@ Page({
       if (goalTemplateId) reqData.goal_template_id = goalTemplateId
       if (goalCustom) reqData.goal_custom = goalCustom
 
-      const res = await request({
+      const res = await this.requestWithBuild({
         baseUrl: API_BASE_URL,
         url: "/api/voice-coach/sessions",
         method: "POST",
@@ -382,7 +537,7 @@ Page({
   async loadSession(sessionId) {
     this.setData({ loading: true })
     try {
-      const res = await request({
+      const res = await this.requestWithBuild({
         baseUrl: API_BASE_URL,
         url: `/api/voice-coach/sessions/${sessionId}`,
         method: "GET",
@@ -419,20 +574,23 @@ Page({
     if (this.pollingEvents || this.stopEvents) return
     if (!this.data.sessionId) return
     this.pollingEvents = true
+    this.pollBackoffMs = 0
     this.streamBuffer = ""
     this.pollEventsLoop()
   },
 
   async pollEventsLoop() {
     while (!this.stopEvents && this.data.sessionId) {
-      const usedStream = await this.pollEventsStreamOnce()
-      if (!usedStream) {
-        const ok = await this.pollEventsOnce()
-        if (!ok) {
-          if (this.stopEvents) break
-          await sleep(400)
-        }
-      }
+      const streamResult = await this.pollEventsStreamOnce()
+      const pollResult = streamResult.usedStream ? streamResult : await this.pollEventsOnce()
+      if (this.stopEvents || (pollResult && pollResult.unauthorized)) break
+
+      const delayMs = this.getNextPollDelay(
+        Boolean(pollResult && pollResult.hasEvents),
+        Boolean(pollResult && pollResult.ok),
+        streamResult.usedStream ? "stream" : "short_poll",
+      )
+      if (delayMs > 0) await sleep(delayMs)
     }
 
     this.pollingEvents = false
@@ -441,41 +599,55 @@ Page({
   async pollEventsOnce() {
     const sessionId = this.data.sessionId
     const cursor = Number(this.data.eventCursor || 0) || 0
-    if (!sessionId) return false
+    if (!sessionId) {
+      return { usedStream: false, ok: false, hasEvents: false, unauthorized: false }
+    }
+    const timeoutMs = Math.max(1200, Math.min(2600, 1200 + Number(this.pollBackoffMs || 0)))
 
     try {
-      const res = await request({
+      const res = await this.requestWithBuild({
         baseUrl: API_BASE_URL,
-        url: `/api/voice-coach/sessions/${sessionId}/events?cursor=${cursor}&timeout_ms=1200`,
+        url: `/api/voice-coach/sessions/${sessionId}/events?cursor=${cursor}&timeout_ms=${timeoutMs}`,
         method: "GET",
       })
-      if (this.stopEvents) return true
+      if (this.stopEvents) {
+        return { usedStream: false, ok: true, hasEvents: false, unauthorized: false }
+      }
 
-      if (res && Array.isArray(res.events) && res.events.length) {
-        this.applyServerEvents(res.events)
+      const events = res && Array.isArray(res.events) ? res.events : []
+      const hasEvents = events.length > 0
+
+      if (hasEvents) {
+        this.applyServerEvents(events)
       }
 
       const nextCursor = Number(res && res.next_cursor ? res.next_cursor : cursor) || cursor
       if (nextCursor !== cursor) {
         this.setData({ eventCursor: nextCursor })
       }
-      return true
-    } catch (_err) {
-      return false
+      return { usedStream: false, ok: true, hasEvents, unauthorized: false }
+    } catch (err) {
+      if (err && Number(err.statusCode || 0) === 401) {
+        this.handleLoginExpired("events_poll", { stopPolling: true })
+        return { usedStream: false, ok: false, hasEvents: false, unauthorized: true }
+      }
+      return { usedStream: false, ok: false, hasEvents: false, unauthorized: false }
     }
   },
 
-  async pollEventsStreamOnce() {
-    if (this.streamEventsDisabled) return false
+  async pollEventsStreamOnce(retried401 = false) {
+    if (this.streamEventsDisabled) {
+      return { usedStream: false, ok: false, hasEvents: false, unauthorized: false }
+    }
     const sessionId = this.data.sessionId
-    if (!sessionId) return false
+    if (!sessionId) {
+      return { usedStream: false, ok: false, hasEvents: false, unauthorized: false }
+    }
     const cursor = Number(this.data.eventCursor || 0) || 0
-    const token = getAccessToken()
-    const deviceId = getDeviceId()
-
-    return new Promise((resolve) => {
+    const result = await new Promise((resolve) => {
       let resolved = false
       let streamUsable = true
+      let unauthorized = false
       let firstChunkReceived = false
       let firstEventReceived = false
       let watchdogTimer = null
@@ -492,7 +664,12 @@ Page({
           clearTimeout(noEventTimer)
           noEventTimer = null
         }
-        resolve(ok)
+        resolve({
+          usedStream: true,
+          ok: Boolean(ok),
+          hasEvents: Boolean(firstEventReceived),
+          unauthorized: Boolean(unauthorized),
+        })
       }
 
       const markChunk = (text) => {
@@ -513,12 +690,12 @@ Page({
         timeout: 26000,
         enableChunked: true,
         responseType: "text",
-        header: {
-          Authorization: token ? `Bearer ${token}` : "",
-          "x-device-id": deviceId || "",
-        },
+        header: this.buildAuthHeaders(),
         success: (res) => {
-          if (res.statusCode === 404 || res.statusCode === 405) {
+          if (res.statusCode === 401) {
+            unauthorized = true
+            streamUsable = false
+          } else if (res.statusCode === 404 || res.statusCode === 405) {
             this.streamEventsDisabled = true
             streamUsable = false
           } else if (res.statusCode < 200 || res.statusCode >= 300) {
@@ -575,6 +752,21 @@ Page({
         if (text) markChunk(text)
       })
     })
+
+    if (!result.unauthorized) return result
+    if (!retried401) {
+      const refreshed = await this.refreshAuthOnce("events_stream")
+      if (refreshed) {
+        return this.pollEventsStreamOnce(true)
+      }
+    }
+    this.handleLoginExpired("events_stream", { stopPolling: true })
+    return {
+      usedStream: true,
+      ok: false,
+      hasEvents: false,
+      unauthorized: true,
+    }
   },
 
   consumeStreamText(textChunk) {
@@ -797,6 +989,7 @@ Page({
           this.openEndModal()
         }
       } else if (type === "customer.text_ready" && turnId) {
+        const textReadyAt = Date.now()
         const parentTurnId = String(data.beautician_turn_id || "")
         if (parentTurnId) {
           this.markTurnLatency(parentTurnId, "customer_text_ready", {
@@ -813,7 +1006,8 @@ Page({
           intent_id: data.intent_id || null,
           angle_id: data.angle_id || null,
           reply_source: data.reply_source || null,
-          showText: false,
+          audio_url: null,
+          showText: true,
           ttsFailed: false,
         })
         if (!updated) {
@@ -831,7 +1025,13 @@ Page({
             }),
           )
         }
-        this.setData({ waitingCustomer: true })
+        this.setData({ waitingCustomer: true }, () => {
+          this.recordUiFeedbackMetric(Math.max(0, Date.now() - textReadyAt), {
+            turn_id: turnId,
+            stage: "customer_text_ready",
+            has_audio: false,
+          })
+        })
       } else if (type === "customer.audio_ready" && turnId) {
         const parentTurnId = String(data.beautician_turn_id || "")
         if (parentTurnId) {
@@ -846,11 +1046,16 @@ Page({
           this.patchTurn(turnId, {
             status: "text_ready",
             pending: false,
-            showText: false,
+            showText: true,
             ttsFailed: true,
           })
           this.setData({ waitingCustomer: false })
         } else {
+          const existingIdx = this.findTurnIndex(turnId)
+          const keepShowText =
+            existingIdx >= 0 && this.data.turns && this.data.turns[existingIdx]
+              ? Boolean(this.data.turns[existingIdx].showText)
+              : false
           const seconds = Number(data.audio_seconds || 0) || 0
           const updated = this.patchTurn(turnId, {
             status: "audio_ready",
@@ -863,7 +1068,7 @@ Page({
             intent_id: data.intent_id || null,
             angle_id: data.angle_id || null,
             reply_source: data.reply_source || null,
-            showText: false,
+            showText: keepShowText,
             ttsFailed: false,
           })
           if (!updated) {
@@ -932,11 +1137,12 @@ Page({
     if (latestCustomer) this.setData({ waitingCustomer: true })
     this.patchTurn(turnId, {
       status: "text_ready",
+      showText: true,
       ttsFailed: false,
     })
 
     try {
-      const res = await request({
+      const res = await this.requestWithBuild({
         baseUrl: API_BASE_URL,
         url: `/api/voice-coach/sessions/${sessionId}/turns/${turnId}/tts`,
         method: "POST",
@@ -946,6 +1152,7 @@ Page({
       if (!res || res.error) {
         this.patchTurn(turnId, {
           status: "text_ready",
+          showText: true,
           ttsFailed: true,
         })
         if (latestCustomer) this.setData({ waitingCustomer: false })
@@ -954,6 +1161,7 @@ Page({
       if (!res.audio_url || res.tts_failed) {
         this.patchTurn(turnId, {
           status: "text_ready",
+          showText: true,
           ttsFailed: true,
         })
         if (latestCustomer) this.setData({ waitingCustomer: false })
@@ -981,6 +1189,7 @@ Page({
     } catch (_err) {
       this.patchTurn(turnId, {
         status: "text_ready",
+        showText: true,
         ttsFailed: true,
       })
       if (latestCustomer) this.setData({ waitingCustomer: false })
@@ -1008,7 +1217,7 @@ Page({
       mode: "view_report",
     })
     try {
-      await request({
+      await this.requestWithBuild({
         baseUrl: API_BASE_URL,
         url: `/api/voice-coach/sessions/${sessionId}/end`,
         method: "POST",
@@ -1033,7 +1242,7 @@ Page({
       mode: "end_only",
     })
     try {
-      await request({
+      await this.requestWithBuild({
         baseUrl: API_BASE_URL,
         url: `/api/voice-coach/sessions/${sessionId}/end`,
         method: "POST",
@@ -1105,6 +1314,7 @@ Page({
       this.recordIntent = "send"
       this.recordEnergyFrames = 0
       this.recordFrameCount = 0
+      this.recordStartedAt = Date.now()
       this.setData({ recording: true, recordCanceling: false, recordingPreviewText: "录音中..." })
       try {
         if (this.audioCtx) this.audioCtx.stop()
@@ -1112,32 +1322,55 @@ Page({
       } catch {}
 
       try {
-        const preferredOptions = {
+        const baseOptions = {
           duration: 30000,
-          format: "mp3",
-          sampleRate: 16000,
-          numberOfChannels: 1,
-          encodeBitRate: 64000,
-          audioSource: "voice_recognition",
-          frameSize: 16,
-        }
-
-        const fallbackOptions = {
-          duration: 30000,
-          format: "mp3",
           sampleRate: 16000,
           numberOfChannels: 1,
           encodeBitRate: 64000,
           frameSize: 16,
         }
+        const candidates = [
+          { ...baseOptions, format: "mp3", audioSource: "voice_recognition" },
+          { ...baseOptions, format: "wav", audioSource: "voice_recognition" },
+          { ...baseOptions, format: "aac", audioSource: "voice_recognition" },
+          { ...baseOptions, format: "mp3" },
+          { ...baseOptions, format: "wav" },
+          { ...baseOptions, format: "aac" },
+        ]
 
-        try {
-          this.recorder.start(preferredOptions)
-        } catch (_startErr) {
-          this.recorder.start(fallbackOptions)
+        let started = false
+        let startError = null
+        for (let i = 0; i < candidates.length; i++) {
+          const opts = candidates[i]
+          try {
+            this.recorder.start(opts)
+            started = true
+            this.lastRecordMeta = {
+              format: String(opts.format || "unknown"),
+              sampleRate: Number(opts.sampleRate || 16000) || 16000,
+              channels: Number(opts.numberOfChannels || 1) || 1,
+            }
+            console.log("[voice-coach] recorder start", {
+              build_id: BUILD_ID,
+              record_format: this.lastRecordMeta.format,
+              record_sample_rate: this.lastRecordMeta.sampleRate,
+              record_channels: this.lastRecordMeta.channels,
+              attempt: i + 1,
+            })
+            break
+          } catch (err) {
+            startError = err
+            console.warn("[voice-coach] recorder start fallback", {
+              build_id: BUILD_ID,
+              record_format: String(opts.format || "unknown"),
+              attempt: i + 1,
+            })
+          }
         }
+        if (!started) throw startError || new Error("recorder_start_failed")
       } catch (_err) {
-        this.setData({ recording: false })
+        this.recordStartedAt = 0
+        this.setData({ recording: false, recordingPreviewText: "" })
         wx.showToast({ title: "无法开始录音", icon: "none" })
       }
     }
@@ -1187,11 +1420,18 @@ Page({
       return
     }
     this.recordIntent = "send"
-    this.setData({ recording: false, recordCanceling: false, loading: true, recordingPreviewText: "" })
+    this.setData({
+      recording: false,
+      recordCanceling: false,
+      loading: true,
+      recordingPreviewText: "已发送，正在识别...",
+    })
+    this.notifyRecordSubmitted()
     try {
       this.recorder.stop()
     } catch (_err) {
-      this.setData({ loading: false })
+      this.recordStartedAt = 0
+      this.setData({ loading: false, recordingPreviewText: "" })
       wx.showToast({ title: "录音停止失败", icon: "none" })
     }
   },
@@ -1199,112 +1439,190 @@ Page({
   onRecordCancel() {
     if (!this.data.recording) return
     this.recordIntent = "cancel"
+    this.recordStartedAt = 0
     this.setData({ recording: false, recordCanceling: false, loading: false, recordingPreviewText: "" })
     try {
       this.recorder.stop()
     } catch {}
   },
 
-  uploadBeauticianTurn(filePath, durationSec) {
+  uploadBeauticianTurn(filePath, durationSec, timingInput = {}) {
     const sessionId = this.data.sessionId
     const replyToTurnId = this.getLastCustomerTurnId()
     if (!replyToTurnId) {
-      this.setData({ loading: false })
+      this.setData({ loading: false, recordingPreviewText: "" })
       wx.showToast({ title: "缺少顾客对话", icon: "none" })
       return
     }
+    const recordMs = Math.max(0, Number((timingInput && timingInput.recordMs) || 0) || 0)
+    const recordFormat = String(
+      (timingInput && timingInput.recordFormat) || detectAudioFormatFromPath(filePath, "unknown"),
+    ).toLowerCase()
+    const recordSampleRate = Number((timingInput && timingInput.recordSampleRate) || 16000) || 16000
+    const recordChannels = Number((timingInput && timingInput.recordChannels) || 1) || 1
 
     const localTurn = makeLocalBeauticianTurn(filePath, durationSec)
     this.pendingLocalTurnId = localTurn.id
     const clientAttemptId = makeClientAttemptId()
+    const submitStartedAt = Date.now()
+    const submitTiming = {
+      build_id: BUILD_ID,
+      session_id: sessionId || "",
+      client_attempt_id: clientAttemptId,
+      record_ms: recordMs,
+      record_format: recordFormat,
+      record_sample_rate: recordSampleRate,
+      record_channels: recordChannels,
+      upload_ms: 0,
+      submit_ack_ms: 0,
+    }
     this.startTurnLatency(localTurn.id, { clientAttemptId })
     this.appendTurn(localTurn)
     track("voicecoach_turn_submit", {
       sessionId,
       role: "beautician",
       clientAttemptId,
+      build_id: BUILD_ID,
+      record_ms: recordMs,
+      record_format: recordFormat,
+      record_sample_rate: recordSampleRate,
+      record_channels: recordChannels,
       audioSeconds: durationSec || 0,
     })
 
-    const token = getAccessToken()
-    const deviceId = getDeviceId()
+    const clearPendingLocalTurn = () => {
+      if (this.pendingLocalTurnId) this.turnLatency.delete(this.pendingLocalTurnId)
+      const turns = (this.data.turns || []).filter((t) => t.id !== this.pendingLocalTurnId)
+      this.pendingLocalTurnId = ""
+      this.setData({ turns })
+    }
 
-    wx.uploadFile({
-      url: `${API_BASE_URL}/api/voice-coach/sessions/${sessionId}/beautician-turn/submit`,
-      filePath,
-      name: "audio",
-      formData: {
-        reply_to_turn_id: replyToTurnId,
-        client_audio_seconds: String(durationSec || ""),
-        client_attempt_id: clientAttemptId,
-      },
-      header: {
-        Authorization: token ? `Bearer ${token}` : "",
-        "x-device-id": deviceId || "",
-      },
-      success: (res) => {
-        let payload = null
-        try {
-          payload = JSON.parse(res.data)
-        } catch (_err) {
-          payload = null
-        }
+    const failSubmit = (message = "上传失败") => {
+      this.setData({ loading: false, waitingCustomer: false, recordingPreviewText: "" })
+      wx.showToast({ title: message, icon: "none" })
+      clearPendingLocalTurn()
+    }
 
-        if (!payload || payload.error) {
-          this.setData({ loading: false, waitingCustomer: false })
-          wx.showToast({ title: payload?.message || payload?.error || "上传失败", icon: "none" })
-          if (this.pendingLocalTurnId) this.turnLatency.delete(this.pendingLocalTurnId)
-          const turns = (this.data.turns || []).filter((t) => t.id !== this.pendingLocalTurnId)
-          this.pendingLocalTurnId = ""
-          this.setData({ turns })
-          return
-        }
+    const uploadOnce = async (retried401 = false) => {
+      const uploadStartedAt = Date.now()
+      wx.uploadFile({
+        url: `${API_BASE_URL}/api/voice-coach/sessions/${sessionId}/beautician-turn/submit`,
+        filePath,
+        name: "audio",
+        formData: {
+          reply_to_turn_id: replyToTurnId,
+          client_audio_seconds: String(durationSec || ""),
+          client_attempt_id: clientAttemptId,
+          audio_format: recordFormat || "unknown",
+          sample_rate: String(recordSampleRate),
+          channels: String(recordChannels),
+        },
+        header: this.buildAuthHeaders(),
+        success: (res) => {
+          ;(async () => {
+            const uploadCost = Math.max(0, Date.now() - uploadStartedAt)
+            submitTiming.upload_ms += uploadCost
 
-        const accepted = normalizeTurn({
-          turn_id: payload.beautician_turn.turn_id,
-          role: "beautician",
-          status: "accepted",
-          text: payload.beautician_turn.text,
-          audio_url: payload.beautician_turn.audio_url,
-          audio_seconds: payload.beautician_turn.audio_seconds,
-          pending: true,
-        })
+            if (Number(res && res.statusCode) === 401) {
+              if (!retried401) {
+                const refreshed = await this.refreshAuthOnce("submit_upload")
+                if (refreshed) {
+                  uploadOnce(true)
+                  return
+                }
+              }
+              this.handleLoginExpired("submit_upload")
+              failSubmit("登录失效，请重新登录")
+              return
+            }
 
-        const pendingId = this.pendingLocalTurnId
-        this.pendingLocalTurnId = ""
-        if (!this.replaceTurn(pendingId, accepted)) {
-          this.appendTurn(accepted)
-          const stale = pendingId ? this.turnLatency.get(pendingId) : null
-          if (stale) {
-            this.turnLatency.delete(pendingId)
-            this.turnLatency.set(accepted.id, stale)
-          }
-        } else {
-          this.moveTurnLatency(pendingId, accepted.id)
-        }
+            let payload = null
+            try {
+              payload = JSON.parse(res.data)
+            } catch (_err) {
+              payload = null
+            }
 
-        this.markTurnLatency(accepted.id, "submit_ack", {
-          deduped: Boolean(payload.deduped),
-          acceptedByServer: true,
-        })
+            if (Number(res && res.statusCode) < 200 || Number(res && res.statusCode) >= 300) {
+              failSubmit((payload && (payload.message || payload.error)) || "上传失败")
+              return
+            }
 
-        const nextCursor = Number(payload.next_cursor || 0) || 0
-        this.setData({
-          loading: false,
-          waitingCustomer: !payload.reached_max_turns,
-          eventCursor: nextCursor > (this.data.eventCursor || 0) ? nextCursor : this.data.eventCursor,
-        })
-        this.ensureEventsPolling()
-      },
-      fail: () => {
-        this.setData({ loading: false, waitingCustomer: false })
-        wx.showToast({ title: "上传失败", icon: "none" })
-        if (this.pendingLocalTurnId) this.turnLatency.delete(this.pendingLocalTurnId)
-        const turns = (this.data.turns || []).filter((t) => t.id !== this.pendingLocalTurnId)
-        this.pendingLocalTurnId = ""
-        this.setData({ turns })
-      },
-    })
+            if (!payload || payload.error || !payload.beautician_turn) {
+              failSubmit((payload && (payload.message || payload.error)) || "上传失败")
+              return
+            }
+
+            const accepted = normalizeTurn({
+              turn_id: payload.beautician_turn.turn_id,
+              role: "beautician",
+              status: "accepted",
+              text: payload.beautician_turn.text,
+              audio_url: payload.beautician_turn.audio_url,
+              audio_seconds: payload.beautician_turn.audio_seconds,
+              pending: true,
+            })
+
+            const pendingId = this.pendingLocalTurnId
+            this.pendingLocalTurnId = ""
+            if (!this.replaceTurn(pendingId, accepted)) {
+              this.appendTurn(accepted)
+              const stale = pendingId ? this.turnLatency.get(pendingId) : null
+              if (stale) {
+                this.turnLatency.delete(pendingId)
+                this.turnLatency.set(accepted.id, stale)
+              }
+            } else {
+              this.moveTurnLatency(pendingId, accepted.id)
+            }
+
+            const totalSubmitMs = Math.max(0, Date.now() - submitStartedAt)
+            submitTiming.submit_ack_ms = Math.max(0, totalSubmitMs - Number(submitTiming.upload_ms || 0))
+            this.markTurnLatency(accepted.id, "submit_ack", {
+              deduped: Boolean(payload.deduped),
+              acceptedByServer: true,
+              record_ms: submitTiming.record_ms,
+              record_format: submitTiming.record_format,
+              record_sample_rate: submitTiming.record_sample_rate,
+              record_channels: submitTiming.record_channels,
+              upload_ms: submitTiming.upload_ms,
+              submit_ack_ms: submitTiming.submit_ack_ms,
+              build_id: BUILD_ID,
+            })
+
+            track("voicecoach_submit_timing", {
+              sessionId,
+              clientAttemptId,
+              build_id: BUILD_ID,
+              record_ms: submitTiming.record_ms,
+              record_format: submitTiming.record_format,
+              record_sample_rate: submitTiming.record_sample_rate,
+              record_channels: submitTiming.record_channels,
+              upload_ms: submitTiming.upload_ms,
+              submit_ack_ms: submitTiming.submit_ack_ms,
+            })
+            console.log("[voice-coach] submit timing", submitTiming)
+
+            const nextCursor = Number(payload.next_cursor || 0) || 0
+            this.setData({
+              loading: false,
+              waitingCustomer: !payload.reached_max_turns,
+              recordingPreviewText: "",
+              eventCursor: nextCursor > (this.data.eventCursor || 0) ? nextCursor : this.data.eventCursor,
+            })
+            this.ensureEventsPolling()
+          })().catch(() => {
+            failSubmit("上传失败")
+          })
+        },
+        fail: () => {
+          submitTiming.upload_ms += Math.max(0, Date.now() - uploadStartedAt)
+          failSubmit("上传失败")
+        },
+      })
+    }
+
+    uploadOnce(false)
   },
 
   toggleText(e) {
@@ -1340,7 +1658,7 @@ Page({
         this.setData({
           [`turns[${idx}].analysisLoading`]: true,
         })
-        request({
+        this.requestWithBuild({
           baseUrl: API_BASE_URL,
           url: `/api/voice-coach/sessions/${this.data.sessionId}/turns/${id}/analysis`,
           method: "POST",
@@ -1393,7 +1711,7 @@ Page({
     if (!sessionId) return
     this.setData({ loading: true, waitingCustomer: false })
     try {
-      const res = await request({
+      const res = await this.requestWithBuild({
         baseUrl: API_BASE_URL,
         url: `/api/voice-coach/sessions/${sessionId}/rollback`,
         method: "POST",
@@ -1421,7 +1739,7 @@ Page({
     if (!customerTurnId) return
 
     this.setData({ loading: true })
-    request({
+    this.requestWithBuild({
       baseUrl: API_BASE_URL,
       url: `/api/voice-coach/sessions/${sessionId}/hint`,
       method: "POST",

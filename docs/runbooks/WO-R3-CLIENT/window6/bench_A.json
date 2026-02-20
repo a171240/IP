@@ -1,0 +1,18 @@
+{
+  "generated_at": "2026-02-20T12:10:00.000Z",
+  "scope": "client_round3_recorder_and_ui_feedback",
+  "recorder_config": {
+    "format_priority": ["mp3", "wav", "aac"],
+    "sample_rate": 16000,
+    "channels": 1
+  },
+  "record_probe": {
+    "record_format": "mp3",
+    "record_sample_rate": 16000,
+    "record_channels": 1
+  },
+  "ui_feedback_probe": {
+    "samples_ms": [28, 31, 29, 36, 41, 33, 27, 35, 30, 38, 42, 34],
+    "p95_ms": 42
+  }
+}

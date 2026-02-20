@@ -149,8 +149,8 @@
       {{recording ? (recordCanceling ? "松开取消" : "松开发送") : "按住说话"}}
     </button>
   </view>
-  <view class="record-preview" wx:if="{{recording}}">
-    {{recordingPreviewText || "录音中..."}}
+  <view class="record-preview" wx:if="{{recording || (loading && recordingPreviewText)}}">
+    {{recordingPreviewText || (recording ? "录音中..." : "处理中...")}}
   </view>
 
   <!-- 结束对话弹窗 -->

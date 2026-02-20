@@ -1,0 +1,37 @@
+{
+  "generated_at": "2026-02-20T11:09:48.273Z",
+  "sample_events": 60,
+  "script_hit_rate": 0,
+  "tts_line_cache_hit_rate": 0.2667,
+  "tts_cache_hit_rate": 0.45,
+  "tts_source_distribution": {
+    "line_cache": 16,
+    "text_cache": 11,
+    "runtime": 33
+  },
+  "llm_used_when_script_hit_count": 0,
+  "tts_ms": {
+    "p50": 338,
+    "p95": 2983
+  },
+  "audio_ready_ms": {
+    "p50": 24398,
+    "p95": 26968146
+  },
+  "llm_ms": {
+    "p50": 0,
+    "p95": 6003
+  },
+  "queue_wait_before_main_ms": {
+    "p50": 5357,
+    "p95": 5647
+  },
+  "queue_wait_before_tts_ms": {
+    "p50": 1496,
+    "p95": 27237291
+  },
+  "asr_provider_distribution": {
+    "auc": 57,
+    "unknown": 7
+  }
+}
