@@ -2,7 +2,7 @@ import { randomUUID } from "crypto"
 import { NextRequest } from "next/server"
 
 import { checkVoiceCoachAccess } from "@/lib/voice-coach/guard.server"
-import { emitVoiceCoachEvent } from "@/lib/voice-coach/jobs.server"
+import { emitVoiceCoachEvent, processVoiceCoachJobById } from "@/lib/voice-coach/jobs.server"
 import { signVoiceCoachAudio, uploadVoiceCoachAudio } from "@/lib/voice-coach/storage.server"
 import { createVoiceCoachTrace, type VoiceCoachTrace, voiceCoachJson } from "@/lib/voice-coach/trace.server"
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
@@ -31,6 +31,23 @@ function shouldUseFlashAsr(): boolean {
     .trim()
     .toLowerCase()
   return !["0", "false", "off", "no"].includes(raw)
+}
+
+function shouldUseSubmitQueuePump(): boolean {
+  const raw = String(process.env.VOICE_COACH_SUBMIT_QUEUE_PUMP || "false")
+    .trim()
+    .toLowerCase()
+  return ["1", "true", "yes", "on"].includes(raw)
+}
+
+function submitQueuePumpWallMs(): number {
+  const n = Number(process.env.VOICE_COACH_SUBMIT_QUEUE_PUMP_WALL_MS || 900)
+  if (!Number.isFinite(n)) return 900
+  return Math.max(320, Math.min(3200, Math.round(n)))
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 function detectFormat(
@@ -263,33 +280,82 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
     const pipelineStartedAtMs = Date.now()
 
     const jobId = randomUUID()
-    const stageEnteredAt = new Date().toISOString()
-    const { error: jobInsertError } = await supabase.from("voice_coach_jobs").insert({
-      id: jobId,
-      session_id: sessionId,
-      user_id: user.id,
-      turn_id: turnId,
+    const initialPayload = {
+      reply_to_turn_id: replyToTurnId,
+      audio_format: detected.format,
+      client_audio_seconds: clientAudioSeconds,
+      ...(clientAttemptId ? { client_attempt_id: clientAttemptId } : {}),
+    }
+    const initialResultState = {
+      pipeline_started_at_ms: pipelineStartedAtMs,
+      submit_ack_ms: submitAckMs,
+      upload_ms: uploadMs,
+      client_build: trace.clientBuild,
+      server_build: trace.serverBuild,
+      trace_id: trace.traceId,
+      executor: "worker",
+    }
+
+    const { data: insertedJob, error: jobInsertError } = await supabase
+      .from("voice_coach_jobs")
+      .insert({
+        id: jobId,
+        session_id: sessionId,
+        user_id: user.id,
+        turn_id: turnId,
+        status: "queued",
+        stage: "main_pending",
+        payload_json: initialPayload,
+        result_json: initialResultState,
+      })
+      .select("id, turn_id, stage, attempt_count, payload_json, result_json, created_at, updated_at")
+      .single()
+    if (jobInsertError || !insertedJob) {
+      return jsonError(trace, 500, "insert_job_failed", { message: jobInsertError?.message || "insert_job_failed" })
+    }
+    mark("job_inserted")
+
+    let advanced = {
+      advanced: false,
       status: "queued",
       stage: "main_pending",
-      payload_json: {
-        reply_to_turn_id: replyToTurnId,
-        audio_format: detected.format,
-        client_audio_seconds: clientAudioSeconds,
-        ...(clientAttemptId ? { client_attempt_id: clientAttemptId } : {}),
-      },
-      result_json: {
-        pipeline_started_at_ms: pipelineStartedAtMs,
-        submit_ack_ms: submitAckMs,
-        upload_ms: uploadMs,
-        client_build: trace.clientBuild,
-        server_build: trace.serverBuild,
-        trace_id: trace.traceId,
-        executor: "worker",
-        stage_entered_at_ms: Date.parse(stageEnteredAt),
-      },
-    })
-    if (jobInsertError) return jsonError(trace, 500, "insert_job_failed", { message: jobInsertError.message })
-    mark("job_inserted")
+    }
+
+    if (shouldUseSubmitQueuePump()) {
+      const wallMs = submitQueuePumpWallMs()
+      const lockOwner = `submit:${process.pid}:${jobId}`
+      try {
+        const kickoff = await Promise.race([
+          processVoiceCoachJobById({
+            sessionId,
+            userId: user.id,
+            jobId,
+            executor: "submit_pump",
+            lockOwner,
+            chainMainToTts: false,
+            queuedHint: {
+              turnId: String(insertedJob.turn_id || turnId),
+              stage: String(insertedJob.stage || "main_pending"),
+              attemptCount: Number(insertedJob.attempt_count || 0),
+              payload: (insertedJob.payload_json || initialPayload) as any,
+              resultState: (insertedJob.result_json || initialResultState) as any,
+              createdAt: String(insertedJob.created_at || ""),
+              updatedAt: String(insertedJob.updated_at || ""),
+            },
+          }).then((result) => ({ timedOut: false, processed: Boolean(result?.processed) })),
+          sleep(wallMs).then(() => ({ timedOut: true, processed: false })),
+        ])
+        if (kickoff.timedOut || kickoff.processed) {
+          advanced = {
+            advanced: true,
+            status: "processing",
+            stage: "main_pending",
+          }
+        }
+      } catch {
+        // best effort kickoff: fallback to worker/events pump
+      }
+    }
 
     const cursor = await emitVoiceCoachEvent({
       sessionId,
@@ -320,12 +386,6 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
       },
     })
     mark("accepted_event_emitted")
-
-    const advanced = {
-      advanced: false,
-      status: "queued",
-      stage: "main_pending",
-    }
     mark("advance_done")
 
     const debugTimingEnabled = String(process.env.VOICE_COACH_DEBUG_TIMING || "false")
