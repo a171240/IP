@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { checkVoiceCoachAccess } from "@/lib/voice-coach/guard.server"
-import { pumpVoiceCoachQueuedJobs } from "@/lib/voice-coach/jobs.server"
+import {
+  createVoiceCoachTrace,
+  type VoiceCoachTrace,
+  withVoiceCoachTraceHeaders,
+  voiceCoachJson,
+} from "@/lib/voice-coach/trace.server"
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
 
-function jsonError(status: number, error: string, extra?: Record<string, unknown>) {
-  return NextResponse.json({ error, ...extra }, { status })
+function jsonError(trace: VoiceCoachTrace, status: number, error: string, extra?: Record<string, unknown>) {
+  return voiceCoachJson(trace, { error, ...extra }, status)
 }
 
 function sleep(ms: number) {
@@ -20,25 +25,26 @@ function clamp(n: number, min: number, max: number) {
 }
 
 export async function GET(request: NextRequest, context: { params: Promise<{ sessionId: string }> }) {
+  const trace = createVoiceCoachTrace(request)
   try {
     const { sessionId } = await context.params
-    if (!sessionId) return jsonError(400, "missing_session_id")
+    if (!sessionId) return jsonError(trace, 400, "missing_session_id")
 
     const supabase = await createServerSupabaseClientForRequest(request)
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    if (!user) return jsonError(401, "请先登录")
+    if (!user) return jsonError(trace, 401, "请先登录")
 
     const access = checkVoiceCoachAccess(user.id)
-    if (!access.ok) return jsonError(access.status, access.error)
+    if (!access.ok) return jsonError(trace, access.status, access.error)
 
     const { data: session, error: sessionError } = await supabase
       .from("voice_coach_sessions")
       .select("id, status")
       .eq("id", sessionId)
       .single()
-    if (sessionError || !session) return jsonError(404, "session_not_found")
+    if (sessionError || !session) return jsonError(trace, 404, "session_not_found")
 
     const search = request.nextUrl.searchParams
     const cursor = Math.max(0, Number(search.get("cursor") || 0) || 0)
@@ -65,6 +71,9 @@ export async function GET(request: NextRequest, context: { params: Promise<{ ses
 
         push("ready", {
           next_cursor: latestCursor,
+          trace_id: trace.traceId,
+          client_build: trace.clientBuild,
+          server_build: trace.serverBuild,
           ts: new Date().toISOString(),
         })
 
@@ -73,14 +82,6 @@ export async function GET(request: NextRequest, context: { params: Promise<{ ses
             closed = true
             break
           }
-
-          await pumpVoiceCoachQueuedJobs({
-            sessionId,
-            userId: user.id,
-            maxJobs: 1,
-            allowedStages: ["main_pending", "tts_pending"],
-            maxWallMs: 700,
-          })
 
           const { data: events, error: eventsError } = await supabase
             .from("voice_coach_events")
@@ -110,11 +111,14 @@ export async function GET(request: NextRequest, context: { params: Promise<{ ses
               })),
               next_cursor: latestCursor,
               has_more: events.length >= 50,
+              trace_id: trace.traceId,
+              client_build: trace.clientBuild,
+              server_build: trace.serverBuild,
             })
             continue
           }
 
-          await sleep(220)
+          await sleep(180)
         }
 
         if (!closed) {
@@ -122,6 +126,9 @@ export async function GET(request: NextRequest, context: { params: Promise<{ ses
             timeout: true,
             next_cursor: latestCursor,
             session_status: session.status,
+            trace_id: trace.traceId,
+            client_build: trace.clientBuild,
+            server_build: trace.serverBuild,
             ts: new Date().toISOString(),
           })
         }
@@ -133,7 +140,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ ses
       },
     })
 
-    return new NextResponse(stream, {
+    const response = new NextResponse(stream, {
       headers: {
         "Content-Type": "text/event-stream; charset=utf-8",
         "Cache-Control": "no-cache, no-transform",
@@ -141,7 +148,9 @@ export async function GET(request: NextRequest, context: { params: Promise<{ ses
         "X-Accel-Buffering": "no",
       },
     })
+    withVoiceCoachTraceHeaders(response, trace)
+    return response
   } catch (err: any) {
-    return jsonError(500, "voice_coach_error", { message: err?.message || String(err) })
+    return jsonError(trace, 500, "voice_coach_error", { message: err?.message || String(err) })
   }
 }
