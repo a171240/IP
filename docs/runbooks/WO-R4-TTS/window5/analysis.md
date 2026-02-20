@@ -15,9 +15,9 @@
 - B (Flash main path):
   - `tts_cache_hit_rate=1`
   - `tts_line_cache_hit_rate=1`
-  - `tts_ms.p50=0`, `tts_ms.p95=0`
+  - `tts_ms.p50=0`, `tts_ms.p95=319`
   - `llm_used_when_script_hit_count=0`
-  - `tts_source_distribution={"line_cache":4,"text_cache":0,"runtime":0}`
+  - `tts_source_distribution={"line_cache":8,"text_cache":0,"runtime":0}`
 - C (degraded slow path, `VOICE_COACH_REQUIRE_FLASH=false` + Flash disabled):
   - `asr_provider_final={"auc":5}`
   - `tts_cache_hit_rate=1`
@@ -29,7 +29,7 @@
 ## Gate Decision (WO-R4-TTS)
 - Gate `tts_cache_hit_rate >= 0.95` on B/C: PASS (B=1, C=1)
 - Gate `tts_ms_p50 <= 280`: PASS (B=0, C=0)
-- Gate `tts_ms_p95 <= 450`: PASS (B=0, C=0)
+- Gate `tts_ms_p95 <= 450`: PASS (B=319, C=0)
 - Gate `llm_used_when_script_hit_count = 0`: PASS (B=0, C=0)
 
 ## Notes
