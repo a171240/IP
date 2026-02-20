@@ -34,16 +34,14 @@ export async function GET(request: NextRequest, context: { params: Promise<{ ses
 
     const { data: session, error: sessionError } = await supabase
       .from("voice_coach_sessions")
-      .select("id, scenario_id, category_id, goal_template_id, goal_custom, policy_state_json, status, started_at, ended_at, total_score")
+      .select("id, scenario_id, status, started_at, ended_at, total_score")
       .eq("id", sessionId)
       .single()
     if (sessionError || !session) return jsonError(404, "session_not_found")
 
     const { data: turns, error: turnsError } = await supabase
       .from("voice_coach_turns")
-      .select(
-        "id, turn_index, role, status, text, emotion, audio_path, audio_seconds, analysis_json, features_json, line_id, intent_id, angle_id, reply_source",
-      )
+      .select("id, turn_index, role, status, text, emotion, audio_path, audio_seconds, analysis_json, features_json")
       .eq("session_id", sessionId)
       .order("turn_index", { ascending: true })
     if (turnsError) return jsonError(500, "turns_query_failed", { message: turnsError.message })
@@ -64,10 +62,6 @@ export async function GET(request: NextRequest, context: { params: Promise<{ ses
         status: session.status,
         started_at: session.started_at,
         ended_at: session.ended_at,
-        category_id: session.category_id || scenario.categoryId,
-        goal_template_id: session.goal_template_id || null,
-        goal_custom: session.goal_custom || null,
-        policy_state: session.policy_state_json || null,
         scenario: {
           id: scenario.id,
           name: scenario.name,

@@ -143,7 +143,7 @@ Page({
 
   goVoiceCoach() {
     track("workspace_go_voice_coach")
-    wx.navigateTo({ url: "/pages/voice-coach/index" })
+    wx.navigateTo({ url: "/pages/voice-coach/chat" })
   },
 
   handleOpenPack(e) {
@@ -190,3 +190,4 @@ Page({
     })
   },
 })
+

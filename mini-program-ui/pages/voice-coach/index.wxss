@@ -22,162 +22,19 @@
     linear-gradient(180deg, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0.01) 100%);
 }
 
-.recommend-banner {
-  margin-top: 18rpx;
-  padding: 16rpx 18rpx;
-  border-radius: 18rpx;
-  border: 1px solid rgba(149, 236, 105, 0.36);
-  background: linear-gradient(135deg, rgba(149, 236, 105, 0.12), rgba(255, 255, 255, 0.02));
-}
-
-.recommend-tag {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 36rpx;
-  padding: 0 14rpx;
-  border-radius: 999rpx;
-  font-size: 20rpx;
-  font-weight: 600;
-  color: #123510;
-  background: #95ec69;
-}
-
-.recommend-text {
-  display: block;
-  margin-top: 10rpx;
-  font-size: 24rpx;
-  line-height: 1.55;
+.page-voice-coach .hero-badges .chip {
   color: var(--vc-text-muted);
+  border-color: rgba(149, 236, 105, 0.32);
+  background: linear-gradient(135deg, rgba(149, 236, 105, 0.16), rgba(255, 255, 255, 0.02));
 }
 
-.catalog-loading {
-  padding: 24rpx;
-  border-radius: 18rpx;
-  color: var(--vc-text-muted);
-  border: 1px dashed rgba(229, 211, 179, 0.24);
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.category-list {
-  display: flex;
-  flex-direction: column;
-  gap: 14rpx;
-}
-
-.category-card {
-  position: relative;
-  padding: 20rpx;
-  border-radius: 20rpx;
-  border: 1px solid rgba(229, 211, 179, 0.18);
+.page-voice-coach .card {
+  border-color: rgba(229, 211, 179, 0.16);
   background:
-    radial-gradient(140% 140% at 100% 0%, rgba(149, 236, 105, 0.06) 0%, rgba(5, 5, 7, 0) 55%),
+    radial-gradient(140% 140% at 100% 0%, rgba(149, 236, 105, 0.08) 0%, rgba(5, 5, 7, 0) 55%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%);
 }
 
-.category-card.is-active {
-  border-color: rgba(149, 236, 105, 0.54);
-  box-shadow: 0 14rpx 30rpx rgba(149, 236, 105, 0.14);
-}
-
-.category-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12rpx;
-}
-
-.category-name {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: var(--vc-text);
-}
-
-.category-sub {
-  font-size: 22rpx;
-  color: var(--vc-gold);
-}
-
-.category-objective {
-  margin-top: 10rpx;
-  display: block;
-  font-size: 24rpx;
-  color: var(--vc-text-muted);
-  line-height: 1.6;
-}
-
-.chip {
-  margin-top: 14rpx;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 14rpx;
-  height: 36rpx;
-  border-radius: 999rpx;
-  font-size: 20rpx;
-}
-
-.chip-recommend {
-  color: #123510;
-  background: rgba(149, 236, 105, 0.88);
-}
-
-.goal-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12rpx;
-}
-
-.goal-chip {
-  padding: 16rpx 18rpx;
-  border-radius: 18rpx;
-  border: 1px solid rgba(229, 211, 179, 0.18);
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.goal-chip-active {
-  border-color: rgba(149, 236, 105, 0.54);
-  background: linear-gradient(135deg, rgba(149, 236, 105, 0.14), rgba(255, 255, 255, 0.01));
-}
-
-.goal-name {
-  font-size: 26rpx;
-  font-weight: 600;
-  color: var(--vc-text);
-}
-
-.goal-desc {
-  margin-top: 8rpx;
-  display: block;
-  font-size: 22rpx;
-  line-height: 1.55;
-  color: var(--vc-text-muted);
-}
-
-.goal-custom-wrap {
-  margin-top: 16rpx;
-}
-
-.goal-custom-label {
-  font-size: 22rpx;
-  color: var(--vc-text-subtle);
-}
-
-.goal-custom-input {
-  margin-top: 10rpx;
-  height: 78rpx;
-  border-radius: 16rpx;
-  padding: 0 20rpx;
-  border: 1px solid rgba(229, 211, 179, 0.2);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--vc-text);
-}
-
-.page-voice-coach .hero-actions {
-  margin-top: 24rpx;
-}
-
 .page-voice-coach .btn-primary {
-  width: 100%;
   background: linear-gradient(135deg, #d7c39f 0%, #f0e2c4 50%, #bc9b70 100%);
 }

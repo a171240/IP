@@ -115,7 +115,7 @@
                 <view class="polished-title">润色表达：</view>
                 <view class="polished">{{item.analysis.polished}}</view>
               </view>
-              <view wx:else class="suggest-loading">{{item.analysisLoading ? "建议生成中..." : "建议暂不可用，请重试"}}</view>
+              <view wx:else class="suggest-loading">建议生成中...</view>
             </view>
           </view>
 

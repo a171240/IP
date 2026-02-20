@@ -74,13 +74,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ ses
             break
           }
 
-          await pumpVoiceCoachQueuedJobs({
-            sessionId,
-            userId: user.id,
-            maxJobs: 1,
-            allowedStages: ["main_pending", "tts_pending"],
-            maxWallMs: 700,
-          })
+          await pumpVoiceCoachQueuedJobs({ sessionId, userId: user.id, maxJobs: 3 })
 
           const { data: events, error: eventsError } = await supabase
             .from("voice_coach_events")

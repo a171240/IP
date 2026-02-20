@@ -133,7 +133,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
     if (lastTurnError) return jsonError(500, "turn_index_query_failed", { message: lastTurnError.message })
     const nextTurnIndex = (lastTurnRows?.[0]?.turn_index ?? -1) + 1
     const beauticianTurnNo = Math.floor((nextTurnIndex + 1) / 2)
-    const reachedMax = access.maxTurns > 0 && beauticianTurnNo >= access.maxTurns
+    const reachedMax = beauticianTurnNo >= access.maxTurns
 
     // Read recent history in parallel with ASR/TTS pipeline.
     const historyQueryPromise = supabase

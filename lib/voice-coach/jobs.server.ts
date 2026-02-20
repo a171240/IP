@@ -3,16 +3,8 @@ import "server-only"
 import { randomUUID } from "crypto"
 
 import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
-import { llmAnalyzeBeauticianTurn, llmRewriteCustomerLine, type TurnAnalysis } from "@/lib/voice-coach/llm.server"
+import { llmAnalyzeBeauticianTurn, llmGenerateCustomerTurn, type TurnAnalysis } from "@/lib/voice-coach/llm.server"
 import { calcFillerRatio, calcWpm } from "@/lib/voice-coach/metrics"
-import {
-  createInitialPolicyState,
-  getAnalysisTemplate,
-  maybeRewriteCustomerLine,
-  normalizeVoiceCoachCategoryId,
-  selectNextCustomerLine,
-  type VoiceCoachPolicyState,
-} from "@/lib/voice-coach/script-packs"
 import { getScenario, type VoiceCoachEmotion } from "@/lib/voice-coach/scenarios"
 import {
   doubaoAsrAuc,
@@ -52,11 +44,6 @@ type VoiceCoachJobResultState = {
   beautician_audio_url?: string | null
   beautician_audio_seconds?: number | null
   beautician_asr_confidence?: number | null
-  category_id?: string
-  intent_id?: string
-  angle_id?: string
-  reply_source?: string
-  loop_guard_triggered?: boolean
   next_customer_turn_id?: string
   next_customer_text?: string
   next_customer_emotion?: VoiceCoachEmotion
@@ -79,8 +66,6 @@ type ProcessJobResult = { processed: boolean; done: boolean; jobId?: string; tur
 type SessionRow = {
   id: string
   scenario_id: string
-  category_id: string | null
-  policy_state_json: VoiceCoachPolicyState | null
   status: string
 }
 
@@ -93,8 +78,6 @@ type BeauticianTurnRow = {
   audio_path: string | null
   audio_seconds: number | null
   status: string | null
-  intent_id: string | null
-  angle_id: string | null
   analysis_json: TurnAnalysis | null
 }
 
@@ -102,10 +85,8 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-function hardMaxTurns(): number {
-  const n = Number(process.env.VOICE_COACH_HARD_MAX_TURNS || process.env.VOICE_COACH_MAX_TURNS || 0)
-  if (!Number.isFinite(n) || n <= 0) return 0
-  return Math.max(1, Math.round(n))
+function maxTurns(): number {
+  return Math.max(1, Number(process.env.VOICE_COACH_MAX_TURNS || 10) || 10)
 }
 
 function mapEmotionToTts(emotion: VoiceCoachEmotion): DoubaoTtsEmotion | undefined {
@@ -128,7 +109,7 @@ function shouldUseFlashAsr(): boolean {
 }
 
 function shouldAllowAucFallbackWhenFlashEnabled(): boolean {
-  const raw = String(process.env.VOICE_COACH_ASR_ALLOW_AUC_FALLBACK || "true")
+  const raw = String(process.env.VOICE_COACH_ASR_ALLOW_AUC_FALLBACK || "false")
     .trim()
     .toLowerCase()
   return ["1", "true", "yes", "on"].includes(raw)
@@ -148,33 +129,6 @@ function asNumber(value: unknown): number | null {
 function isAsrSilenceError(err: unknown): boolean {
   const msg = typeof err === "string" ? err : err instanceof Error ? err.message : ""
   return msg.includes("asr_auc_silence") || msg.includes("asr_silence")
-}
-
-function isAsrTimeoutError(err: unknown): boolean {
-  const msg = typeof err === "string" ? err : err instanceof Error ? err.message : ""
-  if (!msg) return false
-  return msg.includes("timeout") || msg.includes("timed out") || msg.includes("AbortError")
-}
-
-function normalizeAsrFailure(err: unknown): { code: "asr_silence" | "asr_timeout" | "asr_failed"; message: string } {
-  if (isAsrSilenceError(err)) {
-    return {
-      code: "asr_silence",
-      message: "没有识别到有效语音，请重录并靠近麦克风。",
-    }
-  }
-
-  if (isAsrTimeoutError(err)) {
-    return {
-      code: "asr_timeout",
-      message: "语音识别超时，请重录并靠近麦克风。",
-    }
-  }
-
-  return {
-    code: "asr_failed",
-    message: "语音识别失败，请重录后重试。",
-  }
 }
 
 function nowIso(): string {
@@ -446,14 +400,10 @@ async function loadSessionAndTurn(args: {
 }): Promise<{ session: SessionRow; turn: BeauticianTurnRow } | null> {
   const admin = createAdminSupabaseClient()
   const [{ data: session, error: sessionError }, { data: turn, error: turnError }] = await Promise.all([
-    admin
-      .from("voice_coach_sessions")
-      .select("id, scenario_id, category_id, policy_state_json, status")
-      .eq("id", args.sessionId)
-      .single(),
+    admin.from("voice_coach_sessions").select("id, scenario_id, status").eq("id", args.sessionId).single(),
     admin
       .from("voice_coach_turns")
-      .select("id, session_id, turn_index, role, text, audio_path, audio_seconds, status, intent_id, angle_id, analysis_json")
+      .select("id, session_id, turn_index, role, text, audio_path, audio_seconds, status, analysis_json")
       .eq("id", args.turnId)
       .eq("session_id", args.sessionId)
       .single(),
@@ -464,8 +414,6 @@ async function loadSessionAndTurn(args: {
     session: {
       id: String(session.id),
       scenario_id: String(session.scenario_id || "objection_safety"),
-      category_id: session.category_id ? String(session.category_id) : null,
-      policy_state_json: (session.policy_state_json || null) as VoiceCoachPolicyState | null,
       status: String(session.status || ""),
     },
     turn: {
@@ -477,8 +425,6 @@ async function loadSessionAndTurn(args: {
       audio_path: turn.audio_path ? String(turn.audio_path) : null,
       audio_seconds: asNumber(turn.audio_seconds),
       status: turn.status ? String(turn.status) : null,
-      intent_id: turn.intent_id ? String(turn.intent_id) : null,
-      angle_id: turn.angle_id ? String(turn.angle_id) : null,
       analysis_json: (turn.analysis_json || null) as TurnAnalysis | null,
     },
   }
@@ -524,7 +470,7 @@ async function processMainStage(args: {
 
   const { data: replyTurn } = await admin
     .from("voice_coach_turns")
-    .select("id, text, emotion, intent_id, angle_id, line_id, turn_index")
+    .select("id, text, emotion, turn_index")
     .eq("id", args.payload.reply_to_turn_id)
     .eq("session_id", args.sessionId)
     .single()
@@ -570,63 +516,72 @@ async function processMainStage(args: {
   }
 
   let asr: DoubaoAsrResult | null = null
-  let asrProvider: "flash" | "auc" = "flash"
-  let asrFallbackUsed = false
+  let flashAttempted = false
+  let flashErrorMessage = ""
   const flashEnabled = shouldUseFlashAsr()
   const allowAucFallback = !flashEnabled || shouldAllowAucFallbackWhenFlashEnabled()
-  const estimatedAudioSeconds = asNumber(args.payload.client_audio_seconds) || loaded.turn.audio_seconds || null
-  const canUseAucFallbackByDuration = !estimatedAudioSeconds || estimatedAudioSeconds >= 1.2
-  let latestAsrError: unknown = null
 
   if (flashEnabled && format !== "raw") {
+    flashAttempted = true
     try {
-      const flashRes = await doubaoAsrFlash({
+      asr = await doubaoAsrFlash({
         audio: audioBuf,
         format: format as "mp3" | "wav" | "ogg" | "flac",
         uid: args.userId,
       })
-      if (flashRes.text) {
-        asr = flashRes
-        asrProvider = "flash"
-      } else {
-        latestAsrError = new Error("asr_flash_empty")
-      }
     } catch (err: any) {
-      latestAsrError = err
+      flashErrorMessage = String(err?.message || err || "")
       asr = null
     }
   }
 
-  if ((!asr || !asr.text) && allowAucFallback && canUseAucFallbackByDuration) {
-    asrFallbackUsed = true
-    asrProvider = "auc"
+  if ((!asr || !asr.text) && allowAucFallback) {
     const signed = await signVoiceCoachAudio(audioPath)
     try {
-      asr = (await Promise.race([
-        doubaoAsrAuc({
-          audioUrl: signed,
-          format: format as "mp3" | "wav" | "ogg" | "raw",
-          uid: args.userId,
-        }),
-        sleep(3500).then(() => {
-          throw new Error("asr_timeout")
-        }),
-      ])) as DoubaoAsrResult
+      asr = await doubaoAsrAuc({
+        audioUrl: signed,
+        format: format as "mp3" | "wav" | "ogg" | "raw",
+        uid: args.userId,
+      })
     } catch (err) {
-      latestAsrError = err
-      asr = null
+      if (isAsrSilenceError(err)) {
+        await markJobError({
+          jobId: args.jobId,
+          sessionId: args.sessionId,
+          userId: args.userId,
+          turnId: args.turnId,
+          code: "asr_silence",
+          message: "没有识别到有效语音，请重录并靠近麦克风。",
+        })
+        return { processed: true, done: true, jobId: args.jobId, turnId: args.turnId }
+      }
+      throw err
     }
   }
 
-  if (!asr || !asr.text) {
-    const normalized = normalizeAsrFailure(latestAsrError)
+  if ((!asr || !asr.text) && flashAttempted && !allowAucFallback) {
+    const asrMsg = flashErrorMessage.includes("timeout")
+      ? "语音识别超时，请重录并靠近麦克风。"
+      : "未识别到有效语音，请重录。"
     await markJobError({
       jobId: args.jobId,
       sessionId: args.sessionId,
       userId: args.userId,
       turnId: args.turnId,
-      code: normalized.code,
-      message: normalized.message,
+      code: flashErrorMessage.includes("timeout") ? "asr_flash_timeout" : "asr_empty",
+      message: asrMsg,
+    })
+    return { processed: true, done: true, jobId: args.jobId, turnId: args.turnId }
+  }
+
+  if (!asr || !asr.text) {
+    await markJobError({
+      jobId: args.jobId,
+      sessionId: args.sessionId,
+      userId: args.userId,
+      turnId: args.turnId,
+      code: "asr_empty",
+      message: "识别内容为空，请重录",
     })
     return { processed: true, done: true, jobId: args.jobId, turnId: args.turnId }
   }
@@ -637,8 +592,7 @@ async function processMainStage(args: {
   const beauticianAudioUrl = await getSignedAudio(audioPath)
 
   const beauticianTurnNo = Math.floor((Number(loaded.turn.turn_index) + 1) / 2)
-  const hardMax = hardMaxTurns()
-  const reachedMax = hardMax > 0 && beauticianTurnNo >= hardMax
+  const reachedMax = beauticianTurnNo >= maxTurns()
 
   await admin
     .from("voice_coach_turns")
@@ -647,8 +601,6 @@ async function processMainStage(args: {
       asr_confidence: asr.confidence,
       audio_seconds: audioSeconds,
       features_json: { wpm, filler_ratio: fillerRatio },
-      intent_id: replyTurn.intent_id ? String(replyTurn.intent_id) : null,
-      angle_id: replyTurn.angle_id ? String(replyTurn.angle_id) : null,
       status: "asr_ready",
     })
     .eq("id", args.turnId)
@@ -665,8 +617,6 @@ async function processMainStage(args: {
       confidence: asr.confidence,
       audio_seconds: audioSeconds,
       audio_url: beauticianAudioUrl,
-      asr_provider: asrProvider,
-      asr_fallback_used: asrFallbackUsed,
       reached_max_turns: reachedMax,
       stage_elapsed_ms: Date.now() - pipelineStartedAt,
       ts: nowIso(),
@@ -685,69 +635,39 @@ async function processMainStage(args: {
   })
 
   if (reachedMax) {
-    await finishJob({
+    await queueNextStage({
       jobId: args.jobId,
-      result: mergeResult(stageResultBase, {
-        pipeline_started_at_ms: pipelineStartedAt,
-      }),
+      stage: "analysis_pending",
+      result: stageResultBase,
     })
-    return { processed: true, done: true, jobId: args.jobId, turnId: args.turnId }
+    return { processed: true, done: false, jobId: args.jobId, turnId: args.turnId }
   }
 
-  const scenario = getScenario(String(loaded.session.scenario_id || "sale"))
-  const categoryId = normalizeVoiceCoachCategoryId(String(loaded.session.category_id || scenario.categoryId))
+  const scenario = getScenario(String(loaded.session.scenario_id || "objection_safety"))
   const history = await buildHistory(args.sessionId, Number(loaded.turn.turn_index))
-  const policyState = loaded.session.policy_state_json || createInitialPolicyState({ categoryId })
-  const selection = selectNextCustomerLine({
-    categoryId,
-    policyState,
+
+  let nextCustomer = fallbackCustomerTurn({
+    scenario,
+    history,
     beauticianText: asr.text,
-    history: history.map((item) => ({ role: item.role, text: item.text })),
   })
-
-  const modelRewriteEnabled = String(process.env.VOICE_COACH_MODEL_REWRITE_ENABLED || "true")
-    .trim()
-    .toLowerCase() !== "false"
-  const modelRewriteRatio = Number(process.env.VOICE_COACH_MODEL_REWRITE_RATIO || 0.3)
-
-  const rewritten = await maybeRewriteCustomerLine({
-    enabled: modelRewriteEnabled,
-    probability: Number.isFinite(modelRewriteRatio) ? modelRewriteRatio : 0.3,
-    base: {
-      text: selection.line.text,
-      emotion: (selection.line.emotion || "skeptical") as VoiceCoachEmotion,
-      tag: String(selection.line.tag || selection.line.intent_id || "跟进追问"),
-    },
-    rewrite: async () => {
-      return llmRewriteCustomerLine({
-        scenario,
-        history,
-        baseText: selection.line.text,
-        intent: selection.intent_id,
-        angle: selection.angle_id,
-        category: categoryId,
-      })
-    },
-  })
-
-  const nextCustomer = {
-    text: rewritten.text,
-    emotion: rewritten.emotion,
-    tag: rewritten.tag,
-    line_id: selection.line.line_id,
-    intent_id: selection.intent_id,
-    angle_id: selection.angle_id,
-    reply_source: rewritten.reply_source,
-    loop_guard_triggered: selection.loop_guard_triggered,
-  }
-
-  await admin
-    .from("voice_coach_sessions")
-    .update({
-      policy_state_json: selection.policy_state,
-      category_id: categoryId,
+  let llmFallbackUsed = false
+  let llmFallbackReason = ""
+  try {
+    nextCustomer = await llmGenerateCustomerTurn({
+      scenario,
+      history,
+      target: "继续追问并要求更具体证据，推动美容师给出可验证信息",
     })
-    .eq("id", args.sessionId)
+  } catch (err: any) {
+    llmFallbackUsed = true
+    llmFallbackReason = err?.message || String(err || "")
+    nextCustomer = fallbackCustomerTurn({
+      scenario,
+      history,
+      beauticianText: asr.text,
+    })
+  }
 
   const customerTurnIndex = Number(loaded.turn.turn_index) + 1
   const { data: existingCustomerAtIndex } = await admin
@@ -778,17 +698,7 @@ async function processMainStage(args: {
         text: nextCustomer.text,
         emotion: nextCustomer.emotion,
         status: "text_ready",
-        line_id: nextCustomer.line_id,
-        intent_id: nextCustomer.intent_id,
-        angle_id: nextCustomer.angle_id,
-        reply_source: nextCustomer.reply_source,
-        features_json: {
-          tag: nextCustomer.tag,
-          category_id: categoryId,
-          intent_id: nextCustomer.intent_id,
-          angle_id: nextCustomer.angle_id,
-          loop_guard_triggered: nextCustomer.loop_guard_triggered,
-        },
+        features_json: { tag: nextCustomer.tag },
       })
       .eq("id", nextCustomerTurnId)
   } else {
@@ -800,40 +710,12 @@ async function processMainStage(args: {
       text: nextCustomer.text,
       emotion: nextCustomer.emotion,
       status: "text_ready",
-      line_id: nextCustomer.line_id,
-      intent_id: nextCustomer.intent_id,
-      angle_id: nextCustomer.angle_id,
-      reply_source: nextCustomer.reply_source,
-      features_json: {
-        tag: nextCustomer.tag,
-        category_id: categoryId,
-        intent_id: nextCustomer.intent_id,
-        angle_id: nextCustomer.angle_id,
-        loop_guard_triggered: nextCustomer.loop_guard_triggered,
-      },
+      features_json: { tag: nextCustomer.tag },
     })
 
     if (customerInsertError) {
       throw new Error(customerInsertError.message || "customer_turn_insert_failed")
     }
-  }
-
-  const fixedAnalysisTemplate = getAnalysisTemplate(categoryId, nextCustomer.intent_id)
-  if (fixedAnalysisTemplate) {
-    const fixedAnalysis = {
-      suggestions: fixedAnalysisTemplate.suggestions.slice(0, 3),
-      polished: fixedAnalysisTemplate.polished,
-      highlights: [],
-      risk_notes: [],
-      source: "fixed",
-    }
-    await admin
-      .from("voice_coach_turns")
-      .update({
-        analysis_json: fixedAnalysis,
-      })
-      .eq("id", args.turnId)
-      .eq("session_id", args.sessionId)
   }
 
   await emitVoiceCoachEvent({
@@ -847,12 +729,8 @@ async function processMainStage(args: {
       beautician_turn_id: args.turnId,
       text: nextCustomer.text,
       emotion: nextCustomer.emotion,
-      category_id: categoryId,
-      intent_id: nextCustomer.intent_id,
-      angle_id: nextCustomer.angle_id,
-      line_id: nextCustomer.line_id,
-      reply_source: nextCustomer.reply_source,
-      loop_guard_triggered: nextCustomer.loop_guard_triggered,
+      llm_fallback_used: llmFallbackUsed,
+      llm_fallback_reason: llmFallbackReason || null,
       stage_elapsed_ms: Date.now() - pipelineStartedAt,
       ts: nowIso(),
     },
@@ -866,11 +744,6 @@ async function processMainStage(args: {
       next_customer_text: nextCustomer.text,
       next_customer_emotion: nextCustomer.emotion,
       next_customer_tag: nextCustomer.tag,
-      category_id: categoryId,
-      intent_id: nextCustomer.intent_id,
-      angle_id: nextCustomer.angle_id,
-      reply_source: nextCustomer.reply_source,
-      loop_guard_triggered: nextCustomer.loop_guard_triggered,
       customer_text_elapsed_ms: Date.now() - pipelineStartedAt,
     }),
   })
@@ -890,11 +763,12 @@ async function processTtsStage(args: {
 
   const nextCustomerTurnId = String(args.resultState.next_customer_turn_id || "")
   if (!nextCustomerTurnId) {
-    await finishJob({
+    await queueNextStage({
       jobId: args.jobId,
+      stage: "analysis_pending",
       result: mergeResult(args.resultState, { pipeline_started_at_ms: pipelineStartedAt }),
     })
-    return { processed: true, done: true, jobId: args.jobId, turnId: args.turnId }
+    return { processed: true, done: false, jobId: args.jobId, turnId: args.turnId }
   }
 
   const { data: customerTurn } = await admin
@@ -961,7 +835,6 @@ async function processTtsStage(args: {
       audio_path: audioPath,
       audio_seconds: audioSeconds,
       status: audioPath ? "audio_ready" : "text_ready",
-      reply_source: args.resultState.reply_source || null,
     })
     .eq("id", nextCustomerTurnId)
 
@@ -978,25 +851,21 @@ async function processTtsStage(args: {
       audio_seconds: audioSeconds,
       tts_failed: ttsFailed || !audioUrl,
       text: args.resultState.next_customer_text || String(customerTurn.text || ""),
-      category_id: args.resultState.category_id || null,
-      intent_id: args.resultState.intent_id || null,
-      angle_id: args.resultState.angle_id || null,
-      reply_source: args.resultState.reply_source || "fixed",
-      loop_guard_triggered: Boolean(args.resultState.loop_guard_triggered),
       stage_elapsed_ms: Date.now() - pipelineStartedAt,
       ts: nowIso(),
     },
   })
 
-  await finishJob({
+  await queueNextStage({
     jobId: args.jobId,
+    stage: "analysis_pending",
     result: mergeResult(args.resultState, {
       pipeline_started_at_ms: pipelineStartedAt,
       customer_audio_elapsed_ms: Date.now() - pipelineStartedAt,
     }),
   })
 
-  return { processed: true, done: true, jobId: args.jobId, turnId: args.turnId }
+  return { processed: true, done: false, jobId: args.jobId, turnId: args.turnId }
 }
 
 async function processAnalysisStage(args: {
@@ -1227,15 +1096,10 @@ export async function pumpVoiceCoachQueuedJobs(args: {
   sessionId: string
   userId: string
   maxJobs?: number
-  allowedStages?: Array<VoiceCoachJobStage>
-  maxWallMs?: number
 }): Promise<number> {
   const admin = createAdminSupabaseClient()
   const maxJobs = Math.max(1, Math.min(5, Number(args.maxJobs || 1) || 1))
-  const maxWallMs = Math.max(200, Number(args.maxWallMs || 1200) || 1200)
-  const allowedStagesSet = Array.isArray(args.allowedStages) && args.allowedStages.length ? new Set(args.allowedStages) : null
   const staleBeforeIso = new Date(Date.now() - processingStaleMs()).toISOString()
-  const deadline = Date.now() + maxWallMs
 
   // Recover stale processing jobs so polling won't wait forever when a previous invocation was interrupted.
   const { data: staleJobs } = await admin
@@ -1268,22 +1132,14 @@ export async function pumpVoiceCoachQueuedJobs(args: {
 
   let processed = 0
   for (let i = 0; i < maxJobs; i++) {
-    if (Date.now() >= deadline) break
-
-    let queuedQuery = admin
+    const { data: queued } = await admin
       .from("voice_coach_jobs")
-      .select("id, stage")
+      .select("id")
       .eq("session_id", args.sessionId)
       .eq("user_id", args.userId)
       .eq("status", "queued")
       .order("created_at", { ascending: true })
       .limit(1)
-
-    if (allowedStagesSet) {
-      queuedQuery = queuedQuery.in("stage", Array.from(allowedStagesSet))
-    }
-
-    const { data: queued } = await queuedQuery
 
     const jobId = queued?.[0]?.id ? String(queued[0].id) : ""
     if (!jobId) break

@@ -2,67 +2,38 @@
   <view class="container">
     <view class="hero fade-up">
       <text class="eyebrow">销售话术练习</text>
-      <text class="title">练练：4类真实场景陪练</text>
-      <text class="subtitle">售前 / 售中 / 售后 / 危机，固定话术主驱动，首句语音秒开场。</text>
+      <text class="title">练练：成交话术陪练</text>
+      <text class="subtitle">语音对话 + 逐句点评 + 练后报告</text>
 
-      <view wx:if="{{recommendation}}" class="recommend-banner">
-        <text class="recommend-tag">系统推荐</text>
-        <text class="recommend-text">{{recommendation.reason}}</text>
+      <view class="hero-actions">
+        <button class="btn-primary" bindtap="handleStart">开始练习</button>
+      </view>
+
+      <view class="hero-badges">
+        <view class="chip">首次进入会申请录音权限</view>
       </view>
     </view>
 
     <view class="section fade-up delay-1">
-      <text class="section-title">选择训练类目</text>
-      <view wx:if="{{loadingCatalog}}" class="catalog-loading">加载类目中...</view>
-
-      <view wx:else class="category-list">
-        <view
-          wx:for="{{categories}}"
-          wx:key="id"
-          class="category-card {{selectedCategoryId === item.id ? 'is-active' : ''}}"
-          data-id="{{item.id}}"
-          bindtap="onSelectCategory"
-        >
-          <view class="category-head">
-            <text class="category-name">{{item.name}}</text>
-            <text class="category-sub">{{item.subtitle}}</text>
-          </view>
-          <text class="category-objective">{{item.objective}}</text>
-
-          <view wx:if="{{recommendation && recommendation.category_id === item.id}}" class="chip chip-recommend">短板优先</view>
+      <text class="section-title">练习亮点</text>
+      <view class="grid-2">
+        <view class="card">
+          <text class="card-title">顾客扮演</text>
+          <text class="muted small">模拟真实异议与犹豫点</text>
+        </view>
+        <view class="card">
+          <text class="card-title">逐句点评</text>
+          <text class="muted small">指出更自然的表达方式</text>
+        </view>
+        <view class="card">
+          <text class="card-title">润色表达</text>
+          <text class="muted small">给出可直接复用的说法</text>
+        </view>
+        <view class="card">
+          <text class="card-title">练后报告</text>
+          <text class="muted small">维度评分 + 下一步建议</text>
         </view>
       </view>
-    </view>
-
-    <view wx:if="{{selectedCategoryId === 'crisis'}}" class="section fade-up delay-2">
-      <text class="section-title">危机目标</text>
-      <view class="goal-list">
-        <view
-          wx:for="{{crisisGoalTemplates}}"
-          wx:key="goal_template_id"
-          class="goal-chip {{selectedGoalTemplateId === item.goal_template_id ? 'goal-chip-active' : ''}}"
-          data-id="{{item.goal_template_id}}"
-          bindtap="onSelectGoalTemplate"
-        >
-          <text class="goal-name">{{item.name}}</text>
-          <text class="goal-desc">{{item.description}}</text>
-        </view>
-      </view>
-
-      <view class="goal-custom-wrap">
-        <text class="goal-custom-label">自定义补充目标（可选）</text>
-        <input
-          class="goal-custom-input"
-          value="{{goalCustom}}"
-          placeholder="例如：先稳定情绪，再明确48小时内处理节点"
-          maxlength="80"
-          bindinput="onGoalCustomInput"
-        />
-      </view>
-    </view>
-
-    <view class="hero-actions fade-up delay-2">
-      <button class="btn-primary" bindtap="handleStart">开始练习</button>
     </view>
   </view>
 </view>

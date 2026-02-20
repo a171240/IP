@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { checkVoiceCoachAccess } from "@/lib/voice-coach/guard.server"
 import { llmGenerateHint } from "@/lib/voice-coach/llm.server"
-import { getHintTemplate, normalizeVoiceCoachCategoryId } from "@/lib/voice-coach/script-packs"
 import { getScenario, type VoiceCoachEmotion } from "@/lib/voice-coach/scenarios"
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 
@@ -31,14 +30,14 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
 
     const { data: session, error: sessionError } = await supabase
       .from("voice_coach_sessions")
-      .select("id, scenario_id, category_id, status")
+      .select("id, scenario_id, status")
       .eq("id", sessionId)
       .single()
     if (sessionError || !session) return jsonError(404, "session_not_found")
 
     const { data: customerTurn, error: turnError } = await supabase
       .from("voice_coach_turns")
-      .select("id, role, text, emotion, intent_id")
+      .select("id, role, text, emotion")
       .eq("id", customerTurnId)
       .eq("session_id", sessionId)
       .single()
@@ -59,16 +58,6 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
         text: String(t.text || ""),
         emotion: (t.emotion ? String(t.emotion) : undefined) as VoiceCoachEmotion | undefined,
       }))
-
-    const categoryId = normalizeVoiceCoachCategoryId(String(session.category_id || ""))
-    const intentId = String(customerTurn.intent_id || "").trim()
-    const hintTemplate = getHintTemplate(categoryId, intentId)
-    if (hintTemplate) {
-      return NextResponse.json({
-        hint_text: hintTemplate.hint_text,
-        hint_points: hintTemplate.hint_points || [],
-      })
-    }
 
     const scenario = getScenario(session.scenario_id)
     const hint = await llmGenerateHint({

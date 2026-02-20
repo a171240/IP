@@ -27,7 +27,6 @@ export function checkVoiceCoachAccess(userId: string): VoiceCoachAccessResult {
     }
   }
 
-  const rawMaxTurns = Number(process.env.VOICE_COACH_HARD_MAX_TURNS || process.env.VOICE_COACH_MAX_TURNS || 0)
-  const maxTurns = Number.isFinite(rawMaxTurns) && rawMaxTurns > 0 ? Math.max(1, Math.round(rawMaxTurns)) : 0
+  const maxTurns = Math.max(1, Number(process.env.VOICE_COACH_MAX_TURNS || 10) || 10)
   return { ok: true, maxTurns }
 }
