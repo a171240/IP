@@ -1515,7 +1515,7 @@ async function processMainStage(args: {
     return { processed: true, done: true, jobId: args.jobId, turnId: args.turnId }
   }
 
-  const asrMs = Date.now() - asrStartedAt
+  const asrMs = Math.max(1, asNumber((asr as any)?.elapsedMs) || Date.now() - asrStartedAt)
   const asrQueueWaitMs = queueWaitBeforeMainMs
   const asrReadyMs = asrMs + (asrQueueWaitMs || 0)
   const asrProviderFinal: "flash" | "auc" = asrProvider

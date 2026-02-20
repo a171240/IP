@@ -16,6 +16,7 @@ export type DoubaoAsrResult = {
   confidence: number | null
   durationSeconds: number | null
   requestId: string
+  elapsedMs?: number
   resourceId?: string
   logid?: string | null
   submitLogid?: string | null
@@ -127,6 +128,33 @@ function getSpeechLogid(headers: Headers): string {
   )
 }
 
+function parseServerTimingDurationMs(headers: Headers): number | null {
+  const raw = getHeaderValue(headers, "Server-Timing")
+  if (!raw) return null
+  const items = raw
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+  if (!items.length) return null
+
+  const pickDuration = (entry: string): number | null => {
+    const m = entry.match(/dur\s*=\s*([0-9]+(?:\.[0-9]+)?)/i)
+    if (!m) return null
+    const n = Number(m[1])
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
+
+  const preferred = items.find((entry) => /^inner\b/i.test(entry)) || items.find((entry) => /^origin\b/i.test(entry))
+  const preferredMs = preferred ? pickDuration(preferred) : null
+  if (preferredMs) return preferredMs
+
+  for (let i = 0; i < items.length; i++) {
+    const n = pickDuration(items[i])
+    if (n) return n
+  }
+  return null
+}
+
 function appidLast4(value: string): string {
   const raw = String(value || "").trim()
   if (!raw) return ""
@@ -138,6 +166,20 @@ function asrFlashDebugEnabled(): boolean {
     .trim()
     .toLowerCase()
   return ["1", "true", "yes", "on"].includes(raw)
+}
+
+function readBoolEnv(name: string, fallback: boolean): boolean {
+  const raw = process.env[name]
+  if (raw == null) return fallback
+  const value = String(raw).trim().toLowerCase()
+  if (!value) return fallback
+  return ["1", "true", "yes", "on"].includes(value)
+}
+
+function asrFlashVadSegmentDurationMs(): number {
+  const raw = Number(process.env.VOICE_COACH_ASR_FLASH_VAD_SEGMENT_MS || 3000)
+  if (!Number.isFinite(raw)) return 3000
+  return Math.max(2000, Math.min(10000, Math.round(raw)))
 }
 
 function flashDebug(event: string, summary: Record<string, unknown>) {
@@ -395,6 +437,10 @@ export async function doubaoAsrFlash(opts: {
   const requestId = randomUUID()
   const appidTail = appidLast4(appid)
   const uid = opts.uid || "voice_coach"
+  const enablePunc = readBoolEnv("VOICE_COACH_ASR_FLASH_ENABLE_PUNC", false)
+  const showUtterances = readBoolEnv("VOICE_COACH_ASR_FLASH_SHOW_UTTERANCES", false)
+  const enableDdc = readBoolEnv("VOICE_COACH_ASR_FLASH_ENABLE_DDC", true)
+  const vadSegmentDuration = asrFlashVadSegmentDurationMs()
   const body = {
     user: { uid },
     audio: {
@@ -403,14 +449,14 @@ export async function doubaoAsrFlash(opts: {
     },
     request: {
       model_name: "bigmodel",
-      enable_punc: true,
-      show_utterances: true,
+      enable_punc: enablePunc,
+      show_utterances: showUtterances,
       result_type: "single",
-      enable_ddc: true,
+      enable_ddc: enableDdc,
       enable_speaker_info: false,
       enable_channel_split: false,
-      // 8s VAD segment is enough for short utterances and keeps latency lower.
-      vad_segment_duration: 8000,
+      // Shorter VAD segment reduces tail latency for short in-app utterances.
+      vad_segment_duration: vadSegmentDuration,
     },
   }
   const headers = {
@@ -443,12 +489,14 @@ export async function doubaoAsrFlash(opts: {
       model_name: body.request.model_name,
       result_type: body.request.result_type,
       enable_punc: body.request.enable_punc,
+      show_utterances: body.request.show_utterances,
       enable_ddc: body.request.enable_ddc,
       vad_segment_duration: body.request.vad_segment_duration,
     },
   })
 
   let res: Response
+  const requestStartedAt = Date.now()
   try {
     res = await fetchWithTimeout(
       "https://openspeech.bytedance.com/api/v3/auc/bigmodel/recognize/flash",
@@ -592,6 +640,7 @@ export async function doubaoAsrFlash(opts: {
   const text = typeof json?.result?.text === "string" ? json.result.text.trim() : ""
   const confidence = safeNumber(json?.utterances?.[0]?.confidence)
   const durationMs = safeNumber(json?.audio_info?.duration)
+  const elapsedMs = parseServerTimingDurationMs(res.headers) || Math.max(1, Date.now() - requestStartedAt)
 
   if (!text) {
     throw createSpeechError("asr_flash_empty", "asr_flash_empty", {
@@ -613,6 +662,7 @@ export async function doubaoAsrFlash(opts: {
     confidence,
     durationSeconds: durationMs ? durationMs / 1000 : null,
     requestId,
+    elapsedMs,
     resourceId,
     logid: flashLogid,
   }
@@ -720,6 +770,7 @@ export async function doubaoAsrAuc(opts: {
   for (let r = 0; r < resourceCandidates.length; r++) {
     const resourceId = String(resourceCandidates[r])
     const requestId = randomUUID()
+    const requestStartedAt = Date.now()
     let submitLogid: string | null = null
     let latestQueryLogid: string | null = null
 
@@ -912,6 +963,7 @@ export async function doubaoAsrAuc(opts: {
           confidence,
           durationSeconds: durationMs ? durationMs / 1000 : null,
           requestId,
+          elapsedMs: parseServerTimingDurationMs(qRes.headers) || Math.max(1, Date.now() - requestStartedAt),
           resourceId,
           logid: qLogid || submitLogid,
           submitLogid,
