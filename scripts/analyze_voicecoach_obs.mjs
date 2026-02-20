@@ -1,6 +1,15 @@
 import fs from "node:fs"
 import path from "node:path"
 
+const REQUIRED_STAGE_METRICS = [
+  "submit_ack_ms",
+  "asr_ready_ms",
+  "text_ready_ms",
+  "audio_ready_ms",
+  "queue_wait_before_main_ms",
+  "queue_wait_before_tts_ms",
+]
+
 function parseArgs(argv) {
   const args = {}
   for (let i = 0; i < argv.length; i++) {
@@ -80,18 +89,14 @@ function stageStats(values) {
 }
 
 function requiredStageStatsPresent(stageMetrics) {
-  const keys = [
-    "submit_ack_ms",
-    "asr_ready_ms",
-    "text_ready_ms",
-    "audio_ready_ms",
-    "queue_wait_before_main_ms",
-    "queue_wait_before_tts_ms",
-  ]
-  return keys.every((key) => {
+  const missing = REQUIRED_STAGE_METRICS.filter((key) => {
     const metric = stageMetrics[key]
-    return metric && metric.p50 !== null && metric.p95 !== null
+    return !(metric && metric.p50 !== null && metric.p95 !== null)
   })
+  return {
+    ok: missing.length === 0,
+    missing,
+  }
 }
 
 function summarizeGroup(label, bench, opts) {
@@ -141,6 +146,7 @@ function summarizeGroup(label, bench, opts) {
     llm_ms: stageStats(textReady.map((ev) => ev?.llm_ms)),
     tts_ms: stageStats(audioReady.map((ev) => ev?.tts_ms)),
   }
+  const stageMetricStatus = requiredStageStatsPresent(stageMetrics)
 
   const sampleEvents = events
     .filter((ev) => eventHasAuditFields(ev))
@@ -193,7 +199,8 @@ function summarizeGroup(label, bench, opts) {
     },
     usable,
     require_flash_pass: requireFlashPass,
-    stage_metrics_complete: requiredStageStatsPresent(stageMetrics),
+    stage_metrics_complete: stageMetricStatus.ok,
+    missing_stage_metrics: stageMetricStatus.missing,
     audit_samples: sampleEvents,
   }
 }
@@ -222,6 +229,7 @@ const benchBPath = String(args.b || "").trim()
 const benchCPath = String(args.c || "").trim()
 const outJsonPath = String(args.out || "").trim()
 const outMdPath = String(args.md || "").trim()
+const workOrder = String(args.work_order || args.wo || "WO-R5-OBS/window2").trim() || "WO-R5-OBS/window2"
 
 if (!benchAPath || !benchBPath || !benchCPath || !outJsonPath || !outMdPath) {
   console.error(
@@ -261,6 +269,7 @@ const stageMetricsOverall = {
   llm_ms: aggregateStageMetric(groups, "llm_ms"),
   tts_ms: aggregateStageMetric(groups, "tts_ms"),
 }
+const overallStageMetricStatus = requiredStageStatsPresent(stageMetricsOverall)
 
 const ttsCacheRates = groups.map((group) => toNumber(group?.tts_cache_hit_rate)).filter((n) => n !== null)
 const ttsCacheHitRate =
@@ -278,14 +287,18 @@ const queueWaitBeforeTtsInvalidRate =
     ? Number((queueWaitBeforeTtsInvalidRates.reduce((sum, n) => sum + n, 0) / queueWaitBeforeTtsInvalidRates.length).toFixed(4))
     : null
 
-const g0Pass = missingRequiredCountTotal === 0 && submitPumpCount === 0
+const g0Pass =
+  missingRequiredCountTotal === 0 &&
+  submitPumpCount === 0 &&
+  eventsPumpCount === 0 &&
+  overallStageMetricStatus.ok
 const g1Pass = toNumber(groupB?.stage_metrics?.audio_ready_ms?.p50) !== null && Number(groupB.stage_metrics.audio_ready_ms.p50) <= 8000
-const g2Pass = groups.every((group) => group.stage_metrics_complete)
+const g2Pass = groups.every((group) => group.stage_metrics_complete) && overallStageMetricStatus.ok
 const g3Pass = groupA.require_flash_pass && groupC.usable && groupC.path_mode === "slow_path_degraded"
 
 const analysis = {
   generated_at: new Date().toISOString(),
-  work_order: "WO-R4-OBS/window2",
+  work_order: workOrder,
   inputs: {
     bench_A: path.resolve(benchAPath),
     bench_B: path.resolve(benchBPath),
@@ -300,6 +313,9 @@ const analysis = {
     missing_required_count_total: missingRequiredCountTotal,
     submit_pump_count: submitPumpCount,
     events_pump_count: eventsPumpCount,
+    required_stage_metrics: REQUIRED_STAGE_METRICS,
+    stage_metrics_complete: overallStageMetricStatus.ok,
+    missing_stage_metrics: overallStageMetricStatus.missing,
     executor_worker_ratio: executorWorkerRatio,
     asr_provider_final_flash_ratio: asrProviderFinalFlashRatio,
     queue_wait_before_tts_invalid_rate: queueWaitBeforeTtsInvalidRate,
@@ -308,7 +324,7 @@ const analysis = {
     b_audio_ready_p50_actual_ms: toNumber(groupB?.stage_metrics?.audio_ready_ms?.p50),
   },
   gates: {
-    G0: `${g0Pass ? "PASS" : "FAIL"}: missing_required_count_total=${missingRequiredCountTotal}, submit_pump_count=${submitPumpCount}`,
+    G0: `${g0Pass ? "PASS" : "FAIL"}: missing_required_count_total=${missingRequiredCountTotal}, submit_pump_count=${submitPumpCount}, events_pump_count=${eventsPumpCount}, stage_metrics_complete=${overallStageMetricStatus.ok}, missing_stage_metrics=${overallStageMetricStatus.missing.join("|") || "none"}`,
     G1: `${g1Pass ? "PASS" : "FAIL"}: audio_ready_ms_B_p50=${groupB?.stage_metrics?.audio_ready_ms?.p50} target<=8000`,
     G2: `${g2Pass ? "PASS" : "FAIL"}: stage_metric_fields_complete=${g2Pass}`,
     G3: `${g3Pass ? "PASS" : "FAIL"}: A_require_flash_pass=${groupA.require_flash_pass}, C_usable=${groupC.usable}, C_path_mode=${groupC.path_mode}`,
@@ -347,7 +363,7 @@ const analysis = {
 }
 
 const md = [
-  "# WO-R4-OBS Window2 Analysis",
+  `# ${workOrder} Analysis`,
   "",
   "## Scope",
   "- Metrics-calibration and audit rollup only (`scripts/*`, `docs/runbooks/*`).",
@@ -357,13 +373,15 @@ const md = [
   `- bench_B: \`${analysis.inputs.bench_B}\``,
   `- bench_C: \`${analysis.inputs.bench_C}\``,
   "",
+  "## Hard Gate",
+  `- missing_required_count_total=${analysis.summary.missing_required_count_total}`,
+  `- submit_pump_count=${analysis.summary.submit_pump_count}`,
+  `- events_pump_count=${analysis.summary.events_pump_count}`,
+  `- stage_metrics_complete=${analysis.summary.stage_metrics_complete}`,
+  `- missing_stage_metrics=${analysis.summary.missing_stage_metrics.join(",") || "none"}`,
+  "",
   "## Stage Metrics (P50/P95, overall)",
-  `- submit_ack_ms: ${analysis.summary.stage_metrics.submit_ack_ms.p50}/${analysis.summary.stage_metrics.submit_ack_ms.p95}`,
-  `- asr_ready_ms: ${analysis.summary.stage_metrics.asr_ready_ms.p50}/${analysis.summary.stage_metrics.asr_ready_ms.p95}`,
-  `- text_ready_ms: ${analysis.summary.stage_metrics.text_ready_ms.p50}/${analysis.summary.stage_metrics.text_ready_ms.p95}`,
-  `- audio_ready_ms: ${analysis.summary.stage_metrics.audio_ready_ms.p50}/${analysis.summary.stage_metrics.audio_ready_ms.p95}`,
-  `- queue_wait_before_main_ms: ${analysis.summary.stage_metrics.queue_wait_before_main_ms.p50}/${analysis.summary.stage_metrics.queue_wait_before_main_ms.p95}`,
-  `- queue_wait_before_tts_ms(valid-only): ${analysis.summary.stage_metrics.queue_wait_before_tts_ms.p50}/${analysis.summary.stage_metrics.queue_wait_before_tts_ms.p95}`,
+  ...REQUIRED_STAGE_METRICS.map((key) => `- ${key}: ${analysis.summary.stage_metrics[key].p50}/${analysis.summary.stage_metrics[key].p95}`),
   "",
   "## Group Notes",
   `- A: require_flash=true, pass=${groupA.require_flash_pass}`,
