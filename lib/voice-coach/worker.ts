@@ -51,7 +51,7 @@ const claimBurst = Math.max(
   1,
   parseNumberEnv(
     "VOICE_COACH_WORKER_CLAIM_BURST",
-    Math.max(1, Math.min(workerConcurrency, 40)),
+    Math.max(1, Math.min(workerConcurrency, 4)),
     1,
     40,
   ),
@@ -221,17 +221,15 @@ async function runRound(): Promise<RoundResult> {
   let recovered = 0
   let processed = 0
   const inFlight: Array<Promise<{ processed: boolean; timedOut: boolean }>> = []
-  const queuedBuffer: Array<WorkerQueuedJob> = []
-
-  const refillQueueBuffer = async (maxJobs: number) => {
+  const loadClaimBatch = async (maxJobs: number): Promise<Array<WorkerQueuedJob>> => {
     const queued = await listVoiceCoachQueuedJobs({
-      maxJobs: Math.max(2, Math.min(maxJobs * 2, 40)),
+      maxJobs: Math.max(1, Math.min(maxJobs, 12)),
       allowedStages: ACTIVE_STAGES,
       newestFirst: true,
       maxQueueAgeMs,
       includeClaimHint: true,
     })
-    if (queued.length <= 0) return
+    if (queued.length <= 0) return []
 
     const queuedMain: Array<VoiceCoachQueuedJobRecord> = []
     const queuedTts: Array<VoiceCoachQueuedJobRecord> = []
@@ -244,12 +242,10 @@ async function runRound(): Promise<RoundResult> {
       }
     }
 
-    const prioritized = queuedMain.concat(queuedTts)
-    for (let i = 0; i < prioritized.length; i++) {
-      const item = prioritized[i]
-      if (!item?.id) continue
-      if (queuedBuffer.some((existing) => existing.id === item.id)) continue
-      queuedBuffer.push({
+    return queuedMain
+      .concat(queuedTts)
+      .slice(0, maxJobs)
+      .map((item) => ({
         id: item.id,
         sessionId: item.sessionId,
         userId: item.userId,
@@ -260,8 +256,7 @@ async function runRound(): Promise<RoundResult> {
         resultState: item.resultState,
         createdAt: item.createdAt,
         updatedAt: item.updatedAt,
-      })
-    }
+      }))
   }
 
   while (!shuttingDown && processed < maxJobsPerRound) {
@@ -270,13 +265,11 @@ async function runRound(): Promise<RoundResult> {
 
     const remainingBudget = maxJobsPerRound - (processed + inFlight.length)
     const slots = Math.max(0, Math.min(claimBurst, workerConcurrency - inFlight.length, remainingBudget))
-    if (slots > 0 && queuedBuffer.length < slots) {
-      await refillQueueBuffer(Math.max(slots, workerConcurrency))
-    }
+    const claimBatch = slots > 0 ? await loadClaimBatch(slots) : []
 
     let claimedAny = false
-    for (let i = 0; i < slots; i++) {
-      const claimedJob = queuedBuffer.shift()
+    for (let i = 0; i < claimBatch.length; i++) {
+      const claimedJob = claimBatch[i]
       if (!claimedJob) break
       claimedAny = true
       inFlight.push(processOneJob(claimedJob))
