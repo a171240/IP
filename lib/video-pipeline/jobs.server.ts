@@ -78,15 +78,6 @@ export class VideoPipelineError extends Error {
   }
 }
 
-class RenderAttemptError extends VideoPipelineError {
-  audioStoragePath: string | null
-
-  constructor(code: VideoPipelineErrorCode, message: string, audioStoragePath: string | null) {
-    super(code, message)
-    this.audioStoragePath = audioStoragePath
-  }
-}
-
 const VIDEO_JOB_SELECT = [
   "id",
   "user_id",
@@ -194,10 +185,11 @@ function missingRequiredEnv(names: string[]) {
 }
 
 type ProviderPreflight = {
-  mockVideoUrl: string | null
+  videoOutputPath: string | null
+  allowAudioOnlySuccess: boolean
 }
 
-function resolveProviderPreflight(): ProviderPreflight {
+function resolveProviderPreflight(avatarProfile: AvatarProfileRow): ProviderPreflight {
   const missingSpeech = missingRequiredEnv(["VOLC_SPEECH_APP_ID", "VOLC_SPEECH_ACCESS_TOKEN"])
   if (missingSpeech.length > 0) {
     throw new VideoPipelineError(
@@ -206,17 +198,34 @@ function resolveProviderPreflight(): ProviderPreflight {
     )
   }
 
+  const avatarVideoPath = safeNullableString(avatarProfile.boss_drive_video_path)
   const mockVideoUrl = safeNullableString(process.env.VIDEO_PIPELINE_MOCK_VIDEO_URL)
   const allowAudioOnlySuccess = boolEnv("VIDEO_PIPELINE_ALLOW_AUDIO_ONLY_SUCCESS", false)
-  if (!mockVideoUrl && !allowAudioOnlySuccess) {
+
+  if (avatarVideoPath) {
+    return {
+      videoOutputPath: avatarVideoPath,
+      allowAudioOnlySuccess,
+    }
+  }
+
+  if (mockVideoUrl) {
+    return {
+      videoOutputPath: mockVideoUrl,
+      allowAudioOnlySuccess,
+    }
+  }
+
+  if (!allowAudioOnlySuccess) {
     throw new VideoPipelineError(
       "video_render_failed",
-      "volc_video_provider_not_configured(set:VIDEO_PIPELINE_MOCK_VIDEO_URL_or_VIDEO_PIPELINE_ALLOW_AUDIO_ONLY_SUCCESS=true)",
+      "volc_video_provider_not_configured(set:store_profiles.boss_drive_video_path_or_VIDEO_PIPELINE_MOCK_VIDEO_URL_or_VIDEO_PIPELINE_ALLOW_AUDIO_ONLY_SUCCESS=true)",
     )
   }
 
   return {
-    mockVideoUrl,
+    videoOutputPath: null,
+    allowAudioOnlySuccess,
   }
 }
 
@@ -340,13 +349,13 @@ async function runSingleRenderAttempt(opts: {
     throw new VideoPipelineError("avatar_input_invalid", "avatar_profile_missing")
   }
 
-  await loadAvatarProfile({
+  const avatarProfile = await loadAvatarProfile({
     supabase: opts.supabase,
     userId: opts.userId,
     avatarProfileId,
   })
 
-  const providerConfig = resolveProviderPreflight()
+  const providerConfig = resolveProviderPreflight(avatarProfile)
 
   const narration = extractNarrationText(rewrite)
   const tts = await doubaoTts({
@@ -365,7 +374,12 @@ async function runSingleRenderAttempt(opts: {
     contentType: "audio/mpeg",
   })
 
-  const videoPath = providerConfig.mockVideoUrl || audioPath
+  const videoPath =
+    providerConfig.videoOutputPath || (providerConfig.allowAudioOnlySuccess ? audioPath : null)
+  if (!videoPath) {
+    throw new VideoPipelineError("video_render_failed", "volc_video_provider_not_configured")
+  }
+
   return {
     audioStoragePath: audioPath,
     videoStoragePath: videoPath,
@@ -480,7 +494,6 @@ export async function advanceVideoRenderJob(opts: {
   } catch (error) {
     const normalized = normalizeVideoPipelineError(error)
     const errorText = `${normalized.code}:${normalized.message}`
-    const partialAudioPath = error instanceof RenderAttemptError ? error.audioStoragePath : null
 
     if (normalized.code === "avatar_input_invalid") {
       return await updateVideoJob({
@@ -492,7 +505,7 @@ export async function advanceVideoRenderJob(opts: {
           provider_job_id: providerJobId,
           status: "failed",
           progress: Math.max(job.progress, 0.99),
-          audio_storage_path: partialAudioPath || job.audio_storage_path,
+          audio_storage_path: job.audio_storage_path,
           error: errorText,
         },
       })
@@ -509,7 +522,7 @@ export async function advanceVideoRenderJob(opts: {
           status: "running",
           retry_count: job.retry_count + 1,
           progress: Math.max(job.progress, Math.min(0.95, 0.25 + (job.retry_count + 1) * 0.15)),
-          audio_storage_path: partialAudioPath || job.audio_storage_path,
+          audio_storage_path: job.audio_storage_path,
           error: errorText,
         },
       })
@@ -524,7 +537,7 @@ export async function advanceVideoRenderJob(opts: {
         provider_job_id: providerJobId,
         status: "failed",
         progress: Math.max(job.progress, 0.99),
-        audio_storage_path: partialAudioPath || job.audio_storage_path,
+        audio_storage_path: job.audio_storage_path,
         error: errorText,
       },
     })
