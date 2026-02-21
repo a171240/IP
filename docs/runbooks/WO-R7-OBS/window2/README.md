@@ -22,3 +22,10 @@
 
 - `G0`: `missing_required_count_total=0`
 - `G1`: 6 阶段 `submit_ack/asr_ready/text_ready/audio_ready/queue_wait_before_main/queue_wait_before_tts` 的 `P50/P95` 完整
+- `G2`: 长尾门禁输出（`audio_ready_ms_C_p95`、`queue_wait_before_main_ms_C_p95`、`queue_wait_before_tts_ms_C_p95` 以及 overall queue p95）
+
+## run_result 保底落盘
+
+- 脚本在 `PASS/FAIL/BLOCKED` 以及未捕获异常场景都会写入：
+  - `run_result.json`
+  - `run_result.md`

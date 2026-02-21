@@ -35,6 +35,13 @@ function parseArgs(argv) {
   return out
 }
 
+function resolveRunContext(argv) {
+  const args = parseArgs(argv)
+  const wo = String(args.wo || "WO-R8-OBS/window2").trim()
+  const outDir = String(args["out-dir"] || "").trim() || path.join(ROOT, "docs", "runbooks", wo)
+  return { args, wo, outDir }
+}
+
 function boolVal(raw, fallback = false) {
   if (raw === undefined || raw === null || raw === "") return fallback
   return ["1", "true", "yes", "on"].includes(String(raw).trim().toLowerCase())
@@ -92,6 +99,15 @@ function runExecFile(command, args, options = {}) {
 
 function appendLog(file, message) {
   fs.appendFileSync(file, `${message}\n`)
+}
+
+function toNumberOrNull(value) {
+  const n = typeof value === "number" ? value : Number(value)
+  return Number.isFinite(n) ? n : null
+}
+
+function formatMetric(name, value) {
+  return `${name}=${value === null ? "null" : value}`
 }
 
 function parseBenchPath(text) {
@@ -356,27 +372,95 @@ function evaluateObsGate(analysis) {
     return !(metric && metric.p50 !== null && metric.p95 !== null)
   })
   const stageComplete = Boolean(analysis?.summary?.stage_metrics_complete) && missingStage.length === 0
+  const cAudioReadyP95 = toNumberOrNull(analysis?.metrics?.audio_ready_ms_C_p95)
+  const cQueueMainP95 = toNumberOrNull(analysis?.groups?.C?.stage_metrics?.queue_wait_before_main_ms?.p95)
+  const cQueueTtsP95 = toNumberOrNull(analysis?.groups?.C?.stage_metrics?.queue_wait_before_tts_ms?.p95)
+  const queueMainP95 = toNumberOrNull(analysis?.metrics?.queue_wait_before_main_ms_p95)
+  const queueTtsP95 = toNumberOrNull(analysis?.metrics?.queue_wait_before_tts_ms_p95)
+  const longTailReady = [cAudioReadyP95, cQueueMainP95, cQueueTtsP95, queueMainP95, queueTtsP95].every((item) => item !== null)
+  const longTailEvidence = [
+    formatMetric("audio_ready_ms_C_p95", cAudioReadyP95),
+    formatMetric("queue_wait_before_main_ms_C_p95", cQueueMainP95),
+    formatMetric("queue_wait_before_tts_ms_C_p95", cQueueTtsP95),
+    formatMetric("queue_wait_before_main_ms_p95", queueMainP95),
+    formatMetric("queue_wait_before_tts_ms_p95", queueTtsP95),
+  ].join(", ")
 
   return {
-    G0: {
-      status: missingRequired === 0 ? "PASS" : "FAIL",
-      evidence: `missing_required_count_total=${Number.isFinite(missingRequired) ? missingRequired : "NaN"}`,
+    gates: {
+      G0: {
+        status: missingRequired === 0 ? "PASS" : "FAIL",
+        evidence: `missing_required_count_total=${Number.isFinite(missingRequired) ? missingRequired : "NaN"}`,
+      },
+      G1: {
+        status: stageComplete ? "PASS" : "FAIL",
+        evidence: `required_stage_metrics_complete=${stageComplete}, missing=${missingStage.join("|") || "none"}`,
+      },
+      G2: {
+        status: longTailReady ? "PASS" : "FAIL",
+        evidence: longTailEvidence,
+      },
     },
-    G1: {
-      status: stageComplete ? "PASS" : "FAIL",
-      evidence: `required_stage_metrics_complete=${stageComplete}, missing=${missingStage.join("|") || "none"}`,
+    long_tail_metrics: {
+      audio_ready_ms_C_p95: cAudioReadyP95,
+      queue_wait_before_main_ms_C_p95: cQueueMainP95,
+      queue_wait_before_tts_ms_C_p95: cQueueTtsP95,
+      queue_wait_before_main_ms_p95: queueMainP95,
+      queue_wait_before_tts_ms_p95: queueTtsP95,
     },
   }
 }
 
+function writeRunResult(outDir, result) {
+  const jsonFile = path.join(outDir, "run_result.json")
+  const mdFile = path.join(outDir, "run_result.md")
+  fs.mkdirSync(path.dirname(jsonFile), { recursive: true })
+  fs.writeFileSync(jsonFile, JSON.stringify(result, null, 2))
+
+  const gates = result?.gates || {}
+  const gateLines = Object.keys(gates).map((key) => {
+    const gate = gates[key] || {}
+    return `- ${key}: ${gate.status || "N/A"} (${gate.evidence || "none"})`
+  })
+  const longTail = result?.long_tail_metrics || {}
+  const longTailLines = Object.keys(longTail).map((key) => `- ${key}: ${longTail[key] === null ? "null" : longTail[key]}`)
+
+  fs.writeFileSync(
+    mdFile,
+    [
+      `# ${result.wo || "WO"} One-Click Result`,
+      "",
+      `- generated_at: ${result.generated_at || nowIso()}`,
+      `- status: ${result.status || "UNKNOWN"}`,
+      `- head: ${result.head || "unknown"}`,
+      ...(result.reason ? [`- reason: ${result.reason}`] : []),
+      "",
+      "## Gates",
+      ...gateLines,
+      "",
+      "## Long Tail",
+      ...longTailLines,
+      "",
+      "## Outputs",
+      `- bench_A: \`${result?.outputs?.bench_A || ""}\``,
+      `- bench_B: \`${result?.outputs?.bench_B || ""}\``,
+      `- bench_C: \`${result?.outputs?.bench_C || ""}\``,
+      `- analysis.json: \`${result?.outputs?.analysis_json || ""}\``,
+      `- analysis.md: \`${result?.outputs?.analysis_md || ""}\``,
+      "",
+    ].join("\n"),
+  )
+}
+
 async function main() {
-  const args = parseArgs(process.argv.slice(2))
+  const context = resolveRunContext(process.argv.slice(2))
+  const { args, wo, outDir } = context
   if (boolVal(args.help, false)) {
     console.log(`Usage:
   node scripts/run_voicecoach_obs_oneclick.mjs [options]
 
 Options:
-  --wo <work_order>            default: WO-R7-OBS/window2
+  --wo <work_order>            default: WO-R8-OBS/window2
   --out-dir <absolute_path>    default: <repo>/docs/runbooks/<wo>
   --port <number>              default: 3390
   --attempts <number>          default: 6
@@ -388,8 +472,6 @@ Options:
     return
   }
 
-  const wo = String(args.wo || "WO-R7-OBS/window2").trim()
-  const outDir = String(args["out-dir"] || "").trim() || path.join(ROOT, "docs", "runbooks", wo)
   const logsDir = path.join(outDir, "logs")
   const runnerLog = path.join(logsDir, "runner.log")
   const port = intVal(args.port, 3390)
@@ -447,8 +529,7 @@ Options:
           logs_dir: logsDir,
         },
       }
-      const failFile = path.join(outDir, "run_result.json")
-      fs.writeFileSync(failFile, JSON.stringify(failure, null, 2))
+      writeRunResult(outDir, failure)
       console.log(JSON.stringify(failure, null, 2))
       process.exit(2)
     }
@@ -457,19 +538,19 @@ Options:
   const currentHeadRes = await runExecFile("/usr/bin/git", ["-C", ROOT, "rev-parse", "HEAD"], { cwd: ROOT, env: baseEnv })
   const endHead = String(currentHeadRes.stdout || "").trim()
   if (!endHead || endHead !== startHead) {
-    const headFailure = {
-      generated_at: nowIso(),
-      wo,
+      const headFailure = {
+        generated_at: nowIso(),
+        wo,
       status: "BLOCKED",
       reason: `head_changed start=${startHead} current=${endHead || "unknown"}`,
-      outputs: {
-        out_dir: outDir,
-        logs_dir: logsDir,
-      },
-    }
-    fs.writeFileSync(path.join(outDir, "run_result.json"), JSON.stringify(headFailure, null, 2))
-    console.log(JSON.stringify(headFailure, null, 2))
-    process.exit(3)
+        outputs: {
+          out_dir: outDir,
+          logs_dir: logsDir,
+        },
+      }
+      writeRunResult(outDir, headFailure)
+      console.log(JSON.stringify(headFailure, null, 2))
+      process.exit(3)
   }
 
   const analysisJson = path.join(outDir, "analysis.json")
@@ -513,13 +594,15 @@ Options:
         logs_dir: logsDir,
       },
     }
-    fs.writeFileSync(path.join(outDir, "run_result.json"), JSON.stringify(analyzeFailure, null, 2))
+    writeRunResult(outDir, analyzeFailure)
     console.log(JSON.stringify(analyzeFailure, null, 2))
     process.exit(4)
   }
 
   const analysis = JSON.parse(fs.readFileSync(analysisJson, "utf8"))
-  const gates = evaluateObsGate(analysis)
+  const gateEval = evaluateObsGate(analysis)
+  const gates = gateEval.gates
+  const longTailMetrics = gateEval.long_tail_metrics
   const allPass = Object.values(gates).every((item) => item.status === "PASS")
 
   const result = {
@@ -538,35 +621,34 @@ Options:
     },
     groups: groupResults,
     gates,
+    long_tail_metrics: longTailMetrics,
   }
 
-  fs.writeFileSync(path.join(outDir, "run_result.json"), JSON.stringify(result, null, 2))
-  fs.writeFileSync(
-    path.join(outDir, "run_result.md"),
-    [
-      `# ${wo} One-Click Result`,
-      "",
-      `- generated_at: ${result.generated_at}`,
-      `- status: ${result.status}`,
-      `- head: ${result.head}`,
-      `- G0: ${gates.G0.status} (${gates.G0.evidence})`,
-      `- G1: ${gates.G1.status} (${gates.G1.evidence})`,
-      "",
-      "## Outputs",
-      `- bench_A: \`${result.outputs.bench_A}\``,
-      `- bench_B: \`${result.outputs.bench_B}\``,
-      `- bench_C: \`${result.outputs.bench_C}\``,
-      `- analysis.json: \`${result.outputs.analysis_json}\``,
-      `- analysis.md: \`${result.outputs.analysis_md}\``,
-      "",
-    ].join("\n"),
-  )
+  writeRunResult(outDir, result)
 
   console.log(JSON.stringify(result, null, 2))
   process.exit(allPass ? 0 : 5)
 }
 
 main().catch((err) => {
+  const context = resolveRunContext(process.argv.slice(2))
+  const logsDir = path.join(context.outDir, "logs")
+  const failure = {
+    generated_at: nowIso(),
+    wo: context.wo,
+    status: "FAIL",
+    reason: "unhandled_exception",
+    error_message: String(err?.message || err || "unknown"),
+    outputs: {
+      out_dir: context.outDir,
+      logs_dir: logsDir,
+    },
+  }
+  try {
+    writeRunResult(context.outDir, failure)
+  } catch {
+    // ignore secondary write errors
+  }
   console.error(err?.stack || err?.message || err)
   process.exit(1)
 })
