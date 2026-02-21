@@ -1,63 +1,66 @@
 {
-  "generated_at": "2026-02-21T02:58:30.546Z",
+  "generated_at": "2026-02-21T03:10:46.065Z",
   "wo_id": "WO-R7-ASR",
   "bench_C_path": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R7-ASR/window3/bench_C.json",
-  "source_bench_path": "/tmp/voicecoach_e2e_1771642622597.json",
+  "source_bench_path": "/tmp/voicecoach_e2e_1771643445936.json",
   "summary": {
-    "asr_ready_ms_p50": 8187,
-    "asr_ready_ms_p95": 9010,
-    "asr_ready_count": 2,
+    "asr_ready_ms_p50": 7495,
+    "asr_ready_ms_p95": 8749,
     "rounds_total": 3,
-    "rounds_auc_only_3_of_3": true
+    "asr_ready_count": 3,
+    "strict_rounds_pass": true
   },
   "gates": {
-    "G_C_ASR_READY_MS_P95_LE_10000": "PASS",
-    "G_C_AUC_ATTEMPTED_3_OF_3": "PASS",
-    "G_C_NO_FLASH": "PASS"
+    "G_C_AUC_ONLY": "PASS",
+    "G_C_NO_FLASH": "PASS",
+    "G_C_ASR_READY": "PASS"
   },
   "rounds": [
     {
       "round_no": 1,
+      "asr_ready_count": 1,
+      "turn_error_count": 0,
       "asr_provider_attempted": [
         "auc"
       ],
-      "asr_ready_count": 1,
       "asr_ready_ms": [
-        9010
+        8749
       ],
       "turn_error_codes": [],
-      "trace_id": "8621fbd3-cd23-4cf9-a737-5ccab710ba96",
-      "client_build": "bench-1771642571138",
+      "trace_id": "1e5599a4-136d-408d-82d0-5a7f0b396893",
+      "client_build": "bench-1771643394282",
       "server_build": "dev",
       "executor": "worker"
     },
     {
       "round_no": 2,
+      "asr_ready_count": 1,
+      "turn_error_count": 0,
       "asr_provider_attempted": [
         "auc"
       ],
-      "asr_ready_count": 0,
-      "asr_ready_ms": [],
-      "turn_error_codes": [
-        "asr_timeout"
+      "asr_ready_ms": [
+        6812
       ],
-      "trace_id": "6f1b6c45-3d80-4657-bd52-d82f36c48d0c",
-      "client_build": "bench-1771642571138",
+      "turn_error_codes": [],
+      "trace_id": "f7f2e2b7-8378-496a-af3d-c537ea8b5991",
+      "client_build": "bench-1771643394282",
       "server_build": "dev",
       "executor": "worker"
     },
     {
       "round_no": 3,
+      "asr_ready_count": 1,
+      "turn_error_count": 0,
       "asr_provider_attempted": [
         "auc"
       ],
-      "asr_ready_count": 1,
       "asr_ready_ms": [
-        8187
+        7495
       ],
       "turn_error_codes": [],
-      "trace_id": "8314fbce-9918-4fa5-b1b1-7754e7678cc0",
-      "client_build": "bench-1771642571138",
+      "trace_id": "33b24602-3929-4378-b532-3986368920fc",
+      "client_build": "bench-1771643394282",
       "server_build": "dev",
       "executor": "worker"
     }
