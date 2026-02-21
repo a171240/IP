@@ -1459,22 +1459,41 @@ async function processMainStage(args: {
     asrProvider = "auc"
     asrProviderAttempted.push("auc")
     const signed = await signVoiceCoachAudio(audioPath)
-    try {
-      asr = (await Promise.race([
-        doubaoAsrAuc({
-          audioUrl: signed,
-          format: format as "mp3" | "wav" | "ogg" | "raw",
-          uid: args.userId,
-        }),
-        sleep(asrAucTotalTimeoutMs()).then(() => {
-          throw new Error("asr_timeout")
-        }),
-      ])) as DoubaoAsrResult
-      latestAsrMeta = null
-    } catch (err) {
-      latestAsrError = err
-      latestAsrMeta = asrErrorMeta(err, "auc")
-      asr = null
+    const aucAttemptLimitRaw = Number(process.env.VOICE_COACH_ASR_AUC_ATTEMPTS || (!flashEnabled ? 2 : 1))
+    const aucAttemptLimit = Math.max(1, Math.min(3, Number.isFinite(aucAttemptLimitRaw) ? Math.round(aucAttemptLimitRaw) : 1))
+    const aucTimeoutBaseMs = asrAucTotalTimeoutMs()
+    for (let aucAttempt = 1; aucAttempt <= aucAttemptLimit; aucAttempt++) {
+      const aucTimeoutMs =
+        aucAttempt <= 1
+          ? aucTimeoutBaseMs
+          : Math.max(3500, Math.min(45000, Math.round(aucTimeoutBaseMs * (1 + 0.2 * (aucAttempt - 1)))))
+      try {
+        asr = (await Promise.race([
+          doubaoAsrAuc({
+            audioUrl: signed,
+            format: format as "mp3" | "wav" | "ogg" | "raw",
+            uid: args.userId,
+          }),
+          sleep(aucTimeoutMs).then(() => {
+            throw new Error("asr_timeout")
+          }),
+        ])) as DoubaoAsrResult
+        latestAsrMeta = null
+        break
+      } catch (err) {
+        latestAsrError = err
+        latestAsrMeta = asrErrorMeta(err, "auc")
+        asr = null
+        const code = String((err as any)?.code || "").trim()
+        const retryable =
+          isAsrTimeoutError(err) ||
+          code === "asr_auc_submit_timeout" ||
+          code === "asr_auc_query_timeout" ||
+          code === "asr_auc_submit_network" ||
+          code === "asr_auc_query_network"
+        if (retryable && aucAttempt < aucAttemptLimit) continue
+        break
+      }
     }
   }
 
