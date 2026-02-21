@@ -1,0 +1,49 @@
+{
+  "generated_at": "2026-02-21T04:03:06.075Z",
+  "label": "A",
+  "path_mode": "probe_guard",
+  "source_file": "/tmp/voicecoach_e2e_1771646566840.json",
+  "session_id": "7bfa9ca4-a1d4-4567-987f-c2845878e166",
+  "client_build": "bench-1771646544501",
+  "server_build": "dev",
+  "rounds": 1,
+  "sample_events": 3,
+  "audit_sample_count": 3,
+  "audit_samples": [
+    {
+      "trace_id": "561c7b7f-70b2-448d-ab35-4648080c654a",
+      "client_build": "bench-1771646544501",
+      "server_build": "dev",
+      "executor": "worker",
+      "event_type": "beautician.asr_ready"
+    },
+    {
+      "trace_id": "561c7b7f-70b2-448d-ab35-4648080c654a",
+      "client_build": "bench-1771646544501",
+      "server_build": "dev",
+      "executor": "worker",
+      "event_type": "customer.text_ready"
+    },
+    {
+      "trace_id": "561c7b7f-70b2-448d-ab35-4648080c654a",
+      "client_build": "bench-1771646544501",
+      "server_build": "dev",
+      "executor": "worker",
+      "event_type": "customer.audio_ready"
+    }
+  ],
+  "counts": {
+    "asr_ready": 1,
+    "text_ready": 1,
+    "audio_ready": 1,
+    "turn_error": 0
+  },
+  "usable": true,
+  "client_probe": {
+    "record_format": "mp3",
+    "record_sample_rate": 16000,
+    "record_channels": 1,
+    "ui_feedback_p95_ms": 42,
+    "source": "latest_real_device_probe"
+  }
+}
