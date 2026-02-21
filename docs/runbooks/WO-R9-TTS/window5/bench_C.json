@@ -1,0 +1,93 @@
+{
+  "generated_at": "2026-02-21T04:06:12.377Z",
+  "bench_tag": "wo-r9-tts-c-1771646616268",
+  "session_id": "7ddb3da3-d021-494e-bdbd-c9e37dc59738",
+  "rounds_requested": 8,
+  "rounds_planned": 8,
+  "rounds_queued": 8,
+  "round_errors": [
+    "round_4:job_error:语音识别超时，请重录并靠近麦克风。",
+    "round_6:job_error:语音识别超时，请重录并靠近麦克风。",
+    "round_8:job_error:语音识别超时，请重录并靠近麦克风。"
+  ],
+  "sample_counts": {
+    "audio_ready_raw": 5,
+    "asr_ready_raw": 5,
+    "audio_ready_dedup": 5,
+    "asr_ready_dedup": 5
+  },
+  "executor_worker_ratio_audio": 1,
+  "script_hit_rate": 1,
+  "tts_line_cache_hit_rate": 1,
+  "tts_cache_hit_rate": 1,
+  "tts_source_distribution": {
+    "line_cache": 5,
+    "text_cache": 0,
+    "runtime": 0
+  },
+  "llm_used_when_script_hit_count": 0,
+  "tts_ms": {
+    "count": 5,
+    "p50": 0,
+    "p95": 0,
+    "avg": 0,
+    "max": 0
+  },
+  "queue_wait_before_tts_ms": {
+    "count": 5,
+    "p50": 1,
+    "p95": 1,
+    "avg": 0.6,
+    "max": 1
+  },
+  "queue_wait_before_main_ms": {
+    "count": 5,
+    "p50": 6443,
+    "p95": 7491,
+    "avg": 5164.4,
+    "max": 11061
+  },
+  "audio_ready_ms": {
+    "count": 5,
+    "p50": 17239,
+    "p95": 18201,
+    "avg": 15003.8,
+    "max": 18583
+  },
+  "llm_ms": {
+    "count": 5,
+    "p50": 0,
+    "p95": 0,
+    "avg": 0,
+    "max": 0
+  },
+  "asr_provider": {
+    "auc": 5
+  },
+  "asr_provider_final": {
+    "auc": 5
+  },
+  "asr_outcome": {
+    "fallback_success": 5
+  },
+  "asr_provider_final_flash_ratio": 0,
+  "queue_wait_before_tts_invalid_rate": 0,
+  "submit_pump_count": null,
+  "events_pump_count": null,
+  "audit_samples": [
+    {
+      "id": 4729,
+      "trace_id": "59ed1d06-2a51-41a5-b633-b331d8926ac2",
+      "client_build": "wo-r9-tts-c-1771646616268",
+      "server_build": "0.1.0",
+      "executor": "worker"
+    },
+    {
+      "id": 4736,
+      "trace_id": "9e39dbec-1a79-489e-88a9-f42eb4ce9ae3",
+      "client_build": "wo-r9-tts-c-1771646616268",
+      "server_build": "0.1.0",
+      "executor": "worker"
+    }
+  ]
+}
