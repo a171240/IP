@@ -738,7 +738,13 @@ export async function doubaoAsrAuc(opts: {
   // - volc.bigasr.auc (model 1.0, usually lower latency)
   // - volc.seedasr.auc (model 2.0)
   const configuredResourceId = (process.env.VOLC_ASR_RESOURCE_ID || "volc.bigasr.auc").trim()
-  const speedFirst = String(process.env.VOICE_COACH_ASR_FAST_FIRST || "false")
+  const fastFirstDefault =
+    String(process.env.VOICE_COACH_ASR_ENABLE_FLASH || "true")
+      .trim()
+      .toLowerCase() === "false"
+      ? "true"
+      : "false"
+  const speedFirst = String(process.env.VOICE_COACH_ASR_FAST_FIRST || fastFirstDefault)
     .trim()
     .toLowerCase() !== "false"
   const normalizeResource = (input: string) => {
@@ -761,9 +767,11 @@ export async function doubaoAsrAuc(opts: {
         : [primaryResource, alternateResource],
     ),
   ).filter(Boolean)
-  const submitTimeout = Math.max(2200, timeoutMs("VOLC_ASR_AUC_SUBMIT_TIMEOUT_MS", 4000))
-  const queryTimeout = Math.max(2200, timeoutMs("VOLC_ASR_AUC_QUERY_TIMEOUT_MS", 2500))
-  const maxAttempts = Math.max(4, Math.min(20, Number(process.env.VOLC_ASR_AUC_QUERY_MAX_ATTEMPTS || 10) || 10))
+  // Respect env-tuned slow-path latency knobs (used by C-group bench), while
+  // keeping conservative lower bounds for stability.
+  const submitTimeout = Math.max(1800, timeoutMs("VOLC_ASR_AUC_SUBMIT_TIMEOUT_MS", 3000))
+  const queryTimeout = Math.max(1000, timeoutMs("VOLC_ASR_AUC_QUERY_TIMEOUT_MS", 1800))
+  const maxAttempts = Math.max(4, Math.min(16, Number(process.env.VOLC_ASR_AUC_QUERY_MAX_ATTEMPTS || 8) || 8))
 
   let lastError: unknown = null
 
@@ -849,7 +857,7 @@ export async function doubaoAsrAuc(opts: {
 
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
         if (attempt > 0) {
-          await sleep(Math.min(450, 120 + attempt * 60))
+          await sleep(Math.min(280, 80 + attempt * 40))
         }
 
         let qRes: Response
