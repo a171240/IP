@@ -1,0 +1,40 @@
+{
+  "generated_at": "2026-02-21T03:53:17.612Z",
+  "source_bench": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R8-WORKER/window4/bench_C.json",
+  "gate": {
+    "audio_ready_ms_C_p95_le_15000": true,
+    "queue_wait_before_main_ms_C_p95_le_350": true,
+    "submit_pump_count_eq_0": true,
+    "events_pump_count_eq_0": true
+  },
+  "metrics": {
+    "asr_provider_C": {
+      "auc": 3
+    },
+    "audio_ready_ms_C_p50": 13145,
+    "audio_ready_ms_C_p95": 14217,
+    "queue_wait_before_main_ms_C_p50": 190,
+    "queue_wait_before_main_ms_C_p95": 237,
+    "queue_wait_before_tts_ms_C_p50": 0,
+    "queue_wait_before_tts_ms_C_p95": 1,
+    "submit_pump_count": 0,
+    "events_pump_count": 0,
+    "executor_worker_ratio": 1,
+    "asr_provider_final_flash_ratio": 0,
+    "queue_wait_before_tts_invalid_rate": 0,
+    "tts_cache_hit_rate": 1,
+    "counts": {
+      "rounds": 3,
+      "asr_ready": 3,
+      "audio_ready": 3,
+      "turn_error": 0
+    }
+  },
+  "executor_distribution": {
+    "worker": 9
+  },
+  "audit_samples": [
+    "6f740f04-27a7-4bf8-a63a-cef48cfdcd78|bench-1771645904168|dev|worker",
+    "6f740f04-27a7-4bf8-a63a-cef48cfdcd78|bench-1771645904168|dev|worker"
+  ]
+}

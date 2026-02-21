@@ -35,14 +35,14 @@ function randomInRange(min: number, max: number) {
   return min + Math.floor(Math.random() * (max - min + 1))
 }
 
-const maxJobsPerRound = Math.max(16, parseNumberEnv("VOICE_COACH_WORKER_MAX_JOBS", 20, 1, 40))
+const maxJobsPerRound = Math.max(24, parseNumberEnv("VOICE_COACH_WORKER_MAX_JOBS", 32, 1, 40))
 const maxWallMsPerRound = Math.max(3000, parseNumberEnv("VOICE_COACH_WORKER_MAX_WALL_MS", 8000, 800, 30000))
 const perJobTimeoutMs = Math.max(10000, parseNumberEnv("VOICE_COACH_WORKER_JOB_TIMEOUT_MS", 30000, 2000, 120000))
 const workerConcurrency = Math.max(
-  12,
+  16,
   parseNumberEnv(
     "VOICE_COACH_WORKER_CONCURRENCY",
-    Math.max(1, Math.min(maxJobsPerRound, 20)),
+    Math.max(1, Math.min(maxJobsPerRound, 32)),
     1,
     40,
   ),
@@ -51,16 +51,16 @@ const claimBurst = Math.max(
   1,
   parseNumberEnv(
     "VOICE_COACH_WORKER_CLAIM_BURST",
-    Math.max(1, Math.min(workerConcurrency, 4)),
+    Math.max(1, Math.min(workerConcurrency, 16)),
     1,
     40,
   ),
 )
-const legacyIdleSleepMs = parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MS", 60, 20, 5000)
-const idleSleepMinMs = Math.max(20, parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MIN_MS", 20, 20, 5000))
+const legacyIdleSleepMs = parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MS", 30, 5, 5000)
+const idleSleepMinMs = Math.max(5, parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MIN_MS", 10, 5, 5000))
 const idleSleepMaxMs = Math.max(
   idleSleepMinMs,
-  parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MAX_MS", 60, idleSleepMinMs, 5000),
+  parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MAX_MS", 30, idleSleepMinMs, 5000),
   legacyIdleSleepMs,
 )
 const errorSleepMs = parseNumberEnv("VOICE_COACH_WORKER_ERROR_SLEEP_MS", 1200, 100, 10000)
@@ -223,7 +223,7 @@ async function runRound(): Promise<RoundResult> {
   const inFlight: Array<Promise<{ processed: boolean; timedOut: boolean }>> = []
   const loadClaimBatch = async (maxJobs: number): Promise<Array<WorkerQueuedJob>> => {
     const queued = await listVoiceCoachQueuedJobs({
-      maxJobs: Math.max(1, Math.min(maxJobs, 12)),
+      maxJobs: Math.max(1, Math.min(maxJobs, workerConcurrency)),
       allowedStages: ACTIVE_STAGES,
       newestFirst: true,
       maxQueueAgeMs,
