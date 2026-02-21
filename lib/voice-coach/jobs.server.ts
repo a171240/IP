@@ -1377,7 +1377,9 @@ async function processMainStage(args: {
   let asrFallbackUsed = false
   const allowAucFallbackByConfig = !flashEnabled || shouldAllowAucFallbackWhenFlashEnabled()
   const estimatedAudioSeconds = asNumber(args.payload.client_audio_seconds) || loaded.turn.audio_seconds || null
-  const canUseAucFallbackByDuration = !estimatedAudioSeconds || estimatedAudioSeconds >= 1.2
+  const aucOnlyMode = !flashEnabled
+  // In C degraded path (flash disabled), always keep AUC as the single provider.
+  const canUseAucFallbackByDuration = aucOnlyMode || !estimatedAudioSeconds || estimatedAudioSeconds >= 1.2
   let latestAsrError: unknown = null
   let latestAsrMeta: AsrErrorMeta | null = null
   let flashFailureMeta: AsrErrorMeta | null = null

@@ -1,0 +1,66 @@
+{
+  "generated_at": "2026-02-21T03:50:39.132Z",
+  "wo_id": "WO-R8-ASR",
+  "bench_C_path": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R8-ASR/window3/bench_C.json",
+  "source_bench_path": "/tmp/voicecoach_e2e_1771645815001.json",
+  "summary": {
+    "rounds_total": 3,
+    "asr_ready_count": 3,
+    "asr_ready_ms_p50": 13265,
+    "asr_ready_ms_p95": 20201,
+    "c_no_flash_3_of_3": true
+  },
+  "gates": {
+    "G_C_NO_FLASH": "PASS"
+  },
+  "rounds": [
+    {
+      "round_no": 1,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_ready_count": 1,
+      "turn_error_count": 0,
+      "turn_error_codes": [],
+      "asr_ready_ms": [
+        9807
+      ],
+      "trace_id": "2131cb24-12c1-4130-88e5-f1842575fa49",
+      "client_build": "bench-1771645746075",
+      "server_build": "dev",
+      "executor": "worker"
+    },
+    {
+      "round_no": 2,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_ready_count": 1,
+      "turn_error_count": 0,
+      "turn_error_codes": [],
+      "asr_ready_ms": [
+        20201
+      ],
+      "trace_id": "a8a6dcb2-dcb3-4f37-b25b-d1415fa41479",
+      "client_build": "bench-1771645746075",
+      "server_build": "dev",
+      "executor": "worker"
+    },
+    {
+      "round_no": 3,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_ready_count": 1,
+      "turn_error_count": 0,
+      "turn_error_codes": [],
+      "asr_ready_ms": [
+        13265
+      ],
+      "trace_id": "a064f59d-d355-44db-96fd-37878b05ece8",
+      "client_build": "bench-1771645746075",
+      "server_build": "dev",
+      "executor": "worker"
+    }
+  ]
+}
