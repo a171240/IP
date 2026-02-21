@@ -1,0 +1,33 @@
+{
+  "generated_at": "2026-02-21T03:03:25.789Z",
+  "source_bench": "/tmp/voicecoach_e2e_1771642968865.json",
+  "gate": {
+    "audio_ready_ms_C_p50_le_10000": true,
+    "queue_wait_before_main_ms_C_p95_le_350": true,
+    "submit_pump_count_eq_0": true
+  },
+  "metrics": {
+    "audio_ready_ms_C_p50": 9486,
+    "audio_ready_ms_C_p95": 10349,
+    "queue_wait_before_main_ms_C_p50": 200,
+    "queue_wait_before_main_ms_C_p95": 214,
+    "submit_pump_count": 0,
+    "events_pump_count": 0,
+    "executor_worker_ratio": 1,
+    "asr_provider_C": {
+      "auc": 2
+    },
+    "counts": {
+      "rounds": 3,
+      "audio_ready": 2,
+      "turn_error": 1
+    }
+  },
+  "executor_distribution": {
+    "worker": 7
+  },
+  "audit_samples": [
+    "10ea1b36-908c-4715-a0e8-2df649cc4fc7|bench-1771642922421|dev|worker",
+    "10ea1b36-908c-4715-a0e8-2df649cc4fc7|bench-1771642922421|dev|worker"
+  ]
+}

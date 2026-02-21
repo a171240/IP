@@ -1340,6 +1340,10 @@ async function processMainStage(args: {
     return { processed: true, done: true, jobId: args.jobId, turnId: args.turnId }
   }
 
+  const requireFlash = shouldRequireFlashAsr()
+  const flashEnabled = requireFlash || (shouldUseFlashAsr() && !flashResourcePermissionDenied)
+  const shouldAttemptFlash = flashEnabled && format !== "raw"
+
   const [replyTurnRes, audioBuf] = await Promise.all([
     admin
       .from("voice_coach_turns")
@@ -1347,7 +1351,7 @@ async function processMainStage(args: {
       .eq("id", args.payload.reply_to_turn_id)
       .eq("session_id", args.sessionId)
       .single(),
-    downloadVoiceCoachAudio(audioPath),
+    shouldAttemptFlash ? downloadVoiceCoachAudio(audioPath) : Promise.resolve<Buffer | null>(null),
     admin.from("voice_coach_turns").update({ status: "processing" }).eq("id", args.turnId),
   ])
   const replyTurn = replyTurnRes.data
@@ -1371,8 +1375,6 @@ async function processMainStage(args: {
   let asrProvider: "flash" | "auc" = "flash"
   const asrProviderAttempted: Array<"flash" | "auc"> = []
   let asrFallbackUsed = false
-  const requireFlash = shouldRequireFlashAsr()
-  const flashEnabled = requireFlash || (shouldUseFlashAsr() && !flashResourcePermissionDenied)
   const allowAucFallbackByConfig = !flashEnabled || shouldAllowAucFallbackWhenFlashEnabled()
   const estimatedAudioSeconds = asNumber(args.payload.client_audio_seconds) || loaded.turn.audio_seconds || null
   const canUseAucFallbackByDuration = !estimatedAudioSeconds || estimatedAudioSeconds >= 1.2
@@ -1381,7 +1383,7 @@ async function processMainStage(args: {
   let flashFailureMeta: AsrErrorMeta | null = null
   const asrStartedAt = Date.now()
 
-  if (flashEnabled && format !== "raw") {
+  if (shouldAttemptFlash && audioBuf) {
     asrProviderAttempted.push("flash")
     try {
       const flashRes = await doubaoAsrFlash({
