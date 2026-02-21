@@ -377,6 +377,9 @@ function evaluateObsGate(analysis) {
   const cQueueTtsP95 = toNumberOrNull(analysis?.groups?.C?.stage_metrics?.queue_wait_before_tts_ms?.p95)
   const queueMainP95 = toNumberOrNull(analysis?.metrics?.queue_wait_before_main_ms_p95)
   const queueTtsP95 = toNumberOrNull(analysis?.metrics?.queue_wait_before_tts_ms_p95)
+  const cLongTailBuckets = analysis?.groups?.C?.long_tail_buckets || {}
+  const cTimeoutRounds = toNumberOrNull(cLongTailBuckets?.timeout_rounds?.count)
+  const cSuccessRounds = toNumberOrNull(cLongTailBuckets?.success_rounds?.count)
   const longTailReady = [cAudioReadyP95, cQueueMainP95, cQueueTtsP95, queueMainP95, queueTtsP95].every((item) => item !== null)
   const longTailEvidence = [
     formatMetric("audio_ready_ms_C_p95", cAudioReadyP95),
@@ -407,7 +410,10 @@ function evaluateObsGate(analysis) {
       queue_wait_before_tts_ms_C_p95: cQueueTtsP95,
       queue_wait_before_main_ms_p95: queueMainP95,
       queue_wait_before_tts_ms_p95: queueTtsP95,
+      c_timeout_round_count: cTimeoutRounds,
+      c_success_round_count: cSuccessRounds,
     },
+    c_long_tail_buckets: cLongTailBuckets,
   }
 }
 
@@ -424,6 +430,22 @@ function writeRunResult(outDir, result) {
   })
   const longTail = result?.long_tail_metrics || {}
   const longTailLines = Object.keys(longTail).map((key) => `- ${key}: ${longTail[key] === null ? "null" : longTail[key]}`)
+  const cBuckets = result?.c_long_tail_buckets || {}
+  const timeoutBucket = cBuckets?.timeout_rounds || {}
+  const successBucket = cBuckets?.success_rounds || {}
+  const cBucketLines = [
+    `- timeout_rounds.count: ${timeoutBucket.count ?? "null"}`,
+    `- timeout_rounds.indexes: ${Array.isArray(timeoutBucket.round_indexes) && timeoutBucket.round_indexes.length ? timeoutBucket.round_indexes.join(",") : "none"}`,
+    `- timeout_rounds.audio_ready_ms_p95: ${timeoutBucket?.stage_metrics?.audio_ready_ms?.p95 ?? "null"}`,
+    `- timeout_rounds.queue_wait_before_main_ms_p95: ${timeoutBucket?.stage_metrics?.queue_wait_before_main_ms?.p95 ?? "null"}`,
+    `- timeout_rounds.queue_wait_before_tts_ms_p95: ${timeoutBucket?.stage_metrics?.queue_wait_before_tts_ms?.p95 ?? "null"}`,
+    `- timeout_rounds.timeout_signal_distribution: ${JSON.stringify(timeoutBucket?.timeout_signal_distribution || {})}`,
+    `- success_rounds.count: ${successBucket.count ?? "null"}`,
+    `- success_rounds.indexes: ${Array.isArray(successBucket.round_indexes) && successBucket.round_indexes.length ? successBucket.round_indexes.join(",") : "none"}`,
+    `- success_rounds.audio_ready_ms_p95: ${successBucket?.stage_metrics?.audio_ready_ms?.p95 ?? "null"}`,
+    `- success_rounds.queue_wait_before_main_ms_p95: ${successBucket?.stage_metrics?.queue_wait_before_main_ms?.p95 ?? "null"}`,
+    `- success_rounds.queue_wait_before_tts_ms_p95: ${successBucket?.stage_metrics?.queue_wait_before_tts_ms?.p95 ?? "null"}`,
+  ]
 
   fs.writeFileSync(
     mdFile,
@@ -440,6 +462,9 @@ function writeRunResult(outDir, result) {
       "",
       "## Long Tail",
       ...longTailLines,
+      "",
+      "## C Long-Tail Buckets",
+      ...cBucketLines,
       "",
       "## Outputs",
       `- bench_A: \`${result?.outputs?.bench_A || ""}\``,
@@ -538,19 +563,19 @@ Options:
   const currentHeadRes = await runExecFile("/usr/bin/git", ["-C", ROOT, "rev-parse", "HEAD"], { cwd: ROOT, env: baseEnv })
   const endHead = String(currentHeadRes.stdout || "").trim()
   if (!endHead || endHead !== startHead) {
-      const headFailure = {
-        generated_at: nowIso(),
-        wo,
+    const headFailure = {
+      generated_at: nowIso(),
+      wo,
       status: "BLOCKED",
       reason: `head_changed start=${startHead} current=${endHead || "unknown"}`,
-        outputs: {
-          out_dir: outDir,
-          logs_dir: logsDir,
-        },
-      }
-      writeRunResult(outDir, headFailure)
-      console.log(JSON.stringify(headFailure, null, 2))
-      process.exit(3)
+      outputs: {
+        out_dir: outDir,
+        logs_dir: logsDir,
+      },
+    }
+    writeRunResult(outDir, headFailure)
+    console.log(JSON.stringify(headFailure, null, 2))
+    process.exit(3)
   }
 
   const analysisJson = path.join(outDir, "analysis.json")
@@ -603,6 +628,7 @@ Options:
   const gateEval = evaluateObsGate(analysis)
   const gates = gateEval.gates
   const longTailMetrics = gateEval.long_tail_metrics
+  const cLongTailBuckets = gateEval.c_long_tail_buckets
   const allPass = Object.values(gates).every((item) => item.status === "PASS")
 
   const result = {
@@ -622,6 +648,7 @@ Options:
     groups: groupResults,
     gates,
     long_tail_metrics: longTailMetrics,
+    c_long_tail_buckets: cLongTailBuckets,
   }
 
   writeRunResult(outDir, result)

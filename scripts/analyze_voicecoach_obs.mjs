@@ -60,14 +60,18 @@ function countBy(items) {
   return out
 }
 
-function flattenEvents(bench) {
+function flattenEventsFromRounds(rounds) {
   const events = []
-  const rounds = Array.isArray(bench?.rounds) ? bench.rounds : []
-  for (const round of rounds) {
+  for (const round of Array.isArray(rounds) ? rounds : []) {
     const batch = Array.isArray(round?.events) ? round.events : []
     for (const ev of batch) events.push(ev)
   }
   return events
+}
+
+function flattenEvents(bench) {
+  const rounds = Array.isArray(bench?.rounds) ? bench.rounds : []
+  return flattenEventsFromRounds(rounds)
 }
 
 function eventHasAuditFields(ev) {
@@ -85,6 +89,107 @@ function stageStats(values) {
     count: nums.length,
     p50: roundInt(percentile(nums, 50)),
     p95: roundInt(percentile(nums, 95)),
+  }
+}
+
+function buildStageMetrics(rounds, events) {
+  const asrReady = events.filter((ev) => ev?.type === "beautician.asr_ready")
+  const textReady = events.filter((ev) => ev?.type === "customer.text_ready")
+  const audioReady = events.filter((ev) => ev?.type === "customer.audio_ready")
+  const queueWaitBeforeTtsValid = audioReady
+    .filter((ev) => ev?.queue_wait_before_tts_valid === true)
+    .map((ev) => ev?.queue_wait_before_tts_ms)
+
+  return {
+    submit_ack_ms: stageStats(rounds.map((round) => round?.submitElapsedMs)),
+    asr_ready_ms: stageStats(asrReady.map((ev) => ev?.stage_elapsed_ms)),
+    text_ready_ms: stageStats(textReady.map((ev) => ev?.stage_elapsed_ms)),
+    audio_ready_ms: stageStats(audioReady.map((ev) => ev?.stage_elapsed_ms)),
+    queue_wait_before_main_ms: stageStats(asrReady.map((ev) => ev?.queue_wait_before_main_ms)),
+    queue_wait_before_tts_ms: stageStats(queueWaitBeforeTtsValid),
+    llm_ms: stageStats(textReady.map((ev) => ev?.llm_ms)),
+    tts_ms: stageStats(audioReady.map((ev) => ev?.tts_ms)),
+  }
+}
+
+function hasTimeoutToken(value) {
+  const raw = String(value || "").trim()
+  if (!raw) return false
+  const lower = raw.toLowerCase()
+  return lower.includes("timeout") || raw.includes("超时")
+}
+
+function extractRoundTimeoutSignals(round) {
+  const signals = []
+  const roundErrors = Array.isArray(round?.errors) ? round.errors : []
+  for (const err of roundErrors) {
+    const candidates = [err?.code, err?.reason, err?.phase, err?.message]
+    for (const candidate of candidates) {
+      if (!hasTimeoutToken(candidate)) continue
+      signals.push(String(candidate))
+    }
+  }
+
+  const events = Array.isArray(round?.events) ? round.events : []
+  for (const ev of events) {
+    if (ev?.type !== "turn.error") continue
+    const candidates = [ev?.code, ev?.reason, ev?.message]
+    for (const candidate of candidates) {
+      if (!hasTimeoutToken(candidate)) continue
+      signals.push(String(candidate))
+    }
+  }
+
+  return signals
+}
+
+function summarizeCLongTailBuckets(rounds) {
+  const timeoutRounds = []
+  const successRounds = []
+  const otherRounds = []
+  const timeoutSignals = []
+
+  for (let idx = 0; idx < rounds.length; idx += 1) {
+    const round = rounds[idx]
+    const events = Array.isArray(round?.events) ? round.events : []
+    const hasAudioReady = events.some((ev) => ev?.type === "customer.audio_ready")
+    const signals = extractRoundTimeoutSignals(round)
+
+    if (signals.length > 0) {
+      timeoutRounds.push({ round, index: idx + 1 })
+      timeoutSignals.push(...signals)
+      continue
+    }
+    if (hasAudioReady) {
+      successRounds.push({ round, index: idx + 1 })
+      continue
+    }
+    otherRounds.push({ round, index: idx + 1 })
+  }
+
+  const summarizeBucket = (items, extra = {}) => {
+    const bucketRounds = items.map((item) => item.round)
+    const bucketEvents = flattenEventsFromRounds(bucketRounds)
+    const stageMetrics = buildStageMetrics(bucketRounds, bucketEvents)
+    const metricStatus = requiredStageStatsPresent(stageMetrics)
+    return {
+      count: items.length,
+      round_indexes: items.map((item) => item.index),
+      stage_metrics: stageMetrics,
+      stage_metrics_complete: items.length === 0 ? true : metricStatus.ok,
+      missing_stage_metrics: items.length === 0 ? [] : metricStatus.missing,
+      ...extra,
+    }
+  }
+
+  return {
+    timeout_rounds: summarizeBucket(timeoutRounds, {
+      timeout_signal_distribution: countBy(timeoutSignals),
+    }),
+    success_rounds: summarizeBucket(successRounds),
+    other_rounds: summarizeBucket(otherRounds),
+    timeout_round_ratio: rounds.length > 0 ? Number((timeoutRounds.length / rounds.length).toFixed(4)) : null,
+    success_round_ratio: rounds.length > 0 ? Number((successRounds.length / rounds.length).toFixed(4)) : null,
   }
 }
 
@@ -136,17 +241,9 @@ function summarizeGroup(label, bench, opts) {
       ? Number((ttsCacheHitValues.filter(Boolean).length / ttsCacheHitValues.length).toFixed(4))
       : null
 
-  const stageMetrics = {
-    submit_ack_ms: stageStats(rounds.map((round) => round?.submitElapsedMs)),
-    asr_ready_ms: stageStats(asrReady.map((ev) => ev?.stage_elapsed_ms)),
-    text_ready_ms: stageStats(textReady.map((ev) => ev?.stage_elapsed_ms)),
-    audio_ready_ms: stageStats(audioReady.map((ev) => ev?.stage_elapsed_ms)),
-    queue_wait_before_main_ms: stageStats(asrReady.map((ev) => ev?.queue_wait_before_main_ms)),
-    queue_wait_before_tts_ms: stageStats(queueWaitBeforeTtsValid),
-    llm_ms: stageStats(textReady.map((ev) => ev?.llm_ms)),
-    tts_ms: stageStats(audioReady.map((ev) => ev?.tts_ms)),
-  }
+  const stageMetrics = buildStageMetrics(rounds, events)
   const stageMetricStatus = requiredStageStatsPresent(stageMetrics)
+  const longTailBuckets = label === "C" ? summarizeCLongTailBuckets(rounds) : null
 
   const sampleEvents = events
     .filter((ev) => eventHasAuditFields(ev))
@@ -201,6 +298,7 @@ function summarizeGroup(label, bench, opts) {
     require_flash_pass: requireFlashPass,
     stage_metrics_complete: stageMetricStatus.ok,
     missing_stage_metrics: stageMetricStatus.missing,
+    long_tail_buckets: longTailBuckets,
     audit_samples: sampleEvents,
   }
 }
@@ -245,6 +343,7 @@ const benchC = loadJson(benchCPath)
 const groupA = summarizeGroup("A", benchA, { requireFlash: true, pathMode: "flash_required" })
 const groupB = summarizeGroup("B", benchB, { requireFlash: true, pathMode: "flash_primary" })
 const groupC = summarizeGroup("C", benchC, { requireFlash: false, pathMode: "slow_path_degraded" })
+const groupCLongTail = groupC?.long_tail_buckets || {}
 
 const groups = [groupA, groupB, groupC]
 
@@ -337,20 +436,29 @@ const analysis = {
     audio_ready_ms_B_p95: groupB?.stage_metrics?.audio_ready_ms?.p95,
     audio_ready_ms_C_p50: groupC?.stage_metrics?.audio_ready_ms?.p50,
     audio_ready_ms_C_p95: groupC?.stage_metrics?.audio_ready_ms?.p95,
+    audio_ready_ms_C_timeout_p95: groupCLongTail?.timeout_rounds?.stage_metrics?.audio_ready_ms?.p95 ?? null,
+    audio_ready_ms_C_success_p95: groupCLongTail?.success_rounds?.stage_metrics?.audio_ready_ms?.p95 ?? null,
     llm_ms_p50: stageMetricsOverall.llm_ms.p50,
     llm_ms_p95: stageMetricsOverall.llm_ms.p95,
     tts_ms_p50: stageMetricsOverall.tts_ms.p50,
     tts_ms_p95: stageMetricsOverall.tts_ms.p95,
     queue_wait_before_main_ms_p50: stageMetricsOverall.queue_wait_before_main_ms.p50,
     queue_wait_before_main_ms_p95: stageMetricsOverall.queue_wait_before_main_ms.p95,
+    queue_wait_before_main_ms_C_timeout_p95: groupCLongTail?.timeout_rounds?.stage_metrics?.queue_wait_before_main_ms?.p95 ?? null,
+    queue_wait_before_main_ms_C_success_p95: groupCLongTail?.success_rounds?.stage_metrics?.queue_wait_before_main_ms?.p95 ?? null,
     queue_wait_before_tts_ms_p50: stageMetricsOverall.queue_wait_before_tts_ms.p50,
     queue_wait_before_tts_ms_p95: stageMetricsOverall.queue_wait_before_tts_ms.p95,
+    queue_wait_before_tts_ms_C_timeout_p95: groupCLongTail?.timeout_rounds?.stage_metrics?.queue_wait_before_tts_ms?.p95 ?? null,
+    queue_wait_before_tts_ms_C_success_p95: groupCLongTail?.success_rounds?.stage_metrics?.queue_wait_before_tts_ms?.p95 ?? null,
     tts_cache_hit_rate: ttsCacheHitRate,
     executor_worker_ratio: executorWorkerRatio,
     submit_pump_count: submitPumpCount,
     events_pump_count: eventsPumpCount,
     asr_provider_final_flash_ratio: asrProviderFinalFlashRatio,
     queue_wait_before_tts_invalid_rate: queueWaitBeforeTtsInvalidRate,
+    c_timeout_round_count: Number(groupCLongTail?.timeout_rounds?.count || 0),
+    c_success_round_count: Number(groupCLongTail?.success_rounds?.count || 0),
+    c_other_round_count: Number(groupCLongTail?.other_rounds?.count || 0),
     submit_ack_ms_p50: stageMetricsOverall.submit_ack_ms.p50,
     submit_ack_ms_p95: stageMetricsOverall.submit_ack_ms.p95,
     asr_ready_ms_p50: stageMetricsOverall.asr_ready_ms.p50,
@@ -387,6 +495,18 @@ const md = [
   `- A: require_flash=true, pass=${groupA.require_flash_pass}`,
   `- B: flash_primary, audio_ready_ms_p50=${groupB.stage_metrics.audio_ready_ms.p50}`,
   `- C: ${groupC.path_mode}, usable=${groupC.usable}`,
+  "",
+  "## C Long-Tail Buckets",
+  `- timeout_rounds: count=${groupCLongTail?.timeout_rounds?.count ?? 0}, indexes=${(groupCLongTail?.timeout_rounds?.round_indexes || []).join(",") || "none"}`,
+  `- timeout_rounds(audio_ready_ms): ${groupCLongTail?.timeout_rounds?.stage_metrics?.audio_ready_ms?.p50 ?? null}/${groupCLongTail?.timeout_rounds?.stage_metrics?.audio_ready_ms?.p95 ?? null}`,
+  `- timeout_rounds(queue_wait_before_main_ms): ${groupCLongTail?.timeout_rounds?.stage_metrics?.queue_wait_before_main_ms?.p50 ?? null}/${groupCLongTail?.timeout_rounds?.stage_metrics?.queue_wait_before_main_ms?.p95 ?? null}`,
+  `- timeout_rounds(queue_wait_before_tts_ms): ${groupCLongTail?.timeout_rounds?.stage_metrics?.queue_wait_before_tts_ms?.p50 ?? null}/${groupCLongTail?.timeout_rounds?.stage_metrics?.queue_wait_before_tts_ms?.p95 ?? null}`,
+  `- timeout_signal_distribution: ${JSON.stringify(groupCLongTail?.timeout_rounds?.timeout_signal_distribution || {})}`,
+  `- success_rounds: count=${groupCLongTail?.success_rounds?.count ?? 0}, indexes=${(groupCLongTail?.success_rounds?.round_indexes || []).join(",") || "none"}`,
+  `- success_rounds(audio_ready_ms): ${groupCLongTail?.success_rounds?.stage_metrics?.audio_ready_ms?.p50 ?? null}/${groupCLongTail?.success_rounds?.stage_metrics?.audio_ready_ms?.p95 ?? null}`,
+  `- success_rounds(queue_wait_before_main_ms): ${groupCLongTail?.success_rounds?.stage_metrics?.queue_wait_before_main_ms?.p50 ?? null}/${groupCLongTail?.success_rounds?.stage_metrics?.queue_wait_before_main_ms?.p95 ?? null}`,
+  `- success_rounds(queue_wait_before_tts_ms): ${groupCLongTail?.success_rounds?.stage_metrics?.queue_wait_before_tts_ms?.p50 ?? null}/${groupCLongTail?.success_rounds?.stage_metrics?.queue_wait_before_tts_ms?.p95 ?? null}`,
+  `- other_rounds: count=${groupCLongTail?.other_rounds?.count ?? 0}, indexes=${(groupCLongTail?.other_rounds?.round_indexes || []).join(",") || "none"}`,
   "",
   "## Gates",
   `- G0: ${analysis.gates.G0}`,
