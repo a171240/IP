@@ -1,0 +1,40 @@
+{
+  "generated_at": "2026-02-21T04:12:07.731Z",
+  "source_bench": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R9-WORKER/window4/bench_C.json",
+  "gate": {
+    "audio_ready_ms_C_p95_lt_20000": true,
+    "queue_wait_before_main_ms_p95_le_350": true,
+    "c_usable": true
+  },
+  "metrics": {
+    "asr_provider_C": {
+      "auc": 3
+    },
+    "audio_ready_ms_C_p50": 10443,
+    "audio_ready_ms_C_p95": 11556,
+    "queue_wait_before_main_ms_C_p50": 259,
+    "queue_wait_before_main_ms_C_p95": 332,
+    "queue_wait_before_tts_ms_C_p50": 1,
+    "queue_wait_before_tts_ms_C_p95": 1,
+    "submit_pump_count": 0,
+    "events_pump_count": 0,
+    "executor_worker_ratio": 1,
+    "asr_provider_final_flash_ratio": 0,
+    "queue_wait_before_tts_invalid_rate": 0,
+    "tts_cache_hit_rate": 1,
+    "counts": {
+      "rounds": 3,
+      "asr_ready": 3,
+      "text_ready": 3,
+      "audio_ready": 3,
+      "turn_error": 0
+    }
+  },
+  "executor_distribution": {
+    "worker": 9
+  },
+  "audit_samples": [
+    "6b60215b-74a3-4d53-aace-d0a91c1b95c8|bench-1771647043870|dev|worker",
+    "6b60215b-74a3-4d53-aace-d0a91c1b95c8|bench-1771647043870|dev|worker"
+  ]
+}

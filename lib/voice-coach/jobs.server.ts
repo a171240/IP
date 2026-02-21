@@ -259,7 +259,9 @@ function shouldRequireFlashAsr(): boolean {
 }
 
 function asrAucTotalTimeoutMs(): number {
-  const fallback = shouldUseFlashAsr() ? 9000 : 14000
+  // C degraded path (AUC-only) is more latency-variant; keep a slightly wider
+  // default timeout to reduce borderline asr_timeout flakiness.
+  const fallback = shouldUseFlashAsr() ? 9000 : 17000
   const n = Number(process.env.VOICE_COACH_ASR_AUC_TOTAL_TIMEOUT_MS || fallback)
   if (!Number.isFinite(n)) return fallback
   return Math.max(3500, Math.min(30000, Math.round(n)))
