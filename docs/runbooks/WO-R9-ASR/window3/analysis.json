@@ -1,0 +1,69 @@
+{
+  "generated_at": "2026-02-21T04:04:12.086Z",
+  "wo_id": "WO-R9-ASR",
+  "bench_C_path": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R9-ASR/window3/bench_C.json",
+  "source_bench_path": "/tmp/voicecoach_e2e_1771646599223.json",
+  "baseline_r8_asr_ready_ms_p95": 20201,
+  "summary": {
+    "rounds_total": 3,
+    "asr_ready_count": 3,
+    "asr_ready_ms_p50": 12227,
+    "asr_ready_ms_p95": 14439,
+    "asr_ready_ms_p95_delta_vs_r8": -5762,
+    "strict_rounds_auc_only": true
+  },
+  "gates": {
+    "G_C_AUC_ONLY": "PASS",
+    "G_C_NO_FLASH": "PASS"
+  },
+  "rounds": [
+    {
+      "round_no": 1,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_ready_count": 1,
+      "turn_error_count": 0,
+      "turn_error_codes": [],
+      "asr_ready_ms": [
+        12227
+      ],
+      "trace_id": "55aa4afc-8ac7-4151-901e-2da403e500b8",
+      "client_build": "bench-1771646533071",
+      "server_build": "dev",
+      "executor": "worker"
+    },
+    {
+      "round_no": 2,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_ready_count": 1,
+      "turn_error_count": 0,
+      "turn_error_codes": [],
+      "asr_ready_ms": [
+        11774
+      ],
+      "trace_id": "bd530286-b628-415d-abaa-0d0f4b8b244f",
+      "client_build": "bench-1771646533071",
+      "server_build": "dev",
+      "executor": "worker"
+    },
+    {
+      "round_no": 3,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_ready_count": 1,
+      "turn_error_count": 0,
+      "turn_error_codes": [],
+      "asr_ready_ms": [
+        14439
+      ],
+      "trace_id": "ae319dc9-20e7-4f7b-bf6a-ed8e5279aaaa",
+      "client_build": "bench-1771646533071",
+      "server_build": "dev",
+      "executor": "worker"
+    }
+  ]
+}

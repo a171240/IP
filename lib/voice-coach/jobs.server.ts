@@ -259,7 +259,7 @@ function shouldRequireFlashAsr(): boolean {
 }
 
 function asrAucTotalTimeoutMs(): number {
-  const fallback = shouldUseFlashAsr() ? 9000 : 25000
+  const fallback = shouldUseFlashAsr() ? 9000 : 14000
   const n = Number(process.env.VOICE_COACH_ASR_AUC_TOTAL_TIMEOUT_MS || fallback)
   if (!Number.isFinite(n)) return fallback
   return Math.max(3500, Math.min(30000, Math.round(n)))
@@ -1461,7 +1461,8 @@ async function processMainStage(args: {
     asrProvider = "auc"
     asrProviderAttempted.push("auc")
     const signed = await signVoiceCoachAudio(audioPath)
-    const aucAttemptLimitRaw = Number(process.env.VOICE_COACH_ASR_AUC_ATTEMPTS || (!flashEnabled ? 2 : 1))
+    // Keep degraded path latency bounded by using a single outer AUC attempt by default.
+    const aucAttemptLimitRaw = Number(process.env.VOICE_COACH_ASR_AUC_ATTEMPTS || 1)
     const aucAttemptLimit = Math.max(1, Math.min(3, Number.isFinite(aucAttemptLimitRaw) ? Math.round(aucAttemptLimitRaw) : 1))
     const aucTimeoutBaseMs = asrAucTotalTimeoutMs()
     for (let aucAttempt = 1; aucAttempt <= aucAttemptLimit; aucAttempt++) {
