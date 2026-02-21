@@ -1,0 +1,28 @@
+{
+  "wo_id": "WO-R6-WORKER",
+  "generated_at": "2026-02-21T01:33:11.407Z",
+  "evidence": {
+    "bench_C": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R6-WORKER/window4/bench_C.json"
+  },
+  "gate": {
+    "C.usable": true,
+    "counts.turn_error": 0,
+    "asr_provider_C": {
+      "auc": 3
+    },
+    "rounds": 3,
+    "pass": true
+  },
+  "metrics": {
+    "executor_worker_ratio": 1,
+    "queue_wait_before_main_p95_ms": 399,
+    "submit_pump_count": 0
+  },
+  "audit_samples": [
+    "d848ef54-e95a-453d-803e-4798e02959f4|bench-1771637503122|dev|worker",
+    "08496a04-b94b-4429-b04a-4118363fd35c|bench-1771637503122|dev|worker"
+  ],
+  "notes": {
+    "asr_auc_total_timeout_default_when_flash_disabled_ms": 25000
+  }
+}

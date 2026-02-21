@@ -259,9 +259,10 @@ function shouldRequireFlashAsr(): boolean {
 }
 
 function asrAucTotalTimeoutMs(): number {
-  const n = Number(process.env.VOICE_COACH_ASR_AUC_TOTAL_TIMEOUT_MS || 9000)
-  if (!Number.isFinite(n)) return 9000
-  return Math.max(3500, Math.min(15000, Math.round(n)))
+  const fallback = shouldUseFlashAsr() ? 9000 : 25000
+  const n = Number(process.env.VOICE_COACH_ASR_AUC_TOTAL_TIMEOUT_MS || fallback)
+  if (!Number.isFinite(n)) return fallback
+  return Math.max(3500, Math.min(30000, Math.round(n)))
 }
 
 function processingStaleMs(): number {
