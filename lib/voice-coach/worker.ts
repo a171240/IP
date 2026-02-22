@@ -72,10 +72,14 @@ const heartbeatIntervalMs = parseNumberEnv("VOICE_COACH_WORKER_HEARTBEAT_INTERVA
 const heartbeatFile = String(process.env.VOICE_COACH_WORKER_HEARTBEAT_FILE || "/tmp/voicecoach_worker_heartbeat.json")
   .trim()
   .slice(0, 500)
-const staleRecoverIntervalMs = parseNumberEnv("VOICE_COACH_WORKER_RECOVER_INTERVAL_MS", 3000, 1000, 30000)
+const staleRecoverIntervalMs = parseNumberEnv("VOICE_COACH_WORKER_RECOVER_INTERVAL_MS", 60000, 1000, 300000)
 const staleRecoverMaxJobs = parseNumberEnv("VOICE_COACH_WORKER_RECOVER_MAX_JOBS", 20, 1, 200)
 const maxQueueAgeMs = Math.max(0, parseNumberEnv("VOICE_COACH_WORKER_MAX_QUEUE_AGE_MS", 0, 0, 600000))
-const preferFreshQueueMs = Math.max(0, parseNumberEnv("VOICE_COACH_WORKER_PREFER_FRESH_QUEUE_MS", 120000, 0, 600000))
+const preferFreshQueueMs = Math.max(0, parseNumberEnv("VOICE_COACH_WORKER_PREFER_FRESH_QUEUE_MS", 0, 0, 600000))
+const fullQueueFallbackIntervalMs = Math.max(
+  100,
+  parseNumberEnv("VOICE_COACH_WORKER_FULL_SCAN_INTERVAL_MS", 1500, 100, 30000),
+)
 const claimNewestFirst = parseBoolEnv("VOICE_COACH_WORKER_NEWEST_FIRST", true)
 const runOnce = parseBoolEnv("VOICE_COACH_WORKER_RUN_ONCE", false)
 const workerId = String(process.env.VOICE_COACH_WORKER_ID || `${hostname()}#${process.pid}`).slice(0, 120)
@@ -226,6 +230,7 @@ async function runRound(): Promise<RoundResult> {
   const roundStartedAt = Date.now()
   let recovered = 0
   let processed = 0
+  let lastFullQueueScanAt = 0
   const inFlight: Array<Promise<{ processed: boolean; timedOut: boolean }>> = []
   const loadClaimBatch = async (maxJobs: number): Promise<Array<WorkerQueuedJob>> => {
     const cappedFreshAgeMs =
@@ -243,7 +248,13 @@ async function runRound(): Promise<RoundResult> {
       cappedFreshAgeMs > 0
         ? await queryQueued(cappedFreshAgeMs)
         : await queryQueued(maxQueueAgeMs)
-    if (queued.length <= 0 && cappedFreshAgeMs > 0 && (maxQueueAgeMs === 0 || maxQueueAgeMs > cappedFreshAgeMs)) {
+    if (
+      queued.length <= 0 &&
+      cappedFreshAgeMs > 0 &&
+      (maxQueueAgeMs === 0 || maxQueueAgeMs > cappedFreshAgeMs) &&
+      Date.now() - lastFullQueueScanAt >= fullQueueFallbackIntervalMs
+    ) {
+      lastFullQueueScanAt = Date.now()
       queued = await queryQueued(maxQueueAgeMs)
     }
     if (queued.length <= 0) return []

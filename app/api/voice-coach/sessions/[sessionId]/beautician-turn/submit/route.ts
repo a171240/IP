@@ -266,6 +266,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
     }
     const initialResultState = {
       pipeline_started_at_ms: pipelineStartedAtMs,
+      stage_entered_at_ms: pipelineStartedAtMs,
       submit_ack_ms: submitAckMs,
       upload_ms: uploadMs,
       client_build: trace.clientBuild,

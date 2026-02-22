@@ -260,7 +260,8 @@ function shouldRequireFlashAsr(): boolean {
 }
 
 function asrAucTotalTimeoutMs(): number {
-  const fallback = shouldUseFlashAsr() ? 9000 : 9500
+  // Keep degraded C-path tail bounded; flash-enabled path retains slightly wider fallback window.
+  const fallback = shouldUseFlashAsr() ? 9000 : 8200
   const n = Number(process.env.VOICE_COACH_ASR_AUC_TOTAL_TIMEOUT_MS || fallback)
   if (!Number.isFinite(n)) return fallback
   return Math.max(3500, Math.min(30000, Math.round(n)))
@@ -1411,38 +1412,53 @@ async function processMainStage(args: {
 
   if (shouldAttemptFlash && audioBuf) {
     asrProviderAttempted.push("flash")
-    try {
-      const flashRes = await doubaoAsrFlash({
-        audio: audioBuf,
-        format: format as "mp3" | "wav" | "ogg" | "flac",
-        uid: args.userId,
-      })
-      if (flashRes.text) {
-        asr = flashRes
-        asrProvider = "flash"
-        flashResourcePermissionDenied = false
-        latestAsrMeta = null
-        flashFailureMeta = null
-      } else {
+    const flashAttemptLimitRaw = Number(process.env.VOICE_COACH_ASR_FLASH_ATTEMPTS || (requireFlash ? 2 : 1))
+    const flashAttemptLimit = Math.max(1, Math.min(3, Number.isFinite(flashAttemptLimitRaw) ? Math.round(flashAttemptLimitRaw) : 1))
+    for (let flashAttempt = 1; flashAttempt <= flashAttemptLimit; flashAttempt += 1) {
+      try {
+        const flashRes = await doubaoAsrFlash({
+          audio: audioBuf,
+          format: format as "mp3" | "wav" | "ogg" | "flac",
+          uid: args.userId,
+        })
+        if (flashRes.text) {
+          asr = flashRes
+          asrProvider = "flash"
+          flashResourcePermissionDenied = false
+          latestAsrMeta = null
+          flashFailureMeta = null
+          break
+        }
+
         latestAsrError = Object.assign(new Error("asr_flash_empty"), {
           code: "asr_flash_empty",
           provider: "flash",
         })
         flashFailureMeta = asrErrorMeta(latestAsrError, "flash")
         latestAsrMeta = flashFailureMeta
-      }
-    } catch (err: any) {
-      latestAsrError = err
-      if (isAsrFlashPermissionDenied(err)) {
-        // Cache permission denial in-process to avoid repeated slow/failed flash attempts.
-        flashResourcePermissionDenied = true
-        if (typeof (err as any)?.code !== "string") {
-          ;(err as any).code = "asr_flash_permission_denied"
+        asr = null
+      } catch (err: any) {
+        latestAsrError = err
+        if (isAsrFlashPermissionDenied(err)) {
+          // Keep sticky-denial cache only when flash is globally mandatory.
+          if (shouldRequireFlashAsr()) {
+            flashResourcePermissionDenied = true
+          }
+          if (typeof (err as any)?.code !== "string") {
+            ;(err as any).code = "asr_flash_permission_denied"
+          }
         }
+        flashFailureMeta = asrErrorMeta(err, "flash")
+        latestAsrMeta = flashFailureMeta
+        asr = null
       }
-      flashFailureMeta = asrErrorMeta(err, "flash")
-      latestAsrMeta = flashFailureMeta
-      asr = null
+
+      const retryableFlash =
+        !asr &&
+        flashAttempt < flashAttemptLimit &&
+        flashFailureMeta?.code !== "asr_flash_permission_denied" &&
+        (flashFailureMeta?.code === "asr_flash_empty" || isAsrTimeoutError(latestAsrError))
+      if (!retryableFlash) break
     }
   }
 
@@ -2811,13 +2827,26 @@ export async function processVoiceCoachJobById(args: {
   const claimStartedAtMs = parseIsoToMs(claimedAt) || Date.now()
   const resultStateBeforeClaim = ((job as any).result_json || {}) as VoiceCoachJobResultState
   const stageEnteredAtMsFromResult = asNumber(resultStateBeforeClaim.stage_entered_at_ms)
-  // On retry/requeue, result_json.stage_entered_at_ms may be stale.
-  // Use the freshest queued timestamp as the main-stage queue anchor.
-  const queueAnchorCandidates = [stageEnteredAtMsFromResult, updatedAtMs, createdAtMs].filter(
+  const pipelineStartedAtMsFromResult = asNumber(resultStateBeforeClaim.pipeline_started_at_ms)
+  const submitAckMsFromResult = asNumber(resultStateBeforeClaim.submit_ack_ms)
+  const uploadMsFromResult = asNumber(resultStateBeforeClaim.upload_ms)
+  const postUploadSubmitOverheadMs =
+    submitAckMsFromResult === null
+      ? null
+      : Math.max(0, Math.round(submitAckMsFromResult - Math.max(0, uploadMsFromResult || 0)))
+  const queueReadyAtMsFromSubmit =
+    pipelineStartedAtMsFromResult === null || postUploadSubmitOverheadMs === null
+      ? null
+      : pipelineStartedAtMsFromResult + postUploadSubmitOverheadMs
+  // Prefer explicit stage-enter timestamp written by producer/queue transition.
+  // Only fall back to DB timestamps when this anchor is missing.
+  const fallbackQueueAnchors = [updatedAtMs, createdAtMs].filter(
     (value): value is number => typeof value === "number" && Number.isFinite(value),
   )
   const stageEnteredAtMsForMain =
-    queueAnchorCandidates.length > 0 ? Math.max(...queueAnchorCandidates) : Date.now()
+    stageEnteredAtMsFromResult ??
+    queueReadyAtMsFromSubmit ??
+    (fallbackQueueAnchors.length > 0 ? Math.max(...fallbackQueueAnchors) : Date.now())
   const stageEnteredAtMsForClaim = stage === "main_pending" ? stageEnteredAtMsForMain : stageEnteredAtMsFromResult
   const claimedResultState = mergeResult(resultStateBeforeClaim, {
     stage_entered_at_ms: stageEnteredAtMsForClaim ?? undefined,
