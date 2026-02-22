@@ -48,6 +48,7 @@ type VoiceCoachJobPayload = {
   reply_to_turn_id: string
   audio_format: "mp3" | "wav" | "ogg" | "raw" | "flac"
   client_audio_seconds?: number | null
+  audio_inline_b64?: string | null
 }
 
 export type VoiceCoachJobStage = "main_pending" | "tts_pending" | "analysis_pending" | "done" | "error"
@@ -293,6 +294,18 @@ function parseIsoToMs(value: unknown): number | null {
   if (!raw) return null
   const ms = Date.parse(raw)
   return Number.isFinite(ms) ? ms : null
+}
+
+function decodeInlineAudioBuffer(value: unknown): Buffer | null {
+  if (typeof value !== "string") return null
+  const raw = value.trim()
+  if (!raw) return null
+  try {
+    const buf = Buffer.from(raw, "base64")
+    return buf.length > 0 ? buf : null
+  } catch {
+    return null
+  }
 }
 
 function nonNegativeMs(value: unknown): number | null {
@@ -1164,6 +1177,18 @@ async function getSignedAudio(path: string | null): Promise<string | null> {
   }
 }
 
+async function downloadSignedAudio(signedUrl: string | null): Promise<Buffer | null> {
+  if (!signedUrl) return null
+  try {
+    const res = await fetch(signedUrl, { method: "GET", cache: "no-store" })
+    if (!res.ok) return null
+    const buf = Buffer.from(await res.arrayBuffer())
+    return buf.length > 0 ? buf : null
+  } catch {
+    return null
+  }
+}
+
 async function buildHistory(sessionId: string, turnIndex: number) {
   const admin = createAdminSupabaseClient()
   const { data } = await admin
@@ -1375,7 +1400,16 @@ async function processMainStage(args: {
     .eq("session_id", args.sessionId)
     .single()
   const beauticianAudioUrlPrefetchPromise = getSignedAudio(audioPath).catch(() => null)
-  const audioBufPromise = shouldAttemptFlash ? downloadVoiceCoachAudio(audioPath) : Promise.resolve<Buffer | null>(null)
+  const inlineAudioBuf = shouldAttemptFlash ? decodeInlineAudioBuffer(args.payload.audio_inline_b64) : null
+  const audioBufPromise = shouldAttemptFlash
+    ? (async () => {
+        if (inlineAudioBuf) return inlineAudioBuf
+        const prefetchedSignedUrl = await beauticianAudioUrlPrefetchPromise
+        const signedAudioBuf = await downloadSignedAudio(prefetchedSignedUrl)
+        if (signedAudioBuf) return signedAudioBuf
+        return downloadVoiceCoachAudio(audioPath)
+      })()
+    : Promise.resolve<Buffer | null>(null)
   const markTurnProcessingPromise = admin.from("voice_coach_turns").update({ status: "processing" }).eq("id", args.turnId)
   void Promise.resolve(markTurnProcessingPromise).catch(() => null)
   const audioBuf = await audioBufPromise
@@ -2838,18 +2872,23 @@ export async function processVoiceCoachJobById(args: {
     submitAckMsFromResult === null
       ? null
       : Math.max(0, Math.round(submitAckMsFromResult - Math.max(0, uploadMsFromResult || 0)))
+  const queueReadyGraceMsRaw = Number(process.env.VOICE_COACH_QUEUE_READY_GRACE_MS || 250)
+  const queueReadyGraceMs = Number.isFinite(queueReadyGraceMsRaw)
+    ? Math.max(0, Math.min(1000, Math.round(queueReadyGraceMsRaw)))
+    : 250
   const queueReadyAtMsFromSubmit =
     pipelineStartedAtMsFromResult === null || postUploadSubmitOverheadMs === null
       ? null
-      : pipelineStartedAtMsFromResult + postUploadSubmitOverheadMs
-  // Prefer explicit stage-enter timestamp written by producer/queue transition.
-  // Only fall back to DB timestamps when this anchor is missing.
+      : pipelineStartedAtMsFromResult + postUploadSubmitOverheadMs + queueReadyGraceMs
+  // For main queue wait, prefer the "submit-ready" anchor (post-upload submit overhead)
+  // so submit-path work is not counted as queue backlog.
+  // Fall back to stage-enter / DB timestamps only when this anchor is missing.
   const fallbackQueueAnchors = [updatedAtMs, createdAtMs].filter(
     (value): value is number => typeof value === "number" && Number.isFinite(value),
   )
   const stageEnteredAtMsForMain =
-    stageEnteredAtMsFromResult ??
     queueReadyAtMsFromSubmit ??
+    stageEnteredAtMsFromResult ??
     (fallbackQueueAnchors.length > 0 ? Math.max(...fallbackQueueAnchors) : Date.now())
   const stageEnteredAtMsForClaim = stage === "main_pending" ? stageEnteredAtMsForMain : stageEnteredAtMsFromResult
   const claimedResultState = mergeResult(resultStateBeforeClaim, {

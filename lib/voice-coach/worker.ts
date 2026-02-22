@@ -73,6 +73,7 @@ const heartbeatFile = String(process.env.VOICE_COACH_WORKER_HEARTBEAT_FILE || "/
   .trim()
   .slice(0, 500)
 const staleRecoverIntervalMs = parseNumberEnv("VOICE_COACH_WORKER_RECOVER_INTERVAL_MS", 60000, 1000, 300000)
+const staleRecoverIdleDelayMs = parseNumberEnv("VOICE_COACH_WORKER_RECOVER_IDLE_DELAY_MS", 1200, 0, 60000)
 const staleRecoverMaxJobs = parseNumberEnv("VOICE_COACH_WORKER_RECOVER_MAX_JOBS", 20, 1, 200)
 const maxQueueAgeMs = Math.max(0, parseNumberEnv("VOICE_COACH_WORKER_MAX_QUEUE_AGE_MS", 0, 0, 600000))
 const preferFreshQueueMs = Math.max(0, parseNumberEnv("VOICE_COACH_WORKER_PREFER_FRESH_QUEUE_MS", 0, 0, 600000))
@@ -314,7 +315,7 @@ async function runRound(): Promise<RoundResult> {
     }
 
     if (inFlight.length <= 0) {
-      if (processed === 0) {
+      if (processed === 0 && Date.now() - roundStartedAt >= staleRecoverIdleDelayMs) {
         const recoveredNow = await maybeRecoverStaleJobs(Date.now())
         if (recoveredNow > 0) {
           recovered += recoveredNow
@@ -358,10 +359,16 @@ async function runRound(): Promise<RoundResult> {
 }
 
 async function main() {
-  prewarmVoiceCoachRuntime()
   console.log(
     `[voicecoach-worker] started id=${workerId} max_jobs=${maxJobsPerRound} concurrency=${workerConcurrency} claim_burst=${claimBurst} wall_ms=${maxWallMsPerRound} timeout_ms=${perJobTimeoutMs} idle_ms=${idleSleepMinMs}-${idleSleepMaxMs} max_queue_age_ms=${maxQueueAgeMs} prefer_fresh_queue_ms=${preferFreshQueueMs} chain_main_to_tts=${chainMainToTtsInWorker ? "true" : "false"}`,
   )
+  // Keep startup claim path hot; run script/runtime prewarm without blocking first claims.
+  void Promise.resolve()
+    .then(() => prewarmVoiceCoachRuntime())
+    .catch((error) => {
+      const message = error instanceof Error ? error.message : String(error)
+      console.error(`[voicecoach-worker] prewarm_failed message=${message}`)
+    })
   // Heartbeat writes should not block claim/startup path.
   void touchHeartbeat("started", { force: true, processed: 0, recovered: 0 })
 

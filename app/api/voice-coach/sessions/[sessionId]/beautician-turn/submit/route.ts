@@ -14,6 +14,7 @@ function jsonError(trace: VoiceCoachTrace, status: number, error: string, extra?
 }
 
 type UploadedAudioFormat = "mp3" | "wav" | "ogg" | "aac" | "flac" | "unknown"
+const INLINE_FLASH_AUDIO_MAX_BYTES = 600_000
 
 function detectUploadedAudioFormat(file: File): UploadedAudioFormat {
   const name = (file.name || "").toLowerCase()
@@ -262,6 +263,9 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
       reply_to_turn_id: replyToTurnId,
       audio_format: detected.format,
       client_audio_seconds: clientAudioSeconds,
+      ...(audioBuf.length > 0 && audioBuf.length <= INLINE_FLASH_AUDIO_MAX_BYTES
+        ? { audio_inline_b64: audioBuf.toString("base64") }
+        : {}),
       ...(clientAttemptId ? { client_attempt_id: clientAttemptId } : {}),
     }
     const initialResultState = {
