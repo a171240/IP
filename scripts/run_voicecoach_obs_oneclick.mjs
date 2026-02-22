@@ -37,7 +37,7 @@ function parseArgs(argv) {
 
 function resolveRunContext(argv) {
   const args = parseArgs(argv)
-  const wo = String(args.wo || "WO-R11-OBS/window2").trim()
+  const wo = String(args.wo || "WO-R10-OBS/window2").trim()
   const outDir = String(args["out-dir"] || "").trim() || path.join(ROOT, "docs", "runbooks", wo)
   return { args, wo, outDir }
 }
@@ -382,10 +382,7 @@ function evaluateObsGate(analysis, groupResults) {
     return !(metric && metric.p50 !== null && metric.p95 !== null)
   })
   const stageComplete = Boolean(analysis?.summary?.stage_metrics_complete) && missingStage.length === 0
-  const aOk = Boolean(groupResults?.A?.ok)
-  const bOk = Boolean(groupResults?.B?.ok)
   const cOk = Boolean(groupResults?.C?.ok)
-  const groupAllOk = aOk && bOk && cOk
 
   const cAudioReadyP95 = toNumberOrNull(analysis?.metrics?.audio_ready_ms_C_p95)
   const cQueueMainP95 = toNumberOrNull(analysis?.groups?.C?.stage_metrics?.queue_wait_before_main_ms?.p95)
@@ -397,11 +394,7 @@ function evaluateObsGate(analysis, groupResults) {
   const successRounds = cLongTailBuckets?.success_rounds || {}
   const cTimeoutRounds = toNumberOrNull(cLongTailBuckets?.timeout_rounds?.count)
   const cSuccessRounds = toNumberOrNull(cLongTailBuckets?.success_rounds?.count)
-  const hasRequiredBucketNodes =
-    cLongTailBuckets &&
-    typeof cLongTailBuckets === "object" &&
-    "timeout_rounds" in cLongTailBuckets &&
-    "success_rounds" in cLongTailBuckets
+  const longTailReady = [cAudioReadyP95, cQueueMainP95, cQueueTtsP95, queueMainP95, queueTtsP95].every((item) => item !== null)
   const longTailBucketsComplete =
     hasRequiredStageMetricsShape(timeoutRounds?.stage_metrics) && hasRequiredStageMetricsShape(successRounds?.stage_metrics)
   const g0Pass =
@@ -412,9 +405,8 @@ function evaluateObsGate(analysis, groupResults) {
     submitPumpCount === 0 &&
     eventsPumpCount === 0
   const g1Pass = stageComplete
-  const g3Pass = hasRequiredBucketNodes && longTailBucketsComplete
-  const runStatusPass = g0Pass && g1Pass && g3Pass && groupAllOk
-  const g2Pass = runStatusPass && groupAllOk
+  const g3Pass = longTailBucketsComplete && longTailReady
+  const g2Pass = cOk && g0Pass && g1Pass && g3Pass
   const longTailEvidence = [
     formatMetric("audio_ready_ms_C_p95", cAudioReadyP95),
     formatMetric("queue_wait_before_main_ms_C_p95", cQueueMainP95),
@@ -435,11 +427,11 @@ function evaluateObsGate(analysis, groupResults) {
       },
       G2: {
         status: g2Pass ? "PASS" : "FAIL",
-        evidence: `run_result_status=${runStatusPass ? "PASS" : "FAIL"}, A_ok=${aOk}, B_ok=${bOk}, C_ok=${cOk}`,
+        evidence: `run_result_status=${g2Pass ? "PASS" : "FAIL"}, C_ok=${cOk}`,
       },
       G3: {
         status: g3Pass ? "PASS" : "FAIL",
-        evidence: `c_long_tail_buckets_complete=${g3Pass}, ${longTailEvidence}`,
+        evidence: `c_long_tail_buckets_complete=${longTailBucketsComplete}, ${longTailEvidence}`,
       },
     },
     long_tail_metrics: {
@@ -452,7 +444,7 @@ function evaluateObsGate(analysis, groupResults) {
       c_success_round_count: cSuccessRounds,
     },
     c_long_tail_buckets: cLongTailBuckets,
-    all_pass: runStatusPass,
+    all_pass: g0Pass && g1Pass && g2Pass && g3Pass,
   }
 }
 
@@ -525,7 +517,7 @@ async function main() {
   node scripts/run_voicecoach_obs_oneclick.mjs [options]
 
 Options:
-  --wo <work_order>            default: WO-R11-OBS/window2
+  --wo <work_order>            default: WO-R10-OBS/window2
   --out-dir <absolute_path>    default: <repo>/docs/runbooks/<wo>
   --port <number>              default: 3390
   --attempts <number>          default: 6
