@@ -1366,34 +1366,19 @@ async function processMainStage(args: {
   const requireFlash = shouldRequireFlashAsr()
   const flashEnabled = requireFlash || (shouldUseFlashAsr() && !flashResourcePermissionDenied)
   const shouldAttemptFlash = flashEnabled && format !== "raw"
-
-  const [replyTurnRes, audioBuf] = await Promise.all([
-    admin
-      .from("voice_coach_turns")
-      .select("id, text, emotion, intent_id, angle_id, line_id, turn_index")
-      .eq("id", args.payload.reply_to_turn_id)
-      .eq("session_id", args.sessionId)
-      .single(),
-    shouldAttemptFlash ? downloadVoiceCoachAudio(audioPath) : Promise.resolve<Buffer | null>(null),
-    admin.from("voice_coach_turns").update({ status: "processing" }).eq("id", args.turnId),
-  ])
-  const replyTurn = replyTurnRes.data
-  if (!replyTurn) {
-    await markJobError({
-      jobId: args.jobId,
-      sessionId: args.sessionId,
-      userId: args.userId,
-      turnId: args.turnId,
-      code: "reply_turn_not_found",
-      message: "顾客回合不存在，无法继续识别",
-      traceId: auditMeta.traceId,
-      clientBuild: auditMeta.clientBuild,
-      serverBuild: auditMeta.serverBuild,
-      executor: auditMeta.executor,
-    })
-    return { processed: true, done: true, jobId: args.jobId, turnId: args.turnId }
-  }
   const historyPrefetchPromise = buildHistory(args.sessionId, Number(loaded.turn.turn_index)).catch(() => [])
+
+  const replyTurnPromise = admin
+    .from("voice_coach_turns")
+    .select("id, text, emotion, intent_id, angle_id, line_id, turn_index")
+    .eq("id", args.payload.reply_to_turn_id)
+    .eq("session_id", args.sessionId)
+    .single()
+  const beauticianAudioUrlPrefetchPromise = getSignedAudio(audioPath).catch(() => null)
+  const audioBufPromise = shouldAttemptFlash ? downloadVoiceCoachAudio(audioPath) : Promise.resolve<Buffer | null>(null)
+  const markTurnProcessingPromise = admin.from("voice_coach_turns").update({ status: "processing" }).eq("id", args.turnId)
+  void Promise.resolve(markTurnProcessingPromise).catch(() => null)
+  const audioBuf = await audioBufPromise
 
   let asr: DoubaoAsrResult | null = null
   let asrProvider: "flash" | "auc" = "flash"
@@ -1565,6 +1550,24 @@ async function processMainStage(args: {
     }
   }
 
+  const replyTurnRes = await replyTurnPromise
+  const replyTurn = replyTurnRes.data
+  if (!replyTurn) {
+    await markJobError({
+      jobId: args.jobId,
+      sessionId: args.sessionId,
+      userId: args.userId,
+      turnId: args.turnId,
+      code: "reply_turn_not_found",
+      message: "顾客回合不存在，无法继续识别",
+      traceId: auditMeta.traceId,
+      clientBuild: auditMeta.clientBuild,
+      serverBuild: auditMeta.serverBuild,
+      executor: auditMeta.executor,
+    })
+    return { processed: true, done: true, jobId: args.jobId, turnId: args.turnId }
+  }
+
   if (!asr || !asr.text) {
     const asrProviderFinalOnError =
       latestAsrMeta?.provider || (asrProviderAttempted.length > 0 ? asrProviderAttempted[asrProviderAttempted.length - 1] : null)
@@ -1614,7 +1617,7 @@ async function processMainStage(args: {
   const audioSeconds = asr.durationSeconds || asNumber(args.payload.client_audio_seconds) || loaded.turn.audio_seconds || null
   const wpm = calcWpm(asr.text, audioSeconds)
   const fillerRatio = calcFillerRatio(asr.text)
-  const beauticianAudioUrl = await getSignedAudio(audioPath)
+  const beauticianAudioUrl = (await beauticianAudioUrlPrefetchPromise) || (await getSignedAudio(audioPath))
 
   const beauticianTurnNo = Math.floor((Number(loaded.turn.turn_index) + 1) / 2)
   const hardMax = hardMaxTurns()
@@ -1633,7 +1636,7 @@ async function processMainStage(args: {
         ? latestAsrMeta.logid || latestAsrMeta.query_logid || latestAsrMeta.submit_logid || null
         : null
 
-  await admin
+  const updateTurnPromise = admin
     .from("voice_coach_turns")
     .update({
       text: asr.text,
@@ -1702,6 +1705,7 @@ async function processMainStage(args: {
       ts: nowIso(),
     },
   })
+  await updateTurnPromise
 
   const stageResultBase = mergeResult(resultState, {
     pipeline_started_at_ms: pipelineStartedAt,

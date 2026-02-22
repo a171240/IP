@@ -177,8 +177,8 @@ function readBoolEnv(name: string, fallback: boolean): boolean {
 }
 
 function asrFlashVadSegmentDurationMs(): number {
-  const raw = Number(process.env.VOICE_COACH_ASR_FLASH_VAD_SEGMENT_MS || 3000)
-  if (!Number.isFinite(raw)) return 3000
+  const raw = Number(process.env.VOICE_COACH_ASR_FLASH_VAD_SEGMENT_MS || 2000)
+  if (!Number.isFinite(raw)) return 2000
   return Math.max(2000, Math.min(10000, Math.round(raw)))
 }
 
