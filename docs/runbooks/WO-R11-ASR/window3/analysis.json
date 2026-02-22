@@ -1,0 +1,496 @@
+{
+  "generated_at": "2026-02-22T04:47:33.514Z",
+  "wo_id": "WO-R11-ASR",
+  "window": "window3",
+  "inputs": {
+    "bench_A": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R11-ASR/window3/bench_A.json",
+    "bench_B": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R11-ASR/window3/bench_B.json",
+    "bench_C": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R11-ASR/window3/bench_C.json",
+    "selfcheck": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R11-ASR/window3/selfcheck.log",
+    "startup_gate": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R11-ASR/window3/startup_gate.log"
+  },
+  "gates": {
+    "G0": {
+      "pass": true,
+      "evidence": {
+        "selfcheck_status": "PASS",
+        "startup_gate_status": "PASS",
+        "require_flash_true": true
+      }
+    },
+    "G1": {
+      "pass": true,
+      "evidence": {
+        "asr_provider_final_flash_ratio_B": 1,
+        "target": ">=0.98"
+      }
+    },
+    "G2": {
+      "pass": true,
+      "evidence": {
+        "asr_ms_B_p95": 648,
+        "target": "<=750",
+        "flash_permission_denied_count_B": 0,
+        "target_denied": "=0"
+      }
+    },
+    "G3": {
+      "pass": true,
+      "evidence": {
+        "rounds_C": 3,
+        "asr_ready_count_C": 3,
+        "turn_error_count_C": 0,
+        "c_attempted_has_flash": false,
+        "per_round_C": [
+          {
+            "round": 1,
+            "asr_provider_attempted": [
+              "auc"
+            ],
+            "asr_provider_final": "auc",
+            "asr_ready_ms": 8293,
+            "asr_ms": 23,
+            "turn_error": null
+          },
+          {
+            "round": 2,
+            "asr_provider_attempted": [
+              "auc"
+            ],
+            "asr_provider_final": "auc",
+            "asr_ready_ms": 9016,
+            "asr_ms": 6867,
+            "turn_error": null
+          },
+          {
+            "round": 3,
+            "asr_provider_attempted": [
+              "auc"
+            ],
+            "asr_provider_final": "auc",
+            "asr_ready_ms": 8120,
+            "asr_ms": 13,
+            "turn_error": null
+          }
+        ]
+      }
+    }
+  },
+  "groups": {
+    "A": {
+      "group": "A",
+      "bench_label": "WO-R11-ASR-A",
+      "rounds": 3,
+      "sample_events": 9,
+      "missing_required_count": 0,
+      "executor_distribution": {
+        "worker": 9
+      },
+      "executor_worker_ratio": 1,
+      "submit_pump_count": 0,
+      "events_pump_count": 0,
+      "asr_provider_attempted": {
+        "flash": 3
+      },
+      "asr_provider_final": {
+        "flash": 3
+      },
+      "asr_provider_final_flash_ratio": 1,
+      "flash_permission_denied_count": 0,
+      "queue_wait_before_tts_invalid_rate": 0,
+      "tts_cache_hit_rate": 1,
+      "counts": {
+        "asr_ready": 3,
+        "text_ready": 3,
+        "audio_ready": 3,
+        "turn_error": 0
+      },
+      "stage_metrics": {
+        "asr_ready_ms": {
+          "count": 3,
+          "p50": 5255,
+          "p95": 6016
+        },
+        "text_ready_ms": {
+          "count": 3,
+          "p50": 6145,
+          "p95": 6911
+        },
+        "audio_ready_ms": {
+          "count": 3,
+          "p50": 6733,
+          "p95": 7585
+        },
+        "asr_ms": {
+          "count": 3,
+          "p50": 600,
+          "p95": 628
+        },
+        "queue_wait_before_main_ms": {
+          "count": 3,
+          "p50": 75,
+          "p95": 566
+        },
+        "queue_wait_before_tts_ms": {
+          "count": 3,
+          "p50": 1,
+          "p95": 1
+        },
+        "llm_ms": {
+          "count": 3,
+          "p50": 0,
+          "p95": 0
+        },
+        "tts_ms": {
+          "count": 3,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "per_round": [
+        {
+          "round": 1,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ready_ms": 6100,
+          "asr_ms": 600,
+          "turn_error": null
+        },
+        {
+          "round": 2,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ready_ms": 5077,
+          "asr_ms": 631,
+          "turn_error": null
+        },
+        {
+          "round": 3,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ready_ms": 5255,
+          "asr_ms": 529,
+          "turn_error": null
+        }
+      ],
+      "audit_samples": [
+        {
+          "trace_id": "6f487084-a4c6-4897-b936-0b16ac971e37",
+          "client_build": "bench-1771735109111",
+          "server_build": "dev",
+          "executor": "worker",
+          "type": "beautician.asr_ready",
+          "flash_logid": "20260222123843C48ABA2C078AF5A59FBE"
+        },
+        {
+          "trace_id": "6f487084-a4c6-4897-b936-0b16ac971e37",
+          "client_build": "bench-1771735109111",
+          "server_build": "dev",
+          "executor": "worker",
+          "type": "customer.text_ready",
+          "flash_logid": null
+        }
+      ]
+    },
+    "B": {
+      "group": "B",
+      "bench_label": "WO-R11-ASR-B-window3",
+      "rounds": 3,
+      "sample_events": 9,
+      "missing_required_count": 0,
+      "executor_distribution": {
+        "worker": 9
+      },
+      "executor_worker_ratio": 1,
+      "submit_pump_count": 0,
+      "events_pump_count": 0,
+      "asr_provider_attempted": {
+        "flash": 3
+      },
+      "asr_provider_final": {
+        "flash": 3
+      },
+      "asr_provider_final_flash_ratio": 1,
+      "flash_permission_denied_count": 0,
+      "queue_wait_before_tts_invalid_rate": 0,
+      "tts_cache_hit_rate": 1,
+      "counts": {
+        "asr_ready": 3,
+        "text_ready": 3,
+        "audio_ready": 3,
+        "turn_error": 0
+      },
+      "stage_metrics": {
+        "asr_ready_ms": {
+          "count": 3,
+          "p50": 5672,
+          "p95": 5818
+        },
+        "text_ready_ms": {
+          "count": 3,
+          "p50": 6558,
+          "p95": 6699
+        },
+        "audio_ready_ms": {
+          "count": 3,
+          "p50": 7271,
+          "p95": 7321
+        },
+        "asr_ms": {
+          "count": 3,
+          "p50": 574,
+          "p95": 648
+        },
+        "queue_wait_before_main_ms": {
+          "count": 3,
+          "p50": 62,
+          "p95": 193
+        },
+        "queue_wait_before_tts_ms": {
+          "count": 3,
+          "p50": 0,
+          "p95": 1
+        },
+        "llm_ms": {
+          "count": 3,
+          "p50": 0,
+          "p95": 0
+        },
+        "tts_ms": {
+          "count": 3,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "per_round": [
+        {
+          "round": 1,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ready_ms": 5834,
+          "asr_ms": 541,
+          "turn_error": null
+        },
+        {
+          "round": 2,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ready_ms": 5672,
+          "asr_ms": 574,
+          "turn_error": null
+        },
+        {
+          "round": 3,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ready_ms": 4957,
+          "asr_ms": 656,
+          "turn_error": null
+        }
+      ],
+      "audit_samples": [
+        {
+          "trace_id": "88107345-c553-4abe-b7df-66ae7c6e643c",
+          "client_build": "bench-1771735253818",
+          "server_build": "dev",
+          "executor": "worker",
+          "type": "beautician.asr_ready",
+          "flash_logid": "20260222124106D40507565BE30A390DE2"
+        },
+        {
+          "trace_id": "88107345-c553-4abe-b7df-66ae7c6e643c",
+          "client_build": "bench-1771735253818",
+          "server_build": "dev",
+          "executor": "worker",
+          "type": "customer.text_ready",
+          "flash_logid": null
+        }
+      ]
+    },
+    "C": {
+      "group": "C",
+      "bench_label": "WO-R11-ASR-C-window3",
+      "rounds": 3,
+      "sample_events": 9,
+      "missing_required_count": 0,
+      "executor_distribution": {
+        "worker": 9
+      },
+      "executor_worker_ratio": 1,
+      "submit_pump_count": 0,
+      "events_pump_count": 0,
+      "asr_provider_attempted": {
+        "auc": 3
+      },
+      "asr_provider_final": {
+        "auc": 3
+      },
+      "asr_provider_final_flash_ratio": 0,
+      "flash_permission_denied_count": 0,
+      "queue_wait_before_tts_invalid_rate": 0,
+      "tts_cache_hit_rate": 1,
+      "counts": {
+        "asr_ready": 3,
+        "text_ready": 3,
+        "audio_ready": 3,
+        "turn_error": 0
+      },
+      "stage_metrics": {
+        "asr_ready_ms": {
+          "count": 3,
+          "p50": 8293,
+          "p95": 8944
+        },
+        "text_ready_ms": {
+          "count": 3,
+          "p50": 9263,
+          "p95": 9927
+        },
+        "audio_ready_ms": {
+          "count": 3,
+          "p50": 10243,
+          "p95": 10570
+        },
+        "asr_ms": {
+          "count": 3,
+          "p50": 23,
+          "p95": 6183
+        },
+        "queue_wait_before_main_ms": {
+          "count": 3,
+          "p50": 58,
+          "p95": 542
+        },
+        "queue_wait_before_tts_ms": {
+          "count": 3,
+          "p50": 1,
+          "p95": 1
+        },
+        "llm_ms": {
+          "count": 3,
+          "p50": 0,
+          "p95": 0
+        },
+        "tts_ms": {
+          "count": 3,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "per_round": [
+        {
+          "round": 1,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ready_ms": 8293,
+          "asr_ms": 23,
+          "turn_error": null
+        },
+        {
+          "round": 2,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ready_ms": 9016,
+          "asr_ms": 6867,
+          "turn_error": null
+        },
+        {
+          "round": 3,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ready_ms": 8120,
+          "asr_ms": 13,
+          "turn_error": null
+        }
+      ],
+      "audit_samples": [
+        {
+          "trace_id": "97b365e3-1a93-405d-84c9-3ddcd5b65182",
+          "client_build": "bench-1771735360985",
+          "server_build": "dev",
+          "executor": "worker",
+          "type": "beautician.asr_ready",
+          "flash_logid": null
+        },
+        {
+          "trace_id": "97b365e3-1a93-405d-84c9-3ddcd5b65182",
+          "client_build": "bench-1771735360985",
+          "server_build": "dev",
+          "executor": "worker",
+          "type": "customer.text_ready",
+          "flash_logid": null
+        }
+      ]
+    }
+  },
+  "metrics": {
+    "asr_provider_A": {
+      "flash": 3
+    },
+    "asr_provider_B": {
+      "flash": 3
+    },
+    "asr_provider_C": {
+      "auc": 3
+    },
+    "audio_ready_ms_B_p50": 7271,
+    "audio_ready_ms_B_p95": 7321,
+    "audio_ready_ms_C_p50": 10243,
+    "audio_ready_ms_C_p95": 10570,
+    "llm_ms_p50": 0,
+    "llm_ms_p95": 0,
+    "tts_ms_p50": 0,
+    "tts_ms_p95": 0,
+    "queue_wait_before_main_ms_p50": 62,
+    "queue_wait_before_main_ms_p95": 566,
+    "queue_wait_before_tts_ms_p50": 1,
+    "queue_wait_before_tts_ms_p95": 1,
+    "tts_cache_hit_rate": 1,
+    "executor_worker_ratio": 1,
+    "submit_pump_count": 0,
+    "events_pump_count": 0,
+    "asr_provider_final_flash_ratio": 1,
+    "queue_wait_before_tts_invalid_rate": 0,
+    "asr_ms_B_p50": 574,
+    "asr_ms_B_p95": 648,
+    "flash_permission_denied_count_B": 0,
+    "selfcheck_status": "PASS",
+    "startup_gate_status": "PASS"
+  },
+  "audit_samples": [
+    {
+      "trace_id": "88107345-c553-4abe-b7df-66ae7c6e643c",
+      "client_build": "bench-1771735253818",
+      "server_build": "dev",
+      "executor": "worker",
+      "type": "beautician.asr_ready",
+      "flash_logid": "20260222124106D40507565BE30A390DE2"
+    },
+    {
+      "trace_id": "88107345-c553-4abe-b7df-66ae7c6e643c",
+      "client_build": "bench-1771735253818",
+      "server_build": "dev",
+      "executor": "worker",
+      "type": "customer.text_ready",
+      "flash_logid": null
+    }
+  ]
+}
