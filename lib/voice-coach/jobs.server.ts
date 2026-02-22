@@ -624,6 +624,27 @@ function mergeResult(
   }
 }
 
+let voiceCoachRuntimePrewarmed = false
+export function prewarmVoiceCoachRuntime() {
+  if (voiceCoachRuntimePrewarmed) return
+  voiceCoachRuntimePrewarmed = true
+  try {
+    const scenario = getScenario("sale")
+    const categoryId = normalizeVoiceCoachCategoryId(String(scenario.categoryId || "sale_consult"))
+    const policyState = createInitialPolicyState({ categoryId })
+    selectNextCustomerLine({
+      categoryId,
+      policyState,
+      beauticianText: "预热",
+      history: [{ role: "beautician", text: "预热" }],
+    })
+  } catch (error) {
+    voiceCoachRuntimePrewarmed = false
+    const message = error instanceof Error ? error.message : String(error)
+    console.error(`[voicecoach-jobs] prewarm_failed message=${message}`)
+  }
+}
+
 function buildAuditMeta(resultState: VoiceCoachJobResultState | null | undefined, executor?: VoiceCoachJobExecutor) {
   const traceId = sanitizeForEvent(resultState?.trace_id || randomUUID(), randomUUID())
   const clientBuild = sanitizeForEvent(resultState?.client_build || "unknown", "unknown")
@@ -1371,6 +1392,7 @@ async function processMainStage(args: {
     })
     return { processed: true, done: true, jobId: args.jobId, turnId: args.turnId }
   }
+  const historyPrefetchPromise = buildHistory(args.sessionId, Number(loaded.turn.turn_index)).catch(() => [])
 
   let asr: DoubaoAsrResult | null = null
   let asrProvider: "flash" | "auc" = "flash"
@@ -1716,7 +1738,29 @@ async function processMainStage(args: {
   const scenario = getScenario(String(loaded.session.scenario_id || "sale"))
   const categoryId = normalizeVoiceCoachCategoryId(String(loaded.session.category_id || scenario.categoryId))
   const scriptSelectStartedAt = Date.now()
-  const history = await buildHistory(args.sessionId, Number(loaded.turn.turn_index))
+  const useFastHistoryPath = Number(loaded.turn.turn_index || 0) <= 2
+  const historyRaw = useFastHistoryPath
+    ? [
+        {
+          role: "customer" as const,
+          text: String(replyTurn.text || ""),
+          emotion: (replyTurn.emotion as VoiceCoachEmotion | null) || undefined,
+        },
+      ]
+    : await historyPrefetchPromise
+  const history = historyRaw.filter((item) => normalizeInlineText(item.text).length > 0)
+  const asrTextNormalized = normalizeInlineText(asr.text)
+  if (asrTextNormalized) {
+    const lastHistory = history[history.length - 1]
+    const lastText = normalizeInlineText(lastHistory?.text || "")
+    if (!lastHistory || lastHistory.role !== "beautician" || lastText !== asrTextNormalized) {
+      history.push({
+        role: "beautician",
+        text: asr.text,
+        emotion: (loaded.turn.emotion as VoiceCoachEmotion) || undefined,
+      })
+    }
+  }
   const policyState = loaded.session.policy_state_json || createInitialPolicyState({ categoryId })
   const selection = selectNextCustomerLine({
     categoryId,

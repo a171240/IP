@@ -3,6 +3,7 @@ import { hostname } from "os"
 
 import {
   listVoiceCoachQueuedJobs,
+  prewarmVoiceCoachRuntime,
   processVoiceCoachJobById,
   recordVoiceCoachWorkerHeartbeat,
   recoverStaleVoiceCoachProcessingJobs,
@@ -346,18 +347,21 @@ async function runRound(): Promise<RoundResult> {
 }
 
 async function main() {
+  prewarmVoiceCoachRuntime()
   console.log(
     `[voicecoach-worker] started id=${workerId} max_jobs=${maxJobsPerRound} concurrency=${workerConcurrency} claim_burst=${claimBurst} wall_ms=${maxWallMsPerRound} timeout_ms=${perJobTimeoutMs} idle_ms=${idleSleepMinMs}-${idleSleepMaxMs} max_queue_age_ms=${maxQueueAgeMs} prefer_fresh_queue_ms=${preferFreshQueueMs} chain_main_to_tts=${chainMainToTtsInWorker ? "true" : "false"}`,
   )
-  await touchHeartbeat("started", { force: true, processed: 0, recovered: 0 })
+  // Heartbeat writes should not block claim/startup path.
+  void touchHeartbeat("started", { force: true, processed: 0, recovered: 0 })
 
   do {
     if (shuttingDown) break
 
     try {
-      await touchHeartbeat("alive")
+      // Keep heartbeat async so queue claiming is not delayed by DB latency.
+      void touchHeartbeat("alive")
       const round = await runRound()
-      await touchHeartbeat("alive", {
+      void touchHeartbeat("alive", {
         force: round.processed > 0 || round.recovered > 0,
         processed: round.processed,
         recovered: round.recovered,
