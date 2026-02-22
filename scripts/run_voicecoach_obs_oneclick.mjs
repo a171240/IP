@@ -37,7 +37,7 @@ function parseArgs(argv) {
 
 function resolveRunContext(argv) {
   const args = parseArgs(argv)
-  const wo = String(args.wo || "WO-R8-OBS/window2").trim()
+  const wo = String(args.wo || "WO-R10-OBS/window2").trim()
   const outDir = String(args["out-dir"] || "").trim() || path.join(ROOT, "docs", "runbooks", wo)
   return { args, wo, outDir }
 }
@@ -108,6 +108,14 @@ function toNumberOrNull(value) {
 
 function formatMetric(name, value) {
   return `${name}=${value === null ? "null" : value}`
+}
+
+function hasMetricShape(metric) {
+  return Boolean(metric && typeof metric === "object" && "p50" in metric && "p95" in metric)
+}
+
+function hasRequiredStageMetricsShape(stageMetrics) {
+  return REQUIRED_STAGE_KEYS.every((key) => hasMetricShape(stageMetrics?.[key]))
 }
 
 function parseBenchPath(text) {
@@ -364,23 +372,41 @@ async function runGroup(group, ctx) {
   return { ok: false, group: group.key, reason: "failed_after_retries" }
 }
 
-function evaluateObsGate(analysis) {
+function evaluateObsGate(analysis, groupResults) {
   const missingRequired = Number(analysis?.summary?.missing_required_count_total)
+  const submitPumpCount = Number(analysis?.summary?.submit_pump_count)
+  const eventsPumpCount = Number(analysis?.summary?.events_pump_count)
   const summaryMetrics = analysis?.summary?.stage_metrics || {}
   const missingStage = REQUIRED_STAGE_KEYS.filter((key) => {
     const metric = summaryMetrics[key]
     return !(metric && metric.p50 !== null && metric.p95 !== null)
   })
   const stageComplete = Boolean(analysis?.summary?.stage_metrics_complete) && missingStage.length === 0
+  const cOk = Boolean(groupResults?.C?.ok)
+
   const cAudioReadyP95 = toNumberOrNull(analysis?.metrics?.audio_ready_ms_C_p95)
   const cQueueMainP95 = toNumberOrNull(analysis?.groups?.C?.stage_metrics?.queue_wait_before_main_ms?.p95)
   const cQueueTtsP95 = toNumberOrNull(analysis?.groups?.C?.stage_metrics?.queue_wait_before_tts_ms?.p95)
   const queueMainP95 = toNumberOrNull(analysis?.metrics?.queue_wait_before_main_ms_p95)
   const queueTtsP95 = toNumberOrNull(analysis?.metrics?.queue_wait_before_tts_ms_p95)
   const cLongTailBuckets = analysis?.groups?.C?.long_tail_buckets || {}
+  const timeoutRounds = cLongTailBuckets?.timeout_rounds || {}
+  const successRounds = cLongTailBuckets?.success_rounds || {}
   const cTimeoutRounds = toNumberOrNull(cLongTailBuckets?.timeout_rounds?.count)
   const cSuccessRounds = toNumberOrNull(cLongTailBuckets?.success_rounds?.count)
   const longTailReady = [cAudioReadyP95, cQueueMainP95, cQueueTtsP95, queueMainP95, queueTtsP95].every((item) => item !== null)
+  const longTailBucketsComplete =
+    hasRequiredStageMetricsShape(timeoutRounds?.stage_metrics) && hasRequiredStageMetricsShape(successRounds?.stage_metrics)
+  const g0Pass =
+    Number.isFinite(missingRequired) &&
+    Number.isFinite(submitPumpCount) &&
+    Number.isFinite(eventsPumpCount) &&
+    missingRequired === 0 &&
+    submitPumpCount === 0 &&
+    eventsPumpCount === 0
+  const g1Pass = stageComplete
+  const g3Pass = longTailBucketsComplete && longTailReady
+  const g2Pass = cOk && g0Pass && g1Pass && g3Pass
   const longTailEvidence = [
     formatMetric("audio_ready_ms_C_p95", cAudioReadyP95),
     formatMetric("queue_wait_before_main_ms_C_p95", cQueueMainP95),
@@ -392,16 +418,20 @@ function evaluateObsGate(analysis) {
   return {
     gates: {
       G0: {
-        status: missingRequired === 0 ? "PASS" : "FAIL",
-        evidence: `missing_required_count_total=${Number.isFinite(missingRequired) ? missingRequired : "NaN"}`,
+        status: g0Pass ? "PASS" : "FAIL",
+        evidence: `missing_required_count_total=${Number.isFinite(missingRequired) ? missingRequired : "NaN"}, submit_pump_count=${Number.isFinite(submitPumpCount) ? submitPumpCount : "NaN"}, events_pump_count=${Number.isFinite(eventsPumpCount) ? eventsPumpCount : "NaN"}`,
       },
       G1: {
-        status: stageComplete ? "PASS" : "FAIL",
+        status: g1Pass ? "PASS" : "FAIL",
         evidence: `required_stage_metrics_complete=${stageComplete}, missing=${missingStage.join("|") || "none"}`,
       },
       G2: {
-        status: longTailReady ? "PASS" : "FAIL",
-        evidence: longTailEvidence,
+        status: g2Pass ? "PASS" : "FAIL",
+        evidence: `run_result_status=${g2Pass ? "PASS" : "FAIL"}, C_ok=${cOk}`,
+      },
+      G3: {
+        status: g3Pass ? "PASS" : "FAIL",
+        evidence: `c_long_tail_buckets_complete=${longTailBucketsComplete}, ${longTailEvidence}`,
       },
     },
     long_tail_metrics: {
@@ -414,6 +444,7 @@ function evaluateObsGate(analysis) {
       c_success_round_count: cSuccessRounds,
     },
     c_long_tail_buckets: cLongTailBuckets,
+    all_pass: g0Pass && g1Pass && g2Pass && g3Pass,
   }
 }
 
@@ -470,6 +501,7 @@ function writeRunResult(outDir, result) {
       `- bench_A: \`${result?.outputs?.bench_A || ""}\``,
       `- bench_B: \`${result?.outputs?.bench_B || ""}\``,
       `- bench_C: \`${result?.outputs?.bench_C || ""}\``,
+      `- C.json: \`${result?.outputs?.C_json || ""}\``,
       `- analysis.json: \`${result?.outputs?.analysis_json || ""}\``,
       `- analysis.md: \`${result?.outputs?.analysis_md || ""}\``,
       "",
@@ -485,7 +517,7 @@ async function main() {
   node scripts/run_voicecoach_obs_oneclick.mjs [options]
 
 Options:
-  --wo <work_order>            default: WO-R8-OBS/window2
+  --wo <work_order>            default: WO-R10-OBS/window2
   --out-dir <absolute_path>    default: <repo>/docs/runbooks/<wo>
   --port <number>              default: 3390
   --attempts <number>          default: 6
@@ -580,6 +612,8 @@ Options:
 
   const analysisJson = path.join(outDir, "analysis.json")
   const analysisMd = path.join(outDir, "analysis.md")
+  const cJsonPath = path.join(outDir, "C.json")
+  fs.copyFileSync(path.join(outDir, "bench_C.json"), cJsonPath)
   const analyzeRun = await runExecFile(
     process.execPath,
     [
@@ -625,11 +659,11 @@ Options:
   }
 
   const analysis = JSON.parse(fs.readFileSync(analysisJson, "utf8"))
-  const gateEval = evaluateObsGate(analysis)
+  const gateEval = evaluateObsGate(analysis, groupResults)
   const gates = gateEval.gates
   const longTailMetrics = gateEval.long_tail_metrics
   const cLongTailBuckets = gateEval.c_long_tail_buckets
-  const allPass = Object.values(gates).every((item) => item.status === "PASS")
+  const allPass = gateEval.all_pass === true
 
   const result = {
     generated_at: nowIso(),
@@ -642,6 +676,7 @@ Options:
       bench_A: path.join(outDir, "bench_A.json"),
       bench_B: path.join(outDir, "bench_B.json"),
       bench_C: path.join(outDir, "bench_C.json"),
+      C_json: cJsonPath,
       analysis_json: analysisJson,
       analysis_md: analysisMd,
     },

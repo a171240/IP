@@ -1,0 +1,225 @@
+{
+  "generated_at": "2026-02-22T03:23:10.638Z",
+  "wo": "WO-R10-OBS/window2",
+  "status": "PASS",
+  "head": "723162e05821f49f3d4f5dc18da50bc165d264e7",
+  "outputs": {
+    "out_dir": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R10-OBS/window2",
+    "logs_dir": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R10-OBS/window2/logs",
+    "bench_A": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R10-OBS/window2/bench_A.json",
+    "bench_B": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R10-OBS/window2/bench_B.json",
+    "bench_C": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R10-OBS/window2/bench_C.json",
+    "C_json": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R10-OBS/window2/C.json",
+    "analysis_json": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R10-OBS/window2/analysis.json",
+    "analysis_md": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R10-OBS/window2/analysis.md"
+  },
+  "groups": {
+    "A": {
+      "ok": true,
+      "group": "A",
+      "bench_path": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R10-OBS/window2/bench_A.json",
+      "source_bench_path": "/tmp/voicecoach_e2e_1771730400737.json",
+      "client_build": "bench-1771730329844",
+      "server_build": "dev",
+      "attempts_used": 1
+    },
+    "B": {
+      "ok": true,
+      "group": "B",
+      "bench_path": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R10-OBS/window2/bench_B.json",
+      "source_bench_path": "/tmp/voicecoach_e2e_1771730447831.json",
+      "client_build": "bench-1771730404103",
+      "server_build": "dev",
+      "attempts_used": 1
+    },
+    "C": {
+      "ok": true,
+      "group": "C",
+      "bench_path": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R10-OBS/window2/bench_C.json",
+      "source_bench_path": "/tmp/voicecoach_e2e_1771730588307.json",
+      "client_build": "bench-1771730542925",
+      "server_build": "dev",
+      "attempts_used": 3
+    }
+  },
+  "gates": {
+    "G0": {
+      "status": "PASS",
+      "evidence": "missing_required_count_total=0, submit_pump_count=0, events_pump_count=0"
+    },
+    "G1": {
+      "status": "PASS",
+      "evidence": "required_stage_metrics_complete=true, missing=none"
+    },
+    "G2": {
+      "status": "PASS",
+      "evidence": "run_result_status=PASS, C_ok=true"
+    },
+    "G3": {
+      "status": "PASS",
+      "evidence": "c_long_tail_buckets_complete=true, audio_ready_ms_C_p95=9077, queue_wait_before_main_ms_C_p95=348, queue_wait_before_tts_ms_C_p95=2, queue_wait_before_main_ms_p95=22261, queue_wait_before_tts_ms_p95=2"
+    }
+  },
+  "long_tail_metrics": {
+    "audio_ready_ms_C_p95": 9077,
+    "queue_wait_before_main_ms_C_p95": 348,
+    "queue_wait_before_tts_ms_C_p95": 2,
+    "queue_wait_before_main_ms_p95": 22261,
+    "queue_wait_before_tts_ms_p95": 2,
+    "c_timeout_round_count": 0,
+    "c_success_round_count": 3
+  },
+  "c_long_tail_buckets": {
+    "timeout_rounds": {
+      "count": 0,
+      "round_indexes": [],
+      "stage_metrics": {
+        "submit_ack_ms": {
+          "count": 0,
+          "p50": null,
+          "p95": null
+        },
+        "asr_ready_ms": {
+          "count": 0,
+          "p50": null,
+          "p95": null
+        },
+        "text_ready_ms": {
+          "count": 0,
+          "p50": null,
+          "p95": null
+        },
+        "audio_ready_ms": {
+          "count": 0,
+          "p50": null,
+          "p95": null
+        },
+        "queue_wait_before_main_ms": {
+          "count": 0,
+          "p50": null,
+          "p95": null
+        },
+        "queue_wait_before_tts_ms": {
+          "count": 0,
+          "p50": null,
+          "p95": null
+        },
+        "llm_ms": {
+          "count": 0,
+          "p50": null,
+          "p95": null
+        },
+        "tts_ms": {
+          "count": 0,
+          "p50": null,
+          "p95": null
+        }
+      },
+      "stage_metrics_complete": true,
+      "missing_stage_metrics": [],
+      "timeout_signal_distribution": {}
+    },
+    "success_rounds": {
+      "count": 3,
+      "round_indexes": [
+        1,
+        2,
+        3
+      ],
+      "stage_metrics": {
+        "submit_ack_ms": {
+          "count": 3,
+          "p50": 4207,
+          "p95": 4353
+        },
+        "asr_ready_ms": {
+          "count": 3,
+          "p50": 5212,
+          "p95": 7134
+        },
+        "text_ready_ms": {
+          "count": 3,
+          "p50": 6387,
+          "p95": 8403
+        },
+        "audio_ready_ms": {
+          "count": 3,
+          "p50": 6968,
+          "p95": 9077
+        },
+        "queue_wait_before_main_ms": {
+          "count": 3,
+          "p50": 292,
+          "p95": 348
+        },
+        "queue_wait_before_tts_ms": {
+          "count": 3,
+          "p50": 0,
+          "p95": 2
+        },
+        "llm_ms": {
+          "count": 3,
+          "p50": 0,
+          "p95": 0
+        },
+        "tts_ms": {
+          "count": 3,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "stage_metrics_complete": true,
+      "missing_stage_metrics": []
+    },
+    "other_rounds": {
+      "count": 0,
+      "round_indexes": [],
+      "stage_metrics": {
+        "submit_ack_ms": {
+          "count": 0,
+          "p50": null,
+          "p95": null
+        },
+        "asr_ready_ms": {
+          "count": 0,
+          "p50": null,
+          "p95": null
+        },
+        "text_ready_ms": {
+          "count": 0,
+          "p50": null,
+          "p95": null
+        },
+        "audio_ready_ms": {
+          "count": 0,
+          "p50": null,
+          "p95": null
+        },
+        "queue_wait_before_main_ms": {
+          "count": 0,
+          "p50": null,
+          "p95": null
+        },
+        "queue_wait_before_tts_ms": {
+          "count": 0,
+          "p50": null,
+          "p95": null
+        },
+        "llm_ms": {
+          "count": 0,
+          "p50": null,
+          "p95": null
+        },
+        "tts_ms": {
+          "count": 0,
+          "p50": null,
+          "p95": null
+        }
+      },
+      "stage_metrics_complete": true,
+      "missing_stage_metrics": []
+    },
+    "timeout_round_ratio": 0,
+    "success_round_ratio": 1
+  }
+}
