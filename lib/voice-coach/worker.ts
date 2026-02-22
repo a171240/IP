@@ -56,12 +56,15 @@ const claimBurst = Math.max(
     40,
   ),
 )
-const legacyIdleSleepMs = parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MS", 30, 5, 5000)
-const idleSleepMinMs = Math.max(5, parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MIN_MS", 10, 5, 5000))
+const legacyIdleSleepMs =
+  process.env.VOICE_COACH_WORKER_IDLE_SLEEP_MS == null
+    ? null
+    : parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MS", 20, 1, 5000)
+const idleSleepMinMs = Math.max(5, parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MIN_MS", 8, 5, 5000))
 const idleSleepMaxMs = Math.max(
   idleSleepMinMs,
-  parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MAX_MS", 30, idleSleepMinMs, 5000),
-  legacyIdleSleepMs,
+  parseNumberEnv("VOICE_COACH_WORKER_IDLE_SLEEP_MAX_MS", 18, idleSleepMinMs, 5000),
+  legacyIdleSleepMs || 0,
 )
 const errorSleepMs = parseNumberEnv("VOICE_COACH_WORKER_ERROR_SLEEP_MS", 1200, 100, 10000)
 const heartbeatIntervalMs = parseNumberEnv("VOICE_COACH_WORKER_HEARTBEAT_INTERVAL_MS", 2000, 500, 30000)
@@ -71,6 +74,8 @@ const heartbeatFile = String(process.env.VOICE_COACH_WORKER_HEARTBEAT_FILE || "/
 const staleRecoverIntervalMs = parseNumberEnv("VOICE_COACH_WORKER_RECOVER_INTERVAL_MS", 3000, 1000, 30000)
 const staleRecoverMaxJobs = parseNumberEnv("VOICE_COACH_WORKER_RECOVER_MAX_JOBS", 20, 1, 200)
 const maxQueueAgeMs = Math.max(0, parseNumberEnv("VOICE_COACH_WORKER_MAX_QUEUE_AGE_MS", 0, 0, 600000))
+const preferFreshQueueMs = Math.max(0, parseNumberEnv("VOICE_COACH_WORKER_PREFER_FRESH_QUEUE_MS", 120000, 0, 600000))
+const claimNewestFirst = parseBoolEnv("VOICE_COACH_WORKER_NEWEST_FIRST", true)
 const runOnce = parseBoolEnv("VOICE_COACH_WORKER_RUN_ONCE", false)
 const workerId = String(process.env.VOICE_COACH_WORKER_ID || `${hostname()}#${process.pid}`).slice(0, 120)
 const chainMainToTtsInWorker = parseBoolEnv("VOICE_COACH_WORKER_CHAIN_MAIN_TO_TTS", true)
@@ -222,13 +227,24 @@ async function runRound(): Promise<RoundResult> {
   let processed = 0
   const inFlight: Array<Promise<{ processed: boolean; timedOut: boolean }>> = []
   const loadClaimBatch = async (maxJobs: number): Promise<Array<WorkerQueuedJob>> => {
-    const queued = await listVoiceCoachQueuedJobs({
-      maxJobs: Math.max(1, Math.min(maxJobs, workerConcurrency)),
-      allowedStages: ACTIVE_STAGES,
-      newestFirst: true,
-      maxQueueAgeMs,
-      includeClaimHint: true,
-    })
+    const cappedFreshAgeMs =
+      preferFreshQueueMs > 0 ? (maxQueueAgeMs > 0 ? Math.min(preferFreshQueueMs, maxQueueAgeMs) : preferFreshQueueMs) : 0
+    const queryQueued = async (queueAgeMs: number) =>
+      listVoiceCoachQueuedJobs({
+        maxJobs: Math.max(1, Math.min(maxJobs, workerConcurrency)),
+        allowedStages: ACTIVE_STAGES,
+        newestFirst: claimNewestFirst,
+        maxQueueAgeMs: queueAgeMs,
+        includeClaimHint: true,
+      })
+
+    let queued =
+      cappedFreshAgeMs > 0
+        ? await queryQueued(cappedFreshAgeMs)
+        : await queryQueued(maxQueueAgeMs)
+    if (queued.length <= 0 && cappedFreshAgeMs > 0 && (maxQueueAgeMs === 0 || maxQueueAgeMs > cappedFreshAgeMs)) {
+      queued = await queryQueued(maxQueueAgeMs)
+    }
     if (queued.length <= 0) return []
 
     const queuedMain: Array<VoiceCoachQueuedJobRecord> = []
@@ -273,6 +289,16 @@ async function runRound(): Promise<RoundResult> {
       if (!claimedJob) break
       claimedAny = true
       inFlight.push(processOneJob(claimedJob))
+    }
+
+    if (
+      claimedAny &&
+      inFlight.length < workerConcurrency &&
+      processed + inFlight.length < maxJobsPerRound &&
+      Date.now() - roundStartedAt < maxWallMsPerRound
+    ) {
+      // Try to fill remaining concurrency slots before waiting for the first completion.
+      continue
     }
 
     if (inFlight.length <= 0) {
@@ -321,7 +347,7 @@ async function runRound(): Promise<RoundResult> {
 
 async function main() {
   console.log(
-    `[voicecoach-worker] started id=${workerId} max_jobs=${maxJobsPerRound} concurrency=${workerConcurrency} claim_burst=${claimBurst} wall_ms=${maxWallMsPerRound} timeout_ms=${perJobTimeoutMs} idle_ms=${idleSleepMinMs}-${idleSleepMaxMs} max_queue_age_ms=${maxQueueAgeMs} chain_main_to_tts=${chainMainToTtsInWorker ? "true" : "false"}`,
+    `[voicecoach-worker] started id=${workerId} max_jobs=${maxJobsPerRound} concurrency=${workerConcurrency} claim_burst=${claimBurst} wall_ms=${maxWallMsPerRound} timeout_ms=${perJobTimeoutMs} idle_ms=${idleSleepMinMs}-${idleSleepMaxMs} max_queue_age_ms=${maxQueueAgeMs} prefer_fresh_queue_ms=${preferFreshQueueMs} chain_main_to_tts=${chainMainToTtsInWorker ? "true" : "false"}`,
   )
   await touchHeartbeat("started", { force: true, processed: 0, recovered: 0 })
 

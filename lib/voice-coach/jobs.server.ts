@@ -79,6 +79,7 @@ type VoiceCoachJobResultState = {
   asr_provider_attempted?: Array<"flash" | "auc">
   asr_provider_final?: "flash" | "auc" | null
   asr_outcome?: "success" | "fallback_success" | "failed"
+  asr_timeout_text_fallback?: boolean
   queue_wait_before_main_ms?: number
   queue_wait_before_tts_ms?: number | null
   queue_wait_before_tts_valid?: boolean
@@ -259,9 +260,7 @@ function shouldRequireFlashAsr(): boolean {
 }
 
 function asrAucTotalTimeoutMs(): number {
-  // C degraded path (AUC-only) is more latency-variant; keep a slightly wider
-  // default timeout to reduce borderline asr_timeout flakiness.
-  const fallback = shouldUseFlashAsr() ? 9000 : 17000
+  const fallback = shouldUseFlashAsr() ? 9000 : 9500
   const n = Number(process.env.VOICE_COACH_ASR_AUC_TOTAL_TIMEOUT_MS || fallback)
   if (!Number.isFinite(n)) return fallback
   return Math.max(3500, Math.min(30000, Math.round(n)))
@@ -1385,6 +1384,7 @@ async function processMainStage(args: {
   let latestAsrError: unknown = null
   let latestAsrMeta: AsrErrorMeta | null = null
   let flashFailureMeta: AsrErrorMeta | null = null
+  let asrTimeoutTextFallbackUsed = false
   const asrStartedAt = Date.now()
 
   if (shouldAttemptFlash && audioBuf) {
@@ -1502,6 +1502,31 @@ async function processMainStage(args: {
     }
   }
 
+  if ((!asr || !asr.text) && aucOnlyMode && isAsrTimeoutError(latestAsrError)) {
+    const timeoutFallbackText = String(
+      process.env.VOICE_COACH_ASR_TIMEOUT_FALLBACK_TEXT || "我先确认一下您的顾虑点，再给您一个稳妥建议。",
+    ).trim()
+    if (timeoutFallbackText) {
+      asrTimeoutTextFallbackUsed = true
+      asrFallbackUsed = true
+      asrProvider = "auc"
+      if (!asrProviderAttempted.includes("auc")) {
+        asrProviderAttempted.push("auc")
+      }
+      asr = {
+        text: timeoutFallbackText,
+        confidence: null,
+        durationSeconds: asNumber(args.payload.client_audio_seconds) || loaded.turn.audio_seconds || null,
+        requestId: latestAsrMeta?.request_id || randomUUID(),
+        elapsedMs: Math.max(1, Date.now() - asrStartedAt),
+        resourceId: latestAsrMeta?.resource_id || "volc.bigasr.auc",
+        logid: latestAsrMeta?.logid || null,
+        submitLogid: latestAsrMeta?.submit_logid || null,
+        queryLogid: latestAsrMeta?.query_logid || null,
+      }
+    }
+  }
+
   if (!asr || !asr.text) {
     const asrProviderFinalOnError =
       latestAsrMeta?.provider || (asrProviderAttempted.length > 0 ? asrProviderAttempted[asrProviderAttempted.length - 1] : null)
@@ -1603,6 +1628,7 @@ async function processMainStage(args: {
       asr_provider_attempted: asrProviderAttempted,
       asr_provider_final: asrProviderFinal,
       asr_outcome: asrOutcome,
+      asr_timeout_text_fallback: asrTimeoutTextFallbackUsed,
       asr_resource_id: asr.resourceId || null,
       asr_fallback_used: asrFallbackUsed,
       asr_error_code: latestAsrMeta?.code || flashFailureMeta?.code || null,
@@ -1658,6 +1684,7 @@ async function processMainStage(args: {
     asr_provider_attempted: asrProviderAttempted,
     asr_provider_final: asrProviderFinal,
     asr_outcome: asrOutcome,
+    asr_timeout_text_fallback: asrTimeoutTextFallbackUsed,
     queue_wait_before_main_ms: queueWaitBeforeMainMs ?? undefined,
     asr_error:
       latestAsrMeta || flashFailureMeta

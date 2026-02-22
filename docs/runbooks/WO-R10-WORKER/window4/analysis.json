@@ -1,0 +1,175 @@
+{
+  "generated_at": "2026-02-22T03:54:28.288Z",
+  "work_order": "WO-R10-WORKER/window4",
+  "inputs": {
+    "bench_B": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R10-WORKER/window4/bench_B.json",
+    "bench_C": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R10-WORKER/window4/bench_C.json"
+  },
+  "groups": {
+    "B": {
+      "label": "B",
+      "bench_label": "WO-R10-WORKER-B",
+      "client_build": "bench-1771730926690",
+      "server_build": "dev",
+      "rounds": 3,
+      "events": 9,
+      "missing_required_count": 0,
+      "asr_ready": 3,
+      "text_ready": 3,
+      "audio_ready": 3,
+      "turn_error": 0,
+      "asr_provider_final": {
+        "flash": 3
+      },
+      "executor_distribution": {
+        "worker": 9
+      },
+      "executor_worker_ratio": 1,
+      "submit_pump_count": 0,
+      "events_pump_count": 0,
+      "audio_ready_ms": {
+        "count": 3,
+        "p50": 6921,
+        "p95": 7121
+      },
+      "queue_wait_before_main_ms": {
+        "count": 3,
+        "p50": 180,
+        "p95": 230
+      },
+      "queue_wait_before_tts_ms": {
+        "count": 3,
+        "p50": 1,
+        "p95": 1
+      },
+      "llm_ms": {
+        "count": 3,
+        "p50": 0,
+        "p95": 0
+      },
+      "tts_ms": {
+        "count": 3,
+        "p50": 0,
+        "p95": 0
+      },
+      "tts_cache_hit_rate": 1,
+      "asr_provider_final_flash_ratio": 1,
+      "queue_wait_before_tts_invalid_rate": 0,
+      "audit_samples": [
+        "d43a965e-ab61-4751-8ad0-3566647145dd|bench-1771730926690|dev|worker",
+        "d43a965e-ab61-4751-8ad0-3566647145dd|bench-1771730926690|dev|worker"
+      ]
+    },
+    "C": {
+      "label": "C",
+      "bench_label": "WO-R10-WORKER-C",
+      "client_build": "bench-1771731871934",
+      "server_build": "dev",
+      "rounds": 3,
+      "events": 9,
+      "missing_required_count": 0,
+      "asr_ready": 3,
+      "text_ready": 3,
+      "audio_ready": 3,
+      "turn_error": 0,
+      "asr_provider_final": {
+        "flash": 1,
+        "auc": 2
+      },
+      "executor_distribution": {
+        "worker": 9
+      },
+      "executor_worker_ratio": 1,
+      "submit_pump_count": 0,
+      "events_pump_count": 0,
+      "audio_ready_ms": {
+        "count": 3,
+        "p50": 9129,
+        "p95": 9283
+      },
+      "queue_wait_before_main_ms": {
+        "count": 3,
+        "p50": 83,
+        "p95": 196
+      },
+      "queue_wait_before_tts_ms": {
+        "count": 3,
+        "p50": 0,
+        "p95": 0
+      },
+      "llm_ms": {
+        "count": 3,
+        "p50": 0,
+        "p95": 0
+      },
+      "tts_ms": {
+        "count": 3,
+        "p50": 0,
+        "p95": 0
+      },
+      "tts_cache_hit_rate": 1,
+      "asr_provider_final_flash_ratio": 0.3333,
+      "queue_wait_before_tts_invalid_rate": 0,
+      "audit_samples": [
+        "b959636a-bbe5-42d4-9465-41c91cccac43|bench-1771731871934|dev|worker",
+        "b959636a-bbe5-42d4-9465-41c91cccac43|bench-1771731871934|dev|worker"
+      ]
+    }
+  },
+  "gate": {
+    "G0": true,
+    "G1": true,
+    "G2": true,
+    "G3": true
+  },
+  "summary": {
+    "executor_worker_ratio": 1,
+    "submit_pump_count": 0,
+    "events_pump_count": 0,
+    "missing_required_count": 0,
+    "queue_wait_before_main_ms_p95_B": 230,
+    "queue_wait_before_main_ms_p95_C": 196,
+    "audio_ready_ms_B_p50": 6921,
+    "audio_ready_ms_B_p95": 7121,
+    "audio_ready_ms_C_p95": 9283,
+    "C_usable": true,
+    "C_turn_error": 0
+  },
+  "metrics": {
+    "asr_provider_B": {
+      "flash": 3
+    },
+    "asr_provider_C": {
+      "flash": 1,
+      "auc": 2
+    },
+    "audio_ready_ms_B_p50": 6921,
+    "audio_ready_ms_B_p95": 7121,
+    "audio_ready_ms_C_p50": 9129,
+    "audio_ready_ms_C_p95": 9283,
+    "llm_ms_p50": 0,
+    "llm_ms_p95": null,
+    "tts_ms_p50": 0,
+    "tts_ms_p95": null,
+    "queue_wait_before_main_ms_p50": 132,
+    "queue_wait_before_main_ms_p95": 230,
+    "queue_wait_before_tts_ms_p50": 1,
+    "queue_wait_before_tts_ms_p95": 1,
+    "tts_cache_hit_rate": 1,
+    "executor_worker_ratio": 1,
+    "submit_pump_count": 0,
+    "events_pump_count": 0,
+    "asr_provider_final_flash_ratio": 1,
+    "queue_wait_before_tts_invalid_rate": 0
+  },
+  "audit_samples": {
+    "B": [
+      "d43a965e-ab61-4751-8ad0-3566647145dd|bench-1771730926690|dev|worker",
+      "d43a965e-ab61-4751-8ad0-3566647145dd|bench-1771730926690|dev|worker"
+    ],
+    "C": [
+      "b959636a-bbe5-42d4-9465-41c91cccac43|bench-1771731871934|dev|worker",
+      "b959636a-bbe5-42d4-9465-41c91cccac43|bench-1771731871934|dev|worker"
+    ]
+  }
+}
