@@ -1,0 +1,169 @@
+{
+  "generated_at": "2026-02-22T04:02:06.182Z",
+  "wo_id": "WO-R10-ASR",
+  "inputs": {
+    "bench_B": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R10-ASR/window3/bench_B.json",
+    "bench_C": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R10-ASR/window3/bench_C.json",
+    "selfcheck": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R10-ASR/window3/selfcheck.log",
+    "startup_gate": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R10-ASR/window3/startup_gate.log"
+  },
+  "gates": {
+    "G0": {
+      "pass": true,
+      "evidence": {
+        "selfcheck_pass": true,
+        "startup_gate_pass": true,
+        "require_flash_true": true
+      }
+    },
+    "G1": {
+      "pass": true,
+      "evidence": {
+        "asr_provider_final_flash_ratio_B": 1,
+        "target": ">=0.98"
+      }
+    },
+    "G2": {
+      "pass": true,
+      "evidence": {
+        "asr_ms_B_p95": 680,
+        "target": "<=1000",
+        "flash_permission_denied_count": 0,
+        "target_denied": "=0"
+      }
+    },
+    "G3": {
+      "pass": true,
+      "evidence": {
+        "asr_provider_attempted_distribution_C": {
+          "auc": 3
+        },
+        "asr_ready_count_C": 3,
+        "turn_error_count_C": 0,
+        "rounds_C": 3,
+        "per_round_C": [
+          {
+            "round": 1,
+            "asr_provider_attempted": [
+              "auc"
+            ],
+            "asr_provider_final": "auc",
+            "asr_ready_ms": 8050,
+            "asr_ms": 21,
+            "turn_error": null
+          },
+          {
+            "round": 2,
+            "asr_provider_attempted": [
+              "auc"
+            ],
+            "asr_provider_final": "auc",
+            "asr_ready_ms": 5936,
+            "asr_ms": 14,
+            "turn_error": null
+          },
+          {
+            "round": 3,
+            "asr_provider_attempted": [
+              "auc"
+            ],
+            "asr_provider_final": "auc",
+            "asr_ready_ms": 8279,
+            "asr_ms": 5316,
+            "turn_error": null
+          }
+        ]
+      }
+    }
+  },
+  "metrics": {
+    "B": {
+      "rounds": 3,
+      "asr_ready_count": 3,
+      "turn_error_count": 0,
+      "asr_ms_p95": 680,
+      "asr_provider_final_flash_ratio": 1,
+      "asr_provider_attempted_distribution": {
+        "flash": 3
+      },
+      "per_round": [
+        {
+          "round": 1,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ready_ms": 6449,
+          "asr_ms": 697,
+          "turn_error": null
+        },
+        {
+          "round": 2,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ready_ms": 5170,
+          "asr_ms": 680,
+          "turn_error": null
+        },
+        {
+          "round": 3,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ready_ms": 5014,
+          "asr_ms": 630,
+          "turn_error": null
+        }
+      ],
+      "flash_permission_denied_count": 0
+    },
+    "C": {
+      "rounds": 3,
+      "asr_ready_count": 3,
+      "turn_error_count": 0,
+      "asr_ms_p95": 21,
+      "asr_provider_final_flash_ratio": 0,
+      "asr_provider_attempted_distribution": {
+        "auc": 3
+      },
+      "per_round": [
+        {
+          "round": 1,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ready_ms": 8050,
+          "asr_ms": 21,
+          "turn_error": null
+        },
+        {
+          "round": 2,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ready_ms": 5936,
+          "asr_ms": 14,
+          "turn_error": null
+        },
+        {
+          "round": 3,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ready_ms": 8279,
+          "asr_ms": 5316,
+          "turn_error": null
+        }
+      ],
+      "flash_permission_denied_count": 0
+    },
+    "selfcheck_status": "PASS",
+    "startup_gate_status": "PASS"
+  }
+}
