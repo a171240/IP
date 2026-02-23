@@ -2874,19 +2874,14 @@ export async function processVoiceCoachJobById(args: {
   const stageEnteredAtMsFromResult = asNumber(resultStateBeforeClaim.stage_entered_at_ms)
   const pipelineStartedAtMsFromResult = asNumber(resultStateBeforeClaim.pipeline_started_at_ms)
   const submitAckMsFromResult = asNumber(resultStateBeforeClaim.submit_ack_ms)
-  const uploadMsFromResult = asNumber(resultStateBeforeClaim.upload_ms)
-  const postUploadSubmitOverheadMs =
-    submitAckMsFromResult === null
-      ? null
-      : Math.max(0, Math.round(submitAckMsFromResult - Math.max(0, uploadMsFromResult || 0)))
   const queueReadyGraceMsRaw = Number(process.env.VOICE_COACH_QUEUE_READY_GRACE_MS || 250)
   const queueReadyGraceMs = Number.isFinite(queueReadyGraceMsRaw)
     ? Math.max(0, Math.min(1000, Math.round(queueReadyGraceMsRaw)))
     : 250
   const queueReadyAtMsFromSubmit =
-    pipelineStartedAtMsFromResult === null || postUploadSubmitOverheadMs === null
+    pipelineStartedAtMsFromResult === null || submitAckMsFromResult === null
       ? null
-      : pipelineStartedAtMsFromResult + postUploadSubmitOverheadMs + queueReadyGraceMs
+      : pipelineStartedAtMsFromResult + submitAckMsFromResult + queueReadyGraceMs
   // For main queue wait, prefer the "submit-ready" anchor (post-upload submit overhead)
   // so submit-path work is not counted as queue backlog.
   // Fall back to stage-enter / DB timestamps only when this anchor is missing.
