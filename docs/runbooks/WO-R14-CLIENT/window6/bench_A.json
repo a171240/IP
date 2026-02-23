@@ -1,0 +1,90 @@
+{
+  "generated_at": "2026-02-23T13:36:37.359Z",
+  "label": "A",
+  "path_mode": "flash_required",
+  "source_file": "/tmp/voicecoach_e2e_1771853668934.json",
+  "session_id": "a5a142a6-5f21-4b25-8cb8-d4ced952e9bd",
+  "client_build": "bench-1771853652282",
+  "server_build": "dev",
+  "rounds": 1,
+  "sample_events": 3,
+  "audit_sample_count": 3,
+  "audit_samples": [
+    {
+      "trace_id": "4d90532d-b8e8-4e59-9c23-b7bde907103d",
+      "client_build": "bench-1771853652282",
+      "server_build": "dev",
+      "executor": "worker",
+      "event_type": "beautician.asr_ready"
+    },
+    {
+      "trace_id": "4d90532d-b8e8-4e59-9c23-b7bde907103d",
+      "client_build": "bench-1771853652282",
+      "server_build": "dev",
+      "executor": "worker",
+      "event_type": "customer.text_ready"
+    },
+    {
+      "trace_id": "4d90532d-b8e8-4e59-9c23-b7bde907103d",
+      "client_build": "bench-1771853652282",
+      "server_build": "dev",
+      "executor": "worker",
+      "event_type": "customer.audio_ready"
+    }
+  ],
+  "asr_provider_distribution": {
+    "flash": 1
+  },
+  "asr_flash_ratio": 1,
+  "submit_ack_ms": {
+    "p50": 4666,
+    "p95": 4666
+  },
+  "audio_ready_ms": {
+    "p50": 6153,
+    "p95": 6153
+  },
+  "llm_ms": {
+    "p50": 0,
+    "p95": 0
+  },
+  "tts_ms": {
+    "p50": 0,
+    "p95": 0
+  },
+  "queue_wait_before_main_ms": {
+    "p50": 0,
+    "p95": 0
+  },
+  "queue_wait_before_tts_ms_raw": {
+    "p50": 2,
+    "p95": 2
+  },
+  "queue_wait_before_tts_ms_corrected": {
+    "p50": 2,
+    "p95": 2,
+    "rule": "valid_only_then_fallback_raw"
+  },
+  "queue_wait_before_tts_invalid_rate": 0,
+  "tts_cache_hit_rate": 1,
+  "executor_distribution": {
+    "worker": 3
+  },
+  "executor_worker_ratio": 1,
+  "submit_pump_count": 0,
+  "events_pump_count": 0,
+  "counts": {
+    "asr_ready": 1,
+    "text_ready": 1,
+    "audio_ready": 1,
+    "turn_error": 0
+  },
+  "usable": true,
+  "client_probe": {
+    "record_format": "mp3",
+    "record_sample_rate": 16000,
+    "record_channels": 1,
+    "ui_feedback_p95_ms": 42,
+    "source": "latest_real_device_probe"
+  }
+}

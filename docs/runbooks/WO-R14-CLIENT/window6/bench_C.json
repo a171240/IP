@@ -1,0 +1,90 @@
+{
+  "generated_at": "2026-02-23T13:36:37.360Z",
+  "label": "C",
+  "path_mode": "slow_path_degraded",
+  "source_file": "/tmp/voicecoach_e2e_1771853743186.json",
+  "session_id": "1aee9b7a-e9a5-4c4e-a61f-134c07b71f11",
+  "client_build": "bench-1771853722972",
+  "server_build": "dev",
+  "rounds": 1,
+  "sample_events": 3,
+  "audit_sample_count": 3,
+  "audit_samples": [
+    {
+      "trace_id": "97fb0617-75dd-4ce3-a75f-9f9502d82cc6",
+      "client_build": "bench-1771853722972",
+      "server_build": "dev",
+      "executor": "worker",
+      "event_type": "beautician.asr_ready"
+    },
+    {
+      "trace_id": "97fb0617-75dd-4ce3-a75f-9f9502d82cc6",
+      "client_build": "bench-1771853722972",
+      "server_build": "dev",
+      "executor": "worker",
+      "event_type": "customer.text_ready"
+    },
+    {
+      "trace_id": "97fb0617-75dd-4ce3-a75f-9f9502d82cc6",
+      "client_build": "bench-1771853722972",
+      "server_build": "dev",
+      "executor": "worker",
+      "event_type": "customer.audio_ready"
+    }
+  ],
+  "asr_provider_distribution": {
+    "auc": 1
+  },
+  "asr_flash_ratio": 0,
+  "submit_ack_ms": {
+    "p50": 5581,
+    "p95": 5581
+  },
+  "audio_ready_ms": {
+    "p50": 9676,
+    "p95": 9676
+  },
+  "llm_ms": {
+    "p50": 0,
+    "p95": 0
+  },
+  "tts_ms": {
+    "p50": 0,
+    "p95": 0
+  },
+  "queue_wait_before_main_ms": {
+    "p50": 0,
+    "p95": 0
+  },
+  "queue_wait_before_tts_ms_raw": {
+    "p50": 2,
+    "p95": 2
+  },
+  "queue_wait_before_tts_ms_corrected": {
+    "p50": 2,
+    "p95": 2,
+    "rule": "valid_only_then_fallback_raw"
+  },
+  "queue_wait_before_tts_invalid_rate": 0,
+  "tts_cache_hit_rate": 1,
+  "executor_distribution": {
+    "worker": 3
+  },
+  "executor_worker_ratio": 1,
+  "submit_pump_count": 0,
+  "events_pump_count": 0,
+  "counts": {
+    "asr_ready": 1,
+    "text_ready": 1,
+    "audio_ready": 1,
+    "turn_error": 0
+  },
+  "usable": true,
+  "client_probe": {
+    "record_format": "mp3",
+    "record_sample_rate": 16000,
+    "record_channels": 1,
+    "ui_feedback_p95_ms": 42,
+    "source": "latest_real_device_probe"
+  }
+}
