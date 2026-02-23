@@ -1,0 +1,94 @@
+{
+  "generated_at": "2026-02-23T12:20:52.721Z",
+  "bench_tag": "wo-r14-tts-c-1771849010684",
+  "session_id": "7deb25b4-ef4b-41ef-817b-2ad5eb19a73e",
+  "rounds_requested": 8,
+  "rounds_planned": 8,
+  "rounds_queued": 8,
+  "round_errors": [
+    "round_6:job_timeout"
+  ],
+  "sample_counts": {
+    "audio_ready_raw": 7,
+    "asr_ready_raw": 7,
+    "audio_ready_dedup": 7,
+    "asr_ready_dedup": 7
+  },
+  "executor_worker_ratio_audio": 1,
+  "script_hit_rate": 1,
+  "tts_line_cache_hit_rate": 1,
+  "tts_cache_hit_rate": 1,
+  "tts_source_distribution": {
+    "line_cache": 7,
+    "text_cache": 0,
+    "runtime": 0
+  },
+  "llm_used_when_script_hit_count": 0,
+  "tts_ms": {
+    "count": 7,
+    "p50": 0,
+    "p95": 0,
+    "avg": 0,
+    "max": 0
+  },
+  "queue_wait_before_tts_ms": {
+    "count": 7,
+    "p50": 0,
+    "p95": 1,
+    "avg": 0.57,
+    "max": 2
+  },
+  "queue_wait_before_main_ms": {
+    "count": 7,
+    "p50": 1004,
+    "p95": 5086,
+    "avg": 3204.86,
+    "max": 11218
+  },
+  "audio_ready_ms": {
+    "count": 7,
+    "p50": 9470,
+    "p95": 18774,
+    "avg": 11148.14,
+    "max": 20436
+  },
+  "llm_ms": {
+    "count": 7,
+    "p50": 0,
+    "p95": 0,
+    "avg": 0,
+    "max": 0
+  },
+  "asr_provider": {
+    "flash": 5,
+    "auc": 2
+  },
+  "asr_provider_final": {
+    "flash": 5,
+    "auc": 2
+  },
+  "asr_outcome": {
+    "success": 5,
+    "fallback_success": 2
+  },
+  "asr_provider_final_flash_ratio": 0.7143,
+  "queue_wait_before_tts_invalid_rate": 0,
+  "submit_pump_count": null,
+  "events_pump_count": null,
+  "audit_samples": [
+    {
+      "id": 8664,
+      "trace_id": "7df21c85-7663-47a0-82e1-6f409ff440d0",
+      "client_build": "wo-r14-tts-c-1771849010684",
+      "server_build": "0.1.0",
+      "executor": "worker"
+    },
+    {
+      "id": 8670,
+      "trace_id": "ab51314a-3529-4056-b9d2-e0775b9e6c46",
+      "client_build": "wo-r14-tts-c-1771849010684",
+      "server_build": "0.1.0",
+      "executor": "worker"
+    }
+  ]
+}
