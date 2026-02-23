@@ -1,0 +1,372 @@
+{
+  "generated_at": "2026-02-23T03:33:58.906Z",
+  "wo_id": "WO-R12-ASR-R2",
+  "window": "window3",
+  "inputs": {
+    "bench_B": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R12-ASR-R2/window3/bench_B.json",
+    "bench_B_manifest": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R12-ASR-R2/window3/bench_B.manifest.txt",
+    "selfcheck": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R12-ASR-R2/window3/selfcheck.log",
+    "startup_gate": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R12-ASR-R2/window3/startup_gate.log",
+    "attempt2_manifest": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R12-ASR-R2/window3/attempt2/bench_B.manifest.txt"
+  },
+  "gates": {
+    "G0": {
+      "pass": true,
+      "evidence": {
+        "selfcheck_status": "PASS",
+        "startup_gate_status": "PASS"
+      }
+    },
+    "G1": {
+      "pass": true,
+      "evidence": {
+        "turn_error_count": 0,
+        "submit_error_count": 0,
+        "asr_ready_count": 30,
+        "target": "turn.error=0 && submit_error=0 && asr_ready_count=30"
+      }
+    },
+    "G2": {
+      "pass": true,
+      "evidence": {
+        "flash_ratio_B": 1,
+        "target": ">=0.98"
+      }
+    }
+  },
+  "metrics": {
+    "rounds_B": 30,
+    "asr_ready_count_B": 30,
+    "turn_error_count_B": 0,
+    "submit_error_count_B": 0,
+    "asr_provider_attempted_B": {
+      "flash": 30
+    },
+    "asr_provider_final_B": {
+      "flash": 30
+    },
+    "asr_provider_final_flash_ratio_B": 1,
+    "asr_ms_B_p50": 596,
+    "asr_ms_B_p95": 731
+  },
+  "per_round": [
+    {
+      "round": 1,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 579,
+      "turn_error": null
+    },
+    {
+      "round": 2,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 666,
+      "turn_error": null
+    },
+    {
+      "round": 3,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 621,
+      "turn_error": null
+    },
+    {
+      "round": 4,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 530,
+      "turn_error": null
+    },
+    {
+      "round": 5,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 602,
+      "turn_error": null
+    },
+    {
+      "round": 6,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 562,
+      "turn_error": null
+    },
+    {
+      "round": 7,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 606,
+      "turn_error": null
+    },
+    {
+      "round": 8,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 559,
+      "turn_error": null
+    },
+    {
+      "round": 9,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 666,
+      "turn_error": null
+    },
+    {
+      "round": 10,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 563,
+      "turn_error": null
+    },
+    {
+      "round": 11,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 602,
+      "turn_error": null
+    },
+    {
+      "round": 12,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 615,
+      "turn_error": null
+    },
+    {
+      "round": 13,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 589,
+      "turn_error": null
+    },
+    {
+      "round": 14,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 620,
+      "turn_error": null
+    },
+    {
+      "round": 15,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 609,
+      "turn_error": null
+    },
+    {
+      "round": 16,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 660,
+      "turn_error": null
+    },
+    {
+      "round": 17,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 619,
+      "turn_error": null
+    },
+    {
+      "round": 18,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 487,
+      "turn_error": null
+    },
+    {
+      "round": 19,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 570,
+      "turn_error": null
+    },
+    {
+      "round": 20,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 582,
+      "turn_error": null
+    },
+    {
+      "round": 21,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 517,
+      "turn_error": null
+    },
+    {
+      "round": 22,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 586,
+      "turn_error": null
+    },
+    {
+      "round": 23,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 578,
+      "turn_error": null
+    },
+    {
+      "round": 24,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 570,
+      "turn_error": null
+    },
+    {
+      "round": 25,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 784,
+      "turn_error": null
+    },
+    {
+      "round": 26,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 606,
+      "turn_error": null
+    },
+    {
+      "round": 27,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 629,
+      "turn_error": null
+    },
+    {
+      "round": 28,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 1118,
+      "turn_error": null
+    },
+    {
+      "round": 29,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 505,
+      "turn_error": null
+    },
+    {
+      "round": 30,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 582,
+      "turn_error": null
+    }
+  ],
+  "audit_samples": [
+    {
+      "trace_id": "6165f2a1-1b62-4626-8bda-5c77c18f3740",
+      "client_build": "bench-1771817192554",
+      "server_build": "dev",
+      "executor": "worker",
+      "type": "beautician.asr_ready",
+      "flash_logid": "20260223112647DC53E0CD4D0BF3E371E9"
+    },
+    {
+      "trace_id": "6165f2a1-1b62-4626-8bda-5c77c18f3740",
+      "client_build": "bench-1771817192554",
+      "server_build": "dev",
+      "executor": "worker",
+      "type": "customer.text_ready",
+      "flash_logid": null
+    }
+  ]
+}
