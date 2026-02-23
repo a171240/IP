@@ -1,0 +1,41 @@
+{
+  "generated_at": "2026-02-23T02:15:28.044Z",
+  "samples": [
+    {
+      "id": "70d41f80-0162-4670-b961-c8cab4fa71b5",
+      "session_id": "11b64321-6669-4b8d-ae0e-b4cf5b47f66b",
+      "turn_id": "cf537654-6a1a-482e-bf96-44f496a34356",
+      "status": "error",
+      "last_error": "语音识别超时，请重录并靠近麦克风。",
+      "created_at": "2026-02-22T03:35:21.233175+00:00",
+      "trace_id": "e640e5f9-eaa8-4d75-8a01-be9f07c62f36",
+      "client_build": "bench-1771731299744",
+      "server_build": "dev",
+      "executor": "worker"
+    },
+    {
+      "id": "22e6ceec-5db9-41f4-bc2d-b404ddbecad6",
+      "session_id": "11b64321-6669-4b8d-ae0e-b4cf5b47f66b",
+      "turn_id": "889cef27-c2cf-45b5-8d9b-b0f25642a543",
+      "status": "error",
+      "last_error": "语音识别超时，请重录并靠近麦克风。",
+      "created_at": "2026-02-22T03:35:08.316447+00:00",
+      "trace_id": "a87d2f86-5656-4e9c-9797-b17ad228fb5b",
+      "client_build": "bench-1771731299744",
+      "server_build": "dev",
+      "executor": "worker"
+    },
+    {
+      "id": "09b28148-5c7f-4743-998e-eda8277723eb",
+      "session_id": "4b7b6bde-a3e3-4339-baac-6c4c1efa453d",
+      "turn_id": "3dd4666e-47bf-40e7-8fdb-391b2610fdc4",
+      "status": "error",
+      "last_error": "语音识别超时，请重录并靠近麦克风。",
+      "created_at": "2026-02-22T03:34:21.99512+00:00",
+      "trace_id": "b3dda0b5-ecdc-4ca7-87fd-5ad3fbf700a3",
+      "client_build": "bench-1771731234672",
+      "server_build": "dev",
+      "executor": "worker"
+    }
+  ]
+}
