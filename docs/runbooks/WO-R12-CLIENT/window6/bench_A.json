@@ -1,33 +1,33 @@
 {
-  "generated_at": "2026-02-23T02:12:30.339Z",
+  "generated_at": "2026-02-23T03:42:35.716Z",
   "label": "A",
   "path_mode": "flash_required",
-  "source_file": "/tmp/voicecoach_e2e_1771812686296.json",
-  "session_id": "1d50d85e-af3a-412f-815e-2b6c2604803e",
-  "client_build": "bench-1771812671602",
-  "server_build": "0.1.0",
+  "source_file": "/tmp/voicecoach_e2e_1771818044406.json",
+  "session_id": "28174de6-27bd-448d-8e8c-6f2ae6646ae2",
+  "client_build": "bench-1771818028287",
+  "server_build": "dev",
   "rounds": 1,
   "sample_events": 3,
   "audit_sample_count": 3,
   "audit_samples": [
     {
-      "trace_id": "5a87e065-3152-4c66-9e56-7a94199ab92d",
-      "client_build": "bench-1771812671602",
-      "server_build": "0.1.0",
+      "trace_id": "fe04a0e2-8500-455f-a313-458c83c6d9b4",
+      "client_build": "bench-1771818028287",
+      "server_build": "dev",
       "executor": "worker",
       "event_type": "beautician.asr_ready"
     },
     {
-      "trace_id": "5a87e065-3152-4c66-9e56-7a94199ab92d",
-      "client_build": "bench-1771812671602",
-      "server_build": "0.1.0",
+      "trace_id": "fe04a0e2-8500-455f-a313-458c83c6d9b4",
+      "client_build": "bench-1771818028287",
+      "server_build": "dev",
       "executor": "worker",
       "event_type": "customer.text_ready"
     },
     {
-      "trace_id": "5a87e065-3152-4c66-9e56-7a94199ab92d",
-      "client_build": "bench-1771812671602",
-      "server_build": "0.1.0",
+      "trace_id": "fe04a0e2-8500-455f-a313-458c83c6d9b4",
+      "client_build": "bench-1771818028287",
+      "server_build": "dev",
       "executor": "worker",
       "event_type": "customer.audio_ready"
     }
@@ -37,12 +37,12 @@
   },
   "asr_flash_ratio": 1,
   "submit_ack_ms": {
-    "p50": 5548,
-    "p95": 5548
+    "p50": 5116,
+    "p95": 5116
   },
   "audio_ready_ms": {
-    "p50": 6132,
-    "p95": 6132
+    "p50": 6486,
+    "p95": 6486
   },
   "llm_ms": {
     "p50": 0,
@@ -53,16 +53,16 @@
     "p95": 0
   },
   "queue_wait_before_main_ms": {
-    "p50": 366,
-    "p95": 366
+    "p50": 0,
+    "p95": 0
   },
   "queue_wait_before_tts_ms_raw": {
-    "p50": 1,
-    "p95": 1
+    "p50": 2,
+    "p95": 2
   },
   "queue_wait_before_tts_ms_corrected": {
-    "p50": 1,
-    "p95": 1,
+    "p50": 2,
+    "p95": 2,
     "rule": "valid_only_then_fallback_raw"
   },
   "queue_wait_before_tts_invalid_rate": 0,
