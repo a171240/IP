@@ -17,6 +17,26 @@ const REQUIRED_STAGE_KEYS = [
   "queue_wait_before_main_ms",
   "queue_wait_before_tts_ms",
 ]
+const GATE_THRESHOLDS = Object.freeze({
+  G0: Object.freeze({
+    missing_required_count_total: 0,
+    submit_pump_count: 0,
+    events_pump_count: 0,
+  }),
+  G1: Object.freeze({
+    required_stage_metrics: REQUIRED_STAGE_KEYS,
+    required_quantiles: ["p50", "p95"],
+  }),
+  G2: Object.freeze({
+    run_result_status: "PASS",
+    required_groups_ok: ["A", "B", "C"],
+  }),
+  G3: Object.freeze({
+    c_long_tail_required_buckets: ["timeout_rounds", "success_rounds"],
+    c_long_tail_bucket_required_stage_metrics: REQUIRED_STAGE_KEYS,
+    c_long_tail_bucket_required_quantiles: ["p50", "p95"],
+  }),
+})
 
 function parseArgs(argv) {
   const out = {}
@@ -452,6 +472,7 @@ function evaluateObsGate(analysis, groupResults) {
       c_success_round_count: cSuccessRounds,
     },
     c_long_tail_buckets: cLongTailBuckets,
+    gate_thresholds: GATE_THRESHOLDS,
     all_pass: runStatusPass,
   }
 }
@@ -485,6 +506,10 @@ function writeRunResult(outDir, result) {
     `- success_rounds.queue_wait_before_main_ms_p95: ${successBucket?.stage_metrics?.queue_wait_before_main_ms?.p95 ?? "null"}`,
     `- success_rounds.queue_wait_before_tts_ms_p95: ${successBucket?.stage_metrics?.queue_wait_before_tts_ms?.p95 ?? "null"}`,
   ]
+  const gateThresholds = result?.gate_thresholds || {}
+  const gateThresholdLines = Object.keys(gateThresholds).map(
+    (key) => `- ${key}: ${JSON.stringify(gateThresholds[key] || {})}`,
+  )
 
   fs.writeFileSync(
     mdFile,
@@ -498,6 +523,9 @@ function writeRunResult(outDir, result) {
       "",
       "## Gates",
       ...gateLines,
+      "",
+      "## Gate Thresholds",
+      ...gateThresholdLines,
       "",
       "## Long Tail",
       ...longTailLines,
@@ -589,6 +617,7 @@ Options:
         status: "FAIL",
         failed_group: group.key,
         reason: result.reason || "group_failed",
+        gate_thresholds: GATE_THRESHOLDS,
         outputs: {
           out_dir: outDir,
           logs_dir: logsDir,
@@ -608,6 +637,7 @@ Options:
       wo,
       status: "BLOCKED",
       reason: `head_changed start=${startHead} current=${endHead || "unknown"}`,
+      gate_thresholds: GATE_THRESHOLDS,
       outputs: {
         out_dir: outDir,
         logs_dir: logsDir,
@@ -656,6 +686,7 @@ Options:
       reason: "analyze_failed",
       analyze_exit_code: analyzeRun.code,
       analyze_stderr: analyzeRun.stderr,
+      gate_thresholds: GATE_THRESHOLDS,
       outputs: {
         out_dir: outDir,
         logs_dir: logsDir,
@@ -690,6 +721,7 @@ Options:
     },
     groups: groupResults,
     gates,
+    gate_thresholds: gateEval.gate_thresholds || GATE_THRESHOLDS,
     long_tail_metrics: longTailMetrics,
     c_long_tail_buckets: cLongTailBuckets,
   }
@@ -709,6 +741,7 @@ main().catch((err) => {
     status: "FAIL",
     reason: "unhandled_exception",
     error_message: String(err?.message || err || "unknown"),
+    gate_thresholds: GATE_THRESHOLDS,
     outputs: {
       out_dir: context.outDir,
       logs_dir: logsDir,
