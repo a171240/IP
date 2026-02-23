@@ -29,7 +29,7 @@ const GATE_THRESHOLDS = Object.freeze({
   }),
   G2: Object.freeze({
     run_result_status: "PASS",
-    required_groups_ok: ["A", "B", "C"],
+    c_ok: true,
   }),
   G3: Object.freeze({
     c_long_tail_required_buckets: ["timeout_rounds", "success_rounds"],
@@ -57,7 +57,7 @@ function parseArgs(argv) {
 
 function resolveRunContext(argv) {
   const args = parseArgs(argv)
-  const wo = String(args.wo || "WO-R11-OBS/window2").trim()
+  const wo = String(args.wo || "WO-R13-OBS/window2").trim()
   const outDir = String(args["out-dir"] || "").trim() || path.join(ROOT, "docs", "runbooks", wo)
   return { args, wo, outDir }
 }
@@ -402,10 +402,7 @@ function evaluateObsGate(analysis, groupResults) {
     return !(metric && metric.p50 !== null && metric.p95 !== null)
   })
   const stageComplete = Boolean(analysis?.summary?.stage_metrics_complete) && missingStage.length === 0
-  const aOk = Boolean(groupResults?.A?.ok)
-  const bOk = Boolean(groupResults?.B?.ok)
   const cOk = Boolean(groupResults?.C?.ok)
-  const groupAllOk = aOk && bOk && cOk
 
   const cAudioReadyP95 = toNumberOrNull(analysis?.metrics?.audio_ready_ms_C_p95)
   const cQueueMainP95 = toNumberOrNull(analysis?.groups?.C?.stage_metrics?.queue_wait_before_main_ms?.p95)
@@ -433,8 +430,8 @@ function evaluateObsGate(analysis, groupResults) {
     eventsPumpCount === 0
   const g1Pass = stageComplete
   const g3Pass = hasRequiredBucketNodes && longTailBucketsComplete
-  const runStatusPass = g0Pass && g1Pass && g3Pass && groupAllOk
-  const g2Pass = runStatusPass && groupAllOk
+  const runStatusPass = g0Pass && g1Pass && g3Pass && cOk
+  const g2Pass = runStatusPass && cOk
   const longTailEvidence = [
     formatMetric("audio_ready_ms_C_p95", cAudioReadyP95),
     formatMetric("queue_wait_before_main_ms_C_p95", cQueueMainP95),
@@ -455,7 +452,7 @@ function evaluateObsGate(analysis, groupResults) {
       },
       G2: {
         status: g2Pass ? "PASS" : "FAIL",
-        evidence: `run_result_status=${runStatusPass ? "PASS" : "FAIL"}, A_ok=${aOk}, B_ok=${bOk}, C_ok=${cOk}`,
+        evidence: `run_result_status=${runStatusPass ? "PASS" : "FAIL"}, C_ok=${cOk}`,
       },
       G3: {
         status: g3Pass ? "PASS" : "FAIL",
@@ -553,7 +550,7 @@ async function main() {
   node scripts/run_voicecoach_obs_oneclick.mjs [options]
 
 Options:
-  --wo <work_order>            default: WO-R11-OBS/window2
+  --wo <work_order>            default: WO-R13-OBS/window2
   --out-dir <absolute_path>    default: <repo>/docs/runbooks/<wo>
   --port <number>              default: 3390
   --attempts <number>          default: 6

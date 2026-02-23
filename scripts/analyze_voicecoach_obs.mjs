@@ -327,7 +327,7 @@ const benchBPath = String(args.b || "").trim()
 const benchCPath = String(args.c || "").trim()
 const outJsonPath = String(args.out || "").trim()
 const outMdPath = String(args.md || "").trim()
-const workOrder = String(args.work_order || args.wo || "WO-R11-OBS/window2").trim() || "WO-R11-OBS/window2"
+const workOrder = String(args.work_order || args.wo || "WO-R13-OBS/window2").trim() || "WO-R13-OBS/window2"
 
 if (!benchAPath || !benchBPath || !benchCPath || !outJsonPath || !outMdPath) {
   console.error(
