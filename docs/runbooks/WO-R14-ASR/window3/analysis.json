@@ -1,0 +1,1411 @@
+{
+  "generated_at": "2026-02-23T12:37:16.977Z",
+  "wo_id": "WO-R14-ASR",
+  "window": "window3",
+  "head": "aaa8499",
+  "inputs": {
+    "selfcheck": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R14-ASR/window3/selfcheck.log",
+    "startup_gate": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R14-ASR/window3/startup_gate.log",
+    "bench_B": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R14-ASR/window3/bench_B.json",
+    "bench_C": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R14-ASR/window3/bench_C.json",
+    "bench_B_manifest": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R14-ASR/window3/bench_B.manifest.txt",
+    "bench_C_manifest": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R14-ASR/window3/bench_C.manifest.txt"
+  },
+  "gates": {
+    "G0": {
+      "pass": true,
+      "evidence": {
+        "selfcheck_status": "PASS",
+        "startup_gate_status": "PASS"
+      }
+    },
+    "G1": {
+      "pass": true,
+      "evidence": {
+        "asr_ready_count_B": 30,
+        "turn_error_count_B": 0,
+        "submit_error_count_B": 0
+      }
+    },
+    "G2": {
+      "pass": true,
+      "evidence": {
+        "asr_provider_final_flash_ratio_B": 1,
+        "flash_permission_denied_count_B": 0,
+        "asr_ms_B_p95": 693
+      }
+    },
+    "G3": {
+      "pass": true,
+      "evidence": {
+        "flash_attempt_rounds_C": [],
+        "turn_error_count_C": 0,
+        "asr_provider_attempted_C": {
+          "auc": 30
+        }
+      }
+    }
+  },
+  "metrics": {
+    "B": {
+      "rounds": 30,
+      "asr_ready_count": 30,
+      "turn_error_count": 0,
+      "submit_error_count": 0,
+      "flash_permission_denied_count": 0,
+      "asr_provider_attempted": {
+        "flash": 30
+      },
+      "asr_provider_final": {
+        "flash": 30
+      },
+      "asr_provider_final_flash_ratio": 1,
+      "asr_ms_p50": 584,
+      "asr_ms_p95": 693,
+      "per_round": [
+        {
+          "round": 1,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ms": 547,
+          "turn_error": null,
+          "trace_id": "ab67e8f1-56f6-4613-95c2-5ca8fe298778"
+        },
+        {
+          "round": 2,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ms": 569,
+          "turn_error": null,
+          "trace_id": "9c6c83d9-a4d4-4e0a-ab46-208952012e6e"
+        },
+        {
+          "round": 3,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ms": 589,
+          "turn_error": null,
+          "trace_id": "c8c31698-deb6-4275-abbf-705cc29702e9"
+        },
+        {
+          "round": 4,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ms": 527,
+          "turn_error": null,
+          "trace_id": "53e49c8d-2b37-4747-97ab-90d453f0b901"
+        },
+        {
+          "round": 5,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ms": 587,
+          "turn_error": null,
+          "trace_id": "9cda91ee-03c0-407f-a333-a4f5acdfec85"
+        },
+        {
+          "round": 6,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ms": 603,
+          "turn_error": null,
+          "trace_id": "f98af2f6-99ce-46d3-8b4b-bb210d4f32ef"
+        },
+        {
+          "round": 7,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ms": 626,
+          "turn_error": null,
+          "trace_id": "90ce6cdc-b8c8-4fba-b0ad-9056ceef1ad3"
+        },
+        {
+          "round": 8,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ms": 768,
+          "turn_error": null,
+          "trace_id": "dd8bfe09-05f5-4254-a214-2e212553322d"
+        },
+        {
+          "round": 9,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ms": 544,
+          "turn_error": null,
+          "trace_id": "76653f13-d350-424f-9ac1-ab7c9153f21c"
+        },
+        {
+          "round": 10,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ms": 659,
+          "turn_error": null,
+          "trace_id": "f9cbbac8-9beb-40f7-beeb-32dd59543d2e"
+        },
+        {
+          "round": 11,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ms": 568,
+          "turn_error": null,
+          "trace_id": "c45282a9-af05-4957-8b2f-67d04995358f"
+        },
+        {
+          "round": 12,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ms": 580,
+          "turn_error": null,
+          "trace_id": "31006e64-bed3-4732-9817-e48f6a4edf97"
+        },
+        {
+          "round": 13,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ms": 567,
+          "turn_error": null,
+          "trace_id": "d494c98b-60e5-4566-bb3b-1043d8bd9ba1"
+        },
+        {
+          "round": 14,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ms": 530,
+          "turn_error": null,
+          "trace_id": "23d3a2a5-7ac4-4788-ad56-3b13f4995b04"
+        },
+        {
+          "round": 15,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ms": 693,
+          "turn_error": null,
+          "trace_id": "1e11d9ed-28cb-4106-8fe0-5f060c339146"
+        },
+        {
+          "round": 16,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ms": 519,
+          "turn_error": null,
+          "trace_id": "213c2ae8-24e1-44a8-a902-27623c9ad9e1"
+        },
+        {
+          "round": 17,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ms": 600,
+          "turn_error": null,
+          "trace_id": "cf6239ff-523f-4168-9b3a-7dd3c97baa27"
+        },
+        {
+          "round": 18,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ms": 597,
+          "turn_error": null,
+          "trace_id": "e90faa39-5d39-440a-b6a5-6ff2371b9758"
+        },
+        {
+          "round": 19,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ms": 497,
+          "turn_error": null,
+          "trace_id": "84e0acaf-87c3-4963-86c5-1dbeaa7433a5"
+        },
+        {
+          "round": 20,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ms": 567,
+          "turn_error": null,
+          "trace_id": "927cce86-6d92-4688-a073-24d566657655"
+        },
+        {
+          "round": 21,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ms": 609,
+          "turn_error": null,
+          "trace_id": "6cecd9b2-ed52-4f02-ab1b-d267dff88394"
+        },
+        {
+          "round": 22,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ms": 580,
+          "turn_error": null,
+          "trace_id": "9a681fde-6587-4648-aa33-86e8c91f41b6"
+        },
+        {
+          "round": 23,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ms": 591,
+          "turn_error": null,
+          "trace_id": "0be57136-6a29-4b1b-bdbd-e073f9ecef6b"
+        },
+        {
+          "round": 24,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ms": 534,
+          "turn_error": null,
+          "trace_id": "61f059ad-b266-462a-9032-42d3bd2ea878"
+        },
+        {
+          "round": 25,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ms": 651,
+          "turn_error": null,
+          "trace_id": "1002c4d0-81bb-4016-8073-7f4c605bb492"
+        },
+        {
+          "round": 26,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ms": 671,
+          "turn_error": null,
+          "trace_id": "73352cb4-2358-4134-a358-3920d197eeae"
+        },
+        {
+          "round": 27,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ms": 584,
+          "turn_error": null,
+          "trace_id": "139ec689-0d2b-4731-ba22-a81f5808ff58"
+        },
+        {
+          "round": 28,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ms": 685,
+          "turn_error": null,
+          "trace_id": "36dd4d0b-70cd-49c0-bf27-369c49a88ec9"
+        },
+        {
+          "round": 29,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ms": 558,
+          "turn_error": null,
+          "trace_id": "50ac5254-d263-4582-960d-53c438ad0ade"
+        },
+        {
+          "round": 30,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_ms": 592,
+          "turn_error": null,
+          "trace_id": "e7e8bb12-3d23-49f7-9c77-7b4e2f5026ac"
+        }
+      ]
+    },
+    "C": {
+      "rounds": 30,
+      "asr_ready_count": 30,
+      "turn_error_count": 0,
+      "submit_error_count": 0,
+      "flash_permission_denied_count": 0,
+      "asr_provider_attempted": {
+        "auc": 30
+      },
+      "asr_provider_final": {
+        "auc": 30
+      },
+      "asr_provider_final_flash_ratio": 0,
+      "asr_ms_p50": 5442,
+      "asr_ms_p95": 7519,
+      "per_round": [
+        {
+          "round": 1,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ms": 20,
+          "turn_error": null,
+          "trace_id": "ca6d0ea8-5627-4a2e-98e7-125825fc5f96"
+        },
+        {
+          "round": 2,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ms": 5436,
+          "turn_error": null,
+          "trace_id": "16f3712f-f17a-487a-b612-18477d5ac6cc"
+        },
+        {
+          "round": 3,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ms": 7519,
+          "turn_error": null,
+          "trace_id": "15c0e17e-9352-4012-8f56-f4870d94744e"
+        },
+        {
+          "round": 4,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ms": 23,
+          "turn_error": null,
+          "trace_id": "ed1698cf-d257-4e3d-96a3-6bca5c1389f4"
+        },
+        {
+          "round": 5,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ms": 19,
+          "turn_error": null,
+          "trace_id": "b15ad451-c0a3-476f-ac2d-0fed673b44d0"
+        },
+        {
+          "round": 6,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ms": 20,
+          "turn_error": null,
+          "trace_id": "c1519516-a4e8-4032-abfc-d2b510dd1368"
+        },
+        {
+          "round": 7,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ms": 5967,
+          "turn_error": null,
+          "trace_id": "e5ded4b3-c76b-41eb-95d3-b4c18ffc0b35"
+        },
+        {
+          "round": 8,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ms": 7198,
+          "turn_error": null,
+          "trace_id": "a5e9ca06-2319-4387-bc02-482460b42b05"
+        },
+        {
+          "round": 9,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ms": 21,
+          "turn_error": null,
+          "trace_id": "430487c9-e3da-48d2-8a76-67eb3b6fb957"
+        },
+        {
+          "round": 10,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ms": 5496,
+          "turn_error": null,
+          "trace_id": "671babb4-ba9e-4910-9cd2-20e737a2324c"
+        },
+        {
+          "round": 11,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ms": 5526,
+          "turn_error": null,
+          "trace_id": "2d336338-3505-4993-970b-8f56d3209f84"
+        },
+        {
+          "round": 12,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ms": 5458,
+          "turn_error": null,
+          "trace_id": "5cd700f5-0b0b-4ae8-8545-669b7b27c535"
+        },
+        {
+          "round": 13,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ms": 5494,
+          "turn_error": null,
+          "trace_id": "ea59096d-4273-4bd5-be63-086c537bdcac"
+        },
+        {
+          "round": 14,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ms": 20,
+          "turn_error": null,
+          "trace_id": "5961a96e-2bc6-4a3a-8772-5c6594a6239f"
+        },
+        {
+          "round": 15,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ms": 20,
+          "turn_error": null,
+          "trace_id": "00d24946-758d-4eb5-ac83-13a0329a4096"
+        },
+        {
+          "round": 16,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ms": 8583,
+          "turn_error": null,
+          "trace_id": "2254d046-5db7-4458-a556-09e7e5264e4c"
+        },
+        {
+          "round": 17,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ms": 5898,
+          "turn_error": null,
+          "trace_id": "eb283e80-df28-4dae-8cbd-71bb278d39eb"
+        },
+        {
+          "round": 18,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ms": 5451,
+          "turn_error": null,
+          "trace_id": "51fea8ff-ca5a-40ec-8959-5faa6b73c741"
+        },
+        {
+          "round": 19,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ms": 5861,
+          "turn_error": null,
+          "trace_id": "e34f6a05-dc7a-4d3a-960b-12086007f102"
+        },
+        {
+          "round": 20,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ms": 5434,
+          "turn_error": null,
+          "trace_id": "34e98efa-a1ce-436f-96db-1d78df912c68"
+        },
+        {
+          "round": 21,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ms": 1124,
+          "turn_error": null,
+          "trace_id": "85661543-d3de-411c-a8ac-cbe2ad75a55f"
+        },
+        {
+          "round": 22,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ms": 6260,
+          "turn_error": null,
+          "trace_id": "7b92452d-d28d-45ec-961a-3858f94865d0"
+        },
+        {
+          "round": 23,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ms": 5442,
+          "turn_error": null,
+          "trace_id": "967755f4-79b8-4a43-9ab1-d1ea3f9d746f"
+        },
+        {
+          "round": 24,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ms": 24,
+          "turn_error": null,
+          "trace_id": "0db2425e-a3d6-47ff-a53a-317e1205a672"
+        },
+        {
+          "round": 25,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ms": 5876,
+          "turn_error": null,
+          "trace_id": "427de3d0-d872-460c-9f06-1fefec2334a3"
+        },
+        {
+          "round": 26,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ms": 5446,
+          "turn_error": null,
+          "trace_id": "04ab142b-2d3e-4fd6-95e5-d4e7610e738e"
+        },
+        {
+          "round": 27,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ms": 15,
+          "turn_error": null,
+          "trace_id": "0a1144b9-2221-445f-9268-501383ede0d5"
+        },
+        {
+          "round": 28,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ms": 28,
+          "turn_error": null,
+          "trace_id": "3c703aed-51b7-42e5-8d79-7726bba78cac"
+        },
+        {
+          "round": 29,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ms": 6453,
+          "turn_error": null,
+          "trace_id": "cb9da771-7910-4737-8c94-58d72b79030a"
+        },
+        {
+          "round": 30,
+          "submit_status": 200,
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_ms": 5436,
+          "turn_error": null,
+          "trace_id": "e5c9a6ac-6e85-4bf3-82bb-040f6bdd66b1"
+        }
+      ]
+    }
+  },
+  "per_round_B": [
+    {
+      "round": 1,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 547,
+      "turn_error": null,
+      "trace_id": "ab67e8f1-56f6-4613-95c2-5ca8fe298778"
+    },
+    {
+      "round": 2,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 569,
+      "turn_error": null,
+      "trace_id": "9c6c83d9-a4d4-4e0a-ab46-208952012e6e"
+    },
+    {
+      "round": 3,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 589,
+      "turn_error": null,
+      "trace_id": "c8c31698-deb6-4275-abbf-705cc29702e9"
+    },
+    {
+      "round": 4,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 527,
+      "turn_error": null,
+      "trace_id": "53e49c8d-2b37-4747-97ab-90d453f0b901"
+    },
+    {
+      "round": 5,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 587,
+      "turn_error": null,
+      "trace_id": "9cda91ee-03c0-407f-a333-a4f5acdfec85"
+    },
+    {
+      "round": 6,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 603,
+      "turn_error": null,
+      "trace_id": "f98af2f6-99ce-46d3-8b4b-bb210d4f32ef"
+    },
+    {
+      "round": 7,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 626,
+      "turn_error": null,
+      "trace_id": "90ce6cdc-b8c8-4fba-b0ad-9056ceef1ad3"
+    },
+    {
+      "round": 8,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 768,
+      "turn_error": null,
+      "trace_id": "dd8bfe09-05f5-4254-a214-2e212553322d"
+    },
+    {
+      "round": 9,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 544,
+      "turn_error": null,
+      "trace_id": "76653f13-d350-424f-9ac1-ab7c9153f21c"
+    },
+    {
+      "round": 10,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 659,
+      "turn_error": null,
+      "trace_id": "f9cbbac8-9beb-40f7-beeb-32dd59543d2e"
+    },
+    {
+      "round": 11,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 568,
+      "turn_error": null,
+      "trace_id": "c45282a9-af05-4957-8b2f-67d04995358f"
+    },
+    {
+      "round": 12,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 580,
+      "turn_error": null,
+      "trace_id": "31006e64-bed3-4732-9817-e48f6a4edf97"
+    },
+    {
+      "round": 13,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 567,
+      "turn_error": null,
+      "trace_id": "d494c98b-60e5-4566-bb3b-1043d8bd9ba1"
+    },
+    {
+      "round": 14,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 530,
+      "turn_error": null,
+      "trace_id": "23d3a2a5-7ac4-4788-ad56-3b13f4995b04"
+    },
+    {
+      "round": 15,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 693,
+      "turn_error": null,
+      "trace_id": "1e11d9ed-28cb-4106-8fe0-5f060c339146"
+    },
+    {
+      "round": 16,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 519,
+      "turn_error": null,
+      "trace_id": "213c2ae8-24e1-44a8-a902-27623c9ad9e1"
+    },
+    {
+      "round": 17,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 600,
+      "turn_error": null,
+      "trace_id": "cf6239ff-523f-4168-9b3a-7dd3c97baa27"
+    },
+    {
+      "round": 18,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 597,
+      "turn_error": null,
+      "trace_id": "e90faa39-5d39-440a-b6a5-6ff2371b9758"
+    },
+    {
+      "round": 19,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 497,
+      "turn_error": null,
+      "trace_id": "84e0acaf-87c3-4963-86c5-1dbeaa7433a5"
+    },
+    {
+      "round": 20,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 567,
+      "turn_error": null,
+      "trace_id": "927cce86-6d92-4688-a073-24d566657655"
+    },
+    {
+      "round": 21,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 609,
+      "turn_error": null,
+      "trace_id": "6cecd9b2-ed52-4f02-ab1b-d267dff88394"
+    },
+    {
+      "round": 22,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 580,
+      "turn_error": null,
+      "trace_id": "9a681fde-6587-4648-aa33-86e8c91f41b6"
+    },
+    {
+      "round": 23,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 591,
+      "turn_error": null,
+      "trace_id": "0be57136-6a29-4b1b-bdbd-e073f9ecef6b"
+    },
+    {
+      "round": 24,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 534,
+      "turn_error": null,
+      "trace_id": "61f059ad-b266-462a-9032-42d3bd2ea878"
+    },
+    {
+      "round": 25,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 651,
+      "turn_error": null,
+      "trace_id": "1002c4d0-81bb-4016-8073-7f4c605bb492"
+    },
+    {
+      "round": 26,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 671,
+      "turn_error": null,
+      "trace_id": "73352cb4-2358-4134-a358-3920d197eeae"
+    },
+    {
+      "round": 27,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 584,
+      "turn_error": null,
+      "trace_id": "139ec689-0d2b-4731-ba22-a81f5808ff58"
+    },
+    {
+      "round": 28,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 685,
+      "turn_error": null,
+      "trace_id": "36dd4d0b-70cd-49c0-bf27-369c49a88ec9"
+    },
+    {
+      "round": 29,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 558,
+      "turn_error": null,
+      "trace_id": "50ac5254-d263-4582-960d-53c438ad0ade"
+    },
+    {
+      "round": 30,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "flash"
+      ],
+      "asr_provider_final": "flash",
+      "asr_ms": 592,
+      "turn_error": null,
+      "trace_id": "e7e8bb12-3d23-49f7-9c77-7b4e2f5026ac"
+    }
+  ],
+  "per_round_C": [
+    {
+      "round": 1,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_provider_final": "auc",
+      "asr_ms": 20,
+      "turn_error": null,
+      "trace_id": "ca6d0ea8-5627-4a2e-98e7-125825fc5f96"
+    },
+    {
+      "round": 2,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_provider_final": "auc",
+      "asr_ms": 5436,
+      "turn_error": null,
+      "trace_id": "16f3712f-f17a-487a-b612-18477d5ac6cc"
+    },
+    {
+      "round": 3,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_provider_final": "auc",
+      "asr_ms": 7519,
+      "turn_error": null,
+      "trace_id": "15c0e17e-9352-4012-8f56-f4870d94744e"
+    },
+    {
+      "round": 4,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_provider_final": "auc",
+      "asr_ms": 23,
+      "turn_error": null,
+      "trace_id": "ed1698cf-d257-4e3d-96a3-6bca5c1389f4"
+    },
+    {
+      "round": 5,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_provider_final": "auc",
+      "asr_ms": 19,
+      "turn_error": null,
+      "trace_id": "b15ad451-c0a3-476f-ac2d-0fed673b44d0"
+    },
+    {
+      "round": 6,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_provider_final": "auc",
+      "asr_ms": 20,
+      "turn_error": null,
+      "trace_id": "c1519516-a4e8-4032-abfc-d2b510dd1368"
+    },
+    {
+      "round": 7,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_provider_final": "auc",
+      "asr_ms": 5967,
+      "turn_error": null,
+      "trace_id": "e5ded4b3-c76b-41eb-95d3-b4c18ffc0b35"
+    },
+    {
+      "round": 8,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_provider_final": "auc",
+      "asr_ms": 7198,
+      "turn_error": null,
+      "trace_id": "a5e9ca06-2319-4387-bc02-482460b42b05"
+    },
+    {
+      "round": 9,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_provider_final": "auc",
+      "asr_ms": 21,
+      "turn_error": null,
+      "trace_id": "430487c9-e3da-48d2-8a76-67eb3b6fb957"
+    },
+    {
+      "round": 10,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_provider_final": "auc",
+      "asr_ms": 5496,
+      "turn_error": null,
+      "trace_id": "671babb4-ba9e-4910-9cd2-20e737a2324c"
+    },
+    {
+      "round": 11,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_provider_final": "auc",
+      "asr_ms": 5526,
+      "turn_error": null,
+      "trace_id": "2d336338-3505-4993-970b-8f56d3209f84"
+    },
+    {
+      "round": 12,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_provider_final": "auc",
+      "asr_ms": 5458,
+      "turn_error": null,
+      "trace_id": "5cd700f5-0b0b-4ae8-8545-669b7b27c535"
+    },
+    {
+      "round": 13,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_provider_final": "auc",
+      "asr_ms": 5494,
+      "turn_error": null,
+      "trace_id": "ea59096d-4273-4bd5-be63-086c537bdcac"
+    },
+    {
+      "round": 14,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_provider_final": "auc",
+      "asr_ms": 20,
+      "turn_error": null,
+      "trace_id": "5961a96e-2bc6-4a3a-8772-5c6594a6239f"
+    },
+    {
+      "round": 15,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_provider_final": "auc",
+      "asr_ms": 20,
+      "turn_error": null,
+      "trace_id": "00d24946-758d-4eb5-ac83-13a0329a4096"
+    },
+    {
+      "round": 16,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_provider_final": "auc",
+      "asr_ms": 8583,
+      "turn_error": null,
+      "trace_id": "2254d046-5db7-4458-a556-09e7e5264e4c"
+    },
+    {
+      "round": 17,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_provider_final": "auc",
+      "asr_ms": 5898,
+      "turn_error": null,
+      "trace_id": "eb283e80-df28-4dae-8cbd-71bb278d39eb"
+    },
+    {
+      "round": 18,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_provider_final": "auc",
+      "asr_ms": 5451,
+      "turn_error": null,
+      "trace_id": "51fea8ff-ca5a-40ec-8959-5faa6b73c741"
+    },
+    {
+      "round": 19,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_provider_final": "auc",
+      "asr_ms": 5861,
+      "turn_error": null,
+      "trace_id": "e34f6a05-dc7a-4d3a-960b-12086007f102"
+    },
+    {
+      "round": 20,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_provider_final": "auc",
+      "asr_ms": 5434,
+      "turn_error": null,
+      "trace_id": "34e98efa-a1ce-436f-96db-1d78df912c68"
+    },
+    {
+      "round": 21,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_provider_final": "auc",
+      "asr_ms": 1124,
+      "turn_error": null,
+      "trace_id": "85661543-d3de-411c-a8ac-cbe2ad75a55f"
+    },
+    {
+      "round": 22,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_provider_final": "auc",
+      "asr_ms": 6260,
+      "turn_error": null,
+      "trace_id": "7b92452d-d28d-45ec-961a-3858f94865d0"
+    },
+    {
+      "round": 23,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_provider_final": "auc",
+      "asr_ms": 5442,
+      "turn_error": null,
+      "trace_id": "967755f4-79b8-4a43-9ab1-d1ea3f9d746f"
+    },
+    {
+      "round": 24,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_provider_final": "auc",
+      "asr_ms": 24,
+      "turn_error": null,
+      "trace_id": "0db2425e-a3d6-47ff-a53a-317e1205a672"
+    },
+    {
+      "round": 25,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_provider_final": "auc",
+      "asr_ms": 5876,
+      "turn_error": null,
+      "trace_id": "427de3d0-d872-460c-9f06-1fefec2334a3"
+    },
+    {
+      "round": 26,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_provider_final": "auc",
+      "asr_ms": 5446,
+      "turn_error": null,
+      "trace_id": "04ab142b-2d3e-4fd6-95e5-d4e7610e738e"
+    },
+    {
+      "round": 27,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_provider_final": "auc",
+      "asr_ms": 15,
+      "turn_error": null,
+      "trace_id": "0a1144b9-2221-445f-9268-501383ede0d5"
+    },
+    {
+      "round": 28,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_provider_final": "auc",
+      "asr_ms": 28,
+      "turn_error": null,
+      "trace_id": "3c703aed-51b7-42e5-8d79-7726bba78cac"
+    },
+    {
+      "round": 29,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_provider_final": "auc",
+      "asr_ms": 6453,
+      "turn_error": null,
+      "trace_id": "cb9da771-7910-4737-8c94-58d72b79030a"
+    },
+    {
+      "round": 30,
+      "submit_status": 200,
+      "asr_provider_attempted": [
+        "auc"
+      ],
+      "asr_provider_final": "auc",
+      "asr_ms": 5436,
+      "turn_error": null,
+      "trace_id": "e5c9a6ac-6e85-4bf3-82bb-040f6bdd66b1"
+    }
+  ]
+}

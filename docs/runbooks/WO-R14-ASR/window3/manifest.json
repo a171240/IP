@@ -1,0 +1,15 @@
+{
+  "generated_at": "2026-02-23T12:37:16.978Z",
+  "wo_id": "WO-R14-ASR",
+  "window": "window3",
+  "head": "aaa8499",
+  "files": {
+    "selfcheck": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R14-ASR/window3/selfcheck.log",
+    "startup_gate": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R14-ASR/window3/startup_gate.log",
+    "bench_B": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R14-ASR/window3/bench_B.json",
+    "bench_C": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R14-ASR/window3/bench_C.json",
+    "analysis": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R14-ASR/window3/analysis.json",
+    "bench_B_manifest": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R14-ASR/window3/bench_B.manifest.txt",
+    "bench_C_manifest": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R14-ASR/window3/bench_C.manifest.txt"
+  }
+}
