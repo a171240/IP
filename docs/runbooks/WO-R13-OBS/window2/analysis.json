@@ -1,0 +1,35 @@
+{
+  "generated_at": "2026-02-23T04:27:30.000Z",
+  "work_order": "WO-R13-OBS/window2",
+  "status": "BLOCKED",
+  "reason": "oneclick_process_terminated_externally_before_bench_completion",
+  "summary": {
+    "missing_required_count_total": null,
+    "submit_pump_count": null,
+    "events_pump_count": null,
+    "stage_metrics_complete": false,
+    "missing_stage_metrics": [
+      "submit_ack_ms",
+      "asr_ready_ms",
+      "text_ready_ms",
+      "audio_ready_ms",
+      "queue_wait_before_main_ms",
+      "queue_wait_before_tts_ms"
+    ]
+  },
+  "groups": {
+    "C": {
+      "long_tail_buckets": {
+        "timeout_rounds": {
+          "stage_metrics": null
+        },
+        "success_rounds": {
+          "stage_metrics": null
+        }
+      }
+    }
+  },
+  "logs": {
+    "runner": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R13-OBS/window2/logs/runner.log"
+  }
+}

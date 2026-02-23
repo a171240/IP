@@ -1,0 +1,7 @@
+{
+  "generated_at": "2026-02-23T04:27:30.000Z",
+  "work_order": "WO-R13-OBS/window2",
+  "status": "BLOCKED",
+  "reason": "C bench file unavailable because oneclick exited before C group execution",
+  "source": null
+}
