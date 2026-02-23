@@ -1,0 +1,4 @@
+[voicecoach-worker] started id=001deMacBook-Air.local#26136 max_jobs=32 concurrency=32 claim_burst=16 wall_ms=8000 timeout_ms=30000 idle_ms=8-18 max_queue_age_ms=0 prefer_fresh_queue_ms=0 chain_main_to_tts=true
+[voicecoach-worker] heartbeat_failed message=Could not find the table 'public.voice_coach_worker_heartbeats' in the schema cache
+[voicecoach-worker] heartbeat_failed message=Could not find the table 'public.voice_coach_worker_heartbeats' in the schema cache
+[voicecoach-worker] stopped id=001deMacBook-Air.local#26136
