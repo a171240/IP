@@ -1649,9 +1649,16 @@ async function processMainStage(args: {
   const asrOutcome: "success" | "fallback_success" = asrFallbackUsed ? "fallback_success" : "success"
 
   const audioSeconds = asr.durationSeconds || asNumber(args.payload.client_audio_seconds) || loaded.turn.audio_seconds || null
+  const asrReadyAudioUrlWaitRaw = Number(process.env.VOICE_COACH_ASR_READY_AUDIO_URL_WAIT_MS || 20)
+  const asrReadyAudioUrlWaitMs = Number.isFinite(asrReadyAudioUrlWaitRaw)
+    ? Math.max(0, Math.min(500, Math.round(asrReadyAudioUrlWaitRaw)))
+    : 20
   const wpm = calcWpm(asr.text, audioSeconds)
   const fillerRatio = calcFillerRatio(asr.text)
-  const beauticianAudioUrl = (await beauticianAudioUrlPrefetchPromise) || (await getSignedAudio(audioPath))
+  const beauticianAudioUrl = await Promise.race<string | null>([
+    beauticianAudioUrlPrefetchPromise,
+    sleep(asrReadyAudioUrlWaitMs).then(() => null),
+  ])
 
   const beauticianTurnNo = Math.floor((Number(loaded.turn.turn_index) + 1) / 2)
   const hardMax = hardMaxTurns()
@@ -2891,7 +2898,16 @@ export async function processVoiceCoachJobById(args: {
     stageEnteredAtMsFromResult ??
     (fallbackQueueAnchors.length > 0 ? Math.max(...fallbackQueueAnchors) : Date.now())
   const stageEnteredAtMsForClaim = stage === "main_pending" ? stageEnteredAtMsForMain : stageEnteredAtMsFromResult
+  // Align pipeline elapsed anchor with the point where worker execution can actually begin.
+  const pipelineStartedAtMsForClaim =
+    stage === "main_pending"
+      ? Math.max(
+          pipelineStartedAtMsFromResult ?? claimStartedAtMs,
+          Math.min(stageEnteredAtMsForMain, claimStartedAtMs),
+        )
+      : pipelineStartedAtMsFromResult
   const claimedResultState = mergeResult(resultStateBeforeClaim, {
+    pipeline_started_at_ms: pipelineStartedAtMsForClaim ?? undefined,
     stage_entered_at_ms: stageEnteredAtMsForClaim ?? undefined,
     picked_at_ms: claimStartedAtMs,
     picked_at: claimedAt,
