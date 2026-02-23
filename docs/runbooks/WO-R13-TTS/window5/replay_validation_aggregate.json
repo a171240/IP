@@ -1,0 +1,56 @@
+{
+  "generated_at": "2026-02-23T04:15:46.899Z",
+  "replay_scope": "wo-r13-tts-replay*",
+  "replay_groups": 23,
+  "replay_build_distribution": {
+    "wo-r13-tts-replay3-1771819983147": 6,
+    "wo-r13-tts-replay2-1771819799567": 8,
+    "wo-r13-tts-replay-1771819175073": 9
+  },
+  "tts_cache_hit_rate": 1,
+  "tts_line_cache_hit_rate": 1,
+  "tts_source_distribution": {
+    "line_cache": 23,
+    "text_cache": 0,
+    "runtime": 0
+  },
+  "llm_used_when_script_hit_count": 0,
+  "queue_wait_before_tts_invalid_rate": 0,
+  "tts_ms": {
+    "count": 23,
+    "p50": 0,
+    "p95": 0,
+    "avg": 0,
+    "max": 0
+  },
+  "queue_wait_before_tts_ms": {
+    "count": 23,
+    "p50": 1,
+    "p95": 2,
+    "avg": 0.91,
+    "max": 3
+  },
+  "llm_ms": {
+    "count": 23,
+    "p50": 0,
+    "p95": 0,
+    "avg": 0,
+    "max": 0
+  },
+  "audit_samples": [
+    {
+      "id": 7849,
+      "trace_id": "f9832db9-ef80-4b3e-b022-e70e083d5579",
+      "client_build": "wo-r13-tts-replay3-1771819983147",
+      "server_build": "0.1.0",
+      "executor": "worker"
+    },
+    {
+      "id": 7838,
+      "trace_id": "a0e91423-0265-42f5-9400-27d916a31695",
+      "client_build": "wo-r13-tts-replay3-1771819983147",
+      "server_build": "0.1.0",
+      "executor": "worker"
+    }
+  ]
+}

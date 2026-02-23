@@ -1,0 +1,43 @@
+{
+  "generated_at": "2026-02-23T04:12:36.056Z",
+  "require_flash": true,
+  "asr_flash_selfcheck": {
+    "status": "PASS",
+    "error_code": null,
+    "flash_request_id": "e8c043b7-44ec-4aaf-b1b1-92bc201908f4",
+    "flash_logid": "20260223115403C5331F22E0E3730499EA",
+    "appid_last4": "8764",
+    "resource_id": "volc.bigasr.auc_turbo",
+    "occurred_at": "2026-02-23T03:54:03.927Z",
+    "environment": "unknown",
+    "http_status": 200,
+    "api_status": "20000003",
+    "api_code": null,
+    "message": "[Normal silence audio] no valid speech in audio",
+    "operation_hint": null
+  },
+  "startup_gate": {
+    "check": "startup_asr_flash_gate",
+    "status": "PASS",
+    "occurred_at": "2026-02-23T03:54:04.963Z",
+    "require_flash": true,
+    "gate_enabled": true,
+    "selfcheck_exit_code": 0
+  },
+  "audit_samples": [
+    {
+      "id": 7382,
+      "trace_id": "418f24fa-3bd6-4baf-ac89-2b98a671e5a3",
+      "client_build": "wo-r13-tts-b-1771818863644",
+      "server_build": "0.1.0",
+      "executor": "worker"
+    },
+    {
+      "id": 7385,
+      "trace_id": "66e26c37-56b9-4a63-b4ab-9a842a0a2717",
+      "client_build": "wo-r13-tts-b-1771818863644",
+      "server_build": "0.1.0",
+      "executor": "worker"
+    }
+  ]
+}
