@@ -1431,7 +1431,7 @@ async function processMainStage(args: {
 
   if (shouldAttemptFlash && audioBuf) {
     asrProviderAttempted.push("flash")
-    const flashAttemptLimitRaw = Number(process.env.VOICE_COACH_ASR_FLASH_ATTEMPTS || (requireFlash ? 2 : 1))
+    const flashAttemptLimitRaw = Number(process.env.VOICE_COACH_ASR_FLASH_ATTEMPTS || (requireFlash ? 3 : 1))
     const flashAttemptLimit = Math.max(1, Math.min(3, Number.isFinite(flashAttemptLimitRaw) ? Math.round(flashAttemptLimitRaw) : 1))
     for (let flashAttempt = 1; flashAttempt <= flashAttemptLimit; flashAttempt += 1) {
       try {
