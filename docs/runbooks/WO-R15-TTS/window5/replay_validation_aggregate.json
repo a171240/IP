@@ -1,0 +1,56 @@
+{
+  "generated_at": "2026-02-24T04:10:04.135Z",
+  "replay_scope": "wo-r15-tts-replay*",
+  "replay_groups": 24,
+  "replay_build_distribution": {
+    "wo-r15-tts-replay-1771905960652": 8,
+    "wo-r15-tts-replay2-1771906030664": 8,
+    "wo-r15-tts-replay3-1771906104915": 8
+  },
+  "tts_cache_hit_rate": 1,
+  "tts_line_cache_hit_rate": 1,
+  "tts_source_distribution": {
+    "line_cache": 24,
+    "text_cache": 0,
+    "runtime": 0
+  },
+  "llm_used_when_script_hit_count": 0,
+  "queue_wait_before_tts_invalid_rate": 0,
+  "tts_ms": {
+    "count": 24,
+    "p50": 0,
+    "p95": 0,
+    "avg": 0,
+    "max": 0
+  },
+  "queue_wait_before_tts_ms": {
+    "count": 24,
+    "p50": 0,
+    "p95": 1,
+    "avg": 0.54,
+    "max": 2
+  },
+  "llm_ms": {
+    "count": 24,
+    "p50": 0,
+    "p95": 0,
+    "avg": 0,
+    "max": 0
+  },
+  "audit_samples": [
+    {
+      "id": 9167,
+      "trace_id": "641778f1-d5bc-4c84-b4a5-ee89c06436a3",
+      "client_build": "wo-r15-tts-replay-1771905960652",
+      "server_build": "0.1.0",
+      "executor": "worker"
+    },
+    {
+      "id": 9173,
+      "trace_id": "34237733-0c2a-4bbb-9407-ef57fbee331d",
+      "client_build": "wo-r15-tts-replay-1771905960652",
+      "server_build": "0.1.0",
+      "executor": "worker"
+    }
+  ]
+}
