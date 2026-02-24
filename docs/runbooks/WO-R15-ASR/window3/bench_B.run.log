@@ -1,0 +1,46 @@
+[WO-R15-ASR][B] server ready base=http://127.0.0.1:3864
+[WO-R15-ASR][B] run 01/10 attempt=1
+[voicecoach-bench] client_build=bench-1771907053570 server_build=dev
+/tmp/voicecoach_e2e_1771907093633.json
+[WO-R15-ASR][B] run 01 ok src=/tmp/voicecoach_e2e_1771907093633.json
+[WO-R15-ASR][B] run 02/10 attempt=1
+[WO-R15-ASR][B] run 02 attempt=1 failed rc=0 src=/tmp/voicecoach_e2e_1771907120585.json
+[voicecoach-bench] client_build=bench-1771907093722 server_build=dev
+/tmp/voicecoach_e2e_1771907120585.json
+[WO-R15-ASR][B] run 02/10 attempt=2
+[voicecoach-bench] client_build=bench-1771907122702 server_build=dev
+/tmp/voicecoach_e2e_1771907161256.json
+[WO-R15-ASR][B] run 02 ok src=/tmp/voicecoach_e2e_1771907161256.json
+[WO-R15-ASR][B] run 03/10 attempt=1
+[voicecoach-bench] client_build=bench-1771907161345 server_build=dev
+/tmp/voicecoach_e2e_1771907199594.json
+[WO-R15-ASR][B] run 03 ok src=/tmp/voicecoach_e2e_1771907199594.json
+[WO-R15-ASR][B] run 04/10 attempt=1
+[voicecoach-bench] client_build=bench-1771907199681 server_build=dev
+/tmp/voicecoach_e2e_1771907238020.json
+[WO-R15-ASR][B] run 04 ok src=/tmp/voicecoach_e2e_1771907238020.json
+[WO-R15-ASR][B] run 05/10 attempt=1
+[voicecoach-bench] client_build=bench-1771907238107 server_build=dev
+/tmp/voicecoach_e2e_1771907275797.json
+[WO-R15-ASR][B] run 05 ok src=/tmp/voicecoach_e2e_1771907275797.json
+[WO-R15-ASR][B] run 06/10 attempt=1
+[voicecoach-bench] client_build=bench-1771907275884 server_build=dev
+/tmp/voicecoach_e2e_1771907315252.json
+[WO-R15-ASR][B] run 06 ok src=/tmp/voicecoach_e2e_1771907315252.json
+[WO-R15-ASR][B] run 07/10 attempt=1
+[voicecoach-bench] client_build=bench-1771907315340 server_build=dev
+/tmp/voicecoach_e2e_1771907353990.json
+[WO-R15-ASR][B] run 07 ok src=/tmp/voicecoach_e2e_1771907353990.json
+[WO-R15-ASR][B] run 08/10 attempt=1
+[voicecoach-bench] client_build=bench-1771907354075 server_build=dev
+/tmp/voicecoach_e2e_1771907393663.json
+[WO-R15-ASR][B] run 08 ok src=/tmp/voicecoach_e2e_1771907393663.json
+[WO-R15-ASR][B] run 09/10 attempt=1
+[voicecoach-bench] client_build=bench-1771907393747 server_build=dev
+/tmp/voicecoach_e2e_1771907432059.json
+[WO-R15-ASR][B] run 09 ok src=/tmp/voicecoach_e2e_1771907432059.json
+[WO-R15-ASR][B] run 10/10 attempt=1
+[voicecoach-bench] client_build=bench-1771907432145 server_build=dev
+/tmp/voicecoach_e2e_1771907469787.json
+[WO-R15-ASR][B] run 10 ok src=/tmp/voicecoach_e2e_1771907469787.json
+[WO-R15-ASR][B] runs completed
