@@ -30,6 +30,7 @@ const GATE_THRESHOLDS = Object.freeze({
   G2: Object.freeze({
     run_result_status: "PASS",
     c_ok: true,
+    queue_wait_before_main_ms_p95_max: 500,
   }),
   G3: Object.freeze({
     c_long_tail_required_buckets: ["timeout_rounds", "success_rounds"],
@@ -430,8 +431,10 @@ function evaluateObsGate(analysis, groupResults) {
     eventsPumpCount === 0
   const g1Pass = stageComplete
   const g3Pass = hasRequiredBucketNodes && longTailBucketsComplete
-  const runStatusPass = g0Pass && g1Pass && g3Pass && cOk
-  const g2Pass = runStatusPass && cOk
+  const runStatusBasePass = g0Pass && g1Pass && g3Pass && cOk
+  const queueMainThreshold = Number(GATE_THRESHOLDS?.G2?.queue_wait_before_main_ms_p95_max)
+  const queueMainPass = Number.isFinite(queueMainP95) && Number.isFinite(queueMainThreshold) && queueMainP95 <= queueMainThreshold
+  const g2Pass = runStatusBasePass && queueMainPass
   const longTailEvidence = [
     formatMetric("audio_ready_ms_C_p95", cAudioReadyP95),
     formatMetric("queue_wait_before_main_ms_C_p95", cQueueMainP95),
@@ -452,7 +455,7 @@ function evaluateObsGate(analysis, groupResults) {
       },
       G2: {
         status: g2Pass ? "PASS" : "FAIL",
-        evidence: `run_result_status=${runStatusPass ? "PASS" : "FAIL"}, C_ok=${cOk}`,
+        evidence: `run_result_status=${runStatusBasePass ? "PASS" : "FAIL"}, C_ok=${cOk}, queue_wait_before_main_ms_p95=${queueMainP95 === null ? "null" : queueMainP95}, threshold<=${Number.isFinite(queueMainThreshold) ? queueMainThreshold : "NaN"}, queue_wait_pass=${queueMainPass}`,
       },
       G3: {
         status: g3Pass ? "PASS" : "FAIL",
@@ -470,7 +473,7 @@ function evaluateObsGate(analysis, groupResults) {
     },
     c_long_tail_buckets: cLongTailBuckets,
     gate_thresholds: GATE_THRESHOLDS,
-    all_pass: runStatusPass,
+    all_pass: g0Pass && g1Pass && g2Pass && g3Pass,
   }
 }
 
