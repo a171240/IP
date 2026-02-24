@@ -1,0 +1,560 @@
+{
+  "generated_at": "2026-02-24T10:16:44.621Z",
+  "work_order": "WO-R18-MONITOR-7D/window2/T0",
+  "inputs": {
+    "bench_A": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R18-MONITOR-7D/window2/T0/bench_A.json",
+    "bench_B": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R18-MONITOR-7D/window2/T0/bench_B.json",
+    "bench_C": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R18-MONITOR-7D/window2/T0/bench_C.json"
+  },
+  "groups": {
+    "A": {
+      "group": "A",
+      "require_flash": true,
+      "path_mode": "flash_required",
+      "bench_label": "WO-R18-MONITOR-7D-A",
+      "client_build": "bench-1771928034341",
+      "server_build": "dev",
+      "rounds": 3,
+      "sample_events": 9,
+      "missing_required_count": 0,
+      "executor_distribution": {
+        "worker": 9
+      },
+      "executor_worker_ratio": 1,
+      "submit_pump_count": 0,
+      "events_pump_count": 0,
+      "asr_provider_attempted": {
+        "flash": 3
+      },
+      "asr_provider_final": {
+        "flash": 3
+      },
+      "asr_provider_final_flash_ratio": 1,
+      "queue_wait_before_tts_invalid_rate": 0,
+      "tts_cache_hit_rate": 1,
+      "stage_metrics": {
+        "submit_ack_ms": {
+          "count": 3,
+          "p50": 5829,
+          "p95": 6354
+        },
+        "asr_ready_ms": {
+          "count": 3,
+          "p50": 2254,
+          "p95": 2614
+        },
+        "text_ready_ms": {
+          "count": 3,
+          "p50": 3500,
+          "p95": 3822
+        },
+        "audio_ready_ms": {
+          "count": 3,
+          "p50": 4421,
+          "p95": 4488
+        },
+        "queue_wait_before_main_ms": {
+          "count": 3,
+          "p50": 0,
+          "p95": 0
+        },
+        "queue_wait_before_tts_ms": {
+          "count": 3,
+          "p50": 2,
+          "p95": 3
+        },
+        "llm_ms": {
+          "count": 3,
+          "p50": 0,
+          "p95": 0
+        },
+        "tts_ms": {
+          "count": 3,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "counts": {
+        "asr_ready": 3,
+        "text_ready": 3,
+        "audio_ready": 3,
+        "turn_error": 0
+      },
+      "usable": true,
+      "require_flash_pass": true,
+      "stage_metrics_complete": true,
+      "missing_stage_metrics": [],
+      "long_tail_buckets": null,
+      "audit_samples": [
+        {
+          "trace_id": "30841cfd-7a73-4310-a005-77db5c6c57b0",
+          "client_build": "bench-1771928034341",
+          "server_build": "dev",
+          "executor": "worker",
+          "type": "beautician.asr_ready",
+          "flash_logid": "20260224181406835C775D27099CDA54E1"
+        },
+        {
+          "trace_id": "30841cfd-7a73-4310-a005-77db5c6c57b0",
+          "client_build": "bench-1771928034341",
+          "server_build": "dev",
+          "executor": "worker",
+          "type": "customer.text_ready",
+          "flash_logid": null
+        }
+      ]
+    },
+    "B": {
+      "group": "B",
+      "require_flash": true,
+      "path_mode": "flash_primary",
+      "bench_label": "WO-R18-MONITOR-7D-B",
+      "client_build": "bench-1771928116948",
+      "server_build": "dev",
+      "rounds": 3,
+      "sample_events": 9,
+      "missing_required_count": 0,
+      "executor_distribution": {
+        "worker": 9
+      },
+      "executor_worker_ratio": 1,
+      "submit_pump_count": 0,
+      "events_pump_count": 0,
+      "asr_provider_attempted": {
+        "flash": 3
+      },
+      "asr_provider_final": {
+        "flash": 3
+      },
+      "asr_provider_final_flash_ratio": 1,
+      "queue_wait_before_tts_invalid_rate": 0,
+      "tts_cache_hit_rate": 1,
+      "stage_metrics": {
+        "submit_ack_ms": {
+          "count": 3,
+          "p50": 6067,
+          "p95": 6196
+        },
+        "asr_ready_ms": {
+          "count": 3,
+          "p50": 2573,
+          "p95": 2699
+        },
+        "text_ready_ms": {
+          "count": 3,
+          "p50": 3845,
+          "p95": 3929
+        },
+        "audio_ready_ms": {
+          "count": 3,
+          "p50": 4610,
+          "p95": 4775
+        },
+        "queue_wait_before_main_ms": {
+          "count": 3,
+          "p50": 0,
+          "p95": 0
+        },
+        "queue_wait_before_tts_ms": {
+          "count": 3,
+          "p50": 1,
+          "p95": 2
+        },
+        "llm_ms": {
+          "count": 3,
+          "p50": 0,
+          "p95": 0
+        },
+        "tts_ms": {
+          "count": 3,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "counts": {
+        "asr_ready": 3,
+        "text_ready": 3,
+        "audio_ready": 3,
+        "turn_error": 0
+      },
+      "usable": true,
+      "require_flash_pass": true,
+      "stage_metrics_complete": true,
+      "missing_stage_metrics": [],
+      "long_tail_buckets": null,
+      "audit_samples": [
+        {
+          "trace_id": "adf1dbeb-5bcf-4254-bbcb-52f70c5928bc",
+          "client_build": "bench-1771928116948",
+          "server_build": "dev",
+          "executor": "worker",
+          "type": "beautician.asr_ready",
+          "flash_logid": "2026022418152841423C63AC1B5BD27330"
+        },
+        {
+          "trace_id": "adf1dbeb-5bcf-4254-bbcb-52f70c5928bc",
+          "client_build": "bench-1771928116948",
+          "server_build": "dev",
+          "executor": "worker",
+          "type": "customer.text_ready",
+          "flash_logid": null
+        }
+      ]
+    },
+    "C": {
+      "group": "C",
+      "require_flash": false,
+      "path_mode": "slow_path_degraded",
+      "bench_label": "WO-R18-MONITOR-7D-C",
+      "client_build": "bench-1771928162680",
+      "server_build": "dev",
+      "rounds": 3,
+      "sample_events": 9,
+      "missing_required_count": 0,
+      "executor_distribution": {
+        "worker": 9
+      },
+      "executor_worker_ratio": 1,
+      "submit_pump_count": 0,
+      "events_pump_count": 0,
+      "asr_provider_attempted": {
+        "flash": 3
+      },
+      "asr_provider_final": {
+        "flash": 3
+      },
+      "asr_provider_final_flash_ratio": 1,
+      "queue_wait_before_tts_invalid_rate": 0,
+      "tts_cache_hit_rate": 1,
+      "stage_metrics": {
+        "submit_ack_ms": {
+          "count": 3,
+          "p50": 5930,
+          "p95": 6079
+        },
+        "asr_ready_ms": {
+          "count": 3,
+          "p50": 2396,
+          "p95": 2525
+        },
+        "text_ready_ms": {
+          "count": 3,
+          "p50": 3596,
+          "p95": 3828
+        },
+        "audio_ready_ms": {
+          "count": 3,
+          "p50": 4226,
+          "p95": 4535
+        },
+        "queue_wait_before_main_ms": {
+          "count": 3,
+          "p50": 0,
+          "p95": 0
+        },
+        "queue_wait_before_tts_ms": {
+          "count": 3,
+          "p50": 0,
+          "p95": 3
+        },
+        "llm_ms": {
+          "count": 3,
+          "p50": 0,
+          "p95": 0
+        },
+        "tts_ms": {
+          "count": 3,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "counts": {
+        "asr_ready": 3,
+        "text_ready": 3,
+        "audio_ready": 3,
+        "turn_error": 0
+      },
+      "usable": true,
+      "require_flash_pass": true,
+      "stage_metrics_complete": true,
+      "missing_stage_metrics": [],
+      "long_tail_buckets": {
+        "timeout_rounds": {
+          "count": 0,
+          "round_indexes": [],
+          "stage_metrics": {
+            "submit_ack_ms": {
+              "count": 0,
+              "p50": null,
+              "p95": null
+            },
+            "asr_ready_ms": {
+              "count": 0,
+              "p50": null,
+              "p95": null
+            },
+            "text_ready_ms": {
+              "count": 0,
+              "p50": null,
+              "p95": null
+            },
+            "audio_ready_ms": {
+              "count": 0,
+              "p50": null,
+              "p95": null
+            },
+            "queue_wait_before_main_ms": {
+              "count": 0,
+              "p50": null,
+              "p95": null
+            },
+            "queue_wait_before_tts_ms": {
+              "count": 0,
+              "p50": null,
+              "p95": null
+            },
+            "llm_ms": {
+              "count": 0,
+              "p50": null,
+              "p95": null
+            },
+            "tts_ms": {
+              "count": 0,
+              "p50": null,
+              "p95": null
+            }
+          },
+          "stage_metrics_complete": true,
+          "missing_stage_metrics": [],
+          "timeout_signal_distribution": {}
+        },
+        "success_rounds": {
+          "count": 3,
+          "round_indexes": [
+            1,
+            2,
+            3
+          ],
+          "stage_metrics": {
+            "submit_ack_ms": {
+              "count": 3,
+              "p50": 5930,
+              "p95": 6079
+            },
+            "asr_ready_ms": {
+              "count": 3,
+              "p50": 2396,
+              "p95": 2525
+            },
+            "text_ready_ms": {
+              "count": 3,
+              "p50": 3596,
+              "p95": 3828
+            },
+            "audio_ready_ms": {
+              "count": 3,
+              "p50": 4226,
+              "p95": 4535
+            },
+            "queue_wait_before_main_ms": {
+              "count": 3,
+              "p50": 0,
+              "p95": 0
+            },
+            "queue_wait_before_tts_ms": {
+              "count": 3,
+              "p50": 0,
+              "p95": 3
+            },
+            "llm_ms": {
+              "count": 3,
+              "p50": 0,
+              "p95": 0
+            },
+            "tts_ms": {
+              "count": 3,
+              "p50": 0,
+              "p95": 0
+            }
+          },
+          "stage_metrics_complete": true,
+          "missing_stage_metrics": []
+        },
+        "other_rounds": {
+          "count": 0,
+          "round_indexes": [],
+          "stage_metrics": {
+            "submit_ack_ms": {
+              "count": 0,
+              "p50": null,
+              "p95": null
+            },
+            "asr_ready_ms": {
+              "count": 0,
+              "p50": null,
+              "p95": null
+            },
+            "text_ready_ms": {
+              "count": 0,
+              "p50": null,
+              "p95": null
+            },
+            "audio_ready_ms": {
+              "count": 0,
+              "p50": null,
+              "p95": null
+            },
+            "queue_wait_before_main_ms": {
+              "count": 0,
+              "p50": null,
+              "p95": null
+            },
+            "queue_wait_before_tts_ms": {
+              "count": 0,
+              "p50": null,
+              "p95": null
+            },
+            "llm_ms": {
+              "count": 0,
+              "p50": null,
+              "p95": null
+            },
+            "tts_ms": {
+              "count": 0,
+              "p50": null,
+              "p95": null
+            }
+          },
+          "stage_metrics_complete": true,
+          "missing_stage_metrics": []
+        },
+        "timeout_round_ratio": 0,
+        "success_round_ratio": 1
+      },
+      "audit_samples": [
+        {
+          "trace_id": "43142b09-4c0a-437d-89a5-292769c24766",
+          "client_build": "bench-1771928162680",
+          "server_build": "dev",
+          "executor": "worker",
+          "type": "beautician.asr_ready",
+          "flash_logid": "20260224181614D197F3911B2105D70E1A"
+        },
+        {
+          "trace_id": "43142b09-4c0a-437d-89a5-292769c24766",
+          "client_build": "bench-1771928162680",
+          "server_build": "dev",
+          "executor": "worker",
+          "type": "customer.text_ready",
+          "flash_logid": null
+        }
+      ]
+    }
+  },
+  "summary": {
+    "missing_required_count_total": 0,
+    "submit_pump_count": 0,
+    "events_pump_count": 0,
+    "required_stage_metrics": [
+      "submit_ack_ms",
+      "asr_ready_ms",
+      "text_ready_ms",
+      "audio_ready_ms",
+      "queue_wait_before_main_ms",
+      "queue_wait_before_tts_ms"
+    ],
+    "stage_metrics_complete": true,
+    "missing_stage_metrics": [],
+    "executor_worker_ratio": 1,
+    "asr_provider_final_flash_ratio": 1,
+    "queue_wait_before_tts_invalid_rate": 0,
+    "stage_metrics": {
+      "submit_ack_ms": {
+        "p50": 5930,
+        "p95": 6354
+      },
+      "asr_ready_ms": {
+        "p50": 2396,
+        "p95": 2699
+      },
+      "text_ready_ms": {
+        "p50": 3596,
+        "p95": 3929
+      },
+      "audio_ready_ms": {
+        "p50": 4421,
+        "p95": 4775
+      },
+      "queue_wait_before_main_ms": {
+        "p50": 0,
+        "p95": 0
+      },
+      "queue_wait_before_tts_ms": {
+        "p50": 1,
+        "p95": 3
+      },
+      "llm_ms": {
+        "p50": 0,
+        "p95": 0
+      },
+      "tts_ms": {
+        "p50": 0,
+        "p95": 0
+      }
+    },
+    "b_audio_ready_p50_target_ms": 8000,
+    "b_audio_ready_p50_actual_ms": 4610
+  },
+  "gates": {
+    "G0": "PASS: missing_required_count_total=0, submit_pump_count=0, events_pump_count=0, stage_metrics_complete=true, missing_stage_metrics=none",
+    "G1": "PASS: audio_ready_ms_B_p50=4610 target<=8000",
+    "G2": "PASS: stage_metric_fields_complete=true",
+    "G3": "PASS: A_require_flash_pass=true, C_usable=true, C_path_mode=slow_path_degraded"
+  },
+  "metrics": {
+    "asr_provider_A": {
+      "flash": 3
+    },
+    "asr_provider_B": {
+      "flash": 3
+    },
+    "asr_provider_C": {
+      "flash": 3
+    },
+    "audio_ready_ms_B_p50": 4610,
+    "audio_ready_ms_B_p95": 4775,
+    "audio_ready_ms_C_p50": 4226,
+    "audio_ready_ms_C_p95": 4535,
+    "audio_ready_ms_C_timeout_p95": null,
+    "audio_ready_ms_C_success_p95": 4535,
+    "llm_ms_p50": 0,
+    "llm_ms_p95": 0,
+    "tts_ms_p50": 0,
+    "tts_ms_p95": 0,
+    "queue_wait_before_main_ms_p50": 0,
+    "queue_wait_before_main_ms_p95": 0,
+    "queue_wait_before_main_ms_C_timeout_p95": null,
+    "queue_wait_before_main_ms_C_success_p95": 0,
+    "queue_wait_before_tts_ms_p50": 1,
+    "queue_wait_before_tts_ms_p95": 3,
+    "queue_wait_before_tts_ms_C_timeout_p95": null,
+    "queue_wait_before_tts_ms_C_success_p95": 3,
+    "tts_cache_hit_rate": 1,
+    "executor_worker_ratio": 1,
+    "submit_pump_count": 0,
+    "events_pump_count": 0,
+    "asr_provider_final_flash_ratio": 1,
+    "queue_wait_before_tts_invalid_rate": 0,
+    "c_timeout_round_count": 0,
+    "c_success_round_count": 3,
+    "c_other_round_count": 0,
+    "submit_ack_ms_p50": 5930,
+    "submit_ack_ms_p95": 6354,
+    "asr_ready_ms_p50": 2396,
+    "asr_ready_ms_p95": 2699,
+    "text_ready_ms_p50": 3596,
+    "text_ready_ms_p95": 3929,
+    "audio_ready_ms_p50": 4421,
+    "audio_ready_ms_p95": 4775
+  }
+}
