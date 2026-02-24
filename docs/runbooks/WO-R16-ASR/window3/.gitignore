@@ -1,0 +1,5 @@
+bench_*_run*.json
+bench_*_run*.tmp.log
+server_*.pid
+worker_*.pid
+analysis.md
