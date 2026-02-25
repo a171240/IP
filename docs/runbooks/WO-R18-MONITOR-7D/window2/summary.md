@@ -127,12 +127,30 @@
   - B/C runtime=`0`/`0`, llm_used_when_script_hit_count=`0`/`0`
 - window6 CLIENT: N/A (R18 plan runs CLIENT at T0 + T24 only)
 
+## D2 / T12
+- window2 OBS: PASS (after rerun)
+  - T12 first run: `FAIL` on G2 (`queue_wait_before_main_ms_p95=913` > 500)
+  - T12-R1 rerun: `PASS`, `queue_wait_before_main_ms_p95=0`, `run_result.status=PASS`
+  - classification: `SEV-2 transient` (spike not reproduced on immediate rerun)
+- window3 ASR: PASS
+  - selfcheck=`PASS` (request_id=`86985c8a-54ef-4eea-91dd-749fbff245b6`, logid=`20260225192850B25B8ED83A7EDDA22E58`)
+  - startup_gate=`PASS` (request_id=`ea59acfa-203c-494e-8678-af26222c8bee`, logid=`202602251928502DDFE15BA1ADA3208B05`)
+- window4 WORKER: PASS
+  - run_result.status=`PASS`, G0/G1/G2/G3=PASS
+  - queue_wait_before_main_ms_p95=`0` (threshold<=500)
+  - audio_ready_ms_B_p95=`4551`
+- window5 TTS: PASS
+  - G0/G1/G2/G3=PASS
+  - B/C tts_cache_hit_rate=`1`/`1`, tts_ms_p95=`0`/`0`
+  - B/C runtime=`0`/`0`, llm_used_when_script_hit_count=`0`/`0`
+- window6 CLIENT: N/A (R18 plan runs CLIENT at T0 + T24 only)
+
 ## Upcoming Checkpoints
-- D2/T12: PENDING
+- D2/T24: PENDING
 
 ## Blockers
 - NONE
 
 ## Daily Verdict
 - PASS (D1/T0,T6,T12,T24 all required windows PASS; D1 sealed)
-- IN_PROGRESS (D2/T0,T6 PASS; waiting D2/T12,T24)
+- IN_PROGRESS (D2/T0,T6,T12 PASS; waiting D2/T24)
