@@ -1,0 +1,90 @@
+{
+  "generated_at": "2026-02-25T11:44:42.045Z",
+  "label": "C",
+  "path_mode": "slow_path_degraded",
+  "source_file": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R18-MONITOR-7D/window6/D2/T24/bench_C.raw.json",
+  "session_id": "11a06d39-840d-4f5b-b7cc-6fe932921604",
+  "client_build": "bench-1772019824982",
+  "server_build": "dev",
+  "rounds": 1,
+  "sample_events": 3,
+  "audit_sample_count": 3,
+  "audit_samples": [
+    {
+      "trace_id": "4c15cf5c-53c2-4dbc-a4ac-6649ed167b8a",
+      "client_build": "bench-1772019824982",
+      "server_build": "dev",
+      "executor": "worker",
+      "event_type": "beautician.asr_ready"
+    },
+    {
+      "trace_id": "4c15cf5c-53c2-4dbc-a4ac-6649ed167b8a",
+      "client_build": "bench-1772019824982",
+      "server_build": "dev",
+      "executor": "worker",
+      "event_type": "customer.text_ready"
+    },
+    {
+      "trace_id": "4c15cf5c-53c2-4dbc-a4ac-6649ed167b8a",
+      "client_build": "bench-1772019824982",
+      "server_build": "dev",
+      "executor": "worker",
+      "event_type": "customer.audio_ready"
+    }
+  ],
+  "asr_provider_distribution": {
+    "auc": 1
+  },
+  "asr_flash_ratio": 0,
+  "submit_ack_ms": {
+    "p50": 6045,
+    "p95": 6045
+  },
+  "audio_ready_ms": {
+    "p50": 12111,
+    "p95": 12111
+  },
+  "llm_ms": {
+    "p50": 0,
+    "p95": 0
+  },
+  "tts_ms": {
+    "p50": 0,
+    "p95": 0
+  },
+  "queue_wait_before_main_ms": {
+    "p50": 0,
+    "p95": 0
+  },
+  "queue_wait_before_tts_ms_raw": {
+    "p50": 2,
+    "p95": 2
+  },
+  "queue_wait_before_tts_ms_corrected": {
+    "p50": 2,
+    "p95": 2,
+    "rule": "valid_only_then_fallback_raw"
+  },
+  "queue_wait_before_tts_invalid_rate": 0,
+  "tts_cache_hit_rate": 1,
+  "executor_distribution": {
+    "worker": 3
+  },
+  "executor_worker_ratio": 1,
+  "submit_pump_count": 0,
+  "events_pump_count": 0,
+  "counts": {
+    "asr_ready": 1,
+    "text_ready": 1,
+    "audio_ready": 1,
+    "turn_error": 0
+  },
+  "usable": true,
+  "client_probe": {
+    "record_format": "mp3",
+    "record_sample_rate": 16000,
+    "record_channels": 1,
+    "ui_feedback_p95_ms": 42,
+    "source": "latest_real_device_probe"
+  }
+}
