@@ -1,0 +1,92 @@
+{
+  "generated_at": "2026-02-26T12:43:13.507Z",
+  "bench_tag": "monitor-tts-b-d4t12-1772109717549",
+  "session_id": "36c843d1-4744-42ff-a585-abb1ce91d05a",
+  "rounds_requested": 8,
+  "rounds_planned": 8,
+  "rounds_queued": 7,
+  "round_errors": [
+    "round_5:session_context_missing",
+    "round_6:job_error:语音识别超时，请重录并靠近麦克风。"
+  ],
+  "sample_counts": {
+    "audio_ready_raw": 6,
+    "asr_ready_raw": 6,
+    "audio_ready_dedup": 6,
+    "asr_ready_dedup": 6
+  },
+  "executor_worker_ratio_audio": 1,
+  "script_hit_rate": 1,
+  "tts_line_cache_hit_rate": 1,
+  "tts_cache_hit_rate": 1,
+  "tts_source_distribution": {
+    "line_cache": 6,
+    "text_cache": 0,
+    "runtime": 0
+  },
+  "llm_used_when_script_hit_count": 0,
+  "tts_ms": {
+    "count": 6,
+    "p50": 0,
+    "p95": 0,
+    "avg": 0,
+    "max": 0
+  },
+  "queue_wait_before_tts_ms": {
+    "count": 6,
+    "p50": 0,
+    "p95": 0,
+    "avg": 0,
+    "max": 0
+  },
+  "queue_wait_before_main_ms": {
+    "count": 6,
+    "p50": 62,
+    "p95": 263,
+    "avg": 150,
+    "max": 264
+  },
+  "audio_ready_ms": {
+    "count": 6,
+    "p50": 6097,
+    "p95": 7625,
+    "avg": 6742.33,
+    "max": 7815
+  },
+  "llm_ms": {
+    "count": 6,
+    "p50": 0,
+    "p95": 0,
+    "avg": 0,
+    "max": 0
+  },
+  "asr_provider": {
+    "flash": 6
+  },
+  "asr_provider_final": {
+    "flash": 6
+  },
+  "asr_outcome": {
+    "success": 6
+  },
+  "asr_provider_final_flash_ratio": 1,
+  "queue_wait_before_tts_invalid_rate": 0,
+  "submit_pump_count": null,
+  "events_pump_count": null,
+  "audit_samples": [
+    {
+      "id": 13516,
+      "trace_id": "14ea4e36-2003-4c55-9c8e-2491b59845c5",
+      "client_build": "monitor-tts-b-d4t12-1772109717549",
+      "server_build": "0.1.0",
+      "executor": "worker"
+    },
+    {
+      "id": 13519,
+      "trace_id": "60b47dc7-bd25-4c9d-85ec-3640e1fb0505",
+      "client_build": "monitor-tts-b-d4t12-1772109717549",
+      "server_build": "0.1.0",
+      "executor": "worker"
+    }
+  ]
+}

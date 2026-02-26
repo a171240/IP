@@ -293,8 +293,29 @@
   - B/C runtime=`0`/`0`, llm_used_when_script_hit_count=`0`/`0`
 - window6 CLIENT: N/A (R18 plan runs CLIENT at T0 + T24 only)
 
+## D4 / T12
+- window2 OBS: PASS
+  - run_result.status=`PASS`, G0/G1/G2/G3=PASS
+  - queue_wait_before_main_ms_p95=`0` (threshold<=500)
+  - audio_ready_ms_B_p95=`5065`
+  - note: A/B had in-run retries (`A attempts=2`, `B attempts=2`) and converged
+- window3 ASR: PASS
+  - selfcheck=`PASS` (request_id=`22f88dce-f006-439a-a112-43a433ebea33`, logid=`202602262033125B513BFD341952C923CE`)
+  - startup_gate=`PASS` (request_id=`ec1e2c9f-4bc6-488b-b4df-2561ccaced3d`, logid=`20260226203343678E019368A008E2C9C3`)
+- window4 WORKER: PASS (after rerun)
+  - T12 first run: `FAIL` on group B (`failed_after_retries`, missing_asr_ready)
+  - T12-R1 rerun: `PASS`, run_result.status=`PASS`, G0/G1/G2/G3=PASS
+  - queue_wait_before_main_ms_p95=`0` (threshold<=500)
+  - audio_ready_ms_B_p95=`5451`
+  - classification: `transient`
+- window5 TTS: PASS
+  - G0/G1/G2/G3=PASS
+  - B/C tts_cache_hit_rate=`1`/`1`, tts_ms_p95=`0`/`0`
+  - B/C runtime=`0`/`0`, llm_used_when_script_hit_count=`0`/`0`
+- window6 CLIENT: N/A (R18 plan runs CLIENT at T0 + T24 only)
+
 ## Upcoming Checkpoints
-- D4/T12: PENDING
+- D4/T24: PENDING
 
 ## Blockers
 - NONE
@@ -303,4 +324,4 @@
 - PASS (D1/T0,T6,T12,T24 all required windows PASS; D1 sealed)
 - PASS (D2/T0,T6,T12,T24 all required windows PASS; D2 sealed, T12 transient recovered by T12-R1)
 - PASS (D3/T0,T6,T12,T24 all required windows PASS; D3 sealed with transient retries recovered in-run)
-- IN-PROGRESS (D4/T0,T6 PASS; waiting for D4/T12,T24)
+- IN-PROGRESS (D4/T0,T6,T12 PASS; waiting for D4/T24)
