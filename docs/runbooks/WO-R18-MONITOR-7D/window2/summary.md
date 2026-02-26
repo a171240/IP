@@ -225,8 +225,33 @@
   - B/C runtime=`0`/`0`, llm_used_when_script_hit_count=`0`/`0`
 - window6 CLIENT: N/A (R18 plan runs CLIENT at T0 + T24 only)
 
+## D3 / T24
+- window2 OBS: PASS
+  - run_result.status=`PASS`, G0/G1/G2/G3=PASS
+  - queue_wait_before_main_ms_p95=`0` (threshold<=500)
+  - audio_ready_ms_B_p95=`5463`
+  - note: A/B had transient retries (`A attempts=2`, `B attempts=3`) and converged
+- window3 ASR: PASS
+  - selfcheck=`PASS` (request_id=`f9e70ef0-0010-4b5b-b29a-8f9cd9d148fb`, logid=`20260226190937F1F1638A7AD40B7F5FDE`)
+  - startup_gate=`PASS` (request_id=`33b15f68-39ef-4560-864a-f76b7e356e63`, logid=`2026022619094019DF98159C000978BD48`)
+- window4 WORKER: PASS
+  - run_result.status=`PASS`, G0/G1/G2/G3=PASS
+  - queue_wait_before_main_ms_p95=`0` (threshold<=500)
+  - audio_ready_ms_B_p95=`5599`
+  - note: A had one transient `server_not_ready` and recovered on retry
+- window5 TTS: PASS
+  - G0/G1/G2/G3=PASS
+  - B/C tts_cache_hit_rate=`1`/`1`, tts_ms_p95=`0`/`0`
+  - B/C runtime=`0`/`0`, llm_used_when_script_hit_count=`0`/`0`
+  - note: C first run `fetch failed`, R1 rerun PASS
+- window6 CLIENT: PASS
+  - G0=PASS (record_format=`mp3`, record_sample_rate=`16000`, ui_feedback_p95_ms=`42`)
+  - G1=PASS (B.usable=`true`, turn_error=`0`)
+  - G2=PASS (C.path_mode=`slow_path_degraded`, asr_provider_distribution=`{"auc":1}`)
+  - G3=PASS (submit_pump_count=`0`, events_pump_count=`0`, executor_worker_ratio=`1`)
+
 ## Upcoming Checkpoints
-- D3/T24: PENDING
+- D4/T0: PENDING
 
 ## Blockers
 - NONE
@@ -234,4 +259,4 @@
 ## Daily Verdict
 - PASS (D1/T0,T6,T12,T24 all required windows PASS; D1 sealed)
 - PASS (D2/T0,T6,T12,T24 all required windows PASS; D2 sealed, T12 transient recovered by T12-R1)
-- IN_PROGRESS (D3/T0,T6,T12 PASS; waiting D3/T24)
+- PASS (D3/T0,T6,T12,T24 all required windows PASS; D3 sealed with transient retries recovered in-run)
