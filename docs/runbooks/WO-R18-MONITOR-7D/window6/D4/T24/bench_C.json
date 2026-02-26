@@ -1,90 +1,203 @@
 {
-  "generated_at": "2026-02-26T13:07:20.651Z",
-  "label": "C",
-  "path_mode": "slow_path_degraded",
-  "source_file": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R18-MONITOR-7D/window6/D4/T24/bench_C.raw.json",
-  "session_id": null,
-  "client_build": "bench-1772110678580",
-  "server_build": null,
-  "rounds": 1,
-  "sample_events": 3,
-  "audit_sample_count": 3,
-  "audit_samples": [
+  "startedAt": "2026-02-26T13:18:49.222Z",
+  "benchLabel": "C",
+  "clientBuild": "bench-1772111929221",
+  "runAnalysis": false,
+  "client_build": "bench-1772111929221",
+  "models": {
+    "llmProvider": "doubao",
+    "textModel": "doubao-seed-1-6-flash-250828",
+    "fastModel": "doubao-seed-1-6-flash-250828",
+    "analysisModel": "doubao-seed-1-6-flash-250828",
+    "ttsVoiceType": "zh_female_vv_uranus_bigtts",
+    "asrFlashResourceId": "volc.bigasr.auc_turbo",
+    "asrAucResourceId": "volc.seedasr.auc"
+  },
+  "rounds": [
     {
-      "trace_id": "f242c0c1-885d-49ff-9f6e-326b90181343",
-      "client_build": "bench-1772110678580",
-      "server_build": "dev",
-      "executor": "worker",
-      "event_type": "beautician.asr_ready"
-    },
-    {
-      "trace_id": "f242c0c1-885d-49ff-9f6e-326b90181343",
-      "client_build": "bench-1772110678580",
-      "server_build": "dev",
-      "executor": "worker",
-      "event_type": "customer.text_ready"
-    },
-    {
-      "trace_id": "f242c0c1-885d-49ff-9f6e-326b90181343",
-      "client_build": "bench-1772110678580",
-      "server_build": "dev",
-      "executor": "worker",
-      "event_type": "customer.audio_ready"
+      "roundNo": 1,
+      "inputText": "我理解您的顾虑，关于安全我们会先做评估，再根据体质调整手法。",
+      "ttsInputElapsedMs": 1489,
+      "ttsVoiceType": "zh_female_vv_uranus_bigtts",
+      "submitStatus": 200,
+      "submitElapsedMs": 5696,
+      "submitJobId": "ca1c5a15-8e28-447d-a2c3-d383758d949b",
+      "submitAcceptedTurnId": "9b52fba1-b1fa-4368-9185-6ff6f9d875c1",
+      "serverAdvanced": false,
+      "serverAdvancedStage": "main_pending",
+      "events": [
+        {
+          "id": 13709,
+          "type": "beautician.asr_ready",
+          "turn_id": "9b52fba1-b1fa-4368-9185-6ff6f9d875c1",
+          "stage_elapsed_ms": 7643,
+          "asr_provider": "auc",
+          "asr_provider_attempted": [
+            "auc"
+          ],
+          "asr_provider_final": "auc",
+          "asr_outcome": "fallback_success",
+          "asr_fallback_used": true,
+          "asr_ms": 5924,
+          "asr_ready_ms": 5924,
+          "asr_queue_wait_ms": 0,
+          "script_select_ms": null,
+          "llm_ms": null,
+          "text_ready_ms": null,
+          "tts_ms": null,
+          "queue_wait_before_main_ms": 0,
+          "queue_wait_before_tts_ms": null,
+          "queue_wait_before_tts_valid": null,
+          "queue_wait_before_tts_source": null,
+          "tts_source": null,
+          "tts_cache_hit": null,
+          "tts_failed": null,
+          "trace_id": "176a4b54-86be-49a4-a829-d7935fd0371b",
+          "executor": "worker",
+          "client_build": "bench-1772111929221",
+          "server_build": "dev",
+          "flash_logid": null,
+          "code": null,
+          "message": null
+        },
+        {
+          "id": 13710,
+          "type": "customer.text_ready",
+          "turn_id": "764c1b02-a611-4979-b309-7809f3f7f792",
+          "stage_elapsed_ms": 8939,
+          "asr_provider": null,
+          "asr_provider_attempted": null,
+          "asr_provider_final": null,
+          "asr_outcome": null,
+          "asr_fallback_used": null,
+          "asr_ms": 5924,
+          "asr_ready_ms": null,
+          "asr_queue_wait_ms": null,
+          "script_select_ms": 1,
+          "llm_ms": 0,
+          "text_ready_ms": 1,
+          "tts_ms": null,
+          "queue_wait_before_main_ms": 0,
+          "queue_wait_before_tts_ms": null,
+          "queue_wait_before_tts_valid": null,
+          "queue_wait_before_tts_source": null,
+          "tts_source": null,
+          "tts_cache_hit": null,
+          "tts_failed": null,
+          "trace_id": "176a4b54-86be-49a4-a829-d7935fd0371b",
+          "executor": "worker",
+          "client_build": "bench-1772111929221",
+          "server_build": "dev",
+          "flash_logid": null,
+          "code": null,
+          "message": null
+        },
+        {
+          "id": 13711,
+          "type": "customer.audio_ready",
+          "turn_id": "764c1b02-a611-4979-b309-7809f3f7f792",
+          "stage_elapsed_ms": 10071,
+          "asr_provider": null,
+          "asr_provider_attempted": null,
+          "asr_provider_final": null,
+          "asr_outcome": null,
+          "asr_fallback_used": null,
+          "asr_ms": 5924,
+          "asr_ready_ms": null,
+          "asr_queue_wait_ms": null,
+          "script_select_ms": null,
+          "llm_ms": 0,
+          "text_ready_ms": null,
+          "tts_ms": 0,
+          "queue_wait_before_main_ms": null,
+          "queue_wait_before_tts_ms": 2,
+          "queue_wait_before_tts_valid": true,
+          "queue_wait_before_tts_source": "tts_queued_at_ms",
+          "tts_source": "line_cache",
+          "tts_cache_hit": true,
+          "tts_failed": false,
+          "trace_id": "176a4b54-86be-49a4-a829-d7935fd0371b",
+          "executor": "worker",
+          "client_build": "bench-1772111929221",
+          "server_build": "dev",
+          "flash_logid": null,
+          "code": null,
+          "message": null
+        }
+      ],
+      "polls": [
+        {
+          "atMs": 1916,
+          "elapsedMs": 1916,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 13708,
+          "cursorAfter": 13708
+        },
+        {
+          "atMs": 4113,
+          "elapsedMs": 2197,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 13708,
+          "cursorAfter": 13708
+        },
+        {
+          "atMs": 6209,
+          "elapsedMs": 2096,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 13708,
+          "cursorAfter": 13708
+        },
+        {
+          "atMs": 8090,
+          "elapsedMs": 1881,
+          "status": 200,
+          "eventsCount": 1,
+          "cursorBefore": 13708,
+          "cursorAfter": 13709
+        },
+        {
+          "atMs": 9543,
+          "elapsedMs": 1453,
+          "status": 200,
+          "eventsCount": 1,
+          "cursorBefore": 13709,
+          "cursorAfter": 13710
+        },
+        {
+          "atMs": 10668,
+          "elapsedMs": 1124,
+          "status": 200,
+          "eventsCount": 1,
+          "cursorBefore": 13710,
+          "cursorAfter": 13711
+        }
+      ],
+      "errors": [],
+      "analysis": null
     }
   ],
-  "asr_provider_distribution": {
-    "flash": 1
+  "warnings": [],
+  "serverBuilds": [
+    "dev"
+  ],
+  "user": {
+    "id": "71280da8-5874-43a3-8d01-1c06323459c9",
+    "email": "voicecoach.bench.1772111929223.508a55e2@ipgongchang.xin",
+    "createElapsedMs": 572,
+    "loginElapsedMs": 392
   },
-  "asr_flash_ratio": 1,
-  "submit_ack_ms": {
-    "p50": 5070,
-    "p95": 5070
+  "createSession": {
+    "status": 200,
+    "elapsedMs": 1962,
+    "firstTurnSource": "seed_fixed",
+    "firstTurnHasAudio": true,
+    "firstTurnAudioSeconds": 3,
+    "sessionId": "d8cfce81-1bf5-46ee-86d0-b9c1cb6617be",
+    "responseError": null
   },
-  "audio_ready_ms": {
-    "p50": 4260,
-    "p95": 4260
-  },
-  "llm_ms": {
-    "p50": 0,
-    "p95": 0
-  },
-  "tts_ms": {
-    "p50": 0,
-    "p95": 0
-  },
-  "queue_wait_before_main_ms": {
-    "p50": 0,
-    "p95": 0
-  },
-  "queue_wait_before_tts_ms_raw": {
-    "p50": 1,
-    "p95": 1
-  },
-  "queue_wait_before_tts_ms_corrected": {
-    "p50": 1,
-    "p95": 1,
-    "rule": "valid_only_then_fallback_raw"
-  },
-  "queue_wait_before_tts_invalid_rate": 0,
-  "tts_cache_hit_rate": 1,
-  "executor_distribution": {
-    "worker": 3
-  },
-  "executor_worker_ratio": 1,
-  "submit_pump_count": 0,
-  "events_pump_count": 0,
-  "counts": {
-    "asr_ready": 1,
-    "text_ready": 1,
-    "audio_ready": 1,
-    "turn_error": 0
-  },
-  "usable": true,
-  "client_probe": {
-    "record_format": "mp3",
-    "record_sample_rate": 16000,
-    "record_channels": 1,
-    "ui_feedback_p95_ms": 42,
-    "source": "latest_real_device_probe"
-  }
+  "server_build": "dev",
+  "finishedAt": "2026-02-26T13:19:10.006Z"
 }

@@ -1,90 +1,187 @@
 {
-  "generated_at": "2026-02-26T13:07:20.650Z",
-  "label": "B",
-  "path_mode": "flash_required",
-  "source_file": "/Users/zhuan/IP项目/ip-content-factory/docs/runbooks/WO-R18-MONITOR-7D/window6/D4/T24/bench_B.raw.json",
-  "session_id": null,
-  "client_build": "bench-1772110663551",
-  "server_build": null,
-  "rounds": 1,
-  "sample_events": 3,
-  "audit_sample_count": 3,
-  "audit_samples": [
+  "startedAt": "2026-02-26T13:16:52.344Z",
+  "benchLabel": "B",
+  "clientBuild": "bench-1772111812343",
+  "runAnalysis": false,
+  "client_build": "bench-1772111812343",
+  "models": {
+    "llmProvider": "doubao",
+    "textModel": "doubao-seed-1-6-flash-250828",
+    "fastModel": "doubao-seed-1-6-flash-250828",
+    "analysisModel": "doubao-seed-1-6-flash-250828",
+    "ttsVoiceType": "zh_female_vv_uranus_bigtts",
+    "asrFlashResourceId": "volc.bigasr.auc_turbo",
+    "asrAucResourceId": "volc.seedasr.auc"
+  },
+  "rounds": [
     {
-      "trace_id": "87e674ed-9687-4c84-8903-4247ac1cc151",
-      "client_build": "bench-1772110663551",
-      "server_build": "dev",
-      "executor": "worker",
-      "event_type": "beautician.asr_ready"
-    },
-    {
-      "trace_id": "87e674ed-9687-4c84-8903-4247ac1cc151",
-      "client_build": "bench-1772110663551",
-      "server_build": "dev",
-      "executor": "worker",
-      "event_type": "customer.text_ready"
-    },
-    {
-      "trace_id": "87e674ed-9687-4c84-8903-4247ac1cc151",
-      "client_build": "bench-1772110663551",
-      "server_build": "dev",
-      "executor": "worker",
-      "event_type": "customer.audio_ready"
+      "roundNo": 1,
+      "inputText": "我理解您的顾虑，关于安全我们会先做评估，再根据体质调整手法。",
+      "ttsInputElapsedMs": 1444,
+      "ttsVoiceType": "zh_female_vv_uranus_bigtts",
+      "submitStatus": 200,
+      "submitElapsedMs": 9544,
+      "submitJobId": "872c576f-5e78-4f85-9278-6f8241b3970a",
+      "submitAcceptedTurnId": "daa816b0-e2f4-47c6-a290-b7d20f3d7108",
+      "serverAdvanced": false,
+      "serverAdvancedStage": "main_pending",
+      "events": [
+        {
+          "id": 13701,
+          "type": "beautician.asr_ready",
+          "turn_id": "daa816b0-e2f4-47c6-a290-b7d20f3d7108",
+          "stage_elapsed_ms": 2520,
+          "asr_provider": "flash",
+          "asr_provider_attempted": [
+            "flash"
+          ],
+          "asr_provider_final": "flash",
+          "asr_outcome": "success",
+          "asr_fallback_used": false,
+          "asr_ms": 652,
+          "asr_ready_ms": 652,
+          "asr_queue_wait_ms": 0,
+          "script_select_ms": null,
+          "llm_ms": null,
+          "text_ready_ms": null,
+          "tts_ms": null,
+          "queue_wait_before_main_ms": 0,
+          "queue_wait_before_tts_ms": null,
+          "queue_wait_before_tts_valid": null,
+          "queue_wait_before_tts_source": null,
+          "tts_source": null,
+          "tts_cache_hit": null,
+          "tts_failed": null,
+          "trace_id": "8ff733e2-f679-44b9-8fd8-218a94c69f95",
+          "executor": "worker",
+          "client_build": "bench-1772111812343",
+          "server_build": "dev",
+          "flash_logid": "2026022621170787E7D97DE8E2EBD45FCF",
+          "code": null,
+          "message": null
+        },
+        {
+          "id": 13702,
+          "type": "customer.text_ready",
+          "turn_id": "f50fd2bc-d5c4-4261-9e72-448cb4429410",
+          "stage_elapsed_ms": 3744,
+          "asr_provider": null,
+          "asr_provider_attempted": null,
+          "asr_provider_final": null,
+          "asr_outcome": null,
+          "asr_fallback_used": null,
+          "asr_ms": 652,
+          "asr_ready_ms": null,
+          "asr_queue_wait_ms": null,
+          "script_select_ms": 1,
+          "llm_ms": 0,
+          "text_ready_ms": 1,
+          "tts_ms": null,
+          "queue_wait_before_main_ms": 0,
+          "queue_wait_before_tts_ms": null,
+          "queue_wait_before_tts_valid": null,
+          "queue_wait_before_tts_source": null,
+          "tts_source": null,
+          "tts_cache_hit": null,
+          "tts_failed": null,
+          "trace_id": "8ff733e2-f679-44b9-8fd8-218a94c69f95",
+          "executor": "worker",
+          "client_build": "bench-1772111812343",
+          "server_build": "dev",
+          "flash_logid": null,
+          "code": null,
+          "message": null
+        },
+        {
+          "id": 13703,
+          "type": "customer.audio_ready",
+          "turn_id": "f50fd2bc-d5c4-4261-9e72-448cb4429410",
+          "stage_elapsed_ms": 4742,
+          "asr_provider": null,
+          "asr_provider_attempted": null,
+          "asr_provider_final": null,
+          "asr_outcome": null,
+          "asr_fallback_used": null,
+          "asr_ms": 652,
+          "asr_ready_ms": null,
+          "asr_queue_wait_ms": null,
+          "script_select_ms": null,
+          "llm_ms": 0,
+          "text_ready_ms": null,
+          "tts_ms": 0,
+          "queue_wait_before_main_ms": null,
+          "queue_wait_before_tts_ms": 2,
+          "queue_wait_before_tts_valid": true,
+          "queue_wait_before_tts_source": "tts_queued_at_ms",
+          "tts_source": "line_cache",
+          "tts_cache_hit": true,
+          "tts_failed": false,
+          "trace_id": "8ff733e2-f679-44b9-8fd8-218a94c69f95",
+          "executor": "worker",
+          "client_build": "bench-1772111812343",
+          "server_build": "dev",
+          "flash_logid": null,
+          "code": null,
+          "message": null
+        }
+      ],
+      "polls": [
+        {
+          "atMs": 1965,
+          "elapsedMs": 1964,
+          "status": 200,
+          "eventsCount": 0,
+          "cursorBefore": 13700,
+          "cursorAfter": 13700
+        },
+        {
+          "atMs": 2886,
+          "elapsedMs": 921,
+          "status": 200,
+          "eventsCount": 1,
+          "cursorBefore": 13700,
+          "cursorAfter": 13701
+        },
+        {
+          "atMs": 4295,
+          "elapsedMs": 1409,
+          "status": 200,
+          "eventsCount": 1,
+          "cursorBefore": 13701,
+          "cursorAfter": 13702
+        },
+        {
+          "atMs": 5202,
+          "elapsedMs": 907,
+          "status": 200,
+          "eventsCount": 1,
+          "cursorBefore": 13702,
+          "cursorAfter": 13703
+        }
+      ],
+      "errors": [],
+      "analysis": null
     }
   ],
-  "asr_provider_distribution": {
-    "flash": 1
+  "warnings": [],
+  "serverBuilds": [
+    "dev"
+  ],
+  "user": {
+    "id": "730e8df4-7749-470f-920e-32a05926b7a3",
+    "email": "voicecoach.bench.1772111812345.b843e331@ipgongchang.xin",
+    "createElapsedMs": 532,
+    "loginElapsedMs": 388
   },
-  "asr_flash_ratio": 1,
-  "submit_ack_ms": {
-    "p50": 5361,
-    "p95": 5361
+  "createSession": {
+    "status": 200,
+    "elapsedMs": 2342,
+    "firstTurnSource": "seed_fixed",
+    "firstTurnHasAudio": true,
+    "firstTurnAudioSeconds": 4,
+    "sessionId": "b3b2004f-6b8f-4171-a4f0-184f14d49aba",
+    "responseError": null
   },
-  "audio_ready_ms": {
-    "p50": 4383,
-    "p95": 4383
-  },
-  "llm_ms": {
-    "p50": 0,
-    "p95": 0
-  },
-  "tts_ms": {
-    "p50": 0,
-    "p95": 0
-  },
-  "queue_wait_before_main_ms": {
-    "p50": 0,
-    "p95": 0
-  },
-  "queue_wait_before_tts_ms_raw": {
-    "p50": 1,
-    "p95": 1
-  },
-  "queue_wait_before_tts_ms_corrected": {
-    "p50": 1,
-    "p95": 1,
-    "rule": "valid_only_then_fallback_raw"
-  },
-  "queue_wait_before_tts_invalid_rate": 0,
-  "tts_cache_hit_rate": 1,
-  "executor_distribution": {
-    "worker": 3
-  },
-  "executor_worker_ratio": 1,
-  "submit_pump_count": 0,
-  "events_pump_count": 0,
-  "counts": {
-    "asr_ready": 1,
-    "text_ready": 1,
-    "audio_ready": 1,
-    "turn_error": 0
-  },
-  "usable": true,
-  "client_probe": {
-    "record_format": "mp3",
-    "record_sample_rate": 16000,
-    "record_channels": 1,
-    "ui_feedback_p95_ms": 42,
-    "source": "latest_real_device_probe"
-  }
+  "server_build": "dev",
+  "finishedAt": "2026-02-26T13:17:11.799Z"
 }

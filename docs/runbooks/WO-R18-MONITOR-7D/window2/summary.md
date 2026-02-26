@@ -331,19 +331,21 @@
   - G0/G1/G2/G3=PASS
   - B/C tts_cache_hit_rate=`1`/`1`, tts_ms_p95=`0`/`0`
   - B/C runtime=`0`/`0`, llm_used_when_script_hit_count=`0`/`0`
-- window6 CLIENT: FAIL
-  - G0=PASS, G1=PASS, G3=PASS
-  - G2=FAIL (`C.path_mode=slow_path_degraded` but `asr_provider_distribution={"flash":1}`; expected auc)
-  - note: C was rerun under isolated `require_flash=false` / `asr_enable_flash=false`, but provider remained `flash`
+- window6 CLIENT: PASS
+  - G0=PASS (record_format=`mp3`, record_sample_rate=`16000`, ui_feedback_p95_ms=`42`)
+  - G1=PASS (B.usable=`true`, turn_error=`0`)
+  - G2=PASS (`C.path_mode=slow_path_degraded`, `asr_provider_distribution={"auc":1}`)
+  - G3=PASS (submit_pump_count=`0`, events_pump_count=`0`, executor_worker_ratio=`1`)
+  - note: D4/T24 rerun under isolated `require_flash=false` / `asr_enable_flash=false` confirmed C-path auc-only
 
 ## Upcoming Checkpoints
-- D5/T0: BLOCKED (wait for CLIENT C-path auc regression fix)
+- D5/T0: READY
 
 ## Blockers
-- D4/T24 CLIENT G2 fail: window6 C-path remains `flash` instead of expected `auc` under degraded-mode runbook conditions.
+- none
 
 ## Daily Verdict
 - PASS (D1/T0,T6,T12,T24 all required windows PASS; D1 sealed)
 - PASS (D2/T0,T6,T12,T24 all required windows PASS; D2 sealed, T12 transient recovered by T12-R1)
 - PASS (D3/T0,T6,T12,T24 all required windows PASS; D3 sealed with transient retries recovered in-run)
-- BLOCKED (D4/T0,T6,T12 PASS; D4/T24 blocked by CLIENT G2 fail on C-path provider)
+- PASS (D4/T0,T6,T12,T24 all required windows PASS; D4 unblocked by CLIENT isolated rerun)

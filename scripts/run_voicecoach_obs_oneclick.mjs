@@ -307,7 +307,7 @@ async function runGroup(group, ctx) {
 
       workerPid = startDetachedNode(
         ["--conditions=react-server", "--env-file-if-exists=.env.local", "--import", "tsx", "./lib/voice-coach/worker.ts"],
-        baseEnv,
+        runEnv,
         workerLog,
       )
 
