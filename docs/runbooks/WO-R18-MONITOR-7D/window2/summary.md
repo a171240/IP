@@ -338,8 +338,32 @@
   - G3=PASS (submit_pump_count=`0`, events_pump_count=`0`, executor_worker_ratio=`1`)
   - note: D4/T24 rerun under isolated `require_flash=false` / `asr_enable_flash=false` confirmed C-path auc-only
 
+## D5 / T0
+- window2 OBS: PASS
+  - run_result.status=`PASS`, G0/G1/G2/G3=PASS
+  - queue_wait_before_main_ms_p95=`0` (threshold<=500)
+  - audio_ready_ms_B_p95=`5434`
+  - note: A had one transient `ECONNRESET` and recovered on attempt 2
+- window3 ASR: PASS
+  - selfcheck=`PASS` (request_id=`6f4100c9-74c2-4363-a4f8-9b25fd8722d5`, logid=`2026022621315475BCD004FF9861E86C67`)
+  - startup_gate=`PASS` (request_id=`f52d99b8-8c12-4076-a1a7-5a01cc4885ce`, logid=`20260226213156D99F707023EC53FBAEB8`)
+- window4 WORKER: PASS
+  - run_result.status=`PASS`, G0/G1/G2/G3=PASS
+  - queue_wait_before_main_ms_p95=`0` (threshold<=500)
+  - audio_ready_ms_B_p95=`6580`
+- window5 TTS: PASS
+  - G0/G1/G2/G3=PASS
+  - B/C tts_cache_hit_rate=`1`/`1`, tts_ms_p95=`0`/`0`
+  - B/C runtime=`0`/`0`, llm_used_when_script_hit_count=`0`/`0`
+- window6 CLIENT: PASS
+  - G0=PASS (record_format=`mp3`, record_sample_rate=`16000`, ui_feedback_p95_ms=`42`)
+  - G1=PASS (B.usable=`true`, turn_error=`0`)
+  - G2=PASS (`C.path_mode=slow_path_degraded`, `asr_provider_distribution={"auc":1}`)
+  - G3=PASS (submit_pump_count=`0`, events_pump_count=`0`, executor_worker_ratio=`1`)
+  - note: B had one transient `round_count=0` and recovered on attempt 2; C finalized via isolated no-flash rerun
+
 ## Upcoming Checkpoints
-- D5/T0: READY
+- D5/T6: READY
 
 ## Blockers
 - none
@@ -349,3 +373,4 @@
 - PASS (D2/T0,T6,T12,T24 all required windows PASS; D2 sealed, T12 transient recovered by T12-R1)
 - PASS (D3/T0,T6,T12,T24 all required windows PASS; D3 sealed with transient retries recovered in-run)
 - PASS (D4/T0,T6,T12,T24 all required windows PASS; D4 unblocked by CLIENT isolated rerun)
+- IN_PROGRESS (D5/T0 PASS; pending D5/T6,T12,T24 checkpoints)
