@@ -1,0 +1,92 @@
+{
+  "generated_at": "2026-02-26T10:32:36.814Z",
+  "bench_tag": "wo-r18-d3t0-tts-c-1772101884-1772101885090",
+  "session_id": "4681f433-abfd-4792-97c1-e48c3af8fa32",
+  "rounds_requested": 8,
+  "rounds_planned": 8,
+  "rounds_queued": 7,
+  "round_errors": [
+    "round_2:session_context_missing",
+    "round_5:job_error:会话已结束或不存在"
+  ],
+  "sample_counts": {
+    "audio_ready_raw": 6,
+    "asr_ready_raw": 6,
+    "audio_ready_dedup": 6,
+    "asr_ready_dedup": 6
+  },
+  "executor_worker_ratio_audio": 1,
+  "script_hit_rate": 1,
+  "tts_line_cache_hit_rate": 1,
+  "tts_cache_hit_rate": 1,
+  "tts_source_distribution": {
+    "line_cache": 6,
+    "text_cache": 0,
+    "runtime": 0
+  },
+  "llm_used_when_script_hit_count": 0,
+  "tts_ms": {
+    "count": 6,
+    "p50": 0,
+    "p95": 0,
+    "avg": 0,
+    "max": 0
+  },
+  "queue_wait_before_tts_ms": {
+    "count": 6,
+    "p50": 0,
+    "p95": 1,
+    "avg": 0.67,
+    "max": 2
+  },
+  "queue_wait_before_main_ms": {
+    "count": 6,
+    "p50": 96,
+    "p95": 312,
+    "avg": 213.17,
+    "max": 529
+  },
+  "audio_ready_ms": {
+    "count": 6,
+    "p50": 6059,
+    "p95": 6889,
+    "avg": 6332.83,
+    "max": 6953
+  },
+  "llm_ms": {
+    "count": 6,
+    "p50": 0,
+    "p95": 0,
+    "avg": 0,
+    "max": 0
+  },
+  "asr_provider": {
+    "flash": 6
+  },
+  "asr_provider_final": {
+    "flash": 6
+  },
+  "asr_outcome": {
+    "success": 6
+  },
+  "asr_provider_final_flash_ratio": 1,
+  "queue_wait_before_tts_invalid_rate": 0,
+  "submit_pump_count": null,
+  "events_pump_count": null,
+  "audit_samples": [
+    {
+      "id": 12625,
+      "trace_id": "85df4d9b-0142-4dbf-bb5f-e0fa59d9788e",
+      "client_build": "wo-r18-d3t0-tts-c-1772101884-1772101885090",
+      "server_build": "0.1.0",
+      "executor": "worker"
+    },
+    {
+      "id": 12631,
+      "trace_id": "65e01473-30cc-444d-80dd-96a1f022d92d",
+      "client_build": "wo-r18-d3t0-tts-c-1772101884-1772101885090",
+      "server_build": "0.1.0",
+      "executor": "worker"
+    }
+  ]
+}
