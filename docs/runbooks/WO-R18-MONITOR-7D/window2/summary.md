@@ -207,8 +207,26 @@
   - B/C runtime=`0`/`0`, llm_used_when_script_hit_count=`0`/`0`
 - window6 CLIENT: N/A (R18 plan runs CLIENT at T0 + T24 only)
 
+## D3 / T12
+- window2 OBS: PASS
+  - run_result.status=`PASS`, G0/G1/G2/G3=PASS
+  - queue_wait_before_main_ms_p95=`0` (threshold<=500)
+  - audio_ready_ms_B_p95=`5380`
+- window3 ASR: PASS
+  - selfcheck=`PASS` (request_id=`f5092106-2e16-4522-a581-07adc3bbebd9`, logid=`2026022618555243E9DDFBF0EF5BE384A7`)
+  - startup_gate=`PASS` (request_id=`b90c11af-3e2c-4d73-809a-b31276bbbde2`, logid=`20260226185553C5AE703921E1CD762706`)
+- window4 WORKER: PASS
+  - run_result.status=`PASS`, G0/G1/G2/G3=PASS
+  - queue_wait_before_main_ms_p95=`0` (threshold<=500)
+  - audio_ready_ms_B_p95=`5256`
+- window5 TTS: PASS
+  - G0/G1/G2/G3=PASS
+  - B/C tts_cache_hit_rate=`1`/`1`, tts_ms_p95=`0`/`0`
+  - B/C runtime=`0`/`0`, llm_used_when_script_hit_count=`0`/`0`
+- window6 CLIENT: N/A (R18 plan runs CLIENT at T0 + T24 only)
+
 ## Upcoming Checkpoints
-- D3/T12: PENDING
+- D3/T24: PENDING
 
 ## Blockers
 - NONE
@@ -216,4 +234,4 @@
 ## Daily Verdict
 - PASS (D1/T0,T6,T12,T24 all required windows PASS; D1 sealed)
 - PASS (D2/T0,T6,T12,T24 all required windows PASS; D2 sealed, T12 transient recovered by T12-R1)
-- IN_PROGRESS (D3/T0,T6 PASS; waiting D3/T12,T24)
+- IN_PROGRESS (D3/T0,T6,T12 PASS; waiting D3/T24)
