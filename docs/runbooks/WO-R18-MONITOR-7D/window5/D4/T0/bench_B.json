@@ -1,0 +1,44 @@
+{
+  "generated_at": "2026-02-26T11:50:34.454Z",
+  "bench_tag": "bench-1772106371845",
+  "rounds_queued": 1,
+  "sample_counts": {
+    "audio_ready_dedup": 1,
+    "asr_ready_dedup": 1
+  },
+  "executor_worker_ratio_audio": 1,
+  "script_hit_rate": 1,
+  "tts_line_cache_hit_rate": 1,
+  "tts_cache_hit_rate": 1,
+  "tts_source_distribution": {
+    "line_cache": 1,
+    "text_cache": 0,
+    "runtime": 0
+  },
+  "llm_used_when_script_hit_count": 0,
+  "tts_ms": {
+    "count": 1,
+    "p50": 0,
+    "p95": 0
+  },
+  "queue_wait_before_tts_invalid_rate": 0,
+  "asr_provider": {
+    "flash": 1
+  },
+  "audit_samples": [
+    {
+      "id": 13168,
+      "trace_id": "20d15ebb-2dae-432c-bc0a-56431766cee9",
+      "client_build": "bench-1772106371845",
+      "server_build": "dev",
+      "executor": "worker"
+    },
+    {
+      "id": 13169,
+      "trace_id": "20d15ebb-2dae-432c-bc0a-56431766cee9",
+      "client_build": "bench-1772106371845",
+      "server_build": "dev",
+      "executor": "worker"
+    }
+  ]
+}

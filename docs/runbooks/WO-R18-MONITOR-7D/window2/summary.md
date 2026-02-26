@@ -250,8 +250,30 @@
   - G2=PASS (C.path_mode=`slow_path_degraded`, asr_provider_distribution=`{"auc":1}`)
   - G3=PASS (submit_pump_count=`0`, events_pump_count=`0`, executor_worker_ratio=`1`)
 
+## D4 / T0
+- window2 OBS: PASS
+  - run_result.status=`PASS`, G0/G1/G2/G3=PASS
+  - queue_wait_before_main_ms_p95=`0` (threshold<=500)
+  - audio_ready_ms_B_p95=`4631`
+- window3 ASR: PASS
+  - selfcheck=`PASS` (request_id=`6c1833fb-70c6-4c8c-8594-979f2949a7be`, logid=`20260226192544DEE65811D09867EB2E7B`)
+  - startup_gate=`PASS` (request_id=`990e44d2-d9c6-4fa1-b2ea-4596204d5055`, logid=`202602261925457E6516D9852AC06E573F`)
+- window4 WORKER: PASS
+  - run_result.status=`PASS`, G0/G1/G2/G3=PASS
+  - queue_wait_before_main_ms_p95=`0` (threshold<=500)
+  - audio_ready_ms_B_p95=`5205`
+- window5 TTS: PASS
+  - G0/G1/G2/G3=PASS
+  - B/C tts_cache_hit_rate=`1`/`1`, tts_ms_p95=`0`/`0`
+  - B/C runtime=`0`/`0`, llm_used_when_script_hit_count=`0`/`0`
+- window6 CLIENT: PASS
+  - G0=PASS (record_format=`mp3`, record_sample_rate=`16000`, ui_feedback_p95_ms=`42`)
+  - G1=PASS (B.usable=`true`, turn_error=`0`)
+  - G2=PASS (C.path_mode=`slow_path_degraded`, asr_provider_distribution=`{"auc":1}`)
+  - G3=PASS (submit_pump_count=`0`, events_pump_count=`0`, executor_worker_ratio=`1`)
+
 ## Upcoming Checkpoints
-- D4/T0: PENDING
+- D4/T6: PENDING
 
 ## Blockers
 - NONE
@@ -260,3 +282,4 @@
 - PASS (D1/T0,T6,T12,T24 all required windows PASS; D1 sealed)
 - PASS (D2/T0,T6,T12,T24 all required windows PASS; D2 sealed, T12 transient recovered by T12-R1)
 - PASS (D3/T0,T6,T12,T24 all required windows PASS; D3 sealed with transient retries recovered in-run)
+- IN-PROGRESS (D4/T0 PASS; waiting for D4/T6,T12,T24)
