@@ -1,0 +1,95 @@
+{
+  "generated_at": "2026-02-26T12:54:02.417Z",
+  "bench_tag": "monitor-tts-b-d4t24-1772110355476",
+  "session_id": "bdb50553-44b5-40bc-817e-beca75ca3acd",
+  "rounds_requested": 8,
+  "rounds_planned": 8,
+  "rounds_queued": 8,
+  "round_errors": [
+    "round_3:job_error:语音识别超时，请重录并靠近麦克风。",
+    "round_6:job_error:语音识别超时，请重录并靠近麦克风。"
+  ],
+  "sample_counts": {
+    "audio_ready_raw": 6,
+    "asr_ready_raw": 6,
+    "audio_ready_dedup": 6,
+    "asr_ready_dedup": 6
+  },
+  "executor_worker_ratio_audio": 1,
+  "script_hit_rate": 1,
+  "tts_line_cache_hit_rate": 1,
+  "tts_cache_hit_rate": 1,
+  "tts_source_distribution": {
+    "line_cache": 6,
+    "text_cache": 0,
+    "runtime": 0
+  },
+  "llm_used_when_script_hit_count": 0,
+  "tts_ms": {
+    "count": 6,
+    "p50": 0,
+    "p95": 0,
+    "avg": 0,
+    "max": 0
+  },
+  "queue_wait_before_tts_ms": {
+    "count": 6,
+    "p50": 0,
+    "p95": 1,
+    "avg": 0.5,
+    "max": 1
+  },
+  "queue_wait_before_main_ms": {
+    "count": 6,
+    "p50": 139,
+    "p95": 205,
+    "avg": 142.5,
+    "max": 232
+  },
+  "audio_ready_ms": {
+    "count": 6,
+    "p50": 5792,
+    "p95": 7381,
+    "avg": 7339.67,
+    "max": 13767
+  },
+  "llm_ms": {
+    "count": 6,
+    "p50": 0,
+    "p95": 0,
+    "avg": 0,
+    "max": 0
+  },
+  "asr_provider": {
+    "flash": 5,
+    "auc": 1
+  },
+  "asr_provider_final": {
+    "flash": 5,
+    "auc": 1
+  },
+  "asr_outcome": {
+    "success": 5,
+    "fallback_success": 1
+  },
+  "asr_provider_final_flash_ratio": 0.8333,
+  "queue_wait_before_tts_invalid_rate": 0,
+  "submit_pump_count": null,
+  "events_pump_count": null,
+  "audit_samples": [
+    {
+      "id": 13632,
+      "trace_id": "d41a0468-4170-440a-bd01-4ec5c6b19b23",
+      "client_build": "monitor-tts-b-d4t24-1772110355476",
+      "server_build": "0.1.0",
+      "executor": "worker"
+    },
+    {
+      "id": 13635,
+      "trace_id": "a477cc04-b91e-4a97-af1a-82b7e4b4b095",
+      "client_build": "monitor-tts-b-d4t24-1772110355476",
+      "server_build": "0.1.0",
+      "executor": "worker"
+    }
+  ]
+}

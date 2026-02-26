@@ -1,0 +1,6 @@
+[ASR-GATE] require_flash=true，启动前执行 ASR selfcheck...
+[ASR-SELFCHECK] PASS flash_request_id=a3507804-7dc0-436f-b7f4-e1dd35af6aff flash_logid=2026022620492738726B46A15B6A5C35BA error_code=none
+{"status":"PASS","error_code":null,"flash_request_id":"a3507804-7dc0-436f-b7f4-e1dd35af6aff","flash_logid":"2026022620492738726B46A15B6A5C35BA","appid_last4":"8764","resource_id":"volc.bigasr.auc_turbo","occurred_at":"2026-02-26T12:49:27.589Z","environment":"unknown","http_status":200,"api_status":"20000003","api_code":null,"message":"[Normal silence audio] no valid speech in audio","operation_hint":null}
+[ASR-HEALTH] {"check":"asr_flash_selfcheck","status":"PASS","flash_request_id":"a3507804-7dc0-436f-b7f4-e1dd35af6aff","flash_logid":"2026022620492738726B46A15B6A5C35BA","resource_id":"volc.bigasr.auc_turbo","occurred_at":"2026-02-26T12:49:27.589Z","environment":"unknown"}
+[ASR-STARTUP-HEALTH] {"check":"startup_asr_flash_gate","status":"PASS","occurred_at":"2026-02-26T12:49:28.144Z","require_flash":true,"gate_enabled":true,"selfcheck_exit_code":0}
+[ASR-GATE] selfcheck 通过，继续启动。
