@@ -1665,6 +1665,26 @@ function makeConnectionState(ws: WebSocket, userId: string): RealtimeConnectionS
   }
 }
 
+async function processSocketFrame(
+  state: RealtimeConnectionState,
+  data: RawData,
+  isBinary: boolean,
+  request: IncomingMessage,
+) {
+  if (state.closed) return
+  if (isBinary) {
+    handleBinaryFrame(state, data)
+    return
+  }
+
+  const message = parseClientMessage(data)
+  if (!message) {
+    sendError(state, "realtime_message_invalid", "实时消息格式错误", true)
+    return
+  }
+  await handleClientMessage(state, message, request)
+}
+
 export async function startVoiceCoachRealtimeGateway(): Promise<StartGatewayResult> {
   const config = getVoiceCoachRealtimeConfig()
   const server = createServer((req, res) => {
@@ -1680,57 +1700,79 @@ export async function startVoiceCoachRealtimeGateway(): Promise<StartGatewayResu
 
   wss.on("connection", async (ws, request) => {
     let state: RealtimeConnectionState | null = null
-    try {
-      const userId = await authenticateRealtimeRequest(request)
-      state = makeConnectionState(ws, userId)
-    } catch (error: any) {
-      const message = String(error?.message || error || "auth_failed")
-      ws.send(
-        JSON.stringify({
-          type: "error",
-          ts: getIsoNow(),
-          trace_id: null,
-          payload: {
-            code: "realtime_auth_failed",
-            message,
-            retryable: false,
-          },
-        }),
-      )
-      ws.close(4001, "auth_failed")
-      return
+    let connectionClosed = false
+    let authFailed = false
+    let draining = false
+    const pendingFrames: Array<{ data: RawData; isBinary: boolean }> = []
+
+    const drainPendingFrames = async () => {
+      if (draining || !state || state.closed) return
+      draining = true
+      try {
+        while (pendingFrames.length && state && !state.closed) {
+          const frame = pendingFrames.shift()
+          if (!frame) break
+          try {
+            await processSocketFrame(state, frame.data, frame.isBinary, request)
+          } catch (error: any) {
+            sendError(state, "realtime_message_failed", String(error?.message || error || "message_failed"), true)
+          }
+        }
+      } finally {
+        draining = false
+        if (pendingFrames.length && state && !state.closed) {
+          void drainPendingFrames()
+        }
+      }
     }
 
-    ws.on("message", async (data, isBinary) => {
-      if (!state || state.closed) return
-      try {
-        if (isBinary) {
-          handleBinaryFrame(state, data)
-          return
-        }
-
-        const message = parseClientMessage(data)
-        if (!message) {
-          sendError(state, "realtime_message_invalid", "实时消息格式错误", true)
-          return
-        }
-        await handleClientMessage(state, message, request)
-      } catch (error: any) {
-        sendError(state, "realtime_message_failed", String(error?.message || error || "message_failed"), true)
-      }
+    ws.on("message", (data, isBinary) => {
+      if (authFailed || connectionClosed) return
+      pendingFrames.push({ data, isBinary })
+      void drainPendingFrames()
     })
 
     ws.on("close", () => {
+      connectionClosed = true
       if (!state) return
       state.closed = true
       state.interrupted = true
     })
 
     ws.on("error", () => {
+      connectionClosed = true
       if (!state) return
       state.closed = true
       state.interrupted = true
     })
+
+    void (async () => {
+      try {
+        const userId = await authenticateRealtimeRequest(request)
+        if (connectionClosed) return
+        state = makeConnectionState(ws, userId)
+        await drainPendingFrames()
+      } catch (error: any) {
+        authFailed = true
+        pendingFrames.length = 0
+        const message = String(error?.message || error || "auth_failed")
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(
+            JSON.stringify({
+              type: "error",
+              ts: getIsoNow(),
+              trace_id: null,
+              payload: {
+                code: "realtime_auth_failed",
+                message,
+                retryable: false,
+              },
+            }),
+          )
+        }
+        ws.close(4001, "auth_failed")
+      }
+    })()
   })
 
   await new Promise<void>((resolve, reject) => {

@@ -9,7 +9,8 @@
     "regress:delivery-pack": "node scripts/regress-delivery-pack.js",
     "regress:p5p10": "node scripts/regress-p5-p10-context.js",
     "start": "next start",
-    "voicecoach:realtime": "tsx scripts/voicecoach-realtime-gateway.ts"
+    "voicecoach:realtime": "tsx scripts/voicecoach-realtime-gateway.ts",
+    "voicecoach:smoke": "tsx scripts/voicecoach-realtime-smoke.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

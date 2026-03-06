@@ -200,6 +200,7 @@ export function resolveVoiceCoachRealtimeUrl(opts: {
   explicitUrl?: string | null
   origin?: string | null
   path?: string | null
+  portOverride?: number | null
 }) {
   const explicitUrl = String(opts.explicitUrl || "").trim()
   if (explicitUrl) return explicitUrl
@@ -211,6 +212,9 @@ export function resolveVoiceCoachRealtimeUrl(opts: {
   try {
     const url = new URL(origin)
     url.protocol = url.protocol === "https:" ? "wss:" : "ws:"
+    if (Number.isFinite(opts.portOverride)) {
+      url.port = String(Math.max(1, Math.min(65535, Number(opts.portOverride))))
+    }
     url.pathname = path.startsWith("/") ? path : `/${path}`
     url.search = ""
     url.hash = ""
@@ -232,6 +236,7 @@ export function getVoiceCoachRealtimeClientConfig(opts?: {
           explicitUrl: config.realtimeUrl,
           origin: opts?.origin || null,
           path: config.realtimePath,
+          portOverride: config.realtimePort,
         })
       : null,
     default_chunk_ms: config.defaultChunkMs,

@@ -1,7 +1,9 @@
 import { startVoiceCoachRealtimeGateway } from "@/lib/voice-coach/realtime.server"
 import { getVoiceCoachRealtimeConfig } from "@/lib/voice-coach/realtime-contract"
+import { loadLocalEnv } from "@/scripts/load-local-env"
 
 async function main() {
+  loadLocalEnv()
   const config = getVoiceCoachRealtimeConfig()
   const gateway = await startVoiceCoachRealtimeGateway()
 
