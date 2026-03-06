@@ -12,6 +12,8 @@ const TURN_PENDING_STATUSES = {
 // Preview ASR currently uses short chunks with flash endpoint, which is not a compatible path.
 // Keep it disabled by default until realtime streaming ASR is enabled.
 const CLIENT_ASR_PREVIEW_ENABLED = false
+const CUSTOMER_PENDING_REPLY_LABEL = "对方正在回复..."
+const CUSTOMER_PENDING_AUDIO_LABEL = "正在开口..."
 
 function formatSeconds(seconds) {
   const n = Number(seconds || 0)
@@ -36,7 +38,8 @@ function normalizeTurn(raw) {
   const role = raw.role === "beautician" ? "beautician" : "customer"
   const status = String(raw.status || "")
   const hasAudio = Boolean(raw.audio_url || raw.audioUrl || raw.audio_path)
-  const showTextDefault = role === "customer" ? false : !hasAudio
+  const showTextDefault =
+    typeof raw.showText === "boolean" ? raw.showText : role === "customer" ? false : !hasAudio
   const audioSeconds = Number(raw.audio_seconds || raw.audioSeconds || 0) || 0
   const pending = typeof raw.pending === "boolean" ? raw.pending : isPendingByStatus(status)
 
@@ -54,7 +57,9 @@ function normalizeTurn(raw) {
     ttsFailed: Boolean(raw.tts_failed || raw.ttsFailed),
     showSuggestions: false,
     showText: showTextDefault,
-    textOpenedOnce: false,
+    textOpenedOnce: typeof raw.textOpenedOnce === "boolean" ? raw.textOpenedOnce : showTextDefault,
+    pendingLabel: raw.pendingLabel || "",
+    placeholderForTurnId: raw.placeholderForTurnId || "",
     pending,
   }
 }
@@ -76,6 +81,28 @@ function makeLocalBeauticianTurn(filePath, durationSec) {
     showText: false,
     textOpenedOnce: false,
     pending: true,
+  }
+}
+
+function makePendingCustomerTurn(parentTurnId, label) {
+  return {
+    id: `pending_customer_${parentTurnId}`,
+    role: "customer",
+    status: "accepted",
+    text: "",
+    emotion: "",
+    audio_url: null,
+    audio_seconds: null,
+    audio_seconds_text: "",
+    voice_width_rpx: 0,
+    analysis: null,
+    ttsFailed: false,
+    showSuggestions: false,
+    showText: false,
+    textOpenedOnce: false,
+    pending: false,
+    pendingLabel: label || CUSTOMER_PENDING_REPLY_LABEL,
+    placeholderForTurnId: parentTurnId,
   }
 }
 
@@ -161,6 +188,15 @@ Page({
     this.audioCtx.onEnded(() => {
       this.setData({ playingTurnId: "" })
     })
+    this.audioCtx.onPlay(() => {
+      const latencyTurnId = this.pendingPlaybackTurnId || this.resolveLatencyTurnIdForPlayback(this.data.playingTurnId)
+      if (latencyTurnId) {
+        this.markTurnLatency(latencyTurnId, "first_audio_play", {
+          audioTurnId: this.data.playingTurnId || "",
+        })
+      }
+      this.pendingPlaybackTurnId = ""
+    })
 
     this.hasShownAudioError = false
     this.hasShownTtsFallbackToast = false
@@ -173,7 +209,9 @@ Page({
     this.lastAutoPlayedCustomerTurnId = ""
     this.pendingLocalTurnId = ""
     this.turnLatency = new Map()
+    this.customerParentMap = new Map()
     this.sessionCreatedAt = 0
+    this.pendingPlaybackTurnId = ""
     this.previewDisabled = !CLIENT_ASR_PREVIEW_ENABLED
     this.previewInFlight = false
     this.lastPreviewAt = 0
@@ -553,6 +591,12 @@ Page({
     return false
   },
 
+  findPendingCustomerPlaceholderIndex(parentTurnId) {
+    if (!parentTurnId) return -1
+    const turns = this.data.turns || []
+    return turns.findIndex((turn) => turn.role === "customer" && turn.placeholderForTurnId === parentTurnId)
+  },
+
   patchTurn(turnId, patch) {
     const idx = this.findTurnIndex(turnId)
     if (idx < 0) return false
@@ -581,6 +625,47 @@ Page({
       turns,
       scrollIntoView: `turn-${turn.id}`,
     })
+  },
+
+  ensurePendingCustomerPlaceholder(parentTurnId, label) {
+    if (!parentTurnId) return
+    const turns = this.data.turns || []
+    const placeholderIdx = this.findPendingCustomerPlaceholderIndex(parentTurnId)
+    if (placeholderIdx >= 0) {
+      if (label && turns[placeholderIdx].pendingLabel !== label) {
+        this.setData({
+          [`turns[${placeholderIdx}].pendingLabel`]: label,
+        })
+      }
+      return
+    }
+
+    const existingCustomerIdx = turns.findIndex(
+      (turn) => turn.role === "customer" && !turn.placeholderForTurnId && this.customerParentMap.get(turn.id) === parentTurnId,
+    )
+    if (existingCustomerIdx >= 0) return
+
+    this.appendTurn(makePendingCustomerTurn(parentTurnId, label))
+    this.trackUiFeedback("customer_placeholder_shown", { beauticianTurnId: parentTurnId })
+  },
+
+  replacePendingCustomerPlaceholder(parentTurnId, turn) {
+    const idx = this.findPendingCustomerPlaceholderIndex(parentTurnId)
+    if (idx < 0) return false
+    this.setData({
+      [`turns[${idx}]`]: turn,
+      scrollIntoView: `turn-${turn.id}`,
+    })
+    return true
+  },
+
+  clearPendingCustomerPlaceholder(parentTurnId) {
+    const idx = this.findPendingCustomerPlaceholderIndex(parentTurnId)
+    if (idx < 0) return false
+    const turns = (this.data.turns || []).slice()
+    turns.splice(idx, 1)
+    this.setData({ turns })
+    return true
   },
 
   startTurnLatency(turnId, meta = {}) {
@@ -621,6 +706,19 @@ Page({
     })
   },
 
+  trackUiFeedback(stage, extra = {}) {
+    track("voicecoach_ui_feedback", {
+      sessionId: this.data.sessionId || "",
+      stage,
+      ...extra,
+    })
+  },
+
+  resolveLatencyTurnIdForPlayback(turnId) {
+    if (!turnId) return ""
+    return this.customerParentMap.get(turnId) || turnId
+  },
+
   applyServerEvents(events) {
     let latestCursor = Number(this.data.eventCursor || 0) || 0
 
@@ -638,6 +736,7 @@ Page({
         this.markTurnLatency(turnId, "accepted", {
           stageElapsedMs,
           jobId: data.job_id || ev.job_id || "",
+          inlineAudioEligible: typeof data.inline_audio_eligible === "boolean" ? data.inline_audio_eligible : undefined,
         })
         const updated = this.patchTurn(turnId, {
           status: "accepted",
@@ -658,6 +757,7 @@ Page({
             }),
           )
         }
+        this.ensurePendingCustomerPlaceholder(turnId, CUSTOMER_PENDING_REPLY_LABEL)
         this.setData({ waitingCustomer: !data.reached_max_turns })
       } else if (type === "beautician.asr_ready" && turnId) {
         this.markTurnLatency(turnId, "asr_ready", {
@@ -697,33 +797,52 @@ Page({
       } else if (type === "customer.text_ready" && turnId) {
         const parentTurnId = String(data.beautician_turn_id || "")
         if (parentTurnId) {
+          this.customerParentMap.set(turnId, parentTurnId)
+        }
+        if (parentTurnId) {
           this.markTurnLatency(parentTurnId, "customer_text_ready", {
             customerTurnId: turnId,
             stageElapsedMs,
+            submitFastpathHit: Boolean(data.submit_fastpath_hit),
+            asrInputSource: data.asr_input_source || "",
           })
         }
+        const customerTurn = normalizeTurn({
+          turn_id: turnId,
+          role: "customer",
+          status: "text_ready",
+          text: data.text || "",
+          emotion: data.emotion || "",
+          showText: true,
+          textOpenedOnce: true,
+          pendingLabel: CUSTOMER_PENDING_AUDIO_LABEL,
+        })
         const updated = this.patchTurn(turnId, {
           status: "text_ready",
           pending: false,
           text: String(data.text || ""),
           emotion: String(data.emotion || ""),
-          showText: false,
+          showText: true,
+          textOpenedOnce: true,
+          pendingLabel: CUSTOMER_PENDING_AUDIO_LABEL,
           ttsFailed: false,
         })
-        if (!updated) {
-          this.appendTurn(
-            normalizeTurn({
-              turn_id: turnId,
-              role: "customer",
-              status: "text_ready",
-              text: data.text || "",
-              emotion: data.emotion || "",
-            }),
-          )
+        if (updated && parentTurnId) {
+          this.clearPendingCustomerPlaceholder(parentTurnId)
         }
-        this.setData({ waitingCustomer: true })
+        if (!updated && !this.replacePendingCustomerPlaceholder(parentTurnId, customerTurn)) {
+          this.appendTurn(customerTurn)
+        }
+        this.trackUiFeedback("customer_text_ready_visible", {
+          customerTurnId: turnId,
+          beauticianTurnId: parentTurnId,
+        })
+        this.setData({ waitingCustomer: false })
       } else if (type === "customer.audio_ready" && turnId) {
         const parentTurnId = String(data.beautician_turn_id || "")
+        if (parentTurnId) {
+          this.customerParentMap.set(turnId, parentTurnId)
+        }
         if (parentTurnId) {
           this.markTurnLatency(parentTurnId, "customer_audio_ready", {
             customerTurnId: turnId,
@@ -733,12 +852,31 @@ Page({
         }
         if (!data.audio_url || data.tts_failed) {
           this.notifyTtsFallback()
-          this.patchTurn(turnId, {
+          const updated = this.patchTurn(turnId, {
             status: "text_ready",
             pending: false,
-            showText: false,
+            showText: true,
+            textOpenedOnce: true,
+            pendingLabel: "",
             ttsFailed: true,
           })
+          if (updated && parentTurnId) {
+            this.clearPendingCustomerPlaceholder(parentTurnId)
+          }
+          if (!updated && parentTurnId) {
+            this.replacePendingCustomerPlaceholder(
+              parentTurnId,
+              normalizeTurn({
+                turn_id: turnId,
+                role: "customer",
+                status: "text_ready",
+                text: data.text || "",
+                showText: true,
+                textOpenedOnce: true,
+                tts_failed: true,
+              }),
+            )
+          }
           this.setData({ waitingCustomer: false })
         } else {
           const seconds = Number(data.audio_seconds || 0) || 0
@@ -749,20 +887,26 @@ Page({
             audio_seconds: seconds || null,
             audio_seconds_text: formatSeconds(seconds),
             voice_width_rpx: voiceWidthRpx(seconds || 3),
-            showText: false,
+            pendingLabel: "",
             ttsFailed: false,
           })
+          if (updated && parentTurnId) {
+            this.clearPendingCustomerPlaceholder(parentTurnId)
+          }
           if (!updated) {
-            this.appendTurn(
-              normalizeTurn({
-                turn_id: turnId,
-                role: "customer",
-                status: "audio_ready",
-                text: data.text || "",
-                audio_url: data.audio_url,
-                audio_seconds: seconds || null,
-              }),
-            )
+            const customerAudioTurn = normalizeTurn({
+              turn_id: turnId,
+              role: "customer",
+              status: "audio_ready",
+              text: data.text || "",
+              audio_url: data.audio_url,
+              audio_seconds: seconds || null,
+              showText: true,
+              textOpenedOnce: true,
+            })
+            if (!this.replacePendingCustomerPlaceholder(parentTurnId, customerAudioTurn)) {
+              this.appendTurn(customerAudioTurn)
+            }
           }
 
           if (this.lastAutoPlayedCustomerTurnId !== turnId) {
@@ -785,6 +929,9 @@ Page({
         })
         this.turnLatency.delete(turnId)
       } else if (type === "turn.error") {
+        if (turnId) {
+          this.clearPendingCustomerPlaceholder(turnId)
+        }
         if (turnId) {
           this.patchTurn(turnId, { pending: false, status: "error" })
           this.turnLatency.delete(turnId)
@@ -809,10 +956,14 @@ Page({
     if (!sessionId || !turnId) return
     const idx = this.findTurnIndex(turnId)
     if (idx >= 0 && this.data.turns[idx] && this.data.turns[idx].audio_url) return
+    const currentTurn = idx >= 0 ? this.data.turns[idx] : null
+    const keepTranscriptVisible = Boolean(currentTurn && currentTurn.role === "customer" && currentTurn.text)
     const latestCustomer = this.isLatestCustomerTurn(turnId)
     if (latestCustomer) this.setData({ waitingCustomer: true })
     this.patchTurn(turnId, {
       status: "text_ready",
+      showText: keepTranscriptVisible,
+      textOpenedOnce: keepTranscriptVisible,
       ttsFailed: false,
     })
 
@@ -827,6 +978,8 @@ Page({
       if (!res || res.error) {
         this.patchTurn(turnId, {
           status: "text_ready",
+          showText: keepTranscriptVisible,
+          textOpenedOnce: keepTranscriptVisible,
           ttsFailed: true,
         })
         if (latestCustomer) this.setData({ waitingCustomer: false })
@@ -835,6 +988,8 @@ Page({
       if (!res.audio_url || res.tts_failed) {
         this.patchTurn(turnId, {
           status: "text_ready",
+          showText: keepTranscriptVisible,
+          textOpenedOnce: keepTranscriptVisible,
           ttsFailed: true,
         })
         if (latestCustomer) this.setData({ waitingCustomer: false })
@@ -849,7 +1004,8 @@ Page({
         audio_seconds: seconds || null,
         audio_seconds_text: formatSeconds(seconds),
         voice_width_rpx: voiceWidthRpx(seconds || 3),
-        showText: false,
+        showText: keepTranscriptVisible,
+        textOpenedOnce: keepTranscriptVisible,
       })
 
       if (opts && opts.autoplay) {
@@ -862,6 +1018,8 @@ Page({
     } catch (_err) {
       this.patchTurn(turnId, {
         status: "text_ready",
+        showText: keepTranscriptVisible,
+        textOpenedOnce: keepTranscriptVisible,
         ttsFailed: true,
       })
       if (latestCustomer) this.setData({ waitingCustomer: false })
@@ -1203,6 +1361,13 @@ Page({
         this.markTurnLatency(accepted.id, "submit_ack", {
           deduped: Boolean(payload.deduped),
           acceptedByServer: true,
+          inlineAudioEligible: typeof payload.inline_audio_eligible === "boolean" ? payload.inline_audio_eligible : undefined,
+          submitFastpathHit: Boolean(payload.submit_fastpath_hit),
+        })
+        this.ensurePendingCustomerPlaceholder(accepted.id, CUSTOMER_PENDING_REPLY_LABEL)
+        this.trackUiFeedback("submit_accepted", {
+          beauticianTurnId: accepted.id,
+          submitFastpathHit: Boolean(payload.submit_fastpath_hit),
         })
 
         const nextCursor = Number(payload.next_cursor || 0) || 0
@@ -1374,6 +1539,7 @@ Page({
 
     const doPlay = (src) => {
       try {
+        this.pendingPlaybackTurnId = this.resolveLatencyTurnIdForPlayback(turnId)
         this.audioCtx.stop()
         this.audioCtx.src = src
         this.audioCtx.play()

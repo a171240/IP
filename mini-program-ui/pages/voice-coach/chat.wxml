@@ -43,7 +43,9 @@
               class="voice-bubble voice-customer voice-empty {{item.ttsFailed ? 'voice-empty-failed' : ''}}"
             >
               <view class="voice-tail tail-left"></view>
-              <view class="voice-empty-text">{{item.ttsFailed ? "语音暂不可用" : "语音生成中..."}}</view>
+              <view class="voice-empty-text">
+                {{item.ttsFailed ? "语音暂不可用" : (item.pendingLabel || (item.status === 'text_ready' ? "正在开口..." : "语音生成中..."))}}
+              </view>
             </view>
 
             <view wx:else class="bubble bubble-beautician">
