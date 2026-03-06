@@ -1,4 +1,10 @@
-const { API_BASE_URL } = require("../../utils/config")
+const {
+  API_BASE_URL,
+  VOICE_COACH_REALTIME_ENABLED,
+  VOICE_COACH_REALTIME_URL,
+  VOICE_COACH_REALTIME_DEFAULT_CHUNK_MS,
+  VOICE_COACH_REALTIME_INTERRUPT_MIN_CHUNKS,
+} = require("../../utils/config")
 const { request } = require("../../utils/request")
 const { getAccessToken } = require("../../utils/auth")
 const { getDeviceId } = require("../../utils/device")
@@ -155,6 +161,18 @@ function arrayBufferToAsciiText(input) {
   return ""
 }
 
+function copyArrayBuffer(input) {
+  if (!(input instanceof ArrayBuffer)) return null
+  const copy = new Uint8Array(input.byteLength)
+  copy.set(new Uint8Array(input))
+  return copy.buffer
+}
+
+function realtimeAudioChunkPath(turnId, seq) {
+  const root = (wx.env && wx.env.USER_DATA_PATH) || ""
+  return `${root}/voicecoach_rt_${turnId}_${seq}.mp3`
+}
+
 Page({
   data: {
     sessionId: "",
@@ -186,7 +204,12 @@ Page({
       this.audioCtx.obeyMuteSwitch = false
     } catch (_err) {}
     this.audioCtx.onEnded(() => {
+      const hadRealtimeQueue = Boolean(this.realtimeAudioPlaying)
+      this.realtimeAudioPlaying = false
       this.setData({ playingTurnId: "" })
+      if (hadRealtimeQueue) {
+        this.playNextRealtimeAudioChunk()
+      }
     })
     this.audioCtx.onPlay(() => {
       const latencyTurnId = this.pendingPlaybackTurnId || this.resolveLatencyTurnIdForPlayback(this.data.playingTurnId)
@@ -212,11 +235,19 @@ Page({
     this.customerParentMap = new Map()
     this.sessionCreatedAt = 0
     this.pendingPlaybackTurnId = ""
+    this.realtimeEnabled = Boolean(VOICE_COACH_REALTIME_ENABLED && VOICE_COACH_REALTIME_URL)
+    this.realtimeSocket = null
+    this.realtimeSocketOpen = false
+    this.realtimeSession = null
+    this.realtimeAudioQueue = []
+    this.realtimeAudioPlaying = false
+    this.realtimeTempFiles = new Set()
     this.previewDisabled = !CLIENT_ASR_PREVIEW_ENABLED
     this.previewInFlight = false
     this.lastPreviewAt = 0
     this.recordingChunkSeq = 0
     this.recordTouchStartY = 0
+    this.currentClientAttemptId = ""
 
     this.audioCtx.onError(() => {
       if (this.hasShownAudioError) return
@@ -227,22 +258,31 @@ Page({
     this.recorder.onStop((res) => {
       if (this.recordIntent === "cancel") {
         this.recordIntent = ""
+        this.closeRealtimeSocket({ interrupt: false })
         this.setData({ loading: false, recording: false })
         return
       }
       this.recordIntent = ""
       const durationSec = res && res.duration ? Math.round(res.duration / 1000) : 0
       if (!res || !res.tempFilePath) {
+        this.closeRealtimeSocket({ interrupt: false })
         wx.showToast({ title: "录音失败", icon: "none" })
         this.setData({ recording: false, loading: false })
         return
       }
       if (!durationSec || durationSec < 1) {
+        this.closeRealtimeSocket({ interrupt: false })
         wx.showToast({ title: "录音太短，请至少说1秒", icon: "none" })
         this.setData({ recording: false, loading: false })
         return
       }
-      this.uploadBeauticianTurn(res.tempFilePath, durationSec)
+      if (this.shouldUseRealtimeForCurrentTurn()) {
+        this.finalizeRealtimeTurn(res.tempFilePath, durationSec)
+        return
+      }
+      this.uploadBeauticianTurn(res.tempFilePath, durationSec, {
+        clientAttemptId: this.currentClientAttemptId || "",
+      })
     })
 
     if (CLIENT_ASR_PREVIEW_ENABLED && typeof this.recorder.onFrameRecorded === "function") {
@@ -261,6 +301,8 @@ Page({
 
   onUnload() {
     this.stopEvents = true
+    this.flushRealtimeAudioQueue()
+    this.closeRealtimeSocket({ interrupt: false })
     try {
       if (this.streamTask && typeof this.streamTask.abort === "function") this.streamTask.abort()
     } catch (_err) {}
@@ -719,6 +761,560 @@ Page({
     return this.customerParentMap.get(turnId) || turnId
   },
 
+  shouldUseRealtimeForCurrentTurn() {
+    return Boolean(this.realtimeEnabled && this.realtimeSession && !this.realtimeSession.fallbackUsed)
+  },
+
+  closeRealtimeSocket(opts = {}) {
+    const shouldInterrupt = Boolean(opts.interrupt)
+    const session = this.realtimeSession
+    const socket = this.realtimeSocket
+    this.realtimeSocket = null
+    this.realtimeSocketOpen = false
+    if (session) session.closedByClient = true
+
+    if (socket && shouldInterrupt) {
+      try {
+        socket.send({
+          data: JSON.stringify({
+            type: "interrupt",
+            payload: {
+              reason: "user_barge_in",
+            },
+          }),
+        })
+      } catch (_err) {}
+    }
+
+    if (socket) {
+      try {
+        socket.close({
+          code: 1000,
+          reason: "client_close",
+        })
+      } catch (_err) {}
+    }
+  },
+
+  async sendRealtimeJson(message) {
+    if (!this.realtimeSocket || !this.realtimeSocketOpen) return false
+    return new Promise((resolve) => {
+      try {
+        this.realtimeSocket.send({
+          data: JSON.stringify(message),
+          success: () => resolve(true),
+          fail: () => resolve(false),
+        })
+      } catch (_err) {
+        resolve(false)
+      }
+    })
+  },
+
+  async sendRealtimeBinary(buffer) {
+    if (!this.realtimeSocket || !this.realtimeSocketOpen) return false
+    return new Promise((resolve) => {
+      try {
+        this.realtimeSocket.send({
+          data: buffer,
+          success: () => resolve(true),
+          fail: () => resolve(false),
+        })
+      } catch (_err) {
+        resolve(false)
+      }
+    })
+  },
+
+  async flushQueuedRealtimeFrames() {
+    const session = this.realtimeSession
+    if (!session || !this.realtimeSocketOpen) return
+    const queued = session.queuedFrames || []
+    while (queued.length && this.realtimeSocketOpen && !session.fallbackUsed) {
+      const frame = queued.shift()
+      if (!frame) continue
+      // eslint-disable-next-line no-await-in-loop
+      const ok = await this.sendRealtimeFrame(frame)
+      if (!ok) break
+    }
+  },
+
+  async sendRealtimeFrame(frameBuffer) {
+    const session = this.realtimeSession
+    if (!session || session.fallbackUsed) return false
+    const copied = copyArrayBuffer(frameBuffer)
+    if (!copied) return false
+
+    if (!this.realtimeSocketOpen) {
+      session.queuedFrames.push(copied)
+      return true
+    }
+
+    session.chunkSeq += 1
+    session.totalChunks = session.chunkSeq
+    const metaOk = await this.sendRealtimeJson({
+      type: "audio.chunk",
+      payload: {
+        seq: session.chunkSeq,
+        audio_format: "mp3",
+        chunk_ms: VOICE_COACH_REALTIME_DEFAULT_CHUNK_MS,
+        sample_rate: 16000,
+        channels: 1,
+        byte_length: copied.byteLength,
+        transport: "binary",
+      },
+    })
+    if (!metaOk) {
+      session.fallbackUsed = true
+      return false
+    }
+
+    const audioOk = await this.sendRealtimeBinary(copied)
+    if (!audioOk) {
+      session.fallbackUsed = true
+      return false
+    }
+
+    return true
+  },
+
+  startRealtimeSession(replyToTurnId, clientAttemptId) {
+    if (!this.realtimeEnabled || !replyToTurnId || !VOICE_COACH_REALTIME_URL) return false
+
+    this.closeRealtimeSocket({ interrupt: true })
+    this.realtimeSession = {
+      replyToTurnId,
+      clientAttemptId,
+      queuedFrames: [],
+      chunkSeq: 0,
+      totalChunks: 0,
+      localTurnId: "",
+      serverTurnId: "",
+      customerTurnId: "",
+      filePath: "",
+      durationSec: 0,
+      fallbackUsed: false,
+      awaitingServer: false,
+      completed: false,
+      closedByClient: false,
+    }
+
+    const token = getAccessToken()
+    const deviceId = getDeviceId()
+    let settled = false
+
+    try {
+      const socket = wx.connectSocket({
+        url: VOICE_COACH_REALTIME_URL,
+        header: {
+          Authorization: token ? `Bearer ${token}` : "",
+          "x-device-id": deviceId || "",
+        },
+        timeout: 1500,
+      })
+
+      this.realtimeSocket = socket
+      this.realtimeSocketOpen = false
+
+      const failSocket = () => {
+        const session = this.realtimeSession
+        if (!session) return
+        session.fallbackUsed = true
+        this.realtimeSocketOpen = false
+      }
+
+      const openTimer = setTimeout(() => {
+        if (settled) return
+        settled = true
+        failSocket()
+        this.closeRealtimeSocket({ interrupt: false })
+      }, 1500)
+
+      socket.onOpen(async () => {
+        if (settled) return
+        settled = true
+        clearTimeout(openTimer)
+        this.realtimeSocketOpen = true
+        const ok = await this.sendRealtimeJson({
+          type: "session.start",
+          payload: {
+            session_id: this.data.sessionId,
+            reply_to_turn_id: replyToTurnId,
+            client_attempt_id: clientAttemptId,
+            audio_format: "mp3",
+            sample_rate: 16000,
+            channels: 1,
+            chunk_ms: VOICE_COACH_REALTIME_DEFAULT_CHUNK_MS,
+          },
+        })
+        if (!ok) {
+          failSocket()
+          this.closeRealtimeSocket({ interrupt: false })
+          return
+        }
+        this.flushQueuedRealtimeFrames()
+      })
+
+      socket.onError(() => {
+        clearTimeout(openTimer)
+        if (!settled) settled = true
+        failSocket()
+      })
+
+      socket.onClose(() => {
+        clearTimeout(openTimer)
+        this.realtimeSocketOpen = false
+        const session = this.realtimeSession
+        if (!session || session.closedByClient || session.completed) return
+        if (session.awaitingServer && session.filePath && !session.serverTurnId && !session.fallbackUsed) {
+          session.fallbackUsed = true
+          this.fallbackRealtimeToUpload(session.filePath, session.durationSec, "socket_closed")
+        }
+      })
+
+      socket.onMessage((event) => {
+        this.handleRealtimeSocketMessage(event)
+      })
+
+      return true
+    } catch (_err) {
+      if (this.realtimeSession) this.realtimeSession.fallbackUsed = true
+      return false
+    }
+  },
+
+  bindRealtimeBeauticianTurn(serverTurnId) {
+    const session = this.realtimeSession
+    if (!session || !serverTurnId) return serverTurnId
+    if (session.localTurnId && session.localTurnId !== serverTurnId) {
+      const localIdx = this.findTurnIndex(session.localTurnId)
+      const localTurn = localIdx >= 0 ? this.data.turns[localIdx] : null
+      const replacement = normalizeTurn({
+        turn_id: serverTurnId,
+        role: "beautician",
+        status: localTurn && localTurn.status ? localTurn.status : "accepted",
+        text: localTurn && localTurn.text ? localTurn.text : "",
+        audio_url: localTurn && localTurn.audio_url ? localTurn.audio_url : null,
+        audio_seconds: localTurn && localTurn.audio_seconds ? localTurn.audio_seconds : null,
+        pending: true,
+      })
+      if (localTurn) {
+        replacement.showText = Boolean(localTurn.showText)
+        replacement.textOpenedOnce = Boolean(localTurn.textOpenedOnce)
+      }
+      this.replaceTurn(session.localTurnId, replacement)
+      this.moveTurnLatency(session.localTurnId, serverTurnId)
+      if (this.pendingLocalTurnId === session.localTurnId) {
+        this.pendingLocalTurnId = serverTurnId
+      }
+      session.localTurnId = serverTurnId
+    }
+    session.serverTurnId = serverTurnId
+    return serverTurnId
+  },
+
+  handleRealtimeSocketMessage(event) {
+    const text = arrayBufferToAsciiText(event && event.data)
+    if (!text) return
+
+    let message = null
+    try {
+      message = JSON.parse(text)
+    } catch (_err) {
+      return
+    }
+    if (!message || !message.type) return
+
+    const payload = message.payload || {}
+    const session = this.realtimeSession
+
+    if (message.type === "session.ready") {
+      if (payload.turn_id) this.bindRealtimeBeauticianTurn(String(payload.turn_id || ""))
+      return
+    }
+
+    if (message.type === "asr.partial") {
+      if (this.data.recording && payload.text) {
+        this.setData({ recordingPreviewText: String(payload.text || "").slice(0, 48) })
+      }
+      return
+    }
+
+    if (message.type === "asr.final") {
+      const turnId = this.bindRealtimeBeauticianTurn(String(payload.turn_id || ""))
+      if (!turnId) return
+      this.markTurnLatency(turnId, "asr_ready", {
+        stageElapsedMs: Number(payload.stage_elapsed_ms || 0) || null,
+        asrInputSource: payload.asr_input_source || "",
+      })
+      const seconds = Number(payload.audio_seconds || 0) || 0
+      const hasAudio = Boolean(payload.audio_url)
+      this.patchTurn(turnId, {
+        status: "asr_ready",
+        pending: false,
+        text: String(payload.text || ""),
+        audio_url: payload.audio_url || null,
+        audio_seconds: seconds || null,
+        audio_seconds_text: formatSeconds(seconds),
+        voice_width_rpx: hasAudio ? voiceWidthRpx(seconds || 3) : 0,
+        showText: hasAudio ? false : true,
+      })
+      if (payload.reached_max_turns) {
+        this.setData({ waitingCustomer: false, loading: false })
+        this.openEndModal()
+      } else {
+        this.ensurePendingCustomerPlaceholder(turnId, CUSTOMER_PENDING_REPLY_LABEL)
+      }
+      return
+    }
+
+    if (message.type === "customer.text_ready") {
+      const customerTurnId = String(payload.turn_id || "")
+      const beauticianTurnId = String(payload.beautician_turn_id || "")
+      if (!customerTurnId || !beauticianTurnId) return
+      if (session) session.customerTurnId = customerTurnId
+      this.customerParentMap.set(customerTurnId, beauticianTurnId)
+      this.markTurnLatency(beauticianTurnId, "customer_text_ready", {
+        customerTurnId,
+        stageElapsedMs: Number(payload.stage_elapsed_ms || 0) || null,
+        asrInputSource: payload.asr_input_source || "",
+      })
+      const customerTurn = normalizeTurn({
+        turn_id: customerTurnId,
+        role: "customer",
+        status: "text_ready",
+        text: payload.text || "",
+        emotion: payload.emotion || "",
+        showText: true,
+        textOpenedOnce: true,
+        pendingLabel: CUSTOMER_PENDING_AUDIO_LABEL,
+      })
+      const updated = this.patchTurn(customerTurnId, {
+        status: "text_ready",
+        pending: false,
+        text: String(payload.text || ""),
+        emotion: String(payload.emotion || ""),
+        showText: true,
+        textOpenedOnce: true,
+        pendingLabel: CUSTOMER_PENDING_AUDIO_LABEL,
+        ttsFailed: false,
+      })
+      if (updated && beauticianTurnId) {
+        this.clearPendingCustomerPlaceholder(beauticianTurnId)
+      }
+      if (!updated && !this.replacePendingCustomerPlaceholder(beauticianTurnId, customerTurn)) {
+        this.appendTurn(customerTurn)
+      }
+      this.trackUiFeedback("customer_text_ready_visible", {
+        customerTurnId,
+        beauticianTurnId,
+        transport: "realtime",
+      })
+      this.setData({ waitingCustomer: false, loading: false })
+      return
+    }
+
+    if (message.type === "customer.audio_chunk") {
+      const customerTurnId = String(payload.turn_id || "")
+      if (!customerTurnId || !payload.chunk_base64) return
+      const beauticianTurnId = this.customerParentMap.get(customerTurnId) || ""
+      if (beauticianTurnId) {
+        this.markTurnLatency(beauticianTurnId, "first_audio_chunk", {
+          customerTurnId,
+          stageElapsedMs: Number(payload.first_audio_chunk_ms || 0) || null,
+        })
+      }
+      this.lastAutoPlayedCustomerTurnId = customerTurnId
+      const filePath = realtimeAudioChunkPath(customerTurnId, Number(payload.seq || 0) || Date.now())
+      try {
+        const fs = wx.getFileSystemManager()
+        fs.writeFile({
+          filePath,
+          data: String(payload.chunk_base64 || ""),
+          encoding: "base64",
+          success: () => {
+            this.realtimeTempFiles.add(filePath)
+            this.realtimeAudioQueue.push({
+              turnId: customerTurnId,
+              filePath,
+            })
+            if (!this.realtimeAudioPlaying && !this.data.playingTurnId) {
+              this.playNextRealtimeAudioChunk()
+            }
+          },
+        })
+      } catch (_err) {}
+      return
+    }
+
+    if (message.type === "customer.audio_ready") {
+      const customerTurnId = String(payload.turn_id || "")
+      const beauticianTurnId = String(payload.beautician_turn_id || this.customerParentMap.get(customerTurnId) || "")
+      if (!customerTurnId) return
+      if (beauticianTurnId) this.customerParentMap.set(customerTurnId, beauticianTurnId)
+      this.lastAutoPlayedCustomerTurnId = customerTurnId
+      if (beauticianTurnId) {
+        this.markTurnLatency(beauticianTurnId, "customer_audio_ready", {
+          customerTurnId,
+          stageElapsedMs: Number(payload.first_audio_chunk_ms || 0) || null,
+          ttsFailed: Boolean(payload.tts_failed),
+        })
+      }
+      if (!payload.audio_url || payload.tts_failed) {
+        this.notifyTtsFallback()
+        this.patchTurn(customerTurnId, {
+          status: "text_ready",
+          pending: false,
+          showText: true,
+          textOpenedOnce: true,
+          pendingLabel: "",
+          ttsFailed: true,
+        })
+      } else {
+        const seconds = Number(payload.audio_seconds || 0) || 0
+        this.patchTurn(customerTurnId, {
+          status: "audio_ready",
+          pending: false,
+          audio_url: payload.audio_url,
+          audio_seconds: seconds || null,
+          audio_seconds_text: formatSeconds(seconds),
+          voice_width_rpx: voiceWidthRpx(seconds || 3),
+          pendingLabel: "",
+          ttsFailed: false,
+        })
+      }
+      this.setData({ waitingCustomer: false, loading: false })
+      return
+    }
+
+    if (message.type === "turn.done") {
+      if (session) session.completed = true
+      this.closeRealtimeSocket({ interrupt: false })
+      return
+    }
+
+    if (message.type === "error") {
+      const reason = String(payload.message || "实时语音失败")
+      if (session && session.awaitingServer && session.filePath && !session.serverTurnId && !session.fallbackUsed) {
+        session.fallbackUsed = true
+        this.fallbackRealtimeToUpload(session.filePath, session.durationSec, reason)
+        return
+      }
+      wx.showToast({ title: reason, icon: "none" })
+    }
+  },
+
+  finalizeRealtimeTurn(filePath, durationSec) {
+    const session = this.realtimeSession
+    if (!session || session.fallbackUsed) {
+      this.uploadBeauticianTurn(filePath, durationSec, {
+        clientAttemptId: this.currentClientAttemptId || "",
+      })
+      return
+    }
+
+    session.filePath = filePath
+    session.durationSec = durationSec
+    session.awaitingServer = true
+    const localTurn = makeLocalBeauticianTurn(filePath, durationSec)
+    session.localTurnId = localTurn.id
+    this.pendingLocalTurnId = localTurn.id
+    this.startTurnLatency(localTurn.id, { clientAttemptId: session.clientAttemptId || this.currentClientAttemptId || "" })
+    this.appendTurn(localTurn)
+    this.ensurePendingCustomerPlaceholder(localTurn.id, CUSTOMER_PENDING_REPLY_LABEL)
+    track("voicecoach_turn_submit", {
+      sessionId: this.data.sessionId,
+      role: "beautician",
+      clientAttemptId: session.clientAttemptId || this.currentClientAttemptId || "",
+      audioSeconds: durationSec || 0,
+      transport: "realtime",
+    })
+
+    const sendEnd = async () => {
+      const ok = await this.sendRealtimeJson({
+        type: "audio.end",
+        payload: {
+          seq: session.chunkSeq,
+          total_chunks: session.totalChunks,
+        },
+      })
+      if (!ok) {
+        session.fallbackUsed = true
+        this.fallbackRealtimeToUpload(filePath, durationSec, "audio_end_send_failed")
+        return
+      }
+      this.setData({ loading: false, waitingCustomer: true, recordingPreviewText: "" })
+    }
+
+    if (!this.realtimeSocketOpen) {
+      setTimeout(() => {
+        if (this.realtimeSocketOpen && !session.fallbackUsed) {
+          sendEnd()
+          return
+        }
+        session.fallbackUsed = true
+        this.fallbackRealtimeToUpload(filePath, durationSec, "socket_not_ready")
+      }, 400)
+      return
+    }
+
+    sendEnd()
+  },
+
+  fallbackRealtimeToUpload(filePath, durationSec, reason) {
+    const session = this.realtimeSession
+    const clientAttemptId = (session && session.clientAttemptId) || this.currentClientAttemptId || ""
+    if (session && session.localTurnId) {
+      this.clearPendingCustomerPlaceholder(session.localTurnId)
+      const turns = (this.data.turns || []).filter((turn) => turn.id !== session.localTurnId)
+      this.turnLatency.delete(session.localTurnId)
+      this.pendingLocalTurnId = ""
+      this.setData({ turns })
+    }
+    this.trackUiFeedback("realtime_fallback_upload", {
+      reason: reason || "",
+    })
+    this.closeRealtimeSocket({ interrupt: false })
+    this.uploadBeauticianTurn(filePath, durationSec, { clientAttemptId })
+  },
+
+  playNextRealtimeAudioChunk() {
+    const next = this.realtimeAudioQueue.shift()
+    if (!next) {
+      this.realtimeAudioPlaying = false
+      return
+    }
+
+    this.realtimeAudioPlaying = true
+    try {
+      this.pendingPlaybackTurnId = this.resolveLatencyTurnIdForPlayback(next.turnId)
+      this.audioCtx.stop()
+      this.audioCtx.src = next.filePath
+      this.audioCtx.play()
+      this.setData({ playingTurnId: next.turnId })
+    } catch (_err) {
+      this.realtimeAudioPlaying = false
+      this.playNextRealtimeAudioChunk()
+    }
+  },
+
+  flushRealtimeAudioQueue() {
+    this.realtimeAudioQueue = []
+    this.realtimeAudioPlaying = false
+    const files = Array.from(this.realtimeTempFiles || [])
+    this.realtimeTempFiles.clear()
+    try {
+      this.audioCtx.stop()
+    } catch (_err) {}
+    if (!files.length) return
+    const fs = wx.getFileSystemManager()
+    files.forEach((filePath) => {
+      try {
+        fs.unlink({ filePath })
+      } catch (_err) {}
+    })
+  },
+
   applyServerEvents(events) {
     let latestCursor = Number(this.data.eventCursor || 0) || 0
 
@@ -1101,6 +1697,13 @@ Page({
   },
 
   onRecordFrame(frame) {
+    if (this.realtimeEnabled && this.realtimeSession && !this.realtimeSession.fallbackUsed) {
+      const frameBuffer = frame && frame.frameBuffer
+      if (frameBuffer instanceof ArrayBuffer) {
+        this.sendRealtimeFrame(frameBuffer)
+      }
+    }
+
     if (!frame || this.previewDisabled || this.previewInFlight) return
     if (!this.data.recording || !this.data.sessionId) return
 
@@ -1168,7 +1771,6 @@ Page({
   onRecordStart(e) {
     if (this.data.recording) return
     if (this.data.loading) return
-    if (this.data.waitingCustomer) return
     if (!this.data.sessionId) return
     this.recordTouchStartY = 0
     const startTouchY = Number(
@@ -1177,14 +1779,28 @@ Page({
         0,
     )
 
-    const start = (touchY = 0) => {
+    const start = async (touchY = 0) => {
+      if (this.data.waitingCustomer) {
+        this.flushRealtimeAudioQueue()
+        this.closeRealtimeSocket({ interrupt: true })
+        this.setData({ waitingCustomer: false })
+      }
       this.recordTouchStartY = Number(touchY || 0)
       this.recordIntent = "send"
       this.setData({ recording: true, recordCanceling: false, recordingPreviewText: "录音中..." })
       try {
+        this.flushRealtimeAudioQueue()
         if (this.audioCtx) this.audioCtx.stop()
         this.setData({ playingTurnId: "" })
       } catch {}
+
+      const replyToTurnId = this.getLastCustomerTurnId()
+      this.currentClientAttemptId = makeClientAttemptId()
+      if (this.realtimeEnabled && replyToTurnId) {
+        this.startRealtimeSession(replyToTurnId, this.currentClientAttemptId)
+      } else {
+        this.closeRealtimeSocket({ interrupt: false })
+      }
 
       try {
         const preferredOptions = {
@@ -1225,7 +1841,7 @@ Page({
         }
         wx.authorize({
           scope: "scope.record",
-          success: () => start(startTouchY),
+          success: () => void start(startTouchY),
           fail: () => {
             wx.showModal({
               title: "需要录音权限",
@@ -1240,7 +1856,7 @@ Page({
           },
         })
       },
-      fail: () => start(startTouchY),
+      fail: () => void start(startTouchY),
     })
   },
 
@@ -1275,12 +1891,13 @@ Page({
     if (!this.data.recording) return
     this.recordIntent = "cancel"
     this.setData({ recording: false, recordCanceling: false, loading: false, recordingPreviewText: "" })
+    this.closeRealtimeSocket({ interrupt: false })
     try {
       this.recorder.stop()
     } catch {}
   },
 
-  uploadBeauticianTurn(filePath, durationSec) {
+  uploadBeauticianTurn(filePath, durationSec, opts = {}) {
     const sessionId = this.data.sessionId
     const replyToTurnId = this.getLastCustomerTurnId()
     if (!replyToTurnId) {
@@ -1291,7 +1908,7 @@ Page({
 
     const localTurn = makeLocalBeauticianTurn(filePath, durationSec)
     this.pendingLocalTurnId = localTurn.id
-    const clientAttemptId = makeClientAttemptId()
+    const clientAttemptId = String(opts.clientAttemptId || makeClientAttemptId())
     this.startTurnLatency(localTurn.id, { clientAttemptId })
     this.appendTurn(localTurn)
     track("voicecoach_turn_submit", {
@@ -1536,6 +2153,9 @@ Page({
 
   playAudio(turnId, url, opts = {}) {
     const autoplay = Boolean(opts.autoplay)
+    if (this.realtimeAudioQueue.length || this.realtimeAudioPlaying) {
+      this.flushRealtimeAudioQueue()
+    }
 
     const doPlay = (src) => {
       try {
