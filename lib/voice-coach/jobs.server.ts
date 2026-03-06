@@ -31,9 +31,14 @@ type VoiceCoachJobPayload = {
   reply_to_turn_id: string
   audio_format: "mp3" | "wav" | "ogg" | "raw" | "flac"
   client_audio_seconds?: number | null
+  client_attempt_id?: string | null
+  inline_audio_eligible?: boolean
+  audio_inline_b64?: string | null
 }
 
 type VoiceCoachJobStage = "main_pending" | "tts_pending" | "analysis_pending" | "done" | "error"
+type VoiceCoachAsrInputSource = "inline" | "signed_url" | "storage"
+type ProcessJobExecutor = "worker" | "submit_fastpath"
 
 type VoiceCoachJobResultState = {
   pipeline_started_at_ms?: number
@@ -50,6 +55,9 @@ type VoiceCoachJobResultState = {
   next_customer_tag?: string
   customer_text_elapsed_ms?: number
   customer_audio_elapsed_ms?: number
+  inline_audio_eligible?: boolean
+  asr_input_source?: VoiceCoachAsrInputSource
+  submit_fastpath_hit?: boolean
 }
 
 type EmitEventArgs = {
@@ -143,6 +151,16 @@ function normalizeJobStage(raw: unknown): VoiceCoachJobStage {
   if (stage === "error") return "error"
   // Compatibility for legacy values: accepted / processing / empty -> main stage.
   return "main_pending"
+}
+
+function decodeInlineAudio(raw: unknown): Buffer | null {
+  if (typeof raw !== "string" || !raw.trim()) return null
+  try {
+    const buf = Buffer.from(raw, "base64")
+    return buf.length > 0 ? buf : null
+  } catch {
+    return null
+  }
 }
 
 function fallbackTagFromBeauticianText(text: string, defaultTag: string) {
@@ -437,6 +455,7 @@ async function processMainStage(args: {
   turnId: string
   payload: VoiceCoachJobPayload
   resultState: VoiceCoachJobResultState
+  executor: ProcessJobExecutor
 }): Promise<ProcessJobResult> {
   const admin = createAdminSupabaseClient()
   const pipelineStartedAt = Number(args.resultState.pipeline_started_at_ms || Date.now())
@@ -500,8 +519,9 @@ async function processMainStage(args: {
     return { processed: true, done: true, jobId: args.jobId, turnId: args.turnId }
   }
 
-  const audioBuf = await downloadVoiceCoachAudio(audioPath)
   const format = (args.payload.audio_format || "mp3") as "mp3" | "wav" | "ogg" | "raw" | "flac"
+  const inlineAudioEligible = Boolean(args.payload.inline_audio_eligible)
+  const inlineAudioBuf = decodeInlineAudio(args.payload.audio_inline_b64)
 
   if (format === "flac" && !shouldUseFlashAsr()) {
     await markJobError({
@@ -520,12 +540,15 @@ async function processMainStage(args: {
   let flashErrorMessage = ""
   const flashEnabled = shouldUseFlashAsr()
   const allowAucFallback = !flashEnabled || shouldAllowAucFallbackWhenFlashEnabled()
+  let asrInputSource: VoiceCoachAsrInputSource = inlineAudioBuf ? "inline" : "storage"
 
   if (flashEnabled && format !== "raw") {
     flashAttempted = true
     try {
+      const flashAudio = inlineAudioBuf ?? (await downloadVoiceCoachAudio(audioPath))
+      asrInputSource = inlineAudioBuf ? "inline" : "storage"
       asr = await doubaoAsrFlash({
-        audio: audioBuf,
+        audio: flashAudio,
         format: format as "mp3" | "wav" | "ogg" | "flac",
         uid: args.userId,
       })
@@ -537,6 +560,7 @@ async function processMainStage(args: {
 
   if ((!asr || !asr.text) && allowAucFallback) {
     const signed = await signVoiceCoachAudio(audioPath)
+    asrInputSource = "signed_url"
     try {
       asr = await doubaoAsrAuc({
         audioUrl: signed,
@@ -590,6 +614,7 @@ async function processMainStage(args: {
   const wpm = calcWpm(asr.text, audioSeconds)
   const fillerRatio = calcFillerRatio(asr.text)
   const beauticianAudioUrl = await getSignedAudio(audioPath)
+  const submitFastpathHit = Boolean(args.resultState.submit_fastpath_hit || args.executor === "submit_fastpath")
 
   const beauticianTurnNo = Math.floor((Number(loaded.turn.turn_index) + 1) / 2)
   const reachedMax = beauticianTurnNo >= maxTurns()
@@ -618,6 +643,9 @@ async function processMainStage(args: {
       audio_seconds: audioSeconds,
       audio_url: beauticianAudioUrl,
       reached_max_turns: reachedMax,
+      inline_audio_eligible: inlineAudioEligible,
+      asr_input_source: asrInputSource,
+      submit_fastpath_hit: submitFastpathHit,
       stage_elapsed_ms: Date.now() - pipelineStartedAt,
       ts: nowIso(),
     },
@@ -632,6 +660,9 @@ async function processMainStage(args: {
     beautician_audio_url: beauticianAudioUrl,
     beautician_audio_seconds: audioSeconds,
     beautician_asr_confidence: asr.confidence,
+    inline_audio_eligible: inlineAudioEligible,
+    asr_input_source: asrInputSource,
+    submit_fastpath_hit: submitFastpathHit,
   })
 
   if (reachedMax) {
@@ -731,6 +762,9 @@ async function processMainStage(args: {
       emotion: nextCustomer.emotion,
       llm_fallback_used: llmFallbackUsed,
       llm_fallback_reason: llmFallbackReason || null,
+      inline_audio_eligible: inlineAudioEligible,
+      asr_input_source: asrInputSource,
+      submit_fastpath_hit: submitFastpathHit,
       stage_elapsed_ms: Date.now() - pipelineStartedAt,
       ts: nowIso(),
     },
@@ -851,6 +885,9 @@ async function processTtsStage(args: {
       audio_seconds: audioSeconds,
       tts_failed: ttsFailed || !audioUrl,
       text: args.resultState.next_customer_text || String(customerTurn.text || ""),
+      inline_audio_eligible: args.resultState.inline_audio_eligible,
+      asr_input_source: args.resultState.asr_input_source,
+      submit_fastpath_hit: args.resultState.submit_fastpath_hit,
       stage_elapsed_ms: Date.now() - pipelineStartedAt,
       ts: nowIso(),
     },
@@ -862,6 +899,9 @@ async function processTtsStage(args: {
     result: mergeResult(args.resultState, {
       pipeline_started_at_ms: pipelineStartedAt,
       customer_audio_elapsed_ms: Date.now() - pipelineStartedAt,
+      inline_audio_eligible: args.resultState.inline_audio_eligible,
+      asr_input_source: args.resultState.asr_input_source,
+      submit_fastpath_hit: args.resultState.submit_fastpath_hit,
     }),
   })
 
@@ -994,6 +1034,7 @@ export async function processVoiceCoachJobById(args: {
   sessionId: string
   userId: string
   jobId: string
+  executor?: ProcessJobExecutor
 }): Promise<ProcessJobResult> {
   const admin = createAdminSupabaseClient()
 
@@ -1041,6 +1082,7 @@ export async function processVoiceCoachJobById(args: {
         turnId,
         payload,
         resultState,
+        executor: args.executor || "worker",
       })
     }
 
@@ -1148,6 +1190,7 @@ export async function pumpVoiceCoachQueuedJobs(args: {
       sessionId: args.sessionId,
       userId: args.userId,
       jobId,
+      executor: "worker",
     })
 
     if (!result.processed) {

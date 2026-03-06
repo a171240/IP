@@ -2,11 +2,12 @@ import { randomUUID } from "crypto"
 import { NextRequest, NextResponse } from "next/server"
 
 import { checkVoiceCoachAccess } from "@/lib/voice-coach/guard.server"
-import { emitVoiceCoachEvent, processVoiceCoachJobById, pumpVoiceCoachQueuedJobs } from "@/lib/voice-coach/jobs.server"
+import { emitVoiceCoachEvent, processVoiceCoachJobById } from "@/lib/voice-coach/jobs.server"
 import { signVoiceCoachAudio, uploadVoiceCoachAudio } from "@/lib/voice-coach/storage.server"
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
+const INLINE_AUDIO_MAX_BYTES = 600 * 1024
 
 function jsonError(status: number, error: string, extra?: Record<string, unknown>) {
   return NextResponse.json({ error, ...extra }, { status })
@@ -39,6 +40,19 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+function parseBool(value: string | undefined, fallback: boolean) {
+  if (value == null) return fallback
+  const normalized = String(value).trim().toLowerCase()
+  if (!normalized) return fallback
+  return !["0", "false", "off", "no"].includes(normalized)
+}
+
+function parseMs(value: string | undefined, fallback: number, max: number) {
+  const n = Number(value)
+  if (!Number.isFinite(n)) return fallback
+  return Math.max(0, Math.min(max, Math.round(n)))
+}
+
 async function readJobProgress(supabase: any, jobId: string): Promise<{ status: string; stage: string } | null> {
   const { data } = await supabase.from("voice_coach_jobs").select("status, stage").eq("id", jobId).single()
   if (!data) return null
@@ -53,48 +67,54 @@ async function advanceJobWithinBudget(opts: {
   sessionId: string
   userId: string
   jobId: string
-  budgetMs?: number
-}): Promise<{ advanced: boolean; status: string; stage: string }> {
-  const budgetMs = Math.max(500, Number(opts.budgetMs || 2500))
-  const deadline = Date.now() + budgetMs
-  let advanced = false
-  let ranCount = 0
-
-  while (Date.now() < deadline && ranCount < 2) {
-    const remaining = deadline - Date.now()
-    if (remaining < 150) break
-
-    const timeoutMs = Math.max(150, Math.min(remaining, 1800))
-    const raced = await Promise.race([
-      processVoiceCoachJobById({
-        sessionId: opts.sessionId,
-        userId: opts.userId,
-        jobId: opts.jobId,
-      })
-        .then((result) => ({ timedOut: false, result }))
-        .catch(() => ({ timedOut: false, result: null as any })),
-      sleep(timeoutMs).then(() => ({ timedOut: true, result: null as any })),
-    ])
-
-    if (raced.timedOut) break
-    if (raced.result && raced.result.processed) {
-      advanced = true
-      ranCount += 1
-    } else {
-      break
+  maxWallMs: number
+  jobTimeoutMs: number
+}): Promise<{ advanced: boolean; status: string; stage: string; timedOut: boolean }> {
+  const maxWallMs = Math.max(0, Number(opts.maxWallMs || 0))
+  const jobTimeoutMs = Math.max(0, Math.min(Number(opts.jobTimeoutMs || 0), maxWallMs || Number.MAX_SAFE_INTEGER))
+  const initialProgress = await readJobProgress(opts.supabase, opts.jobId)
+  if (!maxWallMs || !jobTimeoutMs || !initialProgress || initialProgress.status !== "queued" || initialProgress.stage !== "main_pending") {
+    return {
+      advanced: false,
+      status: initialProgress?.status || "queued",
+      stage: initialProgress?.stage || "main_pending",
+      timedOut: false,
     }
-
-    const progress = await readJobProgress(opts.supabase, opts.jobId)
-    if (!progress) break
-    if (progress.status !== "queued") break
-    if (progress.stage !== "tts_pending") break
   }
 
+  const deadline = Date.now() + maxWallMs
+  const remaining = Math.max(0, Math.min(jobTimeoutMs, deadline - Date.now()))
+  if (!remaining) {
+    return {
+      advanced: false,
+      status: initialProgress.status,
+      stage: initialProgress.stage,
+      timedOut: false,
+    }
+  }
+
+  const raced = await Promise.race([
+    processVoiceCoachJobById({
+      sessionId: opts.sessionId,
+      userId: opts.userId,
+      jobId: opts.jobId,
+      executor: "submit_fastpath",
+    })
+      .then((result) => ({ timedOut: false, result }))
+      .catch(() => ({ timedOut: false, result: null as any })),
+    sleep(remaining).then(() => ({ timedOut: true, result: null as any })),
+  ])
+
   const finalProgress = await readJobProgress(opts.supabase, opts.jobId)
+  const advanced =
+    Boolean(raced.result?.processed) &&
+    Boolean(finalProgress) &&
+    (finalProgress.stage === "tts_pending" || finalProgress.stage === "analysis_pending" || finalProgress.status === "done")
   return {
     advanced,
     status: finalProgress?.status || "queued",
     stage: finalProgress?.stage || "main_pending",
+    timedOut: raced.timedOut,
   }
 }
 
@@ -106,6 +126,14 @@ async function latestEventCursor(supabase: any, sessionId: string): Promise<numb
     .order("id", { ascending: false })
     .limit(1)
   return data?.[0]?.id ? Number(data[0].id) : 0
+}
+
+function getSubmitFastpathConfig() {
+  return {
+    enabled: parseBool(process.env.VOICE_COACH_SUBMIT_FASTPATH_ENABLED, false),
+    maxWallMs: parseMs(process.env.VOICE_COACH_SUBMIT_FASTPATH_MAX_WALL_MS, 900, 5000),
+    jobTimeoutMs: parseMs(process.env.VOICE_COACH_SUBMIT_FASTPATH_JOB_TIMEOUT_MS, 700, 5000),
+  }
 }
 
 export async function POST(request: NextRequest, context: { params: Promise<{ sessionId: string }> }) {
@@ -168,7 +196,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
     if (clientAttemptId) {
       const { data: existingJobs } = await supabase
         .from("voice_coach_jobs")
-        .select("id, turn_id, payload_json")
+        .select("id, turn_id, payload_json, result_json")
         .eq("session_id", sessionId)
         .eq("user_id", user.id)
         .contains("payload_json", { client_attempt_id: clientAttemptId })
@@ -203,6 +231,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
           deduped: true,
           server_advanced: false,
           server_advanced_stage: null,
+          inline_audio_eligible: Boolean(existing.payload_json?.inline_audio_eligible),
+          submit_fastpath_hit: Boolean(existing.result_json?.submit_fastpath_hit),
           beautician_turn: {
             turn_id: existingTurnId,
             role: "beautician",
@@ -233,6 +263,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
     const audioPath = `${user.id}/${sessionId}/${turnId}.${detected.ext}`
     const audioBuf = Buffer.from(await audioFile.arrayBuffer())
     if (!audioBuf.length) return jsonError(400, "empty_audio")
+    const inlineAudioEligible = audioBuf.length <= INLINE_AUDIO_MAX_BYTES
 
     await uploadVoiceCoachAudio({
       path: audioPath,
@@ -268,6 +299,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
         reply_to_turn_id: replyToTurnId,
         audio_format: detected.format,
         client_audio_seconds: clientAudioSeconds,
+        inline_audio_eligible: inlineAudioEligible,
+        ...(inlineAudioEligible ? { audio_inline_b64: audioBuf.toString("base64") } : {}),
         ...(clientAttemptId ? { client_attempt_id: clientAttemptId } : {}),
       },
     })
@@ -285,25 +318,32 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
         audio_url: audioUrl,
         audio_seconds: formatDuration(clientAudioSeconds),
         reached_max_turns: reachedMax,
+        inline_audio_eligible: inlineAudioEligible,
         ts: new Date().toISOString(),
       },
     })
 
-    // Best-effort kick-off to shorten first event wait.
-    void pumpVoiceCoachQueuedJobs({ sessionId, userId: user.id, maxJobs: 3 }).catch(() => {})
-
-    // Fast-path: try to advance to ASR/text (and optionally TTS) before returning.
-    const advanced = await advanceJobWithinBudget({
-      supabase,
-      sessionId,
-      userId: user.id,
-      jobId,
-      budgetMs: 2500,
-    }).catch(() => ({
-      advanced: false,
-      status: "queued",
-      stage: "main_pending",
-    }))
+    const fastpath = getSubmitFastpathConfig()
+    const advanced = fastpath.enabled
+      ? await advanceJobWithinBudget({
+          supabase,
+          sessionId,
+          userId: user.id,
+          jobId,
+          maxWallMs: fastpath.maxWallMs,
+          jobTimeoutMs: fastpath.jobTimeoutMs,
+        }).catch(() => ({
+          advanced: false,
+          status: "queued",
+          stage: "main_pending",
+          timedOut: false,
+        }))
+      : {
+          advanced: false,
+          status: "queued",
+          stage: "main_pending",
+          timedOut: false,
+        }
 
     return NextResponse.json({
       turn_id: turnId,
@@ -313,6 +353,9 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
       reached_max_turns: reachedMax,
       server_advanced: advanced.advanced,
       server_advanced_stage: advanced.stage,
+      inline_audio_eligible: inlineAudioEligible,
+      submit_fastpath_hit: advanced.advanced,
+      submit_fastpath_timed_out: advanced.timedOut,
       beautician_turn: {
         turn_id: turnId,
         role: "beautician",
