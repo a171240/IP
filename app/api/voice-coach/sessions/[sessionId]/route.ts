@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { checkVoiceCoachAccess } from "@/lib/voice-coach/guard.server"
+import { getVoiceCoachRealtimeClientConfig } from "@/lib/voice-coach/realtime-contract"
 import { getScenario } from "@/lib/voice-coach/scenarios"
 import { signVoiceCoachAudio } from "@/lib/voice-coach/storage.server"
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
@@ -67,6 +68,9 @@ export async function GET(request: NextRequest, context: { params: Promise<{ ses
           name: scenario.name,
         },
       },
+      realtime: getVoiceCoachRealtimeClientConfig({
+        origin: request.nextUrl.origin,
+      }),
       turns: enriched,
       last_event_cursor: lastEventCursor,
     })

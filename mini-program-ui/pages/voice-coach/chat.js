@@ -235,7 +235,10 @@ Page({
     this.customerParentMap = new Map()
     this.sessionCreatedAt = 0
     this.pendingPlaybackTurnId = ""
-    this.realtimeEnabled = Boolean(VOICE_COACH_REALTIME_ENABLED && VOICE_COACH_REALTIME_URL)
+    this.realtimeEnabled = false
+    this.realtimeUrl = ""
+    this.realtimeChunkMs = VOICE_COACH_REALTIME_DEFAULT_CHUNK_MS
+    this.realtimeInterruptMinChunks = VOICE_COACH_REALTIME_INTERRUPT_MIN_CHUNKS
     this.realtimeSocket = null
     this.realtimeSocketOpen = false
     this.realtimeSession = null
@@ -248,6 +251,7 @@ Page({
     this.recordingChunkSeq = 0
     this.recordTouchStartY = 0
     this.currentClientAttemptId = ""
+    this.applyRealtimeConfig(null)
 
     this.audioCtx.onError(() => {
       if (this.hasShownAudioError) return
@@ -322,6 +326,7 @@ Page({
         method: "POST",
         data: { scenario_id: "objection_safety" },
       })
+      this.applyRealtimeConfig(res && res.realtime)
 
       const first = normalizeTurn({
         turn_id: res.first_customer_turn.turn_id,
@@ -345,6 +350,7 @@ Page({
       track("voicecoach_enter", {
         sessionId: res.session_id,
         createSessionMs: Date.now() - startedAt,
+        realtimeEnabled: this.realtimeEnabled,
       })
 
       if (first.audio_url) {
@@ -369,6 +375,7 @@ Page({
         url: `/api/voice-coach/sessions/${sessionId}`,
         method: "GET",
       })
+      this.applyRealtimeConfig(res && res.realtime)
       const turns = (res.turns || []).map(normalizeTurn)
       const last = turns[turns.length - 1]
       const waitingCustomer = turns.some((t) => t.role === "beautician" && t.pending)
@@ -384,6 +391,7 @@ Page({
         sessionId,
         resumed: true,
         turnCount: turns.length,
+        realtimeEnabled: this.realtimeEnabled,
       })
       if (last && last.role === "customer" && last.text && !last.audio_url) {
         this.requestTurnTts(last.id, { autoplay: false })
@@ -761,6 +769,22 @@ Page({
     return this.customerParentMap.get(turnId) || turnId
   },
 
+  applyRealtimeConfig(realtime) {
+    const config = realtime && typeof realtime === "object" ? realtime : {}
+    const enabled = typeof config.enabled === "boolean" ? config.enabled : Boolean(VOICE_COACH_REALTIME_ENABLED)
+    const fallbackUrl = VOICE_COACH_REALTIME_URL || ""
+    const url = String(config.url || fallbackUrl || "")
+    const chunkMs = Number(config.default_chunk_ms || VOICE_COACH_REALTIME_DEFAULT_CHUNK_MS) || VOICE_COACH_REALTIME_DEFAULT_CHUNK_MS
+    const interruptMinChunks =
+      Number(config.interrupt_min_chunks || VOICE_COACH_REALTIME_INTERRUPT_MIN_CHUNKS) ||
+      VOICE_COACH_REALTIME_INTERRUPT_MIN_CHUNKS
+
+    this.realtimeEnabled = Boolean(enabled && url)
+    this.realtimeUrl = this.realtimeEnabled ? url : ""
+    this.realtimeChunkMs = Math.max(100, Math.min(1000, chunkMs))
+    this.realtimeInterruptMinChunks = Math.max(1, Math.min(8, interruptMinChunks))
+  },
+
   shouldUseRealtimeForCurrentTurn() {
     return Boolean(this.realtimeEnabled && this.realtimeSession && !this.realtimeSession.fallbackUsed)
   },
@@ -857,7 +881,7 @@ Page({
       payload: {
         seq: session.chunkSeq,
         audio_format: "mp3",
-        chunk_ms: VOICE_COACH_REALTIME_DEFAULT_CHUNK_MS,
+        chunk_ms: this.realtimeChunkMs,
         sample_rate: 16000,
         channels: 1,
         byte_length: copied.byteLength,
@@ -879,7 +903,7 @@ Page({
   },
 
   startRealtimeSession(replyToTurnId, clientAttemptId) {
-    if (!this.realtimeEnabled || !replyToTurnId || !VOICE_COACH_REALTIME_URL) return false
+    if (!this.realtimeEnabled || !replyToTurnId || !this.realtimeUrl) return false
 
     this.closeRealtimeSocket({ interrupt: true })
     this.realtimeSession = {
@@ -905,7 +929,7 @@ Page({
 
     try {
       const socket = wx.connectSocket({
-        url: VOICE_COACH_REALTIME_URL,
+        url: this.realtimeUrl,
         header: {
           Authorization: token ? `Bearer ${token}` : "",
           "x-device-id": deviceId || "",
@@ -944,7 +968,7 @@ Page({
             audio_format: "mp3",
             sample_rate: 16000,
             channels: 1,
-            chunk_ms: VOICE_COACH_REALTIME_DEFAULT_CHUNK_MS,
+            chunk_ms: this.realtimeChunkMs,
           },
         })
         if (!ok) {

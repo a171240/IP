@@ -196,12 +196,57 @@ export function getVoiceCoachRealtimeConfig(env: NodeJS.ProcessEnv = process.env
   }
 }
 
+export function resolveVoiceCoachRealtimeUrl(opts: {
+  explicitUrl?: string | null
+  origin?: string | null
+  path?: string | null
+}) {
+  const explicitUrl = String(opts.explicitUrl || "").trim()
+  if (explicitUrl) return explicitUrl
+
+  const origin = String(opts.origin || "").trim()
+  const path = String(opts.path || "/api/voice-coach/realtime/ws").trim() || "/api/voice-coach/realtime/ws"
+  if (!origin) return null
+
+  try {
+    const url = new URL(origin)
+    url.protocol = url.protocol === "https:" ? "wss:" : "ws:"
+    url.pathname = path.startsWith("/") ? path : `/${path}`
+    url.search = ""
+    url.hash = ""
+    return url.toString()
+  } catch {
+    return null
+  }
+}
+
+export function getVoiceCoachRealtimeClientConfig(opts?: {
+  env?: NodeJS.ProcessEnv
+  origin?: string | null
+}) {
+  const config = getVoiceCoachRealtimeConfig(opts?.env)
+  return {
+    enabled: config.realtimeEnabled,
+    url: config.realtimeEnabled
+      ? resolveVoiceCoachRealtimeUrl({
+          explicitUrl: config.realtimeUrl,
+          origin: opts?.origin || null,
+          path: config.realtimePath,
+        })
+      : null,
+    default_chunk_ms: config.defaultChunkMs,
+    interrupt_min_chunks: config.interruptMinChunks,
+  }
+}
+
 export const voiceCoachRealtimeContract = {
   VOICE_COACH_REALTIME_CLIENT_MESSAGE_TYPES,
   VOICE_COACH_REALTIME_SERVER_MESSAGE_TYPES,
   VOICE_COACH_REALTIME_METRIC_KEYS,
   VOICE_COACH_REALTIME_ENV_KEYS,
   getVoiceCoachRealtimeConfig,
+  resolveVoiceCoachRealtimeUrl,
+  getVoiceCoachRealtimeClientConfig,
 }
 
 export default voiceCoachRealtimeContract

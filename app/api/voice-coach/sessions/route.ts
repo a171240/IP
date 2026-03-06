@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { checkVoiceCoachAccess } from "@/lib/voice-coach/guard.server"
 import { llmGenerateCustomerTurn } from "@/lib/voice-coach/llm.server"
+import { getVoiceCoachRealtimeClientConfig } from "@/lib/voice-coach/realtime-contract"
 import { getScenario, type VoiceCoachEmotion } from "@/lib/voice-coach/scenarios"
 import { doubaoTts, type DoubaoTtsEmotion } from "@/lib/voice-coach/speech/doubao.server"
 import { uploadVoiceCoachAudio, signVoiceCoachAudio } from "@/lib/voice-coach/storage.server"
@@ -183,6 +184,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       session_id: session.id,
+      realtime: getVoiceCoachRealtimeClientConfig({
+        origin: request.nextUrl.origin,
+      }),
       scenario: {
         id: scenario.id,
         name: scenario.name,

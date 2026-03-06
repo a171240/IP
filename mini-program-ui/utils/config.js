@@ -1,7 +1,7 @@
 const IP_FACTORY_BASE_URL = "https://ip.ipgongchang.xin"
 const API_BASE_URL = IP_FACTORY_BASE_URL
 const VOICE_COACH_REALTIME_URL = `${API_BASE_URL.replace(/^http/i, API_BASE_URL.indexOf("https://") === 0 ? "wss" : "ws")}/api/voice-coach/realtime/ws`
-const VOICE_COACH_REALTIME_ENABLED = Boolean(VOICE_COACH_REALTIME_URL)
+const VOICE_COACH_REALTIME_ENABLED = false
 const VOICE_COACH_REALTIME_DEFAULT_CHUNK_MS = 200
 const VOICE_COACH_REALTIME_INTERRUPT_MIN_CHUNKS = 2
 
