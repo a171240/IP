@@ -28,6 +28,8 @@ export const VOICE_COACH_REALTIME_METRIC_KEYS = [
 export const VOICE_COACH_REALTIME_ENV_KEYS = [
   "VOICE_COACH_REALTIME_ENABLED",
   "VOICE_COACH_REALTIME_URL",
+  "VOICE_COACH_REALTIME_PORT",
+  "VOICE_COACH_REALTIME_PATH",
   "VOICE_COACH_REALTIME_DEFAULT_CHUNK_MS",
   "VOICE_COACH_REALTIME_TARGET_SEGMENT_MS",
   "VOICE_COACH_REALTIME_INTERRUPT_MIN_CHUNKS",
@@ -95,6 +97,13 @@ export type VoiceCoachRealtimeAsrPayload = {
   turn_id: string
   text: string
   is_final: boolean
+  audio_url?: string | null
+  audio_seconds?: number | null
+  confidence?: number | null
+  stage_elapsed_ms?: number | null
+  reached_max_turns?: boolean
+  inline_audio_eligible?: boolean
+  asr_input_source?: VoiceCoachRealtimeAsrInputSource | null
 }
 
 export type VoiceCoachRealtimeCustomerTextReadyPayload = {
@@ -104,6 +113,9 @@ export type VoiceCoachRealtimeCustomerTextReadyPayload = {
   emotion?: string | null
   reply_source?: string | null
   submit_fastpath_hit?: boolean
+  stage_elapsed_ms?: number | null
+  asr_input_source?: VoiceCoachRealtimeAsrInputSource | null
+  inline_audio_eligible?: boolean
 }
 
 export type VoiceCoachRealtimeAudioChunkReadyPayload = {
@@ -118,10 +130,13 @@ export type VoiceCoachRealtimeAudioChunkReadyPayload = {
 
 export type VoiceCoachRealtimeAudioReadyPayload = {
   turn_id: string
+  beautician_turn_id?: string | null
   audio_url: string | null
   audio_seconds: number | null
   first_audio_chunk_ms?: number | null
   first_audio_play_ms?: number | null
+  tts_failed?: boolean
+  text?: string | null
 }
 
 export type VoiceCoachRealtimeTurnDonePayload = {
@@ -169,6 +184,8 @@ export function getVoiceCoachRealtimeConfig(env: NodeJS.ProcessEnv = process.env
   return {
     realtimeEnabled: parseBool(env.VOICE_COACH_REALTIME_ENABLED, false),
     realtimeUrl: String(env.VOICE_COACH_REALTIME_URL || "").trim() || null,
+    realtimePort: parseIntEnv(env.VOICE_COACH_REALTIME_PORT, 8787, 1, 65535),
+    realtimePath: String(env.VOICE_COACH_REALTIME_PATH || "/api/voice-coach/realtime/ws").trim() || "/api/voice-coach/realtime/ws",
     defaultChunkMs: parseIntEnv(env.VOICE_COACH_REALTIME_DEFAULT_CHUNK_MS, 200, 100, 1000),
     targetSegmentMs: parseIntEnv(env.VOICE_COACH_REALTIME_TARGET_SEGMENT_MS, 800, 300, 2000),
     interruptMinChunks: parseIntEnv(env.VOICE_COACH_REALTIME_INTERRUPT_MIN_CHUNKS, 2, 1, 8),
