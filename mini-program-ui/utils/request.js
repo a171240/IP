@@ -1,6 +1,7 @@
 const { IP_FACTORY_BASE_URL, REQUEST_TIMEOUT } = require("./config")
 const { getAccessToken, loginSilent } = require("./auth")
 const { getDeviceId } = require("./device")
+const { getClientBuild } = require("./build")
 
 let silentLoginPromise = null
 
@@ -26,6 +27,12 @@ function buildHeaders(baseUrl, extraHeaders) {
     const deviceId = getDeviceId()
     if (deviceId) {
       headers["x-device-id"] = deviceId
+    }
+
+    const clientBuild = getClientBuild()
+    if (clientBuild) {
+      headers["X-Client-Build"] = clientBuild
+      headers["x-client-build"] = clientBuild
     }
   }
 

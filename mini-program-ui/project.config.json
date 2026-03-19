@@ -1,5 +1,7 @@
 {
   "appid": "wx2fab2dc6ebe442c4",
+  "projectname": "mini-program-ui",
+  "miniprogramRoot": "./",
   "compileType": "miniprogram",
   "libVersion": "3.13.2",
   "packOptions": {
