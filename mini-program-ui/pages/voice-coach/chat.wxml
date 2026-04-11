@@ -1,7 +1,202 @@
+﻿<template name="turn-content">
+  <view class="msg {{item.role === 'customer' ? 'msg-left' : 'msg-right'}}">
+    <view wx:if="{{item.audio_url}}" class="voice-row">
+      <view
+        class="voice-bubble {{item.role === 'customer' ? 'voice-customer' : 'voice-beautician'}} {{playingTurnId === item.id ? 'voice-playing' : ''}}"
+        style="width: {{item.voice_width_rpx}}rpx;"
+        bindtap="onPlay"
+        data-id="{{item.id}}"
+        data-url="{{item.audio_url}}"
+      >
+        <view class="voice-tail {{item.role === 'customer' ? 'tail-left' : 'tail-right'}}"></view>
+        <view class="voice-content {{item.role === 'customer' ? 'content-left' : 'content-right'}}">
+          <view class="voice-icon">
+            <view class="wave w1"></view>
+            <view class="wave w2"></view>
+            <view class="wave w3"></view>
+          </view>
+          <text class="voice-dur-text">{{item.audio_seconds_text}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view
+      wx:elif="{{item.role === 'customer' && item.text && !item.ttsFailed}}"
+      class="voice-row"
+    >
+      <view
+        class="voice-bubble voice-customer voice-pending {{playingTurnId === item.id ? 'voice-playing' : ''}}"
+        style="width: {{item.voice_width_rpx || 220}}rpx;"
+      >
+        <view class="voice-tail tail-left"></view>
+        <view class="voice-content content-left">
+          <view class="voice-icon">
+            <view class="wave w1"></view>
+            <view class="wave w2"></view>
+            <view class="wave w3"></view>
+          </view>
+          <text class="voice-dur-text">{{item.audio_seconds_text || '...'}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view
+      wx:elif="{{item.role === 'beautician' && item.pending && item.audio_seconds_text}}"
+      class="voice-row"
+    >
+      <view
+        class="voice-bubble voice-beautician voice-recording {{playingTurnId === item.id ? 'voice-playing' : ''}}"
+        style="width: {{item.voice_width_rpx || 220}}rpx;"
+      >
+        <view class="voice-tail tail-right"></view>
+        <view class="voice-content content-right">
+          <view class="voice-icon">
+            <view class="wave w1"></view>
+            <view class="wave w2"></view>
+            <view class="wave w3"></view>
+          </view>
+          <text class="voice-dur-text">{{item.audio_seconds_text || '...'}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view
+      wx:elif="{{item.role === 'customer' && item.ttsFailed}}"
+      class="voice-bubble voice-customer voice-empty {{item.ttsFailed ? 'voice-empty-failed' : ''}}"
+    >
+      <view class="voice-tail tail-left"></view>
+      <view class="voice-empty-text">语音暂不可用</view>
+    </view>
+
+    <view wx:else class="bubble bubble-beautician">
+      <view class="msg-text">{{item.text}}</view>
+    </view>
+
+    <view
+      class="op-row"
+      wx:if="{{item.role === 'beautician' || (item.role === 'customer' && (item.audio_url || item.ttsFailed || item.text))}}"
+    >
+      <view class="op-actions {{item.role === 'customer' ? 'op-actions-left' : 'op-actions-right'}}">
+        <view
+          wx:if="{{item.role === 'customer' && (item.audio_url || item.ttsFailed || item.text)}}"
+          class="action-chip action-chip-answer {{hintLoadingTurnId === item.id ? 'action-chip-loading' : ''}}"
+          bindtap="openHint"
+          data-id="{{item.id}}"
+        >
+          <view class="action-chip-bulb">
+            <view class="bulb-icon bulb-icon-chip">
+              <view class="bulb-head"></view>
+              <view class="bulb-neck"></view>
+              <view class="bulb-base"></view>
+            </view>
+          </view>
+          <text class="action-chip-text action-chip-answer-text">{{hintLoadingTurnId === item.id ? '生成中...' : '回答建议'}}</text>
+        </view>
+
+        <view
+          wx:if="{{item.role === 'beautician' && !item.pending}}"
+          class="action-chip action-chip-muted"
+          bindtap="toggleSuggest"
+          data-id="{{item.id}}"
+        >
+          <text class="action-chip-text">{{item.showSuggestions ? '收起建议' : '改进建议'}}</text>
+        </view>
+
+        <view
+          wx:if="{{item.role === 'customer' && item.ttsFailed}}"
+          class="action-chip action-chip-retry"
+          bindtap="onRetryTts"
+          data-id="{{item.id}}"
+        >
+          <text class="action-chip-text">重试语音</text>
+        </view>
+      </view>
+
+      <text wx:if="{{item.pending && item.role === 'beautician' && !item.text && !item.audio_seconds_text}}" class="meta-hint">识别中...</text>
+    </view>
+
+    <view
+      wx:if="{{item.text && item.showText}}"
+      class="text-card {{item.role === 'customer' ? 'card-customer' : 'card-beautician'}}"
+    >
+      {{item.text}}
+    </view>
+
+    <view wx:if="{{item.role === 'beautician' && item.showSuggestions}}" class="suggest-card">
+      <view wx:if="{{item.analysis}}">
+        <!-- 妤傛ü瀵掗崢鐔告瀮閺嶅洦鏁?-->
+        <view wx:if="{{item.analysis.highlightedSegments && item.analysis.highlightedSegments.length}}" class="sug-section">
+          <view class="sug-section-title">原文标注</view>
+          <view class="hl-body">
+            <text wx:for="{{item.analysis.highlightedSegments}}" wx:for-item="seg" wx:key="index"
+              class="hl-seg {{seg.highlighted ? 'hl-' + seg.severity : ''}}">{{seg.text}}</text>
+          </view>
+          <view class="sug-divider"></view>
+        </view>
+
+        <!-- 瀵ら缚顔呴崠?-->
+        <view class="sug-section">
+          <view class="sug-section-title">改进建议</view>
+          <view class="sug-list">
+            <view class="sug-item" wx:for="{{item.analysis.suggestions}}" wx:for-item="sug" wx:key="index">
+              <view class="sug-num">{{index + 1}}</view>
+              <text class="sug-text">{{sug}}</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 濞戯箒澹婇崠?-->
+        <view class="sug-divider"></view>
+        <view class="sug-section sug-polished-section">
+          <view class="sug-section-title">润色表达</view>
+          <view class="sug-polished-card">
+            <view class="sug-polished-bar"></view>
+            <text class="sug-polished-text">"{{item.analysis.polished}}"</text>
+          </view>
+        </view>
+
+        <!-- 妞嬪酣娅撻崠?(閺夆€叉鐏炴洜銇? -->
+        <view wx:if="{{item.analysis.risk_notes && item.analysis.risk_notes.length}}" class="sug-divider"></view>
+        <view wx:if="{{item.analysis.risk_notes && item.analysis.risk_notes.length}}" class="sug-section sug-risk-section">
+          <view class="sug-section-title sug-risk-title">注意事项</view>
+          <view class="sug-risk-item" wx:for="{{item.analysis.risk_notes}}" wx:for-item="note" wx:key="index">
+            <text class="sug-risk-dot">•</text>
+            <text class="sug-risk-text">{{note}}</text>
+          </view>
+        </view>
+
+        <!-- 濮ｅ繗鐤嗙拠鍕瀻 -->
+        <view wx:if="{{item.hasScores}}" class="sug-divider"></view>
+        <view wx:if="{{item.hasScores}}" class="score-card">
+          <view class="score-header">
+            <text class="score-title">本轮评分</text>
+            <text class="score-total">{{item.totalScore}}分</text>
+          </view>
+          <view wx:for="{{item.scores}}" wx:for-item="dim" wx:key="id" class="score-row">
+            <text class="score-label">{{dim.name}}</text>
+            <view class="score-bar-track">
+              <view class="score-bar-fill score-bar-{{dim.level}}" style="width: {{dim.pct}}%"></view>
+            </view>
+            <text class="score-value">{{dim.score}}</text>
+          </view>
+        </view>
+      </view>
+      <view wx:else class="suggest-loading-wrap">
+        <view class="suggest-loading">{{item.analysisLoading === false && item.analysisError ? '建议还没同步出来' : '建议生成中...'}}</view>
+        <view
+          wx:if="{{item.analysisLoading === false && item.analysisError}}"
+          class="suggest-refresh-btn"
+          data-id="{{item.id}}"
+          bindtap="refreshSuggest"
+        >重新刷新</view>
+      </view>
+    </view>
+  </view>
+</template>
+
 <view class="page">
   <view class="topbar">
     <view class="top-left" bindtap="openEndModal">结束</view>
-    <view class="top-right"></view>
   </view>
 
   <scroll-view
@@ -13,165 +208,84 @@
     bounces="false"
     show-scrollbar="false"
   >
-    <block wx:for="{{turns}}" wx:key="id">
-      <view id="turn-{{item.id}}" class="row {{item.role === 'customer' ? 'left' : 'right'}}">
-        <view wx:if="{{item.role === 'customer'}}" class="avatar avatar-customer">客</view>
-
-          <view class="msg {{item.role === 'customer' ? 'msg-left' : 'msg-right'}}">
-            <view wx:if="{{item.audio_url}}" class="voice-row">
-              <view
-                class="voice-bubble {{item.role === 'customer' ? 'voice-customer' : 'voice-beautician'}} {{playingTurnId === item.id ? 'voice-playing' : ''}}"
-                style="width: {{item.voice_width_rpx}}rpx;"
-                bindtap="onPlay"
-                data-id="{{item.id}}"
-                data-url="{{item.audio_url}}"
-              >
-                <view class="voice-tail {{item.role === 'customer' ? 'tail-left' : 'tail-right'}}"></view>
-                <view class="voice-content {{item.role === 'customer' ? 'content-left' : 'content-right'}}">
-                  <view class="voice-icon">
-                    <view class="wave w1"></view>
-                    <view class="wave w2"></view>
-                    <view class="wave w3"></view>
-                  </view>
-                  <text class="voice-dur-text">{{item.audio_seconds_text}}</text>
-                </view>
-              </view>
-            </view>
-
-            <view
-              wx:elif="{{item.role === 'customer'}}"
-              class="voice-bubble voice-customer voice-empty {{item.ttsFailed ? 'voice-empty-failed' : ''}}"
-            >
-              <view class="voice-tail tail-left"></view>
-              <view class="voice-empty-text">{{item.ttsFailed ? "语音暂不可用" : "语音生成中..."}}</view>
-            </view>
-
-            <view wx:else class="bubble bubble-beautician">
-              <view class="msg-text">{{item.text}}</view>
-            </view>
-
-            <view
-              class="op-row"
-              wx:if="{{item.pending || item.role === 'beautician' || item.ttsFailed || (item.text && item.audio_url)}}"
-            >
-              <view class="op-actions {{item.role === 'customer' ? 'op-actions-left' : 'op-actions-right'}}">
-                <view
-                  wx:if="{{item.role === 'customer' ? (item.text && (item.audio_url || item.ttsFailed)) : (item.text && item.audio_url)}}"
-                  class="trans-btn"
-                  bindtap="toggleText"
-                  data-id="{{item.id}}"
-                >
-                  <view class="trans-btn-inner">
-                    <view wx:if="{{!item.textOpenedOnce}}" class="trans-dot"></view>
-                    <text class="trans-text">{{item.showText ? "收起" : "转文字"}}</text>
-                  </view>
-                </view>
-
-                <text
-                  wx:if="{{item.role === 'beautician' && !item.pending}}"
-                  class="meta-action"
-                  bindtap="toggleSuggest"
-                  data-id="{{item.id}}"
-                >
-                  {{item.showSuggestions ? "收起建议" : "改进建议"}}
-                </text>
-
-                <text
-                  wx:if="{{item.role === 'beautician' && !item.pending}}"
-                  class="meta-action meta-danger"
-                  bindtap="onRerecord"
-                  data-id="{{item.id}}"
-                >
-                  重录
-                </text>
-
-                <text
-                  wx:if="{{item.role === 'customer' && item.ttsFailed}}"
-                  class="meta-action meta-retry"
-                  bindtap="onRetryTts"
-                  data-id="{{item.id}}"
-                >
-                  重试语音
-                </text>
-              </view>
-
-              <text wx:if="{{item.pending}}" class="meta-hint">识别中...</text>
-            </view>
-
-            <view
-              wx:if="{{item.text && item.showText}}"
-              class="text-card {{item.role === 'customer' ? 'card-customer' : 'card-beautician'}}"
-            >
-              {{item.text}}
-            </view>
-
-            <view wx:if="{{item.role === 'beautician' && item.showSuggestions}}" class="suggest-card">
-              <view wx:if="{{item.analysis}}">
-                <view class="suggest-title">改进建议：</view>
-                <view class="suggest-item">1. {{item.analysis.suggestions[0]}}</view>
-                <view class="suggest-item">2. {{item.analysis.suggestions[1]}}</view>
-                <view class="suggest-item">3. {{item.analysis.suggestions[2]}}</view>
-
-                <view class="polished-title">润色表达：</view>
-                <view class="polished">{{item.analysis.polished}}</view>
-              </view>
-              <view wx:else class="suggest-loading">建议生成中...</view>
-            </view>
+    <view class="chat-inner">
+      <block wx:for="{{turns}}" wx:key="id">
+        <view wx:if="{{item.role === 'customer'}}" id="turn-{{item.id}}" class="row row-left">
+          <view class="avatar-rail avatar-rail-left">
+            <image
+              class="avatar-image avatar-image-customer"
+              src="/assets/voice-coach/avatar-customer.png"
+              mode="aspectFill"
+            />
           </view>
+          <view class="row-main row-main-left">
+            <template is="turn-content" data="{{item: item, playingTurnId: playingTurnId}}" />
+          </view>
+        </view>
 
-        <view wx:if="{{item.role === 'beautician'}}" class="avatar avatar-beautician">我</view>
-      </view>
-    </block>
-
-    <view class="typing" wx:if="{{loading || waitingCustomer}}">
-      <view class="typing-pill">{{loading ? "处理中..." : "对方正在回复..."}}</view>
+        <view wx:else id="turn-{{item.id}}" class="row row-right">
+          <view class="row-main row-main-right">
+            <template is="turn-content" data="{{item: item, playingTurnId: playingTurnId}}" />
+          </view>
+          <view class="avatar-rail avatar-rail-right">
+            <image
+              class="avatar-image avatar-image-beautician"
+              src="/assets/voice-coach/avatar-self.png"
+              mode="aspectFill"
+            />
+          </view>
+        </view>
+      </block>
     </view>
   </scroll-view>
 
   <view class="footer">
-    <button class="hint-btn-icon" bindtap="openHint">
-      <view class="hint-icon-inner">
-        <view class="bulb-icon">
-          <view class="bulb-head"></view>
-          <view class="bulb-neck"></view>
-          <view class="bulb-base"></view>
-        </view>
-      </view>
-    </button>
-    <button
+    <view
       class="record-btn {{recording ? 'is-recording' : ''}} {{recordCanceling ? 'is-canceling' : ''}}"
       bindtouchstart="onRecordStart"
       catchtouchmove="onRecordMove"
       bindtouchend="onRecordEnd"
       bindtouchcancel="onRecordCancel"
-      hover-class="none"
     >
-      {{recording ? (recordCanceling ? "松开取消" : "松开发送") : "按住说话"}}
-    </button>
-  </view>
-  <view class="record-preview" wx:if="{{recording}}">
-    {{recordingPreviewText || "录音中..."}}
+      <text class="record-btn-label">按住说话</text>
+    </view>
   </view>
 
-  <!-- 结束对话弹窗 -->
+  <view class="record-preview" wx:if="{{recording}}">
+    {{recordCanceling ? '松开取消' : (recordingPreviewText || '松开发送')}}
+  </view>
+
   <view class="modal-mask" wx:if="{{endModalVisible}}" bindtap="closeEndModal"></view>
   <view class="end-modal" wx:if="{{endModalVisible}}">
     <view class="end-title">你确定要结束这次练习吗？</view>
     <button class="end-primary" bindtap="endAndViewReport">结束对话，并查看测评报告</button>
-    <button class="end-secondary" bindtap="endOnly">结束对话</button>
+    <button class="end-secondary" bindtap="endOnly">仅结束对话</button>
   </view>
 
-  <!-- 对话灵感弹层 -->
   <view class="modal-mask" wx:if="{{hintVisible}}" bindtap="closeHint"></view>
   <view class="hint-sheet" wx:if="{{hintVisible}}">
+    <view class="hint-handle"></view>
     <view class="hint-header">
-      <view class="hint-title">对话灵感</view>
-      <view class="hint-sub">用自己的话说出来效果更佳~</view>
+      <view class="hint-title-row">
+        <view class="hint-title-icon">
+          <view class="bulb-icon"><view class="bulb-head"></view><view class="bulb-neck"></view><view class="bulb-base"></view></view>
+        </view>
+        <view class="hint-title">回答建议</view>
+      </view>
+      <view class="hint-sub">基于这句顾客话术，给你一个更自然的回应方向。</view>
     </view>
     <view class="hint-body">
-      <view class="hint-text">{{hintText}}</view>
+      <view class="hint-quote-card">
+        <text class="hint-quote-mark">"</text>
+        <text class="hint-text">{{hintText}}</text>
+        <text class="hint-quote-mark hint-quote-end">"</text>
+      </view>
       <view class="hint-points" wx:if="{{hintPoints.length}}">
-        <view class="hint-point" wx:for="{{hintPoints}}" wx:key="*this">• {{item}}</view>
+        <view class="hint-points-title">关键要点：</view>
+        <view class="hint-point" wx:for="{{hintPoints}}" wx:key="*this">
+          <text class="hint-point-icon">✦</text>
+          <text class="hint-point-text">{{item}}</text>
+        </view>
       </view>
     </view>
     <button class="hint-close" bindtap="closeHint">关闭</button>

@@ -21,32 +21,47 @@
       <view class="headline">恭喜完成练习，这是为您生成的评测报告：</view>
 
       <view class="score-card">
-        <view class="score-left">
-          <view class="score-label">总得分</view>
-          <view class="score-line">
-            <text class="score">{{report.total_score}}</text>
-            <text class="score-suffix">/100</text>
+        <view class="score-card-top">
+          <view class="score-left">
+            <view class="score-label">总得分</view>
+            <view class="score-line">
+              <text class="score">{{animatedScore}}</text>
+              <text class="score-suffix">/100</text>
+            </view>
+            <view class="score-note">五维表现总览</view>
           </view>
+          <view class="score-pill">五维评估</view>
         </view>
-        <canvas
-          canvas-id="radarCanvas"
-          class="radar"
-          style="width: 280px; height: 280px;"
-          width="280"
-          height="280"
-        ></canvas>
+        <view class="score-visual">
+          <canvas
+            canvas-id="radarCanvas"
+            class="radar"
+            style="width: {{radarCanvasSize}}px; height: {{radarCanvasSize}}px;"
+            width="{{radarCanvasSize}}"
+            height="{{radarCanvasSize}}"
+          ></canvas>
+        </view>
       </view>
 
       <view class="dims">
         <block wx:for="{{report.dimension}}" wx:key="id">
           <view class="dim-row">
-            <view class="dim-name">{{item.name}}</view>
-            <view class="dim-stars">{{item.stars_text}}</view>
+            <view class="dim-row-top">
+              <text class="dim-name">{{item.name}}</text>
+              <view class="dim-meta">
+                <text class="dim-score-pill">{{item.score}}分</text>
+                <text class="dim-stars">{{item.stars_text}}</text>
+              </view>
+            </view>
+            <view class="dim-bar-track">
+              <view class="dim-bar-fill" style="width: {{item.score}}%; background: {{item.score >= 80 ? 'var(--vc-green, #95ec69)' : item.score >= 60 ? 'var(--vc-gold, #f6c76f)' : '#ff5858'}}"></view>
+            </view>
           </view>
         </block>
       </view>
 
       <view class="summary">
+        <view class="summary-title">练习总结</view>
         <block wx:for="{{report.summary_blocks}}" wx:key="*this">
           <view class="summary-line">{{item}}</view>
         </block>
@@ -54,18 +69,16 @@
 
       <view id="report-tab-anchor"></view>
       <view class="tabs-wrap">
-        <scroll-view class="tabs" scroll-x="true">
-          <view class="tab {{activeTab === 'persuasion' ? 'active' : ''}}" data-tab="persuasion" bindtap="setTab">说服力</view>
-          <view class="tab {{activeTab === 'fluency' ? 'active' : ''}}" data-tab="fluency" bindtap="setTab">流利度</view>
-          <view class="tab {{activeTab === 'expression' ? 'active' : ''}}" data-tab="expression" bindtap="setTab">语言表达</view>
-          <view class="tab {{activeTab === 'pronunciation' ? 'active' : ''}}" data-tab="pronunciation" bindtap="setTab">发音准确度</view>
-          <view class="tab {{activeTab === 'organization' ? 'active' : ''}}" data-tab="organization" bindtap="setTab">语言组织</view>
-        </scroll-view>
+        <view class="tabs">
+          <block wx:for="{{tabItems}}" wx:key="id">
+            <view class="tab {{activeTab === item.id ? 'active' : ''}}" data-tab="{{item.id}}" bindtap="setTab">{{item.label}}</view>
+          </block>
+          <view class="tab-indicator" style="transform: translateX({{activeTabIndex * 100}}%);"></view>
+        </view>
         <view class="current-tab-title">当前：{{currentTabTitle}}</view>
       </view>
 
       <view class="tab-body">
-        <!-- 说服力 -->
         <view wx:if="{{activeTab === 'persuasion'}}">
           <view class="tab-title">说服力</view>
           <view class="metric-card">
@@ -80,103 +93,120 @@
           </view>
 
           <view class="qa-card">
-            <view class="qa-title">客户异议</view>
-            <view class="qa-text">{{report.tabs.persuasion.customer_objection}}</view>
-            <view class="qa-title">你的应对</view>
-            <view class="qa-text">{{report.tabs.persuasion.your_response}}</view>
-            <view class="qa-title">改进润色</view>
-            <view class="qa-text">{{report.tabs.persuasion.improved_response}}</view>
+            <view class="compare-card-objection">
+              <view class="qa-title">客户异议</view>
+              <view class="qa-text">{{report.tabs.persuasion.customer_objection}}</view>
+            </view>
+            <view class="compare-card-yours">
+              <view class="qa-title">你的应对</view>
+              <view class="qa-text">{{report.tabs.persuasion.your_response}}</view>
+            </view>
+            <view class="compare-card-improved">
+              <view class="qa-title">改进润色</view>
+              <view class="qa-text">{{report.tabs.persuasion.improved_response}}</view>
+            </view>
           </view>
         </view>
 
-        <!-- 流利度 -->
         <view wx:if="{{activeTab === 'fluency'}}">
           <view class="tab-title">流利度</view>
 
-          <view class="metric-card">
-            <view class="metric-row">
-              <view class="metric-name">语速</view>
-              <view class="metric-status">{{report.tabs.fluency.submetrics[0].status}}</view>
+          <block wx:for="{{report.tabs.fluency.submetrics}}" wx:key="index">
+            <view class="metric-card">
+              <view class="metric-row">
+                <view class="metric-name">{{item.name}}</view>
+                <view class="metric-status">{{item.status}}</view>
+              </view>
+              <view class="metric-text">{{item.advice_paragraph}}</view>
             </view>
-            <view class="metric-text">{{report.tabs.fluency.submetrics[0].advice_paragraph}}</view>
-          </view>
+          </block>
 
-          <canvas
-            canvas-id="fluencyChart1"
-            class="linechart"
-            style="width: 330px; height: 160px;"
-            width="330"
-            height="160"
-          ></canvas>
-
-          <view class="metric-card">
-            <view class="metric-row">
-              <view class="metric-name">停顿</view>
-              <view class="metric-status">{{report.tabs.fluency.submetrics[1].status}}</view>
+          <block wx:for="{{report.tabs.fluency.charts}}" wx:key="id">
+            <view wx:if="{{item.points && item.points.length >= 2}}" class="linechart-card">
+              <view class="chart-card-head">
+                <view class="chart-card-title">{{item.label}}</view>
+              </view>
+              <canvas
+                canvas-id="{{item.canvas_id}}"
+                class="linechart-canvas"
+                style="width: {{lineChartWidth}}px; height: {{lineChartHeight}}px;"
+                width="{{lineChartWidth}}"
+                height="{{lineChartHeight}}"
+              ></canvas>
             </view>
-            <view class="metric-text">{{report.tabs.fluency.submetrics[1].advice_paragraph}}</view>
-          </view>
-
-          <canvas
-            canvas-id="fluencyChart2"
-            class="linechart"
-            style="width: 330px; height: 160px;"
-            width="330"
-            height="160"
-          ></canvas>
+            <view wx:else class="chart-empty">
+              <view class="chart-empty-title">{{item.label}}</view>
+              <view class="chart-empty-text">当前轮次不足，暂时无法绘制真实趋势。</view>
+            </view>
+          </block>
         </view>
 
-        <!-- 语言表达 -->
         <view wx:if="{{activeTab === 'expression'}}">
           <view class="tab-title">语言表达</view>
 
-          <view class="metric-card">
-            <view class="metric-row">
-              <view class="metric-name">冗余词</view>
-              <view class="metric-status">{{report.tabs.expression.submetrics[0].status}}</view>
+          <block wx:for="{{report.tabs.expression.submetrics}}" wx:key="index">
+            <view class="metric-card">
+              <view class="metric-row">
+                <view class="metric-name">{{item.name}}</view>
+                <view class="metric-status">{{item.status}}</view>
+              </view>
+              <view class="metric-text">{{item.advice_paragraph}}</view>
             </view>
-            <view class="metric-text">{{report.tabs.expression.submetrics[0].advice_paragraph}}</view>
-          </view>
+          </block>
 
-          <view class="metric-card">
-            <view class="metric-row">
-              <view class="metric-name">语调</view>
-              <view class="metric-status">{{report.tabs.expression.submetrics[1].status}}</view>
+          <block wx:for="{{report.tabs.expression.charts}}" wx:key="id">
+            <view wx:if="{{item.points && item.points.length >= 2}}" class="linechart-card">
+              <view class="chart-card-head">
+                <view class="chart-card-title">{{item.label}}</view>
+              </view>
+              <canvas
+                canvas-id="{{item.canvas_id}}"
+                class="linechart-canvas"
+                style="width: {{lineChartWidth}}px; height: {{lineChartHeight}}px;"
+                width="{{lineChartWidth}}"
+                height="{{lineChartHeight}}"
+              ></canvas>
             </view>
-            <view class="metric-text">{{report.tabs.expression.submetrics[1].advice_paragraph}}</view>
-          </view>
-
-          <canvas
-            canvas-id="expressionChart1"
-            class="linechart"
-            style="width: 330px; height: 160px;"
-            width="330"
-            height="160"
-          ></canvas>
+            <view wx:else class="chart-empty">
+              <view class="chart-empty-title">{{item.label}}</view>
+              <view class="chart-empty-text">当前轮次不足，暂时无法绘制真实趋势。</view>
+            </view>
+          </block>
         </view>
 
-        <!-- 发音准确度 -->
         <view wx:if="{{activeTab === 'pronunciation'}}">
           <view class="tab-title">发音准确度</view>
 
-          <view class="metric-card">
-            <view class="metric-row">
-              <view class="metric-name">清晰度</view>
-              <view class="metric-status">{{report.tabs.pronunciation.submetrics[0].status}}</view>
+          <block wx:for="{{report.tabs.pronunciation.submetrics}}" wx:key="index">
+            <view class="metric-card">
+              <view class="metric-row">
+                <view class="metric-name">{{item.name}}</view>
+                <view class="metric-status">{{item.status}}</view>
+              </view>
+              <view class="metric-text">{{item.advice_paragraph}}</view>
             </view>
-            <view class="metric-text">{{report.tabs.pronunciation.submetrics[0].advice_paragraph}}</view>
-          </view>
+          </block>
 
-          <canvas
-            canvas-id="pronunciationChart1"
-            class="linechart"
-            style="width: 330px; height: 160px;"
-            width="330"
-            height="160"
-          ></canvas>
+          <block wx:for="{{report.tabs.pronunciation.charts}}" wx:key="id">
+            <view wx:if="{{item.points && item.points.length >= 2}}" class="linechart-card">
+              <view class="chart-card-head">
+                <view class="chart-card-title">{{item.label}}</view>
+              </view>
+              <canvas
+                canvas-id="{{item.canvas_id}}"
+                class="linechart-canvas"
+                style="width: {{lineChartWidth}}px; height: {{lineChartHeight}}px;"
+                width="{{lineChartWidth}}"
+                height="{{lineChartHeight}}"
+              ></canvas>
+            </view>
+            <view wx:else class="chart-empty">
+              <view class="chart-empty-title">{{item.label}}</view>
+              <view class="chart-empty-text">当前轮次不足，暂时无法绘制真实趋势。</view>
+            </view>
+          </block>
         </view>
 
-        <!-- 语言组织 -->
         <view wx:if="{{activeTab === 'organization'}}">
           <view class="tab-title">语言组织能力</view>
 
@@ -212,7 +242,6 @@
       报告生成中，请稍候...
     </view>
 
-    <!-- 对话回放 -->
     <view wx:if="{{activeSegment === 'chat'}}" class="chat-view">
       <block wx:for="{{turns}}" wx:key="id">
         <view class="row {{item.role === 'customer' ? 'left' : 'right'}}">

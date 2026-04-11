@@ -1,21 +1,48 @@
+/* mini-program-ui/pages/voice-coach/theme.wxss */
+/**
+ * 暗色主题变量 - 增强版
+ */
 page,
 .vc-theme {
+  /* 主要背景色 */
   --vc-bg: #050507;
   --vc-bg-soft: #0d0d12;
   --vc-surface: #15151d;
   --vc-surface-2: #1b1b24;
+
+  /* 边框颜色 */
   --vc-border: rgba(229, 211, 179, 0.2);
   --vc-border-strong: rgba(229, 211, 179, 0.34);
+
+  /* 文本颜色 */
   --vc-text: #f5f5f5;
   --vc-text-muted: #b9b3c2;
   --vc-text-subtle: #8e8796;
+
+  /* 强调色 */
   --vc-gold: #e5d3b3;
   --vc-success: #95ec69;
   --vc-success-text: #1e2a12;
+  --vc-danger: #ff5858;
+
+  /* 气泡 */
   --vc-bubble-self: #95ec69;
   --vc-bubble-self-text: #1e2a12;
   --vc-bubble-other: #2a2a35;
   --vc-bubble-other-text: #f2f3f7;
+
+  /* 功能组件 */
   --vc-trans-pill: #1b1b24;
   --vc-trans-dot: #ff4d4f;
+
+  /* 渐变背景 */
+  --vc-grad-customer: linear-gradient(135deg, #33333D 0%, #1A1A20 100%);
+  --vc-grad-beautician: linear-gradient(135deg, #95EC69 0%, #149457 100%);
+  --vc-grad-gold: linear-gradient(135deg, #dcc7a6 0%, #f1e3c6 50%, #c1a076 100%);
+
+  /* 阴影与光效 */
+  --vc-shadow-sm: 0 4rpx 12rpx rgba(0, 0, 0, 0.15);
+  --vc-shadow-md: 0 10rpx 28rpx rgba(0, 0, 0, 0.25);
+  --vc-shadow-glow-green: 0 0 20rpx rgba(149, 236, 105, 0.2);
+  --vc-shadow-glow-gold: 0 0 20rpx rgba(220, 199, 166, 0.15);
 }

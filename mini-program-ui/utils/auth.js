@@ -1,4 +1,5 @@
 const { IP_FACTORY_BASE_URL } = require("./config")
+const { getHttpBaseUrlCandidates, rememberWorkingHttpBaseUrl } = require("./http-base")
 
 const ACCESS_TOKEN_KEY = "auth_access_token"
 const REFRESH_TOKEN_KEY = "auth_refresh_token"
@@ -95,15 +96,36 @@ function requestWechatLogin(code, profile) {
       })
     })
 
-  // Prefer /api/mp/* routes (we sometimes firewall /api/wechat/* in devtools).
-  return doRequest(`${IP_FACTORY_BASE_URL}/api/mp/wechat/login`).catch((err) => {
-    const statusCode = err && typeof err.statusCode === "number" ? err.statusCode : 0
-    // Fallback for older deployments.
-    if (statusCode === 404 || statusCode === 405 || statusCode === 403) {
-      return doRequest(`${IP_FACTORY_BASE_URL}/api/wechat/login`)
-    }
-    return Promise.reject(err?.data || err || { error: "login_failed" })
+  const urls = []
+  getHttpBaseUrlCandidates(IP_FACTORY_BASE_URL).forEach((baseUrl) => {
+    urls.push(`${baseUrl}/api/mp/wechat/login`)
+    urls.push(`${baseUrl}/api/wechat/login`)
   })
+
+  const uniqueUrls = [...new Set(urls)]
+
+  const tryRequestAt = (index) => {
+    const url = uniqueUrls[index]
+    if (!url) {
+      return Promise.reject({ error: "login_failed" })
+    }
+
+    return doRequest(url)
+      .then((data) => {
+        const matchedBaseUrl = url.replace(/\/api\/(?:mp\/)?wechat\/login$/, "")
+        rememberWorkingHttpBaseUrl(matchedBaseUrl)
+        return data
+      })
+      .catch((err) => {
+        const statusCode = err && typeof err.statusCode === "number" ? err.statusCode : 0
+        if ((statusCode === 403 || statusCode === 404 || statusCode === 405 || !statusCode) && index < uniqueUrls.length - 1) {
+          return tryRequestAt(index + 1)
+        }
+        return Promise.reject(err?.data || err || { error: "login_failed" })
+      })
+  }
+
+  return tryRequestAt(0)
 }
 
 function loginWithProfile() {

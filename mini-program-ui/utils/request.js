@@ -1,14 +1,19 @@
-const { IP_FACTORY_BASE_URL, REQUEST_TIMEOUT } = require("./config")
+const { REQUEST_TIMEOUT } = require("./config")
 const { getAccessToken, loginSilent } = require("./auth")
 const { getDeviceId } = require("./device")
+const {
+  getHttpBaseUrlCandidates,
+  isConfiguredHttpBaseUrl,
+  normalizeBaseUrl,
+  rememberWorkingHttpBaseUrl,
+} = require("./http-base")
 
 let silentLoginPromise = null
+const RETRYABLE_STATUS_CODES = [403, 404, 405]
 
 function shouldAttachAuth(baseUrl) {
   if (!baseUrl) return false
-  const normalized = baseUrl.replace(/\/$/, "")
-  const target = IP_FACTORY_BASE_URL.replace(/\/$/, "")
-  return normalized === target
+  return isConfiguredHttpBaseUrl(baseUrl)
 }
 
 function buildHeaders(baseUrl, extraHeaders) {
@@ -110,9 +115,12 @@ function normalizeTextResponseData(data) {
 }
 
 function request(opts) {
-  const { baseUrl, url, method = "GET", data, header, __retried401 } = opts
-  const normalizedBase = baseUrl.replace(/\/$/, "")
+  const { baseUrl, url, method = "GET", data, header, __retried401, __baseUrlAttemptIndex = 0 } = opts
+  const candidates = getHttpBaseUrlCandidates(baseUrl)
+  const normalizedBase = candidates[__baseUrlAttemptIndex] || normalizeBaseUrl(baseUrl)
+  const nextBaseUrl = candidates[__baseUrlAttemptIndex + 1] || ""
   const canRetry401 = !__retried401 && shouldAttachAuth(normalizedBase)
+  const canRetryBaseUrl = Boolean(nextBaseUrl) && shouldAttachAuth(normalizedBase)
 
   return new Promise((resolve, reject) => {
     wx.request({
@@ -123,8 +131,13 @@ function request(opts) {
       timeout: REQUEST_TIMEOUT,
       success(res) {
         if (res.statusCode >= 200 && res.statusCode < 300) {
+          rememberWorkingHttpBaseUrl(normalizedBase)
           resolve(res.data)
           return
+        }
+
+        if (res.statusCode === 401) {
+          rememberWorkingHttpBaseUrl(normalizedBase)
         }
 
         if (res.statusCode === 401 && canRetry401) {
@@ -145,6 +158,11 @@ function request(opts) {
 
         if (res.statusCode === 401) {
           clearAuthAndRedirect()
+        } else if (RETRYABLE_STATUS_CODES.includes(res.statusCode) && canRetryBaseUrl) {
+          request({ ...opts, baseUrl: nextBaseUrl, __baseUrlAttemptIndex: __baseUrlAttemptIndex + 1 })
+            .then(resolve)
+            .catch(reject)
+          return
         }
 
         const isHtml = looksLikeHtml(res.data)
@@ -160,6 +178,12 @@ function request(opts) {
         })
       },
       fail(err) {
+        if (canRetryBaseUrl) {
+          request({ ...opts, baseUrl: nextBaseUrl, __baseUrlAttemptIndex: __baseUrlAttemptIndex + 1 })
+            .then(resolve)
+            .catch(reject)
+          return
+        }
         reject(err)
       },
     })
@@ -167,9 +191,12 @@ function request(opts) {
 }
 
 function requestText(opts) {
-  const { baseUrl, url, method = "GET", data, header, __retried401 } = opts
-  const normalizedBase = baseUrl.replace(/\/$/, "")
+  const { baseUrl, url, method = "GET", data, header, __retried401, __baseUrlAttemptIndex = 0 } = opts
+  const candidates = getHttpBaseUrlCandidates(baseUrl)
+  const normalizedBase = candidates[__baseUrlAttemptIndex] || normalizeBaseUrl(baseUrl)
+  const nextBaseUrl = candidates[__baseUrlAttemptIndex + 1] || ""
   const canRetry401 = !__retried401 && shouldAttachAuth(normalizedBase)
+  const canRetryBaseUrl = Boolean(nextBaseUrl) && shouldAttachAuth(normalizedBase)
 
   return new Promise((resolve, reject) => {
     wx.request({
@@ -181,11 +208,16 @@ function requestText(opts) {
       timeout: REQUEST_TIMEOUT,
       success(res) {
         if (res.statusCode >= 200 && res.statusCode < 300) {
+          rememberWorkingHttpBaseUrl(normalizedBase)
           resolve(res.data)
           return
         }
 
         const normalizedData = normalizeTextResponseData(res.data)
+
+        if (res.statusCode === 401) {
+          rememberWorkingHttpBaseUrl(normalizedBase)
+        }
 
         if (res.statusCode === 401 && canRetry401) {
           trySilentLoginOnce().then((ok) => {
@@ -205,6 +237,11 @@ function requestText(opts) {
 
         if (res.statusCode === 401) {
           clearAuthAndRedirect()
+        } else if (RETRYABLE_STATUS_CODES.includes(res.statusCode) && canRetryBaseUrl) {
+          requestText({ ...opts, baseUrl: nextBaseUrl, __baseUrlAttemptIndex: __baseUrlAttemptIndex + 1 })
+            .then(resolve)
+            .catch(reject)
+          return
         }
 
         const isHtml = looksLikeHtml(res.data)
@@ -220,6 +257,12 @@ function requestText(opts) {
         })
       },
       fail(err) {
+        if (canRetryBaseUrl) {
+          requestText({ ...opts, baseUrl: nextBaseUrl, __baseUrlAttemptIndex: __baseUrlAttemptIndex + 1 })
+            .then(resolve)
+            .catch(reject)
+          return
+        }
         reject(err)
       },
     })
@@ -227,9 +270,12 @@ function requestText(opts) {
 }
 
 function requestTextWithMeta(opts) {
-  const { baseUrl, url, method = "GET", data, header, __retried401 } = opts
-  const normalizedBase = baseUrl.replace(/\/$/, "")
+  const { baseUrl, url, method = "GET", data, header, __retried401, __baseUrlAttemptIndex = 0 } = opts
+  const candidates = getHttpBaseUrlCandidates(baseUrl)
+  const normalizedBase = candidates[__baseUrlAttemptIndex] || normalizeBaseUrl(baseUrl)
+  const nextBaseUrl = candidates[__baseUrlAttemptIndex + 1] || ""
   const canRetry401 = !__retried401 && shouldAttachAuth(normalizedBase)
+  const canRetryBaseUrl = Boolean(nextBaseUrl) && shouldAttachAuth(normalizedBase)
 
   return new Promise((resolve, reject) => {
     wx.request({
@@ -241,11 +287,16 @@ function requestTextWithMeta(opts) {
       timeout: REQUEST_TIMEOUT,
       success(res) {
         if (res.statusCode >= 200 && res.statusCode < 300) {
+          rememberWorkingHttpBaseUrl(normalizedBase)
           resolve({ data: res.data, headers: res.header || {}, statusCode: res.statusCode })
           return
         }
 
         const normalizedData = normalizeTextResponseData(res.data)
+
+        if (res.statusCode === 401) {
+          rememberWorkingHttpBaseUrl(normalizedBase)
+        }
 
         if (res.statusCode === 401 && canRetry401) {
           trySilentLoginOnce().then((ok) => {
@@ -266,6 +317,11 @@ function requestTextWithMeta(opts) {
 
         if (res.statusCode === 401) {
           clearAuthAndRedirect()
+        } else if (RETRYABLE_STATUS_CODES.includes(res.statusCode) && canRetryBaseUrl) {
+          requestTextWithMeta({ ...opts, baseUrl: nextBaseUrl, __baseUrlAttemptIndex: __baseUrlAttemptIndex + 1 })
+            .then(resolve)
+            .catch(reject)
+          return
         }
 
         const isHtml = looksLikeHtml(res.data)
@@ -282,6 +338,12 @@ function requestTextWithMeta(opts) {
         })
       },
       fail(err) {
+        if (canRetryBaseUrl) {
+          requestTextWithMeta({ ...opts, baseUrl: nextBaseUrl, __baseUrlAttemptIndex: __baseUrlAttemptIndex + 1 })
+            .then(resolve)
+            .catch(reject)
+          return
+        }
         reject(err)
       },
     })

@@ -1,6 +1,26 @@
 const { IP_FACTORY_BASE_URL } = require("./config")
 const { getDeviceId } = require("./device")
 const { getAccessToken, getUser } = require("./auth")
+const { getHttpBaseUrlCandidates, rememberWorkingHttpBaseUrl } = require("./http-base")
+
+const RETRYABLE_STATUS_CODES = [403, 404, 405]
+const DISABLE_TTL_MS = 60 * 1000
+
+let trackingDisabledUntil = 0
+
+function isTrackingTemporarilyDisabled() {
+  return trackingDisabledUntil > Date.now()
+}
+
+function disableTrackingTemporarily() {
+  trackingDisabledUntil = Date.now() + DISABLE_TTL_MS
+}
+
+function markTrackSuccess(url) {
+  const matchedBaseUrl = url.replace(/\/api\/(?:mp\/)?track$/, "")
+  rememberWorkingHttpBaseUrl(matchedBaseUrl)
+  trackingDisabledUntil = 0
+}
 
 function currentPath() {
   try {
@@ -14,6 +34,7 @@ function currentPath() {
 
 function track(event, props = {}, options = {}) {
   if (!event) return
+  if (isTrackingTemporarilyDisabled()) return
 
   const token = getAccessToken()
   const user = getUser()
@@ -30,7 +51,20 @@ function track(event, props = {}, options = {}) {
     },
   }
 
-  const send = (url) =>
+  const urls = []
+  getHttpBaseUrlCandidates(IP_FACTORY_BASE_URL).forEach((baseUrl) => {
+    urls.push(`${baseUrl}/api/mp/track`)
+    urls.push(`${baseUrl}/api/track`)
+  })
+  const uniqueUrls = [...new Set(urls)]
+
+  const send = (index) => {
+    const url = uniqueUrls[index]
+    if (!url) {
+      disableTrackingTemporarily()
+      return
+    }
+
     wx.request({
       url,
       method: "POST",
@@ -41,20 +75,30 @@ function track(event, props = {}, options = {}) {
         ...(deviceId ? { "x-device-id": deviceId } : {}),
       },
       success(res) {
-        // Some deployments may protect /api/track from devtools; fallback to /api/mp/track.
-        if (res.statusCode === 403 || res.statusCode === 404 || res.statusCode === 405) {
-          if (url.includes("/api/track")) {
-            send(`${IP_FACTORY_BASE_URL}/api/mp/track`)
-          } else if (url.includes("/api/mp/track")) {
-            send(`${IP_FACTORY_BASE_URL}/api/track`)
-          }
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          markTrackSuccess(url)
+          return
         }
-      },
-      fail() {},
-    })
 
-  // Prefer /api/mp/* routes first.
-  send(`${IP_FACTORY_BASE_URL}/api/mp/track`)
+        if (RETRYABLE_STATUS_CODES.includes(res.statusCode) && index < uniqueUrls.length - 1) {
+          send(index + 1)
+          return
+        }
+
+        disableTrackingTemporarily()
+      },
+      fail() {
+        if (index < uniqueUrls.length - 1) {
+          send(index + 1)
+          return
+        }
+
+        disableTrackingTemporarily()
+      },
+    })
+  }
+
+  send(0)
 }
 
 module.exports = { track }
