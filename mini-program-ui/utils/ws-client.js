@@ -38,6 +38,18 @@ function createAbortError(message) {
   return err
 }
 
+function isPermanentSocketError(error) {
+  const message = String((error && (error.errMsg || error.message)) || "")
+    .trim()
+    .toLowerCase()
+  if (!message) return false
+  return (
+    message.includes("url not in domain list") ||
+    message.includes("not in domain list") ||
+    message.includes("合法域名")
+  )
+}
+
 class VoiceCoachWsClient {
   constructor(baseUrl, sessionId, token, options = {}) {
     this.baseUrl = String(baseUrl || "")
@@ -273,6 +285,13 @@ class VoiceCoachWsClient {
     this.rejectDrainWaiters(err)
     this.emit("error", err)
     if (this.manualClose) return
+    if (isPermanentSocketError(err)) {
+      this.closed = true
+      this.clearReconnectTimer()
+      this.rejectConnect(err)
+      this.emit("close", { error: err, permanent: true })
+      return
+    }
     this.scheduleReconnect(err)
   }
 

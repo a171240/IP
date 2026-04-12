@@ -204,19 +204,19 @@ function normalizeTurn(raw) {
 
 function vcLog(stage, meta = {}) {
   try {
-    console.info(VC_TAG, stage, meta)
+    console.info(VC_TAG, stage, normalizeLogMeta(meta))
   } catch (_err) {}
 }
 
 function vcWarn(stage, meta = {}) {
   try {
-    console.warn(VC_TAG, stage, meta)
+    console.warn(VC_TAG, stage, normalizeLogMeta(meta))
   } catch (_err) {}
 }
 
 function vcError(stage, meta = {}) {
   try {
-    console.error(VC_TAG, stage, meta)
+    console.error(VC_TAG, stage, normalizeLogMeta(meta))
   } catch (_err) {}
 }
 
@@ -228,6 +228,30 @@ function estimateRealtimeAudioSeconds(text) {
   const raw = String(text || "").replace(/\s+/g, "")
   if (!raw) return 3
   return Math.max(2, Math.min(18, Math.round(raw.length / 4)))
+}
+
+function normalizeLogMetaValue(value) {
+  if (typeof value === "undefined" || value === null) return ""
+  if (typeof value === "boolean") return value ? "true" : "false"
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : ""
+  if (Array.isArray(value)) return value.map((item) => normalizeLogMetaValue(item))
+  if (Object.prototype.toString.call(value) === "[object Object]") {
+    const normalized = {}
+    Object.keys(value).forEach((key) => {
+      normalized[key] = normalizeLogMetaValue(value[key])
+    })
+    return normalized
+  }
+  return value
+}
+
+function normalizeLogMeta(meta) {
+  if (!meta || typeof meta !== "object") return {}
+  const normalized = {}
+  Object.keys(meta).forEach((key) => {
+    normalized[key] = normalizeLogMetaValue(meta[key])
+  })
+  return normalized
 }
 
 function buildPendingCustomerVoiceUi(text, seconds) {
@@ -386,6 +410,15 @@ Page({
     this._manualPlayStartedAt = 0
     this._ignoreManualPlayUntil = 0
     this._deferredAutoPlayTurn = null
+    this._initialPromptFailSafeTimer = null
+    this._isDevtools = false
+    try {
+      const systemInfo =
+        wx && typeof wx.getSystemInfoSync === "function" ? wx.getSystemInfoSync() : null
+      this._isDevtools = String((systemInfo && systemInfo.platform) || "").toLowerCase() === "devtools"
+    } catch (_err) {
+      this._isDevtools = false
+    }
     this.configureAudioOutput("on_load")
     this.audioCtx.onPlay(() => {
       this._activeAudioStartedAt = Date.now()
@@ -425,6 +458,7 @@ Page({
       if (endedInitialPrompt) {
         this._initialCustomerPromptCompleted = true
       }
+      this.clearInitialPromptFailSafeTimer()
       vcLog("audio.ctx.ended", {
         turnId: endedTurnId,
         owner: endedOwner,
@@ -506,6 +540,7 @@ Page({
     }
 
     this.audioCtx.onError((err) => {
+      this.clearInitialPromptFailSafeTimer()
       this._initialCustomerPromptArmed = false
       this._activeAudioOwner = ""
       this._activeAudioReason = ""
@@ -598,6 +633,7 @@ Page({
       sessionIdFromOptions: sessionId || "",
       hasRecorder: Boolean(this.recorder),
       hasFrameHook: typeof this.recorder.onFrameRecorded === "function",
+      isDevtools: this._isDevtools,
     })
     if (sessionId) {
       this.loadSession(sessionId)
@@ -615,6 +651,7 @@ Page({
     })
     this.stopEvents = true
     this._wsManualClose = true
+    this.clearInitialPromptFailSafeTimer()
     if (this._suggestScrollTimer) clearTimeout(this._suggestScrollTimer)
     if (this._suggestScrollInnerTimer) clearTimeout(this._suggestScrollInnerTimer)
     try {
@@ -654,6 +691,7 @@ Page({
     try {
       if (this._audioPlayer) this._audioPlayer.stop()
     } catch (_err) {}
+    this.clearInitialPromptFailSafeTimer()
     this.setData({ playingTurnId: "" })
     this.clearManualPlayActive("page_hide")
   },
@@ -1080,6 +1118,41 @@ Page({
     this._manualPlayStartedAt = 0
   },
 
+  clearInitialPromptFailSafeTimer() {
+    if (!this._initialPromptFailSafeTimer) return
+    clearTimeout(this._initialPromptFailSafeTimer)
+    this._initialPromptFailSafeTimer = null
+  },
+
+  armInitialPromptFailSafe(turnId, reason = "") {
+    this.clearInitialPromptFailSafeTimer()
+    if (!this._isDevtools) return
+    const turn = this.getTurnById(turnId)
+    const seconds = Number((turn && turn.audio_seconds) || 0) || 0
+    const delayMs = Math.max(6000, Math.min(15000, Math.round(seconds * 1000) + 2500 || 9000))
+    this._initialPromptFailSafeTimer = setTimeout(() => {
+      this._initialPromptFailSafeTimer = null
+      if (this._initialCustomerPromptCompleted) return
+      if (String(this._activeAudioTurnId || "") !== String(turnId || "")) return
+      if (String(this._activeAudioOwner || "") !== "initial") return
+      vcWarn("initial.prompt:timeout-release", {
+        turnId: String(turnId || ""),
+        delayMs,
+        reason: reason || "",
+        isDevtools: this._isDevtools,
+      })
+      this._initialCustomerPromptCompleted = true
+      this._initialCustomerPromptArmed = false
+      this._activeAudioTurnId = ""
+      this._activeAudioOwner = ""
+      this._activeAudioReason = ""
+      try {
+        if (this.audioCtx) this.audioCtx.stop()
+      } catch (_err) {}
+      this.setData({ playingTurnId: "" })
+    }, delayMs)
+  },
+
   isInitialPromptBlockingAutoPlay(turnId) {
     const id = String(turnId || "")
     return Boolean(
@@ -1121,6 +1194,7 @@ Page({
   playInitialCustomerPrompt(turnId, audioUrl, extra = {}) {
     if (!turnId || !audioUrl) return
     this.configureAudioOutput(extra.reason || "initial_prompt")
+    this.armInitialPromptFailSafe(turnId, extra.reason || "initial_prompt")
     vcLog("initial.prompt:play", {
       turnId,
       source: /^https?:\/\//.test(audioUrl) ? "remote" : "local",
@@ -3142,12 +3216,6 @@ Page({
         })
         wx.showToast({ title: "请先听完顾客问题", icon: "none" })
         this._ignoreManualPlayUntil = Date.now() + 1200
-        try {
-          if (this.audioCtx) this.audioCtx.stop()
-        } catch {}
-        this.playInitialCustomerPrompt(initialCustomerTurn.id, initialCustomerTurn.audio_url, {
-          reason: "record_gate",
-        })
         return
       }
       vcWarn("record.start:blocked-initial-prompt-pending", {

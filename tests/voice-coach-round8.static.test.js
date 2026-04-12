@@ -64,8 +64,9 @@ test("initial prompt starts directly without the tap-to-start overlay", () => {
   assert.ok(!chatWxmlSource.includes('catchtap="onTapStartPractice"'))
   assert.match(chatSource, /reason:\s*"session_create_ready"/)
   assert.match(chatSource, /reason:\s*"tts_ready"/)
-  assert.match(chatSource, /reason:\s*"record_gate"/)
   assert.match(chatSource, /reason:\s*"initial_prompt_active"/)
+  assert.match(chatSource, /record\.start:blocked-initial-prompt/)
+  assert.doesNotMatch(chatSource, /reason:\s*"record_gate"/)
   assert.match(
     chatSource,
     /requestTurnTts\(first\.id,\s*\{\s*autoplay:\s*false,\s*initialPrompt:\s*true,\s*\}\)/,

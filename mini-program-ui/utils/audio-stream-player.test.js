@@ -92,6 +92,37 @@ test("prepares the next sealed sentence before the current one finishes", () => 
   assert.equal(stub.audioCtx.src, secondSentencePath)
 })
 
+test("does not skip ahead to a later sealed sentence before the earliest sentence is sealed", () => {
+  const stub = createWxStub()
+  const sentenceStarts = []
+  const AudioStreamPlayer = loadPlayerWithStub(stub)
+  const player = new AudioStreamPlayer({
+    onSentenceStart(index) {
+      sentenceStarts.push(index)
+    },
+  })
+
+  player.markSentenceStart(0)
+  player.feedChunk(0, Uint8Array.from([1, 2, 3]).buffer)
+
+  player.markSentenceStart(1)
+  player.feedChunk(1, Uint8Array.from([4, 5, 6]).buffer)
+  player.markSentenceEnd(1)
+
+  assert.equal(stub.audioCtx.playCount, 0)
+  assert.deepEqual(sentenceStarts, [])
+
+  player.markSentenceEnd(0)
+
+  assert.equal(stub.audioCtx.playCount, 1)
+  assert.deepEqual(sentenceStarts, [0])
+
+  stub.audioEvents.ended()
+
+  assert.equal(stub.audioCtx.playCount, 2)
+  assert.deepEqual(sentenceStarts, [0, 1])
+})
+
 test("drops a prepared sentence file if more chunks arrive after seal", () => {
   const stub = createWxStub()
   const AudioStreamPlayer = loadPlayerWithStub(stub)

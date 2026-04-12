@@ -230,7 +230,7 @@ class AudioStreamPlayer {
 
     const nextIndex = this.order.find((index) => {
       const sentence = this.sentences.get(index)
-      return Boolean(sentence && sentence.sealed && !sentence.played && sentence.chunks.length)
+      return Boolean(sentence && !sentence.played)
     })
 
     if (nextIndex === undefined) {
@@ -249,6 +249,7 @@ class AudioStreamPlayer {
 
     const sentence = this.sentences.get(nextIndex)
     if (!sentence) return
+    if (!sentence.sealed || !sentence.chunks.length) return
     const filePath = this.prepareSentenceFile(nextIndex, sentence)
     if (!filePath) return
     sentence.played = true

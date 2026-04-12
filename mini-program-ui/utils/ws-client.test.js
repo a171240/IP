@@ -92,3 +92,37 @@ test("ws client only schedules one reconnect when both error and close fire for 
   client.clearReconnectTimer()
   delete global.wx
 })
+
+test("ws client stops retrying when the socket url is not in the legal domain list", () => {
+  let onError = null
+
+  global.wx = {
+    connectSocket() {
+      return {
+        close() {},
+        onOpen() {},
+        onMessage() {},
+        onError(handler) {
+          onError = handler
+        },
+        onClose() {},
+      }
+    },
+  }
+
+  const client = new VoiceCoachWsClient("https://ip.ipgongchang.xin", "session-4", "token")
+  let closedEvent = null
+  client.onClose((evt) => {
+    closedEvent = evt
+  })
+  client.openSocket()
+
+  assert.equal(typeof onError, "function")
+  onError({ errMsg: "url not in domain list" })
+
+  assert.equal(client.reconnectAttempts, 0)
+  assert.equal(client.closed, true)
+  assert.equal(Boolean(closedEvent && closedEvent.permanent), true)
+
+  delete global.wx
+})
