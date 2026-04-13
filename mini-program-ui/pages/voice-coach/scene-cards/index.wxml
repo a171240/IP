@@ -1,0 +1,46 @@
+<view class="page vc-page vc-library-page vc-library-minimal">
+  <view class="container">
+    <view class="hero compact-hero fade-up">
+      <text class="eyebrow">Scene Cards</text>
+      <text class="title">场景卡</text>
+      <text class="subtitle">每轮只练一个重点场景。</text>
+
+      <view class="hero-actions compact-actions">
+        <button class="btn-primary" bindtap="handleCreate">新建场景卡</button>
+      </view>
+    </view>
+
+    <view wx:if="{{loading}}" class="summary-card fade-up delay-1">
+      <text class="empty-copy">正在加载场景卡...</text>
+    </view>
+
+    <view wx:if="{{!loading && !cards.length}}" class="summary-card fade-up delay-1">
+      <text class="empty-title">还没有场景卡</text>
+      <text class="empty-copy">先沉淀 2 到 3 张高频场景卡就够用了。</text>
+      <view class="hero-actions compact-actions">
+        <button class="btn-primary" bindtap="handleCreate">去新建</button>
+      </view>
+    </view>
+
+    <view wx:for="{{cards}}" wx:key="id" class="card library-item-card fade-up delay-1">
+      <view class="row space-between">
+        <view class="selection-copy">
+          <text class="card-title">{{item.name}}</text>
+          <text wx:if="{{item.metaLabel}}" class="muted small">{{item.metaLabel}}</text>
+        </view>
+        <text class="tag {{selectedId === item.id ? 'tag-success' : 'tag-accent'}}">{{selectedId === item.id ? '当前' : item.scene_kind_label}}</text>
+      </view>
+
+      <view class="library-item-meta" wx:if="{{item.scene_goal || item.objectionLabel}}">
+        <text wx:if="{{item.scene_goal}}" class="library-item-line">目标：{{item.scene_goal}}</text>
+        <text wx:if="{{item.objectionLabel}}" class="library-item-line">异议：{{item.objectionLabel}}</text>
+      </view>
+
+      <view class="hero-actions compact-actions">
+        <button class="btn-primary" size="mini" data-id="{{item.id}}" catchtap="handleUse">{{pickMode ? '选用' : '设为当前'}}</button>
+        <button class="btn-outline" size="mini" data-id="{{item.id}}" catchtap="handleEdit">编辑</button>
+        <button class="btn-outline" size="mini" data-id="{{item.id}}" catchtap="handleDelete">删除</button>
+      </view>
+    </view>
+  </view>
+</view>

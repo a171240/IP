@@ -101,6 +101,17 @@ function looksLikeHtml(data) {
   return lower.startsWith("<!doctype html") || lower.startsWith("<html")
 }
 
+function buildHttpFallbackMessage(statusCode, data, resErrMsg) {
+  const isHtml = looksLikeHtml(data)
+
+  if (statusCode === 401) return "请先登录"
+  if (statusCode === 403) return isHtml ? "请求被网关拦截，请稍后重试" : "当前请求被拒绝"
+  if (statusCode === 404) return "接口不存在（后端未部署最新版），请更新后端后重试"
+  if (statusCode >= 500) return "服务器暂时异常，请稍后重试"
+  if (isHtml) return `HTTP ${statusCode}`
+  return resErrMsg || `HTTP ${statusCode}`
+}
+
 function normalizeTextResponseData(data) {
   if (typeof data !== "string") return data
   const trimmed = data.trim()
@@ -165,11 +176,7 @@ function request(opts) {
           return
         }
 
-        const isHtml = looksLikeHtml(res.data)
-        const fallback =
-          res.statusCode === 404 && isHtml
-            ? "接口不存在（后端未部署最新版），请更新后端后重试"
-            : res.errMsg || "Request failed"
+        const fallback = buildHttpFallbackMessage(res.statusCode, res.data, res.errMsg)
 
         reject({
           statusCode: res.statusCode,
@@ -244,11 +251,7 @@ function requestText(opts) {
           return
         }
 
-        const isHtml = looksLikeHtml(res.data)
-        const fallback =
-          res.statusCode === 404 && isHtml
-            ? "接口不存在（后端未部署最新版），请更新后端后重试"
-            : res.errMsg || "Request failed"
+        const fallback = buildHttpFallbackMessage(res.statusCode, res.data, res.errMsg)
 
         reject({
           statusCode: res.statusCode,
@@ -324,11 +327,7 @@ function requestTextWithMeta(opts) {
           return
         }
 
-        const isHtml = looksLikeHtml(res.data)
-        const fallback =
-          res.statusCode === 404 && isHtml
-            ? "接口不存在（后端未部署最新版），请更新后端后重试"
-            : res.errMsg || "Request failed"
+        const fallback = buildHttpFallbackMessage(res.statusCode, res.data, res.errMsg)
 
         reject({
           statusCode: res.statusCode,

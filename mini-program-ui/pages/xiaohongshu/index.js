@@ -1,12 +1,11 @@
-﻿const { IP_FACTORY_BASE_URL } = require("../../utils/config")
+const { IP_FACTORY_BASE_URL } = require("../../utils/config")
 const { request, requestText } = require("../../utils/request")
+const { buildAbsoluteApiUrl } = require("../../utils/http-base")
 
 function toAbsoluteUrl(url) {
   const v = String(url || "").trim()
   if (!v) return ""
-  if (v.startsWith("http://") || v.startsWith("https://")) return v
-  if (v.startsWith("/")) return `${IP_FACTORY_BASE_URL}${v}`
-  return v
+  return buildAbsoluteApiUrl(v, IP_FACTORY_BASE_URL)
 }
 function parseSsePayload(rawText) {
   if (!rawText || typeof rawText !== "string") return null

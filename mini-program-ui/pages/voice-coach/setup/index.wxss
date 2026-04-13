@@ -1,0 +1,85 @@
+@import "../theme.wxss";
+
+.vc-setup-minimal .container {
+  padding-top: 36rpx;
+}
+
+.vc-setup-minimal .compact-hero {
+  padding: 28rpx 24rpx;
+}
+
+.vc-setup-minimal .setup-step-card {
+  position: relative;
+  overflow: hidden;
+  padding: 24rpx 22rpx;
+  border-radius: 28rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(140% 150% at 0% 0%, rgba(215, 191, 150, 0.08) 0%, rgba(255, 255, 255, 0) 54%),
+    linear-gradient(180deg, rgba(17, 21, 29, 0.96) 0%, rgba(11, 14, 20, 0.96) 100%);
+  box-shadow: var(--vc-shadow-md), inset 0 1rpx 0 rgba(255, 255, 255, 0.05);
+}
+
+.vc-setup-minimal .setup-step-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14rpx;
+}
+
+.vc-setup-minimal .setup-step-index {
+  width: 46rpx;
+  height: 46rpx;
+  border-radius: 14rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(215, 191, 150, 0.1);
+  border: 1rpx solid rgba(215, 191, 150, 0.18);
+  color: var(--vc-gold);
+  font-size: 20rpx;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.vc-setup-minimal .setup-step-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.vc-setup-minimal .setup-step-note {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  line-height: 1.58;
+  color: var(--vc-text-muted);
+}
+
+.vc-setup-minimal .setup-chip-row {
+  margin-top: 18rpx;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+}
+
+.vc-setup-minimal .setup-empty-copy {
+  margin-top: 16rpx;
+  font-size: 22rpx;
+  line-height: 1.58;
+  color: var(--vc-text-muted);
+}
+
+.vc-setup-minimal .setup-action-row {
+  margin-top: 18rpx;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.vc-setup-minimal .compact-textarea {
+  margin-top: 18rpx;
+  min-height: 160rpx;
+}
+
+.vc-setup-minimal .minimal-footer-card {
+  padding-top: 24rpx;
+}

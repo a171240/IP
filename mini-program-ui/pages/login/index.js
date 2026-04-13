@@ -1,4 +1,4 @@
-﻿const { loginWithProfile } = require("../../utils/auth")
+const { loginWithProfile } = require("../../utils/auth")
 const { track } = require("../../utils/track")
 
 Page({

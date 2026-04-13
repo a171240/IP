@@ -296,3 +296,141 @@ sudo certbot --nginx -d ip.ipgongchang.xin
    - 能查看草稿列表（`GET /api/mp/xhs/drafts`）
    - 能下载交付包 PDF（`GET /api/mp/delivery-pack/[packId]/download`）
 
+
+---
+
+## 6. `voice-coach-ws` 部署（WebSocket 实时语音服务）
+
+`voice-coach-ws` 不是 Next.js API Route，而是一个单独的 Node.js WebSocket 服务。推荐把它和主站放在同一台有公网 IP、已配置 `ip.ipgongchang.xin` 证书的服务器上，由 Nginx 在同一个 443 域名下把 `/ws/voice-coach` 反代到本地 `127.0.0.1:8080`。
+
+### 6.1 目标拓扑
+
+- 主站 HTTP API: `https://ip.ipgongchang.xin/api/*`
+- 实时语音 WebSocket: `wss://ip.ipgongchang.xin/ws/voice-coach`
+- `voice-coach-ws` 进程监听: `127.0.0.1:8080`
+
+### 6.2 服务器准备
+
+至少准备：
+
+1. Node.js 20+
+2. PM2
+3. Nginx
+4. 已签发并可用的 `ip.ipgongchang.xin` HTTPS 证书
+5. 微信公众平台后台权限，用于添加 `wss://ip.ipgongchang.xin` 为 socket 合法域名
+
+### 6.3 代码与环境变量
+
+部署目录建议：
+
+```bash
+/opt/voice-coach-ws
+```
+
+在服务器上：
+
+```bash
+git clone <your-repo> /opt/voice-coach-ws
+cd /opt/voice-coach-ws/voice-coach-ws
+npm ci
+cp .env.production .env
+# 填入真实密钥后再继续
+npm run build
+```
+
+生产模板见：
+
+- `voice-coach-ws/.env.production`
+
+关键变量：
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `VOLC_SPEECH_APP_ID`
+- `VOLC_SPEECH_ACCESS_TOKEN`
+- `DEEPSEEK_API_KEY`
+- `VOICE_COACH_REPLY_PROVIDER=deepseek`
+- `VOICE_COACH_ANALYSIS_PROVIDER=deepseek`
+
+说明：
+
+- `voice-coach-ws` 直接复用主站的 Supabase 项目。
+- 当前实时回复和分析都走 DeepSeek V3 非推理模式，API 模型标识填写 `deepseek-chat`。
+- 火山语音负责流式 ASR 和流式 TTS。
+
+### 6.4 PM2 启动
+
+推荐使用仓库内的：
+
+- `voice-coach-ws/ecosystem.config.cjs`
+- `voice-coach-ws/scripts/deploy.sh`
+
+首次启动示例：
+
+```bash
+cd /opt/voice-coach-ws/voice-coach-ws
+npm run build
+pm2 start ecosystem.config.cjs
+pm2 save
+pm2 status
+```
+
+健康检查：
+
+```bash
+curl http://127.0.0.1:8080/healthz
+```
+
+预期返回：
+
+```json
+{"ok":true}
+```
+
+### 6.5 Nginx 反代
+
+把 `voice-coach-ws/nginx/voice-coach-ws.conf` 里的内容合并进现有 `ip.ipgongchang.xin` 的 TLS server block。
+
+关键要求：
+
+- `location /ws/voice-coach` 反代到 `http://127.0.0.1:8080`
+- 必须带 `Upgrade` / `Connection` 头
+- `proxy_read_timeout` 和 `proxy_send_timeout` 足够长
+- `proxy_buffering off`
+
+修改后执行：
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+### 6.6 微信小程序后台配置
+
+在微信公众平台后台补齐：
+
+- request 合法域名：`https://ip.ipgongchang.xin`
+- uploadFile 合法域名：`https://ip.ipgongchang.xin`
+- downloadFile 合法域名：`https://ip.ipgongchang.xin`
+- socket 合法域名：`wss://ip.ipgongchang.xin`
+
+注意：
+
+- 不能带端口
+- 不能带路径
+- 必须是备案过且证书链正常的 HTTPS / WSS 域名
+
+### 6.7 上线后验收
+
+最少做以下检查：
+
+1. `pm2 logs voice-coach-ws` 无启动报错
+2. `curl http://127.0.0.1:8080/healthz` 返回 `{"ok":true}`
+3. `wss://ip.ipgongchang.xin/ws/voice-coach?session_id=test` 能建立连接
+4. 微信开发者工具内能收到 `session.ready`
+5. 真机上能完成一整轮录音 -> ASR -> LLM -> TTS
+
+正式验收清单另见：
+
+- `docs/VOICE_COACH_DEPLOY_CODEX_TASKS.md`

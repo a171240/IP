@@ -18,7 +18,8 @@
       "ignore": [],
       "disablePlugins": [],
       "outputPath": ""
-    }
+    },
+    "minifyWXML": true
   },
   "condition": {},
   "editorSetting": {

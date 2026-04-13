@@ -5,6 +5,7 @@ const { getDeviceId } = require("../../utils/device")
 const { track } = require("../../utils/track")
 const { normalizePlan } = require("../../utils/credits")
 const { openXhsCompose } = require("../../utils/nav")
+const { buildAbsoluteApiUrl } = require("../../utils/http-base")
 
 function shortId(value) {
   const s = String(value || "")
@@ -28,9 +29,7 @@ function formatTime(value) {
 function toAbsoluteUrl(url) {
   const v = String(url || "").trim()
   if (!v) return ""
-  if (v.startsWith("http://") || v.startsWith("https://")) return v
-  if (v.startsWith("/")) return `${IP_FACTORY_BASE_URL}${v}`
-  return v
+  return buildAbsoluteApiUrl(v, IP_FACTORY_BASE_URL)
 }
 
 function packStatusText(status) {
@@ -480,7 +479,7 @@ Page({
     wx.showLoading({ title: "下载中" })
 
     wx.downloadFile({
-      url: `${IP_FACTORY_BASE_URL}/api/mp/delivery-pack/${packId}/download`,
+      url: buildAbsoluteApiUrl(`/api/mp/delivery-pack/${packId}/download`, IP_FACTORY_BASE_URL),
       header: {
         Authorization: `Bearer ${token}`,
         "x-device-id": getDeviceId(),

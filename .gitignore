@@ -64,6 +64,18 @@ logs/
 .pnpm-store/
 .eslintcache
 .stylelintcache
+.npm-cache/
+
+# Local temporary workdirs and generated artifacts
+.tmp/
+.tmp-*/
+.wechat-localappdata/
+supabase/.temp/
+artifacts/
+envpull.txt
+tmp.production.env
+voice-coach-ws-deploy.tar.gz
+wechatdevtools-window*.png
 
 # Turbopack
 .turbo/

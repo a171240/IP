@@ -1,4 +1,4 @@
-﻿const { IP_FACTORY_BASE_URL } = require("../../utils/config")
+const { IP_FACTORY_BASE_URL } = require("../../utils/config")
 const { request } = require("../../utils/request")
 
 function formatMoneyFen(fen) {

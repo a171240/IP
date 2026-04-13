@@ -13,6 +13,10 @@ const {
   replaceTurnById,
 } = require("./turn-list")
 const {
+  consumePendingVoiceCoachSetup,
+  savePendingVoiceCoachSetup,
+} = require("./setup-storage")
+const {
   shouldUseRealtimeTransport,
   shouldSkipEnsureEventsPolling,
   shouldBlockRecordingForHttpFallback,
@@ -202,6 +206,26 @@ function normalizeTurn(raw) {
   }
 }
 
+function normalizeSessionContext(raw) {
+  const data = raw && typeof raw === "object" ? raw : {}
+  const summaryLines = Array.isArray(data.summary_lines)
+    ? data.summary_lines.map((item) => String(item || "").trim()).filter(Boolean)
+    : []
+
+  return {
+    customerProfileId: String(data.customer_profile_id || "").trim(),
+    sceneCardId: String(data.scene_card_id || "").trim(),
+    liveNotes: String(data.live_notes || "").trim(),
+    customerName: String(data.customer_name || "").trim(),
+    customerSummary: String(data.customer_summary || "").trim(),
+    sceneName: String(data.scene_name || "").trim(),
+    sceneKind: String(data.scene_kind || "").trim(),
+    sceneKindLabel: String(data.scene_kind_label || "").trim(),
+    serviceName: String(data.service_name || "").trim(),
+    summaryLines,
+  }
+}
+
 function vcLog(stage, meta = {}) {
   try {
     console.info(VC_TAG, stage, normalizeLogMeta(meta))
@@ -345,6 +369,7 @@ Page({
   data: {
     sessionId: "",
     turns: [],
+    sessionContext: normalizeSessionContext(null),
     loading: false,
     waitingCustomer: false,
     eventCursor: 0,
@@ -512,6 +537,7 @@ Page({
     this._realtimeCustomerAudioSeconds = 0
     this._lastAsrPartialText = ""
     this._recordTransportActive = false
+    this._recordUseRealtime = false
     this._recordPressActive = false
     this._lastBargeInAt = 0
     this._lastRecordFrameAt = 0
@@ -629,8 +655,10 @@ Page({
     }
 
     const sessionId = options && options.sessionId ? String(options.sessionId) : ""
+    const pendingSetup = sessionId ? null : consumePendingVoiceCoachSetup()
     vcLog("page.load", {
       sessionIdFromOptions: sessionId || "",
+      hasPendingSetup: Boolean(pendingSetup && (pendingSetup.customer_profile_id || pendingSetup.scene_card_id || pendingSetup.live_notes)),
       hasRecorder: Boolean(this.recorder),
       hasFrameHook: typeof this.recorder.onFrameRecorded === "function",
       isDevtools: this._isDevtools,
@@ -639,7 +667,7 @@ Page({
       this.loadSession(sessionId)
       return
     }
-    this.createSession()
+    this.createSession(pendingSetup || null)
   },
 
   onUnload() {
@@ -710,17 +738,26 @@ Page({
     }
   },
 
-  async createSession() {
+  async createSession(setup) {
     const startedAt = Date.now()
     this.sessionCreatedAt = startedAt
     this.setData({ loading: true })
-    vcLog("session.create:start", { scenarioId: "objection_safety" })
+    const payload = { scenario_id: "objection_safety" }
+    if (setup && setup.customer_profile_id) payload.customer_profile_id = setup.customer_profile_id
+    if (setup && setup.scene_card_id) payload.scene_card_id = setup.scene_card_id
+    if (setup && setup.live_notes) payload.live_notes = setup.live_notes
+    vcLog("session.create:start", {
+      scenarioId: "objection_safety",
+      customerProfileId: payload.customer_profile_id || "",
+      sceneCardId: payload.scene_card_id || "",
+      hasLiveNotes: Boolean(payload.live_notes),
+    })
     try {
       const res = await request({
         baseUrl: VOICE_COACH_HTTP_BASE_URL,
         url: "/api/voice-coach/sessions",
         method: "POST",
-        data: { scenario_id: "objection_safety" },
+        data: payload,
       })
 
       const first = normalizeTurn({
@@ -736,6 +773,7 @@ Page({
 
       this.setData({
         sessionId: res.session_id,
+        sessionContext: normalizeSessionContext(res.session_context),
         turns: dedupeTurns([first]),
         eventCursor: 0,
         loading: false,
@@ -754,6 +792,8 @@ Page({
       })
       vcLog("session.create:ok", {
         sessionId: res.session_id,
+        customerName: res.session_context && res.session_context.customer_name ? res.session_context.customer_name : "",
+        sceneName: res.session_context && res.session_context.scene_name ? res.session_context.scene_name : "",
         firstTurnId: res.first_customer_turn && res.first_customer_turn.turn_id ? res.first_customer_turn.turn_id : "",
         firstText: res.first_customer_turn && res.first_customer_turn.text ? res.first_customer_turn.text : "",
         hasAudio: Boolean(res.first_customer_turn && res.first_customer_turn.audio_url),
@@ -785,6 +825,7 @@ Page({
         this.ensureEventsPolling()
       }
     } catch (err) {
+      if (setup) savePendingVoiceCoachSetup(setup)
       this.setData({ loading: false, waitingCustomer: false })
       vcError("session.create:error", {
         message: err && err.message ? err.message : "",
@@ -808,6 +849,7 @@ Page({
       const waitingCustomer = turns.some((t) => t.role === "beautician" && t.pending)
       this.setData({
         sessionId,
+        sessionContext: normalizeSessionContext(res.session && res.session.context),
         turns,
         eventCursor: Number(res.last_event_cursor || 0) || 0,
         loading: false,
@@ -996,6 +1038,7 @@ Page({
 
   resetRecorderUiState(extra = {}) {
     this._recordTransportActive = false
+    this._recordUseRealtime = false
     this._recordPressActive = false
     this._lastRecordFrameAt = 0
     if (this._recordingDraftTimer) {
@@ -1240,6 +1283,7 @@ Page({
 
   cancelRealtimeAudio(reason) {
     this._recordTransportActive = false
+    this._recordUseRealtime = false
     if (!this._realtimeMode || !this._wsClient || !this._wsClient.isConnected()) return
     try {
       this._wsClient.sendJson({ type: "audio.cancel" })
@@ -3105,7 +3149,7 @@ Page({
     if (frameBuffer.byteLength < 1024 || frameBuffer.byteLength > 512 * 1024) return
     this._lastRecordFrameAt = Date.now()
 
-    if (this._realtimeMode && this._wsClient && this._wsClient.isConnected()) {
+    if (this._recordUseRealtime && this._realtimeMode && this._wsClient && this._wsClient.isConnected()) {
       this._realtimeFrameCount += 1
       if (this._realtimeFrameCount === 1 || this._realtimeFrameCount % 10 === 0) {
         vcLog("record.frame", {
@@ -3241,8 +3285,17 @@ Page({
       this.recordTouchStartY = Number(touchY || 0)
       this.recordIntent = "send"
       const replyToTurnId = this.getLastCustomerTurnId()
-      const useRealtime = Boolean(this._realtimeMode && this._wsClient && this._wsClient.isConnected())
+      const realtimeTransportAvailable = Boolean(
+        !this._isDevtools && this._realtimeMode && this._wsClient && this._wsClient.isConnected(),
+      )
+      const useRealtime = realtimeTransportAvailable
       this.resetRealtimeDrafts()
+      this._recordUseRealtime = useRealtime
+      if (!useRealtime && this._isDevtools && this._realtimeMode && this._wsClient && this._wsClient.isConnected()) {
+        vcWarn("record.start:devtools-http-fallback", {
+          sessionId: this.data.sessionId || "",
+        })
+      }
       if (useRealtime) {
         this._realtimeTurnIndex = this.getNextTurnIndex()
       }
@@ -3378,7 +3431,7 @@ Page({
     this.recordIntent = "send"
     vcLog("record.end", {
       sessionId: this.data.sessionId || "",
-      realtime: Boolean(this._realtimeMode),
+      realtime: Boolean(this._recordUseRealtime),
     })
     this.setData({ recording: false, recordCanceling: false, loading: true, recordingPreviewText: "" })
     try {
@@ -3401,7 +3454,7 @@ Page({
     this.discardRecordingBeauticianDraft("manual_cancel")
     vcLog("record.cancel", {
       sessionId: this.data.sessionId || "",
-      realtime: Boolean(this._realtimeMode),
+      realtime: Boolean(this._recordUseRealtime),
     })
     this.resetRecorderUiState()
     this.setData({ loading: false, waitingCustomer: false })
@@ -3421,7 +3474,9 @@ Page({
 
     const clientAttemptId = makeClientAttemptId()
     const normalizedDurationSec = Number(durationSec || 0) || 0
-    const realtimeAvailable = Boolean(this._realtimeMode && this._wsClient && this._wsClient.isConnected())
+    const realtimeAvailable = Boolean(
+      this._recordUseRealtime && this._realtimeMode && this._wsClient && this._wsClient.isConnected(),
+    )
     let useRealtime = Boolean(options.forceHttp ? false : realtimeAvailable)
     if (useRealtime && !shouldUseRealtimeTransport(normalizedDurationSec, MIN_REALTIME_AUDIO_SECONDS)) {
       vcWarn("ws.short-utterance:http", {
@@ -3430,6 +3485,19 @@ Page({
       })
       this.cancelRealtimeAudio("short_utterance_http")
       this.resetRealtimeAttemptState("short_utterance_http")
+      this.beginHttpFallbackTurn(replyToTurnId)
+      useRealtime = false
+    }
+    if (useRealtime && this._realtimeFrameCount <= 0) {
+      vcWarn("ws.zero-frame:http", {
+        audioSeconds: normalizedDurationSec,
+        frameCount: this._realtimeFrameCount,
+        isDevtools: this._isDevtools,
+      })
+      this.cancelRealtimeAudio(this._isDevtools ? "devtools_zero_frame_http" : "zero_frame_http")
+      this.resetRealtimeAttemptState(this._isDevtools ? "devtools_zero_frame_http" : "zero_frame_http", {
+        keepBeauticianDraft: true,
+      })
       this.beginHttpFallbackTurn(replyToTurnId)
       useRealtime = false
     }

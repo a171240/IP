@@ -1,5 +1,6 @@
 import nextCoreWebVitals from "eslint-config-next/core-web-vitals"
 import nextTypeScript from "eslint-config-next/typescript"
+import reactPlugin from "eslint-plugin-react"
 
 const config = [
   {
@@ -15,12 +16,13 @@ const config = [
   ...nextCoreWebVitals,
   ...nextTypeScript,
   {
+    plugins: {
+      react: reactPlugin,
+    },
     rules: {
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-require-imports": "warn",
       "react/no-unescaped-entities": "warn",
-      "react-hooks/purity": "warn",
-      "react-hooks/set-state-in-effect": "warn",
     },
   },
 ]

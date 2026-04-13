@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { checkVoiceCoachAccess } from "@/lib/voice-coach/guard.server"
 import { llmAnalyzeBeauticianAndGenerateNext } from "@/lib/voice-coach/llm.server"
 import { calcFillerRatio, calcWpm } from "@/lib/voice-coach/metrics"
+import { getVoiceCoachSessionPromptContext } from "@/lib/voice-coach/session-context"
 import { getScenario, type VoiceCoachEmotion } from "@/lib/voice-coach/scenarios"
 import {
   doubaoAsrAuc,
@@ -76,7 +77,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
 
     const { data: session, error: sessionError } = await supabase
       .from("voice_coach_sessions")
-      .select("id, scenario_id, status, user_id")
+      .select("id, scenario_id, status, user_id, scenario_snapshot_json")
       .eq("id", sessionId)
       .single()
 
@@ -201,6 +202,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
     const fillerRatio = calcFillerRatio(asr.text)
 
     const scenario = getScenario(session.scenario_id)
+    const sessionContextText = getVoiceCoachSessionPromptContext(session.scenario_snapshot_json)
     const { data: historyRows, error: historyRowsError } = await historyQueryPromise
     if (historyRowsError) return jsonError(500, "history_query_failed", { message: historyRowsError.message })
 
@@ -221,6 +223,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
         emotion: (replyTurn.emotion ? String(replyTurn.emotion) : undefined) as VoiceCoachEmotion | undefined,
       },
       beauticianText: asr.text,
+      sessionContextText: sessionContextText || undefined,
     })
 
     const insertBeauticianPromise = supabase.from("voice_coach_turns").insert({

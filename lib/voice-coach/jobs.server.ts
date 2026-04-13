@@ -4,7 +4,8 @@ import { randomUUID } from "crypto"
 
 import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
 import { llmAnalyzeBeauticianTurn, llmGenerateCustomerTurn, type TurnAnalysis } from "@/lib/voice-coach/llm.server"
-import { calcFillerRatio, calcWpm } from "@/lib/voice-coach/metrics"
+import { calcFillerRatio, calcWpm, computePerTurnScores } from "@/lib/voice-coach/metrics"
+import { getVoiceCoachSessionPromptContext } from "@/lib/voice-coach/session-context"
 import { getScenario, type VoiceCoachEmotion } from "@/lib/voice-coach/scenarios"
 import {
   doubaoAsrAuc,
@@ -18,6 +19,7 @@ import {
   signVoiceCoachAudio,
   uploadVoiceCoachAudio,
 } from "@/lib/voice-coach/storage.server"
+import { normalizeScenarioTag } from "@/lib/voice-coach/tag-utils"
 
 export type VoiceCoachEventType =
   | "turn.accepted"
@@ -45,6 +47,7 @@ type VoiceCoachJobResultState = {
   beautician_audio_seconds?: number | null
   beautician_asr_confidence?: number | null
   next_customer_turn_id?: string
+  next_customer_turn_index?: number
   next_customer_text?: string
   next_customer_emotion?: VoiceCoachEmotion
   next_customer_tag?: string
@@ -67,6 +70,7 @@ type SessionRow = {
   id: string
   scenario_id: string
   status: string
+  scenario_snapshot_json?: unknown
 }
 
 type BeauticianTurnRow = {
@@ -85,23 +89,24 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+const HTTP_FALLBACK_TIMEOUT_CAP_MS = 25000
+const HTTP_FALLBACK_POLL_INTERVAL_MS = 150
+
+function stageElapsed(startedAtMs: number) {
+  return Date.now() - startedAtMs
+}
+
+function logVoiceCoachJob(event: string, fields: Record<string, unknown>) {
+  console.info(`[voice-coach-job] ${event}`, fields)
+}
+
 function maxTurns(): number {
   return Math.max(1, Number(process.env.VOICE_COACH_MAX_TURNS || 10) || 10)
 }
 
-function mapEmotionToTts(emotion: VoiceCoachEmotion): DoubaoTtsEmotion | undefined {
-  switch (emotion) {
-    case "pleased":
-      return "happy"
-    case "worried":
-      return "sad"
-    case "impatient":
-      return "angry"
-    case "neutral":
-    case "skeptical":
-    default:
-      return "neutral"
-  }
+function mapEmotionToTts(emotion?: VoiceCoachEmotion): DoubaoTtsEmotion | undefined {
+  void emotion
+  return "neutral"
 }
 
 function shouldUseFlashAsr(): boolean {
@@ -118,12 +123,18 @@ function shouldAllowAucFallbackWhenFlashEnabled(): boolean {
 function processingStaleMs(): number {
   const n = Number(process.env.VOICE_COACH_PROCESSING_STALE_MS || 20000)
   if (!Number.isFinite(n) || n < 5000) return 20000
-  return Math.round(n)
+  return Math.min(Math.round(n), HTTP_FALLBACK_TIMEOUT_CAP_MS)
 }
 
 function asNumber(value: unknown): number | null {
   const n = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN
   return Number.isFinite(n) ? n : null
+}
+
+function turnIndexOrNull(value: unknown, fallback?: unknown): number | null {
+  const primary = asNumber(value)
+  if (primary !== null) return primary
+  return asNumber(fallback)
 }
 
 function isAsrSilenceError(err: unknown): boolean {
@@ -145,24 +156,34 @@ function normalizeJobStage(raw: unknown): VoiceCoachJobStage {
   return "main_pending"
 }
 
+function jobStagePriority(raw: unknown): number {
+  const stage = normalizeJobStage(raw)
+  if (stage === "main_pending") return 0
+  if (stage === "tts_pending") return 1
+  if (stage === "analysis_pending") return 2
+  if (stage === "done") return 3
+  return 4
+}
+
 function fallbackTagFromBeauticianText(text: string, defaultTag: string) {
   const s = String(text || "")
-  if (/价格|贵|优惠|折扣|套餐|会员/.test(s)) return "价格贵"
-  if (/证书|资质|认证|安全|风险|规范|卫生/.test(s)) return "胸部安全"
-  if (/品牌|产品|院线|材料|成分|进口/.test(s)) return "产品信任"
+  if (/价格|贵|优惠|折扣|套餐|会员|性价比/.test(s)) return "价格价值"
+  if (/证书|资质|认证|安全|风险|规范|卫生|恢复|过敏|敏感/.test(s)) return "安全恢复"
+  if (/推销|办卡|套路|服务|变样|售后|信任/.test(s)) return "服务信任"
   if (/案例|照片|前后|反馈|对比|见证/.test(s)) return "真实案例"
+  if (/效果|见效|多久|改善|维持|反应/.test(s)) return "效果预期"
   return defaultTag
 }
 
 function fallbackTopicPool(tag: string): string[] {
-  if (tag === "胸部安全") {
+  if (tag === "安全恢复") {
     return [
-      "你说安全我理解，但具体有哪些资质和操作规范可以给我看吗？",
-      "如果我有些敏感体质，这个项目怎么确保安全？",
-      "能不能说下你们在安全方面最关键的两三条保障？",
+      "你说安全我理解，但具体有哪些资质、操作规范和恢复期边界可以给我看吗？",
+      "如果我有些敏感体质，这个项目怎么评估适不适合我？",
+      "能不能说下你们在安全和恢复期管理上最关键的两三条保障？",
     ]
   }
-  if (tag === "价格贵") {
+  if (tag === "价格价值") {
     return [
       "价格我还是觉得偏高，你能具体说说和普通项目差在哪吗？",
       "如果按你这个价格，我能拿到哪些更确定的价值？",
@@ -174,6 +195,20 @@ function fallbackTopicPool(tag: string): string[] {
       "我更想看真实的前后对比，最好是和我情况接近的案例。",
       "除了口头介绍，有没有可验证的案例或顾客反馈？",
       "你方便先给我看一两个具体案例吗？",
+    ]
+  }
+  if (tag === "服务信任") {
+    return [
+      "我最怕今天体验很好，后面服务和现在完全两套说法。",
+      "你先别急着推荐，我更想知道后面会不会一直推销和加项。",
+      "如果我现在只是先了解，你们后面是怎么跟进的？",
+    ]
+  }
+  if (tag === "效果预期") {
+    return [
+      "我更关心多久能看到变化，以及看不到时你们会怎么判断。",
+      "如果效果不明显，通常是继续调整还是说明不适合我？",
+      "你说得挺多，我想先知道效果边界到底在哪里。",
     ]
   }
   return [
@@ -195,6 +230,9 @@ function quickHash(input: string): number {
 function detectFocusKeyword(text: string): string {
   const s = String(text || "")
   const checks: Array<[RegExp, string]> = [
+    [/体验|试做|试试看|先做一次|先体验|低风险/, "先体验再决定"],
+    [/效果|舒服|不舒服|反应|变化|改善/, "效果和身体反应"],
+    [/长期|一直做|多久|频率|周期|维持/, "长期安排和频率"],
     [/证书|资质|认证|合规|规范/, "资质和规范"],
     [/安全|风险|卫生|敏感|保障/, "安全保障"],
     [/案例|照片|前后对比|反馈|见证/, "案例证明"],
@@ -211,13 +249,31 @@ function detectFocusKeyword(text: string): string {
 }
 
 function dynamicFallbackLines(tag: string, focus: string): string[] {
-  if (tag === "胸部安全") {
+  if (focus === "先体验再决定") {
+    return [
+      "如果先低风险体验一次，你们通常怎么安排，做到什么程度我才能判断值不值得继续？",
+      "要是先试一次，你们怎么控制风险，让我有把握再决定后续要不要长期做？",
+    ]
+  }
+  if (focus === "效果和身体反应") {
+    return [
+      "我更在意做完之后身体会有什么反应，你能具体说说正常反馈和需要注意的点吗？",
+      "如果我做完觉得不舒服或者效果不明显，你们一般怎么判断是不是适合继续？",
+    ]
+  }
+  if (focus === "长期安排和频率") {
+    return [
+      "如果后面要长期做，频率和阶段安排通常怎么定，什么情况下需要停一停？",
+      "你说可以长期维护，那具体多久做一次、做到什么阶段才算稳定？",
+    ]
+  }
+  if (tag === "安全恢复") {
     return [
       `你提到${focus}，可以给我看下具体标准和执行流程吗？`,
       `我最担心的是安全风险，围绕${focus}你能说得再具体一点吗？`,
     ]
   }
-  if (tag === "价格贵") {
+  if (tag === "价格价值") {
     return [
       `你说了不少优势，但围绕${focus}，我想听到更清晰的价值对比。`,
       `如果按这个价格，关于${focus}你能给我更明确的承诺范围吗？`,
@@ -227,6 +283,18 @@ function dynamicFallbackLines(tag: string, focus: string): string[] {
     return [
       `你提到${focus}，能先给我一个和我情况相近的真实案例吗？`,
       `关于${focus}，有没有可验证的前后对比或顾客反馈？`,
+    ]
+  }
+  if (tag === "服务信任") {
+    return [
+      `你提到${focus}，但我更关心后面服务会不会和现在一样稳定。`,
+      `围绕${focus}，你能先把后续服务和跟进方式讲清楚吗？`,
+    ]
+  }
+  if (tag === "效果预期") {
+    return [
+      `你提到${focus}，那效果到底多久看、看到什么程度才算合理？`,
+      `围绕${focus}，你能把效果边界和不适合继续的情况说清楚吗？`,
     ]
   }
   return [
@@ -244,20 +312,30 @@ function fallbackCustomerTurn(opts: {
   emotion: VoiceCoachEmotion
   tag: string
 } {
-  const defaultTag = String(opts.scenario.seedTopics?.[0] || "产品信任")
+  const defaultTag = String(opts.scenario.seedTopics?.[0] || "服务信任")
   const inferredTag = fallbackTagFromBeauticianText(opts.beauticianText, defaultTag)
-  const focus = detectFocusKeyword(opts.beauticianText)
+  const lastCustomer = [...opts.history].reverse().find((h) => h.role === "customer")
+  const continuityAnchor = detectFocusKeyword(`${lastCustomer?.text || ""} ${opts.beauticianText}`)
+  const focus = continuityAnchor || detectFocusKeyword(opts.beauticianText)
   const pool = Array.from(new Set([...dynamicFallbackLines(inferredTag, focus), ...fallbackTopicPool(inferredTag)]))
 
   const beauticianTurns = opts.history.filter((h) => h.role === "beautician").length
-  const lastCustomer = [...opts.history].reverse().find((h) => h.role === "customer")
+  const continuityLines =
+    lastCustomer && String(lastCustomer.text || "").trim()
+      ? [
+          `我还是回到刚才说的${continuityAnchor}，你能说得更具体一点吗？`,
+          `你刚才回应了，但关于${continuityAnchor}我还想再确认一下。`,
+          `围绕${continuityAnchor}，你能给我一个更直接的依据吗？`,
+        ]
+      : []
+  const mergedPool = Array.from(new Set([...continuityLines, ...pool]))
   const seedText = `${opts.beauticianText}|${lastCustomer?.text || ""}|${beauticianTurns}|${inferredTag}`
-  let idx = quickHash(seedText) % pool.length
-  let picked = pool[idx]
+  let idx = quickHash(seedText) % mergedPool.length
+  let picked = mergedPool[idx]
 
-  if (lastCustomer && lastCustomer.text && lastCustomer.text.trim() === picked && pool.length > 1) {
-    idx = (idx + 1) % pool.length
-    picked = pool[idx]
+  if (lastCustomer && lastCustomer.text && lastCustomer.text.trim() === picked && mergedPool.length > 1) {
+    idx = (idx + 1) % mergedPool.length
+    picked = mergedPool[idx]
   }
 
   return {
@@ -328,6 +406,13 @@ async function markJobError(args: {
       message: args.message,
       ts: nowIso(),
     },
+  })
+
+  logVoiceCoachJob("job.error", {
+    jobId: args.jobId,
+    sessionId: args.sessionId,
+    turnId: args.turnId,
+    code: args.code,
   })
 }
 
@@ -400,7 +485,11 @@ async function loadSessionAndTurn(args: {
 }): Promise<{ session: SessionRow; turn: BeauticianTurnRow } | null> {
   const admin = createAdminSupabaseClient()
   const [{ data: session, error: sessionError }, { data: turn, error: turnError }] = await Promise.all([
-    admin.from("voice_coach_sessions").select("id, scenario_id, status").eq("id", args.sessionId).single(),
+    admin
+      .from("voice_coach_sessions")
+      .select("id, scenario_id, status, scenario_snapshot_json")
+      .eq("id", args.sessionId)
+      .single(),
     admin
       .from("voice_coach_turns")
       .select("id, session_id, turn_index, role, text, audio_path, audio_seconds, status, analysis_json")
@@ -415,6 +504,7 @@ async function loadSessionAndTurn(args: {
       id: String(session.id),
       scenario_id: String(session.scenario_id || "objection_safety"),
       status: String(session.status || ""),
+      scenario_snapshot_json: session.scenario_snapshot_json || null,
     },
     turn: {
       id: String(turn.id),
@@ -439,7 +529,14 @@ async function processMainStage(args: {
   resultState: VoiceCoachJobResultState
 }): Promise<ProcessJobResult> {
   const admin = createAdminSupabaseClient()
+  const stageStartedAt = Date.now()
   const pipelineStartedAt = Number(args.resultState.pipeline_started_at_ms || Date.now())
+  logVoiceCoachJob("main.start", {
+    jobId: args.jobId,
+    sessionId: args.sessionId,
+    turnId: args.turnId,
+    replyToTurnId: args.payload.reply_to_turn_id,
+  })
 
   const loaded = await loadSessionAndTurn({ sessionId: args.sessionId, turnId: args.turnId })
   if (!loaded || loaded.session.status !== "active") {
@@ -502,6 +599,7 @@ async function processMainStage(args: {
 
   const audioBuf = await downloadVoiceCoachAudio(audioPath)
   const format = (args.payload.audio_format || "mp3") as "mp3" | "wav" | "ogg" | "raw" | "flac"
+  const asrStartedAt = Date.now()
 
   if (format === "flac" && !shouldUseFlashAsr()) {
     await markJobError({
@@ -518,6 +616,7 @@ async function processMainStage(args: {
   let asr: DoubaoAsrResult | null = null
   let flashAttempted = false
   let flashErrorMessage = ""
+  let aucFallbackUsed = false
   const flashEnabled = shouldUseFlashAsr()
   const allowAucFallback = !flashEnabled || shouldAllowAucFallbackWhenFlashEnabled()
 
@@ -536,6 +635,7 @@ async function processMainStage(args: {
   }
 
   if ((!asr || !asr.text) && allowAucFallback) {
+    aucFallbackUsed = true
     const signed = await signVoiceCoachAudio(audioPath)
     try {
       asr = await doubaoAsrAuc({
@@ -591,6 +691,19 @@ async function processMainStage(args: {
   const fillerRatio = calcFillerRatio(asr.text)
   const beauticianAudioUrl = await getSignedAudio(audioPath)
 
+  logVoiceCoachJob("main.asr", {
+    jobId: args.jobId,
+    sessionId: args.sessionId,
+    turnId: args.turnId,
+    elapsedMs: stageElapsed(asrStartedAt),
+    format,
+    flashEnabled,
+    flashAttempted,
+    aucFallbackUsed,
+    textLength: asr.text.length,
+    confidence: asr.confidence,
+  })
+
   const beauticianTurnNo = Math.floor((Number(loaded.turn.turn_index) + 1) / 2)
   const reachedMax = beauticianTurnNo >= maxTurns()
 
@@ -613,6 +726,7 @@ async function processMainStage(args: {
     type: "beautician.asr_ready",
     data: {
       turn_id: args.turnId,
+      turn_index: Number.isFinite(Number(loaded.turn.turn_index)) ? Number(loaded.turn.turn_index) : null,
       text: asr.text,
       confidence: asr.confidence,
       audio_seconds: audioSeconds,
@@ -644,7 +758,9 @@ async function processMainStage(args: {
   }
 
   const scenario = getScenario(String(loaded.session.scenario_id || "objection_safety"))
+  const sessionContextText = getVoiceCoachSessionPromptContext(loaded.session.scenario_snapshot_json)
   const history = await buildHistory(args.sessionId, Number(loaded.turn.turn_index))
+  const llmStartedAt = Date.now()
 
   let nextCustomer = fallbackCustomerTurn({
     scenario,
@@ -657,7 +773,9 @@ async function processMainStage(args: {
     nextCustomer = await llmGenerateCustomerTurn({
       scenario,
       history,
-      target: "继续追问并要求更具体证据，推动美容师给出可验证信息",
+      target:
+        "Continue the same objection thread. Directly follow up on the beautician's latest reply, and ask for one concrete proof point, condition, example, risk-control detail, trial arrangement, or next step tied to what they just said.",
+      sessionContextText: sessionContextText || undefined,
     })
   } catch (err: any) {
     llmFallbackUsed = true
@@ -668,8 +786,10 @@ async function processMainStage(args: {
       beauticianText: asr.text,
     })
   }
+  const normalizedNextCustomerTag = normalizeScenarioTag(nextCustomer.tag, scenario)
 
   const customerTurnIndex = Number(loaded.turn.turn_index) + 1
+  const nextCustomerTurnIndex = turnIndexOrNull(customerTurnIndex, args.resultState.next_customer_turn_index)
   const { data: existingCustomerAtIndex } = await admin
     .from("voice_coach_turns")
     .select("id, role")
@@ -698,7 +818,7 @@ async function processMainStage(args: {
         text: nextCustomer.text,
         emotion: nextCustomer.emotion,
         status: "text_ready",
-        features_json: { tag: nextCustomer.tag },
+        features_json: { tag: normalizedNextCustomerTag },
       })
       .eq("id", nextCustomerTurnId)
   } else {
@@ -710,7 +830,7 @@ async function processMainStage(args: {
       text: nextCustomer.text,
       emotion: nextCustomer.emotion,
       status: "text_ready",
-      features_json: { tag: nextCustomer.tag },
+      features_json: { tag: normalizedNextCustomerTag },
     })
 
     if (customerInsertError) {
@@ -726,6 +846,7 @@ async function processMainStage(args: {
     type: "customer.text_ready",
     data: {
       turn_id: nextCustomerTurnId,
+      turn_index: nextCustomerTurnIndex,
       beautician_turn_id: args.turnId,
       text: nextCustomer.text,
       emotion: nextCustomer.emotion,
@@ -736,16 +857,38 @@ async function processMainStage(args: {
     },
   })
 
+  logVoiceCoachJob("main.customer_text_ready", {
+    jobId: args.jobId,
+    sessionId: args.sessionId,
+    turnId: args.turnId,
+    nextCustomerTurnId,
+    nextCustomerTurnIndex,
+    llmElapsedMs: stageElapsed(llmStartedAt),
+    llmFallbackUsed,
+    totalElapsedMs: stageElapsed(stageStartedAt),
+  })
+
   await queueNextStage({
     jobId: args.jobId,
     stage: "tts_pending",
     result: mergeResult(stageResultBase, {
       next_customer_turn_id: nextCustomerTurnId,
+      next_customer_turn_index: nextCustomerTurnIndex ?? undefined,
       next_customer_text: nextCustomer.text,
       next_customer_emotion: nextCustomer.emotion,
-      next_customer_tag: nextCustomer.tag,
+      next_customer_tag: normalizedNextCustomerTag,
       customer_text_elapsed_ms: Date.now() - pipelineStartedAt,
     }),
+  })
+
+  logVoiceCoachJob("main.done", {
+    jobId: args.jobId,
+    sessionId: args.sessionId,
+    turnId: args.turnId,
+    nextStage: "tts_pending",
+    reachedMax,
+    totalElapsedMs: stageElapsed(stageStartedAt),
+    pipelineElapsedMs: stageElapsed(pipelineStartedAt),
   })
 
   return { processed: true, done: false, jobId: args.jobId, turnId: args.turnId }
@@ -759,7 +902,14 @@ async function processTtsStage(args: {
   resultState: VoiceCoachJobResultState
 }): Promise<ProcessJobResult> {
   const admin = createAdminSupabaseClient()
+  const stageStartedAt = Date.now()
   const pipelineStartedAt = Number(args.resultState.pipeline_started_at_ms || Date.now())
+  logVoiceCoachJob("tts.start", {
+    jobId: args.jobId,
+    sessionId: args.sessionId,
+    turnId: args.turnId,
+    nextCustomerTurnId: args.resultState.next_customer_turn_id || "",
+  })
 
   const nextCustomerTurnId = String(args.resultState.next_customer_turn_id || "")
   if (!nextCustomerTurnId) {
@@ -773,7 +923,7 @@ async function processTtsStage(args: {
 
   const { data: customerTurn } = await admin
     .from("voice_coach_turns")
-    .select("id, text, emotion, audio_path, audio_seconds")
+    .select("id, text, emotion, audio_path, audio_seconds, turn_index")
     .eq("id", nextCustomerTurnId)
     .eq("session_id", args.sessionId)
     .single()
@@ -793,9 +943,12 @@ async function processTtsStage(args: {
   let audioUrl: string | null = null
   let audioSeconds: number | null = asNumber(customerTurn.audio_seconds)
   let audioPath: string | null = customerTurn.audio_path ? String(customerTurn.audio_path) : null
+  const customerTurnIndex = turnIndexOrNull(customerTurn.turn_index, args.resultState.next_customer_turn_index)
   let ttsFailed = false
+  let cacheHit = false
 
   if (audioPath) {
+    cacheHit = true
     audioUrl = await getSignedAudio(audioPath)
   } else {
     const text = String(args.resultState.next_customer_text || customerTurn.text || "").trim()
@@ -804,6 +957,7 @@ async function processTtsStage(args: {
     if (!text) {
       ttsFailed = true
     } else {
+      const synthStartedAt = Date.now()
       try {
         const tts = await doubaoTts({
           text,
@@ -823,8 +977,28 @@ async function processTtsStage(args: {
         } else {
           ttsFailed = true
         }
+        logVoiceCoachJob("tts.synth", {
+          jobId: args.jobId,
+          sessionId: args.sessionId,
+          turnId: args.turnId,
+          nextCustomerTurnId,
+          elapsedMs: stageElapsed(synthStartedAt),
+          textLength: text.length,
+          audioSeconds,
+          hasAudio: Boolean(audioUrl),
+        })
       } catch {
         ttsFailed = true
+        logVoiceCoachJob("tts.synth", {
+          jobId: args.jobId,
+          sessionId: args.sessionId,
+          turnId: args.turnId,
+          nextCustomerTurnId,
+          elapsedMs: stageElapsed(synthStartedAt),
+          textLength: text.length,
+          hasAudio: false,
+          failed: true,
+        })
       }
     }
   }
@@ -846,6 +1020,7 @@ async function processTtsStage(args: {
     type: "customer.audio_ready",
     data: {
       turn_id: nextCustomerTurnId,
+      turn_index: customerTurnIndex,
       beautician_turn_id: args.turnId,
       audio_url: audioUrl,
       audio_seconds: audioSeconds,
@@ -863,6 +1038,19 @@ async function processTtsStage(args: {
       pipeline_started_at_ms: pipelineStartedAt,
       customer_audio_elapsed_ms: Date.now() - pipelineStartedAt,
     }),
+  })
+
+  logVoiceCoachJob("tts.done", {
+    jobId: args.jobId,
+    sessionId: args.sessionId,
+    turnId: args.turnId,
+    nextCustomerTurnId,
+    customerTurnIndex,
+    cacheHit,
+    ttsFailed,
+    hasAudio: Boolean(audioUrl),
+    totalElapsedMs: stageElapsed(stageStartedAt),
+    pipelineElapsedMs: stageElapsed(pipelineStartedAt),
   })
 
   return { processed: true, done: false, jobId: args.jobId, turnId: args.turnId }
@@ -931,6 +1119,7 @@ async function processAnalysisStage(args: {
   }
 
   const scenario = getScenario(String(loaded.session.scenario_id || "objection_safety"))
+  const sessionContextText = getVoiceCoachSessionPromptContext(loaded.session.scenario_snapshot_json)
   const history = await buildHistory(args.sessionId, Number(loaded.turn.turn_index))
 
   try {
@@ -942,6 +1131,21 @@ async function processAnalysisStage(args: {
         emotion: replyTurn.emotion ? (String(replyTurn.emotion) as VoiceCoachEmotion) : undefined,
       },
       beauticianText: String(loaded.turn.text || args.resultState.beautician_text || ""),
+      sessionContextText: sessionContextText || undefined,
+    })
+
+    // Compute per-turn dimension scores
+    const beauticianText = String(loaded.turn.text || args.resultState.beautician_text || "")
+    const wpm = calcWpm(beauticianText, loaded.turn.audio_seconds)
+    const fillerRatio = calcFillerRatio(beauticianText)
+    const asrConf = typeof args.resultState.beautician_asr_confidence === "number" ? args.resultState.beautician_asr_confidence : null
+
+    analysis.per_turn_scores = computePerTurnScores({
+      wpm,
+      fillerRatio,
+      asrConfidence: asrConf,
+      llmPersuasion: analysis.persuasion_score,
+      llmOrganization: analysis.organization_score,
     })
 
     await admin
@@ -1098,6 +1302,7 @@ export async function pumpVoiceCoachQueuedJobs(args: {
   maxJobs?: number
 }): Promise<number> {
   const admin = createAdminSupabaseClient()
+  const pumpStartedAt = Date.now()
   const maxJobs = Math.max(1, Math.min(5, Number(args.maxJobs || 1) || 1))
   const staleBeforeIso = new Date(Date.now() - processingStaleMs()).toISOString()
 
@@ -1112,6 +1317,7 @@ export async function pumpVoiceCoachQueuedJobs(args: {
     .order("updated_at", { ascending: true })
     .limit(5)
 
+  const staleRequeueCount = staleJobs?.length || 0
   if (staleJobs && staleJobs.length > 0) {
     for (let i = 0; i < staleJobs.length; i++) {
       const stale = staleJobs[i]
@@ -1134,16 +1340,26 @@ export async function pumpVoiceCoachQueuedJobs(args: {
   for (let i = 0; i < maxJobs; i++) {
     const { data: queued } = await admin
       .from("voice_coach_jobs")
-      .select("id")
+      .select("id, stage, created_at")
       .eq("session_id", args.sessionId)
       .eq("user_id", args.userId)
       .eq("status", "queued")
       .order("created_at", { ascending: true })
-      .limit(1)
+      .limit(20)
 
-    const jobId = queued?.[0]?.id ? String(queued[0].id) : ""
+    const picked = (queued || [])
+      .slice()
+      .sort((a: any, b: any) => {
+        const priorityDiff = jobStagePriority(a?.stage) - jobStagePriority(b?.stage)
+        if (priorityDiff !== 0) return priorityDiff
+        return new Date(String(a?.created_at || 0)).getTime() - new Date(String(b?.created_at || 0)).getTime()
+      })[0]
+
+    const jobId = picked?.id ? String(picked.id) : ""
     if (!jobId) break
+    const stage = normalizeJobStage(picked?.stage)
 
+    const jobStartedAt = Date.now()
     const result = await processVoiceCoachJobById({
       sessionId: args.sessionId,
       userId: args.userId,
@@ -1152,11 +1368,120 @@ export async function pumpVoiceCoachQueuedJobs(args: {
 
     if (!result.processed) {
       // Avoid hot loop when another request claimed it.
-      await sleep(80)
+      await sleep(HTTP_FALLBACK_POLL_INTERVAL_MS)
       continue
     }
 
     processed += 1
+    logVoiceCoachJob("pump.job", {
+      sessionId: args.sessionId,
+      userId: args.userId,
+      jobId,
+      stage,
+      elapsedMs: stageElapsed(jobStartedAt),
+      done: result.done,
+    })
+  }
+
+  if (processed > 0 || staleRequeueCount > 0 || stageElapsed(pumpStartedAt) >= 500) {
+    logVoiceCoachJob("pump.done", {
+      sessionId: args.sessionId,
+      userId: args.userId,
+      processed,
+      staleRequeueCount,
+      maxJobs,
+      elapsedMs: stageElapsed(pumpStartedAt),
+    })
+  }
+
+  return processed
+}
+
+export async function pumpVoiceCoachAnalysisJobs(args: {
+  sessionId: string
+  userId: string
+  maxJobs?: number
+}): Promise<number> {
+  const admin = createAdminSupabaseClient()
+  const pumpStartedAt = Date.now()
+  const maxJobs = Math.max(1, Math.min(5, Number(args.maxJobs || 1) || 1))
+  const staleBeforeIso = new Date(Date.now() - processingStaleMs()).toISOString()
+
+  const { data: staleJobs } = await admin
+    .from("voice_coach_jobs")
+    .select("id")
+    .eq("session_id", args.sessionId)
+    .eq("user_id", args.userId)
+    .eq("status", "processing")
+    .eq("stage", "analysis_pending")
+    .lt("updated_at", staleBeforeIso)
+    .order("updated_at", { ascending: true })
+    .limit(5)
+
+  const staleRequeueCount = staleJobs?.length || 0
+  if (staleJobs && staleJobs.length > 0) {
+    for (let i = 0; i < staleJobs.length; i += 1) {
+      const stale = staleJobs[i]
+      if (!stale?.id) continue
+      await admin
+        .from("voice_coach_jobs")
+        .update({
+          status: "queued",
+          stage: "analysis_pending",
+          last_error: "requeued_stale_processing",
+          updated_at: nowIso(),
+        })
+        .eq("id", String(stale.id))
+        .eq("status", "processing")
+    }
+  }
+
+  let processed = 0
+  for (let i = 0; i < maxJobs; i += 1) {
+    const { data: queued } = await admin
+      .from("voice_coach_jobs")
+      .select("id")
+      .eq("session_id", args.sessionId)
+      .eq("user_id", args.userId)
+      .eq("status", "queued")
+      .eq("stage", "analysis_pending")
+      .order("created_at", { ascending: true })
+      .limit(1)
+
+    const jobId = queued?.[0]?.id ? String(queued[0].id) : ""
+    if (!jobId) break
+
+    const jobStartedAt = Date.now()
+    const result = await processVoiceCoachJobById({
+      sessionId: args.sessionId,
+      userId: args.userId,
+      jobId,
+    })
+
+    if (!result.processed) {
+      await sleep(HTTP_FALLBACK_POLL_INTERVAL_MS)
+      continue
+    }
+
+    processed += 1
+    logVoiceCoachJob("pump.analysis.job", {
+      sessionId: args.sessionId,
+      userId: args.userId,
+      jobId,
+      elapsedMs: stageElapsed(jobStartedAt),
+      done: result.done,
+    })
+  }
+
+  if (processed > 0 || staleRequeueCount > 0 || stageElapsed(pumpStartedAt) >= 500) {
+    logVoiceCoachJob("pump.analysis.done", {
+      sessionId: args.sessionId,
+      userId: args.userId,
+      processed,
+      staleRequeueCount,
+      maxJobs,
+      elapsedMs: stageElapsed(pumpStartedAt),
+    })
   }
 
   return processed

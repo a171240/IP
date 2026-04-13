@@ -1,37 +1,38 @@
-<view class="page page-voice-coach">
+<view class="page page-voice-coach vc-page vc-home-page vc-home-minimal">
   <view class="container">
-    <view class="hero fade-up">
-      <text class="eyebrow">销售话术练习</text>
-      <text class="title">练练：成交话术陪练</text>
-      <text class="subtitle">语音对话 + 逐句点评 + 练后报告</text>
+    <view class="hero compact-hero fade-up">
+      <text class="eyebrow">Voice Coach</text>
+      <text class="title">开始一轮语音训练</text>
+      <text class="subtitle">先选顾客和场景，再直接开练。</text>
 
-      <view class="hero-actions">
-        <button class="btn-primary" bindtap="handleStart">开始练习</button>
-      </view>
-
-      <view class="hero-badges">
-        <view class="chip">首次进入会申请录音权限</view>
+      <view class="quick-launch-card">
+        <view class="quick-launch-copy">
+          <text class="quick-launch-title">现在就开始</text>
+          <text class="quick-launch-note">推荐先用测试顾客跑通流程。</text>
+        </view>
+        <button class="btn-primary" bindtap="handleStart">开始训练</button>
       </view>
     </view>
 
     <view class="section fade-up delay-1">
-      <text class="section-title">练习亮点</text>
-      <view class="grid-2">
-        <view class="card">
-          <text class="card-title">顾客扮演</text>
-          <text class="muted small">模拟真实异议与犹豫点</text>
+      <view class="minimal-section-head">
+        <text class="section-title">训练资产</text>
+        <text class="section-caption">只保留两个入口，其他都放到下一步里。</text>
+      </view>
+
+      <view class="minimal-grid">
+        <view class="card minimal-action-card" bindtap="handleProfiles">
+          <text class="minimal-action-kicker">Customer</text>
+          <text class="card-title">顾客档案</text>
+          <text class="minimal-action-copy">选一个真实顾客，或直接用测试顾客。</text>
+          <text class="minimal-action-link">进入顾客库</text>
         </view>
-        <view class="card">
-          <text class="card-title">逐句点评</text>
-          <text class="muted small">指出更自然的表达方式</text>
-        </view>
-        <view class="card">
-          <text class="card-title">润色表达</text>
-          <text class="muted small">给出可直接复用的说法</text>
-        </view>
-        <view class="card">
-          <text class="card-title">练后报告</text>
-          <text class="muted small">维度评分 + 下一步建议</text>
+
+        <view class="card minimal-action-card" bindtap="handleSceneCards">
+          <text class="minimal-action-kicker">Scene</text>
+          <text class="card-title">场景卡</text>
+          <text class="minimal-action-copy">选定这轮练什么，不再临时想题。</text>
+          <text class="minimal-action-link">进入场景库</text>
         </view>
       </view>
     </view>

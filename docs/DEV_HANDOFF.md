@@ -12,6 +12,7 @@
 - vNext 开发文档：`docs/DEV_SPEC_VNEXT.md`
 - 小程序开发文档：`docs/DEV_SPEC_MINIPROGRAM.md`
 - 当前进度文档：`docs/DEV_HANDOFF.md`
+- 小程序域名/部署拓扑：`docs/VOICE_COACH_DOMAIN_TOPOLOGY.md`
 
 ---
 
@@ -21,6 +22,7 @@
 - 交付包、兑换激活、诊断、内容工坊等主链路：见下方「已完成（P0）」与「vNext 进行中」。
 
 ### 小程序（MP v1）
+- 如果是改小程序或语音教练，先看 `docs/VOICE_COACH_DOMAIN_TOPOLOGY.md`，不要混淆 `ip.ipgongchang.xin`、`www.ipnrgc.com` 和 ECS 本机 WS。
 - 单域名（已备案）：小程序只请求 `https://ip.ipgongchang.xin`。
 - 资产库闭环（已完成）：P7/P8 + 报告查看 + 素材库（搜索/标签/状态/下一步动作）+ 小红书草稿库。
 - 「P8 脚本 → 一键转小红书草稿」：已落库到 `xhs_drafts` 并自动跳转到 `pages/xiaohongshu` 继续封面/风控/发布。

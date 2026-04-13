@@ -59,3 +59,18 @@ test("chat operation area hides transcript chips and keeps left answer suggestio
   assert.ok(chatWxssSource.includes(".action-chip-answer"))
   assert.ok(chatWxssSource.includes(".action-chip-bulb"))
 })
+
+test("devtools recording keeps websocket events but forces audio submit onto the http fallback path", () => {
+  assert.match(chatSource, /this\._recordUseRealtime = false/)
+  assert.match(
+    chatSource,
+    /const realtimeTransportAvailable = Boolean\(\s*!this\._isDevtools && this\._realtimeMode && this\._wsClient && this\._wsClient\.isConnected\(\),/s,
+  )
+  assert.match(chatSource, /record\.start:devtools-http-fallback/)
+  assert.match(
+    chatSource,
+    /if \(this\._recordUseRealtime && this\._realtimeMode && this\._wsClient && this\._wsClient\.isConnected\(\)\)/,
+  )
+  assert.match(chatSource, /ws\.zero-frame:http/)
+  assert.match(chatSource, /keepBeauticianDraft:\s*true/)
+})

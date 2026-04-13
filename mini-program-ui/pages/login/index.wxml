@@ -1,4 +1,4 @@
-﻿<view class="page page-auth">
+<view class="page page-auth">
   <view class="container">
     <view class="hero fade-up">
       <text class="eyebrow">登录</text>

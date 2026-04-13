@@ -4,6 +4,7 @@ const { getAccessToken } = require("../../utils/auth")
 const { getDeviceId } = require("../../utils/device")
 const { track } = require("../../utils/track")
 const { openXhsCompose, openXhsDrafts } = require("../../utils/nav")
+const { buildAbsoluteApiUrl } = require("../../utils/http-base")
 
 function formatMoneyFen(fen) {
   const n = Number(fen || 0)
@@ -77,8 +78,8 @@ Page({
         progressPercent: Number(progress.percent || 0),
         recentXhsDrafts: (recent.xhs_drafts || []).map((d) => ({
           ...d,
-          coverUrl: d.cover_url ? `${IP_FACTORY_BASE_URL}${d.cover_url}` : "",
-          qrUrl: d.qr_url ? `${IP_FACTORY_BASE_URL}${d.qr_url}` : "",
+          coverUrl: d.cover_url ? buildAbsoluteApiUrl(d.cover_url, IP_FACTORY_BASE_URL) : "",
+          qrUrl: d.qr_url ? buildAbsoluteApiUrl(d.qr_url, IP_FACTORY_BASE_URL) : "",
         })),
         recentDeliveryPacks: (recent.delivery_packs || []).map((p) => ({
           ...p,
@@ -159,7 +160,7 @@ Page({
     wx.showLoading({ title: "下载中" })
 
     wx.downloadFile({
-      url: `${IP_FACTORY_BASE_URL}/api/mp/delivery-pack/${packId}/download`,
+      url: buildAbsoluteApiUrl(`/api/mp/delivery-pack/${packId}/download`, IP_FACTORY_BASE_URL),
       header: {
         Authorization: `Bearer ${token}`,
         "x-device-id": getDeviceId(),

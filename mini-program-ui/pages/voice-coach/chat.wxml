@@ -90,7 +90,7 @@
               <view class="bulb-base"></view>
             </view>
           </view>
-          <text class="action-chip-text action-chip-answer-text">{{hintLoadingTurnId === item.id ? '生成中...' : '回答建议'}}</text>
+          <text class="action-chip-text action-chip-answer-text">{{hintLoadingTurnId === item.id ? '生成中...' : '参考回应'}}</text>
         </view>
 
         <view
@@ -194,9 +194,12 @@
   </view>
 </template>
 
-<view class="page">
+<view class="page vc-page vc-chat-page">
   <view class="topbar">
-    <view class="top-left" bindtap="openEndModal">结束</view>
+    <view class="top-left" bindtap="openEndModal">结束训练</view>
+    <view class="top-right">
+      <view class="mode-pill mode-pill-live">Voice Session</view>
+    </view>
   </view>
 
   <scroll-view
@@ -209,6 +212,32 @@
     show-scrollbar="false"
   >
     <view class="chat-inner">
+      <view
+        wx:if="{{sessionContext.sceneName || sessionContext.customerName || sessionContext.summaryLines.length}}"
+        class="session-brief"
+      >
+        <view class="row space-between">
+          <view>
+            <text class="session-brief-title">本次训练背景</text>
+            <text wx:if="{{sessionContext.sceneName}}" class="session-brief-name">{{sessionContext.sceneName}}</text>
+          </view>
+          <text wx:if="{{sessionContext.sceneKindLabel}}" class="tag tag-accent">{{sessionContext.sceneKindLabel}}</text>
+        </view>
+
+        <text wx:if="{{sessionContext.customerName}}" class="session-brief-meta">
+          顾客：{{sessionContext.customerName}}{{sessionContext.customerSummary ? ' · ' + sessionContext.customerSummary : ''}}
+        </text>
+        <text wx:if="{{sessionContext.serviceName}}" class="session-brief-meta">项目：{{sessionContext.serviceName}}</text>
+        <text wx:if="{{sessionContext.liveNotes}}" class="session-brief-meta">补充：{{sessionContext.liveNotes}}</text>
+
+        <view wx:if="{{sessionContext.summaryLines.length}}" class="session-brief-lines">
+          <view class="session-brief-line" wx:for="{{sessionContext.summaryLines}}" wx:key="index">
+            <view class="session-brief-dot"></view>
+            <text class="session-brief-text">{{item}}</text>
+          </view>
+        </view>
+      </view>
+
       <block wx:for="{{turns}}" wx:key="id">
         <view wx:if="{{item.role === 'customer'}}" id="turn-{{item.id}}" class="row row-left">
           <view class="avatar-rail avatar-rail-left">

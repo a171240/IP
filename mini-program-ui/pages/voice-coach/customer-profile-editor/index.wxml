@@ -1,0 +1,113 @@
+<view class="page vc-page vc-editor-page">
+  <view class="container">
+    <view class="hero fade-up">
+      <text class="eyebrow">Profile Editor</text>
+      <text class="title">把这位顾客写得像真的会走进门店</text>
+      <text class="subtitle">重点不是把字段填满，而是把她会怎么问、怎么犹豫、为什么会信你写清楚。越具体，训练越真实。</text>
+
+      <view class="tips-row">
+        <view class="tips-pill">写真人，不写抽象客群</view>
+        <view class="tips-pill">优先记录顾虑与信任点</view>
+        <view class="tips-pill">避免空泛标签</view>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-1">
+      <view class="section-head">
+        <text class="section-kicker">Base</text>
+        <text class="section-title">基础信息</text>
+        <text class="section-caption">先把称呼、年龄标签和职业写清楚，方便训练时快速进入角色。</text>
+      </view>
+
+      <view class="card">
+        <view class="field-stack">
+          <view class="field-block">
+            <text class="field-label">顾客称呼</text>
+            <text class="field-help">例如：王姐、李小姐、陈女士。</text>
+            <input class="input" placeholder="例如：王姐 / 李小姐 / 陈女士" value="{{name}}" bindinput="onName" />
+          </view>
+
+          <view class="field-block">
+            <text class="field-label">年龄标签</text>
+            <text class="field-help">例如：32岁、28-35岁、二胎妈妈。</text>
+            <input class="input" placeholder="例如：32岁 / 28-35岁 / 二胎妈妈" value="{{ageLabel}}" bindinput="onAgeLabel" />
+          </view>
+
+          <view class="field-block">
+            <text class="field-label">职业</text>
+            <text class="field-help">职业会影响她的时间、预算和沟通方式。</text>
+            <input class="input" placeholder="例如：老师 / 宝妈 / 创业者" value="{{occupation}}" bindinput="onOccupation" />
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-1">
+      <view class="section-head">
+        <text class="section-kicker">Portrait</text>
+        <text class="section-title">人物画像</text>
+        <text class="section-caption">尽量用训练时能直接听出来的语言来写，不要只写“高端”“难搞”这类空词。</text>
+      </view>
+
+      <view class="card">
+        <view class="field-stack">
+          <view class="field-block">
+            <text class="field-label">性格标签</text>
+            <text class="field-help">每行一条，例如：谨慎、爱比较、决策慢。</text>
+            <textarea class="input textarea" placeholder="每行一条，例如：谨慎 / 爱比较 / 决策慢" value="{{personalityTags}}" bindinput="onPersonalityTags" />
+          </view>
+
+          <view class="field-block">
+            <text class="field-label">沟通方式</text>
+            <text class="field-help">例如：先接情绪再讲逻辑；不喜欢被强推。</text>
+            <textarea class="input textarea" placeholder="例如：先听情绪，再讲逻辑；不喜欢被强推" value="{{communicationStyle}}" bindinput="onCommunicationStyle" />
+          </view>
+
+          <view class="field-block">
+            <text class="field-label">核心顾虑</text>
+            <text class="field-help">每行一条，例如：怕痛、怕浪费钱、怕效果不稳定。</text>
+            <textarea class="input textarea" placeholder="每行一条，例如：怕痛 / 怕浪费钱 / 怕效果不稳定" value="{{coreConcerns}}" bindinput="onCoreConcerns" />
+          </view>
+
+          <view class="field-block">
+            <text class="field-label">信任触发点</text>
+            <text class="field-help">每行一条，例如：真实案例、过程透明、专业解释。</text>
+            <textarea class="input textarea" placeholder="每行一条，例如：真实案例 / 过程透明 / 专业解释" value="{{trustTriggers}}" bindinput="onTrustTriggers" />
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-2">
+      <view class="section-head">
+        <text class="section-kicker">History</text>
+        <text class="section-title">历史情况</text>
+        <text class="section-caption">写她经历过什么、为什么会防备、这次训练你要特别记住什么。</text>
+      </view>
+
+      <view class="card">
+        <view class="field-stack">
+          <view class="field-block">
+            <text class="field-label">过往经历</text>
+            <text class="field-help">例如：做过基础护理，但被推销过，所以后来对门店比较防备。</text>
+            <textarea class="input textarea" placeholder="例如：做过基础护理，但被推销过，所以后来对门店比较防备" value="{{pastExperience}}" bindinput="onPastExperience" />
+          </view>
+
+          <view class="field-block">
+            <text class="field-label">补充备注</text>
+            <text class="field-help">例如：谁介绍来的、最近状态、不能碰的敏感点。</text>
+            <textarea class="input textarea" placeholder="记录别的关键信息，例如谁介绍来的、最近状态、敏感点" value="{{notes}}" bindinput="onNotes" />
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-2">
+      <view class="footer-cta-card">
+        <text class="tips-title">保存后就能直接进入训练配置</text>
+        <text class="tips-copy">顾客越具体，顾客提出的问题和异议就越像真人。</text>
+        <button class="btn-primary" loading="{{saving}}" disabled="{{saving}}" bindtap="handleSave">保存顾客档案</button>
+      </view>
+    </view>
+  </view>
+</view>

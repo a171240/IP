@@ -69,3 +69,19 @@ export function scorePronunciationFromAsrConfidence(conf: number | null): number
   return clampScore(conf * 100)
 }
 
+export function computePerTurnScores(opts: {
+  wpm: number | null
+  fillerRatio: number | null
+  asrConfidence: number | null
+  llmPersuasion?: number | null
+  llmOrganization?: number | null
+}): Record<string, number> {
+  return {
+    persuasion: clampScore(opts.llmPersuasion ?? 70),
+    fluency: scoreFluencyFromWpm(opts.wpm),
+    expression: scoreExpressionFromFillerRatio(opts.fillerRatio),
+    pronunciation: scorePronunciationFromAsrConfidence(opts.asrConfidence),
+    organization: clampScore(opts.llmOrganization ?? 68),
+  }
+}
+

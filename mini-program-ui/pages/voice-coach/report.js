@@ -89,15 +89,71 @@ function getWindowWidth() {
   return Number.isFinite(width) && width > 0 ? width : 375
 }
 
+function getPixelRatio() {
+  const info = wx.getWindowInfo ? wx.getWindowInfo() : (wx.getSystemInfoSync ? wx.getSystemInfoSync() : {})
+  const pixelRatio = Number(info && info.pixelRatio)
+  return Number.isFinite(pixelRatio) && pixelRatio > 0 ? pixelRatio : 2
+}
+
 function formatSeconds(seconds) {
   const n = Number(seconds || 0)
   if (!n || n <= 0) return ""
   return `${Math.round(n)}''`
 }
 
+function normalizeSessionContext(raw) {
+  const data = raw && typeof raw === "object" ? raw : {}
+  const summaryLines = Array.isArray(data.summary_lines)
+    ? data.summary_lines.map((item) => String(item || "").trim()).filter(Boolean)
+    : []
+
+  return {
+    liveNotes: String(data.live_notes || "").trim(),
+    customerName: String(data.customer_name || "").trim(),
+    customerSummary: String(data.customer_summary || "").trim(),
+    sceneName: String(data.scene_name || "").trim(),
+    sceneKindLabel: String(data.scene_kind_label || "").trim(),
+    serviceName: String(data.service_name || "").trim(),
+    summaryLines,
+  }
+}
+
 function starsText(stars) {
   const n = Math.max(1, Math.min(5, Number(stars || 0) || 0))
   return "★★★★★".slice(0, n) + "☆☆☆☆☆".slice(0, 5 - n)
+}
+
+function scoreBandText(score) {
+  const n = Number(score || 0)
+  if (n >= 85) return "进入稳定成交区间"
+  if (n >= 70) return "表达框架已经成型"
+  return "关键表达仍需继续打磨"
+}
+
+function buildHeroHighlights(report, dimension) {
+  const sorted = (Array.isArray(dimension) ? dimension.slice() : []).sort((a, b) => Number(b.score || 0) - Number(a.score || 0))
+  const strongest = sorted[0]
+  const weakest = sorted[sorted.length - 1]
+
+  const highlights = [
+    { label: "当前结论", value: scoreBandText(report && report.total_score) },
+  ]
+
+  if (strongest) {
+    highlights.push({
+      label: "最强维度",
+      value: `${strongest.name} · ${strongest.score}分`,
+    })
+  }
+
+  if (weakest) {
+    highlights.push({
+      label: "优先提升",
+      value: `${weakest.name} · ${weakest.score}分`,
+    })
+  }
+
+  return highlights.slice(0, 3)
 }
 
 function normalizeTurn(raw) {
@@ -136,6 +192,7 @@ function normalizeReport(report) {
   return {
     ...report,
     dimension,
+    hero_highlights: buildHeroHighlights(report, dimension),
     tabs: {
       ...tabs,
       fluency: {
@@ -161,13 +218,12 @@ function normalizeReport(report) {
 Page({
   data: {
     sessionId: "",
+    sessionContext: normalizeSessionContext(null),
     activeSegment: "report",
     activeTab: "persuasion",
     activeTabIndex: 0,
     tabItems: TAB_ITEMS,
     currentTabTitle: TAB_TITLE_MAP.persuasion,
-    reportScrollIntoView: "",
-    reportScrollTop: 0,
     report: null,
     turns: [],
     playingId: "",
@@ -185,7 +241,7 @@ Page({
     }
     this.audioCtx = wx.createInnerAudioContext()
     this.audioCtx.onEnded(() => this.setData({ playingId: "" }))
-    this.syncCanvasMetrics()
+    this.pixelRatio = getPixelRatio()
     this.setData({ sessionId })
     this.loadAll(sessionId)
   },
@@ -200,15 +256,54 @@ Page({
     } catch {}
   },
 
-  syncCanvasMetrics() {
-    const windowWidth = getWindowWidth()
-    const contentWidth = Math.max(286, Math.min(windowWidth - 22, 360))
-    const radarCanvasSize = Math.round(Math.max(188, Math.min(236, contentWidth - 84)))
+  measureSelector(selector) {
+    return new Promise((resolve) => {
+      const query = wx.createSelectorQuery().in(this)
+      query.select(selector).boundingClientRect((rect) => {
+        resolve(rect || null)
+      }).exec()
+    })
+  },
 
-    this.setData({
-      radarCanvasSize,
-      lineChartWidth: Math.round(contentWidth),
-      lineChartHeight: 176,
+  async syncCanvasMetrics() {
+    const windowWidth = getWindowWidth()
+    const fallbackWidth = Math.max(268, Math.min(windowWidth - 68, 348))
+    const radarRect = await this.measureSelector("#radarStage")
+    const lineRect = await this.measureSelector(".linechart-stage")
+
+    const nextData = {
+      radarCanvasSize: radarRect && radarRect.width ? Math.round(Math.max(188, Math.min(radarRect.width - 2, 260))) : Math.round(Math.max(188, Math.min(236, fallbackWidth - 24))),
+      lineChartWidth: lineRect && lineRect.width ? Math.round(lineRect.width) : Math.round(fallbackWidth),
+      lineChartHeight: 188,
+    }
+
+    await new Promise((resolve) => {
+      this.setData(nextData, resolve)
+    })
+  },
+
+  getCanvas2D(id) {
+    return new Promise((resolve) => {
+      const query = wx.createSelectorQuery().in(this)
+      query.select(`#${id}`).fields({ node: true, size: true }, (res) => {
+        if (!res || !res.node || !res.width || !res.height) {
+          resolve(null)
+          return
+        }
+        const canvas = res.node
+        const ctx = canvas.getContext("2d")
+        const dpr = this.pixelRatio || getPixelRatio()
+        canvas.width = Math.max(1, Math.round(res.width * dpr))
+        canvas.height = Math.max(1, Math.round(res.height * dpr))
+        if (ctx.setTransform) ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+        else ctx.scale(dpr, dpr)
+        resolve({
+          canvas,
+          ctx,
+          width: res.width,
+          height: res.height,
+        })
+      }).exec()
     })
   },
 
@@ -231,14 +326,14 @@ Page({
 
       const report = normalizeReport(endRes.report)
       const turns = (sessionRes.turns || []).map(normalizeTurn)
+      const sessionContext = normalizeSessionContext(sessionRes && sessionRes.session && sessionRes.session.context)
 
-      this.setData({ report, turns })
+      await new Promise((resolve) => this.setData({ report, turns, sessionContext }, resolve))
       this.animateScore(report ? (report.total_score || 0) : 0)
-
-      wx.nextTick(() => {
-        this.drawRadar()
-        this.drawChartsForTab(this.data.activeTab)
-      })
+      await new Promise((resolve) => wx.nextTick(resolve))
+      await this.syncCanvasMetrics()
+      await this.drawRadar()
+      await this.drawChartsForTab(this.data.activeTab)
     } catch (err) {
       wx.showToast({ title: err.message || "加载失败", icon: "none" })
     } finally {
@@ -249,18 +344,13 @@ Page({
   setSegment(e) {
     const seg = e && e.currentTarget ? String(e.currentTarget.dataset.seg || "") : ""
     if (!seg) return
-    this.setData({
-      activeSegment: seg,
-      reportScrollIntoView: seg === "report" ? "report-tab-anchor" : "",
-    })
+    this.setData({ activeSegment: seg })
     if (seg === "report") {
       this.scrollReportToTop()
-      setTimeout(() => {
-        this.setData({ reportScrollIntoView: "" })
-      }, 80)
-      wx.nextTick(() => {
-        this.drawRadar()
-        this.drawChartsForTab(this.data.activeTab)
+      wx.nextTick(async () => {
+        await this.syncCanvasMetrics()
+        await this.drawRadar()
+        await this.drawChartsForTab(this.data.activeTab)
       })
     }
   },
@@ -276,20 +366,26 @@ Page({
       activeTab: tab,
       activeTabIndex: getTabIndex(tab),
       currentTabTitle: TAB_TITLE_MAP[tab] || "",
-      reportScrollIntoView: "report-tab-anchor",
     })
-    this.scrollReportToTop()
-    wx.nextTick(() => {
-      this.drawChartsForTab(tab)
-      setTimeout(() => this.setData({ reportScrollIntoView: "" }), 80)
+    wx.nextTick(async () => {
+      this.scrollToAnchor("#report-tab-anchor")
+      await this.syncCanvasMetrics()
+      await this.drawChartsForTab(tab)
     })
   },
 
   scrollReportToTop() {
-    this.setData({ reportScrollTop: 1 })
-    setTimeout(() => {
-      this.setData({ reportScrollTop: 0 })
-    }, 16)
+    wx.pageScrollTo({
+      scrollTop: 0,
+      duration: 0,
+    })
+  },
+
+  scrollToAnchor(selector) {
+    wx.pageScrollTo({
+      selector,
+      duration: 0,
+    })
   },
 
   animateScore(targetScore) {
@@ -309,7 +405,7 @@ Page({
   },
 
   startAgain() {
-    wx.redirectTo({ url: "/pages/voice-coach/chat" })
+    wx.redirectTo({ url: "/pages/voice-coach/setup/index" })
   },
 
   onPlay(e) {
@@ -345,24 +441,25 @@ Page({
     }
   },
 
-  drawRadar() {
+  async drawRadar() {
     const report = this.data.report
     if (!report || !Array.isArray(report.dimension) || report.dimension.length < 3) return
     const dims = report.dimension
 
-    const ctx = wx.createCanvasContext("radarCanvas", this)
-    const w = Number(this.data.radarCanvasSize || 220)
-    const h = w
+    const canvasRef = await this.getCanvas2D("radarCanvas")
+    if (!canvasRef) return
+
+    const { ctx, width: w, height: h } = canvasRef
     const cx = w / 2
     const cy = h / 2
     const radius = Math.max(70, Math.min(96, Math.round(w * 0.34)))
     const n = dims.length
 
     ctx.clearRect(0, 0, w, h)
-    ctx.setFillStyle(CHART_COLORS.canvasBg)
+    ctx.fillStyle = CHART_COLORS.canvasBg
     ctx.fillRect(0, 0, w, h)
-    ctx.setStrokeStyle(CHART_COLORS.grid)
-    ctx.setLineWidth(1)
+    ctx.strokeStyle = CHART_COLORS.grid
+    ctx.lineWidth = 1
 
     // grid rings
     for (let r = 1; r <= 4; r++) {
@@ -380,8 +477,8 @@ Page({
     }
 
     // axes + labels with dynamic positioning
-    ctx.setFontSize(w >= 220 ? 11 : 10)
-    ctx.setFillStyle(CHART_COLORS.label)
+    ctx.font = `${w >= 220 ? 11 : 10}px sans-serif`
+    ctx.fillStyle = CHART_COLORS.label
     for (let i = 0; i < n; i++) {
       const a = (-Math.PI / 2) + (i * 2 * Math.PI) / n
       const x = cx + radius * Math.cos(a)
@@ -397,18 +494,18 @@ Page({
       const ly = cy + labelDist * Math.sin(a)
 
       // Dynamic text alignment based on angle position
-      ctx.setTextAlign(lx < cx - 2 ? "right" : lx > cx + 2 ? "left" : "center")
-      ctx.setTextBaseline(ly < cy - 2 ? "bottom" : ly > cy + 2 ? "top" : "middle")
+      ctx.textAlign = lx < cx - 2 ? "right" : lx > cx + 2 ? "left" : "center"
+      ctx.textBaseline = ly < cy - 2 ? "bottom" : ly > cy + 2 ? "top" : "middle"
       ctx.fillText(label, lx, ly)
     }
     // Reset alignment for subsequent draws
-    ctx.setTextAlign("left")
-    ctx.setTextBaseline("alphabetic")
+    ctx.textAlign = "left"
+    ctx.textBaseline = "alphabetic"
 
     // data polygon
-    ctx.setStrokeStyle(CHART_COLORS.line)
-    ctx.setLineWidth(2)
-    ctx.setFillStyle(CHART_COLORS.area)
+    ctx.strokeStyle = CHART_COLORS.line
+    ctx.lineWidth = 2
+    ctx.fillStyle = CHART_COLORS.area
     ctx.beginPath()
     const dataPoints = []
     for (let i = 0; i < n; i++) {
@@ -426,42 +523,41 @@ Page({
     ctx.stroke()
 
     // Data point dots on each vertex
-    ctx.setFillStyle(CHART_COLORS.line)
+    ctx.fillStyle = CHART_COLORS.line
     for (let i = 0; i < dataPoints.length; i++) {
       ctx.beginPath()
       ctx.arc(dataPoints[i].x, dataPoints[i].y, 3, 0, 2 * Math.PI)
       ctx.fill()
     }
-
-    ctx.draw()
   },
 
-  drawChartsForTab(tab) {
+  async drawChartsForTab(tab) {
     const report = this.data.report
     if (!report || !report.tabs) return
 
     if (tab === "fluency") {
       const charts = report.tabs.fluency && report.tabs.fluency.charts ? report.tabs.fluency.charts : []
-      charts.forEach((chart) => this.drawLineChart(chart.canvas_id, chart))
+      for (const chart of charts) await this.drawLineChart(chart.canvas_id, chart)
       return
     }
     if (tab === "expression") {
       const charts = report.tabs.expression && report.tabs.expression.charts ? report.tabs.expression.charts : []
-      charts.forEach((chart) => this.drawLineChart(chart.canvas_id, chart))
+      for (const chart of charts) await this.drawLineChart(chart.canvas_id, chart)
       return
     }
     if (tab === "pronunciation") {
       const charts = report.tabs.pronunciation && report.tabs.pronunciation.charts ? report.tabs.pronunciation.charts : []
-      charts.forEach((chart) => this.drawLineChart(chart.canvas_id, chart))
+      for (const chart of charts) await this.drawLineChart(chart.canvas_id, chart)
       return
     }
   },
 
-  drawLineChart(canvasId, chart) {
+  async drawLineChart(canvasId, chart) {
     if (!chart || !Array.isArray(chart.points) || chart.points.length < 2) return
-    const ctx = wx.createCanvasContext(canvasId, this)
-    const w = Number(this.data.lineChartWidth || 320)
-    const h = Number(this.data.lineChartHeight || 176)
+    const canvasRef = await this.getCanvas2D(canvasId)
+    if (!canvasRef) return
+
+    const { ctx, width: w, height: h } = canvasRef
 
     const padL = 36
     const padR = 14
@@ -504,20 +600,20 @@ Page({
     const targetBg = targetBgForChart(chart)
 
     ctx.clearRect(0, 0, w, h)
-    ctx.setFillStyle(CHART_COLORS.canvasBg)
+    ctx.fillStyle = CHART_COLORS.canvasBg
     ctx.fillRect(0, 0, w, h)
 
     // target range background
     if (tr && tr.length === 2) {
       const y1 = yToPx(tr[0])
       const y2 = yToPx(tr[1])
-      ctx.setFillStyle(targetBg)
+      ctx.fillStyle = targetBg
       ctx.fillRect(padL, Math.min(y1, y2), cw, Math.abs(y2 - y1))
     }
 
     // axes
-    ctx.setStrokeStyle(CHART_COLORS.axis)
-    ctx.setLineWidth(1)
+    ctx.strokeStyle = CHART_COLORS.axis
+    ctx.lineWidth = 1
     ctx.beginPath()
     ctx.moveTo(padL, padT)
     ctx.lineTo(padL, padT + ch)
@@ -532,7 +628,7 @@ Page({
     }))
 
     // Area fill under the smooth curve
-    ctx.setFillStyle(areaBg)
+    ctx.fillStyle = areaBg
     ctx.beginPath()
     ctx.moveTo(pixelPts[0].px, padT + ch)
     ctx.lineTo(pixelPts[0].px, pixelPts[0].py)
@@ -550,8 +646,8 @@ Page({
     ctx.fill()
 
     // Smooth line
-    ctx.setStrokeStyle(lineColor)
-    ctx.setLineWidth(2)
+    ctx.strokeStyle = lineColor
+    ctx.lineWidth = 2
     drawSmoothLine(ctx, pixelPts)
 
     // Find min/max points for annotation
@@ -569,20 +665,18 @@ Page({
       // dot
       ctx.beginPath()
       ctx.arc(pt.px, pt.py, 3, 0, 2 * Math.PI)
-      ctx.setFillStyle(lineColor)
+      ctx.fillStyle = lineColor
       ctx.fill()
       // value label
-      ctx.setFontSize(9)
-      ctx.setFillStyle(CHART_COLORS.label)
-      ctx.setTextAlign("center")
+      ctx.font = "9px sans-serif"
+      ctx.fillStyle = CHART_COLORS.label
+      ctx.textAlign = "center"
       const valStr = formatChartValue(chart, pt.val)
       const labelY = ki === maxIdx ? pt.py - 8 : pt.py + 8
-      ctx.setTextBaseline(ki === maxIdx ? "bottom" : "top")
+      ctx.textBaseline = ki === maxIdx ? "bottom" : "top"
       ctx.fillText(valStr, pt.px, labelY)
     })
-    ctx.setTextAlign("left")
-    ctx.setTextBaseline("alphabetic")
-
-    ctx.draw()
+    ctx.textAlign = "left"
+    ctx.textBaseline = "alphabetic"
   },
 })

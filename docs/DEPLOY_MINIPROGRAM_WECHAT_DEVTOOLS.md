@@ -128,3 +128,34 @@
 4. 草稿页能列表（`GET /api/mp/xhs/drafts`）
 5. 门店档案能 CRUD（`/api/mp/store-profiles*`）
 6. （如启用支付）支付能拉起并回调成功（`/api/wechatpay/*`）
+# 0) Voice Coach Realtime 联调补充
+
+语音教练 realtime 走的是独立 websocket 服务，不只是主站 `https://ip.ipgongchang.xin/api/*`。
+
+上线前你必须在微信后台同时配置：
+
+- request 合法域名：`https://ip.ipgongchang.xin`
+- uploadFile 合法域名：`https://ip.ipgongchang.xin`
+- downloadFile 合法域名：`https://ip.ipgongchang.xin`
+- socket 合法域名：`wss://ip.ipgongchang.xin`
+
+本仓库当前小程序配置文件：
+
+- `mini-program-ui/utils/config.js`
+
+默认线上域名已经是：
+
+- `API_BASE_URL = "https://ip.ipgongchang.xin"`
+
+开发者工具联调时，额外检查这一组 realtime 事件：
+
+- [ ] websocket 握手成功
+- [ ] 收到 `session.ready`
+- [ ] 发出 `audio.start`
+- [ ] 录音帧实时发送
+- [ ] 收到 `asr.partial`
+- [ ] 收到 `asr.final`
+- [ ] 收到 `llm.text_delta`
+- [ ] 收到 TTS binary 帧
+- [ ] 音频正常播放
+- [ ] barge-in 正常打断

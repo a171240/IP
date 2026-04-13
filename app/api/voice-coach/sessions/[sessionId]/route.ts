@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { checkVoiceCoachAccess } from "@/lib/voice-coach/guard.server"
+import { getVoiceCoachSessionClientContext } from "@/lib/voice-coach/session-context"
 import { getScenario } from "@/lib/voice-coach/scenarios"
 import { signVoiceCoachAudio } from "@/lib/voice-coach/storage.server"
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
@@ -34,7 +35,9 @@ export async function GET(request: NextRequest, context: { params: Promise<{ ses
 
     const { data: session, error: sessionError } = await supabase
       .from("voice_coach_sessions")
-      .select("id, scenario_id, status, started_at, ended_at, total_score")
+      .select(
+        "id, scenario_id, status, started_at, ended_at, total_score, customer_profile_id, scene_card_id, session_context_json, scenario_snapshot_json",
+      )
       .eq("id", sessionId)
       .single()
     if (sessionError || !session) return jsonError(404, "session_not_found")
@@ -62,10 +65,17 @@ export async function GET(request: NextRequest, context: { params: Promise<{ ses
         status: session.status,
         started_at: session.started_at,
         ended_at: session.ended_at,
+        total_score: session.total_score,
         scenario: {
           id: scenario.id,
           name: scenario.name,
         },
+        context: getVoiceCoachSessionClientContext({
+          snapshot: session.scenario_snapshot_json,
+          customerProfileId: session.customer_profile_id,
+          sceneCardId: session.scene_card_id,
+          sessionContext: session.session_context_json,
+        }),
       },
       turns: enriched,
       last_event_cursor: lastEventCursor,

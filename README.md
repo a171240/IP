@@ -4,8 +4,11 @@
 - **全量开发文档**：`docs/DEV_SPEC_FULL.md`
 - **小程序开发文档**：`docs/DEV_SPEC_MINIPROGRAM.md`
 - **当前进度/交接文档**：`docs/DEV_HANDOFF.md`
+- **小程序域名/部署拓扑必读**：`docs/VOICE_COACH_DOMAIN_TOPOLOGY.md`
 
-> 新电脑一眼指引：先看 `docs/DEV_HANDOFF.md` 的“接下来要完成什么（P0 未完成项）”。
+> 新电脑一眼指引：
+> 1. 先看 `docs/DEV_HANDOFF.md` 的“接下来要完成什么（P0 未完成项）”
+> 2. 如果这次要改小程序或语音教练，先看 `docs/VOICE_COACH_DOMAIN_TOPOLOGY.md`
 
 ---
 

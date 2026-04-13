@@ -180,7 +180,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
         const existingTurnId = String(existing.turn_id)
         const { data: existingTurn } = await supabase
           .from("voice_coach_turns")
-          .select("id, audio_path, audio_seconds")
+          .select("id, audio_path, audio_seconds, turn_index")
           .eq("id", existingTurnId)
           .eq("session_id", sessionId)
           .single()
@@ -205,6 +205,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
           server_advanced_stage: null,
           beautician_turn: {
             turn_id: existingTurnId,
+            turn_index: existingTurn?.turn_index ?? null,
             role: "beautician",
             text: "",
             audio_url: existingAudioUrl,
@@ -281,6 +282,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
       type: "turn.accepted",
       data: {
         turn_id: turnId,
+        turn_index: nextTurnIndex,
         job_id: jobId,
         audio_url: audioUrl,
         audio_seconds: formatDuration(clientAudioSeconds),
@@ -315,6 +317,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
       server_advanced_stage: advanced.stage,
       beautician_turn: {
         turn_id: turnId,
+        turn_index: nextTurnIndex,
         role: "beautician",
         text: "",
         audio_url: audioUrl,

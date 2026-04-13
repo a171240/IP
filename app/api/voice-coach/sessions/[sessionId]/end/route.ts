@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { checkVoiceCoachAccess } from "@/lib/voice-coach/guard.server"
-import { generateVoiceCoachReport, type VoiceCoachTurnRow } from "@/lib/voice-coach/report.server"
-import { getScenario } from "@/lib/voice-coach/scenarios"
+import { pumpVoiceCoachAnalysisJobs } from "@/lib/voice-coach/jobs.server"
+import { refreshVoiceCoachReport } from "@/lib/voice-coach/report-refresh"
 import { signVoiceCoachAudio } from "@/lib/voice-coach/storage.server"
+import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
@@ -17,16 +18,16 @@ async function signAudioExamples(report: any) {
   if (!Array.isArray(examples)) return report
 
   const signed = await Promise.all(
-    examples.map(async (ex: any) => {
-      const path = typeof ex?.audio_path === "string" ? ex.audio_path : ""
-      if (!path) return ex
+    examples.map(async (example: any) => {
+      const audioPath = typeof example?.audio_path === "string" ? example.audio_path : ""
+      if (!audioPath) return example
       try {
-        const url = await signVoiceCoachAudio(path)
-        return { ...ex, audio_url: url }
+        const audioUrl = await signVoiceCoachAudio(audioPath)
+        return { ...example, audio_url: audioUrl }
       } catch {
-        return ex
+        return example
       }
-    })
+    }),
   )
 
   return {
@@ -48,6 +49,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
     const mode = typeof body?.mode === "string" ? body.mode : "view_report"
 
     const supabase = await createServerSupabaseClientForRequest(request)
+    const admin = createAdminSupabaseClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -58,7 +60,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
 
     const { data: session, error: sessionError } = await supabase
       .from("voice_coach_sessions")
-      .select("id, scenario_id, status, report_json")
+      .select("id, scenario_id, status, ended_at")
       .eq("id", sessionId)
       .single()
     if (sessionError || !session) return jsonError(404, "session_not_found")
@@ -66,52 +68,71 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
     if (mode === "end_only") {
       const { error: updateError } = await supabase
         .from("voice_coach_sessions")
-        .update({ status: "ended", ended_at: new Date().toISOString() })
+        .update({ status: "ended", ended_at: session.ended_at || new Date().toISOString() })
         .eq("id", sessionId)
       if (updateError) return jsonError(500, "end_failed", { message: updateError.message })
       return NextResponse.json({ ok: true })
     }
 
-    // view_report
-    let report = session.report_json
+    const { report } = await refreshVoiceCoachReport({
+      markEnded: true,
+      ops: {
+        async fetchSession() {
+          const { data, error } = await supabase
+            .from("voice_coach_sessions")
+            .select("id, scenario_id, status, ended_at")
+            .eq("id", sessionId)
+            .single()
+          if (error || !data) return null
+          return data
+        },
+        async fetchTurns() {
+          const { data, error } = await supabase
+            .from("voice_coach_turns")
+            .select(
+              "id, role, text, emotion, audio_path, audio_seconds, asr_confidence, analysis_json, features_json, turn_index",
+            )
+            .eq("session_id", sessionId)
+            .order("turn_index", { ascending: true })
+          if (error) throw new Error(error.message || "turns_query_failed")
+          return (data || []) as any[]
+        },
+        async countPendingAnalysisJobs() {
+          const { count, error } = await admin
+            .from("voice_coach_jobs")
+            .select("id", { count: "exact", head: true })
+            .eq("session_id", sessionId)
+            .eq("user_id", user.id)
+            .eq("stage", "analysis_pending")
+            .in("status", ["queued", "processing"])
+          if (error) throw new Error(error.message || "analysis_jobs_count_failed")
+          return Number(count || 0)
+        },
+        async pumpAnalysisJobs({ maxJobs }) {
+          return pumpVoiceCoachAnalysisJobs({
+            sessionId,
+            userId: user.id,
+            maxJobs,
+          })
+        },
+        async saveReport({ report: nextReport, totalScore, dimensionScores, status, endedAt }) {
+          const payload: any = {
+            report_json: nextReport,
+            total_score: totalScore,
+            dimension_scores: dimensionScores,
+          }
+          if (status) payload.status = status
+          if (typeof endedAt === "string" && endedAt) payload.ended_at = endedAt
 
-    if (!report) {
-      const { data: turns, error: turnsError } = await supabase
-        .from("voice_coach_turns")
-        .select("id, role, text, emotion, audio_path, audio_seconds, asr_confidence, analysis_json, features_json, turn_index")
-        .eq("session_id", sessionId)
-        .order("turn_index", { ascending: true })
-      if (turnsError) return jsonError(500, "turns_query_failed", { message: turnsError.message })
-
-      const scenario = getScenario(session.scenario_id)
-      report = generateVoiceCoachReport({
-        scenario,
-        turns: (turns || []) as unknown as VoiceCoachTurnRow[],
-      })
-
-      const dimensionScores: Record<string, number> = {}
-      for (const d of report.dimension || []) {
-        if (d && typeof d.id === "string" && typeof d.score === "number") {
-          dimensionScores[d.id] = d.score
-        }
-      }
-
-      const { error: saveError } = await supabase
-        .from("voice_coach_sessions")
-        .update({
-          status: "ended",
-          ended_at: new Date().toISOString(),
-          report_json: report,
-          total_score: report.total_score,
-          dimension_scores: dimensionScores,
-        })
-        .eq("id", sessionId)
-      if (saveError) return jsonError(500, "report_save_failed", { message: saveError.message })
-    }
+          const { error } = await supabase.from("voice_coach_sessions").update(payload).eq("id", sessionId)
+          if (error) throw new Error(error.message || "report_save_failed")
+        },
+      },
+    })
 
     const hydrated = await signAudioExamples(report)
     return NextResponse.json({ report: hydrated })
-  } catch (err: any) {
-    return jsonError(500, "voice_coach_error", { message: err?.message || String(err) })
+  } catch (error: any) {
+    return jsonError(500, "voice_coach_error", { message: error?.message || String(error) })
   }
 }

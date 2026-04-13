@@ -36,16 +36,16 @@ export const ChartSchema = z.object({
 
 export type Chart = z.infer<typeof ChartSchema>
 
+const SubmetricSchema = z.object({
+  name: z.string(),
+  status: z.string(),
+  stars: z.number(),
+  advice_paragraph: z.string(),
+})
+
 export const ReportPersuasionTabSchema = z.object({
-  title: z.literal("说服力"),
-  submetrics: z.array(
-    z.object({
-      name: z.string(),
-      status: z.string(),
-      stars: z.number(),
-      advice_paragraph: z.string(),
-    })
-  ),
+  title: z.string().min(1),
+  submetrics: z.array(SubmetricSchema),
   tags: z.array(z.string()),
   customer_objection: z.string(),
   your_response: z.string(),
@@ -55,15 +55,8 @@ export const ReportPersuasionTabSchema = z.object({
 export type ReportPersuasionTab = z.infer<typeof ReportPersuasionTabSchema>
 
 export const ReportFluencyTabSchema = z.object({
-  title: z.literal("流利度"),
-  submetrics: z.array(
-    z.object({
-      name: z.string(),
-      status: z.string(),
-      stars: z.number(),
-      advice_paragraph: z.string(),
-    })
-  ),
+  title: z.string().min(1),
+  submetrics: z.array(SubmetricSchema),
   avg_speed_wpm: z.number().nullable(),
   target_speed_range: z.tuple([z.number(), z.number()]),
   charts: z.array(ChartSchema),
@@ -72,15 +65,8 @@ export const ReportFluencyTabSchema = z.object({
 export type ReportFluencyTab = z.infer<typeof ReportFluencyTabSchema>
 
 export const ReportExpressionTabSchema = z.object({
-  title: z.literal("语言表达"),
-  submetrics: z.array(
-    z.object({
-      name: z.string(),
-      status: z.string(),
-      stars: z.number(),
-      advice_paragraph: z.string(),
-    })
-  ),
+  title: z.string().min(1),
+  submetrics: z.array(SubmetricSchema),
   filler_ratio: z.number().nullable(),
   charts: z.array(ChartSchema),
 })
@@ -88,15 +74,8 @@ export const ReportExpressionTabSchema = z.object({
 export type ReportExpressionTab = z.infer<typeof ReportExpressionTabSchema>
 
 export const ReportPronunciationTabSchema = z.object({
-  title: z.literal("发音准确度"),
-  submetrics: z.array(
-    z.object({
-      name: z.string(),
-      status: z.string(),
-      stars: z.number(),
-      advice_paragraph: z.string(),
-    })
-  ),
+  title: z.string().min(1),
+  submetrics: z.array(SubmetricSchema),
   charts: z.array(ChartSchema),
 })
 
@@ -106,30 +85,37 @@ export const AudioExampleSchema = z.object({
   turn_id: z.string(),
   audio_path: z.string(),
   audio_seconds: z.number().nullable(),
+  audio_url: z.string().optional(),
 })
 
 export type AudioExample = z.infer<typeof AudioExampleSchema>
 
 export const ReportOrganizationTabSchema = z.object({
-  title: z.literal("语言组织"),
-  submetrics: z.array(
-    z.object({
-      name: z.string(),
-      status: z.string(),
-      stars: z.number(),
-      advice_paragraph: z.string(),
-    })
-  ),
+  title: z.string().min(1),
+  submetrics: z.array(SubmetricSchema),
   advice_paragraph: z.string(),
   audio_examples: z.array(AudioExampleSchema),
 })
 
 export type ReportOrganizationTab = z.infer<typeof ReportOrganizationTabSchema>
 
+export const VoiceCoachReportMetaSchema = z.object({
+  version: z.literal("v2"),
+  generated_at: z.string(),
+  total_turn_count: z.number().int().nonnegative(),
+  total_beautician_turn_count: z.number().int().nonnegative(),
+  analyzed_beautician_turn_count: z.number().int().nonnegative(),
+  is_complete: z.boolean(),
+  representative_turn_id: z.string().nullable(),
+  organization_example_turn_ids: z.array(z.string()),
+})
+
+export type VoiceCoachReportMeta = z.infer<typeof VoiceCoachReportMetaSchema>
+
 export const VoiceCoachReportSchema = z.object({
   total_score: z.number(),
-  dimension: z.array(DimensionScoreSchema),
-  summary_blocks: z.array(z.string()),
+  dimension: z.array(DimensionScoreSchema).length(5),
+  summary_blocks: z.array(z.string()).length(3),
   tabs: z.object({
     persuasion: ReportPersuasionTabSchema,
     fluency: ReportFluencyTabSchema,
@@ -137,7 +123,7 @@ export const VoiceCoachReportSchema = z.object({
     pronunciation: ReportPronunciationTabSchema,
     organization: ReportOrganizationTabSchema,
   }),
+  meta: VoiceCoachReportMetaSchema.optional(),
 })
 
 export type VoiceCoachReport = z.infer<typeof VoiceCoachReportSchema>
-

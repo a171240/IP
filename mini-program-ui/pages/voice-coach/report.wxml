@@ -1,4 +1,4 @@
-<view class="page">
+<view class="page vc-page vc-report-page">
   <view class="seg">
     <view class="seg-item {{activeSegment === 'report' ? 'active' : ''}}" data-seg="report" bindtap="setSegment">
       报告
@@ -8,109 +8,200 @@
     </view>
   </view>
 
-  <scroll-view
-    class="content"
-    scroll-y="true"
-    scroll-top="{{reportScrollTop}}"
-    scroll-into-view="{{reportScrollIntoView}}"
-    enhanced="true"
-    bounces="false"
-    show-scrollbar="false"
-  >
-    <view wx:if="{{activeSegment === 'report' && report}}">
-      <view class="headline">恭喜完成练习，这是为您生成的评测报告：</view>
+  <view class="content">
+    <view wx:if="{{activeSegment === 'report' && report}}" class="report-shell">
+      <view class="report-hero fade-up">
+        <view class="report-hero-copy">
+          <text class="eyebrow">训练完成 · 评测档案</text>
 
-      <view class="score-card">
-        <view class="score-card-top">
-          <view class="score-left">
-            <view class="score-label">总得分</view>
-            <view class="score-line">
-              <text class="score">{{animatedScore}}</text>
-              <text class="score-suffix">/100</text>
+          <view class="hero-head">
+            <view class="hero-score-wrap">
+              <view class="hero-score-row">
+                <text class="hero-score">{{animatedScore}}</text>
+                <text class="hero-score-suffix">/100</text>
+              </view>
+              <text class="hero-grade">
+                {{report.total_score >= 85 ? '进入稳定成交区间' : report.total_score >= 70 ? '表达框架已经成型' : '关键表达仍需继续打磨'}}
+              </text>
+              <text class="hero-subtitle">这是本次练习的五维表现、重点洞察和逐项拆解。</text>
             </view>
-            <view class="score-note">五维表现总览</view>
+
+            <view class="hero-pill">Atelier Report</view>
           </view>
-          <view class="score-pill">五维评估</view>
+
+          <view class="hero-chip-row">
+            <block wx:for="{{report.hero_highlights}}" wx:key="label">
+              <view class="hero-chip">
+                <text class="hero-chip-label">{{item.label}}</text>
+                <text class="hero-chip-value">{{item.value}}</text>
+              </view>
+            </block>
+          </view>
         </view>
-        <view class="score-visual">
-          <canvas
-            canvas-id="radarCanvas"
-            class="radar"
-            style="width: {{radarCanvasSize}}px; height: {{radarCanvasSize}}px;"
-            width="{{radarCanvasSize}}"
-            height="{{radarCanvasSize}}"
-          ></canvas>
+
+        <view class="hero-visual">
+          <view class="hero-visual-card">
+            <view class="hero-visual-head">
+              <text class="hero-visual-title">五维表现总览</text>
+              <text class="hero-visual-note">{{report.dimension.length}}维评估</text>
+            </view>
+            <view id="radarStage" class="hero-radar-stage" style="height: {{radarCanvasSize}}px;">
+              <canvas
+                id="radarCanvas"
+                type="2d"
+                class="radar"
+                style="height: {{radarCanvasSize}}px;"
+              ></canvas>
+            </view>
+          </view>
         </view>
       </view>
 
-      <view class="dims">
-        <block wx:for="{{report.dimension}}" wx:key="id">
-          <view class="dim-row">
-            <view class="dim-row-top">
-              <text class="dim-name">{{item.name}}</text>
-              <view class="dim-meta">
-                <text class="dim-score-pill">{{item.score}}分</text>
-                <text class="dim-stars">{{item.stars_text}}</text>
+      <view wx:if="{{sessionContext.sceneName || sessionContext.customerName || sessionContext.summaryLines.length}}" class="section report-section fade-up delay-1">
+        <view class="section-head">
+          <text class="section-kicker">Training Context</text>
+          <text class="section-title report-section-title">本次训练背景</text>
+        </view>
+
+        <view class="context-card">
+          <view class="row space-between">
+            <view>
+              <text class="context-card-title">{{sessionContext.sceneName || '本次训练'}}</text>
+              <text wx:if="{{sessionContext.customerName}}" class="context-card-meta">
+                顾客：{{sessionContext.customerName}}{{sessionContext.customerSummary ? ' · ' + sessionContext.customerSummary : ''}}
+              </text>
+            </view>
+            <text wx:if="{{sessionContext.sceneKindLabel}}" class="tag tag-accent">{{sessionContext.sceneKindLabel}}</text>
+          </view>
+
+          <text wx:if="{{sessionContext.serviceName}}" class="context-card-meta">项目：{{sessionContext.serviceName}}</text>
+          <text wx:if="{{sessionContext.liveNotes}}" class="context-card-meta">补充：{{sessionContext.liveNotes}}</text>
+
+          <view wx:if="{{sessionContext.summaryLines.length}}" class="context-points">
+            <view class="context-point" wx:for="{{sessionContext.summaryLines}}" wx:key="index">
+              <view class="context-point-dot"></view>
+              <text class="context-point-text">{{item}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <view class="section report-section fade-up delay-1">
+        <view class="section-head">
+          <text class="section-kicker">Scorecards</text>
+          <text class="section-title report-section-title">五维度表现</text>
+        </view>
+
+        <view class="dimension-list">
+          <block wx:for="{{report.dimension}}" wx:key="id">
+            <view class="dimension-card">
+              <view class="dimension-card-head">
+                <view class="dimension-card-copy">
+                  <text class="dimension-name">{{item.name}}</text>
+                  <text class="dimension-stars">{{item.stars_text}}</text>
+                </view>
+                <view class="dimension-score-wrap">
+                  <text class="dimension-score">{{item.score}}</text>
+                  <text class="dimension-score-unit">分</text>
+                </view>
+              </view>
+              <view class="dimension-track">
+                <view
+                  class="dimension-fill"
+                  style="width: {{item.score}}%; background: {{item.score >= 80 ? 'var(--vc-success, #95ec69)' : item.score >= 60 ? 'var(--vc-gold, #e5d3b3)' : '#ff7b7b'}}"
+                ></view>
               </view>
             </view>
-            <view class="dim-bar-track">
-              <view class="dim-bar-fill" style="width: {{item.score}}%; background: {{item.score >= 80 ? 'var(--vc-green, #95ec69)' : item.score >= 60 ? 'var(--vc-gold, #f6c76f)' : '#ff5858'}}"></view>
-            </view>
-          </view>
-        </block>
+          </block>
+        </view>
       </view>
 
-      <view class="summary">
-        <view class="summary-title">练习总结</view>
-        <block wx:for="{{report.summary_blocks}}" wx:key="*this">
-          <view class="summary-line">{{item}}</view>
-        </block>
+      <view class="section report-section fade-up delay-2">
+        <view class="section-head">
+          <text class="section-kicker">Insights</text>
+          <text class="section-title report-section-title">练习总结</text>
+        </view>
+
+        <view class="insight-card">
+          <block wx:for="{{report.summary_blocks}}" wx:key="index" wx:for-index="index">
+            <view class="insight-item">
+              <view class="insight-index">{{index + 1}}</view>
+              <text class="insight-text">{{item}}</text>
+            </view>
+          </block>
+        </view>
+      </view>
+
+      <view wx:if="{{report.meta && report.meta.is_complete === false}}" class="section report-section fade-up delay-2">
+        <view class="insight-card">
+          <view class="insight-item">
+            <view class="insight-index">!</view>
+            <text class="insight-text">报告基于当前已完成分析生成，剩余分析完成后再次打开会自动刷新。</text>
+          </view>
+        </view>
       </view>
 
       <view id="report-tab-anchor"></view>
-      <view class="tabs-wrap">
-        <view class="tabs">
-          <block wx:for="{{tabItems}}" wx:key="id">
-            <view class="tab {{activeTab === item.id ? 'active' : ''}}" data-tab="{{item.id}}" bindtap="setTab">{{item.label}}</view>
-          </block>
-          <view class="tab-indicator" style="transform: translateX({{activeTabIndex * 100}}%);"></view>
+      <view class="tabs-wrap fade-up delay-2">
+        <view class="tabs-shell">
+          <text class="tabs-label">深度拆解</text>
+          <view class="tabs">
+            <block wx:for="{{tabItems}}" wx:key="id">
+              <view class="tab {{activeTab === item.id ? 'active' : ''}}" data-tab="{{item.id}}" bindtap="setTab">{{item.label}}</view>
+            </block>
+            <view class="tab-indicator" style="transform: translateX({{activeTabIndex * 100}}%);"></view>
+          </view>
         </view>
-        <view class="current-tab-title">当前：{{currentTabTitle}}</view>
       </view>
 
       <view class="tab-body">
-        <view wx:if="{{activeTab === 'persuasion'}}">
-          <view class="tab-title">说服力</view>
-          <view class="metric-card">
-            <view class="metric-row">
-              <view class="metric-name">异议处理</view>
-              <view class="metric-status">{{report.tabs.persuasion.submetrics[0].status}}</view>
+        <view wx:if="{{activeTab === 'persuasion'}}" class="tab-panel">
+          <view class="tab-panel-head">
+            <text class="section-kicker">Dimension Analysis</text>
+            <text class="tab-title">本场关键异议复盘</text>
+            <text class="tab-desc">聚焦最值得复盘的一轮异议回应，检查你是否先接住顾客担心，再补证据并推进下一步。</text>
+          </view>
+
+          <view wx:if="{{report.tabs.persuasion.submetrics && report.tabs.persuasion.submetrics.length}}" class="analysis-feature">
+            <view class="analysis-feature-top">
+              <text class="analysis-feature-label">核心判断</text>
+              <text class="metric-status">{{report.tabs.persuasion.submetrics[0].status}}</text>
             </view>
-            <view class="metric-text">{{report.tabs.persuasion.submetrics[0].advice_paragraph}}</view>
-            <view class="tag-row">
-              <view class="tag" wx:for="{{report.tabs.persuasion.tags}}" wx:key="*this">{{item}}</view>
-            </view>
+            <text class="analysis-feature-title">异议处理</text>
+            <text class="metric-text">{{report.tabs.persuasion.submetrics[0].advice_paragraph}}</text>
           </view>
 
           <view class="qa-card">
-            <view class="compare-card-objection">
+            <view class="compare-card compare-card-objection">
               <view class="qa-title">客户异议</view>
               <view class="qa-text">{{report.tabs.persuasion.customer_objection}}</view>
             </view>
-            <view class="compare-card-yours">
+            <view class="compare-card compare-card-yours">
               <view class="qa-title">你的应对</view>
               <view class="qa-text">{{report.tabs.persuasion.your_response}}</view>
             </view>
-            <view class="compare-card-improved">
+            <view class="compare-card compare-card-improved">
               <view class="qa-title">改进润色</view>
               <view class="qa-text">{{report.tabs.persuasion.improved_response}}</view>
             </view>
           </view>
+
+          <view wx:if="{{report.tabs.persuasion.tags && report.tabs.persuasion.tags.length}}" class="tag-support-card">
+            <text class="support-title">辅助提示</text>
+            <view class="tag-row">
+              <view class="tag" wx:for="{{report.tabs.persuasion.tags}}" wx:key="*this">{{item}}</view>
+            </view>
+          </view>
         </view>
 
-        <view wx:if="{{activeTab === 'fluency'}}">
-          <view class="tab-title">流利度</view>
+        <view wx:if="{{activeTab === 'fluency'}}" class="tab-panel">
+          <view class="tab-panel-head">
+            <text class="section-kicker">Dimension Analysis</text>
+            <text class="tab-title">流利度</text>
+            <text class="tab-desc">先看表达是否顺畅，再看趋势是否稳定，帮助你识别卡顿和节奏波动。</text>
+          </view>
 
+          <text class="panel-block-title">关键洞察</text>
           <block wx:for="{{report.tabs.fluency.submetrics}}" wx:key="index">
             <view class="metric-card">
               <view class="metric-row">
@@ -121,18 +212,21 @@
             </view>
           </block>
 
+          <text class="panel-block-title">趋势观察</text>
           <block wx:for="{{report.tabs.fluency.charts}}" wx:key="id">
             <view wx:if="{{item.points && item.points.length >= 2}}" class="linechart-card">
               <view class="chart-card-head">
                 <view class="chart-card-title">{{item.label}}</view>
+                <view class="chart-card-note">轮次趋势</view>
               </view>
-              <canvas
-                canvas-id="{{item.canvas_id}}"
-                class="linechart-canvas"
-                style="width: {{lineChartWidth}}px; height: {{lineChartHeight}}px;"
-                width="{{lineChartWidth}}"
-                height="{{lineChartHeight}}"
-              ></canvas>
+              <view id="{{item.canvas_id}}Stage" class="linechart-stage" style="height: {{lineChartHeight}}px;">
+                <canvas
+                  id="{{item.canvas_id}}"
+                  type="2d"
+                  class="linechart-canvas"
+                  style="height: {{lineChartHeight}}px;"
+                ></canvas>
+              </view>
             </view>
             <view wx:else class="chart-empty">
               <view class="chart-empty-title">{{item.label}}</view>
@@ -141,9 +235,14 @@
           </block>
         </view>
 
-        <view wx:if="{{activeTab === 'expression'}}">
-          <view class="tab-title">语言表达</view>
+        <view wx:if="{{activeTab === 'expression'}}" class="tab-panel">
+          <view class="tab-panel-head">
+            <text class="section-kicker">Dimension Analysis</text>
+            <text class="tab-title">语言表达</text>
+            <text class="tab-desc">聚焦你的措辞、句式和表达完整度，判断是否足够自然、清晰、容易被接受。</text>
+          </view>
 
+          <text class="panel-block-title">关键洞察</text>
           <block wx:for="{{report.tabs.expression.submetrics}}" wx:key="index">
             <view class="metric-card">
               <view class="metric-row">
@@ -154,18 +253,21 @@
             </view>
           </block>
 
+          <text class="panel-block-title">趋势观察</text>
           <block wx:for="{{report.tabs.expression.charts}}" wx:key="id">
             <view wx:if="{{item.points && item.points.length >= 2}}" class="linechart-card">
               <view class="chart-card-head">
                 <view class="chart-card-title">{{item.label}}</view>
+                <view class="chart-card-note">轮次趋势</view>
               </view>
-              <canvas
-                canvas-id="{{item.canvas_id}}"
-                class="linechart-canvas"
-                style="width: {{lineChartWidth}}px; height: {{lineChartHeight}}px;"
-                width="{{lineChartWidth}}"
-                height="{{lineChartHeight}}"
-              ></canvas>
+              <view id="{{item.canvas_id}}Stage" class="linechart-stage" style="height: {{lineChartHeight}}px;">
+                <canvas
+                  id="{{item.canvas_id}}"
+                  type="2d"
+                  class="linechart-canvas"
+                  style="height: {{lineChartHeight}}px;"
+                ></canvas>
+              </view>
             </view>
             <view wx:else class="chart-empty">
               <view class="chart-empty-title">{{item.label}}</view>
@@ -174,9 +276,14 @@
           </block>
         </view>
 
-        <view wx:if="{{activeTab === 'pronunciation'}}">
-          <view class="tab-title">发音准确度</view>
+        <view wx:if="{{activeTab === 'pronunciation'}}" class="tab-panel">
+          <view class="tab-panel-head">
+            <text class="section-kicker">Dimension Analysis</text>
+            <text class="tab-title">发音准确度</text>
+            <text class="tab-desc">从清晰度和稳定性拆解语音输出，让你的表达不仅有内容，也能被听得更清楚。</text>
+          </view>
 
+          <text class="panel-block-title">关键洞察</text>
           <block wx:for="{{report.tabs.pronunciation.submetrics}}" wx:key="index">
             <view class="metric-card">
               <view class="metric-row">
@@ -187,18 +294,21 @@
             </view>
           </block>
 
+          <text class="panel-block-title">趋势观察</text>
           <block wx:for="{{report.tabs.pronunciation.charts}}" wx:key="id">
             <view wx:if="{{item.points && item.points.length >= 2}}" class="linechart-card">
               <view class="chart-card-head">
                 <view class="chart-card-title">{{item.label}}</view>
+                <view class="chart-card-note">轮次趋势</view>
               </view>
-              <canvas
-                canvas-id="{{item.canvas_id}}"
-                class="linechart-canvas"
-                style="width: {{lineChartWidth}}px; height: {{lineChartHeight}}px;"
-                width="{{lineChartWidth}}"
-                height="{{lineChartHeight}}"
-              ></canvas>
+              <view id="{{item.canvas_id}}Stage" class="linechart-stage" style="height: {{lineChartHeight}}px;">
+                <canvas
+                  id="{{item.canvas_id}}"
+                  type="2d"
+                  class="linechart-canvas"
+                  style="height: {{lineChartHeight}}px;"
+                ></canvas>
+              </view>
             </view>
             <view wx:else class="chart-empty">
               <view class="chart-empty-title">{{item.label}}</view>
@@ -207,10 +317,14 @@
           </block>
         </view>
 
-        <view wx:if="{{activeTab === 'organization'}}">
-          <view class="tab-title">语言组织能力</view>
+        <view wx:if="{{activeTab === 'organization'}}" class="tab-panel">
+          <view class="tab-panel-head">
+            <text class="section-kicker">Dimension Analysis</text>
+            <text class="tab-title">语言组织能力</text>
+            <text class="tab-desc">这一部分聚焦逻辑顺序、内容连接和可复述性，帮助你把表达做得更有结构。</text>
+          </view>
 
-          <view class="metric-card">
+          <view wx:if="{{report.tabs.organization.submetrics && report.tabs.organization.submetrics.length}}" class="metric-card">
             <view class="metric-row">
               <view class="metric-name">逻辑性</view>
               <view class="metric-status">{{report.tabs.organization.submetrics[0].status}}</view>
@@ -218,18 +332,27 @@
             <view class="metric-text">{{report.tabs.organization.submetrics[0].advice_paragraph}}</view>
           </view>
 
-          <view class="metric-card">
+          <view class="metric-card narrative-card">
             <view class="metric-text">{{report.tabs.organization.advice_paragraph}}</view>
           </view>
 
-          <view class="audio-list" wx:if="{{report.tabs.organization.audio_examples.length}}">
-            <view class="audio-title">自己录制的音频</view>
-            <block wx:for="{{report.tabs.organization.audio_examples}}" wx:key="turn_id">
+          <view wx:if="{{report.tabs.organization.audio_examples.length}}" class="audio-list">
+            <view class="audio-title">优先回听片段</view>
+            <block wx:for="{{report.tabs.organization.audio_examples}}" wx:key="turn_id" wx:for-index="index">
               <view class="audio-item">
-                <button class="audio-play" size="mini" bindtap="playExample" data-url="{{item.audio_url}}" data-id="{{item.turn_id}}">
-                  播放
+                <view class="audio-item-main">
+                  <text class="audio-item-label">录音片段 {{index + 1}}</text>
+                  <text class="audio-meta">{{item.audio_seconds_text}}</text>
+                </view>
+                <button
+                  class="audio-play {{playingId === item.turn_id ? 'is-playing' : ''}}"
+                  size="mini"
+                  bindtap="playExample"
+                  data-url="{{item.audio_url}}"
+                  data-id="{{item.turn_id}}"
+                >
+                  {{playingId === item.turn_id ? '暂停' : '播放'}}
                 </button>
-                <view class="audio-meta">{{item.audio_seconds_text}}</view>
               </view>
             </block>
           </view>
@@ -238,29 +361,57 @@
 
       <view class="bottom-space"></view>
     </view>
+
     <view wx:if="{{activeSegment === 'report' && !report}}" class="loading-empty">
-      报告生成中，请稍候...
+      <view class="loading-card">
+        <text class="loading-title">报告生成中</text>
+        <text class="loading-copy">系统正在整理本次练习的评测结果，请稍候片刻。</text>
+      </view>
     </view>
 
     <view wx:if="{{activeSegment === 'chat'}}" class="chat-view">
-      <block wx:for="{{turns}}" wx:key="id">
-        <view class="row {{item.role === 'customer' ? 'left' : 'right'}}">
-          <view wx:if="{{item.role === 'customer'}}" class="avatar avatar-customer">客</view>
-          <view class="bubble {{item.role === 'customer' ? 'bubble-customer' : 'bubble-beautician'}}">
-            <view class="voice" wx:if="{{item.audio_url}}">
-              <view class="voice-bar" bindtap="onPlay" data-id="{{item.id}}" data-url="{{item.audio_url}}">
-                <text class="voice-label">播放</text>
-                <text class="voice-dur">{{item.audio_seconds_text}}</text>
+      <view class="chat-hero fade-up">
+        <text class="eyebrow">对话回放</text>
+        <text class="chat-title">完整复盘记录</text>
+        <text class="chat-subtitle">保留原始语音与文本内容，方便对照报告逐句回看。</text>
+      </view>
+
+      <view class="chat-timeline">
+        <block wx:for="{{turns}}" wx:key="id">
+          <view class="chat-row {{item.role === 'customer' ? 'chat-row-customer' : 'chat-row-beautician'}}">
+            <view class="chat-avatar-rail {{item.role === 'customer' ? 'chat-avatar-rail-left' : 'chat-avatar-rail-right'}}">
+              <image
+                class="chat-avatar-image"
+                src="{{item.role === 'customer' ? '/assets/voice-coach/avatar-customer.png' : '/assets/voice-coach/avatar-self.png'}}"
+                mode="aspectFill"
+              />
+            </view>
+
+            <view class="chat-main">
+              <text class="chat-role-label">{{item.role === 'customer' ? '客户原话' : '你的回应'}}</text>
+              <view class="chat-bubble {{item.role === 'customer' ? 'chat-bubble-customer' : 'chat-bubble-beautician'}}">
+                <view wx:if="{{item.audio_url}}" class="chat-audio">
+                  <view
+                    class="chat-audio-pill {{playingId === item.id ? 'is-playing' : ''}}"
+                    bindtap="onPlay"
+                    data-id="{{item.id}}"
+                    data-url="{{item.audio_url}}"
+                  >
+                    <text class="chat-audio-state">{{playingId === item.id ? '暂停' : '播放'}}</text>
+                    <view class="chat-audio-dot"></view>
+                    <text class="chat-audio-dur">{{item.audio_seconds_text}}</text>
+                  </view>
+                </view>
+                <view class="chat-msg-text">{{item.text}}</view>
               </view>
             </view>
-            <view class="msg-text">{{item.text}}</view>
           </view>
-          <view wx:if="{{item.role === 'beautician'}}" class="avatar avatar-beautician">我</view>
-        </view>
-      </block>
-      <view class="bottom-space"></view>
+        </block>
+
+        <view class="bottom-space"></view>
+      </view>
     </view>
-  </scroll-view>
+  </view>
 
   <view class="cta">
     <button class="again-btn" bindtap="startAgain">再来一次</button>

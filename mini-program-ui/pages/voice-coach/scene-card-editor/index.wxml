@@ -1,0 +1,145 @@
+<view class="page vc-page vc-editor-page">
+  <view class="container">
+    <view class="hero fade-up">
+      <text class="eyebrow">Scene Editor</text>
+      <text class="title">把这轮训练任务定义到位</text>
+      <text class="subtitle">场景卡负责提前收束训练焦点，让这轮练的是同一类问题，而不是一会儿练专业解释，一会儿又跳去无关异议。</text>
+
+      <view class="tips-row">
+        <view class="tips-pill">一张卡只练一个主目标</view>
+        <view class="tips-pill">问题与异议分开写</view>
+        <view class="tips-pill">禁忌表达必须明确</view>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-1">
+      <view class="section-head">
+        <text class="section-kicker">Base</text>
+        <text class="section-title">基础信息</text>
+        <text class="section-caption">先说清场景名称、训练类型、关联项目和顾客阶段。</text>
+      </view>
+
+      <view class="card">
+        <view class="field-stack">
+          <view class="field-block">
+            <text class="field-label">场景卡名称</text>
+            <text class="field-help">例如：明天到店水光护理、新项目胶原护理首推。</text>
+            <input class="input" placeholder="例如：明天到店水光护理 / 新项目胶原护理首推" value="{{name}}" bindinput="onName" />
+          </view>
+
+          <view class="field-block">
+            <text class="field-label">训练类型</text>
+            <text class="field-help">区分这是到店顾客训练，还是新项目推广训练。</text>
+            <picker mode="selector" range="{{sceneKindOptions}}" range-key="label" value="{{sceneKindIndex}}" bindchange="onSceneKindChange">
+              <view class="input picker-input">{{sceneKindOptions[sceneKindIndex].label}}</view>
+            </picker>
+          </view>
+
+          <view class="field-block">
+            <text class="field-label">关联项目</text>
+            <text class="field-help">例如：补水护理、胶原抗衰、清洁管理。</text>
+            <input class="input" placeholder="例如：补水护理 / 胶原抗衰 / 清洁管理" value="{{serviceName}}" bindinput="onServiceName" />
+          </view>
+
+          <view class="field-block">
+            <text class="field-label">顾客阶段</text>
+            <text class="field-help">例如：首次到店、有兴趣但犹豫、老顾客复购前。</text>
+            <input class="input" placeholder="例如：首次到店 / 有兴趣但犹豫 / 老顾客复购前" value="{{customerStage}}" bindinput="onCustomerStage" />
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-1">
+      <view class="section-head">
+        <text class="section-kicker">Goal</text>
+        <text class="section-title">训练目标</text>
+        <text class="section-caption">这里决定这轮要练哪些环节，不要把所有问题都塞进一张卡里。</text>
+      </view>
+
+      <view class="card">
+        <view class="field-stack">
+          <view class="field-block">
+            <text class="field-label">场景目标</text>
+            <text class="field-help">例如：练习如何把项目讲专业，但不过度推销；重点练破冰和异议处理。</text>
+            <textarea class="input textarea" placeholder="例如：练习如何把项目讲专业，但不过度推销；重点练破冰和异议处理" value="{{sceneGoal}}" bindinput="onSceneGoal" />
+          </view>
+
+          <view class="field-block">
+            <text class="field-label">重点环节</text>
+            <text class="field-help">每行一条，例如：启动破冰、需求深挖、现场异议。</text>
+            <textarea class="input textarea" placeholder="每行一条，例如：启动破冰 / 需求深挖 / 现场异议" value="{{focusStages}}" bindinput="onFocusStages" />
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-2">
+      <view class="section-head">
+        <text class="section-kicker">Questions</text>
+        <text class="section-title">顾客会问什么、会卡在哪里</text>
+        <text class="section-caption">把专业问题和典型异议分开写，训练时顾客会更自然地推进。</text>
+      </view>
+
+      <view class="card">
+        <view class="field-stack">
+          <view class="field-block">
+            <text class="field-label">高频问题</text>
+            <text class="field-help">每行一条，例如：这项目原理是什么、会不会刺激、需要做几次。</text>
+            <textarea class="input textarea" placeholder="每行一条，例如：这项目原理是什么 / 会不会刺激 / 需要做几次" value="{{likelyQuestions}}" bindinput="onLikelyQuestions" />
+          </view>
+
+          <view class="field-block">
+            <text class="field-label">重点异议</text>
+            <text class="field-help">每行一条，例如：太贵了、怕没效果、我再考虑一下。</text>
+            <textarea class="input textarea" placeholder="每行一条，例如：太贵了 / 怕没效果 / 我再考虑一下" value="{{targetObjections}}" bindinput="onTargetObjections" />
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-2">
+      <view class="section-head">
+        <text class="section-kicker">Method</text>
+        <text class="section-title">沟通方法与边界</text>
+        <text class="section-caption">这里写的是训练时必须坚持的方式，不是标准答案。</text>
+      </view>
+
+      <view class="card">
+        <view class="field-stack">
+          <view class="field-block">
+            <text class="field-label">推荐方法标签</text>
+            <text class="field-help">每行一条，例如：结构化倾听、反向叙述、Feel Felt Found。</text>
+            <textarea class="input textarea" placeholder="每行一条，例如：结构化倾听 / 反向叙述 / Feel Felt Found" value="{{communicationMethodTags}}" bindinput="onCommunicationMethodTags" />
+          </view>
+
+          <view class="field-block">
+            <text class="field-label">必须覆盖点</text>
+            <text class="field-help">每行一条，例如：先接情绪、说清恢复期、不承诺立刻见效。</text>
+            <textarea class="input textarea" placeholder="每行一条，例如：先接情绪 / 说清恢复期 / 不承诺立刻见效" value="{{mustCoverPoints}}" bindinput="onMustCoverPoints" />
+          </view>
+
+          <view class="field-block">
+            <text class="field-label">禁忌表达</text>
+            <text class="field-help">每行一条，例如：今天不做就更严重、错过今天就没机会、我替你决定。</text>
+            <textarea class="input textarea" placeholder="每行一条，例如：今天不做就更严重 / 错过今天就没机会 / 我替你决定" value="{{doNotSay}}" bindinput="onDoNotSay" />
+          </view>
+
+          <view class="field-block">
+            <text class="field-label">补充备注</text>
+            <text class="field-help">例如：门店近期主推原因、团队常见误区、这轮特别提醒。</text>
+            <textarea class="input textarea" placeholder="例如：门店近期主推原因、团队常见误区、这轮特别提醒" value="{{notes}}" bindinput="onNotes" />
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="section fade-up delay-2">
+      <view class="footer-cta-card">
+        <text class="tips-title">保存后，这张卡就能直接进入训练配置</text>
+        <text class="tips-copy">场景卡写得越清楚，训练越不会跑偏。</text>
+        <button class="btn-primary" loading="{{saving}}" disabled="{{saving}}" bindtap="handleSave">保存场景卡</button>
+      </view>
+    </view>
+  </view>
+</view>
