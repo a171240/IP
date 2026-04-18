@@ -65,6 +65,20 @@ page,
   letter-spacing: 0.2rpx;
 }
 
+.vc-page-scroll-shell {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.vc-page .page-scroll {
+  width: 100%;
+  height: 100%;
+}
+
+.vc-page .page-scroll .container {
+  min-height: 100%;
+}
+
 .vc-home-page {
   background:
     radial-gradient(120% 120% at 0% 0%, rgba(215, 191, 150, 0.16) 0%, rgba(6, 7, 10, 0) 48%),
@@ -86,6 +100,14 @@ page,
   padding: 32rpx 24rpx calc(170rpx + env(safe-area-inset-bottom));
   position: relative;
   z-index: 1;
+}
+
+/* Setup/list/editor pages do not have a fixed bottom bar. Keep the scroll area tight. */
+.vc-home-page .container,
+.vc-setup-page .container,
+.vc-library-page .container,
+.vc-editor-page .container {
+  padding-bottom: calc(40rpx + env(safe-area-inset-bottom));
 }
 
 .vc-page .title,
@@ -129,7 +151,7 @@ page,
 }
 
 .vc-page .section {
-  margin-top: 30rpx;
+  margin-top: 22rpx;
 }
 
 .vc-page .section-head {
@@ -170,58 +192,30 @@ page,
 .vc-page .tips-card {
   position: relative;
   overflow: hidden;
-  border-radius: 32rpx;
+  border-radius: 24rpx;
   border: 1rpx solid rgba(255, 255, 255, 0.08);
   background:
-    radial-gradient(130% 150% at 0% 0%, rgba(215, 191, 150, 0.12) 0%, rgba(255, 255, 255, 0) 54%),
+    radial-gradient(130% 150% at 0% 0%, rgba(215, 191, 150, 0.08) 0%, rgba(255, 255, 255, 0) 54%),
     linear-gradient(180deg, rgba(17, 21, 29, 0.96) 0%, rgba(11, 14, 20, 0.96) 100%);
-  box-shadow: var(--vc-shadow-md), inset 0 1rpx 0 rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(18rpx);
-  -webkit-backdrop-filter: blur(18rpx);
+  box-shadow: 0 12rpx 28rpx rgba(0, 0, 0, 0.18), inset 0 1rpx 0 rgba(255, 255, 255, 0.04);
 }
 
 .vc-page .hero {
-  padding: 34rpx 30rpx;
-  box-shadow: var(--vc-shadow-lg), inset 0 1rpx 0 rgba(255, 255, 255, 0.06);
-}
-
-.vc-page .hero::before {
-  content: "";
-  position: absolute;
-  right: -86rpx;
-  top: -90rpx;
-  width: 260rpx;
-  height: 260rpx;
-  border-radius: 999rpx;
-  background: rgba(215, 191, 150, 0.1);
-  filter: blur(18rpx);
-  pointer-events: none;
-}
-
-.vc-page .hero::after {
-  content: "";
-  position: absolute;
-  left: -40rpx;
-  bottom: -90rpx;
-  width: 200rpx;
-  height: 200rpx;
-  border-radius: 999rpx;
-  background: rgba(45, 63, 99, 0.18);
-  filter: blur(20rpx);
-  pointer-events: none;
+  padding: 24rpx 22rpx;
+  box-shadow: 0 14rpx 32rpx rgba(0, 0, 0, 0.2), inset 0 1rpx 0 rgba(255, 255, 255, 0.05);
 }
 
 .vc-page .card,
 .vc-page .summary-card,
 .vc-page .footer-cta-card,
 .vc-page .tips-card {
-  padding: 24rpx 22rpx;
+  padding: 18rpx 18rpx;
 }
 
 .vc-page .card-title {
   display: block;
-  font-size: 28rpx;
-  line-height: 1.35;
+  font-size: 27rpx;
+  line-height: 1.28;
   font-weight: 700;
   color: #f4f6fb;
 }
@@ -261,10 +255,10 @@ page,
 }
 
 .vc-page .hero-actions {
-  margin-top: 24rpx;
+  margin-top: 16rpx;
   display: flex;
   flex-wrap: wrap;
-  gap: 12rpx;
+  gap: 10rpx;
 }
 
 .vc-page .hero-actions > button,
@@ -293,13 +287,13 @@ page,
 .vc-page .tips-pill {
   display: inline-flex;
   align-items: center;
-  min-height: 44rpx;
-  padding: 0 16rpx;
+  min-height: 40rpx;
+  padding: 0 14rpx;
   border-radius: 999rpx;
   background: rgba(255, 255, 255, 0.04);
   border: 1rpx solid rgba(255, 255, 255, 0.08);
   box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.03);
-  font-size: 21rpx;
+  font-size: 20rpx;
   line-height: 1.3;
   color: var(--vc-text-muted);
 }
@@ -322,10 +316,10 @@ page,
 .vc-page .btn-primary,
 .vc-page .btn-outline {
   width: 100%;
-  min-height: 90rpx;
-  padding: 0 28rpx;
+  min-height: 82rpx;
+  padding: 0 24rpx;
   border-radius: 999rpx;
-  font-size: 27rpx;
+  font-size: 25rpx;
   font-weight: 700;
   line-height: 1.2;
   display: inline-flex;
@@ -364,9 +358,9 @@ page,
 .vc-page button[size="mini"].btn-primary,
 .vc-page button[size="mini"].btn-outline {
   width: auto;
-  min-height: 66rpx;
-  padding: 0 20rpx;
-  font-size: 22rpx;
+  min-height: 58rpx;
+  padding: 0 18rpx;
+  font-size: 21rpx;
 }
 
 .vc-page button::after {
@@ -388,6 +382,9 @@ page,
 }
 
 .vc-page .textarea {
+  display: block;
+  width: 100%;
+  height: 184rpx;
   min-height: 184rpx;
   padding: 20rpx;
   line-height: 1.64;
@@ -417,6 +414,52 @@ page,
   font-size: 22rpx;
   line-height: 1.56;
   color: var(--vc-text-subtle);
+}
+
+.vc-editor-page .eyebrow,
+.vc-editor-page .tips-row,
+.vc-editor-page .section-kicker,
+.vc-editor-page .section-caption,
+.vc-editor-page .field-help,
+.vc-editor-page .tips-copy {
+  display: none;
+}
+
+.vc-editor-page .hero {
+  padding: 18rpx 18rpx;
+}
+
+.vc-editor-page .title {
+  margin-bottom: 0;
+  font-size: 34rpx;
+  line-height: 1.2;
+}
+
+.vc-editor-page .section {
+  margin-top: 18rpx;
+}
+
+.vc-editor-page .section-head {
+  margin-bottom: 10rpx;
+}
+
+.vc-editor-page .section-title {
+  margin: 0;
+  font-size: 28rpx;
+  line-height: 1.25;
+}
+
+.vc-editor-page .card,
+.vc-editor-page .footer-cta-card {
+  padding: 16rpx 16rpx;
+}
+
+.vc-editor-page .field-stack {
+  gap: 16rpx;
+}
+
+.vc-editor-page .field-block {
+  gap: 6rpx;
 }
 
 .vc-page .hero-stat-grid {

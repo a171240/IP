@@ -34,6 +34,13 @@ const TURN_PENDING_STATUSES = {
 // Keep it disabled by default until realtime streaming ASR is enabled.
 const CLIENT_ASR_PREVIEW_ENABLED = false
 const VC_TAG = "[vc]"
+const DEBUG_LOG_LIMIT = 120
+const DEBUG_PANEL_NOISY_STAGES = {
+  "record.frame": true,
+  "ws.binary": true,
+}
+let vcDebugBuffer = []
+let vcDebugSink = null
 
 function formatSeconds(seconds) {
   const n = Number(seconds || 0)
@@ -227,20 +234,23 @@ function normalizeSessionContext(raw) {
 }
 
 function vcLog(stage, meta = {}) {
+  const normalized = emitVcDebugLog("log", stage, meta)
   try {
-    console.info(VC_TAG, stage, normalizeLogMeta(meta))
+    console.log(VC_TAG, stage, normalized)
   } catch (_err) {}
 }
 
 function vcWarn(stage, meta = {}) {
+  const normalized = emitVcDebugLog("warn", stage, meta)
   try {
-    console.warn(VC_TAG, stage, normalizeLogMeta(meta))
+    console.warn(VC_TAG, stage, normalized)
   } catch (_err) {}
 }
 
 function vcError(stage, meta = {}) {
+  const normalized = emitVcDebugLog("error", stage, meta)
   try {
-    console.error(VC_TAG, stage, normalizeLogMeta(meta))
+    console.error(VC_TAG, stage, normalized)
   } catch (_err) {}
 }
 
@@ -276,6 +286,58 @@ function normalizeLogMeta(meta) {
     normalized[key] = normalizeLogMetaValue(meta[key])
   })
   return normalized
+}
+
+function shouldCaptureDebugStage(stage) {
+  return !DEBUG_PANEL_NOISY_STAGES[String(stage || "")]
+}
+
+function formatDebugTimestamp(ts) {
+  const date = new Date(ts)
+  const hh = String(date.getHours()).padStart(2, "0")
+  const mm = String(date.getMinutes()).padStart(2, "0")
+  const ss = String(date.getSeconds()).padStart(2, "0")
+  return `${hh}:${mm}:${ss}`
+}
+
+function safeDebugMetaText(meta) {
+  try {
+    const text = JSON.stringify(meta || {})
+    return text === "{}" ? "" : text
+  } catch (_err) {
+    return ""
+  }
+}
+
+function emitVcDebugLog(level, stage, meta) {
+  const normalized = normalizeLogMeta(meta)
+  if (shouldCaptureDebugStage(stage)) {
+    const entry = {
+      id: `vc_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`,
+      level: String(level || "log"),
+      stage: String(stage || ""),
+      metaText: safeDebugMetaText(normalized),
+      timeText: formatDebugTimestamp(Date.now()),
+    }
+    vcDebugBuffer = vcDebugBuffer.concat(entry).slice(-DEBUG_LOG_LIMIT)
+    if (typeof vcDebugSink === "function") {
+      try {
+        vcDebugSink(entry, vcDebugBuffer.slice())
+      } catch (_err) {}
+    }
+  }
+  return normalized
+}
+
+function shouldEnableInPageDebug() {
+  try {
+    if (wx && typeof wx.getAccountInfoSync === "function") {
+      const info = wx.getAccountInfoSync() || {}
+      const envVersion = String(info.miniProgram?.envVersion || "").toLowerCase()
+      if (envVersion) return envVersion !== "release"
+    }
+  } catch (_err) {}
+  return true
 }
 
 function buildPendingCustomerVoiceUi(text, seconds) {
@@ -320,6 +382,33 @@ function sleep(ms) {
 function makeClientAttemptId() {
   const rand = Math.random().toString(36).slice(2, 10)
   return `mp_${Date.now()}_${rand}`
+}
+
+function detectDevtoolsPlatform() {
+  try {
+    if (wx && typeof wx.getDeviceInfo === "function") {
+      const info = wx.getDeviceInfo() || {}
+      const platform = String(info.platform || "").toLowerCase()
+      if (platform) return platform === "devtools"
+    }
+  } catch (_err) {}
+
+  try {
+    if (wx && typeof wx.getAppBaseInfo === "function") {
+      const info = wx.getAppBaseInfo() || {}
+      const platform = String(info.platform || info.host?.platform || "").toLowerCase()
+      if (platform) return platform === "devtools"
+    }
+  } catch (_err) {}
+
+  try {
+    if (wx && typeof wx.getSystemInfoSync === "function") {
+      const info = wx.getSystemInfoSync() || {}
+      return String(info.platform || "").toLowerCase() === "devtools"
+    }
+  } catch (_err) {}
+
+  return false
 }
 
 const MIN_REALTIME_AUDIO_SECONDS = 3
@@ -389,9 +478,26 @@ Page({
     realtimeConnected: false,
     realtimeConnecting: false,
     initialPromptOverlayVisible: false,
+    debugPanelEnabled: false,
+    debugPanelVisible: false,
+    debugLogs: [],
   },
 
   onLoad(options) {
+    this._debugPanelEnabled = shouldEnableInPageDebug()
+    this._debugLogSink = (_entry, snapshot) => {
+      if (!this._debugPanelEnabled) return
+      this.setData({ debugLogs: snapshot })
+    }
+    if (this._debugPanelEnabled) {
+      vcDebugSink = this._debugLogSink
+    }
+    this._chatAutoFollow = true
+    this.setData({
+      debugPanelEnabled: this._debugPanelEnabled,
+      debugPanelVisible: false,
+      debugLogs: this._debugPanelEnabled ? vcDebugBuffer.slice() : [],
+    })
     this.recorder = wx.getRecorderManager()
     try {
       this.audioCtx = wx.createInnerAudioContext({ useWebAudioImplement: true })
@@ -436,14 +542,7 @@ Page({
     this._ignoreManualPlayUntil = 0
     this._deferredAutoPlayTurn = null
     this._initialPromptFailSafeTimer = null
-    this._isDevtools = false
-    try {
-      const systemInfo =
-        wx && typeof wx.getSystemInfoSync === "function" ? wx.getSystemInfoSync() : null
-      this._isDevtools = String((systemInfo && systemInfo.platform) || "").toLowerCase() === "devtools"
-    } catch (_err) {
-      this._isDevtools = false
-    }
+    this._isDevtools = detectDevtoolsPlatform()
     this.configureAudioOutput("on_load")
     this.audioCtx.onPlay(() => {
       this._activeAudioStartedAt = Date.now()
@@ -692,6 +791,9 @@ Page({
     try {
       if (this.uiFxAudioCtx) this.uiFxAudioCtx.destroy()
     } catch {}
+    if (vcDebugSink === this._debugLogSink) {
+      vcDebugSink = null
+    }
   },
 
   onHide() {
@@ -722,9 +824,16 @@ Page({
     this.clearInitialPromptFailSafeTimer()
     this.setData({ playingTurnId: "" })
     this.clearManualPlayActive("page_hide")
+    if (vcDebugSink === this._debugLogSink) {
+      vcDebugSink = null
+    }
   },
 
   onShow() {
+    if (this._debugPanelEnabled && vcDebugSink !== this._debugLogSink) {
+      vcDebugSink = this._debugLogSink
+      this.setData({ debugLogs: vcDebugBuffer.slice() })
+    }
     vcLog("page.show", {
       sessionId: this.data.sessionId || "",
       hiddenMs: this._pageHiddenAt ? Date.now() - this._pageHiddenAt : 0,
@@ -1954,29 +2063,50 @@ Page({
   replaceTurn(turnId, turn) {
     const result = replaceTurnById(this.data.turns || [], turnId, turn)
     if (!result.updated) return false
-    this.setData({
+    const nextData = {
       turns: result.turns,
-      scrollIntoView: `turn-${turn.id}`,
-    })
+    }
+    if (this._chatAutoFollow !== false) {
+      nextData.scrollIntoView = `turn-${turn.id}`
+    }
+    this.setData(nextData)
     return true
   },
 
   appendTurn(turn) {
     const result = appendOrMergeTurn(this.data.turns || [], turn)
-    this.setData({
+    const nextData = {
       turns: result.turns,
-      scrollIntoView: `turn-${turn.id}`,
-    })
+    }
+    if (this._chatAutoFollow !== false) {
+      nextData.scrollIntoView = `turn-${turn.id}`
+    }
+    this.setData(nextData)
   },
 
   renameTurn(oldId, newId) {
     const result = renameTurnId(this.data.turns || [], oldId, newId)
     if (!result.updated) return false
-    this.setData({
+    const nextData = {
       turns: result.turns,
-      scrollIntoView: `turn-${newId}`,
-    })
+    }
+    if (this._chatAutoFollow !== false) {
+      nextData.scrollIntoView = `turn-${newId}`
+    }
+    this.setData(nextData)
     return true
+  },
+
+  onChatScroll(e) {
+    const detail = e && e.detail ? e.detail : {}
+    const deltaY = Number(detail.deltaY || 0)
+    if (deltaY < 0) {
+      this._chatAutoFollow = false
+    }
+  },
+
+  onChatScrollLower() {
+    this._chatAutoFollow = true
   },
 
   removeTurn(turnId) {
@@ -3886,6 +4016,25 @@ Page({
 
   closeHint() {
     this.setData({ hintVisible: false })
+  },
+
+  toggleDebugPanel() {
+    if (!this._debugPanelEnabled) return
+    this.setData({
+      debugPanelVisible: !this.data.debugPanelVisible,
+      debugLogs: vcDebugBuffer.slice(),
+    })
+  },
+
+  closeDebugPanel() {
+    if (!this._debugPanelEnabled) return
+    this.setData({ debugPanelVisible: false })
+  },
+
+  clearDebugPanel() {
+    if (!this._debugPanelEnabled) return
+    vcDebugBuffer = []
+    this.setData({ debugLogs: [], debugPanelVisible: true })
   },
 
   onRetryTts(e) {

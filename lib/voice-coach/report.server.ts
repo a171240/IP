@@ -10,6 +10,7 @@ import {
   scoreToStars,
 } from "./metrics"
 import { type DimensionId, VoiceCoachReportSchema, type VoiceCoachReport } from "./report"
+import { getVoiceCoachSessionInsights } from "./session-context-insights"
 import { normalizeScenarioTag } from "./tag-utils"
 
 export type VoiceCoachTurnRow = {
@@ -37,6 +38,8 @@ type RepresentativeTurn = {
   beautician: VoiceCoachTurnRow | null
   customer: VoiceCoachTurnRow | null
 }
+
+type TrainingContextReview = NonNullable<VoiceCoachReport["training_context"]>
 
 const DIMENSION_NAMES: Record<DimensionId, string> = {
   persuasion: "说服力",
@@ -249,7 +252,146 @@ function statusFromScore(score: number, threshold: { strong: number; mid: number
   return "待加强"
 }
 
-function buildPersuasionAdvice(representative: RepresentativeTurn, persuasionScore: number) {
+function simplifyMatchText(text: string): string {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/[\s\r\n\t，。,；;：:“”‘’"'`()（）【】《》、\-]/g, "")
+    .trim()
+}
+
+function uniqueLimited(items: Array<string | null | undefined>, max = 6): string[] {
+  const result: string[] = []
+  const seen = new Set<string>()
+
+  for (let i = 0; i < items.length; i += 1) {
+    const value = String(items[i] || "").trim()
+    if (!value || seen.has(value)) continue
+    seen.add(value)
+    result.push(value)
+    if (result.length >= max) break
+  }
+
+  return result
+}
+
+function pointMatchesCorpus(point: string, corpus: string): boolean {
+  const compactPoint = simplifyMatchText(point)
+  if (!compactPoint || !corpus) return false
+  if (corpus.includes(compactPoint)) return true
+  if (!/[，。,；;：:“”‘’"'`()（）【】《》、/\s]/.test(String(point || "")) && compactPoint.length >= 4) {
+    return false
+  }
+
+  const segments = Array.from(
+    new Set(
+      String(point || "")
+        .split(/[，。,；;：:“”‘’"'`()（）【】《》、/\s]+/)
+        .map((item) => simplifyMatchText(item))
+        .filter((item) => item.length >= 2),
+    ),
+  ).sort((left, right) => right.length - left.length)
+
+  if (!segments.length) return false
+
+  let hits = 0
+  const requiredHits = segments.length >= 3 ? 2 : 1
+  for (let i = 0; i < Math.min(4, segments.length); i += 1) {
+    if (!corpus.includes(segments[i])) continue
+    hits += 1
+    if (hits >= requiredHits) return true
+  }
+
+  return false
+}
+
+function strictPointMentioned(point: string, corpus: string): boolean {
+  const compactPoint = simplifyMatchText(point)
+  if (!compactPoint || !corpus) return false
+  return corpus.includes(compactPoint)
+}
+
+function buildTrainingContextReview(args: {
+  beauticianTurns: VoiceCoachTurnRow[]
+  sessionSnapshot?: unknown
+  sessionContext?: unknown
+}): TrainingContextReview | undefined {
+  const insights = getVoiceCoachSessionInsights({
+    snapshot: args.sessionSnapshot,
+    sessionContext: args.sessionContext,
+  })
+  if (!insights.hasContext) return undefined
+
+  const priorityPoints = uniqueLimited(
+    [...insights.mustCoverPoints, ...insights.targetObjections, ...insights.communicationMethodTags],
+    5,
+  )
+  const supportPoints = uniqueLimited(
+    [...insights.coreConcerns, ...insights.likelyQuestions, ...insights.focusPoints],
+    4,
+  )
+  const focusPoints = uniqueLimited([...priorityPoints, ...supportPoints], 5)
+  const beauticianCorpus = simplifyMatchText(args.beauticianTurns.map((turn) => turn.text || "").join(" "))
+  const rawBeauticianText = args.beauticianTurns.map((turn) => String(turn.text || "")).join("\n")
+
+  const priorityHitPoints = priorityPoints.filter((item) => strictPointMentioned(item, beauticianCorpus))
+  const priorityMissedPoints = priorityPoints.filter((item) => !strictPointMentioned(item, beauticianCorpus))
+  const supportHitPoints = supportPoints.filter((item) => pointMatchesCorpus(item, beauticianCorpus))
+  const supportMissedPoints = supportPoints.filter((item) => !pointMatchesCorpus(item, beauticianCorpus))
+
+  const hitPoints = uniqueLimited([...priorityHitPoints, ...supportHitPoints], 4)
+  const missedPoints = uniqueLimited([...priorityMissedPoints, ...supportMissedPoints], 4)
+
+  const riskPoints: string[] = []
+  insights.doNotSay.forEach((item) => {
+    if (pointMatchesCorpus(item, beauticianCorpus)) {
+      riskPoints.push(`出现了场景卡禁忌表达：${item}`)
+    }
+  })
+
+  const genericRiskRules: Array<{ pattern: RegExp; label: string }> = [
+    { pattern: /100%|百分之百|保证.*见效|包你有效|一定有效/u, label: "避免绝对化效果承诺" },
+    { pattern: /绝对安全|完全没风险|不会有任何(问题|风险|副作用)/u, label: "避免绝对化安全承诺" },
+    { pattern: /过了今天|今天不做就|最后一天|名额只剩|现在不做/u, label: "避免伪限时或逼单推进" },
+    { pattern: /我帮你决定|你就直接做|必须做|一定要做/u, label: "避免替顾客做决定或强压成交" },
+  ]
+
+  genericRiskRules.forEach((rule) => {
+    if (!rule.pattern.test(rawBeauticianText)) return
+    riskPoints.push(rule.label)
+  })
+
+  return {
+    title: "顾客/场景命中复盘",
+    background_summary: insights.backgroundSummary,
+    focus_points: focusPoints,
+    hit_points: uniqueLimited(hitPoints, 4),
+    missed_points: uniqueLimited(missedPoints, 4),
+    risk_points: uniqueLimited(riskPoints, 3),
+  }
+}
+
+function buildNextStepBlock(trainingContext?: TrainingContextReview) {
+  const missed = trainingContext?.missed_points?.[0]
+  const hit = trainingContext?.hit_points?.[0]
+  const risk = trainingContext?.risk_points?.[0]
+
+  if (missed) {
+    const riskTail = risk ? ` 同时${risk}。` : ""
+    return `下一轮：先把“${missed}”这一点说清楚，再补一条可验证信息和一个低压力下一步。${riskTail}`
+  }
+
+  if (hit) {
+    return `下一轮：可以继续沿着“${hit}”往下讲，先接住情绪，再给证据和行动建议。`
+  }
+
+  return "下一轮：先用“我理解你担心……”起手，再补一条证据和一句推进，可优先讲保障或先讲案例。"
+}
+
+function buildPersuasionAdvice(
+  representative: RepresentativeTurn,
+  persuasionScore: number,
+  trainingContext?: TrainingContextReview,
+) {
   const suggestions = Array.isArray(representative.beautician?.analysis_json?.suggestions)
     ? (representative.beautician?.analysis_json?.suggestions as unknown[])
         .map((item) => (typeof item === "string" ? item.trim() : ""))
@@ -258,17 +400,24 @@ function buildPersuasionAdvice(representative: RepresentativeTurn, persuasionSco
     : []
 
   if (suggestions.length) return suggestions.join("；")
-  if (persuasionScore >= 80) return "你已经能先接住顾客担心，再补充证据和下一步，这套顺序可以继续保持。"
+  if (trainingContext?.missed_points?.[0]) {
+    return `这轮还没正面回应训练重点“${trainingContext.missed_points[0]}”。建议先接住顾客当下情绪，再给一条和这个点直接相关的可验证信息。`
+  }
+  if (persuasionScore >= 80) {
+    return "你已经能先接住顾客担心，再补证据和下一步，这个顺序可以继续保持。"
+  }
   return "建议先明确回应顾客最在意的点，再补一条可验证证据，最后给出一个清晰的下一步动作。"
 }
 
 function buildOrganizationAdvice(representative: RepresentativeTurn, organizationScore: number) {
   if (organizationScore >= 80) {
-    return "这轮回答的结构比较完整，已经能做到先回应顾客顾虑，再给信息，最后自然推进。"
+    return "这轮回答结构比较完整，已经能做到先回应顾客顾虑，再给信息，最后自然推进。"
   }
 
-  const customerSnippet = representative.customer ? `围绕“${quoteSnippet(representative.customer.text, 10)}”` : "围绕顾客当下异议"
-  return `${customerSnippet}时，建议用“共情一句 + 证据一句 + 推进一步”收束表达，减少信息堆叠和跳话题。`
+  const customerSnippet = representative.customer
+    ? `围绕“${quoteSnippet(representative.customer.text, 10)}”时`
+    : "围绕顾客当下异议时"
+  return `${customerSnippet}，建议用“共情一句 + 证据一句 + 推进一步”的收束方式，减少信息堆叠和跳话题。`
 }
 
 function strongestDimension(scores: DimensionScores): DimensionId {
@@ -291,23 +440,25 @@ function describeStrengthEvidence(args: {
   avgConfidence: number | null
 }) {
   const { bestDimensionId, bestTurn, avgWpm, avgFillerRatio, avgConfidence } = args
-  const turnLabel = bestTurn ? `第${bestTurn.turn_index + 1}轮` : "本场对话"
+  const turnLabel = bestTurn ? `第 ${bestTurn.turn_index + 1} 轮` : "本场对话"
 
   switch (bestDimensionId) {
     case "persuasion":
-      return `${turnLabel}更能接住顾客异议再往下推进`
+      return `${turnLabel}更能接住顾客异议后再往下推进`
     case "fluency":
-      return avgWpm == null ? "整体节奏比较顺" : `语速基本落在可跟上的区间（约${avgWpm.toFixed(0)}字/分钟）`
+      return avgWpm == null
+        ? "整体节奏比较顺"
+        : `语速基本落在可跟上的区间（约 ${avgWpm.toFixed(0)} 字/分钟）`
     case "expression":
       return avgFillerRatio == null
         ? "措辞已经比较干净"
-        : `口头禅占比控制得较稳（约${(avgFillerRatio * 100).toFixed(1)}%）`
+        : `口头词占比控制得较稳（约 ${(avgFillerRatio * 100).toFixed(1)}%）`
     case "pronunciation":
       return avgConfidence == null
         ? "语音清晰度整体可接受"
-        : `语音清晰度较稳（识别置信约${(avgConfidence * 100).toFixed(0)}分）`
+        : `语音清晰度较稳（识别置信约 ${(avgConfidence * 100).toFixed(0)} 分）`
     case "organization":
-      return `${turnLabel}能按“回应-说明-推进”去组织内容`
+      return `${turnLabel}能按“回应 - 说明 - 推进”去组织内容`
     default:
       return "整体表现比较稳定"
   }
@@ -318,18 +469,21 @@ function describeWeaknessEvidence(args: {
   representative: RepresentativeTurn
 }) {
   const { weakestDimensionId, representative } = args
-  const customerSnippet = representative.customer ? `围绕“${quoteSnippet(representative.customer.text, 10)}”时` : "这轮回答里"
+  const customerSnippet = representative.customer
+    ? `围绕“${quoteSnippet(representative.customer.text, 10)}”时`
+    : "这轮回答里"
+
   switch (weakestDimensionId) {
     case "persuasion":
-      return `${customerSnippet}还没有把顾客最担心的点回应得足够具体`
+      return `${customerSnippet}还没把顾客最担心的点回应得足够具体`
     case "fluency":
-      return `${customerSnippet}句子转折稍多，节奏还可以再收稳一些`
+      return `${customerSnippet}句子转折稍多，节奏还可以再收稳一点`
     case "expression":
       return `${customerSnippet}信息点偏散，重点句还不够干净`
     case "pronunciation":
       return `${customerSnippet}关键句的清晰度还有提升空间`
     case "organization":
-      return `${customerSnippet}“共情-证据-推进”的顺序还不够收束`
+      return `${customerSnippet}“共情 - 证据 - 推进”的顺序还不够收束`
     default:
       return `${customerSnippet}还需要再聚焦一点`
   }
@@ -342,11 +496,22 @@ function buildSummaryBlocks(args: {
   avgWpm: number | null
   avgFillerRatio: number | null
   avgConfidence: number | null
+  trainingContext?: TrainingContextReview
 }) {
-  const { scores, representative, bestTurn, avgWpm, avgFillerRatio, avgConfidence } = args
+  const {
+    scores,
+    representative,
+    bestTurn,
+    avgWpm,
+    avgFillerRatio,
+    avgConfidence,
+    trainingContext,
+  } = args
   const bestDimensionId = strongestDimension(scores)
   const weakestDimensionId = weakestDimension(scores)
-  const representativeTurnLabel = representative.beautician ? `第${representative.beautician.turn_index + 1}轮` : "代表轮次"
+  const representativeTurnLabel = representative.beautician
+    ? `第 ${representative.beautician.turn_index + 1} 轮`
+    : "代表轮次"
 
   return [
     `优势：${DIMENSION_NAMES[bestDimensionId]}最稳，${describeStrengthEvidence({
@@ -360,7 +525,7 @@ function buildSummaryBlocks(args: {
       weakestDimensionId,
       representative,
     })}。`,
-    "下一轮：先用“我理解你担心…”起手，再补一句证据和一句推进，可选先讲保障或先讲案例。",
+    buildNextStepBlock(trainingContext),
   ]
 }
 
@@ -378,6 +543,8 @@ function buildImprovedResponse(representative: RepresentativeTurn) {
 export function generateVoiceCoachReport(opts: {
   scenario: VoiceCoachScenario
   turns: VoiceCoachTurnRow[]
+  sessionSnapshot?: unknown
+  sessionContext?: unknown
 }): VoiceCoachReport {
   const turns = [...opts.turns].sort((left, right) => left.turn_index - right.turn_index)
   const beauticianTurns = turns.filter((turn) => turn.role === "beautician")
@@ -411,6 +578,11 @@ export function generateVoiceCoachReport(opts: {
   const bestDimensionId = strongestDimension(scores)
   const bestTurn = pickTurnByScore(scoredTurns, bestDimensionId, "highest")
   const organizationExamples = pickOrganizationExamples(beauticianTurns, scoredTurns)
+  const trainingContext = buildTrainingContextReview({
+    beauticianTurns,
+    sessionSnapshot: opts.sessionSnapshot,
+    sessionContext: opts.sessionContext,
+  })
 
   const normalizedTags = Array.from(
     new Set(
@@ -432,6 +604,7 @@ export function generateVoiceCoachReport(opts: {
     avgWpm,
     avgFillerRatio,
     avgConfidence,
+    trainingContext,
   })
 
   const wpmCurve = buildTurnCurve(beauticianTurns, (turn) => {
@@ -469,6 +642,7 @@ export function generateVoiceCoachReport(opts: {
       },
     ],
     summary_blocks: summaryBlocks,
+    training_context: trainingContext,
     tabs: {
       persuasion: {
         title: "说服力",
@@ -477,7 +651,7 @@ export function generateVoiceCoachReport(opts: {
             name: "关键异议处理",
             status: statusFromScore(scores.persuasion, { strong: 80, mid: 65 }),
             stars: scoreToStars(scores.persuasion),
-            advice_paragraph: buildPersuasionAdvice(representative, scores.persuasion),
+            advice_paragraph: buildPersuasionAdvice(representative, scores.persuasion, trainingContext),
           },
         ],
         tags,
@@ -495,7 +669,7 @@ export function generateVoiceCoachReport(opts: {
             stars: scoreToStars(scores.fluency),
             advice_paragraph:
               avgWpm == null
-                ? "整体节奏已基本可跟上，建议重点句继续放慢，让关键证据和下一步更清楚。"
+                ? "整体节奏已基本可跟上，建议重点句继续放慢，让关键信息和下一步更清楚。"
                 : avgWpm > 260
                   ? `平均语速约 ${avgWpm.toFixed(0)} 字/分钟，略快。建议把关键句放慢到 180-260 字/分钟。`
                   : avgWpm < 180
@@ -521,21 +695,27 @@ export function generateVoiceCoachReport(opts: {
           {
             name: "表达干净度",
             status:
-              avgFillerRatio == null ? "一般" : avgFillerRatio < 0.04 ? "稳定" : avgFillerRatio < 0.08 ? "一般" : "待加强",
+              avgFillerRatio == null
+                ? "一般"
+                : avgFillerRatio < 0.04
+                  ? "稳定"
+                  : avgFillerRatio < 0.08
+                    ? "一般"
+                    : "待加强",
             stars: scoreToStars(scores.expression),
             advice_paragraph:
               avgFillerRatio == null
-                ? "建议继续减少“嗯、那个、就是”这类口头禅，让证据句和推进句更利落。"
+                ? "建议继续减少“嗯、那个、就是”这类口头词，让证据句和推进句更利落。"
                 : avgFillerRatio < 0.04
-                  ? `口头禅占比约 ${(avgFillerRatio * 100).toFixed(1)}%，表达已经比较干净，可以继续保持。`
-                  : `口头禅占比约 ${(avgFillerRatio * 100).toFixed(1)}%，建议删掉重复铺垫，让重点信息更靠前。`,
+                  ? `口头词占比约 ${(avgFillerRatio * 100).toFixed(1)}%，表达已经比较干净，可以继续保持。`
+                  : `口头词占比约 ${(avgFillerRatio * 100).toFixed(1)}%，建议删掉重复铺垫，让重点信息更靠前。`,
           },
         ],
         filler_ratio: avgFillerRatio == null ? null : Number(avgFillerRatio.toFixed(4)),
         charts: [
           {
             id: "filler_ratio_curve",
-            label: "冗余词占比曲线",
+            label: "口头词占比曲线",
             unit: "%",
             target_range: [0, 4],
             points: fillerCurve,
@@ -548,7 +728,13 @@ export function generateVoiceCoachReport(opts: {
           {
             name: "语音清晰度",
             status:
-              avgConfidence == null ? "一般" : avgConfidence >= 0.78 ? "稳定" : avgConfidence >= 0.68 ? "一般" : "待加强",
+              avgConfidence == null
+                ? "一般"
+                : avgConfidence >= 0.78
+                  ? "稳定"
+                  : avgConfidence >= 0.68
+                    ? "一般"
+                    : "待加强",
             stars: scoreToStars(scores.pronunciation),
             advice_paragraph:
               avgConfidence == null

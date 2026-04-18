@@ -5,22 +5,47 @@
 }
 
 .vc-library-minimal .compact-hero {
-  padding: 28rpx 24rpx;
+  padding: 16rpx 16rpx;
 }
 
 .vc-library-minimal .library-item-card + .library-item-card {
-  margin-top: 14rpx;
+  margin-top: 10rpx;
 }
 
 .vc-library-minimal .library-item-meta {
-  margin-top: 16rpx;
+  margin-top: 10rpx;
   display: flex;
   flex-direction: column;
-  gap: 8rpx;
+  gap: 4rpx;
 }
 
 .vc-library-minimal .library-item-line {
-  font-size: 22rpx;
-  line-height: 1.58;
+  font-size: 21rpx;
+  line-height: 1.42;
   color: var(--vc-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vc-library-minimal .hero .eyebrow,
+.vc-library-minimal .hero .title,
+.vc-library-minimal .hero .subtitle {
+  display: none;
+}
+
+.vc-library-minimal .hero-actions {
+  margin-top: 0;
+}
+
+.vc-library-minimal .library-item-meta .library-item-line + .library-item-line {
+  display: none;
+}
+
+.vc-library-minimal .muted.small {
+  display: block;
+  margin-top: 2rpx;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

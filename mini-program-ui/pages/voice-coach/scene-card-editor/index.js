@@ -1,10 +1,11 @@
 const { IP_FACTORY_BASE_URL } = require("../../../utils/config")
 const { request } = require("../../../utils/request")
 const { saveSelectedSceneCard } = require("../setup-storage")
+const { buildStarterSceneCardDraft } = require("../test-scene-card")
 
 const SCENE_KIND_OPTIONS = [
   { value: "customer_visit", label: "到店顾客训练" },
-  { value: "offer_promo", label: "新品推广训练" },
+  { value: "offer_promo", label: "新项目推广训练" },
 ]
 
 function safeText(value) {
@@ -40,12 +41,48 @@ Page({
   onLoad(query) {
     const id = safeText(query && query.id)
     const sceneKind = safeText(query && query.kind)
+    const template = safeText(query && query.template)
     this.setData({
       id,
       sceneKindIndex: getSceneKindIndex(sceneKind),
     })
 
-    if (id) this.loadCard(id)
+    if (id) {
+      this.loadCard(id)
+      return
+    }
+
+    if (template === "starter") {
+      this.applyStarterTemplate()
+    }
+  },
+
+  applyStarterTemplate() {
+    const draft = buildStarterSceneCardDraft()
+    this.setData({
+      sceneKindIndex: getSceneKindIndex(draft.scene_kind),
+      name: safeText(draft.name),
+      serviceName: safeText(draft.service_name),
+      customerStage: safeText(draft.customer_stage),
+      sceneGoal: safeText(draft.scene_goal),
+      focusStages: Array.isArray(draft.focus_stages) ? draft.focus_stages.join("\n") : safeText(draft.focus_stages),
+      likelyQuestions: Array.isArray(draft.likely_questions)
+        ? draft.likely_questions.join("\n")
+        : safeText(draft.likely_questions),
+      targetObjections: Array.isArray(draft.target_objections)
+        ? draft.target_objections.join("\n")
+        : safeText(draft.target_objections),
+      communicationMethodTags: Array.isArray(draft.communication_method_tags)
+        ? draft.communication_method_tags.join("\n")
+        : safeText(draft.communication_method_tags),
+      mustCoverPoints: Array.isArray(draft.must_cover_points)
+        ? draft.must_cover_points.join("\n")
+        : safeText(draft.must_cover_points),
+      doNotSay: Array.isArray(draft.do_not_say)
+        ? draft.do_not_say.join("\n")
+        : safeText(draft.do_not_say),
+      notes: safeText(draft.notes),
+    })
   },
 
   async loadCard(id) {
@@ -131,6 +168,11 @@ Page({
 
   onNotes(e) {
     this.setData({ notes: e.detail.value })
+  },
+
+  handleFillStarterTemplate() {
+    this.applyStarterTemplate()
+    wx.showToast({ title: "已填入常用模板", icon: "success" })
   },
 
   async handleSave() {

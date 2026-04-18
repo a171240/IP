@@ -13,6 +13,7 @@
 - 小程序开发文档：`docs/DEV_SPEC_MINIPROGRAM.md`
 - 当前进度文档：`docs/DEV_HANDOFF.md`
 - 小程序域名/部署拓扑：`docs/VOICE_COACH_DOMAIN_TOPOLOGY.md`
+- 语音陪练顾客/场景优化主文档：`docs/VOICE_COACH_CUSTOMER_SCENE_OPTIMIZATION.md`
 
 ---
 

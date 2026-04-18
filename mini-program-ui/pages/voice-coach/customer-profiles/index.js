@@ -42,11 +42,6 @@ Page({
     this.loadProfiles()
   },
 
-  async onPullDownRefresh() {
-    await this.loadProfiles()
-    wx.stopPullDownRefresh()
-  },
-
   async loadProfiles() {
     if (this.data.loading) return
 

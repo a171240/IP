@@ -5,6 +5,7 @@ import { randomUUID } from "crypto"
 import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
 import { llmAnalyzeBeauticianTurn, llmGenerateCustomerTurn, type TurnAnalysis } from "@/lib/voice-coach/llm.server"
 import { calcFillerRatio, calcWpm, computePerTurnScores } from "@/lib/voice-coach/metrics"
+import { getVoiceCoachSessionInsights } from "@/lib/voice-coach/session-context-insights"
 import { getVoiceCoachSessionPromptContext } from "@/lib/voice-coach/session-context"
 import { getScenario, type VoiceCoachEmotion } from "@/lib/voice-coach/scenarios"
 import {
@@ -303,10 +304,45 @@ function dynamicFallbackLines(tag: string, focus: string): string[] {
   ]
 }
 
+function buildContextualFallbackLines(args: {
+  serviceName: string
+  sceneGoal: string
+  coreConcerns: string[]
+  likelyQuestions: string[]
+  targetObjections: string[]
+  mustCoverPoints: string[]
+}) {
+  const serviceLabel = args.serviceName || "这个项目"
+  const lines: string[] = []
+
+  args.coreConcerns.slice(0, 2).forEach((item) => {
+    lines.push(`我现在还是最在意${item}，如果按我的情况做${serviceLabel}，你能说得更具体一点吗？`)
+  })
+
+  args.likelyQuestions.slice(0, 2).forEach((item) => {
+    lines.push(`那回到“${item}”这个点，如果是我来做${serviceLabel}，你们通常会怎么安排？`)
+  })
+
+  args.targetObjections.slice(0, 2).forEach((item) => {
+    lines.push(`你刚刚说了不少好处，但关于${item}我还是想听更直接一点。`)
+  })
+
+  args.mustCoverPoints.slice(0, 2).forEach((item) => {
+    lines.push(`如果围绕“${item}”来判断，我现在最该先确认什么？`)
+  })
+
+  if (args.sceneGoal) {
+    lines.push(`如果这次只是想先判断“${args.sceneGoal}”，你会建议我先了解哪一块？`)
+  }
+
+  return Array.from(new Set(lines.filter(Boolean)))
+}
+
 function fallbackCustomerTurn(opts: {
   scenario: { seedTopics: string[] }
   history: Array<{ role: "customer" | "beautician"; text: string }>
   beauticianText: string
+  sessionSnapshot?: unknown
 }): {
   text: string
   emotion: VoiceCoachEmotion
@@ -317,7 +353,18 @@ function fallbackCustomerTurn(opts: {
   const lastCustomer = [...opts.history].reverse().find((h) => h.role === "customer")
   const continuityAnchor = detectFocusKeyword(`${lastCustomer?.text || ""} ${opts.beauticianText}`)
   const focus = continuityAnchor || detectFocusKeyword(opts.beauticianText)
-  const pool = Array.from(new Set([...dynamicFallbackLines(inferredTag, focus), ...fallbackTopicPool(inferredTag)]))
+  const sessionInsights = getVoiceCoachSessionInsights({ snapshot: opts.sessionSnapshot })
+  const contextLines = buildContextualFallbackLines({
+    serviceName: sessionInsights.serviceName,
+    sceneGoal: sessionInsights.sceneGoal,
+    coreConcerns: sessionInsights.coreConcerns,
+    likelyQuestions: sessionInsights.likelyQuestions,
+    targetObjections: sessionInsights.targetObjections,
+    mustCoverPoints: sessionInsights.mustCoverPoints,
+  })
+  const pool = Array.from(
+    new Set([...contextLines, ...dynamicFallbackLines(inferredTag, focus), ...fallbackTopicPool(inferredTag)]),
+  )
 
   const beauticianTurns = opts.history.filter((h) => h.role === "beautician").length
   const continuityLines =
@@ -766,6 +813,7 @@ async function processMainStage(args: {
     scenario,
     history,
     beauticianText: asr.text,
+    sessionSnapshot: loaded.session.scenario_snapshot_json,
   })
   let llmFallbackUsed = false
   let llmFallbackReason = ""
@@ -784,6 +832,7 @@ async function processMainStage(args: {
       scenario,
       history,
       beauticianText: asr.text,
+      sessionSnapshot: loaded.session.scenario_snapshot_json,
     })
   }
   const normalizedNextCustomerTag = normalizeScenarioTag(nextCustomer.tag, scenario)

@@ -57,7 +57,9 @@ export async function GET(request: NextRequest, context: { params: Promise<{ ses
 
     const { data: session, error: sessionError } = await supabase
       .from("voice_coach_sessions")
-      .select("id, scenario_id, status, ended_at")
+      .select(
+        "id, scenario_id, status, ended_at, customer_profile_id, scene_card_id, session_context_json, scenario_snapshot_json",
+      )
       .eq("id", sessionId)
       .single()
     if (sessionError || !session) return jsonError(404, "session_not_found")
@@ -67,7 +69,9 @@ export async function GET(request: NextRequest, context: { params: Promise<{ ses
         async fetchSession() {
           const { data, error } = await supabase
             .from("voice_coach_sessions")
-            .select("id, scenario_id, status, ended_at")
+            .select(
+              "id, scenario_id, status, ended_at, customer_profile_id, scene_card_id, session_context_json, scenario_snapshot_json",
+            )
             .eq("id", sessionId)
             .single()
           if (error || !data) return null

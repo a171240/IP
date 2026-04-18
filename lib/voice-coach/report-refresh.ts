@@ -7,6 +7,10 @@ type SessionSnapshot = {
   scenario_id: string
   status?: string | null
   ended_at?: string | null
+  customer_profile_id?: string | null
+  scene_card_id?: string | null
+  session_context_json?: unknown
+  scenario_snapshot_json?: unknown
 }
 
 type SaveReportPayload = {
@@ -78,7 +82,12 @@ export async function refreshVoiceCoachReport({
 
   const turns = await ops.fetchTurns()
   const scenario = getScenario(session.scenario_id)
-  const report = generateVoiceCoachReport({ scenario, turns })
+  const report = generateVoiceCoachReport({
+    scenario,
+    turns,
+    sessionSnapshot: session.scenario_snapshot_json,
+    sessionContext: session.session_context_json,
+  })
   const dimensionScores = buildDimensionScoreMap(report)
 
   await ops.saveReport({

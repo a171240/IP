@@ -63,6 +63,9 @@ function loadTsModule(filePath) {
 
 const { generateVoiceCoachReport } = loadTsModule(path.join(root, "lib", "voice-coach", "report.server.ts"))
 const { refreshVoiceCoachReport } = loadTsModule(path.join(root, "lib", "voice-coach", "report-refresh.ts"))
+const { buildVoiceCoachSessionSnapshot } = loadTsModule(
+  path.join(root, "lib", "voice-coach", "session-context.ts"),
+)
 const { getScenario } = loadTsModule(path.join(root, "lib", "voice-coach", "scenarios.ts"))
 const { normalizeScenarioTag } = loadTsModule(path.join(root, "lib", "voice-coach", "tag-utils.ts"))
 
@@ -85,7 +88,7 @@ function createAnalysis(scores, extra = {}) {
   return {
     suggestions: ["先接住顾虑", "补一条证据", "再给下一步动作"],
     polished:
-      "我理解你现在最担心的是安全和效果，所以我先把和你情况最相关的一条证据说清楚，再告诉你可以怎么低风险地继续了解。",
+      "我理解你现在最在意的是安全和效果，所以我先把和你情况最相关的一条证据说明白，再告诉你可以怎么低风险地继续了解。",
     persuasion_score: scores.persuasion,
     organization_score: scores.organization,
     per_turn_scores: scores,
@@ -99,7 +102,7 @@ test("report uses the lowest-persuasion analyzed turn as the representative case
     createTurn({
       id: "c-1",
       role: "customer",
-      text: "我最担心这种护理会不会有安全隐患。",
+      text: "我最担心这类护理会不会有安全隐患。",
       features_json: { tag: "安全顾虑" },
       turn_index: 0,
     }),
@@ -147,7 +150,7 @@ test("report uses the lowest-persuasion analyzed turn as the representative case
   assert.equal(report.meta.representative_turn_id, "b-2")
   assert.equal(report.tabs.persuasion.customer_objection, "你先别讲概念，我想知道有没有真实案例。")
   assert.equal(report.tabs.persuasion.your_response, "案例之后再看，我们先做就知道了。")
-  assert.match(report.tabs.persuasion.improved_response, /我理解你现在最担心的是安全和效果|我理解你现在最在意的是/)
+  assert.match(report.tabs.persuasion.improved_response, /我理解你现在最在意的是|我理解你现在最担心的是/)
   assert.deepEqual(report.tabs.persuasion.tags.sort(), [scenario.seedTopics[2], scenario.seedTopics[3]].sort())
 })
 
@@ -282,11 +285,90 @@ test("report meta marks incomplete analysis and aggregates only analyzed turns",
   assert.equal(persuasionDimension.score, 81)
 })
 
+test("report becomes snapshot-aware for hit, miss and risk review", () => {
+  const scenario = getScenario("objection_safety")
+  const sessionSnapshot = buildVoiceCoachSessionSnapshot({
+    customerProfile: {
+      id: "cp-1",
+      name: "测试顾客·林岚",
+      age_label: "32岁",
+      occupation: "品牌策划",
+      personality_tags: ["理性", "爱比较"],
+      core_concerns: ["恢复期会不会影响上班", "会不会一直被推销"],
+      trust_triggers: ["真实案例", "先做评估"],
+      past_experience: "之前在别家被强推过",
+      notes: "明天下午到店",
+    },
+    sceneCard: {
+      id: "sc-1",
+      name: "测试场景卡·首次到店顾虑",
+      scene_kind: "customer_visit",
+      service_name: "补水修护护理",
+      customer_stage: "首次到店",
+      scene_goal: "让顾客先愿意继续了解",
+      likely_questions: ["一次大概要多久", "做完恢复期怎么安排"],
+      target_objections: ["价格值不值", "会不会被持续推销"],
+      must_cover_points: ["先做皮肤评估", "恢复期安排"],
+      do_not_say: ["保证一次就见效"],
+      notes: "门店新品推广期",
+    },
+    liveNotes: "明天下午来店，时间比较紧。",
+  })
+
+  const turns = [
+    createTurn({ id: "c-1", role: "customer", text: "我明天来做之前，想先问清楚。", turn_index: 0 }),
+    createTurn({
+      id: "b-1",
+      role: "beautician",
+      text: "我们会先做皮肤评估，再根据你的情况讲恢复期安排，而且保证一次就见效。",
+      audio_path: "audio/b-1.mp3",
+      audio_seconds: 8,
+      analysis_json: createAnalysis({
+        persuasion: 72,
+        fluency: 74,
+        expression: 70,
+        pronunciation: 75,
+        organization: 71,
+      }),
+      turn_index: 1,
+    }),
+  ]
+
+  const report = generateVoiceCoachReport({
+    scenario,
+    turns,
+    sessionSnapshot,
+    sessionContext: { live_notes: "明天下午来店，时间比较紧。" },
+  })
+
+  assert.ok(report.training_context)
+  assert.match(report.training_context.background_summary, /测试顾客·林岚/)
+  assert.ok(report.training_context.hit_points.some((item) => item.includes("先做皮肤评估")))
+  assert.ok(report.training_context.hit_points.some((item) => item.includes("恢复期安排")))
+  assert.ok(report.training_context.missed_points.some((item) => item.includes("价格值不值")))
+  assert.ok(report.training_context.risk_points.some((item) => item.includes("禁忌表达")))
+  assert.match(report.summary_blocks[2], /价格值不值|禁忌表达|低压力下一步/)
+})
+
 test("refreshVoiceCoachReport pumps pending analysis and overwrites stale cached report", async () => {
   const scenario = getScenario("objection_safety")
   let pendingJobs = 1
   let pumpCalls = 0
   let savedPayload = null
+  const sessionSnapshot = buildVoiceCoachSessionSnapshot({
+    customerProfile: {
+      id: "cp-1",
+      name: "测试顾客",
+      core_concerns: ["恢复期会不会影响上班"],
+    },
+    sceneCard: {
+      id: "sc-1",
+      name: "测试场景卡",
+      scene_kind: "customer_visit",
+      must_cover_points: ["先做皮肤评估"],
+    },
+    liveNotes: "尽量快一点。",
+  })
 
   const turnsBeforePump = [
     createTurn({ id: "c-1", role: "customer", text: "我怕不安全。", turn_index: 0 }),
@@ -324,6 +406,10 @@ test("refreshVoiceCoachReport pumps pending analysis and overwrites stale cached
           status: "active",
           ended_at: null,
           report_json: { total_score: 12 },
+          customer_profile_id: "cp-1",
+          scene_card_id: "sc-1",
+          session_context_json: { live_notes: "尽量快一点。" },
+          scenario_snapshot_json: sessionSnapshot,
         }
       },
       async fetchTurns() {
@@ -350,6 +436,7 @@ test("refreshVoiceCoachReport pumps pending analysis and overwrites stale cached
   assert.equal(typeof savedPayload.endedAt, "string")
   assert.ok(savedPayload.report.total_score > 12)
   assert.equal(savedPayload.report.meta.is_complete, true)
+  assert.ok(savedPayload.report.training_context)
 })
 
 test("normalizeScenarioTag collapses free-form tags into allowed scenario topics", () => {

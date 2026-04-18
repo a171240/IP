@@ -7,6 +7,7 @@ const {
   saveSelectedSceneCard,
   toTextList,
 } = require("../setup-storage")
+const { ensureTestSceneCard } = require("../test-scene-card")
 
 function safeText(value) {
   return String(value || "").trim()
@@ -15,6 +16,7 @@ function safeText(value) {
 Page({
   data: {
     loading: false,
+    creatingTestCard: false,
     pickMode: false,
     selectedId: "",
     cards: [],
@@ -28,11 +30,6 @@ Page({
 
   onShow() {
     this.loadCards()
-  },
-
-  async onPullDownRefresh() {
-    await this.loadCards()
-    wx.stopPullDownRefresh()
   },
 
   async loadCards() {
@@ -70,7 +67,30 @@ Page({
   },
 
   handleCreate() {
-    wx.navigateTo({ url: "/pages/voice-coach/scene-card-editor/index" })
+    wx.navigateTo({ url: "/pages/voice-coach/scene-card-editor/index?template=starter" })
+  },
+
+  async handleUseTestCard() {
+    if (this.data.creatingTestCard) return
+
+    this.setData({ creatingTestCard: true })
+    try {
+      const result = await ensureTestSceneCard(this.data.cards)
+      const card = normalizeSceneCard(result.card)
+      const mapped = {
+        ...card,
+        metaLabel: buildSceneMeta(card),
+        focusLabel: toTextList(card.focus_stages, 3).join(" / "),
+        objectionLabel: toTextList(card.target_objections, 3).join(" / "),
+      }
+      const cards = [mapped].concat((this.data.cards || []).filter((item) => item.id !== mapped.id))
+      this.setData({ cards })
+      this.handleUse({ currentTarget: { dataset: { id: mapped.id } } })
+    } catch (err) {
+      wx.showToast({ title: (err && err.message) || "生成测试场景卡失败", icon: "none" })
+    } finally {
+      this.setData({ creatingTestCard: false })
+    }
   },
 
   handleUse(e) {

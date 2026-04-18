@@ -194,11 +194,12 @@
   </view>
 </template>
 
-<view class="page vc-page vc-chat-page">
+<view class="vc-page vc-chat-page">
   <view class="topbar">
     <view class="top-left" bindtap="openEndModal">结束训练</view>
     <view class="top-right">
       <view class="mode-pill mode-pill-live">Voice Session</view>
+      <view wx:if="{{debugPanelEnabled}}" class="debug-pill" bindtap="toggleDebugPanel">日志</view>
     </view>
   </view>
 
@@ -207,6 +208,9 @@
     scroll-y="true"
     scroll-with-animation="true"
     scroll-into-view="{{scrollIntoView}}"
+    lower-threshold="80"
+    bindscroll="onChatScroll"
+    bindscrolltolower="onChatScrollLower"
     enhanced="true"
     bounces="false"
     show-scrollbar="false"
@@ -318,5 +322,30 @@
       </view>
     </view>
     <button class="hint-close" bindtap="closeHint">关闭</button>
+  </view>
+
+  <view class="modal-mask" wx:if="{{debugPanelVisible}}" bindtap="closeDebugPanel"></view>
+  <view class="debug-sheet" wx:if="{{debugPanelVisible}}">
+    <view class="debug-sheet-head">
+      <view>
+        <view class="debug-sheet-title">调试日志</view>
+        <view class="debug-sheet-sub">扫码预览时也能直接查看对练链路日志</view>
+      </view>
+      <view class="debug-sheet-actions">
+        <view class="debug-sheet-link" bindtap="clearDebugPanel">清空</view>
+        <view class="debug-sheet-link" bindtap="closeDebugPanel">关闭</view>
+      </view>
+    </view>
+
+    <scroll-view class="debug-log-scroll" scroll-y="true" enhanced="true" bounces="false" show-scrollbar="false">
+      <view wx:if="{{!debugLogs.length}}" class="debug-log-empty">当前还没有日志</view>
+      <view wx:for="{{debugLogs}}" wx:key="id" class="debug-log-item debug-log-{{item.level}}">
+        <view class="debug-log-meta">
+          <text class="debug-log-time">{{item.timeText}}</text>
+          <text class="debug-log-stage">{{item.stage}}</text>
+        </view>
+        <text wx:if="{{item.metaText}}" class="debug-log-text">{{item.metaText}}</text>
+      </view>
+    </scroll-view>
   </view>
 </view>

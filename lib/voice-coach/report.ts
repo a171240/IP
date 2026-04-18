@@ -112,10 +112,22 @@ export const VoiceCoachReportMetaSchema = z.object({
 
 export type VoiceCoachReportMeta = z.infer<typeof VoiceCoachReportMetaSchema>
 
+export const VoiceCoachReportTrainingContextSchema = z.object({
+  title: z.string().min(1),
+  background_summary: z.string(),
+  focus_points: z.array(z.string()),
+  hit_points: z.array(z.string()),
+  missed_points: z.array(z.string()),
+  risk_points: z.array(z.string()),
+})
+
+export type VoiceCoachReportTrainingContext = z.infer<typeof VoiceCoachReportTrainingContextSchema>
+
 export const VoiceCoachReportSchema = z.object({
   total_score: z.number(),
   dimension: z.array(DimensionScoreSchema).length(5),
   summary_blocks: z.array(z.string()).length(3),
+  training_context: VoiceCoachReportTrainingContextSchema.optional(),
   tabs: z.object({
     persuasion: ReportPersuasionTabSchema,
     fluency: ReportFluencyTabSchema,
