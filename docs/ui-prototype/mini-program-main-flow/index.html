@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>小程序主链路 UI 审查稿</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="review-shell">
+    <section class="overview-card">
+      <span class="overview-kicker">UI 审查稿 · Phase 1</span>
+      <h1 class="overview-title">小程序主链路静态审查稿</h1>
+      <p class="overview-copy">
+        这一版先不碰真实逻辑，只验证四个主 Tab 页的层级、密度、文案口吻和主动作是否更像能上线的正式产品。
+      </p>
+      <ul class="review-note-list">
+        <li>统一收掉英文 eyebrow，中文标签只保留帮助决策的内容。</li>
+        <li>发文页改成单一任务工作台；草稿页改成列表库；话术练习页继续做视觉锚点；我的页改成账户中心。</li>
+        <li>所有状态、标题、封面、链接均为静态假数据，方便先审方向，再回填到 WXML / WXSS。</li>
+      </ul>
+      <div class="overview-grid">
+        <a class="overview-link" href="xiaohongshu.html">
+          <strong>发文工作台</strong>
+          <span>首屏只服务“输入条件 → 生成内容”，结果、素材、发布拆成更清楚的顺序。</span>
+        </a>
+        <a class="overview-link" href="drafts.html">
+          <strong>草稿库</strong>
+          <span>弱化说明，强化标题、状态、时间和继续编辑，页面更像内容资产库。</span>
+        </a>
+        <a class="overview-link" href="voice-coach.html">
+          <strong>话术练习</strong>
+          <span>保留专业锚点，只保留一个主动作和两个功能入口。</span>
+        </a>
+        <a class="overview-link" href="mine.html">
+          <strong>我的</strong>
+          <span>收紧账号区和订阅区，把升级/购买做成唯一强 CTA。</span>
+        </a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
