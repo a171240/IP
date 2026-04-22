@@ -58,7 +58,8 @@ test("report-related schema contracts are tightened and context-aware fallbacks 
 
 test("report page copy still exposes the same coaching review structure", () => {
   assert.ok(reportWxmlSource.includes("Atelier Report"))
-  assert.ok(reportWxmlSource.includes("Training Context"))
-  assert.ok(reportWxmlSource.includes("Scorecards"))
-  assert.ok(reportWxmlSource.includes("Insights"))
+  assert.ok(reportWxmlSource.includes("训练背景"))
+  assert.ok(reportWxmlSource.includes("维度评分"))
+  assert.ok(reportWxmlSource.includes("训练总结"))
+  assert.ok(reportWxmlSource.includes("逐项拆解"))
 })

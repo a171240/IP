@@ -59,7 +59,7 @@
 
       <view wx:if="{{sessionContext.sceneName || sessionContext.customerName || sessionContext.summaryLines.length}}" class="section report-section fade-up delay-1">
         <view class="section-head">
-          <text class="section-kicker">Training Context</text>
+          <text class="section-kicker">训练背景</text>
           <text class="section-title report-section-title">本次训练背景</text>
         </view>
 
@@ -88,7 +88,7 @@
 
       <view class="section report-section fade-up delay-1">
         <view class="section-head">
-          <text class="section-kicker">Scorecards</text>
+          <text class="section-kicker">维度评分</text>
           <text class="section-title report-section-title">五维度表现</text>
         </view>
 
@@ -101,7 +101,7 @@
                   <text class="dimension-stars">{{item.stars_text}}</text>
                 </view>
                 <view class="dimension-score-wrap">
-                  <text class="dimension-score">{{item.score}}</text>
+                  <text class="dimension-score">{{item.display_score}}</text>
                   <text class="dimension-score-unit">分</text>
                 </view>
               </view>
@@ -118,7 +118,7 @@
 
       <view class="section report-section fade-up delay-2">
         <view class="section-head">
-          <text class="section-kicker">Insights</text>
+          <text class="section-kicker">训练总结</text>
           <text class="section-title report-section-title">练习总结</text>
         </view>
 
@@ -145,11 +145,10 @@
       <view class="tabs-wrap fade-up delay-2">
         <view class="tabs-shell">
           <text class="tabs-label">深度拆解</text>
-          <view class="tabs">
+          <view class="tabs tabs-compact">
             <block wx:for="{{tabItems}}" wx:key="id">
               <view class="tab {{activeTab === item.id ? 'active' : ''}}" data-tab="{{item.id}}" bindtap="setTab">{{item.label}}</view>
             </block>
-            <view class="tab-indicator" style="transform: translateX({{activeTabIndex * 100}}%);"></view>
           </view>
         </view>
       </view>
@@ -157,7 +156,7 @@
       <view class="tab-body">
         <view wx:if="{{activeTab === 'persuasion'}}" class="tab-panel">
           <view class="tab-panel-head">
-            <text class="section-kicker">Dimension Analysis</text>
+            <text class="section-kicker">逐项拆解</text>
             <text class="tab-title">本场关键异议复盘</text>
             <text class="tab-desc">聚焦最值得复盘的一轮异议回应，检查你是否先接住顾客担心，再补证据并推进下一步。</text>
           </view>
@@ -196,7 +195,7 @@
 
         <view wx:if="{{activeTab === 'fluency'}}" class="tab-panel">
           <view class="tab-panel-head">
-            <text class="section-kicker">Dimension Analysis</text>
+            <text class="section-kicker">逐项拆解</text>
             <text class="tab-title">流利度</text>
             <text class="tab-desc">先看表达是否顺畅，再看趋势是否稳定，帮助你识别卡顿和节奏波动。</text>
           </view>
@@ -237,7 +236,7 @@
 
         <view wx:if="{{activeTab === 'expression'}}" class="tab-panel">
           <view class="tab-panel-head">
-            <text class="section-kicker">Dimension Analysis</text>
+            <text class="section-kicker">逐项拆解</text>
             <text class="tab-title">语言表达</text>
             <text class="tab-desc">聚焦你的措辞、句式和表达完整度，判断是否足够自然、清晰、容易被接受。</text>
           </view>
@@ -278,21 +277,23 @@
 
         <view wx:if="{{activeTab === 'pronunciation'}}" class="tab-panel">
           <view class="tab-panel-head">
-            <text class="section-kicker">Dimension Analysis</text>
+            <text class="section-kicker">逐项拆解</text>
             <text class="tab-title">发音准确度</text>
             <text class="tab-desc">从清晰度和稳定性拆解语音输出，让你的表达不仅有内容，也能被听得更清楚。</text>
           </view>
 
           <text class="panel-block-title">关键洞察</text>
-          <block wx:for="{{report.tabs.pronunciation.submetrics}}" wx:key="index">
-            <view class="metric-card">
-              <view class="metric-row">
-                <view class="metric-name">{{item.name}}</view>
-                <view class="metric-status">{{item.status}}</view>
+          <view class="metric-grid">
+            <block wx:for="{{report.tabs.pronunciation.submetrics}}" wx:key="index">
+              <view class="metric-card metric-card-compact">
+                <view class="metric-row metric-row-compact">
+                  <view class="metric-name">{{item.name}}</view>
+                  <view class="metric-status">{{item.status}}</view>
+                </view>
+                <view class="metric-text">{{item.advice_paragraph}}</view>
               </view>
-              <view class="metric-text">{{item.advice_paragraph}}</view>
-            </view>
-          </block>
+            </block>
+          </view>
 
           <text class="panel-block-title">趋势观察</text>
           <block wx:for="{{report.tabs.pronunciation.charts}}" wx:key="id">
@@ -319,7 +320,7 @@
 
         <view wx:if="{{activeTab === 'organization'}}" class="tab-panel">
           <view class="tab-panel-head">
-            <text class="section-kicker">Dimension Analysis</text>
+            <text class="section-kicker">逐项拆解</text>
             <text class="tab-title">语言组织能力</text>
             <text class="tab-desc">这一部分聚焦逻辑顺序、内容连接和可复述性，帮助你把表达做得更有结构。</text>
           </view>

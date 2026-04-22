@@ -60,7 +60,11 @@
 }
 
 .vc-setup-minimal .setup-empty-copy {
-  display: none;
+  display: block;
+  margin-top: 10rpx;
+  font-size: 22rpx;
+  line-height: 1.6;
+  color: var(--vc-text-subtle);
 }
 
 .vc-setup-minimal .setup-action-row {
@@ -81,11 +85,12 @@
 }
 
 .vc-setup-minimal .hero.compact-hero {
-  display: none;
+  display: block;
+  padding: 22rpx 20rpx;
 }
 
 .vc-setup-minimal .tips-copy {
-  display: none;
+  display: block;
 }
 
 .vc-setup-minimal .setup-step-index {
@@ -94,8 +99,20 @@
   border-radius: 12rpx;
 }
 
-.vc-setup-minimal .setup-chip-row .tag:nth-child(n+3) {
+.vc-setup-minimal .setup-chip-row .tag:nth-child(n+4) {
   display: none;
+}
+
+.vc-setup-minimal .setup-step-card {
+  gap: 14rpx;
+}
+
+.vc-setup-minimal .setup-action-row > button {
+  margin-top: 0;
+}
+
+.vc-setup-minimal .minimal-footer-card {
+  padding-bottom: 20rpx;
 }
 
 .debug-pill {

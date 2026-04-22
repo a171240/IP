@@ -115,6 +115,9 @@ export type VoiceCoachReportMeta = z.infer<typeof VoiceCoachReportMetaSchema>
 export const VoiceCoachReportTrainingContextSchema = z.object({
   title: z.string().min(1),
   background_summary: z.string(),
+  scene_kind: z.string().optional(),
+  scene_kind_label: z.string().optional(),
+  policy_focus: z.string().optional(),
   focus_points: z.array(z.string()),
   hit_points: z.array(z.string()),
   missed_points: z.array(z.string()),

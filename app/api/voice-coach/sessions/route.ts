@@ -4,6 +4,7 @@ import { after, NextRequest, NextResponse } from "next/server"
 import { checkVoiceCoachAccess } from "@/lib/voice-coach/guard.server"
 import { llmGenerateCustomerTurn } from "@/lib/voice-coach/llm.server"
 import {
+  buildVoiceCoachFirstTurnTarget,
   buildVoiceCoachSessionSnapshot,
   getVoiceCoachSessionClientContext,
   getVoiceCoachSessionPromptContext,
@@ -104,45 +105,6 @@ function shouldGenerateFirstTurnTtsSynchronously(scenarioId?: string | null): bo
     .trim()
     .toLowerCase()
   return raw === "sync"
-}
-
-function buildFirstTurnTarget(sessionSnapshot: {
-  customer_profile?: {
-    core_concerns?: unknown
-    trust_triggers?: unknown
-    past_experience?: unknown
-  } | null
-} | null): string {
-  const customerProfile = sessionSnapshot?.customer_profile || null
-  const coreConcerns = Array.isArray(customerProfile?.core_concerns)
-    ? customerProfile.core_concerns.map((item) => String(item || "").trim()).filter(Boolean).slice(0, 3)
-    : []
-  const trustTriggers = Array.isArray(customerProfile?.trust_triggers)
-    ? customerProfile.trust_triggers.map((item) => String(item || "").trim()).filter(Boolean).slice(0, 3)
-    : []
-  const pastExperience = String(customerProfile?.past_experience || "").trim()
-
-  const instructions = [
-    "Use the configured customer profile as the primary persona source.",
-    "Open with one of the customer's explicit core concerns from the training context instead of a generic default objection.",
-  ]
-
-  if (coreConcerns.length) {
-    instructions.push(`Prioritize these explicit core concerns first: ${coreConcerns.join(" / ")}.`)
-    instructions.push(`If multiple concerns exist, prefer opening with \"${coreConcerns[0]}\".`)
-  }
-
-  if (trustTriggers.length) {
-    instructions.push(`Use these trust-building needs only as supporting detail: ${trustTriggers.join(" / ")}.`)
-  }
-
-  if (pastExperience) {
-    instructions.push(
-      "Past experience can reinforce the concern, but should not replace an explicit core concern when one exists.",
-    )
-  }
-
-  return instructions.join(" ")
 }
 
 function getSeedOpeningAudioPath(scenarioId: string): string {
@@ -367,9 +329,10 @@ export async function POST(request: NextRequest) {
           scenario,
           history: [],
           target: sessionContextText
-            ? buildFirstTurnTarget(sessionSnapshot)
+            ? buildVoiceCoachFirstTurnTarget(sessionSnapshot, session.id)
             : "提出对安全性的担忧并追问是否安全",
           sessionContextText: sessionContextText || undefined,
+          variationSeed: session.id,
         })
       } catch {
         first = pickPresetFirstTurnAvoidRepeat(

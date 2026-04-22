@@ -1,71 +1,74 @@
 @import "theme.wxss";
 
-.vc-home-minimal .container {
-  padding-top: 40rpx;
+.vc-home-focus .container {
+  padding-top: 36rpx;
 }
 
-.vc-home-minimal .compact-hero {
-  padding: 24rpx 22rpx;
+.vc-home-focus .vc-focus-hero {
+  padding: 26rpx 22rpx;
 }
 
-.vc-home-minimal .quick-launch-card {
-  margin-top: 18rpx;
-  padding-top: 0;
-  border-top: none;
+.vc-home-focus .vc-focus-launch {
+  margin-top: 20rpx;
   display: flex;
   flex-direction: column;
   gap: 14rpx;
 }
 
-.vc-home-minimal .quick-launch-title {
+.vc-home-focus .vc-focus-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.vc-home-focus .vc-focus-title {
   display: block;
-  font-size: 30rpx;
+  font-size: 32rpx;
+  line-height: 1.24;
   font-weight: 700;
   color: #f5f3ef;
 }
 
-.vc-home-minimal .quick-launch-note {
+.vc-home-focus .vc-focus-note {
   display: block;
-  margin-top: 8rpx;
-  font-size: 22rpx;
-  line-height: 1.6;
+  font-size: 23rpx;
+  line-height: 1.64;
   color: var(--vc-text-muted);
 }
 
-.vc-home-minimal .minimal-section-head {
-  display: none;
-}
-
-.vc-home-minimal .minimal-grid {
+.vc-home-focus .minimal-grid {
   display: flex;
   flex-direction: column;
   gap: 14rpx;
 }
 
-.vc-home-minimal .minimal-action-card {
+.vc-home-focus .minimal-action-card {
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 4rpx;
-  min-height: 0;
+  gap: 10rpx;
 }
 
-.vc-home-minimal .minimal-action-kicker {
-  display: none;
+.vc-home-focus .minimal-action-kicker {
+  display: block;
+  font-size: 18rpx;
+  line-height: 1.3;
+  letter-spacing: 1.5rpx;
+  text-transform: uppercase;
+  color: rgba(215, 191, 150, 0.7);
 }
 
-.vc-home-minimal .minimal-action-copy {
-  display: none;
+.vc-home-focus .minimal-action-copy {
+  display: block;
+  font-size: 22rpx;
+  line-height: 1.58;
+  color: var(--vc-text-muted);
 }
 
-.vc-home-minimal .minimal-action-link {
-  display: none;
-}
-
-.vc-home-minimal .eyebrow {
-  display: none;
-}
-
-.vc-home-minimal .subtitle {
-  font-size: 23rpx;
+.vc-home-focus .minimal-action-link {
+  display: block;
+  font-size: 22rpx;
   line-height: 1.5;
+  font-weight: 700;
+  color: var(--vc-gold);
 }

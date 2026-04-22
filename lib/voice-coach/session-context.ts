@@ -1,5 +1,7 @@
 import { z } from "zod"
 
+import { getVoiceCoachSceneKindPolicy } from "./scene-kind-policy"
+
 export const VOICE_COACH_SCENE_KIND_VALUES = ["customer_visit", "offer_promo"] as const
 export const VOICE_COACH_SCENE_KIND_LABELS: Record<(typeof VOICE_COACH_SCENE_KIND_VALUES)[number], string> = {
   customer_visit: "到店顾客训练",
@@ -231,6 +233,133 @@ function formatBulletLine(label: string, values: Array<string | null | undefined
   return `${label}：${compact.join("；")}`
 }
 
+function pickTopItems(value: unknown, max = 3): string[] {
+  return toStringList(value).slice(0, max)
+}
+
+function quickHash(input: string): number {
+  const text = String(input || "")
+  let hash = 0
+  for (let i = 0; i < text.length; i += 1) {
+    hash = (hash * 131 + text.charCodeAt(i)) >>> 0
+  }
+  return hash
+}
+
+function pickSeededItem(items: string[], seed: string, offset = 0): string {
+  if (!items.length) return ""
+  const index = (quickHash(seed) + offset) % items.length
+  return items[index] || items[0] || ""
+}
+
+export function buildVoiceCoachFirstTurnTarget(snapshot: unknown, variationSeed?: string): string {
+  const snapshotObject =
+    snapshot && typeof snapshot === "object" ? (snapshot as Partial<VoiceCoachSessionSnapshot>) : null
+  const customerProfile = normalizeCustomerProfileRecord((snapshotObject?.customer_profile as any) || null)
+  const sceneCard = normalizeSceneCardRecord((snapshotObject?.scene_card as any) || null)
+  const sceneKindPolicy = getVoiceCoachSceneKindPolicy(sceneCard?.scene_kind, sceneCard?.service_name)
+
+  const coreConcerns = pickTopItems(customerProfile?.core_concerns, 3)
+  const trustTriggers = pickTopItems(customerProfile?.trust_triggers, 3)
+  const likelyQuestions = pickTopItems(sceneCard?.likely_questions, 3)
+  const targetObjections = pickTopItems(sceneCard?.target_objections, 3)
+  const communicationMethodTags = pickTopItems(sceneCard?.communication_method_tags, 3)
+  const mustCoverPoints = pickTopItems(sceneCard?.must_cover_points, 3)
+  const doNotSay = pickTopItems(sceneCard?.do_not_say, 2)
+  const sceneGoal = String(sceneCard?.scene_goal || "").trim()
+  const pastExperience = String(customerProfile?.past_experience || "").trim()
+  const focusPool = [
+    ...coreConcerns,
+    ...likelyQuestions,
+    ...targetObjections,
+    ...mustCoverPoints,
+    ...communicationMethodTags,
+  ].filter(Boolean)
+  const normalizedSeed =
+    String(variationSeed || sceneCard?.id || customerProfile?.id || sceneGoal || "voice-coach").trim() ||
+    "voice-coach"
+  const primaryFocus = pickSeededItem(focusPool, normalizedSeed)
+  const secondaryFocus = pickSeededItem(focusPool, `${normalizedSeed}:secondary`, 1)
+  const openingStyles = [
+    "Open with a cautious, detail-checking question instead of a broad generic opener.",
+    "Open with a trust-gap concern before asking for process details.",
+    "Open with a practical scheduling or recovery concern before discussing value.",
+    "Open with a comparison or proof-oriented concern before discussing price.",
+  ]
+  const openingStyle = pickSeededItem(openingStyles, `${normalizedSeed}:style`)
+
+  const instructions = [
+    "Use the configured customer profile as the primary persona source.",
+    "Open with one of the customer's explicit core concerns instead of a generic default objection.",
+    "Blend the customer's concern with the current training scene, so the first line sounds like this customer in this visit or promotion moment.",
+    "Avoid reusing the same generic opening wording from previous sessions.",
+    openingStyle,
+  ]
+
+  if (coreConcerns.length) {
+    instructions.push(`Prioritize these explicit core concerns first: ${coreConcerns.join(" / ")}.`)
+    if (primaryFocus && coreConcerns.includes(primaryFocus)) {
+      instructions.push(`For this run, prefer opening with \"${primaryFocus}\".`)
+    } else {
+      instructions.push(`If multiple concerns exist, prefer opening with \"${coreConcerns[0]}\".`)
+    }
+  }
+
+  if (sceneGoal) {
+    instructions.push(`The opening should clearly serve this scene goal: ${sceneGoal}.`)
+  }
+
+  instructions.push(sceneKindPolicy.firstTurnGuidance)
+
+  if (likelyQuestions.length) {
+    instructions.push(
+      `Naturally tee up one of these likely scene questions in the opening: ${likelyQuestions.join(" / ")}.`,
+    )
+  }
+
+  if (targetObjections.length) {
+    instructions.push(
+      `When it fits the persona, surface one of these scene-card objections as the first pressure point: ${targetObjections.join(" / ")}.`,
+    )
+  }
+
+  if (mustCoverPoints.length) {
+    instructions.push(
+      `Choose an opening that gives the beautician a natural path to cover: ${mustCoverPoints.join(" / ")}.`,
+    )
+  }
+
+  if (primaryFocus) {
+    instructions.push(`Primary focus for this run: ${primaryFocus}.`)
+  }
+
+  if (secondaryFocus && secondaryFocus !== primaryFocus) {
+    instructions.push(`Secondary follow-up angle for this run: ${secondaryFocus}.`)
+  }
+
+  if (communicationMethodTags.length) {
+    instructions.push(
+      `Bias the conversation toward these communication methods: ${communicationMethodTags.join(" / ")}.`,
+    )
+  }
+
+  if (trustTriggers.length) {
+    instructions.push(`Use these trust-building needs only as supporting detail: ${trustTriggers.join(" / ")}.`)
+  }
+
+  if (doNotSay.length) {
+    instructions.push(`Do not invite or reward forbidden lines such as: ${doNotSay.join(" / ")}.`)
+  }
+
+  if (pastExperience) {
+    instructions.push(
+      "Past experience can reinforce the concern, but should not replace an explicit core concern when one exists.",
+    )
+  }
+
+  return instructions.join(" ")
+}
+
 export function buildVoiceCoachSessionSnapshot(args: {
   customerProfile?: VoiceCoachCustomerProfileRecord | null
   sceneCard?: VoiceCoachSceneCardRecord | null
@@ -239,6 +368,7 @@ export function buildVoiceCoachSessionSnapshot(args: {
   const customerProfile = normalizeCustomerProfileRecord(args.customerProfile || null)
   const sceneCard = normalizeSceneCardRecord(args.sceneCard || null)
   const liveNotes = String(args.liveNotes || "").trim().slice(0, 500)
+  const sceneKindPolicy = getVoiceCoachSceneKindPolicy(sceneCard?.scene_kind, sceneCard?.service_name)
 
   const summaryLines = [
     customerProfile
@@ -261,6 +391,7 @@ export function buildVoiceCoachSessionSnapshot(args: {
         ])
       : "",
     sceneCard ? formatBulletLine("训练目标", [sceneCard.scene_goal]) : "",
+    sceneCard ? formatBulletLine("沟通方法", sceneCard.communication_method_tags) : "",
     sceneCard ? formatBulletLine("重点环节", sceneCard.focus_stages) : "",
     sceneCard ? formatBulletLine("高频问题", sceneCard.likely_questions) : "",
     sceneCard ? formatBulletLine("重点异议", sceneCard.target_objections) : "",
@@ -271,6 +402,7 @@ export function buildVoiceCoachSessionSnapshot(args: {
 
   const promptLines = [
     ...summaryLines,
+    formatBulletLine("场景策略", [sceneKindPolicy.promptSummary]),
     customerProfile ? formatBulletLine("沟通风格", [customerProfile.communication_style]) : "",
     customerProfile ? formatBulletLine("建立信任的点", customerProfile.trust_triggers) : "",
     customerProfile ? formatBulletLine("过往经历", [customerProfile.past_experience]) : "",

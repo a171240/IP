@@ -5,7 +5,7 @@
 }
 
 .vc-library-minimal .compact-hero {
-  padding: 16rpx 16rpx;
+  padding: 20rpx 18rpx;
 }
 
 .vc-library-minimal .library-item-card + .library-item-card {
@@ -28,24 +28,29 @@
   white-space: nowrap;
 }
 
-.vc-library-minimal .hero .eyebrow,
-.vc-library-minimal .hero .title,
-.vc-library-minimal .hero .subtitle {
-  display: none;
-}
-
 .vc-library-minimal .hero-actions {
-  margin-top: 0;
+  margin-top: 16rpx;
+  gap: 10rpx;
 }
 
-.vc-library-minimal .library-item-meta .library-item-line + .library-item-line {
-  display: none;
+.vc-library-minimal .library-item-card {
+  gap: 14rpx;
 }
 
 .vc-library-minimal .muted.small {
   display: block;
   margin-top: 2rpx;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.vc-library-minimal .library-item-line {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.vc-library-minimal .library-item-meta .library-item-line + .library-item-line {
+  display: block;
 }

@@ -188,7 +188,7 @@
 }
 
 .hero-visual-card {
-  overflow: hidden;
+  overflow: visible;
   border-radius: 32rpx;
   padding: 22rpx 18rpx 18rpx;
   border: 1rpx solid rgba(229, 211, 179, 0.12);
@@ -221,7 +221,7 @@
 .hero-radar-stage {
   margin-top: 6rpx;
   border-radius: 26rpx;
-  overflow: hidden;
+  overflow: visible;
   position: relative;
   background:
     radial-gradient(120% 120% at 50% 0%, rgba(149, 236, 105, 0.06) 0%, rgba(255, 255, 255, 0) 44%),
@@ -410,7 +410,7 @@
 
 .tabs-shell {
   border-radius: 30rpx;
-  padding: 16rpx;
+  padding: 14rpx;
   background: rgba(15, 15, 20, 0.62);
   border: 1rpx solid rgba(229, 211, 179, 0.12);
   box-shadow:
@@ -421,59 +421,54 @@
 
 .tabs-label {
   display: block;
-  padding: 0 8rpx 14rpx;
+  padding: 0 8rpx 10rpx;
   font-size: 18rpx;
   font-weight: 700;
-  letter-spacing: 1.8rpx;
-  text-transform: uppercase;
+  letter-spacing: 1.4rpx;
   color: rgba(229, 211, 179, 0.72);
 }
 
 .tabs {
-  position: relative;
   display: flex;
   align-items: center;
-  padding: 6rpx;
-  border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1rpx solid rgba(255, 255, 255, 0.08);
-  overflow: hidden;
+  gap: 10rpx;
+}
+
+.tabs-compact {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  border: none;
+  overflow: visible;
 }
 
 .tab {
-  position: relative;
-  z-index: 1;
   flex: 1;
   text-align: center;
-  padding: 14rpx 0;
+  min-width: 0;
+  padding: 14rpx 12rpx;
   border-radius: 999rpx;
-  font-size: 23rpx;
+  font-size: 22rpx;
   line-height: 1.2;
   color: var(--vc-text-muted);
-  transition: color 0.24s ease;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1rpx solid rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.03);
+  transition: color 0.24s ease, background 0.24s ease, border-color 0.24s ease;
 }
 
 .tab.active {
   color: #16120c;
   font-weight: 800;
-}
-
-.tab-indicator {
-  position: absolute;
-  top: 6rpx;
-  bottom: 6rpx;
-  left: 6rpx;
-  width: calc((100% - 12rpx) / 5);
-  border-radius: 999rpx;
   background: linear-gradient(135deg, #dcc7a6 0%, #f1e3c6 50%, #c1a076 100%);
   box-shadow:
     0 10rpx 20rpx rgba(229, 211, 179, 0.16),
     inset 0 1rpx 0 rgba(255, 255, 255, 0.24);
-  transition: transform 0.28s ease;
+  border-color: rgba(229, 211, 179, 0.24);
 }
 
 .tab-body {
-  margin-top: 18rpx;
+  margin-top: 16rpx;
 }
 
 .tab-panel {
@@ -481,36 +476,43 @@
 }
 
 .tab-panel-head {
-  margin-bottom: 24rpx;
-  padding: 0 2rpx 2rpx;
+  margin-bottom: 20rpx;
+  padding: 24rpx 24rpx 20rpx;
+  border-radius: 30rpx;
+  background:
+    radial-gradient(120% 150% at 0% 0%, rgba(229, 211, 179, 0.08) 0%, rgba(255, 255, 255, 0) 58%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.038) 0%, rgba(255, 255, 255, 0.015) 100%);
+  border: 1rpx solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 14rpx 30rpx rgba(0, 0, 0, 0.2),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.05);
 }
 
 .tab-title {
   display: block;
   margin-top: 10rpx;
   padding: 0;
-  font-size: 42rpx;
-  line-height: 1.2;
+  font-size: 36rpx;
+  line-height: 1.24;
   font-weight: 900;
   color: #f5f2ea;
 }
 
 .tab-desc {
   display: block;
-  margin-top: 14rpx;
-  font-size: 25rpx;
-  line-height: 38rpx;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  line-height: 36rpx;
   color: var(--vc-text-muted);
 }
 
 .panel-block-title {
   display: block;
   margin: 0 4rpx 12rpx;
-  font-size: 22rpx;
+  font-size: 24rpx;
   line-height: 1.2;
   font-weight: 700;
-  letter-spacing: 1.4rpx;
-  text-transform: uppercase;
+  letter-spacing: 0.8rpx;
   color: rgba(229, 211, 179, 0.68);
 }
 
@@ -530,6 +532,21 @@
   box-shadow:
     0 16rpx 36rpx rgba(0, 0, 0, 0.24),
     inset 0 1rpx 0 rgba(255, 255, 255, 0.06);
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18rpx;
+}
+
+.metric-card-compact {
+  margin-bottom: 0;
+  min-height: 0;
+}
+
+.metric-row-compact {
+  align-items: flex-start;
 }
 
 .analysis-feature-top,
@@ -562,7 +579,7 @@
 .metric-name {
   flex: 1;
   min-width: 0;
-  font-size: 30rpx;
+  font-size: 28rpx;
   line-height: 1.35;
   font-weight: 800;
   color: var(--vc-text);
@@ -581,8 +598,8 @@
 
 .metric-text,
 .qa-text {
-  font-size: 28rpx;
-  line-height: 42rpx;
+  font-size: 26rpx;
+  line-height: 38rpx;
   color: var(--vc-text);
   white-space: pre-wrap;
   word-break: break-word;
@@ -658,7 +675,7 @@
 .linechart-card {
   position: relative;
   overflow: hidden;
-  padding: 20rpx 20rpx 16rpx;
+  padding: 20rpx 20rpx 18rpx;
 }
 
 .linechart-stage {

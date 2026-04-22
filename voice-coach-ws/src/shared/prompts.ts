@@ -26,6 +26,7 @@ export type BuildMergedPromptOptions = {
   history: VoiceCoachTurn[]
   beauticianText: string
   sessionContextText?: string
+  variationSeed?: string
 }
 
 export type BuildAsyncAnalysisPromptOptions = BuildMergedPromptOptions & {
@@ -47,6 +48,36 @@ function formatSessionContext(text?: string): string {
   return `当前训练设定：\n${normalized}`
 }
 
+function quickHash(input: string): number {
+  const text = String(input || "")
+  let hash = 0
+  for (let i = 0; i < text.length; i += 1) {
+    hash = (hash * 131 + text.charCodeAt(i)) >>> 0
+  }
+  return hash
+}
+
+function buildVariationDirective(seed?: string, historyLength = 0): string {
+  const normalizedSeed = String(seed || "").trim()
+  if (!normalizedSeed) return ""
+
+  const archetypes = [
+    "本轮顾客更偏谨慎核实，不要复用最泛的追问句式。",
+    "本轮顾客更偏信任缺口，会追着证据和边界问。",
+    "本轮顾客更偏现实安排，会优先问流程、恢复期或时间成本。",
+    "本轮顾客更偏比较判断，会优先追问差异、适配边界和值不值。",
+  ]
+  const nudges = [
+    "尽量换一个更自然的切入角度。",
+    "避免复述上一轮或上一场最常见的那句问法。",
+    "即使核心顾虑相同，也要换一个更具体的说法。",
+    "不要用固定模板句把对话带回同一路径。",
+  ]
+  const baseIndex = quickHash(`${normalizedSeed}:${historyLength}`) % archetypes.length
+  const nudgeIndex = quickHash(`${normalizedSeed}:nudge:${historyLength}`) % nudges.length
+  return `${archetypes[baseIndex]}${nudges[nudgeIndex]}`
+}
+
 export function formatHistory(history: VoiceCoachTurn[]): string {
   if (!history.length) return "(无历史对话)"
 
@@ -60,6 +91,7 @@ export function formatHistory(history: VoiceCoachTurn[]): string {
 }
 
 export function buildFastReplyPrompt(opts: BuildMergedPromptOptions): ChatMessage[] {
+  const variationDirective = buildVariationDirective(opts.variationSeed, opts.history.length)
   const system = [
     "你是美容销售训练里的模拟顾客，只生成下一句顾客回复。",
     `场景：${opts.scenario.name}`,
@@ -73,9 +105,10 @@ export function buildFastReplyPrompt(opts: BuildMergedPromptOptions): ChatMessag
     "1. 先写 1 句顾客回复，优先 20-50 字，最多 60 字。",
     "2. 口语化、自然，带明确顾虑或兴趣点，只站在顾客视角推进对话。",
     "3. 顾客不是来配合成交的；如果美容师回答空泛、夸大、施压或跳过顾虑，顾客要自然追问或后撤。",
-    "4. 优先围绕时间、价格、安全、效果、案例、服务一致性、是否推销这些真实顾虑推进。",
+    "4. 如果训练设定里标明是到店顾客训练，就优先围绕信任、安全、恢复期、时间安排和是否会被推销来追问；如果标明是新品推广训练，就优先围绕原理、适用边界、证据、比较和价值来追问。",
     "5. 如果有当前训练设定，必须与设定里的顾客、场景和项目保持一致。",
     "6. 不要解释、列表、JSON、引号、角色名或舞台说明。",
+    variationDirective ? `6.5 ${variationDirective}` : "",
     `7. 换行后单独输出 ${REPLY_META_DELIMITER}`,
     '8. 最后一行输出紧凑 JSON：{"emotion":"neutral|worried|skeptical|impatient|pleased","tag":"话题标签"}',
     "极简示例：我还是想先弄清楚，会不会做完反而更敏感？",
@@ -111,7 +144,8 @@ export function buildAsyncAnalysisPrompt(opts: BuildAsyncAnalysisPromptOptions):
     "1. suggestions 必须正好 3 条，短句、具体、能立刻执行。",
     "2. polished 要更自然、更稳妥、可直接说出口，同时保持推进感；优先体现“接情绪 -> 讲事实 -> 给下一步”。",
     "3. 不要夸大承诺，不碰医疗结论。",
-    "4. 不鼓励逼单、恐吓、伪限时或替顾客做决定。",
+    "4. 到店顾客训练更看重信任建立、流程/恢复期解释；新品推广训练更看重原理、适用边界、证据和价值。",
+    "5. 不鼓励逼单、恐吓、伪限时或替顾客做决定。",
   ].join("\n")
 
   const user = [

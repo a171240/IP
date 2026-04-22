@@ -96,19 +96,14 @@ function resolveDefaultProfileDir(cliPath) {
   return path.join(hashDirs[0], "Default")
 }
 
-function resetIdeServiceState(cliPath) {
+function writeIdeServiceState(cliPath, idePort) {
+  if (!idePort) return
   const defaultProfileDir = resolveDefaultProfileDir(cliPath)
   if (!defaultProfileDir) return
 
   fs.mkdirSync(defaultProfileDir, { recursive: true })
-  fs.writeFileSync(path.join(defaultProfileDir, ".ide-status"), "Off", "ascii")
-
-  for (const name of [".ide", ".cli"]) {
-    const filePath = path.join(defaultProfileDir, name)
-    try {
-      fs.unlinkSync(filePath)
-    } catch {}
-  }
+  fs.writeFileSync(path.join(defaultProfileDir, ".ide-status"), "On", "ascii")
+  fs.writeFileSync(path.join(defaultProfileDir, ".ide"), String(idePort), "ascii")
 }
 
 function buildCliArgs(command, extraArgs) {
@@ -130,6 +125,12 @@ function quoteForPowerShell(value) {
   return `'${String(value).replaceAll("'", "''")}'`
 }
 
+function detectIdePort(output) {
+  const matches = [...String(output || "").matchAll(/http:\/\/127\.0\.0\.1:(\d+)/g)]
+  if (!matches.length) return 0
+  return Number.parseInt(matches[matches.length - 1][1], 10) || 0
+}
+
 function runCliCommand(cliPath, args, { autoConfirm = false } = {}) {
   return new Promise((resolve, reject) => {
     const cliInvocation = `& ${quoteForPowerShell(cliPath)} ${args.map(quoteForPowerShell).join(" ")}`
@@ -138,8 +139,21 @@ function runCliCommand(cliPath, args, { autoConfirm = false } = {}) {
     const child = spawn("powershell.exe", ["-NoProfile", "-Command", psCommand], {
       cwd: repoRoot,
       env: process.env,
-      stdio: ["inherit", "inherit", "inherit"],
+      stdio: ["inherit", "pipe", "pipe"],
     })
+
+    let combinedOutput = ""
+
+    const pipeOutput = (stream, writer) => {
+      stream.on("data", (chunk) => {
+        const text = chunk.toString()
+        combinedOutput += text
+        writer.write(text)
+      })
+    }
+
+    pipeOutput(child.stdout, process.stdout)
+    pipeOutput(child.stderr, process.stderr)
 
     child.on("error", reject)
 
@@ -148,18 +162,22 @@ function runCliCommand(cliPath, args, { autoConfirm = false } = {}) {
         reject(new Error(`WeChat DevTools CLI exited with signal ${signal}`))
         return
       }
-      resolve(code ?? 1)
+      resolve({
+        exitCode: code ?? 1,
+        detectedIdePort: detectIdePort(combinedOutput),
+      })
     })
   })
 }
 
 async function bootstrapIde(cliPath, extraArgs) {
-  resetIdeServiceState(cliPath)
-
   const bootstrapArgs = buildCliArgs("open", extraArgs)
-  const exitCode = await runCliCommand(cliPath, bootstrapArgs, { autoConfirm: true })
-  if (exitCode !== 0) {
-    process.exit(exitCode)
+  const result = await runCliCommand(cliPath, bootstrapArgs, { autoConfirm: true })
+  if (result.detectedIdePort) {
+    writeIdeServiceState(cliPath, result.detectedIdePort)
+  }
+  if (result.exitCode !== 0) {
+    process.exit(result.exitCode)
   }
 }
 
@@ -178,16 +196,17 @@ async function main() {
     process.exit(0)
   }
 
-  if (command === "open") {
-    resetIdeServiceState(cliPath)
-  } else if (COMMANDS_NEED_BOOTSTRAP.has(command)) {
+  if (COMMANDS_NEED_BOOTSTRAP.has(command)) {
     await bootstrapIde(cliPath, extraArgs.includes("--debug") ? ["--debug"] : [])
   }
 
   const args = buildCliArgs(command, extraArgs)
   const autoConfirm = COMMANDS_NEED_AUTO_CONFIRM.has(command)
-  const exitCode = await runCliCommand(cliPath, args, { autoConfirm })
-  process.exit(exitCode)
+  const result = await runCliCommand(cliPath, args, { autoConfirm })
+  if (result.detectedIdePort) {
+    writeIdeServiceState(cliPath, result.detectedIdePort)
+  }
+  process.exit(result.exitCode)
 }
 
 main().catch((error) => {

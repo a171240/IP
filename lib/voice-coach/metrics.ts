@@ -64,23 +64,90 @@ export function scoreExpressionFromFillerRatio(ratio: number | null): number {
   return clampScore(95 - ratio * 375)
 }
 
+export function normalizeAsrConfidence(conf: number | null | undefined): number | null {
+  const raw = Number(conf)
+  if (!Number.isFinite(raw)) return null
+  if (raw <= 0.01) return null
+  if (raw > 1 && raw <= 100) return raw / 100
+  if (raw > 1) return null
+  return Math.max(0, Math.min(1, raw))
+}
+
+export function estimatePronunciationFromSpeech(opts: {
+  transcript?: string | null
+  wpm: number | null
+  fillerRatio: number | null
+}): number {
+  const transcript = String(opts.transcript || "")
+  const chars = countChineseChars(transcript)
+  const paceScore = scoreFluencyFromWpm(opts.wpm)
+  const fillerScore = scoreExpressionFromFillerRatio(opts.fillerRatio)
+
+  let articulationBase = 72
+  if (chars >= 22) articulationBase = 82
+  else if (chars >= 14) articulationBase = 78
+  else if (chars >= 8) articulationBase = 74
+  else if (chars <= 3) articulationBase = 64
+
+  return clampScore(articulationBase * 0.25 + paceScore * 0.45 + fillerScore * 0.3)
+}
+
+export function derivePronunciationSignal(opts: {
+  transcript?: string | null
+  wpm: number | null
+  fillerRatio: number | null
+  asrConfidence: number | null
+}): {
+  score: number
+  normalizedConfidence: number | null
+  estimatedScore: number
+  source: "confidence" | "estimated"
+} {
+  const normalizedConfidence = normalizeAsrConfidence(opts.asrConfidence)
+  const estimatedScore = estimatePronunciationFromSpeech(opts)
+  if (normalizedConfidence == null) {
+    return {
+      score: estimatedScore,
+      normalizedConfidence: null,
+      estimatedScore,
+      source: "estimated",
+    }
+  }
+
+  return {
+    score: clampScore(normalizedConfidence * 100 * 0.72 + estimatedScore * 0.28),
+    normalizedConfidence,
+    estimatedScore,
+    source: "confidence",
+  }
+}
+
 export function scorePronunciationFromAsrConfidence(conf: number | null): number {
-  if (conf == null) return 70
-  return clampScore(conf * 100)
+  const normalized = normalizeAsrConfidence(conf)
+  if (normalized == null) return 70
+  return clampScore(normalized * 100)
 }
 
 export function computePerTurnScores(opts: {
+  transcript?: string | null
   wpm: number | null
   fillerRatio: number | null
   asrConfidence: number | null
   llmPersuasion?: number | null
   llmOrganization?: number | null
 }): Record<string, number> {
+  const pronunciation = derivePronunciationSignal({
+    transcript: opts.transcript,
+    wpm: opts.wpm,
+    fillerRatio: opts.fillerRatio,
+    asrConfidence: opts.asrConfidence,
+  }).score
+
   return {
     persuasion: clampScore(opts.llmPersuasion ?? 70),
     fluency: scoreFluencyFromWpm(opts.wpm),
     expression: scoreExpressionFromFillerRatio(opts.fillerRatio),
-    pronunciation: scorePronunciationFromAsrConfidence(opts.asrConfidence),
+    pronunciation,
     organization: clampScore(opts.llmOrganization ?? 68),
   }
 }

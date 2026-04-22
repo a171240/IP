@@ -71,12 +71,17 @@ const TAB_TITLE_MAP = {
   persuasion: "说服力",
   fluency: "流利度",
   expression: "语言表达",
-  pronunciation: "发音准确度",
   organization: "语言组织",
 }
 
-const TAB_ORDER = ["persuasion", "fluency", "expression", "pronunciation", "organization"]
+const TAB_ORDER = ["persuasion", "fluency", "expression", "organization"]
 const TAB_ITEMS = TAB_ORDER.map((id) => ({ id, label: TAB_TITLE_MAP[id] }))
+
+function formatDimensionScore(score) {
+  const value = Number(score || 0)
+  if (!Number.isFinite(value)) return 0
+  return Math.round(value)
+}
 
 function getTabIndex(tab) {
   const idx = TAB_ORDER.indexOf(tab)
@@ -142,18 +147,50 @@ function buildHeroHighlights(report, dimension) {
   if (strongest) {
     highlights.push({
       label: "最强维度",
-      value: `${strongest.name} · ${strongest.score}分`,
+      value: `${strongest.name} · ${formatDimensionScore(strongest.score)}分`,
     })
   }
 
   if (weakest) {
     highlights.push({
       label: "优先提升",
-      value: `${weakest.name} · ${weakest.score}分`,
+      value: `${weakest.name} · ${formatDimensionScore(weakest.score)}分`,
     })
   }
 
   return highlights.slice(0, 3)
+}
+
+function buildFallbackSummaryBlocks(dimension) {
+  const sorted = (Array.isArray(dimension) ? dimension.slice() : []).sort((a, b) => Number(b.score || 0) - Number(a.score || 0))
+  const strongest = sorted[0]
+  const weakest = sorted[sorted.length - 1]
+  const strongestName = strongest && strongest.name ? strongest.name : "语言表达"
+  const weakestName = weakest && weakest.name ? weakest.name : "语言组织"
+
+  return [
+    `优势：${strongestName}相对更稳，当前表达主干已经比较清楚。`,
+    `改进：${weakestName}还可以再收束一点，优先把重点句说短、把关键信息放前面。`,
+    "下一轮：先接住顾客顾虑，再补一条证据和一个低压力下一步。",
+  ]
+}
+
+function normalizeSummaryBlocks(report, dimension) {
+  const raw = Array.isArray(report && report.summary_blocks) ? report.summary_blocks : []
+  const filtered = raw.filter((item) => {
+    const text = String(item || "").trim()
+    if (!text) return false
+    return !/发音准确度|语音清晰度|可识别度/.test(text)
+  })
+
+  if (filtered.length >= 3) return filtered.slice(0, 3)
+
+  const fallback = buildFallbackSummaryBlocks(dimension)
+  const next = filtered.slice()
+  while (next.length < 3) {
+    next.push(fallback[next.length])
+  }
+  return next.slice(0, 3)
 }
 
 function normalizeTurn(raw) {
@@ -172,10 +209,13 @@ function normalizeTurn(raw) {
 function normalizeReport(report) {
   if (!report) return null
   const tabs = report.tabs || {}
-  const dimension = (report.dimension || []).map((d) => ({
-    ...d,
-    stars_text: starsText(d.stars),
-  }))
+  const dimension = (report.dimension || [])
+    .filter((d) => String(d && d.id || "") !== "pronunciation")
+    .map((d) => ({
+      ...d,
+      display_score: formatDimensionScore(d.score),
+      stars_text: starsText(d.stars),
+    }))
 
   function attachCanvasIds(charts, prefix) {
     return (Array.isArray(charts) ? charts : []).map((chart, index) => ({
@@ -192,6 +232,7 @@ function normalizeReport(report) {
   return {
     ...report,
     dimension,
+    summary_blocks: normalizeSummaryBlocks(report, dimension),
     hero_highlights: buildHeroHighlights(report, dimension),
     tabs: {
       ...tabs,
@@ -202,10 +243,6 @@ function normalizeReport(report) {
       expression: {
         ...(tabs.expression || {}),
         charts: attachCanvasIds(tabs.expression && tabs.expression.charts, "expression"),
-      },
-      pronunciation: {
-        ...(tabs.pronunciation || {}),
-        charts: attachCanvasIds(tabs.pronunciation && tabs.pronunciation.charts, "pronunciation"),
       },
       organization: {
         ...(tabs.organization || {}),
@@ -272,7 +309,10 @@ Page({
     const lineRect = await this.measureSelector(".linechart-stage")
 
     const nextData = {
-      radarCanvasSize: radarRect && radarRect.width ? Math.round(Math.max(188, Math.min(radarRect.width - 2, 260))) : Math.round(Math.max(188, Math.min(236, fallbackWidth - 24))),
+      radarCanvasSize:
+        radarRect && radarRect.width
+          ? Math.round(Math.max(220, Math.min(radarRect.width + 26, 292)))
+          : Math.round(Math.max(220, Math.min(264, fallbackWidth + 8))),
       lineChartWidth: lineRect && lineRect.width ? Math.round(lineRect.width) : Math.round(fallbackWidth),
       lineChartHeight: 188,
     }
@@ -389,17 +429,16 @@ Page({
   },
 
   animateScore(targetScore) {
-    var self = this
     var current = 0
     var step = Math.max(1, Math.round(targetScore / 40))
     if (this._scoreTimer) clearInterval(this._scoreTimer)
-    self.setData({ animatedScore: 0 })
-    this._scoreTimer = setInterval(function() {
+    this.setData({ animatedScore: 0 })
+    this._scoreTimer = setInterval(() => {
       current = Math.min(current + step, targetScore)
-      self.setData({ animatedScore: current })
+      this.setData({ animatedScore: current })
       if (current >= targetScore) {
-        clearInterval(self._scoreTimer)
-        self._scoreTimer = null
+        clearInterval(this._scoreTimer)
+        this._scoreTimer = null
       }
     }, 25)
   },
@@ -450,9 +489,16 @@ Page({
     if (!canvasRef) return
 
     const { ctx, width: w, height: h } = canvasRef
+    const sidePad = Math.max(24, Math.round(w * 0.09))
+    const topPad = Math.max(28, Math.round(h * 0.12))
+    const bottomPad = Math.max(24, Math.round(h * 0.1))
+    const labelGap = Math.max(16, Math.round(w * 0.06))
     const cx = w / 2
-    const cy = h / 2
-    const radius = Math.max(70, Math.min(96, Math.round(w * 0.34)))
+    const cy = topPad + (h - topPad - bottomPad) / 2 + Math.round(h * 0.01)
+    const radius = Math.max(
+      66,
+      Math.min(92, Math.round(Math.min((w - sidePad * 2) / 2, (h - topPad - bottomPad) / 2) - labelGap)),
+    )
     const n = dims.length
 
     ctx.clearRect(0, 0, w, h)
@@ -489,7 +535,7 @@ Page({
       ctx.stroke()
 
       const label = String(dims[i].name || "")
-      const labelDist = radius + Math.max(18, Math.round(w * 0.08))
+      const labelDist = radius + labelGap
       const lx = cx + labelDist * Math.cos(a)
       const ly = cy + labelDist * Math.sin(a)
 

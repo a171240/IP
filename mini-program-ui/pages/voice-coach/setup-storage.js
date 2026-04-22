@@ -165,6 +165,7 @@ function buildSetupBrief(input) {
         )
       : "",
     sceneCard ? formatLine("训练目标", sceneCard.scene_goal) : "",
+    sceneCard ? formatListLine("沟通方法", sceneCard.communication_method_tags, 4) : "",
     sceneCard ? formatListLine("重点环节", sceneCard.focus_stages, 4) : "",
     sceneCard ? formatListLine("高频问题", sceneCard.likely_questions, 4) : "",
     sceneCard ? formatListLine("重点异议", sceneCard.target_objections, 4) : "",

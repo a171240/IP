@@ -431,6 +431,7 @@ export class TurnOrchestrator {
       history,
       beauticianText: params.promptBeauticianText,
       sessionContextText: this.session.sessionContextText,
+      variationSeed: `${this.session.sessionId}:${history.length}`,
     })
 
     let sentenceIndex = 0

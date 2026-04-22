@@ -5,6 +5,7 @@ import { randomUUID } from "crypto"
 import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
 import { llmAnalyzeBeauticianTurn, llmGenerateCustomerTurn, type TurnAnalysis } from "@/lib/voice-coach/llm.server"
 import { calcFillerRatio, calcWpm, computePerTurnScores } from "@/lib/voice-coach/metrics"
+import { getVoiceCoachSceneKindPolicy } from "@/lib/voice-coach/scene-kind-policy"
 import { getVoiceCoachSessionInsights } from "@/lib/voice-coach/session-context-insights"
 import { getVoiceCoachSessionPromptContext } from "@/lib/voice-coach/session-context"
 import { getScenario, type VoiceCoachEmotion } from "@/lib/voice-coach/scenarios"
@@ -305,6 +306,7 @@ function dynamicFallbackLines(tag: string, focus: string): string[] {
 }
 
 function buildContextualFallbackLines(args: {
+  sceneKind: string
   serviceName: string
   sceneGoal: string
   coreConcerns: string[]
@@ -313,6 +315,7 @@ function buildContextualFallbackLines(args: {
   mustCoverPoints: string[]
 }) {
   const serviceLabel = args.serviceName || "这个项目"
+  const sceneKindPolicy = getVoiceCoachSceneKindPolicy(args.sceneKind, serviceLabel)
   const lines: string[] = []
 
   args.coreConcerns.slice(0, 2).forEach((item) => {
@@ -335,6 +338,10 @@ function buildContextualFallbackLines(args: {
     lines.push(`如果这次只是想先判断“${args.sceneGoal}”，你会建议我先了解哪一块？`)
   }
 
+  sceneKindPolicy.fallbackQuestions.forEach((item) => {
+    lines.push(item)
+  })
+
   return Array.from(new Set(lines.filter(Boolean)))
 }
 
@@ -343,6 +350,7 @@ function fallbackCustomerTurn(opts: {
   history: Array<{ role: "customer" | "beautician"; text: string }>
   beauticianText: string
   sessionSnapshot?: unknown
+  variationSeed?: string
 }): {
   text: string
   emotion: VoiceCoachEmotion
@@ -355,6 +363,7 @@ function fallbackCustomerTurn(opts: {
   const focus = continuityAnchor || detectFocusKeyword(opts.beauticianText)
   const sessionInsights = getVoiceCoachSessionInsights({ snapshot: opts.sessionSnapshot })
   const contextLines = buildContextualFallbackLines({
+    sceneKind: sessionInsights.sceneKind,
     serviceName: sessionInsights.serviceName,
     sceneGoal: sessionInsights.sceneGoal,
     coreConcerns: sessionInsights.coreConcerns,
@@ -376,7 +385,7 @@ function fallbackCustomerTurn(opts: {
         ]
       : []
   const mergedPool = Array.from(new Set([...continuityLines, ...pool]))
-  const seedText = `${opts.beauticianText}|${lastCustomer?.text || ""}|${beauticianTurns}|${inferredTag}`
+  const seedText = `${opts.beauticianText}|${lastCustomer?.text || ""}|${beauticianTurns}|${inferredTag}|${String(opts.variationSeed || "")}`
   let idx = quickHash(seedText) % mergedPool.length
   let picked = mergedPool[idx]
 
@@ -808,12 +817,14 @@ async function processMainStage(args: {
   const sessionContextText = getVoiceCoachSessionPromptContext(loaded.session.scenario_snapshot_json)
   const history = await buildHistory(args.sessionId, Number(loaded.turn.turn_index))
   const llmStartedAt = Date.now()
+  const customerTurnIndex = Number(loaded.turn.turn_index) + 1
 
   let nextCustomer = fallbackCustomerTurn({
     scenario,
     history,
     beauticianText: asr.text,
     sessionSnapshot: loaded.session.scenario_snapshot_json,
+    variationSeed: `${args.sessionId}:${customerTurnIndex}`,
   })
   let llmFallbackUsed = false
   let llmFallbackReason = ""
@@ -824,6 +835,7 @@ async function processMainStage(args: {
       target:
         "Continue the same objection thread. Directly follow up on the beautician's latest reply, and ask for one concrete proof point, condition, example, risk-control detail, trial arrangement, or next step tied to what they just said.",
       sessionContextText: sessionContextText || undefined,
+      variationSeed: `${args.sessionId}:${customerTurnIndex}`,
     })
   } catch (err: any) {
     llmFallbackUsed = true
@@ -833,11 +845,11 @@ async function processMainStage(args: {
       history,
       beauticianText: asr.text,
       sessionSnapshot: loaded.session.scenario_snapshot_json,
+      variationSeed: `${args.sessionId}:${customerTurnIndex}`,
     })
   }
   const normalizedNextCustomerTag = normalizeScenarioTag(nextCustomer.tag, scenario)
 
-  const customerTurnIndex = Number(loaded.turn.turn_index) + 1
   const nextCustomerTurnIndex = turnIndexOrNull(customerTurnIndex, args.resultState.next_customer_turn_index)
   const { data: existingCustomerAtIndex } = await admin
     .from("voice_coach_turns")
@@ -1190,6 +1202,7 @@ async function processAnalysisStage(args: {
     const asrConf = typeof args.resultState.beautician_asr_confidence === "number" ? args.resultState.beautician_asr_confidence : null
 
     analysis.per_turn_scores = computePerTurnScores({
+      transcript: beauticianText,
       wpm,
       fillerRatio,
       asrConfidence: asrConf,

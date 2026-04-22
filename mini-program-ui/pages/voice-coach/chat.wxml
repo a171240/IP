@@ -217,27 +217,16 @@
   >
     <view class="chat-inner">
       <view
-        wx:if="{{sessionContext.sceneName || sessionContext.customerName || sessionContext.summaryLines.length}}"
-        class="session-brief"
+        wx:if="{{sessionContext.customerName || sessionContext.sceneName || sessionContext.serviceName}}"
+        class="session-brief session-brief-compact"
       >
-        <view class="row space-between">
-          <view>
-            <text class="session-brief-title">本次训练背景</text>
-            <text wx:if="{{sessionContext.sceneName}}" class="session-brief-name">{{sessionContext.sceneName}}</text>
-          </view>
-          <text wx:if="{{sessionContext.sceneKindLabel}}" class="tag tag-accent">{{sessionContext.sceneKindLabel}}</text>
-        </view>
-
-        <text wx:if="{{sessionContext.customerName}}" class="session-brief-meta">
-          顾客：{{sessionContext.customerName}}{{sessionContext.customerSummary ? ' · ' + sessionContext.customerSummary : ''}}
-        </text>
-        <text wx:if="{{sessionContext.serviceName}}" class="session-brief-meta">项目：{{sessionContext.serviceName}}</text>
-        <text wx:if="{{sessionContext.liveNotes}}" class="session-brief-meta">补充：{{sessionContext.liveNotes}}</text>
-
-        <view wx:if="{{sessionContext.summaryLines.length}}" class="session-brief-lines">
-          <view class="session-brief-line" wx:for="{{sessionContext.summaryLines}}" wx:key="index">
-            <view class="session-brief-dot"></view>
-            <text class="session-brief-text">{{item}}</text>
+        <view class="session-brief-inline">
+          <view class="session-brief-avatar">顾客</view>
+          <view class="session-brief-main">
+            <text class="session-brief-name">{{sessionContext.customerName || sessionContext.sceneName || '本次训练'}}</text>
+            <text wx:if="{{sessionContext.serviceName || sessionContext.sceneKindLabel}}" class="session-brief-meta">
+              {{sessionContext.serviceName || sessionContext.sceneKindLabel}}
+            </text>
           </view>
         </view>
       </view>

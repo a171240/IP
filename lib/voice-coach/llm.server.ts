@@ -99,6 +99,36 @@ function formatSessionContext(sessionContextText?: string): string {
   return `High-priority training context (override generic defaults when they conflict):\n${text}`
 }
 
+function quickHash(input: string): number {
+  const text = String(input || "")
+  let hash = 0
+  for (let i = 0; i < text.length; i += 1) {
+    hash = (hash * 131 + text.charCodeAt(i)) >>> 0
+  }
+  return hash
+}
+
+function buildVariationDirective(seed?: string, historyLength = 0): string {
+  const normalizedSeed = String(seed || "").trim()
+  if (!normalizedSeed) return ""
+
+  const archetypes = [
+    "Use a cautious, detail-checking tone and avoid the most generic opener.",
+    "Use a trust-gap tone and push for one concrete proof point.",
+    "Use a practical tone and focus on process, recovery, or visit arrangement.",
+    "Use a comparison-first tone and pressure-test value or suitability boundaries.",
+  ]
+  const nudges = [
+    "Keep the wording fresh for this run instead of repeating the default phrasing.",
+    "Prefer a new angle over restating the same concern in the same wording.",
+    "Use a slightly different objection shape even if the core concern is similar.",
+    "Avoid opening with the exact same sentence pattern as previous sessions.",
+  ]
+  const baseIndex = quickHash(`${normalizedSeed}:${historyLength}`) % archetypes.length
+  const nudgeIndex = quickHash(`${normalizedSeed}:nudge:${historyLength}`) % nudges.length
+  return `${archetypes[baseIndex]} ${nudges[nudgeIndex]}`
+}
+
 async function apimartChatJson<T>(opts: {
   messages: ChatMessage[]
   schema: z.ZodType<T>
@@ -259,9 +289,11 @@ export async function llmGenerateCustomerTurn(opts: {
   history: Array<{ role: "customer" | "beautician"; text: string; emotion?: VoiceCoachEmotion }>
   target?: string
   sessionContextText?: string
+  variationSeed?: string
 }): Promise<CustomerTurn> {
   const latestCustomerConcern = findLatestHistoryText(opts.history, "customer")
   const latestBeauticianReply = findLatestHistoryText(opts.history, "beautician")
+  const variationDirective = buildVariationDirective(opts.variationSeed, opts.history.length)
 
   const system = [
     "You are roleplaying the CUSTOMER in a Chinese beauty-sales training chat.",
@@ -271,10 +303,13 @@ export async function llmGenerateCustomerTurn(opts: {
     "The customer is realistic, cautious, and not easy to pressure into a purchase.",
     "When training context includes explicit core concerns, trust triggers, past experience, or communication style, treat those as the primary persona source.",
     "If explicit core concerns are provided, they outrank past-experience clues when choosing the first customer objection.",
+    "If the training context marks this as customer_visit, keep the customer focused on trust, safety, recovery time, visit arrangement, and whether they will be sold to.",
+    "If the training context marks this as offer_promo, keep the customer focused on mechanism, suitability boundaries, evidence, comparison, and whether it is worth it.",
     "Stay on the same objection thread as the latest customer concern.",
     "Directly react to the beautician's most recent reply instead of switching to a generic new concern.",
     "Ask for one concrete proof point, condition, example, boundary, risk-control detail, or next step.",
     "If training context is provided, stay consistent with that named customer, service, and scene.",
+    variationDirective,
     "Write natural spoken Chinese only, one short customer utterance, roughly 10-35 Chinese characters.",
     "Do not praise the beautician. Do not summarise the whole conversation. Do not reset the topic.",
     "Return strict JSON only.",
@@ -295,6 +330,7 @@ export async function llmGenerateCustomerTurn(opts: {
     "- Ask for specifics, proof, conditions, or a concrete example.",
     "- If the training context includes explicit concerns or trust gaps, prioritize one of those instead of inventing a generic concern.",
     "- If explicit core concerns are provided, do not replace them with a different concern just because past experience suggests another angle.",
+    variationDirective ? `- Variation directive for this run: ${variationDirective}` : "",
     "- Output the JSON object only.",
   ].filter(Boolean)
 
@@ -328,6 +364,7 @@ export async function llmAnalyzeBeauticianAndGenerateNext(opts: {
     "3) 给出少量高亮片段，指出问题点或亮点。",
     "4) 生成下一句顾客回复，保持顾客人设和当前顾虑连续。",
     "5) 如果训练设定里明确写了顾客关注点、信任触发点或过往经历，下一句顾客话术要优先围绕这些信息推进，不要回到泛化异议。",
+    "6) 如果训练设定里标明是到店顾客训练，就更看重信任、安全、恢复期和到店决策；如果标明是新品推广训练，就更看重原理、适用边界、证据和价值。",
     "优先方法：先接情绪，再澄清事实，再确认期待；价格/怀疑/犹豫类问题优先使用 Feel / Felt / Found。",
     "不要使用逼单、恐吓、伪限时、替顾客做决定或虚假承诺。",
     "只输出严格 JSON，不要任何额外文字。",
@@ -390,6 +427,7 @@ export async function llmAnalyzeBeauticianTurn(opts: {
     "3) 不要给医疗诊断、疗效承诺、虚假数据。",
     "4) 不鼓励硬压、恐吓、替顾客做决定或伪限时成交。",
     "5) 如果训练设定里已经写明了顾客的关注点、信任触发点或过往经历，评估和润色必须围绕这些具体信息。",
+    "6) 如果训练设定里标明是到店顾客训练，就优先看是否接住顾虑、建立信任、解释流程与恢复期；如果是新品推广训练，就优先看是否讲清原理、适用边界、证据和价值。",
   ].join("\n")
 
   const userParts = [
@@ -429,6 +467,7 @@ export async function llmGenerateHint(opts: {
     "优先方法：先接情绪，再澄清事实，再确认期待；价格/怀疑/犹豫类问题优先使用 Feel / Felt / Found。",
     "不要给医疗诊断、疗效承诺、逼单、恐吓或伪限时表达。",
     "如果训练设定里已经给出顾客的关注点和建立信任方式，提示要围绕这些具体信息，不要给空泛建议。",
+    "如果训练设定里标明是到店顾客训练，就优先提示信任建立、评估流程、恢复期和低压力推进；如果是新品推广训练，就优先提示原理、适用边界、证据和价值解释。",
   ].join("\n")
 
   const userParts = [

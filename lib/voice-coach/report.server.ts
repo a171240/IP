@@ -4,12 +4,13 @@ import {
   calcWpm,
   clampScore,
   DEFAULT_TARGET_WPM_RANGE,
+  derivePronunciationSignal,
   scoreExpressionFromFillerRatio,
   scoreFluencyFromWpm,
-  scorePronunciationFromAsrConfidence,
   scoreToStars,
 } from "./metrics"
 import { type DimensionId, VoiceCoachReportSchema, type VoiceCoachReport } from "./report"
+import { getVoiceCoachSceneKindPolicy } from "./scene-kind-policy"
 import { getVoiceCoachSessionInsights } from "./session-context-insights"
 import { normalizeScenarioTag } from "./tag-utils"
 
@@ -53,6 +54,35 @@ function safeAvg(nums: Array<number | null | undefined>): number | null {
   const vals = nums.filter((n): n is number => typeof n === "number" && Number.isFinite(n))
   if (!vals.length) return null
   return vals.reduce((a, b) => a + b, 0) / vals.length
+}
+
+function safeSpread(nums: Array<number | null | undefined>): number | null {
+  const vals = nums.filter((n): n is number => typeof n === "number" && Number.isFinite(n))
+  if (vals.length < 2) return null
+  return Math.max(...vals) - Math.min(...vals)
+}
+
+function pronunciationStatus(score: number | null): string {
+  const n = Number(score)
+  if (!Number.isFinite(n)) return "一般"
+  if (n >= 82) return "稳定"
+  if (n >= 70) return "一般"
+  return "待加强"
+}
+
+function pronunciationStabilityStatus(spread: number | null): string {
+  if (spread == null) return "一般"
+  if (spread <= 10) return "稳定"
+  if (spread <= 18) return "一般"
+  return "待加强"
+}
+
+function pronunciationStabilityScore(spread: number | null): number {
+  if (spread == null) return 72
+  if (spread <= 8) return 88
+  if (spread <= 14) return 78
+  if (spread <= 22) return 68
+  return 58
 }
 
 function weightedTotal(scores: DimensionScores): number {
@@ -130,17 +160,17 @@ function aggregateDimensionScores(turns: VoiceCoachTurnRow[]): DimensionScores |
 
 function buildTurnCurve(
   turns: VoiceCoachTurnRow[],
-  extractor: (turn: VoiceCoachTurnRow) => number | null,
+  extractor: (turn: VoiceCoachTurnRow, index: number) => number | null,
 ): Array<{ x: number; y: number }> {
   let elapsed = 0
   const points: Array<{ x: number; y: number }> = []
 
-  for (const turn of turns) {
-    const value = extractor(turn)
+  turns.forEach((turn, index) => {
+    const value = extractor(turn, index)
     const seconds = Number(turn.audio_seconds || 0)
     elapsed += seconds
     if (value != null) points.push({ x: Math.round(elapsed), y: value })
-  }
+  })
 
   return points.length >= 2 ? points : []
 }
@@ -320,6 +350,7 @@ function buildTrainingContextReview(args: {
     sessionContext: args.sessionContext,
   })
   if (!insights.hasContext) return undefined
+  const sceneKindPolicy = getVoiceCoachSceneKindPolicy(insights.sceneKind, insights.serviceName)
 
   const priorityPoints = uniqueLimited(
     [...insights.mustCoverPoints, ...insights.targetObjections, ...insights.communicationMethodTags],
@@ -363,6 +394,9 @@ function buildTrainingContextReview(args: {
   return {
     title: "顾客/场景命中复盘",
     background_summary: insights.backgroundSummary,
+    scene_kind: insights.sceneKind,
+    scene_kind_label: insights.sceneKindLabel,
+    policy_focus: sceneKindPolicy.reportFocus,
     focus_points: focusPoints,
     hit_points: uniqueLimited(hitPoints, 4),
     missed_points: uniqueLimited(missedPoints, 4),
@@ -374,17 +408,27 @@ function buildNextStepBlock(trainingContext?: TrainingContextReview) {
   const missed = trainingContext?.missed_points?.[0]
   const hit = trainingContext?.hit_points?.[0]
   const risk = trainingContext?.risk_points?.[0]
+  const sceneKind = String(trainingContext?.scene_kind || "").trim()
+  const policyFocus = String(trainingContext?.policy_focus || "").trim()
+  const actionFocus =
+    sceneKind === "offer_promo"
+      ? "优先把原理、适用边界或价值差异讲清，再给一个不施压的判断建议。"
+      : sceneKind === "customer_visit"
+        ? "优先接住顾虑，讲清评估、流程或恢复期安排，再给一个低压力到店下一步。"
+        : "先接情绪，再补一条证据和一个低压力下一步。"
 
   if (missed) {
     const riskTail = risk ? ` 同时${risk}。` : ""
-    return `下一轮：先把“${missed}”这一点说清楚，再补一条可验证信息和一个低压力下一步。${riskTail}`
+    return `下一轮：先把“${missed}”这一点说清楚，${actionFocus}${riskTail}`
   }
 
   if (hit) {
-    return `下一轮：可以继续沿着“${hit}”往下讲，先接住情绪，再给证据和行动建议。`
+    return `下一轮：可以继续沿着“${hit}”往下讲，${actionFocus}`
   }
 
-  return "下一轮：先用“我理解你担心……”起手，再补一条证据和一句推进，可优先讲保障或先讲案例。"
+  return policyFocus
+    ? `下一轮：${policyFocus}`
+    : "下一轮：先用“我理解你担心……”起手，再补一条证据和一句推进，可优先讲保障或先讲案例。"
 }
 
 function buildPersuasionAdvice(
@@ -401,10 +445,25 @@ function buildPersuasionAdvice(
 
   if (suggestions.length) return suggestions.join("；")
   if (trainingContext?.missed_points?.[0]) {
+    if (trainingContext.scene_kind === "offer_promo") {
+      return `这轮还没正面回应训练重点“${trainingContext.missed_points[0]}”。建议先把原理、适用边界或价值差异说清，再补一条可验证证据。`
+    }
+    if (trainingContext.scene_kind === "customer_visit") {
+      return `这轮还没正面回应训练重点“${trainingContext.missed_points[0]}”。建议先接住顾客当下顾虑，再补一条和到店判断直接相关的流程、评估或恢复期信息。`
+    }
     return `这轮还没正面回应训练重点“${trainingContext.missed_points[0]}”。建议先接住顾客当下情绪，再给一条和这个点直接相关的可验证信息。`
   }
   if (persuasionScore >= 80) {
+    if (trainingContext?.scene_kind === "offer_promo") {
+      return "你已经能先接住顾客疑问，再讲证据和价值，这个专业解释到价值转换的顺序可以继续保持。"
+    }
     return "你已经能先接住顾客担心，再补证据和下一步，这个顺序可以继续保持。"
+  }
+  if (trainingContext?.scene_kind === "offer_promo") {
+    return "建议先明确回应顾客最在意的原理、适用边界或价值问题，再补一条可验证证据，最后给出一个低压力判断建议。"
+  }
+  if (trainingContext?.scene_kind === "customer_visit") {
+    return "建议先明确回应顾客最在意的到店顾虑，再补一条可验证证据，最后给出一个低压力的到店或了解下一步。"
   }
   return "建议先明确回应顾客最在意的点，再补一条可验证证据，最后给出一个清晰的下一步动作。"
 }
@@ -559,9 +618,21 @@ export function generateVoiceCoachReport(opts: {
   )
   const avgWpm = safeAvg(wpmList)
   const avgFillerRatio = safeAvg(fillerRatioList)
-  const avgConfidence = safeAvg(
-    beauticianTurns.map((turn) => (typeof turn.asr_confidence === "number" ? turn.asr_confidence : null)),
+  const pronunciationSignals = beauticianTurns.map((turn, index) =>
+    derivePronunciationSignal({
+      transcript: turn.text || "",
+      wpm: wpmList[index] ?? null,
+      fillerRatio: fillerRatioList[index] ?? null,
+      asrConfidence: typeof turn.asr_confidence === "number" ? turn.asr_confidence : null,
+    }),
   )
+  const avgConfidence = safeAvg(
+    pronunciationSignals.map((signal) => signal.normalizedConfidence),
+  )
+  const avgPronunciationScore = safeAvg(pronunciationSignals.map((signal) => signal.score))
+  const avgPronunciationEstimate = safeAvg(pronunciationSignals.map((signal) => signal.estimatedScore))
+  const pronunciationSpread = safeSpread(pronunciationSignals.map((signal) => signal.score))
+  const pronunciationUsesConfidence = pronunciationSignals.some((signal) => signal.source === "confidence")
 
   const aggregatedScores = aggregateDimensionScores(beauticianTurns)
   const hasAnyAnalysis = beauticianTurns.some((turn) => turn.analysis_json && typeof turn.analysis_json === "object")
@@ -570,7 +641,7 @@ export function generateVoiceCoachReport(opts: {
     persuasion: aggregatedScores?.persuasion ?? (hasAnyAnalysis ? 74 : 66),
     fluency: aggregatedScores?.fluency ?? scoreFluencyFromWpm(avgWpm, DEFAULT_TARGET_WPM_RANGE),
     expression: aggregatedScores?.expression ?? scoreExpressionFromFillerRatio(avgFillerRatio),
-    pronunciation: aggregatedScores?.pronunciation ?? scorePronunciationFromAsrConfidence(avgConfidence),
+    pronunciation: clampScore(Math.round(avgPronunciationScore ?? aggregatedScores?.pronunciation ?? 70)),
     organization: aggregatedScores?.organization ?? (hasAnyAnalysis ? 70 : 64),
   }
 
@@ -614,8 +685,9 @@ export function generateVoiceCoachReport(opts: {
     const ratio = readTurnFeature(turn, "filler_ratio") ?? calcFillerRatio(turn.text || "")
     return ratio == null ? null : Number((ratio * 100).toFixed(2))
   })
-  const clarityCurve = buildTurnCurve(beauticianTurns, (turn) => {
-    return typeof turn.asr_confidence === "number" ? Number((turn.asr_confidence * 100).toFixed(2)) : null
+  const clarityCurve = buildTurnCurve(beauticianTurns, (turn, index) => {
+    const signal = pronunciationSignals[index]
+    return signal ? Number(signal.score.toFixed(2)) : null
   })
 
   const analyzedBeauticianTurnCount = beauticianTurns.filter(
@@ -727,21 +799,25 @@ export function generateVoiceCoachReport(opts: {
         submetrics: [
           {
             name: "语音清晰度",
-            status:
-              avgConfidence == null
-                ? "一般"
-                : avgConfidence >= 0.78
-                  ? "稳定"
-                  : avgConfidence >= 0.68
-                    ? "一般"
-                    : "待加强",
+            status: pronunciationStatus(avgPronunciationScore),
             stars: scoreToStars(scores.pronunciation),
             advice_paragraph:
-              avgConfidence == null
-                ? "从当前录音看，可识别度基本够用。建议关键句放慢并咬字更清楚。"
-                : avgConfidence >= 0.78
-                  ? `整体可识别度约 ${(avgConfidence * 100).toFixed(0)} 分，语音清晰度比较稳。`
-                  : `整体可识别度约 ${(avgConfidence * 100).toFixed(0)} 分。建议关键名词和保障句再说清楚一些。`,
+              pronunciationUsesConfidence && avgConfidence != null
+                ? avgConfidence >= 0.78
+                  ? `整体识别置信约 ${(avgConfidence * 100).toFixed(0)} 分，语音清晰度比较稳。`
+                  : `整体识别置信约 ${(avgConfidence * 100).toFixed(0)} 分。建议关键名词、项目名称和保障句再说清楚一些。`
+                : `当前识别服务没有返回稳定置信度，先按语速、口头词和转写稳定度估算清晰度，当前约 ${(avgPronunciationEstimate || scores.pronunciation).toFixed(0)} 分。建议重点句再放慢一点。`,
+          },
+          {
+            name: "清晰稳定性",
+            status: pronunciationStabilityStatus(pronunciationSpread),
+            stars: scoreToStars(pronunciationStabilityScore(pronunciationSpread)),
+            advice_paragraph:
+              pronunciationSpread == null
+                ? "当前轮次还少，先继续多练几轮，再看清晰度是否稳定。"
+                : pronunciationSpread <= 10
+                  ? `各轮清晰度波动约 ${pronunciationSpread.toFixed(0)} 分，整体比较稳。`
+                  : `各轮清晰度波动约 ${pronunciationSpread.toFixed(0)} 分，说明有些句子清楚、有些句子会掉。建议把项目名、时间安排和保障句固定成更顺口的表达。`,
           },
         ],
         charts: [
@@ -749,7 +825,7 @@ export function generateVoiceCoachReport(opts: {
             id: "clarity_curve",
             label: "清晰度变化曲线",
             unit: "分",
-            target_range: [75, 95],
+            target_range: [72, 92],
             points: clarityCurve,
           },
         ],

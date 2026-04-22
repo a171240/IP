@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { checkVoiceCoachAccess } from "@/lib/voice-coach/guard.server"
 import { llmGenerateHint, type HintResult } from "@/lib/voice-coach/llm.server"
+import { getVoiceCoachSceneKindPolicy } from "@/lib/voice-coach/scene-kind-policy"
 import { getVoiceCoachSessionInsights } from "@/lib/voice-coach/session-context-insights"
 import { getVoiceCoachSessionPromptContext } from "@/lib/voice-coach/session-context"
 import { getScenario, type VoiceCoachEmotion } from "@/lib/voice-coach/scenarios"
@@ -24,6 +25,10 @@ function buildFallbackHint(args: {
     .reverse()
     .find((item) => item.role === "beautician" && item.text)
   const sessionInsights = getVoiceCoachSessionInsights({ snapshot: args.sessionSnapshot })
+  const sceneKindPolicy = getVoiceCoachSceneKindPolicy(
+    sessionInsights.sceneKind,
+    sessionInsights.serviceName,
+  )
 
   const primaryConcern =
     sessionInsights.coreConcerns[0] ||
@@ -32,6 +37,7 @@ function buildFallbackHint(args: {
     ""
   const mustCover = sessionInsights.mustCoverPoints[0] || ""
   const doNotSay = sessionInsights.doNotSay[0] || ""
+  const communicationMethod = sessionInsights.communicationMethodTags[0] || ""
   const serviceLabel = sessionInsights.serviceName || "这次项目"
 
   const points = [
@@ -47,6 +53,13 @@ function buildFallbackHint(args: {
   let hintText = primaryConcern
     ? `这位顾客当前更在意“${primaryConcern}”。先接住她的顾虑，再结合${serviceLabel}给一条可验证的信息，最后只推进一个低压力的下一步。`
     : "先别急着解释项目本身，先顺着顾客刚才的顾虑接一句，让她觉得你真的听懂了；接着给一条可验证的信息，最后再轻轻推进一个下一步。"
+
+  if (communicationMethod) {
+    hintText = `${hintText} 方式上优先用“${communicationMethod}”的方法，先接情绪，再给证据和下一步。`
+    points[2] = `方式上优先用“${communicationMethod}”，先接情绪，再给证据和下一步。`
+  }
+
+  hintText = `${hintText} ${sceneKindPolicy.hintFocus}`
 
   if (/案例|真实|情况接近|和我情况/.test(text)) {
     hintText =

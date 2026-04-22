@@ -4,6 +4,7 @@ import {
   normalizeSceneCardRecord,
   type VoiceCoachSessionSnapshot,
 } from "./session-context"
+import { getVoiceCoachSceneKindPolicy } from "./scene-kind-policy"
 
 function uniqStrings(items: Array<string | null | undefined>, max = 12): string[] {
   const seen = new Set<string>()
@@ -40,6 +41,7 @@ export type VoiceCoachSessionInsights = {
   sceneName: string
   sceneKind: string
   sceneKindLabel: string
+  sceneKindPolicySummary: string
   serviceName: string
   liveNotes: string
   summaryLines: string[]
@@ -74,12 +76,17 @@ export function getVoiceCoachSessionInsights(args: {
     snapshot: args.snapshot,
     sessionContext: args.sessionContext,
   })
+  const sceneKindPolicy = getVoiceCoachSceneKindPolicy(
+    clientContext.scene_kind,
+    clientContext.service_name,
+  )
 
   const summaryLines = uniqStrings(clientContext.summary_lines || [], 6)
   const focusPoints = uniqStrings(
     [
       ...(customerProfile?.core_concerns || []),
       ...(sceneCard?.target_objections || []),
+      ...(sceneCard?.communication_method_tags || []),
       ...(sceneCard?.must_cover_points || []),
       ...(sceneCard?.likely_questions || []),
     ],
@@ -118,6 +125,7 @@ export function getVoiceCoachSessionInsights(args: {
     sceneName: clientContext.scene_name,
     sceneKind: clientContext.scene_kind,
     sceneKindLabel: clientContext.scene_kind_label,
+    sceneKindPolicySummary: sceneKindPolicy.reportFocus,
     serviceName: clientContext.service_name,
     liveNotes: clientContext.live_notes,
     summaryLines,

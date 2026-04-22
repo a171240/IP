@@ -38,8 +38,8 @@ function loadTsModule(filePath) {
     fileName: normalizedPath,
   })
 
-  const module = { exports: {} }
-  tsModuleCache.set(normalizedPath, module.exports)
+  const moduleRef = { exports: {} }
+  tsModuleCache.set(normalizedPath, moduleRef.exports)
 
   const localRequire = (specifier) => {
     if (specifier.startsWith(".") || specifier.startsWith("@/")) {
@@ -56,18 +56,25 @@ function loadTsModule(filePath) {
     `(function (exports, require, module, __filename, __dirname) { ${transpiled.outputText}\n})`,
     { filename: normalizedPath },
   )
-  wrapped(module.exports, localRequire, module, normalizedPath, path.dirname(normalizedPath))
-  tsModuleCache.set(normalizedPath, module.exports)
-  return module.exports
+  wrapped(moduleRef.exports, localRequire, moduleRef, normalizedPath, path.dirname(normalizedPath))
+  tsModuleCache.set(normalizedPath, moduleRef.exports)
+  return moduleRef.exports
 }
 
 const { generateVoiceCoachReport } = loadTsModule(path.join(root, "lib", "voice-coach", "report.server.ts"))
 const { refreshVoiceCoachReport } = loadTsModule(path.join(root, "lib", "voice-coach", "report-refresh.ts"))
-const { buildVoiceCoachSessionSnapshot } = loadTsModule(
+const { buildVoiceCoachFirstTurnTarget, buildVoiceCoachSessionSnapshot } = loadTsModule(
   path.join(root, "lib", "voice-coach", "session-context.ts"),
 )
 const { getScenario } = loadTsModule(path.join(root, "lib", "voice-coach", "scenarios.ts"))
 const { normalizeScenarioTag } = loadTsModule(path.join(root, "lib", "voice-coach", "tag-utils.ts"))
+const { buildSetupBrief } = require(path.join(
+  root,
+  "mini-program-ui",
+  "pages",
+  "voice-coach",
+  "setup-storage.js",
+))
 
 function createTurn(overrides) {
   return {
@@ -348,6 +355,204 @@ test("report becomes snapshot-aware for hit, miss and risk review", () => {
   assert.ok(report.training_context.missed_points.some((item) => item.includes("价格值不值")))
   assert.ok(report.training_context.risk_points.some((item) => item.includes("禁忌表达")))
   assert.match(report.summary_blocks[2], /价格值不值|禁忌表达|低压力下一步/)
+})
+
+test("first-turn target explicitly mixes customer concerns with scene-card constraints", () => {
+  const sessionSnapshot = buildVoiceCoachSessionSnapshot({
+    customerProfile: {
+      id: "cp-1",
+      name: "测试顾客·林岚",
+      core_concerns: ["恢复期会不会影响上班", "会不会一直被推销"],
+      trust_triggers: ["真实案例", "先做评估"],
+      past_experience: "之前在别家被强推过",
+    },
+    sceneCard: {
+      id: "sc-1",
+      name: "首次到店顾虑",
+      scene_kind: "customer_visit",
+      scene_goal: "先让顾客愿意继续了解",
+      likely_questions: ["一次大概要多久", "恢复期怎么安排"],
+      target_objections: ["价格值不值", "会不会被持续推销"],
+      communication_method_tags: ["结构化倾听", "3F"],
+      must_cover_points: ["先做皮肤评估", "恢复期安排"],
+      do_not_say: ["保证一次就见效"],
+    },
+  })
+
+  const target = buildVoiceCoachFirstTurnTarget(sessionSnapshot)
+
+  assert.match(target, /恢复期会不会影响上班/)
+  assert.match(target, /先让顾客愿意继续了解/)
+  assert.match(target, /一次大概要多久|恢复期怎么安排/)
+  assert.match(target, /价格值不值|会不会被持续推销/)
+  assert.match(target, /先做皮肤评估|恢复期安排/)
+  assert.match(target, /结构化倾听|3F/)
+  assert.match(target, /保证一次就见效/)
+})
+
+test("first-turn target changes focus when the variation seed changes", () => {
+  const sessionSnapshot = buildVoiceCoachSessionSnapshot({
+    customerProfile: {
+      id: "cp-1",
+      name: "测试顾客·林岚",
+      core_concerns: ["恢复期会不会影响上班", "会不会一直被推销"],
+    },
+    sceneCard: {
+      id: "sc-1",
+      name: "首次到店顾虑",
+      scene_kind: "customer_visit",
+      scene_goal: "先让顾客愿意继续了解",
+      likely_questions: ["一次大概要多久", "恢复期怎么安排"],
+      target_objections: ["价格值不值", "会不会被持续推销"],
+      must_cover_points: ["先做皮肤评估", "恢复期安排"],
+    },
+  })
+
+  const targetA = buildVoiceCoachFirstTurnTarget(sessionSnapshot, "session-a")
+  const targetB = buildVoiceCoachFirstTurnTarget(sessionSnapshot, "session-b")
+
+  assert.notEqual(targetA, targetB)
+  assert.match(targetA, /Primary focus for this run|For this run, prefer opening/)
+  assert.match(targetB, /Primary focus for this run|For this run, prefer opening/)
+})
+
+test("pronunciation report falls back to speech-derived clarity when ASR confidence is unavailable", () => {
+  const scenario = getScenario("objection_safety")
+  const turns = [
+    createTurn({ id: "c-1", role: "customer", text: "我担心恢复期。", turn_index: 0 }),
+    createTurn({
+      id: "b-1",
+      role: "beautician",
+      text: "我先讲恢复期安排，再说适合你的节奏。",
+      audio_path: "audio/b-1.mp3",
+      audio_seconds: 6,
+      asr_confidence: 0,
+      analysis_json: createAnalysis({
+        persuasion: 78,
+        fluency: 76,
+        expression: 82,
+        pronunciation: 0,
+        organization: 74,
+      }),
+      turn_index: 1,
+    }),
+    createTurn({ id: "c-2", role: "customer", text: "那会影响上班吗？", turn_index: 2 }),
+    createTurn({
+      id: "b-2",
+      role: "beautician",
+      text: "一般当天会先做评估，关键注意点我会一句句和你确认。",
+      audio_path: "audio/b-2.mp3",
+      audio_seconds: 7,
+      asr_confidence: 0,
+      analysis_json: createAnalysis({
+        persuasion: 80,
+        fluency: 80,
+        expression: 86,
+        pronunciation: 0,
+        organization: 78,
+      }),
+      turn_index: 3,
+    }),
+  ]
+
+  const report = generateVoiceCoachReport({ scenario, turns })
+  const pronunciationDimension = report.dimension.find((item) => item.id === "pronunciation")
+
+  assert.ok(pronunciationDimension)
+  assert.ok(pronunciationDimension.score > 60)
+  assert.equal(report.tabs.pronunciation.submetrics.length, 2)
+  assert.match(report.tabs.pronunciation.submetrics[0].advice_paragraph, /没有返回稳定置信度|估算清晰度/)
+  assert.ok(report.tabs.pronunciation.charts[0].points.every((point) => point.y > 0))
+})
+
+test("communication method tags flow into snapshot prompt context and setup brief", () => {
+  const sessionSnapshot = buildVoiceCoachSessionSnapshot({
+    customerProfile: {
+      id: "cp-1",
+      name: "测试顾客·林岚",
+      core_concerns: ["效果稳不稳定"],
+    },
+    sceneCard: {
+      id: "sc-1",
+      name: "新品推广训练",
+      scene_kind: "offer_promo",
+      scene_goal: "先建立专业信任",
+      communication_method_tags: ["反向叙述", "Feel/Felt/Found"],
+      must_cover_points: ["适用边界"],
+    },
+  })
+
+  const brief = buildSetupBrief({
+    customerProfile: {
+      id: "cp-1",
+      name: "测试顾客·林岚",
+      core_concerns: ["效果稳不稳定"],
+    },
+    sceneCard: {
+      id: "sc-1",
+      name: "新品推广训练",
+      scene_kind: "offer_promo",
+      scene_goal: "先建立专业信任",
+      communication_method_tags: ["反向叙述", "Feel/Felt/Found"],
+      must_cover_points: ["适用边界"],
+    },
+  })
+
+  assert.match(sessionSnapshot.prompt_context_text, /场景策略/)
+  assert.match(sessionSnapshot.prompt_context_text, /沟通方法/)
+  assert.match(sessionSnapshot.prompt_context_text, /反向叙述/)
+  assert.ok(brief.summaryLines.some((line) => line.includes("沟通方法")))
+  assert.ok(brief.summaryLines.some((line) => line.includes("Feel\/Felt\/Found")))
+})
+
+test("offer promo scene kind policy reshapes report coaching focus", () => {
+  const scenario = getScenario("objection_safety")
+  const sessionSnapshot = buildVoiceCoachSessionSnapshot({
+    customerProfile: {
+      id: "cp-1",
+      name: "测试顾客·陈默",
+      core_concerns: ["自己适不适合做这个新品"],
+    },
+    sceneCard: {
+      id: "sc-1",
+      name: "新品推广训练",
+      scene_kind: "offer_promo",
+      service_name: "胶原焕活护理",
+      scene_goal: "让顾客先认可专业度",
+      likely_questions: ["这个项目原理是什么"],
+      target_objections: ["值不值得做"],
+      must_cover_points: ["适用边界"],
+    },
+  })
+
+  const turns = [
+    createTurn({ id: "c-1", role: "customer", text: "这个新品到底适合什么人？", turn_index: 0 }),
+    createTurn({
+      id: "b-1",
+      role: "beautician",
+      text: "很多人都能做，先体验就知道了。",
+      audio_path: "audio/b-1.mp3",
+      audio_seconds: 6,
+      analysis_json: createAnalysis({
+        persuasion: 63,
+        fluency: 72,
+        expression: 70,
+        pronunciation: 74,
+        organization: 64,
+      }),
+      turn_index: 1,
+    }),
+  ]
+
+  const report = generateVoiceCoachReport({
+    scenario,
+    turns,
+    sessionSnapshot,
+  })
+
+  assert.equal(report.training_context.scene_kind, "offer_promo")
+  assert.match(report.training_context.policy_focus, /原理|适用边界|价值/)
+  assert.match(report.summary_blocks[2], /原理|适用边界|价值差异/)
 })
 
 test("refreshVoiceCoachReport pumps pending analysis and overwrites stale cached report", async () => {
