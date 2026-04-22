@@ -1,2 +1,35 @@
-/* Uses global styles in app.wxss */
+.page-xhs-drafts .draft-list-card {
+  gap: 16rpx;
+}
 
+.page-xhs-drafts .draft-title {
+  margin-bottom: 0;
+}
+
+.page-xhs-drafts .draft-meta-lines {
+  margin-top: 8rpx;
+}
+
+.page-xhs-drafts .draft-cover-image {
+  max-height: 520rpx;
+  object-fit: cover;
+}
+
+.page-xhs-drafts .draft-actions {
+  margin-top: -2rpx;
+}
+
+.page-xhs-drafts .draft-publish-info {
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+  padding-top: 2rpx;
+}
+
+.page-xhs-drafts .draft-publish-info .field-label {
+  margin-bottom: 0;
+}
+
+.page-xhs-drafts .draft-qr-image {
+  max-width: 320rpx;
+}

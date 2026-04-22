@@ -1,72 +1,114 @@
 <view class="page page-mine">
   <view class="container">
-    <view class="hero fade-up">
-      <view class="row space-between">
+    <view class="hero mine-hero fade-up">
+      <view class="hero-head">
         <view>
+          <text class="eyebrow">Account Center</text>
           <text class="title">我的</text>
-          <text class="subtitle">账号与订阅</text>
+          <text class="subtitle">账户、订阅、订单和工具入口统一收口到这里。</text>
         </view>
-        <view class="chip" wx:if="{{isLoggedIn}}">已登录</view>
-        <view class="chip" wx:else>未登录</view>
+        <text class="status-pill {{isLoggedIn ? 'status-pill-success' : 'status-pill-muted'}}">{{isLoggedIn ? '已登录' : '未登录'}}</text>
       </view>
 
-      <view class="profile-card" wx:if="{{isLoggedIn}}">
-        <image class="avatar" src="{{avatarUrl}}" mode="aspectFill" wx:if="{{avatarUrl}}" />
-        <view class="profile-info">
-          <text class="card-title">{{displayName}}</text>
-          <text class="muted small">微信已绑定</text>
+      <view class="mine-account-card" wx:if="{{isLoggedIn}}">
+        <view class="mine-profile-main">
+          <image class="avatar" src="{{avatarUrl}}" mode="aspectFill" wx:if="{{avatarUrl}}" />
+          <view class="profile-info">
+            <text class="card-title">{{displayName}}</text>
+            <text class="muted small">微信账号已绑定</text>
+          </view>
         </view>
-        <button class="btn-outline" bindtap="handleLogout">退出登录</button>
+        <button class="btn-outline mine-logout-btn" size="mini" bindtap="handleLogout">退出登录</button>
       </view>
 
-      <view class="profile-card" wx:else>
-        <text class="muted small">登录后可同步积分与订阅状态</text>
+      <view class="mine-account-card" wx:else>
+        <text class="muted small">登录后可同步积分、订单和套餐状态。</text>
         <button class="btn-primary" bindtap="handleLoginTap">微信一键登录</button>
       </view>
     </view>
 
     <view class="section fade-up delay-1">
-      <text class="section-title">订阅与积分</text>
-      <view class="card">
-        <text class="card-title">当前套餐</text>
+      <view class="section-head">
+        <text class="section-title">订阅与积分</text>
+        <text class="section-copy">把购买动作做成唯一主 CTA，其它入口全部退到二级。</text>
+      </view>
+
+      <view class="card membership-card">
+        <view class="panel-head">
+          <view>
+            <text class="panel-kicker">Membership</text>
+            <text class="card-title">当前套餐</text>
+          </view>
+        </view>
 
         <view wx:if="{{isLoggedIn}}">
-          <text class="muted small">{{planLabel || "加载中..."}}</text>
-          <text class="muted small" style="margin-top: 6rpx;">
-            积分：{{creditsUnlimited ? "无限" : creditsBalance}}
-          </text>
+          <view class="mine-stat-grid">
+            <view class="mine-stat-item">
+              <text class="hero-summary-label">套餐状态</text>
+              <text class="hero-summary-value">{{planLabel || '加载中...'}}</text>
+            </view>
+            <view class="mine-stat-item">
+              <text class="hero-summary-label">可用积分</text>
+              <text class="hero-summary-value">{{creditsUnlimited ? '不限' : creditsBalance}}</text>
+            </view>
+          </view>
           <button class="btn-primary" bindtap="handleUpgrade">升级/购买</button>
         </view>
 
         <view wx:else>
-          <text class="muted small">登录后展示实时权益与积分</text>
+          <text class="muted small">登录后显示实时权益与积分。</text>
           <button class="btn-primary" bindtap="handleLoginTap">去登录</button>
         </view>
       </view>
     </view>
 
     <view class="section fade-up delay-2">
-      <text class="section-title">订单</text>
+      <view class="section-head">
+        <text class="section-title">订单</text>
+        <text class="section-copy">支付完成后的开通记录继续保留原逻辑展示。</text>
+      </view>
+
       <view class="card">
-        <text class="card-title">订单与开通记录</text>
-        <text class="muted small">支付后这里可查看状态</text>
+        <view class="panel-head">
+          <view>
+            <text class="panel-kicker">Orders</text>
+            <text class="card-title">订单与开通记录</text>
+          </view>
+        </view>
+        <text class="muted small">支付完成后可在这里查看状态。</text>
         <button class="btn-outline" bindtap="handleOrders" wx:if="{{isLoggedIn}}">查看订单</button>
         <button class="btn-outline" bindtap="handleLoginTap" wx:else>去登录</button>
       </view>
     </view>
 
     <view class="section fade-up delay-2">
-      <text class="section-title">工具</text>
-      <view class="card">
-        <text class="card-title">门店档案</text>
-        <text class="muted small">一次配置，发文时可复用</text>
-        <button class="btn-outline" bindtap="handleStoreProfiles">管理门店档案</button>
+      <view class="section-head">
+        <text class="section-title">工具</text>
+        <text class="section-copy">常用工具和进阶入口拆开，避免所有卡片等权。</text>
       </view>
 
-      <view class="card" style="margin-top: 16rpx;">
-        <text class="card-title">进阶工具</text>
-        <text class="muted small">P1-P10 工作流等能力（默认隐藏）</text>
-        <button class="btn-outline" bindtap="handleAdvanced">打开进阶</button>
+      <view class="list-stack">
+        <view class="card tool-card">
+          <view class="panel-head">
+            <view>
+              <text class="panel-kicker">Store Profiles</text>
+              <text class="card-title">门店档案</text>
+            </view>
+          </view>
+          <text class="muted small">一次配置，发文时直接复用。</text>
+          <button class="btn-outline" bindtap="handleStoreProfiles">管理门店档案</button>
+        </view>
+
+        <view class="card tool-card tool-card-subtle">
+          <view class="panel-head">
+            <view>
+              <text class="panel-kicker">Advanced</text>
+              <text class="card-title">进阶工具</text>
+            </view>
+          </view>
+          <text class="muted small">P1-P10 工作流等能力保留原有入口。</text>
+          <button class="btn-outline" bindtap="handleAdvanced">打开进阶</button>
+        </view>
       </view>
     </view>
   </view>

@@ -1,1 +1,78 @@
+.page-xhs-studio .studio-hero {
+  padding-bottom: 22rpx;
+}
 
+.page-xhs-studio .studio-form-card,
+.page-xhs-studio .studio-result-card,
+.page-xhs-studio .studio-asset-card,
+.page-xhs-studio .studio-publish-card {
+  gap: 16rpx;
+}
+
+.page-xhs-studio .studio-tag-grid > view {
+  width: calc(50% - 9rpx);
+  margin-bottom: 0;
+}
+
+.page-xhs-studio .studio-type-tag {
+  min-height: 72rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 18rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+}
+
+.page-xhs-studio .studio-chip-row {
+  gap: 10rpx;
+}
+
+.page-xhs-studio .studio-chip {
+  min-width: 88rpx;
+  justify-content: center;
+}
+
+.page-xhs-studio .studio-primary-btn {
+  margin-top: 0;
+}
+
+.page-xhs-studio .studio-readonly-area {
+  margin-top: 0;
+  min-height: 168rpx;
+}
+
+.page-xhs-studio .studio-sub-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+}
+
+.page-xhs-studio .studio-sub-block .field-label {
+  margin-bottom: 0;
+}
+
+.page-xhs-studio .studio-tag-row {
+  gap: 8rpx;
+  margin-top: -4rpx;
+}
+
+.page-xhs-studio .studio-tag-row > text {
+  margin-right: 0;
+  margin-bottom: 0;
+}
+
+.page-xhs-studio .studio-action-row {
+  margin-top: -2rpx;
+}
+
+.page-xhs-studio .studio-publish-result {
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+  padding-top: 4rpx;
+}
+
+.page-xhs-studio .studio-qr-image {
+  max-width: 360rpx;
+}

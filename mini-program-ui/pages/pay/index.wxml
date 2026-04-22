@@ -1,44 +1,63 @@
-<view class="page page-pay">
+<view class="page page-pay page-pay-checkout">
   <view class="container">
-    <view class="hero fade-up">
+    <view class="hero pay-hero fade-up">
+      <text class="eyebrow">Plans</text>
       <text class="title">订阅支付</text>
-      <text class="subtitle">选择套餐</text>
-    </view>
-    <view class="section fade-up delay-1">
-      <view
-        class="card plan-card {{item.isPro ? 'plan-card-pro' : ''}}"
-        wx:for="{{products}}"
-        wx:key="id"
-        style="margin-top: {{index === 0 ? 0 : 16}}rpx;"
-      >
-        <view class="row space-between">
-          <text class="card-title">{{item.name}}</text>
-          <view class="row action-row">
-            <text wx:if="{{item.isPro}}" class="tag tag-accent">推荐</text>
-            <text class="tag {{item.isPro ? 'tag-accent' : ''}}">{{item.priceLabel}}</text>
-          </view>
+      <text class="subtitle">套餐卡片保留原有价格和支付逻辑，只重做信息层级和主次关系。</text>
+
+      <view class="hero-summary">
+        <view class="hero-summary-item">
+          <text class="hero-summary-label">购买结果</text>
+          <text class="hero-summary-value">支付后同步到订单与我的页</text>
         </view>
-        <text class="muted small">{{item.description}}</text>
-        <view class="row" style="margin-top: 12rpx;">
-          <text class="tag">含 {{item.credits_grant}} 积分</text>
-          <text wx:if="{{item.isPro}}" class="tag tag-accent">Pro 权益</text>
+        <view class="hero-summary-item">
+          <text class="hero-summary-label">权益结构</text>
+          <text class="hero-summary-value">积分额度 + Pro 权益</text>
         </view>
-        <button
-          class="btn-primary"
-          bindtap="handlePay"
-          data-id="{{item.id}}"
-          loading="{{payingId === item.id}}"
-          disabled="{{payingId === item.id}}"
-        >
-          立即支付
-        </button>
       </view>
     </view>
+
+    <view class="section fade-up delay-1" wx:if="{{products.length}}">
+      <view class="list-stack">
+        <view
+          class="card pay-plan-card {{item.isPro ? 'pay-plan-card-pro' : ''}}"
+          wx:for="{{products}}"
+          wx:key="id"
+        >
+          <view class="list-item-head">
+            <view>
+              <text class="card-title">{{item.name}}</text>
+              <text class="meta-line">{{item.description}}</text>
+            </view>
+            <view class="pay-plan-price">
+              <text wx:if="{{item.isPro}}" class="status-pill status-pill-accent">推荐</text>
+              <text class="status-pill {{item.isPro ? 'status-pill-accent' : 'status-pill-muted'}}">{{item.priceLabel}}</text>
+            </view>
+          </view>
+
+          <view class="row pay-feature-row">
+            <text class="tag">含 {{item.credits_grant}} 积分</text>
+            <text wx:if="{{item.isPro}}" class="tag tag-accent">Pro 权益</text>
+          </view>
+
+          <button
+            class="btn-primary"
+            bindtap="handlePay"
+            data-id="{{item.id}}"
+            loading="{{payingId === item.id}}"
+            disabled="{{payingId === item.id}}"
+          >
+            立即支付
+          </button>
+        </view>
+      </view>
+    </view>
+
     <view class="section fade-up delay-2" wx:if="{{!products.length}}">
       <view class="card">
-        <text class="muted small">暂无套餐，请稍后刷新。</text>
+        <text class="card-title">暂无套餐</text>
+        <text class="muted small">请稍后刷新再试。</text>
       </view>
     </view>
   </view>
 </view>
-

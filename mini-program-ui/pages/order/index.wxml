@@ -1,27 +1,47 @@
-<view class="page page-order">
+<view class="page page-order page-order-center">
   <view class="container">
     <view class="hero fade-up">
+      <text class="eyebrow">Orders</text>
       <text class="title">订单</text>
-      <text class="subtitle">最近支付</text>
+      <text class="subtitle">保留原有查询逻辑，只把状态、金额和开通信息压到更清晰的层级里。</text>
+
+      <view class="hero-summary">
+        <view class="hero-summary-item">
+          <text class="hero-summary-label">订单数量</text>
+          <text class="hero-summary-value">{{orders.length}} 条</text>
+        </view>
+        <view class="hero-summary-item">
+          <text class="hero-summary-label">用途</text>
+          <text class="hero-summary-value">查看支付与开通记录</text>
+        </view>
+      </view>
     </view>
 
     <view class="section fade-up delay-1" wx:if="{{orders.length}}">
-      <view class="card" wx:for="{{orders}}" wx:key="out_trade_no">
-        <view class="row space-between">
-          <text class="card-title">订单 {{item.shortId}}</text>
-          <text class="tag {{item.statusClass}}">{{item.statusText}}</text>
+      <view class="list-stack">
+        <view class="card order-card" wx:for="{{orders}}" wx:key="out_trade_no">
+          <view class="list-item-head">
+            <view>
+              <text class="card-title">订单 {{item.shortId}}</text>
+              <text class="meta-line">{{item.description}}</text>
+            </view>
+            <text class="status-pill {{item.statusClass === 'tag-success' ? 'status-pill-success' : 'status-pill-accent'}}">{{item.statusText}}</text>
+          </view>
+
+          <view class="meta-lines">
+            <text class="meta-line">{{item.amountLabel}}</text>
+            <text class="meta-line" wx:if="{{item.grantText}}">{{item.grantText}}</text>
+          </view>
+
+          <button class="btn-outline" bindtap="handleOrderTap" data-out="{{item.out_trade_no}}">查看详情</button>
         </view>
-        <text class="muted small">{{item.description}}</text>
-        <text class="muted small" style="margin-top: 6rpx;">{{item.amountLabel}}</text>
-        <text class="muted small" style="margin-top: 6rpx;" wx:if="{{item.grantText}}">{{item.grantText}}</text>
-        <button class="btn-outline" bindtap="handleOrderTap" data-out="{{item.out_trade_no}}">详情</button>
       </view>
     </view>
 
     <view class="section fade-up delay-1" wx:else>
       <view class="card">
         <text class="card-title">暂无订单</text>
-        <text class="muted small">完成支付后会自动同步</text>
+        <text class="muted small">完成支付后会自动同步到这里。</text>
       </view>
     </view>
   </view>

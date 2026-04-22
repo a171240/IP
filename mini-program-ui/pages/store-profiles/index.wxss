@@ -1,2 +1,4 @@
 /* Optional page styles (kept minimal; most styles live in app.wxss). */
-
+.page-store-center .store-list-card {
+  gap: 14rpx;
+}

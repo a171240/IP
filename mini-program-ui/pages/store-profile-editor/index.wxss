@@ -1,2 +1,5 @@
 /* Optional page styles (kept minimal; most styles live in app.wxss). */
-
+.page-store-editor .store-switch-row {
+  min-height: 80rpx;
+  padding-bottom: 4rpx;
+}

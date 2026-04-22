@@ -1,1 +1,3 @@
-
+.page-order-center .order-card {
+  gap: 14rpx;
+}

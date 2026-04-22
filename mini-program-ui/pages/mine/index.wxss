@@ -1,22 +1,23 @@
 
-.profile-card {
-  margin-top: 20rpx;
+.mine-hero {
+  gap: 18rpx;
+}
+
+.mine-account-card {
+  margin-top: 18rpx;
+  padding: 18rpx;
+  border-radius: 22rpx;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
   display: flex;
   flex-direction: column;
+  gap: 14rpx;
 }
 
-.profile-card > view,
-.profile-card > text,
-.profile-card > image,
-.profile-card > button {
-  margin-top: 12rpx;
-}
-
-.profile-card > view:first-child,
-.profile-card > text:first-child,
-.profile-card > image:first-child,
-.profile-card > button:first-child {
-  margin-top: 0;
+.mine-profile-main {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
 }
 
 .avatar {
@@ -30,6 +31,8 @@
 .profile-info {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  flex: 1;
 }
 
 .profile-info text {
@@ -38,4 +41,34 @@
 
 .profile-info text + text {
   margin-top: 6rpx;
+}
+
+.mine-logout-btn {
+  width: auto;
+  align-self: flex-start;
+}
+
+.membership-card {
+  gap: 16rpx;
+}
+
+.mine-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12rpx;
+}
+
+.mine-stat-item {
+  padding: 16rpx;
+  border-radius: 18rpx;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.tool-card {
+  gap: 14rpx;
+}
+
+.tool-card-subtle {
+  border-color: rgba(255, 255, 255, 0.06);
 }

@@ -1,112 +1,185 @@
-<view class="page page-xhs">
+<view class="page page-xhs page-xhs-studio">
   <view class="container">
-    <view class="hero fade-up">
-      <text class="title">小红书工坊</text>
-      <text class="subtitle">文案、首图、发布</text>
-      <view style="margin-top: 18rpx;">
-        <button class="btn-outline" size="mini" bindtap="handleOpenDrafts">草稿库</button>
+    <view class="hero studio-hero fade-up">
+      <view class="hero-head">
+        <view>
+          <text class="eyebrow">Content Studio</text>
+          <text class="title">小红书工坊</text>
+          <text class="subtitle">把选题、文案、素材和发布拆成清晰的任务流，减少首屏噪音。</text>
+        </view>
+        <button class="btn-outline hero-mini-btn" size="mini" bindtap="handleOpenDrafts">草稿库</button>
+      </view>
+
+      <view class="hero-summary">
+        <view class="hero-summary-item">
+          <text class="hero-summary-label">创作方式</text>
+          <text class="hero-summary-value">先定方向，再生成内容</text>
+        </view>
+        <view class="hero-summary-item">
+          <text class="hero-summary-label">发布路径</text>
+          <text class="hero-summary-value">文案整理后再补首图与发布</text>
+        </view>
       </view>
     </view>
 
     <view class="section fade-up delay-1">
-      <text class="section-title">创作</text>
-      <view class="card">
-        <text class="card-title">内容类型</text>
-        <view class="grid-2" style="margin-top: 12rpx;">
-          <view
-            wx:for="{{contentTypes}}"
-            wx:key="id"
-            class="tag {{contentType === item.id ? 'tag-accent' : ''}}"
-            data-type="{{item.id}}"
-            bindtap="onSelectType"
-          >
-            {{item.label}}
+      <view class="section-head">
+        <text class="section-title">创作</text>
+        <text class="section-copy">先把输入条件压缩到一条主线，再触发生成。</text>
+      </view>
+
+      <view class="card studio-form-card">
+        <view class="field-stack">
+          <view class="field-group">
+            <text class="field-label">内容类型</text>
+            <text class="field-help">决定这条内容的表达方向，避免所有选项同权。</text>
+            <view class="grid-2 studio-tag-grid">
+              <view
+                wx:for="{{contentTypes}}"
+                wx:key="id"
+                class="tag studio-type-tag {{contentType === item.id ? 'tag-accent' : ''}}"
+                data-type="{{item.id}}"
+                bindtap="onSelectType"
+              >
+                {{item.label}}
+              </view>
+            </view>
+          </view>
+
+          <view class="field-group">
+            <text class="field-label">主题</text>
+            <input class="input" placeholder="Input topic or service" value="{{topic}}" bindinput="onTopicInput" />
+          </view>
+
+          <view class="field-group">
+            <text class="field-label">关键词</text>
+            <input class="input" placeholder="关键词 / 标签" value="{{keywords}}" bindinput="onKeywordsInput" />
+          </view>
+
+          <view class="field-group">
+            <text class="field-label">冲突强度</text>
+            <view class="row studio-chip-row">
+              <view
+                class="tag studio-chip {{conflictLevel === 'safe' ? 'tag-accent' : ''}}"
+                data-level="safe"
+                bindtap="onSelectConflict"
+              >稳健</view>
+              <view
+                class="tag studio-chip {{conflictLevel === 'standard' ? 'tag-accent' : ''}}"
+                data-level="standard"
+                bindtap="onSelectConflict"
+              >标准</view>
+              <view
+                class="tag studio-chip {{conflictLevel === 'hard' ? 'tag-accent' : ''}}"
+                data-level="hard"
+                bindtap="onSelectConflict"
+              >狠</view>
+            </view>
+          </view>
+
+          <view class="field-group">
+            <view class="field-inline">
+              <view class="field-inline-copy">
+                <text class="field-label">门店档案</text>
+                <text class="field-help">{{storeProfileLabel}}</text>
+              </view>
+              <button class="btn-outline hero-mini-btn" size="mini" bindtap="handleOpenStoreProfiles">去设置</button>
+            </view>
           </view>
         </view>
-        <text class="muted small" style="margin-top: 16rpx;">主题</text>
-        <input class="input" placeholder="输入主题或服务" value="{{topic}}" bindinput="onTopicInput" />
-        <text class="muted small">关键词</text>
-        <input class="input" placeholder="关键词 / 标签" value="{{keywords}}" bindinput="onKeywordsInput" />
-        <text class="muted small">冲突强度</text>
-        <view class="row" style="margin-top: 10rpx;">
-          <view
-            class="tag {{conflictLevel === 'safe' ? 'tag-accent' : ''}}"
-            data-level="safe"
-            bindtap="onSelectConflict"
-          >稳健</view>
-          <view
-            class="tag {{conflictLevel === 'standard' ? 'tag-accent' : ''}}"
-            data-level="standard"
-            bindtap="onSelectConflict"
-            style="margin-left: 12rpx;"
-          >标准</view>
-          <view
-            class="tag {{conflictLevel === 'hard' ? 'tag-accent' : ''}}"
-            data-level="hard"
-            bindtap="onSelectConflict"
-            style="margin-left: 12rpx;"
-          >狠</view>
-        </view>
-        <text class="muted small" style="margin-top: 16rpx;">门店档案</text>
-        <view class="row space-between" style="margin-top: 10rpx;">
-          <text class="muted small">{{storeProfileLabel}}</text>
-          <button class="btn-outline" size="mini" bindtap="handleOpenStoreProfiles">去设置</button>
-        </view>
-        <button class="btn-primary" loading="{{isGenerating}}" disabled="{{isGenerating}}" bindtap="handleGenerate">一键生成</button>
+
+        <view class="surface-divider"></view>
+        <button class="btn-primary studio-primary-btn" loading="{{isGenerating}}" disabled="{{isGenerating}}" bindtap="handleGenerate">一键生成</button>
       </view>
     </view>
 
     <view class="section fade-up delay-2">
+      <view class="section-head">
         <text class="section-title">结果</text>
-      <view class="card">
-        <text class="card-title">标题：{{resultTitle ? resultTitle : "等待生成"}}</text>
-        <text class="muted small" style="margin-top: 8rpx;">正文预览</text>
-        <textarea
-          class="input textarea"
-          value="{{resultContent ? resultContent : ''}}"
-          maxlength="-1"
-          auto-height="true"
-          disabled="true"
-          placeholder="生成后展示完整文案"
-        ></textarea>
-        <view class="divider"></view>
-        <view class="row space-between">
-          <text class="tag {{dangerStatusClass}}">{{dangerStatusText}}</text>
-          <text class="tag">{{coverImageUrl ? "封面已生成" : "封面未生成"}}</text>
+        <text class="section-copy">先确认文案，再处理封面和补充素材。</text>
+      </view>
+
+      <view class="list-stack">
+        <view class="card studio-result-card">
+          <view class="list-item-head">
+            <view>
+              <text class="panel-kicker">Copy</text>
+              <text class="card-title">{{resultTitle ? resultTitle : '等待生成标题'}}</text>
+            </view>
+            <text class="status-pill status-pill-accent">{{dangerStatusText}}</text>
+          </view>
+
+          <textarea
+            class="input textarea studio-readonly-area"
+            value="{{resultContent ? resultContent : ''}}"
+            maxlength="-1"
+            auto-height="true"
+            disabled="true"
+            placeholder="Generated copy will appear here"
+          ></textarea>
+
+          <view wx:if="{{resultTags.length}}" class="row studio-tag-row">
+            <text class="tag" wx:for="{{resultTags}}" wx:key="*this">{{item}}</text>
+          </view>
+
+          <button class="btn-outline" bindtap="handleCopy" disabled="{{!resultContent}}">复制文案</button>
         </view>
-        <view class="row" style="margin-top: 12rpx;" wx:if="{{pinnedComment}}">
-          <text class="tag tag-accent">置顶评论已生成</text>
+
+        <view class="card studio-asset-card">
+          <view class="list-item-head">
+            <view>
+              <text class="panel-kicker">Assets</text>
+              <text class="card-title">封面与补充素材</text>
+            </view>
+            <text class="status-pill {{coverImageUrl ? 'status-pill-success' : 'status-pill-muted'}}">{{coverImageUrl ? '封面已生成' : '待生成封面'}}</text>
+          </view>
+
+          <view wx:if="{{pinnedComment}}" class="studio-sub-block">
+            <text class="field-label">置顶评论</text>
+            <textarea class="input textarea studio-readonly-area" value="{{pinnedComment}}" maxlength="-1" auto-height="true" disabled="true"></textarea>
+          </view>
+
+          <view wx:if="{{coverPrompt}}" class="studio-sub-block">
+            <text class="field-label">首图提示词</text>
+            <textarea class="input textarea studio-readonly-area" value="{{coverPrompt}}" maxlength="-1" auto-height="true" disabled="true"></textarea>
+          </view>
+
+          <image wx:if="{{coverImageUrl}}" src="{{coverImageUrl}}" mode="widthFix" class="cover-image compact-cover" />
+
+          <view class="card-actions studio-action-row">
+            <button wx:if="{{pinnedComment}}" class="btn-outline" bindtap="handleCopyPinned">复制置顶评论</button>
+            <button wx:if="{{coverPrompt}}" class="btn-outline" bindtap="handleCopyCoverPrompt">复制首图提示词</button>
+          </view>
+
+          <button class="btn-primary" loading="{{isCoverLoading}}" disabled="{{!resultContent || isCoverLoading}}" bindtap="handleGenerateCover">生成封面</button>
         </view>
-        <view class="row" style="margin-top: 12rpx;" wx:if="{{resultTags.length}}">
-          <text class="tag" wx:for="{{resultTags}}" wx:key="*this">{{item}}</text>
-        </view>
-        <view wx:if="{{pinnedComment}}" style="margin-top: 14rpx;">
-          <text class="muted small">置顶评论（可复制）</text>
-          <textarea class="input textarea" value="{{pinnedComment}}" maxlength="-1" auto-height="true" disabled="true"></textarea>
-          <button class="btn-outline" bindtap="handleCopyPinned">复制置顶评论</button>
-        </view>
-        <view wx:if="{{coverPrompt}}" style="margin-top: 14rpx;">
-          <text class="muted small">首图提示词（香蕉2）</text>
-          <textarea class="input textarea" value="{{coverPrompt}}" maxlength="-1" auto-height="true" disabled="true"></textarea>
-          <button class="btn-outline" bindtap="handleCopyCoverPrompt">复制首图提示词</button>
-        </view>
-        <image wx:if="{{coverImageUrl}}" src="{{coverImageUrl}}" mode="widthFix" class="cover-image" />
-        <button class="btn-outline" bindtap="handleCopy" disabled="{{!resultContent}}">复制文案</button>
-        <button class="btn-primary" loading="{{isCoverLoading}}" disabled="{{!resultContent || isCoverLoading}}" bindtap="handleGenerateCover">生成封面</button>
       </view>
     </view>
 
     <view class="section fade-up delay-2">
-      <text class="section-title">发布</text>
-      <view class="card">
-        <text class="muted small">预览后发布到小红书。</text>
+      <view class="section-head">
+        <text class="section-title">发布</text>
+        <text class="section-copy">文案与封面确认后，再触发正式发布。</text>
+      </view>
+
+      <view class="card studio-publish-card">
+        <view class="list-item-head">
+          <view>
+            <text class="panel-kicker">Publish</text>
+            <text class="card-title">发布到小红书</text>
+          </view>
+          <text class="status-pill {{publishResult ? 'status-pill-success' : 'status-pill-muted'}}">{{publishResult ? '已返回结果' : '待发布'}}</text>
+        </view>
+
+        <text class="muted small">保持原有发布逻辑不变，只调整信息顺序和动作层级。</text>
         <button class="btn-primary" loading="{{isPublishing}}" disabled="{{!resultContent || !coverImageUrl || isPublishing}}" bindtap="handlePublish">立即发布</button>
-        <view wx:if="{{publishResult}}" style="margin-top: 12rpx;">
-          <text class="muted small">发布链接：{{publishResult.publishUrl}}</text>
-          <image wx:if="{{publishResult.qrImageUrl}}" src="{{publishResult.qrImageUrl}}" mode="widthFix" class="cover-image" />
+
+        <view wx:if="{{publishResult}}" class="studio-publish-result">
+          <text class="field-label">发布链接</text>
+          <text class="meta-line">{{publishResult.publishUrl}}</text>
+          <image wx:if="{{publishResult.qrImageUrl}}" src="{{publishResult.qrImageUrl}}" mode="widthFix" class="cover-image studio-qr-image" />
         </view>
       </view>
     </view>
   </view>
 </view>
-
