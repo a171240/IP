@@ -1,22 +1,22 @@
 <view class="page page-xhs page-store-editor">
   <view class="container">
     <view class="hero fade-up">
-      <text class="eyebrow">Store Editor</text>
-      <text class="title">门店档案</text>
-      <text class="subtitle">只重组展示和表单节奏，不改任何保存和回填逻辑。</text>
+      <text class="eyebrow">门店档案</text>
+      <text class="title">编辑门店信息</text>
+      <text class="subtitle">只调整表单节奏，不改保存和回填逻辑。</text>
     </view>
 
     <view class="section fade-up delay-1">
       <view class="section-head">
         <text class="section-title">基础信息</text>
-        <text class="section-copy">先把门店名称、城市和门店类型写清，保证生成内容更本地化。</text>
+        <text class="section-copy">先把门店名称和本地信息写清楚。</text>
       </view>
 
       <view class="card">
         <view class="field-stack">
           <view class="field-group">
             <text class="field-label">门店名称</text>
-            <input class="input" placeholder="e.g. Store name" value="{{name}}" bindinput="onName" />
+            <input class="input" placeholder="例如：椿舍日式美肌" value="{{name}}" bindinput="onName" />
           </view>
 
           <view class="field-group">
@@ -26,19 +26,19 @@
 
           <view class="field-group">
             <text class="field-label">区县</text>
-            <input class="input" placeholder="例如：吴中区" value="{{district}}" bindinput="onDistrict" />
+            <input class="input" placeholder="例如：吴江区" value="{{district}}" bindinput="onDistrict" />
           </view>
 
           <view class="field-group">
             <text class="field-label">地标 / 商圈</text>
             <text class="field-help">可选，用于强化本地表达。</text>
-            <input class="input" placeholder="例如：地铁站附近 / 商场旁边" value="{{landmark}}" bindinput="onLandmark" />
+            <input class="input" placeholder="例如：江兴西路地铁站 / 吴江公园附近" value="{{landmark}}" bindinput="onLandmark" />
           </view>
 
           <view class="field-group">
             <text class="field-label">门店类型</text>
             <text class="field-help">可选，例如皮肤管理、SPA、美甲。</text>
-            <input class="input" placeholder="皮肤管理 / SPA / 美甲..." value="{{shopType}}" bindinput="onShopType" />
+            <input class="input" placeholder="例如：皮肤管理 / SPA / 美甲" value="{{shopType}}" bindinput="onShopType" />
           </view>
         </view>
       </view>
@@ -46,20 +46,20 @@
 
     <view class="section fade-up delay-2">
       <view class="section-head">
-        <text class="section-title">引流品</text>
-        <text class="section-copy">把当前主推项目写得更具体，生成内容会更像真实门店。</text>
+        <text class="section-title">主推项目</text>
+        <text class="section-copy">把当前主推项目写具体，生成内容会更像真实门店。</text>
       </view>
 
       <view class="card">
         <view class="field-stack">
           <view class="field-group">
             <text class="field-label">主推项目名称</text>
-            <input class="input" placeholder="e.g. Signature service" value="{{mainOfferName}}" bindinput="onMainOfferName" />
+            <input class="input" placeholder="例如：88 元修丽可面部按摩体验" value="{{mainOfferName}}" bindinput="onMainOfferName" />
           </view>
 
           <view class="field-group">
             <text class="field-label">主推时长（分钟）</text>
-            <input class="input" type="number" placeholder="例如：60" value="{{mainOfferDurationMin}}" bindinput="onMainOfferDurationMin" />
+            <input class="input" type="number" placeholder="例如：90" value="{{mainOfferDurationMin}}" bindinput="onMainOfferDurationMin" />
           </view>
         </view>
       </view>
@@ -67,8 +67,8 @@
 
     <view class="section fade-up delay-2">
       <view class="section-head">
-        <text class="section-title">三条承诺</text>
-        <text class="section-copy">保留原开关逻辑，只把信息排列成更清晰的设置行。</text>
+        <text class="section-title">服务承诺</text>
+        <text class="section-copy">保留原开关逻辑，只收紧排版。</text>
       </view>
 
       <view class="card">
@@ -99,7 +99,7 @@
 
     <view class="section fade-up delay-2">
       <view class="card">
-        <text class="card-title">保存</text>
+        <text class="card-title">保存档案</text>
         <text class="muted small" wx:if="{{draftId}}">保存后可继续基于当前草稿生成门店定制版。</text>
         <button class="btn-primary" loading="{{saving}}" disabled="{{saving}}" bindtap="handleSave">
           {{draftId ? "保存并生成定制版" : "保存"}}
