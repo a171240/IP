@@ -5,7 +5,7 @@
       <text class="title">连接当前账号</text>
       <text class="subtitle">完成连接后，可同步权益、订单和积分状态。</text>
 
-      <button class="btn-primary" bindtap="handleLogin" loading="{{loading}}">继续</button>
+      <button class="btn-primary" bindtap="handleLogin" loading="{{loading}}">继续连接</button>
       <text class="muted small auth-note">首次进入会自动完成基础账号初始化。</text>
     </view>
   </view>
