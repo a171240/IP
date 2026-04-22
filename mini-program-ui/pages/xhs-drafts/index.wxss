@@ -1,5 +1,9 @@
+.page-xhs-drafts .drafts-hero {
+  padding-bottom: 18rpx;
+}
+
 .page-xhs-drafts .draft-list-card {
-  gap: 16rpx;
+  gap: 14rpx;
 }
 
 .page-xhs-drafts .draft-title {
@@ -11,7 +15,7 @@
 }
 
 .page-xhs-drafts .draft-cover-image {
-  max-height: 520rpx;
+  max-height: 260rpx;
   object-fit: cover;
 }
 
