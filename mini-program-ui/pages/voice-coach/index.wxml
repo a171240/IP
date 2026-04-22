@@ -1,9 +1,9 @@
 <view class="vc-page vc-home-page vc-home-focus">
   <view class="container">
     <view class="hero vc-focus-hero fade-up">
-      <text class="eyebrow">Voice Coach</text>
+      <text class="eyebrow">训练入口</text>
       <text class="title">开始一轮语音训练</text>
-      <text class="subtitle">先选顾客和场景，再直接开练，首页只保留一个主动作和两个次入口。</text>
+      <text class="subtitle">先选顾客和场景，再直接开练。</text>
 
       <view class="vc-focus-launch">
         <view class="vc-focus-copy">
@@ -17,21 +17,21 @@
     <view class="section fade-up delay-1">
       <view class="section-head">
         <text class="section-title">训练资产</text>
-        <text class="section-caption">顾客和场景拆成两个独立入口，避免首页继续堆内容。</text>
+        <text class="section-caption">顾客和场景拆成两个次级入口，首页不再堆解释。</text>
       </view>
 
       <view class="minimal-grid">
         <view class="card minimal-action-card" bindtap="handleProfiles">
-          <text class="minimal-action-kicker">Customer</text>
+          <text class="minimal-action-kicker">顾客</text>
           <text class="card-title">顾客档案</text>
-          <text class="minimal-action-copy">先挑一个真实顾客，或直接用测试顾客开练。</text>
+          <text class="minimal-action-copy">先选训练对象，再开始对练。</text>
           <text class="minimal-action-link">进入顾客库</text>
         </view>
 
         <view class="card minimal-action-card" bindtap="handleSceneCards">
-          <text class="minimal-action-kicker">Scene</text>
+          <text class="minimal-action-kicker">场景</text>
           <text class="card-title">场景卡</text>
-          <text class="minimal-action-copy">先定义这轮训练练什么，避免临场不断切题。</text>
+          <text class="minimal-action-copy">先定这轮练什么，避免临场乱切题。</text>
           <text class="minimal-action-link">进入场景库</text>
         </view>
       </view>
