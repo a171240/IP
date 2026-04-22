@@ -3,41 +3,30 @@
     <view class="hero studio-hero fade-up">
       <view class="hero-head">
         <view>
-          <text class="eyebrow">Content Studio</text>
-          <text class="title">小红书工坊</text>
-          <text class="subtitle">把选题、文案、素材和发布拆成清晰的任务流，减少首屏噪音。</text>
+          <text class="eyebrow">发文工作台</text>
+          <text class="title">先把这条内容做出来</text>
+          <text class="subtitle">首屏只保留输入条件和主动作，先把文案做出来。</text>
         </view>
         <button class="btn-outline hero-mini-btn" size="mini" bindtap="handleOpenDrafts">草稿库</button>
-      </view>
-
-      <view class="hero-summary">
-        <view class="hero-summary-item">
-          <text class="hero-summary-label">创作方式</text>
-          <text class="hero-summary-value">先定方向，再生成内容</text>
-        </view>
-        <view class="hero-summary-item">
-          <text class="hero-summary-label">发布路径</text>
-          <text class="hero-summary-value">文案整理后再补首图与发布</text>
-        </view>
       </view>
     </view>
 
     <view class="section fade-up delay-1">
       <view class="section-head">
-        <text class="section-title">创作</text>
-        <text class="section-copy">先把输入条件压缩到一条主线，再触发生成。</text>
+        <text class="section-title">输入条件</text>
+        <text class="section-copy">先定内容方向，再生成文案。</text>
       </view>
 
       <view class="card studio-form-card">
         <view class="field-stack">
           <view class="field-group">
             <text class="field-label">内容类型</text>
-            <text class="field-help">决定这条内容的表达方向，避免所有选项同权。</text>
+            <text class="field-help">先选这条内容最主要的任务。</text>
             <view class="grid-2 studio-tag-grid">
               <view
                 wx:for="{{contentTypes}}"
                 wx:key="id"
-                class="tag studio-type-tag {{contentType === item.id ? 'tag-accent' : ''}}"
+                class="tag studio-type-tag {{contentType === item.id ? 'tag-accent studio-type-tag-active' : ''}}"
                 data-type="{{item.id}}"
                 bindtap="onSelectType"
               >
@@ -48,12 +37,12 @@
 
           <view class="field-group">
             <text class="field-label">主题</text>
-            <input class="input" placeholder="Input topic or service" value="{{topic}}" bindinput="onTopicInput" />
+            <input class="input" placeholder="例如：88 元修丽可体验怎么写成到店文案" value="{{topic}}" bindinput="onTopicInput" />
           </view>
 
           <view class="field-group">
             <text class="field-label">关键词</text>
-            <input class="input" placeholder="关键词 / 标签" value="{{keywords}}" bindinput="onKeywordsInput" />
+            <input class="input" placeholder="例如：修丽可、吴江、面部按摩" value="{{keywords}}" bindinput="onKeywordsInput" />
           </view>
 
           <view class="field-group">
@@ -73,7 +62,7 @@
                 class="tag studio-chip {{conflictLevel === 'hard' ? 'tag-accent' : ''}}"
                 data-level="hard"
                 bindtap="onSelectConflict"
-              >狠</view>
+              >强冲突</view>
             </view>
           </view>
 
@@ -89,22 +78,22 @@
         </view>
 
         <view class="surface-divider"></view>
-        <button class="btn-primary studio-primary-btn" loading="{{isGenerating}}" disabled="{{isGenerating}}" bindtap="handleGenerate">一键生成</button>
+        <button class="btn-primary studio-primary-btn" loading="{{isGenerating}}" disabled="{{isGenerating}}" bindtap="handleGenerate">一键生成文案</button>
       </view>
     </view>
 
     <view class="section fade-up delay-2">
       <view class="section-head">
-        <text class="section-title">结果</text>
-        <text class="section-copy">先确认文案，再处理封面和补充素材。</text>
+        <text class="section-title">生成结果</text>
+        <text class="section-copy">先确认文案，再继续补封面和评论。</text>
       </view>
 
       <view class="list-stack">
         <view class="card studio-result-card">
           <view class="list-item-head">
             <view>
-              <text class="panel-kicker">Copy</text>
-              <text class="card-title">{{resultTitle ? resultTitle : '等待生成标题'}}</text>
+              <text class="panel-kicker">文案</text>
+              <text class="card-title">{{resultTitle ? resultTitle : '等待生成文案标题'}}</text>
             </view>
             <text class="status-pill status-pill-accent">{{dangerStatusText}}</text>
           </view>
@@ -115,7 +104,7 @@
             maxlength="-1"
             auto-height="true"
             disabled="true"
-            placeholder="Generated copy will appear here"
+            placeholder="生成后的文案会显示在这里"
           ></textarea>
 
           <view wx:if="{{resultTags.length}}" class="row studio-tag-row">
@@ -128,10 +117,10 @@
         <view class="card studio-asset-card">
           <view class="list-item-head">
             <view>
-              <text class="panel-kicker">Assets</text>
+              <text class="panel-kicker">素材</text>
               <text class="card-title">封面与补充素材</text>
             </view>
-            <text class="status-pill {{coverImageUrl ? 'status-pill-success' : 'status-pill-muted'}}">{{coverImageUrl ? '封面已生成' : '待生成封面'}}</text>
+            <text class="status-pill {{coverImageUrl ? 'status-pill-success' : 'status-pill-muted'}}">{{coverImageUrl ? '封面已就绪' : '待补封面'}}</text>
           </view>
 
           <view wx:if="{{pinnedComment}}" class="studio-sub-block">
@@ -159,19 +148,18 @@
     <view class="section fade-up delay-2">
       <view class="section-head">
         <text class="section-title">发布</text>
-        <text class="section-copy">文案与封面确认后，再触发正式发布。</text>
+        <text class="section-copy">确认文案与封面后，再正式发布。</text>
       </view>
 
       <view class="card studio-publish-card">
         <view class="list-item-head">
           <view>
-            <text class="panel-kicker">Publish</text>
+            <text class="panel-kicker">发布</text>
             <text class="card-title">发布到小红书</text>
           </view>
           <text class="status-pill {{publishResult ? 'status-pill-success' : 'status-pill-muted'}}">{{publishResult ? '已返回结果' : '待发布'}}</text>
         </view>
 
-        <text class="muted small">保持原有发布逻辑不变，只调整信息顺序和动作层级。</text>
         <button class="btn-primary" loading="{{isPublishing}}" disabled="{{!resultContent || !coverImageUrl || isPublishing}}" bindtap="handlePublish">立即发布</button>
 
         <view wx:if="{{publishResult}}" class="studio-publish-result">
