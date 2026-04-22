@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>发文工作台</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="review-shell">
+    <a class="page-back" href="index.html">← 返回总览</a>
+    <section class="phone">
+      <header class="phone-header">
+        <div class="phone-topline">
+          <span>09:41</span>
+          <span>小程序静态稿</span>
+        </div>
+        <h1 class="phone-title">发文</h1>
+      </header>
+      <div class="phone-body stack">
+        <section class="hero">
+          <div class="hero-row">
+            <div>
+              <span class="hero-kicker">发文工作台</span>
+              <h2 class="hero-title">先把这一条内容做出来</h2>
+              <p class="hero-copy">首屏只保留输入条件和主动作，不再先讲创作方法。</p>
+            </div>
+            <button class="btn-soft">草稿库</button>
+          </div>
+        </section>
+
+        <section class="section-head">
+          <span class="section-title">输入条件</span>
+          <span class="section-copy">先定内容方向，再补主题和关键词。</span>
+        </section>
+
+        <section class="input-card">
+          <div class="field-list">
+            <div>
+              <span class="field-label">内容类型</span>
+              <div class="tag-grid">
+                <span class="tag is-active">到店转化</span>
+                <span class="tag">项目种草</span>
+                <span class="tag">老板人设</span>
+                <span class="tag">活动引流</span>
+              </div>
+            </div>
+
+            <div>
+              <span class="field-label">主题</span>
+              <div class="input-mock">吴江美容院｜88 元修丽可体验怎么写成到店文案</div>
+            </div>
+
+            <div>
+              <span class="field-label">关键词</span>
+              <div class="input-mock">修丽可、面部按摩、吴江、团购、到店</div>
+            </div>
+
+            <div>
+              <span class="field-label">冲突强度</span>
+              <div class="dual-actions">
+                <span class="pill">稳健</span>
+                <span class="pill is-active">标准</span>
+              </div>
+            </div>
+
+            <div class="card" style="padding:14px 16px;">
+              <div class="inline-row align-start">
+                <div class="inline-grow">
+                  <span class="card-kicker">门店档案</span>
+                  <h3 class="card-title">椿舍日式美肌 · 已连接</h3>
+                  <p class="card-copy">发文时直接带入门店信息，不再占首屏太大空间。</p>
+                </div>
+                <button class="btn-soft">去设置</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+          <button class="btn-primary">一键生成文案</button>
+        </section>
+
+        <section class="section-head">
+          <span class="section-title">生成结果</span>
+          <span class="section-copy">先确认文案，再决定要不要继续补素材。</span>
+        </section>
+
+        <section class="card result-block">
+          <div class="card-head align-start">
+            <div class="inline-grow">
+              <span class="card-kicker">文案</span>
+              <h3 class="card-title">同样是 88 元体验，为什么有人发了也没人来？</h3>
+            </div>
+            <span class="badge is-accent">标准冲突</span>
+          </div>
+          <div class="textarea-mock">
+            很多团购笔记没转化，不是项目不行，而是内容太像说明书。把价格、时长、服务感、可拒绝销售这些真正影响下单的信息讲清楚，用户才会把它当成一次值得试的体验。
+          </div>
+          <div class="dual-actions">
+            <span class="pill">修丽可</span>
+            <span class="pill">吴江美容院</span>
+          </div>
+          <button class="btn-outline">复制文案</button>
+        </section>
+
+        <section class="card result-block">
+          <div class="card-head align-start">
+            <div class="inline-grow">
+              <span class="card-kicker">素材</span>
+              <h3 class="card-title">封面与置顶评论</h3>
+            </div>
+            <span class="badge">待补素材</span>
+          </div>
+          <div class="textarea-mock">置顶评论：这次体验是团购价，不加项，不硬推销，不满意可以直接拒绝。</div>
+          <div class="textarea-mock">首图提示词：美容院真实到店场景，柔和灯光，日式护肤氛围，服务感强，黑金极简排版……</div>
+          <div class="dual-actions">
+            <button class="btn-outline">复制置顶评论</button>
+            <button class="btn-outline">复制首图提示词</button>
+          </div>
+          <button class="btn-primary">生成封面</button>
+        </section>
+
+        <section class="card publish-box">
+          <div class="card-head align-start">
+            <div class="inline-grow">
+              <span class="card-kicker">发布</span>
+              <h3 class="card-title">文案确认后再正式发布</h3>
+            </div>
+            <span class="badge">未发布</span>
+          </div>
+          <p class="note">这里不再解释逻辑，只保留动作和结果位置。</p>
+          <button class="btn-primary">立即发布</button>
+        </section>
+
+        <nav class="footer-tabs">
+          <div class="footer-tab is-active"><span class="footer-dot"></span><span>发文</span></div>
+          <div class="footer-tab"><span class="footer-dot"></span><span>草稿</span></div>
+          <div class="footer-tab"><span class="footer-dot"></span><span>练习</span></div>
+          <div class="footer-tab"><span class="footer-dot"></span><span>我的</span></div>
+        </nav>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
