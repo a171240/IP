@@ -1,19 +1,12 @@
 <view class="page page-order page-order-center">
   <view class="container">
     <view class="hero fade-up">
-      <text class="eyebrow">Orders</text>
-      <text class="title">订单</text>
-      <text class="subtitle">保留原有查询逻辑，只把状态、金额和开通信息压到更清晰的层级里。</text>
+      <text class="eyebrow">订单</text>
+      <text class="title">订单与开通记录</text>
+      <text class="subtitle">查看支付结果和开通状态。</text>
 
-      <view class="hero-summary">
-        <view class="hero-summary-item">
-          <text class="hero-summary-label">订单数量</text>
-          <text class="hero-summary-value">{{orders.length}} 条</text>
-        </view>
-        <view class="hero-summary-item">
-          <text class="hero-summary-label">用途</text>
-          <text class="hero-summary-value">查看支付与开通记录</text>
-        </view>
+      <view class="hero-badges">
+        <text class="tag">{{orders.length}} 条记录</text>
       </view>
     </view>
 
