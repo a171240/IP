@@ -1,23 +1,17 @@
 <view class="page page-pay page-pay-checkout">
   <view class="container">
     <view class="hero pay-hero fade-up">
-      <text class="eyebrow">Plans</text>
-      <text class="title">订阅支付</text>
-      <text class="subtitle">套餐卡片保留原有价格和支付逻辑，只重做信息层级和主次关系。</text>
-
-      <view class="hero-summary">
-        <view class="hero-summary-item">
-          <text class="hero-summary-label">购买结果</text>
-          <text class="hero-summary-value">支付后同步到订单与我的页</text>
-        </view>
-        <view class="hero-summary-item">
-          <text class="hero-summary-label">权益结构</text>
-          <text class="hero-summary-value">积分额度 + Pro 权益</text>
-        </view>
-      </view>
+      <text class="eyebrow">支付</text>
+      <text class="title">选择套餐并完成支付</text>
+      <text class="subtitle">价格和支付逻辑保持不变，只收紧信息层级。</text>
     </view>
 
     <view class="section fade-up delay-1" wx:if="{{products.length}}">
+      <view class="section-head">
+        <text class="section-title">可购买套餐</text>
+        <text class="section-copy">先看权益，再决定购买。</text>
+      </view>
+
       <view class="list-stack">
         <view
           class="card pay-plan-card {{item.isPro ? 'pay-plan-card-pro' : ''}}"
