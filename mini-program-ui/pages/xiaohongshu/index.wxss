@@ -1,12 +1,12 @@
 .page-xhs-studio .studio-hero {
-  padding-bottom: 22rpx;
+  padding-bottom: 18rpx;
 }
 
 .page-xhs-studio .studio-form-card,
 .page-xhs-studio .studio-result-card,
 .page-xhs-studio .studio-asset-card,
 .page-xhs-studio .studio-publish-card {
-  gap: 16rpx;
+  gap: 14rpx;
 }
 
 .page-xhs-studio .studio-tag-grid > view {
@@ -15,13 +15,18 @@
 }
 
 .page-xhs-studio .studio-type-tag {
-  min-height: 72rpx;
+  min-height: 78rpx;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  padding: 0 18rpx;
+  justify-content: flex-start;
+  padding: 0 20rpx;
   font-size: 24rpx;
   font-weight: 600;
+  border-radius: 20rpx;
+}
+
+.page-xhs-studio .studio-type-tag-active {
+  box-shadow: 0 10rpx 22rpx rgba(229, 211, 179, 0.16);
 }
 
 .page-xhs-studio .studio-chip-row {
@@ -29,7 +34,7 @@
 }
 
 .page-xhs-studio .studio-chip {
-  min-width: 88rpx;
+  min-width: 112rpx;
   justify-content: center;
 }
 
