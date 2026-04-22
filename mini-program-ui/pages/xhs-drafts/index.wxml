@@ -3,29 +3,22 @@
     <view class="hero drafts-hero fade-up">
       <view class="hero-head">
         <view>
-          <text class="eyebrow">Draft Library</text>
-          <text class="title">草稿库</text>
-          <text class="subtitle">标题、状态和时间优先，封面图只作为预览，不再抢主层级。</text>
+          <text class="eyebrow">草稿库</text>
+          <text class="title">继续编辑，或直接复用</text>
+          <text class="subtitle">标题、状态、时间优先，继续编辑更直接。</text>
         </view>
         <button class="btn-outline hero-mini-btn" size="mini" bindtap="handleGoWorkshop">去工坊</button>
       </view>
 
-      <view class="hero-summary">
-        <view class="hero-summary-item">
-          <text class="hero-summary-label">当前草稿</text>
-          <text class="hero-summary-value">{{loading ? '加载中...' : drafts.length + ' 条记录'}}</text>
-        </view>
-        <view class="hero-summary-item">
-          <text class="hero-summary-label">主任务</text>
-          <text class="hero-summary-value">继续编辑或复制已生成内容</text>
-        </view>
+      <view class="hero-badges">
+        <text class="tag">{{loading ? '加载中...' : drafts.length + ' 条记录'}}</text>
       </view>
     </view>
 
     <view class="section fade-up delay-1">
       <view class="section-head">
         <text class="section-title">最近草稿</text>
-        <text class="section-copy">保留原有操作，只收紧卡片密度和信息顺序。</text>
+        <text class="section-copy">继续编辑可发内容。</text>
       </view>
 
       <view wx:if="{{loading}}" class="card">
@@ -34,7 +27,7 @@
 
       <view wx:if="{{!loading && !drafts.length}}" class="card">
         <text class="card-title">还没有草稿</text>
-        <text class="muted small">先去工坊生成第一条内容，后续会自动沉淀到这里。</text>
+        <text class="muted small">先去工坊生成第一条内容。</text>
         <button class="btn-primary" bindtap="handleGoWorkshop">去工坊</button>
       </view>
 
