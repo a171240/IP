@@ -3,29 +3,22 @@
     <view class="hero fade-up">
       <view class="hero-head">
         <view>
-          <text class="eyebrow">Store Profiles</text>
-          <text class="title">门店档案</text>
-          <text class="subtitle">把门店基础信息沉淀成可复用资产，发文时直接调用。</text>
+          <text class="eyebrow">门店档案</text>
+          <text class="title">管理可复用的门店信息</text>
+          <text class="subtitle">创建后可直接用于发文生成。</text>
         </view>
         <button class="btn-primary hero-mini-btn" size="mini" bindtap="handleCreate">新建档案</button>
       </view>
 
-      <view class="hero-summary">
-        <view class="hero-summary-item">
-          <text class="hero-summary-label">使用方式</text>
-          <text class="hero-summary-value">创建后可直接用于发文生成</text>
-        </view>
-        <view class="hero-summary-item">
-          <text class="hero-summary-label">当前状态</text>
-          <text class="hero-summary-value">{{loading ? '加载中...' : profiles.length + ' 份档案'}}</text>
-        </view>
+      <view class="hero-badges">
+        <text class="tag">{{loading ? '加载中...' : profiles.length + ' 份档案'}}</text>
       </view>
     </view>
 
     <view class="section fade-up delay-1">
       <view class="section-head">
         <text class="section-title">我的档案</text>
-        <text class="section-copy">保留选用、编辑、删除逻辑，只收敛成更清晰的列表动作区。</text>
+        <text class="section-copy">选用、编辑、删除都保留原逻辑。</text>
       </view>
 
       <view wx:if="{{loading}}" class="card">
