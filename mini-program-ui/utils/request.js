@@ -1,5 +1,5 @@
 const { REQUEST_TIMEOUT } = require("./config")
-const { getAccessToken, loginSilent } = require("./auth")
+const { getAccessToken, loginSilent, getPendingSilentLogin } = require("./auth")
 const { getDeviceId } = require("./device")
 const {
   getHttpBaseUrlCandidates,
@@ -125,6 +125,15 @@ function normalizeTextResponseData(data) {
   }
 }
 
+function waitForPendingSilentLogin(baseUrl) {
+  if (!shouldAttachAuth(baseUrl)) return Promise.resolve()
+
+  const pending = getPendingSilentLogin()
+  if (!pending) return Promise.resolve()
+
+  return pending.then(() => undefined).catch(() => undefined)
+}
+
 function request(opts) {
   const { baseUrl, url, method = "GET", data, header, __retried401, __baseUrlAttemptIndex = 0 } = opts
   const candidates = getHttpBaseUrlCandidates(baseUrl)
@@ -133,7 +142,7 @@ function request(opts) {
   const canRetry401 = !__retried401 && shouldAttachAuth(normalizedBase)
   const canRetryBaseUrl = Boolean(nextBaseUrl) && shouldAttachAuth(normalizedBase)
 
-  return new Promise((resolve, reject) => {
+  return waitForPendingSilentLogin(normalizedBase).then(() => new Promise((resolve, reject) => {
     wx.request({
       url: `${normalizedBase}${url}`,
       method,
@@ -194,7 +203,7 @@ function request(opts) {
         reject(err)
       },
     })
-  })
+  }))
 }
 
 function requestText(opts) {
@@ -205,7 +214,7 @@ function requestText(opts) {
   const canRetry401 = !__retried401 && shouldAttachAuth(normalizedBase)
   const canRetryBaseUrl = Boolean(nextBaseUrl) && shouldAttachAuth(normalizedBase)
 
-  return new Promise((resolve, reject) => {
+  return waitForPendingSilentLogin(normalizedBase).then(() => new Promise((resolve, reject) => {
     wx.request({
       url: `${normalizedBase}${url}`,
       method,
@@ -269,7 +278,7 @@ function requestText(opts) {
         reject(err)
       },
     })
-  })
+  }))
 }
 
 function requestTextWithMeta(opts) {
@@ -280,7 +289,7 @@ function requestTextWithMeta(opts) {
   const canRetry401 = !__retried401 && shouldAttachAuth(normalizedBase)
   const canRetryBaseUrl = Boolean(nextBaseUrl) && shouldAttachAuth(normalizedBase)
 
-  return new Promise((resolve, reject) => {
+  return waitForPendingSilentLogin(normalizedBase).then(() => new Promise((resolve, reject) => {
     wx.request({
       url: `${normalizedBase}${url}`,
       method,
@@ -346,7 +355,7 @@ function requestTextWithMeta(opts) {
         reject(err)
       },
     })
-  })
+  }))
 }
 
 module.exports = {

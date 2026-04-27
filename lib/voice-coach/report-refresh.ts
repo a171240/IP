@@ -87,6 +87,7 @@ export async function refreshVoiceCoachReport({
     turns,
     sessionSnapshot: session.scenario_snapshot_json,
     sessionContext: session.session_context_json,
+    sourceSessionId: session.id,
   })
   const dimensionScores = buildDimensionScoreMap(report)
 

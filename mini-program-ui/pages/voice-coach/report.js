@@ -1,20 +1,21 @@
 const { VOICE_COACH_HTTP_BASE_URL } = require("../../utils/config")
 const { request } = require("../../utils/request")
+const { buildPendingVoiceCoachSetup, savePendingVoiceCoachSetup } = require("./setup-storage")
 
 const CHART_COLORS = {
-  grid: "rgba(229, 211, 179, 0.16)",
-  label: "#b9b3c2",
-  axis: "rgba(229, 211, 179, 0.2)",
-  line: "rgba(149,236,105,0.96)",
-  area: "rgba(149,236,105,0.22)",
-  canvasBg: "#15151D",
-  targetBg: "rgba(149,236,105,0.14)",
+  grid: "rgba(189, 201, 180, 0.18)",
+  label: "#cbd5c7",
+  axis: "rgba(189, 201, 180, 0.22)",
+  line: "rgba(156, 190, 130, 0.96)",
+  area: "rgba(156, 190, 130, 0.22)",
+  canvasBg: "#101512",
+  targetBg: "rgba(156, 190, 130, 0.14)",
 }
 
 const LINE_CHART_COLORS = {
-  speech_rate_curve: "#4ea0ff",
-  filler_ratio_curve: "#e5d3b3",
-  clarity_curve: "#95ec69",
+  speech_rate_curve: "#9caf88",
+  filler_ratio_curve: "#d1b47f",
+  clarity_curve: "#86c9a0",
 }
 
 function lineColorForChart(chart) {
@@ -113,6 +114,8 @@ function normalizeSessionContext(raw) {
     : []
 
   return {
+    customerProfileId: String(data.customer_profile_id || "").trim(),
+    sceneCardId: String(data.scene_card_id || "").trim(),
     liveNotes: String(data.live_notes || "").trim(),
     customerName: String(data.customer_name || "").trim(),
     customerSummary: String(data.customer_summary || "").trim(),
@@ -175,6 +178,40 @@ function buildFallbackSummaryBlocks(dimension) {
   ]
 }
 
+function buildNextAction(report, dimension, summaryBlocks) {
+  const focus = report && report.next_round_focus ? report.next_round_focus : null
+  if (focus) {
+    return {
+      title: String(focus.title || "下一轮先练").trim(),
+      copy: String(focus.instruction || (focus.practice_points && focus.practice_points[0]) || "").trim(),
+      metric: typeof focus.focus_score === "number" ? `${formatDimensionScore(focus.focus_score)}分` : "",
+    }
+  }
+
+  const sorted = (Array.isArray(dimension) ? dimension.slice() : []).sort((a, b) => Number(a.score || 0) - Number(b.score || 0))
+  const weakest = sorted[0]
+  const focusName = weakest && weakest.name ? weakest.name : "关键表达"
+  const focusScore = weakest ? formatDimensionScore(weakest.score) : ""
+  const nextLine = (Array.isArray(summaryBlocks) ? summaryBlocks : [])
+    .map((item) => String(item || "").trim())
+    .find((text) => /^下一轮[：:]/.test(text))
+  const copy = nextLine
+    ? nextLine.replace(/^下一轮[：:]\s*/, "")
+    : "先用一句共情接住顾客顾虑，再补一条证据和一个低压力下一步。"
+
+  return {
+    title: `下一轮先练：${focusName}`,
+    copy,
+    metric: focusScore ? `${focusScore}分` : "",
+  }
+}
+
+function scorePercent(score) {
+  const value = Number(score || 0)
+  if (!Number.isFinite(value)) return 0
+  return Math.max(0, Math.min(100, value))
+}
+
 function normalizeSummaryBlocks(report, dimension) {
   const raw = Array.isArray(report && report.summary_blocks) ? report.summary_blocks : []
   const filtered = raw.filter((item) => {
@@ -229,11 +266,15 @@ function normalizeReport(report) {
     audio_seconds_text: formatSeconds(ex.audio_seconds),
   }))
 
+  const summaryBlocks = normalizeSummaryBlocks(report, dimension)
+
   return {
     ...report,
+    total_score_pct: scorePercent(report.total_score),
     dimension,
-    summary_blocks: normalizeSummaryBlocks(report, dimension),
+    summary_blocks: summaryBlocks,
     hero_highlights: buildHeroHighlights(report, dimension),
+    next_action: buildNextAction(report, dimension, summaryBlocks),
     tabs: {
       ...tabs,
       fluency: {
@@ -265,7 +306,7 @@ Page({
     turns: [],
     playingId: "",
     animatedScore: 0,
-    radarCanvasSize: 220,
+    radarCanvasSize: 210,
     lineChartWidth: 320,
     lineChartHeight: 176,
   },
@@ -311,8 +352,8 @@ Page({
     const nextData = {
       radarCanvasSize:
         radarRect && radarRect.width
-          ? Math.round(Math.max(220, Math.min(radarRect.width + 26, 292)))
-          : Math.round(Math.max(220, Math.min(264, fallbackWidth + 8))),
+          ? Math.round(Math.max(204, Math.min(radarRect.width, 228)))
+          : Math.round(Math.max(204, Math.min(220, fallbackWidth))),
       lineChartWidth: lineRect && lineRect.width ? Math.round(lineRect.width) : Math.round(fallbackWidth),
       lineChartHeight: 188,
     }
@@ -444,7 +485,24 @@ Page({
   },
 
   startAgain() {
-    wx.redirectTo({ url: "/pages/voice-coach/setup/index" })
+    const sessionId = String(this.data.sessionId || "").trim()
+    const context = this.data.sessionContext || {}
+    if (!sessionId) {
+      wx.showToast({ title: "缺少上一轮记录", icon: "none" })
+      return
+    }
+
+    const setup = buildPendingVoiceCoachSetup({
+      customerProfile: context.customerProfileId ? { id: context.customerProfileId } : null,
+      sceneCard: context.sceneCardId ? { id: context.sceneCardId } : null,
+      liveNotes: context.liveNotes || "",
+      followupContext: {
+        source_session_id: sessionId,
+      },
+    })
+    savePendingVoiceCoachSetup(setup)
+
+    wx.redirectTo({ url: "/pages/voice-coach/chat" })
   },
 
   onPlay(e) {

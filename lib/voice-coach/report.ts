@@ -126,11 +126,38 @@ export const VoiceCoachReportTrainingContextSchema = z.object({
 
 export type VoiceCoachReportTrainingContext = z.infer<typeof VoiceCoachReportTrainingContextSchema>
 
+export const VoiceCoachReportReferenceTurnSchema = z.object({
+  role: z.enum(["customer", "beautician"]),
+  turn_id: z.string().optional(),
+  turn_index: z.number().int().optional(),
+  text: z.string(),
+})
+
+export type VoiceCoachReportReferenceTurn = z.infer<typeof VoiceCoachReportReferenceTurnSchema>
+
+export const VoiceCoachReportNextRoundFocusSchema = z.object({
+  source_session_id: z.string().optional(),
+  focus_dimension_id: DimensionIdSchema,
+  focus_dimension_name: z.string(),
+  focus_score: z.number(),
+  title: z.string(),
+  instruction: z.string(),
+  practice_points: z.array(z.string()),
+  missed_points: z.array(z.string()),
+  risk_points: z.array(z.string()),
+  summary_blocks: z.array(z.string()),
+  reference_turns: z.array(VoiceCoachReportReferenceTurnSchema),
+  suggested_response: z.string().optional(),
+})
+
+export type VoiceCoachReportNextRoundFocus = z.infer<typeof VoiceCoachReportNextRoundFocusSchema>
+
 export const VoiceCoachReportSchema = z.object({
   total_score: z.number(),
   dimension: z.array(DimensionScoreSchema).length(5),
   summary_blocks: z.array(z.string()).length(3),
   training_context: VoiceCoachReportTrainingContextSchema.optional(),
+  next_round_focus: VoiceCoachReportNextRoundFocusSchema.optional(),
   tabs: z.object({
     persuasion: ReportPersuasionTabSchema,
     fluency: ReportFluencyTabSchema,

@@ -113,6 +113,15 @@ function normalizeSceneCard(card) {
   }
 }
 
+function normalizeFollowupContext(context) {
+  if (!context || typeof context !== "object") return null
+  const sourceSessionId = cleanText(context.source_session_id, 80)
+  if (!sourceSessionId) return null
+  return {
+    source_session_id: sourceSessionId,
+  }
+}
+
 function buildCustomerMeta(profile) {
   if (!profile) return ""
   const bits = []
@@ -223,11 +232,13 @@ function getSetupDraft() {
 
 function buildPendingVoiceCoachSetup(input) {
   const brief = buildSetupBrief(input || {})
+  const followupContext = normalizeFollowupContext(input && input.followupContext)
   return {
     scenario_id: "objection_safety",
     customer_profile_id: brief.customerProfile && brief.customerProfile.id ? brief.customerProfile.id : "",
     scene_card_id: brief.sceneCard && brief.sceneCard.id ? brief.sceneCard.id : "",
     live_notes: brief.liveNotes || "",
+    followup_context: followupContext,
     preview: {
       customerProfile: brief.customerProfile,
       sceneCard: brief.sceneCard,
@@ -260,6 +271,7 @@ module.exports = {
   getSelectedSceneCard,
   getSetupDraft,
   normalizeCustomerProfile,
+  normalizeFollowupContext,
   normalizeSceneCard,
   savePendingVoiceCoachSetup,
   saveSelectedCustomerProfile,

@@ -53,6 +53,13 @@ export const voiceCoachSessionCreateSchema = z.object({
   customer_profile_id: z.string().uuid().optional().nullable(),
   scene_card_id: z.string().uuid().optional().nullable(),
   live_notes: z.string().trim().max(500).optional().nullable(),
+  followup_context: z
+    .object({
+      source_session_id: z.string().uuid(),
+    })
+    .passthrough()
+    .optional()
+    .nullable(),
 })
 
 export type VoiceCoachCustomerProfileInput = z.infer<typeof voiceCoachCustomerProfilePayloadSchema>
@@ -89,10 +96,36 @@ export type VoiceCoachSceneCardRecord = {
   notes?: string | null
 }
 
+export type VoiceCoachFollowupReferenceTurn = {
+  role: "customer" | "beautician"
+  turn_id?: string
+  turn_index?: number | null
+  text: string
+}
+
+export type VoiceCoachFollowupContext = {
+  source_session_id: string
+  source_report_generated_at?: string
+  focus_dimension_id?: string
+  focus_dimension_name?: string
+  focus_score?: number | null
+  title: string
+  instruction: string
+  practice_points: string[]
+  missed_points: string[]
+  risk_points: string[]
+  summary_blocks: string[]
+  reference_turns: VoiceCoachFollowupReferenceTurn[]
+  customer_objection?: string
+  your_response?: string
+  suggested_response?: string
+}
+
 export type VoiceCoachSessionSnapshot = {
   version: "v1"
   customer_profile: ReturnType<typeof normalizeCustomerProfileRecord> | null
   scene_card: ReturnType<typeof normalizeSceneCardRecord> | null
+  followup_context: VoiceCoachFollowupContext | null
   live_notes: string
   prompt_context_text: string
   display: {
@@ -136,6 +169,82 @@ function nullableText(value: unknown, max = 300): string | null {
   const text = String(value || "").trim()
   if (!text) return null
   return text.slice(0, max)
+}
+
+function boundedText(value: unknown, max = 300): string {
+  return nullableText(value, max) || ""
+}
+
+function numberOrNull(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null
+}
+
+function normalizeFollowupReferenceTurn(input: unknown): VoiceCoachFollowupReferenceTurn | null {
+  const data = input && typeof input === "object" ? (input as Record<string, unknown>) : null
+  if (!data) return null
+  const role = data.role === "beautician" ? "beautician" : data.role === "customer" ? "customer" : null
+  const text = boundedText(data.text, 120)
+  if (!role || !text) return null
+  const rawTurnIndex = Number(data.turn_index)
+  return {
+    role,
+    ...(boundedText(data.turn_id, 80) ? { turn_id: boundedText(data.turn_id, 80) } : {}),
+    ...(Number.isFinite(rawTurnIndex) ? { turn_index: rawTurnIndex } : {}),
+    text,
+  }
+}
+
+export function normalizeVoiceCoachFollowupContext(input: unknown): VoiceCoachFollowupContext | null {
+  const data = input && typeof input === "object" ? (input as Record<string, unknown>) : null
+  if (!data) return null
+
+  const sourceSessionId = boundedText(data.source_session_id, 80)
+  const title = boundedText(data.title, 80)
+  const instruction = boundedText(data.instruction, 220)
+  const practicePoints = toStringList(data.practice_points).slice(0, 5)
+  const missedPoints = toStringList(data.missed_points).slice(0, 4)
+  const riskPoints = toStringList(data.risk_points).slice(0, 3)
+  const summaryBlocks = toStringList(data.summary_blocks).slice(0, 3)
+  const referenceTurns = Array.isArray(data.reference_turns)
+    ? data.reference_turns
+        .map((item) => normalizeFollowupReferenceTurn(item))
+        .filter((item): item is VoiceCoachFollowupReferenceTurn => Boolean(item))
+        .slice(0, 6)
+    : []
+
+  if (
+    !sourceSessionId &&
+    !title &&
+    !instruction &&
+    !practicePoints.length &&
+    !missedPoints.length &&
+    !summaryBlocks.length &&
+    !referenceTurns.length
+  ) {
+    return null
+  }
+
+  return {
+    source_session_id: sourceSessionId,
+    ...(boundedText(data.source_report_generated_at, 40)
+      ? { source_report_generated_at: boundedText(data.source_report_generated_at, 40) }
+      : {}),
+    ...(boundedText(data.focus_dimension_id, 40) ? { focus_dimension_id: boundedText(data.focus_dimension_id, 40) } : {}),
+    ...(boundedText(data.focus_dimension_name, 40)
+      ? { focus_dimension_name: boundedText(data.focus_dimension_name, 40) }
+      : {}),
+    focus_score: numberOrNull(data.focus_score),
+    title: title || "上一轮复练重点",
+    instruction: instruction || practicePoints[0] || missedPoints[0] || "围绕上一轮薄弱点继续训练。",
+    practice_points: practicePoints,
+    missed_points: missedPoints,
+    risk_points: riskPoints,
+    summary_blocks: summaryBlocks,
+    reference_turns: referenceTurns,
+    ...(boundedText(data.customer_objection, 120) ? { customer_objection: boundedText(data.customer_objection, 120) } : {}),
+    ...(boundedText(data.your_response, 120) ? { your_response: boundedText(data.your_response, 120) } : {}),
+    ...(boundedText(data.suggested_response, 180) ? { suggested_response: boundedText(data.suggested_response, 180) } : {}),
+  }
 }
 
 export function normalizeCustomerProfileInput(input: VoiceCoachCustomerProfileInput) {
@@ -252,11 +361,75 @@ function pickSeededItem(items: string[], seed: string, offset = 0): string {
   return items[index] || items[0] || ""
 }
 
+function compactSnippet(text: string, max = 28): string {
+  const normalized = String(text || "").replace(/\s+/g, "").trim()
+  if (!normalized) return ""
+  return normalized.length > max ? `${normalized.slice(0, max)}…` : normalized
+}
+
+function buildFollowupPromptLines(followupContext: VoiceCoachFollowupContext | null): string[] {
+  if (!followupContext) return []
+
+  const lines = [
+    formatBulletLine("上一轮复盘重点", [followupContext.title, followupContext.instruction]),
+    followupContext.practice_points.length
+      ? formatBulletLine("第二轮优先训练", followupContext.practice_points.slice(0, 4))
+      : "",
+    followupContext.missed_points.length
+      ? formatBulletLine("上一轮缺失点", followupContext.missed_points.slice(0, 3))
+      : "",
+    followupContext.risk_points.length
+      ? formatBulletLine("上一轮风险提醒", followupContext.risk_points.slice(0, 2))
+      : "",
+    followupContext.customer_objection
+      ? formatBulletLine("上一轮关键异议", [followupContext.customer_objection])
+      : "",
+    followupContext.your_response ? formatBulletLine("上一轮原回答", [followupContext.your_response]) : "",
+    followupContext.suggested_response
+      ? formatBulletLine("上一轮建议表达", [followupContext.suggested_response])
+      : "",
+  ]
+
+  const referenceText = followupContext.reference_turns
+    .slice(0, 4)
+    .map((turn) => `${turn.role === "customer" ? "顾客" : "美容师"}：${turn.text}`)
+  if (referenceText.length) {
+    lines.push(formatBulletLine("上一轮关键对话参考", referenceText))
+  }
+
+  lines.push("第二轮约束：上一轮内容只作为参考，不要原样复述；把第二轮当成新一场训练，围绕同类短板继续追问和压测。")
+
+  return lines.filter(Boolean)
+}
+
+export function buildVoiceCoachFollowupOpening(snapshot: unknown): string {
+  const snapshotObject =
+    snapshot && typeof snapshot === "object" ? (snapshot as Partial<VoiceCoachSessionSnapshot>) : null
+  const followupContext = normalizeVoiceCoachFollowupContext(snapshotObject?.followup_context || null)
+  if (!followupContext) return ""
+
+  const focus =
+    followupContext.missed_points[0] ||
+    followupContext.practice_points[0] ||
+    followupContext.focus_dimension_name ||
+    followupContext.title
+  const objection = followupContext.customer_objection || followupContext.reference_turns.find((turn) => turn.role === "customer")?.text
+  const focusSnippet = compactSnippet(focus, 18) || "这个重点"
+  const objectionSnippet = compactSnippet(objection || "", 18)
+
+  if (objectionSnippet) {
+    return `上次我问到“${objectionSnippet}”，这次你能把${focusSnippet}讲具体一点吗？`
+  }
+
+  return `我这次最想确认${focusSnippet}，你能给我具体依据吗？`
+}
+
 export function buildVoiceCoachFirstTurnTarget(snapshot: unknown, variationSeed?: string): string {
   const snapshotObject =
     snapshot && typeof snapshot === "object" ? (snapshot as Partial<VoiceCoachSessionSnapshot>) : null
   const customerProfile = normalizeCustomerProfileRecord((snapshotObject?.customer_profile as any) || null)
   const sceneCard = normalizeSceneCardRecord((snapshotObject?.scene_card as any) || null)
+  const followupContext = normalizeVoiceCoachFollowupContext(snapshotObject?.followup_context || null)
   const sceneKindPolicy = getVoiceCoachSceneKindPolicy(sceneCard?.scene_kind, sceneCard?.service_name)
 
   const coreConcerns = pickTopItems(customerProfile?.core_concerns, 3)
@@ -290,11 +463,27 @@ export function buildVoiceCoachFirstTurnTarget(snapshot: unknown, variationSeed?
 
   const instructions = [
     "Use the configured customer profile as the primary persona source.",
-    "Open with one of the customer's explicit core concerns instead of a generic default objection.",
+    followupContext
+      ? "Open with the previous report weakness first; use explicit customer concerns only as persona support."
+      : "Open with one of the customer's explicit core concerns instead of a generic default objection.",
     "Blend the customer's concern with the current training scene, so the first line sounds like this customer in this visit or promotion moment.",
     "Avoid reusing the same generic opening wording from previous sessions.",
     openingStyle,
   ]
+
+  if (followupContext) {
+    instructions.unshift(
+      "This is a second-round follow-up training session. The opening customer line must pressure-test the previous report weakness.",
+      `Previous focus: ${followupContext.title}. ${followupContext.instruction}`,
+      followupContext.practice_points.length
+        ? `Practice points to trigger: ${followupContext.practice_points.slice(0, 4).join(" / ")}.`
+        : "",
+      followupContext.customer_objection
+        ? `Use the previous objection only as reference, not as a verbatim repeat: ${followupContext.customer_objection}.`
+        : "",
+      "Do not continue the old conversation as if it never ended; open a fresh but related scenario pressure point.",
+    )
+  }
 
   if (coreConcerns.length) {
     instructions.push(`Prioritize these explicit core concerns first: ${coreConcerns.join(" / ")}.`)
@@ -364,10 +553,12 @@ export function buildVoiceCoachSessionSnapshot(args: {
   customerProfile?: VoiceCoachCustomerProfileRecord | null
   sceneCard?: VoiceCoachSceneCardRecord | null
   liveNotes?: string | null
+  followupContext?: unknown
 }): VoiceCoachSessionSnapshot {
   const customerProfile = normalizeCustomerProfileRecord(args.customerProfile || null)
   const sceneCard = normalizeSceneCardRecord(args.sceneCard || null)
   const liveNotes = String(args.liveNotes || "").trim().slice(0, 500)
+  const followupContext = normalizeVoiceCoachFollowupContext(args.followupContext || null)
   const sceneKindPolicy = getVoiceCoachSceneKindPolicy(sceneCard?.scene_kind, sceneCard?.service_name)
 
   const summaryLines = [
@@ -398,6 +589,7 @@ export function buildVoiceCoachSessionSnapshot(args: {
     sceneCard ? formatBulletLine("必须覆盖", sceneCard.must_cover_points) : "",
     sceneCard ? formatBulletLine("禁忌表达", sceneCard.do_not_say) : "",
     liveNotes ? `本次补充：${liveNotes}` : "",
+    followupContext ? formatBulletLine("复练重点", [followupContext.title]) : "",
   ].filter(Boolean)
 
   const promptLines = [
@@ -407,6 +599,7 @@ export function buildVoiceCoachSessionSnapshot(args: {
     customerProfile ? formatBulletLine("建立信任的点", customerProfile.trust_triggers) : "",
     customerProfile ? formatBulletLine("过往经历", [customerProfile.past_experience]) : "",
     customerProfile ? formatBulletLine("顾客补充备注", [customerProfile.notes]) : "",
+    ...buildFollowupPromptLines(followupContext),
   ].filter(Boolean)
 
   const promptContextText = promptLines.join("\n")
@@ -415,6 +608,7 @@ export function buildVoiceCoachSessionSnapshot(args: {
     version: "v1",
     customer_profile: customerProfile,
     scene_card: sceneCard,
+    followup_context: followupContext,
     live_notes: liveNotes,
     prompt_context_text: promptContextText,
     display: {
@@ -424,7 +618,7 @@ export function buildVoiceCoachSessionSnapshot(args: {
       scene_kind: sceneCard?.scene_kind || "",
       scene_kind_label: sceneCard?.scene_kind_label || "",
       service_name: sceneCard?.service_name || "",
-      summary_lines: summaryLines.slice(0, 6),
+      summary_lines: summaryLines.slice(0, 7),
     },
   }
 }
@@ -446,11 +640,16 @@ export function getVoiceCoachSessionClientContext(args: {
     args.sessionContext && typeof args.sessionContext === "object"
       ? String((args.sessionContext as { live_notes?: unknown }).live_notes || "").trim()
       : ""
+  const followupFromContext =
+    args.sessionContext && typeof args.sessionContext === "object"
+      ? normalizeVoiceCoachFollowupContext((args.sessionContext as { followup_context?: unknown }).followup_context || null)
+      : null
 
   return {
     customer_profile_id: args.customerProfileId || "",
     scene_card_id: args.sceneCardId || "",
     live_notes: liveNotesFromSnapshot || liveNotesFromContext,
+    followup_context: normalizeVoiceCoachFollowupContext(snapshotObject?.followup_context || null) || followupFromContext,
     customer_name: String(snapshotObject?.display?.customer_name || "").trim(),
     customer_summary: String(snapshotObject?.display?.customer_summary || "").trim(),
     scene_name: String(snapshotObject?.display?.scene_name || "").trim(),

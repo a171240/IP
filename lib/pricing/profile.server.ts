@@ -267,3 +267,65 @@ export async function consumeCredits(opts: {
     credits_unlimited: Boolean(consumed?.credits_unlimited ?? false),
   }
 }
+
+export async function refundCredits(opts: {
+  userId: string
+  amount: number
+  stepId: string
+  reason?: string
+  metadata?: Record<string, unknown>
+}) {
+  const amount = Math.max(0, Math.floor(opts.amount))
+  if (amount <= 0) return null
+
+  const admin = createAdminSupabaseClient()
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { data: profileRow, error: profileError } = await admin
+      .from("profiles")
+      .select("credits_balance, credits_unlimited")
+      .eq("id", opts.userId)
+      .single()
+
+    if (profileError || !profileRow) {
+      throw new Error(profileError?.message || "无法读取积分余额")
+    }
+
+    const latestBalance = Number(profileRow.credits_balance ?? 0)
+    const latestUnlimited = Boolean(profileRow.credits_unlimited)
+    if (latestUnlimited) {
+      return { credits_balance: latestBalance, credits_unlimited: true }
+    }
+
+    const { data: updatedRows, error: updateError } = await admin
+      .from("profiles")
+      .update({ credits_balance: latestBalance + amount })
+      .eq("id", opts.userId)
+      .eq("credits_balance", latestBalance)
+      .select("credits_balance, credits_unlimited")
+
+    if (updateError) throw new Error(updateError.message || "积分退回失败")
+
+    const updated = Array.isArray(updatedRows) ? updatedRows[0] : updatedRows
+    if (!updated) continue
+
+    try {
+      await admin.from("credit_transactions").insert({
+        user_id: opts.userId,
+        step_id: opts.stepId,
+        delta: amount,
+        reason: opts.reason || "refund",
+        metadata: opts.metadata || { amount },
+      })
+    } catch {
+      // Best-effort audit log.
+    }
+
+    return {
+      credits_balance: Number((updated as { credits_balance?: number | null }).credits_balance ?? latestBalance + amount),
+      credits_unlimited: Boolean((updated as { credits_unlimited?: boolean | null }).credits_unlimited ?? false),
+    }
+  }
+
+  throw new Error("积分退回失败，请重试")
+}

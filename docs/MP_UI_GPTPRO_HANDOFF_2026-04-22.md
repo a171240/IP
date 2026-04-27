@@ -103,6 +103,33 @@
 - `diagnosis*`
 - `voice-coach/report`
 
+### 4.4 本轮执行方式改为 HTML-first
+
+本轮不建议 GPT Pro 一上来直接改小程序页面。
+
+更稳的方式是分两步：
+
+1. 先做一版 HTML 静态审查稿  
+2. 审查通过后，再把确认过的页面映射回小程序 `.wxml / .wxss`
+
+原因：
+
+- 当前最需要先确认的是整体视觉方向、层级、密度和文案气质
+- HTML 审查稿更适合快速调整和集中审阅
+- 先把主页面关系看顺，再回填小程序，返工更少
+
+### 4.5 HTML 审查稿的边界
+
+HTML 审查稿必须满足以下限制：
+
+- 只做移动端单栏页面
+- 结构必须能直接映射回微信小程序
+- 不使用复杂 Web 专属交互
+- 不接真实接口
+- 不接真实业务逻辑
+- 只用静态假数据展示状态
+- 不把 HTML 做成另一个独立产品
+
 ## 5. 当前代码基线
 
 截至 2026-04-22，已完成一轮 UI 收口，主要涉及：
@@ -130,6 +157,12 @@ CLI 验证记录：
 - 2026-04-22：`npm run mp:preview` 成功
 
 说明当前版本至少能被微信开发者工具正常打开和预览。
+
+这套现有小程序页面应被视为：
+
+- 第二阶段回填目标
+- 当前信息架构和交互边界参考
+- 不是 GPT Pro 第一轮必须直接改写的对象
 
 ## 6. 当前截图里暴露出的主要问题
 
@@ -285,6 +318,45 @@ CLI 验证记录：
 - `mini-program-ui/pages/voice-coach/scene-card-editor/index.wxss`
 - `mini-program-ui/pages/voice-coach/chat.wxss`
 
+## 10.1 第一阶段推荐产物
+
+建议 GPT Pro 第一阶段先产出 HTML 审查稿，而不是直接改小程序源码。
+
+推荐输出位置：
+
+- `docs/ui-prototype/mini-program-main-flow/index.html`
+- `docs/ui-prototype/mini-program-main-flow/styles.css`
+
+如需拆分页面，也应保持为静态审查稿目录，例如：
+
+- `docs/ui-prototype/mini-program-main-flow/xiaohongshu.html`
+- `docs/ui-prototype/mini-program-main-flow/drafts.html`
+- `docs/ui-prototype/mini-program-main-flow/voice-coach.html`
+- `docs/ui-prototype/mini-program-main-flow/mine.html`
+
+第一阶段只要求覆盖：
+
+- 发文
+- 草稿
+- 话术练习
+- 我的
+
+如还有余量，再补：
+
+- 登录
+- 支付
+- 订单
+- 门店档案列表
+- 门店档案编辑
+
+## 10.2 第二阶段回填目标
+
+只有在 HTML 审查稿通过后，才进入第二阶段：
+
+- 把已确认的视觉结构映射到 `mini-program-ui/pages/*`
+- 继续坚持 UI-only
+- 不修改现有逻辑、跳转、接口和状态规则
+
 ## 11. 不建议这轮做的事
 
 - 不要重做全局视觉体系
@@ -292,15 +364,27 @@ CLI 验证记录：
 - 不要重写 voice-coach chat 结构
 - 不要把 deferred 页面一起卷进来
 - 不要把 UI 优化变成后端联调或全仓重构
+- 不要做难以映射回小程序的 Web 专属动画或交互
 
 ## 12. 验收标准
+
+### 12.1 第一阶段 HTML 审查标准
 
 1. 3 秒内能看出每页主任务  
 2. 英文标签显著减少  
 3. 说明性文案显著减少  
 4. 发文、草稿、话术练习、我的，四页一眼可区分  
 5. 主 CTA 更唯一  
-6. 不破坏原有按钮行为和页面跳转
+6. 页面结构能清晰映射回小程序  
+7. 不依赖真实数据和真实逻辑也能看清设计方向
+
+### 12.2 第二阶段小程序回填标准
+
+1. 不破坏原有按钮行为和页面跳转  
+2. 不改业务逻辑  
+3. 不改接口请求和状态规则  
+4. 视觉结果尽量与 HTML 审查稿一致  
+5. `npm run mp:open` 与 `npm run mp:preview` 可继续通过
 
 ## 13. 推荐 Git 策略
 
@@ -310,20 +394,60 @@ CLI 验证记录：
 2. 不要把整个仓库所有脏改动都当成 UI 版本  
 3. UI 接力尽量只围绕 `mini-program-ui` 范围提交
 
+## 13.1 已检查的交接基线
+
+- 远端交接分支：`origin/codex/mp-ui-gptpro-handoff`
+- 该分支相对 `origin/feat/voice-coach-realtime` 当前只多 1 个提交：
+  `5521f26 feat(mp-ui): hand off current mini-program UI pass to GPT Pro`
+- 这次交接提交只包含：
+  - `docs/MP_UI_GPTPRO_HANDOFF_2026-04-22.md`
+  - `mini-program-ui/app.wxss`
+  - `mini-program-ui/pages/xiaohongshu/*`
+  - `mini-program-ui/pages/xhs-drafts/*`
+  - `mini-program-ui/pages/mine/*`
+  - `mini-program-ui/pages/login/*`
+  - `mini-program-ui/pages/pay/*`
+  - `mini-program-ui/pages/order/*`
+  - `mini-program-ui/pages/store-profiles/*`
+  - `mini-program-ui/pages/store-profile-editor/*`
+- 说明：
+  - 本地仍有少量非本轮交接文件未推送，它们不属于 GPT Pro 本轮 UI 任务范围。
+  - GPT Pro 应直接基于 `codex/mp-ui-gptpro-handoff` 分支继续工作，而不是基于本地未同步状态做假设。
+
 ## 14. 可直接给 GPT Pro 的提示词
 
 可直接复制下面这段：
 
 ```md
-Use a design-engineer workflow to continue polishing the WeChat mini program UI under `D:\\IP网站\\mini-program-ui`.
+Use a design-engineer workflow to improve the WeChat mini program main-flow UI on branch `codex/mp-ui-gptpro-handoff`.
+
+Before editing anything:
+- Read `docs/MP_UI_GPTPRO_HANDOFF_2026-04-22.md` first
+- Read `mini-program-ui/app.json` to confirm the active tab pages
+- Read the current `.wxml` / `.wxss` files for the main pages as structural references
+- Start with a short execution plan before changing code
+
+Phase 1 goal:
+- Do not start by editing the mini program pages directly
+- First create an HTML static review prototype for the main flow
+- The HTML prototype must stay structurally translatable to WeChat mini program WXML/WXSS
+- Use static mock data only
+- Keep it mobile-first and single-column
+
+Recommended Phase 1 output:
+- `docs/ui-prototype/mini-program-main-flow/index.html`
+- `docs/ui-prototype/mini-program-main-flow/styles.css`
 
 Hard constraints:
 - UI only
 - Do not change business logic
 - Do not change API calls, auth, routing targets, payment logic, voice training logic, storage, or analytics
-- Prefer `.wxml` and `.wxss` changes only
 - Make surgical edits only
-- Do not touch unrelated dirty files outside `mini-program-ui`
+- In Phase 1, prefer HTML/CSS only
+- In Phase 2, map approved designs into `.wxml` / `.wxss`
+- Do not touch unrelated dirty files outside the files needed for the prototype or approved UI mapping
+- Keep Chinese product tone stable
+- Reduce English eyebrow labels and design-review style copy
 
 Primary scope:
 - `pages/xiaohongshu/index`
@@ -344,7 +468,17 @@ Secondary scope if needed:
 - `pages/voice-coach/scene-card-editor/index`
 - `pages/voice-coach/chat`
 
-Current UI direction is correct but still too "design explanation" heavy.
+Do not expand this round into:
+- `pages/content-studio/index`
+- `pages/video-jobs/index`
+- `pages/home/index`
+- `pages/workspace/index`
+- `pages/workflow*`
+- `pages/library/index`
+- `pages/diagnosis*`
+- `pages/voice-coach/report`
+
+Current UI direction is correct but still too design-explanation heavy.
 
 Fix these problems:
 - Too many English eyebrow labels
@@ -366,6 +500,18 @@ Specific goals:
 
 Keep the dark black-gold base, but reduce decorative explanation and strengthen task clarity.
 
-Validate by keeping the main CTA obvious and preserving all existing behavior.
+Validation requirements:
+- Phase 1: deliver the HTML prototype first for review
+- Wait for approval before broad mini program page mapping
+- Keep the main CTA obvious
+- Preserve all existing behavior
+- Preserve all existing navigation targets
+- If Phase 2 starts, run the available mini program verification flow after edits:
+  - `npm run mp:open`
+  - `npm run mp:preview`
+- In the final summary, separate:
+  - prototype files
+  - mapped mini program files
+  - unchanged logic boundaries
+  - any residual visual risk
 ```
-

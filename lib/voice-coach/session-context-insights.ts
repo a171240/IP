@@ -1,5 +1,6 @@
 import {
   getVoiceCoachSessionClientContext,
+  normalizeVoiceCoachFollowupContext,
   normalizeCustomerProfileRecord,
   normalizeSceneCardRecord,
   type VoiceCoachSessionSnapshot,
@@ -57,6 +58,11 @@ export type VoiceCoachSessionInsights = {
   mustCoverPoints: string[]
   doNotSay: string[]
   focusPoints: string[]
+  followupTitle: string
+  followupInstruction: string
+  followupPracticePoints: string[]
+  followupMissedPoints: string[]
+  followupRiskPoints: string[]
 }
 
 export function getVoiceCoachSessionInsights(args: {
@@ -72,6 +78,7 @@ export function getVoiceCoachSessionInsights(args: {
     (snapshotObject?.customer_profile as any) || null,
   )
   const sceneCard = normalizeSceneCardRecord((snapshotObject?.scene_card as any) || null)
+  const followupContext = normalizeVoiceCoachFollowupContext(snapshotObject?.followup_context || null)
   const clientContext = getVoiceCoachSessionClientContext({
     snapshot: args.snapshot,
     sessionContext: args.sessionContext,
@@ -89,6 +96,8 @@ export function getVoiceCoachSessionInsights(args: {
       ...(sceneCard?.communication_method_tags || []),
       ...(sceneCard?.must_cover_points || []),
       ...(sceneCard?.likely_questions || []),
+      ...(followupContext?.practice_points || []),
+      ...(followupContext?.missed_points || []),
     ],
     6,
   )
@@ -111,12 +120,14 @@ export function getVoiceCoachSessionInsights(args: {
   if (sceneLabel) backgroundParts.push(`训练场景：${sceneLabel}`)
   if (sceneCard?.scene_goal) backgroundParts.push(`目标：${sceneCard.scene_goal}`)
   if (clientContext.live_notes) backgroundParts.push(`备注：${clientContext.live_notes}`)
+  if (followupContext?.title) backgroundParts.push(`复练重点：${followupContext.title}`)
 
   return {
     hasContext: Boolean(
       customerLabel ||
         sceneLabel ||
         clientContext.live_notes ||
+        followupContext?.title ||
         summaryLines.length ||
         focusPoints.length,
     ),
@@ -141,5 +152,10 @@ export function getVoiceCoachSessionInsights(args: {
     mustCoverPoints: uniqStrings(sceneCard?.must_cover_points || [], 6),
     doNotSay: uniqStrings(sceneCard?.do_not_say || [], 6),
     focusPoints,
+    followupTitle: followupContext?.title || "",
+    followupInstruction: followupContext?.instruction || "",
+    followupPracticePoints: uniqStrings(followupContext?.practice_points || [], 5),
+    followupMissedPoints: uniqStrings(followupContext?.missed_points || [], 4),
+    followupRiskPoints: uniqStrings(followupContext?.risk_points || [], 3),
   }
 }

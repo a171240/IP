@@ -78,6 +78,38 @@ function conflictLabel(level: ConflictLevel): string {
   return "标准"
 }
 
+function contentTypeStrategy(contentType: XhsContentType): string {
+  if (contentType === "treatment") {
+    return [
+      "【攻略】写给“想做但怕踩坑”的顾客：从具体触发场景进入，拆出选择标准、流程判断和可核实细节。",
+      "内容路径：她为什么现在需要 -> 最怕哪里不透明 -> 3-4条判断标准 -> 哪些情况建议先缓一缓。",
+      "不要写成项目广告；像一线经营者在帮她做消费决策。",
+    ].join("\n")
+  }
+
+  if (contentType === "education") {
+    return [
+      "【科普】写给“听过很多术语但还是不放心”的顾客：把专业知识翻译成生活场景和可理解边界。",
+      "内容路径：常见误区/误会 -> 为什么会这样 -> 她能自己观察什么 -> 什么情况要谨慎。",
+      "不制造容貌焦虑，不把护理说成医疗治疗，不承诺确定效果。",
+    ].join("\n")
+  }
+
+  if (contentType === "promotion") {
+    return [
+      "【避雷】写给“被推销、加价、缩水体验伤过”的顾客：用骂点反推买点，只拆常见行为，不攻击具体人或店。",
+      "内容路径：真实吐槽/顾虑 -> 这件事背后的风险 -> 识别方法 -> 门店应有的边界。",
+      "冲突可以尖锐，但立场必须是替顾客降低决策成本。",
+    ].join("\n")
+  }
+
+  return [
+    "【对比】写给“正在两种方案之间纠结”的顾客：对比标准、适合人群、时间成本和风险边界。",
+    "内容路径：同一个需求下的两类人 -> 各自更适合什么 -> 怎么判断自己是哪类 -> 别只看表面卖点。",
+    "不点名拉踩同行，不做绝对优劣结论。",
+  ].join("\n")
+}
+
 function buildStoreSummary(profile: StoreProfile | null): string {
   if (!profile) return "（未提供门店档案：请写泛内容，不要编造具体数字、具体地标、具体价格。）"
 
@@ -97,23 +129,63 @@ function buildStoreSummary(profile: StoreProfile | null): string {
   return parts.length ? parts.join("\n") : "（已选择门店档案，但信息不完整：请避免编造具体事实。）"
 }
 
+function pickCoverTemplate(main: string, sub: string): "warm-poster" | "hand-note" | "dialog-bubble" {
+  const text = `${main}${sub}`
+  if (/记到现在|说了句话|三个字|笑了一下|不用回消息|睡着了|日记/.test(text)) return "hand-note"
+  if (/她说|他说|问我|跟我说|消息|发来|聊起来|原话/.test(text)) return "dialog-bubble"
+  return "warm-poster"
+}
+
+function coverTemplateBrief(template: ReturnType<typeof pickCoverTemplate>) {
+  if (template === "hand-note") {
+    return [
+      "【图片类型】小红书单张封面，手写感便签文字海报。",
+      "【版式】像门店老板随手记下来的真心话，标题居中偏上，整句完整可读，留白充足。",
+      "【视觉风格】奶油色便签纸、轻微纸张阴影、暖光晕染、真实纸张纹理，情绪安静但有停顿感。",
+      "【中文字体描述】略带倾斜的手写体或行楷风格，保留一点不完美感，但每个字都必须清晰端正。",
+      "【画面元素】一张奶油色便签纸，可有轻微胶带或阴影质感，不要复杂贴纸拼贴。",
+    ].join("\n")
+  }
+
+  if (template === "dialog-bubble") {
+    return [
+      "【图片类型】小红书单张封面，对话气泡文字海报。",
+      "【版式】单个主气泡承接标题，像聊天截图里的重点句，但不要做成真实平台界面。",
+      "【视觉风格】浅米色背景，白色圆角气泡，柔和阴影，画面干净，只保留一个核心气泡。",
+      "【中文字体描述】圆润的现代无衬线黑体，加粗，手机端一眼可读。",
+      "【画面元素】只保留单个对话气泡和柔和背景，避免头像、时间戳、消息列表、平台 UI 元素。",
+    ].join("\n")
+  }
+
+  return [
+    "【图片类型】小红书单张封面，暖调强标题文字海报。",
+    "【版式】三行冲突式或单句大字式，标题居中偏上，大字短句，整句先可读再做局部强调。",
+    "【视觉风格】暖米白到浅杏色渐变背景，轻纸质肌理，留白 40-50%，不要信息图报告感。",
+    "【中文字体描述】圆润的现代无衬线黑体，加粗，字距略松，主标题稳，重点词可用暖棕色强调。",
+    "【画面元素】背景只保留暖调渐变、纸张肌理和轻微投影，不放人物、产品、门店陈列。",
+  ].join("\n")
+}
+
 function buildBanana2CoverPrompt(opts: { main: string; sub: string }) {
   const { main, sub } = opts
+  const template = pickCoverTemplate(main, sub)
   const prompt = [
-    "竖版3:4，小红书爆款封面，高情绪冲突“文字海报”设计。",
-    "极简留白，奶油白/浅米色背景，高对比黑色粗体中文排版，少量红色强调色块。",
-    "文字必须完全正确、清晰可读、无错别字、无乱码、无多余文字。",
+    "画幅比例3:4竖版。",
+    "为生活美容/皮肤管理门店生成一张小红书首图封面。",
+    coverTemplateBrief(template),
     "",
-    `主标题（超大，居中，占画面60%）：《${main}》`,
-    `副标题（中号，放主标题下方，占20%）：《${sub}》`,
+    "【封面文字】",
+    `主标题：${main}`,
+    `副标题：${sub}`,
     "",
-    "风格：现代排版、干净、克制、有压迫感。",
-    "禁止出现：二维码、电话、微信号、平台名、团购、地址、logo、水印。",
+    "【文字规则】所有文字必须为清晰、准确、简体中文；严格按上面的主标题和副标题原样显示；不要自动改写，不要添加额外标语；不要乱码、错别字、英文或多余文字。",
+    "【结构约束】只做小红书单张封面，保持单页表达，不放门店信息、价格、优惠、地址、平台名、二维码、电话、微信号、logo、水印。",
+    "【输出目标】手机端高可读、情绪停顿感强、适合小红书封面点击。",
   ].join("\n")
 
   const negative = [
-    "watermark, logo, QR code, phone number, extra text, messy layout,",
-    "garbled Chinese characters, misspelled Chinese, blurry text, low resolution",
+    "文字乱码，错别字，英文字母，多余文字，标题不清楚，小字糊掉，二维码，电话，微信号，平台名，团购，价格，优惠，地址，logo，水印，",
+    "廉价促销风，土味红黄配色，信息过载，复杂背景，文字遮挡，人物照片，产品图，3D效果，卡通风格",
   ].join(" ")
 
   return { prompt, negative }
@@ -145,54 +217,14 @@ function safeJsonParse(text: string): unknown {
   }
 }
 
-async function callApimartJson(opts: { messages: Array<{ role: string; content: string }>; maxTokens: number }) {
-  const quickKey = process.env.APIMART_QUICK_API_KEY
-  const quickBaseUrl = process.env.APIMART_QUICK_BASE_URL
-  const quickModel = process.env.APIMART_QUICK_MODEL
-
-  const apiKey = (quickKey && quickKey !== "your-api-key-here" ? quickKey : process.env.APIMART_API_KEY) || ""
-  const baseUrl =
-    (quickBaseUrl && quickBaseUrl.trim().length ? quickBaseUrl : process.env.APIMART_BASE_URL || "https://api.apimart.ai/v1").trim()
-  const model = (quickModel && quickModel.trim().length ? quickModel : process.env.APIMART_MODEL || "gpt-4o").trim()
+async function callDeepSeekJson(opts: { messages: Array<{ role: string; content: string }>; maxTokens: number }) {
+  const apiKey = (process.env.DEEPSEEK_API_KEY || "").trim()
+  const baseUrl = (process.env.DEEPSEEK_XHS_BASE_URL || process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com/v1").trim()
+  const model = (process.env.DEEPSEEK_XHS_MODEL || process.env.DEEPSEEK_MODEL || "deepseek-chat").trim()
 
   if (!apiKey || apiKey === "your-api-key-here") {
-    throw new Error("APIMART_API_KEY 未配置")
+    throw new Error("DEEPSEEK_API_KEY missing")
   }
-
-  const toolName = "emit_xhs_v4_json"
-  const tools = [
-    {
-      type: "function",
-      function: {
-        name: toolName,
-        description: "输出一条可直接发布的小红书图文笔记内容，严格以 JSON 返回，不要输出任何额外文字。",
-        parameters: {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            title: { type: "string", minLength: 1, maxLength: 60 },
-            body: { type: "string", minLength: 120, maxLength: 8000 },
-            cover_main: { type: "string", minLength: 2, maxLength: 20 },
-            cover_sub: { type: "string", minLength: 2, maxLength: 28 },
-            pinned_comment: { type: "string", minLength: 60, maxLength: 2000 },
-            reply_templates: {
-              type: "array",
-              items: { type: "string", minLength: 10, maxLength: 400 },
-              minItems: 3,
-              maxItems: 5,
-            },
-            tags: {
-              type: "array",
-              items: { type: "string", minLength: 1, maxLength: 40 },
-              minItems: 3,
-              maxItems: 20,
-            },
-          },
-          required: ["title", "body", "cover_main", "cover_sub", "pinned_comment"],
-        },
-      },
-    },
-  ] as const
 
   async function doRequest(payload: Record<string, unknown>) {
     const upstream = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
@@ -208,21 +240,18 @@ async function callApimartJson(opts: { messages: Array<{ role: string; content: 
     return { ok: upstream.ok, status: upstream.status, text: jsonText }
   }
 
-  // Prefer tool-calling: some thinking models return empty `message.content` but provide JSON in tool_calls.
   let res = await doRequest({
     model,
     messages: opts.messages,
     temperature: 0.7,
     max_tokens: opts.maxTokens,
     stream: false,
-    tools,
-    tool_choice: { type: "function", function: { name: toolName } },
+    response_format: { type: "json_object" },
   })
 
-  // Compat fallback: if upstream doesn't support tools/tool_choice, retry without them.
   if (!res.ok && res.status === 400) {
-    const lower = res.text.slice(0, 400).toLowerCase()
-    if (lower.includes("tool") || lower.includes("tools") || lower.includes("tool_choice")) {
+    const lower = res.text.slice(0, 500).toLowerCase()
+    if (lower.includes("response_format") || lower.includes("json_object")) {
       res = await doRequest({
         model,
         messages: opts.messages,
@@ -234,7 +263,7 @@ async function callApimartJson(opts: { messages: Array<{ role: string; content: 
   }
 
   if (!res.ok) {
-    throw new Error(`上游 LLM 错误: ${res.status} ${res.text.slice(0, 200)}`)
+    throw new Error(`DeepSeek LLM error: ${res.status} ${res.text.slice(0, 200)}`)
   }
 
   const parsed = safeJsonParse(res.text)
@@ -247,21 +276,6 @@ async function callApimartJson(opts: { messages: Array<{ role: string; content: 
     if (!first || typeof first !== "object") return null
     const message = (first as Record<string, unknown>).message
     if (!message || typeof message !== "object") return null
-
-    const toolCalls = (message as Record<string, unknown>).tool_calls
-    if (Array.isArray(toolCalls) && toolCalls.length) {
-      const call0 = toolCalls[0]
-      if (call0 && typeof call0 === "object") {
-        const fn = (call0 as Record<string, unknown>).function
-        if (fn && typeof fn === "object") {
-          const args = (fn as Record<string, unknown>).arguments
-          if (typeof args === "string" && args.trim()) {
-            const v = safeJsonParse(args)
-            if (v) return v
-          }
-        }
-      }
-    }
 
     const content = (message as Record<string, unknown>).content
     if (typeof content === "string" && content.trim()) {
@@ -279,12 +293,11 @@ async function callApimartJson(opts: { messages: Array<{ role: string; content: 
   })()
 
   if (!extracted) {
-    throw new Error("LLM 未返回有效内容")
+    throw new Error("DeepSeek did not return valid JSON")
   }
 
   return extracted
 }
-
 async function callDangerCheck(opts: { content: string; draftId?: string; billing: BillingContext }) {
   const upstream = await fetch(buildXhsUpstreamUrl("/api/content/danger-check"), {
     method: "POST",
@@ -336,6 +349,7 @@ function compactFlags(flags: GuardrailFlag[]) {
 function buildSystemPrompt(opts: { contentType: XhsContentType; conflictLevel: ConflictLevel }) {
   const typeLabel = contentTypeLabel(opts.contentType)
   const cLabel = conflictLabel(opts.conflictLevel)
+  const typeStrategy = contentTypeStrategy(opts.contentType)
 
   // IMPORTANT:
   // - 正文与首图文案严格禁CTA
@@ -343,8 +357,21 @@ function buildSystemPrompt(opts: { contentType: XhsContentType; conflictLevel: C
   // - 只怼行为话术，不点名攻击
   return [
     "你是“美容行业小红书图文增长策略师 + 情绪冲突文案导演”。",
+    "你的表达基础：像懂一线门店、懂顾客异议的经营者，说人话，给判断标准，不卖焦虑。",
     "",
     `当前任务：生成一条【${typeLabel}】笔记（中文），冲突强度档位：${cLabel}。`,
+    "",
+    "底层方法论：富贵千机塔人群洞察（必须内化，不要输出分析表）：",
+    "1) 拒绝单一画像：不要写“25-35岁女性”这种空泛标签；先在心里拆出3-5种不同顾客，再选最适合本主题的一种作为主角。",
+    "2) 至少爬到第6层：自然属性/社会属性只作背景，正文必须落到消费模式、行为场景、生活方式、此刻情绪；能触及长期情感和价值观更好。",
+    "3) 用5W1H翻译成内容：WHO她是谁，WHEN她处在什么阶段，WHY她真正想解决什么，WHERE需求在哪个场景最强，WHAT她该看什么服务/标准，HOW她会用什么词搜索或比较。",
+    "4) 三条铁律：别猜，优先看门店档案、关键词、差评/吐槽原话；骂点就是买点，把抱怨翻译成可验证卖点；拆到能给她起名字为止，写出一天里的具体画面。",
+    "5) 没有真实资料时，只能写“通用判断标准/自检清单”，不得编造顾客原话、成交数据、效果案例、地标和价格。",
+    "",
+    "美业常见情绪种子（仅作选题方向，不当作真实引语）：怕被推销、怕加价、怕敏感红痒、怕服务缩水、想比较、想看同类案例、担心效果承诺、担心门店不稳定、讨厌被现场施压。",
+    "",
+    "本类目策略：",
+    typeStrategy,
     "",
     "硬性规则（必须遵守）：",
     "1) 正文 body 严格禁CTA：不得出现 评论/私信/关注/加V/微信/VX/电话/扫码/链接/预约/到店 等导流动作；不得出现 大众点评/抖音/团购/下单/买券/核销/价格/优惠/地址/定位/导航 等交易/平台词。",
@@ -355,7 +382,9 @@ function buildSystemPrompt(opts: { contentType: XhsContentType; conflictLevel: C
     "",
     "结构要求：",
     "- title：18字内，包含主关键词（若关键词为空则包含主题核心词）。",
-    "- body：400-600字，短句、画面感；必须包含至少3个“可核实细节”。若缺少门店档案信息，则改为“可验证判断标准/自检清单”，不要编造具体事实。",
+    "- body：400-600字，短句、画面感；隐含链路为“具体顾客画像 -> 触发场景 -> 此刻情绪 -> 判断标准 -> 温和结论”。不要输出画像表。",
+    "- body 必须包含至少3个“可核实细节”。若缺少门店档案信息，则改为“可验证判断标准/自检清单”，不要编造具体事实。",
+    "- body 结尾可以留一个开放问题，但不能出现“评论区/私信/找我/来店”等动作词。",
     "- cover_main：<=12字，冲突最大；cover_sub：<=16字，给答案/承诺（但不含CTA）。",
     "- pinned_comment：给两条路径（本地生活平台优先/短视频平台备用），都用“搜索门店昵称+地标/商圈”的方式表达；最后给出三条承诺口径（不加价/不缩水/可拒绝）。",
     "- reply_templates：3条（反推销/敏感肌合规/本地怎么找店，不写平台名）。",
@@ -389,6 +418,8 @@ function buildUserPrompt(input: GenerateV4Input) {
     storeSummary,
     "",
     seed.length ? "差评/吐槽原话（可用来提炼冲突）：\n" + seed.join("\n") : "差评/吐槽原话：未提供（请用通用冲突种子）。",
+    "",
+    "生成前请先在内部完成：选择一个具体顾客主角，判断她处在千机塔第4-6层的触发场景与即时情绪，再把内容写成可发布笔记；不要输出分析过程。",
   ]
     .filter(Boolean)
     .join("\n")
@@ -431,6 +462,7 @@ function buildRevisionPrompt(opts: {
     "2) pinned_comment：不得出现 大众点评/抖音 字样；不得出现微信/手机号/二维码。",
     "3) 医疗合规：不得承诺疗效，不使用治疗/根治类词。",
     "4) 若当前档位为 hard 仍无法降风险，请把语气降到 standard 或 safe（更克制，不引战）。",
+    "5) 保留具体顾客场景、即时情绪和判断标准，不要改成空泛广告腔。",
     "",
     "只输出 JSON（同 schema）。",
   ].join("\n")
@@ -452,7 +484,7 @@ export async function generateXhsV4(opts: { billing: BillingContext; draftId: st
 
   // Round 0: generate
   {
-    const raw = await callApimartJson({
+    const raw = await callDeepSeekJson({
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: buildUserPrompt(input) },
@@ -509,7 +541,7 @@ export async function generateXhsV4(opts: { billing: BillingContext; draftId: st
     }
 
     // Revision round
-    const revRaw = await callApimartJson({
+    const revRaw = await callDeepSeekJson({
       messages: [
         { role: "system", content: systemPrompt },
         {

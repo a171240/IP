@@ -9,7 +9,12 @@ import {
   scoreFluencyFromWpm,
   scoreToStars,
 } from "./metrics"
-import { type DimensionId, VoiceCoachReportSchema, type VoiceCoachReport } from "./report"
+import {
+  type DimensionId,
+  VoiceCoachReportSchema,
+  type VoiceCoachReport,
+  type VoiceCoachReportReferenceTurn,
+} from "./report"
 import { getVoiceCoachSceneKindPolicy } from "./scene-kind-policy"
 import { getVoiceCoachSessionInsights } from "./session-context-insights"
 import { normalizeScenarioTag } from "./tag-utils"
@@ -49,6 +54,13 @@ const DIMENSION_NAMES: Record<DimensionId, string> = {
   pronunciation: "发音准确度",
   organization: "语言组织",
 }
+
+const NEXT_ROUND_DIMENSION_PRIORITY: DimensionId[] = [
+  "persuasion",
+  "organization",
+  "expression",
+  "fluency",
+]
 
 function safeAvg(nums: Array<number | null | undefined>): number | null {
   const vals = nums.filter((n): n is number => typeof n === "number" && Number.isFinite(n))
@@ -431,6 +443,98 @@ function buildNextStepBlock(trainingContext?: TrainingContextReview) {
     : "下一轮：先用“我理解你担心……”起手，再补一条证据和一句推进，可优先讲保障或先讲案例。"
 }
 
+function pickNextRoundDimension(scores: DimensionScores): DimensionId {
+  return NEXT_ROUND_DIMENSION_PRIORITY.slice().sort((left, right) => scores[left] - scores[right])[0] || "persuasion"
+}
+
+function dimensionPracticePoint(dimensionId: DimensionId): string {
+  switch (dimensionId) {
+    case "persuasion":
+      return "先接住顾客顾虑，再补一条可验证证据，最后给低压力下一步。"
+    case "organization":
+      return "把回答压成“共情一句 + 证据一句 + 推进一步”，减少跳话题和信息堆叠。"
+    case "expression":
+      return "把重点句说短，把关键信息放前面，少用重复铺垫。"
+    case "fluency":
+      return "重点句放慢，转折减少，让顾客更容易听到证据和下一步。"
+    case "pronunciation":
+      return "关键名词、项目名称和保障句再放慢说清楚。"
+    default:
+      return "围绕顾客最在意的问题，补一条证据和一个清晰下一步。"
+  }
+}
+
+function buildNextRoundInstruction(args: {
+  focusDimensionId: DimensionId
+  trainingContext?: TrainingContextReview
+}) {
+  const missed = args.trainingContext?.missed_points?.[0]
+  const risk = args.trainingContext?.risk_points?.[0]
+
+  if (missed) {
+    return `第二轮优先围绕“${missed}”继续压测，让顾客追问这一点是否具体、可信、能落地。`
+  }
+
+  if (risk) {
+    return `第二轮优先围绕“${risk}”继续训练，让顾客对这类表达提出追问，逼迫回答更稳妥。`
+  }
+
+  return `第二轮优先训练${DIMENSION_NAMES[args.focusDimensionId]}：${dimensionPracticePoint(args.focusDimensionId)}`
+}
+
+function buildNextRoundReferenceTurns(representative: RepresentativeTurn): VoiceCoachReportReferenceTurn[] {
+  return [representative.customer, representative.beautician]
+    .filter((turn): turn is VoiceCoachTurnRow => Boolean(turn && String(turn.text || "").trim()))
+    .map((turn) => ({
+      role: turn.role,
+      turn_id: turn.id,
+      turn_index: turn.turn_index,
+      text: String(turn.text || "").trim().slice(0, 120),
+    }))
+}
+
+function buildNextRoundFocus(args: {
+  sourceSessionId?: string
+  scores: DimensionScores
+  summaryBlocks: string[]
+  representative: RepresentativeTurn
+  trainingContext?: TrainingContextReview
+  suggestedResponse?: string
+}): NonNullable<VoiceCoachReport["next_round_focus"]> {
+  const focusDimensionId = pickNextRoundDimension(args.scores)
+  const focusDimensionName = DIMENSION_NAMES[focusDimensionId]
+  const missedPoints = uniqueLimited(args.trainingContext?.missed_points || [], 4)
+  const riskPoints = uniqueLimited(args.trainingContext?.risk_points || [], 3)
+  const instruction = buildNextRoundInstruction({
+    focusDimensionId,
+    trainingContext: args.trainingContext,
+  })
+  const practicePoints = uniqueLimited(
+    [
+      ...missedPoints,
+      ...riskPoints,
+      dimensionPracticePoint(focusDimensionId),
+      args.summaryBlocks.find((item) => /^下一轮[：:]/.test(item))?.replace(/^下一轮[：:]\s*/, ""),
+    ],
+    5,
+  )
+
+  return {
+    ...(args.sourceSessionId ? { source_session_id: args.sourceSessionId } : {}),
+    focus_dimension_id: focusDimensionId,
+    focus_dimension_name: focusDimensionName,
+    focus_score: args.scores[focusDimensionId],
+    title: `下一轮先练：${missedPoints[0] || focusDimensionName}`,
+    instruction,
+    practice_points: practicePoints,
+    missed_points: missedPoints,
+    risk_points: riskPoints,
+    summary_blocks: args.summaryBlocks.slice(0, 3),
+    reference_turns: buildNextRoundReferenceTurns(args.representative),
+    ...(args.suggestedResponse ? { suggested_response: args.suggestedResponse } : {}),
+  }
+}
+
 function buildPersuasionAdvice(
   representative: RepresentativeTurn,
   persuasionScore: number,
@@ -604,6 +708,7 @@ export function generateVoiceCoachReport(opts: {
   turns: VoiceCoachTurnRow[]
   sessionSnapshot?: unknown
   sessionContext?: unknown
+  sourceSessionId?: string
 }): VoiceCoachReport {
   const turns = [...opts.turns].sort((left, right) => left.turn_index - right.turn_index)
   const beauticianTurns = turns.filter((turn) => turn.role === "beautician")
@@ -677,6 +782,15 @@ export function generateVoiceCoachReport(opts: {
     avgConfidence,
     trainingContext,
   })
+  const improvedResponse = buildImprovedResponse(representative)
+  const nextRoundFocus = buildNextRoundFocus({
+    sourceSessionId: opts.sourceSessionId,
+    scores,
+    summaryBlocks,
+    representative,
+    trainingContext,
+    suggestedResponse: improvedResponse,
+  })
 
   const wpmCurve = buildTurnCurve(beauticianTurns, (turn) => {
     return readTurnFeature(turn, "wpm") ?? calcWpm(turn.text || "", turn.audio_seconds)
@@ -715,6 +829,7 @@ export function generateVoiceCoachReport(opts: {
     ],
     summary_blocks: summaryBlocks,
     training_context: trainingContext,
+    next_round_focus: nextRoundFocus,
     tabs: {
       persuasion: {
         title: "说服力",
@@ -729,7 +844,7 @@ export function generateVoiceCoachReport(opts: {
         tags,
         customer_objection: representative.customer?.text || customerTurns[0]?.text || "客户本轮异议暂无完整记录。",
         your_response: representative.beautician?.text || beauticianTurns[0]?.text || "（本轮暂无有效回答）",
-        improved_response: buildImprovedResponse(representative),
+        improved_response: improvedResponse,
       },
       fluency: {
         title: "流利度",

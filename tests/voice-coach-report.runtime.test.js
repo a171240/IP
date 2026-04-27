@@ -63,7 +63,7 @@ function loadTsModule(filePath) {
 
 const { generateVoiceCoachReport } = loadTsModule(path.join(root, "lib", "voice-coach", "report.server.ts"))
 const { refreshVoiceCoachReport } = loadTsModule(path.join(root, "lib", "voice-coach", "report-refresh.ts"))
-const { buildVoiceCoachFirstTurnTarget, buildVoiceCoachSessionSnapshot } = loadTsModule(
+const { buildVoiceCoachFirstTurnTarget, buildVoiceCoachFollowupOpening, buildVoiceCoachSessionSnapshot } = loadTsModule(
   path.join(root, "lib", "voice-coach", "session-context.ts"),
 )
 const { getScenario } = loadTsModule(path.join(root, "lib", "voice-coach", "scenarios.ts"))
@@ -355,6 +355,54 @@ test("report becomes snapshot-aware for hit, miss and risk review", () => {
   assert.ok(report.training_context.missed_points.some((item) => item.includes("价格值不值")))
   assert.ok(report.training_context.risk_points.some((item) => item.includes("禁忌表达")))
   assert.match(report.summary_blocks[2], /价格值不值|禁忌表达|低压力下一步/)
+  assert.ok(report.next_round_focus)
+  assert.equal(report.next_round_focus.source_session_id, undefined)
+  assert.ok(report.next_round_focus.missed_points.some((item) => item.includes("价格值不值")))
+  assert.ok(report.next_round_focus.risk_points.some((item) => item.includes("禁忌表达")))
+  assert.ok(report.next_round_focus.practice_points.length > 0)
+  assert.ok(report.next_round_focus.reference_turns.some((item) => item.text.includes("保证一次就见效")))
+})
+
+test("follow-up context is written into snapshot prompt and opening fallback", () => {
+  const sessionSnapshot = buildVoiceCoachSessionSnapshot({
+    customerProfile: {
+      id: "cp-1",
+      name: "测试顾客·林岚",
+      core_concerns: ["会不会被持续推销"],
+    },
+    sceneCard: {
+      id: "sc-1",
+      name: "首次到店顾虑",
+      scene_kind: "customer_visit",
+      service_name: "补水修护护理",
+    },
+    followupContext: {
+      source_session_id: "11111111-1111-1111-1111-111111111111",
+      title: "下一轮先练：价格值不值",
+      instruction: "第二轮优先围绕“价格值不值”继续压测。",
+      practice_points: ["价格值不值", "补一条可验证案例"],
+      missed_points: ["价格值不值"],
+      risk_points: ["避免绝对化效果承诺"],
+      summary_blocks: ["下一轮：先讲价值差异"],
+      customer_objection: "你先别讲概念，我想知道有没有真实案例。",
+      your_response: "案例之后再看，我们先做就知道了。",
+      suggested_response: "我理解你想先看案例，我先给你一个和你情况接近的判断依据。",
+      reference_turns: [
+        { role: "customer", text: "你先别讲概念，我想知道有没有真实案例。", turn_index: 2 },
+        { role: "beautician", text: "案例之后再看，我们先做就知道了。", turn_index: 3 },
+      ],
+    },
+  })
+
+  const target = buildVoiceCoachFirstTurnTarget(sessionSnapshot)
+  const fallbackOpening = buildVoiceCoachFollowupOpening(sessionSnapshot)
+
+  assert.match(sessionSnapshot.prompt_context_text, /上一轮复盘重点/)
+  assert.match(sessionSnapshot.prompt_context_text, /上一轮关键对话参考/)
+  assert.match(sessionSnapshot.prompt_context_text, /不要原样复述/)
+  assert.match(target, /second-round follow-up|Previous focus/i)
+  assert.match(target, /价格值不值/)
+  assert.match(fallbackOpening, /价格值不值|真实案例/)
 })
 
 test("first-turn target explicitly mixes customer concerns with scene-card constraints", () => {
