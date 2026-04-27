@@ -1,7 +1,9 @@
-<view class="vc-page vc-editor-page">
-  <view class="container">
+<view class="vc-page vc-editor-page vc-flow-v2 vc-editor-v2">
+  <view class="vc-page-scroll-shell">
+    <scroll-view class="page-scroll" scroll-y="true" enhanced="true" bounces="false" show-scrollbar="false">
+      <view class="container">
       <view class="hero fade-up">
-        <text class="eyebrow">Scene Editor</text>
+        <text class="eyebrow">场景编辑</text>
         <text class="title">把这轮训练任务定义到位</text>
         <text class="subtitle">场景卡负责提前收束训练焦点，让这一轮练的是同一类问题，而不是一会儿练专业解释，一会儿又跳去无关异议。</text>
 
@@ -18,7 +20,7 @@
 
       <view class="section fade-up delay-1">
         <view class="section-head">
-          <text class="section-kicker">Base</text>
+          <text class="section-kicker">基础</text>
           <text class="section-title">基础信息</text>
           <text class="section-caption">先说清场景名称、训练类型、关联项目和顾客阶段。</text>
         </view>
@@ -56,7 +58,7 @@
 
       <view class="section fade-up delay-1">
         <view class="section-head">
-          <text class="section-kicker">Goal</text>
+          <text class="section-kicker">目标</text>
           <text class="section-title">训练目标</text>
           <text class="section-caption">这里只决定这轮要练哪些环节，不要把所有问题都塞进一张卡里。</text>
         </view>
@@ -80,7 +82,7 @@
 
       <view class="section fade-up delay-2">
         <view class="section-head">
-          <text class="section-kicker">Questions</text>
+          <text class="section-kicker">问题</text>
           <text class="section-title">顾客会问什么，会卡在哪里</text>
           <text class="section-caption">把专业问题和典型异议分开写，训练时顾客会更自然地推进。</text>
         </view>
@@ -104,7 +106,7 @@
 
       <view class="section fade-up delay-2">
         <view class="section-head">
-          <text class="section-kicker">Method</text>
+          <text class="section-kicker">方法</text>
           <text class="section-title">沟通方法与边界</text>
           <text class="section-caption">这里写的是训练时必须坚持的方法，不是标准答案。</text>
         </view>
@@ -145,5 +147,7 @@
           <button class="btn-primary" loading="{{saving}}" disabled="{{saving}}" bindtap="handleSave">保存场景卡</button>
         </view>
       </view>
+      </view>
+    </scroll-view>
   </view>
 </view>

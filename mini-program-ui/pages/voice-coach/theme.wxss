@@ -1,6 +1,8 @@
 /* mini-program-ui/pages/voice-coach/theme.wxss */
 page,
 .vc-theme {
+  --vc-font-ui: "PingFang SC", "SF Pro Text", "Helvetica Neue", "Microsoft YaHei", sans-serif;
+  --vc-font-display: "PingFang SC", "SF Pro Display", "Helvetica Neue", "Microsoft YaHei", sans-serif;
   --vc-bg: #06070a;
   --vc-bg-soft: #0b0e13;
   --vc-surface: #0f131a;
@@ -35,17 +37,37 @@ page,
   --vc-shadow-sm: 0 12rpx 30rpx rgba(0, 0, 0, 0.24);
   --vc-shadow-md: 0 20rpx 46rpx rgba(0, 0, 0, 0.28);
   --vc-shadow-lg: 0 28rpx 64rpx rgba(0, 0, 0, 0.34);
+
+  /* Local flow-v2 palette.
+     Keep these tokens in the voice theme itself so page styles do not depend on
+     app-level custom properties during mini-program rendering. */
+  --vc-flow-paper: #ece0d3;
+  --vc-flow-paper-2: #e3d6c8;
+  --vc-flow-paper-3: #d9ccbe;
+  --vc-flow-ink: #231d1a;
+  --vc-flow-ink-soft: #5b4e48;
+  --vc-flow-line: rgba(100, 80, 72, 0.16);
+  --vc-flow-line-strong: rgba(106, 86, 78, 0.22);
+  --vc-flow-sage-1: #8d9880;
+  --vc-flow-sage-2: #717c62;
+  --vc-flow-sage-3: #59634d;
+  --vc-flow-sage-text: rgba(95, 109, 85, 0.96);
 }
 
 .vc-page,
-.vc-page view,
-.vc-page text,
 .vc-page button,
 .vc-page navigator,
 .vc-page input,
 .vc-page textarea {
   box-sizing: border-box;
   color: var(--vc-text);
+  font-family: var(--vc-font-ui);
+}
+
+.vc-page view,
+.vc-page text {
+  box-sizing: border-box;
+  font-family: var(--vc-font-ui);
 }
 
 .vc-page input::placeholder,
@@ -113,11 +135,11 @@ page,
 .vc-page .title,
 .vc-page .title-serif {
   display: block;
-  font-family: "HarmonyOS Sans", "Alibaba PuHuiTi 2.0", "PingFang SC", "Microsoft YaHei", sans-serif;
-  font-size: 56rpx;
-  line-height: 1.12;
+  font-family: var(--vc-font-display);
+  font-size: 52rpx;
+  line-height: 1.14;
   font-weight: 700;
-  letter-spacing: 0.4rpx;
+  letter-spacing: -0.8rpx;
   color: #f5f3ef;
   margin-bottom: 12rpx;
 }
@@ -172,9 +194,10 @@ page,
   display: block;
   margin-top: 10rpx;
   margin-bottom: 10rpx;
-  font-size: 34rpx;
-  line-height: 1.24;
+  font-size: 32rpx;
+  line-height: 1.22;
   font-weight: 700;
+  letter-spacing: -0.6rpx;
   color: #f5f3ef;
 }
 
@@ -216,7 +239,8 @@ page,
   display: block;
   font-size: 27rpx;
   line-height: 1.28;
-  font-weight: 700;
+  font-weight: 650;
+  letter-spacing: -0.3rpx;
   color: #f4f6fb;
 }
 
@@ -320,7 +344,7 @@ page,
   padding: 0 24rpx;
   border-radius: 999rpx;
   font-size: 25rpx;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.2;
   display: inline-flex;
   align-items: center;
@@ -405,7 +429,7 @@ page,
 .vc-page .field-label {
   display: block;
   font-size: 24rpx;
-  font-weight: 700;
+  font-weight: 600;
   color: #f3f5f8;
 }
 
@@ -663,4 +687,198 @@ page,
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Voice flow v2: setup / library / editor pages share one lighter paper system. */
+.vc-page.vc-flow-v2 {
+  background:
+    radial-gradient(120% 120% at 0% 0%, rgba(173, 188, 160, 0.16) 0%, rgba(35, 40, 34, 0) 42%),
+    radial-gradient(120% 140% at 100% 0%, rgba(126, 145, 111, 0.14) 0%, rgba(35, 40, 34, 0) 38%),
+    linear-gradient(180deg, #21261f 0%, #21261f 30%, #e6dbce 30%, #ece1d5 100%);
+}
+
+.vc-page.vc-flow-v2 .container {
+  padding-top: 38rpx;
+  padding-bottom: calc(64rpx + env(safe-area-inset-bottom));
+}
+
+.vc-page.vc-flow-v2 .hero {
+  padding: 40rpx 34rpx 34rpx;
+  border-radius: 34rpx;
+  background:
+    radial-gradient(120% 130% at 100% 0%, rgba(138, 154, 124, 0.06) 0%, rgba(255, 255, 255, 0) 52%),
+    linear-gradient(180deg, rgba(34, 39, 32, 0.98) 0%, rgba(27, 32, 26, 0.99) 100%);
+  border: 1rpx solid rgba(208, 220, 197, 0.10);
+  box-shadow:
+    0 18rpx 40rpx rgba(17, 22, 16, 0.24),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.05);
+  color: #f7f2ea;
+}
+
+.vc-page.vc-flow-v2 .eyebrow {
+  width: auto;
+  align-self: flex-start;
+  min-height: 42rpx;
+  padding: 0 16rpx;
+  margin-bottom: 22rpx;
+  color: rgba(242, 236, 227, 0.86);
+  border-color: rgba(214, 226, 203, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 19rpx;
+  letter-spacing: 1.6rpx;
+}
+
+.vc-page.vc-flow-v2 .title {
+  margin-bottom: 16rpx;
+  color: #f7f2ea;
+}
+
+.vc-page.vc-flow-v2 .subtitle {
+  font-size: 24rpx;
+  line-height: 1.72;
+  color: rgba(237, 232, 223, 0.78);
+}
+
+.vc-page.vc-flow-v2 .section {
+  margin-top: 72rpx;
+}
+
+.vc-page.vc-flow-v2 .section-head {
+  margin-bottom: 20rpx;
+}
+
+.vc-page.vc-flow-v2 .section-kicker {
+  color: rgba(120, 140, 105, 0.92);
+}
+
+.vc-page.vc-flow-v2 .section-title {
+  margin-top: 8rpx;
+  margin-bottom: 8rpx;
+  font-size: 34rpx;
+  color: var(--vc-flow-ink);
+}
+
+.vc-page.vc-flow-v2 .section-caption {
+  font-size: 23rpx;
+  line-height: 1.7;
+  color: var(--vc-flow-ink-soft);
+}
+
+.vc-page.vc-flow-v2 .card,
+.vc-page.vc-flow-v2 .summary-card,
+.vc-page.vc-flow-v2 .footer-cta-card,
+.vc-page.vc-flow-v2 .tips-card {
+  padding: 30rpx;
+  border-radius: 30rpx;
+  background: linear-gradient(180deg, rgba(236, 224, 211, 0.98) 0%, rgba(227, 214, 200, 0.98) 100%);
+  border: 1rpx solid rgba(108, 86, 77, 0.12);
+  box-shadow:
+    0 18rpx 34rpx rgba(64, 48, 42, 0.08),
+    0 4rpx 10rpx rgba(64, 48, 42, 0.04),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.56);
+  color: var(--vc-flow-ink);
+}
+
+.vc-page.vc-flow-v2 .card-title,
+.vc-page.vc-flow-v2 .tips-title,
+.vc-page.vc-flow-v2 .empty-title {
+  font-size: 28rpx;
+  color: var(--vc-flow-ink);
+}
+
+.vc-page.vc-flow-v2 .muted,
+.vc-page.vc-flow-v2 .small,
+.vc-page.vc-flow-v2 .field-help,
+.vc-page.vc-flow-v2 .tips-copy,
+.vc-page.vc-flow-v2 .empty-copy {
+  color: var(--vc-flow-ink-soft);
+}
+
+.vc-page.vc-flow-v2 .tag,
+.vc-page.vc-flow-v2 .chip,
+.vc-page.vc-flow-v2 .meta-pill,
+.vc-page.vc-flow-v2 .tips-pill {
+  min-height: 44rpx;
+  padding: 0 16rpx;
+  border-radius: 999rpx;
+  background: rgba(234, 224, 214, 0.82);
+  border: 1rpx solid rgba(145, 125, 114, 0.12);
+  box-shadow:
+    0 6rpx 12rpx rgba(76, 59, 52, 0.04),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.48);
+  font-size: 20rpx;
+  color: var(--vc-flow-ink-soft);
+}
+
+.vc-page.vc-flow-v2 .tag-accent,
+.vc-page.vc-flow-v2 .meta-pill-accent,
+.vc-page.vc-flow-v2 .tips-pill {
+  color: var(--vc-flow-sage-text);
+  border-color: rgba(145, 125, 114, 0.12);
+  background: rgba(232, 222, 212, 0.88);
+}
+
+.vc-page.vc-flow-v2 .tag-success {
+  color: var(--vc-flow-sage-text);
+  border-color: rgba(128, 144, 116, 0.16);
+  background: rgba(215, 224, 206, 0.90);
+}
+
+.vc-page.vc-flow-v2 .btn-primary {
+  background: linear-gradient(180deg, var(--vc-flow-sage-1) 0%, var(--vc-flow-sage-2) 100%);
+  color: #fbf7f0;
+  min-height: 84rpx;
+  font-size: 24rpx;
+  box-shadow:
+    0 10rpx 20rpx rgba(49, 63, 45, 0.14),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.10);
+}
+
+.vc-page.vc-flow-v2 .btn-outline {
+  background: linear-gradient(180deg, rgba(233, 223, 213, 0.94) 0%, rgba(226, 214, 204, 0.96) 100%);
+  border: 1rpx solid rgba(118, 97, 88, 0.14);
+  min-height: 72rpx;
+  font-size: 22rpx;
+  box-shadow:
+    0 6rpx 14rpx rgba(74, 58, 50, 0.05),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.56);
+  color: var(--vc-flow-ink);
+}
+
+.vc-page.vc-flow-v2 button[size="mini"].btn-primary,
+.vc-page.vc-flow-v2 button[size="mini"].btn-outline {
+  width: auto;
+  min-height: 58rpx;
+  padding: 0 20rpx;
+  border-radius: 16rpx;
+  font-size: 20rpx;
+}
+
+.vc-page.vc-flow-v2 .input,
+.vc-page.vc-flow-v2 .picker-input {
+  min-height: 92rpx;
+  border-radius: 20rpx;
+  border: 1rpx solid rgba(118, 97, 88, 0.12);
+  background: rgba(245, 239, 232, 0.90);
+  box-shadow:
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.60),
+    0 6rpx 14rpx rgba(80, 64, 56, 0.03);
+  color: var(--vc-flow-ink);
+}
+
+.vc-page.vc-flow-v2 .textarea {
+  min-height: 188rpx;
+  background: rgba(245, 239, 232, 0.90);
+  color: var(--vc-flow-ink);
+}
+
+.vc-page.vc-flow-v2 .field-label {
+  font-size: 24rpx;
+  color: var(--vc-flow-ink);
+}
+
+.vc-page.vc-flow-v2 .field-help {
+  font-size: 22rpx;
+  line-height: 1.6;
+  color: var(--vc-flow-ink-soft);
 }

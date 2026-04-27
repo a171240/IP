@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>小程序主链路 UI V2 审查稿</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="review-shell">
+      <section class="review-intro">
+        <div>
+          <span class="kicker">UI V2 审查稿</span>
+          <h1>先看五个主入口是否像一个能用的产品</h1>
+          <p>这版不展示工程字段，不解释设计意图，只验证用户进来后能不能快速知道：我在哪、能做什么、下一步点哪里。</p>
+        </div>
+        <aside>
+          <strong>设计方向</strong>
+          <span>专业、克制、门店可用</span>
+          <span>海报页作为新标杆</span>
+          <span>生成结果优先于提示词</span>
+        </aside>
+      </section>
+
+      <section class="phone-grid">
+        <article class="phone page-xhs">
+          <div class="screen">
+            <header class="hero compact">
+              <span class="eyebrow">发文</span>
+              <h2>小红书发文</h2>
+              <p>输入主题和门店档案，先生成可发布正文。</p>
+              <button>生成文案</button>
+            </header>
+            <section class="panel">
+              <div class="panel-head">
+                <span>创作条件</span>
+                <b>主任务</b>
+              </div>
+              <div class="segmented">
+                <span class="active">攻略</span><span>科普</span><span>避雷</span><span>对比</span>
+              </div>
+              <label>主题<input value="第一次做脸怎么选" /></label>
+              <label>关键词<input value="吴江美容院 / 不推销 / 补水" /></label>
+            </section>
+            <section class="panel quiet">
+              <h3>生成结果</h3>
+              <p class="result-line">标题、正文、置顶评论和封面提示词在这里继续处理。</p>
+            </section>
+          </div>
+          <nav class="tabbar"><span class="active">发文</span><span>草稿</span><span>话术</span><span>海报</span><span>我的</span></nav>
+        </article>
+
+        <article class="phone page-drafts">
+          <div class="screen">
+            <header class="hero compact">
+              <span class="eyebrow">草稿</span>
+              <h2>内容资产库</h2>
+              <p>看状态、继续编辑、复制复用。</p>
+              <button>去发文</button>
+            </header>
+            <section class="panel asset-list">
+              <div class="panel-head"><span>最近草稿</span><b>18 条</b></div>
+              <div class="asset-row">
+                <div><strong>第一次做脸不用紧张</strong><p>待补封面 · 风险低</p></div><em></em>
+              </div>
+              <div class="asset-row">
+                <div><strong>美容院套路怎么判断</strong><p>已生成封面 · 可发布</p></div><em></em>
+              </div>
+            </section>
+          </div>
+          <nav class="tabbar"><span>发文</span><span class="active">草稿</span><span>话术</span><span>海报</span><span>我的</span></nav>
+        </article>
+
+        <article class="phone page-voice">
+          <div class="screen">
+            <header class="hero compact">
+              <span class="eyebrow">训练</span>
+              <h2>话术练习</h2>
+              <p>选顾客和场景，开始真实对话训练。</p>
+              <button>开始训练</button>
+            </header>
+            <section class="panel action-list">
+              <div class="action-row"><div><strong>顾客档案</strong><p>维护常见顾客类型</p></div><button>管理</button></div>
+              <div class="action-row"><div><strong>场景卡</strong><p>到店、异议、成交场景</p></div><button>管理</button></div>
+            </section>
+          </div>
+          <nav class="tabbar"><span>发文</span><span>草稿</span><span class="active">话术</span><span>海报</span><span>我的</span></nav>
+        </article>
+
+        <article class="phone page-poster featured">
+          <div class="screen">
+            <header class="hero poster-hero">
+              <span class="eyebrow">海报</span>
+              <h2>门店设计生成器</h2>
+              <p>选择目标、填写事实，直接生成完整海报。</p>
+            </header>
+            <section class="poster-preview">
+              <div class="poster-art">
+                <span>新客首单</span>
+                <strong>第一次来，也能安心变美</strong>
+                <p>不硬推｜可拒绝｜先评估</p>
+              </div>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><span>选目标</span><b>12 模板</b></div>
+              <div class="goal-row"><span class="active">获客</span><span>成交</span><span>信任</span><span>复购</span></div>
+              <label>门店名<input value="椿舍皮肤管理" /></label>
+              <label>权益<input value="新客 99 起" /></label>
+              <button>生成完整海报</button>
+            </section>
+          </div>
+          <nav class="tabbar"><span>发文</span><span>草稿</span><span>话术</span><span class="active">海报</span><span>我的</span></nav>
+        </article>
+
+        <article class="phone page-mine">
+          <div class="screen">
+            <header class="hero compact">
+              <span class="eyebrow">我的</span>
+              <h2>账户与权益</h2>
+              <p>查看套餐、积分、订单和门店档案。</p>
+            </header>
+            <section class="account-card">
+              <div class="avatar">LY</div>
+              <div><strong>品牌账户</strong><p>已登录，权益同步中</p></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><span>订阅与积分</span><b>服务中</b></div>
+              <div class="stats"><span><b>Pro</b>套餐</span><span><b>116</b>积分</span></div>
+              <button>升级 / 购买</button>
+            </section>
+          </div>
+          <nav class="tabbar"><span>发文</span><span>草稿</span><span>话术</span><span>海报</span><span class="active">我的</span></nav>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

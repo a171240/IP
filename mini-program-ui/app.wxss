@@ -15,6 +15,40 @@ page, :root {
   --shadow-soft: 0 18rpx 45rpx rgba(0, 0, 0, 0.45);
   --shadow-glow: 0 32rpx 90rpx rgba(229, 211, 179, 0.2);
   --glow-gold: 0 0 45rpx rgba(229, 211, 179, 0.35);
+
+  /* Shared beauty-system tokens for the new mini-program UI pass. */
+  --beauty-paper: #f7f1ea;
+  --beauty-paper-2: #f2ebe3;
+  --beauty-paper-3: #ece2d9;
+  --beauty-ink: #281f1c;
+  --beauty-ink-soft: #6e605a;
+  --beauty-ink-subtle: #8c7e76;
+  --beauty-line: rgba(108, 85, 77, 0.12);
+  --beauty-line-strong: rgba(108, 85, 77, 0.18);
+  --beauty-shadow-light: 0 18rpx 42rpx rgba(59, 43, 37, 0.10);
+  --beauty-shadow-card: 0 12rpx 28rpx rgba(59, 43, 37, 0.08);
+  --beauty-shadow-tight: 0 8rpx 18rpx rgba(59, 43, 37, 0.06);
+
+  --beauty-sage-1: #a8b49c;
+  --beauty-sage-2: #91a085;
+  --beauty-sage-3: #79886d;
+  --beauty-sage-deep: #273026;
+  --beauty-sage-surface: rgba(160, 176, 147, 0.92);
+  --beauty-sage-surface-2: rgba(143, 158, 131, 0.94);
+  --beauty-sage-line: rgba(205, 218, 194, 0.28);
+
+  --beauty-rose-1: #cb9887;
+  --beauty-rose-2: #b77f6b;
+  --beauty-rose-3: #9d6a57;
+  --beauty-rose-surface: rgba(203, 152, 135, 0.92);
+  --beauty-rose-line: rgba(243, 217, 205, 0.24);
+
+  --beauty-cocoa-1: #bf8a74;
+  --beauty-cocoa-2: #a86f5b;
+  --beauty-cocoa-3: #905845;
+
+  --beauty-pill-bg: rgba(255, 255, 255, 0.78);
+  --beauty-pill-text: #6b5a53;
 }
 
 page {
