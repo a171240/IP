@@ -1259,3 +1259,1220 @@
   color: #16110b;
   box-shadow: 0 16rpx 34rpx rgba(183, 149, 104, 0.2);
 }
+
+/* 2026-04-23 premium report refresh */
+.vc-report-page {
+  background:
+    radial-gradient(120% 100% at 0% 0%, rgba(110, 126, 96, 0.12) 0%, rgba(8, 10, 11, 0) 42%),
+    radial-gradient(120% 100% at 100% 0%, rgba(56, 66, 62, 0.12) 0%, rgba(8, 10, 11, 0) 40%),
+    linear-gradient(180deg, #090b0d 0%, #0f1316 58%, #090b0d 100%);
+}
+
+.vc-report-page .seg {
+  width: 320rpx;
+  margin: 20rpx auto 14rpx;
+  padding: 6rpx;
+  background: rgba(16, 20, 23, 0.84);
+  border-color: rgba(205, 214, 196, 0.10);
+  box-shadow:
+    0 16rpx 30rpx rgba(5, 7, 7, 0.20),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.04);
+}
+
+.vc-report-page .seg-item {
+  font-size: 24rpx;
+  color: rgba(214, 221, 212, 0.72);
+}
+
+.vc-report-page .seg-item.active {
+  background: linear-gradient(180deg, #d1b47f 0%, #bc9a64 100%);
+  color: #17120c;
+  box-shadow:
+    0 10rpx 20rpx rgba(177, 146, 96, 0.16),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.18);
+}
+
+.vc-report-page .content {
+  padding: 0 28rpx 196rpx;
+}
+
+.vc-report-page .report-hero {
+  padding: 34rpx 28rpx 28rpx;
+  border-radius: 36rpx;
+  background:
+    radial-gradient(120% 140% at 100% 0%, rgba(110, 126, 96, 0.08) 0%, rgba(255, 255, 255, 0) 52%),
+    linear-gradient(180deg, rgba(18, 22, 24, 0.98) 0%, rgba(10, 13, 16, 1) 100%);
+  border-color: rgba(205, 214, 196, 0.10);
+  box-shadow:
+    0 22rpx 44rpx rgba(5, 7, 7, 0.24),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.05);
+}
+
+.vc-report-page .hero-score {
+  font-size: 102rpx;
+  color: #f5efe7;
+  text-shadow: none;
+}
+
+.vc-report-page .hero-score-suffix {
+  color: rgba(225, 220, 214, 0.56);
+}
+
+.vc-report-page .hero-grade,
+.vc-report-page .report-section-title,
+.vc-report-page .tab-title,
+.vc-report-page .context-card-title,
+.vc-report-page .chart-card-title,
+.vc-report-page .analysis-feature-title,
+.vc-report-page .chat-title {
+  color: #f5efe7;
+}
+
+.vc-report-page .hero-subtitle,
+.vc-report-page .hero-chip-value,
+.vc-report-page .context-card-meta,
+.vc-report-page .context-point-text,
+.vc-report-page .metric-text,
+.vc-report-page .qa-text,
+.vc-report-page .loading-copy,
+.vc-report-page .chat-subtitle,
+.vc-report-page .chart-empty-text,
+.vc-report-page .audio-meta {
+  color: rgba(214, 221, 212, 0.74);
+}
+
+.vc-report-page .hero-pill,
+.vc-report-page .metric-status,
+.vc-report-page .tag,
+.vc-report-page .audio-play.is-playing {
+  background: rgba(116, 131, 102, 0.14);
+  border-color: rgba(169, 184, 155, 0.16);
+  color: #dfe8d6;
+}
+
+.vc-report-page .hero-chip,
+.vc-report-page .dimension-card,
+.vc-report-page .insight-card,
+.vc-report-page .context-card,
+.vc-report-page .analysis-feature,
+.vc-report-page .metric-card,
+.vc-report-page .qa-card,
+.vc-report-page .linechart-card,
+.vc-report-page .audio-list,
+.vc-report-page .tag-support-card,
+.vc-report-page .loading-card,
+.vc-report-page .chat-hero,
+.vc-report-page .chat-bubble {
+  background: linear-gradient(180deg, rgba(18, 22, 24, 0.96) 0%, rgba(10, 13, 17, 0.98) 100%);
+  border-color: rgba(205, 214, 196, 0.10);
+  box-shadow:
+    0 18rpx 34rpx rgba(5, 7, 7, 0.20),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.04);
+}
+
+.vc-report-page .hero-chip-label,
+.vc-report-page .tabs-label,
+.vc-report-page .section-kicker,
+.vc-report-page .panel-block-title,
+.vc-report-page .qa-title,
+.vc-report-page .chat-role-label,
+.vc-report-page .analysis-feature-label,
+.vc-report-page .audio-title {
+  color: rgba(154, 170, 142, 0.74);
+}
+
+.vc-report-page .hero-visual-card,
+.vc-report-page .hero-radar-stage,
+.vc-report-page .linechart-stage,
+.vc-report-page .tabs-shell {
+  background: linear-gradient(180deg, rgba(17, 21, 23, 0.96) 0%, rgba(10, 13, 16, 0.98) 100%);
+  border-color: rgba(205, 214, 196, 0.08);
+  box-shadow:
+    0 16rpx 30rpx rgba(5, 7, 7, 0.18),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.04);
+}
+
+.vc-report-page .tabs-wrap {
+  background: linear-gradient(180deg, rgba(9, 11, 12, 0.96) 0%, rgba(9, 11, 12, 0.88) 100%);
+}
+
+.vc-report-page .tab {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(205, 214, 196, 0.08);
+  color: rgba(214, 221, 212, 0.72);
+}
+
+.vc-report-page .tab.active {
+  background: linear-gradient(180deg, #d1b47f 0%, #bc9a64 100%);
+  color: #17120c;
+  border-color: rgba(193, 159, 109, 0.20);
+  box-shadow:
+    0 10rpx 20rpx rgba(177, 146, 96, 0.16),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.18);
+}
+
+.vc-report-page .dimension-score,
+.vc-report-page .metric-name,
+.vc-report-page .audio-item-label,
+.vc-report-page .chart-empty-title,
+.vc-report-page .chat-msg-text,
+.vc-report-page .insight-text {
+  color: #f1ece5;
+}
+
+.vc-report-page .dimension-track,
+.vc-report-page .score-bar-track {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.vc-report-page .dimension-fill {
+  box-shadow: 0 0 14rpx rgba(122, 137, 108, 0.14);
+}
+
+.vc-report-page .insight-index,
+.vc-report-page .context-point-dot {
+  background: rgba(116, 131, 102, 0.16);
+  color: #e7efe0;
+}
+
+.vc-report-page .chat-bubble-customer,
+.vc-report-page .chat-audio-pill {
+  background: linear-gradient(180deg, rgba(27, 32, 37, 0.98) 0%, rgba(18, 22, 26, 0.98) 100%);
+}
+
+.vc-report-page .chat-bubble-beautician {
+  background: linear-gradient(180deg, rgba(122, 137, 108, 0.98) 0%, rgba(93, 106, 80, 0.98) 100%);
+}
+
+.vc-report-page .chat-bubble-customer .chat-audio-state,
+.vc-report-page .chat-bubble-customer .chat-audio-dur,
+.vc-report-page .chat-bubble-customer .chat-msg-text,
+.vc-report-page .chat-bubble-customer .chat-audio-dot {
+  color: #f0ece5;
+}
+
+.vc-report-page .chat-bubble-beautician .chat-audio-state,
+.vc-report-page .chat-bubble-beautician .chat-audio-dur,
+.vc-report-page .chat-bubble-beautician .chat-msg-text,
+.vc-report-page .chat-bubble-beautician .chat-audio-dot {
+  color: #f6f2ea;
+}
+
+.vc-report-page .cta {
+  padding: 22rpx 28rpx calc(24rpx + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, rgba(9, 11, 12, 0) 0%, rgba(9, 11, 12, 0.92) 38%, rgba(9, 11, 12, 0.98) 100%);
+  border-top: none;
+  box-shadow: none;
+}
+
+.vc-report-page .again-btn {
+  min-height: 92rpx;
+  border-radius: 28rpx;
+  background: linear-gradient(180deg, #d1b47f 0%, #bc9a64 100%);
+  color: #17120c;
+  box-shadow:
+    0 12rpx 24rpx rgba(177, 146, 96, 0.16),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.16);
+}
+
+/* 2026-04-23 final report system pass */
+.vc-report-page {
+  background:
+    radial-gradient(120% 80% at 0% 0%, rgba(114, 129, 102, 0.10) 0%, rgba(240, 232, 222, 0) 44%),
+    radial-gradient(120% 120% at 100% 0%, rgba(205, 216, 196, 0.10) 0%, rgba(240, 232, 222, 0) 46%),
+    linear-gradient(180deg, #e5dbcf 0%, #ece1d5 100%);
+}
+
+.vc-report-page .seg {
+  margin: 18rpx auto 12rpx;
+  background: linear-gradient(180deg, rgba(22, 27, 25, 0.94) 0%, rgba(14, 17, 17, 0.96) 100%);
+  border-color: rgba(188, 198, 182, 0.10);
+}
+
+.vc-report-page .seg-item.active,
+.vc-report-page .tab.active,
+.vc-report-page .again-btn {
+  background: linear-gradient(180deg, rgba(153, 166, 140, 0.98) 0%, rgba(118, 130, 104, 1) 100%);
+  color: #f7f3eb;
+  border-color: rgba(177, 191, 163, 0.16);
+  box-shadow:
+    0 12rpx 24rpx rgba(77, 88, 72, 0.20),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.14);
+}
+
+.vc-report-page .report-hero {
+  padding: 30rpx 28rpx 26rpx;
+  border-radius: 34rpx;
+  background:
+    radial-gradient(120% 140% at 100% 0%, rgba(110, 126, 96, 0.07) 0%, rgba(255, 255, 255, 0) 48%),
+    linear-gradient(180deg, rgba(17, 21, 22, 0.98) 0%, rgba(10, 13, 14, 1) 100%);
+  box-shadow:
+    0 20rpx 40rpx rgba(5, 7, 7, 0.22),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.04);
+}
+
+.vc-report-page .hero-score {
+  font-size: 90rpx;
+  letter-spacing: -1rpx;
+}
+
+.vc-report-page .hero-grade {
+  margin-top: 14rpx;
+  font-size: 30rpx;
+  line-height: 1.3;
+}
+
+.vc-report-page .hero-subtitle {
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  line-height: 36rpx;
+}
+
+.vc-report-page .hero-pill,
+.vc-report-page .metric-status,
+.vc-report-page .tag,
+.vc-report-page .audio-play.is-playing {
+  background: rgba(116, 131, 102, 0.18);
+  border-color: rgba(167, 183, 154, 0.18);
+  color: #eef2e7;
+}
+
+.vc-report-page .hero-chip,
+.vc-report-page .dimension-card,
+.vc-report-page .insight-card,
+.vc-report-page .context-card,
+.vc-report-page .analysis-feature,
+.vc-report-page .metric-card,
+.vc-report-page .qa-card,
+.vc-report-page .linechart-card,
+.vc-report-page .audio-list,
+.vc-report-page .tag-support-card,
+.vc-report-page .loading-card,
+.vc-report-page .chat-hero,
+.vc-report-page .chat-bubble {
+  background:
+    radial-gradient(120% 120% at 0% 0%, rgba(110, 126, 96, 0.06) 0%, rgba(255, 255, 255, 0) 44%),
+    linear-gradient(180deg, rgba(18, 22, 23, 0.98) 0%, rgba(10, 13, 15, 1) 100%);
+  border-color: rgba(188, 198, 182, 0.10);
+  box-shadow:
+    0 18rpx 34rpx rgba(5, 7, 7, 0.20),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.04);
+}
+
+.vc-report-page .hero-chip-label,
+.vc-report-page .tabs-label,
+.vc-report-page .section-kicker,
+.vc-report-page .panel-block-title,
+.vc-report-page .qa-title,
+.vc-report-page .chat-role-label,
+.vc-report-page .analysis-feature-label,
+.vc-report-page .audio-title {
+  color: rgba(160, 176, 149, 0.74);
+}
+
+.vc-report-page .tabs-shell,
+.vc-report-page .hero-visual-card,
+.vc-report-page .hero-radar-stage,
+.vc-report-page .linechart-stage {
+  background: linear-gradient(180deg, rgba(16, 20, 21, 0.96) 0%, rgba(10, 13, 14, 0.98) 100%);
+}
+
+.vc-report-page .tabs-wrap {
+  background: linear-gradient(180deg, rgba(229, 219, 207, 0.94) 0%, rgba(236, 225, 213, 0.88) 100%);
+}
+
+.vc-report-page .tab {
+  border-radius: 18rpx;
+  background: rgba(255, 255, 255, 0.028);
+}
+
+.vc-report-page .chat-bubble-beautician {
+  background: linear-gradient(180deg, rgba(129, 143, 116, 0.98) 0%, rgba(96, 108, 83, 0.98) 100%);
+}
+
+.vc-report-page .cta {
+  background: linear-gradient(180deg, rgba(236, 225, 213, 0) 0%, rgba(236, 225, 213, 0.88) 42%, rgba(236, 225, 213, 0.98) 100%);
+}
+
+.vc-report-page .again-btn {
+  min-height: 90rpx;
+  border-radius: 28rpx;
+}
+
+/* 2026-04-24 report page coherence pass */
+page {
+  background: #0b100d;
+}
+
+.vc-report-page {
+  min-height: 100vh;
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgba(127, 143, 111, 0.12) 0%, rgba(11, 16, 13, 0) 42%),
+    radial-gradient(120% 90% at 100% 4%, rgba(188, 199, 180, 0.08) 0%, rgba(11, 16, 13, 0) 44%),
+    linear-gradient(180deg, #0b100d 0%, #111712 44%, #090d0b 100%);
+  overflow-x: hidden;
+}
+
+.vc-report-page .content {
+  padding: 0 24rpx calc(180rpx + env(safe-area-inset-bottom));
+}
+
+.vc-report-page .report-shell,
+.vc-report-page .chat-view {
+  padding-top: 10rpx;
+}
+
+.vc-report-page .seg {
+  position: sticky;
+  top: 10rpx;
+  z-index: 60;
+  width: 300rpx;
+  margin: 16rpx auto 12rpx;
+  padding: 6rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(180deg, rgba(21, 27, 23, 0.98) 0%, rgba(11, 15, 13, 0.99) 100%);
+  border: 1rpx solid rgba(188, 199, 180, 0.12);
+  box-shadow:
+    0 12rpx 24rpx rgba(3, 5, 4, 0.24),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.vc-report-page .seg-item {
+  min-height: 58rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8rpx;
+  color: rgba(221, 226, 216, 0.66);
+  font-size: 25rpx;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.vc-report-page .seg-item.active,
+.vc-report-page .tab.active,
+.vc-report-page .again-btn {
+  background: linear-gradient(180deg, #9aa68c 0%, #667554 100%);
+  color: #f8f3ea;
+  border-color: rgba(190, 205, 176, 0.18);
+  box-shadow:
+    0 10rpx 22rpx rgba(44, 57, 38, 0.26),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.14);
+}
+
+.vc-report-page .report-hero,
+.vc-report-page .context-card,
+.vc-report-page .dimension-card,
+.vc-report-page .insight-card,
+.vc-report-page .analysis-feature,
+.vc-report-page .metric-card,
+.vc-report-page .qa-card,
+.vc-report-page .linechart-card,
+.vc-report-page .audio-list,
+.vc-report-page .tag-support-card,
+.vc-report-page .loading-card,
+.vc-report-page .chat-hero,
+.vc-report-page .chat-bubble,
+.vc-report-page .tab-panel-head,
+.vc-report-page .chart-empty {
+  border: 1rpx solid rgba(188, 199, 180, 0.10);
+  background:
+    radial-gradient(120% 120% at 0% 0%, rgba(127, 143, 111, 0.08) 0%, rgba(255, 255, 255, 0) 44%),
+    linear-gradient(180deg, rgba(21, 27, 23, 0.98) 0%, rgba(11, 15, 13, 0.99) 100%);
+  box-shadow:
+    0 16rpx 32rpx rgba(3, 5, 4, 0.22),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.05);
+}
+
+.vc-report-page .report-hero {
+  padding: 28rpx 26rpx 24rpx;
+  border-radius: 30rpx;
+}
+
+.vc-report-page .eyebrow {
+  min-height: 38rpx;
+  margin-bottom: 14rpx;
+  padding: 0 14rpx;
+  border-color: rgba(167, 183, 154, 0.16);
+  background: rgba(116, 131, 102, 0.16);
+  color: #dfe8d6;
+}
+
+.vc-report-page .hero-head {
+  margin-top: 0;
+}
+
+.vc-report-page .hero-score-row {
+  gap: 10rpx;
+}
+
+.vc-report-page .hero-score {
+  font-size: 86rpx;
+  line-height: 0.92;
+  letter-spacing: 0;
+  color: #f7f3eb;
+  text-shadow: none;
+}
+
+.vc-report-page .hero-score-suffix {
+  font-size: 26rpx;
+  color: rgba(221, 226, 216, 0.56);
+}
+
+.vc-report-page .hero-grade {
+  margin-top: 14rpx;
+  font-size: 30rpx;
+  line-height: 1.3;
+  color: #f7f3eb;
+}
+
+.vc-report-page .hero-subtitle {
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  line-height: 36rpx;
+  color: rgba(221, 226, 216, 0.66);
+}
+
+.vc-report-page .hero-pill {
+  margin-top: 18rpx;
+  min-height: 46rpx;
+  padding: 0 18rpx;
+  border-radius: 16rpx;
+  background: rgba(116, 131, 102, 0.16);
+  border-color: rgba(167, 183, 154, 0.16);
+  color: #edf3e8;
+  font-size: 21rpx;
+  letter-spacing: 0.6rpx;
+}
+
+.vc-report-page .hero-chip-row {
+  margin-top: 20rpx;
+  gap: 10rpx;
+}
+
+.vc-report-page .hero-chip {
+  padding: 14rpx 16rpx;
+  border-radius: 18rpx;
+  background: rgba(255, 255, 255, 0.035);
+  border-color: rgba(188, 199, 180, 0.08);
+  box-shadow: none;
+}
+
+.vc-report-page .hero-chip-label,
+.vc-report-page .tabs-label,
+.vc-report-page .section-kicker,
+.vc-report-page .panel-block-title,
+.vc-report-page .qa-title,
+.vc-report-page .chat-role-label,
+.vc-report-page .analysis-feature-label,
+.vc-report-page .audio-title {
+  color: rgba(166, 184, 154, 0.76);
+}
+
+.vc-report-page .hero-chip-value {
+  color: rgba(241, 236, 226, 0.88);
+  font-size: 23rpx;
+  line-height: 32rpx;
+}
+
+.vc-report-page .hero-visual {
+  margin-top: 20rpx;
+}
+
+.vc-report-page .hero-visual-card,
+.vc-report-page .hero-radar-stage,
+.vc-report-page .linechart-stage {
+  border-color: rgba(188, 199, 180, 0.08);
+  background: linear-gradient(180deg, rgba(16, 21, 18, 0.98) 0%, rgba(9, 13, 11, 0.99) 100%);
+  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.04);
+}
+
+.vc-report-page .hero-visual-card {
+  padding: 18rpx 16rpx 16rpx;
+  border-radius: 24rpx;
+}
+
+.vc-report-page .hero-radar-stage {
+  border-radius: 20rpx;
+  overflow: hidden;
+}
+
+.vc-report-page .hero-visual-title,
+.vc-report-page .report-section-title,
+.vc-report-page .tab-title,
+.vc-report-page .context-card-title,
+.vc-report-page .chart-card-title,
+.vc-report-page .analysis-feature-title,
+.vc-report-page .chat-title,
+.vc-report-page .loading-title,
+.vc-report-page .dimension-name,
+.vc-report-page .dimension-score,
+.vc-report-page .metric-name,
+.vc-report-page .audio-item-label,
+.vc-report-page .chart-empty-title,
+.vc-report-page .chat-msg-text,
+.vc-report-page .insight-text {
+  color: #f7f3eb;
+}
+
+.vc-report-page .hero-visual-note,
+.vc-report-page .hero-score-suffix,
+.vc-report-page .dimension-score-unit,
+.vc-report-page .chart-card-note {
+  color: rgba(221, 226, 216, 0.52);
+}
+
+.vc-report-page .report-section {
+  margin-top: 30rpx;
+}
+
+.vc-report-page .section-head {
+  margin-bottom: 14rpx;
+}
+
+.vc-report-page .report-section-title {
+  margin-top: 8rpx;
+  font-size: 32rpx;
+  line-height: 1.26;
+  letter-spacing: 0;
+}
+
+.vc-report-page .dimension-list {
+  gap: 14rpx;
+}
+
+.vc-report-page .dimension-card {
+  padding: 22rpx 22rpx 18rpx;
+  border-radius: 24rpx;
+}
+
+.vc-report-page .dimension-name {
+  font-size: 28rpx;
+}
+
+.vc-report-page .dimension-stars {
+  color: rgba(229, 211, 179, 0.86);
+  font-size: 21rpx;
+}
+
+.vc-report-page .dimension-score {
+  font-size: 42rpx;
+}
+
+.vc-report-page .dimension-track {
+  margin-top: 18rpx;
+  height: 10rpx;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.vc-report-page .insight-card {
+  padding: 10rpx 22rpx;
+  border-radius: 26rpx;
+}
+
+.vc-report-page .insight-item {
+  gap: 16rpx;
+  padding: 20rpx 0;
+  border-bottom-color: rgba(188, 199, 180, 0.10);
+}
+
+.vc-report-page .insight-index {
+  width: 42rpx;
+  height: 42rpx;
+  border-radius: 14rpx;
+  background: rgba(116, 131, 102, 0.20);
+  color: #edf3e8;
+  box-shadow: none;
+}
+
+.vc-report-page .insight-text,
+.vc-report-page .metric-text,
+.vc-report-page .qa-text,
+.vc-report-page .context-point-text,
+.vc-report-page .context-card-meta,
+.vc-report-page .chat-subtitle,
+.vc-report-page .tab-desc,
+.vc-report-page .chart-empty-text,
+.vc-report-page .audio-meta,
+.vc-report-page .loading-copy {
+  color: rgba(221, 226, 216, 0.68);
+}
+
+.vc-report-page .tabs-wrap {
+  position: sticky;
+  top: 88rpx;
+  z-index: 50;
+  margin: 24rpx -24rpx 16rpx;
+  padding: 12rpx 24rpx 14rpx;
+  background: linear-gradient(180deg, rgba(11, 16, 13, 0.98) 0%, rgba(11, 16, 13, 0.90) 100%);
+}
+
+.vc-report-page .tabs-shell {
+  padding: 14rpx;
+  border-radius: 24rpx;
+  border-color: rgba(188, 199, 180, 0.10);
+  background: linear-gradient(180deg, rgba(18, 24, 20, 0.98) 0%, rgba(10, 14, 12, 0.99) 100%);
+  box-shadow:
+    0 12rpx 24rpx rgba(3, 5, 4, 0.20),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.vc-report-page .tabs-label {
+  padding: 0 6rpx 10rpx;
+}
+
+.vc-report-page .tabs {
+  gap: 8rpx;
+}
+
+.vc-report-page .tab {
+  min-height: 56rpx;
+  padding: 0 8rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16rpx;
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(188, 199, 180, 0.08);
+  color: rgba(221, 226, 216, 0.68);
+  font-size: 22rpx;
+  line-height: 1.15;
+}
+
+.vc-report-page .tab-panel-head {
+  margin-bottom: 18rpx;
+  padding: 24rpx;
+  border-radius: 26rpx;
+}
+
+.vc-report-page .tab-title {
+  margin-top: 10rpx;
+  font-size: 34rpx;
+  line-height: 1.24;
+  letter-spacing: 0;
+}
+
+.vc-report-page .tab-desc {
+  margin-top: 10rpx;
+  font-size: 25rpx;
+  line-height: 38rpx;
+}
+
+.vc-report-page .analysis-feature,
+.vc-report-page .metric-card,
+.vc-report-page .qa-card,
+.vc-report-page .linechart-card,
+.vc-report-page .audio-list,
+.vc-report-page .tag-support-card {
+  margin-bottom: 16rpx;
+  padding: 24rpx;
+  border-radius: 26rpx;
+}
+
+.vc-report-page .metric-status,
+.vc-report-page .tag,
+.vc-report-page .hero-pill,
+.vc-report-page .audio-play.is-playing {
+  background: rgba(116, 131, 102, 0.18);
+  border-color: rgba(167, 183, 154, 0.18);
+  color: #edf3e8;
+}
+
+.vc-report-page .metric-text,
+.vc-report-page .qa-text {
+  font-size: 27rpx;
+  line-height: 42rpx;
+}
+
+.vc-report-page .qa-card {
+  padding: 12rpx 22rpx;
+}
+
+.vc-report-page .compare-card {
+  padding: 18rpx 0 18rpx 18rpx;
+  border-left-width: 6rpx;
+}
+
+.vc-report-page .compare-card-objection {
+  border-left-color: #ff8f82;
+}
+
+.vc-report-page .compare-card-yours {
+  border-left-color: rgba(221, 226, 216, 0.28);
+}
+
+.vc-report-page .compare-card-improved {
+  border-left-color: #86c9a0;
+}
+
+.vc-report-page .chart-empty {
+  min-height: 156rpx;
+  justify-content: flex-start;
+  padding: 26rpx 24rpx;
+  border-style: solid;
+}
+
+.vc-report-page .chat-hero {
+  padding: 28rpx 26rpx;
+  border-radius: 28rpx;
+}
+
+.vc-report-page .chat-timeline {
+  padding-top: 4rpx;
+}
+
+.vc-report-page .chat-bubble {
+  border-radius: 24rpx;
+  padding: 20rpx 20rpx 18rpx;
+}
+
+.vc-report-page .chat-bubble-customer,
+.vc-report-page .chat-audio-pill {
+  background: linear-gradient(180deg, rgba(30, 37, 34, 0.98) 0%, rgba(18, 23, 21, 0.99) 100%);
+}
+
+.vc-report-page .chat-bubble-beautician {
+  background: linear-gradient(180deg, rgba(122, 138, 108, 0.98) 0%, rgba(84, 98, 75, 1) 100%);
+  border-color: rgba(184, 199, 171, 0.16);
+}
+
+.vc-report-page .chat-bubble-customer .chat-audio-state,
+.vc-report-page .chat-bubble-customer .chat-audio-dur,
+.vc-report-page .chat-bubble-customer .chat-msg-text,
+.vc-report-page .chat-bubble-customer .chat-audio-dot,
+.vc-report-page .chat-bubble-beautician .chat-audio-state,
+.vc-report-page .chat-bubble-beautician .chat-audio-dur,
+.vc-report-page .chat-bubble-beautician .chat-msg-text,
+.vc-report-page .chat-bubble-beautician .chat-audio-dot {
+  color: #f7f3eb;
+}
+
+.vc-report-page .bottom-space {
+  height: 84rpx;
+}
+
+.vc-report-page .cta {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 70;
+  padding: 18rpx 24rpx calc(20rpx + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, rgba(11, 16, 13, 0) 0%, rgba(11, 16, 13, 0.94) 38%, rgba(8, 12, 10, 0.99) 100%);
+  border-top: none;
+  box-shadow: none;
+}
+
+.vc-report-page .again-btn {
+  min-height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 24rpx;
+  font-size: 32rpx;
+  letter-spacing: 0;
+}
+
+/* 2026-04-24 high-craft report refinement */
+.vc-report-page .content {
+  padding-left: 22rpx;
+  padding-right: 22rpx;
+}
+
+.vc-report-page .report-hero,
+.vc-report-page .context-card,
+.vc-report-page .dimension-card,
+.vc-report-page .insight-card,
+.vc-report-page .analysis-feature,
+.vc-report-page .metric-card,
+.vc-report-page .qa-card,
+.vc-report-page .linechart-card,
+.vc-report-page .audio-list,
+.vc-report-page .tag-support-card,
+.vc-report-page .loading-card,
+.vc-report-page .chat-hero,
+.vc-report-page .chat-bubble,
+.vc-report-page .tab-panel-head,
+.vc-report-page .chart-empty {
+  border-color: rgba(188, 199, 180, 0.12);
+  box-shadow:
+    0 10rpx 24rpx rgba(3, 5, 4, 0.18),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.045);
+}
+
+.vc-report-page .report-hero {
+  border-radius: 26rpx;
+  padding: 26rpx 24rpx 22rpx;
+}
+
+.vc-report-page .hero-head {
+  position: relative;
+}
+
+.vc-report-page .hero-score-wrap {
+  padding-right: 138rpx;
+}
+
+.vc-report-page .hero-pill {
+  position: absolute;
+  top: 4rpx;
+  right: 0;
+  margin-top: 0;
+  min-height: 42rpx;
+  padding: 0 16rpx;
+  border-radius: 14rpx;
+}
+
+.vc-report-page .hero-score {
+  font-size: 82rpx;
+}
+
+.vc-report-page .hero-grade {
+  font-size: 29rpx;
+}
+
+.vc-report-page .hero-score-meter {
+  width: 100%;
+  height: 8rpx;
+  margin-top: 18rpx;
+  border-radius: 999rpx;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.vc-report-page .hero-score-meter-fill {
+  height: 100%;
+  min-width: 8rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(90deg, #667554 0%, #9aa68c 56%, #d1b47f 100%);
+}
+
+.vc-report-page .hero-chip-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10rpx;
+}
+
+.vc-report-page .hero-chip {
+  min-height: 82rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 8rpx;
+  padding: 14rpx 16rpx;
+}
+
+.vc-report-page .hero-chip-0 {
+  grid-column: 1 / -1;
+  min-height: 72rpx;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.vc-report-page .hero-chip-label {
+  font-size: 19rpx;
+  letter-spacing: 1rpx;
+}
+
+.vc-report-page .hero-chip-value {
+  width: 100%;
+  text-align: left;
+  font-size: 24rpx;
+  line-height: 32rpx;
+}
+
+.vc-report-page .hero-chip-0 .hero-chip-value {
+  width: auto;
+  text-align: right;
+  font-size: 26rpx;
+  color: #f7f3eb;
+}
+
+.vc-report-page .hero-visual {
+  margin-top: 18rpx;
+}
+
+.vc-report-page .hero-visual-card {
+  border-radius: 22rpx;
+}
+
+.vc-report-page .hero-radar-stage {
+  border-radius: 18rpx;
+}
+
+.vc-report-page .report-section {
+  margin-top: 28rpx;
+}
+
+.vc-report-page .section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18rpx;
+  margin-bottom: 14rpx;
+}
+
+.vc-report-page .report-section-title {
+  margin-top: 0;
+  font-size: 31rpx;
+}
+
+.vc-report-page .dimension-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12rpx;
+}
+
+.vc-report-page .dimension-card {
+  min-height: 166rpx;
+  padding: 18rpx;
+  border-radius: 20rpx;
+}
+
+.vc-report-page .dimension-card-head {
+  align-items: flex-start;
+  gap: 10rpx;
+}
+
+.vc-report-page .dimension-name {
+  font-size: 26rpx;
+  line-height: 1.22;
+}
+
+.vc-report-page .dimension-stars {
+  font-size: 19rpx;
+  letter-spacing: 0.4rpx;
+}
+
+.vc-report-page .dimension-score {
+  font-size: 36rpx;
+}
+
+.vc-report-page .dimension-score-unit {
+  font-size: 18rpx;
+}
+
+.vc-report-page .dimension-track {
+  margin-top: 16rpx;
+  height: 8rpx;
+}
+
+.vc-report-page .insight-card,
+.vc-report-page .analysis-feature,
+.vc-report-page .metric-card,
+.vc-report-page .qa-card,
+.vc-report-page .linechart-card,
+.vc-report-page .audio-list,
+.vc-report-page .tag-support-card,
+.vc-report-page .tab-panel-head {
+  border-radius: 22rpx;
+}
+
+.vc-report-page .analysis-feature {
+  border-color: rgba(154, 166, 140, 0.18);
+  background:
+    radial-gradient(120% 120% at 0% 0%, rgba(154, 166, 140, 0.10) 0%, rgba(255, 255, 255, 0) 42%),
+    linear-gradient(180deg, rgba(24, 31, 26, 0.99) 0%, rgba(12, 17, 14, 1) 100%);
+}
+
+.vc-report-page .metric-card,
+.vc-report-page .qa-card,
+.vc-report-page .linechart-card,
+.vc-report-page .audio-list,
+.vc-report-page .tag-support-card,
+.vc-report-page .chart-empty {
+  background: linear-gradient(180deg, rgba(18, 24, 20, 0.96) 0%, rgba(10, 14, 12, 0.98) 100%);
+}
+
+.vc-report-page .tabs-wrap {
+  margin-left: -22rpx;
+  margin-right: -22rpx;
+  padding-left: 22rpx;
+  padding-right: 22rpx;
+}
+
+.vc-report-page .tabs-shell {
+  border-radius: 22rpx;
+}
+
+.vc-report-page .tab {
+  border-radius: 14rpx;
+}
+
+.vc-report-page .tab-panel-head {
+  padding: 22rpx;
+  background:
+    linear-gradient(90deg, rgba(154, 166, 140, 0.10) 0%, rgba(154, 166, 140, 0.025) 48%, rgba(255, 255, 255, 0.015) 100%),
+    linear-gradient(180deg, rgba(19, 25, 21, 0.98) 0%, rgba(10, 14, 12, 0.99) 100%);
+}
+
+.vc-report-page .tab-title {
+  font-size: 32rpx;
+}
+
+.vc-report-page .tab-desc {
+  font-size: 24rpx;
+  line-height: 36rpx;
+}
+
+.vc-report-page .metric-text,
+.vc-report-page .qa-text {
+  font-size: 26rpx;
+  line-height: 40rpx;
+}
+
+.vc-report-page .cta {
+  padding-left: 22rpx;
+  padding-right: 22rpx;
+}
+
+.vc-report-page .again-btn {
+  border-radius: 20rpx;
+}
+
+.vc-report-page .section-head {
+  display: block;
+  margin-bottom: 14rpx;
+}
+
+.vc-report-page .report-section-title {
+  margin-top: 8rpx;
+}
+
+.vc-report-page .next-action-card {
+  margin-top: 18rpx;
+  padding: 22rpx;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18rpx;
+  border-radius: 22rpx;
+  border: 1rpx solid rgba(209, 180, 127, 0.18);
+  background:
+    linear-gradient(90deg, rgba(209, 180, 127, 0.10) 0%, rgba(154, 166, 140, 0.075) 42%, rgba(255, 255, 255, 0.015) 100%),
+    linear-gradient(180deg, rgba(23, 29, 24, 0.98) 0%, rgba(12, 17, 14, 0.99) 100%);
+  box-shadow:
+    0 10rpx 24rpx rgba(3, 5, 4, 0.18),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.05);
+}
+
+.vc-report-page .next-action-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.vc-report-page .next-action-kicker {
+  display: block;
+  font-size: 19rpx;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: 1.2rpx;
+  color: rgba(209, 180, 127, 0.86);
+}
+
+.vc-report-page .next-action-title {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 31rpx;
+  line-height: 1.28;
+  font-weight: 800;
+  color: #f7f3eb;
+}
+
+.vc-report-page .next-action-copy {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 25rpx;
+  line-height: 38rpx;
+  color: rgba(221, 226, 216, 0.70);
+}
+
+.vc-report-page .next-action-score {
+  flex-shrink: 0;
+  min-width: 78rpx;
+  height: 50rpx;
+  padding: 0 14rpx;
+  border-radius: 16rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(209, 180, 127, 0.12);
+  border: 1rpx solid rgba(209, 180, 127, 0.22);
+  color: #f3dfb5;
+  font-size: 24rpx;
+  font-weight: 800;
+}
+
+/* 2026-04-27 report coherence pass: report is a light-paper page with dark
+   evidence cards, matching the main mini-program surface model. */
+page {
+  background: #e8ded2;
+}
+
+.vc-report-page {
+  background:
+    radial-gradient(120% 92% at 0% 0%, rgba(127, 143, 111, 0.13) 0%, rgba(11, 16, 13, 0) 42%),
+    radial-gradient(120% 92% at 100% 0%, rgba(226, 235, 217, 0.08) 0%, rgba(11, 16, 13, 0) 44%),
+    linear-gradient(180deg, #0b100d 0rpx, #101711 250rpx, #e8ded2 250rpx, #eee4d8 100%);
+}
+
+.vc-report-page .content {
+  padding-left: 24rpx;
+  padding-right: 24rpx;
+  padding-bottom: calc(198rpx + env(safe-area-inset-bottom));
+}
+
+.vc-report-page .report-hero {
+  border-radius: 32rpx;
+  box-shadow:
+    0 18rpx 34rpx rgba(3, 5, 4, 0.20),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.05);
+}
+
+.vc-report-page .report-section-title {
+  color: #241f1b;
+  font-size: 34rpx;
+  line-height: 1.24;
+}
+
+.vc-report-page .section-kicker,
+.vc-report-page .panel-block-title {
+  color: rgba(96, 118, 84, 0.82);
+}
+
+.vc-report-page .tab-panel-head .section-kicker,
+.vc-report-page .panel-block-title {
+  color: rgba(166, 184, 154, 0.76);
+}
+
+.vc-report-page .tabs-wrap {
+  margin-left: -24rpx;
+  margin-right: -24rpx;
+  padding-left: 24rpx;
+  padding-right: 24rpx;
+  background: linear-gradient(180deg, rgba(232, 222, 210, 0.96) 0%, rgba(238, 228, 216, 0.90) 100%);
+}
+
+.vc-report-page .tabs-shell {
+  background: linear-gradient(180deg, rgba(18, 24, 20, 0.98) 0%, rgba(10, 14, 12, 0.99) 100%);
+}
+
+.vc-report-page .next-action-card {
+  border-color: rgba(102, 117, 84, 0.22);
+  background:
+    linear-gradient(90deg, rgba(102, 117, 84, 0.18) 0%, rgba(154, 166, 140, 0.08) 46%, rgba(255, 255, 255, 0.02) 100%),
+    linear-gradient(180deg, rgba(23, 29, 24, 0.98) 0%, rgba(12, 17, 14, 0.99) 100%);
+}
+
+.vc-report-page .cta {
+  background: linear-gradient(180deg, rgba(232, 222, 210, 0) 0%, rgba(232, 222, 210, 0.86) 38%, rgba(232, 222, 210, 0.98) 100%);
+}
+
+.vc-report-page .again-btn {
+  border-radius: 22rpx;
+  background: linear-gradient(180deg, #9aa68c 0%, #667554 100%);
+}

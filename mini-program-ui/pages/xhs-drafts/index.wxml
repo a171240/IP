@@ -1,44 +1,79 @@
 <view class="page page-xhs page-xhs-drafts">
-  <view class="container">
+  <view class="container drafts-container">
     <view class="hero drafts-hero fade-up">
-      <view class="hero-head">
-        <view>
-          <text class="eyebrow">Draft Library</text>
+      <view class="hero-head drafts-hero-head">
+        <view class="drafts-hero-copy">
+          <text class="eyebrow">草稿入口</text>
           <text class="title">草稿库</text>
-          <text class="subtitle">标题、状态和时间优先，封面图只作为预览，不再抢主层级。</text>
+          <text class="subtitle">把可继续编辑、可复制复用、已发布的内容放进同一条队列，先看状态，再决定下一步。</text>
         </view>
-        <button class="btn-outline hero-mini-btn" size="mini" bindtap="handleGoWorkshop">去工坊</button>
       </view>
 
-      <view class="hero-summary">
-        <view class="hero-summary-item">
-          <text class="hero-summary-label">当前草稿</text>
-          <text class="hero-summary-value">{{loading ? '加载中...' : drafts.length + ' 条记录'}}</text>
+      <view class="drafts-focus-band">
+        <view class="drafts-focus-copy">
+          <text class="drafts-band-label">今日处理</text>
+          <text class="drafts-band-title">优先推进未发布草稿</text>
+          <text class="drafts-band-note">封面只做辅助预览，标题、时间、状态和操作会始终在主层级。</text>
         </view>
-        <view class="hero-summary-item">
-          <text class="hero-summary-label">主任务</text>
-          <text class="hero-summary-value">继续编辑或复制已生成内容</text>
+        <view class="drafts-focus-side">
+          <view class="drafts-focus-stat">
+            <text class="drafts-stat-value">{{loading ? '--' : drafts.length}}</text>
+            <text class="drafts-stat-label">{{loading ? '加载中' : '条内容资产'}}</text>
+          </view>
+          <button class="btn-outline drafts-band-action" size="mini" bindtap="handleGoWorkshop">去发文</button>
         </view>
       </view>
     </view>
 
-    <view class="section fade-up delay-1">
-      <view class="section-head">
-        <text class="section-title">最近草稿</text>
-        <text class="section-copy">保留原有操作，只收紧卡片密度和信息顺序。</text>
+    <view class="section drafts-control-section fade-up delay-1">
+      <view class="drafts-control-panel">
+        <view class="drafts-filter-head">
+          <view>
+            <text class="drafts-filter-kicker">筛选</text>
+            <text class="drafts-filter-title">内容队列</text>
+          </view>
+          <text class="drafts-filter-count">{{loading ? '同步中' : drafts.length + ' 条'}}</text>
+        </view>
+
+        <view class="drafts-filter-rail">
+          <text class="drafts-filter-chip drafts-filter-chip-active">全部</text>
+          <text class="drafts-filter-chip">待编辑</text>
+          <text class="drafts-filter-chip">可复制</text>
+          <text class="drafts-filter-chip">已发布</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="section drafts-library-section fade-up delay-2">
+      <view class="section-head drafts-section-head">
+        <view>
+          <text class="section-title">最近草稿</text>
+          <text class="section-copy">按资产库方式扫描：状态在前，封面降级，主操作只保留继续编辑。</text>
+        </view>
+        <text class="drafts-view-mode">列表</text>
       </view>
 
-      <view wx:if="{{loading}}" class="card">
-        <text class="muted small">加载中...</text>
+      <view wx:if="{{loading}}" class="card drafts-state-card drafts-loading-card">
+        <view class="drafts-state-mark"></view>
+        <view class="drafts-state-copy">
+          <text class="card-title">正在同步草稿</text>
+          <text class="muted small">读取已生成内容、封面和发布结果。</text>
+        </view>
       </view>
 
-      <view wx:if="{{!loading && !drafts.length}}" class="card">
-        <text class="card-title">还没有草稿</text>
-        <text class="muted small">先去工坊生成第一条内容，后续会自动沉淀到这里。</text>
-        <button class="btn-primary" bindtap="handleGoWorkshop">去工坊</button>
+      <view wx:if="{{!loading && !drafts.length}}" class="card drafts-state-card drafts-empty-card">
+        <view class="drafts-empty-top">
+          <view class="drafts-state-mark drafts-state-mark-empty"></view>
+          <text class="status-pill status-pill-muted">空队列</text>
+        </view>
+        <view class="drafts-state-copy">
+          <text class="card-title">还没有草稿</text>
+          <text class="muted small">先生成第一条内容，这里会沉淀成可继续编辑、可复制和可发布的资产队列。</text>
+        </view>
+        <button class="btn-primary drafts-empty-btn" bindtap="handleGoWorkshop">去工坊生成</button>
       </view>
 
-      <view wx:if="{{!loading && drafts.length}}" class="list-stack">
+      <view wx:if="{{!loading && drafts.length}}" class="drafts-list list-stack">
         <view
           wx:for="{{drafts}}"
           wx:key="id"
@@ -46,31 +81,43 @@
           bindtap="handleOpenDraft"
           data-id="{{item.id}}"
         >
-          <view class="list-item-head">
-            <view>
+          <view class="draft-row-top">
+            <view class="draft-main">
+              <view class="draft-status-line">
+                <text class="status-pill {{item.status === 'published' ? 'status-pill-success' : 'status-pill-accent'}}">{{item.statusLabel}}</text>
+                <text class="draft-time">{{item.createdAtLabel}}</text>
+              </view>
+
               <text class="card-title draft-title">{{item.title}}</text>
-              <view class="meta-lines draft-meta-lines">
-                <text class="meta-line">{{item.createdAtLabel}}</text>
-                <text class="meta-line">{{item.riskLabel}}</text>
+
+              <view class="draft-meta-lines">
+                <text class="draft-meta-item">{{item.riskLabel}}</text>
+                <text class="draft-meta-item">{{item.publish_url ? '已生成发布结果' : '待继续处理'}}</text>
               </view>
             </view>
-            <text class="status-pill {{item.status === 'published' ? 'status-pill-success' : 'status-pill-accent'}}">{{item.statusLabel}}</text>
+
+            <view class="draft-preview">
+              <image wx:if="{{item.coverAbs}}" src="{{item.coverAbs}}" mode="aspectFill" class="draft-cover-image" />
+              <view wx:else class="draft-cover-placeholder">
+                <text>未补封面</text>
+              </view>
+            </view>
           </view>
 
-          <image wx:if="{{item.coverAbs}}" src="{{item.coverAbs}}" mode="widthFix" class="cover-image draft-cover-image" />
-
-          <view class="card-actions draft-actions">
-            <button class="btn-primary" size="mini" data-id="{{item.id}}" catchtap="handleOpenDraft">继续编辑</button>
-            <button class="btn-outline" size="mini" data-id="{{item.id}}" catchtap="handleCopyContent">复制文案</button>
+          <view class="draft-actions">
+            <button class="btn-primary draft-primary-action" size="mini" data-id="{{item.id}}" catchtap="handleOpenDraft">继续编辑</button>
+            <button class="btn-outline draft-secondary-action" size="mini" data-id="{{item.id}}" catchtap="handleCopyContent">复制文案</button>
           </view>
 
           <view wx:if="{{item.publish_url}}" class="draft-publish-info">
-            <text class="field-label">发布结果</text>
-            <text class="meta-line">{{item.publish_url}}</text>
-            <view class="card-actions">
-              <button class="btn-outline" size="mini" data-url="{{item.publish_url}}" catchtap="handleCopyUrl">复制链接</button>
+            <view class="draft-publish-copy">
+              <text class="field-label">发布结果</text>
+              <text class="meta-line draft-publish-url">{{item.publish_url}}</text>
             </view>
-            <image wx:if="{{item.qrAbs}}" src="{{item.qrAbs}}" mode="widthFix" class="cover-image draft-qr-image" />
+            <view class="draft-publish-actions">
+              <button class="btn-outline draft-link-action" size="mini" data-url="{{item.publish_url}}" catchtap="handleCopyUrl">复制链接</button>
+              <image wx:if="{{item.qrAbs}}" src="{{item.qrAbs}}" mode="aspectFit" class="draft-qr-image" />
+            </view>
           </view>
         </view>
       </view>

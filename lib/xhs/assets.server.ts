@@ -4,7 +4,7 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
 
 const DEFAULT_BUCKET = process.env.XHS_ASSETS_BUCKET || "xhs-assets"
 
-type UploadedAsset = {
+export type UploadedAsset = {
   bucket: string
   path: string
   contentType: string
@@ -59,6 +59,64 @@ function pickExt(contentType: string): string {
   if (ct.includes("jpeg") || ct.includes("jpg")) return "jpg"
   if (ct.includes("webp")) return "webp"
   return "bin"
+}
+
+export async function uploadBufferAsset(opts: {
+  path: string
+  buffer: Buffer
+  contentType: string
+  bucket?: string
+}): Promise<UploadedAsset> {
+  const bucket = (opts.bucket || DEFAULT_BUCKET).trim() || DEFAULT_BUCKET
+  await ensureBucket(bucket)
+
+  if (!opts.path.trim()) throw new Error("missing_storage_path")
+  if (opts.buffer.length <= 0) throw new Error("empty_buffer")
+
+  const admin = createAdminSupabaseClient()
+  const { error } = await admin.storage
+    .from(bucket)
+    .upload(opts.path, opts.buffer, { contentType: opts.contentType, upsert: true })
+
+  if (error) throw new Error(error.message || "upload_failed")
+
+  return { bucket, path: opts.path, contentType: opts.contentType }
+}
+
+export async function uploadTextAsset(opts: {
+  path: string
+  text: string
+  contentType?: string
+  bucket?: string
+}): Promise<UploadedAsset> {
+  return uploadBufferAsset({
+    bucket: opts.bucket,
+    path: opts.path,
+    contentType: opts.contentType || "application/json; charset=utf-8",
+    buffer: Buffer.from(opts.text, "utf8"),
+  })
+}
+
+export async function uploadRemoteAssetToPath(opts: {
+  path: string
+  url: string
+  bucket?: string
+}): Promise<UploadedAsset> {
+  const u = new URL(opts.url)
+  if (u.protocol !== "https:") throw new Error("only_https_allowed")
+
+  const res = await fetch(u.toString(), { method: "GET" })
+  if (!res.ok) throw new Error(`remote_fetch_failed:${res.status}`)
+
+  const contentType = res.headers.get("content-type") || "application/octet-stream"
+  const buf = Buffer.from(await res.arrayBuffer())
+
+  return uploadBufferAsset({
+    bucket: opts.bucket,
+    path: opts.path,
+    contentType,
+    buffer: buf,
+  })
 }
 
 export async function uploadDataUrlAsset(opts: {

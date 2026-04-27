@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>话术练习页原型</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="mobile-body theme-voice">
+    <main class="mobile-stage">
+      <div class="mobile-topbar">
+        <a class="mobile-back" href="./index.html">返回总览</a>
+        <span class="mobile-stage-note">页面角色：训练入口</span>
+      </div>
+
+      <section class="phone-shell">
+        <div class="screen">
+          <div class="status-bar">
+            <span>9:41</span>
+            <span>5G · 100%</span>
+          </div>
+
+          <div class="screen-bar">
+            <span class="screen-title">话术练习</span>
+            <div class="screen-actions">
+              <button class="icon-bubble icon-history" aria-label="历史"></button>
+              <button class="icon-bubble icon-settings" aria-label="设置"></button>
+            </div>
+          </div>
+
+          <article class="hero-card">
+            <div class="hero-header">
+              <div>
+                <span class="page-kicker">训练入口</span>
+                <h1 class="hero-title">训练更像真实接待</h1>
+                <p class="hero-copy">只保留训练启动、顾客与场景三个必要入口，让你更快进入状态。</p>
+              </div>
+            </div>
+            <div class="hero-band hero-band-stack">
+              <div class="hero-band-section">
+                <span class="label">当前建议</span>
+                <h3 class="hero-band-title">先用测试顾客和基础咨询场景跑通一次</h3>
+                <p class="hero-band-text">先跑通一次完整流程，再切换到真实顾客和特定场景。</p>
+              </div>
+              <div class="hero-band-status">
+                <span class="status-chip status-success">可直接开始</span>
+              </div>
+              <button class="primary-btn sage hero-band-cta">开始训练</button>
+            </div>
+          </article>
+
+          <section class="section-block">
+            <div class="section-head">
+              <div>
+                <h2 class="section-name">训练资源</h2>
+                <p class="section-note">资源入口做得更轻，不继续堆说明内容。</p>
+              </div>
+              <span class="status-chip chip-sage">次级入口</span>
+            </div>
+
+            <div class="surface-panel voice-resource-panel">
+              <div class="entry-stack surface-panel-stack">
+                <article class="entry-row">
+                <div class="entry-row-main">
+                  <span class="label">顾客</span>
+                  <h3 class="entry-row-title">顾客档案</h3>
+                  <p class="info-copy">先选一个真实顾客，训练时更容易带着目标和异议往前走。</p>
+                </div>
+                <div class="entry-row-side">
+                  <span class="status-chip">已建 8 份</span>
+                  <button class="secondary-btn compact-btn">进入顾客库</button>
+                </div>
+                </article>
+
+                <article class="entry-row">
+                <div class="entry-row-main">
+                  <span class="label">场景</span>
+                  <h3 class="entry-row-title">场景卡</h3>
+                  <p class="info-copy">先定义训练主题，避免一开口就跑偏到介绍产品本身。</p>
+                </div>
+                <div class="entry-row-side">
+                  <span class="status-chip">基础场景</span>
+                  <button class="secondary-btn compact-btn">进入场景库</button>
+                </div>
+                </article>
+              </div>
+            </div>
+          </section>
+
+          <section class="section-block">
+            <div class="section-head">
+              <div>
+                <h2 class="section-name">最近练习</h2>
+                <p class="section-note">首页只保留一条轻量状态反馈，不做报告摘要卡。</p>
+              </div>
+            </div>
+
+            <div class="surface-panel">
+              <article class="compact-row">
+                <div class="compact-row-main">
+                  <span class="label">最近完成</span>
+                  <h3 class="compact-row-title">基础咨询 · 首次到店顾客</h3>
+                  <p class="info-copy">上次完成于 2026-04-22 19:40，沟通稳定，追问略少。</p>
+                </div>
+                <div class="compact-row-side">
+                  <span class="status-chip status-success">训练完成</span>
+                  <button class="ghost-btn ghost-btn-quiet">继续练习</button>
+                </div>
+              </article>
+            </div>
+          </section>
+        </div>
+
+        <nav class="tabbar" aria-label="主导航">
+          <div class="tab-item tab-compose"><span class="tab-dot"></span><span>发文</span></div>
+          <div class="tab-item tab-drafts"><span class="tab-dot"></span><span>草稿</span></div>
+          <div class="tab-item tab-coach active"><span class="tab-dot"></span><span>话术练习</span></div>
+          <div class="tab-item tab-mine"><span class="tab-dot"></span><span>我的</span></div>
+        </nav>
+      </section>
+    </main>
+  </body>
+</html>

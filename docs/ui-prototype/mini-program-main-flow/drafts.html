@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>草稿页原型</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="mobile-body theme-drafts">
+    <main class="mobile-stage">
+      <div class="mobile-topbar">
+        <a class="mobile-back" href="./index.html">返回总览</a>
+        <span class="mobile-stage-note">页面角色：内容资料库</span>
+      </div>
+
+      <section class="phone-shell">
+        <div class="screen">
+          <div class="status-bar">
+            <span>9:41</span>
+            <span>5G · 100%</span>
+          </div>
+
+          <div class="screen-bar">
+            <span class="screen-title">草稿</span>
+            <div class="screen-actions">
+              <button class="icon-bubble icon-search" aria-label="搜索"></button>
+              <button class="icon-bubble icon-filter" aria-label="筛选"></button>
+            </div>
+          </div>
+
+          <article class="hero-card">
+            <div class="hero-header">
+              <div>
+                <span class="page-kicker">内容资料库</span>
+                <h1 class="hero-title">草稿库</h1>
+                <p class="hero-copy">把可继续编辑、可复制复用、已发布的内容放进同一条队列。</p>
+              </div>
+            </div>
+            <div class="hero-band hero-band-stack">
+              <div class="hero-band-section">
+                <span class="label">今日重点</span>
+                <h3 class="hero-band-title">先续正文，再补封面</h3>
+                <p class="hero-band-text">优先推进已经成型的草稿，把封面和发布时间安排在后一步。</p>
+              </div>
+              <div class="hero-band-status">
+                <span class="status-chip">当前草稿 12</span>
+                <span class="ghost-chip">最近 7 天新增 4 条</span>
+              </div>
+              <button class="ghost-btn hero-band-cta">去发文</button>
+            </div>
+          </article>
+
+          <section class="section-block">
+            <div class="section-head">
+              <div>
+                <h2 class="section-name">最近草稿</h2>
+                <p class="section-note">封面只做缩略预览，标题、状态和下一步动作仍然放在主层级。</p>
+              </div>
+              <span class="status-chip">列表模式</span>
+            </div>
+
+            <div class="surface-panel drafts-library-panel">
+              <div class="asset-list surface-panel-stack">
+                <article class="asset-row">
+                  <div class="asset-row-top">
+                    <div class="asset-preview">
+                      <div class="thumb skin">
+                        <span class="draft-cover-badge">待补</span>
+                        <div class="draft-cover-copy">
+                          <strong>换季修护</strong>
+                          <span>敏感肌先停刺激还是先补营养</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="asset-row-main">
+                      <h3 class="asset-row-title">敏感肌换季修护，先停刺激还是先补营养？</h3>
+                      <div class="asset-row-head">
+                        <span class="status-chip status-warning">待发布</span>
+                        <div class="meta-line">2026-04-22 11:26 · 风险已检查 · 待补封面</div>
+                      </div>
+                      <p class="asset-row-copy">正文已经完成，建议先补一张近景封面，再复制到小红书做发布整理。</p>
+                    </div>
+                  </div>
+
+                  <div class="asset-row-foot">
+                    <div class="chip-row">
+                      <span class="tag">屏障修护</span>
+                      <span class="tag">春季护理</span>
+                      <span class="tag">咨询转化</span>
+                    </div>
+                    <div class="asset-row-actions">
+                      <button class="secondary-btn compact-btn">继续编辑</button>
+                      <button class="asset-link-btn">复制文案</button>
+                    </div>
+                  </div>
+                </article>
+
+                <article class="asset-row">
+                  <div class="asset-row-top">
+                    <div class="asset-preview">
+                      <div class="thumb note">
+                        <span class="draft-cover-badge draft-cover-badge-ready">已补</span>
+                        <div class="draft-cover-copy">
+                          <strong>沟通模板</strong>
+                          <span>做项目之前最容易忽略的 3 个沟通点</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="asset-row-main">
+                      <h3 class="asset-row-title">做项目之前最容易忽略的 3 个沟通点</h3>
+                      <div class="asset-row-head">
+                        <span class="status-chip status-success">可复用</span>
+                        <div class="meta-line">2026-04-21 18:12 · 已补封面 · 待复核</div>
+                      </div>
+                      <p class="asset-row-copy">结构已经完整，适合直接复用为下一条咨询型内容，只需要替换项目名称和案例细节。</p>
+                    </div>
+                  </div>
+
+                  <div class="asset-row-foot">
+                    <div class="chip-row">
+                      <span class="tag">术前沟通</span>
+                      <span class="tag">顾客教育</span>
+                    </div>
+                    <div class="asset-row-actions">
+                      <button class="secondary-btn compact-btn">复制复用</button>
+                      <button class="asset-link-btn">查看详情</button>
+                    </div>
+                  </div>
+                </article>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <nav class="tabbar" aria-label="主导航">
+          <div class="tab-item tab-compose"><span class="tab-dot"></span><span>发文</span></div>
+          <div class="tab-item tab-drafts active"><span class="tab-dot"></span><span>草稿</span></div>
+          <div class="tab-item tab-coach"><span class="tab-dot"></span><span>话术练习</span></div>
+          <div class="tab-item tab-mine"><span class="tab-dot"></span><span>我的</span></div>
+        </nav>
+      </section>
+    </main>
+  </body>
+</html>

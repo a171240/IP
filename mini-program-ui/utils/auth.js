@@ -5,6 +5,7 @@ const ACCESS_TOKEN_KEY = "auth_access_token"
 const REFRESH_TOKEN_KEY = "auth_refresh_token"
 const USER_KEY = "auth_user"
 const PROFILE_KEY = "auth_profile"
+let silentLoginPromise = null
 
 function getAccessToken() {
   return wx.getStorageSync(ACCESS_TOKEN_KEY) || ""
@@ -159,7 +160,9 @@ function loginWithProfile() {
 }
 
 function loginSilent() {
-  return new Promise((resolve, reject) => {
+  if (silentLoginPromise) return silentLoginPromise
+
+  silentLoginPromise = new Promise((resolve, reject) => {
     wx.login({
       success(loginRes) {
         if (!loginRes.code) {
@@ -177,7 +180,11 @@ function loginSilent() {
         reject(err)
       },
     })
+  }).finally(() => {
+    silentLoginPromise = null
   })
+
+  return silentLoginPromise
 }
 
 function logout() {
@@ -193,5 +200,8 @@ module.exports = {
   },
   loginWithProfile,
   loginSilent,
+  getPendingSilentLogin() {
+    return silentLoginPromise
+  },
   logout,
 }

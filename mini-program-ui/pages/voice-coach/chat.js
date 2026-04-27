@@ -855,11 +855,17 @@ Page({
     if (setup && setup.customer_profile_id) payload.customer_profile_id = setup.customer_profile_id
     if (setup && setup.scene_card_id) payload.scene_card_id = setup.scene_card_id
     if (setup && setup.live_notes) payload.live_notes = setup.live_notes
+    if (setup && setup.followup_context && setup.followup_context.source_session_id) {
+      payload.followup_context = {
+        source_session_id: setup.followup_context.source_session_id,
+      }
+    }
     vcLog("session.create:start", {
       scenarioId: "objection_safety",
       customerProfileId: payload.customer_profile_id || "",
       sceneCardId: payload.scene_card_id || "",
       hasLiveNotes: Boolean(payload.live_notes),
+      followupSourceSessionId: payload.followup_context && payload.followup_context.source_session_id ? payload.followup_context.source_session_id : "",
     })
     try {
       const res = await request({
@@ -3182,13 +3188,43 @@ Page({
     this.setData({ endModalVisible: false })
   },
 
+  navigateToReport(sessionId) {
+    const url = `/pages/voice-coach/report?sessionId=${encodeURIComponent(sessionId)}`
+    wx.redirectTo({
+      url,
+      fail: (redirectErr) => {
+        vcWarn("session.report:redirect-fail", {
+          sessionId,
+          message: redirectErr && redirectErr.errMsg ? redirectErr.errMsg : "",
+        })
+        wx.navigateTo({
+          url,
+          fail: (navigateErr) => {
+            this.stopEvents = false
+            this._wsManualClose = false
+            this.ensureEventsPolling()
+            this.setData({ loading: false })
+            vcError("session.report:navigate-fail", {
+              sessionId,
+              message: navigateErr && navigateErr.errMsg ? navigateErr.errMsg : "",
+            })
+            wx.showToast({ title: "无法打开报告页", icon: "none" })
+          },
+        })
+      },
+    })
+  },
+
   async endAndViewReport() {
     const sessionId = this.data.sessionId
-    if (!sessionId) return
+    if (!sessionId) {
+      wx.showToast({ title: "会话还没准备好", icon: "none" })
+      return
+    }
     this.stopEvents = true
     this._wsManualClose = true
     this.cleanupRealtimeTransport()
-    this.setData({ loading: true, endModalVisible: false })
+    this.setData({ loading: false, endModalVisible: false })
     vcLog("session.end:start", {
       mode: "view_report",
       sessionId,
@@ -3197,25 +3233,7 @@ Page({
       sessionId,
       mode: "view_report",
     })
-    try {
-      await request({
-        baseUrl: VOICE_COACH_HTTP_BASE_URL,
-        url: `/api/voice-coach/sessions/${sessionId}/end`,
-        method: "POST",
-        data: { mode: "view_report" },
-      })
-      wx.navigateTo({ url: `/pages/voice-coach/report?sessionId=${sessionId}` })
-    } catch (err) {
-      this.stopEvents = false
-      this._wsManualClose = false
-      this.ensureEventsPolling()
-      this.setData({ loading: false })
-      vcError("session.end:error", {
-        mode: "view_report",
-        message: err && err.message ? err.message : "",
-      })
-      wx.showToast({ title: err.message || "鐢熸垚鎶ュ憡澶辫触", icon: "none" })
-    }
+    this.navigateToReport(sessionId)
   },
 
   async endOnly() {

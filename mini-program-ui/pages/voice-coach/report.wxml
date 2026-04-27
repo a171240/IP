@@ -24,14 +24,17 @@
                 {{report.total_score >= 85 ? '进入稳定成交区间' : report.total_score >= 70 ? '表达框架已经成型' : '关键表达仍需继续打磨'}}
               </text>
               <text class="hero-subtitle">这是本次练习的五维表现、重点洞察和逐项拆解。</text>
+              <view class="hero-score-meter">
+                <view class="hero-score-meter-fill" style="width: {{report.total_score_pct}}%;"></view>
+              </view>
             </view>
 
-            <view class="hero-pill">Atelier Report</view>
+            <view class="hero-pill">评测档案</view>
           </view>
 
           <view class="hero-chip-row">
-            <block wx:for="{{report.hero_highlights}}" wx:key="label">
-              <view class="hero-chip">
+            <block wx:for="{{report.hero_highlights}}" wx:key="label" wx:for-index="index">
+              <view class="hero-chip hero-chip-{{index}}">
                 <text class="hero-chip-label">{{item.label}}</text>
                 <text class="hero-chip-value">{{item.value}}</text>
               </view>
@@ -55,6 +58,15 @@
             </view>
           </view>
         </view>
+      </view>
+
+      <view wx:if="{{report.next_action}}" class="next-action-card fade-up delay-1">
+        <view class="next-action-main">
+          <text class="next-action-kicker">下一轮动作</text>
+          <text class="next-action-title">{{report.next_action.title}}</text>
+          <text class="next-action-copy">{{report.next_action.copy}}</text>
+        </view>
+        <text wx:if="{{report.next_action.metric}}" class="next-action-score">{{report.next_action.metric}}</text>
       </view>
 
       <view wx:if="{{sessionContext.sceneName || sessionContext.customerName || sessionContext.summaryLines.length}}" class="section report-section fade-up delay-1">
@@ -415,6 +427,6 @@
   </view>
 
   <view class="cta">
-    <button class="again-btn" bindtap="startAgain">再来一次</button>
+    <button class="again-btn" bindtap="startAgain">按这个重点再练一轮</button>
   </view>
 </view>

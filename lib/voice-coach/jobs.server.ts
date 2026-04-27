@@ -313,10 +313,31 @@ function buildContextualFallbackLines(args: {
   likelyQuestions: string[]
   targetObjections: string[]
   mustCoverPoints: string[]
+  followupTitle: string
+  followupInstruction: string
+  followupPracticePoints: string[]
+  followupMissedPoints: string[]
+  followupRiskPoints: string[]
 }) {
   const serviceLabel = args.serviceName || "这个项目"
   const sceneKindPolicy = getVoiceCoachSceneKindPolicy(args.sceneKind, serviceLabel)
   const lines: string[] = []
+
+  args.followupMissedPoints.slice(0, 2).forEach((item) => {
+    lines.push(`上次你们在“${item}”这点讲得还不够具体，这次你能直接说清楚吗？`)
+  })
+
+  args.followupPracticePoints.slice(0, 2).forEach((item) => {
+    lines.push(`我这次想重点听你怎么处理“${item}”，能别泛泛讲吗？`)
+  })
+
+  args.followupRiskPoints.slice(0, 1).forEach((item) => {
+    lines.push(`上次这个说法让我有点担心：${item}。这次你会怎么更稳妥地解释？`)
+  })
+
+  if (args.followupInstruction || args.followupTitle) {
+    lines.push(`围绕上一轮复练重点“${args.followupTitle || args.followupInstruction}”，你能给我一个具体判断依据吗？`)
+  }
 
   args.coreConcerns.slice(0, 2).forEach((item) => {
     lines.push(`我现在还是最在意${item}，如果按我的情况做${serviceLabel}，你能说得更具体一点吗？`)
@@ -370,6 +391,11 @@ function fallbackCustomerTurn(opts: {
     likelyQuestions: sessionInsights.likelyQuestions,
     targetObjections: sessionInsights.targetObjections,
     mustCoverPoints: sessionInsights.mustCoverPoints,
+    followupTitle: sessionInsights.followupTitle,
+    followupInstruction: sessionInsights.followupInstruction,
+    followupPracticePoints: sessionInsights.followupPracticePoints,
+    followupMissedPoints: sessionInsights.followupMissedPoints,
+    followupRiskPoints: sessionInsights.followupRiskPoints,
   })
   const pool = Array.from(
     new Set([...contextLines, ...dynamicFallbackLines(inferredTag, focus), ...fallbackTopicPool(inferredTag)]),

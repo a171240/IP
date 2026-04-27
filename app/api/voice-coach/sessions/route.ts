@@ -4,11 +4,14 @@ import { after, NextRequest, NextResponse } from "next/server"
 import { checkVoiceCoachAccess } from "@/lib/voice-coach/guard.server"
 import { llmGenerateCustomerTurn } from "@/lib/voice-coach/llm.server"
 import {
+  buildVoiceCoachFollowupOpening,
   buildVoiceCoachFirstTurnTarget,
   buildVoiceCoachSessionSnapshot,
   getVoiceCoachSessionClientContext,
   getVoiceCoachSessionPromptContext,
+  normalizeVoiceCoachFollowupContext,
   voiceCoachSessionCreateSchema,
+  type VoiceCoachFollowupContext,
 } from "@/lib/voice-coach/session-context"
 import { getScenario, type VoiceCoachEmotion, type VoiceCoachOpening } from "@/lib/voice-coach/scenarios"
 import { doubaoTts, type DoubaoTtsEmotion } from "@/lib/voice-coach/speech/doubao.server"
@@ -24,6 +27,14 @@ function jsonError(status: number, error: string, extra?: Record<string, unknown
 
 type RequestSupabaseClient = Awaited<ReturnType<typeof createServerSupabaseClientForRequest>>
 
+type SourceTurnRow = {
+  id: string
+  role: string
+  text: string | null
+  emotion?: string | null
+  turn_index: number | null
+}
+
 function mapEmotionToTts(emotion?: VoiceCoachEmotion): DoubaoTtsEmotion | undefined {
   void emotion
   return "neutral"
@@ -35,6 +46,182 @@ function fallbackFirstCustomerTurn(): VoiceCoachOpening {
     text: "我先说最担心的点吧，这种护理会不会有安全隐患或者恢复期问题？",
     emotion: "worried",
     tag: "安全顾虑",
+  }
+}
+
+function cleanText(value: unknown, max = 300): string {
+  const text = String(value || "").trim()
+  if (!text) return ""
+  return text.length > max ? text.slice(0, max) : text
+}
+
+function toStringList(value: unknown, max = 6): string[] {
+  const source = Array.isArray(value) ? value : typeof value === "string" ? value.split(/[\n,，、；;]+/) : []
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const item of source) {
+    const text = cleanText(item, 100)
+    if (!text || seen.has(text)) continue
+    seen.add(text)
+    result.push(text)
+    if (result.length >= max) break
+  }
+  return result
+}
+
+function numberOrNull(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null
+}
+
+function pickReportFocusDimension(report: any) {
+  const preferred = ["persuasion", "organization", "expression", "fluency"]
+  const dims = Array.isArray(report?.dimension) ? report.dimension : []
+  const candidates = dims
+    .filter((item: any) => preferred.includes(String(item?.id || "")))
+    .map((item: any) => ({
+      id: cleanText(item?.id, 40),
+      name: cleanText(item?.name, 40),
+      score: numberOrNull(item?.score) ?? 0,
+    }))
+  candidates.sort((left: any, right: any) => left.score - right.score)
+  return candidates[0] || { id: "persuasion", name: "说服力", score: 0 }
+}
+
+function normalizeSourceReferenceTurn(turn: SourceTurnRow): VoiceCoachFollowupContext["reference_turns"][number] | null {
+  const role = turn.role === "beautician" ? "beautician" : turn.role === "customer" ? "customer" : null
+  const text = cleanText(turn.text, 120)
+  if (!role || !text) return null
+  const turnIndex = Number(turn.turn_index)
+  return {
+    role,
+    turn_id: cleanText(turn.id, 80),
+    ...(Number.isFinite(turnIndex) ? { turn_index: turnIndex } : {}),
+    text,
+  }
+}
+
+function appendReferenceTurn(
+  target: VoiceCoachFollowupContext["reference_turns"],
+  turn: VoiceCoachFollowupContext["reference_turns"][number] | null,
+) {
+  if (!turn || !turn.text) return
+  const key = `${turn.role}:${turn.text}`
+  if (target.some((item) => `${item.role}:${item.text}` === key)) return
+  target.push(turn)
+}
+
+function buildSourceReferenceTurns(report: any, turns: SourceTurnRow[]): VoiceCoachFollowupContext["reference_turns"] {
+  const references: VoiceCoachFollowupContext["reference_turns"] = []
+  const objection = cleanText(report?.tabs?.persuasion?.customer_objection, 120)
+  const response = cleanText(report?.tabs?.persuasion?.your_response, 120)
+  if (objection) appendReferenceTurn(references, { role: "customer", text: objection })
+  if (response) appendReferenceTurn(references, { role: "beautician", text: response })
+
+  const representativeId = cleanText(report?.meta?.representative_turn_id, 80)
+  const representativeBeautician = representativeId
+    ? turns.find((turn) => String(turn.id || "") === representativeId && turn.role === "beautician")
+    : null
+  if (representativeBeautician) {
+    const customerBefore = turns
+      .filter((turn) => turn.role === "customer" && Number(turn.turn_index || 0) < Number(representativeBeautician.turn_index || 0))
+      .sort((left, right) => Number(right.turn_index || 0) - Number(left.turn_index || 0))[0]
+    appendReferenceTurn(references, customerBefore ? normalizeSourceReferenceTurn(customerBefore) : null)
+    appendReferenceTurn(references, normalizeSourceReferenceTurn(representativeBeautician))
+  }
+
+  const recentTurns = turns
+    .slice()
+    .sort((left, right) => Number(right.turn_index || 0) - Number(left.turn_index || 0))
+    .filter((turn) => cleanText(turn.text, 120))
+    .slice(0, 6)
+    .reverse()
+  for (const turn of recentTurns) {
+    appendReferenceTurn(references, normalizeSourceReferenceTurn(turn))
+    if (references.length >= 6) break
+  }
+
+  return references.slice(0, 6)
+}
+
+function buildFallbackFollowupContext(sourceSessionId: string, report: any, turns: SourceTurnRow[]): VoiceCoachFollowupContext {
+  const nextRoundFocus = report?.next_round_focus || {}
+  const focusDimension = nextRoundFocus.focus_dimension_id ? nextRoundFocus : pickReportFocusDimension(report)
+  const trainingContext = report?.training_context || {}
+  const summaryBlocks = toStringList(nextRoundFocus.summary_blocks || report?.summary_blocks, 3)
+  const missedPoints = toStringList(nextRoundFocus.missed_points || trainingContext.missed_points, 4)
+  const riskPoints = toStringList(nextRoundFocus.risk_points || trainingContext.risk_points, 3)
+  const practicePoints = toStringList(
+    [
+      ...(Array.isArray(nextRoundFocus.practice_points) ? nextRoundFocus.practice_points : []),
+      ...missedPoints,
+      ...riskPoints,
+      cleanText(summaryBlocks.find((item) => /^下一轮[：:]/.test(item))?.replace(/^下一轮[：:]\s*/, ""), 100),
+    ],
+    5,
+  )
+  const focusDimensionName =
+    cleanText(nextRoundFocus.focus_dimension_name, 40) || cleanText(focusDimension.name, 40) || "说服力"
+  const instruction =
+    cleanText(nextRoundFocus.instruction, 220) ||
+    cleanText(summaryBlocks.find((item) => /^下一轮[：:]/.test(item)), 220) ||
+    `第二轮优先训练${focusDimensionName}，让顾客继续追问具体证据和下一步。`
+
+  return normalizeVoiceCoachFollowupContext({
+    source_session_id: sourceSessionId,
+    source_report_generated_at: cleanText(report?.meta?.generated_at, 40),
+    focus_dimension_id: cleanText(nextRoundFocus.focus_dimension_id || focusDimension.id, 40),
+    focus_dimension_name: focusDimensionName,
+    focus_score: numberOrNull(nextRoundFocus.focus_score) ?? numberOrNull(focusDimension.score),
+    title: cleanText(nextRoundFocus.title, 80) || `下一轮先练：${missedPoints[0] || focusDimensionName}`,
+    instruction,
+    practice_points: practicePoints.length ? practicePoints : [instruction],
+    missed_points: missedPoints,
+    risk_points: riskPoints,
+    summary_blocks: summaryBlocks,
+    reference_turns: buildSourceReferenceTurns(report, turns),
+    customer_objection: cleanText(report?.tabs?.persuasion?.customer_objection, 120),
+    your_response: cleanText(report?.tabs?.persuasion?.your_response, 120),
+    suggested_response: cleanText(nextRoundFocus.suggested_response || report?.tabs?.persuasion?.improved_response, 180),
+  }) as VoiceCoachFollowupContext
+}
+
+async function loadFollowupContext(args: {
+  supabase: RequestSupabaseClient
+  userId: string
+  sourceSessionId?: string | null
+}): Promise<{ ok: true; context: VoiceCoachFollowupContext | null } | { ok: false; response: NextResponse }> {
+  const sourceSessionId = cleanText(args.sourceSessionId, 80)
+  if (!sourceSessionId) return { ok: true, context: null }
+
+  const { data: sourceSession, error: sourceSessionError } = await args.supabase
+    .from("voice_coach_sessions")
+    .select("id, user_id, report_json")
+    .eq("id", sourceSessionId)
+    .eq("user_id", args.userId)
+    .maybeSingle()
+
+  if (sourceSessionError || !sourceSession) {
+    return { ok: false, response: jsonError(400, "source_session_not_found") }
+  }
+
+  const report = sourceSession.report_json
+  if (!report || typeof report !== "object") {
+    return { ok: false, response: jsonError(400, "source_report_not_found") }
+  }
+
+  const { data: turns, error: turnsError } = await args.supabase
+    .from("voice_coach_turns")
+    .select("id, role, text, emotion, turn_index")
+    .eq("session_id", sourceSessionId)
+    .order("turn_index", { ascending: true })
+
+  if (turnsError) {
+    return { ok: false, response: jsonError(500, "source_turns_query_failed", { message: turnsError.message }) }
+  }
+
+  return {
+    ok: true,
+    context: buildFallbackFollowupContext(sourceSessionId, report, (turns || []) as SourceTurnRow[]),
   }
 }
 
@@ -255,15 +442,29 @@ export async function POST(request: NextRequest) {
       return jsonError(400, "scene_card_not_found")
     }
 
+    const followupContextResult = await loadFollowupContext({
+      supabase,
+      userId: user.id,
+      sourceSessionId: parsed.data.followup_context?.source_session_id || null,
+    })
+    if (!followupContextResult.ok) return followupContextResult.response
+    const followupContext = followupContextResult.context
+
     const sessionSnapshot =
-      customerProfileResult.data || sceneCardResult.data || liveNotes
+      customerProfileResult.data || sceneCardResult.data || liveNotes || followupContext
         ? buildVoiceCoachSessionSnapshot({
             customerProfile: customerProfileResult.data || null,
             sceneCard: sceneCardResult.data || null,
             liveNotes,
+            followupContext,
           })
         : null
-    const sessionContext = sessionSnapshot ? { live_notes: sessionSnapshot.live_notes } : null
+    const sessionContext = sessionSnapshot
+      ? {
+          live_notes: sessionSnapshot.live_notes,
+          followup_context: sessionSnapshot.followup_context,
+        }
+      : null
     const sessionContextText = getVoiceCoachSessionPromptContext(sessionSnapshot)
 
     const { data: session, error: sessionError } = await supabase
@@ -335,12 +536,19 @@ export async function POST(request: NextRequest) {
           variationSeed: session.id,
         })
       } catch {
-        first = pickPresetFirstTurnAvoidRepeat(
-          scenario.id,
-          previousOpeningText,
-          firstTurnOrdinal,
-          session.id,
-        )
+        const followupOpening = buildVoiceCoachFollowupOpening(sessionSnapshot)
+        first = followupOpening
+          ? {
+              text: followupOpening,
+              emotion: "skeptical",
+              tag: normalizeScenarioTag(followupContext?.focus_dimension_name || followupContext?.title || "复练重点", scenario),
+            }
+          : pickPresetFirstTurnAvoidRepeat(
+              scenario.id,
+              previousOpeningText,
+              firstTurnOrdinal,
+              session.id,
+            )
       }
     }
 

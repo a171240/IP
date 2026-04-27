@@ -2,6 +2,7 @@
     "pages":  [
                   "pages/xiaohongshu/index",
                   "pages/xhs-drafts/index",
+                  "pages/poster/index",
                   "pages/content-studio/index",
                   "pages/video-jobs/index",
                   "pages/mine/index",
@@ -51,9 +52,9 @@
                             "downloadFile":  60000
                         },
     "tabBar":  {
-                   "color":  "#8E8796",
-                   "selectedColor":  "#E5D3B3",
-                   "backgroundColor":  "#050506",
+                   "color":  "#A9A2B0",
+                   "selectedColor":  "#EAD8B6",
+                   "backgroundColor":  "#0A090A",
                    "borderStyle":  "black",
                    "list":  [
                                 {
@@ -73,6 +74,12 @@
                                     "text":  "话术练习",
                                     "iconPath":  "assets/tabbar/voice.png",
                                     "selectedIconPath":  "assets/tabbar/voice-active.png"
+                                },
+                                {
+                                    "pagePath":  "pages/poster/index",
+                                    "text":  "海报",
+                                    "iconPath":  "assets/tabbar/poster.png",
+                                    "selectedIconPath":  "assets/tabbar/poster-active.png"
                                 },
                                 {
                                     "pagePath":  "pages/mine/index",

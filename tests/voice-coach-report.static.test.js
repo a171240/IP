@@ -14,7 +14,11 @@ const llmSource = read("lib", "voice-coach", "llm.server.ts")
 const refreshSource = read("lib", "voice-coach", "report-refresh.ts")
 const reportServerSource = read("lib", "voice-coach", "report.server.ts")
 const reportSource = read("lib", "voice-coach", "report.ts")
+const sessionContextSource = read("lib", "voice-coach", "session-context.ts")
 const reportWxmlSource = read("mini-program-ui", "pages", "voice-coach", "report.wxml")
+const reportJsSource = read("mini-program-ui", "pages", "voice-coach", "report.js")
+const chatJsSource = read("mini-program-ui", "pages", "voice-coach", "chat.js")
+const setupStorageSource = read("mini-program-ui", "pages", "voice-coach", "setup-storage.js")
 const sessionRouteSource = read("app", "api", "voice-coach", "sessions", "route.ts")
 
 test("view_report and GET /report both use the shared report refresh service with snapshot fields", () => {
@@ -36,7 +40,10 @@ test("view_report and GET /report both use the shared report refresh service wit
 
 test("report generation now carries snapshot-aware context review plus meta and ordered examples", () => {
   assert.match(reportSource, /training_context: VoiceCoachReportTrainingContextSchema\.optional\(\)/)
+  assert.match(reportSource, /next_round_focus: VoiceCoachReportNextRoundFocusSchema\.optional\(\)/)
   assert.match(reportServerSource, /training_context: trainingContext/)
+  assert.match(reportServerSource, /next_round_focus: nextRoundFocus/)
+  assert.match(reportServerSource, /buildNextRoundFocus/)
   assert.match(reportServerSource, /buildTrainingContextReview/)
   assert.match(reportServerSource, /representative_turn_id/)
   assert.match(reportServerSource, /organization_example_turn_ids/)
@@ -56,10 +63,27 @@ test("report-related schema contracts are tightened and context-aware fallbacks 
   assert.match(sessionRouteSource, /features_json: \{ tag: normalizeScenarioTag\(first\.tag, scenario\) \}/)
 })
 
+test("follow-up second-round training carries source session through client and server", () => {
+  assert.match(sessionContextSource, /followup_context:\s*z/)
+  assert.match(sessionContextSource, /normalizeVoiceCoachFollowupContext/)
+  assert.match(sessionContextSource, /buildVoiceCoachFollowupOpening/)
+  assert.match(sessionContextSource, /上一轮复盘重点/)
+  assert.match(sessionRouteSource, /loadFollowupContext/)
+  assert.match(sessionRouteSource, /\.eq\("user_id", args\.userId\)/)
+  assert.match(sessionRouteSource, /source_report_not_found/)
+  assert.match(sessionRouteSource, /buildVoiceCoachFollowupOpening\(sessionSnapshot\)/)
+  assert.match(setupStorageSource, /normalizeFollowupContext/)
+  assert.match(setupStorageSource, /followup_context: followupContext/)
+  assert.match(reportJsSource, /savePendingVoiceCoachSetup/)
+  assert.match(reportJsSource, /source_session_id: sessionId/)
+  assert.match(chatJsSource, /payload\.followup_context/)
+  assert.ok(reportWxmlSource.includes("按这个重点再练一轮"))
+})
+
 test("report page copy still exposes the same coaching review structure", () => {
-  assert.ok(reportWxmlSource.includes("Atelier Report"))
+  assert.ok(reportWxmlSource.includes("训练完成 · 评测档案"))
   assert.ok(reportWxmlSource.includes("训练背景"))
-  assert.ok(reportWxmlSource.includes("维度评分"))
+  assert.ok(reportWxmlSource.includes("五维度表现"))
   assert.ok(reportWxmlSource.includes("训练总结"))
   assert.ok(reportWxmlSource.includes("逐项拆解"))
 })

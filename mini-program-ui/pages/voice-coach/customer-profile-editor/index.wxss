@@ -1,31 +1,57 @@
 @import "../theme.wxss";
 
-.vc-editor-page .container {
-  padding-top: 28rpx;
+page {
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
 }
 
-.vc-editor-page .hero {
+.vc-editor-v2 .container {
+  padding-top: 36rpx;
+}
+
+.vc-editor-v2 .hero {
+  padding-bottom: 24rpx;
+}
+
+.vc-editor-v2 .hero .subtitle {
+  max-width: 640rpx;
+}
+
+.vc-editor-v2 .tips-row {
+  margin-top: 18rpx;
+  gap: 10rpx;
+}
+
+.vc-editor-v2 .section {
+  margin-top: 26rpx;
+}
+
+.vc-editor-v2 .section-head {
+  margin-bottom: 14rpx;
+}
+
+.vc-editor-v2 .card {
+  padding: 20rpx 18rpx;
+}
+
+.vc-editor-v2 .field-stack {
+  gap: 20rpx;
+}
+
+.vc-editor-v2 .field-block {
+  gap: 10rpx;
+}
+
+.vc-editor-v2 .textarea {
+  min-height: 200rpx;
+}
+
+.vc-editor-v2 .footer-cta-card {
   padding: 22rpx 20rpx;
 }
 
-.vc-editor-page .card {
-  gap: 18rpx;
-}
-
-.vc-editor-page .field-stack {
-  gap: 18rpx;
-}
-
-.vc-editor-page .field-help {
-  display: block;
-}
-
-.vc-editor-page .textarea {
-  min-height: 176rpx;
-}
-
-.vc-editor-page .footer-cta-card {
-  background:
-    radial-gradient(130% 150% at 0% 0%, rgba(215, 191, 150, 0.1) 0%, rgba(255, 255, 255, 0) 52%),
-    linear-gradient(180deg, rgba(18, 23, 31, 0.98) 0%, rgba(11, 14, 20, 0.98) 100%);
+.vc-editor-v2 .footer-cta-card .btn-primary {
+  margin-top: 18rpx;
 }

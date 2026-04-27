@@ -1,7 +1,9 @@
-<view class="vc-page vc-editor-page">
-  <view class="container">
+<view class="vc-page vc-editor-page vc-flow-v2 vc-editor-v2">
+  <view class="vc-page-scroll-shell">
+    <scroll-view class="page-scroll" scroll-y="true" enhanced="true" bounces="false" show-scrollbar="false">
+      <view class="container">
       <view class="hero fade-up">
-        <text class="eyebrow">Profile Editor</text>
+        <text class="eyebrow">顾客编辑</text>
         <text class="title">把这位顾客写得像真的会走进门店</text>
         <text class="subtitle">重点不是把字段填满，而是写清楚她会怎么问、为什么犹豫、什么点能建立信任。</text>
 
@@ -14,7 +16,7 @@
 
       <view class="section fade-up delay-1">
         <view class="section-head">
-          <text class="section-kicker">Base</text>
+          <text class="section-kicker">基础</text>
           <text class="section-title">基础信息</text>
           <text class="section-caption">先把称呼、年龄标签和职业写清楚，训练时更容易马上进入角色。</text>
         </view>
@@ -44,7 +46,7 @@
 
       <view class="section fade-up delay-1">
         <view class="section-head">
-          <text class="section-kicker">Portrait</text>
+          <text class="section-kicker">人物</text>
           <text class="section-title">人物画像</text>
           <text class="section-caption">尽量写训练时能直接听出来的话，而不是“高端”“难搞”这种空词。</text>
         </view>
@@ -80,7 +82,7 @@
 
       <view class="section fade-up delay-2">
         <view class="section-head">
-          <text class="section-kicker">History</text>
+          <text class="section-kicker">历史</text>
           <text class="section-title">历史情况</text>
           <text class="section-caption">写她经历过什么、为什么会防备、这次训练你要特别记住什么。</text>
         </view>
@@ -109,5 +111,7 @@
           <button class="btn-primary" loading="{{saving}}" disabled="{{saving}}" bindtap="handleSave">保存顾客档案</button>
         </view>
       </view>
+      </view>
+    </scroll-view>
   </view>
 </view>
