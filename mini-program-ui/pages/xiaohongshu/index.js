@@ -84,6 +84,7 @@ Page({
     resultContent: "",
     coverTitle: "",
     coverPrompt: "",
+    coverNegative: "",
     pinnedComment: "",
     resultTags: [],
     dangerStatusText: "未检测",
@@ -173,6 +174,7 @@ Page({
         coverTitle: d.cover_title || "",
         pinnedComment: d.pinned_comment || "",
         coverPrompt: d.cover_prompt || "",
+        coverNegative: d.cover_negative || "",
         resultTags: tags,
         dangerStatusText,
         dangerStatusClass,
@@ -232,6 +234,7 @@ Page({
       coverTitle: "",
       pinnedComment: "",
       coverPrompt: "",
+      coverNegative: "",
       resultTags: [],
       dangerStatusText: "检测中...",
       dangerStatusClass: "",
@@ -269,6 +272,7 @@ Page({
         coverTitle: (r.coverText && r.coverText.main) ? r.coverText.main : "",
         pinnedComment: r.pinnedComment || "",
         coverPrompt: r.coverPrompt || "",
+        coverNegative: r.coverNegative || "",
         resultTags: Array.isArray(r.tags) ? r.tags : [],
       })
 
@@ -346,7 +350,7 @@ Page({
   },
 
   async handleGenerateCover() {
-    const { resultContent, contentType, coverTitle, resultTitle, resultTags, draftId } = this.data
+    const { resultContent, contentType, coverTitle, resultTitle, resultTags, draftId, coverPrompt, coverNegative } = this.data
 
     if (!resultContent) {
       wx.showToast({ title: "请先生成文案", icon: "none" })
@@ -363,6 +367,10 @@ Page({
         data: {
           content: resultContent,
           contentType,
+          prompt: coverPrompt || "",
+          negativePrompt: coverNegative || "",
+          size: "3:4",
+          resolution: "2k",
           ...(draftId ? { draft_id: draftId } : {}),
           preExtracted: {
             title: coverTitle || resultTitle,

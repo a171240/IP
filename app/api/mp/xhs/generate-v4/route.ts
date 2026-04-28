@@ -218,6 +218,8 @@ export async function POST(request: NextRequest) {
         rounds: guardrails.rounds,
         flags: guardrails.flags.map((f) => `${f.field}:${f.rule}:${f.match}`).slice(0, 20),
         needProfile,
+        entryClass: result.entryClass,
+        narrator: result.narrator,
       },
     })
 
@@ -233,6 +235,9 @@ export async function POST(request: NextRequest) {
         tags: result.tags,
         coverPrompt: result.coverPrompt,
         coverNegative: result.coverNegative,
+        entryClass: result.entryClass,
+        narrator: result.narrator,
+        persona: result.persona,
       },
       guardrails: {
         rounds: guardrails.rounds,

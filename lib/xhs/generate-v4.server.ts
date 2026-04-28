@@ -1,5 +1,6 @@
 import "server-only"
 
+import { jsonrepair } from "jsonrepair"
 import { z } from "zod"
 
 import type { BillingContext } from "@/lib/xhs/proxy.server"
@@ -9,6 +10,15 @@ import {
   detectPinnedCommentFlags,
   type GuardrailFlag,
 } from "@/lib/xhs/guardrails"
+import {
+  buildBeautyContext,
+  buildBeautySourcePackText,
+  buildCoverPromptRequirements,
+  conflictLabel,
+  contentTypeLabel,
+  normalizeCoverAsset,
+  type BeautyContext,
+} from "@/lib/xhs/beauty-knowledge"
 
 export type ConflictLevel = "safe" | "standard" | "hard"
 export type XhsContentType = "treatment" | "education" | "promotion" | "comparison"
@@ -46,6 +56,9 @@ export type GenerateV4Result = {
   tags: string[]
   coverPrompt: string
   coverNegative: string
+  entryClass?: string
+  narrator?: string
+  persona?: string
 }
 
 export type GuardrailsReport = {
@@ -56,59 +69,19 @@ export type GuardrailsReport = {
 }
 
 const llmOutputSchema = z.object({
+  entry_class: z.string().min(1).max(40).optional(),
+  narrator: z.string().min(1).max(40).optional(),
+  persona: z.string().min(1).max(160).optional(),
   title: z.string().min(1).max(60),
   body: z.string().min(120).max(8000),
   cover_main: z.string().min(2).max(20),
   cover_sub: z.string().min(2).max(28),
+  cover_prompt: z.string().min(80).max(5000).optional(),
+  cover_negative: z.string().min(10).max(1500).optional(),
   pinned_comment: z.string().min(60).max(2000),
   reply_templates: z.array(z.string().min(10).max(400)).min(3).max(5).optional(),
   tags: z.array(z.string().min(1).max(40)).min(3).max(20).optional(),
 })
-
-function contentTypeLabel(contentType: XhsContentType): string {
-  if (contentType === "treatment") return "攻略"
-  if (contentType === "education") return "科普"
-  if (contentType === "promotion") return "避雷"
-  return "对比"
-}
-
-function conflictLabel(level: ConflictLevel): string {
-  if (level === "safe") return "稳健"
-  if (level === "hard") return "狠"
-  return "标准"
-}
-
-function contentTypeStrategy(contentType: XhsContentType): string {
-  if (contentType === "treatment") {
-    return [
-      "【攻略】写给“想做但怕踩坑”的顾客：从具体触发场景进入，拆出选择标准、流程判断和可核实细节。",
-      "内容路径：她为什么现在需要 -> 最怕哪里不透明 -> 3-4条判断标准 -> 哪些情况建议先缓一缓。",
-      "不要写成项目广告；像一线经营者在帮她做消费决策。",
-    ].join("\n")
-  }
-
-  if (contentType === "education") {
-    return [
-      "【科普】写给“听过很多术语但还是不放心”的顾客：把专业知识翻译成生活场景和可理解边界。",
-      "内容路径：常见误区/误会 -> 为什么会这样 -> 她能自己观察什么 -> 什么情况要谨慎。",
-      "不制造容貌焦虑，不把护理说成医疗治疗，不承诺确定效果。",
-    ].join("\n")
-  }
-
-  if (contentType === "promotion") {
-    return [
-      "【避雷】写给“被推销、加价、缩水体验伤过”的顾客：用骂点反推买点，只拆常见行为，不攻击具体人或店。",
-      "内容路径：真实吐槽/顾虑 -> 这件事背后的风险 -> 识别方法 -> 门店应有的边界。",
-      "冲突可以尖锐，但立场必须是替顾客降低决策成本。",
-    ].join("\n")
-  }
-
-  return [
-    "【对比】写给“正在两种方案之间纠结”的顾客：对比标准、适合人群、时间成本和风险边界。",
-    "内容路径：同一个需求下的两类人 -> 各自更适合什么 -> 怎么判断自己是哪类 -> 别只看表面卖点。",
-    "不点名拉踩同行，不做绝对优劣结论。",
-  ].join("\n")
-}
 
 function buildStoreSummary(profile: StoreProfile | null): string {
   if (!profile) return "（未提供门店档案：请写泛内容，不要编造具体数字、具体地标、具体价格。）"
@@ -129,67 +102,6 @@ function buildStoreSummary(profile: StoreProfile | null): string {
   return parts.length ? parts.join("\n") : "（已选择门店档案，但信息不完整：请避免编造具体事实。）"
 }
 
-function pickCoverTemplate(main: string, sub: string): "warm-poster" | "hand-note" | "dialog-bubble" {
-  const text = `${main}${sub}`
-  if (/记到现在|说了句话|三个字|笑了一下|不用回消息|睡着了|日记/.test(text)) return "hand-note"
-  if (/她说|他说|问我|跟我说|消息|发来|聊起来|原话/.test(text)) return "dialog-bubble"
-  return "warm-poster"
-}
-
-function coverTemplateBrief(template: ReturnType<typeof pickCoverTemplate>) {
-  if (template === "hand-note") {
-    return [
-      "【图片类型】小红书单张封面，手写感便签文字海报。",
-      "【版式】像门店老板随手记下来的真心话，标题居中偏上，整句完整可读，留白充足。",
-      "【视觉风格】奶油色便签纸、轻微纸张阴影、暖光晕染、真实纸张纹理，情绪安静但有停顿感。",
-      "【中文字体描述】略带倾斜的手写体或行楷风格，保留一点不完美感，但每个字都必须清晰端正。",
-      "【画面元素】一张奶油色便签纸，可有轻微胶带或阴影质感，不要复杂贴纸拼贴。",
-    ].join("\n")
-  }
-
-  if (template === "dialog-bubble") {
-    return [
-      "【图片类型】小红书单张封面，对话气泡文字海报。",
-      "【版式】单个主气泡承接标题，像聊天截图里的重点句，但不要做成真实平台界面。",
-      "【视觉风格】浅米色背景，白色圆角气泡，柔和阴影，画面干净，只保留一个核心气泡。",
-      "【中文字体描述】圆润的现代无衬线黑体，加粗，手机端一眼可读。",
-      "【画面元素】只保留单个对话气泡和柔和背景，避免头像、时间戳、消息列表、平台 UI 元素。",
-    ].join("\n")
-  }
-
-  return [
-    "【图片类型】小红书单张封面，暖调强标题文字海报。",
-    "【版式】三行冲突式或单句大字式，标题居中偏上，大字短句，整句先可读再做局部强调。",
-    "【视觉风格】暖米白到浅杏色渐变背景，轻纸质肌理，留白 40-50%，不要信息图报告感。",
-    "【中文字体描述】圆润的现代无衬线黑体，加粗，字距略松，主标题稳，重点词可用暖棕色强调。",
-    "【画面元素】背景只保留暖调渐变、纸张肌理和轻微投影，不放人物、产品、门店陈列。",
-  ].join("\n")
-}
-
-function buildBanana2CoverPrompt(opts: { main: string; sub: string }) {
-  const { main, sub } = opts
-  const template = pickCoverTemplate(main, sub)
-  const prompt = [
-    "画幅比例3:4竖版。",
-    "为生活美容/皮肤管理门店生成一张小红书首图封面。",
-    coverTemplateBrief(template),
-    "",
-    "【封面文字】",
-    `主标题：${main}`,
-    `副标题：${sub}`,
-    "",
-    "【文字规则】所有文字必须为清晰、准确、简体中文；严格按上面的主标题和副标题原样显示；不要自动改写，不要添加额外标语；不要乱码、错别字、英文或多余文字。",
-    "【结构约束】只做小红书单张封面，保持单页表达，不放门店信息、价格、优惠、地址、平台名、二维码、电话、微信号、logo、水印。",
-    "【输出目标】手机端高可读、情绪停顿感强、适合小红书封面点击。",
-  ].join("\n")
-
-  const negative = [
-    "文字乱码，错别字，英文字母，多余文字，标题不清楚，小字糊掉，二维码，电话，微信号，平台名，团购，价格，优惠，地址，logo，水印，",
-    "廉价促销风，土味红黄配色，信息过载，复杂背景，文字遮挡，人物照片，产品图，3D效果，卡通风格",
-  ].join(" ")
-
-  return { prompt, negative }
-}
 
 function ensureStringArray(input: unknown, len = 3): string[] {
   if (!Array.isArray(input)) return []
@@ -198,29 +110,110 @@ function ensureStringArray(input: unknown, len = 3): string[] {
   return arr.slice(0, Math.max(1, len))
 }
 
+function sanitizeStrictPublishText(text: string) {
+  return String(text || "")
+    .replace(/评论区|评论/g, "留言区")
+    .replace(/私信/g, "单独问")
+    .replace(/关注/g, "留意")
+    .replace(/加\s*V|加v|加\s*微\s*信|加\s*vx|微信|VX|vx/gi, "联系方式")
+    .replace(/电话|手机号|扫码|二维码|链接/g, "联系方式")
+    .replace(/预约/g, "时间安排")
+    .replace(/到店|进店/g, "进门")
+    .replace(/大众点评|抖音|小红书/g, "本地平台")
+    .replace(/团购|下单|买券|核销/g, "购买动作")
+    .replace(/价格/g, "费用")
+    .replace(/优惠/g, "划算")
+    .replace(/地址|定位|导航/g, "位置线索")
+    .replace(/治疗|根治|治好|包好|百分百|永久|立刻见效|立马见效|保证见效/g, "护理改善")
+}
+
+function sanitizePinnedCommentText(text: string) {
+  return sanitizeStrictPublishText(text)
+    .replace(/联系方式/g, "公开信息")
+    .replace(/\b1\d{10}\b/g, "公开信息")
+    .replace(/\b\d{7,}\b/g, "公开信息")
+}
+
+function extractBalancedJsonObject(text: string) {
+  const start = text.indexOf("{")
+  if (start < 0) return ""
+
+  let depth = 0
+  let inString = false
+  let escaped = false
+
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i]
+    if (inString) {
+      if (escaped) {
+        escaped = false
+      } else if (ch === "\\") {
+        escaped = true
+      } else if (ch === '"') {
+        inString = false
+      }
+      continue
+    }
+
+    if (ch === '"') {
+      inString = true
+    } else if (ch === "{") {
+      depth += 1
+    } else if (ch === "}") {
+      depth -= 1
+      if (depth === 0) return text.slice(start, i + 1)
+    }
+  }
+
+  const end = text.lastIndexOf("}")
+  return end > start ? text.slice(start, end + 1) : ""
+}
+
+function parseJsonCandidate(candidate: string): unknown {
+  const text = candidate.trim()
+  if (!text) return null
+
+  for (const v of [text, text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim()]) {
+    if (!v) continue
+    try {
+      const parsed = JSON.parse(v)
+      return typeof parsed === "string" ? safeJsonParse(parsed) : parsed
+    } catch {
+      try {
+        const repaired = jsonrepair(v)
+        const parsed = JSON.parse(repaired)
+        return typeof parsed === "string" ? safeJsonParse(parsed) : parsed
+      } catch {
+        // try next candidate
+      }
+    }
+  }
+
+  return null
+}
+
 function safeJsonParse(text: string): unknown {
   const trimmed = (text || "").trim()
   if (!trimmed) return null
-  try {
-    return JSON.parse(trimmed)
-  } catch {
-    const start = trimmed.indexOf("{")
-    const end = trimmed.lastIndexOf("}")
-    if (start >= 0 && end > start) {
-      try {
-        return JSON.parse(trimmed.slice(start, end + 1))
-      } catch {
-        return null
-      }
-    }
-    return null
+
+  const direct = parseJsonCandidate(trimmed)
+  if (direct) return direct
+
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1]
+  if (fenced) {
+    const parsed = parseJsonCandidate(fenced)
+    if (parsed) return parsed
   }
+
+  const balanced = extractBalancedJsonObject(trimmed)
+  return balanced ? parseJsonCandidate(balanced) : null
 }
 
 async function callDeepSeekJson(opts: { messages: Array<{ role: string; content: string }>; maxTokens: number }) {
   const apiKey = (process.env.DEEPSEEK_API_KEY || "").trim()
-  const baseUrl = (process.env.DEEPSEEK_XHS_BASE_URL || process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com/v1").trim()
-  const model = (process.env.DEEPSEEK_XHS_MODEL || process.env.DEEPSEEK_MODEL || "deepseek-chat").trim()
+  const baseUrl = (process.env.DEEPSEEK_XHS_BASE_URL || process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").trim()
+  const model = (process.env.DEEPSEEK_XHS_MODEL || process.env.DEEPSEEK_PRO_MODEL || process.env.DEEPSEEK_MODEL || "deepseek-chat").trim()
+  const thinkingMode = (process.env.DEEPSEEK_XHS_THINKING || (model.includes("v4") ? "disabled" : "")).trim()
 
   if (!apiKey || apiKey === "your-api-key-here") {
     throw new Error("DEEPSEEK_API_KEY missing")
@@ -240,25 +233,30 @@ async function callDeepSeekJson(opts: { messages: Array<{ role: string; content:
     return { ok: upstream.ok, status: upstream.status, text: jsonText }
   }
 
-  let res = await doRequest({
+  const basePayload: Record<string, unknown> = {
     model,
     messages: opts.messages,
     temperature: 0.7,
     max_tokens: opts.maxTokens,
     stream: false,
     response_format: { type: "json_object" },
-  })
+  }
+  if (thinkingMode) {
+    basePayload.thinking = { type: thinkingMode }
+  }
+
+  let res = await doRequest(basePayload)
 
   if (!res.ok && res.status === 400) {
     const lower = res.text.slice(0, 500).toLowerCase()
     if (lower.includes("response_format") || lower.includes("json_object")) {
-      res = await doRequest({
-        model,
-        messages: opts.messages,
-        temperature: 0.7,
-        max_tokens: opts.maxTokens,
-        stream: false,
-      })
+      const fallbackPayload = { ...basePayload }
+      delete fallbackPayload.response_format
+      res = await doRequest(fallbackPayload)
+    } else if (lower.includes("thinking")) {
+      const fallbackPayload = { ...basePayload }
+      delete fallbackPayload.thinking
+      res = await doRequest(fallbackPayload)
     }
   }
 
@@ -346,10 +344,10 @@ function compactFlags(flags: GuardrailFlag[]) {
   return flags.map((f) => `${f.field}:${f.rule}:${f.match}`).slice(0, 20)
 }
 
-function buildSystemPrompt(opts: { contentType: XhsContentType; conflictLevel: ConflictLevel }) {
+function buildSystemPrompt(opts: { contentType: XhsContentType; conflictLevel: ConflictLevel; beautyContext: BeautyContext }) {
   const typeLabel = contentTypeLabel(opts.contentType)
   const cLabel = conflictLabel(opts.conflictLevel)
-  const typeStrategy = contentTypeStrategy(opts.contentType)
+  const typeStrategy = opts.beautyContext.contentStrategy
 
   // IMPORTANT:
   // - 正文与首图文案严格禁CTA
@@ -370,8 +368,14 @@ function buildSystemPrompt(opts: { contentType: XhsContentType; conflictLevel: C
     "",
     "美业常见情绪种子（仅作选题方向，不当作真实引语）：怕被推销、怕加价、怕敏感红痒、怕服务缩水、想比较、想看同类案例、担心效果承诺、担心门店不稳定、讨厌被现场施压。",
     "",
+    "本次美容知识包：",
+    buildBeautySourcePackText(opts.beautyContext),
+    "",
     "本类目策略：",
     typeStrategy,
+    "",
+    "封面生图提示词规则：",
+    buildCoverPromptRequirements(opts.beautyContext),
     "",
     "硬性规则（必须遵守）：",
     "1) 正文 body 严格禁CTA：不得出现 评论/私信/关注/加V/微信/VX/电话/扫码/链接/预约/到店 等导流动作；不得出现 大众点评/抖音/团购/下单/买券/核销/价格/优惠/地址/定位/导航 等交易/平台词。",
@@ -385,7 +389,10 @@ function buildSystemPrompt(opts: { contentType: XhsContentType; conflictLevel: C
     "- body：400-600字，短句、画面感；隐含链路为“具体顾客画像 -> 触发场景 -> 此刻情绪 -> 判断标准 -> 温和结论”。不要输出画像表。",
     "- body 必须包含至少3个“可核实细节”。若缺少门店档案信息，则改为“可验证判断标准/自检清单”，不要编造具体事实。",
     "- body 结尾可以留一个开放问题，但不能出现“评论区/私信/找我/来店”等动作词。",
+    "- body 不写模板腔，不使用完整的“不是A，是B / 你要的不是X，是Y / 真正的X不是Y，是Z / 更扎心的是 / 换句话说 / 也就是说”。",
     "- cover_main：<=12字，冲突最大；cover_sub：<=16字，给答案/承诺（但不含CTA）。",
+    "- cover_prompt：直接给 GPT-Image-2 使用的完整提示词，必须包含画幅、版式、文字、字体、风格、约束；不得只给一句描述。",
+    "- cover_negative：单独给负面提示词。",
     "- pinned_comment：给两条路径（本地生活平台优先/短视频平台备用），都用“搜索门店昵称+地标/商圈”的方式表达；最后给出三条承诺口径（不加价/不缩水/可拒绝）。",
     "- reply_templates：3条（反推销/敏感肌合规/本地怎么找店，不写平台名）。",
     "- tags：8-12个，含本地词+服务词+情绪词；避免敏感词与平台名。",
@@ -394,10 +401,15 @@ function buildSystemPrompt(opts: { contentType: XhsContentType; conflictLevel: C
     "",
     "JSON schema：",
     "{",
+    '  "entry_class": "问题修复|信任怀疑|放松养护|本地找店|边界风险词",',
+    '  "narrator": "本次实际使用的叙述者",',
+    '  "persona": "一句话具体人，不要空泛年龄段",',
     '  "title": "string",',
     '  "body": "string",',
     '  "cover_main": "string",',
     '  "cover_sub": "string",',
+    '  "cover_prompt": "string",',
+    '  "cover_negative": "string",',
     '  "pinned_comment": "string",',
     '  "reply_templates": ["string","string","string"],',
     '  "tags": ["#tag1", "#tag2"]',
@@ -405,7 +417,7 @@ function buildSystemPrompt(opts: { contentType: XhsContentType; conflictLevel: C
   ].join("\n")
 }
 
-function buildUserPrompt(input: GenerateV4Input) {
+function buildUserPrompt(input: GenerateV4Input, beautyContext: BeautyContext) {
   const storeSummary = buildStoreSummary(input.storeProfile)
   const seed = (input.seedReviews || []).map((s) => `- ${String(s || "").trim()}`).filter(Boolean).slice(0, 12)
   return [
@@ -419,7 +431,11 @@ function buildUserPrompt(input: GenerateV4Input) {
     "",
     seed.length ? "差评/吐槽原话（可用来提炼冲突）：\n" + seed.join("\n") : "差评/吐槽原话：未提供（请用通用冲突种子）。",
     "",
+    "本次自动路由结果：",
+    buildBeautySourcePackText(beautyContext),
+    "",
     "生成前请先在内部完成：选择一个具体顾客主角，判断她处在千机塔第4-6层的触发场景与即时情绪，再把内容写成可发布笔记；不要输出分析过程。",
+    "封面提示词要直接可用于 GPT-Image-2，不能只输出主副标题。",
   ]
     .filter(Boolean)
     .join("\n")
@@ -434,6 +450,7 @@ function buildRevisionPrompt(opts: {
   contentType: XhsContentType
   topic: string
   keywords: string
+  beautyContext: BeautyContext
 }) {
   const compact = compactFlags(opts.flags)
   const risk = opts.riskLevel ? `${opts.riskLevel}(${opts.dangerCount ?? "?"})` : "unknown"
@@ -449,6 +466,8 @@ function buildRevisionPrompt(opts: {
         body: opts.prev.body,
         cover_main: opts.prev.coverText.main,
         cover_sub: opts.prev.coverText.sub,
+        cover_prompt: opts.prev.coverPrompt,
+        cover_negative: opts.prev.coverNegative,
         pinned_comment: opts.prev.pinnedComment,
         reply_templates: opts.prev.replyTemplates,
         tags: opts.prev.tags,
@@ -463,6 +482,10 @@ function buildRevisionPrompt(opts: {
     "3) 医疗合规：不得承诺疗效，不使用治疗/根治类词。",
     "4) 若当前档位为 hard 仍无法降风险，请把语气降到 standard 或 safe（更克制，不引战）。",
     "5) 保留具体顾客场景、即时情绪和判断标准，不要改成空泛广告腔。",
+    "6) 同步重写 cover_prompt/cover_negative，仍然直接可用于 GPT-Image-2。",
+    "",
+    "封面提示词规则：",
+    buildCoverPromptRequirements(opts.beautyContext),
     "",
     "只输出 JSON（同 schema）。",
   ].join("\n")
@@ -471,7 +494,18 @@ function buildRevisionPrompt(opts: {
 export async function generateXhsV4(opts: { billing: BillingContext; draftId: string; input: GenerateV4Input }) {
   const { billing, draftId, input } = opts
 
-  const systemPrompt = buildSystemPrompt({ contentType: input.contentType, conflictLevel: input.conflictLevel })
+  const beautyContext = buildBeautyContext({
+    contentType: input.contentType,
+    conflictLevel: input.conflictLevel,
+    topic: input.topic,
+    keywords: input.keywords,
+    shopName: input.shopName,
+  })
+  const systemPrompt = buildSystemPrompt({
+    contentType: input.contentType,
+    conflictLevel: input.conflictLevel,
+    beautyContext,
+  })
 
   let rounds = 0
   let flags: GuardrailFlag[] = []
@@ -487,9 +521,9 @@ export async function generateXhsV4(opts: { billing: BillingContext; draftId: st
     const raw = await callDeepSeekJson({
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: buildUserPrompt(input) },
+        { role: "user", content: buildUserPrompt(input, beautyContext) },
       ],
-      maxTokens: 2600,
+      maxTokens: 3600,
     })
     const parsed = llmOutputSchema.safeParse(raw)
     if (!parsed.success) {
@@ -499,18 +533,29 @@ export async function generateXhsV4(opts: { billing: BillingContext; draftId: st
     const data = parsed.data
     const replyTemplates = ensureStringArray(data.reply_templates, 3)
     const tags = ensureStringArray(data.tags, 12)
-    const cover = { main: data.cover_main.trim(), sub: data.cover_sub.trim() }
-    const coverAsset = buildBanana2CoverPrompt(cover)
+    const cover = {
+      main: sanitizeStrictPublishText(data.cover_main).trim(),
+      sub: sanitizeStrictPublishText(data.cover_sub).trim(),
+    }
+    const coverAsset = normalizeCoverAsset({
+      ...cover,
+      prompt: data.cover_prompt,
+      negative: data.cover_negative,
+      ctx: beautyContext,
+    })
 
     current = {
       title: data.title.trim(),
-      body: data.body.trim(),
+      body: sanitizeStrictPublishText(data.body).trim(),
       coverText: cover,
-      pinnedComment: data.pinned_comment.trim(),
-      replyTemplates: replyTemplates.length >= 3 ? replyTemplates.slice(0, 3) : [],
+      pinnedComment: sanitizePinnedCommentText(data.pinned_comment).trim(),
+      replyTemplates: replyTemplates.length >= 3 ? replyTemplates.slice(0, 3).map(sanitizePinnedCommentText) : [],
       tags: tags.length ? tags : [],
       coverPrompt: coverAsset.prompt,
       coverNegative: coverAsset.negative,
+      entryClass: data.entry_class || beautyContext.entryLabel,
+      narrator: data.narrator || beautyContext.narratorName,
+      persona: data.persona || beautyContext.personaHint,
     }
   }
 
@@ -555,10 +600,11 @@ export async function generateXhsV4(opts: { billing: BillingContext; draftId: st
             contentType: input.contentType,
             topic: input.topic,
             keywords: input.keywords,
+            beautyContext,
           }),
         },
       ],
-      maxTokens: 2600,
+      maxTokens: 3600,
     })
 
     const revParsed = llmOutputSchema.safeParse(revRaw)
@@ -570,18 +616,29 @@ export async function generateXhsV4(opts: { billing: BillingContext; draftId: st
     const d = revParsed.data
     const replyTemplates = ensureStringArray(d.reply_templates, 3)
     const tags = ensureStringArray(d.tags, 12)
-    const cover = { main: d.cover_main.trim(), sub: d.cover_sub.trim() }
-    const coverAsset = buildBanana2CoverPrompt(cover)
+    const cover = {
+      main: sanitizeStrictPublishText(d.cover_main).trim(),
+      sub: sanitizeStrictPublishText(d.cover_sub).trim(),
+    }
+    const coverAsset = normalizeCoverAsset({
+      ...cover,
+      prompt: d.cover_prompt,
+      negative: d.cover_negative,
+      ctx: beautyContext,
+    })
 
     current = {
       title: d.title.trim(),
-      body: d.body.trim(),
+      body: sanitizeStrictPublishText(d.body).trim(),
       coverText: cover,
-      pinnedComment: d.pinned_comment.trim(),
-      replyTemplates: replyTemplates.length >= 3 ? replyTemplates.slice(0, 3) : current.replyTemplates,
+      pinnedComment: sanitizePinnedCommentText(d.pinned_comment).trim(),
+      replyTemplates: replyTemplates.length >= 3 ? replyTemplates.slice(0, 3).map(sanitizePinnedCommentText) : current.replyTemplates,
       tags: tags.length ? tags : current.tags,
       coverPrompt: coverAsset.prompt,
       coverNegative: coverAsset.negative,
+      entryClass: d.entry_class || current.entryClass || beautyContext.entryLabel,
+      narrator: d.narrator || current.narrator || beautyContext.narratorName,
+      persona: d.persona || current.persona || beautyContext.personaHint,
     }
   }
 
