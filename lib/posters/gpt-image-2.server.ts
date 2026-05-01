@@ -5,6 +5,7 @@ type GenerateImageOptions = {
   negativePrompt?: string
   size: string
   resolution: string
+  imageUrls?: string[]
 }
 
 type TaskStatus = "pending" | "submitted" | "processing" | "completed" | "failed"
@@ -180,6 +181,7 @@ export async function generateGptImage2(opts: GenerateImageOptions): Promise<{ i
     resolution: opts.resolution || process.env.APIMART_IMAGE_RESOLUTION || "2k",
   }
   payload.prompt = fullPrompt
+  if (opts.imageUrls?.length) payload.image_urls = opts.imageUrls.slice(0, 16)
 
   if (officialFallback()) payload.official_fallback = true
 

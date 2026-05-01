@@ -13,16 +13,27 @@ import {
   type PosterOverlay,
 } from "@/lib/posters/templates"
 import { refundCredits } from "@/lib/pricing/profile.server"
-import { chargeCredits, resolveBillingContext, trackServerEvent } from "@/lib/xhs/proxy.server"
-import { getXhsAssetsBucket, uploadRemoteAssetToPath, uploadTextAsset } from "@/lib/xhs/assets.server"
+import { chargeCredits, resolveBillingContext, trackServerEvent, type BillingContext } from "@/lib/xhs/proxy.server"
+import { downloadAsset, getXhsAssetsBucket, uploadRemoteAssetToPath, uploadTextAsset } from "@/lib/xhs/assets.server"
+import type { PosterAssetRef } from "@/lib/posters/intake"
 
 export const runtime = "nodejs"
+
+const assetRefSchema = z.object({
+  kind: z.enum(["logo", "store", "product", "people"]),
+  bucket: z.string().trim().min(1).max(80),
+  path: z.string().trim().min(1).max(300),
+  contentType: z.string().trim().min(1).max(80),
+})
 
 const bodySchema = z.object({
   mode: z.enum(["template", "free"]),
   templateId: z.string().trim().max(40).optional().default(""),
   fields: z.record(z.string(), z.string().max(200)).optional().default({}),
   prompt: z.string().trim().max(4000).optional().default(""),
+  sessionId: z.string().trim().max(80).optional().default(""),
+  briefId: z.string().trim().max(80).optional().default(""),
+  assetRefs: z.array(assetRefSchema).max(4).optional().default([]),
   size: z
     .enum(["auto", "1:1", "3:2", "2:3", "4:3", "3:4", "5:4", "4:5", "16:9", "9:16", "2:1", "1:2", "21:9", "9:21"])
     .optional(),
@@ -47,6 +58,81 @@ function metadataPath(posterId: string) {
 
 function posterImagePath(userId: string, posterId: string) {
   return `posters/${userId}/${posterId}/image`
+}
+
+function assetPromptBlock(assetRefs: PosterAssetRef[]) {
+  if (!assetRefs.length) return ""
+
+  const labels: Record<PosterAssetRef["kind"], string> = {
+    logo: "Logo/门头",
+    store: "门店环境",
+    product: "产品或服务图",
+    people: "人物或案例图",
+  }
+
+  return [
+    "",
+    "参考素材使用规则：",
+    ...assetRefs.map((ref, index) => `- 参考图 ${index + 1} 是${labels[ref.kind]}素材。`),
+    assetRefs.some((ref) => ref.kind === "logo")
+      ? "- Logo/门头素材必须在海报中可识别地出现，但允许按海报风格自然融入。"
+      : "",
+    "- 产品、门店、人物素材用于保持真实感和行业匹配，不要生成无关行业元素。",
+    "- 不要添加真实平台 logo、二维码、电话、网址或未经提供的联系方式。",
+  ]
+    .filter(Boolean)
+    .join("\n")
+}
+
+async function assetRefsToImageUrls(opts: {
+  bucket: string
+  userId: string
+  assetRefs: PosterAssetRef[]
+}) {
+  const imageUrls: string[] = []
+  const safePrefix = `posters/assets/${opts.userId}/`
+
+  for (const ref of opts.assetRefs.slice(0, 4)) {
+    if (ref.bucket !== opts.bucket) continue
+    if (!ref.path.startsWith(safePrefix)) continue
+    if (!ref.contentType.startsWith("image/")) continue
+
+    const asset = await downloadAsset({ bucket: opts.bucket, path: ref.path })
+    const contentType = asset.contentType || ref.contentType || "image/jpeg"
+    if (!contentType.startsWith("image/")) continue
+    const base64 = Buffer.from(asset.arrayBuffer).toString("base64")
+    imageUrls.push(`data:${contentType};base64,${base64}`)
+  }
+
+  return imageUrls
+}
+
+async function persistPosterHistory(opts: {
+  billing: BillingContext
+  posterId: string
+  templateId: string
+  mode: string
+  bucket: string
+  path: string
+  contentType: string
+  size: string
+  resolution: string
+}) {
+  try {
+    await opts.billing.supabase.from("poster_generations").insert({
+      id: opts.posterId,
+      user_id: opts.billing.userId,
+      mode: opts.mode,
+      template_id: opts.templateId || null,
+      image_bucket: opts.bucket,
+      image_path: opts.path,
+      content_type: opts.contentType,
+      size: opts.size,
+      resolution: opts.resolution,
+    })
+  } catch {
+    // Database migration may not be applied yet; storage metadata remains the fallback.
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -97,6 +183,11 @@ export async function POST(request: NextRequest) {
       warnings.push("自由生图不会自动校验商业海报文字，请生成后人工核对。")
     }
 
+    const validAssetRefs = input.assetRefs as PosterAssetRef[]
+    if (validAssetRefs.length) {
+      prompt = [prompt, assetPromptBlock(validAssetRefs)].filter(Boolean).join("\n")
+    }
+
     charged = await chargeCredits({
       request,
       ctx: billing.ctx,
@@ -122,9 +213,12 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    const generated = await generateGptImage2({ prompt, negativePrompt, size, resolution })
-    const posterId = randomUUID()
     const bucket = getXhsAssetsBucket()
+    const imageUrls = validAssetRefs.length
+      ? await assetRefsToImageUrls({ bucket, userId: billing.ctx.userId, assetRefs: validAssetRefs })
+      : []
+    const generated = await generateGptImage2({ prompt, negativePrompt, size, resolution, imageUrls })
+    const posterId = randomUUID()
     const uploaded = await uploadRemoteAssetToPath({
       bucket,
       path: posterImagePath(billing.ctx.userId, posterId),
@@ -140,14 +234,31 @@ export async function POST(request: NextRequest) {
           userId: billing.ctx.userId,
           mode: input.mode,
           templateId,
+          sessionId: input.sessionId || null,
+          briefId: input.briefId || null,
           bucket,
           path: uploaded.path,
           contentType: uploaded.contentType,
+          size,
+          resolution,
+          assetRefs: validAssetRefs.map((ref) => ({ kind: ref.kind, path: ref.path })),
           createdAt: new Date().toISOString(),
         },
         null,
         2
       ),
+    })
+
+    await persistPosterHistory({
+      billing: billing.ctx,
+      posterId,
+      templateId,
+      mode: input.mode,
+      bucket,
+      path: uploaded.path,
+      contentType: uploaded.contentType,
+      size,
+      resolution,
     })
 
     await trackServerEvent({

@@ -129,33 +129,10 @@ function requestWechatLogin(code, profile) {
   return tryRequestAt(0)
 }
 
-function loginWithProfile() {
-  return new Promise((resolve, reject) => {
-    wx.getUserProfile({
-      desc: "用于完善账号资料",
-      success(profileRes) {
-        wx.login({
-          success(loginRes) {
-            if (!loginRes.code) {
-              reject({ error: "missing_code" })
-              return
-            }
-            requestWechatLogin(loginRes.code, profileRes.userInfo)
-              .then((payload) => {
-                saveSession(payload, profileRes.userInfo)
-                resolve(payload)
-              })
-              .catch(reject)
-          },
-          fail(err) {
-            reject(err)
-          },
-        })
-      },
-      fail(err) {
-        reject(err)
-      },
-    })
+function loginWithCode(code, profile) {
+  return requestWechatLogin(code, profile).then((payload) => {
+    saveSession(payload, profile)
+    return payload
   })
 }
 
@@ -198,7 +175,7 @@ module.exports = {
   getProfile() {
     return wx.getStorageSync(PROFILE_KEY) || null
   },
-  loginWithProfile,
+  loginWithCode,
   loginSilent,
   getPendingSilentLogin() {
     return silentLoginPromise
