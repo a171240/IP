@@ -191,7 +191,7 @@ Page({
   },
 
   handleOpenDrafts() {
-    wx.switchTab({ url: "/pages/xhs-drafts/index" })
+    wx.navigateTo({ url: "/pages/xhs-drafts/index" })
   },
 
   onSelectType(e) {
@@ -495,7 +495,7 @@ Page({
           cancelText: "知道了",
           success: (res) => {
             if (res.confirm) {
-              wx.switchTab({ url: "/pages/xhs-drafts/index" })
+              wx.navigateTo({ url: "/pages/xhs-drafts/index" })
             }
           },
         })

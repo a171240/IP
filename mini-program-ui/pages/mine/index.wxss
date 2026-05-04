@@ -210,6 +210,12 @@
   margin-top: 72rpx;
 }
 
+.mine-v2 .mine-section.fade-up {
+  animation: none;
+  opacity: 1;
+  transform: none;
+}
+
 .mine-benefit-section {
   margin-top: 64rpx;
 }

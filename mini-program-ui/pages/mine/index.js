@@ -2,12 +2,50 @@ const { IP_FACTORY_BASE_URL } = require("../../utils/config")
 const { request } = require("../../utils/request")
 const { getProfile, getUser, isLoggedIn, logout } = require("../../utils/auth")
 
+function firstText(...values) {
+  for (const value of values) {
+    const text = String(value || "").trim()
+    if (text) return text
+  }
+  return ""
+}
+
+function avatarInitial(name) {
+  const text = String(name || "").trim()
+  if (!text) return "我"
+  return text.slice(0, 1).toUpperCase()
+}
+
+function resolveAccountDisplay(user, profile) {
+  const metadata = user && user.user_metadata ? user.user_metadata : {}
+  const displayName = firstText(
+    metadata.nickname,
+    metadata.nickName,
+    metadata.name,
+    profile?.nickname,
+    profile?.nickName,
+    user?.email,
+    "WeChat User",
+  )
+  const avatarUrl = firstText(
+    metadata.avatar_url,
+    metadata.avatarUrl,
+    metadata.picture,
+    profile?.avatar_url,
+    profile?.avatarUrl,
+    user?.avatar_url,
+    user?.avatarUrl,
+  )
+  return { displayName, avatarUrl, avatarInitial: avatarInitial(displayName) }
+}
+
 Page({
   data: {
     isLoggedIn: false,
     user: null,
     displayName: "",
     avatarUrl: "",
+    avatarInitial: "我",
 
     profileLoading: false,
     planId: "",
@@ -33,24 +71,15 @@ Page({
 
   refreshUser() {
     const user = getUser()
-    const metadata = user && user.user_metadata ? user.user_metadata : {}
     const profile = getProfile()
-
-    const displayName =
-      metadata.nickname ||
-      metadata.nickName ||
-      profile?.nickname ||
-      profile?.nickName ||
-      user?.email ||
-      "WeChat User"
-
-    const avatarUrl = metadata.avatar_url || metadata.avatarUrl || profile?.avatarUrl || ""
+    const account = resolveAccountDisplay(user, profile)
 
     this.setData({
       isLoggedIn: isLoggedIn(),
       user: user || null,
-      displayName,
-      avatarUrl,
+      displayName: account.displayName,
+      avatarUrl: account.avatarUrl,
+      avatarInitial: account.avatarInitial,
     })
   },
 
@@ -70,11 +99,15 @@ Page({
       }
 
       const p = res.profile || {}
+      const account = resolveAccountDisplay(res.user || this.data.user, p)
       this.setData({
         planId: p.plan || "",
         planLabel: p.plan_label || p.plan || "",
         creditsBalance: Number(p.credits_balance || 0),
         creditsUnlimited: Boolean(p.credits_unlimited),
+        displayName: account.displayName || this.data.displayName,
+        avatarUrl: account.avatarUrl || this.data.avatarUrl,
+        avatarInitial: account.avatarInitial || this.data.avatarInitial,
       })
     } catch (_) {
       // Ignore; keep UI usable even if the network request fails.
@@ -105,7 +138,7 @@ Page({
 
   handleLogout() {
     logout()
-    this.setData({ isLoggedIn: false, user: null })
+    this.setData({ isLoggedIn: false, user: null, displayName: "", avatarUrl: "", avatarInitial: "我" })
     wx.showToast({ title: "已退出", icon: "none" })
   },
 })

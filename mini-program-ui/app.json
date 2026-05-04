@@ -1,92 +1,85 @@
 {
-    "pages":  [
-                  "pages/xiaohongshu/index",
-                  "pages/xhs-drafts/index",
-                  "pages/poster/index",
-                  "pages/content-studio/index",
-                  "pages/video-jobs/index",
-                  "pages/mine/index",
-                  "pages/store-profiles/index",
-                  "pages/store-profile-editor/index",
-
-                  "pages/home/index",
-                  "pages/workspace/index",
-                  "pages/workflow/index",
-                  "pages/ip-factory/index",
-                  "pages/voice-coach/index",
-                  "pages/voice-coach/setup/index",
-                  "pages/voice-coach/customer-profiles/index",
-                  "pages/voice-coach/customer-profile-editor/index",
-                  "pages/voice-coach/scene-cards/index",
-                  "pages/voice-coach/scene-card-editor/index",
-                  "pages/voice-coach/chat",
-                  "pages/voice-coach/report",
-                  "pages/workflow-p1/index",
-                  "pages/workflow-p2/index",
-                  "pages/workflow-p3/index",
-                  "pages/workflow-p4/index",
-                  "pages/workflow-p5/index",
-                  "pages/workflow-p6/index",
-                  "pages/workflow-p7/index",
-                  "pages/workflow-p8/index",
-                  "pages/workflow-p9/index",
-                  "pages/workflow-p10/index",
-                  "pages/library/index",
-                  "pages/report-viewer/index",
-                  "pages/login/index",
-                  "pages/diagnosis/index",
-                  "pages/diagnosis-quiz/index",
-                  "pages/diagnosis-result/index",
-                  "pages/pay/index",
-                  "pages/order/index"
-              ],
-    "window":  {
-                   "navigationBarBackgroundColor":  "#050507",
-                   "navigationBarTextStyle":  "white",
-                   "backgroundColor":  "#050507",
-                   "backgroundTextStyle":  "light",
-                   "navigationBarTitleText":  "美业内容助手"
-               },
-    "networkTimeout":  {
-                            "request":  60000,
-                            "downloadFile":  60000
-                        },
-    "tabBar":  {
-                   "color":  "#A9A2B0",
-                   "selectedColor":  "#EAD8B6",
-                   "backgroundColor":  "#0A090A",
-                   "borderStyle":  "black",
-                   "list":  [
-                                {
-                                    "pagePath":  "pages/xiaohongshu/index",
-                                    "text":  "发文",
-                                    "iconPath":  "assets/tabbar/xhs.png",
-                                    "selectedIconPath":  "assets/tabbar/xhs-active.png"
-                                },
-                                {
-                                    "pagePath":  "pages/xhs-drafts/index",
-                                    "text":  "草稿",
-                                    "iconPath":  "assets/tabbar/workspace.png",
-                                    "selectedIconPath":  "assets/tabbar/workspace-active.png"
-                                },
-                                {
-                                    "pagePath":  "pages/voice-coach/index",
-                                    "text":  "话术练习",
-                                    "iconPath":  "assets/tabbar/voice.png",
-                                    "selectedIconPath":  "assets/tabbar/voice-active.png"
-                                },
-                                {
-                                    "pagePath":  "pages/poster/index",
-                                    "text":  "海报",
-                                    "iconPath":  "assets/tabbar/poster.png",
-                                    "selectedIconPath":  "assets/tabbar/poster-active.png"
-                                },
-                                {
-                                    "pagePath":  "pages/mine/index",
-                                    "text":  "我的",
-                                    "iconPath":  "assets/tabbar/mine.png",
-                                    "selectedIconPath":  "assets/tabbar/mine-active.png"
-                                }
-                            ]
-               }
+  "pages": [
+    "pages/voice-coach/index",
+    "pages/poster/index",
+    "pages/xiaohongshu/index",
+    "pages/mine/index",
+    "pages/xhs-drafts/index",
+    "pages/content-studio/index",
+    "pages/video-jobs/index",
+    "pages/store-profiles/index",
+    "pages/store-profile-editor/index",
+    "pages/home/index",
+    "pages/workspace/index",
+    "pages/workflow/index",
+    "pages/ip-factory/index",
+    "pages/voice-coach/setup/index",
+    "pages/voice-coach/customer-profiles/index",
+    "pages/voice-coach/customer-profile-editor/index",
+    "pages/voice-coach/scene-cards/index",
+    "pages/voice-coach/scene-card-editor/index",
+    "pages/voice-coach/chat",
+    "pages/voice-coach/report",
+    "pages/workflow-p1/index",
+    "pages/workflow-p2/index",
+    "pages/workflow-p3/index",
+    "pages/workflow-p4/index",
+    "pages/workflow-p5/index",
+    "pages/workflow-p6/index",
+    "pages/workflow-p7/index",
+    "pages/workflow-p8/index",
+    "pages/workflow-p9/index",
+    "pages/workflow-p10/index",
+    "pages/library/index",
+    "pages/report-viewer/index",
+    "pages/login/index",
+    "pages/diagnosis/index",
+    "pages/diagnosis-quiz/index",
+    "pages/diagnosis-result/index",
+    "pages/pay/index",
+    "pages/order/index"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#050507",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#050507",
+    "backgroundTextStyle": "light",
+    "navigationBarTitleText": "\u7f8e\u4e1a\u8bdd\u955c"
+  },
+  "networkTimeout": {
+    "request": 60000,
+    "downloadFile": 60000
+  },
+  "tabBar": {
+    "color": "#A9A2B0",
+    "selectedColor": "#EAD8B6",
+    "backgroundColor": "#0A090A",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/voice-coach/index",
+        "text": "\u8bdd\u672f",
+        "iconPath": "assets/tabbar/voice.png",
+        "selectedIconPath": "assets/tabbar/voice-active.png"
+      },
+      {
+        "pagePath": "pages/poster/index",
+        "text": "\u6d77\u62a5",
+        "iconPath": "assets/tabbar/poster.png",
+        "selectedIconPath": "assets/tabbar/poster-active.png"
+      },
+      {
+        "pagePath": "pages/xiaohongshu/index",
+        "text": "\u53d1\u6587",
+        "iconPath": "assets/tabbar/xhs.png",
+        "selectedIconPath": "assets/tabbar/xhs-active.png"
+      },
+      {
+        "pagePath": "pages/mine/index",
+        "text": "\u6211\u7684",
+        "iconPath": "assets/tabbar/mine.png",
+        "selectedIconPath": "assets/tabbar/mine-active.png"
+      }
+    ]
+  }
 }

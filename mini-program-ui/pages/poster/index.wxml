@@ -6,14 +6,6 @@
         <text class="top-title">说需求，直接出图</text>
         <text class="top-subtitle">我会追问缺的信息，够了就自动生成。</text>
       </view>
-
-      <view class="store-row">
-        <view class="store-copy">
-          <text class="store-label">当前门店</text>
-          <text class="store-name">{{storeProfileLabel}}</text>
-        </view>
-        <button class="store-btn" bindtap="handleOpenStoreProfiles">{{storeProfileId ? '切换' : '选择'}}</button>
-      </view>
     </view>
 
     <scroll-view
@@ -57,6 +49,7 @@
 
     <view class="input-panel">
       <view class="text-row">
+        <button class="attach-btn" bindtap="handleAttachTap" disabled="{{conversationLoading || isGenerating || uploadingAssetKind}}">+</button>
         <input
           class="chat-input"
           value="{{draftText}}"
@@ -66,6 +59,11 @@
           bindconfirm="handleSendText"
         />
         <button class="send-btn" bindtap="handleSendText" disabled="{{!draftText || conversationLoading || isGenerating}}">发送</button>
+      </view>
+
+      <view class="attachment-row" wx:if="{{assetRefs.length}}">
+        <text class="attachment-text">已上传 {{assetRefs.length}} 张参考图</text>
+        <button class="attachment-clear" bindtap="handleClearAssets">清空</button>
       </view>
 
       <button

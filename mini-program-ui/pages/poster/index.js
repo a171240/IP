@@ -9,6 +9,7 @@ const RESOLUTION_OPTIONS = ["1k", "2k"]
 const DEFAULT_SESSION_ID = `mp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 const PRIMARY_TEMPLATE_IDS = ["P01", "P02", "P03", "P04", "P05", "P10"]
 const MORE_TEMPLATE_IDS = ["P06", "P07", "P08", "P09", "P11", "P12"]
+const ATTACHMENT_KINDS = ["store", "product", "people", "logo"]
 const TEMPLATE_TITLES = {
   P01: "新客首单",
   P02: "节日活动",
@@ -180,6 +181,40 @@ function chooseOneImage() {
       fail: reject,
     })
   })
+}
+
+function chooseOneMessageFile() {
+  return new Promise((resolve, reject) => {
+    if (!wx.chooseMessageFile) {
+      reject(new Error("当前微信版本不支持选择文件"))
+      return
+    }
+
+    wx.chooseMessageFile({
+      count: 1,
+      type: "all",
+      success(res) {
+        const file = res.tempFiles && res.tempFiles[0]
+        const path = file && (file.path || file.tempFilePath)
+        const name = file && file.name ? file.name : ""
+        if (!path) {
+          reject(new Error("未选择文件"))
+          return
+        }
+        if (!isLikelyImageFile(path, name)) {
+          reject(new Error("海报参考素材先支持图片文件"))
+          return
+        }
+        resolve(path)
+      },
+      fail: reject,
+    })
+  })
+}
+
+function isLikelyImageFile(path, name) {
+  const value = `${name || ""} ${path || ""}`.toLowerCase()
+  return /\.(png|jpe?g|webp)(\?|#|$)/.test(value)
 }
 
 function uploadPosterAsset({ kind, filePath, sessionId }) {
@@ -705,6 +740,86 @@ Page({
 
   handleOpenStoreProfiles() {
     wx.navigateTo({ url: "/pages/store-profiles/index?returnPage=poster" })
+  },
+
+  handleAttachTap() {
+    if (this.data.conversationLoading || this.data.isGenerating || this.data.uploadingAssetKind) return
+    const itemList = wx.chooseMessageFile ? ["拍照 / 相册", "聊天文件"] : ["拍照 / 相册"]
+    wx.showActionSheet({
+      itemList,
+      success: (res) => {
+        const index = Number(res.tapIndex || 0)
+        void this.handleAttachChoice(index)
+      },
+      fail: (error) => {
+        const message = String(error?.errMsg || error?.message || "")
+        if (!/cancel/i.test(message)) wx.showToast({ title: "未选择素材", icon: "none" })
+      },
+    })
+  },
+
+  async handleAttachChoice(index) {
+    try {
+      const filePath = index === 1 ? await chooseOneMessageFile() : await chooseOneImage()
+      await this.uploadAttachedAsset(filePath)
+    } catch (error) {
+      const message = error.message || "上传失败"
+      if (/cancel/i.test(message)) return
+      this.setData({ lastError: message })
+      wx.showToast({ title: message, icon: "none" })
+    }
+  },
+
+  pickAttachmentKind() {
+    const usedKinds = new Set((this.data.assetRefs || []).map((item) => item.kind))
+    return ATTACHMENT_KINDS.find((kind) => !usedKinds.has(kind)) || ATTACHMENT_KINDS[0]
+  },
+
+  async uploadAttachedAsset(filePath) {
+    const kind = this.pickAttachmentKind()
+    this.setData({ uploadingAssetKind: kind, lastError: "" })
+    try {
+      const res = await uploadPosterAsset({
+        kind,
+        filePath,
+        sessionId: this.data.intakeSessionId,
+      })
+      const assetRef = res.assetRef
+      if (!assetRef) throw new Error("上传结果无效")
+
+      const assetRefs = this.data.assetRefs.filter((item) => item.kind !== kind).concat({
+        ...assetRef,
+        localPath: filePath,
+      })
+      const assetCards = this.data.assetCards.map((item) =>
+        item.kind === kind ? { ...item, localPath: filePath, uploaded: true } : item
+      )
+
+      this.setData({
+        intakeSessionId: res.sessionId || this.data.intakeSessionId,
+        assetRefs,
+        assetCards,
+      })
+      this.appendChatMessage({
+        role: "user",
+        text: "已上传一张参考图",
+      })
+      this.appendChatMessage({
+        role: "assistant",
+        text: "收到，我会把这张图作为海报参考。你可以继续说活动、项目、价格或风格要求。",
+      })
+      wx.showToast({ title: "素材已上传", icon: "success" })
+    } finally {
+      this.setData({ uploadingAssetKind: "" })
+    }
+  },
+
+  handleClearAssets() {
+    this.setData({
+      assetRefs: [],
+      assetCards: this.data.assetCards.map((item) => ({ ...item, localPath: "", uploaded: false })),
+    })
+    wx.showToast({ title: "已清空参考图", icon: "none" })
   },
 
   onFieldInput(e) {

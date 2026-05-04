@@ -62,6 +62,21 @@ export async function GET(request: NextRequest) {
   }
 
   const plan = normalizePlan(resolvedProfile.plan)
+  const userMetadata = (user.user_metadata || {}) as Record<string, unknown>
+  const metadataNickname =
+    typeof userMetadata.nickname === "string"
+      ? userMetadata.nickname
+      : typeof userMetadata.nickName === "string"
+        ? userMetadata.nickName
+        : null
+  const metadataAvatarUrl =
+    typeof userMetadata.avatar_url === "string"
+      ? userMetadata.avatar_url
+      : typeof userMetadata.avatarUrl === "string"
+        ? userMetadata.avatarUrl
+        : typeof userMetadata.picture === "string"
+          ? userMetadata.picture
+          : null
 
   // entitlements: some features (delivery pack) also read from entitlements table
   const { data: entitlements } = await supabase
@@ -85,8 +100,8 @@ export async function GET(request: NextRequest) {
       credits_balance: Number(resolvedProfile.credits_balance || 0),
       credits_unlimited: Boolean(resolvedProfile.credits_unlimited) || plan === "vip",
       trial_granted_at: (resolvedProfile.trial_granted_at as string | null) ?? null,
-      nickname: resolvedProfile.nickname ?? null,
-      avatar_url: resolvedProfile.avatar_url ?? null,
+      nickname: resolvedProfile.nickname ?? metadataNickname,
+      avatar_url: resolvedProfile.avatar_url ?? metadataAvatarUrl,
     },
     entitlements: entitlement
       ? {

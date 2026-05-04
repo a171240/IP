@@ -14,7 +14,7 @@
         <view class="mine-profile-main">
           <image class="avatar" src="{{avatarUrl}}" mode="aspectFill" wx:if="{{avatarUrl}}" />
           <view class="avatar avatar-fallback" wx:else>
-            <text>LY</text>
+            <text>{{avatarInitial}}</text>
           </view>
           <view class="profile-info">
             <text class="mine-profile-name">{{displayName}}</text>

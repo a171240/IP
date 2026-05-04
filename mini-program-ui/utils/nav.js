@@ -7,7 +7,7 @@ function openXhsCompose(draftId) {
 }
 
 function openXhsDrafts() {
-  wx.switchTab({ url: "/pages/xhs-drafts/index" })
+  wx.navigateTo({ url: "/pages/xhs-drafts/index" })
 }
 
 module.exports = {

@@ -1,5 +1,9 @@
 @import "theme.wxss";
 
+page {
+  background-color: #0a0e0b;
+}
+
 .vc-chat-page {
   height: 100vh;
   background-color: var(--vc-bg);

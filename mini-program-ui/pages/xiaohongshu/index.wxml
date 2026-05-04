@@ -7,6 +7,7 @@
           <text class="title xhs-title">小红书发文工作台</text>
           <text class="subtitle xhs-subtitle">把选题、正文、封面和发布收进一条清晰流程，先写准，再补素材。</text>
         </view>
+        <button class="btn-outline xhs-draft-btn" size="mini" bindtap="handleOpenDrafts">草稿</button>
       </view>
 
       <view class="xhs-hero-panel">

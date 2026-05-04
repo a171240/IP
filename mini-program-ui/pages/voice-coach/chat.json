@@ -1,7 +1,8 @@
 {
-  "navigationBarTitleText": "练练",
-  "navigationBarBackgroundColor": "#050507",
+  "navigationBarTitleText": "\u7ec3\u4e60",
+  "navigationBarBackgroundColor": "#0a0e0b",
   "navigationBarTextStyle": "white",
-  "backgroundColor": "#050507",
+  "backgroundColor": "#0a0e0b",
+  "backgroundTextStyle": "light",
   "disableScroll": true
 }
