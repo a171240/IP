@@ -23,6 +23,11 @@ Page({
   data: {
     loading: false,
     profiles: [],
+    returnPage: "",
+  },
+
+  onLoad(options) {
+    this.setData({ returnPage: String(options?.returnPage || "") })
   },
 
   onShow() {
@@ -72,7 +77,7 @@ Page({
     wx.setStorageSync("xhs_store_profile_id", String(id))
     wx.setStorageSync("xhs_store_profile_label", label)
     wx.showToast({ title: "已选用", icon: "success" })
-    wx.switchTab({ url: "/pages/xiaohongshu/index" })
+    wx.switchTab({ url: this.data.returnPage === "poster" ? "/pages/poster/index" : "/pages/xiaohongshu/index" })
   },
 
   handleEdit(e) {

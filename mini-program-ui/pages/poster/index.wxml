@@ -1,185 +1,83 @@
-<view class="page page-poster-v2">
-  <view class="poster-shell">
-    <view class="poster-hero">
-      <view class="poster-hero-copy">
-        <text class="poster-eyebrow">门店设计生成器</text>
-        <text class="poster-title">填门店信息，直接出完整海报</text>
-        <text class="poster-subtitle">先选目标，再补事实。GPT-Image-2 负责画面、版式和文字直出，你只需要核对成品。</text>
+<view class="page page-poster-chat">
+  <view class="chat-shell">
+    <view class="chat-top">
+      <view class="top-copy">
+        <text class="top-kicker">海报助手</text>
+        <text class="top-title">说需求，直接出图</text>
+        <text class="top-subtitle">我会追问缺的信息，够了就自动生成。</text>
       </view>
-      <view class="poster-hero-status">
-        <view class="hero-status-item">
-          <text class="status-value">12</text>
-          <text class="status-label">场景模板</text>
+
+      <view class="store-row">
+        <view class="store-copy">
+          <text class="store-label">当前门店</text>
+          <text class="store-name">{{storeProfileLabel}}</text>
         </view>
-        <view class="hero-status-item">
-          <text class="status-value">{{size}}</text>
-          <text class="status-label">{{resolution}}</text>
-        </view>
+        <button class="store-btn" bindtap="handleOpenStoreProfiles">{{storeProfileId ? '切换' : '选择'}}</button>
       </view>
     </view>
 
-    <view class="poster-studio">
-      <view class="poster-result-card">
-        <view class="result-head">
-          <view>
-            <text class="section-kicker">成品</text>
-            <text class="result-title">{{selectedTemplate.title || '门店海报'}}</text>
-            <text class="result-copy">{{selectedTemplate.goal || '选择场景后生成完整海报'}}</text>
-          </view>
-          <view class="result-action-row">
-            <button wx:if="{{posterImageUrl}}" class="mini-btn" bindtap="handleCopyPrompt">提示词</button>
-            <button wx:if="{{posterImageUrl}}" class="mini-btn primary" bindtap="handleSavePoster" loading="{{isSaving}}">保存</button>
-          </view>
-        </view>
+    <scroll-view
+      class="chat-list"
+      scroll-y
+      scroll-with-animation
+      scroll-into-view="{{chatScrollIntoView}}"
+      enhanced="{{true}}"
+      show-scrollbar="{{false}}"
+    >
+      <view class="chat-spacer"></view>
 
-        <view class="poster-preview-frame" style="{{previewBoxStyle}}">
-          <image wx:if="{{posterImageUrl}}" class="poster-result-image" src="{{posterImageUrl}}" mode="aspectFill" />
-          <view wx:else class="poster-empty-preview {{selectedTemplate.previewStyle}}">
-            <view class="empty-visual-mark"></view>
-            <text class="empty-scenario">{{selectedTemplate.scenario || '先选海报目标'}}</text>
-            <text class="empty-main">{{selectedTemplate.title || '门店海报'}}</text>
-            <text class="empty-sub">{{selectedTemplate.outputHint || '生成后这里会显示完整海报图。'}}</text>
-            <view class="empty-tags">
-              <text wx:for="{{selectedTemplate.styleTags}}" wx:key="*this" class="empty-tag">{{item}}</text>
-            </view>
-          </view>
-        </view>
-
-        <view wx:if="{{warnings.length}}" class="check-panel">
-          <text class="check-title">生成后请核对</text>
-          <text wx:for="{{warnings}}" wx:key="*this" class="check-line">{{item}}</text>
-        </view>
-
-        <view wx:if="{{posterImageUrl}}" class="result-actions">
-          <button class="secondary-btn" data-strict="1" bindtap="handleGenerate" loading="{{isGenerating}}">文字更严格版</button>
-          <button class="primary-btn" bindtap="handleGenerate" loading="{{isGenerating}}">重新生成</button>
-        </view>
-      </view>
-
-      <view class="poster-block target-block">
-        <view class="section-head">
-          <view>
-            <text class="section-kicker">01 选目标</text>
-            <text class="section-title">这张海报要帮门店解决什么</text>
-          </view>
-          <button class="mini-btn" bindtap="loadTemplates" loading="{{templatesLoading}}">刷新</button>
-        </view>
-
-        <scroll-view scroll-x class="goal-scroll" show-scrollbar="{{false}}">
-          <view class="goal-row">
-            <view
-              wx:for="{{goalTabs}}"
-              wx:key="key"
-              class="goal-chip {{activeGoal === item.key ? 'active' : ''}}"
-              data-group="{{item.key}}"
-              bindtap="onGoalTap"
-            >
-              {{item.label}}
-            </view>
-          </view>
-        </scroll-view>
-
-        <view class="template-grid">
-          <view
-            wx:for="{{visibleTemplates}}"
-            wx:key="id"
-            class="template-card {{selectedTemplateId === item.id ? 'is-active' : ''}}"
-            data-id="{{item.id}}"
-            bindtap="onSelectTemplate"
-          >
-            <view class="template-visual {{item.previewStyle}}">
-              <view class="visual-line long"></view>
-              <view class="visual-line"></view>
-              <view class="visual-pill"></view>
-            </view>
-            <view class="template-body">
-              <text class="template-scenario">{{item.scenario}}</text>
-              <text class="template-title">{{item.title}}</text>
-              <text class="template-desc">{{item.description}}</text>
-              <view class="template-meta">
-                <text class="template-size">{{item.defaultSize}}</text>
-                <text wx:for="{{item.styleTags}}" wx:key="*this" class="template-tag">{{item}}</text>
+      <block wx:for="{{chatMessages}}" wx:key="id">
+        <view id="{{item.id}}" class="chat-row {{item.role === 'user' ? 'is-user' : 'is-assistant'}}">
+          <view class="chat-avatar" wx:if="{{item.role !== 'user'}}">AI</view>
+          <view class="chat-bubble {{item.type === 'poster' ? 'is-poster' : ''}}">
+            <text wx:if="{{item.text}}" class="chat-text">{{item.text}}</text>
+            <view wx:if="{{item.type === 'poster' && item.imageUrl}}" class="poster-message">
+              <image class="poster-message-image" src="{{item.imageUrl}}" mode="widthFix" />
+              <view class="poster-actions">
+                <button class="ghost-btn" data-strict="1" bindtap="handleGenerate" loading="{{isGenerating}}">修正文字</button>
+                <button class="ghost-btn" bindtap="handleGenerate" loading="{{isGenerating}}">重做一张</button>
+                <button class="solid-btn" bindtap="handleSavePoster" loading="{{isSaving}}">保存</button>
               </view>
             </view>
           </view>
         </view>
-      </view>
+      </block>
 
-      <view class="poster-block info-block">
-        <view class="section-head">
-          <view>
-            <text class="section-kicker">02 填信息</text>
-            <text class="section-title">只填事实，不写提示词</text>
-          </view>
-        </view>
-
-        <view wx:if="{{selectedTemplate}}" class="template-brief">
-          <text class="brief-title">{{selectedTemplate.title}} · {{selectedTemplate.scenario}}</text>
-          <text class="brief-copy">{{selectedTemplate.outputHint}}</text>
-          <view class="rule-list">
-            <text wx:for="{{selectedTemplate.textRules}}" wx:key="*this" class="rule-item">{{item}}</text>
-          </view>
-        </view>
-
-        <view wx:if="{{selectedTemplateFields.length}}" class="field-stack">
-          <view wx:for="{{selectedTemplateFields}}" wx:key="key" class="field-row">
-            <view class="field-label-row">
-              <text class="field-label">{{item.label}}</text>
-              <text class="field-limit">{{item.value.length || 0}}/{{item.maxLength}}</text>
-            </view>
-            <textarea
-              wx:if="{{item.inputType === 'textarea'}}"
-              class="poster-textarea"
-              maxlength="{{item.maxLength}}"
-              placeholder="{{item.placeholder}}"
-              value="{{item.value}}"
-              data-key="{{item.key}}"
-              bindinput="onFieldInput"
-            />
-            <input
-              wx:else
-              class="poster-input"
-              maxlength="{{item.maxLength}}"
-              placeholder="{{item.placeholder}}"
-              value="{{item.value}}"
-              data-key="{{item.key}}"
-              bindinput="onFieldInput"
-            />
-            <text wx:if="{{item.help}}" class="field-help">{{item.help}}</text>
-          </view>
+      <view wx:if="{{workingText}}" id="msg_working" class="chat-row is-assistant">
+        <view class="chat-avatar">AI</view>
+        <view class="chat-bubble is-status">
+          <view class="typing-dot"></view>
+          <text class="chat-text">{{workingText}}</text>
         </view>
       </view>
 
-      <view class="poster-block output-block">
-        <view class="section-head compact">
-          <view>
-            <text class="section-kicker">03 出成品</text>
-            <text class="section-title">选择规格并生成</text>
-          </view>
-        </view>
+      <view wx:if="{{lastError}}" class="error-line">{{lastError}}</view>
+      <view class="bottom-spacer"></view>
+    </scroll-view>
 
-        <view class="option-row">
-          <picker mode="selector" range="{{sizeOptions}}" value="{{sizeIndex}}" bindchange="onSizeChange">
-            <view class="option-pill">
-              <text class="option-label">比例</text>
-              <text class="option-value">{{size}}</text>
-            </view>
-          </picker>
-          <picker mode="selector" range="{{resolutionOptions}}" value="{{resolutionIndex}}" bindchange="onResolutionChange">
-            <view class="option-pill">
-              <text class="option-label">清晰度</text>
-              <text class="option-value">{{resolution}}</text>
-            </view>
-          </picker>
-        </view>
-
-        <button class="generate-btn" bindtap="handleGenerate" loading="{{isGenerating}}">
-          生成完整海报
-        </button>
-        <text class="output-note">模型会直接生成完整海报图。生成后请核对中文、价格、日期和地址。</text>
+    <view class="input-panel">
+      <view class="text-row">
+        <input
+          class="chat-input"
+          value="{{draftText}}"
+          placeholder="也可以打字，例如：五一新客补水99元"
+          confirm-type="send"
+          bindinput="onDraftInput"
+          bindconfirm="handleSendText"
+        />
+        <button class="send-btn" bindtap="handleSendText" disabled="{{!draftText || conversationLoading || isGenerating}}">发送</button>
       </view>
 
-      <view wx:if="{{lastError}}" class="error-box">{{lastError}}</view>
+      <button
+        class="voice-btn {{recording ? 'is-recording' : ''}} {{recordCanceling ? 'is-canceling' : ''}}"
+        bindtouchstart="onRecordStart"
+        bindtouchmove="onRecordMove"
+        bindtouchend="onRecordEnd"
+        bindtouchcancel="onRecordCancel"
+        disabled="{{conversationLoading || transcribing || isGenerating}}"
+      >
+        {{recording ? (recordCanceling ? '松手取消' : '松开发送') : (transcribing ? '正在识别' : '按住说话')}}
+      </button>
     </view>
   </view>
 </view>
