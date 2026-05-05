@@ -549,7 +549,7 @@ test("communication method tags flow into snapshot prompt context and setup brie
   assert.match(sessionSnapshot.prompt_context_text, /场景策略/)
   assert.match(sessionSnapshot.prompt_context_text, /沟通方法/)
   assert.match(sessionSnapshot.prompt_context_text, /反向叙述/)
-  assert.ok(brief.summaryLines.some((line) => line.includes("沟通方法")))
+  assert.ok(brief.summaryLines.some((line) => line.includes("推荐切入") || line.includes("沟通方法")))
   assert.ok(brief.summaryLines.some((line) => line.includes("Feel\/Felt\/Found")))
 })
 

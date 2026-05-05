@@ -1,109 +1,111 @@
-<view class="vc-page vc-setup-page vc-flow-v2 vc-setup-v2">
+<view class="vc-page vc-setup-page vc-setup-v4">
   <view wx:if="{{debugPanelEnabled}}" class="debug-pill" bindtap="toggleDebugPanel">日志</view>
+
   <view class="vc-page-scroll-shell">
-    <scroll-view class="page-scroll" scroll-y="true" enhanced="true" bounces="false" show-scrollbar="false">
+    <scroll-view class="page-scroll" scroll-y="true" enhanced="true" bounces="false" refresher-enabled="{{false}}" show-scrollbar="false">
       <view class="container">
-      <view class="hero compact-hero fade-up">
-        <text class="eyebrow">训练配置</text>
-        <text class="title">配置好就开始练</text>
-        <text class="subtitle">三步完成，不用先读一堆说明。</text>
-      </view>
+        <view class="setup-hero fade-up">
+          <view class="setup-hero-copy">
+            <text class="setup-eyebrow">{{customerProfile ? '顾客已就绪' : '顾客准备'}}</text>
+            <view class="setup-title">
+              <text>{{customerProfile ? '确认后直接开练' : '先准备一位顾客'}}</text>
+            </view>
+            <text class="setup-subtitle">{{customerProfile ? '这一步只确认顾客，不再额外配置其他内容。' : '顾客是唯一必选项。没有真实档案时，先生成一位模拟顾客。'}}</text>
+          </view>
 
-      <view class="section fade-up delay-1">
-        <view class="setup-step-card">
-          <view class="setup-step-head">
-            <view class="setup-step-index">1</view>
-            <view class="setup-step-copy">
-              <text class="card-title">顾客</text>
-              <text class="setup-step-note">{{customerProfile ? customerProfile.name : '还没选择顾客档案'}}</text>
+          <view class="setup-flow-pill setup-flow-pill-compact">
+            <view class="setup-flow-step {{customerProfile ? 'is-done' : 'is-active'}}">
+              <view class="setup-flow-dot">1</view>
+              <view class="setup-flow-copy">
+                <text class="setup-flow-label">顾客</text>
+                <text class="setup-flow-caption">{{customerProfile ? '已确认' : '当前步骤'}}</text>
+              </view>
+            </view>
+            <view class="setup-flow-step {{customerProfile ? 'is-active' : 'is-locked'}}">
+              <view class="setup-flow-dot">2</view>
+              <view class="setup-flow-copy">
+                <text class="setup-flow-label">开练</text>
+                <text class="setup-flow-caption">{{customerProfile ? '马上进入' : '准备后进入'}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <view wx:if="{{!customerProfile}}" class="setup-panel setup-guide-card fade-up delay-1">
+          <view class="setup-panel-head">
+            <view>
+              <text class="setup-card-title">还没有当前顾客</text>
+              <text class="setup-card-copy">先生成一位模拟顾客，可以马上开始；真实档案后面再换。</text>
+            </view>
+            <text class="setup-state-pill">必选</text>
+          </view>
+
+          <button
+            class="setup-primary-btn setup-main-btn"
+            loading="{{preparingTestCustomer || starting}}"
+            disabled="{{preparingTestCustomer || starting}}"
+            bindtap="handleGenerateAndStart"
+          >
+            {{preparingTestCustomer ? '正在生成模拟顾客' : '生成模拟顾客并开练'}}
+          </button>
+
+          <view class="setup-secondary-row">
+            <button class="setup-outline-btn" disabled="{{preparingTestCustomer || starting}}" bindtap="handlePickCustomerProfile">选择已有档案</button>
+            <button class="setup-outline-btn" disabled="{{preparingTestCustomer || starting}}" bindtap="handleCreateCustomerProfile">新建真实档案</button>
+          </view>
+        </view>
+
+        <view wx:else class="setup-panel setup-ready-card fade-up delay-1">
+          <view class="setup-panel-head">
+            <view>
+              <text class="setup-card-title">当前顾客</text>
+              <text class="setup-card-copy">确认后直接进入训练。</text>
+            </view>
+            <text class="setup-state-pill is-ready">已就绪</text>
+          </view>
+
+          <view class="setup-profile-box">
+            <text class="setup-profile-name">{{customerProfile.name}}</text>
+            <text wx:if="{{customerMeta}}" class="setup-profile-meta">{{customerMeta}}</text>
+            <view wx:if="{{customerProfile.core_concerns.length || customerProfile.trust_triggers.length}}" class="setup-chip-row">
+              <text wx:if="{{customerProfile.core_concerns.length}}" class="setup-chip">顾虑：{{customerProfile.core_concerns[0]}}</text>
+              <text wx:if="{{customerProfile.trust_triggers.length}}" class="setup-chip is-accent">信任：{{customerProfile.trust_triggers[0]}}</text>
             </view>
           </view>
 
-          <view wx:if="{{customerProfile}}" class="setup-chip-row">
-            <text wx:if="{{customerMeta}}" class="tag tag-accent">{{customerMeta}}</text>
-            <text wx:if="{{customerProfile.core_concerns.length}}" class="tag">{{customerProfile.core_concerns[0]}}</text>
-          </view>
-
-          <view wx:if="{{!customerProfile}}" class="setup-empty-copy">可以先直接用测试顾客。</view>
+          <button
+            class="setup-primary-btn setup-main-btn"
+            loading="{{starting}}"
+            disabled="{{starting || preparingTestCustomer}}"
+            bindtap="handleStart"
+          >
+            {{startingText || '开始语音训练'}}
+          </button>
 
           <view class="setup-action-row">
-            <button
-              class="btn-primary"
-              size="mini"
-              loading="{{preparingTestCustomer}}"
-              disabled="{{preparingTestCustomer}}"
-              bindtap="handleUseTestCustomer"
-            >
-              {{customerProfile ? '切换测试顾客' : '直接用测试顾客'}}
-            </button>
-            <button class="btn-outline" size="mini" bindtap="handlePickCustomerProfile">{{customerProfile ? '更换' : '选择'}}</button>
-            <button wx:if="{{customerProfile}}" class="btn-outline" size="mini" bindtap="handleClearCustomerProfile">清空</button>
-            <button wx:else class="btn-outline" size="mini" bindtap="handleCreateCustomerProfile">新建</button>
+            <button class="setup-secondary-btn" disabled="{{starting || preparingTestCustomer}}" bindtap="handlePickCustomerProfile">更换顾客</button>
+            <button class="setup-secondary-btn" loading="{{preparingTestCustomer}}" disabled="{{preparingTestCustomer || starting}}" bindtap="handleUseTestCustomer">重新模拟</button>
+            <button class="setup-ghost-btn" disabled="{{starting || preparingTestCustomer}}" bindtap="handleClearCustomerProfile">清空</button>
           </view>
         </view>
-      </view>
 
-      <view class="section fade-up delay-1">
-        <view class="setup-step-card">
-          <view class="setup-step-head">
-            <view class="setup-step-index">2</view>
-            <view class="setup-step-copy">
-              <text class="card-title">场景卡</text>
-              <text class="setup-step-note">{{sceneCard ? sceneCard.name : '还没选择场景卡'}}</text>
+        <view class="setup-support-card fade-up delay-2">
+          <view class="setup-support-visual">
+            <view class="setup-visual-sheet">
+              <view class="setup-visual-avatar"></view>
+              <view class="setup-visual-lines">
+                <view></view>
+                <view></view>
+                <view></view>
+              </view>
             </view>
+            <view class="setup-visual-badge">AI</view>
           </view>
-
-          <view wx:if="{{sceneCard}}" class="setup-chip-row">
-            <text class="tag tag-accent">{{sceneCard.scene_kind_label}}</text>
-            <text wx:if="{{sceneMeta}}" class="tag">{{sceneMeta}}</text>
-          </view>
-
-          <view wx:if="{{!sceneCard}}" class="setup-empty-copy">先选一个重点场景，这轮训练才不会发散。</view>
-
-          <view class="setup-action-row">
-            <button
-              class="btn-primary"
-              size="mini"
-              loading="{{preparingTestSceneCard}}"
-              disabled="{{preparingTestSceneCard}}"
-              bindtap="handleUseTestSceneCard"
-            >
-              {{sceneCard ? '切换测试场景卡' : '直接用测试场景卡'}}
-            </button>
-            <button class="btn-outline" size="mini" bindtap="handlePickSceneCard">{{sceneCard ? '更换' : '选择场景卡'}}</button>
-            <button class="btn-outline" size="mini" bindtap="handleCreateSceneCard">新建</button>
-            <button wx:if="{{sceneCard}}" class="btn-outline" size="mini" bindtap="handleClearSceneCard">清空</button>
+          <view class="setup-support-copy">
+            <text class="setup-support-title">开练后自动带入顾客画像</text>
+            <text class="setup-support-text">语气、顾虑点和追问节奏会直接进入对练，不需要再配第二页。</text>
           </view>
         </view>
-      </view>
-
-      <view class="section fade-up delay-2">
-        <view class="setup-step-card">
-          <view class="setup-step-head">
-            <view class="setup-step-index">3</view>
-            <view class="setup-step-copy">
-              <text class="card-title">备注</text>
-              <text class="setup-step-note">只写本次特殊背景。</text>
-            </view>
-          </view>
-
-          <textarea
-            class="input textarea compact-textarea"
-            maxlength="500"
-            placeholder="例如：明天下午来做护理，这轮重点练破冰和价格异议。"
-            value="{{liveNotes}}"
-            bindinput="onLiveNotes"
-          />
-        </view>
-      </view>
-
-      <view class="section fade-up delay-2">
-        <view class="footer-cta-card minimal-footer-card">
-          <text class="tips-title">开始训练</text>
-          <text class="tips-copy">进入后，顾客会按当前顾客档案和场景卡来提问。</text>
-          <button class="btn-primary" loading="{{starting}}" disabled="{{starting}}" bindtap="handleStart">开始语音训练</button>
-        </view>
-      </view>
       </view>
     </scroll-view>
   </view>
@@ -113,7 +115,7 @@
     <view class="debug-sheet-head">
       <view>
         <view class="debug-sheet-title">调试日志</view>
-        <view class="debug-sheet-sub">扫码预览时也能直接查看训练配置链路</view>
+        <view class="debug-sheet-sub">扫码预览时也能直接查看训练准备链路</view>
       </view>
       <view class="debug-sheet-actions">
         <view class="debug-sheet-link" bindtap="clearDebugPanel">清空</view>

@@ -110,9 +110,9 @@ Page({
       const profiles = [profile].concat((this.data.profiles || []).filter((item) => item.id !== profile.id))
 
       this.setData({ profiles })
-      this.activateProfile(profile, result.created ? "测试顾客已生成" : "已切换到测试顾客")
+      this.activateProfile(profile, result.created ? "模拟顾客已生成" : "已切换到模拟顾客")
     } catch (err) {
-      wx.showToast({ title: (err && err.message) || "生成测试顾客失败", icon: "none" })
+      wx.showToast({ title: (err && err.message) || "生成模拟顾客失败", icon: "none" })
     } finally {
       this.setData({ creatingTestProfile: false })
     }

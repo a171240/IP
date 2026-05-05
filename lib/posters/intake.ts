@@ -83,7 +83,7 @@ const TEMPLATE_KEYWORDS: Array<{ id: string; words: string[]; reason: string }> 
   { id: "P09", words: ["科普", "知识", "一张图", "讲清楚", "信息图"], reason: "识别到科普信息图目标" },
   { id: "P07", words: ["探店", "打卡", "本地", "门店环境", "宝藏店"], reason: "识别到本地探店目标" },
   { id: "P05", words: ["会员", "办卡", "储值", "复购", "老客"], reason: "识别到会员/复购目标" },
-  { id: "P12", words: ["朋友圈", "转发", "私域", "社群", "分享"], reason: "识别到朋友圈/私域分享目标" },
+  { id: "P12", words: ["朋友圈", "转发", "私域", "社群", "分享", "祝福", "节日快乐", "老顾客"], reason: "识别到朋友圈/私域分享目标" },
   { id: "P04", words: ["品牌", "形象", "高级", "信任", "调性"], reason: "识别到品牌形象目标" },
   { id: "P02", words: ["节日", "活动", "五一", "520", "七夕", "周年", "618", "双11"], reason: "识别到节日/活动促销目标" },
   { id: "P01", words: ["新客", "首单", "体验", "团购", "引流"], reason: "识别到新客引流目标" },
@@ -171,6 +171,9 @@ function inferAnswers(message: string): PosterIntakeAnswers {
   const out = parseLineAnswers(text)
   if (!text) return out
 
+  const storeName = inferStoreName(text)
+  if (storeName) out.storeName ||= storeName
+
   const goalHit = TEMPLATE_KEYWORDS.find((item) => item.words.some((word) => text.includes(word)))
   if (goalHit) {
     out.templateId = goalHit.id
@@ -184,15 +187,20 @@ function inferAnswers(message: string): PosterIntakeAnswers {
     out.shopType ||= industry
   }
 
-  const price = text.match(/(?:¥|￥)?\s*\d{1,5}\s*(?:元|起|\/人|\/次)?/)
-  if (price) out.offerText ||= price[0].trim()
+  const audience = inferAudience(text)
+  if (audience) out.audience ||= audience
 
-  const date = text.match(/(?:\d{1,2}[./月-]\d{1,2}(?:[日号])?(?:\s*[-~到至]\s*\d{1,2}[./月-]\d{1,2}(?:[日号])?)?|本周|本月|周末|今天|明天|五一|端午|中秋|春节|暑假)/)
-  if (date) out.dateRange ||= date[0].trim()
+  const offer = inferOfferText(text)
+  if (offer) out.offerText ||= offer
 
-  if (!out.campaignTitle && goalHit?.id === "P02") out.campaignTitle = firstShortPhrase(text)
-  if (!out.projectName && ["P01", "P03", "P10", "P11"].includes(goalHit?.id || "")) out.projectName = firstShortPhrase(text)
-  if (!out.headline) out.headline = firstShortPhrase(text)
+  const date = inferDateRange(text)
+  if (date) out.dateRange ||= date
+
+  const topic = inferTopic(text, storeName)
+  if (!out.campaignTitle && ["P02", "P05", "P06", "P12"].includes(goalHit?.id || "")) out.campaignTitle = topic
+  if (!out.projectName && ["P01", "P03", "P10", "P11"].includes(goalHit?.id || "")) out.projectName = topic
+  if (/不卖东西|不做促销|祝福|节日快乐/.test(text)) out.posterGoal ||= "节日祝福/客户维护"
+  if (!out.headline) out.headline = topic
   return out
 }
 
@@ -203,6 +211,63 @@ function firstShortPhrase(text: string) {
     .map((part) => part.trim())
     .find((part) => part.length >= 4 && part.length <= 18)
   return cleaned || text.slice(0, 16)
+}
+
+function splitClauses(text: string) {
+  return text
+    .split(/[\n，,。；;！!？?]+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+function inferStoreName(text: string) {
+  const explicit = text.match(/(?:店名|门店|品牌|店叫|叫做|名字是)[:：\s]*([\u4e00-\u9fa5A-Za-z0-9·&-]{2,18})/)
+  if (explicit?.[1]) return explicit[1].trim()
+
+  const first = splitClauses(text)[0] || ""
+  if (
+    first.length >= 2 &&
+    first.length <= 14 &&
+    !/(海报|活动|通知|祝福|第二杯|半价|折|元|优惠)/.test(first) &&
+    /(咖啡|茶|茶饮|养生|美容|美甲|美睫|皮肤管理|瑜伽|健身|餐厅|火锅|烘焙|摄影|宠物|门店|店|馆|社|中心|工作室)$/.test(first)
+  ) {
+    return first
+  }
+
+  return ""
+}
+
+function inferAudience(text: string) {
+  const giveMatch = text.match(/给([\u4e00-\u9fa5A-Za-z0-9·]{2,12})(?:发|看|用|送)/)
+  if (giveMatch?.[1]) return giveMatch[1].trim()
+  if (/老客|老顾客|会员/.test(text)) return "老顾客"
+  if (/新客|新顾客|第一次/.test(text)) return "新顾客"
+  const direct = text.match(/宝妈|学生|上班族|白领|情侣|亲子/)
+  return direct?.[0] || ""
+}
+
+function inferOfferText(text: string) {
+  const offer = text.match(
+    /(?:第[一二三四五六七八九十\d]+杯半价|买[一二三四五六七八九十\d]+送[一二三四五六七八九十\d]+|满\s*\d{1,5}\s*减\s*\d{1,5}|[一二三四五六七八九十\d](?:\.\d)?\s*折|(?:¥|￥)\s*\d{1,5}(?:\.\d+)?\s*元?|(?:^|[^\d])\d{1,5}(?:\.\d+)?\s*元(?:起|\/人|\/次)?|免费|免单|赠送|立减\s*\d{1,5})/,
+  )
+  if (offer?.[0]) return offer[0].replace(/^[^\d¥￥一二三四五六七八九十买满第免赠立]+/, "").trim()
+  if (/不卖东西|不做促销|祝福|节日快乐/.test(text)) return "节日祝福，不做促销"
+  return ""
+}
+
+function inferDateRange(text: string) {
+  const numeric = text.match(/\d{1,2}\s*月\s*\d{1,2}\s*(?:日|号)?(?:\s*(?:到|至|[-~—])\s*\d{1,2}\s*月\s*\d{1,2}\s*(?:日|号)?)?/)
+  if (numeric?.[0]) return numeric[0].replace(/\s+/g, "")
+  const festival = text.match(/本周|本月|周末|今天|明天|五一|端午|中秋|春节|暑假|国庆|七夕|520|母亲节|父亲节/)
+  return festival?.[0] || ""
+}
+
+function inferTopic(text: string, storeName = "") {
+  const clauses = splitClauses(text).filter((item) => item !== storeName)
+  const topic =
+    clauses.find((item) => /(活动|祝福|节日|通知|半价|折|优惠|新客|开业|上新|朋友圈)/.test(item)) ||
+    clauses.find((item) => item.length >= 4 && item.length <= 22)
+  return topic || firstShortPhrase(text)
 }
 
 function mergeAnswers(...items: Array<PosterIntakeAnswers | null | undefined>) {
@@ -367,10 +432,13 @@ export function buildPosterFieldsFromBrief(templateId: string, brief: PosterBrie
 
 export function buildAssistantMessage(brief: PosterBrief, missingFields: string[], recommendation: PosterRecommendation) {
   if (missingFields.length) {
-    return `我先帮你整理了：${brief.sourceSummary}。还差 ${missingFields.join("、")}。请直接补充这些信息，可以一句话写完。`
+    const missing = missingFields.slice(0, 3).join("、")
+    const topic = brief.campaignTitle || brief.projectName || brief.headline || brief.posterGoal
+    return `我先抓到「${topic}」。还差 ${missing}，你直接一句话补上就行。`
   }
 
-  return `信息已够。我推荐用「${recommendation.stylePreset}」风格和 ${recommendation.templateId} 模板，生成前请确认标题、权益、时间和 CTA。`
+  const checks = [brief.headline, brief.offerText, brief.dateRange, brief.cta].filter(Boolean).slice(0, 3).join("｜")
+  return `信息够了，适合做「${recommendation.stylePreset}」。先核对 ${checks}，没问题就点生成。`
 }
 
 export function shouldUseLlmFallback(answers: PosterIntakeAnswers, message: string, recommendation: PosterRecommendation) {

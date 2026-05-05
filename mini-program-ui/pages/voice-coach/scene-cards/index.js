@@ -1,7 +1,6 @@
 const { IP_FACTORY_BASE_URL } = require("../../../utils/config")
 const { request } = require("../../../utils/request")
 const {
-  buildSceneMeta,
   getSelectedSceneCard,
   normalizeSceneCard,
   saveSelectedSceneCard,
@@ -11,6 +10,67 @@ const { ensureTestSceneCard } = require("../test-scene-card")
 
 function safeText(value) {
   return String(value || "").trim()
+}
+
+function stripInternalMarker(value) {
+  return safeText(String(value || "").replace(/\s*\[voice-coach-test-[^\]]+\]\s*/g, " "))
+}
+
+function buildProjectMeta(card) {
+  if (isLegacyTestSceneCard(card)) {
+    return "品项 胶原抗衰护理 · 适合 初抗老 / 暗沉 / 紧致需求"
+  }
+
+  const bits = []
+  if (card && card.service_name) bits.push("品项 " + card.service_name)
+  if (card && card.customer_stage) bits.push("适合 " + card.customer_stage)
+  return bits.join(" · ")
+}
+
+function isLegacyTestSceneCard(card) {
+  const name = safeText(card && card.name)
+  return name.indexOf("测试场景卡") >= 0
+}
+
+function buildProjectDisplayName(card) {
+  const name = safeText(card && card.name)
+  if (!name) return ""
+  if (isLegacyTestSceneCard(card)) return "示例项目·胶原抗衰启动"
+  return name.replace(/场景卡/g, "项目卡").replace(/场景/g, "项目")
+}
+
+function buildProjectDisplayOverrides(card) {
+  if (!isLegacyTestSceneCard(card)) return {}
+  return {
+    displaySceneGoal: "胶原抗衰护理主打紧致、细腻和光泽感，重点练专业讲解、自然推荐和预期管理。",
+    displayFocusLabel: "项目原理 / 推荐切入 / 体验流程",
+    displayObjectionLabel: "价格有点高 / 怕没效果 / 想再考虑",
+  }
+}
+
+function buildProjectPitch(card) {
+  if (!card) return ""
+  if (isLegacyTestSceneCard(card)) {
+    return "胶原抗衰护理主打紧致、细腻和光泽感，重点练专业讲解、自然推荐和拒绝应对。"
+  }
+
+  const text = stripInternalMarker(card.notes || card.scene_goal)
+  if (!text) return "已整理成项目训练包，可练专业讲解、推荐切入和拒绝应对。"
+  return text.length > 72 ? text.slice(0, 72) + "..." : text
+}
+
+function mapProjectCard(item) {
+  const card = normalizeSceneCard(item)
+  return {
+    ...card,
+    ...buildProjectDisplayOverrides(card),
+    displayName: buildProjectDisplayName(card),
+    metaLabel: buildProjectMeta(card),
+    focusLabel: toTextList(card.focus_stages, 3).join(" / "),
+    objectionLabel: toTextList(card.target_objections, 3).join(" / "),
+    simplePitch: buildProjectPitch(card),
+    packTags: ["专业讲解", "推荐切入", "拒绝应对"],
+  }
 }
 
 Page({
@@ -45,15 +105,7 @@ Page({
       if (!res || !res.ok) throw new Error((res && res.error) || "加载失败")
 
       const selected = getSelectedSceneCard()
-      const cards = (res.cards || []).map((item) => {
-        const card = normalizeSceneCard(item)
-        return {
-          ...card,
-          metaLabel: buildSceneMeta(card),
-          focusLabel: toTextList(card.focus_stages, 3).join(" / "),
-          objectionLabel: toTextList(card.target_objections, 3).join(" / "),
-        }
-      })
+      const cards = (res.cards || []).map(mapProjectCard)
 
       this.setData({
         selectedId: selected && selected.id ? selected.id : "",
@@ -76,18 +128,12 @@ Page({
     this.setData({ creatingTestCard: true })
     try {
       const result = await ensureTestSceneCard(this.data.cards)
-      const card = normalizeSceneCard(result.card)
-      const mapped = {
-        ...card,
-        metaLabel: buildSceneMeta(card),
-        focusLabel: toTextList(card.focus_stages, 3).join(" / "),
-        objectionLabel: toTextList(card.target_objections, 3).join(" / "),
-      }
+      const mapped = mapProjectCard(result.card)
       const cards = [mapped].concat((this.data.cards || []).filter((item) => item.id !== mapped.id))
       this.setData({ cards })
       this.handleUse({ currentTarget: { dataset: { id: mapped.id } } })
     } catch (err) {
-      wx.showToast({ title: (err && err.message) || "生成测试场景卡失败", icon: "none" })
+      wx.showToast({ title: (err && err.message) || "生成示例项目失败", icon: "none" })
     } finally {
       this.setData({ creatingTestCard: false })
     }
@@ -102,7 +148,7 @@ Page({
 
     saveSelectedSceneCard(card)
     this.setData({ selectedId: id })
-    wx.showToast({ title: "已设为当前场景", icon: "success" })
+    wx.showToast({ title: "已设为当前项目", icon: "success" })
 
     if (!this.data.pickMode) return
 
@@ -121,37 +167,4 @@ Page({
     wx.navigateTo({ url: "/pages/voice-coach/scene-card-editor/index?id=" + encodeURIComponent(id) })
   },
 
-  handleDelete(e) {
-    const id = safeText(e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id)
-    if (!id) return
-
-    wx.showModal({
-      title: "删除场景卡",
-      content: "删除后不可恢复，确定删除这张场景卡吗？",
-      confirmText: "删除",
-      cancelText: "取消",
-      success: async (res) => {
-        if (!res.confirm) return
-
-        try {
-          const result = await request({
-            baseUrl: IP_FACTORY_BASE_URL,
-            url: "/api/mp/voice-coach/scene-cards/" + encodeURIComponent(id),
-            method: "DELETE",
-          })
-          if (!result || !result.ok) throw new Error((result && result.error) || "删除失败")
-
-          if (this.data.selectedId === id) {
-            saveSelectedSceneCard(null)
-            this.setData({ selectedId: "" })
-          }
-
-          wx.showToast({ title: "已删除", icon: "success" })
-          this.loadCards()
-        } catch (err) {
-          wx.showToast({ title: (err && err.message) || "删除失败", icon: "none" })
-        }
-      },
-    })
-  },
 })

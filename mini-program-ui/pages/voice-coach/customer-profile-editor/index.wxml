@@ -2,16 +2,10 @@
   <view class="vc-page-scroll-shell">
     <scroll-view class="page-scroll" scroll-y="true" enhanced="true" bounces="false" show-scrollbar="false">
       <view class="container">
-      <view class="hero fade-up">
-        <text class="eyebrow">顾客编辑</text>
-        <text class="title">把这位顾客写得像真的会走进门店</text>
-        <text class="subtitle">重点不是把字段填满，而是写清楚她会怎么问、为什么犹豫、什么点能建立信任。</text>
-
-        <view class="tips-row">
-          <view class="tips-pill">写具体的人，不写抽象客群</view>
-          <view class="tips-pill">优先记录顾虑与信任点</view>
-          <view class="tips-pill">方便训练时直接代入</view>
-        </view>
+      <view class="editor-top fade-up">
+        <text class="editor-eyebrow">顾客编辑</text>
+        <text class="editor-title">把这位顾客写得像真的会走进门店</text>
+        <text class="editor-subtitle">写清楚她会怎么问、为什么犹豫、什么点能建立信任。</text>
       </view>
 
       <view class="section fade-up delay-1">

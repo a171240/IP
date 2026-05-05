@@ -134,8 +134,45 @@ function fieldMap(fields: Record<string, string>, specs: PosterTemplateField[]) 
     acc[spec.key] = cleanFieldValue(fields, spec)
     return acc
   }, {})
-  if (fields._textStrictness) mapped._textStrictness = fields._textStrictness
+
+  for (const [key, value] of Object.entries(fields)) {
+    if (mapped[key] !== undefined) continue
+    const text = String(value ?? "").trim()
+    if (text) mapped[key] = text.slice(0, key.startsWith("_") ? 180 : 240)
+  }
+
   return mapped
+}
+
+function posterIndustry(fields: Record<string, string>) {
+  return (
+    fields._industry ||
+    fields._businessType ||
+    fields.industry ||
+    fields.shopType ||
+    fields.storeType ||
+    "本地生活门店"
+  )
+}
+
+function posterBusinessType(fields: Record<string, string>) {
+  return fields._businessType || fields.shopType || fields.storeType || posterIndustry(fields)
+}
+
+function campaignVisualContext(fields: Record<string, string>) {
+  const industry = posterIndustry(fields)
+  const businessType = posterBusinessType(fields)
+  const points = fields.sellingPoints || fields.highlights || "门店特色、服务细节和活动权益"
+  return {
+    taskType: `竖版 4:5 ${industry}节日活动海报`,
+    industryTheme: `${industry}｜${fields.campaignTitle || fields.headline || "节日活动"}`,
+    mainVisual: `${businessType}的真实产品、服务场景或门店环境作为主视觉，围绕“${fields.campaignTitle || "节日活动"}”和“${points}”展开。若是餐饮饮品，优先出现真实饮品、餐桌、吧台、门店氛围；若是零售产品，优先出现产品陈列和使用场景；若是服务门店，优先出现空间、工具、服务细节和顾客可感知的体验。不要生成与${industry}无关的其他行业人物、产品或服务道具。`,
+    sceneProps: `只使用与${industry}相关的真实道具、门店元素、产品细节、节日小物、礼盒、花束、卡片和优惠标签，画面要能一眼看出是${businessType}，不要混入无关行业元素。`,
+    style: `${fields._stylePreset || "高级节日活动"}，温暖、干净、真实商业摄影，高级但不冷淡，有节日氛围但不廉价；配色跟随行业和素材，不强行套用不相关行业配色。`,
+    layout: "标题在上方偏左或居中，主视觉占中部，优惠权益用精致标签突出，底部放活动时间、门店名和行动号召；信息层级清楚，手机端一眼能读懂。",
+    outputGoal: `让用户立刻知道这是一张${industry}活动海报，清楚看到活动主题、权益、时间和下一步动作。`,
+    emotion: "用户不是来猜行业的；画面必须先讲清楚这是哪类店、什么活动、为什么现在值得行动。",
+  }
 }
 
 function textRuleBlock(fields: Record<string, string>, extraRules: string[] = []) {
@@ -255,15 +292,16 @@ const templates: InternalPosterTemplate[] = [
       field("dateRange", "活动时间", "5.1-5.5", "5.1-5.5", 14),
     ],
     textSlots: [],
-    promptBuilder: (f) =>
-      visualBrief({
-        taskType: "竖版 4:5 美容门店节日活动海报",
-        industryTheme: "皮肤管理节日活动",
+    promptBuilder: (f) => {
+      const context = campaignVisualContext(f)
+      return visualBrief({
+        taskType: context.taskType,
+        industryTheme: context.industryTheme,
         size: "4:5",
-        mainVisual: "自然清透妆容的女性、精华瓶、面膜、花束和浅色礼盒组成高级活动主视觉。",
-        sceneProps: "丝绸、香薰、柔软毛巾、浅金贴纸、节日礼盒、柔光背景。",
-        style: "奶白、浅粉、香槟金，真实商业摄影，高级温柔，有节日氛围但不廉价。",
-        layout: "标题在上方偏左，人物或产品在右侧，优惠权益用精致标签突出，底部放活动时间和门店名。",
+        mainVisual: context.mainVisual,
+        sceneProps: context.sceneProps,
+        style: context.style,
+        layout: context.layout,
         textLines: [
           `门店：${f.storeName}`,
           `主标题：${f.campaignTitle}`,
@@ -271,12 +309,14 @@ const templates: InternalPosterTemplate[] = [
           `卖点：${f.sellingPoints}`,
           `优惠：${f.offerText}`,
           `时间：${f.dateRange}`,
+          f.cta || f._cta ? `行动号召：${f.cta || f._cta}` : "",
         ],
         textRules: templatesTextRules("price"),
-        outputGoal: "让活动有成交力，但仍然像专业门店的海报。",
-        emotion: "用户想趁节日前变好，但不想看到土味促销。",
+        outputGoal: context.outputGoal,
+        emotion: context.emotion,
         fields: f,
-      }),
+      })
+    },
     negativePrompt: commonNegativePrompt,
   },
   {

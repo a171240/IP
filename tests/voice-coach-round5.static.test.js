@@ -1,12 +1,22 @@
 const test = require("node:test")
 const assert = require("node:assert/strict")
 const fs = require("node:fs")
+const path = require("node:path")
 
-const submitRouteSource = fs.readFileSync(
-  "d:\\IP网站\\app\\api\\voice-coach\\sessions\\[sessionId]\\beautician-turn\\submit\\route.ts",
-  "utf8",
+const root = process.cwd()
+const read = (...parts) => fs.readFileSync(path.join(root, ...parts), "utf8")
+
+const submitRouteSource = read(
+  "app",
+  "api",
+  "voice-coach",
+  "sessions",
+  "[sessionId]",
+  "beautician-turn",
+  "submit",
+  "route.ts",
 )
-const sessionRouteSource = fs.readFileSync("d:\\IP网站\\app\\api\\voice-coach\\sessions\\route.ts", "utf8")
+const sessionRouteSource = read("app", "api", "voice-coach", "sessions", "route.ts")
 
 test("submit route returns turn_index on beautician_turn payloads", () => {
   const matches = submitRouteSource.match(/beautician_turn:\s*\{[\s\S]*?turn_index:/g) || []

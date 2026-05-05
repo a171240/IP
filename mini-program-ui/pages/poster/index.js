@@ -6,6 +6,7 @@ const { getDeviceId } = require("../../utils/device")
 
 const SIZE_OPTIONS = ["4:5", "3:4", "9:16", "16:9", "1:1"]
 const RESOLUTION_OPTIONS = ["1k", "2k"]
+const DEFAULT_RESOLUTION = "1k"
 const DEFAULT_SESSION_ID = `mp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 const PRIMARY_TEMPLATE_IDS = ["P01", "P02", "P03", "P04", "P05", "P10"]
 const MORE_TEMPLATE_IDS = ["P06", "P07", "P08", "P09", "P11", "P12"]
@@ -323,6 +324,20 @@ function decoratePosterHistory(posters, templates) {
   }))
 }
 
+function normalizeResolution(value, fallback = DEFAULT_RESOLUTION) {
+  const resolution = String(value || "").trim()
+  return RESOLUTION_OPTIONS.includes(resolution) ? resolution : fallback
+}
+
+function getResolutionIndex(value) {
+  return Math.max(0, RESOLUTION_OPTIONS.indexOf(normalizeResolution(value)))
+}
+
+function isImageTaskTimeout(error) {
+  const message = String(error?.message || error?.data?.error || error?.errMsg || "")
+  return message.includes("image_task_timeout") || message.includes("超时") || /timeout/i.test(message)
+}
+
 function buildChatMessage(role, text, extra = {}) {
   return {
     id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -350,9 +365,9 @@ Page({
     sizeOptions: SIZE_OPTIONS,
     resolutionOptions: RESOLUTION_OPTIONS,
     sizeIndex: 0,
-    resolutionIndex: 1,
+    resolutionIndex: getResolutionIndex(DEFAULT_RESOLUTION),
     size: "4:5",
-    resolution: "2k",
+    resolution: DEFAULT_RESOLUTION,
     isGenerating: false,
     isSaving: false,
     posterId: "",
@@ -362,14 +377,20 @@ Page({
     warnings: [],
     previewBoxStyle: buildPreviewBoxStyle(canvasForSize("4:5")),
     lastError: "",
+    isPosterHome: false,
 
     chatMessages: [
       {
         id: "msg_welcome",
         role: "assistant",
         type: "text",
-        text: "说一下你要做什么海报，我会追问缺的信息，够了就直接生成。",
+        text: "先说这张海报用来做什么，比如活动促销、节日祝福、门店通知或项目介绍；再补充时间、门店名和想要的感觉。缺 Logo 或门头图时，我再提醒你上传。",
       },
+    ],
+    quickPrompts: [
+      "五一新客补水 99 元，想要高级感",
+      "祝顾客五一快乐，温暖一点",
+      "门店通知海报，突出营业时间",
     ],
     chatScrollIntoView: "",
     draftText: "",
@@ -378,6 +399,7 @@ Page({
     transcribing: false,
     conversationLoading: false,
     workingText: "",
+    workingRole: "assistant",
 
     intakeMessage: "",
     intakeSessionId: DEFAULT_SESSION_ID,
@@ -398,6 +420,8 @@ Page({
   },
 
   onLoad() {
+    this._recordPressActive = false
+    this.recordTouchStartY = 0
     this.setupRecorder()
     this.loadTemplates()
     this.readStoreProfileSelection()
@@ -413,20 +437,25 @@ Page({
     this.recorder = wx.getRecorderManager()
     this._recordingStartedAt = 0
     this.recorder.onStart(() => {
+      if (!this._recordPressActive) return
       this._recordingStartedAt = Date.now()
       this.setData({
         recording: true,
         recordCanceling: false,
         workingText: "正在听你说...",
+        workingRole: "user",
       })
     })
     this.recorder.onStop((res) => this.handleRecordStop(res))
     this.recorder.onError(() => {
+      this._recordPressActive = false
+      this.recordTouchStartY = 0
       this.setData({
         recording: false,
         recordCanceling: false,
         transcribing: false,
         workingText: "",
+        workingRole: "assistant",
       })
       wx.showToast({ title: "录音失败，请再试一次", icon: "none" })
     })
@@ -441,12 +470,46 @@ Page({
     })
   },
 
-  setWorkingText(text) {
-    this.setData({ workingText: text || "" })
+  setWorkingText(text, role = "assistant") {
+    this.setData({
+      workingText: text || "",
+      workingRole: text ? role : "assistant",
+    })
+  },
+
+  handlePosterBack() {
+    const pages = typeof getCurrentPages === "function" ? getCurrentPages() : []
+    if (pages.length > 1) {
+      wx.navigateBack({ delta: 1 })
+      return
+    }
+    wx.switchTab({
+      url: "/pages/voice-coach/index",
+      fail: () => wx.reLaunch({ url: "/pages/voice-coach/index" }),
+    })
+  },
+
+  handleStartPoster() {
+    const lastMessage = this.data.chatMessages[this.data.chatMessages.length - 1]
+    this.setData({
+      isPosterHome: false,
+      chatScrollIntoView: lastMessage?.id || "",
+    })
+  },
+
+  handleStartWithAttach() {
+    this.handleStartPoster()
+    setTimeout(() => this.handleAttachTap(), 80)
   },
 
   onDraftInput(e) {
     this.setData({ draftText: e.detail.value })
+  },
+
+  async handleQuickPromptTap(e) {
+    const text = String(e?.currentTarget?.dataset?.text || "").trim()
+    if (!text || this.data.conversationLoading || this.data.isGenerating) return
+    await this.handleConversationText(text)
   },
 
   async handleSendText() {
@@ -494,53 +557,103 @@ Page({
     })
   },
 
-  async onRecordStart() {
+  async onRecordStart(e) {
     if (this.data.conversationLoading || this.data.transcribing || this.data.isGenerating) return
     if (!this.recorder) {
       wx.showToast({ title: "当前微信版本不支持录音", icon: "none" })
       return
     }
+    this._recordPressActive = true
+    this.recordTouchStartY = Number(
+      (e && e.touches && e.touches[0] && e.touches[0].clientY) ||
+        (e && e.changedTouches && e.changedTouches[0] && e.changedTouches[0].clientY) ||
+        0,
+    )
     try {
       await this.requestRecordPermission()
+      if (!this._recordPressActive) return
+      this._recordingStartedAt = Date.now()
+      this.setData({
+        recording: true,
+        recordCanceling: false,
+        workingText: "正在听你说...",
+        workingRole: "user",
+      })
       this.recorder.start(RECORDER_OPTIONS)
     } catch (error) {
+      this._recordPressActive = false
+      this.recordTouchStartY = 0
+      this.setData({
+        recording: false,
+        recordCanceling: false,
+        workingText: "",
+        workingRole: "assistant",
+      })
       wx.showToast({ title: error.message || "无法录音", icon: "none" })
     }
   },
 
   onRecordMove(e) {
+    if (!this._recordPressActive || !this.data.recording) return
     const touch = e.touches && e.touches[0]
-    const shouldCancel = touch ? touch.clientY < 120 : false
+    const y = touch ? Number(touch.clientY || 0) : 0
+    if (y && !this.recordTouchStartY) this.recordTouchStartY = y
+    const shouldCancel = y && this.recordTouchStartY ? this.recordTouchStartY - y > 70 : false
     if (shouldCancel !== this.data.recordCanceling) {
       this.setData({
         recordCanceling: shouldCancel,
         workingText: shouldCancel ? "松手取消" : "正在听你说...",
+        workingRole: "user",
       })
     }
   },
 
   onRecordEnd() {
+    this._recordPressActive = false
     if (!this.data.recording || !this.recorder) return
-    this.recorder.stop()
+    if (this.data.recordCanceling) {
+      this.onRecordCancel()
+      return
+    }
+    this.setData({
+      recording: false,
+      recordCanceling: false,
+      workingText: "正在识别语音...",
+      workingRole: "user",
+    })
+    try {
+      this.recorder.stop()
+    } catch (_error) {
+      this.setData({ workingText: "", workingRole: "assistant" })
+      wx.showToast({ title: "录音停止失败", icon: "none" })
+    }
   },
 
   onRecordCancel() {
+    this._recordPressActive = false
     if (!this.data.recording || !this.recorder) return
-    this.setData({ recordCanceling: true })
-    this.recorder.stop()
+    this.setData({ recording: false, recordCanceling: true, workingText: "", workingRole: "assistant" })
+    try {
+      this.recorder.stop()
+    } catch (_error) {}
   },
 
   async handleRecordStop(res) {
-    const durationSec = Math.max(1, Math.round((Date.now() - (this._recordingStartedAt || Date.now())) / 1000))
+    this._recordPressActive = false
+    this.recordTouchStartY = 0
+    const elapsedMs = Date.now() - (this._recordingStartedAt || Date.now())
+    const durationSec = res?.duration ? Math.round(res.duration / 1000) : Math.ceil(elapsedMs / 1000)
+    this._recordingStartedAt = 0
     const canceled = this.data.recordCanceling
     this.setData({
       recording: false,
       recordCanceling: false,
       workingText: canceled ? "" : "正在识别语音...",
+      workingRole: canceled ? "assistant" : "user",
     })
 
     if (canceled) return
-    if (!res?.tempFilePath || durationSec < 1) {
+    if (!res?.tempFilePath || elapsedMs < 800 || durationSec < 1) {
       wx.showToast({ title: "说话时间太短", icon: "none" })
       this.setWorkingText("")
       return
@@ -563,7 +676,7 @@ Page({
       })
       wx.showToast({ title: message, icon: "none" })
     } finally {
-      this.setData({ transcribing: false, workingText: "" })
+      this.setData({ transcribing: false, workingText: "", workingRole: "assistant" })
     }
   },
 
@@ -582,6 +695,7 @@ Page({
       conversationLoading: true,
       intakeLoading: true,
       workingText: "正在判断海报需求...",
+      workingRole: "assistant",
       lastError: "",
     })
 
@@ -602,6 +716,7 @@ Page({
       if (!res?.ok) throw new Error(res?.error || "整理失败")
 
       const recommendation = res.recommendation || {}
+      const nextRecommendation = Object.keys(recommendation).length ? recommendation : null
       const templateId = String(recommendation.templateId || "").trim()
       if (templateId && !this.data.templates.length) {
         await this.loadTemplates()
@@ -611,7 +726,7 @@ Page({
         this.applyTemplate(template, {
           fields: res.fields || {},
           size: recommendation.size || this.data.size,
-          resolution: recommendation.resolution || this.data.resolution,
+          resolution: this.data.resolution || DEFAULT_RESOLUTION,
         })
       }
 
@@ -620,15 +735,14 @@ Page({
         intakeAssistantMessage: res.assistantMessage || "",
         intakeMissingFields: Array.isArray(res.missingFields) ? res.missingFields : [],
         intakeReady: !!res.readyToConfirm,
-        intakeRecommendation: recommendation,
+        intakeRecommendation: nextRecommendation,
       })
 
       if (res.readyToConfirm) {
         this.appendChatMessage({
           role: "assistant",
-          text: "信息够了，我直接帮你生成。",
+          text: res.assistantMessage || "信息够了，先核对目标、素材和规格，确认后我再生成。",
         })
-        await this.handleGenerate({ fromChat: true })
       } else {
         this.appendChatMessage({
           role: "assistant",
@@ -648,6 +762,7 @@ Page({
         conversationLoading: false,
         intakeLoading: false,
         workingText: "",
+        workingRole: "assistant",
       })
     }
   },
@@ -692,9 +807,9 @@ Page({
       ? normalizeFieldsWithValues(normalized, options.fields)
       : normalizeFields(normalized)
     const size = options.size || normalized.defaultSize || "4:5"
-    const resolution = options.resolution || normalized.defaultResolution || "2k"
+    const resolution = normalizeResolution(options.resolution || DEFAULT_RESOLUTION)
     const sizeIndex = Math.max(0, SIZE_OPTIONS.indexOf(size))
-    const resolutionIndex = Math.max(0, RESOLUTION_OPTIONS.indexOf(resolution))
+    const resolutionIndex = getResolutionIndex(resolution)
     const canvas = canvasForSize(size)
     this.setData({
       selectedTemplateId: normalized.id,
@@ -744,6 +859,7 @@ Page({
 
   handleAttachTap() {
     if (this.data.conversationLoading || this.data.isGenerating || this.data.uploadingAssetKind) return
+    if (this.data.isPosterHome) this.setData({ isPosterHome: false })
     const itemList = wx.chooseMessageFile ? ["拍照 / 相册", "聊天文件"] : ["拍照 / 相册"]
     wx.showActionSheet({
       itemList,
@@ -852,7 +968,7 @@ Page({
     const resolutionIndex = Number(e.detail.value || 0)
     this.setData({
       resolutionIndex,
-      resolution: RESOLUTION_OPTIONS[resolutionIndex] || "2k",
+      resolution: RESOLUTION_OPTIONS[resolutionIndex] || DEFAULT_RESOLUTION,
     })
   },
 
@@ -864,7 +980,7 @@ Page({
     const fields = this.data.fields || {}
     return {
       ...fields,
-      templateId: this.data.selectedTemplateId || "",
+      templateId: this.data.intakeRecommendation ? this.data.selectedTemplateId || "" : "",
     }
   },
 
@@ -896,13 +1012,14 @@ Page({
       if (!res?.ok) throw new Error(res?.error || "整理失败")
 
       const recommendation = res.recommendation || {}
+      const nextRecommendation = Object.keys(recommendation).length ? recommendation : null
       const templateId = String(recommendation.templateId || "").trim()
       const template = this.data.templates.find((item) => item.id === templateId) || this.data.selectedTemplate
       if (template) {
         this.applyTemplate(template, {
           fields: res.fields || {},
           size: recommendation.size || this.data.size,
-          resolution: recommendation.resolution || this.data.resolution,
+          resolution: this.data.resolution || DEFAULT_RESOLUTION,
         })
       }
 
@@ -911,7 +1028,7 @@ Page({
         intakeAssistantMessage: res.assistantMessage || "",
         intakeMissingFields: Array.isArray(res.missingFields) ? res.missingFields : [],
         intakeReady: !!res.readyToConfirm,
-        intakeRecommendation: recommendation,
+        intakeRecommendation: nextRecommendation,
         showDetailFields: !res.readyToConfirm || this.data.showDetailFields,
       })
       wx.showToast({ title: res.readyToConfirm ? "已整理，可生成" : "已整理，请补信息", icon: "none" })
@@ -1026,6 +1143,12 @@ Page({
     const strictText = e?.currentTarget?.dataset?.strict === "1"
     const fromChat = !!e?.fromChat
     const { selectedTemplateId, selectedTemplateFields, fields, size, resolution } = this.data
+    if (!this.data.intakeReady && !this.data.posterImageUrl) {
+      const text = "先把海报目标、活动信息和参考素材补齐，再确认生成。"
+      if (fromChat) this.appendChatMessage({ role: "assistant", text })
+      else wx.showToast({ title: "先补齐信息", icon: "none" })
+      return
+    }
     if (!selectedTemplateId) {
       if (fromChat) {
         this.appendChatMessage({ role: "assistant", text: "我还没判断出这张海报的用途，你再说一下是获客、成交、活动还是品牌展示。" })
@@ -1055,26 +1178,54 @@ Page({
       isGenerating: true,
       lastError: "",
       workingText: fromChat ? "正在生成海报..." : this.data.workingText,
+      workingRole: fromChat ? "assistant" : this.data.workingRole,
     })
     try {
-      const res = await request({
-        baseUrl: IP_FACTORY_BASE_URL,
-        url: "/api/mp/posters/generate",
-        method: "POST",
-        data: {
-          mode: "template",
-          templateId: selectedTemplateId,
-          fields: {
-            ...fields,
-            ...(strictText ? { _textStrictness: "strict" } : {}),
-          },
-          prompt: "",
-          sessionId: this.data.intakeSessionId,
-          assetRefs: this.data.assetRefs.map(stripAssetRef),
-          size,
-          resolution,
+      const payload = {
+        mode: "template",
+        templateId: selectedTemplateId,
+        fields: {
+          ...fields,
+          ...(strictText ? { _textStrictness: "strict" } : {}),
         },
-      })
+        prompt: "",
+        sessionId: this.data.intakeSessionId,
+        assetRefs: this.data.assetRefs.map(stripAssetRef),
+        size,
+        resolution,
+      }
+
+      let fallbackResolutionUsed = false
+      let res
+      try {
+        res = await request({
+          baseUrl: IP_FACTORY_BASE_URL,
+          url: "/api/mp/posters/generate",
+          method: "POST",
+          data: payload,
+        })
+      } catch (error) {
+        if (resolution !== DEFAULT_RESOLUTION && isImageTaskTimeout(error)) {
+          fallbackResolutionUsed = true
+          this.setData({
+            resolution: DEFAULT_RESOLUTION,
+            resolutionIndex: getResolutionIndex(DEFAULT_RESOLUTION),
+            workingText: fromChat ? "高清生成超时，正在改用标准清晰度..." : this.data.workingText,
+            workingRole: fromChat ? "assistant" : this.data.workingRole,
+          })
+          res = await request({
+            baseUrl: IP_FACTORY_BASE_URL,
+            url: "/api/mp/posters/generate",
+            method: "POST",
+            data: {
+              ...payload,
+              resolution: DEFAULT_RESOLUTION,
+            },
+          })
+        } else {
+          throw error
+        }
+      }
 
       if (!res?.ok) throw new Error(res?.error || "海报生成失败")
 
@@ -1085,7 +1236,10 @@ Page({
         posterImageUrl,
         actualPrompt: res.prompt || "",
         negativePrompt: res.negativePrompt || "",
-        warnings: Array.isArray(res.warnings) ? res.warnings : ["请核对海报里的中文、价格和日期。"],
+        warnings: [
+          ...(fallbackResolutionUsed ? ["高清生成超时，已自动改用标准清晰度。"] : []),
+          ...(Array.isArray(res.warnings) ? res.warnings : ["请核对海报里的中文、价格和日期。"]),
+        ],
         previewBoxStyle: buildPreviewBoxStyle(res.overlay?.canvas || canvasForSize(size)),
       })
       if (fromChat) {
@@ -1113,6 +1267,7 @@ Page({
       this.setData({
         isGenerating: false,
         workingText: fromChat ? "" : this.data.workingText,
+        workingRole: fromChat ? "assistant" : this.data.workingRole,
       })
     }
   },

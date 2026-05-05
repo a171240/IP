@@ -1,161 +1,79 @@
-<view class="page page-mine mine-v2">
-  <view class="container mine-container">
-    <view class="hero mine-hero fade-up">
-      <view class="mine-hero-head">
-        <view class="mine-hero-copy">
-          <text class="eyebrow mine-eyebrow">账户中心</text>
-          <text class="title mine-title">我的</text>
-          <text class="subtitle mine-subtitle">账户、权益和常用服务集中在这里。</text>
-        </view>
-        <text class="status-pill mine-login-pill {{isLoggedIn ? 'status-pill-success' : 'status-pill-muted'}}">{{isLoggedIn ? '已登录' : '未登录'}}</text>
-      </view>
-
-      <view class="mine-account-band" wx:if="{{isLoggedIn}}">
-        <view class="mine-profile-main">
-          <image class="avatar" src="{{avatarUrl}}" mode="aspectFill" wx:if="{{avatarUrl}}" />
-          <view class="avatar avatar-fallback" wx:else>
-            <text>{{avatarInitial}}</text>
+<view class="page mine-home-v2">
+  <view class="mine-page-scroll-shell">
+    <scroll-view class="page-scroll" scroll-y="true" enhanced="true" bounces="false" refresher-enabled="{{false}}" show-scrollbar="false">
+      <view class="container">
+        <view class="mine-account-panel fade-up">
+          <view class="mine-heading">
+            <text class="mine-eyebrow">账户中心</text>
+            <text class="mine-title">我的</text>
           </view>
-          <view class="profile-info">
-            <text class="mine-profile-name">{{displayName}}</text>
-            <text class="mine-profile-note">微信账号已绑定，权益状态会自动同步</text>
+
+          <view class="mine-profile-band" wx:if="{{isLoggedIn}}">
+            <image class="mine-avatar" src="{{avatarUrl}}" mode="aspectFill" wx:if="{{avatarUrl}}" />
+            <view class="mine-avatar mine-avatar-fallback" wx:else>
+              <text>{{avatarInitial}}</text>
+            </view>
+            <view class="mine-profile-copy">
+              <text class="mine-profile-name">{{displayName}}</text>
+              <text class="mine-profile-note">权益自动同步</text>
+            </view>
           </view>
-        </view>
-        <view class="mine-account-actions">
-          <text class="mine-soft-chip">品牌账户</text>
-          <button class="btn-outline mine-logout-btn" size="mini" bindtap="handleLogout">退出</button>
-        </view>
-      </view>
 
-      <view class="mine-account-band mine-account-band-guest" wx:else>
-        <view class="mine-guest-copy">
-          <text class="mine-profile-name">登录后同步账户权益</text>
-          <text class="mine-profile-note">查看套餐、积分、订单和门店档案。</text>
-        </view>
-        <button class="btn-primary mine-login-btn" bindtap="handleLoginTap">微信一键登录</button>
-      </view>
-
-      <view class="mine-hero-service-rail">
-        <view class="mine-rail-item">
-          <text class="mine-rail-label">套餐</text>
-          <text class="mine-rail-value">{{isLoggedIn ? (planLabel || '同步中') : '登录后'}}</text>
-        </view>
-        <view class="mine-rail-item">
-          <text class="mine-rail-label">积分</text>
-          <text class="mine-rail-value">{{isLoggedIn ? (creditsUnlimited ? '不限' : creditsBalance) : '--'}}</text>
-        </view>
-        <view class="mine-rail-item">
-          <text class="mine-rail-label">订单</text>
-          <text class="mine-rail-value">{{isLoggedIn ? '可查看' : '待同步'}}</text>
-        </view>
-      </view>
-    </view>
-
-    <view class="section mine-section mine-benefit-section fade-up delay-1">
-      <view class="section-head mine-section-head">
-        <view>
-          <text class="section-title mine-section-title">订阅与积分</text>
-          <text class="section-copy mine-section-copy">会员权益放在最前面，购买动作保持唯一主入口。</text>
-        </view>
-      </view>
-
-      <view class="card membership-card mine-benefit-panel">
-        <view class="mine-benefit-top">
-          <view class="mine-benefit-copy">
-            <text class="panel-kicker mine-kicker">权益</text>
-            <text class="mine-benefit-title">当前套餐</text>
-            <text class="mine-benefit-note" wx:if="{{isLoggedIn}}">{{profileLoading ? '正在同步最新权益...' : '当前服务状态正常，可继续使用内容生成和训练能力。'}}</text>
-            <text class="mine-benefit-note" wx:else>登录后显示实时套餐、积分余额和服务状态。</text>
+          <view class="mine-profile-band" wx:else>
+            <view class="mine-avatar mine-avatar-fallback">
+              <text>微</text>
+            </view>
+            <view class="mine-profile-copy">
+              <text class="mine-profile-name">微信头像 / 昵称</text>
+              <text class="mine-profile-note">权益自动同步</text>
+            </view>
           </view>
-          <text class="mine-service-chip {{isLoggedIn ? 'mine-service-chip-on' : ''}}">{{isLoggedIn ? '服务中' : '待登录'}}</text>
-        </view>
 
-        <view class="mine-stat-grid" wx:if="{{isLoggedIn}}">
-          <view class="mine-stat-item">
-            <text class="mine-stat-label">套餐状态</text>
-            <text class="mine-stat-value">{{planLabel || '加载中...'}}</text>
-          </view>
-          <view class="mine-stat-item">
-            <text class="mine-stat-label">可用积分</text>
-            <text class="mine-stat-value">{{creditsUnlimited ? '不限' : creditsBalance}}</text>
+          <view class="mine-quick-row">
+            <view class="mine-quick-pill" bindtap="handleUpgrade">
+              <text>套餐</text>
+            </view>
+            <view class="mine-quick-pill" bindtap="handleUpgrade">
+              <text>积分</text>
+            </view>
+            <view class="mine-quick-pill" bindtap="handleOrders">
+              <text>订单</text>
+            </view>
           </view>
         </view>
 
-        <view class="mine-stat-grid" wx:else>
-          <view class="mine-stat-item">
-            <text class="mine-stat-label">套餐状态</text>
-            <text class="mine-stat-value">未同步</text>
+        <view class="mine-menu-stack fade-up delay-1">
+          <view class="mine-menu-card mine-menu-card-primary">
+            <view class="mine-menu-copy">
+              <text class="mine-menu-title">订阅与积分</text>
+              <text class="mine-menu-note">查看套餐、余量和升级入口</text>
+            </view>
+            <button class="mine-upgrade-btn" bindtap="handleUpgrade" wx:if="{{isLoggedIn}}">升级</button>
+            <button class="mine-upgrade-btn" bindtap="handleLoginTap" wx:else>登录</button>
           </view>
-          <view class="mine-stat-item">
-            <text class="mine-stat-label">可用积分</text>
-            <text class="mine-stat-value">--</text>
+
+          <view class="mine-menu-card" bindtap="handleOrders" wx:if="{{isLoggedIn}}">
+            <view class="mine-menu-copy">
+              <text class="mine-menu-title">订单记录</text>
+              <text class="mine-menu-note">购买、续费、开通状态</text>
+            </view>
           </view>
-        </view>
 
-        <button class="btn-primary mine-upgrade-btn" bindtap="handleUpgrade" wx:if="{{isLoggedIn}}">升级 / 购买</button>
-        <button class="btn-primary mine-upgrade-btn" bindtap="handleLoginTap" wx:else>登录查看权益</button>
-      </view>
-    </view>
-
-    <view class="section mine-section fade-up delay-2">
-      <view class="section-head mine-section-head">
-        <view>
-          <text class="section-title mine-section-title">订单记录</text>
-          <text class="section-copy mine-section-copy">订单只负责回看支付、续费和开通状态。</text>
-        </view>
-      </view>
-
-      <view class="card mine-surface-panel mine-order-panel">
-        <view class="mine-compact-row">
-          <view class="mine-row-main">
-            <text class="mine-row-label">订单</text>
-            <text class="mine-row-title">订单与开通记录</text>
-            <text class="mine-row-copy">确认购买结果是否生效，保留原有订单入口。</text>
+          <view class="mine-menu-card" bindtap="handleLoginTap" wx:else>
+            <view class="mine-menu-copy">
+              <text class="mine-menu-title">订单记录</text>
+              <text class="mine-menu-note">购买、续费、开通状态</text>
+            </view>
           </view>
-          <view class="mine-row-side">
-            <text class="mine-soft-chip">{{isLoggedIn ? '可查看' : '需登录'}}</text>
-            <button class="btn-outline mine-row-btn" bindtap="handleOrders" wx:if="{{isLoggedIn}}">查看订单</button>
-            <button class="btn-outline mine-row-btn" bindtap="handleLoginTap" wx:else>去登录</button>
+
+          <view class="mine-menu-card" bindtap="handleStoreProfiles">
+            <view class="mine-menu-copy">
+              <text class="mine-menu-title">设置与服务</text>
+              <text class="mine-menu-note">门店档案、进阶设置</text>
+            </view>
           </view>
         </view>
       </view>
-    </view>
-
-    <view class="section mine-section fade-up delay-2">
-      <view class="section-head mine-section-head">
-        <view>
-          <text class="section-title mine-section-title">设置与服务</text>
-          <text class="section-copy mine-section-copy">高频资料靠前，进阶能力降到更安静的位置。</text>
-        </view>
-      </view>
-
-      <view class="card mine-surface-panel mine-tools-panel">
-        <view class="mine-service-row mine-service-row-primary">
-          <view class="mine-row-main">
-            <text class="mine-row-label">门店</text>
-            <text class="mine-row-title">门店档案</text>
-            <text class="mine-row-copy">统一维护定位、项目和承诺，发文时直接复用。</text>
-          </view>
-          <view class="mine-row-side">
-            <text class="mine-soft-chip mine-sage-chip">常用</text>
-            <button class="btn-outline mine-row-btn" bindtap="handleStoreProfiles">管理档案</button>
-          </view>
-        </view>
-
-        <view class="mine-service-divider"></view>
-
-        <view class="mine-service-row mine-service-row-quiet">
-          <view class="mine-row-main">
-            <text class="mine-row-label">进阶</text>
-            <text class="mine-row-title">进阶设置</text>
-            <text class="mine-row-copy">P1-P10 工作流等低频能力继续保留，但不抢占权益焦点。</text>
-          </view>
-          <view class="mine-row-side">
-            <text class="mine-soft-chip">二级入口</text>
-            <button class="btn-outline mine-row-btn mine-quiet-btn" bindtap="handleAdvanced">打开进阶</button>
-          </view>
-        </view>
-      </view>
-    </view>
+    </scroll-view>
   </view>
 </view>

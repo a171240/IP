@@ -1,81 +1,133 @@
-<view class="page page-poster-chat">
-  <view class="chat-shell">
-    <view class="chat-top">
-      <view class="top-copy">
-        <text class="top-kicker">海报助手</text>
-        <text class="top-title">说需求，直接出图</text>
-        <text class="top-subtitle">我会追问缺的信息，够了就自动生成。</text>
+<view class="page poster-chat-page">
+  <view class="poster-chat-shell">
+    <view class="poster-chat-top">
+      <view class="poster-chat-heading">
+        <text class="poster-chat-title">海报助手</text>
+        <view class="poster-chat-subtitle">
+          <view class="poster-status-dot"></view>
+          <text>{{intakeReady ? '信息够了，点生成海报' : (assetRefs.length ? '已收到参考图，继续说需求' : '语音或文字直接说需求')}}</text>
+        </view>
       </view>
     </view>
 
     <scroll-view
-      class="chat-list"
-      scroll-y
-      scroll-with-animation
+      class="poster-chat-scroll"
+      scroll-y="true"
+      scroll-with-animation="true"
       scroll-into-view="{{chatScrollIntoView}}"
-      enhanced="{{true}}"
+      enhanced="true"
+      bounces="false"
+      refresher-enabled="{{false}}"
       show-scrollbar="{{false}}"
     >
-      <view class="chat-spacer"></view>
-
-      <block wx:for="{{chatMessages}}" wx:key="id">
-        <view id="{{item.id}}" class="chat-row {{item.role === 'user' ? 'is-user' : 'is-assistant'}}">
-          <view class="chat-avatar" wx:if="{{item.role !== 'user'}}">AI</view>
-          <view class="chat-bubble {{item.type === 'poster' ? 'is-poster' : ''}}">
-            <text wx:if="{{item.text}}" class="chat-text">{{item.text}}</text>
-            <view wx:if="{{item.type === 'poster' && item.imageUrl}}" class="poster-message">
-              <image class="poster-message-image" src="{{item.imageUrl}}" mode="widthFix" />
-              <view class="poster-actions">
-                <button class="ghost-btn" data-strict="1" bindtap="handleGenerate" loading="{{isGenerating}}">修正文字</button>
-                <button class="ghost-btn" bindtap="handleGenerate" loading="{{isGenerating}}">重做一张</button>
-                <button class="solid-btn" bindtap="handleSavePoster" loading="{{isSaving}}">保存</button>
+      <view class="poster-chat-list">
+        <block wx:for="{{chatMessages}}" wx:key="id">
+          <view id="{{item.id}}" class="poster-chat-message {{item.role === 'user' ? 'is-user' : 'is-ai'}}">
+            <view wx:if="{{item.role !== 'user'}}" class="poster-chat-avatar">AI</view>
+            <view class="poster-chat-bubble {{item.type === 'poster' ? 'has-poster' : ''}}">
+              <text wx:if="{{item.text}}" class="poster-chat-text">{{item.text}}</text>
+              <view wx:if="{{item.id === 'msg_welcome'}}" class="poster-prompt-chips">
+                <button
+                  wx:for="{{quickPrompts}}"
+                  wx:for-item="prompt"
+                  wx:key="*this"
+                  data-text="{{prompt}}"
+                  bindtap="handleQuickPromptTap"
+                  disabled="{{conversationLoading || isGenerating}}"
+                >
+                  {{prompt}}
+                </button>
               </view>
+              <image
+                wx:if="{{item.type === 'poster' && item.imageUrl}}"
+                class="poster-chat-image"
+                src="{{item.imageUrl}}"
+                mode="widthFix"
+              />
             </view>
           </view>
-        </view>
-      </block>
+        </block>
 
-      <view wx:if="{{workingText}}" id="msg_working" class="chat-row is-assistant">
-        <view class="chat-avatar">AI</view>
-        <view class="chat-bubble is-status">
-          <view class="typing-dot"></view>
-          <text class="chat-text">{{workingText}}</text>
+        <view wx:if="{{assetRefs.length}}" class="poster-inline-note">
+          <text>已上传 {{assetRefs.length}} 张参考图</text>
+          <button bindtap="handleAttachTap" disabled="{{conversationLoading || isGenerating || uploadingAssetKind}}">继续上传</button>
         </view>
+
+        <view wx:if="{{intakeReady && !posterImageUrl}}" class="poster-inline-action">
+          <view class="poster-inline-copy">
+            <text class="poster-inline-title">信息够了</text>
+            <text class="poster-inline-desc">确认后生成海报，生成前还可以继续补充文字或上传参考图。</text>
+          </view>
+          <button
+            class="poster-generate-btn"
+            bindtap="handleGenerate"
+            loading="{{isGenerating}}"
+            disabled="{{isGenerating}}"
+          >
+            生成海报
+          </button>
+        </view>
+
+        <view wx:if="{{posterImageUrl}}" class="poster-result-panel">
+          <image class="poster-result-image" src="{{posterImageUrl}}" mode="widthFix" />
+          <view class="poster-result-actions">
+            <button data-strict="1" bindtap="handleGenerate" loading="{{isGenerating}}">修字</button>
+            <button bindtap="handleGenerate" loading="{{isGenerating}}">重做</button>
+            <button class="is-primary" bindtap="handleSavePoster" loading="{{isSaving}}">保存</button>
+          </view>
+        </view>
+
+        <view wx:if="{{workingText}}" id="msg_working" class="poster-chat-message {{workingRole === 'user' ? 'is-user is-voice-working' : 'is-ai'}} is-working {{recordCanceling ? 'is-canceling' : ''}}">
+          <view wx:if="{{workingRole !== 'user'}}" class="poster-chat-avatar">AI</view>
+          <view class="poster-chat-bubble status-text">
+            <view class="typing-dot"></view>
+            <text>{{workingText}}</text>
+          </view>
+        </view>
+
+        <view wx:if="{{lastError}}" class="poster-error">{{lastError}}</view>
       </view>
-
-      <view wx:if="{{lastError}}" class="error-line">{{lastError}}</view>
-      <view class="bottom-spacer"></view>
     </scroll-view>
 
-    <view class="input-panel">
-      <view class="text-row">
-        <button class="attach-btn" bindtap="handleAttachTap" disabled="{{conversationLoading || isGenerating || uploadingAssetKind}}">+</button>
+    <view class="poster-composer">
+      <view wx:if="{{recording || transcribing || uploadingAssetKind}}" class="poster-compose-status">
+        {{recording ? (recordCanceling ? '松手取消录音' : '松开发送语音') : (transcribing ? '正在识别语音' : '正在上传参考素材')}}
+      </view>
+      <view class="poster-compose-row">
+        <button
+          class="poster-plus-btn"
+          bindtap="handleAttachTap"
+          disabled="{{conversationLoading || isGenerating || uploadingAssetKind}}"
+        >
+          +
+        </button>
         <input
-          class="chat-input"
+          class="poster-draft-input"
+          placeholder-class="poster-input-placeholder"
           value="{{draftText}}"
-          placeholder="也可以打字，例如：五一新客补水99元"
+          placeholder="说用途、内容、时间和风格"
           confirm-type="send"
           bindinput="onDraftInput"
           bindconfirm="handleSendText"
         />
-        <button class="send-btn" bindtap="handleSendText" disabled="{{!draftText || conversationLoading || isGenerating}}">发送</button>
+        <button
+          class="poster-voice-btn {{recording ? 'is-recording' : ''}} {{recordCanceling ? 'is-canceling' : ''}}"
+          bindtouchstart="onRecordStart"
+          catchtouchmove="onRecordMove"
+          bindtouchend="onRecordEnd"
+          bindtouchcancel="onRecordCancel"
+          disabled="{{conversationLoading || transcribing || isGenerating}}"
+        >
+          {{recordCanceling ? '松开取消' : (recording ? '松开发送' : (transcribing ? '识别中' : '按住说话'))}}
+        </button>
+        <button
+          class="poster-send-btn"
+          bindtap="handleSendText"
+          disabled="{{!draftText || conversationLoading || isGenerating}}"
+        >
+          发送
+        </button>
       </view>
-
-      <view class="attachment-row" wx:if="{{assetRefs.length}}">
-        <text class="attachment-text">已上传 {{assetRefs.length}} 张参考图</text>
-        <button class="attachment-clear" bindtap="handleClearAssets">清空</button>
-      </view>
-
-      <button
-        class="voice-btn {{recording ? 'is-recording' : ''}} {{recordCanceling ? 'is-canceling' : ''}}"
-        bindtouchstart="onRecordStart"
-        bindtouchmove="onRecordMove"
-        bindtouchend="onRecordEnd"
-        bindtouchcancel="onRecordCancel"
-        disabled="{{conversationLoading || transcribing || isGenerating}}"
-      >
-        {{recording ? (recordCanceling ? '松手取消' : '松开发送') : (transcribing ? '正在识别' : '按住说话')}}
-      </button>
     </view>
   </view>
 </view>

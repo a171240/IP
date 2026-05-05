@@ -1,12 +1,22 @@
 const test = require("node:test")
 const assert = require("node:assert/strict")
 const fs = require("node:fs")
+const path = require("node:path")
 
-const chatSource = fs.readFileSync("d:\\IP网站\\mini-program-ui\\pages\\voice-coach\\chat.js", "utf8")
-const jobsSource = fs.readFileSync("d:\\IP网站\\lib\\voice-coach\\jobs.server.ts", "utf8")
-const submitRouteSource = fs.readFileSync(
-  "d:\\IP网站\\app\\api\\voice-coach\\sessions\\[sessionId]\\beautician-turn\\submit\\route.ts",
-  "utf8",
+const root = process.cwd()
+const read = (...parts) => fs.readFileSync(path.join(root, ...parts), "utf8")
+
+const chatSource = read("mini-program-ui", "pages", "voice-coach", "chat.js")
+const jobsSource = read("lib", "voice-coach", "jobs.server.ts")
+const submitRouteSource = read(
+  "app",
+  "api",
+  "voice-coach",
+  "sessions",
+  "[sessionId]",
+  "beautician-turn",
+  "submit",
+  "route.ts",
 )
 
 test("http fallback success clears state after force polling completes", () => {

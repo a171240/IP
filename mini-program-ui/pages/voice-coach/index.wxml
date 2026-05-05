@@ -2,86 +2,41 @@
   <view class="vc-page-scroll-shell">
     <scroll-view class="page-scroll" scroll-y="true" enhanced="true" bounces="false" refresher-enabled="{{false}}" show-scrollbar="false">
       <view class="container">
-    <view class="hero vc-home-hero-v2 fade-up">
-      <view class="vc-home-copy">
-        <text class="eyebrow">训练入口</text>
-        <text class="title">训练更像真实接待</text>
-        <text class="subtitle">首页不讲概念，只保留训练启动、顾客与场景三个必要入口，让你更快进入状态。</text>
-      </view>
-
-      <view class="vc-home-band-v2">
-        <view class="vc-home-band-copy">
-          <text class="vc-band-label">当前建议</text>
-          <text class="vc-band-title">先用测试顾客和基础咨询场景跑通一次</text>
-          <text class="vc-band-note">先跑通一次完整流程，再切换到真实顾客和特定场景。</text>
-        </view>
-
-        <view class="vc-home-band-meta">
-          <text class="vc-home-band-chip">可直接开始</text>
-        </view>
-
-        <button class="btn-primary vc-home-start-btn" bindtap="handleStart">开始训练</button>
-      </view>
-    </view>
-
-    <view class="section fade-up delay-1">
-      <view class="section-head vc-home-section-head">
-        <view class="vc-home-section-copy">
-          <text class="section-title">训练资源</text>
-          <text class="section-caption">资源入口做得更轻，不继续堆说明内容。</text>
-        </view>
-        <text class="vc-home-section-pill">次级入口</text>
-      </view>
-
-      <view class="card vc-resource-panel-v2">
-        <view class="vc-resource-row">
-          <view class="vc-resource-main">
-            <text class="vc-resource-kicker">顾客</text>
-            <text class="vc-resource-title">顾客档案</text>
-            <text class="vc-resource-copy">先选一个真实顾客，训练时更容易带着目标和异议往前走。</text>
+        <view class="vc-plugin-hero fade-up">
+          <view class="vc-home-copy">
+            <text class="eyebrow">{{heroStatusLabel}}</text>
+            <view class="title">
+              <text wx:if="{{customerProfile}}">顾客就绪，</text>
+              <text wx:else>先定顾客，</text>
+              <text wx:if="{{customerProfile}}">直接开练</text>
+              <text wx:else>再练话术</text>
+            </view>
+            <text class="subtitle">{{heroSubtitle}}</text>
           </view>
-          <view class="vc-resource-action">
-            <text class="vc-resource-chip">已建 8 份</text>
-            <button class="btn-outline vc-inline-btn" bindtap="handleProfiles">进入顾客库</button>
+          <button class="vc-plugin-start-btn" bindtap="handleStart">{{startButtonText}}</button>
+        </view>
+
+        <view class="vc-plugin-stack fade-up delay-1">
+          <view class="vc-plugin-card vc-plugin-card-primary">
+            <view class="vc-plugin-card-main">
+              <text class="vc-plugin-card-title">顾客档案</text>
+              <text class="vc-plugin-card-copy">{{customerCardCopy}}</text>
+            </view>
+            <view class="vc-plugin-card-btn" bindtap="handleProfiles">{{customerCardAction}}</view>
+          </view>
+
+          <view class="vc-plugin-card vc-plugin-card-secondary">
+            <view class="vc-plugin-card-main">
+              <text class="vc-plugin-card-title">项目启动</text>
+              <text class="vc-plugin-card-copy">把新项目讲熟，练推荐和拒绝应对</text>
+            </view>
+            <view class="vc-plugin-card-btn" bindtap="handleSceneCards">项目卡</view>
+          </view>
+
+          <view class="vc-plugin-recent">
+            <text class="vc-plugin-recent-text">{{recentText}}</text>
           </view>
         </view>
-
-        <view class="vc-resource-divider"></view>
-
-        <view class="vc-resource-row">
-          <view class="vc-resource-main">
-            <text class="vc-resource-kicker">场景</text>
-            <text class="vc-resource-title">场景卡</text>
-            <text class="vc-resource-copy">先定义训练主题，避免一开口就跑偏到介绍产品本身。</text>
-          </view>
-          <view class="vc-resource-action">
-            <text class="vc-resource-chip">基础场景</text>
-            <button class="btn-outline vc-inline-btn" bindtap="handleSceneCards">进入场景库</button>
-          </view>
-        </view>
-      </view>
-    </view>
-
-    <view class="section fade-up delay-2">
-      <view class="section-head">
-        <view class="vc-home-section-copy">
-          <text class="section-title">最近练习</text>
-          <text class="section-caption">首页只保留一条轻量状态反馈，不做报告摘要卡。</text>
-        </view>
-      </view>
-
-      <view class="card vc-recent-panel-v2">
-        <view class="vc-recent-main">
-          <text class="vc-resource-kicker">最近完成</text>
-          <text class="vc-recent-title">基础咨询 · 首次到店顾客</text>
-          <text class="vc-recent-copy">上次完成于 2026-04-22 19:40，沟通稳定，追问略少。</text>
-        </view>
-        <view class="vc-recent-actions">
-          <text class="vc-recent-chip">训练完成</text>
-          <button class="btn-outline vc-recent-btn" bindtap="handleStart">继续练习</button>
-        </view>
-      </view>
-    </view>
       </view>
     </scroll-view>
   </view>

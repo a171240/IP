@@ -1,788 +1,265 @@
-.mine-v2 {
-  min-height: 100vh;
-  background:
-    radial-gradient(120% 110% at 0% 0%, rgba(188, 136, 116, 0.16) 0%, rgba(36, 25, 29, 0) 44%),
-    radial-gradient(120% 120% at 100% 0%, rgba(255, 241, 235, 0.08) 0%, rgba(36, 25, 29, 0) 42%),
-    linear-gradient(180deg, rgba(36, 25, 29, 0.98) 0rpx, rgba(53, 38, 43, 0.98) 610rpx, rgba(232, 222, 210, 0.98) 610rpx, rgba(239, 231, 221, 1) 100%);
+page {
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #21181c;
 }
 
-.mine-container {
-  padding: 48rpx 24rpx calc(170rpx + env(safe-area-inset-bottom));
+.mine-home-v2,
+.mine-home-v2 .mine-page-scroll-shell,
+.mine-home-v2 .page-scroll {
+  height: 100%;
+  overflow: hidden;
 }
 
-.mine-hero {
-  min-height: 660rpx;
-  padding: 46rpx 36rpx 36rpx;
-  border-radius: 40rpx;
+.mine-home-v2 {
+  background: #efe5d8;
+}
+
+.mine-home-v2 .container {
+  min-height: 100%;
+  padding: 85rpx 46rpx calc(188rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
   background:
-    radial-gradient(120% 130% at 100% 0%, rgba(188, 136, 116, 0.10) 0%, rgba(255, 255, 255, 0) 52%),
-    linear-gradient(180deg, rgba(48, 33, 37, 0.99) 0%, rgba(35, 25, 29, 0.99) 100%);
-  border: 1rpx solid rgba(220, 172, 150, 0.10);
+    linear-gradient(180deg, #21181c 0rpx, #21181c 900rpx, #efe5d8 900rpx, #efe5d8 100%);
+}
+
+.mine-home-v2 view,
+.mine-home-v2 text,
+.mine-home-v2 image,
+.mine-home-v2 button {
+  box-sizing: border-box;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
+  letter-spacing: 0;
+}
+
+.mine-account-panel {
+  position: relative;
+  height: 604rpx;
+  border-radius: 62rpx;
+  background: #2d2120;
+  border: 1rpx solid rgba(111, 75, 62, 0.22);
   box-shadow:
-    0 18rpx 36rpx rgba(34, 18, 20, 0.22),
-    inset 0 1rpx 0 rgba(255, 255, 255, 0.05);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+    0 28rpx 54rpx rgba(40, 31, 28, 0.24),
+    inset 0 1rpx 0 rgba(248, 241, 232, 0.04);
+  overflow: hidden;
 }
 
-.mine-hero-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 18rpx;
-}
-
-.mine-hero-copy {
-  min-width: 0;
-  flex: 1;
+.mine-heading {
+  position: absolute;
+  left: 58rpx;
+  top: 65rpx;
+  z-index: 1;
   display: flex;
   flex-direction: column;
 }
 
 .mine-eyebrow {
-  align-self: flex-start;
-  min-height: 38rpx;
-  padding: 0 15rpx;
-  margin-bottom: 18rpx;
-  border-color: rgba(220, 172, 150, 0.18);
-  background: rgba(255, 241, 235, 0.06);
-  box-shadow: none;
-  color: rgba(242, 236, 227, 0.86);
-  font-size: 17rpx;
-  line-height: 38rpx;
-  letter-spacing: 1.6rpx;
+  display: block;
+  min-height: 34rpx;
+  color: #f0d8c2;
+  font-size: 26rpx;
+  line-height: 34rpx;
+  font-weight: 800;
 }
 
 .mine-title {
-  margin-bottom: 14rpx;
+  display: block;
+  margin-top: 36rpx;
   color: #f7f2ea;
-  font-size: 54rpx;
-  line-height: 1.14;
-  letter-spacing: -0.8rpx;
-  text-shadow: none;
-}
-
-.mine-subtitle {
-  max-width: 16em;
-  color: rgba(237, 232, 223, 0.78);
-  font-size: 23rpx;
-  line-height: 1.76;
-  font-weight: 500;
-}
-
-.mine-login-pill {
-  flex-shrink: 0;
-  margin-top: 2rpx;
-  min-height: 42rpx;
-  border-radius: 999rpx;
-  font-size: 18rpx;
-  font-weight: 700;
-}
-
-.mine-account-band {
-  margin-top: 34rpx;
-  padding: 28rpx;
-  border-radius: 34rpx;
-  background:
-    radial-gradient(110% 110% at 50% 0%, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0) 54%),
-    linear-gradient(180deg, rgba(186, 132, 111, 0.96) 0%, rgba(156, 102, 84, 0.98) 100%);
-  border: 1rpx solid rgba(255, 239, 232, 0.18);
-  box-shadow:
-    0 14rpx 24rpx rgba(92, 55, 45, 0.14),
-    inset 0 1rpx 0 rgba(255, 255, 255, 0.10);
-}
-
-.mine-account-band-guest {
-  display: flex;
-  flex-direction: column;
-  gap: 22rpx;
-}
-
-.mine-profile-main {
-  display: flex;
-  align-items: center;
-  gap: 18rpx;
-  min-width: 0;
-}
-
-.avatar {
-  width: 104rpx;
-  height: 104rpx;
-  border-radius: 30rpx;
-  flex-shrink: 0;
-  border: 1rpx solid rgba(245, 240, 232, 0.28);
-  box-shadow:
-    0 12rpx 24rpx rgba(92, 55, 45, 0.14),
-    inset 0 1rpx 0 rgba(255, 255, 255, 0.08);
-}
-
-.avatar-fallback {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.16);
-}
-
-.avatar-fallback text {
-  color: #fbf7f0;
-  font-size: 30rpx;
-  font-weight: 700;
-  letter-spacing: 0.8rpx;
-}
-
-.profile-info,
-.mine-guest-copy {
-  min-width: 0;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 8rpx;
-}
-
-.mine-profile-name {
-  display: block;
-  color: #fbf7f0;
-  font-size: 30rpx;
-  line-height: 1.2;
-  font-weight: 700;
-  word-break: break-word;
-}
-
-.mine-profile-note {
-  display: block;
-  color: rgba(245, 240, 232, 0.82);
-  font-size: 21rpx;
-  line-height: 1.62;
-}
-
-.mine-account-actions {
-  margin-top: 22rpx;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16rpx;
-}
-
-.mine-soft-chip,
-.mine-service-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 40rpx;
-  padding: 0 14rpx;
-  border-radius: 999rpx;
-  border: 1rpx solid rgba(130, 107, 96, 0.12);
-  background: rgba(248, 242, 235, 0.82);
-  color: rgba(104, 88, 80, 0.92);
-  font-size: 18rpx;
-  line-height: 1.2;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.mine-sage-chip,
-.mine-service-chip-on {
-  color: rgba(138, 87, 73, 0.96);
-  background: rgba(241, 216, 204, 0.92);
-  border-color: rgba(190, 132, 111, 0.22);
-}
-
-.mine-logout-btn {
-  min-width: 112rpx;
-  color: #fbf7f0;
-  border-color: rgba(245, 240, 232, 0.24);
-  background: rgba(255, 255, 255, 0.08);
-  box-shadow: none;
-}
-
-.mine-login-btn {
-  margin-top: 0;
-  min-height: 82rpx;
-  border-radius: 24rpx;
-  color: #fbf7f0;
-  background: linear-gradient(180deg, rgba(188, 131, 110, 0.98) 0%, rgba(158, 101, 83, 1) 100%);
-  box-shadow:
-    0 10rpx 18rpx rgba(120, 73, 61, 0.14),
-    inset 0 1rpx 0 rgba(255, 255, 255, 0.08);
-}
-
-.mine-section {
-  margin-top: 72rpx;
-}
-
-.mine-v2 .mine-section.fade-up {
-  animation: none;
-  opacity: 1;
-  transform: none;
-}
-
-.mine-benefit-section {
-  margin-top: 64rpx;
-}
-
-.mine-section-head {
-  margin-bottom: 18rpx;
-  padding: 0 30rpx;
-}
-
-.mine-section-title {
-  color: #2b211d;
-  font-size: 38rpx;
-  line-height: 1.16;
-  letter-spacing: -0.6rpx;
-}
-
-.mine-section-copy {
-  max-width: 23em;
-  margin-top: 8rpx;
-  color: rgba(88, 72, 65, 0.78);
-  font-size: 22rpx;
-  line-height: 1.68;
-  font-weight: 500;
-}
-
-.mine-benefit-panel,
-.mine-surface-panel {
-  padding: 30rpx;
-  border-radius: 34rpx;
-  background: linear-gradient(180deg, rgba(247, 239, 229, 0.99) 0%, rgba(238, 227, 216, 0.99) 100%);
-  border: 1rpx solid rgba(108, 86, 77, 0.12);
-  box-shadow:
-    0 18rpx 32rpx rgba(71, 54, 47, 0.08),
-    0 4rpx 10rpx rgba(71, 54, 47, 0.04),
-    inset 0 1rpx 0 rgba(255, 255, 255, 0.56);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-
-.mine-benefit-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 18rpx;
-}
-
-.mine-benefit-copy {
-  min-width: 0;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 8rpx;
-}
-
-.mine-kicker,
-.mine-row-label {
-  display: inline-flex;
-  align-items: center;
-  color: rgba(176, 122, 105, 0.96);
-  font-size: 17rpx;
-  line-height: 1;
-  font-weight: 700;
-  letter-spacing: 1.5rpx;
-  text-transform: uppercase;
-}
-
-.mine-kicker::before,
-.mine-row-label::before {
-  content: "";
-  width: 28rpx;
-  height: 2rpx;
-  margin-right: 8rpx;
-  border-radius: 999rpx;
-  background: rgba(176, 122, 105, 0.76);
-}
-
-.mine-benefit-title {
-  display: block;
-  color: #2b211d;
-  font-size: 38rpx;
-  line-height: 1.18;
-  font-weight: 700;
-  letter-spacing: -0.6rpx;
-}
-
-.mine-benefit-note {
-  display: block;
-  max-width: 22em;
-  color: rgba(88, 72, 65, 0.78);
-  font-size: 22rpx;
-  line-height: 1.68;
-  font-weight: 500;
-}
-
-.mine-service-chip {
-  flex-shrink: 0;
-  margin-top: 2rpx;
-}
-
-.mine-stat-grid {
-  margin-top: 24rpx;
-  display: flex;
-  gap: 14rpx;
-}
-
-.mine-stat-item {
-  flex: 1 1 0;
-  min-width: 0;
-  padding: 22rpx 20rpx;
-  border-radius: 24rpx;
-  background: linear-gradient(180deg, rgba(252, 247, 240, 0.98) 0%, rgba(241, 233, 225, 0.96) 100%);
-  border: 1rpx solid rgba(98, 70, 67, 0.12);
-  box-shadow:
-    0 10rpx 22rpx rgba(26, 17, 19, 0.05),
-    inset 0 1rpx 0 rgba(255, 255, 255, 0.72);
-}
-
-.mine-stat-label {
-  display: block;
-  color: rgba(94, 75, 67, 0.72);
-  font-size: 19rpx;
+  font-size: 64rpx;
   line-height: 1.3;
   font-weight: 700;
 }
 
-.mine-stat-value {
-  display: block;
-  margin-top: 8rpx;
-  color: #2b211d;
-  font-size: 32rpx;
-  line-height: 1.2;
-  font-weight: 800;
-  word-break: break-word;
-}
-
-.mine-upgrade-btn {
-  margin-top: 24rpx;
-  min-height: 86rpx;
-  border-radius: 24rpx;
-  color: #fbf7f0;
-  background: linear-gradient(180deg, rgba(177, 126, 103, 0.98) 0%, rgba(150, 92, 72, 1) 100%);
-  box-shadow:
-    0 12rpx 22rpx rgba(124, 75, 58, 0.16),
-    inset 0 1rpx 0 rgba(255, 255, 255, 0.10);
-}
-
-.mine-order-panel,
-.mine-tools-panel {
-  padding: 18rpx;
-}
-
-.mine-compact-row,
-.mine-service-row {
-  display: flex;
-  justify-content: space-between;
+.mine-profile-band {
+  position: absolute;
+  left: 58rpx;
+  top: 273rpx;
+  z-index: 1;
+  width: 542rpx;
+  height: 185rpx;
+  padding: 0 42rpx;
+  border-radius: 54rpx;
+  display: grid;
+  grid-template-columns: 108rpx minmax(0, 1fr);
   align-items: center;
-  gap: 16rpx;
-  padding: 18rpx;
-  border-radius: 24rpx;
-  background: linear-gradient(180deg, rgba(252, 247, 240, 0.98) 0%, rgba(241, 233, 225, 0.96) 100%);
-  border: 1rpx solid rgba(98, 70, 67, 0.12);
+  gap: 36rpx;
+  background: #b88667;
   box-shadow:
-    0 10rpx 22rpx rgba(26, 17, 19, 0.05),
-    0 2rpx 8rpx rgba(26, 17, 19, 0.03),
-    inset 0 1rpx 0 rgba(255, 255, 255, 0.72);
+    0 16rpx 28rpx rgba(81, 48, 40, 0.18),
+    inset 0 1rpx 0 rgba(248, 241, 232, 0.16);
 }
 
-.mine-service-row-primary {
-  background: linear-gradient(180deg, rgba(251, 246, 239, 0.99) 0%, rgba(239, 231, 222, 0.98) 100%);
+.mine-avatar {
+  width: 108rpx;
+  height: 108rpx;
+  border-radius: 30rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff8ef;
+  overflow: hidden;
 }
 
-.mine-service-row-quiet {
-  background: transparent;
-  border-color: rgba(108, 86, 77, 0.10);
-  box-shadow: none;
+.mine-avatar-fallback text {
+  color: #b88667;
+  font-size: 34rpx;
+  line-height: 1;
+  font-weight: 800;
 }
 
-.mine-row-main {
+.mine-profile-copy {
   min-width: 0;
-  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 8rpx;
-}
-
-.mine-row-title {
-  display: block;
-  color: #2b211d;
-  font-size: 30rpx;
-  line-height: 1.18;
-  font-weight: 700;
-  letter-spacing: -0.4rpx;
-}
-
-.mine-row-copy {
-  display: block;
-  color: rgba(88, 72, 65, 0.78);
-  font-size: 21rpx;
-  line-height: 1.6;
-  font-weight: 500;
-}
-
-.mine-row-side {
-  width: 190rpx;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 10rpx;
-}
-
-.mine-row-side .mine-soft-chip {
-  align-self: flex-end;
-}
-
-.mine-row-btn {
-  width: 100%;
-  min-height: 70rpx;
-  margin-top: 0;
-  border: 0;
-  border-radius: 22rpx;
-  color: #fbf7f0;
-  background: linear-gradient(180deg, rgba(188, 131, 110, 0.98) 0%, rgba(158, 101, 83, 1) 100%);
-  box-shadow:
-    0 8rpx 16rpx rgba(120, 73, 61, 0.12),
-    inset 0 1rpx 0 rgba(255, 255, 255, 0.08);
-  font-size: 22rpx;
-  font-weight: 600;
-}
-
-.mine-quiet-btn {
-  color: rgba(96, 80, 72, 0.92);
-  border: 1rpx solid rgba(122, 99, 89, 0.14);
-  background: rgba(248, 242, 235, 0.72);
-  box-shadow:
-    inset 0 1rpx 0 rgba(255, 255, 255, 0.54),
-    0 6rpx 14rpx rgba(74, 58, 50, 0.04);
-}
-
-.mine-service-divider {
-  height: 1rpx;
-  margin: 16rpx 4rpx;
-  background: rgba(116, 95, 86, 0.10);
-}
-
-/* 2026-04-27 UI system pass: account center uses a warmer service palette,
-   separate from the creation red and draft mauve. */
-.mine-v2 {
-  background:
-    radial-gradient(120% 110% at 0% 0%, rgba(187, 142, 111, 0.15) 0%, rgba(34, 25, 24, 0) 44%),
-    radial-gradient(120% 120% at 100% 0%, rgba(244, 224, 195, 0.08) 0%, rgba(34, 25, 24, 0) 42%),
-    linear-gradient(180deg, rgba(34, 25, 24, 0.98) 0rpx, rgba(50, 37, 35, 0.98) 600rpx, rgba(232, 222, 210, 0.98) 600rpx, rgba(240, 232, 222, 1) 100%);
-}
-
-.mine-container {
-  padding-top: 44rpx;
-  padding-bottom: calc(188rpx + env(safe-area-inset-bottom));
-}
-
-.mine-hero {
-  min-height: 684rpx;
-  padding: 48rpx 38rpx 38rpx;
-  border-radius: 42rpx;
-  background:
-    radial-gradient(120% 130% at 100% 0%, rgba(190, 144, 111, 0.12) 0%, rgba(255, 255, 255, 0) 52%),
-    linear-gradient(180deg, rgba(45, 33, 32, 0.99) 0%, rgba(31, 24, 24, 0.99) 100%);
-  border-color: rgba(232, 190, 154, 0.10);
-}
-
-.mine-eyebrow {
-  min-height: 42rpx;
-  padding: 0 18rpx;
-  border-radius: 20rpx;
-  border-color: rgba(232, 190, 154, 0.18);
-  font-size: 18rpx;
-  line-height: 42rpx;
-}
-
-.mine-title {
-  font-size: 56rpx;
-  line-height: 1.12;
-  letter-spacing: 0;
-}
-
-.mine-account-band {
-  margin-top: 38rpx;
-  padding: 32rpx;
-  border-radius: 40rpx;
-  background:
-    radial-gradient(110% 110% at 50% 0%, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 54%),
-    linear-gradient(180deg, rgba(184, 134, 103, 0.96) 0%, rgba(142, 98, 78, 0.98) 100%);
 }
 
 .mine-profile-name {
-  font-size: 32rpx;
-}
-
-.mine-profile-note {
-  color: rgba(248, 241, 232, 0.84);
-}
-
-.mine-section {
-  margin-top: 64rpx;
-}
-
-.mine-benefit-section {
-  margin-top: 70rpx;
-}
-
-.mine-benefit-panel,
-.mine-surface-panel {
-  background: linear-gradient(180deg, rgba(248, 240, 230, 0.99) 0%, rgba(238, 228, 216, 0.99) 100%);
-  border-color: rgba(117, 88, 76, 0.12);
-}
-
-.mine-kicker,
-.mine-row-label {
-  color: rgba(151, 101, 79, 0.96);
-}
-
-.mine-kicker::before,
-.mine-row-label::before {
-  background: rgba(151, 101, 79, 0.70);
-}
-
-.mine-login-btn,
-.mine-upgrade-btn,
-.mine-row-btn {
-  background: linear-gradient(180deg, rgba(179, 128, 98, 0.98) 0%, rgba(142, 91, 70, 1) 100%);
-  box-shadow:
-    0 10rpx 20rpx rgba(111, 68, 50, 0.15),
-    inset 0 1rpx 0 rgba(255, 255, 255, 0.10);
-}
-
-.mine-service-chip-on,
-.mine-sage-chip {
-  color: rgba(94, 116, 82, 0.96);
-  background: rgba(222, 232, 212, 0.92);
-  border-color: rgba(133, 154, 116, 0.22);
-}
-
-.mine-soft-chip {
-  background: rgba(249, 243, 235, 0.86);
-}
-
-.mine-quiet-btn {
-  color: rgba(88, 74, 66, 0.92);
-}
-
-@media (max-width: 420rpx) {
-  .mine-hero-head,
-  .mine-benefit-top,
-  .mine-compact-row,
-  .mine-service-row {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .mine-login-pill,
-  .mine-service-chip {
-    align-self: flex-start;
-  }
-
-  .mine-account-actions {
-    align-items: stretch;
-  }
-
-  .mine-stat-grid {
-    flex-direction: column;
-  }
-
-  .mine-row-side {
-    width: 100%;
-    min-width: 0;
-    flex-direction: row;
-    align-items: center;
-    flex-wrap: wrap;
-  }
-
-  .mine-row-side .mine-soft-chip {
-    align-self: center;
-  }
-
-  .mine-row-btn {
-    width: auto;
-    min-width: 176rpx;
-    flex: 1 1 176rpx;
-    margin-left: auto;
-  }
-}
-
-/* 2026-04-27 account and service flattening pass. */
-.mine-account-band {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 132rpx;
-  align-items: center;
-  gap: 20rpx;
-  min-height: 192rpx;
-  padding: 26rpx 28rpx;
-  border-radius: 36rpx;
-}
-
-.mine-hero {
-  display: flex;
-  flex-direction: column;
-}
-
-.mine-profile-main {
-  align-items: center;
-  gap: 18rpx;
-}
-
-.mine-account-band .avatar {
-  width: 96rpx;
-  height: 96rpx;
-  border-radius: 28rpx;
-}
-
-.mine-account-band .profile-info {
-  gap: 7rpx;
-}
-
-.mine-account-band .mine-profile-name {
-  font-size: 32rpx;
-  line-height: 1.16;
-}
-
-.mine-account-band .mine-profile-note {
-  max-width: 18em;
-  font-size: 21rpx;
-  line-height: 1.45;
-}
-
-.mine-account-actions {
-  height: 100%;
-  margin-top: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: center;
-  gap: 12rpx;
-}
-
-.mine-account-actions .mine-soft-chip {
-  align-self: stretch;
-  min-height: 38rpx;
-  padding: 0 10rpx;
-  font-size: 17rpx;
-  background: rgba(255, 248, 240, 0.72);
-  border-color: rgba(255, 248, 240, 0.18);
-  color: rgba(93, 65, 54, 0.88);
-}
-
-.mine-logout-btn {
-  width: 100%;
-  min-width: 0;
-  min-height: 58rpx;
-  padding: 0 12rpx;
-  border-radius: 18rpx;
-  color: rgba(255, 249, 242, 0.92);
-  background: rgba(73, 49, 42, 0.18);
-  border-color: rgba(255, 248, 240, 0.18);
-}
-
-.mine-order-panel,
-.mine-tools-panel {
-  padding: 0;
-  overflow: visible;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-.mine-tools-panel {
-  display: grid;
-  gap: 16rpx;
-}
-
-.mine-service-divider {
-  display: none;
-}
-
-.mine-compact-row,
-.mine-service-row,
-.mine-service-row-primary,
-.mine-service-row-quiet {
-  padding: 28rpx;
-  border-radius: 32rpx;
-  background:
-    radial-gradient(96% 86% at 100% 0%, rgba(255, 255, 255, 0.50) 0%, rgba(255, 255, 255, 0) 42%),
-    linear-gradient(180deg, rgba(252, 247, 240, 0.99) 0%, rgba(242, 234, 225, 0.98) 100%);
-  border: 1rpx solid rgba(110, 88, 78, 0.12);
-  box-shadow:
-    0 14rpx 28rpx rgba(46, 35, 31, 0.06),
-    0 2rpx 8rpx rgba(46, 35, 31, 0.03),
-    inset 0 1rpx 0 rgba(255, 255, 255, 0.72);
-}
-
-.mine-row-side {
-  width: 176rpx;
-  gap: 9rpx;
-}
-
-.mine-row-btn {
-  min-height: 64rpx;
-  border-radius: 20rpx;
-}
-
-.mine-hero-service-rail {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10rpx;
-  margin-top: 24rpx;
-  padding: 10rpx;
-  border-radius: 26rpx;
-  background:
-    radial-gradient(110% 100% at 50% 0%, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0) 56%),
-    rgba(255, 247, 239, 0.055);
-  border: 1rpx solid rgba(255, 247, 239, 0.10);
-}
-
-.mine-rail-item {
-  min-width: 0;
-  padding: 13rpx 10rpx 12rpx;
-  border-radius: 20rpx;
-  background: rgba(255, 247, 239, 0.065);
-  border: 1rpx solid rgba(255, 247, 239, 0.08);
-}
-
-.mine-rail-label,
-.mine-rail-value {
   display: block;
-  text-align: center;
+  color: #fff8ef;
+  font-size: 31rpx;
+  line-height: 1.3;
+  font-weight: 800;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.mine-rail-label {
-  color: rgba(244, 232, 222, 0.56);
-  font-size: 16rpx;
-  line-height: 1.2;
-  font-weight: 700;
+.mine-profile-note {
+  display: block;
+  margin-top: 8rpx;
+  color: rgba(255, 248, 239, 0.78);
+  font-size: 23rpx;
+  line-height: 1.3;
+  font-weight: 500;
 }
 
-.mine-rail-value {
-  margin-top: 6rpx;
-  color: rgba(255, 248, 240, 0.92);
-  font-size: 20rpx;
-  line-height: 1.2;
-  font-weight: 700;
+.mine-quick-row {
+  position: absolute;
+  left: 58rpx;
+  top: 496rpx;
+  z-index: 1;
+  width: 542rpx;
+  display: grid;
+  grid-template-columns: repeat(3, 162rpx);
+  gap: 28rpx;
 }
 
-@media (max-width: 420rpx) {
-  .mine-account-band {
-    grid-template-columns: 1fr;
-    min-height: 0;
+.mine-quick-pill {
+  height: 77rpx;
+  border-radius: 31rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 248, 239, 0.13);
+}
+
+.mine-quick-pill text {
+  color: #fff8ef;
+  font-size: 24rpx;
+  line-height: 1;
+  font-weight: 800;
+}
+
+.mine-menu-stack {
+  position: relative;
+  z-index: 2;
+  margin-top: 70rpx;
+  display: grid;
+  gap: 50rpx;
+}
+
+.mine-menu-card {
+  min-height: 207rpx;
+  padding: 54rpx 60rpx;
+  border-radius: 54rpx;
+  display: flex;
+  align-items: center;
+  background: #f8f0e8;
+  border: 1rpx solid #d8c8bb;
+  box-shadow:
+    0 16rpx 34rpx rgba(40, 31, 28, 0.08),
+    inset 0 1rpx 0 rgba(244, 236, 228, 0.82);
+}
+
+.mine-menu-card-primary {
+  min-height: 223rpx;
+  padding-top: 0;
+  padding-bottom: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 162rpx;
+  align-items: center;
+  gap: 28rpx;
+}
+
+.mine-menu-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mine-menu-title {
+  display: block;
+  color: #281f1c;
+  font-size: 38rpx;
+  line-height: 1.25;
+  font-weight: 800;
+}
+
+.mine-menu-note {
+  display: block;
+  margin-top: 13rpx;
+  color: #6e605a;
+  font-size: 25rpx;
+  line-height: 1.35;
+  font-weight: 400;
+}
+
+.mine-upgrade-btn {
+  width: 162rpx;
+  height: 86rpx;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 43rpx;
+  color: #fff8ef;
+  background: #b88667;
+  box-shadow:
+    0 10rpx 20rpx rgba(95, 55, 48, 0.14),
+    inset 0 1rpx 0 rgba(248, 241, 232, 0.16);
+  font-size: 26rpx;
+  line-height: 86rpx;
+  font-weight: 800;
+}
+
+button::after {
+  border: none;
+}
+
+button:active,
+.mine-menu-card:active,
+.mine-quick-pill:active {
+  opacity: 0.94;
+}
+
+.fade-up {
+  animation: mineFadeUp 360ms ease both;
+}
+
+.delay-1 {
+  animation-delay: 60ms;
+}
+
+@keyframes mineFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(10rpx);
   }
 
-  .mine-account-actions {
-    height: auto;
-    flex-direction: row;
-  }
-
-  .mine-account-actions .mine-soft-chip,
-  .mine-logout-btn {
-    flex: 1 1 0;
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
