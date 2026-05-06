@@ -11,6 +11,8 @@ git clone https://github.com/a171240/meiye-huajing-miniprogram.git
 cd meiye-huajing-miniprogram
 ```
 
+这个仓库是 private。Mac 上需要先登录有权限的 GitHub 账号，再 clone。
+
 后端/API：
 
 ```bash
@@ -18,6 +20,8 @@ git clone https://github.com/a171240/IP.git
 cd IP
 git checkout codex/mp-ui-gptpro-handoff
 ```
+
+后端当前进度在分支 `codex/mp-ui-gptpro-handoff` 和 Draft PR `https://github.com/a171240/IP/pull/14`，还没有合并到 `main`。Mac 上不要只拉 `main`。
 
 Windows 上的 `E:\美业话镜` 只是小程序前端仓库的旧本地路径；`D:\IP网站` 只是后端仓库的旧本地路径。Mac 上没有 D/E 盘，不需要照着盘符找。
 
@@ -132,9 +136,11 @@ Windows 上的 `E:\美业话镜` 只是小程序前端仓库的旧本地路径�
 - `store_name`
 - `service_plan_label`
 
+同一个 Supabase 项目里不要重复手动执行这份迁移。迁移文件留在仓库中，是为了后续环境重建和审计。
+
 ### Vercel
 
-已从 `D:\IP网站` 部署生产：
+已从后端仓库本地工作树部署生产：
 
 - project：`ip`
 - deployment：`dpl_AGFL5gqZ2LLkijEMyvPLBMRi81ko`
@@ -149,6 +155,8 @@ Windows 上的 `E:\美业话镜` 只是小程序前端仓库的旧本地路径�
 - `GET https://ip.ipgongchang.xin/api/mp/billing/quote`
 - 返回 `401 {"ok":false,"error":"请先登录","code":"auth_required"}`
 - 说明新路由已上线，鉴权链路正常。
+
+后续补交接文档的提交不需要重新部署 Vercel，因为它们不影响 API 运行。真正改 `app/api/*`、`lib/*` 或环境配置时再部署。
 
 ## 当前扣点表
 
@@ -195,3 +203,10 @@ Vercel 构建：
 2. 补一个后台页面或管理脚本，用于给公司、门店、员工账号绑定 `mp_account_memberships`。
 3. 生成视频仍需等成本模型稳定后再从“按实际成本”落成固定扣点或阶梯扣点。
 4. 如果继续做 P1-P10 工作流，不要混进当前小程序 AI 点体系，另开规则版本。
+
+## 本次没有纳入的内容
+
+- 后端仓库里的 `mini-program-ui` 本地改动没有纳入本次小程序前端交接；当前前端以 `a171240/meiye-huajing-miniprogram` 为准。
+- 后端仓库里 `voice-coach-ws` 的本地配置改动没有纳入本次提交。
+- 临时截图、预览目录、插件生成物没有纳入 Git。
+- 后端 PR 是 Draft，适合 Mac 接手继续检查；准备合并前再确认是否需要把其它未提交改动另开 PR。
