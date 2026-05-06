@@ -17,6 +17,26 @@ export type BeautyNarratorId =
   | "local_observer"
   | "store_operator"
 
+export type BeautyCoverStyleId =
+  | "soft-minimal-poster"
+  | "editorial-magazine"
+  | "clean-info-card"
+  | "warm-dialog-card"
+  | "contrast-warning-poster"
+  | "comparison-split-card"
+  | "lifestyle-spa-scene"
+  | "premium-still-life"
+
+export type BeautyCoverVisualPlan = {
+  id: BeautyCoverStyleId
+  label: string
+  reason: string
+  layout: string
+  palette: string
+  visualCue: string
+  typography: string
+}
+
 export type BeautyContext = {
   contentType: BeautyXhsContentType
   contentTypeLabel: string
@@ -35,12 +55,94 @@ export type BeautyContext = {
   complaintAngles: string[]
   contentStrategy: string
   coverTemplateBias: "warm-poster" | "hand-note" | "dialog-bubble"
+  coverVisualPlan: BeautyCoverVisualPlan
 }
 
 const COMMON_NEGATIVE_PROMPT = [
   "人物照片，产品图，英文字母，二维码，水印，logo，电话，微信号，平台界面，价格，优惠，地址，复杂背景，",
   "文字变形扭曲，文字模糊，错别字，乱码，多余文字，小字密集，冷色科技感，3D效果，卡通风格，廉价促销风",
 ].join("")
+
+const COVER_VISUAL_STYLE_IDS: BeautyCoverStyleId[] = [
+  "soft-minimal-poster",
+  "editorial-magazine",
+  "clean-info-card",
+  "warm-dialog-card",
+  "contrast-warning-poster",
+  "comparison-split-card",
+  "lifestyle-spa-scene",
+  "premium-still-life",
+]
+
+const COVER_VISUAL_STYLES: Record<
+  BeautyCoverStyleId,
+  Omit<BeautyCoverVisualPlan, "id" | "reason"> & { bestFor: string }
+> = {
+  "soft-minimal-poster": {
+    label: "温柔极简海报",
+    bestFor: "补水、敏感、泛红、基础护理、语气温和的体验内容",
+    layout: "居中大标题，副标题靠下，四周留白充足，手机端一眼读完",
+    palette: "暖米白、浅杏、低饱和玫瑰色，整体明亮干净",
+    visualCue: "柔软纸张质感、轻微护理氛围、无人物无产品的抽象暖光背景",
+    typography: "现代中文黑体，主标题加粗，副标题中等字重，字距正常",
+  },
+  "editorial-magazine": {
+    label: "高级杂志封面",
+    bestFor: "本地找店、体验复盘、老客视角、轻专业内容",
+    layout: "杂志封面式排版，顶部小栏目，中部主标题，下方一句副标题",
+    palette: "象牙白、深咖、雾粉或鼠尾草绿，低饱和但有层次",
+    visualCue: "生活方式杂志摄影感、柔和自然光、干净护理空间的局部氛围",
+    typography: "标题用精致中文黑体，副标题更轻，保持高级留白",
+  },
+  "clean-info-card": {
+    label: "清晰知识卡",
+    bestFor: "科普、流程、判断标准、问题修复、需要讲清楚步骤的内容",
+    layout: "单页信息卡，主标题在上，2-3个简短信息块在中下部，不做多页长图",
+    palette: "奶油白、浅茶色、少量薄荷绿或珊瑚色作强调",
+    visualCue: "干净信息图卡片、细线分隔、轻量图标感但不要卡通",
+    typography: "中文无衬线，主次层级清楚，小字尽量少且放大",
+  },
+  "warm-dialog-card": {
+    label: "温和对话卡",
+    bestFor: "信任怀疑、拒绝推销、顾客顾虑、边界感表达",
+    layout: "像对话重点摘录，不做真实聊天软件界面，标题气泡最大",
+    palette: "暖白、柔杏、深棕文字，少量陶土色强调",
+    visualCue: "柔和气泡块、便签层次、真实但克制的沟通氛围",
+    typography: "圆润中文黑体，标题清晰，避免手写潦草",
+  },
+  "contrast-warning-poster": {
+    label: "克制警示海报",
+    bestFor: "避雷、踩坑、风险提醒、推销套路，但不做廉价促销风",
+    layout: "强标题占上半区，副标题作判断标准，少量警示色块，不做报纸拼贴",
+    palette: "米白、炭黑、陶土红，红色只作重点提醒",
+    visualCue: "编辑部警示海报感、清晰边框、强对比但不恐吓",
+    typography: "粗体中文黑体，标题醒目，副标题保持清晰克制",
+  },
+  "comparison-split-card": {
+    label: "左右对比卡",
+    bestFor: "对比、选择困难、两类人、两种方案、前后判断",
+    layout: "左右或上下双栏对比，标题在上，两个分区标签清楚",
+    palette: "暖白底，一侧浅杏，一侧浅绿或浅蓝灰，整体低饱和",
+    visualCue: "清爽分栏信息卡、简短对照、明确视觉秩序",
+    typography: "中文黑体，栏目标题加粗，正文只保留短句",
+  },
+  "lifestyle-spa-scene": {
+    label: "暖光护理场景",
+    bestFor: "SPA、肩颈、按摩、头疗、放松养护、情绪修复",
+    layout: "大面积真实护理氛围背景，上方或中部叠加清晰标题文字",
+    palette: "暖棕、奶油白、浅金、柔和阴影",
+    visualCue: "photorealistic 生活方式摄影感，热毛巾、柔光、护理空间局部，不出现人物脸",
+    typography: "标题用清晰中文黑体，白色或深棕高对比，文字区域有留白",
+  },
+  "premium-still-life": {
+    label: "高级静物海报",
+    bestFor: "项目质感、活动但不促销、护理体验、品牌感较强的内容",
+    layout: "静物/材质氛围在下或侧边，标题居中偏上，副标题作为细小解释",
+    palette: "奶油、琥珀、深棕、少量玫瑰金，不要艳丽",
+    visualCue: "高端护理静物、柔光、织物/石材/水波纹理，不出现具体产品瓶身",
+    typography: "高级中文无衬线，主标题大而稳，副标题简短",
+  },
+}
 
 const ENTRY_PACKS: Record<
   BeautyEntryClass,
@@ -224,6 +326,104 @@ export function conflictLabel(level: BeautyConflictLevel): string {
   return "标准"
 }
 
+function isCoverStyleId(value: string): value is BeautyCoverStyleId {
+  return (COVER_VISUAL_STYLE_IDS as string[]).includes(value)
+}
+
+function selectCoverStyleId(opts: {
+  contentType: BeautyXhsContentType
+  conflictLevel: BeautyConflictLevel
+  entryClass: BeautyEntryClass
+  text: string
+}): BeautyCoverStyleId {
+  const text = opts.text
+
+  if (opts.contentType === "comparison") return "comparison-split-card"
+  if (opts.contentType === "promotion" || opts.conflictLevel === "hard") return "contrast-warning-poster"
+  if (opts.entryClass === "trust_doubt") return "warm-dialog-card"
+  if (opts.entryClass === "relax_care") return "lifestyle-spa-scene"
+  if (opts.entryClass === "local_decision") return "editorial-magazine"
+  if (opts.entryClass === "boundary_risk") return "clean-info-card"
+  if (opts.contentType === "education") return "clean-info-card"
+  if (includesAny(text, ["补水", "敏感", "泛红", "干", "舒缓", "修护"])) return "soft-minimal-poster"
+  if (includesAny(text, ["活动", "老客", "体验", "护理"])) return "premium-still-life"
+
+  return "clean-info-card"
+}
+
+function buildCoverStyleReason(opts: {
+  id: BeautyCoverStyleId
+  contentType: BeautyXhsContentType
+  entryClass: BeautyEntryClass
+  conflictLevel: BeautyConflictLevel
+}) {
+  if (opts.id === "comparison-split-card") return "正文在帮顾客做选择，对比卡能最快讲清两种情况。"
+  if (opts.id === "contrast-warning-poster") return "正文带避雷或强提醒，需要醒目但克制的警示视觉。"
+  if (opts.id === "warm-dialog-card") return "正文在处理顾客顾虑和信任问题，对话卡更像真实沟通。"
+  if (opts.id === "lifestyle-spa-scene") return "正文偏放松养护，暖光护理场景更能传达休息感。"
+  if (opts.id === "editorial-magazine") return "正文偏本地决策或体验复盘，杂志封面感更稳、更像可收藏内容。"
+  if (opts.id === "soft-minimal-poster") return "正文偏温和护理或皮肤状态修复，极简暖调能减少压迫感。"
+  if (opts.id === "premium-still-life") return "正文偏体验质感，静物海报能保留高级感且避免促销味。"
+  return "正文需要讲清判断标准，知识卡能提升手机端可读性。"
+}
+
+function buildCoverVisualPlan(opts: {
+  contentType: BeautyXhsContentType
+  conflictLevel: BeautyConflictLevel
+  entryClass: BeautyEntryClass
+  text: string
+}): BeautyCoverVisualPlan {
+  const id = selectCoverStyleId(opts)
+  const preset = COVER_VISUAL_STYLES[id]
+  return {
+    id,
+    label: preset.label,
+    reason: buildCoverStyleReason({ ...opts, id }),
+    layout: preset.layout,
+    palette: preset.palette,
+    visualCue: preset.visualCue,
+    typography: preset.typography,
+  }
+}
+
+export function resolveCoverVisualPlan(
+  ctx: BeautyContext,
+  styleId?: string | null,
+  styleReason?: string | null
+): BeautyCoverVisualPlan {
+  const id = isCoverStyleId(String(styleId || "")) ? (styleId as BeautyCoverStyleId) : ctx.coverVisualPlan.id
+  const preset = COVER_VISUAL_STYLES[id]
+  return {
+    id,
+    label: preset.label,
+    reason: String(styleReason || "").trim() || (id === ctx.coverVisualPlan.id ? ctx.coverVisualPlan.reason : preset.bestFor),
+    layout: preset.layout,
+    palette: preset.palette,
+    visualCue: preset.visualCue,
+    typography: preset.typography,
+  }
+}
+
+export function buildCoverStyleCatalogText() {
+  return COVER_VISUAL_STYLE_IDS.map((id) => {
+    const item = COVER_VISUAL_STYLES[id]
+    return `- ${id}：${item.label}；适合：${item.bestFor}；版式：${item.layout}`
+  }).join("\n")
+}
+
+function buildCoverStylePromptBlock(plan: BeautyCoverVisualPlan) {
+  return [
+    "【AI视觉风格】",
+    `风格ID：${plan.id}`,
+    `风格名称：${plan.label}`,
+    `选择理由：${plan.reason}`,
+    `主视觉：${plan.visualCue}`,
+    `版式：${plan.layout}`,
+    `配色：${plan.palette}`,
+    `字体：${plan.typography}`,
+  ].join("\n")
+}
+
 function contentTypeStrategy(contentType: BeautyXhsContentType, ctx: Pick<BeautyContext, "entryLabel" | "narratorName">) {
   if (contentType === "treatment") {
     return [
@@ -265,6 +465,12 @@ export function buildBeautyContext(opts: {
   const pack = ENTRY_PACKS[entryClass]
   const narratorId = selectNarrator(opts.contentType, entryClass, text)
   const narrator = NARRATORS[narratorId]
+  const coverVisualPlan = buildCoverVisualPlan({
+    contentType: opts.contentType,
+    conflictLevel: opts.conflictLevel,
+    entryClass,
+    text,
+  })
   const partial = {
     entryLabel: pack.label,
     narratorName: narrator.name,
@@ -288,6 +494,7 @@ export function buildBeautyContext(opts: {
     complaintAngles: pack.complaintAngles,
     contentStrategy: contentTypeStrategy(opts.contentType, partial),
     coverTemplateBias: pack.coverTemplateBias,
+    coverVisualPlan,
   }
 }
 
@@ -310,21 +517,22 @@ export function buildBeautySourcePackText(ctx: BeautyContext) {
 }
 
 export function buildCoverPromptRequirements(ctx: BeautyContext) {
-  const template =
-    ctx.coverTemplateBias === "hand-note"
-      ? "优先手写感便签：像随手记下来的真心话，留白充足，暖光纸张质感。"
-      : ctx.coverTemplateBias === "dialog-bubble"
-        ? "优先对话气泡：像聊天里的重点句，但不要做成真实平台界面。"
-        : "优先暖调文字海报：暖米白/浅杏背景，大字短句，手机端一眼可读。"
+  const plan = ctx.coverVisualPlan
 
   return [
     "封面提示词必须由你直接生成，后端不会再帮你拼版式。",
     "cover_prompt 第一行必须是：画幅比例3:4竖版。",
-    template,
+    "视觉风格必须根据生成正文的真实内容智能选择，不要把“攻略/科普/避雷/对比”硬绑定到固定画风。",
+    "可选视觉风格如下，cover_style_id 必须从中选择一个：",
+    buildCoverStyleCatalogText(),
+    "",
+    `当前默认建议：${plan.id}（${plan.label}）。${plan.reason}`,
+    buildCoverStylePromptBlock(plan),
     "提示词必须包含要生成的中文主标题和副标题，并要求严格原样显示。",
     "封面只做单张小红书首图，不做多页信息图，不放门店信息、价格、优惠、地址、平台名、二维码、电话、微信号、logo、水印。",
     "所有文字必须为清晰、准确、简体中文；不要乱码、错别字、英文、多余文字；不要把标题改写成别的句子。",
-    "cover_negative 单独输出，覆盖：人物照片、产品图、英文字母、二维码、水印、复杂背景、文字变形、文字模糊、乱码、冷色科技感、3D、卡通。",
+    "除非正文明确适合轻插画，否则不要默认手绘、黑板、报纸、贴纸风；优先干净、现代、手机端高可读的封面。",
+    "cover_negative 单独输出，覆盖：人物照片、产品图、英文字母、二维码、水印、复杂背景、文字变形、文字模糊、乱码、冷色科技感、3D、卡通、廉价促销风。",
   ].join("\n")
 }
 
@@ -333,12 +541,16 @@ export function normalizeCoverAsset(opts: {
   sub: string
   prompt?: string | null
   negative?: string | null
+  styleId?: string | null
+  styleReason?: string | null
   ctx: BeautyContext
 }) {
   const main = opts.main.trim()
   const sub = opts.sub.trim()
   const prompt = String(opts.prompt || "").trim()
   const negative = String(opts.negative || "").trim()
+  const plan = resolveCoverVisualPlan(opts.ctx, opts.styleId, opts.styleReason)
+  const styleBlock = buildCoverStylePromptBlock(plan)
 
   const promptBody = prompt
     ? prompt
@@ -346,6 +558,8 @@ export function normalizeCoverAsset(opts: {
         "画幅比例3:4竖版。",
         "为生活美容/皮肤管理门店生成一张小红书首图封面。",
         buildCoverPromptRequirements(opts.ctx),
+        "",
+        styleBlock,
         "",
         "【封面文字】",
         `主标题：${main}`,
@@ -355,10 +569,12 @@ export function normalizeCoverAsset(opts: {
       ].join("\n")
 
   const richPrompt =
-    promptBody.length >= 500 && /文字必须|严格原样|清晰/.test(promptBody) && /二维码|水印|logo/.test(promptBody)
+    promptBody.length >= 500 && /AI视觉风格|风格ID/.test(promptBody) && /文字必须|严格原样|清晰/.test(promptBody) && /二维码|水印|logo/.test(promptBody)
       ? promptBody
       : [
           promptBody,
+          "",
+          styleBlock,
           "",
           "【补充版式约束】",
           buildCoverPromptRequirements(opts.ctx),
@@ -385,5 +601,10 @@ export function normalizeCoverAsset(opts: {
   return {
     prompt: withText,
     negative: negative || COMMON_NEGATIVE_PROMPT,
+    styleId: plan.id,
+    styleLabel: plan.label,
+    styleReason: plan.reason,
+    layout: plan.layout,
+    palette: plan.palette,
   }
 }

@@ -11,6 +11,7 @@ import {
   type GuardrailFlag,
 } from "@/lib/xhs/guardrails"
 import {
+  buildCoverStyleCatalogText,
   buildBeautyContext,
   buildBeautySourcePackText,
   buildCoverPromptRequirements,
@@ -56,6 +57,9 @@ export type GenerateV4Result = {
   tags: string[]
   coverPrompt: string
   coverNegative: string
+  coverStyleId?: string
+  coverStyleLabel?: string
+  coverStyleReason?: string
   entryClass?: string
   narrator?: string
   persona?: string
@@ -78,6 +82,9 @@ const llmOutputSchema = z.object({
   cover_sub: z.string().min(2).max(28),
   cover_prompt: z.string().min(80).max(5000).optional(),
   cover_negative: z.string().min(10).max(1500).optional(),
+  cover_style_id: z.string().min(2).max(80).optional(),
+  cover_style_label: z.string().min(2).max(40).optional(),
+  cover_style_reason: z.string().min(2).max(120).optional(),
   pinned_comment: z.string().min(60).max(2000),
   reply_templates: z.array(z.string().min(10).max(400)).min(3).max(5).optional(),
   tags: z.array(z.string().min(1).max(40)).min(3).max(20).optional(),
@@ -387,10 +394,14 @@ function buildSystemPrompt(opts: { contentType: XhsContentType; conflictLevel: C
     "结构要求：",
     "- title：18字内，包含主关键词（若关键词为空则包含主题核心词）。",
     "- body：400-600字，短句、画面感；隐含链路为“具体顾客画像 -> 触发场景 -> 此刻情绪 -> 判断标准 -> 温和结论”。不要输出画像表。",
+    "- body 自然加入 2-4 个 emoji，让语气更像小红书真实笔记；不要每段都放，不要在严肃风险提醒里堆表情，标题不强制放 emoji。",
     "- body 必须包含至少3个“可核实细节”。若缺少门店档案信息，则改为“可验证判断标准/自检清单”，不要编造具体事实。",
     "- body 结尾可以留一个开放问题，但不能出现“评论区/私信/找我/来店”等动作词。",
     "- body 不写模板腔，不使用完整的“不是A，是B / 你要的不是X，是Y / 真正的X不是Y，是Z / 更扎心的是 / 换句话说 / 也就是说”。",
     "- cover_main：<=12字，冲突最大；cover_sub：<=16字，给答案/承诺（但不含CTA）。",
+    "- cover_style_id：必须从以下风格ID中选择一个，并且要根据你刚写出的正文内容选择，不要按内容类型机械套模板。",
+    buildCoverStyleCatalogText(),
+    "- cover_style_label：输出对应中文风格名；cover_style_reason：一句话说明为什么这篇正文适合这个视觉风格。",
     "- cover_prompt：直接给 GPT-Image-2 使用的完整提示词，必须包含画幅、版式、文字、字体、风格、约束；不得只给一句描述。",
     "- cover_negative：单独给负面提示词。",
     "- pinned_comment：给两条路径（本地生活平台优先/短视频平台备用），都用“搜索门店昵称+地标/商圈”的方式表达；最后给出三条承诺口径（不加价/不缩水/可拒绝）。",
@@ -408,6 +419,9 @@ function buildSystemPrompt(opts: { contentType: XhsContentType; conflictLevel: C
     '  "body": "string",',
     '  "cover_main": "string",',
     '  "cover_sub": "string",',
+    '  "cover_style_id": "string",',
+    '  "cover_style_label": "string",',
+    '  "cover_style_reason": "string",',
     '  "cover_prompt": "string",',
     '  "cover_negative": "string",',
     '  "pinned_comment": "string",',
@@ -466,6 +480,9 @@ function buildRevisionPrompt(opts: {
         body: opts.prev.body,
         cover_main: opts.prev.coverText.main,
         cover_sub: opts.prev.coverText.sub,
+        cover_style_id: opts.prev.coverStyleId,
+        cover_style_label: opts.prev.coverStyleLabel,
+        cover_style_reason: opts.prev.coverStyleReason,
         cover_prompt: opts.prev.coverPrompt,
         cover_negative: opts.prev.coverNegative,
         pinned_comment: opts.prev.pinnedComment,
@@ -541,6 +558,8 @@ export async function generateXhsV4(opts: { billing: BillingContext; draftId: st
       ...cover,
       prompt: data.cover_prompt,
       negative: data.cover_negative,
+      styleId: data.cover_style_id,
+      styleReason: data.cover_style_reason,
       ctx: beautyContext,
     })
 
@@ -553,6 +572,9 @@ export async function generateXhsV4(opts: { billing: BillingContext; draftId: st
       tags: tags.length ? tags : [],
       coverPrompt: coverAsset.prompt,
       coverNegative: coverAsset.negative,
+      coverStyleId: coverAsset.styleId,
+      coverStyleLabel: data.cover_style_label || coverAsset.styleLabel,
+      coverStyleReason: data.cover_style_reason || coverAsset.styleReason,
       entryClass: data.entry_class || beautyContext.entryLabel,
       narrator: data.narrator || beautyContext.narratorName,
       persona: data.persona || beautyContext.personaHint,
@@ -624,6 +646,8 @@ export async function generateXhsV4(opts: { billing: BillingContext; draftId: st
       ...cover,
       prompt: d.cover_prompt,
       negative: d.cover_negative,
+      styleId: d.cover_style_id,
+      styleReason: d.cover_style_reason,
       ctx: beautyContext,
     })
 
@@ -636,6 +660,9 @@ export async function generateXhsV4(opts: { billing: BillingContext; draftId: st
       tags: tags.length ? tags : current.tags,
       coverPrompt: coverAsset.prompt,
       coverNegative: coverAsset.negative,
+      coverStyleId: coverAsset.styleId,
+      coverStyleLabel: d.cover_style_label || coverAsset.styleLabel,
+      coverStyleReason: d.cover_style_reason || coverAsset.styleReason,
       entryClass: d.entry_class || current.entryClass || beautyContext.entryLabel,
       narrator: d.narrator || current.narrator || beautyContext.narratorName,
       persona: d.persona || current.persona || beautyContext.personaHint,

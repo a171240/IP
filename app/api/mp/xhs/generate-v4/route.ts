@@ -3,11 +3,13 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 
 import {
-  chargeCredits,
-  resolveBillingContext,
-  trackServerEvent,
-  type BillingContext,
-} from "@/lib/xhs/proxy.server"
+  chargeMpAiPoints,
+  refundMpAiPoints,
+  resolveMpAiBillingContext,
+  setMpAiPointHeaders,
+  type MpAiBillingContext,
+} from "@/lib/mp/ai-points.server"
+import { trackServerEvent } from "@/lib/xhs/proxy.server"
 import { generateXhsV4, type ConflictLevel, type XhsContentType, type StoreProfile } from "@/lib/xhs/generate-v4.server"
 
 export const runtime = "nodejs"
@@ -26,7 +28,7 @@ const bodySchema = z.object({
 })
 
 async function loadStoreProfile(opts: {
-  billing: BillingContext
+  billing: MpAiBillingContext
   storeProfileId: string
 }): Promise<StoreProfile | null> {
   const { billing, storeProfileId } = opts
@@ -42,7 +44,7 @@ async function loadStoreProfile(opts: {
 }
 
 async function ensureDraft(opts: {
-  billing: BillingContext
+  billing: MpAiBillingContext
   input: z.infer<typeof bodySchema>
 }): Promise<{ id: string; reused: boolean }> {
   const { billing, input } = opts
@@ -109,21 +111,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "invalid_payload", details: parsed.error.issues }, { status: 400 })
   }
 
-  const billing = await resolveBillingContext(request)
+  const billing = await resolveMpAiBillingContext(request)
   if (!billing.ok) return billing.error
 
-  // Billing: treat as "basic" feature, credits can override.
-  const charged = await chargeCredits({
+  const input = parsed.data
+  const actionCode = input.draft_id || input.variant_of ? "xhs.regenerate.text" : "xhs.generate.text"
+  const charged = await chargeMpAiPoints({
     request,
     ctx: billing.ctx,
-    requiredPlan: "basic",
-    allowCreditsOverride: true,
-    baseCost: 4,
-    stepId: "xhs:generate-v4",
+    actionCode,
+    businessObjectType: "xhs_draft",
+    businessObjectId: input.draft_id || input.variant_of || undefined,
+    metadata: {
+      content_type: input.contentType,
+      conflict_level: input.conflictLevel,
+      store_profile_id: input.store_profile_id || null,
+    },
   })
   if (!charged.ok) return charged.error
-
-  const input = parsed.data
 
   await trackServerEvent({
     request,
@@ -133,8 +138,8 @@ export async function POST(request: NextRequest) {
       contentType: input.contentType,
       conflictLevel: input.conflictLevel,
       cost: charged.cost,
+      actionCode: charged.actionCode,
       plan: billing.ctx.plan,
-      planOk: charged.planOk,
     },
   })
 
@@ -144,6 +149,12 @@ export async function POST(request: NextRequest) {
     draftId = ensured.id
   } catch (e) {
     const msg = e instanceof Error ? e.message : "draft_failed"
+    await refundMpAiPoints({
+      ctx: billing.ctx,
+      charge: charged,
+      reason: "xhs_draft_failed",
+      metadata: { error: msg.slice(0, 200) },
+    }).catch(() => null)
     return NextResponse.json({ ok: false, error: msg }, { status: 500 })
   }
 
@@ -170,37 +181,54 @@ export async function POST(request: NextRequest) {
     // Persist best-effort to xhs_drafts.
     try {
       const now = new Date().toISOString()
-      await billing.ctx.supabase
+      const draftUpdate = {
+        content_type: input.contentType,
+        topic: input.topic,
+        keywords: input.keywords || null,
+        shop_name: input.shopName || null,
+
+        result_title: result.title,
+        result_content: result.body,
+        cover_title: result.coverText.main,
+        tags: result.tags,
+
+        pinned_comment: result.pinnedComment,
+        reply_templates: result.replyTemplates,
+        cover_text_main: result.coverText.main,
+        cover_text_sub: result.coverText.sub,
+        cover_prompt: result.coverPrompt,
+        cover_negative: result.coverNegative,
+        cover_style_id: result.coverStyleId || null,
+        cover_style_label: result.coverStyleLabel || null,
+        cover_style_reason: result.coverStyleReason || null,
+
+        conflict_level: input.conflictLevel,
+        guardrail_rounds: guardrails.rounds,
+        guardrail_flags: guardrails.flags,
+        store_profile_id: storeProfileId || null,
+
+        credits_cost: charged.cost,
+        plan_at_generate: billing.ctx.plan,
+        updated_at: now,
+      }
+
+      const { error: updateError } = await billing.ctx.supabase
         .from("xhs_drafts")
-        .update({
-          content_type: input.contentType,
-          topic: input.topic,
-          keywords: input.keywords || null,
-          shop_name: input.shopName || null,
-
-          result_title: result.title,
-          result_content: result.body,
-          cover_title: result.coverText.main,
-          tags: result.tags,
-
-          pinned_comment: result.pinnedComment,
-          reply_templates: result.replyTemplates,
-          cover_text_main: result.coverText.main,
-          cover_text_sub: result.coverText.sub,
-          cover_prompt: result.coverPrompt,
-          cover_negative: result.coverNegative,
-
-          conflict_level: input.conflictLevel,
-          guardrail_rounds: guardrails.rounds,
-          guardrail_flags: guardrails.flags,
-          store_profile_id: storeProfileId || null,
-
-          credits_cost: charged.cost,
-          plan_at_generate: billing.ctx.plan,
-          updated_at: now,
-        })
+        .update(draftUpdate)
         .eq("id", draftId)
         .eq("user_id", billing.ctx.userId)
+
+      if (updateError && /cover_style_/.test(updateError.message || "")) {
+        const fallbackUpdate: Record<string, unknown> = { ...draftUpdate }
+        delete fallbackUpdate.cover_style_id
+        delete fallbackUpdate.cover_style_label
+        delete fallbackUpdate.cover_style_reason
+        await billing.ctx.supabase
+          .from("xhs_drafts")
+          .update(fallbackUpdate)
+          .eq("id", draftId)
+          .eq("user_id", billing.ctx.userId)
+      }
     } catch {
       // ignore (DB migration may not be applied yet)
     }
@@ -220,6 +248,7 @@ export async function POST(request: NextRequest) {
         needProfile,
         entryClass: result.entryClass,
         narrator: result.narrator,
+        coverStyleId: result.coverStyleId,
       },
     })
 
@@ -235,6 +264,9 @@ export async function POST(request: NextRequest) {
         tags: result.tags,
         coverPrompt: result.coverPrompt,
         coverNegative: result.coverNegative,
+        coverStyleId: result.coverStyleId,
+        coverStyleLabel: result.coverStyleLabel,
+        coverStyleReason: result.coverStyleReason,
         entryClass: result.entryClass,
         narrator: result.narrator,
         persona: result.persona,
@@ -244,6 +276,12 @@ export async function POST(request: NextRequest) {
         flags: guardrails.flags.map((f) => `${f.field}:${f.rule}:${f.match}`),
         riskLevel: guardrails.riskLevel,
         dangerCount: guardrails.dangerCount,
+      },
+      billing: {
+        action_code: charged.actionCode,
+        cost_points: charged.cost,
+        balance_points: charged.unlimited ? null : charged.remaining,
+        ai_points_unlimited: charged.unlimited,
       },
       followup: needProfile
         ? {
@@ -258,11 +296,19 @@ export async function POST(request: NextRequest) {
         : { needProfile: false, questions: [] },
     })
 
-    res.headers.set("X-Credits-Cost", String(charged.cost))
-    res.headers.set("X-Credits-Remaining", charged.unlimited ? "unlimited" : String(charged.remaining))
-    res.headers.set("X-Credits-Unlimited", charged.unlimited ? "1" : "0")
+    setMpAiPointHeaders(res, charged)
     return res
   } catch (error) {
+    await refundMpAiPoints({
+      ctx: billing.ctx,
+      charge: charged,
+      reason: "xhs_generate_failed",
+      metadata: {
+        draft_id: draftId || null,
+        error: error instanceof Error ? error.message.slice(0, 200) : String(error || "unknown").slice(0, 200),
+      },
+    }).catch(() => null)
+
     await trackServerEvent({
       request,
       event: "xhs_v4_generate_fail",

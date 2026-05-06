@@ -4,10 +4,23 @@ process.env.BROWSERSLIST_IGNORE_OLD_DATA = "true"
 
 const isProduction = process.env.NODE_ENV === "production"
 const isStrictBuild = isProduction || process.env.NEXT_STRICT_BUILD !== "false"
+const largeLocalOnlyTraceExcludes = [
+  "artifacts/**/*",
+  "codex-plugin-library/**/*",
+  "docs/ui-prototype/**/*",
+  "output/**/*",
+  "tmp/**/*",
+  "tmpshots/**/*",
+  "xiaoshouzhushou1/**/*",
+  "提示词/**/*",
+]
 
 const nextConfig = {
   typescript: {
     ignoreBuildErrors: !isStrictBuild,
+  },
+  outputFileTracingExcludes: {
+    "**": largeLocalOnlyTraceExcludes,
   },
   images: {
     // TODO: Remove unoptimized and configure remotePatterns once image domains are known.

@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { generateContentRewrite, RewriteGenerationError } from "@/lib/content-rewrite"
 import type { ContentSourceForRewrite } from "@/lib/content-rewrite"
-import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
+import {
+  chargeMpAiPoints,
+  refundMpAiPoints,
+  resolveMpAiBillingContext,
+  setMpAiPointHeaders,
+  type MpAiBillingContext,
+  type MpAiChargeResult,
+} from "@/lib/mp/ai-points.server"
 import {
   rewriteRequestSchema,
   type ComplianceReport,
@@ -40,7 +47,7 @@ function mapRewriteErrorMessage(error: unknown): string {
 }
 
 async function loadSource(opts: {
-  supabase: Awaited<ReturnType<typeof createServerSupabaseClientForRequest>>
+  supabase: MpAiBillingContext["supabase"]
   userId: string
   sourceId: string
 }): Promise<ContentSourceForRewrite | null> {
@@ -57,7 +64,7 @@ async function loadSource(opts: {
 }
 
 async function tryInsertFailedRewriteRecord(opts: {
-  supabase: Awaited<ReturnType<typeof createServerSupabaseClientForRequest>>
+  supabase: MpAiBillingContext["supabase"]
   userId: string
   input: RewriteRequestInput
   compliance?: ComplianceReport
@@ -95,25 +102,22 @@ export async function POST(request: NextRequest) {
   }
 
   const input = parsed.data
-  const supabase = await createServerSupabaseClientForRequest(request)
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const billing = await resolveMpAiBillingContext(request)
+  if (!billing.ok) return billing.error
 
-  if (!user) {
-    return failResponse("请先登录", 401)
-  }
+  const supabase = billing.ctx.supabase
+  const userId = billing.ctx.userId
 
   const source = await loadSource({
     supabase,
-    userId: user.id,
+    userId,
     sourceId: input.source_id,
   })
 
   if (!source) {
     // source_id 无效时不能写 content_rewrites（FK 约束），改为明确日志可追踪。
     console.warn("[content-rewrite] source not found", {
-      user_id: user.id,
+      user_id: userId,
       source_id: input.source_id,
       target: input.target,
     })
@@ -124,7 +128,7 @@ export async function POST(request: NextRequest) {
   if (source.status === "failed") {
     await tryInsertFailedRewriteRecord({
       supabase,
-      userId: user.id,
+      userId,
       input,
       reason: "source_status_failed",
     })
@@ -132,7 +136,23 @@ export async function POST(request: NextRequest) {
     return failResponse("源内容不可改写", 400)
   }
 
+  let charged: Extract<MpAiChargeResult, { ok: true }> | null = null
+
   try {
+    const charge = await chargeMpAiPoints({
+      request,
+      ctx: billing.ctx,
+      actionCode: "content.rewrite.video_script",
+      businessObjectType: "content_source",
+      businessObjectId: input.source_id,
+      metadata: {
+        target: input.target,
+        tone: input.tone,
+      },
+    })
+    if (!charge.ok) return charge.error
+    charged = charge
+
     const rewritten = await generateContentRewrite({
       source,
       target: input.target,
@@ -145,7 +165,7 @@ export async function POST(request: NextRequest) {
     const { data: created, error: insertError } = await supabase
       .from("content_rewrites")
       .insert({
-        user_id: user.id,
+        user_id: userId,
         source_id: input.source_id,
         target: input.target,
         tone: input.tone,
@@ -168,20 +188,34 @@ export async function POST(request: NextRequest) {
       throw new Error(insertError?.message || "rewrite_insert_failed")
     }
 
-    return NextResponse.json({
+    const res = NextResponse.json({
       ok: true,
       rewrite_id: created.id,
       result: rewritten.result,
       compliance_report: rewritten.compliance_report,
     })
+    setMpAiPointHeaders(res, charged)
+    return res
   } catch (error) {
     const mappedMessage = mapRewriteErrorMessage(error)
 
     const complianceReport = error instanceof RewriteGenerationError ? error.complianceReport : undefined
 
+    if (charged) {
+      await refundMpAiPoints({
+        ctx: billing.ctx,
+        charge: charged,
+        reason: "content_rewrite_failed",
+        metadata: {
+          source_id: input.source_id,
+          error: error instanceof Error ? error.message.slice(0, 200) : String(error || "unknown").slice(0, 200),
+        },
+      }).catch(() => null)
+    }
+
     await tryInsertFailedRewriteRecord({
       supabase,
-      userId: user.id,
+      userId,
       input,
       compliance: complianceReport,
       reason: "rewrite_runtime_error",

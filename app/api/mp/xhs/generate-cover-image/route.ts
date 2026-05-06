@@ -1,8 +1,14 @@
-﻿import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 
+import {
+  chargeMpAiPoints,
+  refundMpAiPoints,
+  resolveMpAiBillingContext,
+  setMpAiPointHeaders,
+  type MpAiBillingContext,
+} from "@/lib/mp/ai-points.server"
 import { generateGptImage2 } from "@/lib/posters/gpt-image-2.server"
-import type { BillingContext } from "@/lib/xhs/proxy.server"
-import { buildXhsUpstreamUrl, chargeCredits, resolveBillingContext, trackServerEvent } from "@/lib/xhs/proxy.server"
+import { buildXhsUpstreamUrl, trackServerEvent } from "@/lib/xhs/proxy.server"
 import { uploadDataUrlAsset, uploadRemoteAsset } from "@/lib/xhs/assets.server"
 
 export const runtime = "nodejs"
@@ -43,8 +49,12 @@ function normalizeResolution(value: string) {
   return value === "1k" || value === "2k" || value === "4k" ? value : "2k"
 }
 
+function isRegenerateRequest(body: Record<string, unknown>) {
+  return body.regenerate === true || body.action_code === "xhs.regenerate.cover" || body.actionCode === "xhs.regenerate.cover"
+}
+
 async function loadDraftCoverAsset(opts: {
-  supabase: BillingContext["supabase"]
+  supabase: MpAiBillingContext["supabase"]
   userId: string
   draftId: string
 }) {
@@ -83,34 +93,48 @@ async function requestUpstreamCover(body: Record<string, unknown>) {
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null)
   if (!body || typeof body !== "object") {
-    return NextResponse.json({ success: false, error: "无效的请求体" }, { status: 400 })
+    return NextResponse.json({ success: false, ok: false, error: "无效的请求体" }, { status: 400 })
   }
 
-  const billing = await resolveBillingContext(request)
+  const billing = await resolveMpAiBillingContext(request)
   if (!billing.ok) return billing.error
 
-  const charged = await chargeCredits({
+  const requestBody = body as Record<string, unknown>
+  const draftId = getDraftId(requestBody)
+  const actionCode = isRegenerateRequest(requestBody) ? "xhs.regenerate.cover" : "xhs.generate.cover"
+
+  const charged = await chargeMpAiPoints({
     request,
     ctx: billing.ctx,
-    requiredPlan: "basic",
-    allowCreditsOverride: true,
-    baseCost: 2,
-    stepId: "xhs:generate-cover",
+    actionCode,
+    businessObjectType: "xhs_draft",
+    businessObjectId: draftId || undefined,
+    metadata: {
+      size: getTextField(requestBody, ["size"]) || "3:4",
+      resolution: getTextField(requestBody, ["resolution"]) || "2k",
+    },
   })
   if (!charged.ok) return charged.error
 
+  const refundCharge = async (reason: string, message: string) => {
+    await refundMpAiPoints({
+      ctx: billing.ctx,
+      charge: charged,
+      reason,
+      metadata: { draft_id: draftId || null, error: message.slice(0, 200) },
+    }).catch(() => null)
+  }
+
   await trackServerEvent({
     request,
-    event: "xhs_cover_submit",
-    props: { source: "mp", cost: charged.cost, plan: billing.ctx.plan, planOk: charged.planOk },
+    event: "mp_xhs_cover_submit",
+    props: { source: "mp", cost: charged.cost, actionCode: charged.actionCode, plan: billing.ctx.plan },
   })
 
-  const requestBody = body as Record<string, unknown>
   let prompt = getTextField(requestBody, ["prompt", "coverPrompt", "cover_prompt"])
   let negativePrompt = getTextField(requestBody, ["negativePrompt", "coverNegative", "cover_negative"])
   const size = normalizeSize(getTextField(requestBody, ["size"]) || "3:4")
   const resolution = normalizeResolution(getTextField(requestBody, ["resolution"]) || "2k")
-  const draftId = getDraftId(requestBody)
 
   if (!prompt && draftId) {
     try {
@@ -143,14 +167,14 @@ export async function POST(request: NextRequest) {
       const message = error instanceof Error ? error.message : String(error || "image_failed")
       await trackServerEvent({
         request,
-        event: "xhs_cover_gpt_image_fail",
+        event: "mp_xhs_cover_gpt_image_fail",
         props: { source: "mp", message: message.slice(0, 180) },
       })
 
-      // Missing local/staging image keys can still use the old service as a compatibility fallback.
       if (!message.includes("APIMART_API_KEY missing")) {
+        await refundCharge("xhs_cover_gpt_image_failed", message)
         return NextResponse.json(
-          { success: false, error: `GPT-Image-2生成失败：${message.slice(0, 240)}` },
+          { success: false, ok: false, error: `GPT-Image-2生成失败：${message.slice(0, 240)}` },
           { status: 502 }
         )
       }
@@ -160,10 +184,12 @@ export async function POST(request: NextRequest) {
   if (!json) {
     const upstream = await requestUpstreamCover(requestBody)
     if (!upstream.ok) {
-      await trackServerEvent({ request, event: "xhs_cover_fail", props: { source: "mp", status: upstream.status } })
+      await trackServerEvent({ request, event: "mp_xhs_cover_fail", props: { source: "mp", status: upstream.status } })
+      await refundCharge("xhs_cover_upstream_failed", upstream.text || String(upstream.status))
       return NextResponse.json(
         {
           success: false,
+          ok: false,
           error: upstream.status === 502 ? upstream.text : "上游服务错误",
           status: upstream.status,
           details: upstream.text.slice(0, 600),
@@ -174,12 +200,19 @@ export async function POST(request: NextRequest) {
     json = upstream.json
   }
 
-  // Optional: store cover into Supabase Storage so mini-program can load it via single domain.
+  if (json && json.success !== undefined && !json.success) {
+    const message = typeof json.error === "string" ? json.error : "封面生成失败"
+    await refundCharge("xhs_cover_result_failed", message)
+    return NextResponse.json({ ...json, ok: false }, { status: 502 })
+  }
+
   try {
     const imageCandidate =
-      (typeof json?.imageBase64 === "string" && json.imageBase64.trim())
+      typeof json?.imageBase64 === "string" && json.imageBase64.trim()
         ? json.imageBase64.trim()
-        : (typeof json?.imageUrl === "string" ? json.imageUrl.trim() : "")
+        : typeof json?.imageUrl === "string"
+          ? json.imageUrl.trim()
+          : ""
 
     if (draftId && json?.success === true && imageCandidate) {
       const uploaded = isDataUrl(imageCandidate)
@@ -207,19 +240,20 @@ export async function POST(request: NextRequest) {
         .eq("id", draftId)
         .eq("user_id", billing.ctx.userId)
 
-      // Replace the huge base64 with a single-domain URL.
       json.imageUrl = `/api/mp/xhs/covers/${draftId}`
       json.imageBase64 = null
     }
   } catch {
-    // best-effort only
+    // Storage is best-effort; the generated remote URL is still returned.
   }
 
-  await trackServerEvent({ request, event: "xhs_cover_success", props: { source: "mp", cost: charged.cost } })
+  await trackServerEvent({
+    request,
+    event: "mp_xhs_cover_success",
+    props: { source: "mp", cost: charged.cost, actionCode: charged.actionCode },
+  })
 
-  const res = NextResponse.json(json)
-  res.headers.set("X-Credits-Cost", String(charged.cost))
-  res.headers.set("X-Credits-Remaining", charged.unlimited ? "unlimited" : String(charged.remaining))
-  res.headers.set("X-Credits-Unlimited", charged.unlimited ? "1" : "0")
+  const res = NextResponse.json({ ...json, ok: json?.success !== false })
+  setMpAiPointHeaders(res, charged)
   return res
 }
