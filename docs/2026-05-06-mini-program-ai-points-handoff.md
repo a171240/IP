@@ -134,7 +134,12 @@ cd IP
 git checkout codex/mp-ui-gptpro-handoff
 ```
 
-小程序前端仓库单独拉取。仓库地址见 `E:\美业话镜` 的 README 或本次提交记录。
+小程序前端仓库单独拉取：
+
+```bash
+git clone https://github.com/a171240/meiye-huajing-miniprogram.git
+cd meiye-huajing-miniprogram
+```
 
 ## 已验证
 

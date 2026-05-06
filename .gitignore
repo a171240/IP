@@ -76,6 +76,8 @@ envpull.txt
 tmp.production.env
 voice-coach-ws-deploy.tar.gz
 wechatdevtools-window*.png
+tmp/
+codex-plugin-library/
 
 # Turbopack
 .turbo/
