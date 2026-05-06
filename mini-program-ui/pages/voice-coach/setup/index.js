@@ -1,3 +1,5 @@
+const { IP_FACTORY_BASE_URL } = require("../../../utils/config")
+const { request } = require("../../../utils/request")
 const { track } = require("../../../utils/track")
 const {
   buildCustomerMeta,
@@ -76,6 +78,11 @@ function setupWarn(stage, meta = {}) {
   return emitSetupDebug("warn", stage, meta)
 }
 
+function isSceneCardMissingError(err) {
+  const message = String((err && err.message) || "").trim()
+  return Number(err && err.statusCode) === 404 || message === "scene_card_not_found"
+}
+
 function shouldEnableSetupDebug() {
   try {
     const accountInfo = typeof wx.getAccountInfoSync === "function" ? wx.getAccountInfoSync() : null
@@ -100,6 +107,7 @@ Page({
     debugPanelEnabled: false,
     debugPanelVisible: false,
     debugLogs: [],
+    startingText: "",
   },
 
   onLoad() {
@@ -157,7 +165,6 @@ Page({
       customerProfileId: brief.customerProfile ? brief.customerProfile.id : "",
       sceneCardId: brief.sceneCard ? brief.sceneCard.id : "",
       hasLiveNotes: Boolean(brief.liveNotes),
-      summaryCount: brief.summaryLines.length,
     })
   },
 
@@ -185,10 +192,10 @@ Page({
     wx.navigateTo({ url: "/pages/voice-coach/customer-profile-editor/index?pick=1" })
   },
 
-  async handleUseTestCustomer() {
-    if (this.data.preparingTestCustomer) return
+  async ensureSimulatedCustomer() {
+    if (this.data.preparingTestCustomer) return null
 
-    setupLog("handleUseTestCustomer:start", {
+    setupLog("ensureSimulatedCustomer:start", {
       currentCustomerId: this.data.customerProfile ? this.data.customerProfile.id : "",
     })
 
@@ -197,22 +204,35 @@ Page({
       const result = await ensureTestCustomerProfile(this.data.customerProfile ? [this.data.customerProfile] : [])
       saveSelectedCustomerProfile(result.profile)
       this.reloadSelections()
-      setupLog("handleUseTestCustomer:ok", {
+      setupLog("ensureSimulatedCustomer:ok", {
         created: Boolean(result.created),
         customerProfileId: result.profile ? result.profile.id : "",
       })
-      wx.showToast({
-        title: result.created ? "测试顾客已生成" : "已切换到测试顾客",
-        icon: "success",
-      })
+      return result.profile
     } catch (err) {
-      setupWarn("handleUseTestCustomer:fail", {
+      setupWarn("ensureSimulatedCustomer:fail", {
         message: err && err.message ? err.message : "unknown_error",
       })
-      wx.showToast({ title: (err && err.message) || "生成测试顾客失败", icon: "none" })
+      wx.showToast({ title: (err && err.message) || "生成模拟顾客失败", icon: "none" })
+      return null
     } finally {
       this.setData({ preparingTestCustomer: false })
     }
+  },
+
+  async handleUseTestCustomer() {
+    const profile = await this.ensureSimulatedCustomer()
+    if (!profile) return
+    wx.showToast({ title: "已切换到模拟顾客", icon: "success" })
+  },
+
+  async handleGenerateAndStart() {
+    if (this.data.starting) return
+
+    const profile = await this.ensureSimulatedCustomer()
+    if (!profile) return
+
+    this.startTraining(profile, "simulated_customer")
   },
 
   handleClearCustomerProfile() {
@@ -221,6 +241,10 @@ Page({
     })
     clearSelectedCustomerProfile()
     this.reloadSelections()
+  },
+
+  handleStart() {
+    this.startTraining(this.data.customerProfile, "customer_ready")
   },
 
   handlePickSceneCard() {
@@ -250,14 +274,14 @@ Page({
         sceneCardId: result.card ? result.card.id : "",
       })
       wx.showToast({
-        title: result.created ? "测试场景卡已生成" : "已切换到测试场景卡",
+        title: result.created ? "示例项目已生成" : "已切换到示例项目",
         icon: "success",
       })
     } catch (err) {
       setupWarn("handleUseTestSceneCard:fail", {
         message: err && err.message ? err.message : "unknown_error",
       })
-      wx.showToast({ title: (err && err.message) || "生成测试场景卡失败", icon: "none" })
+      wx.showToast({ title: (err && err.message) || "生成示例项目失败", icon: "none" })
     } finally {
       this.setData({ preparingTestSceneCard: false })
     }
@@ -271,35 +295,76 @@ Page({
     this.reloadSelections()
   },
 
-  handleStart() {
+  async resolveSelectedSceneCard() {
+    const sceneCard = getSelectedSceneCard()
+    if (!sceneCard || !sceneCard.id) return null
+
+    try {
+      const res = await request({
+        baseUrl: IP_FACTORY_BASE_URL,
+        url: "/api/mp/voice-coach/scene-cards/" + encodeURIComponent(sceneCard.id),
+      })
+
+      if (res && res.ok && res.card) {
+        saveSelectedSceneCard(res.card)
+        this.setData({
+          sceneCard: res.card,
+          sceneMeta: buildSceneMeta(res.card),
+        })
+        setupLog("sceneCard.validate:ok", {
+          sceneCardId: res.card.id || sceneCard.id,
+        })
+        return res.card
+      }
+    } catch (err) {
+      const missing = isSceneCardMissingError(err)
+      setupWarn(missing ? "sceneCard.validate:stale" : "sceneCard.validate:skip", {
+        sceneCardId: sceneCard.id,
+        statusCode: err && err.statusCode ? err.statusCode : 0,
+        message: err && err.message ? err.message : "unknown_error",
+      })
+      if (!missing) return sceneCard
+    }
+
+    clearSelectedSceneCard()
+    this.setData({
+      sceneCard: null,
+      sceneMeta: "",
+    })
+    wx.showToast({ title: "项目卡已失效，已先跳过", icon: "none" })
+    return null
+  },
+
+  async startTraining(customerProfile, source) {
     if (this.data.starting) return
 
-    const customerProfile = this.data.customerProfile
-    const sceneCard = this.data.sceneCard
-    const liveNotes = String(this.data.liveNotes || "").trim()
-
-    if (!customerProfile && !sceneCard && !liveNotes) {
-      setupWarn("handleStart:block-empty")
-      wx.showToast({ title: "至少先选顾客、场景卡或补充备注", icon: "none" })
+    if (!customerProfile) {
+      wx.showToast({ title: "请先生成或选择顾客", icon: "none" })
       return
     }
 
+    this.setData({
+      starting: true,
+      startingText: "正在进入训练...",
+    })
+
+    const sceneCard = await this.resolveSelectedSceneCard()
     const setup = buildPendingVoiceCoachSetup({
       customerProfile,
       sceneCard,
-      liveNotes,
+      liveNotes: this.data.liveNotes || "",
     })
-
-    saveSetupDraft({ live_notes: liveNotes })
+    saveSetupDraft({ live_notes: this.data.liveNotes || "" })
     savePendingVoiceCoachSetup(setup)
 
-    this.setData({ starting: true })
     track("voice_coach_setup_submit", {
+      source: source || "",
       hasCustomerProfile: Boolean(setup.customer_profile_id),
       hasSceneCard: Boolean(setup.scene_card_id),
       hasLiveNotes: Boolean(setup.live_notes),
     })
-    setupLog("handleStart:navigate", {
+    setupLog("startTraining:navigate", {
+      source: source || "",
       customerProfileId: setup.customer_profile_id || "",
       sceneCardId: setup.scene_card_id || "",
       hasLiveNotes: Boolean(setup.live_notes),
@@ -308,7 +373,10 @@ Page({
     wx.navigateTo({
       url: "/pages/voice-coach/chat",
       complete: () => {
-        this.setData({ starting: false })
+        this.setData({
+          starting: false,
+          startingText: "",
+        })
       },
     })
   },

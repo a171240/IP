@@ -225,6 +225,108 @@ async function loadFollowupContext(args: {
   }
 }
 
+function parseHistoryLimit(value: string | null) {
+  const n = Number(value || 8)
+  if (!Number.isFinite(n)) return 8
+  return Math.max(1, Math.min(30, Math.round(n)))
+}
+
+function roundedScore(value: unknown): number | null {
+  const n = Number(value)
+  if (!Number.isFinite(n)) return null
+  return Math.max(0, Math.min(100, Math.round(n)))
+}
+
+function pickNextLine(report: any) {
+  const lines = Array.isArray(report?.summary_blocks) ? report.summary_blocks : []
+  const nextLine = lines
+    .map((item: unknown) => cleanText(item, 160))
+    .find((text: string) => /^下一轮[：:]/.test(text))
+  return nextLine ? nextLine.replace(/^下一轮[：:]\s*/, "") : ""
+}
+
+function buildSessionHistoryItem(row: any) {
+  const scenario = getScenario(row.scenario_id)
+  const context = getVoiceCoachSessionClientContext({
+    snapshot: row.scenario_snapshot_json,
+    customerProfileId: row.customer_profile_id,
+    sceneCardId: row.scene_card_id,
+    sessionContext: row.session_context_json,
+  })
+  const report = row.report_json && typeof row.report_json === "object" ? row.report_json : null
+  const score = roundedScore(row.total_score ?? report?.total_score)
+  const focus = report?.next_round_focus || null
+  const fallbackFocus = report ? pickReportFocusDimension(report) : null
+  const focusTitle =
+    cleanText(focus?.title, 80) ||
+    (fallbackFocus?.name ? `下一轮先练：${fallbackFocus.name}` : "")
+  const focusCopy =
+    cleanText(focus?.instruction, 140) ||
+    cleanText(pickNextLine(report), 140) ||
+    cleanText(report?.summary_blocks?.[0], 140)
+  const customerName = cleanText(context.customer_name, 40)
+  const serviceName = cleanText(context.service_name, 60)
+  const sceneName = cleanText(context.scene_name, 60)
+  const title = sceneName || serviceName || scenario.name || "话术训练"
+  const subtitle = [customerName, serviceName && serviceName !== title ? serviceName : ""].filter(Boolean).join(" · ")
+  const status = cleanText(row.status, 20) || "active"
+  const completed = status === "ended" || Boolean(report)
+
+  return {
+    id: row.id,
+    status,
+    status_label: completed ? "已完成" : "训练中",
+    started_at: row.started_at || row.created_at || "",
+    ended_at: row.ended_at || "",
+    title,
+    subtitle: subtitle || cleanText(context.customer_summary, 80) || scenario.goal || "",
+    customer_name: customerName,
+    scene_name: sceneName,
+    service_name: serviceName,
+    scene_kind_label: cleanText(context.scene_kind_label, 40),
+    score,
+    score_label: score === null ? "" : `${score}分`,
+    focus_title: focusTitle,
+    focus_copy: focusCopy,
+    is_followup: Boolean(context.followup_context),
+    can_view_report: completed,
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const supabase = await createServerSupabaseClientForRequest(request)
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) return jsonError(401, "请先登录")
+
+    const access = checkVoiceCoachAccess(user.id)
+    if (!access.ok) return jsonError(access.status, access.error)
+
+    const limit = parseHistoryLimit(new URL(request.url).searchParams.get("limit"))
+    const { data, error } = await supabase
+      .from("voice_coach_sessions")
+      .select(
+        "id, scenario_id, status, started_at, ended_at, created_at, total_score, report_json, customer_profile_id, scene_card_id, session_context_json, scenario_snapshot_json",
+      )
+      .eq("user_id", user.id)
+      .order("started_at", { ascending: false })
+      .limit(limit)
+
+    if (error) {
+      return jsonError(500, "sessions_query_failed", { message: error.message })
+    }
+
+    return NextResponse.json({
+      sessions: (data || []).map(buildSessionHistoryItem),
+    })
+  } catch (err: any) {
+    return jsonError(500, "voice_coach_error", { message: err?.message || String(err) })
+  }
+}
+
 function getPresetFirstTurnPool(scenarioId: string | undefined | null): VoiceCoachOpening[] {
   const scenario = getScenario(scenarioId)
   return Array.isArray(scenario.firstTurnPool) ? scenario.firstTurnPool : []

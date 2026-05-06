@@ -2476,3 +2476,139 @@ page {
   border-radius: 22rpx;
   background: linear-gradient(180deg, #9aa68c 0%, #667554 100%);
 }
+
+/* 2026-05-06 report dark alignment pass: keep report and practice in one visual system. */
+page {
+  background: #0a0e0b;
+}
+
+.vc-report-page {
+  color: #f7f3eb;
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgba(127, 143, 111, 0.14) 0%, rgba(10, 14, 11, 0) 46%),
+    radial-gradient(120% 100% at 100% 0%, rgba(188, 199, 180, 0.08) 0%, rgba(10, 14, 11, 0) 44%),
+    linear-gradient(180deg, #0a0e0b 0%, #121713 48%, #0a0e0b 100%);
+}
+
+.vc-report-page .content {
+  padding-left: 24rpx;
+  padding-right: 24rpx;
+  padding-bottom: calc(206rpx + env(safe-area-inset-bottom));
+  background: transparent;
+}
+
+.vc-report-page .report-shell {
+  padding-top: 12rpx;
+}
+
+.vc-report-page .report-hero,
+.vc-report-page .next-action-card,
+.vc-report-page .context-card,
+.vc-report-page .dimension-card,
+.vc-report-page .insight-card,
+.vc-report-page .analysis-feature,
+.vc-report-page .metric-card,
+.vc-report-page .qa-card,
+.vc-report-page .linechart-card,
+.vc-report-page .audio-list,
+.vc-report-page .tag-support-card,
+.vc-report-page .tabs-shell,
+.vc-report-page .tab-panel-head,
+.vc-report-page .chart-empty {
+  border-color: rgba(188, 199, 180, 0.12);
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(112, 126, 98, 0.10) 0%, rgba(255, 255, 255, 0) 46%),
+    linear-gradient(180deg, rgba(20, 25, 24, 0.99) 0%, rgba(10, 13, 12, 0.99) 100%);
+  box-shadow:
+    0 16rpx 32rpx rgba(3, 5, 4, 0.22),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.045);
+}
+
+.vc-report-page .report-hero {
+  border-radius: 30rpx;
+  padding: 32rpx 28rpx 28rpx;
+}
+
+.vc-report-page .hero-score {
+  color: #f7f3eb;
+  letter-spacing: 0;
+}
+
+.vc-report-page .hero-score-suffix,
+.vc-report-page .hero-subtitle,
+.vc-report-page .context-card-meta,
+.vc-report-page .context-point-text,
+.vc-report-page .metric-text,
+.vc-report-page .qa-text,
+.vc-report-page .tab-desc,
+.vc-report-page .next-action-copy {
+  color: rgba(221, 226, 216, 0.70);
+}
+
+.vc-report-page .hero-grade,
+.vc-report-page .report-section-title,
+.vc-report-page .context-card-title,
+.vc-report-page .dimension-name,
+.vc-report-page .dimension-score,
+.vc-report-page .insight-text,
+.vc-report-page .metric-name,
+.vc-report-page .tab-title,
+.vc-report-page .next-action-title {
+  color: #f7f3eb;
+}
+
+.vc-report-page .section-kicker,
+.vc-report-page .panel-block-title,
+.vc-report-page .tabs-label,
+.vc-report-page .next-action-kicker {
+  color: rgba(215, 191, 150, 0.84);
+}
+
+.vc-report-page .hero-chip,
+.vc-report-page .hero-visual-card {
+  background: rgba(255, 255, 255, 0.035);
+  border-color: rgba(188, 199, 180, 0.10);
+}
+
+.vc-report-page .dimension-card {
+  border-radius: 20rpx;
+}
+
+.vc-report-page .dimension-stars {
+  color: rgba(215, 191, 150, 0.82);
+}
+
+.vc-report-page .dimension-track {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.vc-report-page .tabs-wrap {
+  background: linear-gradient(180deg, rgba(10, 14, 11, 0) 0%, rgba(10, 14, 11, 0.90) 34%, rgba(10, 14, 11, 0.98) 100%);
+}
+
+.vc-report-page .tabs-shell {
+  border-radius: 22rpx;
+}
+
+.vc-report-page .tab {
+  background: rgba(255, 255, 255, 0.035);
+  color: rgba(221, 226, 216, 0.68);
+}
+
+.vc-report-page .tab.active {
+  color: #11160f;
+  background: linear-gradient(180deg, #d6e0c9 0%, #9aa68c 100%);
+}
+
+.vc-report-page .cta {
+  background: linear-gradient(180deg, rgba(10, 14, 11, 0) 0%, rgba(10, 14, 11, 0.86) 38%, rgba(10, 14, 11, 0.99) 100%);
+}
+
+.vc-report-page .again-btn {
+  border-radius: 22rpx;
+  background: linear-gradient(180deg, rgba(154, 166, 140, 0.98) 0%, rgba(102, 117, 84, 1) 100%);
+  color: #f7f3eb;
+  box-shadow:
+    0 14rpx 28rpx rgba(3, 5, 4, 0.22),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.12);
+}

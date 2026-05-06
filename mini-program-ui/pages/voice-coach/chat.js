@@ -13,6 +13,7 @@ const {
   replaceTurnById,
 } = require("./turn-list")
 const {
+  clearSelectedSceneCard,
   consumePendingVoiceCoachSetup,
   savePendingVoiceCoachSetup,
 } = require("./setup-storage")
@@ -28,6 +29,10 @@ const {
 const TURN_PENDING_STATUSES = {
   accepted: true,
   processing: true,
+}
+
+const REALTIME_HTTP_RETRY_ERROR_CODES = {
+  llm_stream_failed: true,
 }
 
 // Preview ASR currently uses short chunks with flash endpoint, which is not a compatible path.
@@ -93,6 +98,10 @@ function parsePerTurnScores(perTurnScores) {
 function isPendingByStatus(status) {
   const key = String(status || "").trim()
   return Boolean(TURN_PENDING_STATUSES[key])
+}
+
+function isSceneCardNotFoundError(err) {
+  return String((err && err.message) || "").trim() === "scene_card_not_found"
 }
 
 function normalizeHighlightSeverity(input) {
@@ -781,6 +790,8 @@ Page({
     this.clearInitialPromptFailSafeTimer()
     if (this._suggestScrollTimer) clearTimeout(this._suggestScrollTimer)
     if (this._suggestScrollInnerTimer) clearTimeout(this._suggestScrollInnerTimer)
+    if (this._hintScrollTimer) clearTimeout(this._hintScrollTimer)
+    if (this._hintScrollInnerTimer) clearTimeout(this._hintScrollInnerTimer)
     try {
       if (this.streamTask && typeof this.streamTask.abort === "function") this.streamTask.abort()
     } catch (_err) {}
@@ -815,9 +826,8 @@ Page({
     try {
       if (this.audioCtx) this.audioCtx.stop()
     } catch (_err) {}
-    try {
-      if (this.uiFxAudioCtx) this.uiFxAudioCtx.stop()
-    } catch (_err) {}
+    // onHide runs after the page is already backgrounded on real devices; stopping
+    // a short UI sound there can trigger a noisy operateAudio permission warning.
     try {
       if (this._audioPlayer) this._audioPlayer.stop()
     } catch (_err) {}
@@ -847,7 +857,7 @@ Page({
     }
   },
 
-  async createSession(setup) {
+  async createSession(setup, options = {}) {
     const startedAt = Date.now()
     this.sessionCreatedAt = startedAt
     this.setData({ loading: true })
@@ -940,13 +950,31 @@ Page({
         this.ensureEventsPolling()
       }
     } catch (err) {
+      if (isSceneCardNotFoundError(err) && setup && setup.scene_card_id && !options.retriedWithoutSceneCard) {
+        const staleSceneCardId = String(setup.scene_card_id || "")
+        clearSelectedSceneCard()
+        const retrySetup = {
+          ...setup,
+          scene_card_id: "",
+          preview: {
+            ...(setup.preview || {}),
+            sceneCard: null,
+          },
+        }
+        vcWarn("session.create:retry_without_scene_card", {
+          staleSceneCardId,
+        })
+        wx.showToast({ title: "项目卡已失效，已跳过重试", icon: "none" })
+        this.createSession(retrySetup, { retriedWithoutSceneCard: true })
+        return
+      }
       if (setup) savePendingVoiceCoachSetup(setup)
       this.setData({ loading: false, waitingCustomer: false })
       vcError("session.create:error", {
         message: err && err.message ? err.message : "",
         statusCode: err && err.statusCode ? err.statusCode : 0,
       })
-      wx.showToast({ title: err.message || "鍒涘缓浼氳瘽澶辫触", icon: "none" })
+      wx.showToast({ title: err.message || "创建会话失败", icon: "none" })
     }
   },
 
@@ -1425,7 +1453,9 @@ Page({
     })
 
     this.cancelRealtimeAudio(reason || "realtime_retry_http")
-    this.resetRealtimeAttemptState(reason || "realtime_retry_http")
+    this.resetRealtimeAttemptState(reason || "realtime_retry_http", {
+      keepBeauticianDraft: true,
+    })
     this.beginHttpFallbackTurn(replyToTurnId)
     void this.uploadBeauticianTurn(pending.filePath, durationSec, {
       forceHttp: true,
@@ -2728,6 +2758,10 @@ Page({
         wx.showToast({ title: "实时识别不稳定，已切换稳定模式", icon: "none" })
         return
       }
+      if (REALTIME_HTTP_RETRY_ERROR_CODES[code] && this.fallbackPendingAudioToHttp(code || "realtime_error")) {
+        wx.showToast({ title: "实时生成较慢，已切换稳定模式", icon: "none" })
+        return
+      }
       if (code !== "analysis_failed") {
         const keepDrafts = code === "turn_persist_failed"
         this.resetRealtimeAttemptState(code || "recoverable_error", {
@@ -3772,7 +3806,7 @@ Page({
             clientAttemptId,
             message: payload && (payload.message || payload.error) ? payload.message || payload.error : "submit_failed",
           })
-          wx.showToast({ title: payload?.message || payload?.error || "涓婁紶澶辫触", icon: "none" })
+          wx.showToast({ title: payload?.message || payload?.error || "上传失败", icon: "none" })
           return
         }
 
@@ -3797,14 +3831,19 @@ Page({
           const renamed = this.renameTurn(mergeSourceTurnId, accepted.id)
           hasAcceptedTurn = hasAcceptedTurn || renamed
         }
+        const existingAcceptedTurn = this.getTurnById(accepted.id)
+        const acceptedText = accepted.text || (existingAcceptedTurn && existingAcceptedTurn.text) || ""
         if (!hasAcceptedTurn) {
-          this.appendTurn(accepted)
+          this.appendTurn({
+            ...accepted,
+            text: acceptedText,
+          })
         } else {
           this.patchTurn(accepted.id, {
             turn_index: accepted.turn_index,
             status: "accepted",
             pending: true,
-            text: accepted.text,
+            text: acceptedText,
             audio_url: accepted.audio_url,
             audio_seconds: accepted.audio_seconds,
             audio_seconds_text: accepted.audio_seconds_text,
@@ -3954,6 +3993,29 @@ Page({
     }
   },
 
+  patchHintTurn(turnId, patch) {
+    const id = String(turnId || "")
+    if (!id) return false
+    const nextPatch = Object.assign({}, patch)
+    if (Object.prototype.hasOwnProperty.call(nextPatch, "hintPoints")) {
+      nextPatch.hintPoints = Array.isArray(nextPatch.hintPoints) ? nextPatch.hintPoints : []
+    }
+    return this.patchTurn(id, nextPatch)
+  },
+
+  scrollTurnIntoView(turnId) {
+    const id = String(turnId || "")
+    if (!id) return
+    if (this._hintScrollTimer) clearTimeout(this._hintScrollTimer)
+    if (this._hintScrollInnerTimer) clearTimeout(this._hintScrollInnerTimer)
+    this._hintScrollTimer = setTimeout(() => {
+      this.setData({ scrollIntoView: "" })
+      this._hintScrollInnerTimer = setTimeout(() => {
+        this.setData({ scrollIntoView: `turn-${id}` })
+      }, 30)
+    }, 30)
+  },
+
   openHint(e) {
     wx.vibrateShort({ type: 'light' })
     const sessionId = this.data.sessionId
@@ -3971,23 +4033,40 @@ Page({
       wx.showToast({ title: "请先等顾客开口", icon: "none" })
       return
     }
+    const currentTurn = this.getTurnById(customerTurnId)
+    if (currentTurn && currentTurn.hintText && !currentTurn.hintLoading && !currentTurn.hintError) {
+      this.patchHintTurn(customerTurnId, { hintVisible: true, hintDismissed: false })
+      this.scrollTurnIntoView(customerTurnId)
+      return
+    }
     if (this._hintInFlight) {
       vcWarn("hint.open:skip", {
         sessionId,
         customerTurnId,
         reason: "in_flight",
       })
-      wx.showToast({ title: "灵感生成中", icon: "none" })
+      if (String(this._hintInFlightTurnId || "") !== String(customerTurnId)) {
+        wx.showToast({ title: "建议生成中", icon: "none" })
+      }
       return
     }
 
+    const requestId = `${Date.now()}_${customerTurnId}`
     vcLog("hint.open:start", {
       sessionId,
       customerTurnId,
     })
     this._hintInFlight = true
     this._hintInFlightTurnId = customerTurnId
-    this.setData({ loading: true, hintLoading: true, hintLoadingTurnId: customerTurnId })
+    this.patchHintTurn(customerTurnId, {
+      hintVisible: true,
+      hintLoading: true,
+      hintError: "",
+      hintDismissed: false,
+      hintRequestId: requestId,
+    })
+    this.setData({ hintLoading: true, hintLoadingTurnId: customerTurnId })
+    this.scrollTurnIntoView(customerTurnId)
     request({
       baseUrl: VOICE_COACH_HTTP_BASE_URL,
       url: `/api/voice-coach/sessions/${sessionId}/hint`,
@@ -3995,14 +4074,22 @@ Page({
       data: { customer_turn_id: customerTurnId },
     })
       .then((res) => {
-        this.setData({
-          loading: false,
+        const latestTurn = this.getTurnById(customerTurnId)
+        const dismissed =
+          latestTurn &&
+          String(latestTurn.hintRequestId || "") === requestId &&
+          Boolean(latestTurn.hintDismissed)
+        this.patchHintTurn(customerTurnId, {
+          hintVisible: !dismissed,
           hintLoading: false,
-          hintLoadingTurnId: "",
-          hintVisible: true,
+          hintError: "",
+          hintDismissed: false,
+          hintRequestId: requestId,
           hintText: res.hint_text || "",
           hintPoints: res.hint_points || [],
         })
+        this.setData({ hintLoading: false, hintLoadingTurnId: "" })
+        if (!dismissed) this.scrollTurnIntoView(customerTurnId)
         vcLog("hint.open:ok", {
           sessionId,
           customerTurnId,
@@ -4014,16 +4101,28 @@ Page({
         })
       })
       .catch((err) => {
-        this.setData({ loading: false, hintLoading: false, hintLoadingTurnId: "" })
         const rawMessage = err && err.message ? String(err.message) : ""
         const friendlyMessage =
           rawMessage === "voice_coach_error" ? "灵感服务暂时繁忙，请稍后重试" : (rawMessage || "获取灵感失败")
+        const latestTurn = this.getTurnById(customerTurnId)
+        const dismissed =
+          latestTurn &&
+          String(latestTurn.hintRequestId || "") === requestId &&
+          Boolean(latestTurn.hintDismissed)
+        this.patchHintTurn(customerTurnId, {
+          hintVisible: !dismissed,
+          hintLoading: false,
+          hintError: friendlyMessage,
+          hintDismissed: false,
+          hintRequestId: requestId,
+        })
+        this.setData({ hintLoading: false, hintLoadingTurnId: "" })
         vcWarn("hint.open:error", {
           sessionId,
           customerTurnId,
           message: rawMessage,
         })
-        wx.showToast({ title: friendlyMessage, icon: "none" })
+        if (!dismissed) wx.showToast({ title: friendlyMessage, icon: "none" })
       })
       .finally(() => {
         this._hintInFlight = false
@@ -4032,7 +4131,19 @@ Page({
       })
   },
 
-  closeHint() {
+  closeHint(e) {
+    const id = e && e.currentTarget ? String(e.currentTarget.dataset.id || "") : ""
+    if (id) {
+      this.patchHintTurn(id, {
+        hintVisible: false,
+        hintLoading: false,
+        hintDismissed: true,
+      })
+      if (String(this._hintInFlightTurnId || "") === id) {
+        this.setData({ hintLoading: false, hintLoadingTurnId: "" })
+      }
+      return
+    }
     this.setData({ hintVisible: false })
   },
 

@@ -2,19 +2,21 @@
   <view class="vc-page-scroll-shell">
     <scroll-view class="page-scroll" scroll-y="true" enhanced="true" bounces="false" show-scrollbar="false">
       <view class="container">
-      <view class="hero compact-hero fade-up">
-        <text class="eyebrow">顾客资料库</text>
-        <text class="title">顾客档案</text>
-        <text class="subtitle">选真实顾客，或者先用测试顾客。</text>
+      <view class="library-top fade-up">
+        <view class="library-top-copy">
+          <text class="library-eyebrow">顾客资料库</text>
+          <text class="library-title">顾客档案</text>
+          <text class="library-subtitle">选真实顾客，或者先生成一位模拟顾客。</text>
+        </view>
 
-        <view class="hero-actions compact-actions">
+        <view class="library-top-actions">
           <button class="btn-primary" bindtap="handleCreate">新建档案</button>
           <button
             class="btn-outline"
             loading="{{creatingTestProfile}}"
             disabled="{{creatingTestProfile}}"
             bindtap="handleUseTestProfile"
-          >测试顾客</button>
+          >模拟顾客</button>
         </view>
       </view>
 
@@ -24,19 +26,20 @@
 
       <view wx:if="{{!loading && !profiles.length}}" class="summary-card fade-up delay-1">
         <text class="empty-title">还没有顾客档案</text>
-        <text class="empty-copy">可以先生成测试顾客，直接开始训练。</text>
+        <text class="empty-copy">可以先生成模拟顾客，回到话术页后直接开始训练。</text>
         <view class="hero-actions compact-actions">
           <button
             class="btn-primary"
             loading="{{creatingTestProfile}}"
             disabled="{{creatingTestProfile}}"
             bindtap="handleUseTestProfile"
-          >直接用测试顾客</button>
+          >生成模拟顾客</button>
         </view>
       </view>
 
       <view wx:for="{{profiles}}" wx:key="id" class="card library-item-card fade-up delay-1">
-        <view class="row space-between">
+        <view class="library-item-head">
+          <view class="library-avatar">客</view>
           <view class="selection-copy">
             <text class="card-title">{{item.name}}</text>
             <text wx:if="{{item.metaLabel}}" class="muted small">{{item.metaLabel}}</text>
@@ -49,7 +52,7 @@
           <text wx:if="{{item.trustLabel}}" class="library-item-line">信任：{{item.trustLabel}}</text>
         </view>
 
-        <view class="hero-actions compact-actions">
+        <view class="hero-actions compact-actions library-actions">
           <button class="btn-primary" size="mini" data-id="{{item.id}}" catchtap="handleUse">{{pickMode ? '选用' : '设为当前'}}</button>
           <button class="btn-outline" size="mini" data-id="{{item.id}}" catchtap="handleEdit">编辑</button>
           <button class="btn-outline" size="mini" data-id="{{item.id}}" catchtap="handleDelete">删除</button>

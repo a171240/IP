@@ -4,8 +4,8 @@ const SETUP_DRAFT_KEY = "voice_coach_setup_draft"
 const PENDING_SETUP_KEY = "voice_coach_pending_setup"
 
 const SCENE_KIND_LABELS = {
-  customer_visit: "到店顾客训练",
-  offer_promo: "新品推广训练",
+  customer_visit: "到店项目训练",
+  offer_promo: "项目启动训练",
 }
 
 function readJson(key, fallbackValue) {
@@ -40,6 +40,10 @@ function cleanText(value, maxLen) {
   return text.slice(0, maxLen)
 }
 
+function cleanVisibleText(value, maxLen) {
+  return cleanText(String(value || "").replace(/\s*\[voice-coach-test-[^\]]+\]\s*/g, " "), maxLen)
+}
+
 function toTextList(value, maxItems) {
   let list = []
 
@@ -70,7 +74,7 @@ function toTextList(value, maxItems) {
 
 function getSceneKindLabel(sceneKind) {
   const key = cleanText(sceneKind, 32)
-  return SCENE_KIND_LABELS[key] || "训练场景"
+  return SCENE_KIND_LABELS[key] || "项目训练"
 }
 
 function normalizeCustomerProfile(profile) {
@@ -109,7 +113,7 @@ function normalizeSceneCard(card) {
     communication_method_tags: toTextList(card.communication_method_tags, 8),
     must_cover_points: toTextList(card.must_cover_points, 8),
     do_not_say: toTextList(card.do_not_say, 8),
-    notes: cleanText(card.notes, 300),
+    notes: cleanVisibleText(card.notes, 300),
   }
 }
 
@@ -136,8 +140,8 @@ function buildCustomerMeta(profile) {
 function buildSceneMeta(card) {
   if (!card) return ""
   const bits = [card.scene_kind_label]
-  if (card.service_name) bits.push("项目 " + card.service_name)
-  if (card.customer_stage) bits.push("阶段 " + card.customer_stage)
+  if (card.service_name) bits.push("品项 " + card.service_name)
+  if (card.customer_stage) bits.push("适合 " + card.customer_stage)
   return bits.filter(Boolean).join(" · ")
 }
 
@@ -169,17 +173,17 @@ function buildSetupBrief(input) {
     customerProfile ? formatListLine("信任触发点", customerProfile.trust_triggers, 3) : "",
     sceneCard
       ? formatLine(
-          "场景卡",
+          "项目卡",
           [sceneCard.name, buildSceneMeta(sceneCard)].filter(Boolean).join(" · "),
         )
       : "",
-    sceneCard ? formatLine("训练目标", sceneCard.scene_goal) : "",
-    sceneCard ? formatListLine("沟通方法", sceneCard.communication_method_tags, 4) : "",
-    sceneCard ? formatListLine("重点环节", sceneCard.focus_stages, 4) : "",
-    sceneCard ? formatListLine("高频问题", sceneCard.likely_questions, 4) : "",
-    sceneCard ? formatListLine("重点异议", sceneCard.target_objections, 4) : "",
-    sceneCard ? formatListLine("必须覆盖", sceneCard.must_cover_points, 4) : "",
-    sceneCard ? formatListLine("禁忌表达", sceneCard.do_not_say, 3) : "",
+    sceneCard ? formatLine("项目资料", sceneCard.scene_goal) : "",
+    sceneCard ? formatListLine("推荐切入", sceneCard.communication_method_tags, 4) : "",
+    sceneCard ? formatListLine("专业重点", sceneCard.focus_stages, 4) : "",
+    sceneCard ? formatListLine("顾客追问", sceneCard.likely_questions, 4) : "",
+    sceneCard ? formatListLine("拒绝处理", sceneCard.target_objections, 4) : "",
+    sceneCard ? formatListLine("必须讲清", sceneCard.must_cover_points, 4) : "",
+    sceneCard ? formatListLine("表达边界", sceneCard.do_not_say, 3) : "",
     liveNotes ? formatLine("本次补充", liveNotes) : "",
   ].filter(Boolean)
 

@@ -1,4 +1,8 @@
 {
-  "navigationBarTitleText": "话术练习",
+  "navigationBarTitleText": "\u8bdd\u672f\u7ec3\u4e60",
+  "navigationBarBackgroundColor": "#21261f",
+  "navigationBarTextStyle": "white",
+  "backgroundColor": "#21261f",
+  "backgroundTextStyle": "light",
   "disableScroll": true
 }

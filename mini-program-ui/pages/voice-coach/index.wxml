@@ -1,40 +1,111 @@
-<view class="vc-page vc-home-page vc-home-focus">
-  <view class="container">
-    <view class="hero vc-focus-hero fade-up">
-      <text class="eyebrow">训练入口</text>
-      <text class="title">开始一轮语音训练</text>
-      <text class="subtitle">先选顾客和场景，再直接开练。</text>
-
-      <view class="vc-focus-launch">
-        <view class="vc-focus-copy">
-          <text class="vc-focus-title">现在就开始</text>
-          <text class="vc-focus-note">推荐先用测试顾客和测试场景跑通一次完整流程。</text>
-        </view>
-        <button class="btn-primary" bindtap="handleStart">开始训练</button>
-      </view>
-    </view>
-
-    <view class="section fade-up delay-1">
-      <view class="section-head">
-        <text class="section-title">训练资产</text>
-        <text class="section-caption">顾客和场景拆成两个次级入口，首页不再堆解释。</text>
-      </view>
-
-      <view class="minimal-grid">
-        <view class="card minimal-action-card" bindtap="handleProfiles">
-          <text class="minimal-action-kicker">顾客</text>
-          <text class="card-title">顾客档案</text>
-          <text class="minimal-action-copy">先选训练对象，再开始对练。</text>
-          <text class="minimal-action-link">进入顾客库</text>
+<view class="vc-page vc-home-page vc-home-focus vc-home-v2">
+  <view class="vc-page-scroll-shell">
+    <scroll-view class="page-scroll" scroll-y="true" enhanced="true" bounces="false" refresher-enabled="{{false}}" show-scrollbar="false">
+      <view class="container">
+        <view class="vc-plugin-hero fade-up">
+          <view class="vc-home-copy">
+            <text class="eyebrow">{{heroStatusLabel}}</text>
+            <view class="title">
+              <text wx:if="{{customerProfile}}">顾客就绪，</text>
+              <text wx:else>先定顾客，</text>
+              <text wx:if="{{customerProfile}}">直接开练</text>
+              <text wx:else>再练话术</text>
+            </view>
+            <text class="subtitle">{{heroSubtitle}}</text>
+          </view>
+          <button class="vc-plugin-start-btn" bindtap="handleStart">{{startButtonText}}</button>
         </view>
 
-        <view class="card minimal-action-card" bindtap="handleSceneCards">
-          <text class="minimal-action-kicker">场景</text>
-          <text class="card-title">场景卡</text>
-          <text class="minimal-action-copy">先定这轮练什么，避免临场乱切题。</text>
-          <text class="minimal-action-link">进入场景库</text>
+        <view class="vc-plugin-stack fade-up delay-1">
+          <view
+            class="vc-plugin-card vc-plugin-card-primary"
+            bindtap="handleProfiles"
+            hover-class="vc-plugin-card-pressed"
+            hover-stay-time="80"
+          >
+            <view class="vc-plugin-card-main">
+              <text class="vc-plugin-card-title">顾客档案</text>
+              <text class="vc-plugin-card-copy">{{customerCardCopy}}</text>
+            </view>
+            <view class="vc-plugin-card-btn">
+              <text>{{customerCardAction}}</text>
+              <text class="vc-plugin-card-chevron">›</text>
+            </view>
+          </view>
+
+          <view
+            class="vc-plugin-card vc-plugin-card-secondary"
+            bindtap="handleSceneCards"
+            hover-class="vc-plugin-card-pressed"
+            hover-stay-time="80"
+          >
+            <view class="vc-plugin-card-main">
+              <text class="vc-plugin-card-title">项目启动</text>
+              <text class="vc-plugin-card-copy">把新项目讲熟，练推荐和拒绝应对</text>
+            </view>
+            <view class="vc-plugin-card-btn">
+              <text>项目卡</text>
+              <text class="vc-plugin-card-chevron">›</text>
+            </view>
+          </view>
+
+          <view class="vc-plugin-recent">
+            <text class="vc-plugin-recent-text">{{recentText}}</text>
+          </view>
+        </view>
+
+        <view class="vc-history-panel fade-up delay-2">
+          <view class="vc-history-head">
+            <view class="vc-history-title-wrap">
+              <text class="vc-history-kicker">训练痕迹</text>
+              <text class="vc-history-title">最近练习</text>
+            </view>
+            <view class="vc-history-refresh" bindtap="refreshTrainingHistory">刷新</view>
+          </view>
+
+          <view wx:if="{{historyLoading}}" class="vc-history-state">
+            <text>正在同步训练记录...</text>
+          </view>
+          <view wx:elif="{{historyError}}" class="vc-history-state vc-history-state-error" bindtap="refreshTrainingHistory">
+            <text>{{historyError}}</text>
+            <text class="vc-history-state-action">点这里重试</text>
+          </view>
+          <view wx:elif="{{trainingHistory.length === 0}}" class="vc-history-state">
+            <text>还没有训练记录。完成一次练习后，这里会沉淀报告和复练入口。</text>
+          </view>
+          <view wx:else class="vc-history-list">
+            <view
+              wx:for="{{trainingHistory}}"
+              wx:key="id"
+              class="vc-history-item"
+              data-id="{{item.id}}"
+              bindtap="openTrainingRecord"
+              hover-class="vc-history-item-pressed"
+              hover-stay-time="80"
+            >
+              <view class="vc-history-item-main">
+                <view class="vc-history-item-top">
+                  <text class="vc-history-item-title">{{item.title}}</text>
+                  <text class="vc-history-status">{{item.statusLabel}}</text>
+                </view>
+                <text wx:if="{{item.subtitle}}" class="vc-history-item-subtitle">{{item.subtitle}}</text>
+                <view wx:if="{{item.focusTitle || item.focusCopy}}" class="vc-history-focus">
+                  <text wx:if="{{item.focusTitle}}" class="vc-history-focus-title">{{item.focusTitle}}</text>
+                  <text wx:if="{{item.focusCopy}}" class="vc-history-focus-copy">{{item.focusCopy}}</text>
+                </view>
+              </view>
+              <view class="vc-history-item-side">
+                <text class="vc-history-score">{{item.scoreLabel || '--'}}</text>
+                <text class="vc-history-time">{{item.startedAtText}}</text>
+                <view class="vc-history-action">
+                  <text>{{item.actionText}}</text>
+                  <text class="vc-history-action-arrow">›</text>
+                </view>
+              </view>
+            </view>
+          </view>
         </view>
       </view>
-    </view>
+    </scroll-view>
   </view>
 </view>

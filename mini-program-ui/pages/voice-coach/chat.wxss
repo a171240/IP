@@ -1,5 +1,9 @@
 @import "theme.wxss";
 
+page {
+  background-color: #0a0e0b;
+}
+
 .vc-chat-page {
   height: 100vh;
   background-color: var(--vc-bg);
@@ -2301,4 +2305,346 @@
 
 .vc-chat-page .footer {
   min-height: 132rpx;
+}
+
+.vc-chat-page .footer {
+  flex-shrink: 0;
+  position: relative;
+  z-index: 34;
+  transform: translateZ(0);
+}
+
+.vc-chat-page .record-btn,
+.vc-chat-page .record-btn:active,
+.vc-chat-page .record-btn.is-recording,
+.vc-chat-page .record-btn.is-canceling {
+  transform: none !important;
+  margin: 0;
+}
+
+.vc-chat-page .record-btn-label {
+  position: relative;
+  z-index: 1;
+  line-height: 1;
+}
+
+.vc-chat-page .record-preview {
+  position: fixed !important;
+  left: 50% !important;
+  right: auto !important;
+  bottom: calc(172rpx + env(safe-area-inset-bottom)) !important;
+  z-index: 36;
+  width: auto;
+  min-width: 152rpx;
+  max-width: 460rpx;
+  transform: translateX(-50%);
+  padding: 12rpx 24rpx;
+  border-radius: 999rpx;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* Real-device bottom alignment: keep the hold-to-talk bar above the safe-area edge. */
+.vc-chat-page .footer {
+  min-height: 154rpx;
+  padding: 14rpx 24rpx calc(54rpx + env(safe-area-inset-bottom));
+  align-items: flex-start;
+}
+
+.vc-chat-page .record-preview {
+  bottom: calc(198rpx + env(safe-area-inset-bottom)) !important;
+}
+
+/* Inline answer hint: keep the record bar fixed and show guidance inside the chat flow. */
+.vc-chat-page .row-main-left .msg-left {
+  width: 100%;
+}
+
+.vc-chat-page .inline-hint-card {
+  width: 100%;
+  max-width: 620rpx;
+  margin: 8rpx auto 0;
+  padding: 24rpx 24rpx 22rpx;
+  box-sizing: border-box;
+  border-radius: 24rpx;
+  border: 1rpx solid rgba(188, 199, 180, 0.12);
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(112, 126, 98, 0.12) 0%, rgba(255, 255, 255, 0) 48%),
+    linear-gradient(180deg, rgba(20, 25, 24, 0.98) 0%, rgba(9, 12, 11, 0.99) 100%);
+  box-shadow:
+    0 18rpx 36rpx rgba(3, 5, 4, 0.24),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.04);
+}
+
+.vc-chat-page .inline-hint-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14rpx;
+  margin-bottom: 18rpx;
+}
+
+.vc-chat-page .inline-hint-icon {
+  width: 44rpx;
+  height: 44rpx;
+  flex: 0 0 44rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vc-chat-page .inline-hint-icon .bulb-icon {
+  transform: scale(0.7);
+  transform-origin: center;
+}
+
+.vc-chat-page .inline-hint-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.vc-chat-page .inline-hint-title {
+  font-size: 30rpx;
+  line-height: 38rpx;
+  font-weight: 800;
+  color: #edf3e8;
+}
+
+.vc-chat-page .inline-hint-sub {
+  margin-top: 6rpx;
+  font-size: 24rpx;
+  line-height: 34rpx;
+  color: rgba(215, 220, 211, 0.58);
+}
+
+.vc-chat-page .inline-hint-loading,
+.vc-chat-page .inline-hint-error {
+  min-height: 120rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  padding: 20rpx;
+  box-sizing: border-box;
+  border-radius: 18rpx;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1rpx solid rgba(188, 199, 180, 0.10);
+  color: rgba(237, 243, 232, 0.72);
+  font-size: 26rpx;
+  line-height: 36rpx;
+  text-align: center;
+}
+
+.vc-chat-page .inline-hint-error {
+  color: #f2c7bd;
+  border-color: rgba(221, 148, 136, 0.18);
+  background: rgba(150, 91, 82, 0.10);
+}
+
+.vc-chat-page .inline-hint-loading-dot {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  background: #9aec77;
+  box-shadow: 0 0 18rpx rgba(154, 236, 119, 0.45);
+  animation: inlineHintPulse 1.1s ease-in-out infinite;
+}
+
+@keyframes inlineHintPulse {
+  0%, 100% { opacity: 0.38; transform: scale(0.86); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+.vc-chat-page .inline-hint-quote-card {
+  position: relative;
+  padding: 22rpx 24rpx;
+  border-radius: 18rpx;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1rpx solid rgba(205, 214, 196, 0.10);
+}
+
+.vc-chat-page .inline-hint-quote-mark {
+  display: block;
+  font-size: 46rpx;
+  line-height: 1;
+  font-family: Georgia, serif;
+  color: rgba(215, 191, 150, 0.74);
+}
+
+.vc-chat-page .inline-hint-quote-end {
+  text-align: right;
+  margin-top: 8rpx;
+}
+
+.vc-chat-page .inline-hint-text {
+  display: block;
+  margin-top: -4rpx;
+  font-size: 28rpx;
+  line-height: 46rpx;
+  color: rgba(237, 243, 232, 0.86);
+  white-space: pre-wrap;
+}
+
+.vc-chat-page .inline-hint-points {
+  margin-top: 18rpx;
+}
+
+.vc-chat-page .inline-hint-points-title {
+  margin-bottom: 10rpx;
+  font-size: 24rpx;
+  line-height: 34rpx;
+  font-weight: 800;
+  color: rgba(237, 243, 232, 0.64);
+}
+
+.vc-chat-page .inline-hint-point {
+  display: flex;
+  align-items: flex-start;
+  gap: 10rpx;
+  margin-bottom: 10rpx;
+}
+
+.vc-chat-page .inline-hint-point-icon {
+  flex: 0 0 auto;
+  color: rgba(215, 191, 150, 0.82);
+  font-size: 24rpx;
+  line-height: 38rpx;
+}
+
+.vc-chat-page .inline-hint-point-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 27rpx;
+  line-height: 40rpx;
+  color: rgba(237, 243, 232, 0.72);
+}
+
+.vc-chat-page .inline-hint-close {
+  width: 100%;
+  height: 78rpx;
+  line-height: 78rpx;
+  margin: 22rpx 0 0;
+  padding: 0;
+  border-radius: 20rpx;
+  border: 1rpx solid rgba(188, 199, 180, 0.12);
+  background: rgba(255, 255, 255, 0.038);
+  color: #eef2ea;
+  font-size: 28rpx;
+  font-weight: 500;
+}
+
+.vc-chat-page .inline-hint-close::after {
+  border: none;
+}
+
+/* Align answer hints with the structured in-call suggestion cards. */
+.vc-chat-page .inline-hint-card {
+  padding: 26rpx 24rpx 22rpx;
+  border-radius: 22rpx;
+}
+
+.vc-chat-page .inline-hint-head {
+  padding-bottom: 18rpx;
+  margin-bottom: 18rpx;
+  border-bottom: 1rpx solid rgba(188, 199, 180, 0.08);
+}
+
+.vc-chat-page .inline-hint-title {
+  font-size: 30rpx;
+  line-height: 38rpx;
+}
+
+.vc-chat-page .inline-hint-sub {
+  font-size: 24rpx;
+  line-height: 34rpx;
+}
+
+.vc-chat-page .inline-hint-section {
+  display: block;
+}
+
+.vc-chat-page .inline-hint-section-title {
+  margin-bottom: 12rpx;
+  font-size: 24rpx;
+  line-height: 32rpx;
+  font-weight: 800;
+  color: rgba(230, 211, 174, 0.92);
+}
+
+.vc-chat-page .inline-hint-source {
+  padding: 18rpx 20rpx;
+  border-radius: 16rpx;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1rpx solid rgba(205, 214, 196, 0.10);
+  font-size: 27rpx;
+  line-height: 42rpx;
+  color: rgba(237, 243, 232, 0.78);
+  white-space: pre-wrap;
+}
+
+.vc-chat-page .inline-hint-divider {
+  height: 1rpx;
+  margin: 18rpx 0;
+  background: rgba(188, 199, 180, 0.08);
+}
+
+.vc-chat-page .inline-hint-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 14rpx;
+  margin-bottom: 14rpx;
+}
+
+.vc-chat-page .inline-hint-step:last-child {
+  margin-bottom: 0;
+}
+
+.vc-chat-page .inline-hint-step-num {
+  width: 38rpx;
+  height: 38rpx;
+  border-radius: 50%;
+  flex: 0 0 38rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2rpx;
+  background: linear-gradient(180deg, #ead9b7 0%, #c9ac7c 100%);
+  color: #1a1510;
+  font-size: 22rpx;
+  font-weight: 900;
+}
+
+.vc-chat-page .inline-hint-step-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 27rpx;
+  line-height: 42rpx;
+  color: rgba(237, 243, 232, 0.84);
+}
+
+.vc-chat-page .inline-hint-polished-card {
+  display: flex;
+  align-items: stretch;
+  padding: 4rpx 0;
+}
+
+.vc-chat-page .inline-hint-polished-bar {
+  width: 7rpx;
+  margin-right: 16rpx;
+  border-radius: 999rpx;
+  flex: 0 0 7rpx;
+  background: linear-gradient(180deg, #ead9b7 0%, #9aa68c 100%);
+}
+
+.vc-chat-page .inline-hint-polished-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 28rpx;
+  line-height: 46rpx;
+  color: rgba(247, 243, 235, 0.90);
+  font-style: italic;
+  white-space: pre-wrap;
+}
+
+.vc-chat-page .inline-hint-close {
+  margin-top: 22rpx;
 }

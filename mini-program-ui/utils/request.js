@@ -134,11 +134,28 @@ function waitForPendingSilentLogin(baseUrl) {
   return pending.then(() => undefined).catch(() => undefined)
 }
 
-function request(opts) {
-  const { baseUrl, url, method = "GET", data, header, __retried401, __baseUrlAttemptIndex = 0 } = opts
-  const candidates = getHttpBaseUrlCandidates(baseUrl)
+function getBaseUrlRetryState(opts) {
+  const { baseUrl, __baseUrlAttemptIndex = 0, __baseUrlCandidates } = opts
+  const candidates = Array.isArray(__baseUrlCandidates) && __baseUrlCandidates.length
+    ? __baseUrlCandidates
+    : getHttpBaseUrlCandidates(baseUrl)
   const normalizedBase = candidates[__baseUrlAttemptIndex] || normalizeBaseUrl(baseUrl)
   const nextBaseUrl = candidates[__baseUrlAttemptIndex + 1] || ""
+
+  return { candidates, normalizedBase, nextBaseUrl }
+}
+
+function buildNextBaseUrlAttempt(opts, candidates) {
+  return {
+    ...opts,
+    __baseUrlCandidates: candidates,
+    __baseUrlAttemptIndex: Number(opts.__baseUrlAttemptIndex || 0) + 1,
+  }
+}
+
+function request(opts) {
+  const { baseUrl, url, method = "GET", data, header, __retried401, __baseUrlAttemptIndex = 0 } = opts
+  const { candidates, normalizedBase, nextBaseUrl } = getBaseUrlRetryState(opts)
   const canRetry401 = !__retried401 && shouldAttachAuth(normalizedBase)
   const canRetryBaseUrl = Boolean(nextBaseUrl) && shouldAttachAuth(normalizedBase)
 
@@ -179,7 +196,7 @@ function request(opts) {
         if (res.statusCode === 401) {
           clearAuthAndRedirect()
         } else if (RETRYABLE_STATUS_CODES.includes(res.statusCode) && canRetryBaseUrl) {
-          request({ ...opts, baseUrl: nextBaseUrl, __baseUrlAttemptIndex: __baseUrlAttemptIndex + 1 })
+          request(buildNextBaseUrlAttempt(opts, candidates))
             .then(resolve)
             .catch(reject)
           return
@@ -195,7 +212,7 @@ function request(opts) {
       },
       fail(err) {
         if (canRetryBaseUrl) {
-          request({ ...opts, baseUrl: nextBaseUrl, __baseUrlAttemptIndex: __baseUrlAttemptIndex + 1 })
+          request(buildNextBaseUrlAttempt(opts, candidates))
             .then(resolve)
             .catch(reject)
           return
@@ -208,9 +225,7 @@ function request(opts) {
 
 function requestText(opts) {
   const { baseUrl, url, method = "GET", data, header, __retried401, __baseUrlAttemptIndex = 0 } = opts
-  const candidates = getHttpBaseUrlCandidates(baseUrl)
-  const normalizedBase = candidates[__baseUrlAttemptIndex] || normalizeBaseUrl(baseUrl)
-  const nextBaseUrl = candidates[__baseUrlAttemptIndex + 1] || ""
+  const { candidates, normalizedBase, nextBaseUrl } = getBaseUrlRetryState(opts)
   const canRetry401 = !__retried401 && shouldAttachAuth(normalizedBase)
   const canRetryBaseUrl = Boolean(nextBaseUrl) && shouldAttachAuth(normalizedBase)
 
@@ -254,7 +269,7 @@ function requestText(opts) {
         if (res.statusCode === 401) {
           clearAuthAndRedirect()
         } else if (RETRYABLE_STATUS_CODES.includes(res.statusCode) && canRetryBaseUrl) {
-          requestText({ ...opts, baseUrl: nextBaseUrl, __baseUrlAttemptIndex: __baseUrlAttemptIndex + 1 })
+          requestText(buildNextBaseUrlAttempt(opts, candidates))
             .then(resolve)
             .catch(reject)
           return
@@ -270,7 +285,7 @@ function requestText(opts) {
       },
       fail(err) {
         if (canRetryBaseUrl) {
-          requestText({ ...opts, baseUrl: nextBaseUrl, __baseUrlAttemptIndex: __baseUrlAttemptIndex + 1 })
+          requestText(buildNextBaseUrlAttempt(opts, candidates))
             .then(resolve)
             .catch(reject)
           return
@@ -283,9 +298,7 @@ function requestText(opts) {
 
 function requestTextWithMeta(opts) {
   const { baseUrl, url, method = "GET", data, header, __retried401, __baseUrlAttemptIndex = 0 } = opts
-  const candidates = getHttpBaseUrlCandidates(baseUrl)
-  const normalizedBase = candidates[__baseUrlAttemptIndex] || normalizeBaseUrl(baseUrl)
-  const nextBaseUrl = candidates[__baseUrlAttemptIndex + 1] || ""
+  const { candidates, normalizedBase, nextBaseUrl } = getBaseUrlRetryState(opts)
   const canRetry401 = !__retried401 && shouldAttachAuth(normalizedBase)
   const canRetryBaseUrl = Boolean(nextBaseUrl) && shouldAttachAuth(normalizedBase)
 
@@ -330,7 +343,7 @@ function requestTextWithMeta(opts) {
         if (res.statusCode === 401) {
           clearAuthAndRedirect()
         } else if (RETRYABLE_STATUS_CODES.includes(res.statusCode) && canRetryBaseUrl) {
-          requestTextWithMeta({ ...opts, baseUrl: nextBaseUrl, __baseUrlAttemptIndex: __baseUrlAttemptIndex + 1 })
+          requestTextWithMeta(buildNextBaseUrlAttempt(opts, candidates))
             .then(resolve)
             .catch(reject)
           return
@@ -347,7 +360,7 @@ function requestTextWithMeta(opts) {
       },
       fail(err) {
         if (canRetryBaseUrl) {
-          requestTextWithMeta({ ...opts, baseUrl: nextBaseUrl, __baseUrlAttemptIndex: __baseUrlAttemptIndex + 1 })
+          requestTextWithMeta(buildNextBaseUrlAttempt(opts, candidates))
             .then(resolve)
             .catch(reject)
           return

@@ -79,7 +79,7 @@
       <view class="op-actions {{item.role === 'customer' ? 'op-actions-left' : 'op-actions-right'}}">
         <view
           wx:if="{{item.role === 'customer' && (item.audio_url || item.ttsFailed || item.text)}}"
-          class="action-chip action-chip-answer {{hintLoadingTurnId === item.id ? 'action-chip-loading' : ''}}"
+          class="action-chip action-chip-answer {{item.hintLoading ? 'action-chip-loading' : ''}}"
           bindtap="openHint"
           data-id="{{item.id}}"
         >
@@ -90,7 +90,7 @@
               <view class="bulb-base"></view>
             </view>
           </view>
-          <text class="action-chip-text action-chip-answer-text">{{hintLoadingTurnId === item.id ? '生成中...' : '参考回应'}}</text>
+          <text class="action-chip-text action-chip-answer-text">{{item.hintLoading ? '生成中...' : (item.hintVisible ? '已展开' : '参考回应')}}</text>
         </view>
 
         <view
@@ -120,6 +120,52 @@
       class="text-card {{item.role === 'customer' ? 'card-customer' : 'card-beautician'}}"
     >
       {{item.text}}
+    </view>
+
+    <view wx:if="{{item.role === 'customer' && item.hintVisible}}" class="inline-hint-card">
+      <view class="inline-hint-head">
+        <view class="inline-hint-icon">
+          <view class="bulb-icon"><view class="bulb-head"></view><view class="bulb-neck"></view><view class="bulb-base"></view></view>
+        </view>
+        <view class="inline-hint-copy">
+          <view class="inline-hint-title">回答建议</view>
+          <view class="inline-hint-sub">基于这句顾客话术，给你一个更自然的回应方向。</view>
+        </view>
+      </view>
+
+      <view wx:if="{{item.hintLoading}}" class="inline-hint-loading">
+        <view class="inline-hint-loading-dot"></view>
+        <text>建议生成中...</text>
+      </view>
+      <view wx:elif="{{item.hintError}}" class="inline-hint-error">{{item.hintError}}</view>
+      <block wx:else>
+        <view wx:if="{{item.text}}" class="inline-hint-section">
+          <view class="inline-hint-section-title">顾客原话</view>
+          <view class="inline-hint-source">{{item.text}}</view>
+        </view>
+
+        <view wx:if="{{item.text && ((item.hintPoints && item.hintPoints.length) || item.hintText)}}" class="inline-hint-divider"></view>
+
+        <view class="inline-hint-section" wx:if="{{item.hintPoints && item.hintPoints.length}}">
+          <view class="inline-hint-section-title">回应结构</view>
+          <view class="inline-hint-step" wx:for="{{item.hintPoints}}" wx:for-item="point" wx:for-index="pointIndex" wx:key="*this">
+            <view class="inline-hint-step-num">{{pointIndex + 1}}</view>
+            <text class="inline-hint-step-text">{{point}}</text>
+          </view>
+        </view>
+
+        <view wx:if="{{item.hintPoints && item.hintPoints.length && item.hintText}}" class="inline-hint-divider"></view>
+
+        <view class="inline-hint-section inline-hint-polished-section" wx:if="{{item.hintText}}">
+          <view class="inline-hint-section-title">推荐表达</view>
+          <view class="inline-hint-polished-card">
+            <view class="inline-hint-polished-bar"></view>
+            <text class="inline-hint-polished-text">"{{item.hintText}}"</text>
+          </view>
+        </view>
+      </block>
+
+      <button class="inline-hint-close" bindtap="closeHint" data-id="{{item.id}}">收起</button>
     </view>
 
     <view wx:if="{{item.role === 'beautician' && item.showSuggestions}}" class="suggest-card">
@@ -274,12 +320,12 @@
       bindtouchend="onRecordEnd"
       bindtouchcancel="onRecordCancel"
     >
-      <text class="record-btn-label">按住说话</text>
+      <text class="record-btn-label">{{recordCanceling ? '松开取消' : (recording ? '松开发送' : '按住说话')}}</text>
     </view>
   </view>
 
-  <view class="record-preview" wx:if="{{recording}}">
-    {{recordCanceling ? '松开取消' : (recordingPreviewText || '松开发送')}}
+  <view class="record-preview" wx:if="{{recording && recordCanceling}}">
+    松开取消
   </view>
 
   <view class="modal-mask" wx:if="{{endModalVisible}}" bindtap="closeEndModal"></view>
@@ -287,35 +333,6 @@
     <view class="end-title">你确定要结束这次练习吗？</view>
     <button class="end-primary" bindtap="endAndViewReport">结束对话，并查看测评报告</button>
     <button class="end-secondary" bindtap="endOnly">仅结束对话</button>
-  </view>
-
-  <view class="modal-mask" wx:if="{{hintVisible}}" bindtap="closeHint"></view>
-  <view class="hint-sheet" wx:if="{{hintVisible}}">
-    <view class="hint-handle"></view>
-    <view class="hint-header">
-      <view class="hint-title-row">
-        <view class="hint-title-icon">
-          <view class="bulb-icon"><view class="bulb-head"></view><view class="bulb-neck"></view><view class="bulb-base"></view></view>
-        </view>
-        <view class="hint-title">回答建议</view>
-      </view>
-      <view class="hint-sub">基于这句顾客话术，给你一个更自然的回应方向。</view>
-    </view>
-    <view class="hint-body">
-      <view class="hint-quote-card">
-        <text class="hint-quote-mark">"</text>
-        <text class="hint-text">{{hintText}}</text>
-        <text class="hint-quote-mark hint-quote-end">"</text>
-      </view>
-      <view class="hint-points" wx:if="{{hintPoints.length}}">
-        <view class="hint-points-title">关键要点：</view>
-        <view class="hint-point" wx:for="{{hintPoints}}" wx:key="*this">
-          <text class="hint-point-icon">✦</text>
-          <text class="hint-point-text">{{item}}</text>
-        </view>
-      </view>
-    </view>
-    <button class="hint-close" bindtap="closeHint">关闭</button>
   </view>
 
   <view class="modal-mask" wx:if="{{debugPanelVisible}}" bindtap="closeDebugPanel"></view>
