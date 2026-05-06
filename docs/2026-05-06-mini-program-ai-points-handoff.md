@@ -1,13 +1,58 @@
 # 2026-05-06 小程序 AI 点与出差交接说明
 
-## 当前结论
+## Mac 接手先看这里
 
-今天的主线已经拆成两个可拉取的项目：
+Mac 上不要按 Windows 盘符理解项目。以后只按 GitHub 仓库接手：
 
-- 小程序前端：`E:\美业话镜`，需要作为独立小程序仓库维护。
-- 后端/API：`D:\IP网站`，GitHub 仓库 `a171240/IP`，当前分支 `codex/mp-ui-gptpro-handoff`。
+小程序前端：
 
-注意：`D:\IP网站\mini-program-ui` 不是本次小程序前端进度的来源，不要把它当成当前小程序 CLR 继续改。
+```bash
+git clone https://github.com/a171240/meiye-huajing-miniprogram.git
+cd meiye-huajing-miniprogram
+```
+
+后端/API：
+
+```bash
+git clone https://github.com/a171240/IP.git
+cd IP
+git checkout codex/mp-ui-gptpro-handoff
+```
+
+Windows 上的 `E:\美业话镜` 只是小程序前端仓库的旧本地路径；`D:\IP网站` 只是后端仓库的旧本地路径。Mac 上没有 D/E 盘，不需要照着盘符找。
+
+注意：后端仓库里的 `mini-program-ui` 不是本次小程序前端进度的来源，不要把它当成当前小程序 CLR 继续改。当前小程序前端以 `a171240/meiye-huajing-miniprogram` 为准。
+
+## 四个线程汇总
+
+这份交接按今天截图里的四个线程来整理，覆盖今天已经落到代码仓库里的内容。注意：我不能直接读取其他已关闭线程的完整聊天记录，所以这里以“线程名称 + 当前两个仓库里的实际代码变更”为准。
+
+1. 找到 E 盘的小程序
+   - 明确当前小程序前端不是后端仓库里的 `mini-program-ui`，而是独立项目。
+   - 已创建并推送私有仓库：`a171240/meiye-huajing-miniprogram`。
+   - 小程序仓库已包含当前前端快照、AI 点文档、Mac 接手说明。
+
+2. 定位到海报页面
+   - 海报页完成 UI/按钮路径检查后的整理。
+   - 后端补齐海报需求整理、素材上传、生成、历史记录、图片读取、语音转写接口。
+   - 海报生成、修字、重做分别接入小程序 AI 点动作码和失败退款。
+
+3. 定位到发文页面
+   - 小红书发文页完成正文生成、换一版、封面、换风格路径整理。
+   - 新增小程序专用封面接口：`/api/mp/xhs/generate-cover-image`。
+   - 小红书正文和封面生成已接入 AI 点扣点与流水。
+
+4. 定位到我的页面并检查按钮
+   - “我的”页、充值页、工作台等入口统一成 AI 点/服务包表达。
+   - 后端 `profile` / `workbench` 返回 AI 点余额、账号角色、公司/门店字段。
+   - 按钮检查后保留当前页面可用路径；P1-P10 旧工作流暂不纳入本轮小程序 AI 点体系。
+
+后续在这个线程里继续完成了跨前后端落地：
+
+- 小程序 AI 点后端模块：`lib/mp/ai-points.server.ts`
+- 小程序报价接口：`app/api/mp/billing/quote/route.ts`
+- Supabase 迁移：`supabase/migrations/20260506_add_mp_ai_points_backend.sql`
+- Vercel 生产部署：`dpl_AGFL5gqZ2LLkijEMyvPLBMRi81ko`
 
 ## 已完成事项
 
@@ -124,36 +169,19 @@
 
 P1-P10 工作流暂不纳入本轮小程序 AI 点体系。
 
-## Mac 接手方式
-
-后端：
-
-```bash
-git clone https://github.com/a171240/IP.git
-cd IP
-git checkout codex/mp-ui-gptpro-handoff
-```
-
-小程序前端仓库单独拉取：
-
-```bash
-git clone https://github.com/a171240/meiye-huajing-miniprogram.git
-cd meiye-huajing-miniprogram
-```
-
 ## 已验证
 
 本地后端：
 
 ```bash
-D:\IP网站\node_modules\.bin\tsc.cmd --noEmit --pretty false
+node_modules/.bin/tsc --noEmit --pretty false
 ```
 
 前端关键 JS：
 
 ```bash
-node --check E:\美业话镜\pages\poster\index.js
-node --check E:\美业话镜\pages\xiaohongshu\index.js
+node --check pages/poster/index.js
+node --check pages/xiaohongshu/index.js
 ```
 
 Vercel 构建：
