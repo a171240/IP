@@ -18,8 +18,8 @@ function apiKey() {
   return (process.env.APIMART_IMAGE_API_KEY || process.env.APIMART_API_KEY || "").trim()
 }
 
-function imageModel() {
-  return (process.env.APIMART_IMAGE_MODEL || "gpt-image-2").trim()
+export function imageModel() {
+  return (process.env.APIMART_IMAGE_MODEL || process.env.OPENAI_IMAGE_MODEL || "gpt-image-1.5").trim()
 }
 
 function officialFallback() {
@@ -169,12 +169,13 @@ async function pollTask(taskId: string) {
   throw new Error("image_task_timeout")
 }
 
-export async function generateGptImage2(opts: GenerateImageOptions): Promise<{ imageUrl: string }> {
+export async function generateGptImage2(opts: GenerateImageOptions): Promise<{ imageUrl: string; model: string }> {
+  const model = imageModel()
   const fullPrompt = [opts.prompt, opts.negativePrompt ? `\nNegative prompt: ${opts.negativePrompt}` : ""]
     .join("")
     .trim()
   const payload: Record<string, unknown> = {
-    model: imageModel(),
+    model,
     prompt: [opts.prompt, opts.negativePrompt ? `\n负面提示词：${opts.negativePrompt}` : ""].join("").trim(),
     n: 1,
     size: opts.size || process.env.APIMART_IMAGE_SIZE || "4:5",
@@ -191,11 +192,11 @@ export async function generateGptImage2(opts: GenerateImageOptions): Promise<{ i
   })
 
   const directUrl = extractImageUrl(submitted)
-  if (directUrl) return { imageUrl: directUrl }
+  if (directUrl) return { imageUrl: directUrl, model }
 
   const taskId = extractTaskId(submitted)
   if (!taskId) throw new Error("image_task_id_missing")
 
   const imageUrl = await pollTask(taskId)
-  return { imageUrl }
+  return { imageUrl, model }
 }

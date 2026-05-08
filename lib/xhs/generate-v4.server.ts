@@ -402,7 +402,7 @@ function buildSystemPrompt(opts: { contentType: XhsContentType; conflictLevel: C
     "- cover_style_id：必须从以下风格ID中选择一个，并且要根据你刚写出的正文内容选择，不要按内容类型机械套模板。",
     buildCoverStyleCatalogText(),
     "- cover_style_label：输出对应中文风格名；cover_style_reason：一句话说明为什么这篇正文适合这个视觉风格。",
-    "- cover_prompt：直接给 GPT-Image-2 使用的完整提示词，必须包含画幅、版式、文字、字体、风格、约束；不得只给一句描述。",
+    "- cover_prompt：直接给当前 GPT Image 生图模型使用的完整提示词，必须包含画幅、版式、文字、字体、风格、约束；不得只给一句描述。",
     "- cover_negative：单独给负面提示词。",
     "- pinned_comment：给两条路径（本地生活平台优先/短视频平台备用），都用“搜索门店昵称+地标/商圈”的方式表达；最后给出三条承诺口径（不加价/不缩水/可拒绝）。",
     "- reply_templates：3条（反推销/敏感肌合规/本地怎么找店，不写平台名）。",
@@ -449,7 +449,7 @@ function buildUserPrompt(input: GenerateV4Input, beautyContext: BeautyContext) {
     buildBeautySourcePackText(beautyContext),
     "",
     "生成前请先在内部完成：选择一个具体顾客主角，判断她处在千机塔第4-6层的触发场景与即时情绪，再把内容写成可发布笔记；不要输出分析过程。",
-    "封面提示词要直接可用于 GPT-Image-2，不能只输出主副标题。",
+    "封面提示词要直接可用于当前 GPT Image 生图模型，不能只输出主副标题。",
   ]
     .filter(Boolean)
     .join("\n")
@@ -499,7 +499,7 @@ function buildRevisionPrompt(opts: {
     "3) 医疗合规：不得承诺疗效，不使用治疗/根治类词。",
     "4) 若当前档位为 hard 仍无法降风险，请把语气降到 standard 或 safe（更克制，不引战）。",
     "5) 保留具体顾客场景、即时情绪和判断标准，不要改成空泛广告腔。",
-    "6) 同步重写 cover_prompt/cover_negative，仍然直接可用于 GPT-Image-2。",
+    "6) 同步重写 cover_prompt/cover_negative，仍然直接可用于当前 GPT Image 生图模型。",
     "",
     "封面提示词规则：",
     buildCoverPromptRequirements(opts.beautyContext),

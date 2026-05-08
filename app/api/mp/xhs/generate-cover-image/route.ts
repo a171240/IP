@@ -8,7 +8,7 @@ import {
   type MpAiBillingContext,
 } from "@/lib/mp/ai-points.server"
 import { generateGptImage2 } from "@/lib/posters/gpt-image-2.server"
-import { buildXhsUpstreamUrl, trackServerEvent } from "@/lib/xhs/proxy.server"
+import { trackServerEvent } from "@/lib/xhs/proxy.server"
 import { uploadDataUrlAsset, uploadRemoteAsset } from "@/lib/xhs/assets.server"
 
 export const runtime = "nodejs"
@@ -49,6 +49,70 @@ function normalizeResolution(value: string) {
   return value === "1k" || value === "2k" || value === "4k" ? value : "2k"
 }
 
+function getNestedRecord(body: Record<string, unknown>, name: string) {
+  const value = body[name]
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null
+}
+
+function compactText(value: string, max = 900) {
+  return value.replace(/\s+/g, " ").trim().slice(0, max)
+}
+
+function getFallbackCoverTitle(body: Record<string, unknown>) {
+  const preExtracted = getNestedRecord(body, "preExtracted")
+  const title =
+    getTextField(body, ["coverTitle", "cover_title", "title"]) ||
+    (preExtracted ? getTextField(preExtracted, ["title"]) : "")
+  return title || "补水前先看这3点"
+}
+
+function buildPromptFromContent(body: Record<string, unknown>) {
+  const content = getTextField(body, ["content", "resultContent", "body", "text"])
+  if (!content) return ""
+
+  const title = getFallbackCoverTitle(body)
+  const preExtracted = getNestedRecord(body, "preExtracted")
+  const rawKeywords = preExtracted?.keywords
+  const keywords = Array.isArray(rawKeywords)
+    ? rawKeywords.map((item) => String(item || "").trim()).filter(Boolean).slice(0, 8).join("、")
+    : ""
+
+  return [
+    "画幅比例3:4竖版。",
+    "为生活美容/皮肤管理小红书笔记生成一张可直接发布的首图封面。",
+    "",
+    "【必须原样显示的中文文字】",
+    `主标题：${title}`,
+    "副标题：不红不干，安心出门",
+    "",
+    "【根据正文提炼视觉】",
+    compactText(content),
+    keywords ? `参考关键词：${keywords}` : "",
+    "",
+    "【设计要求】",
+    "选择 clean-info-card 或高级杂志信息卡方向，不要生成空白水彩模板。",
+    "主标题必须最大、最清楚；副标题更小；手机端缩略图也能一眼读清。",
+    "画面必须有明确设计层次：信息卡、细线分隔、材质背景或局部护理场景至少两项。",
+    "暖米白/浅杏/奶油色为主，少量陶土色或薄荷绿点缀；高级、干净、专业，不要廉价促销感。",
+    "不要人物脸、产品瓶、logo、二维码、电话、微信、价格、优惠、平台名。",
+  ]
+    .filter(Boolean)
+    .join("\n")
+}
+
+function strengthenMiniProgramCoverPrompt(prompt: string) {
+  return [
+    prompt.trim(),
+    "",
+    "【小程序封面质量底线】",
+    "这张图必须是完成度高的小红书首图设计，不是背景图。",
+    "不要空白水彩模板、淡色抽象弧形堆叠、纯背景加大字、廉价Canva模板、素材站样图。",
+    "必须有明确版式、文字层级、视觉焦点和美业质感；手机端缩略图里主标题也要清楚。",
+    "如果标题是清单/几点/先看/判断标准，请做成高级信息卡或克制警示卡，而不是温柔空白海报。",
+    "中文文字必须严格按提示词原样显示，不要错字、乱码、多余文字。",
+  ].join("\n")
+}
+
 function isRegenerateRequest(body: Record<string, unknown>) {
   return body.regenerate === true || body.action_code === "xhs.regenerate.cover" || body.actionCode === "xhs.regenerate.cover"
 }
@@ -68,25 +132,6 @@ async function loadDraftCoverAsset(opts: {
   return {
     prompt: typeof data?.cover_prompt === "string" ? data.cover_prompt.trim() : "",
     negativePrompt: typeof data?.cover_negative === "string" ? data.cover_negative.trim() : "",
-  }
-}
-
-async function requestUpstreamCover(body: Record<string, unknown>) {
-  const upstream = await fetch(buildXhsUpstreamUrl("/api/generate-cover-image"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  })
-
-  const text = await upstream.text().catch(() => "")
-  if (!upstream.ok) {
-    return { ok: false as const, status: upstream.status, text }
-  }
-
-  try {
-    return { ok: true as const, json: JSON.parse(text) as UpstreamGenerateCoverResponse }
-  } catch {
-    return { ok: false as const, status: 502, text: "上游返回非JSON" }
   }
 }
 
@@ -146,58 +191,50 @@ export async function POST(request: NextRequest) {
       prompt = draftAsset.prompt
       negativePrompt = negativePrompt || draftAsset.negativePrompt
     } catch {
-      // Keep compatibility fallback below.
+      // Fall back to prompt synthesis from the request content below.
     }
   }
+
+  if (!prompt) {
+    prompt = buildPromptFromContent(requestBody)
+  }
+
+  if (!prompt) {
+    await refundCharge("xhs_cover_prompt_missing", "missing cover prompt/content")
+    return NextResponse.json(
+      { success: false, ok: false, error: "缺少封面提示词或正文内容，无法生成高质量封面" },
+      { status: 400 }
+    )
+  }
+
+  prompt = strengthenMiniProgramCoverPrompt(prompt)
 
   let json: UpstreamGenerateCoverResponse | null = null
 
-  if (prompt) {
-    try {
-      const generated = await generateGptImage2({ prompt, negativePrompt, size, resolution })
-      json = {
-        success: true,
-        imageUrl: generated.imageUrl,
-        imageBase64: null,
-        prompt,
-        negativePrompt,
-        source: "gpt-image-2",
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error || "image_failed")
-      await trackServerEvent({
-        request,
-        event: "mp_xhs_cover_gpt_image_fail",
-        props: { source: "mp", message: message.slice(0, 180) },
-      })
-
-      if (!message.includes("APIMART_API_KEY missing")) {
-        await refundCharge("xhs_cover_gpt_image_failed", message)
-        return NextResponse.json(
-          { success: false, ok: false, error: `GPT-Image-2生成失败：${message.slice(0, 240)}` },
-          { status: 502 }
-        )
-      }
+  try {
+    const generated = await generateGptImage2({ prompt, negativePrompt, size, resolution })
+    json = {
+      success: true,
+      imageUrl: generated.imageUrl,
+      imageBase64: null,
+      prompt,
+      negativePrompt,
+      model: generated.model,
+      source: generated.model,
     }
-  }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error || "image_failed")
+    await trackServerEvent({
+      request,
+      event: "mp_xhs_cover_gpt_image_fail",
+      props: { source: "mp", message: message.slice(0, 180) },
+    })
 
-  if (!json) {
-    const upstream = await requestUpstreamCover(requestBody)
-    if (!upstream.ok) {
-      await trackServerEvent({ request, event: "mp_xhs_cover_fail", props: { source: "mp", status: upstream.status } })
-      await refundCharge("xhs_cover_upstream_failed", upstream.text || String(upstream.status))
-      return NextResponse.json(
-        {
-          success: false,
-          ok: false,
-          error: upstream.status === 502 ? upstream.text : "上游服务错误",
-          status: upstream.status,
-          details: upstream.text.slice(0, 600),
-        },
-        { status: 502 }
-      )
-    }
-    json = upstream.json
+    await refundCharge("xhs_cover_gpt_image_failed", message)
+    return NextResponse.json(
+      { success: false, ok: false, error: `封面高质量生图失败：${message.slice(0, 240)}` },
+      { status: 502 }
+    )
   }
 
   if (json && json.success !== undefined && !json.success) {

@@ -137,7 +137,8 @@ export async function POST(request: NextRequest) {
         imageBase64: null,
         prompt,
         negativePrompt,
-        source: "gpt-image-2",
+        model: generated.model,
+        source: generated.model,
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error || "image_failed")
@@ -150,7 +151,7 @@ export async function POST(request: NextRequest) {
       // Missing local/staging image keys can still use the old service as a compatibility fallback.
       if (!message.includes("APIMART_API_KEY missing")) {
         return NextResponse.json(
-          { success: false, error: `GPT-Image-2生成失败：${message.slice(0, 240)}` },
+          { success: false, error: `GPT Image生成失败：${message.slice(0, 240)}` },
           { status: 502 }
         )
       }

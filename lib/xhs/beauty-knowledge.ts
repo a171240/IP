@@ -60,7 +60,8 @@ export type BeautyContext = {
 
 const COMMON_NEGATIVE_PROMPT = [
   "人物照片，产品图，英文字母，二维码，水印，logo，电话，微信号，平台界面，价格，优惠，地址，复杂背景，",
-  "文字变形扭曲，文字模糊，错别字，乱码，多余文字，小字密集，冷色科技感，3D效果，卡通风格，廉价促销风",
+  "文字变形扭曲，文字模糊，错别字，乱码，多余文字，小字密集，冷色科技感，3D效果，卡通风格，廉价促销风，",
+  "空白水彩模板，Canva模板感，淡色抽象弧形堆叠，廉价贴纸，纯背景加大字，低清截图感",
 ].join("")
 
 const COVER_VISUAL_STYLE_IDS: BeautyCoverStyleId[] = [
@@ -80,11 +81,11 @@ const COVER_VISUAL_STYLES: Record<
 > = {
   "soft-minimal-poster": {
     label: "温柔极简海报",
-    bestFor: "补水、敏感、泛红、基础护理、语气温和的体验内容",
-    layout: "居中大标题，副标题靠下，四周留白充足，手机端一眼读完",
-    palette: "暖米白、浅杏、低饱和玫瑰色，整体明亮干净",
-    visualCue: "柔软纸张质感、轻微护理氛围、无人物无产品的抽象暖光背景",
-    typography: "现代中文黑体，主标题加粗，副标题中等字重，字距正常",
+    bestFor: "敏感、泛红、基础护理、语气温和但仍需要高级质感的体验内容",
+    layout: "主标题占画面中上部，副标题下方，配一个清晰信息卡/细线框/材质层次，不能只有空白背景",
+    palette: "暖米白、浅杏、低饱和玫瑰色，整体明亮干净但有明确层次",
+    visualCue: "高级皮肤管理杂志感，柔光、干净护理空间局部、纸张/玻璃/水纹材质细节，不出现人物脸和具体产品瓶身",
+    typography: "现代中文黑体，主标题加粗，副标题中等字重，字距正常，缩略图也清楚",
   },
   "editorial-magazine": {
     label: "高级杂志封面",
@@ -345,7 +346,8 @@ function selectCoverStyleId(opts: {
   if (opts.entryClass === "local_decision") return "editorial-magazine"
   if (opts.entryClass === "boundary_risk") return "clean-info-card"
   if (opts.contentType === "education") return "clean-info-card"
-  if (includesAny(text, ["补水", "敏感", "泛红", "干", "舒缓", "修护"])) return "soft-minimal-poster"
+  if (includesAny(text, ["补水", "清洁", "黑头", "毛孔", "闭口", "粉刺"])) return "clean-info-card"
+  if (includesAny(text, ["敏感", "泛红", "舒缓", "修护"])) return "soft-minimal-poster"
   if (includesAny(text, ["活动", "老客", "体验", "护理"])) return "premium-still-life"
 
   return "clean-info-card"
@@ -522,16 +524,19 @@ export function buildCoverPromptRequirements(ctx: BeautyContext) {
   return [
     "封面提示词必须由你直接生成，后端不会再帮你拼版式。",
     "cover_prompt 第一行必须是：画幅比例3:4竖版。",
+    "封面必须是可直接发布的小红书首图设计，不是背景图。必须有明确版式、文字层级、视觉焦点和美业质感。",
     "视觉风格必须根据生成正文的真实内容智能选择，不要把“攻略/科普/避雷/对比”硬绑定到固定画风。",
+    "如果标题含“3点/三点/几点/清单/先看/判断/避雷/标准”，优先选择 clean-info-card 或 contrast-warning-poster，不要选择纯极简水彩背景。",
     "可选视觉风格如下，cover_style_id 必须从中选择一个：",
     buildCoverStyleCatalogText(),
     "",
     `当前默认建议：${plan.id}（${plan.label}）。${plan.reason}`,
     buildCoverStylePromptBlock(plan),
     "提示词必须包含要生成的中文主标题和副标题，并要求严格原样显示。",
+    "提示词必须写清楚：主标题字号最大、手机端缩略图可读；副标题明显更小；画面至少有2个设计层次（信息卡、细线分隔、材质背景、局部护理场景、色块之一）。",
     "封面只做单张小红书首图，不做多页信息图，不放门店信息、价格、优惠、地址、平台名、二维码、电话、微信号、logo、水印。",
     "所有文字必须为清晰、准确、简体中文；不要乱码、错别字、英文、多余文字；不要把标题改写成别的句子。",
-    "除非正文明确适合轻插画，否则不要默认手绘、黑板、报纸、贴纸风；优先干净、现代、手机端高可读的封面。",
+    "不要生成空白水彩模板、淡色抽象弧形堆叠、纯背景加大字、廉价Canva模板、素材站样图。优先干净、现代、手机端高可读的美业封面。",
     "cover_negative 单独输出，覆盖：人物照片、产品图、英文字母、二维码、水印、复杂背景、文字变形、文字模糊、乱码、冷色科技感、3D、卡通、廉价促销风。",
   ].join("\n")
 }
@@ -584,6 +589,7 @@ export function normalizeCoverAsset(opts: {
           `副标题：${sub}`,
           "",
           "【输出目标】手机端高可读，暖米白/浅杏/奶油色等暖调优先，克制、干净、有情绪停顿感；不要促销感，不要信息过载。",
+          "【质量底线】必须像专业美业账号首图，不要空白水彩模板、纯背景大字、低成本素材感。",
         ].join("\n")
 
   const withRatio = richPrompt.startsWith("画幅比例3:4竖版。") ? richPrompt : `画幅比例3:4竖版。\n${richPrompt}`
