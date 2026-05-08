@@ -4,7 +4,9 @@ type GenerateImageOptions = {
   prompt: string
   negativePrompt?: string
   size: string
-  resolution: string
+  resolution?: string
+  quality?: string
+  outputFormat?: string
   imageUrls?: string[]
 }
 
@@ -19,11 +21,7 @@ function apiKey() {
 }
 
 export function imageModel() {
-  return (process.env.APIMART_IMAGE_MODEL || process.env.OPENAI_IMAGE_MODEL || "gpt-image-1.5").trim()
-}
-
-function officialFallback() {
-  return String(process.env.APIMART_IMAGE_OFFICIAL_FALLBACK || "").trim().toLowerCase() === "true"
+  return "gpt-image-2"
 }
 
 function pollTimeoutMs() {
@@ -37,8 +35,8 @@ function requestTimeoutMs() {
 }
 
 function maxRetries() {
-  const v = Number(process.env.APIMART_IMAGE_MAX_RETRIES || 2)
-  return Number.isFinite(v) && v >= 0 ? Math.min(Math.floor(v), 5) : 2
+  const v = Number(process.env.APIMART_IMAGE_MAX_RETRIES || 0)
+  return Number.isFinite(v) && v >= 0 ? Math.min(Math.floor(v), 5) : 0
 }
 
 function sleep(ms: number) {
@@ -171,20 +169,20 @@ async function pollTask(taskId: string) {
 
 export async function generateGptImage2(opts: GenerateImageOptions): Promise<{ imageUrl: string; model: string }> {
   const model = imageModel()
-  const fullPrompt = [opts.prompt, opts.negativePrompt ? `\nNegative prompt: ${opts.negativePrompt}` : ""]
-    .join("")
-    .trim()
+  const fullPrompt = opts.prompt.trim()
   const payload: Record<string, unknown> = {
     model,
-    prompt: [opts.prompt, opts.negativePrompt ? `\n负面提示词：${opts.negativePrompt}` : ""].join("").trim(),
+    prompt: fullPrompt,
     n: 1,
-    size: opts.size || process.env.APIMART_IMAGE_SIZE || "4:5",
-    resolution: opts.resolution || process.env.APIMART_IMAGE_RESOLUTION || "2k",
+    size: opts.size || process.env.APIMART_IMAGE_SIZE || "3:4",
   }
-  payload.prompt = fullPrompt
+  const resolution = opts.resolution || process.env.APIMART_IMAGE_RESOLUTION || ""
+  const quality = opts.quality || process.env.APIMART_IMAGE_QUALITY || ""
+  const outputFormat = opts.outputFormat || process.env.APIMART_IMAGE_OUTPUT_FORMAT || ""
+  if (resolution) payload.resolution = resolution
+  if (quality) payload.quality = quality
+  if (outputFormat) payload.output_format = outputFormat
   if (opts.imageUrls?.length) payload.image_urls = opts.imageUrls.slice(0, 16)
-
-  if (officialFallback()) payload.official_fallback = true
 
   const submitted = await requestJson("/images/generations", {
     method: "POST",

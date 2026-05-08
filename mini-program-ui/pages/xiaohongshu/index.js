@@ -85,6 +85,9 @@ Page({
     coverTitle: "",
     coverPrompt: "",
     coverNegative: "",
+    coverStyleId: "",
+    coverStyleLabel: "",
+    coverStyleReason: "",
     pinnedComment: "",
     resultTags: [],
     dangerStatusText: "未检测",
@@ -175,6 +178,9 @@ Page({
         pinnedComment: d.pinned_comment || "",
         coverPrompt: d.cover_prompt || "",
         coverNegative: d.cover_negative || "",
+        coverStyleId: d.cover_style_id || "",
+        coverStyleLabel: d.cover_style_label || "",
+        coverStyleReason: d.cover_style_reason || "",
         resultTags: tags,
         dangerStatusText,
         dangerStatusClass,
@@ -235,6 +241,9 @@ Page({
       pinnedComment: "",
       coverPrompt: "",
       coverNegative: "",
+      coverStyleId: "",
+      coverStyleLabel: "",
+      coverStyleReason: "",
       resultTags: [],
       dangerStatusText: "检测中...",
       dangerStatusClass: "",
@@ -273,6 +282,9 @@ Page({
         pinnedComment: r.pinnedComment || "",
         coverPrompt: r.coverPrompt || "",
         coverNegative: r.coverNegative || "",
+        coverStyleId: r.coverStyleId || "",
+        coverStyleLabel: r.coverStyleLabel || "",
+        coverStyleReason: r.coverStyleReason || "",
         resultTags: Array.isArray(r.tags) ? r.tags : [],
       })
 
@@ -350,7 +362,7 @@ Page({
   },
 
   async handleGenerateCover() {
-    const { resultContent, contentType, coverTitle, resultTitle, resultTags, draftId, coverPrompt, coverNegative } = this.data
+    const { resultContent, contentType, coverTitle, resultTitle, resultTags, draftId, coverStyleId, coverStyleReason } = this.data
 
     if (!resultContent) {
       wx.showToast({ title: "请先生成文案", icon: "none" })
@@ -367,10 +379,9 @@ Page({
         data: {
           content: resultContent,
           contentType,
-          prompt: coverPrompt || "",
-          negativePrompt: coverNegative || "",
+          ...(coverStyleId ? { coverStyleId } : {}),
+          ...(coverStyleReason ? { coverStyleReason } : {}),
           size: "3:4",
-          resolution: "2k",
           ...(draftId ? { draft_id: draftId } : {}),
           preExtracted: {
             title: coverTitle || resultTitle,

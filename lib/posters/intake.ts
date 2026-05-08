@@ -98,6 +98,46 @@ function joinClean(parts: Array<string | null | undefined>, sep = "") {
   return parts.map((part) => asText(part)).filter(Boolean).join(sep)
 }
 
+function hasBeautySignal(...values: Array<string | undefined>) {
+  const text = values.map((value) => asText(value)).join(" ")
+  return /美容|皮肤|护肤|美甲|美睫|养生|面部|补水|清洁|舒缓|提亮|焕颜/.test(text)
+}
+
+function defaultCampaignDate(...values: Array<string | undefined>) {
+  const text = values.map((value) => asText(value)).join(" ")
+  if (/五一|劳动节/.test(text)) return "五一期间"
+  if (/520/.test(text)) return "520期间"
+  if (/七夕/.test(text)) return "七夕期间"
+  if (/女神节/.test(text)) return "女神节期间"
+  if (/周年/.test(text)) return "周年庆期间"
+  return "近期可约"
+}
+
+function defaultSubline(opts: {
+  industry: string
+  shopType: string
+  campaignTitle: string
+  dateRange: string
+  audience?: string
+}) {
+  const haystack = `${opts.industry} ${opts.shopType} ${opts.campaignTitle} ${opts.dateRange} ${opts.audience || ""}`
+  if (/五一|劳动节/.test(haystack)) return "假期前，把好状态养回来"
+  if (/520|七夕/.test(haystack)) return "把好状态留给重要时刻"
+  if (/女神节/.test(haystack)) return "把今天的好状态送给自己"
+  if (hasBeautySignal(haystack)) return "把好状态留给重要时刻"
+  return "把到店体验安排得更清楚"
+}
+
+function defaultSellingPoints(industry: string, shopType: string) {
+  if (hasBeautySignal(industry, shopType)) return "补水｜清洁｜舒缓｜提亮"
+  return "真实到店｜服务清楚｜新手友好"
+}
+
+function defaultOfferText(industry: string, shopType: string) {
+  if (hasBeautySignal(industry, shopType)) return "到店护理体验礼"
+  return "到店专属体验"
+}
+
 function normalizeTemplateId(value: unknown) {
   const id = asText(value, 8).toUpperCase()
   return TEMPLATE_STYLE[id] ? id : ""
@@ -274,9 +314,11 @@ export function buildPosterBrief(opts: {
   const projectName = merged.projectName || asText(opts.profile?.main_offer_name) || `${shopType}主推项目`
   const campaignTitle = merged.campaignTitle || merged.headline || `${storeName}活动`
   const headline = merged.headline || campaignTitle || projectName
-  const subline = merged.subline || `适合想了解${shopType}的本地用户`
-  const sellingPoints = merged.sellingPoints || "真实到店｜服务清楚｜新手友好"
-  const cta = merged.cta || "立即预约"
+  const dateRange = merged.dateRange || defaultCampaignDate(campaignTitle, merged.posterGoal, merged.constraints)
+  const subline = merged.subline || defaultSubline({ industry, shopType, campaignTitle, dateRange, audience: merged.audience })
+  const sellingPoints = merged.sellingPoints || defaultSellingPoints(industry, shopType)
+  const offerText = merged.offerText || defaultOfferText(industry, shopType)
+  const cta = merged.cta || "预约到店"
   const serviceRule = promisesToRule(opts.profile?.promises) || "先了解 · 再决定"
 
   return {
@@ -292,8 +334,8 @@ export function buildPosterBrief(opts: {
     subline,
     audience: merged.audience || "本地潜在顾客",
     sellingPoints,
-    offerText: merged.offerText || "到店专属权益",
-    dateRange: merged.dateRange || "近期可约",
+    offerText,
+    dateRange,
     cta,
     constraints: merged.constraints || "不要夸大承诺，不要低价土味风",
     serviceRule,

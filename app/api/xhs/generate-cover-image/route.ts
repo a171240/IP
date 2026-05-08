@@ -4,6 +4,13 @@ import { generateGptImage2 } from "@/lib/posters/gpt-image-2.server"
 import type { BillingContext } from "@/lib/xhs/proxy.server"
 import { buildXhsUpstreamUrl, chargeCredits, resolveBillingContext, trackServerEvent } from "@/lib/xhs/proxy.server"
 import { uploadDataUrlAsset, uploadRemoteAsset } from "@/lib/xhs/assets.server"
+import {
+  buildBeautyContext,
+  normalizeCoverAsset,
+  XHS_COVER_PROMPT_VERSION,
+  type BeautyConflictLevel,
+  type BeautyXhsContentType,
+} from "@/lib/xhs/beauty-knowledge"
 
 export const runtime = "nodejs"
 
@@ -15,6 +22,19 @@ type UpstreamGenerateCoverResponse = {
   negativePrompt?: string | null
   source?: string | null
   [key: string]: unknown
+}
+
+type DraftCoverAsset = {
+  prompt: string
+  negativePrompt: string
+  coverMain: string
+  coverSub: string
+  resultContent: string
+  contentType: string
+  topic: string
+  keywords: string
+  styleId: string
+  styleReason: string
 }
 
 function getDraftId(body: Record<string, unknown>) {
@@ -40,17 +60,137 @@ function normalizeSize(value: string) {
 }
 
 function normalizeResolution(value: string) {
-  return value === "1k" || value === "2k" || value === "4k" ? value : "2k"
+  return value === "1k" || value === "2k" || value === "4k" ? value : ""
+}
+
+function getNestedRecord(body: Record<string, unknown>, name: string) {
+  const value = body[name]
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null
+}
+
+function compactText(value: string, max = 900) {
+  return value.replace(/\s+/g, " ").trim().slice(0, max)
+}
+
+const COVER_REFERENCE_CTA_LINE_RE =
+  /(关注|私信|评论|留言|点击|收藏|点赞|转发|扫码|二维码|加微信|微信|VX|vx|领取|咨询|预约|进群|小程序|主页|链接|回复|下方|底部|立即进入|解锁)/i
+const COVER_REFERENCE_CTA_WORD_RE =
+  /(关注|私信|评论|留言|点击|收藏|点赞|转发|扫码|二维码|加微信|微信|VX|vx|领取|咨询|预约|进群|小程序|主页|链接|回复|下方|底部|立即进入|解锁)/gi
+
+function sanitizeCoverReferenceText(value: string) {
+  return value
+    .split(/\r?\n+/)
+    .map((line) => line.trim())
+    .filter((line) => line && !COVER_REFERENCE_CTA_LINE_RE.test(line))
+    .join(" ")
+    .replace(COVER_REFERENCE_CTA_WORD_RE, "")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+function normalizeContentType(value: string): BeautyXhsContentType {
+  if (value === "education" || value === "promotion" || value === "comparison") return value
+  return "treatment"
+}
+
+function normalizeConflictLevel(value: string): BeautyConflictLevel {
+  if (value === "safe" || value === "hard") return value
+  return "standard"
+}
+
+function isCurrentCoverPrompt(prompt: string) {
+  return prompt.includes(XHS_COVER_PROMPT_VERSION)
+}
+
+function getFallbackCoverTitle(body: Record<string, unknown>, draft?: DraftCoverAsset | null) {
+  const preExtracted = getNestedRecord(body, "preExtracted")
+  const title =
+    getTextField(body, ["coverTitle", "cover_title", "title"]) ||
+    (preExtracted ? getTextField(preExtracted, ["title"]) : "") ||
+    draft?.coverMain ||
+    getTextField(body, ["resultTitle"]) ||
+    draft?.topic
+  return title || "补水前先看这3点"
+}
+
+function getFallbackCoverSub(body: Record<string, unknown>, draft?: DraftCoverAsset | null) {
+  const preExtracted = getNestedRecord(body, "preExtracted")
+  const sub =
+    getTextField(body, ["coverSub", "coverSubtitle", "cover_sub", "cover_text_sub", "subTitle"]) ||
+    (preExtracted ? getTextField(preExtracted, ["sub", "subtitle", "coverSub"]) : "") ||
+    draft?.coverSub
+  return sub || "少走弯路，安心护理"
+}
+
+function getKeywordText(body: Record<string, unknown>, draft?: DraftCoverAsset | null) {
+  const preExtracted = getNestedRecord(body, "preExtracted")
+  const rawKeywords = preExtracted?.keywords
+  const fromArray = Array.isArray(rawKeywords)
+    ? rawKeywords.map((item) => String(item || "").trim()).filter(Boolean).slice(0, 8).join("、")
+    : ""
+  return fromArray || getTextField(body, ["keywords"]) || draft?.keywords || ""
+}
+
+function buildPromptFromContent(body: Record<string, unknown>, draft?: DraftCoverAsset | null) {
+  const content = getTextField(body, ["content", "resultContent", "body", "text"]) || draft?.resultContent || ""
+  const safeContent = sanitizeCoverReferenceText(content)
+  const preExtracted = getNestedRecord(body, "preExtracted")
+  const hasTitleSource = Boolean(
+    getTextField(body, ["coverTitle", "cover_title", "title"]) ||
+      (preExtracted ? getTextField(preExtracted, ["title"]) : "") ||
+      draft?.coverMain ||
+      getTextField(body, ["resultTitle"]) ||
+      draft?.topic
+  )
+  if (!content && !hasTitleSource) {
+    return { prompt: "", negativePrompt: "", styleId: "", styleLabel: "", styleReason: "" }
+  }
+
+  const title = getFallbackCoverTitle(body, draft)
+  const sub = getFallbackCoverSub(body, draft)
+  const keywords = getKeywordText(body, draft)
+  const contentType = normalizeContentType(getTextField(body, ["contentType", "content_type"]) || draft?.contentType || "")
+  const conflictLevel = normalizeConflictLevel(getTextField(body, ["conflictLevel", "conflict_level"]))
+  const styleReason = getTextField(body, ["coverStyleReason", "cover_style_reason"]) || draft?.styleReason || ""
+  const ctx = buildBeautyContext({
+    contentType,
+    conflictLevel,
+    topic: [title, draft?.topic || "", compactText(content, 180)].filter(Boolean).join(" "),
+    keywords,
+  })
+  const asset = normalizeCoverAsset({
+    main: title,
+    sub,
+    prompt: null,
+    negative: null,
+    styleId: getTextField(body, ["coverStyleId", "cover_style_id", "styleId"]) || draft?.styleId || "",
+    styleReason,
+    ctx,
+  })
+
+  return {
+    prompt: [
+      asset.prompt,
+      "",
+      safeContent ? "【正文参考，仅用于理解主题和情绪，不要把正文拆成小字放进画面】" : "",
+      safeContent ? compactText(safeContent, 650) : "",
+      keywords ? `参考关键词：${keywords}` : "",
+    ].filter(Boolean).join("\n"),
+    negativePrompt: asset.negative,
+    styleId: asset.styleId,
+    styleLabel: asset.styleLabel,
+    styleReason: asset.styleReason,
+  }
 }
 
 async function loadDraftCoverAsset(opts: {
   supabase: BillingContext["supabase"]
   userId: string
   draftId: string
-}) {
+}): Promise<DraftCoverAsset> {
   const { data } = await opts.supabase
     .from("xhs_drafts")
-    .select("cover_prompt, cover_negative")
+    .select("cover_prompt, cover_negative, cover_title, cover_text_main, cover_text_sub, result_title, result_content, content_type, topic, keywords, cover_style_id, cover_style_reason")
     .eq("id", opts.draftId)
     .eq("user_id", opts.userId)
     .maybeSingle()
@@ -58,6 +198,26 @@ async function loadDraftCoverAsset(opts: {
   return {
     prompt: typeof data?.cover_prompt === "string" ? data.cover_prompt.trim() : "",
     negativePrompt: typeof data?.cover_negative === "string" ? data.cover_negative.trim() : "",
+    coverMain:
+      typeof data?.cover_text_main === "string" && data.cover_text_main.trim()
+        ? data.cover_text_main.trim()
+        : typeof data?.cover_title === "string" && data.cover_title.trim()
+          ? data.cover_title.trim()
+          : typeof data?.result_title === "string"
+            ? data.result_title.trim()
+            : "",
+    coverSub: typeof data?.cover_text_sub === "string" ? data.cover_text_sub.trim() : "",
+    resultContent: typeof data?.result_content === "string" ? data.result_content.trim() : "",
+    contentType: typeof data?.content_type === "string" ? data.content_type.trim() : "",
+    topic: typeof data?.topic === "string" ? data.topic.trim() : "",
+    keywords:
+      typeof data?.keywords === "string"
+        ? data.keywords.trim()
+        : Array.isArray(data?.keywords)
+          ? data.keywords.map((item) => String(item || "").trim()).filter(Boolean).join("、")
+          : "",
+    styleId: typeof data?.cover_style_id === "string" ? data.cover_style_id.trim() : "",
+    styleReason: typeof data?.cover_style_reason === "string" ? data.cover_style_reason.trim() : "",
   }
 }
 
@@ -106,31 +266,46 @@ export async function POST(request: NextRequest) {
   })
 
   const requestBody = body as Record<string, unknown>
-  let prompt = getTextField(requestBody, ["prompt", "coverPrompt", "cover_prompt"])
-  let negativePrompt = getTextField(requestBody, ["negativePrompt", "coverNegative", "cover_negative"])
+  const incomingPrompt = getTextField(requestBody, ["prompt", "coverPrompt", "cover_prompt"])
   const size = normalizeSize(getTextField(requestBody, ["size"]) || "3:4")
-  const resolution = normalizeResolution(getTextField(requestBody, ["resolution"]) || "2k")
+  const resolution = normalizeResolution("")
   const draftId = getDraftId(requestBody)
 
-  if (!prompt && draftId) {
+  let draftAsset: DraftCoverAsset | null = null
+  if (draftId) {
     try {
-      const draftAsset = await loadDraftCoverAsset({
+      draftAsset = await loadDraftCoverAsset({
         supabase: billing.ctx.supabase,
         userId: billing.ctx.userId,
         draftId,
       })
-      prompt = draftAsset.prompt
-      negativePrompt = negativePrompt || draftAsset.negativePrompt
     } catch {
       // Keep compatibility fallback below.
     }
+  }
+
+  const coverAsset = buildPromptFromContent(requestBody, draftAsset)
+  let prompt = coverAsset.prompt
+  let negativePrompt = coverAsset.negativePrompt
+
+  if (!prompt && isCurrentCoverPrompt(incomingPrompt)) {
+    prompt = incomingPrompt
+    negativePrompt =
+      getTextField(requestBody, ["negativePrompt", "coverNegative", "cover_negative"]) ||
+      draftAsset?.negativePrompt ||
+      negativePrompt
   }
 
   let json: UpstreamGenerateCoverResponse | null = null
 
   if (prompt) {
     try {
-      const generated = await generateGptImage2({ prompt, negativePrompt, size, resolution })
+      const generated = await generateGptImage2({
+        prompt,
+        negativePrompt,
+        size,
+        ...(resolution ? { resolution } : {}),
+      })
       json = {
         success: true,
         imageUrl: generated.imageUrl,
@@ -203,6 +378,11 @@ export async function POST(request: NextRequest) {
         .update({
           cover_storage_path: uploaded.path,
           cover_content_type: uploaded.contentType,
+          cover_prompt: prompt,
+          cover_negative: negativePrompt,
+          cover_style_id: coverAsset.styleId || null,
+          cover_style_label: coverAsset.styleLabel || null,
+          cover_style_reason: coverAsset.styleReason || null,
           updated_at: now,
         })
         .eq("id", draftId)

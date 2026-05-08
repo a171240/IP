@@ -10,6 +10,13 @@ import {
 import { generateGptImage2 } from "@/lib/posters/gpt-image-2.server"
 import { trackServerEvent } from "@/lib/xhs/proxy.server"
 import { uploadDataUrlAsset, uploadRemoteAsset } from "@/lib/xhs/assets.server"
+import {
+  buildBeautyContext,
+  normalizeCoverAsset,
+  XHS_COVER_PROMPT_VERSION,
+  type BeautyConflictLevel,
+  type BeautyXhsContentType,
+} from "@/lib/xhs/beauty-knowledge"
 
 export const runtime = "nodejs"
 
@@ -21,6 +28,30 @@ type UpstreamGenerateCoverResponse = {
   negativePrompt?: string | null
   source?: string | null
   [key: string]: unknown
+}
+
+type DraftCoverAsset = {
+  prompt: string
+  negativePrompt: string
+  coverMain: string
+  coverSub: string
+  resultContent: string
+  contentType: string
+  topic: string
+  keywords: string
+  styleId: string
+  styleReason: string
+}
+
+const ALT_STYLE_BY_CURRENT: Record<string, string> = {
+  "premium-still-life": "editorial-magazine",
+  "editorial-magazine": "premium-still-life",
+  "contrast-warning-poster": "clean-info-card",
+  "clean-info-card": "editorial-magazine",
+  "warm-dialog-card": "editorial-magazine",
+  "comparison-split-card": "premium-still-life",
+  "lifestyle-spa-scene": "premium-still-life",
+  "soft-minimal-poster": "editorial-magazine",
 }
 
 function getDraftId(body: Record<string, unknown>) {
@@ -46,7 +77,7 @@ function normalizeSize(value: string) {
 }
 
 function normalizeResolution(value: string) {
-  return value === "1k" || value === "2k" || value === "4k" ? value : "2k"
+  return value === "1k" || value === "2k" || value === "4k" ? value : ""
 }
 
 function getNestedRecord(body: Record<string, unknown>, name: string) {
@@ -58,46 +89,125 @@ function compactText(value: string, max = 900) {
   return value.replace(/\s+/g, " ").trim().slice(0, max)
 }
 
-function getFallbackCoverTitle(body: Record<string, unknown>) {
+const COVER_REFERENCE_CTA_LINE_RE =
+  /(关注|私信|评论|留言|点击|收藏|点赞|转发|扫码|二维码|加微信|微信|VX|vx|领取|咨询|预约|进群|小程序|主页|链接|回复|下方|底部|立即进入|解锁)/i
+const COVER_REFERENCE_CTA_WORD_RE =
+  /(关注|私信|评论|留言|点击|收藏|点赞|转发|扫码|二维码|加微信|微信|VX|vx|领取|咨询|预约|进群|小程序|主页|链接|回复|下方|底部|立即进入|解锁)/gi
+
+function sanitizeCoverReferenceText(value: string) {
+  return value
+    .split(/\r?\n+/)
+    .map((line) => line.trim())
+    .filter((line) => line && !COVER_REFERENCE_CTA_LINE_RE.test(line))
+    .join(" ")
+    .replace(COVER_REFERENCE_CTA_WORD_RE, "")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+function normalizeContentType(value: string): BeautyXhsContentType {
+  if (value === "education" || value === "promotion" || value === "comparison") return value
+  return "treatment"
+}
+
+function normalizeConflictLevel(value: string): BeautyConflictLevel {
+  if (value === "safe" || value === "hard") return value
+  return "standard"
+}
+
+function isCurrentCoverPrompt(prompt: string) {
+  return prompt.includes(XHS_COVER_PROMPT_VERSION)
+}
+
+function getFallbackCoverTitle(body: Record<string, unknown>, draft?: DraftCoverAsset | null) {
   const preExtracted = getNestedRecord(body, "preExtracted")
   const title =
     getTextField(body, ["coverTitle", "cover_title", "title"]) ||
-    (preExtracted ? getTextField(preExtracted, ["title"]) : "")
+    (preExtracted ? getTextField(preExtracted, ["title"]) : "") ||
+    draft?.coverMain ||
+    getTextField(body, ["resultTitle"]) ||
+    draft?.topic
   return title || "补水前先看这3点"
 }
 
-function buildPromptFromContent(body: Record<string, unknown>) {
-  const content = getTextField(body, ["content", "resultContent", "body", "text"])
-  if (!content) return ""
+function getFallbackCoverSub(body: Record<string, unknown>, draft?: DraftCoverAsset | null) {
+  const preExtracted = getNestedRecord(body, "preExtracted")
+  const sub =
+    getTextField(body, ["coverSub", "coverSubtitle", "cover_sub", "cover_text_sub", "subTitle"]) ||
+    (preExtracted ? getTextField(preExtracted, ["sub", "subtitle", "coverSub"]) : "") ||
+    draft?.coverSub
+  return sub || "少走弯路，安心护理"
+}
 
-  const title = getFallbackCoverTitle(body)
+function getKeywordText(body: Record<string, unknown>, draft?: DraftCoverAsset | null) {
   const preExtracted = getNestedRecord(body, "preExtracted")
   const rawKeywords = preExtracted?.keywords
-  const keywords = Array.isArray(rawKeywords)
+  const fromArray = Array.isArray(rawKeywords)
     ? rawKeywords.map((item) => String(item || "").trim()).filter(Boolean).slice(0, 8).join("、")
     : ""
+  return fromArray || getTextField(body, ["keywords"]) || draft?.keywords || ""
+}
 
-  return [
-    "画幅比例3:4竖版。",
-    "为生活美容/皮肤管理小红书笔记生成一张可直接发布的首图封面。",
-    "",
-    "【必须原样显示的中文文字】",
-    `主标题：${title}`,
-    "副标题：不红不干，安心出门",
-    "",
-    "【根据正文提炼视觉】",
-    compactText(content),
-    keywords ? `参考关键词：${keywords}` : "",
-    "",
-    "【设计要求】",
-    "选择 clean-info-card 或高级杂志信息卡方向，不要生成空白水彩模板。",
-    "主标题必须最大、最清楚；副标题更小；手机端缩略图也能一眼读清。",
-    "画面必须有明确设计层次：信息卡、细线分隔、材质背景或局部护理场景至少两项。",
-    "暖米白/浅杏/奶油色为主，少量陶土色或薄荷绿点缀；高级、干净、专业，不要廉价促销感。",
-    "不要人物脸、产品瓶、logo、二维码、电话、微信、价格、优惠、平台名。",
-  ]
-    .filter(Boolean)
-    .join("\n")
+function getRequestedStyleId(body: Record<string, unknown>, draft?: DraftCoverAsset | null) {
+  const requested = getTextField(body, ["coverStyleId", "cover_style_id", "styleId"])
+  const avoid = getTextField(body, ["avoidStyleId", "avoid_style_id"])
+  if (avoid) {
+    if (requested && requested !== avoid) return requested
+    return ALT_STYLE_BY_CURRENT[avoid] || ""
+  }
+  return requested || draft?.styleId || ""
+}
+
+function buildPromptFromContent(body: Record<string, unknown>, draft?: DraftCoverAsset | null) {
+  const content = getTextField(body, ["content", "resultContent", "body", "text"]) || draft?.resultContent || ""
+  const safeContent = sanitizeCoverReferenceText(content)
+  const preExtracted = getNestedRecord(body, "preExtracted")
+  const hasTitleSource = Boolean(
+    getTextField(body, ["coverTitle", "cover_title", "title"]) ||
+      (preExtracted ? getTextField(preExtracted, ["title"]) : "") ||
+      draft?.coverMain ||
+      getTextField(body, ["resultTitle"]) ||
+      draft?.topic
+  )
+  if (!content && !hasTitleSource) {
+    return { prompt: "", negativePrompt: "", styleId: "", styleLabel: "", styleReason: "" }
+  }
+
+  const title = getFallbackCoverTitle(body, draft)
+  const sub = getFallbackCoverSub(body, draft)
+  const keywords = getKeywordText(body, draft)
+  const contentType = normalizeContentType(getTextField(body, ["contentType", "content_type"]) || draft?.contentType || "")
+  const conflictLevel = normalizeConflictLevel(getTextField(body, ["conflictLevel", "conflict_level"]))
+  const styleReason = getTextField(body, ["coverStyleReason", "cover_style_reason"]) || draft?.styleReason || ""
+  const ctx = buildBeautyContext({
+    contentType,
+    conflictLevel,
+    topic: [title, draft?.topic || "", compactText(content, 180)].filter(Boolean).join(" "),
+    keywords,
+  })
+  const asset = normalizeCoverAsset({
+    main: title,
+    sub,
+    prompt: null,
+    negative: null,
+    styleId: getRequestedStyleId(body, draft),
+    styleReason,
+    ctx,
+  })
+
+  return {
+    prompt: [
+      asset.prompt,
+      "",
+      safeContent ? "【正文参考，仅用于理解主题和情绪，不要把正文拆成小字放进画面】" : "",
+      safeContent ? compactText(safeContent, 650) : "",
+      keywords ? `参考关键词：${keywords}` : "",
+    ].filter(Boolean).join("\n"),
+    negativePrompt: asset.negative,
+    styleId: asset.styleId,
+    styleLabel: asset.styleLabel,
+    styleReason: asset.styleReason,
+  }
 }
 
 function strengthenMiniProgramCoverPrompt(prompt: string) {
@@ -105,11 +215,10 @@ function strengthenMiniProgramCoverPrompt(prompt: string) {
     prompt.trim(),
     "",
     "【小程序封面质量底线】",
-    "这张图必须是完成度高的小红书首图设计，不是背景图。",
-    "不要空白水彩模板、淡色抽象弧形堆叠、纯背景加大字、廉价Canva模板、素材站样图。",
-    "必须有明确版式、文字层级、视觉焦点和美业质感；手机端缩略图里主标题也要清楚。",
-    "如果标题是清单/几点/先看/判断标准，请做成高级信息卡或克制警示卡，而不是温柔空白海报。",
-    "中文文字必须严格按提示词原样显示，不要错字、乱码、多余文字。",
+    "这张图必须是完成度高的小红书首图设计，不是背景图，也不是营销落地页。",
+    "可以有人脸、护理场景、局部对比、少量清单或辅助说明，但画面底部必须保持干净。",
+    "禁止底部导流组件、转化按钮、互动引导、私域联系方式、平台入口、可扫码联系元素。",
+    "必须有明确视觉焦点、美业质感和手机端可读标题；中文文字不要错字、乱码。",
   ].join("\n")
 }
 
@@ -121,10 +230,10 @@ async function loadDraftCoverAsset(opts: {
   supabase: MpAiBillingContext["supabase"]
   userId: string
   draftId: string
-}) {
+}): Promise<DraftCoverAsset> {
   const { data } = await opts.supabase
     .from("xhs_drafts")
-    .select("cover_prompt, cover_negative")
+    .select("cover_prompt, cover_negative, cover_title, cover_text_main, cover_text_sub, result_title, result_content, content_type, topic, keywords, cover_style_id, cover_style_reason")
     .eq("id", opts.draftId)
     .eq("user_id", opts.userId)
     .maybeSingle()
@@ -132,6 +241,26 @@ async function loadDraftCoverAsset(opts: {
   return {
     prompt: typeof data?.cover_prompt === "string" ? data.cover_prompt.trim() : "",
     negativePrompt: typeof data?.cover_negative === "string" ? data.cover_negative.trim() : "",
+    coverMain:
+      typeof data?.cover_text_main === "string" && data.cover_text_main.trim()
+        ? data.cover_text_main.trim()
+        : typeof data?.cover_title === "string" && data.cover_title.trim()
+          ? data.cover_title.trim()
+          : typeof data?.result_title === "string"
+            ? data.result_title.trim()
+            : "",
+    coverSub: typeof data?.cover_text_sub === "string" ? data.cover_text_sub.trim() : "",
+    resultContent: typeof data?.result_content === "string" ? data.result_content.trim() : "",
+    contentType: typeof data?.content_type === "string" ? data.content_type.trim() : "",
+    topic: typeof data?.topic === "string" ? data.topic.trim() : "",
+    keywords:
+      typeof data?.keywords === "string"
+        ? data.keywords.trim()
+        : Array.isArray(data?.keywords)
+          ? data.keywords.map((item) => String(item || "").trim()).filter(Boolean).join("、")
+          : "",
+    styleId: typeof data?.cover_style_id === "string" ? data.cover_style_id.trim() : "",
+    styleReason: typeof data?.cover_style_reason === "string" ? data.cover_style_reason.trim() : "",
   }
 }
 
@@ -156,7 +285,7 @@ export async function POST(request: NextRequest) {
     businessObjectId: draftId || undefined,
     metadata: {
       size: getTextField(requestBody, ["size"]) || "3:4",
-      resolution: getTextField(requestBody, ["resolution"]) || "2k",
+      resolution: "default",
     },
   })
   if (!charged.ok) return charged.error
@@ -176,27 +305,33 @@ export async function POST(request: NextRequest) {
     props: { source: "mp", cost: charged.cost, actionCode: charged.actionCode, plan: billing.ctx.plan },
   })
 
-  let prompt = getTextField(requestBody, ["prompt", "coverPrompt", "cover_prompt"])
-  let negativePrompt = getTextField(requestBody, ["negativePrompt", "coverNegative", "cover_negative"])
+  const incomingPrompt = getTextField(requestBody, ["prompt", "coverPrompt", "cover_prompt"])
   const size = normalizeSize(getTextField(requestBody, ["size"]) || "3:4")
-  const resolution = normalizeResolution(getTextField(requestBody, ["resolution"]) || "2k")
+  const resolution = normalizeResolution("")
 
-  if (!prompt && draftId) {
+  let draftAsset: DraftCoverAsset | null = null
+  if (draftId) {
     try {
-      const draftAsset = await loadDraftCoverAsset({
+      draftAsset = await loadDraftCoverAsset({
         supabase: billing.ctx.supabase,
         userId: billing.ctx.userId,
         draftId,
       })
-      prompt = draftAsset.prompt
-      negativePrompt = negativePrompt || draftAsset.negativePrompt
     } catch {
       // Fall back to prompt synthesis from the request content below.
     }
   }
 
-  if (!prompt) {
-    prompt = buildPromptFromContent(requestBody)
+  const coverAsset = buildPromptFromContent(requestBody, draftAsset)
+  let prompt = coverAsset.prompt
+  let negativePrompt = coverAsset.negativePrompt
+
+  if (!prompt && isCurrentCoverPrompt(incomingPrompt)) {
+    prompt = incomingPrompt
+    negativePrompt =
+      getTextField(requestBody, ["negativePrompt", "coverNegative", "cover_negative"]) ||
+      draftAsset?.negativePrompt ||
+      negativePrompt
   }
 
   if (!prompt) {
@@ -212,7 +347,12 @@ export async function POST(request: NextRequest) {
   let json: UpstreamGenerateCoverResponse | null = null
 
   try {
-    const generated = await generateGptImage2({ prompt, negativePrompt, size, resolution })
+    const generated = await generateGptImage2({
+      prompt,
+      negativePrompt,
+      size,
+      ...(resolution ? { resolution } : {}),
+    })
     json = {
       success: true,
       imageUrl: generated.imageUrl,
@@ -232,7 +372,7 @@ export async function POST(request: NextRequest) {
 
     await refundCharge("xhs_cover_gpt_image_failed", message)
     return NextResponse.json(
-      { success: false, ok: false, error: `封面高质量生图失败：${message.slice(0, 240)}` },
+      { success: false, ok: false, error: `封面生图失败：${message.slice(0, 240)}` },
       { status: 502 }
     )
   }
@@ -272,6 +412,11 @@ export async function POST(request: NextRequest) {
         .update({
           cover_storage_path: uploaded.path,
           cover_content_type: uploaded.contentType,
+          cover_prompt: prompt,
+          cover_negative: negativePrompt,
+          cover_style_id: coverAsset.styleId || null,
+          cover_style_label: coverAsset.styleLabel || null,
+          cover_style_reason: coverAsset.styleReason || null,
           updated_at: now,
         })
         .eq("id", draftId)

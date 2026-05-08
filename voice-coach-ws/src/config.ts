@@ -228,7 +228,7 @@ export const config: VoiceCoachWsConfig = {
     replyProvider,
     analysisProvider,
     providers: providerConfigs,
-    replyTimeoutMs: readNumberEnv("ARK_VOICE_COACH_REPLY_TIMEOUT_MS", readNumberEnv("ARK_VOICE_COACH_TIMEOUT_MS", 8000), 3000),
+    replyTimeoutMs: readNumberEnv("ARK_VOICE_COACH_REPLY_TIMEOUT_MS", readNumberEnv("ARK_VOICE_COACH_TIMEOUT_MS", 20000), 3000),
     analysisTimeoutMs: readNumberEnv("ARK_VOICE_COACH_ANALYSIS_TIMEOUT_MS", readNumberEnv("ARK_ANALYSIS_TIMEOUT_MS", 15000), 3000),
   },
   voiceCoach: {

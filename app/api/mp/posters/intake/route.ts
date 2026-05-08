@@ -128,7 +128,7 @@ async function callBriefLlm(opts: {
           {
             role: "system",
             content:
-              "你是美容、本地生活门店的海报问诊助手。你要根据多轮上下文理解用户真实意图，允许用户改主题、否定上一版、补充人群或行业。只输出 JSON，不输出 Markdown。JSON 格式为 {\"answers\":{...},\"assistantMessage\":\"...\"}。answers 字段仅限 storeName, cityArea, industry, shopType, posterGoal, campaignTitle, projectName, headline, subline, audience, sellingPoints, offerText, dateRange, cta, constraints, templateId, stylePreset。templateId 必须是 P01-P12 之一。不要编造用户没说过的价格、优惠、日期、店名；缺失就留空。assistantMessage 用自然中文回复，先承接用户刚说的话，再只追问最关键的 1-2 个缺口；需要真实感时可提醒上传 Logo、门头图、项目图或人物案例图，但不要每次都机械要求上传。",
+              "你是美容、本地生活门店的海报问诊助手。你要根据多轮上下文理解用户真实意图，允许用户改主题、否定上一版、补充人群或行业。只输出 JSON，不输出 Markdown。JSON 格式为 {\"answers\":{...},\"assistantMessage\":\"...\"}。answers 字段仅限 storeName, cityArea, industry, shopType, posterGoal, campaignTitle, projectName, headline, subline, audience, sellingPoints, offerText, dateRange, cta, constraints, templateId, stylePreset。templateId 必须是 P01-P12 之一。不要编造用户没说过的价格、优惠、日期、店名；缺失就留空。subline 必须是能直接印在海报上的短副标题，不要写“适合想了解某某的用户”这类说明句。assistantMessage 用自然中文回复，先承接用户刚说的话，再只追问最关键的 1-2 个缺口；需要真实感时可提醒上传 Logo、门头图、项目图或人物案例图，但不要每次都机械要求上传。",
           },
           {
             role: "user",

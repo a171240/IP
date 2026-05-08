@@ -98,6 +98,7 @@ const commonNegativePrompt = [
 const defaultTextRules = [
   "所有文字必须为清晰、准确、端正的简体中文。",
   "只使用我给出的文字，不要自动改写，不要添加额外标语。",
+  "不要把字段名、字段说明、用途说明、目标人群说明写进画面，例如不要出现“主标题：”“副标题：”“适合想了解”等说明式文案。",
   "主标题控制在 8-16 个字，标签控制在 2-4 个短词。",
   "价格、日期、地址必须原样显示，不能多字、漏字或换成英文。",
   "手机端远看也能读，避免小字堆叠。",
@@ -146,6 +147,17 @@ function textRuleBlock(fields: Record<string, string>, extraRules: string[] = []
   return [...defaultTextRules, ...strict, ...extraRules].map((rule) => `- ${rule}`).join("\n")
 }
 
+function visibleCopyLine(line: string) {
+  const text = String(line || "").trim()
+  const idx = text.indexOf("：")
+  return (idx >= 0 ? text.slice(idx + 1) : text).trim()
+}
+
+function contextLine(label: string, value: string | undefined) {
+  const text = String(value || "").trim()
+  return text ? `${label}：${text}` : ""
+}
+
 function visualBrief(input: {
   taskType: string
   industryTheme: string
@@ -160,6 +172,16 @@ function visualBrief(input: {
   emotion?: string
   fields?: Record<string, string>
 }) {
+  const visibleTextLines = input.textLines.map(visibleCopyLine).filter(Boolean)
+  const hiddenContext = [
+    contextLine("行业", input.fields?._industry),
+    contextLine("门店类型", input.fields?._businessType),
+    contextLine("目标人群", input.fields?._targetAudience),
+    contextLine("行动目标", input.fields?._cta),
+    contextLine("风格限制", input.fields?._constraints),
+    contextLine("商圈", input.fields?._cityArea),
+  ].filter(Boolean)
+
   return [
     `任务类型：${input.taskType}`,
     `行业主题：${input.industryTheme}`,
@@ -169,8 +191,10 @@ function visualBrief(input: {
     `风格基底：${input.style}`,
     `版式：${input.layout}`,
     input.emotion ? `情绪与人群洞察：${input.emotion}` : "",
-    "必须出现的文字：",
-    ...input.textLines.filter(Boolean).map((line) => `- ${line}`),
+    hiddenContext.length ? "只用于画面理解的上下文，不要作为海报可见文字：" : "",
+    ...hiddenContext.map((line) => `- ${line}`),
+    "海报可见文案，只允许出现下面这些内容；不要出现字段名、冒号、解释句或用户画像说明：",
+    ...visibleTextLines.map((line) => `- ${line}`),
     "中文文字规则：",
     textRuleBlock(input.fields || {}, input.textRules),
     `输出目标：${input.outputGoal}`,

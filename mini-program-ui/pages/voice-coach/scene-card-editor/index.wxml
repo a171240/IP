@@ -37,7 +37,7 @@
               loading="{{generating}}"
               disabled="{{generating}}"
               bindtap="handleGeneratePack"
-            >{{packReady ? '重新生成训练包' : '生成训练包'}}</button>
+            >{{packReady ? '重新生成项目训练包' : '生成项目训练包'}}</button>
           </view>
         </view>
 

@@ -68,11 +68,13 @@ test("setup-related pages trim the shared bottom spacer instead of inheriting ch
   )
 })
 
-test("scene card flow exposes a starter template and a one-tap test card", () => {
+test("project card flow exposes a starter template and a one-tap sample project", () => {
   const setupSource = read("mini-program-ui/pages/voice-coach/setup/index.js")
   const sceneCardsSource = read("mini-program-ui/pages/voice-coach/scene-cards/index.js")
   const editorSource = read("mini-program-ui/pages/voice-coach/scene-card-editor/index.js")
   const helperSource = read("mini-program-ui/pages/voice-coach/test-scene-card.js")
+  const sceneCardsMarkup = read("mini-program-ui/pages/voice-coach/scene-cards/index.wxml")
+  const editorMarkup = read("mini-program-ui/pages/voice-coach/scene-card-editor/index.wxml")
 
   assert.match(setupSource, /ensureTestSceneCard/)
   assert.match(setupSource, /scene-card-editor\/index\?template=starter/)
@@ -82,6 +84,19 @@ test("scene card flow exposes a starter template and a one-tap test card", () =>
   assert.match(editorSource, /handleFillStarterTemplate/)
   assert.match(helperSource, /buildStarterSceneCardDraft/)
   assert.match(helperSource, /TEST_SCENE_CARD_NAME/)
+  assert.match(sceneCardsMarkup, /项目启动/)
+  assert.match(sceneCardsMarkup, /项目卡/)
+  assert.match(editorMarkup, /生成项目训练包/)
+  assert.match(editorMarkup, /项目资料/)
+  ;[
+    "mini-program-ui/pages/voice-coach/index.wxml",
+    "mini-program-ui/pages/voice-coach/setup/index.wxml",
+    "mini-program-ui/pages/voice-coach/scene-cards/index.wxml",
+    "mini-program-ui/pages/voice-coach/scene-card-editor/index.wxml",
+    "mini-program-ui/pages/voice-coach/setup-storage.js",
+  ].forEach((file) => {
+    assert.doesNotMatch(read(file), /场景|场景卡|测试场景|训练场景/, file)
+  })
 })
 
 test("voice coach logs use console.log for normal device-visible tracing", () => {

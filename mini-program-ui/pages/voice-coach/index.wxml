@@ -75,7 +75,7 @@
           </view>
           <view wx:else class="vc-history-list">
             <view
-              wx:for="{{trainingHistory}}"
+              wx:for="{{primaryTrainingHistory}}"
               wx:key="id"
               class="vc-history-item"
               data-id="{{item.id}}"
@@ -103,6 +103,41 @@
                 </view>
               </view>
             </view>
+            <view wx:if="{{trainingHistory.length > 2}}" class="vc-history-fold" bindtap="toggleTrainingHistory">
+              <text>{{historyFoldText}}</text>
+              <view class="vc-history-fold-arrow {{historyFoldArrowClass}}"></view>
+            </view>
+            <block wx:if="{{historyExpanded}}">
+              <view
+                wx:for="{{extraTrainingHistory}}"
+                wx:key="id"
+                class="vc-history-item vc-history-item-extra"
+                data-id="{{item.id}}"
+                bindtap="openTrainingRecord"
+                hover-class="vc-history-item-pressed"
+                hover-stay-time="80"
+              >
+                <view class="vc-history-item-main">
+                  <view class="vc-history-item-top">
+                    <text class="vc-history-item-title">{{item.title}}</text>
+                    <text class="vc-history-status">{{item.statusLabel}}</text>
+                  </view>
+                  <text wx:if="{{item.subtitle}}" class="vc-history-item-subtitle">{{item.subtitle}}</text>
+                  <view wx:if="{{item.focusTitle || item.focusCopy}}" class="vc-history-focus">
+                    <text wx:if="{{item.focusTitle}}" class="vc-history-focus-title">{{item.focusTitle}}</text>
+                    <text wx:if="{{item.focusCopy}}" class="vc-history-focus-copy">{{item.focusCopy}}</text>
+                  </view>
+                </view>
+                <view class="vc-history-item-side">
+                  <text class="vc-history-score">{{item.scoreLabel || '--'}}</text>
+                  <text class="vc-history-time">{{item.startedAtText}}</text>
+                  <view class="vc-history-action">
+                    <text>{{item.actionText}}</text>
+                    <text class="vc-history-action-arrow">›</text>
+                  </view>
+                </view>
+              </view>
+            </block>
           </view>
         </view>
       </view>

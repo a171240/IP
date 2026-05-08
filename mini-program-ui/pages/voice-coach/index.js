@@ -51,6 +51,20 @@ function normalizeHistoryItem(raw) {
   }
 }
 
+function buildHistoryView(list, expanded) {
+  const source = Array.isArray(list) ? list : []
+  const primaryTrainingHistory = source.slice(0, 2)
+  const extraTrainingHistory = expanded ? source.slice(2) : []
+  const historyExtraCount = Math.max(0, source.length - 2)
+  return {
+    primaryTrainingHistory,
+    extraTrainingHistory,
+    historyExtraCount,
+    historyFoldText: expanded ? "收起记录" : `展开更多 ${historyExtraCount} 条`,
+    historyFoldArrowClass: expanded ? "vc-history-fold-arrow-up" : "",
+  }
+}
+
 Page({
   data: {
     customerProfile: null,
@@ -62,6 +76,12 @@ Page({
     customerCardAction: "去准备",
     recentText: "当前：先准备顾客，再进入训练",
     trainingHistory: [],
+    primaryTrainingHistory: [],
+    extraTrainingHistory: [],
+    historyExpanded: false,
+    historyExtraCount: 0,
+    historyFoldText: "展开更多 0 条",
+    historyFoldArrowClass: "",
     historyLoading: false,
     historyError: "",
   },
@@ -141,8 +161,10 @@ Page({
       })
       if (this._historyRequestId !== requestId) return
       const trainingHistory = (res.sessions || []).map(normalizeHistoryItem).filter((item) => item.id)
+      const historyView = buildHistoryView(trainingHistory, this.data.historyExpanded)
       this.setData({
         trainingHistory,
+        ...historyView,
         historyLoading: false,
         historyError: "",
       })
@@ -172,6 +194,14 @@ Page({
     }
 
     wx.navigateTo({ url: `/pages/voice-coach/chat?sessionId=${id}` })
+  },
+
+  toggleTrainingHistory() {
+    const historyExpanded = !this.data.historyExpanded
+    this.setData({
+      historyExpanded,
+      ...buildHistoryView(this.data.trainingHistory, historyExpanded),
+    })
   },
 })
 
