@@ -57,7 +57,7 @@ type InternalPosterTemplate = {
   outputHint: string
   previewImage: string
   defaultSize: PosterImageSize
-  defaultResolution: "1k" | "2k" | "4k"
+  defaultResolution: "1k"
   requiredFields: PosterTemplateField[]
   textSlots: PosterTextSlot[]
   previewStyle: string
@@ -89,6 +89,18 @@ const commonNegativePrompt = [
   "手指畸形",
   "杂乱背景",
   "暗沉肤色",
+  "AI模板感",
+  "Canva模板感",
+  "廉价电商风",
+  "卡通插画",
+  "3D卡通",
+  "塑料质感",
+  "过度渐变",
+  "描边大字",
+  "气泡字",
+  "字体混乱",
+  "小图标堆叠",
+  "随机贴纸",
   "夸张医美针头",
   "恐怖皮肤图",
   "虚假医疗承诺",
@@ -135,7 +147,10 @@ function fieldMap(fields: Record<string, string>, specs: PosterTemplateField[]) 
     acc[spec.key] = cleanFieldValue(fields, spec)
     return acc
   }, {})
-  if (fields._textStrictness) mapped._textStrictness = fields._textStrictness
+  for (const [key, value] of Object.entries(fields)) {
+    if (!key.startsWith("_")) continue
+    mapped[key] = String(value || "").trim().slice(0, 240)
+  }
   return mapped
 }
 
@@ -158,6 +173,29 @@ function contextLine(label: string, value: string | undefined) {
   return text ? `${label}：${text}` : ""
 }
 
+function visibleCopyBlock(lines: string[]) {
+  return lines.map((line, index) => `${index + 1}. "${line}"`)
+}
+
+function premiumPosterDirectionBlock(fields: Record<string, string> = {}) {
+  const stylePreset = String(fields._stylePreset || "").trim()
+  const constraints = String(fields._constraints || "").trim()
+
+  return [
+    "总气质：品牌级美业杂志广告/精品店视觉，不是低价促销传单、AI模板拼贴或信息流广告截图。",
+    stylePreset
+      ? `用户指定风格方向：${stylePreset}。把它翻译成构图、色彩、字体层级、材质、光线和留白，不要只做表面元素堆叠。`
+      : "",
+    constraints ? `用户明确强调/避开：${constraints}。` : "",
+    "构图：一处明确主视觉 + 一处安静可读的文字区；主视觉要有摄影棚级光影和空间层次，画面边缘保持干净。",
+    "版式：大留白、高对齐、强层级；最多 3 个视觉层级、最多 3 种字号；文字不要压满画面，也不要散成很多小标签。",
+    "字体：中文主标题用高端杂志感宋体/明朝/品牌衬线字气质；副标题和辅助信息用克制无衬线；字距自然，像真实品牌海报排版。",
+    "材质与摄影：真实商业摄影质感，柔和自然光或高级棚拍光，浅景深；优先皮肤管理空间、护理用品、织物、玻璃、陶瓷、花材、纸张等可触摸材质。",
+    "配色：低饱和、干净、精致，允许象牙白、烟粉、鼠尾草绿、深棕、香槟金等小面积点缀；全图主色不超过 3 个。",
+    "细节：装饰线、图标、标签只作为辅助；不要堆满小图标、小贴纸、随机英文、假按钮或无意义角标。",
+  ].filter(Boolean)
+}
+
 function visualBrief(input: {
   taskType: string
   industryTheme: string
@@ -173,32 +211,51 @@ function visualBrief(input: {
   fields?: Record<string, string>
 }) {
   const visibleTextLines = input.textLines.map(visibleCopyLine).filter(Boolean)
+  const resolvedSize = (input.fields?._requestedSize as PosterImageSize | undefined) || input.size
   const hiddenContext = [
     contextLine("行业", input.fields?._industry),
     contextLine("门店类型", input.fields?._businessType),
     contextLine("目标人群", input.fields?._targetAudience),
     contextLine("行动目标", input.fields?._cta),
+    contextLine("用户风格方向", input.fields?._stylePreset),
     contextLine("风格限制", input.fields?._constraints),
     contextLine("商圈", input.fields?._cityArea),
   ].filter(Boolean)
 
   return [
-    `任务类型：${input.taskType}`,
-    `行业主题：${input.industryTheme}`,
-    `画面比例：${input.size}。`,
-    `主视觉：${input.mainVisual}`,
-    `场景/道具：${input.sceneProps}`,
-    `风格基底：${input.style}`,
-    `版式：${input.layout}`,
-    input.emotion ? `情绪与人群洞察：${input.emotion}` : "",
-    hiddenContext.length ? "只用于画面理解的上下文，不要作为海报可见文字：" : "",
-    ...hiddenContext.map((line) => `- ${line}`),
-    "海报可见文案，只允许出现下面这些内容；不要出现字段名、冒号、解释句或用户画像说明：",
-    ...visibleTextLines.map((line) => `- ${line}`),
-    "中文文字规则：",
+    "生成一张可直接发布的完整中文商业海报。把它当成真实品牌广告创作，而不是模板填字或素材拼贴。",
+    "",
+    "【画布与任务】",
+    `- 类型：${input.taskType}`,
+    `- 行业：${input.industryTheme}`,
+    `- 比例：${resolvedSize}，实际输出比例以这里为准。`,
+    `- 目标：${input.outputGoal}`,
+    input.emotion ? `- 情绪洞察：${input.emotion}` : "",
+    "",
+    "【主视觉创意】",
+    `- 主体：${input.mainVisual}`,
+    `- 场景/道具：${input.sceneProps}`,
+    `- 风格基底：${input.style}`,
+    "",
+    "【高级美术指导】",
+    ...premiumPosterDirectionBlock(input.fields || {}).map((line) => `- ${line}`),
+    "",
+    "【版式结构】",
+    `- ${input.layout}`,
+    "- 先整体设计画面，再把文字作为版式的一部分嵌入，不要像后期贴字。",
+    "- 文字区必须有足够留白和对比度，手机端缩略图也能读出主标题。",
+    "",
+    "【可见文字】",
+    "只渲染下面这些文字，每条逐字出现一次；不要显示引号、序号、字段名、冒号、解释句或用户画像说明；不要自行加英文、副标、电话、二维码、平台名。",
+    ...visibleCopyBlock(visibleTextLines),
+    "",
+    "【中文排版规则】",
     textRuleBlock(input.fields || {}, input.textRules),
-    `输出目标：${input.outputGoal}`,
-    `负面约束：${commonNegativePrompt}`,
+    hiddenContext.length ? "" : "",
+    hiddenContext.length ? "【背景信息，不要写进画面】" : "",
+    ...hiddenContext.map((line) => `- ${line}`),
+    "",
+    `【不要出现】${commonNegativePrompt}`,
   ]
     .filter(Boolean)
     .join("\n")
@@ -216,7 +273,7 @@ const templates: InternalPosterTemplate[] = [
     outputHint: "突出第一次来不尴尬、不硬推、先看状态。",
     previewImage: "",
     defaultSize: "4:5",
-    defaultResolution: "2k",
+    defaultResolution: "1k",
     previewStyle: "soft-entry",
     styleTags: ["清新可信", "真实门店", "低压到店"],
     textRules: ["不要把标题写成医疗承诺。", "不要添加电话、二维码或平台名。"],
@@ -266,7 +323,7 @@ const templates: InternalPosterTemplate[] = [
     outputHint: "保留优惠信息，但画面要像高端护肤广告。",
     previewImage: "",
     defaultSize: "4:5",
-    defaultResolution: "2k",
+    defaultResolution: "1k",
     previewStyle: "campaign",
     styleTags: ["活动权益", "香槟柔光", "高转化"],
     textRules: ["价格必须醒目但不能土味。", "活动时间必须完整准确。"],
@@ -304,6 +361,51 @@ const templates: InternalPosterTemplate[] = [
     negativePrompt: commonNegativePrompt,
   },
   {
+    id: "P13",
+    group: "retain",
+    title: "节日祝福",
+    scenario: "客户问候",
+    goal: "让老客收到一张有温度、不推销的节日问候图",
+    description: "适合端午、中秋、春节、节气和客户群问候，不主打优惠。",
+    useCase: "老客维护 / 节日问候 / 私域关系",
+    outputHint: "像高端品牌节日贺卡，不像促销活动单。",
+    previewImage: "",
+    defaultSize: "4:5",
+    defaultResolution: "1k",
+    previewStyle: "festival-greeting",
+    styleTags: ["节日祝福", "老客关怀", "杂志贺卡"],
+    textRules: ["不要出现价格、优惠、促销、到店礼包。", "祝福文案要短而克制，不要堆满画面。"],
+    requiredFields: [
+      field("storeName", "门店名", "青禾养生", "青禾养生", 18),
+      field("festivalName", "节日", "端午", "端午", 10),
+      field("blessingTitle", "祝福标题", "端午安康", "端午安康", 12),
+      field("blessingSubtitle", "祝福副标题", "愿你清爽一夏", "愿你清爽一夏", 18),
+      field("signature", "署名", "青禾养生", "青禾养生", 18),
+    ],
+    textSlots: [],
+    promptBuilder: (f) =>
+      visualBrief({
+        taskType: "竖版 4:5 非促销节日祝福海报",
+        industryTheme: `${f.festivalName}客户问候 / 美业养生老客维护`,
+        size: "4:5",
+        mainVisual: "节日静物与门店护理氛围融合，画面安静、干净、有呼吸感；不出现促销牌、价格牌或活动标签。",
+        sceneProps: `${f.festivalName}应景道具、植物叶片、茶、花材、护肤瓶、毛巾、浅色织物、自然窗光、纸张贺卡。`,
+        style: "高端品牌节日贺卡 + 美业杂志大片，东方美学、低饱和、克制留白、真实摄影质感。",
+        layout: "左侧或上方保留大祝福标题，右侧或下半部为节日静物主视觉；底部只放门店署名，整体像可转发的节日贺卡。",
+        textLines: [
+          `节日：${f.festivalName}`,
+          `祝福标题：${f.blessingTitle}`,
+          `祝福副标题：${f.blessingSubtitle}`,
+          `署名：${f.signature || f.storeName}`,
+        ],
+        textRules: templatesTextRules("greeting"),
+        outputGoal: "让老顾客感到被记得和被祝福，而不是被营销。",
+        emotion: "用户不想卖东西，只想在节日里自然维护关系，语气要温暖但不油腻。",
+        fields: f,
+      }),
+    negativePrompt: commonNegativePrompt,
+  },
+  {
     id: "P03",
     group: "deal",
     title: "爆款项目",
@@ -314,7 +416,7 @@ const templates: InternalPosterTemplate[] = [
     outputHint: "强调适合谁、解决什么状态，不做夸张前后对比。",
     previewImage: "",
     defaultSize: "4:5",
-    defaultResolution: "2k",
+    defaultResolution: "1k",
     previewStyle: "project",
     styleTags: ["项目主推", "适合人群", "状态管理"],
     textRules: ["不要使用永久、根治、立刻年轻等风险词。"],
@@ -362,7 +464,7 @@ const templates: InternalPosterTemplate[] = [
     outputHint: "像高端杂志广告，不像促销单页。",
     previewImage: "",
     defaultSize: "4:5",
-    defaultResolution: "2k",
+    defaultResolution: "1k",
     previewStyle: "brand-trust",
     styleTags: ["高级留白", "门店质感", "信任主张"],
     textRules: ["标题不要过大到压迫，保持高端品牌大片感。"],
@@ -401,7 +503,7 @@ const templates: InternalPosterTemplate[] = [
     outputHint: "不要低端充值海报，要像生活方式会员卡视觉。",
     previewImage: "",
     defaultSize: "4:5",
-    defaultResolution: "2k",
+    defaultResolution: "1k",
     previewStyle: "member",
     styleTags: ["会员卡", "长期陪伴", "复购"],
     textRules: ["会员权益用短词，不堆长句。"],
@@ -441,7 +543,7 @@ const templates: InternalPosterTemplate[] = [
     outputHint: "要有城市高级感，避免传统剪彩风。",
     previewImage: "",
     defaultSize: "9:16",
-    defaultResolution: "2k",
+    defaultResolution: "1k",
     previewStyle: "opening",
     styleTags: ["城市感", "新店", "开业礼"],
     textRules: ["地址如有较长，放底部小字但必须清楚。"],
@@ -489,7 +591,7 @@ const templates: InternalPosterTemplate[] = [
     outputHint: "不要像硬广，重点是真实、干净、可点击。",
     previewImage: "",
     defaultSize: "4:5",
-    defaultResolution: "2k",
+    defaultResolution: "1k",
     previewStyle: "local-visit",
     styleTags: ["探店", "真实门店", "可点击"],
     textRules: ["不要出现真实平台商标。"],
@@ -534,7 +636,7 @@ const templates: InternalPosterTemplate[] = [
     outputHint: "冲突要强，但不能恐吓和制造焦虑。",
     previewImage: "",
     defaultSize: "3:4",
-    defaultResolution: "2k",
+    defaultResolution: "1k",
     previewStyle: "xhs-conflict",
     styleTags: ["避坑", "强标题", "收藏"],
     textRules: ["标题必须短、粗、清楚。", "不要使用恐吓式营销。"],
@@ -574,7 +676,7 @@ const templates: InternalPosterTemplate[] = [
     outputHint: "专家感要亲切，不要像报告。",
     previewImage: "",
     defaultSize: "3:4",
-    defaultResolution: "2k",
+    defaultResolution: "1k",
     previewStyle: "infographic",
     styleTags: ["信息图", "专业可信", "可收藏"],
     textRules: ["每个知识点只用短句，不放长段落。"],
@@ -624,7 +726,7 @@ const templates: InternalPosterTemplate[] = [
     outputHint: "价格对齐、分区清楚，是这类海报的第一优先级。",
     previewImage: "",
     defaultSize: "4:5",
-    defaultResolution: "2k",
+    defaultResolution: "1k",
     previewStyle: "menu",
     styleTags: ["菜单", "价目表", "清晰"],
     textRules: ["价格必须对齐，不能糊。", "分区不要超过 3 组。"],
@@ -672,7 +774,7 @@ const templates: InternalPosterTemplate[] = [
     outputHint: "远看可读，不把竖版海报硬拉宽。",
     previewImage: "",
     defaultSize: "16:9",
-    defaultResolution: "2k",
+    defaultResolution: "1k",
     previewStyle: "screen",
     styleTags: ["16:9", "远看可读", "店内屏"],
     textRules: ["字要大，小字只保留一行。"],
@@ -712,7 +814,7 @@ const templates: InternalPosterTemplate[] = [
     outputHint: "像生活方式分享，不像强硬广告。",
     previewImage: "",
     defaultSize: "4:5",
-    defaultResolution: "2k",
+    defaultResolution: "1k",
     previewStyle: "moments",
     styleTags: ["朋友圈", "轻活动", "老客"],
     textRules: ["文案要像可以转发的朋友提醒，不要硬广口吻。"],
@@ -743,7 +845,7 @@ const templates: InternalPosterTemplate[] = [
   },
 ]
 
-function templatesTextRules(kind: "price" | "safe" | "brand" | "address" | "xhs" | "screen") {
+function templatesTextRules(kind: "price" | "safe" | "brand" | "address" | "xhs" | "screen" | "greeting") {
   const rules: Record<typeof kind, string[]> = {
     price: ["价格和日期必须原样显示，价格区域醒目但高级。"],
     safe: ["避免医疗夸大，使用状态管理、护理体验、到店评估这类表达。"],
@@ -751,6 +853,7 @@ function templatesTextRules(kind: "price" | "safe" | "brand" | "address" | "xhs"
     address: ["地址或商圈信息必须清晰，不要生成电话、二维码或微信号。"],
     xhs: ["标题要短、粗、清楚，像真实小红书热门封面，不像淘宝广告。"],
     screen: ["远距离可读，主标题最大，信息不要超过三层。"],
+    greeting: ["只做节日问候，不出现优惠、价格、促销、到店礼包、预约按钮或销售话术。"],
   }
   return rules[kind]
 }
@@ -794,6 +897,7 @@ export function renderPosterTemplate(
   size?: PosterImageSize
 ) {
   const mapped = fieldMap(fields, template.requiredFields)
+  mapped._requestedSize = size || template.defaultSize
   const canvas = canvasForSize(size || template.defaultSize)
   const overlay: PosterOverlay = {
     canvas,

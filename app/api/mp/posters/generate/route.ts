@@ -25,9 +25,12 @@ import { downloadAsset, getXhsAssetsBucket, uploadRemoteAssetToPath, uploadTextA
 import type { PosterAssetRef } from "@/lib/posters/intake"
 
 export const runtime = "nodejs"
+export const maxDuration = 300
+
+const BASIC_POSTER_RESOLUTION = "1k" as const
 
 const assetRefSchema = z.object({
-  kind: z.enum(["logo", "store", "product", "people"]),
+  kind: z.enum(["style", "logo", "store", "product", "people"]),
   bucket: z.string().trim().min(1).max(80),
   path: z.string().trim().min(1).max(300),
   contentType: z.string().trim().min(1).max(80),
@@ -44,11 +47,11 @@ const bodySchema = z.object({
     .enum(["poster.generate.image", "poster.rewrite.text", "poster.regenerate.image"])
     .optional()
     .default("poster.generate.image"),
-  assetRefs: z.array(assetRefSchema).max(4).optional().default([]),
+  assetRefs: z.array(assetRefSchema).max(5).optional().default([]),
   size: z
     .enum(["auto", "1:1", "3:2", "2:3", "4:3", "3:4", "5:4", "4:5", "16:9", "9:16", "2:1", "1:2", "21:9", "9:21"])
     .optional(),
-  resolution: z.enum(["1k", "2k", "4k"]).optional(),
+  resolution: z.enum(["1k"]).optional(),
 })
 
 type PosterRequest = z.infer<typeof bodySchema>
@@ -75,6 +78,7 @@ function assetPromptBlock(assetRefs: PosterAssetRef[]) {
   if (!assetRefs.length) return ""
 
   const labels: Record<PosterAssetRef["kind"], string> = {
+    style: "风格/版式参考",
     logo: "Logo/门头",
     store: "门店环境",
     product: "产品或服务图",
@@ -85,6 +89,9 @@ function assetPromptBlock(assetRefs: PosterAssetRef[]) {
     "",
     "参考素材使用规则：",
     ...assetRefs.map((ref, index) => `- 参考图 ${index + 1} 是${labels[ref.kind]}素材。`),
+    assetRefs.some((ref) => ref.kind === "style")
+      ? "- 风格/版式参考图只用于学习构图、配色、字体气质、留白比例和高级感；不要照抄其中的文字、Logo、人物、产品、价格或具体版面内容。"
+      : "",
     assetRefs.some((ref) => ref.kind === "logo")
       ? "- Logo/门头素材必须在海报中可识别地出现，但允许按海报风格自然融入。"
       : "",
@@ -103,7 +110,7 @@ async function assetRefsToImageUrls(opts: {
   const imageUrls: string[] = []
   const safePrefix = `posters/assets/${opts.userId}/`
 
-  for (const ref of opts.assetRefs.slice(0, 4)) {
+  for (const ref of opts.assetRefs.slice(0, 5)) {
     if (ref.bucket !== opts.bucket) continue
     if (!ref.path.startsWith(safePrefix)) continue
     if (!ref.contentType.startsWith("image/")) continue
@@ -164,7 +171,7 @@ export async function POST(request: NextRequest) {
   let overlay: PosterOverlay = { canvas: canvasForSize(input.size || "4:5"), slots: [] }
   let templateId = ""
   let size: PosterSize = input.size || "4:5"
-  let resolution: PosterResolution = input.resolution || "2k"
+  let resolution: PosterResolution = BASIC_POSTER_RESOLUTION
   const warnings: string[] = []
 
   try {
@@ -179,7 +186,7 @@ export async function POST(request: NextRequest) {
 
       templateId = template.id
       size = input.size || template.defaultSize
-      resolution = input.resolution || template.defaultResolution
+      resolution = BASIC_POSTER_RESOLUTION
       const rendered = renderPosterTemplate(template, input.fields, size)
       prompt = rendered.prompt
       negativePrompt = rendered.negativePrompt

@@ -1,6 +1,6 @@
 import "server-only"
 
-export type PosterAssetKind = "logo" | "store" | "product" | "people"
+export type PosterAssetKind = "style" | "logo" | "store" | "product" | "people"
 
 export type PosterAssetRef = {
   kind: PosterAssetKind
@@ -54,25 +54,26 @@ export type PosterRecommendation = {
   confidence: number
   reason: string
   size: "4:5" | "3:4" | "9:16" | "16:9" | "1:1"
-  resolution: "1k" | "2k"
+  resolution: "1k"
 }
 
 const TEMPLATE_STYLE: Record<
   string,
   { stylePreset: string; size: PosterRecommendation["size"]; resolution: PosterRecommendation["resolution"] }
 > = {
-  P01: { stylePreset: "高级新客引流", size: "4:5", resolution: "2k" },
-  P02: { stylePreset: "高级促销", size: "4:5", resolution: "2k" },
-  P03: { stylePreset: "爆款项目种草", size: "4:5", resolution: "2k" },
-  P04: { stylePreset: "品牌大片", size: "4:5", resolution: "2k" },
-  P05: { stylePreset: "会员权益", size: "4:5", resolution: "2k" },
-  P06: { stylePreset: "城市开业", size: "9:16", resolution: "2k" },
-  P07: { stylePreset: "真实探店", size: "4:5", resolution: "2k" },
-  P08: { stylePreset: "强标题攻略", size: "3:4", resolution: "2k" },
-  P09: { stylePreset: "科普信息图", size: "3:4", resolution: "2k" },
-  P10: { stylePreset: "菜单价目", size: "4:5", resolution: "2k" },
-  P11: { stylePreset: "电子屏大字", size: "16:9", resolution: "2k" },
-  P12: { stylePreset: "朋友圈轻分享", size: "4:5", resolution: "2k" },
+  P01: { stylePreset: "高级新客引流", size: "4:5", resolution: "1k" },
+  P02: { stylePreset: "高级促销", size: "4:5", resolution: "1k" },
+  P03: { stylePreset: "爆款项目种草", size: "4:5", resolution: "1k" },
+  P04: { stylePreset: "品牌大片", size: "4:5", resolution: "1k" },
+  P05: { stylePreset: "会员权益", size: "4:5", resolution: "1k" },
+  P06: { stylePreset: "城市开业", size: "9:16", resolution: "1k" },
+  P07: { stylePreset: "真实探店", size: "4:5", resolution: "1k" },
+  P08: { stylePreset: "强标题攻略", size: "3:4", resolution: "1k" },
+  P09: { stylePreset: "科普信息图", size: "3:4", resolution: "1k" },
+  P10: { stylePreset: "菜单价目", size: "4:5", resolution: "1k" },
+  P11: { stylePreset: "电子屏大字", size: "16:9", resolution: "1k" },
+  P12: { stylePreset: "朋友圈轻分享", size: "4:5", resolution: "1k" },
+  P13: { stylePreset: "节日祝福杂志感", size: "4:5", resolution: "1k" },
 }
 
 const TEMPLATE_KEYWORDS: Array<{ id: string; words: string[]; reason: string }> = [
@@ -83,6 +84,7 @@ const TEMPLATE_KEYWORDS: Array<{ id: string; words: string[]; reason: string }> 
   { id: "P09", words: ["科普", "知识", "一张图", "讲清楚", "信息图"], reason: "识别到科普信息图目标" },
   { id: "P07", words: ["探店", "打卡", "本地", "门店环境", "宝藏店"], reason: "识别到本地探店目标" },
   { id: "P05", words: ["会员", "办卡", "储值", "复购", "老客"], reason: "识别到会员/复购目标" },
+  { id: "P13", words: ["祝福", "问候", "安康", "不卖东西", "不促销", "不卖货", "客户群问候"], reason: "识别到非促销节日祝福/客户关怀目标" },
   { id: "P12", words: ["朋友圈", "转发", "私域", "社群", "分享"], reason: "识别到朋友圈/私域分享目标" },
   { id: "P04", words: ["品牌", "形象", "高级", "信任", "调性"], reason: "识别到品牌形象目标" },
   { id: "P02", words: ["节日", "活动", "五一", "520", "七夕", "周年", "618", "双11"], reason: "识别到节日/活动促销目标" },
@@ -106,6 +108,9 @@ function hasBeautySignal(...values: Array<string | undefined>) {
 function defaultCampaignDate(...values: Array<string | undefined>) {
   const text = values.map((value) => asText(value)).join(" ")
   if (/五一|劳动节/.test(text)) return "五一期间"
+  if (/端午/.test(text)) return "端午期间"
+  if (/中秋/.test(text)) return "中秋期间"
+  if (/春节|新年/.test(text)) return "春节期间"
   if (/520/.test(text)) return "520期间"
   if (/七夕/.test(text)) return "七夕期间"
   if (/女神节/.test(text)) return "女神节期间"
@@ -136,6 +141,31 @@ function defaultSellingPoints(industry: string, shopType: string) {
 function defaultOfferText(industry: string, shopType: string) {
   if (hasBeautySignal(industry, shopType)) return "到店护理体验礼"
   return "到店专属体验"
+}
+
+function inferStylePreset(text: string) {
+  const styleHits = [
+    "高级感",
+    "杂志感",
+    "高端",
+    "轻奢",
+    "极简",
+    "留白",
+    "温暖",
+    "清冷",
+    "奶油风",
+    "法式",
+    "国风",
+    "东方美学",
+    "小红书",
+    "真实摄影",
+    "商业摄影",
+    "品牌大片",
+  ].filter((word) => text.includes(word))
+
+  const explicit = text.match(/(?:风格|感觉|调性|参考|类似|像)(?:要|想要|做成|做得)?([^，。！？\n]{2,28})/)
+  const phrase = explicit?.[1]?.trim().replace(/^(一点|一些|这种|这个|那种|那个)/, "")
+  return [phrase, ...styleHits].filter(Boolean).slice(0, 4).join("，")
 }
 
 function normalizeTemplateId(value: unknown) {
@@ -216,6 +246,14 @@ function inferAnswers(message: string): PosterIntakeAnswers {
   if (goalHit) {
     out.templateId = goalHit.id
     out.posterGoal ||= goalHit.reason.replace(/^识别到/, "").replace(/目标$/, "")
+    if (goalHit.id === "P13") {
+      const blessing = inferFestivalBlessing(text)
+      out.campaignTitle ||= `${blessing.festivalName}祝福`
+      out.headline ||= blessing.headline
+      out.subline ||= blessing.subline
+      out.dateRange ||= blessing.festivalName
+      out.constraints ||= "不卖东西，不做促销，只做节日问候和老客关怀"
+    }
   }
 
   const industryWords = ["美容", "美甲", "美睫", "皮肤管理", "餐饮", "火锅", "咖啡", "茶饮", "烘焙", "教培", "瑜伽", "健身", "宠物", "摄影", "家政", "养生", "零售"]
@@ -224,6 +262,9 @@ function inferAnswers(message: string): PosterIntakeAnswers {
     out.industry ||= industry
     out.shopType ||= industry
   }
+
+  const stylePreset = inferStylePreset(text)
+  if (stylePreset) out.stylePreset ||= stylePreset
 
   if (/女性|女士|女客|女生|姐姐|宝妈|妈妈|宝妈群体/.test(text)) {
     out.audience ||= "女性顾客"
@@ -256,6 +297,16 @@ function firstShortPhrase(text: string) {
   return cleaned || text.slice(0, 16)
 }
 
+function inferFestivalBlessing(text: string) {
+  if (/端午/.test(text)) return { festivalName: "端午", headline: "端午安康", subline: "愿你清爽一夏" }
+  if (/中秋/.test(text)) return { festivalName: "中秋", headline: "中秋安康", subline: "愿你团圆顺遂" }
+  if (/春节|新年/.test(text)) return { festivalName: /新年/.test(text) ? "新年" : "春节", headline: "新春安康", subline: "愿新一年皆是好状态" }
+  if (/七夕/.test(text)) return { festivalName: "七夕", headline: "七夕快乐", subline: "把好状态留给重要时刻" }
+  if (/520/.test(text)) return { festivalName: "520", headline: "愿你被温柔以待", subline: "把好状态送给自己" }
+  if (/女神节/.test(text)) return { festivalName: "女神节", headline: "女神节快乐", subline: "把今天的好状态送给自己" }
+  return { festivalName: "节日", headline: "节日安康", subline: "愿你平安顺遂" }
+}
+
 function mergeAnswers(...items: Array<PosterIntakeAnswers | null | undefined>) {
   const out: PosterIntakeAnswers = {}
   for (const item of items) {
@@ -272,7 +323,13 @@ export function recommendPosterTemplate(answers: PosterIntakeAnswers): PosterRec
   const explicit = normalizeTemplateId(answers.templateId)
   if (explicit) {
     const style = TEMPLATE_STYLE[explicit]
-    return { templateId: explicit, ...style, confidence: 0.95, reason: "用户或模型已明确模板" }
+    return {
+      templateId: explicit,
+      ...style,
+      stylePreset: asText(answers.stylePreset) || style.stylePreset,
+      confidence: 0.95,
+      reason: "用户或模型已明确模板",
+    }
   }
 
   const haystack = [
@@ -292,6 +349,7 @@ export function recommendPosterTemplate(answers: PosterIntakeAnswers): PosterRec
   return {
     templateId: id,
     ...style,
+    stylePreset: asText(answers.stylePreset) || style.stylePreset,
     confidence: hit ? 0.82 : 0.58,
     reason: hit?.reason || "信息较泛，默认按主推项目/产品海报处理",
   }
@@ -413,6 +471,10 @@ export function buildPosterFieldsFromBrief(templateId: string, brief: PosterBrie
     category3: `${tags.split("｜")[2] || "预约方式"}：${brief.cta || "立即预约"}`,
     bottomLine: brief.cta || "到店咨询",
     shareOffer: brief.offerText || "转发可享到店礼",
+    festivalName: brief.dateRange || brief.campaignTitle || "节日",
+    blessingTitle: brief.headline || brief.campaignTitle || "节日安康",
+    blessingSubtitle: brief.subline || "愿你平安顺遂",
+    signature: brief.storeName,
   }
 
   return { ...base, ...common }

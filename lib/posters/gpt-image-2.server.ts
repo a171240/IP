@@ -12,12 +12,14 @@ type GenerateImageOptions = {
 
 type TaskStatus = "pending" | "submitted" | "processing" | "completed" | "failed"
 
+const BASIC_IMAGE_RESOLUTION = "1k"
+
 function apiBaseUrl() {
   return (process.env.APIMART_IMAGE_BASE_URL || "https://api.apimart.ai/v1").trim().replace(/\/$/, "")
 }
 
 function apiKey() {
-  return (process.env.APIMART_IMAGE_API_KEY || process.env.APIMART_API_KEY || "").trim()
+  return (process.env.APIMART_API_KEY || "").trim()
 }
 
 export function imageModel() {
@@ -25,8 +27,8 @@ export function imageModel() {
 }
 
 function pollTimeoutMs() {
-  const v = Number(process.env.APIMART_IMAGE_POLL_TIMEOUT_MS || 90000)
-  return Number.isFinite(v) && v > 5000 ? Math.min(v, 120000) : 90000
+  const v = Number(process.env.APIMART_IMAGE_POLL_TIMEOUT_MS || 240000)
+  return Number.isFinite(v) && v > 5000 ? Math.min(v, 300000) : 240000
 }
 
 function requestTimeoutMs() {
@@ -41,6 +43,18 @@ function maxRetries() {
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function buildFullPrompt(opts: Pick<GenerateImageOptions, "prompt" | "negativePrompt">) {
+  const prompt = opts.prompt.trim()
+  const negativePrompt = opts.negativePrompt?.trim()
+  if (!negativePrompt || prompt.includes(negativePrompt)) return prompt
+
+  return [
+    prompt,
+    "",
+    `需要避开的画面问题：${negativePrompt}`,
+  ].join("\n")
 }
 
 function parseJson(text: string): unknown {
@@ -169,17 +183,17 @@ async function pollTask(taskId: string) {
 
 export async function generateGptImage2(opts: GenerateImageOptions): Promise<{ imageUrl: string; model: string }> {
   const model = imageModel()
-  const fullPrompt = opts.prompt.trim()
+  const fullPrompt = buildFullPrompt(opts)
   const payload: Record<string, unknown> = {
     model,
     prompt: fullPrompt,
     n: 1,
     size: opts.size || process.env.APIMART_IMAGE_SIZE || "3:4",
   }
-  const resolution = opts.resolution || process.env.APIMART_IMAGE_RESOLUTION || ""
+  const resolution = BASIC_IMAGE_RESOLUTION
   const quality = opts.quality || process.env.APIMART_IMAGE_QUALITY || ""
   const outputFormat = opts.outputFormat || process.env.APIMART_IMAGE_OUTPUT_FORMAT || ""
-  if (resolution) payload.resolution = resolution
+  payload.resolution = resolution
   if (quality) payload.quality = quality
   if (outputFormat) payload.output_format = outputFormat
   if (opts.imageUrls?.length) payload.image_urls = opts.imageUrls.slice(0, 16)

@@ -820,24 +820,23 @@ navigator {
 }
 
 .fade-up {
-  animation: fadeUp 420ms ease both;
+  animation: none;
+  opacity: 1;
+  transform: none;
 }
 
-.delay-1 {
-  animation-delay: 80ms;
-}
-
+.delay-1,
 .delay-2 {
-  animation-delay: 160ms;
+  animation-delay: 0s;
 }
 
 @keyframes fadeUp {
   from {
     opacity: 0;
-    transform: translateY(12rpx);
+    transform: none;
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
   }
 }

@@ -30,7 +30,7 @@ const bodySchema = z.object({
   messages: z.array(chatMessageSchema).max(12).optional().default([]),
   store_profile_id: z.string().uuid().optional(),
   answers: z.any().optional(),
-  asset_refs: z.array(z.any()).max(4).optional().default([]),
+  asset_refs: z.array(z.any()).max(5).optional().default([]),
 })
 
 type ChatMessage = z.infer<typeof chatMessageSchema>
@@ -128,7 +128,7 @@ async function callBriefLlm(opts: {
           {
             role: "system",
             content:
-              "你是美容、本地生活门店的海报问诊助手。你要根据多轮上下文理解用户真实意图，允许用户改主题、否定上一版、补充人群或行业。只输出 JSON，不输出 Markdown。JSON 格式为 {\"answers\":{...},\"assistantMessage\":\"...\"}。answers 字段仅限 storeName, cityArea, industry, shopType, posterGoal, campaignTitle, projectName, headline, subline, audience, sellingPoints, offerText, dateRange, cta, constraints, templateId, stylePreset。templateId 必须是 P01-P12 之一。不要编造用户没说过的价格、优惠、日期、店名；缺失就留空。subline 必须是能直接印在海报上的短副标题，不要写“适合想了解某某的用户”这类说明句。assistantMessage 用自然中文回复，先承接用户刚说的话，再只追问最关键的 1-2 个缺口；需要真实感时可提醒上传 Logo、门头图、项目图或人物案例图，但不要每次都机械要求上传。",
+              "你是美容、本地生活门店的海报问诊助手。你要根据多轮上下文理解用户真实意图，允许用户改主题、否定上一版、补充人群或行业。只输出 JSON，不输出 Markdown。JSON 格式为 {\"answers\":{...},\"assistantMessage\":\"...\"}。answers 字段仅限 storeName, cityArea, industry, shopType, posterGoal, campaignTitle, projectName, headline, subline, audience, sellingPoints, offerText, dateRange, cta, constraints, templateId, stylePreset。templateId 必须是 P01-P13 之一。用户说祝福、问候、不卖东西、不促销、给老客发节日图时，优先选择 P13。不要编造用户没说过的价格、优惠、日期、店名；缺失就留空。用户说高级感、杂志感、轻奢、极简、温暖、类似某张图等，都要归入 stylePreset 或 constraints。subline 必须是能直接印在海报上的短副标题，不要写“适合想了解某某的用户”这类说明句。assistantMessage 用自然中文回复，先承接用户刚说的话，再只追问最关键的 1-2 个缺口；需要真实感时可提醒上传 Logo、门头图、项目图、人物案例图或风格参考图，但不要每次都机械要求上传。",
           },
           {
             role: "user",
@@ -153,6 +153,7 @@ async function callBriefLlm(opts: {
                 P10: "价目菜单",
                 P11: "门店电子屏",
                 P12: "朋友圈转发",
+                P13: "节日祝福/客户问候/不卖东西",
               },
             }),
           },

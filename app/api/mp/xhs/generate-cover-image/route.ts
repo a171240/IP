@@ -9,7 +9,7 @@ import {
 } from "@/lib/mp/ai-points.server"
 import { generateGptImage2 } from "@/lib/posters/gpt-image-2.server"
 import { trackServerEvent } from "@/lib/xhs/proxy.server"
-import { uploadDataUrlAsset, uploadRemoteAsset } from "@/lib/xhs/assets.server"
+import { downloadAsset, getXhsAssetsBucket, uploadDataUrlAsset, uploadRemoteAsset } from "@/lib/xhs/assets.server"
 import {
   buildBeautyContext,
   normalizeCoverAsset,
@@ -19,6 +19,7 @@ import {
 } from "@/lib/xhs/beauty-knowledge"
 
 export const runtime = "nodejs"
+export const maxDuration = 300
 
 type UpstreamGenerateCoverResponse = {
   success?: boolean
@@ -39,8 +40,19 @@ type DraftCoverAsset = {
   contentType: string
   topic: string
   keywords: string
+  coverPoints: string[]
   styleId: string
   styleReason: string
+}
+
+type CoverReferenceKind = "style" | "logo" | "store" | "product" | "people"
+
+type CoverReferenceAsset = {
+  kind: CoverReferenceKind
+  bucket: string
+  path: string
+  contentType: string
+  usage?: string
 }
 
 const ALT_STYLE_BY_CURRENT: Record<string, string> = {
@@ -74,10 +86,6 @@ function getTextField(body: Record<string, unknown>, names: string[]) {
 function normalizeSize(value: string) {
   const allowed = new Set(["auto", "1:1", "3:2", "2:3", "4:3", "3:4", "5:4", "4:5", "16:9", "9:16", "2:1", "1:2", "21:9", "9:21"])
   return allowed.has(value) ? value : "3:4"
-}
-
-function normalizeResolution(value: string) {
-  return value === "1k" || value === "2k" || value === "4k" ? value : ""
 }
 
 function getNestedRecord(body: Record<string, unknown>, name: string) {
@@ -148,6 +156,117 @@ function getKeywordText(body: Record<string, unknown>, draft?: DraftCoverAsset |
   return fromArray || getTextField(body, ["keywords"]) || draft?.keywords || ""
 }
 
+function getStringArrayField(body: Record<string, unknown>, names: string[]) {
+  for (const name of names) {
+    const value = body[name]
+    if (Array.isArray(value)) {
+      return value.map((item) => String(item || "").trim()).filter(Boolean)
+    }
+  }
+  return []
+}
+
+function getCoverPoints(body: Record<string, unknown>, draft?: DraftCoverAsset | null) {
+  const preExtracted = getNestedRecord(body, "preExtracted")
+  const direct = getStringArrayField(body, ["coverPoints", "cover_points"])
+  if (direct.length) return direct.slice(0, 4)
+  if (preExtracted) {
+    const points = getStringArrayField(preExtracted, ["points", "coverPoints", "cover_points"]).slice(0, 4)
+    if (points.length) return points
+  }
+  if (draft?.coverPoints?.length) return draft.coverPoints.slice(0, 4)
+  return []
+}
+
+function normalizeCoverDensity(value: string) {
+  if (value === "simple" || value === "rich") return value
+  return "balanced"
+}
+
+function coverPointTarget(density: string) {
+  if (density === "simple") return 0
+  if (density === "rich") return 4
+  return 3
+}
+
+function normalizeAssetRefs(value: unknown): CoverReferenceAsset[] {
+  if (!Array.isArray(value)) return []
+  const allowed = new Set<CoverReferenceKind>(["style", "logo", "store", "product", "people"])
+  const refs: CoverReferenceAsset[] = []
+  for (const raw of value) {
+    if (!raw || typeof raw !== "object") continue
+    const item = raw as Record<string, unknown>
+    const kind = String(item.kind || "").trim() as CoverReferenceKind
+    const bucket = String(item.bucket || "").trim()
+    const path = String(item.path || "").trim()
+    const contentType = String(item.contentType || item.content_type || "").trim()
+    const usage = String(item.usage || "").trim()
+    if (!allowed.has(kind) || !bucket || !path || !contentType.startsWith("image/")) continue
+    refs.push({ kind, bucket, path, contentType, usage })
+    if (refs.length >= 5) break
+  }
+  return refs
+}
+
+function assetPromptBlock(assetRefs: CoverReferenceAsset[], brandVisibility: string) {
+  if (!assetRefs.length) return ""
+  const labels: Record<CoverReferenceKind, string> = {
+    style: "风格/版式参考",
+    logo: "Logo/门头",
+    store: "门店环境",
+    product: "项目/产品/仪器",
+    people: "人物/案例",
+  }
+  const allowSubtleBrand = brandVisibility === "subtle"
+  return [
+    "",
+    "【商家参考图使用规则】",
+    ...assetRefs.map((ref, index) => `参考图${index + 1}：${labels[ref.kind]}素材${ref.usage ? `，用途：${ref.usage}` : ""}。`),
+    assetRefs.some((ref) => ref.kind === "style")
+      ? "风格参考图只学习构图、配色、字体气质和信息密度，不照抄文字、Logo、人物、产品、价格或具体版面。"
+      : "",
+    assetRefs.some((ref) => ref.kind === "store")
+      ? "门店环境图优先作为真实空间氛围或背景质感参考，让画面更像真实美业门店。"
+      : "",
+    assetRefs.some((ref) => ref.kind === "product")
+      ? "项目/产品/仪器图可作为局部元素或材质参考，不要变成硬广产品图。"
+      : "",
+    assetRefs.some((ref) => ref.kind === "people")
+      ? "人物/案例图只用于皮肤状态、护理动作或人物情绪参考；不要夸大前后效果，不生成医疗疗效承诺。"
+      : "",
+    assetRefs.some((ref) => ref.kind === "logo")
+      ? allowSubtleBrand
+        ? "Logo/门头可小面积自然融入，但绝不能出现电话、地址、二维码、价格、平台入口或促销按钮。"
+        : "Logo/门头默认只作品牌气质参考，不要直接把门头文字、联系方式或二维码放进封面。"
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n")
+}
+
+async function assetRefsToImageUrls(opts: {
+  bucket: string
+  userId: string
+  assetRefs: CoverReferenceAsset[]
+}) {
+  const imageUrls: string[] = []
+  const safePrefix = `posters/assets/${opts.userId}/`
+  for (const ref of opts.assetRefs) {
+    if (ref.bucket !== opts.bucket) continue
+    if (!ref.path.startsWith(safePrefix)) continue
+    try {
+      const asset = await downloadAsset({ bucket: opts.bucket, path: ref.path })
+      const contentType = asset.contentType || ref.contentType || "image/jpeg"
+      if (!contentType.startsWith("image/")) continue
+      const base64 = Buffer.from(asset.arrayBuffer).toString("base64")
+      imageUrls.push(`data:${contentType};base64,${base64}`)
+    } catch {
+      // Reference images are optional; keep cover generation available if one asset is stale.
+    }
+  }
+  return imageUrls
+}
+
 function getRequestedStyleId(body: Record<string, unknown>, draft?: DraftCoverAsset | null) {
   const requested = getTextField(body, ["coverStyleId", "cover_style_id", "styleId"])
   const avoid = getTextField(body, ["avoidStyleId", "avoid_style_id"])
@@ -179,6 +298,18 @@ function buildPromptFromContent(body: Record<string, unknown>, draft?: DraftCove
   const contentType = normalizeContentType(getTextField(body, ["contentType", "content_type"]) || draft?.contentType || "")
   const conflictLevel = normalizeConflictLevel(getTextField(body, ["conflictLevel", "conflict_level"]))
   const styleReason = getTextField(body, ["coverStyleReason", "cover_style_reason"]) || draft?.styleReason || ""
+  const coverDensity = normalizeCoverDensity(getTextField(body, ["coverDensity", "cover_density"]))
+  const coverPoints = getCoverPoints(body, draft).slice(0, coverPointTarget(coverDensity))
+  const pointTarget = coverPointTarget(coverDensity)
+  const coverPointInstruction = pointTarget
+    ? [
+        "【辅助信息点】",
+        coverPoints.length
+          ? `请在主标题和副标题之外，加入以下${coverPoints.length}个短信息点/小标签：${coverPoints.join(" / ")}。`
+          : `请在主标题和副标题之外，加入${pointTarget}个来自正文的短信息点/小标签，避免画面只有大标题和背景图。`,
+        "辅助信息点必须简短、清晰、手机端可读；不得包含CTA、平台名、门店地址、价格、联系方式或按钮样式。",
+      ].join("\n")
+    : ""
   const ctx = buildBeautyContext({
     contentType,
     conflictLevel,
@@ -198,6 +329,7 @@ function buildPromptFromContent(body: Record<string, unknown>, draft?: DraftCove
   return {
     prompt: [
       asset.prompt,
+      coverPointInstruction,
       "",
       safeContent ? "【正文参考，仅用于理解主题和情绪，不要把正文拆成小字放进画面】" : "",
       safeContent ? compactText(safeContent, 650) : "",
@@ -233,7 +365,7 @@ async function loadDraftCoverAsset(opts: {
 }): Promise<DraftCoverAsset> {
   const { data } = await opts.supabase
     .from("xhs_drafts")
-    .select("cover_prompt, cover_negative, cover_title, cover_text_main, cover_text_sub, result_title, result_content, content_type, topic, keywords, cover_style_id, cover_style_reason")
+    .select("*")
     .eq("id", opts.draftId)
     .eq("user_id", opts.userId)
     .maybeSingle()
@@ -257,8 +389,11 @@ async function loadDraftCoverAsset(opts: {
       typeof data?.keywords === "string"
         ? data.keywords.trim()
         : Array.isArray(data?.keywords)
-          ? data.keywords.map((item) => String(item || "").trim()).filter(Boolean).join("、")
+          ? data.keywords.map((item: unknown) => String(item || "").trim()).filter(Boolean).join("、")
           : "",
+    coverPoints: Array.isArray(data?.cover_points)
+      ? data.cover_points.map((item: unknown) => String(item || "").trim()).filter(Boolean).slice(0, 4)
+      : [],
     styleId: typeof data?.cover_style_id === "string" ? data.cover_style_id.trim() : "",
     styleReason: typeof data?.cover_style_reason === "string" ? data.cover_style_reason.trim() : "",
   }
@@ -276,6 +411,7 @@ export async function POST(request: NextRequest) {
   const requestBody = body as Record<string, unknown>
   const draftId = getDraftId(requestBody)
   const actionCode = isRegenerateRequest(requestBody) ? "xhs.regenerate.cover" : "xhs.generate.cover"
+  const assetRefs = normalizeAssetRefs(requestBody.assetRefs || requestBody.asset_refs)
 
   const charged = await chargeMpAiPoints({
     request,
@@ -285,7 +421,8 @@ export async function POST(request: NextRequest) {
     businessObjectId: draftId || undefined,
     metadata: {
       size: getTextField(requestBody, ["size"]) || "3:4",
-      resolution: "default",
+      resolution: "1k",
+      asset_count: assetRefs.length,
     },
   })
   if (!charged.ok) return charged.error
@@ -302,12 +439,12 @@ export async function POST(request: NextRequest) {
   await trackServerEvent({
     request,
     event: "mp_xhs_cover_submit",
-    props: { source: "mp", cost: charged.cost, actionCode: charged.actionCode, plan: billing.ctx.plan },
+    props: { source: "mp", cost: charged.cost, actionCode: charged.actionCode, plan: billing.ctx.plan, assetCount: assetRefs.length },
   })
 
   const incomingPrompt = getTextField(requestBody, ["prompt", "coverPrompt", "cover_prompt"])
   const size = normalizeSize(getTextField(requestBody, ["size"]) || "3:4")
-  const resolution = normalizeResolution("")
+  const resolution = "1k"
 
   let draftAsset: DraftCoverAsset | null = null
   if (draftId) {
@@ -343,6 +480,12 @@ export async function POST(request: NextRequest) {
   }
 
   prompt = strengthenMiniProgramCoverPrompt(prompt)
+  const brandVisibility = getTextField(requestBody, ["brandVisibility", "brand_visibility"])
+  prompt = [prompt, assetPromptBlock(assetRefs, brandVisibility)].filter(Boolean).join("\n")
+  const bucket = getXhsAssetsBucket()
+  const imageUrls = assetRefs.length
+    ? await assetRefsToImageUrls({ bucket, userId: billing.ctx.userId, assetRefs })
+    : []
 
   let json: UpstreamGenerateCoverResponse | null = null
 
@@ -351,7 +494,8 @@ export async function POST(request: NextRequest) {
       prompt,
       negativePrompt,
       size,
-      ...(resolution ? { resolution } : {}),
+      resolution,
+      imageUrls,
     })
     json = {
       success: true,
@@ -432,7 +576,7 @@ export async function POST(request: NextRequest) {
   await trackServerEvent({
     request,
     event: "mp_xhs_cover_success",
-    props: { source: "mp", cost: charged.cost, actionCode: charged.actionCode },
+    props: { source: "mp", cost: charged.cost, actionCode: charged.actionCode, assetCount: assetRefs.length, imageCount: imageUrls.length },
   })
 
   const res = NextResponse.json({ ...json, ok: json?.success !== false })

@@ -154,7 +154,7 @@ function buildNextBaseUrlAttempt(opts, candidates) {
 }
 
 function request(opts) {
-  const { baseUrl, url, method = "GET", data, header, __retried401, __baseUrlAttemptIndex = 0 } = opts
+  const { baseUrl, url, method = "GET", data, header, timeout = REQUEST_TIMEOUT, __retried401, __baseUrlAttemptIndex = 0 } = opts
   const { candidates, normalizedBase, nextBaseUrl } = getBaseUrlRetryState(opts)
   const canRetry401 = !__retried401 && shouldAttachAuth(normalizedBase)
   const canRetryBaseUrl = Boolean(nextBaseUrl) && shouldAttachAuth(normalizedBase)
@@ -165,7 +165,7 @@ function request(opts) {
       method,
       data,
       header: buildHeaders(normalizedBase, header),
-      timeout: REQUEST_TIMEOUT,
+      timeout,
       success(res) {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           rememberWorkingHttpBaseUrl(normalizedBase)
@@ -224,7 +224,7 @@ function request(opts) {
 }
 
 function requestText(opts) {
-  const { baseUrl, url, method = "GET", data, header, __retried401, __baseUrlAttemptIndex = 0 } = opts
+  const { baseUrl, url, method = "GET", data, header, timeout = REQUEST_TIMEOUT, __retried401, __baseUrlAttemptIndex = 0 } = opts
   const { candidates, normalizedBase, nextBaseUrl } = getBaseUrlRetryState(opts)
   const canRetry401 = !__retried401 && shouldAttachAuth(normalizedBase)
   const canRetryBaseUrl = Boolean(nextBaseUrl) && shouldAttachAuth(normalizedBase)
@@ -236,7 +236,7 @@ function requestText(opts) {
       data,
       header: buildHeaders(normalizedBase, header),
       responseType: "text",
-      timeout: REQUEST_TIMEOUT,
+      timeout,
       success(res) {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           rememberWorkingHttpBaseUrl(normalizedBase)
@@ -297,7 +297,7 @@ function requestText(opts) {
 }
 
 function requestTextWithMeta(opts) {
-  const { baseUrl, url, method = "GET", data, header, __retried401, __baseUrlAttemptIndex = 0 } = opts
+  const { baseUrl, url, method = "GET", data, header, timeout = REQUEST_TIMEOUT, __retried401, __baseUrlAttemptIndex = 0 } = opts
   const { candidates, normalizedBase, nextBaseUrl } = getBaseUrlRetryState(opts)
   const canRetry401 = !__retried401 && shouldAttachAuth(normalizedBase)
   const canRetryBaseUrl = Boolean(nextBaseUrl) && shouldAttachAuth(normalizedBase)
@@ -309,7 +309,7 @@ function requestTextWithMeta(opts) {
       data,
       header: buildHeaders(normalizedBase, header),
       responseType: "text",
-      timeout: REQUEST_TIMEOUT,
+      timeout,
       success(res) {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           rememberWorkingHttpBaseUrl(normalizedBase)

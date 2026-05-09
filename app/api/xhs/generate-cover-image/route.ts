@@ -13,6 +13,7 @@ import {
 } from "@/lib/xhs/beauty-knowledge"
 
 export const runtime = "nodejs"
+export const maxDuration = 300
 
 type UpstreamGenerateCoverResponse = {
   success?: boolean
@@ -57,10 +58,6 @@ function getTextField(body: Record<string, unknown>, names: string[]) {
 function normalizeSize(value: string) {
   const allowed = new Set(["auto", "1:1", "3:2", "2:3", "4:3", "3:4", "5:4", "4:5", "16:9", "9:16", "2:1", "1:2", "21:9", "9:21"])
   return allowed.has(value) ? value : "3:4"
-}
-
-function normalizeResolution(value: string) {
-  return value === "1k" || value === "2k" || value === "4k" ? value : ""
 }
 
 function getNestedRecord(body: Record<string, unknown>, name: string) {
@@ -268,7 +265,7 @@ export async function POST(request: NextRequest) {
   const requestBody = body as Record<string, unknown>
   const incomingPrompt = getTextField(requestBody, ["prompt", "coverPrompt", "cover_prompt"])
   const size = normalizeSize(getTextField(requestBody, ["size"]) || "3:4")
-  const resolution = normalizeResolution("")
+  const resolution = "1k"
   const draftId = getDraftId(requestBody)
 
   let draftAsset: DraftCoverAsset | null = null
@@ -304,7 +301,7 @@ export async function POST(request: NextRequest) {
         prompt,
         negativePrompt,
         size,
-        ...(resolution ? { resolution } : {}),
+        resolution,
       })
       json = {
         success: true,

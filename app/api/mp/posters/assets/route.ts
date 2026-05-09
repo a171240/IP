@@ -10,7 +10,7 @@ import type { PosterAssetKind } from "@/lib/posters/intake"
 export const runtime = "nodejs"
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024
-const ALLOWED_KINDS = new Set<PosterAssetKind>(["logo", "store", "product", "people"])
+const ALLOWED_KINDS = new Set<PosterAssetKind>(["style", "logo", "store", "product", "people"])
 const ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "image/webp"])
 
 function safeId(value: string) {

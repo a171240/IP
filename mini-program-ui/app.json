@@ -48,8 +48,8 @@
                    "navigationBarTitleText":  "美业内容助手"
                },
     "networkTimeout":  {
-                            "request":  60000,
-                            "downloadFile":  60000
+                            "request":  240000,
+                            "downloadFile":  240000
                         },
     "tabBar":  {
                    "color":  "#A9A2B0",

@@ -1,4 +1,46 @@
-/* Optional page styles (kept minimal; most styles live in app.wxss). */
+.page-store-editor {
+  min-height: 100vh;
+  color: #21191c;
+  background: #efe5d8;
+}
+
+.page-store-editor .container {
+  min-height: 100vh;
+  background:
+    linear-gradient(180deg, #21181c 0rpx, #21181c 292rpx, #efe5d8 292rpx, #efe5d8 100%);
+}
+
+.page-store-editor view,
+.page-store-editor text,
+.page-store-editor input,
+.page-store-editor textarea,
+.page-store-editor button {
+  text-shadow: none;
+  filter: none;
+  -webkit-filter: none;
+}
+
+.page-store-editor .fade-up {
+  animation: none;
+  opacity: 1;
+  transform: none;
+}
+
+.page-store-editor .delay-1,
+.page-store-editor .delay-2 {
+  animation-delay: 0s;
+}
+
+.page-store-editor .hero {
+  position: relative;
+  z-index: 2;
+}
+
+.page-store-editor .section {
+  position: relative;
+  z-index: 1;
+}
+
 .page-store-editor .store-switch-row {
   min-height: 80rpx;
   padding-bottom: 4rpx;

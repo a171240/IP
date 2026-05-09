@@ -1,3 +1,19 @@
+.page-xhs-studio view,
+.page-xhs-studio text,
+.page-xhs-studio input,
+.page-xhs-studio textarea,
+.page-xhs-studio button {
+  text-shadow: none;
+  filter: none;
+  -webkit-filter: none;
+}
+
+.page-xhs-studio .fade-up {
+  animation: none;
+  opacity: 1;
+  transform: none;
+}
+
 .page-xhs-studio .studio-hero {
   padding-bottom: 18rpx;
 }

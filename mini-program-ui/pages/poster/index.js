@@ -3,7 +3,7 @@ const { request } = require("../../utils/request")
 const { buildAbsoluteApiUrl } = require("../../utils/http-base")
 
 const SIZE_OPTIONS = ["4:5", "3:4", "9:16", "16:9", "1:1"]
-const RESOLUTION_OPTIONS = ["1k", "2k"]
+const RESOLUTION_OPTIONS = ["1k"]
 const GOAL_TABS = [
   { key: "all", label: "全部" },
   { key: "acquire", label: "获客" },
@@ -106,9 +106,9 @@ Page({
     sizeOptions: SIZE_OPTIONS,
     resolutionOptions: RESOLUTION_OPTIONS,
     sizeIndex: 0,
-    resolutionIndex: 1,
+    resolutionIndex: 0,
     size: "4:5",
-    resolution: "2k",
+    resolution: "1k",
     isGenerating: false,
     isSaving: false,
     posterId: "",
@@ -148,7 +148,7 @@ Page({
     const normalized = normalizeTemplate(template)
     const { fields, specs } = normalizeFields(normalized)
     const size = normalized.defaultSize || "4:5"
-    const resolution = normalized.defaultResolution || "2k"
+    const resolution = "1k"
     const sizeIndex = Math.max(0, SIZE_OPTIONS.indexOf(size))
     const resolutionIndex = Math.max(0, RESOLUTION_OPTIONS.indexOf(resolution))
     const canvas = canvasForSize(size)
@@ -215,7 +215,7 @@ Page({
     const resolutionIndex = Number(e.detail.value || 0)
     this.setData({
       resolutionIndex,
-      resolution: RESOLUTION_OPTIONS[resolutionIndex] || "2k",
+      resolution: RESOLUTION_OPTIONS[resolutionIndex] || "1k",
     })
   },
 

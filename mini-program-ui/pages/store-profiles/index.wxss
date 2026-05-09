@@ -1,4 +1,46 @@
-/* Optional page styles (kept minimal; most styles live in app.wxss). */
+.page-store-center {
+  min-height: 100vh;
+  color: #21191c;
+  background: #efe5d8;
+}
+
+.page-store-center .container {
+  min-height: 100vh;
+  background:
+    linear-gradient(180deg, #21181c 0rpx, #21181c 292rpx, #efe5d8 292rpx, #efe5d8 100%);
+}
+
+.page-store-center view,
+.page-store-center text,
+.page-store-center input,
+.page-store-center textarea,
+.page-store-center button {
+  text-shadow: none;
+  filter: none;
+  -webkit-filter: none;
+}
+
+.page-store-center .fade-up {
+  animation: none;
+  opacity: 1;
+  transform: none;
+}
+
+.page-store-center .delay-1,
+.page-store-center .delay-2 {
+  animation-delay: 0s;
+}
+
+.page-store-center .hero {
+  position: relative;
+  z-index: 2;
+}
+
+.page-store-center .section {
+  position: relative;
+  z-index: 1;
+}
+
 .page-store-center .store-list-card {
   gap: 14rpx;
 }

@@ -23,6 +23,19 @@ import {
 
 export type ConflictLevel = "safe" | "standard" | "hard"
 export type XhsContentType = "treatment" | "education" | "promotion" | "comparison"
+export type CommercialInsertMode = "none" | "soft_offer" | "store_once" | "local_category_guide" | "recommendation_reply"
+export type PinnedCommentPolicy = "off" | "recommendation_only"
+export type MentionStorePolicy = "none" | "offer_only" | "body_once" | "pinned_only"
+export type CoverDensity = "simple" | "balanced" | "rich"
+
+export type CommercialContext = {
+  mode: CommercialInsertMode
+  offerName: string
+  localScope: string
+  sellingPoint: string
+  pinnedCommentPolicy: PinnedCommentPolicy
+  mentionStorePolicy: MentionStorePolicy
+}
 
 export type StoreProfile = {
   id: string
@@ -45,6 +58,8 @@ export type GenerateV4Input = {
   conflictLevel: ConflictLevel
   storeProfile: StoreProfile | null
   seedReviews: string[]
+  commercialContext: CommercialContext
+  coverDensity: CoverDensity
   maxRounds: number
 }
 
@@ -57,6 +72,7 @@ export type GenerateV4Result = {
   tags: string[]
   coverPrompt: string
   coverNegative: string
+  coverPoints: string[]
   coverStyleId?: string
   coverStyleLabel?: string
   coverStyleReason?: string
@@ -82,10 +98,11 @@ const llmOutputSchema = z.object({
   cover_sub: z.string().min(2).max(28),
   cover_prompt: z.string().max(5000).optional(),
   cover_negative: z.string().max(1500).optional(),
+  cover_points: z.array(z.string().min(1).max(24)).max(4).optional(),
   cover_style_id: z.string().min(2).max(80).optional(),
   cover_style_label: z.string().min(2).max(40).optional(),
   cover_style_reason: z.string().min(2).max(120).optional(),
-  pinned_comment: z.string().min(60).max(2000),
+  pinned_comment: z.string().max(2000).optional().default(""),
   reply_templates: z.array(z.string().min(10).max(400)).min(3).max(5).optional(),
   tags: z.array(z.string().min(1).max(40)).min(3).max(20).optional(),
 })
@@ -139,6 +156,82 @@ function sanitizePinnedCommentText(text: string) {
     .replace(/联系方式/g, "公开信息")
     .replace(/\b1\d{10}\b/g, "公开信息")
     .replace(/\b\d{7,}\b/g, "公开信息")
+}
+
+function shouldGeneratePinnedComment(ctx: CommercialContext) {
+  return ctx.mode === "recommendation_reply" || ctx.pinnedCommentPolicy === "recommendation_only"
+}
+
+function coverPointTarget(density: CoverDensity) {
+  if (density === "simple") return 0
+  if (density === "rich") return 4
+  return 3
+}
+
+function sanitizeCoverPoints(input: unknown, density: CoverDensity) {
+  const target = coverPointTarget(density)
+  if (!target || !Array.isArray(input)) return []
+  return input
+    .map((item) => sanitizeStrictPublishText(String(item || "")).replace(/[：:。.!！?？]+$/g, "").trim())
+    .filter(Boolean)
+    .filter((item) => item.length <= 14)
+    .slice(0, target)
+}
+
+function buildCommercialContextText(input: GenerateV4Input) {
+  const ctx = input.commercialContext
+  const storeName = input.storeProfile?.name || input.shopName || ""
+  const offer = ctx.offerName || input.storeProfile?.main_offer_name || input.keywords || ""
+  const localScope = ctx.localScope || [input.storeProfile?.city, input.storeProfile?.district, input.storeProfile?.landmark].filter(Boolean).join(" ")
+  const pinned = shouldGeneratePinnedComment(ctx)
+
+  const lines = [
+    "本次门店/项目上下文（系统自动处理，不需要用户选择植入方式）：",
+    `- 自动内容策略：${ctx.mode}`,
+    offer ? `- 主推项目/服务：${offer}` : "- 主推项目/服务：未指定，按主题和关键词自然判断，不要编造项目。",
+    localScope ? `- 本地范围：${localScope}` : "- 本地范围：未指定，不要编造城市、商圈或地标。",
+    storeName ? `- 可用门店昵称：${storeName}` : "- 未提供门店昵称，正文不得编造具体门店。",
+    ctx.sellingPoint ? `- 本次一句话卖点：${ctx.sellingPoint}` : "- 本次一句话卖点：未指定，按门店档案和主题提炼，不要编造承诺。",
+  ]
+
+  if (ctx.mode === "none") {
+    lines.push("- 门店信息不足时，正文只写通用干货，不出现店名，不做项目销售，不生成置顶评论。")
+  } else if (ctx.mode === "soft_offer") {
+    lines.push("- 正文围绕主推项目能解决什么问题来写，可提到服务逻辑，但不要硬塞店名；像给选择标准，不像广告。")
+  } else if (ctx.mode === "store_once") {
+    lines.push("- 正文最多自然出现一次门店昵称，用于说明服务边界、流程或适合人群；不能出现引导动作。")
+  } else if (ctx.mode === "local_category_guide") {
+    lines.push("- 正文写成本地选择攻略：优先使用“三类门店适合不同人”的结构；不得虚构其他门店名称、评分、价格或案例。")
+    lines.push("- 如果有门店昵称，把本店定位为其中一类门店的代表/适合人群，不要写成唯一推荐。")
+  } else if (ctx.mode === "recommendation_reply") {
+    lines.push("- 正文保持干货或本地选择逻辑；只有这种求推荐语境才允许额外输出置顶评论承接。")
+  }
+
+  lines.push(pinned ? "- pinned_comment 必须输出，可写公开搜索路径，但不得写平台名、联系方式、二维码、电话、微信。" : "- pinned_comment 必须输出空字符串。")
+
+  return lines.join("\n")
+}
+
+function buildCoverDensityText(density: CoverDensity) {
+  const target = coverPointTarget(density)
+  if (!target) {
+    return "封面信息密度：simple。只输出主标题和副标题，不强制辅助信息点。"
+  }
+  return [
+    `封面信息密度：${density}。`,
+    `cover_points 必须输出 ${target} 个短信息点，每个不超过14个字。`,
+    "这些点用于首图上的小标签/短清单，必须来自正文核心判断，不得包含CTA、平台名、门店地址、价格或联系方式。",
+  ].join("\n")
+}
+
+function fallbackPinnedComment(input: GenerateV4Input) {
+  if (!shouldGeneratePinnedComment(input.commercialContext)) return ""
+  const storeName = input.storeProfile?.name || input.shopName || ""
+  const place = input.commercialContext.localScope || [input.storeProfile?.city, input.storeProfile?.district, input.storeProfile?.landmark].filter(Boolean).join(" ")
+  if (!storeName) return ""
+  return sanitizePinnedCommentText(
+    `如果是想自己核对门店，可以用“${storeName}${place ? " " + place : ""}”去公开平台搜公开信息。重点看三件事：是否提前说清流程、是否临时加费用、是否允许你拒绝升级。`
+  ).trim()
 }
 
 function extractBalancedJsonObject(text: string) {
@@ -387,7 +480,7 @@ function buildSystemPrompt(opts: { contentType: XhsContentType; conflictLevel: C
     "硬性规则（必须遵守）：",
     "1) 正文 body 严格禁CTA：不得出现 评论/私信/关注/加V/微信/VX/电话/扫码/链接/预约/到店 等导流动作；不得出现 大众点评/抖音/团购/下单/买券/核销/价格/优惠/地址/定位/导航 等交易/平台词。",
     "2) 首图文案 cover_main/cover_sub 同样严格禁CTA与平台/交易词。",
-    "3) 置顶评论 pinned_comment 允许给到“怎么找到门店”的路径，但不得直写平台名（大众点评/抖音），不得出现微信/手机号/二维码等联系方式收集。",
+    "3) 置顶评论 pinned_comment 只在本次门店植入规则明确要求时输出；否则必须为空字符串。若输出，允许给到“怎么找到门店”的公开路径，但不得直写平台名（大众点评/抖音），不得出现微信/手机号/二维码等联系方式收集。",
     "4) 不做医疗诊断与疗效承诺：禁用 治疗/根治/治好/百分百/立刻见效 等表述，用“舒缓/体验/因人而异/减少刺激”替代。",
     "5) 不点名攻击具体同行/个人；只描述常见行为话术与自己的边界规则。",
     "",
@@ -399,12 +492,13 @@ function buildSystemPrompt(opts: { contentType: XhsContentType; conflictLevel: C
     "- body 结尾可以留一个开放问题，但不能出现“评论区/私信/找我/来店”等动作词。",
     "- body 不写模板腔，不使用完整的“不是A，是B / 你要的不是X，是Y / 真正的X不是Y，是Z / 更扎心的是 / 换句话说 / 也就是说”。",
     "- cover_main：<=12字，冲突最大；cover_sub：<=16字，给答案/承诺（但不含CTA）。",
+    "- cover_points：按本次封面信息密度输出短信息点，用于首图小标签/短清单；不得包含CTA、平台名、价格、地址、联系方式。",
     "- cover_style_id：必须从以下风格ID中选择一个，并且要根据你刚写出的正文内容选择，不要按内容类型机械套模板。",
     buildCoverStyleCatalogText(),
     "- cover_style_label：输出对应中文风格名；cover_style_reason：一句话说明为什么这篇正文适合这个视觉风格。",
     "- cover_prompt：可留空；最终生图提示词由后端根据 cover_main/cover_sub/cover_style_id 统一生成，避免信息卡模板污染。",
     "- cover_negative：可留空；后端会补充统一负面词。",
-    "- pinned_comment：给两条路径（本地生活平台优先/短视频平台备用），都用“搜索门店昵称+地标/商圈”的方式表达；最后给出三条承诺口径（不加价/不缩水/可拒绝）。",
+    "- pinned_comment：默认输出空字符串；只有门店植入规则要求 recommendation_reply 时，才给公开搜索路径和三条承诺口径（不加价/不缩水/可拒绝）。",
     "- reply_templates：3条（反推销/敏感肌合规/本地怎么找店，不写平台名）。",
     "- tags：8-12个，含本地词+服务词+情绪词；避免敏感词与平台名。",
     "",
@@ -424,6 +518,7 @@ function buildSystemPrompt(opts: { contentType: XhsContentType; conflictLevel: C
     '  "cover_style_reason": "string",',
     '  "cover_prompt": "",',
     '  "cover_negative": "",',
+    '  "cover_points": ["短点1","短点2","短点3"],',
     '  "pinned_comment": "string",',
     '  "reply_templates": ["string","string","string"],',
     '  "tags": ["#tag1", "#tag2"]',
@@ -442,6 +537,10 @@ function buildUserPrompt(input: GenerateV4Input, beautyContext: BeautyContext) {
     "",
     "门店档案：",
     storeSummary,
+    "",
+    buildCommercialContextText(input),
+    "",
+    buildCoverDensityText(input.coverDensity),
     "",
     seed.length ? "差评/吐槽原话（可用来提炼冲突）：\n" + seed.join("\n") : "差评/吐槽原话：未提供（请用通用冲突种子）。",
     "",
@@ -465,6 +564,8 @@ function buildRevisionPrompt(opts: {
   topic: string
   keywords: string
   beautyContext: BeautyContext
+  commercialContext: CommercialContext
+  coverDensity: CoverDensity
 }) {
   const compact = compactFlags(opts.flags)
   const risk = opts.riskLevel ? `${opts.riskLevel}(${opts.dangerCount ?? "?"})` : "unknown"
@@ -483,6 +584,7 @@ function buildRevisionPrompt(opts: {
         cover_style_id: opts.prev.coverStyleId,
         cover_style_label: opts.prev.coverStyleLabel,
         cover_style_reason: opts.prev.coverStyleReason,
+        cover_points: opts.prev.coverPoints,
         cover_prompt: opts.prev.coverPrompt,
         cover_negative: opts.prev.coverNegative,
         pinned_comment: opts.prev.pinnedComment,
@@ -495,11 +597,14 @@ function buildRevisionPrompt(opts: {
     "",
     "改写要求（必须遵守）：",
     "1) body/cover_main/cover_sub：严格移除任何 CTA 动作词、平台名、交易词（见系统规则）。",
-    "2) pinned_comment：不得出现 大众点评/抖音 字样；不得出现微信/手机号/二维码。",
+    shouldGeneratePinnedComment(opts.commercialContext)
+      ? "2) pinned_comment：保留公开搜索路径，但不得出现 大众点评/抖音 字样；不得出现微信/手机号/二维码。"
+      : "2) pinned_comment：必须改为空字符串。",
     "3) 医疗合规：不得承诺疗效，不使用治疗/根治类词。",
     "4) 若当前档位为 hard 仍无法降风险，请把语气降到 standard 或 safe（更克制，不引战）。",
     "5) 保留具体顾客场景、即时情绪和判断标准，不要改成空泛广告腔。",
     "6) 同步保留 cover_style_id/cover_style_reason；cover_prompt/cover_negative 可留空，由后端统一生成。",
+    `7) ${buildCoverDensityText(opts.coverDensity)}`,
     "",
     "封面提示词规则：",
     buildCoverPromptRequirements(opts.beautyContext),
@@ -562,16 +667,21 @@ export async function generateXhsV4(opts: { billing: BillingContext; draftId: st
       styleReason: data.cover_style_reason,
       ctx: beautyContext,
     })
+    const pinnedComment = shouldGeneratePinnedComment(input.commercialContext)
+      ? (sanitizePinnedCommentText(data.pinned_comment || "").trim() || fallbackPinnedComment(input))
+      : ""
+    const coverPoints = sanitizeCoverPoints(data.cover_points, input.coverDensity)
 
     current = {
       title: data.title.trim(),
       body: sanitizeStrictPublishText(data.body).trim(),
       coverText: cover,
-      pinnedComment: sanitizePinnedCommentText(data.pinned_comment).trim(),
+      pinnedComment,
       replyTemplates: replyTemplates.length >= 3 ? replyTemplates.slice(0, 3).map(sanitizePinnedCommentText) : [],
       tags: tags.length ? tags : [],
       coverPrompt: coverAsset.prompt,
       coverNegative: coverAsset.negative,
+      coverPoints,
       coverStyleId: coverAsset.styleId,
       coverStyleLabel: data.cover_style_label || coverAsset.styleLabel,
       coverStyleReason: data.cover_style_reason || coverAsset.styleReason,
@@ -591,7 +701,7 @@ export async function generateXhsV4(opts: { billing: BillingContext; draftId: st
         coverMain: current.coverText.main,
         coverSub: current.coverText.sub,
       }),
-      ...detectPinnedCommentFlags(current.pinnedComment),
+      ...(current.pinnedComment ? detectPinnedCommentFlags(current.pinnedComment) : []),
     ]
 
     // 2) upstream danger-check (best-effort)
@@ -623,6 +733,8 @@ export async function generateXhsV4(opts: { billing: BillingContext; draftId: st
             topic: input.topic,
             keywords: input.keywords,
             beautyContext,
+            commercialContext: input.commercialContext,
+            coverDensity: input.coverDensity,
           }),
         },
       ],
@@ -650,16 +762,21 @@ export async function generateXhsV4(opts: { billing: BillingContext; draftId: st
       styleReason: d.cover_style_reason,
       ctx: beautyContext,
     })
+    const nextPinnedComment: string = shouldGeneratePinnedComment(input.commercialContext)
+      ? (sanitizePinnedCommentText(d.pinned_comment || "").trim() || current.pinnedComment || fallbackPinnedComment(input))
+      : ""
+    const coverPoints = sanitizeCoverPoints(d.cover_points, input.coverDensity)
 
     current = {
       title: d.title.trim(),
       body: sanitizeStrictPublishText(d.body).trim(),
       coverText: cover,
-      pinnedComment: sanitizePinnedCommentText(d.pinned_comment).trim(),
+      pinnedComment: nextPinnedComment,
       replyTemplates: replyTemplates.length >= 3 ? replyTemplates.slice(0, 3).map(sanitizePinnedCommentText) : current.replyTemplates,
       tags: tags.length ? tags : current.tags,
       coverPrompt: coverAsset.prompt,
       coverNegative: coverAsset.negative,
+      coverPoints: coverPoints.length ? coverPoints : current.coverPoints,
       coverStyleId: coverAsset.styleId,
       coverStyleLabel: d.cover_style_label || coverAsset.styleLabel,
       coverStyleReason: d.cover_style_reason || coverAsset.styleReason,

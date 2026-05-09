@@ -10,22 +10,134 @@ import {
   type MpAiBillingContext,
 } from "@/lib/mp/ai-points.server"
 import { trackServerEvent } from "@/lib/xhs/proxy.server"
-import { generateXhsV4, type ConflictLevel, type XhsContentType, type StoreProfile } from "@/lib/xhs/generate-v4.server"
+import {
+  generateXhsV4,
+  type CommercialInsertMode,
+  type CommercialContext,
+  type ConflictLevel,
+  type CoverDensity,
+  type StoreProfile,
+  type XhsContentType,
+} from "@/lib/xhs/generate-v4.server"
 
 export const runtime = "nodejs"
+
+const commercialContextSchema = z.object({
+  mode: z
+    .enum(["none", "soft_offer", "store_once", "local_category_guide", "recommendation_reply"])
+    .optional(),
+  offerName: z.string().trim().max(80).optional(),
+  localScope: z.string().trim().max(80).optional(),
+  sellingPoint: z.string().trim().max(160).optional(),
+  pinnedCommentPolicy: z.enum(["off", "recommendation_only"]).optional(),
+  mentionStorePolicy: z.enum(["none", "offer_only", "body_once", "pinned_only"]).optional(),
+})
 
 const bodySchema = z.object({
   draft_id: z.string().uuid().optional(),
   variant_of: z.string().uuid().optional(),
 
   contentType: z.enum(["treatment", "education", "promotion", "comparison"]),
-  topic: z.string().trim().min(1).max(200),
+  topic: z.string().trim().max(200).optional().default(""),
   keywords: z.string().trim().max(400).optional().default(""),
   shopName: z.string().trim().max(120).optional().default(""),
+  offerName: z.string().trim().max(80).optional().default(""),
+  localScope: z.string().trim().max(80).optional().default(""),
+  sellingPoint: z.string().trim().max(160).optional().default(""),
   conflictLevel: z.enum(["safe", "standard", "hard"]).optional().default("standard"),
   store_profile_id: z.string().uuid().optional(),
   seed_reviews: z.array(z.string().trim().min(1).max(200)).max(20).optional().default([]),
+  coverDensity: z.enum(["simple", "balanced", "rich"]).optional().default("balanced"),
+  commercialContext: commercialContextSchema.optional(),
+  commercial_context: commercialContextSchema.optional(),
 })
+
+function contentTypeText(type: z.infer<typeof bodySchema>["contentType"]) {
+  if (type === "education") return "科普"
+  if (type === "promotion") return "避雷"
+  if (type === "comparison") return "对比"
+  return "攻略"
+}
+
+function profileLocalScope(storeProfile: StoreProfile | null) {
+  return [storeProfile?.city, storeProfile?.district, storeProfile?.landmark].filter(Boolean).join(" ")
+}
+
+function buildEffectiveInput(input: z.infer<typeof bodySchema>, storeProfile: StoreProfile | null): z.infer<typeof bodySchema> {
+  const shopName = input.shopName || storeProfile?.name || ""
+  const offerName = input.offerName || storeProfile?.main_offer_name || ""
+  const localScope = input.localScope || profileLocalScope(storeProfile)
+  const topic =
+    input.topic ||
+    (offerName ? `${offerName}${contentTypeText(input.contentType)}` : "") ||
+    (shopName ? `${shopName}${contentTypeText(input.contentType)}内容` : "") ||
+    `美业${contentTypeText(input.contentType)}内容`
+
+  return {
+    ...input,
+    topic,
+    shopName,
+    offerName,
+    localScope,
+  }
+}
+
+function hasStoreContext(input: z.infer<typeof bodySchema>, storeProfile: StoreProfile | null) {
+  return Boolean(
+    storeProfile ||
+      input.shopName ||
+      input.offerName ||
+      input.localScope ||
+      input.sellingPoint ||
+      input.commercialContext?.offerName ||
+      input.commercialContext?.localScope ||
+      input.commercialContext?.sellingPoint ||
+      input.commercial_context?.offerName ||
+      input.commercial_context?.localScope ||
+      input.commercial_context?.sellingPoint
+  )
+}
+
+function isRecommendationLike(input: z.infer<typeof bodySchema>) {
+  const text = [input.topic, input.keywords, input.offerName, input.localScope].filter(Boolean).join(" ")
+  return /求推荐|求推|有没有.*推荐|哪家|哪种店|哪类店|附近.*(店|美容|皮肤|护理|项目)|本地.*(推荐|怎么选|哪家|靠谱)|同城.*(推荐|怎么选|哪家|靠谱)|商圈.*(推荐|怎么选|哪家|靠谱)|排行榜/.test(text)
+}
+
+function inferCommercialMode(
+  input: z.infer<typeof bodySchema>,
+  storeProfile: StoreProfile | null,
+  ctx: z.infer<typeof commercialContextSchema>
+): CommercialInsertMode {
+  if (ctx.mode) return ctx.mode
+  if (!hasStoreContext(input, storeProfile)) return "none"
+  if (isRecommendationLike(input)) return "recommendation_reply"
+
+  if (input.contentType === "education") return "soft_offer"
+  if (input.contentType === "comparison") return "local_category_guide"
+  return "store_once"
+}
+
+function normalizeCommercialContext(input: z.infer<typeof bodySchema>, storeProfile: StoreProfile | null): CommercialContext {
+  const ctx = input.commercialContext || input.commercial_context || {}
+  const mode = inferCommercialMode(input, storeProfile, ctx)
+  return {
+    mode,
+    offerName: input.offerName || ctx.offerName || "",
+    localScope: input.localScope || ctx.localScope || "",
+    sellingPoint: input.sellingPoint || ctx.sellingPoint || "",
+    pinnedCommentPolicy:
+      ctx.pinnedCommentPolicy || (mode === "recommendation_reply" ? "recommendation_only" : "off"),
+    mentionStorePolicy:
+      ctx.mentionStorePolicy ||
+      (mode === "soft_offer"
+        ? "offer_only"
+        : mode === "store_once" || mode === "local_category_guide"
+          ? "body_once"
+          : mode === "recommendation_reply"
+            ? "pinned_only"
+            : "none"),
+  }
+}
 
 async function loadStoreProfile(opts: {
   billing: MpAiBillingContext
@@ -143,9 +255,14 @@ export async function POST(request: NextRequest) {
     },
   })
 
+  const storeProfileId = (input.store_profile_id || "").trim()
+  const storeProfile = storeProfileId ? await loadStoreProfile({ billing: billing.ctx, storeProfileId }) : null
+  const effectiveInput = buildEffectiveInput(input, storeProfile)
+  const commercialContext = normalizeCommercialContext(effectiveInput, storeProfile)
+
   let draftId = ""
   try {
-    const ensured = await ensureDraft({ billing: billing.ctx, input })
+    const ensured = await ensureDraft({ billing: billing.ctx, input: effectiveInput })
     draftId = ensured.id
   } catch (e) {
     const msg = e instanceof Error ? e.message : "draft_failed"
@@ -158,21 +275,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: msg }, { status: 500 })
   }
 
-  const storeProfileId = (input.store_profile_id || "").trim()
-  const storeProfile = storeProfileId ? await loadStoreProfile({ billing: billing.ctx, storeProfileId }) : null
-
   try {
     const { result, guardrails } = await generateXhsV4({
       billing: billing.ctx,
       draftId,
       input: {
-        contentType: input.contentType as XhsContentType,
-        topic: input.topic,
-        keywords: input.keywords || "",
-        shopName: input.shopName || "",
-        conflictLevel: input.conflictLevel as ConflictLevel,
+        contentType: effectiveInput.contentType as XhsContentType,
+        topic: effectiveInput.topic,
+        keywords: effectiveInput.keywords || "",
+        shopName: effectiveInput.shopName || "",
+        conflictLevel: effectiveInput.conflictLevel as ConflictLevel,
         storeProfile,
-        seedReviews: input.seed_reviews || [],
+        seedReviews: effectiveInput.seed_reviews || [],
+        commercialContext,
+        coverDensity: effectiveInput.coverDensity as CoverDensity,
         // Mini program client timeout is 60s; keep to a single pass + one danger-check to stay within budget.
         maxRounds: 1,
       },
@@ -182,10 +298,10 @@ export async function POST(request: NextRequest) {
     try {
       const now = new Date().toISOString()
       const draftUpdate = {
-        content_type: input.contentType,
-        topic: input.topic,
-        keywords: input.keywords || null,
-        shop_name: input.shopName || null,
+        content_type: effectiveInput.contentType,
+        topic: effectiveInput.topic,
+        keywords: effectiveInput.keywords || null,
+        shop_name: effectiveInput.shopName || null,
 
         result_title: result.title,
         result_content: result.body,
@@ -198,11 +314,12 @@ export async function POST(request: NextRequest) {
         cover_text_sub: result.coverText.sub,
         cover_prompt: result.coverPrompt,
         cover_negative: result.coverNegative,
+        cover_points: result.coverPoints,
         cover_style_id: result.coverStyleId || null,
         cover_style_label: result.coverStyleLabel || null,
         cover_style_reason: result.coverStyleReason || null,
 
-        conflict_level: input.conflictLevel,
+        conflict_level: effectiveInput.conflictLevel,
         guardrail_rounds: guardrails.rounds,
         guardrail_flags: guardrails.flags,
         store_profile_id: storeProfileId || null,
@@ -218,8 +335,9 @@ export async function POST(request: NextRequest) {
         .eq("id", draftId)
         .eq("user_id", billing.ctx.userId)
 
-      if (updateError && /cover_style_/.test(updateError.message || "")) {
+      if (updateError && /(cover_style_|cover_points)/.test(updateError.message || "")) {
         const fallbackUpdate: Record<string, unknown> = { ...draftUpdate }
+        delete fallbackUpdate.cover_points
         delete fallbackUpdate.cover_style_id
         delete fallbackUpdate.cover_style_label
         delete fallbackUpdate.cover_style_reason
@@ -249,6 +367,8 @@ export async function POST(request: NextRequest) {
         entryClass: result.entryClass,
         narrator: result.narrator,
         coverStyleId: result.coverStyleId,
+        commercialMode: commercialContext.mode,
+        coverDensity: effectiveInput.coverDensity,
       },
     })
 
@@ -264,6 +384,7 @@ export async function POST(request: NextRequest) {
         tags: result.tags,
         coverPrompt: result.coverPrompt,
         coverNegative: result.coverNegative,
+        coverPoints: result.coverPoints,
         coverStyleId: result.coverStyleId,
         coverStyleLabel: result.coverStyleLabel,
         coverStyleReason: result.coverStyleReason,
