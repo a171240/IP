@@ -90,7 +90,7 @@ test("warning cover routes to warning poster without stale info-card prompt", ()
   assert.match(result.prompt, /高级美业杂志封面感/)
   assert.doesNotMatch(result.prompt, /旧版信息卡/)
   assert.doesNotMatch(result.prompt, /信息卡、三条清单、圆形小图标、细线分隔/)
-  assert.match(result.prompt, /可以有少量辅助说明或对比元素/)
+  assert.match(result.prompt, /3个短避坑点或对比标签/)
   assert.doesNotMatch(result.prompt, /no human/)
   assert.doesNotMatch(result.prompt, /no checklist/)
 })
@@ -122,6 +122,48 @@ test("cover prompt strips CTA words from title and subtitle", () => {
   assert.doesNotMatch(result.prompt, /领取/)
   assert.match(result.prompt, /防晒避雷/)
   assert.match(result.prompt, /护理方案/)
+})
+
+test("relax cover prompt requires structured info layout, not only ambience", () => {
+  const result = runBeautyModule(`
+    import { buildBeautyContext, normalizeCoverAsset } from "./lib/xhs/beauty-knowledge.ts";
+
+    const ctx = buildBeautyContext({
+      contentType: "treatment",
+      conflictLevel: "standard",
+      topic: "修丽可面部+肩颈 SPA放松",
+      keywords: "肩颈 放松 SPA",
+    });
+
+    const asset = normalizeCoverAsset({
+      main: "肩颈SPA怎么选",
+      sub: "别只看项目名",
+      prompt: "",
+      negative: null,
+      ctx,
+    });
+
+    console.log(JSON.stringify({ style: asset.styleId, prompt: asset.prompt, negative: asset.negative }));
+  `)
+
+  assert.equal(result.style, "lifestyle-spa-scene")
+  assert.match(result.prompt, /主标题区、副标题区、辅助信息点区、主视觉区/)
+  assert.match(result.prompt, /短标签\/短清单/)
+  assert.match(result.prompt, /不要生成单调的“背景图 \+ 大标题”/)
+  assert.match(result.negative, /纯背景加大字/)
+})
+
+test("xhs text generation prompt requires store anchor when profile exists", () => {
+  const source = readFileSync(join(root, "lib/xhs/generate-v4.server.ts"), "utf8")
+  const coverRoute = readFileSync(join(root, "app/api/mp/xhs/generate-cover-image/route.ts"), "utf8")
+
+  assert.match(source, /门店锚点要求/)
+  assert.match(source, /正文必须自然出现门店昵称/)
+  assert.match(source, /主推项目\/服务.*全文主线/)
+  assert.match(source, /拿一家真实门店做样本解释怎么选/)
+  assert.match(source, /body 必须出现清楚的门店锚点/)
+  assert.match(coverRoute, /辅助信息点区和主视觉区/)
+  assert.match(coverRoute, /不要生成单调的氛围背景加大标题/)
 })
 
 test("image generation defaults stay single-image on gpt-image-2", () => {

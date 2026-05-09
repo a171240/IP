@@ -107,6 +107,44 @@ const llmOutputSchema = z.object({
   tags: z.array(z.string().min(1).max(40)).min(3).max(20).optional(),
 })
 
+function compactUnknownValue(value: unknown, max = 180): string {
+  if (!value) return ""
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => {
+        if (typeof item === "string") return item.trim()
+        if (item && typeof item === "object") {
+          const record = item as Record<string, unknown>
+          return String(record.name || record.title || record.label || record.step || "").trim()
+        }
+        return String(item || "").trim()
+      })
+      .filter(Boolean)
+      .slice(0, 6)
+      .join("、")
+      .slice(0, max)
+  }
+  if (typeof value === "object") {
+    return Object.entries(value as Record<string, unknown>)
+      .filter(([, v]) => v !== false && v !== null && v !== undefined && String(v).trim() !== "")
+      .map(([k, v]) => `${k}:${typeof v === "boolean" ? "是" : String(v).trim()}`)
+      .slice(0, 8)
+      .join("、")
+      .slice(0, max)
+  }
+  return String(value || "").trim().slice(0, max)
+}
+
+function formatStorePromises(promises: unknown) {
+  if (!promises || typeof promises !== "object") return ""
+  const p = promises as Record<string, unknown>
+  const labels: string[] = []
+  if (p.no_extra_fee !== false) labels.push("规则提前说清，不临时加价")
+  if (p.no_shrink !== false) labels.push("流程尽量完整，不把主推时长缩水")
+  if (p.can_refuse !== false) labels.push("顾客可拒绝升级或硬推销")
+  return labels.join("；")
+}
+
 function buildStoreSummary(profile: StoreProfile | null): string {
   if (!profile) return "（未提供门店档案：请写泛内容，不要编造具体数字、具体地标、具体价格。）"
 
@@ -120,8 +158,10 @@ function buildStoreSummary(profile: StoreProfile | null): string {
   if (typeof profile.main_offer_duration_min === "number" && profile.main_offer_duration_min > 0) {
     parts.push(`时长：约${profile.main_offer_duration_min}分钟（以团购页为准）`)
   }
-  if (profile.promises) parts.push(`承诺口径：${JSON.stringify(profile.promises)}`)
-  if (profile.included_steps) parts.push(`流程要点：${JSON.stringify(profile.included_steps)}`)
+  const promiseText = formatStorePromises(profile.promises) || compactUnknownValue(profile.promises)
+  if (promiseText) parts.push(`承诺口径：${promiseText}`)
+  const stepsText = compactUnknownValue(profile.included_steps)
+  if (stepsText) parts.push(`流程要点：${stepsText}`)
 
   return parts.length ? parts.join("\n") : "（已选择门店档案，但信息不完整：请避免编造具体事实。）"
 }
@@ -184,6 +224,7 @@ function buildCommercialContextText(input: GenerateV4Input) {
   const offer = ctx.offerName || input.storeProfile?.main_offer_name || input.keywords || ""
   const localScope = ctx.localScope || [input.storeProfile?.city, input.storeProfile?.district, input.storeProfile?.landmark].filter(Boolean).join(" ")
   const pinned = shouldGeneratePinnedComment(ctx)
+  const hasCommercialAnchor = ctx.mode !== "none" && Boolean(storeName || offer || localScope || ctx.sellingPoint || input.storeProfile)
 
   const lines = [
     "本次门店/项目上下文（系统自动处理，不需要用户选择植入方式）：",
@@ -194,17 +235,29 @@ function buildCommercialContextText(input: GenerateV4Input) {
     ctx.sellingPoint ? `- 本次一句话卖点：${ctx.sellingPoint}` : "- 本次一句话卖点：未指定，按门店档案和主题提炼，不要编造承诺。",
   ]
 
+  if (hasCommercialAnchor) {
+    lines.push("- 门店锚点要求：正文必须让读者看出这不是泛泛品类文章，而是以本次门店/项目为样本写出的判断内容。")
+    if (storeName) {
+      lines.push(`- 正文必须自然出现门店昵称“${storeName}”至少1次、最多2次；建议放在中段作为服务样本，不要放成广告结尾。`)
+    }
+    if (offer) {
+      lines.push(`- 主推项目/服务“${offer}”必须成为全文主线，正文至少出现2次：开头承接需求一次，判断标准或服务细节里再出现一次。`)
+    }
+    lines.push("- 至少写出1-2个可验证门店锚点：时长、流程、力度/温度确认、少打扰、不硬推销、不缩水、适合人群；没有资料的点不要编。")
+    lines.push("- 写法像“拿一家真实门店做样本解释怎么选”，不要像广告口号；禁止欢迎、快来、立即、预约、到店等动作引导。")
+  }
+
   if (ctx.mode === "none") {
     lines.push("- 门店信息不足时，正文只写通用干货，不出现店名，不做项目销售，不生成置顶评论。")
   } else if (ctx.mode === "soft_offer") {
-    lines.push("- 正文围绕主推项目能解决什么问题来写，可提到服务逻辑，但不要硬塞店名；像给选择标准，不像广告。")
+    lines.push("- 正文围绕主推项目能解决什么问题来写；若有门店昵称，必须用“以本店/本项目为样本”的方式轻轻带出一次，像给选择标准，不像广告。")
   } else if (ctx.mode === "store_once") {
-    lines.push("- 正文最多自然出现一次门店昵称，用于说明服务边界、流程或适合人群；不能出现引导动作。")
+    lines.push("- 正文至少自然出现一次门店昵称，用于说明服务边界、流程或适合人群；整体不超过两次，不能出现引导动作。")
   } else if (ctx.mode === "local_category_guide") {
     lines.push("- 正文写成本地选择攻略：优先使用“三类门店适合不同人”的结构；不得虚构其他门店名称、评分、价格或案例。")
-    lines.push("- 如果有门店昵称，把本店定位为其中一类门店的代表/适合人群，不要写成唯一推荐。")
+    lines.push("- 如果有门店昵称，必须把本店定位为其中一类门店的代表/适合人群，不要写成唯一推荐。")
   } else if (ctx.mode === "recommendation_reply") {
-    lines.push("- 正文保持干货或本地选择逻辑；只有这种求推荐语境才允许额外输出置顶评论承接。")
+    lines.push("- 正文保持干货或本地选择逻辑；可把本店作为一种适合人群样本轻带一次，主要承接放在置顶评论。")
   }
 
   lines.push(pinned ? "- pinned_comment 必须输出，可写公开搜索路径，但不得写平台名、联系方式、二维码、电话、微信。" : "- pinned_comment 必须输出空字符串。")
@@ -221,6 +274,8 @@ function buildCoverDensityText(density: CoverDensity) {
     `封面信息密度：${density}。`,
     `cover_points 必须输出 ${target} 个短信息点，每个不超过14个字。`,
     "这些点用于首图上的小标签/短清单，必须来自正文核心判断，不得包含CTA、平台名、门店地址、价格或联系方式。",
+    "cover_points 不要写抽象情绪口号，要写成可直接上图的判断点、避坑点、流程点或适合人群点。",
+    "封面版式必须有主标题区、副标题区、短信息点区和主视觉区；不得只生成氛围背景+大标题。",
   ].join("\n")
 }
 
@@ -487,6 +542,7 @@ function buildSystemPrompt(opts: { contentType: XhsContentType; conflictLevel: C
     "结构要求：",
     "- title：18字内，包含主关键词（若关键词为空则包含主题核心词）。",
     "- body：400-600字，短句、画面感；隐含链路为“具体顾客画像 -> 触发场景 -> 此刻情绪 -> 判断标准 -> 温和结论”。不要输出画像表。",
+    "- 若本次提供门店档案或门店/项目上下文，body 必须出现清楚的门店锚点：读者能看出是哪家店/哪个项目的服务样本，而不是只写通用品类知识。",
     "- body 自然加入 2-4 个 emoji，让语气更像小红书真实笔记；不要每段都放，不要在严肃风险提醒里堆表情，标题不强制放 emoji。",
     "- body 必须包含至少3个“可核实细节”。若缺少门店档案信息，则改为“可验证判断标准/自检清单”，不要编造具体事实。",
     "- body 结尾可以留一个开放问题，但不能出现“评论区/私信/找我/来店”等动作词。",
@@ -548,7 +604,7 @@ function buildUserPrompt(input: GenerateV4Input, beautyContext: BeautyContext) {
     buildBeautySourcePackText(beautyContext),
     "",
     "生成前请先在内部完成：选择一个具体顾客主角，判断她处在千机塔第4-6层的触发场景与即时情绪，再把内容写成可发布笔记；不要输出分析过程。",
-    "封面只需要选择视觉风格ID；最终生图提示词由后端统一拼接，不要输出信息卡、清单、图标列表类提示词。",
+    "封面只需要选择视觉风格ID，并按信息密度输出 cover_points；最终生图提示词由后端统一拼接，不要输出旧版信息卡模板提示词。",
   ]
     .filter(Boolean)
     .join("\n")
