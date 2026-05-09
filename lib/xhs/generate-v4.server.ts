@@ -289,6 +289,68 @@ function fallbackPinnedComment(input: GenerateV4Input) {
   ).trim()
 }
 
+function getStoreAnchorName(input: GenerateV4Input) {
+  return (input.storeProfile?.name || input.shopName || "").trim()
+}
+
+function getOfferAnchorName(input: GenerateV4Input) {
+  return (input.storeProfile?.main_offer_name || input.commercialContext.offerName || "").trim()
+}
+
+function buildStoreAnchorSentence(input: GenerateV4Input) {
+  const storeName = getStoreAnchorName(input)
+  const offerName = getOfferAnchorName(input)
+  const detailBits: string[] = []
+  const duration = input.storeProfile?.main_offer_duration_min
+  if (typeof duration === "number" && duration > 0) detailBits.push(`约${duration}分钟流程是否完整`)
+  const promiseText = formatStorePromises(input.storeProfile?.promises)
+  if (promiseText) detailBits.push(promiseText)
+  if (!detailBits.length) detailBits.push("服务边界、流程细节和顾客节奏是否说清楚")
+
+  if (storeName && offerName) {
+    return `如果拿${storeName}的${offerName}做样本看，重点不是项目名本身，而是${detailBits.join("；")}。`
+  }
+  if (storeName) {
+    return `如果拿${storeName}这类门店做样本看，重点是${detailBits.join("；")}。`
+  }
+  if (offerName) {
+    return `拿${offerName}这类项目来说，重点不只是项目名，而是${detailBits.join("；")}。`
+  }
+  return ""
+}
+
+function insertParagraphAfterOpening(body: string, sentence: string) {
+  const paragraphs = body
+    .split(/\n{2,}/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+  if (!paragraphs.length) return sentence
+  if (paragraphs.some((item) => item.includes(sentence))) return body
+  const index = paragraphs.length > 1 ? 1 : paragraphs.length
+  paragraphs.splice(index, 0, sentence)
+  return paragraphs.join("\n\n")
+}
+
+function ensureStoreAnchor(result: GenerateV4Result, input: GenerateV4Input): GenerateV4Result {
+  if (input.commercialContext.mode === "none") return result
+  const storeName = getStoreAnchorName(input)
+  const offerName = getOfferAnchorName(input)
+  if (!storeName && !offerName) return result
+
+  const body = result.body || ""
+  const missingStore = Boolean(storeName && !body.includes(storeName))
+  const missingOffer = Boolean(offerName && !body.includes(offerName))
+  if (!missingStore && !missingOffer) return result
+
+  const sentence = buildStoreAnchorSentence(input)
+  if (!sentence) return result
+
+  return {
+    ...result,
+    body: insertParagraphAfterOpening(body, sentence),
+  }
+}
+
 function extractBalancedJsonObject(text: string) {
   const start = text.indexOf("{")
   if (start < 0) return ""
@@ -745,6 +807,7 @@ export async function generateXhsV4(opts: { billing: BillingContext; draftId: st
       narrator: data.narrator || beautyContext.narratorName,
       persona: data.persona || beautyContext.personaHint,
     }
+    current = ensureStoreAnchor(current, input)
   }
 
   for (rounds = 1; rounds <= maxRounds; rounds++) {
@@ -840,6 +903,7 @@ export async function generateXhsV4(opts: { billing: BillingContext; draftId: st
       narrator: d.narrator || current.narrator || beautyContext.narratorName,
       persona: d.persona || current.persona || beautyContext.personaHint,
     }
+    current = ensureStoreAnchor(current, input)
   }
 
   if (!current) {

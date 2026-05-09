@@ -63,10 +63,20 @@ function profileLocalScope(storeProfile: StoreProfile | null) {
   return [storeProfile?.city, storeProfile?.district, storeProfile?.landmark].filter(Boolean).join(" ")
 }
 
+function mergeLocalScope(inputScope: string, profileScope: string) {
+  const inputValue = inputScope.trim()
+  const profileValue = profileScope.trim()
+  if (!profileValue) return inputValue
+  if (!inputValue) return profileValue
+  if (profileValue.includes(inputValue)) return profileValue
+  if (inputValue.includes(profileValue)) return inputValue
+  return profileValue
+}
+
 function buildEffectiveInput(input: z.infer<typeof bodySchema>, storeProfile: StoreProfile | null): z.infer<typeof bodySchema> {
-  const shopName = input.shopName || storeProfile?.name || ""
-  const offerName = input.offerName || storeProfile?.main_offer_name || ""
-  const localScope = input.localScope || profileLocalScope(storeProfile)
+  const shopName = storeProfile?.name || input.shopName || ""
+  const offerName = storeProfile?.main_offer_name || input.offerName || ""
+  const localScope = mergeLocalScope(input.localScope || "", profileLocalScope(storeProfile))
   const topic =
     input.topic ||
     (offerName ? `${offerName}${contentTypeText(input.contentType)}` : "") ||

@@ -34,6 +34,7 @@ type DraftCoverAsset = {
   contentType: string
   topic: string
   keywords: string
+  coverPoints: string[]
   styleId: string
   styleReason: string
 }
@@ -128,6 +129,39 @@ function getKeywordText(body: Record<string, unknown>, draft?: DraftCoverAsset |
   return fromArray || getTextField(body, ["keywords"]) || draft?.keywords || ""
 }
 
+function getStringArrayField(body: Record<string, unknown>, names: string[]) {
+  for (const name of names) {
+    const value = body[name]
+    if (Array.isArray(value)) {
+      return value.map((item) => String(item || "").trim()).filter(Boolean)
+    }
+  }
+  return []
+}
+
+function getCoverPoints(body: Record<string, unknown>, draft?: DraftCoverAsset | null) {
+  const preExtracted = getNestedRecord(body, "preExtracted")
+  const direct = getStringArrayField(body, ["coverPoints", "cover_points"])
+  if (direct.length) return direct.slice(0, 4)
+  if (preExtracted) {
+    const points = getStringArrayField(preExtracted, ["points", "coverPoints", "cover_points"]).slice(0, 4)
+    if (points.length) return points
+  }
+  if (draft?.coverPoints?.length) return draft.coverPoints.slice(0, 4)
+  return []
+}
+
+function normalizeCoverDensity(value: string) {
+  if (value === "simple" || value === "rich") return value
+  return "balanced"
+}
+
+function coverPointTarget(density: string) {
+  if (density === "simple") return 0
+  if (density === "rich") return 4
+  return 3
+}
+
 function buildPromptFromContent(body: Record<string, unknown>, draft?: DraftCoverAsset | null) {
   const content = getTextField(body, ["content", "resultContent", "body", "text"]) || draft?.resultContent || ""
   const safeContent = sanitizeCoverReferenceText(content)
@@ -149,6 +183,20 @@ function buildPromptFromContent(body: Record<string, unknown>, draft?: DraftCove
   const contentType = normalizeContentType(getTextField(body, ["contentType", "content_type"]) || draft?.contentType || "")
   const conflictLevel = normalizeConflictLevel(getTextField(body, ["conflictLevel", "conflict_level"]))
   const styleReason = getTextField(body, ["coverStyleReason", "cover_style_reason"]) || draft?.styleReason || ""
+  const coverDensity = normalizeCoverDensity(getTextField(body, ["coverDensity", "cover_density"]))
+  const coverPoints = getCoverPoints(body, draft).slice(0, coverPointTarget(coverDensity))
+  const pointTarget = coverPointTarget(coverDensity)
+  const coverPointInstruction = pointTarget
+    ? [
+        "【辅助信息点】",
+        coverPoints.length
+          ? `请在主标题和副标题之外，加入以下${coverPoints.length}个短信息点/小标签：${coverPoints.join(" / ")}。`
+          : `请在主标题和副标题之外，加入${pointTarget}个来自正文的短信息点/小标签，避免画面只有大标题和背景图。`,
+        "辅助信息点必须简短、清晰、手机端可读；不得包含CTA、平台名、门店地址、价格、联系方式或按钮样式。",
+        "必须把辅助信息点做成清晰的小标签、侧边短清单或分区信息条；不要只用图标代替文字，不要省略这些短点。",
+        "整体版式必须包含主标题区、副标题区、辅助信息点区和主视觉区；不要生成单调的氛围背景加大标题。",
+      ].join("\n")
+    : ""
   const ctx = buildBeautyContext({
     contentType,
     conflictLevel,
@@ -168,6 +216,7 @@ function buildPromptFromContent(body: Record<string, unknown>, draft?: DraftCove
   return {
     prompt: [
       asset.prompt,
+      coverPointInstruction,
       "",
       safeContent ? "【正文参考，仅用于理解主题和情绪，不要把正文拆成小字放进画面】" : "",
       safeContent ? compactText(safeContent, 650) : "",
@@ -180,6 +229,20 @@ function buildPromptFromContent(body: Record<string, unknown>, draft?: DraftCove
   }
 }
 
+function strengthenLegacyCoverPrompt(prompt: string) {
+  return [
+    prompt.trim(),
+    "",
+    "【旧入口封面质量底线】",
+    "这张图必须是完成度高的小红书首图设计，不是背景图，也不是营销落地页。",
+    "可以有人脸、护理场景、局部对比、少量清单或辅助说明，但画面底部必须保持干净。",
+    "版式必须有主标题区、副标题区、辅助信息点区和主视觉区；如果提示词包含短信息点，必须逐条清晰显示。",
+    "禁止只生成氛围背景加大标题，禁止主标题占满半张图导致信息层级单薄。",
+    "禁止底部导流组件、转化按钮、互动引导、私域联系方式、平台入口、可扫码联系元素。",
+    "必须有明确视觉焦点、美业质感和手机端可读标题；中文文字不要错字、乱码。",
+  ].join("\n")
+}
+
 async function loadDraftCoverAsset(opts: {
   supabase: BillingContext["supabase"]
   userId: string
@@ -187,7 +250,7 @@ async function loadDraftCoverAsset(opts: {
 }): Promise<DraftCoverAsset> {
   const { data } = await opts.supabase
     .from("xhs_drafts")
-    .select("cover_prompt, cover_negative, cover_title, cover_text_main, cover_text_sub, result_title, result_content, content_type, topic, keywords, cover_style_id, cover_style_reason")
+    .select("cover_prompt, cover_negative, cover_title, cover_text_main, cover_text_sub, result_title, result_content, content_type, topic, keywords, cover_points, cover_style_id, cover_style_reason")
     .eq("id", opts.draftId)
     .eq("user_id", opts.userId)
     .maybeSingle()
@@ -213,6 +276,9 @@ async function loadDraftCoverAsset(opts: {
         : Array.isArray(data?.keywords)
           ? data.keywords.map((item) => String(item || "").trim()).filter(Boolean).join("、")
           : "",
+    coverPoints: Array.isArray(data?.cover_points)
+      ? data.cover_points.map((item: unknown) => String(item || "").trim()).filter(Boolean).slice(0, 4)
+      : [],
     styleId: typeof data?.cover_style_id === "string" ? data.cover_style_id.trim() : "",
     styleReason: typeof data?.cover_style_reason === "string" ? data.cover_style_reason.trim() : "",
   }
@@ -293,6 +359,10 @@ export async function POST(request: NextRequest) {
       negativePrompt
   }
 
+  if (prompt) {
+    prompt = strengthenLegacyCoverPrompt(prompt)
+  }
+
   let json: UpstreamGenerateCoverResponse | null = null
 
   if (prompt) {
@@ -321,7 +391,7 @@ export async function POST(request: NextRequest) {
       })
 
       // Missing local/staging image keys can still use the old service as a compatibility fallback.
-      if (!message.includes("APIMART_API_KEY missing")) {
+      if (!message.includes("APIMART_API_KEY missing") && !message.includes("APIMART_IMAGE_API_KEY missing")) {
         return NextResponse.json(
           { success: false, error: `GPT Image生成失败：${message.slice(0, 240)}` },
           { status: 502 }
@@ -331,7 +401,17 @@ export async function POST(request: NextRequest) {
   }
 
   if (!json) {
-    const upstream = await requestUpstreamCover(requestBody)
+    const upstream = await requestUpstreamCover(
+      prompt
+        ? {
+            ...requestBody,
+            prompt,
+            coverPrompt: prompt,
+            negativePrompt,
+            coverNegative: negativePrompt,
+          }
+        : requestBody
+    )
     if (!upstream.ok) {
       await trackServerEvent({ request, event: "xhs_cover_fail", props: { source: "mp", status: upstream.status } })
       return NextResponse.json(
