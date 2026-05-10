@@ -18,7 +18,7 @@
 
 - 一个可用于小程序的 **备案 HTTPS 域名**（示例：`ip.ipgongchang.xin`）
 - 一个 Supabase 项目（Production）
-- Apimart/Evolink 的 `APIMART_API_KEY`（用于内容生成）
+- APIMart 的 `APIMART_API_KEY`（用于内容生成）
 
 如果用小程序微信登录：
 
@@ -114,7 +114,9 @@
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `CREDITS_IP_SALT`（生产必须是长随机串）
 - `APIMART_API_KEY`
-- `APIMART_BASE_URL`（默认是 `https://api.evolink.ai/v1` 也可不填）
+- `APIMART_BASE_URL`（默认是 `https://api.apimart.ai/v1`，也可不填）
+- `APIMART_IMAGE_API_KEY`（生图/海报/发文封面；如果和 `APIMART_API_KEY` 同一把 key，可留空）
+- `APIMART_IMAGE_BASE_URL`（默认是 `https://api.apimart.ai/v1`，也可不填）
 - `APIMART_MODEL`（示例：`kimi-k2-thinking`）
 
 小程序登录（需要就填）：

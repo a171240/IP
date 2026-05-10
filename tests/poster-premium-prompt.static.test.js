@@ -71,9 +71,10 @@ test("poster image provider folds negative prompt into the submitted prompt", ()
   assert.match(providerSource, /prompt\.includes\(negativePrompt\)/)
   assert.match(providerSource, /const fullPrompt = buildFullPrompt\(opts\)/)
   assert.match(providerSource, /APIMART_IMAGE_BASE_URL \|\| "https:\/\/api\.apimart\.ai\/v1"/)
+  assert.match(providerSource, /process\.env\.APIMART_IMAGE_API_KEY/)
   assert.match(providerSource, /process\.env\.APIMART_API_KEY \|\| ""/)
-  assert.doesNotMatch(providerSource, /APIMART_IMAGE_API_KEY/)
-  assert.doesNotMatch(providerSource, /APIMART_BASE_URL/)
+  assert.match(providerSource, /sharedBaseUrl === apiBaseUrl\(\)/)
+  assert.match(providerSource, /APIMART_IMAGE_API_KEY missing/)
 })
 
 test("poster intake keeps user-provided style instead of overwriting it with defaults", () => {

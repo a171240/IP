@@ -14,12 +14,29 @@ type TaskStatus = "pending" | "submitted" | "processing" | "completed" | "failed
 
 const BASIC_IMAGE_RESOLUTION = "1k"
 
+function normalizeBaseUrl(value: string) {
+  return value.trim().replace(/\/$/, "")
+}
+
+function isConfiguredKey(value: string) {
+  return Boolean(value && value !== "your-api-key-here")
+}
+
 function apiBaseUrl() {
-  return (process.env.APIMART_IMAGE_BASE_URL || "https://api.apimart.ai/v1").trim().replace(/\/$/, "")
+  return normalizeBaseUrl(process.env.APIMART_IMAGE_BASE_URL || "https://api.apimart.ai/v1")
 }
 
 function apiKey() {
-  return (process.env.APIMART_API_KEY || "").trim()
+  const imageKey = (process.env.APIMART_IMAGE_API_KEY || "").trim()
+  if (isConfiguredKey(imageKey)) return imageKey
+
+  const sharedKey = (process.env.APIMART_API_KEY || "").trim()
+  if (!isConfiguredKey(sharedKey)) return ""
+
+  const sharedBaseUrl = process.env.APIMART_BASE_URL ? normalizeBaseUrl(process.env.APIMART_BASE_URL) : ""
+  if (!sharedBaseUrl || sharedBaseUrl === apiBaseUrl()) return sharedKey
+
+  return ""
 }
 
 export function imageModel() {
@@ -118,7 +135,7 @@ function extractErrorMessage(json: unknown, fallback: string) {
 
 async function requestJson(path: string, init?: RequestInit) {
   const key = apiKey()
-  if (!key || key === "your-api-key-here") throw new Error("APIMART_API_KEY missing")
+  if (!key) throw new Error("APIMART_IMAGE_API_KEY missing")
 
   let lastError: Error | null = null
   const attempts = maxRetries() + 1
