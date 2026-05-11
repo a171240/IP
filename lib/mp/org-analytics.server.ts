@@ -112,8 +112,8 @@ function mapById(rows: any[]) {
 function scopedSession(row: any, args: { companyIdSet: Set<string>; storeIdSet: Set<string>; userIdSet: Set<string> }) {
   const companyId = cleanText(row.company_id, 80)
   const storeId = cleanText(row.store_id, 80)
-  if (args.storeIdSet.size && storeId) return args.storeIdSet.has(storeId)
-  if (args.companyIdSet.size && companyId) return args.companyIdSet.has(companyId)
+  if (args.storeIdSet.size) return args.storeIdSet.has(storeId)
+  if (args.companyIdSet.size) return args.companyIdSet.has(companyId)
   return args.userIdSet.has(String(row.user_id))
 }
 
