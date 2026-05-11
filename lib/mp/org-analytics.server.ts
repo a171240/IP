@@ -170,6 +170,7 @@ export async function collectMpOrgAnalytics(admin: any, args: CollectArgs) {
   if (membershipError) throw new Error(membershipError.message)
 
   const memberships = ((membershipRows || []) as any[]).filter((row) => {
+    if (row.role === "service_operator") return false
     const storeId = cleanText(row.store_id, 80)
     if (!storeId) return !args.strictStoreScope
     if (!storeIdSet.size) return true
