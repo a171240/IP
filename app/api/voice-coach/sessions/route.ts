@@ -17,6 +17,7 @@ import { getScenario, type VoiceCoachEmotion, type VoiceCoachOpening } from "@/l
 import { doubaoTts, type DoubaoTtsEmotion } from "@/lib/voice-coach/speech/doubao.server"
 import { signVoiceCoachAudio, uploadVoiceCoachAudio } from "@/lib/voice-coach/storage.server"
 import { normalizeScenarioTag } from "@/lib/voice-coach/tag-utils"
+import { resolveMpAccountContextForUser } from "@/lib/mp/account-context.server"
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
@@ -53,6 +54,18 @@ function cleanText(value: unknown, max = 300): string {
   const text = String(value || "").trim()
   if (!text) return ""
   return text.length > max ? text.slice(0, max) : text
+}
+
+function isMissingOrgSnapshotColumn(error: any) {
+  const message = String(error?.message || "").toLowerCase()
+  return (
+    error?.code === "42703" ||
+    error?.code === "PGRST204" ||
+    message.includes("company_id") ||
+    message.includes("store_id") ||
+    message.includes("membership_id") ||
+    message.includes("schema cache")
+  )
 }
 
 function toStringList(value: unknown, max = 6): string[] {
@@ -516,6 +529,12 @@ export async function POST(request: NextRequest) {
     const access = checkVoiceCoachAccess(user.id)
     if (!access.ok) return jsonError(access.status, access.error)
 
+    const accountContext = await resolveMpAccountContextForUser({
+      userId: user.id,
+      userEmail: user.email ?? null,
+      userMetadata: (user.user_metadata || {}) as Record<string, unknown>,
+    }).catch(() => null)
+
     const liveNotes = String(parsed.data.live_notes || "").trim()
     const [customerProfileResult, sceneCardResult] = await Promise.all([
       parsed.data.customer_profile_id
@@ -569,21 +588,42 @@ export async function POST(request: NextRequest) {
       : null
     const sessionContextText = getVoiceCoachSessionPromptContext(sessionSnapshot)
 
-    const { data: session, error: sessionError } = await supabase
+    const sessionInsertPayload = {
+      user_id: user.id,
+      scenario_id: scenario.id,
+      status: "active",
+      customer_profile_id: customerProfileResult.data?.id || null,
+      scene_card_id: sceneCardResult.data?.id || null,
+      session_context_json: sessionContext,
+      scenario_snapshot_json: sessionSnapshot,
+      company_id: accountContext?.companyId || null,
+      store_id: accountContext?.storeId || null,
+      membership_id: accountContext?.membershipId || null,
+    }
+
+    let { data: session, error: sessionError } = await supabase
       .from("voice_coach_sessions")
-      .insert({
-        user_id: user.id,
-        scenario_id: scenario.id,
-        status: "active",
-        customer_profile_id: customerProfileResult.data?.id || null,
-        scene_card_id: sceneCardResult.data?.id || null,
-        session_context_json: sessionContext,
-        scenario_snapshot_json: sessionSnapshot,
-      })
+      .insert(sessionInsertPayload)
       .select(
         "id, scenario_id, status, started_at, customer_profile_id, scene_card_id, session_context_json, scenario_snapshot_json",
       )
       .single()
+
+    if (sessionError && isMissingOrgSnapshotColumn(sessionError)) {
+      const { company_id, store_id, membership_id, ...fallbackPayload } = sessionInsertPayload
+      void company_id
+      void store_id
+      void membership_id
+      const fallbackResult = await supabase
+        .from("voice_coach_sessions")
+        .insert(fallbackPayload)
+        .select(
+          "id, scenario_id, status, started_at, customer_profile_id, scene_card_id, session_context_json, scenario_snapshot_json",
+        )
+        .single()
+      session = fallbackResult.data
+      sessionError = fallbackResult.error
+    }
 
     if (sessionError || !session) {
       return jsonError(500, "create_session_failed", { message: sessionError?.message })
