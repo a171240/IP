@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
   const { data: membershipRows, error: membershipError } = await membershipQuery
   if (membershipError) return jsonError(500, membershipError.message, "members_query_failed")
 
-  const memberships = (membershipRows || []) as any[]
+  const memberships = ((membershipRows || []) as any[]).filter((item) => item.role !== "service_operator")
   const userIds = Array.from(new Set(memberships.map((item) => item.user_id).filter(Boolean)))
   const { data: profileRows } = userIds.length
     ? await admin.from("profiles").select("id, nickname, avatar_url, email").in("id", userIds)
