@@ -51,6 +51,18 @@ export async function POST(request: NextRequest) {
   if (!name) return jsonError(400, "公司名称不能为空", "name_required")
 
   const admin = createAdminSupabaseClient()
+  if (ownerUserId) {
+    const { data: ownerProfile, error: ownerError } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("id", ownerUserId)
+      .maybeSingle()
+
+    if (ownerError || !ownerProfile) {
+      return jsonError(404, ownerError?.message || "owner_user_not_found", "owner_user_not_found")
+    }
+  }
+
   const { data: company, error: companyError } = await admin
     .from("mp_companies")
     .insert({

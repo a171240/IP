@@ -9,9 +9,21 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
 
 export const runtime = "nodejs"
 
+const COMPANY_SCOPE_ROLES = new Set<MpAccountRole>([
+  "company_owner",
+  "company_admin",
+  "merchant_owner",
+  "merchant_admin",
+  "service_operator",
+])
+
 function cleanText(value: unknown, max = 120) {
   const text = String(value || "").trim()
   return text.length > max ? text.slice(0, max) : text
+}
+
+function isCompanyScopeRole(role: unknown): role is MpAccountRole {
+  return COMPANY_SCOPE_ROLES.has(String(role || "").trim() as MpAccountRole)
 }
 
 function jsonError(status: number, error: string, code = error, extra?: Record<string, unknown>) {
@@ -60,6 +72,32 @@ export async function POST(request: NextRequest) {
 
   if (companyError || !company) {
     return jsonError(404, companyError?.message || "company_not_found", "company_not_found")
+  }
+
+  let companyScopeMembership: { role: MpAccountRole } | null = null
+  if (ownerUserId) {
+    const { data: ownerProfile, error: ownerError } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("id", ownerUserId)
+      .maybeSingle()
+
+    if (ownerError || !ownerProfile) {
+      return jsonError(404, ownerError?.message || "owner_user_not_found", "owner_user_not_found")
+    }
+
+    const { data: existingCompanyScopeMembership } = await admin
+      .from("mp_account_memberships")
+      .select("role")
+      .eq("user_id", ownerUserId)
+      .eq("company_id", company.id)
+      .is("store_id", null)
+      .eq("status", "active")
+      .in("role", Array.from(COMPANY_SCOPE_ROLES))
+      .limit(1)
+      .maybeSingle()
+
+    companyScopeMembership = existingCompanyScopeMembership as { role: MpAccountRole } | null
   }
 
   const { data: store, error: storeError } = await admin
@@ -117,15 +155,27 @@ export async function POST(request: NextRequest) {
     }
 
     membership = membershipResult.data
+    const shouldKeepCompanyScope = isCompanyScopeRole(companyScopeMembership?.role) || isCompanyScopeRole(ownerRole)
+    const profileRole = shouldKeepCompanyScope ? companyScopeMembership?.role || ownerRole : ownerRole
+    const profileScope = shouldKeepCompanyScope
+      ? {
+          account_role: profileRole,
+          company_id: company.id,
+          company_name: company.name,
+          store_id: null,
+          store_name: null,
+        }
+      : {
+          account_role: ownerRole,
+          company_id: company.id,
+          company_name: company.name,
+          store_id: store.id,
+          store_name: store.name,
+        }
+
     await admin
       .from("profiles")
-      .update({
-        account_role: ownerRole,
-        company_id: company.id,
-        company_name: company.name,
-        store_id: store.id,
-        store_name: store.name,
-      })
+      .update(profileScope)
       .eq("id", ownerUserId)
   }
 
