@@ -7,6 +7,7 @@ import { createMiniProgramCode } from "@/lib/wechat/mini-program.server"
 export const runtime = "nodejs"
 
 const INVITE_ACCEPT_PAGE = "pages/store-admin/invite-accept/index"
+const VALID_ENV_VERSIONS = new Set(["release", "trial", "develop"])
 
 type InviteRow = {
   max_uses: number | null
@@ -24,6 +25,13 @@ function inviteUsable(invite: InviteRow | null | undefined) {
   if (Number(invite.used_count || 0) >= Number(invite.max_uses || 1)) return false
   if (!invite.expires_at) return false
   return new Date(invite.expires_at).getTime() > Date.now()
+}
+
+function resolveEnvVersion(request: NextRequest) {
+  const urlValue = new URL(request.url).searchParams.get("env_version")
+  const envValue = process.env.WECHAT_INVITE_QR_ENV_VERSION
+  const value = String(urlValue || envValue || "release").trim()
+  return VALID_ENV_VERSIONS.has(value) ? (value as "release" | "trial" | "develop") : "release"
 }
 
 export async function GET(
@@ -51,13 +59,13 @@ export async function GET(
       page: INVITE_ACCEPT_PAGE,
       width,
       checkPath: false,
-      envVersion: "release",
+      envVersion: resolveEnvVersion(request),
     })
 
     return new NextResponse(bytes, {
       headers: {
         "Content-Type": contentType,
-        "Cache-Control": "private, max-age=300",
+        "Cache-Control": "private, no-store",
       },
     })
   } catch (error) {
