@@ -11,14 +11,36 @@ import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
 
+type InviteRow = {
+  id: string
+  company_id: string
+  store_id?: string | null
+  role: string
+  max_uses: number | null
+  used_count: number | null
+  expires_at: string | null
+  status: string | null
+  note?: string | null
+}
+
 function jsonError(status: number, error: string, code = error, extra?: Record<string, unknown>) {
   return NextResponse.json({ ok: false, error, code, ...(extra || {}) }, { status })
 }
 
-function inviteUsable(invite: any) {
+function inviteUsable(invite: InviteRow | null | undefined) {
   if (!invite || invite.status !== "active") return false
   if (Number(invite.used_count || 0) >= Number(invite.max_uses || 1)) return false
+  if (!invite.expires_at) return false
   return new Date(invite.expires_at).getTime() > Date.now()
+}
+
+async function releaseInviteUse(invite: { id: string; used_count: number }, nextUsedCount: number) {
+  const admin = createAdminSupabaseClient()
+  await admin
+    .from("mp_account_invites")
+    .update({ used_count: Number(invite.used_count || 0) })
+    .eq("id", invite.id)
+    .eq("used_count", nextUsedCount)
 }
 
 export async function POST(
@@ -55,6 +77,24 @@ export async function POST(
 
   if (!company) return jsonError(404, "公司不存在", "company_not_found")
 
+  const nextUsedCount = Number(invite.used_count || 0) + 1
+  const { data: claimedInvite, error: claimError } = await admin
+    .from("mp_account_invites")
+    .update({
+      used_count: nextUsedCount,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", invite.id)
+    .eq("status", "active")
+    .eq("used_count", Number(invite.used_count || 0))
+    .gt("expires_at", new Date().toISOString())
+    .select("id, used_count")
+    .maybeSingle()
+
+  if (claimError || !claimedInvite) {
+    return jsonError(409, "邀请入口已被使用或已失效", "invite_already_claimed")
+  }
+
   let existingQuery = admin
     .from("mp_account_memberships")
     .select("id, user_id, company_id, store_id, role, status")
@@ -67,7 +107,7 @@ export async function POST(
 
   let membership = existing
   if (membership?.id) {
-    await admin
+    const { data: updatedMembership, error: updateError } = await admin
       .from("mp_account_memberships")
       .update({
         store_id: invite.store_id || null,
@@ -76,6 +116,14 @@ export async function POST(
         last_seen_at: new Date().toISOString(),
       })
       .eq("id", membership.id)
+      .select("id, user_id, company_id, store_id, role, status, created_at")
+      .single()
+
+    if (updateError || !updatedMembership) {
+      await releaseInviteUse({ id: invite.id, used_count: Number(invite.used_count || 0) }, nextUsedCount)
+      return jsonError(500, updateError?.message || "membership_update_failed", "membership_update_failed")
+    }
+    membership = updatedMembership
   } else {
     const { data: inserted, error: insertError } = await admin
       .from("mp_account_memberships")
@@ -92,15 +140,11 @@ export async function POST(
       .single()
 
     if (insertError || !inserted) {
+      await releaseInviteUse({ id: invite.id, used_count: Number(invite.used_count || 0) }, nextUsedCount)
       return jsonError(500, insertError?.message || "membership_create_failed", "membership_create_failed")
     }
     membership = inserted
   }
-
-  await admin
-    .from("mp_account_invites")
-    .update({ used_count: Number(invite.used_count || 0) + 1 })
-    .eq("id", invite.id)
 
   await admin
     .from("profiles")
