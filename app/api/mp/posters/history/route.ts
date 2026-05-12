@@ -1,11 +1,28 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { resolveBillingContext } from "@/lib/xhs/proxy.server"
+import { downloadAsset, getXhsAssetsBucket } from "@/lib/xhs/assets.server"
 
 export const runtime = "nodejs"
 
 function imageUrlForPoster(posterId: string) {
   return `/api/mp/posters/images/${posterId}`
+}
+
+function metadataPath(posterId: string) {
+  return `posters/index/${posterId}.json`
+}
+
+async function loadPosterMetadata(opts: { bucket: string; posterId: string; userId: string }) {
+  try {
+    const asset = await downloadAsset({ bucket: opts.bucket, path: metadataPath(opts.posterId) })
+    const text = Buffer.from(asset.arrayBuffer).toString("utf8")
+    const parsed = JSON.parse(text) as Record<string, unknown>
+    if (parsed.userId && parsed.userId !== opts.userId) return null
+    return parsed
+  } catch {
+    return null
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -17,7 +34,7 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await billing.ctx.supabase
     .from("poster_generations")
-    .select("id, created_at, mode, template_id, size, resolution, content_type")
+    .select("id, created_at, mode, template_id, image_bucket, size, resolution, content_type")
     .eq("user_id", billing.ctx.userId)
     .order("created_at", { ascending: false })
     .limit(limit)
@@ -30,17 +47,34 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: false, error: msg || "query_failed" }, { status: 500 })
   }
 
+  const posters = await Promise.all(
+    (data || []).map(async (item) => {
+      const meta = await loadPosterMetadata({
+        bucket: item.image_bucket || getXhsAssetsBucket(),
+        posterId: item.id,
+        userId: billing.ctx.userId,
+      })
+
+      return {
+        posterId: item.id,
+        createdAt: item.created_at,
+        mode: item.mode,
+        templateId: item.template_id,
+        size: item.size,
+        resolution: item.resolution,
+        contentType: item.content_type,
+        imageUrl: imageUrlForPoster(item.id),
+        fields: meta?.fields || null,
+        posterPlan: meta?.posterPlan || null,
+        visibleCopy: meta?.visibleCopy || null,
+        hiddenContext: meta?.hiddenContext || null,
+        assetRefs: Array.isArray(meta?.assetRefs) ? meta.assetRefs : [],
+      }
+    })
+  )
+
   return NextResponse.json({
     ok: true,
-    posters: (data || []).map((item) => ({
-      posterId: item.id,
-      createdAt: item.created_at,
-      mode: item.mode,
-      templateId: item.template_id,
-      size: item.size,
-      resolution: item.resolution,
-      contentType: item.content_type,
-      imageUrl: imageUrlForPoster(item.id),
-    })),
+    posters,
   })
 }

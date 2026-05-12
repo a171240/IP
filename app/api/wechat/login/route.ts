@@ -9,6 +9,7 @@ export const runtime = "nodejs"
 const WECHAT_APP_ID = process.env.WECHAT_MINI_APPID || process.env.WX_MINI_APPID || ""
 const WECHAT_APP_SECRET = process.env.WECHAT_MINI_SECRET || process.env.WX_MINI_SECRET || ""
 const WECHAT_LOGIN_SECRET = process.env.WECHAT_LOGIN_SECRET || ""
+const DEFAULT_WECHAT_NICKNAME = "微信用户"
 
 function getSupabaseUrl(): string {
   return (
@@ -36,6 +37,12 @@ function buildWechatEmail(openid: string) {
 
 function buildWechatPassword(openid: string) {
   return createHmac("sha256", WECHAT_LOGIN_SECRET).update(openid).digest("hex")
+}
+
+function metadataText(meta: unknown, key: string) {
+  if (!meta || typeof meta !== "object") return ""
+  const value = (meta as Record<string, unknown>)[key]
+  return typeof value === "string" ? value.trim() : ""
 }
 
 export async function POST(request: NextRequest) {
@@ -101,7 +108,7 @@ export async function POST(request: NextRequest) {
       password,
       email_confirm: true,
       user_metadata: {
-        nickname: nickname || "WeChat User",
+        nickname: nickname || DEFAULT_WECHAT_NICKNAME,
         avatar_url: avatarUrl || null,
         wechat_openid: openid,
         wechat_unionid: unionid || null,
@@ -144,16 +151,20 @@ export async function POST(request: NextRequest) {
   }
 
   const user = sessionData.session.user
-  if (nickname || avatarUrl || unionid) {
-    await admin.auth.admin.updateUserById(user.id, {
-      user_metadata: {
-        ...(user.user_metadata || {}),
-        ...(nickname ? { nickname } : {}),
-        ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
-        ...(unionid ? { wechat_unionid: unionid } : {}),
-      },
-    })
+  const existingNickname = metadataText(user.user_metadata, "nickname")
+  const nextNickname = nickname || (!existingNickname || existingNickname === "WeChat User" ? DEFAULT_WECHAT_NICKNAME : existingNickname)
+  const nextUserMetadata = {
+    ...(user.user_metadata || {}),
+    nickname: nextNickname,
+    wechat_openid: openid,
+    ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
+    ...(unionid ? { wechat_unionid: unionid } : {}),
   }
+
+  const { data: updatedUserData } = await admin.auth.admin.updateUserById(user.id, {
+    user_metadata: nextUserMetadata,
+  })
+  const responseUser = updatedUserData?.user || { ...user, user_metadata: nextUserMetadata }
 
   if (nickname || avatarUrl) {
     await admin
@@ -162,7 +173,7 @@ export async function POST(request: NextRequest) {
         {
           id: user.id,
           email,
-          nickname: nickname || "WeChat User",
+          nickname: nickname || DEFAULT_WECHAT_NICKNAME,
           avatar_url: avatarUrl || null,
         },
         { onConflict: "id" }
@@ -173,6 +184,6 @@ export async function POST(request: NextRequest) {
     access_token: sessionData.session.access_token,
     refresh_token: sessionData.session.refresh_token,
     expires_in: sessionData.session.expires_in,
-    user: sessionData.session.user,
+    user: responseUser,
   })
 }

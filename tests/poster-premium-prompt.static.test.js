@@ -2,9 +2,34 @@ const test = require("node:test")
 const assert = require("node:assert/strict")
 const { execFileSync } = require("node:child_process")
 const { readFileSync } = require("node:fs")
-const { join } = require("node:path")
+const { join, dirname } = require("node:path")
+const vm = require("node:vm")
+const ts = require("typescript")
 
 const root = process.cwd()
+
+function loadTsModule(filePath) {
+  const source = readFileSync(filePath, "utf8")
+  const transpiled = ts.transpileModule(source, {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2020,
+      esModuleInterop: true,
+    },
+    fileName: filePath,
+  })
+  const moduleRef = { exports: {} }
+  const localRequire = (specifier) => {
+    if (specifier === "server-only") return {}
+    return require(specifier)
+  }
+  const wrapped = vm.runInThisContext(
+    `(function (exports, require, module, __filename, __dirname) { ${transpiled.outputText}\n})`,
+    { filename: filePath },
+  )
+  wrapped(moduleRef.exports, localRequire, moduleRef, filePath, dirname(filePath))
+  return moduleRef.exports
+}
 
 function runPosterModule(script) {
   const stdout = execFileSync(
@@ -71,10 +96,54 @@ test("poster image provider folds negative prompt into the submitted prompt", ()
   assert.match(providerSource, /prompt\.includes\(negativePrompt\)/)
   assert.match(providerSource, /const fullPrompt = buildFullPrompt\(opts\)/)
   assert.match(providerSource, /APIMART_IMAGE_BASE_URL \|\| "https:\/\/api\.apimart\.ai\/v1"/)
-  assert.match(providerSource, /process\.env\.APIMART_IMAGE_API_KEY/)
+  assert.match(providerSource, /process\.env\.APIMART_IMAGE_API_KEY \|\| ""/)
   assert.match(providerSource, /process\.env\.APIMART_API_KEY \|\| ""/)
-  assert.match(providerSource, /sharedBaseUrl === apiBaseUrl\(\)/)
-  assert.match(providerSource, /APIMART_IMAGE_API_KEY missing/)
+  assert.match(providerSource, /sharedBaseUrl === baseUrl/)
+})
+
+test("poster intake keeps user command out of visible poster copy", () => {
+  const {
+    buildPosterBrief,
+    buildPosterFieldsFromBrief,
+    buildPosterPlan,
+    sanitizePosterTemplateFields,
+  } = loadTsModule(join(root, "lib", "posters", "intake.ts"))
+
+  const profile = {
+    id: "store_1",
+    name: "椿舍日式美肌",
+    shop_type: "皮肤管理",
+    main_offer_name: "补水护理",
+  }
+  const brief = buildPosterBrief({
+    profile,
+    message: "给我生成一张五一的宣传海报",
+  })
+  const fields = buildPosterFieldsFromBrief("P02", brief)
+  const plan = buildPosterPlan({
+    templateId: "P02",
+    brief,
+    fields,
+    message: "给我生成一张五一的宣传海报",
+    storeProfileId: "store_1",
+  })
+  const sanitized = sanitizePosterTemplateFields("P02", {
+    storeName: "椿舍日式美肌",
+    campaignTitle: "给我生成一张五一的宣传海报",
+    subline: "假期也要美美的",
+    sellingPoints: "补水｜清洁｜舒缓｜提亮",
+    offerText: "到店护理体验礼",
+    dateRange: "五一期间",
+    _industry: "皮肤管理",
+    _businessType: "皮肤管理",
+    _storeName: "椿舍日式美肌",
+  })
+
+  assert.equal(fields.campaignTitle, "五一焕颜季")
+  assert.equal(plan.visibleCopy.title, "五一焕颜季")
+  assert.match(plan.intent.userCommand, /给我生成一张五一的宣传海报/)
+  assert.equal(sanitized.fields.campaignTitle, "五一焕颜季")
+  assert.deepEqual(sanitized.sanitizedFields, ["campaignTitle"])
 })
 
 test("poster intake keeps user-provided style instead of overwriting it with defaults", () => {

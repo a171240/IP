@@ -26,17 +26,40 @@ function apiBaseUrl() {
   return normalizeBaseUrl(process.env.APIMART_IMAGE_BASE_URL || "https://api.apimart.ai/v1")
 }
 
-function apiKey() {
+function safeHost(value: string) {
+  try {
+    return new URL(value).host
+  } catch {
+    return value.replace(/^https?:\/\//, "").split("/")[0] || ""
+  }
+}
+
+function resolveApiConfig() {
+  const baseUrl = apiBaseUrl()
   const imageKey = (process.env.APIMART_IMAGE_API_KEY || "").trim()
-  if (isConfiguredKey(imageKey)) return imageKey
-
   const sharedKey = (process.env.APIMART_API_KEY || "").trim()
-  if (!isConfiguredKey(sharedKey)) return ""
-
   const sharedBaseUrl = process.env.APIMART_BASE_URL ? normalizeBaseUrl(process.env.APIMART_BASE_URL) : ""
-  if (!sharedBaseUrl || sharedBaseUrl === apiBaseUrl()) return sharedKey
 
-  return ""
+  if (isConfiguredKey(imageKey)) {
+    return { key: imageKey, keySource: "APIMART_IMAGE_API_KEY", baseUrl, sharedBaseUrl }
+  }
+
+  if (isConfiguredKey(sharedKey) && (!sharedBaseUrl || sharedBaseUrl === baseUrl)) {
+    return { key: sharedKey, keySource: "APIMART_API_KEY", baseUrl, sharedBaseUrl }
+  }
+
+  return { key: "", keySource: "none", baseUrl, sharedBaseUrl }
+}
+
+function imageProviderDiagnostics(config: ReturnType<typeof resolveApiConfig>) {
+  return {
+    baseHost: safeHost(config.baseUrl),
+    sharedBaseHost: config.sharedBaseUrl ? safeHost(config.sharedBaseUrl) : "",
+    keySource: config.keySource,
+    hasImageKey: isConfiguredKey((process.env.APIMART_IMAGE_API_KEY || "").trim()),
+    hasSharedKey: isConfiguredKey((process.env.APIMART_API_KEY || "").trim()),
+    deploymentId: process.env.VERCEL_DEPLOYMENT_ID || process.env.VERCEL_GIT_COMMIT_SHA || "",
+  }
 }
 
 export function imageModel() {
@@ -134,8 +157,11 @@ function extractErrorMessage(json: unknown, fallback: string) {
 }
 
 async function requestJson(path: string, init?: RequestInit) {
-  const key = apiKey()
-  if (!key) throw new Error("APIMART_IMAGE_API_KEY missing")
+  const config = resolveApiConfig()
+  if (!config.key) {
+    console.error("APIMart image provider missing key", imageProviderDiagnostics(config))
+    throw new Error("APIMART_IMAGE_API_KEY missing")
+  }
 
   let lastError: Error | null = null
   const attempts = maxRetries() + 1
@@ -145,12 +171,12 @@ async function requestJson(path: string, init?: RequestInit) {
     const timer = setTimeout(() => controller.abort(), requestTimeoutMs())
 
     try {
-      const res = await fetch(`${apiBaseUrl()}${path}`, {
+      const res = await fetch(`${config.baseUrl}${path}`, {
         ...init,
         signal: controller.signal,
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${key}`,
+          Authorization: `Bearer ${config.key}`,
           ...(init?.headers || {}),
         },
       })
@@ -158,9 +184,19 @@ async function requestJson(path: string, init?: RequestInit) {
       const text = await res.text().catch(() => "")
       const json = parseJson(text)
       if (!res.ok) {
-        const message = `APIMart image error: ${res.status} ${extractErrorMessage(json, text.slice(0, 200))}`
+        const upstreamMessage = extractErrorMessage(json, text.slice(0, 200))
+        const message = `APIMart image error: ${res.status} ${upstreamMessage}`
         lastError = new Error(message)
-        if (![408, 409, 425, 429, 500, 502, 503, 504].includes(res.status) || attempt >= attempts - 1) {
+        const retryable = [408, 409, 425, 429, 500, 502, 503, 504].includes(res.status)
+        if (!retryable || attempt >= attempts - 1) {
+          console.error("APIMart image request failed", {
+            ...imageProviderDiagnostics(config),
+            path,
+            status: res.status,
+            upstreamMessage: upstreamMessage.slice(0, 200),
+            attempt: attempt + 1,
+            attempts,
+          })
           throw lastError
         }
       } else {
@@ -168,8 +204,20 @@ async function requestJson(path: string, init?: RequestInit) {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "fetch failed"
-      lastError = new Error(`APIMart image request failed: ${message}`)
-      if (attempt >= attempts - 1) throw lastError
+      const isUpstreamHttpError = message.startsWith("APIMart image error:")
+      lastError = new Error(isUpstreamHttpError ? message : `APIMart image request failed: ${message}`)
+      if (attempt >= attempts - 1) {
+        if (!isUpstreamHttpError) {
+          console.error("APIMart image fetch failed", {
+            ...imageProviderDiagnostics(config),
+            path,
+            message: message.slice(0, 200),
+            attempt: attempt + 1,
+            attempts,
+          })
+        }
+        throw lastError
+      }
     } finally {
       clearTimeout(timer)
     }
