@@ -103,7 +103,9 @@ export async function POST(request: NextRequest) {
     return jsonError(500, inviteError?.message || "invite_create_failed", "invite_create_failed")
   }
 
-  const path = `/pages/store-admin/invite-accept/index?token=${encodeURIComponent(token)}`
+  const encodedToken = encodeURIComponent(token)
+  const path = `/pages/store-admin/invite-accept/index?token=${encodedToken}`
+  const qrcodeUrl = `/api/mp/store-admin/invites/${encodedToken}/qrcode`
   return NextResponse.json({
     ok: true,
     context: accountContextPayload(auth.ctx),
@@ -115,5 +117,6 @@ export async function POST(request: NextRequest) {
     },
     token,
     path,
+    qrcode_url: qrcodeUrl,
   })
 }
