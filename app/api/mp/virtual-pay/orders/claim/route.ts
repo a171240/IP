@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
+import { resolveMpAccountContextForUser } from "@/lib/mp/account-context.server"
 import { tryFulfillWechatpayOrder } from "@/lib/wechatpay/fulfill.server"
 import { isVirtualPayOrderPaid, notifyVirtualPayGoods, queryVirtualPayOrder } from "@/lib/wechatpay/virtual-pay.server"
 
@@ -15,6 +16,11 @@ function metadataOpenid(user: { user_metadata?: unknown }) {
   const meta = user.user_metadata
   if (!meta || typeof meta !== "object") return ""
   return textFrom((meta as Record<string, unknown>).wechat_openid)
+}
+
+function isStoreStaffAccount(role: unknown) {
+  const value = String(role || "").trim()
+  return value === "staff" || value === "employee"
 }
 
 export async function POST(request: NextRequest) {
@@ -37,6 +43,18 @@ export async function POST(request: NextRequest) {
 
   if (!user) {
     return NextResponse.json({ error: "请先登录" }, { status: 401 })
+  }
+
+  const account = await resolveMpAccountContextForUser({
+    userId: user.id,
+    userEmail: user.email ?? null,
+    userMetadata: (user.user_metadata || {}) as Record<string, unknown>,
+  }).catch(() => null)
+  if (account && isStoreStaffAccount(account.role) && (account.companyId || account.storeId)) {
+    return NextResponse.json(
+      { error: "员工账号不需要单独购买服务包，请联系店长或负责人补充门店服务包。", code: "staff_purchase_blocked" },
+      { status: 403 }
+    )
   }
 
   const admin = createAdminSupabaseClient()
@@ -97,4 +115,3 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json(current)
 }
-

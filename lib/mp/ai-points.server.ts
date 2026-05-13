@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
-import { resolveMpAccountContextForUser } from "@/lib/mp/account-context.server"
+import { resolveMpAccountContextForUser, type MpAccountContext } from "@/lib/mp/account-context.server"
 import {
   consumeCredits,
   ensureTrialCreditsIfNeeded,
@@ -68,8 +68,10 @@ const ACCOUNT_ROLE_LABELS: Record<string, string> = {
 }
 
 type SupabaseForRequest = Awaited<ReturnType<typeof createServerSupabaseClientForRequest>>
+type BillingScope = "personal" | "company" | "store"
 
 type ProfileRow = {
+  id?: string | null
   plan?: string | null
   credits_balance?: number | null
   credits_unlimited?: boolean | null
@@ -98,6 +100,13 @@ export type MpAiBillingContext = {
   ipHash: string | null
   ai_points_balance: number
   ai_points_unlimited: boolean
+  billing_user_id: string
+  billing_scope: BillingScope
+  billing_scope_label: string
+  billing_owner_role: string | null
+  billing_owner_name: string | null
+  billing_is_org: boolean
+  can_purchase_ai_points: boolean
   account_role: string
   account_role_label: string
   company_id: string | null
@@ -117,11 +126,34 @@ export type MpAiChargeResult =
       costLabel: string
       remaining: number
       unlimited: boolean
+      billingUserId: string
+      billingScope: BillingScope
+      billingScopeLabel: string
     }
   | { ok: false; error: Response }
 
 const BASE_PROFILE_SELECT = "plan, credits_balance, credits_unlimited, trial_granted_at, nickname, avatar_url, email"
 const EXTENDED_PROFILE_SELECT = `${BASE_PROFILE_SELECT}, account_role, company_id, company_name, store_id, store_name, service_plan_label`
+const ADMIN_PROFILE_SELECT = `id, ${EXTENDED_PROFILE_SELECT}`
+const STAFF_ROLES = new Set(["staff", "employee"])
+const MANAGER_ROLES = new Set([
+  "company_owner",
+  "company_admin",
+  "merchant_owner",
+  "merchant_admin",
+  "store_owner",
+  "store_admin",
+])
+const STORE_BILLING_ROLES = ["store_owner", "store_admin"] as const
+const COMPANY_BILLING_ROLES = ["company_owner", "merchant_owner", "company_admin", "merchant_admin"] as const
+const BILLING_ROLE_PRIORITY: Record<string, number> = {
+  company_owner: 90,
+  merchant_owner: 88,
+  company_admin: 80,
+  merchant_admin: 78,
+  store_owner: 70,
+  store_admin: 65,
+}
 
 function isMissingProfileColumn(error: { code?: string | null; message?: string | null } | null | undefined) {
   const msg = String(error?.message || "").toLowerCase()
@@ -139,9 +171,59 @@ function normalizeAccountRole(role: unknown) {
   return ACCOUNT_ROLE_LABELS[value] ? value : "merchant_owner"
 }
 
+function profileDisplayName(row: ProfileRow | null | undefined, fallback = "门店账号") {
+  const nickname = typeof row?.nickname === "string" ? row.nickname.trim() : ""
+  return nickname || row?.email || fallback
+}
+
+function profileBalance(row: ProfileRow | null | undefined) {
+  return Number(row?.credits_balance || 0)
+}
+
+function profileUnlimited(row: ProfileRow | null | undefined) {
+  return Boolean(row?.credits_unlimited) || normalizePlan(row?.plan) === "vip"
+}
+
+function hasUsableBalance(row: ProfileRow | null | undefined) {
+  return profileUnlimited(row) || profileBalance(row) > 0
+}
+
+function billingScopeForAccount(account: MpAccountContext): BillingScope {
+  if (account.storeId) return "store"
+  if (account.companyId) return "company"
+  return "personal"
+}
+
+function billingScopeLabel(account: MpAccountContext, scope: BillingScope) {
+  if (scope === "store") return account.storeName || account.scopeLabel || "门店服务包"
+  if (scope === "company") return account.companyName || account.scopeLabel || "公司服务包"
+  return "个人账号"
+}
+
+function canPurchaseAiPoints(account: MpAccountContext) {
+  if (account.isPlatformAdmin) return true
+  if (!account.companyId && !account.storeId) return true
+  return MANAGER_ROLES.has(account.role)
+}
+
 function normalizeProfile(
   row: ProfileRow | null | undefined
-): Omit<MpAiBillingContext, "supabase" | "userId" | "userEmail" | "userMetadata" | "deviceId" | "ipHash"> {
+): Omit<
+  MpAiBillingContext,
+  | "supabase"
+  | "userId"
+  | "userEmail"
+  | "userMetadata"
+  | "deviceId"
+  | "ipHash"
+  | "billing_user_id"
+  | "billing_scope"
+  | "billing_scope_label"
+  | "billing_owner_role"
+  | "billing_owner_name"
+  | "billing_is_org"
+  | "can_purchase_ai_points"
+> {
   const plan = normalizePlan(row?.plan)
   const creditsBalance = Number(row?.credits_balance || 0)
   const creditsUnlimited = Boolean(row?.credits_unlimited) || plan === "vip"
@@ -193,6 +275,187 @@ async function createProfileRow(opts: {
     .single()
 }
 
+async function selectAdminProfileMap(
+  admin: ReturnType<typeof createAdminSupabaseClient>,
+  userIds: string[]
+): Promise<Map<string, ProfileRow>> {
+  const ids = Array.from(new Set(userIds.map((id) => String(id || "").trim()).filter(Boolean)))
+  const out = new Map<string, ProfileRow>()
+  if (!ids.length) return out
+
+  const selected = await admin.from("profiles").select(ADMIN_PROFILE_SELECT).in("id", ids)
+  const result =
+    selected.error && isMissingProfileColumn(selected.error)
+      ? await admin.from("profiles").select(`id, ${BASE_PROFILE_SELECT}`).in("id", ids)
+      : selected
+
+  for (const row of (result.data || []) as ProfileRow[]) {
+    if (row?.id) out.set(String(row.id), row)
+  }
+  return out
+}
+
+type BillingOwner = {
+  userId: string
+  profile: ProfileRow
+  scope: BillingScope
+  scopeLabel: string
+  ownerRole: string | null
+  ownerName: string | null
+}
+
+function currentUserBillingOwner(args: {
+  userId: string
+  profileRow: ProfileRow
+  account: MpAccountContext | null
+}): BillingOwner {
+  const scope = args.account ? billingScopeForAccount(args.account) : "personal"
+  return {
+    userId: args.userId,
+    profile: args.profileRow,
+    scope,
+    scopeLabel: args.account ? billingScopeLabel(args.account, scope) : "个人账号",
+    ownerRole: args.account?.role || args.profileRow.account_role || null,
+    ownerName: profileDisplayName(args.profileRow, args.account?.scopeLabel || "当前账号"),
+  }
+}
+
+async function pickMembershipBillingOwner(opts: {
+  admin: ReturnType<typeof createAdminSupabaseClient>
+  account: MpAccountContext
+  roles: readonly string[]
+  scope: BillingScope
+  storeId?: string | null
+}): Promise<BillingOwner | null> {
+  if (!opts.account.companyId) return null
+
+  let query = opts.admin
+    .from("mp_account_memberships")
+    .select("user_id, role, display_name, accepted_at, created_at")
+    .eq("company_id", opts.account.companyId)
+    .eq("status", "active")
+    .in("role", Array.from(opts.roles))
+
+  query = opts.storeId ? query.eq("store_id", opts.storeId) : query.is("store_id", null)
+
+  const { data } = await query
+  const rows = (data || []) as Array<{
+    user_id?: string | null
+    role?: string | null
+    display_name?: string | null
+    accepted_at?: string | null
+    created_at?: string | null
+  }>
+  const profileMap = await selectAdminProfileMap(
+    opts.admin,
+    rows.map((row) => String(row.user_id || ""))
+  )
+
+  const candidates = rows
+    .map((row) => {
+      const userId = String(row.user_id || "")
+      const profile = profileMap.get(userId)
+      if (!userId || !profile) return null
+      return {
+        userId,
+        profile,
+        role: String(row.role || ""),
+        displayName: row.display_name || profileDisplayName(profile),
+        timestamp: Date.parse(row.accepted_at || row.created_at || "") || 0,
+      }
+    })
+    .filter(Boolean) as Array<{
+    userId: string
+    profile: ProfileRow
+    role: string
+    displayName: string
+    timestamp: number
+  }>
+
+  candidates.sort((left, right) => {
+    const balanceRank = Number(hasUsableBalance(right.profile)) - Number(hasUsableBalance(left.profile))
+    if (balanceRank) return balanceRank
+    const roleRank = (BILLING_ROLE_PRIORITY[right.role] || 0) - (BILLING_ROLE_PRIORITY[left.role] || 0)
+    if (roleRank) return roleRank
+    return right.timestamp - left.timestamp
+  })
+
+  const picked = candidates[0]
+  if (!picked) return null
+
+  return {
+    userId: picked.userId,
+    profile: picked.profile,
+    scope: opts.scope,
+    scopeLabel: billingScopeLabel(opts.account, opts.scope),
+    ownerRole: picked.role || null,
+    ownerName: picked.displayName || null,
+  }
+}
+
+async function resolveBillingOwner(opts: {
+  userId: string
+  profileRow: ProfileRow
+  account: MpAccountContext | null
+}): Promise<BillingOwner> {
+  const account = opts.account
+  if (!account || account.isPlatformAdmin || (!account.companyId && !account.storeId)) {
+    return currentUserBillingOwner(opts)
+  }
+
+  const currentOwner = currentUserBillingOwner(opts)
+  const admin = createAdminSupabaseClient()
+
+  if (MANAGER_ROLES.has(account.role) && hasUsableBalance(opts.profileRow)) {
+    return currentOwner
+  }
+
+  if (account.storeId) {
+    const storeOwner = await pickMembershipBillingOwner({
+      admin,
+      account,
+      roles: STORE_BILLING_ROLES,
+      scope: "store",
+      storeId: account.storeId,
+    })
+    if (storeOwner && (!MANAGER_ROLES.has(account.role) || hasUsableBalance(storeOwner.profile))) return storeOwner
+  }
+
+  const companyOwner = await pickMembershipBillingOwner({
+    admin,
+    account,
+    roles: COMPANY_BILLING_ROLES,
+    scope: "company",
+  })
+  if (companyOwner && (!MANAGER_ROLES.has(account.role) || hasUsableBalance(companyOwner.profile))) return companyOwner
+
+  if (STAFF_ROLES.has(account.role)) {
+    return storeOwnerFallback({
+      userId: opts.userId,
+      profileRow: opts.profileRow,
+      account,
+    })
+  }
+
+  return currentOwner
+}
+
+function storeOwnerFallback(args: {
+  userId: string
+  profileRow: ProfileRow
+  account: MpAccountContext
+}): BillingOwner {
+  const scope = billingScopeForAccount(args.account)
+  return {
+    userId: args.userId,
+    profile: args.profileRow,
+    scope,
+    scopeLabel: billingScopeLabel(args.account, scope),
+    ownerRole: args.account.role,
+    ownerName: profileDisplayName(args.profileRow, args.account.scopeLabel),
+  }
+}
+
 export function getMpAiAction(actionCode: string | null | undefined): MpAiActionRule | null {
   const code = String(actionCode || "") as MpAiActionCode
   return MP_AI_ACTIONS[code] || null
@@ -214,6 +477,10 @@ export function formatMpAiPointCost(actionCode: string | null | undefined) {
 }
 
 export function buildMpAiProfilePayload(ctx: MpAiBillingContext, extra?: Pick<ProfileRow, "nickname" | "avatar_url">) {
+  const aiPointsLabel = ctx.ai_points_unlimited
+    ? `${ctx.billing_scope_label} AI 点无限`
+    : `${ctx.billing_scope_label} AI 点 ${ctx.ai_points_balance}`
+
   return {
     plan: ctx.plan,
     plan_label: ctx.service_plan_label,
@@ -222,6 +489,17 @@ export function buildMpAiProfilePayload(ctx: MpAiBillingContext, extra?: Pick<Pr
     credits_unlimited: ctx.credits_unlimited,
     ai_points_balance: ctx.ai_points_balance,
     ai_points_unlimited: ctx.ai_points_unlimited,
+    ai_points_label: aiPointsLabel,
+    ai_points_scope: ctx.billing_scope,
+    ai_points_scope_label: ctx.billing_scope_label,
+    ai_points_owner_label: ctx.billing_owner_name,
+    billing_user_id: ctx.billing_user_id,
+    billing_scope: ctx.billing_scope,
+    billing_scope_label: ctx.billing_scope_label,
+    billing_owner_role: ctx.billing_owner_role,
+    billing_owner_name: ctx.billing_owner_name,
+    billing_is_org: ctx.billing_is_org,
+    can_purchase_ai_points: ctx.can_purchase_ai_points,
     trial_granted_at: ctx.trial_granted_at,
     account_role: ctx.account_role,
     account_role_label: ctx.account_role_label,
@@ -278,6 +556,7 @@ export async function resolveMpAiBillingContext(request: NextRequest): Promise<
   }
 
   let profile = normalizeProfile(profileRow)
+  let accountContext: MpAccountContext | null = null
   try {
     const account = await resolveMpAccountContextForUser({
       userId: user.id,
@@ -285,6 +564,7 @@ export async function resolveMpAiBillingContext(request: NextRequest): Promise<
       userMetadata: (user.user_metadata || {}) as Record<string, unknown>,
       profileFallback: profileRow,
     })
+    accountContext = account
     profile = {
       ...profile,
       account_role: account.role,
@@ -298,8 +578,28 @@ export async function resolveMpAiBillingContext(request: NextRequest): Promise<
     // Keep profile-based billing usable if the organization tables are not deployed yet.
   }
 
+  let billingOwner = currentUserBillingOwner({ userId: user.id, profileRow, account: accountContext })
+  try {
+    billingOwner = await resolveBillingOwner({ userId: user.id, profileRow, account: accountContext })
+  } catch {
+    // Keep personal-wallet billing usable if organization owner lookup fails.
+  }
+
+  const billingProfile = normalizeProfile(billingOwner.profile)
+  profile = {
+    ...billingProfile,
+    account_role: profile.account_role,
+    account_role_label: profile.account_role_label,
+    company_id: profile.company_id,
+    company_name: profile.company_name,
+    store_id: profile.store_id,
+    store_name: profile.store_name,
+    service_plan_label: billingProfile.service_plan_label,
+  }
+
   const deviceId = request.headers.get("x-device-id") || ""
   const ip = getClientIp(request)
+  const billingIsOrg = billingOwner.scope !== "personal"
 
   return {
     ok: true,
@@ -309,6 +609,13 @@ export async function resolveMpAiBillingContext(request: NextRequest): Promise<
       userEmail: user.email ?? null,
       userMetadata: (user.user_metadata || {}) as Record<string, unknown>,
       ...profile,
+      billing_user_id: billingOwner.userId,
+      billing_scope: billingOwner.scope,
+      billing_scope_label: billingOwner.scopeLabel,
+      billing_owner_role: billingOwner.ownerRole,
+      billing_owner_name: billingOwner.ownerName,
+      billing_is_org: billingIsOrg,
+      can_purchase_ai_points: accountContext ? canPurchaseAiPoints(accountContext) : true,
       deviceId,
       ipHash: ip ? hashIp(ip) : null,
     },
@@ -322,6 +629,7 @@ function aiPointsError(opts: {
   status: number
   required?: number
   balance?: number
+  extra?: Record<string, unknown>
 }) {
   return NextResponse.json(
     {
@@ -333,6 +641,7 @@ function aiPointsError(opts: {
       error_code: opts.code,
       required: opts.required,
       balance: opts.balance,
+      ...(opts.extra || {}),
     },
     { status: opts.status }
   )
@@ -372,11 +681,113 @@ async function recordMpAiPointLedger(opts: {
       balance_after: opts.balanceAfter,
       status: opts.status,
       reason: opts.reason || null,
-      metadata: opts.metadata || null,
+      metadata: {
+        ...(opts.metadata || {}),
+        billing_user_id: opts.ctx.billing_user_id,
+        billing_scope: opts.ctx.billing_scope,
+        billing_scope_label: opts.ctx.billing_scope_label,
+        billing_owner_role: opts.ctx.billing_owner_role,
+        billing_owner_name: opts.ctx.billing_owner_name,
+      },
     })
   } catch {
     // The migration may not be deployed yet. The balance update remains authoritative.
   }
+}
+
+async function consumeMpBillingCredits(opts: {
+  ctx: MpAiBillingContext
+  currentProfile: BillingProfile
+  amount: number
+  stepId: string
+}) {
+  if (opts.ctx.billing_user_id === opts.ctx.userId && opts.ctx.billing_scope === "personal") {
+    return consumeCredits({
+      supabase: opts.ctx.supabase,
+      userId: opts.ctx.userId,
+      currentBalance: opts.currentProfile.credits_balance,
+      amount: opts.amount,
+      stepId: opts.stepId,
+    })
+  }
+
+  if (opts.ctx.billing_is_org && STAFF_ROLES.has(opts.ctx.account_role) && opts.ctx.billing_user_id === opts.ctx.userId) {
+    const err = new Error("insufficient_credits")
+    ;(err as unknown as { meta?: Record<string, unknown> }).meta = {
+      required: opts.amount,
+      balance: 0,
+    }
+    throw err
+  }
+
+  const admin = createAdminSupabaseClient()
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const { data: profileRow, error: profileError } = await admin
+      .from("profiles")
+      .select("credits_balance, credits_unlimited")
+      .eq("id", opts.ctx.billing_user_id)
+      .single()
+
+    if (profileError || !profileRow) {
+      throw new Error(profileError?.message || "无法读取门店服务包余额")
+    }
+
+    const latestBalance = Number(profileRow.credits_balance ?? opts.currentProfile.credits_balance)
+    const latestUnlimited = Boolean(profileRow.credits_unlimited)
+
+    if (latestUnlimited) {
+      return { credits_balance: latestBalance, credits_unlimited: true }
+    }
+
+    if (latestBalance < opts.amount) {
+      const err = new Error("insufficient_credits")
+      ;(err as unknown as { meta?: Record<string, unknown> }).meta = {
+        required: opts.amount,
+        balance: latestBalance,
+      }
+      throw err
+    }
+
+    const { data: updatedRows, error: updateError } = await admin
+      .from("profiles")
+      .update({ credits_balance: latestBalance - opts.amount })
+      .eq("id", opts.ctx.billing_user_id)
+      .eq("credits_balance", latestBalance)
+      .gte("credits_balance", opts.amount)
+      .select("credits_balance, credits_unlimited")
+
+    if (updateError) throw new Error(updateError.message || "门店服务包扣减失败")
+
+    const updated = Array.isArray(updatedRows) ? updatedRows[0] : updatedRows
+    if (!updated) continue
+
+    try {
+      await admin.from("credit_transactions").insert({
+        user_id: opts.ctx.billing_user_id,
+        step_id: opts.stepId,
+        delta: -opts.amount,
+        reason: opts.ctx.billing_scope === "personal" ? "consume" : "mp_org_consume",
+        metadata: {
+          amount: opts.amount,
+          actor_user_id: opts.ctx.userId,
+          actor_role: opts.ctx.account_role,
+          company_id: opts.ctx.company_id,
+          store_id: opts.ctx.store_id,
+          billing_scope: opts.ctx.billing_scope,
+        },
+      })
+    } catch {
+      // Best-effort audit log; mp_ai_point_ledger records the actor-facing event.
+    }
+
+    return {
+      credits_balance: Number((updated as { credits_balance?: number | null }).credits_balance ?? latestBalance - opts.amount),
+      credits_unlimited: Boolean((updated as { credits_unlimited?: boolean | null }).credits_unlimited ?? false),
+    }
+  }
+
+  throw new Error("门店服务包扣减失败，请重试")
 }
 
 export async function chargeMpAiPoints(opts: {
@@ -402,6 +813,9 @@ export async function chargeMpAiPoints(opts: {
       costLabel,
       remaining: opts.ctx.ai_points_balance,
       unlimited: opts.ctx.ai_points_unlimited,
+      billingUserId: opts.ctx.billing_user_id,
+      billingScope: opts.ctx.billing_scope,
+      billingScopeLabel: opts.ctx.billing_scope_label,
     }
   }
 
@@ -415,6 +829,9 @@ export async function chargeMpAiPoints(opts: {
       costLabel,
       remaining: opts.ctx.ai_points_balance,
       unlimited: true,
+      billingUserId: opts.ctx.billing_user_id,
+      billingScope: opts.ctx.billing_scope,
+      billingScopeLabel: opts.ctx.billing_scope_label,
     }
   }
 
@@ -425,7 +842,13 @@ export async function chargeMpAiPoints(opts: {
     trial_granted_at: opts.ctx.trial_granted_at,
   }
 
-  if (!currentProfile.credits_unlimited && !currentProfile.trial_granted_at && currentProfile.credits_balance <= 0) {
+  if (
+    opts.ctx.billing_scope === "personal" &&
+    opts.ctx.billing_user_id === opts.ctx.userId &&
+    !currentProfile.credits_unlimited &&
+    !currentProfile.trial_granted_at &&
+    currentProfile.credits_balance <= 0
+  ) {
     if (!opts.ctx.deviceId || opts.ctx.deviceId.trim().length < 8) {
       return {
         ok: false,
@@ -452,10 +875,9 @@ export async function chargeMpAiPoints(opts: {
   }
 
   try {
-    const consumed = await consumeCredits({
-      supabase: opts.ctx.supabase,
-      userId: opts.ctx.userId,
-      currentBalance: currentProfile.credits_balance,
+    const consumed = await consumeMpBillingCredits({
+      ctx: opts.ctx,
+      currentProfile,
       amount: numericCost,
       stepId: opts.actionCode,
     })
@@ -478,6 +900,9 @@ export async function chargeMpAiPoints(opts: {
       costLabel,
       remaining: consumed.credits_balance,
       unlimited: consumed.credits_unlimited,
+      billingUserId: opts.ctx.billing_user_id,
+      billingScope: opts.ctx.billing_scope,
+      billingScopeLabel: opts.ctx.billing_scope_label,
     }
   } catch (error) {
     if (error instanceof Error && error.message === "insufficient_credits") {
@@ -495,14 +920,22 @@ export async function chargeMpAiPoints(opts: {
         reason: "insufficient_ai_points",
         metadata: { ...(opts.metadata || {}), required, balance },
       })
+      const orgMessage = opts.ctx.billing_is_org
+        ? `${opts.ctx.billing_scope_label} AI 点不足：本次需要 ${required} 点，当前余额 ${balance} 点。请联系店长或负责人补充服务包。`
+        : `AI 点不足：本次需要 ${required} 点，当前余额 ${balance} 点。`
       return {
         ok: false,
         error: aiPointsError({
-          message: `AI 点不足：本次需要 ${required} 点，当前余额 ${balance} 点。`,
+          message: orgMessage,
           code: "insufficient_ai_points",
           status: 402,
           required,
           balance,
+          extra: {
+            billing_scope: opts.ctx.billing_scope,
+            billing_scope_label: opts.ctx.billing_scope_label,
+            can_purchase_ai_points: opts.ctx.can_purchase_ai_points,
+          },
         }),
       }
     }
@@ -521,13 +954,15 @@ export async function refundMpAiPoints(opts: {
   if (opts.charge.cost <= 0 || opts.charge.unlimited) return null
 
   const refunded = await refundCredits({
-    userId: opts.ctx.userId,
+    userId: opts.charge.billingUserId || opts.ctx.billing_user_id,
     amount: opts.charge.cost,
     stepId: opts.charge.actionCode,
     reason: opts.reason,
     metadata: {
       action_code: opts.charge.actionCode,
       action_title: opts.charge.title,
+      actor_user_id: opts.ctx.userId,
+      billing_scope: opts.charge.billingScope,
       ...(opts.metadata || {}),
     },
   })
@@ -551,6 +986,8 @@ export function setMpAiPointHeaders(response: NextResponse, charge: Extract<MpAi
   response.headers.set("X-AI-Points-Quoted-Cost", charge.quotedCost == null ? "variable" : String(charge.quotedCost))
   response.headers.set("X-AI-Points-Remaining", charge.unlimited ? "unlimited" : String(charge.remaining))
   response.headers.set("X-AI-Points-Unlimited", charge.unlimited ? "1" : "0")
+  response.headers.set("X-AI-Points-Billing-Scope", charge.billingScope)
+  response.headers.set("X-AI-Points-Billing-Label", encodeURIComponent(charge.billingScopeLabel))
 
   // Keep the old headers for clients that have not switched names yet.
   response.headers.set("X-Credits-Cost", String(charge.cost))
@@ -574,6 +1011,9 @@ export function quoteMpAiAction(opts: { ctx: MpAiBillingContext; actionCode: str
     balance_points: opts.ctx.ai_points_balance,
     ai_points_balance: opts.ctx.ai_points_balance,
     ai_points_unlimited: opts.ctx.ai_points_unlimited,
+    billing_scope: opts.ctx.billing_scope,
+    billing_scope_label: opts.ctx.billing_scope_label,
+    can_purchase_ai_points: opts.ctx.can_purchase_ai_points,
     can_run: canRun,
   }
 }

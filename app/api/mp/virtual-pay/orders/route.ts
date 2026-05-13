@@ -4,6 +4,7 @@ import crypto from "node:crypto"
 
 import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
+import { resolveMpAccountContextForUser } from "@/lib/mp/account-context.server"
 import {
   buildVirtualPayParams,
   exchangeWechatCodeForSession,
@@ -87,6 +88,11 @@ function metadataOpenid(user: { user_metadata?: unknown }) {
   return textFrom(value)
 }
 
+function isStoreStaffAccount(role: unknown) {
+  const value = String(role || "").trim()
+  return value === "staff" || value === "employee"
+}
+
 async function ensureProfileRowExists(
   admin: ReturnType<typeof createAdminSupabaseClient>,
   user: { id: string; email?: string | null; user_metadata?: unknown }
@@ -132,6 +138,17 @@ export async function POST(request: NextRequest) {
     const product = getVirtualPayProduct(productId)
     if (!product) return jsonError(400, "未知的 product_id")
 
+    const account = await resolveMpAccountContextForUser({
+      userId: user.id,
+      userEmail: user.email ?? null,
+      userMetadata: (user.user_metadata || {}) as Record<string, unknown>,
+    }).catch(() => null)
+    if (account && isStoreStaffAccount(account.role) && (account.companyId || account.storeId)) {
+      return jsonError(403, "员工账号不需要单独购买服务包，请联系店长或负责人补充门店服务包。", {
+        code: "staff_purchase_blocked",
+      })
+    }
+
     const wechatSession = await exchangeWechatCodeForSession(loginCode)
     const boundOpenid = metadataOpenid(user)
     if (boundOpenid && boundOpenid !== wechatSession.openid) {
@@ -159,7 +176,17 @@ export async function POST(request: NextRequest) {
       ip_address: ipAddress || null,
       user_agent: userAgent || null,
       origin: origin || null,
-      raw_notify: { provider: "wechat_virtual_pay" },
+      raw_notify: {
+        provider: "wechat_virtual_pay",
+        account_context: account
+          ? {
+              role: account.role,
+              company_id: account.companyId,
+              store_id: account.storeId,
+              scope_label: account.scopeLabel,
+            }
+          : null,
+      },
     })
 
     if (insertError) {
