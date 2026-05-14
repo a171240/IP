@@ -78,7 +78,7 @@ function isAdminUser(user: { id?: string; email?: string } | null): boolean {
 }
 
 type AdminFunnelPageProps = {
-  searchParams?: Promise<{ days?: string }> | { days?: string }
+  searchParams?: Promise<{ days?: string }>
 }
 
 export default async function AdminFunnelPage({ searchParams }: AdminFunnelPageProps) {

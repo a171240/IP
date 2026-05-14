@@ -96,5 +96,24 @@
     "tw-animate-css": "1.3.3",
     "typescript": "^5"
   },
-  "packageManager": "pnpm@9.15.1+sha512.1acb565e6193efbebda772702950469150cf12bcc764262e7587e71d19dc98a423dff9536e57ea44c49bdf790ff694e83c27be5faa23d67e0c033b583be4bfcf"
+  "packageManager": "pnpm@9.15.1+sha512.1acb565e6193efbebda772702950469150cf12bcc764262e7587e71d19dc98a423dff9536e57ea44c49bdf790ff694e83c27be5faa23d67e0c033b583be4bfcf",
+  "description": "- **全量开发文档**：`docs/DEV_SPEC_FULL.md` - **小程序开发文档**：`docs/DEV_SPEC_MINIPROGRAM.md` - **当前进度/交接文档**：`docs/DEV_HANDOFF.md` - **小程序域名/部署拓扑必读**：`docs/VOICE_COACH_DOMAIN_TOPOLOGY.md` - **语音陪练顾客/场景优化主文档**：`docs/VOICE_COACH_CUSTOMER_SCENE_OPTIMIZATION.md`",
+  "main": "docx_app_spa.js",
+  "directories": {
+    "doc": "docs",
+    "lib": "lib",
+    "test": "tests"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/a171240/IP.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/a171240/IP/issues"
+  },
+  "homepage": "https://github.com/a171240/IP#readme"
 }

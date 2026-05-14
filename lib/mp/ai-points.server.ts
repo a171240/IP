@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
+import { resolveMpAccountContextForUser } from "@/lib/mp/account-context.server"
 import {
   consumeCredits,
   ensureTrialCreditsIfNeeded,
@@ -276,7 +277,27 @@ export async function resolveMpAiBillingContext(request: NextRequest): Promise<
     }
   }
 
-  const profile = normalizeProfile(profileRow)
+  let profile = normalizeProfile(profileRow)
+  try {
+    const account = await resolveMpAccountContextForUser({
+      userId: user.id,
+      userEmail: user.email ?? null,
+      userMetadata: (user.user_metadata || {}) as Record<string, unknown>,
+      profileFallback: profileRow,
+    })
+    profile = {
+      ...profile,
+      account_role: account.role,
+      account_role_label: account.roleLabel,
+      company_id: account.companyId,
+      company_name: account.companyName,
+      store_id: account.storeId,
+      store_name: account.storeName,
+    }
+  } catch {
+    // Keep profile-based billing usable if the organization tables are not deployed yet.
+  }
+
   const deviceId = request.headers.get("x-device-id") || ""
   const ip = getClientIp(request)
 

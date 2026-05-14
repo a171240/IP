@@ -46,4 +46,4 @@ if (isStrictBuild) {
   await run(process.execPath, [eslintBin, "."])
 }
 
-await run(process.execPath, [nextBin, "build"])
+await run(process.execPath, [nextBin, "build", "--webpack"])

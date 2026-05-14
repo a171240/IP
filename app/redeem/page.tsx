@@ -3,7 +3,7 @@ import { redirect } from "next/navigation"
 type RedeemSearchParams = Record<string, string | string[] | undefined>
 
 type RedeemPageProps = {
-  searchParams?: RedeemSearchParams | Promise<RedeemSearchParams>
+  searchParams?: Promise<RedeemSearchParams>
 }
 
 function getParam(searchParams: RedeemSearchParams | undefined, key: string): string | undefined {

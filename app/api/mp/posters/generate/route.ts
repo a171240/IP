@@ -12,6 +12,7 @@ import {
   renderPosterTemplate,
   type PosterOverlay,
 } from "@/lib/posters/templates"
+import { sanitizePosterTemplateFields } from "@/lib/posters/intake"
 import {
   chargeMpAiPoints,
   refundMpAiPoints,
@@ -41,6 +42,9 @@ const bodySchema = z.object({
   templateId: z.string().trim().max(40).optional().default(""),
   fields: z.record(z.string(), z.string().max(200)).optional().default({}),
   prompt: z.string().trim().max(4000).optional().default(""),
+  posterPlan: z.any().optional(),
+  visibleCopy: z.any().optional(),
+  hiddenContext: z.any().optional(),
   sessionId: z.string().trim().max(80).optional().default(""),
   briefId: z.string().trim().max(80).optional().default(""),
   action_code: z
@@ -100,6 +104,17 @@ function assetPromptBlock(assetRefs: PosterAssetRef[]) {
   ]
     .filter(Boolean)
     .join("\n")
+}
+
+function metadataObject(value: unknown, maxLength = 8000) {
+  if (!value || typeof value !== "object") return null
+  try {
+    const text = JSON.stringify(value)
+    if (text.length > maxLength) return { truncated: true }
+    return JSON.parse(text) as Record<string, unknown>
+  } catch {
+    return null
+  }
 }
 
 async function assetRefsToImageUrls(opts: {
@@ -173,6 +188,8 @@ export async function POST(request: NextRequest) {
   let size: PosterSize = input.size || "4:5"
   let resolution: PosterResolution = BASIC_POSTER_RESOLUTION
   const warnings: string[] = []
+  let renderedFields: Record<string, string> = {}
+  let fieldSafety: ReturnType<typeof sanitizePosterTemplateFields> | null = null
 
   try {
     if (input.mode === "template") {
@@ -187,12 +204,17 @@ export async function POST(request: NextRequest) {
       templateId = template.id
       size = input.size || template.defaultSize
       resolution = BASIC_POSTER_RESOLUTION
-      const rendered = renderPosterTemplate(template, input.fields, size)
+      fieldSafety = sanitizePosterTemplateFields(template.id, input.fields)
+      renderedFields = fieldSafety.fields
+      const rendered = renderPosterTemplate(template, renderedFields, size)
       prompt = rendered.prompt
       negativePrompt = rendered.negativePrompt
       overlay = rendered.overlay
       warnings.push("模型会直接生成完整海报，请重点核对标题、价格、日期和地址。")
       warnings.push("如果中文有错字，使用“文字更严格版”重新生成。")
+      if (fieldSafety.sanitizedFields.length) {
+        warnings.push("已自动移除不会印在海报上的用户指令文字。")
+      }
     } else {
       if (!input.prompt.trim()) return NextResponse.json({ ok: false, error: "prompt_required" }, { status: 400 })
       prompt = buildFreeImagePrompt(input.prompt)
@@ -216,6 +238,7 @@ export async function POST(request: NextRequest) {
         template_id: templateId || null,
         size,
         resolution,
+        sanitized_count: fieldSafety?.sanitizedFields.length || 0,
       },
     })
     if (!charge.ok) return charge.error
@@ -264,7 +287,18 @@ export async function POST(request: NextRequest) {
           contentType: uploaded.contentType,
           size,
           resolution,
-          assetRefs: validAssetRefs.map((ref) => ({ kind: ref.kind, path: ref.path })),
+          fields: renderedFields,
+          posterPlan: metadataObject(input.posterPlan),
+          visibleCopy: metadataObject(input.visibleCopy) || metadataObject(input.posterPlan?.visibleCopy),
+          hiddenContext: metadataObject(input.hiddenContext) || metadataObject(input.posterPlan?.hiddenContext),
+          prompt,
+          negativePrompt,
+          assetRefs: validAssetRefs.map((ref) => ({
+            kind: ref.kind,
+            bucket: ref.bucket,
+            path: ref.path,
+            contentType: ref.contentType,
+          })),
           createdAt: new Date().toISOString(),
         },
         null,
@@ -299,6 +333,13 @@ export async function POST(request: NextRequest) {
       negativePrompt,
       warnings,
       overlay,
+      fields: renderedFields,
+      safety: fieldSafety
+        ? {
+            sanitizedFields: fieldSafety.sanitizedFields,
+            visibleCopyWarnings: fieldSafety.warnings,
+          }
+        : null,
     })
     setMpAiPointHeaders(res, charged)
     return res

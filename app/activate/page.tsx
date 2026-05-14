@@ -6,7 +6,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server"
 type ActivateSearchParams = Record<string, string | string[] | undefined>
 
 type ActivatePageProps = {
-  searchParams?: ActivateSearchParams | Promise<ActivateSearchParams>
+  searchParams?: Promise<ActivateSearchParams>
 }
 
 function getParam(searchParams: ActivateSearchParams | undefined, key: string): string | undefined {

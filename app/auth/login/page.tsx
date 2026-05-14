@@ -4,7 +4,7 @@ import { safeRedirect } from "@/lib/safe-redirect"
 export const dynamic = "force-dynamic"
 
 type LoginPageProps = {
-  searchParams?: Promise<{ redirect?: string | string[] }> | { redirect?: string | string[] }
+  searchParams?: Promise<{ redirect?: string | string[] }>
 }
 
 export default async function Page({ searchParams }: LoginPageProps) {

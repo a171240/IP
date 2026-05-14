@@ -57,6 +57,44 @@ export type PosterRecommendation = {
   resolution: "1k"
 }
 
+export type PosterVisibleCopy = {
+  title: string
+  subtitle: string
+  tags: string[]
+  offer: string
+  dateRange: string
+  cta: string
+  storeSignature: string
+}
+
+export type PosterPlan = {
+  intent: {
+    goal: string
+    scene: string
+    festivalName: string
+    templateId: string
+    userCommand: string
+  }
+  visibleCopy: PosterVisibleCopy
+  hiddenContext: {
+    storeProfileId: string
+    storeName: string
+    cityArea: string
+    industry: string
+    shopType: string
+    projectName: string
+    audience: string
+    stylePreset: string
+    constraints: string
+    assetKinds: string[]
+  }
+  safety: {
+    sanitizedFields: string[]
+    autoGenerateBlocked: boolean
+    visibleCopyWarnings: string[]
+  }
+}
+
 const TEMPLATE_STYLE: Record<
   string,
   { stylePreset: string; size: PosterRecommendation["size"]; resolution: PosterRecommendation["resolution"] }
@@ -173,6 +211,69 @@ function normalizeTemplateId(value: unknown) {
   return TEMPLATE_STYLE[id] ? id : ""
 }
 
+function compactText(value: unknown, max = 220) {
+  return asText(value, max).replace(/\s+/g, "")
+}
+
+const POSTER_COMMAND_PATTERN =
+  /(?:请|麻烦|帮我|给我|我要|我想|想要|需要|帮忙)?(?:生成|做|制作|设计|出|来|搞|弄|开做|出图|做图).{0,28}(?:海报|图片|图|封面)|(?:宣传海报|生成海报|做海报|出图|做图)/
+
+export function containsPosterCommandText(value: unknown) {
+  const text = compactText(value)
+  if (!text) return false
+  return POSTER_COMMAND_PATTERN.test(text) || /(?:请|麻烦|帮我|给我|我要|我想|想要|需要|帮忙).{0,18}(?:海报|图片|图|封面)/.test(text)
+}
+
+export function stripPosterCommandText(value: unknown) {
+  let text = asText(value, 220)
+  if (!text) return ""
+
+  text = text
+    .replace(/^(?:请|麻烦|帮我|给我|我要|我想|想要|需要|帮忙)?\s*(?:生成|做|制作|设计|出|来|搞|弄|开做|出图|做图)?\s*(?:一张|一个|一份|张)?\s*/g, "")
+    .replace(/(?:给我|帮我|我要|我想|想要|需要|请|麻烦|帮忙)/g, "")
+    .replace(/(?:直接|现在|马上|立即|开始)?(?:生成|出图|做图|开做)(?:吧|呀|哦)?/g, "")
+    .replace(/(?:的)?(?:宣传|活动|门店|节日|小红书)?海报/g, "")
+    .replace(/(?:图片|配图|封面)/g, "")
+    .replace(/[“”"']/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/^[，。！？、,.!?~～\s]+|[，。！？、,.!?~～\s]+$/g, "")
+    .trim()
+
+  return text.slice(0, 120)
+}
+
+function extractFestivalName(...values: Array<string | undefined>) {
+  const text = values.map((value) => asText(value)).join(" ")
+  if (/五一|劳动节/.test(text)) return "五一"
+  if (/端午/.test(text)) return "端午"
+  if (/中秋/.test(text)) return "中秋"
+  if (/春节|新年/.test(text)) return /新年/.test(text) ? "新年" : "春节"
+  if (/520/.test(text)) return "520"
+  if (/七夕/.test(text)) return "七夕"
+  if (/女神节/.test(text)) return "女神节"
+  if (/周年/.test(text)) return "周年"
+  if (/618/.test(text)) return "618"
+  return ""
+}
+
+function fallbackCampaignTitleFromText(text: string, answers: PosterIntakeAnswers = {}) {
+  const festival = extractFestivalName(text, answers.campaignTitle, answers.headline)
+  const haystack = `${text} ${answers.industry || ""} ${answers.shopType || ""} ${answers.projectName || ""}`
+  if (festival === "五一") return hasBeautySignal(haystack) ? "五一焕颜季" : "五一焕新季"
+  if (festival === "520" || festival === "七夕") return `${festival}心动焕颜礼`
+  if (festival === "女神节") return "女神节宠爱季"
+  if (festival) return `${festival}焕新季`
+  if (/新客|首单|体验/.test(haystack)) return "新客体验礼"
+  if (/会员|老客|复购/.test(haystack)) return "会员宠粉礼"
+  return ""
+}
+
+function refineCampaignTitleForContext(title: string, ...values: Array<string | undefined>) {
+  const haystack = [title, ...values].map((value) => asText(value)).join(" ")
+  if (title === "五一焕新季" && hasBeautySignal(haystack)) return "五一焕颜季"
+  return title
+}
+
 function promisesToRule(promises: unknown) {
   if (!promises || typeof promises !== "object") return ""
   const p = promises as Record<string, unknown>
@@ -238,6 +339,7 @@ function parseLineAnswers(message: string): PosterIntakeAnswers {
 
 function inferAnswers(message: string): PosterIntakeAnswers {
   const text = message.trim()
+  const copyText = stripPosterCommandText(text)
   const out = parseLineAnswers(text)
   if (!text) return out
   const wantsThemeChange = /(?:主题|标题).{0,8}(?:不好|不对|不合适|换|改)|换个主题|重新定主题|不要这个主题/.test(text)
@@ -278,12 +380,16 @@ function inferAnswers(message: string): PosterIntakeAnswers {
   const date = text.match(/(?:\d{1,2}[./月-]\d{1,2}(?:[日号])?(?:\s*[-~到至]\s*\d{1,2}[./月-]\d{1,2}(?:[日号])?)?|本周|本月|周末|今天|明天|五一|端午|中秋|春节|暑假)/)
   if (date) out.dateRange ||= date[0].trim()
 
-  if (!out.campaignTitle && goalHit?.id === "P02") out.campaignTitle = firstShortPhrase(text)
-  if (!out.projectName && ["P01", "P03", "P10", "P11"].includes(goalHit?.id || "")) out.projectName = firstShortPhrase(text)
+  if (!out.campaignTitle && goalHit?.id === "P02") {
+    out.campaignTitle = fallbackCampaignTitleFromText(text, out) || firstShortPhrase(copyText || text)
+  }
+  if (!out.projectName && ["P01", "P03", "P10", "P11"].includes(goalHit?.id || "")) {
+    out.projectName = firstShortPhrase(copyText || text)
+  }
   if (wantsThemeChange) {
     out.constraints ||= "不要沿用上一版主题，重新换一个更合适的主题"
-  } else if (!out.headline && !out.audience && !out.industry) {
-    out.headline = firstShortPhrase(text)
+  } else if (!out.headline && !out.audience && !out.industry && copyText && !containsPosterCommandText(copyText)) {
+    out.headline = firstShortPhrase(copyText)
   }
   return out
 }
@@ -305,6 +411,231 @@ function inferFestivalBlessing(text: string) {
   if (/520/.test(text)) return { festivalName: "520", headline: "愿你被温柔以待", subline: "把好状态送给自己" }
   if (/女神节/.test(text)) return { festivalName: "女神节", headline: "女神节快乐", subline: "把今天的好状态送给自己" }
   return { festivalName: "节日", headline: "节日安康", subline: "愿你平安顺遂" }
+}
+
+const TITLE_LIKE_FIELDS = new Set([
+  "headline",
+  "campaignTitle",
+  "projectName",
+  "brandPromise",
+  "topic",
+  "blessingTitle",
+])
+
+const VISIBLE_COPY_FIELDS = new Set([
+  "storeName",
+  "cityArea",
+  "headline",
+  "subline",
+  "projectName",
+  "campaignTitle",
+  "sellingPoints",
+  "offerText",
+  "dateRange",
+  "serviceRule",
+  "trustRules",
+  "audience",
+  "highlights",
+  "bookingLine",
+  "brandPromise",
+  "proofLine",
+  "benefits",
+  "giftLine",
+  "openingGift",
+  "addressLine",
+  "storeType",
+  "reason",
+  "tags",
+  "topic",
+  "point1",
+  "point2",
+  "point3",
+  "point4",
+  "category1",
+  "category2",
+  "category3",
+  "bottomLine",
+  "shareOffer",
+  "festivalName",
+  "blessingTitle",
+  "blessingSubtitle",
+  "signature",
+])
+
+function splitCopyTags(value: string) {
+  return value
+    .split(/[|｜、，,~～·・]+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 4)
+}
+
+function isWeakTitleLikeCopy(key: string, value: string) {
+  if (!TITLE_LIKE_FIELDS.has(key)) return false
+  const text = value.trim()
+  if (!text) return false
+  if (/^(五一|劳动节|端午|中秋|春节|新年|520|七夕|女神节|618|周年)$/.test(text)) return true
+  return /(?:宣传)?海报|图片|配图|封面/.test(text)
+}
+
+function fallbackVisibleField(key: string, templateId: string, fields: Record<string, string>) {
+  const haystack = Object.values(fields).join(" ")
+  const industry = fields._industry || fields._businessType || fields.industry || ""
+  const shopType = fields._businessType || fields.storeType || industry || "门店服务"
+  const festival = extractFestivalName(haystack)
+  const campaignTitle = fallbackCampaignTitleFromText(haystack, {
+    industry,
+    shopType,
+    projectName: fields.projectName || fields.topic,
+    campaignTitle: fields.campaignTitle,
+    headline: fields.headline,
+  })
+
+  if (key === "storeName" || key === "signature") return fields._storeName || "你的门店"
+  if (key === "campaignTitle") return campaignTitle || `${shopType}活动`
+  if (key === "headline" || key === "brandPromise" || key === "topic") return campaignTitle || fields.projectName || `${shopType}推荐`
+  if (key === "projectName") return fields.projectName || fields.topic || `${shopType}项目`
+  if (key === "subline") {
+    if (festival === "五一") return "假期也要美美的"
+    if (templateId === "P13") return inferFestivalBlessing(haystack).subline
+    return hasBeautySignal(haystack) ? "把好状态留给重要时刻" : "到店体验安排得更清楚"
+  }
+  if (key === "sellingPoints" || key === "highlights" || key === "benefits" || key === "tags") {
+    return defaultSellingPoints(industry, shopType)
+  }
+  if (key === "offerText" || key === "giftLine" || key === "openingGift" || key === "shareOffer") {
+    return defaultOfferText(industry, shopType)
+  }
+  if (key === "dateRange") return defaultCampaignDate(haystack)
+  if (key === "festivalName") return festival || "节日"
+  if (key === "blessingTitle") return inferFestivalBlessing(haystack).headline
+  if (key === "blessingSubtitle") return inferFestivalBlessing(haystack).subline
+  if (key === "bookingLine" || key === "bottomLine" || key === "point4") return fields._cta || "预约到店"
+  if (key === "cityArea" || key === "addressLine") return fields._cityArea || "本地商圈"
+  if (key === "storeType") return shopType
+  if (key === "reason" || key === "proofLine" || key === "serviceRule" || key === "trustRules") {
+    return "先了解，再决定"
+  }
+  if (/^point\d$/.test(key)) return "真实到店"
+  if (/^category\d$/.test(key)) return `${shopType}：到店咨询`
+  return ""
+}
+
+export function sanitizePosterTemplateFields(templateId: string, inputFields: Record<string, string>) {
+  const fields = { ...inputFields }
+  const sanitizedFields: string[] = []
+  const warnings: string[] = []
+
+  for (const key of Object.keys(fields)) {
+    if (key.startsWith("_") || !VISIBLE_COPY_FIELDS.has(key)) continue
+    const raw = asText(fields[key], 220)
+    if (!raw) continue
+
+    const shouldSanitize = containsPosterCommandText(raw) || isWeakTitleLikeCopy(key, raw)
+    if (!shouldSanitize) continue
+
+    const stripped = stripPosterCommandText(raw)
+    const fallback = fallbackVisibleField(key, templateId, fields)
+    const replacement =
+      stripped && stripped.length >= 3 && !containsPosterCommandText(stripped) && !isWeakTitleLikeCopy(key, stripped)
+        ? stripped
+        : fallback
+
+    if (replacement && replacement !== raw) {
+      fields[key] = replacement.slice(0, 180)
+      sanitizedFields.push(key)
+      warnings.push(`${key}: ${raw.slice(0, 24)} -> ${replacement.slice(0, 24)}`)
+    }
+  }
+
+  if (sanitizedFields.length) {
+    fields._copySanitized = Array.from(new Set(sanitizedFields)).join(",")
+    fields._copyWarnings = warnings.join("；").slice(0, 180)
+  } else {
+    delete fields._copySanitized
+    delete fields._copyWarnings
+  }
+
+  return {
+    fields,
+    sanitizedFields: Array.from(new Set(sanitizedFields)),
+    warnings,
+  }
+}
+
+function visibleCopyFromFields(templateId: string, fields: Record<string, string>): PosterVisibleCopy {
+  const title =
+    (templateId === "P02" && fields.campaignTitle) ||
+    (templateId === "P13" && fields.blessingTitle) ||
+    fields.headline ||
+    fields.campaignTitle ||
+    fields.projectName ||
+    fields.topic ||
+    "门店海报"
+  const subtitle =
+    (templateId === "P13" && fields.blessingSubtitle) ||
+    fields.subline ||
+    fields.reason ||
+    "把到店体验安排得更清楚"
+  const tags = splitCopyTags(fields.sellingPoints || fields.highlights || fields.benefits || fields.tags || "")
+  return {
+    title,
+    subtitle,
+    tags,
+    offer: fields.offerText || fields.giftLine || fields.openingGift || fields.shareOffer || "",
+    dateRange: fields.dateRange || fields.festivalName || "",
+    cta: fields.bookingLine || fields.bottomLine || fields._cta || "",
+    storeSignature: fields.signature || fields.storeName || fields._storeName || "",
+  }
+}
+
+export function buildPosterPlan(opts: {
+  templateId: string
+  brief: PosterBrief
+  fields: Record<string, string>
+  message?: string
+  storeProfileId?: string
+  assetRefs?: unknown[]
+}): PosterPlan {
+  const sanitizedFields = String(opts.fields._copySanitized || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+  const festivalName = extractFestivalName(opts.message, opts.brief.campaignTitle, opts.brief.dateRange, opts.brief.headline)
+  const assetKinds = (opts.assetRefs || [])
+    .map((item) => (item && typeof item === "object" ? asText((item as { kind?: unknown }).kind, 24) : ""))
+    .filter(Boolean)
+
+  return {
+    intent: {
+      goal: opts.brief.posterGoal || "",
+      scene: opts.brief.campaignTitle || opts.brief.projectName || opts.brief.headline || "",
+      festivalName,
+      templateId: opts.templateId,
+      userCommand: containsPosterCommandText(opts.message || "") ? asText(opts.message, 160) : "",
+    },
+    visibleCopy: visibleCopyFromFields(opts.templateId, opts.fields),
+    hiddenContext: {
+      storeProfileId: opts.storeProfileId || "",
+      storeName: opts.brief.storeName || "",
+      cityArea: opts.brief.cityArea || "",
+      industry: opts.brief.industry || "",
+      shopType: opts.brief.shopType || "",
+      projectName: opts.brief.projectName || "",
+      audience: opts.brief.audience || "",
+      stylePreset: opts.brief.stylePreset || opts.fields._stylePreset || "",
+      constraints: opts.brief.constraints || "",
+      assetKinds,
+    },
+    safety: {
+      sanitizedFields,
+      autoGenerateBlocked: sanitizedFields.length > 0,
+      visibleCopyWarnings: String(opts.fields._copyWarnings || "")
+        .split("；")
+        .map((item) => item.trim())
+        .filter(Boolean),
+    },
+  }
 }
 
 function mergeAnswers(...items: Array<PosterIntakeAnswers | null | undefined>) {
@@ -370,7 +701,12 @@ export function buildPosterBrief(opts: {
     merged.cityArea || joinClean([opts.profile?.city, opts.profile?.district, opts.profile?.landmark], " ") || "本地商圈"
   const storeName = merged.storeName || asText(opts.profile?.name) || "你的门店"
   const projectName = merged.projectName || asText(opts.profile?.main_offer_name) || `${shopType}主推项目`
-  const campaignTitle = merged.campaignTitle || merged.headline || `${storeName}活动`
+  const campaignTitle = refineCampaignTitleForContext(
+    merged.campaignTitle || merged.headline || `${storeName}活动`,
+    industry,
+    shopType,
+    projectName,
+  )
   const headline = merged.headline || campaignTitle || projectName
   const dateRange = merged.dateRange || defaultCampaignDate(campaignTitle, merged.posterGoal, merged.constraints)
   const subline = merged.subline || defaultSubline({ industry, shopType, campaignTitle, dateRange, audience: merged.audience })
@@ -477,7 +813,7 @@ export function buildPosterFieldsFromBrief(templateId: string, brief: PosterBrie
     signature: brief.storeName,
   }
 
-  return { ...base, ...common }
+  return sanitizePosterTemplateFields(templateId, { ...base, ...common }).fields
 }
 
 export function buildAssistantMessage(brief: PosterBrief, missingFields: string[], recommendation: PosterRecommendation) {

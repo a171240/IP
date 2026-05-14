@@ -51,7 +51,7 @@ function isAdminUser(user: { id?: string; email?: string } | null): boolean {
 }
 
 type AdminLeadsPageProps = {
-  searchParams?: Promise<{ days?: string; limit?: string }> | { days?: string; limit?: string }
+  searchParams?: Promise<{ days?: string; limit?: string }>
 }
 
 export default async function AdminLeadsPage({ searchParams }: AdminLeadsPageProps) {
