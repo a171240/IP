@@ -7,7 +7,7 @@ store-account, service-package, and service-record work.
 
 - Path: `D:/IP网站/.tmp/worktrees/backend-integration-20260514`
 - Branch: `codex/backend-integration-20260514`
-- Current head: `7e8831f Integrate service record backend routes`
+- Recent local head before this follow-up: `60f96e6 Document backend integration handoff`
 - Base service-package commit: `9925a78 Align store service package entitlements`
 - Backup snapshot: `E:/CodexHome/codex-backups/IP网站/20260514-103934`
 
@@ -33,6 +33,7 @@ store-account, service-package, and service-record work.
   - `/api/cron/service-records`
 - Service-record migration is included:
   `supabase/migrations/20260513085315_add_service_record_sessions.sql`.
+- Service-record ASR environment keys are documented in `.env.example`.
 
 ## Not Included
 
@@ -44,6 +45,18 @@ store-account, service-package, and service-record work.
 - The local endpoint smoke could not fully exercise auth-required routes because
   the new integration worktree has no `.env.local` Supabase config. Route
   existence was verified by the successful Next build route table instead.
+- These source-worktree-only compatibility edits were intentionally deferred
+  because the integration build already passes and the changes are not required
+  for the service-package or service-record release candidate:
+  - `app/activate/page.tsx`
+  - `app/admin/funnel/page.tsx`
+  - `app/admin/leads/page.tsx`
+  - `app/auth/login/page.tsx`
+  - `app/auth/register/page.tsx`
+  - `app/demo/page.tsx`
+  - `app/redeem/page.tsx`
+  - `package.json`
+  - `scripts/strict-build.mjs`
 
 ## Verification
 
@@ -51,6 +64,8 @@ store-account, service-package, and service-record work.
 - `node --check scripts/service-record-smoke.js` passed.
 - `corepack pnpm install --frozen-lockfile` completed without lockfile changes.
 - `corepack pnpm build` completed successfully.
+- After adding the service-record ASR env template keys, `corepack pnpm build`
+  was run again and completed successfully.
 - Build output listed `/api/mp/virtual-pay/products` and all
   `/api/mp/service-records/*` routes.
 - Static search confirmed current product display names are `测试服务包`,
