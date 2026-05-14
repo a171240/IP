@@ -88,6 +88,9 @@ Preview branch pushed:
   `https://ip-git-codex-backend-integration-20260514-a171240s-projects.vercel.app`
 - Vercel state: `READY`
 - Vercel target: preview only (`target=null`)
+- Follow-up doc-only deployment: `dpl_FZ9DNFj8n1CegnbD7U9ccVLE65og`,
+  commit `aa62d6d4f95cb988f8a0db896207b54beca3dc24`, `READY`,
+  preview only.
 
 Preview smoke results:
 
@@ -97,10 +100,12 @@ Preview smoke results:
   and is protected by mini-program auth.
 - `GET /api/admin/mp/store-accounts`: `401 auth_required`; route exists and is
   protected by admin auth.
-- `GET /api/mp/profile`: inconclusive in this unauthenticated preview probe
-  because Vercel Authentication returned an HTML protection page. The route was
-  still present in the successful Next build table and should be rechecked with
-  an authenticated mini-program client or preview bypass before production.
+- `GET /api/mp/profile`: `401 auth_required`; route exists and is protected by
+  mini-program auth when probed through the branch alias.
+
+Use the branch alias for preview smoke because the one-off deployment URL can
+show the Vercel Authentication page for some protected routes even when the
+branch alias reaches the application route correctly.
 
 No production deploy, Vercel promote/alias, Supabase production migration, or
 WeChat DevTools upload was run during preview verification.
