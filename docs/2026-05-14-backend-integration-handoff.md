@@ -76,6 +76,35 @@ store-account, service-package, and service-record work.
 Build warnings remain, mainly existing `@typescript-eslint/no-explicit-any` and
 CommonJS test warnings. They did not block compilation.
 
+## Preview Verification
+
+Preview branch pushed:
+
+- Branch: `origin/codex/backend-integration-20260514`
+- Tested commit: `bae90a475eb8384f7919bc94ca1346d0a08449e2`
+- Vercel deployment: `dpl_4MXPUoC8rKvvS4Nbsx6AHLB9fRAU`
+- Preview URL: `https://ip-mpb25lnhx-a171240s-projects.vercel.app`
+- Branch alias:
+  `https://ip-git-codex-backend-integration-20260514-a171240s-projects.vercel.app`
+- Vercel state: `READY`
+- Vercel target: preview only (`target=null`)
+
+Preview smoke results:
+
+- `GET /api/mp/virtual-pay/products`: `200 OK`; returned service-package
+  products named `基础服务包` and `专业服务包`.
+- `GET /api/mp/service-records/sessions`: `401 auth_required`; route exists
+  and is protected by mini-program auth.
+- `GET /api/admin/mp/store-accounts`: `401 auth_required`; route exists and is
+  protected by admin auth.
+- `GET /api/mp/profile`: inconclusive in this unauthenticated preview probe
+  because Vercel Authentication returned an HTML protection page. The route was
+  still present in the successful Next build table and should be rechecked with
+  an authenticated mini-program client or preview bypass before production.
+
+No production deploy, Vercel promote/alias, Supabase production migration, or
+WeChat DevTools upload was run during preview verification.
+
 ## Release Next Steps
 
 Before production release:
