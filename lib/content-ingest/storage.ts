@@ -1,5 +1,6 @@
 import type { User } from "@supabase/supabase-js"
 
+import { DEFAULT_TRIAL_CREDITS } from "@/lib/pricing/constants"
 import type { IngestErrorCode, JsonObject } from "@/lib/content-ingest/types"
 import type { ExtractedPayload, IngestMode, SourcePlatformId } from "@/lib/types/content-pipeline"
 
@@ -56,7 +57,7 @@ export async function ensureProfileRowExists(supabase: SupabaseClientForRequest,
       nickname: safeNickname(user),
       avatar_url: null,
       plan: "free",
-      credits_balance: 30,
+      credits_balance: DEFAULT_TRIAL_CREDITS,
       credits_unlimited: false,
     })
 

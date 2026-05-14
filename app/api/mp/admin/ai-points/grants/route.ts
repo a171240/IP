@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     store_id: storeId || updatedProfile.store_id || profile.store_id || null,
     action_code: "admin.ai_points.adjust",
     action_title: effectiveDelta >= 0 ? "平台发放 AI 点" : "平台扣减 AI 点",
-    page_path: "pages/platform-admin/index",
+    page_path: "web:/admin/store-accounts",
     business_object_type: storeId ? "mp_store" : companyId ? "mp_company" : "profile",
     business_object_id: storeId || companyId || userId,
     delta: effectiveDelta,

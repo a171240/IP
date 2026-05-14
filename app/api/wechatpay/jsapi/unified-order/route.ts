@@ -4,6 +4,7 @@ import crypto from "node:crypto"
 
 import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
+import { DEFAULT_TRIAL_CREDITS } from "@/lib/pricing/constants"
 import { wechatpayBuildJsapiPayParams, wechatpayCreateJsapiOrder } from "@/lib/wechatpay/wechatpay.server"
 import { getWechatpayProduct } from "@/lib/wechatpay/products"
 
@@ -109,7 +110,7 @@ async function ensureProfileRowExists(admin: ReturnType<typeof createAdminSupaba
     nickname: (user.user_metadata as Record<string, unknown> | null)?.nickname || user.email?.split("@")[0] || "User",
     avatar_url: (user.user_metadata as Record<string, unknown> | null)?.avatar_url || null,
     plan: "free",
-    credits_balance: 30,
+    credits_balance: DEFAULT_TRIAL_CREDITS,
     credits_unlimited: false,
   })
 }

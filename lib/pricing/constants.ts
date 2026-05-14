@@ -1,0 +1,1 @@
+export const DEFAULT_TRIAL_CREDITS = 20

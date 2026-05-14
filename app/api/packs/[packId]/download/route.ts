@@ -2,6 +2,7 @@
 
 import { readPackFileForDownload } from "@/lib/packs/packs.server"
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
+import { DEFAULT_TRIAL_CREDITS } from "@/lib/pricing/constants"
 import { canDownloadPack, getCreditCostForPackFileDownload, getDownloadPermissionMessage, normalizePlan, PLAN_LABELS } from "@/lib/pricing/rules"
 import { consumeCredits, ensureTrialCreditsIfNeeded, getClientIp, hashIp } from "@/lib/pricing/profile.server"
 
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             email: user.email,
             nickname: user.email?.split("@")[0] || "User",
             plan: "free",
-            credits_balance: 30,
+            credits_balance: DEFAULT_TRIAL_CREDITS,
             credits_unlimited: false,
           })
           .select("plan, credits_balance, credits_unlimited, trial_granted_at")

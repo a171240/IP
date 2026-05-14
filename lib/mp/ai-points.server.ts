@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 import { resolveMpAccountContextForUser, type MpAccountContext } from "@/lib/mp/account-context.server"
+import { DEFAULT_TRIAL_CREDITS } from "@/lib/pricing/constants"
 import {
   consumeCredits,
   ensureTrialCreditsIfNeeded,
@@ -268,7 +269,7 @@ async function createProfileRow(opts: {
       nickname,
       avatar_url: avatarUrl,
       plan: "free",
-      credits_balance: 30,
+      credits_balance: DEFAULT_TRIAL_CREDITS,
       credits_unlimited: false,
     })
     .select(BASE_PROFILE_SELECT)
@@ -478,8 +479,13 @@ export function formatMpAiPointCost(actionCode: string | null | undefined) {
 
 export function buildMpAiProfilePayload(ctx: MpAiBillingContext, extra?: Pick<ProfileRow, "nickname" | "avatar_url">) {
   const aiPointsLabel = ctx.ai_points_unlimited
-    ? `${ctx.billing_scope_label} AI 点无限`
+    ? `${ctx.billing_scope_label} 服务包不限量`
     : `${ctx.billing_scope_label} AI 点 ${ctx.ai_points_balance}`
+  const servicePackageLabel = ctx.ai_points_unlimited
+    ? `${ctx.billing_scope_label} 服务包不限量`
+    : ctx.billing_is_org
+      ? `${ctx.billing_scope_label} 服务包待开通`
+      : `${ctx.billing_scope_label} 体验点 ${ctx.ai_points_balance}`
 
   return {
     plan: ctx.plan,
@@ -490,6 +496,8 @@ export function buildMpAiProfilePayload(ctx: MpAiBillingContext, extra?: Pick<Pr
     ai_points_balance: ctx.ai_points_balance,
     ai_points_unlimited: ctx.ai_points_unlimited,
     ai_points_label: aiPointsLabel,
+    service_package_label: servicePackageLabel,
+    service_package_unlimited: ctx.ai_points_unlimited,
     ai_points_scope: ctx.billing_scope,
     ai_points_scope_label: ctx.billing_scope_label,
     ai_points_owner_label: ctx.billing_owner_name,

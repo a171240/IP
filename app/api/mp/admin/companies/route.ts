@@ -126,6 +126,8 @@ export async function POST(request: NextRequest) {
         company_name: company.name,
         store_id: null,
         store_name: null,
+        credits_unlimited: true,
+        service_plan_label: "门店不限量服务包",
       })
       .eq("id", ownerUserId)
   }

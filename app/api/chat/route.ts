@@ -3,6 +3,7 @@ import { getStepPrompt } from '@/lib/prompts/step-prompts'
 import { readPromptFile } from '@/lib/prompts/prompts.server'
 import { getAgentPrompt } from '@/lib/agents/prompt.server'
 import { createServerSupabaseClientForRequest } from '@/lib/supabase/server'
+import { DEFAULT_TRIAL_CREDITS } from '@/lib/pricing/constants'
 import { getClientIp, hashIp } from '@/lib/pricing/profile.server'
 import { agentsConfig } from '@/lib/agents/config'
 
@@ -175,7 +176,7 @@ export async function POST(request: NextRequest) {
             email: user.email,
             nickname: user.email?.split('@')[0] || 'User',
             plan: 'free',
-            credits_balance: 30, // 给新用户初始积分
+            credits_balance: DEFAULT_TRIAL_CREDITS, // 给新用户初始积分
             credits_unlimited: false,
           })
           .select('plan, credits_balance, credits_unlimited, trial_granted_at')

@@ -4,6 +4,7 @@ import { NextRequest } from "next/server"
 
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
+import { DEFAULT_TRIAL_CREDITS } from "@/lib/pricing/constants"
 import {
   PLAN_LABELS,
   getCrossLevelMultiplier,
@@ -85,7 +86,7 @@ export async function resolveBillingContext(request: NextRequest): Promise<
           email: user.email,
           nickname: user.email?.split("@")[0] || "User",
           plan: "free",
-          credits_balance: 30,
+          credits_balance: DEFAULT_TRIAL_CREDITS,
           credits_unlimited: false,
         })
         .select("plan, credits_balance, credits_unlimited, trial_granted_at")

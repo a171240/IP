@@ -173,7 +173,7 @@ BEGIN
 
   -- Decide grant
   IF device_claimed AND ip_count < 3 THEN
-    grant_amount := 30;
+    grant_amount := 20;
     source := 'trial_full';
   ELSIF NOT device_claimed THEN
     grant_amount := 0;

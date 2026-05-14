@@ -3,6 +3,7 @@
 import { z } from "zod"
 
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
+import { DEFAULT_TRIAL_CREDITS } from "@/lib/pricing/constants"
 
 export const runtime = "nodejs"
 
@@ -39,7 +40,7 @@ async function ensureProfileRowExists(
     nickname: (user.user_metadata as Record<string, unknown> | null)?.nickname || user.email?.split("@")[0] || "User",
     avatar_url: (user.user_metadata as Record<string, unknown> | null)?.avatar_url || null,
     plan: "free",
-    credits_balance: 30,
+    credits_balance: DEFAULT_TRIAL_CREDITS,
     credits_unlimited: false,
   })
 }

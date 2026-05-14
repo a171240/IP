@@ -49,11 +49,11 @@ export function getWechatpayProduct(productId: string | null | undefined): Wecha
 
     return {
       id,
-      name: "Test 0.01",
+      name: "测试服务包",
       plan: normalizePlan("free"),
       amount_total: priceCentsFor(id),
       currency: "CNY",
-      description: "Virtual payment test product",
+      description: "虚拟支付测试商品",
       credits_grant: envInt("WECHAT_VIRTUAL_PAY_TEST_CREDITS") ?? 1,
     }
   }
@@ -61,22 +61,22 @@ export function getWechatpayProduct(productId: string | null | undefined): Wecha
   if (id === "basic_month") {
     return {
       id,
-      name: "Plus",
+      name: "基础服务包",
       plan: normalizePlan("basic"),
       amount_total: priceCentsFor(id),
       currency: "CNY",
-      description: "Plus 会员购买",
+      description: "适合单店日常海报、发文和训练复盘",
       credits_grant: 300,
     }
   }
 
   return {
     id,
-    name: "Pro",
+    name: "专业服务包",
     plan: normalizePlan("pro"),
     amount_total: priceCentsFor(id),
     currency: "CNY",
-    description: "Pro 会员购买",
+    description: "适合高频内容生产和多员工训练复盘",
     credits_grant: 1200,
   }
 }

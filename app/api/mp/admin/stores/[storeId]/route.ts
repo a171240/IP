@@ -141,6 +141,8 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ s
           company_name: company.name,
           store_id: null,
           store_name: null,
+          credits_unlimited: true,
+          service_plan_label: "门店不限量服务包",
         }
       : {
           account_role: ownerRole,
@@ -148,6 +150,8 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ s
           company_name: company.name,
           store_id: nextStore.id,
           store_name: nextStore.name,
+          credits_unlimited: true,
+          service_plan_label: "门店不限量服务包",
         }
     if (servicePlanLabel) profileUpdate.service_plan_label = servicePlanLabel
 

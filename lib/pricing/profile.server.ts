@@ -4,6 +4,7 @@ import type { User } from "@supabase/supabase-js"
 import { createHash } from "crypto"
 import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { DEFAULT_TRIAL_CREDITS } from "@/lib/pricing/constants"
 import { normalizePlan, type PlanId } from "@/lib/pricing/rules"
 
 export type BillingProfile = {
@@ -81,7 +82,7 @@ export async function getOrCreateBillingProfile(opts: { user: User }) {
         email: user.email,
         nickname: user.email?.split("@")[0] || "User",
         plan: "free",
-        credits_balance: 30,
+        credits_balance: DEFAULT_TRIAL_CREDITS,
         credits_unlimited: false,
       })
       .select("plan, credits_balance, credits_unlimited, trial_granted_at")

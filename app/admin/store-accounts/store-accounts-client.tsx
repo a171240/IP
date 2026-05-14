@@ -45,6 +45,7 @@ type StoreRow = {
   created_at: string | null
   owner_count: number
   owner_names: string[]
+  service_package_label: string
   staff_count: number
   member_count: number
   session_count: number
@@ -316,7 +317,7 @@ export default function StoreAccountsClient() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="text-sm text-zinc-400">
-          第一阶段只做开通与绑定。AI 点数仍按个人扣费，这里先按门店统计消耗。
+          这里负责开通客户和门店。负责人绑定并开通后，门店服务包暂按不限量处理；员工加入后直接使用门店服务包。
         </div>
         <button
           type="button"
@@ -445,7 +446,7 @@ export default function StoreAccountsClient() {
                     <td className="px-5 py-4">
                       <div className="text-zinc-200">{store.member_count} 人 · {store.session_count} 次</div>
                       <div className="mt-1 text-xs text-zinc-500">
-                        {formatSeconds(store.practice_seconds)} · {store.avg_score == null ? "暂无均分" : `${store.avg_score} 分`} · {store.ai_points_spent} 点
+                        {formatSeconds(store.practice_seconds)} · {store.avg_score == null ? "暂无均分" : `${store.avg_score} 分`} · {store.service_package_label}
                       </div>
                     </td>
                     <td className="px-5 py-4">

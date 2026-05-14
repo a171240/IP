@@ -225,6 +225,7 @@ async function listStoreAccounts() {
     const latestInvite = (invitesByStore.get(String(store.id)) || [])[0] || null
     const latestInviteStatus = inviteStatus(latestInvite)
     const stat = analyticsStoreMap.get(String(store.id))
+    const hasUnlimitedOwner = owners.some((owner) => Boolean(profileMap.get(String(owner.user_id))?.credits_unlimited))
 
     return {
       id: store.id,
@@ -235,6 +236,7 @@ async function listStoreAccounts() {
       created_at: store.created_at || null,
       owner_count: owners.length,
       owner_names: owners.map((owner) => profileLabel(profileMap.get(String(owner.user_id)), owner.user_id)).slice(0, 3),
+      service_package_label: hasUnlimitedOwner ? "服务包不限量" : owners.length ? "待开通服务包" : "待负责人绑定",
       staff_count: staff.length,
       member_count: storeMemberships.length,
       session_count: Number(stat?.session_count || 0),

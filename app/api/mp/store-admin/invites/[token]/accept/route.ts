@@ -146,6 +146,7 @@ export async function POST(
     membership = inserted
   }
 
+  const isStoreOwnerRole = invite.role === "store_admin" || invite.role === "store_owner"
   await admin
     .from("profiles")
     .update({
@@ -154,6 +155,12 @@ export async function POST(
       company_name: company.name,
       store_id: store?.id || null,
       store_name: store?.name || null,
+      ...(isStoreOwnerRole
+        ? {
+            credits_unlimited: true,
+            service_plan_label: "门店不限量服务包",
+          }
+        : {}),
     })
     .eq("id", user.id)
 
