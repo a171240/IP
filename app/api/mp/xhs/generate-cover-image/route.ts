@@ -7,7 +7,11 @@ import {
   setMpAiPointHeaders,
   type MpAiBillingContext,
 } from "@/lib/mp/ai-points.server"
-import { generateGptImage2 } from "@/lib/posters/gpt-image-2.server"
+import {
+  generateGptImage2,
+  imageGenerationErrorStatus,
+  publicImageGenerationErrorMessage,
+} from "@/lib/posters/gpt-image-2.server"
 import { trackServerEvent } from "@/lib/xhs/proxy.server"
 import { downloadAsset, getXhsAssetsBucket, uploadDataUrlAsset, uploadRemoteAsset } from "@/lib/xhs/assets.server"
 import {
@@ -512,6 +516,7 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error || "image_failed")
+    const publicMessage = publicImageGenerationErrorMessage(error)
     await trackServerEvent({
       request,
       event: "mp_xhs_cover_gpt_image_fail",
@@ -520,8 +525,8 @@ export async function POST(request: NextRequest) {
 
     await refundCharge("xhs_cover_gpt_image_failed", message)
     return NextResponse.json(
-      { success: false, ok: false, error: `封面生图失败：${message.slice(0, 240)}` },
-      { status: 502 }
+      { success: false, ok: false, error: publicMessage },
+      { status: imageGenerationErrorStatus(error) }
     )
   }
 

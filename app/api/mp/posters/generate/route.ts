@@ -3,7 +3,11 @@ import { randomUUID } from "crypto"
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 
-import { generateGptImage2 } from "@/lib/posters/gpt-image-2.server"
+import {
+  generateGptImage2,
+  imageGenerationErrorStatus,
+  publicImageGenerationErrorMessage,
+} from "@/lib/posters/gpt-image-2.server"
 import {
   buildFreeImagePrompt,
   getDefaultPosterNegativePrompt,
@@ -345,6 +349,7 @@ export async function POST(request: NextRequest) {
     return res
   } catch (error) {
     const message = error instanceof Error ? error.message : "poster_generate_failed"
+    const publicMessage = publicImageGenerationErrorMessage(error)
     if (charged?.ok && charged.cost > 0 && !charged.unlimited) {
       try {
         await refundMpAiPoints({
@@ -362,6 +367,6 @@ export async function POST(request: NextRequest) {
       event: "poster_generate_fail",
       props: { source: "mp", mode: input.mode, templateId, error: message.slice(0, 200) },
     })
-    return NextResponse.json({ ok: false, error: message }, { status: message === "image_task_timeout" ? 504 : 502 })
+    return NextResponse.json({ ok: false, error: publicMessage }, { status: imageGenerationErrorStatus(error) })
   }
 }

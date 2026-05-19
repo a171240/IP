@@ -4,27 +4,19 @@ import { NextRequest } from "next/server"
 
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
+import { resolveMpAiBillingContext } from "@/lib/mp/ai-points.server"
 import {
   PLAN_LABELS,
   getCrossLevelMultiplier,
   isPlanSufficient,
-  normalizePlan,
   type PlanId,
 } from "@/lib/pricing/rules"
 import {
   consumeCredits,
   ensureTrialCreditsIfNeeded,
   getClientIp,
-  hashIp,
   type BillingProfile,
 } from "@/lib/pricing/profile.server"
-
-type ProfileRow = {
-  plan?: string | null
-  credits_balance?: number | null
-  credits_unlimited?: boolean | null
-  trial_granted_at?: string | null
-}
 
 export type BillingContext = {
   supabase: Awaited<ReturnType<typeof createServerSupabaseClientForRequest>>
@@ -36,6 +28,9 @@ export type BillingContext = {
   trial_granted_at: string | null
   deviceId: string
   ipHash: string | null
+  billing_user_id?: string | null
+  billing_owner_label?: string | null
+  billing_scope?: string | null
 }
 
 export function getXhsUpstreamBaseUrl(): string {
@@ -53,87 +48,26 @@ export async function resolveBillingContext(request: NextRequest): Promise<
   | { ok: true; ctx: BillingContext }
   | { ok: false; error: Response }
 > {
-  const supabase = await createServerSupabaseClientForRequest(request)
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const billing = await resolveMpAiBillingContext(request)
+  if (!billing.ok) return billing
 
-  if (!user) {
-    return {
-      ok: false,
-      error: new Response(JSON.stringify({ error: "请先登录" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      }),
-    }
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("plan, credits_balance, credits_unlimited, trial_granted_at")
-    .eq("id", user.id)
-    .single()
-
-  let resolvedProfile: ProfileRow | null = profile as ProfileRow | null
-
-  if (profileError || !resolvedProfile) {
-    if (profileError?.code === "PGRST116") {
-      const { data: created, error: createError } = await supabase
-        .from("profiles")
-        .insert({
-          id: user.id,
-          email: user.email,
-          nickname: user.email?.split("@")[0] || "User",
-          plan: "free",
-          credits_balance: 30,
-          credits_unlimited: false,
-        })
-        .select("plan, credits_balance, credits_unlimited, trial_granted_at")
-        .single()
-
-      if (createError || !created) {
-        return {
-          ok: false,
-          error: new Response(JSON.stringify({ error: createError?.message || "profile create failed" }), {
-            status: 500,
-            headers: { "Content-Type": "application/json" },
-          }),
-        }
-      }
-
-      resolvedProfile = created as ProfileRow
-    } else {
-      return {
-        ok: false,
-        error: new Response(JSON.stringify({ error: profileError?.message || "profile not found" }), {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        }),
-      }
-    }
-  }
-
-  const plan = normalizePlan(resolvedProfile.plan)
-  const credits_balance = Number(resolvedProfile.credits_balance || 0)
-  const credits_unlimited = Boolean(resolvedProfile.credits_unlimited) || plan === "vip"
-  const trial_granted_at = (resolvedProfile.trial_granted_at as string | null) ?? null
-
-  const deviceId = request.headers.get("x-device-id") || ""
-  const ip = getClientIp(request)
-  const ipHash = ip ? hashIp(ip) : null
+  const ctx = billing.ctx
 
   return {
     ok: true,
     ctx: {
-      supabase,
-      userId: user.id,
-      userEmail: user.email ?? null,
-      plan,
-      credits_balance,
-      credits_unlimited,
-      trial_granted_at,
-      deviceId,
-      ipHash,
+      supabase: ctx.supabase,
+      userId: ctx.userId,
+      userEmail: ctx.userEmail,
+      plan: ctx.plan,
+      credits_balance: ctx.credits_balance,
+      credits_unlimited: ctx.credits_unlimited,
+      trial_granted_at: ctx.trial_granted_at,
+      deviceId: ctx.deviceId,
+      ipHash: ctx.ipHash,
+      billing_user_id: ctx.billing_user_id ?? null,
+      billing_owner_label: ctx.billing_owner_label ?? null,
+      billing_scope: ctx.billing_scope ?? null,
     },
   }
 }
@@ -187,6 +121,7 @@ export async function chargeCredits(opts: {
     credits_unlimited: ctx.credits_unlimited,
     trial_granted_at: ctx.trial_granted_at,
   }
+  const billingUserId = ctx.billing_user_id || ctx.userId
 
   // First-time trial grant (device + IP throttling), matching the web logic.
   if (!currentProfile.credits_unlimited && !currentProfile.trial_granted_at && currentProfile.credits_balance <= 0) {
@@ -202,7 +137,7 @@ export async function chargeCredits(opts: {
 
     currentProfile = await ensureTrialCreditsIfNeeded({
       supabase: ctx.supabase,
-      userId: ctx.userId,
+      userId: billingUserId,
       profile: currentProfile,
       deviceId: ctx.deviceId,
       ipHash: ctx.ipHash,
@@ -212,7 +147,7 @@ export async function chargeCredits(opts: {
   try {
     const consumed = await consumeCredits({
       supabase: ctx.supabase,
-      userId: ctx.userId,
+      userId: billingUserId,
       currentBalance: currentProfile.credits_balance,
       amount: cost,
       stepId,
