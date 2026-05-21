@@ -3,6 +3,7 @@
 import { z } from "zod"
 
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
+import { xhsCoverUrl } from "@/lib/xhs/cover-url"
 
 export const runtime = "nodejs"
 
@@ -72,7 +73,7 @@ export async function GET(request: NextRequest) {
   }
 
   const drafts = (data || []).map((row) => {
-    const coverUrl = row.cover_storage_path ? `/api/mp/xhs/covers/${row.id}` : null
+    const coverUrl = row.cover_storage_path ? xhsCoverUrl(row.id, row.cover_storage_path, row.updated_at) : null
     const qrUrl = row.publish_qr_url || row.publish_qr_storage_path ? `/api/mp/xhs/qrs/${row.id}` : null
     return { ...row, cover_url: coverUrl, qr_url: qrUrl }
   })

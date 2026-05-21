@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 import { extractTopicsFromText } from "@/lib/workflow/topic-extract"
+import { xhsCoverUrl } from "@/lib/xhs/cover-url"
 
 export const runtime = "nodejs"
 
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
     supabase
       .from("xhs_drafts")
       .select(
-        "id, created_at, status, result_title, danger_risk_level, cover_storage_path, publish_qr_url, publish_qr_storage_path, publish_url, published_at"
+        "id, created_at, updated_at, status, result_title, danger_risk_level, cover_storage_path, publish_qr_url, publish_qr_storage_path, publish_url, published_at"
       )
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
@@ -111,7 +112,7 @@ export async function GET(request: NextRequest) {
 
   const xhs_drafts = (draftsRes.data || []).map((d) => ({
     ...d,
-    cover_url: d.cover_storage_path ? `/api/mp/xhs/covers/${d.id}` : null,
+    cover_url: d.cover_storage_path ? xhsCoverUrl(d.id, d.cover_storage_path, d.updated_at) : null,
     qr_url: d.publish_qr_url || d.publish_qr_storage_path ? `/api/mp/xhs/qrs/${d.id}` : null,
   }))
 

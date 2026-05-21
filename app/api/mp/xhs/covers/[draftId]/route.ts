@@ -37,7 +37,9 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       status: 200,
       headers: {
         "Content-Type": contentType,
-        "Cache-Control": "public, max-age=300",
+        "Cache-Control": "no-store",
+        Pragma: "no-cache",
+        Expires: "0",
       },
     })
   } catch {

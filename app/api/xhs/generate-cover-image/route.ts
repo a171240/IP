@@ -4,6 +4,7 @@ import { generateGptImage2 } from "@/lib/posters/gpt-image-2.server"
 import type { BillingContext } from "@/lib/xhs/proxy.server"
 import { buildXhsUpstreamUrl, chargeCredits, resolveBillingContext, trackServerEvent } from "@/lib/xhs/proxy.server"
 import { uploadDataUrlAsset, uploadRemoteAsset } from "@/lib/xhs/assets.server"
+import { xhsCoverUrl, xhsCoverVersion } from "@/lib/xhs/cover-url"
 import {
   buildBeautyContext,
   normalizeCoverAsset,
@@ -381,6 +382,9 @@ export async function POST(request: NextRequest) {
         negativePrompt,
         model: generated.model,
         source: generated.model,
+        coverStyleId: coverAsset.styleId || null,
+        coverStyleLabel: coverAsset.styleLabel || null,
+        coverStyleReason: coverAsset.styleReason || null,
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error || "image_failed")
@@ -450,7 +454,7 @@ export async function POST(request: NextRequest) {
           })
 
       const now = new Date().toISOString()
-      await billing.ctx.supabase
+      const { data: updatedDraft, error: updateError } = await billing.ctx.supabase
         .from("xhs_drafts")
         .update({
           cover_storage_path: uploaded.path,
@@ -464,10 +468,20 @@ export async function POST(request: NextRequest) {
         })
         .eq("id", draftId)
         .eq("user_id", billing.ctx.userId)
+        .select("id")
+        .maybeSingle()
+
+      if (updateError || !updatedDraft?.id) {
+        throw new Error(updateError?.message || "cover_update_failed")
+      }
 
       // Replace the huge base64 with a single-domain URL.
-      json.imageUrl = `/api/mp/xhs/covers/${draftId}`
+      json.coverStyleId = json.coverStyleId || coverAsset.styleId || null
+      json.coverStyleLabel = json.coverStyleLabel || coverAsset.styleLabel || null
+      json.coverStyleReason = json.coverStyleReason || coverAsset.styleReason || null
+      json.imageUrl = xhsCoverUrl(draftId, uploaded.path, now)
       json.imageBase64 = null
+      json.coverVersion = xhsCoverVersion(uploaded.path, now)
     }
   } catch {
     // best-effort only
