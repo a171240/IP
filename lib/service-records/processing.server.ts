@@ -12,6 +12,243 @@ type ProcessOptions = {
   pollLimit?: number
 }
 
+type DeepSeekMessage = {
+  role: "system" | "user"
+  content: string
+}
+
+function envText(...names: string[]) {
+  for (const name of names) {
+    const value = cleanText(process.env[name], 1000)
+    if (value && value !== "your-api-key-here") return value
+  }
+  return ""
+}
+
+function envNumber(name: string, fallback: number, min: number, max: number) {
+  const n = Number(process.env[name] || fallback)
+  if (!Number.isFinite(n)) return fallback
+  return Math.max(min, Math.min(max, Math.round(n)))
+}
+
+function timestampMs(value: unknown) {
+  const text = cleanText(value, 80)
+  if (!text) return 0
+  const time = Date.parse(text)
+  return Number.isFinite(time) ? time : 0
+}
+
+function getServiceRecordDeepSeekKey() {
+  return envText("SERVICE_RECORD_DEEPSEEK_API_KEY", "DEEPSEEK_API_KEY")
+}
+
+function getServiceRecordDeepSeekBaseUrl() {
+  return envText("SERVICE_RECORD_DEEPSEEK_BASE_URL", "DEEPSEEK_BASE_URL") || "https://api.deepseek.com"
+}
+
+function getServiceRecordDeepSeekModel() {
+  return envText("SERVICE_RECORD_DEEPSEEK_MODEL", "DEEPSEEK_MODEL") || "deepseek-v4-flash"
+}
+
+function deepSeekChatCompletionsUrl() {
+  const baseUrl = getServiceRecordDeepSeekBaseUrl().replace(/\/$/, "")
+  return baseUrl.endsWith("/chat/completions") ? baseUrl : `${baseUrl}/chat/completions`
+}
+
+function compactTranscriptForPrompt(text: string) {
+  const limit = envNumber("SERVICE_RECORD_DEEPSEEK_TRANSCRIPT_CHARS", 18000, 2000, 80000)
+  if (text.length <= limit) return text
+  const head = Math.floor(limit * 0.6)
+  const tail = limit - head
+  return `${text.slice(0, head)}\n\n[中间转写过长，已截断]\n\n${text.slice(-tail)}`
+}
+
+function extractJsonObject(content: string) {
+  const trimmed = String(content || "")
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim()
+  const start = trimmed.indexOf("{")
+  const end = trimmed.lastIndexOf("}")
+  if (start === -1 || end === -1 || end <= start) throw new Error("deepseek_json_missing")
+  return JSON.parse(trimmed.slice(start, end + 1))
+}
+
+function listFrom(value: unknown, fallback: string[] = [], max = 8) {
+  const items = Array.isArray(value)
+    ? value.map((item) => cleanText(item, 140)).filter(Boolean)
+    : []
+  return items.length ? items.slice(0, max) : fallback
+}
+
+function recordFrom(value: unknown) {
+  return isRecord(value) ? value : {}
+}
+
+function buildDeepSeekMessages(session: any, segments: any[], markers: any[], counts: ReturnType<typeof statusCounts>): DeepSeekMessage[] {
+  const transcript = compactTranscriptForPrompt(transcriptTextOf(segments))
+  const customerName = snapshotName(session.customer_snapshot_json, "本位顾客")
+  const projectName = snapshotName(session.scene_snapshot_json, "未命名项目")
+  const markerText = markers.length
+    ? markers.map((marker) => `- ${formatDuration(marker.offset_seconds)} ${markerLabel(marker)}`).join("\n")
+    : "无"
+  const segmentText = segments
+    .map((segment) => `- 片段 ${segment.segment_index || "-"}: ${cleanText(segment.asr_status, 40) || "pending"}`)
+    .join("\n")
+
+  const system = [
+    "你是美业门店的到店服务复盘助手，专门把服务录音转写整理成店员可执行的复盘结果。",
+    "只输出严格 json object，不要输出 Markdown，不要解释，不要包裹代码块。",
+    "json 字段必须符合这个结构：",
+    "{",
+    '  "employee_feedback": {',
+    '    "summary": "一句话说明本轮服务结论",',
+    '    "customer_concerns": ["顾客真实顾虑"],',
+    '    "staff_highlights": ["员工做得好的地方"],',
+    '    "next_follow_up": "下次跟进动作",',
+    '    "coaching_tip": "一句话话术建议"',
+    "  },",
+    '  "manager_review": {',
+    '    "conversation_summary": "店长视角复盘",',
+    '    "deal_signals": ["成交信号"],',
+    '    "professional_questions": ["专业问题"],',
+    '    "manager_intervention": ["店长介入点"],',
+    '    "staff_improvement": ["员工改进建议"],',
+    '    "training_topics": ["后续训练主题"]',
+    "  },",
+    '  "operations": {',
+    '    "customer_profile_suggestions": ["顾客档案补充建议"],',
+    '    "knowledge_base_candidates": ["可沉淀到门店知识库的内容"],',
+    '    "xhs_material_candidates": ["可匿名化做内容素材的角度"],',
+    '    "quality_warnings": ["录音或识别质量提醒"]',
+    "  }",
+    "}",
+    "要求：内容必须基于转写和标记；不要编造医疗疗效、价格承诺或不存在的顾客信息；每个数组最多 5 条。",
+  ].join("\n")
+
+  const user = [
+    `顾客：${customerName}`,
+    `项目：${projectName}`,
+    `服务目标：${cleanText(session.objective, 300) || "到店服务沟通记录"}`,
+    `录音时长：${formatDuration(session.audio_seconds)}`,
+    `ASR 片段状态：${JSON.stringify(counts)}`,
+    "片段列表：",
+    segmentText || "无",
+    "人工标记：",
+    markerText,
+    "转写内容：",
+    transcript || "当前没有可用转写，请只基于人工标记和服务上下文给出谨慎复盘。",
+  ].join("\n\n")
+
+  return [
+    { role: "system", content: system },
+    { role: "user", content: user },
+  ]
+}
+
+function normalizeDeepSeekResult(value: unknown, fallbackEmployee: any, fallbackManager: any, fallbackOperations: any) {
+  const root = recordFrom(value)
+  const employee = recordFrom(root.employee_feedback)
+  const manager = recordFrom(root.manager_review)
+  const operations = recordFrom(root.operations)
+
+  return {
+    employee_feedback: {
+      summary: cleanText(employee.summary, 500) || fallbackEmployee.summary,
+      customer_concerns: listFrom(employee.customer_concerns, fallbackEmployee.customer_concerns),
+      staff_highlights: listFrom(employee.staff_highlights, fallbackEmployee.staff_highlights),
+      next_follow_up: cleanText(employee.next_follow_up, 500) || fallbackEmployee.next_follow_up,
+      coaching_tip: cleanText(employee.coaching_tip, 500) || fallbackEmployee.coaching_tip,
+    },
+    manager_review: {
+      conversation_summary: cleanText(manager.conversation_summary, 600) || fallbackManager.conversation_summary,
+      deal_signals: listFrom(manager.deal_signals, fallbackManager.deal_signals),
+      professional_questions: listFrom(manager.professional_questions, fallbackManager.professional_questions),
+      manager_intervention: listFrom(manager.manager_intervention, fallbackManager.manager_intervention),
+      staff_improvement: listFrom(manager.staff_improvement, fallbackManager.staff_improvement),
+      training_topics: listFrom(manager.training_topics, fallbackManager.training_topics),
+    },
+    operations: {
+      customer_profile_suggestions: listFrom(
+        operations.customer_profile_suggestions,
+        fallbackOperations.customer_profile_suggestions,
+      ),
+      knowledge_base_candidates: listFrom(operations.knowledge_base_candidates, fallbackOperations.knowledge_base_candidates),
+      xhs_material_candidates: listFrom(operations.xhs_material_candidates, fallbackOperations.xhs_material_candidates),
+      quality_warnings: listFrom(operations.quality_warnings, fallbackOperations.quality_warnings),
+    },
+  }
+}
+
+async function generateDeepSeekServiceRecordResult(
+  session: any,
+  segments: any[],
+  markers: any[],
+  counts: ReturnType<typeof statusCounts>,
+  fallbackEmployee: any,
+  fallbackManager: any,
+  fallbackOperations: any,
+) {
+  const apiKey = getServiceRecordDeepSeekKey()
+  if (!apiKey) return null
+
+  const model = getServiceRecordDeepSeekModel()
+  const timeoutMs = envNumber("SERVICE_RECORD_DEEPSEEK_TIMEOUT_MS", 15000, 3000, 60000)
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+
+  try {
+    const res = await fetch(deepSeekChatCompletionsUrl(), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: buildDeepSeekMessages(session, segments, markers, counts),
+        response_format: { type: "json_object" },
+        temperature: 0.2,
+        max_tokens: envNumber("SERVICE_RECORD_DEEPSEEK_MAX_TOKENS", 1800, 800, 6000),
+        stream: false,
+      }),
+      signal: controller.signal,
+    })
+
+    const json = (await res.json().catch(() => null)) as any
+    if (!res.ok) {
+      const message = cleanText(json?.error?.message || json?.error || json?.message, 300) || `deepseek_http_${res.status}`
+      throw new Error(message)
+    }
+
+    const content = cleanText(json?.choices?.[0]?.message?.content, 50000)
+    const parsed = extractJsonObject(content)
+    return {
+      ...normalizeDeepSeekResult(parsed, fallbackEmployee, fallbackManager, fallbackOperations),
+      meta: {
+        provider: "deepseek",
+        model,
+        used: true,
+      },
+    }
+  } catch (error: any) {
+    return {
+      employee_feedback: fallbackEmployee,
+      manager_review: fallbackManager,
+      operations: fallbackOperations,
+      meta: {
+        provider: "deepseek",
+        model,
+        used: false,
+        error: cleanText(error?.name === "AbortError" ? "deepseek_timeout" : error?.message || "deepseek_failed", 300),
+      },
+    }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 function taskIdOf(segment: any) {
   const asrJson = isRecord(segment?.asr_json) ? segment.asr_json : {}
   return cleanText(asrJson.task_id, 160)
@@ -200,7 +437,24 @@ export function buildServiceRecordNoteMarkdown(session: any, segments: any[], ma
 }
 
 async function submitPendingSegmentAsr(admin: any, segment: any) {
-  if (!isBailianAsrConfigured()) return segment
+  if (!isBailianAsrConfigured()) {
+    const { data } = await admin
+      .from("service_record_segments")
+      .update({
+        asr_status: "failed",
+        asr_json: {
+          ...(isRecord(segment.asr_json) ? segment.asr_json : {}),
+          provider: "bailian",
+          error: "bailian_api_key_missing",
+          failed_at: new Date().toISOString(),
+        },
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", segment.id)
+      .select("*")
+      .maybeSingle()
+    return data || segment
+  }
   if (taskIdOf(segment)) return segment
 
   const storagePath = cleanText(segment.storage_path, 2000)
@@ -267,6 +521,8 @@ async function submitPendingSegmentAsr(admin: any, segment: any) {
 
 export async function pollServiceRecordAsrSegments(admin: any, sessionId: string, opts: ProcessOptions = {}) {
   const pollLimit = Math.max(1, Math.min(100, Number(opts.pollLimit || 50)))
+  const maxWaitMs = envNumber("SERVICE_RECORD_ASR_MAX_WAIT_MS", 30 * 60 * 1000, 60 * 1000, 12 * 60 * 60 * 1000)
+  const nowMs = Date.now()
   const { data: candidates, error } = await admin
     .from("service_record_segments")
     .select("*")
@@ -285,6 +541,52 @@ export async function pollServiceRecordAsrSegments(admin: any, sessionId: string
     }
 
     const taskId = taskIdOf(segment)
+    const asrJson = isRecord(segment.asr_json) ? segment.asr_json : {}
+    if (!isBailianAsrConfigured()) {
+      const { data } = await admin
+        .from("service_record_segments")
+        .update({
+          asr_status: "failed",
+          asr_json: {
+            ...asrJson,
+            provider: cleanText(asrJson.provider, 40) || "bailian",
+            task_id: taskId || null,
+            error: "bailian_api_key_missing",
+            failed_at: new Date().toISOString(),
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", segment.id)
+        .select("*")
+        .maybeSingle()
+      if (data) updated.push(data)
+      continue
+    }
+    const waitStartedAt =
+      timestampMs(asrJson.submitted_at) ||
+      timestampMs(segment.uploaded_at) ||
+      timestampMs(segment.updated_at) ||
+      0
+    if (waitStartedAt && nowMs - waitStartedAt > maxWaitMs) {
+      const { data } = await admin
+        .from("service_record_segments")
+        .update({
+          asr_status: "failed",
+          asr_json: {
+            ...asrJson,
+            provider: cleanText(asrJson.provider, 40) || "bailian",
+            task_id: taskId || null,
+            error: "asr_timeout",
+            failed_at: new Date().toISOString(),
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", segment.id)
+        .select("*")
+        .maybeSingle()
+      if (data) updated.push(data)
+      continue
+    }
     if (!taskId || !isBailianAsrConfigured()) continue
 
     try {
@@ -363,15 +665,49 @@ export async function processServiceRecordSession(admin: any, session: any, opts
   const hasOpenAsr = counts.pending > 0 || counts.running > 0
   const nextStatus = hasOpenAsr ? "processing" : "completed"
   const now = new Date().toISOString()
-  const employeeFeedback = buildEmployeeFeedback(session, segments, markers, counts)
-  const managerReview = buildManagerReview(markers, counts)
-  const operations = buildOperations(session, counts)
+  const fallbackEmployeeFeedback = buildEmployeeFeedback(session, segments, markers, counts)
+  const fallbackManagerReview = buildManagerReview(markers, counts)
+  const fallbackOperations = buildOperations(session, counts)
+  let employeeFeedback = fallbackEmployeeFeedback
+  let managerReview = fallbackManagerReview
+  let operations = fallbackOperations
+  let llm = {
+    provider: getServiceRecordDeepSeekKey() ? "deepseek" : "local",
+    model: getServiceRecordDeepSeekKey() ? getServiceRecordDeepSeekModel() : "",
+    used: false,
+    reason: hasOpenAsr ? "asr_still_open" : "deepseek_api_key_missing",
+  }
+
+  if (!hasOpenAsr && (transcriptTextOf(segments) || markers.length) && getServiceRecordDeepSeekKey()) {
+    const deepSeekResult = await generateDeepSeekServiceRecordResult(
+      session,
+      segments,
+      markers,
+      counts,
+      fallbackEmployeeFeedback,
+      fallbackManagerReview,
+      fallbackOperations,
+    )
+    if (deepSeekResult) {
+      employeeFeedback = deepSeekResult.employee_feedback
+      managerReview = deepSeekResult.manager_review
+      operations = deepSeekResult.operations
+      llm = {
+        provider: deepSeekResult.meta.provider,
+        model: deepSeekResult.meta.model,
+        used: deepSeekResult.meta.used,
+        reason: deepSeekResult.meta.error || (deepSeekResult.meta.used ? "deepseek_completed" : "deepseek_fallback"),
+      }
+    }
+  }
+
   const noteMarkdown = buildServiceRecordNoteMarkdown(session, segments, markers, employeeFeedback)
   const resultJson = {
-    source: "service_record_processing_v1",
+    source: llm.used ? "service_record_deepseek_v1" : "service_record_processing_v1",
     generated_at: now,
     status: nextStatus,
     asr: counts,
+    llm,
     marker_count: markers.length,
     has_note: Boolean(noteMarkdown),
     employee_feedback: employeeFeedback,

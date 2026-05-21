@@ -42,7 +42,23 @@ async function refreshSessionAggregate(admin: any, sessionId: string) {
 }
 
 async function submitSegmentAsr(admin: any, segment: any) {
-  if (!isBailianAsrConfigured()) return segment
+  if (!isBailianAsrConfigured()) {
+    const { data } = await admin
+      .from("service_record_segments")
+      .update({
+        asr_status: "failed",
+        asr_json: {
+          provider: "bailian",
+          error: "bailian_api_key_missing",
+          failed_at: new Date().toISOString(),
+        },
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", segment.id)
+      .select("*")
+      .maybeSingle()
+    return data || segment
+  }
 
   try {
     const audioUrl = await createSignedAudioUrlForBailian(segment.storage_path)
