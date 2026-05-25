@@ -53,6 +53,18 @@ export const voiceCoachSessionCreateSchema = z.object({
   customer_profile_id: z.string().uuid().optional().nullable(),
   scene_card_id: z.string().uuid().optional().nullable(),
   live_notes: z.string().trim().max(500).optional().nullable(),
+  training_task_id: z.string().trim().min(1).max(80).optional().nullable(),
+  training_pack_id: z.string().trim().min(1).max(80).optional().nullable(),
+  training_brand_code: z.string().trim().min(1).max(40).optional().nullable(),
+  training_context: z
+    .object({
+      brand_code: z.string().trim().min(1).max(40).optional().nullable(),
+      pack_id: z.string().trim().min(1).max(80).optional().nullable(),
+      task_id: z.string().trim().min(1).max(80).optional().nullable(),
+    })
+    .passthrough()
+    .optional()
+    .nullable(),
   followup_context: z
     .object({
       source_session_id: z.string().uuid(),
@@ -177,6 +189,20 @@ function boundedText(value: unknown, max = 300): string {
 
 function numberOrNull(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null
+}
+
+function normalizeTrainingTaskClientContext(input: unknown) {
+  const data = input && typeof input === "object" ? (input as Record<string, unknown>) : null
+  if (!data) return null
+  const taskId = boundedText(data.task_id || data.taskId, 80)
+  if (!taskId) return null
+  return {
+    brand_code: boundedText(data.brand_code || data.brandCode, 40),
+    pack_id: boundedText(data.pack_id || data.packId, 80),
+    task_id: taskId,
+    title: boundedText(data.title, 80),
+    day_index: numberOrNull(data.day_index || data.dayIndex),
+  }
 }
 
 function normalizeFollowupReferenceTurn(input: unknown): VoiceCoachFollowupReferenceTurn | null {
@@ -644,12 +670,17 @@ export function getVoiceCoachSessionClientContext(args: {
     args.sessionContext && typeof args.sessionContext === "object"
       ? normalizeVoiceCoachFollowupContext((args.sessionContext as { followup_context?: unknown }).followup_context || null)
       : null
+  const trainingTaskFromContext =
+    args.sessionContext && typeof args.sessionContext === "object"
+      ? normalizeTrainingTaskClientContext((args.sessionContext as { training_task?: unknown }).training_task || null)
+      : null
 
   return {
     customer_profile_id: args.customerProfileId || "",
     scene_card_id: args.sceneCardId || "",
     live_notes: liveNotesFromSnapshot || liveNotesFromContext,
     followup_context: normalizeVoiceCoachFollowupContext(snapshotObject?.followup_context || null) || followupFromContext,
+    training_task: trainingTaskFromContext,
     customer_name: String(snapshotObject?.display?.customer_name || "").trim(),
     customer_summary: String(snapshotObject?.display?.customer_summary || "").trim(),
     scene_name: String(snapshotObject?.display?.scene_name || "").trim(),

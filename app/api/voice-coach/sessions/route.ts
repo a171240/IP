@@ -18,6 +18,13 @@ import { doubaoTts, type DoubaoTtsEmotion } from "@/lib/voice-coach/speech/douba
 import { signVoiceCoachAudio, uploadVoiceCoachAudio } from "@/lib/voice-coach/storage.server"
 import { normalizeScenarioTag } from "@/lib/voice-coach/tag-utils"
 import { resolveMpAccountContextForUser } from "@/lib/mp/account-context.server"
+import {
+  buildBaibaituTaskLiveNotes,
+  findBaibaituTrainingTask,
+  linkBaibaituVoiceSession,
+  resolveBaibaituTrainingAccess,
+} from "@/lib/voice-training/baibaitu.server"
+import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
@@ -535,7 +542,39 @@ export async function POST(request: NextRequest) {
       userMetadata: (user.user_metadata || {}) as Record<string, unknown>,
     }).catch(() => null)
 
-    const liveNotes = String(parsed.data.live_notes || "").trim()
+    const trainingTaskId = cleanText(
+      parsed.data.training_context?.task_id || parsed.data.training_task_id,
+      80,
+    )
+    const trainingPackId = cleanText(
+      parsed.data.training_context?.pack_id || parsed.data.training_pack_id,
+      80,
+    )
+    const trainingBrandCode = cleanText(
+      parsed.data.training_context?.brand_code || parsed.data.training_brand_code,
+      40,
+    )
+    const baibaituTrainingTask = trainingTaskId ? findBaibaituTrainingTask(trainingTaskId) : null
+    let liveNotes = String(parsed.data.live_notes || "").trim()
+    let baibaituTrainingAllowed = false
+
+    if (trainingTaskId) {
+      if (!baibaituTrainingTask) return jsonError(400, "training_task_not_found")
+      if (trainingBrandCode && trainingBrandCode !== "baibaitu") return jsonError(400, "training_brand_not_supported")
+      if (trainingPackId && trainingPackId !== "baibaitu_onboarding_v1") return jsonError(400, "training_pack_not_supported")
+      if (!accountContext) return jsonError(403, "training_account_context_missing")
+
+      const admin = createAdminSupabaseClient()
+      const access = await resolveBaibaituTrainingAccess({
+        admin,
+        ctx: accountContext,
+        user: { id: user.id, email: user.email ?? null },
+      })
+      if (!access.enabled) return jsonError(403, "baibaitu_training_not_enabled")
+      baibaituTrainingAllowed = true
+      if (!liveNotes) liveNotes = buildBaibaituTaskLiveNotes(baibaituTrainingTask)
+    }
+
     const [customerProfileResult, sceneCardResult] = await Promise.all([
       parsed.data.customer_profile_id
         ? supabase
@@ -580,10 +619,20 @@ export async function POST(request: NextRequest) {
             followupContext,
           })
         : null
-    const sessionContext = sessionSnapshot
+    const trainingTaskContext = baibaituTrainingTask
       ? {
-          live_notes: sessionSnapshot.live_notes,
-          followup_context: sessionSnapshot.followup_context,
+          brand_code: "baibaitu",
+          pack_id: "baibaitu_onboarding_v1",
+          task_id: baibaituTrainingTask.id,
+          title: baibaituTrainingTask.title,
+          day_index: baibaituTrainingTask.dayIndex,
+        }
+      : null
+    const sessionContext = sessionSnapshot || trainingTaskContext
+      ? {
+          live_notes: sessionSnapshot?.live_notes || liveNotes,
+          followup_context: sessionSnapshot?.followup_context || null,
+          training_task: trainingTaskContext,
         }
       : null
     const sessionContextText = getVoiceCoachSessionPromptContext(sessionSnapshot)
@@ -772,6 +821,17 @@ export async function POST(request: NextRequest) {
       return jsonError(500, "create_turn_failed", { message: turnError.message })
     }
 
+    if (baibaituTrainingAllowed && baibaituTrainingTask && accountContext) {
+      const admin = createAdminSupabaseClient()
+      await linkBaibaituVoiceSession({
+        admin,
+        ctx: accountContext,
+        user: { id: user.id, email: user.email ?? null },
+        sessionId: session.id,
+        taskId: baibaituTrainingTask.id,
+      })
+    }
+
     if (!audioUrl && first.text && !ttsFailed) {
       const warmPromise = warmFirstTurnTts({
         supabase,
@@ -801,6 +861,7 @@ export async function POST(request: NextRequest) {
         sceneCardId: session.scene_card_id,
         sessionContext: session.session_context_json,
       }),
+      training_task: trainingTaskContext,
       first_customer_turn: {
         turn_id: turnId,
         turn_index: 0,
