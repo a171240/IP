@@ -14,7 +14,8 @@ import {
 } from "@/lib/posters/gpt-image-2.server"
 import { trackServerEvent } from "@/lib/xhs/proxy.server"
 import { downloadAsset, getXhsAssetsBucket, uploadDataUrlAsset, uploadRemoteAsset } from "@/lib/xhs/assets.server"
-import { xhsCoverUrl, xhsCoverVersion } from "@/lib/xhs/cover-url"
+import { xhsCoverVersion } from "@/lib/xhs/cover-url"
+import { resolveXhsCoverImageUrl } from "@/lib/xhs/cover-url.server"
 import {
   buildBeautyContext,
   normalizeCoverAsset,
@@ -639,7 +640,7 @@ export async function POST(request: NextRequest) {
       json.coverStyleId = json.coverStyleId || coverAsset.styleId || null
       json.coverStyleLabel = json.coverStyleLabel || coverAsset.styleLabel || null
       json.coverStyleReason = json.coverStyleReason || coverAsset.styleReason || null
-      json.imageUrl = xhsCoverUrl(draftId, uploaded.path, now)
+      json.imageUrl = await resolveXhsCoverImageUrl(draftId, uploaded.path, now)
       json.imageBase64 = null
       json.coverVersion = xhsCoverVersion(uploaded.path, now)
     }

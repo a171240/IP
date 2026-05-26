@@ -3,7 +3,7 @@
 import { z } from "zod"
 
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
-import { xhsCoverUrl } from "@/lib/xhs/cover-url"
+import { resolveXhsCoverImageUrl } from "@/lib/xhs/cover-url.server"
 
 export const runtime = "nodejs"
 
@@ -72,11 +72,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: false, error: error.message || "query_failed" }, { status: 500 })
   }
 
-  const drafts = (data || []).map((row) => {
-    const coverUrl = row.cover_storage_path ? xhsCoverUrl(row.id, row.cover_storage_path, row.updated_at) : null
+  const drafts = await Promise.all((data || []).map(async (row) => {
+    const coverUrl = await resolveXhsCoverImageUrl(row.id, row.cover_storage_path, row.updated_at)
     const qrUrl = row.publish_qr_url || row.publish_qr_storage_path ? `/api/mp/xhs/qrs/${row.id}` : null
     return { ...row, cover_url: coverUrl, qr_url: qrUrl }
-  })
+  }))
 
   return NextResponse.json({ ok: true, drafts })
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { buildMpAiProfilePayload, resolveMpAiBillingContext } from "@/lib/mp/ai-points.server"
-import { xhsCoverUrl } from "@/lib/xhs/cover-url"
+import { resolveXhsCoverImageUrl } from "@/lib/xhs/cover-url.server"
 
 export const runtime = "nodejs"
 
@@ -43,12 +43,14 @@ export async function GET(request: NextRequest) {
       .limit(3),
   ])
 
-  const recent = {
-    xhs_drafts: (xhsDrafts || []).map((d) => ({
+  const xhsDraftRows = await Promise.all((xhsDrafts || []).map(async (d) => ({
       ...d,
-      cover_url: d.cover_storage_path ? xhsCoverUrl(d.id, d.cover_storage_path, d.updated_at) : null,
+      cover_url: await resolveXhsCoverImageUrl(d.id, d.cover_storage_path, d.updated_at),
       qr_url: d.publish_qr_url || d.publish_qr_storage_path ? `/api/mp/xhs/qrs/${d.id}` : null,
-    })),
+    })))
+
+  const recent = {
+    xhs_drafts: xhsDraftRows,
     delivery_packs: (packs || []).map((p) => ({
       ...p,
       download_url: p.pdf_path ? `/api/mp/delivery-pack/${p.id}/download` : null,

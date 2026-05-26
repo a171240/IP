@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
-import { xhsCoverUrl } from "@/lib/xhs/cover-url"
+import { resolveXhsCoverImageUrl } from "@/lib/xhs/cover-url.server"
 
 export const runtime = "nodejs"
 
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 })
   }
 
-  const coverUrl = data.cover_storage_path ? xhsCoverUrl(data.id, data.cover_storage_path, data.updated_at) : null
+  const coverUrl = await resolveXhsCoverImageUrl(data.id, data.cover_storage_path, data.updated_at)
   const qrUrl = data.publish_qr_url || data.publish_qr_storage_path ? `/api/mp/xhs/qrs/${data.id}` : null
 
   return NextResponse.json({ ok: true, draft: { ...data, cover_url: coverUrl, qr_url: qrUrl } })

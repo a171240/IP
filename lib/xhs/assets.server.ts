@@ -3,6 +3,7 @@ import "server-only"
 import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
 
 const DEFAULT_BUCKET = process.env.XHS_ASSETS_BUCKET || "xhs-assets"
+const DEFAULT_SIGNED_URL_EXPIRES_IN = 60 * 60 * 24 * 7
 
 export type UploadedAsset = {
   bucket: string
@@ -191,6 +192,25 @@ export async function downloadAsset(opts: {
   const contentType = (data as unknown as { type?: string }).type || "application/octet-stream"
   const arrayBuffer = await data.arrayBuffer()
   return { arrayBuffer, contentType }
+}
+
+export async function signXhsAssetUrl(opts: {
+  bucket?: string
+  path: string
+  expiresIn?: number
+}): Promise<string> {
+  const bucket = (opts.bucket || DEFAULT_BUCKET).trim() || DEFAULT_BUCKET
+  const path = opts.path.trim()
+  if (!path) throw new Error("missing_storage_path")
+
+  const admin = createAdminSupabaseClient()
+  const { data, error } = await admin.storage
+    .from(bucket)
+    .createSignedUrl(path, opts.expiresIn || DEFAULT_SIGNED_URL_EXPIRES_IN)
+
+  if (error || !data?.signedUrl) throw new Error(error?.message || "storage_signed_url_failed")
+
+  return data.signedUrl
 }
 
 export function getXhsAssetsBucket(): string {

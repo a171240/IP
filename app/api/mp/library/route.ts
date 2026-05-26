@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 import { extractTopicsFromText } from "@/lib/workflow/topic-extract"
-import { xhsCoverUrl } from "@/lib/xhs/cover-url"
+import { resolveXhsCoverImageUrl } from "@/lib/xhs/cover-url.server"
 
 export const runtime = "nodejs"
 
@@ -110,11 +110,11 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const xhs_drafts = (draftsRes.data || []).map((d) => ({
+  const xhs_drafts = await Promise.all((draftsRes.data || []).map(async (d) => ({
     ...d,
-    cover_url: d.cover_storage_path ? xhsCoverUrl(d.id, d.cover_storage_path, d.updated_at) : null,
+    cover_url: await resolveXhsCoverImageUrl(d.id, d.cover_storage_path, d.updated_at),
     qr_url: d.publish_qr_url || d.publish_qr_storage_path ? `/api/mp/xhs/qrs/${d.id}` : null,
-  }))
+  })))
 
   const delivery_packs = (packsRes.data || []).map((p) => ({
     ...p,
