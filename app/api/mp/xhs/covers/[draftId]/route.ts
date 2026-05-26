@@ -5,7 +5,7 @@ import { downloadAsset, getXhsAssetsBucket } from "@/lib/xhs/assets.server"
 
 export const runtime = "nodejs"
 
-export async function GET(_request: NextRequest, { params }: { params: Promise<{ draftId: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ draftId: string }> }) {
   const { draftId } = await params
   const id = (draftId || "").trim()
   if (!id) return new Response("missing draftId", { status: 400 })
@@ -32,14 +32,17 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     const bucket = getXhsAssetsBucket()
     const downloaded = await downloadAsset({ bucket, path: draft.cover_storage_path })
     const contentType = draft.cover_content_type || downloaded.contentType || "application/octet-stream"
+    const hasVersion = request.nextUrl.searchParams.has("v")
 
     return new Response(downloaded.arrayBuffer, {
       status: 200,
       headers: {
         "Content-Type": contentType,
-        "Cache-Control": "no-store",
-        Pragma: "no-cache",
-        Expires: "0",
+        "Content-Length": String(downloaded.arrayBuffer.byteLength),
+        "Content-Disposition": "inline",
+        "Cache-Control": hasVersion
+          ? "public, max-age=31536000, immutable"
+          : "public, max-age=60, stale-while-revalidate=300",
       },
     })
   } catch {
