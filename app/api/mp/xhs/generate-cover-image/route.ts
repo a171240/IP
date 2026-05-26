@@ -80,6 +80,16 @@ function isDataUrl(value: string) {
   return value.startsWith("data:")
 }
 
+function logCoverStage(stage: string, startedAt: number, props: Record<string, unknown> = {}) {
+  console.log(JSON.stringify({
+    level: "info",
+    msg: "mp_xhs_cover_stage",
+    stage,
+    ms: Date.now() - startedAt,
+    ...props,
+  }))
+}
+
 function getTextField(body: Record<string, unknown>, names: string[]) {
   for (const name of names) {
     const v = body[name]
@@ -409,6 +419,7 @@ async function loadDraftCoverAsset(opts: {
 }
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now()
   const body = await request.json().catch(() => null)
   if (!body || typeof body !== "object") {
     return NextResponse.json({ success: false, ok: false, error: "无效的请求体" }, { status: 400 })
@@ -449,6 +460,11 @@ export async function POST(request: NextRequest) {
     request,
     event: "mp_xhs_cover_submit",
     props: { source: "mp", cost: charged.cost, actionCode: charged.actionCode, plan: billing.ctx.plan, assetCount: assetRefs.length },
+  })
+  logCoverStage("submit", startedAt, {
+    draftId: draftId || "",
+    actionCode: charged.actionCode,
+    assetCount: assetRefs.length,
   })
 
   const incomingPrompt = getTextField(requestBody, ["prompt", "coverPrompt", "cover_prompt"])
@@ -492,19 +508,39 @@ export async function POST(request: NextRequest) {
   const brandVisibility = getTextField(requestBody, ["brandVisibility", "brand_visibility"])
   prompt = [prompt, assetPromptBlock(assetRefs, brandVisibility)].filter(Boolean).join("\n")
   const bucket = getXhsAssetsBucket()
+  const assetStartedAt = Date.now()
   const imageUrls = assetRefs.length
     ? await assetRefsToImageUrls({ bucket, userId: billing.ctx.userId, assetRefs })
     : []
+  logCoverStage("reference_assets_ready", startedAt, {
+    draftId: draftId || "",
+    stageMs: Date.now() - assetStartedAt,
+    assetCount: assetRefs.length,
+    imageCount: imageUrls.length,
+  })
 
   let json: UpstreamGenerateCoverResponse | null = null
 
   try {
+    const imageStartedAt = Date.now()
+    logCoverStage("image_generate_start", startedAt, {
+      draftId: draftId || "",
+      size,
+      resolution,
+      imageCount: imageUrls.length,
+    })
     const generated = await generateGptImage2({
       prompt,
       negativePrompt,
       size,
       resolution,
       imageUrls,
+    })
+    logCoverStage("image_generate_done", startedAt, {
+      draftId: draftId || "",
+      stageMs: Date.now() - imageStartedAt,
+      model: generated.model,
+      hasImageUrl: Boolean(generated.imageUrl),
     })
     json = {
       success: true,
@@ -524,7 +560,11 @@ export async function POST(request: NextRequest) {
     await trackServerEvent({
       request,
       event: "mp_xhs_cover_gpt_image_fail",
-      props: { source: "mp", message: message.slice(0, 180) },
+      props: { source: "mp", durationMs: Date.now() - startedAt, message: message.slice(0, 180) },
+    })
+    logCoverStage("image_generate_failed", startedAt, {
+      draftId: draftId || "",
+      message: message.slice(0, 180),
     })
 
     await refundCharge("xhs_cover_gpt_image_failed", message)
@@ -549,6 +589,11 @@ export async function POST(request: NextRequest) {
           : ""
 
     if (draftId && json?.success === true && imageCandidate) {
+      const storageStartedAt = Date.now()
+      logCoverStage("storage_upload_start", startedAt, {
+        draftId,
+        imageSource: isDataUrl(imageCandidate) ? "data_url" : "remote_url",
+      })
       const uploaded = isDataUrl(imageCandidate)
         ? await uploadDataUrlAsset({
             userId: billing.ctx.userId,
@@ -584,6 +629,12 @@ export async function POST(request: NextRequest) {
       if (updateError || !updatedDraft?.id) {
         throw new Error(updateError?.message || "cover_update_failed")
       }
+      logCoverStage("storage_upload_done", startedAt, {
+        draftId,
+        stageMs: Date.now() - storageStartedAt,
+        contentType: uploaded.contentType,
+        hasStoredPath: Boolean(uploaded.path),
+      })
 
       json.coverStyleId = json.coverStyleId || coverAsset.styleId || null
       json.coverStyleLabel = json.coverStyleLabel || coverAsset.styleLabel || null
@@ -592,14 +643,30 @@ export async function POST(request: NextRequest) {
       json.imageBase64 = null
       json.coverVersion = xhsCoverVersion(uploaded.path, now)
     }
-  } catch {
+  } catch (error) {
+    logCoverStage("storage_upload_failed", startedAt, {
+      draftId: draftId || "",
+      message: error instanceof Error ? error.message.slice(0, 180) : String(error || "storage_failed").slice(0, 180),
+    })
     // Storage is best-effort; the generated remote URL is still returned.
   }
 
   await trackServerEvent({
     request,
     event: "mp_xhs_cover_success",
-    props: { source: "mp", cost: charged.cost, actionCode: charged.actionCode, assetCount: assetRefs.length, imageCount: imageUrls.length },
+    props: {
+      source: "mp",
+      cost: charged.cost,
+      actionCode: charged.actionCode,
+      assetCount: assetRefs.length,
+      imageCount: imageUrls.length,
+      durationMs: Date.now() - startedAt,
+      model: typeof json?.model === "string" ? json.model : "",
+    },
+  })
+  logCoverStage("success", startedAt, {
+    draftId: draftId || "",
+    model: typeof json?.model === "string" ? json.model : "",
   })
 
   const res = NextResponse.json({ ...json, ok: json?.success !== false })
