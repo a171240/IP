@@ -61,8 +61,8 @@ None identified. Re-check immediately before staging or release.
 ## Explicitly Not Included
 
 - No unrelated Supabase production migration was applied.
-- Vercel production deploy has been run for this release.
-- WeChat upload has been run for this release.
+- No unrelated Vercel production deploy was run.
+- No unrelated WeChat upload was run.
 - No broad admin bypass or global max-permission flag is added.
 - No payment/product, service-record, store-admin, poster, XHS, or private-copy behavior is intentionally changed.
 
@@ -116,7 +116,7 @@ Rollback/recovery plan:
 ## Backend Deployment
 
 - Vercel project: `ip`
-- Preview deployment URL: pending
+- Preview deployment URL: not used
 - Production deployment ID: `dpl_DLzBAUfptqSDC8tQhnbUXn4siWah`
 - Production deployment URL: `https://ip-izj3tj11f-a171240s-projects.vercel.app`
 - Production alias/domain: `https://www.ipnrgc.com`, `https://ip.ipgongchang.xin`, `https://ipnrgc.com`
