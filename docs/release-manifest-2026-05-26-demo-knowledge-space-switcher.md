@@ -1,23 +1,25 @@
-# Release Manifest Draft: Demo Knowledge Space Switcher
+# Release Manifest: Demo Knowledge Space Switcher
 
 ## Basic Info
 
 - Release date: 2026-05-26
 - Release thread: confirmed by user in this Codex thread
 - Operator: Codex
-- Version: proposed `1.0.20260526.2`
+- Version: `1.0.20260526.2`
+- Backend commit released: `bbdbb83`
+- Mini-program commit released: `bc02369`
 - Backend repository: `/Users/Admin/Documents/.repo-search-private-domain/a171240__IP.worktrees/codex__backend-main-checkpoint-20260514`
 - Backend branch: `codex/baibaitu-private-copy-release-20260526`
 - Mini-program repository: `/Users/Admin/Documents/美业话镜小程序`
 - Mini-program branch: `codex/app-migration-handoff-20260521`
-- Supabase project/environment: production project `IP网站` / ref `topyedxzcdfswxdcucpl`, pending release-thread confirmation
+- Supabase project/environment: production project `IP网站` / ref `topyedxzcdfswxdcucpl`
 
 ## Permission Confirmation
 
 - Has the user explicitly named this thread as the release thread? Yes. User said: "这个线程是本次 release thread"
-- Are all other threads frozen from production deploy/upload? Not independently confirmed; this release uses the current staged mini-program/backend worktrees only.
-- Is this release allowed to touch production data or schema? Yes, after the final preflight checks in this thread.
-- Production actions currently blocked: None after final preflight passes.
+- Are all other threads frozen from production deploy/upload? Not independently confirmed; this release used the committed/pushed mini-program and backend worktrees listed here.
+- Is this release allowed to touch production data or schema? Yes
+- Production actions currently blocked: None; release executed.
 
 ## Workspace State
 
@@ -25,50 +27,18 @@ Backend status:
 
 ```text
 ## codex/baibaitu-private-copy-release-20260526...origin/codex/baibaitu-private-copy-release-20260526
- M app/api/mp/voice-coach/training-home/route.ts
- M app/api/mp/voice-coach/training-progress/route.ts
- M app/api/mp/voice-coach/training-sessions/[sessionId]/complete/route.ts
- M app/api/mp/voice-coach/training-tasks/[taskId]/start/route.ts
- M app/api/voice-coach/sessions/route.ts
- M lib/voice-coach/session-context.ts
- M tests/baibaitu-training-flow.runtime.test.js
-?? app/api/mp/knowledge-spaces/
-?? lib/mp/knowledge-space.server.ts
-?? lib/voice-training/knowledge-space-training.server.ts
-?? supabase/migrations/20260526130550_add_mp_knowledge_spaces.sql
 ```
 
 Mini-program status:
 
 ```text
 ## codex/app-migration-handoff-20260521...origin/codex/app-migration-handoff-20260521
- M pages/voice-coach/baibaitu-training-api.js
- M pages/voice-coach/baibaitu-training-storage.js
- M pages/voice-coach/chat.js
- M pages/voice-coach/index.js
- M pages/voice-coach/index.wxml
- M pages/voice-coach/index.wxss
- M pages/voice-coach/report.js
- M pages/voice-coach/report.wxml
- M pages/voice-coach/training-map/index.js
- M pages/voice-coach/training-map/index.json
- M pages/voice-coach/training-map/index.wxml
- M utils/request.js
-?? docs/demo-knowledge-space-target-mode-execution-plan.md
-?? pages/voice-coach/training-api.js
-?? utils/knowledge-space.js
 ```
 
 Untracked files that must be included:
 
 ```text
-app/api/mp/knowledge-spaces/options/route.ts
-lib/mp/knowledge-space.server.ts
-lib/voice-training/knowledge-space-training.server.ts
-supabase/migrations/20260526130550_add_mp_knowledge_spaces.sql
-docs/demo-knowledge-space-target-mode-execution-plan.md
-pages/voice-coach/training-api.js
-utils/knowledge-space.js
+none
 ```
 
 Dirty files intentionally excluded:
@@ -90,9 +60,9 @@ None identified. Re-check immediately before staging or release.
 
 ## Explicitly Not Included
 
-- Supabase production migrations have been applied in this release thread.
-- No Vercel production deploy has been run.
-- No WeChat upload has been run.
+- No unrelated Supabase production migration was applied.
+- Vercel production deploy has been run for this release.
+- WeChat upload has been run for this release.
 - No broad admin bypass or global max-permission flag is added.
 - No payment/product, service-record, store-admin, poster, XHS, or private-copy behavior is intentionally changed.
 
@@ -147,9 +117,10 @@ Rollback/recovery plan:
 
 - Vercel project: `ip`
 - Preview deployment URL: pending
-- Production deployment ID: pending
-- Production alias/domain: pending
-- Deploy command: pending release thread
+- Production deployment ID: `dpl_DLzBAUfptqSDC8tQhnbUXn4siWah`
+- Production deployment URL: `https://ip-izj3tj11f-a171240s-projects.vercel.app`
+- Production alias/domain: `https://www.ipnrgc.com`, `https://ip.ipgongchang.xin`, `https://ipnrgc.com`
+- Deploy command: `VERCEL_TELEMETRY_DISABLED=1 corepack pnpm dlx vercel@50.28.0 deploy --prod --yes`
 
 Backend smoke results before release:
 
@@ -162,6 +133,22 @@ Result: pass, 5/5
 
 git diff --check
 Result: pass
+
+corepack pnpm build
+Result: pass, with existing warnings.
+```
+
+Backend smoke results after deploy:
+
+```text
+GET https://www.ipnrgc.com/api/mp/profile -> 401 auth_required
+GET https://www.ipnrgc.com/api/mp/knowledge-spaces/options -> 401 auth_required
+GET https://www.ipnrgc.com/api/mp/voice-coach/training-home -> 401 auth_required
+GET https://www.ipnrgc.com/api/mp/voice-coach/training-progress -> 401 auth_required
+GET https://www.ipnrgc.com/api/mp/virtual-pay/products -> 200
+GET https://www.ipnrgc.com/api/mp/service-records/sessions -> 401 auth_required
+GET https://ip.ipgongchang.xin/api/mp/knowledge-spaces/options -> 401 auth_required
+vercel logs --level error --since 15m -> No logs found
 ```
 
 Known warnings:
@@ -186,10 +173,10 @@ Required backend checks after deploy:
 
 - WeChat AppID: `wx2fab2dc6ebe442c4`
 - DevTools CLI path: `/Applications/wechatwebdevtools.app/Contents/MacOS/cli`
-- Upload version: proposed `1.0.20260526.2`
-- Upload description: proposed `demo-knowledge-space-switcher-20260526`
-- Upload command: pending release thread
-- Upload result: pending
+- Upload version: `1.0.20260526.2`
+- Upload description: `demo-knowledge-space-switcher-20260526`
+- Upload command: `/Applications/wechatwebdevtools.app/Contents/MacOS/cli upload --project /Users/Admin/Documents/美业话镜小程序 --version 1.0.20260526.2 --desc demo-knowledge-space-switcher-20260526 --lang zh`
+- Upload result: success, package size `1.2 MB` / `1267533` bytes
 
 Mini-program local checks:
 
@@ -205,6 +192,9 @@ Result: pass
 
 git diff --check
 Result: pass
+
+app.json route file check
+Result: 47 routes, route files ok
 ```
 
 Required mini-program checks:
@@ -230,21 +220,16 @@ Required mini-program checks:
 
 ## Rollback / Recovery
 
-- Previous backend deployment ID: fill in during release thread.
+- Previous backend deployment ID: not captured in this thread; use Vercel deployment history before `dpl_DLzBAUfptqSDC8tQhnbUXn4siWah` if rollback is needed.
 - Previous mini-program version: `1.0.20260526.1` if that remains current.
 - Database rollback note: use access revocation and backend rollback first; avoid destructive schema rollback.
 - Who should be notified: user in the release thread.
 
 ## Final Decision
 
-- Release approved: Yes, pending successful execution of the release checklist above.
-- Released by: pending
-- Release time: pending
+- Release approved: Yes
+- Released by: Codex
+- Release time: 2026-05-26 14:01:44 CST
 - Follow-up items:
-  - Confirm this is the release thread.
-  - Identify the demo WeChat account's Supabase `auth.users.id`.
-  - Apply migration.
-  - Grant `baibaitu` and `chunshe`.
-  - Deploy backend.
-  - Upload mini-program.
-  - Run authenticated real-device walkthrough.
+  - Run authenticated real-device walkthrough with the 吴江店演示账号.
+  - Confirm the homepage picker shows 白白兔 and 椿舍.
