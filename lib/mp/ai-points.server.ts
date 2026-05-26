@@ -33,6 +33,9 @@ export const MP_AI_ACTIONS = {
   "xhs.danger_check": { title: "雷区检测", cost: 0, page: "pages/xiaohongshu/index" },
   "xhs.generate.cover": { title: "生成小红书封面", cost: 8, page: "pages/xiaohongshu/index" },
   "xhs.regenerate.cover": { title: "重做小红书封面", cost: 6, page: "pages/xiaohongshu/index" },
+  "private.copy.generate": { title: "生成私域文案", cost: 1, page: "pages/private-copy/index" },
+  "private.copy.regenerate": { title: "换一版私域文案", cost: 1, page: "pages/private-copy/index" },
+  "private.copy.ocr": { title: "识别私域文案图片", cost: 0, page: "pages/private-copy/index", stage: "future" },
   "content.ingest": { title: "链接提取", cost: 0, page: "pages/content-studio/index" },
   "content.rewrite.video_script": { title: "改写为视频脚本", cost: 3, page: "pages/content-studio/index" },
   "content.generate.video": {
