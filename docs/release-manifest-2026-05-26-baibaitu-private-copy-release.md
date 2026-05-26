@@ -8,7 +8,8 @@
 - Version: `1.0.20260526.1`
 - Backend repository: `a171240/IP`
 - Backend branch: `codex/baibaitu-private-copy-release-20260526`
-- Backend commit: `a389a7e`
+- Backend code commit: `a389a7e`
+- Backend release manifest commit: `1980981`
 - Mini-program repository: `a171240/meiye-huajing-miniprogram`
 - Mini-program branch: `codex/app-migration-handoff-20260521`
 - Mini-program commit: `f965a36`
@@ -65,7 +66,7 @@ none
   - `supabase/migrations/20260521_add_private_copy_drafts.sql`
   - `supabase/migrations/20260521111500_harden_private_copy_drafts_grants.sql`
   - `supabase/migrations/20260525093000_baibaitu_training_minimal.sql`
-- Applied to production in this thread: pending final decision; preflight shows equivalent production migration history already exists:
+- Applied to production in this thread: no new migration executed; preflight shows equivalent production migration history already exists:
   - private-copy: `20260521110108`, `20260521110205`
   - Baibaitu: `20260525101216`
 - Production schema preflight:
@@ -73,7 +74,7 @@ none
   - `voice_training_packs`, `voice_training_tasks`, `voice_training_session_links`, `voice_training_progress`, and `voice_training_rewards` exist.
   - RLS is enabled on the private-copy and voice-training tables.
   - `private_copy_drafts` grants are present for `authenticated` and `service_role`; no `anon` grant was found.
-- Rollback/recovery plan: if backend deploy fails, keep current production deployment `dpl_D2PJ7U7oPGJbxda9eq2JwiN2pEDn`. If schema verification later finds a missing object, apply only the missing idempotent SQL and record it below.
+- Rollback/recovery plan: if backend deploy fails, roll back to previous production deployment `dpl_D2PJ7U7oPGJbxda9eq2JwiN2pEDn`. If schema verification later finds a missing object, apply only the missing idempotent SQL and record it below.
 
 ## Backend Deployment
 
@@ -81,8 +82,9 @@ none
 - Previous production deployment ID: `dpl_D2PJ7U7oPGJbxda9eq2JwiN2pEDn`
 - Previous production aliases: `https://www.ipnrgc.com`, `https://ip.ipgongchang.xin`
 - Preview deployment URL: not used
-- Production deployment ID: pending
-- Production alias/domain: pending
+- Production deployment ID: `dpl_2m3EMSZhLhxeJdKM8nKkLw82Cdso`
+- Production deployment URL: `https://ip-7bzfej7f3-a171240s-projects.vercel.app`
+- Production alias/domain: `https://www.ipnrgc.com`, `https://ip.ipgongchang.xin`
 - Deploy command: `pnpm dlx vercel@latest deploy --prod --yes`
 
 Backend checks before deploy:
@@ -97,12 +99,15 @@ pre-deploy /api/mp/private-copy/generate without auth: 404, confirming productio
 
 Required backend checks after deploy:
 
-- `/api/mp/profile`
-- `/api/mp/private-copy/generate`
-- `/api/mp/private-copy/drafts`
-- `/api/mp/voice-coach/training-home`
-- `/api/mp/virtual-pay/products`
-- `/api/mp/service-records/sessions`
+```text
+GET  https://www.ipnrgc.com/api/mp/profile -> 401 auth_required
+GET  https://www.ipnrgc.com/api/mp/private-copy/drafts -> 401 auth_required
+POST https://www.ipnrgc.com/api/mp/private-copy/generate with empty payload -> 400 invalid_payload
+GET  https://www.ipnrgc.com/api/mp/voice-coach/training-home -> 401 auth_required
+GET  https://www.ipnrgc.com/api/mp/virtual-pay/products -> 200
+GET  https://www.ipnrgc.com/api/mp/service-records/sessions -> 401 auth_required
+POST https://ip.ipgongchang.xin/api/mp/private-copy/generate with empty payload -> 400 invalid_payload
+```
 
 ## Mini-program Upload
 
@@ -111,7 +116,7 @@ Required backend checks after deploy:
 - Upload version: `1.0.20260526.1`
 - Upload description: `baibaitu-private-copy-20260526`
 - Upload command: `/Applications/wechatwebdevtools.app/Contents/MacOS/cli upload --project /Users/Admin/Documents/美业话镜小程序 --version 1.0.20260526.1 --desc baibaitu-private-copy-20260526 --lang zh`
-- Upload result: pending
+- Upload result: success. DevTools returned `✔ upload`; package size `1.2 MB / 1261591 bytes`.
 
 Mini-program local checks:
 
@@ -152,6 +157,6 @@ Required mini-program checks:
 ## Final Decision
 
 - Release approved: yes, by user authorization in this thread.
-- Released by: pending
-- Release time: pending
-- Follow-up items: run authenticated real-device generation after backend deploy and mini-program upload.
+- Released by: Codex
+- Release time: 2026-05-26 12:32:56 CST
+- Follow-up items: run authenticated real-device private-copy generation and Baibaitu account walkthrough with real test accounts.
