@@ -33,6 +33,8 @@ const IMAGE_OVERLOADED_MESSAGE =
   "\u751f\u56fe\u901a\u9053\u6b63\u5728\u6392\u961f\uff0c\u4e0a\u6e38\u6682\u65f6\u8fc7\u8f7d\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002\u5931\u8d25\u4e0d\u4f1a\u6263 AI \u70b9\u3002"
 const IMAGE_TIMEOUT_MESSAGE =
   "\u751f\u6210\u7b49\u5f85\u8d85\u65f6\uff1a\u4e0a\u6e38\u6ca1\u6709\u5728\u9650\u65f6\u5185\u8fd4\u56de\u56fe\u7247\uff0c\u5931\u8d25\u4e0d\u4f1a\u6263 AI \u70b9\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002"
+const IMAGE_PROVIDER_CREDIT_MESSAGE =
+  "\u751f\u56fe\u901a\u9053\u4f59\u989d\u4e0d\u8db3\uff0c\u5df2\u5c1d\u8bd5\u5907\u7528\u901a\u9053\u3002\u5982\u4ecd\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5\uff0c\u5931\u8d25\u4e0d\u4f1a\u6263 AI \u70b9\u3002"
 
 type ImageProviderError = Error & {
   code?: string
@@ -154,7 +156,8 @@ function evolinkImageModelCandidates() {
 function imageModelCandidates(): ImageModelCandidate[] {
   const apimartCandidates = apimartImageModelCandidates().map((model) => ({ provider: "apimart" as const, model }))
   const evolinkCandidates = evolinkImageModelCandidates().map((model) => ({ provider: "evolink" as const, model }))
-  const candidates: ImageModelCandidate[] = envFlag("EVOLINK_IMAGE_PRIMARY")
+  const useEvolinkPrimary = envFlag("EVOLINK_IMAGE_PRIMARY") && envFlag("ALLOW_EVOLINK_IMAGE_PRIMARY")
+  const candidates: ImageModelCandidate[] = useEvolinkPrimary
     ? [...evolinkCandidates, ...apimartCandidates]
     : [...apimartCandidates, ...evolinkCandidates]
   const seen = new Set<string>()
@@ -302,6 +305,10 @@ function isOverloadedMessage(message: string) {
   return /overloaded|queue=.*pending|pending=\d+\s*>\s*\d+|image_provider_overloaded/i.test(message)
 }
 
+function isInsufficientProviderCreditsMessage(message: string) {
+  return /insufficient (credits|quota)|insufficient_credits|insufficient_quota|pre-deduction failed|quota/i.test(message)
+}
+
 function imageProviderErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error || "")
 }
@@ -311,10 +318,16 @@ export function isImageProviderOverloadedError(error: unknown) {
   return e?.code === "image_provider_overloaded" || e?.status === 503 || isOverloadedMessage(imageProviderErrorMessage(error))
 }
 
+export function isImageProviderInsufficientCreditsError(error: unknown) {
+  const e = error as ImageProviderError
+  return e?.code === "image_provider_insufficient_credits" || isInsufficientProviderCreditsMessage(imageProviderErrorMessage(error))
+}
+
 export function imageGenerationErrorStatus(error: unknown) {
   const e = error as ImageProviderError
   const message = imageProviderErrorMessage(error)
   if (isImageProviderOverloadedError(error)) return 503
+  if (isImageProviderInsufficientCreditsError(error)) return 503
   if (e?.code === "image_task_timeout" || message === "image_task_timeout") return 504
   return 502
 }
@@ -323,6 +336,7 @@ export function publicImageGenerationErrorMessage(error: unknown) {
   const e = error as ImageProviderError
   const message = imageProviderErrorMessage(error)
   if (isImageProviderOverloadedError(error)) return IMAGE_OVERLOADED_MESSAGE
+  if (isImageProviderInsufficientCreditsError(error)) return IMAGE_PROVIDER_CREDIT_MESSAGE
   if (e?.code === "image_task_timeout" || message === "image_task_timeout") return IMAGE_TIMEOUT_MESSAGE
   return message || "image_generation_failed"
 }
@@ -332,6 +346,7 @@ function shouldTryFallback(error: unknown) {
   return Boolean(
     e?.retryable ||
       isImageProviderOverloadedError(error) ||
+      isImageProviderInsufficientCreditsError(error) ||
       e?.code === "image_task_timeout" ||
       e?.code === "image_provider_missing_key"
   )
@@ -370,10 +385,15 @@ async function requestJson(config: ImageProviderConfig, path: string, init?: Req
         const upstreamMessage = extractErrorMessage(json, text.slice(0, 200))
         const message = `${config.label} image error: ${res.status} ${upstreamMessage}`
         const overloaded = res.status === 503 && isOverloadedMessage(upstreamMessage)
-        const retryable = [408, 409, 425, 429, 500, 502, 503, 504].includes(res.status)
+        const insufficientCredits = res.status === 402 && isInsufficientProviderCreditsMessage(upstreamMessage)
+        const retryable = insufficientCredits || [408, 409, 425, 429, 500, 502, 503, 504].includes(res.status)
         lastError = imageProviderError(message, {
           status: res.status,
-          code: overloaded ? "image_provider_overloaded" : "image_provider_http_error",
+          code: insufficientCredits
+            ? "image_provider_insufficient_credits"
+            : overloaded
+              ? "image_provider_overloaded"
+              : "image_provider_http_error",
           retryable,
         })
         if (!retryable || attempt >= attempts - 1) {
@@ -461,6 +481,8 @@ export async function generateGptImage2(opts: GenerateImageOptions): Promise<{ i
     throw imageProviderError(`image_generation_all_models_failed: ${failures.join(" | ")}`, {
       code: isImageProviderOverloadedError(lastError)
         ? "image_provider_overloaded"
+        : isImageProviderInsufficientCreditsError(lastError)
+          ? "image_provider_insufficient_credits"
         : last?.code === "image_task_timeout"
           ? "image_task_timeout"
           : "image_generation_all_models_failed",
