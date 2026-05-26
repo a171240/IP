@@ -208,31 +208,35 @@ function createMockAdmin(initialState = {}) {
 }
 
 const training = loadTsModule(path.join(root, "lib", "voice-training", "baibaitu.server.ts"))
+const genericTraining = loadTsModule(path.join(root, "lib", "voice-training", "knowledge-space-training.server.ts"))
 
 function read(relPath) {
   return fs.readFileSync(path.join(root, relPath), "utf8")
 }
 
-test("Baibaitu mp API routes keep the required auth, access, and persistence contracts", () => {
+test("Voice training mp API routes keep the required auth, knowledge-space, and persistence contracts", () => {
+  const optionsRoute = read("app/api/mp/knowledge-spaces/options/route.ts")
   const homeRoute = read("app/api/mp/voice-coach/training-home/route.ts")
   const progressRoute = read("app/api/mp/voice-coach/training-progress/route.ts")
   const startRoute = read("app/api/mp/voice-coach/training-tasks/[taskId]/start/route.ts")
   const completeRoute = read("app/api/mp/voice-coach/training-sessions/[sessionId]/complete/route.ts")
   const sessionRoute = read("app/api/voice-coach/sessions/route.ts")
 
+  assert.match(optionsRoute, /listMpKnowledgeSpaceOptions/)
   assert.match(homeRoute, /resolveMpAccountContext/)
-  assert.match(homeRoute, /resolveBaibaituTrainingAccess/)
-  assert.match(homeRoute, /loadBaibaituTrainingDashboard/)
-  assert.match(progressRoute, /resolveBaibaituTrainingAccess/)
-  assert.match(progressRoute, /loadBaibaituTrainingDashboard/)
-  assert.match(startRoute, /buildBaibaituTaskSetup/)
+  assert.match(homeRoute, /resolveActiveKnowledgeSpace/)
+  assert.match(homeRoute, /loadVoiceTrainingDashboard/)
+  assert.match(progressRoute, /resolveActiveKnowledgeSpace/)
+  assert.match(progressRoute, /loadVoiceTrainingDashboard/)
+  assert.match(startRoute, /buildVoiceTrainingTaskSetup/)
   assert.match(startRoute, /task_locked/)
-  assert.match(completeRoute, /buildBaibaituTrainingResult/)
-  assert.match(completeRoute, /saveBaibaituTrainingResult/)
-  assert.match(completeRoute, /loadBaibaituTrainingDashboard/)
+  assert.match(completeRoute, /buildVoiceTrainingResult/)
+  assert.match(completeRoute, /saveVoiceTrainingResult/)
+  assert.match(completeRoute, /loadVoiceTrainingDashboard/)
   assert.match(sessionRoute, /training_task_id/)
-  assert.match(sessionRoute, /resolveBaibaituTrainingAccess/)
-  assert.match(sessionRoute, /linkBaibaituVoiceSession/)
+  assert.match(sessionRoute, /resolveActiveKnowledgeSpace/)
+  assert.match(sessionRoute, /linkVoiceTrainingSessionTask/)
+  assert.match(sessionRoute, /knowledge_space_id/)
   assert.match(sessionRoute, /training_task:\s*trainingTaskContext/)
 })
 
@@ -246,6 +250,27 @@ test("Baibaitu task start setup carries server-owned training context", () => {
   assert.equal(setup.training_context.task_id, "day1_brand_intro")
   assert.match(setup.live_notes, /白白兔训练任务：品牌文化入职/)
   assert.deepEqual(setup.training_task_preview.pass_goals, task.passGoals.slice(0, 3))
+})
+
+test("Chunshe knowledge space maps to its own training pack and setup context", () => {
+  const knowledgeSpace = {
+    id: "space-chunshe",
+    code: "chunshe",
+    displayName: "椿舍",
+    brandCode: "chunshe",
+    defaultPackId: "chunshe_onboarding_v1",
+  }
+  const pack = genericTraining.getVoiceTrainingPackForSpace(knowledgeSpace)
+  assert.equal(pack.title, "椿舍演示训练营")
+
+  const task = genericTraining.findVoiceTrainingTask(pack, "chunshe_day1_brand_intro")
+  const setup = genericTraining.buildVoiceTrainingTaskSetup({ pack, task, knowledgeSpace })
+
+  assert.equal(setup.training_knowledge_space_id, "space-chunshe")
+  assert.equal(setup.training_brand_code, "chunshe")
+  assert.equal(setup.training_pack_id, "chunshe_onboarding_v1")
+  assert.equal(setup.training_context.knowledge_space_name, "椿舍")
+  assert.match(setup.live_notes, /椿舍演示训练营任务：日式美肌开场/)
 })
 
 test("Baibaitu access can be granted by env, profile feature flags, or company brand", async () => {

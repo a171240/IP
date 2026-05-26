@@ -2,13 +2,16 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { accountContextPayload, resolveMpAccountContext } from "@/lib/mp/account-context.server"
 import {
-  BAIBAITU_BRAND_CODE,
-  buildBaibaituTaskSetup,
-  findBaibaituTrainingTask,
-  loadBaibaituTrainingDashboard,
-  resolveBaibaituTrainingAccess,
-} from "@/lib/voice-training/baibaitu.server"
+  knowledgeSpacePayload,
+  resolveActiveKnowledgeSpace,
+} from "@/lib/mp/knowledge-space.server"
 import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
+import {
+  buildVoiceTrainingTaskSetup,
+  findVoiceTrainingTask,
+  getVoiceTrainingPackForSpace,
+  loadVoiceTrainingDashboard,
+} from "@/lib/voice-training/knowledge-space-training.server"
 
 export const runtime = "nodejs"
 
@@ -21,18 +24,25 @@ export async function POST(
   context: { params: Promise<{ taskId: string }> },
 ) {
   const { taskId } = await context.params
-  const task = findBaibaituTrainingTask(taskId)
-  if (!task) return jsonError(404, "训练任务不存在", "task_not_found")
 
   const auth = await resolveMpAccountContext(request)
   if (!auth.ok) return auth.error
 
   const admin = createAdminSupabaseClient()
-  const access = await resolveBaibaituTrainingAccess({ admin, ctx: auth.ctx, user: auth.user })
-  if (!access.enabled) return jsonError(403, "当前账号暂未开放白白兔训练营", "baibaitu_training_not_enabled")
+  const active = await resolveActiveKnowledgeSpace({ admin, request, ctx: auth.ctx, user: auth.user, required: true })
+  if (!active.ok) return active.error
+  const pack = getVoiceTrainingPackForSpace(active.active)
+  const task = findVoiceTrainingTask(pack, taskId)
+  if (!active.active || !pack || !task) return jsonError(404, "训练任务不存在", "task_not_found")
 
   try {
-    const dashboard = await loadBaibaituTrainingDashboard({ admin, ctx: auth.ctx, user: auth.user })
+    const dashboard = await loadVoiceTrainingDashboard({
+      admin,
+      ctx: auth.ctx,
+      user: auth.user,
+      knowledgeSpace: active.active,
+    })
+    if (!dashboard) return jsonError(404, "训练包不存在", "training_pack_not_found")
     const taskView = (dashboard.tasks || []).find((item: any) => item.id === task.id)
     if (taskView?.locked) {
       return jsonError(403, "请先完成前一关", "task_locked", {
@@ -42,10 +52,13 @@ export async function POST(
 
     return NextResponse.json({
       ok: true,
-      brand_code: BAIBAITU_BRAND_CODE,
+      brand_code: pack.brandCode,
+      active_knowledge_space_id: active.active.id,
+      active_knowledge_space: knowledgeSpacePayload(active.active),
+      knowledge_spaces: active.options.map(knowledgeSpacePayload).filter(Boolean),
       context: accountContextPayload(auth.ctx),
       task: taskView || task,
-      setup: buildBaibaituTaskSetup(task),
+      setup: buildVoiceTrainingTaskSetup({ pack, task, knowledgeSpace: active.active }),
       progress: dashboard.progress,
     })
   } catch (error: any) {

@@ -19,13 +19,17 @@ import { signVoiceCoachAudio, uploadVoiceCoachAudio } from "@/lib/voice-coach/st
 import { normalizeScenarioTag } from "@/lib/voice-coach/tag-utils"
 import { resolveMpAccountContextForUser } from "@/lib/mp/account-context.server"
 import {
-  buildBaibaituTaskLiveNotes,
-  findBaibaituTrainingTask,
-  linkBaibaituVoiceSession,
-  resolveBaibaituTrainingAccess,
-} from "@/lib/voice-training/baibaitu.server"
+  knowledgeSpacePayload,
+  resolveActiveKnowledgeSpace,
+} from "@/lib/mp/knowledge-space.server"
 import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
+import {
+  buildVoiceTrainingTaskLiveNotes,
+  findVoiceTrainingTask,
+  getVoiceTrainingPackForSpace,
+  linkVoiceTrainingSessionTask,
+} from "@/lib/voice-training/knowledge-space-training.server"
 
 export const runtime = "nodejs"
 
@@ -71,6 +75,7 @@ function isMissingOrgSnapshotColumn(error: any) {
     message.includes("company_id") ||
     message.includes("store_id") ||
     message.includes("membership_id") ||
+    message.includes("knowledge_space_id") ||
     message.includes("schema cache")
   )
 }
@@ -325,21 +330,55 @@ export async function GET(request: NextRequest) {
     const access = checkVoiceCoachAccess(user.id)
     if (!access.ok) return jsonError(access.status, access.error)
 
+    const accountContext = await resolveMpAccountContextForUser({
+      userId: user.id,
+      userEmail: user.email ?? null,
+      userMetadata: (user.user_metadata || {}) as Record<string, unknown>,
+    }).catch(() => null)
+    const admin = createAdminSupabaseClient()
+    const active = accountContext
+      ? await resolveActiveKnowledgeSpace({
+          admin,
+          request,
+          ctx: accountContext,
+          user: { id: user.id, email: user.email ?? null },
+        })
+      : null
+    if (active && !active.ok) return active.error
+
     const limit = parseHistoryLimit(new URL(request.url).searchParams.get("limit"))
-    const { data, error } = await supabase
+    let query = supabase
       .from("voice_coach_sessions")
       .select(
-        "id, scenario_id, status, started_at, ended_at, created_at, total_score, report_json, customer_profile_id, scene_card_id, session_context_json, scenario_snapshot_json",
+        "id, scenario_id, status, started_at, ended_at, created_at, total_score, report_json, customer_profile_id, scene_card_id, session_context_json, scenario_snapshot_json, knowledge_space_id",
       )
       .eq("user_id", user.id)
       .order("started_at", { ascending: false })
       .limit(limit)
+    if (active?.active?.id) query = query.eq("knowledge_space_id", active.active.id)
+    let { data, error } = await query
+
+    if (error && isMissingOrgSnapshotColumn(error)) {
+      const fallback = await supabase
+        .from("voice_coach_sessions")
+        .select(
+          "id, scenario_id, status, started_at, ended_at, created_at, total_score, report_json, customer_profile_id, scene_card_id, session_context_json, scenario_snapshot_json",
+        )
+        .eq("user_id", user.id)
+        .order("started_at", { ascending: false })
+        .limit(limit)
+      data = fallback.data as any
+      error = fallback.error as any
+    }
 
     if (error) {
       return jsonError(500, "sessions_query_failed", { message: error.message })
     }
 
     return NextResponse.json({
+      active_knowledge_space_id: active && active.ok ? active.active?.id || "" : "",
+      active_knowledge_space: active && active.ok ? knowledgeSpacePayload(active.active) : null,
+      knowledge_spaces: active && active.ok ? active.options.map(knowledgeSpacePayload).filter(Boolean) : [],
       sessions: (data || []).map(buildSessionHistoryItem),
     })
   } catch (err: any) {
@@ -554,25 +593,46 @@ export async function POST(request: NextRequest) {
       parsed.data.training_context?.brand_code || parsed.data.training_brand_code,
       40,
     )
-    const baibaituTrainingTask = trainingTaskId ? findBaibaituTrainingTask(trainingTaskId) : null
+    const trainingKnowledgeSpaceId = cleanText(
+      parsed.data.training_context?.knowledge_space_id || parsed.data.training_knowledge_space_id,
+      80,
+    )
     let liveNotes = String(parsed.data.live_notes || "").trim()
-    let baibaituTrainingAllowed = false
+    let activeKnowledgeSpace: any = null
+    let knowledgeSpaceOptions: any[] = []
+    let voiceTrainingPack: any = null
+    let voiceTrainingTask: any = null
+    let voiceTrainingAllowed = false
 
-    if (trainingTaskId) {
-      if (!baibaituTrainingTask) return jsonError(400, "training_task_not_found")
-      if (trainingBrandCode && trainingBrandCode !== "baibaitu") return jsonError(400, "training_brand_not_supported")
-      if (trainingPackId && trainingPackId !== "baibaitu_onboarding_v1") return jsonError(400, "training_pack_not_supported")
-      if (!accountContext) return jsonError(403, "training_account_context_missing")
-
+    if (accountContext) {
       const admin = createAdminSupabaseClient()
-      const access = await resolveBaibaituTrainingAccess({
+      const active = await resolveActiveKnowledgeSpace({
         admin,
+        request,
         ctx: accountContext,
         user: { id: user.id, email: user.email ?? null },
+        fallbackKnowledgeSpaceId: trainingKnowledgeSpaceId,
       })
-      if (!access.enabled) return jsonError(403, "baibaitu_training_not_enabled")
-      baibaituTrainingAllowed = true
-      if (!liveNotes) liveNotes = buildBaibaituTaskLiveNotes(baibaituTrainingTask)
+      if (!active.ok) return active.error
+      activeKnowledgeSpace = active.active
+      knowledgeSpaceOptions = active.options
+    }
+
+    if (trainingTaskId) {
+      if (!accountContext) return jsonError(403, "training_account_context_missing")
+      if (!activeKnowledgeSpace) return jsonError(403, "training_knowledge_space_required")
+      voiceTrainingPack = getVoiceTrainingPackForSpace(activeKnowledgeSpace)
+      if (!voiceTrainingPack) return jsonError(400, "training_pack_not_found")
+      if (trainingBrandCode && trainingBrandCode !== voiceTrainingPack.brandCode) {
+        return jsonError(400, "training_brand_not_supported")
+      }
+      if (trainingPackId && trainingPackId !== voiceTrainingPack.packId) {
+        return jsonError(400, "training_pack_not_supported")
+      }
+      voiceTrainingTask = findVoiceTrainingTask(voiceTrainingPack, trainingTaskId)
+      if (!voiceTrainingTask) return jsonError(400, "training_task_not_found")
+      voiceTrainingAllowed = true
+      if (!liveNotes) liveNotes = buildVoiceTrainingTaskLiveNotes(voiceTrainingPack, voiceTrainingTask)
     }
 
     const [customerProfileResult, sceneCardResult] = await Promise.all([
@@ -619,13 +679,17 @@ export async function POST(request: NextRequest) {
             followupContext,
           })
         : null
-    const trainingTaskContext = baibaituTrainingTask
+    const trainingTaskContext = voiceTrainingTask && voiceTrainingPack
       ? {
-          brand_code: "baibaitu",
-          pack_id: "baibaitu_onboarding_v1",
-          task_id: baibaituTrainingTask.id,
-          title: baibaituTrainingTask.title,
-          day_index: baibaituTrainingTask.dayIndex,
+          knowledge_space_id: activeKnowledgeSpace?.id || "",
+          knowledge_space_code: activeKnowledgeSpace?.code || "",
+          knowledge_space_name: activeKnowledgeSpace?.displayName || "",
+          brand_code: voiceTrainingPack.brandCode,
+          pack_id: voiceTrainingPack.packId,
+          pack_title: voiceTrainingPack.title,
+          task_id: voiceTrainingTask.id,
+          title: voiceTrainingTask.title,
+          day_index: voiceTrainingTask.dayIndex,
         }
       : null
     const sessionContext = sessionSnapshot || trainingTaskContext
@@ -645,6 +709,7 @@ export async function POST(request: NextRequest) {
       scene_card_id: sceneCardResult.data?.id || null,
       session_context_json: sessionContext,
       scenario_snapshot_json: sessionSnapshot,
+      knowledge_space_id: activeKnowledgeSpace?.id || null,
       company_id: accountContext?.companyId || null,
       store_id: accountContext?.storeId || null,
       membership_id: accountContext?.membershipId || null,
@@ -654,12 +719,13 @@ export async function POST(request: NextRequest) {
       .from("voice_coach_sessions")
       .insert(sessionInsertPayload)
       .select(
-        "id, scenario_id, status, started_at, customer_profile_id, scene_card_id, session_context_json, scenario_snapshot_json",
+        "id, scenario_id, status, started_at, customer_profile_id, scene_card_id, session_context_json, scenario_snapshot_json, knowledge_space_id",
       )
       .single()
 
     if (sessionError && isMissingOrgSnapshotColumn(sessionError)) {
-      const { company_id, store_id, membership_id, ...fallbackPayload } = sessionInsertPayload
+      const { knowledge_space_id, company_id, store_id, membership_id, ...fallbackPayload } = sessionInsertPayload
+      void knowledge_space_id
       void company_id
       void store_id
       void membership_id
@@ -670,7 +736,7 @@ export async function POST(request: NextRequest) {
           "id, scenario_id, status, started_at, customer_profile_id, scene_card_id, session_context_json, scenario_snapshot_json",
         )
         .single()
-      session = fallbackResult.data
+      session = fallbackResult.data ? { ...fallbackResult.data, knowledge_space_id: null } : null
       sessionError = fallbackResult.error
     }
 
@@ -821,14 +887,16 @@ export async function POST(request: NextRequest) {
       return jsonError(500, "create_turn_failed", { message: turnError.message })
     }
 
-    if (baibaituTrainingAllowed && baibaituTrainingTask && accountContext) {
+    if (voiceTrainingAllowed && voiceTrainingTask && voiceTrainingPack && accountContext) {
       const admin = createAdminSupabaseClient()
-      await linkBaibaituVoiceSession({
+      await linkVoiceTrainingSessionTask({
         admin,
         ctx: accountContext,
         user: { id: user.id, email: user.email ?? null },
         sessionId: session.id,
-        taskId: baibaituTrainingTask.id,
+        taskId: voiceTrainingTask.id,
+        pack: voiceTrainingPack,
+        knowledgeSpace: activeKnowledgeSpace,
       })
     }
 
@@ -849,6 +917,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       session_id: session.id,
+      active_knowledge_space_id: activeKnowledgeSpace?.id || "",
+      active_knowledge_space: knowledgeSpacePayload(activeKnowledgeSpace),
+      knowledge_spaces: knowledgeSpaceOptions.map(knowledgeSpacePayload).filter(Boolean),
       scenario: {
         id: scenario.id,
         name: scenario.name,

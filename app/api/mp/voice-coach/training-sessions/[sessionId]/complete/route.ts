@@ -2,13 +2,18 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { accountContextPayload, resolveMpAccountContext } from "@/lib/mp/account-context.server"
 import {
-  buildBaibaituTrainingResult,
-  findBaibaituTrainingTask,
-  loadBaibaituTrainingDashboard,
-  resolveBaibaituTrainingAccess,
-  saveBaibaituTrainingResult,
-} from "@/lib/voice-training/baibaitu.server"
+  knowledgeSpacePayload,
+  resolveActiveKnowledgeSpace,
+} from "@/lib/mp/knowledge-space.server"
 import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
+import {
+  buildVoiceTrainingResult,
+  findVoiceTrainingTask,
+  getVoiceTrainingPack,
+  getVoiceTrainingPackForSpace,
+  loadVoiceTrainingDashboard,
+  saveVoiceTrainingResult,
+} from "@/lib/voice-training/knowledge-space-training.server"
 
 export const runtime = "nodejs"
 
@@ -27,9 +32,6 @@ export async function POST(
   if (!auth.ok) return auth.error
 
   const admin = createAdminSupabaseClient()
-  const access = await resolveBaibaituTrainingAccess({ admin, ctx: auth.ctx, user: auth.user })
-  if (!access.enabled) return jsonError(403, "当前账号暂未开放白白兔训练营", "baibaitu_training_not_enabled")
-
   const { data: link, error: linkError } = await admin
     .from("voice_training_session_links")
     .select("*")
@@ -37,10 +39,28 @@ export async function POST(
     .eq("staff_user_id", auth.user.id)
     .maybeSingle()
   if (linkError) return jsonError(500, linkError.message, "training_link_query_failed")
-  if (!link) return jsonError(404, "这次练习未绑定白白兔任务", "training_link_not_found")
+  if (!link) return jsonError(404, "这次练习未绑定训练任务", "training_link_not_found")
 
-  const task = findBaibaituTrainingTask(link.task_id)
+  const active = await resolveActiveKnowledgeSpace({
+    admin,
+    request,
+    ctx: auth.ctx,
+    user: auth.user,
+    fallbackKnowledgeSpaceId: link.knowledge_space_id || "",
+  })
+  if (!active.ok) return active.error
+
+  const linkKnowledgeSpace = link.knowledge_space_id
+    ? active.options.find((option) => option.id === link.knowledge_space_id) || null
+    : active.active
+  if (link.knowledge_space_id && !linkKnowledgeSpace) {
+    return jsonError(403, "当前账号无权访问该训练知识库", "knowledge_space_forbidden")
+  }
+
+  const pack = getVoiceTrainingPack(link.brand_code, link.pack_id) || getVoiceTrainingPackForSpace(linkKnowledgeSpace)
+  const task = findVoiceTrainingTask(pack, link.task_id)
   if (!task) return jsonError(404, "训练任务不存在", "task_not_found")
+  if (!pack) return jsonError(404, "训练包不存在", "training_pack_not_found")
 
   const { data: session, error: sessionError } = await admin
     .from("voice_coach_sessions")
@@ -64,24 +84,37 @@ export async function POST(
   if (turnsError) return jsonError(500, turnsError.message, "turns_query_failed")
 
   try {
-    const result = buildBaibaituTrainingResult({
+    const result = buildVoiceTrainingResult({
       task,
+      pack,
       sessionId,
       report,
       turns: turns || [],
     })
-    const saved = await saveBaibaituTrainingResult({
+    const saved = await saveVoiceTrainingResult({
       admin,
       ctx: auth.ctx,
       user: auth.user,
       sessionId,
+      pack,
+      knowledgeSpace: linkKnowledgeSpace,
       task,
       result,
     })
-    const dashboard = await loadBaibaituTrainingDashboard({ admin, ctx: auth.ctx, user: auth.user })
+    const dashboard = linkKnowledgeSpace
+      ? await loadVoiceTrainingDashboard({
+          admin,
+          ctx: auth.ctx,
+          user: auth.user,
+          knowledgeSpace: linkKnowledgeSpace,
+        })
+      : null
 
     return NextResponse.json({
       ok: true,
+      active_knowledge_space_id: linkKnowledgeSpace?.id || "",
+      active_knowledge_space: knowledgeSpacePayload(linkKnowledgeSpace),
+      knowledge_spaces: active.options.map(knowledgeSpacePayload).filter(Boolean),
       context: accountContextPayload(auth.ctx),
       task,
       result,

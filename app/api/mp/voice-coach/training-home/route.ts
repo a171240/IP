@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { accountContextPayload, resolveMpAccountContext } from "@/lib/mp/account-context.server"
 import {
-  BAIBAITU_BRAND_CODE,
-  loadBaibaituTrainingDashboard,
-  resolveBaibaituTrainingAccess,
-} from "@/lib/voice-training/baibaitu.server"
+  knowledgeSpacePayload,
+  resolveActiveKnowledgeSpace,
+} from "@/lib/mp/knowledge-space.server"
 import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
+import { loadVoiceTrainingDashboard } from "@/lib/voice-training/knowledge-space-training.server"
 
 export const runtime = "nodejs"
 
@@ -19,36 +19,56 @@ export async function GET(request: NextRequest) {
   if (!auth.ok) return auth.error
 
   const admin = createAdminSupabaseClient()
-  const access = await resolveBaibaituTrainingAccess({
+  const active = await resolveActiveKnowledgeSpace({
     admin,
+    request,
     ctx: auth.ctx,
     user: auth.user,
   })
+  if (!active.ok) return active.error
 
-  if (!access.enabled) {
+  if (!active.active) {
     return NextResponse.json({
       ok: true,
       visible: false,
       brand_code: "",
-      features: { baibaitu_training: false },
-      access,
+      features: { voice_training: false, baibaitu_training: false },
+      active_knowledge_space_id: "",
+      active_knowledge_space: null,
+      knowledge_spaces: active.options.map(knowledgeSpacePayload).filter(Boolean),
       context: accountContextPayload(auth.ctx),
     })
   }
 
   try {
-    const dashboard = await loadBaibaituTrainingDashboard({
+    const dashboard = await loadVoiceTrainingDashboard({
       admin,
       ctx: auth.ctx,
       user: auth.user,
+      knowledgeSpace: active.active,
     })
+
+    if (!dashboard) {
+      return NextResponse.json({
+        ok: true,
+        visible: false,
+        brand_code: active.active.brandCode,
+        features: { voice_training: false, baibaitu_training: active.active.brandCode === "baibaitu" },
+        active_knowledge_space_id: active.active.id,
+        active_knowledge_space: knowledgeSpacePayload(active.active),
+        knowledge_spaces: active.options.map(knowledgeSpacePayload).filter(Boolean),
+        context: accountContextPayload(auth.ctx),
+      })
+    }
 
     return NextResponse.json({
       ok: true,
       visible: true,
-      brand_code: BAIBAITU_BRAND_CODE,
-      features: { baibaitu_training: true },
-      access,
+      brand_code: active.active.brandCode,
+      features: { voice_training: true, baibaitu_training: active.active.brandCode === "baibaitu" },
+      active_knowledge_space_id: active.active.id,
+      active_knowledge_space: knowledgeSpacePayload(active.active),
+      knowledge_spaces: active.options.map(knowledgeSpacePayload).filter(Boolean),
       context: accountContextPayload(auth.ctx),
       ...dashboard,
     })

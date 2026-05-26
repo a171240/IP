@@ -56,10 +56,15 @@ export const voiceCoachSessionCreateSchema = z.object({
   training_task_id: z.string().trim().min(1).max(80).optional().nullable(),
   training_pack_id: z.string().trim().min(1).max(80).optional().nullable(),
   training_brand_code: z.string().trim().min(1).max(40).optional().nullable(),
+  training_knowledge_space_id: z.string().trim().min(1).max(80).optional().nullable(),
   training_context: z
     .object({
+      knowledge_space_id: z.string().trim().min(1).max(80).optional().nullable(),
+      knowledge_space_code: z.string().trim().min(1).max(80).optional().nullable(),
+      knowledge_space_name: z.string().trim().min(1).max(80).optional().nullable(),
       brand_code: z.string().trim().min(1).max(40).optional().nullable(),
       pack_id: z.string().trim().min(1).max(80).optional().nullable(),
+      pack_title: z.string().trim().min(1).max(80).optional().nullable(),
       task_id: z.string().trim().min(1).max(80).optional().nullable(),
     })
     .passthrough()
