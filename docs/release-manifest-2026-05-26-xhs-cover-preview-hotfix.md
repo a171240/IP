@@ -68,8 +68,9 @@ This hotfix is built from clean worktrees only.
 
 - Vercel project: `ip`
 - Previous production deployment ID: `dpl_2m3EMSZhLhxeJdKM8nKkLw82Cdso`
-- Preview deployment URL: pending
-- Production deployment ID: pending
+- Preview deployment URL: not used
+- Production deployment ID: `dpl_8pSmTo7TzBqukRT649rJdWkSJp43`
+- Production deployment URL: `https://ip-k3ceoxjhc-a171240s-projects.vercel.app`
 - Production alias/domain: `https://www.ipnrgc.com`, `https://ip.ipgongchang.xin`
 - Deploy command: `pnpm dlx vercel@latest deploy --prod --yes`
 
@@ -82,6 +83,13 @@ https://ip.ipgongchang.xin/api/mp/xhs/covers/e094a7fb-475b-4842-92b7-7fa224fcae3
 
 pnpm exec tsc --noEmit --pretty false -> pass
 pnpm build -> pass, 338 existing warnings, 0 errors
+Production deploy -> ready, aliases include www.ipnrgc.com and ip.ipgongchang.xin
+Post-deploy cover header smoke:
+https://www.ipnrgc.com/api/mp/xhs/covers/e094a7fb-475b-4842-92b7-7fa224fcae36?v=1779772836714 -> 200 image/png, Content-Length 1908263, Cache-Control public immutable, first request 3.92s, second request 0.98s CDN HIT
+https://ip.ipgongchang.xin/api/mp/xhs/covers/e094a7fb-475b-4842-92b7-7fa224fcae36?v=1779772836714 -> 200 image/png, still 67.67s through nginx proxy, so mini-program must use www.ipnrgc.com for cover media
+GET /api/mp/profile -> 401
+GET /api/mp/virtual-pay/products -> 200
+GET /api/mp/service-records/sessions -> 401
 ```
 
 Required backend checks:
@@ -98,7 +106,7 @@ Required backend checks:
 - Upload version: `1.0.20260526.2`
 - Upload description: `xhs-cover-preview-hotfix-20260526`
 - Upload command: `/Applications/wechatwebdevtools.app/Contents/MacOS/cli upload --project /Users/Admin/Documents/.repo-search-private-domain/meiye-huajing-miniapp.worktrees/codex__xhs-cover-preview-hotfix-20260526 --version 1.0.20260526.2 --desc xhs-cover-preview-hotfix-20260526 --lang zh`
-- Upload result: pending
+- Upload result: success. DevTools returned `✔ upload`; package size `1.2 MB / 1261263 bytes`.
 
 Mini-program local checks:
 
@@ -133,6 +141,6 @@ Required mini-program checks:
 ## Final Decision
 
 - Release approved: yes, by user authorization in this thread.
-- Released by: pending
-- Release time: pending
+- Released by: Codex
+- Release time: 2026-05-26 13:50:45 CST
 - Follow-up items: ask user to re-open the generated cover and tap preview on real device.
