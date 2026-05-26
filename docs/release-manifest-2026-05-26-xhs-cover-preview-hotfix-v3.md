@@ -64,7 +64,8 @@ none
 
 - Vercel project: `ip`
 - Previous production deployment ID: `dpl_DLzBAUfptqSDC8tQhnbUXn4siWah`
-- Production deployment ID: pending
+- Production deployment ID: `dpl_Fma4HDEkJYdqjLfkwA8y8cdDArMp`
+- Production deployment URL: `https://ip-e0quti2un-a171240s-projects.vercel.app`
 - Production alias/domain: `https://www.ipnrgc.com`, `https://ip.ipgongchang.xin`
 - Deploy command: `pnpm dlx vercel@latest deploy --prod --yes`
 
@@ -74,6 +75,12 @@ Backend smoke results:
 pnpm exec tsc --noEmit --pretty false -> pass
 git diff --check -> pass
 pnpm build -> pass, existing warnings only, 0 errors
+vercel inspect https://www.ipnrgc.com -> dpl_Fma4HDEkJYdqjLfkwA8y8cdDArMp, Ready
+GET /api/mp/xhs/covers/56a23b0a-fc9c-4521-b55e-fad2e0780807?v=1779775022279 -> 200 image/png, 1,960,457 bytes, Content-Length present
+same cover second request -> 200, x-vercel-cache: HIT, 0.740818s
+GET /api/mp/profile -> 401 expected unauthenticated
+GET /api/mp/virtual-pay/products -> 200
+GET /api/mp/service-records/sessions -> 401 expected unauthenticated
 ```
 
 ## Mini-program Upload
@@ -83,12 +90,13 @@ pnpm build -> pass, existing warnings only, 0 errors
 - Upload version: `1.0.20260526.3`
 - Upload description: `xhs-cover-preview-hotfix-v3-20260526`
 - Upload command: `/Applications/wechatwebdevtools.app/Contents/MacOS/cli upload --project /Users/Admin/Documents/美业话镜小程序 --version 1.0.20260526.3 --desc xhs-cover-preview-hotfix-v3-20260526 --lang zh`
-- Upload result: pending
+- Upload result: pass, total 1.2 MB / 1,267,645 bytes
 
 Mini-program local checks:
 
 ```text
-pending
+node --check pages/xiaohongshu/index.js -> pass
+git diff --check -> pass
 ```
 
 ## Risk Checklist
@@ -111,6 +119,6 @@ pending
 ## Final Decision
 
 - Release approved: yes, by user authorization in this thread.
-- Released by: pending
-- Release time: pending
+- Released by: Codex
+- Release time: 2026-05-26 14:34 CST
 - Follow-up items: ask user to close and reopen the test mini-program before testing preview.
