@@ -79,7 +79,8 @@ assets/voice-coach/training-map-visual.jpg
 
 - Vercel project: `ip`
 - Previous production deployment ID: `dpl_Fma4HDEkJYdqjLfkwA8y8cdDArMp`
-- Production deployment ID: pending
+- Production deployment ID: `dpl_968axyiBqqA485Jr8cVXWASX5DgH`
+- Production deployment URL: `https://ip-g0txgrbtu-a171240s-projects.vercel.app`
 - Production alias/domain: `https://www.ipnrgc.com`, `https://ip.ipgongchang.xin`
 - Deploy command: `pnpm dlx vercel@latest deploy --prod --yes`
 
@@ -89,6 +90,12 @@ Backend smoke results:
 pnpm exec tsc --noEmit --pretty false -> pass
 git diff --check -- app/api/mp/xhs/generate-cover-image/route.ts -> pass
 pnpm build -> pass, existing warnings only, 0 errors
+vercel inspect https://www.ipnrgc.com -> dpl_968axyiBqqA485Jr8cVXWASX5DgH, Ready
+GET /api/mp/xhs/covers/1d6fcb2b-603b-4c0b-b2a4-03d092318a04?v=1779779488206 -> 200 image/png, 1,740,766 bytes, Content-Length present
+same cover second request -> 200, x-vercel-cache: HIT, 0.763450s
+GET /api/mp/profile -> 401 expected unauthenticated
+GET /api/mp/virtual-pay/products -> 200
+GET /api/mp/service-records/sessions -> 401 expected unauthenticated
 ```
 
 ## Mini-program Upload
@@ -97,8 +104,9 @@ pnpm build -> pass, existing warnings only, 0 errors
 - DevTools CLI path: `/Applications/wechatwebdevtools.app/Contents/MacOS/cli`
 - Upload version: `1.0.20260526.4`
 - Upload description: `xhs-cover-preview-hotfix-v4-20260526`
-- Upload command: pending
-- Upload result: pending
+- Upload command: `/Applications/wechatwebdevtools.app/Contents/MacOS/cli upload --project /tmp/meiye-xhs-v4-upload.9OrdRx --version 1.0.20260526.4 --desc xhs-cover-preview-hotfix-v4-20260526 --lang zh`
+- Upload result: pass, total 1.2 MB / 1,268,599 bytes
+- Upload source: clean detached worktree at commit `e49e346`; excluded local training-map dirty files.
 
 Mini-program local checks:
 
@@ -128,6 +136,6 @@ simulated preferred_http_base_url=ip.ipgongchang.xin -> cover URL still rewrites
 ## Final Decision
 
 - Release approved: yes, by user authorization in this thread.
-- Released by: pending
-- Release time: pending
+- Released by: Codex
+- Release time: 2026-05-26 15:43 CST
 - Follow-up items: fix DNS for `ip.ipgongchang.xin` separately by setting `A ip.ipgongchang.xin 76.76.21.21`.
