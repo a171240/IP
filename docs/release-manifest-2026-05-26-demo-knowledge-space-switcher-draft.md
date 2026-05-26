@@ -90,7 +90,7 @@ None identified. Re-check immediately before staging or release.
 
 ## Explicitly Not Included
 
-- No production Supabase migration has been applied.
+- Supabase production migrations have been applied in this release thread.
 - No Vercel production deploy has been run.
 - No WeChat upload has been run.
 - No broad admin bypass or global max-permission flag is added.
@@ -100,7 +100,11 @@ None identified. Re-check immediately before staging or release.
 
 - Supabase migration files:
   - `supabase/migrations/20260526130550_add_mp_knowledge_spaces.sql`
-- Applied to production: No
+  - `supabase/migrations/20260526135453_harden_mp_knowledge_space_grants.sql`
+- Applied to production: Yes
+- Production migration history:
+  - `20260526055401` / `add_mp_knowledge_spaces`
+  - `20260526055507` / `harden_mp_knowledge_space_grants`
 - Migration summary:
   - Create `public.mp_knowledge_spaces`.
   - Create `public.mp_knowledge_space_access`.
@@ -109,13 +113,14 @@ None identified. Re-check immediately before staging or release.
   - Seed `baibaitu` and `chunshe`.
   - Backfill existing Baibaitu training links, progress, rewards, and identifiable sessions to the Baibaitu knowledge space.
   - Add RLS, grants, indexes, and comments.
+  - Revoke non-SELECT access from `anon` and `authenticated` on the new knowledge-space tables.
 - Supabase CLI status: local `supabase` command is not installed, so the migration was created manually and has not been locally applied.
 
-Required production grant after migration:
+Production grant applied:
 
 ```sql
 insert into public.mp_knowledge_space_access (user_id, knowledge_space_id, role, status)
-select '<auth.users.id>'::uuid, id, 'demo_operator', 'active'
+select '<吴江店演示账号 user_id>'::uuid, id, 'demo_operator', 'active'
 from public.mp_knowledge_spaces
 where code in ('baibaitu', 'chunshe')
 on conflict (user_id, knowledge_space_id)
@@ -125,6 +130,11 @@ do update set
   expires_at = null,
   updated_at = now();
 ```
+
+Grant verification:
+
+- 吴江店演示账号 now has active `demo_operator` access to `baibaitu`.
+- 吴江店演示账号 now has active `demo_operator` access to `chunshe`.
 
 Rollback/recovery plan:
 
