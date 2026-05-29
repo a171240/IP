@@ -45,6 +45,12 @@ function metadataText(meta: unknown, key: string) {
   return typeof value === "string" ? value.trim() : ""
 }
 
+function normalizeStoredAvatarUrl(value: string) {
+  const text = value.trim()
+  if (!text) return ""
+  return text.startsWith("https://") ? text : ""
+}
+
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null)
   if (!body || typeof body !== "object") {
@@ -53,7 +59,8 @@ export async function POST(request: NextRequest) {
 
   const code = typeof (body as { code?: unknown }).code === "string" ? (body as { code: string }).code : ""
   const nickname = typeof (body as { nickname?: unknown }).nickname === "string" ? (body as { nickname: string }).nickname : ""
-  const avatarUrl = typeof (body as { avatar_url?: unknown }).avatar_url === "string" ? (body as { avatar_url: string }).avatar_url : ""
+  const rawAvatarUrl = typeof (body as { avatar_url?: unknown }).avatar_url === "string" ? (body as { avatar_url: string }).avatar_url : ""
+  const avatarUrl = normalizeStoredAvatarUrl(rawAvatarUrl)
 
   if (!code) {
     return NextResponse.json({ error: "missing_code" }, { status: 400 })
@@ -167,17 +174,21 @@ export async function POST(request: NextRequest) {
   const responseUser = updatedUserData?.user || { ...user, user_metadata: nextUserMetadata }
 
   if (nickname || avatarUrl) {
+    const profileUpdate: {
+      id: string
+      email: string
+      nickname?: string
+      avatar_url?: string
+    } = {
+      id: user.id,
+      email,
+    }
+    if (nickname) profileUpdate.nickname = nickname
+    if (avatarUrl) profileUpdate.avatar_url = avatarUrl
+
     await admin
       .from("profiles")
-      .upsert(
-        {
-          id: user.id,
-          email,
-          nickname: nickname || DEFAULT_WECHAT_NICKNAME,
-          avatar_url: avatarUrl || null,
-        },
-        { onConflict: "id" }
-      )
+      .upsert(profileUpdate, { onConflict: "id" })
   }
 
   return NextResponse.json({
