@@ -190,8 +190,8 @@ function normalizeCoverDensity(value: string) {
 
 function coverPointTarget(density: string) {
   if (density === "simple") return 0
-  if (density === "rich") return 4
-  return 3
+  if (density === "rich") return 3
+  return 2
 }
 
 function normalizeAssetRefs(value: unknown): CoverReferenceAsset[] {
@@ -308,14 +308,11 @@ function buildPromptFromContent(body: Record<string, unknown>, draft?: DraftCove
   const pointTarget = coverPointTarget(coverDensity)
   const coverPointInstruction = pointTarget
     ? [
-        "【辅助信息点】",
+        "【短标签】",
         coverPoints.length
-          ? `请在主标题和副标题之外，加入以下${coverPoints.length}个短信息点/小标签，并严格按文字显示：${coverPoints.join(" / ")}。`
-          : `请在主标题和副标题之外，加入${pointTarget}个来自正文的短信息点/小标签，避免画面只有大标题和背景图。`,
-        "辅助信息点必须简短、清晰、手机端可读；不得包含CTA、平台名、门店地址、价格、联系方式或按钮样式。",
-        "必须把辅助信息点做成清晰的小标签、侧边短清单或分区信息条；不要只用图标代替文字，不要省略这些短点。",
-        "如果文字空间紧张，优先保证主标题和副标题准确；辅助信息点宁可更短、更少装饰，也不要错字、乱码或额外改写。",
-        "整体版式必须包含主标题区、副标题区、辅助信息点区和主视觉区；不要生成单调的氛围背景加大标题。",
+          ? `显示这些短标签：${coverPoints.map((point) => `「${point}」`).join(" ")}。`
+          : `可从主题提炼${pointTarget}个极短标签，但不要写成长句。`,
+        "短标签只占一个轻量区域，像小红书封面上的信息贴纸；不要做成表格、按钮或落地页模块。",
       ].join("\n")
     : ""
   const ctx = buildBeautyContext({
@@ -338,10 +335,8 @@ function buildPromptFromContent(body: Record<string, unknown>, draft?: DraftCove
     prompt: [
       asset.prompt,
       coverPointInstruction,
-      "",
-      safeContent ? "【正文参考，仅用于理解主题和情绪，不要把正文拆成小字放进画面】" : "",
-      safeContent ? compactText(safeContent, 650) : "",
-      keywords ? `参考关键词：${keywords}` : "",
+      safeContent ? `主题语境：${compactText(safeContent, 160)}` : "",
+      keywords ? `参考关键词：${compactText(keywords, 80)}` : "",
     ].filter(Boolean).join("\n"),
     negativePrompt: asset.negative,
     styleId: asset.styleId,
@@ -355,14 +350,9 @@ function strengthenMiniProgramCoverPrompt(prompt: string) {
     prompt.trim(),
     "",
     "【小程序封面质量底线】",
-    "这次提示词已按 gpt-image-2-poster-xhs skill 规格组织：任务类型、行业主题、主视觉、场景道具、构图、版式、可见文字和负面约束都必须执行。",
-    "这张图必须是完成度高的小红书首图设计，不是背景图，也不是营销落地页。",
-    "可以有人脸、护理场景、局部对比、少量清单或辅助说明，但画面底部必须保持干净。",
-    "版式必须有主标题区、副标题区、辅助信息点区和主视觉区；如果提示词包含短信息点，必须逐条清晰显示。",
-    "禁止只生成氛围背景加大标题，禁止主标题占满半张图导致信息层级单薄。",
-    "禁止把画面做成PPT、表格、App页面、商城详情页或投放落地页。",
-    "禁止底部导流组件、转化按钮、互动引导、私域联系方式、平台入口、可扫码联系元素。",
-    "必须有明确视觉焦点、美业质感和手机端可读标题；中文文字不要错字、乱码。",
+    "优先做精品小红书封面：主标题醒目、构图有设计感、主视觉高级、短标签克制。",
+    "不要生成普通护理房素材图加大字；不要PPT、表格、App页面、商城详情页、按钮、底部导流条或联系方式。",
+    "中文文字必须准确清晰，宁可减少装饰也不要乱码和错字。",
   ].join("\n")
 }
 

@@ -411,7 +411,9 @@ function forceCoverStyleByTitle(text: string): BeautyCoverStyleId | "" {
   if (includesAny(text, ["避雷", "踩坑", "做错", "越做越", "越护越", "别再", "千万别", "翻车", "烂脸", "风险"])) {
     return "contrast-warning-poster"
   }
-  if (includesAny(text, ["3点", "三点", "几点", "先看", "判断", "标准", "清单"])) return "clean-info-card"
+  if (includesAny(text, ["3点", "三点", "几点", "先看", "判断", "标准", "清单", "别盲选", "怎么选", "先确认"])) {
+    return "clean-info-card"
+  }
   return ""
 }
 
@@ -662,17 +664,10 @@ export function buildCoverPromptRequirements(ctx: BeautyContext) {
 function buildDirectCoverPromptRequirements(plan: BeautyCoverVisualPlan) {
   return [
     `版本：${XHS_COVER_PROMPT_VERSION}`,
-    "这是最终生图提示词：按 gpt-image-2-poster-xhs skill 的直出封面规格生成一张完整小红书首图。",
-    "当前阶段仍由生图模型直接生成完整封面，不做多图候选，不做后期叠字排版。",
-    `最终风格ID：${plan.id}。最终风格名称：${plan.label}。`,
-    "封面必须是可直接发布的高级护肤杂志封面视觉，不是App入口页，不是引流落地页。",
-    "画面应像高级美业杂志封面或商业护肤摄影海报：有明确主视觉、干净留白、真实材质和克制情绪。",
-    "最高优先级：禁止任何底部导流组件、转化按钮、互动引导、平台入口、扫码联系入口或私域联系方式；画面底部应保持干净，不要像营销落地页。",
-    "中文主标题和副标题必须清晰、准确、简体中文；不要乱码、错别字、英文。",
-    "可以有人脸、护理场景、局部对比、少量清单或辅助说明，但不要做成营销转化页，不要出现门店信息、价格优惠、地址、平台名、联系方式、可扫描私域入口、logo、水印。",
-    "版式必须有设计骨架：主标题区、副标题区、辅助信息点区、主视觉区。若提示词后续包含【辅助信息点】，必须把这些短点做成清晰可读的小标签、侧边短清单或分区信息条。",
-    "禁止只做一张氛围背景再压一个大标题；禁止主标题占满半张图导致其它信息没有层次。",
-    "不要空白水彩模板、廉价Canva模板、素材站样图、廉价贴纸、低清截图感。",
+    "按 gpt-image-2-poster-xhs skill 的直出封面规格生成一张完整小红书首图。",
+    `最终风格：${plan.id}（${plan.label}）。`,
+    "成品应像高级小红书封面或商业护肤杂志首图，而不是素材站照片、App页面或营销落地页。",
+    "手机缩略图先读标题，再看副标题和短标签；画面必须有明确主视觉、留白和版式秩序。",
   ].join("\n")
 }
 
@@ -688,42 +683,33 @@ export function normalizeCoverAsset(opts: {
   const main = cleanCoverDisplayText(opts.main.trim(), "皮肤护理先看这几点")
   const sub = cleanCoverDisplayText(opts.sub.trim(), "少走弯路，安心护理")
   const negative = String(opts.negative || "").trim()
-  const forcedStyle = forceCoverStyleByTitle(main)
+  const forcedStyle = forceCoverStyleByTitle([main, sub, opts.prompt || ""].filter(Boolean).join(" "))
   const plan = resolveCoverVisualPlan(opts.ctx, forcedStyle || opts.styleId, forcedStyle ? null : opts.styleReason)
-  const styleBlock = buildCoverStylePromptBlock(plan)
   const directRequirements = buildDirectCoverPromptRequirements(plan)
   const promptBody = [
     `【${XHS_COVER_PROMPT_VERSION}】`,
-    `任务类型：${plan.taskType}`,
-    "行业/主题：生活美容、皮肤管理、本地门店小红书首图封面。",
-    "画幅比例：3:4 竖版。",
-    "输出：只生成一张完成度高的封面图。",
-    "CRITICAL CTA RULE: no bottom conversion footer, no action button, no platform-entry UI, no social interaction prompt, no private-domain contact element, no scannable contact code.",
-    "",
-    styleBlock,
+    `生成一张 3:4 竖版小红书封面，行业为生活美容、皮肤管理、本地门店内容。`,
+    `主题：「${main}」。输出一张完成度高、可直接发布的封面图。`,
     "",
     directRequirements,
     "",
-    "【必须原样显示的中文文字】",
-    `主标题："${main}"`,
-    `副标题："${sub}"`,
-    "文字要求：",
-    "- 所有文字必须为清晰、准确、简体中文。",
-    "- 严格使用我给出的主标题、副标题和短标签；不要自动改写，不要添加额外标语。",
-    "- 不要乱码、错别字、英文、拼音或无意义小字。",
-    "- 主标题优先保证准确和最大可读，副标题更小但必须清楚。",
-    "- 如果后续提示词包含【辅助信息点】，这些短点必须逐条显示在画面里，不要省略，不要只用图标代替文字。",
-    "",
-    "【画面方向】",
+    "【Skill视觉Brief】",
+    `模板参考：${plan.templateFamily}`,
     `主视觉：${plan.mainVisual}`,
     `场景道具：${plan.sceneProps}`,
     `构图：${plan.composition}`,
-    "文字要自然融入海报，而不是贴在模板上。",
-    "版面至少有三层信息：主标题、短副标题、短标签/短清单；不要生成单调的“背景图 + 大标题”。",
+    `配色：${plan.palette}`,
+    `字体：${plan.typography}`,
+    `质感目标：${plan.qualityGoal}`,
     "",
-    "【输出目标】",
-    "手机端缩略图可读，商业化可发布，干净、现代、专业；信息密度稳定但不拥挤；不要促销感，不要信息过载，不要像App入口页，不要像投放转化页。",
-    `质量底线：${plan.qualityGoal}`,
+    "【必须显示的文字】",
+    `大标题「${main}」`,
+    `副标题「${sub}」`,
+    "文字必须是清晰、准确的简体中文；不要改写标题，不要添加英文、拼音、错别字或无意义小字。",
+    "",
+    "【版式要求】",
+    "标题区、主视觉区、短标签区三层清楚；标题要大而稳，短标签只做轻量辅助。",
+    "不要把护理床照片铺满整张图后简单压字；不要做成长表格、按钮、底部导流条或平台入口。",
   ].join("\n")
 
   return {
