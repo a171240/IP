@@ -106,6 +106,7 @@ const COVER_REFERENCE_CTA_LINE_RE =
   /(关注|私信|评论|留言|点击|收藏|点赞|转发|扫码|二维码|加微信|微信|VX|vx|领取|咨询|预约|进群|小程序|主页|链接|回复|下方|底部|立即进入|解锁)/i
 const COVER_REFERENCE_CTA_WORD_RE =
   /(关注|私信|评论|留言|点击|收藏|点赞|转发|扫码|二维码|加微信|微信|VX|vx|领取|咨询|预约|进群|小程序|主页|链接|回复|下方|底部|立即进入|解锁)/gi
+const MAX_COVER_POINTS = 4
 
 function sanitizeCoverReferenceText(value: string) {
   return value
@@ -171,16 +172,67 @@ function getStringArrayField(body: Record<string, unknown>, names: string[]) {
   return []
 }
 
-function getCoverPoints(body: Record<string, unknown>, draft?: DraftCoverAsset | null) {
+function normalizeCoverPointLabel(value: string) {
+  const raw = String(value || "")
+    .replace(/^\s*(?:[①②③④]|[1-4][、.)）]|第[一二三四1234][点条项]?)\s*/, "")
+    .trim()
+  const quoted = raw.match(/[“「『"]([^”」』"]{2,12})[”」』"]/)
+  const candidate = (quoted?.[1] || raw.split(/[。！？!?；;：:，,]/)[0] || raw)
+    .replace(/^(先|再)?看/, "")
+    .replace(/^先确认/, "确认")
+    .replace(/有没有/g, "")
+    .replace(/会不会/g, "不")
+    .replace(/是不是真的/g, "")
+    .replace(/是否/g, "")
+    .replace(/\s+/g, "")
+    .trim()
+  return sanitizeCoverReferenceText(candidate).slice(0, 14)
+}
+
+function normalizeCoverPointList(points: string[]) {
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const point of points) {
+    const label = normalizeCoverPointLabel(point)
+    if (!label || seen.has(label)) continue
+    seen.add(label)
+    result.push(label)
+    if (result.length >= MAX_COVER_POINTS) break
+  }
+  return result
+}
+
+function extractCoverPointsFromContent(content: string) {
+  const lines = String(content || "")
+    .split(/\r?\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+  const sectionLines = lines.filter((line) =>
+    /^\s*(?:[①②③④]|[1-4][、.)）]|第[一二三四1234][点条项]?)/.test(line)
+  )
+  return normalizeCoverPointList(sectionLines)
+}
+
+function inferPointCountFromText(text: string) {
+  const match = String(text || "").match(/([2-4两二三四])\s*(?:个)?(?:点|条|项|种)/)
+  if (!match) return 0
+  const value = match[1]
+  if (value === "2" || value === "两" || value === "二") return 2
+  if (value === "3" || value === "三") return 3
+  if (value === "4" || value === "四") return 4
+  return 0
+}
+
+function getCoverPoints(body: Record<string, unknown>, draft?: DraftCoverAsset | null, content = "") {
   const preExtracted = getNestedRecord(body, "preExtracted")
   const direct = getStringArrayField(body, ["coverPoints", "cover_points"])
-  if (direct.length) return direct.slice(0, 4)
+  if (direct.length) return normalizeCoverPointList(direct)
   if (preExtracted) {
-    const points = getStringArrayField(preExtracted, ["points", "coverPoints", "cover_points"]).slice(0, 4)
+    const points = normalizeCoverPointList(getStringArrayField(preExtracted, ["points", "coverPoints", "cover_points"]))
     if (points.length) return points
   }
-  if (draft?.coverPoints?.length) return draft.coverPoints.slice(0, 4)
-  return []
+  if (draft?.coverPoints?.length) return normalizeCoverPointList(draft.coverPoints)
+  return extractCoverPointsFromContent(content)
 }
 
 function normalizeCoverDensity(value: string) {
@@ -188,9 +240,12 @@ function normalizeCoverDensity(value: string) {
   return "balanced"
 }
 
-function coverPointTarget(density: string) {
+function coverPointTarget(density: string, text = "", availableCount = 0) {
   if (density === "simple") return 0
-  if (density === "rich") return 3
+  if (availableCount) return Math.min(MAX_COVER_POINTS, availableCount)
+  const inferred = inferPointCountFromText(text)
+  if (inferred) return inferred
+  if (density === "rich") return 4
   return 2
 }
 
@@ -304,14 +359,15 @@ function buildPromptFromContent(body: Record<string, unknown>, draft?: DraftCove
   const conflictLevel = normalizeConflictLevel(getTextField(body, ["conflictLevel", "conflict_level"]))
   const styleReason = getTextField(body, ["coverStyleReason", "cover_style_reason"]) || draft?.styleReason || ""
   const coverDensity = normalizeCoverDensity(getTextField(body, ["coverDensity", "cover_density"]))
-  const coverPoints = getCoverPoints(body, draft).slice(0, coverPointTarget(coverDensity))
-  const pointTarget = coverPointTarget(coverDensity)
+  const rawCoverPoints = getCoverPoints(body, draft, content)
+  const pointTarget = coverPointTarget(coverDensity, [title, sub, content].filter(Boolean).join(" "), rawCoverPoints.length)
+  const coverPoints = rawCoverPoints.slice(0, pointTarget)
   const coverPointInstruction = pointTarget
     ? [
         "【短标签】",
         coverPoints.length
-          ? `显示这些短标签：${coverPoints.map((point) => `「${point}」`).join(" ")}。`
-          : `可从主题提炼${pointTarget}个极短标签，但不要写成长句。`,
+          ? `严格显示这${coverPoints.length}个短标签：${coverPoints.map((point) => `「${point}」`).join(" ")}。数量不要自行增减。`
+          : `从正文小节提炼${pointTarget}个极短标签；若正文有编号小节，数量必须和小节一致。`,
         "短标签只占一个轻量区域，像小红书封面上的信息贴纸；不要做成表格、按钮或落地页模块。",
       ].join("\n")
     : ""

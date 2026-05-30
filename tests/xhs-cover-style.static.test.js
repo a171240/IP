@@ -199,6 +199,18 @@ test("xhs text generation prompt requires store anchor when profile exists", () 
   assert.match(coverRoute, /普通护理房素材图加大字/)
 })
 
+test("cover short labels follow body sections instead of a fixed two-point layout", () => {
+  const source = readFileSync(join(root, "lib/xhs/generate-v4.server.ts"), "utf8")
+  const coverRoute = readFileSync(join(root, "app/api/mp/xhs/generate-cover-image/route.ts"), "utf8")
+
+  assert.match(source, /function extractCoverPointsFromBody/)
+  assert.match(source, /cover_points 数量必须和正文核心小节一致/)
+  assert.match(coverRoute, /function extractCoverPointsFromContent/)
+  assert.match(coverRoute, /严格显示这\$\{coverPoints\.length\}个短标签/)
+  assert.match(coverRoute, /数量必须和小节一致/)
+  assert.doesNotMatch(coverRoute, /if \(density === "rich"\) return 3\s+return 2/)
+})
+
 test("image generation defaults stay single-image and support provider fallbacks", () => {
   const source = readFileSync(join(root, "lib/posters/gpt-image-2.server.ts"), "utf8")
   const mpRoute = readFileSync(join(root, "app/api/mp/xhs/generate-cover-image/route.ts"), "utf8")

@@ -208,14 +208,43 @@ function coverPointTarget(density: CoverDensity) {
   return 3
 }
 
-function sanitizeCoverPoints(input: unknown, density: CoverDensity) {
+function normalizeCoverPointLabel(value: string) {
+  const raw = String(value || "")
+    .replace(/^\s*(?:[①②③④]|[1-4][、.)）]|第[一二三四1234][点条项]?)\s*/, "")
+    .trim()
+  const quoted = raw.match(/[“「『"]([^”」』"]{2,12})[”」』"]/)
+  const candidate = (quoted?.[1] || raw.split(/[。！？!?；;：:，,]/)[0] || raw)
+    .replace(/^(先|再)?看/, "")
+    .replace(/^先确认/, "确认")
+    .replace(/有没有/g, "")
+    .replace(/会不会/g, "不")
+    .replace(/是不是真的/g, "")
+    .replace(/是否/g, "")
+    .replace(/\s+/g, "")
+    .trim()
+  return sanitizeStrictPublishText(candidate).replace(/[：:。.!！?？]+$/g, "").trim().slice(0, 14)
+}
+
+function extractCoverPointsFromBody(body: string) {
+  const lines = String(body || "")
+    .split(/\r?\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+  return lines
+    .filter((line) => /^\s*(?:[①②③④]|[1-4][、.)）]|第[一二三四1234][点条项]?)/.test(line))
+    .map(normalizeCoverPointLabel)
+    .filter(Boolean)
+}
+
+function sanitizeCoverPoints(input: unknown, density: CoverDensity, body = "") {
   const target = coverPointTarget(density)
-  if (!target || !Array.isArray(input)) return []
-  return input
+  if (!target) return []
+  const source = Array.isArray(input) && input.length ? input : extractCoverPointsFromBody(body)
+  return source
     .map((item) => sanitizeStrictPublishText(String(item || "")).replace(/[：:。.!！?？]+$/g, "").trim())
     .filter(Boolean)
     .filter((item) => item.length <= 14)
-    .slice(0, target)
+    .slice(0, 4)
 }
 
 function buildCommercialContextText(input: GenerateV4Input) {
@@ -272,8 +301,8 @@ function buildCoverDensityText(density: CoverDensity) {
   }
   return [
     `封面信息密度：${density}。`,
-    `cover_points 必须输出 ${target} 个短信息点，每个不超过14个字。`,
-    "这些点用于首图上的小标签/短清单，必须来自正文核心判断，不得包含CTA、平台名、门店地址、价格或联系方式。",
+    `如果正文有编号小节或清单结构，cover_points 数量必须和正文核心小节一致（2-4个）；没有清晰小节时，参考输出 ${target} 个短信息点。`,
+    "每个 cover_point 不超过14个字，用于首图上的小标签/短清单，必须来自正文核心判断，不得包含CTA、平台名、门店地址、价格或联系方式。",
     "cover_points 不要写抽象情绪口号，要写成可直接上图的判断点、避坑点、流程点或适合人群点。",
     "封面版式必须有主标题区、副标题区、短信息点区和主视觉区；不得只生成氛围背景+大标题。",
   ].join("\n")
@@ -788,7 +817,7 @@ export async function generateXhsV4(opts: { billing: BillingContext; draftId: st
     const pinnedComment = shouldGeneratePinnedComment(input.commercialContext)
       ? (sanitizePinnedCommentText(data.pinned_comment || "").trim() || fallbackPinnedComment(input))
       : ""
-    const coverPoints = sanitizeCoverPoints(data.cover_points, input.coverDensity)
+    const coverPoints = sanitizeCoverPoints(data.cover_points, input.coverDensity, data.body)
 
     current = {
       title: data.title.trim(),
@@ -884,7 +913,7 @@ export async function generateXhsV4(opts: { billing: BillingContext; draftId: st
     const nextPinnedComment: string = shouldGeneratePinnedComment(input.commercialContext)
       ? (sanitizePinnedCommentText(d.pinned_comment || "").trim() || current.pinnedComment || fallbackPinnedComment(input))
       : ""
-    const coverPoints = sanitizeCoverPoints(d.cover_points, input.coverDensity)
+    const coverPoints = sanitizeCoverPoints(d.cover_points, input.coverDensity, d.body)
 
     current = {
       title: d.title.trim(),
