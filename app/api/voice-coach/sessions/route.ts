@@ -570,20 +570,42 @@ export async function POST(request: NextRequest) {
     })
     if (!followupContextResult.ok) return followupContextResult.response
     const followupContext = followupContextResult.context
+    const rawTrainingContext =
+      parsed.data.training_context && typeof parsed.data.training_context === "object"
+        ? parsed.data.training_context
+        : {}
+    const trainingContext =
+      parsed.data.training_task_id ||
+      parsed.data.training_pack_id ||
+      parsed.data.training_knowledge_space_id ||
+      parsed.data.training_context
+        ? {
+            ...rawTrainingContext,
+            task_id: parsed.data.training_task_id || rawTrainingContext.task_id || "",
+            pack_id: parsed.data.training_pack_id || rawTrainingContext.pack_id || "",
+            brand_code: parsed.data.training_brand_code || rawTrainingContext.brand_code || "",
+            knowledge_space_id:
+              parsed.data.training_knowledge_space_id ||
+              rawTrainingContext.knowledge_space_id ||
+              "",
+          }
+        : null
 
     const sessionSnapshot =
-      customerProfileResult.data || sceneCardResult.data || liveNotes || followupContext
+      customerProfileResult.data || sceneCardResult.data || liveNotes || followupContext || trainingContext
         ? buildVoiceCoachSessionSnapshot({
             customerProfile: customerProfileResult.data || null,
             sceneCard: sceneCardResult.data || null,
             liveNotes,
             followupContext,
+            trainingContext,
           })
         : null
     const sessionContext = sessionSnapshot
       ? {
           live_notes: sessionSnapshot.live_notes,
           followup_context: sessionSnapshot.followup_context,
+          training_context: sessionSnapshot.training_context,
         }
       : null
     const sessionContextText = getVoiceCoachSessionPromptContext(sessionSnapshot)

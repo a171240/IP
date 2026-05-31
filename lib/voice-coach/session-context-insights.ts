@@ -3,6 +3,7 @@ import {
   normalizeVoiceCoachFollowupContext,
   normalizeCustomerProfileRecord,
   normalizeSceneCardRecord,
+  normalizeVoiceCoachTrainingContext,
   type VoiceCoachSessionSnapshot,
 } from "./session-context"
 import { getVoiceCoachSceneKindPolicy } from "./scene-kind-policy"
@@ -58,6 +59,11 @@ export type VoiceCoachSessionInsights = {
   mustCoverPoints: string[]
   doNotSay: string[]
   focusPoints: string[]
+  trainingTitle: string
+  trainingCustomerLine: string
+  trainingFocus: string
+  trainingPassCriteria: string[]
+  trainingForbiddenPhrases: string[]
   followupTitle: string
   followupInstruction: string
   followupPracticePoints: string[]
@@ -79,6 +85,7 @@ export function getVoiceCoachSessionInsights(args: {
   )
   const sceneCard = normalizeSceneCardRecord((snapshotObject?.scene_card as any) || null)
   const followupContext = normalizeVoiceCoachFollowupContext(snapshotObject?.followup_context || null)
+  const trainingContext = normalizeVoiceCoachTrainingContext(snapshotObject?.training_context || null)
   const clientContext = getVoiceCoachSessionClientContext({
     snapshot: args.snapshot,
     sessionContext: args.sessionContext,
@@ -96,6 +103,8 @@ export function getVoiceCoachSessionInsights(args: {
       ...(sceneCard?.communication_method_tags || []),
       ...(sceneCard?.must_cover_points || []),
       ...(sceneCard?.likely_questions || []),
+      trainingContext?.focus || "",
+      ...(trainingContext?.pass_criteria || []),
       ...(followupContext?.practice_points || []),
       ...(followupContext?.missed_points || []),
     ],
@@ -119,6 +128,8 @@ export function getVoiceCoachSessionInsights(args: {
   if (customerLabel) backgroundParts.push(`顾客设定：${customerLabel}`)
   if (sceneLabel) backgroundParts.push(`训练场景：${sceneLabel}`)
   if (sceneCard?.scene_goal) backgroundParts.push(`目标：${sceneCard.scene_goal}`)
+  if (trainingContext?.title) backgroundParts.push(`训练任务：${trainingContext.title}`)
+  if (trainingContext?.customer_line) backgroundParts.push(`顾客原话：${trainingContext.customer_line}`)
   if (clientContext.live_notes) backgroundParts.push(`备注：${clientContext.live_notes}`)
   if (followupContext?.title) backgroundParts.push(`复练重点：${followupContext.title}`)
 
@@ -127,6 +138,8 @@ export function getVoiceCoachSessionInsights(args: {
       customerLabel ||
         sceneLabel ||
         clientContext.live_notes ||
+        trainingContext?.title ||
+        trainingContext?.customer_line ||
         followupContext?.title ||
         summaryLines.length ||
         focusPoints.length,
@@ -150,8 +163,13 @@ export function getVoiceCoachSessionInsights(args: {
     targetObjections: uniqStrings(sceneCard?.target_objections || [], 6),
     communicationMethodTags: uniqStrings(sceneCard?.communication_method_tags || [], 6),
     mustCoverPoints: uniqStrings(sceneCard?.must_cover_points || [], 6),
-    doNotSay: uniqStrings(sceneCard?.do_not_say || [], 6),
+    doNotSay: uniqStrings([...(sceneCard?.do_not_say || []), ...(trainingContext?.forbidden_phrases || [])], 8),
     focusPoints,
+    trainingTitle: trainingContext?.title || "",
+    trainingCustomerLine: trainingContext?.customer_line || "",
+    trainingFocus: trainingContext?.focus || "",
+    trainingPassCriteria: uniqStrings(trainingContext?.pass_criteria || [], 6),
+    trainingForbiddenPhrases: uniqStrings(trainingContext?.forbidden_phrases || [], 6),
     followupTitle: followupContext?.title || "",
     followupInstruction: followupContext?.instruction || "",
     followupPracticePoints: uniqStrings(followupContext?.practice_points || [], 5),
