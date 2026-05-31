@@ -1,5 +1,13 @@
 import "server-only"
 
+import {
+  getDefaultLayoutPresetId,
+  getPosterLayoutPreset,
+  getTemplateLayoutCandidateIds,
+  inferLayoutPresetFromText,
+  normalizeLayoutPresetId,
+} from "./layout-presets"
+
 export type PosterAssetKind = "style" | "logo" | "store" | "product" | "people"
 
 export type PosterAssetRef = {
@@ -38,6 +46,7 @@ export type PosterIntakeAnswers = {
   constraints?: string
   templateId?: string
   stylePreset?: string
+  layoutPresetId?: string
 }
 
 export type PosterBrief = Required<
@@ -55,6 +64,8 @@ export type PosterRecommendation = {
   reason: string
   size: "4:5" | "3:4" | "9:16" | "16:9" | "1:1"
   resolution: "1k"
+  layoutPresetId: string
+  layoutCandidates: string[]
 }
 
 export type PosterVisibleCopy = {
@@ -86,6 +97,9 @@ export type PosterPlan = {
     audience: string
     stylePreset: string
     constraints: string
+    layoutPresetId: string
+    layoutName: string
+    layoutPresetVersion: string
     assetKinds: string[]
   }
   safety: {
@@ -121,12 +135,12 @@ const TEMPLATE_KEYWORDS: Array<{ id: string; words: string[]; reason: string }> 
   { id: "P08", words: ["避坑", "避雷", "攻略", "踩坑", "注意"], reason: "识别到攻略/避坑封面目标" },
   { id: "P09", words: ["科普", "知识", "一张图", "讲清楚", "信息图"], reason: "识别到科普信息图目标" },
   { id: "P07", words: ["探店", "打卡", "本地", "门店环境", "宝藏店"], reason: "识别到本地探店目标" },
-  { id: "P05", words: ["会员", "办卡", "储值", "复购", "老客"], reason: "识别到会员/复购目标" },
   { id: "P13", words: ["祝福", "问候", "安康", "不卖东西", "不促销", "不卖货", "客户群问候"], reason: "识别到非促销节日祝福/客户关怀目标" },
+  { id: "P05", words: ["会员", "办卡", "储值", "复购", "老客"], reason: "识别到会员/复购目标" },
   { id: "P12", words: ["朋友圈", "转发", "私域", "社群", "分享"], reason: "识别到朋友圈/私域分享目标" },
-  { id: "P04", words: ["品牌", "形象", "高级", "信任", "调性"], reason: "识别到品牌形象目标" },
   { id: "P02", words: ["节日", "活动", "五一", "520", "七夕", "周年", "618", "双11"], reason: "识别到节日/活动促销目标" },
   { id: "P01", words: ["新客", "首单", "体验", "团购", "引流"], reason: "识别到新客引流目标" },
+  { id: "P04", words: ["品牌", "形象", "信任", "调性"], reason: "识别到品牌形象目标" },
   { id: "P03", words: ["爆款", "项目", "产品", "套餐", "主推", "上新"], reason: "识别到主推项目/产品目标" },
 ]
 
@@ -367,6 +381,8 @@ function inferAnswers(message: string): PosterIntakeAnswers {
 
   const stylePreset = inferStylePreset(text)
   if (stylePreset) out.stylePreset ||= stylePreset
+  const layoutPresetId = inferLayoutPresetFromText(text, out.templateId)
+  if (layoutPresetId) out.layoutPresetId ||= layoutPresetId
 
   if (/女性|女士|女客|女生|姐姐|宝妈|妈妈|宝妈群体/.test(text)) {
     out.audience ||= "女性顾客"
@@ -625,6 +641,9 @@ export function buildPosterPlan(opts: {
       audience: opts.brief.audience || "",
       stylePreset: opts.brief.stylePreset || opts.fields._stylePreset || "",
       constraints: opts.brief.constraints || "",
+      layoutPresetId: opts.fields._layoutPresetId || opts.brief.layoutPresetId || "",
+      layoutName: opts.fields._layoutName || "",
+      layoutPresetVersion: opts.fields._layoutPresetVersion || "",
       assetKinds,
     },
     safety: {
@@ -651,13 +670,34 @@ function mergeAnswers(...items: Array<PosterIntakeAnswers | null | undefined>) {
 }
 
 export function recommendPosterTemplate(answers: PosterIntakeAnswers): PosterRecommendation {
+  const resolveLayout = (templateId: string) => {
+    const haystack = [
+      answers.posterGoal,
+      answers.campaignTitle,
+      answers.projectName,
+      answers.headline,
+      answers.sellingPoints,
+      answers.constraints,
+      answers.stylePreset,
+    ]
+      .filter(Boolean)
+      .join(" ")
+    const requested = normalizeLayoutPresetId(answers.layoutPresetId)
+    const inferred = requested || inferLayoutPresetFromText(haystack, templateId) || getDefaultLayoutPresetId(templateId)
+    const preset = getPosterLayoutPreset(inferred, templateId)
+    const candidates = [preset.id, ...getTemplateLayoutCandidateIds(templateId)].filter((id, index, arr) => arr.indexOf(id) === index)
+    return { layoutPresetId: preset.id, layoutCandidates: candidates.slice(0, 3) }
+  }
+
   const explicit = normalizeTemplateId(answers.templateId)
   if (explicit) {
     const style = TEMPLATE_STYLE[explicit]
+    const layout = resolveLayout(explicit)
     return {
       templateId: explicit,
       ...style,
       stylePreset: asText(answers.stylePreset) || style.stylePreset,
+      ...layout,
       confidence: 0.95,
       reason: "用户或模型已明确模板",
     }
@@ -677,10 +717,12 @@ export function recommendPosterTemplate(answers: PosterIntakeAnswers): PosterRec
   const hit = TEMPLATE_KEYWORDS.find((item) => item.words.some((word) => haystack.includes(word)))
   const id = hit?.id || "P03"
   const style = TEMPLATE_STYLE[id]
+  const layout = resolveLayout(id)
   return {
     templateId: id,
     ...style,
     stylePreset: asText(answers.stylePreset) || style.stylePreset,
+    ...layout,
     confidence: hit ? 0.82 : 0.58,
     reason: hit?.reason || "信息较泛，默认按主推项目/产品海报处理",
   }
@@ -762,6 +804,7 @@ function listToText(input: string, fallback: string) {
 
 export function buildPosterFieldsFromBrief(templateId: string, brief: PosterBrief): Record<string, string> {
   const tags = listToText(brief.sellingPoints || "", "真实到店｜服务清楚｜新手友好")
+  const layoutPreset = getPosterLayoutPreset(brief.layoutPresetId, templateId)
   const common = {
     _industry: brief.industry,
     _businessType: brief.shopType,
@@ -771,6 +814,9 @@ export function buildPosterFieldsFromBrief(templateId: string, brief: PosterBrie
     _constraints: brief.constraints || "",
     _cityArea: brief.cityArea,
     _storeName: brief.storeName,
+    _layoutPresetId: layoutPreset.id,
+    _layoutName: layoutPreset.name,
+    _layoutPresetVersion: layoutPreset.version,
   }
 
   const base: Record<string, string> = {
@@ -865,5 +911,6 @@ export function coercePosterAnswers(input: unknown): PosterIntakeAnswers {
     constraints: asText(raw.constraints, 180) || asText(raw._constraints, 180),
     templateId: normalizeTemplateId(raw.templateId),
     stylePreset: asText(raw.stylePreset),
+    layoutPresetId: normalizeLayoutPresetId(raw.layoutPresetId) || normalizeLayoutPresetId(raw._layoutPresetId),
   }
 }

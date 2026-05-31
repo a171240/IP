@@ -5,6 +5,13 @@ import { z } from "zod"
 
 import { generateGptImage2 } from "@/lib/posters/gpt-image-2.server"
 import {
+  getPosterLayoutPreset,
+  layoutReferencePromptBlock,
+  publicPosterLayoutPreset,
+  readLayoutReferenceDataUrl,
+  type PosterLayoutPreset,
+} from "@/lib/posters/layout-presets"
+import {
   buildFreeImagePrompt,
   getDefaultPosterNegativePrompt,
   getMissingRequiredFields,
@@ -52,6 +59,7 @@ const bodySchema = z.object({
     .optional()
     .default("poster.generate.image"),
   assetRefs: z.array(assetRefSchema).max(5).optional().default([]),
+  layoutPresetId: z.string().trim().max(80).optional().default(""),
   size: z
     .enum(["auto", "1:1", "3:2", "2:3", "4:3", "3:4", "5:4", "4:5", "16:9", "9:16", "2:1", "1:2", "21:9", "9:21"])
     .optional(),
@@ -78,7 +86,7 @@ function posterImagePath(userId: string, posterId: string) {
   return `posters/${userId}/${posterId}/image`
 }
 
-function assetPromptBlock(assetRefs: PosterAssetRef[]) {
+function assetPromptBlock(assetRefs: PosterAssetRef[], startIndex = 1) {
   if (!assetRefs.length) return ""
 
   const labels: Record<PosterAssetRef["kind"], string> = {
@@ -92,7 +100,7 @@ function assetPromptBlock(assetRefs: PosterAssetRef[]) {
   return [
     "",
     "参考素材使用规则：",
-    ...assetRefs.map((ref, index) => `- 参考图 ${index + 1} 是${labels[ref.kind]}素材。`),
+    ...assetRefs.map((ref, index) => `- 参考图 ${startIndex + index} 是${labels[ref.kind]}素材。`),
     assetRefs.some((ref) => ref.kind === "style")
       ? "- 风格/版式参考图只用于学习构图、配色、字体气质、留白比例和高级感；不要照抄其中的文字、Logo、人物、产品、价格或具体版面内容。"
       : "",
@@ -190,6 +198,8 @@ export async function POST(request: NextRequest) {
   const warnings: string[] = []
   let renderedFields: Record<string, string> = {}
   let fieldSafety: ReturnType<typeof sanitizePosterTemplateFields> | null = null
+  let layoutPreset: PosterLayoutPreset | null = null
+  let layoutReferenceDataUrl: string | null = null
 
   try {
     if (input.mode === "template") {
@@ -204,17 +214,31 @@ export async function POST(request: NextRequest) {
       templateId = template.id
       size = input.size || template.defaultSize
       resolution = BASIC_POSTER_RESOLUTION
-      fieldSafety = sanitizePosterTemplateFields(template.id, input.fields)
+      const requestedLayoutPresetId =
+        input.layoutPresetId ||
+        (typeof input.hiddenContext?.layoutPresetId === "string" ? input.hiddenContext.layoutPresetId : "") ||
+        (typeof input.posterPlan?.hiddenContext?.layoutPresetId === "string" ? input.posterPlan.hiddenContext.layoutPresetId : "") ||
+        input.fields._layoutPresetId ||
+        ""
+      layoutPreset = getPosterLayoutPreset(requestedLayoutPresetId, template.id)
+      fieldSafety = sanitizePosterTemplateFields(template.id, {
+        ...input.fields,
+        _layoutPresetId: layoutPreset.id,
+        _layoutName: layoutPreset.name,
+        _layoutPresetVersion: layoutPreset.version,
+      })
       renderedFields = fieldSafety.fields
-      const rendered = renderPosterTemplate(template, renderedFields, size)
+      const rendered = renderPosterTemplate(template, renderedFields, size, { layoutPreset })
       prompt = rendered.prompt
       negativePrompt = rendered.negativePrompt
       overlay = rendered.overlay
       warnings.push("模型会直接生成完整海报，请重点核对标题、价格、日期和地址。")
       warnings.push("如果中文有错字，使用“文字更严格版”重新生成。")
+      warnings.push(`已采用「${layoutPreset.name}」版式骨架，请重点核对版面中文是否准确。`)
       if (fieldSafety.sanitizedFields.length) {
         warnings.push("已自动移除不会印在海报上的用户指令文字。")
       }
+      layoutReferenceDataUrl = await readLayoutReferenceDataUrl(layoutPreset)
     } else {
       if (!input.prompt.trim()) return NextResponse.json({ ok: false, error: "prompt_required" }, { status: 400 })
       prompt = buildFreeImagePrompt(input.prompt)
@@ -224,9 +248,13 @@ export async function POST(request: NextRequest) {
     }
 
     const validAssetRefs = input.assetRefs as PosterAssetRef[]
-    if (validAssetRefs.length) {
-      prompt = [prompt, assetPromptBlock(validAssetRefs)].filter(Boolean).join("\n")
-    }
+    prompt = [
+      prompt,
+      layoutPreset ? layoutReferencePromptBlock({ preset: layoutPreset, hasReferenceImage: Boolean(layoutReferenceDataUrl) }) : "",
+      validAssetRefs.length ? assetPromptBlock(validAssetRefs, layoutReferenceDataUrl ? 2 : 1) : "",
+    ]
+      .filter(Boolean)
+      .join("\n")
 
     const charge = await chargeMpAiPoints({
       request,
@@ -239,6 +267,8 @@ export async function POST(request: NextRequest) {
         size,
         resolution,
         sanitized_count: fieldSafety?.sanitizedFields.length || 0,
+        layout_preset_id: layoutPreset?.id || null,
+        layout_reference_used: Boolean(layoutReferenceDataUrl),
       },
     })
     if (!charge.ok) return charge.error
@@ -256,13 +286,16 @@ export async function POST(request: NextRequest) {
         cost: charged.cost,
         actionCode: charged.actionCode,
         plan: billing.ctx.plan,
+        layoutPresetId: layoutPreset?.id || "",
+        layoutReferenceUsed: Boolean(layoutReferenceDataUrl),
       },
     })
 
     const bucket = getXhsAssetsBucket()
-    const imageUrls = validAssetRefs.length
+    const userImageUrls = validAssetRefs.length
       ? await assetRefsToImageUrls({ bucket, userId: billing.ctx.userId, assetRefs: validAssetRefs })
       : []
+    const imageUrls = [layoutReferenceDataUrl || "", ...userImageUrls].filter(Boolean)
     const generated = await generateGptImage2({ prompt, negativePrompt, size, resolution, imageUrls })
     const posterId = randomUUID()
     const uploaded = await uploadRemoteAssetToPath({
@@ -287,6 +320,11 @@ export async function POST(request: NextRequest) {
           contentType: uploaded.contentType,
           size,
           resolution,
+          layoutPresetId: layoutPreset?.id || null,
+          layoutPresetName: layoutPreset?.name || null,
+          layoutPresetVersion: layoutPreset?.version || null,
+          layoutReferenceUsed: Boolean(layoutReferenceDataUrl),
+          layoutReferenceSource: layoutReferenceDataUrl ? "system-wireframe" : "prompt-only",
           fields: renderedFields,
           posterPlan: metadataObject(input.posterPlan),
           visibleCopy: metadataObject(input.visibleCopy) || metadataObject(input.posterPlan?.visibleCopy),
@@ -321,7 +359,16 @@ export async function POST(request: NextRequest) {
     await trackServerEvent({
       request,
       event: "poster_generate_success",
-      props: { source: "mp", mode: input.mode, templateId, size, resolution, cost: charged.cost },
+      props: {
+        source: "mp",
+        mode: input.mode,
+        templateId,
+        size,
+        resolution,
+        cost: charged.cost,
+        layoutPresetId: layoutPreset?.id || "",
+        layoutReferenceUsed: Boolean(layoutReferenceDataUrl),
+      },
     })
 
     const res = NextResponse.json({
@@ -334,6 +381,9 @@ export async function POST(request: NextRequest) {
       warnings,
       overlay,
       fields: renderedFields,
+      layoutPreset: layoutPreset ? publicPosterLayoutPreset(layoutPreset) : null,
+      layoutReferenceUsed: Boolean(layoutReferenceDataUrl),
+      layoutPresetVersion: layoutPreset?.version || null,
       safety: fieldSafety
         ? {
             sanitizedFields: fieldSafety.sanitizedFields,
@@ -360,7 +410,13 @@ export async function POST(request: NextRequest) {
     await trackServerEvent({
       request,
       event: "poster_generate_fail",
-      props: { source: "mp", mode: input.mode, templateId, error: message.slice(0, 200) },
+      props: {
+        source: "mp",
+        mode: input.mode,
+        templateId,
+        layoutPresetId: layoutPreset?.id || "",
+        error: message.slice(0, 200),
+      },
     })
     return NextResponse.json({ ok: false, error: message }, { status: message === "image_task_timeout" ? 504 : 502 })
   }

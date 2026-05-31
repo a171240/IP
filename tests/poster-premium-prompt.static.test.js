@@ -1,33 +1,45 @@
 const test = require("node:test")
 const assert = require("node:assert/strict")
 const { execFileSync } = require("node:child_process")
-const { readFileSync } = require("node:fs")
-const { join, dirname } = require("node:path")
+const { existsSync, readFileSync } = require("node:fs")
+const { join, dirname, resolve } = require("node:path")
 const vm = require("node:vm")
 const ts = require("typescript")
 
 const root = process.cwd()
+const moduleCache = new Map()
 
 function loadTsModule(filePath) {
-  const source = readFileSync(filePath, "utf8")
+  const absolutePath = resolve(filePath)
+  if (moduleCache.has(absolutePath)) return moduleCache.get(absolutePath).exports
+
+  const source = readFileSync(absolutePath, "utf8")
   const transpiled = ts.transpileModule(source, {
     compilerOptions: {
       module: ts.ModuleKind.CommonJS,
       target: ts.ScriptTarget.ES2020,
       esModuleInterop: true,
     },
-    fileName: filePath,
+    fileName: absolutePath,
   })
   const moduleRef = { exports: {} }
+  moduleCache.set(absolutePath, moduleRef)
   const localRequire = (specifier) => {
     if (specifier === "server-only") return {}
+    if (specifier.startsWith(".") || specifier.startsWith("@/")) {
+      const base = specifier.startsWith("@/") ? join(root, specifier.slice(2)) : resolve(dirname(absolutePath), specifier)
+      const candidates = [base, `${base}.ts`, `${base}.tsx`, `${base}.js`, join(base, "index.ts"), join(base, "index.js")]
+      const resolvedPath = candidates.find((candidate) => existsSync(candidate))
+      if (resolvedPath && /\.(ts|tsx)$/.test(resolvedPath)) return loadTsModule(resolvedPath)
+      if (resolvedPath) return require(resolvedPath)
+    }
     return require(specifier)
   }
   const wrapped = vm.runInThisContext(
     `(function (exports, require, module, __filename, __dirname) { ${transpiled.outputText}\n})`,
-    { filename: filePath },
+    { filename: absolutePath },
   )
-  wrapped(moduleRef.exports, localRequire, moduleRef, filePath, dirname(filePath))
+  wrapped(moduleRef.exports, localRequire, moduleRef, absolutePath, dirname(absolutePath))
   return moduleRef.exports
 }
 
@@ -64,7 +76,7 @@ test("poster template prompt carries premium art direction and user style preset
 
   assert.match(result.prompt, /高级美术指导/)
   assert.match(result.prompt, /用户指定风格方向：端午国风杂志感，参考图风格/)
-  assert.match(result.prompt, /最多 3 个视觉层级/)
+  assert.match(result.prompt, /保持清晰主次、稳定对齐和足够呼吸感/)
   assert.match(result.prompt, /中文主标题用高端杂志感宋体/)
   assert.match(result.prompt, /低饱和、干净、精致/)
   assert.match(result.prompt, /不要堆满小图标/)
@@ -76,16 +88,67 @@ test("poster template prompt carries premium art direction and user style preset
   assert.match(result.negativePrompt, /字体混乱/)
 })
 
+test("poster layout presets expose system wireframes and render into premium prompts", () => {
+  const result = runPosterModule(`
+    import { existsSync } from "node:fs";
+    import { join } from "node:path";
+    import { getPosterLayoutPreset, getTemplateLayoutMap, readLayoutReferenceDataUrl } from "./lib/posters/layout-presets.ts";
+    import { getPosterTemplate, renderPosterTemplate } from "./lib/posters/templates.ts";
+
+    const preset = getPosterLayoutPreset("card-benefits", "P10");
+    const template = getPosterTemplate("P10");
+    const rendered = renderPosterTemplate(template, {
+      storeName: "椿舍皮肤管理",
+      menuTitle: "夏季护理菜单",
+      menuItems: "清洁管理 199｜补水护理 168｜舒缓修护 268",
+      footerNote: "到店先做皮肤状态沟通",
+      _industry: "皮肤管理",
+    }, "4:5", { layoutPreset: preset });
+    const dataUrl = await readLayoutReferenceDataUrl(preset);
+    const map = getTemplateLayoutMap();
+
+    console.log(JSON.stringify({
+      presetId: preset.id,
+      prompt: rendered.prompt,
+      mapP10: map.P10,
+      hasReference: Boolean(dataUrl && dataUrl.startsWith("data:image/png;base64,")),
+      fileExists: existsSync(join(process.cwd(), "public", preset.publicReferencePath)),
+    }));
+  `)
+
+  assert.equal(result.presetId, "card-benefits")
+  assert.match(result.prompt, /系统版式骨架/)
+  assert.match(result.prompt, /卡片权益式/)
+  assert.match(result.prompt, /系统版式：卡片权益/)
+  assert.ok(result.mapP10.includes("grid-menu"))
+  assert.equal(result.hasReference, true)
+  assert.equal(result.fileExists, true)
+})
+
 test("poster image routes support style reference assets without treating them as logo", () => {
   const generateRoute = readFileSync(join(root, "app/api/mp/posters/generate/route.ts"), "utf8")
   const assetsRoute = readFileSync(join(root, "app/api/mp/posters/assets/route.ts"), "utf8")
 
   assert.match(generateRoute, /z\.enum\(\["style", "logo", "store", "product", "people"\]\)/)
   assert.match(generateRoute, /assetRefs:\s*z\.array\(assetRefSchema\)\.max\(5\)/)
+  assert.match(generateRoute, /layoutPresetId:\s*z\.string\(\)\.trim\(\)\.max\(80\)/)
   assert.match(generateRoute, /resolution:\s*z\.enum\(\["1k"\]\)\.optional\(\)/)
   assert.match(generateRoute, /style:\s*"风格\/版式参考"/)
   assert.match(generateRoute, /风格\/版式参考图只用于学习构图、配色、字体气质、留白比例和高级感/)
+  assert.match(generateRoute, /layoutReferencePromptBlock/)
+  assert.match(generateRoute, /assetPromptBlock\(validAssetRefs,\s*layoutReferenceDataUrl \? 2 : 1\)/)
+  assert.match(generateRoute, /const imageUrls = \[layoutReferenceDataUrl \|\| "", \.\.\.userImageUrls\]\.filter\(Boolean\)/)
+  assert.match(generateRoute, /layoutReferenceSource:\s*layoutReferenceDataUrl \? "system-wireframe" : "prompt-only"/)
   assert.match(assetsRoute, /new Set<PosterAssetKind>\(\["style", "logo", "store", "product", "people"\]\)/)
+})
+
+test("poster templates endpoint exposes layout presets without requiring user layout uploads", () => {
+  const templatesRoute = readFileSync(join(root, "app/api/mp/posters/templates/route.ts"), "utf8")
+  const assetsRoute = readFileSync(join(root, "app/api/mp/posters/assets/route.ts"), "utf8")
+
+  assert.match(templatesRoute, /layoutPresets:\s*listPublicPosterLayoutPresets\(\)/)
+  assert.match(templatesRoute, /templateLayoutMap:\s*getTemplateLayoutMap\(\)/)
+  assert.doesNotMatch(assetsRoute, /"layout"/)
 })
 
 test("poster image provider folds negative prompt into the submitted prompt", () => {
@@ -140,7 +203,9 @@ test("poster intake keeps user command out of visible poster copy", () => {
   })
 
   assert.equal(fields.campaignTitle, "五一焕颜季")
+  assert.equal(fields._layoutPresetId, "campaign-motion-x")
   assert.equal(plan.visibleCopy.title, "五一焕颜季")
+  assert.equal(plan.hiddenContext.layoutPresetId, "campaign-motion-x")
   assert.match(plan.intent.userCommand, /给我生成一张五一的宣传海报/)
   assert.equal(sanitized.fields.campaignTitle, "五一焕颜季")
   assert.deepEqual(sanitized.sanitizedFields, ["campaignTitle"])
@@ -155,6 +220,56 @@ test("poster intake keeps user-provided style instead of overwriting it with def
   assert.match(intakeSource, /stylePreset:\s*asText\(answers\.stylePreset\) \|\| style\.stylePreset/)
   assert.match(intakeRoute, /用户说高级感、杂志感、轻奢、极简、温暖、类似某张图/)
   assert.match(intakeRoute, /asset_refs:\s*z\.array\(z\.any\(\)\)\.max\(5\)/)
+})
+
+test("poster intake recommends expected layout presets for common beauty poster cases", () => {
+  const { buildPosterBrief, recommendPosterTemplate } = loadTsModule(join(root, "lib", "posters", "intake.ts"))
+  const profile = {
+    id: "store_1",
+    name: "椿舍皮肤管理",
+    shop_type: "皮肤管理",
+    main_offer_name: "补水护理",
+  }
+  const cases = [
+    {
+      name: "品牌留白",
+      message: "给我做一张椿舍皮肤管理的品牌形象海报，要高级感、留白、不要促销。",
+      templates: ["P04"],
+      layoutPresetId: "editorial-whitespace",
+    },
+    {
+      name: "五一新客",
+      message: "五一新客补水 99 元，想要高级一点，不要红黄促销。",
+      templates: ["P01", "P02"],
+      layoutPresetId: "campaign-motion-x",
+    },
+    {
+      name: "价目菜单",
+      message: "做一张皮肤管理价目菜单，补水、清洁、舒缓、提亮四个项目。",
+      templates: ["P10"],
+      layoutPresetId: "grid-menu",
+    },
+    {
+      name: "避坑封面",
+      message: "做一张小红书封面，主题是新客做皮肤管理避坑。",
+      templates: ["P08"],
+      layoutPresetId: "diagonal-xhs-cover",
+    },
+    {
+      name: "节日祝福",
+      message: "端午给老客发一张祝福图，不卖东西，不促销。",
+      templates: ["P13"],
+      layoutPresetId: "editorial-whitespace",
+    },
+  ]
+
+  for (const item of cases) {
+    const brief = buildPosterBrief({ profile, message: item.message })
+    const recommendation = recommendPosterTemplate(brief)
+    assert.ok(item.templates.includes(recommendation.templateId), item.name)
+    assert.equal(recommendation.layoutPresetId, item.layoutPresetId, item.name)
+    assert.ok(recommendation.layoutCandidates.includes(recommendation.layoutPresetId), item.name)
+  }
 })
 
 test("non-promotional festival greetings route to a dedicated premium greeting template", () => {

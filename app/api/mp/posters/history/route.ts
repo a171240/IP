@@ -68,6 +68,16 @@ export async function GET(request: NextRequest) {
         posterPlan: meta?.posterPlan || null,
         visibleCopy: meta?.visibleCopy || null,
         hiddenContext: meta?.hiddenContext || null,
+        layoutPresetId:
+          meta?.layoutPresetId ||
+          (meta?.hiddenContext && typeof meta.hiddenContext === "object" ? (meta.hiddenContext as { layoutPresetId?: unknown }).layoutPresetId : null) ||
+          null,
+        layoutPresetName:
+          meta?.layoutPresetName ||
+          (meta?.hiddenContext && typeof meta.hiddenContext === "object" ? (meta.hiddenContext as { layoutName?: unknown }).layoutName : null) ||
+          null,
+        layoutPresetVersion: meta?.layoutPresetVersion || null,
+        layoutReferenceUsed: Boolean(meta?.layoutReferenceUsed),
         assetRefs: Array.isArray(meta?.assetRefs) ? meta.assetRefs : [],
       }
     })

@@ -46,6 +46,13 @@ export type PosterOverlay = {
   slots: Array<PosterTextSlot & { text: string }>
 }
 
+type PosterLayoutPrompt = {
+  id: string
+  name: string
+  promptBlock: string
+  version: string
+}
+
 type InternalPosterTemplate = {
   id: string
   group: PosterTemplateGroup
@@ -149,7 +156,9 @@ function fieldMap(fields: Record<string, string>, specs: PosterTemplateField[]) 
   }, {})
   for (const [key, value] of Object.entries(fields)) {
     if (!key.startsWith("_")) continue
-    mapped[key] = String(value || "").trim().slice(0, 240)
+    mapped[key] = String(value || "")
+      .trim()
+      .slice(0, key === "_layoutPresetBlock" ? 1200 : 240)
   }
   return mapped
 }
@@ -188,7 +197,7 @@ function premiumPosterDirectionBlock(fields: Record<string, string> = {}) {
       : "",
     constraints ? `用户明确强调/避开：${constraints}。` : "",
     "构图：一处明确主视觉 + 一处安静可读的文字区；主视觉要有摄影棚级光影和空间层次，画面边缘保持干净。",
-    "版式：大留白、高对齐、强层级；最多 3 个视觉层级、最多 3 种字号；文字不要压满画面，也不要散成很多小标签。",
+    "版式：保持清晰主次、稳定对齐和足够呼吸感；具体空间结构优先遵循系统版式骨架。",
     "字体：中文主标题用高端杂志感宋体/明朝/品牌衬线字气质；副标题和辅助信息用克制无衬线；字距自然，像真实品牌海报排版。",
     "材质与摄影：真实商业摄影质感，柔和自然光或高级棚拍光，浅景深；优先皮肤管理空间、护理用品、织物、玻璃、陶瓷、花材、纸张等可触摸材质。",
     "配色：低饱和、干净、精致，允许象牙白、烟粉、鼠尾草绿、深棕、香槟金等小面积点缀；全图主色不超过 3 个。",
@@ -204,6 +213,7 @@ function visualBrief(input: {
   sceneProps: string
   style: string
   layout: string
+  layoutPresetBlock?: string
   textLines: string[]
   textRules?: string[]
   outputGoal: string
@@ -212,6 +222,7 @@ function visualBrief(input: {
 }) {
   const visibleTextLines = input.textLines.map(visibleCopyLine).filter(Boolean)
   const resolvedSize = (input.fields?._requestedSize as PosterImageSize | undefined) || input.size
+  const layoutPresetBlock = String(input.layoutPresetBlock || input.fields?._layoutPresetBlock || "").trim()
   const hiddenContext = [
     contextLine("行业", input.fields?._industry),
     contextLine("门店类型", input.fields?._businessType),
@@ -220,6 +231,7 @@ function visualBrief(input: {
     contextLine("用户风格方向", input.fields?._stylePreset),
     contextLine("风格限制", input.fields?._constraints),
     contextLine("商圈", input.fields?._cityArea),
+    contextLine("系统版式", input.fields?._layoutName),
   ].filter(Boolean)
 
   return [
@@ -241,7 +253,9 @@ function visualBrief(input: {
     ...premiumPosterDirectionBlock(input.fields || {}).map((line) => `- ${line}`),
     "",
     "【版式结构】",
-    `- ${input.layout}`,
+    `- 模板基础结构：${input.layout}`,
+    layoutPresetBlock ? "- 系统版式骨架：" : "",
+    ...layoutPresetBlock.split("\n").filter(Boolean).map((line) => `- ${line}`),
     "- 先整体设计画面，再把文字作为版式的一部分嵌入，不要像后期贴字。",
     "- 文字区必须有足够留白和对比度，手机端缩略图也能读出主标题。",
     "",
@@ -894,10 +908,17 @@ export function getMissingRequiredFields(template: InternalPosterTemplate, field
 export function renderPosterTemplate(
   template: InternalPosterTemplate,
   fields: Record<string, string>,
-  size?: PosterImageSize
+  size?: PosterImageSize,
+  options: { layoutPreset?: PosterLayoutPrompt | null } = {}
 ) {
   const mapped = fieldMap(fields, template.requiredFields)
   mapped._requestedSize = size || template.defaultSize
+  if (options.layoutPreset) {
+    mapped._layoutPresetId = options.layoutPreset.id
+    mapped._layoutName = options.layoutPreset.name
+    mapped._layoutPresetVersion = options.layoutPreset.version
+    mapped._layoutPresetBlock = options.layoutPreset.promptBlock
+  }
   const canvas = canvasForSize(size || template.defaultSize)
   const overlay: PosterOverlay = {
     canvas,
