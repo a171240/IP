@@ -77,9 +77,17 @@ Backend smoke results:
 
 Required backend checks:
 
+- `MP_API_BASE_URL=<preview-or-production-url> corepack pnpm mp:api-contract-smoke`
 - `/api/mp/profile`
 - `/api/mp/virtual-pay/products`
 - `/api/mp/service-records/sessions`
+- `/api/mp/private-copy/generate`
+- `/api/mp/private-copy/drafts`
+- `/api/mp/xhs/generate-v4`
+- `/api/mp/xhs/drafts`
+- `/api/mp/posters/templates`
+- `/api/mp/knowledge-spaces/options`
+- `/api/mp/voice-coach/training-home`
 - Any changed admin/store route
 
 ## Mini-program Upload
@@ -113,6 +121,7 @@ Required mini-program checks:
 - Route conflicts:
 - Product/point display conflicts:
 - Store account permission conflicts:
+- MP API contract smoke:
 - Service-record backend availability:
 - Test data visibility:
 

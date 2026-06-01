@@ -216,6 +216,13 @@ Prefer:
 corepack pnpm build
 ```
 
+For any backend preview or production release that can affect the mini-program,
+also run the MP API contract smoke against the target URL:
+
+```powershell
+MP_API_BASE_URL=https://ip.ipgongchang.xin corepack pnpm mp:api-contract-smoke
+```
+
 Preview or live endpoint checks must distinguish:
 
 - `401` or auth-required responses can mean the route exists.
@@ -225,9 +232,17 @@ Preview or live endpoint checks must distinguish:
 
 Important backend smoke checks:
 
+- `corepack pnpm mp:api-contract-smoke`
 - `/api/mp/profile`
 - `/api/mp/virtual-pay/products`
 - `/api/mp/service-records/sessions`
+- `/api/mp/private-copy/generate`
+- `/api/mp/private-copy/drafts`
+- `/api/mp/xhs/generate-v4`
+- `/api/mp/xhs/drafts`
+- `/api/mp/posters/templates`
+- `/api/mp/knowledge-spaces/options`
+- `/api/mp/voice-coach/training-home`
 - Changed admin/store routes
 - Changed payment or entitlement routes
 
