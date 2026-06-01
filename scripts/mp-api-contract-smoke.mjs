@@ -151,7 +151,7 @@ async function runContract(baseUrl, contract) {
   }
 
   const started = Date.now()
-  const res = await fetch(url, init)
+  const res = await fetchWithRetry(url, init)
   const text = await res.text()
   const data = tryParseJson(text)
   const elapsed = Date.now() - started
@@ -179,6 +179,28 @@ async function runContract(baseUrl, contract) {
   }
 
   return { status: res.status, elapsed }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function fetchWithRetry(url, init, retries = 2) {
+  let lastError = null
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 15000)
+    try {
+      return await fetch(url, { ...init, signal: controller.signal })
+    } catch (error) {
+      lastError = error
+      if (attempt >= retries) break
+      await sleep(500 * (attempt + 1))
+    } finally {
+      clearTimeout(timeout)
+    }
+  }
+  throw lastError
 }
 
 async function main() {
