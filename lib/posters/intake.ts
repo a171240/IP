@@ -251,11 +251,6 @@ function defaultSellingPoints(industry: string, shopType: string) {
   return "真实到店｜服务清楚｜新手友好"
 }
 
-function defaultOfferText(industry: string, shopType: string) {
-  if (hasBeautySignal(industry, shopType)) return "到店护理体验礼"
-  return "到店专属体验"
-}
-
 function inferStylePreset(text: string) {
   const styleHits = [
     "高级感",

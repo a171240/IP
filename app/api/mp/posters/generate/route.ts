@@ -187,7 +187,7 @@ function metadataObject(value: unknown, maxLength = 8000) {
   }
 }
 
-function posterSizeForTemplate(templateId: string, requested?: PosterSize): PosterSize {
+function posterSizeForTemplate(templateId: string): PosterSize {
   return templateId === "P11" ? "16:9" : "4:5"
 }
 
@@ -373,7 +373,7 @@ export async function POST(request: NextRequest) {
       if (!template) return NextResponse.json({ ok: false, error: "template_not_found" }, { status: 404 })
 
       templateId = template.id
-      size = posterSizeForTemplate(template.id, input.size || template.defaultSize)
+      size = posterSizeForTemplate(template.id)
       resolution = BASIC_POSTER_RESOLUTION
       visualStylePreset = getPosterVisualStylePreset(input.visualStylePresetId, template.id)
       const requestedLayoutPresetId =

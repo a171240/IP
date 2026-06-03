@@ -296,14 +296,22 @@ export function listPosterVisualStylePresets() {
 }
 
 export function listPublicPosterVisualStylePresets(): PublicPosterVisualStylePreset[] {
-  return STYLE_PRESETS.filter(isPosterVisualStyleAvailable).map(
-    ({ promptSource: _promptSource, promptBlock: _promptBlock, negativeAdditions: _negativeAdditions, ...preset }) => preset
-  )
+  return STYLE_PRESETS.filter(isPosterVisualStyleAvailable).map(publicPosterVisualStylePreset)
 }
 
 export function publicPosterVisualStylePreset(preset: PosterVisualStylePreset): PublicPosterVisualStylePreset {
-  const { promptSource: _promptSource, promptBlock: _promptBlock, negativeAdditions: _negativeAdditions, ...publicPreset } = preset
-  return publicPreset
+  return {
+    id: preset.id,
+    name: preset.name,
+    shortName: preset.shortName,
+    description: preset.description,
+    orientation: preset.orientation,
+    useCases: preset.useCases,
+    avoidCases: preset.avoidCases,
+    recommendedTemplateIds: preset.recommendedTemplateIds,
+    textDensity: preset.textDensity,
+    directTextRisk: preset.directTextRisk,
+  }
 }
 
 export function getTemplateVisualStyleCandidateIds(templateId: string) {

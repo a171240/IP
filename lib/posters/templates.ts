@@ -134,7 +134,7 @@ function canvasForSize(size: PosterImageSize): PosterOverlay["canvas"] {
   return { width: 900, height: 1125, size: "4:5" }
 }
 
-function posterSizeForTemplate(templateId: string, _size?: PosterImageSize): PosterImageSize {
+function posterSizeForTemplate(templateId: string): PosterImageSize {
   return templateId === "P11" ? "16:9" : "4:5"
 }
 
@@ -905,7 +905,7 @@ export function getPublicPosterTemplates() {
     useCase: template.useCase,
     outputHint: template.outputHint,
     previewImage: template.previewImage,
-    defaultSize: posterSizeForTemplate(template.id, template.defaultSize),
+    defaultSize: posterSizeForTemplate(template.id),
     defaultResolution: template.defaultResolution,
     requiredFields: template.requiredFields,
     fields: template.requiredFields,
@@ -934,7 +934,7 @@ export function renderPosterTemplate(
   size?: PosterImageSize,
   options: { layoutPreset?: PosterLayoutPrompt | null } = {}
 ) {
-  const resolvedSize = posterSizeForTemplate(template.id, size || template.defaultSize)
+  const resolvedSize = posterSizeForTemplate(template.id)
   const mapped = fieldMap(fields, template.requiredFields)
   mapped._requestedSize = resolvedSize
   if (options.layoutPreset) {
