@@ -120,6 +120,9 @@ const defaultTextRules = [
   "不要把字段名、字段说明、用途说明、目标人群说明写进画面，例如不要出现“主标题：”“副标题：”“适合想了解”等说明式文案。",
   "主标题控制在 8-16 个字，标签控制在 2-4 个短词。",
   "价格、日期、地址必须原样显示，不能多字、漏字或换成英文。",
+  "日期和时间只能使用【可见文字】里提供的内容；如果没有提供年份，禁止自行补全年份。",
+  "除非【可见文字】明确包含“2024”，否则画面里不要出现“2024”；2025、2026 或其他年份也不能自行编造。",
+  "如果时间字段是“本周可约”“5.1-5.5”“4.27 起”这类无年份表达，必须原样显示，不要改写成完整年月日。",
   "手机端远看也能读，避免小字堆叠。",
 ]
 
@@ -129,6 +132,10 @@ function canvasForSize(size: PosterImageSize): PosterOverlay["canvas"] {
   if (size === "1:1") return { width: 1000, height: 1000, size }
   if (size === "16:9") return { width: 1600, height: 900, size }
   return { width: 900, height: 1125, size: "4:5" }
+}
+
+function posterSizeForTemplate(templateId: string, _size?: PosterImageSize): PosterImageSize {
+  return templateId === "P11" ? "16:9" : "4:5"
 }
 
 function field(
@@ -144,9 +151,16 @@ function field(
 }
 
 function cleanFieldValue(fields: Record<string, string>, spec: PosterTemplateField) {
-  const raw = String(fields[spec.key] ?? spec.defaultValue ?? "").trim()
+  const raw = String(fields[spec.key] ?? "").trim()
   if (!spec.maxLength || raw.length <= spec.maxLength) return raw
   return raw.slice(0, spec.maxLength)
+}
+
+function internalFieldMaxLength(key: string) {
+  if (key === "_visualStylePromptBlock") return 6000
+  if (key === "_layoutPresetBlock") return 1200
+  if (key === "_qrPromptBlock") return 800
+  return 240
 }
 
 function fieldMap(fields: Record<string, string>, specs: PosterTemplateField[]) {
@@ -158,7 +172,7 @@ function fieldMap(fields: Record<string, string>, specs: PosterTemplateField[]) 
     if (!key.startsWith("_")) continue
     mapped[key] = String(value || "")
       .trim()
-      .slice(0, key === "_layoutPresetBlock" ? 1200 : 240)
+      .slice(0, internalFieldMaxLength(key))
   }
   return mapped
 }
@@ -223,6 +237,8 @@ function visualBrief(input: {
   const visibleTextLines = input.textLines.map(visibleCopyLine).filter(Boolean)
   const resolvedSize = (input.fields?._requestedSize as PosterImageSize | undefined) || input.size
   const layoutPresetBlock = String(input.layoutPresetBlock || input.fields?._layoutPresetBlock || "").trim()
+  const visualStyleBlock = String(input.fields?._visualStylePromptBlock || "").trim()
+  const qrPromptBlock = String(input.fields?._qrPromptBlock || "").trim()
   const hiddenContext = [
     contextLine("行业", input.fields?._industry),
     contextLine("门店类型", input.fields?._businessType),
@@ -251,6 +267,9 @@ function visualBrief(input: {
     "",
     "【高级美术指导】",
     ...premiumPosterDirectionBlock(input.fields || {}).map((line) => `- ${line}`),
+    visualStyleBlock ? "" : "",
+    visualStyleBlock ? "【视觉风格预设】" : "",
+    ...visualStyleBlock.split("\n").filter(Boolean).map((line) => `- ${line}`),
     "",
     "【版式结构】",
     `- 模板基础结构：${input.layout}`,
@@ -265,6 +284,9 @@ function visualBrief(input: {
     "",
     "【中文排版规则】",
     textRuleBlock(input.fields || {}, input.textRules),
+    "",
+    "【二维码规则】",
+    qrPromptBlock || "不要二维码、不要二维码框、不要扫码提示、不要空白二维码占位、不要联系方式。",
     hiddenContext.length ? "" : "",
     hiddenContext.length ? "【背景信息，不要写进画面】" : "",
     ...hiddenContext.map((line) => `- ${line}`),
@@ -556,7 +578,7 @@ const templates: InternalPosterTemplate[] = [
     useCase: "开业获客 / 本地传播 / 商圈曝光",
     outputHint: "要有城市高级感，避免传统剪彩风。",
     previewImage: "",
-    defaultSize: "9:16",
+    defaultSize: "4:5",
     defaultResolution: "1k",
     previewStyle: "opening",
     styleTags: ["城市感", "新店", "开业礼"],
@@ -649,7 +671,7 @@ const templates: InternalPosterTemplate[] = [
     useCase: "搜索获客 / 小红书封面 / 避坑笔记",
     outputHint: "冲突要强，但不能恐吓和制造焦虑。",
     previewImage: "",
-    defaultSize: "3:4",
+    defaultSize: "4:5",
     defaultResolution: "1k",
     previewStyle: "xhs-conflict",
     styleTags: ["避坑", "强标题", "收藏"],
@@ -689,7 +711,7 @@ const templates: InternalPosterTemplate[] = [
     useCase: "小红书科普 / 专业信任 / 收藏转发",
     outputHint: "专家感要亲切，不要像报告。",
     previewImage: "",
-    defaultSize: "3:4",
+    defaultSize: "4:5",
     defaultResolution: "1k",
     previewStyle: "infographic",
     styleTags: ["信息图", "专业可信", "可收藏"],
@@ -883,9 +905,10 @@ export function getPublicPosterTemplates() {
     useCase: template.useCase,
     outputHint: template.outputHint,
     previewImage: template.previewImage,
-    defaultSize: template.defaultSize,
+    defaultSize: posterSizeForTemplate(template.id, template.defaultSize),
     defaultResolution: template.defaultResolution,
     requiredFields: template.requiredFields,
+    fields: template.requiredFields,
     textSlots: template.textSlots,
     previewStyle: template.previewStyle,
     styleTags: template.styleTags,
@@ -911,15 +934,16 @@ export function renderPosterTemplate(
   size?: PosterImageSize,
   options: { layoutPreset?: PosterLayoutPrompt | null } = {}
 ) {
+  const resolvedSize = posterSizeForTemplate(template.id, size || template.defaultSize)
   const mapped = fieldMap(fields, template.requiredFields)
-  mapped._requestedSize = size || template.defaultSize
+  mapped._requestedSize = resolvedSize
   if (options.layoutPreset) {
     mapped._layoutPresetId = options.layoutPreset.id
     mapped._layoutName = options.layoutPreset.name
     mapped._layoutPresetVersion = options.layoutPreset.version
     mapped._layoutPresetBlock = options.layoutPreset.promptBlock
   }
-  const canvas = canvasForSize(size || template.defaultSize)
+  const canvas = canvasForSize(resolvedSize)
   const overlay: PosterOverlay = {
     canvas,
     slots: template.textSlots.map((slot) => ({ ...slot, text: mapped[slot.key] || "" })).filter((slot) => slot.text),

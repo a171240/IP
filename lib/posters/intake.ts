@@ -7,8 +7,12 @@ import {
   inferLayoutPresetFromText,
   normalizeLayoutPresetId,
 } from "./layout-presets"
+import {
+  getTemplateVisualStyleCandidateIds,
+  inferVisualStylePresetFromText,
+} from "./visual-style-presets"
 
-export type PosterAssetKind = "style" | "logo" | "store" | "product" | "people"
+export type PosterAssetKind = "style" | "logo" | "store" | "product" | "people" | "qr"
 
 export type PosterAssetRef = {
   kind: PosterAssetKind
@@ -47,6 +51,9 @@ export type PosterIntakeAnswers = {
   templateId?: string
   stylePreset?: string
   layoutPresetId?: string
+  visualStylePresetId?: string
+  hasQr?: string
+  qrPolicy?: string
 }
 
 export type PosterBrief = Required<
@@ -66,6 +73,32 @@ export type PosterRecommendation = {
   resolution: "1k"
   layoutPresetId: string
   layoutCandidates: string[]
+  visualStylePresetId: string
+  visualStyleCandidates: string[]
+}
+
+export type PosterFieldSource =
+  | "store_profile"
+  | "user_voice"
+  | "user_text"
+  | "uploaded_asset"
+  | "system_inferred"
+  | "placeholder"
+  | "default_value"
+  | "missing"
+
+export type PosterFieldSourceState = {
+  value: string
+  source: PosterFieldSource
+  visible: boolean
+  confidence: "high" | "medium" | "low"
+}
+
+export type PosterQrState = {
+  hasQr: boolean
+  source: "uploaded_asset" | "missing"
+  reserveArea: boolean
+  compositeRequired: boolean
 }
 
 export type PosterVisibleCopy = {
@@ -118,10 +151,10 @@ const TEMPLATE_STYLE: Record<
   P03: { stylePreset: "爆款项目种草", size: "4:5", resolution: "1k" },
   P04: { stylePreset: "品牌大片", size: "4:5", resolution: "1k" },
   P05: { stylePreset: "会员权益", size: "4:5", resolution: "1k" },
-  P06: { stylePreset: "城市开业", size: "9:16", resolution: "1k" },
+  P06: { stylePreset: "城市开业", size: "4:5", resolution: "1k" },
   P07: { stylePreset: "真实探店", size: "4:5", resolution: "1k" },
-  P08: { stylePreset: "强标题攻略", size: "3:4", resolution: "1k" },
-  P09: { stylePreset: "科普信息图", size: "3:4", resolution: "1k" },
+  P08: { stylePreset: "强标题攻略", size: "4:5", resolution: "1k" },
+  P09: { stylePreset: "科普信息图", size: "4:5", resolution: "1k" },
   P10: { stylePreset: "菜单价目", size: "4:5", resolution: "1k" },
   P11: { stylePreset: "电子屏大字", size: "16:9", resolution: "1k" },
   P12: { stylePreset: "朋友圈轻分享", size: "4:5", resolution: "1k" },
@@ -143,6 +176,34 @@ const TEMPLATE_KEYWORDS: Array<{ id: string; words: string[]; reason: string }> 
   { id: "P04", words: ["品牌", "形象", "信任", "调性"], reason: "识别到品牌形象目标" },
   { id: "P03", words: ["爆款", "项目", "产品", "套餐", "主推", "上新"], reason: "识别到主推项目/产品目标" },
 ]
+
+const TEST_DEFAULT_VALUES = new Set([
+  "吴江万宝",
+  "万宝商圈附近",
+  "苏州吴江",
+  "吴江松陵",
+  "椿舍皮肤管理",
+  "云肌皮肤管理",
+  "青禾养生",
+  "本地商圈",
+  "你的门店",
+  "近期可约",
+])
+
+const REAL_SOURCE_VALUES = new Set<PosterFieldSource>(["store_profile", "user_voice", "user_text", "uploaded_asset"])
+
+export function isPosterTestDefaultValue(value: unknown) {
+  const text = asText(value, 120)
+  return Boolean(text && TEST_DEFAULT_VALUES.has(text))
+}
+
+export function isRealPosterFieldSource(source: unknown): source is PosterFieldSource {
+  return REAL_SOURCE_VALUES.has(String(source || "") as PosterFieldSource)
+}
+
+function posterSizeForTemplate(templateId: string): PosterRecommendation["size"] {
+  return templateId === "P11" ? "16:9" : "4:5"
+}
 
 function asText(value: unknown, max = 120) {
   return typeof value === "string" ? value.trim().slice(0, max) : ""
@@ -167,7 +228,7 @@ function defaultCampaignDate(...values: Array<string | undefined>) {
   if (/七夕/.test(text)) return "七夕期间"
   if (/女神节/.test(text)) return "女神节期间"
   if (/周年/.test(text)) return "周年庆期间"
-  return "近期可约"
+  return ""
 }
 
 function defaultSubline(opts: {
@@ -314,8 +375,11 @@ function parseLineAnswers(message: string): PosterIntakeAnswers {
   const out: PosterIntakeAnswers = {}
   const map: Record<string, keyof PosterIntakeAnswers> = {
     店名: "storeName",
+    门店名称: "storeName",
     门店: "storeName",
+    店铺: "storeName",
     品牌: "storeName",
+    品牌名: "storeName",
     行业: "industry",
     品类: "industry",
     类型: "shopType",
@@ -324,25 +388,41 @@ function parseLineAnswers(message: string): PosterIntakeAnswers {
     活动: "campaignTitle",
     项目: "projectName",
     产品: "projectName",
+    服务: "projectName",
+    套餐: "projectName",
     标题: "headline",
     副标题: "subline",
     人群: "audience",
+    目标人群: "audience",
+    目标用户: "audience",
+    适合对象: "audience",
     卖点: "sellingPoints",
+    亮点: "sellingPoints",
     优惠: "offerText",
+    权益: "offerText",
     价格: "offerText",
+    体验价: "offerText",
+    新客价: "offerText",
+    活动时间: "dateRange",
     时间: "dateRange",
     日期: "dateRange",
+    有效期: "dateRange",
+    行动号召: "cta",
+    预约文案: "cta",
     CTA: "cta",
     口令: "cta",
+    底部: "cta",
     禁忌: "constraints",
     不要: "constraints",
     商圈: "cityArea",
+    地点: "cityArea",
+    位置: "cityArea",
     地址: "cityArea",
   }
 
-  for (const rawLine of message.split(/\n|；|;/)) {
+  for (const rawLine of message.split(/\n|；|;|。|！|？/)) {
     const line = rawLine.trim()
-    const match = line.match(/^([^:：]{1,8})[:：]\s*(.+)$/)
+    const match = line.match(/^([^:：]{1,12})[:：]\s*(.+)$/)
     if (!match) continue
     const key = Object.keys(map).find((item) => match[1].includes(item))
     if (!key) continue
@@ -351,12 +431,129 @@ function parseLineAnswers(message: string): PosterIntakeAnswers {
   return out
 }
 
+function cleanExtractedAnswer(value: string, max = 80) {
+  return asText(value, max)
+    .replace(/^(?:是|叫|为|写|填|填写|就是|在|位于|到|：|:)\s*/, "")
+    .replace(/(?:，|。|！|？|；|;).*$/g, "")
+    .replace(/^(?:一家|一个|这个|那个|本次|这次)/, "")
+    .trim()
+}
+
+function matchAnswer(text: string, pattern: RegExp, index = 1, max = 80) {
+  const match = text.match(pattern)
+  return match ? cleanExtractedAnswer(match[index] || "", max) : ""
+}
+
+function isFieldSupplementOnly(text: string) {
+  const value = text.replace(/\s+/g, "")
+  if (!value) return false
+  const signalCount = [
+    /(?:活动时间|有效期|日期|时间)(?:写|是|到|：|:)/.test(value),
+    /(?:行动号召|CTA|预约文案|底部)(?:写|是|：|:)/i.test(value),
+    /(?:地址|地点|商圈|位置)(?:写|是|就是|在|：|:)/.test(value),
+    /(?:二维码|不需要二维码|不要二维码)/.test(value),
+  ].filter(Boolean).length
+  return signalCount > 0 && !/(?:新客|首单|项目|套餐|品牌|形象|开业|探店|避坑|知识|菜单|祝福)/.test(value.replace(/活动时间/g, ""))
+}
+
+function extractExplicitAnswers(message: string): PosterIntakeAnswers {
+  const text = message.trim()
+  const out = parseLineAnswers(text)
+  if (!text) return out
+
+  const storeWithLocation = text.match(/(?:我在|我们在|门店在|店在|位于)([^，。！？；;\n]{2,40}?)(?:有一家|开了一家|有个|开了个)([^，。！？；;\n]{2,28})(?:，|。|！|？|；|;|想|要|做|$)/)
+  if (storeWithLocation) {
+    out.cityArea ||= cleanExtractedAnswer(storeWithLocation[1], 40)
+    out.storeName ||= cleanExtractedAnswer(storeWithLocation[2], 28)
+  }
+
+  out.storeName ||= matchAnswer(
+    text,
+    /(?:门店名称|门店名|店名|店铺名|品牌名称|品牌名|门店|店铺|品牌)(?:叫|是|为|写|填|填写|：|:)\s*([^，。！？；;\n]{2,28})/,
+    1,
+    28
+  )
+  out.storeName ||= matchAnswer(
+    text,
+    /(?:我的店叫|我们店叫|我的门店叫|我们门店叫|我叫|我们是)([^，。！？；;\n]{2,28})/,
+    1,
+    28
+  )
+
+  out.cityArea ||= matchAnswer(
+    text,
+    /(?:地点|地址|商圈|位置|门店地址|门店位置)(?:是|在|写|填|填写|就是|：|:)?\s*([^，。！？；;\n]{2,40})/,
+    1,
+    40
+  )
+  out.cityArea ||= matchAnswer(
+    text,
+    /(?:在|位于)([^，。！？；;\n]{2,40}?)(?:商圈|附近|周边)/,
+    1,
+    40
+  )
+
+  out.projectName ||= matchAnswer(
+    text,
+    /(?:项目|产品|套餐|服务)(?:是|叫|为|写|填|填写|：|:)\s*([^，。！？；;\n]{2,36})/,
+    1,
+    36
+  )
+
+  const offer = text.match(/((?:新客体验价|新客价|体验价|价格|优惠|权益|活动权益)(?:是|写|填|填写|：|:)?\s*(?:¥|￥)?\s*\d{1,5}\s*(?:元|起|\/人|\/次)?)/)
+  if (offer) out.offerText ||= cleanExtractedAnswer(offer[1], 40)
+
+  out.dateRange ||= matchAnswer(
+    text,
+    /(?:活动时间|有效期|日期|时间)(?:是|写|填|填写|：|:)?\s*([^，。！？；;\n]{2,40})/,
+    1,
+    40
+  )
+
+  out.cta ||= matchAnswer(
+    text,
+    /(?:行动号召|CTA|预约文案|底部|按钮文案|引导文案)(?:是|写|填|填写|：|:)?\s*([^，。！？；;\n]{2,40})/i,
+    1,
+    40
+  )
+  out.cta ||= matchAnswer(
+    text,
+    /(预约到店领取|预约到店|预约后保留体验名额|私信预约档期|私信预约|到店领取|立即预约|新客可先咨询|咨询门店顾问|详情咨询门店顾问)/,
+    1,
+    40
+  )
+
+  out.audience ||= matchAnswer(
+    text,
+    /(?:目标用户|目标人群|目标顾客|适合对象|人群|用户)(?:是|写|填|填写|：|:)?\s*([^，。！？；;\n]{2,44})/,
+    1,
+    44
+  )
+  out.audience ||= matchAnswer(
+    text,
+    /(附近?\d{2}\s*(?:到|至|-|~)\s*\d{2}岁[^，。！？；;\n]{0,18})/,
+    1,
+    44
+  )
+
+  const gift = matchAnswer(text, /(送一次[^，。！？；;\n]{2,28}|赠送[^，。！？；;\n]{2,28})/, 1, 40)
+  if (gift) out.sellingPoints ||= gift
+
+  if (/不需要二维码|不要二维码|无二维码|这次不需要二维码/.test(text)) {
+    out.qrPolicy ||= "no_qr"
+    out.constraints = [out.constraints, "不需要二维码"].filter(Boolean).join("；")
+  }
+
+  return out
+}
+
 function inferAnswers(message: string): PosterIntakeAnswers {
   const text = message.trim()
   const copyText = stripPosterCommandText(text)
-  const out = parseLineAnswers(text)
+  const out = extractExplicitAnswers(text)
   if (!text) return out
   const wantsThemeChange = /(?:主题|标题).{0,8}(?:不好|不对|不合适|换|改)|换个主题|重新定主题|不要这个主题/.test(text)
+  const supplementOnly = isFieldSupplementOnly(text)
 
   const goalHit = TEMPLATE_KEYWORDS.find((item) => item.words.some((word) => text.includes(word)))
   if (goalHit) {
@@ -383,6 +580,8 @@ function inferAnswers(message: string): PosterIntakeAnswers {
   if (stylePreset) out.stylePreset ||= stylePreset
   const layoutPresetId = inferLayoutPresetFromText(text, out.templateId)
   if (layoutPresetId) out.layoutPresetId ||= layoutPresetId
+  const visualStylePresetId = inferVisualStylePresetFromText(text, out.templateId || "")
+  if (visualStylePresetId) out.visualStylePresetId ||= visualStylePresetId
 
   if (/女性|女士|女客|女生|姐姐|宝妈|妈妈|宝妈群体/.test(text)) {
     out.audience ||= "女性顾客"
@@ -396,7 +595,7 @@ function inferAnswers(message: string): PosterIntakeAnswers {
   const date = text.match(/(?:\d{1,2}[./月-]\d{1,2}(?:[日号])?(?:\s*[-~到至]\s*\d{1,2}[./月-]\d{1,2}(?:[日号])?)?|本周|本月|周末|今天|明天|五一|端午|中秋|春节|暑假)/)
   if (date) out.dateRange ||= date[0].trim()
 
-  if (!out.campaignTitle && goalHit?.id === "P02") {
+  if (!out.campaignTitle && goalHit?.id === "P02" && !supplementOnly) {
     out.campaignTitle = fallbackCampaignTitleFromText(text, out) || firstShortPhrase(copyText || text)
   }
   if (!out.projectName && ["P01", "P03", "P10", "P11"].includes(goalHit?.id || "")) {
@@ -507,7 +706,7 @@ function fallbackVisibleField(key: string, templateId: string, fields: Record<st
     headline: fields.headline,
   })
 
-  if (key === "storeName" || key === "signature") return fields._storeName || "你的门店"
+  if (key === "storeName" || key === "signature") return isPosterTestDefaultValue(fields._storeName) ? "" : fields._storeName || ""
   if (key === "campaignTitle") return campaignTitle || `${shopType}活动`
   if (key === "headline" || key === "brandPromise" || key === "topic") return campaignTitle || fields.projectName || `${shopType}推荐`
   if (key === "projectName") return fields.projectName || fields.topic || `${shopType}项目`
@@ -519,15 +718,16 @@ function fallbackVisibleField(key: string, templateId: string, fields: Record<st
   if (key === "sellingPoints" || key === "highlights" || key === "benefits" || key === "tags") {
     return defaultSellingPoints(industry, shopType)
   }
-  if (key === "offerText" || key === "giftLine" || key === "openingGift" || key === "shareOffer") {
-    return defaultOfferText(industry, shopType)
+  if (key === "offerText" || key === "giftLine" || key === "openingGift" || key === "shareOffer") return ""
+  if (key === "dateRange") {
+    const date = defaultCampaignDate(haystack)
+    return isPosterTestDefaultValue(date) ? "" : date
   }
-  if (key === "dateRange") return defaultCampaignDate(haystack)
   if (key === "festivalName") return festival || "节日"
   if (key === "blessingTitle") return inferFestivalBlessing(haystack).headline
   if (key === "blessingSubtitle") return inferFestivalBlessing(haystack).subline
   if (key === "bookingLine" || key === "bottomLine" || key === "point4") return fields._cta || "预约到店"
-  if (key === "cityArea" || key === "addressLine") return fields._cityArea || "本地商圈"
+  if (key === "cityArea" || key === "addressLine") return isPosterTestDefaultValue(fields._cityArea) ? "" : fields._cityArea || ""
   if (key === "storeType") return shopType
   if (key === "reason" || key === "proofLine" || key === "serviceRule" || key === "trustRules") {
     return "先了解，再决定"
@@ -688,16 +888,40 @@ export function recommendPosterTemplate(answers: PosterIntakeAnswers): PosterRec
     const candidates = [preset.id, ...getTemplateLayoutCandidateIds(templateId)].filter((id, index, arr) => arr.indexOf(id) === index)
     return { layoutPresetId: preset.id, layoutCandidates: candidates.slice(0, 3) }
   }
+  const resolveVisualStyle = (templateId: string) => {
+    const haystack = [
+      answers.visualStylePresetId,
+      answers.stylePreset,
+      answers.posterGoal,
+      answers.campaignTitle,
+      answers.projectName,
+      answers.headline,
+      answers.sellingPoints,
+      answers.constraints,
+    ]
+      .filter(Boolean)
+      .join(" ")
+    const candidates = getTemplateVisualStyleCandidateIds(templateId)
+    const inferred = answers.visualStylePresetId || inferVisualStylePresetFromText(haystack, templateId) || candidates[0]
+    const visualStylePresetId = candidates.includes(inferred) || inferred ? inferred : candidates[0]
+    return {
+      visualStylePresetId,
+      visualStyleCandidates: [visualStylePresetId, ...candidates].filter((id, index, arr) => id && arr.indexOf(id) === index).slice(0, 3),
+    }
+  }
 
   const explicit = normalizeTemplateId(answers.templateId)
   if (explicit) {
     const style = TEMPLATE_STYLE[explicit]
     const layout = resolveLayout(explicit)
+    const visualStyle = resolveVisualStyle(explicit)
     return {
       templateId: explicit,
       ...style,
+      size: posterSizeForTemplate(explicit),
       stylePreset: asText(answers.stylePreset) || style.stylePreset,
       ...layout,
+      ...visualStyle,
       confidence: 0.95,
       reason: "用户或模型已明确模板",
     }
@@ -718,11 +942,14 @@ export function recommendPosterTemplate(answers: PosterIntakeAnswers): PosterRec
   const id = hit?.id || "P03"
   const style = TEMPLATE_STYLE[id]
   const layout = resolveLayout(id)
+  const visualStyle = resolveVisualStyle(id)
   return {
     templateId: id,
     ...style,
+    size: posterSizeForTemplate(id),
     stylePreset: asText(answers.stylePreset) || style.stylePreset,
     ...layout,
+    ...visualStyle,
     confidence: hit ? 0.82 : 0.58,
     reason: hit?.reason || "信息较泛，默认按主推项目/产品海报处理",
   }
@@ -737,25 +964,24 @@ export function buildPosterBrief(opts: {
   const profileAnswers = answersFromStoreProfile(opts.profile)
   const inferred = inferAnswers(opts.message || "")
   const merged = mergeAnswers(profileAnswers, opts.answers, inferred, opts.llmAnswers)
-  const industry = merged.industry || merged.shopType || "本地生活门店"
+  const industry = merged.industry || merged.shopType || ""
   const shopType = merged.shopType || industry
-  const cityArea =
-    merged.cityArea || joinClean([opts.profile?.city, opts.profile?.district, opts.profile?.landmark], " ") || "本地商圈"
-  const storeName = merged.storeName || asText(opts.profile?.name) || "你的门店"
-  const projectName = merged.projectName || asText(opts.profile?.main_offer_name) || `${shopType}主推项目`
+  const cityArea = merged.cityArea || joinClean([opts.profile?.city, opts.profile?.district, opts.profile?.landmark], " ")
+  const storeName = merged.storeName || asText(opts.profile?.name)
+  const projectName = merged.projectName || asText(opts.profile?.main_offer_name)
   const campaignTitle = refineCampaignTitleForContext(
-    merged.campaignTitle || merged.headline || `${storeName}活动`,
+    merged.campaignTitle || merged.headline || projectName,
     industry,
     shopType,
     projectName,
   )
   const headline = merged.headline || campaignTitle || projectName
-  const dateRange = merged.dateRange || defaultCampaignDate(campaignTitle, merged.posterGoal, merged.constraints)
-  const subline = merged.subline || defaultSubline({ industry, shopType, campaignTitle, dateRange, audience: merged.audience })
-  const sellingPoints = merged.sellingPoints || defaultSellingPoints(industry, shopType)
-  const offerText = merged.offerText || defaultOfferText(industry, shopType)
-  const cta = merged.cta || "预约到店"
-  const serviceRule = promisesToRule(opts.profile?.promises) || "先了解 · 再决定"
+  const dateRange = merged.dateRange || ""
+  const subline = merged.subline || (headline ? defaultSubline({ industry, shopType, campaignTitle, dateRange, audience: merged.audience }) : "")
+  const sellingPoints = merged.sellingPoints || (industry || shopType ? defaultSellingPoints(industry, shopType) : "")
+  const offerText = merged.offerText || ""
+  const cta = merged.cta || ""
+  const serviceRule = promisesToRule(opts.profile?.promises)
 
   return {
     ...merged,
@@ -768,27 +994,27 @@ export function buildPosterBrief(opts: {
     projectName,
     headline,
     subline,
-    audience: merged.audience || "本地潜在顾客",
+    audience: merged.audience || "",
     sellingPoints,
     offerText,
     dateRange,
     cta,
-    constraints: merged.constraints || "不要夸大承诺，不要低价土味风",
+    constraints: merged.constraints || "",
     serviceRule,
-    sourceSummary: `${industry}｜${cityArea}｜${storeName}`,
+    sourceSummary: [industry, cityArea, storeName].filter(Boolean).join("｜"),
   }
 }
 
 export function getPosterMissingFields(brief: PosterBrief) {
   const missing: string[] = []
-  if (!brief.storeName || brief.storeName === "你的门店") missing.push("门店/品牌名称")
-  if (!brief.industry || brief.industry === "本地生活门店") missing.push("行业/品类")
+  if (!brief.storeName || isPosterTestDefaultValue(brief.storeName)) missing.push("门店/品牌名称")
+  if (!brief.industry) missing.push("行业/品类")
   if (!brief.posterGoal) missing.push("海报目标")
   if (!brief.projectName && !brief.campaignTitle && !brief.headline) missing.push("活动、项目、产品或主题")
-  if (!brief.audience || brief.audience === "本地潜在顾客") missing.push("目标人群/适合对象")
+  if (!brief.audience) missing.push("目标人群/适合对象")
   if (!brief.sellingPoints) missing.push("3-4个卖点")
-  if (!brief.offerText || brief.offerText === "到店专属权益") missing.push("优惠/权益/价格")
-  if (!brief.dateRange || brief.dateRange === "近期可约") missing.push("活动时间/有效期")
+  if (!brief.offerText && !["P04", "P09", "P13"].includes(brief.templateId || "")) missing.push("优惠/权益/价格")
+  if (!brief.dateRange && !/祝福|问候|不促销/.test(`${brief.posterGoal} ${brief.constraints}`)) missing.push("活动时间/有效期")
   if (!brief.cta) missing.push("行动号召")
   return missing.slice(0, 9)
 }
@@ -803,7 +1029,7 @@ function listToText(input: string, fallback: string) {
 }
 
 export function buildPosterFieldsFromBrief(templateId: string, brief: PosterBrief): Record<string, string> {
-  const tags = listToText(brief.sellingPoints || "", "真实到店｜服务清楚｜新手友好")
+  const tags = listToText(brief.sellingPoints || "", "")
   const layoutPreset = getPosterLayoutPreset(brief.layoutPresetId, templateId)
   const common = {
     _industry: brief.industry,
@@ -819,47 +1045,146 @@ export function buildPosterFieldsFromBrief(templateId: string, brief: PosterBrie
     _layoutPresetVersion: layoutPreset.version,
   }
 
-  const base: Record<string, string> = {
-    storeName: brief.storeName,
-    cityArea: brief.cityArea,
-    headline: brief.headline || brief.campaignTitle || brief.projectName || `${brief.shopType}推荐`,
-    subline: brief.subline || `适合${brief.audience}`,
-    projectName: brief.projectName || brief.campaignTitle || `${brief.shopType}项目`,
-    campaignTitle: brief.campaignTitle || brief.headline || `${brief.storeName}活动`,
-    sellingPoints: tags,
-    offerText: brief.offerText || "到店专属权益",
-    dateRange: brief.dateRange || "近期可约",
-    serviceRule: brief.serviceRule || brief.cta || "先了解 · 再决定",
-    trustRules: brief.serviceRule || "先了解 · 再决定",
-    audience: brief.audience || "本地潜在顾客",
-    highlights: tags,
-    bookingLine: brief.cta || "立即预约",
-    brandPromise: brief.headline || `${brief.storeName}，值得信任`,
-    proofLine: brief.serviceRule || "信息透明，服务清楚",
-    benefits: tags,
-    giftLine: brief.offerText || "到店专属权益",
-    openingGift: brief.offerText || "开业专属礼",
-    addressLine: brief.cityArea,
-    storeType: brief.shopType,
-    reason: brief.subline || "值得收藏的本地好店",
-    tags,
-    topic: brief.projectName || brief.campaignTitle || brief.industry,
-    point1: tags.split("｜")[0] || "先了解",
-    point2: tags.split("｜")[1] || "看清楚",
-    point3: tags.split("｜")[2] || "再决定",
-    point4: brief.cta || "到店咨询",
-    category1: `${brief.projectName || brief.shopType}：${brief.offerText || "到店咨询"}`,
-    category2: `${tags.split("｜")[0] || "服务亮点"}：${tags.split("｜")[1] || "清楚透明"}`,
-    category3: `${tags.split("｜")[2] || "预约方式"}：${brief.cta || "立即预约"}`,
-    bottomLine: brief.cta || "到店咨询",
-    shareOffer: brief.offerText || "转发可享到店礼",
-    festivalName: brief.dateRange || brief.campaignTitle || "节日",
-    blessingTitle: brief.headline || brief.campaignTitle || "节日安康",
-    blessingSubtitle: brief.subline || "愿你平安顺遂",
-    signature: brief.storeName,
+  const base: Record<string, string> = {}
+  const set = (key: string, value: string | undefined) => {
+    const text = asText(value, 180)
+    if (text) base[key] = text
   }
 
+  set("storeName", brief.storeName)
+  set("cityArea", brief.cityArea)
+  set("headline", brief.headline || brief.campaignTitle || brief.projectName)
+  set("subline", brief.subline)
+  set("projectName", brief.projectName || brief.campaignTitle)
+  set("campaignTitle", brief.campaignTitle || brief.headline)
+  set("sellingPoints", tags)
+  set("offerText", brief.offerText)
+  set("dateRange", brief.dateRange)
+  set("serviceRule", brief.serviceRule || brief.cta)
+  set("trustRules", brief.serviceRule)
+  set("audience", brief.audience)
+  set("highlights", tags)
+  set("bookingLine", brief.cta)
+  set("brandPromise", brief.headline || brief.campaignTitle)
+  set("proofLine", brief.serviceRule)
+  set("benefits", tags)
+  set("giftLine", brief.offerText)
+  set("openingGift", brief.offerText)
+  set("addressLine", brief.cityArea)
+  set("storeType", brief.shopType)
+  set("reason", brief.subline)
+  set("tags", tags)
+  set("topic", brief.projectName || brief.campaignTitle || brief.industry)
+  set("point1", tags.split("｜")[0])
+  set("point2", tags.split("｜")[1])
+  set("point3", tags.split("｜")[2])
+  set("point4", brief.cta)
+  set("category1", brief.projectName && brief.offerText ? `${brief.projectName}：${brief.offerText}` : brief.projectName)
+  set("category2", tags.split("｜")[0] && tags.split("｜")[1] ? `${tags.split("｜")[0]}：${tags.split("｜")[1]}` : "")
+  set("category3", tags.split("｜")[2] && brief.cta ? `${tags.split("｜")[2]}：${brief.cta}` : "")
+  set("bottomLine", brief.cta)
+  set("shareOffer", brief.offerText)
+  set("festivalName", brief.dateRange || brief.campaignTitle)
+  set("blessingTitle", brief.headline || brief.campaignTitle)
+  set("blessingSubtitle", brief.subline)
+  set("signature", brief.storeName)
+
   return sanitizePosterTemplateFields(templateId, { ...base, ...common }).fields
+}
+
+function sourceValuesForProfile(profile: StoreProfileForPoster | null) {
+  return answersFromStoreProfile(profile)
+}
+
+function resolveFieldSourceForValue(opts: {
+  key: string
+  value: string
+  profileAnswers: PosterIntakeAnswers
+  explicitAnswers: PosterIntakeAnswers
+  inferredAnswers: PosterIntakeAnswers
+  llmAnswers: PosterIntakeAnswers
+}) {
+  const answerKey = opts.key as keyof PosterIntakeAnswers
+  const aliases: Record<string, Array<keyof PosterIntakeAnswers>> = {
+    signature: ["storeName"],
+    addressLine: ["cityArea"],
+    storeType: ["shopType", "industry"],
+    trustRules: ["sellingPoints"],
+    highlights: ["sellingPoints"],
+    benefits: ["sellingPoints"],
+    giftLine: ["offerText"],
+    openingGift: ["offerText"],
+    bookingLine: ["cta"],
+    bottomLine: ["cta"],
+    shareOffer: ["offerText"],
+    tags: ["sellingPoints"],
+    topic: ["projectName", "campaignTitle"],
+    blessingTitle: ["headline", "campaignTitle"],
+    blessingSubtitle: ["subline"],
+  }
+  const keys = [answerKey, ...(aliases[opts.key] || [])]
+  const hasValue = (answers: PosterIntakeAnswers) =>
+    keys.some((key) => {
+      const value = asText(answers[key], 180)
+      return value && (value === opts.value || opts.value.includes(value) || value.includes(opts.value))
+    })
+
+  if (hasValue(opts.profileAnswers)) return "store_profile" as const
+  if (hasValue(opts.explicitAnswers)) return "user_text" as const
+  if (hasValue(opts.llmAnswers)) return "user_text" as const
+  if (hasValue(opts.inferredAnswers)) return "user_text" as const
+  return isPosterTestDefaultValue(opts.value) ? "default_value" : "system_inferred"
+}
+
+export function buildPosterFieldSources(opts: {
+  profile: StoreProfileForPoster | null
+  answers?: PosterIntakeAnswers
+  message?: string
+  llmAnswers?: PosterIntakeAnswers
+  fields: Record<string, string>
+}) {
+  const profileAnswers = sourceValuesForProfile(opts.profile)
+  const explicitAnswers = coercePosterAnswers(opts.answers)
+  const inferredAnswers = inferAnswers(opts.message || "")
+  const llmAnswers = coercePosterAnswers(opts.llmAnswers)
+  const out: Record<string, PosterFieldSourceState> = {}
+
+  for (const [key, rawValue] of Object.entries(opts.fields || {})) {
+    if (key.startsWith("_")) continue
+    const value = asText(rawValue, 180)
+    if (!value) {
+      out[key] = { value: "", source: "missing", visible: false, confidence: "low" }
+      continue
+    }
+
+    const source = resolveFieldSourceForValue({
+      key,
+      value,
+      profileAnswers,
+      explicitAnswers,
+      inferredAnswers,
+      llmAnswers,
+    })
+    const visible = isRealPosterFieldSource(source)
+    out[key] = {
+      value,
+      source,
+      visible,
+      confidence: isRealPosterFieldSource(source) ? "high" : "low",
+    }
+  }
+
+  return out
+}
+
+export function buildPosterQrState(assetRefs: unknown[]): PosterQrState {
+  const hasQr = (assetRefs || []).some((item) => item && typeof item === "object" && (item as { kind?: unknown }).kind === "qr")
+  return {
+    hasQr,
+    source: hasQr ? "uploaded_asset" : "missing",
+    reserveArea: false,
+    compositeRequired: hasQr,
+  }
 }
 
 export function buildAssistantMessage(brief: PosterBrief, missingFields: string[], recommendation: PosterRecommendation) {
@@ -912,5 +1237,8 @@ export function coercePosterAnswers(input: unknown): PosterIntakeAnswers {
     templateId: normalizeTemplateId(raw.templateId),
     stylePreset: asText(raw.stylePreset),
     layoutPresetId: normalizeLayoutPresetId(raw.layoutPresetId) || normalizeLayoutPresetId(raw._layoutPresetId),
+    visualStylePresetId: asText(raw.visualStylePresetId) || asText(raw._visualStylePresetId),
+    hasQr: asText(raw.hasQr),
+    qrPolicy: asText(raw.qrPolicy),
   }
 }

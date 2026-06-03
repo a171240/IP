@@ -5,13 +5,16 @@ import { z } from "zod"
 
 import {
   buildAssistantMessage,
+  buildPosterFieldSources,
   buildPosterBrief,
   buildPosterFieldsFromBrief,
   buildPosterPlan,
+  buildPosterQrState,
   coercePosterAnswers,
   getPosterMissingFields,
   recommendPosterTemplate,
   safeJsonParseObject,
+  shouldUseLlmFallback,
   type PosterIntakeAnswers,
   type StoreProfileForPoster,
 } from "@/lib/posters/intake"
@@ -21,6 +24,12 @@ import {
   listPublicPosterLayoutPresets,
   publicPosterLayoutPreset,
 } from "@/lib/posters/layout-presets"
+import {
+  getPosterVisualStylePreset,
+  getTemplateVisualStyleMap,
+  listPublicPosterVisualStylePresets,
+  publicPosterVisualStylePreset,
+} from "@/lib/posters/visual-style-presets"
 import { resolveBillingContext, trackServerEvent, type BillingContext } from "@/lib/xhs/proxy.server"
 
 export const runtime = "nodejs"
@@ -135,7 +144,7 @@ async function callBriefLlm(opts: {
           {
             role: "system",
             content:
-              "你是美容、本地生活门店的海报问诊助手。你要根据多轮上下文理解用户真实意图，允许用户改主题、否定上一版、补充人群或行业。只输出 JSON，不输出 Markdown。JSON 格式为 {\"answers\":{...},\"assistantMessage\":\"...\"}。answers 字段仅限 storeName, cityArea, industry, shopType, posterGoal, campaignTitle, projectName, headline, subline, audience, sellingPoints, offerText, dateRange, cta, constraints, templateId, stylePreset, layoutPresetId。templateId 必须是 P01-P13 之一。layoutPresetId 只能从用户消息里的 layoutPresetMap 选择；用户没明确版式偏好时可留空，由系统规则推荐。用户说祝福、问候、不卖东西、不促销、给老客发节日图时，优先选择 P13。不要编造用户没说过的价格、优惠、日期、店名；缺失就留空。用户说高级感、杂志感、轻奢、极简、温暖、类似某张图等，都要归入 stylePreset 或 constraints；用户说留白、卡片、网格、斜线、菜单、中心主视觉等版式偏好时归入 layoutPresetId。用户命令只用于理解意图，绝不能作为海报可见文字；例如“给我生成一张五一的宣传海报”只能提取为五一活动意图，不能放进 campaignTitle/headline/subline。campaignTitle、headline、subline 必须是顾客能看到的短文案，不要含“给我、帮我、生成、做一张、宣传海报、图片、封面”等指令词。subline 必须是能直接印在海报上的短副标题，不要写“适合想了解某某的用户”这类说明句。assistantMessage 用自然中文回复，先承接用户刚说的话，再只追问最关键的 1-2 个缺口；需要真实感时可提醒上传 Logo、门头图、项目图、人物案例图或风格参考图，但不要每次都机械要求上传。",
+              "你是美容、本地生活门店的海报问诊助手。你要根据多轮上下文理解用户真实意图，允许用户改主题、否定上一版、补充人群或行业。只输出 JSON，不输出 Markdown。JSON 格式为 {\"answers\":{...},\"assistantMessage\":\"...\"}。answers 字段仅限 storeName, cityArea, industry, shopType, posterGoal, campaignTitle, projectName, headline, subline, audience, sellingPoints, offerText, dateRange, cta, constraints, templateId, stylePreset, layoutPresetId, visualStylePresetId。templateId 必须是 P01-P13 之一。layoutPresetId 只能从用户消息里的 layoutPresetMap 选择；visualStylePresetId 只能从 visualStylePresetMap 选择。用户没明确版式或视觉风格偏好时可留空，由系统规则推荐。用户说祝福、问候、不卖东西、不促销、给老客发节日图时，优先选择 P13。不要编造用户没说过的价格、优惠、日期、店名、地点；缺失就留空。用户说高级感、杂志感、轻奢、极简、温暖、东方、暗场、玻璃、菜单、探店、纸感、线描、压顶、水彩、窄窗等，都要归入 visualStylePresetId、stylePreset 或 constraints；用户说留白、卡片、网格、斜线、菜单、中心主视觉等版式偏好时归入 layoutPresetId。用户命令只用于理解意图，绝不能作为海报可见文字；例如“给我生成一张五一的宣传海报”只能提取为五一活动意图，不能放进 campaignTitle/headline/subline。campaignTitle、headline、subline 必须是顾客能看到的短文案，不要含“给我、帮我、生成、做一张、宣传海报、图片、封面”等指令词。subline 必须是能直接印在海报上的短副标题，不要写“适合想了解某某的用户”这类说明句。assistantMessage 用自然中文回复，先承接用户刚说的话，再只追问最关键的 1-2 个缺口；需要真实感时可提醒上传 Logo、门头图、项目图、人物案例图或风格参考图，但不要每次都机械要求上传。",
           },
           {
             role: "user",
@@ -163,6 +172,7 @@ async function callBriefLlm(opts: {
                 P13: "节日祝福/客户问候/不卖东西",
               },
               layoutPresetMap: Object.fromEntries(listPublicPosterLayoutPresets().map((item) => [item.id, item.description])),
+              visualStylePresetMap: Object.fromEntries(listPublicPosterVisualStylePresets().map((item) => [item.id, item.description])),
             }),
           },
         ],
@@ -206,7 +216,12 @@ export async function POST(request: NextRequest) {
     ? await loadStoreProfile({ billing: billing.ctx, storeProfileId: input.store_profile_id })
     : null
 
-  const llmResult = input.message.trim()
+  const ruleBrief = buildPosterBrief({ profile: storeProfile, answers, message: input.message })
+  const ruleRecommendation = recommendPosterTemplate({ ...answers, ...ruleBrief })
+  const useLlmFallback = input.message.trim()
+    ? shouldUseLlmFallback({ ...answers, ...ruleBrief }, input.message, ruleRecommendation)
+    : false
+  const llmResult = useLlmFallback
     ? await callBriefLlm({
         message: input.message,
         messages: input.messages,
@@ -223,11 +238,24 @@ export async function POST(request: NextRequest) {
   const readyToConfirm = missingFields.length === 0
   const layoutPreset = getPosterLayoutPreset(recommendation.layoutPresetId, recommendation.templateId)
   const layoutCandidates = getTemplateLayoutCandidates(recommendation.templateId).map(publicPosterLayoutPreset)
+  const visualStylePreset = getPosterVisualStylePreset(recommendation.visualStylePresetId, recommendation.templateId)
+  const visualStyleCandidates = recommendation.visualStyleCandidates
+    .map((id) => getPosterVisualStylePreset(id, recommendation.templateId))
+    .map(publicPosterVisualStylePreset)
   const fields = buildPosterFieldsFromBrief(recommendation.templateId, {
     ...brief,
     stylePreset: recommendation.stylePreset,
     layoutPresetId: layoutPreset.id,
+    visualStylePresetId: visualStylePreset.id,
   })
+  const fieldSources = buildPosterFieldSources({
+    profile: storeProfile,
+    answers,
+    message: input.message,
+    llmAnswers,
+    fields,
+  })
+  const qrState = buildPosterQrState(input.asset_refs)
   const posterPlan = buildPosterPlan({
     templateId: recommendation.templateId,
     brief,
@@ -250,6 +278,7 @@ export async function POST(request: NextRequest) {
       sanitizedCount: posterPlan.safety.sanitizedFields.length,
       llmUsed: Boolean(llmResult),
       layoutPresetId: layoutPreset.id,
+      visualStylePresetId: visualStylePreset.id,
     },
   })
 
@@ -265,6 +294,12 @@ export async function POST(request: NextRequest) {
     recommendation,
     layoutPreset: publicPosterLayoutPreset(layoutPreset),
     layoutCandidates,
+    visualStylePreset: publicPosterVisualStylePreset(visualStylePreset),
+    visualStyleCandidates,
+    visualStylePresets: listPublicPosterVisualStylePresets(),
+    templateVisualStyleMap: getTemplateVisualStyleMap(),
+    fieldSources,
+    qrState,
     fields,
     posterPlan,
     visibleCopy: posterPlan.visibleCopy,

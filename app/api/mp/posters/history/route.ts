@@ -78,6 +78,13 @@ export async function GET(request: NextRequest) {
           null,
         layoutPresetVersion: meta?.layoutPresetVersion || null,
         layoutReferenceUsed: Boolean(meta?.layoutReferenceUsed),
+        visualStylePresetId: meta?.visualStylePresetId || null,
+        visualStylePresetName: meta?.visualStylePresetName || null,
+        visualStylePreset: meta?.visualStylePreset || null,
+        fieldSources: meta?.fieldSources || null,
+        qrState: meta?.qrState || null,
+        qrAssetRef: meta?.qrAssetRef || null,
+        promptVersion: meta?.promptVersion || null,
         assetRefs: Array.isArray(meta?.assetRefs) ? meta.assetRefs : [],
       }
     })
