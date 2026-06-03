@@ -10,6 +10,7 @@
     "mp:islogin": "node scripts/wechat-devtools-cli.mjs islogin",
     "mp:login": "node scripts/wechat-devtools-cli.mjs login",
     "mp:open": "node scripts/wechat-devtools-cli.mjs open",
+    "mp:voice-coach-invariants": "node scripts/voice-coach-asset-invariants.mjs",
     "mp:preview": "node scripts/wechat-devtools-cli.mjs preview",
     "mp:upload": "node scripts/miniprogram-upload.mjs",
     "mp:upload:ci": "node scripts/miniprogram-upload.mjs --ci",

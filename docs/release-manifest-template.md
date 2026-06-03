@@ -80,6 +80,8 @@ Required backend checks:
 - `/api/mp/profile`
 - `/api/mp/virtual-pay/products`
 - `/api/mp/service-records/sessions`
+- If VoiceCoach or knowledge-space training assets are touched:
+  `corepack pnpm mp:voice-coach-invariants -- --base-url <preview-or-production-url>`
 - Any changed admin/store route
 
 ## Mini-program Upload
