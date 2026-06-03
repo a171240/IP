@@ -1,7 +1,7 @@
-# Release Manifest Draft: Professional Learning Static Assets
+# Release Manifest: Professional Learning Static Assets
 
-This is a release-prep manifest. It does not record a completed production
-release.
+This manifest records the completed backend production release for professional
+learning static assets.
 
 ## Basic Info
 
@@ -70,7 +70,7 @@ No API, database, payment, store-admin, poster, or service-record backend code i
 - No mini-program upload.
 - No Supabase schema or data change.
 - No backend API code change.
-- No Vercel production deploy has been run from this manifest yet.
+- Vercel production deploy was run only for the backend static asset addition.
 - No project protection or Vercel Authentication setting change.
 
 ## Database Changes
@@ -89,8 +89,10 @@ No API, database, payment, store-admin, poster, or service-record backend code i
   `https://ip-haqle4l7a-a171240s-projects.vercel.app`
 - Preview deployment ID: `dpl_7C5W5anWKuzLnJ5Zg9nso3mRnsH5`
 - Preview target/status: `preview`, `Ready`
-- Production deployment ID: not run
-- Deploy command for production release thread:
+- Production deployment ID: `dpl_2v9UZrfGmSA92L8t8Fih8WfZa64B`
+- Production deployment URL:
+  `https://ip-1k6jntsl3-a171240s-projects.vercel.app`
+- Deploy command:
   `corepack pnpm dlx vercel@latest deploy --prod --yes`
 
 Backend smoke results before production deploy:
@@ -112,6 +114,33 @@ Required backend checks after production deploy:
   - `https://ip.ipgongchang.xin/professional-learning-assets/professional-learning/v2/dry-skin/01-main.jpg`
   - `https://ip.ipgongchang.xin/professional-learning-assets/professional-learning/v2/skin-layers/pages/01-customer_problem.jpg`
   - `https://ip.ipgongchang.xin/professional-learning-assets/professional-learning/v2/forbidden-medical-claims/pages/12-practice.jpg`
+
+Backend smoke results after production deploy:
+
+```text
+Production deployment:
+dpl_2v9UZrfGmSA92L8t8Fih8WfZa64B
+https://ip-1k6jntsl3-a171240s-projects.vercel.app
+
+Vercel inspect:
+target -> production
+status -> Ready
+aliases -> https://www.ipnrgc.com, https://ip.ipgongchang.xin, https://ip-a171240s-projects.vercel.app, https://ip-a171240-a171240s-projects.vercel.app, https://ipnrgc.com
+
+https://ip.ipgongchang.xin/api/mp/profile -> 401 Unauthorized
+
+https://ip.ipgongchang.xin/professional-learning-assets/professional-learning/v2/dry-skin/01-main.jpg
+-> 200 OK, image/jpeg, 52176 bytes
+
+https://ip.ipgongchang.xin/professional-learning-assets/professional-learning/v2/skin-layers/pages/01-customer_problem.jpg
+-> 200 OK, image/jpeg, 114094 bytes
+
+https://ip.ipgongchang.xin/professional-learning-assets/professional-learning/v2/forbidden-medical-claims/pages/12-practice.jpg
+-> 200 OK, image/jpeg, 178398 bytes
+
+Full professional-learning public asset check:
+288/288 JPG URLs returned 200 image/jpeg
+```
 
 ## Mini-program Upload
 
@@ -155,6 +184,6 @@ Mini-program follow-up after production static URLs return 200:
 ## Final Decision
 
 - Release approved: yes, by user request in this thread
-- Released by: not released
-- Release time: not released
-- Follow-up items: make this thread the explicit release thread before production deploy, then smoke the three production JPG URLs before changing mini-program config.
+- Released by: Codex
+- Release time: 2026-06-04 00:19:36 CST
+- Follow-up items: switch mini-program `PROFESSIONAL_LEARNING_ASSET_BASE_URL` to the production base URL, exclude local `assets/professional-learning` from the WeChat package, then run mini-program checks before any upload.
