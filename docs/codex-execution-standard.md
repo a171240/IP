@@ -228,6 +228,9 @@ Important backend smoke checks:
 - `/api/mp/profile`
 - `/api/mp/virtual-pay/products`
 - `/api/mp/service-records/sessions`
+- VoiceCoach or knowledge-space training changes must run
+  `corepack pnpm mp:voice-coach-invariants -- --base-url <preview-or-production-url>`
+  and must not pass with `404` on training APIs or image assets.
 - Changed admin/store routes
 - Changed payment or entitlement routes
 
