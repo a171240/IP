@@ -84,7 +84,9 @@ No mini-program upload is included.
 - Vercel projectId: `prj_8SL1t8fEXw9QeQxScrvlroGio8TC`
 - Preview deployment URL: not used; this is a release-thread production deploy after local checks
 - Previous production deployment ID: `dpl_GJH6rZXfLPetnShVf4CF6xCiq2ix`
-- Production deployment ID: pending
+- Production deployment ID: `dpl_32XqJHGcyXLXztctiE6PRRpTT9Hy`
+- Production deployment URL: `https://ip-deqtsep53-a171240s-projects.vercel.app`
+- Vercel inspect URL: `https://vercel.com/a171240s-projects/ip/32XqJHGcyXLXztctiE6PRRpTT9Hy`
 - Production alias/domain: `https://ip.ipgongchang.xin`, `https://www.ipnrgc.com`
 - Deploy command: `corepack pnpm dlx vercel deploy --prod --yes`
 
@@ -116,7 +118,33 @@ Required backend checks:
 Backend smoke results after production deploy:
 
 ```text
-Pending.
+Vercel inspect:
+id -> dpl_32XqJHGcyXLXztctiE6PRRpTT9Hy
+target -> production
+status -> Ready
+aliases -> https://www.ipnrgc.com, https://ip.ipgongchang.xin, https://ipnrgc.com
+
+https://www.ipnrgc.com:
+/api/mp/profile -> 401
+/api/mp/knowledge-spaces/options -> 401
+/api/mp/posters/templates -> 200, ok=true, visualStylePresets=12, templateVisualStyleMap=13
+/api/mp/posters/intake -> 401
+/api/mp/posters/generate -> 400 on empty payload, route exists
+/api/mp/posters/history -> 401
+/api/mp/posters/assets -> 401
+corepack pnpm mp:voice-coach-invariants -- --base-url https://www.ipnrgc.com -> passed 28 checks
+Full public VoiceCoach asset GET check -> 210/210 images OK
+
+https://ip.ipgongchang.xin:
+/api/mp/profile -> 401
+/api/mp/knowledge-spaces/options -> 401
+/api/mp/posters/templates -> 200, ok=true, visualStylePresets=12, templateVisualStyleMap=13
+/api/mp/posters/intake -> 401
+/api/mp/posters/generate -> 400 on empty payload, route exists
+/api/mp/posters/history -> 401
+/api/mp/posters/assets -> 401
+corepack pnpm mp:voice-coach-invariants -- --base-url https://ip.ipgongchang.xin -> passed 28 checks
+Full public VoiceCoach asset GET check -> 210/210 images OK
 ```
 
 ## Mini-program Upload
@@ -159,5 +187,5 @@ Required mini-program checks:
 
 - Release approved: yes, by user request in this thread
 - Released by: Codex
-- Release time: pending
+- Release time: 2026-06-03 23:07:47 CST
 - Follow-up items: keep poster prompt tests and VoiceCoach asset invariant as required checks for every backend production deploy that touches poster, knowledge-space, or VoiceCoach surfaces.
