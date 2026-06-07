@@ -2,14 +2,38 @@ const test = require("node:test")
 const assert = require("node:assert/strict")
 const { execFileSync } = require("node:child_process")
 const { readFileSync } = require("node:fs")
+const { mkdtempSync } = require("node:fs")
 const { join } = require("node:path")
+const { tmpdir } = require("node:os")
 
 const root = process.cwd()
+const compiledDir = mkdtempSync(join(tmpdir(), "xhs-cover-style-"))
+execFileSync(
+  process.execPath,
+  [
+    "./node_modules/typescript/bin/tsc",
+    "lib/xhs/beauty-knowledge.ts",
+    "--outDir",
+    compiledDir,
+    "--module",
+    "commonjs",
+    "--target",
+    "es2022",
+    "--esModuleInterop",
+    "--skipLibCheck",
+  ],
+  { cwd: root, stdio: "pipe" }
+)
+const compiledBeautyModule = join(compiledDir, "beauty-knowledge.js").replace(/\\/g, "\\\\")
 
 function runBeautyModule(script) {
+  const runnable = script.replace(
+    /import \{([^}]+)\} from "\.\/lib\/xhs\/beauty-knowledge\.ts";/,
+    `const {$1} = require("${compiledBeautyModule}");`
+  )
   const stdout = execFileSync(
     process.execPath,
-    ["--no-warnings", "--experimental-strip-types", "--input-type=module", "--eval", script],
+    ["--eval", runnable],
     { cwd: root, encoding: "utf8" }
   )
   return JSON.parse(stdout.trim())
@@ -46,12 +70,13 @@ test("hydration list cover rebuilds stale LLM prompt into current brief", () => 
 
   assert.equal(result.coercedStyle, "clean-info-card")
   assert.match(result.prompt, /xhs-cover-brief-v4-text-guard/)
-  assert.match(result.prompt, /风格ID：clean-info-card/)
-  assert.doesNotMatch(result.prompt, /风格ID：soft-minimal-poster/)
+  assert.match(result.prompt, /最终风格：clean-info-card/)
+  assert.match(result.prompt, /【Skill视觉Brief】/)
+  assert.doesNotMatch(result.prompt, /最终风格：soft-minimal-poster/)
   assert.doesNotMatch(result.prompt, /柔软纸张质感/)
   assert.match(result.negative, /底部引流条/)
-  assert.match(result.prompt, /底部绝对不要出现导流组件/)
-  assert.match(result.prompt, /可以有少量辅助说明或清单/)
+  assert.match(result.prompt, /标题区、主视觉区、短标签区/)
+  assert.match(result.prompt, /高级小红书封面/)
   assert.doesNotMatch(result.prompt, /commercial mini program/)
   assert.doesNotMatch(result.prompt, /进入小程序/)
   assert.doesNotMatch(result.prompt, /立即进入/)
@@ -87,10 +112,11 @@ test("warning cover routes to warning poster without stale info-card prompt", ()
   `)
 
   assert.equal(result.style, "contrast-warning-poster")
-  assert.match(result.prompt, /高级美业杂志封面感/)
+  assert.match(result.prompt, /最终风格：contrast-warning-poster/)
+  assert.match(result.prompt, /克制警示/)
   assert.doesNotMatch(result.prompt, /旧版信息卡/)
   assert.doesNotMatch(result.prompt, /信息卡、三条清单、圆形小图标、细线分隔/)
-  assert.match(result.prompt, /3个短避坑点或对比标签/)
+  assert.match(result.prompt, /短标签区/)
   assert.doesNotMatch(result.prompt, /no human/)
   assert.doesNotMatch(result.prompt, /no checklist/)
 })
@@ -124,7 +150,7 @@ test("cover prompt strips CTA words from title and subtitle", () => {
   assert.match(result.prompt, /护理方案/)
 })
 
-test("relax cover prompt requires structured info layout, not only ambience", () => {
+test("decision-style relax cover is corrected away from ambience-only spa scene", () => {
   const result = runBeautyModule(`
     import { buildBeautyContext, normalizeCoverAsset } from "./lib/xhs/beauty-knowledge.ts";
 
@@ -146,10 +172,10 @@ test("relax cover prompt requires structured info layout, not only ambience", ()
     console.log(JSON.stringify({ style: asset.styleId, prompt: asset.prompt, negative: asset.negative }));
   `)
 
-  assert.equal(result.style, "lifestyle-spa-scene")
-  assert.match(result.prompt, /主标题区、副标题区、辅助信息点区、主视觉区/)
-  assert.match(result.prompt, /短标签\/短清单/)
-  assert.match(result.prompt, /不要生成单调的“背景图 \+ 大标题”/)
+  assert.equal(result.style, "clean-info-card")
+  assert.match(result.prompt, /最终风格：clean-info-card/)
+  assert.match(result.prompt, /标题区、主视觉区、短标签区/)
+  assert.match(result.prompt, /不要把护理床照片铺满整张图后简单压字/)
   assert.match(result.negative, /纯背景加大字/)
 })
 
@@ -169,8 +195,8 @@ test("xhs text generation prompt requires store anchor when profile exists", () 
   assert.match(generateRoute, /function mergeLocalScope/)
   assert.match(generateRoute, /storeProfile\?\.main_offer_name \|\| input\.offerName/)
   assert.match(generateRoute, /mergeLocalScope\(input\.localScope \|\| "", profileLocalScope\(storeProfile\)\)/)
-  assert.match(coverRoute, /辅助信息点区和主视觉区/)
-  assert.match(coverRoute, /不要生成单调的氛围背景加大标题/)
+  assert.match(coverRoute, /短标签克制/)
+  assert.match(coverRoute, /普通护理房素材图加大字/)
 })
 
 test("image generation defaults stay single-image and support provider fallbacks", () => {
@@ -199,7 +225,7 @@ test("image generation defaults stay single-image and support provider fallbacks
   assert.doesNotMatch(legacyRoute, /normalizeResolution\(getTextField\(requestBody, \["resolution"\]/)
   assert.match(mpRoute, /sanitizeCoverReferenceText/)
   assert.match(legacyRoute, /sanitizeCoverReferenceText/)
-  assert.match(mpRoute, /safeContent \? compactText\(safeContent/)
+  assert.match(mpRoute, /主题语境：\$\{compactText\(safeContent/)
   assert.match(legacyRoute, /safeContent \? compactText\(safeContent/)
   assert.match(legacyRoute, /function getCoverPoints/)
   assert.match(legacyRoute, /function strengthenLegacyCoverPrompt/)

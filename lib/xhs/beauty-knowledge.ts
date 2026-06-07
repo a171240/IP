@@ -31,10 +31,16 @@ export type BeautyCoverVisualPlan = {
   id: BeautyCoverStyleId
   label: string
   reason: string
+  taskType: string
+  templateFamily: string
+  mainVisual: string
+  sceneProps: string
+  composition: string
   layout: string
   palette: string
   visualCue: string
   typography: string
+  qualityGoal: string
 }
 
 export type BeautyContext = {
@@ -99,66 +105,114 @@ const COVER_VISUAL_STYLES: Record<
   "soft-minimal-poster": {
     label: "温柔极简海报",
     bestFor: "敏感、泛红、基础护理、语气温和但仍需要高级质感的体验内容",
+    taskType: "竖版 3:4 小红书温柔护理首图",
+    templateFamily: "X09 痛点解决封面 / X20 强标题弱背景",
+    mainVisual: "柔光护理室局部、干净毛巾、玻璃护肤精华、水润材质或自然皮肤纹理，不出现夸张人脸特写",
+    sceneProps: "浅色纸张卡片、洁净护理床、柔光窗帘、精华水滴、白瓷或磨砂玻璃材质",
+    composition: "上方保留短标题区，中部为柔和护理材质主视觉，下方用轻量短标签补足信息层级",
     layout: "主标题占画面中上部，副标题下方；若有辅助信息点，用2-3个轻量短标签排在下方，不要只有空背景和大标题",
     palette: "温暖自然光、柔白、低饱和肤粉或浅杏，只用少量强调色",
     visualCue: "高级皮肤管理杂志感，柔光、干净护理空间局部、纸张/玻璃/水纹材质细节",
     typography: "现代中文黑体，主标题加粗，副标题中等字重，字距正常，缩略图也清楚",
+    qualityGoal: "温和但不空，手机缩略图能读出核心判断，避免水彩模板感和纯背景大字。",
   },
   "editorial-magazine": {
     label: "高级杂志封面",
     bestFor: "本地找店、体验复盘、老客视角、轻专业内容",
+    taskType: "竖版 3:4 小红书本地生活杂志封面",
+    templateFamily: "X02 探店封面 / X08 到店打卡封面 / X18 真实体验日记",
+    mainVisual: "真实明亮的皮肤管理门店空间、前台、护理床、产品陈列或服务细节局部，像高级手机实拍",
+    sceneProps: "门店空间、护理床、产品架、接待茶水、镜面反射、花材、自然窗光",
+    composition: "杂志封面式大标题和真实门店局部结合，主视觉占中部，底部或侧边放短栏目标签",
     layout: "杂志封面式排版，顶部小栏目，中部主标题，下方一句副标题；底部或侧边放短栏目标签，形成可收藏的信息层级",
     palette: "象牙白、深咖、雾粉或鼠尾草绿，低饱和但有层次",
     visualCue: "生活方式杂志摄影感、柔和自然光、干净护理空间的局部氛围",
     typography: "标题用精致中文黑体，副标题更轻，保持高级留白",
+    qualityGoal: "像可发布的小红书首图，不像硬广落地页；真实、干净、可收藏。",
   },
   "clean-info-card": {
     label: "清晰专业海报",
     bestFor: "科普、流程、判断标准、问题修复、需要讲清楚步骤的内容",
+    taskType: "竖版 3:4 小红书专业知识卡首图",
+    templateFamily: "X10 专业科普卡 / X29 一图读懂封面 / X06 教程步骤首图",
+    mainVisual: "护肤桌面、肌肤纹理抽象局部、水润精华、干净纸张模块或护理空间局部，专业但不医院化",
+    sceneProps: "浅色纸张、精华水滴、玻璃瓶、细线模块、柔和标签、白瓷、浅灰背景",
+    composition: "顶部大标题，中部真实护肤材质或简洁示意主视觉，底部/侧边放3-4个短知识标签",
     layout: "大标题专业海报，主标题+副标题+3个短判断点，真实材质或护理空间局部作视觉锚点；不要把正文拆成长段步骤",
     palette: "干净暖白、自然浅灰、低饱和肤粉或浅绿，深色标题，少量强调色",
     visualCue: "现代美业编辑封面、真实护肤材质细节、局部护理氛围或诊室级干净光线，不使用线框图标",
     typography: "清晰中文无衬线，主标题有冲击力，副标题克制清楚，只保留两组文字",
+    qualityGoal: "信息层级清楚但不拥挤，一眼像专业小红书收藏卡，避免PPT、表格和报告感。",
   },
   "warm-dialog-card": {
     label: "温和对话卡",
     bestFor: "信任怀疑、拒绝推销、顾客顾虑、边界感表达",
+    taskType: "竖版 3:4 小红书边界感对话封面",
+    templateFamily: "X17 高频问题封面 / X20 强标题弱背景",
+    mainVisual: "真实沟通氛围、接待桌局部、便签、项目单、温柔纸张卡片，不做真实聊天软件界面",
+    sceneProps: "浅色便签、纸张、笔、茶水、柔光桌面、护理空间虚化背景",
+    composition: "像一句被划重点的话，主标题居中偏上，副标题贴近标题，短标签用边界词辅助",
     layout: "像一句被划重点的话，不做真实聊天软件界面；可加2-3个边界短标签，避免画面只有一句话",
     palette: "暖白、柔杏、深棕文字，少量低饱和强调色",
     visualCue: "柔和便签或杂志摘录感，真实但克制的沟通氛围",
     typography: "圆润中文黑体，标题清晰，避免手写潦草",
+    qualityGoal: "有真实沟通感，不像聊天截图；温和、有边界、可读。",
   },
   "contrast-warning-poster": {
     label: "克制警示海报",
     bestFor: "避雷、踩坑、风险提醒、推销套路，但不做廉价促销风",
+    taskType: "竖版 3:4 小红书避坑警示首图",
+    templateFamily: "X03 避坑攻略封面 / X20 强标题弱背景 / X24 红黑榜封面",
+    mainVisual: "美容门店接待桌局部、空白项目单、笔、护理环境阴影或纸张标签，真实但不恐吓",
+    sceneProps: "纸张、便签、深色判断标签、柔光护理环境、少量红色警示标记、干净浅底",
+    composition: "上方强标题，中部真实门店局部或纸张主视觉，下方三条避坑短标签，红色只作重点提醒",
     layout: "强标题与一个克制警示视觉焦点组合；加入3个短避坑点或对比标签；底部不要出现任何引流CTA、平台入口或互动引导",
     palette: "干净浅底、炭黑、低饱和警示红，红色只作重点提醒",
     visualCue: "高级编辑部警示海报感、强对比但不恐吓，可用光影、色块、人脸局部或护肤材质质感制造停顿",
     typography: "粗体中文黑体，标题醒目，副标题保持清晰克制",
+    qualityGoal: "点击感强但不土，不制造恐惧，不像廉价促销或情绪化海报。",
   },
   "comparison-split-card": {
     label: "左右对比卡",
     bestFor: "对比、选择困难、两类人、两种方案、前后判断",
+    taskType: "竖版 3:4 小红书双分区对比首图",
+    templateFamily: "X04 状态对比封面 / X23 对比测评封面",
+    mainVisual: "两组护肤材质或服务场景分区对照，例如清洁材质 vs 补水材质，或两类状态判断",
+    sceneProps: "左侧浅杏纸张/泡沫/毛巾，右侧浅雾绿精华/面膜/水润材质，统一真实摄影质感",
+    composition: "顶部大标题，中部左右分区，两个短栏目标题清楚，底部一句判断建议",
     layout: "标题在上，左右分区表达两类人/两种方案，保留主副标题，并用2-4个短标签做对比信息",
     palette: "暖白底，一侧浅杏，一侧浅绿或浅蓝灰，整体低饱和",
     visualCue: "清爽分区海报、明确视觉秩序，不做表格或多条项目符号",
     typography: "中文黑体，栏目标题加粗，正文只保留短句",
+    qualityGoal: "一眼看懂两边差异，不像表格，不做夸张前后对比。",
   },
   "lifestyle-spa-scene": {
     label: "暖光护理场景",
     bestFor: "SPA、肩颈、按摩、头疗、放松养护、情绪修复",
+    taskType: "竖版 3:4 小红书生活方式护理首图",
+    templateFamily: "X07 生活方式种草 / B07 Spa 放松海报",
+    mainVisual: "暖光护理空间、热毛巾、香薰、精油、肩颈或头疗服务局部，不出现过度性感化人物",
+    sceneProps: "香薰、毛巾、精油瓶、护理床、花材、暖光、木质或织物材质",
+    composition: "真实护理氛围作为主视觉，左上或中上放标题，侧边或底部放短标签",
     layout: "真实护理氛围背景作为主视觉，左上或中上放清晰主标题，标题下方或左侧放3个短标签；不要只有背景图和大标题",
     palette: "暖棕、奶油白、浅金、柔和阴影",
     visualCue: "photorealistic 生活方式摄影感，热毛巾、柔光、护理空间局部，不出现人物脸",
     typography: "标题用清晰中文黑体，白色或深棕高对比，文字区域有留白",
+    qualityGoal: "让人感觉放松和可信，不能像按摩会所广告，也不能只有氛围图。",
   },
   "premium-still-life": {
     label: "高级静物海报",
     bestFor: "项目质感、活动但不促销、护理体验、品牌感较强的内容",
+    taskType: "竖版 3:4 小红书高级静物首图",
+    templateFamily: "X11 护肤桌面 Flat Lay / X01 美容爆款封面",
+    mainVisual: "高端护理静物、精华水滴、玻璃瓶、织物、石材、水波纹或护肤桌面，避免具体产品硬广",
+    sceneProps: "精华瓶、面膜、白瓷、丝绸、浅色花材、玻璃、柔光阴影、纸张标签",
+    composition: "静物/材质氛围在下方或侧边，标题居中偏上，短标签条补足信息密度",
     layout: "静物/材质氛围在下或侧边，标题居中偏上，副标题作为解释；下方用短标签条补足信息密度",
     palette: "奶油、琥珀、深棕、少量玫瑰金，不要艳丽",
     visualCue: "高端护理静物、柔光、织物/石材/水波纹理，不出现具体产品瓶身",
     typography: "高级中文无衬线，主标题大而稳，副标题简短",
+    qualityGoal: "高级、干净、可商用，但不出现价格和促销按钮，不像电商主图。",
   },
 }
 
@@ -357,7 +411,9 @@ function forceCoverStyleByTitle(text: string): BeautyCoverStyleId | "" {
   if (includesAny(text, ["避雷", "踩坑", "做错", "越做越", "越护越", "别再", "千万别", "翻车", "烂脸", "风险"])) {
     return "contrast-warning-poster"
   }
-  if (includesAny(text, ["3点", "三点", "几点", "先看", "判断", "标准", "清单"])) return "clean-info-card"
+  if (includesAny(text, ["3点", "三点", "几点", "先看", "判断", "标准", "清单", "别盲选", "怎么选", "先确认"])) {
+    return "clean-info-card"
+  }
   return ""
 }
 
@@ -388,7 +444,7 @@ function selectCoverStyleId(opts: {
   if (opts.entryClass === "relax_care") return "lifestyle-spa-scene"
   if (opts.entryClass === "local_decision") return "editorial-magazine"
   if (opts.entryClass === "boundary_risk") return "contrast-warning-poster"
-  if (opts.contentType === "education") return "editorial-magazine"
+  if (opts.contentType === "education") return "clean-info-card"
   if (includesAny(text, ["防晒", "补水", "清洁", "黑头", "毛孔", "闭口", "粉刺"])) return "premium-still-life"
   if (includesAny(text, ["敏感", "泛红", "舒缓", "修护"])) return "soft-minimal-poster"
   if (includesAny(text, ["活动", "老客", "体验", "护理"])) return "premium-still-life"
@@ -424,10 +480,16 @@ function buildCoverVisualPlan(opts: {
     id,
     label: preset.label,
     reason: buildCoverStyleReason({ ...opts, id }),
+    taskType: preset.taskType,
+    templateFamily: preset.templateFamily,
+    mainVisual: preset.mainVisual,
+    sceneProps: preset.sceneProps,
+    composition: preset.composition,
     layout: preset.layout,
     palette: preset.palette,
     visualCue: preset.visualCue,
     typography: preset.typography,
+    qualityGoal: preset.qualityGoal,
   }
 }
 
@@ -444,10 +506,16 @@ export function resolveCoverVisualPlan(
     id,
     label: preset.label,
     reason: reason || (id === ctx.coverVisualPlan.id ? ctx.coverVisualPlan.reason : preset.bestFor),
+    taskType: preset.taskType,
+    templateFamily: preset.templateFamily,
+    mainVisual: preset.mainVisual,
+    sceneProps: preset.sceneProps,
+    composition: preset.composition,
     layout: preset.layout,
     palette: preset.palette,
     visualCue: preset.visualCue,
     typography: preset.typography,
+    qualityGoal: preset.qualityGoal,
   }
 }
 
@@ -460,14 +528,20 @@ export function buildCoverStyleCatalogText() {
 
 function buildCoverStylePromptBlock(plan: BeautyCoverVisualPlan) {
   return [
-    "【AI视觉风格】",
+    "【Skill视觉Brief】",
     `风格ID：${plan.id}`,
     `风格名称：${plan.label}`,
+    `任务类型：${plan.taskType}`,
+    `模板参考：${plan.templateFamily}`,
     `选择理由：${plan.reason}`,
-    `主视觉：${plan.visualCue}`,
+    `主视觉：${plan.mainVisual}`,
+    `场景道具：${plan.sceneProps}`,
+    `构图：${plan.composition}`,
     `版式：${plan.layout}`,
     `配色：${plan.palette}`,
     `字体：${plan.typography}`,
+    `质感目标：${plan.qualityGoal}`,
+    `视觉气质：${plan.visualCue}`,
   ].join("\n")
 }
 
@@ -567,7 +641,7 @@ export function buildCoverPromptRequirements(ctx: BeautyContext) {
   const plan = ctx.coverVisualPlan
 
   return [
-    "封面只需要你输出短标题、短副标题和视觉风格ID；最终生图提示词由后端统一拼接，避免旧模板污染。",
+    "封面只需要你输出短标题、短副标题和视觉风格ID；最终生图提示词由后端按 gpt-image-2-poster-xhs skill brief 统一拼接，避免旧模板污染。",
     "cover_prompt 可以留空；如果输出了也只会作为参考，不得写成信息卡、清单、图标、细线分隔列表。",
     "封面必须是可直接发布的小红书首图设计，不是背景图。必须有明确视觉焦点和美业质感。",
     "视觉风格必须根据生成正文的真实内容智能选择，不要把“攻略/科普/避雷/对比”硬绑定到固定画风。",
@@ -590,16 +664,10 @@ export function buildCoverPromptRequirements(ctx: BeautyContext) {
 function buildDirectCoverPromptRequirements(plan: BeautyCoverVisualPlan) {
   return [
     `版本：${XHS_COVER_PROMPT_VERSION}`,
-    "这是最终生图提示词，只调用一次基础生图模型生成一张图，不做多图候选，不做后期叠字排版。",
-    `最终风格ID：${plan.id}。最终风格名称：${plan.label}。`,
-    "封面必须是可直接发布的高级护肤杂志封面视觉，不是App入口页，不是引流落地页。",
-    "画面应像高级美业杂志封面或商业护肤摄影海报：有明确主视觉、干净留白、真实材质和克制情绪。",
-    "最高优先级：禁止任何底部导流组件、转化按钮、互动引导、平台入口、扫码联系入口或私域联系方式；画面底部应保持干净，不要像营销落地页。",
-    "中文主标题和副标题必须清晰、准确、简体中文；不要乱码、错别字、英文。",
-    "可以有人脸、护理场景、局部对比、少量清单或辅助说明，但不要做成营销转化页，不要出现门店信息、价格优惠、地址、平台名、联系方式、可扫描私域入口、logo、水印。",
-    "版式必须有设计骨架：主标题区、副标题区、辅助信息点区、主视觉区。若提示词后续包含【辅助信息点】，必须把这些短点做成清晰可读的小标签、侧边短清单或分区信息条。",
-    "禁止只做一张氛围背景再压一个大标题；禁止主标题占满半张图导致其它信息没有层次。",
-    "不要空白水彩模板、廉价Canva模板、素材站样图、廉价贴纸、低清截图感。",
+    "按 gpt-image-2-poster-xhs skill 的直出封面规格生成一张完整小红书首图。",
+    `最终风格：${plan.id}（${plan.label}）。`,
+    "成品应像高级小红书封面或商业护肤杂志首图，而不是素材站照片、App页面或营销落地页。",
+    "手机缩略图先读标题，再看副标题和短标签；画面必须有明确主视觉、留白和版式秩序。",
   ].join("\n")
 }
 
@@ -615,34 +683,33 @@ export function normalizeCoverAsset(opts: {
   const main = cleanCoverDisplayText(opts.main.trim(), "皮肤护理先看这几点")
   const sub = cleanCoverDisplayText(opts.sub.trim(), "少走弯路，安心护理")
   const negative = String(opts.negative || "").trim()
-  const forcedStyle = forceCoverStyleByTitle(main)
+  const forcedStyle = forceCoverStyleByTitle([main, sub, opts.prompt || ""].filter(Boolean).join(" "))
   const plan = resolveCoverVisualPlan(opts.ctx, forcedStyle || opts.styleId, forcedStyle ? null : opts.styleReason)
-  const styleBlock = buildCoverStylePromptBlock(plan)
   const directRequirements = buildDirectCoverPromptRequirements(plan)
   const promptBody = [
     `【${XHS_COVER_PROMPT_VERSION}】`,
-    "画幅比例3:4竖版。",
-    "Create one vertical premium skincare magazine cover visual.",
-    "Use the base/default image generation model once; generate exactly one finished poster.",
-    "CRITICAL CTA RULE: no bottom conversion footer, no action button, no platform-entry UI, no social interaction prompt, no private-domain contact element, no scannable contact code.",
-    "",
-    styleBlock,
+    `生成一张 3:4 竖版小红书封面，行业为生活美容、皮肤管理、本地门店内容。`,
+    `主题：「${main}」。输出一张完成度高、可直接发布的封面图。`,
     "",
     directRequirements,
     "",
-    "【必须原样显示的中文文字】",
-    `主标题："${main}"`,
-    `副标题："${sub}"`,
-    "主标题必须最大且最清楚，副标题更小。可以有少量辅助说明或清单，但底部绝对不要出现导流组件、转化按钮、互动引导、私域入口或平台入口。",
-    "如果后续提示词包含【辅助信息点】，这些短点必须逐条显示在画面里，不要省略，不要只用图标代替文字。",
+    "【Skill视觉Brief】",
+    `模板参考：${plan.templateFamily}`,
+    `主视觉：${plan.mainVisual}`,
+    `场景道具：${plan.sceneProps}`,
+    `构图：${plan.composition}`,
+    `配色：${plan.palette}`,
+    `字体：${plan.typography}`,
+    `质感目标：${plan.qualityGoal}`,
     "",
-    "【画面方向】",
-    "高级美业杂志封面感，真实护肤材质、干净光线、清晰视觉焦点、克制留白。文字要自然融入海报，而不是贴在模板上。",
-    "优先让画面有摄影/材质/场景质感，例如柔光护肤质地纹理、护理空间局部、玻璃/水纹/织物/石材质感、克制色块。",
-    "版面至少有三层信息：主标题、短副标题、短标签/短清单；不要生成单调的“背景图 + 大标题”。",
+    "【必须显示的文字】",
+    `大标题「${main}」`,
+    `副标题「${sub}」`,
+    "文字必须是清晰、准确的简体中文；不要改写标题，不要添加英文、拼音、错别字或无意义小字。",
     "",
-    "【输出目标】",
-    "手机端缩略图可读，商业化可发布，干净、现代、专业；信息密度稳定但不拥挤；不要促销感，不要信息过载，不要像App入口页，不要像投放转化页。",
+    "【版式要求】",
+    "标题区、主视觉区、短标签区三层清楚；标题要大而稳，短标签只做轻量辅助。",
+    "不要把护理床照片铺满整张图后简单压字；不要做成长表格、按钮、底部导流条或平台入口。",
   ].join("\n")
 
   return {
