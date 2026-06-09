@@ -1,0 +1,2820 @@
+{
+  "schema_version": "professional_learning.rendered_assets.v1",
+  "generated_from": "美业话镜小程序 pages/professional rendered image URL collector",
+  "generated_at": "2026-06-08T04:54:05.840Z",
+  "source_base_url": "https://www.ipnrgc.com/professional-learning-assets/professional-learning",
+  "asset_count": 397,
+  "assets": [
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/acne-comedone/01-main.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/acne-comedone/01-main.jpg",
+      "where": [
+        "path:skin-types.lessons[5].imageAsset:acne-comedone",
+        "lesson:acne-comedone.steps[4].imageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/acne-comedone/pages/01-customer_problem.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/acne-comedone/pages/01-customer_problem.jpg",
+      "where": [
+        "lesson:acne-comedone.steps[0].pageImageAsset:customer_problem"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/acne-comedone/pages/02-wrong_scene.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/acne-comedone/pages/02-wrong_scene.jpg",
+      "where": [
+        "lesson:acne-comedone.steps[1].pageImageAsset:wrong_scene"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/acne-comedone/pages/04-definition.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/acne-comedone/pages/04-definition.jpg",
+      "where": [
+        "lesson:acne-comedone.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/acne-comedone/pages/05-mechanism.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/acne-comedone/pages/05-mechanism.jpg",
+      "where": [
+        "lesson:acne-comedone.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/acne-comedone/pages/06-observe.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/acne-comedone/pages/06-observe.jpg",
+      "where": [
+        "lesson:acne-comedone.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/acne-comedone/pages/07-misconception.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/acne-comedone/pages/07-misconception.jpg",
+      "where": [
+        "lesson:acne-comedone.steps[6].pageImageAsset:misconception"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/acne-comedone/pages/08-project.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/acne-comedone/pages/08-project.jpg",
+      "where": [
+        "lesson:acne-comedone.steps[7].pageImageAsset:project"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/acne-comedone/pages/09-translate.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/acne-comedone/pages/09-translate.jpg",
+      "where": [
+        "lesson:acne-comedone.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/acne-comedone/pages/10-boundary.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/acne-comedone/pages/10-boundary.jpg",
+      "where": [
+        "lesson:acne-comedone.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/acne-comedone/pages/11-retell.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/acne-comedone/pages/11-retell.jpg",
+      "where": [
+        "lesson:acne-comedone.steps[10].pageImageAsset:retell"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/acne-comedone/pages/12-practice.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/acne-comedone/pages/12-practice.jpg",
+      "where": [
+        "lesson:acne-comedone.steps[11].pageImageAsset:practice"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/anti-aging-project/01-main.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/anti-aging-project/01-main.jpg",
+      "where": [
+        "path:project-principles.lessons[3].imageAsset:anti-aging-project",
+        "lesson:anti-aging-project.steps[4].imageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/anti-aging-project/pages/01-customer_problem.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/anti-aging-project/pages/01-customer_problem.jpg",
+      "where": [
+        "lesson:anti-aging-project.steps[0].pageImageAsset:customer_problem"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/anti-aging-project/pages/02-wrong_scene.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/anti-aging-project/pages/02-wrong_scene.jpg",
+      "where": [
+        "lesson:anti-aging-project.steps[1].pageImageAsset:wrong_scene"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/anti-aging-project/pages/04-definition.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/anti-aging-project/pages/04-definition.jpg",
+      "where": [
+        "lesson:anti-aging-project.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/anti-aging-project/pages/05-mechanism.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/anti-aging-project/pages/05-mechanism.jpg",
+      "where": [
+        "lesson:anti-aging-project.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/anti-aging-project/pages/06-observe.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/anti-aging-project/pages/06-observe.jpg",
+      "where": [
+        "lesson:anti-aging-project.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/anti-aging-project/pages/07-misconception.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/anti-aging-project/pages/07-misconception.jpg",
+      "where": [
+        "lesson:anti-aging-project.steps[6].pageImageAsset:misconception"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/anti-aging-project/pages/08-project.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/anti-aging-project/pages/08-project.jpg",
+      "where": [
+        "lesson:anti-aging-project.steps[7].pageImageAsset:project"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/anti-aging-project/pages/09-translate.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/anti-aging-project/pages/09-translate.jpg",
+      "where": [
+        "lesson:anti-aging-project.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/anti-aging-project/pages/10-boundary.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/anti-aging-project/pages/10-boundary.jpg",
+      "where": [
+        "lesson:anti-aging-project.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/anti-aging-project/pages/11-retell.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/anti-aging-project/pages/11-retell.jpg",
+      "where": [
+        "lesson:anti-aging-project.steps[10].pageImageAsset:retell"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/anti-aging-project/pages/12-practice.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/anti-aging-project/pages/12-practice.jpg",
+      "where": [
+        "lesson:anti-aging-project.steps[11].pageImageAsset:practice"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/cleansing-project/01-main.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/cleansing-project/01-main.jpg",
+      "where": [
+        "home.featuredLessons[4].imageAsset:cleansing-project",
+        "path:project-principles.lessons[0].imageAsset:cleansing-project",
+        "lesson:cleansing-project.steps[4].imageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/cleansing-project/pages/01-customer_problem.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/cleansing-project/pages/01-customer_problem.jpg",
+      "where": [
+        "lesson:cleansing-project.steps[0].pageImageAsset:customer_problem"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/cleansing-project/pages/02-wrong_scene.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/cleansing-project/pages/02-wrong_scene.jpg",
+      "where": [
+        "lesson:cleansing-project.steps[1].pageImageAsset:wrong_scene"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/cleansing-project/pages/04-definition.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/cleansing-project/pages/04-definition.jpg",
+      "where": [
+        "lesson:cleansing-project.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/cleansing-project/pages/05-mechanism.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/cleansing-project/pages/05-mechanism.jpg",
+      "where": [
+        "lesson:cleansing-project.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/cleansing-project/pages/06-observe.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/cleansing-project/pages/06-observe.jpg",
+      "where": [
+        "lesson:cleansing-project.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/cleansing-project/pages/07-misconception.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/cleansing-project/pages/07-misconception.jpg",
+      "where": [
+        "lesson:cleansing-project.steps[6].pageImageAsset:misconception"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/cleansing-project/pages/08-project.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/cleansing-project/pages/08-project.jpg",
+      "where": [
+        "lesson:cleansing-project.steps[7].pageImageAsset:project"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/cleansing-project/pages/09-translate.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/cleansing-project/pages/09-translate.jpg",
+      "where": [
+        "lesson:cleansing-project.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/cleansing-project/pages/10-boundary.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/cleansing-project/pages/10-boundary.jpg",
+      "where": [
+        "lesson:cleansing-project.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/cleansing-project/pages/11-retell.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/cleansing-project/pages/11-retell.jpg",
+      "where": [
+        "lesson:cleansing-project.steps[10].pageImageAsset:retell"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/cleansing-project/pages/12-practice.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/cleansing-project/pages/12-practice.jpg",
+      "where": [
+        "lesson:cleansing-project.steps[11].pageImageAsset:practice"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/combination-skin/01-main.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/combination-skin/01-main.jpg",
+      "where": [
+        "home.featuredLessons[2].imageAsset:combination-skin",
+        "path:skin-types.lessons[2].imageAsset:combination-skin",
+        "lesson:combination-skin.steps[4].imageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/combination-skin/pages/01-customer_problem.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/combination-skin/pages/01-customer_problem.jpg",
+      "where": [
+        "lesson:combination-skin.steps[0].pageImageAsset:customer_problem"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/combination-skin/pages/02-wrong_scene.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/combination-skin/pages/02-wrong_scene.jpg",
+      "where": [
+        "lesson:combination-skin.steps[1].pageImageAsset:wrong_scene"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/combination-skin/pages/04-definition.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/combination-skin/pages/04-definition.jpg",
+      "where": [
+        "lesson:combination-skin.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/combination-skin/pages/05-mechanism.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/combination-skin/pages/05-mechanism.jpg",
+      "where": [
+        "lesson:combination-skin.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/combination-skin/pages/06-observe.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/combination-skin/pages/06-observe.jpg",
+      "where": [
+        "lesson:combination-skin.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/combination-skin/pages/07-misconception.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/combination-skin/pages/07-misconception.jpg",
+      "where": [
+        "lesson:combination-skin.steps[6].pageImageAsset:misconception"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/combination-skin/pages/08-project.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/combination-skin/pages/08-project.jpg",
+      "where": [
+        "lesson:combination-skin.steps[7].pageImageAsset:project"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/combination-skin/pages/09-translate.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/combination-skin/pages/09-translate.jpg",
+      "where": [
+        "lesson:combination-skin.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/combination-skin/pages/10-boundary.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/combination-skin/pages/10-boundary.jpg",
+      "where": [
+        "lesson:combination-skin.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/combination-skin/pages/11-retell.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/combination-skin/pages/11-retell.jpg",
+      "where": [
+        "lesson:combination-skin.steps[10].pageImageAsset:retell"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/combination-skin/pages/12-practice.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/combination-skin/pages/12-practice.jpg",
+      "where": [
+        "lesson:combination-skin.steps[11].pageImageAsset:practice"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/detox-language-risk/01-main.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/detox-language-risk/01-main.jpg",
+      "where": [
+        "path:organ-expression.lessons[27].imageAsset:detox-language-risk",
+        "lesson:detox-language-risk.steps[4].imageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/detox-language-risk/pages/01-customer_problem.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/detox-language-risk/pages/01-customer_problem.jpg",
+      "where": [
+        "lesson:detox-language-risk.steps[0].pageImageAsset:customer_problem"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/detox-language-risk/pages/02-wrong_scene.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/detox-language-risk/pages/02-wrong_scene.jpg",
+      "where": [
+        "lesson:detox-language-risk.steps[1].pageImageAsset:wrong_scene"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/detox-language-risk/pages/04-definition.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/detox-language-risk/pages/04-definition.jpg",
+      "where": [
+        "lesson:detox-language-risk.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/detox-language-risk/pages/05-mechanism.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/detox-language-risk/pages/05-mechanism.jpg",
+      "where": [
+        "lesson:detox-language-risk.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/detox-language-risk/pages/06-observe.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/detox-language-risk/pages/06-observe.jpg",
+      "where": [
+        "lesson:detox-language-risk.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/detox-language-risk/pages/07-misconception.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/detox-language-risk/pages/07-misconception.jpg",
+      "where": [
+        "lesson:detox-language-risk.steps[6].pageImageAsset:misconception"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/detox-language-risk/pages/08-project.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/detox-language-risk/pages/08-project.jpg",
+      "where": [
+        "lesson:detox-language-risk.steps[7].pageImageAsset:project"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/detox-language-risk/pages/09-translate.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/detox-language-risk/pages/09-translate.jpg",
+      "where": [
+        "lesson:detox-language-risk.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/detox-language-risk/pages/10-boundary.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/detox-language-risk/pages/10-boundary.jpg",
+      "where": [
+        "lesson:detox-language-risk.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/detox-language-risk/pages/11-retell.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/detox-language-risk/pages/11-retell.jpg",
+      "where": [
+        "lesson:detox-language-risk.steps[10].pageImageAsset:retell"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/detox-language-risk/pages/12-practice.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/detox-language-risk/pages/12-practice.jpg",
+      "where": [
+        "lesson:detox-language-risk.steps[11].pageImageAsset:practice"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/dry-skin/01-main.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/dry-skin/01-main.jpg",
+      "where": [
+        "home.featuredLessons[0].imageAsset:dry-skin",
+        "path:skin-types.lessons[0].imageAsset:dry-skin",
+        "lesson:dry-skin.steps[4].imageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/dry-skin/pages/01-customer_problem.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/dry-skin/pages/01-customer_problem.jpg",
+      "where": [
+        "lesson:dry-skin.steps[0].pageImageAsset:customer_problem"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/dry-skin/pages/02-wrong_scene.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/dry-skin/pages/02-wrong_scene.jpg",
+      "where": [
+        "lesson:dry-skin.steps[1].pageImageAsset:wrong_scene"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/dry-skin/pages/04-definition.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/dry-skin/pages/04-definition.jpg",
+      "where": [
+        "lesson:dry-skin.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/dry-skin/pages/05-mechanism.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/dry-skin/pages/05-mechanism.jpg",
+      "where": [
+        "lesson:dry-skin.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/dry-skin/pages/06-observe.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/dry-skin/pages/06-observe.jpg",
+      "where": [
+        "lesson:dry-skin.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/dry-skin/pages/07-misconception.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/dry-skin/pages/07-misconception.jpg",
+      "where": [
+        "lesson:dry-skin.steps[6].pageImageAsset:misconception"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/dry-skin/pages/08-project.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/dry-skin/pages/08-project.jpg",
+      "where": [
+        "lesson:dry-skin.steps[7].pageImageAsset:project"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/dry-skin/pages/09-translate.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/dry-skin/pages/09-translate.jpg",
+      "where": [
+        "lesson:dry-skin.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/dry-skin/pages/10-boundary.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/dry-skin/pages/10-boundary.jpg",
+      "where": [
+        "lesson:dry-skin.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/dry-skin/pages/11-retell.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/dry-skin/pages/11-retell.jpg",
+      "where": [
+        "lesson:dry-skin.steps[10].pageImageAsset:retell"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/dry-skin/pages/12-practice.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/dry-skin/pages/12-practice.jpg",
+      "where": [
+        "lesson:dry-skin.steps[11].pageImageAsset:practice"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/forbidden-medical-claims/01-main.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/forbidden-medical-claims/01-main.jpg",
+      "where": [
+        "path:compliance-translation.lessons[1].imageAsset:forbidden-medical-claims",
+        "lesson:forbidden-medical-claims.steps[4].imageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/forbidden-medical-claims/pages/01-customer_problem.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/forbidden-medical-claims/pages/01-customer_problem.jpg",
+      "where": [
+        "lesson:forbidden-medical-claims.steps[0].pageImageAsset:customer_problem"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/forbidden-medical-claims/pages/02-wrong_scene.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/forbidden-medical-claims/pages/02-wrong_scene.jpg",
+      "where": [
+        "lesson:forbidden-medical-claims.steps[1].pageImageAsset:wrong_scene"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/forbidden-medical-claims/pages/04-definition.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/forbidden-medical-claims/pages/04-definition.jpg",
+      "where": [
+        "lesson:forbidden-medical-claims.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/forbidden-medical-claims/pages/05-mechanism.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/forbidden-medical-claims/pages/05-mechanism.jpg",
+      "where": [
+        "lesson:forbidden-medical-claims.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/forbidden-medical-claims/pages/06-observe.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/forbidden-medical-claims/pages/06-observe.jpg",
+      "where": [
+        "lesson:forbidden-medical-claims.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/forbidden-medical-claims/pages/07-misconception.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/forbidden-medical-claims/pages/07-misconception.jpg",
+      "where": [
+        "lesson:forbidden-medical-claims.steps[6].pageImageAsset:misconception"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/forbidden-medical-claims/pages/08-project.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/forbidden-medical-claims/pages/08-project.jpg",
+      "where": [
+        "lesson:forbidden-medical-claims.steps[7].pageImageAsset:project"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/forbidden-medical-claims/pages/09-translate.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/forbidden-medical-claims/pages/09-translate.jpg",
+      "where": [
+        "lesson:forbidden-medical-claims.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/forbidden-medical-claims/pages/10-boundary.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/forbidden-medical-claims/pages/10-boundary.jpg",
+      "where": [
+        "lesson:forbidden-medical-claims.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/forbidden-medical-claims/pages/11-retell.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/forbidden-medical-claims/pages/11-retell.jpg",
+      "where": [
+        "lesson:forbidden-medical-claims.steps[10].pageImageAsset:retell"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/forbidden-medical-claims/pages/12-practice.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/forbidden-medical-claims/pages/12-practice.jpg",
+      "where": [
+        "lesson:forbidden-medical-claims.steps[11].pageImageAsset:practice"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/hydration-lock/01-main.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/hydration-lock/01-main.jpg",
+      "where": [
+        "path:skin-physiology.lessons[4].imageAsset:hydration-lock",
+        "lesson:hydration-lock.steps[4].imageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/hydration-lock/pages/01-customer_problem.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/hydration-lock/pages/01-customer_problem.jpg",
+      "where": [
+        "lesson:hydration-lock.steps[0].pageImageAsset:customer_problem"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/hydration-lock/pages/02-wrong_scene.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/hydration-lock/pages/02-wrong_scene.jpg",
+      "where": [
+        "lesson:hydration-lock.steps[1].pageImageAsset:wrong_scene"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/hydration-lock/pages/04-definition.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/hydration-lock/pages/04-definition.jpg",
+      "where": [
+        "lesson:hydration-lock.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/hydration-lock/pages/05-mechanism.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/hydration-lock/pages/05-mechanism.jpg",
+      "where": [
+        "lesson:hydration-lock.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/hydration-lock/pages/06-observe.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/hydration-lock/pages/06-observe.jpg",
+      "where": [
+        "lesson:hydration-lock.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/hydration-lock/pages/07-misconception.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/hydration-lock/pages/07-misconception.jpg",
+      "where": [
+        "lesson:hydration-lock.steps[6].pageImageAsset:misconception"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/hydration-lock/pages/08-project.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/hydration-lock/pages/08-project.jpg",
+      "where": [
+        "lesson:hydration-lock.steps[7].pageImageAsset:project"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/hydration-lock/pages/09-translate.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/hydration-lock/pages/09-translate.jpg",
+      "where": [
+        "lesson:hydration-lock.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/hydration-lock/pages/10-boundary.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/hydration-lock/pages/10-boundary.jpg",
+      "where": [
+        "lesson:hydration-lock.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/hydration-lock/pages/11-retell.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/hydration-lock/pages/11-retell.jpg",
+      "where": [
+        "lesson:hydration-lock.steps[10].pageImageAsset:retell"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/hydration-lock/pages/12-practice.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/hydration-lock/pages/12-practice.jpg",
+      "where": [
+        "lesson:hydration-lock.steps[11].pageImageAsset:practice"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/hydration-project/01-main.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/hydration-project/01-main.jpg",
+      "where": [
+        "home.featuredLessons[5].imageAsset:hydration-project",
+        "path:project-principles.lessons[1].imageAsset:hydration-project",
+        "lesson:hydration-project.steps[4].imageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/hydration-project/pages/01-customer_problem.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/hydration-project/pages/01-customer_problem.jpg",
+      "where": [
+        "lesson:hydration-project.steps[0].pageImageAsset:customer_problem"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/hydration-project/pages/02-wrong_scene.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/hydration-project/pages/02-wrong_scene.jpg",
+      "where": [
+        "lesson:hydration-project.steps[1].pageImageAsset:wrong_scene"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/hydration-project/pages/04-definition.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/hydration-project/pages/04-definition.jpg",
+      "where": [
+        "lesson:hydration-project.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/hydration-project/pages/05-mechanism.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/hydration-project/pages/05-mechanism.jpg",
+      "where": [
+        "lesson:hydration-project.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/hydration-project/pages/06-observe.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/hydration-project/pages/06-observe.jpg",
+      "where": [
+        "lesson:hydration-project.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/hydration-project/pages/07-misconception.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/hydration-project/pages/07-misconception.jpg",
+      "where": [
+        "lesson:hydration-project.steps[6].pageImageAsset:misconception"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/hydration-project/pages/08-project.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/hydration-project/pages/08-project.jpg",
+      "where": [
+        "lesson:hydration-project.steps[7].pageImageAsset:project"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/hydration-project/pages/09-translate.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/hydration-project/pages/09-translate.jpg",
+      "where": [
+        "lesson:hydration-project.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/hydration-project/pages/10-boundary.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/hydration-project/pages/10-boundary.jpg",
+      "where": [
+        "lesson:hydration-project.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/hydration-project/pages/11-retell.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/hydration-project/pages/11-retell.jpg",
+      "where": [
+        "lesson:hydration-project.steps[10].pageImageAsset:retell"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/hydration-project/pages/12-practice.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/hydration-project/pages/12-practice.jpg",
+      "where": [
+        "lesson:hydration-project.steps[11].pageImageAsset:practice"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/late-night-dullness/01-main.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/late-night-dullness/01-main.jpg",
+      "where": [
+        "path:organ-expression.lessons[26].imageAsset:late-night-dullness",
+        "lesson:late-night-dullness.steps[4].imageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/late-night-dullness/pages/01-customer_problem.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/late-night-dullness/pages/01-customer_problem.jpg",
+      "where": [
+        "lesson:late-night-dullness.steps[0].pageImageAsset:customer_problem"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/late-night-dullness/pages/02-wrong_scene.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/late-night-dullness/pages/02-wrong_scene.jpg",
+      "where": [
+        "lesson:late-night-dullness.steps[1].pageImageAsset:wrong_scene"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/late-night-dullness/pages/04-definition.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/late-night-dullness/pages/04-definition.jpg",
+      "where": [
+        "lesson:late-night-dullness.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/late-night-dullness/pages/05-mechanism.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/late-night-dullness/pages/05-mechanism.jpg",
+      "where": [
+        "lesson:late-night-dullness.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/late-night-dullness/pages/06-observe.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/late-night-dullness/pages/06-observe.jpg",
+      "where": [
+        "lesson:late-night-dullness.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/late-night-dullness/pages/07-misconception.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/late-night-dullness/pages/07-misconception.jpg",
+      "where": [
+        "lesson:late-night-dullness.steps[6].pageImageAsset:misconception"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/late-night-dullness/pages/08-project.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/late-night-dullness/pages/08-project.jpg",
+      "where": [
+        "lesson:late-night-dullness.steps[7].pageImageAsset:project"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/late-night-dullness/pages/09-translate.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/late-night-dullness/pages/09-translate.jpg",
+      "where": [
+        "lesson:late-night-dullness.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/late-night-dullness/pages/10-boundary.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/late-night-dullness/pages/10-boundary.jpg",
+      "where": [
+        "lesson:late-night-dullness.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/late-night-dullness/pages/11-retell.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/late-night-dullness/pages/11-retell.jpg",
+      "where": [
+        "lesson:late-night-dullness.steps[10].pageImageAsset:retell"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/late-night-dullness/pages/12-practice.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/late-night-dullness/pages/12-practice.jpg",
+      "where": [
+        "lesson:late-night-dullness.steps[11].pageImageAsset:practice"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/meridian-basic/01-main.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/meridian-basic/01-main.jpg",
+      "where": [
+        "path:meridian-expression.lessons[0].imageAsset:meridian-basic",
+        "lesson:meridian-basic.steps[4].imageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/meridian-basic/pages/01-customer_problem.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/meridian-basic/pages/01-customer_problem.jpg",
+      "where": [
+        "lesson:meridian-basic.steps[0].pageImageAsset:customer_problem"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/meridian-basic/pages/02-wrong_scene.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/meridian-basic/pages/02-wrong_scene.jpg",
+      "where": [
+        "lesson:meridian-basic.steps[1].pageImageAsset:wrong_scene"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/meridian-basic/pages/04-definition.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/meridian-basic/pages/04-definition.jpg",
+      "where": [
+        "lesson:meridian-basic.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/meridian-basic/pages/05-mechanism.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/meridian-basic/pages/05-mechanism.jpg",
+      "where": [
+        "lesson:meridian-basic.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/meridian-basic/pages/06-observe.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/meridian-basic/pages/06-observe.jpg",
+      "where": [
+        "lesson:meridian-basic.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/meridian-basic/pages/07-misconception.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/meridian-basic/pages/07-misconception.jpg",
+      "where": [
+        "lesson:meridian-basic.steps[6].pageImageAsset:misconception"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/meridian-basic/pages/08-project.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/meridian-basic/pages/08-project.jpg",
+      "where": [
+        "lesson:meridian-basic.steps[7].pageImageAsset:project"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/meridian-basic/pages/09-translate.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/meridian-basic/pages/09-translate.jpg",
+      "where": [
+        "lesson:meridian-basic.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/meridian-basic/pages/10-boundary.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/meridian-basic/pages/10-boundary.jpg",
+      "where": [
+        "lesson:meridian-basic.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/meridian-basic/pages/11-retell.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/meridian-basic/pages/11-retell.jpg",
+      "where": [
+        "lesson:meridian-basic.steps[10].pageImageAsset:retell"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/meridian-basic/pages/12-practice.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/meridian-basic/pages/12-practice.jpg",
+      "where": [
+        "lesson:meridian-basic.steps[11].pageImageAsset:practice"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/oily-skin/01-main.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/oily-skin/01-main.jpg",
+      "where": [
+        "home.featuredLessons[1].imageAsset:oily-skin",
+        "path:skin-types.lessons[1].imageAsset:oily-skin",
+        "lesson:oily-skin.steps[4].imageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/oily-skin/pages/01-customer_problem.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/oily-skin/pages/01-customer_problem.jpg",
+      "where": [
+        "lesson:oily-skin.steps[0].pageImageAsset:customer_problem"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/oily-skin/pages/02-wrong_scene.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/oily-skin/pages/02-wrong_scene.jpg",
+      "where": [
+        "lesson:oily-skin.steps[1].pageImageAsset:wrong_scene"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/oily-skin/pages/04-definition.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/oily-skin/pages/04-definition.jpg",
+      "where": [
+        "lesson:oily-skin.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/oily-skin/pages/05-mechanism.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/oily-skin/pages/05-mechanism.jpg",
+      "where": [
+        "lesson:oily-skin.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/oily-skin/pages/06-observe.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/oily-skin/pages/06-observe.jpg",
+      "where": [
+        "lesson:oily-skin.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/oily-skin/pages/07-misconception.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/oily-skin/pages/07-misconception.jpg",
+      "where": [
+        "lesson:oily-skin.steps[6].pageImageAsset:misconception"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/oily-skin/pages/08-project.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/oily-skin/pages/08-project.jpg",
+      "where": [
+        "lesson:oily-skin.steps[7].pageImageAsset:project"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/oily-skin/pages/09-translate.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/oily-skin/pages/09-translate.jpg",
+      "where": [
+        "lesson:oily-skin.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/oily-skin/pages/10-boundary.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/oily-skin/pages/10-boundary.jpg",
+      "where": [
+        "lesson:oily-skin.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/oily-skin/pages/11-retell.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/oily-skin/pages/11-retell.jpg",
+      "where": [
+        "lesson:oily-skin.steps[10].pageImageAsset:retell"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/oily-skin/pages/12-practice.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/oily-skin/pages/12-practice.jpg",
+      "where": [
+        "lesson:oily-skin.steps[11].pageImageAsset:practice"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/pores-blackheads/01-main.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/pores-blackheads/01-main.jpg",
+      "where": [
+        "path:skin-physiology.lessons[5].imageAsset:pores-blackheads",
+        "lesson:pores-blackheads.steps[4].imageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/pores-blackheads/pages/01-customer_problem.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/pores-blackheads/pages/01-customer_problem.jpg",
+      "where": [
+        "lesson:pores-blackheads.steps[0].pageImageAsset:customer_problem"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/pores-blackheads/pages/02-wrong_scene.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/pores-blackheads/pages/02-wrong_scene.jpg",
+      "where": [
+        "lesson:pores-blackheads.steps[1].pageImageAsset:wrong_scene"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/pores-blackheads/pages/04-definition.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/pores-blackheads/pages/04-definition.jpg",
+      "where": [
+        "lesson:pores-blackheads.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/pores-blackheads/pages/05-mechanism.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/pores-blackheads/pages/05-mechanism.jpg",
+      "where": [
+        "lesson:pores-blackheads.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/pores-blackheads/pages/06-observe.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/pores-blackheads/pages/06-observe.jpg",
+      "where": [
+        "lesson:pores-blackheads.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/pores-blackheads/pages/07-misconception.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/pores-blackheads/pages/07-misconception.jpg",
+      "where": [
+        "lesson:pores-blackheads.steps[6].pageImageAsset:misconception"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/pores-blackheads/pages/08-project.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/pores-blackheads/pages/08-project.jpg",
+      "where": [
+        "lesson:pores-blackheads.steps[7].pageImageAsset:project"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/pores-blackheads/pages/09-translate.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/pores-blackheads/pages/09-translate.jpg",
+      "where": [
+        "lesson:pores-blackheads.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/pores-blackheads/pages/10-boundary.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/pores-blackheads/pages/10-boundary.jpg",
+      "where": [
+        "lesson:pores-blackheads.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/pores-blackheads/pages/11-retell.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/pores-blackheads/pages/11-retell.jpg",
+      "where": [
+        "lesson:pores-blackheads.steps[10].pageImageAsset:retell"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/pores-blackheads/pages/12-practice.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/pores-blackheads/pages/12-practice.jpg",
+      "where": [
+        "lesson:pores-blackheads.steps[11].pageImageAsset:practice"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/professional-to-customer/01-main.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/professional-to-customer/01-main.jpg",
+      "where": [
+        "path:compliance-translation.lessons[0].imageAsset:professional-to-customer",
+        "lesson:professional-to-customer.steps[4].imageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/professional-to-customer/pages/01-customer_problem.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/professional-to-customer/pages/01-customer_problem.jpg",
+      "where": [
+        "lesson:professional-to-customer.steps[0].pageImageAsset:customer_problem"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/professional-to-customer/pages/02-wrong_scene.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/professional-to-customer/pages/02-wrong_scene.jpg",
+      "where": [
+        "lesson:professional-to-customer.steps[1].pageImageAsset:wrong_scene"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/professional-to-customer/pages/04-definition.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/professional-to-customer/pages/04-definition.jpg",
+      "where": [
+        "lesson:professional-to-customer.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/professional-to-customer/pages/05-mechanism.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/professional-to-customer/pages/05-mechanism.jpg",
+      "where": [
+        "lesson:professional-to-customer.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/professional-to-customer/pages/06-observe.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/professional-to-customer/pages/06-observe.jpg",
+      "where": [
+        "lesson:professional-to-customer.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/professional-to-customer/pages/07-misconception.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/professional-to-customer/pages/07-misconception.jpg",
+      "where": [
+        "lesson:professional-to-customer.steps[6].pageImageAsset:misconception"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/professional-to-customer/pages/08-project.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/professional-to-customer/pages/08-project.jpg",
+      "where": [
+        "lesson:professional-to-customer.steps[7].pageImageAsset:project"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/professional-to-customer/pages/09-translate.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/professional-to-customer/pages/09-translate.jpg",
+      "where": [
+        "lesson:professional-to-customer.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/professional-to-customer/pages/10-boundary.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/professional-to-customer/pages/10-boundary.jpg",
+      "where": [
+        "lesson:professional-to-customer.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/professional-to-customer/pages/11-retell.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/professional-to-customer/pages/11-retell.jpg",
+      "where": [
+        "lesson:professional-to-customer.steps[10].pageImageAsset:retell"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/professional-to-customer/pages/12-practice.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/professional-to-customer/pages/12-practice.jpg",
+      "where": [
+        "lesson:professional-to-customer.steps[11].pageImageAsset:practice"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/repair-project/01-main.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/repair-project/01-main.jpg",
+      "where": [
+        "path:project-principles.lessons[2].imageAsset:repair-project",
+        "lesson:repair-project.steps[4].imageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/repair-project/pages/01-customer_problem.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/repair-project/pages/01-customer_problem.jpg",
+      "where": [
+        "lesson:repair-project.steps[0].pageImageAsset:customer_problem"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/repair-project/pages/02-wrong_scene.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/repair-project/pages/02-wrong_scene.jpg",
+      "where": [
+        "lesson:repair-project.steps[1].pageImageAsset:wrong_scene"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/repair-project/pages/04-definition.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/repair-project/pages/04-definition.jpg",
+      "where": [
+        "lesson:repair-project.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/repair-project/pages/05-mechanism.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/repair-project/pages/05-mechanism.jpg",
+      "where": [
+        "lesson:repair-project.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/repair-project/pages/06-observe.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/repair-project/pages/06-observe.jpg",
+      "where": [
+        "lesson:repair-project.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/repair-project/pages/07-misconception.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/repair-project/pages/07-misconception.jpg",
+      "where": [
+        "lesson:repair-project.steps[6].pageImageAsset:misconception"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/repair-project/pages/08-project.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/repair-project/pages/08-project.jpg",
+      "where": [
+        "lesson:repair-project.steps[7].pageImageAsset:project"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/repair-project/pages/09-translate.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/repair-project/pages/09-translate.jpg",
+      "where": [
+        "lesson:repair-project.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/repair-project/pages/10-boundary.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/repair-project/pages/10-boundary.jpg",
+      "where": [
+        "lesson:repair-project.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/repair-project/pages/11-retell.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/repair-project/pages/11-retell.jpg",
+      "where": [
+        "lesson:repair-project.steps[10].pageImageAsset:retell"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/repair-project/pages/12-practice.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/repair-project/pages/12-practice.jpg",
+      "where": [
+        "lesson:repair-project.steps[11].pageImageAsset:practice"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/sebum-film/01-main.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/sebum-film/01-main.jpg",
+      "where": [
+        "home.starterLessons[2].imageAsset:sebum-film",
+        "path:skin-physiology.lessons[3].imageAsset:sebum-film",
+        "lesson:sebum-film.steps[4].imageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/sebum-film/pages/01-customer_problem.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/sebum-film/pages/01-customer_problem.jpg",
+      "where": [
+        "lesson:sebum-film.steps[0].pageImageAsset:customer_problem"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/sebum-film/pages/02-wrong_scene.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/sebum-film/pages/02-wrong_scene.jpg",
+      "where": [
+        "lesson:sebum-film.steps[1].pageImageAsset:wrong_scene"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/sebum-film/pages/04-definition.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/sebum-film/pages/04-definition.jpg",
+      "where": [
+        "lesson:sebum-film.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/sebum-film/pages/05-mechanism.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/sebum-film/pages/05-mechanism.jpg",
+      "where": [
+        "lesson:sebum-film.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/sebum-film/pages/06-observe.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/sebum-film/pages/06-observe.jpg",
+      "where": [
+        "lesson:sebum-film.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/sebum-film/pages/07-misconception.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/sebum-film/pages/07-misconception.jpg",
+      "where": [
+        "lesson:sebum-film.steps[6].pageImageAsset:misconception"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/sebum-film/pages/08-project.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/sebum-film/pages/08-project.jpg",
+      "where": [
+        "lesson:sebum-film.steps[7].pageImageAsset:project"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/sebum-film/pages/09-translate.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/sebum-film/pages/09-translate.jpg",
+      "where": [
+        "lesson:sebum-film.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/sebum-film/pages/10-boundary.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/sebum-film/pages/10-boundary.jpg",
+      "where": [
+        "lesson:sebum-film.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/sebum-film/pages/11-retell.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/sebum-film/pages/11-retell.jpg",
+      "where": [
+        "lesson:sebum-film.steps[10].pageImageAsset:retell"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/sebum-film/pages/12-practice.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/sebum-film/pages/12-practice.jpg",
+      "where": [
+        "lesson:sebum-film.steps[11].pageImageAsset:practice"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/sensitive-state/01-main.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/sensitive-state/01-main.jpg",
+      "where": [
+        "path:skin-types.lessons[4].imageAsset:sensitive-state",
+        "lesson:sensitive-state.steps[4].imageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/sensitive-state/pages/01-customer_problem.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/sensitive-state/pages/01-customer_problem.jpg",
+      "where": [
+        "lesson:sensitive-state.steps[0].pageImageAsset:customer_problem"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/sensitive-state/pages/02-wrong_scene.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/sensitive-state/pages/02-wrong_scene.jpg",
+      "where": [
+        "lesson:sensitive-state.steps[1].pageImageAsset:wrong_scene"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/sensitive-state/pages/04-definition.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/sensitive-state/pages/04-definition.jpg",
+      "where": [
+        "lesson:sensitive-state.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/sensitive-state/pages/05-mechanism.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/sensitive-state/pages/05-mechanism.jpg",
+      "where": [
+        "lesson:sensitive-state.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/sensitive-state/pages/06-observe.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/sensitive-state/pages/06-observe.jpg",
+      "where": [
+        "lesson:sensitive-state.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/sensitive-state/pages/07-misconception.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/sensitive-state/pages/07-misconception.jpg",
+      "where": [
+        "lesson:sensitive-state.steps[6].pageImageAsset:misconception"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/sensitive-state/pages/08-project.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/sensitive-state/pages/08-project.jpg",
+      "where": [
+        "lesson:sensitive-state.steps[7].pageImageAsset:project"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/sensitive-state/pages/09-translate.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/sensitive-state/pages/09-translate.jpg",
+      "where": [
+        "lesson:sensitive-state.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/sensitive-state/pages/10-boundary.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/sensitive-state/pages/10-boundary.jpg",
+      "where": [
+        "lesson:sensitive-state.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/sensitive-state/pages/11-retell.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/sensitive-state/pages/11-retell.jpg",
+      "where": [
+        "lesson:sensitive-state.steps[10].pageImageAsset:retell"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/sensitive-state/pages/12-practice.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/sensitive-state/pages/12-practice.jpg",
+      "where": [
+        "lesson:sensitive-state.steps[11].pageImageAsset:practice"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-barrier/01-main.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-barrier/01-main.jpg",
+      "where": [
+        "home.featuredLessons[3].imageAsset:skin-barrier",
+        "home.starterLessons[1].imageAsset:skin-barrier",
+        "path:skin-physiology.lessons[2].imageAsset:skin-barrier",
+        "lesson:skin-barrier.steps[4].imageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-barrier/pages/01-customer_problem.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-barrier/pages/01-customer_problem.jpg",
+      "where": [
+        "lesson:skin-barrier.steps[0].pageImageAsset:customer_problem"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-barrier/pages/02-wrong_scene.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-barrier/pages/02-wrong_scene.jpg",
+      "where": [
+        "lesson:skin-barrier.steps[1].pageImageAsset:wrong_scene"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-barrier/pages/04-definition.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-barrier/pages/04-definition.jpg",
+      "where": [
+        "lesson:skin-barrier.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-barrier/pages/05-mechanism.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-barrier/pages/05-mechanism.jpg",
+      "where": [
+        "lesson:skin-barrier.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-barrier/pages/06-observe.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-barrier/pages/06-observe.jpg",
+      "where": [
+        "lesson:skin-barrier.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-barrier/pages/07-misconception.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-barrier/pages/07-misconception.jpg",
+      "where": [
+        "lesson:skin-barrier.steps[6].pageImageAsset:misconception"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-barrier/pages/08-project.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-barrier/pages/08-project.jpg",
+      "where": [
+        "lesson:skin-barrier.steps[7].pageImageAsset:project"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-barrier/pages/09-translate.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-barrier/pages/09-translate.jpg",
+      "where": [
+        "lesson:skin-barrier.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-barrier/pages/10-boundary.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-barrier/pages/10-boundary.jpg",
+      "where": [
+        "lesson:skin-barrier.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-barrier/pages/11-retell.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-barrier/pages/11-retell.jpg",
+      "where": [
+        "lesson:skin-barrier.steps[10].pageImageAsset:retell"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-barrier/pages/12-practice.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-barrier/pages/12-practice.jpg",
+      "where": [
+        "lesson:skin-barrier.steps[11].pageImageAsset:practice"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-layers/01-main.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-layers/01-main.jpg",
+      "where": [
+        "home.todayLesson.imageAsset",
+        "path:skin-physiology.lessons[0].imageAsset:skin-layers",
+        "lesson:skin-layers.steps[4].imageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-layers/pages/01-customer_problem.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-layers/pages/01-customer_problem.jpg",
+      "where": [
+        "lesson:skin-layers.steps[0].pageImageAsset:customer_problem"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-layers/pages/02-wrong_scene.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-layers/pages/02-wrong_scene.jpg",
+      "where": [
+        "lesson:skin-layers.steps[1].pageImageAsset:wrong_scene"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-layers/pages/04-definition.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-layers/pages/04-definition.jpg",
+      "where": [
+        "lesson:skin-layers.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-layers/pages/05-mechanism.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-layers/pages/05-mechanism.jpg",
+      "where": [
+        "lesson:skin-layers.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-layers/pages/06-observe.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-layers/pages/06-observe.jpg",
+      "where": [
+        "lesson:skin-layers.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-layers/pages/07-misconception.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-layers/pages/07-misconception.jpg",
+      "where": [
+        "lesson:skin-layers.steps[6].pageImageAsset:misconception"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-layers/pages/08-project.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-layers/pages/08-project.jpg",
+      "where": [
+        "lesson:skin-layers.steps[7].pageImageAsset:project"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-layers/pages/09-translate.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-layers/pages/09-translate.jpg",
+      "where": [
+        "lesson:skin-layers.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-layers/pages/10-boundary.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-layers/pages/10-boundary.jpg",
+      "where": [
+        "lesson:skin-layers.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-layers/pages/11-retell.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-layers/pages/11-retell.jpg",
+      "where": [
+        "lesson:skin-layers.steps[10].pageImageAsset:retell"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-layers/pages/12-practice.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-layers/pages/12-practice.jpg",
+      "where": [
+        "lesson:skin-layers.steps[11].pageImageAsset:practice"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-type-vs-condition/01-main.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-type-vs-condition/01-main.jpg",
+      "where": [
+        "path:skin-types.lessons[3].imageAsset:skin-type-vs-condition",
+        "lesson:skin-type-vs-condition.steps[4].imageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-type-vs-condition/pages/01-customer_problem.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-type-vs-condition/pages/01-customer_problem.jpg",
+      "where": [
+        "lesson:skin-type-vs-condition.steps[0].pageImageAsset:customer_problem"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-type-vs-condition/pages/02-wrong_scene.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-type-vs-condition/pages/02-wrong_scene.jpg",
+      "where": [
+        "lesson:skin-type-vs-condition.steps[1].pageImageAsset:wrong_scene"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-type-vs-condition/pages/04-definition.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-type-vs-condition/pages/04-definition.jpg",
+      "where": [
+        "lesson:skin-type-vs-condition.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-type-vs-condition/pages/05-mechanism.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-type-vs-condition/pages/05-mechanism.jpg",
+      "where": [
+        "lesson:skin-type-vs-condition.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-type-vs-condition/pages/06-observe.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-type-vs-condition/pages/06-observe.jpg",
+      "where": [
+        "lesson:skin-type-vs-condition.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-type-vs-condition/pages/07-misconception.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-type-vs-condition/pages/07-misconception.jpg",
+      "where": [
+        "lesson:skin-type-vs-condition.steps[6].pageImageAsset:misconception"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-type-vs-condition/pages/08-project.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-type-vs-condition/pages/08-project.jpg",
+      "where": [
+        "lesson:skin-type-vs-condition.steps[7].pageImageAsset:project"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-type-vs-condition/pages/09-translate.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-type-vs-condition/pages/09-translate.jpg",
+      "where": [
+        "lesson:skin-type-vs-condition.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-type-vs-condition/pages/10-boundary.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-type-vs-condition/pages/10-boundary.jpg",
+      "where": [
+        "lesson:skin-type-vs-condition.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-type-vs-condition/pages/11-retell.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-type-vs-condition/pages/11-retell.jpg",
+      "where": [
+        "lesson:skin-type-vs-condition.steps[10].pageImageAsset:retell"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/skin-type-vs-condition/pages/12-practice.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/skin-type-vs-condition/pages/12-practice.jpg",
+      "where": [
+        "lesson:skin-type-vs-condition.steps[11].pageImageAsset:practice"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/stratum-corneum/01-main.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/stratum-corneum/01-main.jpg",
+      "where": [
+        "home.starterLessons[0].imageAsset:stratum-corneum",
+        "path:skin-physiology.lessons[1].imageAsset:stratum-corneum",
+        "lesson:stratum-corneum.steps[4].imageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/stratum-corneum/pages/01-customer_problem.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/stratum-corneum/pages/01-customer_problem.jpg",
+      "where": [
+        "lesson:stratum-corneum.steps[0].pageImageAsset:customer_problem"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/stratum-corneum/pages/02-wrong_scene.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/stratum-corneum/pages/02-wrong_scene.jpg",
+      "where": [
+        "lesson:stratum-corneum.steps[1].pageImageAsset:wrong_scene"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/stratum-corneum/pages/04-definition.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/stratum-corneum/pages/04-definition.jpg",
+      "where": [
+        "lesson:stratum-corneum.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/stratum-corneum/pages/05-mechanism.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/stratum-corneum/pages/05-mechanism.jpg",
+      "where": [
+        "lesson:stratum-corneum.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/stratum-corneum/pages/06-observe.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/stratum-corneum/pages/06-observe.jpg",
+      "where": [
+        "lesson:stratum-corneum.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/stratum-corneum/pages/07-misconception.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/stratum-corneum/pages/07-misconception.jpg",
+      "where": [
+        "lesson:stratum-corneum.steps[6].pageImageAsset:misconception"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/stratum-corneum/pages/08-project.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/stratum-corneum/pages/08-project.jpg",
+      "where": [
+        "lesson:stratum-corneum.steps[7].pageImageAsset:project"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/stratum-corneum/pages/09-translate.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/stratum-corneum/pages/09-translate.jpg",
+      "where": [
+        "lesson:stratum-corneum.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/stratum-corneum/pages/10-boundary.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/stratum-corneum/pages/10-boundary.jpg",
+      "where": [
+        "lesson:stratum-corneum.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/stratum-corneum/pages/11-retell.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/stratum-corneum/pages/11-retell.jpg",
+      "where": [
+        "lesson:stratum-corneum.steps[10].pageImageAsset:retell"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/stratum-corneum/pages/12-practice.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/stratum-corneum/pages/12-practice.jpg",
+      "where": [
+        "lesson:stratum-corneum.steps[11].pageImageAsset:practice"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/yellow-face-spleen-stomach/01-main.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/yellow-face-spleen-stomach/01-main.jpg",
+      "where": [
+        "path:organ-expression.lessons[0].imageAsset:yellow-face-spleen-stomach",
+        "lesson:yellow-face-spleen-stomach.steps[4].imageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/yellow-face-spleen-stomach/pages/01-customer_problem.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/yellow-face-spleen-stomach/pages/01-customer_problem.jpg",
+      "where": [
+        "lesson:yellow-face-spleen-stomach.steps[0].pageImageAsset:customer_problem"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/yellow-face-spleen-stomach/pages/02-wrong_scene.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/yellow-face-spleen-stomach/pages/02-wrong_scene.jpg",
+      "where": [
+        "lesson:yellow-face-spleen-stomach.steps[1].pageImageAsset:wrong_scene"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/yellow-face-spleen-stomach/pages/04-definition.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/yellow-face-spleen-stomach/pages/04-definition.jpg",
+      "where": [
+        "lesson:yellow-face-spleen-stomach.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/yellow-face-spleen-stomach/pages/05-mechanism.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/yellow-face-spleen-stomach/pages/05-mechanism.jpg",
+      "where": [
+        "lesson:yellow-face-spleen-stomach.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/yellow-face-spleen-stomach/pages/06-observe.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/yellow-face-spleen-stomach/pages/06-observe.jpg",
+      "where": [
+        "lesson:yellow-face-spleen-stomach.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/yellow-face-spleen-stomach/pages/07-misconception.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/yellow-face-spleen-stomach/pages/07-misconception.jpg",
+      "where": [
+        "lesson:yellow-face-spleen-stomach.steps[6].pageImageAsset:misconception"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/yellow-face-spleen-stomach/pages/08-project.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/yellow-face-spleen-stomach/pages/08-project.jpg",
+      "where": [
+        "lesson:yellow-face-spleen-stomach.steps[7].pageImageAsset:project"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/yellow-face-spleen-stomach/pages/09-translate.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/yellow-face-spleen-stomach/pages/09-translate.jpg",
+      "where": [
+        "lesson:yellow-face-spleen-stomach.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/yellow-face-spleen-stomach/pages/10-boundary.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/yellow-face-spleen-stomach/pages/10-boundary.jpg",
+      "where": [
+        "lesson:yellow-face-spleen-stomach.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/yellow-face-spleen-stomach/pages/11-retell.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/yellow-face-spleen-stomach/pages/11-retell.jpg",
+      "where": [
+        "lesson:yellow-face-spleen-stomach.steps[10].pageImageAsset:retell"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v2/yellow-face-spleen-stomach/pages/12-practice.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v2/yellow-face-spleen-stomach/pages/12-practice.jpg",
+      "where": [
+        "lesson:yellow-face-spleen-stomach.steps[11].pageImageAsset:practice"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/bladder-meridian-knowledge/pages/01-bladder-meridian-route-overview-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/bladder-meridian-knowledge/pages/01-bladder-meridian-route-overview-v1.jpg",
+      "where": [
+        "lesson:bladder-meridian-knowledge.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/bladder-meridian-knowledge/pages/02-bladder-meridian-back-line-not-treatment-p6fix-api-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/bladder-meridian-knowledge/pages/02-bladder-meridian-back-line-not-treatment-p6fix-api-v1.jpg",
+      "where": [
+        "lesson:bladder-meridian-knowledge.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/bladder-meridian-signals/pages/01-bladder-meridian-back-waist-entry-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/bladder-meridian-signals/pages/01-bladder-meridian-back-waist-entry-v1.jpg",
+      "where": [
+        "lesson:bladder-meridian-signals.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/bladder-meridian-signals/pages/02-bladder-meridian-sitting-fatigue-speech-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/bladder-meridian-signals/pages/02-bladder-meridian-sitting-fatigue-speech-v1.jpg",
+      "where": [
+        "lesson:bladder-meridian-signals.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/bladder-meridian-translation/pages/01-bladder-meridian-redline-referral-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/bladder-meridian-translation/pages/01-bladder-meridian-redline-referral-v1.jpg",
+      "where": [
+        "lesson:bladder-meridian-translation.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/bladder-organ-boundary/pages/01-bladder-water-boundary-concept-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/bladder-organ-boundary/pages/01-bladder-water-boundary-concept-v1.jpg",
+      "where": [
+        "lesson:bladder-organ-boundary.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/bladder-organ-boundary/pages/02-bladder-safe-boundary-speech-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/bladder-organ-boundary/pages/02-bladder-safe-boundary-speech-v1.jpg",
+      "where": [
+        "lesson:bladder-organ-boundary.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/du-meridian-knowledge/pages/01-du-meridian-route-overview-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/du-meridian-knowledge/pages/01-du-meridian-route-overview-v1.jpg",
+      "where": [
+        "lesson:du-meridian-knowledge.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/du-meridian-knowledge/pages/02-du-meridian-back-line-not-spine-treatment-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/du-meridian-knowledge/pages/02-du-meridian-back-line-not-spine-treatment-v1.jpg",
+      "where": [
+        "lesson:du-meridian-knowledge.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/du-meridian-signals/pages/01-du-meridian-neck-back-entry-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/du-meridian-signals/pages/01-du-meridian-neck-back-entry-v1.jpg",
+      "where": [
+        "lesson:du-meridian-signals.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/du-meridian-signals/pages/02-du-meridian-sitting-head-down-speech-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/du-meridian-signals/pages/02-du-meridian-sitting-head-down-speech-v1.jpg",
+      "where": [
+        "lesson:du-meridian-signals.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/du-meridian-translation/pages/01-du-meridian-redline-referral-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/du-meridian-translation/pages/01-du-meridian-redline-referral-v1.jpg",
+      "where": [
+        "lesson:du-meridian-translation.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/gallbladder-meridian-knowledge/pages/01-gallbladder-meridian-route-overview-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/gallbladder-meridian-knowledge/pages/01-gallbladder-meridian-route-overview-v1.jpg",
+      "where": [
+        "lesson:gallbladder-meridian-knowledge.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/gallbladder-meridian-knowledge/pages/02-gallbladder-meridian-side-line-not-treatment-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/gallbladder-meridian-knowledge/pages/02-gallbladder-meridian-side-line-not-treatment-v1.jpg",
+      "where": [
+        "lesson:gallbladder-meridian-knowledge.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/gallbladder-meridian-signals/pages/01-gallbladder-meridian-side-head-neck-entry-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/gallbladder-meridian-signals/pages/01-gallbladder-meridian-side-head-neck-entry-v1.jpg",
+      "where": [
+        "lesson:gallbladder-meridian-signals.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/gallbladder-meridian-signals/pages/02-gallbladder-meridian-stress-speech-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/gallbladder-meridian-signals/pages/02-gallbladder-meridian-stress-speech-v1.jpg",
+      "where": [
+        "lesson:gallbladder-meridian-signals.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/gallbladder-meridian-translation/pages/01-gallbladder-meridian-redline-referral-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/gallbladder-meridian-translation/pages/01-gallbladder-meridian-redline-referral-v1.jpg",
+      "where": [
+        "lesson:gallbladder-meridian-translation.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/gallbladder-organ-expression/pages/01-gallbladder-liver-pair-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/gallbladder-organ-expression/pages/01-gallbladder-liver-pair-organ-card.jpg",
+      "where": [
+        "lesson:gallbladder-organ-expression.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/gallbladder-organ-expression/pages/02-shaoyang-side-line-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/gallbladder-organ-expression/pages/02-shaoyang-side-line-organ-card.jpg",
+      "where": [
+        "lesson:gallbladder-organ-expression.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/gallbladder-store-translation/pages/01-gallbladder-customer-signals-map.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/gallbladder-store-translation/pages/01-gallbladder-customer-signals-map.jpg",
+      "where": [
+        "lesson:gallbladder-store-translation.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/gallbladder-store-translation/pages/02-gallbladder-store-translation-table-v2style.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/gallbladder-store-translation/pages/02-gallbladder-store-translation-table-v2style.jpg",
+      "where": [
+        "lesson:gallbladder-store-translation.steps[7].pageImageAsset:project"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/gallbladder-store-translation/pages/02-gallbladder-store-translation-table.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/gallbladder-store-translation/pages/02-gallbladder-store-translation-table.jpg",
+      "where": [
+        "lesson:gallbladder-store-translation.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/heart-customer-signals/pages/01-heart-customer-signals-map.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/heart-customer-signals/pages/01-heart-customer-signals-map.jpg",
+      "where": [
+        "lesson:heart-customer-signals.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/heart-meridian-boundary/pages/01-heart-meridian-route-boundary-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/heart-meridian-boundary/pages/01-heart-meridian-route-boundary-v1.jpg",
+      "where": [
+        "lesson:heart-meridian-boundary.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/heart-meridian-boundary/pages/02-heart-meridian-redline-referral-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/heart-meridian-boundary/pages/02-heart-meridian-redline-referral-v1.jpg",
+      "where": [
+        "lesson:heart-meridian-boundary.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/heart-organ-expression/pages/01-heart-blood-vessels-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/heart-organ-expression/pages/01-heart-blood-vessels-organ-card.jpg",
+      "where": [
+        "lesson:heart-organ-expression.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/heart-organ-expression/pages/02-heart-stores-shen-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/heart-organ-expression/pages/02-heart-stores-shen-organ-card.jpg",
+      "where": [
+        "lesson:heart-organ-expression.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/heart-organ-expression/pages/03-heart-opens-to-tongue-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/heart-organ-expression/pages/03-heart-opens-to-tongue-organ-card.jpg",
+      "where": [
+        "lesson:heart-organ-expression.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/heart-organ-expression/pages/04-heart-face-complexion-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/heart-organ-expression/pages/04-heart-face-complexion-organ-card.jpg",
+      "where": [
+        "lesson:heart-organ-expression.steps[6].pageImageAsset:misconception"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/heart-organ-expression/pages/05-heart-small-intestine-pair-organ-card-v2.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/heart-organ-expression/pages/05-heart-small-intestine-pair-organ-card-v2.jpg",
+      "where": [
+        "lesson:heart-organ-expression.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/heart-organ-expression/pages/06-heart-fire-element-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/heart-organ-expression/pages/06-heart-fire-element-organ-card.jpg",
+      "where": [
+        "lesson:heart-organ-expression.steps[7].pageImageAsset:project"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/heart-store-translation/pages/01-heart-store-translation-table.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/heart-store-translation/pages/01-heart-store-translation-table.jpg",
+      "where": [
+        "lesson:heart-store-translation.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/kidney-customer-signals/pages/01-kidney-customer-signals-map.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/kidney-customer-signals/pages/01-kidney-customer-signals-map.jpg",
+      "where": [
+        "lesson:kidney-customer-signals.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/kidney-meridian-knowledge/pages/01-kidney-meridian-route-overview-v2.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/kidney-meridian-knowledge/pages/01-kidney-meridian-route-overview-v2.jpg",
+      "where": [
+        "lesson:kidney-meridian-knowledge.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/kidney-meridian-signals/pages/01-kidney-meridian-fatigue-aging-entry-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/kidney-meridian-signals/pages/01-kidney-meridian-fatigue-aging-entry-v1.jpg",
+      "where": [
+        "lesson:kidney-meridian-translation.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/kidney-meridian-translation/pages/01-kidney-meridian-redline-referral-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/kidney-meridian-translation/pages/01-kidney-meridian-redline-referral-v1.jpg",
+      "where": [
+        "lesson:kidney-meridian-translation.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/kidney-organ-expression/pages/01-kidney-stores-essence-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/kidney-organ-expression/pages/01-kidney-stores-essence-organ-card.jpg",
+      "where": [
+        "lesson:kidney-organ-expression.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/kidney-organ-expression/pages/02-kidney-governs-water-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/kidney-organ-expression/pages/02-kidney-governs-water-organ-card.jpg",
+      "where": [
+        "lesson:kidney-organ-expression.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/kidney-organ-expression/pages/03-kidney-receives-qi-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/kidney-organ-expression/pages/03-kidney-receives-qi-organ-card.jpg",
+      "where": [
+        "lesson:kidney-organ-expression.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/kidney-organ-expression/pages/04-kidney-bones-marrow-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/kidney-organ-expression/pages/04-kidney-bones-marrow-organ-card.jpg",
+      "where": [
+        "lesson:kidney-organ-expression.steps[6].pageImageAsset:misconception"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/kidney-organ-expression/pages/05-kidney-ears-two-yin-organ-card-p6fix-api-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/kidney-organ-expression/pages/05-kidney-ears-two-yin-organ-card-p6fix-api-v1.jpg",
+      "where": [
+        "lesson:kidney-organ-expression.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/kidney-organ-expression/pages/06-kidney-hair-luster-organ-card-p6fix-api-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/kidney-organ-expression/pages/06-kidney-hair-luster-organ-card-p6fix-api-v1.jpg",
+      "where": [
+        "lesson:kidney-organ-expression.steps[10].pageImageAsset:retell"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/kidney-organ-expression/pages/07-kidney-bladder-pair-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/kidney-organ-expression/pages/07-kidney-bladder-pair-organ-card.jpg",
+      "where": [
+        "lesson:kidney-organ-expression.steps[7].pageImageAsset:project"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/kidney-organ-expression/pages/08-kidney-water-element-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/kidney-organ-expression/pages/08-kidney-water-element-organ-card.jpg",
+      "where": [
+        "lesson:kidney-organ-expression.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/kidney-store-translation/pages/01-kidney-store-translation-table.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/kidney-store-translation/pages/01-kidney-store-translation-table.jpg",
+      "where": [
+        "lesson:kidney-store-translation.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/large-intestine-meridian-knowledge/pages/01-large-intestine-meridian-route-overview-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/large-intestine-meridian-knowledge/pages/01-large-intestine-meridian-route-overview-v1.jpg",
+      "where": [
+        "lesson:large-intestine-meridian-knowledge.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/large-intestine-meridian-signals/pages/01-large-intestine-meridian-arm-face-entry-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/large-intestine-meridian-signals/pages/01-large-intestine-meridian-arm-face-entry-v1.jpg",
+      "where": [
+        "lesson:large-intestine-meridian-translation.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/large-intestine-meridian-translation/pages/01-large-intestine-meridian-redline-referral-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/large-intestine-meridian-translation/pages/01-large-intestine-meridian-redline-referral-v1.jpg",
+      "where": [
+        "lesson:large-intestine-meridian-translation.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/large-intestine-organ-expression/pages/01-large-intestine-transmission-professional-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/large-intestine-organ-expression/pages/01-large-intestine-transmission-professional-v1.jpg",
+      "where": [
+        "lesson:large-intestine-organ-expression.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/large-intestine-organ-expression/pages/02-lung-large-intestine-paired-relation-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/large-intestine-organ-expression/pages/02-lung-large-intestine-paired-relation-v1.jpg",
+      "where": [
+        "lesson:large-intestine-organ-expression.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/large-intestine-store-translation/pages/01-large-intestine-customer-entry-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/large-intestine-store-translation/pages/01-large-intestine-customer-entry-v1.jpg",
+      "where": [
+        "lesson:large-intestine-store-translation.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/large-intestine-store-translation/pages/02-large-intestine-detox-correction-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/large-intestine-store-translation/pages/02-large-intestine-detox-correction-v1.jpg",
+      "where": [
+        "lesson:large-intestine-store-translation.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/liver-customer-signals/pages/01-liver-customer-signals-map.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/liver-customer-signals/pages/01-liver-customer-signals-map.jpg",
+      "where": [
+        "lesson:liver-customer-signals.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/liver-meridian-knowledge/pages/01-liver-meridian-route-overview-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/liver-meridian-knowledge/pages/01-liver-meridian-route-overview-v1.jpg",
+      "where": [
+        "lesson:liver-meridian-knowledge.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/liver-meridian-signals/pages/01-liver-meridian-pressure-side-entry-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/liver-meridian-signals/pages/01-liver-meridian-pressure-side-entry-v1.jpg",
+      "where": [
+        "lesson:liver-meridian-translation.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/liver-meridian-translation/pages/01-liver-meridian-redline-referral-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/liver-meridian-translation/pages/01-liver-meridian-redline-referral-v1.jpg",
+      "where": [
+        "lesson:liver-meridian-translation.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/liver-organ-expression/pages/00-liver-organ-centered-overview-candidate.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/liver-organ-expression/pages/00-liver-organ-centered-overview-candidate.jpg",
+      "where": [
+        "lesson:liver-organ-expression.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/liver-organ-expression/pages/00-liver-traditional-main-overview.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/liver-organ-expression/pages/00-liver-traditional-main-overview.jpg",
+      "where": [
+        "lesson:liver-organ-expression.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/liver-organ-expression/pages/01-liver-soothing-flow-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/liver-organ-expression/pages/01-liver-soothing-flow-organ-card.jpg",
+      "where": [
+        "lesson:liver-organ-expression.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/liver-organ-expression/pages/02-liver-stores-blood-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/liver-organ-expression/pages/02-liver-stores-blood-organ-card.jpg",
+      "where": [
+        "lesson:liver-organ-expression.steps[6].pageImageAsset:misconception"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/liver-organ-expression/pages/03-liver-governs-sinews-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/liver-organ-expression/pages/03-liver-governs-sinews-organ-card.jpg",
+      "where": [
+        "lesson:liver-organ-expression.steps[7].pageImageAsset:project"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/liver-organ-expression/pages/04-liver-eyes-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/liver-organ-expression/pages/04-liver-eyes-organ-card.jpg",
+      "where": [
+        "lesson:liver-organ-expression.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/liver-organ-expression/pages/05-liver-nails-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/liver-organ-expression/pages/05-liver-nails-organ-card.jpg",
+      "where": [
+        "lesson:liver-organ-expression.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/liver-organ-expression/pages/06-liver-gallbladder-pair-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/liver-organ-expression/pages/06-liver-gallbladder-pair-organ-card.jpg",
+      "where": [
+        "lesson:liver-organ-expression.steps[10].pageImageAsset:retell"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/liver-organ-expression/pages/07-liver-wood-element-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/liver-organ-expression/pages/07-liver-wood-element-organ-card.jpg",
+      "where": [
+        "lesson:liver-organ-expression.steps[11].pageImageAsset:practice"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/liver-store-translation/pages/01-liver-store-translation-table.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/liver-store-translation/pages/01-liver-store-translation-table.jpg",
+      "where": [
+        "lesson:liver-store-translation.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/lung-customer-signals/pages/01-lung-customer-signals-map.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/lung-customer-signals/pages/01-lung-customer-signals-map.jpg",
+      "where": [
+        "lesson:lung-customer-signals.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/lung-meridian-knowledge/pages/01-lung-meridian-route-overview-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/lung-meridian-knowledge/pages/01-lung-meridian-route-overview-v1.jpg",
+      "where": [
+        "lesson:lung-meridian-knowledge.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/lung-meridian-signals/pages/01-lung-meridian-chest-arm-entry-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/lung-meridian-signals/pages/01-lung-meridian-chest-arm-entry-v1.jpg",
+      "where": [
+        "lesson:lung-meridian-translation.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/lung-meridian-translation/pages/01-lung-meridian-redline-referral-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/lung-meridian-translation/pages/01-lung-meridian-redline-referral-v1.jpg",
+      "where": [
+        "lesson:lung-meridian-translation.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/lung-organ-expression/pages/01-lung-qi-breathing-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/lung-organ-expression/pages/01-lung-qi-breathing-organ-card.jpg",
+      "where": [
+        "lesson:lung-organ-expression.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/lung-organ-expression/pages/02-lung-dispersing-descending-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/lung-organ-expression/pages/02-lung-dispersing-descending-organ-card.jpg",
+      "where": [
+        "lesson:lung-organ-expression.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/lung-organ-expression/pages/03-lung-water-passages-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/lung-organ-expression/pages/03-lung-water-passages-organ-card.jpg",
+      "where": [
+        "lesson:lung-organ-expression.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/lung-organ-expression/pages/04-lung-faces-hundred-vessels-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/lung-organ-expression/pages/04-lung-faces-hundred-vessels-organ-card.jpg",
+      "where": [
+        "lesson:lung-organ-expression.steps[6].pageImageAsset:misconception"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/lung-organ-expression/pages/05-lung-skin-hair-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/lung-organ-expression/pages/05-lung-skin-hair-organ-card.jpg",
+      "where": [
+        "lesson:lung-organ-expression.steps[7].pageImageAsset:project"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/lung-organ-expression/pages/06-lung-opens-to-nose-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/lung-organ-expression/pages/06-lung-opens-to-nose-organ-card.jpg",
+      "where": [
+        "lesson:lung-organ-expression.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/lung-organ-expression/pages/07-lung-large-intestine-pair-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/lung-organ-expression/pages/07-lung-large-intestine-pair-organ-card.jpg",
+      "where": [
+        "lesson:lung-organ-expression.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/lung-organ-expression/pages/08-lung-metal-element-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/lung-organ-expression/pages/08-lung-metal-element-organ-card.jpg",
+      "where": [
+        "lesson:lung-organ-expression.steps[10].pageImageAsset:retell"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/lung-store-translation/pages/01-lung-store-translation-table.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/lung-store-translation/pages/01-lung-store-translation-table.jpg",
+      "where": [
+        "lesson:lung-store-translation.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/meridian-fourteen-map/pages/01-meridian-fourteen-map.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/meridian-fourteen-map/pages/01-meridian-fourteen-map.jpg",
+      "where": [
+        "lesson:meridian-fourteen-map.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/meridian-project-translation/pages/01-meridian-project-translation.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/meridian-project-translation/pages/01-meridian-project-translation.jpg",
+      "where": [
+        "lesson:meridian-project-translation.steps[7].pageImageAsset:project"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/meridian-redline-boundary/pages/01-meridian-safety-boundary.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/meridian-redline-boundary/pages/01-meridian-safety-boundary.jpg",
+      "where": [
+        "lesson:meridian-redline-boundary.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/pericardium-meridian-boundary/pages/01-pericardium-meridian-route-boundary-v2.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/pericardium-meridian-boundary/pages/01-pericardium-meridian-route-boundary-v2.jpg",
+      "where": [
+        "lesson:pericardium-meridian-boundary.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/pericardium-meridian-boundary/pages/02-pericardium-meridian-redline-referral-v2.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/pericardium-meridian-boundary/pages/02-pericardium-meridian-redline-referral-v2.jpg",
+      "where": [
+        "lesson:pericardium-meridian-boundary.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/ren-meridian-knowledge/pages/01-ren-meridian-route-overview-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/ren-meridian-knowledge/pages/01-ren-meridian-route-overview-v1.jpg",
+      "where": [
+        "lesson:ren-meridian-knowledge.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/ren-meridian-knowledge/pages/02-ren-meridian-front-line-not-gynecology-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/ren-meridian-knowledge/pages/02-ren-meridian-front-line-not-gynecology-v1.jpg",
+      "where": [
+        "lesson:ren-meridian-knowledge.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/ren-meridian-signals/pages/01-ren-meridian-abdomen-chest-entry-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/ren-meridian-signals/pages/01-ren-meridian-abdomen-chest-entry-v1.jpg",
+      "where": [
+        "lesson:ren-meridian-signals.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/ren-meridian-signals/pages/02-ren-meridian-period-question-speech-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/ren-meridian-signals/pages/02-ren-meridian-period-question-speech-v1.jpg",
+      "where": [
+        "lesson:ren-meridian-signals.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/ren-meridian-translation/pages/01-ren-meridian-redline-referral-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/ren-meridian-translation/pages/01-ren-meridian-redline-referral-v1.jpg",
+      "where": [
+        "lesson:ren-meridian-translation.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/sanjiao-meridian-boundary/pages/01-sanjiao-meridian-route-boundary-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/sanjiao-meridian-boundary/pages/01-sanjiao-meridian-route-boundary-v1.jpg",
+      "where": [
+        "lesson:sanjiao-meridian-boundary.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/sanjiao-meridian-boundary/pages/02-sanjiao-meridian-redline-referral-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/sanjiao-meridian-boundary/pages/02-sanjiao-meridian-redline-referral-v1.jpg",
+      "where": [
+        "lesson:sanjiao-meridian-boundary.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/sanjiao-organ-expression/pages/01-sanjiao-traditional-channel-concept-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/sanjiao-organ-expression/pages/01-sanjiao-traditional-channel-concept-v1.jpg",
+      "where": [
+        "lesson:sanjiao-organ-expression.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/sanjiao-organ-expression/pages/02-sanjiao-upper-middle-lower-downgrade-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/sanjiao-organ-expression/pages/02-sanjiao-upper-middle-lower-downgrade-v1.jpg",
+      "where": [
+        "lesson:sanjiao-organ-expression.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/sanjiao-store-translation/pages/01-sanjiao-customer-entry-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/sanjiao-store-translation/pages/01-sanjiao-customer-entry-v1.jpg",
+      "where": [
+        "lesson:sanjiao-store-translation.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/sanjiao-store-translation/pages/02-sanjiao-safe-translation-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/sanjiao-store-translation/pages/02-sanjiao-safe-translation-v1.jpg",
+      "where": [
+        "lesson:sanjiao-store-translation.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/small-intestine-meridian-boundary/pages/01-small-intestine-meridian-route-boundary-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/small-intestine-meridian-boundary/pages/01-small-intestine-meridian-route-boundary-v1.jpg",
+      "where": [
+        "lesson:small-intestine-meridian-boundary.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/small-intestine-meridian-boundary/pages/02-small-intestine-meridian-redline-referral-v2.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/small-intestine-meridian-boundary/pages/02-small-intestine-meridian-redline-referral-v2.jpg",
+      "where": [
+        "lesson:small-intestine-meridian-boundary.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/small-intestine-organ-boundary/pages/01-small-intestine-clear-turbid-boundary-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/small-intestine-organ-boundary/pages/01-small-intestine-clear-turbid-boundary-v1.jpg",
+      "where": [
+        "lesson:small-intestine-organ-boundary.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/small-intestine-organ-boundary/pages/02-small-intestine-safe-boundary-speech-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/small-intestine-organ-boundary/pages/02-small-intestine-safe-boundary-speech-v1.jpg",
+      "where": [
+        "lesson:small-intestine-organ-boundary.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/spleen-customer-signals/pages/01-spleen-customer-signals-map.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/spleen-customer-signals/pages/01-spleen-customer-signals-map.jpg",
+      "where": [
+        "lesson:spleen-customer-signals.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/spleen-meridian-knowledge/pages/01-spleen-meridian-route-overview-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/spleen-meridian-knowledge/pages/01-spleen-meridian-route-overview-v1.jpg",
+      "where": [
+        "lesson:spleen-meridian-knowledge.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/spleen-meridian-signals/pages/01-spleen-meridian-yellow-swelling-entry-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/spleen-meridian-signals/pages/01-spleen-meridian-yellow-swelling-entry-v1.jpg",
+      "where": [
+        "lesson:spleen-meridian-translation.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/spleen-meridian-translation/pages/01-spleen-meridian-redline-referral-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/spleen-meridian-translation/pages/01-spleen-meridian-redline-referral-v1.jpg",
+      "where": [
+        "lesson:spleen-meridian-translation.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/spleen-organ-expression/pages/01-spleen-transformation-transportation-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/spleen-organ-expression/pages/01-spleen-transformation-transportation-organ-card.jpg",
+      "where": [
+        "lesson:spleen-organ-expression.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/spleen-organ-expression/pages/02-spleen-governs-blood-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/spleen-organ-expression/pages/02-spleen-governs-blood-organ-card.jpg",
+      "where": [
+        "lesson:spleen-organ-expression.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/spleen-organ-expression/pages/03-spleen-muscles-limbs-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/spleen-organ-expression/pages/03-spleen-muscles-limbs-organ-card.jpg",
+      "where": [
+        "lesson:spleen-organ-expression.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/spleen-organ-expression/pages/04-spleen-opens-to-mouth-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/spleen-organ-expression/pages/04-spleen-opens-to-mouth-organ-card.jpg",
+      "where": [
+        "lesson:spleen-organ-expression.steps[6].pageImageAsset:misconception"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/spleen-organ-expression/pages/05-spleen-lips-complexion-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/spleen-organ-expression/pages/05-spleen-lips-complexion-organ-card.jpg",
+      "where": [
+        "lesson:spleen-organ-expression.steps[7].pageImageAsset:project"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/spleen-organ-expression/pages/06-spleen-stomach-pair-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/spleen-organ-expression/pages/06-spleen-stomach-pair-organ-card.jpg",
+      "where": [
+        "lesson:spleen-organ-expression.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/spleen-organ-expression/pages/07-spleen-earth-element-organ-card.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/spleen-organ-expression/pages/07-spleen-earth-element-organ-card.jpg",
+      "where": [
+        "lesson:spleen-organ-expression.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/spleen-store-translation/pages/01-spleen-store-translation-table.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/spleen-store-translation/pages/01-spleen-store-translation-table.jpg",
+      "where": [
+        "lesson:spleen-store-translation.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/stomach-meridian-knowledge/pages/01-stomach-meridian-route-overview-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/stomach-meridian-knowledge/pages/01-stomach-meridian-route-overview-v1.jpg",
+      "where": [
+        "lesson:stomach-meridian-knowledge.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/stomach-meridian-signals/pages/01-stomach-meridian-face-leg-entry-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/stomach-meridian-signals/pages/01-stomach-meridian-face-leg-entry-v1.jpg",
+      "where": [
+        "lesson:stomach-meridian-translation.steps[5].pageImageAsset:observe"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/stomach-meridian-translation/pages/01-stomach-meridian-redline-referral-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/stomach-meridian-translation/pages/01-stomach-meridian-redline-referral-v1.jpg",
+      "where": [
+        "lesson:stomach-meridian-translation.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/stomach-organ-expression/pages/01-stomach-opening-professional-v4.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/stomach-organ-expression/pages/01-stomach-opening-professional-v4.jpg",
+      "where": [
+        "lesson:stomach-organ-expression.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/stomach-store-translation/pages/01-stomach-customer-translation-v4.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/stomach-store-translation/pages/01-stomach-customer-translation-v4.jpg",
+      "where": [
+        "lesson:stomach-store-translation.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/tcm-five-elements-foundation/pages/01-five-elements-foundation-overview.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/tcm-five-elements-foundation/pages/01-five-elements-foundation-overview.jpg",
+      "where": [
+        "lesson:tcm-five-elements-foundation.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/tcm-five-elements-foundation/pages/02-five-elements-state-translation.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/tcm-five-elements-foundation/pages/02-five-elements-state-translation.jpg",
+      "where": [
+        "lesson:tcm-five-elements-foundation.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/tcm-five-elements-organ-season/pages/01-five-elements-organ-season-overview.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/tcm-five-elements-organ-season/pages/01-five-elements-organ-season-overview.jpg",
+      "where": [
+        "lesson:tcm-five-elements-organ-season.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/tcm-five-elements-organ-season/pages/02-five-elements-boundary-translation.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/tcm-five-elements-organ-season/pages/02-five-elements-boundary-translation.jpg",
+      "where": [
+        "lesson:tcm-five-elements-organ-season.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/tcm-generation-control/pages/01-five-elements-generation-cycle.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/tcm-generation-control/pages/01-five-elements-generation-cycle.jpg",
+      "where": [
+        "lesson:tcm-generation-control.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/tcm-generation-control/pages/02-five-elements-control-cycle.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/tcm-generation-control/pages/02-five-elements-control-cycle.jpg",
+      "where": [
+        "lesson:tcm-generation-control.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/tcm-imbalance-safe-translation/pages/02-imbalance-safe-translation.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/tcm-imbalance-safe-translation/pages/02-imbalance-safe-translation.jpg",
+      "where": [
+        "lesson:tcm-imbalance-safe-translation.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/tcm-store-foundation-translation/pages/01-foundation-to-meridian-organ.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/tcm-store-foundation-translation/pages/01-foundation-to-meridian-organ.jpg",
+      "where": [
+        "lesson:tcm-store-foundation-translation.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/tcm-store-foundation-translation/pages/02-foundation-speaking-practice.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/tcm-store-foundation-translation/pages/02-foundation-speaking-practice.jpg",
+      "where": [
+        "lesson:tcm-store-foundation-translation.steps[11].pageImageAsset:practice"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/tcm-yinyang-foundation/pages/01-yinyang-foundation-overview.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/tcm-yinyang-foundation/pages/01-yinyang-foundation-overview.jpg",
+      "where": [
+        "lesson:tcm-yinyang-foundation.steps[4].pageImageAsset:mechanism"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/tcm-yinyang-foundation/pages/02-yinyang-state-translation.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/tcm-yinyang-foundation/pages/02-yinyang-state-translation.jpg",
+      "where": [
+        "lesson:tcm-yinyang-foundation.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/zangfu-boundary-foundation/pages/01-zangfu-not-diagnosis-tool-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/zangfu-boundary-foundation/pages/01-zangfu-not-diagnosis-tool-v1.jpg",
+      "where": [
+        "lesson:zangfu-redline-referral.steps[3].pageImageAsset:definition"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/zangfu-boundary-foundation/pages/02-zangfu-safe-unified-speech-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/zangfu-boundary-foundation/pages/02-zangfu-safe-unified-speech-v1.jpg",
+      "where": [
+        "lesson:zangfu-redline-referral.steps[8].pageImageAsset:translate"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/zangfu-lifestyle-translation/pages/01-zangfu-complexion-lifestyle-first-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/zangfu-lifestyle-translation/pages/01-zangfu-complexion-lifestyle-first-v1.jpg",
+      "where": [
+        "lesson:zangfu-redline-referral.steps[6].pageImageAsset:misconception"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/zangfu-lifestyle-translation/pages/02-zangfu-terms-to-customer-language-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/zangfu-lifestyle-translation/pages/02-zangfu-terms-to-customer-language-v1.jpg",
+      "where": [
+        "lesson:zangfu-redline-referral.steps[7].pageImageAsset:project"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/zangfu-redline-referral/pages/01-zangfu-redline-forbidden-phrases-p6fix-api-v1.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/zangfu-redline-referral/pages/01-zangfu-redline-forbidden-phrases-p6fix-api-v1.jpg",
+      "where": [
+        "lesson:zangfu-redline-referral.steps[9].pageImageAsset:boundary"
+      ]
+    },
+    {
+      "public_path": "public/professional-learning-assets/professional-learning/v3-imagegen/zangfu-redline-referral/pages/02-zangfu-referral-before-service-v3.jpg",
+      "url_path": "/professional-learning-assets/professional-learning/v3-imagegen/zangfu-redline-referral/pages/02-zangfu-referral-before-service-v3.jpg",
+      "where": [
+        "lesson:zangfu-redline-referral.steps[5].pageImageAsset:observe"
+      ]
+    }
+  ]
+}

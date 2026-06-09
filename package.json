@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "node ./scripts/strict-build.mjs",
+    "build": "node ./scripts/check-backend-release-package.mjs && node ./scripts/strict-build.mjs",
+    "release:preflight": "node ./scripts/check-backend-release-package.mjs",
     "dev": "next dev",
     "lint": "eslint .",
     "mp:build-npm": "node scripts/wechat-devtools-cli.mjs build-npm",
