@@ -63,9 +63,12 @@ function loadTsModule(filePath) {
 
 const { generateVoiceCoachReport } = loadTsModule(path.join(root, "lib", "voice-coach", "report.server.ts"))
 const { refreshVoiceCoachReport } = loadTsModule(path.join(root, "lib", "voice-coach", "report-refresh.ts"))
-const { buildVoiceCoachFirstTurnTarget, buildVoiceCoachFollowupOpening, buildVoiceCoachSessionSnapshot } = loadTsModule(
-  path.join(root, "lib", "voice-coach", "session-context.ts"),
-)
+const {
+  buildVoiceCoachFirstTurnTarget,
+  buildVoiceCoachFollowupOpening,
+  buildVoiceCoachSessionSnapshot,
+  voiceCoachSessionCreateSchema,
+} = loadTsModule(path.join(root, "lib", "voice-coach", "session-context.ts"))
 const { getScenario } = loadTsModule(path.join(root, "lib", "voice-coach", "scenarios.ts"))
 const { normalizeScenarioTag } = loadTsModule(path.join(root, "lib", "voice-coach", "tag-utils.ts"))
 const { buildSetupBrief } = require(path.join(
@@ -438,6 +441,69 @@ test("first-turn target explicitly mixes customer concerns with scene-card const
   assert.match(target, /保证一次就见效/)
 })
 
+test("customer profile name is treated as the simulated customer, not the addressee", () => {
+  const sessionSnapshot = buildVoiceCoachSessionSnapshot({
+    customerProfile: {
+      id: "cp-xu",
+      name: "徐老师",
+      core_concerns: ["安全性"],
+    },
+    sceneCard: {
+      id: "sc-collagen",
+      name: "示例项目·胶原抗衰启动",
+      scene_kind: "offer_promo",
+      service_name: "胶原抗衰护理",
+      scene_goal: "讲清项目原理和预期管理",
+    },
+  })
+
+  const target = buildVoiceCoachFirstTurnTarget(sessionSnapshot)
+
+  assert.match(sessionSnapshot.prompt_context_text, /顾客显示名：徐老师（仅用于后台识别和报告展示，不进入顾客对美容师的称呼）/)
+  assert.doesNotMatch(sessionSnapshot.prompt_context_text, /顾客本人：徐老师/)
+  assert.match(target, /Customer name "徐老师" is the simulated customer themself, not the beautician/)
+  assert.match(target, /must not address the beautician as "徐老师"/)
+})
+
+test("training-context-only session snapshot keeps the active training topic", () => {
+  const parsed = voiceCoachSessionCreateSchema.safeParse({
+    scenario_id: "objection_safety",
+    training_task_id: "anti-aging-1",
+    training_pack_id: "beauty_case_training_v1",
+    training_knowledge_space_id: "common_beauty_knowledge_v1",
+    training_context: {
+      task_id: "anti-aging-1",
+      pack_id: "beauty_case_training_v1",
+      knowledge_space_id: "common_beauty_knowledge_v1",
+      pack_title: "真实顾客问题库 v1",
+      training_pack_mode: "common-generic",
+      title: "抗衰紧致护理",
+      focus: "把补水、胶原、紧致讲成一条线",
+      customer_line: "我这个年龄需要抗衰吗？和普通补水有什么区别？做几次有效？",
+      pass_goals: ["解释补水、胶原维养和紧致维护的区别"],
+      forbidden_phrases: ["保证一次就见效"],
+    },
+  })
+
+  assert.equal(parsed.success, true)
+
+  const sessionSnapshot = buildVoiceCoachSessionSnapshot({
+    trainingContext: parsed.data.training_context,
+  })
+
+  assert.equal(sessionSnapshot.training_context.service_name, "胶原抗衰护理")
+  assert.equal(sessionSnapshot.display.service_name, "胶原抗衰护理")
+  assert.match(sessionSnapshot.prompt_context_text, /当前训练项目：胶原抗衰护理/)
+  assert.match(sessionSnapshot.prompt_context_text, /训练任务：抗衰紧致护理/)
+  assert.match(sessionSnapshot.prompt_context_text, /顾客开场原话：我这个年龄需要抗衰吗/)
+  assert.match(sessionSnapshot.prompt_context_text, /训练通过目标：解释补水、胶原维养和紧致维护的区别/)
+  assert.match(sessionSnapshot.prompt_context_text, /训练禁忌表达：保证一次就见效/)
+
+  const target = buildVoiceCoachFirstTurnTarget(sessionSnapshot)
+  assert.match(target, /active training service\/topic is "胶原抗衰护理"/)
+  assert.match(target, /Use this customer line as the opening pressure point/)
+})
+
 test("first-turn target changes focus when the variation seed changes", () => {
   const sessionSnapshot = buildVoiceCoachSessionSnapshot({
     customerProfile: {
@@ -549,7 +615,8 @@ test("communication method tags flow into snapshot prompt context and setup brie
   assert.match(sessionSnapshot.prompt_context_text, /场景策略/)
   assert.match(sessionSnapshot.prompt_context_text, /沟通方法/)
   assert.match(sessionSnapshot.prompt_context_text, /反向叙述/)
-  assert.ok(brief.summaryLines.some((line) => line.includes("沟通方法")))
+  assert.ok(brief.summaryLines.some((line) => line.includes("推荐切入")))
+  assert.ok(brief.summaryLines.some((line) => line.includes("反向叙述")))
   assert.ok(brief.summaryLines.some((line) => line.includes("Feel\/Felt\/Found")))
 })
 

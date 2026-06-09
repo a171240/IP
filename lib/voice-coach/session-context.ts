@@ -21,6 +21,8 @@ const stringListSchema = z
   .array(z.string().trim().min(1).max(80))
   .max(12)
 
+const looseObjectSchema = z.object({}).passthrough()
+
 export const voiceCoachCustomerProfilePayloadSchema = z.object({
   name: z.string().trim().min(1).max(40),
   age_label: z.string().trim().max(30).optional().nullable(),
@@ -53,6 +55,12 @@ export const voiceCoachSessionCreateSchema = z.object({
   customer_profile_id: z.string().uuid().optional().nullable(),
   scene_card_id: z.string().uuid().optional().nullable(),
   live_notes: z.string().trim().max(500).optional().nullable(),
+  training_task_id: z.string().trim().max(160).optional().nullable(),
+  training_pack_id: z.string().trim().max(160).optional().nullable(),
+  training_brand_code: z.string().trim().max(80).optional().nullable(),
+  training_knowledge_space_id: z.string().trim().max(160).optional().nullable(),
+  training_context: looseObjectSchema.optional().nullable(),
+  training_task_preview: looseObjectSchema.optional().nullable(),
   followup_context: z
     .object({
       source_session_id: z.string().uuid(),
@@ -121,11 +129,38 @@ export type VoiceCoachFollowupContext = {
   suggested_response?: string
 }
 
+export type VoiceCoachTrainingContext = {
+  task_id: string
+  pack_id: string
+  brand_code: string
+  knowledge_space_id: string
+  knowledge_space_name: string
+  pack_title: string
+  training_pack_mode: string
+  title: string
+  task_title: string
+  service_name: string
+  focus: string
+  customer_line: string
+  hidden_concern: string
+  decision_question: string
+  decision_answer: string
+  store_action: string
+  can_serve_text: string
+  ability_domain_name: string
+  stage_name: string
+  speaking_steps: string[]
+  pass_goals: string[]
+  forbidden_phrases: string[]
+  scoring_focus: string[]
+}
+
 export type VoiceCoachSessionSnapshot = {
   version: "v1"
   customer_profile: ReturnType<typeof normalizeCustomerProfileRecord> | null
   scene_card: ReturnType<typeof normalizeSceneCardRecord> | null
   followup_context: VoiceCoachFollowupContext | null
+  training_context: VoiceCoachTrainingContext | null
   live_notes: string
   prompt_context_text: string
   display: {
@@ -173,6 +208,66 @@ function nullableText(value: unknown, max = 300): string | null {
 
 function boundedText(value: unknown, max = 300): string {
   return nullableText(value, max) || ""
+}
+
+function normalizeLooseObject(input: unknown): Record<string, unknown> {
+  return input && typeof input === "object" && !Array.isArray(input) ? (input as Record<string, unknown>) : {}
+}
+
+function pickText(data: Record<string, unknown>, keys: string[], max = 300): string {
+  for (const key of keys) {
+    const value = boundedText(data[key], max)
+    if (value) return value
+  }
+  return ""
+}
+
+function inferTrainingServiceName(data: Record<string, unknown>): string {
+  const explicit = pickText(
+    data,
+    [
+      "service_name",
+      "serviceName",
+      "active_service",
+      "activeService",
+      "project",
+      "project_name",
+      "projectName",
+      "护理项目",
+      "品项",
+    ],
+    80,
+  )
+
+  const text = [
+    data.title,
+    data.task_title,
+    data.focus,
+    data.customer_line,
+    data.customerLine,
+    data.customerConcern,
+    data.hidden_concern,
+    data.professional_kernel,
+    data.pack_title,
+  ]
+    .map((item) => String(item || ""))
+    .join(" ")
+
+  if (explicit) {
+    if (/胶原/.test(text) && /(抗衰|抗初老|紧致|松弛|垮|法令纹)/.test(explicit)) return "胶原抗衰护理"
+    return explicit.slice(0, 60)
+  }
+
+  if (/胶原/.test(text) && /(抗衰|抗初老|紧致|松弛|垮|法令纹)/.test(text)) return "胶原抗衰护理"
+  if (/抗衰|抗初老|紧致|松弛|法令纹/.test(text)) return "抗衰紧致护理"
+  if (/补水|干|锁水|屏障/.test(text)) return "补水修护护理"
+  if (/黑头|毛孔|小气泡|清洁/.test(text)) return "清洁毛孔护理"
+  if (/痘|闭口|痘印/.test(text)) return "痘痘闭口调理"
+  if (/淡斑|亮肤|暗黄|提亮|反黑/.test(text)) return "亮肤淡斑护理"
+  if (/眼周|眼纹|黑眼圈/.test(text)) return "眼周护理"
+
+  const fallback = pickText(data, ["title", "task_title", "focus"], 80)
+  return fallback.slice(0, 60)
 }
 
 function numberOrNull(value: unknown): number | null {
@@ -244,6 +339,63 @@ export function normalizeVoiceCoachFollowupContext(input: unknown): VoiceCoachFo
     ...(boundedText(data.customer_objection, 120) ? { customer_objection: boundedText(data.customer_objection, 120) } : {}),
     ...(boundedText(data.your_response, 120) ? { your_response: boundedText(data.your_response, 120) } : {}),
     ...(boundedText(data.suggested_response, 180) ? { suggested_response: boundedText(data.suggested_response, 180) } : {}),
+  }
+}
+
+export function normalizeVoiceCoachTrainingContext(input: unknown): VoiceCoachTrainingContext | null {
+  const data = normalizeLooseObject(input)
+  if (!Object.keys(data).length) return null
+
+  const title = pickText(data, ["task_title", "title", "name"], 120)
+  const focus = pickText(data, ["focus", "professional_kernel", "professionalKernel"], 240)
+  const customerLine = pickText(
+    data,
+    ["customer_line", "customerLine", "customerConcern", "customer_concern", "opening_line"],
+    300,
+  )
+  const serviceName = inferTrainingServiceName({ ...data, title, focus, customer_line: customerLine })
+  const passGoals = toStringList(data.pass_goals || data.passGoals).slice(0, 5)
+  const forbiddenPhrases = toStringList(data.forbidden_phrases || data.forbiddenPhrases).slice(0, 6)
+  const scoringFocus = toStringList(data.scoring_focus || data.scoringFocus).slice(0, 6)
+  const speakingSteps = toStringList(data.speaking_steps || data.speakingSteps).slice(0, 5)
+
+  const hasUsefulContent = Boolean(
+    title ||
+      focus ||
+      customerLine ||
+      serviceName ||
+      passGoals.length ||
+      forbiddenPhrases.length ||
+      scoringFocus.length ||
+      speakingSteps.length ||
+      pickText(data, ["task_id", "training_task_id"], 160),
+  )
+  if (!hasUsefulContent) return null
+
+  return {
+    task_id: pickText(data, ["task_id", "training_task_id", "id"], 160),
+    pack_id: pickText(data, ["pack_id", "training_pack_id"], 160),
+    brand_code: pickText(data, ["brand_code", "training_brand_code"], 80),
+    knowledge_space_id: pickText(data, ["knowledge_space_id", "training_knowledge_space_id"], 160),
+    knowledge_space_name: pickText(data, ["knowledge_space_name", "knowledgeSpaceName"], 80),
+    pack_title: pickText(data, ["pack_title", "packTitle"], 120),
+    training_pack_mode: pickText(data, ["training_pack_mode", "trainingPackMode"], 80),
+    title,
+    task_title: title,
+    service_name: serviceName,
+    focus,
+    customer_line: customerLine,
+    hidden_concern: pickText(data, ["hidden_concern", "hiddenConcern"], 240),
+    decision_question: pickText(data, ["decision_question", "decisionQuestion"], 180),
+    decision_answer: pickText(data, ["decision_answer", "decisionAnswer"], 240),
+    store_action: pickText(data, ["store_action", "storeAction"], 120),
+    can_serve_text: pickText(data, ["can_serve_text", "canServeText"], 180),
+    ability_domain_name: pickText(data, ["ability_domain_name", "abilityDomainName"], 120),
+    stage_name: pickText(data, ["stage_name", "stageName"], 120),
+    speaking_steps: speakingSteps,
+    pass_goals: passGoals,
+    forbidden_phrases: forbiddenPhrases,
+    scoring_focus: scoringFocus,
   }
 }
 
@@ -430,7 +582,9 @@ export function buildVoiceCoachFirstTurnTarget(snapshot: unknown, variationSeed?
   const customerProfile = normalizeCustomerProfileRecord((snapshotObject?.customer_profile as any) || null)
   const sceneCard = normalizeSceneCardRecord((snapshotObject?.scene_card as any) || null)
   const followupContext = normalizeVoiceCoachFollowupContext(snapshotObject?.followup_context || null)
-  const sceneKindPolicy = getVoiceCoachSceneKindPolicy(sceneCard?.scene_kind, sceneCard?.service_name)
+  const trainingContext = normalizeVoiceCoachTrainingContext(snapshotObject?.training_context || null)
+  const serviceName = sceneCard?.service_name || trainingContext?.service_name || ""
+  const sceneKindPolicy = getVoiceCoachSceneKindPolicy(sceneCard?.scene_kind, serviceName)
 
   const coreConcerns = pickTopItems(customerProfile?.core_concerns, 3)
   const trustTriggers = pickTopItems(customerProfile?.trust_triggers, 3)
@@ -447,9 +601,13 @@ export function buildVoiceCoachFirstTurnTarget(snapshot: unknown, variationSeed?
     ...targetObjections,
     ...mustCoverPoints,
     ...communicationMethodTags,
+    trainingContext?.customer_line || "",
+    trainingContext?.hidden_concern || "",
+    trainingContext?.focus || "",
+    ...pickTopItems(trainingContext?.pass_goals, 3),
   ].filter(Boolean)
   const normalizedSeed =
-    String(variationSeed || sceneCard?.id || customerProfile?.id || sceneGoal || "voice-coach").trim() ||
+    String(variationSeed || sceneCard?.id || customerProfile?.id || trainingContext?.task_id || sceneGoal || "voice-coach").trim() ||
     "voice-coach"
   const primaryFocus = pickSeededItem(focusPool, normalizedSeed)
   const secondaryFocus = pickSeededItem(focusPool, `${normalizedSeed}:secondary`, 1)
@@ -462,7 +620,13 @@ export function buildVoiceCoachFirstTurnTarget(snapshot: unknown, variationSeed?
   const openingStyle = pickSeededItem(openingStyles, `${normalizedSeed}:style`)
 
   const instructions = [
+    customerProfile?.name
+      ? `Customer name "${customerProfile.name}" is the simulated customer themself, not the beautician; the opening must not address the beautician as "${customerProfile.name}".`
+      : "",
     "Use the configured customer profile as the primary persona source.",
+    trainingContext
+      ? "Use the training task context as the active scenario source; do not ignore its project, customer line, pass goals, or forbidden phrases."
+      : "",
     followupContext
       ? "Open with the previous report weakness first; use explicit customer concerns only as persona support."
       : "Open with one of the customer's explicit core concerns instead of a generic default objection.",
@@ -491,6 +655,25 @@ export function buildVoiceCoachFirstTurnTarget(snapshot: unknown, variationSeed?
       instructions.push(`For this run, prefer opening with \"${primaryFocus}\".`)
     } else {
       instructions.push(`If multiple concerns exist, prefer opening with \"${coreConcerns[0]}\".`)
+    }
+  }
+
+  if (trainingContext) {
+    if (serviceName) instructions.push(`The active training service/topic is "${serviceName}"; do not switch to another service domain.`)
+    if (trainingContext.title || trainingContext.focus) {
+      instructions.push(`Training task: ${[trainingContext.title, trainingContext.focus].filter(Boolean).join(" / ")}.`)
+    }
+    if (trainingContext.customer_line) {
+      instructions.push(`Use this customer line as the opening pressure point: ${trainingContext.customer_line}.`)
+    }
+    if (trainingContext.hidden_concern) {
+      instructions.push(`Hidden concern to preserve: ${trainingContext.hidden_concern}.`)
+    }
+    if (trainingContext.pass_goals.length) {
+      instructions.push(`The opening should give the beautician a path to cover: ${trainingContext.pass_goals.slice(0, 4).join(" / ")}.`)
+    }
+    if (trainingContext.forbidden_phrases.length) {
+      instructions.push(`Do not invite or reward forbidden lines such as: ${trainingContext.forbidden_phrases.slice(0, 4).join(" / ")}.`)
     }
   }
 
@@ -546,7 +729,7 @@ export function buildVoiceCoachFirstTurnTarget(snapshot: unknown, variationSeed?
     )
   }
 
-  return instructions.join(" ")
+  return instructions.filter(Boolean).join(" ")
 }
 
 export function buildVoiceCoachSessionSnapshot(args: {
@@ -554,16 +737,19 @@ export function buildVoiceCoachSessionSnapshot(args: {
   sceneCard?: VoiceCoachSceneCardRecord | null
   liveNotes?: string | null
   followupContext?: unknown
+  trainingContext?: unknown
 }): VoiceCoachSessionSnapshot {
   const customerProfile = normalizeCustomerProfileRecord(args.customerProfile || null)
   const sceneCard = normalizeSceneCardRecord(args.sceneCard || null)
   const liveNotes = String(args.liveNotes || "").trim().slice(0, 500)
   const followupContext = normalizeVoiceCoachFollowupContext(args.followupContext || null)
-  const sceneKindPolicy = getVoiceCoachSceneKindPolicy(sceneCard?.scene_kind, sceneCard?.service_name)
+  const trainingContext = normalizeVoiceCoachTrainingContext(args.trainingContext || null)
+  const activeServiceName = sceneCard?.service_name || trainingContext?.service_name || ""
+  const sceneKindPolicy = getVoiceCoachSceneKindPolicy(sceneCard?.scene_kind, activeServiceName)
 
-  const summaryLines = [
+  const displaySummaryLines = [
     customerProfile
-      ? formatBulletLine("顾客设定", [
+      ? formatBulletLine("顾客", [
           customerProfile.name,
           customerProfile.age_label,
           customerProfile.occupation,
@@ -588,13 +774,77 @@ export function buildVoiceCoachSessionSnapshot(args: {
     sceneCard ? formatBulletLine("重点异议", sceneCard.target_objections) : "",
     sceneCard ? formatBulletLine("必须覆盖", sceneCard.must_cover_points) : "",
     sceneCard ? formatBulletLine("禁忌表达", sceneCard.do_not_say) : "",
+    trainingContext
+      ? formatBulletLine("训练任务", [
+          trainingContext.title,
+          trainingContext.service_name ? `项目 ${trainingContext.service_name}` : "",
+          trainingContext.focus ? `重点 ${trainingContext.focus}` : "",
+        ])
+      : "",
+    trainingContext ? formatBulletLine("训练顾客问题", [trainingContext.customer_line]) : "",
     liveNotes ? `本次补充：${liveNotes}` : "",
     followupContext ? formatBulletLine("复练重点", [followupContext.title]) : "",
   ].filter(Boolean)
 
+  const generationIdentityLines = [
+    customerProfile
+      ? formatBulletLine("模拟顾客画像", [
+          customerProfile.age_label,
+          customerProfile.occupation,
+          customerProfile.personality_tags.length ? `性格 ${customerProfile.personality_tags.join("、")}` : "",
+        ])
+      : "",
+    customerProfile?.name ? `顾客显示名：${customerProfile.name}（仅用于后台识别和报告展示，不进入顾客对美容师的称呼）` : "",
+    customerProfile ? formatBulletLine("核心顾虑", customerProfile.core_concerns) : "",
+    trainingContext && !customerProfile ? formatBulletLine("模拟顾客问题", [trainingContext.customer_line]) : "",
+    trainingContext?.hidden_concern ? formatBulletLine("隐藏顾虑", [trainingContext.hidden_concern]) : "",
+  ].filter(Boolean)
+
   const promptLines = [
-    ...summaryLines,
+    ...generationIdentityLines,
+    activeServiceName
+      ? formatBulletLine("当前训练项目", [
+          activeServiceName,
+          sceneCard?.scene_kind_label || "",
+          sceneCard?.customer_stage ? `阶段 ${sceneCard.customer_stage}` : "",
+        ])
+      : "",
+    trainingContext
+      ? formatBulletLine("训练任务", [
+          trainingContext.title,
+          trainingContext.focus,
+          trainingContext.knowledge_space_name || trainingContext.pack_title,
+        ])
+      : "",
+    trainingContext ? formatBulletLine("顾客开场原话", [trainingContext.customer_line]) : "",
+    trainingContext ? formatBulletLine("训练隐藏顾虑", [trainingContext.hidden_concern]) : "",
+    trainingContext ? formatBulletLine("训练通过目标", trainingContext.pass_goals) : "",
+    trainingContext ? formatBulletLine("训练表达步骤", trainingContext.speaking_steps) : "",
+    trainingContext ? formatBulletLine("训练评分重点", trainingContext.scoring_focus) : "",
+    trainingContext ? formatBulletLine("训练禁忌表达", trainingContext.forbidden_phrases) : "",
+    sceneCard && !activeServiceName
+      ? formatBulletLine("当前训练项目", [
+          sceneCard.service_name || sceneCard.name,
+          sceneCard.scene_kind_label,
+          sceneCard.customer_stage ? `阶段 ${sceneCard.customer_stage}` : "",
+        ])
+      : "",
+    activeServiceName ? formatBulletLine("项目追问范围", [
+      "安全性",
+      "原理",
+      "成分/检测",
+      "适用边界",
+      "效果预期",
+      "流程安排",
+    ]) : "",
     formatBulletLine("场景策略", [sceneKindPolicy.promptSummary]),
+    sceneCard ? formatBulletLine("训练目标", [sceneCard.scene_goal]) : "",
+    sceneCard ? formatBulletLine("沟通方法", sceneCard.communication_method_tags) : "",
+    sceneCard ? formatBulletLine("重点环节", sceneCard.focus_stages) : "",
+    sceneCard ? formatBulletLine("高频问题", sceneCard.likely_questions) : "",
+    sceneCard ? formatBulletLine("重点异议", sceneCard.target_objections) : "",
+    sceneCard ? formatBulletLine("必须覆盖", sceneCard.must_cover_points) : "",
+    sceneCard ? formatBulletLine("禁忌表达", sceneCard.do_not_say) : "",
     customerProfile ? formatBulletLine("沟通风格", [customerProfile.communication_style]) : "",
     customerProfile ? formatBulletLine("建立信任的点", customerProfile.trust_triggers) : "",
     customerProfile ? formatBulletLine("过往经历", [customerProfile.past_experience]) : "",
@@ -609,6 +859,7 @@ export function buildVoiceCoachSessionSnapshot(args: {
     customer_profile: customerProfile,
     scene_card: sceneCard,
     followup_context: followupContext,
+    training_context: trainingContext,
     live_notes: liveNotes,
     prompt_context_text: promptContextText,
     display: {
@@ -617,8 +868,8 @@ export function buildVoiceCoachSessionSnapshot(args: {
       scene_name: sceneCard?.name || "",
       scene_kind: sceneCard?.scene_kind || "",
       scene_kind_label: sceneCard?.scene_kind_label || "",
-      service_name: sceneCard?.service_name || "",
-      summary_lines: summaryLines.slice(0, 7),
+      service_name: activeServiceName,
+      summary_lines: displaySummaryLines.slice(0, 7),
     },
   }
 }
@@ -644,12 +895,18 @@ export function getVoiceCoachSessionClientContext(args: {
     args.sessionContext && typeof args.sessionContext === "object"
       ? normalizeVoiceCoachFollowupContext((args.sessionContext as { followup_context?: unknown }).followup_context || null)
       : null
+  const trainingContextFromSnapshot = normalizeVoiceCoachTrainingContext(snapshotObject?.training_context || null)
+  const trainingContextFromContext =
+    args.sessionContext && typeof args.sessionContext === "object"
+      ? normalizeVoiceCoachTrainingContext((args.sessionContext as { training_context?: unknown }).training_context || null)
+      : null
 
   return {
     customer_profile_id: args.customerProfileId || "",
     scene_card_id: args.sceneCardId || "",
     live_notes: liveNotesFromSnapshot || liveNotesFromContext,
     followup_context: normalizeVoiceCoachFollowupContext(snapshotObject?.followup_context || null) || followupFromContext,
+    training_context: trainingContextFromSnapshot || trainingContextFromContext,
     customer_name: String(snapshotObject?.display?.customer_name || "").trim(),
     customer_summary: String(snapshotObject?.display?.customer_summary || "").trim(),
     scene_name: String(snapshotObject?.display?.scene_name || "").trim(),

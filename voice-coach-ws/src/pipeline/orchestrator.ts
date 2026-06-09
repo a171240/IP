@@ -12,6 +12,13 @@ import {
   encodeTtsBinaryFrame,
 } from "../protocol.js"
 import { calcWpm, calcFillerRatio, computePerTurnScores } from "../shared/metrics.js"
+import {
+  buildDialoguePolicy,
+  buildTopicLock,
+  normalizeCustomerReplyByPolicy,
+  validateCustomerReplyTopic,
+  type TopicGuardResult,
+} from "../shared/topic-guard.js"
 import type { SessionState } from "../session/session-state.js"
 import { buildAsyncAnalysisPrompt, buildFastReplyPrompt, REPLY_META_DELIMITER, streamChat } from "./streaming-llm.js"
 import { StreamingAsr, type StreamingAsrOptions, type StreamingAsrResult } from "./streaming-asr.js"
@@ -426,6 +433,14 @@ export class TurnOrchestrator {
 
     const splitter = new SentenceSplitter(SPLITTER_OPTIONS)
     const sentenceTasks: Promise<void>[] = []
+    const topicLock = buildTopicLock(this.session.sessionContextText)
+    const dialoguePolicy = buildDialoguePolicy({
+      sessionContextText: this.session.sessionContextText,
+      history,
+      beauticianText: params.promptBeauticianText,
+    })
+    let topicGuardRejected = false
+    let topicGuardRejection: TopicGuardResult | null = null
     const prompt = buildFastReplyPrompt({
       scenario: this.session.scenario,
       history,
@@ -450,8 +465,20 @@ export class TurnOrchestrator {
 
       const sentences = splitter.feed(delta)
       for (const sentence of sentences) {
-        const trimmed = sentence.trim()
+        const trimmed = normalizeCustomerReplyByPolicy(sentence.trim(), dialoguePolicy)
         if (!trimmed) continue
+        const topicCheck = validateCustomerReplyTopic(trimmed, topicLock)
+        if (!topicCheck.ok) {
+          topicGuardRejected = true
+          topicGuardRejection = topicCheck
+          this.deps.logger.warn("[voice-coach-ws] topic_guard:sentence_rejected", {
+            sessionId: this.session.sessionId,
+            serviceName: topicLock?.serviceName || "",
+            offendingTerms: topicCheck.offendingTerms,
+            sentence: trimmed,
+          })
+          continue
+        }
         this.activeMetrics.firstSentenceAt ??= Date.now()
         this.session.currentPhase = "playing"
         this.safeSendJson({ type: "llm.sentence_ready", sentence: trimmed, index: sentenceIndex })
@@ -526,15 +553,46 @@ export class TurnOrchestrator {
     flushVisibleBuffer()
     const trailingSentence = splitter.flush()
     if (trailingSentence && trailingSentence.trim()) {
-      this.activeMetrics.firstSentenceAt ??= Date.now()
-      this.session.currentPhase = "playing"
-      this.safeSendJson({ type: "llm.sentence_ready", sentence: trailingSentence.trim(), index: sentenceIndex })
-      sentenceTasks.push(this.runSentenceTts(runToken, sentenceIndex, trailingSentence.trim()))
-      sentenceIndex += 1
+      const trimmed = normalizeCustomerReplyByPolicy(trailingSentence.trim(), dialoguePolicy)
+      const topicCheck = validateCustomerReplyTopic(trimmed, topicLock)
+      if (!topicCheck.ok) {
+        topicGuardRejected = true
+        topicGuardRejection = topicCheck
+        this.deps.logger.warn("[voice-coach-ws] topic_guard:sentence_rejected", {
+          sessionId: this.session.sessionId,
+          serviceName: topicLock?.serviceName || "",
+          offendingTerms: topicCheck.offendingTerms,
+          sentence: trimmed,
+        })
+      } else {
+        this.activeMetrics.firstSentenceAt ??= Date.now()
+        this.session.currentPhase = "playing"
+        this.safeSendJson({ type: "llm.sentence_ready", sentence: trimmed, index: sentenceIndex })
+        sentenceTasks.push(this.runSentenceTts(runToken, sentenceIndex, trimmed))
+        sentenceIndex += 1
+      }
     }
 
     const replyMeta = parseReplyMeta(metaBuffer)
-    this.activeCustomerText = customerText.trim()
+    let finalCustomerText = normalizeCustomerReplyByPolicy(customerText.trim(), dialoguePolicy)
+    const finalTopicCheck = validateCustomerReplyTopic(finalCustomerText, topicLock)
+    if (topicLock && (!finalTopicCheck.ok || topicGuardRejected)) {
+      const rejection = !finalTopicCheck.ok ? finalTopicCheck : topicGuardRejection
+      this.deps.logger.warn("[voice-coach-ws] topic_guard:fallback", {
+        sessionId: this.session.sessionId,
+        serviceName: topicLock.serviceName,
+        offendingTerms: rejection?.offendingTerms || [],
+        reason: rejection?.reason || "",
+      })
+      finalCustomerText = dialoguePolicy?.fallbackCustomerText || topicLock.fallbackCustomerText
+      customerText = finalCustomerText
+      this.activeMetrics.firstSentenceAt ??= Date.now()
+      this.session.currentPhase = "playing"
+      this.safeSendJson({ type: "llm.sentence_ready", sentence: finalCustomerText, index: sentenceIndex })
+      sentenceTasks.push(this.runSentenceTts(runToken, sentenceIndex, finalCustomerText))
+      sentenceIndex += 1
+    }
+    this.activeCustomerText = finalCustomerText
     this.activeCustomerEmotion = replyMeta.emotion
     this.activeTag = replyMeta.tag
 

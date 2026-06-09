@@ -12,11 +12,18 @@ import {
   normalizeVoiceCoachFollowupContext,
   voiceCoachSessionCreateSchema,
   type VoiceCoachFollowupContext,
+  type VoiceCoachSessionCreateInput,
 } from "@/lib/voice-coach/session-context"
 import { getScenario, type VoiceCoachEmotion, type VoiceCoachOpening } from "@/lib/voice-coach/scenarios"
 import { doubaoTts, type DoubaoTtsEmotion } from "@/lib/voice-coach/speech/doubao.server"
 import { signVoiceCoachAudio, uploadVoiceCoachAudio } from "@/lib/voice-coach/storage.server"
 import { normalizeScenarioTag } from "@/lib/voice-coach/tag-utils"
+import {
+  getTrainingTask,
+  listKnowledgeSpaces,
+  resolveActiveKnowledgeSpace,
+  resolveTrainingPack,
+} from "@/lib/voice-coach/training.server"
 import { resolveMpAccountContextForUser } from "@/lib/mp/account-context.server"
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 
@@ -54,6 +61,23 @@ function cleanText(value: unknown, max = 300): string {
   const text = String(value || "").trim()
   if (!text) return ""
   return text.length > max ? text.slice(0, max) : text
+}
+
+function normalizeObject(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
+}
+
+function mergeTrainingContext(base: unknown, extra: Record<string, unknown>): Record<string, unknown> | null {
+  const merged = {
+    ...normalizeObject(base),
+    ...extra,
+  }
+  const compact = Object.entries(merged).filter(([, value]) => {
+    if (Array.isArray(value)) return value.length > 0
+    if (value && typeof value === "object") return Object.keys(value as Record<string, unknown>).length > 0
+    return cleanText(value, 500) !== ""
+  })
+  return compact.length ? Object.fromEntries(compact) : null
 }
 
 function isMissingOrgSnapshotColumn(error: any) {
@@ -236,6 +260,71 @@ async function loadFollowupContext(args: {
     ok: true,
     context: buildFallbackFollowupContext(sourceSessionId, report, (turns || []) as SourceTurnRow[]),
   }
+}
+
+async function resolveTrainingContextForSession(args: {
+  supabase: RequestSupabaseClient
+  accountContext: Awaited<ReturnType<typeof resolveMpAccountContextForUser>> | null
+  parsedData: VoiceCoachSessionCreateInput
+}): Promise<Record<string, unknown> | null> {
+  const payloadContext = normalizeObject(args.parsedData.training_context)
+  const preview = normalizeObject(args.parsedData.training_task_preview)
+  const requestedTaskId = cleanText(
+    args.parsedData.training_task_id || payloadContext.task_id || payloadContext.training_task_id,
+    160,
+  )
+  const requestedPackId = cleanText(
+    args.parsedData.training_pack_id || payloadContext.pack_id || payloadContext.training_pack_id,
+    160,
+  )
+  const requestedKnowledgeSpaceId = cleanText(
+    args.parsedData.training_knowledge_space_id ||
+      payloadContext.knowledge_space_id ||
+      payloadContext.training_knowledge_space_id,
+    160,
+  )
+  const requestedMode = cleanText(payloadContext.training_pack_mode || payloadContext.trainingPackMode, 80)
+
+  let serverContext: Record<string, unknown> = {}
+  if (requestedTaskId || requestedKnowledgeSpaceId || requestedMode) {
+    try {
+      const spaces = await listKnowledgeSpaces({
+        supabase: args.supabase,
+        ctx: args.accountContext,
+        activeKnowledgeSpaceId: requestedKnowledgeSpaceId,
+      })
+      const space = resolveActiveKnowledgeSpace(spaces, requestedKnowledgeSpaceId, requestedMode)
+      if (space) {
+        const pack = await resolveTrainingPack({ supabase: args.supabase, space })
+        const task = pack ? getTrainingTask(pack, requestedTaskId) : null
+        serverContext = mergeTrainingContext(task?.training_context || null, {
+          task_id: task?.task_id || requestedTaskId,
+          pack_id: pack?.pack_id || requestedPackId,
+          brand_code: pack?.brand_code || args.parsedData.training_brand_code || "",
+          knowledge_space_id: space.id || requestedKnowledgeSpaceId,
+          knowledge_space_name: space.display_name || "",
+          pack_title: pack?.title || "",
+          training_pack_mode: pack?.training_pack_mode || requestedMode,
+          title: task?.title || preview.title || "",
+          focus: task?.focus || preview.focus || "",
+          customer_line: task?.customer_line || preview.customer_line || "",
+        }) || {}
+      }
+    } catch {
+      serverContext = {}
+    }
+  }
+
+  return mergeTrainingContext(serverContext, {
+    ...payloadContext,
+    task_id: requestedTaskId || payloadContext.task_id || payloadContext.training_task_id || "",
+    pack_id: requestedPackId || payloadContext.pack_id || payloadContext.training_pack_id || "",
+    brand_code: args.parsedData.training_brand_code || payloadContext.brand_code || payloadContext.training_brand_code || "",
+    knowledge_space_id: requestedKnowledgeSpaceId || payloadContext.knowledge_space_id || payloadContext.training_knowledge_space_id || "",
+    title: payloadContext.title || payloadContext.task_title || preview.title || "",
+    focus: payloadContext.focus || preview.focus || "",
+    customer_line: payloadContext.customer_line || payloadContext.customerLine || preview.customer_line || "",
+  })
 }
 
 function parseHistoryLimit(value: string | null) {
@@ -570,20 +659,30 @@ export async function POST(request: NextRequest) {
     })
     if (!followupContextResult.ok) return followupContextResult.response
     const followupContext = followupContextResult.context
+    const trainingContext = await resolveTrainingContextForSession({
+      supabase,
+      accountContext,
+      parsedData: parsed.data,
+    })
 
     const sessionSnapshot =
-      customerProfileResult.data || sceneCardResult.data || liveNotes || followupContext
+      customerProfileResult.data || sceneCardResult.data || liveNotes || followupContext || trainingContext
         ? buildVoiceCoachSessionSnapshot({
             customerProfile: customerProfileResult.data || null,
             sceneCard: sceneCardResult.data || null,
             liveNotes,
             followupContext,
+            trainingContext,
           })
         : null
     const sessionContext = sessionSnapshot
       ? {
           live_notes: sessionSnapshot.live_notes,
           followup_context: sessionSnapshot.followup_context,
+          training_context: sessionSnapshot.training_context,
+          training_task_id: sessionSnapshot.training_context?.task_id || null,
+          training_pack_id: sessionSnapshot.training_context?.pack_id || null,
+          training_knowledge_space_id: sessionSnapshot.training_context?.knowledge_space_id || null,
         }
       : null
     const sessionContextText = getVoiceCoachSessionPromptContext(sessionSnapshot)

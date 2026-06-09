@@ -62,6 +62,7 @@ describe("buildFastReplyPrompt", () => {
       scenario: baseScenario,
       history: [{ role: "customer", text: "我还是担心安全", emotion: "worried" }],
       beauticianText: "您最在意的是哪一点？",
+      sessionContextText: "顾客显示名：徐老师（仅用于后台识别和报告展示，不进入顾客对美容师的称呼）\n当前训练项目：胶原抗衰护理\n核心顾虑：安全性",
     })
 
     expect(prompt).toHaveLength(2)
@@ -71,8 +72,55 @@ describe("buildFastReplyPrompt", () => {
     expect(system?.content).not.toContain('"suggestions"')
     expect(system?.content).toContain("只生成下一句顾客回复")
     expect(system?.content).toContain("极简示例")
+    expect(system?.content).toContain("当前唯一训练项目：胶原抗衰护理")
+    expect(system?.content).toContain("active_service=胶原抗衰护理")
+    expect(system?.content).toContain("next_customer_move=")
+    expect(system?.content).toContain("不得切换到这些无关服务或身体部位")
+    expect(system?.content).toContain("顾客姓名是模拟顾客本人")
     expect(user?.content).toContain("顾客（情绪：worried）：我还是担心安全")
     expect(user?.content).toContain("按规则续写顾客下一句。")
+  })
+
+  it("uses training-context-only text as the active service and rotates repeated safety", () => {
+    const prompt = buildFastReplyPrompt({
+      scenario: baseScenario,
+      history: [
+        { role: "customer", text: "我还是担心安全", emotion: "worried" },
+        { role: "beautician", text: "我们会先评估。" },
+        { role: "customer", text: "那会不会有风险？", emotion: "worried" },
+      ],
+      beauticianText: "很安全，您放心。",
+      sessionContextText: [
+        "训练任务：抗衰紧致护理；把补水、胶原、紧致讲成一条线；通用知识库",
+        "顾客开场原话：我这个年龄需要抗衰吗？和普通补水有什么区别？做几次有效？",
+      ].join("\n"),
+    })
+
+    const [system] = prompt
+    expect(system?.content).toContain("active_service=胶原抗衰护理")
+    expect(system?.content).toContain("current_axis=证据验证")
+    expect(system?.content).not.toContain("current_axis=安全性")
+  })
+
+  it("asks for next-step arrangement after repeated vague sensitive-skin safety loops", () => {
+    const prompt = buildFastReplyPrompt({
+      scenario: baseScenario,
+      history: [
+        { role: "customer", text: "我有点敏感，做完会不会更红？", emotion: "worried" },
+        { role: "beautician", text: "放心，我们很专业。" },
+        { role: "customer", text: "那哪些情况不适合做，要先避开？", emotion: "worried" },
+        { role: "beautician", text: "一般都没问题的。" },
+        { role: "customer", text: "有没有检测报告或者数据能证明？", emotion: "skeptical" },
+      ],
+      beauticianText: "做，适合做，非常适合做，成分都标清楚的。",
+      sessionContextText: "当前训练项目：胶原抗衰护理\n核心顾虑：敏感肌、安全性、适用边界",
+    })
+
+    const [system, user] = prompt
+    expect(system?.content).toContain("current_axis=推进决策")
+    expect(system?.content).toContain("下一步怎么安排")
+    expect(system?.content).toContain("不要再重复问同一个安全问题")
+    expect(user?.content).toContain("本轮顾客策略：美容师连续回答偏空泛")
   })
 })
 

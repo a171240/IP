@@ -1,3 +1,5 @@
+import { buildDialoguePolicy, buildTopicLock } from "./topic-guard.js"
+
 export type VoiceCoachEmotion = "neutral" | "worried" | "skeptical" | "impatient" | "pleased"
 
 export type VoiceCoachScenario = {
@@ -92,6 +94,12 @@ export function formatHistory(history: VoiceCoachTurn[]): string {
 
 export function buildFastReplyPrompt(opts: BuildMergedPromptOptions): ChatMessage[] {
   const variationDirective = buildVariationDirective(opts.variationSeed, opts.history.length)
+  const topicLock = buildTopicLock(opts.sessionContextText)
+  const dialoguePolicy = buildDialoguePolicy({
+    sessionContextText: opts.sessionContextText,
+    history: opts.history,
+    beauticianText: opts.beauticianText,
+  })
   const system = [
     "你是美容销售训练里的模拟顾客，只生成下一句顾客回复。",
     `场景：${opts.scenario.name}`,
@@ -99,6 +107,8 @@ export function buildFastReplyPrompt(opts: BuildMergedPromptOptions): ChatMessag
     `背景：${opts.scenario.businessContext}`,
     `人设：${opts.scenario.customerPersona}`,
     formatSessionContext(opts.sessionContextText),
+    dialoguePolicy ? `对话状态与策略：\n${dialoguePolicy.promptText}` : "",
+    topicLock ? `项目锁定：\n${topicLock.promptText}` : "",
     `约束：\n${formatSafetyConstraints(opts.scenario.safetyConstraints)}`,
     "",
     "输出规则：",
@@ -106,7 +116,9 @@ export function buildFastReplyPrompt(opts: BuildMergedPromptOptions): ChatMessag
     "2. 口语化、自然，带明确顾虑或兴趣点，只站在顾客视角推进对话。",
     "3. 顾客不是来配合成交的；如果美容师回答空泛、夸大、施压或跳过顾虑，顾客要自然追问或后撤。",
     "4. 如果训练设定里标明是到店顾客训练，就优先围绕信任、安全、恢复期、时间安排和是否会被推销来追问；如果标明是新品推广训练，就优先围绕原理、适用边界、证据、比较和价值来追问。",
-    "5. 如果有当前训练设定，必须与设定里的顾客、场景和项目保持一致。",
+    "5. 如果有当前训练设定，必须执行对话状态里的 next_customer_move；如果存在项目锁定，必须严格围绕唯一训练项目，不要切换到其他项目或身体部位。",
+    "5.5 训练设定里的顾客姓名是模拟顾客本人，不是美容师称呼；顾客回复里不要用这个名字称呼对方。",
+    "5.6 如果已经连续多轮围绕敏感/安全/适用边界，而美容师仍回答空泛，下一句顾客要转向“下一步怎么安排/先检测还是先修复/是否先体验/价格周期值不值”，不要再重复问同一个安全问题。",
     "6. 不要解释、列表、JSON、引号、角色名或舞台说明。",
     variationDirective ? `6.5 ${variationDirective}` : "",
     `7. 换行后单独输出 ${REPLY_META_DELIMITER}`,
@@ -119,6 +131,7 @@ export function buildFastReplyPrompt(opts: BuildMergedPromptOptions): ChatMessag
     "对话历史：",
     formatHistory(opts.history),
     `美容师本轮说：${opts.beauticianText}`,
+    dialoguePolicy ? `本轮顾客策略：${dialoguePolicy.nextMove}` : "",
     "按规则续写顾客下一句。",
   ].filter(Boolean).join("\n\n")
 
@@ -172,6 +185,11 @@ export function buildAsyncAnalysisPrompt(opts: BuildAsyncAnalysisPromptOptions):
 }
 
 export function buildMergedPrompt(opts: BuildMergedPromptOptions): ChatMessage[] {
+  const dialoguePolicy = buildDialoguePolicy({
+    sessionContextText: opts.sessionContextText,
+    history: opts.history,
+    beauticianText: opts.beauticianText,
+  })
   const system = [
     "你是美容销售话术教练的模拟顾客。",
     `场景：${opts.scenario.name}`,
@@ -179,6 +197,7 @@ export function buildMergedPrompt(opts: BuildMergedPromptOptions): ChatMessage[]
     `背景：${opts.scenario.businessContext}`,
     `顾客人设：${opts.scenario.customerPersona}`,
     formatSessionContext(opts.sessionContextText),
+    dialoguePolicy ? `对话状态与策略：\n${dialoguePolicy.promptText}` : "",
     `合规约束：\n${formatSafetyConstraints(opts.scenario.safetyConstraints)}`,
     "",
     "任务：",
@@ -199,7 +218,10 @@ export function buildMergedPrompt(opts: BuildMergedPromptOptions): ChatMessage[]
     "约束：",
     "- 顾客回复控制在 30-80 字。",
     "- 情绪要符合对话上下文。",
+    dialoguePolicy ? `- 顾客回复必须执行本轮策略：${dialoguePolicy.nextMove}` : "",
+    "- 如果对话已经多轮重复敏感/安全/适用边界，且美容师回答仍空泛，顾客回复要推进到下一步安排，不要继续原地追问同一个安全点。",
     "- 建议要具体可执行。",
+    "- 训练设定里的顾客姓名是模拟顾客本人，不是美容师称呼；顾客回复里不要用这个名字称呼对方。",
     "- 润色表达优先体现“接情绪 -> 讲事实 -> 给下一步”，不要使用逼单或恐吓。",
   ].filter(Boolean).join("\n")
 
@@ -208,6 +230,7 @@ export function buildMergedPrompt(opts: BuildMergedPromptOptions): ChatMessage[]
     "对话历史：",
     formatHistory(opts.history),
     `美容师本轮说：${opts.beauticianText}`,
+    dialoguePolicy ? `本轮顾客策略：${dialoguePolicy.nextMove}` : "",
   ].filter(Boolean).join("\n\n")
 
   return [

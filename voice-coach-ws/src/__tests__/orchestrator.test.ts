@@ -156,6 +156,71 @@ describe("TurnOrchestrator", () => {
     expect(state.turnHistory).toHaveLength(2)
   })
 
+  it("strips customer-name addressing before TTS and persistence", async () => {
+    const state = createSessionState({
+      sessionId: "session-name",
+      userId: "user-1",
+      scenario: getScenario("objection_safety"),
+      sessionContextText: "顾客显示名：徐老师（仅用于后台识别和报告展示，不进入顾客对美容师的称呼）\n当前训练项目：胶原抗衰护理",
+    })
+
+    const synthesizedSentences: string[] = []
+    const streamChat = vi
+      .fn()
+      .mockImplementationOnce(async (_prompt, options) => {
+        for (const token of [
+          "徐老师您好，我想问有没有检测报告？",
+          "---META---",
+          '{"emotion":"worried","tag":"证据"}',
+        ]) {
+          options.onToken(token)
+        }
+        options.onDone("")
+      })
+      .mockImplementationOnce(async (_prompt, options) => {
+        for (const token of [
+          '{"suggestions":["先共情","补证据","再推进"],',
+          '"polished":"我理解你的顾虑，我们可以先把检测报告和成分依据说明白。",',
+          '"highlights":[],',
+          '"risk_notes":[]}',
+        ]) {
+          options.onToken(token)
+        }
+        options.onDone("")
+      })
+
+    const orchestrator = new TurnOrchestrator(
+      state,
+      () => undefined,
+      () => undefined,
+      {
+        createAsr: () => new FakeAsr() as never,
+        createTts: (options) => new FakeTts(options as never, synthesizedSentences) as never,
+        streamChat,
+        logger: {
+          info: () => undefined,
+          warn: () => undefined,
+          error: () => undefined,
+        },
+      },
+    )
+
+    await orchestrator.startRecording(1, "customer-0")
+    orchestrator.handleAudioChunk(Buffer.from("mock-audio"))
+    await orchestrator.finishRecording(2)
+    await vi.waitFor(() => {
+      expect(insertCustomerTurn).toHaveBeenCalledTimes(1)
+    })
+
+    expect(synthesizedSentences).toEqual(["我想问有没有检测报告？"])
+    expect(insertCustomerTurn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: "我想问有没有检测报告？",
+      }),
+    )
+    expect(state.turnHistory[state.turnHistory.length - 1]?.text).toBe("我想问有没有检测报告？")
+  })
+
   it("clamps stale client turn indexes to the server session cursor", async () => {
     const state = createSessionState({
       sessionId: "session-2",
