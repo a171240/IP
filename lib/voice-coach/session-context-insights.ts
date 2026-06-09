@@ -3,6 +3,8 @@ import {
   normalizeVoiceCoachFollowupContext,
   normalizeCustomerProfileRecord,
   normalizeSceneCardRecord,
+  normalizeVoiceCoachTrainingContext,
+  type VoiceCoachProfessionalProfile,
   type VoiceCoachSessionSnapshot,
 } from "./session-context"
 import { getVoiceCoachSceneKindPolicy } from "./scene-kind-policy"
@@ -57,6 +59,13 @@ export type VoiceCoachSessionInsights = {
   communicationMethodTags: string[]
   mustCoverPoints: string[]
   doNotSay: string[]
+  professionalProfile: VoiceCoachProfessionalProfile | null
+  professionalSummary: string
+  professionalMustAsk: string[]
+  professionalMustCover: string[]
+  professionalAllowedPhrases: string[]
+  professionalDoNotSay: string[]
+  professionalPauseAndRefer: string[]
   focusPoints: string[]
   followupTitle: string
   followupInstruction: string
@@ -79,6 +88,14 @@ export function getVoiceCoachSessionInsights(args: {
   )
   const sceneCard = normalizeSceneCardRecord((snapshotObject?.scene_card as any) || null)
   const followupContext = normalizeVoiceCoachFollowupContext(snapshotObject?.followup_context || null)
+  const trainingContext =
+    normalizeVoiceCoachTrainingContext(snapshotObject?.training_context || null) ||
+    normalizeVoiceCoachTrainingContext(
+      args.sessionContext && typeof args.sessionContext === "object"
+        ? (args.sessionContext as { training_context?: unknown }).training_context || null
+        : null,
+    )
+  const professionalProfile = trainingContext?.professional_profile || null
   const clientContext = getVoiceCoachSessionClientContext({
     snapshot: args.snapshot,
     sessionContext: args.sessionContext,
@@ -98,6 +115,8 @@ export function getVoiceCoachSessionInsights(args: {
       ...(sceneCard?.likely_questions || []),
       ...(followupContext?.practice_points || []),
       ...(followupContext?.missed_points || []),
+      ...(professionalProfile?.must_ask || []),
+      ...(professionalProfile?.must_cover || []),
     ],
     6,
   )
@@ -121,6 +140,18 @@ export function getVoiceCoachSessionInsights(args: {
   if (sceneCard?.scene_goal) backgroundParts.push(`目标：${sceneCard.scene_goal}`)
   if (clientContext.live_notes) backgroundParts.push(`备注：${clientContext.live_notes}`)
   if (followupContext?.title) backgroundParts.push(`复练重点：${followupContext.title}`)
+  if (professionalProfile) {
+    backgroundParts.push(
+      `专业主题：${compactJoin(
+        [
+          professionalProfile.title,
+          professionalProfile.domain_label || professionalProfile.domain,
+          professionalProfile.plain_definition,
+        ],
+        "｜",
+      )}`,
+    )
+  }
 
   return {
     hasContext: Boolean(
@@ -129,7 +160,8 @@ export function getVoiceCoachSessionInsights(args: {
         clientContext.live_notes ||
         followupContext?.title ||
         summaryLines.length ||
-        focusPoints.length,
+        focusPoints.length ||
+        Boolean(professionalProfile),
     ),
     customerName: clientContext.customer_name,
     customerSummary: clientContext.customer_summary,
@@ -150,7 +182,28 @@ export function getVoiceCoachSessionInsights(args: {
     targetObjections: uniqStrings(sceneCard?.target_objections || [], 6),
     communicationMethodTags: uniqStrings(sceneCard?.communication_method_tags || [], 6),
     mustCoverPoints: uniqStrings(sceneCard?.must_cover_points || [], 6),
-    doNotSay: uniqStrings(sceneCard?.do_not_say || [], 6),
+    doNotSay: uniqStrings([...(sceneCard?.do_not_say || []), ...(professionalProfile?.do_not_say || [])], 8),
+    professionalProfile,
+    professionalSummary: professionalProfile
+      ? truncateText(
+          compactJoin(
+            [
+              professionalProfile.title,
+              professionalProfile.domain_label || professionalProfile.domain,
+              professionalProfile.safe_frame,
+              professionalProfile.plain_definition,
+              ...professionalProfile.core_mechanism.slice(0, 3),
+            ],
+            "；",
+          ),
+          260,
+        )
+      : "",
+    professionalMustAsk: uniqStrings(professionalProfile?.must_ask || [], 8),
+    professionalMustCover: uniqStrings(professionalProfile?.must_cover || [], 10),
+    professionalAllowedPhrases: uniqStrings(professionalProfile?.allowed_phrases || [], 8),
+    professionalDoNotSay: uniqStrings(professionalProfile?.do_not_say || [], 10),
+    professionalPauseAndRefer: uniqStrings(professionalProfile?.pause_and_refer || [], 8),
     focusPoints,
     followupTitle: followupContext?.title || "",
     followupInstruction: followupContext?.instruction || "",

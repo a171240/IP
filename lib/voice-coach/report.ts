@@ -6,6 +6,7 @@ export const DimensionIdSchema = z.enum([
   "expression",
   "pronunciation",
   "organization",
+  "professionalism",
 ])
 
 export type DimensionId = z.infer<typeof DimensionIdSchema>
@@ -99,6 +100,37 @@ export const ReportOrganizationTabSchema = z.object({
 
 export type ReportOrganizationTab = z.infer<typeof ReportOrganizationTabSchema>
 
+const ProfessionalismSubmetricSchema = z.object({
+  code: z.string(),
+  name: z.string(),
+  label: z.string(),
+  score: z.number(),
+  stars: z.number(),
+  evidence_quote: z.string(),
+  missed_point: z.string(),
+  advice: z.string(),
+  advice_paragraph: z.string(),
+  status: z.string(),
+})
+
+const ProfessionalismRedFlagSchema = z.object({
+  code: z.string(),
+  quote: z.string(),
+  safer_rewrite: z.string(),
+})
+
+export const ReportProfessionalismTabSchema = z.object({
+  summary: z.string(),
+  advice_paragraph: z.string(),
+  submetrics: z.array(ProfessionalismSubmetricSchema),
+  red_flags: z.array(ProfessionalismRedFlagSchema),
+  missed_must_cover: z.array(z.string()),
+  must_cover_hits: z.array(z.string()),
+  next_practice_focus: z.string(),
+})
+
+export type ReportProfessionalismTab = z.infer<typeof ReportProfessionalismTabSchema>
+
 export const VoiceCoachReportMetaSchema = z.object({
   version: z.literal("v2"),
   generated_at: z.string(),
@@ -154,7 +186,7 @@ export type VoiceCoachReportNextRoundFocus = z.infer<typeof VoiceCoachReportNext
 
 export const VoiceCoachReportSchema = z.object({
   total_score: z.number(),
-  dimension: z.array(DimensionScoreSchema).length(5),
+  dimension: z.array(DimensionScoreSchema).min(5).max(6),
   summary_blocks: z.array(z.string()).length(3),
   training_context: VoiceCoachReportTrainingContextSchema.optional(),
   next_round_focus: VoiceCoachReportNextRoundFocusSchema.optional(),
@@ -164,6 +196,7 @@ export const VoiceCoachReportSchema = z.object({
     expression: ReportExpressionTabSchema,
     pronunciation: ReportPronunciationTabSchema,
     organization: ReportOrganizationTabSchema,
+    professionalism: ReportProfessionalismTabSchema.optional(),
   }),
   meta: VoiceCoachReportMetaSchema.optional(),
 })

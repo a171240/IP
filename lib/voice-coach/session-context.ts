@@ -129,6 +129,24 @@ export type VoiceCoachFollowupContext = {
   suggested_response?: string
 }
 
+export type VoiceCoachProfessionalProfile = {
+  id: string
+  title: string
+  domain: string
+  domain_label: string
+  compliance_risk: string
+  safe_frame: string
+  plain_definition: string
+  core_mechanism: string[]
+  state_relations: string[]
+  must_ask: string[]
+  must_cover: string[]
+  allowed_phrases: string[]
+  do_not_say: string[]
+  pause_and_refer: string[]
+  scoring_rubric?: unknown
+}
+
 export type VoiceCoachTrainingContext = {
   task_id: string
   pack_id: string
@@ -153,6 +171,7 @@ export type VoiceCoachTrainingContext = {
   pass_goals: string[]
   forbidden_phrases: string[]
   scoring_focus: string[]
+  professional_profile: VoiceCoachProfessionalProfile | null
 }
 
 export type VoiceCoachSessionSnapshot = {
@@ -220,6 +239,72 @@ function pickText(data: Record<string, unknown>, keys: string[], max = 300): str
     if (value) return value
   }
   return ""
+}
+
+function normalizeBoundedJson(value: unknown, maxChars = 4000): unknown {
+  if (value == null) return undefined
+  if (typeof value !== "object") return boundedText(value, 600)
+  try {
+    return JSON.parse(JSON.stringify(value).slice(0, maxChars))
+  } catch {
+    return undefined
+  }
+}
+
+function normalizeMechanismList(value: unknown): string[] {
+  if (Array.isArray(value)) return toStringList(value).slice(0, 8)
+  const text = boundedText(value, 500)
+  return text ? [text] : []
+}
+
+export function normalizeVoiceCoachProfessionalProfile(input: unknown): VoiceCoachProfessionalProfile | null {
+  const data = normalizeLooseObject(input)
+  if (!Object.keys(data).length) return null
+
+  const title = pickText(data, ["title", "name"], 120)
+  const domain = pickText(data, ["domain"], 80)
+  const domainLabel = pickText(data, ["domain_label", "domainLabel"], 80)
+  const mustAsk = toStringList(data.must_ask || data.mustAsk).slice(0, 8)
+  const mustCover = toStringList(data.must_cover || data.mustCover).slice(0, 10)
+  const doNotSay = toStringList(data.do_not_say || data.doNotSay).slice(0, 10)
+  const pauseAndRefer = toStringList(data.pause_and_refer || data.pauseAndRefer).slice(0, 8)
+  const allowedPhrases = toStringList(data.allowed_phrases || data.allowedPhrases).slice(0, 8)
+  const stateRelations = toStringList(data.state_relations || data.stateRelations).slice(0, 8)
+  const coreMechanism = normalizeMechanismList(data.core_mechanism || data.coreMechanism)
+
+  const hasUsefulContent = Boolean(
+    title ||
+      domain ||
+      domainLabel ||
+      mustAsk.length ||
+      mustCover.length ||
+      doNotSay.length ||
+      pauseAndRefer.length ||
+      allowedPhrases.length ||
+      coreMechanism.length ||
+      pickText(data, ["plain_definition", "plainDefinition"], 300),
+  )
+  if (!hasUsefulContent) return null
+
+  const rubric = normalizeBoundedJson(data.scoring_rubric || data.scoringRubric)
+
+  return {
+    id: pickText(data, ["id"], 120),
+    title,
+    domain,
+    domain_label: domainLabel,
+    compliance_risk: pickText(data, ["compliance_risk", "complianceRisk"], 160),
+    safe_frame: pickText(data, ["safe_frame", "safeFrame"], 300),
+    plain_definition: pickText(data, ["plain_definition", "plainDefinition"], 300),
+    core_mechanism: coreMechanism,
+    state_relations: stateRelations,
+    must_ask: mustAsk,
+    must_cover: mustCover,
+    allowed_phrases: allowedPhrases,
+    do_not_say: doNotSay,
+    pause_and_refer: pauseAndRefer,
+    ...(rubric === undefined ? {} : { scoring_rubric: rubric }),
+  }
 }
 
 function inferTrainingServiceName(data: Record<string, unknown>): string {
@@ -358,6 +443,7 @@ export function normalizeVoiceCoachTrainingContext(input: unknown): VoiceCoachTr
   const forbiddenPhrases = toStringList(data.forbidden_phrases || data.forbiddenPhrases).slice(0, 6)
   const scoringFocus = toStringList(data.scoring_focus || data.scoringFocus).slice(0, 6)
   const speakingSteps = toStringList(data.speaking_steps || data.speakingSteps).slice(0, 5)
+  const professionalProfile = normalizeVoiceCoachProfessionalProfile(data.professional_profile || data.professionalProfile)
 
   const hasUsefulContent = Boolean(
     title ||
@@ -368,6 +454,7 @@ export function normalizeVoiceCoachTrainingContext(input: unknown): VoiceCoachTr
       forbiddenPhrases.length ||
       scoringFocus.length ||
       speakingSteps.length ||
+      professionalProfile ||
       pickText(data, ["task_id", "training_task_id"], 160),
   )
   if (!hasUsefulContent) return null
@@ -396,6 +483,7 @@ export function normalizeVoiceCoachTrainingContext(input: unknown): VoiceCoachTr
     pass_goals: passGoals,
     forbidden_phrases: forbiddenPhrases,
     scoring_focus: scoringFocus,
+    professional_profile: professionalProfile,
   }
 }
 
@@ -593,6 +681,11 @@ export function buildVoiceCoachFirstTurnTarget(snapshot: unknown, variationSeed?
   const communicationMethodTags = pickTopItems(sceneCard?.communication_method_tags, 3)
   const mustCoverPoints = pickTopItems(sceneCard?.must_cover_points, 3)
   const doNotSay = pickTopItems(sceneCard?.do_not_say, 2)
+  const professionalProfile = trainingContext?.professional_profile || null
+  const professionalMustAsk = pickTopItems(professionalProfile?.must_ask, 3)
+  const professionalMustCover = pickTopItems(professionalProfile?.must_cover, 4)
+  const professionalDoNotSay = pickTopItems(professionalProfile?.do_not_say, 3)
+  const professionalPauseAndRefer = pickTopItems(professionalProfile?.pause_and_refer, 3)
   const sceneGoal = String(sceneCard?.scene_goal || "").trim()
   const pastExperience = String(customerProfile?.past_experience || "").trim()
   const focusPool = [
@@ -605,6 +698,8 @@ export function buildVoiceCoachFirstTurnTarget(snapshot: unknown, variationSeed?
     trainingContext?.hidden_concern || "",
     trainingContext?.focus || "",
     ...pickTopItems(trainingContext?.pass_goals, 3),
+    ...professionalMustAsk,
+    ...professionalMustCover,
   ].filter(Boolean)
   const normalizedSeed =
     String(variationSeed || sceneCard?.id || customerProfile?.id || trainingContext?.task_id || sceneGoal || "voice-coach").trim() ||
@@ -674,6 +769,31 @@ export function buildVoiceCoachFirstTurnTarget(snapshot: unknown, variationSeed?
     }
     if (trainingContext.forbidden_phrases.length) {
       instructions.push(`Do not invite or reward forbidden lines such as: ${trainingContext.forbidden_phrases.slice(0, 4).join(" / ")}.`)
+    }
+    if (professionalProfile) {
+      instructions.push(
+        `Professional profile: ${[
+          professionalProfile.title,
+          professionalProfile.domain_label || professionalProfile.domain,
+          professionalProfile.plain_definition,
+          professionalProfile.safe_frame,
+          ...professionalProfile.core_mechanism.slice(0, 3),
+        ]
+          .filter(Boolean)
+          .join(" / ")}.`,
+      )
+      if (professionalMustAsk.length) {
+        instructions.push(`As the customer, naturally ask about these professional check points: ${professionalMustAsk.join(" / ")}.`)
+      }
+      if (professionalMustCover.length) {
+        instructions.push(`Pressure-test whether the beautician can explain: ${professionalMustCover.join(" / ")}.`)
+      }
+      if (professionalDoNotSay.length) {
+        instructions.push(`Do not reward these unsafe professional claims: ${professionalDoNotSay.join(" / ")}.`)
+      }
+      if (professionalPauseAndRefer.length) {
+        instructions.push(`If the beautician crosses these boundaries, follow up cautiously: ${professionalPauseAndRefer.join(" / ")}.`)
+      }
     }
   }
 
@@ -822,6 +942,34 @@ export function buildVoiceCoachSessionSnapshot(args: {
     trainingContext ? formatBulletLine("训练表达步骤", trainingContext.speaking_steps) : "",
     trainingContext ? formatBulletLine("训练评分重点", trainingContext.scoring_focus) : "",
     trainingContext ? formatBulletLine("训练禁忌表达", trainingContext.forbidden_phrases) : "",
+    trainingContext?.professional_profile
+      ? formatBulletLine("专业主题", [
+          trainingContext.professional_profile.title,
+          trainingContext.professional_profile.domain_label || trainingContext.professional_profile.domain,
+          trainingContext.professional_profile.plain_definition,
+        ])
+      : "",
+    trainingContext?.professional_profile
+      ? formatBulletLine("专业机制", trainingContext.professional_profile.core_mechanism)
+      : "",
+    trainingContext?.professional_profile
+      ? formatBulletLine("专业安全框架", [
+          trainingContext.professional_profile.safe_frame,
+          trainingContext.professional_profile.compliance_risk,
+        ])
+      : "",
+    trainingContext?.professional_profile
+      ? formatBulletLine("专业必问", trainingContext.professional_profile.must_ask)
+      : "",
+    trainingContext?.professional_profile
+      ? formatBulletLine("专业必讲", trainingContext.professional_profile.must_cover)
+      : "",
+    trainingContext?.professional_profile
+      ? formatBulletLine("专业边界", [
+          ...trainingContext.professional_profile.do_not_say,
+          ...trainingContext.professional_profile.pause_and_refer,
+        ])
+      : "",
     sceneCard && !activeServiceName
       ? formatBulletLine("当前训练项目", [
           sceneCard.service_name || sceneCard.name,

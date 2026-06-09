@@ -33,11 +33,13 @@ export type VoiceCoachTurnRow = {
   created_at?: string
 }
 
-type DimensionScores = Record<DimensionId, number>
+type BaseDimensionId = Exclude<DimensionId, "professionalism">
+type BaseDimensionScores = Record<BaseDimensionId, number>
+type ReportDimensionScores = BaseDimensionScores & Partial<Record<"professionalism", number>>
 
 type ScoredBeauticianTurn = {
   turn: VoiceCoachTurnRow
-  scores: Partial<DimensionScores>
+  scores: Partial<BaseDimensionScores>
 }
 
 type RepresentativeTurn = {
@@ -46,6 +48,12 @@ type RepresentativeTurn = {
 }
 
 type TrainingContextReview = NonNullable<VoiceCoachReport["training_context"]>
+type ProfessionalismTab = NonNullable<VoiceCoachReport["tabs"]["professionalism"]>
+type ProfessionalismReview = {
+  score: number
+  tab: ProfessionalismTab
+  redFlagCap: number | null
+}
 
 const DIMENSION_NAMES: Record<DimensionId, string> = {
   persuasion: "说服力",
@@ -53,9 +61,11 @@ const DIMENSION_NAMES: Record<DimensionId, string> = {
   expression: "语言表达",
   pronunciation: "发音准确度",
   organization: "语言组织",
+  professionalism: "专业度",
 }
 
 const NEXT_ROUND_DIMENSION_PRIORITY: DimensionId[] = [
+  "professionalism",
   "persuasion",
   "organization",
   "expression",
@@ -97,13 +107,17 @@ function pronunciationStabilityScore(spread: number | null): number {
   return 58
 }
 
-function weightedTotal(scores: DimensionScores): number {
-  const total =
+function weightedTotal(scores: ReportDimensionScores): number {
+  const baseTotal =
     scores.persuasion * 0.3 +
     scores.fluency * 0.2 +
     scores.expression * 0.2 +
     scores.pronunciation * 0.15 +
     scores.organization * 0.15
+  const total =
+    typeof scores.professionalism === "number"
+      ? baseTotal * 0.8 + scores.professionalism * 0.2
+      : baseTotal
   return clampScore(total)
 }
 
@@ -137,21 +151,21 @@ function readTurnScore(turn: VoiceCoachTurnRow, dimensionId: DimensionId): numbe
   return null
 }
 
-function aggregateDimensionScores(turns: VoiceCoachTurnRow[]): DimensionScores | null {
+function aggregateDimensionScores(turns: VoiceCoachTurnRow[]): BaseDimensionScores | null {
   const turnScores = turns
     .map((turn) => turn.analysis_json?.per_turn_scores)
     .filter((scores): scores is Record<string, number> => !!scores && typeof scores === "object")
 
   if (!turnScores.length) return null
 
-  const dimensions: DimensionId[] = [
+  const dimensions: BaseDimensionId[] = [
     "persuasion",
     "fluency",
     "expression",
     "pronunciation",
     "organization",
   ]
-  const result = {} as DimensionScores
+  const result = {} as BaseDimensionScores
 
   for (const dimensionId of dimensions) {
     let weightedSum = 0
@@ -207,6 +221,8 @@ function pickTurnByScore(
   dimensionId: DimensionId,
   mode: "lowest" | "highest",
 ): VoiceCoachTurnRow | null {
+  if (dimensionId === "professionalism") return null
+
   const candidates = scoredTurns
     .map((entry) => ({
       turn: entry.turn,
@@ -352,6 +368,94 @@ function strictPointMentioned(point: string, corpus: string): boolean {
   return corpus.includes(compactPoint)
 }
 
+function quoteOriginalText(text: string, maxLength = 90): string {
+  const normalized = String(text || "").replace(/\s+/g, " ").trim()
+  if (!normalized) return ""
+  return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 1)}…` : normalized
+}
+
+function splitClaimSegments(text: string): string[] {
+  return String(text || "")
+    .split(/[。！？!?；;\n]+/)
+    .flatMap((sentence) => sentence.split(/(?<=[，,、])|(?=但|但是|不过|然而|而且|同时)/u))
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+function hasExplicitBoundaryNegation(text: string): boolean {
+  const compact = simplifyMatchText(text)
+  if (!compact) return false
+  return /不做|不能|不可|不要|不建议|不能说|不承诺|不保证|无法保证|不是治疗|不属于治疗|不是诊断|不做诊断|只能|仅能|建议就医|咨询医生|暂停/u.test(compact)
+}
+
+function isBoundarySafeRedFlagSegment(text: string, code: string): boolean {
+  const compact = simplifyMatchText(text)
+  if (!compact || !hasExplicitBoundaryNegation(text)) return false
+
+  if (code.startsWith("do_not_say_")) {
+    return /(不能说|不要说|不可说|不可以说|不能这样说|不要这样说|不承诺|不保证|不能承诺|不会承诺|不做|不是)/u.test(compact)
+  }
+
+  if (code === "medical_treatment_claim") {
+    return /(不做|不能|不可|不是|不属于).*(诊断|治疗|治好|根治|处方|药物|医学疗效|消炎|炎症治疗)|只能.*(美容护理|护理建议)|建议.*(就医|咨询医生)/u.test(compact)
+  }
+
+  if (code === "absolute_result_claim") {
+    return /(不能|不可|不要|不承诺|不保证|无法保证).*(100%|百分之百|保证|一定|肯定|见效|有效|改善|变好|一次|清干净|清完|做好|解决)/u.test(compact)
+  }
+
+  if (code === "absolute_safety_claim") {
+    return /(不能|不可|不要|不承诺|不保证|无法保证|不能说).*(绝对安全|完全没风险|任何问题|任何风险|任何副作用)/u.test(compact)
+  }
+
+  return false
+}
+
+function findEvidenceQuote(point: string, turns: VoiceCoachTurnRow[]): string {
+  const compactPoint = simplifyMatchText(point)
+  if (!compactPoint) return ""
+
+  for (const turn of turns) {
+    const rawText = String(turn.text || "")
+    const corpus = simplifyMatchText(rawText)
+    if (!corpus) continue
+    if (strictPointMentioned(point, corpus) || pointMatchesCorpus(point, corpus)) {
+      return quoteOriginalText(rawText)
+    }
+  }
+
+  return ""
+}
+
+function findUnsafePointQuote(point: string, turns: VoiceCoachTurnRow[], code: string): string {
+  const compactPoint = simplifyMatchText(point)
+  if (!compactPoint) return ""
+
+  for (const turn of turns) {
+    for (const segment of splitClaimSegments(turn.text || "")) {
+      const corpus = simplifyMatchText(segment)
+      if (!corpus) continue
+      if (!strictPointMentioned(point, corpus) && !pointMatchesCorpus(point, corpus)) continue
+      if (isBoundarySafeRedFlagSegment(segment, code)) continue
+      return quoteOriginalText(segment)
+    }
+  }
+
+  return ""
+}
+
+function findRegexQuote(rule: RegExp, turns: VoiceCoachTurnRow[], code: string): string {
+  for (const turn of turns) {
+    for (const segment of splitClaimSegments(turn.text || "")) {
+      rule.lastIndex = 0
+      if (!rule.test(segment)) continue
+      if (isBoundarySafeRedFlagSegment(segment, code)) continue
+      return quoteOriginalText(segment)
+    }
+  }
+  return ""
+}
+
 function buildTrainingContextReview(args: {
   beauticianTurns: VoiceCoachTurnRow[]
   sessionSnapshot?: unknown
@@ -416,6 +520,178 @@ function buildTrainingContextReview(args: {
   }
 }
 
+function buildProfessionalismReview(args: {
+  beauticianTurns: VoiceCoachTurnRow[]
+  sessionSnapshot?: unknown
+  sessionContext?: unknown
+}): ProfessionalismReview | undefined {
+  const insights = getVoiceCoachSessionInsights({
+    snapshot: args.sessionSnapshot,
+    sessionContext: args.sessionContext,
+  })
+  const profile = insights.professionalProfile
+  if (!profile) return undefined
+
+  const mustAskPoints = uniqueLimited(insights.professionalMustAsk, 8)
+  const mustCoverPoints = uniqueLimited(
+    [
+      ...insights.professionalMustCover,
+      ...profile.core_mechanism.map((item) => `讲清原理：${item}`),
+      profile.safe_frame ? `说明安全边界：${profile.safe_frame}` : "",
+    ],
+    10,
+  )
+  const submetrics: ProfessionalismTab["submetrics"] = []
+
+  const pushPointMetric = (argsForPoint: {
+    code: string
+    label: string
+    point: string
+    hitAdvice: string
+    missAdvice: string
+  }) => {
+    const evidenceQuote = findEvidenceQuote(argsForPoint.point, args.beauticianTurns)
+    const hit = Boolean(evidenceQuote)
+    const advice = hit ? argsForPoint.hitAdvice : argsForPoint.missAdvice
+    const score = hit ? 88 : 52
+    submetrics.push({
+      code: argsForPoint.code,
+      name: argsForPoint.label,
+      label: argsForPoint.label,
+      score,
+      stars: scoreToStars(score),
+      evidence_quote: evidenceQuote,
+      missed_point: hit ? "" : argsForPoint.point,
+      advice,
+      advice_paragraph: advice,
+      status: hit ? "hit" : "missed",
+    })
+  }
+
+  mustAskPoints.forEach((point, index) => {
+    pushPointMetric({
+      code: `must_ask_${index + 1}`,
+      label: "专业必问",
+      point,
+      hitAdvice: "这一项已经有原话证据，下一轮继续先问清再判断。",
+      missAdvice: `下次先问清“${point}”，不要直接进入项目推荐。`,
+    })
+  })
+
+  mustCoverPoints.forEach((point, index) => {
+    pushPointMetric({
+      code: `must_cover_${index + 1}`,
+      label: "专业必讲",
+      point,
+      hitAdvice: "这一项已经有原话证据，下一轮可以继续把解释说短一点。",
+      missAdvice: `下次必须补上“${point}”，并用顾客听得懂的话讲清楚。`,
+    })
+  })
+
+  if (!submetrics.length && insights.professionalAllowedPhrases.length) {
+    insights.professionalAllowedPhrases.slice(0, 3).forEach((point, index) => {
+      pushPointMetric({
+        code: `allowed_phrase_${index + 1}`,
+        label: "推荐专业表达",
+        point,
+        hitAdvice: "这一项推荐表达已经有原话证据。",
+        missAdvice: `下次可以练习把“${point}”自然说出来。`,
+      })
+    })
+  }
+
+  const redFlags: ProfessionalismTab["red_flags"] = []
+  const redFlagCaps: number[] = []
+  const addRedFlag = (code: string, quote: string, saferRewrite: string, cap: number) => {
+    if (!quote) return
+    if (redFlags.some((item) => item.code === code && item.quote === quote)) return
+    redFlags.push({
+      code,
+      quote,
+      safer_rewrite: saferRewrite,
+    })
+    redFlagCaps.push(cap)
+  }
+
+  insights.professionalDoNotSay.forEach((point, index) => {
+    const quote = findUnsafePointQuote(point, args.beauticianTurns, `do_not_say_${index + 1}`)
+    addRedFlag(
+      `do_not_say_${index + 1}`,
+      quote,
+      "改成先说明适用边界、观察周期和个体差异，不做绝对承诺。",
+      60,
+    )
+  })
+
+  const genericRedFlagRules: Array<{ code: string; pattern: RegExp; saferRewrite: string; cap: number }> = [
+    {
+      code: "medical_treatment_claim",
+      pattern: /(治疗|治好|根治|诊断|处方|药物|医学疗效|消炎|炎症治疗)/u,
+      saferRewrite: "改成美容护理的舒缓、清洁或改善体验；涉及疾病、炎症、药物和诊断时建议顾客咨询医生。",
+      cap: 55,
+    },
+    {
+      code: "absolute_result_claim",
+      pattern: /(100%|百分之百|保证.*(见效|有效|改善|变好|清干净|清完|做好|解决)|一定(能|会)?(有效|改善|变好|见效|清干净|清完|做好|解决)|肯定(能|会)?(有效|改善|变好|见效|清干净|清完|做好|解决)|包你有效)/u,
+      saferRewrite: "改成基于评估给出预期范围，并说明效果存在个体差异。",
+      cap: 60,
+    },
+    {
+      code: "absolute_safety_claim",
+      pattern: /(绝对安全|完全没风险|不会有任何(问题|风险|副作用))/u,
+      saferRewrite: "改成先评估禁忌和敏感情况，再说明门店能做的安全流程。",
+      cap: 60,
+    },
+  ]
+
+  genericRedFlagRules.forEach((rule) => {
+    addRedFlag(rule.code, findRegexQuote(rule.pattern, args.beauticianTurns, rule.code), rule.saferRewrite, rule.cap)
+  })
+
+  const missedMustCover = submetrics
+    .filter((item) => item.code.startsWith("must_cover") && item.status !== "hit")
+    .map((item) => item.missed_point)
+    .filter(Boolean)
+  const mustCoverHits = submetrics
+    .filter((item) => item.code.startsWith("must_cover") && item.status === "hit" && item.evidence_quote)
+    .map((item) => item.evidence_quote)
+    .filter(Boolean)
+
+  const baseScore = submetrics.length
+    ? submetrics.reduce((sum, item) => sum + item.score, 0) / submetrics.length
+    : redFlags.length
+      ? 50
+      : 70
+  const redFlagCap = redFlagCaps.length ? Math.min(...redFlagCaps) : null
+  const score = clampScore(Math.round(Math.min(baseScore, redFlagCap ?? 100)))
+  const firstMissed = submetrics.find((item) => item.status !== "hit")?.missed_point || ""
+  const firstRedFlag = redFlags[0]
+
+  return {
+    score,
+    redFlagCap,
+    tab: {
+      summary: redFlags.length
+        ? `本轮专业表达踩到了安全边界，专业度最高按 ${redFlagCap} 分处理。`
+        : firstMissed
+          ? `本轮专业主题是${profile.title || "当前训练主题"}，还有关键专业点没有用原话讲出来。`
+          : `本轮专业主题是${profile.title || "当前训练主题"}，关键专业点已有原话证据。`,
+      advice_paragraph: firstRedFlag
+        ? `先把“${firstRedFlag.quote}”这类说法改掉：${firstRedFlag.safer_rewrite}`
+        : firstMissed
+          ? `下一轮先补“${firstMissed}”，必须让报告能从原话里找到证据。`
+          : "下一轮继续保持先询问、再解释机制、最后说明边界的顺序。",
+      submetrics,
+      red_flags: redFlags,
+      missed_must_cover: uniqueLimited(missedMustCover, 8),
+      must_cover_hits: uniqueLimited(mustCoverHits, 6),
+      next_practice_focus: firstRedFlag
+        ? "先把医疗/治疗/保证类风险表达改成边界清楚的美容护理表达。"
+        : firstMissed || "继续练习把专业解释压成顾客能复述的一句话。",
+    },
+  }
+}
+
 function buildNextStepBlock(trainingContext?: TrainingContextReview) {
   const missed = trainingContext?.missed_points?.[0]
   const hit = trainingContext?.hit_points?.[0]
@@ -443,8 +719,19 @@ function buildNextStepBlock(trainingContext?: TrainingContextReview) {
     : "下一轮：先用“我理解你担心……”起手，再补一条证据和一句推进，可优先讲保障或先讲案例。"
 }
 
-function pickNextRoundDimension(scores: DimensionScores): DimensionId {
-  return NEXT_ROUND_DIMENSION_PRIORITY.slice().sort((left, right) => scores[left] - scores[right])[0] || "persuasion"
+function scoreEntries(scores: ReportDimensionScores): Array<[DimensionId, number]> {
+  return (Object.entries(scores) as Array<[DimensionId, number | undefined]>).filter(
+    (entry): entry is [DimensionId, number] => typeof entry[1] === "number" && Number.isFinite(entry[1]),
+  )
+}
+
+function pickNextRoundDimension(scores: ReportDimensionScores): DimensionId {
+  const available = new Set(scoreEntries(scores).map(([id]) => id))
+  return (
+    NEXT_ROUND_DIMENSION_PRIORITY.filter((id) => available.has(id)).sort(
+      (left, right) => (scores[left] ?? 100) - (scores[right] ?? 100),
+    )[0] || "persuasion"
+  )
 }
 
 function dimensionPracticePoint(dimensionId: DimensionId): string {
@@ -459,6 +746,8 @@ function dimensionPracticePoint(dimensionId: DimensionId): string {
       return "重点句放慢，转折减少，让顾客更容易听到证据和下一步。"
     case "pronunciation":
       return "关键名词、项目名称和保障句再放慢说清楚。"
+    case "professionalism":
+      return "先问清禁忌和状态，再用顾客能听懂的话讲机制、边界和下一步。"
     default:
       return "围绕顾客最在意的问题，补一条证据和一个清晰下一步。"
   }
@@ -495,7 +784,7 @@ function buildNextRoundReferenceTurns(representative: RepresentativeTurn): Voice
 
 function buildNextRoundFocus(args: {
   sourceSessionId?: string
-  scores: DimensionScores
+  scores: ReportDimensionScores
   summaryBlocks: string[]
   representative: RepresentativeTurn
   trainingContext?: TrainingContextReview
@@ -523,7 +812,7 @@ function buildNextRoundFocus(args: {
     ...(args.sourceSessionId ? { source_session_id: args.sourceSessionId } : {}),
     focus_dimension_id: focusDimensionId,
     focus_dimension_name: focusDimensionName,
-    focus_score: args.scores[focusDimensionId],
+    focus_score: args.scores[focusDimensionId] ?? 0,
     title: `下一轮先练：${missedPoints[0] || focusDimensionName}`,
     instruction,
     practice_points: practicePoints,
@@ -583,14 +872,14 @@ function buildOrganizationAdvice(representative: RepresentativeTurn, organizatio
   return `${customerSnippet}，建议用“共情一句 + 证据一句 + 推进一步”的收束方式，减少信息堆叠和跳话题。`
 }
 
-function strongestDimension(scores: DimensionScores): DimensionId {
-  return (Object.entries(scores) as Array<[DimensionId, number]>)
+function strongestDimension(scores: ReportDimensionScores): DimensionId {
+  return scoreEntries(scores)
     .slice()
     .sort((left, right) => right[1] - left[1])[0][0]
 }
 
-function weakestDimension(scores: DimensionScores): DimensionId {
-  return (Object.entries(scores) as Array<[DimensionId, number]>)
+function weakestDimension(scores: ReportDimensionScores): DimensionId {
+  return scoreEntries(scores)
     .slice()
     .sort((left, right) => left[1] - right[1])[0][0]
 }
@@ -622,6 +911,8 @@ function describeStrengthEvidence(args: {
         : `语音清晰度较稳（识别置信约 ${(avgConfidence * 100).toFixed(0)} 分）`
     case "organization":
       return `${turnLabel}能按“回应 - 说明 - 推进”去组织内容`
+    case "professionalism":
+      return `${turnLabel}能把专业判断和安全边界讲得更清楚`
     default:
       return "整体表现比较稳定"
   }
@@ -647,13 +938,15 @@ function describeWeaknessEvidence(args: {
       return `${customerSnippet}关键句的清晰度还有提升空间`
     case "organization":
       return `${customerSnippet}“共情 - 证据 - 推进”的顺序还不够收束`
+    case "professionalism":
+      return `${customerSnippet}专业依据、禁忌边界或必问项还没有讲到可验证`
     default:
       return `${customerSnippet}还需要再聚焦一点`
   }
 }
 
 function buildSummaryBlocks(args: {
-  scores: DimensionScores
+  scores: ReportDimensionScores
   representative: RepresentativeTurn
   bestTurn: VoiceCoachTurnRow | null
   avgWpm: number | null
@@ -742,7 +1035,7 @@ export function generateVoiceCoachReport(opts: {
   const aggregatedScores = aggregateDimensionScores(beauticianTurns)
   const hasAnyAnalysis = beauticianTurns.some((turn) => turn.analysis_json && typeof turn.analysis_json === "object")
 
-  const scores: DimensionScores = {
+  const scores: ReportDimensionScores = {
     persuasion: aggregatedScores?.persuasion ?? (hasAnyAnalysis ? 74 : 66),
     fluency: aggregatedScores?.fluency ?? scoreFluencyFromWpm(avgWpm, DEFAULT_TARGET_WPM_RANGE),
     expression: aggregatedScores?.expression ?? scoreExpressionFromFillerRatio(avgFillerRatio),
@@ -759,6 +1052,14 @@ export function generateVoiceCoachReport(opts: {
     sessionSnapshot: opts.sessionSnapshot,
     sessionContext: opts.sessionContext,
   })
+  const professionalismReview = buildProfessionalismReview({
+    beauticianTurns,
+    sessionSnapshot: opts.sessionSnapshot,
+    sessionContext: opts.sessionContext,
+  })
+  if (professionalismReview) {
+    scores.professionalism = professionalismReview.score
+  }
 
   const normalizedTags = Array.from(
     new Set(
@@ -772,7 +1073,9 @@ export function generateVoiceCoachReport(opts: {
     ? normalizedTags.slice(0, Math.max(3, opts.scenario.seedTopics.length))
     : opts.scenario.seedTopics
 
-  const totalScore = weightedTotal(scores)
+  const totalScore = professionalismReview?.redFlagCap
+    ? Math.min(weightedTotal(scores), Math.max(65, professionalismReview.redFlagCap + 18))
+    : weightedTotal(scores)
   const summaryBlocks = buildSummaryBlocks({
     scores,
     representative,
@@ -826,6 +1129,16 @@ export function generateVoiceCoachReport(opts: {
         score: scores.organization,
         stars: scoreToStars(scores.organization),
       },
+      ...(professionalismReview
+        ? [
+            {
+              id: "professionalism" as const,
+              name: "专业度",
+              score: professionalismReview.score,
+              stars: scoreToStars(professionalismReview.score),
+            },
+          ]
+        : []),
     ],
     summary_blocks: summaryBlocks,
     training_context: trainingContext,
@@ -965,6 +1278,7 @@ export function generateVoiceCoachReport(opts: {
           audio_seconds: turn.audio_seconds ?? null,
         })),
       },
+      ...(professionalismReview ? { professionalism: professionalismReview.tab } : {}),
     },
     meta: {
       version: "v2",

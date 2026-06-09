@@ -67,6 +67,7 @@ const {
   buildVoiceCoachFirstTurnTarget,
   buildVoiceCoachFollowupOpening,
   buildVoiceCoachSessionSnapshot,
+  normalizeVoiceCoachTrainingContext,
   voiceCoachSessionCreateSchema,
 } = loadTsModule(path.join(root, "lib", "voice-coach", "session-context.ts"))
 const { getScenario } = loadTsModule(path.join(root, "lib", "voice-coach", "scenarios.ts"))
@@ -103,6 +104,31 @@ function createAnalysis(scores, extra = {}) {
     organization_score: scores.organization,
     per_turn_scores: scores,
     ...extra,
+  }
+}
+
+function createProfessionalProfile(overrides = {}) {
+  return {
+    id: "blackhead-sting-profile",
+    title: "黑头清洁刺痛解释",
+    domain: "skin_care",
+    domain_label: "皮肤管理",
+    compliance_risk: "不能承诺治疗、治愈或百分百见效",
+    safe_frame: "先询问敏感史和近期刷酸，再说明刺痛可能来自屏障状态、清洁刺激或短时反应。",
+    plain_definition: "黑头是皮脂和角质在毛孔口氧化后的表现，不是脏东西。",
+    core_mechanism: "清洁会减少表面油脂和角栓堆积，但敏感或屏障不稳时需要降低刺激。",
+    state_relations: ["出油多更容易反复", "屏障不稳时更容易刺痛"],
+    must_ask: ["近期有没有刷酸或过敏", "刺痛是持续疼还是短时刺"],
+    must_cover: ["黑头不是脏东西", "先做皮肤评估", "刺痛要看屏障状态"],
+    allowed_phrases: ["我们先看你的皮肤状态，再决定清洁力度"],
+    do_not_say: ["保证一次清干净", "可以治疗敏感"],
+    pause_and_refer: ["持续红肿疼痛先暂停并建议就医"],
+    scoring_rubric: {
+      must_ask: 30,
+      must_cover: 40,
+      compliance: 30,
+    },
+    ...overrides,
   }
 }
 
@@ -502,6 +528,407 @@ test("training-context-only session snapshot keeps the active training topic", (
   const target = buildVoiceCoachFirstTurnTarget(sessionSnapshot)
   assert.match(target, /active training service\/topic is "胶原抗衰护理"/)
   assert.match(target, /Use this customer line as the opening pressure point/)
+})
+
+test("training context normalization preserves nested professional profile", () => {
+  const professionalProfile = createProfessionalProfile()
+  const normalized = normalizeVoiceCoachTrainingContext({
+    task_id: "blackhead-sting-1",
+    title: "黑头清洁刺痛",
+    customer_line: "为什么清黑头会刺痛？",
+    professional_profile: professionalProfile,
+  })
+
+  assert.ok(normalized)
+  assert.equal(normalized.professional_profile.id, professionalProfile.id)
+  assert.equal(normalized.professional_profile.title, "黑头清洁刺痛解释")
+  assert.deepEqual(normalized.professional_profile.must_ask, professionalProfile.must_ask)
+  assert.deepEqual(normalized.professional_profile.must_cover, professionalProfile.must_cover)
+  assert.deepEqual(normalized.professional_profile.do_not_say, professionalProfile.do_not_say)
+  assert.deepEqual(normalized.professional_profile.core_mechanism, [professionalProfile.core_mechanism])
+  assert.deepEqual(normalized.professional_profile.scoring_rubric, professionalProfile.scoring_rubric)
+})
+
+test("report returns professionalism dimension and tab when professional profile exists", () => {
+  const scenario = getScenario("objection_safety")
+  const sessionSnapshot = buildVoiceCoachSessionSnapshot({
+    trainingContext: {
+      task_id: "blackhead-sting-1",
+      title: "黑头清洁刺痛",
+      customer_line: "为什么清黑头会刺痛？",
+      professional_profile: createProfessionalProfile(),
+    },
+  })
+  const turns = [
+    createTurn({ id: "c-1", role: "customer", text: "为什么清黑头会刺痛？", turn_index: 0 }),
+    createTurn({
+      id: "b-1",
+      role: "beautician",
+      text: "我先问一下你近期有没有刷酸或过敏，刺痛是持续疼还是短时刺。黑头不是脏东西，我们会先做皮肤评估，刺痛要看屏障状态。",
+      audio_seconds: 10,
+      analysis_json: createAnalysis({
+        persuasion: 86,
+        fluency: 82,
+        expression: 84,
+        pronunciation: 80,
+        organization: 83,
+      }),
+      turn_index: 1,
+    }),
+  ]
+
+  const report = generateVoiceCoachReport({ scenario, turns, sessionSnapshot })
+  const professionalismDimension = report.dimension.find((item) => item.id === "professionalism")
+
+  assert.ok(professionalismDimension)
+  assert.equal(professionalismDimension.name, "专业度")
+  assert.ok(report.tabs.professionalism)
+  assert.ok(report.tabs.professionalism.submetrics.length >= 3)
+  assert.ok(report.tabs.professionalism.must_cover_hits.length > 0)
+  assert.ok(
+    report.tabs.professionalism.submetrics.every(
+      (item) =>
+        item.name === item.label &&
+        item.advice_paragraph === item.advice &&
+        typeof item.stars === "number",
+    ),
+  )
+  assert.ok(
+    report.tabs.professionalism.submetrics
+      .filter((item) => item.status === "hit")
+      .every((item) => item.evidence_quote.length > 0),
+  )
+})
+
+test("report does not fake professionalism score without professional profile", () => {
+  const scenario = getScenario("objection_safety")
+  const turns = [
+    createTurn({ id: "c-1", role: "customer", text: "我担心刺痛。", turn_index: 0 }),
+    createTurn({
+      id: "b-1",
+      role: "beautician",
+      text: "我们会先做评估，再决定护理力度。",
+      audio_seconds: 7,
+      analysis_json: createAnalysis({
+        persuasion: 86,
+        fluency: 82,
+        expression: 84,
+        pronunciation: 80,
+        organization: 83,
+      }),
+      turn_index: 1,
+    }),
+  ]
+
+  const report = generateVoiceCoachReport({ scenario, turns })
+
+  assert.equal(report.dimension.some((item) => item.id === "professionalism"), false)
+  assert.equal(report.tabs.professionalism, undefined)
+})
+
+test("professionalism red flags cap score for treatment and guarantee claims", () => {
+  const scenario = getScenario("objection_safety")
+  const sessionSnapshot = buildVoiceCoachSessionSnapshot({
+    trainingContext: {
+      task_id: "blackhead-sting-1",
+      title: "黑头清洁刺痛",
+      customer_line: "为什么清黑头会刺痛？",
+      professional_profile: createProfessionalProfile(),
+    },
+  })
+  const turns = [
+    createTurn({ id: "c-1", role: "customer", text: "敏感刺痛可以解决吗？", turn_index: 0 }),
+    createTurn({
+      id: "b-1",
+      role: "beautician",
+      text: "这个可以治疗敏感，保证一次清干净，百分之百有效。",
+      audio_seconds: 8,
+      analysis_json: createAnalysis({
+        persuasion: 96,
+        fluency: 94,
+        expression: 95,
+        pronunciation: 92,
+        organization: 93,
+      }),
+      turn_index: 1,
+    }),
+  ]
+
+  const report = generateVoiceCoachReport({ scenario, turns, sessionSnapshot })
+  const professionalismDimension = report.dimension.find((item) => item.id === "professionalism")
+
+  assert.ok(professionalismDimension)
+  assert.ok(professionalismDimension.score <= 55)
+  assert.ok(report.tabs.professionalism.red_flags.some((item) => item.code === "medical_treatment_claim"))
+  assert.ok(report.tabs.professionalism.red_flags.some((item) => item.code === "absolute_result_claim"))
+  assert.match(report.tabs.professionalism.summary, /封顶|安全边界/)
+})
+
+test("professionalism boundary language does not trigger generic red flags", () => {
+  const scenario = getScenario("objection_safety")
+  const sessionSnapshot = buildVoiceCoachSessionSnapshot({
+    trainingContext: {
+      task_id: "blackhead-sting-1",
+      title: "黑头清洁刺痛",
+      customer_line: "为什么清黑头会刺痛？",
+      professional_profile: createProfessionalProfile({
+        do_not_say: [],
+      }),
+    },
+  })
+  const turns = [
+    createTurn({ id: "c-1", role: "customer", text: "这个能不能保证安全和效果？", turn_index: 0 }),
+    createTurn({
+      id: "b-1",
+      role: "beautician",
+      text:
+        "我们不做诊断治疗，只能做美容护理建议。不能保证一次见效，要看状态和周期观察。不能说绝对安全，需要先评估敏感和禁忌。",
+      audio_seconds: 11,
+      analysis_json: createAnalysis({
+        persuasion: 88,
+        fluency: 84,
+        expression: 85,
+        pronunciation: 82,
+        organization: 86,
+      }),
+      turn_index: 1,
+    }),
+  ]
+
+  const report = generateVoiceCoachReport({ scenario, turns, sessionSnapshot })
+  const redFlagCodes = report.tabs.professionalism.red_flags.map((item) => item.code)
+
+  assert.equal(redFlagCodes.includes("medical_treatment_claim"), false)
+  assert.equal(redFlagCodes.includes("absolute_result_claim"), false)
+  assert.equal(redFlagCodes.includes("absolute_safety_claim"), false)
+  assert.doesNotMatch(report.tabs.professionalism.summary, /封顶/)
+})
+
+test("professionalism do-not-say boundary language does not trigger but direct forbidden phrase does", () => {
+  const scenario = getScenario("objection_safety")
+  const baseSnapshot = (text) =>
+    buildVoiceCoachSessionSnapshot({
+      trainingContext: {
+        task_id: "anti-aging-boundary-1",
+        title: "抗衰边界表达",
+        customer_line: "这个能逆龄吗？",
+        professional_profile: createProfessionalProfile({
+          title: "抗衰边界表达",
+          must_ask: [],
+          must_cover: [],
+          core_mechanism: [],
+          do_not_say: ["逆龄"],
+        }),
+      },
+    })
+  const makeReport = (text) =>
+    generateVoiceCoachReport({
+      scenario,
+      sessionSnapshot: baseSnapshot(text),
+      turns: [
+        createTurn({ id: "c-1", role: "customer", text: "这个能逆龄吗？", turn_index: 0 }),
+        createTurn({
+          id: "b-1",
+          role: "beautician",
+          text,
+          audio_seconds: 6,
+          analysis_json: createAnalysis({
+            persuasion: 82,
+            fluency: 82,
+            expression: 82,
+            pronunciation: 82,
+            organization: 82,
+          }),
+          turn_index: 1,
+        }),
+      ],
+    })
+
+  const boundaryReport = makeReport("我们不承诺逆龄，只做状态管理。")
+  const directReport = makeReport("这个项目可以帮你逆龄，看起来年轻很多。")
+
+  assert.equal(boundaryReport.tabs.professionalism.red_flags.some((item) => item.code === "do_not_say_1"), false)
+  assert.ok(directReport.tabs.professionalism.red_flags.some((item) => item.code === "do_not_say_1"))
+})
+
+test("professionalism still flags direct treatment guarantee and absolute safety claims", () => {
+  const scenario = getScenario("objection_safety")
+  const sessionSnapshot = buildVoiceCoachSessionSnapshot({
+    trainingContext: {
+      task_id: "blackhead-sting-1",
+      title: "黑头清洁刺痛",
+      customer_line: "为什么清黑头会刺痛？",
+      professional_profile: createProfessionalProfile({
+        do_not_say: [],
+      }),
+    },
+  })
+  const turns = [
+    createTurn({ id: "c-1", role: "customer", text: "这个安全吗？", turn_index: 0 }),
+    createTurn({
+      id: "b-1",
+      role: "beautician",
+      text: "这个可以治疗敏感，保证一次清干净，而且绝对安全。",
+      audio_seconds: 8,
+      analysis_json: createAnalysis({
+        persuasion: 96,
+        fluency: 94,
+        expression: 95,
+        pronunciation: 92,
+        organization: 93,
+      }),
+      turn_index: 1,
+    }),
+  ]
+
+  const report = generateVoiceCoachReport({ scenario, turns, sessionSnapshot })
+  const redFlagCodes = report.tabs.professionalism.red_flags.map((item) => item.code)
+
+  assert.ok(redFlagCodes.includes("medical_treatment_claim"))
+  assert.ok(redFlagCodes.includes("absolute_result_claim"))
+  assert.ok(redFlagCodes.includes("absolute_safety_claim"))
+})
+
+test("professionalism flags guarantee claims after boundary clauses and mixed boundary wording", () => {
+  const scenario = getScenario("objection_safety")
+  const makeReport = (text) => {
+    const sessionSnapshot = buildVoiceCoachSessionSnapshot({
+      trainingContext: {
+        task_id: "mixed-red-flag-1",
+        title: "效果边界表达",
+        customer_line: "这个效果能保证吗？",
+        professional_profile: createProfessionalProfile({
+          must_ask: [],
+          must_cover: [],
+          core_mechanism: [],
+          do_not_say: [],
+        }),
+      },
+    })
+    return generateVoiceCoachReport({
+      scenario,
+      sessionSnapshot,
+      turns: [
+        createTurn({ id: "c-1", role: "customer", text: "这个效果能保证吗？", turn_index: 0 }),
+        createTurn({
+          id: "b-1",
+          role: "beautician",
+          text,
+          audio_seconds: 6,
+          analysis_json: createAnalysis({
+            persuasion: 90,
+            fluency: 90,
+            expression: 90,
+            pronunciation: 90,
+            organization: 90,
+          }),
+          turn_index: 1,
+        }),
+      ],
+    })
+  }
+
+  const afterBoundary = makeReport("不能保证一次见效，但一定能清干净。")
+  const mixedResult = makeReport("保证有效但也有个体差异。")
+  const mixedSafety = makeReport("绝对安全需要先评估。")
+
+  assert.ok(afterBoundary.tabs.professionalism.red_flags.some((item) => item.code === "absolute_result_claim"))
+  assert.ok(mixedResult.tabs.professionalism.red_flags.some((item) => item.code === "absolute_result_claim"))
+  assert.ok(mixedSafety.tabs.professionalism.red_flags.some((item) => item.code === "absolute_safety_claim"))
+})
+
+test("professionalism submetric cannot pass without original evidence quote", () => {
+  const scenario = getScenario("objection_safety")
+  const sessionSnapshot = buildVoiceCoachSessionSnapshot({
+    trainingContext: {
+      task_id: "barrier-profile-1",
+      title: "补水锁水",
+      customer_line: "补水和屏障有什么关系？",
+      professional_profile: createProfessionalProfile({
+        title: "补水锁水专业解释",
+        must_ask: [],
+        must_cover: ["解释角质层屏障如何减少水分流失", "说明先评估敏感状态"],
+        do_not_say: [],
+      }),
+    },
+  })
+  const turns = [
+    createTurn({ id: "c-1", role: "customer", text: "补水和屏障有什么关系？", turn_index: 0 }),
+    createTurn({
+      id: "b-1",
+      role: "beautician",
+      text: "你放心，我们这个项目很多顾客都喜欢，做起来也很舒服。",
+      audio_seconds: 8,
+      analysis_json: createAnalysis({
+        persuasion: 84,
+        fluency: 82,
+        expression: 81,
+        pronunciation: 80,
+        organization: 82,
+      }),
+      turn_index: 1,
+    }),
+  ]
+
+  const report = generateVoiceCoachReport({ scenario, turns, sessionSnapshot })
+  const missedMetric = report.tabs.professionalism.submetrics.find((item) =>
+    item.missed_point.includes("角质层屏障"),
+  )
+
+  assert.ok(missedMetric)
+  assert.equal(missedMetric.status, "missed")
+  assert.equal(missedMetric.evidence_quote, "")
+  assert.match(missedMetric.advice, /下次必须补上/)
+  assert.equal(missedMetric.advice_paragraph, missedMetric.advice)
+  assert.equal(missedMetric.name, missedMetric.label)
+  assert.equal(typeof missedMetric.stars, "number")
+  assert.ok(report.tabs.professionalism.missed_must_cover.some((item) => item.includes("角质层屏障")))
+})
+
+test("professionalism supports array core mechanisms as separate evidence checks", () => {
+  const scenario = getScenario("objection_safety")
+  const mechanisms = ["角质层屏障减少水分流失", "皮脂膜帮助锁住水分"]
+  const normalized = normalizeVoiceCoachTrainingContext({
+    task_id: "hydration-mechanism-1",
+    title: "补水锁水",
+    professional_profile: createProfessionalProfile({
+      title: "补水锁水专业解释",
+      must_ask: [],
+      must_cover: [],
+      core_mechanism: mechanisms,
+      do_not_say: [],
+    }),
+  })
+  const sessionSnapshot = buildVoiceCoachSessionSnapshot({
+    trainingContext: normalized,
+  })
+  const turns = [
+    createTurn({ id: "c-1", role: "customer", text: "补水为什么还要讲屏障？", turn_index: 0 }),
+    createTurn({
+      id: "b-1",
+      role: "beautician",
+      text: "角质层屏障减少水分流失，所以补水之后也要看屏障状态。",
+      audio_seconds: 8,
+      analysis_json: createAnalysis({
+        persuasion: 84,
+        fluency: 82,
+        expression: 81,
+        pronunciation: 80,
+        organization: 82,
+      }),
+      turn_index: 1,
+    }),
+  ]
+
+  const report = generateVoiceCoachReport({ scenario, turns, sessionSnapshot })
+  const mechanismMetrics = report.tabs.professionalism.submetrics.filter((item) =>
+    item.missed_point.includes("皮脂膜") || item.evidence_quote.includes("角质层屏障"),
+  )
+
+  assert.deepEqual(normalized.professional_profile.core_mechanism, mechanisms)
+  assert.ok(report.tabs.professionalism.submetrics.some((item) => item.evidence_quote.includes("角质层屏障")))
+  assert.ok(report.tabs.professionalism.submetrics.some((item) => item.missed_point.includes("皮脂膜")))
+  assert.ok(mechanismMetrics.length >= 2)
 })
 
 test("first-turn target changes focus when the variation seed changes", () => {
