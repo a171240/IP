@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
 
-import {
-  createSignedAudioUrlForBailian,
-  isBailianAsrConfigured,
-  submitBailianAsrTask,
-} from "@/lib/service-records/bailian-asr.server"
 import { uploadVoiceCoachAudio, VOICE_COACH_AUDIO_BUCKET } from "@/lib/voice-coach/storage.server"
 import {
   SERVICE_RECORD_MAX_SEGMENT_BYTES,
@@ -19,88 +14,12 @@ import {
   resolveServiceRecordAuth,
   toPublicSegment,
 } from "@/lib/service-records/server"
+import {
+  refreshServiceRecordSessionAggregate,
+  submitServiceRecordSegmentAsr,
+} from "@/lib/service-records/segments.server"
 
 export const runtime = "nodejs"
-
-async function refreshSessionAggregate(admin: any, sessionId: string) {
-  const { data, error } = await admin
-    .from("service_record_segments")
-    .select("client_audio_seconds")
-    .eq("session_id", sessionId)
-
-  if (error) throw new Error(error.message)
-  const rows = data || []
-  const audioSeconds = rows.reduce((sum: number, row: any) => sum + numberValue(row.client_audio_seconds, 0), 0)
-  await admin
-    .from("service_record_sessions")
-    .update({
-      segment_count: rows.length,
-      audio_seconds: Math.round(audioSeconds),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", sessionId)
-}
-
-async function submitSegmentAsr(admin: any, segment: any) {
-  if (!isBailianAsrConfigured()) {
-    const { data } = await admin
-      .from("service_record_segments")
-      .update({
-        asr_status: "failed",
-        asr_json: {
-          provider: "bailian",
-          error: "bailian_api_key_missing",
-          failed_at: new Date().toISOString(),
-        },
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", segment.id)
-      .select("*")
-      .maybeSingle()
-    return data || segment
-  }
-
-  try {
-    const audioUrl = await createSignedAudioUrlForBailian(segment.storage_path)
-    const asr = await submitBailianAsrTask({ audioUrl })
-    const nextAsrJson = {
-      provider: asr.provider,
-      model: asr.model,
-      task_id: asr.taskId,
-      task_status: asr.taskStatus,
-      request_id: asr.requestId,
-      submitted_at: asr.submittedAt,
-    }
-    const { data, error } = await admin
-      .from("service_record_segments")
-      .update({
-        asr_status: "running",
-        asr_json: nextAsrJson,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", segment.id)
-      .select("*")
-      .single()
-    if (error || !data) return segment
-    return data
-  } catch (error: any) {
-    const { data } = await admin
-      .from("service_record_segments")
-      .update({
-        asr_status: "failed",
-        asr_json: {
-          provider: "bailian",
-          error: cleanText(error?.message || "bailian_submit_failed", 300),
-          failed_at: new Date().toISOString(),
-        },
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", segment.id)
-      .select("*")
-      .maybeSingle()
-    return data || segment
-  }
-}
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params
@@ -176,6 +95,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     asr_status: "pending",
     metadata: {
       source: "mp_service_record",
+      upload_source: cleanText(form.get("source"), 80) || "phone",
+      audio_format_guess: cleanText(form.get("audio_format_guess"), 200),
       original_file_name: audioFile.name || "",
     },
   }
@@ -189,12 +110,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (error || !data) return jsonError(500, error?.message || "segment_upsert_failed", "segment_upsert_failed")
 
   try {
-    await refreshSessionAggregate(admin, session.id)
+    await refreshServiceRecordSessionAggregate(admin, session.id)
   } catch {
     // The segment is safely stored; aggregate refresh can be repaired later.
   }
 
-  const segmentWithAsr = await submitSegmentAsr(admin, data)
+  const segmentWithAsr = await submitServiceRecordSegmentAsr(admin, data)
 
   return NextResponse.json({
     ok: true,

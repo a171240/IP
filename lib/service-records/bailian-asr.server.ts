@@ -1,6 +1,10 @@
 import "server-only"
 
 import { signVoiceCoachAudio } from "@/lib/voice-coach/storage.server"
+import {
+  createAliyunOssSignedGetUrl,
+  isAliyunOssStorageBucket,
+} from "@/lib/service-records/aliyun-oss.server"
 import { cleanText, isRecord } from "@/lib/service-records/server"
 
 const BAILIAN_TRANSCRIPTION_URL = "https://dashscope.aliyuncs.com/api/v1/services/audio/asr/transcription"
@@ -126,8 +130,18 @@ function transcriptionParameters() {
   return params
 }
 
-export async function createSignedAudioUrlForBailian(storagePath: string) {
+export async function createSignedAudioUrlForBailian(opts: string | {
+  storagePath: string
+  storageBucket?: string | null
+  metadata?: Record<string, unknown>
+}) {
+  const storagePath = typeof opts === "string" ? opts : opts.storagePath
+  const storageBucket = typeof opts === "string" ? "" : cleanText(opts.storageBucket, 200)
+  const metadata = typeof opts === "string" ? {} : (isRecord(opts.metadata) ? opts.metadata : {})
   const expiresInSeconds = envNumber("BAILIAN_ASR_AUDIO_URL_EXPIRES_SECONDS", 6 * 60 * 60, 600, 48 * 60 * 60)
+  if (metadata.storage_provider === "aliyun_oss" || isAliyunOssStorageBucket(storageBucket)) {
+    return createAliyunOssSignedGetUrl(storagePath, expiresInSeconds)
+  }
   return signVoiceCoachAudio(storagePath, expiresInSeconds)
 }
 

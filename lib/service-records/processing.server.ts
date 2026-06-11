@@ -478,7 +478,11 @@ async function submitPendingSegmentAsr(admin: any, segment: any) {
   }
 
   try {
-    const audioUrl = await createSignedAudioUrlForBailian(storagePath)
+    const audioUrl = await createSignedAudioUrlForBailian({
+      storagePath,
+      storageBucket: segment.storage_bucket,
+      metadata: isRecord(segment.metadata) ? segment.metadata : {},
+    })
     const asr = await submitBailianAsrTask({ audioUrl })
     const { data } = await admin
       .from("service_record_segments")
