@@ -4,14 +4,20 @@ vi.mock("../db/turns.js", () => ({
   insertBeauticianTurn: vi.fn(async (row) => row),
   insertCustomerTurn: vi.fn(async (row) => row),
   updateTurnAnalysis: vi.fn(async () => undefined),
+  updateTurnAudio: vi.fn(async () => undefined),
 }))
 
 vi.mock("../db/events.js", () => ({
   emitEvent: vi.fn(async () => undefined),
 }))
 
+vi.mock("../db/storage.js", () => ({
+  uploadVoiceCoachAudio: vi.fn(async () => undefined),
+}))
+
 import { emitEvent } from "../db/events.js"
-import { insertBeauticianTurn, insertCustomerTurn, updateTurnAnalysis } from "../db/turns.js"
+import { uploadVoiceCoachAudio } from "../db/storage.js"
+import { insertBeauticianTurn, insertCustomerTurn, updateTurnAnalysis, updateTurnAudio } from "../db/turns.js"
 import { TurnOrchestrator } from "../pipeline/orchestrator.js"
 import { decodeTtsBinaryFrame, type ServerMsg } from "../protocol.js"
 import { createSessionState } from "../session/session-state.js"
@@ -151,6 +157,19 @@ describe("TurnOrchestrator", () => {
     expect(frames.map((frame) => frame.sentenceIndex)).toEqual([0, 1])
     expect(insertBeauticianTurn).toHaveBeenCalledTimes(1)
     expect(insertCustomerTurn).toHaveBeenCalledTimes(1)
+    expect(uploadVoiceCoachAudio).toHaveBeenCalledTimes(2)
+    expect(insertBeauticianTurn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        audio_path: expect.stringMatching(/^user-1\/session-1\/.+\.mp3$/),
+      }),
+    )
+    expect(updateTurnAudio).toHaveBeenCalledTimes(1)
+    expect(updateTurnAudio).toHaveBeenCalledWith(
+      expect.objectContaining({
+        audioPath: expect.stringMatching(/^user-1\/session-1\/.+\.mp3$/),
+        status: "audio_ready",
+      }),
+    )
     expect(updateTurnAnalysis).toHaveBeenCalledTimes(1)
     expect(emitEvent).toHaveBeenCalledTimes(1)
     expect(state.turnHistory).toHaveLength(2)

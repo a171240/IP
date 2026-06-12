@@ -107,3 +107,24 @@ export async function updateTurnAnalysis(params: {
     .eq("id", params.turnId)
   if (error) throw error
 }
+
+/**
+ * Attach replay audio to an existing turn row.
+ */
+export async function updateTurnAudio(params: {
+  turnId: string
+  audioPath: string
+  audioSeconds?: number | null
+  status?: VoiceCoachTurnStatus
+}): Promise<void> {
+  const supabase = createAdminSupabaseClient()
+  const { error } = await supabase
+    .from("voice_coach_turns")
+    .update({
+      audio_path: params.audioPath,
+      ...(params.audioSeconds !== undefined ? { audio_seconds: params.audioSeconds } : {}),
+      status: params.status || "audio_ready",
+    })
+    .eq("id", params.turnId)
+  if (error) throw error
+}

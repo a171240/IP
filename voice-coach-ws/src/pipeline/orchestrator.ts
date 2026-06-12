@@ -4,7 +4,8 @@ import { z } from "zod"
 
 import { config, getLlmProviderConfig } from "../config.js"
 import { emitEvent } from "../db/events.js"
-import { insertBeauticianTurn, insertCustomerTurn, updateTurnAnalysis } from "../db/turns.js"
+import { uploadVoiceCoachAudio } from "../db/storage.js"
+import { insertBeauticianTurn, insertCustomerTurn, updateTurnAnalysis, updateTurnAudio } from "../db/turns.js"
 import {
   type ServerMsg,
   VoiceCoachEmotionSchema as VoiceCoachEmotionZodSchema,
@@ -53,6 +54,7 @@ type TurnOrchestratorDeps = {
   createAsr: (options: StreamingAsrOptions) => StreamingAsr
   createTts: (options: StreamingTtsOptions) => StreamingTts
   streamChat: typeof streamChat
+  uploadAudio: typeof uploadVoiceCoachAudio
   logger: Pick<Console, "info" | "warn" | "error">
 }
 
@@ -62,6 +64,7 @@ const ReplyMetaSchema = z.object({
 })
 
 const MAX_HISTORY_TURNS = 6
+const MAX_PERSISTED_AUDIO_BYTES = 8 * 1024 * 1024
 const SPLITTER_OPTIONS = {
   minSentenceLength: 4,
   maxBufferLength: 60,
@@ -235,6 +238,9 @@ export class TurnOrchestrator {
   private activeTag = ""
   private activeAnalysis: ParsedAnalysis = createFallbackAnalysis("")
   private activeMetrics: TurnMetrics = createEmptyMetrics()
+  private activeBeauticianAudioChunks: Buffer[] = []
+  private activeBeauticianAudioBytes = 0
+  private activeCustomerAudioChunksBySentence = new Map<number, Buffer[]>()
   private latestPartialAt = 0
 
   constructor(
@@ -247,6 +253,7 @@ export class TurnOrchestrator {
       createAsr: deps.createAsr ?? ((options) => new StreamingAsr(options)),
       createTts: deps.createTts ?? ((options) => new StreamingTts(options)),
       streamChat: deps.streamChat ?? streamChat,
+      uploadAudio: deps.uploadAudio ?? uploadVoiceCoachAudio,
       logger: deps.logger ?? console,
     }
   }
@@ -272,6 +279,7 @@ export class TurnOrchestrator {
     this.activeTag = ""
     this.activeAnalysis = createFallbackAnalysis("")
     this.activeMetrics = createEmptyMetrics()
+    this.resetAudioPersistenceBuffers()
     this.latestPartialAt = 0
 
     const asr = this.deps.createAsr({
@@ -314,6 +322,7 @@ export class TurnOrchestrator {
   handleAudioChunk(chunk: Buffer): void {
     if (!this.activeAsr || this.session.currentPhase !== "recording") return
     try {
+      this.captureBeauticianAudioChunk(chunk)
       this.activeAsr.sendAudio(chunk)
       this.session.lastActivityAt = Date.now()
     } catch (error) {
@@ -388,6 +397,7 @@ export class TurnOrchestrator {
     this.clearAsr()
     this.clearTrackedAbortControllers()
     this.clearTtsInstances()
+    this.resetAudioPersistenceBuffers()
     this.session.currentPhase = "idle"
     this.session.lastActivityAt = Date.now()
     this.deps.logger.info("[voice-coach-ws] barge_in", {
@@ -403,6 +413,7 @@ export class TurnOrchestrator {
     this.clearAsr()
     this.abortTrackedControllers("audio.cancel")
     this.clearTtsInstances()
+    this.resetAudioPersistenceBuffers()
     this.session.currentPhase = "idle"
     this.session.lastActivityAt = Date.now()
   }
@@ -641,6 +652,16 @@ export class TurnOrchestrator {
     await Promise.allSettled(sentenceTasks)
     if (!this.isRunActive(runToken)) return
 
+    if (persistedTurns?.customerTurnId) {
+      await this.persistCustomerAudio(persistedTurns.customerTurnId).catch((error) => {
+        this.deps.logger.warn("[voice-coach-ws] customer_audio_persist_failed", {
+          sessionId: this.session.sessionId,
+          customerTurnId: persistedTurns.customerTurnId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      })
+    }
+
     this.activeMetrics.ttsDoneAt = Date.now()
     this.safeSendJson({ type: "tts.done" })
     this.logLatencyMetrics()
@@ -649,6 +670,7 @@ export class TurnOrchestrator {
       this.session.currentTurnIndex = this.activeTurnIndex + 2
       this.session.currentPhase = "idle"
       this.session.lastActivityAt = Date.now()
+      this.resetAudioPersistenceBuffers()
     }
   }
 
@@ -782,6 +804,7 @@ export class TurnOrchestrator {
   }
 
   private async runSentenceTts(runToken: number, sentenceIndex: number, sentence: string): Promise<void> {
+    const sentenceAudioChunks: Buffer[] = []
     const tts = this.deps.createTts({
       appId: config.volc.appId,
       accessToken: config.volc.accessToken,
@@ -792,6 +815,7 @@ export class TurnOrchestrator {
       emotion: mapEmotionToTtsEmotion(this.activeCustomerEmotion),
       onAudioChunk: (chunk) => {
         if (!this.isRunActive(runToken)) return
+        sentenceAudioChunks.push(Buffer.from(chunk))
         if (!started) {
           started = true
           this.activeMetrics.ttsFirstChunkAt ??= Date.now()
@@ -818,6 +842,9 @@ export class TurnOrchestrator {
     try {
       await tts.synthesize(sentence)
       if (!this.isRunActive(runToken)) return
+      if (sentenceAudioChunks.length) {
+        this.activeCustomerAudioChunksBySentence.set(sentenceIndex, sentenceAudioChunks)
+      }
       if (!started) {
         this.safeSendJson({ type: "tts.sentence_start", index: sentenceIndex })
       }
@@ -847,6 +874,14 @@ export class TurnOrchestrator {
   }): Promise<PersistedTurnIds | null> {
     const beauticianTurnId = randomUUID()
     const customerTurnId = randomUUID()
+    const beauticianAudioPath = await this.persistBeauticianAudio(beauticianTurnId).catch((error) => {
+      this.deps.logger.warn("[voice-coach-ws] beautician_audio_persist_failed", {
+        sessionId: this.session.sessionId,
+        beauticianTurnId,
+        error: error instanceof Error ? error.message : String(error),
+      })
+      return null
+    })
 
     try {
       await insertBeauticianTurn({
@@ -854,11 +889,11 @@ export class TurnOrchestrator {
         session_id: this.session.sessionId,
         turn_index: this.activeTurnIndex,
         text: params.beauticianText,
-        audio_path: null,
+        audio_path: beauticianAudioPath,
         audio_seconds: params.clientAudioSeconds || null,
         asr_confidence: params.beauticianConfidence,
         analysis_json: null,
-        status: "text_ready",
+        status: beauticianAudioPath ? "audio_ready" : "text_ready",
       })
 
       await insertCustomerTurn({
@@ -898,6 +933,70 @@ export class TurnOrchestrator {
       this.safeSendError("turn_persist_failed", error instanceof Error ? error.message : "会话落库失败", true)
       return null
     }
+  }
+
+  private resetAudioPersistenceBuffers(): void {
+    this.activeBeauticianAudioChunks = []
+    this.activeBeauticianAudioBytes = 0
+    this.activeCustomerAudioChunksBySentence.clear()
+  }
+
+  private captureBeauticianAudioChunk(chunk: Buffer): void {
+    if (!chunk.length) return
+    if (this.activeBeauticianAudioBytes + chunk.length > MAX_PERSISTED_AUDIO_BYTES) {
+      if (this.activeBeauticianAudioBytes <= MAX_PERSISTED_AUDIO_BYTES) {
+        this.deps.logger.warn("[voice-coach-ws] beautician_audio_persist_limit", {
+          sessionId: this.session.sessionId,
+          turnIndex: this.activeTurnIndex,
+          bytes: this.activeBeauticianAudioBytes + chunk.length,
+          maxBytes: MAX_PERSISTED_AUDIO_BYTES,
+        })
+      }
+      this.activeBeauticianAudioBytes = MAX_PERSISTED_AUDIO_BYTES + 1
+      return
+    }
+    this.activeBeauticianAudioChunks.push(Buffer.from(chunk))
+    this.activeBeauticianAudioBytes += chunk.length
+  }
+
+  private async persistBeauticianAudio(turnId: string): Promise<string | null> {
+    if (!this.activeBeauticianAudioChunks.length) return null
+    if (this.activeBeauticianAudioBytes > MAX_PERSISTED_AUDIO_BYTES) return null
+    const audio = Buffer.concat(this.activeBeauticianAudioChunks)
+    if (!audio.length) return null
+
+    const audioPath = `${this.session.userId}/${this.session.sessionId}/${turnId}.mp3`
+    await this.deps.uploadAudio({
+      path: audioPath,
+      data: audio,
+      contentType: "audio/mpeg",
+    })
+    return audioPath
+  }
+
+  private async persistCustomerAudio(turnId: string): Promise<string | null> {
+    const orderedChunks: Buffer[] = []
+    const sentenceIndexes = Array.from(this.activeCustomerAudioChunksBySentence.keys()).sort((a, b) => a - b)
+    for (const index of sentenceIndexes) {
+      orderedChunks.push(...(this.activeCustomerAudioChunksBySentence.get(index) || []))
+    }
+    if (!orderedChunks.length) return null
+
+    const audio = Buffer.concat(orderedChunks)
+    if (!audio.length || audio.length > MAX_PERSISTED_AUDIO_BYTES) return null
+
+    const audioPath = `${this.session.userId}/${this.session.sessionId}/${turnId}.mp3`
+    await this.deps.uploadAudio({
+      path: audioPath,
+      data: audio,
+      contentType: "audio/mpeg",
+    })
+    await updateTurnAudio({
+      turnId,
+      audioPath,
+      status: "audio_ready",
+    })
+    return audioPath
   }
 
   private trackAbortController(controller: AbortController): void {
