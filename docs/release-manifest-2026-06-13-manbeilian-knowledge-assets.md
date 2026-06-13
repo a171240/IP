@@ -113,19 +113,35 @@ tests/image-provider-fallback.runtime.test.js
 
 - Vercel project: `ip`
 - Preview deployment URL: not created in this round.
-- Production deployment ID: pending.
-- Production deployment URL: pending.
+- Production deployment ID: `dpl_ENdr7B72sgRY1sZbVLRs5yZzzqDH`
+- Production deployment URL: `https://ip-bzl6slzce-a171240s-projects.vercel.app`
 - Production alias/domain: `https://www.ipnrgc.com`
-- Deploy command: pending.
-- Deploy source: pending clean worktree from scoped commit.
+- Vercel inspect URL: `https://vercel.com/a171240s-projects/ip/ENdr7B72sgRY1sZbVLRs5yZzzqDH`
+- Deploy command: `npx --yes vercel@latest --prod --yes`
+- Deploy source: clean detached worktree `/tmp/meiye-ip-manbeilian-assets-20260613-BVj8if` at backend commit `039934e`.
 
 Backend smoke results:
 
 ```text
-Pending:
 GET https://www.ipnrgc.com/voice-coach-assets/manbeilian-knowledge/v1/manifest.json
+HTTP 200, bytes=20282, content-type=application/json; charset=utf-8
+Parsed JSON: title="曼贝莲项目知识库", groupCount=26, imageCount=217
+
 GET https://www.ipnrgc.com/voice-coach-assets/manbeilian-knowledge/v1/groups/miaoyao-project-cards.json
+HTTP 200, bytes=8172, content-type=application/json; charset=utf-8
+Parsed JSON: title="苗药筋骨养护", imageCount=10
+
 GET https://www.ipnrgc.com/voice-coach-assets/manbeilian-knowledge/v1/images/miaoyao-project-cards/card-01-project-overview.jpg
+HTTP 200, bytes=392186, content-type=image/jpeg
+Image dimensions: 900x1200
+
+Old asset preservation spot checks:
+
+GET https://www.ipnrgc.com/voice-coach-assets/voice-coach/common-beauty/v2/d01/scene.jpg
+HTTP 200, bytes=101432
+
+GET https://www.ipnrgc.com/voice-coach-assets/voice-coach/baibaitu-speaking/v1/s01/concept.jpg
+HTTP 200, bytes=58672
 ```
 
 Required backend checks:
@@ -133,8 +149,9 @@ Required backend checks:
 ```text
 node JSON parse check: PASS, 245 total files, 28 JSON files, 217 JPG files
 sips dimension spot check: PASS, representative images are 900x1200
-corepack pnpm release:preflight: pending
-corepack pnpm build: pending
+corepack pnpm release:preflight: PASS, 4/4
+corepack pnpm build: PASS in original worktree and clean deployment worktree; existing lint/runtime warnings only
+Vercel production build: PASS; existing lint/runtime warnings only
 ```
 
 ## Mini-program Upload
@@ -155,15 +172,16 @@ corepack pnpm build: pending
 
 ## Rollback / Recovery
 
-- Previous backend production deployment ID: pending lookup before deploy.
+- Previous backend production deployment ID: `dpl_76XzrzLFj1k4g8Ep47SDG9c15q8j`
+- Previous backend production deployment URL: `https://ip-lxhsc7xwi-a171240s-projects.vercel.app`
 - Previous mini-program version: unchanged.
 - Database rollback note: no schema/data change.
 - Who should be notified: release thread/user.
 
 ## Final Decision
 
-- Release approved: pending.
-- Released by: pending.
-- Release time: pending.
+- Release approved: yes, backend static asset production deploy completed.
+- Released by: Codex release thread.
+- Release time: `2026-06-13 19:20:38 CST`
 - Follow-up items:
   - After backend GET smoke passes, return to mini-program Manbeilian knowledge loading checks.
