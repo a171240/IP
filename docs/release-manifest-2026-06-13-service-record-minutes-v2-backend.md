@@ -84,15 +84,31 @@ tests/image-provider-fallback.runtime.test.js
 ## Backend Deployment
 
 - Vercel project: `ip`
-- Preview deployment URL: pending.
-- Production deployment ID: pending.
-- Production alias/domain: pending.
-- Deploy command: pending.
+- Preview deployment URL: not created in this round.
+- Production deployment ID: `dpl_76XzrzLFj1k4g8Ep47SDG9c15q8j`
+- Production deployment URL: `https://ip-lxhsc7xwi-a171240s-projects.vercel.app`
+- Production alias/domain: `https://www.ipnrgc.com`
+- Vercel inspect URL: `https://vercel.com/a171240s-projects/ip/76XzrzLFj1k4g8Ep47SDG9c15q8j`
+- Deploy command: `npx --yes vercel@latest --prod --yes`
+- Deploy source: clean detached worktree at backend commit `d6de254`.
 
 Backend smoke results:
 
 ```text
-pending
+curl -i https://www.ipnrgc.com/api/mp/profile
+HTTP/2 401
+x-matched-path: /api/mp/profile
+{"ok":false,"error":"请先登录","code":"auth_required"}
+
+curl -i https://www.ipnrgc.com/api/mp/service-records/sessions
+HTTP/2 401
+x-matched-path: /api/mp/service-records/sessions
+{"ok":false,"error":"请先登录","code":"auth_required"}
+
+curl -i -X POST https://www.ipnrgc.com/api/mp/service-records/sessions/test-session/process
+HTTP/2 401
+x-matched-path: /api/mp/service-records/sessions/[sessionId]/process
+{"ok":false,"error":"请先登录","code":"auth_required"}
 ```
 
 Required backend checks:
@@ -120,22 +136,20 @@ corepack pnpm release:preflight
 - Route conflicts: no new route.
 - Product/point display conflicts: none in backend.
 - Store account permission conflicts: no new permission logic; existing service-record/customer-profile APIs are reused by mini-program.
-- Service-record backend availability: local checks pass; production smoke pending.
+- Service-record backend availability: production deployed and smoke passed at auth boundary.
 - Test data visibility: no schema/data mutation.
 
 ## Rollback / Recovery
 
-- Previous backend deployment ID: pending lookup before deploy.
+- Previous backend production deployment URL from `vercel ls ip`: `https://ip-adguiwk2m-a171240s-projects.vercel.app` (2d old, rollback candidate).
 - Previous mini-program version: unchanged by backend deploy.
 - Database rollback note: no schema change.
 - Who should be notified: release thread/user.
 
 ## Final Decision
 
-- Release approved: backend deploy may proceed after scoped commit and route smoke.
-- Released by: not released yet.
-- Release time: pending.
+- Release approved: backend production deploy completed; mini-program upload remains governed by the mini-program manifest.
+- Released by: Codex release thread.
+- Release time: `2026-06-13 14:01:20 CST`
 - Follow-up items:
-  - Vercel production deploy.
-  - Smoke `/api/mp/profile` and `/api/mp/service-records/sessions`.
   - Mini-program upload remains blocked until commercial UI gate is complete.
