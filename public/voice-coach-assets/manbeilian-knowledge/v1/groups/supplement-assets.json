@@ -1,0 +1,24 @@
+{
+  "id": "supplement-assets",
+  "title": "封面与补充资产",
+  "subtitle": "资产目录中未归入正式卡组的图片，保留在这里方便检查和调用。",
+  "category": "26 / 1 张",
+  "originalHtml": "",
+  "imageCount": 1,
+  "cards": [
+    {
+      "id": "manbeilian-miaoyao-jingu-hero",
+      "order": 1,
+      "title": "manbeilian-miaoyao-jingu-hero",
+      "label": "补充资产",
+      "description": "assets/manbeilian-miaoyao-jingu-hero.png",
+      "alt": "manbeilian-miaoyao-jingu-hero.png",
+      "sourceImagePath": "manbeilian-miaoyao-jingu-hero.png",
+      "image": "images/manbeilian-miaoyao-jingu-hero.jpg",
+      "remoteImage": "https://www.ipnrgc.com/voice-coach-assets/manbeilian-knowledge/v1/images/manbeilian-miaoyao-jingu-hero.jpg",
+      "remoteImagePath": "images/manbeilian-miaoyao-jingu-hero.jpg",
+      "groupId": "supplement-assets",
+      "groupTitle": "封面与补充资产"
+    }
+  ]
+}
