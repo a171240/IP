@@ -47,7 +47,7 @@ function getServiceRecordDeepSeekBaseUrl() {
 }
 
 function getServiceRecordDeepSeekModel() {
-  return envText("SERVICE_RECORD_DEEPSEEK_MODEL", "DEEPSEEK_MODEL") || "deepseek-v4-flash"
+  return envText("SERVICE_RECORD_DEEPSEEK_MODEL", "DEEPSEEK_MODEL") || "deepseek-v4-pro"
 }
 
 function deepSeekChatCompletionsUrl() {
@@ -56,7 +56,7 @@ function deepSeekChatCompletionsUrl() {
 }
 
 function compactTranscriptForPrompt(text: string) {
-  const limit = envNumber("SERVICE_RECORD_DEEPSEEK_TRANSCRIPT_CHARS", 18000, 2000, 80000)
+  const limit = envNumber("SERVICE_RECORD_DEEPSEEK_TRANSCRIPT_CHARS", 60000, 2000, 80000)
   if (text.length <= limit) return text
   const head = Math.floor(limit * 0.6)
   const tail = limit - head
@@ -84,6 +84,36 @@ function listFrom(value: unknown, fallback: string[] = [], max = 8) {
 
 function recordFrom(value: unknown) {
   return isRecord(value) ? value : {}
+}
+
+function oneOf(value: unknown, allowed: string[], fallback: string) {
+  const text = cleanText(value, 40)
+  return allowed.includes(text) ? text : fallback
+}
+
+function listRecordFrom<T>(value: unknown, mapper: (item: any, index: number) => T | null, fallback: T[] = [], max = 8) {
+  const items = Array.isArray(value)
+    ? value.map((item, index) => mapper(recordFrom(item), index)).filter(Boolean) as T[]
+    : []
+  return items.length ? items.slice(0, max) : fallback
+}
+
+function qualityWarningsFrom(segments: any[], counts: ReturnType<typeof statusCounts>, transcript: string) {
+  const warnings: string[] = []
+  if (!transcript) warnings.push("当前没有可用转写文本，结论仅能作为现场备注辅助。")
+  if (counts.pending || counts.running) warnings.push("仍有录音片段在识别中，智能纪要会继续补齐。")
+  if (counts.failed) warnings.push("存在识别失败片段，部分顾客表达可能缺失。")
+  if (transcript && transcript.length < 80 && counts.total > 0) warnings.push("转写文本较短，建议结合现场情况复核。")
+  if (segments.length === 1 && numberValue(segments[0]?.client_audio_seconds, 0) > 1800) {
+    warnings.push("长录音只有一个片段，章节时间为系统估算。")
+  }
+  return Array.from(new Set(warnings)).slice(0, 5)
+}
+
+function asrQualityOf(segments: any[], counts: ReturnType<typeof statusCounts>, transcript: string) {
+  if (!transcript || counts.done === 0) return "poor"
+  if (counts.failed || counts.pending || counts.running || transcript.length < 160) return "partial"
+  return "good"
 }
 
 function buildDeepSeekMessages(session: any, segments: any[], markers: any[], counts: ReturnType<typeof statusCounts>): DeepSeekMessage[] {
@@ -249,6 +279,162 @@ async function generateDeepSeekServiceRecordResult(
   }
 }
 
+function buildServiceMinutesV2Messages(
+  session: any,
+  segments: any[],
+  markers: any[],
+  counts: ReturnType<typeof statusCounts>,
+): DeepSeekMessage[] {
+  const customerName = snapshotName(session.customer_snapshot_json, "本位顾客")
+  const projectName = snapshotName(session.scene_snapshot_json, "未命名项目")
+  const transcript = transcriptTextOf(segments)
+  const chunks = transcriptChunksOf(session, segments, 12)
+  const markerText = markers.length
+    ? markers.map((marker) => `- ${formatDuration(marker.offset_seconds)} ${markerLabel(marker)}`).join("\n")
+    : "无"
+  const chunkText = chunks.length
+    ? chunks
+      .map((chunk, index) => [
+        `### chunk_${index + 1} ${chunk.time_label}`,
+        `标题线索：${chunk.title}`,
+        compactTranscriptForPrompt(chunk.text),
+      ].join("\n"))
+      .join("\n\n")
+    : "当前没有可用转写。"
+
+  const system = [
+    "你是美业门店的服务复盘助手，负责把到店服务录音整理为“美业门店智能纪要”。",
+    "只输出严格 JSON object，不要 Markdown，不要解释，不要包裹代码块。",
+    "你不是医疗诊断助手。不要编造顾客事实、价格、疗效、成交结果或护理效果；不要使用保证性表达。",
+    "如果转写像测试语音、随机内容、噪音、断裂文本或信息不足，recording.asr_quality 必须为 partial 或 poor，并在 recording.quality_warnings 里说明，结论要保守。",
+    "证据摘录必须来自转写原文，单条不超过 60 个中文字符；没有证据就留空或省略。",
+    "输出字段必须符合：",
+    "{",
+    '  "version": "service_minutes_v2",',
+    '  "title": "本轮服务智能纪要",',
+    '  "recording": { "theme": "", "started_at": "", "ended_at": "", "duration_seconds": 0, "segment_count": 0, "asr_quality": "good|partial|poor", "quality_warnings": [] },',
+    '  "executive_summary": { "one_line": "", "service_outcome": "", "customer_state": "", "staff_state": "" },',
+    '  "todos": [{ "owner": "manager|staff|ops", "priority": "high|normal|low", "title": "", "detail": "", "due_hint": "" }],',
+    '  "customer_concerns": [{ "concern": "", "evidence": "", "follow_up_angle": "" }],',
+    '  "sales_opportunities": [{ "type": "project_conversion|renewal|upgrade|follow_up|manager_intervention", "signal": "", "evidence": "", "suggested_offer": "", "priority": "high|normal|low", "owner": "staff|manager", "due_hint": "", "confidence": "high|medium|low", "compliance_note": "" }],',
+    '  "staff_review": { "highlights": [], "misses": [], "missed_sales_signals": [], "coaching_tips": [], "next_script": "" },',
+    '  "manager_brief": { "priority": "high|normal|low", "one_line": "", "conversion_opportunity": "", "main_risk": "", "recommended_owner": "manager|staff", "next_action": "", "training_topics": [] },',
+    '  "customer_profile_update_suggestions": { "new_concerns": [], "new_preferences": [], "project_interests": [], "commitments": [], "follow_up_suggestions": [], "risk_notes": [] },',
+    '  "smart_chapters": [{ "start_seconds": 0, "time_label": "00:00", "title": "", "summary": "", "signals": [] }],',
+    '  "key_decisions": [{ "decision": "", "problem": "", "basis": "", "next_action": "" }],',
+    '  "manager_review": { "summary": "", "deal_signals": [], "professional_questions": [], "intervention_points": [], "training_topics": [], "risk_warnings": [] },',
+    '  "knowledge_assets": { "customer_profile_updates": [], "knowledge_base_candidates": [], "content_material_candidates": [] },',
+    '  "quote_moments": [{ "quote": "", "why_it_matters": "", "time_label": "" }]',
+    "}",
+    "数组上限：todos 5；customer_concerns 6；sales_opportunities 5；smart_chapters 10；key_decisions 5；quote_moments 5；其他数组最多 6。",
+    "销售机会必须基于转写证据或顾客档案上下文，不能为了推项目而硬编；不确定时 confidence 用 low。",
+    "顾客档案内容只能输出 customer_profile_update_suggestions，表示待确认建议，不能写成已更新事实。",
+    "语言要求：使用门店员工和店长能直接执行的中文，不要出现后端字段名。",
+  ].join("\n")
+
+  const user = [
+    `顾客：${customerName}`,
+    `项目：${projectName}`,
+    `服务目标：${cleanText(session.objective, 300) || "到店服务沟通记录"}`,
+    `录音时长：${formatDuration(session.audio_seconds)}`,
+    `ASR 片段状态：${JSON.stringify(counts)}`,
+    `总转写字数：${transcript.length}`,
+    "人工标记：",
+    markerText,
+    "分段转写或长录音切片：",
+    chunkText,
+  ].join("\n\n")
+
+  return [
+    { role: "system", content: system },
+    { role: "user", content: user },
+  ]
+}
+
+async function generateDeepSeekServiceRecordV2Result(
+  session: any,
+  segments: any[],
+  markers: any[],
+  counts: ReturnType<typeof statusCounts>,
+  fallbackServiceMinutesV2: any,
+) {
+  const apiKey = getServiceRecordDeepSeekKey()
+  if (!apiKey) return null
+
+  const model = getServiceRecordDeepSeekModel()
+  const timeoutMs = envNumber("SERVICE_RECORD_DEEPSEEK_TIMEOUT_MS", 45000, 3000, 90000)
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  const transcript = transcriptTextOf(segments)
+  const chunkCount = transcriptChunksOf(session, segments, 12).length
+  const isSegmented = chunkCount > 1 || numberValue(session.audio_seconds, 0) > 30 * 60
+
+  try {
+    const res = await fetch(deepSeekChatCompletionsUrl(), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: buildServiceMinutesV2Messages(session, segments, markers, counts),
+        response_format: { type: "json_object" },
+        temperature: 0.2,
+        max_tokens: envNumber("SERVICE_RECORD_DEEPSEEK_MAX_TOKENS", 5000, 800, 8000),
+        stream: false,
+      }),
+      signal: controller.signal,
+    })
+
+    const json = (await res.json().catch(() => null)) as any
+    if (!res.ok) {
+      const message = cleanText(json?.error?.message || json?.error || json?.message, 300) || `deepseek_http_${res.status}`
+      throw new Error(message)
+    }
+
+    const content = cleanText(json?.choices?.[0]?.message?.content, 100000)
+    const parsed = extractJsonObject(content)
+    const serviceMinutesV2 = normalizeServiceMinutesV2(parsed, fallbackServiceMinutesV2)
+    return {
+      service_minutes_v2: serviceMinutesV2,
+      meta: {
+        provider: "deepseek",
+        model,
+        used: true,
+        source: isSegmented ? "service_record_deepseek_v2_segmented" : "service_record_deepseek_v2",
+        chunk_count: chunkCount,
+        transcript_chars: transcript.length,
+      },
+    }
+  } catch (error: any) {
+    const fallback = normalizeServiceMinutesV2({
+      ...fallbackServiceMinutesV2,
+      recording: {
+        ...fallbackServiceMinutesV2.recording,
+        quality_warnings: [
+          ...fallbackServiceMinutesV2.recording.quality_warnings,
+          "智能纪要模型调用失败，当前展示本地保守整理结果。",
+        ],
+      },
+    }, fallbackServiceMinutesV2)
+    return {
+      service_minutes_v2: fallback,
+      meta: {
+        provider: "deepseek",
+        model,
+        used: false,
+        source: "service_record_deepseek_v2_fallback",
+        chunk_count: chunkCount,
+        transcript_chars: transcript.length,
+        error: cleanText(error?.name === "AbortError" ? "deepseek_timeout" : error?.message || "deepseek_failed", 300),
+      },
+    }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 function taskIdOf(segment: any) {
   const asrJson = isRecord(segment?.asr_json) ? segment.asr_json : {}
   return cleanText(asrJson.task_id, 160)
@@ -361,6 +547,417 @@ function buildOperations(session: any, counts: ReturnType<typeof statusCounts>) 
     knowledge_base_candidates: ["从本轮专业问题中沉淀门店项目知识和话术边界。"],
     xhs_material_candidates: ["可在匿名化后提炼顾客高频顾虑，作为后续内容素材候选。"],
     quality_warnings: warnings,
+  }
+}
+
+function transcriptChunksOf(session: any, segments: any[], maxChunks = 10) {
+  const totalSeconds = Math.max(0, numberValue(session.audio_seconds, 0))
+  const transcriptSegments = segments
+    .map((segment, index) => ({
+      index: Number(segment.segment_index || index + 1),
+      seconds: Math.max(0, numberValue(segment.client_audio_seconds, 0)),
+      text: cleanText(segment.transcript_text, 100000),
+    }))
+    .filter((segment) => segment.text)
+
+  if (!transcriptSegments.length) return []
+
+  const chunks: Array<{ start_seconds: number; time_label: string; title: string; text: string }> = []
+  let cursor = 0
+  const onlyOneLongSegment = transcriptSegments.length === 1 && transcriptSegments[0].text.length > 1600
+
+  for (const segment of transcriptSegments) {
+    const segmentSeconds = segment.seconds || Math.round(totalSeconds / Math.max(1, transcriptSegments.length)) || 0
+    if (onlyOneLongSegment) {
+      const text = segment.text
+      const chunkCount = Math.min(maxChunks, Math.max(2, Math.ceil(text.length / 1600)))
+      const size = Math.ceil(text.length / chunkCount)
+      for (let i = 0; i < chunkCount; i += 1) {
+        const start = cursor + Math.round((segmentSeconds / chunkCount) * i)
+        chunks.push({
+          start_seconds: start,
+          time_label: formatDuration(start),
+          title: `录音片段 ${i + 1}`,
+          text: text.slice(i * size, (i + 1) * size),
+        })
+      }
+    } else {
+      chunks.push({
+        start_seconds: cursor,
+        time_label: formatDuration(cursor),
+        title: `片段 ${segment.index}`,
+        text: segment.text,
+      })
+    }
+    cursor += segmentSeconds
+  }
+
+  return chunks.slice(0, maxChunks)
+}
+
+function smartChaptersFromTranscript(session: any, segments: any[]) {
+  const chunks = transcriptChunksOf(session, segments, 10)
+  return chunks.map((chunk, index) => {
+    const summary = cleanText(chunk.text.replace(/\s+/g, " "), 220)
+    return {
+      start_seconds: chunk.start_seconds,
+      time_label: chunk.time_label,
+      title: summary ? `${chunk.time_label} 服务沟通片段` : `服务沟通片段 ${index + 1}`,
+      summary: summary || "本段录音已保存，等待转写补齐后可继续完善章节摘要。",
+      signals: [],
+    }
+  })
+}
+
+function buildServiceMinutesV2Fallback(
+  session: any,
+  segments: any[],
+  markers: any[],
+  counts: ReturnType<typeof statusCounts>,
+  employeeFeedback: any,
+  managerReview: any,
+  operations: any,
+) {
+  const transcript = transcriptTextOf(segments)
+  const warnings = Array.from(new Set([
+    ...qualityWarningsFrom(segments, counts, transcript),
+    ...listFrom(operations.quality_warnings, [], 5),
+  ])).slice(0, 5)
+  const customerName = snapshotName(session.customer_snapshot_json, "本位顾客")
+  const projectName = snapshotName(session.scene_snapshot_json, "未命名项目")
+  const hasTranscript = Boolean(transcript)
+  const todos = [
+    {
+      owner: "staff",
+      priority: hasTranscript ? "normal" : "low",
+      title: cleanText(employeeFeedback.next_follow_up, 120) || "下次沟通前先查看顾客关注点",
+      detail: cleanText(employeeFeedback.coaching_tip, 240) || "先接住顾客顾虑，再补项目依据，最后给出轻量下一步。",
+      due_hint: "下次服务前",
+    },
+  ]
+  if (session.customer_profile_id) {
+    todos.push({
+      owner: "manager",
+      priority: "normal",
+      title: "复核顾客档案补充点",
+      detail: listFrom(operations.customer_profile_suggestions, ["结合本轮顾客关注点补充档案。"], 1)[0],
+      due_hint: "服务复盘后",
+    })
+  }
+  const fallbackSalesSignals = Array.from(new Set([
+    ...listFrom(managerReview.deal_signals, [], 6),
+    ...listFrom(markers.filter((marker) => marker.marker_type === "deal_signal").map((marker) => marker.label), [], 6),
+  ])).slice(0, 5)
+  const customerProfileSuggestions = listFrom(operations.customer_profile_suggestions, [], 6)
+  const managerTrainingTopics = listFrom(managerReview.training_topics, [], 5)
+  const managerInterventions = listFrom(managerReview.manager_intervention, [], 5)
+
+  return {
+    version: "service_minutes_v2",
+    title: "本轮服务智能纪要",
+    recording: {
+      theme: cleanText(session.objective, 160) || `${customerName} · ${projectName}`,
+      started_at: session.started_at || null,
+      ended_at: session.ended_at || null,
+      duration_seconds: Math.max(0, Math.round(numberValue(session.audio_seconds, 0))),
+      segment_count: counts.total,
+      asr_quality: asrQualityOf(segments, counts, transcript),
+      quality_warnings: warnings,
+    },
+    executive_summary: {
+      one_line: cleanText(employeeFeedback.summary, 500) || "本轮服务反馈还在整理中。",
+      service_outcome: cleanText(managerReview.conversation_summary, 500) || cleanText(employeeFeedback.summary, 500) || "本轮服务记录已保存。",
+      customer_state: listFrom(employeeFeedback.customer_concerns, ["等待系统继续识别顾客关注点。"], 1)[0],
+      staff_state: listFrom(employeeFeedback.staff_highlights, ["本轮沟通已记录，可结合转写复盘亮点。"], 1)[0],
+    },
+    todos,
+    customer_concerns: listFrom(employeeFeedback.customer_concerns, ["等待系统继续识别顾客关注点。"], 6).map((concern) => ({
+      concern,
+      evidence: "",
+      follow_up_angle: "下次沟通先确认这个关注点，再补充项目依据。",
+    })),
+    sales_opportunities: fallbackSalesSignals.map((signal) => ({
+      type: "follow_up",
+      signal,
+      evidence: "",
+      suggested_offer: "下次沟通先确认顾客真实顾虑，再给一个低压力下一步。",
+      priority: "normal",
+      owner: "staff",
+      due_hint: "下次服务前",
+      confidence: "low",
+      compliance_note: "仅作为沟通提醒，不承诺护理效果。",
+    })),
+    staff_review: {
+      highlights: listFrom(employeeFeedback.staff_highlights, ["本轮沟通已记录，可结合转写复盘亮点。"], 5),
+      misses: listFrom(managerReview.staff_improvement, [], 5),
+      missed_sales_signals: fallbackSalesSignals,
+      coaching_tips: [cleanText(employeeFeedback.coaching_tip, 240)].filter(Boolean),
+      next_script: cleanText(employeeFeedback.coaching_tip, 300) || "先接住顾客顾虑，再补项目依据，最后给出轻量下一步。",
+    },
+    manager_brief: {
+      priority: fallbackSalesSignals.length || warnings.length ? "normal" : "low",
+      one_line: cleanText(managerReview.conversation_summary, 300) || cleanText(employeeFeedback.summary, 300) || "本轮服务记录已保存，等待店长复盘。",
+      conversion_opportunity: fallbackSalesSignals[0] || "",
+      main_risk: warnings[0] || "",
+      recommended_owner: fallbackSalesSignals.length ? "staff" : "manager",
+      next_action: cleanText(employeeFeedback.next_follow_up, 240) || managerInterventions[0] || "复核本轮服务记录并确认下次跟进动作。",
+      training_topics: managerTrainingTopics,
+    },
+    customer_profile_update_suggestions: {
+      new_concerns: listFrom(employeeFeedback.customer_concerns, [], 4),
+      new_preferences: [],
+      project_interests: fallbackSalesSignals,
+      commitments: [],
+      follow_up_suggestions: customerProfileSuggestions,
+      risk_notes: warnings,
+    },
+    smart_chapters: smartChaptersFromTranscript(session, segments),
+    key_decisions: cleanText(employeeFeedback.next_follow_up, 300)
+      ? [{
+        decision: cleanText(employeeFeedback.next_follow_up, 240),
+        problem: listFrom(employeeFeedback.customer_concerns, ["顾客关注点待复核。"], 1)[0],
+        basis: hasTranscript ? "基于本轮转写内容和服务标记整理。" : "基于当前服务记录状态整理，等待转写补齐。",
+        next_action: cleanText(employeeFeedback.next_follow_up, 240),
+      }]
+      : [],
+    manager_review: {
+      summary: cleanText(managerReview.conversation_summary, 600) || "店长复盘还在整理中。",
+      deal_signals: listFrom(managerReview.deal_signals, [], 6),
+      professional_questions: listFrom(managerReview.professional_questions, [], 6),
+      intervention_points: listFrom(managerReview.manager_intervention, [], 5),
+      training_topics: listFrom(managerReview.training_topics, [], 5),
+      risk_warnings: warnings,
+    },
+    knowledge_assets: {
+      customer_profile_updates: listFrom(operations.customer_profile_suggestions, [], 6),
+      knowledge_base_candidates: listFrom(operations.knowledge_base_candidates, [], 6),
+      content_material_candidates: listFrom(operations.xhs_material_candidates, [], 6),
+    },
+    quote_moments: [],
+  }
+}
+
+function normalizeTodo(value: any, index: number) {
+  const title = cleanText(value.title, 120)
+  const detail = cleanText(value.detail, 240)
+  if (!title && !detail) return null
+  return {
+    owner: oneOf(value.owner, ["manager", "staff", "ops"], index === 0 ? "staff" : "manager"),
+    priority: oneOf(value.priority, ["high", "normal", "low"], "normal"),
+    title: title || detail,
+    detail,
+    due_hint: cleanText(value.due_hint, 80),
+  }
+}
+
+function normalizeConcern(value: any) {
+  const concern = cleanText(value.concern, 160)
+  if (!concern) return null
+  return {
+    concern,
+    evidence: cleanText(value.evidence, 80),
+    follow_up_angle: cleanText(value.follow_up_angle, 180),
+  }
+}
+
+function normalizeSalesOpportunity(value: any) {
+  const signal = cleanText(value.signal || value.evidence || value.suggested_offer || value.next_action, 180)
+  if (!signal) return null
+  return {
+    type: oneOf(value.type, ["project_conversion", "renewal", "upgrade", "follow_up", "manager_intervention"], "follow_up"),
+    signal,
+    evidence: cleanText(value.evidence, 80),
+    suggested_offer: cleanText(value.suggested_offer || value.next_action, 240),
+    priority: oneOf(value.priority, ["high", "normal", "low"], "normal"),
+    owner: oneOf(value.owner, ["staff", "manager"], "staff"),
+    due_hint: cleanText(value.due_hint, 80),
+    confidence: oneOf(value.confidence, ["high", "medium", "low"], "low"),
+    compliance_note: cleanText(value.compliance_note, 160) || "仅作为沟通建议，不承诺护理效果。",
+  }
+}
+
+function normalizeManagerBrief(value: unknown, fallback: any) {
+  const brief = recordFrom(value)
+  return {
+    priority: oneOf(brief.priority, ["high", "normal", "low"], fallback.priority || "normal"),
+    one_line: cleanText(brief.one_line, 300) || fallback.one_line || "",
+    conversion_opportunity: cleanText(brief.conversion_opportunity, 240) || fallback.conversion_opportunity || "",
+    main_risk: cleanText(brief.main_risk, 240) || fallback.main_risk || "",
+    recommended_owner: oneOf(brief.recommended_owner, ["manager", "staff"], fallback.recommended_owner || "manager"),
+    next_action: cleanText(brief.next_action, 240) || fallback.next_action || "",
+    training_topics: listFrom(brief.training_topics, fallback.training_topics || [], 5),
+  }
+}
+
+function normalizeProfileUpdateSuggestions(value: unknown, fallback: any) {
+  const suggestions = recordFrom(value)
+  return {
+    new_concerns: listFrom(suggestions.new_concerns, fallback.new_concerns || [], 6),
+    new_preferences: listFrom(suggestions.new_preferences, fallback.new_preferences || [], 6),
+    project_interests: listFrom(suggestions.project_interests, fallback.project_interests || [], 6),
+    commitments: listFrom(suggestions.commitments, fallback.commitments || [], 6),
+    follow_up_suggestions: listFrom(suggestions.follow_up_suggestions, fallback.follow_up_suggestions || [], 6),
+    risk_notes: listFrom(suggestions.risk_notes, fallback.risk_notes || [], 6),
+  }
+}
+
+function normalizeChapter(value: any, index: number) {
+  const summary = cleanText(value.summary, 260)
+  const title = cleanText(value.title, 120)
+  if (!title && !summary) return null
+  const startSeconds = Math.max(0, Math.round(numberValue(value.start_seconds, 0)))
+  return {
+    start_seconds: startSeconds,
+    time_label: cleanText(value.time_label, 40) || formatDuration(startSeconds),
+    title: title || `服务沟通片段 ${index + 1}`,
+    summary: summary || "本段摘要待补充。",
+    signals: listFrom(value.signals, [], 5),
+  }
+}
+
+function normalizeDecision(value: any) {
+  const decision = cleanText(value.decision, 180)
+  if (!decision) return null
+  return {
+    decision,
+    problem: cleanText(value.problem, 220),
+    basis: cleanText(value.basis, 260),
+    next_action: cleanText(value.next_action, 180),
+  }
+}
+
+function normalizeQuote(value: any) {
+  const quote = cleanText(value.quote, 80)
+  if (!quote) return null
+  return {
+    quote,
+    why_it_matters: cleanText(value.why_it_matters, 180),
+    time_label: cleanText(value.time_label, 40),
+  }
+}
+
+function normalizeServiceMinutesV2(value: unknown, fallback: any) {
+  const root = recordFrom(recordFrom(value).service_minutes_v2 || value)
+  const recording = recordFrom(root.recording)
+  const summary = recordFrom(root.executive_summary)
+  const staffReview = recordFrom(root.staff_review)
+  const manager = recordFrom(root.manager_review)
+  const assets = recordFrom(root.knowledge_assets)
+
+  const normalized = {
+    version: "service_minutes_v2",
+    title: cleanText(root.title, 80) || fallback.title,
+    recording: {
+      theme: cleanText(recording.theme, 160) || fallback.recording.theme,
+      started_at: cleanText(recording.started_at, 80) || fallback.recording.started_at,
+      ended_at: cleanText(recording.ended_at, 80) || fallback.recording.ended_at,
+      duration_seconds: Math.max(0, Math.round(numberValue(recording.duration_seconds, fallback.recording.duration_seconds))),
+      segment_count: Math.max(0, Math.round(numberValue(recording.segment_count, fallback.recording.segment_count))),
+      asr_quality: oneOf(recording.asr_quality, ["good", "partial", "poor"], fallback.recording.asr_quality),
+      quality_warnings: listFrom(recording.quality_warnings, fallback.recording.quality_warnings, 5),
+    },
+    executive_summary: {
+      one_line: cleanText(summary.one_line, 500) || fallback.executive_summary.one_line,
+      service_outcome: cleanText(summary.service_outcome, 500) || fallback.executive_summary.service_outcome,
+      customer_state: cleanText(summary.customer_state, 240) || fallback.executive_summary.customer_state,
+      staff_state: cleanText(summary.staff_state, 240) || fallback.executive_summary.staff_state,
+    },
+    todos: listRecordFrom(root.todos, normalizeTodo, fallback.todos, 5),
+    customer_concerns: listRecordFrom(root.customer_concerns, normalizeConcern, fallback.customer_concerns, 6),
+    sales_opportunities: listRecordFrom(root.sales_opportunities, normalizeSalesOpportunity, fallback.sales_opportunities, 5),
+    staff_review: {
+      highlights: listFrom(staffReview.highlights, fallback.staff_review.highlights, 5),
+      misses: listFrom(staffReview.misses, fallback.staff_review.misses, 5),
+      missed_sales_signals: listFrom(staffReview.missed_sales_signals, fallback.staff_review.missed_sales_signals, 5),
+      coaching_tips: listFrom(staffReview.coaching_tips, fallback.staff_review.coaching_tips, 5),
+      next_script: cleanText(staffReview.next_script, 400) || fallback.staff_review.next_script,
+    },
+    manager_brief: normalizeManagerBrief(root.manager_brief, fallback.manager_brief || {}),
+    customer_profile_update_suggestions: normalizeProfileUpdateSuggestions(
+      root.customer_profile_update_suggestions,
+      fallback.customer_profile_update_suggestions || {},
+    ),
+    smart_chapters: listRecordFrom(root.smart_chapters, normalizeChapter, fallback.smart_chapters, 10),
+    key_decisions: listRecordFrom(root.key_decisions, normalizeDecision, fallback.key_decisions, 5),
+    manager_review: {
+      summary: cleanText(manager.summary, 600) || fallback.manager_review.summary,
+      deal_signals: listFrom(manager.deal_signals, fallback.manager_review.deal_signals, 6),
+      professional_questions: listFrom(manager.professional_questions, fallback.manager_review.professional_questions, 6),
+      intervention_points: listFrom(manager.intervention_points, fallback.manager_review.intervention_points, 5),
+      training_topics: listFrom(manager.training_topics, fallback.manager_review.training_topics, 5),
+      risk_warnings: listFrom(manager.risk_warnings, fallback.manager_review.risk_warnings, 5),
+    },
+    knowledge_assets: {
+      customer_profile_updates: listFrom(assets.customer_profile_updates, fallback.knowledge_assets.customer_profile_updates, 6),
+      knowledge_base_candidates: listFrom(assets.knowledge_base_candidates, fallback.knowledge_assets.knowledge_base_candidates, 6),
+      content_material_candidates: listFrom(assets.content_material_candidates, fallback.knowledge_assets.content_material_candidates, 6),
+    },
+    quote_moments: listRecordFrom(root.quote_moments, normalizeQuote, fallback.quote_moments, 5),
+  }
+
+  const warnings = Array.from(new Set([
+    ...normalized.recording.quality_warnings,
+    ...normalized.manager_review.risk_warnings,
+  ])).slice(0, 5)
+  normalized.recording.quality_warnings = warnings
+  normalized.manager_review.risk_warnings = warnings
+  return normalized
+}
+
+function deriveLegacyResultFromServiceMinutesV2(serviceMinutes: any, fallbackEmployee: any, fallbackManager: any, fallbackOperations: any) {
+  const staffTodo = (serviceMinutes.todos || []).find((todo: any) => todo.owner === "staff") || serviceMinutes.todos?.[0] || {}
+  const manager = serviceMinutes.manager_review || {}
+  const assets = serviceMinutes.knowledge_assets || {}
+  const salesSignals = listFrom((serviceMinutes.sales_opportunities || []).map((item: any) => item.signal), [], 6)
+  const missedSalesSignals = listFrom(serviceMinutes.staff_review?.missed_sales_signals, [], 5)
+  const profileSuggestions = serviceMinutes.customer_profile_update_suggestions || {}
+  const flattenedProfileSuggestions = [
+    ...listFrom(profileSuggestions.new_concerns, [], 6),
+    ...listFrom(profileSuggestions.new_preferences, [], 6),
+    ...listFrom(profileSuggestions.project_interests, [], 6),
+    ...listFrom(profileSuggestions.commitments, [], 6),
+    ...listFrom(profileSuggestions.follow_up_suggestions, [], 6),
+    ...listFrom(profileSuggestions.risk_notes, [], 6),
+  ].slice(0, 8)
+  return {
+    employee_feedback: {
+      summary: cleanText(serviceMinutes.executive_summary?.one_line, 500) || fallbackEmployee.summary,
+      customer_concerns: listFrom(
+        (serviceMinutes.customer_concerns || []).map((item: any) => item.concern),
+        fallbackEmployee.customer_concerns,
+      ),
+      staff_highlights: listFrom(serviceMinutes.staff_review?.highlights, fallbackEmployee.staff_highlights),
+      next_follow_up: cleanText(staffTodo.title || staffTodo.detail, 500) || fallbackEmployee.next_follow_up,
+      coaching_tip: cleanText(serviceMinutes.staff_review?.next_script, 500)
+        || listFrom(serviceMinutes.staff_review?.coaching_tips, [], 1)[0]
+        || fallbackEmployee.coaching_tip,
+    },
+    manager_review: {
+      conversation_summary: cleanText(manager.summary, 600) || cleanText(serviceMinutes.executive_summary?.service_outcome, 600) || fallbackManager.conversation_summary,
+      deal_signals: listFrom(manager.deal_signals, salesSignals.length ? salesSignals : fallbackManager.deal_signals),
+      professional_questions: listFrom(manager.professional_questions, fallbackManager.professional_questions),
+      manager_intervention: listFrom(manager.intervention_points, fallbackManager.manager_intervention),
+      staff_improvement: listFrom(
+        [
+          ...listFrom(serviceMinutes.staff_review?.misses, [], 5),
+          ...missedSalesSignals.map((signal) => `未接住成交信号：${signal}`),
+        ],
+        fallbackManager.staff_improvement,
+      ),
+      training_topics: listFrom(serviceMinutes.manager_brief?.training_topics, listFrom(manager.training_topics, fallbackManager.training_topics)),
+    },
+    operations: {
+      customer_profile_suggestions: listFrom(
+        [
+          ...flattenedProfileSuggestions,
+          ...listFrom(assets.customer_profile_updates, [], 6),
+        ],
+        fallbackOperations.customer_profile_suggestions,
+      ),
+      knowledge_base_candidates: listFrom(assets.knowledge_base_candidates, fallbackOperations.knowledge_base_candidates),
+      xhs_material_candidates: listFrom(assets.content_material_candidates, fallbackOperations.xhs_material_candidates),
+      quality_warnings: listFrom(serviceMinutes.recording?.quality_warnings, fallbackOperations.quality_warnings),
+    },
   }
 }
 
@@ -672,6 +1269,15 @@ export async function processServiceRecordSession(admin: any, session: any, opts
   const fallbackEmployeeFeedback = buildEmployeeFeedback(session, segments, markers, counts)
   const fallbackManagerReview = buildManagerReview(markers, counts)
   const fallbackOperations = buildOperations(session, counts)
+  let serviceMinutesV2: any = buildServiceMinutesV2Fallback(
+    session,
+    segments,
+    markers,
+    counts,
+    fallbackEmployeeFeedback,
+    fallbackManagerReview,
+    fallbackOperations,
+  )
   let employeeFeedback = fallbackEmployeeFeedback
   let managerReview = fallbackManagerReview
   let operations = fallbackOperations
@@ -679,41 +1285,63 @@ export async function processServiceRecordSession(admin: any, session: any, opts
     provider: getServiceRecordDeepSeekKey() ? "deepseek" : "local",
     model: getServiceRecordDeepSeekKey() ? getServiceRecordDeepSeekModel() : "",
     used: false,
+    source: "service_record_processing_v1",
+    chunk_count: transcriptChunksOf(session, segments, 12).length,
+    transcript_chars: transcriptTextOf(segments).length,
     reason: hasOpenAsr ? "asr_still_open" : "deepseek_api_key_missing",
   }
 
   if (!hasOpenAsr && (transcriptTextOf(segments) || markers.length) && getServiceRecordDeepSeekKey()) {
-    const deepSeekResult = await generateDeepSeekServiceRecordResult(
+    const deepSeekResult = await generateDeepSeekServiceRecordV2Result(
       session,
       segments,
       markers,
       counts,
-      fallbackEmployeeFeedback,
-      fallbackManagerReview,
-      fallbackOperations,
+      serviceMinutesV2,
     )
     if (deepSeekResult) {
-      employeeFeedback = deepSeekResult.employee_feedback
-      managerReview = deepSeekResult.manager_review
-      operations = deepSeekResult.operations
+      serviceMinutesV2 = deepSeekResult.service_minutes_v2
+      const legacy = deriveLegacyResultFromServiceMinutesV2(
+        serviceMinutesV2,
+        fallbackEmployeeFeedback,
+        fallbackManagerReview,
+        fallbackOperations,
+      )
+      employeeFeedback = legacy.employee_feedback
+      managerReview = legacy.manager_review
+      operations = legacy.operations
       llm = {
         provider: deepSeekResult.meta.provider,
         model: deepSeekResult.meta.model,
         used: deepSeekResult.meta.used,
+        source: deepSeekResult.meta.source,
+        chunk_count: deepSeekResult.meta.chunk_count,
+        transcript_chars: deepSeekResult.meta.transcript_chars,
         reason: deepSeekResult.meta.error || (deepSeekResult.meta.used ? "deepseek_completed" : "deepseek_fallback"),
       }
     }
+  } else {
+    const legacy = deriveLegacyResultFromServiceMinutesV2(
+      serviceMinutesV2,
+      fallbackEmployeeFeedback,
+      fallbackManagerReview,
+      fallbackOperations,
+    )
+    employeeFeedback = legacy.employee_feedback
+    managerReview = legacy.manager_review
+    operations = legacy.operations
   }
 
   const noteMarkdown = buildServiceRecordNoteMarkdown(session, segments, markers, employeeFeedback)
   const resultJson = {
-    source: llm.used ? "service_record_deepseek_v1" : "service_record_processing_v1",
+    source: llm.used ? llm.source : "service_record_processing_v1",
     generated_at: now,
     status: nextStatus,
     asr: counts,
     llm,
     marker_count: markers.length,
     has_note: Boolean(noteMarkdown),
+    service_minutes_v2: serviceMinutesV2,
     employee_feedback: employeeFeedback,
     manager_review: managerReview,
     operations,
