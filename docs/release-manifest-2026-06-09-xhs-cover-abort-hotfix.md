@@ -1,9 +1,9 @@
-# Release Manifest: XHS Cover Abort/Fallback Hotfix Candidate
+# Release Manifest: XHS Cover Abort/Fallback Hotfix
 
 ## Basic Info
 
 - Release date: 2026-06-14
-- Release thread: pending user confirmation; this document is a release candidate, not a completed production release record.
+- Release thread: this Codex thread; user authorized this thread as the backend release thread on 2026-06-14.
 - Operator: Codex
 - Version: backend XHS cover abort/timeout provider fallback hotfix
 - Backend repository: `/Users/Admin/Documents/美业话镜APP/handoff/IP`
@@ -14,10 +14,10 @@
 
 ## Permission Confirmation
 
-- Has the user explicitly named this thread as the release thread? No. Current scope is repository整理 and commit-candidate review only.
-- Are all other threads frozen from production deploy/upload? Not globally confirmed.
+- Has the user explicitly named this thread as the release thread? Yes. User said: `授权本线程作为这次后端 release thread`.
+- Are all other threads frozen from production deploy/upload? Not globally confirmed; this release was scoped to backend Vercel production deploy only.
 - Is this release allowed to touch production data or schema? No. No Supabase write, schema change, or data migration is included.
-- Is production deployment allowed now? No. A future Vercel production deploy requires explicit release-thread authorization.
+- Is production deployment allowed now? Yes, backend Vercel production deploy only.
 
 ## Current Context
 
@@ -28,7 +28,7 @@ This hotfix was tested and deployed during the historical 2026-06-09 XHS cover i
 - `c21708b Cache Manbeilian knowledge images immutably`
 - `74ccffe Document Manbeilian cache header release`
 
-The later Manbeilian cache-header production deploy was built from a clean package and intentionally excluded the still-dirty XHS cover fallback files. Therefore the XHS cover fallback diff in this worktree must be treated as a current release candidate that needs a fresh commit and future production deploy before it is considered live again.
+The later Manbeilian cache-header production deploy was built from a clean package and intentionally excluded the still-dirty XHS cover fallback files. This release recommitted and redeployed that XHS cover fallback diff so it is live again on the production aliases listed below.
 
 The poster backend protocol fix is a separate change and has already gone live through the later clean deploy. This manifest is only for `/api/mp/xhs/generate-cover-image` provider fallback and timeout handling.
 
@@ -122,7 +122,7 @@ tools/build-manbeilian-knowledge-*.js
 - Applied to production: no.
 - Rollback/recovery plan: not applicable; no database mutation.
 
-## Verification Completed For Commit Candidate
+## Verification Completed Before Deploy
 
 ```text
 node --test tests/image-provider-fallback.runtime.test.js tests/xhs-cover-style.static.test.js
@@ -136,6 +136,15 @@ PASS with 0 errors; test files have existing CommonJS require warnings.
 
 git diff --check -- app/api/mp/xhs/generate-cover-image/route.ts lib/posters/gpt-image-2.server.ts tests/xhs-cover-style.static.test.js docs/release-manifest-2026-06-09-xhs-cover-abort-hotfix.md docs/xhs-cover-generation-primary-fallback-flow-2026-06-09.md tests/image-provider-fallback.runtime.test.js
 PASS
+
+corepack pnpm build
+PASS. Build completed with existing lint/runtime warnings.
+
+node tools/check-mp-api-contract-before-asset-release.js https://www.ipnrgc.com
+PASS, 12/12
+
+node tools/check-mp-api-contract-before-asset-release.js https://ip.ipgongchang.xin
+PASS, 12/12
 
 POST https://www.ipnrgc.com/api/mp/xhs/generate-cover-image without auth
 401 auth_required; x-matched-path=/api/mp/xhs/generate-cover-image
@@ -161,26 +170,39 @@ dpl_CFhme2kMB3GyuT64cAyAATDS3uex
 dpl_5zDVpKbc8yDDLC9sbd5KvKbnwWnS
 ```
 
-Do not cite those ids as the current production deployment for this candidate. The current production baseline at this handoff is the later Manbeilian cache-header release.
-
-## Required Before Production Deployment
-
-- User explicitly names this thread as the backend release thread.
-- Confirm no unrelated backend dirty files are staged.
-- Fill production deployment fields below.
-- Run or intentionally waive `corepack pnpm build`.
-- Run API contract checks after deploy.
-- Confirm unauthenticated `/api/mp/xhs/generate-cover-image` still returns `401 auth_required`.
-- If doing an authenticated smoke, note that it burns one real image generation and must clean up test auth/profile data.
+Do not cite those ids as the current production deployment for this release. The current production deployment is `dpl_Aouj9rTAtFgppCKVrHUMzN8XtVxL`.
 
 ## Backend Deployment
 
 - Vercel project: `a171240s-projects/ip`
-- Preview deployment URL: not run for this candidate.
-- Production deployment ID: not deployed in current整理 thread.
-- Production deployment URL: not deployed in current整理 thread.
+- Preview deployment URL: not run for this release.
+- Production deployment ID: `dpl_Aouj9rTAtFgppCKVrHUMzN8XtVxL`
+- Production deployment URL: `https://ip-5xu8bj2hw-a171240s-projects.vercel.app`
+- Production inspector URL: `https://vercel.com/a171240s-projects/ip/Aouj9rTAtFgppCKVrHUMzN8XtVxL`
 - Production alias/domain: `https://www.ipnrgc.com`, `https://ip.ipgongchang.xin`, `https://ipnrgc.com`
-- Deploy command: not run; production deploy requires explicit release-thread authorization.
+- Deploy command: `npx --yes vercel@latest deploy --prod --yes --project ip --scope a171240s-projects`
+
+Post-deploy smoke:
+
+```text
+node tools/check-mp-api-contract-before-asset-release.js https://www.ipnrgc.com
+PASS, 12/12
+
+node tools/check-mp-api-contract-before-asset-release.js https://ip.ipgongchang.xin
+PASS, 12/12
+
+POST https://www.ipnrgc.com/api/mp/xhs/generate-cover-image without auth
+401 auth_required; x-matched-path=/api/mp/xhs/generate-cover-image
+
+POST https://ip.ipgongchang.xin/api/mp/xhs/generate-cover-image without auth
+401 auth_required; x-matched-path=/api/mp/xhs/generate-cover-image
+
+GET https://www.ipnrgc.com/api/mp/posters/templates
+200; templates=13; layoutPresets=10; visualStylePresets=7
+
+GET https://www.ipnrgc.com/voice-coach-assets/manbeilian-knowledge/v1/covers/project-main.jpg
+200 image/jpeg; cache-control=public, max-age=31536000, immutable
+```
 
 ## Mini-program Upload
 
@@ -192,9 +214,9 @@ Do not cite those ids as the current production deployment for this candidate. T
 
 ## Risk Checklist
 
-- Unknown dirty changes: no unknown backend files outside the listed 6 candidate files.
+- Unknown dirty changes: none after the XHS fallback commit; backend worktree only has this release-manifest update pending.
 - Mini-program dirty changes: present, intentionally excluded.
-- Deleted files: none observed in this candidate.
+- Deleted files: none observed in this release.
 - Route conflicts: only `/api/mp/xhs/generate-cover-image` backend route is changed.
 - Product/point display conflicts: no billing contract change; failure refund path remains.
 - Store account permission conflicts: no account or permission logic changed.
@@ -202,15 +224,15 @@ Do not cite those ids as the current production deployment for this candidate. T
 
 ## Rollback / Recovery
 
-- Previous backend deployment ID: use the production deployment immediately before the future release deploy.
+- Previous backend deployment ID: `dpl_F9vCQJKnkiimJnWXHAio9KkeFsws`
 - Previous mini-program version: unchanged; no upload.
 - Database rollback note: no database rollback needed.
 - Recovery path: if fallback timing is wrong, adjust `APIMART_IMAGE_FALLBACK_AFTER_MS` and redeploy; if provider path is unstable, temporarily set Evolink primary only with explicit release approval; otherwise promote/rollback to the prior backend deployment.
 
 ## Final Decision
 
-- Release approved: no.
-- Released by: not released.
-- Release time: not released.
-- Current decision: commit candidate after docs correction; production deployment pending explicit user authorization.
+- Release approved: yes, backend production deploy only.
+- Released by: Codex
+- Release time: 2026-06-14 23:39 CST
+- Current decision: released to Vercel production; no mini-program upload and no Supabase write.
 - Follow-up items after deploy: monitor `mp_xhs_cover_gpt_image_fail` and `mp_xhs_cover_success` for `message`, `model`, `fallbackUsed`, `providerFailureCount`, `providerElapsedMs`, and `totalElapsedMs`.
