@@ -24,6 +24,14 @@ type ImageModelCandidate = {
   provider: ImageProviderName
   model: string
 }
+type ImageGenerationResult = {
+  imageUrl: string
+  model: string
+  fallbackUsed: boolean
+  failureCount: number
+  providerElapsedMs: number
+  totalElapsedMs: number
+}
 
 const BASIC_IMAGE_RESOLUTION = "1k"
 const DEFAULT_IMAGE_MODEL = "gpt-image-2"
@@ -201,6 +209,13 @@ function pollTimeoutMs(provider: ImageProviderName) {
   return Number.isFinite(v) && v > 5000 ? Math.min(v, 300000) : 240000
 }
 
+function fallbackAfterMs(provider: ImageProviderName) {
+  const raw = provider === "evolink" ? process.env.EVOLINK_IMAGE_FALLBACK_AFTER_MS : process.env.APIMART_IMAGE_FALLBACK_AFTER_MS
+  const defaultMs = provider === "apimart" ? 150000 : 0
+  const v = Number(raw || defaultMs)
+  return Number.isFinite(v) && v > 5000 ? Math.min(v, 180000) : 0
+}
+
 function requestTimeoutMs(provider: ImageProviderName) {
   const raw =
     provider === "evolink" ? process.env.EVOLINK_IMAGE_REQUEST_TIMEOUT_MS : process.env.APIMART_IMAGE_REQUEST_TIMEOUT_MS
@@ -313,6 +328,10 @@ function imageProviderErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error || "")
 }
 
+function isTimeoutLikeMessage(message: string) {
+  return /abort|aborted|timeout|timed out|operation was aborted|request_timeout|request timed out/i.test(message)
+}
+
 export function isImageProviderOverloadedError(error: unknown) {
   const e = error as ImageProviderError
   return e?.code === "image_provider_overloaded" || e?.status === 503 || isOverloadedMessage(imageProviderErrorMessage(error))
@@ -323,21 +342,29 @@ export function isImageProviderInsufficientCreditsError(error: unknown) {
   return e?.code === "image_provider_insufficient_credits" || isInsufficientProviderCreditsMessage(imageProviderErrorMessage(error))
 }
 
-export function imageGenerationErrorStatus(error: unknown) {
+export function isImageProviderTimeoutError(error: unknown) {
   const e = error as ImageProviderError
   const message = imageProviderErrorMessage(error)
+  return (
+    e?.code === "image_task_timeout" ||
+    e?.code === "image_provider_request_timeout" ||
+    message === "image_task_timeout" ||
+    isTimeoutLikeMessage(message)
+  )
+}
+
+export function imageGenerationErrorStatus(error: unknown) {
   if (isImageProviderOverloadedError(error)) return 503
   if (isImageProviderInsufficientCreditsError(error)) return 503
-  if (e?.code === "image_task_timeout" || message === "image_task_timeout") return 504
+  if (isImageProviderTimeoutError(error)) return 504
   return 502
 }
 
 export function publicImageGenerationErrorMessage(error: unknown) {
-  const e = error as ImageProviderError
   const message = imageProviderErrorMessage(error)
   if (isImageProviderOverloadedError(error)) return IMAGE_OVERLOADED_MESSAGE
   if (isImageProviderInsufficientCreditsError(error)) return IMAGE_PROVIDER_CREDIT_MESSAGE
-  if (e?.code === "image_task_timeout" || message === "image_task_timeout") return IMAGE_TIMEOUT_MESSAGE
+  if (isImageProviderTimeoutError(error)) return IMAGE_TIMEOUT_MESSAGE
   return message || "image_generation_failed"
 }
 
@@ -347,7 +374,7 @@ function shouldTryFallback(error: unknown) {
     e?.retryable ||
       isImageProviderOverloadedError(error) ||
       isImageProviderInsufficientCreditsError(error) ||
-      e?.code === "image_task_timeout" ||
+      isImageProviderTimeoutError(error) ||
       e?.code === "image_provider_missing_key"
   )
 }
@@ -414,10 +441,11 @@ async function requestJson(config: ImageProviderConfig, path: string, init?: Req
       const message = error instanceof Error ? error.message : "fetch failed"
       const isUpstreamHttpError = message.startsWith(`${config.label} image error:`)
       const incoming = error as ImageProviderError
+      const timeoutLike = incoming?.name === "AbortError" || isTimeoutLikeMessage(message)
       lastError = incoming?.code
         ? incoming
         : imageProviderError(isUpstreamHttpError ? message : `${config.label} image request failed: ${message}`, {
-            code: /abort|timeout/i.test(message) ? "image_provider_request_timeout" : "image_provider_fetch_failed",
+            code: timeoutLike ? "image_provider_request_timeout" : "image_provider_fetch_failed",
             retryable: true,
           })
       if (attempt >= attempts - 1) {
@@ -442,32 +470,52 @@ async function requestJson(config: ImageProviderConfig, path: string, init?: Req
   throw lastError || new Error(`${config.label} image request failed`)
 }
 
-async function pollTask(config: ImageProviderConfig, taskId: string) {
+async function pollTask(config: ImageProviderConfig, taskId: string, allowProviderFallback: boolean) {
   const started = Date.now()
+  const hardTimeout = pollTimeoutMs(config.provider)
+  const fallbackTimeout = allowProviderFallback ? fallbackAfterMs(config.provider) : 0
+  const effectiveTimeout = fallbackTimeout ? Math.min(hardTimeout, fallbackTimeout) : hardTimeout
   await sleep(9000)
 
-  while (Date.now() - started < pollTimeoutMs(config.provider)) {
+  while (Date.now() - started < effectiveTimeout) {
     const json = await requestJson(config, `/tasks/${encodeURIComponent(taskId)}`, { method: "GET" })
     const status = extractStatus(json)
     const url = extractImageUrl(json)
 
     if (status === "completed" && url) return url
-    if (status === "failed") throw new Error(extractErrorMessage(json, "image_task_failed"))
+    if (status === "failed") {
+      throw imageProviderError(extractErrorMessage(json, "image_task_failed"), {
+        code: "image_task_failed",
+        retryable: true,
+      })
+    }
 
     await sleep(3500)
   }
 
-  throw imageProviderError("image_task_timeout", { code: "image_task_timeout", retryable: true })
+  throw imageProviderError(fallbackTimeout ? "image_provider_fallback_after_timeout" : "image_task_timeout", {
+    code: fallbackTimeout ? "image_provider_request_timeout" : "image_task_timeout",
+    retryable: true,
+  })
 }
 
-export async function generateGptImage2(opts: GenerateImageOptions): Promise<{ imageUrl: string; model: string }> {
+export async function generateGptImage2(opts: GenerateImageOptions): Promise<ImageGenerationResult> {
   const candidates = imageModelCandidates()
   const failures: string[] = []
   let lastError: unknown = null
+  const totalStarted = Date.now()
 
   for (const model of candidates) {
+    const providerStarted = Date.now()
     try {
-      return await generateGptImage2WithModel(model, opts)
+      const result = await generateGptImage2WithModel(model, opts, candidates.length > failures.length + 1)
+      return {
+        ...result,
+        fallbackUsed: failures.length > 0,
+        failureCount: failures.length,
+        providerElapsedMs: Date.now() - providerStarted,
+        totalElapsedMs: Date.now() - totalStarted,
+      }
     } catch (error) {
       lastError = error
       const message = imageProviderErrorMessage(error)
@@ -477,13 +525,12 @@ export async function generateGptImage2(opts: GenerateImageOptions): Promise<{ i
   }
 
   if (failures.length > 1) {
-    const last = lastError as ImageProviderError
     throw imageProviderError(`image_generation_all_models_failed: ${failures.join(" | ")}`, {
       code: isImageProviderOverloadedError(lastError)
         ? "image_provider_overloaded"
         : isImageProviderInsufficientCreditsError(lastError)
           ? "image_provider_insufficient_credits"
-        : last?.code === "image_task_timeout"
+        : isImageProviderTimeoutError(lastError)
           ? "image_task_timeout"
           : "image_generation_all_models_failed",
       retryable: shouldTryFallback(lastError),
@@ -493,7 +540,11 @@ export async function generateGptImage2(opts: GenerateImageOptions): Promise<{ i
   throw lastError instanceof Error ? lastError : new Error("image_generation_failed")
 }
 
-async function generateGptImage2WithModel(candidate: ImageModelCandidate, opts: GenerateImageOptions): Promise<{ imageUrl: string; model: string }> {
+async function generateGptImage2WithModel(
+  candidate: ImageModelCandidate,
+  opts: GenerateImageOptions,
+  allowProviderFallback: boolean
+): Promise<{ imageUrl: string; model: string }> {
   const config = candidate.provider === "evolink" ? resolveEvolinkConfig() : resolveApiConfig()
   const fullPrompt = buildFullPrompt(opts)
   const payload: Record<string, unknown> = {
@@ -529,8 +580,8 @@ async function generateGptImage2WithModel(candidate: ImageModelCandidate, opts: 
   if (directUrl) return { imageUrl: directUrl, model: modelLabel(candidate) }
 
   const taskId = extractTaskId(submitted)
-  if (!taskId) throw new Error("image_task_id_missing")
+  if (!taskId) throw imageProviderError("image_task_id_missing", { code: "image_task_id_missing", retryable: true })
 
-  const imageUrl = await pollTask(config, taskId)
+  const imageUrl = await pollTask(config, taskId, allowProviderFallback)
   return { imageUrl, model: modelLabel(candidate) }
 }

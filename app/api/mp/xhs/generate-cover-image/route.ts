@@ -517,6 +517,10 @@ export async function POST(request: NextRequest) {
       negativePrompt,
       model: generated.model,
       source: generated.model,
+      fallbackUsed: generated.fallbackUsed,
+      providerFailureCount: generated.failureCount,
+      providerElapsedMs: generated.providerElapsedMs,
+      totalElapsedMs: generated.totalElapsedMs,
       coverStyleId: coverAsset.styleId || null,
       coverStyleLabel: coverAsset.styleLabel || null,
       coverStyleReason: coverAsset.styleReason || null,
@@ -602,7 +606,18 @@ export async function POST(request: NextRequest) {
   await trackServerEvent({
     request,
     event: "mp_xhs_cover_success",
-    props: { source: "mp", cost: charged.cost, actionCode: charged.actionCode, assetCount: assetRefs.length, imageCount: imageUrls.length },
+    props: {
+      source: "mp",
+      cost: charged.cost,
+      actionCode: charged.actionCode,
+      assetCount: assetRefs.length,
+      imageCount: imageUrls.length,
+      model: typeof json?.model === "string" ? json.model : "",
+      fallbackUsed: json?.fallbackUsed === true,
+      providerFailureCount: typeof json?.providerFailureCount === "number" ? json.providerFailureCount : 0,
+      providerElapsedMs: typeof json?.providerElapsedMs === "number" ? json.providerElapsedMs : null,
+      totalElapsedMs: typeof json?.totalElapsedMs === "number" ? json.totalElapsedMs : null,
+    },
   })
 
   const res = NextResponse.json({ ...json, ok: json?.success !== false })
