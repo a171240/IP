@@ -101,9 +101,11 @@ all current dirty files; no mini-program upload in this backend release
 
 - Vercel project: `ip`
 - Preview deployment URL: not used.
-- Production deployment ID: pending.
+- Production deployment ID: `dpl_Ax9sqrXj3WYQYyyxaggnoMVvKoTG`
+- Production deployment URL: `https://ip-5b3v1wx2l-a171240s-projects.vercel.app`
+- Vercel inspector URL: `https://vercel.com/a171240s-projects/ip/Ax9sqrXj3WYQYyyxaggnoMVvKoTG`
 - Production alias/domain: `https://www.ipnrgc.com`
-- Deploy command: from clean worktree, `vercel deploy --prod`
+- Deploy command: from clean worktree `/tmp/manbeilian-backend-release-20260614-urPtGk`, `npx --yes vercel@latest deploy --prod --yes`
 
 Backend smoke results before deploy:
 
@@ -129,12 +131,28 @@ Required post-deploy checks:
 
 ```text
 curl -I https://www.ipnrgc.com/voice-coach-assets/manbeilian-knowledge/v1/covers/project-main.jpg
+HTTP/2 200, content-type: image/jpeg, content-length: 163536
+
 curl -I https://www.ipnrgc.com/voice-coach-assets/manbeilian-knowledge/v1/covers/chunguiye.jpg
+HTTP/2 200, content-type: image/jpeg, content-length: 197139
+
 curl -I https://www.ipnrgc.com/voice-coach-assets/manbeilian-knowledge/v1/covers/herbal.jpg
+HTTP/2 200, content-type: image/jpeg, content-length: 208575
+
 curl -I https://www.ipnrgc.com/voice-coach-assets/manbeilian-knowledge/v1/covers/coach.jpg
+HTTP/2 200, content-type: image/jpeg, content-length: 144137
+
+curl https://www.ipnrgc.com/api/mp/profile
+HTTP/2 401, {"ok":false,"error":"请先登录","code":"auth_required"}
+
+Single transient fetch failure during first full remote gate:
+images/manbeilian-learning-path-cards/card-02-day1-safety.jpg -> fetch failed.
+Immediate single URL retest:
+HTTP/2 200, content-type: image/jpeg, content-length: 363783, JPEG 900x1200.
 
 cd /Users/Admin/Documents/美业话镜小程序
 node tools/check-manbeilian-knowledge-assets.js --full-knowledge --skip-source-safety --remote --concurrency 1 --timeout-ms 45000
+PASS: expectedTaskCount=221, checkedCount=221, remote.failureCount=0
 ```
 
 ## Mini-program Upload
@@ -165,7 +183,7 @@ No mini-program upload is authorized in this backend release.
 
 ## Rollback / Recovery
 
-- Previous backend deployment ID: to be recorded after deploy inspection if needed.
+- Previous backend deployment ID: not captured in this thread; current deployment can be rolled back from Vercel dashboard if needed.
 - Previous mini-program version: unchanged.
 - Database rollback note: no database changes.
 - Who should be notified: user in current Codex thread.
@@ -173,9 +191,10 @@ No mini-program upload is authorized in this backend release.
 ## Final Decision
 
 - Release approved: yes, by user instruction in current thread.
-- Released by: pending.
-- Release time: pending.
+- Released by: Codex
+- Release time: 2026-06-14 20:42 Asia/Shanghai
 - Follow-up items:
-  - Deploy backend from clean worktree.
-  - Confirm four cover URLs return `200 image/jpeg`.
-  - Confirm Manbeilian remote full-knowledge check returns `221/221`.
+  - Backend production static-resource release complete.
+  - Four cover URLs return `200 image/jpeg`.
+  - Manbeilian remote full-knowledge check returns `221/221`.
+  - Mini-program upload remains separate and was not performed in this release.
