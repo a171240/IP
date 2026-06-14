@@ -1,6 +1,5 @@
 const test = require("node:test")
 const assert = require("node:assert/strict")
-const { execFileSync } = require("node:child_process")
 const { readFileSync } = require("node:fs")
 const { join, dirname } = require("node:path")
 const vm = require("node:vm")
@@ -31,21 +30,12 @@ function loadTsModule(filePath) {
   return moduleRef.exports
 }
 
-function runPosterModule(script) {
-  const stdout = execFileSync(
-    process.execPath,
-    ["--no-warnings", "--experimental-strip-types", "--input-type=module", "--eval", script],
-    { cwd: root, encoding: "utf8" }
-  )
-  return JSON.parse(stdout.trim())
-}
-
 test("poster template prompt carries premium art direction and user style preset", () => {
-  const result = runPosterModule(`
-    import { getPosterTemplate, renderPosterTemplate } from "./lib/posters/templates.ts";
-
-    const template = getPosterTemplate("P02");
-    const rendered = renderPosterTemplate(template, {
+  const { getPosterTemplate, renderPosterTemplate } = loadTsModule(join(root, "lib", "posters", "templates.ts"))
+  const template = getPosterTemplate("P02")
+  const rendered = renderPosterTemplate(
+    template,
+    {
       storeName: "椿舍皮肤管理",
       campaignTitle: "端午宠粉礼",
       subline: "愿你清爽一夏",
@@ -54,13 +44,17 @@ test("poster template prompt carries premium art direction and user style preset
       dateRange: "端午期间",
       _stylePreset: "端午国风杂志感，参考图风格",
       _constraints: "不要廉价促销，不要红黄大字",
-    }, "4:5");
-
-    console.log(JSON.stringify({
-      prompt: rendered.prompt,
-      negativePrompt: rendered.negativePrompt,
-    }));
-  `)
+    },
+    "4:5",
+    {
+      layoutPresetId: "card-benefits",
+      visualStylePresetId: "warm-campaign-card",
+    },
+  )
+  const result = {
+    prompt: rendered.prompt,
+    negativePrompt: rendered.negativePrompt,
+  }
 
   assert.match(result.prompt, /高级美术指导/)
   assert.match(result.prompt, /用户指定风格方向：端午国风杂志感，参考图风格/)
@@ -72,20 +66,82 @@ test("poster template prompt carries premium art direction and user style preset
   assert.match(result.prompt, /每条逐字出现一次/)
   assert.match(result.prompt, /背景信息，不要写进画面/)
   assert.match(result.prompt, /用户风格方向：端午国风杂志感，参考图风格/)
+  assert.match(result.prompt, /【版式预设】/)
+  assert.match(result.prompt, /卡片权益/)
+  assert.match(result.prompt, /【视觉风格预设】/)
+  assert.match(result.prompt, /温柔活动卡/)
   assert.match(result.negativePrompt, /Canva模板感/)
   assert.match(result.negativePrompt, /字体混乱/)
+  assert.match(result.negativePrompt, /爆炸贴纸/)
 })
 
 test("poster image routes support style reference assets without treating them as logo", () => {
   const generateRoute = readFileSync(join(root, "app/api/mp/posters/generate/route.ts"), "utf8")
   const assetsRoute = readFileSync(join(root, "app/api/mp/posters/assets/route.ts"), "utf8")
 
-  assert.match(generateRoute, /z\.enum\(\["style", "logo", "store", "product", "people"\]\)/)
-  assert.match(generateRoute, /assetRefs:\s*z\.array\(assetRefSchema\)\.max\(5\)/)
+  assert.match(generateRoute, /z\.enum\(\["style", "logo", "store", "product", "people", "qr"\]\)/)
+  assert.match(generateRoute, /assetRefs:\s*z\.array\(assetRefSchema\)\.max\(6\)/)
   assert.match(generateRoute, /resolution:\s*z\.enum\(\["1k"\]\)\.optional\(\)/)
   assert.match(generateRoute, /style:\s*"风格\/版式参考"/)
   assert.match(generateRoute, /风格\/版式参考图只用于学习构图、配色、字体气质、留白比例和高级感/)
-  assert.match(assetsRoute, /new Set<PosterAssetKind>\(\["style", "logo", "store", "product", "people"\]\)/)
+  assert.match(generateRoute, /if \(ref\.kind === "qr"\) continue/)
+  assert.match(assetsRoute, /new Set<PosterAssetKind>\(\["style", "logo", "store", "product", "people", "qr"\]\)/)
+})
+
+test("poster backend exposes and preserves layout, visual style, and QR protocol fields", () => {
+  const {
+    getPosterTemplate,
+    getPosterTemplateLayoutMap,
+    getPosterTemplateVisualStyleMap,
+    getPublicPosterLayoutPresets,
+    getPublicPosterVisualStylePresets,
+    renderPosterTemplate,
+  } = loadTsModule(join(root, "lib", "posters", "templates.ts"))
+  const templatesRoute = readFileSync(join(root, "app/api/mp/posters/templates/route.ts"), "utf8")
+  const generateRoute = readFileSync(join(root, "app/api/mp/posters/generate/route.ts"), "utf8")
+  const historyRoute = readFileSync(join(root, "app/api/mp/posters/history/route.ts"), "utf8")
+
+  assert.ok(getPublicPosterLayoutPresets().some((preset) => preset.id === "editorial-whitespace"))
+  assert.ok(getPublicPosterVisualStylePresets().some((preset) => preset.id === "frosted-glass-archive-cover"))
+  assert.deepEqual(getPosterTemplateLayoutMap().P01.slice(0, 2), ["editorial-whitespace", "center-square-brand"])
+  assert.equal(getPosterTemplateVisualStyleMap().P01[0], "frosted-glass-archive-cover")
+
+  const rendered = renderPosterTemplate(
+    getPosterTemplate("P01"),
+    {
+      storeName: "云朵美容院",
+      cityArea: "本地商圈",
+      headline: "新客补水体验",
+      subline: "99元补水护理",
+      projectName: "深层补水护理",
+      offerText: "99元",
+      trustRules: "扫码预约",
+    },
+    "4:5",
+    {
+      layoutPresetId: "editorial-whitespace",
+      visualStylePresetId: "frosted-glass-archive-cover",
+      qrState: { hasQr: true, reserveArea: true, compositeRequired: true },
+    },
+  )
+
+  assert.match(rendered.prompt, /雾面玻璃档案封面/)
+  assert.match(rendered.prompt, /二维码由小程序在保存时后合成/)
+  assert.equal(rendered.layoutPreset.id, "editorial-whitespace")
+  assert.equal(rendered.visualStylePreset.id, "frosted-glass-archive-cover")
+  assert.match(templatesRoute, /layoutPresets: getPublicPosterLayoutPresets\(\)/)
+  assert.match(templatesRoute, /visualStylePresets: getPublicPosterVisualStylePresets\(\)/)
+  assert.match(generateRoute, /layoutPresetId:\s*z\.string\(\)/)
+  assert.match(generateRoute, /visualStylePresetId:\s*z\.string\(\)/)
+  assert.match(generateRoute, /fieldSources:\s*z\.record\(z\.string\(\), fieldSourceSchema\)/)
+  assert.match(generateRoute, /qrState:\s*qrStateSchema/)
+  assert.match(generateRoute, /const qrAssetRefSchema = assetRefSchema\.refine/)
+  assert.match(generateRoute, /qrAssetRef:\s*qrAssetRefSchema/)
+  assert.match(generateRoute, /allowMissingFields:\s*z\.boolean\(\)/)
+  assert.match(generateRoute, /qrCompositePromptBlock\(qrState\)/)
+  assert.match(generateRoute, /layoutPreset,\n\s+visualStylePreset,\n\s+visualStylePresetId/)
+  assert.match(historyRoute, /visualStylePresetId: meta\?\.visualStylePresetId/)
+  assert.match(historyRoute, /qrAssetRef: meta\?\.qrAssetRef/)
 })
 
 test("poster image provider folds negative prompt into the submitted prompt", () => {
@@ -154,15 +210,15 @@ test("poster intake keeps user-provided style instead of overwriting it with def
   assert.match(intakeSource, /out\.stylePreset \|\|= stylePreset/)
   assert.match(intakeSource, /stylePreset:\s*asText\(answers\.stylePreset\) \|\| style\.stylePreset/)
   assert.match(intakeRoute, /用户说高级感、杂志感、轻奢、极简、温暖、类似某张图/)
-  assert.match(intakeRoute, /asset_refs:\s*z\.array\(z\.any\(\)\)\.max\(5\)/)
+  assert.match(intakeRoute, /asset_refs:\s*z\.array\(z\.any\(\)\)\.max\(6\)/)
 })
 
 test("non-promotional festival greetings route to a dedicated premium greeting template", () => {
-  const result = runPosterModule(`
-    import { getPosterTemplate, renderPosterTemplate } from "./lib/posters/templates.ts";
-
-    const template = getPosterTemplate("P13");
-    const rendered = renderPosterTemplate(template, {
+  const { getPosterTemplate, renderPosterTemplate } = loadTsModule(join(root, "lib", "posters", "templates.ts"))
+  const template = getPosterTemplate("P13")
+  const rendered = renderPosterTemplate(
+    template,
+    {
       storeName: "青禾养生",
       festivalName: "端午",
       blessingTitle: "端午安康",
@@ -171,13 +227,13 @@ test("non-promotional festival greetings route to a dedicated premium greeting t
       _industry: "养生美容",
       _stylePreset: "温暖克制的端午国风杂志感",
       _constraints: "不卖东西，不做促销",
-    }, "4:5");
-
-    console.log(JSON.stringify({
-      title: template.title,
-      prompt: rendered.prompt,
-    }));
-  `)
+    },
+    "4:5",
+  )
+  const result = {
+    title: template.title,
+    prompt: rendered.prompt,
+  }
   const intakeSource = readFileSync(join(root, "lib/posters/intake.ts"), "utf8")
   const intakeRoute = readFileSync(join(root, "app/api/mp/posters/intake/route.ts"), "utf8")
 

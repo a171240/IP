@@ -10,10 +10,15 @@ import {
 } from "@/lib/posters/gpt-image-2.server"
 import {
   buildFreeImagePrompt,
+  getDefaultPosterLayoutPresetId,
   getDefaultPosterNegativePrompt,
+  getDefaultPosterVisualStylePresetId,
   getMissingRequiredFields,
+  getPosterLayoutPreset,
   getPosterTemplate,
+  getPosterVisualStylePreset,
   renderPosterTemplate,
+  type PosterQrState,
   type PosterOverlay,
 } from "@/lib/posters/templates"
 import { sanitizePosterTemplateFields } from "@/lib/posters/intake"
@@ -35,11 +40,28 @@ export const maxDuration = 300
 const BASIC_POSTER_RESOLUTION = "1k" as const
 
 const assetRefSchema = z.object({
-  kind: z.enum(["style", "logo", "store", "product", "people"]),
+  kind: z.enum(["style", "logo", "store", "product", "people", "qr"]),
   bucket: z.string().trim().min(1).max(80),
   path: z.string().trim().min(1).max(300),
   contentType: z.string().trim().min(1).max(80),
 })
+const qrAssetRefSchema = assetRefSchema.refine((ref) => ref.kind === "qr", {
+  message: "qrAssetRef_must_be_qr",
+})
+
+const fieldSourceSchema = z.object({
+  value: z.string().trim().max(240).optional(),
+  source: z.string().trim().max(80).optional(),
+  visible: z.boolean().optional(),
+  confidence: z.string().trim().max(40).optional(),
+}).passthrough()
+
+const qrStateSchema = z.object({
+  hasQr: z.boolean().optional(),
+  source: z.string().trim().max(80).optional(),
+  reserveArea: z.boolean().optional(),
+  compositeRequired: z.boolean().optional(),
+}).passthrough()
 
 const bodySchema = z.object({
   mode: z.enum(["template", "free"]),
@@ -55,7 +77,14 @@ const bodySchema = z.object({
     .enum(["poster.generate.image", "poster.rewrite.text", "poster.regenerate.image"])
     .optional()
     .default("poster.generate.image"),
-  assetRefs: z.array(assetRefSchema).max(5).optional().default([]),
+  layoutPresetId: z.string().trim().max(80).optional().default(""),
+  visualStylePresetId: z.string().trim().max(80).optional().default(""),
+  fieldSources: z.record(z.string(), fieldSourceSchema).optional().default({}),
+  qrState: qrStateSchema.optional().default({}),
+  qrAssetRef: qrAssetRefSchema.optional(),
+  allowMissingFields: z.boolean().optional().default(false),
+  layoutReferenceMode: z.enum(["prompt-only", "image-reference", "none"]).optional().default("prompt-only"),
+  assetRefs: z.array(assetRefSchema).max(6).optional().default([]),
   size: z
     .enum(["auto", "1:1", "3:2", "2:3", "4:3", "3:4", "5:4", "4:5", "16:9", "9:16", "2:1", "1:2", "21:9", "9:21"])
     .optional(),
@@ -91,16 +120,20 @@ function assetPromptBlock(assetRefs: PosterAssetRef[]) {
     store: "门店环境",
     product: "产品或服务图",
     people: "人物或案例图",
+    qr: "二维码",
   }
+
+  const promptRefs = assetRefs.filter((ref) => ref.kind !== "qr")
+  if (!promptRefs.length) return ""
 
   return [
     "",
     "参考素材使用规则：",
-    ...assetRefs.map((ref, index) => `- 参考图 ${index + 1} 是${labels[ref.kind]}素材。`),
-    assetRefs.some((ref) => ref.kind === "style")
+    ...promptRefs.map((ref, index) => `- 参考图 ${index + 1} 是${labels[ref.kind]}素材。`),
+    promptRefs.some((ref) => ref.kind === "style")
       ? "- 风格/版式参考图只用于学习构图、配色、字体气质、留白比例和高级感；不要照抄其中的文字、Logo、人物、产品、价格或具体版面内容。"
       : "",
-    assetRefs.some((ref) => ref.kind === "logo")
+    promptRefs.some((ref) => ref.kind === "logo")
       ? "- Logo/门头素材必须在海报中可识别地出现，但允许按海报风格自然融入。"
       : "",
     "- 产品、门店、人物素材用于保持真实感和行业匹配，不要生成无关行业元素。",
@@ -108,6 +141,16 @@ function assetPromptBlock(assetRefs: PosterAssetRef[]) {
   ]
     .filter(Boolean)
     .join("\n")
+}
+
+function qrCompositePromptBlock(qrState: PosterQrState) {
+  if (!qrState.hasQr) return ""
+  return [
+    "",
+    "二维码后合成规则：",
+    "- 用户已上传二维码。二维码由小程序在保存时后合成，模型不要绘制、仿造、生成或扭曲二维码。",
+    "- 在底部 CTA 附近或右下区域预留一块干净浅色可读空间，不要让人物、产品、主标题或价格压住这块区域。",
+  ].join("\n")
 }
 
 function metadataObject(value: unknown, maxLength = 8000) {
@@ -129,7 +172,8 @@ async function assetRefsToImageUrls(opts: {
   const imageUrls: string[] = []
   const safePrefix = `posters/assets/${opts.userId}/`
 
-  for (const ref of opts.assetRefs.slice(0, 5)) {
+  for (const ref of opts.assetRefs.slice(0, 6)) {
+    if (ref.kind === "qr") continue
     if (ref.bucket !== opts.bucket) continue
     if (!ref.path.startsWith(safePrefix)) continue
     if (!ref.contentType.startsWith("image/")) continue
@@ -142,6 +186,17 @@ async function assetRefsToImageUrls(opts: {
   }
 
   return imageUrls
+}
+
+function normalizeQrState(input: unknown, assetRefs: PosterAssetRef[], qrAssetRef?: PosterAssetRef): PosterQrState {
+  const raw = input && typeof input === "object" ? input as PosterQrState : {}
+  const hasQr = !!raw.hasQr || !!qrAssetRef || assetRefs.some((ref) => ref.kind === "qr")
+  return {
+    hasQr,
+    source: String(raw.source || (hasQr ? "uploaded_asset" : "missing")).trim(),
+    reserveArea: !!raw.reserveArea || hasQr,
+    compositeRequired: !!raw.compositeRequired || hasQr,
+  }
 }
 
 async function persistPosterHistory(opts: {
@@ -194,14 +249,21 @@ export async function POST(request: NextRequest) {
   const warnings: string[] = []
   let renderedFields: Record<string, string> = {}
   let fieldSafety: ReturnType<typeof sanitizePosterTemplateFields> | null = null
+  let layoutPreset: ReturnType<typeof getPosterLayoutPreset> = null
+  let visualStylePreset: ReturnType<typeof getPosterVisualStylePreset> = null
 
   try {
+    const validAssetRefs = input.assetRefs as PosterAssetRef[]
+    const inputQrAssetRef = input.qrAssetRef as PosterAssetRef | undefined
+    const qrAssetRef = inputQrAssetRef || validAssetRefs.find((ref) => ref.kind === "qr")
+    const qrState = normalizeQrState(input.qrState, validAssetRefs, qrAssetRef)
+
     if (input.mode === "template") {
       const template = getPosterTemplate(input.templateId)
       if (!template) return NextResponse.json({ ok: false, error: "template_not_found" }, { status: 404 })
 
       const missing = getMissingRequiredFields(template, input.fields)
-      if (missing.length) {
+      if (missing.length && !input.allowMissingFields) {
         return NextResponse.json({ ok: false, error: "missing_fields", fields: missing }, { status: 400 })
       }
 
@@ -209,27 +271,55 @@ export async function POST(request: NextRequest) {
       size = input.size || template.defaultSize
       resolution = BASIC_POSTER_RESOLUTION
       fieldSafety = sanitizePosterTemplateFields(template.id, input.fields)
-      renderedFields = fieldSafety.fields
-      const rendered = renderPosterTemplate(template, renderedFields, size)
+      layoutPreset =
+        getPosterLayoutPreset(input.layoutPresetId || fieldSafety.fields._layoutPresetId || "") ||
+        getPosterLayoutPreset(getDefaultPosterLayoutPresetId(template.id))
+      visualStylePreset =
+        getPosterVisualStylePreset(input.visualStylePresetId || fieldSafety.fields._visualStylePresetId || "") ||
+        getPosterVisualStylePreset(getDefaultPosterVisualStylePresetId(template.id))
+      renderedFields = {
+        ...fieldSafety.fields,
+        ...(layoutPreset
+          ? {
+              _layoutPresetId: layoutPreset.id,
+              _layoutName: layoutPreset.name,
+              _layoutPresetVersion: layoutPreset.version,
+            }
+          : {}),
+        ...(visualStylePreset
+          ? {
+              _visualStylePresetId: visualStylePreset.id,
+              _visualStyleName: visualStylePreset.name,
+            }
+          : {}),
+      }
+      const rendered = renderPosterTemplate(template, renderedFields, size, {
+        layoutPresetId: layoutPreset?.id,
+        visualStylePresetId: visualStylePreset?.id,
+        qrState,
+      })
       prompt = rendered.prompt
       negativePrompt = rendered.negativePrompt
       overlay = rendered.overlay
       warnings.push("模型会直接生成完整海报，请重点核对标题、价格、日期和地址。")
       warnings.push("如果中文有错字，使用“文字更严格版”重新生成。")
+      if (missing.length) {
+        warnings.push("部分必填信息缺失，已按模板默认值补齐，请核对。")
+      }
       if (fieldSafety.sanitizedFields.length) {
         warnings.push("已自动移除不会印在海报上的用户指令文字。")
       }
     } else {
       if (!input.prompt.trim()) return NextResponse.json({ ok: false, error: "prompt_required" }, { status: 400 })
-      prompt = buildFreeImagePrompt(input.prompt)
+      prompt = [buildFreeImagePrompt(input.prompt), qrCompositePromptBlock(qrState)].filter(Boolean).join("\n")
       negativePrompt = getDefaultPosterNegativePrompt()
       overlay = { canvas: canvasForSize(size), slots: [] }
       warnings.push("自由生图不会自动校验商业海报文字，请生成后人工核对。")
     }
 
-    const validAssetRefs = input.assetRefs as PosterAssetRef[]
-    if (validAssetRefs.length) {
-      prompt = [prompt, assetPromptBlock(validAssetRefs)].filter(Boolean).join("\n")
+    const modelAssetRefs = validAssetRefs.filter((ref) => ref.kind !== "qr")
+    if (modelAssetRefs.length) {
+      prompt = [prompt, assetPromptBlock(modelAssetRefs)].filter(Boolean).join("\n")
     }
 
     const charge = await chargeMpAiPoints({
@@ -264,8 +354,8 @@ export async function POST(request: NextRequest) {
     })
 
     const bucket = getXhsAssetsBucket()
-    const imageUrls = validAssetRefs.length
-      ? await assetRefsToImageUrls({ bucket, userId: billing.ctx.userId, assetRefs: validAssetRefs })
+    const imageUrls = modelAssetRefs.length
+      ? await assetRefsToImageUrls({ bucket, userId: billing.ctx.userId, assetRefs: modelAssetRefs })
       : []
     const generated = await generateGptImage2({ prompt, negativePrompt, size, resolution, imageUrls })
     const posterId = randomUUID()
@@ -292,6 +382,36 @@ export async function POST(request: NextRequest) {
           size,
           resolution,
           fields: renderedFields,
+          fieldSources: metadataObject(input.fieldSources),
+          layoutPresetId: layoutPreset?.id || null,
+          layoutPreset: layoutPreset ? {
+            id: layoutPreset.id,
+            name: layoutPreset.name,
+            shortName: layoutPreset.shortName,
+            description: layoutPreset.description,
+            textDensity: layoutPreset.textDensity,
+            directTextRisk: layoutPreset.directTextRisk,
+            version: layoutPreset.version,
+          } : null,
+          visualStylePresetId: visualStylePreset?.id || null,
+          visualStylePreset: visualStylePreset ? {
+            id: visualStylePreset.id,
+            name: visualStylePreset.name,
+            shortName: visualStylePreset.shortName,
+            description: visualStylePreset.description,
+            textDensity: visualStylePreset.textDensity,
+            directTextRisk: visualStylePreset.directTextRisk,
+          } : null,
+          qrState,
+          qrAssetRef: qrAssetRef
+            ? {
+                kind: qrAssetRef.kind,
+                bucket: qrAssetRef.bucket,
+                path: qrAssetRef.path,
+                contentType: qrAssetRef.contentType,
+              }
+            : null,
+          layoutReferenceMode: input.layoutReferenceMode,
           posterPlan: metadataObject(input.posterPlan),
           visibleCopy: metadataObject(input.visibleCopy) || metadataObject(input.posterPlan?.visibleCopy),
           hiddenContext: metadataObject(input.hiddenContext) || metadataObject(input.posterPlan?.hiddenContext),
@@ -338,6 +458,12 @@ export async function POST(request: NextRequest) {
       warnings,
       overlay,
       fields: renderedFields,
+      fieldSources: input.fieldSources,
+      layoutPreset,
+      visualStylePreset,
+      visualStylePresetId: visualStylePreset?.id || "",
+      qrState,
+      qrAssetRef: qrAssetRef || null,
       safety: fieldSafety
         ? {
             sanitizedFields: fieldSafety.sanitizedFields,

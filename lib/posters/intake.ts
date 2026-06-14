@@ -1,6 +1,6 @@
 import "server-only"
 
-export type PosterAssetKind = "style" | "logo" | "store" | "product" | "people"
+export type PosterAssetKind = "style" | "logo" | "store" | "product" | "people" | "qr"
 
 export type PosterAssetRef = {
   kind: PosterAssetKind

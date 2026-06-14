@@ -65,9 +65,16 @@ export async function GET(request: NextRequest) {
         contentType: item.content_type,
         imageUrl: imageUrlForPoster(item.id),
         fields: meta?.fields || null,
+        fieldSources: meta?.fieldSources || null,
+        layoutPresetId: meta?.layoutPresetId || null,
+        layoutPreset: meta?.layoutPreset || null,
+        visualStylePresetId: meta?.visualStylePresetId || null,
+        visualStylePreset: meta?.visualStylePreset || null,
         posterPlan: meta?.posterPlan || null,
         visibleCopy: meta?.visibleCopy || null,
         hiddenContext: meta?.hiddenContext || null,
+        qrState: meta?.qrState || null,
+        qrAssetRef: meta?.qrAssetRef || null,
         assetRefs: Array.isArray(meta?.assetRefs) ? meta.assetRefs : [],
       }
     })

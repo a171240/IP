@@ -31,7 +31,7 @@ const bodySchema = z.object({
   messages: z.array(chatMessageSchema).max(12).optional().default([]),
   store_profile_id: z.string().uuid().optional(),
   answers: z.any().optional(),
-  asset_refs: z.array(z.any()).max(5).optional().default([]),
+  asset_refs: z.array(z.any()).max(6).optional().default([]),
 })
 
 type ChatMessage = z.infer<typeof chatMessageSchema>

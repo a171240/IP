@@ -46,6 +46,41 @@ export type PosterOverlay = {
   slots: Array<PosterTextSlot & { text: string }>
 }
 
+export type PosterPresetTextDensity = "low" | "medium" | "high"
+export type PosterDirectTextRisk = "low" | "medium" | "high"
+
+export type PosterLayoutPreset = {
+  id: string
+  name: string
+  shortName: string
+  description: string
+  textDensity: PosterPresetTextDensity
+  directTextRisk: PosterDirectTextRisk
+  version: string
+  prompt: string
+}
+
+export type PosterVisualStylePreset = {
+  id: string
+  name: string
+  shortName: string
+  description: string
+  textDensity: PosterPresetTextDensity
+  directTextRisk: PosterDirectTextRisk
+}
+
+type InternalPosterVisualStylePreset = PosterVisualStylePreset & {
+  prompt: string
+  negativePrompt?: string
+}
+
+export type PosterQrState = {
+  hasQr?: boolean
+  source?: string
+  reserveArea?: boolean
+  compositeRequired?: boolean
+}
+
 type InternalPosterTemplate = {
   id: string
   group: PosterTemplateGroup
@@ -65,6 +100,280 @@ type InternalPosterTemplate = {
   textRules: string[]
   promptBuilder: (fields: Record<string, string>) => string
   negativePrompt: string
+}
+
+const DEFAULT_LAYOUT_PRESET_ID = "editorial-whitespace"
+const DEFAULT_VISUAL_STYLE_PRESET_ID = "frosted-glass-archive-cover"
+
+const layoutPresets: PosterLayoutPreset[] = [
+  {
+    id: "editorial-whitespace",
+    name: "高级留白",
+    shortName: "留白",
+    description: "主视觉明确，文字放在安静留白处。",
+    textDensity: "low",
+    directTextRisk: "low",
+    version: "poster-layout-v1",
+    prompt: "采用品牌杂志式留白：一处主视觉、一处安静文字区、强对齐、少标签，避免画面被信息塞满。",
+  },
+  {
+    id: "center-square-brand",
+    name: "中心主视觉",
+    shortName: "中心",
+    description: "主体居中聚焦，品牌感稳定。",
+    textDensity: "low",
+    directTextRisk: "low",
+    version: "poster-layout-v1",
+    prompt: "主体居中或略偏上，背景干净，品牌名和主标题形成稳定中轴，适合高级主推和形象页。",
+  },
+  {
+    id: "grouped-service-modules",
+    name: "服务模块",
+    shortName: "模块",
+    description: "卖点和权益分组展示。",
+    textDensity: "medium",
+    directTextRisk: "medium",
+    version: "poster-layout-v1",
+    prompt: "把卖点、权益、时间和行动号召分成 2-3 个清晰模块，每组信息有边界，不堆小字。",
+  },
+  {
+    id: "card-benefits",
+    name: "卡片权益",
+    shortName: "卡片",
+    description: "用卡片承载权益或知识点。",
+    textDensity: "medium",
+    directTextRisk: "medium",
+    version: "poster-layout-v1",
+    prompt: "用少量精致卡片承载权益和卖点，卡片像真实品牌物料，不像廉价贴纸。",
+  },
+  {
+    id: "layered-product",
+    name: "层叠质感",
+    shortName: "层叠",
+    description: "主视觉和材质形成前后层次。",
+    textDensity: "medium",
+    directTextRisk: "medium",
+    version: "poster-layout-v1",
+    prompt: "用产品、花材、玻璃、织物等材质形成前后层次，文字保持在浅色留白区域。",
+  },
+  {
+    id: "campaign-motion-x",
+    name: "活动动势",
+    shortName: "动势",
+    description: "适合活动促销和开业张力。",
+    textDensity: "medium",
+    directTextRisk: "medium",
+    version: "poster-layout-v1",
+    prompt: "画面有轻微斜向动势和活动节奏，但价格与时间必须清楚，不要红黄促销传单感。",
+  },
+  {
+    id: "radial-event",
+    name: "节点放射",
+    shortName: "放射",
+    description: "中心主题向外展开节点信息。",
+    textDensity: "medium",
+    directTextRisk: "medium",
+    version: "poster-layout-v1",
+    prompt: "中心主题清晰，周围只展开少量关键节点，适合节日活动和开业节点。",
+  },
+  {
+    id: "grid-menu",
+    name: "网格菜单",
+    shortName: "网格",
+    description: "价目、菜单和清单更清楚。",
+    textDensity: "high",
+    directTextRisk: "high",
+    version: "poster-layout-v1",
+    prompt: "使用克制网格和清单层级展示项目或价目，保证每一项可读，避免模型自造额外项目。",
+  },
+  {
+    id: "diagonal-xhs-cover",
+    name: "斜线封面",
+    shortName: "斜线",
+    description: "适合探店、避坑和强标题封面。",
+    textDensity: "medium",
+    directTextRisk: "medium",
+    version: "poster-layout-v1",
+    prompt: "用斜向分割或强标题区域形成封面冲击，但只保留用户提供的可见文字。",
+  },
+  {
+    id: "visual-center-premium",
+    name: "视觉中心",
+    shortName: "焦点",
+    description: "单一焦点，适合高级主推。",
+    textDensity: "low",
+    directTextRisk: "low",
+    version: "poster-layout-v1",
+    prompt: "只保留一个强主视觉焦点，文字极少且高级，适合品牌形象和高客单项目。",
+  },
+]
+
+const visualStylePresets: InternalPosterVisualStylePreset[] = [
+  {
+    id: "frosted-glass-archive-cover",
+    name: "雾面玻璃档案封面",
+    shortName: "雾面",
+    description: "奶白、透明玻璃、浅色档案卡片，适合高级留白和新客信任。",
+    textDensity: "low",
+    directTextRisk: "low",
+    prompt: "视觉像高端美容院的雾面玻璃档案封面：奶白底、半透明玻璃质感、浅灰投影、少量鼠尾草绿或烟粉点缀，文字像品牌档案标题。",
+    negativePrompt: "重色块，霓虹灯，廉价玻璃拟态按钮",
+  },
+  {
+    id: "salon-real-light",
+    name: "真实护理光影",
+    shortName: "真实",
+    description: "真实护理室、柔和自然光、可触摸材质，减少模板感。",
+    textDensity: "low",
+    directTextRisk: "low",
+    prompt: "主视觉必须像真实美容院护理场景或商业摄影：柔光、干净护理床、毛巾、产品瓶和自然皮肤质感，避免棚拍假模特和塑料皮肤。",
+    negativePrompt: "假人脸，过度磨皮，医美手术器械，医院场景",
+  },
+  {
+    id: "editorial-serif-whitespace",
+    name: "宋体留白杂志",
+    shortName: "宋体",
+    description: "品牌杂志感宋体标题、大留白、强层级。",
+    textDensity: "low",
+    directTextRisk: "low",
+    prompt: "版面像中文高端生活方式杂志：大留白、宋体或明朝气质主标题、克制无衬线辅助文字，字距自然，整体安静有质感。",
+    negativePrompt: "描边大字，气泡字，字体混乱，标题挤压",
+  },
+  {
+    id: "warm-campaign-card",
+    name: "温柔活动卡",
+    shortName: "活动",
+    description: "温柔浅色活动氛围，权益清楚但不廉价。",
+    textDensity: "medium",
+    directTextRisk: "medium",
+    prompt: "活动信息用温柔浅色卡片承载：香槟白、烟粉、浅金，小面积强调价格和日期，像精品店活动物料，不像低价传单。",
+    negativePrompt: "爆炸贴纸，红黄促销，电商秒杀，夸张折扣角标",
+  },
+  {
+    id: "clean-menu-grid",
+    name: "清爽菜单网格",
+    shortName: "菜单",
+    description: "项目菜单、价格表和清单更清楚。",
+    textDensity: "high",
+    directTextRisk: "high",
+    prompt: "用清爽网格和服务清单组织信息，留出足够行距，项目名和价格分栏对齐，像真实门店价目卡。",
+    negativePrompt: "错列，密集小字，随机项目，价格乱码",
+  },
+  {
+    id: "local-life-cover",
+    name: "本地生活封面",
+    shortName: "探店",
+    description: "真实门店、强标题、适合探店/攻略封面。",
+    textDensity: "medium",
+    directTextRisk: "medium",
+    prompt: "整体像真实本地生活探店封面：强主标题、真实空间、少量标签，重点是可点击但不廉价。",
+    negativePrompt: "平台logo，小红书水印，假评分，假证书",
+  },
+  {
+    id: "festive-greeting-card",
+    name: "节日祝福贺卡",
+    shortName: "祝福",
+    description: "节日问候、老客关怀，不出现促销感。",
+    textDensity: "low",
+    directTextRisk: "low",
+    prompt: "像高端品牌节日贺卡：温暖、克制、留白、少量节日意象，只表达问候和祝福，不出现促销、抢购或预约压迫感。",
+    negativePrompt: "优惠券，促销标签，红包雨，销售话术",
+  },
+]
+
+const templateLayoutMap: Record<string, string[]> = {
+  P01: ["editorial-whitespace", "center-square-brand", "card-benefits"],
+  P02: ["campaign-motion-x", "card-benefits", "radial-event"],
+  P03: ["layered-product", "visual-center-premium", "card-benefits"],
+  P04: ["visual-center-premium", "editorial-whitespace", "center-square-brand"],
+  P05: ["card-benefits", "grouped-service-modules", "editorial-whitespace"],
+  P06: ["campaign-motion-x", "radial-event", "center-square-brand"],
+  P07: ["diagonal-xhs-cover", "editorial-whitespace", "center-square-brand"],
+  P08: ["diagonal-xhs-cover", "grouped-service-modules", "card-benefits"],
+  P09: ["grouped-service-modules", "card-benefits", "editorial-whitespace"],
+  P10: ["grid-menu", "grouped-service-modules", "card-benefits"],
+  P11: ["center-square-brand", "grid-menu", "visual-center-premium"],
+  P12: ["editorial-whitespace", "card-benefits", "center-square-brand"],
+  P13: ["editorial-whitespace", "center-square-brand", "radial-event"],
+}
+
+const templateVisualStyleMap: Record<string, string[]> = {
+  P01: ["frosted-glass-archive-cover", "salon-real-light", "editorial-serif-whitespace"],
+  P02: ["warm-campaign-card", "editorial-serif-whitespace", "frosted-glass-archive-cover"],
+  P03: ["salon-real-light", "editorial-serif-whitespace", "warm-campaign-card"],
+  P04: ["editorial-serif-whitespace", "salon-real-light", "frosted-glass-archive-cover"],
+  P05: ["frosted-glass-archive-cover", "warm-campaign-card", "editorial-serif-whitespace"],
+  P06: ["warm-campaign-card", "salon-real-light", "editorial-serif-whitespace"],
+  P07: ["local-life-cover", "salon-real-light", "editorial-serif-whitespace"],
+  P08: ["local-life-cover", "editorial-serif-whitespace", "warm-campaign-card"],
+  P09: ["editorial-serif-whitespace", "frosted-glass-archive-cover", "clean-menu-grid"],
+  P10: ["clean-menu-grid", "editorial-serif-whitespace", "frosted-glass-archive-cover"],
+  P11: ["editorial-serif-whitespace", "clean-menu-grid", "salon-real-light"],
+  P12: ["frosted-glass-archive-cover", "editorial-serif-whitespace", "warm-campaign-card"],
+  P13: ["festive-greeting-card", "editorial-serif-whitespace", "frosted-glass-archive-cover"],
+}
+
+function publicLayoutPreset(preset: PosterLayoutPreset) {
+  return {
+    id: preset.id,
+    name: preset.name,
+    shortName: preset.shortName,
+    description: preset.description,
+    textDensity: preset.textDensity,
+    directTextRisk: preset.directTextRisk,
+    version: preset.version,
+  }
+}
+
+function publicVisualStylePreset(preset: InternalPosterVisualStylePreset): PosterVisualStylePreset {
+  return {
+    id: preset.id,
+    name: preset.name,
+    shortName: preset.shortName,
+    description: preset.description,
+    textDensity: preset.textDensity,
+    directTextRisk: preset.directTextRisk,
+  }
+}
+
+function normalizePresetId(id: string) {
+  return String(id || "").trim()
+}
+
+export function getPublicPosterLayoutPresets() {
+  return layoutPresets.map(publicLayoutPreset)
+}
+
+export function getPublicPosterVisualStylePresets() {
+  return visualStylePresets.map(publicVisualStylePreset)
+}
+
+export function getPosterTemplateLayoutMap() {
+  return { ...templateLayoutMap }
+}
+
+export function getPosterTemplateVisualStyleMap() {
+  return { ...templateVisualStyleMap }
+}
+
+export function getDefaultPosterLayoutPresetId(templateId: string) {
+  const templateCandidates = templateLayoutMap[String(templateId || "").trim().toUpperCase()] || []
+  return templateCandidates[0] || DEFAULT_LAYOUT_PRESET_ID
+}
+
+export function getDefaultPosterVisualStylePresetId(templateId: string) {
+  const templateCandidates = templateVisualStyleMap[String(templateId || "").trim().toUpperCase()] || []
+  return templateCandidates[0] || DEFAULT_VISUAL_STYLE_PRESET_ID
+}
+
+export function getPosterLayoutPreset(id: string) {
+  const normalized = normalizePresetId(id)
+  return layoutPresets.find((preset) => preset.id === normalized) || null
+}
+
+export function getPosterVisualStylePreset(id: string) {
+  const normalized = normalizePresetId(id)
+  return visualStylePresets.find((preset) => preset.id === normalized) || null
 }
 
 const commonNegativePrompt = [
@@ -194,6 +503,35 @@ function premiumPosterDirectionBlock(fields: Record<string, string> = {}) {
     "配色：低饱和、干净、精致，允许象牙白、烟粉、鼠尾草绿、深棕、香槟金等小面积点缀；全图主色不超过 3 个。",
     "细节：装饰线、图标、标签只作为辅助；不要堆满小图标、小贴纸、随机英文、假按钮或无意义角标。",
   ].filter(Boolean)
+}
+
+function posterProtocolBlock(opts: {
+  layoutPresetId?: string
+  visualStylePresetId?: string
+  qrState?: PosterQrState
+}) {
+  const layoutPreset = getPosterLayoutPreset(opts.layoutPresetId || "")
+  const visualStylePreset = getPosterVisualStylePreset(opts.visualStylePresetId || "")
+  const hasQr = !!opts.qrState?.hasQr
+
+  return [
+    layoutPreset ? "【版式预设】" : "",
+    layoutPreset ? `- 预设：${layoutPreset.name}（${layoutPreset.id}）。${layoutPreset.description}` : "",
+    layoutPreset ? `- 执行方式：${layoutPreset.prompt}` : "",
+    layoutPreset
+      ? `- 信息密度：${layoutPreset.textDensity}；模型直接写字风险：${layoutPreset.directTextRisk}。风险越高越要减少装饰、优先保证中文可读。`
+      : "",
+    visualStylePreset ? "" : "",
+    visualStylePreset ? "【视觉风格预设】" : "",
+    visualStylePreset ? `- 预设：${visualStylePreset.name}（${visualStylePreset.id}）。${visualStylePreset.description}` : "",
+    visualStylePreset ? `- 执行方式：${visualStylePreset.prompt}` : "",
+    hasQr ? "" : "",
+    hasQr ? "【二维码后合成】" : "",
+    hasQr ? "- 用户已上传二维码。二维码由小程序在保存时后合成，模型不要绘制、仿造、生成或扭曲二维码。" : "",
+    hasQr ? "- 在底部 CTA 附近或右下区域预留一块干净浅色可读空间，不要让人物、产品、主标题或价格压住这块区域。" : "",
+  ]
+    .filter(Boolean)
+    .join("\n")
 }
 
 function visualBrief(input: {
@@ -894,20 +1232,47 @@ export function getMissingRequiredFields(template: InternalPosterTemplate, field
 export function renderPosterTemplate(
   template: InternalPosterTemplate,
   fields: Record<string, string>,
-  size?: PosterImageSize
+  size?: PosterImageSize,
+  options: {
+    layoutPresetId?: string
+    visualStylePresetId?: string
+    qrState?: PosterQrState
+  } = {}
 ) {
   const mapped = fieldMap(fields, template.requiredFields)
+  const layoutPresetId = options.layoutPresetId || mapped._layoutPresetId || getDefaultPosterLayoutPresetId(template.id)
+  const visualStylePresetId =
+    options.visualStylePresetId || mapped._visualStylePresetId || getDefaultPosterVisualStylePresetId(template.id)
+  const layoutPreset = getPosterLayoutPreset(layoutPresetId) || getPosterLayoutPreset(DEFAULT_LAYOUT_PRESET_ID)
+  const visualStylePreset =
+    getPosterVisualStylePreset(visualStylePresetId) || getPosterVisualStylePreset(DEFAULT_VISUAL_STYLE_PRESET_ID)
+  if (layoutPreset) {
+    mapped._layoutPresetId = layoutPreset.id
+    mapped._layoutName = layoutPreset.name
+    mapped._layoutPresetVersion = layoutPreset.version
+  }
+  if (visualStylePreset) {
+    mapped._visualStylePresetId = visualStylePreset.id
+    mapped._visualStyleName = visualStylePreset.name
+  }
   mapped._requestedSize = size || template.defaultSize
   const canvas = canvasForSize(size || template.defaultSize)
   const overlay: PosterOverlay = {
     canvas,
     slots: template.textSlots.map((slot) => ({ ...slot, text: mapped[slot.key] || "" })).filter((slot) => slot.text),
   }
+  const protocol = posterProtocolBlock({
+    layoutPresetId: layoutPreset?.id,
+    visualStylePresetId: visualStylePreset?.id,
+    qrState: options.qrState,
+  })
 
   return {
-    prompt: template.promptBuilder(mapped),
-    negativePrompt: template.negativePrompt,
+    prompt: [template.promptBuilder(mapped), protocol].filter(Boolean).join("\n\n"),
+    negativePrompt: [template.negativePrompt, visualStylePreset?.negativePrompt].filter(Boolean).join("，"),
     overlay,
+    layoutPreset: layoutPreset ? publicLayoutPreset(layoutPreset) : null,
+    visualStylePreset: visualStylePreset ? publicVisualStylePreset(visualStylePreset) : null,
   }
 }
 
