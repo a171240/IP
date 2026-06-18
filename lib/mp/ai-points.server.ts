@@ -60,7 +60,7 @@ const MP_SERVICE_PLAN_LABELS: Record<PlanId, string> = {
 
 const ACCOUNT_ROLE_LABELS: Record<string, string> = {
   company_owner: "公司主账号",
-  company_admin: "公司账号",
+  company_admin: "总管理员",
   merchant_owner: "商家主账号",
   merchant_admin: "商家账号",
   store_owner: "门店主账号",

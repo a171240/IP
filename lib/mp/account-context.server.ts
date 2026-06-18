@@ -70,7 +70,7 @@ type SupabaseUserLike = {
 
 const ROLE_LABELS: Record<MpAccountRole, string> = {
   company_owner: "公司主账号",
-  company_admin: "公司管理员",
+  company_admin: "总管理员",
   merchant_owner: "商家主账号",
   merchant_admin: "商家管理员",
   store_owner: "门店主账号",
