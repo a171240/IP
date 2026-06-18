@@ -144,6 +144,44 @@ test("poster backend exposes and preserves layout, visual style, and QR protocol
   assert.match(historyRoute, /qrAssetRef: meta\?\.qrAssetRef/)
 })
 
+test("poster required-field checks do not treat template defaults as supplied input", () => {
+  const { getPosterTemplate, getMissingRequiredFields, renderPosterTemplate } = loadTsModule(
+    join(root, "lib", "posters", "templates.ts"),
+  )
+  const template = getPosterTemplate("P13")
+
+  assert.deepEqual(getMissingRequiredFields(template, {}), [
+    "storeName",
+    "festivalName",
+    "blessingTitle",
+    "blessingSubtitle",
+    "signature",
+  ])
+  assert.deepEqual(getMissingRequiredFields(template, { storeName: "椿舍日式美肌" }), [
+    "festivalName",
+    "blessingTitle",
+    "blessingSubtitle",
+    "signature",
+  ])
+
+  const rendered = renderPosterTemplate(template, {}, "4:5")
+  assert.match(rendered.prompt, /端午安康/)
+})
+
+test("poster generation metadata keeps a request audit for missing-field diagnosis", () => {
+  const generateRoute = readFileSync(join(root, "app", "api", "mp", "posters", "generate", "route.ts"), "utf8")
+
+  assert.match(generateRoute, /requestAudit:\s*\{/)
+  assert.match(generateRoute, /intakeReady:\s*z\.boolean\(\)/)
+  assert.match(generateRoute, /intakeMissingFields:\s*z\.array\(z\.string\(\)/)
+  assert.match(generateRoute, /error:\s*"intake_not_ready"/)
+  assert.match(generateRoute, /rawFieldKeys:\s*Object\.keys\(input\.fields \|\| \{\}\)/)
+  assert.match(generateRoute, /missingRequiredFields/)
+  assert.match(generateRoute, /intakeReady:\s*input\.intakeReady/)
+  assert.match(generateRoute, /intakeMissingFields:\s*input\.intakeMissingFields/)
+  assert.match(generateRoute, /allowMissingFields:\s*input\.allowMissingFields/)
+})
+
 test("poster image provider folds negative prompt into the submitted prompt", () => {
   const providerSource = readFileSync(join(root, "lib/posters/gpt-image-2.server.ts"), "utf8")
 

@@ -73,6 +73,8 @@ const bodySchema = z.object({
   hiddenContext: z.any().optional(),
   sessionId: z.string().trim().max(80).optional().default(""),
   briefId: z.string().trim().max(80).optional().default(""),
+  intakeReady: z.boolean().optional().default(false),
+  intakeMissingFields: z.array(z.string().trim().max(80)).max(20).optional().default([]),
   action_code: z
     .enum(["poster.generate.image", "poster.rewrite.text", "poster.regenerate.image"])
     .optional()
@@ -251,6 +253,7 @@ export async function POST(request: NextRequest) {
   let fieldSafety: ReturnType<typeof sanitizePosterTemplateFields> | null = null
   let layoutPreset: ReturnType<typeof getPosterLayoutPreset> = null
   let visualStylePreset: ReturnType<typeof getPosterVisualStylePreset> = null
+  let missingRequiredFields: string[] = []
 
   try {
     const validAssetRefs = input.assetRefs as PosterAssetRef[]
@@ -262,9 +265,17 @@ export async function POST(request: NextRequest) {
       const template = getPosterTemplate(input.templateId)
       if (!template) return NextResponse.json({ ok: false, error: "template_not_found" }, { status: 404 })
 
-      const missing = getMissingRequiredFields(template, input.fields)
-      if (missing.length && !input.allowMissingFields) {
-        return NextResponse.json({ ok: false, error: "missing_fields", fields: missing }, { status: 400 })
+      const intakeMissingFields = input.intakeMissingFields.filter(Boolean)
+      if (!input.intakeReady && intakeMissingFields.length && !input.allowMissingFields) {
+        return NextResponse.json(
+          { ok: false, error: "intake_not_ready", fields: intakeMissingFields },
+          { status: 400 },
+        )
+      }
+
+      missingRequiredFields = getMissingRequiredFields(template, input.fields)
+      if (missingRequiredFields.length && !input.allowMissingFields) {
+        return NextResponse.json({ ok: false, error: "missing_fields", fields: missingRequiredFields }, { status: 400 })
       }
 
       templateId = template.id
@@ -303,7 +314,7 @@ export async function POST(request: NextRequest) {
       overlay = rendered.overlay
       warnings.push("模型会直接生成完整海报，请重点核对标题、价格、日期和地址。")
       warnings.push("如果中文有错字，使用“文字更严格版”重新生成。")
-      if (missing.length) {
+      if (missingRequiredFields.length) {
         warnings.push("部分必填信息缺失，已按模板默认值补齐，请核对。")
       }
       if (fieldSafety.sanitizedFields.length) {
@@ -383,6 +394,14 @@ export async function POST(request: NextRequest) {
           resolution,
           fields: renderedFields,
           fieldSources: metadataObject(input.fieldSources),
+          requestAudit: {
+            rawFieldKeys: Object.keys(input.fields || {}).filter((key) => !key.startsWith("_")).sort(),
+            missingRequiredFields,
+            allowMissingFields: input.allowMissingFields,
+            intakeReady: input.intakeReady,
+            intakeMissingFields: input.intakeMissingFields,
+            fieldSourceKeys: Object.keys(input.fieldSources || {}).sort(),
+          },
           layoutPresetId: layoutPreset?.id || null,
           layoutPreset: layoutPreset ? {
             id: layoutPreset.id,
@@ -459,6 +478,7 @@ export async function POST(request: NextRequest) {
       overlay,
       fields: renderedFields,
       fieldSources: input.fieldSources,
+      missingRequiredFields,
       layoutPreset,
       visualStylePreset,
       visualStylePresetId: visualStylePreset?.id || "",

@@ -445,15 +445,24 @@ function field(
   return { key, label, placeholder, defaultValue, maxLength, help, inputType, required: true }
 }
 
-function cleanFieldValue(fields: Record<string, string>, spec: PosterTemplateField) {
-  const raw = String(fields[spec.key] ?? spec.defaultValue ?? "").trim()
+function cleanFieldValue(
+  fields: Record<string, string>,
+  spec: PosterTemplateField,
+  options: { useDefaultValue?: boolean } = {},
+) {
+  const fallback = options.useDefaultValue === false ? "" : spec.defaultValue ?? ""
+  const raw = String(fields[spec.key] ?? fallback).trim()
   if (!spec.maxLength || raw.length <= spec.maxLength) return raw
   return raw.slice(0, spec.maxLength)
 }
 
-function fieldMap(fields: Record<string, string>, specs: PosterTemplateField[]) {
+function fieldMap(
+  fields: Record<string, string>,
+  specs: PosterTemplateField[],
+  options: { useDefaultValue?: boolean } = {},
+) {
   const mapped = specs.reduce<Record<string, string>>((acc, spec) => {
-    acc[spec.key] = cleanFieldValue(fields, spec)
+    acc[spec.key] = cleanFieldValue(fields, spec, options)
     return acc
   }, {})
   for (const [key, value] of Object.entries(fields)) {
@@ -1223,7 +1232,7 @@ export function getPosterTemplate(id: string) {
 }
 
 export function getMissingRequiredFields(template: InternalPosterTemplate, fields: Record<string, string>) {
-  const mapped = fieldMap(fields, template.requiredFields)
+  const mapped = fieldMap(fields, template.requiredFields, { useDefaultValue: false })
   return template.requiredFields
     .filter((spec) => spec.required !== false && !mapped[spec.key])
     .map((spec) => spec.key)
