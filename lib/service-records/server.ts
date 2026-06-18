@@ -182,12 +182,14 @@ export function toPublicSession(row: any) {
 }
 
 export function toPublicSegment(row: any) {
+  const metadata = isRecord(row?.metadata) ? row.metadata : {}
   return {
     id: row.id,
     client_segment_id: row.client_segment_id,
     segment_index: row.segment_index,
     status: row.status,
     format: row.format || "",
+    content_type: cleanText(row.content_type, 120),
     audio_bytes: Number(row.audio_bytes || 0),
     client_audio_seconds: row.client_audio_seconds == null ? null : Number(row.client_audio_seconds),
     started_at: row.started_at || null,
@@ -195,6 +197,22 @@ export function toPublicSegment(row: any) {
     uploaded_at: row.uploaded_at || null,
     asr_status: row.asr_status || "pending",
     transcript_text: row.transcript_text || "",
+    audio_available: Boolean(row.storage_path),
+    storage_provider: cleanText(metadata.storage_provider, 80),
+    upload_source: cleanText(metadata.upload_source, 80),
+    audio_format_guess: cleanText(metadata.audio_format_guess, 200),
+    original_file_name: cleanText(metadata.original_file_name, 200),
+    source_file_key: cleanText(metadata.source_file_key, 360),
+    device_id: cleanText(metadata.device_id, 180),
+    device_name: cleanText(metadata.device_name, 120),
+    device_file_name: cleanText(metadata.device_file_name, 220),
+    device_file_time: metadata.device_file_time || null,
+    device_file_size: metadata.device_file_size || null,
+    reused_upload: Boolean(metadata.reused_upload),
+    reused_from_segment_id: cleanText(metadata.reused_from_segment_id, 160),
+    playback_api_url: row.session_id && row.id
+      ? `/api/mp/service-records/sessions/${encodeURIComponent(String(row.session_id))}/audio/${encodeURIComponent(String(row.id))}`
+      : "",
   }
 }
 

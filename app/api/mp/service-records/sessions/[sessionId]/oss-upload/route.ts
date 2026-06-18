@@ -13,7 +13,15 @@ import {
   isRecord,
   jsonError,
   resolveServiceRecordAuth,
+  toPublicSegment,
 } from "@/lib/service-records/server"
+import {
+  findReusableServiceRecordSegment,
+  findReusableServiceRecordSegmentBySourceMeta,
+  reusableSegmentHasAudio,
+  serviceRecordAppendClosed,
+  sourceFileMetadataFromPayload,
+} from "@/lib/service-records/segments.server"
 
 export const runtime = "nodejs"
 
@@ -23,6 +31,24 @@ function audioFormat(format: unknown) {
   if (normalized === "flac") return { format: "flac", ext: "flac", contentType: "audio/flac" }
   if (normalized === "mp3") return { format: "mp3", ext: "mp3", contentType: "audio/mpeg" }
   return { format: "ogg", ext: "ogg", contentType: "audio/ogg" }
+}
+
+function uploadPolicyMaxBytes(payload: Record<string, unknown>, detected: ReturnType<typeof audioFormat>, audioBytes: number, maxDirectBytes: number) {
+  if (!audioBytes) return maxDirectBytes
+  const base = Math.min(audioBytes, maxDirectBytes)
+  const genericSlack = Math.ceil(base * 1.02) + 1024
+  if (detected.format !== "ogg") return Math.min(maxDirectBytes, genericSlack)
+
+  const source = cleanText(payload.source, 80)
+  const guess = cleanText(payload.audio_format_guess, 200)
+  const likelyRawL12Opus = source === "ble_card" || /裸\s*Opus|raw\s*opus/i.test(guess)
+  if (!likelyRawL12Opus) return Math.min(maxDirectBytes, Math.max(genericSlack, Math.ceil(base * 1.05) + 8192))
+
+  const frameBytes = 40
+  const frames = Math.ceil(base / frameBytes)
+  const oggPageCount = Math.ceil(frames / 255) + 2
+  const oggContainerSlack = frames + oggPageCount * 32 + 8192
+  return Math.min(maxDirectBytes, Math.max(genericSlack, base + oggContainerSlack, Math.ceil(base * 1.08) + 64 * 1024))
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ sessionId: string }> }) {
@@ -38,7 +64,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const loaded = await getOwnedServiceRecordSession(admin, ctx, id)
   if ("error" in loaded) return loaded.error
   const session = loaded.session
-  if (["processing", "completed", "failed", "cancelled"].includes(String(session.status || ""))) {
+  if (serviceRecordAppendClosed(session.status)) {
     return jsonError(409, "service_record_closed", "service_record_closed")
   }
 
@@ -55,6 +81,40 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return jsonError(400, "audio_too_large", "audio_too_large", { max_bytes: maxDirectBytes })
   }
 
+  const sourceMeta = sourceFileMetadataFromPayload(payload)
+  let reusable = sourceMeta.source_file_key
+    ? await findReusableServiceRecordSegment(admin, session, String(sourceMeta.source_file_key))
+    : null
+  if (!reusableSegmentHasAudio(reusable)) {
+    reusable = await findReusableServiceRecordSegmentBySourceMeta(admin, session, sourceMeta)
+  }
+  if (reusableSegmentHasAudio(reusable)) {
+    return NextResponse.json({
+      ok: true,
+      reused: true,
+      upload: {
+        provider: "aliyun_oss",
+        bucket: reusable.storage_bucket || "",
+        url: "",
+        method: "REUSE",
+        object_key: reusable.storage_path,
+        fields: {},
+        expires_at: null,
+        max_bytes: Number(reusable.audio_bytes || audioBytes || 0),
+        content_type: reusable.content_type || detected.contentType,
+        reused: true,
+      },
+      reusable_segment: toPublicSegment(reusable),
+      segment: {
+        client_segment_id: clientSegmentId,
+        segment_index: segmentIndex,
+        format: reusable.format || detected.format,
+        content_type: reusable.content_type || detected.contentType,
+        reused_from_segment_id: reusable.id,
+      },
+    })
+  }
+
   const objectKey = buildServiceRecordOssObjectKey({
     session,
     clientSegmentId,
@@ -63,7 +123,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const policy = createAliyunOssPostPolicy({
     objectKey,
     contentType: detected.contentType,
-    maxBytes: audioBytes ? Math.min(maxDirectBytes, Math.ceil(audioBytes * 1.02) + 1024) : maxDirectBytes,
+    maxBytes: uploadPolicyMaxBytes(payload, detected, audioBytes, maxDirectBytes),
   })
 
   return NextResponse.json({

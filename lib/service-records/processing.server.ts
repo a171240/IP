@@ -10,6 +10,7 @@ import { cleanText, isRecord, numberValue } from "@/lib/service-records/server"
 
 type ProcessOptions = {
   pollLimit?: number
+  allowFallbackCompletion?: boolean
 }
 
 type DeepSeekMessage = {
@@ -91,6 +92,15 @@ function oneOf(value: unknown, allowed: string[], fallback: string) {
   return allowed.includes(text) ? text : fallback
 }
 
+function booleanValue(value: unknown, fallback = false) {
+  if (typeof value === "boolean") return value
+  const text = cleanText(value, 20).toLowerCase()
+  if (!text) return fallback
+  if (["1", "true", "yes", "on"].includes(text)) return true
+  if (["0", "false", "no", "off"].includes(text)) return false
+  return fallback
+}
+
 function listRecordFrom<T>(value: unknown, mapper: (item: any, index: number) => T | null, fallback: T[] = [], max = 8) {
   const items = Array.isArray(value)
     ? value.map((item, index) => mapper(recordFrom(item), index)).filter(Boolean) as T[]
@@ -114,6 +124,29 @@ function asrQualityOf(segments: any[], counts: ReturnType<typeof statusCounts>, 
   if (!transcript || counts.done === 0) return "poor"
   if (counts.failed || counts.pending || counts.running || transcript.length < 160) return "partial"
   return "good"
+}
+
+function audioEvidenceFromSegments(segments: any[]) {
+  const audioSegments = segments
+    .filter((segment) => cleanText(segment.storage_path, 2000))
+    .map((segment) => ({
+      id: cleanText(segment.id, 160),
+      segment_index: Number(segment.segment_index || 0) || null,
+      client_segment_id: cleanText(segment.client_segment_id, 160),
+      content_type: cleanText(segment.content_type, 120) || "audio/ogg",
+      audio_bytes: Math.max(0, Math.round(numberValue(segment.audio_bytes, 0))),
+      duration_seconds: Math.max(0, Math.round(numberValue(segment.client_audio_seconds, 0))),
+    }))
+
+  return {
+    saved: audioSegments.length > 0,
+    status_label: audioSegments.length ? "原音已保存" : "原音待确认",
+    playback_available: false,
+    signed_url_required: true,
+    segment_count: audioSegments.length,
+    first_segment_id: audioSegments[0]?.id || "",
+    segments: audioSegments.slice(0, 12),
+  }
 }
 
 function buildDeepSeekMessages(session: any, segments: any[], markers: any[], counts: ReturnType<typeof statusCounts>): DeepSeekMessage[] {
@@ -306,28 +339,36 @@ function buildServiceMinutesV2Messages(
     "你是美业门店的服务复盘助手，负责把到店服务录音整理为“美业门店智能纪要”。",
     "只输出严格 JSON object，不要 Markdown，不要解释，不要包裹代码块。",
     "你不是医疗诊断助手。不要编造顾客事实、价格、疗效、成交结果或护理效果；不要使用保证性表达。",
-    "如果转写像测试语音、随机内容、噪音、断裂文本或信息不足，recording.asr_quality 必须为 partial 或 poor，并在 recording.quality_warnings 里说明，结论要保守。",
+    "正式/基础纪要不能只是转写摘录或流水账，必须把可用转写整理成：顾客真实关注、员工下一句怎么说、店长今日动作、可复核原话证据。",
+    "如果转写中有真实服务沟通，至少输出 1 条 customer_concerns 或 1 条 todos；如果没有明确销售机会或风险，可以留空，但要说明下次先补问什么。",
+    "不要把“录音已保存/请复核转写”当成正式纪要结论；那只允许出现在 transcript_only 模式。",
+    "如果转写像测试语音、随机内容、噪音、断裂文本、游戏/闲聊/朗读内容或信息不足，recording.asr_quality 必须为 partial 或 poor，recording.can_generate_business_minutes 必须为 false，recording.business_minutes_mode 必须为 transcript_only。",
     "证据摘录必须来自转写原文，单条不超过 60 个中文字符；没有证据就留空或省略。",
     "输出字段必须符合：",
     "{",
     '  "version": "service_minutes_v2",',
     '  "title": "本轮服务智能纪要",',
-    '  "recording": { "theme": "", "started_at": "", "ended_at": "", "duration_seconds": 0, "segment_count": 0, "asr_quality": "good|partial|poor", "quality_warnings": [] },',
+    '  "recording": { "theme": "", "started_at": "", "ended_at": "", "duration_seconds": 0, "segment_count": 0, "asr_quality": "good|partial|poor", "quality_warnings": [], "can_generate_business_minutes": true, "business_minutes_mode": "formal|basic|transcript_only", "quality_reason": "" },',
     '  "executive_summary": { "one_line": "", "service_outcome": "", "customer_state": "", "staff_state": "" },',
-    '  "todos": [{ "owner": "manager|staff|ops", "priority": "high|normal|low", "title": "", "detail": "", "due_hint": "" }],',
+    '  "todos": [{ "owner": "manager|staff|ops", "priority": "high|normal|low", "title": "", "detail": "", "due_hint": "", "evidence": "" }],',
     '  "customer_concerns": [{ "concern": "", "evidence": "", "follow_up_angle": "" }],',
     '  "sales_opportunities": [{ "type": "project_conversion|renewal|upgrade|follow_up|manager_intervention", "signal": "", "evidence": "", "suggested_offer": "", "priority": "high|normal|low", "owner": "staff|manager", "due_hint": "", "confidence": "high|medium|low", "compliance_note": "" }],',
+    '  "risk_warnings": [{ "type": "complaint|churn|professional|expectation|compliance|service_gap", "trigger": "", "evidence": "", "recommended_response": "", "manager_required": true }],',
     '  "staff_review": { "highlights": [], "misses": [], "missed_sales_signals": [], "coaching_tips": [], "next_script": "" },',
-    '  "manager_brief": { "priority": "high|normal|low", "one_line": "", "conversion_opportunity": "", "main_risk": "", "recommended_owner": "manager|staff", "next_action": "", "training_topics": [] },',
+    '  "manager_brief": { "priority": "high|normal|low", "one_line": "", "opportunity_one_line": "", "risk_one_line": "", "conversion_opportunity": "", "main_risk": "", "recommended_owner": "manager|staff", "intervention_needed": false, "next_action": "", "training_topics": [] },',
     '  "customer_profile_update_suggestions": { "new_concerns": [], "new_preferences": [], "project_interests": [], "commitments": [], "follow_up_suggestions": [], "risk_notes": [] },',
     '  "smart_chapters": [{ "start_seconds": 0, "time_label": "00:00", "title": "", "summary": "", "signals": [] }],',
     '  "key_decisions": [{ "decision": "", "problem": "", "basis": "", "next_action": "" }],',
     '  "manager_review": { "summary": "", "deal_signals": [], "professional_questions": [], "intervention_points": [], "training_topics": [], "risk_warnings": [] },',
     '  "knowledge_assets": { "customer_profile_updates": [], "knowledge_base_candidates": [], "content_material_candidates": [] },',
+    '  "voice_coach_payload": { "scenario": "", "customer_focus": [], "sales_opportunities": [], "staff_misses": [], "practice_goal": "", "opening_script": "" },',
+    '  "evidence_timeline": [{ "time_label": "", "type": "concern|opportunity|risk|coaching", "quote": "", "related_card_id": "" }],',
     '  "quote_moments": [{ "quote": "", "why_it_matters": "", "time_label": "" }]',
     "}",
-    "数组上限：todos 5；customer_concerns 6；sales_opportunities 5；smart_chapters 10；key_decisions 5；quote_moments 5；其他数组最多 6。",
+    "数组上限：todos 5；customer_concerns 6；sales_opportunities 5；risk_warnings 5；smart_chapters 10；key_decisions 5；quote_moments 5；evidence_timeline 12；其他数组最多 6。",
+    "当 can_generate_business_minutes=false 或 business_minutes_mode=transcript_only 时：sales_opportunities 必须为空，customer_profile_update_suggestions 只保留 risk_notes 或 follow_up_suggestions，manager_brief.priority 用 low，结论只能提示先复核原音和转写。",
     "销售机会必须基于转写证据或顾客档案上下文，不能为了推项目而硬编；不确定时 confidence 用 low。",
+    "risk_warnings 必须是店长能处理的风险，不要把普通质量提醒包装成投诉风险；没有顾客原话时 evidence 留空。",
     "顾客档案内容只能输出 customer_profile_update_suggestions，表示待确认建议，不能写成已更新事实。",
     "语言要求：使用门店员工和店长能直接执行的中文，不要出现后端字段名。",
   ].join("\n")
@@ -648,11 +689,19 @@ function buildServiceMinutesV2Fallback(
     ...listFrom(managerReview.deal_signals, [], 6),
     ...listFrom(markers.filter((marker) => marker.marker_type === "deal_signal").map((marker) => marker.label), [], 6),
   ])).slice(0, 5)
+  const audioEvidence = audioEvidenceFromSegments(segments)
   const customerProfileSuggestions = listFrom(operations.customer_profile_suggestions, [], 6)
   const managerTrainingTopics = listFrom(managerReview.training_topics, [], 5)
   const managerInterventions = listFrom(managerReview.manager_intervention, [], 5)
+  const canGenerateBusinessMinutes = hasTranscript && counts.done > 0 && transcript.length >= 160
+  const businessMinutesMode = canGenerateBusinessMinutes
+    ? (session.customer_profile_id || session.scene_card_id ? "formal" : "basic")
+    : "transcript_only"
+  const qualityReason = canGenerateBusinessMinutes
+    ? "录音转写已具备基础复盘条件。"
+    : (warnings[0] || "转写信息不足，暂不适合生成正式经营纪要。")
 
-  return {
+  const fallback = {
     version: "service_minutes_v2",
     title: "本轮服务智能纪要",
     recording: {
@@ -663,6 +712,13 @@ function buildServiceMinutesV2Fallback(
       segment_count: counts.total,
       asr_quality: asrQualityOf(segments, counts, transcript),
       quality_warnings: warnings,
+      can_generate_business_minutes: canGenerateBusinessMinutes,
+      business_minutes_mode: businessMinutesMode,
+      quality_reason: qualityReason,
+      audio_saved: audioEvidence.saved,
+      playback_available: audioEvidence.playback_available,
+      signed_url_required: audioEvidence.signed_url_required,
+      audio_evidence: audioEvidence,
     },
     executive_summary: {
       one_line: cleanText(employeeFeedback.summary, 500) || "本轮服务反馈还在整理中。",
@@ -687,6 +743,13 @@ function buildServiceMinutesV2Fallback(
       confidence: "low",
       compliance_note: "仅作为沟通提醒，不承诺护理效果。",
     })),
+    risk_warnings: warnings.map((warning) => ({
+      type: "service_gap",
+      trigger: warning,
+      evidence: "",
+      recommended_response: "先复核原始转写和现场备注，再决定是否需要店长介入。",
+      manager_required: true,
+    })).slice(0, 5),
     staff_review: {
       highlights: listFrom(employeeFeedback.staff_highlights, ["本轮沟通已记录，可结合转写复盘亮点。"], 5),
       misses: listFrom(managerReview.staff_improvement, [], 5),
@@ -697,9 +760,12 @@ function buildServiceMinutesV2Fallback(
     manager_brief: {
       priority: fallbackSalesSignals.length || warnings.length ? "normal" : "low",
       one_line: cleanText(managerReview.conversation_summary, 300) || cleanText(employeeFeedback.summary, 300) || "本轮服务记录已保存，等待店长复盘。",
+      opportunity_one_line: fallbackSalesSignals[0] || "",
+      risk_one_line: warnings[0] || "",
       conversion_opportunity: fallbackSalesSignals[0] || "",
       main_risk: warnings[0] || "",
       recommended_owner: fallbackSalesSignals.length ? "staff" : "manager",
+      intervention_needed: warnings.length > 0,
       next_action: cleanText(employeeFeedback.next_follow_up, 240) || managerInterventions[0] || "复核本轮服务记录并确认下次跟进动作。",
       training_topics: managerTrainingTopics,
     },
@@ -733,8 +799,91 @@ function buildServiceMinutesV2Fallback(
       knowledge_base_candidates: listFrom(operations.knowledge_base_candidates, [], 6),
       content_material_candidates: listFrom(operations.xhs_material_candidates, [], 6),
     },
+    audio_evidence: audioEvidence,
+    voice_coach_payload: {
+      scenario: `${customerName} · ${projectName}`,
+      customer_focus: listFrom(employeeFeedback.customer_concerns, [], 5),
+      sales_opportunities: fallbackSalesSignals,
+      staff_misses: listFrom(managerReview.staff_improvement, [], 5),
+      practice_goal: cleanText(employeeFeedback.next_follow_up, 240) || "练习先接住顾客顾虑，再推进低压力下一步。",
+      opening_script: cleanText(employeeFeedback.coaching_tip, 240) || "先接住顾客顾虑，再补项目依据。",
+    },
+    evidence_timeline: [],
     quote_moments: [],
   }
+
+  return enforceBusinessQualityGate(fallback)
+}
+
+function markServiceMinutesV2PendingSmartReview(minutes: any, reason: string) {
+  const recording = recordFrom(minutes.recording)
+  const pendingReason = cleanText(reason, 240) || "智能整理仍在重试，当前不是最终服务纪要。"
+  const warnings = Array.from(new Set([
+    ...listFrom(recording.quality_warnings, [], 5),
+    pendingReason,
+  ])).slice(0, 5)
+  return enforceBusinessQualityGate({
+    ...minutes,
+    recording: {
+      ...recording,
+      asr_quality: oneOf(recording.asr_quality, ["good", "partial", "poor"], "partial"),
+      quality_warnings: warnings,
+      can_generate_business_minutes: false,
+      business_minutes_mode: "transcript_only",
+      quality_reason: pendingReason,
+    },
+    executive_summary: {
+      ...recordFrom(minutes.executive_summary),
+      one_line: "智能整理仍在进行，请稍后刷新。",
+      service_outcome: "原音和转写已保存，系统正在重试生成服务纪要。",
+      customer_state: "等待智能整理完成后确认顾客关注。",
+      staff_state: "等待智能整理完成后再进入员工复盘。",
+    },
+    todos: [{
+      owner: "ops",
+      priority: "normal",
+      title: "等待智能整理完成",
+      detail: pendingReason,
+      due_hint: "稍后自动重试",
+      evidence: "",
+    }],
+    sales_opportunities: [],
+    risk_warnings: [],
+    staff_review: {
+      ...recordFrom(minutes.staff_review),
+      misses: [],
+      missed_sales_signals: [],
+      coaching_tips: [],
+      next_script: "",
+    },
+    manager_brief: {
+      ...recordFrom(minutes.manager_brief),
+      priority: "low",
+      one_line: "智能整理仍在重试，当前先不要作为最终复盘。",
+      opportunity_one_line: "",
+      risk_one_line: pendingReason,
+      recommended_owner: "manager",
+      intervention_needed: false,
+      next_action: "稍后刷新，等待智能整理完成。",
+      training_topics: [],
+    },
+    customer_profile_update_suggestions: {
+      new_concerns: [],
+      new_preferences: [],
+      project_interests: [],
+      commitments: [],
+      follow_up_suggestions: ["等待智能整理完成后，再决定是否补充顾客档案。"],
+      risk_notes: warnings,
+    },
+    voice_coach_payload: {
+      scenario: "",
+      customer_focus: [],
+      sales_opportunities: [],
+      staff_misses: [],
+      practice_goal: "等待智能整理完成后再进入训练。",
+      opening_script: "",
+    },
+  })
 }
 
 function normalizeTodo(value: any, index: number) {
@@ -747,6 +896,7 @@ function normalizeTodo(value: any, index: number) {
     title: title || detail,
     detail,
     due_hint: cleanText(value.due_hint, 80),
+    evidence: cleanText(value.evidence, 80),
   }
 }
 
@@ -776,14 +926,40 @@ function normalizeSalesOpportunity(value: any) {
   }
 }
 
+function normalizeRiskWarning(value: any, index: number) {
+  const trigger = cleanText(value.trigger || value.evidence || value.recommended_response, 180)
+  if (!trigger) return null
+  return {
+    id: cleanText(value.id, 80) || `risk-${index + 1}`,
+    type: oneOf(value.type, ["complaint", "churn", "professional", "expectation", "compliance", "service_gap"], "service_gap"),
+    trigger,
+    evidence: cleanText(value.evidence, 80),
+    recommended_response: cleanText(value.recommended_response, 220) || "先复核原始对话后确定处理口径。",
+    manager_required: booleanValue(value.manager_required, true),
+  }
+}
+
 function normalizeManagerBrief(value: unknown, fallback: any) {
   const brief = recordFrom(value)
+  const opportunity = cleanText(brief.opportunity_one_line, 240)
+    || cleanText(brief.conversion_opportunity, 240)
+    || fallback.opportunity_one_line
+    || fallback.conversion_opportunity
+    || ""
+  const risk = cleanText(brief.risk_one_line, 240)
+    || cleanText(brief.main_risk, 240)
+    || fallback.risk_one_line
+    || fallback.main_risk
+    || ""
   return {
     priority: oneOf(brief.priority, ["high", "normal", "low"], fallback.priority || "normal"),
     one_line: cleanText(brief.one_line, 300) || fallback.one_line || "",
-    conversion_opportunity: cleanText(brief.conversion_opportunity, 240) || fallback.conversion_opportunity || "",
-    main_risk: cleanText(brief.main_risk, 240) || fallback.main_risk || "",
+    opportunity_one_line: opportunity,
+    risk_one_line: risk,
+    conversion_opportunity: opportunity,
+    main_risk: risk,
     recommended_owner: oneOf(brief.recommended_owner, ["manager", "staff"], fallback.recommended_owner || "manager"),
+    intervention_needed: booleanValue(brief.intervention_needed, Boolean(fallback.intervention_needed)),
     next_action: cleanText(brief.next_action, 240) || fallback.next_action || "",
     training_topics: listFrom(brief.training_topics, fallback.training_topics || [], 5),
   }
@@ -836,6 +1012,117 @@ function normalizeQuote(value: any) {
   }
 }
 
+function normalizeVoiceCoachPayload(value: unknown, fallback: any) {
+  const payload = recordFrom(value)
+  return {
+    scenario: cleanText(payload.scenario, 120) || fallback.scenario || "",
+    customer_focus: listFrom(payload.customer_focus, fallback.customer_focus || [], 6),
+    sales_opportunities: listFrom(payload.sales_opportunities, fallback.sales_opportunities || [], 6),
+    staff_misses: listFrom(payload.staff_misses, fallback.staff_misses || [], 6),
+    practice_goal: cleanText(payload.practice_goal, 240) || fallback.practice_goal || "",
+    opening_script: cleanText(payload.opening_script, 300) || fallback.opening_script || "",
+  }
+}
+
+function normalizeEvidenceTimelineItem(value: any, index: number) {
+  const quote = cleanText(value.quote, 80)
+  const type = oneOf(value.type, ["concern", "opportunity", "risk", "coaching"], "concern")
+  if (!quote && !cleanText(value.related_card_id, 80)) return null
+  return {
+    id: cleanText(value.id, 80) || `evidence-${index + 1}`,
+    time_label: cleanText(value.time_label, 40),
+    type,
+    quote,
+    related_card_id: cleanText(value.related_card_id, 80),
+  }
+}
+
+function enforceBusinessQualityGate(minutes: any) {
+  const recording = recordFrom(minutes.recording)
+  const canGenerate = booleanValue(recording.can_generate_business_minutes, true)
+  const mode = oneOf(recording.business_minutes_mode, ["formal", "basic", "transcript_only"], "basic")
+  const asrQuality = oneOf(recording.asr_quality, ["good", "partial", "poor"], "partial")
+  if (canGenerate && mode !== "transcript_only" && asrQuality !== "poor") return minutes
+
+  const reason = cleanText(recording.quality_reason, 240)
+    || listFrom(recording.quality_warnings, [], 1)[0]
+    || "当前录音不适合生成正式经营纪要。"
+  const warnings = Array.from(new Set([
+    ...listFrom(recording.quality_warnings, [], 5),
+    reason,
+  ])).slice(0, 5)
+
+  return {
+    ...minutes,
+    recording: {
+      ...minutes.recording,
+      asr_quality: asrQuality === "good" ? "partial" : asrQuality,
+      can_generate_business_minutes: false,
+      business_minutes_mode: "transcript_only",
+      quality_reason: reason,
+      quality_warnings: warnings,
+    },
+    executive_summary: {
+      ...minutes.executive_summary,
+      one_line: reason,
+      service_outcome: "当前只建议复核原音和转写，不生成销售机会或员工评价。",
+    },
+    todos: [{
+      owner: "manager",
+      priority: "low",
+      title: "先复核原音和转写",
+      detail: reason,
+      due_hint: "复盘前",
+      evidence: "",
+    }],
+    sales_opportunities: [],
+    risk_warnings: [],
+    manager_brief: {
+      ...minutes.manager_brief,
+      priority: "low",
+      opportunity_one_line: "",
+      conversion_opportunity: "",
+      risk_one_line: reason,
+      main_risk: reason,
+      recommended_owner: "manager",
+      intervention_needed: false,
+      next_action: "先复核原音和转写，再决定是否进入员工复盘或店长跟进。",
+    },
+    customer_profile_update_suggestions: {
+      new_concerns: [],
+      new_preferences: [],
+      project_interests: [],
+      commitments: [],
+      follow_up_suggestions: [],
+      risk_notes: warnings,
+    },
+    staff_review: {
+      ...minutes.staff_review,
+      misses: [],
+      missed_sales_signals: [],
+      coaching_tips: [],
+      next_script: "",
+    },
+    manager_review: {
+      ...minutes.manager_review,
+      deal_signals: [],
+      risk_warnings: warnings,
+    },
+    knowledge_assets: {
+      ...minutes.knowledge_assets,
+      customer_profile_updates: [],
+    },
+    voice_coach_payload: {
+      ...minutes.voice_coach_payload,
+      customer_focus: [],
+      sales_opportunities: [],
+      staff_misses: [],
+      practice_goal: "先复核原音和转写，再决定是否进入正式训练。",
+      opening_script: "",
+    },
+  }
+}
+
 function normalizeServiceMinutesV2(value: unknown, fallback: any) {
   const root = recordFrom(recordFrom(value).service_minutes_v2 || value)
   const recording = recordFrom(root.recording)
@@ -843,6 +1130,12 @@ function normalizeServiceMinutesV2(value: unknown, fallback: any) {
   const staffReview = recordFrom(root.staff_review)
   const manager = recordFrom(root.manager_review)
   const assets = recordFrom(root.knowledge_assets)
+  const fallbackAudioEvidence = recordFrom(fallback.audio_evidence || fallback.recording?.audio_evidence)
+  const audioEvidence = {
+    ...fallbackAudioEvidence,
+    ...recordFrom(root.audio_evidence),
+    ...recordFrom(recording.audio_evidence),
+  }
 
   const normalized = {
     version: "service_minutes_v2",
@@ -855,6 +1148,21 @@ function normalizeServiceMinutesV2(value: unknown, fallback: any) {
       segment_count: Math.max(0, Math.round(numberValue(recording.segment_count, fallback.recording.segment_count))),
       asr_quality: oneOf(recording.asr_quality, ["good", "partial", "poor"], fallback.recording.asr_quality),
       quality_warnings: listFrom(recording.quality_warnings, fallback.recording.quality_warnings, 5),
+      can_generate_business_minutes: booleanValue(recording.can_generate_business_minutes, Boolean(fallback.recording.can_generate_business_minutes)),
+      business_minutes_mode: oneOf(recording.business_minutes_mode, ["formal", "basic", "transcript_only"], fallback.recording.business_minutes_mode || "basic"),
+      quality_reason: cleanText(recording.quality_reason, 240) || fallback.recording.quality_reason || "",
+      audio_saved: booleanValue(recording.audio_saved, Boolean(fallback.recording.audio_saved)),
+      playback_available: booleanValue(recording.playback_available, Boolean(fallback.recording.playback_available)),
+      signed_url_required: booleanValue(recording.signed_url_required, Boolean(fallback.recording.signed_url_required ?? true)),
+      audio_evidence: {
+        saved: booleanValue(audioEvidence.saved, Boolean(fallbackAudioEvidence.saved)),
+        status_label: cleanText(audioEvidence.status_label, 80) || fallbackAudioEvidence.status_label || "",
+        playback_available: booleanValue(audioEvidence.playback_available, Boolean(fallbackAudioEvidence.playback_available)),
+        signed_url_required: booleanValue(audioEvidence.signed_url_required, Boolean(fallbackAudioEvidence.signed_url_required ?? true)),
+        segment_count: Math.max(0, Math.round(numberValue(audioEvidence.segment_count, numberValue(fallbackAudioEvidence.segment_count, 0)))),
+        first_segment_id: cleanText(audioEvidence.first_segment_id, 160) || fallbackAudioEvidence.first_segment_id || "",
+        segments: Array.isArray(audioEvidence.segments) ? audioEvidence.segments.slice(0, 12) : (Array.isArray(fallbackAudioEvidence.segments) ? fallbackAudioEvidence.segments.slice(0, 12) : []),
+      },
     },
     executive_summary: {
       one_line: cleanText(summary.one_line, 500) || fallback.executive_summary.one_line,
@@ -865,6 +1173,7 @@ function normalizeServiceMinutesV2(value: unknown, fallback: any) {
     todos: listRecordFrom(root.todos, normalizeTodo, fallback.todos, 5),
     customer_concerns: listRecordFrom(root.customer_concerns, normalizeConcern, fallback.customer_concerns, 6),
     sales_opportunities: listRecordFrom(root.sales_opportunities, normalizeSalesOpportunity, fallback.sales_opportunities, 5),
+    risk_warnings: listRecordFrom(root.risk_warnings, normalizeRiskWarning, fallback.risk_warnings || [], 5),
     staff_review: {
       highlights: listFrom(staffReview.highlights, fallback.staff_review.highlights, 5),
       misses: listFrom(staffReview.misses, fallback.staff_review.misses, 5),
@@ -892,6 +1201,17 @@ function normalizeServiceMinutesV2(value: unknown, fallback: any) {
       knowledge_base_candidates: listFrom(assets.knowledge_base_candidates, fallback.knowledge_assets.knowledge_base_candidates, 6),
       content_material_candidates: listFrom(assets.content_material_candidates, fallback.knowledge_assets.content_material_candidates, 6),
     },
+    audio_evidence: {
+      saved: booleanValue(audioEvidence.saved, Boolean(fallbackAudioEvidence.saved)),
+      status_label: cleanText(audioEvidence.status_label, 80) || fallbackAudioEvidence.status_label || "",
+      playback_available: booleanValue(audioEvidence.playback_available, Boolean(fallbackAudioEvidence.playback_available)),
+      signed_url_required: booleanValue(audioEvidence.signed_url_required, Boolean(fallbackAudioEvidence.signed_url_required ?? true)),
+      segment_count: Math.max(0, Math.round(numberValue(audioEvidence.segment_count, numberValue(fallbackAudioEvidence.segment_count, 0)))),
+      first_segment_id: cleanText(audioEvidence.first_segment_id, 160) || fallbackAudioEvidence.first_segment_id || "",
+      segments: Array.isArray(audioEvidence.segments) ? audioEvidence.segments.slice(0, 12) : (Array.isArray(fallbackAudioEvidence.segments) ? fallbackAudioEvidence.segments.slice(0, 12) : []),
+    },
+    voice_coach_payload: normalizeVoiceCoachPayload(root.voice_coach_payload, fallback.voice_coach_payload || {}),
+    evidence_timeline: listRecordFrom(root.evidence_timeline, normalizeEvidenceTimelineItem, fallback.evidence_timeline || [], 12),
     quote_moments: listRecordFrom(root.quote_moments, normalizeQuote, fallback.quote_moments, 5),
   }
 
@@ -901,7 +1221,7 @@ function normalizeServiceMinutesV2(value: unknown, fallback: any) {
   ])).slice(0, 5)
   normalized.recording.quality_warnings = warnings
   normalized.manager_review.risk_warnings = warnings
-  return normalized
+  return enforceBusinessQualityGate(normalized)
 }
 
 function deriveLegacyResultFromServiceMinutesV2(serviceMinutes: any, fallbackEmployee: any, fallbackManager: any, fallbackOperations: any) {
@@ -1264,7 +1584,8 @@ export async function processServiceRecordSession(admin: any, session: any, opts
   const { segments, markers } = await loadSessionParts(admin, session.id)
   const counts = statusCounts(segments)
   const hasOpenAsr = counts.pending > 0 || counts.running > 0
-  const nextStatus = hasOpenAsr ? "processing" : "completed"
+  const transcript = transcriptTextOf(segments)
+  let nextStatus = hasOpenAsr ? "processing" : "completed"
   const now = new Date().toISOString()
   const fallbackEmployeeFeedback = buildEmployeeFeedback(session, segments, markers, counts)
   const fallbackManagerReview = buildManagerReview(markers, counts)
@@ -1287,11 +1608,12 @@ export async function processServiceRecordSession(admin: any, session: any, opts
     used: false,
     source: "service_record_processing_v1",
     chunk_count: transcriptChunksOf(session, segments, 12).length,
-    transcript_chars: transcriptTextOf(segments).length,
+    transcript_chars: transcript.length,
     reason: hasOpenAsr ? "asr_still_open" : "deepseek_api_key_missing",
   }
+  let smartMinutesPendingReason = ""
 
-  if (!hasOpenAsr && (transcriptTextOf(segments) || markers.length) && getServiceRecordDeepSeekKey()) {
+  if (!hasOpenAsr && (transcript || markers.length) && getServiceRecordDeepSeekKey()) {
     const deepSeekResult = await generateDeepSeekServiceRecordV2Result(
       session,
       segments,
@@ -1319,6 +1641,11 @@ export async function processServiceRecordSession(admin: any, session: any, opts
         transcript_chars: deepSeekResult.meta.transcript_chars,
         reason: deepSeekResult.meta.error || (deepSeekResult.meta.used ? "deepseek_completed" : "deepseek_fallback"),
       }
+      if (!deepSeekResult.meta.used) {
+        smartMinutesPendingReason = deepSeekResult.meta.error
+          ? `智能整理失败，系统会继续重试：${deepSeekResult.meta.error}`
+          : "智能整理未完成，系统会继续重试。"
+      }
     }
   } else {
     const legacy = deriveLegacyResultFromServiceMinutesV2(
@@ -1330,6 +1657,25 @@ export async function processServiceRecordSession(admin: any, session: any, opts
     employeeFeedback = legacy.employee_feedback
     managerReview = legacy.manager_review
     operations = legacy.operations
+  }
+
+  if (smartMinutesPendingReason && !opts.allowFallbackCompletion) {
+    nextStatus = "processing"
+    serviceMinutesV2 = markServiceMinutesV2PendingSmartReview(serviceMinutesV2, smartMinutesPendingReason)
+    const legacy = deriveLegacyResultFromServiceMinutesV2(
+      serviceMinutesV2,
+      fallbackEmployeeFeedback,
+      fallbackManagerReview,
+      fallbackOperations,
+    )
+    employeeFeedback = legacy.employee_feedback
+    managerReview = legacy.manager_review
+    operations = legacy.operations
+    llm = {
+      ...llm,
+      used: false,
+      reason: smartMinutesPendingReason,
+    }
   }
 
   const noteMarkdown = buildServiceRecordNoteMarkdown(session, segments, markers, employeeFeedback)
@@ -1352,7 +1698,7 @@ export async function processServiceRecordSession(admin: any, session: any, opts
     .update({
       status: nextStatus,
       processing_started_at: session.processing_started_at || now,
-      completed_at: nextStatus === "completed" ? now : session.completed_at || null,
+      completed_at: nextStatus === "completed" ? now : null,
       note_markdown: noteMarkdown,
       result_json: resultJson,
       updated_at: now,

@@ -18,7 +18,12 @@ import {
 } from "@/lib/service-records/server"
 import {
   refreshServiceRecordSessionAggregate,
-  submitServiceRecordSegmentAsr,
+  findReusableServiceRecordSegment,
+  findReusableServiceRecordSegmentBySourceMeta,
+  reusableSegmentAsrSnapshot,
+  reusableSegmentHasAudio,
+  serviceRecordAppendClosed,
+  sourceFileMetadataFromPayload,
 } from "@/lib/service-records/segments.server"
 
 export const runtime = "nodejs"
@@ -44,7 +49,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const loaded = await getOwnedServiceRecordSession(admin, ctx, id)
   if ("error" in loaded) return loaded.error
   const session = loaded.session
-  if (["processing", "completed", "failed", "cancelled"].includes(String(session.status || ""))) {
+  if (serviceRecordAppendClosed(session.status)) {
     return jsonError(409, "service_record_closed", "service_record_closed")
   }
 
@@ -55,16 +60,26 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!clientSegmentId || !segmentIndex) return jsonError(400, "missing_segment_meta", "missing_segment_meta")
 
   const detected = audioFormat(payload.format)
+  const sourceMeta = sourceFileMetadataFromPayload(payload)
+  let reusable = sourceMeta.source_file_key
+    ? await findReusableServiceRecordSegment(admin, session, String(sourceMeta.source_file_key))
+    : null
+  if (!reusableSegmentHasAudio(reusable)) {
+    reusable = await findReusableServiceRecordSegmentBySourceMeta(admin, session, sourceMeta)
+  }
+  const reuseAudio = Boolean(payload.reused_upload) && reusableSegmentHasAudio(reusable)
   const objectKey = cleanText(payload.object_key, 2000)
   const expectedObjectKey = buildServiceRecordOssObjectKey({
     session,
     clientSegmentId,
     ext: detected.ext,
   })
-  if (!objectKey || objectKey !== expectedObjectKey) {
+  const reusableObjectKey = reusableSegmentHasAudio(reusable) ? cleanText(reusable.storage_path, 2000) : ""
+  if (!objectKey || (!reuseAudio && objectKey !== expectedObjectKey) || (reuseAudio && objectKey !== reusableObjectKey)) {
     return jsonError(400, "invalid_oss_object_key", "invalid_oss_object_key")
   }
 
+  const reusableAsr = reuseAudio ? reusableSegmentAsrSnapshot(reusable) : null
   const now = new Date().toISOString()
   const payloadRow = {
     session_id: session.id,
@@ -74,23 +89,29 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     client_segment_id: clientSegmentId,
     segment_index: segmentIndex,
     status: "uploaded",
-    storage_bucket: getAliyunOssBucket(),
+    storage_bucket: reuseAudio ? reusable.storage_bucket : getAliyunOssBucket(),
     storage_path: objectKey,
-    content_type: cleanText(payload.content_type, 120) || detected.contentType,
-    format: detected.format,
-    audio_bytes: integerValue(payload.audio_bytes, 0),
+    content_type: reuseAudio ? reusable.content_type : cleanText(payload.content_type, 120) || detected.contentType,
+    format: reuseAudio ? reusable.format || detected.format : detected.format,
+    audio_bytes: reuseAudio ? integerValue(reusable.audio_bytes, integerValue(payload.audio_bytes, 0)) : integerValue(payload.audio_bytes, 0),
     client_audio_seconds: numberValue(payload.client_audio_seconds, 0) || null,
     started_at: isoOrNull(payload.started_at),
     ended_at: isoOrNull(payload.ended_at),
     uploaded_at: now,
     updated_at: now,
-    asr_status: "pending",
+    asr_status: reusableAsr?.asr_status || "pending",
+    transcript_text: reusableAsr?.transcript_text || null,
+    asr_json: reusableAsr?.asr_json || null,
     metadata: {
       source: "mp_service_record",
       storage_provider: "aliyun_oss",
       upload_source: cleanText(payload.source, 80) || "ble_card",
       audio_format_guess: cleanText(payload.audio_format_guess, 200),
       original_file_name: cleanText(payload.original_file_name, 200),
+      reused_upload: reuseAudio,
+      reused_from_segment_id: reuseAudio ? reusable.id : cleanText(payload.reused_from_segment_id, 160),
+      reused_from_session_id: reuseAudio ? reusable.session_id : "",
+      ...sourceMeta,
     },
   }
 
@@ -108,10 +129,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // The segment is registered; aggregate refresh can be repaired later.
   }
 
-  const segmentWithAsr = await submitServiceRecordSegmentAsr(admin, data)
-
   return NextResponse.json({
     ok: true,
-    segment: toPublicSegment(segmentWithAsr),
+    reused: reuseAudio,
+    segment: toPublicSegment(data),
   })
 }
