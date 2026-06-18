@@ -213,8 +213,13 @@ Mini-program:
 Prefer:
 
 ```powershell
+corepack pnpm release:preflight
 corepack pnpm build
 ```
+
+`release:preflight` is a hard gate before any Vercel production deploy. It
+checks that required API routes and static assets are present in the backend
+release package. `build` also runs this gate before `strict-build`.
 
 Preview or live endpoint checks must distinguish:
 
@@ -230,6 +235,13 @@ Important backend smoke checks:
 - `/api/mp/service-records/sessions`
 - Changed admin/store routes
 - Changed payment or entitlement routes
+
+For releases that can affect static assets, also run the live image check after
+production deploy and before marking the release complete:
+
+```powershell
+corepack pnpm release:verify:professional-images
+```
 
 ## 9. Mini-program Verification
 

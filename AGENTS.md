@@ -73,3 +73,23 @@ affected route after editing.
 No production deployment, promotion, alias change, WeChat upload, or production
 Supabase change is allowed unless a release manifest has been filled out for the
 version being released.
+
+Before any Vercel production deploy, run and record:
+
+```bash
+corepack pnpm release:preflight
+```
+
+This is a hard gate for backend release packages. It validates that required API
+routes and static assets, including voice-coach and professional-learning image
+assets, are present in the package being built. Do not bypass this by deploying
+a static-only or partial folder.
+
+After a production deploy that can affect static assets, run and record:
+
+```bash
+corepack pnpm release:verify:professional-images
+```
+
+This performs live GET checks against the professional-learning rendered image
+URLs and must pass before the release is marked complete.

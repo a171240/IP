@@ -5,6 +5,7 @@
   "scripts": {
     "build": "node ./scripts/check-backend-release-package.mjs && node ./scripts/strict-build.mjs",
     "release:preflight": "node ./scripts/check-backend-release-package.mjs",
+    "release:verify:professional-images": "node ./scripts/check-professional-learning-remote-images.mjs --concurrency 4 --timeout-ms 30000",
     "dev": "next dev",
     "lint": "eslint .",
     "mp:build-npm": "node scripts/wechat-devtools-cli.mjs build-npm",

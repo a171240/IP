@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs"
 import { extname, join } from "node:path"
 
 const checks = []
+const REQUIRED_PROFESSIONAL_RENDERED_ASSET_MIN_COUNT = 800
 
 function addCheck(name, run) {
   checks.push({ name, run })
@@ -53,8 +54,10 @@ function assertRequiredProfessionalAssets() {
 
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"))
   const assets = Array.isArray(manifest.assets) ? manifest.assets : []
-  if (assets.length < 397) {
-    fail(`too few required professional-learning rendered assets: ${assets.length}, expected at least 397`)
+  if (assets.length < REQUIRED_PROFESSIONAL_RENDERED_ASSET_MIN_COUNT) {
+    fail(
+      `too few required professional-learning rendered assets: ${assets.length}, expected at least ${REQUIRED_PROFESSIONAL_RENDERED_ASSET_MIN_COUNT}`,
+    )
   }
   if (manifest.asset_count !== assets.length) {
     fail(`professional-learning required asset count mismatch: manifest=${manifest.asset_count}, actual=${assets.length}`)
@@ -101,6 +104,11 @@ addCheck("professional-learning static assets are in the backend package", () =>
     "public/professional-learning-assets/professional-learning/v2/skin-layers/01-main.jpg",
     "public/professional-learning-assets/professional-learning/v3-imagegen/tcm-yinyang-foundation/pages/02-yinyang-state-translation.jpg",
     "public/professional-learning-assets/professional-learning/v3-imagegen-reference/liver-organ-expression/pages/01-soothing-flow-candidate-c-customer-entry.jpg",
+    "public/professional-learning-assets/professional-learning/v3-imagegen/skin-system/S00-01/pages/S00-01-P01.jpg",
+    "public/professional-learning-assets/professional-learning/v3-imagegen/meridian-system/M01/pages/M01-01.jpg",
+    "public/professional-learning-assets/professional-learning/v3-imagegen/zangfu-system/Z00/pages/Z00-01.jpg",
+    "public/professional-learning-assets/professional-learning/v3-imagegen/entrance-covers/EC01/pages/EC01-P01.jpg",
+    "public/professional-learning-assets/professional-learning/v3-imagegen/customer-speech-system/A01/pages/A01-P01.jpg",
   ].forEach(assertImageFile)
 })
 

@@ -69,6 +69,12 @@ Dirty files intentionally excluded:
 - Production alias/domain:
 - Deploy command:
 
+Backend release preflight:
+
+```text
+corepack pnpm release:preflight
+```
+
 Backend smoke results:
 
 ```text
@@ -81,6 +87,11 @@ Required backend checks:
 - `/api/mp/virtual-pay/products`
 - `/api/mp/service-records/sessions`
 - Any changed admin/store route
+
+Required static asset checks:
+
+- Before deploy: `corepack pnpm release:preflight`
+- After deploy: `corepack pnpm release:verify:professional-images`
 
 ## Mini-program Upload
 
