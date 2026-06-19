@@ -61,6 +61,7 @@ export const voiceCoachSessionCreateSchema = z.object({
   training_knowledge_space_id: z.string().trim().max(160).optional().nullable(),
   training_context: looseObjectSchema.optional().nullable(),
   training_task_preview: looseObjectSchema.optional().nullable(),
+  opening_preparation_id: z.string().uuid().optional().nullable(),
   followup_context: z
     .object({
       source_session_id: z.string().uuid(),

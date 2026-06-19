@@ -3,20 +3,25 @@ import "server-only"
 import type { NextRequest } from "next/server"
 
 import type { MpAccountContext } from "@/lib/mp/account-context.server"
+import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 import commonBeautyTrainingPack from "./training-packs/common-beauty-v2.json"
 import baibaituSpeakingTrainingPack from "./training-packs/baibaitu-speaking-v2.json"
 
 export const COMMON_KNOWLEDGE_SPACE_ID = "common_beauty_knowledge_v1"
 export const BAIBAITU_KNOWLEDGE_SPACE_ID = "baibaitu_store_knowledge_v1"
+export const MANBEILIAN_KNOWLEDGE_SPACE_ID = "manbeilian_store_knowledge_v1"
 
 export const TRAINING_PACK_MODE_COMMON = "common-generic"
 export const TRAINING_PACK_MODE_BAIBAITU = "baibaitu-speaking"
+export const TRAINING_PACK_MODE_MANBEILIAN = "manbeilian-speaking"
 
 const COMMON_PACK_ID = "beauty_case_training_v1"
 const BAIBAITU_PACK_ID = "baibaitu_professional_speaking_v1"
+const MANBEILIAN_PACK_ID = "manbeilian_professional_speaking_v1"
 
 type SupabaseClient = Awaited<ReturnType<typeof createServerSupabaseClientForRequest>>
+type QuerySupabaseClient = SupabaseClient | ReturnType<typeof createAdminSupabaseClient>
 
 export type TrainingKnowledgeSpace = {
   id: string
@@ -29,7 +34,7 @@ export type TrainingKnowledgeSpace = {
   default_pack_id: string
   training_pack_mode: string
   version: string
-  status: "draft" | "active" | "archived"
+  status: "draft" | "active" | "inactive" | "archived"
   is_default: boolean
   metadata: Record<string, unknown>
 }
@@ -42,7 +47,7 @@ type TrainingPack = {
   knowledge_space_id: string
   training_pack_mode: string
   version: string
-  status: "draft" | "active" | "archived"
+  status: "draft" | "active" | "published" | "archived"
   metadata: Record<string, unknown>
   tasks_json?: TrainingTask[]
 }
@@ -114,6 +119,29 @@ const DEFAULT_SPACES: TrainingKnowledgeSpace[] = [
       task_count: 30,
     },
   },
+  {
+    id: MANBEILIAN_KNOWLEDGE_SPACE_ID,
+    code: "manbeilian",
+    display_name: "曼贝莲项目库",
+    type: "store_custom",
+    company_id: null,
+    store_id: null,
+    brand_code: "manbeilian",
+    default_pack_id: MANBEILIAN_PACK_ID,
+    training_pack_mode: TRAINING_PACK_MODE_MANBEILIAN,
+    version: "v1",
+    status: "active",
+    is_default: false,
+    metadata: {
+      description: "曼贝莲苗药筋骨养护、春归液项目卡和门店安全表达训练。",
+      source: "system_seed",
+      local_fallback: true,
+      asset_version: "manbeilian-knowledge-v1",
+      task_count: 221,
+      task_unit: "张",
+      static_asset_root: "/voice-coach-assets/manbeilian-knowledge/v1",
+    },
+  },
 ]
 
 const STATIC_PACKS: Record<string, TrainingPack> = {
@@ -150,6 +178,24 @@ const STATIC_PACKS: Record<string, TrainingPack> = {
       task_count: 30,
     },
   },
+  [MANBEILIAN_PACK_ID]: {
+    pack_id: MANBEILIAN_PACK_ID,
+    title: "曼贝莲项目卡开口训练",
+    subtitle: "苗药筋骨养护、春归液和门店项目卡安全表达",
+    brand_code: "manbeilian",
+    knowledge_space_id: MANBEILIAN_KNOWLEDGE_SPACE_ID,
+    training_pack_mode: TRAINING_PACK_MODE_MANBEILIAN,
+    version: "v1",
+    status: "active",
+    metadata: {
+      source: "system_seed",
+      local_fallback: true,
+      asset_version: "manbeilian-knowledge-v1",
+      task_count: 221,
+      task_unit: "张",
+      static_asset_root: "/voice-coach-assets/manbeilian-knowledge/v1",
+    },
+  },
 }
 
 function cleanText(value: unknown, max = 300) {
@@ -160,6 +206,14 @@ function cleanText(value: unknown, max = 300) {
 
 function normalizeMetadata(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
+}
+
+function createQuerySupabaseClient(fallback: SupabaseClient): QuerySupabaseClient {
+  try {
+    return createAdminSupabaseClient()
+  } catch (_error) {
+    return fallback
+  }
 }
 
 function isMissingTableError(error: any) {
@@ -173,6 +227,11 @@ function isMissingTableError(error: any) {
   )
 }
 
+function isDatabaseFeatureUnavailableError(error: any) {
+  const message = String(error?.message || "").toLowerCase()
+  return isMissingTableError(error) || error?.code === "42501" || message.includes("permission denied")
+}
+
 function boolValue(value: unknown) {
   if (value === true || value === 1) return true
   const text = cleanText(value, 20).toLowerCase()
@@ -182,6 +241,66 @@ function boolValue(value: unknown) {
 function numberValue(value: unknown, fallback = 0) {
   const n = Number(value)
   return Number.isFinite(n) ? n : fallback
+}
+
+function firstTextValue(...values: unknown[]) {
+  for (const value of values) {
+    const text = cleanText(value, 300)
+    if (text) return text
+  }
+  return ""
+}
+
+function normalizeStatus(value: unknown, fallback = "active") {
+  return cleanText(value || fallback, 20) || fallback
+}
+
+function normalizeSpaceType(row: any, metadata: Record<string, unknown>): TrainingKnowledgeSpace["type"] {
+  const raw = cleanText(row?.type || row?.knowledge_space_type || row?.scope_type || metadata.type, 40)
+  if (raw === "common_generic") return "common_generic"
+  if (raw === "brand_template" || raw === "brand" || raw === "demo") return "brand_template"
+  return "store_custom"
+}
+
+function inferTrainingPackMode(row: any, metadata: Record<string, unknown>, featureFlags: Record<string, unknown>) {
+  const explicit = firstTextValue(
+    row?.training_pack_mode,
+    row?.trainingPackMode,
+    metadata.training_pack_mode,
+    metadata.trainingPackMode,
+    featureFlags.training_pack_mode,
+    featureFlags.trainingPackMode,
+  )
+  if (explicit) return normalizeTrainingPackMode(explicit)
+
+  const key = `${row?.code || ""} ${row?.brand_code || ""} ${row?.display_name || row?.name || ""}`.toLowerCase()
+  if (key.includes("manbeilian") || key.includes("曼贝莲")) return TRAINING_PACK_MODE_MANBEILIAN
+  if (key.includes("baibaitu") || key.includes("白白兔")) return TRAINING_PACK_MODE_BAIBAITU
+  return TRAINING_PACK_MODE_COMMON
+}
+
+function contextCompanyIds(ctx: MpAccountContext | null) {
+  return new Set([ctx?.companyId, ...(ctx?.memberships || []).map((item) => item.companyId)].filter(Boolean) as string[])
+}
+
+function contextStoreIds(ctx: MpAccountContext | null) {
+  return new Set([ctx?.storeId, ...(ctx?.memberships || []).map((item) => item.storeId)].filter(Boolean) as string[])
+}
+
+function userScopeText(ctx: MpAccountContext | null) {
+  return [
+    ctx?.companyName,
+    ctx?.storeName,
+    ctx?.scopeLabel,
+    ...(ctx?.memberships || []).flatMap((item) => [item.companyName, item.storeName]),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+}
+
+function isUuid(value: unknown) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(cleanText(value, 80))
 }
 
 function normalizeTrainingTask(value: unknown, packId?: string | null): TrainingTask | null {
@@ -232,6 +351,7 @@ function normalizeTrainingTasks(value: unknown, packId?: string | null) {
 const STATIC_TASKS_BY_PACK: Record<string, TrainingTask[]> = {
   [COMMON_PACK_ID]: normalizeTrainingTasks(COMMON_TRAINING_PACK_SEED.tasks, COMMON_PACK_ID),
   [BAIBAITU_PACK_ID]: normalizeTrainingTasks(BAIBAITU_TRAINING_PACK_SEED.tasks, BAIBAITU_PACK_ID),
+  [MANBEILIAN_PACK_ID]: [],
 }
 
 function getStaticTrainingPack(packId: string): TrainingPack | null {
@@ -278,6 +398,9 @@ export function normalizeTrainingPackMode(mode: unknown) {
   if (value === "baibaitu_speaking" || value === "speaking" || value === TRAINING_PACK_MODE_BAIBAITU) {
     return TRAINING_PACK_MODE_BAIBAITU
   }
+  if (value === "manbeilian_speaking" || value === "manbeilian" || value === TRAINING_PACK_MODE_MANBEILIAN) {
+    return TRAINING_PACK_MODE_MANBEILIAN
+  }
   if (value === "generic" || value === "beauty" || value === "common" || value === TRAINING_PACK_MODE_COMMON) {
     return TRAINING_PACK_MODE_COMMON
   }
@@ -287,34 +410,55 @@ export function normalizeTrainingPackMode(mode: unknown) {
 function normalizeSpaceRow(row: any): TrainingKnowledgeSpace | null {
   const id = cleanText(row?.id, 120)
   if (!id) return null
-  const metadata = normalizeMetadata(row?.metadata)
-  const type = cleanText(row?.type || row?.knowledge_space_type || metadata.type, 40) as TrainingKnowledgeSpace["type"]
-  const status = cleanText(row?.status || "active", 20) as TrainingKnowledgeSpace["status"]
+  const metadata = {
+    ...normalizeMetadata(row?.metadata),
+    ...normalizeMetadata(row?.metadata_json),
+  }
+  const featureFlags = normalizeMetadata(row?.feature_flags)
+  const type = normalizeSpaceType(row, metadata)
+  const status = normalizeStatus(row?.status, "active") as TrainingKnowledgeSpace["status"]
+  const brandCode = cleanText(row?.brand_code || metadata.brand_code || metadata.brandCode, 80)
+  const code = cleanText(row?.code, 80) || id
+  const staticDefault =
+    code === "manbeilian" || brandCode === "manbeilian"
+      ? MANBEILIAN_PACK_ID
+      : code === "baibaitu" || brandCode === "baibaitu"
+        ? BAIBAITU_PACK_ID
+        : code === "common_beauty" || brandCode === "meiye_huajing"
+          ? COMMON_PACK_ID
+          : ""
   return {
     id,
-    code: cleanText(row?.code, 80) || id,
+    code,
     display_name: cleanText(row?.display_name || row?.name, 80) || id,
     type: type || "store_custom",
     company_id: cleanText(row?.company_id, 120) || null,
     store_id: cleanText(row?.store_id, 120) || null,
-    brand_code: cleanText(row?.brand_code, 80) || null,
-    default_pack_id: cleanText(row?.default_pack_id, 120),
-    training_pack_mode: normalizeTrainingPackMode(row?.training_pack_mode || metadata.training_pack_mode),
+    brand_code: brandCode || null,
+    default_pack_id: cleanText(row?.default_pack_id || metadata.default_pack_id || metadata.defaultPackId || staticDefault, 120),
+    training_pack_mode: inferTrainingPackMode(row, metadata, featureFlags),
     version: cleanText(row?.version || metadata.version, 40) || "v1",
     status: status || "active",
     is_default: boolValue(row?.is_default),
-    metadata,
+    metadata: {
+      ...metadata,
+      feature_flags: featureFlags,
+      scope_type: cleanText(row?.scope_type, 40) || metadata.scope_type,
+    },
   }
 }
 
 function normalizePackRow(row: any, fallbackSpace: TrainingKnowledgeSpace): TrainingPack | null {
   const packId = cleanText(row?.pack_id || row?.id || fallbackSpace.default_pack_id, 120)
   if (!packId) return null
-  const metadata = normalizeMetadata(row?.metadata)
+  const metadata = {
+    ...normalizeMetadata(row?.metadata),
+    ...normalizeMetadata(row?.metadata_json),
+  }
   return {
     pack_id: packId,
     title: cleanText(row?.title, 100) || STATIC_PACKS[packId]?.title || fallbackSpace.display_name,
-    subtitle: cleanText(row?.subtitle, 180) || STATIC_PACKS[packId]?.subtitle || "",
+    subtitle: cleanText(row?.subtitle || metadata.subtitle, 180) || STATIC_PACKS[packId]?.subtitle || "",
     brand_code: cleanText(row?.brand_code || fallbackSpace.brand_code, 80),
     knowledge_space_id: cleanText(row?.knowledge_space_id || fallbackSpace.id, 120),
     training_pack_mode: normalizeTrainingPackMode(row?.training_pack_mode || fallbackSpace.training_pack_mode),
@@ -325,12 +469,69 @@ function normalizePackRow(row: any, fallbackSpace: TrainingKnowledgeSpace): Trai
   }
 }
 
+function normalizeVoiceTrainingTaskRow(row: any, pack: TrainingPack): TrainingTask | null {
+  const id = cleanText(row?.id, 160)
+  if (!id) return null
+  const customerPersona = normalizeMetadata(row?.customer_persona_json)
+  const visibleGoal = Array.isArray(row?.visible_goal_json) ? row.visible_goal_json : []
+  const mustCoverPoints = Array.isArray(row?.must_cover_points_json) ? row.must_cover_points_json : []
+  const forbiddenPhrases = Array.isArray(row?.forbidden_phrases_json) ? row.forbidden_phrases_json : []
+  const reward = normalizeMetadata(row?.reward_json)
+  const rubric = normalizeMetadata(row?.rubric_json)
+  const title = cleanText(row?.title, 120) || "训练任务"
+  const focus = cleanText(row?.focus || customerPersona.focus, 240)
+  const customerLine = firstTextValue(
+    customerPersona.customer_line,
+    customerPersona.customerLine,
+    customerPersona.line,
+    customerPersona.concern,
+    customerPersona.hidden_concern,
+    customerPersona.hiddenConcern,
+  )
+  const dayIndex = numberValue(row?.day_index, 0)
+  return {
+    id,
+    task_id: id,
+    title,
+    customer_line: customerLine,
+    focus,
+    order: dayIndex,
+    dayIndex,
+    pathDay: dayIndex,
+    estimated_minutes: numberValue(row?.estimated_minutes, 6) || 6,
+    estimatedMinutes: numberValue(row?.estimated_minutes, 6) || 6,
+    customer_persona: customerPersona,
+    visible_goal: visibleGoal,
+    must_cover_points: mustCoverPoints,
+    forbidden_phrases: forbiddenPhrases,
+    reward,
+    rubric,
+    training_context: {
+      task_id: id,
+      pack_id: pack.pack_id,
+      pack_title: pack.title,
+      brand_code: pack.brand_code,
+      training_pack_mode: pack.training_pack_mode,
+      title,
+      focus,
+      customer_line: customerLine,
+      customer_persona: customerPersona,
+      visible_goal: visibleGoal,
+      must_cover_points: mustCoverPoints,
+      forbidden_phrases: forbiddenPhrases,
+      reward,
+      rubric,
+    },
+  }
+}
+
 function uniqueSpaces(spaces: TrainingKnowledgeSpace[]) {
   const seen = new Set<string>()
   const result: TrainingKnowledgeSpace[] = []
   for (const space of spaces) {
-    if (!space.id || seen.has(space.id) || space.status !== "active") continue
-    seen.add(space.id)
+    const keys = [space.id ? `id:${space.id}` : "", space.code ? `code:${space.code}` : ""].filter(Boolean)
+    if (!space.id || space.status !== "active" || keys.some((key) => seen.has(key))) continue
+    keys.forEach((key) => seen.add(key))
     result.push(space)
   }
   return result
@@ -338,7 +539,7 @@ function uniqueSpaces(spaces: TrainingKnowledgeSpace[]) {
 
 function isBaibaituRequested(activeId: string, ctx: MpAccountContext | null) {
   if (activeId === BAIBAITU_KNOWLEDGE_SPACE_ID) return true
-  const scopeText = `${ctx?.companyName || ""} ${ctx?.storeName || ""}`.toLowerCase()
+  const scopeText = userScopeText(ctx)
   return scopeText.includes("白白兔") || scopeText.includes("baibaitu")
 }
 
@@ -348,15 +549,78 @@ function includeBaibaituSeed(activeId: string, ctx: MpAccountContext | null) {
   return true
 }
 
-export async function listKnowledgeSpaces(args: {
-  supabase: SupabaseClient
-  ctx: MpAccountContext | null
-  activeKnowledgeSpaceId?: string
-}) {
-  const activeId = cleanText(args.activeKnowledgeSpaceId, 120)
-  const seedSpaces = DEFAULT_SPACES.filter((space) => space.id !== BAIBAITU_KNOWLEDGE_SPACE_ID || includeBaibaituSeed(activeId, args.ctx))
-  let databaseSpaces: TrainingKnowledgeSpace[] = []
+function isManbeilianRequested(activeId: string, ctx: MpAccountContext | null) {
+  if (activeId === MANBEILIAN_KNOWLEDGE_SPACE_ID) return true
+  const scopeText = userScopeText(ctx)
+  return scopeText.includes("曼贝莲") || scopeText.includes("manbeilian")
+}
 
+function includeManbeilianSeed(activeId: string, ctx: MpAccountContext | null) {
+  const env = cleanText(process.env.VOICE_COACH_ENABLE_MANBEILIAN_SEED, 20).toLowerCase()
+  if (env === "1" || env === "true") return true
+  return Boolean(ctx?.isPlatformAdmin) || isManbeilianRequested(activeId, ctx)
+}
+
+function canAccessKnowledgeSpace(
+  space: TrainingKnowledgeSpace,
+  ctx: MpAccountContext | null,
+  explicitAccessIds: Set<string>,
+) {
+  if (space.type === "common_generic") return true
+  if (ctx?.isPlatformAdmin) return true
+  if (explicitAccessIds.has(space.id)) return true
+
+  const companyIds = contextCompanyIds(ctx)
+  const storeIds = contextStoreIds(ctx)
+  if (space.store_id && storeIds.has(space.store_id)) return true
+  if (space.company_id && companyIds.has(space.company_id)) return true
+  return false
+}
+
+async function getExplicitKnowledgeSpaceAccessIds(supabase: QuerySupabaseClient, ctx: MpAccountContext | null) {
+  if (!ctx?.userId) return new Set<string>()
+  const { data, error } = await supabase
+    .from("mp_knowledge_space_access")
+    .select("knowledge_space_id, status, expires_at")
+    .eq("user_id", ctx.userId)
+    .eq("status", "active")
+
+  if (error && isDatabaseFeatureUnavailableError(error)) return new Set<string>()
+  if (error) throw error
+
+  const now = Date.now()
+  return new Set(
+    (data || [])
+      .filter((row: any) => !row.expires_at || new Date(row.expires_at).getTime() > now)
+      .map((row: any) => cleanText(row.knowledge_space_id, 120))
+      .filter(Boolean),
+  )
+}
+
+async function listMpKnowledgeSpaces(args: {
+  supabase: QuerySupabaseClient
+  ctx: MpAccountContext | null
+}) {
+  const { data, error } = await args.supabase
+    .from("mp_knowledge_spaces")
+    .select("*")
+    .eq("status", "active")
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true })
+
+  if (error && isDatabaseFeatureUnavailableError(error)) return []
+  if (error) throw error
+
+  const explicitAccessIds = await getExplicitKnowledgeSpaceAccessIds(args.supabase, args.ctx)
+  return (data || [])
+    .map(normalizeSpaceRow)
+    .filter((space): space is TrainingKnowledgeSpace => Boolean(space && canAccessKnowledgeSpace(space, args.ctx, explicitAccessIds)))
+}
+
+async function listLegacyKnowledgeSpaces(args: {
+  supabase: QuerySupabaseClient
+  ctx: MpAccountContext | null
+}) {
   const { data, error } = await args.supabase
     .from("voice_coach_knowledge_spaces")
     .select("*")
@@ -364,21 +628,30 @@ export async function listKnowledgeSpaces(args: {
     .order("is_default", { ascending: false })
     .order("created_at", { ascending: true })
 
-  if (!error && data) {
-    databaseSpaces = (data || [])
-      .map(normalizeSpaceRow)
-      .filter((space): space is TrainingKnowledgeSpace => {
-        if (!space) return false
-        if (space.type === "common_generic") return true
-        if (space.store_id && args.ctx?.storeId && space.store_id === args.ctx.storeId) return true
-        if (space.company_id && args.ctx?.companyId && space.company_id === args.ctx.companyId) return true
-        return space.id === activeId
-      })
-  } else if (error && !isMissingTableError(error)) {
-    throw error
-  }
+  if (error && isDatabaseFeatureUnavailableError(error)) return []
+  if (error) throw error
 
-  return uniqueSpaces([...databaseSpaces, ...seedSpaces])
+  return (data || [])
+    .map(normalizeSpaceRow)
+    .filter((space): space is TrainingKnowledgeSpace => Boolean(space && canAccessKnowledgeSpace(space, args.ctx, new Set())))
+}
+
+export async function listKnowledgeSpaces(args: {
+  supabase: SupabaseClient
+  ctx: MpAccountContext | null
+  activeKnowledgeSpaceId?: string
+}) {
+  const activeId = cleanText(args.activeKnowledgeSpaceId, 120)
+  const seedSpaces = DEFAULT_SPACES.filter((space) => {
+    if (space.id === BAIBAITU_KNOWLEDGE_SPACE_ID) return includeBaibaituSeed(activeId, args.ctx)
+    if (space.id === MANBEILIAN_KNOWLEDGE_SPACE_ID) return includeManbeilianSeed(activeId, args.ctx)
+    return true
+  })
+  const supabase = createQuerySupabaseClient(args.supabase)
+  const mpSpaces = await listMpKnowledgeSpaces({ supabase, ctx: args.ctx })
+  const legacySpaces = await listLegacyKnowledgeSpaces({ supabase, ctx: args.ctx })
+
+  return uniqueSpaces([...mpSpaces, ...legacySpaces, ...seedSpaces])
 }
 
 export function resolveActiveKnowledgeSpace(spaces: TrainingKnowledgeSpace[], requestedId?: string | null, requestedMode?: string | null) {
@@ -399,7 +672,49 @@ export async function resolveTrainingPack(args: {
   space: TrainingKnowledgeSpace
 }) {
   const staticPack = getStaticTrainingPack(args.space.default_pack_id)
-  const { data, error } = await args.supabase
+  const supabase = createQuerySupabaseClient(args.supabase)
+  const { data: packData, error: packError } = await supabase
+    .from("voice_training_packs")
+    .select("*")
+    .eq("brand_code", args.space.brand_code || "")
+    .eq("pack_id", args.space.default_pack_id)
+    .in("status", ["active", "published"])
+    .order("published_at", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (!packError && packData) {
+    const normalizedPack = mergeTrainingPackWithStaticTasks(normalizePackRow(packData, args.space), staticPack)
+    if (!normalizedPack) return staticPack || normalizePackRow(null, args.space)
+
+    const { data: taskData, error: taskError } = await supabase
+      .from("voice_training_tasks")
+      .select("*")
+      .eq("brand_code", normalizedPack.brand_code)
+      .eq("pack_id", normalizedPack.pack_id)
+      .in("status", ["active", "published"])
+      .order("day_index", { ascending: true })
+
+    if (!taskError && taskData) {
+      const tasks = (taskData || [])
+        .map((task: any) => normalizeVoiceTrainingTaskRow(task, normalizedPack))
+        .filter((task): task is TrainingTask => Boolean(task))
+      return {
+        ...normalizedPack,
+        metadata: {
+          ...normalizedPack.metadata,
+          task_count: tasks.length || normalizedPack.metadata.task_count || 0,
+        },
+        tasks_json: tasks.length ? tasks : normalizedPack.tasks_json,
+      }
+    }
+    if (taskError && !isDatabaseFeatureUnavailableError(taskError)) throw taskError
+    return normalizedPack
+  }
+  if (packError && !isDatabaseFeatureUnavailableError(packError)) throw packError
+
+  const { data, error } = await supabase
     .from("voice_coach_training_packs")
     .select("*")
     .eq("status", "active")
@@ -409,8 +724,19 @@ export async function resolveTrainingPack(args: {
     .maybeSingle()
 
   if (!error && data) return mergeTrainingPackWithStaticTasks(normalizePackRow(data, args.space), staticPack)
-  if (error && !isMissingTableError(error)) throw error
+  if (error && !isDatabaseFeatureUnavailableError(error)) throw error
   return staticPack || normalizePackRow(null, args.space)
+}
+
+function normalizeProgressRow(row: any) {
+  if (!row) return null
+  const progressJson = normalizeMetadata(row.progress_json)
+  return {
+    ...row,
+    user_id: row.staff_user_id || row.user_id,
+    completed_task_ids: normalizeMetadata(row.completed_task_ids || progressJson.completed_task_ids),
+    progress_json: progressJson,
+  }
 }
 
 export async function getTrainingProgress(args: {
@@ -419,6 +745,19 @@ export async function getTrainingProgress(args: {
   knowledgeSpaceId: string
   packId: string
 }) {
+  if (isUuid(args.knowledgeSpaceId)) {
+    const { data, error } = await args.supabase
+      .from("voice_training_progress")
+      .select("*")
+      .eq("staff_user_id", args.userId)
+      .eq("knowledge_space_id", args.knowledgeSpaceId)
+      .eq("pack_id", args.packId)
+      .maybeSingle()
+
+    if (!error && data) return normalizeProgressRow(data)
+    if (error && !isDatabaseFeatureUnavailableError(error)) throw error
+  }
+
   const { data, error } = await args.supabase
     .from("voice_coach_training_progress")
     .select("*")
@@ -428,7 +767,7 @@ export async function getTrainingProgress(args: {
     .maybeSingle()
 
   if (!error && data) return data
-  if (error && !isMissingTableError(error)) throw error
+  if (error && !isDatabaseFeatureUnavailableError(error)) throw error
   return null
 }
 
@@ -557,7 +896,14 @@ export function shouldAllowLocalFallback(space: TrainingKnowledgeSpace, pack: Tr
     ...normalizeMetadata(space.metadata),
     ...normalizeMetadata(pack?.metadata),
   }
-  return Boolean(metadata.local_fallback || space.id === BAIBAITU_KNOWLEDGE_SPACE_ID)
+  const mode = normalizeTrainingPackMode(space.training_pack_mode || pack?.training_pack_mode)
+  return Boolean(
+    metadata.local_fallback ||
+      space.id === BAIBAITU_KNOWLEDGE_SPACE_ID ||
+      space.id === MANBEILIAN_KNOWLEDGE_SPACE_ID ||
+      mode === TRAINING_PACK_MODE_BAIBAITU ||
+      mode === TRAINING_PACK_MODE_MANBEILIAN,
+  )
 }
 
 export function buildTrainingHomeResponse(args: {
@@ -635,6 +981,12 @@ export function extractTrainingContextFromSession(session: any) {
   }
 }
 
+function brandCodeFromPackId(packId: string) {
+  if (packId === MANBEILIAN_PACK_ID || packId.includes("manbeilian")) return "manbeilian"
+  if (packId === BAIBAITU_PACK_ID || packId.includes("baibaitu")) return "baibaitu"
+  return "meiye_huajing"
+}
+
 export async function markTrainingTaskComplete(args: {
   supabase: SupabaseClient
   userId: string
@@ -694,14 +1046,45 @@ export async function markTrainingTaskComplete(args: {
     last_completed_at: now,
     updated_at: now,
   }
+  const writeSupabase = createQuerySupabaseClient(args.supabase)
 
-  const { data, error } = await args.supabase
+  if (isUuid(args.knowledgeSpaceId)) {
+    const newProgressPayload = {
+      brand_code: brandCodeFromPackId(args.packId),
+      pack_id: args.packId,
+      staff_user_id: args.userId,
+      company_id: args.companyId || null,
+      store_id: args.storeId || null,
+      membership_id: args.membershipId || null,
+      knowledge_space_id: args.knowledgeSpaceId,
+      current_task_id: args.taskId,
+      completed_task_count: Object.keys(completedTaskIds).length,
+      stars_total: numberValue(existing?.stars_total, 0),
+      reward_count: numberValue(existing?.reward_count, 0),
+      progress_json: progressJson,
+      last_completed_at: now,
+      updated_at: now,
+    }
+
+    const { data: newProgress, error: newProgressError } = await writeSupabase
+      .from("voice_training_progress")
+      .upsert(newProgressPayload, { onConflict: "knowledge_space_id,pack_id,staff_user_id" })
+      .select("*")
+      .single()
+
+    if (!newProgressError) {
+      return { ok: true, progress: buildProgressPayload(normalizeProgressRow(newProgress), null), persisted: true }
+    }
+    if (!isDatabaseFeatureUnavailableError(newProgressError)) throw newProgressError
+  }
+
+  const { data, error } = await writeSupabase
     .from("voice_coach_training_progress")
     .upsert(payload, { onConflict: "user_id,knowledge_space_id,pack_id" })
     .select("*")
     .single()
 
-  if (error && isMissingTableError(error)) {
+  if (error && isDatabaseFeatureUnavailableError(error)) {
     return { ok: true, progress: buildProgressPayload(null, null), persisted: false }
   }
   if (error) throw error

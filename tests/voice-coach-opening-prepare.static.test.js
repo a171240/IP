@@ -1,0 +1,85 @@
+const test = require("node:test")
+const assert = require("node:assert/strict")
+const fs = require("node:fs")
+const path = require("node:path")
+
+const root = process.cwd()
+const read = (...parts) => fs.readFileSync(path.join(root, ...parts), "utf8")
+
+const migrationSource = read("supabase", "migrations", "20260619015445_add_voice_coach_opening_preparations.sql")
+const hardeningMigrationSource = read(
+  "supabase",
+  "migrations",
+  "20260619021545_harden_voice_coach_opening_preparations_grants.sql",
+)
+const prepareRouteSource = read("app", "api", "voice-coach", "opening-prepare", "route.ts")
+const sessionRouteSource = read("app", "api", "voice-coach", "sessions", "route.ts")
+const preparationHelperSource = read("lib", "voice-coach", "opening-preparation.server.ts")
+const trainingContextSource = read("lib", "voice-coach", "training-context.server.ts")
+const sessionContextSource = read("lib", "voice-coach", "session-context.ts")
+
+test("opening preparation migration stores prepared text, audio, status, and consumption state", () => {
+  assert.match(migrationSource, /create table if not exists public\.voice_coach_opening_preparations/)
+  assert.match(migrationSource, /idempotency_key text not null/)
+  assert.match(migrationSource, /opening_context_json jsonb null/)
+  assert.match(migrationSource, /opening_line_json jsonb null/)
+  assert.match(migrationSource, /audio_path text null/)
+  assert.match(migrationSource, /status text not null default 'preparing'/)
+  assert.match(migrationSource, /consumed_at timestamptz null/)
+  assert.match(migrationSource, /voice_coach_opening_preparations_user_idempotency_key/)
+  assert.match(migrationSource, /grant select, insert, update, delete on public\.voice_coach_opening_preparations to service_role/)
+  assert.match(migrationSource, /voice_coach_opening_preparations_select_own/)
+  assert.match(migrationSource, /voice_coach_opening_preparations_service_role_all/)
+  assert.match(hardeningMigrationSource, /revoke all on table public\.voice_coach_opening_preparations from authenticated/)
+  assert.match(hardeningMigrationSource, /drop policy if exists "voice_coach_opening_preparations_insert_own"/)
+  assert.match(hardeningMigrationSource, /drop policy if exists "voice_coach_opening_preparations_update_own"/)
+})
+
+test("opening prepare route resolves the same server training context before generating TTS", () => {
+  assert.match(prepareRouteSource, /openingPrepareSchema = voiceCoachSessionCreateSchema\.extend/)
+  assert.match(prepareRouteSource, /idempotency_key: z\.string\(\)\.trim\(\)\.min\(8\)\.max\(160\)/)
+  assert.match(prepareRouteSource, /resolveVoiceCoachTrainingContextForSession\({/)
+  assert.match(prepareRouteSource, /buildVoiceCoachSessionSnapshot\({/)
+  assert.match(prepareRouteSource, /buildVoiceCoachFirstTurnTarget\(sessionSnapshot, idempotencyKey\)/)
+  assert.match(prepareRouteSource, /llmGenerateCustomerTurn\({/)
+  assert.match(prepareRouteSource, /doubaoTts\({/)
+  assert.match(prepareRouteSource, /uploadVoiceCoachAudio\({/)
+  assert.match(prepareRouteSource, /const openingPreparationAdmin = createAdminSupabaseClient\(\)/)
+  assert.match(prepareRouteSource, /upsertOpeningPreparation\({ supabase: openingPreparationAdmin, payload \}/)
+  assert.match(prepareRouteSource, /session_id: null/)
+  assert.match(prepareRouteSource, /consumed_at: null/)
+  assert.match(prepareRouteSource, /opening_preparation_table_unavailable/)
+})
+
+test("session creation consumes a prepared opening without regenerating first-turn text", () => {
+  assert.match(sessionContextSource, /opening_preparation_id: z\.string\(\)\.uuid\(\)\.optional\(\)\.nullable\(\)/)
+  assert.match(sessionRouteSource, /const openingPreparationAdmin = createAdminSupabaseClient\(\)/)
+  assert.match(sessionRouteSource, /lockOpeningPreparationForSession\({/)
+  assert.match(sessionRouteSource, /signPreparedOpening\(lockedOpening\)/)
+  assert.match(sessionRouteSource, /opening_preparation_id: preparedOpening\.preparation_id/)
+  assert.match(sessionRouteSource, /markOpeningPreparationConsumed\({/)
+  assert.match(sessionRouteSource, /audio_source: preparedOpening\.audio_source/)
+  assert.match(sessionRouteSource, /tts_pending: !preparedOpening\.audio_url/)
+})
+
+test("training context helper keeps prepare and session routes on the same knowledge-space resolution path", () => {
+  assert.match(trainingContextSource, /export async function resolveVoiceCoachTrainingContextForSession/)
+  assert.match(trainingContextSource, /listKnowledgeSpaces\({/)
+  assert.match(trainingContextSource, /resolveActiveKnowledgeSpace\(spaces, requestedKnowledgeSpaceId, requestedMode\)/)
+  assert.match(trainingContextSource, /resolveTrainingPack\({ supabase: args\.supabase, space \}/)
+  assert.match(trainingContextSource, /getTrainingTask\(pack, requestedTaskId\)/)
+  assert.match(sessionRouteSource, /resolveVoiceCoachTrainingContextForSession\({/)
+  assert.match(prepareRouteSource, /resolveVoiceCoachTrainingContextForSession\({/)
+})
+
+test("opening preparation helper signs, locks, and marks consumption with expiry protection", () => {
+  assert.match(preparationHelperSource, /export async function signPreparedOpening/)
+  assert.match(preparationHelperSource, /if \(isExpired\(row\)\) return null/)
+  assert.match(preparationHelperSource, /row\.status !== "audio_ready" && row\.status !== "fallback_ready"/)
+  assert.match(preparationHelperSource, /export async function lockOpeningPreparationForSession/)
+  assert.match(preparationHelperSource, /\.eq\("user_id", args\.userId\)/)
+  assert.match(preparationHelperSource, /row\.consumed_at && row\.session_id !== args\.sessionId/)
+  assert.match(preparationHelperSource, /locked_at: new Date\(\)\.toISOString\(\)/)
+  assert.match(preparationHelperSource, /export async function markOpeningPreparationConsumed/)
+  assert.match(preparationHelperSource, /status: "consumed"/)
+})

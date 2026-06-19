@@ -4,6 +4,12 @@ import { after, NextRequest, NextResponse } from "next/server"
 import { checkVoiceCoachAccess } from "@/lib/voice-coach/guard.server"
 import { llmGenerateCustomerTurn } from "@/lib/voice-coach/llm.server"
 import {
+  isOpeningPreparationUnavailableError,
+  lockOpeningPreparationForSession,
+  markOpeningPreparationConsumed,
+  signPreparedOpening,
+} from "@/lib/voice-coach/opening-preparation.server"
+import {
   buildVoiceCoachFollowupOpening,
   buildVoiceCoachFirstTurnTarget,
   buildVoiceCoachSessionSnapshot,
@@ -12,19 +18,14 @@ import {
   normalizeVoiceCoachFollowupContext,
   voiceCoachSessionCreateSchema,
   type VoiceCoachFollowupContext,
-  type VoiceCoachSessionCreateInput,
 } from "@/lib/voice-coach/session-context"
 import { getScenario, type VoiceCoachEmotion, type VoiceCoachOpening } from "@/lib/voice-coach/scenarios"
 import { doubaoTts, type DoubaoTtsEmotion } from "@/lib/voice-coach/speech/doubao.server"
 import { signVoiceCoachAudio, uploadVoiceCoachAudio } from "@/lib/voice-coach/storage.server"
 import { normalizeScenarioTag } from "@/lib/voice-coach/tag-utils"
-import {
-  getTrainingTask,
-  listKnowledgeSpaces,
-  resolveActiveKnowledgeSpace,
-  resolveTrainingPack,
-} from "@/lib/voice-coach/training.server"
+import { resolveVoiceCoachTrainingContextForSession } from "@/lib/voice-coach/training-context.server"
 import { resolveMpAccountContextForUser } from "@/lib/mp/account-context.server"
+import { createAdminSupabaseClient } from "@/lib/supabase/admin.server"
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
@@ -61,23 +62,6 @@ function cleanText(value: unknown, max = 300): string {
   const text = String(value || "").trim()
   if (!text) return ""
   return text.length > max ? text.slice(0, max) : text
-}
-
-function normalizeObject(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
-}
-
-function mergeTrainingContext(base: unknown, extra: Record<string, unknown>): Record<string, unknown> | null {
-  const merged = {
-    ...normalizeObject(base),
-    ...extra,
-  }
-  const compact = Object.entries(merged).filter(([, value]) => {
-    if (Array.isArray(value)) return value.length > 0
-    if (value && typeof value === "object") return Object.keys(value as Record<string, unknown>).length > 0
-    return cleanText(value, 500) !== ""
-  })
-  return compact.length ? Object.fromEntries(compact) : null
 }
 
 function isMissingOrgSnapshotColumn(error: any) {
@@ -260,71 +244,6 @@ async function loadFollowupContext(args: {
     ok: true,
     context: buildFallbackFollowupContext(sourceSessionId, report, (turns || []) as SourceTurnRow[]),
   }
-}
-
-async function resolveTrainingContextForSession(args: {
-  supabase: RequestSupabaseClient
-  accountContext: Awaited<ReturnType<typeof resolveMpAccountContextForUser>> | null
-  parsedData: VoiceCoachSessionCreateInput
-}): Promise<Record<string, unknown> | null> {
-  const payloadContext = normalizeObject(args.parsedData.training_context)
-  const preview = normalizeObject(args.parsedData.training_task_preview)
-  const requestedTaskId = cleanText(
-    args.parsedData.training_task_id || payloadContext.task_id || payloadContext.training_task_id,
-    160,
-  )
-  const requestedPackId = cleanText(
-    args.parsedData.training_pack_id || payloadContext.pack_id || payloadContext.training_pack_id,
-    160,
-  )
-  const requestedKnowledgeSpaceId = cleanText(
-    args.parsedData.training_knowledge_space_id ||
-      payloadContext.knowledge_space_id ||
-      payloadContext.training_knowledge_space_id,
-    160,
-  )
-  const requestedMode = cleanText(payloadContext.training_pack_mode || payloadContext.trainingPackMode, 80)
-
-  let serverContext: Record<string, unknown> = {}
-  if (requestedTaskId || requestedKnowledgeSpaceId || requestedMode) {
-    try {
-      const spaces = await listKnowledgeSpaces({
-        supabase: args.supabase,
-        ctx: args.accountContext,
-        activeKnowledgeSpaceId: requestedKnowledgeSpaceId,
-      })
-      const space = resolveActiveKnowledgeSpace(spaces, requestedKnowledgeSpaceId, requestedMode)
-      if (space) {
-        const pack = await resolveTrainingPack({ supabase: args.supabase, space })
-        const task = pack ? getTrainingTask(pack, requestedTaskId) : null
-        serverContext = mergeTrainingContext(task?.training_context || null, {
-          task_id: task?.task_id || requestedTaskId,
-          pack_id: pack?.pack_id || requestedPackId,
-          brand_code: pack?.brand_code || args.parsedData.training_brand_code || "",
-          knowledge_space_id: space.id || requestedKnowledgeSpaceId,
-          knowledge_space_name: space.display_name || "",
-          pack_title: pack?.title || "",
-          training_pack_mode: pack?.training_pack_mode || requestedMode,
-          title: task?.title || preview.title || "",
-          focus: task?.focus || preview.focus || "",
-          customer_line: task?.customer_line || preview.customer_line || "",
-        }) || {}
-      }
-    } catch {
-      serverContext = {}
-    }
-  }
-
-  return mergeTrainingContext(serverContext, {
-    ...payloadContext,
-    task_id: requestedTaskId || payloadContext.task_id || payloadContext.training_task_id || "",
-    pack_id: requestedPackId || payloadContext.pack_id || payloadContext.training_pack_id || "",
-    brand_code: args.parsedData.training_brand_code || payloadContext.brand_code || payloadContext.training_brand_code || "",
-    knowledge_space_id: requestedKnowledgeSpaceId || payloadContext.knowledge_space_id || payloadContext.training_knowledge_space_id || "",
-    title: payloadContext.title || payloadContext.task_title || preview.title || "",
-    focus: payloadContext.focus || preview.focus || "",
-    customer_line: payloadContext.customer_line || payloadContext.customerLine || preview.customer_line || "",
-  })
 }
 
 function parseHistoryLimit(value: string | null) {
@@ -659,7 +578,7 @@ export async function POST(request: NextRequest) {
     })
     if (!followupContextResult.ok) return followupContextResult.response
     const followupContext = followupContextResult.context
-    const trainingContext = await resolveTrainingContextForSession({
+    const trainingContext = await resolveVoiceCoachTrainingContextForSession({
       supabase,
       accountContext,
       parsedData: parsed.data,
@@ -726,6 +645,81 @@ export async function POST(request: NextRequest) {
 
     if (sessionError || !session) {
       return jsonError(500, "create_session_failed", { message: sessionError?.message })
+    }
+
+    const openingPreparationId = cleanText(parsed.data.opening_preparation_id, 80)
+    if (openingPreparationId) {
+      try {
+        const openingPreparationAdmin = createAdminSupabaseClient()
+        const lockedOpening = await lockOpeningPreparationForSession({
+          supabase: openingPreparationAdmin,
+          userId: user.id,
+          preparationId: openingPreparationId,
+          sessionId: session.id,
+        })
+        const preparedOpening = lockedOpening ? await signPreparedOpening(lockedOpening) : null
+        if (preparedOpening) {
+          const turnId = randomUUID()
+          const { error: turnError } = await supabase.from("voice_coach_turns").insert({
+            id: turnId,
+            session_id: session.id,
+            turn_index: 0,
+            role: "customer",
+            text: preparedOpening.text,
+            emotion: preparedOpening.emotion,
+            audio_path: preparedOpening.audio_path || null,
+            audio_seconds: preparedOpening.audio_seconds,
+            status: preparedOpening.audio_url ? "audio_ready" : "text_ready",
+            features_json: {
+              tag: normalizeScenarioTag(preparedOpening.tag, scenario),
+              opening_preparation_id: preparedOpening.preparation_id,
+            },
+          })
+
+          if (turnError) {
+            return jsonError(500, "create_turn_failed", { message: turnError.message })
+          }
+
+          await markOpeningPreparationConsumed({
+            supabase: openingPreparationAdmin,
+            userId: user.id,
+            preparationId: preparedOpening.preparation_id,
+            sessionId: session.id,
+          })
+
+          return NextResponse.json({
+            session_id: session.id,
+            scenario: {
+              id: scenario.id,
+              name: scenario.name,
+              goal: scenario.goal,
+              seedTopics: scenario.seedTopics,
+            },
+            session_context: getVoiceCoachSessionClientContext({
+              snapshot: session.scenario_snapshot_json,
+              customerProfileId: session.customer_profile_id,
+              sceneCardId: session.scene_card_id,
+              sessionContext: session.session_context_json,
+            }),
+            first_customer_turn: {
+              turn_id: turnId,
+              turn_index: 0,
+              text: preparedOpening.text,
+              emotion: preparedOpening.emotion,
+              audio_url: preparedOpening.audio_url,
+              audio_seconds: preparedOpening.audio_seconds,
+              tts_failed: false,
+              tts_pending: !preparedOpening.audio_url,
+              audio_source: preparedOpening.audio_source,
+              opening_preparation_id: preparedOpening.preparation_id,
+            },
+          })
+        }
+      } catch (error: any) {
+        if (!isOpeningPreparationUnavailableError(error)) {
+          throw error
+        }
+      }
     }
 
     const { count: scenarioSessionCount } = await supabase
