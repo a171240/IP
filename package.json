@@ -7,6 +7,7 @@
     "release:preflight": "node ./scripts/check-backend-release-package.mjs",
     "release:verify:professional-images": "node ./scripts/check-professional-learning-remote-images.mjs --concurrency 4 --timeout-ms 30000",
     "aliyun:env:check": "node ./scripts/prepare-aliyun-runtime-env.mjs --allow-todo",
+    "aliyun:env:plan": "node ./scripts/prepare-aliyun-runtime-env.mjs --allow-todo --write-plan /tmp/meiye-aliyun-env-import-plan.json",
     "aliyun:cloud:check": "node ./scripts/check-aliyun-production-cn-readiness.mjs --allow-blocking --cloud-confirmations ./deploy/aliyun-production-cn.cloud-confirmations.local.json",
     "aliyun:readiness": "node ./scripts/check-aliyun-production-cn-readiness.mjs --allow-blocking",
     "aliyun:readiness:strict": "node ./scripts/check-aliyun-production-cn-readiness.mjs",

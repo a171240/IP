@@ -4,6 +4,7 @@ import { spawn } from "node:child_process"
 
 const COMMANDS = [
   ["run", "aliyun:env:check"],
+  ["run", "aliyun:env:plan"],
   ["run", "aliyun:cloud:check"],
   ["run", "aliyun:readiness"],
   ["run", "aliyun:routes:check"],

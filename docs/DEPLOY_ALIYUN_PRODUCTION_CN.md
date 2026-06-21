@@ -339,6 +339,39 @@ slsAlerts：SLS 项目和健康检查失败、5xx 告警配置。
 corepack pnpm aliyun:cloud:check
 ```
 
+## 4.8 阿里云环境变量导入计划
+
+生成不含任何变量值的导入任务单：
+
+```bash
+corepack pnpm aliyun:env:plan
+```
+
+默认输出：
+
+```text
+/tmp/meiye-aliyun-env-import-plan.json
+```
+
+这个 JSON 只包含：
+
+```text
+变量名
+是否必填
+当前状态：ready / todo / empty
+敏感分类：public / identifier_or_connection / secret
+获得来源
+导入动作
+```
+
+它不包含真实 value，可用于进阿里云 SAE/ECS/KMS/Secrets Manager 控制台时逐项核对。真正带 value 的导入文件只能用下面命令写到仓库外临时路径，并在导入后删除：
+
+```bash
+node scripts/prepare-aliyun-runtime-env.mjs \
+  --env-file /Users/Admin/Documents/美业话镜APP/.env.production-cn.local \
+  --write /tmp/meiye-sae-env.json
+```
+
 ## 5. 微信登录变量来源
 
 APP 登录使用微信开放平台的移动应用，不使用小程序 AppID/Secret。
@@ -396,6 +429,7 @@ corepack pnpm aliyun:predeploy
 
 ```bash
 corepack pnpm aliyun:env:check
+corepack pnpm aliyun:env:plan
 corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:readiness
 corepack pnpm aliyun:routes:check

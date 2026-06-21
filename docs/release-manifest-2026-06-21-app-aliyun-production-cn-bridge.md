@@ -1,6 +1,6 @@
 # 美业话镜 APP 阿里云 production-cn 桥接后端发布清单
 
-生成时间：2026-06-21 21:45:10 CST
+生成时间：2026-06-21 21:58:08 CST
 
 本文只记录 APP 国内 production-cn 后端桥接包的本地准备状态，不包含任何密钥值，也不代表已经执行阿里云生产部署。
 
@@ -9,9 +9,9 @@
 - Release lane: APP production-cn backend bridge
 - Backend repository: `/Users/Admin/Documents/美业话镜APP/handoff/IP`
 - Backend branch: `codex/app-api-handoff-20260521`
-- Backend HEAD: `83acfa1 deploy: require aliyun cloud confirmations`
+- Backend HEAD before env-plan update: `da9f812 docs: record aliyun console readiness evidence`
 - Remote baseline branch: `origin/codex/app-api-handoff-20260521`
-- Branch state before this manifest: ahead 9, clean worktree
+- Branch state before env-plan update: ahead 11, clean worktree
 - App workspace: `/Users/Admin/Documents/美业话镜APP`
 - Mini-program repository: `/Users/Admin/Documents/美业话镜小程序`
 
@@ -29,6 +29,8 @@
 ## 3. 本轮包含的后端提交
 
 ```text
+da9f812 docs: record aliyun console readiness evidence
+232cf5f docs: refresh aliyun production-cn readiness
 83acfa1 deploy: require aliyun cloud confirmations
 8096803 docs: add aliyun production-cn release manifest
 bc2b787 deploy: track wechat open app review status
@@ -254,6 +256,7 @@ node scripts/prepare-aliyun-runtime-env.mjs --env-file /Users/Admin/Documents/�
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.cloud-confirmations.example.json','utf8'))"
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.cloud-confirmations.local.json','utf8'))"
 node scripts/generate-app-runtime-config.mjs --env-file ../.env.production-cn.local --out /tmp/meiye-build-config.generated.ts --require-production-ready --check
+corepack pnpm aliyun:env:plan
 corepack pnpm aliyun:readiness
 corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:release:artifacts -- --skip-bundle
@@ -264,6 +267,7 @@ corepack pnpm aliyun:predeploy
 
 ```text
 aliyun:env:check
+aliyun:env:plan
 aliyun:cloud:check
 aliyun:readiness
 aliyun:routes:check
@@ -284,6 +288,15 @@ release preflight: 4 / 4 pass
 build: compiled successfully; existing lint warnings only
 health smoke: sensitiveLeakCount 0
 app-api smoke: 22 probes, 0 failures
+```
+
+`aliyun:env:plan` 生成：
+
+```text
+/tmp/meiye-aliyun-env-import-plan.json
+containsValues: false
+variables: 61
+requiredBlocking: WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET
 ```
 
 本机 Docker daemon 当前不可用：

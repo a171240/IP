@@ -99,6 +99,7 @@ const REQUIRED_BACKEND_FILES = [
 
 const REQUIRED_BACKEND_SCRIPTS = [
   "aliyun:env:check",
+  "aliyun:env:plan",
   "aliyun:cloud:check",
   "aliyun:readiness",
   "aliyun:readiness:strict",

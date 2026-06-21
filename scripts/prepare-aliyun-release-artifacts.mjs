@@ -227,6 +227,12 @@ function renderMarkdown(audit) {
       ? `- forbiddenEntryCount: ${bundle.forbiddenEntryCount}`
       : "- forbiddenEntryCount: skipped",
     "",
+    "## 阿里云环境变量导入计划",
+    "",
+    `- path: ${audit.outputFiles.envImportPlan}`,
+    "- containsValues: false",
+    `- requiredBlocking: ${env.planRequiredBlocking?.length ? env.planRequiredBlocking.join(", ") : "none"}`,
+    "",
     "## 后续命令",
     "",
     "```bash",
@@ -249,6 +255,8 @@ function main() {
     "--env-file",
     args.envFile,
     "--allow-todo",
+    "--write-plan",
+    resolve(args.outDir, "env-import-plan.json"),
   ])
   const readiness = runJson("readiness", [
     "scripts/check-aliyun-production-cn-readiness.mjs",
@@ -281,6 +289,7 @@ function main() {
     outputFiles: {
       auditJson: resolve(args.outDir, "release-audit.json"),
       auditMarkdown: resolve(args.outDir, "release-audit.md"),
+      envImportPlan: resolve(args.outDir, "env-import-plan.json"),
       bundle: bundle?.path || null,
     },
   }
@@ -299,6 +308,7 @@ function main() {
     bundle: audit.bundle,
     auditJson: audit.outputFiles.auditJson,
     auditMarkdown: audit.outputFiles.auditMarkdown,
+    envImportPlan: audit.outputFiles.envImportPlan,
   }, null, 2))
 }
 
