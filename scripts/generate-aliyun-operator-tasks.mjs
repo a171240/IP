@@ -94,7 +94,9 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan }) {
       item.includes("WECHAT_OPEN") ||
       item.includes("wechat_open_platform") ||
       item.includes("invalid_app_native_release_config") ||
-      item.includes("app_native:")
+      item.includes("app_native:") ||
+      item.includes("invalid_app_universal_link_config") ||
+      item.includes("app_universal_link:")
     ),
     owner: "用户/微信开放平台操作员",
     consolePath: "微信开放平台 -> 管理中心 -> 移动应用 -> 美业话镜 App",
@@ -105,7 +107,9 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan }) {
       "获取移动应用 AppSecret，填入 WECHAT_OPEN_APP_SECRET。",
       "确认 Android 包名为 com.ipgongchang.meiyehuajing，并从 release 签名证书取得微信开放平台要求的 Android 应用签名。",
       "确认 iOS Bundle ID 为 com.ipgongchang.meiyehuajing，并配置 HTTPS Universal Link。",
+      "从 Apple Developer 确认 10 位 Team ID，填入 APPLE_TEAM_ID，用于后端 AASA 路由生成 iOS appID。",
       "运行 corepack pnpm aliyun:app-native:check，确认 APP 原生发布配置状态进入 release audit。",
+      "运行 corepack pnpm aliyun:aasa:check，确认后端 AASA 路由和 APPLE_TEAM_ID 状态。",
       "在 deploy/aliyun-production-cn.cloud-confirmations.local.json 的 wechatOpenPlatform 项记录非密钥证据。",
     ],
     evidence: [
@@ -118,11 +122,14 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan }) {
       "androidConfigured=true",
       "iosBundleId=com.ipgongchang.meiyehuajing",
       "iosUniversalLink=https://...",
+      "APPLE_TEAM_ID ready",
       "iosConfigured=true",
     ],
     verifyCommands: [
       "corepack pnpm aliyun:app-native:check",
+      "corepack pnpm aliyun:aasa:check",
       "corepack pnpm aliyun:readiness",
+      "curl -i https://api-cn.ipgongchang.xin/.well-known/apple-app-site-association after deployment",
       "GET https://api-cn.ipgongchang.xin/api/app/health?strict=1 after deployment",
     ],
     notes: [

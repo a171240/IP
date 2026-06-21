@@ -613,6 +613,22 @@ WECHAT_OPEN_APP_SECRET
 -> AppID / AppSecret
 ```
 
+iOS Universal Link 还需要一个 Apple Developer 侧的非密钥变量：
+
+```text
+APPLE_TEAM_ID
+```
+
+来源：
+
+```text
+Apple Developer
+-> Membership 或 Certificates, Identifiers & Profiles
+-> Identifiers
+-> 美业话镜 App ID
+-> Team ID
+```
+
 `WECHAT_OPEN_APP_REVIEW_STATUS` 不是密钥，只用于 readiness 报告当前状态。可选值：
 
 ```text
@@ -631,10 +647,11 @@ rejected
 Android applicationId / 包名：com.ipgongchang.meiyehuajing
 Android 应用签名：用正式 release keystore 生成，并把同一份 release 证书签名填入微信开放平台；密钥值不进入仓库
 iOS Bundle ID：com.ipgongchang.meiyehuajing
-iOS Universal Link：HTTPS 域名路径，建议走 api-cn.ipgongchang.xin 或另一个已备案 APP 域名
+iOS Universal Link：https://api-cn.ipgongchang.xin/app/wechat/
+iOS AASA：https://api-cn.ipgongchang.xin/.well-known/apple-app-site-association
 ```
 
-其中移动应用名称、Android 包名、iOS Bundle ID 已能从当前 APP 工程核对；Android 应用签名和 iOS Universal Link 需要在微信开放平台移动应用配置页和正式 release/iOS 关联域名配置里确认。
+其中移动应用名称、Android 包名、iOS Bundle ID 已能从当前 APP 工程核对；Android 应用签名、iOS Associated Domains 和 iOS Universal Link 需要在微信开放平台移动应用配置页、Apple Developer / Xcode release 配置里确认。`APPLE_TEAM_ID` 从 Apple Developer 的 Membership 或 App ID 页面获取，不是密钥；后端 AASA 路由会用它生成 `appID`。
 
 当前浏览器自动化不能打开 `open.weixin.qq.com`，需要用户手工登录后提供或手工填入本机 `.env.production-cn.local` 与 `deploy/aliyun-production-cn.cloud-confirmations.local.json`。
 
@@ -661,6 +678,7 @@ corepack pnpm aliyun:readiness
 corepack pnpm aliyun:routes:check
 corepack pnpm aliyun:app-client:contract
 corepack pnpm aliyun:app-native:check
+corepack pnpm aliyun:aasa:check
 corepack pnpm aliyun:app-api:coverage
 corepack pnpm aliyun:docker:check
 corepack pnpm exec tsc --noEmit --pretty false
@@ -764,6 +782,7 @@ APP env template forbidden backend/secret keys: WECHAT_OPEN_APP_ID、WECHAT_OPEN
 node scripts/prepare-aliyun-runtime-env.mjs --env-file /Users/Admin/Documents/美业话镜APP/.env.production-cn.example --allow-todo
 node --check scripts/check-aliyun-production-cn-readiness.mjs
 node --check scripts/check-app-native-release-config.mjs
+node --check scripts/check-apple-app-site-association.mjs
 node --check scripts/prepare-aliyun-release-artifacts.mjs
 node --check scripts/generate-aliyun-operator-tasks.mjs
 node --check scripts/run-aliyun-predeploy.mjs
@@ -775,7 +794,7 @@ node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.exam
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.image-publish.example.json','utf8'))"
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.cloud-confirmations.example.json','utf8'))"
 corepack pnpm aliyun:readiness
-corepack pnpm aliyun:env:sources（61 variables / 61 source metadata ready）
+corepack pnpm aliyun:env:sources（62 variables / 62 source metadata ready）
 corepack pnpm aliyun:image:plan（template ready / local missing）
 corepack pnpm aliyun:operator:tasks
 corepack pnpm aliyun:cloud:confirmations（template ready / local 21 blockers）
@@ -785,6 +804,7 @@ corepack pnpm aliyun:predeploy
 corepack pnpm aliyun:routes:check（31 routes / 0 failures）
 corepack pnpm aliyun:app-client:contract（40 audited calls / 34 unique client routes）
 corepack pnpm aliyun:app-native:check（当前 ok=false；iOS Associated Domains 缺失；Android release 已切到 signingConfigs.release，真实 keystore 值需由本机 Gradle properties 或环境变量提供）
+corepack pnpm aliyun:aasa:check（当前 ok=false；AASA route exists；APPLE_TEAM_ID 缺失）
 corepack pnpm aliyun:app-api:coverage（29 / 29 business routes covered）
 corepack pnpm aliyun:docker:check（7 files / 24 dockerignore patterns / sensitive env excluded）
 corepack pnpm aliyun:container:smoke（Docker health + 30 APP API probes / sanitized env deleted）
@@ -813,6 +833,8 @@ TERMS_URL
 WECHAT_OPEN_APP_ID
 WECHAT_OPEN_APP_SECRET
 wechat_open_platform_mobile_app_reviewing 或 wechat_open_platform_mobile_app_not_ready
+invalid_app_universal_link_config
+app_universal_link:apple_team_id_missing
 ```
 
 2026-06-21 21:45 CST 更新：本机 `.env.production-cn.local` 已补入非密钥域名：

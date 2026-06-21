@@ -102,6 +102,7 @@ const REQUIRED_BACKEND_FILES = [
   "scripts/check-app-api-production-cn-routes.mjs",
   "scripts/check-app-client-api-contract.mjs",
   "scripts/check-app-native-release-config.mjs",
+  "scripts/check-apple-app-site-association.mjs",
   "scripts/check-app-api-smoke-coverage.mjs",
   "scripts/check-aliyun-docker-context.mjs",
   "scripts/prepare-aliyun-release-artifacts.mjs",
@@ -136,6 +137,8 @@ const REQUIRED_BACKEND_SCRIPTS = [
   "aliyun:app-client:contract",
   "aliyun:app-native:check",
   "aliyun:app-native:strict",
+  "aliyun:aasa:check",
+  "aliyun:aasa:strict",
   "aliyun:app-api:coverage",
   "aliyun:docker:check",
   "aliyun:predeploy",
@@ -675,6 +678,7 @@ function main() {
   const appScripts = scriptStatus(resolve(APP_ROOT, "package.json"), REQUIRED_APP_SCRIPTS)
   const appProductionCnEnvTemplate = envTemplateStatus(resolve(APP_ROOT, ".env.production-cn.example"))
   const appNativeReleaseConfig = runJsonScript("scripts/check-app-native-release-config.mjs", ["--allow-blocking"])
+  const appUniversalLinkConfig = runJsonScript("scripts/check-apple-app-site-association.mjs", ["--allow-blocking"])
   const imagePublishPlan = runJsonScript("scripts/check-aliyun-image-publish-plan.mjs", [
     "--local",
     DEFAULT_IMAGE_PUBLISH_FILE,
@@ -735,6 +739,12 @@ function main() {
       machineBlocking.push(`app_native:${blocker}`)
     }
   }
+  if (appUniversalLinkConfig.ok !== true) {
+    machineBlocking.push("invalid_app_universal_link_config")
+    for (const blocker of appUniversalLinkConfig.blockers || []) {
+      machineBlocking.push(`app_universal_link:${blocker}`)
+    }
+  }
 
   if (envFileExists && envMode !== "600") warnings.push(`env_file_mode_should_be_600:current_${envMode}`)
   if (!docker.ready) warnings.push(docker.status)
@@ -791,6 +801,7 @@ function main() {
         scripts: appScripts,
         envTemplate: appProductionCnEnvTemplate,
         nativeRelease: appNativeReleaseConfig,
+        universalLink: appUniversalLinkConfig,
       },
       docker,
       imagePublishPlan,
@@ -802,6 +813,7 @@ function main() {
       wechatOpenPlatform.reviewStatus === "reviewing"
         ? "等待微信开放平台移动应用审核通过后补 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET"
         : "从微信开放平台移动应用补 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET",
+      "从 Apple Developer 确认 APPLE_TEAM_ID，部署后验证 /.well-known/apple-app-site-association 可返回美业话镜 iOS AASA",
       "复制 deploy/aliyun-production-cn.cloud-confirmations.example.json 到 .local.json，并逐项填写非密钥云资源确认",
       docker.ready
         ? "镜像本地构建能力已就绪；正式部署前复制 image-publish example 到 .local.json，推送/导入阿里云 ACR 并配置 SAE/ECS 拉取远端镜像"

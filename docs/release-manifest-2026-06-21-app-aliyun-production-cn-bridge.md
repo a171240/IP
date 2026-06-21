@@ -133,8 +133,12 @@ scripts/check-aliyun-image-publish-plan.mjs
 scripts/generate-aliyun-operator-tasks.mjs
 scripts/check-app-client-api-contract.mjs
 scripts/check-app-native-release-config.mjs
+scripts/check-apple-app-site-association.mjs
 scripts/prepare-aliyun-release-artifacts.mjs
 scripts/run-aliyun-predeploy.mjs
+app/.well-known/apple-app-site-association/route.ts
+app/apple-app-site-association/route.ts
+lib/app-universal-link/aasa.ts
 ```
 
 本 manifest 本身是后续补充的发布控制文件：
@@ -239,7 +243,8 @@ required missing in Vercel production:
   PRIVACY_POLICY_URL
   TERMS_URL
   WECHAT_OPEN_APP_ID
-  WECHAT_OPEN_APP_SECRET
+WECHAT_OPEN_APP_SECRET
+APPLE_TEAM_ID
 ```
 
 结论：Vercel production 可以作为 Supabase、旧微信小程序兼容、OSS、百炼、DeepSeek、火山语音等桥接变量来源；缺失的 8 个必填项是 APP 国内版新增运行环境、`api-cn` 域名变量、国内 APP 正式协议 URL 和微信开放平台移动应用 AppID/AppSecret，不能从旧小程序变量替代。
@@ -304,6 +309,8 @@ missing_required_env:TERMS_URL
 wechat_open_platform_mobile_app_reviewing
 invalid_app_native_release_config
 app_native:ios_associated_domains_missing
+invalid_app_universal_link_config
+app_universal_link:apple_team_id_missing
 ```
 
 人工确认阻塞：
@@ -383,6 +390,7 @@ aliyun:readiness
 aliyun:routes:check
 aliyun:app-client:contract
 aliyun:app-native:check
+aliyun:aasa:check
 aliyun:app-api:coverage
 aliyun:docker:check
 pnpm exec tsc --noEmit --pretty false
@@ -396,9 +404,10 @@ aliyun:app-api:smoke
 
 ```text
 routes: 31 checked, 0 failures
-env source catalog: 61 variables, 61 source metadata ready, containsValues false
+env source catalog: 62 variables, 62 source metadata ready, containsValues false
 app-client contract: 40 audited calls, 34 unique client routes, 26 matched backend routes, 4 deferred knowledge-space calls, 0 failures
 app-native release config: ok=false, blockers ios_associated_domains_missing
+aasa config: ok=false, route files exist, blocker apple_team_id_missing, universalLink https://api-cn.ipgongchang.xin/app/wechat/
 app-api coverage: 29 / 29 business routes, 30 probes, 0 missing
 docker context: 7 files, 24 dockerignore patterns, sensitive env excluded
 image publish plan: template ready, local file not ready until ACR remote image and runtime pull evidence are filled
@@ -548,6 +557,7 @@ APP_ASSET_BASE_URL=https://assets-cn.ipgongchang.xin
 WECHAT_OPEN_APP_REVIEW_STATUS=approved
 WECHAT_OPEN_APP_ID=<微信开放平台移动应用 AppID>
 WECHAT_OPEN_APP_SECRET=<微信开放平台移动应用 AppSecret>
+APPLE_TEAM_ID=<Apple Developer 10 位 Team ID>
 ```
 
 `APP_API_BASE_URL`、`NEXT_PUBLIC_SITE_URL`、`APP_ASSET_BASE_URL` 已写入本机 `.env.production-cn.local`，但仍需阿里云 DNS/HTTPS/OSS/CDN 证据确认后才能算生产 ready。
@@ -579,7 +589,8 @@ iOS Associated Domains / Universal Link 尚未配置
 
 ```text
 Android 应用签名：用正式 release keystore 生成，并把同一份 release 证书签名填入微信开放平台；密钥值不进入仓库
-iOS Universal Link：HTTPS 域名路径，需要和 iOS Associated Domains / AASA 文件一致
+iOS Universal Link：https://api-cn.ipgongchang.xin/app/wechat/，需要和 iOS Associated Domains / AASA 文件一致
+APPLE_TEAM_ID：Apple Developer -> Membership 或 Identifiers/App ID 页面读取，不是密钥，用于 AASA appID
 WECHAT_OPEN_APP_ID：审核通过后读取
 WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KMS
 ```
