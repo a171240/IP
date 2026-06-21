@@ -193,6 +193,7 @@ function renderMarkdown(audit) {
   const legalPages = audit.checks.legalPages
   const imagePublishPlan = audit.checks.imagePublishPlan
   const operatorTasks = audit.checks.operatorTasks
+  const operatorHandoff = audit.checks.operatorHandoff
   const productionStatus = audit.checks.productionStatus
   const cloudConfirmationsCheck = audit.checks.cloudConfirmationsCheck
   const cloudConfirmations = readiness.checks?.cloudConfirmations
@@ -223,6 +224,7 @@ function renderMarkdown(audit) {
     `- appRuntimeConfig: ${appRuntimeConfig?.ok === true ? "ready" : "not ready"}`,
     `- appNativeRelease: ${appNativeRelease?.ok === true ? "ready" : "not ready"}`,
     `- operatorTasks: ${operatorTasks.summary.ready} / ${operatorTasks.summary.total} ready`,
+    `- operatorHandoff: ${operatorHandoff.verdict}, missing required env ${operatorHandoff.missingVariables.required.length}`,
     `- productionStatus: ${productionStatus.verdict}, canDeployNow ${productionStatus.canDeployNow === true}`,
     `- cloudConfirmations: ${cloudConfirmations?.ready ? "ready" : "not ready"}`,
     `- cloudConfirmationsCheck: template ${cloudConfirmationsCheck?.template?.ready ? "ready" : "not ready"}, local ${cloudConfirmationsCheck?.local?.ready ? "ready" : "not ready"}`,
@@ -337,6 +339,15 @@ function renderMarkdown(audit) {
     `- ready: ${operatorTasks.summary.ready} / ${operatorTasks.summary.total}`,
     `- blocked: ${operatorTasks.summary.blocked}`,
     `- pendingCloud: ${operatorTasks.summary.pendingCloud}`,
+    "",
+    "## 操作员操作包",
+    "",
+    `- json: ${audit.outputFiles.operatorHandoffJson}`,
+    `- markdown: ${audit.outputFiles.operatorHandoffMarkdown}`,
+    `- verdict: ${operatorHandoff.verdict}`,
+    `- canDeployNow: ${operatorHandoff.canDeployNow === true}`,
+    `- blockingRequiredEnv: ${operatorHandoff.missingVariables.required.length ? operatorHandoff.missingVariables.required.map((item) => item.name).join(", ") : "none"}`,
+    `- optionalDeferredEnv: ${operatorHandoff.missingVariables.optionalDeferred.length}`,
     "",
     "## 发布负责人状态总览",
     "",
@@ -519,6 +530,8 @@ function main() {
   ])
   const operatorTasksJsonPath = resolve(args.outDir, "operator-tasks.json")
   const operatorTasksMarkdownPath = resolve(args.outDir, "operator-tasks.md")
+  const operatorHandoffJsonPath = resolve(args.outDir, "operator-handoff.json")
+  const operatorHandoffMarkdownPath = resolve(args.outDir, "operator-handoff.md")
   const productionStatusJsonPath = resolve(args.outDir, "production-cn-status.json")
   const productionStatusMarkdownPath = resolve(args.outDir, "production-cn-status.md")
   const cloudConfirmationsCheckPath = resolve(args.outDir, "cloud-confirmations-check.json")
@@ -531,6 +544,16 @@ function main() {
     operatorTasksJsonPath,
     "--markdown",
     operatorTasksMarkdownPath,
+  ])
+  const operatorHandoff = runJson("operator_handoff", [
+    "scripts/generate-aliyun-operator-handoff.mjs",
+    "--env-file",
+    args.envFile,
+    ...(args.cloudConfirmationsFile ? ["--cloud-confirmations", args.cloudConfirmationsFile] : []),
+    "--out",
+    operatorHandoffJsonPath,
+    "--markdown",
+    operatorHandoffMarkdownPath,
   ])
   const productionStatus = runJson("production_status", [
     "scripts/summarize-aliyun-production-cn-status.mjs",
@@ -573,6 +596,7 @@ function main() {
       legalPages,
       imagePublishPlan,
       operatorTasks,
+      operatorHandoff,
       productionStatus,
       cloudConfirmationsCheck,
       routes,
@@ -595,6 +619,8 @@ function main() {
       appApiBridgeMap: resolve(args.outDir, "app-api-bridge-map-check.json"),
       operatorTasksJson: operatorTasksJsonPath,
       operatorTasksMarkdown: operatorTasksMarkdownPath,
+      operatorHandoffJson: operatorHandoffJsonPath,
+      operatorHandoffMarkdown: operatorHandoffMarkdownPath,
       productionStatusJson: productionStatusJsonPath,
       productionStatusMarkdown: productionStatusMarkdownPath,
       bundle: bundle?.path || null,
@@ -661,6 +687,15 @@ function main() {
       operatorTasks: productionStatus.summary.operatorTasks || {},
       cloudConfirmations: productionStatus.summary.cloudConfirmations || {},
     },
+    operatorHandoff: {
+      report: audit.outputFiles.operatorHandoffJson,
+      markdown: audit.outputFiles.operatorHandoffMarkdown,
+      verdict: operatorHandoff.verdict,
+      canDeployNow: operatorHandoff.canDeployNow === true,
+      blockingRequiredEnv: operatorHandoff.missingVariables.required.map((item) => item.name),
+      optionalDeferredEnv: operatorHandoff.missingVariables.optionalDeferred.map((item) => item.name),
+      priorityTasks: operatorHandoff.priorityTasks.map((task) => `${task.id}:${task.status}`),
+    },
     appProductionConfig: {
       filesReady: readiness.checks?.appProductionConfig?.files?.ready === true,
       scriptsReady: readiness.checks?.appProductionConfig?.scripts?.ready === true,
@@ -722,6 +757,8 @@ function main() {
     cloudConfirmationsCheckReport: audit.outputFiles.cloudConfirmationsCheck,
     operatorTasksJson: audit.outputFiles.operatorTasksJson,
     operatorTasksMarkdown: audit.outputFiles.operatorTasksMarkdown,
+    operatorHandoffJson: audit.outputFiles.operatorHandoffJson,
+    operatorHandoffMarkdown: audit.outputFiles.operatorHandoffMarkdown,
   }, null, 2))
 }
 

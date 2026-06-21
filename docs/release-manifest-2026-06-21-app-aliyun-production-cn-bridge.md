@@ -140,6 +140,7 @@ scripts/check-app-client-api-contract.mjs
 scripts/check-app-native-release-config.mjs
 scripts/check-apple-app-site-association.mjs
 scripts/summarize-aliyun-production-cn-status.mjs
+scripts/generate-aliyun-operator-handoff.mjs
 scripts/prepare-aliyun-release-artifacts.mjs
 scripts/run-aliyun-predeploy.mjs
 app/.well-known/apple-app-site-association/route.ts
@@ -361,6 +362,7 @@ node --check scripts/check-aliyun-image-publish-plan.mjs
 node --check scripts/check-aliyun-domain-readiness.mjs
 node --check scripts/generate-aliyun-operator-tasks.mjs
 node --check scripts/summarize-aliyun-production-cn-status.mjs
+node --check scripts/generate-aliyun-operator-handoff.mjs
 node scripts/generate-app-runtime-config.mjs --env-file ../.env.production-cn.local --out /tmp/meiye-build-config.generated.ts --require-production-ready --check
 corepack pnpm aliyun:env:plan
 corepack pnpm aliyun:env:sources
@@ -370,6 +372,7 @@ corepack pnpm aliyun:deploy:spec
 corepack pnpm aliyun:image:plan
 corepack pnpm aliyun:status
 corepack pnpm aliyun:operator:tasks
+corepack pnpm aliyun:operator:handoff
 corepack pnpm aliyun:cloud:confirmations
 corepack pnpm aliyun:cloud:confirmations:strict（exit 1 as expected while cloud resources are incomplete）
 corepack pnpm aliyun:readiness
@@ -472,8 +475,8 @@ aliyun:status 只输出非密钥总览，覆盖 productionReady、required env�
 ```text
 /tmp/meiye-aliyun-env-import-plan.json
 containsValues: false
-variables: 61
-sourceMetadataReady: 61 / 61
+variables: 62
+sourceMetadataReady: 62 / 62
 requiredBlocking: WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET
 ```
 
@@ -492,13 +495,17 @@ release-audit.json
 release-audit.md
 production-cn-status.json
 production-cn-status.md
+operator-tasks.json
+operator-tasks.md
+operator-handoff.json
+operator-handoff.md
 env-import-plan.json
 vercel-env-coverage.json
 image-publish-plan-check.json
 meiye-huajing-app-api-production-cn-context.tar.gz
 ```
 
-其中 `vercel-env-coverage.json` 只包含 Vercel production 变量名、环境和加密/敏感元数据，不包含真实 value；Vercel 登录态不可用时只记录 non-blocking failure，不阻断 release audit。
+其中 `operator-handoff.json/md` 是给用户、阿里云控制台操作员、微信开放平台操作员和发布负责人共用的非密钥操作包；`vercel-env-coverage.json` 只包含 Vercel production 变量名、环境和加密/敏感元数据，不包含真实 value；Vercel 登录态不可用时只记录 non-blocking failure，不阻断 release audit。
 
 2026-06-22 03:56 CST 最新 artifacts：
 
@@ -555,6 +562,8 @@ sanitizedEnvFileDeleted: true
 2026-06-22 06:36 CST 追加：新增 `corepack pnpm aliyun:app-config:check`，由后端门禁只读调用 App 工程 `generate-app-runtime-config --require-production-ready --check`，确认 production-cn 正式包会使用 `api-cn` / `assets-cn` 非密钥 runtime 配置，并拒绝旧 Vercel/小程序入口或密钥字段进入 App build config。该命令已纳入 `aliyun:readiness` 和 `aliyun:predeploy`，部署规格 `predeployChecks` 从 19 项更新为 20 项。
 
 2026-06-22 06:45 CST 复核：新增 App runtime config 门禁后重新执行 `node --check scripts/check-app-production-runtime-config.mjs`、`corepack pnpm aliyun:app-config:check`、`corepack pnpm aliyun:status`、`corepack pnpm aliyun:deploy:spec`、`corepack pnpm aliyun:release:artifacts -- --skip-bundle --skip-vercel-env-coverage` 和 `corepack pnpm aliyun:predeploy`，全部通过。`aliyun:status` 现在输出 `appRuntimeConfig.ok=true`、`containsSecretValues=false`、`apiBaseUrl=https://api-cn.ipgongchang.xin`、`assetBaseUrl=https://assets-cn.ipgongchang.xin`；`aliyun:deploy:spec` 显示 `predeployChecks=20`；`predeploy` 仍只剩微信 App 登录和外部云资源确认阻塞，APP API smoke `30 probes / 0 failures`。
+
+2026-06-22 07:02 CST 追加：新增 `corepack pnpm aliyun:operator:handoff` 和 `scripts/generate-aliyun-operator-handoff.mjs`，把 `aliyun:status`、`aliyun:operator:tasks` 和 env import plan 合并成一个非密钥操作包。微信开放平台已提交审核时，当前动作是等待移动应用审核通过后读取 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；阿里云侧继续补 SAE/ECS、ACR、DNS/HTTPS/ICP、OSS/RAM、env import 和 SLS 证据。`aliyun:release:artifacts` 会随包输出 `operator-handoff.json` 和 `operator-handoff.md`。同轮已执行 `node --check scripts/generate-aliyun-operator-handoff.mjs`、`corepack pnpm aliyun:operator:handoff`、`corepack pnpm aliyun:readiness`、`corepack pnpm aliyun:release:artifacts -- --skip-bundle --skip-vercel-env-coverage` 和 `corepack pnpm aliyun:predeploy`，全部通过；`predeploy` 仍只剩 `appWechatLogin` 外部阻塞，APP API smoke `30 probes / 0 failures`。
 
 ## 10. 发布前必须补齐
 

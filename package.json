@@ -16,6 +16,7 @@
     "aliyun:domain:check": "node ./scripts/check-aliyun-domain-readiness.mjs --allow-blocking",
     "aliyun:domain:strict": "node ./scripts/check-aliyun-domain-readiness.mjs",
     "aliyun:operator:tasks": "node ./scripts/generate-aliyun-operator-tasks.mjs",
+    "aliyun:operator:handoff": "node ./scripts/generate-aliyun-operator-handoff.mjs",
     "aliyun:status": "node ./scripts/summarize-aliyun-production-cn-status.mjs",
     "aliyun:legal:check": "node ./scripts/check-app-legal-pages.mjs --allow-missing-env",
     "aliyun:legal:strict": "node ./scripts/check-app-legal-pages.mjs",
