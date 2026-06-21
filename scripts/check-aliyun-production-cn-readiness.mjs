@@ -89,6 +89,7 @@ const REQUIRED_BACKEND_FILES = [
   ".dockerignore",
   "package.json",
   "pnpm-lock.yaml",
+  "deploy/app-api-production-cn.bridge-map.json",
   "deploy/aliyun-production-cn.image-publish.example.json",
   "app/api/app/health/route.ts",
   "app/api/healthz/route.ts",
@@ -101,6 +102,7 @@ const REQUIRED_BACKEND_FILES = [
   "scripts/check-app-legal-pages.mjs",
   "scripts/prepare-aliyun-runtime-env.mjs",
   "scripts/check-app-api-production-cn-routes.mjs",
+  "scripts/check-app-api-bridge-map.mjs",
   "scripts/check-app-client-api-contract.mjs",
   "scripts/check-app-native-release-config.mjs",
   "scripts/check-apple-app-site-association.mjs",
@@ -137,6 +139,7 @@ const REQUIRED_BACKEND_SCRIPTS = [
   "aliyun:readiness:assume-cloud-ready",
   "aliyun:release:artifacts",
   "aliyun:routes:check",
+  "aliyun:app-api:bridge-map",
   "aliyun:app-client:contract",
   "aliyun:app-native:check",
   "aliyun:app-native:strict",
@@ -677,6 +680,7 @@ function main() {
   const wechatOpenPlatform = checkWechatOpenPlatform(env)
   const backendFiles = fileStatus(BACKEND_ROOT, REQUIRED_BACKEND_FILES)
   const backendScripts = scriptStatus(resolve(BACKEND_ROOT, "package.json"), REQUIRED_BACKEND_SCRIPTS)
+  const appApiBridgeMap = runJsonScript("scripts/check-app-api-bridge-map.mjs")
   const appLegalPages = runJsonScript("scripts/check-app-legal-pages.mjs", ["--allow-missing-env"])
   const appFiles = fileStatus(APP_ROOT, REQUIRED_APP_FILES)
   const appScripts = scriptStatus(resolve(APP_ROOT, "package.json"), REQUIRED_APP_SCRIPTS)
@@ -726,6 +730,11 @@ function main() {
   addBlocker(machineBlocking, !wechatOpenPlatform.ready, wechatOpenPlatformBlocker(wechatOpenPlatform))
   addBlocker(machineBlocking, !backendFiles.ready, `missing_backend_files:${backendFiles.missing.join(",")}`)
   addBlocker(machineBlocking, !backendScripts.ready, `missing_backend_scripts:${backendScripts.missing.join(",")}`)
+  addBlocker(
+    machineBlocking,
+    !appApiBridgeMap.ok,
+    `invalid_app_api_bridge_map:${appApiBridgeMap.failures?.map((failure) => failure.error).join(",") || appApiBridgeMap.blockers?.join(",") || "unknown"}`,
+  )
   addBlocker(machineBlocking, !appLegalPages.ok, `invalid_app_legal_pages:${appLegalPages.blockers?.join(",") || "unknown"}`)
   addBlocker(machineBlocking, !appFiles.ready, `missing_app_config_files:${appFiles.missing.join(",")}`)
   addBlocker(machineBlocking, !appScripts.ready, `missing_app_config_scripts:${appScripts.missing.join(",")}`)
@@ -799,9 +808,10 @@ function main() {
       wechatOpenPlatform,
       backend: {
         files: backendFiles,
-      scripts: backendScripts,
-      legalPages: appLegalPages,
-    },
+        scripts: backendScripts,
+        appApiBridgeMap,
+        legalPages: appLegalPages,
+      },
       appProductionConfig: {
         files: appFiles,
         scripts: appScripts,

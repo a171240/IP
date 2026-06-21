@@ -31,6 +31,7 @@
     "aliyun:app-api:smoke": "node ./scripts/smoke-app-api-production-cn.mjs",
     "aliyun:postdeploy:smoke": "node ./scripts/run-aliyun-postdeploy-smoke.mjs",
     "aliyun:routes:check": "node ./scripts/check-app-api-production-cn-routes.mjs",
+    "aliyun:app-api:bridge-map": "node ./scripts/check-app-api-bridge-map.mjs",
     "aliyun:app-client:contract": "node ./scripts/check-app-client-api-contract.mjs",
     "aliyun:app-native:check": "node ./scripts/check-app-native-release-config.mjs --allow-blocking",
     "aliyun:app-native:strict": "node ./scripts/check-app-native-release-config.mjs",

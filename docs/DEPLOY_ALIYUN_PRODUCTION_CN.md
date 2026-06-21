@@ -116,6 +116,7 @@ GET /api/app/health?strict=1
 ```bash
 corepack pnpm build
 corepack pnpm aliyun:health:smoke
+corepack pnpm aliyun:app-api:bridge-map（31 mapped routes / 29 bridge-ready routes / 2 WeChat env-blocked routes）
 corepack pnpm aliyun:app-client:contract（40 audited calls / 34 unique client routes）
 corepack pnpm aliyun:app-api:coverage（29 / 29 business routes covered）
 corepack pnpm aliyun:app-api:smoke（30 business probes / 0 failures）
@@ -125,6 +126,8 @@ corepack pnpm aliyun:container:smoke（Docker image health + 30 APP API probes�
 `aliyun:health:smoke` 会启动本地 production server，请求三个 health URL，并检查响应里没有敏感变量值。
 
 `aliyun:app-api:smoke` 会启动本地 production server，用未登录或假 token 请求验证第一版 APP 后端入口已经接到业务 guard，不是 404/405，也不会写入业务数据。覆盖范围包括登录、profile、门店管理、门店邀请、知识上下文和服务记录入口。
+
+`aliyun:app-api:bridge-map` 是小程序链路复用门禁：它读取 `deploy/app-api-production-cn.bridge-map.json`，逐条校验 31 个 APP API route、App route 文件、源小程序 API 文件和小程序源页面是否一致。当前分类是 22 条 `mp_reexport`、5 条 `mp_adapter`、1 条 `app_native`、1 条 `app_alias`、2 条 `native_health`。微信登录必须保持 `app_native/app_alias`，不能回退复用小程序 `wx.login` 链路。
 
 `aliyun:app-client:contract` 是静态门禁：它读取 App 工程 `src/api` 里的 `apiRequest(...)` 调用，归一化动态路径后和后端 production-cn route 清单匹配。第一版范围包括登录、profile、entitlements、门店管理、邀请、顾客/场景/门店上下文和服务记录；Package 2 的 `knowledge-spaces` 调用只报告为 deferred，不作为第一版阻断。
 
@@ -232,7 +235,7 @@ corepack pnpm aliyun:readiness
 3. APP_API_BASE_URL / NEXT_PUBLIC_SITE_URL 是否为 production-cn HTTPS 域名，且不是 example、localhost、Vercel 旧域名。
 3a. `aliyun:domain:check` 是否可用，用于机器检查 DNS、HTTPS 和 `/api/healthz`。
 4. 微信登录是否使用微信开放平台“移动应用” AppID / AppSecret，而不是小程序 AppID / Secret。
-5. 后端阿里云部署脚本、Dockerfile、health、APP client API contract、APP API smoke 是否齐全。
+5. 后端阿里云部署脚本、Dockerfile、health、小程序链路桥接清单、APP client API contract、APP API smoke 是否齐全。
 6. App production-cn 构建配置生成门禁是否齐全。
 7. Docker daemon 是否可用于本地镜像构建。
 8. ACR 镜像发布计划和 SAE/ECS 运行时镜像拉取配置是否有非密钥证据。
@@ -302,10 +305,11 @@ release-audit.json
 release-audit.md
 env-import-plan.json
 vercel-env-coverage.json
+app-api-bridge-map-check.json
 meiye-huajing-app-api-production-cn-context.tar.gz
 ```
 
-该脚本会复用当前 readiness、env、routes、Docker context 检查，并默认尝试生成 Vercel production 变量名覆盖报告。Vercel 覆盖报告只包含变量名、环境和加密/敏感元数据，不包含真实 value；如果 Vercel 登录态不可用，会在审计里记录失败，不阻断本地发布审计包生成。
+该脚本会复用当前 readiness、env、routes、小程序链路桥接清单、Docker context 检查，并默认尝试生成 Vercel production 变量名覆盖报告。Vercel 覆盖报告只包含变量名、环境和加密/敏感元数据，不包含真实 value；如果 Vercel 登录态不可用，会在审计里记录失败，不阻断本地发布审计包生成。
 
 如果只想离线生成审计包，或不想访问 Vercel：
 
@@ -678,6 +682,7 @@ corepack pnpm aliyun:cloud:confirmations
 corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:readiness
 corepack pnpm aliyun:routes:check
+corepack pnpm aliyun:app-api:bridge-map
 corepack pnpm aliyun:app-client:contract
 corepack pnpm aliyun:app-native:check
 corepack pnpm aliyun:aasa:check
@@ -783,6 +788,7 @@ APP env template forbidden backend/secret keys: WECHAT_OPEN_APP_ID、WECHAT_OPEN
 ```text
 node scripts/prepare-aliyun-runtime-env.mjs --env-file /Users/Admin/Documents/美业话镜APP/.env.production-cn.example --allow-todo
 node --check scripts/check-aliyun-production-cn-readiness.mjs
+node --check scripts/check-app-api-bridge-map.mjs
 node --check scripts/check-app-native-release-config.mjs
 node --check scripts/check-apple-app-site-association.mjs
 node --check scripts/check-app-legal-pages.mjs
@@ -794,6 +800,7 @@ node --check scripts/check-aliyun-cloud-confirmations.mjs
 node --check scripts/check-aliyun-deployment-spec.mjs
 node --check scripts/check-aliyun-image-publish-plan.mjs
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.example.json','utf8'))"
+node -e "JSON.parse(require('fs').readFileSync('deploy/app-api-production-cn.bridge-map.json','utf8'))"
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.image-publish.example.json','utf8'))"
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.cloud-confirmations.example.json','utf8'))"
 corepack pnpm aliyun:readiness
@@ -806,6 +813,7 @@ corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:release:artifacts
 corepack pnpm aliyun:predeploy
 corepack pnpm aliyun:routes:check（31 routes / 0 failures）
+corepack pnpm aliyun:app-api:bridge-map（31 mapped routes / sourceTypes: mp_reexport 22, mp_adapter 5, app_native 1, app_alias 1, native_health 2）
 corepack pnpm aliyun:app-client:contract（40 audited calls / 34 unique client routes）
 corepack pnpm aliyun:app-native:check（当前 ok=true；Android release 已切到 signingConfigs.release；iOS Associated Domains 已配置 applinks:api-cn.ipgongchang.xin；真实 Android keystore 值仍需由本机 Gradle properties 或环境变量提供）
 corepack pnpm aliyun:aasa:check（当前 ok=false；AASA route exists；APPLE_TEAM_ID 缺失）
@@ -814,7 +822,7 @@ corepack pnpm aliyun:docker:check（7 files / 24 dockerignore patterns / sensiti
 corepack pnpm aliyun:container:smoke（Docker health + 30 APP API probes / sanitized env deleted）
 node --check scripts/check-aliyun-domain-readiness.mjs
 corepack pnpm aliyun:domain:check（状态看板 exit 0；当前 ok=false）
-corepack pnpm aliyun:deploy:spec（image meiye-huajing-app-api:production-cn / port 3000 / predeploy 17 / postdeploy 5）
+corepack pnpm aliyun:deploy:spec（image meiye-huajing-app-api:production-cn / port 3000 / predeploy 18 / postdeploy 5）
 corepack pnpm aliyun:remote:smoke -- --base-url http://127.0.0.1:3022 --allow-missing appWechatLogin,legalLinks
 corepack pnpm aliyun:env:check
 corepack pnpm exec tsc --noEmit --pretty false
@@ -828,6 +836,8 @@ npm run lint
 npm test -- --runInBand（38 suites / 119 tests）
 android ./gradlew assembleDebug
 ```
+
+2026-06-22 05:47 CST 复核：新增小程序链路桥接门禁后，`corepack pnpm aliyun:predeploy` 再次通过；`aliyun:app-api:bridge-map` 输出 31 mapped routes，29 bridge-ready routes，2 WeChat env-blocked routes。
 
 `aliyun:readiness` 当前机器可验证阻塞：
 

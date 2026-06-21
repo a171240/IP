@@ -182,6 +182,7 @@ function renderMarkdown(audit) {
   const readiness = audit.checks.readiness
   const env = audit.checks.env
   const routes = audit.checks.routes
+  const appApiBridgeMap = audit.checks.appApiBridgeMap
   const appClientContract = audit.checks.appClientContract
   const appApiSmokeCoverage = audit.checks.appApiSmokeCoverage
   const docker = audit.checks.dockerContext
@@ -209,6 +210,7 @@ function renderMarkdown(audit) {
     `- env requiredReady: ${env.requiredReady} / ${env.requiredTotal}`,
     `- env sourceMetadataReady: ${env.planSourceMetadataReady || 0} / ${env.planVariables || 0}`,
     `- routes: ${routes.checkedRoutes} checked, ${routes.failures.length} failures`,
+    `- appApiBridgeMap: ${appApiBridgeMap.mappedRoutes} mapped routes, ${appApiBridgeMap.failures.length} failures`,
     `- appClientContract: ${appClientContract.auditedClientApiCalls} audited calls, ${appClientContract.uniqueAuditedClientRoutes} unique client routes`,
     `- appApiSmokeCoverage: ${appApiSmokeCoverage.coveredBusinessRoutes} / ${appApiSmokeCoverage.businessRoutes} business routes`,
     `- dockerContext: ${docker.ok ? "ok" : "not ok"}`,
@@ -327,6 +329,21 @@ function renderMarkdown(audit) {
     `- ready: ${operatorTasks.summary.ready} / ${operatorTasks.summary.total}`,
     `- blocked: ${operatorTasks.summary.blocked}`,
     `- pendingCloud: ${operatorTasks.summary.pendingCloud}`,
+    "",
+    "## APP API 小程序链路桥接清单",
+    "",
+    `- ok: ${appApiBridgeMap.ok === true}`,
+    `- checkedRoutes: ${appApiBridgeMap.checkedRoutes}`,
+    `- mappedRoutes: ${appApiBridgeMap.mappedRoutes}`,
+    `- bridgeReadyRoutes: ${appApiBridgeMap.bridgeReadyRoutes}`,
+    `- externalEnvBlockedRoutes: ${appApiBridgeMap.externalEnvBlockedRoutes}`,
+    `- sourceTypes: ${Object.entries(appApiBridgeMap.sourceTypes || {}).map(([key, value]) => `${key} ${value}`).join(", ")}`,
+    ...(appApiBridgeMap.failures?.length
+      ? [
+          "- failures:",
+          ...appApiBridgeMap.failures.map((item) => `  - ${item.route || item.path || "unknown"}: ${item.error}`),
+        ]
+      : ["- failures: none"]),
     "",
     "## APP 客户端 API 契约",
     "",
@@ -499,6 +516,7 @@ function main() {
     "--allow-incomplete",
   ])
   const routes = runJson("routes", ["scripts/check-app-api-production-cn-routes.mjs"])
+  const appApiBridgeMap = runJson("app_api_bridge_map", ["scripts/check-app-api-bridge-map.mjs"])
   const appClientContract = runJson("app_client_contract", ["scripts/check-app-client-api-contract.mjs"])
   const appApiSmokeCoverage = runJson("app_api_smoke_coverage", ["scripts/check-app-api-smoke-coverage.mjs"])
   const dockerContext = runJson("docker_context", ["scripts/check-aliyun-docker-context.mjs"])
@@ -525,6 +543,7 @@ function main() {
       operatorTasks,
       cloudConfirmationsCheck,
       routes,
+      appApiBridgeMap,
       appClientContract,
       appApiSmokeCoverage,
       dockerContext,
@@ -540,6 +559,7 @@ function main() {
       cloudConfirmationsCheck: cloudConfirmationsCheckPath,
       legalPages: resolve(args.outDir, "legal-pages.json"),
       imagePublishPlan: resolve(args.outDir, "image-publish-plan-check.json"),
+      appApiBridgeMap: resolve(args.outDir, "app-api-bridge-map-check.json"),
       operatorTasksJson: operatorTasksJsonPath,
       operatorTasksMarkdown: operatorTasksMarkdownPath,
       bundle: bundle?.path || null,
@@ -552,6 +572,7 @@ function main() {
   writeText(audit.outputFiles.cloudConfirmationsCheck, JSON.stringify(cloudConfirmationsCheck, null, 2))
   writeText(audit.outputFiles.legalPages, JSON.stringify(legalPages, null, 2))
   writeText(audit.outputFiles.imagePublishPlan, JSON.stringify(imagePublishPlan, null, 2))
+  writeText(audit.outputFiles.appApiBridgeMap, JSON.stringify(appApiBridgeMap, null, 2))
 
   console.log(JSON.stringify({
     ok: true,
@@ -615,6 +636,14 @@ function main() {
       uniqueAuditedClientRoutes: appClientContract.uniqueAuditedClientRoutes,
       matchedBackendRoutes: appClientContract.matchedBackendRoutes,
       deferredClientApiCalls: appClientContract.deferredClientApiCalls,
+    },
+    appApiBridgeMap: {
+      report: audit.outputFiles.appApiBridgeMap,
+      ok: appApiBridgeMap.ok === true,
+      mappedRoutes: appApiBridgeMap.mappedRoutes,
+      bridgeReadyRoutes: appApiBridgeMap.bridgeReadyRoutes,
+      externalEnvBlockedRoutes: appApiBridgeMap.externalEnvBlockedRoutes,
+      sourceTypes: appApiBridgeMap.sourceTypes,
     },
     appApiSmokeCoverage: {
       ok: appApiSmokeCoverage.ok === true,

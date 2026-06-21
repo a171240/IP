@@ -1,0 +1,572 @@
+{
+  "schemaVersion": 1,
+  "environment": "production-cn",
+  "updatedAt": "2026-06-22",
+  "containsValues": false,
+  "firstVersionScope": [
+    "login",
+    "test-token",
+    "profile",
+    "multi-tenant-permissions",
+    "store-invites",
+    "long-service-recording",
+    "store-admin-service-records"
+  ],
+  "sourceDocs": [
+    "../meiye-huajing-miniprogram/docs/app-api-contract-map.md",
+    "../meiye-huajing-miniprogram/docs/app-api-smoke-playbook.md",
+    "../meiye-huajing-miniprogram/docs/store-knowledge-service-record-brief.md"
+  ],
+  "rules": {
+    "wechatAppLogin": {
+      "miniProgramCredentialReuse": false,
+      "requiredProvider": "WeChat Open Platform mobile application",
+      "requiredEnv": [
+        "WECHAT_OPEN_APP_ID",
+        "WECHAT_OPEN_APP_SECRET"
+      ],
+      "currentExternalStatus": "reviewing"
+    },
+    "productionBaseUrl": {
+      "requiredHost": "api-cn.ipgongchang.xin",
+      "forbiddenHosts": [
+        "ip.ipgongchang.xin",
+        "www.ipnrgc.com",
+        "ipnrgc.com",
+        "*.vercel.app"
+      ]
+    }
+  },
+  "routes": [
+    {
+      "scope": "health",
+      "route": "/api/healthz",
+      "methods": [
+        "GET"
+      ],
+      "appFile": "app/api/healthz/route.ts",
+      "sourceType": "native_health",
+      "sourceFiles": [
+        "app/api/healthz/route.ts"
+      ],
+      "productionCnStatus": "bridge_ready"
+    },
+    {
+      "scope": "health",
+      "route": "/api/app/health",
+      "methods": [
+        "GET"
+      ],
+      "appFile": "app/api/app/health/route.ts",
+      "sourceType": "native_health",
+      "sourceFiles": [
+        "app/api/app/health/route.ts"
+      ],
+      "productionCnStatus": "bridge_ready"
+    },
+    {
+      "scope": "auth",
+      "route": "/api/app/auth/wechat",
+      "methods": [
+        "POST"
+      ],
+      "appFile": "app/api/app/auth/wechat/route.ts",
+      "sourceType": "app_native",
+      "sourceFiles": [
+        "app/api/app/auth/wechat/route.ts"
+      ],
+      "productionCnStatus": "external_env_blocked",
+      "blocksUntilEnvReady": [
+        "WECHAT_OPEN_APP_ID",
+        "WECHAT_OPEN_APP_SECRET"
+      ],
+      "note": "App login must use WeChat Open Platform mobile app code exchange. Mini-program wx.login credentials are not reusable."
+    },
+    {
+      "scope": "auth",
+      "route": "/api/app/wechat/login",
+      "methods": [
+        "POST"
+      ],
+      "appFile": "app/api/app/wechat/login/route.ts",
+      "sourceType": "app_alias",
+      "sourceRoute": "/api/app/auth/wechat",
+      "sourceFiles": [
+        "app/api/app/auth/wechat/route.ts"
+      ],
+      "productionCnStatus": "external_env_blocked"
+    },
+    {
+      "scope": "account",
+      "route": "/api/app/profile",
+      "methods": [
+        "GET"
+      ],
+      "appFile": "app/api/app/profile/route.ts",
+      "sourceType": "mp_reexport",
+      "sourceRoute": "/api/mp/profile",
+      "sourceFiles": [
+        "app/api/mp/profile/route.ts"
+      ],
+      "sourcePages": [
+        "../meiye-huajing-miniprogram/pages/mine/index.js"
+      ],
+      "productionCnStatus": "bridge_ready"
+    },
+    {
+      "scope": "account",
+      "route": "/api/app/entitlements",
+      "methods": [
+        "GET"
+      ],
+      "appFile": "app/api/app/entitlements/route.ts",
+      "sourceType": "mp_reexport",
+      "sourceRoute": "/api/mp/profile",
+      "sourceFiles": [
+        "app/api/mp/profile/route.ts"
+      ],
+      "sourcePages": [
+        "../meiye-huajing-miniprogram/pages/mine/index.js"
+      ],
+      "productionCnStatus": "bridge_ready"
+    },
+    {
+      "scope": "store-admin",
+      "route": "/api/app/store-admin/overview",
+      "methods": [
+        "GET"
+      ],
+      "appFile": "app/api/app/store-admin/overview/route.ts",
+      "sourceType": "mp_reexport",
+      "sourceRoute": "/api/mp/store-admin/overview",
+      "sourceFiles": [
+        "app/api/mp/store-admin/overview/route.ts"
+      ],
+      "sourcePages": [
+        "../meiye-huajing-miniprogram/pages/store-admin/index.js"
+      ],
+      "productionCnStatus": "bridge_ready"
+    },
+    {
+      "scope": "store-admin",
+      "route": "/api/app/store-admin/members",
+      "methods": [
+        "GET"
+      ],
+      "appFile": "app/api/app/store-admin/members/route.ts",
+      "sourceType": "mp_reexport",
+      "sourceRoute": "/api/mp/store-admin/members",
+      "sourceFiles": [
+        "app/api/mp/store-admin/members/route.ts"
+      ],
+      "sourcePages": [
+        "../meiye-huajing-miniprogram/pages/store-admin/members/index.js"
+      ],
+      "productionCnStatus": "bridge_ready"
+    },
+    {
+      "scope": "store-admin",
+      "route": "/api/app/store-admin/analytics",
+      "methods": [
+        "GET"
+      ],
+      "appFile": "app/api/app/store-admin/analytics/route.ts",
+      "sourceType": "mp_reexport",
+      "sourceRoute": "/api/mp/store-admin/analytics",
+      "sourceFiles": [
+        "app/api/mp/store-admin/analytics/route.ts"
+      ],
+      "sourcePages": [
+        "../meiye-huajing-miniprogram/pages/store-admin/index.js"
+      ],
+      "productionCnStatus": "bridge_ready"
+    },
+    {
+      "scope": "invites",
+      "route": "/api/app/store-admin/invites",
+      "methods": [
+        "POST"
+      ],
+      "appFile": "app/api/app/store-admin/invites/route.ts",
+      "sourceType": "mp_reexport",
+      "sourceRoute": "/api/mp/store-admin/invites",
+      "sourceFiles": [
+        "app/api/mp/store-admin/invites/route.ts"
+      ],
+      "sourcePages": [
+        "../meiye-huajing-miniprogram/pages/store-admin/members/index.js"
+      ],
+      "productionCnStatus": "bridge_ready"
+    },
+    {
+      "scope": "invites",
+      "route": "/api/app/store-admin/invites/[token]/preview",
+      "methods": [
+        "GET"
+      ],
+      "appFile": "app/api/app/store-admin/invites/[token]/preview/route.ts",
+      "sourceType": "mp_reexport",
+      "sourceRoute": "/api/mp/store-admin/invites/[token]/preview",
+      "sourceFiles": [
+        "app/api/mp/store-admin/invites/[token]/preview/route.ts"
+      ],
+      "sourcePages": [
+        "../meiye-huajing-miniprogram/pages/store-admin/invite-accept/index.js"
+      ],
+      "productionCnStatus": "bridge_ready"
+    },
+    {
+      "scope": "invites",
+      "route": "/api/app/store-admin/invites/[token]/accept",
+      "methods": [
+        "POST"
+      ],
+      "appFile": "app/api/app/store-admin/invites/[token]/accept/route.ts",
+      "sourceType": "mp_reexport",
+      "sourceRoute": "/api/mp/store-admin/invites/[token]/accept",
+      "sourceFiles": [
+        "app/api/mp/store-admin/invites/[token]/accept/route.ts"
+      ],
+      "sourcePages": [
+        "../meiye-huajing-miniprogram/pages/store-admin/invite-accept/index.js"
+      ],
+      "productionCnStatus": "bridge_ready"
+    },
+    {
+      "scope": "invites",
+      "route": "/api/app/store-admin/invites/[token]/qrcode",
+      "methods": [
+        "GET"
+      ],
+      "appFile": "app/api/app/store-admin/invites/[token]/qrcode/route.ts",
+      "sourceType": "mp_reexport",
+      "sourceRoute": "/api/mp/store-admin/invites/[token]/qrcode",
+      "sourceFiles": [
+        "app/api/mp/store-admin/invites/[token]/qrcode/route.ts"
+      ],
+      "sourcePages": [
+        "../meiye-huajing-miniprogram/pages/store-admin/members/index.js"
+      ],
+      "productionCnStatus": "bridge_ready"
+    },
+    {
+      "scope": "context",
+      "route": "/api/app/store-profiles",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "appFile": "app/api/app/store-profiles/route.ts",
+      "sourceType": "mp_adapter",
+      "sourceRoute": "/api/mp/store-profiles",
+      "sourceFiles": [
+        "app/api/mp/store-profiles/route.ts"
+      ],
+      "sourcePages": [
+        "../meiye-huajing-miniprogram/pages/store-profiles/index.js"
+      ],
+      "productionCnStatus": "bridge_ready"
+    },
+    {
+      "scope": "context",
+      "route": "/api/app/store-profiles/[profileId]",
+      "methods": [
+        "GET",
+        "PUT",
+        "DELETE"
+      ],
+      "appFile": "app/api/app/store-profiles/[profileId]/route.ts",
+      "sourceType": "mp_adapter",
+      "sourceRoute": "/api/mp/store-profiles/[profileId]",
+      "sourceFiles": [
+        "app/api/mp/store-profiles/[profileId]/route.ts"
+      ],
+      "sourcePages": [
+        "../meiye-huajing-miniprogram/pages/store-profile-editor/index.js"
+      ],
+      "productionCnStatus": "bridge_ready"
+    },
+    {
+      "scope": "context",
+      "route": "/api/app/customer-profiles",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "appFile": "app/api/app/customer-profiles/route.ts",
+      "sourceType": "mp_reexport",
+      "sourceRoute": "/api/mp/voice-coach/customer-profiles",
+      "sourceFiles": [
+        "app/api/mp/voice-coach/customer-profiles/route.ts"
+      ],
+      "sourcePages": [
+        "../meiye-huajing-miniprogram/pages/voice-coach/customer-profiles/index.js"
+      ],
+      "productionCnStatus": "bridge_ready"
+    },
+    {
+      "scope": "context",
+      "route": "/api/app/customer-profiles/[profileId]",
+      "methods": [
+        "GET",
+        "PUT",
+        "DELETE"
+      ],
+      "appFile": "app/api/app/customer-profiles/[profileId]/route.ts",
+      "sourceType": "mp_reexport",
+      "sourceRoute": "/api/mp/voice-coach/customer-profiles/[profileId]",
+      "sourceFiles": [
+        "app/api/mp/voice-coach/customer-profiles/[profileId]/route.ts"
+      ],
+      "sourcePages": [
+        "../meiye-huajing-miniprogram/pages/voice-coach/customer-profile-editor/index.js"
+      ],
+      "productionCnStatus": "bridge_ready"
+    },
+    {
+      "scope": "context",
+      "route": "/api/app/scene-cards",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "appFile": "app/api/app/scene-cards/route.ts",
+      "sourceType": "mp_reexport",
+      "sourceRoute": "/api/mp/voice-coach/scene-cards",
+      "sourceFiles": [
+        "app/api/mp/voice-coach/scene-cards/route.ts"
+      ],
+      "sourcePages": [
+        "../meiye-huajing-miniprogram/pages/voice-coach/scene-cards/index.js"
+      ],
+      "productionCnStatus": "bridge_ready"
+    },
+    {
+      "scope": "context",
+      "route": "/api/app/scene-cards/[cardId]",
+      "methods": [
+        "GET",
+        "PUT",
+        "DELETE"
+      ],
+      "appFile": "app/api/app/scene-cards/[cardId]/route.ts",
+      "sourceType": "mp_reexport",
+      "sourceRoute": "/api/mp/voice-coach/scene-cards/[cardId]",
+      "sourceFiles": [
+        "app/api/mp/voice-coach/scene-cards/[cardId]/route.ts"
+      ],
+      "sourcePages": [
+        "../meiye-huajing-miniprogram/pages/voice-coach/scene-card-editor/index.js"
+      ],
+      "productionCnStatus": "bridge_ready"
+    },
+    {
+      "scope": "service-records",
+      "route": "/api/app/service-records/sessions",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "appFile": "app/api/app/service-records/sessions/route.ts",
+      "sourceType": "mp_reexport",
+      "sourceRoute": "/api/mp/service-records/sessions",
+      "sourceFiles": [
+        "app/api/mp/service-records/sessions/route.ts"
+      ],
+      "sourcePages": [
+        "../meiye-huajing-miniprogram/pages/service-record/index.js",
+        "../meiye-huajing-miniprogram/pages/store-admin/service-records/index.js"
+      ],
+      "productionCnStatus": "bridge_ready"
+    },
+    {
+      "scope": "service-records",
+      "route": "/api/app/service-records/sessions/[sessionId]",
+      "methods": [
+        "GET"
+      ],
+      "appFile": "app/api/app/service-records/sessions/[sessionId]/route.ts",
+      "sourceType": "mp_reexport",
+      "sourceRoute": "/api/mp/service-records/sessions/[sessionId]",
+      "sourceFiles": [
+        "app/api/mp/service-records/sessions/[sessionId]/route.ts"
+      ],
+      "sourcePages": [
+        "../meiye-huajing-miniprogram/pages/service-record/detail/index.js",
+        "../meiye-huajing-miniprogram/pages/store-admin/service-records/detail/index.js"
+      ],
+      "productionCnStatus": "bridge_ready"
+    },
+    {
+      "scope": "service-records",
+      "route": "/api/app/service-records/device-files/check",
+      "methods": [
+        "POST"
+      ],
+      "appFile": "app/api/app/service-records/device-files/check/route.ts",
+      "sourceType": "mp_adapter",
+      "sourceRoute": "/api/mp/service-records/device-files/check",
+      "sourceFiles": [
+        "app/api/mp/service-records/device-files/check/route.ts"
+      ],
+      "sourcePages": [
+        "../meiye-huajing-miniprogram/pages/service-record/index.js"
+      ],
+      "productionCnStatus": "bridge_ready"
+    },
+    {
+      "scope": "service-records",
+      "route": "/api/app/service-records/sessions/[sessionId]/segments",
+      "methods": [
+        "POST"
+      ],
+      "appFile": "app/api/app/service-records/sessions/[sessionId]/segments/route.ts",
+      "sourceType": "mp_reexport",
+      "sourceRoute": "/api/mp/service-records/sessions/[sessionId]/segments",
+      "sourceFiles": [
+        "app/api/mp/service-records/sessions/[sessionId]/segments/route.ts"
+      ],
+      "sourcePages": [
+        "../meiye-huajing-miniprogram/pages/service-record/index.js"
+      ],
+      "productionCnStatus": "bridge_ready"
+    },
+    {
+      "scope": "service-records",
+      "route": "/api/app/service-records/sessions/[sessionId]/oss-upload",
+      "methods": [
+        "POST"
+      ],
+      "appFile": "app/api/app/service-records/sessions/[sessionId]/oss-upload/route.ts",
+      "sourceType": "mp_adapter",
+      "sourceRoute": "/api/mp/service-records/sessions/[sessionId]/oss-upload",
+      "sourceFiles": [
+        "app/api/mp/service-records/sessions/[sessionId]/oss-upload/route.ts"
+      ],
+      "sourcePages": [
+        "../meiye-huajing-miniprogram/pages/service-record/index.js"
+      ],
+      "productionCnStatus": "bridge_ready"
+    },
+    {
+      "scope": "service-records",
+      "route": "/api/app/service-records/sessions/[sessionId]/segments/oss",
+      "methods": [
+        "POST"
+      ],
+      "appFile": "app/api/app/service-records/sessions/[sessionId]/segments/oss/route.ts",
+      "sourceType": "mp_adapter",
+      "sourceRoute": "/api/mp/service-records/sessions/[sessionId]/segments/oss",
+      "sourceFiles": [
+        "app/api/mp/service-records/sessions/[sessionId]/segments/oss/route.ts"
+      ],
+      "sourcePages": [
+        "../meiye-huajing-miniprogram/pages/service-record/index.js"
+      ],
+      "productionCnStatus": "bridge_ready"
+    },
+    {
+      "scope": "service-records",
+      "route": "/api/app/service-records/sessions/[sessionId]/markers",
+      "methods": [
+        "POST"
+      ],
+      "appFile": "app/api/app/service-records/sessions/[sessionId]/markers/route.ts",
+      "sourceType": "mp_reexport",
+      "sourceRoute": "/api/mp/service-records/sessions/[sessionId]/markers",
+      "sourceFiles": [
+        "app/api/mp/service-records/sessions/[sessionId]/markers/route.ts"
+      ],
+      "sourcePages": [
+        "../meiye-huajing-miniprogram/pages/service-record/detail/index.js"
+      ],
+      "productionCnStatus": "bridge_ready"
+    },
+    {
+      "scope": "service-records",
+      "route": "/api/app/service-records/sessions/[sessionId]/resume",
+      "methods": [
+        "POST"
+      ],
+      "appFile": "app/api/app/service-records/sessions/[sessionId]/resume/route.ts",
+      "sourceType": "mp_reexport",
+      "sourceRoute": "/api/mp/service-records/sessions/[sessionId]/resume",
+      "sourceFiles": [
+        "app/api/mp/service-records/sessions/[sessionId]/resume/route.ts"
+      ],
+      "sourcePages": [
+        "../meiye-huajing-miniprogram/pages/service-record/detail/index.js"
+      ],
+      "productionCnStatus": "bridge_ready"
+    },
+    {
+      "scope": "service-records",
+      "route": "/api/app/service-records/sessions/[sessionId]/end",
+      "methods": [
+        "POST"
+      ],
+      "appFile": "app/api/app/service-records/sessions/[sessionId]/end/route.ts",
+      "sourceType": "mp_reexport",
+      "sourceRoute": "/api/mp/service-records/sessions/[sessionId]/end",
+      "sourceFiles": [
+        "app/api/mp/service-records/sessions/[sessionId]/end/route.ts"
+      ],
+      "sourcePages": [
+        "../meiye-huajing-miniprogram/pages/service-record/detail/index.js"
+      ],
+      "productionCnStatus": "bridge_ready"
+    },
+    {
+      "scope": "service-records",
+      "route": "/api/app/service-records/sessions/[sessionId]/process",
+      "methods": [
+        "POST"
+      ],
+      "appFile": "app/api/app/service-records/sessions/[sessionId]/process/route.ts",
+      "sourceType": "mp_reexport",
+      "sourceRoute": "/api/mp/service-records/sessions/[sessionId]/process",
+      "sourceFiles": [
+        "app/api/mp/service-records/sessions/[sessionId]/process/route.ts"
+      ],
+      "sourcePages": [
+        "../meiye-huajing-miniprogram/pages/service-record/detail/index.js"
+      ],
+      "productionCnStatus": "bridge_ready"
+    },
+    {
+      "scope": "service-records",
+      "route": "/api/app/service-records/sessions/[sessionId]/asr/poll",
+      "methods": [
+        "POST"
+      ],
+      "appFile": "app/api/app/service-records/sessions/[sessionId]/asr/poll/route.ts",
+      "sourceType": "mp_reexport",
+      "sourceRoute": "/api/mp/service-records/sessions/[sessionId]/asr/poll",
+      "sourceFiles": [
+        "app/api/mp/service-records/sessions/[sessionId]/asr/poll/route.ts"
+      ],
+      "sourcePages": [
+        "../meiye-huajing-miniprogram/pages/service-record/detail/index.js"
+      ],
+      "productionCnStatus": "bridge_ready"
+    },
+    {
+      "scope": "service-records",
+      "route": "/api/app/service-records/sessions/[sessionId]/audio/[segmentId]",
+      "methods": [
+        "GET"
+      ],
+      "appFile": "app/api/app/service-records/sessions/[sessionId]/audio/[segmentId]/route.ts",
+      "sourceType": "mp_reexport",
+      "sourceRoute": "/api/mp/service-records/sessions/[sessionId]/audio/[segmentId]",
+      "sourceFiles": [
+        "app/api/mp/service-records/sessions/[sessionId]/audio/[segmentId]/route.ts"
+      ],
+      "sourcePages": [
+        "../meiye-huajing-miniprogram/pages/service-record/detail/index.js",
+        "../meiye-huajing-miniprogram/pages/store-admin/service-records/detail/index.js"
+      ],
+      "productionCnStatus": "bridge_ready"
+    }
+  ]
+}

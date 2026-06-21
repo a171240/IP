@@ -83,12 +83,14 @@ app/api/app/service-records/sessions/[sessionId]/segments/oss/route.ts
 app/api/app/store-profiles/[profileId]/route.ts
 app/api/app/store-profiles/route.ts
 app/api/healthz/route.ts
+deploy/app-api-production-cn.bridge-map.json
 deploy/aliyun-production-cn.example.json
 deploy/aliyun-production-cn.cloud-confirmations.example.json
 docs/DEPLOY_ALIYUN_PRODUCTION_CN.md
 package.json
 scripts/check-aliyun-docker-context.mjs
 scripts/check-aliyun-production-cn-readiness.mjs
+scripts/check-app-api-bridge-map.mjs
 scripts/check-app-api-production-cn-routes.mjs
 scripts/prepare-aliyun-release-artifacts.mjs
 scripts/prepare-aliyun-runtime-env.mjs
@@ -372,6 +374,7 @@ corepack pnpm aliyun:cloud:confirmations:strict（exit 1 as expected while cloud
 corepack pnpm aliyun:readiness
 corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:release:artifacts -- --skip-bundle
+corepack pnpm aliyun:app-api:bridge-map
 corepack pnpm aliyun:app-client:contract
 local localhost aliyun:postdeploy:smoke with --allow-missing appWechatLogin,legalLinks
 corepack pnpm aliyun:container:smoke -- --port 3023
@@ -390,6 +393,7 @@ aliyun:legal:check
 aliyun:cloud:check
 aliyun:readiness
 aliyun:routes:check
+aliyun:app-api:bridge-map
 aliyun:app-client:contract
 aliyun:app-native:check
 aliyun:aasa:check
@@ -406,6 +410,7 @@ aliyun:app-api:smoke
 
 ```text
 routes: 31 checked, 0 failures
+app-api bridge map: 31 mapped routes, sourceTypes mp_reexport 22 / mp_adapter 5 / app_native 1 / app_alias 1 / native_health 2, failures 0
 env source catalog: 62 variables, 62 source metadata ready, containsValues false
 app-client contract: 40 audited calls, 34 unique client routes, 26 matched backend routes, 4 deferred knowledge-space calls, 0 failures
 app legal pages: ok=true, /privacy and /terms route files ready, env URL still requires operator confirmation
@@ -414,7 +419,7 @@ aasa config: ok=false, route files exist, blocker apple_team_id_missing, univers
 app-api coverage: 29 / 29 business routes, 30 probes, 0 missing
 docker context: 7 files, 24 dockerignore patterns, sensitive env excluded
 image publish plan: template ready, local file not ready until ACR remote image and runtime pull evidence are filled
-deployment spec: image meiye-huajing-app-api:production-cn, port 3000, apiHost api-cn.ipgongchang.xin, predeploy 17, postdeploy 5, 0 blockers
+deployment spec: image meiye-huajing-app-api:production-cn, port 3000, apiHost api-cn.ipgongchang.xin, predeploy 18, postdeploy 5, 0 blockers
 release preflight: 4 / 4 pass
 build: compiled successfully; existing lint warnings only
 health smoke: sensitiveLeakCount 0
@@ -519,7 +524,9 @@ sanitizedEnvFileDeleted: true
 
 本轮新增门禁：`PRIVACY_POLICY_URL` / `TERMS_URL` 的 ready 判定现在必须通过 HTTPS 正式 URL 形态校验；localhost、example、`.vercel.app` 和旧 Vercel 入口域名不会让后端 `legalLinks` 或 APP runtime/build-time config 误判为 ready。2026-06-22 追加：后端包已提供 `/privacy` 和 `/terms` 页面落点，`corepack pnpm aliyun:legal:check` 可检查页面核心字段；正式 URL 仍需运营者复核文本后填入 env。
 
-2026-06-22 03:56 CST 复核：`corepack pnpm aliyun:predeploy` 通过。该命令重新覆盖了 env plan/source、deploy spec、image plan、cloud confirmations、domain check、readiness、routes check、App client contract、App native release check、App API coverage、Docker context、TypeScript、release preflight、Next build、health smoke 和 App API smoke。当前通过表示桥接后端本地包自洽；不表示微信开放平台、阿里云 ACR/runtime、DNS/HTTPS/ICP、OSS/RAM/SLS 已生产 ready。2026-06-22 追加后，`predeploy` 还会覆盖 `aliyun:legal:check`。
+2026-06-22 03:56 CST 复核：`corepack pnpm aliyun:predeploy` 通过。该命令重新覆盖了 env plan/source、deploy spec、image plan、cloud confirmations、domain check、readiness、routes check、App API bridge map、App client contract、App native release check、App API coverage、Docker context、TypeScript、release preflight、Next build、health smoke 和 App API smoke。当前通过表示桥接后端本地包自洽；不表示微信开放平台、阿里云 ACR/runtime、DNS/HTTPS/ICP、OSS/RAM/SLS 已生产 ready。2026-06-22 追加后，`predeploy` 还会覆盖 `aliyun:legal:check`。
+
+2026-06-22 05:47 CST 复核：新增 `deploy/app-api-production-cn.bridge-map.json` 和 `corepack pnpm aliyun:app-api:bridge-map` 后，`corepack pnpm aliyun:predeploy` 再次通过。新增桥接门禁结果为 31 mapped routes，29 bridge-ready routes，2 WeChat env-blocked routes；微信开放平台仍按审核中处理。
 
 ## 10. 发布前必须补齐
 
@@ -670,4 +677,4 @@ corepack pnpm aliyun:postdeploy:smoke -- \
 
 ## 13. 当前结论
 
-本地桥接代码、APP API 路由、App production-cn API 配置、native release 配置和检查脚手架已经可以作为阿里云 production-cn 后端准备包继续推进；当前不能称为可发布，因为阿里云运行资源、api-cn DNS/HTTPS/OSS/SLS 确认、Apple Team ID/AASA、微信开放平台移动应用 AppID/AppSecret 和云侧环境变量导入尚未完成。
+本地桥接代码、APP API 路由、小程序链路桥接清单、App production-cn API 配置、native release 配置和检查脚手架已经可以作为阿里云 production-cn 后端准备包继续推进；当前不能称为可发布，因为阿里云运行资源、api-cn DNS/HTTPS/OSS/SLS 确认、Apple Team ID/AASA、微信开放平台移动应用 AppID/AppSecret 和云侧环境变量导入尚未完成。微信开放平台移动应用当前按审核中处理，审核通过前不能把 App 微信登录视为正式 ready。

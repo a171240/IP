@@ -14,6 +14,7 @@ const COMMANDS = [
   ["run", "aliyun:cloud:check"],
   ["run", "aliyun:readiness"],
   ["run", "aliyun:routes:check"],
+  ["run", "aliyun:app-api:bridge-map"],
   ["run", "aliyun:app-client:contract"],
   ["run", "aliyun:app-native:check"],
   ["run", "aliyun:aasa:check"],
