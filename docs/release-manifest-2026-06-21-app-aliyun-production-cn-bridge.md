@@ -264,6 +264,9 @@ urls.appApiBaseUrl: ready
 urls.nextPublicSiteUrl: ready
 urls.appAssetBaseUrl: ready
 wechatOpenPlatform.reviewStatus: reviewing
+appProductionConfig.files: ready, 6 checked
+appProductionConfig.scripts: ready, 3 checked
+appProductionConfig.envTemplate: ready, 8 canonical keys checked, 0 deprecated keys
 ```
 
 机器可验证阻塞：

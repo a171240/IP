@@ -188,6 +188,8 @@ function renderMarkdown(audit) {
   const domain = audit.checks.domain
   const operatorTasks = audit.checks.operatorTasks
   const cloudConfirmations = readiness.checks?.cloudConfirmations
+  const appProductionConfig = readiness.checks?.appProductionConfig
+  const appEnvTemplate = appProductionConfig?.envTemplate
   return [
     "# 美业话镜 APP production-cn 阿里云发布审计",
     "",
@@ -227,6 +229,25 @@ function renderMarkdown(audit) {
     ...(cloudConfirmations?.items?.length
       ? cloudConfirmations.items.map((item) => `- ${item.key}: ${item.status}${item.missing?.length ? ` (${item.missing.join(", ")})` : ""}`)
       : ["- none"]),
+    "",
+    "## APP production-cn 配置模板",
+    "",
+    `- files: ${appProductionConfig?.files?.ready === true ? "ready" : "not ready"} (${appProductionConfig?.files?.checked ?? 0} checked)`,
+    `- scripts: ${appProductionConfig?.scripts?.ready === true ? "ready" : "not ready"} (${appProductionConfig?.scripts?.checked ?? 0} checked)`,
+    `- envTemplate: ${appEnvTemplate?.ready === true ? "ready" : "not ready"} (${appEnvTemplate?.checked ?? 0} canonical keys checked)`,
+    `- envTemplateKeyCount: ${appEnvTemplate?.keyCount ?? 0}`,
+    ...(appEnvTemplate?.missingCanonicalKeys?.length
+      ? [
+          "- missingCanonicalKeys:",
+          ...appEnvTemplate.missingCanonicalKeys.map((item) => `  - ${item}`),
+        ]
+      : []),
+    ...(appEnvTemplate?.deprecatedKeys?.length
+      ? [
+          "- deprecatedKeys:",
+          ...appEnvTemplate.deprecatedKeys.map((item) => `  - ${item}`),
+        ]
+      : []),
     "",
     "## 域名 DNS / HTTPS 检查",
     "",
@@ -390,6 +411,12 @@ function main() {
     machineBlocking: readiness.machineBlocking,
     manualBlockingCount: readiness.manualBlocking.length,
     cloudConfirmationsReady: readiness.checks?.cloudConfirmations?.ready === true,
+    appProductionConfig: {
+      filesReady: readiness.checks?.appProductionConfig?.files?.ready === true,
+      scriptsReady: readiness.checks?.appProductionConfig?.scripts?.ready === true,
+      envTemplateReady: readiness.checks?.appProductionConfig?.envTemplate?.ready === true,
+      envTemplateKeyCount: readiness.checks?.appProductionConfig?.envTemplate?.keyCount ?? 0,
+    },
     vercelEnvCoverage: vercelEnvCoverage.ok
       ? {
           report: audit.outputFiles.vercelEnvCoverage,

@@ -125,8 +125,10 @@ const REQUIRED_BACKEND_SCRIPTS = [
 ]
 
 const REQUIRED_APP_FILES = [
+  ".env.production-cn.example",
   "package.json",
   "scripts/generate-app-runtime-config.mjs",
+  "scripts/validate-package0-registries.mjs",
   "src/config/bootstrap.ts",
   "src/config/build-config.generated.ts",
 ]
@@ -134,6 +136,25 @@ const REQUIRED_APP_FILES = [
 const REQUIRED_APP_SCRIPTS = [
   "config:generate:production-cn",
   "android:assemble:production-cn",
+  "validate:package0",
+]
+
+const REQUIRED_APP_PRODUCTION_CN_ENV_TEMPLATE_KEYS = [
+  "APP_ENV",
+  "APP_API_BASE_URL",
+  "APP_ASSET_BASE_URL",
+  "PRIVACY_POLICY_URL",
+  "TERMS_URL",
+  "WECHAT_OPEN_APP_REVIEW_STATUS",
+  "WECHAT_OPEN_APP_ID",
+  "WECHAT_OPEN_APP_SECRET",
+]
+
+const FORBIDDEN_APP_PRODUCTION_CN_ENV_TEMPLATE_KEYS = [
+  "APP_PRIVACY_URL",
+  "APP_TERMS_URL",
+  "WECHAT_OPEN_PLATFORM_APP_ID",
+  "WECHAT_OPEN_PLATFORM_SECRET",
 ]
 
 const CLOUD_CONFIRMATION_ITEMS = [
@@ -360,6 +381,30 @@ function scriptStatus(packagePath, requiredScripts) {
   }
 }
 
+function envTemplateStatus(filePath) {
+  if (!existsSync(filePath)) {
+    return {
+      ready: false,
+      path: filePath,
+      checked: REQUIRED_APP_PRODUCTION_CN_ENV_TEMPLATE_KEYS.length,
+      missingCanonicalKeys: REQUIRED_APP_PRODUCTION_CN_ENV_TEMPLATE_KEYS,
+      deprecatedKeys: [],
+      keyCount: 0,
+    }
+  }
+  const env = parseEnvFile(filePath)
+  const missingCanonicalKeys = REQUIRED_APP_PRODUCTION_CN_ENV_TEMPLATE_KEYS.filter((key) => !env.has(key))
+  const deprecatedKeys = FORBIDDEN_APP_PRODUCTION_CN_ENV_TEMPLATE_KEYS.filter((key) => env.has(key))
+  return {
+    ready: missingCanonicalKeys.length === 0 && deprecatedKeys.length === 0,
+    path: filePath,
+    checked: REQUIRED_APP_PRODUCTION_CN_ENV_TEMPLATE_KEYS.length,
+    missingCanonicalKeys,
+    deprecatedKeys,
+    keyCount: env.size,
+  }
+}
+
 function gitIgnored(root, filePath) {
   const relative = filePath.startsWith(`${root}/`) ? filePath.slice(root.length + 1) : filePath
   const result = spawnSync("git", ["-C", root, "check-ignore", "-q", relative], {
@@ -553,6 +598,7 @@ function main() {
   const backendScripts = scriptStatus(resolve(BACKEND_ROOT, "package.json"), REQUIRED_BACKEND_SCRIPTS)
   const appFiles = fileStatus(APP_ROOT, REQUIRED_APP_FILES)
   const appScripts = scriptStatus(resolve(APP_ROOT, "package.json"), REQUIRED_APP_SCRIPTS)
+  const appProductionCnEnvTemplate = envTemplateStatus(resolve(APP_ROOT, ".env.production-cn.example"))
   const docker = dockerStatus()
   const cloudConfirmations = checkCloudConfirmations(args)
 
@@ -583,6 +629,15 @@ function main() {
   addBlocker(machineBlocking, !backendScripts.ready, `missing_backend_scripts:${backendScripts.missing.join(",")}`)
   addBlocker(machineBlocking, !appFiles.ready, `missing_app_config_files:${appFiles.missing.join(",")}`)
   addBlocker(machineBlocking, !appScripts.ready, `missing_app_config_scripts:${appScripts.missing.join(",")}`)
+  addBlocker(
+    machineBlocking,
+    !appProductionCnEnvTemplate.ready,
+    [
+      "invalid_app_production_cn_env_template",
+      ...appProductionCnEnvTemplate.missingCanonicalKeys.map((key) => `missing:${key}`),
+      ...appProductionCnEnvTemplate.deprecatedKeys.map((key) => `deprecated:${key}`),
+    ].join(","),
+  )
 
   if (envFileExists && envMode !== "600") warnings.push(`env_file_mode_should_be_600:current_${envMode}`)
   if (!docker.ready) warnings.push(docker.status)
@@ -631,6 +686,7 @@ function main() {
       appProductionConfig: {
         files: appFiles,
         scripts: appScripts,
+        envTemplate: appProductionCnEnvTemplate,
       },
       docker,
       cloudConfirmations,

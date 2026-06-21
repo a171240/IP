@@ -661,6 +661,15 @@ corepack pnpm aliyun:readiness
 
 当前该门禁会把机器可验证阻塞和人工确认项分开列出。机器可验证阻塞解除后，仍需阿里云资源与微信开放平台移动应用配置确认，才能称为 production-cn 可发布。
 
+`aliyun:readiness` 同时检查 App 工程的 production-cn 配置模板：
+
+```text
+APP files checked: .env.production-cn.example、package.json、generate-app-runtime-config、validate-package0、bootstrap、build-config.generated
+APP scripts checked: config:generate:production-cn、android:assemble:production-cn、validate:package0
+APP env template canonical keys: APP_ENV、APP_API_BASE_URL、APP_ASSET_BASE_URL、PRIVACY_POLICY_URL、TERMS_URL、WECHAT_OPEN_APP_REVIEW_STATUS、WECHAT_OPEN_APP_ID、WECHAT_OPEN_APP_SECRET
+APP env template deprecated keys forbidden: APP_PRIVACY_URL、APP_TERMS_URL、WECHAT_OPEN_PLATFORM_APP_ID、WECHAT_OPEN_PLATFORM_SECRET
+```
+
 在这些阻塞解除前，只能完成本地桥接准备和部署脚手架，不能称为 APP 国内正式生产上线完成。
 
 ## 8. 2026-06-21 本地验证状态
