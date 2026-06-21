@@ -879,16 +879,25 @@ forbiddenEntryCount: 0
 bytes: 295585706
 ```
 
-2026-06-22 更新：本机 Docker Desktop 已启动，`corepack pnpm aliyun:docker:build` 已成功构建镜像：
+2026-06-22 03:12 CST 更新：本机 Docker Desktop 已启动，`corepack pnpm aliyun:docker:build` 已成功构建镜像：
 
 ```text
 repoTag: meiye-huajing-app-api:production-cn
-imageDigest: sha256:905bdd0db460e4eadb5edbd9c7ed76781a651b058381059e29a4ec607d1780f3
-imageId: sha256:905bdd0db460e4eadb5edbd9c7ed76781a651b058381059e29a4ec607d1780f3
-imageSize: 3.02GB
+imageDigest: sha256:087a6c99206fe32895b4bdbcaba9e12499a2b866fb1596cdf6f2df06f9da2d84
+imageId: sha256:087a6c99206fe32895b4bdbcaba9e12499a2b866fb1596cdf6f2df06f9da2d84
+imageSize: 726527744 bytes
+architecture: linux/arm64
 ```
 
-最新 `aliyun:readiness` 中 Docker 状态为 `ready`。正式部署仍需要把该镜像推送/导入到阿里云 ACR，或使用阿里云镜像构建服务从审计包/源码上下文构建，并把 remote image / digest / 运行时拉取证据写入 `deploy/aliyun-production-cn.image-publish.local.json` 后通过 `corepack pnpm aliyun:image:plan:strict`。
+`corepack pnpm aliyun:container:smoke` 已用该镜像完成本地容器验证：
+
+```text
+containerHealth: /api/healthz 200, /api/app/health 200, strict health 503 for allowed appWechatLogin/legalLinks
+appApiSmoke: 30 probes / 0 failures
+sanitizedEnvFileDeleted: true
+```
+
+最新 `aliyun:readiness` 中 Docker 状态为 `ready`，`corepack pnpm aliyun:image:plan` 也能识别本地镜像。本机已创建 ignored 非密钥草稿 `deploy/aliyun-production-cn.image-publish.local.json`，当前只填了 local image digest。正式部署仍需要把该镜像推送/导入到阿里云 ACR，或使用阿里云镜像构建服务从审计包/源码上下文构建，并把 remote image / digest / 运行时拉取证据补入该 local 文件后通过 `corepack pnpm aliyun:image:plan:strict`。
 
 如果 `corepack pnpm aliyun:image:plan` 报 `localDockerImage=image_not_found_or_docker_unavailable`，说明当前 Docker daemon 里没有可推送的本地镜像缓存；正式推送前重新执行 `corepack pnpm aliyun:docker:build` 和 `corepack pnpm aliyun:container:smoke`。
 

@@ -289,7 +289,7 @@ appProductionConfig.envTemplate: ready, 5 canonical keys checked, 0 forbidden ba
 backend.files: ready, 26 checked
 backend.scripts: ready, 31 checked
 docker: ready
-imagePublishPlan: template ready, local missing, localDockerImage image_not_found_or_docker_unavailable
+imagePublishPlan: template ready, local draft exists, localDockerImage ready, ACR/runtime evidence still incomplete
 appClientContract: 40 audited calls / 34 unique client routes, 4 deferred knowledge-space calls
 appApiSmokeCoverage: 29 / 29 business routes
 ```
@@ -471,16 +471,27 @@ meiye-huajing-app-api-production-cn-context.tar.gz
 
 其中 `vercel-env-coverage.json` 只包含 Vercel production 变量名、环境和加密/敏感元数据，不包含真实 value；Vercel 登录态不可用时只记录 non-blocking failure，不阻断 release audit。
 
-本机 Docker 镜像已构建成功：
+本机 Docker 镜像已在 2026-06-22 03:12 CST 重新构建成功：
 
 ```text
 repoTag: meiye-huajing-app-api:production-cn
-digest: sha256:905bdd0db460e4eadb5edbd9c7ed76781a651b058381059e29a4ec607d1780f3
-size: 3.02GB
+digest: sha256:087a6c99206fe32895b4bdbcaba9e12499a2b866fb1596cdf6f2df06f9da2d84
+size: 726527744 bytes
+architecture: linux/arm64
 readiness.docker.status: ready
 ```
 
-正式部署仍未执行；下一步需要推送/导入到阿里云 ACR，或使用阿里云镜像构建服务，并把 remote image / digest / 运行时拉取证据写入 `deploy/aliyun-production-cn.image-publish.local.json`。
+`corepack pnpm aliyun:container:smoke` 已通过：
+
+```text
+healthz: 200, missing appWechatLogin/legalLinks
+appHealth: 200, missing appWechatLogin/legalLinks
+strictHealth: 503, expected missing appWechatLogin/legalLinks
+appApiSmoke: 30 probes / 0 failures
+sanitizedEnvFileDeleted: true
+```
+
+正式部署仍未执行；`deploy/aliyun-production-cn.image-publish.local.json` 已在本机作为 ignored 非密钥草稿创建，当前只填了 local image digest。下一步需要推送/导入到阿里云 ACR，或使用阿里云镜像构建服务，并把 ACR remote image / digest / 运行时拉取证据补入该 local 文件。
 
 ## 10. 发布前必须补齐
 
