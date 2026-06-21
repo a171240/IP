@@ -265,6 +265,10 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan }) {
       "corepack pnpm aliyun:domain:strict",
       "corepack pnpm aliyun:postdeploy:smoke -- --base-url https://api-cn.ipgongchang.xin",
     ],
+    notes: [
+      "dns_special_use_ip 表示当前域名仍解析到特殊用途或占位地址，不是公网可访问的阿里云入口。",
+      "域名检查只能证明 DNS/HTTPS/health；ICP备案仍需阿里云或工信部备案证据。",
+    ],
   })
 
   const oss = cloud.get("oss")
@@ -416,12 +420,17 @@ function renderMarkdown(report) {
     "",
     "## 当前阻塞",
     "",
+    "### Readiness / env / APP native",
+    "",
     ...(report.readiness.machineBlocking.length
       ? report.readiness.machineBlocking.map((item) => `- ${item}`)
       : ["- none"]),
+    "",
+    "### Domain / DNS / HTTPS",
+    "",
     ...(report.domain.machineBlocking.length
       ? report.domain.machineBlocking.map((item) => `- ${item}`)
-      : []),
+      : ["- none"]),
     "",
     "## 环境变量来源清单",
     "",
@@ -460,6 +469,7 @@ function renderMarkdown(report) {
       ...task.evidence.map((item) => `  - ${item}`),
       "- verifyCommands:",
       ...task.verifyCommands.map((item) => `  - ${item}`),
+      ...(task.notes?.length ? ["- notes:", ...task.notes.map((item) => `  - ${item}`)] : []),
       "",
     )
   }
