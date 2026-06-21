@@ -90,6 +90,7 @@ GET /api/app/health?strict=1
 ```bash
 corepack pnpm build
 corepack pnpm aliyun:health:smoke
+corepack pnpm aliyun:app-client:contract（40 audited calls / 34 unique client routes）
 corepack pnpm aliyun:app-api:coverage（29 / 29 business routes covered）
 corepack pnpm aliyun:app-api:smoke（30 business probes / 0 failures）
 ```
@@ -97,6 +98,8 @@ corepack pnpm aliyun:app-api:smoke（30 business probes / 0 failures）
 `aliyun:health:smoke` 会启动本地 production server，请求三个 health URL，并检查响应里没有敏感变量值。
 
 `aliyun:app-api:smoke` 会启动本地 production server，用未登录或假 token 请求验证第一版 APP 后端入口已经接到业务 guard，不是 404/405，也不会写入业务数据。覆盖范围包括登录、profile、门店管理、门店邀请、知识上下文和服务记录入口。
+
+`aliyun:app-client:contract` 是静态门禁：它读取 App 工程 `src/api` 里的 `apiRequest(...)` 调用，归一化动态路径后和后端 production-cn route 清单匹配。第一版范围包括登录、profile、entitlements、门店管理、邀请、顾客/场景/门店上下文和服务记录；Package 2 的 `knowledge-spaces` 调用只报告为 deferred，不作为第一版阻断。
 
 `aliyun:app-api:coverage` 是静态门禁：它把 APP API route 清单和 smoke 探针清单做匹配，要求除 health 外的每个业务 route 至少有一个 smoke 探针覆盖。
 
@@ -198,7 +201,7 @@ corepack pnpm aliyun:readiness
 3. APP_API_BASE_URL / NEXT_PUBLIC_SITE_URL 是否为 production-cn HTTPS 域名，且不是 example、localhost、Vercel 旧域名。
 3a. `aliyun:domain:check` 是否可用，用于机器检查 DNS、HTTPS 和 `/api/healthz`。
 4. 微信登录是否使用微信开放平台“移动应用” AppID / AppSecret，而不是小程序 AppID / Secret。
-5. 后端阿里云部署脚本、Dockerfile、health、APP API smoke 是否齐全。
+5. 后端阿里云部署脚本、Dockerfile、health、APP client API contract、APP API smoke 是否齐全。
 6. App production-cn 构建配置生成门禁是否齐全。
 7. Docker daemon 是否可用于本地镜像构建。
 8. 还需要人工确认的阿里云 SAE / DNS / HTTPS / OSS / SLS 等资源，且可以读取非密钥 JSON 确认证据。
@@ -583,6 +586,7 @@ corepack pnpm aliyun:env:plan
 corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:readiness
 corepack pnpm aliyun:routes:check
+corepack pnpm aliyun:app-client:contract
 corepack pnpm aliyun:app-api:coverage
 corepack pnpm aliyun:docker:check
 corepack pnpm exec tsc --noEmit --pretty false
@@ -694,6 +698,7 @@ corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:release:artifacts
 corepack pnpm aliyun:predeploy
 corepack pnpm aliyun:routes:check（31 routes / 0 failures）
+corepack pnpm aliyun:app-client:contract（40 audited calls / 34 unique client routes）
 corepack pnpm aliyun:app-api:coverage（29 / 29 business routes covered）
 corepack pnpm aliyun:docker:check（7 files / 24 dockerignore patterns / sensitive env excluded）
 node --check scripts/check-aliyun-domain-readiness.mjs
@@ -801,6 +806,7 @@ sensitiveLeakCount -> 0
 
 ```text
 checkedProbes: 30
+appClientContract: 40 audited calls / 34 unique client routes, 4 deferred knowledge-space calls, 0 failures
 appApiSmokeCoverage: 29 / 29 business routes
 scopes:
 - auth: 2

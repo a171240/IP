@@ -182,6 +182,7 @@ function renderMarkdown(audit) {
   const readiness = audit.checks.readiness
   const env = audit.checks.env
   const routes = audit.checks.routes
+  const appClientContract = audit.checks.appClientContract
   const appApiSmokeCoverage = audit.checks.appApiSmokeCoverage
   const docker = audit.checks.dockerContext
   const bundle = audit.bundle
@@ -202,6 +203,7 @@ function renderMarkdown(audit) {
     `- localCodeReady: ${readiness.localCodeReady}`,
     `- env requiredReady: ${env.requiredReady} / ${env.requiredTotal}`,
     `- routes: ${routes.checkedRoutes} checked, ${routes.failures.length} failures`,
+    `- appClientContract: ${appClientContract.auditedClientApiCalls} audited calls, ${appClientContract.uniqueAuditedClientRoutes} unique client routes`,
     `- appApiSmokeCoverage: ${appApiSmokeCoverage.coveredBusinessRoutes} / ${appApiSmokeCoverage.businessRoutes} business routes`,
     `- dockerContext: ${docker.ok ? "ok" : "not ok"}`,
     `- domainReadiness: ${domain.ok ? "ok" : "not ready"} (${domain.targetReady} / ${domain.targetTotal})`,
@@ -266,6 +268,40 @@ function renderMarkdown(audit) {
     `- ready: ${operatorTasks.summary.ready} / ${operatorTasks.summary.total}`,
     `- blocked: ${operatorTasks.summary.blocked}`,
     `- pendingCloud: ${operatorTasks.summary.pendingCloud}`,
+    "",
+    "## APP 客户端 API 契约",
+    "",
+    `- ok: ${appClientContract.ok === true}`,
+    `- scannedFiles: ${appClientContract.scannedFiles}`,
+    `- clientApiCalls: ${appClientContract.clientApiCalls}`,
+    `- auditedClientApiCalls: ${appClientContract.auditedClientApiCalls}`,
+    `- uniqueAuditedClientRoutes: ${appClientContract.uniqueAuditedClientRoutes}`,
+    `- matchedBackendRoutes: ${appClientContract.matchedBackendRoutes}`,
+    `- deferredClientApiCalls: ${appClientContract.deferredClientApiCalls}`,
+    ...(appClientContract.failures?.missingBackendRoutes?.length
+      ? [
+          "- missingBackendRoutes:",
+          ...appClientContract.failures.missingBackendRoutes.map((item) => `  - ${item.method} ${item.route} (${item.file}:${item.line})`),
+        ]
+      : ["- missingBackendRoutes: none"]),
+    ...(appClientContract.failures?.methodMismatches?.length
+      ? [
+          "- methodMismatches:",
+          ...appClientContract.failures.methodMismatches.map((item) => `  - ${item.method} ${item.route} -> ${item.backendMethods.join(",")}`),
+        ]
+      : ["- methodMismatches: none"]),
+    ...(appClientContract.failures?.unclassifiedRoutes?.length
+      ? [
+          "- unclassifiedRoutes:",
+          ...appClientContract.failures.unclassifiedRoutes.map((item) => `  - ${item.method} ${item.route} (${item.file}:${item.line})`),
+        ]
+      : ["- unclassifiedRoutes: none"]),
+    ...(appClientContract.deferredRoutes?.length
+      ? [
+          "- deferredRoutes:",
+          ...appClientContract.deferredRoutes.map((item) => `  - ${item.method} ${item.route} (${item.reason})`),
+        ]
+      : ["- deferredRoutes: none"]),
     "",
     "## APP API smoke 覆盖",
     "",
@@ -384,6 +420,7 @@ function main() {
     operatorTasksMarkdownPath,
   ])
   const routes = runJson("routes", ["scripts/check-app-api-production-cn-routes.mjs"])
+  const appClientContract = runJson("app_client_contract", ["scripts/check-app-client-api-contract.mjs"])
   const appApiSmokeCoverage = runJson("app_api_smoke_coverage", ["scripts/check-app-api-smoke-coverage.mjs"])
   const dockerContext = runJson("docker_context", ["scripts/check-aliyun-docker-context.mjs"])
   const vercelEnvCoverage = runVercelEnvCoverage(args, resolve(args.outDir, "vercel-env-coverage.json"))
@@ -405,6 +442,7 @@ function main() {
       domain,
       operatorTasks,
       routes,
+      appClientContract,
       appApiSmokeCoverage,
       dockerContext,
       vercelEnvCoverage,
@@ -439,6 +477,13 @@ function main() {
       scriptsReady: readiness.checks?.appProductionConfig?.scripts?.ready === true,
       envTemplateReady: readiness.checks?.appProductionConfig?.envTemplate?.ready === true,
       envTemplateKeyCount: readiness.checks?.appProductionConfig?.envTemplate?.keyCount ?? 0,
+    },
+    appClientContract: {
+      ok: appClientContract.ok === true,
+      auditedClientApiCalls: appClientContract.auditedClientApiCalls,
+      uniqueAuditedClientRoutes: appClientContract.uniqueAuditedClientRoutes,
+      matchedBackendRoutes: appClientContract.matchedBackendRoutes,
+      deferredClientApiCalls: appClientContract.deferredClientApiCalls,
     },
     appApiSmokeCoverage: {
       ok: appApiSmokeCoverage.ok === true,

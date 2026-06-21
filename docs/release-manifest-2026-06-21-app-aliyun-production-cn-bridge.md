@@ -119,6 +119,19 @@ scripts/prepare-aliyun-release-artifacts.mjs
 scripts/run-aliyun-predeploy.mjs
 ```
 
+本轮继续补充的本地门禁文件：
+
+```text
+deploy/aliyun-production-cn.example.json
+docs/DEPLOY_ALIYUN_PRODUCTION_CN.md
+docs/release-manifest-2026-06-21-app-aliyun-production-cn-bridge.md
+package.json
+scripts/check-aliyun-production-cn-readiness.mjs
+scripts/check-app-client-api-contract.mjs
+scripts/prepare-aliyun-release-artifacts.mjs
+scripts/run-aliyun-predeploy.mjs
+```
+
 本 manifest 本身是后续补充的发布控制文件：
 
 ```text
@@ -267,8 +280,9 @@ wechatOpenPlatform.reviewStatus: reviewing
 appProductionConfig.files: ready, 6 checked
 appProductionConfig.scripts: ready, 3 checked
 appProductionConfig.envTemplate: ready, 8 canonical keys checked, 0 deprecated keys
-backend.files: ready, 19 checked
-backend.scripts: ready, 21 checked
+backend.files: ready, 20 checked
+backend.scripts: ready, 22 checked
+appClientContract: 40 audited calls / 34 unique client routes, 4 deferred knowledge-space calls
 appApiSmokeCoverage: 29 / 29 business routes
 ```
 
@@ -329,6 +343,7 @@ corepack pnpm aliyun:operator:tasks
 corepack pnpm aliyun:readiness
 corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:release:artifacts -- --skip-bundle
+corepack pnpm aliyun:app-client:contract
 local localhost aliyun:postdeploy:smoke with --allow-missing appWechatLogin,legalLinks
 corepack pnpm aliyun:predeploy
 ```
@@ -341,6 +356,7 @@ aliyun:env:plan
 aliyun:cloud:check
 aliyun:readiness
 aliyun:routes:check
+aliyun:app-client:contract
 aliyun:app-api:coverage
 aliyun:docker:check
 pnpm exec tsc --noEmit --pretty false
@@ -354,6 +370,7 @@ aliyun:app-api:smoke
 
 ```text
 routes: 31 checked, 0 failures
+app-client contract: 40 audited calls, 34 unique client routes, 26 matched backend routes, 4 deferred knowledge-space calls, 0 failures
 app-api coverage: 29 / 29 business routes, 30 probes, 0 missing
 docker context: 7 files, 24 dockerignore patterns, sensitive env excluded
 release preflight: 4 / 4 pass

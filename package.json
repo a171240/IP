@@ -23,6 +23,7 @@
     "aliyun:app-api:smoke": "node ./scripts/smoke-app-api-production-cn.mjs",
     "aliyun:postdeploy:smoke": "node ./scripts/run-aliyun-postdeploy-smoke.mjs",
     "aliyun:routes:check": "node ./scripts/check-app-api-production-cn-routes.mjs",
+    "aliyun:app-client:contract": "node ./scripts/check-app-client-api-contract.mjs",
     "aliyun:app-api:coverage": "node ./scripts/check-app-api-smoke-coverage.mjs",
     "aliyun:docker:check": "node ./scripts/check-aliyun-docker-context.mjs",
     "aliyun:predeploy": "node ./scripts/run-aliyun-predeploy.mjs",
