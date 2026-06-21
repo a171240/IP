@@ -27,12 +27,15 @@
   "cloudConfirmations": {
     "exampleFile": "deploy/aliyun-production-cn.cloud-confirmations.example.json",
     "localFile": "deploy/aliyun-production-cn.cloud-confirmations.local.json",
-    "checkCommand": "corepack pnpm aliyun:cloud:check",
+    "checkCommand": "corepack pnpm aliyun:cloud:confirmations",
+    "strictCheckCommand": "corepack pnpm aliyun:cloud:confirmations:strict",
     "operatorTasksCommand": "corepack pnpm aliyun:operator:tasks",
     "secretsPolicy": "The local confirmation file must contain resource names, booleans, and evidence handles only. Do not paste secret values."
   },
   "predeployChecks": [
+    "corepack pnpm aliyun:deploy:spec",
     "corepack pnpm aliyun:operator:tasks",
+    "corepack pnpm aliyun:cloud:confirmations",
     "corepack pnpm aliyun:readiness",
     "corepack pnpm aliyun:env:sources",
     "corepack pnpm aliyun:domain:check",
@@ -42,10 +45,12 @@
     "corepack pnpm aliyun:app-client:contract",
     "corepack pnpm aliyun:app-api:coverage",
     "corepack pnpm aliyun:predeploy",
-    "corepack pnpm aliyun:docker:build"
+    "corepack pnpm aliyun:docker:build",
+    "corepack pnpm aliyun:container:smoke"
   ],
   "postdeployChecks": [
     "corepack pnpm aliyun:domain:strict",
+    "corepack pnpm aliyun:cloud:confirmations:strict",
     "corepack pnpm aliyun:postdeploy:smoke -- --base-url https://api-cn.ipgongchang.xin",
     "corepack pnpm aliyun:remote:smoke -- --base-url https://api-cn.ipgongchang.xin",
     "corepack pnpm aliyun:app-api:smoke -- --base-url https://api-cn.ipgongchang.xin"

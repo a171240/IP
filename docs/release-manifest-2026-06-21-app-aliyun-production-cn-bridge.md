@@ -280,8 +280,8 @@ wechatOpenPlatform.reviewStatus: reviewing
 appProductionConfig.files: ready, 6 checked
 appProductionConfig.scripts: ready, 5 checked
 appProductionConfig.envTemplate: ready, 5 canonical keys checked, 0 forbidden backend/secret keys
-backend.files: ready, 22 checked
-backend.scripts: ready, 26 checked
+backend.files: ready, 23 checked
+backend.scripts: ready, 27 checked
 docker: ready, image meiye-huajing-app-api:production-cn, digest sha256:905bdd0db460e4eadb5edbd9c7ed76781a651b058381059e29a4ec607d1780f3, size 3.02GB
 appClientContract: 40 audited calls / 34 unique client routes, 4 deferred knowledge-space calls
 appApiSmokeCoverage: 29 / 29 business routes
@@ -336,6 +336,7 @@ node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.clou
 node --check scripts/run-aliyun-postdeploy-smoke.mjs
 node --check scripts/run-aliyun-container-smoke.mjs
 node --check scripts/check-aliyun-cloud-confirmations.mjs
+node --check scripts/check-aliyun-deployment-spec.mjs
 node --check scripts/check-aliyun-domain-readiness.mjs
 node --check scripts/generate-aliyun-operator-tasks.mjs
 node scripts/generate-app-runtime-config.mjs --env-file ../.env.production-cn.local --out /tmp/meiye-build-config.generated.ts --require-production-ready --check
@@ -343,6 +344,7 @@ corepack pnpm aliyun:env:plan
 corepack pnpm aliyun:env:sources
 corepack pnpm aliyun:vercel-env:coverage
 corepack pnpm aliyun:domain:check
+corepack pnpm aliyun:deploy:spec
 corepack pnpm aliyun:operator:tasks
 corepack pnpm aliyun:cloud:confirmations
 corepack pnpm aliyun:cloud:confirmations:strict（exit 1 as expected while cloud resources are incomplete）
@@ -382,6 +384,7 @@ env source catalog: 61 variables, 61 source metadata ready, containsValues false
 app-client contract: 40 audited calls, 34 unique client routes, 26 matched backend routes, 4 deferred knowledge-space calls, 0 failures
 app-api coverage: 29 / 29 business routes, 30 probes, 0 missing
 docker context: 7 files, 24 dockerignore patterns, sensitive env excluded
+deployment spec: image meiye-huajing-app-api:production-cn, port 3000, apiHost api-cn.ipgongchang.xin, predeploy 14, postdeploy 5, 0 blockers
 release preflight: 4 / 4 pass
 build: compiled successfully; existing lint warnings only
 health smoke: sensitiveLeakCount 0

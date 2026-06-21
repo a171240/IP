@@ -188,6 +188,7 @@ function renderMarkdown(audit) {
   const bundle = audit.bundle
   const vercelEnvCoverage = audit.checks.vercelEnvCoverage
   const domain = audit.checks.domain
+  const deploymentSpec = audit.checks.deploymentSpec
   const operatorTasks = audit.checks.operatorTasks
   const cloudConfirmationsCheck = audit.checks.cloudConfirmationsCheck
   const cloudConfirmations = readiness.checks?.cloudConfirmations
@@ -208,6 +209,7 @@ function renderMarkdown(audit) {
     `- appClientContract: ${appClientContract.auditedClientApiCalls} audited calls, ${appClientContract.uniqueAuditedClientRoutes} unique client routes`,
     `- appApiSmokeCoverage: ${appApiSmokeCoverage.coveredBusinessRoutes} / ${appApiSmokeCoverage.businessRoutes} business routes`,
     `- dockerContext: ${docker.ok ? "ok" : "not ok"}`,
+    `- deploymentSpec: ${deploymentSpec.ok ? "ok" : "not ready"}`,
     `- domainReadiness: ${domain.ok ? "ok" : "not ready"} (${domain.targetReady} / ${domain.targetTotal})`,
     `- operatorTasks: ${operatorTasks.summary.ready} / ${operatorTasks.summary.total} ready`,
     `- cloudConfirmations: ${cloudConfirmations?.ready ? "ready" : "not ready"}`,
@@ -272,6 +274,19 @@ function renderMarkdown(audit) {
     ...(domain.machineBlocking?.length
       ? domain.machineBlocking.map((item) => `- ${item}`)
       : ["- none"]),
+    "",
+    "## 阿里云部署规格",
+    "",
+    `- ready: ${deploymentSpec.ok}`,
+    `- image: ${deploymentSpec.image}`,
+    `- port: ${deploymentSpec.port}`,
+    `- apiHost: ${deploymentSpec.apiHost}`,
+    `- assetHost: ${deploymentSpec.assetHost}`,
+    `- predeployChecks: ${deploymentSpec.predeployChecks}`,
+    `- postdeployChecks: ${deploymentSpec.postdeployChecks}`,
+    ...(deploymentSpec.blockers?.length
+      ? deploymentSpec.blockers.map((item) => `- ${item}`)
+      : ["- blockers: none"]),
     "",
     "## 操作员任务清单",
     "",
@@ -421,6 +436,7 @@ function main() {
     args.envFile,
     "--allow-blocking",
   ])
+  const deploymentSpec = runJson("deployment_spec", ["scripts/check-aliyun-deployment-spec.mjs"])
   const operatorTasksJsonPath = resolve(args.outDir, "operator-tasks.json")
   const operatorTasksMarkdownPath = resolve(args.outDir, "operator-tasks.md")
   const cloudConfirmationsCheckPath = resolve(args.outDir, "cloud-confirmations-check.json")
@@ -460,6 +476,7 @@ function main() {
       env,
       readiness,
       domain,
+      deploymentSpec,
       operatorTasks,
       cloudConfirmationsCheck,
       routes,
@@ -495,6 +512,14 @@ function main() {
     machineBlocking: readiness.machineBlocking,
     manualBlockingCount: readiness.manualBlocking.length,
     cloudConfirmationsReady: readiness.checks?.cloudConfirmations?.ready === true,
+    deploymentSpec: {
+      ok: deploymentSpec.ok === true,
+      image: deploymentSpec.image,
+      port: deploymentSpec.port,
+      apiHost: deploymentSpec.apiHost,
+      predeployChecks: deploymentSpec.predeployChecks,
+      postdeployChecks: deploymentSpec.postdeployChecks,
+    },
     cloudConfirmationsCheck: {
       report: audit.outputFiles.cloudConfirmationsCheck,
       templateReady: cloudConfirmationsCheck.template?.ready === true,

@@ -10,6 +10,7 @@
     "aliyun:env:plan": "node ./scripts/prepare-aliyun-runtime-env.mjs --allow-todo --write-plan /tmp/meiye-aliyun-env-import-plan.json",
     "aliyun:env:sources": "node ./scripts/prepare-aliyun-runtime-env.mjs --allow-todo --write-plan /tmp/meiye-aliyun-env-source-catalog.json",
     "aliyun:vercel-env:coverage": "node ./scripts/check-vercel-env-coverage.mjs --write-report /tmp/meiye-vercel-env-coverage.json",
+    "aliyun:deploy:spec": "node ./scripts/check-aliyun-deployment-spec.mjs",
     "aliyun:domain:check": "node ./scripts/check-aliyun-domain-readiness.mjs --allow-blocking",
     "aliyun:domain:strict": "node ./scripts/check-aliyun-domain-readiness.mjs",
     "aliyun:operator:tasks": "node ./scripts/generate-aliyun-operator-tasks.mjs",

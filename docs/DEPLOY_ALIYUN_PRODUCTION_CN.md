@@ -168,10 +168,11 @@ corepack pnpm aliyun:domain:strict
 如果要给阿里云/微信后台操作员看下一步清单，先跑：
 
 ```bash
+corepack pnpm aliyun:deploy:spec
 corepack pnpm aliyun:operator:tasks
 ```
 
-这条命令不输出任何密钥值，也不会创建资源或导入变量。它会把当前 `readiness`、`domain`、`.env.production-cn.local` 变量状态和 `cloud-confirmations.local.json` 汇总为 8 个任务：
+这两条命令不输出任何密钥值，也不会创建资源或导入变量。`aliyun:deploy:spec` 校验 `deploy/aliyun-production-cn.example.json` 的镜像、端口、域名、健康检查和前后置门禁顺序；`aliyun:operator:tasks` 会把当前 `readiness`、`domain`、`.env.production-cn.local` 变量状态和 `cloud-confirmations.local.json` 汇总为 8 个任务：
 
 ```text
 T01 微信开放平台移动应用审核和 APP 登录凭证
@@ -622,6 +623,7 @@ corepack pnpm aliyun:predeploy
 corepack pnpm aliyun:env:check
 corepack pnpm aliyun:env:plan
 corepack pnpm aliyun:env:sources
+corepack pnpm aliyun:deploy:spec
 corepack pnpm aliyun:cloud:confirmations
 corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:readiness
@@ -733,6 +735,7 @@ node --check scripts/generate-aliyun-operator-tasks.mjs
 node --check scripts/run-aliyun-predeploy.mjs
 node --check scripts/run-aliyun-container-smoke.mjs
 node --check scripts/check-aliyun-cloud-confirmations.mjs
+node --check scripts/check-aliyun-deployment-spec.mjs
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.example.json','utf8'))"
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.cloud-confirmations.example.json','utf8'))"
 corepack pnpm aliyun:readiness
@@ -749,6 +752,7 @@ corepack pnpm aliyun:docker:check（7 files / 24 dockerignore patterns / sensiti
 corepack pnpm aliyun:container:smoke（Docker health + 30 APP API probes / sanitized env deleted）
 node --check scripts/check-aliyun-domain-readiness.mjs
 corepack pnpm aliyun:domain:check（状态看板 exit 0；当前 ok=false）
+corepack pnpm aliyun:deploy:spec（image meiye-huajing-app-api:production-cn / port 3000 / predeploy 14 / postdeploy 5）
 corepack pnpm aliyun:remote:smoke -- --base-url http://127.0.0.1:3022 --allow-missing appWechatLogin,legalLinks
 corepack pnpm aliyun:env:check
 corepack pnpm exec tsc --noEmit --pretty false
