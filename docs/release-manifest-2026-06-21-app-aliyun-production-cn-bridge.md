@@ -1,6 +1,6 @@
 # 美业话镜 APP 阿里云 production-cn 桥接后端发布清单
 
-生成时间：2026-06-21 21:58:08 CST
+生成时间：2026-06-21 22:11:22 CST
 
 本文只记录 APP 国内 production-cn 后端桥接包的本地准备状态，不包含任何密钥值，也不代表已经执行阿里云生产部署。
 
@@ -9,9 +9,9 @@
 - Release lane: APP production-cn backend bridge
 - Backend repository: `/Users/Admin/Documents/美业话镜APP/handoff/IP`
 - Backend branch: `codex/app-api-handoff-20260521`
-- Backend HEAD before env-plan update: `da9f812 docs: record aliyun console readiness evidence`
+- Backend HEAD before Vercel env coverage update: `cb78415 deploy: add aliyun env import plan`
 - Remote baseline branch: `origin/codex/app-api-handoff-20260521`
-- Branch state before env-plan update: ahead 11, clean worktree
+- Branch state before Vercel env coverage update: ahead 12, clean worktree
 - App workspace: `/Users/Admin/Documents/美业话镜APP`
 - Mini-program repository: `/Users/Admin/Documents/美业话镜小程序`
 
@@ -30,11 +30,24 @@
 
 ```text
 da9f812 docs: record aliyun console readiness evidence
+cb78415 deploy: add aliyun env import plan
 232cf5f docs: refresh aliyun production-cn readiness
 83acfa1 deploy: require aliyun cloud confirmations
 8096803 docs: add aliyun production-cn release manifest
 bc2b787 deploy: track wechat open app review status
 641bc1a deploy: add aliyun production-cn app api bridge
+```
+
+`cb78415` 包含的核心文件：
+
+```text
+docs/DEPLOY_ALIYUN_PRODUCTION_CN.md
+docs/release-manifest-2026-06-21-app-aliyun-production-cn-bridge.md
+package.json
+scripts/check-aliyun-production-cn-readiness.mjs
+scripts/prepare-aliyun-release-artifacts.mjs
+scripts/prepare-aliyun-runtime-env.mjs
+scripts/run-aliyun-predeploy.mjs
 ```
 
 `641bc1a` 包含的核心文件：
@@ -170,6 +183,25 @@ ipnrgc.com
 https://api-cn.ipgongchang.xin
 ```
 
+Vercel production 变量名只读覆盖检查：
+
+```text
+command: corepack pnpm aliyun:vercel-env:coverage
+report: /tmp/meiye-vercel-env-coverage.json
+containsValues: false
+vercel production variable names: 130
+required APP production-cn variables covered by Vercel production: 17 / 23
+required missing in Vercel production:
+  APP_ENV
+  APP_REGION
+  APP_API_BASE_URL
+  NEXT_PUBLIC_SITE_URL
+  WECHAT_OPEN_APP_ID
+  WECHAT_OPEN_APP_SECRET
+```
+
+结论：Vercel production 可以作为 Supabase、旧微信小程序兼容、OSS、百炼、DeepSeek、火山语音等桥接变量来源；缺失的 6 个必填项是 APP 国内版新增运行环境、`api-cn` 域名变量和微信开放平台移动应用 AppID/AppSecret，不能从旧小程序变量替代。
+
 ## 7. Supabase / 数据层状态
 
 当前 APP production-cn 是桥接版：
@@ -257,6 +289,7 @@ node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.clou
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.cloud-confirmations.local.json','utf8'))"
 node scripts/generate-app-runtime-config.mjs --env-file ../.env.production-cn.local --out /tmp/meiye-build-config.generated.ts --require-production-ready --check
 corepack pnpm aliyun:env:plan
+corepack pnpm aliyun:vercel-env:coverage
 corepack pnpm aliyun:readiness
 corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:release:artifacts -- --skip-bundle

@@ -2,13 +2,13 @@
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, isAbsolute, resolve } from "node:path"
-import { fileURLToPath } from "node:url"
+import { fileURLToPath, pathToFileURL } from "node:url"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const APP_ENV_FILE = resolve(__dirname, "../../../.env.production-cn.local")
 
-const REQUIRED_KEYS = [
+export const REQUIRED_KEYS = [
   "APP_ENV",
   "APP_REGION",
   "APP_API_BASE_URL",
@@ -34,7 +34,7 @@ const REQUIRED_KEYS = [
   "VOLC_SPEECH_ACCESS_TOKEN",
 ]
 
-const OPTIONAL_KEYS = [
+export const OPTIONAL_KEYS = [
   "APP_ASSET_BASE_URL",
   "PRIVACY_POLICY_URL",
   "TERMS_URL",
@@ -119,7 +119,7 @@ function resolveValue(value, name) {
   return isAbsolute(value) ? value : resolve(process.cwd(), value)
 }
 
-function parseEnvFile(filePath) {
+export function parseEnvFile(filePath) {
   if (!existsSync(filePath)) throw new Error(`env_file_not_found:${filePath}`)
   const env = new Map()
   const raw = readFileSync(filePath, "utf8")
@@ -152,7 +152,7 @@ function isTodo(value) {
   return String(value || "").trim().startsWith("TODO_")
 }
 
-function summarize(env, allowTodo) {
+export function summarize(env, allowTodo) {
   const required = REQUIRED_KEYS.map((key) => ({
     key,
     status: statusOf(env.get(key), allowTodo),
@@ -200,7 +200,7 @@ function writeImportPlan(env, writePath) {
   return plan
 }
 
-function buildImportPlan(env) {
+export function buildImportPlan(env) {
   const variables = [
     ...REQUIRED_KEYS.map((key) => buildPlanItem(env, key, true)),
     ...OPTIONAL_KEYS.map((key) => buildPlanItem(env, key, false)),
@@ -338,9 +338,11 @@ function main() {
   if (summary.missingRequired.length && !args.allowTodo) process.exit(1)
 }
 
-try {
-  main()
-} catch (error) {
-  console.error(error instanceof Error ? error.message : String(error))
-  process.exit(1)
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  try {
+    main()
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error))
+    process.exit(1)
+  }
 }

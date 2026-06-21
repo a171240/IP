@@ -227,7 +227,40 @@ node scripts/prepare-aliyun-runtime-env.mjs \
   --allow-todo
 ```
 
-### 3.2 生成阿里云控制台导入 JSON
+### 3.2 只读盘点 Vercel production 变量名
+
+旧 Vercel 项目是桥接期的变量来源之一，但这里只读取变量名、环境和加密状态，不读取、不导出真实 value：
+
+```bash
+cd /Users/Admin/Documents/美业话镜APP/handoff/IP
+corepack pnpm aliyun:vercel-env:coverage
+```
+
+默认输出无密钥报告：
+
+```text
+/tmp/meiye-vercel-env-coverage.json
+```
+
+这个报告回答三件事：
+
+```text
+Vercel production 里已经有哪些变量名
+阿里云 production-cn 导入计划里哪些变量名在 Vercel production 缺失
+哪些缺口是 APP 国内版新增项，例如 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET / api-cn 域名变量
+```
+
+如果已经在浏览器或 CLI 里保存了 `vercel env ls production --format json` 输出，也可以离线解析：
+
+```bash
+node scripts/check-vercel-env-coverage.mjs \
+  --input /tmp/meiye-vercel-env-production.json \
+  --write-report /tmp/meiye-vercel-env-coverage.json
+```
+
+这一步不等于阿里云已导入环境变量。它只证明旧 Vercel 里有哪些名称可迁移，正式导入仍以阿里云 SAE/ECS/KMS/Secrets Manager 控制台和 `aliyun:cloud:check` 为准。
+
+### 3.3 生成阿里云控制台导入 JSON
 
 只在确实要导入时执行，并写到仓库外：
 

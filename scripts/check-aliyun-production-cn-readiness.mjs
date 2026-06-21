@@ -87,6 +87,7 @@ const REQUIRED_BACKEND_FILES = [
   "pnpm-lock.yaml",
   "app/api/app/health/route.ts",
   "app/api/healthz/route.ts",
+  "scripts/check-vercel-env-coverage.mjs",
   "scripts/prepare-aliyun-runtime-env.mjs",
   "scripts/check-app-api-production-cn-routes.mjs",
   "scripts/check-aliyun-docker-context.mjs",
@@ -100,6 +101,7 @@ const REQUIRED_BACKEND_FILES = [
 const REQUIRED_BACKEND_SCRIPTS = [
   "aliyun:env:check",
   "aliyun:env:plan",
+  "aliyun:vercel-env:coverage",
   "aliyun:cloud:check",
   "aliyun:readiness",
   "aliyun:readiness:strict",
