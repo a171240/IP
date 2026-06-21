@@ -280,8 +280,8 @@ wechatOpenPlatform.reviewStatus: reviewing
 appProductionConfig.files: ready, 6 checked
 appProductionConfig.scripts: ready, 5 checked
 appProductionConfig.envTemplate: ready, 5 canonical keys checked, 0 forbidden backend/secret keys
-backend.files: ready, 21 checked
-backend.scripts: ready, 24 checked
+backend.files: ready, 22 checked
+backend.scripts: ready, 26 checked
 docker: ready, image meiye-huajing-app-api:production-cn, digest sha256:905bdd0db460e4eadb5edbd9c7ed76781a651b058381059e29a4ec607d1780f3, size 3.02GB
 appClientContract: 40 audited calls / 34 unique client routes, 4 deferred knowledge-space calls
 appApiSmokeCoverage: 29 / 29 business routes
@@ -335,6 +335,7 @@ node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.clou
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.cloud-confirmations.local.json','utf8'))"
 node --check scripts/run-aliyun-postdeploy-smoke.mjs
 node --check scripts/run-aliyun-container-smoke.mjs
+node --check scripts/check-aliyun-cloud-confirmations.mjs
 node --check scripts/check-aliyun-domain-readiness.mjs
 node --check scripts/generate-aliyun-operator-tasks.mjs
 node scripts/generate-app-runtime-config.mjs --env-file ../.env.production-cn.local --out /tmp/meiye-build-config.generated.ts --require-production-ready --check
@@ -343,6 +344,8 @@ corepack pnpm aliyun:env:sources
 corepack pnpm aliyun:vercel-env:coverage
 corepack pnpm aliyun:domain:check
 corepack pnpm aliyun:operator:tasks
+corepack pnpm aliyun:cloud:confirmations
+corepack pnpm aliyun:cloud:confirmations:strict（exit 1 as expected while cloud resources are incomplete）
 corepack pnpm aliyun:readiness
 corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:release:artifacts -- --skip-bundle
@@ -385,6 +388,7 @@ health smoke: sensitiveLeakCount 0
 app-api smoke: 30 business probes, 0 failures
 postdeploy smoke: local localhost pass, remoteHealth pass, appApiSmoke pass, sensitive value pattern 0
 container smoke: Docker image meiye-huajing-app-api:production-cn pass, /api/healthz 200, /api/app/health 200, strict health 503 for allowed appWechatLogin/legalLinks, app-api smoke 30 probes, sanitized env file deleted, container stopped
+cloud confirmations: example template ready, local file not ready, 19 blockers, containsValues false
 ```
 
 Domain readiness 说明：
@@ -513,6 +517,7 @@ WECHAT_OPEN_APP_REVIEW_STATUS=reviewing
 ```bash
 cd /Users/Admin/Documents/美业话镜APP/handoff/IP
 corepack pnpm aliyun:cloud:check
+corepack pnpm aliyun:cloud:confirmations:strict
 corepack pnpm aliyun:domain:strict
 corepack pnpm aliyun:readiness:cloud-ready
 corepack pnpm aliyun:release:artifacts

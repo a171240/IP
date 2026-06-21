@@ -6,6 +6,7 @@ const COMMANDS = [
   ["run", "aliyun:env:check"],
   ["run", "aliyun:env:plan"],
   ["run", "aliyun:env:sources"],
+  ["run", "aliyun:cloud:confirmations"],
   ["run", "aliyun:domain:check"],
   ["run", "aliyun:cloud:check"],
   ["run", "aliyun:readiness"],

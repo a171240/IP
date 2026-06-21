@@ -230,10 +230,19 @@ cp deploy/aliyun-production-cn.cloud-confirmations.example.json \
 
 ```bash
 corepack pnpm aliyun:cloud:check
+corepack pnpm aliyun:cloud:confirmations
 corepack pnpm aliyun:readiness:cloud-ready
 ```
 
 `aliyun:readiness:cloud-ready` 会读取 `deploy/aliyun-production-cn.cloud-confirmations.local.json`。六项确认没有全部 ready 前，它仍会失败。`aliyun:readiness:assume-cloud-ready` 只保留给临时本地诊断，不能作为正式发布门禁。
+
+`aliyun:cloud:confirmations` 会同时校验 example 模板和本机 `.local.json`：模板必须结构有效，本机文件可以在看板模式下列出未完成项。严格发布前使用：
+
+```bash
+corepack pnpm aliyun:cloud:confirmations:strict
+```
+
+严格模式会在 SAE/ECS、DNS/HTTPS/ICP、OSS/CORS/RAM、微信开放平台 approved、环境变量导入、SLS 告警任一项未确认时失败。确认文件只能写资源名、布尔状态、证据编号或控制台路径，不能写任何 AppSecret、AccessKey、Token、Service Role Key。
 
 非密钥部署样例：
 
@@ -613,6 +622,7 @@ corepack pnpm aliyun:predeploy
 corepack pnpm aliyun:env:check
 corepack pnpm aliyun:env:plan
 corepack pnpm aliyun:env:sources
+corepack pnpm aliyun:cloud:confirmations
 corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:readiness
 corepack pnpm aliyun:routes:check
@@ -722,11 +732,13 @@ node --check scripts/prepare-aliyun-release-artifacts.mjs
 node --check scripts/generate-aliyun-operator-tasks.mjs
 node --check scripts/run-aliyun-predeploy.mjs
 node --check scripts/run-aliyun-container-smoke.mjs
+node --check scripts/check-aliyun-cloud-confirmations.mjs
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.example.json','utf8'))"
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.cloud-confirmations.example.json','utf8'))"
 corepack pnpm aliyun:readiness
 corepack pnpm aliyun:env:sources（61 variables / 61 source metadata ready）
 corepack pnpm aliyun:operator:tasks
+corepack pnpm aliyun:cloud:confirmations（template ready / local 19 blockers）
 corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:release:artifacts
 corepack pnpm aliyun:predeploy

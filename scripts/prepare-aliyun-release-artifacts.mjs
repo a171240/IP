@@ -189,6 +189,7 @@ function renderMarkdown(audit) {
   const vercelEnvCoverage = audit.checks.vercelEnvCoverage
   const domain = audit.checks.domain
   const operatorTasks = audit.checks.operatorTasks
+  const cloudConfirmationsCheck = audit.checks.cloudConfirmationsCheck
   const cloudConfirmations = readiness.checks?.cloudConfirmations
   const appProductionConfig = readiness.checks?.appProductionConfig
   const appEnvTemplate = appProductionConfig?.envTemplate
@@ -210,6 +211,7 @@ function renderMarkdown(audit) {
     `- domainReadiness: ${domain.ok ? "ok" : "not ready"} (${domain.targetReady} / ${domain.targetTotal})`,
     `- operatorTasks: ${operatorTasks.summary.ready} / ${operatorTasks.summary.total} ready`,
     `- cloudConfirmations: ${cloudConfirmations?.ready ? "ready" : "not ready"}`,
+    `- cloudConfirmationsCheck: template ${cloudConfirmationsCheck?.template?.ready ? "ready" : "not ready"}, local ${cloudConfirmationsCheck?.local?.ready ? "ready" : "not ready"}`,
     `- vercelEnvCoverage: ${vercelEnvCoverage?.ok ? "ok" : vercelEnvCoverage?.skipped ? "skipped" : "not ok"}`,
     `- bundle: ${bundle ? basename(bundle.path) : "skipped"}`,
     "",
@@ -233,6 +235,15 @@ function renderMarkdown(audit) {
     "",
     ...(cloudConfirmations?.items?.length
       ? cloudConfirmations.items.map((item) => `- ${item.key}: ${item.status}${item.missing?.length ? ` (${item.missing.join(", ")})` : ""}`)
+      : ["- none"]),
+    "",
+    "## 云确认文件结构校验",
+    "",
+    `- templateReady: ${cloudConfirmationsCheck?.template?.ready === true}`,
+    `- localReady: ${cloudConfirmationsCheck?.local?.ready === true}`,
+    `- totalBlockers: ${cloudConfirmationsCheck?.summary?.totalBlockers ?? 0}`,
+    ...(cloudConfirmationsCheck?.local?.blockers?.length
+      ? cloudConfirmationsCheck.local.blockers.map((item) => `- ${item}`)
       : ["- none"]),
     "",
     "## APP production-cn 配置模板",
@@ -412,6 +423,7 @@ function main() {
   ])
   const operatorTasksJsonPath = resolve(args.outDir, "operator-tasks.json")
   const operatorTasksMarkdownPath = resolve(args.outDir, "operator-tasks.md")
+  const cloudConfirmationsCheckPath = resolve(args.outDir, "cloud-confirmations-check.json")
   const operatorTasks = runJson("operator_tasks", [
     "scripts/generate-aliyun-operator-tasks.mjs",
     "--env-file",
@@ -421,6 +433,11 @@ function main() {
     operatorTasksJsonPath,
     "--markdown",
     operatorTasksMarkdownPath,
+  ])
+  const cloudConfirmationsCheck = runJson("cloud_confirmations", [
+    "scripts/check-aliyun-cloud-confirmations.mjs",
+    ...(args.cloudConfirmationsFile ? ["--local", args.cloudConfirmationsFile] : []),
+    "--allow-incomplete",
   ])
   const routes = runJson("routes", ["scripts/check-app-api-production-cn-routes.mjs"])
   const appClientContract = runJson("app_client_contract", ["scripts/check-app-client-api-contract.mjs"])
@@ -444,6 +461,7 @@ function main() {
       readiness,
       domain,
       operatorTasks,
+      cloudConfirmationsCheck,
       routes,
       appClientContract,
       appApiSmokeCoverage,
@@ -457,6 +475,7 @@ function main() {
       envImportPlan: resolve(args.outDir, "env-import-plan.json"),
       vercelEnvCoverage: vercelEnvCoverage.ok ? resolve(args.outDir, "vercel-env-coverage.json") : null,
       domainReadiness: resolve(args.outDir, "domain-readiness.json"),
+      cloudConfirmationsCheck: cloudConfirmationsCheckPath,
       operatorTasksJson: operatorTasksJsonPath,
       operatorTasksMarkdown: operatorTasksMarkdownPath,
       bundle: bundle?.path || null,
@@ -466,6 +485,7 @@ function main() {
   writeText(audit.outputFiles.auditJson, JSON.stringify(audit, null, 2))
   writeText(audit.outputFiles.auditMarkdown, renderMarkdown(audit))
   writeText(audit.outputFiles.domainReadiness, JSON.stringify(domain, null, 2))
+  writeText(audit.outputFiles.cloudConfirmationsCheck, JSON.stringify(cloudConfirmationsCheck, null, 2))
 
   console.log(JSON.stringify({
     ok: true,
@@ -475,6 +495,12 @@ function main() {
     machineBlocking: readiness.machineBlocking,
     manualBlockingCount: readiness.manualBlocking.length,
     cloudConfirmationsReady: readiness.checks?.cloudConfirmations?.ready === true,
+    cloudConfirmationsCheck: {
+      report: audit.outputFiles.cloudConfirmationsCheck,
+      templateReady: cloudConfirmationsCheck.template?.ready === true,
+      localReady: cloudConfirmationsCheck.local?.ready === true,
+      totalBlockers: cloudConfirmationsCheck.summary?.totalBlockers ?? 0,
+    },
     appProductionConfig: {
       filesReady: readiness.checks?.appProductionConfig?.files?.ready === true,
       scriptsReady: readiness.checks?.appProductionConfig?.scripts?.ready === true,
@@ -519,6 +545,7 @@ function main() {
     envImportPlan: audit.outputFiles.envImportPlan,
     vercelEnvCoverageReport: audit.outputFiles.vercelEnvCoverage,
     domainReadinessReport: audit.outputFiles.domainReadiness,
+    cloudConfirmationsCheckReport: audit.outputFiles.cloudConfirmationsCheck,
     operatorTasksJson: audit.outputFiles.operatorTasksJson,
     operatorTasksMarkdown: audit.outputFiles.operatorTasksMarkdown,
   }, null, 2))
