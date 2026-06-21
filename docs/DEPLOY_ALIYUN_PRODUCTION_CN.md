@@ -600,13 +600,16 @@ rejected
 微信开放平台移动应用需要准备：
 
 ```text
-iOS Bundle ID
-iOS Universal Link
-Android applicationId / 包名
-Android 签名
+移动应用名称：美业话镜
+Android applicationId / 包名：com.ipgongchang.meiyehuajing
+Android 应用签名：用正式 release 签名证书生成，不能用 debug keystore
+iOS Bundle ID：com.ipgongchang.meiyehuajing
+iOS Universal Link：HTTPS 域名路径，建议走 api-cn.ipgongchang.xin 或另一个已备案 APP 域名
 ```
 
-当前浏览器自动化不能打开 `open.weixin.qq.com`，需要用户手工登录后提供或手工填入本机 `.env.production-cn.local`。
+其中移动应用名称、Android 包名、iOS Bundle ID 已能从当前 APP 工程核对；Android 应用签名和 iOS Universal Link 需要在微信开放平台移动应用配置页和正式 release/iOS 关联域名配置里确认。
+
+当前浏览器自动化不能打开 `open.weixin.qq.com`，需要用户手工登录后提供或手工填入本机 `.env.production-cn.local` 与 `deploy/aliyun-production-cn.cloud-confirmations.local.json`。
 
 ## 6. 上线前最小验证
 
@@ -816,7 +819,7 @@ path: deploy/aliyun-production-cn.cloud-confirmations.local.json
 runtime missing: confirmed
 apiDomainHttps missing: confirmed, dnsResolvedToAliyun, httpsEnabled, icpReady
 oss missing: confirmed, corsConfigured, ramLeastPrivilege
-wechatOpenPlatform missing: confirmed, mobileAppIdReady, mobileAppSecretReady, androidConfigured, iosConfigured, reviewStatus=approved
+wechatOpenPlatform missing: confirmed, mobileAppIdReady, mobileAppSecretReady, androidSignature, androidConfigured, iosUniversalLink, iosConfigured, reviewStatus=approved
 envImport missing: confirmed, secretNotInImage
 slsAlerts missing: confirmed, healthAlertConfigured, serverErrorAlertConfigured
 ```

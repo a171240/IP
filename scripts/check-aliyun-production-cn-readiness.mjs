@@ -12,6 +12,9 @@ const WORKSPACE_ROOT = resolve(BACKEND_ROOT, "../..")
 const APP_ROOT = resolve(WORKSPACE_ROOT, "meiye-huajing-app")
 const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
+const EXPECTED_WECHAT_MOBILE_APP_NAME = "美业话镜"
+const EXPECTED_ANDROID_PACKAGE_NAME = "com.ipgongchang.meiyehuajing"
+const EXPECTED_IOS_BUNDLE_ID = "com.ipgongchang.meiyehuajing"
 
 const REQUIRED_ENV_KEYS = [
   "APP_ENV",
@@ -217,18 +220,36 @@ const CLOUD_CONFIRMATION_ITEMS = [
     label: "微信开放平台移动应用审核已通过，并已取得 AppID/AppSecret、Android 包名/签名、iOS Bundle ID/Universal Link 配置",
     requiredFields: [
       "reviewStatus",
+      "mobileAppName",
       "mobileAppIdReady",
       "mobileAppSecretReady",
+      "androidPackageName",
+      "androidSignature",
       "androidConfigured",
+      "iosBundleId",
+      "iosUniversalLink",
       "iosConfigured",
       "evidence",
     ],
     validate: (item) => {
       const missing = []
       if (String(item.reviewStatus || "").trim() !== "approved") missing.push("reviewStatus=approved")
+      if (String(item.mobileAppName || "").trim() !== EXPECTED_WECHAT_MOBILE_APP_NAME) {
+        missing.push(`mobileAppName=${EXPECTED_WECHAT_MOBILE_APP_NAME}`)
+      }
       if (item.mobileAppIdReady !== true) missing.push("mobileAppIdReady")
       if (item.mobileAppSecretReady !== true) missing.push("mobileAppSecretReady")
+      if (String(item.androidPackageName || "").trim() !== EXPECTED_ANDROID_PACKAGE_NAME) {
+        missing.push(`androidPackageName=${EXPECTED_ANDROID_PACKAGE_NAME}`)
+      }
       if (item.androidConfigured !== true) missing.push("androidConfigured")
+      if (String(item.iosBundleId || "").trim() !== EXPECTED_IOS_BUNDLE_ID) {
+        missing.push(`iosBundleId=${EXPECTED_IOS_BUNDLE_ID}`)
+      }
+      const iosUniversalLink = String(item.iosUniversalLink || "").trim()
+      if (iosUniversalLink && !iosUniversalLink.startsWith("TODO_") && !iosUniversalLink.startsWith("https://")) {
+        missing.push("iosUniversalLink=https")
+      }
       if (item.iosConfigured !== true) missing.push("iosConfigured")
       return missing
     },

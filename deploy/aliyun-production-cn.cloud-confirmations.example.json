@@ -34,9 +34,14 @@
     "wechatOpenPlatform": {
       "confirmed": false,
       "reviewStatus": "reviewing",
+      "mobileAppName": "美业话镜",
       "mobileAppIdReady": false,
       "mobileAppSecretReady": false,
+      "androidPackageName": "com.ipgongchang.meiyehuajing",
+      "androidSignature": "TODO_ANDROID_RELEASE_WECHAT_SIGNATURE",
       "androidConfigured": false,
+      "iosBundleId": "com.ipgongchang.meiyehuajing",
+      "iosUniversalLink": "TODO_IOS_UNIVERSAL_LINK_HTTPS_URL",
       "iosConfigured": false,
       "evidence": "TODO_WECHAT_OPEN_PLATFORM_REVIEW_EVIDENCE"
     },

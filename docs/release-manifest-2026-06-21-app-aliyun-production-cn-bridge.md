@@ -317,7 +317,7 @@ path: deploy/aliyun-production-cn.cloud-confirmations.local.json
 runtime missing: confirmed
 apiDomainHttps missing: confirmed, dnsResolvedToAliyun, httpsEnabled, icpReady
 oss missing: confirmed, corsConfigured, ramLeastPrivilege
-wechatOpenPlatform missing: confirmed, mobileAppIdReady, mobileAppSecretReady, androidConfigured, iosConfigured, reviewStatus=approved
+wechatOpenPlatform missing: confirmed, mobileAppIdReady, mobileAppSecretReady, androidSignature, androidConfigured, iosUniversalLink, iosConfigured, reviewStatus=approved
 envImport missing: confirmed, secretNotInImage
 slsAlerts missing: confirmed, healthAlertConfigured, serverErrorAlertConfigured
 ```
@@ -509,6 +509,23 @@ WECHAT_OPEN_APP_SECRET=<微信开放平台移动应用 AppSecret>
 
 ```text
 WECHAT_OPEN_APP_REVIEW_STATUS=reviewing
+```
+
+当前 APP 工程已确认的非密钥配置：
+
+```text
+移动应用名称：美业话镜
+Android applicationId / 包名：com.ipgongchang.meiyehuajing
+iOS Bundle ID：com.ipgongchang.meiyehuajing
+```
+
+仍需微信开放平台或正式发布资料确认：
+
+```text
+Android 应用签名：正式 release 签名证书生成，不能用 debug keystore
+iOS Universal Link：HTTPS 域名路径，需要和 iOS Associated Domains / AASA 文件一致
+WECHAT_OPEN_APP_ID：审核通过后读取
+WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KMS
 ```
 
 审核通过后才能把 readiness blocker 从 `wechat_open_platform_mobile_app_reviewing` 清掉。

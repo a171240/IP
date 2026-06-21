@@ -9,6 +9,9 @@ const __dirname = dirname(__filename)
 const BACKEND_ROOT = resolve(__dirname, "..")
 const DEFAULT_TEMPLATE_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.example.json")
 const DEFAULT_LOCAL_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
+const EXPECTED_WECHAT_MOBILE_APP_NAME = "美业话镜"
+const EXPECTED_ANDROID_PACKAGE_NAME = "com.ipgongchang.meiyehuajing"
+const EXPECTED_IOS_BUNDLE_ID = "com.ipgongchang.meiyehuajing"
 
 const DEFINITIONS = [
   {
@@ -63,18 +66,28 @@ const DEFINITIONS = [
     requiredFields: [
       "confirmed",
       "reviewStatus",
+      "mobileAppName",
       "mobileAppIdReady",
       "mobileAppSecretReady",
+      "androidPackageName",
+      "androidSignature",
       "androidConfigured",
+      "iosBundleId",
+      "iosUniversalLink",
       "iosConfigured",
       "evidence",
     ],
     allowedFields: [
       "confirmed",
       "reviewStatus",
+      "mobileAppName",
       "mobileAppIdReady",
       "mobileAppSecretReady",
+      "androidPackageName",
+      "androidSignature",
       "androidConfigured",
+      "iosBundleId",
+      "iosUniversalLink",
       "iosConfigured",
       "evidence",
     ],
@@ -86,9 +99,28 @@ const DEFINITIONS = [
       }
       if (mode === "local" && item.confirmed !== true) blockers.push("confirmed")
       if (mode === "local" && reviewStatus !== "approved") blockers.push("reviewStatus=approved")
+      if (mode === "local" && String(item.mobileAppName || "").trim() !== EXPECTED_WECHAT_MOBILE_APP_NAME) {
+        blockers.push(`mobileAppName=${EXPECTED_WECHAT_MOBILE_APP_NAME}`)
+      }
       if (mode === "local" && item.mobileAppIdReady !== true) blockers.push("mobileAppIdReady")
       if (mode === "local" && item.mobileAppSecretReady !== true) blockers.push("mobileAppSecretReady")
+      if (mode === "local" && String(item.androidPackageName || "").trim() !== EXPECTED_ANDROID_PACKAGE_NAME) {
+        blockers.push(`androidPackageName=${EXPECTED_ANDROID_PACKAGE_NAME}`)
+      }
       if (mode === "local" && item.androidConfigured !== true) blockers.push("androidConfigured")
+      if (mode === "local" && String(item.iosBundleId || "").trim() !== EXPECTED_IOS_BUNDLE_ID) {
+        blockers.push(`iosBundleId=${EXPECTED_IOS_BUNDLE_ID}`)
+      }
+      if (mode === "local") {
+        const iosUniversalLink = String(item.iosUniversalLink || "").trim()
+        if (
+          iosUniversalLink &&
+          !iosUniversalLink.startsWith("TODO_") &&
+          !iosUniversalLink.startsWith("https://")
+        ) {
+          blockers.push("iosUniversalLink=https")
+        }
+      }
       if (mode === "local" && item.iosConfigured !== true) blockers.push("iosConfigured")
       return blockers
     },
