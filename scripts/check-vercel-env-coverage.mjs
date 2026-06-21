@@ -150,14 +150,24 @@ function buildReport(args, envs) {
     requiredMissingInVercelProduction: requiredMissing,
     optionalMissingInVercelProduction: optionalMissing,
     bridgeKeysPresentInVercelProduction: knownBridgeKeys.filter((key) => productionEnvNames.has(key)),
-    appSpecificKeysMissingInVercelProduction: requiredMissing.filter((key) => /^APP_|^NEXT_PUBLIC_SITE_URL|^WECHAT_OPEN_/.test(key)),
+    appSpecificKeysMissingInVercelProduction: requiredMissing.filter(isAppProductionCnOwnedKey),
     extraProductionKeys,
     notes: [
       "Vercel env ls returns names, target environments, and encrypted/sensitive metadata only; this report must not include values.",
       "WECHAT_OPEN_APP_ID and WECHAT_OPEN_APP_SECRET come from WeChat Open Platform mobile app approval, not from the mini program credentials.",
-      "APP production-cn domain variables are new Aliyun-side values and may be absent from the legacy Vercel project by design.",
+      "APP production-cn domain, legal URL, and WeChat Open Platform variables are new Aliyun/App-release values and may be absent from the legacy Vercel project by design.",
     ],
   }
+}
+
+function isAppProductionCnOwnedKey(key) {
+  return (
+    /^APP_/.test(key) ||
+    key === "NEXT_PUBLIC_SITE_URL" ||
+    key === "PRIVACY_POLICY_URL" ||
+    key === "TERMS_URL" ||
+    /^WECHAT_OPEN_/.test(key)
+  )
 }
 
 function writeReport(report, writePath) {

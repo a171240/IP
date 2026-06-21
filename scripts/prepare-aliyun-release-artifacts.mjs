@@ -280,6 +280,12 @@ function renderMarkdown(audit) {
           ...vercelEnvCoverage.report.requiredMissingInVercelProduction.map((item) => `  - ${item}`),
         ]
       : []),
+    ...(vercelEnvCoverage?.report?.appSpecificKeysMissingInVercelProduction?.length
+      ? [
+          "- appSpecificKeysMissingInVercelProduction:",
+          ...vercelEnvCoverage.report.appSpecificKeysMissingInVercelProduction.map((item) => `  - ${item}`),
+        ]
+      : []),
     vercelEnvCoverage?.error
       ? `- error: ${vercelEnvCoverage.error}`
       : "",
@@ -390,6 +396,7 @@ function main() {
           containsValues: vercelEnvCoverage.report.containsValues,
           requiredCovered: `${vercelEnvCoverage.report.totals.requiredPresentInVercelProduction}/${vercelEnvCoverage.report.totals.requiredTotal}`,
           requiredMissing: vercelEnvCoverage.report.requiredMissingInVercelProduction,
+          appSpecificMissing: vercelEnvCoverage.report.appSpecificKeysMissingInVercelProduction,
         }
       : {
           ok: false,

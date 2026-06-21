@@ -349,7 +349,7 @@ corepack pnpm aliyun:vercel-env:coverage
 ```text
 Vercel production 里已经有哪些变量名
 阿里云 production-cn 导入计划里哪些变量名在 Vercel production 缺失
-哪些缺口是 APP 国内版新增项，例如 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET / api-cn 域名变量
+哪些缺口是 APP 国内版新增项，例如 api-cn 域名变量、正式协议 URL、WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET
 ```
 
 如果已经在浏览器或 CLI 里保存了 `vercel env ls production --format json` 输出，也可以离线解析：
