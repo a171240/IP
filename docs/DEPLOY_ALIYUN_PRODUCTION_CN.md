@@ -651,7 +651,7 @@ iOS Universal Link：https://api-cn.ipgongchang.xin/app/wechat/
 iOS AASA：https://api-cn.ipgongchang.xin/.well-known/apple-app-site-association
 ```
 
-其中移动应用名称、Android 包名、iOS Bundle ID 已能从当前 APP 工程核对；Android 应用签名、iOS Associated Domains 和 iOS Universal Link 需要在微信开放平台移动应用配置页、Apple Developer / Xcode release 配置里确认。`APPLE_TEAM_ID` 从 Apple Developer 的 Membership 或 App ID 页面获取，不是密钥；后端 AASA 路由会用它生成 `appID`。
+其中移动应用名称、Android 包名、iOS Bundle ID 已能从当前 APP 工程核对；iOS Associated Domains 已在当前 Xcode target 的 entitlements 中配置为 `applinks:api-cn.ipgongchang.xin`。Android 应用签名、微信开放平台 iOS Universal Link、Apple Developer Team ID 和部署后的 AASA 返回仍需要在微信开放平台移动应用配置页、Apple Developer / 阿里云域名环境里确认。`APPLE_TEAM_ID` 从 Apple Developer 的 Membership 或 App ID 页面获取，不是密钥；后端 AASA 路由会用它生成 `appID`。
 
 当前浏览器自动化不能打开 `open.weixin.qq.com`，需要用户手工登录后提供或手工填入本机 `.env.production-cn.local` 与 `deploy/aliyun-production-cn.cloud-confirmations.local.json`。
 
@@ -803,7 +803,7 @@ corepack pnpm aliyun:release:artifacts
 corepack pnpm aliyun:predeploy
 corepack pnpm aliyun:routes:check（31 routes / 0 failures）
 corepack pnpm aliyun:app-client:contract（40 audited calls / 34 unique client routes）
-corepack pnpm aliyun:app-native:check（当前 ok=false；iOS Associated Domains 缺失；Android release 已切到 signingConfigs.release，真实 keystore 值需由本机 Gradle properties 或环境变量提供）
+corepack pnpm aliyun:app-native:check（当前 ok=true；Android release 已切到 signingConfigs.release；iOS Associated Domains 已配置 applinks:api-cn.ipgongchang.xin；真实 Android keystore 值仍需由本机 Gradle properties 或环境变量提供）
 corepack pnpm aliyun:aasa:check（当前 ok=false；AASA route exists；APPLE_TEAM_ID 缺失）
 corepack pnpm aliyun:app-api:coverage（29 / 29 business routes covered）
 corepack pnpm aliyun:docker:check（7 files / 24 dockerignore patterns / sensitive env excluded）

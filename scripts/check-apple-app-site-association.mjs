@@ -125,7 +125,7 @@ function main() {
     blockers,
     nextActions: [
       "从 Apple Developer 账号 Membership 或 Identifiers/App ID 页面确认 10 位 Team ID，导入 APPLE_TEAM_ID。",
-      "在 iOS Associated Domains 里配置 applinks:api-cn.ipgongchang.xin。",
+      "保持 iOS Associated Domains 为 applinks:api-cn.ipgongchang.xin，并与微信开放平台 Universal Link 域名一致。",
       "微信开放平台 iOS Universal Link 使用 https://api-cn.ipgongchang.xin/app/wechat/，并确保该域名部署后可 GET AASA。",
       "部署后执行 curl -i https://api-cn.ipgongchang.xin/.well-known/apple-app-site-association，状态应为 200 且 Content-Type 为 application/json。",
     ],

@@ -291,8 +291,8 @@ wechatOpenPlatform.reviewStatus: reviewing
 appProductionConfig.files: ready, 6 checked
 appProductionConfig.scripts: ready, 5 checked
 appProductionConfig.envTemplate: ready, 5 canonical keys checked, 0 forbidden backend/secret keys
-backend.files: ready, 26 checked
-backend.scripts: ready, 31 checked
+backend.files: ready, 27 checked
+backend.scripts: ready, 33 checked
 docker: ready
 imagePublishPlan: template ready, local draft exists, localDockerImage ready, ACR/runtime evidence still incomplete
 appClientContract: 40 audited calls / 34 unique client routes, 4 deferred knowledge-space calls
@@ -307,8 +307,6 @@ missing_required_env:WECHAT_OPEN_APP_SECRET
 missing_required_env:PRIVACY_POLICY_URL
 missing_required_env:TERMS_URL
 wechat_open_platform_mobile_app_reviewing
-invalid_app_native_release_config
-app_native:ios_associated_domains_missing
 invalid_app_universal_link_config
 app_universal_link:apple_team_id_missing
 ```
@@ -406,7 +404,7 @@ aliyun:app-api:smoke
 routes: 31 checked, 0 failures
 env source catalog: 62 variables, 62 source metadata ready, containsValues false
 app-client contract: 40 audited calls, 34 unique client routes, 26 matched backend routes, 4 deferred knowledge-space calls, 0 failures
-app-native release config: ok=false, blockers ios_associated_domains_missing
+app-native release config: ok=true, Android release signing config ready, iOS Associated Domains applinks:api-cn.ipgongchang.xin configured
 aasa config: ok=false, route files exist, blocker apple_team_id_missing, universalLink https://api-cn.ipgongchang.xin/app/wechat/
 app-api coverage: 29 / 29 business routes, 30 probes, 0 missing
 docker context: 7 files, 24 dockerignore patterns, sensitive env excluded
@@ -576,13 +574,14 @@ WECHAT_OPEN_APP_REVIEW_STATUS=reviewing
 移动应用名称：美业话镜
 Android applicationId / 包名：com.ipgongchang.meiyehuajing
 iOS Bundle ID：com.ipgongchang.meiyehuajing
+iOS Associated Domains：applinks:api-cn.ipgongchang.xin
 ```
 
 `corepack pnpm aliyun:app-native:check` 当前会额外确认这些真实工程状态：
 
 ```text
 Android release 已切到 signingConfigs.release；真实 release keystore 值仍需通过本机 Gradle properties 或环境变量提供
-iOS Associated Domains / Universal Link 尚未配置
+iOS target 已通过 CODE_SIGN_ENTITLEMENTS 引用 MeiyeHuajingApp.entitlements，Associated Domains 已包含 applinks:api-cn.ipgongchang.xin
 ```
 
 仍需微信开放平台或正式发布资料确认：
@@ -664,4 +663,4 @@ corepack pnpm aliyun:postdeploy:smoke -- \
 
 ## 13. 当前结论
 
-本地桥接代码、APP API 路由、App production-cn API 配置和检查脚手架已经可以作为阿里云 production-cn 后端准备包继续推进；当前不能称为可发布，因为阿里云运行资源、api-cn DNS/HTTPS/OSS/SLS 确认、微信开放平台移动应用 AppID/AppSecret 和云侧环境变量导入尚未完成。
+本地桥接代码、APP API 路由、App production-cn API 配置、native release 配置和检查脚手架已经可以作为阿里云 production-cn 后端准备包继续推进；当前不能称为可发布，因为阿里云运行资源、api-cn DNS/HTTPS/OSS/SLS 确认、Apple Team ID/AASA、微信开放平台移动应用 AppID/AppSecret 和云侧环境变量导入尚未完成。

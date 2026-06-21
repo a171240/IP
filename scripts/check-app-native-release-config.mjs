@@ -13,6 +13,7 @@ const DEFAULT_APP_ROOT = resolve(WORKSPACE_ROOT, "meiye-huajing-app")
 const EXPECTED_APP_NAME = "美业话镜"
 const EXPECTED_ANDROID_PACKAGE_NAME = "com.ipgongchang.meiyehuajing"
 const EXPECTED_IOS_BUNDLE_ID = "com.ipgongchang.meiyehuajing"
+const EXPECTED_IOS_ASSOCIATED_DOMAIN = "applinks:api-cn.ipgongchang.xin"
 
 function parseArgs(argv) {
   const args = {
@@ -53,6 +54,19 @@ function firstMatch(source, pattern) {
 
 function allMatches(source, pattern) {
   return [...source.matchAll(pattern)].map((match) => match[1]?.trim()).filter(Boolean)
+}
+
+function stripPbxValue(value) {
+  return value.trim().replace(/^"(.+)"$/, "$1")
+}
+
+function resolveIosPath(iosRoot, pbxValue) {
+  const expanded = stripPbxValue(pbxValue)
+    .replaceAll("$(SRCROOT)", iosRoot)
+    .replaceAll("${SRCROOT}", iosRoot)
+    .replaceAll("$(PROJECT_DIR)", iosRoot)
+    .replaceAll("${PROJECT_DIR}", iosRoot)
+  return isAbsolute(expanded) ? expanded : resolve(iosRoot, expanded)
 }
 
 function findBlock(source, name) {
@@ -124,6 +138,7 @@ function checkAndroid(appRoot) {
 }
 
 function checkIos(appRoot) {
+  const iosRoot = resolve(appRoot, "ios")
   const projectPath = resolve(appRoot, "ios/MeiyeHuajingApp.xcodeproj/project.pbxproj")
   const infoPlistPath = resolve(appRoot, "ios/MeiyeHuajingApp/Info.plist")
   const project = readTextIfExists(projectPath)
@@ -134,16 +149,48 @@ function checkIos(appRoot) {
 
   const bundleIds = [...new Set(allMatches(project, /\bPRODUCT_BUNDLE_IDENTIFIER\s*=\s*([^;]+);/g))]
   const displayName = firstMatch(infoPlist, /<key>CFBundleDisplayName<\/key>\s*<string>([^<]+)<\/string>/)
+  const entitlementsRefs = [
+    ...new Set(allMatches(project, /\bCODE_SIGN_ENTITLEMENTS\s*=\s*([^;]+);/g).map(stripPbxValue)),
+  ]
+  const entitlementsFiles = entitlementsRefs.map((item) => {
+    const filePath = resolveIosPath(iosRoot, item)
+    return {
+      ref: item,
+      path: filePath,
+      exists: existsSync(filePath),
+      source: readTextIfExists(filePath),
+    }
+  })
+  const readableEntitlements = entitlementsFiles.filter((item) => item.source)
+  const entitlementsSource = readableEntitlements.map((item) => item.source).join("\n")
+  const associatedDomains = [
+    ...new Set([
+      ...allMatches(entitlementsSource, /<string>\s*(applinks:[^<]+?)\s*<\/string>/g),
+      ...allMatches(entitlementsSource, /\b(applinks:[A-Za-z0-9.-]+)\b/g),
+    ]),
+  ]
+  const hasAssociatedDomainsKey = /com\.apple\.developer\.associated-domains/.test(entitlementsSource)
+  const expectedAssociatedDomainPresent = associatedDomains.includes(EXPECTED_IOS_ASSOCIATED_DOMAIN)
   const associatedDomainsConfigured =
-    /com\.apple\.developer\.associated-domains/.test(project) ||
-    /com\.apple\.developer\.associated-domains/.test(infoPlist) ||
-    /applinks:/.test(project) ||
-    /applinks:/.test(infoPlist)
+    entitlementsRefs.length > 0 &&
+    entitlementsFiles.every((item) => item.exists) &&
+    hasAssociatedDomainsKey &&
+    expectedAssociatedDomainPresent
   const allBundleIdsExpected = bundleIds.length > 0 && bundleIds.every((item) => item === EXPECTED_IOS_BUNDLE_ID)
 
   if (!allBundleIdsExpected) blockers.push(`ios_bundle_id=${EXPECTED_IOS_BUNDLE_ID}`)
   if (displayName !== EXPECTED_APP_NAME) blockers.push(`ios_display_name=${EXPECTED_APP_NAME}`)
   if (!associatedDomainsConfigured) blockers.push("ios_associated_domains_missing")
+  if (project && entitlementsRefs.length === 0) blockers.push("ios_code_sign_entitlements_missing")
+  if (entitlementsRefs.length > 0 && entitlementsFiles.some((item) => !item.exists)) {
+    blockers.push("ios_entitlements_file_missing")
+  }
+  if (readableEntitlements.length > 0 && !hasAssociatedDomainsKey) {
+    blockers.push("ios_associated_domains_entitlement_missing")
+  }
+  if (readableEntitlements.length > 0 && !expectedAssociatedDomainPresent) {
+    blockers.push(`ios_associated_domain=${EXPECTED_IOS_ASSOCIATED_DOMAIN}`)
+  }
 
   return {
     ready: blockers.length === 0,
@@ -152,6 +199,11 @@ function checkIos(appRoot) {
     blockers: [...new Set(blockers)],
     bundleIds,
     displayName,
+    entitlementsRefs,
+    entitlementsPaths: entitlementsFiles.map((item) => item.path),
+    associatedDomains,
+    expectedAssociatedDomain: EXPECTED_IOS_ASSOCIATED_DOMAIN,
+    expectedAssociatedDomainPresent,
     associatedDomainsConfigured,
   }
 }
@@ -180,7 +232,7 @@ function main() {
     blockers: uniqueBlockers,
     nextActions: [
       "Android release 应使用 signingConfigs.release；正式打包前在 ~/.gradle/gradle.properties 或环境变量中提供 release keystore 路径、别名和密码，并把微信开放平台 Android 应用签名按 release 证书填写。",
-      "iOS 需要配置 Associated Domains / Universal Link，并确保微信开放平台的 iOS Universal Link 与 AASA 文件一致。",
+      "iOS 需要保持 Associated Domains / Universal Link、微信开放平台 iOS Universal Link 与 AASA 文件一致。",
       "确认微信开放平台移动应用审核通过后，再把 AppID/AppSecret 导入阿里云运行环境或 KMS/Secrets Manager。",
     ],
   }
