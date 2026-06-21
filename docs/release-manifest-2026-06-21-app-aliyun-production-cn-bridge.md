@@ -303,8 +303,6 @@ missing_required_env:PRIVACY_POLICY_URL
 missing_required_env:TERMS_URL
 wechat_open_platform_mobile_app_reviewing
 invalid_app_native_release_config
-app_native:android_release_uses_debug_signing
-app_native:android_release_signing_config_not_ready
 app_native:ios_associated_domains_missing
 ```
 
@@ -400,7 +398,7 @@ aliyun:app-api:smoke
 routes: 31 checked, 0 failures
 env source catalog: 61 variables, 61 source metadata ready, containsValues false
 app-client contract: 40 audited calls, 34 unique client routes, 26 matched backend routes, 4 deferred knowledge-space calls, 0 failures
-app-native release config: ok=false, blockers android_release_uses_debug_signing / android_release_signing_config_not_ready / ios_associated_domains_missing
+app-native release config: ok=false, blockers ios_associated_domains_missing
 app-api coverage: 29 / 29 business routes, 30 probes, 0 missing
 docker context: 7 files, 24 dockerignore patterns, sensitive env excluded
 image publish plan: template ready, local file not ready until ACR remote image and runtime pull evidence are filled
@@ -573,15 +571,14 @@ iOS Bundle ID：com.ipgongchang.meiyehuajing
 `corepack pnpm aliyun:app-native:check` 当前会额外确认这些真实工程状态：
 
 ```text
-Android release 当前仍使用 signingConfigs.debug
-Android release signingConfig 尚未切到正式 release keystore
+Android release 已切到 signingConfigs.release；真实 release keystore 值仍需通过本机 Gradle properties 或环境变量提供
 iOS Associated Domains / Universal Link 尚未配置
 ```
 
 仍需微信开放平台或正式发布资料确认：
 
 ```text
-Android 应用签名：正式 release 签名证书生成，不能用 debug keystore
+Android 应用签名：用正式 release keystore 生成，并把同一份 release 证书签名填入微信开放平台；密钥值不进入仓库
 iOS Universal Link：HTTPS 域名路径，需要和 iOS Associated Domains / AASA 文件一致
 WECHAT_OPEN_APP_ID：审核通过后读取
 WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KMS

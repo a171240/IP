@@ -629,7 +629,7 @@ rejected
 ```text
 移动应用名称：美业话镜
 Android applicationId / 包名：com.ipgongchang.meiyehuajing
-Android 应用签名：用正式 release 签名证书生成，不能用 debug keystore
+Android 应用签名：用正式 release keystore 生成，并把同一份 release 证书签名填入微信开放平台；密钥值不进入仓库
 iOS Bundle ID：com.ipgongchang.meiyehuajing
 iOS Universal Link：HTTPS 域名路径，建议走 api-cn.ipgongchang.xin 或另一个已备案 APP 域名
 ```
@@ -784,7 +784,7 @@ corepack pnpm aliyun:release:artifacts
 corepack pnpm aliyun:predeploy
 corepack pnpm aliyun:routes:check（31 routes / 0 failures）
 corepack pnpm aliyun:app-client:contract（40 audited calls / 34 unique client routes）
-corepack pnpm aliyun:app-native:check（当前 ok=false；Android release debug signing / iOS Associated Domains 缺失）
+corepack pnpm aliyun:app-native:check（当前 ok=false；iOS Associated Domains 缺失；Android release 已切到 signingConfigs.release，真实 keystore 值需由本机 Gradle properties 或环境变量提供）
 corepack pnpm aliyun:app-api:coverage（29 / 29 business routes covered）
 corepack pnpm aliyun:docker:check（7 files / 24 dockerignore patterns / sensitive env excluded）
 corepack pnpm aliyun:container:smoke（Docker health + 30 APP API probes / sanitized env deleted）

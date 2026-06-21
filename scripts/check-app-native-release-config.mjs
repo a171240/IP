@@ -71,6 +71,11 @@ function findBlock(source, name) {
   return ""
 }
 
+function findNestedBlock(source, outerName, innerName) {
+  const outer = findBlock(source, outerName)
+  return outer ? findBlock(outer, innerName) : ""
+}
+
 function checkAndroid(appRoot) {
   const buildGradlePath = resolve(appRoot, "android/app/build.gradle")
   const source = readTextIfExists(buildGradlePath)
@@ -90,7 +95,7 @@ function checkAndroid(appRoot) {
 
   const namespace = firstMatch(source, /\bnamespace\s+["']([^"']+)["']/)
   const applicationId = firstMatch(source, /\bapplicationId\s+["']([^"']+)["']/)
-  const releaseBlock = findBlock(source, "release")
+  const releaseBlock = findNestedBlock(source, "buildTypes", "release")
   const releaseSigningConfig = firstMatch(releaseBlock, /\bsigningConfig\s+signingConfigs\.([A-Za-z0-9_]+)/)
   const hasReleaseSigningConfig = /\brelease\s*\{/.test(findBlock(source, "signingConfigs"))
   const releaseUsesDebugSigning = releaseSigningConfig === "debug"
@@ -174,7 +179,7 @@ function main() {
     ios,
     blockers: uniqueBlockers,
     nextActions: [
-      "Android release 不能继续使用 debug.keystore；正式打包前生成 release keystore，并把微信开放平台 Android 应用签名按 release 证书填写。",
+      "Android release 应使用 signingConfigs.release；正式打包前在 ~/.gradle/gradle.properties 或环境变量中提供 release keystore 路径、别名和密码，并把微信开放平台 Android 应用签名按 release 证书填写。",
       "iOS 需要配置 Associated Domains / Universal Link，并确保微信开放平台的 iOS Universal Link 与 AASA 文件一致。",
       "确认微信开放平台移动应用审核通过后，再把 AppID/AppSecret 导入阿里云运行环境或 KMS/Secrets Manager。",
     ],
