@@ -41,6 +41,7 @@ docs/release-manifest-2026-06-21-app-aliyun-production-cn-bridge.md
 cd /Users/Admin/Documents/美业话镜APP/handoff/IP
 corepack pnpm aliyun:docker:check
 corepack pnpm aliyun:docker:build
+corepack pnpm aliyun:container:smoke
 ```
 
 镜像名：
@@ -50,6 +51,8 @@ meiye-huajing-app-api:production-cn
 ```
 
 `aliyun:docker:check` 不依赖 Docker daemon，会先检查 Dockerfile、pnpm lockfile、`.dockerignore`、健康检查入口和敏感 env 排除规则。真实镜像构建仍需要本机 Docker daemon 或阿里云镜像构建服务。
+
+`aliyun:container:smoke` 会用去引号后的临时 env 文件启动本地 Docker 镜像，验证 `/api/healthz`、`/api/app/health`、`/api/app/health?strict=1` 和 30 个 APP API 探针，然后自动停止容器并删除临时 env 文件。不要直接把带引号的 `.env.production-cn.local` 传给 Docker `--env-file`，Docker 不会像 Node dotenv 解析器一样自动去掉引号。
 
 ### 2.2 健康检查
 
@@ -93,6 +96,7 @@ corepack pnpm aliyun:health:smoke
 corepack pnpm aliyun:app-client:contract（40 audited calls / 34 unique client routes）
 corepack pnpm aliyun:app-api:coverage（29 / 29 business routes covered）
 corepack pnpm aliyun:app-api:smoke（30 business probes / 0 failures）
+corepack pnpm aliyun:container:smoke（Docker image health + 30 APP API probes）
 ```
 
 `aliyun:health:smoke` 会启动本地 production server，请求三个 health URL，并检查响应里没有敏感变量值。
@@ -626,6 +630,7 @@ corepack pnpm aliyun:app-api:smoke
 
 ```bash
 corepack pnpm aliyun:docker:build
+corepack pnpm aliyun:container:smoke
 ```
 
 部署后验证：
@@ -716,6 +721,7 @@ node --check scripts/check-aliyun-production-cn-readiness.mjs
 node --check scripts/prepare-aliyun-release-artifacts.mjs
 node --check scripts/generate-aliyun-operator-tasks.mjs
 node --check scripts/run-aliyun-predeploy.mjs
+node --check scripts/run-aliyun-container-smoke.mjs
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.example.json','utf8'))"
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.cloud-confirmations.example.json','utf8'))"
 corepack pnpm aliyun:readiness
@@ -728,6 +734,7 @@ corepack pnpm aliyun:routes:check（31 routes / 0 failures）
 corepack pnpm aliyun:app-client:contract（40 audited calls / 34 unique client routes）
 corepack pnpm aliyun:app-api:coverage（29 / 29 business routes covered）
 corepack pnpm aliyun:docker:check（7 files / 24 dockerignore patterns / sensitive env excluded）
+corepack pnpm aliyun:container:smoke（Docker health + 30 APP API probes / sanitized env deleted）
 node --check scripts/check-aliyun-domain-readiness.mjs
 corepack pnpm aliyun:domain:check（状态看板 exit 0；当前 ok=false）
 corepack pnpm aliyun:remote:smoke -- --base-url http://127.0.0.1:3022 --allow-missing appWechatLogin,legalLinks

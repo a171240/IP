@@ -98,6 +98,7 @@ const REQUIRED_BACKEND_FILES = [
   "scripts/prepare-aliyun-release-artifacts.mjs",
   "scripts/run-aliyun-postdeploy-smoke.mjs",
   "scripts/run-aliyun-predeploy.mjs",
+  "scripts/run-aliyun-container-smoke.mjs",
   "scripts/smoke-aliyun-health.mjs",
   "scripts/smoke-app-api-production-cn.mjs",
   "scripts/smoke-aliyun-remote.mjs",
@@ -123,6 +124,7 @@ const REQUIRED_BACKEND_SCRIPTS = [
   "aliyun:docker:check",
   "aliyun:predeploy",
   "aliyun:docker:build",
+  "aliyun:container:smoke",
   "aliyun:health:smoke",
   "aliyun:remote:smoke",
   "aliyun:app-api:smoke",
@@ -712,6 +714,7 @@ function main() {
       docker.ready
         ? "镜像本地构建能力已就绪；正式部署前将 meiye-huajing-app-api:production-cn 推送/导入阿里云镜像仓库或使用阿里云镜像构建服务"
         : "Docker daemon 就绪后执行 corepack pnpm aliyun:docker:build",
+      "推送/导入阿里云前执行 corepack pnpm aliyun:container:smoke，确认 Docker 镜像内 APP API 链路可用",
       "部署后执行 corepack pnpm aliyun:postdeploy:smoke -- --base-url https://api-cn.ipgongchang.xin",
     ],
   }

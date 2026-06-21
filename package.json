@@ -29,6 +29,7 @@
     "aliyun:docker:check": "node ./scripts/check-aliyun-docker-context.mjs",
     "aliyun:predeploy": "node ./scripts/run-aliyun-predeploy.mjs",
     "aliyun:docker:build": "docker build -t meiye-huajing-app-api:production-cn .",
+    "aliyun:container:smoke": "node ./scripts/run-aliyun-container-smoke.mjs",
     "dev": "next dev",
     "lint": "eslint .",
     "mp:build-npm": "node scripts/wechat-devtools-cli.mjs build-npm",
