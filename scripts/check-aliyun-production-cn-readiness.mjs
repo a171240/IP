@@ -68,6 +68,7 @@ const OPTIONAL_ENV_KEYS = [
   "CREDITS_IP_SALT",
   "ADMIN_EMAILS",
   "ADMIN_USER_IDS",
+  "WECHAT_OPEN_APP_REVIEW_STATUS",
   "APIMART_API_KEY",
   "APIMART_BASE_URL",
   "APIMART_MODEL",
@@ -126,7 +127,7 @@ const MANUAL_CONFIRMATIONS = [
   "阿里云 SAE 或 ECS 容器应用已创建，运行端口 3000",
   "api-cn 域名已备案、解析到阿里云入口并配置 HTTPS",
   "OSS Bucket CORS、RAM 最小权限和服务记录音频前缀已确认",
-  "微信开放平台移动应用已完成 AppID/AppSecret、Android 包名/签名、iOS Bundle ID/Universal Link 配置",
+  "微信开放平台移动应用审核已通过，并已取得 AppID/AppSecret、Android 包名/签名、iOS Bundle ID/Universal Link 配置",
   "生产环境变量已通过阿里云控制台、KMS 或 Secrets Manager 导入，未把密钥写进镜像",
   "SLS 日志、健康检查失败告警和 5xx 告警已配置",
 ]
@@ -296,6 +297,7 @@ function dockerStatus() {
 }
 
 function checkWechatOpenPlatform(env) {
+  const reviewStatus = normalizeWechatReviewStatus(env.get("WECHAT_OPEN_APP_REVIEW_STATUS"))
   const openAppIdStatus = envStatus(env.get("WECHAT_OPEN_APP_ID"))
   const openSecretStatus = envStatus(env.get("WECHAT_OPEN_APP_SECRET"))
   const miniAppId = env.get("WECHAT_MINI_APPID")
@@ -313,11 +315,26 @@ function checkWechatOpenPlatform(env) {
 
   return {
     ready: openAppIdStatus === "ready" && openSecretStatus === "ready" && !reusesMiniAppId && !reusesMiniSecret,
+    reviewStatus,
     openAppIdStatus,
     openSecretStatus,
     mobileAppRequired: true,
     miniProgramReuseDetected: reusesMiniAppId || reusesMiniSecret,
   }
+}
+
+function normalizeWechatReviewStatus(value) {
+  const status = String(value || "").trim().toLowerCase()
+  if (!status || status.startsWith("todo_")) return "unknown"
+  if (["not_started", "reviewing", "approved", "rejected"].includes(status)) return status
+  return "unknown"
+}
+
+function wechatOpenPlatformBlocker(wechatOpenPlatform) {
+  if (wechatOpenPlatform.ready) return ""
+  if (wechatOpenPlatform.reviewStatus === "reviewing") return "wechat_open_platform_mobile_app_reviewing"
+  if (wechatOpenPlatform.reviewStatus === "rejected") return "wechat_open_platform_mobile_app_rejected"
+  return "wechat_open_platform_mobile_app_not_ready"
 }
 
 function addBlocker(blocking, condition, code) {
@@ -374,7 +391,7 @@ function main() {
     assetBaseUrl !== "ready" && assetBaseUrl !== "optional_empty" && assetBaseUrl !== "optional_todo",
     `invalid_app_asset_base_url:${assetBaseUrl}`,
   )
-  addBlocker(machineBlocking, !wechatOpenPlatform.ready, "wechat_open_platform_mobile_app_not_ready")
+  addBlocker(machineBlocking, !wechatOpenPlatform.ready, wechatOpenPlatformBlocker(wechatOpenPlatform))
   addBlocker(machineBlocking, !backendFiles.ready, `missing_backend_files:${backendFiles.missing.join(",")}`)
   addBlocker(machineBlocking, !backendScripts.ready, `missing_backend_scripts:${backendScripts.missing.join(",")}`)
   addBlocker(machineBlocking, !appFiles.ready, `missing_app_config_files:${appFiles.missing.join(",")}`)
@@ -428,7 +445,9 @@ function main() {
     nextActions: [
       "创建或确认阿里云 SAE/ECS 容器应用、api-cn 域名和 HTTPS 证书",
       "把 APP_API_BASE_URL 和 NEXT_PUBLIC_SITE_URL 填为 api-cn HTTPS 正式地址",
-      "从微信开放平台移动应用补 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET",
+      wechatOpenPlatform.reviewStatus === "reviewing"
+        ? "等待微信开放平台移动应用审核通过后补 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET"
+        : "从微信开放平台移动应用补 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET",
       "Docker daemon 就绪后执行 corepack pnpm aliyun:docker:build",
       "部署后执行 corepack pnpm aliyun:remote:smoke -- --base-url https://api-cn.ipgongchang.xin",
       "部署后执行 corepack pnpm aliyun:app-api:smoke -- --base-url https://api-cn.ipgongchang.xin",

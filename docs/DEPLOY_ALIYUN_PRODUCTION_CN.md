@@ -304,6 +304,7 @@ APP 登录使用微信开放平台的移动应用，不使用小程序 AppID/Sec
 需要变量：
 
 ```text
+WECHAT_OPEN_APP_REVIEW_STATUS
 WECHAT_OPEN_APP_ID
 WECHAT_OPEN_APP_SECRET
 ```
@@ -317,6 +318,17 @@ WECHAT_OPEN_APP_SECRET
 -> 美业话镜 App
 -> AppID / AppSecret
 ```
+
+`WECHAT_OPEN_APP_REVIEW_STATUS` 不是密钥，只用于 readiness 报告当前状态。可选值：
+
+```text
+not_started
+reviewing
+approved
+rejected
+```
+
+当前用户已确认微信开放平台移动应用正在审核中。审核中仍不能发布，只能把 blocker 从 `wechat_open_platform_mobile_app_not_ready` 细分为 `wechat_open_platform_mobile_app_reviewing`。审核通过后再填 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`。
 
 微信开放平台移动应用需要准备：
 
@@ -451,7 +463,7 @@ APP_API_BASE_URL
 NEXT_PUBLIC_SITE_URL
 WECHAT_OPEN_APP_ID
 WECHAT_OPEN_APP_SECRET
-wechat_open_platform_mobile_app_not_ready
+wechat_open_platform_mobile_app_reviewing 或 wechat_open_platform_mobile_app_not_ready
 ```
 
 `APP_ASSET_BASE_URL` 当前仍是可选 TODO，不阻塞桥接版 API 部署；正式资产 CDN 切换时再补。

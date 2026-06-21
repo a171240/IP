@@ -61,6 +61,7 @@ function parseArgs(argv) {
   }
   for (let index = 2; index < argv.length; index += 1) {
     const arg = argv[index]
+    if (arg === "--") continue
     if (arg === "--env-file") {
       args.envFile = resolveValue(argv[++index], "--env-file")
       continue
