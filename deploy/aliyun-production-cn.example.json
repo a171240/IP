@@ -1,0 +1,47 @@
+{
+  "name": "meiye-huajing-app-api",
+  "environment": "production-cn",
+  "region": "cn-hangzhou",
+  "runtime": "custom-container",
+  "container": {
+    "image": "meiye-huajing-app-api:production-cn",
+    "port": 3000,
+    "healthPath": "/api/healthz",
+    "strictHealthPath": "/api/app/health?strict=1"
+  },
+  "domain": {
+    "apiHost": "api-cn.ipgongchang.xin",
+    "httpsRequired": true,
+    "dnsProvider": "aliyun",
+    "note": "Do not repoint ip.ipgongchang.xin until the APP production-cn backend passes remote smoke."
+  },
+  "environmentImport": {
+    "localEnvFile": "/Users/Admin/Documents/美业话镜APP/.env.production-cn.local",
+    "exampleEnvFile": "/Users/Admin/Documents/美业话镜APP/.env.production-cn.example",
+    "prepareCommand": "node scripts/prepare-aliyun-runtime-env.mjs --env-file /Users/Admin/Documents/美业话镜APP/.env.production-cn.local --write /tmp/meiye-sae-env.json",
+    "secretsPolicy": "Import through Aliyun console, KMS, or Secrets Manager. Do not bake secrets into the image."
+  },
+  "predeployChecks": [
+    "corepack pnpm aliyun:readiness",
+    "corepack pnpm aliyun:readiness:cloud-ready",
+    "corepack pnpm aliyun:release:artifacts",
+    "corepack pnpm aliyun:predeploy",
+    "corepack pnpm aliyun:docker:build"
+  ],
+  "postdeployChecks": [
+    "corepack pnpm aliyun:remote:smoke -- --base-url https://api-cn.ipgongchang.xin",
+    "corepack pnpm aliyun:app-api:smoke -- --base-url https://api-cn.ipgongchang.xin"
+  ],
+  "requiredExternalConfirmations": [
+    "SAE or ECS application created",
+    "api-cn DNS and HTTPS certificate configured",
+    "OSS CORS and RAM least-privilege policy confirmed",
+    "WeChat Open Platform mobile app credentials configured",
+    "SLS logging and alerts configured"
+  ],
+  "bridgeDataLayer": {
+    "current": "Supabase",
+    "target": "Aliyun RDS PostgreSQL",
+    "status": "RDS migration is not included in the first bridge deployment"
+  }
+}
