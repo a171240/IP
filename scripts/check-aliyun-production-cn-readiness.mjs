@@ -660,6 +660,8 @@ function main() {
   const missingRequired = required.filter((item) => item.status !== "ready").map((item) => item.key)
   const appApiBaseUrl = checkUrl("APP_API_BASE_URL", env.get("APP_API_BASE_URL"))
   const siteUrl = checkUrl("NEXT_PUBLIC_SITE_URL", env.get("NEXT_PUBLIC_SITE_URL"))
+  const privacyPolicyUrl = checkUrl("PRIVACY_POLICY_URL", env.get("PRIVACY_POLICY_URL"))
+  const termsUrl = checkUrl("TERMS_URL", env.get("TERMS_URL"))
   const assetBaseUrlStatus = envStatus(env.get("APP_ASSET_BASE_URL"))
   const assetBaseUrl = assetBaseUrlStatus === "ready"
     ? checkUrl("APP_ASSET_BASE_URL", env.get("APP_ASSET_BASE_URL"))
@@ -702,6 +704,16 @@ function main() {
     machineBlocking,
     assetBaseUrl !== "ready" && assetBaseUrl !== "optional_empty" && assetBaseUrl !== "optional_todo",
     `invalid_app_asset_base_url:${assetBaseUrl}`,
+  )
+  addBlocker(
+    machineBlocking,
+    !missingRequired.includes("PRIVACY_POLICY_URL") && privacyPolicyUrl !== "ready",
+    `invalid_privacy_policy_url:${privacyPolicyUrl}`,
+  )
+  addBlocker(
+    machineBlocking,
+    !missingRequired.includes("TERMS_URL") && termsUrl !== "ready",
+    `invalid_terms_url:${termsUrl}`,
   )
   addBlocker(machineBlocking, !wechatOpenPlatform.ready, wechatOpenPlatformBlocker(wechatOpenPlatform))
   addBlocker(machineBlocking, !backendFiles.ready, `missing_backend_files:${backendFiles.missing.join(",")}`)
@@ -766,6 +778,8 @@ function main() {
         appApiBaseUrl,
         nextPublicSiteUrl: siteUrl,
         appAssetBaseUrl: assetBaseUrl,
+        privacyPolicyUrl,
+        termsUrl,
       },
       wechatOpenPlatform,
       backend: {

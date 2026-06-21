@@ -40,6 +40,13 @@ const REQUIRED_RUNTIME_GROUPS = {
   volcSpeech: [["VOLC_SPEECH_APP_ID"], ["VOLC_SPEECH_ACCESS_TOKEN"]],
 }
 
+const LEGAL_LINK_KEYS = ["PRIVACY_POLICY_URL", "TERMS_URL"]
+const DISALLOWED_LEGAL_HOSTS = new Set([
+  "ip.ipgongchang.xin",
+  "ipnrgc.com",
+  "www.ipnrgc.com",
+])
+
 function parseArgs(argv) {
   const args = {
     envFile: DEFAULT_ENV_FILE,
@@ -106,17 +113,37 @@ function isReadyEnvValue(value) {
   return Boolean(text && text !== "\"\"" && text !== "''" && !text.startsWith("TODO_"))
 }
 
+function isReadyLegalUrl(value) {
+  if (!isReadyEnvValue(value)) return false
+  let parsed
+  try {
+    parsed = new URL(String(value).trim())
+  } catch {
+    return false
+  }
+  if (parsed.protocol !== "https:") return false
+  if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") return false
+  if (parsed.hostname.endsWith(".localhost")) return false
+  if (parsed.hostname.includes("example.")) return false
+  if (parsed.hostname.endsWith(".vercel.app")) return false
+  if (DISALLOWED_LEGAL_HOSTS.has(parsed.hostname)) return false
+  return true
+}
+
 function hasAnyEnv(env, names) {
   return names.some((name) => isReadyEnvValue(env.get(name)))
 }
 
-function groupReady(env, groups) {
+function groupReady(env, name, groups) {
+  if (name === "legalLinks") {
+    return LEGAL_LINK_KEYS.every((key) => isReadyLegalUrl(env.get(key)))
+  }
   return groups.every((group) => hasAnyEnv(env, group))
 }
 
 function expectedMissingGroups(env) {
   return Object.entries(REQUIRED_RUNTIME_GROUPS)
-    .filter(([, groups]) => !groupReady(env, groups))
+    .filter(([name, groups]) => !groupReady(env, name, groups))
     .map(([name]) => name)
 }
 

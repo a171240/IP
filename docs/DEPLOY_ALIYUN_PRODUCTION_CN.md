@@ -871,10 +871,10 @@ slsAlerts missing: confirmed, healthAlertConfigured, serverErrorAlertConfigured
 /tmp/meiye-huajing-aliyun-production-cn-*/meiye-huajing-app-api-production-cn-context.tar.gz
 ```
 
-2026-06-22 03:26 CST 最新不打包审计目录：
+2026-06-22 03:43 CST 最新不打包审计目录：
 
 ```text
-/tmp/meiye-huajing-aliyun-production-cn-2026-06-21T19-26-16-828Z
+/tmp/meiye-huajing-aliyun-production-cn-2026-06-21T19-43-58-275Z
 ```
 
 该目录包含不含密钥的 `release-audit.*`、`env-import-plan.json`、`vercel-env-coverage.json`、`image-publish-plan-check.json`、`domain-readiness.json`、`cloud-confirmations-check.json`、`operator-tasks.*`。当前摘要：
@@ -897,13 +897,13 @@ forbiddenEntryCount: 0
 bytes: 295585706
 ```
 
-2026-06-22 03:12 CST 更新：本机 Docker Desktop 已启动，`corepack pnpm aliyun:docker:build` 已成功构建镜像：
+2026-06-22 03:40 CST 更新：本机 Docker Desktop 已启动，`corepack pnpm aliyun:docker:build` 已成功构建镜像。该镜像包含 health/readiness 对国内 APP 正式协议 URL 的基础形态校验：
 
 ```text
 repoTag: meiye-huajing-app-api:production-cn
-imageDigest: sha256:087a6c99206fe32895b4bdbcaba9e12499a2b866fb1596cdf6f2df06f9da2d84
-imageId: sha256:087a6c99206fe32895b4bdbcaba9e12499a2b866fb1596cdf6f2df06f9da2d84
-imageSize: 726527744 bytes
+imageDigest: sha256:fa2832568f26cc3f997cb858c560aad9f2208964016f50608ff960df18a88e74
+imageId: sha256:fa2832568f26cc3f997cb858c560aad9f2208964016f50608ff960df18a88e74
+imageSize: 726480426 bytes
 architecture: linux/arm64
 ```
 
@@ -919,15 +919,15 @@ sanitizedEnvFileDeleted: true
 
 如果 `corepack pnpm aliyun:image:plan` 报 `localDockerImage=image_not_found_or_docker_unavailable`，说明当前 Docker daemon 里没有可推送的本地镜像缓存；正式推送前重新执行 `corepack pnpm aliyun:docker:build` 和 `corepack pnpm aliyun:container:smoke`。
 
-2026-06-22 03:27 CST 复核：`corepack pnpm aliyun:predeploy` 通过，且 `corepack pnpm aliyun:image:plan` 当前能识别本机镜像：
+2026-06-22 03:40 CST 复核：`corepack pnpm aliyun:image:plan` 当前能识别本机镜像：
 
 ```text
 localDockerImage.status: ready
-localDockerImage.id: sha256:087a6c99206fe32895b4bdbcaba9e12499a2b866fb1596cdf6f2df06f9da2d84
-localDockerImage.size: 726527744
+localDockerImage.id: sha256:fa2832568f26cc3f997cb858c560aad9f2208964016f50608ff960df18a88e74
+localDockerImage.size: 726480426
 ```
 
-本地曾重试 `corepack pnpm aliyun:docker:build`，在拉取 `node:24-bookworm-slim` metadata 时遇到 Docker Hub `EOF`，属于外部 registry 网络错误；未生成新镜像。当前可用镜像仍是上面的 `087a6c...`，并已重新通过 `corepack pnpm aliyun:container:smoke`。
+`deploy/aliyun-production-cn.image-publish.local.json` 作为 ignored 非密钥草稿已同步到该 local digest。ACR remote image / digest 仍未填写，不能视为阿里云镜像已发布。
 
 本地 production server 已用 `.env.production-cn.local` 做过 HTTP 验证：
 
@@ -954,4 +954,4 @@ scopes:
 结果：0 failures，入口均进入预期的 missing_code / auth_required / invite_not_found 分支。
 ```
 
-这说明当前 TODO 微信开放平台变量和协议 URL 不会被健康检查误判为 ready。
+`PRIVACY_POLICY_URL` / `TERMS_URL` 的 ready 判定现在不只是“有值”：还必须是 HTTPS，且不能是 localhost、example、`.vercel.app` 或旧 Vercel 入口域名。当前 TODO 微信开放平台变量和协议 URL 不会被健康检查误判为 ready。
