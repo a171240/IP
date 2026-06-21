@@ -123,11 +123,14 @@ scripts/run-aliyun-predeploy.mjs
 
 ```text
 deploy/aliyun-production-cn.example.json
+deploy/aliyun-production-cn.image-publish.example.json
 docs/DEPLOY_ALIYUN_PRODUCTION_CN.md
 docs/release-manifest-2026-06-21-app-aliyun-production-cn-bridge.md
 package.json
 scripts/check-aliyun-production-cn-readiness.mjs
 scripts/check-aliyun-deployment-spec.mjs
+scripts/check-aliyun-image-publish-plan.mjs
+scripts/generate-aliyun-operator-tasks.mjs
 scripts/check-app-client-api-contract.mjs
 scripts/check-app-native-release-config.mjs
 scripts/prepare-aliyun-release-artifacts.mjs
@@ -169,6 +172,7 @@ App 根目录当前仍是未初始化提交状态，以下内容不属于本后�
 ```text
 /Users/Admin/Documents/美业话镜APP/.env.production-cn.local
 /Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.cloud-confirmations.local.json
+/Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.image-publish.local.json
 ```
 
 小程序仓库当前排除项：
@@ -282,9 +286,10 @@ wechatOpenPlatform.reviewStatus: reviewing
 appProductionConfig.files: ready, 6 checked
 appProductionConfig.scripts: ready, 5 checked
 appProductionConfig.envTemplate: ready, 5 canonical keys checked, 0 forbidden backend/secret keys
-backend.files: ready, 23 checked
-backend.scripts: ready, 27 checked
-docker: ready, image meiye-huajing-app-api:production-cn, digest sha256:905bdd0db460e4eadb5edbd9c7ed76781a651b058381059e29a4ec607d1780f3, size 3.02GB
+backend.files: ready, 26 checked
+backend.scripts: ready, 31 checked
+docker: ready
+imagePublishPlan: template ready, local missing, localDockerImage image_not_found_or_docker_unavailable
 appClientContract: 40 audited calls / 34 unique client routes, 4 deferred knowledge-space calls
 appApiSmokeCoverage: 29 / 29 business routes
 ```
@@ -297,12 +302,17 @@ missing_required_env:WECHAT_OPEN_APP_SECRET
 missing_required_env:PRIVACY_POLICY_URL
 missing_required_env:TERMS_URL
 wechat_open_platform_mobile_app_reviewing
+invalid_app_native_release_config
+app_native:android_release_uses_debug_signing
+app_native:android_release_signing_config_not_ready
+app_native:ios_associated_domains_missing
 ```
 
 人工确认阻塞：
 
 ```text
 阿里云 SAE 或 ECS 容器应用已创建，运行端口 3000
+阿里云 ACR 镜像发布和运行时镜像拉取配置已确认
 api-cn 域名已备案、解析到阿里云入口并配置 HTTPS
 OSS Bucket CORS、RAM 最小权限和服务记录音频前缀已确认
 微信开放平台移动应用审核已通过，并已取得 AppID/AppSecret、Android 包名/签名、iOS Bundle ID/Universal Link 配置
@@ -334,11 +344,13 @@ git diff --cached --check
 staged secret-value scan
 node scripts/prepare-aliyun-runtime-env.mjs --env-file /Users/Admin/Documents/美业话镜APP/.env.production-cn.example --allow-todo
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.cloud-confirmations.example.json','utf8'))"
+node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.image-publish.example.json','utf8'))"
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.cloud-confirmations.local.json','utf8'))"
 node --check scripts/run-aliyun-postdeploy-smoke.mjs
 node --check scripts/run-aliyun-container-smoke.mjs
 node --check scripts/check-aliyun-cloud-confirmations.mjs
 node --check scripts/check-aliyun-deployment-spec.mjs
+node --check scripts/check-aliyun-image-publish-plan.mjs
 node --check scripts/check-aliyun-domain-readiness.mjs
 node --check scripts/generate-aliyun-operator-tasks.mjs
 node scripts/generate-app-runtime-config.mjs --env-file ../.env.production-cn.local --out /tmp/meiye-build-config.generated.ts --require-production-ready --check
@@ -347,6 +359,7 @@ corepack pnpm aliyun:env:sources
 corepack pnpm aliyun:vercel-env:coverage
 corepack pnpm aliyun:domain:check
 corepack pnpm aliyun:deploy:spec
+corepack pnpm aliyun:image:plan
 corepack pnpm aliyun:operator:tasks
 corepack pnpm aliyun:cloud:confirmations
 corepack pnpm aliyun:cloud:confirmations:strict（exit 1 as expected while cloud resources are incomplete）
@@ -365,6 +378,8 @@ corepack pnpm aliyun:predeploy
 aliyun:env:check
 aliyun:env:plan
 aliyun:env:sources
+aliyun:deploy:spec
+aliyun:image:plan
 aliyun:cloud:check
 aliyun:readiness
 aliyun:routes:check
@@ -388,7 +403,8 @@ app-client contract: 40 audited calls, 34 unique client routes, 26 matched backe
 app-native release config: ok=false, blockers android_release_uses_debug_signing / android_release_signing_config_not_ready / ios_associated_domains_missing
 app-api coverage: 29 / 29 business routes, 30 probes, 0 missing
 docker context: 7 files, 24 dockerignore patterns, sensitive env excluded
-deployment spec: image meiye-huajing-app-api:production-cn, port 3000, apiHost api-cn.ipgongchang.xin, predeploy 15, postdeploy 5, 0 blockers
+image publish plan: template ready, local file not ready until ACR remote image and runtime pull evidence are filled
+deployment spec: image meiye-huajing-app-api:production-cn, port 3000, apiHost api-cn.ipgongchang.xin, predeploy 16, postdeploy 5, 0 blockers
 release preflight: 4 / 4 pass
 build: compiled successfully; existing lint warnings only
 health smoke: sensitiveLeakCount 0
@@ -449,6 +465,7 @@ release-audit.json
 release-audit.md
 env-import-plan.json
 vercel-env-coverage.json
+image-publish-plan-check.json
 meiye-huajing-app-api-production-cn-context.tar.gz
 ```
 
@@ -463,7 +480,7 @@ size: 3.02GB
 readiness.docker.status: ready
 ```
 
-正式部署仍未执行；下一步需要推送/导入到阿里云镜像仓库，或使用阿里云镜像构建服务。
+正式部署仍未执行；下一步需要推送/导入到阿里云 ACR，或使用阿里云镜像构建服务，并把 remote image / digest / 运行时拉取证据写入 `deploy/aliyun-production-cn.image-publish.local.json`。
 
 ## 10. 发布前必须补齐
 
@@ -471,6 +488,7 @@ readiness.docker.status: ready
 
 ```text
 SAE 或 ECS 容器应用
+ACR 镜像仓库、remote image、digest 和 SAE/ECS 镜像拉取配置
 api-cn 域名解析
 HTTPS 证书
 OSS Bucket CORS
@@ -550,6 +568,7 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 cd /Users/Admin/Documents/美业话镜APP/handoff/IP
 corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:cloud:confirmations:strict
+corepack pnpm aliyun:image:plan:strict
 corepack pnpm aliyun:domain:strict
 corepack pnpm aliyun:readiness:cloud-ready
 corepack pnpm aliyun:release:artifacts

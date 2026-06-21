@@ -12,6 +12,7 @@ const WORKSPACE_ROOT = resolve(BACKEND_ROOT, "../..")
 const APP_ROOT = resolve(WORKSPACE_ROOT, "meiye-huajing-app")
 const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
+const DEFAULT_IMAGE_PUBLISH_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.image-publish.local.json")
 const EXPECTED_WECHAT_MOBILE_APP_NAME = "美业话镜"
 const EXPECTED_ANDROID_PACKAGE_NAME = "com.ipgongchang.meiyehuajing"
 const EXPECTED_IOS_BUNDLE_ID = "com.ipgongchang.meiyehuajing"
@@ -88,10 +89,12 @@ const REQUIRED_BACKEND_FILES = [
   ".dockerignore",
   "package.json",
   "pnpm-lock.yaml",
+  "deploy/aliyun-production-cn.image-publish.example.json",
   "app/api/app/health/route.ts",
   "app/api/healthz/route.ts",
   "scripts/check-vercel-env-coverage.mjs",
   "scripts/check-aliyun-deployment-spec.mjs",
+  "scripts/check-aliyun-image-publish-plan.mjs",
   "scripts/check-aliyun-cloud-confirmations.mjs",
   "scripts/check-aliyun-domain-readiness.mjs",
   "scripts/generate-aliyun-operator-tasks.mjs",
@@ -116,6 +119,8 @@ const REQUIRED_BACKEND_SCRIPTS = [
   "aliyun:env:sources",
   "aliyun:vercel-env:coverage",
   "aliyun:deploy:spec",
+  "aliyun:image:plan",
+  "aliyun:image:plan:strict",
   "aliyun:domain:check",
   "aliyun:domain:strict",
   "aliyun:operator:tasks",
@@ -668,6 +673,11 @@ function main() {
   const appScripts = scriptStatus(resolve(APP_ROOT, "package.json"), REQUIRED_APP_SCRIPTS)
   const appProductionCnEnvTemplate = envTemplateStatus(resolve(APP_ROOT, ".env.production-cn.example"))
   const appNativeReleaseConfig = runJsonScript("scripts/check-app-native-release-config.mjs", ["--allow-blocking"])
+  const imagePublishPlan = runJsonScript("scripts/check-aliyun-image-publish-plan.mjs", [
+    "--local",
+    DEFAULT_IMAGE_PUBLISH_FILE,
+    "--allow-incomplete",
+  ])
   const docker = dockerStatus()
   const cloudConfirmations = checkCloudConfirmations(args)
 
@@ -716,14 +726,18 @@ function main() {
 
   if (envFileExists && envMode !== "600") warnings.push(`env_file_mode_should_be_600:current_${envMode}`)
   if (!docker.ready) warnings.push(docker.status)
+  if (imagePublishPlan.ready !== true) warnings.push("manual_image_publish_plan_required")
   if (args.assumeCloudReady) warnings.push("manual_cloud_confirmations_assumed")
   if (!cloudConfirmations.ready) warnings.push("manual_cloud_confirmations_required")
 
-  const manualBlocking = cloudConfirmations.ready
-    ? []
-    : cloudConfirmations.items
+  const manualBlocking = [
+    ...(imagePublishPlan.ready === true ? [] : ["阿里云 ACR 镜像发布和运行时镜像拉取配置已确认"]),
+    ...(cloudConfirmations.ready
+      ? []
+      : cloudConfirmations.items
       .filter((item) => !item.ready)
-      .map((item) => item.label)
+      .map((item) => item.label)),
+  ]
   const localCodeReady = machineBlocking.length === 0
   const productionReady = localCodeReady && manualBlocking.length === 0
 
@@ -765,6 +779,7 @@ function main() {
         nativeRelease: appNativeReleaseConfig,
       },
       docker,
+      imagePublishPlan,
       cloudConfirmations,
     },
     nextActions: [
@@ -775,8 +790,9 @@ function main() {
         : "从微信开放平台移动应用补 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET",
       "复制 deploy/aliyun-production-cn.cloud-confirmations.example.json 到 .local.json，并逐项填写非密钥云资源确认",
       docker.ready
-        ? "镜像本地构建能力已就绪；正式部署前将 meiye-huajing-app-api:production-cn 推送/导入阿里云镜像仓库或使用阿里云镜像构建服务"
+        ? "镜像本地构建能力已就绪；正式部署前复制 image-publish example 到 .local.json，推送/导入阿里云 ACR 并配置 SAE/ECS 拉取远端镜像"
         : "Docker daemon 就绪后执行 corepack pnpm aliyun:docker:build",
+      "ACR 镜像推送和运行时拉取配置完成后执行 corepack pnpm aliyun:image:plan:strict",
       "推送/导入阿里云前执行 corepack pnpm aliyun:container:smoke，确认 Docker 镜像内 APP API 链路可用",
       "部署后执行 corepack pnpm aliyun:postdeploy:smoke -- --base-url https://api-cn.ipgongchang.xin",
     ],

@@ -11,6 +11,7 @@ const DEFAULT_SPEC_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.exa
 
 const REQUIRED_PREDEPLOY_CHECKS = [
   "corepack pnpm aliyun:deploy:spec",
+  "corepack pnpm aliyun:image:plan",
   "corepack pnpm aliyun:operator:tasks",
   "corepack pnpm aliyun:cloud:confirmations",
   "corepack pnpm aliyun:readiness",
@@ -120,6 +121,27 @@ function validateSpec(spec) {
   if (container.healthPath !== "/api/healthz") blockers.push("container.healthPath")
   if (container.strictHealthPath !== "/api/app/health?strict=1") blockers.push("container.strictHealthPath")
 
+  const imagePublish = spec.imagePublish || {}
+  if (imagePublish.exampleFile !== "deploy/aliyun-production-cn.image-publish.example.json") {
+    blockers.push("imagePublish.exampleFile")
+  }
+  if (imagePublish.localFile !== "deploy/aliyun-production-cn.image-publish.local.json") {
+    blockers.push("imagePublish.localFile")
+  }
+  if (imagePublish.checkCommand !== "corepack pnpm aliyun:image:plan") {
+    blockers.push("imagePublish.checkCommand")
+  }
+  if (imagePublish.strictCheckCommand !== "corepack pnpm aliyun:image:plan:strict") {
+    blockers.push("imagePublish.strictCheckCommand")
+  }
+  if (imagePublish.provider !== "Aliyun ACR") blockers.push("imagePublish.provider")
+  if (imagePublish.registryRegion !== "cn-hangzhou") blockers.push("imagePublish.registryRegion")
+  if (imagePublish.remoteRepository !== "meiye-huajing-app-api") blockers.push("imagePublish.remoteRepository")
+  if (imagePublish.remoteTag !== "production-cn") blockers.push("imagePublish.remoteTag")
+  if (!String(imagePublish.secretsPolicy || "").includes("Do not store ACR username")) {
+    blockers.push("imagePublish.secretsPolicy")
+  }
+
   const domain = spec.domain || {}
   if (domain.apiHost !== "api-cn.ipgongchang.xin") blockers.push("domain.apiHost")
   if (domain.assetHost !== "assets-cn.ipgongchang.xin") blockers.push("domain.assetHost")
@@ -169,7 +191,7 @@ function validateSpec(spec) {
   }
 
   const externalConfirmations = requireArray(spec.requiredExternalConfirmations)
-  const requiredConfirmationKeywords = ["SAE", "DNS", "OSS", "WeChat", "SLS"]
+  const requiredConfirmationKeywords = ["SAE", "ACR", "DNS", "OSS", "WeChat", "SLS"]
   for (const keyword of requiredConfirmationKeywords) {
     if (!externalConfirmations.some((item) => String(item).includes(keyword))) {
       blockers.push(`requiredExternalConfirmations:${keyword}`)
@@ -207,6 +229,13 @@ function main() {
     containsValues: false,
     environment: spec.environment || "",
     image: spec.container?.image || "",
+    imagePublish: {
+      provider: spec.imagePublish?.provider || "",
+      registryRegion: spec.imagePublish?.registryRegion || "",
+      remoteRepository: spec.imagePublish?.remoteRepository || "",
+      remoteTag: spec.imagePublish?.remoteTag || "",
+      checkCommand: spec.imagePublish?.checkCommand || "",
+    },
     port: spec.container?.port || null,
     apiHost: spec.domain?.apiHost || "",
     assetHost: spec.domain?.assetHost || "",
@@ -217,6 +246,7 @@ function main() {
     warnings: validation.warnings,
     nextActions: [
       "保持 deploy/aliyun-production-cn.example.json 只包含部署规格和命令，不包含密钥值。",
+      "选择阿里云 ACR 后复制 image-publish example 到 .local.json，只填写非密钥镜像和运行时证据。",
       "云资源确认完成后先跑 corepack pnpm aliyun:cloud:confirmations:strict。",
       "正式部署前后按 predeployChecks / postdeployChecks 顺序执行。",
     ],

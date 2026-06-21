@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "environment": "production-cn",
+  "updatedAt": "TODO_YYYY-MM-DDTHH:mm:ss+08:00",
+  "operator": "TODO_OPERATOR",
+  "notes": "Copy this file to aliyun-production-cn.image-publish.local.json. Keep it non-secret and do not commit the local copy.",
+  "image": {
+    "localTag": "meiye-huajing-app-api:production-cn",
+    "localDigest": "TODO_LOCAL_IMAGE_DIGEST_SHA256",
+    "dockerBuildCommand": "corepack pnpm aliyun:docker:build",
+    "containerSmokeCommand": "corepack pnpm aliyun:container:smoke"
+  },
+  "acr": {
+    "confirmed": false,
+    "provider": "Aliyun ACR",
+    "region": "cn-hangzhou",
+    "registryHost": "TODO_ACR_REGISTRY_HOST",
+    "namespace": "TODO_ACR_NAMESPACE",
+    "repository": "meiye-huajing-app-api",
+    "remoteTag": "production-cn",
+    "remoteImage": "TODO_ACR_REGISTRY_HOST/TODO_ACR_NAMESPACE/meiye-huajing-app-api:production-cn",
+    "remoteDigest": "TODO_ACR_IMAGE_DIGEST_SHA256",
+    "imagePushed": false,
+    "digestVerified": false,
+    "evidence": "TODO_ACR_IMAGE_EVIDENCE"
+  },
+  "runtime": {
+    "confirmed": false,
+    "target": "TODO_SAE_OR_ECS",
+    "appName": "TODO_ALIYUN_APP_NAME",
+    "remoteImageConfigured": false,
+    "imagePullConfigured": false,
+    "imagePullCredentialMode": "TODO_NOT_REQUIRED_OR_CONFIGURED_OUTSIDE_THIS_FILE",
+    "evidence": "TODO_RUNTIME_IMAGE_PULL_EVIDENCE"
+  },
+  "commands": {
+    "tag": "docker tag meiye-huajing-app-api:production-cn TODO_ACR_REGISTRY_HOST/TODO_ACR_NAMESPACE/meiye-huajing-app-api:production-cn",
+    "push": "docker push TODO_ACR_REGISTRY_HOST/TODO_ACR_NAMESPACE/meiye-huajing-app-api:production-cn",
+    "inspect": "docker image inspect TODO_ACR_REGISTRY_HOST/TODO_ACR_NAMESPACE/meiye-huajing-app-api:production-cn"
+  },
+  "security": {
+    "containsRegistryCredentials": false,
+    "secretPolicy": "Do not store ACR username, password, access token, RAM secret, or image pull secret in this file. Use docker login, credential helper, RAM, or Aliyun runtime secret settings outside git."
+  }
+}

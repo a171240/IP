@@ -189,6 +189,7 @@ function renderMarkdown(audit) {
   const vercelEnvCoverage = audit.checks.vercelEnvCoverage
   const domain = audit.checks.domain
   const deploymentSpec = audit.checks.deploymentSpec
+  const imagePublishPlan = audit.checks.imagePublishPlan
   const operatorTasks = audit.checks.operatorTasks
   const cloudConfirmationsCheck = audit.checks.cloudConfirmationsCheck
   const cloudConfirmations = readiness.checks?.cloudConfirmations
@@ -211,6 +212,7 @@ function renderMarkdown(audit) {
     `- appApiSmokeCoverage: ${appApiSmokeCoverage.coveredBusinessRoutes} / ${appApiSmokeCoverage.businessRoutes} business routes`,
     `- dockerContext: ${docker.ok ? "ok" : "not ok"}`,
     `- deploymentSpec: ${deploymentSpec.ok ? "ok" : "not ready"}`,
+    `- imagePublishPlan: ${imagePublishPlan.ready === true ? "ready" : "not ready"}`,
     `- domainReadiness: ${domain.ok ? "ok" : "not ready"} (${domain.targetReady} / ${domain.targetTotal})`,
     `- appNativeRelease: ${appNativeRelease?.ok === true ? "ready" : "not ready"}`,
     `- operatorTasks: ${operatorTasks.summary.ready} / ${operatorTasks.summary.total} ready`,
@@ -301,6 +303,19 @@ function renderMarkdown(audit) {
     `- postdeployChecks: ${deploymentSpec.postdeployChecks}`,
     ...(deploymentSpec.blockers?.length
       ? deploymentSpec.blockers.map((item) => `- ${item}`)
+      : ["- blockers: none"]),
+    "",
+    "## 阿里云 ACR 镜像发布计划",
+    "",
+    `- ready: ${imagePublishPlan.ready === true}`,
+    `- templateReady: ${imagePublishPlan.summary?.templateReady === true}`,
+    `- localExists: ${imagePublishPlan.summary?.localExists === true}`,
+    `- localReady: ${imagePublishPlan.summary?.localReady === true}`,
+    `- totalBlockers: ${imagePublishPlan.summary?.totalBlockers ?? 0}`,
+    `- localDockerImage: ${imagePublishPlan.localDockerImage?.status || "unknown"}`,
+    `- remoteImage: ${imagePublishPlan.local?.acr?.remoteImage || imagePublishPlan.template?.acr?.remoteImage || "unknown"}`,
+    ...(imagePublishPlan.local?.blockers?.length
+      ? imagePublishPlan.local.blockers.map((item) => `- ${item}`)
       : ["- blockers: none"]),
     "",
     "## 操作员任务清单",
@@ -416,6 +431,7 @@ function renderMarkdown(audit) {
     "",
     "```bash",
     "corepack pnpm aliyun:cloud:check",
+    "corepack pnpm aliyun:image:plan:strict",
     "corepack pnpm aliyun:domain:strict",
     "corepack pnpm aliyun:readiness:cloud-ready",
     "corepack pnpm aliyun:docker:build",
@@ -452,6 +468,10 @@ function main() {
     "--allow-blocking",
   ])
   const deploymentSpec = runJson("deployment_spec", ["scripts/check-aliyun-deployment-spec.mjs"])
+  const imagePublishPlan = runJson("image_publish_plan", [
+    "scripts/check-aliyun-image-publish-plan.mjs",
+    "--allow-incomplete",
+  ])
   const operatorTasksJsonPath = resolve(args.outDir, "operator-tasks.json")
   const operatorTasksMarkdownPath = resolve(args.outDir, "operator-tasks.md")
   const cloudConfirmationsCheckPath = resolve(args.outDir, "cloud-confirmations-check.json")
@@ -492,6 +512,7 @@ function main() {
       readiness,
       domain,
       deploymentSpec,
+      imagePublishPlan,
       operatorTasks,
       cloudConfirmationsCheck,
       routes,
@@ -508,6 +529,7 @@ function main() {
       vercelEnvCoverage: vercelEnvCoverage.ok ? resolve(args.outDir, "vercel-env-coverage.json") : null,
       domainReadiness: resolve(args.outDir, "domain-readiness.json"),
       cloudConfirmationsCheck: cloudConfirmationsCheckPath,
+      imagePublishPlan: resolve(args.outDir, "image-publish-plan-check.json"),
       operatorTasksJson: operatorTasksJsonPath,
       operatorTasksMarkdown: operatorTasksMarkdownPath,
       bundle: bundle?.path || null,
@@ -518,6 +540,7 @@ function main() {
   writeText(audit.outputFiles.auditMarkdown, renderMarkdown(audit))
   writeText(audit.outputFiles.domainReadiness, JSON.stringify(domain, null, 2))
   writeText(audit.outputFiles.cloudConfirmationsCheck, JSON.stringify(cloudConfirmationsCheck, null, 2))
+  writeText(audit.outputFiles.imagePublishPlan, JSON.stringify(imagePublishPlan, null, 2))
 
   console.log(JSON.stringify({
     ok: true,
@@ -534,6 +557,15 @@ function main() {
       apiHost: deploymentSpec.apiHost,
       predeployChecks: deploymentSpec.predeployChecks,
       postdeployChecks: deploymentSpec.postdeployChecks,
+    },
+    imagePublishPlan: {
+      report: audit.outputFiles.imagePublishPlan,
+      ready: imagePublishPlan.ready === true,
+      templateReady: imagePublishPlan.summary?.templateReady === true,
+      localExists: imagePublishPlan.summary?.localExists === true,
+      localReady: imagePublishPlan.summary?.localReady === true,
+      totalBlockers: imagePublishPlan.summary?.totalBlockers ?? 0,
+      localDockerImage: imagePublishPlan.localDockerImage?.status || "unknown",
     },
     cloudConfirmationsCheck: {
       report: audit.outputFiles.cloudConfirmationsCheck,

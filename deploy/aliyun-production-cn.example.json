@@ -9,6 +9,17 @@
     "healthPath": "/api/healthz",
     "strictHealthPath": "/api/app/health?strict=1"
   },
+  "imagePublish": {
+    "exampleFile": "deploy/aliyun-production-cn.image-publish.example.json",
+    "localFile": "deploy/aliyun-production-cn.image-publish.local.json",
+    "checkCommand": "corepack pnpm aliyun:image:plan",
+    "strictCheckCommand": "corepack pnpm aliyun:image:plan:strict",
+    "provider": "Aliyun ACR",
+    "registryRegion": "cn-hangzhou",
+    "remoteRepository": "meiye-huajing-app-api",
+    "remoteTag": "production-cn",
+    "secretsPolicy": "Do not store ACR username, password, access token, RAM secret, or image pull secret in git. Keep credentials in docker credential helper, RAM, KMS, Secrets Manager, or Aliyun runtime settings."
+  },
   "domain": {
     "apiHost": "api-cn.ipgongchang.xin",
     "assetHost": "assets-cn.ipgongchang.xin",
@@ -34,6 +45,7 @@
   },
   "predeployChecks": [
     "corepack pnpm aliyun:deploy:spec",
+    "corepack pnpm aliyun:image:plan",
     "corepack pnpm aliyun:operator:tasks",
     "corepack pnpm aliyun:cloud:confirmations",
     "corepack pnpm aliyun:readiness",
@@ -58,6 +70,7 @@
   ],
   "requiredExternalConfirmations": [
     "SAE or ECS application created",
+    "Aliyun ACR image pushed and runtime image pull configured",
     "api-cn/assets-cn DNS and HTTPS certificates configured",
     "OSS CORS and RAM least-privilege policy confirmed",
     "WeChat Open Platform mobile app credentials configured",

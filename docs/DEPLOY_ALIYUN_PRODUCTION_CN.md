@@ -54,6 +54,29 @@ meiye-huajing-app-api:production-cn
 
 `aliyun:container:smoke` 会用去引号后的临时 env 文件启动本地 Docker 镜像，验证 `/api/healthz`、`/api/app/health`、`/api/app/health?strict=1` 和 30 个 APP API 探针，然后自动停止容器并删除临时 env 文件。不要直接把带引号的 `.env.production-cn.local` 传给 Docker `--env-file`，Docker 不会像 Node dotenv 解析器一样自动去掉引号。
 
+### 2.1a 阿里云 ACR 镜像发布计划
+
+```bash
+corepack pnpm aliyun:image:plan
+```
+
+`aliyun:image:plan` 校验非密钥镜像发布计划：
+
+```text
+deploy/aliyun-production-cn.image-publish.example.json
+deploy/aliyun-production-cn.image-publish.local.json
+```
+
+example 模板只放 ACR registry host、namespace、repository、tag、remote image、digest 状态、运行时拉取状态和证据字段。正式推送前复制到 `.local.json`，只填写资源名、布尔状态、digest 和证据编号，不写 ACR 密码、RAM Secret、token 或 image pull secret。
+
+严格发布前必须通过：
+
+```bash
+corepack pnpm aliyun:image:plan:strict
+```
+
+这一步确认镜像已经推送/导入阿里云 ACR，并且 SAE/ECS 运行时已经配置为拉取该 remote image。它不执行 `docker login`、不推送镜像、不创建 ACR 仓库。
+
 ### 2.2 健康检查
 
 ```text
@@ -169,15 +192,17 @@ corepack pnpm aliyun:domain:strict
 
 ```bash
 corepack pnpm aliyun:deploy:spec
+corepack pnpm aliyun:image:plan
 corepack pnpm aliyun:operator:tasks
 ```
 
-这两条命令不输出任何密钥值，也不会创建资源或导入变量。`aliyun:deploy:spec` 校验 `deploy/aliyun-production-cn.example.json` 的镜像、端口、域名、健康检查和前后置门禁顺序；`aliyun:operator:tasks` 会把当前 `readiness`、`domain`、`.env.production-cn.local` 变量状态和 `cloud-confirmations.local.json` 汇总为 8 个任务：
+这些命令不输出任何密钥值，也不会创建资源、导入变量或推送镜像。`aliyun:deploy:spec` 校验 `deploy/aliyun-production-cn.example.json` 的镜像、端口、ACR 发布计划、域名、健康检查和前后置门禁顺序；`aliyun:operator:tasks` 会把当前 `readiness`、`domain`、`.env.production-cn.local`、`image-publish.local.json` 和 `cloud-confirmations.local.json` 汇总为 9 个任务：
 
 ```text
 T01 微信开放平台移动应用审核和 APP 登录凭证
 T02 国内 APP 隐私政策和用户协议正式 URL
 T03 阿里云 SAE/ECS 后端运行容器
+T03B 发布后端 Docker 镜像到阿里云 ACR 并配置运行时拉取
 T04 api-cn/assets-cn DNS、HTTPS 和 ICP 证据
 T05 服务记录音频 OSS、CORS 和 RAM 最小权限
 T06 production-cn 运行环境变量导入
@@ -209,7 +234,8 @@ corepack pnpm aliyun:readiness
 5. 后端阿里云部署脚本、Dockerfile、health、APP client API contract、APP API smoke 是否齐全。
 6. App production-cn 构建配置生成门禁是否齐全。
 7. Docker daemon 是否可用于本地镜像构建。
-8. 还需要人工确认的阿里云 SAE / DNS / HTTPS / OSS / SLS 等资源，且可以读取非密钥 JSON 确认证据。
+8. ACR 镜像发布计划和 SAE/ECS 运行时镜像拉取配置是否有非密钥证据。
+9. 还需要人工确认的阿里云 SAE / DNS / HTTPS / OSS / SLS 等资源，且可以读取非密钥 JSON 确认证据。
 ```
 
 严格模式用于真正发布前：
@@ -249,6 +275,7 @@ corepack pnpm aliyun:cloud:confirmations:strict
 
 ```text
 /Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.example.json
+/Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.image-publish.example.json
 /Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.cloud-confirmations.example.json
 ```
 
@@ -627,6 +654,7 @@ corepack pnpm aliyun:env:check
 corepack pnpm aliyun:env:plan
 corepack pnpm aliyun:env:sources
 corepack pnpm aliyun:deploy:spec
+corepack pnpm aliyun:image:plan
 corepack pnpm aliyun:cloud:confirmations
 corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:readiness
@@ -702,10 +730,11 @@ ASR poll
 
 ```text
 1. 需要确认是否创建阿里云 SAE 应用和 api-cn 域名。
-2. 需要微信开放平台移动应用 AppID / AppSecret。
-3. 需要确认隐私政策和用户协议正式 URL。
-4. 正式数据层迁移到 RDS PostgreSQL 还未开始。
-5. Redis/Tair、SLS、KMS/Secrets Manager 还未确认。
+2. 需要确认阿里云 ACR 镜像仓库、remote image、digest 和 SAE/ECS 镜像拉取配置。
+3. 需要微信开放平台移动应用 AppID / AppSecret。
+4. 需要确认隐私政策和用户协议正式 URL。
+5. 正式数据层迁移到 RDS PostgreSQL 还未开始。
+6. Redis/Tair、SLS、KMS/Secrets Manager 还未确认。
 ```
 
 也可以直接运行：
@@ -741,10 +770,13 @@ node --check scripts/run-aliyun-predeploy.mjs
 node --check scripts/run-aliyun-container-smoke.mjs
 node --check scripts/check-aliyun-cloud-confirmations.mjs
 node --check scripts/check-aliyun-deployment-spec.mjs
+node --check scripts/check-aliyun-image-publish-plan.mjs
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.example.json','utf8'))"
+node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.image-publish.example.json','utf8'))"
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.cloud-confirmations.example.json','utf8'))"
 corepack pnpm aliyun:readiness
 corepack pnpm aliyun:env:sources（61 variables / 61 source metadata ready）
+corepack pnpm aliyun:image:plan（template ready / local missing）
 corepack pnpm aliyun:operator:tasks
 corepack pnpm aliyun:cloud:confirmations（template ready / local 21 blockers）
 corepack pnpm aliyun:cloud:check
@@ -758,7 +790,7 @@ corepack pnpm aliyun:docker:check（7 files / 24 dockerignore patterns / sensiti
 corepack pnpm aliyun:container:smoke（Docker health + 30 APP API probes / sanitized env deleted）
 node --check scripts/check-aliyun-domain-readiness.mjs
 corepack pnpm aliyun:domain:check（状态看板 exit 0；当前 ok=false）
-corepack pnpm aliyun:deploy:spec（image meiye-huajing-app-api:production-cn / port 3000 / predeploy 15 / postdeploy 5）
+corepack pnpm aliyun:deploy:spec（image meiye-huajing-app-api:production-cn / port 3000 / predeploy 16 / postdeploy 5）
 corepack pnpm aliyun:remote:smoke -- --base-url http://127.0.0.1:3022 --allow-missing appWechatLogin,legalLinks
 corepack pnpm aliyun:env:check
 corepack pnpm exec tsc --noEmit --pretty false
@@ -856,7 +888,9 @@ imageId: sha256:905bdd0db460e4eadb5edbd9c7ed76781a651b058381059e29a4ec607d1780f3
 imageSize: 3.02GB
 ```
 
-最新 `aliyun:readiness` 中 Docker 状态为 `ready`。正式部署仍需要把该镜像推送/导入到阿里云镜像仓库，或使用阿里云镜像构建服务从审计包/源码上下文构建。
+最新 `aliyun:readiness` 中 Docker 状态为 `ready`。正式部署仍需要把该镜像推送/导入到阿里云 ACR，或使用阿里云镜像构建服务从审计包/源码上下文构建，并把 remote image / digest / 运行时拉取证据写入 `deploy/aliyun-production-cn.image-publish.local.json` 后通过 `corepack pnpm aliyun:image:plan:strict`。
+
+如果 `corepack pnpm aliyun:image:plan` 报 `localDockerImage=image_not_found_or_docker_unavailable`，说明当前 Docker daemon 里没有可推送的本地镜像缓存；正式推送前重新执行 `corepack pnpm aliyun:docker:build` 和 `corepack pnpm aliyun:container:smoke`。
 
 本地 production server 已用 `.env.production-cn.local` 做过 HTTP 验证：
 

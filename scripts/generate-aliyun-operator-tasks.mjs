@@ -82,7 +82,7 @@ function buildCloudConfirmationIndex(readiness) {
   return new Map(items.map((item) => [item.key, item]))
 }
 
-function buildTasks({ envPlan, readiness, domain }) {
+function buildTasks({ envPlan, readiness, domain, imagePublishPlan }) {
   const cloud = buildCloudConfirmationIndex(readiness)
   const tasks = []
 
@@ -184,6 +184,44 @@ function buildTasks({ envPlan, readiness, domain }) {
     verifyCommands: [
       "corepack pnpm aliyun:docker:check",
       "corepack pnpm aliyun:health:smoke",
+    ],
+  })
+
+  addTask(tasks, {
+    id: "T03B_ALIYUN_ACR_IMAGE_PUBLISH",
+    title: "发布后端 Docker 镜像到阿里云 ACR 并配置运行时拉取",
+    status: imagePublishPlan?.ready ? "ready" : imagePublishPlan?.template?.ready === false ? "blocked" : "pending_cloud",
+    blockerCodes: [
+      ...(imagePublishPlan?.template?.blockers || []).map((item) => `imagePublishTemplate:${item}`),
+      ...(imagePublishPlan?.local?.blockers || []).map((item) => `imagePublishLocal:${item}`),
+    ],
+    owner: "阿里云 ACR/后端发布操作员",
+    consolePath: "阿里云控制台 -> 容器镜像服务 ACR / SAE 或 ECS 容器运行时",
+    actions: [
+      "复制 deploy/aliyun-production-cn.image-publish.example.json 到 deploy/aliyun-production-cn.image-publish.local.json。",
+      "确认 ACR region 为 cn-hangzhou，repository 为 meiye-huajing-app-api，tag 为 production-cn。",
+      "先运行 corepack pnpm aliyun:docker:build 和 corepack pnpm aliyun:container:smoke。",
+      "通过 docker login 或阿里云镜像构建服务把镜像推送/导入 ACR；不要把 registry 密码、RAM Secret 或 token 写入 JSON、文档或 git。",
+      "配置 SAE/ECS 使用 ACR remoteImage，并确认运行时有镜像拉取权限。",
+      "把 remote image、digest、push evidence 和 runtime image pull evidence 写入 image-publish.local.json。",
+    ],
+    evidence: [
+      "acr.confirmed=true",
+      "imagePushed=true",
+      "digestVerified=true",
+      "runtime.remoteImageConfigured=true",
+      "runtime.imagePullConfigured=true",
+      "corepack pnpm aliyun:image:plan:strict pass",
+    ],
+    verifyCommands: [
+      "corepack pnpm aliyun:image:plan",
+      "corepack pnpm aliyun:docker:build",
+      "corepack pnpm aliyun:container:smoke",
+      "corepack pnpm aliyun:image:plan:strict",
+    ],
+    notes: [
+      "image-publish.local.json 只记录非密钥镜像发布证据。",
+      "ACR 登录凭证只能放在 docker credential helper、RAM/KMS/Secrets Manager 或阿里云运行时配置里。",
     ],
   })
 
@@ -307,7 +345,7 @@ function buildTasks({ envPlan, readiness, domain }) {
     owner: "后端发布操作员",
     consolePath: "本机终端 + 阿里云部署控制台",
     actions: [
-      "完成 T01-T07 后部署 production-cn 后端。",
+      "完成前置微信、协议、运行时、ACR 镜像、域名、OSS、环境变量和 SLS 任务后部署 production-cn 后端。",
       "先运行 domain strict，确认 api-cn/assets-cn DNS 和 HTTPS 可用。",
       "再运行统一 postdeploy smoke，验证 health 和 APP API guard。",
       "微信开放平台或正式协议 URL 未补齐时只能使用 --allow-missing appWechatLogin,legalLinks 做桥接调试，不能作为正式上线结论。",
@@ -361,6 +399,7 @@ function renderMarkdown(report) {
     `- productionReady: ${report.readiness.productionReady}`,
     `- localCodeReady: ${report.readiness.localCodeReady}`,
     `- domainReady: ${report.domain.ok}`,
+    `- imagePublishReady: ${report.imagePublishPlan.ready}`,
     `- env requiredReady: ${report.env.summary.requiredReady} / ${report.env.summary.requiredTotal}`,
     `- tasks ready: ${report.summary.ready} / ${report.summary.total}`,
     "",
@@ -449,7 +488,11 @@ function main() {
     "--allow-blocking",
   ])
   const cloudConfirmations = readJsonIfExists(args.cloudConfirmationsFile)
-  const tasks = buildTasks({ envPlan, readiness, domain, cloudConfirmations })
+  const imagePublishPlan = runJson("image_publish_plan", [
+    "scripts/check-aliyun-image-publish-plan.mjs",
+    "--allow-incomplete",
+  ])
+  const tasks = buildTasks({ envPlan, readiness, domain, cloudConfirmations, imagePublishPlan })
   const report = {
     generatedAt: new Date().toISOString(),
     containsValues: false,
@@ -467,6 +510,14 @@ function main() {
       targetReady: domain.targetReady,
       targetTotal: domain.targetTotal,
       machineBlocking: domain.machineBlocking,
+    },
+    imagePublishPlan: {
+      ready: imagePublishPlan.ready === true,
+      templateReady: imagePublishPlan.summary?.templateReady === true,
+      localExists: imagePublishPlan.summary?.localExists === true,
+      localReady: imagePublishPlan.summary?.localReady === true,
+      totalBlockers: imagePublishPlan.summary?.totalBlockers ?? 0,
+      localDockerImage: imagePublishPlan.localDockerImage?.status || "unknown",
     },
     env: {
       containsValues: false,
@@ -488,6 +539,7 @@ function main() {
     nextCommandOrder: [
       "corepack pnpm aliyun:operator:tasks",
       "corepack pnpm aliyun:cloud:check",
+      "corepack pnpm aliyun:image:plan:strict",
       "corepack pnpm aliyun:domain:strict",
       "corepack pnpm aliyun:readiness:cloud-ready",
       "corepack pnpm aliyun:docker:build",
