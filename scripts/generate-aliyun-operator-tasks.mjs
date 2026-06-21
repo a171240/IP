@@ -90,7 +90,12 @@ function buildTasks({ envPlan, readiness, domain }) {
     id: "T01_WECHAT_OPEN_PLATFORM_APP_LOGIN",
     title: "微信开放平台移动应用审核和 APP 登录凭证",
     status: readiness.checks?.wechatOpenPlatform?.ready ? "ready" : "blocked",
-    blockerCodes: readiness.machineBlocking.filter((item) => item.includes("WECHAT_OPEN") || item.includes("wechat_open_platform")),
+    blockerCodes: readiness.machineBlocking.filter((item) =>
+      item.includes("WECHAT_OPEN") ||
+      item.includes("wechat_open_platform") ||
+      item.includes("invalid_app_native_release_config") ||
+      item.includes("app_native:")
+    ),
     owner: "用户/微信开放平台操作员",
     consolePath: "微信开放平台 -> 管理中心 -> 移动应用 -> 美业话镜 App",
     actions: [
@@ -100,6 +105,7 @@ function buildTasks({ envPlan, readiness, domain }) {
       "获取移动应用 AppSecret，填入 WECHAT_OPEN_APP_SECRET。",
       "确认 Android 包名为 com.ipgongchang.meiyehuajing，并从 release 签名证书取得微信开放平台要求的 Android 应用签名。",
       "确认 iOS Bundle ID 为 com.ipgongchang.meiyehuajing，并配置 HTTPS Universal Link。",
+      "运行 corepack pnpm aliyun:app-native:check，确认 APP 原生发布配置状态进入 release audit。",
       "在 deploy/aliyun-production-cn.cloud-confirmations.local.json 的 wechatOpenPlatform 项记录非密钥证据。",
     ],
     evidence: [
@@ -115,6 +121,7 @@ function buildTasks({ envPlan, readiness, domain }) {
       "iosConfigured=true",
     ],
     verifyCommands: [
+      "corepack pnpm aliyun:app-native:check",
       "corepack pnpm aliyun:readiness",
       "GET https://api-cn.ipgongchang.xin/api/app/health?strict=1 after deployment",
     ],

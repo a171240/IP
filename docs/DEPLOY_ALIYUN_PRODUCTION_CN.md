@@ -632,6 +632,7 @@ corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:readiness
 corepack pnpm aliyun:routes:check
 corepack pnpm aliyun:app-client:contract
+corepack pnpm aliyun:app-native:check
 corepack pnpm aliyun:app-api:coverage
 corepack pnpm aliyun:docker:check
 corepack pnpm exec tsc --noEmit --pretty false
@@ -733,6 +734,7 @@ APP env template forbidden backend/secret keys: WECHAT_OPEN_APP_ID、WECHAT_OPEN
 ```text
 node scripts/prepare-aliyun-runtime-env.mjs --env-file /Users/Admin/Documents/美业话镜APP/.env.production-cn.example --allow-todo
 node --check scripts/check-aliyun-production-cn-readiness.mjs
+node --check scripts/check-app-native-release-config.mjs
 node --check scripts/prepare-aliyun-release-artifacts.mjs
 node --check scripts/generate-aliyun-operator-tasks.mjs
 node --check scripts/run-aliyun-predeploy.mjs
@@ -744,18 +746,19 @@ node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.clou
 corepack pnpm aliyun:readiness
 corepack pnpm aliyun:env:sources（61 variables / 61 source metadata ready）
 corepack pnpm aliyun:operator:tasks
-corepack pnpm aliyun:cloud:confirmations（template ready / local 19 blockers）
+corepack pnpm aliyun:cloud:confirmations（template ready / local 21 blockers）
 corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:release:artifacts
 corepack pnpm aliyun:predeploy
 corepack pnpm aliyun:routes:check（31 routes / 0 failures）
 corepack pnpm aliyun:app-client:contract（40 audited calls / 34 unique client routes）
+corepack pnpm aliyun:app-native:check（当前 ok=false；Android release debug signing / iOS Associated Domains 缺失）
 corepack pnpm aliyun:app-api:coverage（29 / 29 business routes covered）
 corepack pnpm aliyun:docker:check（7 files / 24 dockerignore patterns / sensitive env excluded）
 corepack pnpm aliyun:container:smoke（Docker health + 30 APP API probes / sanitized env deleted）
 node --check scripts/check-aliyun-domain-readiness.mjs
 corepack pnpm aliyun:domain:check（状态看板 exit 0；当前 ok=false）
-corepack pnpm aliyun:deploy:spec（image meiye-huajing-app-api:production-cn / port 3000 / predeploy 14 / postdeploy 5）
+corepack pnpm aliyun:deploy:spec（image meiye-huajing-app-api:production-cn / port 3000 / predeploy 15 / postdeploy 5）
 corepack pnpm aliyun:remote:smoke -- --base-url http://127.0.0.1:3022 --allow-missing appWechatLogin,legalLinks
 corepack pnpm aliyun:env:check
 corepack pnpm exec tsc --noEmit --pretty false

@@ -127,7 +127,9 @@ docs/DEPLOY_ALIYUN_PRODUCTION_CN.md
 docs/release-manifest-2026-06-21-app-aliyun-production-cn-bridge.md
 package.json
 scripts/check-aliyun-production-cn-readiness.mjs
+scripts/check-aliyun-deployment-spec.mjs
 scripts/check-app-client-api-contract.mjs
+scripts/check-app-native-release-config.mjs
 scripts/prepare-aliyun-release-artifacts.mjs
 scripts/run-aliyun-predeploy.mjs
 ```
@@ -367,6 +369,7 @@ aliyun:cloud:check
 aliyun:readiness
 aliyun:routes:check
 aliyun:app-client:contract
+aliyun:app-native:check
 aliyun:app-api:coverage
 aliyun:docker:check
 pnpm exec tsc --noEmit --pretty false
@@ -382,16 +385,17 @@ aliyun:app-api:smoke
 routes: 31 checked, 0 failures
 env source catalog: 61 variables, 61 source metadata ready, containsValues false
 app-client contract: 40 audited calls, 34 unique client routes, 26 matched backend routes, 4 deferred knowledge-space calls, 0 failures
+app-native release config: ok=false, blockers android_release_uses_debug_signing / android_release_signing_config_not_ready / ios_associated_domains_missing
 app-api coverage: 29 / 29 business routes, 30 probes, 0 missing
 docker context: 7 files, 24 dockerignore patterns, sensitive env excluded
-deployment spec: image meiye-huajing-app-api:production-cn, port 3000, apiHost api-cn.ipgongchang.xin, predeploy 14, postdeploy 5, 0 blockers
+deployment spec: image meiye-huajing-app-api:production-cn, port 3000, apiHost api-cn.ipgongchang.xin, predeploy 15, postdeploy 5, 0 blockers
 release preflight: 4 / 4 pass
 build: compiled successfully; existing lint warnings only
 health smoke: sensitiveLeakCount 0
 app-api smoke: 30 business probes, 0 failures
 postdeploy smoke: local localhost pass, remoteHealth pass, appApiSmoke pass, sensitive value pattern 0
 container smoke: Docker image meiye-huajing-app-api:production-cn pass, /api/healthz 200, /api/app/health 200, strict health 503 for allowed appWechatLogin/legalLinks, app-api smoke 30 probes, sanitized env file deleted, container stopped
-cloud confirmations: example template ready, local file not ready, 19 blockers, containsValues false
+cloud confirmations: example template ready, local file not ready, 21 blockers, containsValues false
 ```
 
 Domain readiness 说明：
@@ -517,6 +521,14 @@ WECHAT_OPEN_APP_REVIEW_STATUS=reviewing
 移动应用名称：美业话镜
 Android applicationId / 包名：com.ipgongchang.meiyehuajing
 iOS Bundle ID：com.ipgongchang.meiyehuajing
+```
+
+`corepack pnpm aliyun:app-native:check` 当前会额外确认这些真实工程状态：
+
+```text
+Android release 当前仍使用 signingConfigs.debug
+Android release signingConfig 尚未切到正式 release keystore
+iOS Associated Domains / Universal Link 尚未配置
 ```
 
 仍需微信开放平台或正式发布资料确认：

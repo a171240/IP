@@ -194,6 +194,7 @@ function renderMarkdown(audit) {
   const cloudConfirmations = readiness.checks?.cloudConfirmations
   const appProductionConfig = readiness.checks?.appProductionConfig
   const appEnvTemplate = appProductionConfig?.envTemplate
+  const appNativeRelease = appProductionConfig?.nativeRelease
   return [
     "# 美业话镜 APP production-cn 阿里云发布审计",
     "",
@@ -211,6 +212,7 @@ function renderMarkdown(audit) {
     `- dockerContext: ${docker.ok ? "ok" : "not ok"}`,
     `- deploymentSpec: ${deploymentSpec.ok ? "ok" : "not ready"}`,
     `- domainReadiness: ${domain.ok ? "ok" : "not ready"} (${domain.targetReady} / ${domain.targetTotal})`,
+    `- appNativeRelease: ${appNativeRelease?.ok === true ? "ready" : "not ready"}`,
     `- operatorTasks: ${operatorTasks.summary.ready} / ${operatorTasks.summary.total} ready`,
     `- cloudConfirmations: ${cloudConfirmations?.ready ? "ready" : "not ready"}`,
     `- cloudConfirmationsCheck: template ${cloudConfirmationsCheck?.template?.ready ? "ready" : "not ready"}, local ${cloudConfirmationsCheck?.local?.ready ? "ready" : "not ready"}`,
@@ -266,6 +268,19 @@ function renderMarkdown(audit) {
           ...appEnvTemplate.forbiddenKeys.map((item) => `  - ${item}`),
         ]
       : []),
+    "",
+    "## APP 原生发布配置",
+    "",
+    `- ready: ${appNativeRelease?.ok === true}`,
+    `- appName: ${appNativeRelease?.expected?.appName || "unknown"}`,
+    `- androidPackageName: ${appNativeRelease?.android?.applicationId || "unknown"}`,
+    `- androidReleaseSigningConfig: ${appNativeRelease?.android?.releaseSigningConfig || "missing"}`,
+    `- androidReleaseUsesDebugSigning: ${appNativeRelease?.android?.releaseUsesDebugSigning === true}`,
+    `- iosBundleIds: ${appNativeRelease?.ios?.bundleIds?.length ? appNativeRelease.ios.bundleIds.join(", ") : "unknown"}`,
+    `- iosAssociatedDomainsConfigured: ${appNativeRelease?.ios?.associatedDomainsConfigured === true}`,
+    ...(appNativeRelease?.blockers?.length
+      ? appNativeRelease.blockers.map((item) => `- ${item}`)
+      : ["- blockers: none"]),
     "",
     "## 域名 DNS / HTTPS 检查",
     "",
@@ -531,6 +546,8 @@ function main() {
       scriptsReady: readiness.checks?.appProductionConfig?.scripts?.ready === true,
       envTemplateReady: readiness.checks?.appProductionConfig?.envTemplate?.ready === true,
       envTemplateKeyCount: readiness.checks?.appProductionConfig?.envTemplate?.keyCount ?? 0,
+      nativeReleaseReady: readiness.checks?.appProductionConfig?.nativeRelease?.ok === true,
+      nativeReleaseBlockers: readiness.checks?.appProductionConfig?.nativeRelease?.blockers || [],
     },
     envSourceCatalog: {
       containsValues: false,

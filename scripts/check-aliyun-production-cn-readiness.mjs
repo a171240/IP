@@ -98,6 +98,7 @@ const REQUIRED_BACKEND_FILES = [
   "scripts/prepare-aliyun-runtime-env.mjs",
   "scripts/check-app-api-production-cn-routes.mjs",
   "scripts/check-app-client-api-contract.mjs",
+  "scripts/check-app-native-release-config.mjs",
   "scripts/check-app-api-smoke-coverage.mjs",
   "scripts/check-aliyun-docker-context.mjs",
   "scripts/prepare-aliyun-release-artifacts.mjs",
@@ -128,6 +129,8 @@ const REQUIRED_BACKEND_SCRIPTS = [
   "aliyun:release:artifacts",
   "aliyun:routes:check",
   "aliyun:app-client:contract",
+  "aliyun:app-native:check",
+  "aliyun:app-native:strict",
   "aliyun:app-api:coverage",
   "aliyun:docker:check",
   "aliyun:predeploy",
@@ -480,6 +483,32 @@ function dockerStatus() {
   }
 }
 
+function runJsonScript(scriptPath, args = []) {
+  const result = spawnSync(process.execPath, [resolve(BACKEND_ROOT, scriptPath), ...args], {
+    cwd: BACKEND_ROOT,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 20,
+  })
+  if (result.status !== 0) {
+    return {
+      ok: false,
+      ready: false,
+      blockers: [`script_failed:${scriptPath}:${result.status}`],
+      error: (result.stderr || result.stdout || "").split(/\r?\n/).filter(Boolean).slice(0, 5).join(" | "),
+    }
+  }
+  try {
+    return JSON.parse(result.stdout)
+  } catch (error) {
+    return {
+      ok: false,
+      ready: false,
+      blockers: [`script_invalid_json:${scriptPath}`],
+      error: error instanceof Error ? error.message : String(error),
+    }
+  }
+}
+
 function checkWechatOpenPlatform(env) {
   const reviewStatus = normalizeWechatReviewStatus(env.get("WECHAT_OPEN_APP_REVIEW_STATUS"))
   const openAppIdStatus = envStatus(env.get("WECHAT_OPEN_APP_ID"))
@@ -638,6 +667,7 @@ function main() {
   const appFiles = fileStatus(APP_ROOT, REQUIRED_APP_FILES)
   const appScripts = scriptStatus(resolve(APP_ROOT, "package.json"), REQUIRED_APP_SCRIPTS)
   const appProductionCnEnvTemplate = envTemplateStatus(resolve(APP_ROOT, ".env.production-cn.example"))
+  const appNativeReleaseConfig = runJsonScript("scripts/check-app-native-release-config.mjs", ["--allow-blocking"])
   const docker = dockerStatus()
   const cloudConfirmations = checkCloudConfirmations(args)
 
@@ -677,6 +707,12 @@ function main() {
       ...appProductionCnEnvTemplate.forbiddenKeys.map((key) => `forbidden:${key}`),
     ].join(","),
   )
+  if (appNativeReleaseConfig.ok !== true) {
+    machineBlocking.push("invalid_app_native_release_config")
+    for (const blocker of appNativeReleaseConfig.blockers || []) {
+      machineBlocking.push(`app_native:${blocker}`)
+    }
+  }
 
   if (envFileExists && envMode !== "600") warnings.push(`env_file_mode_should_be_600:current_${envMode}`)
   if (!docker.ready) warnings.push(docker.status)
@@ -726,6 +762,7 @@ function main() {
         files: appFiles,
         scripts: appScripts,
         envTemplate: appProductionCnEnvTemplate,
+        nativeRelease: appNativeReleaseConfig,
       },
       docker,
       cloudConfirmations,
