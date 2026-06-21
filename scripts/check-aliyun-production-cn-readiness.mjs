@@ -709,7 +709,9 @@ function main() {
         ? "等待微信开放平台移动应用审核通过后补 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET"
         : "从微信开放平台移动应用补 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET",
       "复制 deploy/aliyun-production-cn.cloud-confirmations.example.json 到 .local.json，并逐项填写非密钥云资源确认",
-      "Docker daemon 就绪后执行 corepack pnpm aliyun:docker:build",
+      docker.ready
+        ? "镜像本地构建能力已就绪；正式部署前将 meiye-huajing-app-api:production-cn 推送/导入阿里云镜像仓库或使用阿里云镜像构建服务"
+        : "Docker daemon 就绪后执行 corepack pnpm aliyun:docker:build",
       "部署后执行 corepack pnpm aliyun:postdeploy:smoke -- --base-url https://api-cn.ipgongchang.xin",
     ],
   }

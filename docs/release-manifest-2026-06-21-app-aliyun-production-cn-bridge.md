@@ -282,6 +282,7 @@ appProductionConfig.scripts: ready, 5 checked
 appProductionConfig.envTemplate: ready, 5 canonical keys checked, 0 forbidden backend/secret keys
 backend.files: ready, 20 checked
 backend.scripts: ready, 23 checked
+docker: ready, image meiye-huajing-app-api:production-cn, digest sha256:905bdd0db460e4eadb5edbd9c7ed76781a651b058381059e29a4ec607d1780f3, size 3.02GB
 appClientContract: 40 audited calls / 34 unique client routes, 4 deferred knowledge-space calls
 appApiSmokeCoverage: 29 / 29 business routes
 ```
@@ -439,13 +440,16 @@ meiye-huajing-app-api-production-cn-context.tar.gz
 
 其中 `vercel-env-coverage.json` 只包含 Vercel production 变量名、环境和加密/敏感元数据，不包含真实 value；Vercel 登录态不可用时只记录 non-blocking failure，不阻断 release audit。
 
-本机 Docker daemon 当前不可用：
+本机 Docker 镜像已构建成功：
 
 ```text
-docker_daemon_unavailable
+repoTag: meiye-huajing-app-api:production-cn
+digest: sha256:905bdd0db460e4eadb5edbd9c7ed76781a651b058381059e29a4ec607d1780f3
+size: 3.02GB
+readiness.docker.status: ready
 ```
 
-因此 `corepack pnpm aliyun:docker:build` 还需要等 Docker daemon 或阿里云镜像构建服务可用后重跑。
+正式部署仍未执行；下一步需要推送/导入到阿里云镜像仓库，或使用阿里云镜像构建服务。
 
 ## 10. 发布前必须补齐
 

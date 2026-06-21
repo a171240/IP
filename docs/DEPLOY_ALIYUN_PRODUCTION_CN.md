@@ -818,7 +818,16 @@ forbiddenEntryCount: 0
 bytes: 295585706
 ```
 
-`corepack pnpm aliyun:docker:build` 已尝试，但本机 Docker daemon 未启动成功，当前 readiness 报告为 `docker_daemon_unavailable`。Docker daemon 就绪后需要重跑该命令。
+2026-06-22 更新：本机 Docker Desktop 已启动，`corepack pnpm aliyun:docker:build` 已成功构建镜像：
+
+```text
+repoTag: meiye-huajing-app-api:production-cn
+imageDigest: sha256:905bdd0db460e4eadb5edbd9c7ed76781a651b058381059e29a4ec607d1780f3
+imageId: sha256:905bdd0db460e4eadb5edbd9c7ed76781a651b058381059e29a4ec607d1780f3
+imageSize: 3.02GB
+```
+
+最新 `aliyun:readiness` 中 Docker 状态为 `ready`。正式部署仍需要把该镜像推送/导入到阿里云镜像仓库，或使用阿里云镜像构建服务从审计包/源码上下文构建。
 
 本地 production server 已用 `.env.production-cn.local` 做过 HTTP 验证：
 
