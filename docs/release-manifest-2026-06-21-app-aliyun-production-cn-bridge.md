@@ -1,0 +1,339 @@
+# 美业话镜 APP 阿里云 production-cn 桥接后端发布清单
+
+生成时间：2026-06-21 21:13:17 CST
+
+本文只记录 APP 国内 production-cn 后端桥接包的本地准备状态，不包含任何密钥值，也不代表已经执行阿里云生产部署。
+
+## 1. 基本信息
+
+- Release lane: APP production-cn backend bridge
+- Backend repository: `/Users/Admin/Documents/美业话镜APP/handoff/IP`
+- Backend branch: `codex/app-api-handoff-20260521`
+- Backend HEAD: `bc2b787 deploy: track wechat open app review status`
+- Remote baseline branch: `origin/codex/app-api-handoff-20260521`
+- Branch state before this manifest: ahead 7, clean worktree
+- App workspace: `/Users/Admin/Documents/美业话镜APP`
+- Mini-program repository: `/Users/Admin/Documents/美业话镜小程序`
+
+## 2. 权限边界
+
+- Production deployment authorized in this manifest: no
+- Git push authorized in this manifest: no
+- Aliyun SAE/ECS/DNS/OSS/SLS/KMS changes authorized in this manifest: no
+- Supabase production schema/data write authorized in this manifest: no
+- WeChat DevTools mini-program upload authorized in this manifest: no
+- WeChat Open Platform write/action authorized in this manifest: no
+
+本清单允许的动作仅限本地文档、脚本、构建和 smoke 检查。
+
+## 3. 本轮包含的后端提交
+
+```text
+bc2b787 deploy: track wechat open app review status
+641bc1a deploy: add aliyun production-cn app api bridge
+```
+
+`641bc1a` 包含的核心文件：
+
+```text
+.dockerignore
+Dockerfile
+app/api/app/health/route.ts
+app/api/app/service-records/device-files/check/route.ts
+app/api/app/service-records/sessions/[sessionId]/oss-upload/route.ts
+app/api/app/service-records/sessions/[sessionId]/segments/oss/route.ts
+app/api/app/store-profiles/[profileId]/route.ts
+app/api/app/store-profiles/route.ts
+app/api/healthz/route.ts
+deploy/aliyun-production-cn.example.json
+docs/DEPLOY_ALIYUN_PRODUCTION_CN.md
+package.json
+scripts/check-aliyun-docker-context.mjs
+scripts/check-aliyun-production-cn-readiness.mjs
+scripts/check-app-api-production-cn-routes.mjs
+scripts/prepare-aliyun-release-artifacts.mjs
+scripts/prepare-aliyun-runtime-env.mjs
+scripts/run-aliyun-predeploy.mjs
+scripts/smoke-aliyun-health.mjs
+scripts/smoke-aliyun-remote.mjs
+scripts/smoke-app-api-production-cn.mjs
+```
+
+`bc2b787` 包含的核心文件：
+
+```text
+docs/DEPLOY_ALIYUN_PRODUCTION_CN.md
+scripts/check-aliyun-production-cn-readiness.mjs
+scripts/prepare-aliyun-release-artifacts.mjs
+scripts/prepare-aliyun-runtime-env.mjs
+```
+
+本 manifest 本身是后续补充的发布控制文件：
+
+```text
+docs/release-manifest-2026-06-21-app-aliyun-production-cn-bridge.md
+```
+
+## 4. 明确不包含
+
+- 不包含 App 内支付、苹果 IAP、安卓应用市场支付。
+- 不包含海报、小红书、视频任务的全量迁移。
+- 不包含完整小程序页面迁移。
+- 不包含小程序上传或体验版发布。
+- 不包含 Supabase 生产 migration 或数据写入。
+- 不包含 Vercel production deploy / promote / alias。
+- 不包含阿里云控制台资源创建、环境变量导入、域名解析或证书配置。
+- 不包含微信开放平台审核动作或 AppID/AppSecret 读取。
+
+## 5. 当前工作区排除项
+
+App 根目录当前仍是未初始化提交状态，以下内容不属于本后端桥接发布包：
+
+```text
+/Users/Admin/Documents/美业话镜APP/.env.production-cn.example
+/Users/Admin/Documents/美业话镜APP/.gitignore
+/Users/Admin/Documents/美业话镜APP/AGENTS.md
+/Users/Admin/Documents/美业话镜APP/APP*.md
+/Users/Admin/Documents/美业话镜APP/meiye-huajing-app/**
+/Users/Admin/Documents/美业话镜APP/线上后台与小程序业务盘点.md
+```
+
+小程序仓库当前排除项：
+
+```text
+/Users/Admin/Documents/美业话镜小程序/project.config.json
+/Users/Admin/Documents/美业话镜小程序/canvas/**
+```
+
+这些文件没有进入本后端 manifest，也不会随本后端包自动提交、推送、上传或部署。
+
+## 6. Vercel 当前生产基线
+
+只读查询时间：2026-06-21。
+
+Vercel project:
+
+```text
+name: ip
+projectId: prj_8SL1t8fEXw9QeQxScrvlroGio8TC
+teamId: team_AK04Yi2jdL1IA8FMsXHRBman
+framework: nextjs
+nodeVersion: 24.x
+```
+
+当前 Vercel production latestDeployment:
+
+```text
+id: dpl_6cbnr11reAts8QtjfQbQXaMifF8R
+url: ip-8mys5ez96-a171240s-projects.vercel.app
+createdAt: 2026-06-19T06:50:04.212Z
+readyState: READY
+target: production
+meta.release: voice-coach-opening-prepare-backend-2026-06-19
+```
+
+生产域名仍属于现有 Vercel 后端链路：
+
+```text
+www.ipnrgc.com
+ip.ipgongchang.xin
+ipnrgc.com
+```
+
+本轮阿里云 production-cn 目标不能直接复用 `ip.ipgongchang.xin` 作为新 APP API 域名，建议新建：
+
+```text
+https://api-cn.ipgongchang.xin
+```
+
+## 7. Supabase / 数据层状态
+
+当前 APP production-cn 是桥接版：
+
+```text
+数据库：暂时沿用现有 Supabase
+对象存储：阿里云 OSS
+长录音 ASR：百炼 / DashScope
+服务复盘总结：DeepSeek
+语音对练：火山语音 + DeepSeek
+```
+
+本清单没有 Supabase migration 文件，也没有授权 Supabase production schema/data write。
+
+最终完整 production-cn 仍需要独立的数据层迁移：
+
+```text
+阿里云 RDS PostgreSQL
+DATABASE_URL_CN
+后端 Supabase SDK 到 RDS/Postgres 数据访问层迁移
+数据迁移与回滚方案
+```
+
+## 8. 当前机器可验证状态
+
+最近一次 `corepack pnpm aliyun:readiness` 结果摘要：
+
+```text
+productionReady: false
+localCodeReady: false
+requiredReady: 19 / 23
+optionalReady: 27
+envFile: /Users/Admin/Documents/美业话镜APP/.env.production-cn.local
+env mode: 600
+env gitIgnored: true
+wechatOpenPlatform.reviewStatus: reviewing
+```
+
+机器可验证阻塞：
+
+```text
+missing_required_env:APP_API_BASE_URL
+missing_required_env:NEXT_PUBLIC_SITE_URL
+missing_required_env:WECHAT_OPEN_APP_ID
+missing_required_env:WECHAT_OPEN_APP_SECRET
+wechat_open_platform_mobile_app_reviewing
+```
+
+人工确认阻塞：
+
+```text
+阿里云 SAE 或 ECS 容器应用已创建，运行端口 3000
+api-cn 域名已备案、解析到阿里云入口并配置 HTTPS
+OSS Bucket CORS、RAM 最小权限和服务记录音频前缀已确认
+微信开放平台移动应用审核已通过，并已取得 AppID/AppSecret、Android 包名/签名、iOS Bundle ID/Universal Link 配置
+生产环境变量已通过阿里云控制台、KMS 或 Secrets Manager 导入，未把密钥写进镜像
+SLS 日志、健康检查失败告警和 5xx 告警已配置
+```
+
+## 9. 本地检查结果
+
+已通过：
+
+```text
+git diff --check
+git diff --cached --check
+staged secret-value scan
+node scripts/prepare-aliyun-runtime-env.mjs --env-file /Users/Admin/Documents/美业话镜APP/.env.production-cn.example --allow-todo
+corepack pnpm aliyun:readiness
+corepack pnpm aliyun:release:artifacts -- --skip-bundle
+corepack pnpm aliyun:predeploy
+```
+
+`corepack pnpm aliyun:predeploy` 覆盖：
+
+```text
+aliyun:env:check
+aliyun:readiness
+aliyun:routes:check
+aliyun:docker:check
+pnpm exec tsc --noEmit --pretty false
+release:preflight
+build
+aliyun:health:smoke
+aliyun:app-api:smoke
+```
+
+关键检查摘要：
+
+```text
+routes: 31 checked, 0 failures
+docker context: 7 files, 24 dockerignore patterns, sensitive env excluded
+release preflight: 4 / 4 pass
+build: compiled successfully; existing lint warnings only
+health smoke: sensitiveLeakCount 0
+app-api smoke: 22 probes, 0 failures
+```
+
+本机 Docker daemon 当前不可用：
+
+```text
+docker_daemon_unavailable
+```
+
+因此 `corepack pnpm aliyun:docker:build` 还需要等 Docker daemon 或阿里云镜像构建服务可用后重跑。
+
+## 10. 发布前必须补齐
+
+### 10.1 阿里云资源
+
+```text
+SAE 或 ECS 容器应用
+api-cn 域名解析
+HTTPS 证书
+OSS Bucket CORS
+RAM 最小权限密钥
+SLS 日志项目和告警
+KMS 或 Secrets Manager 环境变量管理
+```
+
+### 10.2 环境变量
+
+```text
+APP_API_BASE_URL=https://api-cn.ipgongchang.xin
+NEXT_PUBLIC_SITE_URL=https://api-cn.ipgongchang.xin
+WECHAT_OPEN_APP_REVIEW_STATUS=approved
+WECHAT_OPEN_APP_ID=<微信开放平台移动应用 AppID>
+WECHAT_OPEN_APP_SECRET=<微信开放平台移动应用 AppSecret>
+```
+
+`APP_ASSET_BASE_URL` 当前是桥接版可选项，正式资产 CDN 切换时再补。
+
+### 10.3 微信开放平台
+
+用户已确认微信开放平台移动应用正在审核中。审核中只能记录：
+
+```text
+WECHAT_OPEN_APP_REVIEW_STATUS=reviewing
+```
+
+审核通过后才能把 readiness blocker 从 `wechat_open_platform_mobile_app_reviewing` 清掉。
+
+## 11. 真正部署时的命令顺序
+
+生产动作必须另行授权。授权后建议顺序：
+
+```bash
+cd /Users/Admin/Documents/美业话镜APP/handoff/IP
+corepack pnpm aliyun:readiness:cloud-ready
+corepack pnpm aliyun:release:artifacts
+corepack pnpm aliyun:docker:build
+```
+
+阿里云部署完成后：
+
+```bash
+corepack pnpm aliyun:remote:smoke -- --base-url https://api-cn.ipgongchang.xin
+corepack pnpm aliyun:app-api:smoke -- --base-url https://api-cn.ipgongchang.xin
+```
+
+如果微信开放平台仍在审核中，只能作为桥接调试放行已知缺口：
+
+```bash
+corepack pnpm aliyun:remote:smoke -- \
+  --base-url https://api-cn.ipgongchang.xin \
+  --allow-missing appWechatLogin
+```
+
+这种放行不能用于正式 production-cn 发布结论。
+
+## 12. 回滚 / 恢复
+
+在阿里云 production-cn 尚未部署前：
+
+```text
+回滚动作：无需执行，线上仍是 Vercel production baseline。
+当前线上基线：dpl_6cbnr11reAts8QtjfQbQXaMifF8R
+```
+
+如果后续阿里云已经部署：
+
+```text
+1. 将 APP 端 APP_API_BASE_URL / 发布配置回退到上一可用 API。
+2. 在阿里云 SAE/ECS 回滚到上一镜像或停止 api-cn 入口。
+3. 保留 Vercel production baseline 作为现有小程序/旧后端对照。
+4. 如已做数据库迁移，按单独 Supabase/RDS 迁移 manifest 回滚；本清单不覆盖数据库回滚。
+```
+
+## 13. 当前结论
+
+本地桥接代码和检查脚手架已经可以作为阿里云 production-cn 后端准备包继续推进；当前不能称为可发布，因为 API 域名、阿里云运行资源、微信开放平台移动应用 AppID/AppSecret 和云侧环境变量导入尚未完成。

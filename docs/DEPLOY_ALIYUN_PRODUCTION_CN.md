@@ -4,6 +4,12 @@
 
 本文只描述第一版 APP 后端桥接部署：登录、测试 token、profile、多租户权限、门店邀请、服务记录长录音、店长查看本店服务记录。本文不包含任何密钥值。
 
+配套发布控制清单：
+
+```text
+docs/release-manifest-2026-06-21-app-aliyun-production-cn-bridge.md
+```
+
 ## 1. 当前部署目标
 
 ```text
