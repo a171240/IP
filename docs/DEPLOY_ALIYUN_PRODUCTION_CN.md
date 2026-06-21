@@ -167,10 +167,27 @@ corepack pnpm aliyun:release:artifacts
 ```text
 release-audit.json
 release-audit.md
+env-import-plan.json
+vercel-env-coverage.json
 meiye-huajing-app-api-production-cn-context.tar.gz
 ```
 
-该脚本会复用当前 readiness、env、routes、Docker context 检查，不输出任何密钥值。生成 tar.gz 后会扫描并拒绝以下危险内容：
+该脚本会复用当前 readiness、env、routes、Docker context 检查，并默认尝试生成 Vercel production 变量名覆盖报告。Vercel 覆盖报告只包含变量名、环境和加密/敏感元数据，不包含真实 value；如果 Vercel 登录态不可用，会在审计里记录失败，不阻断本地发布审计包生成。
+
+如果只想离线生成审计包，或不想访问 Vercel：
+
+```bash
+corepack pnpm aliyun:release:artifacts -- --skip-vercel-env-coverage
+```
+
+如果已经保存了 `vercel env ls production --format json` 输出，可以离线带入：
+
+```bash
+corepack pnpm aliyun:release:artifacts -- \
+  --vercel-env-coverage-input /tmp/meiye-vercel-env-production.json
+```
+
+该脚本不输出任何密钥值。生成 tar.gz 后会扫描并拒绝以下危险内容：
 
 ```text
 .env*

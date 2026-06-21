@@ -1,6 +1,6 @@
 # 美业话镜 APP 阿里云 production-cn 桥接后端发布清单
 
-生成时间：2026-06-21 22:11:22 CST
+生成时间：2026-06-21 22:17:21 CST
 
 本文只记录 APP 国内 production-cn 后端桥接包的本地准备状态，不包含任何密钥值，也不代表已经执行阿里云生产部署。
 
@@ -9,9 +9,9 @@
 - Release lane: APP production-cn backend bridge
 - Backend repository: `/Users/Admin/Documents/美业话镜APP/handoff/IP`
 - Backend branch: `codex/app-api-handoff-20260521`
-- Backend HEAD before Vercel env coverage update: `cb78415 deploy: add aliyun env import plan`
+- Backend HEAD before release-artifact env coverage update: `ea1a8c7 deploy: add vercel env coverage check`
 - Remote baseline branch: `origin/codex/app-api-handoff-20260521`
-- Branch state before Vercel env coverage update: ahead 12, clean worktree
+- Branch state before release-artifact env coverage update: ahead 13, clean worktree
 - App workspace: `/Users/Admin/Documents/美业话镜APP`
 - Mini-program repository: `/Users/Admin/Documents/美业话镜小程序`
 
@@ -30,12 +30,24 @@
 
 ```text
 da9f812 docs: record aliyun console readiness evidence
+ea1a8c7 deploy: add vercel env coverage check
 cb78415 deploy: add aliyun env import plan
 232cf5f docs: refresh aliyun production-cn readiness
 83acfa1 deploy: require aliyun cloud confirmations
 8096803 docs: add aliyun production-cn release manifest
 bc2b787 deploy: track wechat open app review status
 641bc1a deploy: add aliyun production-cn app api bridge
+```
+
+`ea1a8c7` 包含的核心文件：
+
+```text
+docs/DEPLOY_ALIYUN_PRODUCTION_CN.md
+docs/release-manifest-2026-06-21-app-aliyun-production-cn-bridge.md
+package.json
+scripts/check-aliyun-production-cn-readiness.mjs
+scripts/check-vercel-env-coverage.mjs
+scripts/prepare-aliyun-runtime-env.mjs
 ```
 
 `cb78415` 包含的核心文件：
@@ -331,6 +343,18 @@ containsValues: false
 variables: 61
 requiredBlocking: WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET
 ```
+
+`aliyun:release:artifacts` 当前会生成：
+
+```text
+release-audit.json
+release-audit.md
+env-import-plan.json
+vercel-env-coverage.json
+meiye-huajing-app-api-production-cn-context.tar.gz
+```
+
+其中 `vercel-env-coverage.json` 只包含 Vercel production 变量名、环境和加密/敏感元数据，不包含真实 value；Vercel 登录态不可用时只记录 non-blocking failure，不阻断 release audit。
 
 本机 Docker daemon 当前不可用：
 

@@ -59,6 +59,8 @@ function parseArgs(argv) {
     cloudConfirmationsFile: "",
     outDir: "",
     skipBundle: false,
+    skipVercelEnvCoverage: false,
+    vercelEnvCoverageInput: "",
   }
   for (let index = 2; index < argv.length; index += 1) {
     const arg = argv[index]
@@ -77,6 +79,14 @@ function parseArgs(argv) {
     }
     if (arg === "--skip-bundle") {
       args.skipBundle = true
+      continue
+    }
+    if (arg === "--skip-vercel-env-coverage") {
+      args.skipVercelEnvCoverage = true
+      continue
+    }
+    if (arg === "--vercel-env-coverage-input") {
+      args.vercelEnvCoverageInput = resolveValue(argv[++index], "--vercel-env-coverage-input")
       continue
     }
     if (arg === "--help" || arg === "-h") {
@@ -174,6 +184,7 @@ function renderMarkdown(audit) {
   const routes = audit.checks.routes
   const docker = audit.checks.dockerContext
   const bundle = audit.bundle
+  const vercelEnvCoverage = audit.checks.vercelEnvCoverage
   const cloudConfirmations = readiness.checks?.cloudConfirmations
   return [
     "# 美业话镜 APP production-cn 阿里云发布审计",
@@ -188,6 +199,7 @@ function renderMarkdown(audit) {
     `- routes: ${routes.checkedRoutes} checked, ${routes.failures.length} failures`,
     `- dockerContext: ${docker.ok ? "ok" : "not ok"}`,
     `- cloudConfirmations: ${cloudConfirmations?.ready ? "ready" : "not ready"}`,
+    `- vercelEnvCoverage: ${vercelEnvCoverage?.ok ? "ok" : vercelEnvCoverage?.skipped ? "skipped" : "not ok"}`,
     `- bundle: ${bundle ? basename(bundle.path) : "skipped"}`,
     "",
     "## 机器可验证阻塞",
@@ -233,6 +245,25 @@ function renderMarkdown(audit) {
     "- containsValues: false",
     `- requiredBlocking: ${env.planRequiredBlocking?.length ? env.planRequiredBlocking.join(", ") : "none"}`,
     "",
+    "## Vercel production 变量名覆盖",
+    "",
+    vercelEnvCoverage?.ok
+      ? `- path: ${audit.outputFiles.vercelEnvCoverage}`
+      : `- path: ${audit.outputFiles.vercelEnvCoverage || "not generated"}`,
+    `- containsValues: ${vercelEnvCoverage?.report?.containsValues === false ? "false" : "unknown"}`,
+    vercelEnvCoverage?.ok
+      ? `- requiredCovered: ${vercelEnvCoverage.report.totals.requiredPresentInVercelProduction} / ${vercelEnvCoverage.report.totals.requiredTotal}`
+      : `- status: ${vercelEnvCoverage?.skipped ? "skipped" : "not ok"}`,
+    ...(vercelEnvCoverage?.report?.requiredMissingInVercelProduction?.length
+      ? [
+          "- requiredMissingInVercelProduction:",
+          ...vercelEnvCoverage.report.requiredMissingInVercelProduction.map((item) => `  - ${item}`),
+        ]
+      : []),
+    vercelEnvCoverage?.error
+      ? `- error: ${vercelEnvCoverage.error}`
+      : "",
+    "",
     "## 后续命令",
     "",
     "```bash",
@@ -267,6 +298,7 @@ function main() {
   ])
   const routes = runJson("routes", ["scripts/check-app-api-production-cn-routes.mjs"])
   const dockerContext = runJson("docker_context", ["scripts/check-aliyun-docker-context.mjs"])
+  const vercelEnvCoverage = runVercelEnvCoverage(args, resolve(args.outDir, "vercel-env-coverage.json"))
 
   const bundle = args.skipBundle ? null : createArchive(args.outDir)
   const audit = {
@@ -284,12 +316,14 @@ function main() {
       readiness,
       routes,
       dockerContext,
+      vercelEnvCoverage,
     },
     bundle,
     outputFiles: {
       auditJson: resolve(args.outDir, "release-audit.json"),
       auditMarkdown: resolve(args.outDir, "release-audit.md"),
       envImportPlan: resolve(args.outDir, "env-import-plan.json"),
+      vercelEnvCoverage: vercelEnvCoverage.ok ? resolve(args.outDir, "vercel-env-coverage.json") : null,
       bundle: bundle?.path || null,
     },
   }
@@ -305,19 +339,70 @@ function main() {
     machineBlocking: readiness.machineBlocking,
     manualBlockingCount: readiness.manualBlocking.length,
     cloudConfirmationsReady: readiness.checks?.cloudConfirmations?.ready === true,
+    vercelEnvCoverage: vercelEnvCoverage.ok
+      ? {
+          report: audit.outputFiles.vercelEnvCoverage,
+          containsValues: vercelEnvCoverage.report.containsValues,
+          requiredCovered: `${vercelEnvCoverage.report.totals.requiredPresentInVercelProduction}/${vercelEnvCoverage.report.totals.requiredTotal}`,
+          requiredMissing: vercelEnvCoverage.report.requiredMissingInVercelProduction,
+        }
+      : {
+          ok: false,
+          skipped: vercelEnvCoverage.skipped === true,
+          error: vercelEnvCoverage.error || null,
+        },
     bundle: audit.bundle,
     auditJson: audit.outputFiles.auditJson,
     auditMarkdown: audit.outputFiles.auditMarkdown,
     envImportPlan: audit.outputFiles.envImportPlan,
+    vercelEnvCoverageReport: audit.outputFiles.vercelEnvCoverage,
   }, null, 2))
+}
+
+function runVercelEnvCoverage(args, reportPath) {
+  if (args.skipVercelEnvCoverage) {
+    return {
+      ok: false,
+      skipped: true,
+      report: null,
+      error: null,
+    }
+  }
+  const commandArgs = [
+    "scripts/check-vercel-env-coverage.mjs",
+    "--write-report",
+    reportPath,
+  ]
+  if (args.vercelEnvCoverageInput) {
+    commandArgs.push("--input", args.vercelEnvCoverageInput)
+  }
+  const output = run(process.execPath, commandArgs, {
+    allowFailure: true,
+    label: "vercel_env_coverage",
+  })
+  if (output.status !== 0) {
+    return {
+      ok: false,
+      skipped: false,
+      report: null,
+      error: (output.stderr || output.stdout || `exit ${output.status}`).split(/\r?\n/).slice(0, 8).join(" | "),
+    }
+  }
+  return {
+    ok: true,
+    skipped: false,
+    report: parseJsonOutput("vercel_env_coverage", output),
+    error: null,
+  }
 }
 
 function printHelp() {
   console.log([
     "Usage:",
-    "  node scripts/prepare-aliyun-release-artifacts.mjs [--env-file path] [--cloud-confirmations path] [--out-dir /tmp/path] [--skip-bundle]",
+    "  node scripts/prepare-aliyun-release-artifacts.mjs [--env-file path] [--cloud-confirmations path] [--out-dir /tmp/path] [--skip-bundle] [--skip-vercel-env-coverage] [--vercel-env-coverage-input /tmp/vercel-env.json]",
     "",
     "Creates non-secret production-cn release audit files and a Docker context tarball outside the repo by default.",
+    "Vercel env coverage is metadata-only and non-blocking; it never includes values.",
     "The tarball is scanned for forbidden entries such as .env files, .git, node_modules, .next, and logs.",
   ].join("\n"))
 }
