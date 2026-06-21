@@ -303,13 +303,71 @@ function findSecretLikeValues(value, path = "$") {
   return matches
 }
 
-function inspectLocalDockerImage(tag) {
-  const result = spawnSync("docker", ["image", "inspect", tag, "--format", "{{json .}}"], {
+function inspectDockerImageReference(reference) {
+  const result = spawnSync("docker", ["image", "inspect", reference, "--format", "{{json .}}"], {
     cwd: BACKEND_ROOT,
     encoding: "utf8",
     timeout: 5000,
     maxBuffer: 1024 * 1024 * 2,
   })
+  return result
+}
+
+function findLocalDockerImageListing(tag) {
+  const result = spawnSync("docker", ["image", "ls", "--no-trunc", "--digests", "--format", "{{json .}}", tag], {
+    cwd: BACKEND_ROOT,
+    encoding: "utf8",
+    timeout: 5000,
+    maxBuffer: 1024 * 1024,
+  })
+  if (result.error?.code === "ENOENT") {
+    return { status: "docker_cli_missing" }
+  }
+  if (result.error) {
+    return { status: "docker_error", error: result.error.message }
+  }
+  if (result.status !== 0) {
+    return {
+      status: "image_not_found_or_docker_unavailable",
+      detail: (result.stderr || result.stdout || "").split(/\r?\n/).filter(Boolean).slice(0, 3).join(" | "),
+    }
+  }
+  const lines = result.stdout.trim().split(/\r?\n/).filter(Boolean)
+  if (!lines.length) return { status: "image_not_found_or_docker_unavailable", detail: "docker image ls returned no rows" }
+  try {
+    return { status: "listed", listing: JSON.parse(lines[0]) }
+  } catch (error) {
+    return {
+      status: "image_list_parse_failed",
+      error: error instanceof Error ? error.message : String(error),
+    }
+  }
+}
+
+function inspectLocalDockerImage(tag) {
+  let result = inspectDockerImageReference(tag)
+  let inspectedReference = tag
+  let fallbackFromTagInspect = false
+  if (result.error?.code === "ENOENT") {
+    return { status: "docker_cli_missing", tag }
+  }
+  if (result.error) {
+    return { status: "docker_error", tag, error: result.error.message }
+  }
+  if (result.status !== 0) {
+    const listing = findLocalDockerImageListing(tag)
+    const fallbackId = listing.listing?.ID
+    if (!fallbackId || fallbackId === "<none>") {
+      return {
+        status: listing.status,
+        tag,
+        detail: listing.detail || listing.error || (result.stderr || result.stdout || "").split(/\r?\n/).filter(Boolean).slice(0, 3).join(" | "),
+      }
+    }
+    result = inspectDockerImageReference(fallbackId)
+    inspectedReference = fallbackId
+    fallbackFromTagInspect = true
+  }
   if (result.error?.code === "ENOENT") {
     return { status: "docker_cli_missing", tag }
   }
@@ -329,6 +387,8 @@ function inspectLocalDockerImage(tag) {
       status: "ready",
       tag,
       id: metadata.Id || "",
+      inspectedReference,
+      fallbackFromTagInspect,
       repoTags: metadata.RepoTags || [],
       repoDigests: metadata.RepoDigests || [],
       size: metadata.Size || 0,
