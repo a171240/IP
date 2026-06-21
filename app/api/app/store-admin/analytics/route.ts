@@ -1,1 +1,3 @@
-export { GET, runtime } from "@/app/api/mp/store-admin/analytics/route"
+export { GET } from "@/app/api/mp/store-admin/analytics/route"
+
+export const runtime = "nodejs"

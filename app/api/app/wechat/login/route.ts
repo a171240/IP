@@ -1,1 +1,3 @@
-export { POST, runtime } from "@/app/api/app/auth/wechat/route"
+export { POST } from "@/app/api/app/auth/wechat/route"
+
+export const runtime = "nodejs"
