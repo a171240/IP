@@ -567,6 +567,8 @@ sanitizedEnvFileDeleted: true
 
 2026-06-22 07:10 CST 追加：`operator-handoff` 现在把 `APPLE_TEAM_ID` 从普通可后置变量中拆出，列为 `appLaunchBlocking.variables`。当前分类应读作：后端必填变量缺 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；APP 发布/AASA 阻塞缺 `APPLE_TEAM_ID`，并且 `WECHAT_OPEN_APP_REVIEW_STATUS=reviewing`；`DATABASE_URL_CN` / `REDIS_URL_CN` 等仍是可后置变量，不应被误读为第一版 APP 登录链路阻塞。同轮已重新执行 `node --check scripts/generate-aliyun-operator-handoff.mjs`、`node --check scripts/prepare-aliyun-release-artifacts.mjs`、`git diff --check`、`corepack pnpm aliyun:operator:handoff`、`corepack pnpm aliyun:release:artifacts -- --skip-bundle --skip-vercel-env-coverage`、`corepack pnpm aliyun:readiness` 和 `corepack pnpm aliyun:predeploy`，全部通过；`predeploy` 仍显示 health strict 只缺 `appWechatLogin`，APP API smoke `30 probes / 0 failures`。
 
+2026-06-22 07:18 CST 追加：`aliyun:readiness:assume-cloud-ready` 已降为显式诊断命令，package script 会带 `--allow-blocking`，输出固定包含 `diagnosticOnly=true` 与 `releaseEvidenceUsable=false`；即使本地机器项全部通过，也不能让 `productionReady` 变成正式可发布证据。正式发布仍只能用 `aliyun:readiness:cloud-ready`、`aliyun:cloud:confirmations:strict` 和部署后远端 smoke 证明。
+
 ## 10. 发布前必须补齐
 
 ### 10.1 阿里云资源

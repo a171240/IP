@@ -143,6 +143,8 @@ function buildStatus({ readiness, operatorTasks, args }) {
   return {
     generatedAt: new Date().toISOString(),
     containsValues: false,
+    diagnosticOnly: readiness.diagnosticOnly === true,
+    releaseEvidenceUsable: readiness.releaseEvidenceUsable !== false,
     verdict,
     canDeployNow,
     authorizationNote,
@@ -154,6 +156,8 @@ function buildStatus({ readiness, operatorTasks, args }) {
     },
     summary: {
       productionReady: readiness.productionReady,
+      diagnosticOnly: readiness.diagnosticOnly === true,
+      releaseEvidenceUsable: readiness.releaseEvidenceUsable !== false,
       localCodeReady: readiness.localCodeReady,
       requiredReady: readiness.checks?.env?.requiredReady || 0,
       requiredTotal: readiness.checks?.env?.requiredTotal || 0,
@@ -243,6 +247,8 @@ function renderMarkdown(status) {
     "",
     `- Verdict: ${status.verdict}`,
     `- Can deploy now: ${status.canDeployNow ? "yes" : "no"}`,
+    `- Diagnostic only: ${status.diagnosticOnly ? "yes" : "no"}`,
+    `- Release evidence usable: ${status.releaseEvidenceUsable ? "yes" : "no"}`,
     `- Required env: ${status.summary.requiredReady}/${status.summary.requiredTotal}`,
     `- Missing required env: ${status.summary.requiredBlocking.length ? status.summary.requiredBlocking.join(", ") : "none"}`,
     `- Operator tasks: ready ${status.summary.operatorTasks.ready || 0}/${status.summary.operatorTasks.total || 0}, blocked ${status.summary.operatorTasks.blocked || 0}, pending_cloud ${status.summary.operatorTasks.pendingCloud || 0}, waiting_for_deploy ${status.summary.operatorTasks.waitingForDeploy || 0}`,

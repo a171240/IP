@@ -275,7 +275,7 @@ corepack pnpm aliyun:cloud:confirmations
 corepack pnpm aliyun:readiness:cloud-ready
 ```
 
-`aliyun:readiness:cloud-ready` 会读取 `deploy/aliyun-production-cn.cloud-confirmations.local.json`。六项确认没有全部 ready 前，它仍会失败。`aliyun:readiness:assume-cloud-ready` 只保留给临时本地诊断，不能作为正式发布门禁。
+`aliyun:readiness:cloud-ready` 会读取 `deploy/aliyun-production-cn.cloud-confirmations.local.json`。六项确认没有全部 ready 前，它仍会失败。`aliyun:readiness:assume-cloud-ready` 只保留给临时本地诊断，不能作为正式发布门禁；该命令会强制输出 `diagnosticOnly=true`、`releaseEvidenceUsable=false`，即使其它本地项通过，也不能作为上线证据。
 
 `aliyun:cloud:confirmations` 会同时校验 example 模板和本机 `.local.json`：模板必须结构有效，本机文件可以在看板模式下列出未完成项。严格发布前使用：
 

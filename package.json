@@ -26,7 +26,7 @@
     "aliyun:readiness": "node ./scripts/check-aliyun-production-cn-readiness.mjs --allow-blocking",
     "aliyun:readiness:strict": "node ./scripts/check-aliyun-production-cn-readiness.mjs",
     "aliyun:readiness:cloud-ready": "node ./scripts/check-aliyun-production-cn-readiness.mjs --cloud-confirmations ./deploy/aliyun-production-cn.cloud-confirmations.local.json",
-    "aliyun:readiness:assume-cloud-ready": "node ./scripts/check-aliyun-production-cn-readiness.mjs --assume-cloud-ready",
+    "aliyun:readiness:assume-cloud-ready": "node ./scripts/check-aliyun-production-cn-readiness.mjs --assume-cloud-ready --allow-blocking",
     "aliyun:release:artifacts": "node ./scripts/prepare-aliyun-release-artifacts.mjs",
     "aliyun:health:smoke": "node ./scripts/smoke-aliyun-health.mjs",
     "aliyun:remote:smoke": "node ./scripts/smoke-aliyun-remote.mjs",

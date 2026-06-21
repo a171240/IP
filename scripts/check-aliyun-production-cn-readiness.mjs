@@ -702,6 +702,7 @@ function main() {
   ])
   const docker = dockerStatus()
   const cloudConfirmations = checkCloudConfirmations(args)
+  const diagnosticOnly = args.assumeCloudReady === true
 
   const machineBlocking = []
   const warnings = []
@@ -776,7 +777,10 @@ function main() {
   if (envFileExists && envMode !== "600") warnings.push(`env_file_mode_should_be_600:current_${envMode}`)
   if (!docker.ready) warnings.push(docker.status)
   if (imagePublishPlan.ready !== true) warnings.push("manual_image_publish_plan_required")
-  if (args.assumeCloudReady) warnings.push("manual_cloud_confirmations_assumed")
+  if (args.assumeCloudReady) {
+    warnings.push("manual_cloud_confirmations_assumed")
+    warnings.push("diagnostic_only_assumed_cloud_ready_not_release_evidence")
+  }
   if (!cloudConfirmations.ready) warnings.push("manual_cloud_confirmations_required")
 
   const manualBlocking = [
@@ -788,12 +792,14 @@ function main() {
       .map((item) => item.label)),
   ]
   const localCodeReady = machineBlocking.length === 0
-  const productionReady = localCodeReady && manualBlocking.length === 0
+  const productionReady = !diagnosticOnly && localCodeReady && manualBlocking.length === 0
 
   const result = {
     ok: productionReady,
+    diagnosticOnly,
     localCodeReady,
     productionReady,
+    releaseEvidenceUsable: !diagnosticOnly,
     envFile: args.envFile,
     suggestedApiHost: "api-cn.ipgongchang.xin",
     machineBlocking,
@@ -844,7 +850,9 @@ function main() {
         ? "等待微信开放平台移动应用审核通过后补 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET"
         : "从微信开放平台移动应用补 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET",
       "从 Apple Developer 确认 APPLE_TEAM_ID，部署后验证 /.well-known/apple-app-site-association 可返回美业话镜 iOS AASA",
-      "复制 deploy/aliyun-production-cn.cloud-confirmations.example.json 到 .local.json，并逐项填写非密钥云资源确认",
+      diagnosticOnly
+        ? "当前使用 --assume-cloud-ready，只能做本地诊断；正式发布必须改用 cloud-confirmations.local.json 非密钥证据"
+        : "复制 deploy/aliyun-production-cn.cloud-confirmations.example.json 到 .local.json，并逐项填写非密钥云资源确认",
       docker.ready
         ? "镜像本地构建能力已就绪；正式部署前复制 image-publish example 到 .local.json，推送/导入阿里云 ACR 并配置 SAE/ECS 拉取远端镜像"
         : "Docker daemon 就绪后执行 corepack pnpm aliyun:docker:build",
@@ -866,7 +874,7 @@ function printHelp() {
     "Default mode fails when production-cn is not ready. It never prints secret values.",
     "--allow-blocking prints the report but exits 0 for local status dashboards.",
     "--cloud-confirmations reads non-secret Aliyun resource confirmation evidence from JSON.",
-    "--assume-cloud-ready bypasses manual cloud confirmations for emergency local diagnosis only.",
+    "--assume-cloud-ready bypasses manual cloud confirmations for emergency local diagnosis only and always marks the result as diagnostic-only, not release evidence.",
   ].join("\n"))
 }
 
