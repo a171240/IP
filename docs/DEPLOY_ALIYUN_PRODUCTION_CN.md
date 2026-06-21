@@ -197,10 +197,11 @@ corepack pnpm aliyun:domain:strict
 corepack pnpm aliyun:deploy:spec
 corepack pnpm aliyun:image:plan
 corepack pnpm aliyun:legal:check
+corepack pnpm aliyun:status
 corepack pnpm aliyun:operator:tasks
 ```
 
-这些命令不输出任何密钥值，也不会创建资源、导入变量或推送镜像。`aliyun:legal:check` 只确认后端包内 `/privacy` 和 `/terms` 页面存在、核心字段完整，并允许正式 URL 仍未填入 env；`aliyun:deploy:spec` 校验 `deploy/aliyun-production-cn.example.json` 的镜像、端口、ACR 发布计划、域名、健康检查和前后置门禁顺序；`aliyun:operator:tasks` 会把当前 `readiness`、`domain`、`.env.production-cn.local`、`image-publish.local.json` 和 `cloud-confirmations.local.json` 汇总为 9 个任务：
+这些命令不输出任何密钥值，也不会创建资源、导入变量或推送镜像。`aliyun:legal:check` 只确认后端包内 `/privacy` 和 `/terms` 页面存在、核心字段完整，并允许正式 URL 仍未填入 env；`aliyun:deploy:spec` 校验 `deploy/aliyun-production-cn.example.json` 的镜像、端口、ACR 发布计划、域名、健康检查和前后置门禁顺序；`aliyun:status` 是给当前发布负责人看的只读总览，会把本地门禁、微信审核、Apple Universal Link、阿里云云资源确认、域名和 ACR 镜像证据压缩成一个 JSON 摘要；`aliyun:operator:tasks` 会把当前 `readiness`、`domain`、`.env.production-cn.local`、`image-publish.local.json` 和 `cloud-confirmations.local.json` 汇总为 9 个任务：
 
 ```text
 T01 微信开放平台移动应用审核和 APP 登录凭证
@@ -217,6 +218,10 @@ T08 阿里云部署后远端 smoke 验收
 如需生成文件给人工核对：
 
 ```bash
+node scripts/summarize-aliyun-production-cn-status.mjs \
+  --out /tmp/meiye-aliyun-production-cn-status.json \
+  --markdown /tmp/meiye-aliyun-production-cn-status.md
+
 node scripts/generate-aliyun-operator-tasks.mjs \
   --out /tmp/meiye-aliyun-operator-tasks.json \
   --markdown /tmp/meiye-aliyun-operator-tasks.md

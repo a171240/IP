@@ -139,6 +139,7 @@ scripts/generate-aliyun-operator-tasks.mjs
 scripts/check-app-client-api-contract.mjs
 scripts/check-app-native-release-config.mjs
 scripts/check-apple-app-site-association.mjs
+scripts/summarize-aliyun-production-cn-status.mjs
 scripts/prepare-aliyun-release-artifacts.mjs
 scripts/run-aliyun-predeploy.mjs
 app/.well-known/apple-app-site-association/route.ts
@@ -359,6 +360,7 @@ node --check scripts/check-aliyun-deployment-spec.mjs
 node --check scripts/check-aliyun-image-publish-plan.mjs
 node --check scripts/check-aliyun-domain-readiness.mjs
 node --check scripts/generate-aliyun-operator-tasks.mjs
+node --check scripts/summarize-aliyun-production-cn-status.mjs
 node scripts/generate-app-runtime-config.mjs --env-file ../.env.production-cn.local --out /tmp/meiye-build-config.generated.ts --require-production-ready --check
 corepack pnpm aliyun:env:plan
 corepack pnpm aliyun:env:sources
@@ -366,6 +368,7 @@ corepack pnpm aliyun:vercel-env:coverage
 corepack pnpm aliyun:domain:check
 corepack pnpm aliyun:deploy:spec
 corepack pnpm aliyun:image:plan
+corepack pnpm aliyun:status
 corepack pnpm aliyun:operator:tasks
 corepack pnpm aliyun:cloud:confirmations
 corepack pnpm aliyun:cloud:confirmations:strict（exit 1 as expected while cloud resources are incomplete）
@@ -453,6 +456,13 @@ aliyun:operator:tasks 只输出非密钥任务清单，覆盖微信开放平台�
 它不创建云资源、不导入变量、不部署、不 push。
 ```
 
+Status summary 说明：
+
+```text
+aliyun:status 只输出非密钥总览，覆盖 productionReady、required env、微信审核、Apple Universal Link、阿里云 cloud confirmations、域名、ACR 镜像发布计划和关键未完成任务。
+它是发布负责人快速判断“现在能不能上线/部署”的入口；不创建云资源、不导入变量、不部署、不 push。
+```
+
 `aliyun:env:plan` 生成：
 
 ```text
@@ -460,7 +470,7 @@ aliyun:operator:tasks 只输出非密钥任务清单，覆盖微信开放平台�
 containsValues: false
 variables: 61
 sourceMetadataReady: 61 / 61
-requiredBlocking: PRIVACY_POLICY_URL, TERMS_URL, WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET
+requiredBlocking: WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET
 ```
 
 `aliyun:env:sources` 同样不输出变量值，默认生成：
@@ -531,6 +541,8 @@ sanitizedEnvFileDeleted: true
 2026-06-22 05:57 CST 复核：在协议 URL ready 后重新执行 `corepack pnpm aliyun:predeploy`，通过。该轮 predeploy 显示 env requiredReady 23/25、blocking 只剩 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；`aliyun:health:smoke` missing 只剩 `appWechatLogin`；`aliyun:app-api:smoke` 仍为 30 probes / 0 failures。
 
 2026-06-22 06:01 CST 复核：在协议 URL ready 后重新执行 `corepack pnpm aliyun:container:smoke`，通过。Docker 镜像内 `/api/healthz`、`/api/app/health` 为 200，strict health 为 503 且 missing 只剩 `appWechatLogin`；App API smoke 仍为 30 probes，临时 sanitized env file 已删除。
+
+2026-06-22 06:18 CST 复核：新增 `corepack pnpm aliyun:status` 后，状态总览命令通过，输出 `containsValues=false`、`verdict=blocked`、`canDeployNow=false`、operator tasks `1/9 ready`、required env `23/25`，缺 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`。同轮重新执行 `git diff --check`、`corepack pnpm aliyun:operator:tasks`、`corepack pnpm aliyun:readiness` 和 `corepack pnpm aliyun:predeploy`，全部通过；`predeploy` 仍显示 health strict 只缺 `appWechatLogin`，APP API smoke `30 probes / 0 failures`，既有 lint warnings 439 个、0 errors。
 
 ## 10. 发布前必须补齐
 
