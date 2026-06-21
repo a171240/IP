@@ -16,6 +16,8 @@
     "aliyun:domain:check": "node ./scripts/check-aliyun-domain-readiness.mjs --allow-blocking",
     "aliyun:domain:strict": "node ./scripts/check-aliyun-domain-readiness.mjs",
     "aliyun:operator:tasks": "node ./scripts/generate-aliyun-operator-tasks.mjs",
+    "aliyun:legal:check": "node ./scripts/check-app-legal-pages.mjs --allow-missing-env",
+    "aliyun:legal:strict": "node ./scripts/check-app-legal-pages.mjs",
     "aliyun:cloud:confirmations": "node ./scripts/check-aliyun-cloud-confirmations.mjs --allow-incomplete",
     "aliyun:cloud:confirmations:strict": "node ./scripts/check-aliyun-cloud-confirmations.mjs",
     "aliyun:cloud:check": "node ./scripts/check-aliyun-production-cn-readiness.mjs --allow-blocking --cloud-confirmations ./deploy/aliyun-production-cn.cloud-confirmations.local.json",

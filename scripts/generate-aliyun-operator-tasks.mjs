@@ -149,6 +149,7 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan }) {
     owner: "产品/法务/发布操作员",
     consolePath: "自有备案 HTTPS 域名或可公开访问的正式协议页面",
     actions: [
+      "先确认后端包内 /privacy 与 /terms 页面存在，并由运营者复核协议文本。",
       "确认隐私政策正式页面 URL，并填入 PRIVACY_POLICY_URL。",
       "确认用户协议或服务条款正式页面 URL，并填入 TERMS_URL。",
       "两个 URL 必须是正式 HTTPS 页面，不能是 TODO、localhost、临时预览或仅本地文件。",
@@ -156,11 +157,14 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan }) {
       "导入阿里云运行环境后，/api/app/health?strict=1 不应再缺 legalLinks。",
     ],
     evidence: [
+      "corepack pnpm aliyun:legal:check 通过",
       "PRIVACY_POLICY_URL ready",
       "TERMS_URL ready",
+      "GET /privacy 和 GET /terms 返回美业话镜 APP 协议页面",
       "GET /api/app/health?strict=1 missing 不包含 legalLinks",
     ],
     verifyCommands: [
+      "corepack pnpm aliyun:legal:check",
       "corepack pnpm aliyun:env:check",
       "corepack pnpm aliyun:health:smoke",
       "corepack pnpm aliyun:remote:smoke -- --base-url https://api-cn.ipgongchang.xin",

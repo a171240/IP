@@ -312,7 +312,7 @@ function sourceMetadataOf(key) {
       category: "legal_links",
       owner: "产品/法务/发布操作员",
       consolePath: "自有备案 HTTPS 域名上的正式协议页面",
-      obtain: "发布正式隐私政策和用户协议页面，确认移动应用审核材料与 APP 内入口使用同一 URL。",
+      obtain: "先运行 corepack pnpm aliyun:legal:check 确认 /privacy 与 /terms 页面存在；运营者复核文本后，建议填写 https://api-cn.ipgongchang.xin/privacy 与 https://api-cn.ipgongchang.xin/terms 或对应 app-cn 正式域名。",
       importTarget: "阿里云 SAE/ECS plain env",
       cloudConfirmationKey: "envImport",
       notes: "不能是 TODO、localhost、本地文件、临时预览或仅 Vercel 预览。",

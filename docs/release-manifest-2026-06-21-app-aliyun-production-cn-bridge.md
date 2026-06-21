@@ -124,12 +124,15 @@ scripts/run-aliyun-predeploy.mjs
 ```text
 deploy/aliyun-production-cn.example.json
 deploy/aliyun-production-cn.image-publish.example.json
+app/privacy/page.tsx
+app/terms/page.tsx
 docs/DEPLOY_ALIYUN_PRODUCTION_CN.md
 docs/release-manifest-2026-06-21-app-aliyun-production-cn-bridge.md
 package.json
 scripts/check-aliyun-production-cn-readiness.mjs
 scripts/check-aliyun-deployment-spec.mjs
 scripts/check-aliyun-image-publish-plan.mjs
+scripts/check-app-legal-pages.mjs
 scripts/generate-aliyun-operator-tasks.mjs
 scripts/check-app-client-api-contract.mjs
 scripts/check-app-native-release-config.mjs
@@ -383,6 +386,7 @@ aliyun:env:plan
 aliyun:env:sources
 aliyun:deploy:spec
 aliyun:image:plan
+aliyun:legal:check
 aliyun:cloud:check
 aliyun:readiness
 aliyun:routes:check
@@ -404,12 +408,13 @@ aliyun:app-api:smoke
 routes: 31 checked, 0 failures
 env source catalog: 62 variables, 62 source metadata ready, containsValues false
 app-client contract: 40 audited calls, 34 unique client routes, 26 matched backend routes, 4 deferred knowledge-space calls, 0 failures
+app legal pages: ok=true, /privacy and /terms route files ready, env URL still requires operator confirmation
 app-native release config: ok=true, Android release signing config ready, iOS Associated Domains applinks:api-cn.ipgongchang.xin configured
 aasa config: ok=false, route files exist, blocker apple_team_id_missing, universalLink https://api-cn.ipgongchang.xin/app/wechat/
 app-api coverage: 29 / 29 business routes, 30 probes, 0 missing
 docker context: 7 files, 24 dockerignore patterns, sensitive env excluded
 image publish plan: template ready, local file not ready until ACR remote image and runtime pull evidence are filled
-deployment spec: image meiye-huajing-app-api:production-cn, port 3000, apiHost api-cn.ipgongchang.xin, predeploy 16, postdeploy 5, 0 blockers
+deployment spec: image meiye-huajing-app-api:production-cn, port 3000, apiHost api-cn.ipgongchang.xin, predeploy 17, postdeploy 5, 0 blockers
 release preflight: 4 / 4 pass
 build: compiled successfully; existing lint warnings only
 health smoke: sensitiveLeakCount 0
@@ -512,9 +517,9 @@ sanitizedEnvFileDeleted: true
 
 正式部署仍未执行；`deploy/aliyun-production-cn.image-publish.local.json` 已在本机作为 ignored 非密钥草稿创建，当前只填了 local image digest。下一步需要推送/导入到阿里云 ACR，或使用阿里云镜像构建服务，并把 ACR remote image / digest / 运行时拉取证据补入该 local 文件。
 
-本轮新增门禁：`PRIVACY_POLICY_URL` / `TERMS_URL` 的 ready 判定现在必须通过 HTTPS 正式 URL 形态校验；localhost、example、`.vercel.app` 和旧 Vercel 入口域名不会让后端 `legalLinks` 或 APP runtime/build-time config 误判为 ready。
+本轮新增门禁：`PRIVACY_POLICY_URL` / `TERMS_URL` 的 ready 判定现在必须通过 HTTPS 正式 URL 形态校验；localhost、example、`.vercel.app` 和旧 Vercel 入口域名不会让后端 `legalLinks` 或 APP runtime/build-time config 误判为 ready。2026-06-22 追加：后端包已提供 `/privacy` 和 `/terms` 页面落点，`corepack pnpm aliyun:legal:check` 可检查页面核心字段；正式 URL 仍需运营者复核文本后填入 env。
 
-2026-06-22 03:56 CST 复核：`corepack pnpm aliyun:predeploy` 通过。该命令重新覆盖了 env plan/source、deploy spec、image plan、cloud confirmations、domain check、readiness、routes check、App client contract、App native release check、App API coverage、Docker context、TypeScript、release preflight、Next build、health smoke 和 App API smoke。当前通过表示桥接后端本地包自洽；不表示微信开放平台、阿里云 ACR/runtime、DNS/HTTPS/ICP、OSS/RAM/SLS 已生产 ready。
+2026-06-22 03:56 CST 复核：`corepack pnpm aliyun:predeploy` 通过。该命令重新覆盖了 env plan/source、deploy spec、image plan、cloud confirmations、domain check、readiness、routes check、App client contract、App native release check、App API coverage、Docker context、TypeScript、release preflight、Next build、health smoke 和 App API smoke。当前通过表示桥接后端本地包自洽；不表示微信开放平台、阿里云 ACR/runtime、DNS/HTTPS/ICP、OSS/RAM/SLS 已生产 ready。2026-06-22 追加后，`predeploy` 还会覆盖 `aliyun:legal:check`。
 
 ## 10. 发布前必须补齐
 
@@ -552,13 +557,15 @@ SLS：仅看到入口，未确认项目和告警
 APP_API_BASE_URL=https://api-cn.ipgongchang.xin
 NEXT_PUBLIC_SITE_URL=https://api-cn.ipgongchang.xin
 APP_ASSET_BASE_URL=https://assets-cn.ipgongchang.xin
+PRIVACY_POLICY_URL=https://api-cn.ipgongchang.xin/privacy
+TERMS_URL=https://api-cn.ipgongchang.xin/terms
 WECHAT_OPEN_APP_REVIEW_STATUS=approved
 WECHAT_OPEN_APP_ID=<微信开放平台移动应用 AppID>
 WECHAT_OPEN_APP_SECRET=<微信开放平台移动应用 AppSecret>
 APPLE_TEAM_ID=<Apple Developer 10 位 Team ID>
 ```
 
-`APP_API_BASE_URL`、`NEXT_PUBLIC_SITE_URL`、`APP_ASSET_BASE_URL` 已写入本机 `.env.production-cn.local`，但仍需阿里云 DNS/HTTPS/OSS/CDN 证据确认后才能算生产 ready。
+`APP_API_BASE_URL`、`NEXT_PUBLIC_SITE_URL`、`APP_ASSET_BASE_URL` 已写入本机 `.env.production-cn.local`，但仍需阿里云 DNS/HTTPS/OSS/CDN 证据确认后才能算生产 ready。`PRIVACY_POLICY_URL` 与 `TERMS_URL` 已有推荐落点，但当前仍保持缺失状态，需运营者复核页面文本后再写入本机 env 和阿里云运行环境。
 
 ### 10.3 微信开放平台
 

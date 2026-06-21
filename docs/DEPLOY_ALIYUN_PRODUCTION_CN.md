@@ -193,10 +193,11 @@ corepack pnpm aliyun:domain:strict
 ```bash
 corepack pnpm aliyun:deploy:spec
 corepack pnpm aliyun:image:plan
+corepack pnpm aliyun:legal:check
 corepack pnpm aliyun:operator:tasks
 ```
 
-这些命令不输出任何密钥值，也不会创建资源、导入变量或推送镜像。`aliyun:deploy:spec` 校验 `deploy/aliyun-production-cn.example.json` 的镜像、端口、ACR 发布计划、域名、健康检查和前后置门禁顺序；`aliyun:operator:tasks` 会把当前 `readiness`、`domain`、`.env.production-cn.local`、`image-publish.local.json` 和 `cloud-confirmations.local.json` 汇总为 9 个任务：
+这些命令不输出任何密钥值，也不会创建资源、导入变量或推送镜像。`aliyun:legal:check` 只确认后端包内 `/privacy` 和 `/terms` 页面存在、核心字段完整，并允许正式 URL 仍未填入 env；`aliyun:deploy:spec` 校验 `deploy/aliyun-production-cn.example.json` 的镜像、端口、ACR 发布计划、域名、健康检查和前后置门禁顺序；`aliyun:operator:tasks` 会把当前 `readiness`、`domain`、`.env.production-cn.local`、`image-publish.local.json` 和 `cloud-confirmations.local.json` 汇总为 9 个任务：
 
 ```text
 T01 微信开放平台移动应用审核和 APP 登录凭证
@@ -672,6 +673,7 @@ corepack pnpm aliyun:env:plan
 corepack pnpm aliyun:env:sources
 corepack pnpm aliyun:deploy:spec
 corepack pnpm aliyun:image:plan
+corepack pnpm aliyun:legal:check
 corepack pnpm aliyun:cloud:confirmations
 corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:readiness
@@ -783,6 +785,7 @@ node scripts/prepare-aliyun-runtime-env.mjs --env-file /Users/Admin/Documents/�
 node --check scripts/check-aliyun-production-cn-readiness.mjs
 node --check scripts/check-app-native-release-config.mjs
 node --check scripts/check-apple-app-site-association.mjs
+node --check scripts/check-app-legal-pages.mjs
 node --check scripts/prepare-aliyun-release-artifacts.mjs
 node --check scripts/generate-aliyun-operator-tasks.mjs
 node --check scripts/run-aliyun-predeploy.mjs
@@ -796,6 +799,7 @@ node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.clou
 corepack pnpm aliyun:readiness
 corepack pnpm aliyun:env:sources（62 variables / 62 source metadata ready）
 corepack pnpm aliyun:image:plan（template ready / local missing）
+corepack pnpm aliyun:legal:check（/privacy 与 /terms route files ready；正式 URL env 仍允许缺失）
 corepack pnpm aliyun:operator:tasks
 corepack pnpm aliyun:cloud:confirmations（template ready / local 21 blockers）
 corepack pnpm aliyun:cloud:check
@@ -810,7 +814,7 @@ corepack pnpm aliyun:docker:check（7 files / 24 dockerignore patterns / sensiti
 corepack pnpm aliyun:container:smoke（Docker health + 30 APP API probes / sanitized env deleted）
 node --check scripts/check-aliyun-domain-readiness.mjs
 corepack pnpm aliyun:domain:check（状态看板 exit 0；当前 ok=false）
-corepack pnpm aliyun:deploy:spec（image meiye-huajing-app-api:production-cn / port 3000 / predeploy 16 / postdeploy 5）
+corepack pnpm aliyun:deploy:spec（image meiye-huajing-app-api:production-cn / port 3000 / predeploy 17 / postdeploy 5）
 corepack pnpm aliyun:remote:smoke -- --base-url http://127.0.0.1:3022 --allow-missing appWechatLogin,legalLinks
 corepack pnpm aliyun:env:check
 corepack pnpm exec tsc --noEmit --pretty false
@@ -846,6 +850,28 @@ APP_ASSET_BASE_URL=https://assets-cn.ipgongchang.xin
 ```
 
 这些值只表示本地目标配置已补齐；正式发布仍要由 `deploy/aliyun-production-cn.cloud-confirmations.local.json` 确认 DNS、HTTPS、ICP、OSS/CORS/RAM 和 SLS。
+
+2026-06-22 追加：后端包已提供 APP 国内版协议页面落点：
+
+```text
+GET /privacy
+GET /terms
+```
+
+本地门禁：
+
+```bash
+corepack pnpm aliyun:legal:check
+```
+
+该门禁只证明页面文件和核心字段存在，不代表运营者已经确认正式法律文本。正式上线前仍需把经营者确认后的 URL 填入：
+
+```text
+PRIVACY_POLICY_URL=https://api-cn.ipgongchang.xin/privacy
+TERMS_URL=https://api-cn.ipgongchang.xin/terms
+```
+
+如果最终使用独立 APP 站点域名，也可以改为同路径的 `https://app-cn.ipgongchang.xin/privacy` 和 `https://app-cn.ipgongchang.xin/terms`，但必须保持 APP 构建配置、阿里云运行环境和应用商店提交材料一致。
 
 域名机器检查命令：
 

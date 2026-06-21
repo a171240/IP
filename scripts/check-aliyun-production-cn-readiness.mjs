@@ -98,6 +98,7 @@ const REQUIRED_BACKEND_FILES = [
   "scripts/check-aliyun-cloud-confirmations.mjs",
   "scripts/check-aliyun-domain-readiness.mjs",
   "scripts/generate-aliyun-operator-tasks.mjs",
+  "scripts/check-app-legal-pages.mjs",
   "scripts/prepare-aliyun-runtime-env.mjs",
   "scripts/check-app-api-production-cn-routes.mjs",
   "scripts/check-app-client-api-contract.mjs",
@@ -125,6 +126,8 @@ const REQUIRED_BACKEND_SCRIPTS = [
   "aliyun:domain:check",
   "aliyun:domain:strict",
   "aliyun:operator:tasks",
+  "aliyun:legal:check",
+  "aliyun:legal:strict",
   "aliyun:cloud:confirmations",
   "aliyun:cloud:confirmations:strict",
   "aliyun:cloud:check",
@@ -674,6 +677,7 @@ function main() {
   const wechatOpenPlatform = checkWechatOpenPlatform(env)
   const backendFiles = fileStatus(BACKEND_ROOT, REQUIRED_BACKEND_FILES)
   const backendScripts = scriptStatus(resolve(BACKEND_ROOT, "package.json"), REQUIRED_BACKEND_SCRIPTS)
+  const appLegalPages = runJsonScript("scripts/check-app-legal-pages.mjs", ["--allow-missing-env"])
   const appFiles = fileStatus(APP_ROOT, REQUIRED_APP_FILES)
   const appScripts = scriptStatus(resolve(APP_ROOT, "package.json"), REQUIRED_APP_SCRIPTS)
   const appProductionCnEnvTemplate = envTemplateStatus(resolve(APP_ROOT, ".env.production-cn.example"))
@@ -722,6 +726,7 @@ function main() {
   addBlocker(machineBlocking, !wechatOpenPlatform.ready, wechatOpenPlatformBlocker(wechatOpenPlatform))
   addBlocker(machineBlocking, !backendFiles.ready, `missing_backend_files:${backendFiles.missing.join(",")}`)
   addBlocker(machineBlocking, !backendScripts.ready, `missing_backend_scripts:${backendScripts.missing.join(",")}`)
+  addBlocker(machineBlocking, !appLegalPages.ok, `invalid_app_legal_pages:${appLegalPages.blockers?.join(",") || "unknown"}`)
   addBlocker(machineBlocking, !appFiles.ready, `missing_app_config_files:${appFiles.missing.join(",")}`)
   addBlocker(machineBlocking, !appScripts.ready, `missing_app_config_scripts:${appScripts.missing.join(",")}`)
   addBlocker(
@@ -794,8 +799,9 @@ function main() {
       wechatOpenPlatform,
       backend: {
         files: backendFiles,
-        scripts: backendScripts,
-      },
+      scripts: backendScripts,
+      legalPages: appLegalPages,
+    },
       appProductionConfig: {
         files: appFiles,
         scripts: appScripts,

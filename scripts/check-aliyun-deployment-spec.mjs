@@ -12,6 +12,7 @@ const DEFAULT_SPEC_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.exa
 const REQUIRED_PREDEPLOY_CHECKS = [
   "corepack pnpm aliyun:deploy:spec",
   "corepack pnpm aliyun:image:plan",
+  "corepack pnpm aliyun:legal:check",
   "corepack pnpm aliyun:operator:tasks",
   "corepack pnpm aliyun:cloud:confirmations",
   "corepack pnpm aliyun:readiness",

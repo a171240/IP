@@ -189,6 +189,7 @@ function renderMarkdown(audit) {
   const vercelEnvCoverage = audit.checks.vercelEnvCoverage
   const domain = audit.checks.domain
   const deploymentSpec = audit.checks.deploymentSpec
+  const legalPages = audit.checks.legalPages
   const imagePublishPlan = audit.checks.imagePublishPlan
   const operatorTasks = audit.checks.operatorTasks
   const cloudConfirmationsCheck = audit.checks.cloudConfirmationsCheck
@@ -212,6 +213,7 @@ function renderMarkdown(audit) {
     `- appApiSmokeCoverage: ${appApiSmokeCoverage.coveredBusinessRoutes} / ${appApiSmokeCoverage.businessRoutes} business routes`,
     `- dockerContext: ${docker.ok ? "ok" : "not ok"}`,
     `- deploymentSpec: ${deploymentSpec.ok ? "ok" : "not ready"}`,
+    `- legalPages: ${legalPages.ok ? "ok" : "not ready"}`,
     `- imagePublishPlan: ${imagePublishPlan.ready === true ? "ready" : "not ready"}`,
     `- domainReadiness: ${domain.ok ? "ok" : "not ready"} (${domain.targetReady} / ${domain.targetTotal})`,
     `- appNativeRelease: ${appNativeRelease?.ok === true ? "ready" : "not ready"}`,
@@ -472,6 +474,12 @@ function main() {
     "scripts/check-aliyun-image-publish-plan.mjs",
     "--allow-incomplete",
   ])
+  const legalPages = runJson("legal_pages", [
+    "scripts/check-app-legal-pages.mjs",
+    "--env-file",
+    args.envFile,
+    "--allow-missing-env",
+  ])
   const operatorTasksJsonPath = resolve(args.outDir, "operator-tasks.json")
   const operatorTasksMarkdownPath = resolve(args.outDir, "operator-tasks.md")
   const cloudConfirmationsCheckPath = resolve(args.outDir, "cloud-confirmations-check.json")
@@ -512,6 +520,7 @@ function main() {
       readiness,
       domain,
       deploymentSpec,
+      legalPages,
       imagePublishPlan,
       operatorTasks,
       cloudConfirmationsCheck,
@@ -529,6 +538,7 @@ function main() {
       vercelEnvCoverage: vercelEnvCoverage.ok ? resolve(args.outDir, "vercel-env-coverage.json") : null,
       domainReadiness: resolve(args.outDir, "domain-readiness.json"),
       cloudConfirmationsCheck: cloudConfirmationsCheckPath,
+      legalPages: resolve(args.outDir, "legal-pages.json"),
       imagePublishPlan: resolve(args.outDir, "image-publish-plan-check.json"),
       operatorTasksJson: operatorTasksJsonPath,
       operatorTasksMarkdown: operatorTasksMarkdownPath,
@@ -540,6 +550,7 @@ function main() {
   writeText(audit.outputFiles.auditMarkdown, renderMarkdown(audit))
   writeText(audit.outputFiles.domainReadiness, JSON.stringify(domain, null, 2))
   writeText(audit.outputFiles.cloudConfirmationsCheck, JSON.stringify(cloudConfirmationsCheck, null, 2))
+  writeText(audit.outputFiles.legalPages, JSON.stringify(legalPages, null, 2))
   writeText(audit.outputFiles.imagePublishPlan, JSON.stringify(imagePublishPlan, null, 2))
 
   console.log(JSON.stringify({
@@ -566,6 +577,17 @@ function main() {
       localReady: imagePublishPlan.summary?.localReady === true,
       totalBlockers: imagePublishPlan.summary?.totalBlockers ?? 0,
       localDockerImage: imagePublishPlan.localDockerImage?.status || "unknown",
+    },
+    legalPages: {
+      report: audit.outputFiles.legalPages,
+      ok: legalPages.ok === true,
+      blockers: legalPages.blockers || [],
+      pages: legalPages.pages?.map((page) => ({
+        key: page.key,
+        routePath: page.routePath,
+        exists: page.exists,
+        envStatus: page.envUrl?.status || "unknown",
+      })) || [],
     },
     cloudConfirmationsCheck: {
       report: audit.outputFiles.cloudConfirmationsCheck,
