@@ -12,6 +12,7 @@ const BACKEND_ROOT = resolve(__dirname, "..")
 const WORKSPACE_ROOT = resolve(BACKEND_ROOT, "../..")
 const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
+const APP_LAUNCH_BLOCKING_VARIABLE_NAMES = new Set(["APPLE_TEAM_ID"])
 
 function parseArgs(argv) {
   const args = {
@@ -88,6 +89,18 @@ function compactVariable(item) {
   }
 }
 
+function variableByName(variables, name) {
+  return variables.find((item) => item.name === name) || null
+}
+
+function compactLaunchBlockingVariable(item, blockingReason) {
+  return {
+    ...compactVariable(item),
+    launchBlocking: true,
+    blockingReason,
+  }
+}
+
 function taskById(tasks, id) {
   return tasks.find((task) => task.id === id) || null
 }
@@ -111,11 +124,13 @@ function compactTask(task) {
 
 function buildHandoff({ args, envPlan, status, operatorTasks }) {
   const tasks = operatorTasks.tasks || []
+  const machineBlocking = status.summary?.machineBlocking || []
+  const appLaunchBlocking = buildAppLaunchBlocking(envPlan.variables, machineBlocking)
   const blockingRequiredVariables = envPlan.variables
     .filter((item) => item.required && item.status !== "ready")
     .map(compactVariable)
   const optionalDeferredVariables = envPlan.variables
-    .filter((item) => !item.required && item.status !== "ready")
+    .filter((item) => !item.required && item.status !== "ready" && !APP_LAUNCH_BLOCKING_VARIABLE_NAMES.has(item.name))
     .map(compactVariable)
   const priorityTaskIds = [
     "T01_WECHAT_OPEN_PLATFORM_APP_LOGIN",
@@ -156,6 +171,7 @@ function buildHandoff({ args, envPlan, status, operatorTasks }) {
       required: blockingRequiredVariables,
       optionalDeferred: optionalDeferredVariables,
     },
+    appLaunchBlocking,
     userActionNow: [
       {
         title: "等待微信开放平台移动应用审核通过",
@@ -200,6 +216,47 @@ function buildHandoff({ args, envPlan, status, operatorTasks }) {
   }
 }
 
+function buildAppLaunchBlocking(variables, machineBlocking) {
+  const blockingVariables = []
+  const appleTeamId = variableByName(variables, "APPLE_TEAM_ID")
+  if (appleTeamId && appleTeamId.status !== "ready") {
+    blockingVariables.push(compactLaunchBlockingVariable(
+      appleTeamId,
+      "iOS Universal Link 的 AASA appID 需要 Apple Team ID；它不是后端必填密钥，但会阻塞 iOS APP 微信登录发布验收。",
+    ))
+  }
+
+  const states = []
+  if (machineBlocking.includes("wechat_open_platform_mobile_app_reviewing")) {
+    states.push({
+      name: "WECHAT_OPEN_APP_REVIEW_STATUS",
+      status: "reviewing",
+      launchBlocking: true,
+      owner: "用户/微信开放平台操作员",
+      where: "微信开放平台 -> 管理中心 -> 移动应用 -> 美业话镜 App",
+      obtain: "移动应用审核通过后把状态更新为 approved，再读取 AppID/AppSecret。",
+      action: "等待审核通过；不能用小程序凭证绕过。",
+    })
+  }
+  if (machineBlocking.includes("invalid_app_universal_link_config")) {
+    states.push({
+      name: "IOS_UNIVERSAL_LINK_AASA",
+      status: "blocked",
+      launchBlocking: true,
+      owner: "Apple Developer / iOS 发布操作员",
+      where: "Apple Developer -> Identifiers -> 美业话镜 App ID；阿里云部署后 GET /.well-known/apple-app-site-association",
+      obtain: "确认 APPLE_TEAM_ID、iOS Bundle ID com.ipgongchang.meiyehuajing、Associated Domains applinks:api-cn.ipgongchang.xin 和微信开放平台 Universal Link 一致。",
+      action: "补 APPLE_TEAM_ID，部署 api-cn 后验证 AASA 路由 200。",
+    })
+  }
+
+  return {
+    variables: blockingVariables,
+    states,
+    machineBlocking,
+  }
+}
+
 function renderMarkdown(handoff) {
   const lines = [
     "# 美业话镜 APP production-cn 操作包",
@@ -227,6 +284,14 @@ function renderMarkdown(handoff) {
     ...(handoff.missingVariables.required.length
       ? handoff.missingVariables.required.flatMap((item) => renderVariable(item))
       : ["- none", ""]),
+    "## APP 发布阻塞但不属于后端必填密钥",
+    "",
+    ...(handoff.appLaunchBlocking.variables.length
+      ? handoff.appLaunchBlocking.variables.flatMap((item) => renderVariable(item))
+      : ["- no launch-blocking variables", ""]),
+    ...(handoff.appLaunchBlocking.states.length
+      ? handoff.appLaunchBlocking.states.flatMap((item) => renderBlockingState(item))
+      : ["- no launch-blocking states", ""]),
     "## 可后置或可选但未 ready 的变量",
     "",
     ...(handoff.missingVariables.optionalDeferred.length
@@ -281,9 +346,25 @@ function renderVariable(item) {
     `- importTarget: ${item.importTarget}`,
     `- cloudConfirmationKey: ${item.cloudConfirmationKey}`,
     `- action: ${item.action}`,
+    item.launchBlocking ? `- launchBlocking: ${item.launchBlocking}` : "",
+    item.blockingReason ? `- blockingReason: ${item.blockingReason}` : "",
     item.notes ? `- notes: ${item.notes}` : "",
     "",
   ].filter(Boolean)
+}
+
+function renderBlockingState(item) {
+  return [
+    `### ${item.name}`,
+    "",
+    `- status: ${item.status}`,
+    `- launchBlocking: ${item.launchBlocking}`,
+    `- owner: ${item.owner}`,
+    `- where: ${item.where}`,
+    `- obtain: ${item.obtain}`,
+    `- action: ${item.action}`,
+    "",
+  ]
 }
 
 function renderTask(task) {
