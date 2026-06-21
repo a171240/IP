@@ -193,6 +193,7 @@ function renderMarkdown(audit) {
   const legalPages = audit.checks.legalPages
   const imagePublishPlan = audit.checks.imagePublishPlan
   const operatorTasks = audit.checks.operatorTasks
+  const productionStatus = audit.checks.productionStatus
   const cloudConfirmationsCheck = audit.checks.cloudConfirmationsCheck
   const cloudConfirmations = readiness.checks?.cloudConfirmations
   const appProductionConfig = readiness.checks?.appProductionConfig
@@ -220,6 +221,7 @@ function renderMarkdown(audit) {
     `- domainReadiness: ${domain.ok ? "ok" : "not ready"} (${domain.targetReady} / ${domain.targetTotal})`,
     `- appNativeRelease: ${appNativeRelease?.ok === true ? "ready" : "not ready"}`,
     `- operatorTasks: ${operatorTasks.summary.ready} / ${operatorTasks.summary.total} ready`,
+    `- productionStatus: ${productionStatus.verdict}, canDeployNow ${productionStatus.canDeployNow === true}`,
     `- cloudConfirmations: ${cloudConfirmations?.ready ? "ready" : "not ready"}`,
     `- cloudConfirmationsCheck: template ${cloudConfirmationsCheck?.template?.ready ? "ready" : "not ready"}, local ${cloudConfirmationsCheck?.local?.ready ? "ready" : "not ready"}`,
     `- vercelEnvCoverage: ${vercelEnvCoverage?.ok ? "ok" : vercelEnvCoverage?.skipped ? "skipped" : "not ok"}`,
@@ -329,6 +331,18 @@ function renderMarkdown(audit) {
     `- ready: ${operatorTasks.summary.ready} / ${operatorTasks.summary.total}`,
     `- blocked: ${operatorTasks.summary.blocked}`,
     `- pendingCloud: ${operatorTasks.summary.pendingCloud}`,
+    "",
+    "## 发布负责人状态总览",
+    "",
+    `- json: ${audit.outputFiles.productionStatusJson}`,
+    `- markdown: ${audit.outputFiles.productionStatusMarkdown}`,
+    `- verdict: ${productionStatus.verdict}`,
+    `- canDeployNow: ${productionStatus.canDeployNow === true}`,
+    `- requiredEnv: ${productionStatus.summary.requiredReady} / ${productionStatus.summary.requiredTotal}`,
+    `- requiredBlocking: ${productionStatus.summary.requiredBlocking?.length ? productionStatus.summary.requiredBlocking.join(", ") : "none"}`,
+    ...(productionStatus.humanSummary?.length
+      ? productionStatus.humanSummary.map((item) => `- ${item}`)
+      : ["- humanSummary: none"]),
     "",
     "## APP API 小程序链路桥接清单",
     "",
@@ -499,6 +513,8 @@ function main() {
   ])
   const operatorTasksJsonPath = resolve(args.outDir, "operator-tasks.json")
   const operatorTasksMarkdownPath = resolve(args.outDir, "operator-tasks.md")
+  const productionStatusJsonPath = resolve(args.outDir, "production-cn-status.json")
+  const productionStatusMarkdownPath = resolve(args.outDir, "production-cn-status.md")
   const cloudConfirmationsCheckPath = resolve(args.outDir, "cloud-confirmations-check.json")
   const operatorTasks = runJson("operator_tasks", [
     "scripts/generate-aliyun-operator-tasks.mjs",
@@ -509,6 +525,16 @@ function main() {
     operatorTasksJsonPath,
     "--markdown",
     operatorTasksMarkdownPath,
+  ])
+  const productionStatus = runJson("production_status", [
+    "scripts/summarize-aliyun-production-cn-status.mjs",
+    "--env-file",
+    args.envFile,
+    ...(args.cloudConfirmationsFile ? ["--cloud-confirmations", args.cloudConfirmationsFile] : []),
+    "--out",
+    productionStatusJsonPath,
+    "--markdown",
+    productionStatusMarkdownPath,
   ])
   const cloudConfirmationsCheck = runJson("cloud_confirmations", [
     "scripts/check-aliyun-cloud-confirmations.mjs",
@@ -541,6 +567,7 @@ function main() {
       legalPages,
       imagePublishPlan,
       operatorTasks,
+      productionStatus,
       cloudConfirmationsCheck,
       routes,
       appApiBridgeMap,
@@ -562,6 +589,8 @@ function main() {
       appApiBridgeMap: resolve(args.outDir, "app-api-bridge-map-check.json"),
       operatorTasksJson: operatorTasksJsonPath,
       operatorTasksMarkdown: operatorTasksMarkdownPath,
+      productionStatusJson: productionStatusJsonPath,
+      productionStatusMarkdown: productionStatusMarkdownPath,
       bundle: bundle?.path || null,
     },
   }
@@ -615,6 +644,16 @@ function main() {
       templateReady: cloudConfirmationsCheck.template?.ready === true,
       localReady: cloudConfirmationsCheck.local?.ready === true,
       totalBlockers: cloudConfirmationsCheck.summary?.totalBlockers ?? 0,
+    },
+    productionStatus: {
+      report: audit.outputFiles.productionStatusJson,
+      markdown: audit.outputFiles.productionStatusMarkdown,
+      verdict: productionStatus.verdict,
+      canDeployNow: productionStatus.canDeployNow === true,
+      requiredReady: `${productionStatus.summary.requiredReady}/${productionStatus.summary.requiredTotal}`,
+      requiredBlocking: productionStatus.summary.requiredBlocking || [],
+      operatorTasks: productionStatus.summary.operatorTasks || {},
+      cloudConfirmations: productionStatus.summary.cloudConfirmations || {},
     },
     appProductionConfig: {
       filesReady: readiness.checks?.appProductionConfig?.files?.ready === true,

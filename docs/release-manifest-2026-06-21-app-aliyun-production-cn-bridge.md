@@ -393,6 +393,7 @@ aliyun:image:plan
 aliyun:legal:check
 aliyun:cloud:check
 aliyun:readiness
+aliyun:status
 aliyun:routes:check
 aliyun:app-api:bridge-map
 aliyun:app-client:contract
@@ -420,7 +421,7 @@ aasa config: ok=false, route files exist, blocker apple_team_id_missing, univers
 app-api coverage: 29 / 29 business routes, 30 probes, 0 missing
 docker context: 7 files, 24 dockerignore patterns, sensitive env excluded
 image publish plan: template ready, local file not ready until ACR remote image and runtime pull evidence are filled
-deployment spec: image meiye-huajing-app-api:production-cn, port 3000, apiHost api-cn.ipgongchang.xin, predeploy 18, postdeploy 5, 0 blockers
+deployment spec: image meiye-huajing-app-api:production-cn, port 3000, apiHost api-cn.ipgongchang.xin, predeploy 19, postdeploy 5, 0 blockers
 release preflight: 4 / 4 pass
 build: compiled successfully; existing lint warnings only
 health smoke: sensitiveLeakCount 0
@@ -486,6 +487,8 @@ requiredBlocking: WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET
 ```text
 release-audit.json
 release-audit.md
+production-cn-status.json
+production-cn-status.md
 env-import-plan.json
 vercel-env-coverage.json
 image-publish-plan-check.json
@@ -543,6 +546,8 @@ sanitizedEnvFileDeleted: true
 2026-06-22 06:01 CST 复核：在协议 URL ready 后重新执行 `corepack pnpm aliyun:container:smoke`，通过。Docker 镜像内 `/api/healthz`、`/api/app/health` 为 200，strict health 为 503 且 missing 只剩 `appWechatLogin`；App API smoke 仍为 30 probes，临时 sanitized env file 已删除。
 
 2026-06-22 06:18 CST 复核：新增 `corepack pnpm aliyun:status` 后，状态总览命令通过，输出 `containsValues=false`、`verdict=blocked`、`canDeployNow=false`、operator tasks `1/9 ready`、required env `23/25`，缺 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`。同轮重新执行 `git diff --check`、`corepack pnpm aliyun:operator:tasks`、`corepack pnpm aliyun:readiness` 和 `corepack pnpm aliyun:predeploy`，全部通过；`predeploy` 仍显示 health strict 只缺 `appWechatLogin`，APP API smoke `30 probes / 0 failures`，既有 lint warnings 439 个、0 errors。
+
+2026-06-22 06:31 CST 追加：`corepack pnpm aliyun:release:artifacts` 现在会同时生成 `production-cn-status.json` 和 `production-cn-status.md`，并把状态总览写入 `release-audit.json/md`。`corepack pnpm aliyun:predeploy` 也纳入 `aliyun:status`，部署规格 `predeployChecks` 从 18 项更新为 19 项，发布前门禁会固定覆盖“能不能上线/部署”的非密钥总览。
 
 ## 10. 发布前必须补齐
 

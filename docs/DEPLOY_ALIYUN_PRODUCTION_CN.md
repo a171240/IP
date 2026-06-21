@@ -308,6 +308,8 @@ corepack pnpm aliyun:release:artifacts
 ```text
 release-audit.json
 release-audit.md
+production-cn-status.json
+production-cn-status.md
 env-import-plan.json
 vercel-env-coverage.json
 app-api-bridge-map-check.json
@@ -315,6 +317,8 @@ meiye-huajing-app-api-production-cn-context.tar.gz
 ```
 
 该脚本会复用当前 readiness、env、routes、小程序链路桥接清单、Docker context 检查，并默认尝试生成 Vercel production 变量名覆盖报告。Vercel 覆盖报告只包含变量名、环境和加密/敏感元数据，不包含真实 value；如果 Vercel 登录态不可用，会在审计里记录失败，不阻断本地发布审计包生成。
+
+`production-cn-status.json` 和 `production-cn-status.md` 是 `aliyun:status` 的打包输出，供发布负责人快速判断当前能否上线、还缺哪些微信/阿里云/Apple 证据。
 
 如果只想离线生成审计包，或不想访问 Vercel：
 
@@ -827,7 +831,7 @@ corepack pnpm aliyun:docker:check（7 files / 24 dockerignore patterns / sensiti
 corepack pnpm aliyun:container:smoke（Docker health + 30 APP API probes / sanitized env deleted）
 node --check scripts/check-aliyun-domain-readiness.mjs
 corepack pnpm aliyun:domain:check（状态看板 exit 0；当前 ok=false）
-corepack pnpm aliyun:deploy:spec（image meiye-huajing-app-api:production-cn / port 3000 / predeploy 18 / postdeploy 5）
+corepack pnpm aliyun:deploy:spec（image meiye-huajing-app-api:production-cn / port 3000 / predeploy 19 / postdeploy 5）
 corepack pnpm aliyun:remote:smoke -- --base-url http://127.0.0.1:3022 --allow-missing appWechatLogin,legalLinks
 corepack pnpm aliyun:env:check
 corepack pnpm exec tsc --noEmit --pretty false

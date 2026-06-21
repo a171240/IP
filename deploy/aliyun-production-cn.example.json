@@ -41,6 +41,7 @@
     "checkCommand": "corepack pnpm aliyun:cloud:confirmations",
     "strictCheckCommand": "corepack pnpm aliyun:cloud:confirmations:strict",
     "operatorTasksCommand": "corepack pnpm aliyun:operator:tasks",
+    "statusCommand": "corepack pnpm aliyun:status",
     "secretsPolicy": "The local confirmation file must contain resource names, booleans, and evidence handles only. Do not paste secret values."
   },
   "predeployChecks": [
@@ -48,6 +49,7 @@
     "corepack pnpm aliyun:image:plan",
     "corepack pnpm aliyun:legal:check",
     "corepack pnpm aliyun:operator:tasks",
+    "corepack pnpm aliyun:status",
     "corepack pnpm aliyun:cloud:confirmations",
     "corepack pnpm aliyun:readiness",
     "corepack pnpm aliyun:env:sources",

@@ -14,6 +14,7 @@ const REQUIRED_PREDEPLOY_CHECKS = [
   "corepack pnpm aliyun:image:plan",
   "corepack pnpm aliyun:legal:check",
   "corepack pnpm aliyun:operator:tasks",
+  "corepack pnpm aliyun:status",
   "corepack pnpm aliyun:cloud:confirmations",
   "corepack pnpm aliyun:readiness",
   "corepack pnpm aliyun:env:sources",
@@ -180,6 +181,9 @@ function validateSpec(spec) {
   }
   if (cloudConfirmations.operatorTasksCommand !== "corepack pnpm aliyun:operator:tasks") {
     blockers.push("cloudConfirmations.operatorTasksCommand")
+  }
+  if (cloudConfirmations.statusCommand !== "corepack pnpm aliyun:status") {
+    blockers.push("cloudConfirmations.statusCommand")
   }
 
   const predeployChecks = requireArray(spec.predeployChecks)
