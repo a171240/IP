@@ -113,7 +113,7 @@ corepack pnpm aliyun:readiness
 5. 后端阿里云部署脚本、Dockerfile、health、APP API smoke 是否齐全。
 6. App production-cn 构建配置生成门禁是否齐全。
 7. Docker daemon 是否可用于本地镜像构建。
-8. 还需要人工确认的阿里云 SAE / DNS / HTTPS / OSS / SLS 等资源。
+8. 还需要人工确认的阿里云 SAE / DNS / HTTPS / OSS / SLS 等资源，且可以读取非密钥 JSON 确认证据。
 ```
 
 严格模式用于真正发布前：
@@ -124,16 +124,27 @@ corepack pnpm aliyun:readiness:strict
 
 如果还有机器可验证阻塞或未显式确认的云资源，严格模式会失败。只做本地状态看板时使用 `aliyun:readiness`。
 
-如果阿里云 SAE/ECS、api-cn HTTPS、OSS、微信开放平台、SLS 和环境变量导入已经人工确认完成，可以用下面这个命令只保留机器可验证阻塞：
+阿里云资源确认不靠口头 `assume`。控制台资源确认后，先复制非密钥模板：
 
 ```bash
+cp deploy/aliyun-production-cn.cloud-confirmations.example.json \
+  deploy/aliyun-production-cn.cloud-confirmations.local.json
+```
+
+然后只在 `.local.json` 里填写资源名、布尔状态和证据链接/截图编号，不填任何密钥值：
+
+```bash
+corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:readiness:cloud-ready
 ```
+
+`aliyun:readiness:cloud-ready` 会读取 `deploy/aliyun-production-cn.cloud-confirmations.local.json`。六项确认没有全部 ready 前，它仍会失败。`aliyun:readiness:assume-cloud-ready` 只保留给临时本地诊断，不能作为正式发布门禁。
 
 非密钥部署样例：
 
 ```text
 /Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.example.json
+/Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.cloud-confirmations.example.json
 ```
 
 ### 2.4 发布审计与 Docker 上下文包
@@ -171,7 +182,7 @@ node_modules
 *.tsbuildinfo
 ```
 
-这份 tar.gz 可作为阿里云镜像构建服务或 ECS 手工构建的源上下文。正式部署前仍要以 `aliyun:readiness:cloud-ready` 和远端 smoke 为准。
+这份 tar.gz 可作为阿里云镜像构建服务或 ECS 手工构建的源上下文。正式部署前仍要以 `aliyun:cloud:check`、`aliyun:readiness:cloud-ready` 和远端 smoke 为准。
 
 ## 3. 环境变量导入
 
@@ -303,6 +314,31 @@ RDS PostgreSQL：替代 Supabase 数据层
 Tair / Redis：任务队列、轮询和重试
 ```
 
+### 4.7 云资源确认文件
+
+本地确认文件位置：
+
+```text
+deploy/aliyun-production-cn.cloud-confirmations.local.json
+```
+
+该文件被 `.gitignore` 排除，不能提交。字段获得方式：
+
+```text
+runtime：阿里云 SAE 应用详情或 ECS 容器运行配置，确认端口 3000 和 /api/healthz。
+apiDomainHttps：阿里云 DNS / 证书服务 / 备案信息，确认 api-cn 已解析到阿里云并启用 HTTPS。
+oss：OSS Bucket CORS、RAM 策略和 service-records/production-cn 前缀。
+wechatOpenPlatform：微信开放平台移动应用审核状态、Android 包名/签名、iOS Bundle ID/Universal Link。
+envImport：SAE/ECS/KMS/Secrets Manager 环境变量导入记录，确认密钥没有写进镜像。
+slsAlerts：SLS 项目和健康检查失败、5xx 告警配置。
+```
+
+检查命令：
+
+```bash
+corepack pnpm aliyun:cloud:check
+```
+
 ## 5. 微信登录变量来源
 
 APP 登录使用微信开放平台的移动应用，不使用小程序 AppID/Secret。
@@ -360,6 +396,7 @@ corepack pnpm aliyun:predeploy
 
 ```bash
 corepack pnpm aliyun:env:check
+corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:readiness
 corepack pnpm aliyun:routes:check
 corepack pnpm aliyun:docker:check
@@ -441,9 +478,12 @@ corepack pnpm aliyun:readiness
 ```text
 node scripts/prepare-aliyun-runtime-env.mjs --env-file /Users/Admin/Documents/美业话镜APP/.env.production-cn.example --allow-todo
 node --check scripts/check-aliyun-production-cn-readiness.mjs
+node --check scripts/prepare-aliyun-release-artifacts.mjs
 node --check scripts/run-aliyun-predeploy.mjs
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.example.json','utf8'))"
+node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.cloud-confirmations.example.json','utf8'))"
 corepack pnpm aliyun:readiness
+corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:release:artifacts
 corepack pnpm aliyun:predeploy
 corepack pnpm aliyun:routes:check（31 routes / 0 failures）
@@ -470,6 +510,14 @@ NEXT_PUBLIC_SITE_URL
 WECHAT_OPEN_APP_ID
 WECHAT_OPEN_APP_SECRET
 wechat_open_platform_mobile_app_reviewing 或 wechat_open_platform_mobile_app_not_ready
+```
+
+`aliyun:cloud:check` 当前云确认状态：
+
+```text
+cloudConfirmations.mode: missing_file
+cloudConfirmations.ready: false
+missing file: deploy/aliyun-production-cn.cloud-confirmations.local.json
 ```
 
 `APP_ASSET_BASE_URL` 当前仍是可选 TODO，不阻塞桥接版 API 部署；正式资产 CDN 切换时再补。

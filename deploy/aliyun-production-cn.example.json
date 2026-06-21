@@ -21,8 +21,15 @@
     "prepareCommand": "node scripts/prepare-aliyun-runtime-env.mjs --env-file /Users/Admin/Documents/美业话镜APP/.env.production-cn.local --write /tmp/meiye-sae-env.json",
     "secretsPolicy": "Import through Aliyun console, KMS, or Secrets Manager. Do not bake secrets into the image."
   },
+  "cloudConfirmations": {
+    "exampleFile": "deploy/aliyun-production-cn.cloud-confirmations.example.json",
+    "localFile": "deploy/aliyun-production-cn.cloud-confirmations.local.json",
+    "checkCommand": "corepack pnpm aliyun:cloud:check",
+    "secretsPolicy": "The local confirmation file must contain resource names, booleans, and evidence handles only. Do not paste secret values."
+  },
   "predeployChecks": [
     "corepack pnpm aliyun:readiness",
+    "corepack pnpm aliyun:cloud:check",
     "corepack pnpm aliyun:readiness:cloud-ready",
     "corepack pnpm aliyun:release:artifacts",
     "corepack pnpm aliyun:predeploy",

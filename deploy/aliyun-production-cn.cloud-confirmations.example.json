@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "environment": "production-cn",
+  "updatedAt": "TODO_YYYY-MM-DDTHH:mm:ss+08:00",
+  "operator": "TODO_OPERATOR",
+  "notes": "Copy this file to aliyun-production-cn.cloud-confirmations.local.json. Keep it non-secret and do not commit the local copy.",
+  "items": {
+    "runtime": {
+      "confirmed": false,
+      "provider": "TODO_SAE_OR_ECS",
+      "region": "TODO_ALIYUN_REGION",
+      "appName": "TODO_ALIYUN_APP_NAME",
+      "containerPort": 3000,
+      "healthPath": "/api/healthz",
+      "evidence": "TODO_ALIYUN_CONSOLE_URL_OR_SCREENSHOT_ID"
+    },
+    "apiDomainHttps": {
+      "confirmed": false,
+      "host": "api-cn.ipgongchang.xin",
+      "dnsResolvedToAliyun": false,
+      "httpsEnabled": false,
+      "icpReady": false,
+      "evidence": "TODO_DNS_CERT_ICP_EVIDENCE"
+    },
+    "oss": {
+      "confirmed": false,
+      "bucket": "TODO_OSS_BUCKET_NAME",
+      "region": "TODO_OSS_REGION",
+      "corsConfigured": false,
+      "ramLeastPrivilege": false,
+      "serviceRecordPrefix": "service-records/production-cn",
+      "evidence": "TODO_OSS_CORS_RAM_EVIDENCE"
+    },
+    "wechatOpenPlatform": {
+      "confirmed": false,
+      "reviewStatus": "reviewing",
+      "mobileAppIdReady": false,
+      "mobileAppSecretReady": false,
+      "androidConfigured": false,
+      "iosConfigured": false,
+      "evidence": "TODO_WECHAT_OPEN_PLATFORM_REVIEW_EVIDENCE"
+    },
+    "envImport": {
+      "confirmed": false,
+      "target": "TODO_SAE_OR_ECS_OR_KMS_OR_SECRETS_MANAGER",
+      "importedAt": "TODO_YYYY-MM-DDTHH:mm:ss+08:00",
+      "secretNotInImage": false,
+      "evidence": "TODO_ENV_IMPORT_EVIDENCE"
+    },
+    "slsAlerts": {
+      "confirmed": false,
+      "slsProject": "TODO_SLS_PROJECT",
+      "healthAlertConfigured": false,
+      "serverErrorAlertConfigured": false,
+      "evidence": "TODO_SLS_ALERT_EVIDENCE"
+    }
+  }
+}

@@ -11,6 +11,7 @@ const BACKEND_ROOT = resolve(__dirname, "..")
 const WORKSPACE_ROOT = resolve(BACKEND_ROOT, "../..")
 const APP_ROOT = resolve(WORKSPACE_ROOT, "meiye-huajing-app")
 const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
+const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
 
 const REQUIRED_ENV_KEYS = [
   "APP_ENV",
@@ -98,9 +99,11 @@ const REQUIRED_BACKEND_FILES = [
 
 const REQUIRED_BACKEND_SCRIPTS = [
   "aliyun:env:check",
+  "aliyun:cloud:check",
   "aliyun:readiness",
   "aliyun:readiness:strict",
   "aliyun:readiness:cloud-ready",
+  "aliyun:readiness:assume-cloud-ready",
   "aliyun:release:artifacts",
   "aliyun:routes:check",
   "aliyun:docker:check",
@@ -123,14 +126,89 @@ const REQUIRED_APP_SCRIPTS = [
   "android:assemble:production-cn",
 ]
 
-const MANUAL_CONFIRMATIONS = [
-  "阿里云 SAE 或 ECS 容器应用已创建，运行端口 3000",
-  "api-cn 域名已备案、解析到阿里云入口并配置 HTTPS",
-  "OSS Bucket CORS、RAM 最小权限和服务记录音频前缀已确认",
-  "微信开放平台移动应用审核已通过，并已取得 AppID/AppSecret、Android 包名/签名、iOS Bundle ID/Universal Link 配置",
-  "生产环境变量已通过阿里云控制台、KMS 或 Secrets Manager 导入，未把密钥写进镜像",
-  "SLS 日志、健康检查失败告警和 5xx 告警已配置",
+const CLOUD_CONFIRMATION_ITEMS = [
+  {
+    key: "runtime",
+    label: "阿里云 SAE 或 ECS 容器应用已创建，运行端口 3000",
+    requiredFields: ["provider", "region", "appName", "containerPort", "evidence"],
+    validate: (item) => {
+      const missing = []
+      if (!["SAE", "ECS"].includes(String(item.provider || "").trim())) missing.push("provider")
+      if (Number(item.containerPort) !== 3000) missing.push("containerPort=3000")
+      return missing
+    },
+  },
+  {
+    key: "apiDomainHttps",
+    label: "api-cn 域名已备案、解析到阿里云入口并配置 HTTPS",
+    requiredFields: ["host", "dnsResolvedToAliyun", "httpsEnabled", "icpReady", "evidence"],
+    validate: (item) => {
+      const missing = []
+      const host = String(item.host || "").trim()
+      if (!host.startsWith("api-cn.")) missing.push("host_api_cn")
+      if (item.dnsResolvedToAliyun !== true) missing.push("dnsResolvedToAliyun")
+      if (item.httpsEnabled !== true) missing.push("httpsEnabled")
+      if (item.icpReady !== true) missing.push("icpReady")
+      return missing
+    },
+  },
+  {
+    key: "oss",
+    label: "OSS Bucket CORS、RAM 最小权限和服务记录音频前缀已确认",
+    requiredFields: ["bucket", "region", "corsConfigured", "ramLeastPrivilege", "serviceRecordPrefix", "evidence"],
+    validate: (item) => {
+      const missing = []
+      if (item.corsConfigured !== true) missing.push("corsConfigured")
+      if (item.ramLeastPrivilege !== true) missing.push("ramLeastPrivilege")
+      return missing
+    },
+  },
+  {
+    key: "wechatOpenPlatform",
+    label: "微信开放平台移动应用审核已通过，并已取得 AppID/AppSecret、Android 包名/签名、iOS Bundle ID/Universal Link 配置",
+    requiredFields: [
+      "reviewStatus",
+      "mobileAppIdReady",
+      "mobileAppSecretReady",
+      "androidConfigured",
+      "iosConfigured",
+      "evidence",
+    ],
+    validate: (item) => {
+      const missing = []
+      if (String(item.reviewStatus || "").trim() !== "approved") missing.push("reviewStatus=approved")
+      if (item.mobileAppIdReady !== true) missing.push("mobileAppIdReady")
+      if (item.mobileAppSecretReady !== true) missing.push("mobileAppSecretReady")
+      if (item.androidConfigured !== true) missing.push("androidConfigured")
+      if (item.iosConfigured !== true) missing.push("iosConfigured")
+      return missing
+    },
+  },
+  {
+    key: "envImport",
+    label: "生产环境变量已通过阿里云控制台、KMS 或 Secrets Manager 导入，未把密钥写进镜像",
+    requiredFields: ["target", "secretNotInImage", "importedAt", "evidence"],
+    validate: (item) => {
+      const missing = []
+      if (!["SAE", "ECS", "KMS", "SecretsManager"].includes(String(item.target || "").trim())) missing.push("target")
+      if (item.secretNotInImage !== true) missing.push("secretNotInImage")
+      return missing
+    },
+  },
+  {
+    key: "slsAlerts",
+    label: "SLS 日志、健康检查失败告警和 5xx 告警已配置",
+    requiredFields: ["slsProject", "healthAlertConfigured", "serverErrorAlertConfigured", "evidence"],
+    validate: (item) => {
+      const missing = []
+      if (item.healthAlertConfigured !== true) missing.push("healthAlertConfigured")
+      if (item.serverErrorAlertConfigured !== true) missing.push("serverErrorAlertConfigured")
+      return missing
+    },
+  },
 ]
+
+const MANUAL_CONFIRMATIONS = CLOUD_CONFIRMATION_ITEMS.map((item) => item.label)
 
 const OLD_VERCEL_HOSTS = new Set([
   "ip.ipgongchang.xin",
@@ -141,6 +219,8 @@ const OLD_VERCEL_HOSTS = new Set([
 function parseArgs(argv) {
   const args = {
     envFile: DEFAULT_ENV_FILE,
+    cloudConfirmationsFile: "",
+    cloudConfirmationsExplicit: false,
     allowBlocking: false,
     assumeCloudReady: false,
   }
@@ -148,6 +228,11 @@ function parseArgs(argv) {
     const arg = argv[index]
     if (arg === "--env-file") {
       args.envFile = resolveValue(argv[++index], "--env-file")
+      continue
+    }
+    if (arg === "--cloud-confirmations") {
+      args.cloudConfirmationsFile = resolveValue(argv[++index], "--cloud-confirmations")
+      args.cloudConfirmationsExplicit = true
       continue
     }
     if (arg === "--allow-blocking") {
@@ -174,6 +259,11 @@ function resolveValue(value, name) {
 
 function readJson(filePath) {
   return JSON.parse(readFileSync(filePath, "utf8"))
+}
+
+function nonTodoText(value) {
+  const text = String(value || "").trim()
+  return Boolean(text && !text.startsWith("TODO_"))
 }
 
 function parseEnvFile(filePath) {
@@ -323,6 +413,92 @@ function checkWechatOpenPlatform(env) {
   }
 }
 
+function resolveCloudConfirmationPath(args) {
+  if (args.cloudConfirmationsFile) return args.cloudConfirmationsFile
+  if (existsSync(DEFAULT_CLOUD_CONFIRMATIONS_FILE)) return DEFAULT_CLOUD_CONFIRMATIONS_FILE
+  return ""
+}
+
+function checkCloudConfirmations(args) {
+  if (args.assumeCloudReady) {
+    return {
+      mode: "assumed",
+      path: null,
+      ready: true,
+      items: CLOUD_CONFIRMATION_ITEMS.map((item) => ({
+        key: item.key,
+        label: item.label,
+        ready: true,
+        status: "assumed",
+        missing: [],
+      })),
+    }
+  }
+
+  const filePath = resolveCloudConfirmationPath(args)
+  if (!filePath) {
+    return {
+      mode: "not_provided",
+      path: null,
+      ready: false,
+      items: CLOUD_CONFIRMATION_ITEMS.map((item) => ({
+        key: item.key,
+        label: item.label,
+        ready: false,
+        status: "not_provided",
+        missing: ["confirmation_file"],
+      })),
+    }
+  }
+
+  if (!existsSync(filePath)) {
+    return {
+      mode: args.cloudConfirmationsExplicit ? "missing_file" : "not_provided",
+      path: filePath,
+      ready: false,
+      items: CLOUD_CONFIRMATION_ITEMS.map((item) => ({
+        key: item.key,
+        label: item.label,
+        ready: false,
+        status: "missing_file",
+        missing: ["confirmation_file"],
+      })),
+    }
+  }
+
+  const data = readJson(filePath)
+  const rawItems = data.items && typeof data.items === "object" ? data.items : {}
+  const items = CLOUD_CONFIRMATION_ITEMS.map((definition) => {
+    const item = rawItems[definition.key] && typeof rawItems[definition.key] === "object"
+      ? rawItems[definition.key]
+      : {}
+    const missing = []
+    if (item.confirmed !== true) missing.push("confirmed")
+    for (const field of definition.requiredFields) {
+      if (!nonTodoText(item[field])) missing.push(field)
+    }
+    missing.push(...definition.validate(item))
+    const uniqueMissing = [...new Set(missing)]
+    return {
+      key: definition.key,
+      label: definition.label,
+      ready: uniqueMissing.length === 0,
+      status: uniqueMissing.length === 0 ? "ready" : "incomplete",
+      missing: uniqueMissing,
+    }
+  })
+
+  return {
+    mode: "file",
+    path: filePath,
+    ready: items.every((item) => item.ready),
+    schemaVersion: data.schemaVersion || null,
+    updatedAt: data.updatedAt || "",
+    operator: data.operator || "",
+    items,
+  }
+}
+
 function normalizeWechatReviewStatus(value) {
   const status = String(value || "").trim().toLowerCase()
   if (!status || status.startsWith("todo_")) return "unknown"
@@ -368,6 +544,7 @@ function main() {
   const appFiles = fileStatus(APP_ROOT, REQUIRED_APP_FILES)
   const appScripts = scriptStatus(resolve(APP_ROOT, "package.json"), REQUIRED_APP_SCRIPTS)
   const docker = dockerStatus()
+  const cloudConfirmations = checkCloudConfirmations(args)
 
   const machineBlocking = []
   const warnings = []
@@ -399,9 +576,14 @@ function main() {
 
   if (envFileExists && envMode !== "600") warnings.push(`env_file_mode_should_be_600:current_${envMode}`)
   if (!docker.ready) warnings.push(docker.status)
-  if (!args.assumeCloudReady) warnings.push("manual_cloud_confirmations_required")
+  if (args.assumeCloudReady) warnings.push("manual_cloud_confirmations_assumed")
+  if (!cloudConfirmations.ready) warnings.push("manual_cloud_confirmations_required")
 
-  const manualBlocking = args.assumeCloudReady ? [] : MANUAL_CONFIRMATIONS
+  const manualBlocking = cloudConfirmations.ready
+    ? []
+    : cloudConfirmations.items
+      .filter((item) => !item.ready)
+      .map((item) => item.label)
   const localCodeReady = machineBlocking.length === 0
   const productionReady = localCodeReady && manualBlocking.length === 0
 
@@ -441,6 +623,7 @@ function main() {
         scripts: appScripts,
       },
       docker,
+      cloudConfirmations,
     },
     nextActions: [
       "创建或确认阿里云 SAE/ECS 容器应用、api-cn 域名和 HTTPS 证书",
@@ -448,6 +631,7 @@ function main() {
       wechatOpenPlatform.reviewStatus === "reviewing"
         ? "等待微信开放平台移动应用审核通过后补 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET"
         : "从微信开放平台移动应用补 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET",
+      "复制 deploy/aliyun-production-cn.cloud-confirmations.example.json 到 .local.json，并逐项填写非密钥云资源确认",
       "Docker daemon 就绪后执行 corepack pnpm aliyun:docker:build",
       "部署后执行 corepack pnpm aliyun:remote:smoke -- --base-url https://api-cn.ipgongchang.xin",
       "部署后执行 corepack pnpm aliyun:app-api:smoke -- --base-url https://api-cn.ipgongchang.xin",
@@ -461,11 +645,12 @@ function main() {
 function printHelp() {
   console.log([
     "Usage:",
-    "  node scripts/check-aliyun-production-cn-readiness.mjs [--env-file path] [--allow-blocking] [--assume-cloud-ready]",
+    "  node scripts/check-aliyun-production-cn-readiness.mjs [--env-file path] [--cloud-confirmations path] [--allow-blocking] [--assume-cloud-ready]",
     "",
     "Default mode fails when production-cn is not ready. It never prints secret values.",
     "--allow-blocking prints the report but exits 0 for local status dashboards.",
-    "--assume-cloud-ready removes manual cloud confirmations from the productionReady calculation.",
+    "--cloud-confirmations reads non-secret Aliyun resource confirmation evidence from JSON.",
+    "--assume-cloud-ready bypasses manual cloud confirmations for emergency local diagnosis only.",
   ].join("\n"))
 }
 

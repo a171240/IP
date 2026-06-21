@@ -46,6 +46,7 @@ app/api/app/store-profiles/[profileId]/route.ts
 app/api/app/store-profiles/route.ts
 app/api/healthz/route.ts
 deploy/aliyun-production-cn.example.json
+deploy/aliyun-production-cn.cloud-confirmations.example.json
 docs/DEPLOY_ALIYUN_PRODUCTION_CN.md
 package.json
 scripts/check-aliyun-docker-context.mjs
@@ -205,6 +206,14 @@ OSS Bucket CORS、RAM 最小权限和服务记录音频前缀已确认
 SLS 日志、健康检查失败告警和 5xx 告警已配置
 ```
 
+结构化云确认状态：
+
+```text
+cloudConfirmations.mode: missing_file
+cloudConfirmations.ready: false
+missing file: deploy/aliyun-production-cn.cloud-confirmations.local.json
+```
+
 ## 9. 本地检查结果
 
 已通过：
@@ -214,7 +223,9 @@ git diff --check
 git diff --cached --check
 staged secret-value scan
 node scripts/prepare-aliyun-runtime-env.mjs --env-file /Users/Admin/Documents/美业话镜APP/.env.production-cn.example --allow-todo
+node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.cloud-confirmations.example.json','utf8'))"
 corepack pnpm aliyun:readiness
+corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:release:artifacts -- --skip-bundle
 corepack pnpm aliyun:predeploy
 ```
@@ -223,6 +234,7 @@ corepack pnpm aliyun:predeploy
 
 ```text
 aliyun:env:check
+aliyun:cloud:check
 aliyun:readiness
 aliyun:routes:check
 aliyun:docker:check
@@ -294,6 +306,7 @@ WECHAT_OPEN_APP_REVIEW_STATUS=reviewing
 
 ```bash
 cd /Users/Admin/Documents/美业话镜APP/handoff/IP
+corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:readiness:cloud-ready
 corepack pnpm aliyun:release:artifacts
 corepack pnpm aliyun:docker:build

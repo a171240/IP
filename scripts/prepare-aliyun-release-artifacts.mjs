@@ -56,6 +56,7 @@ const FORBIDDEN_ARCHIVE_PATTERNS = [
 function parseArgs(argv) {
   const args = {
     envFile: DEFAULT_ENV_FILE,
+    cloudConfirmationsFile: "",
     outDir: "",
     skipBundle: false,
   }
@@ -64,6 +65,10 @@ function parseArgs(argv) {
     if (arg === "--") continue
     if (arg === "--env-file") {
       args.envFile = resolveValue(argv[++index], "--env-file")
+      continue
+    }
+    if (arg === "--cloud-confirmations") {
+      args.cloudConfirmationsFile = resolveValue(argv[++index], "--cloud-confirmations")
       continue
     }
     if (arg === "--out-dir") {
@@ -169,6 +174,7 @@ function renderMarkdown(audit) {
   const routes = audit.checks.routes
   const docker = audit.checks.dockerContext
   const bundle = audit.bundle
+  const cloudConfirmations = readiness.checks?.cloudConfirmations
   return [
     "# 美业话镜 APP production-cn 阿里云发布审计",
     "",
@@ -181,6 +187,7 @@ function renderMarkdown(audit) {
     `- env requiredReady: ${env.requiredReady} / ${env.requiredTotal}`,
     `- routes: ${routes.checkedRoutes} checked, ${routes.failures.length} failures`,
     `- dockerContext: ${docker.ok ? "ok" : "not ok"}`,
+    `- cloudConfirmations: ${cloudConfirmations?.ready ? "ready" : "not ready"}`,
     `- bundle: ${bundle ? basename(bundle.path) : "skipped"}`,
     "",
     "## 机器可验证阻塞",
@@ -193,6 +200,16 @@ function renderMarkdown(audit) {
     "",
     ...(readiness.manualBlocking.length
       ? readiness.manualBlocking.map((item) => `- ${item}`)
+      : ["- none"]),
+    "",
+    "## 云资源确认文件",
+    "",
+    `- mode: ${cloudConfirmations?.mode || "unknown"}`,
+    `- path: ${cloudConfirmations?.path || "not provided"}`,
+    `- ready: ${cloudConfirmations?.ready === true}`,
+    "",
+    ...(cloudConfirmations?.items?.length
+      ? cloudConfirmations.items.map((item) => `- ${item.key}: ${item.status}${item.missing?.length ? ` (${item.missing.join(", ")})` : ""}`)
       : ["- none"]),
     "",
     "## Docker 上下文包",
@@ -213,6 +230,7 @@ function renderMarkdown(audit) {
     "## 后续命令",
     "",
     "```bash",
+    "corepack pnpm aliyun:cloud:check",
     "corepack pnpm aliyun:readiness:cloud-ready",
     "corepack pnpm aliyun:docker:build",
     "corepack pnpm aliyun:remote:smoke -- --base-url https://api-cn.ipgongchang.xin",
@@ -236,6 +254,7 @@ function main() {
     "scripts/check-aliyun-production-cn-readiness.mjs",
     "--env-file",
     args.envFile,
+    ...(args.cloudConfirmationsFile ? ["--cloud-confirmations", args.cloudConfirmationsFile] : []),
     "--allow-blocking",
   ])
   const routes = runJson("routes", ["scripts/check-app-api-production-cn-routes.mjs"])
@@ -246,6 +265,7 @@ function main() {
     generatedAt: new Date().toISOString(),
     backendRoot: BACKEND_ROOT,
     envFile: args.envFile,
+    cloudConfirmationsFile: args.cloudConfirmationsFile || null,
     git: {
       branch: git(["branch", "--show-current"]),
       head: git(["rev-parse", "HEAD"]),
@@ -275,6 +295,7 @@ function main() {
     localCodeReady: readiness.localCodeReady,
     machineBlocking: readiness.machineBlocking,
     manualBlockingCount: readiness.manualBlocking.length,
+    cloudConfirmationsReady: readiness.checks?.cloudConfirmations?.ready === true,
     bundle: audit.bundle,
     auditJson: audit.outputFiles.auditJson,
     auditMarkdown: audit.outputFiles.auditMarkdown,
@@ -284,7 +305,7 @@ function main() {
 function printHelp() {
   console.log([
     "Usage:",
-    "  node scripts/prepare-aliyun-release-artifacts.mjs [--env-file path] [--out-dir /tmp/path] [--skip-bundle]",
+    "  node scripts/prepare-aliyun-release-artifacts.mjs [--env-file path] [--cloud-confirmations path] [--out-dir /tmp/path] [--skip-bundle]",
     "",
     "Creates non-secret production-cn release audit files and a Docker context tarball outside the repo by default.",
     "The tarball is scanned for forbidden entries such as .env files, .git, node_modules, .next, and logs.",
