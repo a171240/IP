@@ -12,6 +12,7 @@ const HEALTH_PATHS = ["/api/healthz", "/api/app/health", "/api/app/health?strict
 const KNOWN_CHECK_GROUPS = new Set([
   "supabase",
   "appWechatLogin",
+  "legalLinks",
   "aliyunOss",
   "bailianAsr",
   "serviceRecordSummary",
@@ -197,7 +198,7 @@ function summarize(result) {
 function printHelp() {
   console.log([
     "Usage:",
-    "  node scripts/smoke-aliyun-remote.mjs [--base-url https://api-cn.example.com] [--allow-missing appWechatLogin]",
+    "  node scripts/smoke-aliyun-remote.mjs [--base-url https://api-cn.example.com] [--allow-missing appWechatLogin,legalLinks]",
     "",
     "Validates deployed health endpoints without reading or printing secrets.",
     "If --base-url is omitted, APP_API_BASE_URL is read from .env.production-cn.local.",

@@ -117,9 +117,38 @@ function buildTasks({ envPlan, readiness, domain }) {
     ],
   })
 
+  const legalBlocking = envPlan.summary.requiredBlocking
+    .filter((key) => key === "PRIVACY_POLICY_URL" || key === "TERMS_URL")
+    .map((key) => `missing_required_env:${key}`)
+  addTask(tasks, {
+    id: "T02_APP_LEGAL_LINKS",
+    title: "国内 APP 隐私政策和用户协议正式 URL",
+    status: legalBlocking.length ? "blocked" : "ready",
+    blockerCodes: legalBlocking,
+    owner: "产品/法务/发布操作员",
+    consolePath: "自有备案 HTTPS 域名或可公开访问的正式协议页面",
+    actions: [
+      "确认隐私政策正式页面 URL，并填入 PRIVACY_POLICY_URL。",
+      "确认用户协议或服务条款正式页面 URL，并填入 TERMS_URL。",
+      "两个 URL 必须是正式 HTTPS 页面，不能是 TODO、localhost、临时预览或仅本地文件。",
+      "APP 国内发布材料、登录/注册入口和后端 health 门禁应使用同一组正式 URL。",
+      "导入阿里云运行环境后，/api/app/health?strict=1 不应再缺 legalLinks。",
+    ],
+    evidence: [
+      "PRIVACY_POLICY_URL ready",
+      "TERMS_URL ready",
+      "GET /api/app/health?strict=1 missing 不包含 legalLinks",
+    ],
+    verifyCommands: [
+      "corepack pnpm aliyun:env:check",
+      "corepack pnpm aliyun:health:smoke",
+      "corepack pnpm aliyun:remote:smoke -- --base-url https://api-cn.ipgongchang.xin",
+    ],
+  })
+
   const runtime = cloud.get("runtime")
   addTask(tasks, {
-    id: "T02_ALIYUN_RUNTIME_CONTAINER",
+    id: "T03_ALIYUN_RUNTIME_CONTAINER",
     title: "创建或确认阿里云后端运行容器",
     status: runtime?.ready ? "ready" : "pending_cloud",
     blockerCodes: missingList(runtime),
@@ -146,7 +175,7 @@ function buildTasks({ envPlan, readiness, domain }) {
 
   const apiDomain = cloud.get("apiDomainHttps")
   addTask(tasks, {
-    id: "T03_ALIYUN_DOMAIN_DNS_HTTPS",
+    id: "T04_ALIYUN_DOMAIN_DNS_HTTPS",
     title: "配置 api-cn/assets-cn DNS、HTTPS 和 ICP 证据",
     status: domain.ok && apiDomain?.ready ? "ready" : "blocked",
     blockerCodes: [
@@ -177,7 +206,7 @@ function buildTasks({ envPlan, readiness, domain }) {
 
   const oss = cloud.get("oss")
   addTask(tasks, {
-    id: "T04_ALIYUN_OSS_AUDIO_STORAGE",
+    id: "T05_ALIYUN_OSS_AUDIO_STORAGE",
     title: "确认服务记录音频 OSS、CORS 和 RAM 最小权限",
     status: oss?.ready ? "ready" : "pending_cloud",
     blockerCodes: missingList(oss),
@@ -204,7 +233,7 @@ function buildTasks({ envPlan, readiness, domain }) {
 
   const envImport = cloud.get("envImport")
   addTask(tasks, {
-    id: "T05_ALIYUN_ENV_IMPORT",
+    id: "T06_ALIYUN_ENV_IMPORT",
     title: "导入 production-cn 运行环境变量",
     status: envImport?.ready && envPlan.summary.requiredBlocking.length === 0 ? "ready" : "blocked",
     blockerCodes: [
@@ -233,7 +262,7 @@ function buildTasks({ envPlan, readiness, domain }) {
 
   const sls = cloud.get("slsAlerts")
   addTask(tasks, {
-    id: "T06_ALIYUN_SLS_ALERTS",
+    id: "T07_ALIYUN_SLS_ALERTS",
     title: "配置 SLS 日志和健康/5xx 告警",
     status: sls?.ready ? "ready" : "pending_cloud",
     blockerCodes: missingList(sls),
@@ -257,22 +286,22 @@ function buildTasks({ envPlan, readiness, domain }) {
   })
 
   addTask(tasks, {
-    id: "T07_POSTDEPLOY_REMOTE_SMOKE",
+    id: "T08_POSTDEPLOY_REMOTE_SMOKE",
     title: "阿里云部署后远端 smoke 验收",
     status: readiness.productionReady ? "ready" : "waiting_for_deploy",
     blockerCodes: readiness.productionReady ? [] : ["requires_runtime_domain_env_wechat_cloud_confirmations"],
     owner: "后端发布操作员",
     consolePath: "本机终端 + 阿里云部署控制台",
     actions: [
-      "完成 T01-T06 后部署 production-cn 后端。",
+      "完成 T01-T07 后部署 production-cn 后端。",
       "先运行 domain strict，确认 api-cn/assets-cn DNS 和 HTTPS 可用。",
       "再运行统一 postdeploy smoke，验证 health 和 APP API guard。",
-      "微信开放平台仍审核中时只能使用 --allow-missing appWechatLogin 做桥接调试，不能作为正式上线结论。",
+      "微信开放平台或正式协议 URL 未补齐时只能使用 --allow-missing appWechatLogin,legalLinks 做桥接调试，不能作为正式上线结论。",
     ],
     evidence: [
       "corepack pnpm aliyun:domain:strict pass",
       "corepack pnpm aliyun:postdeploy:smoke pass",
-      "strict health 不再缺 appWechatLogin",
+      "strict health 不再缺 appWechatLogin 或 legalLinks",
     ],
     verifyCommands: [
       "corepack pnpm aliyun:domain:strict",

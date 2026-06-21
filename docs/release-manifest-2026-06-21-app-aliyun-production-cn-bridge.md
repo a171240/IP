@@ -211,17 +211,19 @@ command: corepack pnpm aliyun:vercel-env:coverage
 report: /tmp/meiye-vercel-env-coverage.json
 containsValues: false
 vercel production variable names: 130
-required APP production-cn variables covered by Vercel production: 17 / 23
+required APP production-cn variables covered by Vercel production: 17 / 25
 required missing in Vercel production:
   APP_ENV
   APP_REGION
   APP_API_BASE_URL
   NEXT_PUBLIC_SITE_URL
+  PRIVACY_POLICY_URL
+  TERMS_URL
   WECHAT_OPEN_APP_ID
   WECHAT_OPEN_APP_SECRET
 ```
 
-结论：Vercel production 可以作为 Supabase、旧微信小程序兼容、OSS、百炼、DeepSeek、火山语音等桥接变量来源；缺失的 6 个必填项是 APP 国内版新增运行环境、`api-cn` 域名变量和微信开放平台移动应用 AppID/AppSecret，不能从旧小程序变量替代。
+结论：Vercel production 可以作为 Supabase、旧微信小程序兼容、OSS、百炼、DeepSeek、火山语音等桥接变量来源；缺失的 8 个必填项是 APP 国内版新增运行环境、`api-cn` 域名变量、国内 APP 正式协议 URL 和微信开放平台移动应用 AppID/AppSecret，不能从旧小程序变量替代。
 
 ## 7. Supabase / 数据层状态
 
@@ -253,7 +255,7 @@ DATABASE_URL_CN
 ```text
 productionReady: false
 localCodeReady: false
-requiredReady: 21 / 23
+requiredReady: 21 / 25
 optionalReady: 28
 envFile: /Users/Admin/Documents/美业话镜APP/.env.production-cn.local
 env mode: 600
@@ -269,6 +271,8 @@ wechatOpenPlatform.reviewStatus: reviewing
 ```text
 missing_required_env:WECHAT_OPEN_APP_ID
 missing_required_env:WECHAT_OPEN_APP_SECRET
+missing_required_env:PRIVACY_POLICY_URL
+missing_required_env:TERMS_URL
 wechat_open_platform_mobile_app_reviewing
 ```
 
@@ -319,7 +323,7 @@ corepack pnpm aliyun:operator:tasks
 corepack pnpm aliyun:readiness
 corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:release:artifacts -- --skip-bundle
-local localhost aliyun:postdeploy:smoke with --allow-missing appWechatLogin
+local localhost aliyun:postdeploy:smoke with --allow-missing appWechatLogin,legalLinks
 corepack pnpm aliyun:predeploy
 ```
 
@@ -373,7 +377,7 @@ APP_ASSET_BASE_URL: assets-cn.ipgongchang.xin -> A 198.18.0.6, dns_special_use_i
 Operator tasks 说明：
 
 ```text
-aliyun:operator:tasks 只输出非密钥任务清单，覆盖微信开放平台、阿里云运行时、DNS/HTTPS、OSS、环境变量导入、SLS 和部署后 smoke。
+aliyun:operator:tasks 只输出非密钥任务清单，覆盖微信开放平台、国内 APP 协议 URL、阿里云运行时、DNS/HTTPS、OSS、环境变量导入、SLS 和部署后 smoke。
 它不创建云资源、不导入变量、不部署、不 push。
 ```
 
@@ -383,7 +387,7 @@ aliyun:operator:tasks 只输出非密钥任务清单，覆盖微信开放平台�
 /tmp/meiye-aliyun-env-import-plan.json
 containsValues: false
 variables: 61
-requiredBlocking: WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET
+requiredBlocking: PRIVACY_POLICY_URL, TERMS_URL, WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET
 ```
 
 `aliyun:release:artifacts` 当前会生成：
@@ -489,7 +493,7 @@ corepack pnpm aliyun:app-api:smoke -- --base-url https://api-cn.ipgongchang.xin
 ```bash
 corepack pnpm aliyun:remote:smoke -- \
   --base-url https://api-cn.ipgongchang.xin \
-  --allow-missing appWechatLogin
+  --allow-missing appWechatLogin,legalLinks
 ```
 
 或使用统一 postdeploy smoke：
@@ -497,7 +501,7 @@ corepack pnpm aliyun:remote:smoke -- \
 ```bash
 corepack pnpm aliyun:postdeploy:smoke -- \
   --base-url https://api-cn.ipgongchang.xin \
-  --allow-missing appWechatLogin
+  --allow-missing appWechatLogin,legalLinks
 ```
 
 这种放行不能用于正式 production-cn 发布结论。

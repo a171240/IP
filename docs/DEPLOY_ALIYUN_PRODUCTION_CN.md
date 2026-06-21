@@ -64,6 +64,7 @@ GET /api/app/health?strict=1
 ```text
 supabase
 appWechatLogin
+legalLinks
 aliyunOss
 bailianAsr
 serviceRecordSummary
@@ -118,12 +119,12 @@ postdeploy-smoke.json
 postdeploy-smoke.md
 ```
 
-如果微信开放平台仍在审核中，只能作为桥接调试放行已知缺口：
+如果微信开放平台或正式协议 URL 仍未补齐，只能作为桥接调试放行已知缺口：
 
 ```bash
 corepack pnpm aliyun:postdeploy:smoke -- \
   --base-url https://api-cn.ipgongchang.xin \
-  --allow-missing appWechatLogin
+  --allow-missing appWechatLogin,legalLinks
 ```
 
 正式 production-cn 不应使用 Vercel、旧域名、非 HTTPS 域名或 `ip.ipgongchang.xin` 作为 `--base-url`。
@@ -160,16 +161,17 @@ corepack pnpm aliyun:domain:strict
 corepack pnpm aliyun:operator:tasks
 ```
 
-这条命令不输出任何密钥值，也不会创建资源或导入变量。它会把当前 `readiness`、`domain`、`.env.production-cn.local` 变量状态和 `cloud-confirmations.local.json` 汇总为 7 个任务：
+这条命令不输出任何密钥值，也不会创建资源或导入变量。它会把当前 `readiness`、`domain`、`.env.production-cn.local` 变量状态和 `cloud-confirmations.local.json` 汇总为 8 个任务：
 
 ```text
 T01 微信开放平台移动应用审核和 APP 登录凭证
-T02 阿里云 SAE/ECS 后端运行容器
-T03 api-cn/assets-cn DNS、HTTPS 和 ICP 证据
-T04 服务记录音频 OSS、CORS 和 RAM 最小权限
-T05 production-cn 运行环境变量导入
-T06 SLS 日志和健康/5xx 告警
-T07 阿里云部署后远端 smoke 验收
+T02 国内 APP 隐私政策和用户协议正式 URL
+T03 阿里云 SAE/ECS 后端运行容器
+T04 api-cn/assets-cn DNS、HTTPS 和 ICP 证据
+T05 服务记录音频 OSS、CORS 和 RAM 最小权限
+T06 production-cn 运行环境变量导入
+T07 SLS 日志和健康/5xx 告警
+T08 阿里云部署后远端 smoke 验收
 ```
 
 如需生成文件给人工核对：
@@ -605,16 +607,16 @@ corepack pnpm aliyun:remote:smoke -- --base-url https://api-cn.ipgongchang.xin
 corepack pnpm aliyun:app-api:smoke -- --base-url https://api-cn.ipgongchang.xin
 ```
 
-如果是微信开放平台变量尚未补齐的桥接调试阶段，只允许显式放行已知缺口：
+如果是微信开放平台变量或正式协议 URL 尚未补齐的桥接调试阶段，只允许显式放行已知缺口：
 
 ```bash
 corepack pnpm aliyun:postdeploy:smoke -- \
   --base-url https://api-cn.ipgongchang.xin \
-  --allow-missing appWechatLogin
+  --allow-missing appWechatLogin,legalLinks
 
 corepack pnpm aliyun:remote:smoke -- \
   --base-url https://api-cn.ipgongchang.xin \
-  --allow-missing appWechatLogin
+  --allow-missing appWechatLogin,legalLinks
 ```
 
 `aliyun:remote:smoke` 会检查 `/api/healthz`、`/api/app/health`、`/api/app/health?strict=1` 的响应结构，并拒绝包含敏感字段名的 health 响应。
@@ -682,14 +684,14 @@ corepack pnpm aliyun:routes:check（31 routes / 0 failures）
 corepack pnpm aliyun:docker:check（7 files / 24 dockerignore patterns / sensitive env excluded）
 node --check scripts/check-aliyun-domain-readiness.mjs
 corepack pnpm aliyun:domain:check（状态看板 exit 0；当前 ok=false）
-corepack pnpm aliyun:remote:smoke -- --base-url http://127.0.0.1:3022 --allow-missing appWechatLogin
+corepack pnpm aliyun:remote:smoke -- --base-url http://127.0.0.1:3022 --allow-missing appWechatLogin,legalLinks
 corepack pnpm aliyun:env:check
 corepack pnpm exec tsc --noEmit --pretty false
 corepack pnpm release:preflight
 corepack pnpm build
 corepack pnpm aliyun:health:smoke
 corepack pnpm aliyun:app-api:smoke
-corepack pnpm aliyun:remote:smoke -- --base-url http://127.0.0.1:PORT --allow-missing appWechatLogin
+corepack pnpm aliyun:remote:smoke -- --base-url http://127.0.0.1:PORT --allow-missing appWechatLogin,legalLinks
 npm run typecheck
 npm run lint
 npm test -- --runInBand（38 suites / 119 tests）
@@ -699,6 +701,8 @@ android ./gradlew assembleDebug
 `aliyun:readiness` 当前机器可验证阻塞：
 
 ```text
+PRIVACY_POLICY_URL
+TERMS_URL
 WECHAT_OPEN_APP_ID
 WECHAT_OPEN_APP_SECRET
 wechat_open_platform_mobile_app_reviewing 或 wechat_open_platform_mobile_app_not_ready
@@ -773,9 +777,9 @@ bytes: 295585706
 本地 production server 已用 `.env.production-cn.local` 做过 HTTP 验证：
 
 ```text
-GET /api/healthz -> 200, ok:false, missing:[appWechatLogin]
-GET /api/app/health -> 200, ok:false, missing:[appWechatLogin]
-GET /api/app/health?strict=1 -> 503, ok:false, missing:[appWechatLogin]
+GET /api/healthz -> 200, ok:false, missing:[appWechatLogin, legalLinks]
+GET /api/app/health -> 200, ok:false, missing:[appWechatLogin, legalLinks]
+GET /api/app/health?strict=1 -> 503, ok:false, missing:[appWechatLogin, legalLinks]
 sensitiveLeakCount -> 0
 ```
 
@@ -793,4 +797,4 @@ scopes:
 结果：0 failures，入口均进入预期的 missing_code / auth_required / invite_not_found 分支。
 ```
 
-这说明当前 TODO 微信开放平台变量不会被健康检查误判为 ready。
+这说明当前 TODO 微信开放平台变量和协议 URL 不会被健康检查误判为 ready。

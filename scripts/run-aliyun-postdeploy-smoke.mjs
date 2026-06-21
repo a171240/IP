@@ -226,7 +226,7 @@ function writeMarkdown(filePath, report) {
 function printHelp() {
   console.log([
     "Usage:",
-    "  node scripts/run-aliyun-postdeploy-smoke.mjs --base-url https://api-cn.ipgongchang.xin [--allow-missing appWechatLogin] [--out-dir /tmp/path]",
+    "  node scripts/run-aliyun-postdeploy-smoke.mjs --base-url https://api-cn.ipgongchang.xin [--allow-missing appWechatLogin,legalLinks] [--out-dir /tmp/path]",
     "",
     "Runs deployed Aliyun health smoke and APP API smoke, then writes non-secret JSON/Markdown reports outside the repo.",
     "If --base-url is omitted, APP_API_BASE_URL is read from .env.production-cn.local.",
