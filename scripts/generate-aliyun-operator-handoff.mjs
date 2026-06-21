@@ -125,6 +125,7 @@ function compactTask(task) {
 function buildHandoff({ args, envPlan, status, operatorTasks }) {
   const tasks = operatorTasks.tasks || []
   const machineBlocking = status.summary?.machineBlocking || []
+  const waitingWechatReview = status.summary?.operatorTasks?.waitingWechatReview || 0
   const appLaunchBlocking = buildAppLaunchBlocking(envPlan.variables, machineBlocking)
   const blockingRequiredVariables = envPlan.variables
     .filter((item) => item.required && item.status !== "ready")
@@ -150,6 +151,8 @@ function buildHandoff({ args, envPlan, status, operatorTasks }) {
     verdict: status.verdict,
     currentAnswer: status.canDeployNow === true
       ? "机器门禁显示可部署，但仍需要单独授权生产部署。"
+      : waitingWechatReview > 0
+        ? "现在不能上线/部署；微信开放平台移动应用已在审核中，审核通过前不能取得生产 AppID/AppSecret，同时还要补阿里云运行资源、DNS/HTTPS/ICP、OSS、环境变量导入和 SLS 证据。"
       : "现在不能上线/部署；先补微信开放平台移动应用、阿里云运行资源、DNS/HTTPS/ICP、OSS、环境变量导入和 SLS 证据。",
     files: {
       envFile: args.envFile,

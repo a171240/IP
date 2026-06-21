@@ -85,11 +85,26 @@ function buildCloudConfirmationIndex(readiness) {
 function buildTasks({ envPlan, readiness, domain, imagePublishPlan }) {
   const cloud = buildCloudConfirmationIndex(readiness)
   const tasks = []
+  const wechatOpenPlatform = readiness.checks?.wechatOpenPlatform || {}
+  const wechatReviewStatus = wechatOpenPlatform.reviewStatus || "unknown"
+  const wechatTaskStatus = wechatOpenPlatform.ready
+    ? "ready"
+    : wechatReviewStatus === "reviewing"
+      ? "waiting_wechat_review"
+      : "blocked"
+  const wechatActions = wechatTaskStatus === "waiting_wechat_review"
+    ? [
+        "当前移动应用已是 reviewing：本地不需要再创建 APP，也不能用小程序凭证绕过。",
+        "等待移动应用审核状态从 reviewing 变为 approved。",
+      ]
+    : [
+        "等待移动应用审核状态从 reviewing 变为 approved。",
+      ]
 
   addTask(tasks, {
     id: "T01_WECHAT_OPEN_PLATFORM_APP_LOGIN",
     title: "微信开放平台移动应用审核和 APP 登录凭证",
-    status: readiness.checks?.wechatOpenPlatform?.ready ? "ready" : "blocked",
+    status: wechatTaskStatus,
     blockerCodes: readiness.machineBlocking.filter((item) =>
       item.includes("WECHAT_OPEN") ||
       item.includes("wechat_open_platform") ||
@@ -101,7 +116,7 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan }) {
     owner: "用户/微信开放平台操作员",
     consolePath: "微信开放平台 -> 管理中心 -> 移动应用 -> 美业话镜 App",
     actions: [
-      "等待移动应用审核状态从 reviewing 变为 approved。",
+      ...wechatActions,
       "确认移动应用名称为“美业话镜”，对应本机 APP 工程，而不是小程序应用。",
       "审核通过后获取移动应用 AppID，填入 WECHAT_OPEN_APP_ID。",
       "获取移动应用 AppSecret，填入 WECHAT_OPEN_APP_SECRET。",
@@ -113,7 +128,8 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan }) {
       "在 deploy/aliyun-production-cn.cloud-confirmations.local.json 的 wechatOpenPlatform 项记录非密钥证据。",
     ],
     evidence: [
-      "reviewStatus=approved",
+      `currentReviewStatus=${wechatReviewStatus}`,
+      "targetReviewStatus=approved",
       "mobileAppName=美业话镜",
       "mobileAppIdReady=true",
       "mobileAppSecretReady=true",
@@ -133,6 +149,7 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan }) {
       "GET https://api-cn.ipgongchang.xin/api/app/health?strict=1 after deployment",
     ],
     notes: [
+      "waiting_wechat_review 表示微信开放平台已进入审核流程，但还不能发布；approved 之前不要填猜测值。",
       "不能用小程序 AppID/Secret 替代 APP 微信登录。",
       "脚本只记录变量名和状态，不输出 AppSecret。",
     ],
@@ -398,6 +415,7 @@ function summarizeTasks(tasks) {
     total: tasks.length,
     ready: tasks.filter((task) => task.ready).length,
     blocked: tasks.filter((task) => task.status === "blocked").length,
+    waitingWechatReview: tasks.filter((task) => task.status === "waiting_wechat_review").length,
     pendingCloud: tasks.filter((task) => task.status === "pending_cloud").length,
     waitingForDeploy: tasks.filter((task) => task.status === "waiting_for_deploy").length,
   }
@@ -417,6 +435,7 @@ function renderMarkdown(report) {
     `- imagePublishReady: ${report.imagePublishPlan.ready}`,
     `- env requiredReady: ${report.env.summary.requiredReady} / ${report.env.summary.requiredTotal}`,
     `- tasks ready: ${report.summary.ready} / ${report.summary.total}`,
+    `- waitingWechatReview: ${report.summary.waitingWechatReview}`,
     "",
     "## 当前阻塞",
     "",

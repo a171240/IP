@@ -340,6 +340,7 @@ function renderMarkdown(audit) {
     `- markdown: ${audit.outputFiles.operatorTasksMarkdown}`,
     `- ready: ${operatorTasks.summary.ready} / ${operatorTasks.summary.total}`,
     `- blocked: ${operatorTasks.summary.blocked}`,
+    `- waitingWechatReview: ${operatorTasks.summary.waitingWechatReview || 0}`,
     `- pendingCloud: ${operatorTasks.summary.pendingCloud}`,
     "",
     "## 操作员操作包",

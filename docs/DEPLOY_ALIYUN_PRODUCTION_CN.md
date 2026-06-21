@@ -661,7 +661,7 @@ approved
 rejected
 ```
 
-当前用户已确认微信开放平台移动应用正在审核中。审核中仍不能发布，只能把 blocker 从 `wechat_open_platform_mobile_app_not_ready` 细分为 `wechat_open_platform_mobile_app_reviewing`。审核通过后再填 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`。
+当前用户已确认微信开放平台移动应用正在审核中。审核中仍不能发布，只能把 blocker 从 `wechat_open_platform_mobile_app_not_ready` 细分为 `wechat_open_platform_mobile_app_reviewing`，并在操作员任务里显示为 `waiting_wechat_review`。这表示 APP 已进入微信审核流程，不是还缺创建 APP；审核通过后再填 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`。
 
 微信开放平台移动应用需要准备：
 
@@ -872,7 +872,7 @@ app_universal_link:apple_team_id_missing
 
 2026-06-22 05:52 CST 更新：本机 `.env.production-cn.local` 已补入 `PRIVACY_POLICY_URL=https://api-cn.ipgongchang.xin/privacy` 与 `TERMS_URL=https://api-cn.ipgongchang.xin/terms`，`corepack pnpm aliyun:legal:strict` 通过；`aliyun:readiness` requiredReady 为 23/25，必需变量只剩 `WECHAT_OPEN_APP_ID` 和 `WECHAT_OPEN_APP_SECRET` 未 ready。
 
-2026-06-22 07:10 CST 更新：`aliyun:operator:handoff` 会把缺口分成三类：后端必填变量缺 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；APP 发布阻塞但非密钥缺 `APPLE_TEAM_ID` 且微信开放平台状态仍为 `reviewing`；其他可后置变量如 `DATABASE_URL_CN` / `REDIS_URL_CN` 不再和 iOS AASA 阻塞混在一起。
+2026-06-22 07:10 CST 更新：`aliyun:operator:handoff` 会把缺口分成三类：后端必填变量缺 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；APP 发布阻塞但非密钥缺 `APPLE_TEAM_ID` 且微信开放平台状态仍为 `reviewing`；其他可后置变量如 `DATABASE_URL_CN` / `REDIS_URL_CN` 不再和 iOS AASA 阻塞混在一起。`aliyun:operator:tasks` / `aliyun:status` 会把微信审核中显示为 `waiting_wechat_review`，避免把它误读成还没创建 APP 或需要使用小程序凭证。
 
 2026-06-22 05:57 CST 复核：协议 URL ready 后重新运行 `corepack pnpm aliyun:predeploy`，通过；env requiredReady 23/25，health smoke 只缺 `appWechatLogin`，App API smoke 30 probes / 0 failures。
 

@@ -122,6 +122,7 @@ function buildStatus({ readiness, operatorTasks, args }) {
   const universalLink = readiness.checks?.appProductionConfig?.universalLink || null
   const imagePlan = readiness.checks?.imagePublishPlan || null
   const docker = readiness.checks?.docker || null
+  const wechatReviewStatus = readiness.checks?.wechatOpenPlatform?.reviewStatus || "unknown"
 
   const verdict = readiness.productionReady ? "ready_to_deploy_after_authorization" : "blocked"
   const canDeployNow = false
@@ -133,7 +134,9 @@ function buildStatus({ readiness, operatorTasks, args }) {
       : `现在不能上线/部署：productionReady=false，operator tasks ${operatorTasks.summary?.ready || 0}/${operatorTasks.summary?.total || tasks.length} ready。`,
     `必填环境变量 ready ${readiness.checks?.env?.requiredReady || 0}/${readiness.checks?.env?.requiredTotal || 0}；缺 ${missingRequiredEnv.length ? missingRequiredEnv.join(", ") : "none"}。`,
     `APP production-cn runtime config：${appRuntimeConfig?.ok ? "ready" : "blocked"}；apiBaseUrl ${appRuntimeConfig?.productionRuntime?.apiBaseUrl || "unknown"}，assetBaseUrl ${appRuntimeConfig?.productionRuntime?.assetBaseUrl || "unknown"}。`,
-    `微信开放平台移动应用状态：${readiness.checks?.wechatOpenPlatform?.reviewStatus || "unknown"}；AppID/Secret 只能等移动应用审核通过后从微信开放平台获取。`,
+    wechatReviewStatus === "reviewing"
+      ? "微信开放平台移动应用状态：reviewing；这表示 APP 已进入审核流程，不是缺创建 APP。AppID/Secret 仍只能等审核通过后获取。"
+      : `微信开放平台移动应用状态：${wechatReviewStatus}；AppID/Secret 只能等移动应用审核通过后从微信开放平台获取。`,
     `Apple Universal Link：${universalLink?.ok ? "ready" : "blocked"}；${(universalLink?.blockers || []).join(", ") || "no blockers"}。`,
     `阿里云云资源确认：${cloudReady.ready}/${cloudReady.total} ready；还缺 SAE/ECS、DNS/HTTPS/ICP、OSS/CORS/RAM、微信开放平台 approved、env import、SLS 中未完成项。`,
     `域名门禁：${operatorTasks.domain?.ok ? "ready" : "blocked"}；当前 api-cn/assets-cn 仍未证明解析到阿里云 HTTPS 入口。`,
@@ -225,6 +228,7 @@ function buildStatus({ readiness, operatorTasks, args }) {
       notReady: notReadyTasks.map(compactTask),
       keyBlocked: [wechatTask, domainTask, envTask].filter(Boolean).map(compactTask),
       legal: legalTask ? compactTask(legalTask) : null,
+      waitingWechatReview: wechatTask?.status === "waiting_wechat_review" ? compactTask(wechatTask) : null,
     },
     nextCommandOrder: [
       "corepack pnpm aliyun:operator:tasks",
@@ -251,7 +255,7 @@ function renderMarkdown(status) {
     `- Release evidence usable: ${status.releaseEvidenceUsable ? "yes" : "no"}`,
     `- Required env: ${status.summary.requiredReady}/${status.summary.requiredTotal}`,
     `- Missing required env: ${status.summary.requiredBlocking.length ? status.summary.requiredBlocking.join(", ") : "none"}`,
-    `- Operator tasks: ready ${status.summary.operatorTasks.ready || 0}/${status.summary.operatorTasks.total || 0}, blocked ${status.summary.operatorTasks.blocked || 0}, pending_cloud ${status.summary.operatorTasks.pendingCloud || 0}, waiting_for_deploy ${status.summary.operatorTasks.waitingForDeploy || 0}`,
+    `- Operator tasks: ready ${status.summary.operatorTasks.ready || 0}/${status.summary.operatorTasks.total || 0}, blocked ${status.summary.operatorTasks.blocked || 0}, waiting_wechat_review ${status.summary.operatorTasks.waitingWechatReview || 0}, pending_cloud ${status.summary.operatorTasks.pendingCloud || 0}, waiting_for_deploy ${status.summary.operatorTasks.waitingForDeploy || 0}`,
     `- Cloud confirmations: ${status.summary.cloudConfirmations.ready}/${status.summary.cloudConfirmations.total} ready`,
     "",
     "## Human Summary",
