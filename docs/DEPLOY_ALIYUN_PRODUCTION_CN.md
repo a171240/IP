@@ -128,6 +128,30 @@ corepack pnpm aliyun:postdeploy:smoke -- \
 
 正式 production-cn 不应使用 Vercel、旧域名、非 HTTPS 域名或 `ip.ipgongchang.xin` 作为 `--base-url`。
 
+部署前后都可以先跑域名检查：
+
+```bash
+corepack pnpm aliyun:domain:check
+```
+
+`aliyun:domain:check` 读取 `.env.production-cn.local` 中的 `APP_API_BASE_URL`、`NEXT_PUBLIC_SITE_URL` 和可选的 `APP_ASSET_BASE_URL`，只输出非密钥域名状态。它会检查：
+
+```text
+1. 域名必须是 HTTPS，不能是 localhost、example、Vercel 或旧线上域名。
+2. APP_API_BASE_URL / NEXT_PUBLIC_SITE_URL 必须使用 api-cn.*。
+3. APP_ASSET_BASE_URL 如果填写，必须使用 assets-cn.*。
+4. DNS 至少存在 A / AAAA / CNAME 记录，且不能指向 Vercel。
+5. api-cn 的 /api/healthz 必须能通过 HTTPS 返回 2xx。
+```
+
+只看状态时使用 `aliyun:domain:check`，它会列出阻塞但退出 0；生产发布或部署后验收使用严格模式：
+
+```bash
+corepack pnpm aliyun:domain:strict
+```
+
+严格模式在 DNS、HTTPS 或 `/api/healthz` 未 ready 时会失败。ICP备案状态仍不能只靠本机命令证明，需要在 `deploy/aliyun-production-cn.cloud-confirmations.local.json` 的 `apiDomainHttps` 里写非密钥证据。
+
 ### 2.3 Production-cn readiness 门禁
 
 ```bash
@@ -141,6 +165,7 @@ corepack pnpm aliyun:readiness
 1. .env.production-cn.local 是否存在、是否被 git 忽略、权限是否为 600。
 2. 必需环境变量是否 ready。
 3. APP_API_BASE_URL / NEXT_PUBLIC_SITE_URL 是否为 production-cn HTTPS 域名，且不是 example、localhost、Vercel 旧域名。
+3a. `aliyun:domain:check` 是否可用，用于机器检查 DNS、HTTPS 和 `/api/healthz`。
 4. 微信登录是否使用微信开放平台“移动应用” AppID / AppSecret，而不是小程序 AppID / Secret。
 5. 后端阿里云部署脚本、Dockerfile、health、APP API smoke 是否齐全。
 6. App production-cn 构建配置生成门禁是否齐全。
@@ -360,6 +385,18 @@ api-cn.ipgongchang.xin
 ```
 
 当前 DNS 已确认 `ipgongchang.xin` 在阿里云解析。`ip.ipgongchang.xin` 仍指向 Vercel，不要直接改这个线上入口。
+
+机器检查：
+
+```bash
+corepack pnpm aliyun:domain:check
+```
+
+阿里云 DNS、证书和后端部署都完成后，必须改跑严格模式：
+
+```bash
+corepack pnpm aliyun:domain:strict
+```
 
 ### 4.3 HTTPS 证书
 
@@ -615,6 +652,8 @@ corepack pnpm aliyun:release:artifacts
 corepack pnpm aliyun:predeploy
 corepack pnpm aliyun:routes:check（31 routes / 0 failures）
 corepack pnpm aliyun:docker:check（7 files / 24 dockerignore patterns / sensitive env excluded）
+node --check scripts/check-aliyun-domain-readiness.mjs
+corepack pnpm aliyun:domain:check（状态看板 exit 0；当前 ok=false）
 corepack pnpm aliyun:remote:smoke -- --base-url http://127.0.0.1:3022 --allow-missing appWechatLogin
 corepack pnpm aliyun:env:check
 corepack pnpm exec tsc --noEmit --pretty false
@@ -646,6 +685,26 @@ APP_ASSET_BASE_URL=https://assets-cn.ipgongchang.xin
 ```
 
 这些值只表示本地目标配置已补齐；正式发布仍要由 `deploy/aliyun-production-cn.cloud-confirmations.local.json` 确认 DNS、HTTPS、ICP、OSS/CORS/RAM 和 SLS。
+
+域名机器检查命令：
+
+```bash
+corepack pnpm aliyun:domain:check
+corepack pnpm aliyun:domain:strict
+```
+
+`aliyun:domain:check` 可以作为当前状态看板；`aliyun:domain:strict` 只有在 api-cn/assets-cn DNS、HTTPS 和 api-cn `/api/healthz` 都 ready 后才会通过。
+
+2026-06-21 22:36 CST 实测结果：
+
+```text
+targetReady: 0 / 3
+APP_API_BASE_URL: api-cn.ipgongchang.xin -> A 198.18.0.5, dns_special_use_ip, HTTPS ECONNRESET
+NEXT_PUBLIC_SITE_URL: api-cn.ipgongchang.xin -> A 198.18.0.5, dns_special_use_ip, HTTPS ECONNRESET
+APP_ASSET_BASE_URL: assets-cn.ipgongchang.xin -> A 198.18.0.6, dns_special_use_ip, HTTPS ECONNRESET
+```
+
+因此当前域名不是 production ready。下一步需要把 `api-cn` / `assets-cn` 解析到公网可访问的阿里云 SAE/SLB/ECS 或 OSS/CDN 入口，并配置 HTTPS 证书；之后再跑 `corepack pnpm aliyun:domain:strict`。
 
 `aliyun:cloud:check` 当前云确认状态：
 

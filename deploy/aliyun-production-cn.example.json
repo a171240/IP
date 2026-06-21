@@ -11,8 +11,11 @@
   },
   "domain": {
     "apiHost": "api-cn.ipgongchang.xin",
+    "assetHost": "assets-cn.ipgongchang.xin",
     "httpsRequired": true,
     "dnsProvider": "aliyun",
+    "checkCommand": "corepack pnpm aliyun:domain:check",
+    "strictCheckCommand": "corepack pnpm aliyun:domain:strict",
     "note": "Do not repoint ip.ipgongchang.xin until the APP production-cn backend passes remote smoke."
   },
   "environmentImport": {
@@ -29,6 +32,7 @@
   },
   "predeployChecks": [
     "corepack pnpm aliyun:readiness",
+    "corepack pnpm aliyun:domain:check",
     "corepack pnpm aliyun:cloud:check",
     "corepack pnpm aliyun:readiness:cloud-ready",
     "corepack pnpm aliyun:release:artifacts",
@@ -36,13 +40,14 @@
     "corepack pnpm aliyun:docker:build"
   ],
   "postdeployChecks": [
+    "corepack pnpm aliyun:domain:strict",
     "corepack pnpm aliyun:postdeploy:smoke -- --base-url https://api-cn.ipgongchang.xin",
     "corepack pnpm aliyun:remote:smoke -- --base-url https://api-cn.ipgongchang.xin",
     "corepack pnpm aliyun:app-api:smoke -- --base-url https://api-cn.ipgongchang.xin"
   ],
   "requiredExternalConfirmations": [
     "SAE or ECS application created",
-    "api-cn DNS and HTTPS certificate configured",
+    "api-cn/assets-cn DNS and HTTPS certificates configured",
     "OSS CORS and RAM least-privilege policy confirmed",
     "WeChat Open Platform mobile app credentials configured",
     "SLS logging and alerts configured"

@@ -185,6 +185,7 @@ function renderMarkdown(audit) {
   const docker = audit.checks.dockerContext
   const bundle = audit.bundle
   const vercelEnvCoverage = audit.checks.vercelEnvCoverage
+  const domain = audit.checks.domain
   const cloudConfirmations = readiness.checks?.cloudConfirmations
   return [
     "# 美业话镜 APP production-cn 阿里云发布审计",
@@ -198,6 +199,7 @@ function renderMarkdown(audit) {
     `- env requiredReady: ${env.requiredReady} / ${env.requiredTotal}`,
     `- routes: ${routes.checkedRoutes} checked, ${routes.failures.length} failures`,
     `- dockerContext: ${docker.ok ? "ok" : "not ok"}`,
+    `- domainReadiness: ${domain.ok ? "ok" : "not ready"} (${domain.targetReady} / ${domain.targetTotal})`,
     `- cloudConfirmations: ${cloudConfirmations?.ready ? "ready" : "not ready"}`,
     `- vercelEnvCoverage: ${vercelEnvCoverage?.ok ? "ok" : vercelEnvCoverage?.skipped ? "skipped" : "not ok"}`,
     `- bundle: ${bundle ? basename(bundle.path) : "skipped"}`,
@@ -222,6 +224,14 @@ function renderMarkdown(audit) {
     "",
     ...(cloudConfirmations?.items?.length
       ? cloudConfirmations.items.map((item) => `- ${item.key}: ${item.status}${item.missing?.length ? ` (${item.missing.join(", ")})` : ""}`)
+      : ["- none"]),
+    "",
+    "## 域名 DNS / HTTPS 检查",
+    "",
+    `- ready: ${domain.ok}`,
+    `- targetReady: ${domain.targetReady} / ${domain.targetTotal}`,
+    ...(domain.machineBlocking?.length
+      ? domain.machineBlocking.map((item) => `- ${item}`)
       : ["- none"]),
     "",
     "## Docker 上下文包",
@@ -268,6 +278,7 @@ function renderMarkdown(audit) {
     "",
     "```bash",
     "corepack pnpm aliyun:cloud:check",
+    "corepack pnpm aliyun:domain:strict",
     "corepack pnpm aliyun:readiness:cloud-ready",
     "corepack pnpm aliyun:docker:build",
     "corepack pnpm aliyun:remote:smoke -- --base-url https://api-cn.ipgongchang.xin",
@@ -296,6 +307,12 @@ function main() {
     ...(args.cloudConfirmationsFile ? ["--cloud-confirmations", args.cloudConfirmationsFile] : []),
     "--allow-blocking",
   ])
+  const domain = runJson("domain", [
+    "scripts/check-aliyun-domain-readiness.mjs",
+    "--env-file",
+    args.envFile,
+    "--allow-blocking",
+  ])
   const routes = runJson("routes", ["scripts/check-app-api-production-cn-routes.mjs"])
   const dockerContext = runJson("docker_context", ["scripts/check-aliyun-docker-context.mjs"])
   const vercelEnvCoverage = runVercelEnvCoverage(args, resolve(args.outDir, "vercel-env-coverage.json"))
@@ -314,6 +331,7 @@ function main() {
     checks: {
       env,
       readiness,
+      domain,
       routes,
       dockerContext,
       vercelEnvCoverage,
@@ -324,12 +342,14 @@ function main() {
       auditMarkdown: resolve(args.outDir, "release-audit.md"),
       envImportPlan: resolve(args.outDir, "env-import-plan.json"),
       vercelEnvCoverage: vercelEnvCoverage.ok ? resolve(args.outDir, "vercel-env-coverage.json") : null,
+      domainReadiness: resolve(args.outDir, "domain-readiness.json"),
       bundle: bundle?.path || null,
     },
   }
 
   writeText(audit.outputFiles.auditJson, JSON.stringify(audit, null, 2))
   writeText(audit.outputFiles.auditMarkdown, renderMarkdown(audit))
+  writeText(audit.outputFiles.domainReadiness, JSON.stringify(domain, null, 2))
 
   console.log(JSON.stringify({
     ok: true,
@@ -356,6 +376,7 @@ function main() {
     auditMarkdown: audit.outputFiles.auditMarkdown,
     envImportPlan: audit.outputFiles.envImportPlan,
     vercelEnvCoverageReport: audit.outputFiles.vercelEnvCoverage,
+    domainReadinessReport: audit.outputFiles.domainReadiness,
   }, null, 2))
 }
 

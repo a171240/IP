@@ -309,9 +309,11 @@ node scripts/prepare-aliyun-runtime-env.mjs --env-file /Users/Admin/Documents/�
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.cloud-confirmations.example.json','utf8'))"
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.cloud-confirmations.local.json','utf8'))"
 node --check scripts/run-aliyun-postdeploy-smoke.mjs
+node --check scripts/check-aliyun-domain-readiness.mjs
 node scripts/generate-app-runtime-config.mjs --env-file ../.env.production-cn.local --out /tmp/meiye-build-config.generated.ts --require-production-ready --check
 corepack pnpm aliyun:env:plan
 corepack pnpm aliyun:vercel-env:coverage
+corepack pnpm aliyun:domain:check
 corepack pnpm aliyun:readiness
 corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:release:artifacts -- --skip-bundle
@@ -346,6 +348,25 @@ health smoke: sensitiveLeakCount 0
 app-api smoke: 22 probes, 0 failures
 postdeploy smoke: local localhost pass, remoteHealth pass, appApiSmoke pass, sensitive value pattern 0
 ```
+
+Domain readiness 说明：
+
+```text
+aliyun:domain:check 只输出非密钥域名检查结果，作为当前状态看板。
+aliyun:domain:strict 用于生产部署后验收，DNS / HTTPS / api-cn /api/healthz 未 ready 时必须失败。
+```
+
+2026-06-21 22:36 CST 实测：
+
+```text
+corepack pnpm aliyun:domain:check: exit 0, ok=false, targetReady 0/3
+corepack pnpm aliyun:domain:strict: exit 1 as expected
+APP_API_BASE_URL: api-cn.ipgongchang.xin -> A 198.18.0.5, dns_special_use_ip, HTTPS ECONNRESET
+NEXT_PUBLIC_SITE_URL: api-cn.ipgongchang.xin -> A 198.18.0.5, dns_special_use_ip, HTTPS ECONNRESET
+APP_ASSET_BASE_URL: assets-cn.ipgongchang.xin -> A 198.18.0.6, dns_special_use_ip, HTTPS ECONNRESET
+```
+
+结论：本机目标域名变量已填，但当前 DNS/HTTPS 不是 production ready；需要阿里云公网入口、证书和 ICP 证据补齐后，`domain:strict` 才能作为部署后验收通过。
 
 `aliyun:env:plan` 生成：
 
@@ -435,6 +456,7 @@ WECHAT_OPEN_APP_REVIEW_STATUS=reviewing
 ```bash
 cd /Users/Admin/Documents/美业话镜APP/handoff/IP
 corepack pnpm aliyun:cloud:check
+corepack pnpm aliyun:domain:strict
 corepack pnpm aliyun:readiness:cloud-ready
 corepack pnpm aliyun:release:artifacts
 corepack pnpm aliyun:docker:build
