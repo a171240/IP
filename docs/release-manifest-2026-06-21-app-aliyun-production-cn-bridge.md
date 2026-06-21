@@ -308,6 +308,21 @@ SLS 日志项目和告警
 KMS 或 Secrets Manager 环境变量管理
 ```
 
+2026-06-21 只读控制台核验：
+
+```text
+阿里云控制台登录态：可用
+域名控制台：ipgongchang.xin 正常，DNS 使用 dns11.hichina.com / dns12.hichina.com
+云解析 DNS：ipgongchang.xin 存在 13 条记录；当前未看到 api-cn 主机记录
+现有旧记录：api A 106.14.241.129
+OSS 控制台：显示 1 个 Bucket；Bucket 名称、CORS、RAM 最小权限仍未确认
+SAE 控制台：显示尚未开通 SAE，应用数 0
+SLS：仅看到入口，未确认项目和告警
+微信开放平台：浏览器安全策略阻止自动读取，仍以用户确认的 reviewing 为准
+```
+
+据此，`deploy/aliyun-production-cn.cloud-confirmations.local.json` 已记录这些非密钥证据，但所有 `confirmed` 仍保持 `false`。
+
 ### 10.2 环境变量
 
 ```text
