@@ -71,6 +71,12 @@ const PROBES = [
   },
   {
     scope: "invites",
+    method: "GET",
+    path: "/api/app/store-admin/invites/app-smoke-invalid-token/qrcode",
+    expected: [{ status: 404, code: "invite_not_found" }],
+  },
+  {
+    scope: "invites",
     method: "POST",
     path: "/api/app/store-admin/invites/app-smoke-invalid-token/accept",
     body: {},
@@ -85,13 +91,31 @@ const PROBES = [
   {
     scope: "context",
     method: "GET",
+    path: "/api/app/store-profiles/app-smoke-profile",
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "context",
+    method: "GET",
     path: "/api/app/customer-profiles",
     expected: [{ status: 401 }],
   },
   {
     scope: "context",
     method: "GET",
+    path: "/api/app/customer-profiles/app-smoke-profile",
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "context",
+    method: "GET",
     path: "/api/app/scene-cards",
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "context",
+    method: "GET",
+    path: "/api/app/scene-cards/app-smoke-card",
     expected: [{ status: 401 }],
   },
   {
@@ -137,6 +161,27 @@ const PROBES = [
   {
     scope: "service-records",
     method: "POST",
+    path: "/api/app/service-records/sessions/app-smoke-session/segments/oss",
+    body: {},
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "service-records",
+    method: "POST",
+    path: "/api/app/service-records/sessions/app-smoke-session/markers",
+    body: {},
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "service-records",
+    method: "POST",
+    path: "/api/app/service-records/sessions/app-smoke-session/resume",
+    body: {},
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "service-records",
+    method: "POST",
     path: "/api/app/service-records/sessions/app-smoke-session/end",
     body: {},
     expected: [{ status: 401 }],
@@ -153,6 +198,12 @@ const PROBES = [
     method: "POST",
     path: "/api/app/service-records/sessions/app-smoke-session/asr/poll",
     body: {},
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "service-records",
+    method: "GET",
+    path: "/api/app/service-records/sessions/app-smoke-session/audio/app-smoke-segment",
     expected: [{ status: 401 }],
   },
 ]

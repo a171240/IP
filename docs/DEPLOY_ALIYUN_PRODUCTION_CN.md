@@ -90,7 +90,7 @@ GET /api/app/health?strict=1
 ```bash
 corepack pnpm build
 corepack pnpm aliyun:health:smoke
-corepack pnpm aliyun:app-api:smoke（22 probes / 0 failures）
+corepack pnpm aliyun:app-api:smoke（30 business probes / 0 failures）
 ```
 
 `aliyun:health:smoke` 会启动本地 production server，请求三个 health URL，并检查响应里没有敏感变量值。
@@ -795,13 +795,13 @@ sensitiveLeakCount -> 0
 本地 production server 也已用未登录/假 token 请求验证第一版 APP API 入口：
 
 ```text
-checkedProbes: 22
+checkedProbes: 30
 scopes:
 - auth: 2
 - account: 2
-- context: 3
-- invites: 3
-- service-records: 9
+- context: 6
+- invites: 4
+- service-records: 13
 - store-admin: 3
 结果：0 failures，入口均进入预期的 missing_code / auth_required / invite_not_found 分支。
 ```

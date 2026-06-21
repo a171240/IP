@@ -354,7 +354,7 @@ docker context: 7 files, 24 dockerignore patterns, sensitive env excluded
 release preflight: 4 / 4 pass
 build: compiled successfully; existing lint warnings only
 health smoke: sensitiveLeakCount 0
-app-api smoke: 22 probes, 0 failures
+app-api smoke: 30 business probes, 0 failures
 postdeploy smoke: local localhost pass, remoteHealth pass, appApiSmoke pass, sensitive value pattern 0
 ```
 
