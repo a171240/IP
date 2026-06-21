@@ -24,6 +24,7 @@ const REQUIRED_PREDEPLOY_CHECKS = [
   "corepack pnpm aliyun:release:artifacts",
   "corepack pnpm aliyun:app-api:bridge-map",
   "corepack pnpm aliyun:app-client:contract",
+  "corepack pnpm aliyun:app-config:check",
   "corepack pnpm aliyun:app-native:check",
   "corepack pnpm aliyun:app-api:coverage",
   "corepack pnpm aliyun:predeploy",

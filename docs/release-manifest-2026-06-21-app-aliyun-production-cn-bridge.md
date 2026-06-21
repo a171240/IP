@@ -377,6 +377,7 @@ corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:release:artifacts -- --skip-bundle
 corepack pnpm aliyun:app-api:bridge-map
 corepack pnpm aliyun:app-client:contract
+corepack pnpm aliyun:app-config:check
 local localhost aliyun:postdeploy:smoke with --allow-missing appWechatLogin,legalLinks
 corepack pnpm aliyun:container:smoke -- --port 3023
 corepack pnpm aliyun:predeploy
@@ -397,6 +398,7 @@ aliyun:status
 aliyun:routes:check
 aliyun:app-api:bridge-map
 aliyun:app-client:contract
+aliyun:app-config:check
 aliyun:app-native:check
 aliyun:aasa:check
 aliyun:app-api:coverage
@@ -415,13 +417,14 @@ routes: 31 checked, 0 failures
 app-api bridge map: 31 mapped routes, sourceTypes mp_reexport 22 / mp_adapter 5 / app_native 1 / app_alias 1 / native_health 2, failures 0
 env source catalog: 62 variables, 62 source metadata ready, containsValues false
 app-client contract: 40 audited calls, 34 unique client routes, 26 matched backend routes, 4 deferred knowledge-space calls, 0 failures
+app production runtime config: ok=true, containsSecretValues=false, apiBaseUrl https://api-cn.ipgongchang.xin, assetBaseUrl https://assets-cn.ipgongchang.xin
 app legal pages: ok=true, /privacy and /terms route files ready, env URL ready
 app-native release config: ok=true, Android release signing config ready, iOS Associated Domains applinks:api-cn.ipgongchang.xin configured
 aasa config: ok=false, route files exist, blocker apple_team_id_missing, universalLink https://api-cn.ipgongchang.xin/app/wechat/
 app-api coverage: 29 / 29 business routes, 30 probes, 0 missing
 docker context: 7 files, 24 dockerignore patterns, sensitive env excluded
 image publish plan: template ready, local file not ready until ACR remote image and runtime pull evidence are filled
-deployment spec: image meiye-huajing-app-api:production-cn, port 3000, apiHost api-cn.ipgongchang.xin, predeploy 19, postdeploy 5, 0 blockers
+deployment spec: image meiye-huajing-app-api:production-cn, port 3000, apiHost api-cn.ipgongchang.xin, predeploy 20, postdeploy 5, 0 blockers
 release preflight: 4 / 4 pass
 build: compiled successfully; existing lint warnings only
 health smoke: sensitiveLeakCount 0
@@ -548,6 +551,10 @@ sanitizedEnvFileDeleted: true
 2026-06-22 06:18 CST 复核：新增 `corepack pnpm aliyun:status` 后，状态总览命令通过，输出 `containsValues=false`、`verdict=blocked`、`canDeployNow=false`、operator tasks `1/9 ready`、required env `23/25`，缺 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`。同轮重新执行 `git diff --check`、`corepack pnpm aliyun:operator:tasks`、`corepack pnpm aliyun:readiness` 和 `corepack pnpm aliyun:predeploy`，全部通过；`predeploy` 仍显示 health strict 只缺 `appWechatLogin`，APP API smoke `30 probes / 0 failures`，既有 lint warnings 439 个、0 errors。
 
 2026-06-22 06:31 CST 追加：`corepack pnpm aliyun:release:artifacts` 现在会同时生成 `production-cn-status.json` 和 `production-cn-status.md`，并把状态总览写入 `release-audit.json/md`。`corepack pnpm aliyun:predeploy` 也纳入 `aliyun:status`，部署规格 `predeployChecks` 从 18 项更新为 19 项，发布前门禁会固定覆盖“能不能上线/部署”的非密钥总览。
+
+2026-06-22 06:36 CST 追加：新增 `corepack pnpm aliyun:app-config:check`，由后端门禁只读调用 App 工程 `generate-app-runtime-config --require-production-ready --check`，确认 production-cn 正式包会使用 `api-cn` / `assets-cn` 非密钥 runtime 配置，并拒绝旧 Vercel/小程序入口或密钥字段进入 App build config。该命令已纳入 `aliyun:readiness` 和 `aliyun:predeploy`，部署规格 `predeployChecks` 从 19 项更新为 20 项。
+
+2026-06-22 06:45 CST 复核：新增 App runtime config 门禁后重新执行 `node --check scripts/check-app-production-runtime-config.mjs`、`corepack pnpm aliyun:app-config:check`、`corepack pnpm aliyun:status`、`corepack pnpm aliyun:deploy:spec`、`corepack pnpm aliyun:release:artifacts -- --skip-bundle --skip-vercel-env-coverage` 和 `corepack pnpm aliyun:predeploy`，全部通过。`aliyun:status` 现在输出 `appRuntimeConfig.ok=true`、`containsSecretValues=false`、`apiBaseUrl=https://api-cn.ipgongchang.xin`、`assetBaseUrl=https://assets-cn.ipgongchang.xin`；`aliyun:deploy:spec` 显示 `predeployChecks=20`；`predeploy` 仍只剩微信 App 登录和外部云资源确认阻塞，APP API smoke `30 probes / 0 failures`。
 
 ## 10. 发布前必须补齐
 

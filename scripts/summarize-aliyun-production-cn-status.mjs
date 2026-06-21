@@ -117,6 +117,7 @@ function buildStatus({ readiness, operatorTasks, args }) {
   const manualBlocking = readiness.manualBlocking || []
   const bridgeMap = readiness.checks?.backend?.appApiBridgeMap || null
   const legalPages = readiness.checks?.backend?.legalPages || null
+  const appRuntimeConfig = readiness.checks?.appProductionConfig?.runtimeConfig || null
   const nativeRelease = readiness.checks?.appProductionConfig?.nativeRelease || null
   const universalLink = readiness.checks?.appProductionConfig?.universalLink || null
   const imagePlan = readiness.checks?.imagePublishPlan || null
@@ -131,6 +132,7 @@ function buildStatus({ readiness, operatorTasks, args }) {
       ? "机器门禁显示 productionReady=true；仍需单独取得生产部署授权。"
       : `现在不能上线/部署：productionReady=false，operator tasks ${operatorTasks.summary?.ready || 0}/${operatorTasks.summary?.total || tasks.length} ready。`,
     `必填环境变量 ready ${readiness.checks?.env?.requiredReady || 0}/${readiness.checks?.env?.requiredTotal || 0}；缺 ${missingRequiredEnv.length ? missingRequiredEnv.join(", ") : "none"}。`,
+    `APP production-cn runtime config：${appRuntimeConfig?.ok ? "ready" : "blocked"}；apiBaseUrl ${appRuntimeConfig?.productionRuntime?.apiBaseUrl || "unknown"}，assetBaseUrl ${appRuntimeConfig?.productionRuntime?.assetBaseUrl || "unknown"}。`,
     `微信开放平台移动应用状态：${readiness.checks?.wechatOpenPlatform?.reviewStatus || "unknown"}；AppID/Secret 只能等移动应用审核通过后从微信开放平台获取。`,
     `Apple Universal Link：${universalLink?.ok ? "ready" : "blocked"}；${(universalLink?.blockers || []).join(", ") || "no blockers"}。`,
     `阿里云云资源确认：${cloudReady.ready}/${cloudReady.total} ready；还缺 SAE/ECS、DNS/HTTPS/ICP、OSS/CORS/RAM、微信开放平台 approved、env import、SLS 中未完成项。`,
@@ -176,6 +178,17 @@ function buildStatus({ readiness, operatorTasks, args }) {
             ok: legalPages.ok,
             blockers: legalPages.blockers || [],
             urls: Object.fromEntries((legalPages.pages || []).map((page) => [page.key, page.envUrl?.status || "unknown"])),
+          }
+        : null,
+      appRuntimeConfig: appRuntimeConfig
+        ? {
+            ok: appRuntimeConfig.ok,
+            containsSecretValues: appRuntimeConfig.containsSecretValues,
+            environment: appRuntimeConfig.productionRuntime?.environment || "",
+            apiBaseUrl: appRuntimeConfig.productionRuntime?.apiBaseUrl || "",
+            assetBaseUrl: appRuntimeConfig.productionRuntime?.assetBaseUrl || "",
+            wroteKeys: appRuntimeConfig.productionRuntime?.wroteKeys || [],
+            blockers: appRuntimeConfig.blockers || [],
           }
         : null,
       nativeRelease: nativeRelease

@@ -198,6 +198,7 @@ function renderMarkdown(audit) {
   const cloudConfirmations = readiness.checks?.cloudConfirmations
   const appProductionConfig = readiness.checks?.appProductionConfig
   const appEnvTemplate = appProductionConfig?.envTemplate
+  const appRuntimeConfig = appProductionConfig?.runtimeConfig
   const appNativeRelease = appProductionConfig?.nativeRelease
   return [
     "# 美业话镜 APP production-cn 阿里云发布审计",
@@ -219,6 +220,7 @@ function renderMarkdown(audit) {
     `- legalPages: ${legalPages.ok ? "ok" : "not ready"}`,
     `- imagePublishPlan: ${imagePublishPlan.ready === true ? "ready" : "not ready"}`,
     `- domainReadiness: ${domain.ok ? "ok" : "not ready"} (${domain.targetReady} / ${domain.targetTotal})`,
+    `- appRuntimeConfig: ${appRuntimeConfig?.ok === true ? "ready" : "not ready"}`,
     `- appNativeRelease: ${appNativeRelease?.ok === true ? "ready" : "not ready"}`,
     `- operatorTasks: ${operatorTasks.summary.ready} / ${operatorTasks.summary.total} ready`,
     `- productionStatus: ${productionStatus.verdict}, canDeployNow ${productionStatus.canDeployNow === true}`,
@@ -264,6 +266,10 @@ function renderMarkdown(audit) {
     `- scripts: ${appProductionConfig?.scripts?.ready === true ? "ready" : "not ready"} (${appProductionConfig?.scripts?.checked ?? 0} checked)`,
     `- envTemplate: ${appEnvTemplate?.ready === true ? "ready" : "not ready"} (${appEnvTemplate?.checked ?? 0} canonical keys checked)`,
     `- envTemplateKeyCount: ${appEnvTemplate?.keyCount ?? 0}`,
+    `- runtimeConfig: ${appRuntimeConfig?.ok === true ? "ready" : "not ready"}`,
+    `- runtimeContainsSecretValues: ${appRuntimeConfig?.containsSecretValues === true}`,
+    `- runtimeApiBaseUrl: ${appRuntimeConfig?.productionRuntime?.apiBaseUrl || "unknown"}`,
+    `- runtimeAssetBaseUrl: ${appRuntimeConfig?.productionRuntime?.assetBaseUrl || "unknown"}`,
     ...(appEnvTemplate?.missingCanonicalKeys?.length
       ? [
           "- missingCanonicalKeys:",
@@ -660,6 +666,10 @@ function main() {
       scriptsReady: readiness.checks?.appProductionConfig?.scripts?.ready === true,
       envTemplateReady: readiness.checks?.appProductionConfig?.envTemplate?.ready === true,
       envTemplateKeyCount: readiness.checks?.appProductionConfig?.envTemplate?.keyCount ?? 0,
+      runtimeConfigReady: readiness.checks?.appProductionConfig?.runtimeConfig?.ok === true,
+      runtimeContainsSecretValues: readiness.checks?.appProductionConfig?.runtimeConfig?.containsSecretValues === true,
+      runtimeApiBaseUrl: readiness.checks?.appProductionConfig?.runtimeConfig?.productionRuntime?.apiBaseUrl || "",
+      runtimeAssetBaseUrl: readiness.checks?.appProductionConfig?.runtimeConfig?.productionRuntime?.assetBaseUrl || "",
       nativeReleaseReady: readiness.checks?.appProductionConfig?.nativeRelease?.ok === true,
       nativeReleaseBlockers: readiness.checks?.appProductionConfig?.nativeRelease?.blockers || [],
     },

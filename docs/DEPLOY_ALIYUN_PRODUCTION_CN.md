@@ -779,13 +779,14 @@ corepack pnpm aliyun:readiness
 
 当前该门禁会把机器可验证阻塞和人工确认项分开列出。机器可验证阻塞解除后，仍需阿里云资源与微信开放平台移动应用配置确认，才能称为 production-cn 可发布。
 
-`aliyun:readiness` 同时检查 App 工程的 production-cn 配置模板：
+`aliyun:readiness` 同时检查 App 工程的 production-cn 配置模板和当前 runtime build config：
 
 ```text
 APP files checked: .env.production-cn.example、package.json、generate-app-runtime-config、validate-package0、bootstrap、build-config.generated
 APP scripts checked: config:generate:production-cn、config:check:production-cn、config:check:template、android:assemble:production-cn、validate:package0
 APP env template canonical keys: APP_ENV、APP_API_BASE_URL、APP_ASSET_BASE_URL、PRIVACY_POLICY_URL、TERMS_URL
 APP env template forbidden backend/secret keys: WECHAT_OPEN_APP_ID、WECHAT_OPEN_APP_SECRET、SUPABASE_SERVICE_ROLE_KEY、ALIYUN_OSS_ACCESS_KEY_SECRET、DASHSCOPE_API_KEY、DEEPSEEK_API_KEY、VOLC_SPEECH_ACCESS_TOKEN
+APP runtime config check: corepack pnpm aliyun:app-config:check，实际调用 App 工程 generate-app-runtime-config --require-production-ready --check，只输出非密钥 APP runtime 字段
 ```
 
 在这些阻塞解除前，只能完成本地桥接准备和部署脚手架，不能称为 APP 国内正式生产上线完成。
@@ -808,6 +809,7 @@ node --check scripts/run-aliyun-container-smoke.mjs
 node --check scripts/check-aliyun-cloud-confirmations.mjs
 node --check scripts/check-aliyun-deployment-spec.mjs
 node --check scripts/check-aliyun-image-publish-plan.mjs
+node --check scripts/check-app-production-runtime-config.mjs
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.example.json','utf8'))"
 node -e "JSON.parse(require('fs').readFileSync('deploy/app-api-production-cn.bridge-map.json','utf8'))"
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.image-publish.example.json','utf8'))"
@@ -824,6 +826,7 @@ corepack pnpm aliyun:predeploy
 corepack pnpm aliyun:routes:check（31 routes / 0 failures）
 corepack pnpm aliyun:app-api:bridge-map（31 mapped routes / sourceTypes: mp_reexport 22, mp_adapter 5, app_native 1, app_alias 1, native_health 2）
 corepack pnpm aliyun:app-client:contract（40 audited calls / 34 unique client routes）
+corepack pnpm aliyun:app-config:check（production-cn runtime config ok=true / containsSecretValues=false / apiBaseUrl https://api-cn.ipgongchang.xin / assetBaseUrl https://assets-cn.ipgongchang.xin）
 corepack pnpm aliyun:app-native:check（当前 ok=true；Android release 已切到 signingConfigs.release；iOS Associated Domains 已配置 applinks:api-cn.ipgongchang.xin；真实 Android keystore 值仍需由本机 Gradle properties 或环境变量提供）
 corepack pnpm aliyun:aasa:check（当前 ok=false；AASA route exists；APPLE_TEAM_ID 缺失）
 corepack pnpm aliyun:app-api:coverage（29 / 29 business routes covered）
@@ -831,7 +834,7 @@ corepack pnpm aliyun:docker:check（7 files / 24 dockerignore patterns / sensiti
 corepack pnpm aliyun:container:smoke（Docker health + 30 APP API probes / sanitized env deleted）
 node --check scripts/check-aliyun-domain-readiness.mjs
 corepack pnpm aliyun:domain:check（状态看板 exit 0；当前 ok=false）
-corepack pnpm aliyun:deploy:spec（image meiye-huajing-app-api:production-cn / port 3000 / predeploy 19 / postdeploy 5）
+corepack pnpm aliyun:deploy:spec（image meiye-huajing-app-api:production-cn / port 3000 / predeploy 20 / postdeploy 5）
 corepack pnpm aliyun:remote:smoke -- --base-url http://127.0.0.1:3022 --allow-missing appWechatLogin,legalLinks
 corepack pnpm aliyun:env:check
 corepack pnpm exec tsc --noEmit --pretty false

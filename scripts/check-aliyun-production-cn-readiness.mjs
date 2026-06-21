@@ -104,6 +104,7 @@ const REQUIRED_BACKEND_FILES = [
   "scripts/check-app-api-production-cn-routes.mjs",
   "scripts/check-app-api-bridge-map.mjs",
   "scripts/check-app-client-api-contract.mjs",
+  "scripts/check-app-production-runtime-config.mjs",
   "scripts/check-app-native-release-config.mjs",
   "scripts/check-apple-app-site-association.mjs",
   "scripts/check-app-api-smoke-coverage.mjs",
@@ -141,6 +142,7 @@ const REQUIRED_BACKEND_SCRIPTS = [
   "aliyun:routes:check",
   "aliyun:app-api:bridge-map",
   "aliyun:app-client:contract",
+  "aliyun:app-config:check",
   "aliyun:app-native:check",
   "aliyun:app-native:strict",
   "aliyun:aasa:check",
@@ -685,6 +687,10 @@ function main() {
   const appFiles = fileStatus(APP_ROOT, REQUIRED_APP_FILES)
   const appScripts = scriptStatus(resolve(APP_ROOT, "package.json"), REQUIRED_APP_SCRIPTS)
   const appProductionCnEnvTemplate = envTemplateStatus(resolve(APP_ROOT, ".env.production-cn.example"))
+  const appProductionRuntimeConfig = runJsonScript("scripts/check-app-production-runtime-config.mjs", [
+    "--env-file",
+    args.envFile,
+  ])
   const appNativeReleaseConfig = runJsonScript("scripts/check-app-native-release-config.mjs", ["--allow-blocking"])
   const appUniversalLinkConfig = runJsonScript("scripts/check-apple-app-site-association.mjs", ["--allow-blocking"])
   const imagePublishPlan = runJsonScript("scripts/check-aliyun-image-publish-plan.mjs", [
@@ -746,6 +752,11 @@ function main() {
       ...appProductionCnEnvTemplate.missingCanonicalKeys.map((key) => `missing:${key}`),
       ...appProductionCnEnvTemplate.forbiddenKeys.map((key) => `forbidden:${key}`),
     ].join(","),
+  )
+  addBlocker(
+    machineBlocking,
+    appProductionRuntimeConfig.ok !== true,
+    `invalid_app_production_runtime_config:${appProductionRuntimeConfig.blockers?.join(",") || "unknown"}`,
   )
   if (appNativeReleaseConfig.ok !== true) {
     machineBlocking.push("invalid_app_native_release_config")
@@ -816,6 +827,7 @@ function main() {
         files: appFiles,
         scripts: appScripts,
         envTemplate: appProductionCnEnvTemplate,
+        runtimeConfig: appProductionRuntimeConfig,
         nativeRelease: appNativeReleaseConfig,
         universalLink: appUniversalLinkConfig,
       },
