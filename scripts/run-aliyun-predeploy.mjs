@@ -9,6 +9,7 @@ const COMMANDS = [
   ["run", "aliyun:cloud:check"],
   ["run", "aliyun:readiness"],
   ["run", "aliyun:routes:check"],
+  ["run", "aliyun:app-api:coverage"],
   ["run", "aliyun:docker:check"],
   ["exec", "tsc", "--noEmit", "--pretty", "false"],
   ["run", "release:preflight"],

@@ -90,12 +90,15 @@ GET /api/app/health?strict=1
 ```bash
 corepack pnpm build
 corepack pnpm aliyun:health:smoke
+corepack pnpm aliyun:app-api:coverage（29 / 29 business routes covered）
 corepack pnpm aliyun:app-api:smoke（30 business probes / 0 failures）
 ```
 
 `aliyun:health:smoke` 会启动本地 production server，请求三个 health URL，并检查响应里没有敏感变量值。
 
 `aliyun:app-api:smoke` 会启动本地 production server，用未登录或假 token 请求验证第一版 APP 后端入口已经接到业务 guard，不是 404/405，也不会写入业务数据。覆盖范围包括登录、profile、门店管理、门店邀请、知识上下文和服务记录入口。
+
+`aliyun:app-api:coverage` 是静态门禁：它把 APP API route 清单和 smoke 探针清单做匹配，要求除 health 外的每个业务 route 至少有一个 smoke 探针覆盖。
 
 阿里云部署后统一 smoke：
 
@@ -580,6 +583,7 @@ corepack pnpm aliyun:env:plan
 corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:readiness
 corepack pnpm aliyun:routes:check
+corepack pnpm aliyun:app-api:coverage
 corepack pnpm aliyun:docker:check
 corepack pnpm exec tsc --noEmit --pretty false
 corepack pnpm release:preflight
@@ -690,6 +694,7 @@ corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:release:artifacts
 corepack pnpm aliyun:predeploy
 corepack pnpm aliyun:routes:check（31 routes / 0 failures）
+corepack pnpm aliyun:app-api:coverage（29 / 29 business routes covered）
 corepack pnpm aliyun:docker:check（7 files / 24 dockerignore patterns / sensitive env excluded）
 node --check scripts/check-aliyun-domain-readiness.mjs
 corepack pnpm aliyun:domain:check（状态看板 exit 0；当前 ok=false）
@@ -796,6 +801,7 @@ sensitiveLeakCount -> 0
 
 ```text
 checkedProbes: 30
+appApiSmokeCoverage: 29 / 29 business routes
 scopes:
 - auth: 2
 - account: 2

@@ -92,6 +92,7 @@ const REQUIRED_BACKEND_FILES = [
   "scripts/generate-aliyun-operator-tasks.mjs",
   "scripts/prepare-aliyun-runtime-env.mjs",
   "scripts/check-app-api-production-cn-routes.mjs",
+  "scripts/check-app-api-smoke-coverage.mjs",
   "scripts/check-aliyun-docker-context.mjs",
   "scripts/prepare-aliyun-release-artifacts.mjs",
   "scripts/run-aliyun-postdeploy-smoke.mjs",
@@ -115,6 +116,7 @@ const REQUIRED_BACKEND_SCRIPTS = [
   "aliyun:readiness:assume-cloud-ready",
   "aliyun:release:artifacts",
   "aliyun:routes:check",
+  "aliyun:app-api:coverage",
   "aliyun:docker:check",
   "aliyun:predeploy",
   "aliyun:docker:build",
@@ -238,8 +240,6 @@ const CLOUD_CONFIRMATION_ITEMS = [
     },
   },
 ]
-
-const MANUAL_CONFIRMATIONS = CLOUD_CONFIRMATION_ITEMS.map((item) => item.label)
 
 const OLD_VERCEL_HOSTS = new Set([
   "ip.ipgongchang.xin",

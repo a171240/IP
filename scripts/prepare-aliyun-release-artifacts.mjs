@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs"
 import { basename, dirname, isAbsolute, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { spawnSync } from "node:child_process"
@@ -182,6 +182,7 @@ function renderMarkdown(audit) {
   const readiness = audit.checks.readiness
   const env = audit.checks.env
   const routes = audit.checks.routes
+  const appApiSmokeCoverage = audit.checks.appApiSmokeCoverage
   const docker = audit.checks.dockerContext
   const bundle = audit.bundle
   const vercelEnvCoverage = audit.checks.vercelEnvCoverage
@@ -201,6 +202,7 @@ function renderMarkdown(audit) {
     `- localCodeReady: ${readiness.localCodeReady}`,
     `- env requiredReady: ${env.requiredReady} / ${env.requiredTotal}`,
     `- routes: ${routes.checkedRoutes} checked, ${routes.failures.length} failures`,
+    `- appApiSmokeCoverage: ${appApiSmokeCoverage.coveredBusinessRoutes} / ${appApiSmokeCoverage.businessRoutes} business routes`,
     `- dockerContext: ${docker.ok ? "ok" : "not ok"}`,
     `- domainReadiness: ${domain.ok ? "ok" : "not ready"} (${domain.targetReady} / ${domain.targetTotal})`,
     `- operatorTasks: ${operatorTasks.summary.ready} / ${operatorTasks.summary.total} ready`,
@@ -264,6 +266,25 @@ function renderMarkdown(audit) {
     `- ready: ${operatorTasks.summary.ready} / ${operatorTasks.summary.total}`,
     `- blocked: ${operatorTasks.summary.blocked}`,
     `- pendingCloud: ${operatorTasks.summary.pendingCloud}`,
+    "",
+    "## APP API smoke 覆盖",
+    "",
+    `- ok: ${appApiSmokeCoverage.ok === true}`,
+    `- businessRoutes: ${appApiSmokeCoverage.businessRoutes}`,
+    `- smokeProbes: ${appApiSmokeCoverage.smokeProbes}`,
+    `- coveredBusinessRoutes: ${appApiSmokeCoverage.coveredBusinessRoutes}`,
+    ...(appApiSmokeCoverage.missingRoutes?.length
+      ? [
+          "- missingRoutes:",
+          ...appApiSmokeCoverage.missingRoutes.map((item) => `  - ${item.route}`),
+        ]
+      : ["- missingRoutes: none"]),
+    ...(appApiSmokeCoverage.unmatchedProbes?.length
+      ? [
+          "- unmatchedProbes:",
+          ...appApiSmokeCoverage.unmatchedProbes.map((item) => `  - ${item.method} ${item.path}`),
+        ]
+      : ["- unmatchedProbes: none"]),
     "",
     "## Docker 上下文包",
     "",
@@ -363,6 +384,7 @@ function main() {
     operatorTasksMarkdownPath,
   ])
   const routes = runJson("routes", ["scripts/check-app-api-production-cn-routes.mjs"])
+  const appApiSmokeCoverage = runJson("app_api_smoke_coverage", ["scripts/check-app-api-smoke-coverage.mjs"])
   const dockerContext = runJson("docker_context", ["scripts/check-aliyun-docker-context.mjs"])
   const vercelEnvCoverage = runVercelEnvCoverage(args, resolve(args.outDir, "vercel-env-coverage.json"))
 
@@ -383,6 +405,7 @@ function main() {
       domain,
       operatorTasks,
       routes,
+      appApiSmokeCoverage,
       dockerContext,
       vercelEnvCoverage,
     },
@@ -416,6 +439,12 @@ function main() {
       scriptsReady: readiness.checks?.appProductionConfig?.scripts?.ready === true,
       envTemplateReady: readiness.checks?.appProductionConfig?.envTemplate?.ready === true,
       envTemplateKeyCount: readiness.checks?.appProductionConfig?.envTemplate?.keyCount ?? 0,
+    },
+    appApiSmokeCoverage: {
+      ok: appApiSmokeCoverage.ok === true,
+      coveredBusinessRoutes: appApiSmokeCoverage.coveredBusinessRoutes,
+      businessRoutes: appApiSmokeCoverage.businessRoutes,
+      smokeProbes: appApiSmokeCoverage.smokeProbes,
     },
     vercelEnvCoverage: vercelEnvCoverage.ok
       ? {

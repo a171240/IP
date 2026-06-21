@@ -2,8 +2,9 @@
 
 import { existsSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
+import { pathToFileURL } from "node:url"
 
-const REQUIRED_ROUTES = [
+export const REQUIRED_ROUTES = [
   {
     scope: "health",
     route: "/api/healthz",
@@ -242,4 +243,6 @@ function main() {
   if (failures.length) process.exit(1)
 }
 
-main()
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main()
+}

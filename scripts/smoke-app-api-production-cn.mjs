@@ -4,14 +4,14 @@ import { spawn } from "node:child_process"
 import { existsSync, readFileSync } from "node:fs"
 import net from "node:net"
 import { dirname, isAbsolute, resolve } from "node:path"
-import { fileURLToPath } from "node:url"
+import { fileURLToPath, pathToFileURL } from "node:url"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const DEFAULT_ENV_FILE = resolve(__dirname, "../../../.env.production-cn.local")
 const DEFAULT_TIMEOUT_MS = 20_000
 
-const PROBES = [
+export const PROBES = [
   {
     scope: "auth",
     method: "POST",
@@ -467,4 +467,6 @@ async function main() {
   }
 }
 
-await main()
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await main()
+}

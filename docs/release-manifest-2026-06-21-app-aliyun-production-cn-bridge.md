@@ -267,6 +267,9 @@ wechatOpenPlatform.reviewStatus: reviewing
 appProductionConfig.files: ready, 6 checked
 appProductionConfig.scripts: ready, 3 checked
 appProductionConfig.envTemplate: ready, 8 canonical keys checked, 0 deprecated keys
+backend.files: ready, 19 checked
+backend.scripts: ready, 21 checked
+appApiSmokeCoverage: 29 / 29 business routes
 ```
 
 机器可验证阻塞：
@@ -338,6 +341,7 @@ aliyun:env:plan
 aliyun:cloud:check
 aliyun:readiness
 aliyun:routes:check
+aliyun:app-api:coverage
 aliyun:docker:check
 pnpm exec tsc --noEmit --pretty false
 release:preflight
@@ -350,6 +354,7 @@ aliyun:app-api:smoke
 
 ```text
 routes: 31 checked, 0 failures
+app-api coverage: 29 / 29 business routes, 30 probes, 0 missing
 docker context: 7 files, 24 dockerignore patterns, sensitive env excluded
 release preflight: 4 / 4 pass
 build: compiled successfully; existing lint warnings only
