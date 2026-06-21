@@ -842,14 +842,16 @@ android ./gradlew assembleDebug
 `aliyun:readiness` 当前机器可验证阻塞：
 
 ```text
-PRIVACY_POLICY_URL
-TERMS_URL
 WECHAT_OPEN_APP_ID
 WECHAT_OPEN_APP_SECRET
 wechat_open_platform_mobile_app_reviewing 或 wechat_open_platform_mobile_app_not_ready
 invalid_app_universal_link_config
 app_universal_link:apple_team_id_missing
 ```
+
+2026-06-22 05:52 CST 更新：本机 `.env.production-cn.local` 已补入 `PRIVACY_POLICY_URL=https://api-cn.ipgongchang.xin/privacy` 与 `TERMS_URL=https://api-cn.ipgongchang.xin/terms`，`corepack pnpm aliyun:legal:strict` 通过；`aliyun:readiness` requiredReady 为 23/25，必需变量只剩 `WECHAT_OPEN_APP_ID` 和 `WECHAT_OPEN_APP_SECRET` 未 ready。
+
+2026-06-22 05:57 CST 复核：协议 URL ready 后重新运行 `corepack pnpm aliyun:predeploy`，通过；env requiredReady 23/25，health smoke 只缺 `appWechatLogin`，App API smoke 30 probes / 0 failures。
 
 2026-06-21 21:45 CST 更新：本机 `.env.production-cn.local` 已补入非密钥域名：
 
@@ -874,7 +876,7 @@ GET /terms
 corepack pnpm aliyun:legal:check
 ```
 
-该门禁只证明页面文件和核心字段存在，不代表运营者已经确认正式法律文本。正式上线前仍需把经营者确认后的 URL 填入：
+该门禁只证明页面文件和核心字段存在，不代表运营者已经确认正式法律文本。本机当前已按推荐落点填入：
 
 ```text
 PRIVACY_POLICY_URL=https://api-cn.ipgongchang.xin/privacy
@@ -962,10 +964,12 @@ architecture: linux/arm64
 `corepack pnpm aliyun:container:smoke` 已用该镜像完成本地容器验证：
 
 ```text
-containerHealth: /api/healthz 200, /api/app/health 200, strict health 503 for allowed appWechatLogin/legalLinks
+containerHealth: /api/healthz 200, /api/app/health 200, strict health 503 for expected appWechatLogin only
 appApiSmoke: 30 probes / 0 failures
 sanitizedEnvFileDeleted: true
 ```
+
+2026-06-22 06:01 CST 更新：协议 URL ready 后重新运行 `corepack pnpm aliyun:container:smoke`，通过；容器内 `/api/healthz`、`/api/app/health` 为 200，strict health 为 503 且 missing 只剩 `appWechatLogin`，App API smoke 30 probes，临时 sanitized env file 已删除。
 
 最新 `aliyun:readiness` 中 Docker 状态为 `ready`，`corepack pnpm aliyun:image:plan` 也能识别本地镜像。本机已创建 ignored 非密钥草稿 `deploy/aliyun-production-cn.image-publish.local.json`，当前只填了 local image digest。正式部署仍需要把该镜像推送/导入到阿里云 ACR，或使用阿里云镜像构建服务从审计包/源码上下文构建，并把 remote image / digest / 运行时拉取证据补入该 local 文件后通过 `corepack pnpm aliyun:image:plan:strict`。
 
@@ -990,6 +994,8 @@ GET /api/app/health?strict=1 -> 503, ok:false, missing:[appWechatLogin, legalLin
 sensitiveLeakCount -> 0
 ```
 
+2026-06-22 05:52 CST 更新：协议 URL ready 后再次运行 `corepack pnpm aliyun:health:smoke`，`/api/healthz` 与 `/api/app/health` 仍为 200，strict health 仍为 503，但 missing 已从 `[appWechatLogin, legalLinks]` 变为只剩 `[appWechatLogin]`，`sensitiveLeakCount` 仍为 0。
+
 本地 production server 也已用未登录/假 token 请求验证第一版 APP API 入口：
 
 ```text
@@ -1006,4 +1012,4 @@ scopes:
 结果：0 failures，入口均进入预期的 missing_code / auth_required / invite_not_found 分支。
 ```
 
-`PRIVACY_POLICY_URL` / `TERMS_URL` 的 ready 判定现在不只是“有值”：后端 health/readiness 和 APP runtime/build-time config 都要求 HTTPS，且不能是 localhost、example、`.vercel.app` 或旧 Vercel 入口域名。当前 TODO 微信开放平台变量和协议 URL 不会被健康检查或 APP 正式包配置误判为 ready。
+`PRIVACY_POLICY_URL` / `TERMS_URL` 的 ready 判定现在不只是“有值”：后端 health/readiness 和 APP runtime/build-time config 都要求 HTTPS，且不能是 localhost、example、`.vercel.app` 或旧 Vercel 入口域名。当前 TODO 微信开放平台变量不会被健康检查或 APP 正式包配置误判为 ready。

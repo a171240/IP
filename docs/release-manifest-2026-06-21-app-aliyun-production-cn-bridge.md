@@ -284,7 +284,7 @@ DATABASE_URL_CN
 ```text
 productionReady: false
 localCodeReady: false
-requiredReady: 21 / 25
+requiredReady: 23 / 25
 optionalReady: 28
 envFile: /Users/Admin/Documents/美业话镜APP/.env.production-cn.local
 env mode: 600
@@ -309,8 +309,6 @@ appApiSmokeCoverage: 29 / 29 business routes
 ```text
 missing_required_env:WECHAT_OPEN_APP_ID
 missing_required_env:WECHAT_OPEN_APP_SECRET
-missing_required_env:PRIVACY_POLICY_URL
-missing_required_env:TERMS_URL
 wechat_open_platform_mobile_app_reviewing
 invalid_app_universal_link_config
 app_universal_link:apple_team_id_missing
@@ -413,7 +411,7 @@ routes: 31 checked, 0 failures
 app-api bridge map: 31 mapped routes, sourceTypes mp_reexport 22 / mp_adapter 5 / app_native 1 / app_alias 1 / native_health 2, failures 0
 env source catalog: 62 variables, 62 source metadata ready, containsValues false
 app-client contract: 40 audited calls, 34 unique client routes, 26 matched backend routes, 4 deferred knowledge-space calls, 0 failures
-app legal pages: ok=true, /privacy and /terms route files ready, env URL still requires operator confirmation
+app legal pages: ok=true, /privacy and /terms route files ready, env URL ready
 app-native release config: ok=true, Android release signing config ready, iOS Associated Domains applinks:api-cn.ipgongchang.xin configured
 aasa config: ok=false, route files exist, blocker apple_team_id_missing, universalLink https://api-cn.ipgongchang.xin/app/wechat/
 app-api coverage: 29 / 29 business routes, 30 probes, 0 missing
@@ -425,7 +423,7 @@ build: compiled successfully; existing lint warnings only
 health smoke: sensitiveLeakCount 0
 app-api smoke: 30 business probes, 0 failures
 postdeploy smoke: local localhost pass, remoteHealth pass, appApiSmoke pass, sensitive value pattern 0
-container smoke: Docker image meiye-huajing-app-api:production-cn pass, /api/healthz 200, /api/app/health 200, strict health 503 for allowed appWechatLogin/legalLinks, app-api smoke 30 probes, sanitized env file deleted, container stopped
+container smoke: Docker image meiye-huajing-app-api:production-cn pass, /api/healthz 200, /api/app/health 200, strict health 503 for expected appWechatLogin only, app-api smoke 30 probes, sanitized env file deleted, container stopped
 cloud confirmations: example template ready, local file not ready, 21 blockers, containsValues false
 ```
 
@@ -513,9 +511,9 @@ readiness.docker.status: ready
 `corepack pnpm aliyun:container:smoke` 已通过：
 
 ```text
-healthz: 200, missing appWechatLogin/legalLinks
-appHealth: 200, missing appWechatLogin/legalLinks
-strictHealth: 503, expected missing appWechatLogin/legalLinks
+healthz: 200, missing appWechatLogin
+appHealth: 200, missing appWechatLogin
+strictHealth: 503, expected missing appWechatLogin
 appApiSmoke: 30 probes / 0 failures
 sanitizedEnvFileDeleted: true
 ```
@@ -527,6 +525,12 @@ sanitizedEnvFileDeleted: true
 2026-06-22 03:56 CST 复核：`corepack pnpm aliyun:predeploy` 通过。该命令重新覆盖了 env plan/source、deploy spec、image plan、cloud confirmations、domain check、readiness、routes check、App API bridge map、App client contract、App native release check、App API coverage、Docker context、TypeScript、release preflight、Next build、health smoke 和 App API smoke。当前通过表示桥接后端本地包自洽；不表示微信开放平台、阿里云 ACR/runtime、DNS/HTTPS/ICP、OSS/RAM/SLS 已生产 ready。2026-06-22 追加后，`predeploy` 还会覆盖 `aliyun:legal:check`。
 
 2026-06-22 05:47 CST 复核：新增 `deploy/app-api-production-cn.bridge-map.json` 和 `corepack pnpm aliyun:app-api:bridge-map` 后，`corepack pnpm aliyun:predeploy` 再次通过。新增桥接门禁结果为 31 mapped routes，29 bridge-ready routes，2 WeChat env-blocked routes；微信开放平台仍按审核中处理。
+
+2026-06-22 05:52 CST 复核：本机 ignored `.env.production-cn.local` 已补入 `PRIVACY_POLICY_URL=https://api-cn.ipgongchang.xin/privacy` 与 `TERMS_URL=https://api-cn.ipgongchang.xin/terms`。`corepack pnpm aliyun:legal:strict` 通过，`corepack pnpm aliyun:readiness` 的 requiredReady 变为 23/25，requiredBlocking 只剩 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；`corepack pnpm aliyun:health:smoke` 显示 strict health 仍为 503，但 missing 只剩 `appWechatLogin`。
+
+2026-06-22 05:57 CST 复核：在协议 URL ready 后重新执行 `corepack pnpm aliyun:predeploy`，通过。该轮 predeploy 显示 env requiredReady 23/25、blocking 只剩 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；`aliyun:health:smoke` missing 只剩 `appWechatLogin`；`aliyun:app-api:smoke` 仍为 30 probes / 0 failures。
+
+2026-06-22 06:01 CST 复核：在协议 URL ready 后重新执行 `corepack pnpm aliyun:container:smoke`，通过。Docker 镜像内 `/api/healthz`、`/api/app/health` 为 200，strict health 为 503 且 missing 只剩 `appWechatLogin`；App API smoke 仍为 30 probes，临时 sanitized env file 已删除。
 
 ## 10. 发布前必须补齐
 
@@ -566,13 +570,13 @@ NEXT_PUBLIC_SITE_URL=https://api-cn.ipgongchang.xin
 APP_ASSET_BASE_URL=https://assets-cn.ipgongchang.xin
 PRIVACY_POLICY_URL=https://api-cn.ipgongchang.xin/privacy
 TERMS_URL=https://api-cn.ipgongchang.xin/terms
-WECHAT_OPEN_APP_REVIEW_STATUS=approved
+WECHAT_OPEN_APP_REVIEW_STATUS=reviewing（当前；发布前必须 approved）
 WECHAT_OPEN_APP_ID=<微信开放平台移动应用 AppID>
 WECHAT_OPEN_APP_SECRET=<微信开放平台移动应用 AppSecret>
 APPLE_TEAM_ID=<Apple Developer 10 位 Team ID>
 ```
 
-`APP_API_BASE_URL`、`NEXT_PUBLIC_SITE_URL`、`APP_ASSET_BASE_URL` 已写入本机 `.env.production-cn.local`，但仍需阿里云 DNS/HTTPS/OSS/CDN 证据确认后才能算生产 ready。`PRIVACY_POLICY_URL` 与 `TERMS_URL` 已有推荐落点，但当前仍保持缺失状态，需运营者复核页面文本后再写入本机 env 和阿里云运行环境。
+`APP_API_BASE_URL`、`NEXT_PUBLIC_SITE_URL`、`APP_ASSET_BASE_URL`、`PRIVACY_POLICY_URL`、`TERMS_URL` 已写入本机 `.env.production-cn.local`。协议 URL 形态已通过本机 strict 检查；正式生产仍需阿里云 DNS/HTTPS/ICP 证据、页面可公网 GET、运营者复核文本，并在阿里云运行环境中导入同一组 URL。
 
 ### 10.3 微信开放平台
 
