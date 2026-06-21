@@ -871,6 +871,24 @@ slsAlerts missing: confirmed, healthAlertConfigured, serverErrorAlertConfigured
 /tmp/meiye-huajing-aliyun-production-cn-*/meiye-huajing-app-api-production-cn-context.tar.gz
 ```
 
+2026-06-22 03:26 CST 最新不打包审计目录：
+
+```text
+/tmp/meiye-huajing-aliyun-production-cn-2026-06-21T19-26-16-828Z
+```
+
+该目录包含不含密钥的 `release-audit.*`、`env-import-plan.json`、`vercel-env-coverage.json`、`image-publish-plan-check.json`、`domain-readiness.json`、`cloud-confirmations-check.json`、`operator-tasks.*`。当前摘要：
+
+```text
+productionReady: false
+localCodeReady: false
+Vercel required coverage: 17 / 25
+imagePublishPlan: localDockerImage ready, ACR/runtime blockers 16
+cloudConfirmations: local blockers 21
+appClientContract: 40 audited calls / 34 unique client routes
+appApiSmokeCoverage: 29 / 29 business routes
+```
+
 产物检查：
 
 ```text
@@ -900,6 +918,16 @@ sanitizedEnvFileDeleted: true
 最新 `aliyun:readiness` 中 Docker 状态为 `ready`，`corepack pnpm aliyun:image:plan` 也能识别本地镜像。本机已创建 ignored 非密钥草稿 `deploy/aliyun-production-cn.image-publish.local.json`，当前只填了 local image digest。正式部署仍需要把该镜像推送/导入到阿里云 ACR，或使用阿里云镜像构建服务从审计包/源码上下文构建，并把 remote image / digest / 运行时拉取证据补入该 local 文件后通过 `corepack pnpm aliyun:image:plan:strict`。
 
 如果 `corepack pnpm aliyun:image:plan` 报 `localDockerImage=image_not_found_or_docker_unavailable`，说明当前 Docker daemon 里没有可推送的本地镜像缓存；正式推送前重新执行 `corepack pnpm aliyun:docker:build` 和 `corepack pnpm aliyun:container:smoke`。
+
+2026-06-22 03:27 CST 复核：`corepack pnpm aliyun:predeploy` 通过，且 `corepack pnpm aliyun:image:plan` 当前能识别本机镜像：
+
+```text
+localDockerImage.status: ready
+localDockerImage.id: sha256:087a6c99206fe32895b4bdbcaba9e12499a2b866fb1596cdf6f2df06f9da2d84
+localDockerImage.size: 726527744
+```
+
+本地曾重试 `corepack pnpm aliyun:docker:build`，在拉取 `node:24-bookworm-slim` metadata 时遇到 Docker Hub `EOF`，属于外部 registry 网络错误；未生成新镜像。当前可用镜像仍是上面的 `087a6c...`，并已重新通过 `corepack pnpm aliyun:container:smoke`。
 
 本地 production server 已用 `.env.production-cn.local` 做过 HTTP 验证：
 

@@ -471,6 +471,20 @@ meiye-huajing-app-api-production-cn-context.tar.gz
 
 其中 `vercel-env-coverage.json` 只包含 Vercel production 变量名、环境和加密/敏感元数据，不包含真实 value；Vercel 登录态不可用时只记录 non-blocking failure，不阻断 release audit。
 
+2026-06-22 03:26 CST 最新 artifacts：
+
+```text
+outDir: /tmp/meiye-huajing-aliyun-production-cn-2026-06-21T19-26-16-828Z
+productionReady: false
+localCodeReady: false
+imagePublishPlan.localDockerImage: ready
+imagePublishPlan.totalBlockers: 16
+cloudConfirmations.totalBlockers: 21
+vercelEnvCoverage.requiredCovered: 17 / 25
+appClientContract: 40 audited calls / 34 unique client routes / 26 matched backend routes
+appApiSmokeCoverage: 29 / 29 business routes / 30 probes
+```
+
 本机 Docker 镜像已在 2026-06-22 03:12 CST 重新构建成功：
 
 ```text
@@ -492,6 +506,8 @@ sanitizedEnvFileDeleted: true
 ```
 
 正式部署仍未执行；`deploy/aliyun-production-cn.image-publish.local.json` 已在本机作为 ignored 非密钥草稿创建，当前只填了 local image digest。下一步需要推送/导入到阿里云 ACR，或使用阿里云镜像构建服务，并把 ACR remote image / digest / 运行时拉取证据补入该 local 文件。
+
+2026-06-22 03:27 CST 复核：`corepack pnpm aliyun:predeploy` 通过。该命令重新覆盖了 env plan/source、deploy spec、image plan、cloud confirmations、domain check、readiness、routes check、App client contract、App native release check、App API coverage、Docker context、TypeScript、release preflight、Next build、health smoke 和 App API smoke。当前通过表示桥接后端本地包自洽；不表示微信开放平台、阿里云 ACR/runtime、DNS/HTTPS/ICP、OSS/RAM/SLS 已生产 ready。
 
 ## 10. 发布前必须补齐
 
