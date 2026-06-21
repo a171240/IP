@@ -278,8 +278,8 @@ urls.nextPublicSiteUrl: ready
 urls.appAssetBaseUrl: ready
 wechatOpenPlatform.reviewStatus: reviewing
 appProductionConfig.files: ready, 6 checked
-appProductionConfig.scripts: ready, 3 checked
-appProductionConfig.envTemplate: ready, 8 canonical keys checked, 0 deprecated keys
+appProductionConfig.scripts: ready, 5 checked
+appProductionConfig.envTemplate: ready, 5 canonical keys checked, 0 forbidden backend/secret keys
 backend.files: ready, 20 checked
 backend.scripts: ready, 23 checked
 appClientContract: 40 audited calls / 34 unique client routes, 4 deferred knowledge-space calls

@@ -247,10 +247,10 @@ function renderMarkdown(audit) {
           ...appEnvTemplate.missingCanonicalKeys.map((item) => `  - ${item}`),
         ]
       : []),
-    ...(appEnvTemplate?.deprecatedKeys?.length
+    ...(appEnvTemplate?.forbiddenKeys?.length
       ? [
-          "- deprecatedKeys:",
-          ...appEnvTemplate.deprecatedKeys.map((item) => `  - ${item}`),
+          "- forbiddenKeys:",
+          ...appEnvTemplate.forbiddenKeys.map((item) => `  - ${item}`),
         ]
       : []),
     "",

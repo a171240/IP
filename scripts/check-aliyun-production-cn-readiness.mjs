@@ -140,6 +140,8 @@ const REQUIRED_APP_FILES = [
 
 const REQUIRED_APP_SCRIPTS = [
   "config:generate:production-cn",
+  "config:check:production-cn",
+  "config:check:template",
   "android:assemble:production-cn",
   "validate:package0",
 ]
@@ -150,9 +152,6 @@ const REQUIRED_APP_PRODUCTION_CN_ENV_TEMPLATE_KEYS = [
   "APP_ASSET_BASE_URL",
   "PRIVACY_POLICY_URL",
   "TERMS_URL",
-  "WECHAT_OPEN_APP_REVIEW_STATUS",
-  "WECHAT_OPEN_APP_ID",
-  "WECHAT_OPEN_APP_SECRET",
 ]
 
 const FORBIDDEN_APP_PRODUCTION_CN_ENV_TEMPLATE_KEYS = [
@@ -160,6 +159,13 @@ const FORBIDDEN_APP_PRODUCTION_CN_ENV_TEMPLATE_KEYS = [
   "APP_TERMS_URL",
   "WECHAT_OPEN_PLATFORM_APP_ID",
   "WECHAT_OPEN_PLATFORM_SECRET",
+  "WECHAT_OPEN_APP_ID",
+  "WECHAT_OPEN_APP_SECRET",
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "ALIYUN_OSS_ACCESS_KEY_SECRET",
+  "DASHSCOPE_API_KEY",
+  "DEEPSEEK_API_KEY",
+  "VOLC_SPEECH_ACCESS_TOKEN",
 ]
 
 const CLOUD_CONFIRMATION_ITEMS = [
@@ -392,18 +398,20 @@ function envTemplateStatus(filePath) {
       checked: REQUIRED_APP_PRODUCTION_CN_ENV_TEMPLATE_KEYS.length,
       missingCanonicalKeys: REQUIRED_APP_PRODUCTION_CN_ENV_TEMPLATE_KEYS,
       deprecatedKeys: [],
+      forbiddenKeys: [],
       keyCount: 0,
     }
   }
   const env = parseEnvFile(filePath)
   const missingCanonicalKeys = REQUIRED_APP_PRODUCTION_CN_ENV_TEMPLATE_KEYS.filter((key) => !env.has(key))
-  const deprecatedKeys = FORBIDDEN_APP_PRODUCTION_CN_ENV_TEMPLATE_KEYS.filter((key) => env.has(key))
+  const forbiddenKeys = FORBIDDEN_APP_PRODUCTION_CN_ENV_TEMPLATE_KEYS.filter((key) => env.has(key))
   return {
-    ready: missingCanonicalKeys.length === 0 && deprecatedKeys.length === 0,
+    ready: missingCanonicalKeys.length === 0 && forbiddenKeys.length === 0,
     path: filePath,
     checked: REQUIRED_APP_PRODUCTION_CN_ENV_TEMPLATE_KEYS.length,
     missingCanonicalKeys,
-    deprecatedKeys,
+    deprecatedKeys: forbiddenKeys,
+    forbiddenKeys,
     keyCount: env.size,
   }
 }
@@ -638,7 +646,7 @@ function main() {
     [
       "invalid_app_production_cn_env_template",
       ...appProductionCnEnvTemplate.missingCanonicalKeys.map((key) => `missing:${key}`),
-      ...appProductionCnEnvTemplate.deprecatedKeys.map((key) => `deprecated:${key}`),
+      ...appProductionCnEnvTemplate.forbiddenKeys.map((key) => `forbidden:${key}`),
     ].join(","),
   )
 
