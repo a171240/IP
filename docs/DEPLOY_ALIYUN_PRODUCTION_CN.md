@@ -327,6 +327,31 @@ corepack pnpm aliyun:env:check
 
 这个命令只输出变量名和状态，不输出变量值。
 
+生成不含 value 的变量来源清单：
+
+```bash
+corepack pnpm aliyun:env:sources
+```
+
+默认输出：
+
+```text
+/tmp/meiye-aliyun-env-source-catalog.json
+```
+
+这份 JSON 仍不包含真实变量值。每个变量会列出：
+
+```text
+sensitivity
+owner
+consolePath
+obtain
+importTarget
+cloudConfirmationKey
+```
+
+它用于回答“这个变量去哪里拿、由谁确认、导入阿里云哪里”。例如 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET` 的来源是微信开放平台移动应用，不是小程序后台；`PRIVACY_POLICY_URL` / `TERMS_URL` 的来源是正式 HTTPS 协议页面；OSS、百炼、DeepSeek、火山语音、Supabase 桥接变量会分别标出对应控制台或旧 Vercel production 变量来源。
+
 校验模板变量名覆盖：
 
 ```bash
@@ -583,6 +608,7 @@ corepack pnpm aliyun:predeploy
 ```bash
 corepack pnpm aliyun:env:check
 corepack pnpm aliyun:env:plan
+corepack pnpm aliyun:env:sources
 corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:readiness
 corepack pnpm aliyun:routes:check
@@ -693,6 +719,7 @@ node --check scripts/run-aliyun-predeploy.mjs
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.example.json','utf8'))"
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.cloud-confirmations.example.json','utf8'))"
 corepack pnpm aliyun:readiness
+corepack pnpm aliyun:env:sources（61 variables / 61 source metadata ready）
 corepack pnpm aliyun:operator:tasks
 corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:release:artifacts

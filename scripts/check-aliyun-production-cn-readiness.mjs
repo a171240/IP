@@ -106,6 +106,7 @@ const REQUIRED_BACKEND_FILES = [
 const REQUIRED_BACKEND_SCRIPTS = [
   "aliyun:env:check",
   "aliyun:env:plan",
+  "aliyun:env:sources",
   "aliyun:vercel-env:coverage",
   "aliyun:domain:check",
   "aliyun:domain:strict",

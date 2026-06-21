@@ -281,7 +281,7 @@ appProductionConfig.files: ready, 6 checked
 appProductionConfig.scripts: ready, 3 checked
 appProductionConfig.envTemplate: ready, 8 canonical keys checked, 0 deprecated keys
 backend.files: ready, 20 checked
-backend.scripts: ready, 22 checked
+backend.scripts: ready, 23 checked
 appClientContract: 40 audited calls / 34 unique client routes, 4 deferred knowledge-space calls
 appApiSmokeCoverage: 29 / 29 business routes
 ```
@@ -337,6 +337,7 @@ node --check scripts/check-aliyun-domain-readiness.mjs
 node --check scripts/generate-aliyun-operator-tasks.mjs
 node scripts/generate-app-runtime-config.mjs --env-file ../.env.production-cn.local --out /tmp/meiye-build-config.generated.ts --require-production-ready --check
 corepack pnpm aliyun:env:plan
+corepack pnpm aliyun:env:sources
 corepack pnpm aliyun:vercel-env:coverage
 corepack pnpm aliyun:domain:check
 corepack pnpm aliyun:operator:tasks
@@ -353,6 +354,7 @@ corepack pnpm aliyun:predeploy
 ```text
 aliyun:env:check
 aliyun:env:plan
+aliyun:env:sources
 aliyun:cloud:check
 aliyun:readiness
 aliyun:routes:check
@@ -370,6 +372,7 @@ aliyun:app-api:smoke
 
 ```text
 routes: 31 checked, 0 failures
+env source catalog: 61 variables, 61 source metadata ready, containsValues false
 app-client contract: 40 audited calls, 34 unique client routes, 26 matched backend routes, 4 deferred knowledge-space calls, 0 failures
 app-api coverage: 29 / 29 business routes, 30 probes, 0 missing
 docker context: 7 files, 24 dockerignore patterns, sensitive env excluded
@@ -412,8 +415,17 @@ aliyun:operator:tasks 只输出非密钥任务清单，覆盖微信开放平台�
 /tmp/meiye-aliyun-env-import-plan.json
 containsValues: false
 variables: 61
+sourceMetadataReady: 61 / 61
 requiredBlocking: PRIVACY_POLICY_URL, TERMS_URL, WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET
 ```
+
+`aliyun:env:sources` 同样不输出变量值，默认生成：
+
+```text
+/tmp/meiye-aliyun-env-source-catalog.json
+```
+
+每个变量包含 `sensitivity`、`owner`、`consolePath`、`obtain`、`importTarget`、`cloudConfirmationKey`，用于说明变量从哪里获得、由谁确认、导入阿里云哪里。
 
 `aliyun:release:artifacts` 当前会生成：
 

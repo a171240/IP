@@ -359,6 +359,25 @@ function renderMarkdown(report) {
       ? report.domain.machineBlocking.map((item) => `- ${item}`)
       : []),
     "",
+    "## 环境变量来源清单",
+    "",
+    `- containsValues: ${report.env.containsValues === false ? "false" : "unknown"}`,
+    `- variables: ${report.env.summary.total}`,
+    `- sourceMetadataReady: ${report.env.summary.sourceMetadataReady} / ${report.env.summary.total}`,
+    "",
+    ...(report.env.requiredBlockingDetails.length
+      ? report.env.requiredBlockingDetails.flatMap((item) => [
+          `### ${item.name}`,
+          "",
+          `- owner: ${item.owner}`,
+          `- consolePath: ${item.consolePath}`,
+          `- obtain: ${item.obtain}`,
+          `- importTarget: ${item.importTarget}`,
+          `- cloudConfirmationKey: ${item.cloudConfirmationKey}`,
+          "",
+        ])
+      : ["- requiredBlocking: none", ""]),
+    "",
     "## 任务",
     "",
   ]
@@ -436,8 +455,20 @@ function main() {
       machineBlocking: domain.machineBlocking,
     },
     env: {
+      containsValues: false,
       summary: envPlan.summary,
       requiredBlocking: envPlan.summary.requiredBlocking,
+      requiredBlockingDetails: envPlan.variables
+        .filter((item) => envPlan.summary.requiredBlocking.includes(item.name))
+        .map((item) => ({
+          name: item.name,
+          sensitivity: item.sensitivity,
+          owner: item.owner,
+          consolePath: item.consolePath,
+          obtain: item.obtain,
+          importTarget: item.importTarget,
+          cloudConfirmationKey: item.cloudConfirmationKey,
+        })),
     },
     tasks,
     nextCommandOrder: [

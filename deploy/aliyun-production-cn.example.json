@@ -34,6 +34,7 @@
   "predeployChecks": [
     "corepack pnpm aliyun:operator:tasks",
     "corepack pnpm aliyun:readiness",
+    "corepack pnpm aliyun:env:sources",
     "corepack pnpm aliyun:domain:check",
     "corepack pnpm aliyun:cloud:check",
     "corepack pnpm aliyun:readiness:cloud-ready",

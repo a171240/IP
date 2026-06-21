@@ -8,6 +8,7 @@
     "release:verify:professional-images": "node ./scripts/check-professional-learning-remote-images.mjs --concurrency 4 --timeout-ms 30000",
     "aliyun:env:check": "node ./scripts/prepare-aliyun-runtime-env.mjs --allow-todo",
     "aliyun:env:plan": "node ./scripts/prepare-aliyun-runtime-env.mjs --allow-todo --write-plan /tmp/meiye-aliyun-env-import-plan.json",
+    "aliyun:env:sources": "node ./scripts/prepare-aliyun-runtime-env.mjs --allow-todo --write-plan /tmp/meiye-aliyun-env-source-catalog.json",
     "aliyun:vercel-env:coverage": "node ./scripts/check-vercel-env-coverage.mjs --write-report /tmp/meiye-vercel-env-coverage.json",
     "aliyun:domain:check": "node ./scripts/check-aliyun-domain-readiness.mjs --allow-blocking",
     "aliyun:domain:strict": "node ./scripts/check-aliyun-domain-readiness.mjs",
