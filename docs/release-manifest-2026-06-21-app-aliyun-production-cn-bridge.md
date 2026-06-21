@@ -1,6 +1,6 @@
 # 美业话镜 APP 阿里云 production-cn 桥接后端发布清单
 
-生成时间：2026-06-21 22:17:21 CST
+生成时间：2026-06-21 22:24:39 CST
 
 本文只记录 APP 国内 production-cn 后端桥接包的本地准备状态，不包含任何密钥值，也不代表已经执行阿里云生产部署。
 
@@ -9,9 +9,9 @@
 - Release lane: APP production-cn backend bridge
 - Backend repository: `/Users/Admin/Documents/美业话镜APP/handoff/IP`
 - Backend branch: `codex/app-api-handoff-20260521`
-- Backend HEAD before release-artifact env coverage update: `ea1a8c7 deploy: add vercel env coverage check`
+- Backend HEAD before postdeploy smoke update: `9d1281f deploy: include vercel env coverage in aliyun artifacts`
 - Remote baseline branch: `origin/codex/app-api-handoff-20260521`
-- Branch state before release-artifact env coverage update: ahead 13, clean worktree
+- Branch state before postdeploy smoke update: ahead 14, clean worktree
 - App workspace: `/Users/Admin/Documents/美业话镜APP`
 - Mini-program repository: `/Users/Admin/Documents/美业话镜小程序`
 
@@ -30,6 +30,7 @@
 
 ```text
 da9f812 docs: record aliyun console readiness evidence
+9d1281f deploy: include vercel env coverage in aliyun artifacts
 ea1a8c7 deploy: add vercel env coverage check
 cb78415 deploy: add aliyun env import plan
 232cf5f docs: refresh aliyun production-cn readiness
@@ -37,6 +38,14 @@ cb78415 deploy: add aliyun env import plan
 8096803 docs: add aliyun production-cn release manifest
 bc2b787 deploy: track wechat open app review status
 641bc1a deploy: add aliyun production-cn app api bridge
+```
+
+`9d1281f` 包含的核心文件：
+
+```text
+docs/DEPLOY_ALIYUN_PRODUCTION_CN.md
+docs/release-manifest-2026-06-21-app-aliyun-production-cn-bridge.md
+scripts/prepare-aliyun-release-artifacts.mjs
 ```
 
 `ea1a8c7` 包含的核心文件：
@@ -299,12 +308,14 @@ staged secret-value scan
 node scripts/prepare-aliyun-runtime-env.mjs --env-file /Users/Admin/Documents/美业话镜APP/.env.production-cn.example --allow-todo
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.cloud-confirmations.example.json','utf8'))"
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.cloud-confirmations.local.json','utf8'))"
+node --check scripts/run-aliyun-postdeploy-smoke.mjs
 node scripts/generate-app-runtime-config.mjs --env-file ../.env.production-cn.local --out /tmp/meiye-build-config.generated.ts --require-production-ready --check
 corepack pnpm aliyun:env:plan
 corepack pnpm aliyun:vercel-env:coverage
 corepack pnpm aliyun:readiness
 corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:release:artifacts -- --skip-bundle
+local localhost aliyun:postdeploy:smoke with --allow-missing appWechatLogin
 corepack pnpm aliyun:predeploy
 ```
 
@@ -333,6 +344,7 @@ release preflight: 4 / 4 pass
 build: compiled successfully; existing lint warnings only
 health smoke: sensitiveLeakCount 0
 app-api smoke: 22 probes, 0 failures
+postdeploy smoke: local localhost pass, remoteHealth pass, appApiSmoke pass, sensitive value pattern 0
 ```
 
 `aliyun:env:plan` 生成：
@@ -431,6 +443,12 @@ corepack pnpm aliyun:docker:build
 阿里云部署完成后：
 
 ```bash
+corepack pnpm aliyun:postdeploy:smoke -- --base-url https://api-cn.ipgongchang.xin
+```
+
+分步排查命令：
+
+```bash
 corepack pnpm aliyun:remote:smoke -- --base-url https://api-cn.ipgongchang.xin
 corepack pnpm aliyun:app-api:smoke -- --base-url https://api-cn.ipgongchang.xin
 ```
@@ -439,6 +457,14 @@ corepack pnpm aliyun:app-api:smoke -- --base-url https://api-cn.ipgongchang.xin
 
 ```bash
 corepack pnpm aliyun:remote:smoke -- \
+  --base-url https://api-cn.ipgongchang.xin \
+  --allow-missing appWechatLogin
+```
+
+或使用统一 postdeploy smoke：
+
+```bash
+corepack pnpm aliyun:postdeploy:smoke -- \
   --base-url https://api-cn.ipgongchang.xin \
   --allow-missing appWechatLogin
 ```

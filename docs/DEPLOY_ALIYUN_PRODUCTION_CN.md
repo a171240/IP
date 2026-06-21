@@ -96,6 +96,38 @@ corepack pnpm aliyun:app-api:smoke（22 probes / 0 failures）
 
 `aliyun:app-api:smoke` 会启动本地 production server，用未登录或假 token 请求验证第一版 APP 后端入口已经接到业务 guard，不是 404/405，也不会写入业务数据。覆盖范围包括登录、profile、门店管理、门店邀请、知识上下文和服务记录入口。
 
+阿里云部署后统一 smoke：
+
+```bash
+corepack pnpm aliyun:postdeploy:smoke -- \
+  --base-url https://api-cn.ipgongchang.xin
+```
+
+默认输出到：
+
+```text
+/tmp/meiye-huajing-aliyun-postdeploy-smoke-*
+```
+
+目录内容：
+
+```text
+remote-health-smoke.json
+app-api-smoke.json
+postdeploy-smoke.json
+postdeploy-smoke.md
+```
+
+如果微信开放平台仍在审核中，只能作为桥接调试放行已知缺口：
+
+```bash
+corepack pnpm aliyun:postdeploy:smoke -- \
+  --base-url https://api-cn.ipgongchang.xin \
+  --allow-missing appWechatLogin
+```
+
+正式 production-cn 不应使用 Vercel、旧域名、非 HTTPS 域名或 `ip.ipgongchang.xin` 作为 `--base-url`。
+
 ### 2.3 Production-cn readiness 门禁
 
 ```bash
@@ -500,12 +532,23 @@ corepack pnpm aliyun:docker:build
 部署后验证：
 
 ```bash
+corepack pnpm aliyun:postdeploy:smoke -- --base-url https://api-cn.ipgongchang.xin
+```
+
+分步排查命令：
+
+```bash
 corepack pnpm aliyun:remote:smoke -- --base-url https://api-cn.ipgongchang.xin
+corepack pnpm aliyun:app-api:smoke -- --base-url https://api-cn.ipgongchang.xin
 ```
 
 如果是微信开放平台变量尚未补齐的桥接调试阶段，只允许显式放行已知缺口：
 
 ```bash
+corepack pnpm aliyun:postdeploy:smoke -- \
+  --base-url https://api-cn.ipgongchang.xin \
+  --allow-missing appWechatLogin
+
 corepack pnpm aliyun:remote:smoke -- \
   --base-url https://api-cn.ipgongchang.xin \
   --allow-missing appWechatLogin
@@ -513,7 +556,7 @@ corepack pnpm aliyun:remote:smoke -- \
 
 `aliyun:remote:smoke` 会检查 `/api/healthz`、`/api/app/health`、`/api/app/health?strict=1` 的响应结构，并拒绝包含敏感字段名的 health 响应。
 
-部署后还要跑 APP API 入口 smoke：
+也可以单独跑 APP API 入口 smoke：
 
 ```bash
 corepack pnpm aliyun:app-api:smoke -- --base-url https://api-cn.ipgongchang.xin

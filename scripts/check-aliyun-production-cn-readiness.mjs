@@ -92,6 +92,7 @@ const REQUIRED_BACKEND_FILES = [
   "scripts/check-app-api-production-cn-routes.mjs",
   "scripts/check-aliyun-docker-context.mjs",
   "scripts/prepare-aliyun-release-artifacts.mjs",
+  "scripts/run-aliyun-postdeploy-smoke.mjs",
   "scripts/run-aliyun-predeploy.mjs",
   "scripts/smoke-aliyun-health.mjs",
   "scripts/smoke-app-api-production-cn.mjs",
@@ -115,6 +116,7 @@ const REQUIRED_BACKEND_SCRIPTS = [
   "aliyun:health:smoke",
   "aliyun:remote:smoke",
   "aliyun:app-api:smoke",
+  "aliyun:postdeploy:smoke",
 ]
 
 const REQUIRED_APP_FILES = [
@@ -636,8 +638,7 @@ function main() {
         : "从微信开放平台移动应用补 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET",
       "复制 deploy/aliyun-production-cn.cloud-confirmations.example.json 到 .local.json，并逐项填写非密钥云资源确认",
       "Docker daemon 就绪后执行 corepack pnpm aliyun:docker:build",
-      "部署后执行 corepack pnpm aliyun:remote:smoke -- --base-url https://api-cn.ipgongchang.xin",
-      "部署后执行 corepack pnpm aliyun:app-api:smoke -- --base-url https://api-cn.ipgongchang.xin",
+      "部署后执行 corepack pnpm aliyun:postdeploy:smoke -- --base-url https://api-cn.ipgongchang.xin",
     ],
   }
 

@@ -36,6 +36,7 @@
     "corepack pnpm aliyun:docker:build"
   ],
   "postdeployChecks": [
+    "corepack pnpm aliyun:postdeploy:smoke -- --base-url https://api-cn.ipgongchang.xin",
     "corepack pnpm aliyun:remote:smoke -- --base-url https://api-cn.ipgongchang.xin",
     "corepack pnpm aliyun:app-api:smoke -- --base-url https://api-cn.ipgongchang.xin"
   ],

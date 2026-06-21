@@ -18,6 +18,7 @@
     "aliyun:health:smoke": "node ./scripts/smoke-aliyun-health.mjs",
     "aliyun:remote:smoke": "node ./scripts/smoke-aliyun-remote.mjs",
     "aliyun:app-api:smoke": "node ./scripts/smoke-app-api-production-cn.mjs",
+    "aliyun:postdeploy:smoke": "node ./scripts/run-aliyun-postdeploy-smoke.mjs",
     "aliyun:routes:check": "node ./scripts/check-app-api-production-cn-routes.mjs",
     "aliyun:docker:check": "node ./scripts/check-aliyun-docker-context.mjs",
     "aliyun:predeploy": "node ./scripts/run-aliyun-predeploy.mjs",
