@@ -1,6 +1,6 @@
 # 美业话镜 APP 阿里云 production-cn 桥接后端发布清单
 
-生成时间：2026-06-21 21:13:17 CST
+生成时间：2026-06-21 21:45:10 CST
 
 本文只记录 APP 国内 production-cn 后端桥接包的本地准备状态，不包含任何密钥值，也不代表已经执行阿里云生产部署。
 
@@ -9,9 +9,9 @@
 - Release lane: APP production-cn backend bridge
 - Backend repository: `/Users/Admin/Documents/美业话镜APP/handoff/IP`
 - Backend branch: `codex/app-api-handoff-20260521`
-- Backend HEAD: `bc2b787 deploy: track wechat open app review status`
+- Backend HEAD: `83acfa1 deploy: require aliyun cloud confirmations`
 - Remote baseline branch: `origin/codex/app-api-handoff-20260521`
-- Branch state before this manifest: ahead 7, clean worktree
+- Branch state before this manifest: ahead 9, clean worktree
 - App workspace: `/Users/Admin/Documents/美业话镜APP`
 - Mini-program repository: `/Users/Admin/Documents/美业话镜小程序`
 
@@ -29,6 +29,8 @@
 ## 3. 本轮包含的后端提交
 
 ```text
+83acfa1 deploy: require aliyun cloud confirmations
+8096803 docs: add aliyun production-cn release manifest
 bc2b787 deploy: track wechat open app review status
 641bc1a deploy: add aliyun production-cn app api bridge
 ```
@@ -69,6 +71,18 @@ scripts/prepare-aliyun-release-artifacts.mjs
 scripts/prepare-aliyun-runtime-env.mjs
 ```
 
+`83acfa1` 包含的核心文件：
+
+```text
+.gitignore
+deploy/aliyun-production-cn.cloud-confirmations.example.json
+docs/DEPLOY_ALIYUN_PRODUCTION_CN.md
+package.json
+scripts/check-aliyun-production-cn-readiness.mjs
+scripts/prepare-aliyun-release-artifacts.mjs
+scripts/run-aliyun-predeploy.mjs
+```
+
 本 manifest 本身是后续补充的发布控制文件：
 
 ```text
@@ -97,6 +111,13 @@ App 根目录当前仍是未初始化提交状态，以下内容不属于本后�
 /Users/Admin/Documents/美业话镜APP/APP*.md
 /Users/Admin/Documents/美业话镜APP/meiye-huajing-app/**
 /Users/Admin/Documents/美业话镜APP/线上后台与小程序业务盘点.md
+```
+
+本地密钥/环境文件仍只保留在本机且被 git ignore：
+
+```text
+/Users/Admin/Documents/美业话镜APP/.env.production-cn.local
+/Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.cloud-confirmations.local.json
 ```
 
 小程序仓库当前排除项：
@@ -177,19 +198,20 @@ DATABASE_URL_CN
 ```text
 productionReady: false
 localCodeReady: false
-requiredReady: 19 / 23
-optionalReady: 27
+requiredReady: 21 / 23
+optionalReady: 28
 envFile: /Users/Admin/Documents/美业话镜APP/.env.production-cn.local
 env mode: 600
 env gitIgnored: true
+urls.appApiBaseUrl: ready
+urls.nextPublicSiteUrl: ready
+urls.appAssetBaseUrl: ready
 wechatOpenPlatform.reviewStatus: reviewing
 ```
 
 机器可验证阻塞：
 
 ```text
-missing_required_env:APP_API_BASE_URL
-missing_required_env:NEXT_PUBLIC_SITE_URL
 missing_required_env:WECHAT_OPEN_APP_ID
 missing_required_env:WECHAT_OPEN_APP_SECRET
 wechat_open_platform_mobile_app_reviewing
@@ -209,9 +231,15 @@ SLS 日志、健康检查失败告警和 5xx 告警已配置
 结构化云确认状态：
 
 ```text
-cloudConfirmations.mode: missing_file
+cloudConfirmations.mode: file
 cloudConfirmations.ready: false
-missing file: deploy/aliyun-production-cn.cloud-confirmations.local.json
+path: deploy/aliyun-production-cn.cloud-confirmations.local.json
+runtime missing: confirmed
+apiDomainHttps missing: confirmed, dnsResolvedToAliyun, httpsEnabled, icpReady
+oss missing: confirmed, corsConfigured, ramLeastPrivilege
+wechatOpenPlatform missing: confirmed, mobileAppIdReady, mobileAppSecretReady, androidConfigured, iosConfigured, reviewStatus=approved
+envImport missing: confirmed, secretNotInImage
+slsAlerts missing: confirmed, healthAlertConfigured, serverErrorAlertConfigured
 ```
 
 ## 9. 本地检查结果
@@ -224,6 +252,8 @@ git diff --cached --check
 staged secret-value scan
 node scripts/prepare-aliyun-runtime-env.mjs --env-file /Users/Admin/Documents/美业话镜APP/.env.production-cn.example --allow-todo
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.cloud-confirmations.example.json','utf8'))"
+node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.cloud-confirmations.local.json','utf8'))"
+node scripts/generate-app-runtime-config.mjs --env-file ../.env.production-cn.local --out /tmp/meiye-build-config.generated.ts --require-production-ready --check
 corepack pnpm aliyun:readiness
 corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:release:artifacts -- --skip-bundle
@@ -283,12 +313,13 @@ KMS 或 Secrets Manager 环境变量管理
 ```text
 APP_API_BASE_URL=https://api-cn.ipgongchang.xin
 NEXT_PUBLIC_SITE_URL=https://api-cn.ipgongchang.xin
+APP_ASSET_BASE_URL=https://assets-cn.ipgongchang.xin
 WECHAT_OPEN_APP_REVIEW_STATUS=approved
 WECHAT_OPEN_APP_ID=<微信开放平台移动应用 AppID>
 WECHAT_OPEN_APP_SECRET=<微信开放平台移动应用 AppSecret>
 ```
 
-`APP_ASSET_BASE_URL` 当前是桥接版可选项，正式资产 CDN 切换时再补。
+`APP_API_BASE_URL`、`NEXT_PUBLIC_SITE_URL`、`APP_ASSET_BASE_URL` 已写入本机 `.env.production-cn.local`，但仍需阿里云 DNS/HTTPS/OSS/CDN 证据确认后才能算生产 ready。
 
 ### 10.3 微信开放平台
 
@@ -349,4 +380,4 @@ corepack pnpm aliyun:remote:smoke -- \
 
 ## 13. 当前结论
 
-本地桥接代码和检查脚手架已经可以作为阿里云 production-cn 后端准备包继续推进；当前不能称为可发布，因为 API 域名、阿里云运行资源、微信开放平台移动应用 AppID/AppSecret 和云侧环境变量导入尚未完成。
+本地桥接代码、APP API 路由、App production-cn API 配置和检查脚手架已经可以作为阿里云 production-cn 后端准备包继续推进；当前不能称为可发布，因为阿里云运行资源、api-cn DNS/HTTPS/OSS/SLS 确认、微信开放平台移动应用 AppID/AppSecret 和云侧环境变量导入尚未完成。

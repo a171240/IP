@@ -505,22 +505,36 @@ android ./gradlew assembleDebug
 `aliyun:readiness` 当前机器可验证阻塞：
 
 ```text
-APP_API_BASE_URL
-NEXT_PUBLIC_SITE_URL
 WECHAT_OPEN_APP_ID
 WECHAT_OPEN_APP_SECRET
 wechat_open_platform_mobile_app_reviewing 或 wechat_open_platform_mobile_app_not_ready
 ```
 
+2026-06-21 21:45 CST 更新：本机 `.env.production-cn.local` 已补入非密钥域名：
+
+```text
+APP_API_BASE_URL=https://api-cn.ipgongchang.xin
+NEXT_PUBLIC_SITE_URL=https://api-cn.ipgongchang.xin
+APP_ASSET_BASE_URL=https://assets-cn.ipgongchang.xin
+```
+
+这些值只表示本地目标配置已补齐；正式发布仍要由 `deploy/aliyun-production-cn.cloud-confirmations.local.json` 确认 DNS、HTTPS、ICP、OSS/CORS/RAM 和 SLS。
+
 `aliyun:cloud:check` 当前云确认状态：
 
 ```text
-cloudConfirmations.mode: missing_file
+cloudConfirmations.mode: file
 cloudConfirmations.ready: false
-missing file: deploy/aliyun-production-cn.cloud-confirmations.local.json
+path: deploy/aliyun-production-cn.cloud-confirmations.local.json
+runtime missing: confirmed
+apiDomainHttps missing: confirmed, dnsResolvedToAliyun, httpsEnabled, icpReady
+oss missing: confirmed, corsConfigured, ramLeastPrivilege
+wechatOpenPlatform missing: confirmed, mobileAppIdReady, mobileAppSecretReady, androidConfigured, iosConfigured, reviewStatus=approved
+envImport missing: confirmed, secretNotInImage
+slsAlerts missing: confirmed, healthAlertConfigured, serverErrorAlertConfigured
 ```
 
-`APP_ASSET_BASE_URL` 当前仍是可选 TODO，不阻塞桥接版 API 部署；正式资产 CDN 切换时再补。
+`APP_ASSET_BASE_URL` 已按 `https://assets-cn.ipgongchang.xin` 写入本地配置，但资产域名和 OSS/CDN 仍未人工确认为 production ready。
 
 最新发布审计产物：
 
