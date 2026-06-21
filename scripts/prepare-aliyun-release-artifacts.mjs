@@ -186,6 +186,7 @@ function renderMarkdown(audit) {
   const bundle = audit.bundle
   const vercelEnvCoverage = audit.checks.vercelEnvCoverage
   const domain = audit.checks.domain
+  const operatorTasks = audit.checks.operatorTasks
   const cloudConfirmations = readiness.checks?.cloudConfirmations
   return [
     "# 美业话镜 APP production-cn 阿里云发布审计",
@@ -200,6 +201,7 @@ function renderMarkdown(audit) {
     `- routes: ${routes.checkedRoutes} checked, ${routes.failures.length} failures`,
     `- dockerContext: ${docker.ok ? "ok" : "not ok"}`,
     `- domainReadiness: ${domain.ok ? "ok" : "not ready"} (${domain.targetReady} / ${domain.targetTotal})`,
+    `- operatorTasks: ${operatorTasks.summary.ready} / ${operatorTasks.summary.total} ready`,
     `- cloudConfirmations: ${cloudConfirmations?.ready ? "ready" : "not ready"}`,
     `- vercelEnvCoverage: ${vercelEnvCoverage?.ok ? "ok" : vercelEnvCoverage?.skipped ? "skipped" : "not ok"}`,
     `- bundle: ${bundle ? basename(bundle.path) : "skipped"}`,
@@ -233,6 +235,14 @@ function renderMarkdown(audit) {
     ...(domain.machineBlocking?.length
       ? domain.machineBlocking.map((item) => `- ${item}`)
       : ["- none"]),
+    "",
+    "## 操作员任务清单",
+    "",
+    `- json: ${audit.outputFiles.operatorTasksJson}`,
+    `- markdown: ${audit.outputFiles.operatorTasksMarkdown}`,
+    `- ready: ${operatorTasks.summary.ready} / ${operatorTasks.summary.total}`,
+    `- blocked: ${operatorTasks.summary.blocked}`,
+    `- pendingCloud: ${operatorTasks.summary.pendingCloud}`,
     "",
     "## Docker 上下文包",
     "",
@@ -313,6 +323,18 @@ function main() {
     args.envFile,
     "--allow-blocking",
   ])
+  const operatorTasksJsonPath = resolve(args.outDir, "operator-tasks.json")
+  const operatorTasksMarkdownPath = resolve(args.outDir, "operator-tasks.md")
+  const operatorTasks = runJson("operator_tasks", [
+    "scripts/generate-aliyun-operator-tasks.mjs",
+    "--env-file",
+    args.envFile,
+    ...(args.cloudConfirmationsFile ? ["--cloud-confirmations", args.cloudConfirmationsFile] : []),
+    "--out",
+    operatorTasksJsonPath,
+    "--markdown",
+    operatorTasksMarkdownPath,
+  ])
   const routes = runJson("routes", ["scripts/check-app-api-production-cn-routes.mjs"])
   const dockerContext = runJson("docker_context", ["scripts/check-aliyun-docker-context.mjs"])
   const vercelEnvCoverage = runVercelEnvCoverage(args, resolve(args.outDir, "vercel-env-coverage.json"))
@@ -332,6 +354,7 @@ function main() {
       env,
       readiness,
       domain,
+      operatorTasks,
       routes,
       dockerContext,
       vercelEnvCoverage,
@@ -343,6 +366,8 @@ function main() {
       envImportPlan: resolve(args.outDir, "env-import-plan.json"),
       vercelEnvCoverage: vercelEnvCoverage.ok ? resolve(args.outDir, "vercel-env-coverage.json") : null,
       domainReadiness: resolve(args.outDir, "domain-readiness.json"),
+      operatorTasksJson: operatorTasksJsonPath,
+      operatorTasksMarkdown: operatorTasksMarkdownPath,
       bundle: bundle?.path || null,
     },
   }
@@ -377,6 +402,8 @@ function main() {
     envImportPlan: audit.outputFiles.envImportPlan,
     vercelEnvCoverageReport: audit.outputFiles.vercelEnvCoverage,
     domainReadinessReport: audit.outputFiles.domainReadiness,
+    operatorTasksJson: audit.outputFiles.operatorTasksJson,
+    operatorTasksMarkdown: audit.outputFiles.operatorTasksMarkdown,
   }, null, 2))
 }
 

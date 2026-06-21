@@ -1,0 +1,445 @@
+#!/usr/bin/env node
+
+import { existsSync, readFileSync, writeFileSync } from "node:fs"
+import { dirname, isAbsolute, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
+import { spawnSync } from "node:child_process"
+import { buildImportPlan, parseEnvFile } from "./prepare-aliyun-runtime-env.mjs"
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+const BACKEND_ROOT = resolve(__dirname, "..")
+const WORKSPACE_ROOT = resolve(BACKEND_ROOT, "../..")
+const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
+const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
+
+function parseArgs(argv) {
+  const args = {
+    envFile: DEFAULT_ENV_FILE,
+    cloudConfirmationsFile: DEFAULT_CLOUD_CONFIRMATIONS_FILE,
+    outPath: "",
+    markdownPath: "",
+  }
+
+  for (let index = 2; index < argv.length; index += 1) {
+    const arg = argv[index]
+    if (arg === "--") continue
+    if (arg === "--env-file") {
+      args.envFile = resolveValue(argv[++index], "--env-file")
+      continue
+    }
+    if (arg === "--cloud-confirmations") {
+      args.cloudConfirmationsFile = resolveValue(argv[++index], "--cloud-confirmations")
+      continue
+    }
+    if (arg === "--out") {
+      args.outPath = resolveValue(argv[++index], "--out")
+      continue
+    }
+    if (arg === "--markdown") {
+      args.markdownPath = resolveValue(argv[++index], "--markdown")
+      continue
+    }
+    if (arg === "--help" || arg === "-h") {
+      printHelp()
+      process.exit(0)
+    }
+    throw new Error(`unknown_arg:${arg}`)
+  }
+
+  return args
+}
+
+function resolveValue(value, name) {
+  if (!value) throw new Error(`missing_value:${name}`)
+  return isAbsolute(value) ? value : resolve(process.cwd(), value)
+}
+
+function runJson(label, args) {
+  const result = spawnSync(process.execPath, args, {
+    cwd: BACKEND_ROOT,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 20,
+  })
+  if (result.error) throw result.error
+  if (result.status !== 0) {
+    throw new Error(`${label}_failed:${result.status}\n${result.stderr || result.stdout}`)
+  }
+  try {
+    return JSON.parse(result.stdout)
+  } catch (error) {
+    throw new Error(`invalid_json_from_${label}:${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
+function readJsonIfExists(filePath) {
+  if (!filePath || !existsSync(filePath)) return null
+  return JSON.parse(readFileSync(filePath, "utf8"))
+}
+
+function buildCloudConfirmationIndex(readiness) {
+  const items = readiness.checks?.cloudConfirmations?.items || []
+  return new Map(items.map((item) => [item.key, item]))
+}
+
+function buildTasks({ envPlan, readiness, domain }) {
+  const cloud = buildCloudConfirmationIndex(readiness)
+  const tasks = []
+
+  addTask(tasks, {
+    id: "T01_WECHAT_OPEN_PLATFORM_APP_LOGIN",
+    title: "微信开放平台移动应用审核和 APP 登录凭证",
+    status: readiness.checks?.wechatOpenPlatform?.ready ? "ready" : "blocked",
+    blockerCodes: readiness.machineBlocking.filter((item) => item.includes("WECHAT_OPEN") || item.includes("wechat_open_platform")),
+    owner: "用户/微信开放平台操作员",
+    consolePath: "微信开放平台 -> 管理中心 -> 移动应用 -> 美业话镜 App",
+    actions: [
+      "等待移动应用审核状态从 reviewing 变为 approved。",
+      "审核通过后获取移动应用 AppID，填入 WECHAT_OPEN_APP_ID。",
+      "获取移动应用 AppSecret，填入 WECHAT_OPEN_APP_SECRET。",
+      "确认 Android 包名、应用签名；iOS Bundle ID 和 Universal Link 后续发布前也要确认。",
+      "在 deploy/aliyun-production-cn.cloud-confirmations.local.json 的 wechatOpenPlatform 项记录非密钥证据。",
+    ],
+    evidence: [
+      "reviewStatus=approved",
+      "mobileAppIdReady=true",
+      "mobileAppSecretReady=true",
+      "androidConfigured=true",
+      "iosConfigured=true",
+    ],
+    verifyCommands: [
+      "corepack pnpm aliyun:readiness",
+      "GET https://api-cn.ipgongchang.xin/api/app/health?strict=1 after deployment",
+    ],
+    notes: [
+      "不能用小程序 AppID/Secret 替代 APP 微信登录。",
+      "脚本只记录变量名和状态，不输出 AppSecret。",
+    ],
+  })
+
+  const runtime = cloud.get("runtime")
+  addTask(tasks, {
+    id: "T02_ALIYUN_RUNTIME_CONTAINER",
+    title: "创建或确认阿里云后端运行容器",
+    status: runtime?.ready ? "ready" : "pending_cloud",
+    blockerCodes: missingList(runtime),
+    owner: "阿里云操作员",
+    consolePath: "阿里云控制台 -> SAE 或 ECS/容器服务",
+    actions: [
+      "创建或确认 production-cn 后端应用，建议名称 meiye-huajing-app-api-production-cn。",
+      "运行区域使用 cn-hangzhou，容器监听端口 3000。",
+      "健康检查路径配置为 /api/healthz。",
+      "镜像或构建上下文使用后端仓库 Dockerfile，密钥通过运行环境变量或 KMS/Secrets Manager 导入。",
+      "在 cloud-confirmations.local.json 的 runtime 项写入应用名、端口和非密钥证据。",
+    ],
+    evidence: [
+      "provider=SAE 或 ECS",
+      "containerPort=3000",
+      "healthPath=/api/healthz",
+      "confirmed=true",
+    ],
+    verifyCommands: [
+      "corepack pnpm aliyun:docker:check",
+      "corepack pnpm aliyun:health:smoke",
+    ],
+  })
+
+  const apiDomain = cloud.get("apiDomainHttps")
+  addTask(tasks, {
+    id: "T03_ALIYUN_DOMAIN_DNS_HTTPS",
+    title: "配置 api-cn/assets-cn DNS、HTTPS 和 ICP 证据",
+    status: domain.ok && apiDomain?.ready ? "ready" : "blocked",
+    blockerCodes: [
+      ...domain.machineBlocking,
+      ...missingList(apiDomain),
+    ],
+    owner: "阿里云域名/证书操作员",
+    consolePath: "阿里云控制台 -> 云解析 DNS / 数字证书管理服务 / SAE 或 SLB/网关 / CDN 或 OSS 域名",
+    actions: [
+      "把 api-cn.ipgongchang.xin 解析到公网可访问的 SAE/SLB/ECS 后端入口。",
+      "把 assets-cn.ipgongchang.xin 解析到公网可访问的 OSS/CDN/静态资源入口。",
+      "不要把 APP production-cn 正式域名指向 Vercel、localhost、example 或 198.18.0.x 特殊用途网段。",
+      "给 api-cn 和 assets-cn 配置 HTTPS 证书。",
+      "确认 ICP 备案状态满足国内 APP 正式访问要求。",
+      "配置完成后运行严格域名门禁，并把证据写入 cloud-confirmations.local.json 的 apiDomainHttps 项。",
+    ],
+    evidence: [
+      "dnsResolvedToAliyun=true",
+      "httpsEnabled=true",
+      "icpReady=true",
+      "corepack pnpm aliyun:domain:strict pass",
+    ],
+    verifyCommands: [
+      "corepack pnpm aliyun:domain:strict",
+      "corepack pnpm aliyun:postdeploy:smoke -- --base-url https://api-cn.ipgongchang.xin",
+    ],
+  })
+
+  const oss = cloud.get("oss")
+  addTask(tasks, {
+    id: "T04_ALIYUN_OSS_AUDIO_STORAGE",
+    title: "确认服务记录音频 OSS、CORS 和 RAM 最小权限",
+    status: oss?.ready ? "ready" : "pending_cloud",
+    blockerCodes: missingList(oss),
+    owner: "阿里云 OSS/RAM 操作员",
+    consolePath: "阿里云控制台 -> OSS Bucket / RAM 访问控制",
+    actions: [
+      "确认服务记录音频使用的 OSS Bucket 名称和 region。",
+      "确认 CORS 允许 APP 所需上传/下载方法和 Header。",
+      "确认 RAM 权限限制到服务记录音频前缀 service-records/production-cn。",
+      "确认 ALIYUN_OSS_ACCESS_KEY_ID、ALIYUN_OSS_ACCESS_KEY_SECRET、ALIYUN_OSS_BUCKET、ALIYUN_OSS_REGION 已通过密钥环境变量导入。",
+      "在 cloud-confirmations.local.json 的 oss 项记录 Bucket、region 和非密钥证据。",
+    ],
+    evidence: [
+      "corsConfigured=true",
+      "ramLeastPrivilege=true",
+      "serviceRecordPrefix=service-records/production-cn",
+      "confirmed=true",
+    ],
+    verifyCommands: [
+      "corepack pnpm aliyun:app-api:smoke",
+      "postdeploy service-records upload smoke after API deployment",
+    ],
+  })
+
+  const envImport = cloud.get("envImport")
+  addTask(tasks, {
+    id: "T05_ALIYUN_ENV_IMPORT",
+    title: "导入 production-cn 运行环境变量",
+    status: envImport?.ready && envPlan.summary.requiredBlocking.length === 0 ? "ready" : "blocked",
+    blockerCodes: [
+      ...envPlan.summary.requiredBlocking.map((key) => `missing_required_env:${key}`),
+      ...missingList(envImport),
+    ],
+    owner: "阿里云运行环境/密钥操作员",
+    consolePath: "阿里云 SAE/ECS 环境变量 / KMS / Secrets Manager",
+    actions: [
+      "使用 corepack pnpm aliyun:env:plan 生成不含 value 的变量名核对清单。",
+      "从现有 Vercel production、Supabase、阿里云 OSS/百炼、DeepSeek、火山引擎、微信开放平台等来源迁移变量值。",
+      "密钥值只导入阿里云运行环境、KMS 或 Secrets Manager，不写入 Docker 镜像、文档或 git。",
+      "导入后在 cloud-confirmations.local.json 的 envImport 项记录 importedAt、target 和 secretNotInImage=true。",
+    ],
+    evidence: [
+      "secretNotInImage=true",
+      "importedAt=实际导入时间",
+      `requiredReady=${envPlan.summary.requiredReady}/${envPlan.summary.requiredTotal}`,
+      `requiredBlocking=${envPlan.summary.requiredBlocking.length ? envPlan.summary.requiredBlocking.join(",") : "none"}`,
+    ],
+    verifyCommands: [
+      "corepack pnpm aliyun:env:check",
+      "corepack pnpm aliyun:readiness:strict",
+    ],
+  })
+
+  const sls = cloud.get("slsAlerts")
+  addTask(tasks, {
+    id: "T06_ALIYUN_SLS_ALERTS",
+    title: "配置 SLS 日志和健康/5xx 告警",
+    status: sls?.ready ? "ready" : "pending_cloud",
+    blockerCodes: missingList(sls),
+    owner: "阿里云运维操作员",
+    consolePath: "阿里云控制台 -> 日志服务 SLS / 应用监控告警",
+    actions: [
+      "创建或确认 SLS Project 和日志采集配置。",
+      "配置 /api/healthz 健康检查失败告警。",
+      "配置 5xx 错误率或错误数告警。",
+      "建议补 ASR、OSS 上传失败相关告警。",
+      "在 cloud-confirmations.local.json 的 slsAlerts 项记录项目名和非密钥证据。",
+    ],
+    evidence: [
+      "healthAlertConfigured=true",
+      "serverErrorAlertConfigured=true",
+      "confirmed=true",
+    ],
+    verifyCommands: [
+      "corepack pnpm aliyun:cloud:check",
+    ],
+  })
+
+  addTask(tasks, {
+    id: "T07_POSTDEPLOY_REMOTE_SMOKE",
+    title: "阿里云部署后远端 smoke 验收",
+    status: readiness.productionReady ? "ready" : "waiting_for_deploy",
+    blockerCodes: readiness.productionReady ? [] : ["requires_runtime_domain_env_wechat_cloud_confirmations"],
+    owner: "后端发布操作员",
+    consolePath: "本机终端 + 阿里云部署控制台",
+    actions: [
+      "完成 T01-T06 后部署 production-cn 后端。",
+      "先运行 domain strict，确认 api-cn/assets-cn DNS 和 HTTPS 可用。",
+      "再运行统一 postdeploy smoke，验证 health 和 APP API guard。",
+      "微信开放平台仍审核中时只能使用 --allow-missing appWechatLogin 做桥接调试，不能作为正式上线结论。",
+    ],
+    evidence: [
+      "corepack pnpm aliyun:domain:strict pass",
+      "corepack pnpm aliyun:postdeploy:smoke pass",
+      "strict health 不再缺 appWechatLogin",
+    ],
+    verifyCommands: [
+      "corepack pnpm aliyun:domain:strict",
+      "corepack pnpm aliyun:postdeploy:smoke -- --base-url https://api-cn.ipgongchang.xin",
+    ],
+  })
+
+  return tasks
+}
+
+function addTask(tasks, task) {
+  const blockerCodes = Array.from(new Set((task.blockerCodes || []).filter(Boolean)))
+  tasks.push({
+    ...task,
+    blockerCodes,
+    ready: task.status === "ready",
+  })
+}
+
+function missingList(item) {
+  if (!item || item.ready) return []
+  return (item.missing || []).map((field) => `${item.key || "cloud"}:${field}`)
+}
+
+function summarizeTasks(tasks) {
+  return {
+    total: tasks.length,
+    ready: tasks.filter((task) => task.ready).length,
+    blocked: tasks.filter((task) => task.status === "blocked").length,
+    pendingCloud: tasks.filter((task) => task.status === "pending_cloud").length,
+    waitingForDeploy: tasks.filter((task) => task.status === "waiting_for_deploy").length,
+  }
+}
+
+function renderMarkdown(report) {
+  const lines = [
+    "# 美业话镜 APP production-cn 操作员任务清单",
+    "",
+    `生成时间：${report.generatedAt}`,
+    "",
+    "## 结论",
+    "",
+    `- productionReady: ${report.readiness.productionReady}`,
+    `- localCodeReady: ${report.readiness.localCodeReady}`,
+    `- domainReady: ${report.domain.ok}`,
+    `- env requiredReady: ${report.env.summary.requiredReady} / ${report.env.summary.requiredTotal}`,
+    `- tasks ready: ${report.summary.ready} / ${report.summary.total}`,
+    "",
+    "## 当前阻塞",
+    "",
+    ...(report.readiness.machineBlocking.length
+      ? report.readiness.machineBlocking.map((item) => `- ${item}`)
+      : ["- none"]),
+    ...(report.domain.machineBlocking.length
+      ? report.domain.machineBlocking.map((item) => `- ${item}`)
+      : []),
+    "",
+    "## 任务",
+    "",
+  ]
+
+  for (const task of report.tasks) {
+    lines.push(
+      `### ${task.id} ${task.title}`,
+      "",
+      `- status: ${task.status}`,
+      `- owner: ${task.owner}`,
+      `- consolePath: ${task.consolePath}`,
+      `- blockers: ${task.blockerCodes.length ? task.blockerCodes.join(", ") : "none"}`,
+      "- actions:",
+      ...task.actions.map((item) => `  - ${item}`),
+      "- evidence:",
+      ...task.evidence.map((item) => `  - ${item}`),
+      "- verifyCommands:",
+      ...task.verifyCommands.map((item) => `  - ${item}`),
+      "",
+    )
+  }
+
+  lines.push(
+    "## 安全边界",
+    "",
+    "- 本清单不包含任何密钥值。",
+    "- 不要把 AppSecret、Service Role Key、OSS Secret、语音/LLM Token 写入文档或 git。",
+    "- 生产部署、DNS 改动、资源创建、环境变量导入、微信上传和 git push 都需要单独授权。",
+  )
+  return `${lines.join("\n")}\n`
+}
+
+function writeOutput(filePath, content) {
+  if (!filePath) return
+  if (!isAbsolute(filePath)) throw new Error("output_path_must_be_absolute")
+  writeFileSync(filePath, content, { mode: 0o600 })
+}
+
+function main() {
+  const args = parseArgs(process.argv)
+  const env = parseEnvFile(args.envFile)
+  const envPlan = buildImportPlan(env)
+  const readiness = runJson("readiness", [
+    "scripts/check-aliyun-production-cn-readiness.mjs",
+    "--env-file",
+    args.envFile,
+    "--cloud-confirmations",
+    args.cloudConfirmationsFile,
+    "--allow-blocking",
+  ])
+  const domain = runJson("domain", [
+    "scripts/check-aliyun-domain-readiness.mjs",
+    "--env-file",
+    args.envFile,
+    "--allow-blocking",
+  ])
+  const cloudConfirmations = readJsonIfExists(args.cloudConfirmationsFile)
+  const tasks = buildTasks({ envPlan, readiness, domain, cloudConfirmations })
+  const report = {
+    generatedAt: new Date().toISOString(),
+    containsValues: false,
+    envFile: args.envFile,
+    cloudConfirmationsFile: existsSync(args.cloudConfirmationsFile) ? args.cloudConfirmationsFile : null,
+    summary: summarizeTasks(tasks),
+    readiness: {
+      productionReady: readiness.productionReady,
+      localCodeReady: readiness.localCodeReady,
+      machineBlocking: readiness.machineBlocking,
+      manualBlocking: readiness.manualBlocking,
+    },
+    domain: {
+      ok: domain.ok,
+      targetReady: domain.targetReady,
+      targetTotal: domain.targetTotal,
+      machineBlocking: domain.machineBlocking,
+    },
+    env: {
+      summary: envPlan.summary,
+      requiredBlocking: envPlan.summary.requiredBlocking,
+    },
+    tasks,
+    nextCommandOrder: [
+      "corepack pnpm aliyun:operator:tasks",
+      "corepack pnpm aliyun:cloud:check",
+      "corepack pnpm aliyun:domain:strict",
+      "corepack pnpm aliyun:readiness:cloud-ready",
+      "corepack pnpm aliyun:docker:build",
+      "corepack pnpm aliyun:postdeploy:smoke -- --base-url https://api-cn.ipgongchang.xin",
+    ],
+  }
+
+  const json = JSON.stringify(report, null, 2)
+  console.log(json)
+  writeOutput(args.outPath, `${json}\n`)
+  writeOutput(args.markdownPath, renderMarkdown(report))
+}
+
+function printHelp() {
+  console.log([
+    "Usage:",
+    "  node scripts/generate-aliyun-operator-tasks.mjs [--env-file path] [--cloud-confirmations path] [--out /tmp/tasks.json] [--markdown /tmp/tasks.md]",
+    "",
+    "Generates a non-secret Aliyun/WeChat operator task list from env plan, readiness, cloud confirmations, and domain probes.",
+    "It does not create cloud resources, import secrets, deploy, or push.",
+  ].join("\n"))
+}
+
+try {
+  main()
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error))
+  process.exit(1)
+}

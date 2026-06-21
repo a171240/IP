@@ -154,6 +154,32 @@ corepack pnpm aliyun:domain:strict
 
 ### 2.3 Production-cn readiness 门禁
 
+如果要给阿里云/微信后台操作员看下一步清单，先跑：
+
+```bash
+corepack pnpm aliyun:operator:tasks
+```
+
+这条命令不输出任何密钥值，也不会创建资源或导入变量。它会把当前 `readiness`、`domain`、`.env.production-cn.local` 变量状态和 `cloud-confirmations.local.json` 汇总为 7 个任务：
+
+```text
+T01 微信开放平台移动应用审核和 APP 登录凭证
+T02 阿里云 SAE/ECS 后端运行容器
+T03 api-cn/assets-cn DNS、HTTPS 和 ICP 证据
+T04 服务记录音频 OSS、CORS 和 RAM 最小权限
+T05 production-cn 运行环境变量导入
+T06 SLS 日志和健康/5xx 告警
+T07 阿里云部署后远端 smoke 验收
+```
+
+如需生成文件给人工核对：
+
+```bash
+node scripts/generate-aliyun-operator-tasks.mjs \
+  --out /tmp/meiye-aliyun-operator-tasks.json \
+  --markdown /tmp/meiye-aliyun-operator-tasks.md
+```
+
 ```bash
 cd /Users/Admin/Documents/美业话镜APP/handoff/IP
 corepack pnpm aliyun:readiness
@@ -643,10 +669,12 @@ corepack pnpm aliyun:readiness
 node scripts/prepare-aliyun-runtime-env.mjs --env-file /Users/Admin/Documents/美业话镜APP/.env.production-cn.example --allow-todo
 node --check scripts/check-aliyun-production-cn-readiness.mjs
 node --check scripts/prepare-aliyun-release-artifacts.mjs
+node --check scripts/generate-aliyun-operator-tasks.mjs
 node --check scripts/run-aliyun-predeploy.mjs
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.example.json','utf8'))"
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.cloud-confirmations.example.json','utf8'))"
 corepack pnpm aliyun:readiness
+corepack pnpm aliyun:operator:tasks
 corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:release:artifacts
 corepack pnpm aliyun:predeploy
@@ -725,8 +753,11 @@ slsAlerts missing: confirmed, healthAlertConfigured, serverErrorAlertConfigured
 最新发布审计产物：
 
 ```text
-/tmp/meiye-huajing-aliyun-production-cn-2026-06-21T12-15-51-558Z/release-audit.md
-/tmp/meiye-huajing-aliyun-production-cn-2026-06-21T12-15-51-558Z/meiye-huajing-app-api-production-cn-context.tar.gz
+/tmp/meiye-huajing-aliyun-production-cn-*/release-audit.md
+/tmp/meiye-huajing-aliyun-production-cn-*/operator-tasks.json
+/tmp/meiye-huajing-aliyun-production-cn-*/operator-tasks.md
+/tmp/meiye-huajing-aliyun-production-cn-*/domain-readiness.json
+/tmp/meiye-huajing-aliyun-production-cn-*/meiye-huajing-app-api-production-cn-context.tar.gz
 ```
 
 产物检查：

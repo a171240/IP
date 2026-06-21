@@ -28,9 +28,11 @@
     "exampleFile": "deploy/aliyun-production-cn.cloud-confirmations.example.json",
     "localFile": "deploy/aliyun-production-cn.cloud-confirmations.local.json",
     "checkCommand": "corepack pnpm aliyun:cloud:check",
+    "operatorTasksCommand": "corepack pnpm aliyun:operator:tasks",
     "secretsPolicy": "The local confirmation file must contain resource names, booleans, and evidence handles only. Do not paste secret values."
   },
   "predeployChecks": [
+    "corepack pnpm aliyun:operator:tasks",
     "corepack pnpm aliyun:readiness",
     "corepack pnpm aliyun:domain:check",
     "corepack pnpm aliyun:cloud:check",

@@ -310,10 +310,12 @@ node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.clou
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.cloud-confirmations.local.json','utf8'))"
 node --check scripts/run-aliyun-postdeploy-smoke.mjs
 node --check scripts/check-aliyun-domain-readiness.mjs
+node --check scripts/generate-aliyun-operator-tasks.mjs
 node scripts/generate-app-runtime-config.mjs --env-file ../.env.production-cn.local --out /tmp/meiye-build-config.generated.ts --require-production-ready --check
 corepack pnpm aliyun:env:plan
 corepack pnpm aliyun:vercel-env:coverage
 corepack pnpm aliyun:domain:check
+corepack pnpm aliyun:operator:tasks
 corepack pnpm aliyun:readiness
 corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:release:artifacts -- --skip-bundle
@@ -367,6 +369,13 @@ APP_ASSET_BASE_URL: assets-cn.ipgongchang.xin -> A 198.18.0.6, dns_special_use_i
 ```
 
 结论：本机目标域名变量已填，但当前 DNS/HTTPS 不是 production ready；需要阿里云公网入口、证书和 ICP 证据补齐后，`domain:strict` 才能作为部署后验收通过。
+
+Operator tasks 说明：
+
+```text
+aliyun:operator:tasks 只输出非密钥任务清单，覆盖微信开放平台、阿里云运行时、DNS/HTTPS、OSS、环境变量导入、SLS 和部署后 smoke。
+它不创建云资源、不导入变量、不部署、不 push。
+```
 
 `aliyun:env:plan` 生成：
 
