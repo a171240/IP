@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "environment": "production-cn",
+  "updatedAt": "2026-06-22T07:45:00+08:00",
+  "containsValues": false,
+  "target": {
+    "provider": "SAE",
+    "region": "cn-hangzhou",
+    "appName": "meiye-huajing-app-api-production-cn",
+    "runtime": "custom-container",
+    "containerPort": 3000,
+    "healthPath": "/api/healthz",
+    "strictHealthPath": "/api/app/health?strict=1",
+    "publicIngress": true
+  },
+  "image": {
+    "provider": "Aliyun ACR",
+    "localImage": "meiye-huajing-app-api:production-cn",
+    "repository": "meiye-huajing-app-api",
+    "tag": "production-cn",
+    "remoteImagePattern": "TODO_ACR_REGISTRY_HOST/TODO_ACR_NAMESPACE/meiye-huajing-app-api:production-cn",
+    "publishPlanFile": "deploy/aliyun-production-cn.image-publish.local.json",
+    "strictCheckCommand": "corepack pnpm aliyun:image:plan:strict"
+  },
+  "domains": {
+    "apiHost": "api-cn.ipgongchang.xin",
+    "assetHost": "assets-cn.ipgongchang.xin",
+    "apiHealthUrl": "https://api-cn.ipgongchang.xin/api/healthz",
+    "strictAppHealthUrl": "https://api-cn.ipgongchang.xin/api/app/health?strict=1",
+    "strictCheckCommand": "corepack pnpm aliyun:domain:strict"
+  },
+  "environmentImport": {
+    "sourcePlanCommand": "corepack pnpm aliyun:env:plan",
+    "target": "SAE env / KMS / Secrets Manager",
+    "secretPolicy": "Import secrets through Aliyun runtime env, KMS, or Secrets Manager. Do not bake secrets into the Docker image, JSON, docs, or git.",
+    "strictCheckCommand": "corepack pnpm aliyun:readiness:cloud-ready"
+  },
+  "observability": {
+    "slsRequired": true,
+    "healthAlertRequired": true,
+    "serverErrorAlertRequired": true,
+    "cloudConfirmationKey": "slsAlerts"
+  },
+  "confirmations": {
+    "cloudConfirmationsFile": "deploy/aliyun-production-cn.cloud-confirmations.local.json",
+    "strictCheckCommand": "corepack pnpm aliyun:cloud:confirmations:strict"
+  },
+  "notIncludedInFirstBridge": [
+    "RDS production data migration",
+    "Redis/Tair hard dependency",
+    "Mini-program upload",
+    "App store submission",
+    "Payment or IAP integration"
+  ],
+  "security": {
+    "containsSecrets": false,
+    "secretPolicy": "This file is a non-secret runtime target plan. Store only resource names, paths, booleans, and command references."
+  }
+}

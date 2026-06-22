@@ -239,7 +239,7 @@ function validateCommonValues(data, blockers) {
   }
 
   const target = text(runtime.target)
-  if (target && !isTodo(target) && !["SAE", "ECS"].includes(target)) blockers.push("runtime.target")
+  if (target && !isTodo(target) && target !== "SAE") blockers.push("runtime.target=SAE")
 }
 
 function validateLocalValues(data, blockers) {
@@ -431,7 +431,7 @@ function main() {
       "Copy deploy/aliyun-production-cn.image-publish.example.json to deploy/aliyun-production-cn.image-publish.local.json after ACR is chosen.",
       "Fill only registry host, namespace, repository, image digest, booleans, and evidence handles. Do not store registry credentials.",
       "Run corepack pnpm aliyun:docker:build and corepack pnpm aliyun:container:smoke before pushing the image.",
-      "Push or import the image into Aliyun ACR, configure SAE/ECS to use the remote image, then run corepack pnpm aliyun:image:plan:strict.",
+      "Push or import the image into Aliyun ACR, configure SAE to use the remote image, then run corepack pnpm aliyun:image:plan:strict.",
     ],
   }
 

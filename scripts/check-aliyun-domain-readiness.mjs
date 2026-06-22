@@ -408,7 +408,7 @@ function nextActions(blocking) {
     actions.push("把 APP production-cn 正式入口切到 api-cn/assets-cn HTTPS 域名，不使用旧 Vercel 域名。")
   }
   if (blocking.some((item) => item.includes("dns_not_ready"))) {
-    actions.push("在阿里云 DNS 为 api-cn/assets-cn 添加解析，指向 SAE/SLB/ECS 或 OSS/CDN 入口。")
+    actions.push("在阿里云 DNS 为 api-cn/assets-cn 添加解析，指向 SAE/SLB 或 OSS/CDN 入口。")
   }
   if (blocking.some((item) => item.includes("dns_special_use_ip"))) {
     actions.push("把 api-cn/assets-cn 从特殊用途 IP 改为公网可访问的阿里云入口地址。")

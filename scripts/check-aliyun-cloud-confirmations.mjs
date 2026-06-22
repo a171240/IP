@@ -16,13 +16,13 @@ const EXPECTED_IOS_BUNDLE_ID = "com.ipgongchang.meiyehuajing"
 const DEFINITIONS = [
   {
     key: "runtime",
-    label: "阿里云 SAE 或 ECS 容器应用",
+    label: "阿里云 SAE 容器应用",
     requiredFields: ["confirmed", "provider", "region", "appName", "containerPort", "healthPath", "evidence"],
     allowedFields: ["confirmed", "provider", "region", "appName", "containerPort", "healthPath", "evidence"],
     validate: (item, mode) => {
       const blockers = []
       if (mode === "local" && item.confirmed !== true) blockers.push("confirmed")
-      if (mode === "local" && !["SAE", "ECS"].includes(String(item.provider || "").trim())) blockers.push("provider")
+      if (mode === "local" && String(item.provider || "").trim() !== "SAE") blockers.push("provider=SAE")
       if (Number(item.containerPort) !== 3000) blockers.push("containerPort=3000")
       if (String(item.healthPath || "").trim() !== "/api/healthz") blockers.push("healthPath=/api/healthz")
       return blockers
@@ -134,7 +134,7 @@ const DEFINITIONS = [
       const blockers = []
       const target = String(item.target || "").trim()
       if (mode === "local" && item.confirmed !== true) blockers.push("confirmed")
-      if (mode === "local" && !["SAE", "ECS", "KMS", "SecretsManager"].includes(target)) blockers.push("target")
+      if (mode === "local" && !["SAE", "KMS", "SecretsManager"].includes(target)) blockers.push("target")
       if (mode === "local" && item.secretNotInImage !== true) blockers.push("secretNotInImage")
       return blockers
     },

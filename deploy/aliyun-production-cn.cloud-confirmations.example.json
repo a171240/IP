@@ -7,7 +7,7 @@
   "items": {
     "runtime": {
       "confirmed": false,
-      "provider": "TODO_SAE_OR_ECS",
+      "provider": "TODO_SAE",
       "region": "TODO_ALIYUN_REGION",
       "appName": "TODO_ALIYUN_APP_NAME",
       "containerPort": 3000,
@@ -47,7 +47,7 @@
     },
     "envImport": {
       "confirmed": false,
-      "target": "TODO_SAE_OR_ECS_OR_KMS_OR_SECRETS_MANAGER",
+      "target": "TODO_SAE_OR_KMS_OR_SECRETS_MANAGER",
       "importedAt": "TODO_YYYY-MM-DDTHH:mm:ss+08:00",
       "secretNotInImage": false,
       "evidence": "TODO_ENV_IMPORT_EVIDENCE"

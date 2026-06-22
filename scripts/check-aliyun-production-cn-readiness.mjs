@@ -90,11 +90,13 @@ const REQUIRED_BACKEND_FILES = [
   "package.json",
   "pnpm-lock.yaml",
   "deploy/app-api-production-cn.bridge-map.json",
+  "deploy/aliyun-production-cn.runtime-plan.json",
   "deploy/aliyun-production-cn.image-publish.example.json",
   "app/api/app/health/route.ts",
   "app/api/healthz/route.ts",
   "scripts/check-vercel-env-coverage.mjs",
   "scripts/check-aliyun-deployment-spec.mjs",
+  "scripts/check-aliyun-runtime-plan.mjs",
   "scripts/check-aliyun-image-publish-plan.mjs",
   "scripts/check-aliyun-cloud-confirmations.mjs",
   "scripts/check-aliyun-domain-readiness.mjs",
@@ -125,6 +127,7 @@ const REQUIRED_BACKEND_SCRIPTS = [
   "aliyun:env:sources",
   "aliyun:vercel-env:coverage",
   "aliyun:deploy:spec",
+  "aliyun:runtime:plan",
   "aliyun:image:plan",
   "aliyun:image:plan:strict",
   "aliyun:domain:check",
@@ -202,11 +205,11 @@ const FORBIDDEN_APP_PRODUCTION_CN_ENV_TEMPLATE_KEYS = [
 const CLOUD_CONFIRMATION_ITEMS = [
   {
     key: "runtime",
-    label: "阿里云 SAE 或 ECS 容器应用已创建，运行端口 3000",
+    label: "阿里云 SAE 容器应用已创建，运行端口 3000",
     requiredFields: ["provider", "region", "appName", "containerPort", "evidence"],
     validate: (item) => {
       const missing = []
-      if (!["SAE", "ECS"].includes(String(item.provider || "").trim())) missing.push("provider")
+      if (String(item.provider || "").trim() !== "SAE") missing.push("provider=SAE")
       if (Number(item.containerPort) !== 3000) missing.push("containerPort=3000")
       return missing
     },
@@ -281,7 +284,7 @@ const CLOUD_CONFIRMATION_ITEMS = [
     requiredFields: ["target", "secretNotInImage", "importedAt", "evidence"],
     validate: (item) => {
       const missing = []
-      if (!["SAE", "ECS", "KMS", "SecretsManager"].includes(String(item.target || "").trim())) missing.push("target")
+      if (!["SAE", "KMS", "SecretsManager"].includes(String(item.target || "").trim())) missing.push("target")
       if (item.secretNotInImage !== true) missing.push("secretNotInImage")
       return missing
     },
@@ -844,7 +847,7 @@ function main() {
       cloudConfirmations,
     },
     nextActions: [
-      "创建或确认阿里云 SAE/ECS 容器应用、api-cn 域名和 HTTPS 证书",
+      "创建或确认阿里云 SAE 容器应用、api-cn 域名和 HTTPS 证书",
       "把 APP_API_BASE_URL 和 NEXT_PUBLIC_SITE_URL 填为 api-cn HTTPS 正式地址",
       wechatOpenPlatform.reviewStatus === "reviewing"
         ? "等待微信开放平台移动应用审核通过后补 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET"
@@ -854,7 +857,7 @@ function main() {
         ? "当前使用 --assume-cloud-ready，只能做本地诊断；正式发布必须改用 cloud-confirmations.local.json 非密钥证据"
         : "复制 deploy/aliyun-production-cn.cloud-confirmations.example.json 到 .local.json，并逐项填写非密钥云资源确认",
       docker.ready
-        ? "镜像本地构建能力已就绪；正式部署前复制 image-publish example 到 .local.json，推送/导入阿里云 ACR 并配置 SAE/ECS 拉取远端镜像"
+        ? "镜像本地构建能力已就绪；正式部署前复制 image-publish example 到 .local.json，推送/导入阿里云 ACR 并配置 SAE 拉取远端镜像"
         : "Docker daemon 就绪后执行 corepack pnpm aliyun:docker:build",
       "ACR 镜像推送和运行时拉取配置完成后执行 corepack pnpm aliyun:image:plan:strict",
       "推送/导入阿里云前执行 corepack pnpm aliyun:container:smoke，确认 Docker 镜像内 APP API 链路可用",

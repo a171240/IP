@@ -138,7 +138,7 @@ function buildStatus({ readiness, operatorTasks, args }) {
       ? "微信开放平台移动应用状态：reviewing；这表示 APP 已进入审核流程，不是缺创建 APP。AppID/Secret 仍只能等审核通过后获取。"
       : `微信开放平台移动应用状态：${wechatReviewStatus}；AppID/Secret 只能等移动应用审核通过后从微信开放平台获取。`,
     `Apple Universal Link：${universalLink?.ok ? "ready" : "blocked"}；${(universalLink?.blockers || []).join(", ") || "no blockers"}。`,
-    `阿里云云资源确认：${cloudReady.ready}/${cloudReady.total} ready；还缺 SAE/ECS、DNS/HTTPS/ICP、OSS/CORS/RAM、微信开放平台 approved、env import、SLS 中未完成项。`,
+    `阿里云云资源确认：${cloudReady.ready}/${cloudReady.total} ready；还缺 SAE、DNS/HTTPS/ICP、OSS/CORS/RAM、微信开放平台 approved、env import、SLS 中未完成项。`,
     `域名门禁：${operatorTasks.domain?.ok ? "ready" : "blocked"}；当前 api-cn/assets-cn 仍未证明解析到阿里云 HTTPS 入口。`,
     `镜像发布计划：${imagePlan?.ready ? "ready" : "blocked"}；本地 Docker 镜像 ${imagePlan?.localDockerImage?.status || operatorTasks.imagePublishPlan?.localDockerImage || "unknown"}，ACR/runtime 拉取证据未完成。`,
   ]

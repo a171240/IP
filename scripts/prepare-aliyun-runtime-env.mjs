@@ -210,7 +210,7 @@ export function buildImportPlan(env) {
     generatedAt: new Date().toISOString(),
     target: "aliyun-production-cn-runtime-env",
     containsValues: false,
-    importPolicy: "Import ready values from the local env file into Aliyun SAE/ECS/KMS/Secrets Manager. Do not paste values into docs or commit them.",
+    importPolicy: "Import ready values from the local env file into Aliyun SAE/KMS/Secrets Manager. Do not paste values into docs or commit them.",
     summary: {
       total: variables.length,
       requiredTotal: variables.filter((item) => item.required).length,
@@ -267,9 +267,9 @@ function sourceMetadataOf(key) {
     return metadata({
       category: "runtime",
       owner: "后端发布操作员",
-      consolePath: "本仓库 .env.production-cn.example / 阿里云 SAE 或 ECS 环境变量",
+      consolePath: "本仓库 .env.production-cn.example / 阿里云 SAE 环境变量",
       obtain: "固定填写 production-cn，并在阿里云运行环境中保持一致。",
-      importTarget: "阿里云 SAE/ECS plain env",
+      importTarget: "阿里云 SAE plain env",
       cloudConfirmationKey: "envImport",
       notes: "非密钥。",
     })
@@ -278,9 +278,9 @@ function sourceMetadataOf(key) {
     return metadata({
       category: "runtime",
       owner: "阿里云操作员",
-      consolePath: "阿里云控制台 -> SAE/ECS 应用地域",
+      consolePath: "阿里云控制台 -> SAE 应用地域",
       obtain: "使用 production-cn 后端实际部署地域；当前建议 cn-hangzhou。",
-      importTarget: "阿里云 SAE/ECS plain env",
+      importTarget: "阿里云 SAE plain env",
       cloudConfirmationKey: "runtime",
       notes: "非密钥。",
     })
@@ -289,9 +289,9 @@ function sourceMetadataOf(key) {
     return metadata({
       category: "domain",
       owner: "阿里云域名/证书操作员",
-      consolePath: "阿里云控制台 -> 云解析 DNS / SAE 或 SLB/ECS 入口 / 数字证书管理服务",
+      consolePath: "阿里云控制台 -> 云解析 DNS / SAE 或 SLB 入口 / 数字证书管理服务",
       obtain: "配置 api-cn.ipgongchang.xin 到公网可访问的阿里云后端入口并启用 HTTPS 后填写。",
-      importTarget: "阿里云 SAE/ECS plain env",
+      importTarget: "阿里云 SAE plain env",
       cloudConfirmationKey: "apiDomainHttps",
       notes: "不能使用 Vercel、localhost、example 或 198.18.0.x 特殊用途地址。",
     })
@@ -302,7 +302,7 @@ function sourceMetadataOf(key) {
       owner: "阿里云 OSS/CDN 操作员",
       consolePath: "阿里云控制台 -> OSS Bucket / CDN 或 OSS 绑定域名 / 数字证书管理服务",
       obtain: "配置 assets-cn.ipgongchang.xin 到 OSS/CDN 静态资源入口并启用 HTTPS 后填写。",
-      importTarget: "阿里云 SAE/ECS plain env",
+      importTarget: "阿里云 SAE plain env",
       cloudConfirmationKey: "oss",
       notes: "非必填；填写后需要 OSS/CDN、CORS 和 HTTPS 证据。",
     })
@@ -313,7 +313,7 @@ function sourceMetadataOf(key) {
       owner: "产品/法务/发布操作员",
       consolePath: "自有备案 HTTPS 域名上的正式协议页面",
       obtain: "先运行 corepack pnpm aliyun:legal:check 确认 /privacy 与 /terms 页面存在；运营者复核文本后，建议填写 https://api-cn.ipgongchang.xin/privacy 与 https://api-cn.ipgongchang.xin/terms 或对应 app-cn 正式域名。",
-      importTarget: "阿里云 SAE/ECS plain env",
+      importTarget: "阿里云 SAE plain env",
       cloudConfirmationKey: "envImport",
       notes: "不能是 TODO、localhost、本地文件、临时预览或仅 Vercel 预览。",
     })
@@ -324,7 +324,7 @@ function sourceMetadataOf(key) {
       owner: "Vercel/Supabase 操作员",
       consolePath: "Vercel 项目 ip -> Settings -> Environment Variables；Supabase 项目 -> Settings -> API",
       obtain: "从现有 Vercel production 或 Supabase 项目读取对应变量值，桥接期迁入阿里云运行环境。",
-      importTarget: sensitivityOf(key) === "public" ? "阿里云 SAE/ECS plain env" : "阿里云 KMS/Secrets Manager/SAE secret env",
+      importTarget: sensitivityOf(key) === "public" ? "阿里云 SAE plain env" : "阿里云 KMS/Secrets Manager/SAE secret env",
       cloudConfirmationKey: "envImport",
       notes: "桥接期仍使用 Supabase；最终 production-cn RDS 迁移另行处理。",
     })
@@ -368,7 +368,7 @@ function sourceMetadataOf(key) {
       owner: "用户/微信开放平台操作员",
       consolePath: "微信开放平台 -> 管理中心 -> 移动应用 -> 美业话镜 App",
       obtain: "移动应用审核通过后读取 AppID/AppSecret；审核状态填 WECHAT_OPEN_APP_REVIEW_STATUS。",
-      importTarget: key === "WECHAT_OPEN_APP_REVIEW_STATUS" ? "阿里云 SAE/ECS plain env" : "阿里云 KMS/Secrets Manager/SAE secret env",
+      importTarget: key === "WECHAT_OPEN_APP_REVIEW_STATUS" ? "阿里云 SAE plain env" : "阿里云 KMS/Secrets Manager/SAE secret env",
       cloudConfirmationKey: "wechatOpenPlatform",
       notes: "小程序 AppID/Secret 不能替代 APP 微信登录。",
     })
@@ -379,7 +379,7 @@ function sourceMetadataOf(key) {
       owner: "Apple Developer / iOS 发布操作员",
       consolePath: "Apple Developer -> Membership 或 Certificates, Identifiers & Profiles -> Identifiers -> 美业话镜 App ID",
       obtain: "确认 10 位 Team ID，用于生成 apple-app-site-association 里的 appID；它不是密钥。",
-      importTarget: "阿里云 SAE/ECS plain env",
+      importTarget: "阿里云 SAE plain env",
       cloudConfirmationKey: "wechatOpenPlatform",
       notes: "需与 iOS Bundle ID com.ipgongchang.meiyehuajing 和 Associated Domains 保持一致。",
     })
@@ -401,7 +401,7 @@ function sourceMetadataOf(key) {
       owner: "阿里云 OSS/RAM 操作员",
       consolePath: "阿里云控制台 -> OSS Bucket / RAM 访问控制",
       obtain: "确认服务记录音频 Bucket、region、CORS 和 RAM 最小权限，生成受限 AccessKey。",
-      importTarget: sensitivityOf(key) === "public" ? "阿里云 SAE/ECS plain env" : "阿里云 KMS/Secrets Manager/SAE secret env",
+      importTarget: sensitivityOf(key) === "public" ? "阿里云 SAE plain env" : "阿里云 KMS/Secrets Manager/SAE secret env",
       cloudConfirmationKey: "oss",
       notes: "RAM 权限应限制到服务记录音频前缀。",
     })
@@ -412,7 +412,7 @@ function sourceMetadataOf(key) {
       owner: "阿里云百炼/DashScope 操作员",
       consolePath: "阿里云控制台 -> 百炼 / DashScope -> API Key 与模型配置",
       obtain: "确认 paraformer ASR 模型和 API Key；桥接期用于服务记录长录音转写。",
-      importTarget: sensitivityOf(key) === "public" ? "阿里云 SAE/ECS plain env" : "阿里云 KMS/Secrets Manager/SAE secret env",
+      importTarget: sensitivityOf(key) === "public" ? "阿里云 SAE plain env" : "阿里云 KMS/Secrets Manager/SAE secret env",
       cloudConfirmationKey: "envImport",
       notes: "DASHSCOPE_API_KEY 是密钥。",
     })
@@ -423,7 +423,7 @@ function sourceMetadataOf(key) {
       owner: "DeepSeek/API 操作员",
       consolePath: "DeepSeek 控制台 / 现有 Vercel production 环境变量",
       obtain: "从 DeepSeek 控制台或现有 Vercel production 变量迁移 API Key、base URL 和模型名。",
-      importTarget: sensitivityOf(key) === "public" ? "阿里云 SAE/ECS plain env" : "阿里云 KMS/Secrets Manager/SAE secret env",
+      importTarget: sensitivityOf(key) === "public" ? "阿里云 SAE plain env" : "阿里云 KMS/Secrets Manager/SAE secret env",
       cloudConfirmationKey: "envImport",
       notes: "用于服务复盘总结和语音对练回复。",
     })
@@ -434,7 +434,7 @@ function sourceMetadataOf(key) {
       owner: "火山引擎语音操作员",
       consolePath: "火山引擎控制台 -> 语音技术 / 访问控制",
       obtain: "从火山引擎控制台或现有 Vercel production 变量迁移 AppID、Token、Secret 和资源 ID。",
-      importTarget: sensitivityOf(key) === "public" ? "阿里云 SAE/ECS plain env" : "阿里云 KMS/Secrets Manager/SAE secret env",
+      importTarget: sensitivityOf(key) === "public" ? "阿里云 SAE plain env" : "阿里云 KMS/Secrets Manager/SAE secret env",
       cloudConfirmationKey: "envImport",
       notes: "桥接期保留语音对练链路。",
     })
@@ -445,7 +445,7 @@ function sourceMetadataOf(key) {
       owner: "产品/后端发布操作员",
       consolePath: "现有 Vercel production 环境变量 / 本仓库语音对练配置",
       obtain: "按桥接期策略确认是否启用、允许用户、最大轮次和 provider。",
-      importTarget: "阿里云 SAE/ECS plain env",
+      importTarget: "阿里云 SAE plain env",
       cloudConfirmationKey: "envImport",
       notes: "第一版 APP 范围以服务记录为主，语音对练配置为兼容保留。",
     })
@@ -456,7 +456,7 @@ function sourceMetadataOf(key) {
       owner: "后端运维/管理员",
       consolePath: "现有 Vercel production 环境变量 / 管理员名单 / 阿里云 KMS",
       obtain: "从现有 production 配置迁移，或为 production-cn 生成新的随机 secret 并确认管理员名单。",
-      importTarget: sensitivityOf(key) === "public" ? "阿里云 SAE/ECS plain env" : "阿里云 KMS/Secrets Manager/SAE secret env",
+      importTarget: sensitivityOf(key) === "public" ? "阿里云 SAE plain env" : "阿里云 KMS/Secrets Manager/SAE secret env",
       cloudConfirmationKey: "envImport",
       notes: "ADMIN_* 是标识符列表，不应公开在文档里。",
     })
@@ -467,7 +467,7 @@ function sourceMetadataOf(key) {
       owner: "旧内容供应商/API 操作员",
       consolePath: "APIMART 控制台 / 现有 Vercel production 环境变量",
       obtain: "桥接兼容需要时从旧供应商或 Vercel production 迁移。",
-      importTarget: sensitivityOf(key) === "public" ? "阿里云 SAE/ECS plain env" : "阿里云 KMS/Secrets Manager/SAE secret env",
+      importTarget: sensitivityOf(key) === "public" ? "阿里云 SAE plain env" : "阿里云 KMS/Secrets Manager/SAE secret env",
       cloudConfirmationKey: "envImport",
       notes: "可选，第一版 APP 后端接入不依赖全量内容能力。",
     })

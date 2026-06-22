@@ -19,6 +19,7 @@ const REQUIRED_PREDEPLOY_CHECKS = [
   "corepack pnpm aliyun:readiness",
   "corepack pnpm aliyun:env:sources",
   "corepack pnpm aliyun:domain:check",
+  "corepack pnpm aliyun:runtime:plan",
   "corepack pnpm aliyun:cloud:check",
   "corepack pnpm aliyun:readiness:cloud-ready",
   "corepack pnpm aliyun:release:artifacts",
@@ -124,6 +125,14 @@ function validateSpec(spec) {
   if (Number(container.port) !== 3000) blockers.push("container.port=3000")
   if (container.healthPath !== "/api/healthz") blockers.push("container.healthPath")
   if (container.strictHealthPath !== "/api/app/health?strict=1") blockers.push("container.strictHealthPath")
+
+  const runtimePlan = spec.runtimePlan || {}
+  if (runtimePlan.file !== "deploy/aliyun-production-cn.runtime-plan.json") blockers.push("runtimePlan.file")
+  if (runtimePlan.checkCommand !== "corepack pnpm aliyun:runtime:plan") blockers.push("runtimePlan.checkCommand")
+  if (runtimePlan.provider !== "SAE") blockers.push("runtimePlan.provider=SAE")
+  if (runtimePlan.region !== "cn-hangzhou") blockers.push("runtimePlan.region=cn-hangzhou")
+  if (runtimePlan.appName !== "meiye-huajing-app-api-production-cn") blockers.push("runtimePlan.appName")
+  if (!String(runtimePlan.note || "").includes("SAE custom container")) blockers.push("runtimePlan.note")
 
   const imagePublish = spec.imagePublish || {}
   if (imagePublish.exampleFile !== "deploy/aliyun-production-cn.image-publish.example.json") {
@@ -236,6 +245,12 @@ function main() {
     containsValues: false,
     environment: spec.environment || "",
     image: spec.container?.image || "",
+    runtimePlan: {
+      provider: spec.runtimePlan?.provider || "",
+      region: spec.runtimePlan?.region || "",
+      appName: spec.runtimePlan?.appName || "",
+      checkCommand: spec.runtimePlan?.checkCommand || "",
+    },
     imagePublish: {
       provider: spec.imagePublish?.provider || "",
       registryRegion: spec.imagePublish?.registryRegion || "",

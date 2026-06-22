@@ -26,7 +26,7 @@
   },
   "runtime": {
     "confirmed": false,
-    "target": "TODO_SAE_OR_ECS",
+    "target": "TODO_SAE",
     "appName": "TODO_ALIYUN_APP_NAME",
     "remoteImageConfigured": false,
     "imagePullConfigured": false,

@@ -9,6 +9,14 @@
     "healthPath": "/api/healthz",
     "strictHealthPath": "/api/app/health?strict=1"
   },
+  "runtimePlan": {
+    "file": "deploy/aliyun-production-cn.runtime-plan.json",
+    "checkCommand": "corepack pnpm aliyun:runtime:plan",
+    "provider": "SAE",
+    "region": "cn-hangzhou",
+    "appName": "meiye-huajing-app-api-production-cn",
+    "note": "First production-cn bridge deploy targets Aliyun SAE custom container. ECS remains a fallback only if SAE cannot satisfy runtime constraints."
+  },
   "imagePublish": {
     "exampleFile": "deploy/aliyun-production-cn.image-publish.example.json",
     "localFile": "deploy/aliyun-production-cn.image-publish.local.json",
@@ -54,6 +62,7 @@
     "corepack pnpm aliyun:readiness",
     "corepack pnpm aliyun:env:sources",
     "corepack pnpm aliyun:domain:check",
+    "corepack pnpm aliyun:runtime:plan",
     "corepack pnpm aliyun:cloud:check",
     "corepack pnpm aliyun:readiness:cloud-ready",
     "corepack pnpm aliyun:release:artifacts",

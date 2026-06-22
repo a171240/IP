@@ -190,6 +190,7 @@ function renderMarkdown(audit) {
   const vercelEnvCoverage = audit.checks.vercelEnvCoverage
   const domain = audit.checks.domain
   const deploymentSpec = audit.checks.deploymentSpec
+  const runtimePlan = audit.checks.runtimePlan
   const legalPages = audit.checks.legalPages
   const imagePublishPlan = audit.checks.imagePublishPlan
   const operatorTasks = audit.checks.operatorTasks
@@ -220,6 +221,7 @@ function renderMarkdown(audit) {
     `- appApiSmokeCoverage: ${appApiSmokeCoverage.coveredBusinessRoutes} / ${appApiSmokeCoverage.businessRoutes} business routes`,
     `- dockerContext: ${docker.ok ? "ok" : "not ok"}`,
     `- deploymentSpec: ${deploymentSpec.ok ? "ok" : "not ready"}`,
+    `- runtimePlan: ${runtimePlan.ok ? "ok" : "not ready"} (${runtimePlan.provider || "unknown"} / ${runtimePlan.region || "unknown"} / ${runtimePlan.appName || "unknown"})`,
     `- legalPages: ${legalPages.ok ? "ok" : "not ready"}`,
     `- imagePublishPlan: ${imagePublishPlan.ready === true ? "ready" : "not ready"}`,
     `- domainReadiness: ${domain.ok ? "ok" : "not ready"} (${domain.targetReady} / ${domain.targetTotal})`,
@@ -319,6 +321,21 @@ function renderMarkdown(audit) {
     `- postdeployChecks: ${deploymentSpec.postdeployChecks}`,
     ...(deploymentSpec.blockers?.length
       ? deploymentSpec.blockers.map((item) => `- ${item}`)
+      : ["- blockers: none"]),
+    "",
+    "## 阿里云 SAE 运行时计划",
+    "",
+    `- ready: ${runtimePlan.ok === true}`,
+    `- provider: ${runtimePlan.provider}`,
+    `- region: ${runtimePlan.region}`,
+    `- appName: ${runtimePlan.appName}`,
+    `- runtime: ${runtimePlan.runtime}`,
+    `- containerPort: ${runtimePlan.containerPort}`,
+    `- healthPath: ${runtimePlan.healthPath}`,
+    `- apiHost: ${runtimePlan.apiHost}`,
+    `- assetHost: ${runtimePlan.assetHost}`,
+    ...(runtimePlan.blockers?.length
+      ? runtimePlan.blockers.map((item) => `- ${item}`)
       : ["- blockers: none"]),
     "",
     "## 阿里云 ACR 镜像发布计划",
@@ -523,6 +540,7 @@ function main() {
     "--allow-blocking",
   ])
   const deploymentSpec = runJson("deployment_spec", ["scripts/check-aliyun-deployment-spec.mjs"])
+  const runtimePlan = runJson("runtime_plan", ["scripts/check-aliyun-runtime-plan.mjs"])
   const imagePublishPlan = runJson("image_publish_plan", [
     "scripts/check-aliyun-image-publish-plan.mjs",
     "--allow-incomplete",
@@ -598,6 +616,7 @@ function main() {
       readiness,
       domain,
       deploymentSpec,
+      runtimePlan,
       legalPages,
       imagePublishPlan,
       operatorTasks,
@@ -620,6 +639,7 @@ function main() {
       domainReadiness: resolve(args.outDir, "domain-readiness.json"),
       cloudConfirmationsCheck: cloudConfirmationsCheckPath,
       legalPages: resolve(args.outDir, "legal-pages.json"),
+      runtimePlan: resolve(args.outDir, "runtime-plan.json"),
       imagePublishPlan: resolve(args.outDir, "image-publish-plan-check.json"),
       appApiBridgeMap: resolve(args.outDir, "app-api-bridge-map-check.json"),
       operatorTasksJson: operatorTasksJsonPath,
@@ -637,6 +657,7 @@ function main() {
   writeText(audit.outputFiles.domainReadiness, JSON.stringify(domain, null, 2))
   writeText(audit.outputFiles.cloudConfirmationsCheck, JSON.stringify(cloudConfirmationsCheck, null, 2))
   writeText(audit.outputFiles.legalPages, JSON.stringify(legalPages, null, 2))
+  writeText(audit.outputFiles.runtimePlan, JSON.stringify(runtimePlan, null, 2))
   writeText(audit.outputFiles.imagePublishPlan, JSON.stringify(imagePublishPlan, null, 2))
   writeText(audit.outputFiles.appApiBridgeMap, JSON.stringify(appApiBridgeMap, null, 2))
 
@@ -657,6 +678,19 @@ function main() {
       apiHost: deploymentSpec.apiHost,
       predeployChecks: deploymentSpec.predeployChecks,
       postdeployChecks: deploymentSpec.postdeployChecks,
+      runtimePlan: deploymentSpec.runtimePlan,
+    },
+    runtimePlan: {
+      report: audit.outputFiles.runtimePlan,
+      ok: runtimePlan.ok === true,
+      provider: runtimePlan.provider,
+      region: runtimePlan.region,
+      appName: runtimePlan.appName,
+      runtime: runtimePlan.runtime,
+      containerPort: runtimePlan.containerPort,
+      healthPath: runtimePlan.healthPath,
+      apiHost: runtimePlan.apiHost,
+      assetHost: runtimePlan.assetHost,
     },
     imagePublishPlan: {
       report: audit.outputFiles.imagePublishPlan,

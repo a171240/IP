@@ -19,7 +19,7 @@
 
 - Production deployment authorized in this manifest: no
 - Git push authorized in this manifest: no
-- Aliyun SAE/ECS/DNS/OSS/SLS/KMS changes authorized in this manifest: no
+- Aliyun SAE/DNS/OSS/SLS/KMS changes authorized in this manifest: no
 - Supabase production schema/data write authorized in this manifest: no
 - WeChat DevTools mini-program upload authorized in this manifest: no
 - WeChat Open Platform write/action authorized in this manifest: no
@@ -319,7 +319,7 @@ app_universal_link:apple_team_id_missing
 人工确认阻塞：
 
 ```text
-阿里云 SAE 或 ECS 容器应用已创建，运行端口 3000
+阿里云 SAE 容器应用已创建，运行端口 3000
 阿里云 ACR 镜像发布和运行时镜像拉取配置已确认
 api-cn 域名已备案、解析到阿里云入口并配置 HTTPS
 OSS Bucket CORS、RAM 最小权限和服务记录音频前缀已确认
@@ -574,8 +574,8 @@ sanitizedEnvFileDeleted: true
 ### 10.1 阿里云资源
 
 ```text
-SAE 或 ECS 容器应用
-ACR 镜像仓库、remote image、digest 和 SAE/ECS 镜像拉取配置
+SAE 容器应用
+ACR 镜像仓库、remote image、digest 和 SAE 镜像拉取配置
 api-cn 域名解析
 HTTPS 证书
 OSS Bucket CORS
@@ -653,6 +653,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 07:34 CST 追加：`aliyun:operator:tasks`、`aliyun:status` 和操作包输出已把微信开放平台移动应用审核中的任务状态细分为 `waiting_wechat_review`。该状态表示移动应用已进入微信审核流程，不能再误读为“还缺创建 APP”或“可以用小程序凭证替代”；正式发布仍必须等审核通过后取得移动应用 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`，并完成 Apple Team ID、阿里云云资源和非密钥证据确认。
 
+2026-06-22 07:55 CST 追加：新增 `deploy/aliyun-production-cn.runtime-plan.json` 与 `corepack pnpm aliyun:runtime:plan`，把第一版 APP 国内后端主部署目标固定为阿里云 SAE `cn-hangzhou` 自定义容器应用 `meiye-huajing-app-api-production-cn`，监听端口 3000，健康检查 `/api/healthz`。该计划不含任何密钥值，只用于约束阿里云运行时、ACR 镜像计划、域名和云确认文件；ECS 仅作为 SAE 不满足运行约束时的备选。`aliyun:deploy:spec`、`aliyun:predeploy` 和 release artifacts 已接入该 runtime plan。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：
@@ -713,7 +715,7 @@ corepack pnpm aliyun:postdeploy:smoke -- \
 
 ```text
 1. 将 APP 端 APP_API_BASE_URL / 发布配置回退到上一可用 API。
-2. 在阿里云 SAE/ECS 回滚到上一镜像或停止 api-cn 入口。
+2. 在阿里云 SAE 回滚到上一镜像或停止 api-cn 入口。
 3. 保留 Vercel production baseline 作为现有小程序/旧后端对照。
 4. 如已做数据库迁移，按单独 Supabase/RDS 迁移 manifest 回滚；本清单不覆盖数据库回滚。
 ```

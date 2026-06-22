@@ -201,11 +201,11 @@ function buildHandoff({ args, envPlan, status, operatorTasks }) {
       },
     ],
     aliyunConsoleActionNow: [
-      "创建或确认 SAE/ECS 容器应用：cn-hangzhou，端口 3000，健康检查 /api/healthz。",
+      "创建或确认 SAE 容器应用：cn-hangzhou，端口 3000，健康检查 /api/healthz。",
       "创建或确认 ACR 仓库：meiye-huajing-app-api:production-cn，并记录 remote image 和 digest。",
       "把 api-cn.ipgongchang.xin / assets-cn.ipgongchang.xin 指到阿里云公网入口并启用 HTTPS，补 ICP 证据。",
       "确认 OSS Bucket、CORS、RAM 最小权限和 service-records/production-cn 前缀。",
-      "把 ready 的环境变量导入 SAE/ECS/KMS/Secrets Manager，密钥不进镜像。",
+      "把 ready 的环境变量导入 SAE/KMS/Secrets Manager，密钥不进镜像。",
       "配置 SLS 日志、/api/healthz 健康告警和 5xx 告警。",
     ],
     priorityTasks: priorityTaskIds.map((id) => compactTask(taskById(tasks, id))).filter(Boolean),

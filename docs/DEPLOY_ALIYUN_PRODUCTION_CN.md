@@ -15,7 +15,9 @@ docs/release-manifest-2026-06-21-app-aliyun-production-cn-bridge.md
 ```text
 运行平台：阿里云中国内地
 后端形态：Next.js API 容器
-建议入口：SAE 应用或 ECS Docker 容器
+第一版部署入口：阿里云 SAE 自定义容器
+地域：cn-hangzhou
+SAE 应用名：meiye-huajing-app-api-production-cn
 监听端口：3000
 健康检查：GET /api/healthz
 严格健康检查：GET /api/app/health?strict=1
@@ -34,6 +36,23 @@ docs/release-manifest-2026-06-21-app-aliyun-production-cn-bridge.md
 最终版 production-cn 还需要把数据层迁到阿里云 RDS PostgreSQL。当前代码仍以 Supabase SDK 为主，不要只填 `DATABASE_URL_CN` 就认为数据库已迁移完成。
 
 ## 2. 本轮新增的后端部署入口
+
+### 2.0 阿里云 SAE 运行时计划
+
+第一版 APP 国内后端桥接部署目标已经固定为 SAE，而不是继续停留在“SAE 或 ECS 二选一”的描述：
+
+```bash
+cd /Users/Admin/Documents/美业话镜APP/handoff/IP
+corepack pnpm aliyun:runtime:plan
+```
+
+非密钥运行时计划文件：
+
+```text
+deploy/aliyun-production-cn.runtime-plan.json
+```
+
+该文件只保存平台、地域、应用名、容器端口、健康检查、域名、ACR 镜像计划和云确认文件路径，不保存任何 AppSecret、AccessKey、Supabase key 或 token。ECS 只作为 SAE 不能满足运行约束时的备选方案；除非另开部署决策，不再作为第一版主路径。
 
 ### 2.1 Docker 镜像
 
@@ -75,7 +94,7 @@ example 模板只放 ACR registry host、namespace、repository、tag、remote i
 corepack pnpm aliyun:image:plan:strict
 ```
 
-这一步确认镜像已经推送/导入阿里云 ACR，并且 SAE/ECS 运行时已经配置为拉取该 remote image。它不执行 `docker login`、不推送镜像、不创建 ACR 仓库。
+这一步确认镜像已经推送/导入阿里云 ACR，并且 SAE 运行时已经配置为拉取该 remote image。它不执行 `docker login`、不推送镜像、不创建 ACR 仓库。
 
 ### 2.2 健康检查
 
@@ -195,6 +214,7 @@ corepack pnpm aliyun:domain:strict
 
 ```bash
 corepack pnpm aliyun:deploy:spec
+corepack pnpm aliyun:runtime:plan
 corepack pnpm aliyun:image:plan
 corepack pnpm aliyun:legal:check
 corepack pnpm aliyun:status
@@ -202,12 +222,12 @@ corepack pnpm aliyun:operator:tasks
 corepack pnpm aliyun:operator:handoff
 ```
 
-这些命令不输出任何密钥值，也不会创建资源、导入变量或推送镜像。`aliyun:legal:check` 只确认后端包内 `/privacy` 和 `/terms` 页面存在、核心字段完整，并允许正式 URL 仍未填入 env；`aliyun:deploy:spec` 校验 `deploy/aliyun-production-cn.example.json` 的镜像、端口、ACR 发布计划、域名、健康检查和前后置门禁顺序；`aliyun:status` 是给当前发布负责人看的只读总览，会把本地门禁、微信审核、Apple Universal Link、阿里云云资源确认、域名和 ACR 镜像证据压缩成一个 JSON 摘要；`aliyun:operator:tasks` 会把当前 `readiness`、`domain`、`.env.production-cn.local`、`image-publish.local.json` 和 `cloud-confirmations.local.json` 汇总为 9 个任务；`aliyun:operator:handoff` 是给用户、阿里云操作员、微信开放平台操作员和发布负责人共用的非密钥操作包，适合直接判断“现在缺什么、去哪里拿、导入哪里”。
+这些命令不输出任何密钥值，也不会创建资源、导入变量或推送镜像。`aliyun:legal:check` 只确认后端包内 `/privacy` 和 `/terms` 页面存在、核心字段完整，并允许正式 URL 仍未填入 env；`aliyun:deploy:spec` 校验 `deploy/aliyun-production-cn.example.json` 的镜像、端口、ACR 发布计划、SAE runtime plan、域名、健康检查和前后置门禁顺序；`aliyun:runtime:plan` 校验 `deploy/aliyun-production-cn.runtime-plan.json` 是否仍指向 `cn-hangzhou` 的 SAE 自定义容器、端口 3000 和 `api-cn.ipgongchang.xin`；`aliyun:status` 是给当前发布负责人看的只读总览，会把本地门禁、微信审核、Apple Universal Link、阿里云云资源确认、域名和 ACR 镜像证据压缩成一个 JSON 摘要；`aliyun:operator:tasks` 会把当前 `readiness`、`domain`、`.env.production-cn.local`、`image-publish.local.json` 和 `cloud-confirmations.local.json` 汇总为 9 个任务；`aliyun:operator:handoff` 是给用户、阿里云操作员、微信开放平台操作员和发布负责人共用的非密钥操作包，适合直接判断“现在缺什么、去哪里拿、导入哪里”。
 
 ```text
 T01 微信开放平台移动应用审核和 APP 登录凭证
 T02 国内 APP 隐私政策和用户协议正式 URL
-T03 阿里云 SAE/ECS 后端运行容器
+T03 阿里云 SAE 后端运行容器
 T03B 发布后端 Docker 镜像到阿里云 ACR 并配置运行时拉取
 T04 api-cn/assets-cn DNS、HTTPS 和 ICP 证据
 T05 服务记录音频 OSS、CORS 和 RAM 最小权限
@@ -248,7 +268,7 @@ corepack pnpm aliyun:readiness
 5. 后端阿里云部署脚本、Dockerfile、health、小程序链路桥接清单、APP client API contract、APP API smoke 是否齐全。
 6. App production-cn 构建配置生成门禁是否齐全。
 7. Docker daemon 是否可用于本地镜像构建。
-8. ACR 镜像发布计划和 SAE/ECS 运行时镜像拉取配置是否有非密钥证据。
+8. ACR 镜像发布计划和 SAE 运行时镜像拉取配置是否有非密钥证据。
 9. 还需要人工确认的阿里云 SAE / DNS / HTTPS / OSS / SLS 等资源，且可以读取非密钥 JSON 确认证据。
 ```
 
@@ -283,12 +303,13 @@ corepack pnpm aliyun:readiness:cloud-ready
 corepack pnpm aliyun:cloud:confirmations:strict
 ```
 
-严格模式会在 SAE/ECS、DNS/HTTPS/ICP、OSS/CORS/RAM、微信开放平台 approved、环境变量导入、SLS 告警任一项未确认时失败。确认文件只能写资源名、布尔状态、证据编号或控制台路径，不能写任何 AppSecret、AccessKey、Token、Service Role Key。
+严格模式会在 SAE、DNS/HTTPS/ICP、OSS/CORS/RAM、微信开放平台 approved、环境变量导入、SLS 告警任一项未确认时失败。确认文件只能写资源名、布尔状态、证据编号或控制台路径，不能写任何 AppSecret、AccessKey、Token、Service Role Key。
 
 非密钥部署样例：
 
 ```text
 /Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.example.json
+/Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.runtime-plan.json
 /Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.image-publish.example.json
 /Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.cloud-confirmations.example.json
 ```
@@ -322,10 +343,11 @@ operator-handoff.md
 env-import-plan.json
 vercel-env-coverage.json
 app-api-bridge-map-check.json
+runtime-plan.json
 meiye-huajing-app-api-production-cn-context.tar.gz
 ```
 
-该脚本会复用当前 readiness、env、routes、小程序链路桥接清单、Docker context 检查，并默认尝试生成 Vercel production 变量名覆盖报告。Vercel 覆盖报告只包含变量名、环境和加密/敏感元数据，不包含真实 value；如果 Vercel 登录态不可用，会在审计里记录失败，不阻断本地发布审计包生成。
+该脚本会复用当前 readiness、env、routes、小程序链路桥接清单、SAE runtime plan、Docker context 检查，并默认尝试生成 Vercel production 变量名覆盖报告。Vercel 覆盖报告只包含变量名、环境和加密/敏感元数据，不包含真实 value；如果 Vercel 登录态不可用，会在审计里记录失败，不阻断本地发布审计包生成。
 
 `production-cn-status.json` 和 `production-cn-status.md` 是 `aliyun:status` 的打包输出，供发布负责人快速判断当前能否上线、还缺哪些微信/阿里云/Apple 证据。`operator-handoff.json` 和 `operator-handoff.md` 是当前唯一建议交给人工操作员的非密钥操作包：微信开放平台已提交审核时，先等移动应用审核通过，再从移动应用详情读取 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`，不要复用小程序 AppID / Secret。操作包会把 `APPLE_TEAM_ID` 单独列为 APP 发布/AASA 阻塞项：它不是后端必填密钥，但 iOS Universal Link 验收需要它生成 AASA `appID`。
 
@@ -455,7 +477,7 @@ node scripts/check-vercel-env-coverage.mjs \
   --write-report /tmp/meiye-vercel-env-coverage.json
 ```
 
-这一步不等于阿里云已导入环境变量。它只证明旧 Vercel 里有哪些名称可迁移，正式导入仍以阿里云 SAE/ECS/KMS/Secrets Manager 控制台和 `aliyun:cloud:check` 为准。
+这一步不等于阿里云已导入环境变量。它只证明旧 Vercel 里有哪些名称可迁移，正式导入仍以阿里云 SAE/KMS/Secrets Manager 控制台和 `aliyun:cloud:check` 为准。
 
 ### 3.3 生成阿里云控制台导入 JSON
 
@@ -478,19 +500,20 @@ rm -f /tmp/meiye-sae-env.json
 
 ## 4. 阿里云控制台需要创建或确认的资源
 
-### 4.1 SAE 或 ECS 容器
+### 4.1 SAE 自定义容器
 
-推荐先用 SAE：
+按 `deploy/aliyun-production-cn.runtime-plan.json` 创建或确认 SAE 应用：
 
 ```text
-地域：华东 1 / 华北 2 任选一个和 OSS、RDS 规划一致的地域
+地域：cn-hangzhou
+应用名：meiye-huajing-app-api-production-cn
 运行时：自定义容器
 端口：3000
 健康检查：/api/healthz
 环境变量：从 .env.production-cn.local 导入非 TODO 值
 ```
 
-如果先用 ECS：
+ECS 只作为 SAE 不能满足运行约束时的备选：
 
 ```text
 安装 Docker
@@ -567,11 +590,11 @@ deploy/aliyun-production-cn.cloud-confirmations.local.json
 该文件被 `.gitignore` 排除，不能提交。字段获得方式：
 
 ```text
-runtime：阿里云 SAE 应用详情或 ECS 容器运行配置，确认端口 3000 和 /api/healthz。
+runtime：阿里云 SAE 应用详情，确认端口 3000 和 /api/healthz。
 apiDomainHttps：阿里云 DNS / 证书服务 / 备案信息，确认 api-cn 已解析到阿里云并启用 HTTPS。
 oss：OSS Bucket CORS、RAM 策略和 service-records/production-cn 前缀。
 wechatOpenPlatform：微信开放平台移动应用审核状态、Android 包名/签名、iOS Bundle ID/Universal Link。
-envImport：SAE/ECS/KMS/Secrets Manager 环境变量导入记录，确认密钥没有写进镜像。
+envImport：SAE/KMS/Secrets Manager 环境变量导入记录，确认密钥没有写进镜像。
 slsAlerts：SLS 项目和健康检查失败、5xx 告警配置。
 ```
 
@@ -606,7 +629,7 @@ corepack pnpm aliyun:env:plan
 导入动作
 ```
 
-它不包含真实 value，可用于进阿里云 SAE/ECS/KMS/Secrets Manager 控制台时逐项核对。真正带 value 的导入文件只能用下面命令写到仓库外临时路径，并在导入后删除：
+它不包含真实 value，可用于进阿里云 SAE/KMS/Secrets Manager 控制台时逐项核对。真正带 value 的导入文件只能用下面命令写到仓库外临时路径，并在导入后删除：
 
 ```bash
 node scripts/prepare-aliyun-runtime-env.mjs \
@@ -694,6 +717,7 @@ corepack pnpm aliyun:env:check
 corepack pnpm aliyun:env:plan
 corepack pnpm aliyun:env:sources
 corepack pnpm aliyun:deploy:spec
+corepack pnpm aliyun:runtime:plan
 corepack pnpm aliyun:image:plan
 corepack pnpm aliyun:legal:check
 corepack pnpm aliyun:cloud:confirmations
@@ -773,7 +797,7 @@ ASR poll
 
 ```text
 1. 需要确认是否创建阿里云 SAE 应用和 api-cn 域名。
-2. 需要确认阿里云 ACR 镜像仓库、remote image、digest 和 SAE/ECS 镜像拉取配置。
+2. 需要确认阿里云 ACR 镜像仓库、remote image、digest 和 SAE 镜像拉取配置。
 3. 需要微信开放平台移动应用 AppID / AppSecret。
 4. 需要确认隐私政策和用户协议正式 URL。
 5. 正式数据层迁移到 RDS PostgreSQL 还未开始。
@@ -817,9 +841,11 @@ node --check scripts/run-aliyun-predeploy.mjs
 node --check scripts/run-aliyun-container-smoke.mjs
 node --check scripts/check-aliyun-cloud-confirmations.mjs
 node --check scripts/check-aliyun-deployment-spec.mjs
+node --check scripts/check-aliyun-runtime-plan.mjs
 node --check scripts/check-aliyun-image-publish-plan.mjs
 node --check scripts/check-app-production-runtime-config.mjs
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.example.json','utf8'))"
+node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.runtime-plan.json','utf8'))"
 node -e "JSON.parse(require('fs').readFileSync('deploy/app-api-production-cn.bridge-map.json','utf8'))"
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.image-publish.example.json','utf8'))"
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.cloud-confirmations.example.json','utf8'))"
@@ -843,7 +869,8 @@ corepack pnpm aliyun:docker:check（7 files / 24 dockerignore patterns / sensiti
 corepack pnpm aliyun:container:smoke（Docker health + 30 APP API probes / sanitized env deleted）
 node --check scripts/check-aliyun-domain-readiness.mjs
 corepack pnpm aliyun:domain:check（状态看板 exit 0；当前 ok=false）
-corepack pnpm aliyun:deploy:spec（image meiye-huajing-app-api:production-cn / port 3000 / predeploy 20 / postdeploy 5）
+corepack pnpm aliyun:deploy:spec（image meiye-huajing-app-api:production-cn / port 3000 / predeploy 21 / postdeploy 5）
+corepack pnpm aliyun:runtime:plan（SAE / cn-hangzhou / meiye-huajing-app-api-production-cn / port 3000）
 corepack pnpm aliyun:remote:smoke -- --base-url http://127.0.0.1:3022 --allow-missing appWechatLogin,legalLinks
 corepack pnpm aliyun:env:check
 corepack pnpm exec tsc --noEmit --pretty false
@@ -926,7 +953,7 @@ NEXT_PUBLIC_SITE_URL: api-cn.ipgongchang.xin -> A 198.18.0.5, dns_special_use_ip
 APP_ASSET_BASE_URL: assets-cn.ipgongchang.xin -> A 198.18.0.6, dns_special_use_ip, HTTPS ECONNRESET
 ```
 
-因此当前域名不是 production ready。下一步需要把 `api-cn` / `assets-cn` 解析到公网可访问的阿里云 SAE/SLB/ECS 或 OSS/CDN 入口，并配置 HTTPS 证书；之后再跑 `corepack pnpm aliyun:domain:strict`。
+因此当前域名不是 production ready。下一步需要把 `api-cn` / `assets-cn` 解析到公网可访问的阿里云 SAE/SLB 或 OSS/CDN 入口，并配置 HTTPS 证书；之后再跑 `corepack pnpm aliyun:domain:strict`。
 
 `aliyun:cloud:check` 当前云确认状态：
 

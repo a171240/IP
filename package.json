@@ -11,6 +11,7 @@
     "aliyun:env:sources": "node ./scripts/prepare-aliyun-runtime-env.mjs --allow-todo --write-plan /tmp/meiye-aliyun-env-source-catalog.json",
     "aliyun:vercel-env:coverage": "node ./scripts/check-vercel-env-coverage.mjs --write-report /tmp/meiye-vercel-env-coverage.json",
     "aliyun:deploy:spec": "node ./scripts/check-aliyun-deployment-spec.mjs",
+    "aliyun:runtime:plan": "node ./scripts/check-aliyun-runtime-plan.mjs",
     "aliyun:image:plan": "node ./scripts/check-aliyun-image-publish-plan.mjs --allow-incomplete",
     "aliyun:image:plan:strict": "node ./scripts/check-aliyun-image-publish-plan.mjs",
     "aliyun:domain:check": "node ./scripts/check-aliyun-domain-readiness.mjs --allow-blocking",
