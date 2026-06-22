@@ -1013,7 +1013,7 @@ required missing: APP_ENV, APP_REGION, APP_API_BASE_URL, APP_ASSET_BASE_URL, NEX
 optional/app-launch missing: DATABASE_URL_CN, REDIS_URL_CN, SERVICE_RECORD_DEEPSEEK_API_KEY, SERVICE_RECORD_DEEPSEEK_BASE_URL, SERVICE_RECORD_DEEPSEEK_MODEL, WECHAT_OPEN_APP_REVIEW_STATUS, APPLE_TEAM_ID
 imagePublishPlan: localDockerImage ready, ACR/runtime blockers 16
 cloudAccess: canReadCloudNow false, blocker aliyun_cli_missing
-cloudConfirmations: local blockers 25
+cloudConfirmations: local blockers 30
 appClientContract: 40 audited calls / 34 unique client routes
 appApiSmokeCoverage: 29 / 29 business routes
 ```
@@ -1088,3 +1088,5 @@ scopes:
 ```
 
 `PRIVACY_POLICY_URL` / `TERMS_URL` 的 ready 判定现在不只是“有值”：后端 health/readiness 和 APP runtime/build-time config 都要求 HTTPS，且不能是 localhost、example、`.vercel.app` 或旧 Vercel 入口域名。当前 TODO 微信开放平台变量不会被健康检查或 APP 正式包配置误判为 ready。
+
+2026-06-22 10:44 CST 更新：`corepack pnpm aliyun:cloud:confirmations:strict` 现在会把 `.local.json` 里的 `pending_*` / `TBD_*` 字符串视为占位证据 blocker。控制台证据文件仍只能写非密钥资源名、布尔值、控制台路径或证据编号；不能通过把 `confirmed` 改成 `true` 但保留 `pending_env_import`、`pending_sls_project_confirmation` 这类占位文本来通过正式云侧门禁。

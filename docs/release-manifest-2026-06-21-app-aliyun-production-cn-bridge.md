@@ -695,6 +695,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 追加：新增结构化 `bridgeDataLayer` 到 `aliyun:readiness`、`aliyun:status`、`aliyun:operator:tasks`、`aliyun:operator:handoff` 和 `aliyun:release:artifacts`。机器输出现在会明确：第一版后端桥接部署当前数据层是 Supabase，目标数据层是阿里云 RDS PostgreSQL，`rdsMigrationIncludedInThisRelease=false`；`DATABASE_URL_CN` / `REDIS_URL_CN` 只是后续迁移变量，不应被误读为第一版部署阻塞或已完成数据层迁移。同轮已执行相关脚本 `node --check`、`corepack pnpm aliyun:readiness`、`corepack pnpm aliyun:status`、`corepack pnpm aliyun:operator:tasks`、`node scripts/generate-aliyun-operator-handoff.mjs --skip-vercel-env-coverage`、`corepack pnpm aliyun:release:artifacts -- --skip-bundle --skip-vercel-env-coverage`、`corepack pnpm aliyun:deploy:spec`、目标 eslint、`git diff --check`、新增行密钥扫描和 `corepack pnpm aliyun:predeploy`，全部通过；`predeploy` 仍显示 health strict 只缺 `appWechatLogin`，APP API smoke `30 probes / 0 failures`。
 
+2026-06-22 10:44 CST 追加：`aliyun:cloud:confirmations:strict` 加严 `.local.json` 占位证据校验，严格模式会把 `pending_*` / `TBD_*` 字符串作为 blocker。这样阿里云/微信控制台证据必须是真实非密钥资源名、控制台路径、时间或证据编号，不能保留 `pending_env_import`、`pending_sls_project_confirmation` 等占位文本后误判为云侧 ready。同轮已执行 `node --check scripts/check-aliyun-cloud-confirmations.mjs`、`corepack pnpm aliyun:cloud:confirmations`、`corepack pnpm aliyun:operator:tasks`、`corepack pnpm aliyun:status`、目标 eslint、`git diff --check`、新增行密钥扫描、`corepack pnpm aliyun:release:artifacts -- --skip-bundle --skip-vercel-env-coverage`、`corepack pnpm aliyun:deploy:spec` 和 `corepack pnpm aliyun:predeploy`，全部通过；当前 cloud confirmations local blockers 为 30，其中 5 个是新增占位证据 blocker，`predeploy` 仍显示 health strict 只缺 `appWechatLogin`，APP API smoke `30 probes / 0 failures`。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：

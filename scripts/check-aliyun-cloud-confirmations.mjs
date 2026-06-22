@@ -289,7 +289,8 @@ function validateItem(rawItem, definition, mode) {
     for (const field of definition.requiredFields) {
       if (!Object.prototype.hasOwnProperty.call(rawItem, field)) continue
       const value = rawItem[field]
-      if (typeof value === "string" && value.trim().startsWith("TODO_")) blockers.push(`todo:${field}`)
+      if (typeof value === "string" && isTodoText(value)) blockers.push(`todo:${field}`)
+      if (typeof value === "string" && isPendingPlaceholderText(value)) blockers.push(`placeholder:${field}`)
       if (value === "") blockers.push(`empty:${field}`)
     }
   }
@@ -304,6 +305,18 @@ function validateItem(rawItem, definition, mode) {
     warnings,
     missingFields,
   }
+}
+
+function text(value) {
+  return String(value || "").trim()
+}
+
+function isTodoText(value) {
+  return /^TODO(?:_|$)/i.test(text(value))
+}
+
+function isPendingPlaceholderText(value) {
+  return /^(?:pending|TBD)(?:_|$)/i.test(text(value))
 }
 
 function findSecretLikeValues(value, path = "$") {
