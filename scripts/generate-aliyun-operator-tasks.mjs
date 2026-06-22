@@ -424,6 +424,21 @@ function summarizeTasks(tasks) {
   }
 }
 
+function defaultBridgeDataLayer() {
+  return {
+    current: "Supabase",
+    target: "Aliyun RDS PostgreSQL",
+    status: "RDS migration is not included in the first bridge deployment",
+    firstBridgeDeploymentUses: "Supabase bridge env",
+    supabaseBridgeReady: false,
+    databaseUrlCnStatus: "unknown",
+    redisUrlCnStatus: "unknown",
+    rdsMigrationIncludedInThisRelease: false,
+    rdsMigrationRequiredForFinalProductionCn: true,
+    notes: [],
+  }
+}
+
 function renderMarkdown(report) {
   const lines = [
     "# 美业话镜 APP production-cn 操作员任务清单",
@@ -439,6 +454,7 @@ function renderMarkdown(report) {
     `- env requiredReady: ${report.env.summary.requiredReady} / ${report.env.summary.requiredTotal}`,
     `- tasks ready: ${report.summary.ready} / ${report.summary.total}`,
     `- waitingWechatReview: ${report.summary.waitingWechatReview}`,
+    `- bridgeDataLayer: ${report.bridgeDataLayer.current} -> ${report.bridgeDataLayer.target}`,
     "",
     "## 当前阻塞",
     "",
@@ -472,6 +488,19 @@ function renderMarkdown(report) {
           "",
         ])
       : ["- requiredBlocking: none", ""]),
+    "",
+    "## 数据层桥接状态",
+    "",
+    `- current: ${report.bridgeDataLayer.current}`,
+    `- target: ${report.bridgeDataLayer.target}`,
+    `- status: ${report.bridgeDataLayer.status}`,
+    `- firstBridgeDeploymentUses: ${report.bridgeDataLayer.firstBridgeDeploymentUses}`,
+    `- supabaseBridgeReady: ${report.bridgeDataLayer.supabaseBridgeReady}`,
+    `- DATABASE_URL_CN: ${report.bridgeDataLayer.databaseUrlCnStatus}`,
+    `- REDIS_URL_CN: ${report.bridgeDataLayer.redisUrlCnStatus}`,
+    `- rdsMigrationIncludedInThisRelease: ${report.bridgeDataLayer.rdsMigrationIncludedInThisRelease}`,
+    `- rdsMigrationRequiredForFinalProductionCn: ${report.bridgeDataLayer.rdsMigrationRequiredForFinalProductionCn}`,
+    ...(report.bridgeDataLayer.notes || []).map((item) => `- ${item}`),
     "",
     "## 任务",
     "",
@@ -562,6 +591,7 @@ function main() {
       totalBlockers: imagePublishPlan.summary?.totalBlockers ?? 0,
       localDockerImage: imagePublishPlan.localDockerImage?.status || "unknown",
     },
+    bridgeDataLayer: readiness.checks?.bridgeDataLayer || defaultBridgeDataLayer(),
     env: {
       containsValues: false,
       summary: envPlan.summary,

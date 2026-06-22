@@ -203,6 +203,7 @@ function renderMarkdown(audit) {
   const appEnvTemplate = appProductionConfig?.envTemplate
   const appRuntimeConfig = appProductionConfig?.runtimeConfig
   const appNativeRelease = appProductionConfig?.nativeRelease
+  const bridgeDataLayer = readiness.checks?.bridgeDataLayer || {}
   return [
     "# 美业话镜 APP production-cn 阿里云发布审计",
     "",
@@ -235,6 +236,7 @@ function renderMarkdown(audit) {
     `- cloudConfirmations: ${cloudConfirmations?.ready ? "ready" : "not ready"}`,
     `- cloudConfirmationsCheck: template ${cloudConfirmationsCheck?.template?.ready ? "ready" : "not ready"}, local ${cloudConfirmationsCheck?.local?.ready ? "ready" : "not ready"}`,
     `- vercelEnvCoverage: ${vercelEnvCoverage?.ok ? "ok" : vercelEnvCoverage?.skipped ? "skipped" : "not ok"}`,
+    `- bridgeDataLayer: ${bridgeDataLayer.current || "unknown"} -> ${bridgeDataLayer.target || "unknown"} (${bridgeDataLayer.status || "unknown"})`,
     `- bundle: ${bundle ? basename(bundle.path) : "skipped"}`,
     "",
     "## 机器可验证阻塞",
@@ -401,6 +403,19 @@ function renderMarkdown(audit) {
     ...(productionStatus.humanSummary?.length
       ? productionStatus.humanSummary.map((item) => `- ${item}`)
       : ["- humanSummary: none"]),
+    "",
+    "## 数据层桥接状态",
+    "",
+    `- current: ${bridgeDataLayer.current || "unknown"}`,
+    `- target: ${bridgeDataLayer.target || "unknown"}`,
+    `- status: ${bridgeDataLayer.status || "unknown"}`,
+    `- firstBridgeDeploymentUses: ${bridgeDataLayer.firstBridgeDeploymentUses || "unknown"}`,
+    `- supabaseBridgeReady: ${bridgeDataLayer.supabaseBridgeReady === true}`,
+    `- DATABASE_URL_CN: ${bridgeDataLayer.databaseUrlCnStatus || "unknown"}`,
+    `- REDIS_URL_CN: ${bridgeDataLayer.redisUrlCnStatus || "unknown"}`,
+    `- rdsMigrationIncludedInThisRelease: ${bridgeDataLayer.rdsMigrationIncludedInThisRelease === true}`,
+    `- rdsMigrationRequiredForFinalProductionCn: ${bridgeDataLayer.rdsMigrationRequiredForFinalProductionCn === true}`,
+    ...(bridgeDataLayer.notes?.length ? bridgeDataLayer.notes.map((item) => `- ${item}`) : []),
     "",
     "## APP API 小程序链路桥接清单",
     "",
@@ -769,6 +784,7 @@ function main() {
       canDeployNow: productionStatus.canDeployNow === true,
       requiredReady: `${productionStatus.summary.requiredReady}/${productionStatus.summary.requiredTotal}`,
       requiredBlocking: productionStatus.summary.requiredBlocking || [],
+      bridgeDataLayer: productionStatus.summary.bridgeDataLayer || null,
       operatorTasks: productionStatus.summary.operatorTasks || {},
       cloudConfirmations: productionStatus.summary.cloudConfirmations || {},
     },
@@ -781,6 +797,7 @@ function main() {
       appLaunchBlockingVariables: operatorHandoff.appLaunchBlocking.variables.map((item) => item.name),
       appLaunchBlockingStates: operatorHandoff.appLaunchBlocking.states.map((item) => `${item.name}:${item.status}`),
       optionalDeferredEnv: operatorHandoff.missingVariables.optionalDeferred.map((item) => item.name),
+      bridgeDataLayer: operatorHandoff.bridgeDataLayer || null,
       vercelEnvCoverage: operatorHandoff.vercelEnvCoverage?.ok
         ? {
             containsValues: operatorHandoff.vercelEnvCoverage.containsValues,

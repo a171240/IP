@@ -913,6 +913,8 @@ app_universal_link:apple_team_id_missing
 
 2026-06-22 追加：`aliyun:operator:handoff` 现在也内置 Vercel production 变量名覆盖摘要，会输出 `requiredCovered`、`optionalCovered`、可迁移桥接变量名、Vercel 仍缺的 production-cn 必填变量名，以及其中属于国内 APP/微信开放平台/正式域名的新变量。该摘要只来自 `vercel env ls --format json` 的元数据，`containsValues=false`，不会展示或写出任何环境变量值；`aliyun:release:artifacts -- --skip-vercel-env-coverage` 会把跳过参数透传给 `operator-handoff`，离线生成审计包时不会隐式访问 Vercel。
 
+2026-06-22 追加：`aliyun:readiness` / `aliyun:status` / `aliyun:operator:tasks` / `aliyun:operator:handoff` / `aliyun:release:artifacts` 现在都会输出结构化 `bridgeDataLayer`。该字段明确第一版 APP production-cn 是阿里云 API 容器 + 现有 Supabase 数据层的桥接部署，`DATABASE_URL_CN` / `REDIS_URL_CN` 可后置；RDS PostgreSQL / Tair 仍是完整 production-cn 数据层迁移的后续任务，不能因为填写变量或完成 SAE 部署就认为数据层已经国产化迁移完成。
+
 2026-06-22 05:57 CST 复核：协议 URL ready 后重新运行 `corepack pnpm aliyun:predeploy`，通过；env requiredReady 23/25，health smoke 只缺 `appWechatLogin`，App API smoke 30 probes / 0 failures。
 
 2026-06-21 21:45 CST 更新：本机 `.env.production-cn.local` 已补入非密钥域名：

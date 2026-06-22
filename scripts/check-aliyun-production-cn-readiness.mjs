@@ -13,6 +13,7 @@ const APP_ROOT = resolve(WORKSPACE_ROOT, "meiye-huajing-app")
 const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
 const DEFAULT_IMAGE_PUBLISH_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.image-publish.local.json")
+const DEPLOYMENT_SPEC_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.example.json")
 const EXPECTED_WECHAT_MOBILE_APP_NAME = "美业话镜"
 const EXPECTED_ANDROID_PACKAGE_NAME = "com.ipgongchang.meiyehuajing"
 const EXPECTED_IOS_BUNDLE_ID = "com.ipgongchang.meiyehuajing"
@@ -412,6 +413,33 @@ function envStatus(value) {
   return "ready"
 }
 
+function buildBridgeDataLayer(env) {
+  const spec = existsSync(DEPLOYMENT_SPEC_FILE) ? readJson(DEPLOYMENT_SPEC_FILE) : {}
+  const configured = spec.bridgeDataLayer || {}
+  const supabaseKeys = [
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY",
+  ]
+  return {
+    current: configured.current || "Supabase",
+    target: configured.target || "Aliyun RDS PostgreSQL",
+    status: configured.status || "RDS migration is not included in the first bridge deployment",
+    firstBridgeDeploymentUses: "Supabase bridge env",
+    supabaseBridgeReady: supabaseKeys.every((key) => envStatus(env.get(key)) === "ready"),
+    supabaseKeys,
+    databaseUrlCnStatus: envStatus(env.get("DATABASE_URL_CN")),
+    redisUrlCnStatus: envStatus(env.get("REDIS_URL_CN")),
+    rdsMigrationIncludedInThisRelease: false,
+    rdsMigrationRequiredForFinalProductionCn: true,
+    notes: [
+      "第一版 APP production-cn 后端是桥接部署：API 容器跑在阿里云，数据层暂时沿用现有 Supabase。",
+      "DATABASE_URL_CN / REDIS_URL_CN 目前可后置；即使填写，也不代表已完成 Supabase SDK 到 RDS/Postgres 的数据层迁移。",
+      "正式完整 production-cn 数据层迁移需要单独 RDS PostgreSQL/Tair 方案、迁移脚本、回滚方案和授权。",
+    ],
+  }
+}
+
 function checkUrl(key, value) {
   const status = envStatus(value)
   if (status !== "ready") return status
@@ -718,6 +746,7 @@ function main() {
     DEFAULT_IMAGE_PUBLISH_FILE,
     "--allow-incomplete",
   ])
+  const bridgeDataLayer = buildBridgeDataLayer(env)
   const docker = dockerStatus()
   const cloudConfirmations = checkCloudConfirmations(args)
   const diagnosticOnly = args.assumeCloudReady === true
@@ -857,6 +886,7 @@ function main() {
         nativeRelease: appNativeReleaseConfig,
         universalLink: appUniversalLinkConfig,
       },
+      bridgeDataLayer,
       docker,
       imagePublishPlan,
       cloudConfirmations,

@@ -122,6 +122,7 @@ function buildStatus({ readiness, operatorTasks, args }) {
   const universalLink = readiness.checks?.appProductionConfig?.universalLink || null
   const imagePlan = readiness.checks?.imagePublishPlan || null
   const docker = readiness.checks?.docker || null
+  const bridgeDataLayer = readiness.checks?.bridgeDataLayer || null
   const wechatReviewStatus = readiness.checks?.wechatOpenPlatform?.reviewStatus || "unknown"
 
   const verdict = readiness.productionReady ? "ready_to_deploy_after_authorization" : "blocked"
@@ -138,6 +139,9 @@ function buildStatus({ readiness, operatorTasks, args }) {
       ? "微信开放平台移动应用状态：reviewing；这表示 APP 已进入审核流程，不是缺创建 APP。AppID/Secret 仍只能等审核通过后获取。"
       : `微信开放平台移动应用状态：${wechatReviewStatus}；AppID/Secret 只能等移动应用审核通过后从微信开放平台获取。`,
     `Apple Universal Link：${universalLink?.ok ? "ready" : "blocked"}；${(universalLink?.blockers || []).join(", ") || "no blockers"}。`,
+    bridgeDataLayer
+      ? `数据层：第一版桥接使用 ${bridgeDataLayer.current}；目标 ${bridgeDataLayer.target}，RDS migration included=${bridgeDataLayer.rdsMigrationIncludedInThisRelease === true}，DATABASE_URL_CN=${bridgeDataLayer.databaseUrlCnStatus || "unknown"}。`
+      : "数据层：unknown。",
     `阿里云云资源确认：${cloudReady.ready}/${cloudReady.total} ready；还缺 SAE、DNS/HTTPS/ICP、OSS/CORS/RAM、微信开放平台 approved、env import、SLS 中未完成项。`,
     `域名门禁：${operatorTasks.domain?.ok ? "ready" : "blocked"}；当前 api-cn/assets-cn 仍未证明解析到阿里云 HTTPS 入口。`,
     `镜像发布计划：${imagePlan?.ready ? "ready" : "blocked"}；本地 Docker 镜像 ${imagePlan?.localDockerImage?.status || operatorTasks.imagePublishPlan?.localDockerImage || "unknown"}，ACR/runtime 拉取证据未完成。`,
@@ -167,6 +171,7 @@ function buildStatus({ readiness, operatorTasks, args }) {
       requiredBlocking: missingRequiredEnv,
       machineBlocking,
       manualBlocking,
+      bridgeDataLayer,
       operatorTasks: operatorTasks.summary || {},
       cloudConfirmations: cloudReady,
     },
@@ -222,6 +227,7 @@ function buildStatus({ readiness, operatorTasks, args }) {
             blockers: imagePlan.local?.blockers || [],
           }
         : null,
+      bridgeDataLayer,
     },
     tasks: {
       ready: readyTasks.map(compactTask),
@@ -260,6 +266,7 @@ function renderMarkdown(status) {
     `- Missing required env: ${status.summary.requiredBlocking.length ? status.summary.requiredBlocking.join(", ") : "none"}`,
     `- Operator tasks: ready ${status.summary.operatorTasks.ready || 0}/${status.summary.operatorTasks.total || 0}, blocked ${status.summary.operatorTasks.blocked || 0}, waiting_wechat_review ${status.summary.operatorTasks.waitingWechatReview || 0}, pending_cloud ${status.summary.operatorTasks.pendingCloud || 0}, waiting_for_deploy ${status.summary.operatorTasks.waitingForDeploy || 0}`,
     `- Cloud confirmations: ${status.summary.cloudConfirmations.ready}/${status.summary.cloudConfirmations.total} ready`,
+    `- Bridge data layer: ${status.summary.bridgeDataLayer?.current || "unknown"} -> ${status.summary.bridgeDataLayer?.target || "unknown"} (${status.summary.bridgeDataLayer?.status || "unknown"})`,
     "",
     "## Human Summary",
     "",
