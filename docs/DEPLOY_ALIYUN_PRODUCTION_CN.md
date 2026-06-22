@@ -768,7 +768,9 @@ approved
 rejected
 ```
 
-当前用户已确认微信开放平台移动应用正在审核中。审核中仍不能发布，只能把 blocker 从 `wechat_open_platform_mobile_app_not_ready` 细分为 `wechat_open_platform_mobile_app_reviewing`，并在操作员任务里显示为 `waiting_wechat_review`。这表示 APP 已进入微信审核流程，不是还缺创建 APP；审核通过后再填 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`。
+如果微信开放平台移动应用已提交审核，审核中仍不能发布，只能把 blocker 从 `wechat_open_platform_mobile_app_not_ready` 细分为 `wechat_open_platform_mobile_app_reviewing`，并在操作员任务里显示为 `waiting_wechat_review`。这表示 APP 已进入审核流程，不是还缺创建 APP；审核通过后再填 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`。
+
+2026-06-22 14:52 CST 更新：用户澄清当前只是微信开放平台账号认证成功，移动应用还没创建。本机应把 `WECHAT_OPEN_APP_REVIEW_STATUS` 记录为 `not_started`，把 blocker 保持为 `wechat_open_platform_mobile_app_not_ready`。下一步是在微信开放平台创建“美业话镜”移动应用并提交审核；审核通过后才会取得移动应用 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`。浏览器安全策略会阻止自动读取或代填 `open.weixin.qq.com` 创建页，需用户手工完成页面材料与提交动作。
 
 微信开放平台移动应用需要准备：
 

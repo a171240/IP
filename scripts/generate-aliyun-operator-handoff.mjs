@@ -545,6 +545,17 @@ function buildAppLaunchBlocking(variables, machineBlocking) {
       action: "等待审核通过；不能用小程序凭证绕过。",
     })
   }
+  if (machineBlocking.includes("wechat_open_platform_mobile_app_not_ready")) {
+    states.push({
+      name: "WECHAT_OPEN_APP_REVIEW_STATUS",
+      status: "not_started",
+      launchBlocking: true,
+      owner: "用户/微信开放平台操作员",
+      where: "微信开放平台 -> 管理中心 -> 移动应用",
+      obtain: "账号认证通过后创建“美业话镜”移动应用；提交审核后状态进入 reviewing，审核通过后更新为 approved。",
+      action: "先创建移动应用并提交审核；不能创建小程序应用，也不能用小程序凭证替代 APP 微信登录。",
+    })
+  }
   if (machineBlocking.includes("invalid_app_universal_link_config")) {
     states.push({
       name: "IOS_UNIVERSAL_LINK_AASA",

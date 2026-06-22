@@ -731,6 +731,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 14:41 CST 追加：继续修正微信开放平台移动应用变量导入分类，`WECHAT_OPEN_APP_ID` 现在明确作为服务端标识符导入 `阿里云 SAE plain env`，但仍禁止写进 App 包；`WECHAT_OPEN_APP_SECRET` 继续只能导入 KMS/Secrets Manager/SAE secret env。`sensitiveActionItems` 的微信任务文案也同步拆分 AppID 与 AppSecret 的导入目标，避免把非密钥 AppID 误读成 secret env，或误读成可以写入客户端。该变更不改变发布阻塞结论：微信开放平台移动应用仍需审核通过后才能取得 AppID/AppSecret。
 
+2026-06-22 14:52 CST 追加：用户澄清微信开放平台当前只是账号认证成功，移动应用尚未创建。已把本机 ignored 状态调整为 `WECHAT_OPEN_APP_REVIEW_STATUS=not_started`，`wechatOpenPlatform.reviewStatus=not_started`，证据为 `user_confirmed_wechat_open_platform_account_verified_mobile_app_not_created_browser_read_blocked_by_policy_2026-06-22`。`open.weixin.qq.com` 创建页受浏览器安全策略保护，不能由自动化读取或代填；下一步需用户在微信开放平台创建“美业话镜”移动应用并提交审核，审核通过后再把 AppID/AppSecret 安全导入阿里云运行环境。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：
@@ -798,4 +800,4 @@ corepack pnpm aliyun:postdeploy:smoke -- \
 
 ## 13. 当前结论
 
-本地桥接代码、APP API 路由、小程序链路桥接清单、App production-cn API 配置、native release 配置和检查脚手架已经可以作为阿里云 production-cn 后端准备包继续推进；当前不能称为可发布，因为阿里云运行资源、ACR 镜像发布、api-cn/assets-cn DNS/HTTPS/ICP、OSS/CORS/RAM、SLS、Apple Team ID/AASA、微信开放平台移动应用 AppID/AppSecret 和云侧环境变量导入尚未完成。微信开放平台移动应用当前按审核中处理，审核通过前不能把 App 微信登录视为正式 ready。
+本地桥接代码、APP API 路由、小程序链路桥接清单、App production-cn API 配置、native release 配置和检查脚手架已经可以作为阿里云 production-cn 后端准备包继续推进；当前不能称为可发布，因为阿里云运行资源、ACR 镜像发布、api-cn/assets-cn DNS/HTTPS/ICP、OSS/CORS/RAM、SLS、Apple Team ID/AASA、微信开放平台移动应用创建/审核/AppID/AppSecret 和云侧环境变量导入尚未完成。微信开放平台当前只是账号认证通过，移动应用尚未创建，不能把 App 微信登录视为正式 ready。

@@ -92,14 +92,7 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan }) {
     : wechatReviewStatus === "reviewing"
       ? "waiting_wechat_review"
       : "blocked"
-  const wechatActions = wechatTaskStatus === "waiting_wechat_review"
-    ? [
-        "当前移动应用已是 reviewing：本地不需要再创建 APP，也不能用小程序凭证绕过。",
-        "等待移动应用审核状态从 reviewing 变为 approved。",
-      ]
-    : [
-        "等待移动应用审核状态从 reviewing 变为 approved。",
-      ]
+  const wechatActions = buildWechatOpenPlatformActions(wechatReviewStatus)
 
   addTask(tasks, {
     id: "T01_WECHAT_OPEN_PLATFORM_APP_LOGIN",
@@ -149,7 +142,7 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan }) {
       "GET https://api-cn.ipgongchang.xin/api/app/health?strict=1 after deployment",
     ],
     notes: [
-      "waiting_wechat_review 表示微信开放平台已进入审核流程，但还不能发布；approved 之前不要填猜测值。",
+      "not_started 表示微信开放平台移动应用还没创建；reviewing 表示移动应用已进入审核流程；approved 之前不要填猜测值。",
       "不能用小程序 AppID/Secret 替代 APP 微信登录。",
       "脚本只记录变量名和状态，不输出 AppSecret。",
     ],
@@ -401,6 +394,32 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan }) {
   })
 
   return tasks
+}
+
+function buildWechatOpenPlatformActions(reviewStatus) {
+  if (reviewStatus === "reviewing") {
+    return [
+      "当前移动应用已是 reviewing：本地不需要再创建 APP，也不能用小程序凭证绕过。",
+      "等待移动应用审核状态从 reviewing 变为 approved。",
+    ]
+  }
+  if (reviewStatus === "not_started") {
+    return [
+      "当前记录为 not_started：移动应用尚未创建；账号认证完成后，需要在 open.weixin.qq.com 创建“美业话镜”移动应用。",
+      "创建移动应用时使用本机 APP 工程信息，不要创建小程序应用或复用小程序凭证。",
+      "提交创建前确认 Android release 签名、iOS Bundle ID、Universal Link 和应用资料齐全。",
+    ]
+  }
+  if (reviewStatus === "rejected") {
+    return [
+      "当前移动应用审核被 rejected：先按微信开放平台驳回原因修正后重新提交。",
+      "重新提交前不要填猜测的 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET。",
+    ]
+  }
+  return [
+    "确认微信开放平台账号已完成认证后，创建“美业话镜”移动应用并提交审核。",
+    "审核通过后把 WECHAT_OPEN_APP_REVIEW_STATUS 更新为 approved，再读取 AppID/AppSecret。",
+  ]
 }
 
 function addTask(tasks, task) {

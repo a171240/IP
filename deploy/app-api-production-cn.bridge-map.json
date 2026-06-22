@@ -25,7 +25,7 @@
         "WECHAT_OPEN_APP_ID",
         "WECHAT_OPEN_APP_SECRET"
       ],
-      "currentExternalStatus": "reviewing"
+      "currentExternalStatus": "not_started"
     },
     "productionBaseUrl": {
       "requiredHost": "api-cn.ipgongchang.xin",

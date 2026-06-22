@@ -138,7 +138,9 @@ function buildStatus({ readiness, operatorTasks, args }) {
     `APP production-cn runtime config：${appRuntimeConfig?.ok ? "ready" : "blocked"}；apiBaseUrl ${appRuntimeConfig?.productionRuntime?.apiBaseUrl || "unknown"}，assetBaseUrl ${appRuntimeConfig?.productionRuntime?.assetBaseUrl || "unknown"}。`,
     wechatReviewStatus === "reviewing"
       ? "微信开放平台移动应用状态：reviewing；这表示 APP 已进入审核流程，不是缺创建 APP。AppID/Secret 仍只能等审核通过后获取。"
-      : `微信开放平台移动应用状态：${wechatReviewStatus}；AppID/Secret 只能等移动应用审核通过后从微信开放平台获取。`,
+      : wechatReviewStatus === "not_started"
+        ? "微信开放平台移动应用状态：not_started；移动应用还没创建，下一步是在微信开放平台创建“美业话镜”移动应用并提交审核。"
+        : `微信开放平台移动应用状态：${wechatReviewStatus}；AppID/Secret 只能等移动应用审核通过后从微信开放平台获取。`,
     `Apple Universal Link：${universalLink?.ok ? "ready" : "blocked"}；${(universalLink?.blockers || []).join(", ") || "no blockers"}。`,
     bridgeDataLayer
       ? `数据层：第一版桥接使用 ${bridgeDataLayer.current}；目标 ${bridgeDataLayer.target}，RDS migration included=${bridgeDataLayer.rdsMigrationIncludedInThisRelease === true}，DATABASE_URL_CN=${bridgeDataLayer.databaseUrlCnStatus || "unknown"}。`
