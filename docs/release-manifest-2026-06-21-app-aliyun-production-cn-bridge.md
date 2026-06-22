@@ -723,6 +723,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 14:06 CST 追加：`aliyun:operator:tasks`、`aliyun:status` 和 `aliyun:operator:handoff` 新增结构化 `sensitiveActionItems`，专门列出仍需用户介入的密钥、密码、token 或付款动作，不输出任何真实 value。当前输出 6 项 blocked：微信开放平台移动应用审核通过后的 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；Apple Developer 的 `APPLE_TEAM_ID`；ACR 企业版经济版 `cn-hangzhou` 1 个月 `CNY 117.00` 付款确认；ACR/SAE 镜像拉取认证；OSS RAM Secret 或 STS 注入；以及本地已有 ready 值但尚未导入阿里云运行环境的敏感/连接类变量组。`status.humanSummary` 会直接显示该数量，操作包 Markdown 也会单独列出每项的控制台路径、解除条件和禁止事项，方便发布负责人先判断哪些事情必须由用户或控制台操作员介入。
 
+2026-06-22 14:18 CST 追加：重新执行 `corepack pnpm aliyun:domain:check`，当前 `api-cn.ipgongchang.xin` 已有 A 记录 `198.18.0.7`，`assets-cn.ipgongchang.xin` 已有 A 记录 `198.18.0.8`，但二者均属于特殊用途地址，HTTPS 探测均为 `ECONNRESET`，因此仍不能作为阿里云 production-cn 公网入口证据。本地 ignored 的 `deploy/aliyun-production-cn.cloud-confirmations.local.json` 已把域名证据从旧的“记录缺失”更新为这次实测状态，`confirmed`、`dnsResolvedToAliyun`、`httpsEnabled`、`icpReady` 继续保持 `false`。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：

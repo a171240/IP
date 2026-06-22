@@ -546,6 +546,8 @@ api-cn.ipgongchang.xin
 
 当前 DNS 已确认 `ipgongchang.xin` 在阿里云解析。`ip.ipgongchang.xin` 仍指向 Vercel，不要直接改这个线上入口。
 
+2026-06-22 14:18 CST 实测：`api-cn.ipgongchang.xin` 当前 A 记录为 `198.18.0.7`，`assets-cn.ipgongchang.xin` 当前 A 记录为 `198.18.0.8`；二者均为特殊用途地址，HTTPS 探测为 `ECONNRESET`，还不能作为阿里云公网入口证据。
+
 机器检查：
 
 ```bash
