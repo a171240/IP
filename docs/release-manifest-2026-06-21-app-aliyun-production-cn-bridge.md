@@ -624,6 +624,15 @@ SLS：仅看到入口，未确认项目和告警
 微信开放平台：浏览器安全策略阻止自动读取；2026-06-22 14:52 CST 用户澄清为账号认证通过、移动应用尚未创建，当前记录 `not_started`
 ```
 
+2026-06-22 19:17 CST 只读复核：
+
+```text
+SAE 控制台：cn-hangzhou / 华东1（杭州）应用列表可打开，但当前地域显示“暂无实例”；目标应用 meiye-huajing-app-api-production-cn 未创建/未确认。
+DNS 控制台：ipgongchang.xin 在阿里云云解析 DNS 下，13 条记录，状态正常；未看到 api-cn 或 assets-cn 主机记录。现有旧记录 api A 106.14.241.129、ip A 106.14.241.129 不能直接证明新 APP production-cn API/资产域名 ready。
+SLS 控制台：project meiye-huajing-app-prod-cn / logstore app-api 页面可打开，资源面板显示 SLS 2 日志库/2 日志项目；health/5xx 告警仍 pending SAE runtime。
+Cloud Shell：当前浏览器页显示连接断开，本轮未点击重连，也没有执行 CLI inventory 或云 API。
+```
+
 据此，`deploy/aliyun-production-cn.cloud-confirmations.local.json` 已记录这些非密钥证据，但所有 `confirmed` 仍保持 `false`。
 
 ### 10.2 环境变量
@@ -792,6 +801,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 2026-06-22 18:55 CST 追加：新增 `corepack pnpm aliyun:action:authorization` 和 `tests/aliyun-action-authorization.static.test.js`，把 9 项用户/操作员动作进一步归类为外部平台审核、外部标识符、付费购买、registry/运行时 Secret、RAM/STS、Secret 导入、公网域名变更、云资源创建和生产发布授权。该矩阵明确：没有动作时确认时，Codex 只能继续本地检查、报告、非密钥证据记录和本地提交；不能购买 ACR、创建/修改 SAE/SLS/OSS/RAM/KMS/DNS/证书/CDN、公网入口，不能读取或导入 AppSecret/AccessKeySecret/registry password/RAM Secret/STS token/cookie/Supabase service role key，不能推送镜像、部署 production-cn、改正式域名解析或 git push。当前权威脚本口径为 `imagePublishPlan.totalBlockers=12`、`cloudConfirmations.totalBlockers=27`、`localPredeployChecks=44`、`predeployChecks=27`。
 
 2026-06-22 19:08 CST 复核：通过已登录 Chrome 只读读取阿里云 ACR 购买页，确认当前仍是 ACR Enterprise Economic、`cn-hangzhou`、实例名 `meiye-huajing`、购买时长 1 个月、页面应付 `¥117.00`。已只更新 ignored 的 `deploy/aliyun-production-cn.image-publish.local.json` 与 `deploy/aliyun-production-cn.cloud-access.local.json` 非密钥证据；没有点击购买、没有创建 registry、没有推送镜像、没有配置 SAE 镜像拉取、没有修改 DNS/证书/环境变量。复核后 `corepack pnpm aliyun:image:plan` 仍显示 `localReady=false`、`totalBlockers=12`，`corepack pnpm aliyun:resources:matrix` 仍显示阿里云资源 `ready 0/7`，`corepack pnpm aliyun:action:authorization` 仍显示 `canCodexProceedWithoutUser=[]`、9 项动作都需要外部完成或动作时确认。
+
+2026-06-22 19:17 CST 复核：继续通过已登录 Chrome 只读读取阿里云 SAE、DNS、SLS 和 Cloud Shell 页面。SAE `cn-hangzhou` 应用列表显示当前地域暂无实例，目标应用 `meiye-huajing-app-api-production-cn` 未创建/未确认；DNS `ipgongchang.xin` 有 13 条记录，存在旧 `api` / `ip` A 记录指向 `106.14.241.129`，但没有 `api-cn` / `assets-cn` 主机记录，不能复用为 APP production-cn 正式域名；SLS project `meiye-huajing-app-prod-cn` 与 logstore `app-api` 页面可见，但告警仍需等 SAE runtime；Cloud Shell 当前连接断开，本轮未重连、未执行 CLI inventory、未调用云 API。已只更新 ignored 的 `deploy/aliyun-production-cn.cloud-access.local.json` 与 `deploy/aliyun-production-cn.cloud-confirmations.local.json` 非密钥证据；没有购买 ACR、没有创建 SAE 应用、没有修改 DNS/证书/CDN、没有导入环境变量、没有读取微信 AppSecret、没有 production-cn 部署。
 
 ## 11. 真正部署时的命令顺序
 
