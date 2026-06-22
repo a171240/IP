@@ -756,6 +756,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 16:34 CST 追加：新增 `corepack pnpm aliyun:user:actions` 与 `tests/aliyun-user-action-brief.static.test.js`，把 `sensitive:blockers`、`resources:matrix` 和 `status` 合并成用户动作简报。当前固定输出 9 项：微信移动应用创建/审核、Apple Team ID、ACR 付费确认、ACR/SAE 镜像认证、OSS RAM/STS、环境变量导入、DNS/HTTPS/ICP、SAE/SLS、最终生产部署授权。该简报只列获取位置、写入目标、变量名、解除条件和动作时确认边界，不输出任何 value，并声明 `mutationPerformed=false`；`aliyun:release:artifacts` 也会随包输出 `user-action-brief.json` 和 `user-action-brief.md`。
 
+2026-06-22 17:12 CST 追加：`aliyun:user:actions` 现在为每个 U 项输出 `currentBlockers` 和 `currentEvidence`。微信 U01 当前会显示 `accountVerified=true`、`mobileAppCreated=false`、`mobileAppSubmitted=false`、`reviewStatus=not_started`，并把 `wechatOpenPlatform:mobileAppCreated` / `wechatOpenPlatform:mobileAppSubmitted` 作为当前 blocker；域名 U07 会显示 api-cn/assets-cn 的 DNS、HTTPS、ICP 当前布尔状态；部署 U09 会显示 `canDeployNow=false`、`productionReady=false`、`cloudConfirmations=0/7`。这些字段用于解释现状，不包含密钥值，也不代表已执行云资源变更。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：

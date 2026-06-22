@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process"
-import { writeFileSync } from "node:fs"
+import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, isAbsolute, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -120,7 +120,13 @@ function buildReport(args) {
 
   const sensitiveById = new Map((sensitive.items || []).map((item) => [item.id, item]))
   const resourcesById = new Map((resources.resources || []).map((item) => [item.id, item]))
-  const actions = buildActions({ sensitiveById, resourcesById, status })
+  const cloudConfirmations = readOptionalJson(args.cloudConfirmationsFile)
+  const actions = buildActions({
+    sensitiveById,
+    resourcesById,
+    status,
+    cloudItems: cloudConfirmations?.items || {},
+  })
   const blocked = actions.filter((item) => item.status !== "ready")
   const report = {
     ok: true,
@@ -184,7 +190,12 @@ function buildReport(args) {
   return report
 }
 
-function buildActions({ sensitiveById, resourcesById, status }) {
+function readOptionalJson(filePath) {
+  if (!filePath || !existsSync(filePath)) return null
+  return JSON.parse(readFileSync(filePath, "utf8"))
+}
+
+function buildActions({ sensitiveById, resourcesById, status, cloudItems }) {
   const actionMap = new Map()
 
   addAction(actionMap, {
@@ -205,6 +216,18 @@ function buildActions({ sensitiveById, resourcesById, status }) {
     requiresActionTimeConfirmation: false,
     nonSecretEvidenceOnly: false,
     sourceIds: ["S01_WECHAT_OPEN_APP_LOGIN"],
+    currentBlockers: [
+      ...machineBlockers(status, /WECHAT_OPEN|wechat_open_platform/),
+      ...cloudMissing(status, "wechatOpenPlatform"),
+    ],
+    currentEvidence: cloudEvidence(cloudItems, "wechatOpenPlatform", [
+      "accountVerified",
+      "mobileAppCreated",
+      "mobileAppSubmitted",
+      "reviewStatus",
+      "mobileAppIdReady",
+      "mobileAppSecretReady",
+    ]),
     verifyCommands: ["corepack pnpm aliyun:wechat-state:test", "corepack pnpm aliyun:readiness"],
   })
 
@@ -222,6 +245,8 @@ function buildActions({ sensitiveById, resourcesById, status }) {
     requiresActionTimeConfirmation: false,
     nonSecretEvidenceOnly: false,
     sourceIds: ["S02_APPLE_TEAM_ID"],
+    currentBlockers: machineBlockers(status, /apple_team_id|universal_link/i),
+    currentEvidence: ["APPLE_TEAM_ID=missing"],
     verifyCommands: ["corepack pnpm aliyun:aasa:check", "corepack pnpm aliyun:app-native:check"],
   })
 
@@ -239,6 +264,11 @@ function buildActions({ sensitiveById, resourcesById, status }) {
     requiresActionTimeConfirmation: true,
     nonSecretEvidenceOnly: true,
     sourceIds: ["S03_ACR_PAID_PURCHASE", "R02_ACR_IMAGE_REGISTRY"],
+    currentBlockers: [
+      ...sensitiveStatusBlockers(sensitiveById, ["S03_ACR_PAID_PURCHASE"]),
+      ...resourceBlockers(resourcesById, ["R02_ACR_IMAGE_REGISTRY"]),
+    ],
+    currentEvidence: resourceEvidence(resourcesById, ["R02_ACR_IMAGE_REGISTRY"]),
     verifyCommands: ["corepack pnpm aliyun:image:plan"],
   })
 
@@ -256,6 +286,11 @@ function buildActions({ sensitiveById, resourcesById, status }) {
     requiresActionTimeConfirmation: false,
     nonSecretEvidenceOnly: true,
     sourceIds: ["S04_ACR_REGISTRY_AUTH", "R02_ACR_IMAGE_REGISTRY"],
+    currentBlockers: [
+      ...sensitiveStatusBlockers(sensitiveById, ["S04_ACR_REGISTRY_AUTH"]),
+      ...resourceBlockers(resourcesById, ["R02_ACR_IMAGE_REGISTRY"]),
+    ],
+    currentEvidence: resourceEvidence(resourcesById, ["R02_ACR_IMAGE_REGISTRY"]),
     verifyCommands: ["corepack pnpm aliyun:image:plan:strict", "corepack pnpm aliyun:container:smoke"],
   })
 
@@ -276,6 +311,22 @@ function buildActions({ sensitiveById, resourcesById, status }) {
     requiresActionTimeConfirmation: false,
     nonSecretEvidenceOnly: false,
     sourceIds: ["S05_OSS_RAM_SECRET_OR_STS", "R05_OSS_AUDIO_STORAGE"],
+    currentBlockers: [
+      ...sensitiveStatusBlockers(sensitiveById, ["S05_OSS_RAM_SECRET_OR_STS"]),
+      ...resourceBlockers(resourcesById, ["R05_OSS_AUDIO_STORAGE"]),
+      ...cloudMissing(status, "oss"),
+    ],
+    currentEvidence: [
+      ...cloudEvidence(cloudItems, "oss", [
+        "confirmed",
+        "bucket",
+        "region",
+        "corsConfigured",
+        "ramLeastPrivilege",
+        "serviceRecordPrefix",
+      ]),
+      ...resourceEvidence(resourcesById, ["R05_OSS_AUDIO_STORAGE"]),
+    ],
     verifyCommands: ["corepack pnpm aliyun:cloud:confirmations", "corepack pnpm aliyun:health:smoke"],
   })
 
@@ -296,6 +347,17 @@ function buildActions({ sensitiveById, resourcesById, status }) {
     requiresActionTimeConfirmation: true,
     nonSecretEvidenceOnly: false,
     sourceIds: ["S06_READY_SENSITIVE_ENV_IMPORT", "R06_ENV_IMPORT"],
+    currentBlockers: [
+      ...sensitiveStatusBlockers(sensitiveById, ["S06_READY_SENSITIVE_ENV_IMPORT"]),
+      ...resourceBlockers(resourcesById, ["R06_ENV_IMPORT"]),
+      ...cloudMissing(status, "envImport"),
+      ...requiredBlocking(status),
+    ],
+    currentEvidence: cloudEvidence(cloudItems, "envImport", [
+      "confirmed",
+      "target",
+      "secretNotInImage",
+    ]),
     verifyCommands: ["corepack pnpm aliyun:env:checklist", "corepack pnpm aliyun:readiness:cloud-ready"],
   })
 
@@ -318,6 +380,28 @@ function buildActions({ sensitiveById, resourcesById, status }) {
     requiresActionTimeConfirmation: true,
     nonSecretEvidenceOnly: true,
     sourceIds: ["R03_API_DOMAIN_HTTPS", "R04_ASSET_DOMAIN_HTTPS"],
+    currentBlockers: [
+      ...resourceBlockers(resourcesById, ["R03_API_DOMAIN_HTTPS", "R04_ASSET_DOMAIN_HTTPS"]),
+      ...cloudMissing(status, "apiDomainHttps"),
+      ...cloudMissing(status, "assetDomainHttps"),
+    ],
+    currentEvidence: [
+      ...cloudEvidence(cloudItems, "apiDomainHttps", [
+        "confirmed",
+        "host",
+        "dnsResolvedToAliyun",
+        "httpsEnabled",
+        "icpReady",
+      ]),
+      ...cloudEvidence(cloudItems, "assetDomainHttps", [
+        "confirmed",
+        "host",
+        "dnsResolvedToAliyun",
+        "httpsEnabled",
+        "icpReady",
+      ]),
+      ...resourceEvidence(resourcesById, ["R03_API_DOMAIN_HTTPS", "R04_ASSET_DOMAIN_HTTPS"]),
+    ],
     verifyCommands: ["corepack pnpm aliyun:domain:strict", "corepack pnpm aliyun:remote:smoke -- --base-url https://api-cn.ipgongchang.xin"],
   })
 
@@ -340,6 +424,28 @@ function buildActions({ sensitiveById, resourcesById, status }) {
     requiresActionTimeConfirmation: false,
     nonSecretEvidenceOnly: true,
     sourceIds: ["R01_SAE_RUNTIME", "R07_SLS_ALERTS"],
+    currentBlockers: [
+      ...resourceBlockers(resourcesById, ["R01_SAE_RUNTIME", "R07_SLS_ALERTS"]),
+      ...cloudMissing(status, "runtime"),
+      ...cloudMissing(status, "slsAlerts"),
+    ],
+    currentEvidence: [
+      ...cloudEvidence(cloudItems, "runtime", [
+        "confirmed",
+        "provider",
+        "region",
+        "appName",
+        "containerPort",
+        "healthPath",
+      ]),
+      ...cloudEvidence(cloudItems, "slsAlerts", [
+        "confirmed",
+        "slsProject",
+        "healthAlertConfigured",
+        "serverErrorAlertConfigured",
+      ]),
+      ...resourceEvidence(resourcesById, ["R01_SAE_RUNTIME", "R07_SLS_ALERTS"]),
+    ],
     verifyCommands: ["corepack pnpm aliyun:runtime:plan", "corepack pnpm aliyun:cloud:confirmations:strict"],
   })
 
@@ -357,6 +463,13 @@ function buildActions({ sensitiveById, resourcesById, status }) {
     requiresActionTimeConfirmation: true,
     nonSecretEvidenceOnly: true,
     sourceIds: ["release_gate"],
+    currentBlockers: deployAuthorizationBlockers(status),
+    currentEvidence: [
+      `verdict=${status.verdict || "unknown"}`,
+      `canDeployNow=${status.canDeployNow === true}`,
+      `productionReady=${status.summary?.productionReady === true}`,
+      `cloudConfirmations=${status.summary?.cloudConfirmations?.ready || 0}/${status.summary?.cloudConfirmations?.total || 0}`,
+    ],
     verifyCommands: ["corepack pnpm aliyun:predeploy", "corepack pnpm aliyun:cloud:confirmations:strict"],
   })
 
@@ -374,12 +487,81 @@ function addAction(actionMap, action) {
     requiredUserAction: action.requiredUserAction || "",
     unblockCondition: action.unblockCondition || "",
     variableNames: action.variableNames || [],
+    currentBlockers: uniqueStrings(action.currentBlockers || []),
+    currentEvidence: uniqueStrings(action.currentEvidence || []),
     requiresUserAction: action.requiresUserAction === true,
     requiresActionTimeConfirmation: action.requiresActionTimeConfirmation === true,
     nonSecretEvidenceOnly: action.nonSecretEvidenceOnly === true,
     sourceIds: action.sourceIds || [],
     verifyCommands: action.verifyCommands || [],
   })
+}
+
+function machineBlockers(status, pattern) {
+  return (status.summary?.machineBlocking || []).filter((item) => pattern.test(String(item)))
+}
+
+function requiredBlocking(status) {
+  return (status.summary?.requiredBlocking || []).map((item) => `requiredEnv:${item}`)
+}
+
+function cloudMissing(status, key) {
+  const pending = status.summary?.cloudConfirmations?.pending || []
+  const item = pending.find((entry) => entry.key === key)
+  return (item?.missing || []).map((missing) => `${key}:${missing}`)
+}
+
+function sensitiveStatusBlockers(sensitiveById, ids) {
+  return ids.flatMap((id) => {
+    const item = sensitiveById.get(id)
+    if (!item || item.status === "ready") return []
+    return [`${id}:${item.status}`]
+  })
+}
+
+function resourceBlockers(resourcesById, ids) {
+  return ids.flatMap((id) => {
+    const item = resourcesById.get(id)
+    return (item?.blockers || []).map((blocker) => `${id}:${blocker}`)
+  })
+}
+
+function resourceEvidence(resourcesById, ids) {
+  return ids.flatMap((id) => {
+    const evidence = resourcesById.get(id)?.currentLocalEvidence
+    if (!evidence) return []
+    return [`${id}:${evidence}`]
+  })
+}
+
+function cloudEvidence(cloudItems, key, fields) {
+  const item = cloudItems?.[key]
+  if (!item || typeof item !== "object") return []
+  return fields
+    .filter((field) => Object.prototype.hasOwnProperty.call(item, field))
+    .map((field) => `${key}.${field}=${formatEvidenceValue(item[field])}`)
+}
+
+function formatEvidenceValue(value) {
+  if (typeof value === "boolean") return value ? "true" : "false"
+  if (typeof value === "number") return String(value)
+  const text = String(value || "").trim()
+  if (text.length <= 140) return text
+  return `${text.slice(0, 137)}...`
+}
+
+function deployAuthorizationBlockers(status) {
+  const blockers = []
+  if (status.canDeployNow !== true) blockers.push("canDeployNow=false")
+  if (status.summary?.productionReady !== true) blockers.push("productionReady=false")
+  blockers.push(...requiredBlocking(status))
+  blockers.push(...(status.summary?.machineBlocking || []))
+  blockers.push(...(status.summary?.manualBlocking || []).map((item) => `manual:${item}`))
+  return blockers
+}
+
+function uniqueStrings(values) {
+  return Array.from(new Set((values || []).filter(Boolean).map((item) => String(item))))
 }
 
 function findSecretLikeValues(value, path = "$", matches = []) {
@@ -427,6 +609,8 @@ function renderMarkdown(report) {
       `- obtainFrom: ${item.obtainFrom}`,
       `- writeTargets: ${item.writeTargets.join("; ")}`,
       `- variableNames: ${item.variableNames.length ? item.variableNames.join(", ") : "none"}`,
+      `- currentBlockers: ${item.currentBlockers.length ? item.currentBlockers.join("; ") : "none"}`,
+      `- currentEvidence: ${item.currentEvidence.length ? item.currentEvidence.join("; ") : "none"}`,
       `- requiresActionTimeConfirmation: ${item.requiresActionTimeConfirmation}`,
       `- requiredUserAction: ${item.requiredUserAction}`,
       `- unblockCondition: ${item.unblockCondition}`,
