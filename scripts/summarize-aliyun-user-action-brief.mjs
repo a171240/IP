@@ -528,9 +528,11 @@ function resourceBlockers(resourcesById, ids) {
 
 function resourceEvidence(resourcesById, ids) {
   return ids.flatMap((id) => {
-    const evidence = resourcesById.get(id)?.currentLocalEvidence
-    if (!evidence) return []
-    return [`${id}:${evidence}`]
+    const resource = resourcesById.get(id)
+    const evidence = resource?.currentEvidence?.length ? resource.currentEvidence : [resource?.currentLocalEvidence]
+    return (evidence || [])
+      .filter(Boolean)
+      .map((item) => `${id}:${item}`)
   })
 }
 

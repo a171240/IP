@@ -219,6 +219,10 @@ function buildReport(args) {
     const task = taskById.get(definition.operatorTaskId) || null
     const confirmation = definition.cloudConfirmationKey ? confirmationByKey.get(definition.cloudConfirmationKey) || null : null
     const checklist = cloudChecklistById.get(definition.cloudAccessChecklistId) || null
+    const currentEvidence = unique([
+      isUsableEvidence(checklist?.currentLocalEvidence) ? checklist.currentLocalEvidence : "",
+      ...(definition.imagePublish ? imagePublishEvidence(imagePublishPlan) : []),
+    ])
     const blockers = unique([
       ...(task?.blockerCodes || []),
       ...(confirmation?.blockers || []).map((blocker) => `${definition.cloudConfirmationKey}:${blocker}`),
@@ -243,6 +247,7 @@ function buildReport(args) {
       writeTargets: definition.writeTargets,
       nonSecretFieldsToRecord: checklist?.nonSecretFieldsToRecord || [],
       currentLocalEvidence: checklist?.currentLocalEvidence || "",
+      currentEvidence,
       blockers,
       nextActions: task?.actions || [],
       evidenceExpected: task?.evidence || [],
@@ -319,6 +324,49 @@ function unique(values) {
   return Array.from(new Set(values.filter(Boolean)))
 }
 
+function isUsableEvidence(value) {
+  const text = String(value || "").trim()
+  return Boolean(text) && !/^TODO_/i.test(text)
+}
+
+function imagePublishEvidence(imagePublishPlan) {
+  const local = imagePublishPlan.local || {}
+  const purchaseCandidate = local.acr?.purchaseCandidate || {}
+  const runtime = local.runtime || {}
+  const image = local.image || {}
+  const localDockerImage = imagePublishPlan.localDockerImage || {}
+  const evidence = []
+
+  if (local.exists !== undefined) evidence.push(`imagePublish.localExists=${local.exists === true}`)
+  if (local.ready !== undefined) evidence.push(`imagePublish.localReady=${local.ready === true}`)
+  if (image.localDigestReady !== undefined) evidence.push(`image.localDigestReady=${image.localDigestReady === true}`)
+  if (localDockerImage.status) evidence.push(`localDockerImage.status=${localDockerImage.status}`)
+  if (localDockerImage.repoDigests?.[0]) evidence.push(`localDockerImage.repoDigest=${localDockerImage.repoDigests[0]}`)
+  if (purchaseCandidate.edition) evidence.push(`acr.purchaseCandidate.edition=${purchaseCandidate.edition}`)
+  if (purchaseCandidate.region) evidence.push(`acr.purchaseCandidate.region=${purchaseCandidate.region}`)
+  if (purchaseCandidate.duration) evidence.push(`acr.purchaseCandidate.duration=${purchaseCandidate.duration}`)
+  if (purchaseCandidate.quotedAmount) evidence.push(`acr.purchaseCandidate.quotedAmount=${purchaseCandidate.quotedAmount}`)
+  if (purchaseCandidate.confirmed !== undefined) {
+    evidence.push(`acr.purchaseCandidate.confirmed=${purchaseCandidate.confirmed === true}`)
+  }
+  if (purchaseCandidate.requiresActionTimePurchaseConfirmation !== undefined) {
+    evidence.push(
+      `acr.purchaseCandidate.requiresActionTimePurchaseConfirmation=${purchaseCandidate.requiresActionTimePurchaseConfirmation === true}`,
+    )
+  }
+  if (purchaseCandidate.evidence) evidence.push(`acr.purchaseCandidate.evidence=${purchaseCandidate.evidence}`)
+  if (runtime.target) evidence.push(`runtime.target=${runtime.target}`)
+  if (runtime.appName) evidence.push(`runtime.appName=${runtime.appName}`)
+  if (runtime.remoteImageConfigured !== undefined) {
+    evidence.push(`runtime.remoteImageConfigured=${runtime.remoteImageConfigured === true}`)
+  }
+  if (runtime.imagePullConfigured !== undefined) {
+    evidence.push(`runtime.imagePullConfigured=${runtime.imagePullConfigured === true}`)
+  }
+
+  return evidence
+}
+
 function findSecretLikeValues(value, path = "$", matches = []) {
   if (typeof value === "string") {
     if (SECRET_VALUE_PATTERNS.some((pattern) => pattern.test(value))) matches.push(path)
@@ -364,6 +412,7 @@ function renderMarkdown(report) {
       `- writeTargets: ${item.writeTargets.join("; ")}`,
       `- actionTimeConfirmationRequired: ${item.requiresActionTimeConfirmation}`,
       `- blockers: ${item.blockers.length ? item.blockers.join(", ") : "none"}`,
+      `- currentEvidence: ${item.currentEvidence.length ? item.currentEvidence.join("; ") : "none"}`,
       `- verifyCommands: ${item.verifyCommands.join("; ")}`,
       "",
     )
