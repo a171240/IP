@@ -774,6 +774,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 17:47 CST 追加：通过已登录 Chrome 只读复核阿里云页面并更新 ignored 本地证据文件，不执行购买、DNS 修改、env import、镜像 push 或部署。当前 ACR 购买页仍为企业版经济版 `cn-hangzhou`、实例名 `meiye-huajing`、1 个月、应付 `CNY 117.00`，未购买且需要动作时确认；OSS bucket overview 可打开，显示 `meiye-huajing-service-records-production-cn` / `oss-cn-hangzhou`，未见 AccessDenied 或 NoSuchBucket，但 RAM 最小权限/STS 或运行时 Secret 仍未完成；SLS logsearch URL 可打开，显示 project `meiye-huajing-app-prod-cn` 和 logstore `app-api`，但 health/5xx 告警仍 pending SAE runtime。微信开放平台移动应用列表仍被浏览器安全策略阻止自动读取，本地状态继续以用户确认的“账号认证通过、移动 App 未创建”为准。复核后 `corepack pnpm aliyun:resources:matrix` 和 `corepack pnpm aliyun:user:actions` 已读到新证据，但阿里云资源仍为 `0/7 ready`，用户动作仍为 `0/9 ready`，生产状态仍为 `blocked`。
 
+2026-06-22 17:55 CST 追加：增强 `corepack pnpm aliyun:sensitive:blockers` 的操作员输出。每个 S01-S06 密钥/密码/token/付款/受控标识符阻塞项现在都会带 `obtainFrom`、`writeTargets`、`verifyCommands`、`requiresActionTimeConfirmation` 和 `completionEvidence`，用于直接回答“从哪里拿、写到哪里、是否需要动作时确认、完成后记录什么非密钥证据”。当前动作时确认项固定为 `S03_ACR_PAID_PURCHASE` 和 `S06_READY_SENSITIVE_ENV_IMPORT`；微信移动 App 登录凭证、Apple Team ID、ACR/SAE 拉取认证、OSS RAM/STS 仍 blocked，但不代表可把任何 secret value 写入 JSON、文档、镜像或 git。该变更只增强本地报告结构，不执行任何阿里云写操作。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：
