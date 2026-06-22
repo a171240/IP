@@ -672,6 +672,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 08:41 CST 追加：`deploy/aliyun-production-cn.example.json` 的 `requiredExternalConfirmations` 从 6 项扩展为 8 项，并由 `aliyun:deploy:spec` 精确校验。新增/拆分点是：`api-cn` 域名证据、`assets-cn` 域名证据分别确认；production-cn 环境变量导入且密钥未进镜像作为独立外部确认。这样部署规格、`cloud-confirmations`、`operator:tasks` 和 `status` 的阻塞口径一致。
 
+2026-06-22 08:53 CST 追加：`aliyun:release:artifacts` 的控制台摘要和 `release-audit.md` 现在也输出 `assetHost` 与 `requiredExternalConfirmations=8`，不用再打开完整 `release-audit.json` 才能确认部署规格是否覆盖 assets-cn 和 8 项外部确认。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：

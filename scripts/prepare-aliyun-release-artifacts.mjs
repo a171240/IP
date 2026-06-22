@@ -319,6 +319,7 @@ function renderMarkdown(audit) {
     `- assetHost: ${deploymentSpec.assetHost}`,
     `- predeployChecks: ${deploymentSpec.predeployChecks}`,
     `- postdeployChecks: ${deploymentSpec.postdeployChecks}`,
+    `- requiredExternalConfirmations: ${deploymentSpec.requiredExternalConfirmations}`,
     ...(deploymentSpec.blockers?.length
       ? deploymentSpec.blockers.map((item) => `- ${item}`)
       : ["- blockers: none"]),
@@ -676,8 +677,10 @@ function main() {
       image: deploymentSpec.image,
       port: deploymentSpec.port,
       apiHost: deploymentSpec.apiHost,
+      assetHost: deploymentSpec.assetHost,
       predeployChecks: deploymentSpec.predeployChecks,
       postdeployChecks: deploymentSpec.postdeployChecks,
+      requiredExternalConfirmations: deploymentSpec.requiredExternalConfirmations,
       runtimePlan: deploymentSpec.runtimePlan,
     },
     runtimePlan: {
