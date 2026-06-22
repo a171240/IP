@@ -64,3 +64,45 @@ test("Aliyun sensitive blockers output has current blocked action ids but no sec
   assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
 })
+
+test("Aliyun operator status and handoff inherit sensitive action metadata", () => {
+  const operatorTasksOutput = execFileSync(process.execPath, ["scripts/generate-aliyun-operator-tasks.mjs"], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 30,
+  })
+  const statusOutput = execFileSync(process.execPath, ["scripts/summarize-aliyun-production-cn-status.mjs"], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 30,
+  })
+  const handoffOutput = execFileSync(
+    process.execPath,
+    ["scripts/generate-aliyun-operator-handoff.mjs", "--skip-vercel-env-coverage"],
+    {
+      cwd: root,
+      encoding: "utf8",
+      maxBuffer: 1024 * 1024 * 30,
+    },
+  )
+  const operatorTasks = JSON.parse(operatorTasksOutput)
+  const status = JSON.parse(statusOutput)
+  const handoff = JSON.parse(handoffOutput)
+  const operatorWechat = operatorTasks.sensitiveActionItems.find((item) => item.id === "S01_WECHAT_OPEN_APP_LOGIN")
+  const statusAcrPurchase = status.tasks.sensitiveActionItems.find((item) => item.id === "S03_ACR_PAID_PURCHASE")
+  const handoffEnvImport = handoff.sensitiveActionItems.find((item) => item.id === "S06_READY_SENSITIVE_ENV_IMPORT")
+
+  assert.match(operatorWechat.obtainFrom, /微信开放平台/)
+  assert.ok(operatorWechat.writeTargets.includes("WECHAT_OPEN_APP_ID -> 阿里云 SAE plain env"))
+  assert.ok(operatorWechat.verifyCommands.includes("corepack pnpm aliyun:app-api:smoke"))
+  assert.match(operatorWechat.completionEvidence.join("\n"), /mobileAppSubmitted=true/)
+  assert.equal(statusAcrPurchase.requiresActionTimeConfirmation, true)
+  assert.match(statusAcrPurchase.obtainFrom, /容器镜像服务 ACR/)
+  assert.ok(statusAcrPurchase.writeTargets.some((target) => target.includes("image-publish.local.json")))
+  assert.equal(handoffEnvImport.requiresActionTimeConfirmation, true)
+  assert.ok(handoffEnvImport.verifyCommands.includes("corepack pnpm aliyun:readiness:cloud-ready"))
+  assert.match(handoffEnvImport.completionEvidence.join("\n"), /envImport\.secretNotInImage=true/)
+  assert.doesNotMatch(operatorTasksOutput + statusOutput + handoffOutput, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(operatorTasksOutput + statusOutput + handoffOutput, /LTAI[A-Za-z0-9]{12,}/)
+  assert.doesNotMatch(operatorTasksOutput + statusOutput + handoffOutput, /:\/\/[^\s:@]+:[^\s@]+@/)
+})

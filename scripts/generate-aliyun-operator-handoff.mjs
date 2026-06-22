@@ -820,6 +820,11 @@ function renderSensitiveActionItem(item) {
     `- status: ${item.status}`,
     `- owner: ${item.owner}`,
     `- consolePath: ${item.consolePath}`,
+    `- obtainFrom: ${item.obtainFrom || item.consolePath}`,
+    `- writeTargets: ${(item.writeTargets || []).length ? item.writeTargets.join("; ") : "none"}`,
+    `- verifyCommands: ${(item.verifyCommands || []).length ? item.verifyCommands.join("; ") : "none"}`,
+    `- requiresActionTimeConfirmation: ${item.requiresActionTimeConfirmation === true}`,
+    `- completionEvidence: ${(item.completionEvidence || []).length ? item.completionEvidence.join("; ") : "none"}`,
     `- variables: ${(item.variableNames || []).length ? item.variableNames.join(", ") : "none"}`,
     item.variableGroups?.length
       ? `- variableGroups: ${item.variableGroups.map((group) => `${group.category || "unknown"}:${group.count}`).join(", ")}`

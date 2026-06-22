@@ -5,6 +5,7 @@ import { dirname, isAbsolute, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { spawnSync } from "node:child_process"
 import { buildImportPlan, parseEnvFile } from "./prepare-aliyun-runtime-env.mjs"
+import { SENSITIVE_ACTION_METADATA } from "./aliyun-sensitive-action-metadata.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -567,7 +568,19 @@ function buildSensitiveActionItems({ envPlan, readiness, imagePublishPlan }) {
     })
   }
 
-  return items
+  return items.map(withSensitiveActionMetadata)
+}
+
+function withSensitiveActionMetadata(item) {
+  const metadata = SENSITIVE_ACTION_METADATA[item.id] || {}
+  return {
+    ...item,
+    obtainFrom: metadata.obtainFrom || item.consolePath,
+    writeTargets: metadata.writeTargets || [],
+    verifyCommands: metadata.verifyCommands || [],
+    requiresActionTimeConfirmation: metadata.requiresActionTimeConfirmation === true,
+    completionEvidence: metadata.completionEvidence || [],
+  }
 }
 
 function groupReadySensitiveVariables(variables) {
@@ -674,6 +687,11 @@ function renderMarkdown(report) {
           `- status: ${item.status}`,
           `- owner: ${item.owner}`,
           `- consolePath: ${item.consolePath}`,
+          `- obtainFrom: ${item.obtainFrom || item.consolePath}`,
+          `- writeTargets: ${(item.writeTargets || []).length ? item.writeTargets.join("; ") : "none"}`,
+          `- verifyCommands: ${(item.verifyCommands || []).length ? item.verifyCommands.join("; ") : "none"}`,
+          `- requiresActionTimeConfirmation: ${item.requiresActionTimeConfirmation === true}`,
+          `- completionEvidence: ${(item.completionEvidence || []).length ? item.completionEvidence.join("; ") : "none"}`,
           `- variableNames: ${(item.variableNames || []).length ? item.variableNames.join(", ") : "none"}`,
           `- requiredUserAction: ${item.requiredUserAction}`,
           `- unblockCondition: ${item.unblockCondition}`,

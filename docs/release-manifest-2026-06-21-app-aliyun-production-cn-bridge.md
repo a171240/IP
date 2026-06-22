@@ -776,6 +776,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 17:55 CST 追加：增强 `corepack pnpm aliyun:sensitive:blockers` 的操作员输出。每个 S01-S06 密钥/密码/token/付款/受控标识符阻塞项现在都会带 `obtainFrom`、`writeTargets`、`verifyCommands`、`requiresActionTimeConfirmation` 和 `completionEvidence`，用于直接回答“从哪里拿、写到哪里、是否需要动作时确认、完成后记录什么非密钥证据”。当前动作时确认项固定为 `S03_ACR_PAID_PURCHASE` 和 `S06_READY_SENSITIVE_ENV_IMPORT`；微信移动 App 登录凭证、Apple Team ID、ACR/SAE 拉取认证、OSS RAM/STS 仍 blocked，但不代表可把任何 secret value 写入 JSON、文档、镜像或 git。该变更只增强本地报告结构，不执行任何阿里云写操作。
 
+2026-06-22 18:03 CST 追加：将 S01-S06 的密钥/密码/token/付款/受控标识符元数据上提为共享本地脚本元数据，并让 `corepack pnpm aliyun:operator:tasks`、`corepack pnpm aliyun:status`、`corepack pnpm aliyun:operator:handoff` 与 release artifacts 都能直接继承 `obtainFrom`、`writeTargets`、`verifyCommands`、`requiresActionTimeConfirmation`、`completionEvidence`。这样操作包本身即可回答“去哪拿、写到哪里、怎么验证、完成后留什么非密钥证据”，不需要再交叉查 `aliyun:sensitive:blockers`；该变更仍只增强本地报告，不创建微信移动 App、不付款、不改 DNS、不导入环境变量、不部署。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：
