@@ -206,7 +206,7 @@ corepack pnpm aliyun:domain:check
 corepack pnpm aliyun:domain:strict
 ```
 
-严格模式在 DNS、HTTPS 或 `/api/healthz` 未 ready 时会失败。ICP备案状态仍不能只靠本机命令证明，需要在 `deploy/aliyun-production-cn.cloud-confirmations.local.json` 的 `apiDomainHttps` 里写非密钥证据。
+严格模式在 DNS、HTTPS 或 `/api/healthz` 未 ready 时会失败。ICP备案状态仍不能只靠本机命令证明，需要在 `deploy/aliyun-production-cn.cloud-confirmations.local.json` 的 `apiDomainHttps` 和 `assetDomainHttps` 里分别写非密钥证据。
 
 ### 2.3 Production-cn readiness 门禁
 
@@ -592,6 +592,7 @@ deploy/aliyun-production-cn.cloud-confirmations.local.json
 ```text
 runtime：阿里云 SAE 应用详情，确认端口 3000 和 /api/healthz。
 apiDomainHttps：阿里云 DNS / 证书服务 / 备案信息，确认 api-cn 已解析到阿里云并启用 HTTPS。
+assetDomainHttps：阿里云 DNS / 证书服务 / 备案信息，确认 assets-cn 已解析到 OSS/CDN 或静态资源入口并启用 HTTPS。
 oss：OSS Bucket CORS、RAM 策略和 service-records/production-cn 前缀。
 wechatOpenPlatform：微信开放平台移动应用审核状态、Android 包名/签名、iOS Bundle ID/Universal Link。
 envImport：SAE/KMS/Secrets Manager 环境变量导入记录，确认密钥没有写进镜像。
@@ -963,13 +964,14 @@ cloudConfirmations.ready: false
 path: deploy/aliyun-production-cn.cloud-confirmations.local.json
 runtime missing: confirmed
 apiDomainHttps missing: confirmed, dnsResolvedToAliyun, httpsEnabled, icpReady
+assetDomainHttps missing: confirmed, dnsResolvedToAliyun, httpsEnabled, icpReady
 oss missing: confirmed, corsConfigured, ramLeastPrivilege
 wechatOpenPlatform missing: confirmed, mobileAppIdReady, mobileAppSecretReady, androidSignature, androidConfigured, iosUniversalLink, iosConfigured, reviewStatus=approved
 envImport missing: confirmed, secretNotInImage
 slsAlerts missing: confirmed, healthAlertConfigured, serverErrorAlertConfigured
 ```
 
-`APP_ASSET_BASE_URL` 已按 `https://assets-cn.ipgongchang.xin` 写入本地配置，但资产域名和 OSS/CDN 仍未人工确认为 production ready。
+`APP_ASSET_BASE_URL` 已按 `https://assets-cn.ipgongchang.xin` 写入本地配置，但资产域名、HTTPS/ICP 和 OSS/CDN 仍未人工确认为 production ready；`assetDomainHttps` 必须单独确认，不能复用 `apiDomainHttps` 的证据。
 
 最新发布审计产物：
 
@@ -997,12 +999,14 @@ Vercel production names: 130
 required missing: APP_ENV, APP_REGION, APP_API_BASE_URL, NEXT_PUBLIC_SITE_URL, PRIVACY_POLICY_URL, TERMS_URL, WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET
 optional/app-launch missing: APP_ASSET_BASE_URL, DATABASE_URL_CN, REDIS_URL_CN, SERVICE_RECORD_DEEPSEEK_API_KEY, SERVICE_RECORD_DEEPSEEK_BASE_URL, SERVICE_RECORD_DEEPSEEK_MODEL, WECHAT_OPEN_APP_REVIEW_STATUS, APPLE_TEAM_ID
 imagePublishPlan: localDockerImage ready, ACR/runtime blockers 16
-cloudConfirmations: local blockers 21
+cloudConfirmations: local blockers 25
 appClientContract: 40 audited calls / 34 unique client routes
 appApiSmokeCoverage: 29 / 29 business routes
 ```
 
 本轮为 `--skip-bundle` 审计，未重新生成 context tar；Docker context 和镜像已由 `aliyun:docker:check`、`aliyun:docker:build`、`aliyun:container:smoke` 覆盖。
+
+2026-06-22 08:24 CST 更新：云确认模板从 6 项扩展为 7 项，新增 `assetDomainHttps`，用于单独确认 `assets-cn.ipgongchang.xin` 的 DNS、HTTPS 和 ICP 证据。`corepack pnpm aliyun:cloud:confirmations` 当前显示 example checkedItems=7 且模板通过，local checkedItems=7、totalBlockers=25；新增的 4 个 local blocker 是 `assetDomainHttps:confirmed`、`assetDomainHttps:dnsResolvedToAliyun`、`assetDomainHttps:httpsEnabled`、`assetDomainHttps:icpReady`。
 
 2026-06-22 03:54 CST 更新：本机 Docker Desktop 已启动，`corepack pnpm aliyun:docker:build` 已成功构建镜像。该镜像包含 health/readiness 对国内 APP 正式协议 URL 的基础形态校验：
 

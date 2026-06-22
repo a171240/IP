@@ -255,13 +255,15 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan }) {
   })
 
   const apiDomain = cloud.get("apiDomainHttps")
+  const assetDomain = cloud.get("assetDomainHttps")
   addTask(tasks, {
     id: "T04_ALIYUN_DOMAIN_DNS_HTTPS",
     title: "配置 api-cn/assets-cn DNS、HTTPS 和 ICP 证据",
-    status: domain.ok && apiDomain?.ready ? "ready" : "blocked",
+    status: domain.ok && apiDomain?.ready && assetDomain?.ready ? "ready" : "blocked",
     blockerCodes: [
       ...domain.machineBlocking,
       ...missingList(apiDomain),
+      ...missingList(assetDomain),
     ],
     owner: "阿里云域名/证书操作员",
     consolePath: "阿里云控制台 -> 云解析 DNS / 数字证书管理服务 / SAE 或 SLB/网关 / CDN 或 OSS 域名",
@@ -271,7 +273,7 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan }) {
       "不要把 APP production-cn 正式域名指向 Vercel、localhost、example 或 198.18.0.x 特殊用途网段。",
       "给 api-cn 和 assets-cn 配置 HTTPS 证书。",
       "确认 ICP 备案状态满足国内 APP 正式访问要求。",
-      "配置完成后运行严格域名门禁，并把证据写入 cloud-confirmations.local.json 的 apiDomainHttps 项。",
+      "配置完成后运行严格域名门禁，并把证据写入 cloud-confirmations.local.json 的 apiDomainHttps 与 assetDomainHttps 项。",
     ],
     evidence: [
       "dnsResolvedToAliyun=true",

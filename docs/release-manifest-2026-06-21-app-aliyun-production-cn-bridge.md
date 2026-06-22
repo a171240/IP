@@ -331,6 +331,7 @@ app_universal_link:apple_team_id_missing
 阿里云 SAE 容器应用已创建，运行端口 3000
 阿里云 ACR 镜像发布和运行时镜像拉取配置已确认
 api-cn 域名已备案、解析到阿里云入口并配置 HTTPS
+assets-cn 域名已备案、解析到阿里云入口并配置 HTTPS
 OSS Bucket CORS、RAM 最小权限和服务记录音频前缀已确认
 微信开放平台移动应用审核已通过，并已取得 AppID/AppSecret、Android 包名/签名、iOS Bundle ID/Universal Link 配置
 生产环境变量已通过阿里云控制台、KMS 或 Secrets Manager 导入，未把密钥写进镜像
@@ -345,6 +346,7 @@ cloudConfirmations.ready: false
 path: deploy/aliyun-production-cn.cloud-confirmations.local.json
 runtime missing: confirmed
 apiDomainHttps missing: confirmed, dnsResolvedToAliyun, httpsEnabled, icpReady
+assetDomainHttps missing: confirmed, dnsResolvedToAliyun, httpsEnabled, icpReady
 oss missing: confirmed, corsConfigured, ramLeastPrivilege
 wechatOpenPlatform missing: confirmed, mobileAppIdReady, mobileAppSecretReady, androidSignature, androidConfigured, iosUniversalLink, iosConfigured, reviewStatus=approved
 envImport missing: confirmed, secretNotInImage
@@ -524,7 +526,7 @@ productionReady: false
 localCodeReady: false
 imagePublishPlan.localDockerImage: ready
 imagePublishPlan.totalBlockers: 16
-cloudConfirmations.totalBlockers: 21
+cloudConfirmations.totalBlockers: 25
 vercelEnvCoverage.requiredCovered: 17 / 25
 appClientContract: 40 audited calls / 34 unique client routes / 26 matched backend routes
 appApiSmokeCoverage: 29 / 29 business routes / 30 probes
@@ -663,6 +665,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 2026-06-22 07:34 CST 追加：`aliyun:operator:tasks`、`aliyun:status` 和操作包输出已把微信开放平台移动应用审核中的任务状态细分为 `waiting_wechat_review`。该状态表示移动应用已进入微信审核流程，不能再误读为“还缺创建 APP”或“可以用小程序凭证替代”；正式发布仍必须等审核通过后取得移动应用 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`，并完成 Apple Team ID、阿里云云资源和非密钥证据确认。
 
 2026-06-22 07:55 CST 追加：新增 `deploy/aliyun-production-cn.runtime-plan.json` 与 `corepack pnpm aliyun:runtime:plan`，把第一版 APP 国内后端主部署目标固定为阿里云 SAE `cn-hangzhou` 自定义容器应用 `meiye-huajing-app-api-production-cn`，监听端口 3000，健康检查 `/api/healthz`。该计划不含任何密钥值，只用于约束阿里云运行时、ACR 镜像计划、域名和云确认文件；ECS 仅作为 SAE 不满足运行约束时的备选。`aliyun:deploy:spec`、`aliyun:predeploy` 和 release artifacts 已接入该 runtime plan。
+
+2026-06-22 08:24 CST 追加：新增 `assetDomainHttps` 云确认项，并把 `aliyun:readiness` 与 `aliyun:operator:tasks` 的 T04 域名任务改为同时要求 `apiDomainHttps` 和 `assetDomainHttps` ready。当前 `corepack pnpm aliyun:cloud:confirmations` 输出模板 checkedItems=7、local checkedItems=7、totalBlockers=25；其中 `assets-cn.ipgongchang.xin` 需要单独补 confirmed、dnsResolvedToAliyun、httpsEnabled、icpReady 四项非密钥证据，不能复用 `api-cn` 的证据或仅依赖 OSS 项。
 
 ## 11. 真正部署时的命令顺序
 

@@ -22,6 +22,14 @@
       "icpReady": false,
       "evidence": "TODO_DNS_CERT_ICP_EVIDENCE"
     },
+    "assetDomainHttps": {
+      "confirmed": false,
+      "host": "assets-cn.ipgongchang.xin",
+      "dnsResolvedToAliyun": false,
+      "httpsEnabled": false,
+      "icpReady": false,
+      "evidence": "TODO_ASSET_DNS_CERT_ICP_EVIDENCE"
+    },
     "oss": {
       "confirmed": false,
       "bucket": "TODO_OSS_BUCKET_NAME",

@@ -45,6 +45,22 @@ const DEFINITIONS = [
     },
   },
   {
+    key: "assetDomainHttps",
+    label: "assets-cn DNS、HTTPS 和 ICP",
+    requiredFields: ["confirmed", "host", "dnsResolvedToAliyun", "httpsEnabled", "icpReady", "evidence"],
+    allowedFields: ["confirmed", "host", "dnsResolvedToAliyun", "httpsEnabled", "icpReady", "evidence"],
+    validate: (item, mode) => {
+      const blockers = []
+      const host = String(item.host || "").trim()
+      if (!host.startsWith("assets-cn.")) blockers.push("host_assets_cn")
+      if (mode === "local" && item.confirmed !== true) blockers.push("confirmed")
+      if (mode === "local" && item.dnsResolvedToAliyun !== true) blockers.push("dnsResolvedToAliyun")
+      if (mode === "local" && item.httpsEnabled !== true) blockers.push("httpsEnabled")
+      if (mode === "local" && item.icpReady !== true) blockers.push("icpReady")
+      return blockers
+    },
+  },
+  {
     key: "oss",
     label: "OSS Bucket、CORS 和 RAM 最小权限",
     requiredFields: ["confirmed", "bucket", "region", "corsConfigured", "ramLeastPrivilege", "serviceRecordPrefix", "evidence"],

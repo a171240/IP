@@ -229,6 +229,20 @@ const CLOUD_CONFIRMATION_ITEMS = [
     },
   },
   {
+    key: "assetDomainHttps",
+    label: "assets-cn 域名已备案、解析到阿里云入口并配置 HTTPS",
+    requiredFields: ["host", "dnsResolvedToAliyun", "httpsEnabled", "icpReady", "evidence"],
+    validate: (item) => {
+      const missing = []
+      const host = String(item.host || "").trim()
+      if (!host.startsWith("assets-cn.")) missing.push("host_assets_cn")
+      if (item.dnsResolvedToAliyun !== true) missing.push("dnsResolvedToAliyun")
+      if (item.httpsEnabled !== true) missing.push("httpsEnabled")
+      if (item.icpReady !== true) missing.push("icpReady")
+      return missing
+    },
+  },
+  {
     key: "oss",
     label: "OSS Bucket CORS、RAM 最小权限和服务记录音频前缀已确认",
     requiredFields: ["bucket", "region", "corsConfigured", "ramLeastPrivilege", "serviceRecordPrefix", "evidence"],
