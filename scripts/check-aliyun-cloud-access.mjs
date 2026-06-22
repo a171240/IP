@@ -12,6 +12,7 @@ const WORKSPACE_ROOT = resolve(BACKEND_ROOT, "../..")
 const DEFAULT_RUNTIME_PLAN_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.runtime-plan.json")
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
 const DEFAULT_IMAGE_PUBLISH_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.image-publish.local.json")
+const DEFAULT_CLOUD_ACCESS_OBSERVATION_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-access.local.json")
 const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
 const EXPECTED_ALIYUN_REGION = "cn-hangzhou"
 const EXPECTED_SERVICE_RECORD_OSS_PREFIX = "service-records/production-cn"
@@ -33,6 +34,7 @@ function parseArgs(argv) {
     runtimePlanFile: DEFAULT_RUNTIME_PLAN_FILE,
     cloudConfirmationsFile: DEFAULT_CLOUD_CONFIRMATIONS_FILE,
     imagePublishFile: DEFAULT_IMAGE_PUBLISH_FILE,
+    cloudAccessObservationFile: DEFAULT_CLOUD_ACCESS_OBSERVATION_FILE,
     envFile: DEFAULT_ENV_FILE,
     writeReport: "",
     strict: false,
@@ -50,6 +52,10 @@ function parseArgs(argv) {
     }
     if (arg === "--image-publish") {
       args.imagePublishFile = resolveValue(argv[++index], "--image-publish")
+      continue
+    }
+    if (arg === "--cloud-access-observation") {
+      args.cloudAccessObservationFile = resolveValue(argv[++index], "--cloud-access-observation")
       continue
     }
     if (arg === "--env-file") {
@@ -139,6 +145,79 @@ function findSecretLikeValues(value, path = "$", matches = []) {
     findSecretLikeValues(nested, `${path}.${key}`, matches)
   }
   return matches
+}
+
+function normalizeCloudAccessObservation(observation) {
+  if (!observation) {
+    return {
+      exists: false,
+      ready: false,
+      blockers: ["cloud_access_observation_missing"],
+      warnings: [],
+      browserConsole: {
+        chromeLoggedIn: false,
+        observedAt: "",
+        evidence: "",
+        resourcesObserved: [],
+      },
+      cloudShell: {
+        connected: false,
+        regionLabel: "",
+        cliAvailable: false,
+        cliVersion: "",
+        cliConfigFileExists: false,
+        canRunReadOnlyInventory: false,
+        cloudApiCalled: false,
+        cloudMutationPerformed: false,
+        lastReadOnlyCommand: "",
+        blockers: [],
+        evidence: "",
+      },
+    }
+  }
+
+  const blockers = []
+  const warnings = []
+  if (observation.schemaVersion !== 1) blockers.push("schemaVersion=1")
+  if (observation.environment !== "production-cn") blockers.push("environment=production-cn")
+  const browserConsole = observation.browserConsole || {}
+  const cloudShell = observation.cloudShell || {}
+  if (cloudShell.cloudMutationPerformed === true) blockers.push("cloudshell_mutation_observed")
+  if (cloudShell.cloudApiCalled === true && cloudShell.canRunReadOnlyInventory !== true) {
+    warnings.push("cloudshell_api_called_but_inventory_not_ready")
+  }
+  if (cloudShell.connected === true && cloudShell.cliAvailable === true && cloudShell.cliConfigFileExists !== true) {
+    blockers.push("cloudshell_cli_config_missing_or_unread")
+  }
+  const canRunReadOnlyInventory = cloudShell.canRunReadOnlyInventory === true
+
+  return {
+    exists: true,
+    ready: blockers.length === 0 && canRunReadOnlyInventory,
+    blockers,
+    warnings,
+    browserConsole: {
+      chromeLoggedIn: browserConsole.chromeLoggedIn === true,
+      observedAt: String(browserConsole.observedAt || ""),
+      evidence: String(browserConsole.evidence || ""),
+      resourcesObserved: Array.isArray(browserConsole.resourcesObserved)
+        ? browserConsole.resourcesObserved.map((item) => String(item))
+        : [],
+    },
+    cloudShell: {
+      connected: cloudShell.connected === true,
+      regionLabel: String(cloudShell.regionLabel || ""),
+      cliAvailable: cloudShell.cliAvailable === true,
+      cliVersion: String(cloudShell.cliVersion || ""),
+      cliConfigFileExists: cloudShell.cliConfigFileExists === true,
+      canRunReadOnlyInventory,
+      cloudApiCalled: cloudShell.cloudApiCalled === true,
+      cloudMutationPerformed: cloudShell.cloudMutationPerformed === true,
+      lastReadOnlyCommand: String(cloudShell.lastReadOnlyCommand || ""),
+      blockers: Array.isArray(cloudShell.blockers) ? cloudShell.blockers.map((item) => String(item)) : [],
+      evidence: String(cloudShell.evidence || ""),
+    },
+  }
 }
 
 function buildConsoleChecklist(runtimePlan, cloudConfirmations, imagePublish) {
@@ -269,6 +348,7 @@ function main() {
   const runtimePlan = readJsonIfExists(args.runtimePlanFile)
   const cloudConfirmations = readJsonIfExists(args.cloudConfirmationsFile)
   const imagePublish = readJsonIfExists(args.imagePublishFile)
+  const cloudAccessObservation = normalizeCloudAccessObservation(readJsonIfExists(args.cloudAccessObservationFile))
   const configFiles = candidateAliyunConfigFiles()
   const cliConfigExists = configFiles.some((item) => item.exists)
   const cliAvailable = Boolean(aliyunPath || aliyuncliPath)
@@ -279,7 +359,7 @@ function main() {
     readOnlyOnly: true,
     cloudMutationPerformed: false,
     cloudApiCalled: false,
-    canReadCloudNow: cliAvailable && cliConfigExists,
+    canReadCloudNow: (cliAvailable && cliConfigExists) || cloudAccessObservation.ready,
     files: {
       runtimePlanFile: args.runtimePlanFile,
       runtimePlanFileExists: existsSync(args.runtimePlanFile),
@@ -287,6 +367,8 @@ function main() {
       cloudConfirmationsFileExists: existsSync(args.cloudConfirmationsFile),
       imagePublishFile: args.imagePublishFile,
       imagePublishFileExists: existsSync(args.imagePublishFile),
+      cloudAccessObservationFile: args.cloudAccessObservationFile,
+      cloudAccessObservationFileExists: existsSync(args.cloudAccessObservationFile),
       envFile: args.envFile,
       envFileExists: existsSync(args.envFile),
     },
@@ -298,6 +380,7 @@ function main() {
       configFiles,
       note: "No Aliyun cloud API is called by this script. It only checks whether this machine can plausibly run read-only Aliyun CLI inventory later.",
     },
+    cloudShellObservation: cloudAccessObservation,
     targets: {
       provider: runtimePlan?.target?.provider || "SAE",
       region: runtimePlan?.target?.region || EXPECTED_ALIYUN_REGION,
@@ -320,6 +403,15 @@ function main() {
     report.blockers.push("aliyun_cli_config_missing_or_unread")
     report.nextActions.push("本机发现 aliyun CLI，但未发现常见配置文件；不要把 AccessKey 写入仓库，优先使用阿里云官方登录/配置方式。")
   }
+  if (cloudAccessObservation.exists && cloudAccessObservation.ready !== true) {
+    report.blockers.push(...cloudAccessObservation.blockers)
+    if (cloudAccessObservation.cloudShell.connected && cloudAccessObservation.cloudShell.cliAvailable) {
+      report.nextActions.push("Cloud Shell 已能启动 aliyun CLI，但当前观察显示缺 CLI 配置；只能继续用控制台页面核验证据，不能声称已具备自动云 API inventory。")
+    }
+  }
+  if (!cloudAccessObservation.exists) {
+    report.nextActions.push("如使用已登录 Chrome 或 Cloud Shell 做云侧只读核验，把非密钥观察写入 deploy/aliyun-production-cn.cloud-access.local.json。")
+  }
   report.nextActions.push("从控制台读取资源名、布尔状态、digest 和证据编号后，只写入 ignored 的 .local.json；不要写入任何密钥。")
   report.nextActions.push("云资源配置完成后运行 corepack pnpm aliyun:cloud:confirmations:strict、corepack pnpm aliyun:image:plan:strict、corepack pnpm aliyun:domain:strict。")
 
@@ -340,6 +432,7 @@ function printHelp() {
   console.log([
     "Usage:",
     "  node scripts/check-aliyun-cloud-access.mjs [--strict] [--write-report /tmp/report.json]",
+    "  node scripts/check-aliyun-cloud-access.mjs --cloud-access-observation deploy/aliyun-production-cn.cloud-access.local.json",
     "",
     "Checks whether this machine can perform read-only Aliyun cloud inventory and prints",
     "a non-secret console evidence checklist for production-cn cloud confirmations.",

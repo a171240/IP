@@ -363,6 +363,8 @@ meiye-huajing-app-api-production-cn-context.tar.gz
 
 `production-cn-status.json` 和 `production-cn-status.md` 是 `aliyun:status` 的打包输出，供发布负责人快速判断当前能否上线、还缺哪些微信/阿里云/Apple 证据。`operator-handoff.json` 和 `operator-handoff.md` 是当前唯一建议交给人工操作员的非密钥操作包：微信开放平台 `reviewStatus=not_started` 时先创建“美业话镜”移动应用并提交审核；`reviewStatus=reviewing` 时等待审核通过；审核通过后才从移动应用详情读取 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`，不要复用小程序 AppID / Secret。操作包会把 `APPLE_TEAM_ID` 单独列为 APP 发布/AASA 阻塞项：它不是后端必填密钥，但 iOS Universal Link 验收需要它生成 AASA `appID`。操作包也会内置 `cloudAccess` 摘要：当前机器是否有 `aliyun` CLI、是否已经能做只读云 inventory、以及 SAE/ACR/DNS/OSS/env/SLS 需要从控制台抄录到 `.local.json` 的非密钥字段。
 
+2026-06-22 15:35 CST 追加：已通过 Chrome 重新连接阿里云 Cloud Shell，只执行只读基础命令 `date`、`whoami`、`aliyun version`、`aliyun configure list`。Cloud Shell 本身可启动，`aliyun` CLI 版本为 `3.3.23`，但当前临时环境缺 `/home/shell/.aliyun/config.json`，因此不能做自动云 API inventory；`cloudApiCalled=false`、`cloudMutationPerformed=false`。新增 `deploy/aliyun-production-cn.cloud-access.example.json` 和 ignored 的 `.local.json` 观察文件，`aliyun:cloud:access` / `aliyun:operator:handoff` 会输出 `cloudShellCanRunReadOnlyInventory=false`，避免把 Chrome 控制台登录态误读成 CLI/API 已可读。
+
 如果只想离线生成审计包，或不想访问 Vercel：
 
 ```bash
@@ -807,6 +809,7 @@ corepack pnpm run aliyun:env:sources
 corepack pnpm run aliyun:env:classification:test
 corepack pnpm run aliyun:wechat-state:test
 corepack pnpm run aliyun:domain:test
+corepack pnpm run aliyun:cloud-access:test
 corepack pnpm run aliyun:deploy:spec
 corepack pnpm run aliyun:runtime:plan
 corepack pnpm run aliyun:image:plan

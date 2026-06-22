@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "environment": "production-cn",
+  "updatedAt": "TODO_YYYY-MM-DDTHH:mm:ss+08:00",
+  "operator": "TODO_OPERATOR",
+  "notes": "Copy to aliyun-production-cn.cloud-access.local.json. Keep it non-secret and do not commit the local copy.",
+  "browserConsole": {
+    "chromeLoggedIn": false,
+    "observedAt": "TODO_YYYY-MM-DDTHH:mm:ss+08:00",
+    "evidence": "TODO_NON_SECRET_BROWSER_CONSOLE_EVIDENCE",
+    "resourcesObserved": []
+  },
+  "cloudShell": {
+    "connected": false,
+    "regionLabel": "TODO_REGION_LABEL",
+    "cliAvailable": false,
+    "cliVersion": "TODO_CLI_VERSION_OR_EMPTY",
+    "cliConfigFileExists": false,
+    "canRunReadOnlyInventory": false,
+    "cloudApiCalled": false,
+    "cloudMutationPerformed": false,
+    "lastReadOnlyCommand": "TODO_COMMAND_SUMMARY_NO_VALUES",
+    "blockers": [],
+    "evidence": "TODO_NON_SECRET_CLOUDSHELL_EVIDENCE"
+  }
+}

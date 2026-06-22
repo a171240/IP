@@ -217,6 +217,8 @@ function compactVercelEnvCoverage(result) {
 
 function compactCloudAccess(report) {
   const checklist = report.consoleEvidenceChecklist || []
+  const cloudShell = report.cloudShellObservation?.cloudShell || {}
+  const browserConsole = report.cloudShellObservation?.browserConsole || {}
   return {
     readOnlyOnly: report.readOnlyOnly === true,
     cloudApiCalled: report.cloudApiCalled === true,
@@ -227,6 +229,24 @@ function compactCloudAccess(report) {
     cliConfigFileExists: report.cli?.configFileExists === true,
     blockers: report.blockers || [],
     targets: report.targets || {},
+    browserConsole: {
+      chromeLoggedIn: browserConsole.chromeLoggedIn === true,
+      observedAt: browserConsole.observedAt || "",
+      evidence: browserConsole.evidence || "",
+      resourcesObserved: browserConsole.resourcesObserved || [],
+    },
+    cloudShell: {
+      connected: cloudShell.connected === true,
+      regionLabel: cloudShell.regionLabel || "",
+      cliAvailable: cloudShell.cliAvailable === true,
+      cliVersion: cloudShell.cliVersion || "",
+      cliConfigFileExists: cloudShell.cliConfigFileExists === true,
+      canRunReadOnlyInventory: cloudShell.canRunReadOnlyInventory === true,
+      cloudApiCalled: cloudShell.cloudApiCalled === true,
+      cloudMutationPerformed: cloudShell.cloudMutationPerformed === true,
+      blockers: cloudShell.blockers || [],
+      evidence: cloudShell.evidence || "",
+    },
     consoleEvidenceChecklist: checklist.map((item) => ({
       id: item.id,
       title: item.title,
@@ -605,6 +625,11 @@ function renderMarkdown(handoff) {
     `- canReadCloudNow: ${handoff.cloudAccess.canReadCloudNow}`,
     `- cliAvailable: ${handoff.cloudAccess.cliAvailable}`,
     `- cliConfigFileExists: ${handoff.cloudAccess.cliConfigFileExists}`,
+    `- browserConsoleChromeLoggedIn: ${handoff.cloudAccess.browserConsole.chromeLoggedIn}`,
+    `- cloudShellConnected: ${handoff.cloudAccess.cloudShell.connected}`,
+    `- cloudShellCliAvailable: ${handoff.cloudAccess.cloudShell.cliAvailable}`,
+    `- cloudShellCliConfigFileExists: ${handoff.cloudAccess.cloudShell.cliConfigFileExists}`,
+    `- cloudShellCanRunReadOnlyInventory: ${handoff.cloudAccess.cloudShell.canRunReadOnlyInventory}`,
     `- blockers: ${handoff.cloudAccess.blockers.length ? handoff.cloudAccess.blockers.join(", ") : "none"}`,
     `- target: ${handoff.cloudAccess.targets.provider || "unknown"} / ${handoff.cloudAccess.targets.region || "unknown"} / ${handoff.cloudAccess.targets.appName || "unknown"}`,
     "",

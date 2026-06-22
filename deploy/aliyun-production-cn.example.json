@@ -59,6 +59,7 @@
     "corepack pnpm run aliyun:env:classification:test",
     "corepack pnpm run aliyun:wechat-state:test",
     "corepack pnpm run aliyun:domain:test",
+    "corepack pnpm run aliyun:cloud-access:test",
     "corepack pnpm run aliyun:deploy:spec",
     "corepack pnpm run aliyun:runtime:plan",
     "corepack pnpm run aliyun:image:plan",
