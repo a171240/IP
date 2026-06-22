@@ -16,6 +16,8 @@
     "aliyun:cloud-access:test": "node --test tests/aliyun-cloud-access.static.test.js",
     "aliyun:sensitive:blockers": "node ./scripts/summarize-aliyun-sensitive-blockers.mjs",
     "aliyun:sensitive:blockers:test": "node --test tests/aliyun-sensitive-blockers.static.test.js",
+    "aliyun:resources:matrix": "node ./scripts/summarize-aliyun-resource-matrix.mjs",
+    "aliyun:resources:matrix:test": "node --test tests/aliyun-resource-matrix.static.test.js",
     "aliyun:vercel-env:coverage": "node ./scripts/check-vercel-env-coverage.mjs --write-report /tmp/meiye-vercel-env-coverage.json",
     "aliyun:deploy:spec": "node ./scripts/check-aliyun-deployment-spec.mjs",
     "aliyun:runtime:plan": "node ./scripts/check-aliyun-runtime-plan.mjs",

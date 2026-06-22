@@ -512,6 +512,10 @@ production-cn-status.json
 production-cn-status.md
 operator-tasks.json
 operator-tasks.md
+sensitive-blockers.json
+sensitive-blockers.md
+resource-matrix.json
+resource-matrix.md
 operator-handoff.json
 operator-handoff.md
 env-import-plan.json
@@ -521,7 +525,7 @@ image-publish-plan-check.json
 meiye-huajing-app-api-production-cn-context.tar.gz
 ```
 
-其中 `cloud-access.json` 是本机阿里云只读访问能力报告；当前用于记录是否存在 `aliyun` CLI、是否能自动读云，以及控制台需要抄录到 `.local.json` 的非密钥证据字段。`operator-handoff.json/md` 是给用户、阿里云控制台操作员、微信开放平台操作员和发布负责人共用的非密钥操作包；它会区分后端必填缺口、APP 发布/AASA 阻塞但非密钥的缺口、以及可后置变量。`vercel-env-coverage.json` 只包含 Vercel production 变量名、环境和加密/敏感元数据，不包含真实 value；Vercel 登录态不可用时只记录 non-blocking failure，不阻断 release audit。
+其中 `cloud-access.json` 是本机阿里云只读访问能力报告；当前用于记录是否存在 `aliyun` CLI、是否能自动读云，以及控制台需要抄录到 `.local.json` 的非密钥证据字段。`sensitive-blockers.json/md` 单独列密钥、密码、token、付款和受控标识符类人工介入项；`resource-matrix.json/md` 单独列 SAE、ACR、api-cn、assets-cn、OSS、env import、SLS 这 7 个阿里云资源项和对应验收字段。`operator-handoff.json/md` 是给用户、阿里云控制台操作员、微信开放平台操作员和发布负责人共用的非密钥操作包；它会区分后端必填缺口、APP 发布/AASA 阻塞但非密钥的缺口、以及可后置变量。`vercel-env-coverage.json` 只包含 Vercel production 变量名、环境和加密/敏感元数据，不包含真实 value；Vercel 登录态不可用时只记录 non-blocking failure，不阻断 release audit。
 
 2026-06-22 03:56 CST 最新 artifacts：
 
@@ -687,7 +691,7 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 10:07 CST 追加：`aliyun:release:artifacts` 现在会生成 `cloud-access.json`，并把 `cloudAccess.canReadCloudNow`、CLI 状态、blockers 和控制台证据清单数量写入 `release-audit.json/md` 与控制台摘要。这样交付包本身可以解释为什么当前云侧仍是人工控制台确认，而不是误认为阿里云 CLI 自动 inventory 已可用。
 
-2026-06-22 追加：新增 `scripts/aliyun-predeploy-commands.mjs` 与 `deploy/aliyun-production-cn.example.json.localPredeployChecks`，把本地 `aliyun:predeploy` 的代码级检查从正式 `predeployChecks` 的严格部署顺序里拆出。2026-06-22 15:35 CST 后本地 predeploy 为 30 项，会额外覆盖 `aliyun:env:classification:test`、`aliyun:wechat-state:test`、`aliyun:domain:test` 和 `aliyun:cloud-access:test`。2026-06-22 16:00 CST 后本地 predeploy 增加到 32 项，继续覆盖 `aliyun:sensitive:blockers:test` 和 `aliyun:sensitive:blockers`；正式 predeployChecks 增加到 23 项，新增 `corepack pnpm aliyun:sensitive:blockers`。`aliyun:deploy:spec` 会校验两份清单：本地 predeploy 继续允许在微信开放平台/阿里云云侧未完成时作为代码级总检通过；正式部署前仍必须单独通过 `aliyun:cloud:confirmations:strict`、`aliyun:readiness:cloud-ready`、`aliyun:release:artifacts`、`aliyun:docker:build` 和 `aliyun:container:smoke`。
+2026-06-22 追加：新增 `scripts/aliyun-predeploy-commands.mjs` 与 `deploy/aliyun-production-cn.example.json.localPredeployChecks`，把本地 `aliyun:predeploy` 的代码级检查从正式 `predeployChecks` 的严格部署顺序里拆出。2026-06-22 15:35 CST 后本地 predeploy 为 30 项，会额外覆盖 `aliyun:env:classification:test`、`aliyun:wechat-state:test`、`aliyun:domain:test` 和 `aliyun:cloud-access:test`。2026-06-22 16:00 CST 后本地 predeploy 增加到 32 项，继续覆盖 `aliyun:sensitive:blockers:test` 和 `aliyun:sensitive:blockers`；正式 predeployChecks 增加到 23 项，新增 `corepack pnpm aliyun:sensitive:blockers`。2026-06-22 16:18 CST 后本地 predeploy 增加到 34 项，继续覆盖 `aliyun:resources:matrix:test` 和 `aliyun:resources:matrix`；正式 predeployChecks 增加到 24 项，新增 `corepack pnpm aliyun:resources:matrix`。`aliyun:deploy:spec` 会校验两份清单：本地 predeploy 继续允许在微信开放平台/阿里云云侧未完成时作为代码级总检通过；正式部署前仍必须单独通过 `aliyun:cloud:confirmations:strict`、`aliyun:readiness:cloud-ready`、`aliyun:release:artifacts`、`aliyun:docker:build` 和 `aliyun:container:smoke`。
 
 2026-06-22 10:11 CST 追加：`corepack pnpm aliyun:operator:handoff` 现在内置 `cloudAccess` 摘要，会直接说明本机是否有 `aliyun` CLI、是否已具备只读云 inventory 条件、是否调用过云 API/执行过云修改，以及 SAE/ACR/DNS/OSS/env/SLS 需要从阿里云控制台抄录到 `.local.json` 的非密钥字段。`aliyun:status` 和 `operator:tasks` 的正式下一步命令顺序同步补上 `aliyun:cloud:confirmations:strict`、`aliyun:release:artifacts` 和 `aliyun:container:smoke`，避免只跑本地代码门禁后误认为可以部署。
 
@@ -740,6 +744,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 2026-06-22 15:35 CST 追加：重新连接阿里云 Cloud Shell 后只执行只读基础命令，确认 `aliyun` CLI 版本 `3.3.23`，但 `aliyun configure list` 报 `/home/shell/.aliyun/config.json` 不存在；本轮 Cloud Shell 观察为 `cloudApiCalled=false`、`cloudMutationPerformed=false`、`canRunReadOnlyInventory=false`。新增 `deploy/aliyun-production-cn.cloud-access.example.json`、ignored `.local.json` 观察文件、`tests/aliyun-cloud-access.static.test.js` 和 `corepack pnpm aliyun:cloud-access:test`；`aliyun:operator:handoff` 现在会显示 `browserConsoleChromeLoggedIn`、`cloudShellConnected` 与 `cloudShellCanRunReadOnlyInventory`，避免把 Cloud Shell 可打开误判为云 API 可自动盘点。`aliyun:predeploy` 本地门禁同步增加到 30 项。
 
 2026-06-22 16:00 CST 追加：新增 `corepack pnpm aliyun:sensitive:blockers` 与 `tests/aliyun-sensitive-blockers.static.test.js`，把 `operator:tasks` 里的 `sensitiveActionItems` 单独压缩成无密钥 JSON/Markdown 清单。该命令只输出变量名、控制台路径、动作、解除条件和禁止事项，并执行 secret-like 输出扫描；当前预期仍为 blocked，但命令本身只有在输出疑似真实密钥值时才失败。这样用户介入项可以直接按 S01-S06 追踪：微信开放平台移动 App 登录凭证、Apple Team ID、ACR 付费确认、ACR/SAE 镜像拉取认证、OSS RAM Secret 或 STS、以及本地 ready 但尚未导入阿里云的敏感环境变量组。
+
+2026-06-22 16:18 CST 追加：新增 `corepack pnpm aliyun:resources:matrix` 与 `tests/aliyun-resource-matrix.static.test.js`，把现有 `operator:tasks`、`cloud:confirmations`、`image:plan` 和 `cloud:access` 汇总成阿里云资源矩阵。当前矩阵固定输出 7 项：SAE runtime、ACR 镜像仓库/SAE 拉取、api-cn DNS/HTTPS/ICP、assets-cn DNS/HTTPS/ICP、OSS 音频存储、SAE/KMS/Secrets Manager 环境变量导入、SLS 日志告警。每项都会列控制台路径、写入 `.local.json` 的非密钥字段、当前 blocker、验收命令、是否需要动作时确认，并声明 `mutationPerformed=false`；`aliyun:release:artifacts` 也会随包输出 `resource-matrix.json` 和 `resource-matrix.md`。
 
 ## 11. 真正部署时的命令顺序
 
