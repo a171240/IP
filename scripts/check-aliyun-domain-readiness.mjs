@@ -231,10 +231,11 @@ function validateUrl(target) {
 }
 
 async function resolveDns(hostname) {
-  const [a, aaaa, cname] = await Promise.all([
+  const [a, aaaa, cname, wildcardProbe] = await Promise.all([
     safeDns(() => resolve4(hostname)),
     safeDns(() => resolve6(hostname)),
     safeDns(() => resolveCname(hostname)),
+    resolveWildcardDns(hostname),
   ])
   const records = {
     A: a.records,
@@ -256,7 +257,62 @@ async function resolveDns(hostname) {
     errors,
     specialUseRecords,
     pointsToVercel,
+    wildcardProbe,
   }
+}
+
+async function resolveWildcardDns(hostname) {
+  const baseDomain = baseDomainFromHostname(hostname)
+  if (!baseDomain) {
+    return {
+      checked: false,
+      host: "",
+      recordCount: 0,
+      records: { A: [], AAAA: [], CNAME: [] },
+      errors: {},
+      specialUseRecords: [],
+      detected: false,
+    }
+  }
+
+  const nonce = new Date().toISOString().slice(0, 10).replace(/-/g, "")
+  const host = `wildcard-proof-${nonce}.${baseDomain}`
+  const [a, aaaa, cname] = await Promise.all([
+    safeDns(() => resolve4(host)),
+    safeDns(() => resolve6(host)),
+    safeDns(() => resolveCname(host)),
+  ])
+  const records = {
+    A: a.records,
+    AAAA: aaaa.records,
+    CNAME: cname.records,
+  }
+  const errors = {
+    A: a.error,
+    AAAA: aaaa.error,
+    CNAME: cname.error,
+  }
+  const allRecords = [...records.A, ...records.AAAA, ...records.CNAME]
+  const specialUseRecords = [...records.A, ...records.AAAA].filter((record) => isSpecialUseIp(record))
+  return {
+    checked: true,
+    host,
+    recordCount: allRecords.length,
+    records,
+    errors,
+    specialUseRecords,
+    detected: allRecords.length > 0,
+  }
+}
+
+function baseDomainFromHostname(hostname) {
+  const labels = String(hostname || "")
+    .trim()
+    .toLowerCase()
+    .split(".")
+    .filter(Boolean)
+  if (labels.length < 2) return ""
+  return labels.slice(-2).join(".")
 }
 
 function isSpecialUseIp(value) {
@@ -370,7 +426,11 @@ async function checkTarget(target, args) {
     if (dns.pointsToVercel) {
       blocking.push(`${target.label}:dns_points_to_vercel`)
     } else if (dns.specialUseRecords.length > 0) {
-      blocking.push(`${target.label}:dns_special_use_ip`)
+      if (dns.wildcardProbe?.specialUseRecords?.length > 0) {
+        blocking.push(`${target.label}:dns_special_use_wildcard_ip`)
+      } else {
+        blocking.push(`${target.label}:dns_special_use_ip`)
+      }
     } else {
       blocking.push(`${target.label}:dns_not_ready`)
     }
@@ -409,6 +469,9 @@ function nextActions(blocking) {
   }
   if (blocking.some((item) => item.includes("dns_not_ready"))) {
     actions.push("在阿里云 DNS 为 api-cn/assets-cn 添加解析，指向 SAE/SLB 或 OSS/CDN 入口。")
+  }
+  if (blocking.some((item) => item.includes("dns_special_use_wildcard_ip"))) {
+    actions.push("api-cn/assets-cn 当前命中 198.18.0.0/15 这类特殊用途占位解析，且随机子域也返回特殊用途地址；先清理泛解析/占位解析，再指向 SAE/SLB 或 OSS/CDN 公网入口。")
   }
   if (blocking.some((item) => item.includes("dns_special_use_ip"))) {
     actions.push("把 api-cn/assets-cn 从特殊用途 IP 改为公网可访问的阿里云入口地址。")

@@ -687,7 +687,7 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 10:07 CST 追加：`aliyun:release:artifacts` 现在会生成 `cloud-access.json`，并把 `cloudAccess.canReadCloudNow`、CLI 状态、blockers 和控制台证据清单数量写入 `release-audit.json/md` 与控制台摘要。这样交付包本身可以解释为什么当前云侧仍是人工控制台确认，而不是误认为阿里云 CLI 自动 inventory 已可用。
 
-2026-06-22 追加：新增 `scripts/aliyun-predeploy-commands.mjs` 与 `deploy/aliyun-production-cn.example.json.localPredeployChecks`，把本地 `aliyun:predeploy` 的代码级检查从正式 `predeployChecks` 的 22 项严格部署顺序里拆出。2026-06-22 15:08 CST 后本地 predeploy 为 28 项，会额外覆盖 `aliyun:env:classification:test` 和 `aliyun:wechat-state:test`。`aliyun:deploy:spec` 会校验两份清单：本地 predeploy 继续允许在微信开放平台/阿里云云侧未完成时作为代码级总检通过；正式部署前仍必须单独通过 `aliyun:cloud:confirmations:strict`、`aliyun:readiness:cloud-ready`、`aliyun:release:artifacts`、`aliyun:docker:build` 和 `aliyun:container:smoke`。
+2026-06-22 追加：新增 `scripts/aliyun-predeploy-commands.mjs` 与 `deploy/aliyun-production-cn.example.json.localPredeployChecks`，把本地 `aliyun:predeploy` 的代码级检查从正式 `predeployChecks` 的 22 项严格部署顺序里拆出。2026-06-22 15:24 CST 后本地 predeploy 为 29 项，会额外覆盖 `aliyun:env:classification:test`、`aliyun:wechat-state:test` 和 `aliyun:domain:test`。`aliyun:deploy:spec` 会校验两份清单：本地 predeploy 继续允许在微信开放平台/阿里云云侧未完成时作为代码级总检通过；正式部署前仍必须单独通过 `aliyun:cloud:confirmations:strict`、`aliyun:readiness:cloud-ready`、`aliyun:release:artifacts`、`aliyun:docker:build` 和 `aliyun:container:smoke`。
 
 2026-06-22 10:11 CST 追加：`corepack pnpm aliyun:operator:handoff` 现在内置 `cloudAccess` 摘要，会直接说明本机是否有 `aliyun` CLI、是否已具备只读云 inventory 条件、是否调用过云 API/执行过云修改，以及 SAE/ACR/DNS/OSS/env/SLS 需要从阿里云控制台抄录到 `.local.json` 的非密钥字段。`aliyun:status` 和 `operator:tasks` 的正式下一步命令顺序同步补上 `aliyun:cloud:confirmations:strict`、`aliyun:release:artifacts` 和 `aliyun:container:smoke`，避免只跑本地代码门禁后误认为可以部署。
 
@@ -734,6 +734,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 2026-06-22 14:52 CST 追加：用户澄清微信开放平台当前只是账号认证成功，移动应用尚未创建。已把本机 ignored 状态调整为 `WECHAT_OPEN_APP_REVIEW_STATUS=not_started`，`wechatOpenPlatform.reviewStatus=not_started`，证据为 `user_confirmed_wechat_open_platform_account_verified_mobile_app_not_created_browser_read_blocked_by_policy_2026-06-22`。`open.weixin.qq.com` 创建页受浏览器安全策略保护，不能由自动化读取或代填；下一步需用户在微信开放平台创建“美业话镜”移动应用并提交审核，审核通过后再把 AppID/AppSecret 安全导入阿里云运行环境。
 
 2026-06-22 15:08 CST 追加：补齐 `not_started` 口径防回归门禁。新增 `tests/aliyun-wechat-open-platform-state.static.test.js` 与 `corepack pnpm aliyun:wechat-state:test`，检查云确认模板、APP API 桥接清单、部署文档和 readiness nextAction 都把当前微信开放平台状态视为“账号认证通过但移动应用尚未创建”。`scripts/check-aliyun-production-cn-readiness.mjs` 的 nextActions 也已区分 `not_started`、`reviewing`、`rejected`：当前 `not_started` 会提示先创建“美业话镜”移动应用并提交审核，而不是直接去读取 AppID/AppSecret。`aliyun:predeploy` 已纳入该测试，部署规格 `localPredeployChecks` 更新为 28 项。
+
+2026-06-22 15:24 CST 追加：通过已登录 Chrome 只读核验阿里云控制台：SAE 可进入概览页但尚未证明目标应用 `meiye-huajing-app-api-production-cn` 已创建；ACR 仍停在企业版经济版华东1（杭州）1 个月购买页，应付 `¥117.00`，未付款；OSS Bucket 列表确认 `meiye-huajing-service-records-production-cn` 位于华东1（杭州），但 CORS/RAM 绑定仍需单独证明；阿里云 DNS 控制台 `ipgongchang.xin` 记录列表未显示显式 api-cn/assets-cn 记录。权威 DNS 查询显示 `api-cn/assets-cn` 当前命中 `198.18.0.0/15` 特殊用途占位地址，随机子域也返回特殊用途地址，说明域名仍是 `dns_special_use_wildcard_ip` 阻塞。新增 `tests/aliyun-domain-readiness.static.test.js` 与 `corepack pnpm aliyun:domain:test`，`aliyun:predeploy` 本地门禁同步增加到 29 项。
 
 ## 11. 真正部署时的命令顺序
 

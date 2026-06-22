@@ -563,6 +563,8 @@ api-cn.ipgongchang.xin
 
 2026-06-22 14:18 CST 实测：`api-cn.ipgongchang.xin` 当前 A 记录为 `198.18.0.7`，`assets-cn.ipgongchang.xin` 当前 A 记录为 `198.18.0.8`；二者均为特殊用途地址，HTTPS 探测为 `ECONNRESET`，还不能作为阿里云公网入口证据。
 
+2026-06-22 15:24 CST 通过已登录 Chrome 只读查看阿里云 DNS 控制台：`ipgongchang.xin` 当前显示 13 条解析记录，但阿里云 DNS 控制台未显示显式 api-cn/assets-cn 记录；权威 DNS 查询仍返回 `api-cn.ipgongchang.xin -> 198.18.0.7`、`assets-cn.ipgongchang.xin -> 198.18.0.8`，且随机子域也返回特殊用途地址。`api-cn/assets-cn` 当前命中 `198.18.0.0/15` 这类特殊用途占位解析，不能作为公网入口；需要先清理泛解析/占位解析，再把 `api-cn` 指向 SAE/SLB 等后端入口，把 `assets-cn` 指向 OSS/CDN 等资产入口，并配置 HTTPS/ICP。`aliyun:domain:check` 已增加 `dns_special_use_wildcard_ip` 门禁和 `wildcardProbe` 输出，避免误把泛解析占位当成已接通。
+
 机器检查：
 
 ```bash
@@ -804,6 +806,7 @@ corepack pnpm run aliyun:env:plan
 corepack pnpm run aliyun:env:sources
 corepack pnpm run aliyun:env:classification:test
 corepack pnpm run aliyun:wechat-state:test
+corepack pnpm run aliyun:domain:test
 corepack pnpm run aliyun:deploy:spec
 corepack pnpm run aliyun:runtime:plan
 corepack pnpm run aliyun:image:plan
