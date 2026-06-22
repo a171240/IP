@@ -123,6 +123,13 @@ function buildPackage(args) {
     wechat.accountVerified === true &&
     nativeRelease.android?.ready === true &&
     nativeRelease.ios?.ready === true
+  const submissionBlockers = buildSubmissionBlockers({
+    canCreateDraftInWechatOpenPlatform,
+    hasReleaseWechatSignature,
+    androidConfigured: wechat.androidConfigured === true,
+    iosConfigured: wechat.iosConfigured === true,
+    appleTeamIdMissing,
+  })
   const readyToSubmitForReview =
     canCreateDraftInWechatOpenPlatform &&
     hasReleaseWechatSignature &&
@@ -146,6 +153,7 @@ function buildPackage(args) {
       reviewStatus: wechat.reviewStatus || "unknown",
       canCreateDraftInWechatOpenPlatform,
       readyToSubmitForReview,
+      submissionBlockers,
       mobileAppCredentialsAvailable: wechat.mobileAppIdReady === true && wechat.mobileAppSecretReady === true,
       requiredBlocking: status.summary?.requiredBlocking || [],
       machineBlocking: status.summary?.machineBlocking || [],
@@ -186,6 +194,60 @@ function buildPackage(args) {
         "deploy/aliyun-production-cn.cloud-confirmations.local.json -> reviewStatus=approved and non-secret evidence handle",
       ],
     },
+    actionPacket: {
+      packetId: "P01_WECHAT_OPEN_MOBILE_APP",
+      title: "创建微信开放平台移动应用并提交审核",
+      canStartNow: canCreateDraftInWechatOpenPlatform,
+      readyToSubmitForReview,
+      submissionBlockers,
+      consolePath: "微信开放平台 -> 管理中心 -> 移动应用 -> 创建移动应用",
+      minimumAuthorizationPhrase: "授权在微信开放平台创建“美业话镜”移动应用草稿，填写 Android 包名、iOS Bundle ID 和 Universal Link；审核通过前不读取或输出 AppSecret。",
+      createDraftFields: [
+        field("appName", wechat.mobileAppName || EXPECTED_APP_NAME, "product identity"),
+        field("appType", "移动应用，不是小程序", "release policy"),
+        field("androidPackageName", nativeRelease.android?.applicationId || EXPECTED_ANDROID_PACKAGE_NAME, "React Native Android release config"),
+        field("androidReleaseSignature", hasReleaseWechatSignature ? "recorded_non_secret_signature_hash" : "missing_release_wechat_signature", "release APK signature evidence"),
+        field("iosBundleId", nativeRelease.ios?.bundleIds?.[0] || EXPECTED_IOS_BUNDLE_ID, "iOS release config"),
+        field("iosUniversalLink", wechat.iosUniversalLink || EXPECTED_IOS_UNIVERSAL_LINK, "WeChat Open Platform mobile app config"),
+        field("iosAssociatedDomain", EXPECTED_IOS_ASSOCIATED_DOMAIN, "iOS entitlements"),
+      ],
+      submissionMaterials: [
+        "应用图标、截图、应用介绍、官网/隐私协议等素材由操作员在微信开放平台页面填写；本报告不保存素材或账号凭证。",
+        "Android 签名必须来自 release APK 的微信签名，不接受 debug keystore。",
+        "iOS Universal Link 必须与 App Associated Domains 和服务端 AASA 一致。",
+      ],
+      acceptanceEvidence: [
+        "mobileAppCreated=true",
+        "mobileAppSubmitted=true",
+        "reviewStatus=reviewing 或 approved",
+        "审核通过后 mobileAppIdReady=true",
+        "审核通过后 mobileAppSecretReady=true",
+        "cloud-confirmations.local.json 只记录审核状态和非密钥 evidence handle",
+      ],
+      backendWriteTargetsAfterApproval: [
+        "WECHAT_OPEN_APP_ID -> 阿里云 SAE plain env",
+        "WECHAT_OPEN_APP_SECRET -> 阿里云 KMS/Secrets Manager/SAE secret env",
+        "WECHAT_OPEN_APP_REVIEW_STATUS=approved -> 阿里云 SAE plain env",
+      ],
+      localEvidenceWriteTargetsAfterApproval: [
+        "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.wechatOpenPlatform.confirmed=true",
+        "deploy/aliyun-production-cn.cloud-confirmations.local.json -> mobileAppCreated/mobileAppSubmitted/mobileAppIdReady/mobileAppSecretReady=true",
+        "deploy/aliyun-production-cn.cloud-confirmations.local.json -> reviewStatus=approved and non-secret evidence handle",
+      ],
+      verifyCommands: [
+        "corepack pnpm aliyun:wechat-open:package",
+        "corepack pnpm aliyun:app-native:check",
+        "corepack pnpm aliyun:aasa:check",
+        "corepack pnpm aliyun:readiness",
+      ],
+      forbidden: [
+        "不能用小程序 AppID/Secret 替代移动应用 AppID/AppSecret。",
+        "审核通过前不能把 WECHAT_OPEN_APP_ID/SECRET 标记为 ready。",
+        "不能把 WECHAT_OPEN_APP_SECRET 写入 App 包、文档、JSON、Docker 镜像或 git。",
+      ],
+      mutationPerformedByThisCommand: false,
+      nonSecretEvidenceOnly: true,
+    },
     beforeSubmissionChecklist: [
       "确认创建的是微信开放平台移动应用，不是小程序或公众号。",
       "App 名称使用“美业话镜”，Android 包名和 iOS Bundle ID 都使用 com.ipgongchang.meiyehuajing。",
@@ -225,6 +287,30 @@ function buildPackage(args) {
   return report
 }
 
+function buildSubmissionBlockers({
+  canCreateDraftInWechatOpenPlatform,
+  hasReleaseWechatSignature,
+  androidConfigured,
+  iosConfigured,
+  appleTeamIdMissing,
+}) {
+  const blockers = []
+  if (!canCreateDraftInWechatOpenPlatform) blockers.push("native_release_config_not_ready")
+  if (!hasReleaseWechatSignature) blockers.push("android_release_wechat_signature_missing")
+  if (!androidConfigured) blockers.push("wechat_android_package_signature_not_recorded")
+  if (!iosConfigured) blockers.push("wechat_ios_bundle_universal_link_not_recorded")
+  if (appleTeamIdMissing) blockers.push("apple_team_id_missing_for_aasa")
+  return blockers
+}
+
+function field(name, value, source) {
+  return {
+    name,
+    value,
+    source,
+  }
+}
+
 function findSecretLikeValues(value, path = "$", matches = []) {
   if (typeof value === "string") {
     if (SECRET_VALUE_PATTERNS.some((pattern) => pattern.test(value))) matches.push(path)
@@ -243,6 +329,7 @@ function findSecretLikeValues(value, path = "$", matches = []) {
 
 function renderMarkdown(report) {
   const app = report.mobileAppCreationPackage
+  const actionPacket = report.actionPacket
   return [
     "# 微信开放平台移动应用创建材料包",
     "",
@@ -259,7 +346,28 @@ function renderMarkdown(report) {
     `- reviewStatus: ${report.summary.reviewStatus}`,
     `- canCreateDraftInWechatOpenPlatform: ${report.summary.canCreateDraftInWechatOpenPlatform}`,
     `- readyToSubmitForReview: ${report.summary.readyToSubmitForReview}`,
+    `- submissionBlockers: ${report.summary.submissionBlockers.length ? report.summary.submissionBlockers.join(", ") : "none"}`,
     `- requiredBlocking: ${report.summary.requiredBlocking.length ? report.summary.requiredBlocking.join(", ") : "none"}`,
+    "",
+    "## 动作确认包",
+    "",
+    `- packetId: ${actionPacket.packetId}`,
+    `- title: ${actionPacket.title}`,
+    `- canStartNow: ${actionPacket.canStartNow}`,
+    `- readyToSubmitForReview: ${actionPacket.readyToSubmitForReview}`,
+    `- consolePath: ${actionPacket.consolePath}`,
+    `- minimumAuthorizationPhrase: ${actionPacket.minimumAuthorizationPhrase}`,
+    `- submissionBlockers: ${actionPacket.submissionBlockers.length ? actionPacket.submissionBlockers.join(", ") : "none"}`,
+    "- createDraftFields:",
+    ...actionPacket.createDraftFields.map((item) => `  - ${item.name}: ${item.value} (${item.source})`),
+    "- submissionMaterials:",
+    ...actionPacket.submissionMaterials.map((item) => `  - ${item}`),
+    "- acceptanceEvidence:",
+    ...actionPacket.acceptanceEvidence.map((item) => `  - ${item}`),
+    "- verifyCommands:",
+    ...actionPacket.verifyCommands.map((item) => `  - ${item}`),
+    "- forbidden:",
+    ...actionPacket.forbidden.map((item) => `  - ${item}`),
     "",
     "## 创建材料",
     "",
