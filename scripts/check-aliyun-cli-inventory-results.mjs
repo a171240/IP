@@ -207,6 +207,8 @@ function validateOperation(rawOperation, mode) {
   }
   return {
     id,
+    status: String(rawOperation.status || ""),
+    evidenceReady: !isPlaceholder(rawOperation.evidence),
     ready: blockers.length === 0,
     blockers: [...new Set(blockers)],
     warnings: [...new Set(warnings)],
@@ -227,14 +229,40 @@ function validateCommandResult(rawResult, mode, index) {
   }
   if (!String(rawResult.command || "").startsWith("aliyun ")) blockers.push("command=aliyun")
   if (rawResult.mutationPerformed !== false) blockers.push("mutationPerformed=false")
-  if (mode === "template") return { index, ready: blockers.length === 0, blockers, warnings }
+  if (mode === "template") {
+    return {
+      index,
+      ready: blockers.length === 0,
+      blockers,
+      warnings,
+      executed: rawResult.executed === true,
+      exitStatus: typeof rawResult.exitStatus === "number" ? rawResult.exitStatus : null,
+      cloudApiCalled: rawResult.cloudApiCalled === true,
+      mutationPerformed: rawResult.mutationPerformed === true,
+      observedAtReady: !isPlaceholder(rawResult.observedAt),
+      outputSummaryReady: !isPlaceholder(rawResult.outputSummary),
+      evidenceReady: !isPlaceholder(rawResult.evidence),
+    }
+  }
   if (rawResult.executed !== true) blockers.push("executed=true")
   if (rawResult.exitStatus !== 0) blockers.push("exitStatus=0")
   if (rawResult.cloudApiCalled !== true) blockers.push("cloudApiCalled=true")
   if (isPlaceholder(rawResult.observedAt)) blockers.push("observedAt")
   if (isPlaceholder(rawResult.outputSummary)) blockers.push("outputSummary")
   if (isPlaceholder(rawResult.evidence)) blockers.push("evidence")
-  return { index, ready: blockers.length === 0, blockers: [...new Set(blockers)], warnings }
+  return {
+    index,
+    ready: blockers.length === 0,
+    blockers: [...new Set(blockers)],
+    warnings,
+    executed: rawResult.executed === true,
+    exitStatus: typeof rawResult.exitStatus === "number" ? rawResult.exitStatus : null,
+    cloudApiCalled: rawResult.cloudApiCalled === true,
+    mutationPerformed: rawResult.mutationPerformed === true,
+    observedAtReady: !isPlaceholder(rawResult.observedAt),
+    outputSummaryReady: !isPlaceholder(rawResult.outputSummary),
+    evidenceReady: !isPlaceholder(rawResult.evidence),
+  }
 }
 
 function isPlaceholder(value) {
@@ -277,6 +305,44 @@ function summarize(files) {
   }
 }
 
+function summarizeLocalObservation(localFile) {
+  const operations = localFile.operations || []
+  const commandResults = operations.flatMap((operation) => operation.commandResults || [])
+  const statusCounts = {}
+  for (const operation of operations) {
+    const status = operation.status || "unknown"
+    statusCounts[status] = (statusCounts[status] || 0) + 1
+  }
+  const evidenceReadyOperations = operations.filter((operation) => operation.evidenceReady === true).length
+  const consoleObservationOperations = operations.filter((operation) =>
+    ["observed", "not_found", "blocked", "skipped"].includes(operation.status) &&
+    operation.evidenceReady === true &&
+    (operation.commandResults || []).every((result) =>
+      result.mutationPerformed !== true &&
+      result.observedAtReady === true &&
+      result.outputSummaryReady === true &&
+      result.evidenceReady === true
+    ),
+  ).length
+  return {
+    statusCounts,
+    operations: operations.length,
+    strictReadyOperations: operations.filter((operation) => operation.ready).length,
+    evidenceReadyOperations,
+    consoleObservationOperations,
+    safeConsoleOnly: operations.length > 0 &&
+      consoleObservationOperations === operations.length &&
+      commandResults.every((result) => result.cloudApiCalled !== true && result.mutationPerformed !== true),
+    commandResults: commandResults.length,
+    executedCommandResults: commandResults.filter((result) => result.executed === true).length,
+    cloudApiCalledCommandResults: commandResults.filter((result) => result.cloudApiCalled === true).length,
+    mutationPerformedCommandResults: commandResults.filter((result) => result.mutationPerformed === true).length,
+    observedOperationIds: operations.filter((operation) => operation.status === "observed").map((operation) => operation.id),
+    notFoundOperationIds: operations.filter((operation) => operation.status === "not_found").map((operation) => operation.id),
+    blockedOperationIds: operations.filter((operation) => operation.status === "blocked").map((operation) => operation.id),
+  }
+}
+
 function renderMarkdown(report) {
   return [
     "# 阿里云 CLI 只读盘点结果校验",
@@ -288,6 +354,10 @@ function renderMarkdown(report) {
     `- templateReady: ${report.template.ready}`,
     `- localReady: ${report.local.ready}`,
     `- localFile: ${report.local.file}`,
+    `- localConsoleObservationSafe: ${report.local.observationSummary.safeConsoleOnly}`,
+    `- localConsoleObservationOperations: ${report.local.observationSummary.consoleObservationOperations} / ${report.local.observationSummary.operations}`,
+    `- executedCommandResults: ${report.local.observationSummary.executedCommandResults} / ${report.local.observationSummary.commandResults}`,
+    `- cloudApiCalledCommandResults: ${report.local.observationSummary.cloudApiCalledCommandResults}`,
     "",
     "## Local Blockers",
     "",
@@ -326,9 +396,18 @@ function main() {
       blockers: local.blockers,
       warnings: local.warnings,
       checkedOperations: local.operations.length,
+      observationSummary: summarizeLocalObservation(local),
       operationStatus: Object.fromEntries(local.operations.map((operation) => [operation.id, {
+        status: operation.status,
         ready: operation.ready,
+        evidenceReady: operation.evidenceReady,
         blockers: operation.blockers,
+        commandExecution: {
+          results: operation.commandResults.length,
+          executed: operation.commandResults.filter((result) => result.executed === true).length,
+          cloudApiCalled: operation.commandResults.filter((result) => result.cloudApiCalled === true).length,
+          mutationPerformed: operation.commandResults.filter((result) => result.mutationPerformed === true).length,
+        },
       }])),
     },
     nextActions: [

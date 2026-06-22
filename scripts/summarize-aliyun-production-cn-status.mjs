@@ -120,6 +120,20 @@ function buildStatus({ readiness, operatorTasks, cloudInventoryResults, args }) 
   const cloudReady = countCloudReady(readiness)
   const cloudInventoryLocal = cloudInventoryResults.local || {}
   const cloudInventorySummary = cloudInventoryResults.summary || {}
+  const cloudInventoryObservationSummary = cloudInventoryLocal.observationSummary || {
+    operations: 0,
+    strictReadyOperations: 0,
+    evidenceReadyOperations: 0,
+    consoleObservationOperations: 0,
+    safeConsoleOnly: false,
+    commandResults: 0,
+    executedCommandResults: 0,
+    cloudApiCalledCommandResults: 0,
+    mutationPerformedCommandResults: 0,
+    observedOperationIds: [],
+    notFoundOperationIds: [],
+    blockedOperationIds: [],
+  }
   const missingRequiredEnv = readiness.checks?.env?.missingRequired || operatorTasks.env?.requiredBlocking || []
   const machineBlocking = readiness.machineBlocking || []
   const manualBlocking = readiness.manualBlocking || []
@@ -155,6 +169,7 @@ function buildStatus({ readiness, operatorTasks, cloudInventoryResults, args }) 
       : "数据层：unknown。",
     `阿里云云资源确认：${cloudReady.ready}/${cloudReady.total} ready；还缺 SAE、DNS/HTTPS/ICP、OSS/CORS/RAM、微信开放平台 approved、env import、SLS 中未完成项。`,
     `阿里云 CLI 只读盘点结果：${cloudInventoryLocal.ready ? "ready" : "not ready"}；localExists=${cloudInventoryLocal.exists === true}，local operations ${cloudInventorySummary.readyLocalOperations || 0}/${cloudInventorySummary.localOperations || 0} ready，blockers ${(cloudInventoryLocal.blockers || []).join(", ") || "none"}。`,
+    `阿里云控制台观察证据：safeConsoleOnly=${cloudInventoryObservationSummary.safeConsoleOnly === true}，consoleObservationOperations=${cloudInventoryObservationSummary.consoleObservationOperations || 0}/${cloudInventoryObservationSummary.operations || 0}，executedCommandResults=${cloudInventoryObservationSummary.executedCommandResults || 0}/${cloudInventoryObservationSummary.commandResults || 0}，cloudApiCalledCommandResults=${cloudInventoryObservationSummary.cloudApiCalledCommandResults || 0}。`,
     `域名门禁：${operatorTasks.domain?.ok ? "ready" : "blocked"}；当前 api-cn/assets-cn 仍未证明解析到阿里云 HTTPS 入口。`,
     `镜像发布计划：${imagePlan?.ready ? "ready" : "blocked"}；本地 Docker 镜像 ${imagePlan?.localDockerImage?.status || operatorTasks.imagePublishPlan?.localDockerImage || "unknown"}，ACR/runtime 拉取证据未完成。`,
     `密钥/密码/token/付款/受控标识符类人工介入项：${sensitiveActionItems.length} 项；脚本只输出变量名、控制台路径和动作，不输出任何 value。`,
@@ -202,6 +217,7 @@ function buildStatus({ readiness, operatorTasks, cloudInventoryResults, args }) 
         localOperations: cloudInventorySummary.localOperations || 0,
         readyLocalOperations: cloudInventorySummary.readyLocalOperations || 0,
         localBlockers: cloudInventoryLocal.blockers || [],
+        observationSummary: cloudInventoryObservationSummary,
       },
     },
     localReadiness: {
@@ -266,6 +282,7 @@ function buildStatus({ readiness, operatorTasks, cloudInventoryResults, args }) 
         localExists: cloudInventoryLocal.exists === true,
         localCheckedOperations: cloudInventoryLocal.checkedOperations || 0,
         localBlockers: cloudInventoryLocal.blockers || [],
+        observationSummary: cloudInventoryObservationSummary,
       },
     },
     tasks: {
@@ -355,6 +372,10 @@ function renderMarkdown(status) {
     `- Local checked operations: ${status.localReadiness.cloudInventoryResults.localCheckedOperations}`,
     `- Read-only only: ${status.localReadiness.cloudInventoryResults.readOnlyOnly}`,
     `- Cloud mutation performed: ${status.localReadiness.cloudInventoryResults.cloudMutationPerformed}`,
+    `- Safe console-only evidence: ${status.localReadiness.cloudInventoryResults.observationSummary?.safeConsoleOnly === true}`,
+    `- Console observation operations: ${status.localReadiness.cloudInventoryResults.observationSummary?.consoleObservationOperations || 0}/${status.localReadiness.cloudInventoryResults.observationSummary?.operations || 0}`,
+    `- Executed command results: ${status.localReadiness.cloudInventoryResults.observationSummary?.executedCommandResults || 0}/${status.localReadiness.cloudInventoryResults.observationSummary?.commandResults || 0}`,
+    `- Cloud API called command results: ${status.localReadiness.cloudInventoryResults.observationSummary?.cloudApiCalledCommandResults || 0}`,
     `- Blockers: ${status.localReadiness.cloudInventoryResults.localBlockers.length ? status.localReadiness.cloudInventoryResults.localBlockers.join(", ") : "none"}`,
     "",
     "## Sensitive / Token / Payment / Controlled Identifier Action Items",

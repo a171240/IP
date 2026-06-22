@@ -88,12 +88,78 @@ test("Aliyun production status surfaces CLI inventory result blockers", () => {
   assert.equal(report.summary.cloudInventoryResults.localExists, false)
   assert.equal(report.summary.cloudInventoryResults.localReady, false)
   assert.equal(report.summary.cloudInventoryResults.localOperations, 0)
+  assert.equal(report.summary.cloudInventoryResults.observationSummary.operations, 0)
+  assert.equal(report.summary.cloudInventoryResults.observationSummary.safeConsoleOnly, false)
   assert.ok(report.summary.cloudInventoryResults.localBlockers.includes("file_missing"))
   assert.equal(report.localReadiness.cloudInventoryResults.localFile, missingLocal)
   assert.equal(report.localReadiness.cloudInventoryResults.readOnlyOnly, true)
   assert.equal(report.localReadiness.cloudInventoryResults.cloudMutationPerformed, false)
   assert.ok(report.humanSummary.some((line) => /阿里云 CLI 只读盘点结果/.test(line)))
   assert.ok(report.nextCommandOrder.includes("corepack pnpm aliyun:cloud:inventory-results:strict"))
+  assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
+  assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
+})
+
+test("Aliyun production status surfaces safe console-only inventory observations", () => {
+  const output = execFileSync(process.execPath, ["scripts/summarize-aliyun-production-cn-status.mjs"], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 30,
+  })
+  const report = JSON.parse(output)
+  const summary = report.summary.cloudInventoryResults.observationSummary
+  const local = report.localReadiness.cloudInventoryResults.observationSummary
+
+  assert.equal(report.summary.cloudInventoryResults.localReady, false)
+  assert.equal(summary.safeConsoleOnly, true)
+  assert.equal(summary.operations, 7)
+  assert.equal(summary.consoleObservationOperations, 7)
+  assert.equal(summary.strictReadyOperations, 0)
+  assert.equal(summary.executedCommandResults, 0)
+  assert.equal(summary.cloudApiCalledCommandResults, 0)
+  assert.equal(summary.mutationPerformedCommandResults, 0)
+  assert.deepEqual(local, summary)
+  assert.ok(report.humanSummary.some((line) => /阿里云控制台观察证据/.test(line)))
+  assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
+  assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
+})
+
+test("Aliyun CLI inventory results separates console observations from strict CLI readiness", () => {
+  const { output, report } = run(["--allow-incomplete"])
+  const summary = report.local.observationSummary
+  const oss = report.local.operationStatus.I05_OSS_AUDIO_BUCKET
+  const sls = report.local.operationStatus.I06_SLS_ALERTS
+  const sae = report.local.operationStatus.I01_SAE_RUNTIME
+
+  assert.equal(report.ok, false)
+  assert.equal(report.local.ready, false)
+  assert.equal(report.local.checkedOperations, 7)
+  assert.equal(summary.operations, 7)
+  assert.equal(summary.strictReadyOperations, 0)
+  assert.equal(summary.evidenceReadyOperations, 7)
+  assert.equal(summary.consoleObservationOperations, 7)
+  assert.equal(summary.safeConsoleOnly, true)
+  assert.equal(summary.commandResults, 7)
+  assert.equal(summary.executedCommandResults, 0)
+  assert.equal(summary.cloudApiCalledCommandResults, 0)
+  assert.equal(summary.mutationPerformedCommandResults, 0)
+  assert.deepEqual(summary.statusCounts, {
+    not_found: 3,
+    blocked: 2,
+    observed: 2,
+  })
+  assert.deepEqual(summary.observedOperationIds, ["I05_OSS_AUDIO_BUCKET", "I06_SLS_ALERTS"])
+  assert.ok(summary.notFoundOperationIds.includes("I01_SAE_RUNTIME"))
+  assert.ok(summary.blockedOperationIds.includes("I02_ACR_IMAGE"))
+  assert.equal(oss.status, "observed")
+  assert.equal(oss.evidenceReady, true)
+  assert.equal(oss.commandExecution.executed, 0)
+  assert.equal(oss.commandExecution.cloudApiCalled, 0)
+  assert.equal(sls.status, "observed")
+  assert.equal(sae.status, "not_found")
+  assert.match(output, /safeConsoleOnly/)
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
