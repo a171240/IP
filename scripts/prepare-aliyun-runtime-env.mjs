@@ -77,6 +77,10 @@ export const OPTIONAL_KEYS = [
   "WECHAT_MINI_SECRET",
 ]
 
+const APP_LAUNCH_BLOCKING_KEYS = new Set([
+  "APPLE_TEAM_ID",
+])
+
 function parseArgs(argv) {
   const args = {
     envFile: APP_ENV_FILE,
@@ -233,6 +237,10 @@ export function buildImportPlan(env) {
       emptyTotal: variables.filter((item) => item.status === "empty").length,
       secretOrSensitiveTotal: variables.filter((item) => item.sensitivity !== "public").length,
       sourceMetadataReady: variables.filter((item) => item.source && item.consolePath && item.obtain && item.importTarget).length,
+      appLaunchBlocking: variables
+        .filter((item) => item.status !== "ready")
+        .filter((item) => isAppLaunchBlockingVariable(item.name))
+        .map((item) => item.name),
     },
     variables,
   }
@@ -241,7 +249,12 @@ export function buildImportPlan(env) {
 function renderImportPlanMarkdown(plan) {
   const blockedRequired = plan.variables.filter((item) => item.required && item.status !== "ready")
   const readyVariables = plan.variables.filter((item) => item.status === "ready")
-  const deferredVariables = plan.variables.filter((item) => item.status !== "ready" && !item.required)
+  const appLaunchBlockingVariables = plan.variables
+    .filter((item) => item.status !== "ready" && !item.required)
+    .filter((item) => isAppLaunchBlockingVariable(item.name))
+  const deferredVariables = plan.variables
+    .filter((item) => item.status !== "ready" && !item.required)
+    .filter((item) => !isAppLaunchBlockingVariable(item.name))
   const plainReady = readyVariables.filter((item) => item.importTarget === "阿里云 SAE plain env")
   const secretReady = readyVariables.filter((item) => item.importTarget !== "阿里云 SAE plain env")
   return [
@@ -256,6 +269,7 @@ function renderImportPlanMarkdown(plan) {
     `- total: ${plan.summary.total}`,
     `- requiredReady: ${plan.summary.requiredReady} / ${plan.summary.requiredTotal}`,
     `- requiredBlocking: ${plan.summary.requiredBlocking.length ? plan.summary.requiredBlocking.join(", ") : "none"}`,
+    `- appLaunchBlocking: ${plan.summary.appLaunchBlocking.length ? plan.summary.appLaunchBlocking.join(", ") : "none"}`,
     `- readyTotal: ${plan.summary.readyTotal}`,
     `- todoTotal: ${plan.summary.todoTotal}`,
     `- emptyTotal: ${plan.summary.emptyTotal}`,
@@ -272,6 +286,9 @@ function renderImportPlanMarkdown(plan) {
     "## 必填阻塞变量",
     "",
     ...renderVariableTable(blockedRequired),
+    "## APP 发布阻塞但非后端必填",
+    "",
+    ...renderVariableTable(appLaunchBlockingVariables),
     "## 可直接导入的 Plain Env",
     "",
     ...renderVariableTable(plainReady),
@@ -618,8 +635,15 @@ function actionFor(key, status, required, importTarget) {
   if (key === "WECHAT_OPEN_APP_ID" || key === "WECHAT_OPEN_APP_SECRET") {
     return "等待微信开放平台移动应用审核通过后获取并导入"
   }
+  if (key === "APPLE_TEAM_ID") {
+    return "APP 发布/AASA 阻塞：从 Apple Developer 获取 10 位 Team ID 后导入阿里云 SAE plain env"
+  }
   if (required) return "补齐后才能进入 production-cn 发布门禁"
   return "可后置；功能启用或正式迁移时再补齐"
+}
+
+function isAppLaunchBlockingVariable(key) {
+  return APP_LAUNCH_BLOCKING_KEYS.has(key)
 }
 
 function printHelp() {

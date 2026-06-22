@@ -25,6 +25,8 @@ test("APP production-cn checklist records current blockers without secret values
     "ready 0/7",
     "required `17/26`",
     "本机 required env 是 `24/26` ready",
+    "后端必填阻塞只剩",
+    "APP 发布阻塞但非后端必填",
     "WECHAT_OPEN_APP_ID",
     "WECHAT_OPEN_APP_SECRET",
     "移动 App 未创建",

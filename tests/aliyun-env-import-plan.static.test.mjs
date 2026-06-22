@@ -1,5 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
+import { execFileSync } from "node:child_process"
+import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 
@@ -67,4 +69,39 @@ test("Aliyun env import plan splits WeChat Open AppID and AppSecret import targe
   assert.equal(appSecret.sensitivity, "secret")
   assert.equal(appSecret.importTarget, "阿里云 KMS/Secrets Manager/SAE secret env")
   assert.equal(appSecret.action, "通过阿里云 KMS/Secrets Manager/SAE 密钥环境变量导入")
+})
+
+test("Aliyun env import plan separates Apple Team ID from deferred variables", async () => {
+  const plan = await buildPlan({})
+  const appleTeamId = byName(plan, "APPLE_TEAM_ID")
+
+  assert.equal(appleTeamId.required, false)
+  assert.equal(appleTeamId.status, "empty")
+  assert.equal(appleTeamId.sensitivity, "public")
+  assert.equal(appleTeamId.importTarget, "阿里云 SAE plain env")
+  assert.deepEqual(plan.summary.appLaunchBlocking, ["APPLE_TEAM_ID"])
+  assert.match(appleTeamId.action, /APP 发布\/AASA 阻塞/)
+})
+
+test("Aliyun env checklist renders Apple Team ID outside deferred section", () => {
+  const markdownPath = "/tmp/meiye-aliyun-env-import-checklist-test.md"
+  execFileSync(process.execPath, [
+    "scripts/prepare-aliyun-runtime-env.mjs",
+    "--allow-todo",
+    "--write-plan-markdown",
+    markdownPath,
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 10,
+  })
+  const markdown = readFileSync(markdownPath, "utf8")
+  const appLaunchSection = markdown.match(/## APP 发布阻塞但非后端必填[\s\S]*?## 可直接导入的 Plain Env/)
+  const deferredSection = markdown.match(/## 可后置或空缺变量[\s\S]*$/)
+
+  assert.ok(appLaunchSection, "expected app launch blocking section")
+  assert.match(appLaunchSection[0], /`APPLE_TEAM_ID`/)
+  assert.match(appLaunchSection[0], /APP 发布\/AASA 阻塞/)
+  assert.ok(deferredSection, "expected deferred section")
+  assert.doesNotMatch(deferredSection[0], /`APPLE_TEAM_ID`/)
 })
