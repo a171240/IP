@@ -533,6 +533,8 @@ function renderMarkdown(audit) {
     `- appLaunchBlockingStates: ${operatorHandoff.appLaunchBlocking.states.length ? operatorHandoff.appLaunchBlocking.states.map((item) => `${item.name}:${item.status}`).join(", ") : "none"}`,
     `- optionalDeferredEnv: ${operatorHandoff.missingVariables.optionalDeferred.length}`,
     `- sensitiveActionItems: ${operatorHandoff.sensitiveActionItems?.length || 0}`,
+    `- canStartNowConsoleTasks: ${operatorHandoff.aliyunConsoleTaskOrder?.canStartNow?.length ? operatorHandoff.aliyunConsoleTaskOrder.canStartNow.join(", ") : "none"}`,
+    `- blockedByConsoleTaskDependencies: ${operatorHandoff.aliyunConsoleTaskOrder?.blockedByDependencies?.length ? operatorHandoff.aliyunConsoleTaskOrder.blockedByDependencies.join(", ") : "none"}`,
     "",
     "## 发布负责人状态总览",
     "",
@@ -1211,6 +1213,9 @@ function main() {
       appLaunchBlockingStates: operatorHandoff.appLaunchBlocking.states.map((item) => `${item.name}:${item.status}`),
       optionalDeferredEnv: operatorHandoff.missingVariables.optionalDeferred.map((item) => item.name),
       sensitiveActionItems: (operatorHandoff.sensitiveActionItems || []).map((item) => `${item.id}:${item.status}`),
+      canStartNowConsoleTasks: operatorHandoff.aliyunConsoleTaskOrder?.canStartNow || [],
+      blockedByConsoleTaskDependencies: operatorHandoff.aliyunConsoleTaskOrder?.blockedByDependencies || [],
+      aliyunConsoleTasks: (operatorHandoff.aliyunConsoleTaskOrder?.tasks || []).map((task) => `${task.id}:${task.status}:canStartNow=${task.canStartNow}`),
       bridgeDataLayer: operatorHandoff.bridgeDataLayer || null,
       localEvidenceGaps: {
         cloudInventoryResults: {

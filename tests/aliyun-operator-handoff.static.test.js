@@ -12,6 +12,7 @@ const readJson = (...parts) => JSON.parse(read(...parts))
 test("Aliyun operator handoff command is wired into scripts and local predeploy", () => {
   const pkg = readJson("package.json")
   const predeploy = read("scripts", "aliyun-predeploy-commands.mjs")
+  const releaseArtifacts = read("scripts", "prepare-aliyun-release-artifacts.mjs")
   const deploySpec = readJson("deploy", "aliyun-production-cn.example.json")
 
   assert.equal(pkg.scripts["aliyun:operator:handoff"], "node ./scripts/generate-aliyun-operator-handoff.mjs")
@@ -21,6 +22,8 @@ test("Aliyun operator handoff command is wired into scripts and local predeploy"
   assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:operator:handoff:test"))
   assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:operator:handoff -- --skip-vercel-env-coverage"))
   assert.ok(deploySpec.predeployChecks.includes("corepack pnpm aliyun:operator:handoff"))
+  assert.match(releaseArtifacts, /canStartNowConsoleTasks/)
+  assert.match(releaseArtifacts, /blockedByConsoleTaskDependencies/)
 })
 
 test("Aliyun operator handoff maps ACR and SAE evidence gaps to the correct consoles", () => {
@@ -47,6 +50,23 @@ test("Aliyun operator handoff maps ACR and SAE evidence gaps to the correct cons
   const imagePullConfigured = byPath.get("runtime.imagePullConfigured")
 
   assert.equal(report.containsValues, false)
+  assert.deepEqual(report.aliyunConsoleTaskOrder.canStartNow, [
+    "C02_ACR_IMAGE_AND_PULL",
+    "C05_OSS_AUDIO_RAM_STS",
+  ])
+  assert.ok(report.aliyunConsoleTaskOrder.blockedByDependencies.includes("C01_SAE_RUNTIME"))
+  assert.ok(report.aliyunConsoleTaskOrder.blockedByDependencies.includes("C06_ENV_IMPORT"))
+  assert.ok(report.aliyunConsoleActionNow.some((item) => item.includes("当前可先处理 C02_ACR_IMAGE_AND_PULL")))
+  assert.ok(report.aliyunConsoleActionNow.some((item) => item.includes("当前可先处理 C05_OSS_AUDIO_RAM_STS")))
+  assert.ok(report.aliyunConsoleActionNow.some((item) => item.includes("先暂缓 C01_SAE_RUNTIME")))
+  const consoleTasksById = new Map(report.aliyunConsoleTaskOrder.tasks.map((item) => [item.id, item]))
+  assert.equal(consoleTasksById.get("C02_ACR_IMAGE_AND_PULL").canStartNow, true)
+  assert.equal(consoleTasksById.get("C05_OSS_AUDIO_RAM_STS").canStartNow, true)
+  assert.deepEqual(consoleTasksById.get("C01_SAE_RUNTIME").blockingDependencies, [
+    "C02_ACR_IMAGE_AND_PULL",
+    "C05_OSS_AUDIO_RAM_STS",
+    "C06_ENV_IMPORT",
+  ])
   assert.equal(inventoryResults.exists, false)
   assert.equal(inventoryResults.ready, false)
   assert.equal(inventoryResults.checkedOperations, 0)

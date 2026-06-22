@@ -287,6 +287,59 @@ function compactTask(task) {
   }
 }
 
+function compactConsoleTask(task) {
+  return {
+    id: task.id,
+    title: task.title,
+    status: task.status,
+    ready: task.ready === true,
+    sequencePhase: task.sequencePhase || "",
+    dependsOn: task.dependsOn || [],
+    blockingDependencies: task.blockingDependencies || [],
+    canStartNow: task.canStartNow === true,
+    requiresActionTimeConfirmation: task.requiresActionTimeConfirmation === true,
+    consolePath: task.consolePath || "",
+    currentBlockers: task.currentBlockers || [],
+    verifyCommands: task.verifyCommands || [],
+  }
+}
+
+function buildAliyunConsoleTaskOrder(consoleRunbook) {
+  const tasks = (consoleRunbook.consoleTasks || []).map(compactConsoleTask)
+  return {
+    sourceCommand: "corepack pnpm aliyun:console:runbook",
+    resourceReady: consoleRunbook.summary?.resourceReady || "unknown",
+    userActionReady: consoleRunbook.summary?.userActionReady || "unknown",
+    canStartNow: consoleRunbook.summary?.canStartNowConsoleTasks || tasks
+      .filter((task) => task.canStartNow)
+      .map((task) => task.id),
+    blockedByDependencies: consoleRunbook.summary?.blockedByTaskDependencies || tasks
+      .filter((task) => task.blockingDependencies.length > 0)
+      .map((task) => task.id),
+    tasks,
+  }
+}
+
+function buildAliyunConsoleActionNow(consoleTaskOrder) {
+  const tasks = consoleTaskOrder.tasks || []
+  const byId = new Map(tasks.map((task) => [task.id, task]))
+  const canStartNow = (consoleTaskOrder.canStartNow || [])
+    .map((id) => byId.get(id))
+    .filter(Boolean)
+  const blockedByDependencies = (consoleTaskOrder.blockedByDependencies || [])
+    .map((id) => byId.get(id))
+    .filter(Boolean)
+
+  return [
+    ...canStartNow.map((task) =>
+      `当前可先处理 ${task.id}：${task.title}；consolePath=${task.consolePath}；requiresActionTimeConfirmation=${task.requiresActionTimeConfirmation}`,
+    ),
+    ...blockedByDependencies.map((task) =>
+      `先暂缓 ${task.id}：${task.title}；dependsOn=${task.dependsOn.join(", ") || "none"}；blockingDependencies=${task.blockingDependencies.join(", ") || "none"}`,
+    ),
+  ]
+}
+
 function buildWechatUserActionNow(machineBlocking) {
   const base = {
     owner: "用户/微信开放平台操作员",
@@ -342,9 +395,11 @@ function buildHandoff({
   cloudAccess,
   cloudConfirmationsCheck,
   imagePublishPlan,
+  consoleRunbook,
   vercelEnvCoverage,
 }) {
   const tasks = operatorTasks.tasks || []
+  const aliyunConsoleTaskOrder = buildAliyunConsoleTaskOrder(consoleRunbook)
   const machineBlocking = status.summary?.machineBlocking || []
   const waitingWechatReview = status.summary?.operatorTasks?.waitingWechatReview || 0
   const appLaunchBlocking = buildAppLaunchBlocking(envPlan.variables, machineBlocking)
@@ -424,14 +479,8 @@ function buildHandoff({
         mustNotUse: ["APPLE_TEAM_ID 不是密钥，但仍不要猜测；必须从 Apple Developer 当前团队读取"],
       },
     ],
-    aliyunConsoleActionNow: [
-      "创建或确认 SAE 容器应用：cn-hangzhou，端口 3000，健康检查 /api/healthz。",
-      "创建或确认 ACR 仓库：meiye-huajing-app-api:production-cn，并记录 remote image 和 digest。",
-      "把 api-cn.ipgongchang.xin / assets-cn.ipgongchang.xin 指到阿里云公网入口并启用 HTTPS，补 ICP 证据。",
-      "确认 OSS Bucket、CORS、RAM 最小权限和 service-records/production-cn 前缀。",
-      "把 ready 的环境变量导入 SAE/KMS/Secrets Manager，密钥不进镜像。",
-      "配置 SLS 日志、/api/healthz 健康告警和 5xx 告警。",
-    ],
+    aliyunConsoleTaskOrder,
+    aliyunConsoleActionNow: buildAliyunConsoleActionNow(aliyunConsoleTaskOrder),
     priorityTasks: priorityTaskIds.map((id) => compactTask(taskById(tasks, id))).filter(Boolean),
     nextCommandOrder: status.nextCommandOrder || [],
     safetyBoundary: [
@@ -871,7 +920,24 @@ function renderMarkdown(handoff) {
     ]),
     "## 阿里云控制台要做",
     "",
+    `- resourceReady: ${handoff.aliyunConsoleTaskOrder.resourceReady}`,
+    `- userActionReady: ${handoff.aliyunConsoleTaskOrder.userActionReady}`,
+    `- canStartNow: ${handoff.aliyunConsoleTaskOrder.canStartNow.length ? handoff.aliyunConsoleTaskOrder.canStartNow.join(", ") : "none"}`,
+    `- blockedByDependencies: ${handoff.aliyunConsoleTaskOrder.blockedByDependencies.length ? handoff.aliyunConsoleTaskOrder.blockedByDependencies.join(", ") : "none"}`,
+    "",
     ...handoff.aliyunConsoleActionNow.map((item) => `- ${item}`),
+    "",
+    "### 阿里云控制台任务顺序",
+    "",
+    ...handoff.aliyunConsoleTaskOrder.tasks.flatMap((task) => [
+      `- ${task.id}: ${task.title}`,
+      `  - status: ${task.status}`,
+      `  - sequencePhase: ${task.sequencePhase}`,
+      `  - dependsOn: ${task.dependsOn.join(", ") || "none"}`,
+      `  - blockingDependencies: ${task.blockingDependencies.join(", ") || "none"}`,
+      `  - canStartNow: ${task.canStartNow}`,
+      `  - requiresActionTimeConfirmation: ${task.requiresActionTimeConfirmation}`,
+    ]),
     "",
     "## 本地要补证据的文件",
     "",
@@ -1026,6 +1092,13 @@ function main() {
     resolve(BACKEND_ROOT, "scripts/check-aliyun-image-publish-plan.mjs"),
     "--allow-incomplete",
   ])
+  const consoleRunbook = runJson("console_runbook", [
+    resolve(BACKEND_ROOT, "scripts/generate-aliyun-console-runbook.mjs"),
+    "--env-file",
+    args.envFile,
+    "--cloud-confirmations",
+    args.cloudConfirmationsFile,
+  ])
   const vercelEnvCoverage = runVercelEnvCoverage(args)
   const handoff = buildHandoff({
     args,
@@ -1035,6 +1108,7 @@ function main() {
     cloudAccess,
     cloudConfirmationsCheck,
     imagePublishPlan,
+    consoleRunbook,
     vercelEnvCoverage,
   })
   const output = `${JSON.stringify(handoff, null, 2)}\n`
