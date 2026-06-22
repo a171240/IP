@@ -500,11 +500,29 @@ function buildImagePublishGaps(imagePublishPlan, cloudAccess) {
   return (imagePublishPlan.local?.blockers || []).map((blocker) => ({
     jsonPath: fieldFromImageBlocker(blocker),
     blocker,
-    source: acrChecklist.consolePath || "阿里云控制台 -> 容器镜像服务 ACR / SAE 容器运行时",
-    writeTo: acrChecklist.writeTo || "deploy/aliyun-production-cn.image-publish.local.json",
+    source: imagePublishGapSource(blocker, acrChecklist),
+    writeTo: imagePublishGapWriteTarget(blocker),
     expected: expectedImagePublishEvidence(blocker),
     forbidden: acrChecklist.forbidden || [],
   }))
+}
+
+function imagePublishGapSource(blocker, acrChecklist) {
+  const field = fieldFromImageBlocker(blocker)
+  if (field.startsWith("runtime.")) {
+    return "阿里云控制台 -> SAE -> cn-hangzhou -> 应用 -> 镜像部署 / 镜像拉取配置"
+  }
+  if (field.startsWith("acr.")) {
+    return acrChecklist.consolePath || "阿里云控制台 -> 容器镜像服务 ACR -> cn-hangzhou -> 命名空间/仓库"
+  }
+  return acrChecklist.consolePath || "阿里云控制台 -> 容器镜像服务 ACR / SAE 容器运行时"
+}
+
+function imagePublishGapWriteTarget(blocker) {
+  const field = fieldFromImageBlocker(blocker)
+  if (field.startsWith("runtime.")) return "deploy/aliyun-production-cn.image-publish.local.json -> runtime"
+  if (field.startsWith("acr.")) return "deploy/aliyun-production-cn.image-publish.local.json -> acr"
+  return "deploy/aliyun-production-cn.image-publish.local.json"
 }
 
 function fieldFromBlocker(blocker) {
