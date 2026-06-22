@@ -422,6 +422,20 @@ function buildWechatOpenPlatformActions(reviewStatus) {
   ]
 }
 
+function wechatSensitiveRequiredUserAction(reviewStatus) {
+  const importInstruction = "AppID 只导入阿里云 SAE 服务端 plain env，AppSecret 只导入 KMS/Secrets Manager/SAE secret env。"
+  if (reviewStatus === "not_started") {
+    return `先在微信开放平台创建“美业话镜”移动应用并提交审核；审核通过后读取 AppID/AppSecret；${importInstruction}`
+  }
+  if (reviewStatus === "reviewing") {
+    return `等待移动应用审核通过后读取 AppID/AppSecret；${importInstruction}`
+  }
+  if (reviewStatus === "rejected") {
+    return `先按微信开放平台驳回原因修正并重新提交；审核通过后读取 AppID/AppSecret；${importInstruction}`
+  }
+  return `确认微信开放平台账号已认证后创建移动应用；审核通过后读取 AppID/AppSecret；${importInstruction}`
+}
+
 function addTask(tasks, task) {
   const blockerCodes = Array.from(new Set((task.blockerCodes || []).filter(Boolean)))
   tasks.push({
@@ -472,7 +486,7 @@ function buildSensitiveActionItems({ envPlan, readiness, imagePublishPlan }) {
         "WECHAT_OPEN_APP_ID",
         "WECHAT_OPEN_APP_SECRET",
       ])),
-      requiredUserAction: "等待移动应用审核通过后读取 AppID/AppSecret；AppID 只导入阿里云 SAE 服务端 plain env，AppSecret 只导入 KMS/Secrets Manager/SAE secret env。",
+      requiredUserAction: wechatSensitiveRequiredUserAction(wechatOpenPlatform.reviewStatus),
       unblockCondition: "reviewStatus=approved 且 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET ready。",
       forbidden: "不能用小程序 AppID/Secret 替代，不能把 AppID 写进 App 包，也不能把 AppSecret 写入文档、镜像或 git。",
     })

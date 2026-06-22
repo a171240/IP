@@ -361,7 +361,7 @@ meiye-huajing-app-api-production-cn-context.tar.gz
 
 该脚本会复用当前 readiness、env、routes、小程序链路桥接清单、SAE runtime plan、Docker context 和 `aliyun:cloud:access` 检查，并默认尝试生成 Vercel production 变量名覆盖报告。Vercel 覆盖报告只包含变量名、环境和加密/敏感元数据，不包含真实 value；如果 Vercel 登录态不可用，会在审计里记录失败，不阻断本地发布审计包生成。
 
-`production-cn-status.json` 和 `production-cn-status.md` 是 `aliyun:status` 的打包输出，供发布负责人快速判断当前能否上线、还缺哪些微信/阿里云/Apple 证据。`operator-handoff.json` 和 `operator-handoff.md` 是当前唯一建议交给人工操作员的非密钥操作包：微信开放平台已提交审核时，先等移动应用审核通过，再从移动应用详情读取 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`，不要复用小程序 AppID / Secret。操作包会把 `APPLE_TEAM_ID` 单独列为 APP 发布/AASA 阻塞项：它不是后端必填密钥，但 iOS Universal Link 验收需要它生成 AASA `appID`。操作包也会内置 `cloudAccess` 摘要：当前机器是否有 `aliyun` CLI、是否已经能做只读云 inventory、以及 SAE/ACR/DNS/OSS/env/SLS 需要从控制台抄录到 `.local.json` 的非密钥字段。
+`production-cn-status.json` 和 `production-cn-status.md` 是 `aliyun:status` 的打包输出，供发布负责人快速判断当前能否上线、还缺哪些微信/阿里云/Apple 证据。`operator-handoff.json` 和 `operator-handoff.md` 是当前唯一建议交给人工操作员的非密钥操作包：微信开放平台 `reviewStatus=not_started` 时先创建“美业话镜”移动应用并提交审核；`reviewStatus=reviewing` 时等待审核通过；审核通过后才从移动应用详情读取 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`，不要复用小程序 AppID / Secret。操作包会把 `APPLE_TEAM_ID` 单独列为 APP 发布/AASA 阻塞项：它不是后端必填密钥，但 iOS Universal Link 验收需要它生成 AASA `appID`。操作包也会内置 `cloudAccess` 摘要：当前机器是否有 `aliyun` CLI、是否已经能做只读云 inventory、以及 SAE/ACR/DNS/OSS/env/SLS 需要从控制台抄录到 `.local.json` 的非密钥字段。
 
 如果只想离线生成审计包，或不想访问 Vercel：
 
@@ -803,6 +803,7 @@ corepack pnpm run aliyun:env:check
 corepack pnpm run aliyun:env:plan
 corepack pnpm run aliyun:env:sources
 corepack pnpm run aliyun:env:classification:test
+corepack pnpm run aliyun:wechat-state:test
 corepack pnpm run aliyun:deploy:spec
 corepack pnpm run aliyun:runtime:plan
 corepack pnpm run aliyun:image:plan
@@ -992,7 +993,7 @@ app_universal_link:apple_team_id_missing
 
 2026-06-22 05:52 CST 更新：本机 `.env.production-cn.local` 已补入 `PRIVACY_POLICY_URL=https://api-cn.ipgongchang.xin/privacy` 与 `TERMS_URL=https://api-cn.ipgongchang.xin/terms`，`corepack pnpm aliyun:legal:strict` 通过；`aliyun:readiness` requiredReady 为 23/25，必需变量只剩 `WECHAT_OPEN_APP_ID` 和 `WECHAT_OPEN_APP_SECRET` 未 ready。
 
-2026-06-22 07:10 CST 更新：`aliyun:operator:handoff` 会把缺口分成三类：后端必填变量缺 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；APP 发布阻塞但非密钥缺 `APPLE_TEAM_ID` 且微信开放平台状态仍为 `reviewing`；其他可后置变量如 `DATABASE_URL_CN` / `REDIS_URL_CN` 不再和 iOS AASA 阻塞混在一起。`aliyun:operator:tasks` / `aliyun:status` 会把微信审核中显示为 `waiting_wechat_review`，避免把它误读成还没创建 APP 或需要使用小程序凭证。
+2026-06-22 07:10 CST 更新：`aliyun:operator:handoff` 会把缺口分成三类：后端必填变量缺 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；APP 发布阻塞但非密钥缺 `APPLE_TEAM_ID`，微信开放平台状态按 `WECHAT_OPEN_APP_REVIEW_STATUS` 区分 `not_started` / `reviewing` / `approved`；其他可后置变量如 `DATABASE_URL_CN` / `REDIS_URL_CN` 不再和 iOS AASA 阻塞混在一起。`aliyun:operator:tasks` / `aliyun:status` 只会在移动应用确实进入审核时显示 `waiting_wechat_review`，当前未创建移动应用时保持 `wechat_open_platform_mobile_app_not_ready`。
 
 2026-06-22 追加：`aliyun:operator:handoff` 现在也内置 Vercel production 变量名覆盖摘要，会输出 `requiredCovered`、`optionalCovered`、可迁移桥接变量名、Vercel 仍缺的 production-cn 必填变量名，以及其中属于国内 APP/微信开放平台/正式域名的新变量。该摘要只来自 `vercel env ls --format json` 的元数据，`containsValues=false`，不会展示或写出任何环境变量值；`aliyun:release:artifacts -- --skip-vercel-env-coverage` 会把跳过参数透传给 `operator-handoff`，离线生成审计包时不会隐式访问 Vercel。
 

@@ -295,20 +295,20 @@ DATABASE_URL_CN
 ```text
 productionReady: false
 localCodeReady: false
-requiredReady: 23 / 25
-optionalReady: 28
+requiredReady: 24 / 26
+optionalReady: 27
 envFile: /Users/Admin/Documents/美业话镜APP/.env.production-cn.local
 env mode: 600
 env gitIgnored: true
 urls.appApiBaseUrl: ready
 urls.nextPublicSiteUrl: ready
 urls.appAssetBaseUrl: ready
-wechatOpenPlatform.reviewStatus: reviewing
+wechatOpenPlatform.reviewStatus: not_started
 appProductionConfig.files: ready, 6 checked
 appProductionConfig.scripts: ready, 5 checked
 appProductionConfig.envTemplate: ready, 5 canonical keys checked, 0 forbidden backend/secret keys
-backend.files: ready, 27 checked
-backend.scripts: ready, 33 checked
+backend.files: ready, 35 checked
+backend.scripts: ready, 39 checked
 docker: ready
 imagePublishPlan: template ready, local draft exists, localDockerImage ready, ACR/runtime evidence still incomplete
 appClientContract: 40 audited calls / 34 unique client routes, 4 deferred knowledge-space calls
@@ -320,7 +320,7 @@ appApiSmokeCoverage: 29 / 29 business routes
 ```text
 missing_required_env:WECHAT_OPEN_APP_ID
 missing_required_env:WECHAT_OPEN_APP_SECRET
-wechat_open_platform_mobile_app_reviewing
+wechat_open_platform_mobile_app_not_ready
 invalid_app_universal_link_config
 app_universal_link:apple_team_id_missing
 ```
@@ -563,7 +563,7 @@ sanitizedEnvFileDeleted: true
 
 2026-06-22 03:56 CST 复核：`corepack pnpm aliyun:predeploy` 通过。该命令重新覆盖了 env plan/source、deploy spec、image plan、cloud confirmations、domain check、readiness、routes check、App API bridge map、App client contract、App native release check、App API coverage、Docker context、TypeScript、release preflight、Next build、health smoke 和 App API smoke。当前通过表示桥接后端本地包自洽；不表示微信开放平台、阿里云 ACR/runtime、DNS/HTTPS/ICP、OSS/RAM/SLS 已生产 ready。2026-06-22 追加后，`predeploy` 还会覆盖 `aliyun:legal:check`。
 
-2026-06-22 05:47 CST 复核：新增 `deploy/app-api-production-cn.bridge-map.json` 和 `corepack pnpm aliyun:app-api:bridge-map` 后，`corepack pnpm aliyun:predeploy` 再次通过。新增桥接门禁结果为 31 mapped routes，29 bridge-ready routes，2 WeChat env-blocked routes；微信开放平台仍按审核中处理。
+2026-06-22 05:47 CST 复核：新增 `deploy/app-api-production-cn.bridge-map.json` 和 `corepack pnpm aliyun:app-api:bridge-map` 后，`corepack pnpm aliyun:predeploy` 再次通过。新增桥接门禁结果为 31 mapped routes，29 bridge-ready routes，2 WeChat env-blocked routes；当时微信开放平台按审核中处理，后续 14:52 CST 已按用户澄清修正为账号认证通过但移动应用尚未创建。
 
 2026-06-22 05:52 CST 复核：本机 ignored `.env.production-cn.local` 已补入 `PRIVACY_POLICY_URL=https://api-cn.ipgongchang.xin/privacy` 与 `TERMS_URL=https://api-cn.ipgongchang.xin/terms`。`corepack pnpm aliyun:legal:strict` 通过，`corepack pnpm aliyun:readiness` 的 requiredReady 变为 23/25，requiredBlocking 只剩 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；`corepack pnpm aliyun:health:smoke` 显示 strict health 仍为 503，但 missing 只剩 `appWechatLogin`。
 
@@ -581,7 +581,7 @@ sanitizedEnvFileDeleted: true
 
 2026-06-22 07:02 CST 追加：新增 `corepack pnpm aliyun:operator:handoff` 和 `scripts/generate-aliyun-operator-handoff.mjs`，把 `aliyun:status`、`aliyun:operator:tasks` 和 env import plan 合并成一个非密钥操作包。微信开放平台已提交审核时，当前动作是等待移动应用审核通过后读取 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；阿里云侧继续补 SAE/ECS、ACR、DNS/HTTPS/ICP、OSS/RAM、env import 和 SLS 证据。`aliyun:release:artifacts` 会随包输出 `operator-handoff.json` 和 `operator-handoff.md`。同轮已执行 `node --check scripts/generate-aliyun-operator-handoff.mjs`、`corepack pnpm aliyun:operator:handoff`、`corepack pnpm aliyun:readiness`、`corepack pnpm aliyun:release:artifacts -- --skip-bundle --skip-vercel-env-coverage` 和 `corepack pnpm aliyun:predeploy`，全部通过；`predeploy` 仍只剩 `appWechatLogin` 外部阻塞，APP API smoke `30 probes / 0 failures`。
 
-2026-06-22 07:10 CST 追加：`operator-handoff` 现在把 `APPLE_TEAM_ID` 从普通可后置变量中拆出，列为 `appLaunchBlocking.variables`。当前分类应读作：后端必填变量缺 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；APP 发布/AASA 阻塞缺 `APPLE_TEAM_ID`，并且 `WECHAT_OPEN_APP_REVIEW_STATUS=reviewing`；`DATABASE_URL_CN` / `REDIS_URL_CN` 等仍是可后置变量，不应被误读为第一版 APP 登录链路阻塞。同轮已重新执行 `node --check scripts/generate-aliyun-operator-handoff.mjs`、`node --check scripts/prepare-aliyun-release-artifacts.mjs`、`git diff --check`、`corepack pnpm aliyun:operator:handoff`、`corepack pnpm aliyun:release:artifacts -- --skip-bundle --skip-vercel-env-coverage`、`corepack pnpm aliyun:readiness` 和 `corepack pnpm aliyun:predeploy`，全部通过；`predeploy` 仍显示 health strict 只缺 `appWechatLogin`，APP API smoke `30 probes / 0 failures`。
+2026-06-22 07:10 CST 追加：`operator-handoff` 现在把 `APPLE_TEAM_ID` 从普通可后置变量中拆出，列为 `appLaunchBlocking.variables`。当时分类应读作：后端必填变量缺 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；APP 发布/AASA 阻塞缺 `APPLE_TEAM_ID`，并且 `WECHAT_OPEN_APP_REVIEW_STATUS=reviewing`；`DATABASE_URL_CN` / `REDIS_URL_CN` 等仍是可后置变量，不应被误读为第一版 APP 登录链路阻塞。2026-06-22 14:52 CST 后当前状态已修正为 `WECHAT_OPEN_APP_REVIEW_STATUS=not_started`。同轮已重新执行 `node --check scripts/generate-aliyun-operator-handoff.mjs`、`node --check scripts/prepare-aliyun-release-artifacts.mjs`、`git diff --check`、`corepack pnpm aliyun:operator:handoff`、`corepack pnpm aliyun:release:artifacts -- --skip-bundle --skip-vercel-env-coverage`、`corepack pnpm aliyun:readiness` 和 `corepack pnpm aliyun:predeploy`，全部通过；`predeploy` 仍显示 health strict 只缺 `appWechatLogin`，APP API smoke `30 probes / 0 failures`。
 
 2026-06-22 07:18 CST 追加：`aliyun:readiness:assume-cloud-ready` 已降为显式诊断命令，package script 会带 `--allow-blocking`，输出固定包含 `diagnosticOnly=true` 与 `releaseEvidenceUsable=false`；即使本地机器项全部通过，也不能让 `productionReady` 变成正式可发布证据。正式发布仍只能用 `aliyun:readiness:cloud-ready`、`aliyun:cloud:confirmations:strict` 和部署后远端 smoke 证明。
 
@@ -610,7 +610,7 @@ KMS 或 Secrets Manager 环境变量管理
 OSS 控制台：显示 1 个 Bucket；Bucket 名称、CORS、RAM 最小权限仍未确认
 SAE 控制台：显示尚未开通 SAE，应用数 0
 SLS：仅看到入口，未确认项目和告警
-微信开放平台：浏览器安全策略阻止自动读取，仍以用户确认的 reviewing 为准
+微信开放平台：浏览器安全策略阻止自动读取；2026-06-22 14:52 CST 用户澄清为账号认证通过、移动应用尚未创建，当前记录 `not_started`
 ```
 
 据此，`deploy/aliyun-production-cn.cloud-confirmations.local.json` 已记录这些非密钥证据，但所有 `confirmed` 仍保持 `false`。
@@ -623,7 +623,7 @@ NEXT_PUBLIC_SITE_URL=https://api-cn.ipgongchang.xin
 APP_ASSET_BASE_URL=https://assets-cn.ipgongchang.xin
 PRIVACY_POLICY_URL=https://api-cn.ipgongchang.xin/privacy
 TERMS_URL=https://api-cn.ipgongchang.xin/terms
-WECHAT_OPEN_APP_REVIEW_STATUS=reviewing（当前；发布前必须 approved）
+WECHAT_OPEN_APP_REVIEW_STATUS=not_started（当前；发布前必须 approved）
 WECHAT_OPEN_APP_ID：微信开放平台移动应用 AppID
 WECHAT_OPEN_APP_SECRET：微信开放平台移动应用 AppSecret
 APPLE_TEAM_ID：Apple Developer 10 位 Team ID
@@ -635,10 +635,10 @@ APPLE_TEAM_ID：Apple Developer 10 位 Team ID
 
 ### 10.3 微信开放平台
 
-用户已确认微信开放平台移动应用正在审核中。审核中只能记录：
+用户已确认微信开放平台账号认证已通过，但移动应用尚未创建。当前只能记录：
 
 ```text
-WECHAT_OPEN_APP_REVIEW_STATUS=reviewing
+WECHAT_OPEN_APP_REVIEW_STATUS=not_started
 ```
 
 当前 APP 工程已确认的非密钥配置：
@@ -667,7 +667,7 @@ WECHAT_OPEN_APP_ID：审核通过后读取
 WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KMS
 ```
 
-审核通过后才能把 readiness blocker 从 `wechat_open_platform_mobile_app_reviewing` 清掉。
+先创建“美业话镜”移动应用并提交审核；提交后可记录 `reviewing`，审核通过后记录 `approved` 并取得 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`。审核通过前 readiness blocker 会保持 `wechat_open_platform_mobile_app_not_ready` 或 `wechat_open_platform_mobile_app_reviewing`。
 
 2026-06-22 07:34 CST 追加：`aliyun:operator:tasks`、`aliyun:status` 和操作包输出已把微信开放平台移动应用审核中的任务状态细分为 `waiting_wechat_review`。该状态表示移动应用已进入微信审核流程，不能再误读为“还缺创建 APP”或“可以用小程序凭证替代”；正式发布仍必须等审核通过后取得移动应用 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`，并完成 Apple Team ID、阿里云云资源和非密钥证据确认。
 
@@ -687,7 +687,7 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 10:07 CST 追加：`aliyun:release:artifacts` 现在会生成 `cloud-access.json`，并把 `cloudAccess.canReadCloudNow`、CLI 状态、blockers 和控制台证据清单数量写入 `release-audit.json/md` 与控制台摘要。这样交付包本身可以解释为什么当前云侧仍是人工控制台确认，而不是误认为阿里云 CLI 自动 inventory 已可用。
 
-2026-06-22 追加：新增 `scripts/aliyun-predeploy-commands.mjs` 与 `deploy/aliyun-production-cn.example.json.localPredeployChecks`，把本地 `aliyun:predeploy` 的代码级检查从正式 `predeployChecks` 的 22 项严格部署顺序里拆出。2026-06-22 14:33 CST 后本地 predeploy 为 27 项，会额外覆盖 `aliyun:env:classification:test`。`aliyun:deploy:spec` 会校验两份清单：本地 predeploy 继续允许在微信开放平台/阿里云云侧未完成时作为代码级总检通过；正式部署前仍必须单独通过 `aliyun:cloud:confirmations:strict`、`aliyun:readiness:cloud-ready`、`aliyun:release:artifacts`、`aliyun:docker:build` 和 `aliyun:container:smoke`。
+2026-06-22 追加：新增 `scripts/aliyun-predeploy-commands.mjs` 与 `deploy/aliyun-production-cn.example.json.localPredeployChecks`，把本地 `aliyun:predeploy` 的代码级检查从正式 `predeployChecks` 的 22 项严格部署顺序里拆出。2026-06-22 15:08 CST 后本地 predeploy 为 28 项，会额外覆盖 `aliyun:env:classification:test` 和 `aliyun:wechat-state:test`。`aliyun:deploy:spec` 会校验两份清单：本地 predeploy 继续允许在微信开放平台/阿里云云侧未完成时作为代码级总检通过；正式部署前仍必须单独通过 `aliyun:cloud:confirmations:strict`、`aliyun:readiness:cloud-ready`、`aliyun:release:artifacts`、`aliyun:docker:build` 和 `aliyun:container:smoke`。
 
 2026-06-22 10:11 CST 追加：`corepack pnpm aliyun:operator:handoff` 现在内置 `cloudAccess` 摘要，会直接说明本机是否有 `aliyun` CLI、是否已具备只读云 inventory 条件、是否调用过云 API/执行过云修改，以及 SAE/ACR/DNS/OSS/env/SLS 需要从阿里云控制台抄录到 `.local.json` 的非密钥字段。`aliyun:status` 和 `operator:tasks` 的正式下一步命令顺序同步补上 `aliyun:cloud:confirmations:strict`、`aliyun:release:artifacts` 和 `aliyun:container:smoke`，避免只跑本地代码门禁后误认为可以部署。
 
@@ -719,7 +719,7 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 13:58 CST 追加：加严 Docker 构建上下文门禁。由于生产 Dockerfile 使用 `COPY . .`，`.dockerignore` 现在显式排除 `deploy/*.local.json`、`**/*.local.json`、`.npmrc*`、证书/私钥/移动描述文件等常见凭据文件；`aliyun:docker:check` 同步校验这些排除项，并禁止用反向规则重新包含 `.env`、`.local.json`、`.npmrc`、证书或私钥。这样本机 ignored 的阿里云非密钥证据文件和未来可能出现的凭据文件都不会进入生产镜像构建上下文；真实密钥仍只能通过阿里云 SAE 环境变量、KMS 或 Secrets Manager 注入。
 
-2026-06-22 14:01 CST 追加：在上述 `.dockerignore` 门禁后重新执行 `corepack pnpm aliyun:docker:build`，Docker build context 为约 `1.06MB`，生产镜像 `meiye-huajing-app-api:production-cn` 重新构建成功，manifest digest 为 `sha256:494907a4f9e7342064dda55fe30e0e48dd245b6d6ae753bdbb3945f77c0f518d`。随后执行 `corepack pnpm aliyun:container:smoke` 通过：容器从 `/Users/Admin/Documents/美业话镜APP/.env.production-cn.local` 的临时 sanitized copy 启动，临时 env 文件已删除，health / app health 只缺 `appWechatLogin`，strict health 返回 `503`，APP API smoke 共 `30` 个 probe 覆盖 account/auth/context/invites/service-records/store-admin，结果符合微信开放平台审核中的预期。该 digest 只证明本地 production-cn 镜像 ready，不代表已推送 ACR 或 SAE 已配置拉取。
+2026-06-22 14:01 CST 追加：在上述 `.dockerignore` 门禁后重新执行 `corepack pnpm aliyun:docker:build`，Docker build context 为约 `1.06MB`，生产镜像 `meiye-huajing-app-api:production-cn` 重新构建成功，manifest digest 为 `sha256:494907a4f9e7342064dda55fe30e0e48dd245b6d6ae753bdbb3945f77c0f518d`。随后执行 `corepack pnpm aliyun:container:smoke` 通过：容器从 `/Users/Admin/Documents/美业话镜APP/.env.production-cn.local` 的临时 sanitized copy 启动，临时 env 文件已删除，health / app health 只缺 `appWechatLogin`，strict health 返回 `503`，APP API smoke 共 `30` 个 probe 覆盖 account/auth/context/invites/service-records/store-admin，结果符合微信开放平台移动应用未 ready 的预期。该 digest 只证明本地 production-cn 镜像 ready，不代表已推送 ACR 或 SAE 已配置拉取。
 
 2026-06-22 14:06 CST 追加：`aliyun:operator:tasks`、`aliyun:status` 和 `aliyun:operator:handoff` 新增结构化 `sensitiveActionItems`，专门列出仍需用户介入的密钥、密码、token 或付款动作，不输出任何真实 value。当前输出 6 项 blocked：微信开放平台移动应用审核通过后的 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；Apple Developer 的 `APPLE_TEAM_ID`；ACR 企业版经济版 `cn-hangzhou` 1 个月 `CNY 117.00` 付款确认；ACR/SAE 镜像拉取认证；OSS RAM Secret 或 STS 注入；以及本地已有 ready 值但尚未导入阿里云运行环境的敏感/连接类变量组。`status.humanSummary` 会直接显示该数量，操作包 Markdown 也会单独列出每项的控制台路径、解除条件和禁止事项，方便发布负责人先判断哪些事情必须由用户或控制台操作员介入。
 
@@ -727,11 +727,13 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 14:25 CST 追加：新增 `corepack pnpm aliyun:env:checklist`，复用无值 env import plan 生成 `/tmp/meiye-aliyun-env-import-checklist.md`。该 Markdown 清单按“必填阻塞变量 / 可直接导入的 Plain Env / 可直接导入的 Secret Env / 可后置或空缺变量”分组，只列变量名、状态、敏感等级、来源分类、获取位置、导入目标和动作，不输出任何真实 value。`aliyun:release:artifacts` 也会把 `env-import-checklist.md` 放进审计包，方便阿里云 SAE/KMS/Secrets Manager 导入时逐项核对。
 
-2026-06-22 14:33 CST 追加：修正 env import plan 的非密钥分类，`ALIYUN_OSS_BUCKET`、`ALIYUN_OSS_REGION` 和 `SERVICE_RECORD_ASR_PROVIDER` 现在明确归入 `阿里云 SAE plain env`，不再出现在 Secret Env 分组；新增 `tests/aliyun-env-import-plan.static.test.mjs` 与 `corepack pnpm aliyun:env:classification:test`，确保 ready 且 public 的变量不会误指向 secret env。`aliyun:predeploy` 已纳入该测试，部署规格 `localPredeployChecks` 更新为 27 项。
+2026-06-22 14:33 CST 追加：修正 env import plan 的非密钥分类，`ALIYUN_OSS_BUCKET`、`ALIYUN_OSS_REGION` 和 `SERVICE_RECORD_ASR_PROVIDER` 现在明确归入 `阿里云 SAE plain env`，不再出现在 Secret Env 分组；新增 `tests/aliyun-env-import-plan.static.test.mjs` 与 `corepack pnpm aliyun:env:classification:test`，确保 ready 且 public 的变量不会误指向 secret env。`aliyun:predeploy` 已纳入该测试，部署规格 `localPredeployChecks` 当时更新为 27 项。
 
 2026-06-22 14:41 CST 追加：继续修正微信开放平台移动应用变量导入分类，`WECHAT_OPEN_APP_ID` 现在明确作为服务端标识符导入 `阿里云 SAE plain env`，但仍禁止写进 App 包；`WECHAT_OPEN_APP_SECRET` 继续只能导入 KMS/Secrets Manager/SAE secret env。`sensitiveActionItems` 的微信任务文案也同步拆分 AppID 与 AppSecret 的导入目标，避免把非密钥 AppID 误读成 secret env，或误读成可以写入客户端。该变更不改变发布阻塞结论：微信开放平台移动应用仍需审核通过后才能取得 AppID/AppSecret。
 
 2026-06-22 14:52 CST 追加：用户澄清微信开放平台当前只是账号认证成功，移动应用尚未创建。已把本机 ignored 状态调整为 `WECHAT_OPEN_APP_REVIEW_STATUS=not_started`，`wechatOpenPlatform.reviewStatus=not_started`，证据为 `user_confirmed_wechat_open_platform_account_verified_mobile_app_not_created_browser_read_blocked_by_policy_2026-06-22`。`open.weixin.qq.com` 创建页受浏览器安全策略保护，不能由自动化读取或代填；下一步需用户在微信开放平台创建“美业话镜”移动应用并提交审核，审核通过后再把 AppID/AppSecret 安全导入阿里云运行环境。
+
+2026-06-22 15:08 CST 追加：补齐 `not_started` 口径防回归门禁。新增 `tests/aliyun-wechat-open-platform-state.static.test.js` 与 `corepack pnpm aliyun:wechat-state:test`，检查云确认模板、APP API 桥接清单、部署文档和 readiness nextAction 都把当前微信开放平台状态视为“账号认证通过但移动应用尚未创建”。`scripts/check-aliyun-production-cn-readiness.mjs` 的 nextActions 也已区分 `not_started`、`reviewing`、`rejected`：当前 `not_started` 会提示先创建“美业话镜”移动应用并提交审核，而不是直接去读取 AppID/AppSecret。`aliyun:predeploy` 已纳入该测试，部署规格 `localPredeployChecks` 更新为 28 项。
 
 ## 11. 真正部署时的命令顺序
 
@@ -762,7 +764,7 @@ corepack pnpm aliyun:remote:smoke -- --base-url https://api-cn.ipgongchang.xin
 corepack pnpm aliyun:app-api:smoke -- --base-url https://api-cn.ipgongchang.xin
 ```
 
-如果微信开放平台仍在审核中，只能作为桥接调试放行已知缺口：
+如果微信开放平台移动应用仍未 `approved`（`not_started` 或 `reviewing`），只能作为桥接调试放行已知缺口：
 
 ```bash
 corepack pnpm aliyun:remote:smoke -- \

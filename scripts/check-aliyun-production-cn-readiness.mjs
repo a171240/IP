@@ -706,6 +706,19 @@ function wechatOpenPlatformBlocker(wechatOpenPlatform) {
   return "wechat_open_platform_mobile_app_not_ready"
 }
 
+function wechatOpenPlatformNextAction(reviewStatus) {
+  if (reviewStatus === "not_started") {
+    return "先在微信开放平台创建“美业话镜”移动应用并提交审核；审核通过后再补 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET"
+  }
+  if (reviewStatus === "reviewing") {
+    return "等待微信开放平台移动应用审核通过后补 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET"
+  }
+  if (reviewStatus === "rejected") {
+    return "按微信开放平台驳回原因修正并重新提交移动应用；通过前不要填写猜测的 AppID/AppSecret"
+  }
+  return "确认微信开放平台账号已认证后创建移动应用；审核通过后再补 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET"
+}
+
 function addBlocker(blocking, condition, code) {
   if (condition) blocking.push(code)
 }
@@ -900,9 +913,7 @@ function main() {
     nextActions: [
       "创建或确认阿里云 SAE 容器应用、api-cn 域名和 HTTPS 证书",
       "把 APP_API_BASE_URL 和 NEXT_PUBLIC_SITE_URL 填为 api-cn HTTPS 正式地址",
-      wechatOpenPlatform.reviewStatus === "reviewing"
-        ? "等待微信开放平台移动应用审核通过后补 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET"
-        : "从微信开放平台移动应用补 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET",
+      wechatOpenPlatformNextAction(wechatOpenPlatform.reviewStatus),
       "从 Apple Developer 确认 APPLE_TEAM_ID，部署后验证 /.well-known/apple-app-site-association 可返回美业话镜 iOS AASA",
       diagnosticOnly
         ? "当前使用 --assume-cloud-ready，只能做本地诊断；正式发布必须改用 cloud-confirmations.local.json 非密钥证据"
