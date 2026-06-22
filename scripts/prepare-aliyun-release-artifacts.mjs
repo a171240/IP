@@ -189,6 +189,7 @@ function renderMarkdown(audit) {
   const bundle = audit.bundle
   const vercelEnvCoverage = audit.checks.vercelEnvCoverage
   const domain = audit.checks.domain
+  const cloudAccess = audit.checks.cloudAccess
   const deploymentSpec = audit.checks.deploymentSpec
   const runtimePlan = audit.checks.runtimePlan
   const legalPages = audit.checks.legalPages
@@ -225,6 +226,7 @@ function renderMarkdown(audit) {
     `- legalPages: ${legalPages.ok ? "ok" : "not ready"}`,
     `- imagePublishPlan: ${imagePublishPlan.ready === true ? "ready" : "not ready"}`,
     `- domainReadiness: ${domain.ok ? "ok" : "not ready"} (${domain.targetReady} / ${domain.targetTotal})`,
+    `- cloudAccess: ${cloudAccess.canReadCloudNow ? "cli-ready" : "manual-console"} (${cloudAccess.blockers?.length || 0} blockers)`,
     `- appRuntimeConfig: ${appRuntimeConfig?.ok === true ? "ready" : "not ready"}`,
     `- appNativeRelease: ${appNativeRelease?.ok === true ? "ready" : "not ready"}`,
     `- operatorTasks: ${operatorTasks.summary.ready} / ${operatorTasks.summary.total} ready`,
@@ -265,6 +267,21 @@ function renderMarkdown(audit) {
     ...(cloudConfirmationsCheck?.local?.blockers?.length
       ? cloudConfirmationsCheck.local.blockers.map((item) => `- ${item}`)
       : ["- none"]),
+    "",
+    "## 阿里云云侧访问能力",
+    "",
+    `- path: ${audit.outputFiles.cloudAccess}`,
+    `- readOnlyOnly: ${cloudAccess.readOnlyOnly === true}`,
+    `- cloudApiCalled: ${cloudAccess.cloudApiCalled === true}`,
+    `- cloudMutationPerformed: ${cloudAccess.cloudMutationPerformed === true}`,
+    `- canReadCloudNow: ${cloudAccess.canReadCloudNow === true}`,
+    `- cliAvailable: ${cloudAccess.cli?.available === true}`,
+    `- cliBinary: ${cloudAccess.cli?.binary || "missing"}`,
+    `- cliConfigFileExists: ${cloudAccess.cli?.configFileExists === true}`,
+    `- checklistItems: ${cloudAccess.consoleEvidenceChecklist?.length || 0}`,
+    ...(cloudAccess.blockers?.length
+      ? cloudAccess.blockers.map((item) => `- ${item}`)
+      : ["- blockers: none"]),
     "",
     "## APP production-cn 配置模板",
     "",
@@ -540,6 +557,15 @@ function main() {
     args.envFile,
     "--allow-blocking",
   ])
+  const cloudAccessPath = resolve(args.outDir, "cloud-access.json")
+  const cloudAccess = runJson("cloud_access", [
+    "scripts/check-aliyun-cloud-access.mjs",
+    "--env-file",
+    args.envFile,
+    ...(args.cloudConfirmationsFile ? ["--cloud-confirmations", args.cloudConfirmationsFile] : []),
+    "--write-report",
+    cloudAccessPath,
+  ])
   const deploymentSpec = runJson("deployment_spec", ["scripts/check-aliyun-deployment-spec.mjs"])
   const runtimePlan = runJson("runtime_plan", ["scripts/check-aliyun-runtime-plan.mjs"])
   const imagePublishPlan = runJson("image_publish_plan", [
@@ -616,6 +642,7 @@ function main() {
       env,
       readiness,
       domain,
+      cloudAccess,
       deploymentSpec,
       runtimePlan,
       legalPages,
@@ -638,6 +665,7 @@ function main() {
       envImportPlan: resolve(args.outDir, "env-import-plan.json"),
       vercelEnvCoverage: vercelEnvCoverage.ok ? resolve(args.outDir, "vercel-env-coverage.json") : null,
       domainReadiness: resolve(args.outDir, "domain-readiness.json"),
+      cloudAccess: cloudAccessPath,
       cloudConfirmationsCheck: cloudConfirmationsCheckPath,
       legalPages: resolve(args.outDir, "legal-pages.json"),
       runtimePlan: resolve(args.outDir, "runtime-plan.json"),
@@ -656,6 +684,7 @@ function main() {
   writeText(audit.outputFiles.auditJson, JSON.stringify(audit, null, 2))
   writeText(audit.outputFiles.auditMarkdown, renderMarkdown(audit))
   writeText(audit.outputFiles.domainReadiness, JSON.stringify(domain, null, 2))
+  writeText(audit.outputFiles.cloudAccess, JSON.stringify(cloudAccess, null, 2))
   writeText(audit.outputFiles.cloudConfirmationsCheck, JSON.stringify(cloudConfirmationsCheck, null, 2))
   writeText(audit.outputFiles.legalPages, JSON.stringify(legalPages, null, 2))
   writeText(audit.outputFiles.runtimePlan, JSON.stringify(runtimePlan, null, 2))
@@ -672,6 +701,14 @@ function main() {
     machineBlocking: readiness.machineBlocking,
     manualBlockingCount: readiness.manualBlocking.length,
     cloudConfirmationsReady: readiness.checks?.cloudConfirmations?.ready === true,
+    cloudAccess: {
+      report: audit.outputFiles.cloudAccess,
+      canReadCloudNow: cloudAccess.canReadCloudNow === true,
+      cliAvailable: cloudAccess.cli?.available === true,
+      cliConfigFileExists: cloudAccess.cli?.configFileExists === true,
+      blockers: cloudAccess.blockers || [],
+      checklistItems: cloudAccess.consoleEvidenceChecklist?.length || 0,
+    },
     deploymentSpec: {
       ok: deploymentSpec.ok === true,
       image: deploymentSpec.image,
@@ -800,6 +837,7 @@ function main() {
     envImportPlan: audit.outputFiles.envImportPlan,
     vercelEnvCoverageReport: audit.outputFiles.vercelEnvCoverage,
     domainReadinessReport: audit.outputFiles.domainReadiness,
+    cloudAccessReport: audit.outputFiles.cloudAccess,
     cloudConfirmationsCheckReport: audit.outputFiles.cloudConfirmationsCheck,
     operatorTasksJson: audit.outputFiles.operatorTasksJson,
     operatorTasksMarkdown: audit.outputFiles.operatorTasksMarkdown,
