@@ -23,6 +23,7 @@ const REQUIRED_PREDEPLOY_CHECKS = [
   "corepack pnpm aliyun:completion:audit",
   "corepack pnpm aliyun:operator:handoff",
   "corepack pnpm aliyun:wechat-open:package",
+  "corepack pnpm aliyun:apple-team:package",
   "corepack pnpm aliyun:status",
   "corepack pnpm aliyun:cloud:access",
   "corepack pnpm aliyun:cloud:inventory-plan",

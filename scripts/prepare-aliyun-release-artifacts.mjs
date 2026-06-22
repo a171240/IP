@@ -212,6 +212,7 @@ function renderMarkdown(audit) {
   const actionAuthorization = audit.checks.actionAuthorization
   const completionAudit = audit.checks.completionAudit
   const wechatOpenMobileAppPackage = audit.checks.wechatOpenMobileAppPackage
+  const appleTeamAasaPackage = audit.checks.appleTeamAasaPackage
   const operatorHandoff = audit.checks.operatorHandoff
   const productionStatus = audit.checks.productionStatus
   const cloudConfirmationsCheck = audit.checks.cloudConfirmationsCheck
@@ -580,6 +581,23 @@ function renderMarkdown(audit) {
     `- androidPackageName: ${wechatOpenMobileAppPackage.mobileAppCreationPackage?.android?.packageName || "unknown"}`,
     `- iosBundleId: ${wechatOpenMobileAppPackage.mobileAppCreationPackage?.ios?.bundleId || "unknown"}`,
     "",
+    "## Apple Team ID / AASA 动作确认包",
+    "",
+    `- json: ${audit.outputFiles.appleTeamAasaPackageJson}`,
+    `- markdown: ${audit.outputFiles.appleTeamAasaPackageMarkdown}`,
+    `- ok: ${appleTeamAasaPackage.ok === true}`,
+    `- containsValues: ${appleTeamAasaPackage.containsValues === true}`,
+    `- mutationPerformed: ${appleTeamAasaPackage.mutationPerformed === true}`,
+    `- teamIdStatus: ${appleTeamAasaPackage.summary?.teamIdStatus || "unknown"}`,
+    `- aasaOk: ${appleTeamAasaPackage.summary?.aasaOk === true}`,
+    `- routeFilesReady: ${appleTeamAasaPackage.summary?.routeFilesReady === true}`,
+    `- iosNativeReady: ${appleTeamAasaPackage.summary?.iosNativeReady === true}`,
+    `- readyForAasa: ${appleTeamAasaPackage.actionPacket?.readyForAasa === true}`,
+    `- actionPacket: ${appleTeamAasaPackage.actionPacket?.packetId || "none"}`,
+    `- blockers: ${appleTeamAasaPackage.summary?.blockers?.length ? appleTeamAasaPackage.summary.blockers.join(", ") : "none"}`,
+    `- iosBundleId: ${appleTeamAasaPackage.summary?.expectedIosBundleId || "unknown"}`,
+    `- associatedDomain: ${appleTeamAasaPackage.summary?.associatedDomain || "unknown"}`,
+    "",
     "## 操作员操作包",
     "",
     `- json: ${audit.outputFiles.operatorHandoffJson}`,
@@ -864,6 +882,8 @@ function main() {
   const completionAuditMarkdownPath = resolve(args.outDir, "completion-audit.md")
   const wechatOpenMobileAppPackageJsonPath = resolve(args.outDir, "wechat-open-mobile-app-package.json")
   const wechatOpenMobileAppPackageMarkdownPath = resolve(args.outDir, "wechat-open-mobile-app-package.md")
+  const appleTeamAasaPackageJsonPath = resolve(args.outDir, "apple-team-aasa-package.json")
+  const appleTeamAasaPackageMarkdownPath = resolve(args.outDir, "apple-team-aasa-package.md")
   const operatorHandoffJsonPath = resolve(args.outDir, "operator-handoff.json")
   const operatorHandoffMarkdownPath = resolve(args.outDir, "operator-handoff.md")
   const productionStatusJsonPath = resolve(args.outDir, "production-cn-status.json")
@@ -969,6 +989,15 @@ function main() {
     "--markdown",
     wechatOpenMobileAppPackageMarkdownPath,
   ])
+  const appleTeamAasaPackage = runJson("apple_team_aasa_package", [
+    "scripts/generate-apple-team-aasa-package.mjs",
+    "--env-file",
+    args.envFile,
+    "--out",
+    appleTeamAasaPackageJsonPath,
+    "--markdown",
+    appleTeamAasaPackageMarkdownPath,
+  ])
   const operatorHandoff = runJson("operator_handoff", [
     "scripts/generate-aliyun-operator-handoff.mjs",
     "--env-file",
@@ -1039,6 +1068,7 @@ function main() {
       actionAuthorization,
       completionAudit,
       wechatOpenMobileAppPackage,
+      appleTeamAasaPackage,
       operatorHandoff,
       productionStatus,
       cloudConfirmationsCheck,
@@ -1089,6 +1119,8 @@ function main() {
       completionAuditMarkdown: completionAuditMarkdownPath,
       wechatOpenMobileAppPackageJson: wechatOpenMobileAppPackageJsonPath,
       wechatOpenMobileAppPackageMarkdown: wechatOpenMobileAppPackageMarkdownPath,
+      appleTeamAasaPackageJson: appleTeamAasaPackageJsonPath,
+      appleTeamAasaPackageMarkdown: appleTeamAasaPackageMarkdownPath,
       operatorHandoffJson: operatorHandoffJsonPath,
       operatorHandoffMarkdown: operatorHandoffMarkdownPath,
       productionStatusJson: productionStatusJsonPath,
@@ -1353,6 +1385,24 @@ function main() {
       androidPackageName: wechatOpenMobileAppPackage.mobileAppCreationPackage?.android?.packageName || "",
       iosBundleId: wechatOpenMobileAppPackage.mobileAppCreationPackage?.ios?.bundleId || "",
     },
+    appleTeamAasaPackage: {
+      report: audit.outputFiles.appleTeamAasaPackageJson,
+      markdown: audit.outputFiles.appleTeamAasaPackageMarkdown,
+      ok: appleTeamAasaPackage.ok === true,
+      containsValues: appleTeamAasaPackage.containsValues === true,
+      mutationPerformed: appleTeamAasaPackage.mutationPerformed === true,
+      teamIdStatus: appleTeamAasaPackage.summary?.teamIdStatus || "unknown",
+      aasaOk: appleTeamAasaPackage.summary?.aasaOk === true,
+      routeFilesReady: appleTeamAasaPackage.summary?.routeFilesReady === true,
+      iosNativeReady: appleTeamAasaPackage.summary?.iosNativeReady === true,
+      readyForAasa: appleTeamAasaPackage.actionPacket?.readyForAasa === true,
+      actionPacket: appleTeamAasaPackage.actionPacket || null,
+      blockers: appleTeamAasaPackage.summary?.blockers || [],
+      expectedIosBundleId: appleTeamAasaPackage.summary?.expectedIosBundleId || "",
+      associatedDomain: appleTeamAasaPackage.summary?.associatedDomain || "",
+      universalLink: appleTeamAasaPackage.summary?.universalLink || "",
+      aasaUrl: appleTeamAasaPackage.summary?.aasaUrl || "",
+    },
     operatorHandoff: {
       report: audit.outputFiles.operatorHandoffJson,
       markdown: audit.outputFiles.operatorHandoffMarkdown,
@@ -1483,6 +1533,8 @@ function main() {
     completionAuditMarkdown: audit.outputFiles.completionAuditMarkdown,
     wechatOpenMobileAppPackageJson: audit.outputFiles.wechatOpenMobileAppPackageJson,
     wechatOpenMobileAppPackageMarkdown: audit.outputFiles.wechatOpenMobileAppPackageMarkdown,
+    appleTeamAasaPackageJson: audit.outputFiles.appleTeamAasaPackageJson,
+    appleTeamAasaPackageMarkdown: audit.outputFiles.appleTeamAasaPackageMarkdown,
     operatorHandoffJson: audit.outputFiles.operatorHandoffJson,
     operatorHandoffMarkdown: audit.outputFiles.operatorHandoffMarkdown,
   }, null, 2))

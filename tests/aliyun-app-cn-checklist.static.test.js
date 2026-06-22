@@ -87,7 +87,7 @@ test("APP production-cn release manifest separates historical snapshots from cur
   assert.match(manifest, /当前权威脚本口径为 `imagePublishPlan\.totalBlockers=12`/)
   assert.match(manifest, /`cloudConfirmations\.totalBlockers=27`/)
   assert.match(manifest, /该时点脚本口径为 `localPredeployChecks=48`、`predeployChecks=29`/)
-  assert.match(manifest, /当前权威脚本口径为 `localPredeployChecks=58`、`predeployChecks=34`/)
+  assert.match(manifest, /当前权威脚本口径为 `localPredeployChecks=60`、`predeployChecks=35`/)
   assert.match(manifest, /18:46 口径保留为历史证据/)
   assert.match(manifest, /18:55 的 `44\/27` 也只代表对应时点的历史快照/)
   assert.match(manifest, /早前 35\/24、40\/25、16、25 也只代表对应时点的历史快照/)
