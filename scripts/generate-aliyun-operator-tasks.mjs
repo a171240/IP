@@ -229,6 +229,7 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan }) {
     actions: [
       "复制 deploy/aliyun-production-cn.image-publish.example.json 到 deploy/aliyun-production-cn.image-publish.local.json。",
       "确认 ACR region 为 cn-hangzhou，repository 为 meiye-huajing-app-api，tag 为 production-cn。",
+      "当前已核到 ACR 企业版经济版 cn-hangzhou 1 个月候选报价 CNY 117.00；该步骤是付费购买，必须在付款动作前取得用户对金额和规格的明确确认。",
       "先运行 corepack pnpm aliyun:docker:build 和 corepack pnpm aliyun:container:smoke。",
       "通过 docker login 或阿里云镜像构建服务把镜像推送/导入 ACR；不要把 registry 密码、RAM Secret 或 token 写入 JSON、文档或 git。",
       "配置 SAE 使用 ACR remoteImage，并确认运行时有镜像拉取权限。",
@@ -236,6 +237,7 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan }) {
     ],
     evidence: [
       "acr.confirmed=true",
+      "purchaseCandidate=ACR Enterprise Economic cn-hangzhou 1 month CNY 117.00 not purchased",
       "imagePushed=true",
       "digestVerified=true",
       "runtime.remoteImageConfigured=true",
@@ -250,6 +252,7 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan }) {
     ],
     notes: [
       "image-publish.local.json 只记录非密钥镜像发布证据。",
+      "未付款前只能记录 purchaseCandidate，不能把 ACR 视为 confirmed。",
       "ACR 登录凭证只能放在 docker credential helper、RAM/KMS/Secrets Manager 或阿里云运行时配置里。",
     ],
   })

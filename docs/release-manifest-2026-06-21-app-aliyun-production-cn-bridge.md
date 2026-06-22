@@ -715,6 +715,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 13:42 CST 追加：RAM 控制台权限策略页在 Chrome 中反复卡骨架屏，控制台日志显示 `SecurityError: Failed to read a named property 'setTimeout' from 'Window'`；改用阿里云 Cloud Shell 通过当前登录态执行 `aliyun ram CreatePolicy`，已创建自定义策略 `MeiyeHuajingServiceRecordsOssPolicy`，`PolicyType=Custom`，`DefaultVersion=v1`，`CreateDate=2026-06-22T05:42:34Z`，`RequestId=B001B97B-26B7-5737-9A05-61792150EB1C`。策略内容来自 `deploy/aliyun-production-cn.oss-ram-policy.json`，只允许服务记录前缀的 `oss:GetObject`、`oss:PutObject`、`oss:PostObject`。本轮没有创建 RAM AccessKey、没有读取或导入 secret、没有绑定 RAM 用户/角色；因此 `oss.ramLeastPrivilege` 仍保持 false，等绑定到实际运行身份并完成密钥或 STS 安全导入后再改为 ready。
 
+2026-06-22 13:46 CST 追加：ACR 企业版购买页已核到最低生产候选路径：`cn-hangzhou` 企业版经济版、购买时长 `1` 个月，应付 `CNY 117.00`，按钮为“立即购买”。该页面属于明确付费购买动作，当前未点击购买、未创建企业版实例、未创建 namespace/repository、未 push 镜像。`deploy/aliyun-production-cn.image-publish.local.json` 只记录非密钥 `purchaseCandidate`，`acr.confirmed`、`imagePushed`、`digestVerified`、`runtime.remoteImageConfigured` 和 `runtime.imagePullConfigured` 继续保持 false；`corepack pnpm aliyun:image:plan` 会输出该候选报价，但严格发布仍必须等 ACR 真实实例、remote image/digest 和 SAE 拉取证据完成。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：

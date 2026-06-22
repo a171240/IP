@@ -101,9 +101,10 @@ corepack pnpm aliyun:image:plan:strict
 ```text
 ACR 个人版：可进入创建页，但页面提示个人版无 SLA 且有使用限制，请勿在生产业务中使用。
 ACR 企业版：入口存在，属于生产级实例选择/购买路径。
+ACR 企业版经济版：2026-06-22 控制台核到 cn-hangzhou / 1 个月候选报价 CNY 117.00，尚未购买。
 ```
 
-因此正式 production-cn 不应把个人版 ACR 当作最终生产证据。若只是桥接调试，可以单独标记为 diagnostic；正式发布需要选择企业版 ACR，或改用阿里云镜像构建/SAE 支持的其它生产级镜像来源，并把 remote image、digest 和运行时拉取证据写入 `deploy/aliyun-production-cn.image-publish.local.json`。
+因此正式 production-cn 不应把个人版 ACR 当作最终生产证据。若只是桥接调试，可以单独标记为 diagnostic；正式发布需要选择企业版 ACR，或改用阿里云镜像构建/SAE 支持的其它生产级镜像来源，并把 remote image、digest 和运行时拉取证据写入 `deploy/aliyun-production-cn.image-publish.local.json`。ACR 企业版购买是明确付费动作，未取得用户对规格和金额的动作前确认时，只能在 local 文件里记录 `purchaseCandidate`，不能把 `acr.confirmed` 改成 true。
 
 ### 2.2 健康检查
 

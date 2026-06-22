@@ -195,6 +195,7 @@ function validateFile(filePath, mode) {
       remoteImage: data.acr?.remoteImage || "",
       imagePushed: data.acr?.imagePushed === true,
       digestVerified: data.acr?.digestVerified === true,
+      purchaseCandidate: data.acr?.purchaseCandidate || null,
     },
     runtime: {
       target: data.runtime?.target || "",
@@ -429,6 +430,7 @@ function main() {
     localDockerImage,
     nextActions: [
       "Copy deploy/aliyun-production-cn.image-publish.example.json to deploy/aliyun-production-cn.image-publish.local.json after ACR is chosen.",
+      "If the ACR buy page is still waiting for payment, record only the non-secret purchase candidate quote and do not mark ACR as confirmed.",
       "Fill only registry host, namespace, repository, image digest, booleans, and evidence handles. Do not store registry credentials.",
       "Run corepack pnpm aliyun:docker:build and corepack pnpm aliyun:container:smoke before pushing the image.",
       "Push or import the image into Aliyun ACR, configure SAE to use the remote image, then run corepack pnpm aliyun:image:plan:strict.",

@@ -22,7 +22,17 @@
     "remoteDigest": "TODO_ACR_IMAGE_DIGEST_SHA256",
     "imagePushed": false,
     "digestVerified": false,
-    "evidence": "TODO_ACR_IMAGE_EVIDENCE"
+    "evidence": "TODO_ACR_IMAGE_EVIDENCE",
+    "purchaseCandidate": {
+      "confirmed": false,
+      "edition": "TODO_ACR_EDITION",
+      "region": "cn-hangzhou",
+      "duration": "TODO_DURATION",
+      "quotedAmount": "TODO_QUOTED_AMOUNT",
+      "quotedAt": "TODO_QUOTED_AT",
+      "requiresActionTimePurchaseConfirmation": true,
+      "evidence": "TODO_ACR_PURCHASE_CANDIDATE_EVIDENCE"
+    }
   },
   "runtime": {
     "confirmed": false,
