@@ -758,6 +758,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 17:12 CST 追加：`aliyun:user:actions` 现在为每个 U 项输出 `currentBlockers` 和 `currentEvidence`。微信 U01 当前会显示 `accountVerified=true`、`mobileAppCreated=false`、`mobileAppSubmitted=false`、`reviewStatus=not_started`，并把 `wechatOpenPlatform:mobileAppCreated` / `wechatOpenPlatform:mobileAppSubmitted` 作为当前 blocker；域名 U07 会显示 api-cn/assets-cn 的 DNS、HTTPS、ICP 当前布尔状态；部署 U09 会显示 `canDeployNow=false`、`productionReady=false`、`cloudConfirmations=0/7`。这些字段用于解释现状，不包含密钥值，也不代表已执行云资源变更。
 
+2026-06-22 17:25 CST 追加：按“微信开放平台账号已认证、移动 App 未创建”的真实状态复核后，本机 ignored 镜像发布证据只补运行时非密钥字段：`runtime.target=SAE`、`runtime.appName=meiye-huajing-app-api-production-cn`、`runtime.imagePullCredentialMode=pending_acr_runtime_configuration_no_credentials_in_file`。`corepack pnpm aliyun:image:plan` 当前识别本地 Docker 镜像 digest `sha256:494907a4f9e7342064dda55fe30e0e48dd245b6d6ae753bdbb3945f77c0f518d`，`containsValues=false`，镜像发布 blocker 从旧记录的 16 项降到 12 项；剩余阻塞仍需要 ACR 购买/仓库/推送 digest 和 SAE 拉镜像配置，不能视为已部署或可上线。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：

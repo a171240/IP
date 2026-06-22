@@ -1167,6 +1167,8 @@ localDockerImage.size: 726504043
 
 `deploy/aliyun-production-cn.image-publish.local.json` 作为 ignored 非密钥草稿已同步到该 local digest。ACR remote image / digest 仍未填写，不能视为阿里云镜像已发布。
 
+2026-06-22 16:38 CST 更新：ignored 非密钥草稿 `deploy/aliyun-production-cn.image-publish.local.json` 已补入运行时目标 `SAE`、应用名 `meiye-huajing-app-api-production-cn` 和运行时镜像拉取计划证据。`corepack pnpm aliyun:image:plan` 当前仍为 `ok=false`，但 blocker 已收敛到 12 项，剩余均为 ACR registry/namespace/remote image/remote digest/push evidence、ACR confirmed/imagePushed/digestVerified，以及 SAE runtime confirmed/remoteImageConfigured/imagePullConfigured。当前本地镜像可识别为 `meiye-huajing-app-api:production-cn`，digest `sha256:494907a4f9e7342064dda55fe30e0e48dd245b6d6ae753bdbb3945f77c0f518d`，未推送到阿里云 ACR，不能部署。
+
 本地 production server 已用 `.env.production-cn.local` 做过 HTTP 验证：
 
 ```text
