@@ -351,7 +351,7 @@ meiye-huajing-app-api-production-cn-context.tar.gz
 
 该脚本会复用当前 readiness、env、routes、小程序链路桥接清单、SAE runtime plan、Docker context 和 `aliyun:cloud:access` 检查，并默认尝试生成 Vercel production 变量名覆盖报告。Vercel 覆盖报告只包含变量名、环境和加密/敏感元数据，不包含真实 value；如果 Vercel 登录态不可用，会在审计里记录失败，不阻断本地发布审计包生成。
 
-`production-cn-status.json` 和 `production-cn-status.md` 是 `aliyun:status` 的打包输出，供发布负责人快速判断当前能否上线、还缺哪些微信/阿里云/Apple 证据。`operator-handoff.json` 和 `operator-handoff.md` 是当前唯一建议交给人工操作员的非密钥操作包：微信开放平台已提交审核时，先等移动应用审核通过，再从移动应用详情读取 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`，不要复用小程序 AppID / Secret。操作包会把 `APPLE_TEAM_ID` 单独列为 APP 发布/AASA 阻塞项：它不是后端必填密钥，但 iOS Universal Link 验收需要它生成 AASA `appID`。
+`production-cn-status.json` 和 `production-cn-status.md` 是 `aliyun:status` 的打包输出，供发布负责人快速判断当前能否上线、还缺哪些微信/阿里云/Apple 证据。`operator-handoff.json` 和 `operator-handoff.md` 是当前唯一建议交给人工操作员的非密钥操作包：微信开放平台已提交审核时，先等移动应用审核通过，再从移动应用详情读取 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`，不要复用小程序 AppID / Secret。操作包会把 `APPLE_TEAM_ID` 单独列为 APP 发布/AASA 阻塞项：它不是后端必填密钥，但 iOS Universal Link 验收需要它生成 AASA `appID`。操作包也会内置 `cloudAccess` 摘要：当前机器是否有 `aliyun` CLI、是否已经能做只读云 inventory、以及 SAE/ACR/DNS/OSS/env/SLS 需要从控制台抄录到 `.local.json` 的非密钥字段。
 
 如果只想离线生成审计包，或不想访问 Vercel：
 

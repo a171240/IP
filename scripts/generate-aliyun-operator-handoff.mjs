@@ -101,6 +101,31 @@ function compactLaunchBlockingVariable(item, blockingReason) {
   }
 }
 
+function compactCloudAccess(report) {
+  const checklist = report.consoleEvidenceChecklist || []
+  return {
+    readOnlyOnly: report.readOnlyOnly === true,
+    cloudApiCalled: report.cloudApiCalled === true,
+    cloudMutationPerformed: report.cloudMutationPerformed === true,
+    canReadCloudNow: report.canReadCloudNow === true,
+    cliAvailable: report.cli?.available === true,
+    cliBinary: report.cli?.binary || "",
+    cliConfigFileExists: report.cli?.configFileExists === true,
+    blockers: report.blockers || [],
+    targets: report.targets || {},
+    consoleEvidenceChecklist: checklist.map((item) => ({
+      id: item.id,
+      title: item.title,
+      consolePath: item.consolePath,
+      writeTo: item.writeTo,
+      currentLocalEvidence: item.currentLocalEvidence || "",
+      nonSecretFieldsToRecord: item.nonSecretFieldsToRecord || [],
+      forbidden: item.forbidden || [],
+    })),
+    nextActions: report.nextActions || [],
+  }
+}
+
 function taskById(tasks, id) {
   return tasks.find((task) => task.id === id) || null
 }
@@ -122,7 +147,7 @@ function compactTask(task) {
   }
 }
 
-function buildHandoff({ args, envPlan, status, operatorTasks }) {
+function buildHandoff({ args, envPlan, status, operatorTasks, cloudAccess }) {
   const tasks = operatorTasks.tasks || []
   const machineBlocking = status.summary?.machineBlocking || []
   const waitingWechatReview = status.summary?.operatorTasks?.waitingWechatReview || 0
@@ -170,6 +195,7 @@ function buildHandoff({ args, envPlan, status, operatorTasks }) {
       nativeRelease: status.localReadiness?.nativeRelease?.ok === true,
       docker: status.localReadiness?.docker?.ready === true,
     },
+    cloudAccess: compactCloudAccess(cloudAccess),
     missingVariables: {
       required: blockingRequiredVariables,
       optionalDeferred: optionalDeferredVariables,
@@ -281,6 +307,30 @@ function renderMarkdown(handoff) {
     `- legal pages: ${handoff.localReady.legalPages}`,
     `- native release config: ${handoff.localReady.nativeRelease}`,
     `- docker local gate: ${handoff.localReady.docker}`,
+    "",
+    "## 阿里云云侧访问能力",
+    "",
+    `- readOnlyOnly: ${handoff.cloudAccess.readOnlyOnly}`,
+    `- cloudApiCalled: ${handoff.cloudAccess.cloudApiCalled}`,
+    `- cloudMutationPerformed: ${handoff.cloudAccess.cloudMutationPerformed}`,
+    `- canReadCloudNow: ${handoff.cloudAccess.canReadCloudNow}`,
+    `- cliAvailable: ${handoff.cloudAccess.cliAvailable}`,
+    `- cliConfigFileExists: ${handoff.cloudAccess.cliConfigFileExists}`,
+    `- blockers: ${handoff.cloudAccess.blockers.length ? handoff.cloudAccess.blockers.join(", ") : "none"}`,
+    `- target: ${handoff.cloudAccess.targets.provider || "unknown"} / ${handoff.cloudAccess.targets.region || "unknown"} / ${handoff.cloudAccess.targets.appName || "unknown"}`,
+    "",
+    "### 控制台证据清单",
+    "",
+    ...handoff.cloudAccess.consoleEvidenceChecklist.flatMap((item) => [
+      `- ${item.id}: ${item.title}`,
+      `  - consolePath: ${item.consolePath}`,
+      `  - writeTo: ${item.writeTo}`,
+      `  - nonSecretFieldsToRecord: ${item.nonSecretFieldsToRecord.join(", ")}`,
+    ]),
+    "",
+    "### 云侧访问下一步",
+    "",
+    ...handoff.cloudAccess.nextActions.map((item) => `- ${item}`),
     "",
     "## 现在缺的必填环境变量",
     "",
@@ -409,7 +459,14 @@ function main() {
     "--cloud-confirmations",
     args.cloudConfirmationsFile,
   ])
-  const handoff = buildHandoff({ args, envPlan, status, operatorTasks })
+  const cloudAccess = runJson("cloud_access", [
+    resolve(BACKEND_ROOT, "scripts/check-aliyun-cloud-access.mjs"),
+    "--env-file",
+    args.envFile,
+    "--cloud-confirmations",
+    args.cloudConfirmationsFile,
+  ])
+  const handoff = buildHandoff({ args, envPlan, status, operatorTasks, cloudAccess })
   const output = `${JSON.stringify(handoff, null, 2)}\n`
   process.stdout.write(output)
   writeOutput(args.outPath, output)

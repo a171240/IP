@@ -233,10 +233,13 @@ function buildStatus({ readiness, operatorTasks, args }) {
     nextCommandOrder: [
       "corepack pnpm aliyun:operator:tasks",
       "corepack pnpm aliyun:cloud:check",
+      "corepack pnpm aliyun:cloud:confirmations:strict",
       "corepack pnpm aliyun:image:plan:strict",
       "corepack pnpm aliyun:domain:strict",
       "corepack pnpm aliyun:readiness:cloud-ready",
+      "corepack pnpm aliyun:release:artifacts",
       "corepack pnpm aliyun:docker:build",
+      "corepack pnpm aliyun:container:smoke",
       "corepack pnpm aliyun:postdeploy:smoke -- --base-url https://api-cn.ipgongchang.xin",
     ],
     humanSummary,
