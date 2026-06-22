@@ -479,17 +479,20 @@ function buildSensitiveActionItems({ envPlan, readiness, imagePublishPlan }) {
   const items = []
 
   if (wechatMissing.length > 0 || wechatOpenPlatform.reviewStatus !== "approved") {
+    const variableNames = Array.from(new Set([
+      ...wechatMissing.map((item) => item.name),
+      "WECHAT_OPEN_APP_ID",
+      "WECHAT_OPEN_APP_SECRET",
+      "WECHAT_OPEN_APP_REVIEW_STATUS",
+    ]))
     items.push({
       id: "S01_WECHAT_OPEN_APP_LOGIN",
       type: "external_credential_after_review",
       status: wechatOpenPlatform.reviewStatus === "approved" && wechatMissing.length === 0 ? "ready" : "blocked",
       owner: "用户/微信开放平台操作员",
       consolePath: "微信开放平台 -> 管理中心 -> 移动应用 -> 美业话镜 App",
-      variableNames: Array.from(new Set([
-        ...wechatMissing.map((item) => item.name),
-        "WECHAT_OPEN_APP_ID",
-        "WECHAT_OPEN_APP_SECRET",
-      ])),
+      variableNames,
+      variableDetails: variableDetailsFor(variables, variableNames),
       requiredUserAction: wechatSensitiveRequiredUserAction(wechatOpenPlatform.reviewStatus),
       unblockCondition: "reviewStatus=approved 且 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET ready。",
       forbidden: "不能用小程序 AppID/Secret 替代，不能把 AppID 写进 App 包，也不能把 AppSecret 写入文档、镜像或 git。",
@@ -504,6 +507,7 @@ function buildSensitiveActionItems({ envPlan, readiness, imagePublishPlan }) {
       owner: "Apple Developer / iOS 发布操作员",
       consolePath: appleTeamId?.consolePath || "Apple Developer -> Membership",
       variableNames: ["APPLE_TEAM_ID"],
+      variableDetails: variableDetailsFor(variables, ["APPLE_TEAM_ID"]),
       requiredUserAction: "从 Apple Developer 确认 10 位 Team ID 后导入阿里云 plain env，用于 AASA appID。",
       unblockCondition: "APPLE_TEAM_ID ready 且 aliyun:aasa:check 不再报 apple_team_id_missing。",
       forbidden: "不要猜测 Team ID；需与 iOS Bundle ID com.ipgongchang.meiyehuajing 一致。",
@@ -547,6 +551,11 @@ function buildSensitiveActionItems({ envPlan, readiness, imagePublishPlan }) {
       owner: "阿里云 OSS/RAM 操作员",
       consolePath: "阿里云控制台 -> RAM 访问控制 / OSS Bucket / SAE 环境变量或 Secrets Manager",
       variableNames: ["ALIYUN_OSS_ACCESS_KEY_ID", "ALIYUN_OSS_ACCESS_KEY_SECRET", "ALIYUN_OSS_SECURITY_TOKEN"],
+      variableDetails: variableDetailsFor(variables, [
+        "ALIYUN_OSS_ACCESS_KEY_ID",
+        "ALIYUN_OSS_ACCESS_KEY_SECRET",
+        "ALIYUN_OSS_SECURITY_TOKEN",
+      ]),
       requiredUserAction: "把已创建的 OSS 最小权限策略绑定到实际运行身份，并选择受限 AccessKey 或 STS/运行时角色注入方案。",
       unblockCondition: "oss.ramLeastPrivilege=true，且对应 secret/token 只通过阿里云密钥环境注入。",
       forbidden: "不创建可提交的长期明文 Secret；不把 AccessKeySecret 或 STS token 写入仓库、文档或镜像。",
@@ -562,6 +571,7 @@ function buildSensitiveActionItems({ envPlan, readiness, imagePublishPlan }) {
       consolePath: "阿里云 SAE 应用 -> 环境变量 / KMS / Secrets Manager",
       variableGroups: readySecretGroups,
       variableNames: readySecretGroups.flatMap((group) => group.variableNames),
+      variableDetails: variableDetailsFor(variables, readySecretGroups.flatMap((group) => group.variableNames)),
       requiredUserAction: "这些敏感或连接类变量名在本地已有 ready 值，但仍需导入阿里云运行环境；脚本只输出变量名，不输出值。",
       unblockCondition: "envImport.confirmed=true 且 envImport.secretNotInImage=true。",
       forbidden: "不要把任何 value 复制到文档、release manifest、Dockerfile、image 或 git。",
@@ -569,6 +579,49 @@ function buildSensitiveActionItems({ envPlan, readiness, imagePublishPlan }) {
   }
 
   return items.map(withSensitiveActionMetadata)
+}
+
+function variableDetailsFor(variables, names) {
+  const seen = new Set()
+  return names
+    .filter((name) => {
+      if (!name || seen.has(name)) return false
+      seen.add(name)
+      return true
+    })
+    .map((name) => {
+      const item = variables.find((variable) => variable.name === name)
+      if (!item) {
+        return {
+          name,
+          required: false,
+          status: "unknown",
+          sensitivity: "unknown",
+          sourceCategory: "unknown",
+          owner: "unknown",
+          consolePath: "",
+          obtain: "",
+          importTarget: "",
+          cloudConfirmationKey: "",
+          action: "变量未出现在 env import plan 中；先检查 REQUIRED_KEYS/OPTIONAL_KEYS。",
+          notes: "",
+        }
+      }
+      return {
+        name: item.name,
+        required: item.required,
+        status: item.status,
+        sensitivity: item.sensitivity,
+        sourceCategory: categoryOf(item),
+        owner: item.owner,
+        consolePath: item.consolePath,
+        obtain: item.obtain,
+        importTarget: item.importTarget,
+        cloudConfirmationKey: item.cloudConfirmationKey,
+        action: item.action,
+        notes: item.notes,
+      }
+    })
 }
 
 function withSensitiveActionMetadata(item) {

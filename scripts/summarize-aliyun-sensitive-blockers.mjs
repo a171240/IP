@@ -119,6 +119,15 @@ function summarize(items) {
         count: group.count,
         variableNames: group.variableNames || [],
       })),
+    variableDetails: {
+      total: items.reduce((sum, item) => sum + (item.variableDetails || []).length, 0),
+      blocked: items.reduce((sum, item) =>
+        sum + (item.variableDetails || []).filter((variable) => variable.status !== "ready").length, 0),
+      ready: items.reduce((sum, item) =>
+        sum + (item.variableDetails || []).filter((variable) => variable.status === "ready").length, 0),
+      secretOrSensitive: items.reduce((sum, item) =>
+        sum + (item.variableDetails || []).filter((variable) => variable.sensitivity !== "public").length, 0),
+    },
   }
 }
 
@@ -137,6 +146,7 @@ function compactItem(item) {
     completionEvidence: item.completionEvidence || metadata.completionEvidence || [],
     variableNames: item.variableNames || [],
     variableGroups: item.variableGroups || [],
+    variableDetails: item.variableDetails || [],
     requiredUserAction: item.requiredUserAction,
     unblockCondition: item.unblockCondition,
     forbidden: item.forbidden,
@@ -246,6 +256,13 @@ function renderMarkdown(report) {
       `- forbidden: ${item.forbidden}`,
       "",
     )
+    if (item.variableDetails.length) {
+      lines.push(
+        "#### 变量获取和导入明细",
+        "",
+        ...renderVariableDetailTable(item.variableDetails),
+      )
+    }
   }
 
   lines.push(
@@ -255,6 +272,34 @@ function renderMarkdown(report) {
     "",
   )
   return `${lines.join("\n")}\n`
+}
+
+function renderVariableDetailTable(items) {
+  return [
+    "| 变量 | 必填 | 状态 | 敏感等级 | 来源分类 | 获取位置 | 导入目标 | 解除/动作 |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    ...items.map((item) => [
+      codeCell(item.name),
+      item.required ? "是" : "否",
+      escapeTableCell(item.status),
+      escapeTableCell(item.sensitivity),
+      escapeTableCell(item.sourceCategory),
+      escapeTableCell(item.consolePath),
+      escapeTableCell(item.importTarget),
+      escapeTableCell(item.action || item.obtain),
+    ].join(" | ").replace(/^/, "| ").replace(/$/, " |")),
+    "",
+  ]
+}
+
+function codeCell(value) {
+  return `\`${escapeTableCell(value)}\``
+}
+
+function escapeTableCell(value) {
+  return String(value || "")
+    .replace(/\|/g, "\\|")
+    .replace(/\r?\n/g, " ")
 }
 
 function writeOutput(filePath, content) {

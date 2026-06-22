@@ -47,11 +47,30 @@ test("Aliyun sensitive blockers output has current blocked action ids but no sec
   assert.ok(wechatItem.writeTargets.includes("WECHAT_OPEN_APP_SECRET -> 阿里云 KMS/Secrets Manager/SAE secret env"))
   assert.ok(wechatItem.verifyCommands.includes("corepack pnpm aliyun:health:smoke"))
   assert.equal(wechatItem.requiresActionTimeConfirmation, true)
+  assert.ok(report.summary.variableDetails.total >= report.summary.variableDetails.blocked)
+  assert.ok(report.summary.variableDetails.secretOrSensitive >= 1)
+  assert.ok(wechatItem.variableDetails.some((item) =>
+    item.name === "WECHAT_OPEN_APP_ID" &&
+    item.status === "todo" &&
+    item.importTarget === "阿里云 SAE plain env" &&
+    /微信开放平台/.test(item.consolePath)
+  ))
+  assert.ok(wechatItem.variableDetails.some((item) =>
+    item.name === "WECHAT_OPEN_APP_SECRET" &&
+    item.status === "todo" &&
+    item.importTarget === "阿里云 KMS/Secrets Manager/SAE secret env" &&
+    /小程序 AppID\/Secret 不能替代/.test(item.notes)
+  ))
   assert.match(wechatItem.completionEvidence.join("\n"), /mobileAppCreated=true/)
   assert.ok(ids.includes("S02_APPLE_TEAM_ID"))
   assert.equal(appleItem.type, "external_identifier")
   assert.match(appleItem.requiredUserAction, /Apple Developer/)
   assert.match(appleItem.forbidden, /不要猜测 Team ID/)
+  assert.ok(appleItem.variableDetails.some((item) =>
+    item.name === "APPLE_TEAM_ID" &&
+    item.status === "empty" &&
+    item.importTarget === "阿里云 SAE plain env"
+  ))
   assert.ok(ids.includes("S03_ACR_PAID_PURCHASE"))
   assert.ok(ids.includes("S06_READY_SENSITIVE_ENV_IMPORT"))
   assert.equal(acrPurchaseItem.requiresActionTimeConfirmation, true)
@@ -60,6 +79,11 @@ test("Aliyun sensitive blockers output has current blocked action ids but no sec
   assert.equal(envImportItem.requiresActionTimeConfirmation, true)
   assert.ok(envImportItem.writeTargets.some((target) => target.includes("items.envImport")))
   assert.ok(envImportItem.verifyCommands.includes("corepack pnpm aliyun:env:checklist"))
+  assert.ok(envImportItem.variableDetails.some((item) =>
+    item.name === "SUPABASE_SERVICE_ROLE_KEY" &&
+    item.status === "ready" &&
+    item.importTarget === "阿里云 KMS/Secrets Manager/SAE secret env"
+  ))
   assert.deepEqual(
     report.summary.actionTimeConfirmationRequired,
     [
@@ -106,19 +130,44 @@ test("Aliyun operator status and handoff inherit sensitive action metadata", () 
   const handoffEnvImport = handoff.sensitiveActionItems.find((item) => item.id === "S06_READY_SENSITIVE_ENV_IMPORT")
 
   assert.match(operatorWechat.obtainFrom, /微信开放平台/)
+  assert.ok(operatorWechat.variableDetails.some((item) => item.name === "WECHAT_OPEN_APP_SECRET"))
   assert.ok(operatorWechat.writeTargets.includes("WECHAT_OPEN_APP_ID -> 阿里云 SAE plain env"))
   assert.ok(operatorWechat.verifyCommands.includes("corepack pnpm aliyun:app-api:smoke"))
   assert.match(operatorWechat.completionEvidence.join("\n"), /mobileAppSubmitted=true/)
   assert.equal(operatorWechat.requiresActionTimeConfirmation, true)
   assert.equal(operatorApple.type, "external_identifier")
+  assert.ok(operatorApple.variableDetails.some((item) => item.name === "APPLE_TEAM_ID"))
   assert.ok(status.humanSummary.some((line) => /密钥\/密码\/token\/付款\/受控标识符类人工介入项/.test(line)))
   assert.equal(statusAcrPurchase.requiresActionTimeConfirmation, true)
   assert.match(statusAcrPurchase.obtainFrom, /容器镜像服务 ACR/)
   assert.ok(statusAcrPurchase.writeTargets.some((target) => target.includes("image-publish.local.json")))
   assert.equal(handoffEnvImport.requiresActionTimeConfirmation, true)
+  assert.ok(handoffEnvImport.variableDetails.some((item) => item.name === "SUPABASE_SERVICE_ROLE_KEY"))
   assert.ok(handoffEnvImport.verifyCommands.includes("corepack pnpm aliyun:readiness:cloud-ready"))
   assert.match(handoffEnvImport.completionEvidence.join("\n"), /envImport\.secretNotInImage=true/)
   assert.doesNotMatch(operatorTasksOutput + statusOutput + handoffOutput, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(operatorTasksOutput + statusOutput + handoffOutput, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(operatorTasksOutput + statusOutput + handoffOutput, /:\/\/[^\s:@]+:[^\s@]+@/)
+})
+
+test("Aliyun sensitive blockers markdown renders value-free variable acquisition details", () => {
+  const markdownPath = "/tmp/meiye-sensitive-blockers-variable-details.md"
+  execFileSync(process.execPath, [
+    "scripts/summarize-aliyun-sensitive-blockers.mjs",
+    "--markdown",
+    markdownPath,
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 20,
+  })
+  const markdown = fs.readFileSync(markdownPath, "utf8")
+
+  assert.match(markdown, /#### 变量获取和导入明细/)
+  assert.match(markdown, /`WECHAT_OPEN_APP_ID`/)
+  assert.match(markdown, /微信开放平台 -> 管理中心 -> 移动应用 -> 美业话镜 App/)
+  assert.match(markdown, /阿里云 KMS\/Secrets Manager\/SAE secret env/)
+  assert.doesNotMatch(markdown, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(markdown, /LTAI[A-Za-z0-9]{12,}/)
+  assert.doesNotMatch(markdown, /:\/\/[^\s:@]+:[^\s@]+@/)
 })
