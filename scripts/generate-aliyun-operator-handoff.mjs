@@ -261,7 +261,16 @@ function compactTask(task) {
   }
 }
 
-function buildHandoff({ args, envPlan, status, operatorTasks, cloudAccess, vercelEnvCoverage }) {
+function buildHandoff({
+  args,
+  envPlan,
+  status,
+  operatorTasks,
+  cloudAccess,
+  cloudConfirmationsCheck,
+  imagePublishPlan,
+  vercelEnvCoverage,
+}) {
   const tasks = operatorTasks.tasks || []
   const machineBlocking = status.summary?.machineBlocking || []
   const waitingWechatReview = status.summary?.operatorTasks?.waitingWechatReview || 0
@@ -310,6 +319,7 @@ function buildHandoff({ args, envPlan, status, operatorTasks, cloudAccess, verce
       docker: status.localReadiness?.docker?.ready === true,
     },
     cloudAccess: compactCloudAccess(cloudAccess),
+    localEvidenceGaps: buildLocalEvidenceGaps({ args, cloudAccess, cloudConfirmationsCheck, imagePublishPlan }),
     vercelEnvCoverage: compactVercelEnvCoverage(vercelEnvCoverage),
     bridgeDataLayer: status.summary?.bridgeDataLayer || status.localReadiness?.bridgeDataLayer || {
       current: "Supabase",
@@ -370,6 +380,145 @@ function buildHandoff({ args, envPlan, status, operatorTasks, cloudAccess, verce
       "image-publish.local.json 只能写镜像名、digest、布尔状态和证据编号，不能写 registry 密码或 RAM Secret。",
     ],
   }
+}
+
+function buildLocalEvidenceGaps({ args, cloudAccess, cloudConfirmationsCheck, imagePublishPlan }) {
+  const cloudChecklistByTarget = buildCloudChecklistByTarget(cloudAccess)
+  return {
+    cloudConfirmations: {
+      file: args.cloudConfirmationsFile,
+      ready: cloudConfirmationsCheck.local?.ready === true,
+      totalBlockers: cloudConfirmationsCheck.summary?.totalBlockers ?? 0,
+      gaps: buildCloudConfirmationGaps(cloudConfirmationsCheck, cloudChecklistByTarget),
+    },
+    imagePublish: {
+      file: resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.image-publish.local.json"),
+      ready: imagePublishPlan.local?.ready === true,
+      totalBlockers: imagePublishPlan.summary?.totalBlockers ?? 0,
+      localDockerImage: imagePublishPlan.localDockerImage?.status || "unknown",
+      gaps: buildImagePublishGaps(imagePublishPlan, cloudAccess),
+    },
+  }
+}
+
+function buildCloudChecklistByTarget(cloudAccess) {
+  const result = new Map()
+  for (const item of cloudAccess.consoleEvidenceChecklist || []) {
+    const writeTo = String(item.writeTo || "")
+    if (writeTo.includes("items.runtime")) result.set("runtime", item)
+    if (writeTo.includes("items.apiDomainHttps")) result.set("apiDomainHttps", item)
+    if (writeTo.includes("items.assetDomainHttps")) result.set("assetDomainHttps", item)
+    if (writeTo.includes("items.oss")) result.set("oss", item)
+    if (writeTo.includes("items.envImport")) result.set("envImport", item)
+    if (writeTo.includes("items.slsAlerts")) result.set("slsAlerts", item)
+  }
+  result.set("wechatOpenPlatform", {
+    consolePath: "微信开放平台 -> 管理中心 -> 移动应用 -> 美业话镜 App",
+    writeTo: "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.wechatOpenPlatform",
+    forbidden: [
+      "AppSecret",
+      "小程序 AppID/Secret",
+      "token",
+      "cookie",
+    ],
+  })
+  return result
+}
+
+function buildCloudConfirmationGaps(check, checklistByTarget) {
+  const itemStatus = check.local?.itemStatus || {}
+  return Object.entries(itemStatus).flatMap(([key, status]) => {
+    const checklist = checklistByTarget.get(key) || {}
+    return (status.blockers || []).map((blocker) => ({
+      jsonPath: `items.${key}.${fieldFromBlocker(blocker)}`,
+      blocker,
+      source: checklist.consolePath || "对应控制台",
+      writeTo: checklist.writeTo || `deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.${key}`,
+      expected: expectedCloudEvidence(key, blocker),
+      forbidden: checklist.forbidden || [],
+    }))
+  })
+}
+
+function buildImagePublishGaps(imagePublishPlan, cloudAccess) {
+  const acrChecklist = (cloudAccess.consoleEvidenceChecklist || []).find((item) =>
+    String(item.writeTo || "").includes("image-publish.local.json")
+  ) || {}
+  return (imagePublishPlan.local?.blockers || []).map((blocker) => ({
+    jsonPath: fieldFromImageBlocker(blocker),
+    blocker,
+    source: acrChecklist.consolePath || "阿里云控制台 -> 容器镜像服务 ACR / SAE 容器运行时",
+    writeTo: acrChecklist.writeTo || "deploy/aliyun-production-cn.image-publish.local.json",
+    expected: expectedImagePublishEvidence(blocker),
+    forbidden: acrChecklist.forbidden || [],
+  }))
+}
+
+function fieldFromBlocker(blocker) {
+  const value = String(blocker || "")
+  const prefixed = value.match(/^(?:missing|todo|placeholder|empty):(.+)$/)
+  if (prefixed) return prefixed[1]
+  const expected = value.match(/^([^=]+)=/)
+  if (expected) return expected[1]
+  return value
+}
+
+function fieldFromImageBlocker(blocker) {
+  const value = String(blocker || "")
+  const prefixed = value.match(/^(?:missing|todo|empty):(.+)$/)
+  if (prefixed) return prefixed[1]
+  const expected = value.match(/^([^=]+)=/)
+  if (expected) return expected[1]
+  return value
+}
+
+function expectedCloudEvidence(key, blocker) {
+  const field = fieldFromBlocker(blocker)
+  const expectedByField = {
+    confirmed: "确认完成后填 true。",
+    dnsResolvedToAliyun: "域名已解析到阿里云公网入口后填 true。",
+    httpsEnabled: "HTTPS 证书已启用并可访问后填 true。",
+    icpReady: "备案状态满足国内正式访问要求后填 true。",
+    corsConfigured: "OSS CORS 已按 APP 上传/下载需求配置后填 true。",
+    ramLeastPrivilege: "RAM 权限已限制到服务记录前缀后填 true。",
+    mobileAppIdReady: "微信开放平台移动应用审核通过并取得 AppID 后填 true。",
+    mobileAppSecretReady: "微信开放平台移动应用审核通过并取得 AppSecret 后填 true。",
+    androidConfigured: "微信开放平台 Android 包名和 release 签名配置完成后填 true。",
+    iosConfigured: "微信开放平台 iOS Bundle ID 和 Universal Link 配置完成后填 true。",
+    reviewStatus: "微信开放平台移动应用审核通过后填 approved。",
+    androidSignature: "填 Android release 签名证据或证据编号，不填 debug keystore。",
+    iosUniversalLink: "填 https:// 开头的正式 Universal Link。",
+    bucket: "填实际 OSS Bucket 名称或控制台证据编号。",
+    importedAt: "填实际导入 production-cn env 的时间或控制台证据编号。",
+    evidence: "填控制台路径、截图编号、工单号或其它非密钥证据编号。",
+    slsProject: "填实际 SLS Project 名称或控制台证据编号。",
+    secretNotInImage: "确认密钥只在 SAE/KMS/Secrets Manager 中，未写入镜像后填 true。",
+  }
+  if (expectedByField[field]) return expectedByField[field]
+  if (key === "runtime") return "按 runtime plan 填 SAE cn-hangzhou 应用、端口和健康检查证据。"
+  return "填真实非密钥控制台证据，不能保留 TODO、pending 或 TBD 占位值。"
+}
+
+function expectedImagePublishEvidence(blocker) {
+  const field = fieldFromImageBlocker(blocker)
+  const expectedByField = {
+    "acr.registryHost": "填阿里云 ACR registry host。",
+    "acr.namespace": "填阿里云 ACR namespace。",
+    "acr.remoteImage": "填 production-cn 远端镜像完整地址。",
+    "acr.remoteDigest": "填 sha256:<64 hex> 镜像 digest。",
+    "acr.evidence": "填 ACR 推送/导入证据编号。",
+    "acr.confirmed": "ACR 仓库确认后填 true。",
+    "acr.imagePushed": "镜像已推送或导入 ACR 后填 true。",
+    "acr.digestVerified": "远端 digest 已核对后填 true。",
+    "runtime.target": "填 SAE。",
+    "runtime.appName": "填 SAE 应用名。",
+    "runtime.imagePullCredentialMode": "填 not_required 或 configured_outside_this_file 等非密钥说明。",
+    "runtime.evidence": "填 SAE 运行时镜像拉取配置证据编号。",
+    "runtime.confirmed": "SAE runtime 已确认后填 true。",
+    "runtime.remoteImageConfigured": "SAE 已指向 ACR remote image 后填 true。",
+    "runtime.imagePullConfigured": "SAE 镜像拉取权限配置完成后填 true。",
+  }
+  return expectedByField[field] || "填真实非密钥 ACR/SAE 证据，不能写 registry 密码、RAM Secret 或 token。"
 }
 
 function buildAppLaunchBlocking(variables, machineBlocking) {
@@ -458,6 +607,29 @@ function renderMarkdown(handoff) {
     "### 云侧访问下一步",
     "",
     ...handoff.cloudAccess.nextActions.map((item) => `- ${item}`),
+    "",
+    "## 本地证据待填字段",
+    "",
+    "### cloud-confirmations.local.json",
+    "",
+    `- file: ${handoff.localEvidenceGaps.cloudConfirmations.file}`,
+    `- ready: ${handoff.localEvidenceGaps.cloudConfirmations.ready}`,
+    `- totalBlockers: ${handoff.localEvidenceGaps.cloudConfirmations.totalBlockers}`,
+    "",
+    ...(handoff.localEvidenceGaps.cloudConfirmations.gaps.length
+      ? handoff.localEvidenceGaps.cloudConfirmations.gaps.flatMap((item) => renderEvidenceGap(item))
+      : ["- none"]),
+    "",
+    "### image-publish.local.json",
+    "",
+    `- file: ${handoff.localEvidenceGaps.imagePublish.file}`,
+    `- ready: ${handoff.localEvidenceGaps.imagePublish.ready}`,
+    `- totalBlockers: ${handoff.localEvidenceGaps.imagePublish.totalBlockers}`,
+    `- localDockerImage: ${handoff.localEvidenceGaps.imagePublish.localDockerImage}`,
+    "",
+    ...(handoff.localEvidenceGaps.imagePublish.gaps.length
+      ? handoff.localEvidenceGaps.imagePublish.gaps.flatMap((item) => renderEvidenceGap(item))
+      : ["- none"]),
     "",
     "## Vercel production 变量名覆盖",
     "",
@@ -561,6 +733,17 @@ function renderMarkdown(handoff) {
   return `${lines.join("\n")}\n`
 }
 
+function renderEvidenceGap(item) {
+  return [
+    `- \`${item.jsonPath}\``,
+    `  - blocker: ${item.blocker}`,
+    `  - source: ${item.source}`,
+    `  - writeTo: ${item.writeTo}`,
+    `  - expected: ${item.expected}`,
+    ...(item.forbidden?.length ? [`  - forbidden: ${item.forbidden.join(", ")}`] : []),
+  ]
+}
+
 function renderVariable(item) {
   return [
     `### ${item.name}`,
@@ -641,8 +824,27 @@ function main() {
     "--cloud-confirmations",
     args.cloudConfirmationsFile,
   ])
+  const cloudConfirmationsCheck = runJson("cloud_confirmations", [
+    resolve(BACKEND_ROOT, "scripts/check-aliyun-cloud-confirmations.mjs"),
+    "--allow-incomplete",
+    "--local",
+    args.cloudConfirmationsFile,
+  ])
+  const imagePublishPlan = runJson("image_publish_plan", [
+    resolve(BACKEND_ROOT, "scripts/check-aliyun-image-publish-plan.mjs"),
+    "--allow-incomplete",
+  ])
   const vercelEnvCoverage = runVercelEnvCoverage(args)
-  const handoff = buildHandoff({ args, envPlan, status, operatorTasks, cloudAccess, vercelEnvCoverage })
+  const handoff = buildHandoff({
+    args,
+    envPlan,
+    status,
+    operatorTasks,
+    cloudAccess,
+    cloudConfirmationsCheck,
+    imagePublishPlan,
+    vercelEnvCoverage,
+  })
   const output = `${JSON.stringify(handoff, null, 2)}\n`
   process.stdout.write(output)
   writeOutput(args.outPath, output)

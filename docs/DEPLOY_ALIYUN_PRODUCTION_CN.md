@@ -223,7 +223,7 @@ corepack pnpm aliyun:operator:tasks
 corepack pnpm aliyun:operator:handoff
 ```
 
-这些命令不输出任何密钥值，也不会创建资源、导入变量或推送镜像。`aliyun:legal:check` 只确认后端包内 `/privacy` 和 `/terms` 页面存在、核心字段完整，并允许正式 URL 仍未填入 env；`aliyun:deploy:spec` 校验 `deploy/aliyun-production-cn.example.json` 的镜像、端口、ACR 发布计划、SAE runtime plan、域名、健康检查、前后置门禁顺序和 8 项外部确认；`aliyun:runtime:plan` 校验 `deploy/aliyun-production-cn.runtime-plan.json` 是否仍指向 `cn-hangzhou` 的 SAE 自定义容器、端口 3000 和 `api-cn.ipgongchang.xin`；`aliyun:cloud:access` 只检查本机是否具备阿里云 CLI 只读 inventory 条件，并输出 SAE/ACR/DNS/OSS/SLS 控制台要记录的非密钥证据字段，不调用阿里云 API；`aliyun:status` 是给当前发布负责人看的只读总览，会把本地门禁、微信审核、Apple Universal Link、阿里云云资源确认、域名和 ACR 镜像证据压缩成一个 JSON 摘要；`aliyun:operator:tasks` 会把当前 `readiness`、`domain`、`.env.production-cn.local`、`image-publish.local.json` 和 `cloud-confirmations.local.json` 汇总为 9 个任务；`aliyun:operator:handoff` 是给用户、阿里云操作员、微信开放平台操作员和发布负责人共用的非密钥操作包，适合直接判断“现在缺什么、去哪里拿、导入哪里”。它还会读取 Vercel production 的变量名元数据，列出哪些旧后端桥接变量已在 Vercel 中存在、哪些 production-cn 必填变量仍缺；这一步不读取值、不导出密钥，也不等于已导入阿里云。
+这些命令不输出任何密钥值，也不会创建资源、导入变量或推送镜像。`aliyun:legal:check` 只确认后端包内 `/privacy` 和 `/terms` 页面存在、核心字段完整，并允许正式 URL 仍未填入 env；`aliyun:deploy:spec` 校验 `deploy/aliyun-production-cn.example.json` 的镜像、端口、ACR 发布计划、SAE runtime plan、域名、健康检查、前后置门禁顺序和 8 项外部确认；`aliyun:runtime:plan` 校验 `deploy/aliyun-production-cn.runtime-plan.json` 是否仍指向 `cn-hangzhou` 的 SAE 自定义容器、端口 3000 和 `api-cn.ipgongchang.xin`；`aliyun:cloud:access` 只检查本机是否具备阿里云 CLI 只读 inventory 条件，并输出 SAE/ACR/DNS/OSS/SLS 控制台要记录的非密钥证据字段，不调用阿里云 API；`aliyun:status` 是给当前发布负责人看的只读总览，会把本地门禁、微信审核、Apple Universal Link、阿里云云资源确认、域名和 ACR 镜像证据压缩成一个 JSON 摘要；`aliyun:operator:tasks` 会把当前 `readiness`、`domain`、`.env.production-cn.local`、`image-publish.local.json` 和 `cloud-confirmations.local.json` 汇总为 9 个任务；`aliyun:operator:handoff` 是给用户、阿里云操作员、微信开放平台操作员和发布负责人共用的非密钥操作包，适合直接判断“现在缺什么、去哪里拿、导入哪里”。它还会读取 Vercel production 的变量名元数据，列出哪些旧后端桥接变量已在 Vercel 中存在、哪些 production-cn 必填变量仍缺，并把 `cloud-confirmations.local.json` 与 `image-publish.local.json` 仍待填写的 JSON path、控制台来源、期望证据和禁止写入的敏感值逐项列出；这一步不读取值、不导出密钥，也不等于已导入阿里云。
 
 ```text
 T01 微信开放平台移动应用审核和 APP 登录凭证
@@ -1090,3 +1090,5 @@ scopes:
 `PRIVACY_POLICY_URL` / `TERMS_URL` 的 ready 判定现在不只是“有值”：后端 health/readiness 和 APP runtime/build-time config 都要求 HTTPS，且不能是 localhost、example、`.vercel.app` 或旧 Vercel 入口域名。当前 TODO 微信开放平台变量不会被健康检查或 APP 正式包配置误判为 ready。
 
 2026-06-22 10:44 CST 更新：`corepack pnpm aliyun:cloud:confirmations:strict` 现在会把 `.local.json` 里的 `pending_*` / `TBD_*` 字符串视为占位证据 blocker。控制台证据文件仍只能写非密钥资源名、布尔值、控制台路径或证据编号；不能通过把 `confirmed` 改成 `true` 但保留 `pending_env_import`、`pending_sls_project_confirmation` 这类占位文本来通过正式云侧门禁。
+
+2026-06-22 追加：`corepack pnpm aliyun:operator:handoff` 现在输出 `localEvidenceGaps`，会把 `cloud-confirmations.local.json` 当前 30 个云侧 blocker 和 `image-publish.local.json` 当前 16 个镜像/运行时 blocker 映射到具体 JSON path。操作员应按该清单从阿里云、微信开放平台或 Apple Developer 控制台抄录非密钥证据；不要把 AppSecret、AccessKeySecret、registry password、RAM Secret、token、cookie 或 Supabase service role key 写入这些 local 文件。

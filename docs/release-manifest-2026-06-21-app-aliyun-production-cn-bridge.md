@@ -697,6 +697,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 10:44 CST 追加：`aliyun:cloud:confirmations:strict` 加严 `.local.json` 占位证据校验，严格模式会把 `pending_*` / `TBD_*` 字符串作为 blocker。这样阿里云/微信控制台证据必须是真实非密钥资源名、控制台路径、时间或证据编号，不能保留 `pending_env_import`、`pending_sls_project_confirmation` 等占位文本后误判为云侧 ready。同轮已执行 `node --check scripts/check-aliyun-cloud-confirmations.mjs`、`corepack pnpm aliyun:cloud:confirmations`、`corepack pnpm aliyun:operator:tasks`、`corepack pnpm aliyun:status`、目标 eslint、`git diff --check`、新增行密钥扫描、`corepack pnpm aliyun:release:artifacts -- --skip-bundle --skip-vercel-env-coverage`、`corepack pnpm aliyun:deploy:spec` 和 `corepack pnpm aliyun:predeploy`，全部通过；当前 cloud confirmations local blockers 为 30，其中 5 个是新增占位证据 blocker，`predeploy` 仍显示 health strict 只缺 `appWechatLogin`，APP API smoke `30 probes / 0 failures`。
 
+2026-06-22 追加：`aliyun:operator:handoff` 现在输出结构化 `localEvidenceGaps`，把 `deploy/aliyun-production-cn.cloud-confirmations.local.json` 和 `deploy/aliyun-production-cn.image-publish.local.json` 的剩余 blocker 映射到具体 JSON path、控制台来源、期望证据和禁止写入的敏感值。当前生成结果显示云侧确认仍有 30 个 blocker、镜像/运行时发布仍有 16 个 blocker；该清单用于指导阿里云/微信/Apple 控制台抄录非密钥证据，不代表已经创建云资源、推送 ACR 镜像或导入 production-cn 密钥。同轮已执行 `node --check scripts/generate-aliyun-operator-handoff.mjs`、目标 eslint、`git diff --check`、`corepack pnpm aliyun:operator:handoff -- --skip-vercel-env-coverage`、`corepack pnpm aliyun:release:artifacts -- --skip-bundle --skip-vercel-env-coverage`、新增行密钥扫描和 `corepack pnpm aliyun:predeploy`，全部通过；`predeploy` 仍显示 health strict 只缺 `appWechatLogin`，APP API smoke `30 probes / 0 failures`。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：
