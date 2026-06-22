@@ -2,6 +2,7 @@ const test = require("node:test")
 const assert = require("node:assert/strict")
 const { execFileSync } = require("node:child_process")
 const fs = require("node:fs")
+const os = require("node:os")
 const path = require("node:path")
 
 const root = process.cwd()
@@ -23,9 +24,13 @@ test("Aliyun operator handoff command is wired into scripts and local predeploy"
 })
 
 test("Aliyun operator handoff maps ACR and SAE evidence gaps to the correct consoles", () => {
+  const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-operator-handoff-inventory-missing-"))
+  const missingInventoryResults = path.join(tmpdir, "missing.cloud-inventory-results.local.json")
   const output = execFileSync(process.execPath, [
     "scripts/generate-aliyun-operator-handoff.mjs",
     "--skip-vercel-env-coverage",
+    "--cloud-inventory-results",
+    missingInventoryResults,
   ], {
     cwd: root,
     encoding: "utf8",
