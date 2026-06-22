@@ -293,6 +293,9 @@ function buildRunbook(args) {
       ],
     }),
   ])
+  const readyActionPackets = tasks
+    .filter((task) => task.canStartNow)
+    .map((task) => buildReadyActionPacket(task))
 
   const runbook = {
     ok: true,
@@ -314,6 +317,7 @@ function buildRunbook(args) {
       canStartNowConsoleTasks: tasks
         .filter((task) => task.canStartNow)
         .map((task) => task.id),
+      readyActionPackets: readyActionPackets.length,
       blockedByTaskDependencies: tasks
         .filter((task) => task.blockingDependencies.length > 0)
         .map((task) => task.id),
@@ -337,6 +341,7 @@ function buildRunbook(args) {
       apiHost: runtimePlan.apiHost,
       assetHost: runtimePlan.assetHost,
     },
+    readyActionPackets,
     consoleTasks: tasks,
     nextVerifyCommands: [
       "corepack pnpm aliyun:console:runbook",
@@ -360,6 +365,36 @@ function buildRunbook(args) {
   }
   runbook.ok = runbook.secretLeakCheck.ok
   return runbook
+}
+
+function buildReadyActionPacket(task) {
+  return {
+    taskId: task.id,
+    title: task.title,
+    status: task.status,
+    consolePath: task.consolePath,
+    minimumAuthorizationPhrase: minimumAuthorizationPhrase(task),
+    actionTimeConfirmationReason: task.actionTimeConfirmationReason || "",
+    targetFields: task.targetFields,
+    acceptanceEvidence: task.completionEvidence || [],
+    writeTargets: task.writeTargets,
+    verifyCommands: task.verifyCommands,
+    currentBlockers: task.currentBlockers,
+    forbidden: task.forbidden,
+    mutationPerformedByThisCommand: false,
+    nonSecretEvidenceOnly: true,
+  }
+}
+
+function minimumAuthorizationPhrase(task) {
+  if (task.id === "C02_ACR_IMAGE_AND_PULL") {
+    const amount = task.targetFields.find((item) => item.name === "quotedAmount")?.value || "当前报价"
+    return `授权购买或确认 ACR Enterprise Economic，cn-hangzhou，1 个月，${amount}；只记录 registry/image/digest 非密钥证据，不输出 registry 密码。`
+  }
+  if (task.id === "C05_OSS_AUDIO_RAM_STS") {
+    return "授权为服务记录音频 OSS 配置最小权限 RAM/STS 或运行时角色；凭据只进入阿里云受控 secret env，不写入仓库、文档或镜像。"
+  }
+  return `授权执行 ${task.id} ${task.title}；只记录非密钥证据，密钥和 token 只进入受控运行环境。`
 }
 
 function applyTaskSequencing(tasks) {
@@ -424,6 +459,7 @@ function renderMarkdown(runbook) {
     `- userActionReady: ${runbook.summary.userActionReady}`,
     `- requiredBlocking: ${runbook.summary.requiredBlocking.length ? runbook.summary.requiredBlocking.join(", ") : "none"}`,
     `- canStartNowConsoleTasks: ${runbook.summary.canStartNowConsoleTasks.length ? runbook.summary.canStartNowConsoleTasks.join(", ") : "none"}`,
+    `- readyActionPackets: ${runbook.summary.readyActionPackets}`,
     `- blockedByTaskDependencies: ${runbook.summary.blockedByTaskDependencies.length ? runbook.summary.blockedByTaskDependencies.join(", ") : "none"}`,
     `- actionTimeConfirmationRequired: ${runbook.summary.actionTimeConfirmationRequired.length ? runbook.summary.actionTimeConfirmationRequired.join(", ") : "none"}`,
     "",
@@ -444,9 +480,39 @@ function renderMarkdown(runbook) {
     `- cloudShellCanRunReadOnlyInventory: ${runbook.cloudAccess.cloudShellCanRunReadOnlyInventory}`,
     `- blockers: ${runbook.cloudAccess.blockers.length ? runbook.cloudAccess.blockers.join(", ") : "none"}`,
     "",
-    "## 控制台任务",
+    "## 当前可进入动作确认的包",
     "",
   ]
+
+  if (runbook.readyActionPackets.length === 0) {
+    lines.push("- none", "")
+  } else {
+    for (const packet of runbook.readyActionPackets) {
+      lines.push(
+        `### ${packet.taskId} ${packet.title}`,
+        "",
+        `- consolePath: ${packet.consolePath}`,
+        `- minimumAuthorizationPhrase: ${packet.minimumAuthorizationPhrase}`,
+        packet.actionTimeConfirmationReason ? `- actionTimeConfirmationReason: ${packet.actionTimeConfirmationReason}` : "",
+        "- targetFields:",
+        ...packet.targetFields.map((item) => `  - ${item.name}: ${item.value} (${item.source})`),
+        "- acceptanceEvidence:",
+        ...(packet.acceptanceEvidence.length ? packet.acceptanceEvidence.map((item) => `  - ${item}`) : ["  - none"]),
+        "- writeTargets:",
+        ...(packet.writeTargets.length ? packet.writeTargets.map((item) => `  - ${item}`) : ["  - none"]),
+        "- verifyCommands:",
+        ...(packet.verifyCommands.length ? packet.verifyCommands.map((item) => `  - ${item}`) : ["  - none"]),
+        "- forbidden:",
+        ...(packet.forbidden.length ? packet.forbidden.map((item) => `  - ${item}`) : ["  - none"]),
+        "",
+      )
+    }
+  }
+
+  lines.push(
+    "## 控制台任务",
+    "",
+  )
 
   for (const task of runbook.consoleTasks) {
     lines.push(
@@ -471,6 +537,8 @@ function renderMarkdown(runbook) {
       ...(task.currentBlockers.length ? task.currentBlockers.map((item) => `  - ${item}`) : ["  - none"]),
       "- currentEvidence:",
       ...(task.currentEvidence.length ? task.currentEvidence.map((item) => `  - ${item}`) : ["  - none"]),
+      "- completionEvidence:",
+      ...(task.completionEvidence.length ? task.completionEvidence.map((item) => `  - ${item}`) : ["  - none"]),
       "- verifyCommands:",
       ...(task.verifyCommands.length ? task.verifyCommands.map((item) => `  - ${item}`) : ["  - none"]),
       "- forbidden:",

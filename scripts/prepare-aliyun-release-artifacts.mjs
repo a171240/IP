@@ -504,6 +504,7 @@ function renderMarkdown(audit) {
     `- consoleTasks: ${consoleRunbook.consoleTasks?.length || 0}`,
     `- resourceReady: ${consoleRunbook.summary?.resourceReady || "unknown"}`,
     `- canStartNowConsoleTasks: ${consoleRunbook.summary?.canStartNowConsoleTasks?.length ? consoleRunbook.summary.canStartNowConsoleTasks.join(", ") : "none"}`,
+    `- readyActionPackets: ${consoleRunbook.summary?.readyActionPackets ?? 0}`,
     `- blockedByTaskDependencies: ${consoleRunbook.summary?.blockedByTaskDependencies?.length ? consoleRunbook.summary.blockedByTaskDependencies.join(", ") : "none"}`,
     `- actionTimeConfirmationRequired: ${consoleRunbook.summary?.actionTimeConfirmationRequired?.length ? consoleRunbook.summary.actionTimeConfirmationRequired.join(", ") : "none"}`,
     ...(consoleRunbook.consoleTasks?.length
@@ -1282,6 +1283,7 @@ function main() {
       resourceReady: consoleRunbook.summary?.resourceReady || "unknown",
       userActionReady: consoleRunbook.summary?.userActionReady || "unknown",
       canStartNowConsoleTasks: consoleRunbook.summary?.canStartNowConsoleTasks || [],
+      readyActionPackets: consoleRunbook.readyActionPackets || [],
       blockedByTaskDependencies: consoleRunbook.summary?.blockedByTaskDependencies || [],
       consoleTasks: (consoleRunbook.consoleTasks || []).map((item) => `${item.id}:${item.status}:canStartNow=${item.canStartNow}`),
       actionTimeConfirmationRequired: consoleRunbook.summary?.actionTimeConfirmationRequired || [],

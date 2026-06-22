@@ -2,6 +2,7 @@ const test = require("node:test")
 const assert = require("node:assert/strict")
 const { execFileSync } = require("node:child_process")
 const fs = require("node:fs")
+const os = require("node:os")
 const path = require("node:path")
 
 const root = process.cwd()
@@ -22,6 +23,7 @@ test("Aliyun console runbook command is wired into scripts and predeploy", () =>
   assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:console:runbook"))
   assert.ok(deploySpec.predeployChecks.includes("corepack pnpm aliyun:console:runbook"))
   assert.match(releaseArtifacts, /canStartNowConsoleTasks/)
+  assert.match(releaseArtifacts, /readyActionPackets/)
   assert.match(releaseArtifacts, /blockedByTaskDependencies/)
 })
 
@@ -37,7 +39,9 @@ test("Aliyun console runbook renders current console fields without secret value
   const acr = report.consoleTasks.find((item) => item.id === "C02_ACR_IMAGE_AND_PULL")
   const apiDomain = report.consoleTasks.find((item) => item.id === "C03_API_DOMAIN_HTTPS_ICP")
   const assetDomain = report.consoleTasks.find((item) => item.id === "C04_ASSET_DOMAIN_HTTPS_ICP")
+  const oss = report.consoleTasks.find((item) => item.id === "C05_OSS_AUDIO_RAM_STS")
   const env = report.consoleTasks.find((item) => item.id === "C06_ENV_IMPORT")
+  const readyPacketIds = report.readyActionPackets.map((item) => item.taskId)
 
   assert.equal(report.ok, true)
   assert.equal(report.containsValues, false)
@@ -61,6 +65,11 @@ test("Aliyun console runbook renders current console fields without secret value
     "C02_ACR_IMAGE_AND_PULL",
     "C05_OSS_AUDIO_RAM_STS",
   ])
+  assert.equal(report.summary.readyActionPackets, 2)
+  assert.deepEqual(readyPacketIds, [
+    "C02_ACR_IMAGE_AND_PULL",
+    "C05_OSS_AUDIO_RAM_STS",
+  ])
   assert.ok(report.summary.blockedByTaskDependencies.includes("C01_SAE_RUNTIME"))
   assert.ok(report.summary.blockedByTaskDependencies.includes("C06_ENV_IMPORT"))
   assert.equal(sae.sequencePhase, "runtime")
@@ -81,6 +90,13 @@ test("Aliyun console runbook renders current console fields without secret value
   assert.ok(acr.targetFields.some((item) => item.name === "quotedAmount" && item.value === "CNY 117.00"))
   assert.ok(acr.targetFields.some((item) => item.name === "localDigest" && /sha256:[a-f0-9]{64}/i.test(String(item.value))))
   assert.ok(acr.currentEvidence.includes("acr.purchaseCandidate.requiresActionTimePurchaseConfirmation=true"))
+  assert.ok(acr.completionEvidence.includes("corepack pnpm aliyun:image:plan:strict pass"))
+  assert.match(report.readyActionPackets[0].minimumAuthorizationPhrase, /CNY 117\.00/)
+  assert.ok(report.readyActionPackets[0].acceptanceEvidence.includes("acr.confirmed=true"))
+  assert.ok(report.readyActionPackets[0].acceptanceEvidence.includes("digestVerified=true"))
+  assert.equal(oss.canStartNow, true)
+  assert.ok(report.readyActionPackets[1].minimumAuthorizationPhrase.includes("最小权限 RAM/STS"))
+  assert.ok(report.readyActionPackets[1].acceptanceEvidence.includes("ramLeastPrivilege=true"))
   assert.deepEqual(apiDomain.dependsOn, ["C01_SAE_RUNTIME"])
   assert.deepEqual(apiDomain.blockingDependencies, ["C01_SAE_RUNTIME"])
   assert.equal(apiDomain.canStartNow, false)
@@ -97,4 +113,29 @@ test("Aliyun console runbook renders current console fields without secret value
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
+})
+
+test("Aliyun console runbook markdown includes action packets and completion evidence", () => {
+  const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-console-runbook-"))
+  const markdownPath = path.join(tmpdir, "console-runbook.md")
+  const output = execFileSync(process.execPath, [
+    "scripts/generate-aliyun-console-runbook.mjs",
+    "--markdown",
+    markdownPath,
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 40,
+  })
+  const markdown = fs.readFileSync(markdownPath, "utf8")
+
+  assert.match(markdown, /## 当前可进入动作确认的包/)
+  assert.match(markdown, /minimumAuthorizationPhrase: 授权购买或确认 ACR Enterprise Economic/)
+  assert.match(markdown, /- acceptanceEvidence:/)
+  assert.match(markdown, /corepack pnpm aliyun:image:plan:strict pass/)
+  assert.match(markdown, /ramLeastPrivilege=true/)
+  assert.match(markdown, /- completionEvidence:/)
+  assert.doesNotMatch(output + markdown, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(output + markdown, /LTAI[A-Za-z0-9]{12,}/)
+  assert.doesNotMatch(output + markdown, /:\/\/[^\s:@]+:[^\s@]+@/)
 })
