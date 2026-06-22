@@ -497,6 +497,7 @@ function renderMarkdown(audit) {
     `- canCodexProceedWithoutUser: ${actionAuthorization.summary.canCodexProceedWithoutUser.length ? actionAuthorization.summary.canCodexProceedWithoutUser.join(", ") : "none"}`,
     `- authorizationPackets: ${actionAuthorization.summary.authorizationPackets || 0}`,
     `- authorizationPacketIds: ${(actionAuthorization.authorizationPackets || []).map((item) => item.packetId).join(", ") || "none"}`,
+    `- canStartNowPackets: ${(actionAuthorization.summary.canStartNowPackets || []).join(", ") || "none"}`,
     `- actionTimeConfirmationRequired: ${actionAuthorization.summary.actionTimeConfirmationRequired.join(", ")}`,
     ...(actionAuthorization.actions?.length
       ? actionAuthorization.actions.map((item) => `- ${item.id}: ${item.automationPolicy} (${item.blockerClass})`)
@@ -1176,6 +1177,8 @@ function main() {
       actions: actionAuthorization.summary.actions,
       authorizationPackets: actionAuthorization.summary.authorizationPackets || 0,
       authorizationPacketIds: (actionAuthorization.authorizationPackets || []).map((item) => item.packetId),
+      canStartNowPackets: actionAuthorization.summary.canStartNowPackets || [],
+      blockedByPacketDependencies: actionAuthorization.summary.blockedByPacketDependencies || [],
       canCodexProceedWithoutUser: actionAuthorization.summary.canCodexProceedWithoutUser,
       currentExternalBlockers: actionAuthorization.summary.currentExternalBlockers,
       actionTimeConfirmationRequired: actionAuthorization.summary.actionTimeConfirmationRequired,

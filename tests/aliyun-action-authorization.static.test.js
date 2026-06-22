@@ -23,6 +23,8 @@ test("Aliyun action authorization command is wired into scripts and predeploy", 
   assert.ok(deploySpec.predeployChecks.includes("corepack pnpm aliyun:action:authorization"))
   assert.match(releaseArtifacts, /authorizationPackets/)
   assert.match(releaseArtifacts, /authorizationPacketIds/)
+  assert.match(releaseArtifacts, /canStartNowPackets/)
+  assert.match(releaseArtifacts, /blockedByPacketDependencies/)
 })
 
 test("Aliyun action authorization matrix separates local-safe work from external actions", () => {
@@ -42,6 +44,14 @@ test("Aliyun action authorization matrix separates local-safe work from external
   assert.equal(report.secretLeakCheck.ok, true)
   assert.equal(report.summary.actions, 9)
   assert.equal(report.summary.authorizationPackets, 9)
+  assert.deepEqual(report.summary.canStartNowPackets, [
+    "P01_WECHAT_OPEN_MOBILE_APP",
+    "P02_APPLE_TEAM_ID",
+    "P03_ACR_PURCHASE",
+    "P05_OSS_RAM_STS",
+  ])
+  assert.ok(report.summary.blockedByPacketDependencies.includes("P04_ACR_IMAGE_AND_PULL"))
+  assert.ok(report.summary.blockedByPacketDependencies.includes("P09_PRODUCTION_DEPLOY"))
   assert.deepEqual(report.summary.canCodexProceedWithoutUser, [])
   assert.equal(report.summary.cloudConsoleTasks, 7)
   assert.ok(report.summary.requiredBlocking.includes("WECHAT_OPEN_APP_ID"))
@@ -82,12 +92,24 @@ test("Aliyun action authorization matrix separates local-safe work from external
   assert.equal(report.authorizationPackets.length, 9)
   const packetsById = new Map(report.authorizationPackets.map((item) => [item.packetId, item]))
   assert.equal(packetsById.get("P03_ACR_PURCHASE").actionId, "U03_ACR_PURCHASE_CONFIRMATION")
+  assert.equal(packetsById.get("P03_ACR_PURCHASE").canStartNow, true)
   assert.match(packetsById.get("P03_ACR_PURCHASE").minimumUserPhrase, /CNY 117\.00/)
   assert.ok(packetsById.get("P03_ACR_PURCHASE").explicitlyExcluded.some((item) => item.includes("docker login")))
+  assert.deepEqual(packetsById.get("P04_ACR_IMAGE_AND_PULL").dependsOn, ["P03_ACR_PURCHASE"])
+  assert.deepEqual(packetsById.get("P04_ACR_IMAGE_AND_PULL").blockingDependencies, ["P03_ACR_PURCHASE"])
+  assert.equal(packetsById.get("P04_ACR_IMAGE_AND_PULL").canStartNow, false)
   assert.ok(packetsById.get("P04_ACR_IMAGE_AND_PULL").explicitlyExcluded.some((item) => item.includes("不购买 ACR")))
+  assert.deepEqual(packetsById.get("P06_ENV_IMPORT").dependsOn, [
+    "P01_WECHAT_OPEN_MOBILE_APP",
+    "P02_APPLE_TEAM_ID",
+    "P05_OSS_RAM_STS",
+  ])
   assert.ok(packetsById.get("P06_ENV_IMPORT").explicitlyExcluded.some((item) => item.includes("不把任何 value")))
+  assert.deepEqual(packetsById.get("P07_DOMAIN_DNS_HTTPS").dependsOn, ["P08_SAE_RUNTIME_SLS"])
   assert.ok(packetsById.get("P07_DOMAIN_DNS_HTTPS").allowedActions.some((item) => item.includes("api-cn.ipgongchang.xin")))
   assert.ok(packetsById.get("P08_SAE_RUNTIME_SLS").explicitlyExcluded.some((item) => item.includes("不推送镜像")))
+  assert.ok(packetsById.get("P09_PRODUCTION_DEPLOY").dependsOn.includes("P08_SAE_RUNTIME_SLS"))
+  assert.equal(packetsById.get("P09_PRODUCTION_DEPLOY").canStartNow, false)
   assert.ok(packetsById.get("P09_PRODUCTION_DEPLOY").explicitlyExcluded.some((item) => item.includes("不 git push")))
 
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)

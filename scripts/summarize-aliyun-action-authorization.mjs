@@ -93,6 +93,8 @@ const POLICY_BY_ACTION_ID = Object.freeze({
 const AUTHORIZATION_PACKET_BY_ACTION_ID = Object.freeze({
   U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE: Object.freeze({
     packetId: "P01_WECHAT_OPEN_MOBILE_APP",
+    sequenceGroup: "identity",
+    dependsOn: [],
     minimumUserPhrase: "授权在微信开放平台创建/补全美业话镜移动应用资料并提交审核；不读取或输出 AppSecret。",
     allowedActions: [
       "只在微信开放平台移动应用页面填写 APP 资料、Android 包名/签名、iOS Bundle ID/Universal Link。",
@@ -113,6 +115,8 @@ const AUTHORIZATION_PACKET_BY_ACTION_ID = Object.freeze({
   }),
   U02_APPLE_TEAM_ID: Object.freeze({
     packetId: "P02_APPLE_TEAM_ID",
+    sequenceGroup: "identity",
+    dependsOn: [],
     minimumUserPhrase: "授权读取 Apple Developer Team ID 并导入阿里云 plain env。",
     allowedActions: [
       "从 Apple Developer Membership 或 Identifiers 页面读取 10 位 Team ID。",
@@ -130,6 +134,8 @@ const AUTHORIZATION_PACKET_BY_ACTION_ID = Object.freeze({
   }),
   U03_ACR_PURCHASE_CONFIRMATION: Object.freeze({
     packetId: "P03_ACR_PURCHASE",
+    sequenceGroup: "cloud_foundation",
+    dependsOn: [],
     minimumUserPhrase: "授权购买 ACR Enterprise Economic，cn-hangzhou，1 个月，当前报价 CNY 117.00。",
     allowedActions: [
       "在阿里云 ACR 企业版购买页确认规格、地域、时长和金额。",
@@ -150,6 +156,8 @@ const AUTHORIZATION_PACKET_BY_ACTION_ID = Object.freeze({
   }),
   U04_ACR_RUNTIME_AUTH: Object.freeze({
     packetId: "P04_ACR_IMAGE_AND_PULL",
+    sequenceGroup: "image_runtime",
+    dependsOn: ["P03_ACR_PURCHASE"],
     minimumUserPhrase: "授权把后端镜像推送到已创建的 ACR，并配置 SAE 拉取该镜像；不输出 registry 密码。",
     allowedActions: [
       "构建并 smoke 本地 Docker 镜像。",
@@ -171,6 +179,8 @@ const AUTHORIZATION_PACKET_BY_ACTION_ID = Object.freeze({
   }),
   U05_OSS_RAM_OR_STS: Object.freeze({
     packetId: "P05_OSS_RAM_STS",
+    sequenceGroup: "cloud_foundation",
+    dependsOn: [],
     minimumUserPhrase: "授权为服务记录音频 OSS 配置最小权限 RAM/STS 或运行时角色，并只通过密钥环境注入。",
     allowedActions: [
       "确认 bucket、region、CORS 和 service-records/production-cn 前缀。",
@@ -191,6 +201,8 @@ const AUTHORIZATION_PACKET_BY_ACTION_ID = Object.freeze({
   }),
   U06_ENV_IMPORT: Object.freeze({
     packetId: "P06_ENV_IMPORT",
+    sequenceGroup: "runtime_config",
+    dependsOn: ["P01_WECHAT_OPEN_MOBILE_APP", "P02_APPLE_TEAM_ID", "P05_OSS_RAM_STS"],
     minimumUserPhrase: "授权把已准备好的 production-cn 环境变量导入 SAE/KMS/Secrets Manager；不在报告中显示任何 value。",
     allowedActions: [
       "按 env handoff 清单导入 plain env 和 secret env。",
@@ -212,6 +224,8 @@ const AUTHORIZATION_PACKET_BY_ACTION_ID = Object.freeze({
   }),
   U07_DOMAIN_DNS_HTTPS_ICP: Object.freeze({
     packetId: "P07_DOMAIN_DNS_HTTPS",
+    sequenceGroup: "public_entry",
+    dependsOn: ["P08_SAE_RUNTIME_SLS"],
     minimumUserPhrase: "授权配置 api-cn/assets-cn 的 DNS、HTTPS 和 ICP 证据，目标必须是阿里云公网入口。",
     allowedActions: [
       "把 api-cn.ipgongchang.xin 指向 SAE/SLB/API 公网入口。",
@@ -234,6 +248,8 @@ const AUTHORIZATION_PACKET_BY_ACTION_ID = Object.freeze({
   }),
   U08_SAE_RUNTIME_AND_SLS: Object.freeze({
     packetId: "P08_SAE_RUNTIME_SLS",
+    sequenceGroup: "runtime_observability",
+    dependsOn: ["P03_ACR_PURCHASE", "P04_ACR_IMAGE_AND_PULL", "P05_OSS_RAM_STS", "P06_ENV_IMPORT"],
     minimumUserPhrase: "授权创建/确认 SAE production-cn 应用和 SLS health/5xx 告警；不导入密钥、不部署镜像。",
     allowedActions: [
       "创建或确认 cn-hangzhou SAE 自定义容器应用，端口 3000，健康检查 /api/healthz。",
@@ -256,6 +272,17 @@ const AUTHORIZATION_PACKET_BY_ACTION_ID = Object.freeze({
   }),
   U09_DEPLOY_AUTHORIZATION: Object.freeze({
     packetId: "P09_PRODUCTION_DEPLOY",
+    sequenceGroup: "production_release",
+    dependsOn: [
+      "P01_WECHAT_OPEN_MOBILE_APP",
+      "P02_APPLE_TEAM_ID",
+      "P03_ACR_PURCHASE",
+      "P04_ACR_IMAGE_AND_PULL",
+      "P05_OSS_RAM_STS",
+      "P06_ENV_IMPORT",
+      "P07_DOMAIN_DNS_HTTPS",
+      "P08_SAE_RUNTIME_SLS",
+    ],
     minimumUserPhrase: "授权在所有 strict 门禁通过后执行 production-cn 部署；不包含 git push 或小程序上传。",
     allowedActions: [
       "确认 cloud confirmations、image plan、domain、readiness 和 predeploy strict 全部通过。",
@@ -360,7 +387,10 @@ function buildReport(args) {
   ])
 
   const actions = (userActions.actions || []).map((action) => classifyAction(action))
-  const authorizationPackets = actions.map((action) => buildAuthorizationPacket(action))
+  const authorizationPackets = buildAuthorizationPackets(actions)
+  const canStartNowPackets = authorizationPackets
+    .filter((packet) => packet.canStartNow)
+    .map((packet) => packet.packetId)
   const actionTimeConfirmationRequired = actions
     .filter((action) => action.requiresActionTimeConfirmation)
     .map((action) => action.id)
@@ -399,6 +429,10 @@ function buildReport(args) {
       requiredBlocking: status.summary?.requiredBlocking || [],
       sensitiveActionItems: status.summary?.sensitiveActionItems || {},
       authorizationPackets: authorizationPackets.length,
+      canStartNowPackets,
+      blockedByPacketDependencies: authorizationPackets
+        .filter((packet) => packet.blockingDependencies.length > 0)
+        .map((packet) => packet.packetId),
     },
     safeLocalWorkStillAllowed: [
       "运行本地检查和 smoke。",
@@ -463,14 +497,31 @@ function classifyAction(action) {
   }
 }
 
-function buildAuthorizationPacket(action) {
+function buildAuthorizationPackets(actions) {
+  const packetByActionId = new Map(
+    actions.map((action) => {
+      const packet = AUTHORIZATION_PACKET_BY_ACTION_ID[action.id]
+      return [action.id, packet ? packet.packetId : `P_UNKNOWN_${action.id || "ACTION"}`]
+    }),
+  )
+  const statusByPacketId = new Map(
+    actions.map((action) => [packetByActionId.get(action.id), action.status || "unknown"]),
+  )
+  return actions.map((action) => buildAuthorizationPacket(action, statusByPacketId))
+}
+
+function buildAuthorizationPacket(action, statusByPacketId) {
   const packet = AUTHORIZATION_PACKET_BY_ACTION_ID[action.id] || {
     packetId: `P_UNKNOWN_${action.id || "ACTION"}`,
+    sequenceGroup: "unknown",
+    dependsOn: [],
     minimumUserPhrase: `授权执行 ${action.title || action.id}；先人工复核范围。`,
     allowedActions: [],
     explicitlyExcluded: ["未配置的动作包不能自动执行。"],
     completionEvidence: [],
   }
+  const dependsOn = packet.dependsOn || []
+  const blockingDependencies = dependsOn.filter((packetId) => statusByPacketId.get(packetId) !== "ready")
   return {
     packetId: packet.packetId,
     actionId: action.id,
@@ -478,6 +529,10 @@ function buildAuthorizationPacket(action) {
     status: action.status,
     owner: action.owner,
     blockerClass: action.blockerClass,
+    sequenceGroup: packet.sequenceGroup,
+    dependsOn,
+    blockingDependencies,
+    canStartNow: action.status !== "ready" && blockingDependencies.length === 0,
     requiresActionTimeConfirmation: action.requiresActionTimeConfirmation,
     minimumUserPhrase: packet.minimumUserPhrase,
     allowedActions: packet.allowedActions,
@@ -571,6 +626,10 @@ function renderMarkdown(report) {
       `- actionId: ${packet.actionId}`,
       `- status: ${packet.status}`,
       `- owner: ${packet.owner}`,
+      `- sequenceGroup: ${packet.sequenceGroup}`,
+      `- dependsOn: ${packet.dependsOn.join(", ") || "none"}`,
+      `- blockingDependencies: ${packet.blockingDependencies.join(", ") || "none"}`,
+      `- canStartNow: ${packet.canStartNow}`,
       `- requiresActionTimeConfirmation: ${packet.requiresActionTimeConfirmation}`,
       `- minimumUserPhrase: ${packet.minimumUserPhrase}`,
       `- allowedActions: ${packet.allowedActions.join("; ") || "none"}`,
