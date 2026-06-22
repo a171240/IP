@@ -762,6 +762,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 17:40 CST 追加：新增 `corepack pnpm aliyun:app-cn-checklist:test`，把 `docs/app-production-cn-env-checklist.md` 纳入本地发布门禁。该测试会校验清单仍记录用户动作 `0/9`、阿里云资源 `0/7`、Vercel required 覆盖 `17/26`、本机 required env `24/26`、微信移动 App 未创建、ACR `CNY 117.00` / `¥117.00` 付款阻塞、SAE runtime 未 confirmed、以及 6 类密钥/密码/token/付款阻塞，同时执行基础 secret-like 扫描。`scripts/aliyun-predeploy-commands.mjs` 与 `deploy/aliyun-production-cn.example.json.localPredeployChecks` 已同步，本地 predeploy 现在为 35 项；正式 `predeployChecks` 仍为 24 项，不改变生产部署必须另行通过云侧严格门禁的结论。
 
+2026-06-22 17:55 CST 追加：`corepack pnpm aliyun:user:actions:test` 与 `corepack pnpm aliyun:user:actions` 已接入本地 `aliyun:predeploy`，并由 `tests/aliyun-user-action-brief.static.test.js` 反向校验 `scripts/aliyun-predeploy-commands.mjs` 和 `deploy/aliyun-production-cn.example.json.localPredeployChecks` 不会漏掉这两项。本地 predeploy 现在为 37 项，每次总检都会重新输出当前用户动作简报；当前微信状态仍是 `accountVerified=true`、`mobileAppCreated=false`、`mobileAppSubmitted=false`、`reviewStatus=not_started`，所以不能读取或导入 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：

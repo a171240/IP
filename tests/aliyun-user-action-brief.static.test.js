@@ -8,10 +8,17 @@ const root = process.cwd()
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), "utf8")
 const readJson = (...parts) => JSON.parse(read(...parts))
 
-test("Aliyun user action brief command is wired into scripts", () => {
+test("Aliyun user action brief command is wired into scripts and local predeploy", () => {
   const pkg = readJson("package.json")
+  const predeploy = read("scripts", "aliyun-predeploy-commands.mjs")
+  const deploySpec = readJson("deploy", "aliyun-production-cn.example.json")
+
   assert.equal(pkg.scripts["aliyun:user:actions"], "node ./scripts/summarize-aliyun-user-action-brief.mjs")
   assert.equal(pkg.scripts["aliyun:user:actions:test"], "node --test tests/aliyun-user-action-brief.static.test.js")
+  assert.match(predeploy, /aliyun:user:actions:test/)
+  assert.match(predeploy, /aliyun:user:actions/)
+  assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:user:actions:test"))
+  assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:user:actions"))
 })
 
 test("Aliyun user action brief is value-free and includes the expected blockers", () => {
