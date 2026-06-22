@@ -601,6 +601,8 @@ function main() {
     "--env-file",
     args.envFile,
     ...(args.cloudConfirmationsFile ? ["--cloud-confirmations", args.cloudConfirmationsFile] : []),
+    ...(args.skipVercelEnvCoverage ? ["--skip-vercel-env-coverage"] : []),
+    ...(args.vercelEnvCoverageInput ? ["--vercel-env-coverage-input", args.vercelEnvCoverageInput] : []),
     "--out",
     operatorHandoffJsonPath,
     "--markdown",
@@ -779,6 +781,18 @@ function main() {
       appLaunchBlockingVariables: operatorHandoff.appLaunchBlocking.variables.map((item) => item.name),
       appLaunchBlockingStates: operatorHandoff.appLaunchBlocking.states.map((item) => `${item.name}:${item.status}`),
       optionalDeferredEnv: operatorHandoff.missingVariables.optionalDeferred.map((item) => item.name),
+      vercelEnvCoverage: operatorHandoff.vercelEnvCoverage?.ok
+        ? {
+            containsValues: operatorHandoff.vercelEnvCoverage.containsValues,
+            requiredCovered: operatorHandoff.vercelEnvCoverage.requiredCovered,
+            requiredMissing: operatorHandoff.vercelEnvCoverage.requiredMissingInVercelProduction,
+            appSpecificMissing: operatorHandoff.vercelEnvCoverage.appSpecificKeysMissingInVercelProduction,
+          }
+        : {
+            ok: false,
+            skipped: operatorHandoff.vercelEnvCoverage?.skipped === true,
+            error: operatorHandoff.vercelEnvCoverage?.error || null,
+          },
       priorityTasks: operatorHandoff.priorityTasks.map((task) => `${task.id}:${task.status}`),
     },
     appProductionConfig: {

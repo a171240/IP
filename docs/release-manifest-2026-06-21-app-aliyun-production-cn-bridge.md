@@ -691,6 +691,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 10:11 CST 追加：`corepack pnpm aliyun:operator:handoff` 现在内置 `cloudAccess` 摘要，会直接说明本机是否有 `aliyun` CLI、是否已具备只读云 inventory 条件、是否调用过云 API/执行过云修改，以及 SAE/ACR/DNS/OSS/env/SLS 需要从阿里云控制台抄录到 `.local.json` 的非密钥字段。`aliyun:status` 和 `operator:tasks` 的正式下一步命令顺序同步补上 `aliyun:cloud:confirmations:strict`、`aliyun:release:artifacts` 和 `aliyun:container:smoke`，避免只跑本地代码门禁后误认为可以部署。
 
+2026-06-22 追加：`corepack pnpm aliyun:operator:handoff` 现在也内置 Vercel production 变量名覆盖摘要，直接列出 Vercel 中已存在、可作为迁移来源的旧后端桥接变量名，以及 production-cn 仍缺的必填变量名。该摘要保持 `containsValues=false`，不会输出密钥值；`aliyun:release:artifacts -- --skip-vercel-env-coverage` 已透传跳过参数给 `operator-handoff`，因此离线审计包不会隐式访问 Vercel。同轮已执行 `node --check scripts/generate-aliyun-operator-handoff.mjs`、`node --check scripts/prepare-aliyun-release-artifacts.mjs`、`node scripts/generate-aliyun-operator-handoff.mjs` 默认/跳过两种模式、`corepack pnpm aliyun:release:artifacts -- --skip-bundle --skip-vercel-env-coverage`、`corepack pnpm aliyun:release:artifacts -- --skip-bundle`、`corepack pnpm exec eslint scripts/generate-aliyun-operator-handoff.mjs scripts/prepare-aliyun-release-artifacts.mjs`、`git diff --check`、新增行密钥扫描、`corepack pnpm aliyun:status`、`corepack pnpm aliyun:operator:tasks` 和 `corepack pnpm aliyun:predeploy`，全部通过；当前正式阻塞仍是微信开放平台 APP 审核/APPID/AppSecret、Apple Team ID/AASA、阿里云云资源确认、ACR、DNS/HTTPS/ICP、OSS/RAM、env import 和 SLS。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：

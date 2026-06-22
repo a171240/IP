@@ -20,6 +20,8 @@ function parseArgs(argv) {
     cloudConfirmationsFile: DEFAULT_CLOUD_CONFIRMATIONS_FILE,
     outPath: "",
     markdownPath: "",
+    skipVercelEnvCoverage: false,
+    vercelEnvCoverageInput: "",
   }
 
   for (let index = 2; index < argv.length; index += 1) {
@@ -39,6 +41,14 @@ function parseArgs(argv) {
     }
     if (arg === "--markdown") {
       args.markdownPath = resolveValue(argv[++index], "--markdown")
+      continue
+    }
+    if (arg === "--skip-vercel-env-coverage") {
+      args.skipVercelEnvCoverage = true
+      continue
+    }
+    if (arg === "--vercel-env-coverage-input") {
+      args.vercelEnvCoverageInput = resolveValue(argv[++index], "--vercel-env-coverage-input")
       continue
     }
     if (arg === "--help" || arg === "-h") {
@@ -73,6 +83,60 @@ function runJson(label, scriptArgs) {
   }
 }
 
+function runJsonAllowFailure(label, scriptArgs) {
+  const result = spawnSync(process.execPath, scriptArgs, {
+    cwd: BACKEND_ROOT,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 30,
+  })
+  if (result.error) {
+    return {
+      ok: false,
+      report: null,
+      error: result.error.message,
+    }
+  }
+  if (result.status !== 0) {
+    return {
+      ok: false,
+      report: null,
+      error: (result.stderr || result.stdout || `exit ${result.status}`).split(/\r?\n/).slice(0, 8).join(" | "),
+    }
+  }
+  try {
+    return {
+      ok: true,
+      report: JSON.parse(result.stdout),
+      error: null,
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      report: null,
+      error: `invalid_json_from_${label}:${error instanceof Error ? error.message : String(error)}`,
+    }
+  }
+}
+
+function runVercelEnvCoverage(args) {
+  if (args.skipVercelEnvCoverage) {
+    return {
+      ok: false,
+      skipped: true,
+      report: null,
+      error: null,
+    }
+  }
+  const scriptArgs = [resolve(BACKEND_ROOT, "scripts/check-vercel-env-coverage.mjs")]
+  if (args.vercelEnvCoverageInput) {
+    scriptArgs.push("--input", args.vercelEnvCoverageInput)
+  }
+  return {
+    skipped: false,
+    ...runJsonAllowFailure("vercel_env_coverage", scriptArgs),
+  }
+}
+
 function compactVariable(item) {
   return {
     name: item.name,
@@ -98,6 +162,56 @@ function compactLaunchBlockingVariable(item, blockingReason) {
     ...compactVariable(item),
     launchBlocking: true,
     blockingReason,
+  }
+}
+
+function compactVercelEnvCoverage(result) {
+  if (!result.ok || !result.report) {
+    return {
+      ok: false,
+      skipped: result.skipped === true,
+      containsValues: false,
+      project: "",
+      scope: "",
+      environment: "",
+      source: "",
+      requiredCovered: "0/0",
+      optionalCovered: "0/0",
+      vercelEntries: 0,
+      productionNames: 0,
+      extraProductionKeys: 0,
+      requiredMissingInVercelProduction: [],
+      optionalMissingInVercelProduction: [],
+      appSpecificKeysMissingInVercelProduction: [],
+      bridgeKeysPresentInVercelProduction: [],
+      notes: result.skipped === true
+        ? ["Skipped by --skip-vercel-env-coverage."]
+        : ["Vercel coverage could not be read; this does not include or expose any values."],
+      error: result.error || null,
+    }
+  }
+
+  const report = result.report
+  const totals = report.totals || {}
+  return {
+    ok: true,
+    skipped: false,
+    containsValues: report.containsValues === true,
+    project: report.project || "",
+    scope: report.scope || "",
+    environment: report.environment || "",
+    source: report.source || "",
+    requiredCovered: `${totals.requiredPresentInVercelProduction ?? 0}/${totals.requiredTotal ?? 0}`,
+    optionalCovered: `${totals.optionalPresentInVercelProduction ?? 0}/${totals.optionalTotal ?? 0}`,
+    vercelEntries: totals.vercelEntries ?? 0,
+    productionNames: totals.productionNames ?? 0,
+    extraProductionKeys: totals.extraProductionKeys ?? 0,
+    requiredMissingInVercelProduction: report.requiredMissingInVercelProduction || [],
+    optionalMissingInVercelProduction: report.optionalMissingInVercelProduction || [],
+    appSpecificKeysMissingInVercelProduction: report.appSpecificKeysMissingInVercelProduction || [],
+    bridgeKeysPresentInVercelProduction: report.bridgeKeysPresentInVercelProduction || [],
+    notes: report.notes || [],
+    error: null,
   }
 }
 
@@ -147,7 +261,7 @@ function compactTask(task) {
   }
 }
 
-function buildHandoff({ args, envPlan, status, operatorTasks, cloudAccess }) {
+function buildHandoff({ args, envPlan, status, operatorTasks, cloudAccess, vercelEnvCoverage }) {
   const tasks = operatorTasks.tasks || []
   const machineBlocking = status.summary?.machineBlocking || []
   const waitingWechatReview = status.summary?.operatorTasks?.waitingWechatReview || 0
@@ -196,6 +310,7 @@ function buildHandoff({ args, envPlan, status, operatorTasks, cloudAccess }) {
       docker: status.localReadiness?.docker?.ready === true,
     },
     cloudAccess: compactCloudAccess(cloudAccess),
+    vercelEnvCoverage: compactVercelEnvCoverage(vercelEnvCoverage),
     missingVariables: {
       required: blockingRequiredVariables,
       optionalDeferred: optionalDeferredVariables,
@@ -332,6 +447,41 @@ function renderMarkdown(handoff) {
     "",
     ...handoff.cloudAccess.nextActions.map((item) => `- ${item}`),
     "",
+    "## Vercel production 变量名覆盖",
+    "",
+    `- status: ${handoff.vercelEnvCoverage.ok ? "ok" : handoff.vercelEnvCoverage.skipped ? "skipped" : "not ok"}`,
+    `- containsValues: ${handoff.vercelEnvCoverage.containsValues}`,
+    `- project: ${handoff.vercelEnvCoverage.project || "unknown"}`,
+    `- scope: ${handoff.vercelEnvCoverage.scope || "unknown"}`,
+    `- environment: ${handoff.vercelEnvCoverage.environment || "production"}`,
+    `- requiredCovered: ${handoff.vercelEnvCoverage.requiredCovered}`,
+    `- optionalCovered: ${handoff.vercelEnvCoverage.optionalCovered}`,
+    `- productionNames: ${handoff.vercelEnvCoverage.productionNames}`,
+    `- extraProductionKeys: ${handoff.vercelEnvCoverage.extraProductionKeys}`,
+    ...(handoff.vercelEnvCoverage.error ? [`- error: ${handoff.vercelEnvCoverage.error}`] : []),
+    "",
+    "### Vercel 中已存在、可作为迁移来源的桥接变量名",
+    "",
+    ...(handoff.vercelEnvCoverage.bridgeKeysPresentInVercelProduction.length
+      ? handoff.vercelEnvCoverage.bridgeKeysPresentInVercelProduction.map((item) => `- ${item}`)
+      : ["- none"]),
+    "",
+    "### Vercel production 仍缺的必填变量名",
+    "",
+    ...(handoff.vercelEnvCoverage.requiredMissingInVercelProduction.length
+      ? handoff.vercelEnvCoverage.requiredMissingInVercelProduction.map((item) => `- ${item}`)
+      : ["- none"]),
+    "",
+    "### 其中属于国内 APP / 微信开放平台 / 正式域名新增项",
+    "",
+    ...(handoff.vercelEnvCoverage.appSpecificKeysMissingInVercelProduction.length
+      ? handoff.vercelEnvCoverage.appSpecificKeysMissingInVercelProduction.map((item) => `- ${item}`)
+      : ["- none"]),
+    "",
+    "### Vercel 覆盖说明",
+    "",
+    ...handoff.vercelEnvCoverage.notes.map((item) => `- ${item}`),
+    "",
     "## 现在缺的必填环境变量",
     "",
     ...(handoff.missingVariables.required.length
@@ -466,7 +616,8 @@ function main() {
     "--cloud-confirmations",
     args.cloudConfirmationsFile,
   ])
-  const handoff = buildHandoff({ args, envPlan, status, operatorTasks, cloudAccess })
+  const vercelEnvCoverage = runVercelEnvCoverage(args)
+  const handoff = buildHandoff({ args, envPlan, status, operatorTasks, cloudAccess, vercelEnvCoverage })
   const output = `${JSON.stringify(handoff, null, 2)}\n`
   process.stdout.write(output)
   writeOutput(args.outPath, output)
@@ -476,9 +627,10 @@ function main() {
 function printHelp() {
   console.log([
     "Usage:",
-    "  node scripts/generate-aliyun-operator-handoff.mjs [--env-file path] [--cloud-confirmations path] [--out /tmp/handoff.json] [--markdown /tmp/handoff.md]",
+    "  node scripts/generate-aliyun-operator-handoff.mjs [--env-file path] [--cloud-confirmations path] [--out /tmp/handoff.json] [--markdown /tmp/handoff.md] [--skip-vercel-env-coverage] [--vercel-env-coverage-input /tmp/vercel-env.json]",
     "",
     "Generates a concise non-secret handoff for the user, Aliyun operator, WeChat Open Platform operator, and release owner.",
+    "Vercel env coverage is metadata-only, non-blocking, and never includes values.",
     "It does not create resources, import secrets, deploy, upload, or push.",
   ].join("\n"))
 }
