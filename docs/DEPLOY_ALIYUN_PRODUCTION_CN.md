@@ -222,7 +222,7 @@ corepack pnpm aliyun:operator:tasks
 corepack pnpm aliyun:operator:handoff
 ```
 
-这些命令不输出任何密钥值，也不会创建资源、导入变量或推送镜像。`aliyun:legal:check` 只确认后端包内 `/privacy` 和 `/terms` 页面存在、核心字段完整，并允许正式 URL 仍未填入 env；`aliyun:deploy:spec` 校验 `deploy/aliyun-production-cn.example.json` 的镜像、端口、ACR 发布计划、SAE runtime plan、域名、健康检查和前后置门禁顺序；`aliyun:runtime:plan` 校验 `deploy/aliyun-production-cn.runtime-plan.json` 是否仍指向 `cn-hangzhou` 的 SAE 自定义容器、端口 3000 和 `api-cn.ipgongchang.xin`；`aliyun:status` 是给当前发布负责人看的只读总览，会把本地门禁、微信审核、Apple Universal Link、阿里云云资源确认、域名和 ACR 镜像证据压缩成一个 JSON 摘要；`aliyun:operator:tasks` 会把当前 `readiness`、`domain`、`.env.production-cn.local`、`image-publish.local.json` 和 `cloud-confirmations.local.json` 汇总为 9 个任务；`aliyun:operator:handoff` 是给用户、阿里云操作员、微信开放平台操作员和发布负责人共用的非密钥操作包，适合直接判断“现在缺什么、去哪里拿、导入哪里”。
+这些命令不输出任何密钥值，也不会创建资源、导入变量或推送镜像。`aliyun:legal:check` 只确认后端包内 `/privacy` 和 `/terms` 页面存在、核心字段完整，并允许正式 URL 仍未填入 env；`aliyun:deploy:spec` 校验 `deploy/aliyun-production-cn.example.json` 的镜像、端口、ACR 发布计划、SAE runtime plan、域名、健康检查、前后置门禁顺序和 8 项外部确认；`aliyun:runtime:plan` 校验 `deploy/aliyun-production-cn.runtime-plan.json` 是否仍指向 `cn-hangzhou` 的 SAE 自定义容器、端口 3000 和 `api-cn.ipgongchang.xin`；`aliyun:status` 是给当前发布负责人看的只读总览，会把本地门禁、微信审核、Apple Universal Link、阿里云云资源确认、域名和 ACR 镜像证据压缩成一个 JSON 摘要；`aliyun:operator:tasks` 会把当前 `readiness`、`domain`、`.env.production-cn.local`、`image-publish.local.json` 和 `cloud-confirmations.local.json` 汇总为 9 个任务；`aliyun:operator:handoff` 是给用户、阿里云操作员、微信开放平台操作员和发布负责人共用的非密钥操作包，适合直接判断“现在缺什么、去哪里拿、导入哪里”。
 
 ```text
 T01 微信开放平台移动应用审核和 APP 登录凭证
@@ -295,7 +295,7 @@ corepack pnpm aliyun:cloud:confirmations
 corepack pnpm aliyun:readiness:cloud-ready
 ```
 
-`aliyun:readiness:cloud-ready` 会读取 `deploy/aliyun-production-cn.cloud-confirmations.local.json`。六项确认没有全部 ready 前，它仍会失败。`aliyun:readiness:assume-cloud-ready` 只保留给临时本地诊断，不能作为正式发布门禁；该命令会强制输出 `diagnosticOnly=true`、`releaseEvidenceUsable=false`，即使其它本地项通过，也不能作为上线证据。
+`aliyun:readiness:cloud-ready` 会读取 `deploy/aliyun-production-cn.cloud-confirmations.local.json`。7 项云确认没有全部 ready 前，它仍会失败。`aliyun:readiness:assume-cloud-ready` 只保留给临时本地诊断，不能作为正式发布门禁；该命令会强制输出 `diagnosticOnly=true`、`releaseEvidenceUsable=false`，即使其它本地项通过，也不能作为上线证据。
 
 `aliyun:cloud:confirmations` 会同时校验 example 模板和本机 `.local.json`：模板必须结构有效，本机文件可以在看板模式下列出未完成项。严格发布前使用：
 
@@ -1008,6 +1008,8 @@ appApiSmokeCoverage: 29 / 29 business routes
 本轮为 `--skip-bundle` 审计，未重新生成 context tar；Docker context 和镜像已由 `aliyun:docker:check`、`aliyun:docker:build`、`aliyun:container:smoke` 覆盖。
 
 2026-06-22 08:24 CST 更新：云确认模板从 6 项扩展为 7 项，新增 `assetDomainHttps`，用于单独确认 `assets-cn.ipgongchang.xin` 的 DNS、HTTPS 和 ICP 证据。`corepack pnpm aliyun:cloud:confirmations` 当前显示 example checkedItems=7 且模板通过，local checkedItems=7、totalBlockers=25；新增的 4 个 local blocker 是 `assetDomainHttps:confirmed`、`assetDomainHttps:dnsResolvedToAliyun`、`assetDomainHttps:httpsEnabled`、`assetDomainHttps:icpReady`。
+
+2026-06-22 08:41 CST 更新：`deploy/aliyun-production-cn.example.json` 的 `requiredExternalConfirmations` 从 6 项扩展为 8 项：`api-cn` 和 `assets-cn` 域名证据拆开，且新增 production-cn 环境变量已导入、密钥未进镜像的外部确认。`aliyun:deploy:spec` 会检查这 8 项完整存在。
 
 2026-06-22 03:54 CST 更新：本机 Docker Desktop 已启动，`corepack pnpm aliyun:docker:build` 已成功构建镜像。该镜像包含 health/readiness 对国内 APP 正式协议 URL 的基础形态校验：
 

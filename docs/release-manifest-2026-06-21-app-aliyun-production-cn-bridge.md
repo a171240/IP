@@ -670,6 +670,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 08:34 CST 追加：`APP_ASSET_BASE_URL` 的 env source catalog 归属从 `oss` 改为 `assetDomainHttps`，`aliyun:domain:check` 的 nextAction 也同步要求分别写入 `apiDomainHttps` 与 `assetDomainHttps` 证据。这样操作员清单会把 assets-cn 域名 DNS/HTTPS/ICP 与 OSS Bucket CORS/RAM 分开确认：前者对应 `assetDomainHttps`，后者对应 `oss`，避免把静态资源域名证据误写到 Bucket 权限证据里。
 
+2026-06-22 08:41 CST 追加：`deploy/aliyun-production-cn.example.json` 的 `requiredExternalConfirmations` 从 6 项扩展为 8 项，并由 `aliyun:deploy:spec` 精确校验。新增/拆分点是：`api-cn` 域名证据、`assets-cn` 域名证据分别确认；production-cn 环境变量导入且密钥未进镜像作为独立外部确认。这样部署规格、`cloud-confirmations`、`operator:tasks` 和 `status` 的阻塞口径一致。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：
@@ -737,4 +739,4 @@ corepack pnpm aliyun:postdeploy:smoke -- \
 
 ## 13. 当前结论
 
-本地桥接代码、APP API 路由、小程序链路桥接清单、App production-cn API 配置、native release 配置和检查脚手架已经可以作为阿里云 production-cn 后端准备包继续推进；当前不能称为可发布，因为阿里云运行资源、api-cn DNS/HTTPS/OSS/SLS 确认、Apple Team ID/AASA、微信开放平台移动应用 AppID/AppSecret 和云侧环境变量导入尚未完成。微信开放平台移动应用当前按审核中处理，审核通过前不能把 App 微信登录视为正式 ready。
+本地桥接代码、APP API 路由、小程序链路桥接清单、App production-cn API 配置、native release 配置和检查脚手架已经可以作为阿里云 production-cn 后端准备包继续推进；当前不能称为可发布，因为阿里云运行资源、ACR 镜像发布、api-cn/assets-cn DNS/HTTPS/ICP、OSS/CORS/RAM、SLS、Apple Team ID/AASA、微信开放平台移动应用 AppID/AppSecret 和云侧环境变量导入尚未完成。微信开放平台移动应用当前按审核中处理，审核通过前不能把 App 微信登录视为正式 ready。

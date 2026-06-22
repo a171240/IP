@@ -41,6 +41,17 @@ const REQUIRED_POSTDEPLOY_CHECKS = [
   "corepack pnpm aliyun:app-api:smoke -- --base-url https://api-cn.ipgongchang.xin",
 ]
 
+const REQUIRED_EXTERNAL_CONFIRMATIONS = [
+  "SAE application created",
+  "Aliyun ACR image pushed and runtime image pull configured",
+  "api-cn DNS, HTTPS, and ICP configured",
+  "assets-cn DNS, HTTPS, and ICP configured",
+  "OSS CORS and RAM least-privilege policy confirmed",
+  "WeChat Open Platform mobile app credentials configured",
+  "Production environment variables imported without secrets in image",
+  "SLS logging and alerts configured",
+]
+
 const FORBIDDEN_HOSTS = new Set([
   "ip.ipgongchang.xin",
   "ipnrgc.com",
@@ -207,14 +218,13 @@ function validateSpec(spec) {
   }
 
   const externalConfirmations = requireArray(spec.requiredExternalConfirmations)
-  const requiredConfirmationKeywords = ["SAE", "ACR", "DNS", "OSS", "WeChat", "SLS"]
-  for (const keyword of requiredConfirmationKeywords) {
-    if (!externalConfirmations.some((item) => String(item).includes(keyword))) {
-      blockers.push(`requiredExternalConfirmations:${keyword}`)
-    }
+  if (externalConfirmations.length !== REQUIRED_EXTERNAL_CONFIRMATIONS.length) {
+    blockers.push(`requiredExternalConfirmations:length=${REQUIRED_EXTERNAL_CONFIRMATIONS.length}`)
   }
-  if (!externalConfirmations.some((item) => String(item) === "SAE application created")) {
-    blockers.push("requiredExternalConfirmations:SAE application created")
+  for (const confirmation of REQUIRED_EXTERNAL_CONFIRMATIONS) {
+    if (!externalConfirmations.includes(confirmation)) {
+      blockers.push(`requiredExternalConfirmations:${confirmation}`)
+    }
   }
 
   const bridgeDataLayer = spec.bridgeDataLayer || {}

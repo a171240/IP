@@ -85,9 +85,11 @@
   "requiredExternalConfirmations": [
     "SAE application created",
     "Aliyun ACR image pushed and runtime image pull configured",
-    "api-cn/assets-cn DNS and HTTPS certificates configured",
+    "api-cn DNS, HTTPS, and ICP configured",
+    "assets-cn DNS, HTTPS, and ICP configured",
     "OSS CORS and RAM least-privilege policy confirmed",
     "WeChat Open Platform mobile app credentials configured",
+    "Production environment variables imported without secrets in image",
     "SLS logging and alerts configured"
   ],
   "bridgeDataLayer": {
