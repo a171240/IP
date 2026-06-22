@@ -703,6 +703,12 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 追加：同步修正 `aliyun:cloud:access` 的 OSS 控制台证据清单，`expected.region` 固定为 production-cn 目标地域 `cn-hangzhou`，`oss-cn-beijing` 仅保留在本机 ignored `.local.json` 的只读发现证据里，避免操作交接时把北京 Bucket 当成可用目标。
 
+2026-06-22 13:08 CST 追加：在用户明确授权阿里云侧“需要什么自己开通”后，已通过阿里云控制台完成两项可安全推进的云侧动作：创建 OSS Bucket `meiye-huajing-service-records-production-cn`，地域 `cn-hangzhou`，私有读写并开启阻止公共访问；配置该 Bucket CORS，来源为 `https://api-cn.ipgongchang.xin` 与 `https://assets-cn.ipgongchang.xin`，Methods 为 `GET/POST/PUT/HEAD`，Allowed Headers 为 `*`，Expose Headers 为 `ETag`、`x-oss-request-id`、`x-oss-hash-crc64ecma`，Max Age 为 `600`。同轮已开通 SAE 服务并创建标准服务关联角色 `AliyunServiceRoleForSAE`，SAE `cn-hangzhou` 创建应用表单可进入；但 SAE 应用 `meiye-huajing-app-api-production-cn` 尚未创建，因为现有 runtime plan 固定为 ACR 自定义容器，而 ACR 个人版页面明确提示“无 SLA 且勿在生产业务中使用”。本轮没有创建 ACR 个人版实例、没有购买企业版实例、没有推送镜像、没有创建 RAM AccessKey、没有导入任何密钥环境变量。`deploy/aliyun-production-cn.cloud-confirmations.local.json` 仅同步非密钥证据：OSS 的 `region` 和 `corsConfigured` 已满足，仍保留 `oss:ramLeastPrivilege` 与 `oss:confirmed` blocker；runtime 仍保留 `confirmed` blocker。
+
+2026-06-22 追加：新增 `deploy/aliyun-production-cn.oss-ram-policy.json`，作为服务记录音频 OSS 的 RAM 最小权限策略模板。该模板只允许 `oss:GetObject`、`oss:PutObject`、`oss:PostObject` 访问 `meiye-huajing-service-records-production-cn/service-records/production-cn/*`，不包含任何 AccessKey、Secret 或 token。当前 RAM 控制台权限策略页在 Chrome 中停留骨架屏，未取得可提交的创建表单；因此不能把 `ramLeastPrivilege` 改为 true，也没有创建或绑定 RAM 用户/角色、没有生成 `ALIYUN_OSS_ACCESS_KEY_SECRET`、没有导入 SAE/KMS/Secrets Manager。后续需要用户在 RAM 控制台完成策略创建/绑定和密钥安全导入，或明确授权采用 SAE 角色/STS 方案并同步改造后端签名逻辑。
+
+2026-06-22 追加：尝试开通日志服务 SLS。控制台开通页显示“仅开通 SLS 不会产生费用”，进入订单/收银台后实付金额为 `￥0.00`，但最后一步仍是“支付”确认动作；按浏览器安全边界已停在支付页，未点击最终支付，未创建 SLS Project，未配置日志采集、健康检查失败告警或 5xx 告警。`deploy/aliyun-production-cn.cloud-confirmations.local.json` 只记录该非密钥停点证据，`slsAlerts.confirmed`、`healthAlertConfigured` 和 `serverErrorAlertConfigured` 继续保持 false。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：

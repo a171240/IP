@@ -96,6 +96,15 @@ corepack pnpm aliyun:image:plan:strict
 
 这一步确认镜像已经推送/导入阿里云 ACR，并且 SAE 运行时已经配置为拉取该 remote image。它不执行 `docker login`、不推送镜像、不创建 ACR 仓库。
 
+当前控制台核验结果：
+
+```text
+ACR 个人版：可进入创建页，但页面提示个人版无 SLA 且有使用限制，请勿在生产业务中使用。
+ACR 企业版：入口存在，属于生产级实例选择/购买路径。
+```
+
+因此正式 production-cn 不应把个人版 ACR 当作最终生产证据。若只是桥接调试，可以单独标记为 diagnostic；正式发布需要选择企业版 ACR，或改用阿里云镜像构建/SAE 支持的其它生产级镜像来源，并把 remote image、digest 和运行时拉取证据写入 `deploy/aliyun-production-cn.image-publish.local.json`。
+
 ### 2.2 健康检查
 
 ```text
@@ -563,6 +572,25 @@ Bucket 私有读
 CORS 允许 APP 上传所需方法和 Header
 RAM 权限最小化到服务记录音频前缀
 ```
+
+当前 production-cn 目标 Bucket 已调整为：
+
+```text
+Bucket: meiye-huajing-service-records-production-cn
+Region: cn-hangzhou
+Prefix: service-records/production-cn/
+```
+
+RAM 最小权限策略模板见：
+
+```text
+deploy/aliyun-production-cn.oss-ram-policy.json
+```
+
+该模板只允许 `oss:GetObject`、`oss:PutObject`、`oss:PostObject` 访问
+`acs:oss:*:*:meiye-huajing-service-records-production-cn/service-records/production-cn/*`。
+创建/绑定 RAM 用户或角色、生成 `ALIYUN_OSS_ACCESS_KEY_SECRET`、导入 SAE/KMS/Secrets Manager
+都属于密钥动作，不写入文档、JSON 或 git。
 
 ### 4.5 日志与告警
 
