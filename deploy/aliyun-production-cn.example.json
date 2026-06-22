@@ -52,6 +52,13 @@
     "statusCommand": "corepack pnpm aliyun:status",
     "secretsPolicy": "The local confirmation file must contain resource names, booleans, and evidence handles only. Do not paste secret values."
   },
+  "cloudInventoryPlan": {
+    "checkCommand": "corepack pnpm aliyun:cloud:inventory-plan",
+    "script": "scripts/generate-aliyun-cli-inventory-plan.mjs",
+    "scope": "read-only command plan only; it never calls Aliyun cloud APIs by itself",
+    "requiresConfiguredCli": true,
+    "secretsPolicy": "Do not pass AccessKeySecret, AppSecret, registry password, STS token, cookie, or Supabase service role key on the command line or into reports."
+  },
   "localPredeployChecks": [
     "corepack pnpm run aliyun:env:check",
     "corepack pnpm run aliyun:env:plan",
@@ -64,6 +71,7 @@
     "corepack pnpm run aliyun:wechat-open:package:test",
     "corepack pnpm run aliyun:domain:test",
     "corepack pnpm run aliyun:cloud-access:test",
+    "corepack pnpm run aliyun:cloud:inventory-plan:test",
     "corepack pnpm run aliyun:sensitive:blockers:test",
     "corepack pnpm run aliyun:resources:matrix:test",
     "corepack pnpm run aliyun:app-cn-checklist:test",
@@ -83,6 +91,7 @@
     "corepack pnpm run aliyun:image:plan",
     "corepack pnpm run aliyun:legal:check",
     "corepack pnpm run aliyun:cloud:access",
+    "corepack pnpm run aliyun:cloud:inventory-plan",
     "corepack pnpm run aliyun:cloud:confirmations",
     "corepack pnpm run aliyun:domain:check",
     "corepack pnpm run aliyun:cloud:check",
@@ -115,6 +124,7 @@
     "corepack pnpm aliyun:wechat-open:package",
     "corepack pnpm aliyun:status",
     "corepack pnpm aliyun:cloud:access",
+    "corepack pnpm aliyun:cloud:inventory-plan",
     "corepack pnpm aliyun:cloud:confirmations",
     "corepack pnpm aliyun:readiness",
     "corepack pnpm aliyun:env:sources",

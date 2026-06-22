@@ -19,6 +19,8 @@
     "aliyun:wechat-open:package:test": "node --test tests/aliyun-wechat-open-mobile-app-package.static.test.js",
     "aliyun:domain:test": "node --test tests/aliyun-domain-readiness.static.test.js",
     "aliyun:cloud-access:test": "node --test tests/aliyun-cloud-access.static.test.js",
+    "aliyun:cloud:inventory-plan": "node ./scripts/generate-aliyun-cli-inventory-plan.mjs",
+    "aliyun:cloud:inventory-plan:test": "node --test tests/aliyun-cli-inventory-plan.static.test.js",
     "aliyun:sensitive:blockers": "node ./scripts/summarize-aliyun-sensitive-blockers.mjs",
     "aliyun:sensitive:blockers:test": "node --test tests/aliyun-sensitive-blockers.static.test.js",
     "aliyun:resources:matrix": "node ./scripts/summarize-aliyun-resource-matrix.mjs",

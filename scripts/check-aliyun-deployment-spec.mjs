@@ -23,6 +23,7 @@ const REQUIRED_PREDEPLOY_CHECKS = [
   "corepack pnpm aliyun:wechat-open:package",
   "corepack pnpm aliyun:status",
   "corepack pnpm aliyun:cloud:access",
+  "corepack pnpm aliyun:cloud:inventory-plan",
   "corepack pnpm aliyun:cloud:confirmations",
   "corepack pnpm aliyun:readiness",
   "corepack pnpm aliyun:env:sources",
@@ -214,6 +215,23 @@ function validateSpec(spec) {
   }
   if (cloudConfirmations.statusCommand !== "corepack pnpm aliyun:status") {
     blockers.push("cloudConfirmations.statusCommand")
+  }
+
+  const cloudInventoryPlan = spec.cloudInventoryPlan || {}
+  if (cloudInventoryPlan.checkCommand !== "corepack pnpm aliyun:cloud:inventory-plan") {
+    blockers.push("cloudInventoryPlan.checkCommand")
+  }
+  if (cloudInventoryPlan.script !== "scripts/generate-aliyun-cli-inventory-plan.mjs") {
+    blockers.push("cloudInventoryPlan.script")
+  }
+  if (cloudInventoryPlan.requiresConfiguredCli !== true) {
+    blockers.push("cloudInventoryPlan.requiresConfiguredCli")
+  }
+  if (!String(cloudInventoryPlan.scope || "").includes("never calls Aliyun cloud APIs")) {
+    blockers.push("cloudInventoryPlan.scope")
+  }
+  if (!String(cloudInventoryPlan.secretsPolicy || "").includes("AppSecret")) {
+    blockers.push("cloudInventoryPlan.secretsPolicy")
   }
 
   const predeployChecks = requireArray(spec.predeployChecks)

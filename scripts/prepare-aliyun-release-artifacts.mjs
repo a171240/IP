@@ -190,6 +190,7 @@ function renderMarkdown(audit) {
   const vercelEnvCoverage = audit.checks.vercelEnvCoverage
   const domain = audit.checks.domain
   const cloudAccess = audit.checks.cloudAccess
+  const cloudInventoryPlan = audit.checks.cloudInventoryPlan
   const deploymentSpec = audit.checks.deploymentSpec
   const runtimePlan = audit.checks.runtimePlan
   const legalPages = audit.checks.legalPages
@@ -235,6 +236,7 @@ function renderMarkdown(audit) {
     `- imagePublishPlan: ${imagePublishPlan.ready === true ? "ready" : "not ready"}`,
     `- domainReadiness: ${domain.ok ? "ok" : "not ready"} (${domain.targetReady} / ${domain.targetTotal})`,
     `- cloudAccess: ${cloudAccess.canReadCloudNow ? "cli-ready" : "manual-console"} (${cloudAccess.blockers?.length || 0} blockers)`,
+    `- cloudInventoryPlan: ${cloudInventoryPlan.canRunReadOnlyInventoryNow ? "ready" : "blocked"} (${cloudInventoryPlan.summary?.totalOperations || 0} operations)`,
     `- appRuntimeConfig: ${appRuntimeConfig?.ok === true ? "ready" : "not ready"}`,
     `- appNativeRelease: ${appNativeRelease?.ok === true ? "ready" : "not ready"}`,
     `- operatorTasks: ${operatorTasks.summary.ready} / ${operatorTasks.summary.total} ready`,
@@ -295,6 +297,20 @@ function renderMarkdown(audit) {
     `- checklistItems: ${cloudAccess.consoleEvidenceChecklist?.length || 0}`,
     ...(cloudAccess.blockers?.length
       ? cloudAccess.blockers.map((item) => `- ${item}`)
+      : ["- blockers: none"]),
+    "",
+    "## 阿里云 CLI 只读资源盘点计划",
+    "",
+    `- json: ${audit.outputFiles.cloudInventoryPlanJson}`,
+    `- markdown: ${audit.outputFiles.cloudInventoryPlanMarkdown}`,
+    `- readOnlyOnly: ${cloudInventoryPlan.readOnlyOnly === true}`,
+    `- cloudApiCalled: ${cloudInventoryPlan.cloudApiCalled === true}`,
+    `- cloudMutationPerformed: ${cloudInventoryPlan.cloudMutationPerformed === true}`,
+    `- canRunReadOnlyInventoryNow: ${cloudInventoryPlan.canRunReadOnlyInventoryNow === true}`,
+    `- totalOperations: ${cloudInventoryPlan.summary?.totalOperations ?? 0}`,
+    `- commandTemplates: ${cloudInventoryPlan.summary?.commandTemplates ?? 0}`,
+    ...(cloudInventoryPlan.blockers?.length
+      ? cloudInventoryPlan.blockers.map((item) => `- ${item}`)
       : ["- blockers: none"]),
     "",
     "## APP production-cn 配置模板",
@@ -697,6 +713,15 @@ function main() {
     "--write-report",
     cloudAccessPath,
   ])
+  const cloudInventoryPlanJsonPath = resolve(args.outDir, "cloud-inventory-plan.json")
+  const cloudInventoryPlanMarkdownPath = resolve(args.outDir, "cloud-inventory-plan.md")
+  const cloudInventoryPlan = runJson("cloud_inventory_plan", [
+    "scripts/generate-aliyun-cli-inventory-plan.mjs",
+    "--out",
+    cloudInventoryPlanJsonPath,
+    "--markdown",
+    cloudInventoryPlanMarkdownPath,
+  ])
   const deploymentSpec = runJson("deployment_spec", ["scripts/check-aliyun-deployment-spec.mjs"])
   const runtimePlan = runJson("runtime_plan", ["scripts/check-aliyun-runtime-plan.mjs"])
   const imagePublishPlan = runJson("image_publish_plan", [
@@ -859,6 +884,7 @@ function main() {
       readiness,
       domain,
       cloudAccess,
+      cloudInventoryPlan,
       deploymentSpec,
       runtimePlan,
       legalPages,
@@ -892,6 +918,8 @@ function main() {
       vercelEnvCoverage: vercelEnvCoverage.ok ? resolve(args.outDir, "vercel-env-coverage.json") : null,
       domainReadiness: resolve(args.outDir, "domain-readiness.json"),
       cloudAccess: cloudAccessPath,
+      cloudInventoryPlanJson: cloudInventoryPlanJsonPath,
+      cloudInventoryPlanMarkdown: cloudInventoryPlanMarkdownPath,
       cloudConfirmationsCheck: cloudConfirmationsCheckPath,
       legalPages: resolve(args.outDir, "legal-pages.json"),
       runtimePlan: resolve(args.outDir, "runtime-plan.json"),
@@ -923,6 +951,7 @@ function main() {
   writeText(audit.outputFiles.auditMarkdown, renderMarkdown(audit))
   writeText(audit.outputFiles.domainReadiness, JSON.stringify(domain, null, 2))
   writeText(audit.outputFiles.cloudAccess, JSON.stringify(cloudAccess, null, 2))
+  writeText(audit.outputFiles.cloudInventoryPlanJson, JSON.stringify(cloudInventoryPlan, null, 2))
   writeText(audit.outputFiles.cloudConfirmationsCheck, JSON.stringify(cloudConfirmationsCheck, null, 2))
   writeText(audit.outputFiles.legalPages, JSON.stringify(legalPages, null, 2))
   writeText(audit.outputFiles.runtimePlan, JSON.stringify(runtimePlan, null, 2))
@@ -946,6 +975,18 @@ function main() {
       cliConfigFileExists: cloudAccess.cli?.configFileExists === true,
       blockers: cloudAccess.blockers || [],
       checklistItems: cloudAccess.consoleEvidenceChecklist?.length || 0,
+    },
+    cloudInventoryPlan: {
+      report: audit.outputFiles.cloudInventoryPlanJson,
+      markdown: audit.outputFiles.cloudInventoryPlanMarkdown,
+      readOnlyOnly: cloudInventoryPlan.readOnlyOnly === true,
+      cloudApiCalled: cloudInventoryPlan.cloudApiCalled === true,
+      cloudMutationPerformed: cloudInventoryPlan.cloudMutationPerformed === true,
+      canRunReadOnlyInventoryNow: cloudInventoryPlan.canRunReadOnlyInventoryNow === true,
+      status: cloudInventoryPlan.status,
+      totalOperations: cloudInventoryPlan.summary?.totalOperations ?? 0,
+      commandTemplates: cloudInventoryPlan.summary?.commandTemplates ?? 0,
+      blockers: cloudInventoryPlan.blockers || [],
     },
     deploymentSpec: {
       ok: deploymentSpec.ok === true,
@@ -1181,6 +1222,8 @@ function main() {
     vercelEnvCoverageReport: audit.outputFiles.vercelEnvCoverage,
     domainReadinessReport: audit.outputFiles.domainReadiness,
     cloudAccessReport: audit.outputFiles.cloudAccess,
+    cloudInventoryPlanJson: audit.outputFiles.cloudInventoryPlanJson,
+    cloudInventoryPlanMarkdown: audit.outputFiles.cloudInventoryPlanMarkdown,
     cloudConfirmationsCheckReport: audit.outputFiles.cloudConfirmationsCheck,
     operatorTasksJson: audit.outputFiles.operatorTasksJson,
     operatorTasksMarkdown: audit.outputFiles.operatorTasksMarkdown,
