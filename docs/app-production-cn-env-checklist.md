@@ -113,6 +113,8 @@ corepack pnpm aliyun:predeploy
 
 `aliyun:env:handoff` 会输出无值的环境变量获取与导入手册，按 `blockedRequired`、`appLaunchBlocking`、`readyPlainEnv`、`readySecretEnv` 和 `deferred` 分组回答“从哪里取得、写到阿里云哪里、当前是否阻塞、禁止写到哪里”。该手册会明确 `WECHAT_OPEN_APP_ID` 只能作为服务端 SAE plain env，`WECHAT_OPEN_APP_SECRET` 只能进入 KMS/Secrets Manager/SAE secret env，`APPLE_TEAM_ID` 是受控标识符且不能猜测。
 
+`aliyun:status` 现在也会读取 `cloud-inventory-results.local.json` 的非密钥摘要，并在 `cloudInventoryResults` 里显示 CLI/Cloud Shell 只读盘点结果是否已落地、local operations ready 数量和 blocker；当前 local 结果文件未生成时，状态仍会明确显示 `file_missing`。
+
 正式部署前必须满足：
 
 ```text

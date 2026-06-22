@@ -529,6 +529,8 @@ function renderMarkdown(audit) {
     `- canDeployNow: ${productionStatus.canDeployNow === true}`,
     `- requiredEnv: ${productionStatus.summary.requiredReady} / ${productionStatus.summary.requiredTotal}`,
     `- requiredBlocking: ${productionStatus.summary.requiredBlocking?.length ? productionStatus.summary.requiredBlocking.join(", ") : "none"}`,
+    `- cloudInventoryResults: local ${productionStatus.summary.cloudInventoryResults?.readyLocalOperations || 0} / ${productionStatus.summary.cloudInventoryResults?.localOperations || 0} operations ready, localReady ${productionStatus.summary.cloudInventoryResults?.localReady === true}`,
+    `- cloudInventoryResultBlockers: ${productionStatus.summary.cloudInventoryResults?.localBlockers?.length ? productionStatus.summary.cloudInventoryResults.localBlockers.join(", ") : "none"}`,
     `- sensitiveActionItems: ${productionStatus.summary.sensitiveActionItems?.total || 0} total, ${productionStatus.summary.sensitiveActionItems?.blocked || 0} blocked`,
     ...(productionStatus.humanSummary?.length
       ? productionStatus.humanSummary.map((item) => `- ${item}`)
@@ -1089,6 +1091,7 @@ function main() {
       operatorTasks: productionStatus.summary.operatorTasks || {},
       sensitiveActionItems: productionStatus.summary.sensitiveActionItems || {},
       cloudConfirmations: productionStatus.summary.cloudConfirmations || {},
+      cloudInventoryResults: productionStatus.summary.cloudInventoryResults || {},
     },
     envHandoff: {
       report: audit.outputFiles.envHandoffJson,

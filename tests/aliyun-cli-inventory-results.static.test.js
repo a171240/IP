@@ -63,6 +63,38 @@ test("Aliyun CLI inventory results reports incomplete local evidence without cal
   assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
 })
 
+test("Aliyun production status surfaces CLI inventory result blockers", () => {
+  const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-status-inventory-results-missing-"))
+  const missingLocal = path.join(tmpdir, "missing.local.json")
+  const output = execFileSync(
+    process.execPath,
+    [
+      "scripts/summarize-aliyun-production-cn-status.mjs",
+      "--cloud-inventory-results",
+      missingLocal,
+    ],
+    {
+      cwd: root,
+      encoding: "utf8",
+      maxBuffer: 1024 * 1024 * 30,
+    },
+  )
+  const report = JSON.parse(output)
+
+  assert.equal(report.summary.cloudInventoryResults.localExists, false)
+  assert.equal(report.summary.cloudInventoryResults.localReady, false)
+  assert.equal(report.summary.cloudInventoryResults.localOperations, 0)
+  assert.ok(report.summary.cloudInventoryResults.localBlockers.includes("file_missing"))
+  assert.equal(report.localReadiness.cloudInventoryResults.localFile, missingLocal)
+  assert.equal(report.localReadiness.cloudInventoryResults.readOnlyOnly, true)
+  assert.equal(report.localReadiness.cloudInventoryResults.cloudMutationPerformed, false)
+  assert.ok(report.humanSummary.some((line) => /阿里云 CLI 只读盘点结果/.test(line)))
+  assert.ok(report.nextCommandOrder.includes("corepack pnpm aliyun:cloud:inventory-results:strict"))
+  assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
+  assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
+})
+
 test("Aliyun CLI inventory results strict mode accepts complete non-secret local summaries", () => {
   const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-inventory-results-ready-"))
   const localFile = path.join(tmpdir, "inventory.local.json")

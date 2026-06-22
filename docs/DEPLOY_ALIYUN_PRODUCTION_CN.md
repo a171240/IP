@@ -228,6 +228,7 @@ corepack pnpm aliyun:runtime:plan
 corepack pnpm aliyun:image:plan
 corepack pnpm aliyun:legal:check
 corepack pnpm aliyun:cloud:access
+corepack pnpm aliyun:cloud:inventory-results
 corepack pnpm aliyun:status
 corepack pnpm aliyun:operator:tasks
 corepack pnpm aliyun:sensitive:blockers
@@ -236,7 +237,7 @@ corepack pnpm aliyun:user:actions
 corepack pnpm aliyun:operator:handoff
 ```
 
-这些命令不输出任何密钥值，也不会创建资源、导入变量或推送镜像。`aliyun:legal:check` 只确认后端包内 `/privacy` 和 `/terms` 页面存在、核心字段完整，并允许正式 URL 仍未填入 env；`aliyun:deploy:spec` 校验 `deploy/aliyun-production-cn.example.json` 的镜像、端口、ACR 发布计划、SAE runtime plan、域名、健康检查、前后置门禁顺序和 8 项外部确认；`aliyun:runtime:plan` 校验 `deploy/aliyun-production-cn.runtime-plan.json` 是否仍指向 `cn-hangzhou` 的 SAE 自定义容器、端口 3000 和 `api-cn.ipgongchang.xin`；`aliyun:cloud:access` 只检查本机是否具备阿里云 CLI 只读 inventory 条件，并输出 SAE/ACR/DNS/OSS/SLS 控制台要记录的非密钥证据字段，不调用阿里云 API；`aliyun:status` 是给当前发布负责人看的只读总览，会把本地门禁、微信审核、Apple Universal Link、阿里云云资源确认、域名和 ACR 镜像证据压缩成一个 JSON 摘要；`aliyun:operator:tasks` 会把当前 `readiness`、`domain`、`.env.production-cn.local`、`image-publish.local.json` 和 `cloud-confirmations.local.json` 汇总为 9 个任务；`aliyun:sensitive:blockers` 会把 operator tasks 里的密钥、密码、token、付款和受控标识符类人工介入项单独压缩成无密钥清单；`aliyun:resources:matrix` 会把 SAE、ACR、api-cn、assets-cn、OSS、env import 和 SLS 这 7 个阿里云资源项压缩成资源矩阵，列出控制台路径、写入的 `.local.json` 字段、当前 blocker、验收命令和是否需要动作时确认；`aliyun:user:actions` 会把微信移动应用、Apple Team ID、ACR 付费、OSS/RAM、环境变量导入、DNS/HTTPS/ICP、SAE/SLS 和最终部署授权整理成给用户看的单页动作简报；`aliyun:operator:handoff` 是给用户、阿里云操作员、微信开放平台操作员和发布负责人共用的非密钥操作包，适合直接判断“现在缺什么、去哪里拿、导入哪里”。它还会读取 Vercel production 的变量名元数据，列出哪些旧后端桥接变量已在 Vercel 中存在、哪些 production-cn 必填变量仍缺，并把 `cloud-confirmations.local.json` 与 `image-publish.local.json` 仍待填写的 JSON path、控制台来源、期望证据和禁止写入的敏感值逐项列出；这一步不读取值、不导出密钥，也不等于已导入阿里云。
+这些命令不输出任何密钥值，也不会创建资源、导入变量或推送镜像。`aliyun:legal:check` 只确认后端包内 `/privacy` 和 `/terms` 页面存在、核心字段完整，并允许正式 URL 仍未填入 env；`aliyun:deploy:spec` 校验 `deploy/aliyun-production-cn.example.json` 的镜像、端口、ACR 发布计划、SAE runtime plan、域名、健康检查、前后置门禁顺序和 8 项外部确认；`aliyun:runtime:plan` 校验 `deploy/aliyun-production-cn.runtime-plan.json` 是否仍指向 `cn-hangzhou` 的 SAE 自定义容器、端口 3000 和 `api-cn.ipgongchang.xin`；`aliyun:cloud:access` 只检查本机是否具备阿里云 CLI 只读 inventory 条件，并输出 SAE/ACR/DNS/OSS/SLS 控制台要记录的非密钥证据字段，不调用阿里云 API；`aliyun:cloud:inventory-results` 校验 CLI/Cloud Shell 只读盘点后的本地非密钥摘要是否已经落到 `cloud-inventory-results.local.json`；`aliyun:status` 是给当前发布负责人看的只读总览，会把本地门禁、微信审核、Apple Universal Link、阿里云云资源确认、CLI 只读盘点结果、域名和 ACR 镜像证据压缩成一个 JSON 摘要；`aliyun:operator:tasks` 会把当前 `readiness`、`domain`、`.env.production-cn.local`、`image-publish.local.json` 和 `cloud-confirmations.local.json` 汇总为 9 个任务；`aliyun:sensitive:blockers` 会把 operator tasks 里的密钥、密码、token、付款和受控标识符类人工介入项单独压缩成无密钥清单；`aliyun:resources:matrix` 会把 SAE、ACR、api-cn、assets-cn、OSS、env import 和 SLS 这 7 个阿里云资源项压缩成资源矩阵，列出控制台路径、写入的 `.local.json` 字段、当前 blocker、验收命令和是否需要动作时确认；`aliyun:user:actions` 会把微信移动应用、Apple Team ID、ACR 付费、OSS/RAM、环境变量导入、DNS/HTTPS/ICP、SAE/SLS 和最终部署授权整理成给用户看的单页动作简报；`aliyun:operator:handoff` 是给用户、阿里云操作员、微信开放平台操作员和发布负责人共用的非密钥操作包，适合直接判断“现在缺什么、去哪里拿、导入哪里”。它还会读取 Vercel production 的变量名元数据，列出哪些旧后端桥接变量已在 Vercel 中存在、哪些 production-cn 必填变量仍缺，并把 `cloud-confirmations.local.json` 与 `image-publish.local.json` 仍待填写的 JSON path、控制台来源、期望证据和禁止写入的敏感值逐项列出；这一步不读取值、不导出密钥，也不等于已导入阿里云。
 
 ```text
 T01 微信开放平台移动应用审核和 APP 登录凭证

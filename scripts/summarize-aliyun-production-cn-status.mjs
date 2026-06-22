@@ -11,11 +11,13 @@ const BACKEND_ROOT = resolve(__dirname, "..")
 const WORKSPACE_ROOT = resolve(BACKEND_ROOT, "../..")
 const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
+const DEFAULT_CLOUD_INVENTORY_RESULTS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-inventory-results.local.json")
 
 function parseArgs(argv) {
   const args = {
     envFile: DEFAULT_ENV_FILE,
     cloudConfirmationsFile: DEFAULT_CLOUD_CONFIRMATIONS_FILE,
+    cloudInventoryResultsFile: DEFAULT_CLOUD_INVENTORY_RESULTS_FILE,
     outPath: "",
     markdownPath: "",
   }
@@ -29,6 +31,10 @@ function parseArgs(argv) {
     }
     if (arg === "--cloud-confirmations") {
       args.cloudConfirmationsFile = resolveValue(argv[++index], "--cloud-confirmations")
+      continue
+    }
+    if (arg === "--cloud-inventory-results") {
+      args.cloudInventoryResultsFile = resolveValue(argv[++index], "--cloud-inventory-results")
       continue
     }
     if (arg === "--out") {
@@ -103,7 +109,7 @@ function compactTask(task) {
   }
 }
 
-function buildStatus({ readiness, operatorTasks, args }) {
+function buildStatus({ readiness, operatorTasks, cloudInventoryResults, args }) {
   const tasks = operatorTasks.tasks || []
   const notReadyTasks = tasks.filter((task) => !task.ready)
   const readyTasks = tasks.filter((task) => task.ready)
@@ -112,6 +118,8 @@ function buildStatus({ readiness, operatorTasks, args }) {
   const domainTask = taskById(tasks, "T04_ALIYUN_DOMAIN_DNS_HTTPS")
   const envTask = taskById(tasks, "T06_ALIYUN_ENV_IMPORT")
   const cloudReady = countCloudReady(readiness)
+  const cloudInventoryLocal = cloudInventoryResults.local || {}
+  const cloudInventorySummary = cloudInventoryResults.summary || {}
   const missingRequiredEnv = readiness.checks?.env?.missingRequired || operatorTasks.env?.requiredBlocking || []
   const machineBlocking = readiness.machineBlocking || []
   const manualBlocking = readiness.manualBlocking || []
@@ -146,6 +154,7 @@ function buildStatus({ readiness, operatorTasks, args }) {
       ? `数据层：第一版桥接使用 ${bridgeDataLayer.current}；目标 ${bridgeDataLayer.target}，RDS migration included=${bridgeDataLayer.rdsMigrationIncludedInThisRelease === true}，DATABASE_URL_CN=${bridgeDataLayer.databaseUrlCnStatus || "unknown"}。`
       : "数据层：unknown。",
     `阿里云云资源确认：${cloudReady.ready}/${cloudReady.total} ready；还缺 SAE、DNS/HTTPS/ICP、OSS/CORS/RAM、微信开放平台 approved、env import、SLS 中未完成项。`,
+    `阿里云 CLI 只读盘点结果：${cloudInventoryLocal.ready ? "ready" : "not ready"}；localExists=${cloudInventoryLocal.exists === true}，local operations ${cloudInventorySummary.readyLocalOperations || 0}/${cloudInventorySummary.localOperations || 0} ready，blockers ${(cloudInventoryLocal.blockers || []).join(", ") || "none"}。`,
     `域名门禁：${operatorTasks.domain?.ok ? "ready" : "blocked"}；当前 api-cn/assets-cn 仍未证明解析到阿里云 HTTPS 入口。`,
     `镜像发布计划：${imagePlan?.ready ? "ready" : "blocked"}；本地 Docker 镜像 ${imagePlan?.localDockerImage?.status || operatorTasks.imagePublishPlan?.localDockerImage || "unknown"}，ACR/runtime 拉取证据未完成。`,
     `密钥/密码/token/付款/受控标识符类人工介入项：${sensitiveActionItems.length} 项；脚本只输出变量名、控制台路径和动作，不输出任何 value。`,
@@ -164,6 +173,8 @@ function buildStatus({ readiness, operatorTasks, args }) {
       envFileExists: existsSync(args.envFile),
       cloudConfirmationsFile: args.cloudConfirmationsFile,
       cloudConfirmationsFileExists: existsSync(args.cloudConfirmationsFile),
+      cloudInventoryResultsFile: args.cloudInventoryResultsFile,
+      cloudInventoryResultsFileExists: existsSync(args.cloudInventoryResultsFile),
     },
     summary: {
       productionReady: readiness.productionReady,
@@ -183,6 +194,15 @@ function buildStatus({ readiness, operatorTasks, args }) {
       bridgeDataLayer,
       operatorTasks: operatorTasks.summary || {},
       cloudConfirmations: cloudReady,
+      cloudInventoryResults: {
+        templateReady: cloudInventoryResults.template?.ready === true,
+        localExists: cloudInventoryLocal.exists === true,
+        localReady: cloudInventoryLocal.ready === true,
+        localCheckedOperations: cloudInventoryLocal.checkedOperations || 0,
+        localOperations: cloudInventorySummary.localOperations || 0,
+        readyLocalOperations: cloudInventorySummary.readyLocalOperations || 0,
+        localBlockers: cloudInventoryLocal.blockers || [],
+      },
     },
     localReadiness: {
       backendBridgeMap: bridgeMap
@@ -237,6 +257,16 @@ function buildStatus({ readiness, operatorTasks, args }) {
           }
         : null,
       bridgeDataLayer,
+      cloudInventoryResults: {
+        ok: cloudInventoryResults.ok === true,
+        readOnlyOnly: cloudInventoryResults.readOnlyOnly === true,
+        cloudMutationPerformed: cloudInventoryResults.cloudMutationPerformed === true,
+        localFile: cloudInventoryLocal.file || args.cloudInventoryResultsFile,
+        localReady: cloudInventoryLocal.ready === true,
+        localExists: cloudInventoryLocal.exists === true,
+        localCheckedOperations: cloudInventoryLocal.checkedOperations || 0,
+        localBlockers: cloudInventoryLocal.blockers || [],
+      },
     },
     tasks: {
       ready: readyTasks.map(compactTask),
@@ -249,6 +279,8 @@ function buildStatus({ readiness, operatorTasks, args }) {
     nextCommandOrder: [
       "corepack pnpm aliyun:operator:tasks",
       "corepack pnpm aliyun:cloud:check",
+      "corepack pnpm aliyun:cloud:inventory-results",
+      "corepack pnpm aliyun:cloud:inventory-results:strict",
       "corepack pnpm aliyun:cloud:confirmations:strict",
       "corepack pnpm aliyun:image:plan:strict",
       "corepack pnpm aliyun:domain:strict",
@@ -296,6 +328,7 @@ function renderMarkdown(status) {
     `- Missing required env: ${status.summary.requiredBlocking.length ? status.summary.requiredBlocking.join(", ") : "none"}`,
     `- Operator tasks: ready ${status.summary.operatorTasks.ready || 0}/${status.summary.operatorTasks.total || 0}, blocked ${status.summary.operatorTasks.blocked || 0}, waiting_wechat_review ${status.summary.operatorTasks.waitingWechatReview || 0}, pending_cloud ${status.summary.operatorTasks.pendingCloud || 0}, waiting_for_deploy ${status.summary.operatorTasks.waitingForDeploy || 0}`,
     `- Cloud confirmations: ${status.summary.cloudConfirmations.ready}/${status.summary.cloudConfirmations.total} ready`,
+    `- Cloud inventory results: local ${status.summary.cloudInventoryResults.readyLocalOperations}/${status.summary.cloudInventoryResults.localOperations} operations ready, localReady ${status.summary.cloudInventoryResults.localReady}`,
     `- Sensitive action items: ${status.summary.sensitiveActionItems.total} total, ${status.summary.sensitiveActionItems.blocked} blocked`,
     `- Bridge data layer: ${status.summary.bridgeDataLayer?.current || "unknown"} -> ${status.summary.bridgeDataLayer?.target || "unknown"} (${status.summary.bridgeDataLayer?.status || "unknown"})`,
     "",
@@ -314,6 +347,16 @@ function renderMarkdown(status) {
       `- Blockers: ${task.blockerCodes.length ? task.blockerCodes.join(", ") : "none"}`,
       "",
     ]),
+    "## Aliyun CLI Read-only Inventory Results",
+    "",
+    `- Local file: ${status.localReadiness.cloudInventoryResults.localFile}`,
+    `- Local exists: ${status.localReadiness.cloudInventoryResults.localExists}`,
+    `- Local ready: ${status.localReadiness.cloudInventoryResults.localReady}`,
+    `- Local checked operations: ${status.localReadiness.cloudInventoryResults.localCheckedOperations}`,
+    `- Read-only only: ${status.localReadiness.cloudInventoryResults.readOnlyOnly}`,
+    `- Cloud mutation performed: ${status.localReadiness.cloudInventoryResults.cloudMutationPerformed}`,
+    `- Blockers: ${status.localReadiness.cloudInventoryResults.localBlockers.length ? status.localReadiness.cloudInventoryResults.localBlockers.join(", ") : "none"}`,
+    "",
     "## Sensitive / Token / Payment / Controlled Identifier Action Items",
     "",
     ...status.tasks.sensitiveActionItems.flatMap((item) => [
@@ -349,6 +392,8 @@ function printHelp() {
 Options:
   --env-file <path>              Env file to check. Defaults to workspace .env.production-cn.local.
   --cloud-confirmations <path>   Non-secret cloud confirmation file.
+  --cloud-inventory-results <path>
+                                  Non-secret Aliyun CLI inventory result summary file.
   --out <path>                   Write JSON summary to a file.
   --markdown <path>              Write Markdown summary to a file.
   -h, --help                     Show this help.
@@ -372,8 +417,14 @@ function main() {
     "--cloud-confirmations",
     args.cloudConfirmationsFile,
   ])
+  const cloudInventoryResults = runJson("cloud_inventory_results", [
+    resolve(BACKEND_ROOT, "scripts/check-aliyun-cli-inventory-results.mjs"),
+    "--allow-incomplete",
+    "--local",
+    args.cloudInventoryResultsFile,
+  ])
 
-  const status = buildStatus({ readiness, operatorTasks, args })
+  const status = buildStatus({ readiness, operatorTasks, cloudInventoryResults, args })
   const output = `${JSON.stringify(status, null, 2)}\n`
   if (args.outPath) writeFileSync(args.outPath, output)
   if (args.markdownPath) writeFileSync(args.markdownPath, renderMarkdown(status))
