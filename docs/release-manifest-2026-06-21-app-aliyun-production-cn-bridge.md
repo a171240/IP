@@ -530,7 +530,7 @@ meiye-huajing-app-api-production-cn-context.tar.gz
 
 其中 `cloud-access.json` 是本机阿里云只读访问能力报告；当前用于记录是否存在 `aliyun` CLI、是否能自动读云，以及控制台需要抄录到 `.local.json` 的非密钥证据字段。`sensitive-blockers.json/md` 单独列密钥、密码、token、付款和受控标识符类人工介入项；`resource-matrix.json/md` 单独列 SAE、ACR、api-cn、assets-cn、OSS、env import、SLS 这 7 个阿里云资源项和对应验收字段；`user-action-brief.json/md` 单独列用户/操作员动作项、获取位置、写入目标和动作时确认边界。`operator-handoff.json/md` 是给用户、阿里云控制台操作员、微信开放平台操作员和发布负责人共用的非密钥操作包；它会区分后端必填缺口、APP 发布/AASA 阻塞但非密钥的缺口、以及可后置变量。`vercel-env-coverage.json` 只包含 Vercel production 变量名、环境和加密/敏感元数据，不包含真实 value；Vercel 登录态不可用时只记录 non-blocking failure，不阻断 release audit。
 
-2026-06-22 03:56 CST 最新 artifacts：
+2026-06-22 03:56 CST artifacts 历史快照：
 
 ```text
 outDir: /tmp/meiye-huajing-aliyun-production-cn-2026-06-21T19-56-07-018Z
@@ -543,6 +543,8 @@ vercelEnvCoverage.requiredCovered: 17 / 26
 appClientContract: 40 audited calls / 34 unique client routes / 26 matched backend routes
 appApiSmokeCoverage: 29 / 29 business routes / 30 probes
 ```
+
+2026-06-22 18:46 CST 复核：当前权威脚本口径已更新为 `imagePublishPlan.totalBlockers=12`、`cloudConfirmations.totalBlockers=27`、`localPredeployChecks=42`、`predeployChecks=26`。03:56 快照只保留为历史证据，不作为后续阿里云执行口径。
 
 本机 Docker 镜像已在 2026-06-22 03:54 CST 重新构建成功：
 
@@ -761,7 +763,7 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 17:25 CST 追加：按“微信开放平台账号已认证、移动 App 未创建”的真实状态复核后，本机 ignored 镜像发布证据只补运行时非密钥字段：`runtime.target=SAE`、`runtime.appName=meiye-huajing-app-api-production-cn`、`runtime.imagePullCredentialMode=pending_acr_runtime_configuration_no_credentials_in_file`。`corepack pnpm aliyun:image:plan` 当前识别本地 Docker 镜像 digest `sha256:494907a4f9e7342064dda55fe30e0e48dd245b6d6ae753bdbb3945f77c0f518d`，`containsValues=false`，镜像发布 blocker 从旧记录的 16 项降到 12 项；剩余阻塞仍需要 ACR 购买/仓库/推送 digest 和 SAE 拉镜像配置，不能视为已部署或可上线。
 
-2026-06-22 17:40 CST 追加：新增 `corepack pnpm aliyun:app-cn-checklist:test`，把 `docs/app-production-cn-env-checklist.md` 纳入本地发布门禁。该测试会校验清单仍记录用户动作 `0/9`、阿里云资源 `0/7`、Vercel required 覆盖 `17/26`、本机 required env `24/26`、微信移动 App 未创建、ACR `CNY 117.00` / `¥117.00` 付款阻塞、SAE runtime 未 confirmed、以及 6 类密钥/密码/token/付款阻塞，同时执行基础 secret-like 扫描。`scripts/aliyun-predeploy-commands.mjs` 与 `deploy/aliyun-production-cn.example.json.localPredeployChecks` 已同步，本地 predeploy 现在为 35 项；正式 `predeployChecks` 仍为 24 项，不改变生产部署必须另行通过云侧严格门禁的结论。
+2026-06-22 17:40 CST 追加：新增 `corepack pnpm aliyun:app-cn-checklist:test`，把 `docs/app-production-cn-env-checklist.md` 纳入本地发布门禁。该测试会校验清单仍记录用户动作 `0/9`、阿里云资源 `0/7`、Vercel required 覆盖 `17/26`、本机 required env `24/26`、微信移动 App 未创建、ACR `CNY 117.00` / `¥117.00` 付款阻塞、SAE runtime 未 confirmed、以及 6 类密钥/密码/token/付款阻塞，同时执行基础 secret-like 扫描。`scripts/aliyun-predeploy-commands.mjs` 与 `deploy/aliyun-production-cn.example.json.localPredeployChecks` 已同步；该时点本地 predeploy 为 35 项、正式 `predeployChecks` 为 24 项，后续已更新，当前以 `localPredeployChecks=42` / `predeployChecks=26` 为准。此项不改变生产部署必须另行通过云侧严格门禁的结论。
 
 2026-06-22 17:55 CST 追加：`corepack pnpm aliyun:user:actions:test` 与 `corepack pnpm aliyun:user:actions` 已接入本地 `aliyun:predeploy`，并由 `tests/aliyun-user-action-brief.static.test.js` 反向校验 `scripts/aliyun-predeploy-commands.mjs` 和 `deploy/aliyun-production-cn.example.json.localPredeployChecks` 不会漏掉这两项。本地 predeploy 现在为 37 项，每次总检都会重新输出当前用户动作简报；当前微信状态仍是 `accountVerified=true`、`mobileAppCreated=false`、`mobileAppSubmitted=false`、`reviewStatus=not_started`，所以不能读取或导入 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`。
 
@@ -779,9 +781,11 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 18:03 CST 追加：将 S01-S06 的密钥/密码/token/付款/受控标识符元数据上提为共享本地脚本元数据，并让 `corepack pnpm aliyun:operator:tasks`、`corepack pnpm aliyun:status`、`corepack pnpm aliyun:operator:handoff` 与 release artifacts 都能直接继承 `obtainFrom`、`writeTargets`、`verifyCommands`、`requiresActionTimeConfirmation`、`completionEvidence`。这样操作包本身即可回答“去哪拿、写到哪里、怎么验证、完成后留什么非密钥证据”，不需要再交叉查 `aliyun:sensitive:blockers`；该变更仍只增强本地报告，不创建微信移动 App、不付款、不改 DNS、不导入环境变量、不部署。
 
-2026-06-22 18:24 CST 追加：新增 `corepack pnpm aliyun:console:runbook` 和 `tests/aliyun-console-runbook.static.test.js`，把阿里云控制台要填/确认的 7 项任务单独汇总为非密钥 JSON/Markdown：SAE runtime、ACR 镜像与 SAE 拉取、api-cn、assets-cn、OSS/RAM/STS、env import、SLS。`aliyun:release:artifacts` 现在会随包输出 `console-runbook.json` 和 `console-runbook.md`；本地 predeploy 增至 40 项，正式 predeployChecks 增至 25 项。该 runbook 只输出目标字段、当前 blocker、当前非密钥证据、写入目标和验证命令，不创建资源、不付款、不修改 DNS、不导入环境变量、不推送镜像、不部署。
+2026-06-22 18:24 CST 追加：新增 `corepack pnpm aliyun:console:runbook` 和 `tests/aliyun-console-runbook.static.test.js`，把阿里云控制台要填/确认的 7 项任务单独汇总为非密钥 JSON/Markdown：SAE runtime、ACR 镜像与 SAE 拉取、api-cn、assets-cn、OSS/RAM/STS、env import、SLS。`aliyun:release:artifacts` 现在会随包输出 `console-runbook.json` 和 `console-runbook.md`；该时点本地 predeploy 增至 40 项、正式 predeployChecks 增至 25 项，后续已更新，当前以 `localPredeployChecks=42` / `predeployChecks=26` 为准。该 runbook 只输出目标字段、当前 blocker、当前非密钥证据、写入目标和验证命令，不创建资源、不付款、不修改 DNS、不导入环境变量、不推送镜像、不部署。
 
 2026-06-22 18:37 CST 追加：新增 `corepack pnpm aliyun:wechat-open:package` 和 `tests/aliyun-wechat-open-mobile-app-package.static.test.js`，把微信开放平台“移动应用”创建材料单独机器化输出，防止误用小程序凭证。该材料包会从当前 RN 原生配置和 `cloud-confirmations.local.json` 非密钥证据中汇总 App 名称、Android 包名、iOS Bundle ID、Universal Link、AASA URL、当前 `accountVerified=true / mobileAppCreated=false / reviewStatus=not_started` 状态、审核前缺口、审核通过后 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET` 写入阿里云的位置和禁止事项；`aliyun:release:artifacts` 会随包输出 `wechat-open-mobile-app-package.json` 和 `wechat-open-mobile-app-package.md`。本地 predeploy 增至 42 项，正式 predeployChecks 增至 26 项。该命令不创建微信移动 App、不读取 AppSecret、不导入环境变量、不部署。
+
+2026-06-22 18:46 CST 复核：`corepack pnpm aliyun:operator:handoff -- --skip-vercel-env-coverage` 当前输出 `localEvidenceGaps.cloudConfirmations.totalBlockers=27`，`corepack pnpm aliyun:image:plan` 当前输出 `summary.totalBlockers=12`，`corepack pnpm aliyun:deploy:spec` 当前输出 `localPredeployChecks=42`、`predeployChecks=26`。这四个数字是当前执行口径；早前 35/24、40/25、16、25 均只代表对应时点的历史快照。
 
 ## 11. 真正部署时的命令顺序
 

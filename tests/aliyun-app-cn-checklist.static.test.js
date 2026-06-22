@@ -73,3 +73,14 @@ test("APP production-cn release manifest keeps Vercel coverage aligned with requ
   assert.doesNotMatch(manifest, /required APP production-cn variables covered by Vercel production: 17 \/ 25/)
   assert.doesNotMatch(manifest, /缺失的 8 个必填项/)
 })
+
+test("APP production-cn release manifest separates historical snapshots from current gate counts", () => {
+  const manifest = read("docs", "release-manifest-2026-06-21-app-aliyun-production-cn-bridge.md")
+
+  assert.match(manifest, /03:56 CST artifacts 历史快照/)
+  assert.match(manifest, /当前权威脚本口径已更新为 `imagePublishPlan\.totalBlockers=12`/)
+  assert.match(manifest, /`cloudConfirmations\.totalBlockers=27`/)
+  assert.match(manifest, /`localPredeployChecks=42`/)
+  assert.match(manifest, /`predeployChecks=26`/)
+  assert.match(manifest, /早前 35\/24、40\/25、16、25 均只代表对应时点的历史快照/)
+})
