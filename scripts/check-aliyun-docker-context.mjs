@@ -25,6 +25,15 @@ const REQUIRED_DOCKERFILE_SNIPPETS = [
 const REQUIRED_DOCKERIGNORE_PATTERNS = [
   ".env",
   ".env.*",
+  "deploy/*.local.json",
+  "**/*.local.json",
+  ".npmrc",
+  ".npmrc.*",
+  "*.pem",
+  "*.key",
+  "*.p8",
+  "*.p12",
+  "*.mobileprovision",
   "node_modules",
   ".next",
   ".vercel",
@@ -62,7 +71,16 @@ function assertDockerignore() {
   for (const required of REQUIRED_DOCKERIGNORE_PATTERNS) {
     if (!patterns.includes(required)) throw new Error(`missing_dockerignore_pattern:${required}`)
   }
-  for (const unsafe of ["!.env", "!.env.*", "!.env.production-cn.local"]) {
+  for (const unsafe of [
+    "!.env",
+    "!.env.*",
+    "!.env.production-cn.local",
+    "!deploy/*.local.json",
+    "!**/*.local.json",
+    "!.npmrc",
+    "!*.pem",
+    "!*.key",
+  ]) {
     if (patterns.includes(unsafe)) throw new Error(`unsafe_dockerignore_unignore:${unsafe}`)
   }
   return patterns

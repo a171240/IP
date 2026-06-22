@@ -14,6 +14,15 @@ xiaoshouzhushou1
 .env
 .env.*
 !.env.example
+deploy/*.local.json
+**/*.local.json
+.npmrc
+.npmrc.*
+*.pem
+*.key
+*.p8
+*.p12
+*.mobileprovision
 *.log
 *.tsbuildinfo
 voice-coach-ws-deploy.tar.gz

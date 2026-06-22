@@ -717,6 +717,10 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 13:46 CST 追加：ACR 企业版购买页已核到最低生产候选路径：`cn-hangzhou` 企业版经济版、购买时长 `1` 个月，应付 `CNY 117.00`，按钮为“立即购买”。该页面属于明确付费购买动作，当前未点击购买、未创建企业版实例、未创建 namespace/repository、未 push 镜像。`deploy/aliyun-production-cn.image-publish.local.json` 只记录非密钥 `purchaseCandidate`，`acr.confirmed`、`imagePushed`、`digestVerified`、`runtime.remoteImageConfigured` 和 `runtime.imagePullConfigured` 继续保持 false；`corepack pnpm aliyun:image:plan` 会输出该候选报价，但严格发布仍必须等 ACR 真实实例、remote image/digest 和 SAE 拉取证据完成。
 
+2026-06-22 13:58 CST 追加：加严 Docker 构建上下文门禁。由于生产 Dockerfile 使用 `COPY . .`，`.dockerignore` 现在显式排除 `deploy/*.local.json`、`**/*.local.json`、`.npmrc*`、证书/私钥/移动描述文件等常见凭据文件；`aliyun:docker:check` 同步校验这些排除项，并禁止用反向规则重新包含 `.env`、`.local.json`、`.npmrc`、证书或私钥。这样本机 ignored 的阿里云非密钥证据文件和未来可能出现的凭据文件都不会进入生产镜像构建上下文；真实密钥仍只能通过阿里云 SAE 环境变量、KMS 或 Secrets Manager 注入。
+
+2026-06-22 14:01 CST 追加：在上述 `.dockerignore` 门禁后重新执行 `corepack pnpm aliyun:docker:build`，Docker build context 为约 `1.06MB`，生产镜像 `meiye-huajing-app-api:production-cn` 重新构建成功，manifest digest 为 `sha256:494907a4f9e7342064dda55fe30e0e48dd245b6d6ae753bdbb3945f77c0f518d`。随后执行 `corepack pnpm aliyun:container:smoke` 通过：容器从 `/Users/Admin/Documents/美业话镜APP/.env.production-cn.local` 的临时 sanitized copy 启动，临时 env 文件已删除，health / app health 只缺 `appWechatLogin`，strict health 返回 `503`，APP API smoke 共 `30` 个 probe 覆盖 account/auth/context/invites/service-records/store-admin，结果符合微信开放平台审核中的预期。该 digest 只证明本地 production-cn 镜像 ready，不代表已推送 ACR 或 SAE 已配置拉取。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：
