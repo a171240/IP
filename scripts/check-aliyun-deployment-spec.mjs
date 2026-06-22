@@ -16,6 +16,7 @@ const REQUIRED_PREDEPLOY_CHECKS = [
   "corepack pnpm aliyun:image:plan",
   "corepack pnpm aliyun:legal:check",
   "corepack pnpm aliyun:operator:tasks",
+  "corepack pnpm aliyun:sensitive:blockers",
   "corepack pnpm aliyun:status",
   "corepack pnpm aliyun:cloud:access",
   "corepack pnpm aliyun:cloud:confirmations",

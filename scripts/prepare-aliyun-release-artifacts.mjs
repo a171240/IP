@@ -195,6 +195,7 @@ function renderMarkdown(audit) {
   const legalPages = audit.checks.legalPages
   const imagePublishPlan = audit.checks.imagePublishPlan
   const operatorTasks = audit.checks.operatorTasks
+  const sensitiveBlockers = audit.checks.sensitiveBlockers
   const operatorHandoff = audit.checks.operatorHandoff
   const productionStatus = audit.checks.productionStatus
   const cloudConfirmationsCheck = audit.checks.cloudConfirmationsCheck
@@ -233,7 +234,7 @@ function renderMarkdown(audit) {
     `- operatorTasks: ${operatorTasks.summary.ready} / ${operatorTasks.summary.total} ready`,
     `- operatorHandoff: ${operatorHandoff.verdict}, missing required env ${operatorHandoff.missingVariables.required.length}`,
     `- productionStatus: ${productionStatus.verdict}, canDeployNow ${productionStatus.canDeployNow === true}`,
-    `- sensitiveActionItems: ${productionStatus.summary?.sensitiveActionItems?.total || operatorHandoff.sensitiveActionItems?.length || 0}`,
+    `- sensitiveActionItems: ${sensitiveBlockers.summary.total} total, ${sensitiveBlockers.summary.blocked} blocked`,
     `- cloudConfirmations: ${cloudConfirmations?.ready ? "ready" : "not ready"}`,
     `- cloudConfirmationsCheck: template ${cloudConfirmationsCheck?.template?.ready ? "ready" : "not ready"}, local ${cloudConfirmationsCheck?.local?.ready ? "ready" : "not ready"}`,
     `- vercelEnvCoverage: ${vercelEnvCoverage?.ok ? "ok" : vercelEnvCoverage?.skipped ? "skipped" : "not ok"}`,
@@ -382,6 +383,18 @@ function renderMarkdown(audit) {
     `- waitingWechatReview: ${operatorTasks.summary.waitingWechatReview || 0}`,
     `- pendingCloud: ${operatorTasks.summary.pendingCloud}`,
     `- sensitiveActionItems: ${operatorTasks.sensitiveActionItems?.length || 0}`,
+    "",
+    "## 密钥/密码/付款类人工介入项",
+    "",
+    `- json: ${audit.outputFiles.sensitiveBlockersJson}`,
+    `- markdown: ${audit.outputFiles.sensitiveBlockersMarkdown}`,
+    `- ok: ${sensitiveBlockers.ok === true}`,
+    `- containsValues: ${sensitiveBlockers.containsValues === true}`,
+    `- secretLeakCheck: ${sensitiveBlockers.secretLeakCheck?.ok === true}`,
+    `- blocked: ${sensitiveBlockers.summary.blocked} / ${sensitiveBlockers.summary.total}`,
+    ...(sensitiveBlockers.items?.length
+      ? sensitiveBlockers.items.map((item) => `- ${item.id}: ${item.status} (${item.type})`)
+      : ["- none"]),
     "",
     "## 操作员操作包",
     "",
@@ -603,6 +616,8 @@ function main() {
   ])
   const operatorTasksJsonPath = resolve(args.outDir, "operator-tasks.json")
   const operatorTasksMarkdownPath = resolve(args.outDir, "operator-tasks.md")
+  const sensitiveBlockersJsonPath = resolve(args.outDir, "sensitive-blockers.json")
+  const sensitiveBlockersMarkdownPath = resolve(args.outDir, "sensitive-blockers.md")
   const operatorHandoffJsonPath = resolve(args.outDir, "operator-handoff.json")
   const operatorHandoffMarkdownPath = resolve(args.outDir, "operator-handoff.md")
   const productionStatusJsonPath = resolve(args.outDir, "production-cn-status.json")
@@ -617,6 +632,16 @@ function main() {
     operatorTasksJsonPath,
     "--markdown",
     operatorTasksMarkdownPath,
+  ])
+  const sensitiveBlockers = runJson("sensitive_blockers", [
+    "scripts/summarize-aliyun-sensitive-blockers.mjs",
+    "--env-file",
+    args.envFile,
+    ...(args.cloudConfirmationsFile ? ["--cloud-confirmations", args.cloudConfirmationsFile] : []),
+    "--out",
+    sensitiveBlockersJsonPath,
+    "--markdown",
+    sensitiveBlockersMarkdownPath,
   ])
   const operatorHandoff = runJson("operator_handoff", [
     "scripts/generate-aliyun-operator-handoff.mjs",
@@ -673,6 +698,7 @@ function main() {
       legalPages,
       imagePublishPlan,
       operatorTasks,
+      sensitiveBlockers,
       operatorHandoff,
       productionStatus,
       cloudConfirmationsCheck,
@@ -699,6 +725,8 @@ function main() {
       appApiBridgeMap: resolve(args.outDir, "app-api-bridge-map-check.json"),
       operatorTasksJson: operatorTasksJsonPath,
       operatorTasksMarkdown: operatorTasksMarkdownPath,
+      sensitiveBlockersJson: sensitiveBlockersJsonPath,
+      sensitiveBlockersMarkdown: sensitiveBlockersMarkdownPath,
       operatorHandoffJson: operatorHandoffJsonPath,
       operatorHandoffMarkdown: operatorHandoffMarkdownPath,
       productionStatusJson: productionStatusJsonPath,
@@ -797,6 +825,16 @@ function main() {
       sensitiveActionItems: productionStatus.summary.sensitiveActionItems || {},
       cloudConfirmations: productionStatus.summary.cloudConfirmations || {},
     },
+    sensitiveBlockers: {
+      report: audit.outputFiles.sensitiveBlockersJson,
+      markdown: audit.outputFiles.sensitiveBlockersMarkdown,
+      ok: sensitiveBlockers.ok === true,
+      containsValues: sensitiveBlockers.containsValues === true,
+      secretLeakCheck: sensitiveBlockers.secretLeakCheck?.ok === true,
+      blocked: sensitiveBlockers.summary.blocked,
+      total: sensitiveBlockers.summary.total,
+      blockedIds: sensitiveBlockers.summary.blockedIds,
+    },
     operatorHandoff: {
       report: audit.outputFiles.operatorHandoffJson,
       markdown: audit.outputFiles.operatorHandoffMarkdown,
@@ -885,6 +923,8 @@ function main() {
     cloudConfirmationsCheckReport: audit.outputFiles.cloudConfirmationsCheck,
     operatorTasksJson: audit.outputFiles.operatorTasksJson,
     operatorTasksMarkdown: audit.outputFiles.operatorTasksMarkdown,
+    sensitiveBlockersJson: audit.outputFiles.sensitiveBlockersJson,
+    sensitiveBlockersMarkdown: audit.outputFiles.sensitiveBlockersMarkdown,
     operatorHandoffJson: audit.outputFiles.operatorHandoffJson,
     operatorHandoffMarkdown: audit.outputFiles.operatorHandoffMarkdown,
   }, null, 2))

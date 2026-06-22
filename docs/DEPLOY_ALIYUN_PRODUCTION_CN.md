@@ -233,7 +233,7 @@ corepack pnpm aliyun:operator:tasks
 corepack pnpm aliyun:operator:handoff
 ```
 
-这些命令不输出任何密钥值，也不会创建资源、导入变量或推送镜像。`aliyun:legal:check` 只确认后端包内 `/privacy` 和 `/terms` 页面存在、核心字段完整，并允许正式 URL 仍未填入 env；`aliyun:deploy:spec` 校验 `deploy/aliyun-production-cn.example.json` 的镜像、端口、ACR 发布计划、SAE runtime plan、域名、健康检查、前后置门禁顺序和 8 项外部确认；`aliyun:runtime:plan` 校验 `deploy/aliyun-production-cn.runtime-plan.json` 是否仍指向 `cn-hangzhou` 的 SAE 自定义容器、端口 3000 和 `api-cn.ipgongchang.xin`；`aliyun:cloud:access` 只检查本机是否具备阿里云 CLI 只读 inventory 条件，并输出 SAE/ACR/DNS/OSS/SLS 控制台要记录的非密钥证据字段，不调用阿里云 API；`aliyun:status` 是给当前发布负责人看的只读总览，会把本地门禁、微信审核、Apple Universal Link、阿里云云资源确认、域名和 ACR 镜像证据压缩成一个 JSON 摘要；`aliyun:operator:tasks` 会把当前 `readiness`、`domain`、`.env.production-cn.local`、`image-publish.local.json` 和 `cloud-confirmations.local.json` 汇总为 9 个任务；`aliyun:operator:handoff` 是给用户、阿里云操作员、微信开放平台操作员和发布负责人共用的非密钥操作包，适合直接判断“现在缺什么、去哪里拿、导入哪里”。它还会读取 Vercel production 的变量名元数据，列出哪些旧后端桥接变量已在 Vercel 中存在、哪些 production-cn 必填变量仍缺，并把 `cloud-confirmations.local.json` 与 `image-publish.local.json` 仍待填写的 JSON path、控制台来源、期望证据和禁止写入的敏感值逐项列出；这一步不读取值、不导出密钥，也不等于已导入阿里云。
+这些命令不输出任何密钥值，也不会创建资源、导入变量或推送镜像。`aliyun:legal:check` 只确认后端包内 `/privacy` 和 `/terms` 页面存在、核心字段完整，并允许正式 URL 仍未填入 env；`aliyun:deploy:spec` 校验 `deploy/aliyun-production-cn.example.json` 的镜像、端口、ACR 发布计划、SAE runtime plan、域名、健康检查、前后置门禁顺序和 8 项外部确认；`aliyun:runtime:plan` 校验 `deploy/aliyun-production-cn.runtime-plan.json` 是否仍指向 `cn-hangzhou` 的 SAE 自定义容器、端口 3000 和 `api-cn.ipgongchang.xin`；`aliyun:cloud:access` 只检查本机是否具备阿里云 CLI 只读 inventory 条件，并输出 SAE/ACR/DNS/OSS/SLS 控制台要记录的非密钥证据字段，不调用阿里云 API；`aliyun:status` 是给当前发布负责人看的只读总览，会把本地门禁、微信审核、Apple Universal Link、阿里云云资源确认、域名和 ACR 镜像证据压缩成一个 JSON 摘要；`aliyun:operator:tasks` 会把当前 `readiness`、`domain`、`.env.production-cn.local`、`image-publish.local.json` 和 `cloud-confirmations.local.json` 汇总为 9 个任务；`aliyun:sensitive:blockers` 会把 operator tasks 里的密钥、密码、token、付款和受控标识符类人工介入项单独压缩成无密钥清单；`aliyun:operator:handoff` 是给用户、阿里云操作员、微信开放平台操作员和发布负责人共用的非密钥操作包，适合直接判断“现在缺什么、去哪里拿、导入哪里”。它还会读取 Vercel production 的变量名元数据，列出哪些旧后端桥接变量已在 Vercel 中存在、哪些 production-cn 必填变量仍缺，并把 `cloud-confirmations.local.json` 与 `image-publish.local.json` 仍待填写的 JSON path、控制台来源、期望证据和禁止写入的敏感值逐项列出；这一步不读取值、不导出密钥，也不等于已导入阿里云。
 
 ```text
 T01 微信开放平台移动应用审核和 APP 登录凭证
@@ -467,7 +467,7 @@ corepack pnpm aliyun:env:checklist
 
 Markdown 清单会按“必填阻塞变量 / 可直接导入的 Plain Env / 可直接导入的 Secret Env / 可后置或空缺变量”分组，只包含变量名、状态、来源、获取位置、导入目标和动作，不包含任何 value。
 
-`corepack pnpm aliyun:operator:tasks`、`corepack pnpm aliyun:status` 和 `corepack pnpm aliyun:operator:handoff` 还会额外输出 `sensitiveActionItems`，专门回答“还需要用户介入哪些密钥、密码、token 或付款动作”。该字段只列变量名、控制台路径、动作、解除条件和禁止事项，不输出任何 value。当前会把微信开放平台移动应用 AppID/AppSecret、Apple Team ID、ACR 企业版付费确认、ACR/SAE 镜像拉取认证、OSS RAM Secret 或 STS 注入、以及本地已有 ready 值但尚未导入阿里云的敏感/连接类变量组分开列出；其中 `WECHAT_OPEN_APP_ID` 是服务端标识符，导入阿里云 SAE plain env，`WECHAT_OPEN_APP_SECRET` 才走 KMS/Secrets Manager/SAE secret env。
+`corepack pnpm aliyun:operator:tasks`、`corepack pnpm aliyun:status`、`corepack pnpm aliyun:sensitive:blockers` 和 `corepack pnpm aliyun:operator:handoff` 还会额外输出 `sensitiveActionItems`，专门回答“还需要用户介入哪些密钥、密码、token 或付款动作”。该字段只列变量名、控制台路径、动作、解除条件和禁止事项，不输出任何 value。当前会把微信开放平台移动应用 AppID/AppSecret、Apple Team ID、ACR 企业版付费确认、ACR/SAE 镜像拉取认证、OSS RAM Secret 或 STS 注入、以及本地已有 ready 值但尚未导入阿里云的敏感/连接类变量组分开列出；其中 `WECHAT_OPEN_APP_ID` 是服务端标识符，导入阿里云 SAE plain env，`WECHAT_OPEN_APP_SECRET` 才走 KMS/Secrets Manager/SAE secret env。`aliyun:sensitive:blockers` 会额外执行 secret-like 输出扫描，只有在报告不含疑似密钥值时才通过。
 
 校验模板变量名覆盖：
 
@@ -810,7 +810,9 @@ corepack pnpm run aliyun:env:classification:test
 corepack pnpm run aliyun:wechat-state:test
 corepack pnpm run aliyun:domain:test
 corepack pnpm run aliyun:cloud-access:test
+corepack pnpm run aliyun:sensitive:blockers:test
 corepack pnpm run aliyun:deploy:spec
+corepack pnpm run aliyun:sensitive:blockers
 corepack pnpm run aliyun:runtime:plan
 corepack pnpm run aliyun:image:plan
 corepack pnpm run aliyun:legal:check
