@@ -19,6 +19,7 @@ const REQUIRED_PREDEPLOY_CHECKS = [
   "corepack pnpm aliyun:sensitive:blockers",
   "corepack pnpm aliyun:resources:matrix",
   "corepack pnpm aliyun:action:authorization",
+  "corepack pnpm aliyun:completion:audit",
   "corepack pnpm aliyun:operator:handoff",
   "corepack pnpm aliyun:wechat-open:package",
   "corepack pnpm aliyun:status",
