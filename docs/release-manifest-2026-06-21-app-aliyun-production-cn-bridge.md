@@ -764,6 +764,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 17:55 CST 追加：`corepack pnpm aliyun:user:actions:test` 与 `corepack pnpm aliyun:user:actions` 已接入本地 `aliyun:predeploy`，并由 `tests/aliyun-user-action-brief.static.test.js` 反向校验 `scripts/aliyun-predeploy-commands.mjs` 和 `deploy/aliyun-production-cn.example.json.localPredeployChecks` 不会漏掉这两项。本地 predeploy 现在为 37 项，每次总检都会重新输出当前用户动作简报；当前微信状态仍是 `accountVerified=true`、`mobileAppCreated=false`、`mobileAppSubmitted=false`、`reviewStatus=not_started`，所以不能读取或导入 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`。
 
+2026-06-22 17:10 CST 追加：`tests/aliyun-cloud-access.static.test.js` 增加当前云侧只读观察回归：默认运行 `scripts/check-aliyun-cloud-access.mjs`，断言报告仍为 `containsValues=false`、`readOnlyOnly=true`、`cloudMutationPerformed=false`、`cloudApiCalled=false`，并覆盖 7 项控制台证据清单。该测试锁住当前阿里云状态：Chrome 控制台已登录；ACR 经济版 cn-hangzhou 1 个月报价 CNY 117.00 仍未付款；SAE 目标应用未确认创建；OSS bucket `meiye-huajing-service-records-production-cn` 可见；api-cn/assets-cn DNS 记录未证明存在；SLS 仍待 runtime 绑定。此项只增强本地证据门禁，不执行云资源创建、付款、DNS 修改或环境变量导入。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：

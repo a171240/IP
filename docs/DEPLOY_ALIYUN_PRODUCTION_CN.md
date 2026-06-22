@@ -374,6 +374,8 @@ meiye-huajing-app-api-production-cn-context.tar.gz
 
 2026-06-22 17:12 CST 追加：`aliyun:user:actions` 的每个动作项新增 `currentBlockers` 和 `currentEvidence`。这两个字段只来自 readiness、resource matrix 和 ignored 的 `cloud-confirmations.local.json` 非密钥字段，用来直接说明“为什么当前还没 ready”。例如微信动作会显示 `accountVerified=true`、`mobileAppCreated=false`、`mobileAppSubmitted=false`、`reviewStatus=not_started`；域名动作会显示 api-cn/assets-cn 的 DNS、HTTPS、ICP 布尔状态；最终部署授权动作会显示 `canDeployNow=false` 和 `cloudConfirmations=0/7`。
 
+2026-06-22 17:10 CST 追加：`corepack pnpm aliyun:cloud-access:test` 现在会运行 `scripts/check-aliyun-cloud-access.mjs` 并校验当前 ignored 的云侧只读观察仍然是无密钥、无云变更、无付款、无 DNS 修改状态。当前固定证据包括：Chrome 阿里云控制台已登录、ACR Enterprise Economic / cn-hangzhou / 1 month / CNY 117.00 仍未购买、SAE 目标应用尚未证明创建、OSS bucket `meiye-huajing-service-records-production-cn` 可见、DNS 控制台没有显式 api-cn/assets-cn 记录、SLS 控制台可访问但告警仍待 runtime 绑定。
+
 2026-06-22 15:35 CST 追加：已通过 Chrome 重新连接阿里云 Cloud Shell，只执行只读基础命令 `date`、`whoami`、`aliyun version`、`aliyun configure list`。Cloud Shell 本身可启动，`aliyun` CLI 版本为 `3.3.23`，但当前临时环境缺 `/home/shell/.aliyun/config.json`，因此不能做自动云 API inventory；`cloudApiCalled=false`、`cloudMutationPerformed=false`。新增 `deploy/aliyun-production-cn.cloud-access.example.json` 和 ignored 的 `.local.json` 观察文件，`aliyun:cloud:access` / `aliyun:operator:handoff` 会输出 `cloudShellCanRunReadOnlyInventory=false`，避免把 Chrome 控制台登录态误读成 CLI/API 已可读。
 
 如果只想离线生成审计包，或不想访问 Vercel：

@@ -64,3 +64,40 @@ test("Aliyun cloud access does not mark invalid Cloud Shell observations ready",
   assert.equal(report.cloudShellObservation.ready, false)
   assert.match(report.cloudShellObservation.blockers.join(","), /schemaVersion=1/)
 })
+
+test("Aliyun cloud access report preserves current non-secret console evidence", () => {
+  const output = execFileSync(process.execPath, ["scripts/check-aliyun-cloud-access.mjs"], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 30,
+  })
+  const report = JSON.parse(output)
+  const checklistIds = report.consoleEvidenceChecklist.map((item) => item.id)
+  const resourcesObserved = report.cloudShellObservation.browserConsole.resourcesObserved.join("\n")
+
+  assert.equal(report.ok, true)
+  assert.equal(report.containsValues, false)
+  assert.equal(report.readOnlyOnly, true)
+  assert.equal(report.cloudMutationPerformed, false)
+  assert.equal(report.cloudApiCalled, false)
+  assert.equal(report.cloudShellObservation.exists, true)
+  assert.equal(report.cloudShellObservation.browserConsole.chromeLoggedIn, true)
+  assert.match(resourcesObserved, /ACR Enterprise Economic cn-hangzhou 1 month purchase page visible, CNY 117\.00, not purchased/)
+  assert.match(resourcesObserved, /SAE console accessible; target app not proven created/)
+  assert.match(resourcesObserved, /OSS bucket meiye-huajing-service-records-production-cn visible in cn-hangzhou/)
+  assert.match(resourcesObserved, /DNS ipgongchang\.xin visible; no explicit api-cn\/assets-cn records shown/)
+  assert.match(resourcesObserved, /SLS console accessible/)
+  assert.deepEqual(checklistIds, [
+    "saeRuntime",
+    "acrImage",
+    "apiDomain",
+    "assetDomain",
+    "ossAudio",
+    "envImport",
+    "slsAlerts",
+  ])
+  assert.ok(report.blockers.includes("cloudshell_cli_config_missing_or_unread"))
+  assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
+  assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
+})
