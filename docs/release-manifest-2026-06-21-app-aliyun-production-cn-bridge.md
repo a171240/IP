@@ -760,6 +760,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 17:25 CST 追加：按“微信开放平台账号已认证、移动 App 未创建”的真实状态复核后，本机 ignored 镜像发布证据只补运行时非密钥字段：`runtime.target=SAE`、`runtime.appName=meiye-huajing-app-api-production-cn`、`runtime.imagePullCredentialMode=pending_acr_runtime_configuration_no_credentials_in_file`。`corepack pnpm aliyun:image:plan` 当前识别本地 Docker 镜像 digest `sha256:494907a4f9e7342064dda55fe30e0e48dd245b6d6ae753bdbb3945f77c0f518d`，`containsValues=false`，镜像发布 blocker 从旧记录的 16 项降到 12 项；剩余阻塞仍需要 ACR 购买/仓库/推送 digest 和 SAE 拉镜像配置，不能视为已部署或可上线。
 
+2026-06-22 17:40 CST 追加：新增 `corepack pnpm aliyun:app-cn-checklist:test`，把 `docs/app-production-cn-env-checklist.md` 纳入本地发布门禁。该测试会校验清单仍记录用户动作 `0/9`、阿里云资源 `0/7`、Vercel required 覆盖 `17/26`、本机 required env `24/26`、微信移动 App 未创建、ACR `CNY 117.00` / `¥117.00` 付款阻塞、SAE runtime 未 confirmed、以及 6 类密钥/密码/token/付款阻塞，同时执行基础 secret-like 扫描。`scripts/aliyun-predeploy-commands.mjs` 与 `deploy/aliyun-production-cn.example.json.localPredeployChecks` 已同步，本地 predeploy 现在为 35 项；正式 `predeployChecks` 仍为 24 项，不改变生产部署必须另行通过云侧严格门禁的结论。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：

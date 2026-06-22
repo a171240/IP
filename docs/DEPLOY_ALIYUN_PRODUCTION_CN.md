@@ -825,6 +825,7 @@ corepack pnpm run aliyun:domain:test
 corepack pnpm run aliyun:cloud-access:test
 corepack pnpm run aliyun:sensitive:blockers:test
 corepack pnpm run aliyun:resources:matrix:test
+corepack pnpm run aliyun:app-cn-checklist:test
 corepack pnpm run aliyun:deploy:spec
 corepack pnpm run aliyun:sensitive:blockers
 corepack pnpm run aliyun:resources:matrix

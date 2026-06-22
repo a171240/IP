@@ -20,6 +20,7 @@
     "aliyun:resources:matrix:test": "node --test tests/aliyun-resource-matrix.static.test.js",
     "aliyun:user:actions": "node ./scripts/summarize-aliyun-user-action-brief.mjs",
     "aliyun:user:actions:test": "node --test tests/aliyun-user-action-brief.static.test.js",
+    "aliyun:app-cn-checklist:test": "node --test tests/aliyun-app-cn-checklist.static.test.js",
     "aliyun:vercel-env:coverage": "node ./scripts/check-vercel-env-coverage.mjs --write-report /tmp/meiye-vercel-env-coverage.json",
     "aliyun:deploy:spec": "node ./scripts/check-aliyun-deployment-spec.mjs",
     "aliyun:runtime:plan": "node ./scripts/check-aliyun-runtime-plan.mjs",

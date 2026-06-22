@@ -8,6 +8,7 @@ export const LOCAL_PREDEPLOY_COMMANDS = Object.freeze([
   Object.freeze(["run", "aliyun:cloud-access:test"]),
   Object.freeze(["run", "aliyun:sensitive:blockers:test"]),
   Object.freeze(["run", "aliyun:resources:matrix:test"]),
+  Object.freeze(["run", "aliyun:app-cn-checklist:test"]),
   Object.freeze(["run", "aliyun:deploy:spec"]),
   Object.freeze(["run", "aliyun:sensitive:blockers"]),
   Object.freeze(["run", "aliyun:resources:matrix"]),
