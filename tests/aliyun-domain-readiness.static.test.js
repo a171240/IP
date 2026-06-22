@@ -26,3 +26,13 @@ test("Aliyun deployment docs record current api-cn and assets-cn wildcard blocke
   assert.match(releaseManifest, /`?api-cn\/assets-cn`? 当前命中 `?198\.18\.0\.0\/15`?/)
   assert.match(releaseManifest, /阿里云 DNS 控制台[\s\S]{0,80}未显示显式 api-cn\/assets-cn 记录/)
 })
+
+test("Aliyun domain docs reject legacy api/ip records as APP production-cn evidence", () => {
+  const deployDoc = read("docs", "DEPLOY_ALIYUN_PRODUCTION_CN.md")
+  const checklist = read("docs", "app-production-cn-env-checklist.md")
+  const releaseManifest = read("docs", "release-manifest-2026-06-21-app-aliyun-production-cn-bridge.md")
+
+  assert.match(deployDoc, /106\.14\.241\.129[\s\S]{0,120}不能作为 APP production-cn/)
+  assert.match(checklist, /106\.14\.241\.129[\s\S]{0,120}不能作为 `api-cn`/)
+  assert.match(releaseManifest, /旧 `api` \/ `ip` A 记录指向 `106\.14\.241\.129`[\s\S]{0,120}不能复用为 APP production-cn/)
+})

@@ -153,6 +153,10 @@ function buildRunbook(args) {
   const acr = imagePlan.local?.acr || {}
   const purchaseCandidate = acr.purchaseCandidate || {}
   const runtime = imagePlan.local?.runtime || {}
+  const localDockerDigest =
+    imagePlan.localDockerImage?.repoDigests?.[0] ||
+    imagePlan.localDockerImage?.id ||
+    (imagePlan.local?.image?.localDigestReady ? "ready" : "missing")
 
   const tasks = [
     buildTask({
@@ -185,7 +189,7 @@ function buildRunbook(args) {
         field("repository", acr.repository || "meiye-huajing-app-api", "image publish plan"),
         field("remoteTag", acr.remoteTag || "production-cn", "image publish plan"),
         field("localImage", imagePlan.local?.image?.localTag || "meiye-huajing-app-api:production-cn", "image publish plan"),
-        field("localDigest", imagePlan.local?.image?.localDigest || "missing", "local docker evidence"),
+        field("localDigest", localDockerDigest, "local docker evidence"),
         field("runtimeAppName", runtime.appName || runtimePlan.appName, "image publish plan"),
       ],
     }),
@@ -198,6 +202,7 @@ function buildRunbook(args) {
       targetFields: [
         field("host", runtimePlan.apiHost || "api-cn.ipgongchang.xin", "runtime plan"),
         field("target", "SAE/SLB/网关公网入口，不能指向 198.18.0.x、localhost、example 或 Vercel", "domain gate"),
+        field("notAccepted", "现有 api/ip A 106.14.241.129 是旧记录，不是 api-cn 主机记录，不能当作 APP production-cn API ready 证据", "read-only DNS evidence"),
         field("httpsRequired", true, "deployment spec"),
         field("icpReadyRequired", true, "domestic app release"),
       ],
@@ -211,6 +216,7 @@ function buildRunbook(args) {
       targetFields: [
         field("host", runtimePlan.assetHost || "assets-cn.ipgongchang.xin", "runtime plan"),
         field("target", "OSS/CDN 静态资源入口，不能只用 Bucket/CORS 证据替代域名证据", "domain gate"),
+        field("notAccepted", "现有 api/ip A 106.14.241.129 不是 assets-cn 主机记录，不能当作 APP production-cn 资产域名 ready 证据", "read-only DNS evidence"),
         field("httpsRequired", true, "deployment spec"),
         field("icpReadyRequired", true, "domestic app release"),
       ],

@@ -804,6 +804,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 19:17 CST 复核：继续通过已登录 Chrome 只读读取阿里云 SAE、DNS、SLS 和 Cloud Shell 页面。SAE `cn-hangzhou` 应用列表显示当前地域暂无实例，目标应用 `meiye-huajing-app-api-production-cn` 未创建/未确认；DNS `ipgongchang.xin` 有 13 条记录，存在旧 `api` / `ip` A 记录指向 `106.14.241.129`，但没有 `api-cn` / `assets-cn` 主机记录，不能复用为 APP production-cn 正式域名；SLS project `meiye-huajing-app-prod-cn` 与 logstore `app-api` 页面可见，但告警仍需等 SAE runtime；Cloud Shell 当前连接断开，本轮未重连、未执行 CLI inventory、未调用云 API。已只更新 ignored 的 `deploy/aliyun-production-cn.cloud-access.local.json` 与 `deploy/aliyun-production-cn.cloud-confirmations.local.json` 非密钥证据；没有购买 ACR、没有创建 SAE 应用、没有修改 DNS/证书/CDN、没有导入环境变量、没有读取微信 AppSecret、没有 production-cn 部署。
 
+2026-06-22 19:26 CST 追加：增强 `corepack pnpm aliyun:console:runbook` 的操作员防误判字段。ACR 任务现在会在 `targetFields.localDigest` 中显示本地 Docker repo digest；`api-cn` / `assets-cn` 域名任务新增 `notAccepted` 字段，明确旧 `api` / `ip` A 记录 `106.14.241.129` 不是 `api-cn` 或 `assets-cn` 主机记录，不能作为 APP production-cn API/资产域名 ready 证据。`tests/aliyun-console-runbook.static.test.js` 和 `tests/aliyun-domain-readiness.static.test.js` 已覆盖该行为；同轮已执行 `node --check scripts/generate-aliyun-console-runbook.mjs`、`corepack pnpm aliyun:console:runbook:test`、`corepack pnpm aliyun:domain:test`、`corepack pnpm aliyun:console:runbook`、`corepack pnpm aliyun:release:artifacts -- --skip-bundle --skip-vercel-env-coverage`、`git diff --check` 和变更文件密钥形态扫描，全部通过。该变更只补本地门禁和非密钥操作包，不创建资源、不付款、不修改 DNS、不导入环境变量、不推送镜像、不部署。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：

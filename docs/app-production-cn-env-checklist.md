@@ -37,6 +37,8 @@
 
 `api-cn` 与 `assets-cn` 是两组外部证据：`api-cn` 证明 SAE/API HTTPS 入口，`assets-cn` 证明资产域名 DNS/HTTPS/ICP。不能用 OSS Bucket CORS/RAM 证据替代 `assets-cn` 域名证据。
 
+2026-06-22 19:17 CST 复核：当前 DNS 详情页存在旧 `api` / `ip` A 记录，均指向 `106.14.241.129`；它们不能作为 `api-cn` 或 `assets-cn` 的 APP production-cn ready 证据。操作员仍需分别补 `api-cn.ipgongchang.xin` 和 `assets-cn.ipgongchang.xin` 的阿里云入口、HTTPS 和 ICP 证据。
+
 ## 阿里云资源
 
 | 项目 | 获取/创建位置 | 写入文件或导入位置 | 密钥 | 当前状态 |
