@@ -711,6 +711,10 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 追加：后端 OSS 签名链路新增可选 `ALIYUN_OSS_SECURITY_TOKEN` 支持。长期或受限 AccessKey 模式保持兼容；如果运行环境注入 STS token，`createAliyunOssPostPolicy` 会把 `x-oss-security-token` 写入表单字段和 policy 条件，`createAliyunOssSignedGetUrl` 会追加 `security-token` 查询参数。`scripts/prepare-aliyun-runtime-env.mjs` 已把 `ALIYUN_OSS_SECURITY_TOKEN` 作为 optional secret 纳入 env plan，`tests/aliyun-oss-sts.static.test.js` 覆盖该契约。同轮已执行 `node --test tests/aliyun-oss-sts.static.test.js`、`corepack pnpm exec tsc --noEmit --pretty false`、`corepack pnpm aliyun:env:plan` 和 `corepack pnpm aliyun:health:smoke`，均通过或符合预期；`aliyun:env:plan` 仍只阻塞 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`，`aliyun:health:smoke` 仍只缺 `appWechatLogin`。这不代表 RAM 已完成，`oss:ramLeastPrivilege` 仍必须等策略创建/绑定和密钥或 STS 安全导入后才能改为 ready。
 
+2026-06-22 13:42 CST 追加：SLS 已可直接进入控制台，并创建 production-cn 后端日志项目 `meiye-huajing-app-prod-cn`，地域 `cn-hangzhou`；在该项目下创建 Logstore `app-api`，默认 `Standard`、按写入数据量计费、数据保存时间 `30` 天、WebTracking 关闭、Shard 数目 `2`。创建成功弹窗提示“是否立即接入数据”时已取消，原因是 SAE 应用尚未创建，不能提前绑定错误采集源；因此 `slsAlerts.slsProject` 已更新为真实项目名，但 `healthAlertConfigured`、`serverErrorAlertConfigured` 与 `slsAlerts.confirmed` 继续保持 false，等 SAE runtime 和健康检查 URL 可用后再配置。
+
+2026-06-22 13:42 CST 追加：RAM 控制台权限策略页在 Chrome 中反复卡骨架屏，控制台日志显示 `SecurityError: Failed to read a named property 'setTimeout' from 'Window'`；改用阿里云 Cloud Shell 通过当前登录态执行 `aliyun ram CreatePolicy`，已创建自定义策略 `MeiyeHuajingServiceRecordsOssPolicy`，`PolicyType=Custom`，`DefaultVersion=v1`，`CreateDate=2026-06-22T05:42:34Z`，`RequestId=B001B97B-26B7-5737-9A05-61792150EB1C`。策略内容来自 `deploy/aliyun-production-cn.oss-ram-policy.json`，只允许服务记录前缀的 `oss:GetObject`、`oss:PutObject`、`oss:PostObject`。本轮没有创建 RAM AccessKey、没有读取或导入 secret、没有绑定 RAM 用户/角色；因此 `oss.ramLeastPrivilege` 仍保持 false，等绑定到实际运行身份并完成密钥或 STS 安全导入后再改为 ready。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：

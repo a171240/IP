@@ -589,6 +589,8 @@ deploy/aliyun-production-cn.oss-ram-policy.json
 
 该模板只允许 `oss:GetObject`、`oss:PutObject`、`oss:PostObject` 访问
 `acs:oss:*:*:meiye-huajing-service-records-production-cn/service-records/production-cn/*`。
+2026-06-22 已通过阿里云 Cloud Shell 创建自定义策略 `MeiyeHuajingServiceRecordsOssPolicy`，
+但尚未绑定到 RAM 用户/角色，也没有生成或导入 OSS AccessKey / STS token。
 创建/绑定 RAM 用户或角色、生成 `ALIYUN_OSS_ACCESS_KEY_SECRET`、导入 SAE/KMS/Secrets Manager
 都属于密钥动作，不写入文档、JSON 或 git。
 
@@ -605,10 +607,18 @@ deploy/aliyun-production-cn.oss-ram-policy.json
 
 ### 4.5 日志与告警
 
-建议补：
+已创建 SLS 基础资源：
 
 ```text
-SLS 日志项目
+Project: meiye-huajing-app-prod-cn
+Region: cn-hangzhou
+Logstore: app-api
+Retention: 30 days
+```
+
+仍需在 SAE 应用创建并接入日志后补：
+
+```text
 5xx 告警
 健康检查失败告警
 ASR / OSS 上传失败告警
