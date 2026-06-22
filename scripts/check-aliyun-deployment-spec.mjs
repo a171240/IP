@@ -4,6 +4,8 @@ import { existsSync, readFileSync } from "node:fs"
 import { dirname, isAbsolute, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
+import { LOCAL_PREDEPLOY_CHECKS } from "./aliyun-predeploy-commands.mjs"
+
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const BACKEND_ROOT = resolve(__dirname, "..")
@@ -213,6 +215,17 @@ function validateSpec(spec) {
     if (!predeployChecks.includes(command)) blockers.push(`predeployChecks:${command}`)
   }
 
+  const localPredeployChecks = requireArray(spec.localPredeployChecks)
+  if (localPredeployChecks.length !== LOCAL_PREDEPLOY_CHECKS.length) {
+    blockers.push(`localPredeployChecks:length=${LOCAL_PREDEPLOY_CHECKS.length}`)
+  }
+  for (const command of LOCAL_PREDEPLOY_CHECKS) {
+    if (!localPredeployChecks.includes(command)) blockers.push(`localPredeployChecks:${command}`)
+  }
+  for (const command of localPredeployChecks) {
+    if (!LOCAL_PREDEPLOY_CHECKS.includes(command)) blockers.push(`localPredeployChecks:unexpected:${command}`)
+  }
+
   const postdeployChecks = requireArray(spec.postdeployChecks)
   for (const command of REQUIRED_POSTDEPLOY_CHECKS) {
     if (!postdeployChecks.includes(command)) blockers.push(`postdeployChecks:${command}`)
@@ -275,6 +288,7 @@ function main() {
     port: spec.container?.port || null,
     apiHost: spec.domain?.apiHost || "",
     assetHost: spec.domain?.assetHost || "",
+    localPredeployChecks: requireArray(spec.localPredeployChecks).length,
     predeployChecks: validation.predeployChecks,
     postdeployChecks: validation.postdeployChecks,
     requiredExternalConfirmations: validation.requiredExternalConfirmations,

@@ -2,34 +2,7 @@
 
 import { spawn } from "node:child_process"
 
-const COMMANDS = [
-  ["run", "aliyun:env:check"],
-  ["run", "aliyun:env:plan"],
-  ["run", "aliyun:env:sources"],
-  ["run", "aliyun:deploy:spec"],
-  ["run", "aliyun:runtime:plan"],
-  ["run", "aliyun:image:plan"],
-  ["run", "aliyun:legal:check"],
-  ["run", "aliyun:cloud:access"],
-  ["run", "aliyun:cloud:confirmations"],
-  ["run", "aliyun:domain:check"],
-  ["run", "aliyun:cloud:check"],
-  ["run", "aliyun:readiness"],
-  ["run", "aliyun:status"],
-  ["run", "aliyun:routes:check"],
-  ["run", "aliyun:app-api:bridge-map"],
-  ["run", "aliyun:app-client:contract"],
-  ["run", "aliyun:app-config:check"],
-  ["run", "aliyun:app-native:check"],
-  ["run", "aliyun:aasa:check"],
-  ["run", "aliyun:app-api:coverage"],
-  ["run", "aliyun:docker:check"],
-  ["exec", "tsc", "--noEmit", "--pretty", "false"],
-  ["run", "release:preflight"],
-  ["run", "build"],
-  ["run", "aliyun:health:smoke"],
-  ["run", "aliyun:app-api:smoke"],
-]
+import { LOCAL_PREDEPLOY_COMMANDS } from "./aliyun-predeploy-commands.mjs"
 
 function resolvePnpmInvocation(args) {
   if (process.env.npm_execpath) {
@@ -58,7 +31,7 @@ async function runStep(args) {
   }
 }
 
-for (const command of COMMANDS) {
+for (const command of LOCAL_PREDEPLOY_COMMANDS) {
   await runStep(command)
 }
 

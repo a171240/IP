@@ -400,28 +400,32 @@ corepack pnpm aliyun:predeploy
 `corepack pnpm aliyun:predeploy` 覆盖：
 
 ```text
-aliyun:env:check
-aliyun:env:plan
-aliyun:env:sources
-aliyun:deploy:spec
-aliyun:image:plan
-aliyun:legal:check
-aliyun:cloud:check
-aliyun:readiness
-aliyun:status
-aliyun:routes:check
-aliyun:app-api:bridge-map
-aliyun:app-client:contract
-aliyun:app-config:check
-aliyun:app-native:check
-aliyun:aasa:check
-aliyun:app-api:coverage
-aliyun:docker:check
-pnpm exec tsc --noEmit --pretty false
-release:preflight
-build
-aliyun:health:smoke
-aliyun:app-api:smoke
+corepack pnpm run aliyun:env:check
+corepack pnpm run aliyun:env:plan
+corepack pnpm run aliyun:env:sources
+corepack pnpm run aliyun:deploy:spec
+corepack pnpm run aliyun:runtime:plan
+corepack pnpm run aliyun:image:plan
+corepack pnpm run aliyun:legal:check
+corepack pnpm run aliyun:cloud:access
+corepack pnpm run aliyun:cloud:confirmations
+corepack pnpm run aliyun:domain:check
+corepack pnpm run aliyun:cloud:check
+corepack pnpm run aliyun:readiness
+corepack pnpm run aliyun:status
+corepack pnpm run aliyun:routes:check
+corepack pnpm run aliyun:app-api:bridge-map
+corepack pnpm run aliyun:app-client:contract
+corepack pnpm run aliyun:app-config:check
+corepack pnpm run aliyun:app-native:check
+corepack pnpm run aliyun:aasa:check
+corepack pnpm run aliyun:app-api:coverage
+corepack pnpm run aliyun:docker:check
+corepack pnpm exec tsc --noEmit --pretty false
+corepack pnpm run release:preflight
+corepack pnpm run build
+corepack pnpm run aliyun:health:smoke
+corepack pnpm run aliyun:app-api:smoke
 ```
 
 关键检查摘要：
@@ -620,9 +624,9 @@ APP_ASSET_BASE_URL=https://assets-cn.ipgongchang.xin
 PRIVACY_POLICY_URL=https://api-cn.ipgongchang.xin/privacy
 TERMS_URL=https://api-cn.ipgongchang.xin/terms
 WECHAT_OPEN_APP_REVIEW_STATUS=reviewing（当前；发布前必须 approved）
-WECHAT_OPEN_APP_ID=<微信开放平台移动应用 AppID>
-WECHAT_OPEN_APP_SECRET=<微信开放平台移动应用 AppSecret>
-APPLE_TEAM_ID=<Apple Developer 10 位 Team ID>
+WECHAT_OPEN_APP_ID：微信开放平台移动应用 AppID
+WECHAT_OPEN_APP_SECRET：微信开放平台移动应用 AppSecret
+APPLE_TEAM_ID：Apple Developer 10 位 Team ID
 ```
 
 `APP_API_BASE_URL`、`NEXT_PUBLIC_SITE_URL`、`APP_ASSET_BASE_URL`、`PRIVACY_POLICY_URL`、`TERMS_URL` 已写入本机 `.env.production-cn.local`。协议 URL 形态已通过本机 strict 检查；正式生产仍需阿里云 DNS/HTTPS/ICP 证据、页面可公网 GET、运营者复核文本，并在阿里云运行环境中导入同一组 URL。
@@ -682,6 +686,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 2026-06-22 09:50 CST 追加：新增 `corepack pnpm aliyun:cloud:access` 作为只读云侧访问能力 gate。该命令不调用阿里云 API、不创建资源、不修改 DNS、不推送镜像，只检查本机是否存在 `aliyun` CLI 和常见配置文件，并输出 SAE、ACR、api-cn/assets-cn、OSS、环境变量导入、SLS 告警需要写入 `.local.json` 的非密钥证据字段。当前本机未发现 `aliyun` CLI，因此云侧状态仍以阿里云控制台人工只读核验和 `cloud-confirmations.local.json` 证据为准；部署规格 `predeployChecks` 同步从 21 项更新为 22 项。
 
 2026-06-22 10:07 CST 追加：`aliyun:release:artifacts` 现在会生成 `cloud-access.json`，并把 `cloudAccess.canReadCloudNow`、CLI 状态、blockers 和控制台证据清单数量写入 `release-audit.json/md` 与控制台摘要。这样交付包本身可以解释为什么当前云侧仍是人工控制台确认，而不是误认为阿里云 CLI 自动 inventory 已可用。
+
+2026-06-22 追加：新增 `scripts/aliyun-predeploy-commands.mjs` 与 `deploy/aliyun-production-cn.example.json.localPredeployChecks`，把本地 `aliyun:predeploy` 的 26 项代码级检查从正式 `predeployChecks` 的 22 项严格部署顺序里拆出。`aliyun:deploy:spec` 会校验两份清单：本地 predeploy 继续允许在微信开放平台/阿里云云侧未完成时作为代码级总检通过；正式部署前仍必须单独通过 `aliyun:cloud:confirmations:strict`、`aliyun:readiness:cloud-ready`、`aliyun:release:artifacts`、`aliyun:docker:build` 和 `aliyun:container:smoke`。
 
 ## 11. 真正部署时的命令顺序
 

@@ -95,6 +95,7 @@ const REQUIRED_BACKEND_FILES = [
   "app/api/app/health/route.ts",
   "app/api/healthz/route.ts",
   "scripts/check-vercel-env-coverage.mjs",
+  "scripts/aliyun-predeploy-commands.mjs",
   "scripts/check-aliyun-deployment-spec.mjs",
   "scripts/check-aliyun-runtime-plan.mjs",
   "scripts/check-aliyun-image-publish-plan.mjs",

@@ -717,29 +717,35 @@ corepack pnpm aliyun:predeploy
 `aliyun:predeploy` 等价于：
 
 ```bash
-corepack pnpm aliyun:env:check
-corepack pnpm aliyun:env:plan
-corepack pnpm aliyun:env:sources
-corepack pnpm aliyun:deploy:spec
-corepack pnpm aliyun:runtime:plan
-corepack pnpm aliyun:image:plan
-corepack pnpm aliyun:legal:check
-corepack pnpm aliyun:cloud:confirmations
-corepack pnpm aliyun:cloud:check
-corepack pnpm aliyun:readiness
-corepack pnpm aliyun:routes:check
-corepack pnpm aliyun:app-api:bridge-map
-corepack pnpm aliyun:app-client:contract
-corepack pnpm aliyun:app-native:check
-corepack pnpm aliyun:aasa:check
-corepack pnpm aliyun:app-api:coverage
-corepack pnpm aliyun:docker:check
+corepack pnpm run aliyun:env:check
+corepack pnpm run aliyun:env:plan
+corepack pnpm run aliyun:env:sources
+corepack pnpm run aliyun:deploy:spec
+corepack pnpm run aliyun:runtime:plan
+corepack pnpm run aliyun:image:plan
+corepack pnpm run aliyun:legal:check
+corepack pnpm run aliyun:cloud:access
+corepack pnpm run aliyun:cloud:confirmations
+corepack pnpm run aliyun:domain:check
+corepack pnpm run aliyun:cloud:check
+corepack pnpm run aliyun:readiness
+corepack pnpm run aliyun:status
+corepack pnpm run aliyun:routes:check
+corepack pnpm run aliyun:app-api:bridge-map
+corepack pnpm run aliyun:app-client:contract
+corepack pnpm run aliyun:app-config:check
+corepack pnpm run aliyun:app-native:check
+corepack pnpm run aliyun:aasa:check
+corepack pnpm run aliyun:app-api:coverage
+corepack pnpm run aliyun:docker:check
 corepack pnpm exec tsc --noEmit --pretty false
-corepack pnpm release:preflight
-corepack pnpm build
-corepack pnpm aliyun:health:smoke
-corepack pnpm aliyun:app-api:smoke
+corepack pnpm run release:preflight
+corepack pnpm run build
+corepack pnpm run aliyun:health:smoke
+corepack pnpm run aliyun:app-api:smoke
 ```
+
+这组本地代码级检查由 `deploy/aliyun-production-cn.example.json` 的 `localPredeployChecks` 记录，并由 `aliyun:deploy:spec` 校验。它不会代替正式部署前的严格云侧门禁：`aliyun:cloud:confirmations:strict`、`aliyun:readiness:cloud-ready`、`aliyun:release:artifacts`、`aliyun:docker:build` 和 `aliyun:container:smoke` 仍按下方“真正部署时的命令顺序”单独执行。
 
 容器构建验证：
 
@@ -873,7 +879,7 @@ corepack pnpm aliyun:docker:check（7 files / 24 dockerignore patterns / sensiti
 corepack pnpm aliyun:container:smoke（Docker health + 30 APP API probes / sanitized env deleted）
 node --check scripts/check-aliyun-domain-readiness.mjs
 corepack pnpm aliyun:domain:check（状态看板 exit 0；当前 ok=false）
-corepack pnpm aliyun:deploy:spec（image meiye-huajing-app-api:production-cn / port 3000 / predeploy 22 / postdeploy 5）
+corepack pnpm aliyun:deploy:spec（image meiye-huajing-app-api:production-cn / port 3000 / localPredeploy 26 / predeploy 22 / postdeploy 5）
 corepack pnpm aliyun:runtime:plan（SAE / cn-hangzhou / meiye-huajing-app-api-production-cn / port 3000）
 corepack pnpm aliyun:remote:smoke -- --base-url http://127.0.0.1:3022 --allow-missing appWechatLogin,legalLinks
 corepack pnpm aliyun:env:check
