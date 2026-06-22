@@ -626,6 +626,8 @@ APPLE_TEAM_ID=<Apple Developer 10 位 Team ID>
 
 `APP_API_BASE_URL`、`NEXT_PUBLIC_SITE_URL`、`APP_ASSET_BASE_URL`、`PRIVACY_POLICY_URL`、`TERMS_URL` 已写入本机 `.env.production-cn.local`。协议 URL 形态已通过本机 strict 检查；正式生产仍需阿里云 DNS/HTTPS/ICP 证据、页面可公网 GET、运营者复核文本，并在阿里云运行环境中导入同一组 URL。
 
+变量获取位置、导入位置和是否密钥的操作清单见 `docs/app-production-cn-env-checklist.md`。该清单明确：阿里云不是缺一个 APP，缺的是微信开放平台移动应用审核通过后的 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`，以及阿里云 SAE/ACR/DNS/OSS/SLS/env import 的外部确认。
+
 ### 10.3 微信开放平台
 
 用户已确认微信开放平台移动应用正在审核中。审核中只能记录：
