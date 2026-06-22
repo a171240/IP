@@ -678,6 +678,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 09:31 CST 追加：`APP_ASSET_BASE_URL` 已从 optional 调整为 production-cn 必填 env，与 App build/runtime 门禁保持一致。复核命令显示：`aliyun:env:plan` requiredReady `24/26`，`aliyun:readiness` requiredReady `24/26`，requiredBlocking 仍只剩 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；真实 Vercel 只读覆盖 `aliyun:vercel-env:coverage` 为 `17/26`，`APP_ASSET_BASE_URL` 被归为国内 APP 新增必填变量。
 
+2026-06-22 09:50 CST 追加：新增 `corepack pnpm aliyun:cloud:access` 作为只读云侧访问能力 gate。该命令不调用阿里云 API、不创建资源、不修改 DNS、不推送镜像，只检查本机是否存在 `aliyun` CLI 和常见配置文件，并输出 SAE、ACR、api-cn/assets-cn、OSS、环境变量导入、SLS 告警需要写入 `.local.json` 的非密钥证据字段。当前本机未发现 `aliyun` CLI，因此云侧状态仍以阿里云控制台人工只读核验和 `cloud-confirmations.local.json` 证据为准；部署规格 `predeployChecks` 同步从 21 项更新为 22 项。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：

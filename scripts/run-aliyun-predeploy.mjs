@@ -10,6 +10,7 @@ const COMMANDS = [
   ["run", "aliyun:runtime:plan"],
   ["run", "aliyun:image:plan"],
   ["run", "aliyun:legal:check"],
+  ["run", "aliyun:cloud:access"],
   ["run", "aliyun:cloud:confirmations"],
   ["run", "aliyun:domain:check"],
   ["run", "aliyun:cloud:check"],
