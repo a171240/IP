@@ -38,7 +38,9 @@ test("APP production-cn checklist records current blockers without secret values
     "U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE",
     "U09_DEPLOY_AUTHORIZATION",
     "aliyun:console:runbook",
+    "aliyun:action:authorization",
     "7 项阿里云控制台任务",
+    "所有 9 项都不能在没有动作时确认的情况下自动执行",
     "aliyun:wechat-open:package",
     "微信开放平台移动应用创建材料包",
   ]) {
@@ -78,9 +80,10 @@ test("APP production-cn release manifest separates historical snapshots from cur
   const manifest = read("docs", "release-manifest-2026-06-21-app-aliyun-production-cn-bridge.md")
 
   assert.match(manifest, /03:56 CST artifacts 历史快照/)
-  assert.match(manifest, /当前权威脚本口径已更新为 `imagePublishPlan\.totalBlockers=12`/)
+  assert.match(manifest, /当前权威脚本口径为 `imagePublishPlan\.totalBlockers=12`/)
   assert.match(manifest, /`cloudConfirmations\.totalBlockers=27`/)
-  assert.match(manifest, /`localPredeployChecks=42`/)
-  assert.match(manifest, /`predeployChecks=26`/)
-  assert.match(manifest, /早前 35\/24、40\/25、16、25 均只代表对应时点的历史快照/)
+  assert.match(manifest, /`localPredeployChecks=44`/)
+  assert.match(manifest, /`predeployChecks=27`/)
+  assert.match(manifest, /18:46 口径保留为历史证据/)
+  assert.match(manifest, /早前 35\/24、40\/25、16、25 也只代表对应时点的历史快照/)
 })

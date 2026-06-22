@@ -519,6 +519,8 @@ resource-matrix.json
 resource-matrix.md
 user-action-brief.json
 user-action-brief.md
+action-authorization.json
+action-authorization.md
 operator-handoff.json
 operator-handoff.md
 env-import-plan.json
@@ -528,7 +530,7 @@ image-publish-plan-check.json
 meiye-huajing-app-api-production-cn-context.tar.gz
 ```
 
-其中 `cloud-access.json` 是本机阿里云只读访问能力报告；当前用于记录是否存在 `aliyun` CLI、是否能自动读云，以及控制台需要抄录到 `.local.json` 的非密钥证据字段。`sensitive-blockers.json/md` 单独列密钥、密码、token、付款和受控标识符类人工介入项；`resource-matrix.json/md` 单独列 SAE、ACR、api-cn、assets-cn、OSS、env import、SLS 这 7 个阿里云资源项和对应验收字段；`user-action-brief.json/md` 单独列用户/操作员动作项、获取位置、写入目标和动作时确认边界。`operator-handoff.json/md` 是给用户、阿里云控制台操作员、微信开放平台操作员和发布负责人共用的非密钥操作包；它会区分后端必填缺口、APP 发布/AASA 阻塞但非密钥的缺口、以及可后置变量。`vercel-env-coverage.json` 只包含 Vercel production 变量名、环境和加密/敏感元数据，不包含真实 value；Vercel 登录态不可用时只记录 non-blocking failure，不阻断 release audit。
+其中 `cloud-access.json` 是本机阿里云只读访问能力报告；当前用于记录是否存在 `aliyun` CLI、是否能自动读云，以及控制台需要抄录到 `.local.json` 的非密钥证据字段。`sensitive-blockers.json/md` 单独列密钥、密码、token、付款和受控标识符类人工介入项；`resource-matrix.json/md` 单独列 SAE、ACR、api-cn、assets-cn、OSS、env import、SLS 这 7 个阿里云资源项和对应验收字段；`user-action-brief.json/md` 单独列用户/操作员动作项、获取位置、写入目标和动作时确认边界；`action-authorization.json/md` 单独把 9 个外部动作归类为外部平台审核、外部标识符、付费购买、Secret/STS、DNS/HTTPS/ICP、云资源创建和生产发布授权，明确没有动作时确认前只能继续本地检查、报告、非密钥证据记录和本地提交。`operator-handoff.json/md` 是给用户、阿里云控制台操作员、微信开放平台操作员和发布负责人共用的非密钥操作包；它会区分后端必填缺口、APP 发布/AASA 阻塞但非密钥的缺口、以及可后置变量。`vercel-env-coverage.json` 只包含 Vercel production 变量名、环境和加密/敏感元数据，不包含真实 value；Vercel 登录态不可用时只记录 non-blocking failure，不阻断 release audit。
 
 2026-06-22 03:56 CST artifacts 历史快照：
 
@@ -544,7 +546,7 @@ appClientContract: 40 audited calls / 34 unique client routes / 26 matched backe
 appApiSmokeCoverage: 29 / 29 business routes / 30 probes
 ```
 
-2026-06-22 18:46 CST 复核：当前权威脚本口径已更新为 `imagePublishPlan.totalBlockers=12`、`cloudConfirmations.totalBlockers=27`、`localPredeployChecks=42`、`predeployChecks=26`。03:56 快照只保留为历史证据，不作为后续阿里云执行口径。
+2026-06-22 18:46 CST 复核：当时权威脚本口径已更新为 `imagePublishPlan.totalBlockers=12`、`cloudConfirmations.totalBlockers=27`、`localPredeployChecks=42`、`predeployChecks=26`。后续 18:55 已继续补动作授权矩阵，因此 18:46 口径保留为历史证据，不作为后续阿里云执行口径。
 
 本机 Docker 镜像已在 2026-06-22 03:54 CST 重新构建成功：
 
@@ -785,7 +787,9 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 18:37 CST 追加：新增 `corepack pnpm aliyun:wechat-open:package` 和 `tests/aliyun-wechat-open-mobile-app-package.static.test.js`，把微信开放平台“移动应用”创建材料单独机器化输出，防止误用小程序凭证。该材料包会从当前 RN 原生配置和 `cloud-confirmations.local.json` 非密钥证据中汇总 App 名称、Android 包名、iOS Bundle ID、Universal Link、AASA URL、当前 `accountVerified=true / mobileAppCreated=false / reviewStatus=not_started` 状态、审核前缺口、审核通过后 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET` 写入阿里云的位置和禁止事项；`aliyun:release:artifacts` 会随包输出 `wechat-open-mobile-app-package.json` 和 `wechat-open-mobile-app-package.md`。本地 predeploy 增至 42 项，正式 predeployChecks 增至 26 项。该命令不创建微信移动 App、不读取 AppSecret、不导入环境变量、不部署。
 
-2026-06-22 18:46 CST 复核：`corepack pnpm aliyun:operator:handoff -- --skip-vercel-env-coverage` 当前输出 `localEvidenceGaps.cloudConfirmations.totalBlockers=27`，`corepack pnpm aliyun:image:plan` 当前输出 `summary.totalBlockers=12`，`corepack pnpm aliyun:deploy:spec` 当前输出 `localPredeployChecks=42`、`predeployChecks=26`。这四个数字是当前执行口径；早前 35/24、40/25、16、25 均只代表对应时点的历史快照。
+2026-06-22 18:46 CST 复核：`corepack pnpm aliyun:operator:handoff -- --skip-vercel-env-coverage` 当时输出 `localEvidenceGaps.cloudConfirmations.totalBlockers=27`，`corepack pnpm aliyun:image:plan` 当时输出 `summary.totalBlockers=12`，`corepack pnpm aliyun:deploy:spec` 当时输出 `localPredeployChecks=42`、`predeployChecks=26`。这些数字现在已成为历史快照；早前 35/24、40/25、16、25 也只代表对应时点的历史快照。
+
+2026-06-22 18:55 CST 追加：新增 `corepack pnpm aliyun:action:authorization` 和 `tests/aliyun-action-authorization.static.test.js`，把 9 项用户/操作员动作进一步归类为外部平台审核、外部标识符、付费购买、registry/运行时 Secret、RAM/STS、Secret 导入、公网域名变更、云资源创建和生产发布授权。该矩阵明确：没有动作时确认时，Codex 只能继续本地检查、报告、非密钥证据记录和本地提交；不能购买 ACR、创建/修改 SAE/SLS/OSS/RAM/KMS/DNS/证书/CDN、公网入口，不能读取或导入 AppSecret/AccessKeySecret/registry password/RAM Secret/STS token/cookie/Supabase service role key，不能推送镜像、部署 production-cn、改正式域名解析或 git push。当前权威脚本口径为 `imagePublishPlan.totalBlockers=12`、`cloudConfirmations.totalBlockers=27`、`localPredeployChecks=44`、`predeployChecks=27`。
 
 ## 11. 真正部署时的命令顺序
 

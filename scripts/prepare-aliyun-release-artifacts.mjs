@@ -199,6 +199,7 @@ function renderMarkdown(audit) {
   const resourcesMatrix = audit.checks.resourcesMatrix
   const userActionBrief = audit.checks.userActionBrief
   const consoleRunbook = audit.checks.consoleRunbook
+  const actionAuthorization = audit.checks.actionAuthorization
   const wechatOpenMobileAppPackage = audit.checks.wechatOpenMobileAppPackage
   const operatorHandoff = audit.checks.operatorHandoff
   const productionStatus = audit.checks.productionStatus
@@ -241,6 +242,7 @@ function renderMarkdown(audit) {
     `- sensitiveActionItems: ${sensitiveBlockers.summary.total} total, ${sensitiveBlockers.summary.blocked} blocked`,
     `- aliyunResources: ${resourcesMatrix.summary.ready} / ${resourcesMatrix.summary.total} ready, ${resourcesMatrix.summary.blocked} blocked`,
     `- userActionBrief: ${userActionBrief.summary.ready} / ${userActionBrief.summary.total} ready, ${userActionBrief.summary.blocked} blocked`,
+    `- actionAuthorization: ${actionAuthorization.summary.actions} actions, ${actionAuthorization.summary.actionTimeConfirmationRequired.length} action-time confirmations`,
     `- cloudConfirmations: ${cloudConfirmations?.ready ? "ready" : "not ready"}`,
     `- cloudConfirmationsCheck: template ${cloudConfirmationsCheck?.template?.ready ? "ready" : "not ready"}, local ${cloudConfirmationsCheck?.local?.ready ? "ready" : "not ready"}`,
     `- vercelEnvCoverage: ${vercelEnvCoverage?.ok ? "ok" : vercelEnvCoverage?.skipped ? "skipped" : "not ok"}`,
@@ -443,6 +445,21 @@ function renderMarkdown(audit) {
     `- actionTimeConfirmationRequired: ${consoleRunbook.summary?.actionTimeConfirmationRequired?.length ? consoleRunbook.summary.actionTimeConfirmationRequired.join(", ") : "none"}`,
     ...(consoleRunbook.consoleTasks?.length
       ? consoleRunbook.consoleTasks.map((item) => `- ${item.id}: ${item.status} (${item.consolePath})`)
+      : ["- none"]),
+    "",
+    "## 阿里云动作授权矩阵",
+    "",
+    `- json: ${audit.outputFiles.actionAuthorizationJson}`,
+    `- markdown: ${audit.outputFiles.actionAuthorizationMarkdown}`,
+    `- ok: ${actionAuthorization.ok === true}`,
+    `- containsValues: ${actionAuthorization.containsValues === true}`,
+    `- secretLeakCheck: ${actionAuthorization.secretLeakCheck?.ok === true}`,
+    `- mutationPerformed: ${actionAuthorization.mutationPerformed === true}`,
+    `- canDeployNow: ${actionAuthorization.canDeployNow === true}`,
+    `- canCodexProceedWithoutUser: ${actionAuthorization.summary.canCodexProceedWithoutUser.length ? actionAuthorization.summary.canCodexProceedWithoutUser.join(", ") : "none"}`,
+    `- actionTimeConfirmationRequired: ${actionAuthorization.summary.actionTimeConfirmationRequired.join(", ")}`,
+    ...(actionAuthorization.actions?.length
+      ? actionAuthorization.actions.map((item) => `- ${item.id}: ${item.automationPolicy} (${item.blockerClass})`)
       : ["- none"]),
     "",
     "## 微信开放平台移动应用材料包",
@@ -687,6 +704,8 @@ function main() {
   const userActionBriefMarkdownPath = resolve(args.outDir, "user-action-brief.md")
   const consoleRunbookJsonPath = resolve(args.outDir, "console-runbook.json")
   const consoleRunbookMarkdownPath = resolve(args.outDir, "console-runbook.md")
+  const actionAuthorizationJsonPath = resolve(args.outDir, "action-authorization.json")
+  const actionAuthorizationMarkdownPath = resolve(args.outDir, "action-authorization.md")
   const wechatOpenMobileAppPackageJsonPath = resolve(args.outDir, "wechat-open-mobile-app-package.json")
   const wechatOpenMobileAppPackageMarkdownPath = resolve(args.outDir, "wechat-open-mobile-app-package.md")
   const operatorHandoffJsonPath = resolve(args.outDir, "operator-handoff.json")
@@ -743,6 +762,16 @@ function main() {
     consoleRunbookJsonPath,
     "--markdown",
     consoleRunbookMarkdownPath,
+  ])
+  const actionAuthorization = runJson("action_authorization", [
+    "scripts/summarize-aliyun-action-authorization.mjs",
+    "--env-file",
+    args.envFile,
+    ...(args.cloudConfirmationsFile ? ["--cloud-confirmations", args.cloudConfirmationsFile] : []),
+    "--out",
+    actionAuthorizationJsonPath,
+    "--markdown",
+    actionAuthorizationMarkdownPath,
   ])
   const wechatOpenMobileAppPackage = runJson("wechat_open_mobile_app_package", [
     "scripts/generate-wechat-open-mobile-app-package.mjs",
@@ -813,6 +842,7 @@ function main() {
       resourcesMatrix,
       userActionBrief,
       consoleRunbook,
+      actionAuthorization,
       wechatOpenMobileAppPackage,
       operatorHandoff,
       productionStatus,
@@ -848,6 +878,8 @@ function main() {
       userActionBriefMarkdown: userActionBriefMarkdownPath,
       consoleRunbookJson: consoleRunbookJsonPath,
       consoleRunbookMarkdown: consoleRunbookMarkdownPath,
+      actionAuthorizationJson: actionAuthorizationJsonPath,
+      actionAuthorizationMarkdown: actionAuthorizationMarkdownPath,
       wechatOpenMobileAppPackageJson: wechatOpenMobileAppPackageJsonPath,
       wechatOpenMobileAppPackageMarkdown: wechatOpenMobileAppPackageMarkdownPath,
       operatorHandoffJson: operatorHandoffJsonPath,
@@ -993,6 +1025,20 @@ function main() {
       consoleTasks: (consoleRunbook.consoleTasks || []).map((item) => `${item.id}:${item.status}`),
       actionTimeConfirmationRequired: consoleRunbook.summary?.actionTimeConfirmationRequired || [],
     },
+    actionAuthorization: {
+      report: audit.outputFiles.actionAuthorizationJson,
+      markdown: audit.outputFiles.actionAuthorizationMarkdown,
+      ok: actionAuthorization.ok === true,
+      containsValues: actionAuthorization.containsValues === true,
+      secretLeakCheck: actionAuthorization.secretLeakCheck?.ok === true,
+      mutationPerformed: actionAuthorization.mutationPerformed === true,
+      canDeployNow: actionAuthorization.canDeployNow === true,
+      actions: actionAuthorization.summary.actions,
+      canCodexProceedWithoutUser: actionAuthorization.summary.canCodexProceedWithoutUser,
+      currentExternalBlockers: actionAuthorization.summary.currentExternalBlockers,
+      actionTimeConfirmationRequired: actionAuthorization.summary.actionTimeConfirmationRequired,
+      policyClasses: actionAuthorization.summary.policyClasses,
+    },
     wechatOpenMobileAppPackage: {
       report: audit.outputFiles.wechatOpenMobileAppPackageJson,
       markdown: audit.outputFiles.wechatOpenMobileAppPackageMarkdown,
@@ -1102,6 +1148,8 @@ function main() {
     userActionBriefMarkdown: audit.outputFiles.userActionBriefMarkdown,
     consoleRunbookJson: audit.outputFiles.consoleRunbookJson,
     consoleRunbookMarkdown: audit.outputFiles.consoleRunbookMarkdown,
+    actionAuthorizationJson: audit.outputFiles.actionAuthorizationJson,
+    actionAuthorizationMarkdown: audit.outputFiles.actionAuthorizationMarkdown,
     wechatOpenMobileAppPackageJson: audit.outputFiles.wechatOpenMobileAppPackageJson,
     wechatOpenMobileAppPackageMarkdown: audit.outputFiles.wechatOpenMobileAppPackageMarkdown,
     operatorHandoffJson: audit.outputFiles.operatorHandoffJson,

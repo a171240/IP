@@ -25,6 +25,8 @@
     "aliyun:user:actions:test": "node --test tests/aliyun-user-action-brief.static.test.js",
     "aliyun:console:runbook": "node ./scripts/generate-aliyun-console-runbook.mjs",
     "aliyun:console:runbook:test": "node --test tests/aliyun-console-runbook.static.test.js",
+    "aliyun:action:authorization": "node ./scripts/summarize-aliyun-action-authorization.mjs",
+    "aliyun:action:authorization:test": "node --test tests/aliyun-action-authorization.static.test.js",
     "aliyun:app-cn-checklist:test": "node --test tests/aliyun-app-cn-checklist.static.test.js",
     "aliyun:vercel-env:coverage": "node ./scripts/check-vercel-env-coverage.mjs --write-report /tmp/meiye-vercel-env-coverage.json",
     "aliyun:deploy:spec": "node ./scripts/check-aliyun-deployment-spec.mjs",

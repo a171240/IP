@@ -358,6 +358,8 @@ resource-matrix.json
 resource-matrix.md
 user-action-brief.json
 user-action-brief.md
+action-authorization.json
+action-authorization.md
 operator-handoff.json
 operator-handoff.md
 env-import-plan.json
@@ -370,7 +372,7 @@ meiye-huajing-app-api-production-cn-context.tar.gz
 
 该脚本会复用当前 readiness、env、routes、小程序链路桥接清单、SAE runtime plan、Docker context 和 `aliyun:cloud:access` 检查，并默认尝试生成 Vercel production 变量名覆盖报告。Vercel 覆盖报告只包含变量名、环境和加密/敏感元数据，不包含真实 value；如果 Vercel 登录态不可用，会在审计里记录失败，不阻断本地发布审计包生成。
 
-`production-cn-status.json` 和 `production-cn-status.md` 是 `aliyun:status` 的打包输出，供发布负责人快速判断当前能否上线、还缺哪些微信/阿里云/Apple 证据。`sensitive-blockers.json/md` 单独列密钥、密码、token、付款和受控标识符类人工介入项；`resource-matrix.json/md` 单独列 7 个阿里云资源项、控制台路径、写入字段、当前 blocker 和验收命令；`user-action-brief.json/md` 单独列用户/操作员动作项、获取位置、写入目标和动作时确认边界。`operator-handoff.json` 和 `operator-handoff.md` 是当前唯一建议交给人工操作员的非密钥操作包：微信开放平台 `reviewStatus=not_started` 时先创建“美业话镜”移动应用并提交审核；`reviewStatus=reviewing` 时等待审核通过；审核通过后才从移动应用详情读取 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`，不要复用小程序 AppID / Secret。操作包会把 `APPLE_TEAM_ID` 单独列为 APP 发布/AASA 阻塞项：它不是后端必填密钥，但 iOS Universal Link 验收需要它生成 AASA `appID`。操作包也会内置 `cloudAccess` 摘要：当前机器是否有 `aliyun` CLI、是否已经能做只读云 inventory、以及 SAE/ACR/DNS/OSS/env/SLS 需要从控制台抄录到 `.local.json` 的非密钥字段。
+`production-cn-status.json` 和 `production-cn-status.md` 是 `aliyun:status` 的打包输出，供发布负责人快速判断当前能否上线、还缺哪些微信/阿里云/Apple 证据。`sensitive-blockers.json/md` 单独列密钥、密码、token、付款和受控标识符类人工介入项；`resource-matrix.json/md` 单独列 7 个阿里云资源项、控制台路径、写入字段、当前 blocker 和验收命令；`user-action-brief.json/md` 单独列用户/操作员动作项、获取位置、写入目标和动作时确认边界；`action-authorization.json/md` 单独把 9 个外部动作归类为外部平台审核、外部标识符、付费购买、Secret/STS、DNS/HTTPS/ICP、云资源创建和生产发布授权，明确没有动作时确认前只能继续本地检查、报告、非密钥证据记录和本地提交。`operator-handoff.json` 和 `operator-handoff.md` 是当前唯一建议交给人工操作员的非密钥操作包：微信开放平台 `reviewStatus=not_started` 时先创建“美业话镜”移动应用并提交审核；`reviewStatus=reviewing` 时等待审核通过；审核通过后才从移动应用详情读取 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`，不要复用小程序 AppID / Secret。操作包会把 `APPLE_TEAM_ID` 单独列为 APP 发布/AASA 阻塞项：它不是后端必填密钥，但 iOS Universal Link 验收需要它生成 AASA `appID`。操作包也会内置 `cloudAccess` 摘要：当前机器是否有 `aliyun` CLI、是否已经能做只读云 inventory、以及 SAE/ACR/DNS/OSS/env/SLS 需要从控制台抄录到 `.local.json` 的非密钥字段。
 
 2026-06-22 17:12 CST 追加：`aliyun:user:actions` 的每个动作项新增 `currentBlockers` 和 `currentEvidence`。这两个字段只来自 readiness、resource matrix 和 ignored 的 `cloud-confirmations.local.json` 非密钥字段，用来直接说明“为什么当前还没 ready”。例如微信动作会显示 `accountVerified=true`、`mobileAppCreated=false`、`mobileAppSubmitted=false`、`reviewStatus=not_started`；域名动作会显示 api-cn/assets-cn 的 DNS、HTTPS、ICP 布尔状态；最终部署授权动作会显示 `canDeployNow=false` 和 `cloudConfirmations=0/7`。
 
