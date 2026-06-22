@@ -22,7 +22,7 @@
 | --- | --- | --- | --- | --- |
 | `APP_API_BASE_URL` | 阿里云 DNS/SAE/HTTPS 完成后使用 `https://api-cn.ipgongchang.xin` | App 本机 production-cn 配置、阿里云 SAE 普通环境变量 | 否 | 本机已配置，云端 DNS/HTTPS/ICP 证据未完成 |
 | `NEXT_PUBLIC_SITE_URL` | 同 `APP_API_BASE_URL` | 阿里云 SAE 普通环境变量 | 否 | 本机已配置，云端证据未完成 |
-| `APP_ASSET_BASE_URL` | 阿里云 DNS/CDN/OSS 自定义域完成后使用 `https://assets-cn.ipgongchang.xin` | App 本机 production-cn 配置、阿里云 SAE 普通环境变量 | 否 | 本机已配置，云端 DNS/HTTPS/ICP 证据未完成 |
+| `APP_ASSET_BASE_URL` | 阿里云 DNS/CDN/OSS 自定义域完成后使用 `https://assets-cn.ipgongchang.xin` | App 本机 production-cn 配置、阿里云 SAE 普通环境变量 | 否 | production-cn 必填；本机已配置，云端 DNS/HTTPS/ICP 证据未完成 |
 | `PRIVACY_POLICY_URL` | production-cn 法务页面可公网 GET 后确认 URL | App 本机 production-cn 配置、阿里云 SAE 普通环境变量 | 否 | 本机形态检查通过，公网 GET 证据未完成 |
 | `TERMS_URL` | production-cn 用户协议页可公网 GET 后确认 URL | App 本机 production-cn 配置、阿里云 SAE 普通环境变量 | 否 | 本机形态检查通过，公网 GET 证据未完成 |
 | `APPLE_TEAM_ID` | Apple Developer -> Membership 或 Identifiers/App ID 页面读取 10 位 Team ID | 阿里云 SAE 普通环境变量，用于 AASA `appID` 生成 | 否 | 未提供，AASA/Universal Link 仍阻塞 |

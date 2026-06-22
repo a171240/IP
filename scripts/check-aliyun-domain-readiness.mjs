@@ -35,7 +35,7 @@ const ENV_TARGETS = [
   },
   {
     key: "APP_ASSET_BASE_URL",
-    required: false,
+    required: true,
     expectedHostPrefix: "assets-cn.",
     probePath: "/",
     requireHttp2xx: false,

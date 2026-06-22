@@ -12,6 +12,7 @@ export const REQUIRED_KEYS = [
   "APP_ENV",
   "APP_REGION",
   "APP_API_BASE_URL",
+  "APP_ASSET_BASE_URL",
   "NEXT_PUBLIC_SITE_URL",
   "PRIVACY_POLICY_URL",
   "TERMS_URL",
@@ -37,7 +38,6 @@ export const REQUIRED_KEYS = [
 ]
 
 export const OPTIONAL_KEYS = [
-  "APP_ASSET_BASE_URL",
   "DATABASE_URL_CN",
   "REDIS_URL_CN",
   "BAILIAN_ASR_LANGUAGE_HINTS",
@@ -304,7 +304,7 @@ function sourceMetadataOf(key) {
       obtain: "配置 assets-cn.ipgongchang.xin 到 OSS/CDN 静态资源入口并启用 HTTPS 后填写。",
       importTarget: "阿里云 SAE plain env",
       cloudConfirmationKey: "assetDomainHttps",
-      notes: "非必填；填写后需要 assets-cn DNS、HTTPS 和 ICP 证据；OSS Bucket CORS/RAM 证据由 oss 项单独确认。",
+      notes: "production-cn 正式 APP 必填；需要 assets-cn DNS、HTTPS 和 ICP 证据；OSS Bucket CORS/RAM 证据由 oss 项单独确认。",
     })
   }
   if (key === "PRIVACY_POLICY_URL" || key === "TERMS_URL") {

@@ -190,12 +190,12 @@ corepack pnpm aliyun:postdeploy:smoke -- \
 corepack pnpm aliyun:domain:check
 ```
 
-`aliyun:domain:check` 读取 `.env.production-cn.local` 中的 `APP_API_BASE_URL`、`NEXT_PUBLIC_SITE_URL` 和可选的 `APP_ASSET_BASE_URL`，只输出非密钥域名状态。它会检查：
+`aliyun:domain:check` 读取 `.env.production-cn.local` 中的 `APP_API_BASE_URL`、`NEXT_PUBLIC_SITE_URL` 和 production-cn 必填的 `APP_ASSET_BASE_URL`，只输出非密钥域名状态。它会检查：
 
 ```text
 1. 域名必须是 HTTPS，不能是 localhost、example、Vercel 或旧线上域名。
 2. APP_API_BASE_URL / NEXT_PUBLIC_SITE_URL 必须使用 api-cn.*。
-3. APP_ASSET_BASE_URL 如果填写，必须使用 assets-cn.*。
+3. APP_ASSET_BASE_URL 必须填写，并且必须使用 assets-cn.*。
 4. DNS 至少存在 A / AAAA / CNAME 记录，且不能指向 Vercel。
 5. api-cn 的 /api/healthz 必须能通过 HTTPS 返回 2xx。
 ```
@@ -995,10 +995,10 @@ slsAlerts missing: confirmed, healthAlertConfigured, serverErrorAlertConfigured
 ```text
 productionReady: false
 localCodeReady: false
-Vercel required coverage: 17 / 25
+Vercel required coverage: 17 / 26
 Vercel production names: 130
-required missing: APP_ENV, APP_REGION, APP_API_BASE_URL, NEXT_PUBLIC_SITE_URL, PRIVACY_POLICY_URL, TERMS_URL, WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET
-optional/app-launch missing: APP_ASSET_BASE_URL, DATABASE_URL_CN, REDIS_URL_CN, SERVICE_RECORD_DEEPSEEK_API_KEY, SERVICE_RECORD_DEEPSEEK_BASE_URL, SERVICE_RECORD_DEEPSEEK_MODEL, WECHAT_OPEN_APP_REVIEW_STATUS, APPLE_TEAM_ID
+required missing: APP_ENV, APP_REGION, APP_API_BASE_URL, APP_ASSET_BASE_URL, NEXT_PUBLIC_SITE_URL, PRIVACY_POLICY_URL, TERMS_URL, WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET
+optional/app-launch missing: DATABASE_URL_CN, REDIS_URL_CN, SERVICE_RECORD_DEEPSEEK_API_KEY, SERVICE_RECORD_DEEPSEEK_BASE_URL, SERVICE_RECORD_DEEPSEEK_MODEL, WECHAT_OPEN_APP_REVIEW_STATUS, APPLE_TEAM_ID
 imagePublishPlan: localDockerImage ready, ACR/runtime blockers 16
 cloudConfirmations: local blockers 25
 appClientContract: 40 audited calls / 34 unique client routes
@@ -1010,6 +1010,8 @@ appApiSmokeCoverage: 29 / 29 business routes
 2026-06-22 08:24 CST 更新：云确认模板从 6 项扩展为 7 项，新增 `assetDomainHttps`，用于单独确认 `assets-cn.ipgongchang.xin` 的 DNS、HTTPS 和 ICP 证据。`corepack pnpm aliyun:cloud:confirmations` 当前显示 example checkedItems=7 且模板通过，local checkedItems=7、totalBlockers=25；新增的 4 个 local blocker 是 `assetDomainHttps:confirmed`、`assetDomainHttps:dnsResolvedToAliyun`、`assetDomainHttps:httpsEnabled`、`assetDomainHttps:icpReady`。
 
 2026-06-22 08:41 CST 更新：`deploy/aliyun-production-cn.example.json` 的 `requiredExternalConfirmations` 从 6 项扩展为 8 项：`api-cn` 和 `assets-cn` 域名证据拆开，且新增 production-cn 环境变量已导入、密钥未进镜像的外部确认。`aliyun:deploy:spec` 会检查这 8 项完整存在。
+
+2026-06-22 09:31 CST 更新：`APP_ASSET_BASE_URL` 从 optional 调整为 production-cn 必填 env。`corepack pnpm aliyun:env:plan` 和 `corepack pnpm aliyun:readiness` 当前均显示 requiredReady `24/26`，requiredBlocking 仍只剩 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；`corepack pnpm aliyun:vercel-env:coverage` 当前显示 Vercel required coverage `17/26`，并把 `APP_ASSET_BASE_URL` 归入国内 APP 新增必填项，不能再按可选变量处理。
 
 2026-06-22 03:54 CST 更新：本机 Docker Desktop 已启动，`corepack pnpm aliyun:docker:build` 已成功构建镜像。该镜像包含 health/readiness 对国内 APP 正式协议 URL 的基础形态校验：
 

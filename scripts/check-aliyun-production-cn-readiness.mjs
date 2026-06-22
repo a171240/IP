@@ -21,6 +21,7 @@ const REQUIRED_ENV_KEYS = [
   "APP_ENV",
   "APP_REGION",
   "APP_API_BASE_URL",
+  "APP_ASSET_BASE_URL",
   "NEXT_PUBLIC_SITE_URL",
   "PRIVACY_POLICY_URL",
   "TERMS_URL",
@@ -46,7 +47,6 @@ const REQUIRED_ENV_KEYS = [
 ]
 
 const OPTIONAL_ENV_KEYS = [
-  "APP_ASSET_BASE_URL",
   "DATABASE_URL_CN",
   "REDIS_URL_CN",
   "BAILIAN_ASR_LANGUAGE_HINTS",
@@ -695,7 +695,7 @@ function main() {
   const assetBaseUrlStatus = envStatus(env.get("APP_ASSET_BASE_URL"))
   const assetBaseUrl = assetBaseUrlStatus === "ready"
     ? checkUrl("APP_ASSET_BASE_URL", env.get("APP_ASSET_BASE_URL"))
-    : `optional_${assetBaseUrlStatus}`
+    : assetBaseUrlStatus
   const envMode = fileMode(args.envFile)
   const envGitIgnored = envFileExists ? gitIgnored(WORKSPACE_ROOT, args.envFile) : false
   const wechatOpenPlatform = checkWechatOpenPlatform(env)
@@ -740,7 +740,7 @@ function main() {
   )
   addBlocker(
     machineBlocking,
-    assetBaseUrl !== "ready" && assetBaseUrl !== "optional_empty" && assetBaseUrl !== "optional_todo",
+    !missingRequired.includes("APP_ASSET_BASE_URL") && assetBaseUrl !== "ready",
     `invalid_app_asset_base_url:${assetBaseUrl}`,
   )
   addBlocker(
