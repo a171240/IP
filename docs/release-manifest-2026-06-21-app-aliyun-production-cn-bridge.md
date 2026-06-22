@@ -516,6 +516,8 @@ sensitive-blockers.json
 sensitive-blockers.md
 resource-matrix.json
 resource-matrix.md
+user-action-brief.json
+user-action-brief.md
 operator-handoff.json
 operator-handoff.md
 env-import-plan.json
@@ -525,7 +527,7 @@ image-publish-plan-check.json
 meiye-huajing-app-api-production-cn-context.tar.gz
 ```
 
-其中 `cloud-access.json` 是本机阿里云只读访问能力报告；当前用于记录是否存在 `aliyun` CLI、是否能自动读云，以及控制台需要抄录到 `.local.json` 的非密钥证据字段。`sensitive-blockers.json/md` 单独列密钥、密码、token、付款和受控标识符类人工介入项；`resource-matrix.json/md` 单独列 SAE、ACR、api-cn、assets-cn、OSS、env import、SLS 这 7 个阿里云资源项和对应验收字段。`operator-handoff.json/md` 是给用户、阿里云控制台操作员、微信开放平台操作员和发布负责人共用的非密钥操作包；它会区分后端必填缺口、APP 发布/AASA 阻塞但非密钥的缺口、以及可后置变量。`vercel-env-coverage.json` 只包含 Vercel production 变量名、环境和加密/敏感元数据，不包含真实 value；Vercel 登录态不可用时只记录 non-blocking failure，不阻断 release audit。
+其中 `cloud-access.json` 是本机阿里云只读访问能力报告；当前用于记录是否存在 `aliyun` CLI、是否能自动读云，以及控制台需要抄录到 `.local.json` 的非密钥证据字段。`sensitive-blockers.json/md` 单独列密钥、密码、token、付款和受控标识符类人工介入项；`resource-matrix.json/md` 单独列 SAE、ACR、api-cn、assets-cn、OSS、env import、SLS 这 7 个阿里云资源项和对应验收字段；`user-action-brief.json/md` 单独列用户/操作员动作项、获取位置、写入目标和动作时确认边界。`operator-handoff.json/md` 是给用户、阿里云控制台操作员、微信开放平台操作员和发布负责人共用的非密钥操作包；它会区分后端必填缺口、APP 发布/AASA 阻塞但非密钥的缺口、以及可后置变量。`vercel-env-coverage.json` 只包含 Vercel production 变量名、环境和加密/敏感元数据，不包含真实 value；Vercel 登录态不可用时只记录 non-blocking failure，不阻断 release audit。
 
 2026-06-22 03:56 CST 最新 artifacts：
 
@@ -746,6 +748,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 2026-06-22 16:00 CST 追加：新增 `corepack pnpm aliyun:sensitive:blockers` 与 `tests/aliyun-sensitive-blockers.static.test.js`，把 `operator:tasks` 里的 `sensitiveActionItems` 单独压缩成无密钥 JSON/Markdown 清单。该命令只输出变量名、控制台路径、动作、解除条件和禁止事项，并执行 secret-like 输出扫描；当前预期仍为 blocked，但命令本身只有在输出疑似真实密钥值时才失败。这样用户介入项可以直接按 S01-S06 追踪：微信开放平台移动 App 登录凭证、Apple Team ID、ACR 付费确认、ACR/SAE 镜像拉取认证、OSS RAM Secret 或 STS、以及本地 ready 但尚未导入阿里云的敏感环境变量组。
 
 2026-06-22 16:18 CST 追加：新增 `corepack pnpm aliyun:resources:matrix` 与 `tests/aliyun-resource-matrix.static.test.js`，把现有 `operator:tasks`、`cloud:confirmations`、`image:plan` 和 `cloud:access` 汇总成阿里云资源矩阵。当前矩阵固定输出 7 项：SAE runtime、ACR 镜像仓库/SAE 拉取、api-cn DNS/HTTPS/ICP、assets-cn DNS/HTTPS/ICP、OSS 音频存储、SAE/KMS/Secrets Manager 环境变量导入、SLS 日志告警。每项都会列控制台路径、写入 `.local.json` 的非密钥字段、当前 blocker、验收命令、是否需要动作时确认，并声明 `mutationPerformed=false`；`aliyun:release:artifacts` 也会随包输出 `resource-matrix.json` 和 `resource-matrix.md`。
+
+2026-06-22 16:34 CST 追加：新增 `corepack pnpm aliyun:user:actions` 与 `tests/aliyun-user-action-brief.static.test.js`，把 `sensitive:blockers`、`resources:matrix` 和 `status` 合并成用户动作简报。当前固定输出 9 项：微信移动应用创建/审核、Apple Team ID、ACR 付费确认、ACR/SAE 镜像认证、OSS RAM/STS、环境变量导入、DNS/HTTPS/ICP、SAE/SLS、最终生产部署授权。该简报只列获取位置、写入目标、变量名、解除条件和动作时确认边界，不输出任何 value，并声明 `mutationPerformed=false`；`aliyun:release:artifacts` 也会随包输出 `user-action-brief.json` 和 `user-action-brief.md`。
 
 ## 11. 真正部署时的命令顺序
 

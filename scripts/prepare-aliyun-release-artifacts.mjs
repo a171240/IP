@@ -197,6 +197,7 @@ function renderMarkdown(audit) {
   const operatorTasks = audit.checks.operatorTasks
   const sensitiveBlockers = audit.checks.sensitiveBlockers
   const resourcesMatrix = audit.checks.resourcesMatrix
+  const userActionBrief = audit.checks.userActionBrief
   const operatorHandoff = audit.checks.operatorHandoff
   const productionStatus = audit.checks.productionStatus
   const cloudConfirmationsCheck = audit.checks.cloudConfirmationsCheck
@@ -237,6 +238,7 @@ function renderMarkdown(audit) {
     `- productionStatus: ${productionStatus.verdict}, canDeployNow ${productionStatus.canDeployNow === true}`,
     `- sensitiveActionItems: ${sensitiveBlockers.summary.total} total, ${sensitiveBlockers.summary.blocked} blocked`,
     `- aliyunResources: ${resourcesMatrix.summary.ready} / ${resourcesMatrix.summary.total} ready, ${resourcesMatrix.summary.blocked} blocked`,
+    `- userActionBrief: ${userActionBrief.summary.ready} / ${userActionBrief.summary.total} ready, ${userActionBrief.summary.blocked} blocked`,
     `- cloudConfirmations: ${cloudConfirmations?.ready ? "ready" : "not ready"}`,
     `- cloudConfirmationsCheck: template ${cloudConfirmationsCheck?.template?.ready ? "ready" : "not ready"}, local ${cloudConfirmationsCheck?.local?.ready ? "ready" : "not ready"}`,
     `- vercelEnvCoverage: ${vercelEnvCoverage?.ok ? "ok" : vercelEnvCoverage?.skipped ? "skipped" : "not ok"}`,
@@ -410,6 +412,21 @@ function renderMarkdown(audit) {
     `- blocked: ${resourcesMatrix.summary.blocked}`,
     ...(resourcesMatrix.resources?.length
       ? resourcesMatrix.resources.map((item) => `- ${item.id}: ${item.status} (${item.provider})`)
+      : ["- none"]),
+    "",
+    "## 用户动作简报",
+    "",
+    `- json: ${audit.outputFiles.userActionBriefJson}`,
+    `- markdown: ${audit.outputFiles.userActionBriefMarkdown}`,
+    `- ok: ${userActionBrief.ok === true}`,
+    `- containsValues: ${userActionBrief.containsValues === true}`,
+    `- secretLeakCheck: ${userActionBrief.secretLeakCheck?.ok === true}`,
+    `- mutationPerformed: ${userActionBrief.mutationPerformed === true}`,
+    `- canDeployNow: ${userActionBrief.canDeployNow === true}`,
+    `- ready: ${userActionBrief.summary.ready} / ${userActionBrief.summary.total}`,
+    `- blocked: ${userActionBrief.summary.blocked}`,
+    ...(userActionBrief.actions?.length
+      ? userActionBrief.actions.map((item) => `- ${item.id}: ${item.status} (${item.owner})`)
       : ["- none"]),
     "",
     "## 操作员操作包",
@@ -636,6 +653,8 @@ function main() {
   const sensitiveBlockersMarkdownPath = resolve(args.outDir, "sensitive-blockers.md")
   const resourcesMatrixJsonPath = resolve(args.outDir, "resource-matrix.json")
   const resourcesMatrixMarkdownPath = resolve(args.outDir, "resource-matrix.md")
+  const userActionBriefJsonPath = resolve(args.outDir, "user-action-brief.json")
+  const userActionBriefMarkdownPath = resolve(args.outDir, "user-action-brief.md")
   const operatorHandoffJsonPath = resolve(args.outDir, "operator-handoff.json")
   const operatorHandoffMarkdownPath = resolve(args.outDir, "operator-handoff.md")
   const productionStatusJsonPath = resolve(args.outDir, "production-cn-status.json")
@@ -670,6 +689,16 @@ function main() {
     resourcesMatrixJsonPath,
     "--markdown",
     resourcesMatrixMarkdownPath,
+  ])
+  const userActionBrief = runJson("user_action_brief", [
+    "scripts/summarize-aliyun-user-action-brief.mjs",
+    "--env-file",
+    args.envFile,
+    ...(args.cloudConfirmationsFile ? ["--cloud-confirmations", args.cloudConfirmationsFile] : []),
+    "--out",
+    userActionBriefJsonPath,
+    "--markdown",
+    userActionBriefMarkdownPath,
   ])
   const operatorHandoff = runJson("operator_handoff", [
     "scripts/generate-aliyun-operator-handoff.mjs",
@@ -728,6 +757,7 @@ function main() {
       operatorTasks,
       sensitiveBlockers,
       resourcesMatrix,
+      userActionBrief,
       operatorHandoff,
       productionStatus,
       cloudConfirmationsCheck,
@@ -758,6 +788,8 @@ function main() {
       sensitiveBlockersMarkdown: sensitiveBlockersMarkdownPath,
       resourcesMatrixJson: resourcesMatrixJsonPath,
       resourcesMatrixMarkdown: resourcesMatrixMarkdownPath,
+      userActionBriefJson: userActionBriefJsonPath,
+      userActionBriefMarkdown: userActionBriefMarkdownPath,
       operatorHandoffJson: operatorHandoffJsonPath,
       operatorHandoffMarkdown: operatorHandoffMarkdownPath,
       productionStatusJson: productionStatusJsonPath,
@@ -877,6 +909,19 @@ function main() {
       blockedIds: resourcesMatrix.summary.blockedIds,
       actionTimeConfirmationRequired: resourcesMatrix.summary.actionTimeConfirmationRequired,
     },
+    userActionBrief: {
+      report: audit.outputFiles.userActionBriefJson,
+      markdown: audit.outputFiles.userActionBriefMarkdown,
+      ok: userActionBrief.ok === true,
+      containsValues: userActionBrief.containsValues === true,
+      secretLeakCheck: userActionBrief.secretLeakCheck?.ok === true,
+      mutationPerformed: userActionBrief.mutationPerformed === true,
+      canDeployNow: userActionBrief.canDeployNow === true,
+      ready: `${userActionBrief.summary.ready}/${userActionBrief.summary.total}`,
+      blockedIds: userActionBrief.summary.blockedIds,
+      userMustAct: userActionBrief.summary.userMustAct,
+      actionTimeConfirmationRequired: userActionBrief.summary.actionTimeConfirmationRequired,
+    },
     operatorHandoff: {
       report: audit.outputFiles.operatorHandoffJson,
       markdown: audit.outputFiles.operatorHandoffMarkdown,
@@ -969,6 +1014,8 @@ function main() {
     sensitiveBlockersMarkdown: audit.outputFiles.sensitiveBlockersMarkdown,
     resourcesMatrixJson: audit.outputFiles.resourcesMatrixJson,
     resourcesMatrixMarkdown: audit.outputFiles.resourcesMatrixMarkdown,
+    userActionBriefJson: audit.outputFiles.userActionBriefJson,
+    userActionBriefMarkdown: audit.outputFiles.userActionBriefMarkdown,
     operatorHandoffJson: audit.outputFiles.operatorHandoffJson,
     operatorHandoffMarkdown: audit.outputFiles.operatorHandoffMarkdown,
   }, null, 2))
