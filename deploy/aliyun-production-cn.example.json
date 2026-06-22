@@ -83,7 +83,7 @@
     "corepack pnpm aliyun:app-api:smoke -- --base-url https://api-cn.ipgongchang.xin"
   ],
   "requiredExternalConfirmations": [
-    "SAE or ECS application created",
+    "SAE application created",
     "Aliyun ACR image pushed and runtime image pull configured",
     "api-cn/assets-cn DNS and HTTPS certificates configured",
     "OSS CORS and RAM least-privilege policy confirmed",

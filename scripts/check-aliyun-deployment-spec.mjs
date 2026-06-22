@@ -213,6 +213,9 @@ function validateSpec(spec) {
       blockers.push(`requiredExternalConfirmations:${keyword}`)
     }
   }
+  if (!externalConfirmations.some((item) => String(item) === "SAE application created")) {
+    blockers.push("requiredExternalConfirmations:SAE application created")
+  }
 
   const bridgeDataLayer = spec.bridgeDataLayer || {}
   if (bridgeDataLayer.current !== "Supabase") blockers.push("bridgeDataLayer.current")

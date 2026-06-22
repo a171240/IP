@@ -993,6 +993,9 @@ slsAlerts missing: confirmed, healthAlertConfigured, serverErrorAlertConfigured
 productionReady: false
 localCodeReady: false
 Vercel required coverage: 17 / 25
+Vercel production names: 130
+required missing: APP_ENV, APP_REGION, APP_API_BASE_URL, NEXT_PUBLIC_SITE_URL, PRIVACY_POLICY_URL, TERMS_URL, WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET
+optional/app-launch missing: APP_ASSET_BASE_URL, DATABASE_URL_CN, REDIS_URL_CN, SERVICE_RECORD_DEEPSEEK_API_KEY, SERVICE_RECORD_DEEPSEEK_BASE_URL, SERVICE_RECORD_DEEPSEEK_MODEL, WECHAT_OPEN_APP_REVIEW_STATUS, APPLE_TEAM_ID
 imagePublishPlan: localDockerImage ready, ACR/runtime blockers 16
 cloudConfirmations: local blockers 21
 appClientContract: 40 audited calls / 34 unique client routes
