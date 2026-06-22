@@ -207,6 +207,7 @@ function renderMarkdown(audit) {
   const resourcesMatrix = audit.checks.resourcesMatrix
   const userActionBrief = audit.checks.userActionBrief
   const consoleRunbook = audit.checks.consoleRunbook
+  const provisioningPlan = audit.checks.provisioningPlan
   const actionAuthorization = audit.checks.actionAuthorization
   const completionAudit = audit.checks.completionAudit
   const wechatOpenMobileAppPackage = audit.checks.wechatOpenMobileAppPackage
@@ -255,6 +256,7 @@ function renderMarkdown(audit) {
     `- aliyunResources: ${resourcesMatrix.summary.ready} / ${resourcesMatrix.summary.total} ready, ${resourcesMatrix.summary.blocked} blocked`,
     `- userActionBrief: ${userActionBrief.summary.ready} / ${userActionBrief.summary.total} ready, ${userActionBrief.summary.blocked} blocked`,
     `- actionAuthorization: ${actionAuthorization.summary.actions} actions, ${actionAuthorization.summary.actionTimeConfirmationRequired.length} action-time confirmations`,
+    `- provisioningPlan: ${provisioningPlan.summary.readyToStartPhases.length}/${provisioningPlan.summary.phases} phases ready to start, executionMode ${provisioningPlan.executionMode}`,
     `- completionAudit: ${completionAudit.verdict}, complete ${completionAudit.complete === true}, proved ${completionAudit.summary.proved}/${completionAudit.summary.requirements}`,
     `- cloudConfirmations: ${cloudConfirmations?.ready ? "ready" : "not ready"}`,
     `- cloudConfirmationsCheck: template ${cloudConfirmationsCheck?.template?.ready ? "ready" : "not ready"}, local ${cloudConfirmationsCheck?.local?.ready ? "ready" : "not ready"}`,
@@ -487,6 +489,21 @@ function renderMarkdown(audit) {
     `- actionTimeConfirmationRequired: ${consoleRunbook.summary?.actionTimeConfirmationRequired?.length ? consoleRunbook.summary.actionTimeConfirmationRequired.join(", ") : "none"}`,
     ...(consoleRunbook.consoleTasks?.length
       ? consoleRunbook.consoleTasks.map((item) => `- ${item.id}: ${item.status}, canStartNow=${item.canStartNow}, dependsOn=${item.dependsOn?.join(", ") || "none"} (${item.consolePath})`)
+      : ["- none"]),
+    "",
+    "## 阿里云 Provisioning Plan",
+    "",
+    `- json: ${audit.outputFiles.provisioningPlanJson}`,
+    `- markdown: ${audit.outputFiles.provisioningPlanMarkdown}`,
+    `- ok: ${provisioningPlan.ok === true}`,
+    `- executionMode: ${provisioningPlan.executionMode}`,
+    `- canCodexExecuteNow: ${provisioningPlan.canCodexExecuteNow === true}`,
+    `- containsValues: ${provisioningPlan.containsValues === true}`,
+    `- secretLeakCheck: ${provisioningPlan.secretLeakCheck?.ok === true}`,
+    `- readyToStartPhases: ${provisioningPlan.summary.readyToStartPhases.length ? provisioningPlan.summary.readyToStartPhases.join(", ") : "none"}`,
+    `- blockedPhases: ${provisioningPlan.summary.blockedPhases.length ? provisioningPlan.summary.blockedPhases.join(", ") : "none"}`,
+    ...(provisioningPlan.phases?.length
+      ? provisioningPlan.phases.map((item) => `- ${item.id}: ${item.status}, canStartNow=${item.canStartNow}`)
       : ["- none"]),
     "",
     "## 阿里云动作授权矩阵",
@@ -808,6 +825,8 @@ function main() {
   const userActionBriefMarkdownPath = resolve(args.outDir, "user-action-brief.md")
   const consoleRunbookJsonPath = resolve(args.outDir, "console-runbook.json")
   const consoleRunbookMarkdownPath = resolve(args.outDir, "console-runbook.md")
+  const provisioningPlanJsonPath = resolve(args.outDir, "provisioning-plan.json")
+  const provisioningPlanMarkdownPath = resolve(args.outDir, "provisioning-plan.md")
   const actionAuthorizationJsonPath = resolve(args.outDir, "action-authorization.json")
   const actionAuthorizationMarkdownPath = resolve(args.outDir, "action-authorization.md")
   const completionAuditJsonPath = resolve(args.outDir, "completion-audit.json")
@@ -877,6 +896,16 @@ function main() {
     consoleRunbookJsonPath,
     "--markdown",
     consoleRunbookMarkdownPath,
+  ])
+  const provisioningPlan = runJson("provisioning_plan", [
+    "scripts/generate-aliyun-provisioning-plan.mjs",
+    "--env-file",
+    args.envFile,
+    ...(args.cloudConfirmationsFile ? ["--cloud-confirmations", args.cloudConfirmationsFile] : []),
+    "--out",
+    provisioningPlanJsonPath,
+    "--markdown",
+    provisioningPlanMarkdownPath,
   ])
   const actionAuthorization = runJson("action_authorization", [
     "scripts/summarize-aliyun-action-authorization.mjs",
@@ -974,6 +1003,7 @@ function main() {
       resourcesMatrix,
       userActionBrief,
       consoleRunbook,
+      provisioningPlan,
       actionAuthorization,
       completionAudit,
       wechatOpenMobileAppPackage,
@@ -1017,6 +1047,8 @@ function main() {
       userActionBriefMarkdown: userActionBriefMarkdownPath,
       consoleRunbookJson: consoleRunbookJsonPath,
       consoleRunbookMarkdown: consoleRunbookMarkdownPath,
+      provisioningPlanJson: provisioningPlanJsonPath,
+      provisioningPlanMarkdown: provisioningPlanMarkdownPath,
       actionAuthorizationJson: actionAuthorizationJsonPath,
       actionAuthorizationMarkdown: actionAuthorizationMarkdownPath,
       completionAuditJson: completionAuditJsonPath,
@@ -1207,6 +1239,19 @@ function main() {
       consoleTasks: (consoleRunbook.consoleTasks || []).map((item) => `${item.id}:${item.status}:canStartNow=${item.canStartNow}`),
       actionTimeConfirmationRequired: consoleRunbook.summary?.actionTimeConfirmationRequired || [],
     },
+    provisioningPlan: {
+      report: audit.outputFiles.provisioningPlanJson,
+      markdown: audit.outputFiles.provisioningPlanMarkdown,
+      ok: provisioningPlan.ok === true,
+      executionMode: provisioningPlan.executionMode,
+      canCodexExecuteNow: provisioningPlan.canCodexExecuteNow === true,
+      containsValues: provisioningPlan.containsValues === true,
+      secretLeakCheck: provisioningPlan.secretLeakCheck?.ok === true,
+      phases: provisioningPlan.summary.phases,
+      readyToStartPhases: provisioningPlan.summary.readyToStartPhases,
+      blockedPhases: provisioningPlan.summary.blockedPhases,
+      requiredBlocking: provisioningPlan.summary.requiredBlocking,
+    },
     actionAuthorization: {
       report: audit.outputFiles.actionAuthorizationJson,
       markdown: audit.outputFiles.actionAuthorizationMarkdown,
@@ -1375,6 +1420,8 @@ function main() {
     userActionBriefMarkdown: audit.outputFiles.userActionBriefMarkdown,
     consoleRunbookJson: audit.outputFiles.consoleRunbookJson,
     consoleRunbookMarkdown: audit.outputFiles.consoleRunbookMarkdown,
+    provisioningPlanJson: audit.outputFiles.provisioningPlanJson,
+    provisioningPlanMarkdown: audit.outputFiles.provisioningPlanMarkdown,
     actionAuthorizationJson: audit.outputFiles.actionAuthorizationJson,
     actionAuthorizationMarkdown: audit.outputFiles.actionAuthorizationMarkdown,
     completionAuditJson: audit.outputFiles.completionAuditJson,

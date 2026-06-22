@@ -32,6 +32,8 @@
     "aliyun:user:actions:test": "node --test tests/aliyun-user-action-brief.static.test.js",
     "aliyun:console:runbook": "node ./scripts/generate-aliyun-console-runbook.mjs",
     "aliyun:console:runbook:test": "node --test tests/aliyun-console-runbook.static.test.js",
+    "aliyun:provisioning:plan": "node ./scripts/generate-aliyun-provisioning-plan.mjs",
+    "aliyun:provisioning:plan:test": "node --test tests/aliyun-provisioning-plan.static.test.js",
     "aliyun:action:authorization": "node ./scripts/summarize-aliyun-action-authorization.mjs",
     "aliyun:action:authorization:test": "node --test tests/aliyun-action-authorization.static.test.js",
     "aliyun:completion:audit": "node ./scripts/summarize-aliyun-completion-audit.mjs",
