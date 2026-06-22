@@ -62,3 +62,14 @@ test("APP production-cn checklist records current blockers without secret values
   assert.doesNotMatch(doc, /:\/\/[^\s:@]+:[^\s@]+@/)
   assert.doesNotMatch(doc, /AccessKeySecret\s*[:=]\s*["'][^"']+["']/)
 })
+
+test("APP production-cn release manifest keeps Vercel coverage aligned with required env count", () => {
+  const manifest = read("docs", "release-manifest-2026-06-21-app-aliyun-production-cn-bridge.md")
+
+  assert.match(manifest, /required APP production-cn variables covered by Vercel production: 17 \/ 26/)
+  assert.match(manifest, /缺失的 9 个必填项/)
+  assert.match(manifest, /`api-cn`\/`assets-cn` 域名变量/)
+  assert.match(manifest, /required missing in Vercel production:[\s\S]*APP_ASSET_BASE_URL/)
+  assert.doesNotMatch(manifest, /required APP production-cn variables covered by Vercel production: 17 \/ 25/)
+  assert.doesNotMatch(manifest, /缺失的 8 个必填项/)
+})

@@ -240,22 +240,23 @@ Vercel production 变量名只读覆盖检查：
 command: corepack pnpm aliyun:vercel-env:coverage
 report: /tmp/meiye-vercel-env-coverage.json
 containsValues: false
-checkedAt: 2026-06-22 08:12 CST
+checkedAt: 2026-06-22 18:41 CST
 vercel production variable names: 130
-required APP production-cn variables covered by Vercel production: 17 / 25
+required APP production-cn variables covered by Vercel production: 17 / 26
 required missing in Vercel production:
   APP_ENV
   APP_REGION
   APP_API_BASE_URL
+  APP_ASSET_BASE_URL
   NEXT_PUBLIC_SITE_URL
   PRIVACY_POLICY_URL
   TERMS_URL
   WECHAT_OPEN_APP_ID
   WECHAT_OPEN_APP_SECRET
 optional/app-launch missing in Vercel production:
-  APP_ASSET_BASE_URL
   DATABASE_URL_CN
   REDIS_URL_CN
+  ALIYUN_OSS_SECURITY_TOKEN
   SERVICE_RECORD_DEEPSEEK_API_KEY
   SERVICE_RECORD_DEEPSEEK_BASE_URL
   SERVICE_RECORD_DEEPSEEK_MODEL
@@ -263,7 +264,7 @@ optional/app-launch missing in Vercel production:
   APPLE_TEAM_ID
 ```
 
-结论：Vercel production 可以作为 Supabase、旧微信小程序兼容、OSS、百炼、DeepSeek、火山语音等桥接变量来源；缺失的 8 个必填项是 APP 国内版新增运行环境、`api-cn` 域名变量、国内 APP 正式协议 URL 和微信开放平台移动应用 AppID/AppSecret，不能从旧小程序变量替代。`APPLE_TEAM_ID` 不是后端必填密钥，但会阻塞 iOS AASA / Universal Link 发布验收，必须从 Apple Developer 读取。
+结论：Vercel production 可以作为 Supabase、旧微信小程序兼容、OSS、百炼、DeepSeek、火山语音等桥接变量来源；缺失的 9 个必填项是 APP 国内版新增运行环境、`api-cn`/`assets-cn` 域名变量、国内 APP 正式协议 URL 和微信开放平台移动应用 AppID/AppSecret，不能从旧小程序变量替代。`APPLE_TEAM_ID` 不是后端必填密钥，但会阻塞 iOS AASA / Universal Link 发布验收，必须从 Apple Developer 读取。
 
 ## 7. Supabase / 数据层状态
 
@@ -538,7 +539,7 @@ localCodeReady: false
 imagePublishPlan.localDockerImage: ready
 imagePublishPlan.totalBlockers: 16
 cloudConfirmations.totalBlockers: 25
-vercelEnvCoverage.requiredCovered: 17 / 25
+vercelEnvCoverage.requiredCovered: 17 / 26
 appClientContract: 40 audited calls / 34 unique client routes / 26 matched backend routes
 appApiSmokeCoverage: 29 / 29 business routes / 30 probes
 ```
