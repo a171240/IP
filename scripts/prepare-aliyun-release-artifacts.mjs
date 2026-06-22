@@ -191,6 +191,7 @@ function renderMarkdown(audit) {
   const domain = audit.checks.domain
   const cloudAccess = audit.checks.cloudAccess
   const cloudInventoryPlan = audit.checks.cloudInventoryPlan
+  const cloudInventoryResults = audit.checks.cloudInventoryResults
   const deploymentSpec = audit.checks.deploymentSpec
   const runtimePlan = audit.checks.runtimePlan
   const legalPages = audit.checks.legalPages
@@ -237,6 +238,7 @@ function renderMarkdown(audit) {
     `- domainReadiness: ${domain.ok ? "ok" : "not ready"} (${domain.targetReady} / ${domain.targetTotal})`,
     `- cloudAccess: ${cloudAccess.canReadCloudNow ? "cli-ready" : "manual-console"} (${cloudAccess.blockers?.length || 0} blockers)`,
     `- cloudInventoryPlan: ${cloudInventoryPlan.canRunReadOnlyInventoryNow ? "ready" : "blocked"} (${cloudInventoryPlan.summary?.totalOperations || 0} operations)`,
+    `- cloudInventoryResults: ${cloudInventoryResults.local?.ready ? "ready" : "not ready"} (${cloudInventoryResults.local?.checkedOperations || 0} local operations)`,
     `- appRuntimeConfig: ${appRuntimeConfig?.ok === true ? "ready" : "not ready"}`,
     `- appNativeRelease: ${appNativeRelease?.ok === true ? "ready" : "not ready"}`,
     `- operatorTasks: ${operatorTasks.summary.ready} / ${operatorTasks.summary.total} ready`,
@@ -311,6 +313,19 @@ function renderMarkdown(audit) {
     `- commandTemplates: ${cloudInventoryPlan.summary?.commandTemplates ?? 0}`,
     ...(cloudInventoryPlan.blockers?.length
       ? cloudInventoryPlan.blockers.map((item) => `- ${item}`)
+      : ["- blockers: none"]),
+    "",
+    "## 阿里云 CLI 只读盘点结果",
+    "",
+    `- json: ${audit.outputFiles.cloudInventoryResultsJson}`,
+    `- markdown: ${audit.outputFiles.cloudInventoryResultsMarkdown}`,
+    `- readOnlyOnly: ${cloudInventoryResults.readOnlyOnly === true}`,
+    `- cloudMutationPerformed: ${cloudInventoryResults.cloudMutationPerformed === true}`,
+    `- localExists: ${cloudInventoryResults.local?.exists === true}`,
+    `- localReady: ${cloudInventoryResults.local?.ready === true}`,
+    `- localCheckedOperations: ${cloudInventoryResults.local?.checkedOperations ?? 0}`,
+    ...(cloudInventoryResults.local?.blockers?.length
+      ? cloudInventoryResults.local.blockers.map((item) => `- ${item}`)
       : ["- blockers: none"]),
     "",
     "## APP production-cn 配置模板",
@@ -722,6 +737,16 @@ function main() {
     "--markdown",
     cloudInventoryPlanMarkdownPath,
   ])
+  const cloudInventoryResultsJsonPath = resolve(args.outDir, "cloud-inventory-results.json")
+  const cloudInventoryResultsMarkdownPath = resolve(args.outDir, "cloud-inventory-results.md")
+  const cloudInventoryResults = runJson("cloud_inventory_results", [
+    "scripts/check-aliyun-cli-inventory-results.mjs",
+    "--allow-incomplete",
+    "--out",
+    cloudInventoryResultsJsonPath,
+    "--markdown",
+    cloudInventoryResultsMarkdownPath,
+  ])
   const deploymentSpec = runJson("deployment_spec", ["scripts/check-aliyun-deployment-spec.mjs"])
   const runtimePlan = runJson("runtime_plan", ["scripts/check-aliyun-runtime-plan.mjs"])
   const imagePublishPlan = runJson("image_publish_plan", [
@@ -885,6 +910,7 @@ function main() {
       domain,
       cloudAccess,
       cloudInventoryPlan,
+      cloudInventoryResults,
       deploymentSpec,
       runtimePlan,
       legalPages,
@@ -920,6 +946,8 @@ function main() {
       cloudAccess: cloudAccessPath,
       cloudInventoryPlanJson: cloudInventoryPlanJsonPath,
       cloudInventoryPlanMarkdown: cloudInventoryPlanMarkdownPath,
+      cloudInventoryResultsJson: cloudInventoryResultsJsonPath,
+      cloudInventoryResultsMarkdown: cloudInventoryResultsMarkdownPath,
       cloudConfirmationsCheck: cloudConfirmationsCheckPath,
       legalPages: resolve(args.outDir, "legal-pages.json"),
       runtimePlan: resolve(args.outDir, "runtime-plan.json"),
@@ -952,6 +980,7 @@ function main() {
   writeText(audit.outputFiles.domainReadiness, JSON.stringify(domain, null, 2))
   writeText(audit.outputFiles.cloudAccess, JSON.stringify(cloudAccess, null, 2))
   writeText(audit.outputFiles.cloudInventoryPlanJson, JSON.stringify(cloudInventoryPlan, null, 2))
+  writeText(audit.outputFiles.cloudInventoryResultsJson, JSON.stringify(cloudInventoryResults, null, 2))
   writeText(audit.outputFiles.cloudConfirmationsCheck, JSON.stringify(cloudConfirmationsCheck, null, 2))
   writeText(audit.outputFiles.legalPages, JSON.stringify(legalPages, null, 2))
   writeText(audit.outputFiles.runtimePlan, JSON.stringify(runtimePlan, null, 2))
@@ -987,6 +1016,17 @@ function main() {
       totalOperations: cloudInventoryPlan.summary?.totalOperations ?? 0,
       commandTemplates: cloudInventoryPlan.summary?.commandTemplates ?? 0,
       blockers: cloudInventoryPlan.blockers || [],
+    },
+    cloudInventoryResults: {
+      report: audit.outputFiles.cloudInventoryResultsJson,
+      markdown: audit.outputFiles.cloudInventoryResultsMarkdown,
+      readOnlyOnly: cloudInventoryResults.readOnlyOnly === true,
+      cloudMutationPerformed: cloudInventoryResults.cloudMutationPerformed === true,
+      templateReady: cloudInventoryResults.template?.ready === true,
+      localExists: cloudInventoryResults.local?.exists === true,
+      localReady: cloudInventoryResults.local?.ready === true,
+      localCheckedOperations: cloudInventoryResults.local?.checkedOperations ?? 0,
+      localBlockers: cloudInventoryResults.local?.blockers || [],
     },
     deploymentSpec: {
       ok: deploymentSpec.ok === true,
@@ -1224,6 +1264,8 @@ function main() {
     cloudAccessReport: audit.outputFiles.cloudAccess,
     cloudInventoryPlanJson: audit.outputFiles.cloudInventoryPlanJson,
     cloudInventoryPlanMarkdown: audit.outputFiles.cloudInventoryPlanMarkdown,
+    cloudInventoryResultsJson: audit.outputFiles.cloudInventoryResultsJson,
+    cloudInventoryResultsMarkdown: audit.outputFiles.cloudInventoryResultsMarkdown,
     cloudConfirmationsCheckReport: audit.outputFiles.cloudConfirmationsCheck,
     operatorTasksJson: audit.outputFiles.operatorTasksJson,
     operatorTasksMarkdown: audit.outputFiles.operatorTasksMarkdown,

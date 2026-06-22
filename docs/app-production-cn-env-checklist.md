@@ -12,6 +12,8 @@
 
 2026-06-22 20:53 CST 复核：已新增 `corepack pnpm aliyun:cloud:inventory-plan`。该命令只生成阿里云 CLI 只读资源盘点计划，不调用云 API、不执行 `Create/Update/Delete/Deploy/Start/Stop`、不读取或输出密钥。当前因为 CLI 账号配置仍未就绪，计划状态为 `blocked_until_cli_configured`；等 CLI/Cloud Shell 配置完成后，才能按计划核验 SAE、ACR、DNS、OSS、SLS、HTTPS 证书等云侧证据。
 
+2026-06-22 21:08 CST 复核：已新增 `corepack pnpm aliyun:cloud:inventory-results` 和严格版 `corepack pnpm aliyun:cloud:inventory-results:strict`。该命令只校验 `deploy/aliyun-production-cn.cloud-inventory-results.local.json` 里的只读盘点结果摘要，不运行 Aliyun CLI、不调用云 API、不读取凭据。当前 local 结果文件尚未生成，所以 `inventory-results` 只作为缺口报告；后续 CLI/Cloud Shell 盘点完成后，把非密钥摘要写入该 ignored local 文件，再用 strict 校验通过后，才能把最终布尔证据同步到 `cloud-confirmations.local.json`。
+
 当前 Vercel production 只读覆盖检查 `corepack pnpm aliyun:vercel-env:coverage` 显示 required `17/26` 已存在，缺 `APP_ENV`、`APP_REGION`、`APP_API_BASE_URL`、`APP_ASSET_BASE_URL`、`NEXT_PUBLIC_SITE_URL`、`PRIVACY_POLICY_URL`、`TERMS_URL`、`WECHAT_OPEN_APP_ID`、`WECHAT_OPEN_APP_SECRET`。前 7 个是国内 APP/阿里云运行配置；后 2 个必须等微信开放平台移动应用创建并审核通过后获得。
 
 当前 `/tmp/meiye-aliyun-env-import-checklist.md` 由 `corepack pnpm aliyun:env:checklist` 生成，包含 63 个变量的导入目标和来源说明，不包含真实 value。当前本机 required env 是 `24/26` ready，后端必填阻塞只剩 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；`APPLE_TEAM_ID` 会单独出现在“APP 发布阻塞但非后端必填”分组，用于 iOS Universal Link / AASA 验收。上述状态不等于云侧环境变量已经导入阿里云。
@@ -101,6 +103,7 @@ corepack pnpm aliyun:wechat-open:package
 corepack pnpm aliyun:env:handoff
 corepack pnpm aliyun:cloud:access
 corepack pnpm aliyun:cloud:inventory-plan
+corepack pnpm aliyun:cloud:inventory-results
 corepack pnpm aliyun:cloud:confirmations
 corepack pnpm aliyun:readiness
 corepack pnpm aliyun:predeploy

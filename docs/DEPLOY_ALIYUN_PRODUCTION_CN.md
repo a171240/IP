@@ -1139,6 +1139,8 @@ appApiSmokeCoverage: 29 / 29 business routes
 
 2026-06-22 20:53 CST 更新：新增 `corepack pnpm aliyun:cloud:inventory-plan`，用于生成阿里云 CLI 只读资源盘点计划。该命令不会调用云 API，也不会创建、修改、部署、启动、停止、删除任何云资源；它只输出后续在 CLI/Cloud Shell 配置完成后可按序执行的 SAE、ACR、DNS、OSS、SLS、CAS 只读命令模板和禁止动作清单。当前状态仍为 `blocked_until_cli_configured`，因为本机缺阿里云 CLI 账号配置证据。
 
+2026-06-22 21:08 CST 更新：新增 `corepack pnpm aliyun:cloud:inventory-results`，用于校验阿里云 CLI 只读盘点结果摘要文件 `deploy/aliyun-production-cn.cloud-inventory-results.local.json`。该校验器不运行 Aliyun CLI、不读取凭据、不调用云 API，只检查结果摘要是否覆盖 7 个盘点项、是否保持 `mutationPerformed=false`、是否没有密钥形态。当前 local 结果文件尚未生成，因此结果状态仍是 not ready；这一步是把后续只读命令输出转成 `cloud-confirmations.local.json` 前的中间证据层。
+
 本轮为 `--skip-bundle` 审计，未重新生成 context tar；Docker context 和镜像已由 `aliyun:docker:check`、`aliyun:docker:build`、`aliyun:container:smoke` 覆盖。
 
 2026-06-22 08:24 CST 更新：云确认模板从 6 项扩展为 7 项，新增 `assetDomainHttps`，用于单独确认 `assets-cn.ipgongchang.xin` 的 DNS、HTTPS 和 ICP 证据。`corepack pnpm aliyun:cloud:confirmations` 当前显示 example checkedItems=7 且模板通过，local checkedItems=7、totalBlockers=25；新增的 4 个 local blocker 是 `assetDomainHttps:confirmed`、`assetDomainHttps:dnsResolvedToAliyun`、`assetDomainHttps:httpsEnabled`、`assetDomainHttps:icpReady`。

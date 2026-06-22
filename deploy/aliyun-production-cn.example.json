@@ -59,6 +59,14 @@
     "requiresConfiguredCli": true,
     "secretsPolicy": "Do not pass AccessKeySecret, AppSecret, registry password, STS token, cookie, or Supabase service role key on the command line or into reports."
   },
+  "cloudInventoryResults": {
+    "exampleFile": "deploy/aliyun-production-cn.cloud-inventory-results.example.json",
+    "localFile": "deploy/aliyun-production-cn.cloud-inventory-results.local.json",
+    "checkCommand": "corepack pnpm aliyun:cloud:inventory-results",
+    "strictCheckCommand": "corepack pnpm aliyun:cloud:inventory-results:strict",
+    "scope": "non-secret read-only CLI inventory result summaries only; the checker never runs Aliyun commands",
+    "secretsPolicy": "Record command names, booleans, exit status, timestamps, and evidence handles only. Do not paste full command output when it contains credentials, tokens, registry passwords, certificates, cookies, or personal secrets."
+  },
   "localPredeployChecks": [
     "corepack pnpm run aliyun:env:check",
     "corepack pnpm run aliyun:env:plan",
@@ -72,6 +80,7 @@
     "corepack pnpm run aliyun:domain:test",
     "corepack pnpm run aliyun:cloud-access:test",
     "corepack pnpm run aliyun:cloud:inventory-plan:test",
+    "corepack pnpm run aliyun:cloud:inventory-results:test",
     "corepack pnpm run aliyun:sensitive:blockers:test",
     "corepack pnpm run aliyun:resources:matrix:test",
     "corepack pnpm run aliyun:app-cn-checklist:test",
@@ -92,6 +101,7 @@
     "corepack pnpm run aliyun:legal:check",
     "corepack pnpm run aliyun:cloud:access",
     "corepack pnpm run aliyun:cloud:inventory-plan",
+    "corepack pnpm run aliyun:cloud:inventory-results",
     "corepack pnpm run aliyun:cloud:confirmations",
     "corepack pnpm run aliyun:domain:check",
     "corepack pnpm run aliyun:cloud:check",
@@ -125,6 +135,7 @@
     "corepack pnpm aliyun:status",
     "corepack pnpm aliyun:cloud:access",
     "corepack pnpm aliyun:cloud:inventory-plan",
+    "corepack pnpm aliyun:cloud:inventory-results",
     "corepack pnpm aliyun:cloud:confirmations",
     "corepack pnpm aliyun:readiness",
     "corepack pnpm aliyun:env:sources",

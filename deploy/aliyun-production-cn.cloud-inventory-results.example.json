@@ -1,0 +1,173 @@
+{
+  "schemaVersion": 1,
+  "environment": "production-cn",
+  "updatedAt": "TODO_YYYY-MM-DDTHH:mm:ss+08:00",
+  "operator": "TODO_OPERATOR",
+  "sourcePlanCommand": "corepack pnpm aliyun:cloud:inventory-plan",
+  "notes": "Copy this file to aliyun-production-cn.cloud-inventory-results.local.json after read-only Aliyun CLI or Cloud Shell inventory is run. Keep it non-secret and do not commit the local copy.",
+  "operations": [
+    {
+      "id": "I01_SAE_RUNTIME",
+      "title": "SAE production-cn runtime inventory",
+      "product": "sae",
+      "readOnly": true,
+      "status": "pending",
+      "commandResults": [
+        {
+          "command": "aliyun sae ListApplications --region cn-hangzhou",
+          "executed": false,
+          "exitStatus": null,
+          "cloudApiCalled": false,
+          "mutationPerformed": false,
+          "observedAt": "TODO_YYYY-MM-DDTHH:mm:ss+08:00",
+          "outputSummary": "TODO_NON_SECRET_RESULT_SUMMARY",
+          "evidence": "TODO_NON_SECRET_EVIDENCE_HANDLE"
+        }
+      ],
+      "writesTo": [
+        "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.runtime"
+      ],
+      "evidence": "TODO_NON_SECRET_SAE_EVIDENCE"
+    },
+    {
+      "id": "I02_ACR_IMAGE",
+      "title": "ACR repository and production-cn image inventory",
+      "product": "cr",
+      "readOnly": true,
+      "status": "pending",
+      "commandResults": [
+        {
+          "command": "aliyun cr ListInstance --region cn-hangzhou",
+          "executed": false,
+          "exitStatus": null,
+          "cloudApiCalled": false,
+          "mutationPerformed": false,
+          "observedAt": "TODO_YYYY-MM-DDTHH:mm:ss+08:00",
+          "outputSummary": "TODO_NON_SECRET_RESULT_SUMMARY",
+          "evidence": "TODO_NON_SECRET_EVIDENCE_HANDLE"
+        }
+      ],
+      "writesTo": [
+        "deploy/aliyun-production-cn.image-publish.local.json -> acr",
+        "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.acr"
+      ],
+      "evidence": "TODO_NON_SECRET_ACR_EVIDENCE"
+    },
+    {
+      "id": "I03_DNS_API_DOMAIN",
+      "title": "api-cn DNS and HTTPS route inventory",
+      "product": "alidns",
+      "readOnly": true,
+      "status": "pending",
+      "commandResults": [
+        {
+          "command": "aliyun alidns DescribeSubDomainRecords --SubDomain api-cn.ipgongchang.xin",
+          "executed": false,
+          "exitStatus": null,
+          "cloudApiCalled": false,
+          "mutationPerformed": false,
+          "observedAt": "TODO_YYYY-MM-DDTHH:mm:ss+08:00",
+          "outputSummary": "TODO_NON_SECRET_RESULT_SUMMARY",
+          "evidence": "TODO_NON_SECRET_EVIDENCE_HANDLE"
+        }
+      ],
+      "writesTo": [
+        "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps"
+      ],
+      "evidence": "TODO_NON_SECRET_API_DOMAIN_EVIDENCE"
+    },
+    {
+      "id": "I04_DNS_ASSET_DOMAIN",
+      "title": "assets-cn DNS and HTTPS route inventory",
+      "product": "alidns",
+      "readOnly": true,
+      "status": "pending",
+      "commandResults": [
+        {
+          "command": "aliyun alidns DescribeSubDomainRecords --SubDomain assets-cn.ipgongchang.xin",
+          "executed": false,
+          "exitStatus": null,
+          "cloudApiCalled": false,
+          "mutationPerformed": false,
+          "observedAt": "TODO_YYYY-MM-DDTHH:mm:ss+08:00",
+          "outputSummary": "TODO_NON_SECRET_RESULT_SUMMARY",
+          "evidence": "TODO_NON_SECRET_EVIDENCE_HANDLE"
+        }
+      ],
+      "writesTo": [
+        "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps"
+      ],
+      "evidence": "TODO_NON_SECRET_ASSET_DOMAIN_EVIDENCE"
+    },
+    {
+      "id": "I05_OSS_AUDIO_BUCKET",
+      "title": "OSS service-record audio bucket inventory",
+      "product": "oss",
+      "readOnly": true,
+      "status": "pending",
+      "commandResults": [
+        {
+          "command": "aliyun oss stat oss://meiye-huajing-service-records-production-cn",
+          "executed": false,
+          "exitStatus": null,
+          "cloudApiCalled": false,
+          "mutationPerformed": false,
+          "observedAt": "TODO_YYYY-MM-DDTHH:mm:ss+08:00",
+          "outputSummary": "TODO_NON_SECRET_RESULT_SUMMARY",
+          "evidence": "TODO_NON_SECRET_EVIDENCE_HANDLE"
+        }
+      ],
+      "writesTo": [
+        "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss"
+      ],
+      "evidence": "TODO_NON_SECRET_OSS_EVIDENCE"
+    },
+    {
+      "id": "I06_SLS_ALERTS",
+      "title": "SLS project, logstore, and alert inventory",
+      "product": "sls",
+      "readOnly": true,
+      "status": "pending",
+      "commandResults": [
+        {
+          "command": "aliyun sls ListProject --region cn-hangzhou",
+          "executed": false,
+          "exitStatus": null,
+          "cloudApiCalled": false,
+          "mutationPerformed": false,
+          "observedAt": "TODO_YYYY-MM-DDTHH:mm:ss+08:00",
+          "outputSummary": "TODO_NON_SECRET_RESULT_SUMMARY",
+          "evidence": "TODO_NON_SECRET_EVIDENCE_HANDLE"
+        }
+      ],
+      "writesTo": [
+        "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.slsAlerts"
+      ],
+      "evidence": "TODO_NON_SECRET_SLS_EVIDENCE"
+    },
+    {
+      "id": "I07_CERT_HTTPS",
+      "title": "HTTPS certificate inventory",
+      "product": "cas",
+      "readOnly": true,
+      "status": "pending",
+      "commandResults": [
+        {
+          "command": "aliyun cas ListUserCertificateOrder --region cn-hangzhou",
+          "executed": false,
+          "exitStatus": null,
+          "cloudApiCalled": false,
+          "mutationPerformed": false,
+          "observedAt": "TODO_YYYY-MM-DDTHH:mm:ss+08:00",
+          "outputSummary": "TODO_NON_SECRET_RESULT_SUMMARY",
+          "evidence": "TODO_NON_SECRET_EVIDENCE_HANDLE"
+        }
+      ],
+      "writesTo": [
+        "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps",
+        "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps"
+      ],
+      "evidence": "TODO_NON_SECRET_CERT_EVIDENCE"
+    }
+  ]
+}

@@ -24,6 +24,7 @@ const REQUIRED_PREDEPLOY_CHECKS = [
   "corepack pnpm aliyun:status",
   "corepack pnpm aliyun:cloud:access",
   "corepack pnpm aliyun:cloud:inventory-plan",
+  "corepack pnpm aliyun:cloud:inventory-results",
   "corepack pnpm aliyun:cloud:confirmations",
   "corepack pnpm aliyun:readiness",
   "corepack pnpm aliyun:env:sources",
@@ -232,6 +233,26 @@ function validateSpec(spec) {
   }
   if (!String(cloudInventoryPlan.secretsPolicy || "").includes("AppSecret")) {
     blockers.push("cloudInventoryPlan.secretsPolicy")
+  }
+
+  const cloudInventoryResults = spec.cloudInventoryResults || {}
+  if (cloudInventoryResults.exampleFile !== "deploy/aliyun-production-cn.cloud-inventory-results.example.json") {
+    blockers.push("cloudInventoryResults.exampleFile")
+  }
+  if (cloudInventoryResults.localFile !== "deploy/aliyun-production-cn.cloud-inventory-results.local.json") {
+    blockers.push("cloudInventoryResults.localFile")
+  }
+  if (cloudInventoryResults.checkCommand !== "corepack pnpm aliyun:cloud:inventory-results") {
+    blockers.push("cloudInventoryResults.checkCommand")
+  }
+  if (cloudInventoryResults.strictCheckCommand !== "corepack pnpm aliyun:cloud:inventory-results:strict") {
+    blockers.push("cloudInventoryResults.strictCheckCommand")
+  }
+  if (!String(cloudInventoryResults.scope || "").includes("never runs Aliyun commands")) {
+    blockers.push("cloudInventoryResults.scope")
+  }
+  if (!String(cloudInventoryResults.secretsPolicy || "").includes("registry passwords")) {
+    blockers.push("cloudInventoryResults.secretsPolicy")
   }
 
   const predeployChecks = requireArray(spec.predeployChecks)
