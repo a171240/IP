@@ -82,11 +82,11 @@ test("Aliyun cloud access report preserves current non-secret console evidence",
   assert.equal(report.cloudApiCalled, false)
   assert.equal(report.cloudShellObservation.exists, true)
   assert.equal(report.cloudShellObservation.browserConsole.chromeLoggedIn, true)
-  assert.match(resourcesObserved, /ACR Enterprise Economic cn-hangzhou 1 month purchase page visible, CNY 117\.00, not purchased/)
+  assert.match(resourcesObserved, /ACR Enterprise Economic cn-hangzhou 1 month purchase page visible, CNY 117\.00, instance name meiye-huajing, not purchased/)
   assert.match(resourcesObserved, /SAE console accessible; target app not proven created/)
-  assert.match(resourcesObserved, /OSS bucket meiye-huajing-service-records-production-cn visible in cn-hangzhou/)
+  assert.match(resourcesObserved, /OSS bucket meiye-huajing-service-records-production-cn overview visible in oss-cn-hangzhou/)
   assert.match(resourcesObserved, /DNS ipgongchang\.xin visible; no explicit api-cn\/assets-cn records shown/)
-  assert.match(resourcesObserved, /SLS console accessible/)
+  assert.match(resourcesObserved, /SLS logsearch URL visible for project meiye-huajing-app-prod-cn and logstore app-api/)
   assert.deepEqual(checklistIds, [
     "saeRuntime",
     "acrImage",

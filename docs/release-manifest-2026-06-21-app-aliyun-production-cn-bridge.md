@@ -772,6 +772,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 17:34 CST 追加：修正 `aliyun:env:checklist` 的 APP 发布口径。`APPLE_TEAM_ID` 现在从“可后置或空缺变量”拆到独立的“APP 发布阻塞但非后端必填”分组，Markdown 摘要新增 `appLaunchBlocking: APPLE_TEAM_ID`，动作说明固定为“APP 发布/AASA 阻塞：从 Apple Developer 获取 10 位 Team ID 后导入阿里云 SAE plain env”。这不改变后端必填 env 判定：`requiredBlocking` 仍只剩 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；`DATABASE_URL_CN` / `REDIS_URL_CN` 仍是第一版桥接部署可后置的数据层变量。同轮已执行 `node --check scripts/prepare-aliyun-runtime-env.mjs`、`corepack pnpm aliyun:env:classification:test`、`corepack pnpm aliyun:app-cn-checklist:test`、`corepack pnpm aliyun:env:checklist`、`corepack pnpm aliyun:status`、新增行密钥形态扫描、`git diff --check` 和完整 `corepack pnpm aliyun:predeploy`，全部通过；`predeploy` 仍显示状态为 `blocked`，后端必填 env blocker 仍只剩 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`，用户动作仍阻塞在微信移动 App 未创建、Apple Team ID/AASA、ACR/SAE、DNS/HTTPS/ICP、OSS/RAM、env import 与 SLS。
 
+2026-06-22 17:47 CST 追加：通过已登录 Chrome 只读复核阿里云页面并更新 ignored 本地证据文件，不执行购买、DNS 修改、env import、镜像 push 或部署。当前 ACR 购买页仍为企业版经济版 `cn-hangzhou`、实例名 `meiye-huajing`、1 个月、应付 `CNY 117.00`，未购买且需要动作时确认；OSS bucket overview 可打开，显示 `meiye-huajing-service-records-production-cn` / `oss-cn-hangzhou`，未见 AccessDenied 或 NoSuchBucket，但 RAM 最小权限/STS 或运行时 Secret 仍未完成；SLS logsearch URL 可打开，显示 project `meiye-huajing-app-prod-cn` 和 logstore `app-api`，但 health/5xx 告警仍 pending SAE runtime。微信开放平台移动应用列表仍被浏览器安全策略阻止自动读取，本地状态继续以用户确认的“账号认证通过、移动 App 未创建”为准。复核后 `corepack pnpm aliyun:resources:matrix` 和 `corepack pnpm aliyun:user:actions` 已读到新证据，但阿里云资源仍为 `0/7 ready`，用户动作仍为 `0/9 ready`，生产状态仍为 `blocked`。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：
