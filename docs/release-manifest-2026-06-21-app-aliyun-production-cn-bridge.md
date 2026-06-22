@@ -668,6 +668,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 08:24 CST 追加：新增 `assetDomainHttps` 云确认项，并把 `aliyun:readiness` 与 `aliyun:operator:tasks` 的 T04 域名任务改为同时要求 `apiDomainHttps` 和 `assetDomainHttps` ready。当前 `corepack pnpm aliyun:cloud:confirmations` 输出模板 checkedItems=7、local checkedItems=7、totalBlockers=25；其中 `assets-cn.ipgongchang.xin` 需要单独补 confirmed、dnsResolvedToAliyun、httpsEnabled、icpReady 四项非密钥证据，不能复用 `api-cn` 的证据或仅依赖 OSS 项。
 
+2026-06-22 08:34 CST 追加：`APP_ASSET_BASE_URL` 的 env source catalog 归属从 `oss` 改为 `assetDomainHttps`，`aliyun:domain:check` 的 nextAction 也同步要求分别写入 `apiDomainHttps` 与 `assetDomainHttps` 证据。这样操作员清单会把 assets-cn 域名 DNS/HTTPS/ICP 与 OSS Bucket CORS/RAM 分开确认：前者对应 `assetDomainHttps`，后者对应 `oss`，避免把静态资源域名证据误写到 Bucket 权限证据里。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：

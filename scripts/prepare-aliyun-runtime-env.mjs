@@ -303,8 +303,8 @@ function sourceMetadataOf(key) {
       consolePath: "阿里云控制台 -> OSS Bucket / CDN 或 OSS 绑定域名 / 数字证书管理服务",
       obtain: "配置 assets-cn.ipgongchang.xin 到 OSS/CDN 静态资源入口并启用 HTTPS 后填写。",
       importTarget: "阿里云 SAE plain env",
-      cloudConfirmationKey: "oss",
-      notes: "非必填；填写后需要 OSS/CDN、CORS 和 HTTPS 证据。",
+      cloudConfirmationKey: "assetDomainHttps",
+      notes: "非必填；填写后需要 assets-cn DNS、HTTPS 和 ICP 证据；OSS Bucket CORS/RAM 证据由 oss 项单独确认。",
     })
   }
   if (key === "PRIVACY_POLICY_URL" || key === "TERMS_URL") {

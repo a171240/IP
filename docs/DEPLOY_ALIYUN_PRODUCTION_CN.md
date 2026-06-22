@@ -436,7 +436,7 @@ importTarget
 cloudConfirmationKey
 ```
 
-它用于回答“这个变量去哪里拿、由谁确认、导入阿里云哪里”。例如 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET` 的来源是微信开放平台移动应用，不是小程序后台；`PRIVACY_POLICY_URL` / `TERMS_URL` 的来源是正式 HTTPS 协议页面；OSS、百炼、DeepSeek、火山语音、Supabase 桥接变量会分别标出对应控制台或旧 Vercel production 变量来源。
+它用于回答“这个变量去哪里拿、由谁确认、导入阿里云哪里”。例如 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET` 的来源是微信开放平台移动应用，不是小程序后台；`PRIVACY_POLICY_URL` / `TERMS_URL` 的来源是正式 HTTPS 协议页面；`APP_ASSET_BASE_URL` 对应 `assetDomainHttps`，OSS Bucket/CORS/RAM 对应 `oss`；百炼、DeepSeek、火山语音、Supabase 桥接变量会分别标出对应控制台或旧 Vercel production 变量来源。
 
 校验模板变量名覆盖：
 
@@ -602,6 +602,7 @@ slsAlerts：SLS 项目和健康检查失败、5xx 告警配置。
 检查命令：
 
 ```bash
+corepack pnpm aliyun:cloud:confirmations
 corepack pnpm aliyun:cloud:check
 ```
 

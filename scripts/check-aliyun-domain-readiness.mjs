@@ -419,7 +419,7 @@ function nextActions(blocking) {
   if (blocking.some((item) => item.includes("health_not_2xx"))) {
     actions.push("部署后确认 /api/healthz 在 api-cn 域名下返回 2xx，再执行 postdeploy smoke。")
   }
-  actions.push("ICP备案状态不能由本机 DNS/HTTPS 检查完全证明，仍需写入 cloud-confirmations.local.json 的 apiDomainHttps 证据。")
+  actions.push("ICP备案状态不能由本机 DNS/HTTPS 检查完全证明，仍需分别写入 cloud-confirmations.local.json 的 apiDomainHttps 与 assetDomainHttps 证据。")
   return [...new Set(actions)]
 }
 
