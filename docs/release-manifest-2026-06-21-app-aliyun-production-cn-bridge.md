@@ -766,6 +766,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 17:10 CST 追加：`tests/aliyun-cloud-access.static.test.js` 增加当前云侧只读观察回归：默认运行 `scripts/check-aliyun-cloud-access.mjs`，断言报告仍为 `containsValues=false`、`readOnlyOnly=true`、`cloudMutationPerformed=false`、`cloudApiCalled=false`，并覆盖 7 项控制台证据清单。该测试锁住当前阿里云状态：Chrome 控制台已登录；ACR 经济版 cn-hangzhou 1 个月报价 CNY 117.00 仍未付款；SAE 目标应用未确认创建；OSS bucket `meiye-huajing-service-records-production-cn` 可见；api-cn/assets-cn DNS 记录未证明存在；SLS 仍待 runtime 绑定。此项只增强本地证据门禁，不执行云资源创建、付款、DNS 修改或环境变量导入。
 
+2026-06-22 17:16 CST 追加：新增 `corepack pnpm aliyun:app-native:test` 与 `tests/aliyun-app-native-release.static.test.js`，把微信开放平台移动 App 创建所需的本机 APP 资料纳入本地 predeploy。该测试会执行 `scripts/check-app-native-release-config.mjs --allow-blocking`，校验 Android package/namespace 为 `com.ipgongchang.meiyehuajing`、release signing 不使用 debug、iOS Bundle ID 为 `com.ipgongchang.meiyehuajing`、Associated Domains 包含 `applinks:api-cn.ipgongchang.xin`，并确认 cloud confirmations 的微信项保持移动应用未创建/未提交但已记录 iOS Universal Link `https://api-cn.ipgongchang.xin/app/wechat/`。本地 predeploy 现在为 38 项；这不代表微信移动 App 已创建，也不会读取或写入 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：

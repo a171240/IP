@@ -823,6 +823,7 @@ corepack pnpm run aliyun:env:plan
 corepack pnpm run aliyun:env:sources
 corepack pnpm run aliyun:env:classification:test
 corepack pnpm run aliyun:wechat-state:test
+corepack pnpm run aliyun:app-native:test
 corepack pnpm run aliyun:domain:test
 corepack pnpm run aliyun:cloud-access:test
 corepack pnpm run aliyun:sensitive:blockers:test
