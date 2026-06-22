@@ -33,6 +33,7 @@ test("Aliyun operator handoff maps ACR and SAE evidence gaps to the correct cons
   })
   const report = JSON.parse(output)
   const gaps = report.localEvidenceGaps.imagePublish.gaps
+  const inventoryResults = report.localEvidenceGaps.cloudInventoryResults
   const byPath = new Map(gaps.map((item) => [item.jsonPath, item]))
   const registryHost = byPath.get("acr.registryHost")
   const remoteDigest = byPath.get("acr.remoteDigest")
@@ -41,6 +42,16 @@ test("Aliyun operator handoff maps ACR and SAE evidence gaps to the correct cons
   const imagePullConfigured = byPath.get("runtime.imagePullConfigured")
 
   assert.equal(report.containsValues, false)
+  assert.equal(inventoryResults.exists, false)
+  assert.equal(inventoryResults.ready, false)
+  assert.equal(inventoryResults.checkedOperations, 0)
+  assert.equal(inventoryResults.totalBlockers, 1)
+  assert.equal(inventoryResults.gaps[0].jsonPath, "$")
+  assert.equal(inventoryResults.gaps[0].blocker, "file_missing")
+  assert.match(inventoryResults.gaps[0].source, /CLI/)
+  assert.match(inventoryResults.gaps[0].writeTo, /cloud-inventory-results\.local\.json/)
+  assert.match(inventoryResults.gaps[0].expected, /复制/)
+  assert.match(report.safetyBoundary.join("\n"), /cloud-inventory-results\.local\.json/)
   assert.equal(report.localEvidenceGaps.imagePublish.totalBlockers, 12)
   assert.match(registryHost.source, /容器镜像服务 ACR/)
   assert.match(registryHost.writeTo, /-> acr$/)

@@ -12,12 +12,14 @@ const BACKEND_ROOT = resolve(__dirname, "..")
 const WORKSPACE_ROOT = resolve(BACKEND_ROOT, "../..")
 const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
+const DEFAULT_CLOUD_INVENTORY_RESULTS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-inventory-results.local.json")
 const APP_LAUNCH_BLOCKING_VARIABLE_NAMES = new Set(["APPLE_TEAM_ID"])
 
 function parseArgs(argv) {
   const args = {
     envFile: DEFAULT_ENV_FILE,
     cloudConfirmationsFile: DEFAULT_CLOUD_CONFIRMATIONS_FILE,
+    cloudInventoryResultsFile: DEFAULT_CLOUD_INVENTORY_RESULTS_FILE,
     outPath: "",
     markdownPath: "",
     skipVercelEnvCoverage: false,
@@ -33,6 +35,10 @@ function parseArgs(argv) {
     }
     if (arg === "--cloud-confirmations") {
       args.cloudConfirmationsFile = resolveValue(argv[++index], "--cloud-confirmations")
+      continue
+    }
+    if (arg === "--cloud-inventory-results") {
+      args.cloudInventoryResultsFile = resolveValue(argv[++index], "--cloud-inventory-results")
       continue
     }
     if (arg === "--out") {
@@ -374,6 +380,8 @@ function buildHandoff({
       envFileExists: existsSync(args.envFile),
       cloudConfirmationsFile: args.cloudConfirmationsFile,
       cloudConfirmationsFileExists: existsSync(args.cloudConfirmationsFile),
+      cloudInventoryResultsFile: args.cloudInventoryResultsFile,
+      cloudInventoryResultsFileExists: existsSync(args.cloudInventoryResultsFile),
       imagePublishLocalFile: resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.image-publish.local.json"),
     },
     localReady: {
@@ -386,7 +394,7 @@ function buildHandoff({
       docker: status.localReadiness?.docker?.ready === true,
     },
     cloudAccess: compactCloudAccess(cloudAccess),
-    localEvidenceGaps: buildLocalEvidenceGaps({ args, cloudAccess, cloudConfirmationsCheck, imagePublishPlan }),
+    localEvidenceGaps: buildLocalEvidenceGaps({ args, status, cloudAccess, cloudConfirmationsCheck, imagePublishPlan }),
     vercelEnvCoverage: compactVercelEnvCoverage(vercelEnvCoverage),
     bridgeDataLayer: status.summary?.bridgeDataLayer || status.localReadiness?.bridgeDataLayer || {
       current: "Supabase",
@@ -430,14 +438,24 @@ function buildHandoff({
       "本操作包不包含任何密钥值。",
       "本操作包不代表已授权阿里云部署、ACR push、DNS 修改、微信操作、Supabase 生产写入、微信上传或 git push。",
       "cloud-confirmations.local.json 只能写资源名、布尔值、控制台路径或证据编号。",
+      "cloud-inventory-results.local.json 只能写只读 CLI/Cloud Shell 盘点摘要、退出码、布尔值和非密钥 evidence handle。",
       "image-publish.local.json 只能写镜像名、digest、布尔状态和证据编号，不能写 registry 密码或 RAM Secret。",
     ],
   }
 }
 
-function buildLocalEvidenceGaps({ args, cloudAccess, cloudConfirmationsCheck, imagePublishPlan }) {
+function buildLocalEvidenceGaps({ args, status, cloudAccess, cloudConfirmationsCheck, imagePublishPlan }) {
   const cloudChecklistByTarget = buildCloudChecklistByTarget(cloudAccess)
+  const cloudInventoryResults = status.localReadiness?.cloudInventoryResults || {}
   return {
+    cloudInventoryResults: {
+      file: cloudInventoryResults.localFile || args.cloudInventoryResultsFile,
+      exists: cloudInventoryResults.localExists === true,
+      ready: cloudInventoryResults.localReady === true,
+      checkedOperations: cloudInventoryResults.localCheckedOperations || 0,
+      totalBlockers: (cloudInventoryResults.localBlockers || []).length,
+      gaps: buildCloudInventoryResultGaps(cloudInventoryResults),
+    },
     cloudConfirmations: {
       file: args.cloudConfirmationsFile,
       ready: cloudConfirmationsCheck.local?.ready === true,
@@ -452,6 +470,44 @@ function buildLocalEvidenceGaps({ args, cloudAccess, cloudConfirmationsCheck, im
       gaps: buildImagePublishGaps(imagePublishPlan, cloudAccess),
     },
   }
+}
+
+function buildCloudInventoryResultGaps(cloudInventoryResults) {
+  const blockers = cloudInventoryResults.localBlockers || []
+  return blockers.map((blocker) => ({
+    jsonPath: cloudInventoryResultJsonPath(blocker),
+    blocker,
+    source: "阿里云 CLI 或 Cloud Shell 只读资源盘点",
+    writeTo: "deploy/aliyun-production-cn.cloud-inventory-results.local.json",
+    expected: expectedCloudInventoryResultEvidence(blocker),
+    forbidden: [
+      "AccessKeySecret",
+      "AppSecret",
+      "registry password",
+      "RAM Secret",
+      "token",
+      "cookie",
+      "证书私钥",
+      "Supabase service role key",
+    ],
+  }))
+}
+
+function cloudInventoryResultJsonPath(blocker) {
+  const value = String(blocker || "")
+  if (value === "file_missing") return "$"
+  const operation = value.match(/^(I\d{2}_[A-Z0-9_]+):/)
+  if (operation) return `operations.${operation[1]}`
+  const missingOperation = value.match(/^missing_operation:(I\d{2}_[A-Z0-9_]+)$/)
+  if (missingOperation) return `operations.${missingOperation[1]}`
+  return "$"
+}
+
+function expectedCloudInventoryResultEvidence(blocker) {
+  if (blocker === "file_missing") {
+    return "复制 deploy/aliyun-production-cn.cloud-inventory-results.example.json 到 ignored 的 .local.json；在 CLI/Cloud Shell 只读盘点后只填写 executed、exitStatus、cloudApiCalled、mutationPerformed=false、observedAt、outputSummary 和非密钥 evidence。"
+  }
+  return "补齐对应只读盘点项的非密钥摘要；不能粘贴完整命令输出里的凭据、token、registry password、证书私钥或 cookie。"
 }
 
 function buildCloudChecklistByTarget(cloudAccess) {
@@ -701,6 +757,18 @@ function renderMarkdown(handoff) {
     "",
     "## 本地证据待填字段",
     "",
+    "### cloud-inventory-results.local.json",
+    "",
+    `- file: ${handoff.localEvidenceGaps.cloudInventoryResults.file}`,
+    `- exists: ${handoff.localEvidenceGaps.cloudInventoryResults.exists}`,
+    `- ready: ${handoff.localEvidenceGaps.cloudInventoryResults.ready}`,
+    `- checkedOperations: ${handoff.localEvidenceGaps.cloudInventoryResults.checkedOperations}`,
+    `- totalBlockers: ${handoff.localEvidenceGaps.cloudInventoryResults.totalBlockers}`,
+    "",
+    ...(handoff.localEvidenceGaps.cloudInventoryResults.gaps.length
+      ? handoff.localEvidenceGaps.cloudInventoryResults.gaps.flatMap((item) => renderEvidenceGap(item))
+      : ["- none"]),
+    "",
     "### cloud-confirmations.local.json",
     "",
     `- file: ${handoff.localEvidenceGaps.cloudConfirmations.file}`,
@@ -807,6 +875,7 @@ function renderMarkdown(handoff) {
     "",
     "## 本地要补证据的文件",
     "",
+    `- cloud inventory results: ${handoff.files.cloudInventoryResultsFile}`,
     `- cloud confirmations: ${handoff.files.cloudConfirmationsFile}`,
     `- image publish plan: ${handoff.files.imagePublishLocalFile}`,
     "",
@@ -930,6 +999,8 @@ function main() {
     args.envFile,
     "--cloud-confirmations",
     args.cloudConfirmationsFile,
+    "--cloud-inventory-results",
+    args.cloudInventoryResultsFile,
   ])
   const operatorTasks = runJson("operator_tasks", [
     resolve(BACKEND_ROOT, "scripts/generate-aliyun-operator-tasks.mjs"),
@@ -975,7 +1046,7 @@ function main() {
 function printHelp() {
   console.log([
     "Usage:",
-    "  node scripts/generate-aliyun-operator-handoff.mjs [--env-file path] [--cloud-confirmations path] [--out /tmp/handoff.json] [--markdown /tmp/handoff.md] [--skip-vercel-env-coverage] [--vercel-env-coverage-input /tmp/vercel-env.json]",
+    "  node scripts/generate-aliyun-operator-handoff.mjs [--env-file path] [--cloud-confirmations path] [--cloud-inventory-results path] [--out /tmp/handoff.json] [--markdown /tmp/handoff.md] [--skip-vercel-env-coverage] [--vercel-env-coverage-input /tmp/vercel-env.json]",
     "",
     "Generates a concise non-secret handoff for the user, Aliyun operator, WeChat Open Platform operator, and release owner.",
     "Vercel env coverage is metadata-only, non-blocking, and never includes values.",

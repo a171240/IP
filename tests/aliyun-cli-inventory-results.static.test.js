@@ -24,6 +24,7 @@ function run(args) {
 test("Aliyun CLI inventory results command is wired into scripts, predeploy, and deploy spec", () => {
   const pkg = readJson("package.json")
   const predeploy = read("scripts", "aliyun-predeploy-commands.mjs")
+  const releaseArtifacts = read("scripts", "prepare-aliyun-release-artifacts.mjs")
   const deploySpec = readJson("deploy", "aliyun-production-cn.example.json")
 
   assert.equal(pkg.scripts["aliyun:cloud:inventory-results"], "node ./scripts/check-aliyun-cli-inventory-results.mjs --allow-incomplete")
@@ -38,6 +39,9 @@ test("Aliyun CLI inventory results command is wired into scripts, predeploy, and
   assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:cloud:inventory-results:test"))
   assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:cloud:inventory-results"))
   assert.ok(deploySpec.predeployChecks.includes("corepack pnpm aliyun:cloud:inventory-results"))
+  assert.match(releaseArtifacts, /cloudInventoryResultsFile/)
+  assert.match(releaseArtifacts, /--cloud-inventory-results/)
+  assert.match(releaseArtifacts, /check-aliyun-cli-inventory-results\.mjs/)
 })
 
 test("Aliyun CLI inventory results reports incomplete local evidence without calling cloud APIs", () => {

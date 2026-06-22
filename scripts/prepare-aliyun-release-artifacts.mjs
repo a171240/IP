@@ -57,6 +57,7 @@ function parseArgs(argv) {
   const args = {
     envFile: DEFAULT_ENV_FILE,
     cloudConfirmationsFile: "",
+    cloudInventoryResultsFile: "",
     outDir: "",
     skipBundle: false,
     skipVercelEnvCoverage: false,
@@ -71,6 +72,10 @@ function parseArgs(argv) {
     }
     if (arg === "--cloud-confirmations") {
       args.cloudConfirmationsFile = resolveValue(argv[++index], "--cloud-confirmations")
+      continue
+    }
+    if (arg === "--cloud-inventory-results") {
+      args.cloudInventoryResultsFile = resolveValue(argv[++index], "--cloud-inventory-results")
       continue
     }
     if (arg === "--out-dir") {
@@ -744,6 +749,7 @@ function main() {
   const cloudInventoryResults = runJson("cloud_inventory_results", [
     "scripts/check-aliyun-cli-inventory-results.mjs",
     "--allow-incomplete",
+    ...(args.cloudInventoryResultsFile ? ["--local", args.cloudInventoryResultsFile] : []),
     "--out",
     cloudInventoryResultsJsonPath,
     "--markdown",
@@ -866,6 +872,7 @@ function main() {
     "--env-file",
     args.envFile,
     ...(args.cloudConfirmationsFile ? ["--cloud-confirmations", args.cloudConfirmationsFile] : []),
+    ...(args.cloudInventoryResultsFile ? ["--cloud-inventory-results", args.cloudInventoryResultsFile] : []),
     ...(args.skipVercelEnvCoverage ? ["--skip-vercel-env-coverage"] : []),
     ...(args.vercelEnvCoverageInput ? ["--vercel-env-coverage-input", args.vercelEnvCoverageInput] : []),
     "--out",
@@ -878,6 +885,7 @@ function main() {
     "--env-file",
     args.envFile,
     ...(args.cloudConfirmationsFile ? ["--cloud-confirmations", args.cloudConfirmationsFile] : []),
+    ...(args.cloudInventoryResultsFile ? ["--cloud-inventory-results", args.cloudInventoryResultsFile] : []),
     "--out",
     productionStatusJsonPath,
     "--markdown",
@@ -901,6 +909,7 @@ function main() {
     backendRoot: BACKEND_ROOT,
     envFile: args.envFile,
     cloudConfirmationsFile: args.cloudConfirmationsFile || null,
+    cloudInventoryResultsFile: args.cloudInventoryResultsFile || null,
     git: {
       branch: git(["branch", "--show-current"]),
       head: git(["rev-parse", "HEAD"]),
@@ -1189,6 +1198,21 @@ function main() {
       optionalDeferredEnv: operatorHandoff.missingVariables.optionalDeferred.map((item) => item.name),
       sensitiveActionItems: (operatorHandoff.sensitiveActionItems || []).map((item) => `${item.id}:${item.status}`),
       bridgeDataLayer: operatorHandoff.bridgeDataLayer || null,
+      localEvidenceGaps: {
+        cloudInventoryResults: {
+          exists: operatorHandoff.localEvidenceGaps?.cloudInventoryResults?.exists === true,
+          ready: operatorHandoff.localEvidenceGaps?.cloudInventoryResults?.ready === true,
+          totalBlockers: operatorHandoff.localEvidenceGaps?.cloudInventoryResults?.totalBlockers ?? 0,
+        },
+        cloudConfirmations: {
+          ready: operatorHandoff.localEvidenceGaps?.cloudConfirmations?.ready === true,
+          totalBlockers: operatorHandoff.localEvidenceGaps?.cloudConfirmations?.totalBlockers ?? 0,
+        },
+        imagePublish: {
+          ready: operatorHandoff.localEvidenceGaps?.imagePublish?.ready === true,
+          totalBlockers: operatorHandoff.localEvidenceGaps?.imagePublish?.totalBlockers ?? 0,
+        },
+      },
       vercelEnvCoverage: operatorHandoff.vercelEnvCoverage?.ok
         ? {
             containsValues: operatorHandoff.vercelEnvCoverage.containsValues,
@@ -1329,7 +1353,7 @@ function runVercelEnvCoverage(args, reportPath) {
 function printHelp() {
   console.log([
     "Usage:",
-    "  node scripts/prepare-aliyun-release-artifacts.mjs [--env-file path] [--cloud-confirmations path] [--out-dir /tmp/path] [--skip-bundle] [--skip-vercel-env-coverage] [--vercel-env-coverage-input /tmp/vercel-env.json]",
+    "  node scripts/prepare-aliyun-release-artifacts.mjs [--env-file path] [--cloud-confirmations path] [--cloud-inventory-results path] [--out-dir /tmp/path] [--skip-bundle] [--skip-vercel-env-coverage] [--vercel-env-coverage-input /tmp/vercel-env.json]",
     "",
     "Creates non-secret production-cn release audit files and a Docker context tarball outside the repo by default.",
     "Vercel env coverage is metadata-only and non-blocking; it never includes values.",
