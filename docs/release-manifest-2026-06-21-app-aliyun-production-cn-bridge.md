@@ -699,6 +699,10 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 追加：`aliyun:operator:handoff` 现在输出结构化 `localEvidenceGaps`，把 `deploy/aliyun-production-cn.cloud-confirmations.local.json` 和 `deploy/aliyun-production-cn.image-publish.local.json` 的剩余 blocker 映射到具体 JSON path、控制台来源、期望证据和禁止写入的敏感值。当前生成结果显示云侧确认仍有 30 个 blocker、镜像/运行时发布仍有 16 个 blocker；该清单用于指导阿里云/微信/Apple 控制台抄录非密钥证据，不代表已经创建云资源、推送 ACR 镜像或导入 production-cn 密钥。同轮已执行 `node --check scripts/generate-aliyun-operator-handoff.mjs`、目标 eslint、`git diff --check`、`corepack pnpm aliyun:operator:handoff -- --skip-vercel-env-coverage`、`corepack pnpm aliyun:release:artifacts -- --skip-bundle --skip-vercel-env-coverage`、新增行密钥扫描和 `corepack pnpm aliyun:predeploy`，全部通过；`predeploy` 仍显示 health strict 只缺 `appWechatLogin`，APP API smoke `30 probes / 0 failures`。
 
+2026-06-22 追加：Chrome 只读核验阿里云控制台后确认当前账号可登录，SAE 概览应用列表为“暂无数据”；DNS `ipgongchang.xin` 搜索 `api-cn` 与 `assets-cn` 均为 `共 0 条`；OSS 存在 Bucket `meiye-service-records-20260611`，地域为 `oss-cn-beijing` / 华北2（北京）。据此加严 `aliyun:cloud:confirmations:strict` 的 OSS 校验：production-cn 目标地域必须是 `cn-hangzhou`，北京 Bucket 只能作为已发现资源证据，不能误判为本轮阿里云 production-cn ready。
+
+2026-06-22 追加：同步修正 `aliyun:cloud:access` 的 OSS 控制台证据清单，`expected.region` 固定为 production-cn 目标地域 `cn-hangzhou`，`oss-cn-beijing` 仅保留在本机 ignored `.local.json` 的只读发现证据里，避免操作交接时把北京 Bucket 当成可用目标。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：

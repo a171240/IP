@@ -552,9 +552,12 @@ corepack pnpm aliyun:domain:strict
 
 ### 4.4 OSS
 
+当前 Chrome 只读核验看到的 OSS Bucket 是 `meiye-service-records-20260611`，地域为 `oss-cn-beijing` / 华北2（北京）。这说明账号下已有服务记录相关 Bucket，但它不满足当前 production-cn 主部署目标 `cn-hangzhou` 的一致地域约束，不能直接作为正式 ready 证据。
+
 需要确认：
 
 ```text
+Bucket 地域为 cn-hangzhou
 Bucket 私有读
 服务端使用短期签名 URL
 CORS 允许 APP 上传所需方法和 Header
@@ -978,13 +981,13 @@ path: deploy/aliyun-production-cn.cloud-confirmations.local.json
 runtime missing: confirmed
 apiDomainHttps missing: confirmed, dnsResolvedToAliyun, httpsEnabled, icpReady
 assetDomainHttps missing: confirmed, dnsResolvedToAliyun, httpsEnabled, icpReady
-oss missing: confirmed, corsConfigured, ramLeastPrivilege
+oss missing: confirmed, region=cn-hangzhou, corsConfigured, ramLeastPrivilege
 wechatOpenPlatform missing: confirmed, mobileAppIdReady, mobileAppSecretReady, androidSignature, androidConfigured, iosUniversalLink, iosConfigured, reviewStatus=approved
 envImport missing: confirmed, secretNotInImage
 slsAlerts missing: confirmed, healthAlertConfigured, serverErrorAlertConfigured
 ```
 
-`APP_ASSET_BASE_URL` 已按 `https://assets-cn.ipgongchang.xin` 写入本地配置，但资产域名、HTTPS/ICP 和 OSS/CDN 仍未人工确认为 production ready；`assetDomainHttps` 必须单独确认，不能复用 `apiDomainHttps` 的证据。
+`APP_ASSET_BASE_URL` 已按 `https://assets-cn.ipgongchang.xin` 写入本地配置，但资产域名、HTTPS/ICP 和 OSS/CDN 仍未人工确认为 production ready；`assetDomainHttps` 必须单独确认，不能复用 `apiDomainHttps` 的证据。`corepack pnpm aliyun:cloud:confirmations:strict` 现在也会校验 OSS region 必须为 `cn-hangzhou`，北京 Bucket 只能作为“已发现资源但未满足目标地域”的证据。
 
 最新发布审计产物：
 

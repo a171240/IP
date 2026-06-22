@@ -12,6 +12,7 @@ const DEFAULT_LOCAL_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cl
 const EXPECTED_WECHAT_MOBILE_APP_NAME = "美业话镜"
 const EXPECTED_ANDROID_PACKAGE_NAME = "com.ipgongchang.meiyehuajing"
 const EXPECTED_IOS_BUNDLE_ID = "com.ipgongchang.meiyehuajing"
+const EXPECTED_ALIYUN_REGION = "cn-hangzhou"
 
 const DEFINITIONS = [
   {
@@ -68,6 +69,9 @@ const DEFINITIONS = [
     validate: (item, mode) => {
       const blockers = []
       if (mode === "local" && item.confirmed !== true) blockers.push("confirmed")
+      if (mode === "local" && String(item.region || "").trim() !== EXPECTED_ALIYUN_REGION) {
+        blockers.push(`region=${EXPECTED_ALIYUN_REGION}`)
+      }
       if (mode === "local" && item.corsConfigured !== true) blockers.push("corsConfigured")
       if (mode === "local" && item.ramLeastPrivilege !== true) blockers.push("ramLeastPrivilege")
       if (String(item.serviceRecordPrefix || "").trim() !== "service-records/production-cn") {

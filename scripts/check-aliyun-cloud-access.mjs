@@ -13,6 +13,8 @@ const DEFAULT_RUNTIME_PLAN_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-productio
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
 const DEFAULT_IMAGE_PUBLISH_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.image-publish.local.json")
 const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
+const EXPECTED_ALIYUN_REGION = "cn-hangzhou"
+const EXPECTED_SERVICE_RECORD_OSS_PREFIX = "service-records/production-cn"
 
 const SECRET_VALUE_PATTERNS = [
   /sk-[A-Za-z0-9_-]{20,}/,
@@ -153,7 +155,7 @@ function buildConsoleChecklist(runtimePlan, cloudConfirmations, imagePublish) {
       consolePath: "阿里云控制台 -> SAE -> cn-hangzhou -> 应用列表",
       expected: {
         provider: "SAE",
-        region: target.region || "cn-hangzhou",
+        region: target.region || EXPECTED_ALIYUN_REGION,
         appName: target.appName || "meiye-huajing-app-api-production-cn",
         containerPort: target.containerPort || 3000,
         healthPath: target.healthPath || "/api/healthz",
@@ -168,7 +170,7 @@ function buildConsoleChecklist(runtimePlan, cloudConfirmations, imagePublish) {
       consolePath: "阿里云控制台 -> 容器镜像服务 ACR -> cn-hangzhou -> 命名空间/仓库",
       expected: {
         provider: "Aliyun ACR",
-        region: acr.region || "cn-hangzhou",
+        region: acr.region || EXPECTED_ALIYUN_REGION,
         repository: image.repository || acr.repository || "meiye-huajing-app-api",
         tag: image.tag || acr.remoteTag || "production-cn",
         localTag: localImage.localTag || image.localImage || "meiye-huajing-app-api:production-cn",
@@ -215,8 +217,8 @@ function buildConsoleChecklist(runtimePlan, cloudConfirmations, imagePublish) {
       title: "服务记录音频 OSS、CORS、RAM 最小权限",
       consolePath: "阿里云控制台 -> OSS Bucket / RAM 访问控制",
       expected: {
-        region: cloudItems.oss?.region || "cn-hangzhou",
-        serviceRecordPrefix: cloudItems.oss?.serviceRecordPrefix || "service-records/production-cn",
+        region: EXPECTED_ALIYUN_REGION,
+        serviceRecordPrefix: EXPECTED_SERVICE_RECORD_OSS_PREFIX,
       },
       currentLocalEvidence: cloudItems.oss?.evidence || "",
       writeTo: "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss",
@@ -298,7 +300,7 @@ function main() {
     },
     targets: {
       provider: runtimePlan?.target?.provider || "SAE",
-      region: runtimePlan?.target?.region || "cn-hangzhou",
+      region: runtimePlan?.target?.region || EXPECTED_ALIYUN_REGION,
       appName: runtimePlan?.target?.appName || "meiye-huajing-app-api-production-cn",
       apiHost: runtimePlan?.domains?.apiHost || "api-cn.ipgongchang.xin",
       assetHost: runtimePlan?.domains?.assetHost || "assets-cn.ipgongchang.xin",

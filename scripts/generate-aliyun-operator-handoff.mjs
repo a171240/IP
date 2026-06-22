@@ -491,6 +491,7 @@ function expectedCloudEvidence(key, blocker) {
     bucket: "填实际 OSS Bucket 名称或控制台证据编号。",
     importedAt: "填实际导入 production-cn env 的时间或控制台证据编号。",
     evidence: "填控制台路径、截图编号、工单号或其它非密钥证据编号。",
+    region: "填 cn-hangzhou；当前 production-cn 运行时、ACR 和 OSS 证据必须使用同一目标地域。",
     slsProject: "填实际 SLS Project 名称或控制台证据编号。",
     secretNotInImage: "确认密钥只在 SAE/KMS/Secrets Manager 中，未写入镜像后填 true。",
   }

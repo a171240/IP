@@ -307,6 +307,7 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan }) {
       "在 cloud-confirmations.local.json 的 oss 项记录 Bucket、region 和非密钥证据。",
     ],
     evidence: [
+      "region=cn-hangzhou",
       "corsConfigured=true",
       "ramLeastPrivilege=true",
       "serviceRecordPrefix=service-records/production-cn",

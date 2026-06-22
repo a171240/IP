@@ -17,6 +17,8 @@ const DEPLOYMENT_SPEC_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.
 const EXPECTED_WECHAT_MOBILE_APP_NAME = "美业话镜"
 const EXPECTED_ANDROID_PACKAGE_NAME = "com.ipgongchang.meiyehuajing"
 const EXPECTED_IOS_BUNDLE_ID = "com.ipgongchang.meiyehuajing"
+const EXPECTED_ALIYUN_REGION = "cn-hangzhou"
+const EXPECTED_SERVICE_RECORD_OSS_PREFIX = "service-records/production-cn"
 
 const REQUIRED_ENV_KEYS = [
   "APP_ENV",
@@ -250,8 +252,12 @@ const CLOUD_CONFIRMATION_ITEMS = [
     requiredFields: ["bucket", "region", "corsConfigured", "ramLeastPrivilege", "serviceRecordPrefix", "evidence"],
     validate: (item) => {
       const missing = []
+      if (String(item.region || "").trim() !== EXPECTED_ALIYUN_REGION) missing.push(`region=${EXPECTED_ALIYUN_REGION}`)
       if (item.corsConfigured !== true) missing.push("corsConfigured")
       if (item.ramLeastPrivilege !== true) missing.push("ramLeastPrivilege")
+      if (String(item.serviceRecordPrefix || "").trim() !== EXPECTED_SERVICE_RECORD_OSS_PREFIX) {
+        missing.push(`serviceRecordPrefix=${EXPECTED_SERVICE_RECORD_OSS_PREFIX}`)
+      }
       return missing
     },
   },
