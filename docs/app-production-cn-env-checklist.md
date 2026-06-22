@@ -8,6 +8,8 @@
 
 2026-06-22 17:31 CST 复核：现在仍不能部署。`corepack pnpm aliyun:user:actions` 当前为 `ready 0/9`，`corepack pnpm aliyun:resources:matrix` 当前为阿里云资源 `ready 0/7`。本机和 Vercel 可确认的是：本地后端容器镜像存在，APP API 桥接路由和本地 smoke 通过，Vercel production 只能提供旧后端变量名来源；阿里云 production-cn 仍缺云侧资源确认、密钥导入和移动 App 登录凭证。
 
+2026-06-22 20:37 CST 复核：本机已通过 Homebrew 安装阿里云 CLI，`aliyun version` 为 `3.3.23`，路径为 `/opt/homebrew/bin/aliyun`。`corepack pnpm aliyun:cloud:access` 当前不再报 `aliyun_cli_missing`，但仍报 `aliyun_cli_config_missing_or_unread` 与 `cloudshell_cli_config_missing_or_unread`；脚本未读取任何配置文件内容、未调用云 API、未创建或修改阿里云资源。该状态只表示本机具备后续只读 inventory 的 CLI 前置工具，不表示阿里云资源 ready。
+
 当前 Vercel production 只读覆盖检查 `corepack pnpm aliyun:vercel-env:coverage` 显示 required `17/26` 已存在，缺 `APP_ENV`、`APP_REGION`、`APP_API_BASE_URL`、`APP_ASSET_BASE_URL`、`NEXT_PUBLIC_SITE_URL`、`PRIVACY_POLICY_URL`、`TERMS_URL`、`WECHAT_OPEN_APP_ID`、`WECHAT_OPEN_APP_SECRET`。前 7 个是国内 APP/阿里云运行配置；后 2 个必须等微信开放平台移动应用创建并审核通过后获得。
 
 当前 `/tmp/meiye-aliyun-env-import-checklist.md` 由 `corepack pnpm aliyun:env:checklist` 生成，包含 63 个变量的导入目标和来源说明，不包含真实 value。当前本机 required env 是 `24/26` ready，后端必填阻塞只剩 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；`APPLE_TEAM_ID` 会单独出现在“APP 发布阻塞但非后端必填”分组，用于 iOS Universal Link / AASA 验收。上述状态不等于云侧环境变量已经导入阿里云。
@@ -95,6 +97,7 @@ corepack pnpm aliyun:console:runbook
 corepack pnpm aliyun:action:authorization
 corepack pnpm aliyun:wechat-open:package
 corepack pnpm aliyun:env:handoff
+corepack pnpm aliyun:cloud:access
 corepack pnpm aliyun:cloud:confirmations
 corepack pnpm aliyun:readiness
 corepack pnpm aliyun:predeploy

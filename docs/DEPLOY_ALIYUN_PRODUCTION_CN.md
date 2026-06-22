@@ -1135,6 +1135,8 @@ appClientContract: 40 audited calls / 34 unique client routes
 appApiSmokeCoverage: 29 / 29 business routes
 ```
 
+2026-06-22 20:37 CST 更新：本机已安装阿里云 CLI `3.3.23`（`/opt/homebrew/bin/aliyun`）。最新 `corepack pnpm aliyun:cloud:access` 不再报 `aliyun_cli_missing`，但仍报 `aliyun_cli_config_missing_or_unread` 与 `cloudshell_cli_config_missing_or_unread`；检查只报告配置文件是否存在，不读取配置文件内容，不调用云 API。阿里云云资源 ready 仍为 `0/7`，该安装只补齐后续只读 inventory 的本地工具前置，不代表 SAE/ACR/DNS/OSS/SLS/env import 已完成。
+
 本轮为 `--skip-bundle` 审计，未重新生成 context tar；Docker context 和镜像已由 `aliyun:docker:check`、`aliyun:docker:build`、`aliyun:container:smoke` 覆盖。
 
 2026-06-22 08:24 CST 更新：云确认模板从 6 项扩展为 7 项，新增 `assetDomainHttps`，用于单独确认 `assets-cn.ipgongchang.xin` 的 DNS、HTTPS 和 ICP 证据。`corepack pnpm aliyun:cloud:confirmations` 当前显示 example checkedItems=7 且模板通过，local checkedItems=7、totalBlockers=25；新增的 4 个 local blocker 是 `assetDomainHttps:confirmed`、`assetDomainHttps:dnsResolvedToAliyun`、`assetDomainHttps:httpsEnabled`、`assetDomainHttps:icpReady`。
