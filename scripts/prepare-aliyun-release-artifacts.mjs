@@ -195,6 +195,7 @@ function renderMarkdown(audit) {
   const legalPages = audit.checks.legalPages
   const imagePublishPlan = audit.checks.imagePublishPlan
   const operatorTasks = audit.checks.operatorTasks
+  const envHandoff = audit.checks.envHandoff
   const sensitiveBlockers = audit.checks.sensitiveBlockers
   const resourcesMatrix = audit.checks.resourcesMatrix
   const userActionBrief = audit.checks.userActionBrief
@@ -239,6 +240,7 @@ function renderMarkdown(audit) {
     `- operatorTasks: ${operatorTasks.summary.ready} / ${operatorTasks.summary.total} ready`,
     `- operatorHandoff: ${operatorHandoff.verdict}, missing required env ${operatorHandoff.missingVariables.required.length}`,
     `- productionStatus: ${productionStatus.verdict}, canDeployNow ${productionStatus.canDeployNow === true}`,
+    `- envHandoff: ${envHandoff.summary.requiredBlocking.length} required blocked, ${envHandoff.summary.appLaunchBlocking.length} app launch blocked, ${envHandoff.summary.readySecretEnv} ready secret env`,
     `- sensitiveActionItems: ${sensitiveBlockers.summary.total} total, ${sensitiveBlockers.summary.blocked} blocked`,
     `- aliyunResources: ${resourcesMatrix.summary.ready} / ${resourcesMatrix.summary.total} ready, ${resourcesMatrix.summary.blocked} blocked`,
     `- userActionBrief: ${userActionBrief.summary.ready} / ${userActionBrief.summary.total} ready, ${userActionBrief.summary.blocked} blocked`,
@@ -606,6 +608,19 @@ function renderMarkdown(audit) {
     `- requiredBlocking: ${env.planRequiredBlocking?.length ? env.planRequiredBlocking.join(", ") : "none"}`,
     "- per-variable fields: sensitivity, owner, consolePath, obtain, importTarget, cloudConfirmationKey",
     "",
+    "## 环境变量获取与导入手册",
+    "",
+    `- json: ${audit.outputFiles.envHandoffJson}`,
+    `- markdown: ${audit.outputFiles.envHandoffMarkdown}`,
+    `- ok: ${envHandoff.ok === true}`,
+    `- containsValues: ${envHandoff.containsValues === false ? "false" : "unknown"}`,
+    `- secretLeakCheck: ${envHandoff.secretLeakCheck?.ok === true}`,
+    `- requiredBlocking: ${envHandoff.summary.requiredBlocking.length ? envHandoff.summary.requiredBlocking.join(", ") : "none"}`,
+    `- appLaunchBlocking: ${envHandoff.summary.appLaunchBlocking.length ? envHandoff.summary.appLaunchBlocking.join(", ") : "none"}`,
+    `- readyPlainEnv: ${envHandoff.summary.readyPlainEnv}`,
+    `- readySecretEnv: ${envHandoff.summary.readySecretEnv}`,
+    `- deferred: ${envHandoff.summary.deferred}`,
+    "",
     "## Vercel production 变量名覆盖",
     "",
     vercelEnvCoverage?.ok
@@ -696,6 +711,8 @@ function main() {
   ])
   const operatorTasksJsonPath = resolve(args.outDir, "operator-tasks.json")
   const operatorTasksMarkdownPath = resolve(args.outDir, "operator-tasks.md")
+  const envHandoffJsonPath = resolve(args.outDir, "env-handoff.json")
+  const envHandoffMarkdownPath = resolve(args.outDir, "env-handoff.md")
   const sensitiveBlockersJsonPath = resolve(args.outDir, "sensitive-blockers.json")
   const sensitiveBlockersMarkdownPath = resolve(args.outDir, "sensitive-blockers.md")
   const resourcesMatrixJsonPath = resolve(args.outDir, "resource-matrix.json")
@@ -722,6 +739,15 @@ function main() {
     operatorTasksJsonPath,
     "--markdown",
     operatorTasksMarkdownPath,
+  ])
+  const envHandoff = runJson("env_handoff", [
+    "scripts/summarize-aliyun-env-handoff.mjs",
+    "--env-file",
+    args.envFile,
+    "--out",
+    envHandoffJsonPath,
+    "--markdown",
+    envHandoffMarkdownPath,
   ])
   const sensitiveBlockers = runJson("sensitive_blockers", [
     "scripts/summarize-aliyun-sensitive-blockers.mjs",
@@ -838,6 +864,7 @@ function main() {
       legalPages,
       imagePublishPlan,
       operatorTasks,
+      envHandoff,
       sensitiveBlockers,
       resourcesMatrix,
       userActionBrief,
@@ -860,6 +887,8 @@ function main() {
       auditMarkdown: resolve(args.outDir, "release-audit.md"),
       envImportPlan: resolve(args.outDir, "env-import-plan.json"),
       envImportChecklist: resolve(args.outDir, "env-import-checklist.md"),
+      envHandoffJson: envHandoffJsonPath,
+      envHandoffMarkdown: envHandoffMarkdownPath,
       vercelEnvCoverage: vercelEnvCoverage.ok ? resolve(args.outDir, "vercel-env-coverage.json") : null,
       domainReadiness: resolve(args.outDir, "domain-readiness.json"),
       cloudAccess: cloudAccessPath,
@@ -979,6 +1008,19 @@ function main() {
       operatorTasks: productionStatus.summary.operatorTasks || {},
       sensitiveActionItems: productionStatus.summary.sensitiveActionItems || {},
       cloudConfirmations: productionStatus.summary.cloudConfirmations || {},
+    },
+    envHandoff: {
+      report: audit.outputFiles.envHandoffJson,
+      markdown: audit.outputFiles.envHandoffMarkdown,
+      ok: envHandoff.ok === true,
+      containsValues: envHandoff.containsValues === true,
+      secretLeakCheck: envHandoff.secretLeakCheck?.ok === true,
+      requiredBlocking: envHandoff.summary.requiredBlocking,
+      appLaunchBlocking: envHandoff.summary.appLaunchBlocking,
+      readyPlainEnv: envHandoff.summary.readyPlainEnv,
+      readySecretEnv: envHandoff.summary.readySecretEnv,
+      deferred: envHandoff.summary.deferred,
+      acquisitionOrder: envHandoff.acquisitionOrder.map((item) => `${item.name}:${item.reason}`),
     },
     sensitiveBlockers: {
       report: audit.outputFiles.sensitiveBlockersJson,
@@ -1134,6 +1176,8 @@ function main() {
     auditMarkdown: audit.outputFiles.auditMarkdown,
     envImportPlan: audit.outputFiles.envImportPlan,
     envImportChecklist: audit.outputFiles.envImportChecklist,
+    envHandoffJson: audit.outputFiles.envHandoffJson,
+    envHandoffMarkdown: audit.outputFiles.envHandoffMarkdown,
     vercelEnvCoverageReport: audit.outputFiles.vercelEnvCoverage,
     domainReadinessReport: audit.outputFiles.domainReadiness,
     cloudAccessReport: audit.outputFiles.cloudAccess,
