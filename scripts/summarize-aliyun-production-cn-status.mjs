@@ -124,6 +124,7 @@ function buildStatus({ readiness, operatorTasks, args }) {
   const docker = readiness.checks?.docker || null
   const bridgeDataLayer = readiness.checks?.bridgeDataLayer || null
   const wechatReviewStatus = readiness.checks?.wechatOpenPlatform?.reviewStatus || "unknown"
+  const sensitiveActionItems = operatorTasks.sensitiveActionItems || []
 
   const verdict = readiness.productionReady ? "ready_to_deploy_after_authorization" : "blocked"
   const canDeployNow = false
@@ -145,6 +146,7 @@ function buildStatus({ readiness, operatorTasks, args }) {
     `阿里云云资源确认：${cloudReady.ready}/${cloudReady.total} ready；还缺 SAE、DNS/HTTPS/ICP、OSS/CORS/RAM、微信开放平台 approved、env import、SLS 中未完成项。`,
     `域名门禁：${operatorTasks.domain?.ok ? "ready" : "blocked"}；当前 api-cn/assets-cn 仍未证明解析到阿里云 HTTPS 入口。`,
     `镜像发布计划：${imagePlan?.ready ? "ready" : "blocked"}；本地 Docker 镜像 ${imagePlan?.localDockerImage?.status || operatorTasks.imagePublishPlan?.localDockerImage || "unknown"}，ACR/runtime 拉取证据未完成。`,
+    `密钥/密码/付款类人工介入项：${sensitiveActionItems.length} 项；脚本只输出变量名、控制台路径和动作，不输出任何 value。`,
   ]
 
   return {
@@ -171,6 +173,11 @@ function buildStatus({ readiness, operatorTasks, args }) {
       requiredBlocking: missingRequiredEnv,
       machineBlocking,
       manualBlocking,
+      sensitiveActionItems: {
+        total: sensitiveActionItems.length,
+        blocked: sensitiveActionItems.filter((item) => item.status !== "ready").length,
+        types: Array.from(new Set(sensitiveActionItems.map((item) => item.type))).sort(),
+      },
       bridgeDataLayer,
       operatorTasks: operatorTasks.summary || {},
       cloudConfirmations: cloudReady,
@@ -233,6 +240,7 @@ function buildStatus({ readiness, operatorTasks, args }) {
       ready: readyTasks.map(compactTask),
       notReady: notReadyTasks.map(compactTask),
       keyBlocked: [wechatTask, domainTask, envTask].filter(Boolean).map(compactTask),
+      sensitiveActionItems: sensitiveActionItems.map(compactSensitiveActionItem),
       legal: legalTask ? compactTask(legalTask) : null,
       waitingWechatReview: wechatTask?.status === "waiting_wechat_review" ? compactTask(wechatTask) : null,
     },
@@ -252,6 +260,21 @@ function buildStatus({ readiness, operatorTasks, args }) {
   }
 }
 
+function compactSensitiveActionItem(item) {
+  return {
+    id: item.id,
+    type: item.type,
+    status: item.status,
+    owner: item.owner,
+    consolePath: item.consolePath,
+    variableNames: item.variableNames || [],
+    variableGroupCount: Array.isArray(item.variableGroups) ? item.variableGroups.length : 0,
+    requiredUserAction: item.requiredUserAction,
+    unblockCondition: item.unblockCondition,
+    forbidden: item.forbidden,
+  }
+}
+
 function renderMarkdown(status) {
   const lines = [
     "# 美业话镜 APP production-cn 状态摘要",
@@ -266,6 +289,7 @@ function renderMarkdown(status) {
     `- Missing required env: ${status.summary.requiredBlocking.length ? status.summary.requiredBlocking.join(", ") : "none"}`,
     `- Operator tasks: ready ${status.summary.operatorTasks.ready || 0}/${status.summary.operatorTasks.total || 0}, blocked ${status.summary.operatorTasks.blocked || 0}, waiting_wechat_review ${status.summary.operatorTasks.waitingWechatReview || 0}, pending_cloud ${status.summary.operatorTasks.pendingCloud || 0}, waiting_for_deploy ${status.summary.operatorTasks.waitingForDeploy || 0}`,
     `- Cloud confirmations: ${status.summary.cloudConfirmations.ready}/${status.summary.cloudConfirmations.total} ready`,
+    `- Sensitive action items: ${status.summary.sensitiveActionItems.total} total, ${status.summary.sensitiveActionItems.blocked} blocked`,
     `- Bridge data layer: ${status.summary.bridgeDataLayer?.current || "unknown"} -> ${status.summary.bridgeDataLayer?.target || "unknown"} (${status.summary.bridgeDataLayer?.status || "unknown"})`,
     "",
     "## Human Summary",
@@ -281,6 +305,21 @@ function renderMarkdown(status) {
       `- Owner: ${task.owner}`,
       `- Console path: ${task.consolePath}`,
       `- Blockers: ${task.blockerCodes.length ? task.blockerCodes.join(", ") : "none"}`,
+      "",
+    ]),
+    "## Sensitive / Payment Action Items",
+    "",
+    ...status.tasks.sensitiveActionItems.flatMap((item) => [
+      `### ${item.id}`,
+      "",
+      `- Type: ${item.type}`,
+      `- Status: ${item.status}`,
+      `- Owner: ${item.owner}`,
+      `- Console path: ${item.consolePath}`,
+      `- Variables: ${item.variableNames.length ? item.variableNames.join(", ") : "none"}`,
+      `- Action: ${item.requiredUserAction}`,
+      `- Unblock: ${item.unblockCondition}`,
+      `- Forbidden: ${item.forbidden}`,
       "",
     ]),
     "## Next Command Order",

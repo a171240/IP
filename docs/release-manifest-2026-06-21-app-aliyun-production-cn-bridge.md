@@ -721,6 +721,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 14:01 CST 追加：在上述 `.dockerignore` 门禁后重新执行 `corepack pnpm aliyun:docker:build`，Docker build context 为约 `1.06MB`，生产镜像 `meiye-huajing-app-api:production-cn` 重新构建成功，manifest digest 为 `sha256:494907a4f9e7342064dda55fe30e0e48dd245b6d6ae753bdbb3945f77c0f518d`。随后执行 `corepack pnpm aliyun:container:smoke` 通过：容器从 `/Users/Admin/Documents/美业话镜APP/.env.production-cn.local` 的临时 sanitized copy 启动，临时 env 文件已删除，health / app health 只缺 `appWechatLogin`，strict health 返回 `503`，APP API smoke 共 `30` 个 probe 覆盖 account/auth/context/invites/service-records/store-admin，结果符合微信开放平台审核中的预期。该 digest 只证明本地 production-cn 镜像 ready，不代表已推送 ACR 或 SAE 已配置拉取。
 
+2026-06-22 14:06 CST 追加：`aliyun:operator:tasks`、`aliyun:status` 和 `aliyun:operator:handoff` 新增结构化 `sensitiveActionItems`，专门列出仍需用户介入的密钥、密码、token 或付款动作，不输出任何真实 value。当前输出 6 项 blocked：微信开放平台移动应用审核通过后的 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；Apple Developer 的 `APPLE_TEAM_ID`；ACR 企业版经济版 `cn-hangzhou` 1 个月 `CNY 117.00` 付款确认；ACR/SAE 镜像拉取认证；OSS RAM Secret 或 STS 注入；以及本地已有 ready 值但尚未导入阿里云运行环境的敏感/连接类变量组。`status.humanSummary` 会直接显示该数量，操作包 Markdown 也会单独列出每项的控制台路径、解除条件和禁止事项，方便发布负责人先判断哪些事情必须由用户或控制台操作员介入。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：

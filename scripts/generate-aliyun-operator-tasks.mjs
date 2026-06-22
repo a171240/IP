@@ -428,6 +428,140 @@ function summarizeTasks(tasks) {
   }
 }
 
+function buildSensitiveActionItems({ envPlan, readiness, imagePublishPlan }) {
+  const variables = envPlan.variables || []
+  const envImport = readiness.checks?.cloudConfirmations?.items?.find((item) => item.key === "envImport")
+  const oss = readiness.checks?.cloudConfirmations?.items?.find((item) => item.key === "oss")
+  const wechatOpenPlatform = readiness.checks?.wechatOpenPlatform || {}
+  const wechatMissing = variables.filter((item) =>
+    categoryOf(item) === "wechat_open_platform" &&
+    item.status !== "ready"
+  )
+  const appleTeamId = variables.find((item) => item.name === "APPLE_TEAM_ID")
+  const readySecretGroups = groupReadySensitiveVariables(variables)
+  const items = []
+
+  if (wechatMissing.length > 0 || wechatOpenPlatform.reviewStatus !== "approved") {
+    items.push({
+      id: "S01_WECHAT_OPEN_APP_LOGIN",
+      type: "external_secret_after_review",
+      status: wechatOpenPlatform.reviewStatus === "approved" && wechatMissing.length === 0 ? "ready" : "blocked",
+      owner: "用户/微信开放平台操作员",
+      consolePath: "微信开放平台 -> 管理中心 -> 移动应用 -> 美业话镜 App",
+      variableNames: Array.from(new Set([
+        ...wechatMissing.map((item) => item.name),
+        "WECHAT_OPEN_APP_ID",
+        "WECHAT_OPEN_APP_SECRET",
+      ])),
+      requiredUserAction: "等待移动应用审核通过后读取 AppID/AppSecret，并只导入阿里云 KMS/Secrets Manager/SAE secret env。",
+      unblockCondition: "reviewStatus=approved 且 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET ready。",
+      forbidden: "不能用小程序 AppID/Secret 替代，不能把 AppSecret 写入文档、镜像或 git。",
+    })
+  }
+
+  if (!appleTeamId || appleTeamId.status !== "ready") {
+    items.push({
+      id: "S02_APPLE_TEAM_ID",
+      type: "external_identifier",
+      status: "blocked",
+      owner: "Apple Developer / iOS 发布操作员",
+      consolePath: appleTeamId?.consolePath || "Apple Developer -> Membership",
+      variableNames: ["APPLE_TEAM_ID"],
+      requiredUserAction: "从 Apple Developer 确认 10 位 Team ID 后导入阿里云 plain env，用于 AASA appID。",
+      unblockCondition: "APPLE_TEAM_ID ready 且 aliyun:aasa:check 不再报 apple_team_id_missing。",
+      forbidden: "不要猜测 Team ID；需与 iOS Bundle ID com.ipgongchang.meiyehuajing 一致。",
+    })
+  }
+
+  const purchaseCandidate = imagePublishPlan?.local?.acr?.purchaseCandidate
+  if (purchaseCandidate && purchaseCandidate.confirmed !== true) {
+    items.push({
+      id: "S03_ACR_PAID_PURCHASE",
+      type: "paid_purchase_confirmation",
+      status: "blocked",
+      owner: "用户/阿里云 ACR 操作员",
+      consolePath: "阿里云控制台 -> 容器镜像服务 ACR -> 企业版购买页",
+      variableNames: [],
+      requiredUserAction: `确认是否购买 ${purchaseCandidate.edition} / ${purchaseCandidate.region} / ${purchaseCandidate.duration} / ${purchaseCandidate.quotedAmount}。`,
+      unblockCondition: "完成 ACR 企业版实例购买并创建 namespace/repository 后，填入非密钥 registry/image/digest 证据。",
+      forbidden: "未获得动作前确认时，不点击付款，不把 registry 密码写入 JSON、文档或 git。",
+    })
+  }
+
+  if (imagePublishPlan?.ready !== true) {
+    items.push({
+      id: "S04_ACR_REGISTRY_AUTH",
+      type: "registry_password_or_runtime_pull_secret",
+      status: "blocked",
+      owner: "阿里云 ACR/SAE 操作员",
+      consolePath: "阿里云控制台 -> ACR 命名空间/镜像仓库；SAE 应用 -> 镜像拉取配置",
+      variableNames: [],
+      requiredUserAction: "ACR 实例 ready 后，通过 docker credential helper、RAM、或 SAE 运行时镜像拉取配置完成认证。",
+      unblockCondition: "imagePushed=true、digestVerified=true、runtime.remoteImageConfigured=true、runtime.imagePullConfigured=true。",
+      forbidden: "registry username/password、RAM Secret、token 不能写入 image-publish.local.json、Docker 镜像、文档或 git。",
+    })
+  }
+
+  if (!oss?.ready) {
+    items.push({
+      id: "S05_OSS_RAM_SECRET_OR_STS",
+      type: "ram_secret_or_sts_import",
+      status: "blocked",
+      owner: "阿里云 OSS/RAM 操作员",
+      consolePath: "阿里云控制台 -> RAM 访问控制 / OSS Bucket / SAE 环境变量或 Secrets Manager",
+      variableNames: ["ALIYUN_OSS_ACCESS_KEY_ID", "ALIYUN_OSS_ACCESS_KEY_SECRET", "ALIYUN_OSS_SECURITY_TOKEN"],
+      requiredUserAction: "把已创建的 OSS 最小权限策略绑定到实际运行身份，并选择受限 AccessKey 或 STS/运行时角色注入方案。",
+      unblockCondition: "oss.ramLeastPrivilege=true，且对应 secret/token 只通过阿里云密钥环境注入。",
+      forbidden: "不创建可提交的长期明文 Secret；不把 AccessKeySecret 或 STS token 写入仓库、文档或镜像。",
+    })
+  }
+
+  if (!envImport?.ready && readySecretGroups.length > 0) {
+    items.push({
+      id: "S06_READY_SENSITIVE_ENV_IMPORT",
+      type: "ready_sensitive_env_need_cloud_import",
+      status: "blocked",
+      owner: "阿里云运行环境/密钥操作员",
+      consolePath: "阿里云 SAE 应用 -> 环境变量 / KMS / Secrets Manager",
+      variableGroups: readySecretGroups,
+      variableNames: readySecretGroups.flatMap((group) => group.variableNames),
+      requiredUserAction: "这些敏感或连接类变量名在本地已有 ready 值，但仍需导入阿里云运行环境；脚本只输出变量名，不输出值。",
+      unblockCondition: "envImport.confirmed=true 且 envImport.secretNotInImage=true。",
+      forbidden: "不要把任何 value 复制到文档、release manifest、Dockerfile、image 或 git。",
+    })
+  }
+
+  return items
+}
+
+function groupReadySensitiveVariables(variables) {
+  const groups = new Map()
+  for (const item of variables) {
+    if (item.status !== "ready") continue
+    if (item.sensitivity === "public") continue
+    if (item.cloudConfirmationKey !== "envImport" && item.cloudConfirmationKey !== "oss") continue
+    const category = categoryOf(item)
+    const key = `${category}:${item.importTarget}`
+    const existing = groups.get(key) || {
+      category,
+      owner: item.owner,
+      importTarget: item.importTarget,
+      variableNames: [],
+    }
+    existing.variableNames.push(item.name)
+    groups.set(key, existing)
+  }
+  return Array.from(groups.values()).map((group) => ({
+    ...group,
+    count: group.variableNames.length,
+    variableNames: group.variableNames.sort(),
+  }))
+}
+
+function categoryOf(item) {
+  return item.sourceCategory || item.category || "unknown"
+}
+
 function defaultBridgeDataLayer() {
   return {
     current: "Supabase",
@@ -458,6 +592,7 @@ function renderMarkdown(report) {
     `- env requiredReady: ${report.env.summary.requiredReady} / ${report.env.summary.requiredTotal}`,
     `- tasks ready: ${report.summary.ready} / ${report.summary.total}`,
     `- waitingWechatReview: ${report.summary.waitingWechatReview}`,
+    `- sensitiveActionItems: ${report.sensitiveActionItems.length}`,
     `- bridgeDataLayer: ${report.bridgeDataLayer.current} -> ${report.bridgeDataLayer.target}`,
     "",
     "## 当前阻塞",
@@ -492,6 +627,24 @@ function renderMarkdown(report) {
           "",
         ])
       : ["- requiredBlocking: none", ""]),
+    "",
+    "## 密钥/密码/付款类人工介入项",
+    "",
+    ...(report.sensitiveActionItems.length
+      ? report.sensitiveActionItems.flatMap((item) => [
+          `### ${item.id}`,
+          "",
+          `- type: ${item.type}`,
+          `- status: ${item.status}`,
+          `- owner: ${item.owner}`,
+          `- consolePath: ${item.consolePath}`,
+          `- variableNames: ${(item.variableNames || []).length ? item.variableNames.join(", ") : "none"}`,
+          `- requiredUserAction: ${item.requiredUserAction}`,
+          `- unblockCondition: ${item.unblockCondition}`,
+          `- forbidden: ${item.forbidden}`,
+          "",
+        ])
+      : ["- none", ""]),
     "",
     "## 数据层桥接状态",
     "",
@@ -569,12 +722,14 @@ function main() {
     "--allow-incomplete",
   ])
   const tasks = buildTasks({ envPlan, readiness, domain, cloudConfirmations, imagePublishPlan })
+  const sensitiveActionItems = buildSensitiveActionItems({ envPlan, readiness, imagePublishPlan })
   const report = {
     generatedAt: new Date().toISOString(),
     containsValues: false,
     envFile: args.envFile,
     cloudConfirmationsFile: existsSync(args.cloudConfirmationsFile) ? args.cloudConfirmationsFile : null,
     summary: summarizeTasks(tasks),
+    sensitiveActionItems,
     readiness: {
       productionReady: readiness.productionReady,
       localCodeReady: readiness.localCodeReady,

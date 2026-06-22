@@ -338,6 +338,7 @@ function buildHandoff({
       optionalDeferred: optionalDeferredVariables,
     },
     appLaunchBlocking,
+    sensitiveActionItems: operatorTasks.sensitiveActionItems || status.tasks?.sensitiveActionItems || [],
     userActionNow: [
       {
         title: "等待微信开放平台移动应用审核通过",
@@ -723,6 +724,12 @@ function renderMarkdown(handoff) {
     "## 优先任务",
     "",
     ...handoff.priorityTasks.flatMap((task) => renderTask(task)),
+    "## 密钥/密码/付款类人工介入项",
+    "",
+    ...(handoff.sensitiveActionItems.length
+      ? handoff.sensitiveActionItems.flatMap((item) => renderSensitiveActionItem(item))
+      : ["- none", ""]),
+    "",
     "## 下一组验证命令",
     "",
     ...handoff.nextCommandOrder.map((command) => `- \`${command}\``),
@@ -732,6 +739,25 @@ function renderMarkdown(handoff) {
     ...handoff.safetyBoundary.map((item) => `- ${item}`),
   ]
   return `${lines.join("\n")}\n`
+}
+
+function renderSensitiveActionItem(item) {
+  return [
+    `### ${item.id}`,
+    "",
+    `- type: ${item.type}`,
+    `- status: ${item.status}`,
+    `- owner: ${item.owner}`,
+    `- consolePath: ${item.consolePath}`,
+    `- variables: ${(item.variableNames || []).length ? item.variableNames.join(", ") : "none"}`,
+    item.variableGroups?.length
+      ? `- variableGroups: ${item.variableGroups.map((group) => `${group.category || "unknown"}:${group.count}`).join(", ")}`
+      : "",
+    `- action: ${item.requiredUserAction}`,
+    `- unblock: ${item.unblockCondition}`,
+    `- forbidden: ${item.forbidden}`,
+    "",
+  ].filter(Boolean)
 }
 
 function renderEvidenceGap(item) {

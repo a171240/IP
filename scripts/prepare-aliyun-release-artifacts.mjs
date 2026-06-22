@@ -233,6 +233,7 @@ function renderMarkdown(audit) {
     `- operatorTasks: ${operatorTasks.summary.ready} / ${operatorTasks.summary.total} ready`,
     `- operatorHandoff: ${operatorHandoff.verdict}, missing required env ${operatorHandoff.missingVariables.required.length}`,
     `- productionStatus: ${productionStatus.verdict}, canDeployNow ${productionStatus.canDeployNow === true}`,
+    `- sensitiveActionItems: ${productionStatus.summary?.sensitiveActionItems?.total || operatorHandoff.sensitiveActionItems?.length || 0}`,
     `- cloudConfirmations: ${cloudConfirmations?.ready ? "ready" : "not ready"}`,
     `- cloudConfirmationsCheck: template ${cloudConfirmationsCheck?.template?.ready ? "ready" : "not ready"}, local ${cloudConfirmationsCheck?.local?.ready ? "ready" : "not ready"}`,
     `- vercelEnvCoverage: ${vercelEnvCoverage?.ok ? "ok" : vercelEnvCoverage?.skipped ? "skipped" : "not ok"}`,
@@ -380,6 +381,7 @@ function renderMarkdown(audit) {
     `- blocked: ${operatorTasks.summary.blocked}`,
     `- waitingWechatReview: ${operatorTasks.summary.waitingWechatReview || 0}`,
     `- pendingCloud: ${operatorTasks.summary.pendingCloud}`,
+    `- sensitiveActionItems: ${operatorTasks.sensitiveActionItems?.length || 0}`,
     "",
     "## 操作员操作包",
     "",
@@ -391,6 +393,7 @@ function renderMarkdown(audit) {
     `- appLaunchBlockingVariables: ${operatorHandoff.appLaunchBlocking.variables.length ? operatorHandoff.appLaunchBlocking.variables.map((item) => item.name).join(", ") : "none"}`,
     `- appLaunchBlockingStates: ${operatorHandoff.appLaunchBlocking.states.length ? operatorHandoff.appLaunchBlocking.states.map((item) => `${item.name}:${item.status}`).join(", ") : "none"}`,
     `- optionalDeferredEnv: ${operatorHandoff.missingVariables.optionalDeferred.length}`,
+    `- sensitiveActionItems: ${operatorHandoff.sensitiveActionItems?.length || 0}`,
     "",
     "## 发布负责人状态总览",
     "",
@@ -400,6 +403,7 @@ function renderMarkdown(audit) {
     `- canDeployNow: ${productionStatus.canDeployNow === true}`,
     `- requiredEnv: ${productionStatus.summary.requiredReady} / ${productionStatus.summary.requiredTotal}`,
     `- requiredBlocking: ${productionStatus.summary.requiredBlocking?.length ? productionStatus.summary.requiredBlocking.join(", ") : "none"}`,
+    `- sensitiveActionItems: ${productionStatus.summary.sensitiveActionItems?.total || 0} total, ${productionStatus.summary.sensitiveActionItems?.blocked || 0} blocked`,
     ...(productionStatus.humanSummary?.length
       ? productionStatus.humanSummary.map((item) => `- ${item}`)
       : ["- humanSummary: none"]),
@@ -786,6 +790,7 @@ function main() {
       requiredBlocking: productionStatus.summary.requiredBlocking || [],
       bridgeDataLayer: productionStatus.summary.bridgeDataLayer || null,
       operatorTasks: productionStatus.summary.operatorTasks || {},
+      sensitiveActionItems: productionStatus.summary.sensitiveActionItems || {},
       cloudConfirmations: productionStatus.summary.cloudConfirmations || {},
     },
     operatorHandoff: {
@@ -797,6 +802,7 @@ function main() {
       appLaunchBlockingVariables: operatorHandoff.appLaunchBlocking.variables.map((item) => item.name),
       appLaunchBlockingStates: operatorHandoff.appLaunchBlocking.states.map((item) => `${item.name}:${item.status}`),
       optionalDeferredEnv: operatorHandoff.missingVariables.optionalDeferred.map((item) => item.name),
+      sensitiveActionItems: (operatorHandoff.sensitiveActionItems || []).map((item) => `${item.id}:${item.status}`),
       bridgeDataLayer: operatorHandoff.bridgeDataLayer || null,
       vercelEnvCoverage: operatorHandoff.vercelEnvCoverage?.ok
         ? {
