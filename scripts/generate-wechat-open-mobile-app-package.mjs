@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process"
-import { existsSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs"
 import { dirname, isAbsolute, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -100,6 +100,33 @@ function readJsonIfExists(filePath) {
   return JSON.parse(readFileSync(filePath, "utf8"))
 }
 
+function listFilesRecursive(root, predicate, results = []) {
+  if (!existsSync(root)) return results
+  for (const name of readdirSync(root)) {
+    const filePath = resolve(root, name)
+    const stat = statSync(filePath)
+    if (stat.isDirectory()) {
+      listFilesRecursive(filePath, predicate, results)
+      continue
+    }
+    if (predicate(filePath)) results.push(filePath)
+  }
+  return results
+}
+
+function findAndroidReleaseArtifacts(appRoot) {
+  const outputRoot = resolve(appRoot, "android/app/build/outputs")
+  const artifacts = listFilesRecursive(outputRoot, (filePath) => {
+    const lower = filePath.toLowerCase()
+    return (lower.endsWith(".apk") || lower.endsWith(".aab")) && lower.includes("release")
+  })
+  return artifacts.map((filePath) => ({
+    path: filePath,
+    type: filePath.toLowerCase().endsWith(".aab") ? "aab" : "apk",
+    bytes: statSync(filePath).size,
+  }))
+}
+
 function buildPackage(args) {
   const nativeRelease = runJson("app_native_release", [
     "scripts/check-app-native-release-config.mjs",
@@ -118,6 +145,8 @@ function buildPackage(args) {
   const wechat = cloudConfirmations?.items?.wechatOpenPlatform || {}
   const androidSignature = String(wechat.androidSignature || "").trim()
   const hasReleaseWechatSignature = Boolean(androidSignature && !/^TODO_|^pending_/i.test(androidSignature))
+  const releaseArtifacts = findAndroidReleaseArtifacts(args.appRoot)
+  const releaseArtifactReady = releaseArtifacts.length > 0
   const appleTeamIdMissing = status.summary?.machineBlocking?.includes("app_universal_link:apple_team_id_missing") === true
   const canCreateDraftInWechatOpenPlatform =
     wechat.accountVerified === true &&
@@ -172,6 +201,40 @@ function buildPackage(args) {
         wechatSignatureRecorded: hasReleaseWechatSignature,
         wechatSignatureEvidence: hasReleaseWechatSignature ? androidSignature : "missing_release_wechat_signature",
         currentConfiguredInWechatOpenPlatform: wechat.androidConfigured === true,
+      },
+      androidSignaturePackage: {
+        ready: hasReleaseWechatSignature && wechat.androidConfigured === true,
+        status: hasReleaseWechatSignature ? "recorded" : "missing_release_wechat_signature",
+        packageName: nativeRelease.android?.applicationId || EXPECTED_ANDROID_PACKAGE_NAME,
+        releaseSigningConfig: nativeRelease.android?.releaseSigningConfig || "",
+        releaseUsesDebugSigning: nativeRelease.android?.releaseUsesDebugSigning === true,
+        releaseSigningConfigReady: nativeRelease.android?.releaseSigningConfigReady === true,
+        releaseArtifactReady,
+        releaseArtifacts,
+        wechatSignatureRecorded: hasReleaseWechatSignature,
+        configuredInWechatOpenPlatform: wechat.androidConfigured === true,
+        writeTargets: [
+          "微信开放平台 -> 移动应用 -> Android 应用签名",
+          "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.wechatOpenPlatform.androidSignature",
+          "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.wechatOpenPlatform.androidConfigured=true",
+        ],
+        obtainSteps: [
+          "用 release keystore 构建正式 release APK；不要用 debug.keystore。",
+          "用微信开放平台 Android 签名生成工具或 Android build-tools/apksigner 从 release APK 读取应用签名。",
+          "只记录签名 hash 和非密钥 evidence handle；不要记录 keystore 文件、密码、alias password 或证书私钥。",
+          "把 Android 包名 com.ipgongchang.meiyehuajing 和 release 签名填入微信开放平台移动应用。",
+        ],
+        verifyCommands: [
+          "cd /Users/Admin/Documents/美业话镜APP/meiye-huajing-app/android && ANDROID_HOME=\"$HOME/Library/Android/sdk\" ANDROID_SDK_ROOT=\"$HOME/Library/Android/sdk\" ./gradlew assembleRelease",
+          "ANDROID_HOME=\"$HOME/Library/Android/sdk\" ANDROID_SDK_ROOT=\"$HOME/Library/Android/sdk\" $ANDROID_HOME/build-tools/<version>/apksigner verify --print-certs app/build/outputs/apk/release/*.apk",
+          "corepack pnpm aliyun:wechat-open:package",
+          "corepack pnpm aliyun:app-native:check",
+        ],
+        forbidden: [
+          "不能使用 debug.keystore 或 debug APK 的签名。",
+          "不能把 MEIYE_RELEASE_STORE_PASSWORD、MEIYE_RELEASE_KEY_PASSWORD、keystore 文件、证书私钥或 AppSecret 写入 JSON、Markdown、镜像或 git。",
+          "不能把 Android package name 以外的小程序信息填到移动应用 Android 配置里。",
+        ],
       },
       ios: {
         bundleId: nativeRelease.ios?.bundleIds?.[0] || EXPECTED_IOS_BUNDLE_ID,
@@ -236,6 +299,7 @@ function buildPackage(args) {
       ],
       verifyCommands: [
         "corepack pnpm aliyun:wechat-open:package",
+        "corepack pnpm aliyun:wechat-open:package:test",
         "corepack pnpm aliyun:app-native:check",
         "corepack pnpm aliyun:aasa:check",
         "corepack pnpm aliyun:readiness",
@@ -252,6 +316,7 @@ function buildPackage(args) {
       "确认创建的是微信开放平台移动应用，不是小程序或公众号。",
       "App 名称使用“美业话镜”，Android 包名和 iOS Bundle ID 都使用 com.ipgongchang.meiyehuajing。",
       "Android 应用签名必须来自 release 证书，不能用 debug keystore。",
+      "Android release 签名需要来自 release APK；当前包会报告是否发现 release APK/AAB 产物以及是否已记录微信签名。",
       "iOS Universal Link 使用 https://api-cn.ipgongchang.xin/app/wechat/，并确保 Associated Domains 保持 applinks:api-cn.ipgongchang.xin。",
       "Apple Team ID 需要从 Apple Developer 获取后导入 SAE plain env，用于 AASA appID。",
       "审核资料、图标、截图、应用介绍和隐私协议由操作员在微信开放平台页面填写，本报告不保存这些素材或账号凭证。",
@@ -330,6 +395,7 @@ function findSecretLikeValues(value, path = "$", matches = []) {
 function renderMarkdown(report) {
   const app = report.mobileAppCreationPackage
   const actionPacket = report.actionPacket
+  const androidSignature = app.androidSignaturePackage
   return [
     "# 微信开放平台移动应用创建材料包",
     "",
@@ -382,6 +448,27 @@ function renderMarkdown(report) {
     `- iosUniversalLink: ${app.ios.universalLink}`,
     `- aasaUrl: ${app.ios.aasaUrl}`,
     `- appleTeamIdMissing: ${app.ios.appleTeamIdMissing}`,
+    "",
+    "## Android Release 签名材料",
+    "",
+    `- ready: ${androidSignature.ready}`,
+    `- status: ${androidSignature.status}`,
+    `- packageName: ${androidSignature.packageName}`,
+    `- releaseSigningConfig: ${androidSignature.releaseSigningConfig}`,
+    `- releaseUsesDebugSigning: ${androidSignature.releaseUsesDebugSigning}`,
+    `- releaseSigningConfigReady: ${androidSignature.releaseSigningConfigReady}`,
+    `- releaseArtifactReady: ${androidSignature.releaseArtifactReady}`,
+    `- releaseArtifacts: ${androidSignature.releaseArtifacts.length ? androidSignature.releaseArtifacts.map((item) => `${item.type}:${item.path}`).join(", ") : "none"}`,
+    `- wechatSignatureRecorded: ${androidSignature.wechatSignatureRecorded}`,
+    `- configuredInWechatOpenPlatform: ${androidSignature.configuredInWechatOpenPlatform}`,
+    "- obtainSteps:",
+    ...androidSignature.obtainSteps.map((item) => `  - ${item}`),
+    "- writeTargets:",
+    ...androidSignature.writeTargets.map((item) => `  - ${item}`),
+    "- verifyCommands:",
+    ...androidSignature.verifyCommands.map((item) => `  - ${item}`),
+    "- forbidden:",
+    ...androidSignature.forbidden.map((item) => `  - ${item}`),
     "",
     "## 审核前检查",
     "",
