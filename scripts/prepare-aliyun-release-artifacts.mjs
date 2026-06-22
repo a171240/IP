@@ -480,9 +480,11 @@ function renderMarkdown(audit) {
     `- mutationPerformed: ${consoleRunbook.mutationPerformed === true}`,
     `- consoleTasks: ${consoleRunbook.consoleTasks?.length || 0}`,
     `- resourceReady: ${consoleRunbook.summary?.resourceReady || "unknown"}`,
+    `- canStartNowConsoleTasks: ${consoleRunbook.summary?.canStartNowConsoleTasks?.length ? consoleRunbook.summary.canStartNowConsoleTasks.join(", ") : "none"}`,
+    `- blockedByTaskDependencies: ${consoleRunbook.summary?.blockedByTaskDependencies?.length ? consoleRunbook.summary.blockedByTaskDependencies.join(", ") : "none"}`,
     `- actionTimeConfirmationRequired: ${consoleRunbook.summary?.actionTimeConfirmationRequired?.length ? consoleRunbook.summary.actionTimeConfirmationRequired.join(", ") : "none"}`,
     ...(consoleRunbook.consoleTasks?.length
-      ? consoleRunbook.consoleTasks.map((item) => `- ${item.id}: ${item.status} (${item.consolePath})`)
+      ? consoleRunbook.consoleTasks.map((item) => `- ${item.id}: ${item.status}, canStartNow=${item.canStartNow}, dependsOn=${item.dependsOn?.join(", ") || "none"} (${item.consolePath})`)
       : ["- none"]),
     "",
     "## 阿里云动作授权矩阵",
@@ -1163,7 +1165,9 @@ function main() {
       mutationPerformed: consoleRunbook.mutationPerformed === true,
       resourceReady: consoleRunbook.summary?.resourceReady || "unknown",
       userActionReady: consoleRunbook.summary?.userActionReady || "unknown",
-      consoleTasks: (consoleRunbook.consoleTasks || []).map((item) => `${item.id}:${item.status}`),
+      canStartNowConsoleTasks: consoleRunbook.summary?.canStartNowConsoleTasks || [],
+      blockedByTaskDependencies: consoleRunbook.summary?.blockedByTaskDependencies || [],
+      consoleTasks: (consoleRunbook.consoleTasks || []).map((item) => `${item.id}:${item.status}:canStartNow=${item.canStartNow}`),
       actionTimeConfirmationRequired: consoleRunbook.summary?.actionTimeConfirmationRequired || [],
     },
     actionAuthorization: {

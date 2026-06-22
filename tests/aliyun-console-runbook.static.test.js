@@ -11,6 +11,7 @@ const readJson = (...parts) => JSON.parse(read(...parts))
 test("Aliyun console runbook command is wired into scripts and predeploy", () => {
   const pkg = readJson("package.json")
   const predeploy = read("scripts", "aliyun-predeploy-commands.mjs")
+  const releaseArtifacts = read("scripts", "prepare-aliyun-release-artifacts.mjs")
   const deploySpec = readJson("deploy", "aliyun-production-cn.example.json")
 
   assert.equal(pkg.scripts["aliyun:console:runbook"], "node ./scripts/generate-aliyun-console-runbook.mjs")
@@ -20,6 +21,8 @@ test("Aliyun console runbook command is wired into scripts and predeploy", () =>
   assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:console:runbook:test"))
   assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:console:runbook"))
   assert.ok(deploySpec.predeployChecks.includes("corepack pnpm aliyun:console:runbook"))
+  assert.match(releaseArtifacts, /canStartNowConsoleTasks/)
+  assert.match(releaseArtifacts, /blockedByTaskDependencies/)
 })
 
 test("Aliyun console runbook renders current console fields without secret values", () => {
@@ -54,14 +57,41 @@ test("Aliyun console runbook renders current console fields without secret value
   assert.equal(report.target.appName, "meiye-huajing-app-api-production-cn")
   assert.ok(report.summary.requiredBlocking.includes("WECHAT_OPEN_APP_ID"))
   assert.ok(report.summary.requiredBlocking.includes("WECHAT_OPEN_APP_SECRET"))
+  assert.deepEqual(report.summary.canStartNowConsoleTasks, [
+    "C02_ACR_IMAGE_AND_PULL",
+    "C05_OSS_AUDIO_RAM_STS",
+  ])
+  assert.ok(report.summary.blockedByTaskDependencies.includes("C01_SAE_RUNTIME"))
+  assert.ok(report.summary.blockedByTaskDependencies.includes("C06_ENV_IMPORT"))
+  assert.equal(sae.sequencePhase, "runtime")
+  assert.deepEqual(sae.dependsOn, ["C02_ACR_IMAGE_AND_PULL", "C05_OSS_AUDIO_RAM_STS", "C06_ENV_IMPORT"])
+  assert.deepEqual(sae.blockingDependencies, [
+    "C02_ACR_IMAGE_AND_PULL",
+    "C05_OSS_AUDIO_RAM_STS",
+    "C06_ENV_IMPORT",
+  ])
+  assert.equal(sae.canStartNow, false)
   assert.ok(sae.targetFields.some((item) => item.name === "containerPort" && item.value === 3000))
   assert.ok(sae.currentBlockers.includes("runtime:confirmed"))
   assert.equal(acr.requiresActionTimeConfirmation, true)
+  assert.equal(acr.sequencePhase, "image_runtime")
+  assert.deepEqual(acr.dependsOn, [])
+  assert.deepEqual(acr.blockingDependencies, [])
+  assert.equal(acr.canStartNow, true)
   assert.ok(acr.targetFields.some((item) => item.name === "quotedAmount" && item.value === "CNY 117.00"))
   assert.ok(acr.targetFields.some((item) => item.name === "localDigest" && /sha256:[a-f0-9]{64}/i.test(String(item.value))))
   assert.ok(acr.currentEvidence.includes("acr.purchaseCandidate.requiresActionTimePurchaseConfirmation=true"))
+  assert.deepEqual(apiDomain.dependsOn, ["C01_SAE_RUNTIME"])
+  assert.deepEqual(apiDomain.blockingDependencies, ["C01_SAE_RUNTIME"])
+  assert.equal(apiDomain.canStartNow, false)
   assert.ok(apiDomain.targetFields.some((item) => item.name === "notAccepted" && /106\.14\.241\.129/.test(String(item.value))))
+  assert.deepEqual(assetDomain.dependsOn, ["C05_OSS_AUDIO_RAM_STS"])
+  assert.deepEqual(assetDomain.blockingDependencies, ["C05_OSS_AUDIO_RAM_STS"])
+  assert.equal(assetDomain.canStartNow, false)
   assert.ok(assetDomain.targetFields.some((item) => item.name === "notAccepted" && /106\.14\.241\.129/.test(String(item.value))))
+  assert.deepEqual(env.dependsOn, ["C05_OSS_AUDIO_RAM_STS"])
+  assert.deepEqual(env.blockingDependencies, ["C05_OSS_AUDIO_RAM_STS"])
+  assert.equal(env.canStartNow, false)
   assert.ok(env.targetFields.some((item) => item.name === "secretNotInImage" && item.value === true))
   assert.ok(env.currentBlockers.includes("envImport:secretNotInImage"))
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)

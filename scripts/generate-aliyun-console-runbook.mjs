@@ -12,6 +12,37 @@ const WORKSPACE_ROOT = resolve(BACKEND_ROOT, "../..")
 const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
 
+const TASK_SEQUENCE_BY_ID = Object.freeze({
+  C01_SAE_RUNTIME: Object.freeze({
+    sequencePhase: "runtime",
+    dependsOn: ["C02_ACR_IMAGE_AND_PULL", "C05_OSS_AUDIO_RAM_STS", "C06_ENV_IMPORT"],
+  }),
+  C02_ACR_IMAGE_AND_PULL: Object.freeze({
+    sequencePhase: "image_runtime",
+    dependsOn: [],
+  }),
+  C03_API_DOMAIN_HTTPS_ICP: Object.freeze({
+    sequencePhase: "public_entry",
+    dependsOn: ["C01_SAE_RUNTIME"],
+  }),
+  C04_ASSET_DOMAIN_HTTPS_ICP: Object.freeze({
+    sequencePhase: "asset_entry",
+    dependsOn: ["C05_OSS_AUDIO_RAM_STS"],
+  }),
+  C05_OSS_AUDIO_RAM_STS: Object.freeze({
+    sequencePhase: "cloud_foundation",
+    dependsOn: [],
+  }),
+  C06_ENV_IMPORT: Object.freeze({
+    sequencePhase: "runtime_config",
+    dependsOn: ["C05_OSS_AUDIO_RAM_STS"],
+  }),
+  C07_SLS_ALERTS: Object.freeze({
+    sequencePhase: "observability",
+    dependsOn: ["C01_SAE_RUNTIME"],
+  }),
+})
+
 const SECRET_VALUE_PATTERNS = [
   /sk-[A-Za-z0-9_-]{20,}/,
   /gh[pousr]_[A-Za-z0-9_]{30,}/,
@@ -158,7 +189,7 @@ function buildRunbook(args) {
     imagePlan.localDockerImage?.id ||
     (imagePlan.local?.image?.localDigestReady ? "ready" : "missing")
 
-  const tasks = [
+  const tasks = applyTaskSequencing([
     buildTask({
       id: "C01_SAE_RUNTIME",
       title: "创建或确认 SAE production-cn 自定义容器应用",
@@ -261,7 +292,7 @@ function buildRunbook(args) {
         field("serverErrorAlertConfigured", true, "completion evidence"),
       ],
     }),
-  ]
+  ])
 
   const runbook = {
     ok: true,
@@ -280,6 +311,12 @@ function buildRunbook(args) {
       requiredBlocking: status.summary?.requiredBlocking || [],
       blockedResourceIds: resourcesMatrix.summary.blockedIds || [],
       blockedUserActionIds: userActions.summary.blockedIds || [],
+      canStartNowConsoleTasks: tasks
+        .filter((task) => task.canStartNow)
+        .map((task) => task.id),
+      blockedByTaskDependencies: tasks
+        .filter((task) => task.blockingDependencies.length > 0)
+        .map((task) => task.id),
       actionTimeConfirmationRequired: unique([
         ...(resourcesMatrix.summary.actionTimeConfirmationRequired || []),
         ...(userActions.summary.actionTimeConfirmationRequired || []),
@@ -323,6 +360,22 @@ function buildRunbook(args) {
   }
   runbook.ok = runbook.secretLeakCheck.ok
   return runbook
+}
+
+function applyTaskSequencing(tasks) {
+  const readyById = new Map(tasks.map((task) => [task.id, task.ready === true]))
+  return tasks.map((task) => {
+    const sequence = TASK_SEQUENCE_BY_ID[task.id] || { sequencePhase: "unknown", dependsOn: [] }
+    const dependsOn = sequence.dependsOn || []
+    const blockingDependencies = dependsOn.filter((taskId) => readyById.get(taskId) !== true)
+    return {
+      ...task,
+      sequencePhase: sequence.sequencePhase,
+      dependsOn,
+      blockingDependencies,
+      canStartNow: task.ready !== true && blockingDependencies.length === 0,
+    }
+  })
 }
 
 function field(name, value, source) {
@@ -370,6 +423,8 @@ function renderMarkdown(runbook) {
     `- resourceReady: ${runbook.summary.resourceReady}`,
     `- userActionReady: ${runbook.summary.userActionReady}`,
     `- requiredBlocking: ${runbook.summary.requiredBlocking.length ? runbook.summary.requiredBlocking.join(", ") : "none"}`,
+    `- canStartNowConsoleTasks: ${runbook.summary.canStartNowConsoleTasks.length ? runbook.summary.canStartNowConsoleTasks.join(", ") : "none"}`,
+    `- blockedByTaskDependencies: ${runbook.summary.blockedByTaskDependencies.length ? runbook.summary.blockedByTaskDependencies.join(", ") : "none"}`,
     `- actionTimeConfirmationRequired: ${runbook.summary.actionTimeConfirmationRequired.length ? runbook.summary.actionTimeConfirmationRequired.join(", ") : "none"}`,
     "",
     "## 目标",
@@ -399,6 +454,10 @@ function renderMarkdown(runbook) {
       "",
       `- status: ${task.status}`,
       `- ready: ${task.ready}`,
+      `- sequencePhase: ${task.sequencePhase}`,
+      `- dependsOn: ${task.dependsOn.join(", ") || "none"}`,
+      `- blockingDependencies: ${task.blockingDependencies.join(", ") || "none"}`,
+      `- canStartNow: ${task.canStartNow}`,
       `- consolePath: ${task.consolePath}`,
       `- mutationRequiredInConsole: ${task.mutationRequiredInConsole}`,
       `- mutationPerformedByThisCommand: ${task.mutationPerformedByThisCommand}`,
