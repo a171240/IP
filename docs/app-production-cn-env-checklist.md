@@ -57,11 +57,14 @@
 
 ```bash
 corepack pnpm aliyun:status
+corepack pnpm aliyun:env:checklist
 corepack pnpm aliyun:operator:handoff
 corepack pnpm aliyun:cloud:confirmations
 corepack pnpm aliyun:readiness
 corepack pnpm aliyun:predeploy
 ```
+
+`aliyun:env:checklist` 会生成 `/tmp/meiye-aliyun-env-import-checklist.md`，按必填阻塞变量、可直接导入的 plain env、可直接导入的 secret env、可后置或空缺变量分组；它只包含变量名、获取位置、导入目标和动作，不包含真实 value。
 
 正式部署前必须满足：
 

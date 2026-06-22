@@ -82,6 +82,7 @@ function parseArgs(argv) {
     envFile: APP_ENV_FILE,
     writePath: "",
     writePlanPath: "",
+    writePlanMarkdownPath: "",
     allowTodo: false,
     includeTodoInWrite: false,
   }
@@ -97,6 +98,10 @@ function parseArgs(argv) {
     }
     if (arg === "--write-plan") {
       args.writePlanPath = resolveValue(argv[++index], "--write-plan")
+      continue
+    }
+    if (arg === "--write-plan-markdown") {
+      args.writePlanMarkdownPath = resolveValue(argv[++index], "--write-plan-markdown")
       continue
     }
     if (arg === "--allow-todo") {
@@ -202,6 +207,12 @@ function writeImportPlan(env, writePath) {
   return plan
 }
 
+function writeImportPlanMarkdown(env, writePath) {
+  const plan = buildImportPlan(env)
+  writeFileSync(writePath, renderImportPlanMarkdown(plan), { mode: 0o600 })
+  return plan
+}
+
 export function buildImportPlan(env) {
   const variables = [
     ...REQUIRED_KEYS.map((key) => buildPlanItem(env, key, true)),
@@ -225,6 +236,81 @@ export function buildImportPlan(env) {
     },
     variables,
   }
+}
+
+function renderImportPlanMarkdown(plan) {
+  const blockedRequired = plan.variables.filter((item) => item.required && item.status !== "ready")
+  const readyVariables = plan.variables.filter((item) => item.status === "ready")
+  const deferredVariables = plan.variables.filter((item) => item.status !== "ready" && !item.required)
+  const plainReady = readyVariables.filter((item) => item.importTarget === "阿里云 SAE plain env")
+  const secretReady = readyVariables.filter((item) => item.importTarget !== "阿里云 SAE plain env")
+  return [
+    "# 美业话镜 APP production-cn 阿里云环境变量导入清单",
+    "",
+    `生成时间：${plan.generatedAt}`,
+    "",
+    "## 摘要",
+    "",
+    `- target: ${plan.target}`,
+    "- containsValues: false",
+    `- total: ${plan.summary.total}`,
+    `- requiredReady: ${plan.summary.requiredReady} / ${plan.summary.requiredTotal}`,
+    `- requiredBlocking: ${plan.summary.requiredBlocking.length ? plan.summary.requiredBlocking.join(", ") : "none"}`,
+    `- readyTotal: ${plan.summary.readyTotal}`,
+    `- todoTotal: ${plan.summary.todoTotal}`,
+    `- emptyTotal: ${plan.summary.emptyTotal}`,
+    `- secretOrSensitiveTotal: ${plan.summary.secretOrSensitiveTotal}`,
+    `- sourceMetadataReady: ${plan.summary.sourceMetadataReady} / ${plan.summary.total}`,
+    "",
+    "## 导入规则",
+    "",
+    "- 本文件只列变量名、状态、来源、获取方式和导入目标，不包含任何 value。",
+    "- `阿里云 SAE plain env` 只放非密钥配置。",
+    "- `阿里云 KMS/Secrets Manager/SAE secret env` 用于密钥、token、连接串、AccessKeySecret 和服务端敏感配置。",
+    "- 导入完成后，只在 `cloud-confirmations.local.json` 记录 `envImport.confirmed=true`、`secretNotInImage=true`、`importedAt` 和非密钥证据。",
+    "",
+    "## 必填阻塞变量",
+    "",
+    ...renderVariableTable(blockedRequired),
+    "## 可直接导入的 Plain Env",
+    "",
+    ...renderVariableTable(plainReady),
+    "## 可直接导入的 Secret Env",
+    "",
+    ...renderVariableTable(secretReady),
+    "## 可后置或空缺变量",
+    "",
+    ...renderVariableTable(deferredVariables),
+  ].join("\n")
+}
+
+function renderVariableTable(items) {
+  if (!items.length) return ["- none", ""]
+  return [
+    "| 变量 | 必填 | 状态 | 敏感等级 | 来源分类 | 获取位置 | 导入目标 | 解除/动作 |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    ...items.map((item) => [
+      codeCell(item.name),
+      item.required ? "是" : "否",
+      escapeTableCell(item.status),
+      escapeTableCell(item.sensitivity),
+      escapeTableCell(item.sourceCategory),
+      escapeTableCell(item.consolePath),
+      escapeTableCell(item.importTarget),
+      escapeTableCell(item.action || item.obtain),
+    ].join(" | ").replace(/^/, "| ").replace(/$/, " |")),
+    "",
+  ]
+}
+
+function codeCell(value) {
+  return `\`${escapeTableCell(value)}\``
+}
+
+function escapeTableCell(value) {
+  return String(value || "")
+    .replace(/\|/g, "\\|")
+    .replace(/\r?\n/g, " ")
 }
 
 function buildPlanItem(env, key, required) {
@@ -524,11 +610,12 @@ function actionFor(key, status, required) {
 function printHelp() {
   console.log([
     "Usage:",
-    "  node scripts/prepare-aliyun-runtime-env.mjs [--env-file path] [--allow-todo] [--write /tmp/env.json] [--write-plan /tmp/env-plan.json]",
+    "  node scripts/prepare-aliyun-runtime-env.mjs [--env-file path] [--allow-todo] [--write /tmp/env.json] [--write-plan /tmp/env-plan.json] [--write-plan-markdown /tmp/env-plan.md]",
     "",
     "Default mode only validates variable names and never prints values.",
     "--write emits a value-bearing JSON file for manual import; write it outside the repo or delete it after use.",
     "--write-plan emits a value-free Aliyun console import checklist with variable names, status, sensitivity, source, and action.",
+    "--write-plan-markdown emits the same value-free checklist as Markdown for operators.",
     "--include-todo-in-write keeps TODO placeholders in the value-bearing JSON. Defaults to excluding TODOs.",
   ].join("\n"))
 }
@@ -574,6 +661,17 @@ function main() {
     result.planVariables = plan.summary.total
     result.planRequiredBlocking = plan.summary.requiredBlocking
     result.planSourceMetadataReady = plan.summary.sourceMetadataReady
+  }
+  if (args.writePlanMarkdownPath) {
+    if (!isAbsolute(args.writePlanMarkdownPath)) {
+      throw new Error("write_plan_markdown_path_must_be_absolute")
+    }
+    if (!existsSync(dirname(args.writePlanMarkdownPath))) {
+      throw new Error(`write_plan_markdown_dir_not_found:${dirname(args.writePlanMarkdownPath)}`)
+    }
+    const plan = writeImportPlanMarkdown(env, args.writePlanMarkdownPath)
+    result.writePlanMarkdownPath = args.writePlanMarkdownPath
+    result.planMarkdownVariables = plan.summary.total
   }
 
   console.log(JSON.stringify(result, null, 2))

@@ -450,6 +450,21 @@ cloudConfirmationKey
 
 它用于回答“这个变量去哪里拿、由谁确认、导入阿里云哪里”。例如 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET` 的来源是微信开放平台移动应用，不是小程序后台；`PRIVACY_POLICY_URL` / `TERMS_URL` 的来源是正式 HTTPS 协议页面；`APP_ASSET_BASE_URL` 对应 `assetDomainHttps`，OSS Bucket/CORS/RAM 对应 `oss`；百炼、DeepSeek、火山语音、Supabase 桥接变量会分别标出对应控制台或旧 Vercel production 变量来源。
 
+生成给阿里云操作员看的 Markdown 导入清单：
+
+```bash
+corepack pnpm aliyun:env:checklist
+```
+
+默认输出：
+
+```text
+/tmp/meiye-aliyun-env-import-plan.json
+/tmp/meiye-aliyun-env-import-checklist.md
+```
+
+Markdown 清单会按“必填阻塞变量 / 可直接导入的 Plain Env / 可直接导入的 Secret Env / 可后置或空缺变量”分组，只包含变量名、状态、来源、获取位置、导入目标和动作，不包含任何 value。
+
 `corepack pnpm aliyun:operator:tasks`、`corepack pnpm aliyun:status` 和 `corepack pnpm aliyun:operator:handoff` 还会额外输出 `sensitiveActionItems`，专门回答“还需要用户介入哪些密钥、密码、token 或付款动作”。该字段只列变量名、控制台路径、动作、解除条件和禁止事项，不输出任何 value。当前会把微信开放平台 AppID/AppSecret、Apple Team ID、ACR 企业版付费确认、ACR/SAE 镜像拉取认证、OSS RAM Secret 或 STS 注入、以及本地已有 ready 值但尚未导入阿里云的敏感/连接类变量组分开列出。
 
 校验模板变量名覆盖：
@@ -691,6 +706,14 @@ corepack pnpm aliyun:env:plan
 ```
 
 它不包含真实 value，可用于进阿里云 SAE/KMS/Secrets Manager 控制台时逐项核对。真正带 value 的导入文件只能用下面命令写到仓库外临时路径，并在导入后删除：
+
+如果要给操作员一份更容易读的 Markdown 清单，使用：
+
+```bash
+corepack pnpm aliyun:env:checklist
+```
+
+这会同时写出 `/tmp/meiye-aliyun-env-import-plan.json` 和 `/tmp/meiye-aliyun-env-import-checklist.md`。`corepack pnpm aliyun:release:artifacts` 也会在审计包内自动生成 `env-import-checklist.md`。
 
 ```bash
 node scripts/prepare-aliyun-runtime-env.mjs \

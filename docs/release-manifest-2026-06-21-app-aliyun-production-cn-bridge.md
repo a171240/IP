@@ -725,6 +725,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 14:18 CST 追加：重新执行 `corepack pnpm aliyun:domain:check`，当前 `api-cn.ipgongchang.xin` 已有 A 记录 `198.18.0.7`，`assets-cn.ipgongchang.xin` 已有 A 记录 `198.18.0.8`，但二者均属于特殊用途地址，HTTPS 探测均为 `ECONNRESET`，因此仍不能作为阿里云 production-cn 公网入口证据。本地 ignored 的 `deploy/aliyun-production-cn.cloud-confirmations.local.json` 已把域名证据从旧的“记录缺失”更新为这次实测状态，`confirmed`、`dnsResolvedToAliyun`、`httpsEnabled`、`icpReady` 继续保持 `false`。
 
+2026-06-22 14:25 CST 追加：新增 `corepack pnpm aliyun:env:checklist`，复用无值 env import plan 生成 `/tmp/meiye-aliyun-env-import-checklist.md`。该 Markdown 清单按“必填阻塞变量 / 可直接导入的 Plain Env / 可直接导入的 Secret Env / 可后置或空缺变量”分组，只列变量名、状态、敏感等级、来源分类、获取位置、导入目标和动作，不输出任何真实 value。`aliyun:release:artifacts` 也会把 `env-import-checklist.md` 放进审计包，方便阿里云 SAE/KMS/Secrets Manager 导入时逐项核对。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：

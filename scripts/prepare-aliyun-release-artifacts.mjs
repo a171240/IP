@@ -507,6 +507,7 @@ function renderMarkdown(audit) {
     "## 阿里云环境变量导入计划",
     "",
     `- path: ${audit.outputFiles.envImportPlan}`,
+    `- markdown: ${audit.outputFiles.envImportChecklist}`,
     "- containsValues: false",
     `- sourceMetadataReady: ${env.planSourceMetadataReady || 0} / ${env.planVariables || 0}`,
     `- requiredBlocking: ${env.planRequiredBlocking?.length ? env.planRequiredBlocking.join(", ") : "none"}`,
@@ -563,6 +564,8 @@ function main() {
     "--allow-todo",
     "--write-plan",
     resolve(args.outDir, "env-import-plan.json"),
+    "--write-plan-markdown",
+    resolve(args.outDir, "env-import-checklist.md"),
   ])
   const readiness = runJson("readiness", [
     "scripts/check-aliyun-production-cn-readiness.mjs",
@@ -685,6 +688,7 @@ function main() {
       auditJson: resolve(args.outDir, "release-audit.json"),
       auditMarkdown: resolve(args.outDir, "release-audit.md"),
       envImportPlan: resolve(args.outDir, "env-import-plan.json"),
+      envImportChecklist: resolve(args.outDir, "env-import-checklist.md"),
       vercelEnvCoverage: vercelEnvCoverage.ok ? resolve(args.outDir, "vercel-env-coverage.json") : null,
       domainReadiness: resolve(args.outDir, "domain-readiness.json"),
       cloudAccess: cloudAccessPath,
@@ -874,6 +878,7 @@ function main() {
     auditJson: audit.outputFiles.auditJson,
     auditMarkdown: audit.outputFiles.auditMarkdown,
     envImportPlan: audit.outputFiles.envImportPlan,
+    envImportChecklist: audit.outputFiles.envImportChecklist,
     vercelEnvCoverageReport: audit.outputFiles.vercelEnvCoverage,
     domainReadinessReport: audit.outputFiles.domainReadiness,
     cloudAccessReport: audit.outputFiles.cloudAccess,
