@@ -25,7 +25,10 @@
         "WECHAT_OPEN_APP_ID",
         "WECHAT_OPEN_APP_SECRET"
       ],
-      "currentExternalStatus": "not_started"
+      "currentExternalStatus": "not_started",
+      "accountVerified": true,
+      "mobileAppCreated": false,
+      "mobileAppSubmitted": false
     },
     "productionBaseUrl": {
       "requiredHost": "api-cn.ipgongchang.xin",

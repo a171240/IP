@@ -85,6 +85,9 @@ const DEFINITIONS = [
     label: "微信开放平台移动应用",
     requiredFields: [
       "confirmed",
+      "accountVerified",
+      "mobileAppCreated",
+      "mobileAppSubmitted",
       "reviewStatus",
       "mobileAppName",
       "mobileAppIdReady",
@@ -99,6 +102,9 @@ const DEFINITIONS = [
     ],
     allowedFields: [
       "confirmed",
+      "accountVerified",
+      "mobileAppCreated",
+      "mobileAppSubmitted",
       "reviewStatus",
       "mobileAppName",
       "mobileAppIdReady",
@@ -118,6 +124,9 @@ const DEFINITIONS = [
         blockers.push("reviewStatus")
       }
       if (mode === "local" && item.confirmed !== true) blockers.push("confirmed")
+      if (mode === "local" && item.accountVerified !== true) blockers.push("accountVerified")
+      if (mode === "local" && item.mobileAppCreated !== true) blockers.push("mobileAppCreated")
+      if (mode === "local" && item.mobileAppSubmitted !== true) blockers.push("mobileAppSubmitted")
       if (mode === "local" && reviewStatus !== "approved") blockers.push("reviewStatus=approved")
       if (mode === "local" && String(item.mobileAppName || "").trim() !== EXPECTED_WECHAT_MOBILE_APP_NAME) {
         blockers.push(`mobileAppName=${EXPECTED_WECHAT_MOBILE_APP_NAME}`)

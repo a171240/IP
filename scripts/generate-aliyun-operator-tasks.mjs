@@ -122,6 +122,9 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan }) {
     ],
     evidence: [
       `currentReviewStatus=${wechatReviewStatus}`,
+      "targetAccountVerified=true",
+      "targetMobileAppCreated=true",
+      "targetMobileAppSubmitted=true",
       "targetReviewStatus=approved",
       "mobileAppName=美业话镜",
       "mobileAppIdReady=true",

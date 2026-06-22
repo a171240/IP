@@ -785,6 +785,8 @@ rejected
 
 2026-06-22 14:52 CST 更新：用户澄清当前只是微信开放平台账号认证成功，移动应用还没创建。本机应把 `WECHAT_OPEN_APP_REVIEW_STATUS` 记录为 `not_started`，把 blocker 保持为 `wechat_open_platform_mobile_app_not_ready`。下一步是在微信开放平台创建“美业话镜”移动应用并提交审核；审核通过后才会取得移动应用 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`。浏览器安全策略会阻止自动读取或代填 `open.weixin.qq.com` 创建页，需用户手工完成页面材料与提交动作。
 
+2026-06-22 16:58 CST 更新：微信状态在 `deploy/aliyun-production-cn.cloud-confirmations*.json` 中拆成结构化字段：`accountVerified` 表示开放平台账号认证是否已通过，`mobileAppCreated` 表示移动应用是否已创建，`mobileAppSubmitted` 表示移动应用是否已提交审核，`reviewStatus` 只表示移动应用审核状态。当前本机 ignored 证据应记录为 `accountVerified=true`、`mobileAppCreated=false`、`mobileAppSubmitted=false`、`reviewStatus=not_started`；这仍然不能取得 AppID/AppSecret，也不能视为微信登录 ready。
+
 微信开放平台移动应用需要准备：
 
 ```text

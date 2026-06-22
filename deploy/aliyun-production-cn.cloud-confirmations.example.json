@@ -41,6 +41,9 @@
     },
     "wechatOpenPlatform": {
       "confirmed": false,
+      "accountVerified": false,
+      "mobileAppCreated": false,
+      "mobileAppSubmitted": false,
       "reviewStatus": "not_started",
       "mobileAppName": "美业话镜",
       "mobileAppIdReady": false,

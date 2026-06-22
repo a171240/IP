@@ -644,6 +644,9 @@ APPLE_TEAM_ID：Apple Developer 10 位 Team ID
 用户已确认微信开放平台账号认证已通过，但移动应用尚未创建。当前只能记录：
 
 ```text
+accountVerified=true
+mobileAppCreated=false
+mobileAppSubmitted=false
 WECHAT_OPEN_APP_REVIEW_STATUS=not_started
 ```
 
@@ -674,6 +677,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 ```
 
 先创建“美业话镜”移动应用并提交审核；提交后可记录 `reviewing`，审核通过后记录 `approved` 并取得 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`。审核通过前 readiness blocker 会保持 `wechat_open_platform_mobile_app_not_ready` 或 `wechat_open_platform_mobile_app_reviewing`。
+
+2026-06-22 16:58 CST 追加：微信开放平台状态已从单个 `reviewStatus` 拆成结构化证据字段。`accountVerified=true` 只能证明账号主体认证已通过；当前 `mobileAppCreated=false`、`mobileAppSubmitted=false` 证明移动应用仍未创建/未提交，不能进入 `waiting_wechat_review`，也不能取得移动应用 AppID/AppSecret。后续只有创建并提交审核后才把 `mobileAppCreated` / `mobileAppSubmitted` 改为 true；审核通过后再把 `reviewStatus=approved`、`mobileAppIdReady=true`、`mobileAppSecretReady=true`。
 
 2026-06-22 07:34 CST 追加：`aliyun:operator:tasks`、`aliyun:status` 和操作包输出已把微信开放平台移动应用审核中的任务状态细分为 `waiting_wechat_review`。该状态表示移动应用已进入微信审核流程，不能再误读为“还缺创建 APP”或“可以用小程序凭证替代”；正式发布仍必须等审核通过后取得移动应用 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`，并完成 Apple Team ID、阿里云云资源和非密钥证据确认。
 

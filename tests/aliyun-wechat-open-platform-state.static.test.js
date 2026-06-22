@@ -16,9 +16,15 @@ function readJson(relativePath) {
 test("Aliyun release defaults treat WeChat Open Platform mobile app as not created", () => {
   const cloudConfirmations = readJson("deploy/aliyun-production-cn.cloud-confirmations.example.json")
   assert.equal(cloudConfirmations.items.wechatOpenPlatform.reviewStatus, "not_started")
+  assert.equal(cloudConfirmations.items.wechatOpenPlatform.accountVerified, false)
+  assert.equal(cloudConfirmations.items.wechatOpenPlatform.mobileAppCreated, false)
+  assert.equal(cloudConfirmations.items.wechatOpenPlatform.mobileAppSubmitted, false)
 
   const bridgeMap = readJson("deploy/app-api-production-cn.bridge-map.json")
   assert.equal(bridgeMap.rules.wechatAppLogin.currentExternalStatus, "not_started")
+  assert.equal(bridgeMap.rules.wechatAppLogin.accountVerified, true)
+  assert.equal(bridgeMap.rules.wechatAppLogin.mobileAppCreated, false)
+  assert.equal(bridgeMap.rules.wechatAppLogin.mobileAppSubmitted, false)
 })
 
 test("Aliyun docs describe the current WeChat state as account verified but mobile app not created", () => {
@@ -28,6 +34,8 @@ test("Aliyun docs describe the current WeChat state as account verified but mobi
   const releaseManifest = readText("docs/release-manifest-2026-06-21-app-aliyun-production-cn-bridge.md")
   assert.match(releaseManifest, /WECHAT_OPEN_APP_REVIEW_STATUS=not_started（当前；发布前必须 approved）/)
   assert.match(releaseManifest, /微信开放平台账号认证已通过，但移动应用尚未创建/)
+  assert.match(releaseManifest, /accountVerified=true/)
+  assert.match(releaseManifest, /mobileAppCreated=false/)
   assert.doesNotMatch(releaseManifest, /用户已确认微信开放平台移动应用正在审核中/)
 })
 

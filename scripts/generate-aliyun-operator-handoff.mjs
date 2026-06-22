@@ -529,6 +529,9 @@ function expectedCloudEvidence(key, blocker) {
   const field = fieldFromBlocker(blocker)
   const expectedByField = {
     confirmed: "确认完成后填 true。",
+    accountVerified: "微信开放平台账号认证通过后填 true；这不代表移动应用已创建。",
+    mobileAppCreated: "在微信开放平台移动应用列表创建“美业话镜”后填 true。",
+    mobileAppSubmitted: "移动应用创建后已提交微信审核再填 true。",
     dnsResolvedToAliyun: "域名已解析到阿里云公网入口后填 true。",
     httpsEnabled: "HTTPS 证书已启用并可访问后填 true。",
     icpReady: "备案状态满足国内正式访问要求后填 true。",

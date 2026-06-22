@@ -265,6 +265,9 @@ const CLOUD_CONFIRMATION_ITEMS = [
     key: "wechatOpenPlatform",
     label: "微信开放平台移动应用审核已通过，并已取得 AppID/AppSecret、Android 包名/签名、iOS Bundle ID/Universal Link 配置",
     requiredFields: [
+      "accountVerified",
+      "mobileAppCreated",
+      "mobileAppSubmitted",
       "reviewStatus",
       "mobileAppName",
       "mobileAppIdReady",
@@ -279,6 +282,9 @@ const CLOUD_CONFIRMATION_ITEMS = [
     ],
     validate: (item) => {
       const missing = []
+      if (item.accountVerified !== true) missing.push("accountVerified")
+      if (item.mobileAppCreated !== true) missing.push("mobileAppCreated")
+      if (item.mobileAppSubmitted !== true) missing.push("mobileAppSubmitted")
       if (String(item.reviewStatus || "").trim() !== "approved") missing.push("reviewStatus=approved")
       if (String(item.mobileAppName || "").trim() !== EXPECTED_WECHAT_MOBILE_APP_NAME) {
         missing.push(`mobileAppName=${EXPECTED_WECHAT_MOBILE_APP_NAME}`)
