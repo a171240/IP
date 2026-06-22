@@ -791,6 +791,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 18:55 CST 追加：新增 `corepack pnpm aliyun:action:authorization` 和 `tests/aliyun-action-authorization.static.test.js`，把 9 项用户/操作员动作进一步归类为外部平台审核、外部标识符、付费购买、registry/运行时 Secret、RAM/STS、Secret 导入、公网域名变更、云资源创建和生产发布授权。该矩阵明确：没有动作时确认时，Codex 只能继续本地检查、报告、非密钥证据记录和本地提交；不能购买 ACR、创建/修改 SAE/SLS/OSS/RAM/KMS/DNS/证书/CDN、公网入口，不能读取或导入 AppSecret/AccessKeySecret/registry password/RAM Secret/STS token/cookie/Supabase service role key，不能推送镜像、部署 production-cn、改正式域名解析或 git push。当前权威脚本口径为 `imagePublishPlan.totalBlockers=12`、`cloudConfirmations.totalBlockers=27`、`localPredeployChecks=44`、`predeployChecks=27`。
 
+2026-06-22 19:08 CST 复核：通过已登录 Chrome 只读读取阿里云 ACR 购买页，确认当前仍是 ACR Enterprise Economic、`cn-hangzhou`、实例名 `meiye-huajing`、购买时长 1 个月、页面应付 `¥117.00`。已只更新 ignored 的 `deploy/aliyun-production-cn.image-publish.local.json` 与 `deploy/aliyun-production-cn.cloud-access.local.json` 非密钥证据；没有点击购买、没有创建 registry、没有推送镜像、没有配置 SAE 镜像拉取、没有修改 DNS/证书/环境变量。复核后 `corepack pnpm aliyun:image:plan` 仍显示 `localReady=false`、`totalBlockers=12`，`corepack pnpm aliyun:resources:matrix` 仍显示阿里云资源 `ready 0/7`，`corepack pnpm aliyun:action:authorization` 仍显示 `canCodexProceedWithoutUser=[]`、9 项动作都需要外部完成或动作时确认。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：
