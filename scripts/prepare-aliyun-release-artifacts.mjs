@@ -495,10 +495,15 @@ function renderMarkdown(audit) {
     `- mutationPerformed: ${actionAuthorization.mutationPerformed === true}`,
     `- canDeployNow: ${actionAuthorization.canDeployNow === true}`,
     `- canCodexProceedWithoutUser: ${actionAuthorization.summary.canCodexProceedWithoutUser.length ? actionAuthorization.summary.canCodexProceedWithoutUser.join(", ") : "none"}`,
+    `- authorizationPackets: ${actionAuthorization.summary.authorizationPackets || 0}`,
+    `- authorizationPacketIds: ${(actionAuthorization.authorizationPackets || []).map((item) => item.packetId).join(", ") || "none"}`,
     `- actionTimeConfirmationRequired: ${actionAuthorization.summary.actionTimeConfirmationRequired.join(", ")}`,
     ...(actionAuthorization.actions?.length
       ? actionAuthorization.actions.map((item) => `- ${item.id}: ${item.automationPolicy} (${item.blockerClass})`)
       : ["- none"]),
+    ...(actionAuthorization.authorizationPackets?.length
+      ? actionAuthorization.authorizationPackets.map((item) => `- ${item.packetId}: ${item.minimumUserPhrase}`)
+      : ["- authorization packets: none"]),
     "",
     "## 微信开放平台移动应用材料包",
     "",
@@ -1169,6 +1174,8 @@ function main() {
       mutationPerformed: actionAuthorization.mutationPerformed === true,
       canDeployNow: actionAuthorization.canDeployNow === true,
       actions: actionAuthorization.summary.actions,
+      authorizationPackets: actionAuthorization.summary.authorizationPackets || 0,
+      authorizationPacketIds: (actionAuthorization.authorizationPackets || []).map((item) => item.packetId),
       canCodexProceedWithoutUser: actionAuthorization.summary.canCodexProceedWithoutUser,
       currentExternalBlockers: actionAuthorization.summary.currentExternalBlockers,
       actionTimeConfirmationRequired: actionAuthorization.summary.actionTimeConfirmationRequired,

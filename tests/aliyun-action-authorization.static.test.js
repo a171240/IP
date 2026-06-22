@@ -11,6 +11,7 @@ const readJson = (...parts) => JSON.parse(read(...parts))
 test("Aliyun action authorization command is wired into scripts and predeploy", () => {
   const pkg = readJson("package.json")
   const predeploy = read("scripts", "aliyun-predeploy-commands.mjs")
+  const releaseArtifacts = read("scripts", "prepare-aliyun-release-artifacts.mjs")
   const deploySpec = readJson("deploy", "aliyun-production-cn.example.json")
 
   assert.equal(pkg.scripts["aliyun:action:authorization"], "node ./scripts/summarize-aliyun-action-authorization.mjs")
@@ -20,6 +21,8 @@ test("Aliyun action authorization command is wired into scripts and predeploy", 
   assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:action:authorization:test"))
   assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:action:authorization"))
   assert.ok(deploySpec.predeployChecks.includes("corepack pnpm aliyun:action:authorization"))
+  assert.match(releaseArtifacts, /authorizationPackets/)
+  assert.match(releaseArtifacts, /authorizationPacketIds/)
 })
 
 test("Aliyun action authorization matrix separates local-safe work from external actions", () => {
