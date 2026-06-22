@@ -281,6 +281,53 @@ function compactTask(task) {
   }
 }
 
+function buildWechatUserActionNow(machineBlocking) {
+  const base = {
+    owner: "用户/微信开放平台操作员",
+    needAfterApproval: [
+      "WECHAT_OPEN_APP_ID",
+      "WECHAT_OPEN_APP_SECRET",
+      "Android release 签名",
+      "iOS Universal Link",
+    ],
+    mustNotUse: [
+      "不要用小程序 AppID 代替移动应用 AppID",
+      "不要用小程序 Secret 代替移动应用 AppSecret",
+      "不要把 AppSecret 写入文档、JSON、Docker 镜像或 git",
+    ],
+  }
+
+  if (machineBlocking.includes("wechat_open_platform_mobile_app_not_ready")) {
+    return {
+      ...base,
+      title: "创建微信开放平台移动应用并提交审核",
+      where: "微信开放平台 -> 管理中心 -> 移动应用 -> 创建移动应用 -> 美业话镜 App",
+    }
+  }
+
+  if (machineBlocking.includes("wechat_open_platform_mobile_app_reviewing")) {
+    return {
+      ...base,
+      title: "等待微信开放平台移动应用审核通过",
+      where: "微信开放平台 -> 管理中心 -> 移动应用 -> 美业话镜 App",
+    }
+  }
+
+  if (machineBlocking.includes("wechat_open_platform_mobile_app_rejected")) {
+    return {
+      ...base,
+      title: "处理微信开放平台移动应用审核驳回并重新提交",
+      where: "微信开放平台 -> 管理中心 -> 移动应用 -> 美业话镜 App -> 审核反馈",
+    }
+  }
+
+  return {
+    ...base,
+    title: "确认微信开放平台移动应用状态",
+    where: "微信开放平台 -> 管理中心 -> 移动应用 -> 美业话镜 App",
+  }
+}
+
 function buildHandoff({
   args,
   envPlan,
@@ -360,22 +407,7 @@ function buildHandoff({
     appLaunchBlocking,
     sensitiveActionItems: operatorTasks.sensitiveActionItems || status.tasks?.sensitiveActionItems || [],
     userActionNow: [
-      {
-        title: "等待微信开放平台移动应用审核通过",
-        owner: "用户/微信开放平台操作员",
-        where: "微信开放平台 -> 管理中心 -> 移动应用 -> 美业话镜 App",
-        needAfterApproval: [
-          "WECHAT_OPEN_APP_ID",
-          "WECHAT_OPEN_APP_SECRET",
-          "Android release 签名",
-          "iOS Universal Link",
-        ],
-        mustNotUse: [
-          "不要用小程序 AppID 代替移动应用 AppID",
-          "不要用小程序 Secret 代替移动应用 AppSecret",
-          "不要把 AppSecret 写入文档、JSON、Docker 镜像或 git",
-        ],
-      },
+      buildWechatUserActionNow(machineBlocking),
       {
         title: "确认 Apple Team ID",
         owner: "Apple Developer 操作员",

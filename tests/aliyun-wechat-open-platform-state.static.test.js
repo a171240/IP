@@ -47,4 +47,14 @@ test("Aliyun readiness next action distinguishes not_started from reviewing", ()
     operatorTasksSource,
     /function wechatSensitiveRequiredUserAction[\s\S]*reviewStatus === "not_started"[\s\S]*创建“美业话镜”移动应用并提交审核/,
   )
+
+  const operatorHandoffSource = readText("scripts/generate-aliyun-operator-handoff.mjs")
+  assert.match(
+    operatorHandoffSource,
+    /function buildWechatUserActionNow[\s\S]*wechat_open_platform_mobile_app_not_ready[\s\S]*创建微信开放平台移动应用并提交审核/,
+  )
+  assert.match(
+    operatorHandoffSource,
+    /wechat_open_platform_mobile_app_reviewing[\s\S]*等待微信开放平台移动应用审核通过/,
+  )
 })
