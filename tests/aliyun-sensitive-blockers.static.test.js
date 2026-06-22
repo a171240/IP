@@ -45,7 +45,7 @@ test("Aliyun sensitive blockers output has current blocked action ids but no sec
   assert.ok(wechatItem.writeTargets.includes("WECHAT_OPEN_APP_ID -> 阿里云 SAE plain env"))
   assert.ok(wechatItem.writeTargets.includes("WECHAT_OPEN_APP_SECRET -> 阿里云 KMS/Secrets Manager/SAE secret env"))
   assert.ok(wechatItem.verifyCommands.includes("corepack pnpm aliyun:health:smoke"))
-  assert.equal(wechatItem.requiresActionTimeConfirmation, false)
+  assert.equal(wechatItem.requiresActionTimeConfirmation, true)
   assert.match(wechatItem.completionEvidence.join("\n"), /mobileAppCreated=true/)
   assert.ok(ids.includes("S03_ACR_PAID_PURCHASE"))
   assert.ok(ids.includes("S06_READY_SENSITIVE_ENV_IMPORT"))
@@ -57,7 +57,14 @@ test("Aliyun sensitive blockers output has current blocked action ids but no sec
   assert.ok(envImportItem.verifyCommands.includes("corepack pnpm aliyun:env:checklist"))
   assert.deepEqual(
     report.summary.actionTimeConfirmationRequired,
-    ["S03_ACR_PAID_PURCHASE", "S06_READY_SENSITIVE_ENV_IMPORT"],
+    [
+      "S01_WECHAT_OPEN_APP_LOGIN",
+      "S02_APPLE_TEAM_ID",
+      "S03_ACR_PAID_PURCHASE",
+      "S04_ACR_REGISTRY_AUTH",
+      "S05_OSS_RAM_SECRET_OR_STS",
+      "S06_READY_SENSITIVE_ENV_IMPORT",
+    ],
   )
   assert.ok(report.summary.variableNames.includes("WECHAT_OPEN_APP_SECRET"))
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
@@ -96,6 +103,7 @@ test("Aliyun operator status and handoff inherit sensitive action metadata", () 
   assert.ok(operatorWechat.writeTargets.includes("WECHAT_OPEN_APP_ID -> 阿里云 SAE plain env"))
   assert.ok(operatorWechat.verifyCommands.includes("corepack pnpm aliyun:app-api:smoke"))
   assert.match(operatorWechat.completionEvidence.join("\n"), /mobileAppSubmitted=true/)
+  assert.equal(operatorWechat.requiresActionTimeConfirmation, true)
   assert.equal(statusAcrPurchase.requiresActionTimeConfirmation, true)
   assert.match(statusAcrPurchase.obtainFrom, /容器镜像服务 ACR/)
   assert.ok(statusAcrPurchase.writeTargets.some((target) => target.includes("image-publish.local.json")))

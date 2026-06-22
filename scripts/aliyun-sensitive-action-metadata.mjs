@@ -11,7 +11,7 @@ export const SENSITIVE_ACTION_METADATA = {
       "corepack pnpm aliyun:health:smoke",
       "corepack pnpm aliyun:app-api:smoke",
     ],
-    requiresActionTimeConfirmation: false,
+    requiresActionTimeConfirmation: true,
     completionEvidence: [
       "reviewStatus=approved",
       "mobileAppCreated=true",
@@ -31,7 +31,7 @@ export const SENSITIVE_ACTION_METADATA = {
       "corepack pnpm aliyun:aasa:check",
       "corepack pnpm aliyun:app-native:check",
     ],
-    requiresActionTimeConfirmation: false,
+    requiresActionTimeConfirmation: true,
     completionEvidence: [
       "APPLE_TEAM_ID=ready",
       "aliyun:aasa:check no longer reports apple_team_id_missing",
@@ -65,7 +65,7 @@ export const SENSITIVE_ACTION_METADATA = {
       "corepack pnpm aliyun:image:plan:strict",
       "corepack pnpm aliyun:container:smoke",
     ],
-    requiresActionTimeConfirmation: false,
+    requiresActionTimeConfirmation: true,
     completionEvidence: [
       "acr.imagePushed=true",
       "acr.digestVerified=true",
@@ -84,7 +84,7 @@ export const SENSITIVE_ACTION_METADATA = {
       "corepack pnpm aliyun:cloud:confirmations",
       "corepack pnpm aliyun:health:smoke",
     ],
-    requiresActionTimeConfirmation: false,
+    requiresActionTimeConfirmation: true,
     completionEvidence: [
       "oss.confirmed=true",
       "oss.ramLeastPrivilege=true",

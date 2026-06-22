@@ -874,3 +874,5 @@ corepack pnpm aliyun:postdeploy:smoke -- \
 ## 13. 当前结论
 
 本地桥接代码、APP API 路由、小程序链路桥接清单、App production-cn API 配置、native release 配置和检查脚手架已经可以作为阿里云 production-cn 后端准备包继续推进；当前不能称为可发布，因为阿里云运行资源、ACR 镜像发布、api-cn/assets-cn DNS/HTTPS/ICP、OSS/CORS/RAM、SLS、Apple Team ID/AASA、微信开放平台移动应用创建/审核/AppID/AppSecret 和云侧环境变量导入尚未完成。微信开放平台当前只是账号认证通过，移动应用尚未创建，不能把 App 微信登录视为正式 ready。
+
+2026-06-22 19:36 CST 追加：收紧动作时确认门禁，使 `aliyun:sensitive:blockers` 与 `aliyun:user:actions` 的实际输出和授权矩阵一致。微信开放平台移动 App 创建/AppSecret 读取、Apple Team ID、ACR/SAE 镜像认证、OSS RAM/STS、SAE/SLS 创建或配置、ACR 付款、环境变量导入、DNS/HTTPS/ICP 和 production-cn 部署均不能在无动作时确认的情况下自动执行。本次只更新本地脚本和测试，不创建资源、不付款、不修改 DNS、不读取或导入 secret、不推送镜像、不部署、不 git push。

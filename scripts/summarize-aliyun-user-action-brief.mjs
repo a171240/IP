@@ -213,7 +213,7 @@ function buildActions({ sensitiveById, resourcesById, status, cloudItems }) {
     unblockCondition: sensitiveById.get("S01_WECHAT_OPEN_APP_LOGIN")?.unblockCondition,
     variableNames: sensitiveById.get("S01_WECHAT_OPEN_APP_LOGIN")?.variableNames || [],
     requiresUserAction: true,
-    requiresActionTimeConfirmation: false,
+    requiresActionTimeConfirmation: true,
     nonSecretEvidenceOnly: false,
     sourceIds: ["S01_WECHAT_OPEN_APP_LOGIN"],
     currentBlockers: [
@@ -242,7 +242,7 @@ function buildActions({ sensitiveById, resourcesById, status, cloudItems }) {
     unblockCondition: sensitiveById.get("S02_APPLE_TEAM_ID")?.unblockCondition,
     variableNames: sensitiveById.get("S02_APPLE_TEAM_ID")?.variableNames || [],
     requiresUserAction: true,
-    requiresActionTimeConfirmation: false,
+    requiresActionTimeConfirmation: true,
     nonSecretEvidenceOnly: false,
     sourceIds: ["S02_APPLE_TEAM_ID"],
     currentBlockers: machineBlockers(status, /apple_team_id|universal_link/i),
@@ -283,7 +283,7 @@ function buildActions({ sensitiveById, resourcesById, status, cloudItems }) {
     unblockCondition: sensitiveById.get("S04_ACR_REGISTRY_AUTH")?.unblockCondition,
     variableNames: [],
     requiresUserAction: true,
-    requiresActionTimeConfirmation: false,
+    requiresActionTimeConfirmation: true,
     nonSecretEvidenceOnly: true,
     sourceIds: ["S04_ACR_REGISTRY_AUTH", "R02_ACR_IMAGE_REGISTRY"],
     currentBlockers: [
@@ -308,7 +308,7 @@ function buildActions({ sensitiveById, resourcesById, status, cloudItems }) {
     unblockCondition: sensitiveById.get("S05_OSS_RAM_SECRET_OR_STS")?.unblockCondition,
     variableNames: sensitiveById.get("S05_OSS_RAM_SECRET_OR_STS")?.variableNames || [],
     requiresUserAction: true,
-    requiresActionTimeConfirmation: false,
+    requiresActionTimeConfirmation: true,
     nonSecretEvidenceOnly: false,
     sourceIds: ["S05_OSS_RAM_SECRET_OR_STS", "R05_OSS_AUDIO_STORAGE"],
     currentBlockers: [
@@ -421,7 +421,7 @@ function buildActions({ sensitiveById, resourcesById, status, cloudItems }) {
     unblockCondition: "runtime.confirmed=true，slsAlerts.confirmed=true，healthAlertConfigured=true，serverErrorAlertConfigured=true。",
     variableNames: [],
     requiresUserAction: false,
-    requiresActionTimeConfirmation: false,
+    requiresActionTimeConfirmation: true,
     nonSecretEvidenceOnly: true,
     sourceIds: ["R01_SAE_RUNTIME", "R07_SLS_ALERTS"],
     currentBlockers: [
