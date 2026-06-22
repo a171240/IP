@@ -778,6 +778,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 18:03 CST 追加：将 S01-S06 的密钥/密码/token/付款/受控标识符元数据上提为共享本地脚本元数据，并让 `corepack pnpm aliyun:operator:tasks`、`corepack pnpm aliyun:status`、`corepack pnpm aliyun:operator:handoff` 与 release artifacts 都能直接继承 `obtainFrom`、`writeTargets`、`verifyCommands`、`requiresActionTimeConfirmation`、`completionEvidence`。这样操作包本身即可回答“去哪拿、写到哪里、怎么验证、完成后留什么非密钥证据”，不需要再交叉查 `aliyun:sensitive:blockers`；该变更仍只增强本地报告，不创建微信移动 App、不付款、不改 DNS、不导入环境变量、不部署。
 
+2026-06-22 18:24 CST 追加：新增 `corepack pnpm aliyun:console:runbook` 和 `tests/aliyun-console-runbook.static.test.js`，把阿里云控制台要填/确认的 7 项任务单独汇总为非密钥 JSON/Markdown：SAE runtime、ACR 镜像与 SAE 拉取、api-cn、assets-cn、OSS/RAM/STS、env import、SLS。`aliyun:release:artifacts` 现在会随包输出 `console-runbook.json` 和 `console-runbook.md`；本地 predeploy 增至 40 项，正式 predeployChecks 增至 25 项。该 runbook 只输出目标字段、当前 blocker、当前非密钥证据、写入目标和验证命令，不创建资源、不付款、不修改 DNS、不导入环境变量、不推送镜像、不部署。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：

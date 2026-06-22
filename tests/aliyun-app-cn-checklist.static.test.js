@@ -37,6 +37,8 @@ test("APP production-cn checklist records current blockers without secret values
     "secretNotInImage=true",
     "U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE",
     "U09_DEPLOY_AUTHORIZATION",
+    "aliyun:console:runbook",
+    "7 项阿里云控制台任务",
   ]) {
     assert.match(doc, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
   }

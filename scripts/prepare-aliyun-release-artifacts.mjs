@@ -198,6 +198,7 @@ function renderMarkdown(audit) {
   const sensitiveBlockers = audit.checks.sensitiveBlockers
   const resourcesMatrix = audit.checks.resourcesMatrix
   const userActionBrief = audit.checks.userActionBrief
+  const consoleRunbook = audit.checks.consoleRunbook
   const operatorHandoff = audit.checks.operatorHandoff
   const productionStatus = audit.checks.productionStatus
   const cloudConfirmationsCheck = audit.checks.cloudConfirmationsCheck
@@ -429,6 +430,20 @@ function renderMarkdown(audit) {
       ? userActionBrief.actions.map((item) => `- ${item.id}: ${item.status} (${item.owner})`)
       : ["- none"]),
     "",
+    "## 阿里云控制台 Runbook",
+    "",
+    `- json: ${audit.outputFiles.consoleRunbookJson}`,
+    `- markdown: ${audit.outputFiles.consoleRunbookMarkdown}`,
+    `- ok: ${consoleRunbook.ok === true}`,
+    `- containsValues: ${consoleRunbook.containsValues === true}`,
+    `- mutationPerformed: ${consoleRunbook.mutationPerformed === true}`,
+    `- consoleTasks: ${consoleRunbook.consoleTasks?.length || 0}`,
+    `- resourceReady: ${consoleRunbook.summary?.resourceReady || "unknown"}`,
+    `- actionTimeConfirmationRequired: ${consoleRunbook.summary?.actionTimeConfirmationRequired?.length ? consoleRunbook.summary.actionTimeConfirmationRequired.join(", ") : "none"}`,
+    ...(consoleRunbook.consoleTasks?.length
+      ? consoleRunbook.consoleTasks.map((item) => `- ${item.id}: ${item.status} (${item.consolePath})`)
+      : ["- none"]),
+    "",
     "## 操作员操作包",
     "",
     `- json: ${audit.outputFiles.operatorHandoffJson}`,
@@ -655,6 +670,8 @@ function main() {
   const resourcesMatrixMarkdownPath = resolve(args.outDir, "resource-matrix.md")
   const userActionBriefJsonPath = resolve(args.outDir, "user-action-brief.json")
   const userActionBriefMarkdownPath = resolve(args.outDir, "user-action-brief.md")
+  const consoleRunbookJsonPath = resolve(args.outDir, "console-runbook.json")
+  const consoleRunbookMarkdownPath = resolve(args.outDir, "console-runbook.md")
   const operatorHandoffJsonPath = resolve(args.outDir, "operator-handoff.json")
   const operatorHandoffMarkdownPath = resolve(args.outDir, "operator-handoff.md")
   const productionStatusJsonPath = resolve(args.outDir, "production-cn-status.json")
@@ -699,6 +716,16 @@ function main() {
     userActionBriefJsonPath,
     "--markdown",
     userActionBriefMarkdownPath,
+  ])
+  const consoleRunbook = runJson("console_runbook", [
+    "scripts/generate-aliyun-console-runbook.mjs",
+    "--env-file",
+    args.envFile,
+    ...(args.cloudConfirmationsFile ? ["--cloud-confirmations", args.cloudConfirmationsFile] : []),
+    "--out",
+    consoleRunbookJsonPath,
+    "--markdown",
+    consoleRunbookMarkdownPath,
   ])
   const operatorHandoff = runJson("operator_handoff", [
     "scripts/generate-aliyun-operator-handoff.mjs",
@@ -758,6 +785,7 @@ function main() {
       sensitiveBlockers,
       resourcesMatrix,
       userActionBrief,
+      consoleRunbook,
       operatorHandoff,
       productionStatus,
       cloudConfirmationsCheck,
@@ -790,6 +818,8 @@ function main() {
       resourcesMatrixMarkdown: resourcesMatrixMarkdownPath,
       userActionBriefJson: userActionBriefJsonPath,
       userActionBriefMarkdown: userActionBriefMarkdownPath,
+      consoleRunbookJson: consoleRunbookJsonPath,
+      consoleRunbookMarkdown: consoleRunbookMarkdownPath,
       operatorHandoffJson: operatorHandoffJsonPath,
       operatorHandoffMarkdown: operatorHandoffMarkdownPath,
       productionStatusJson: productionStatusJsonPath,
@@ -922,6 +952,17 @@ function main() {
       userMustAct: userActionBrief.summary.userMustAct,
       actionTimeConfirmationRequired: userActionBrief.summary.actionTimeConfirmationRequired,
     },
+    consoleRunbook: {
+      report: audit.outputFiles.consoleRunbookJson,
+      markdown: audit.outputFiles.consoleRunbookMarkdown,
+      ok: consoleRunbook.ok === true,
+      containsValues: consoleRunbook.containsValues === true,
+      mutationPerformed: consoleRunbook.mutationPerformed === true,
+      resourceReady: consoleRunbook.summary?.resourceReady || "unknown",
+      userActionReady: consoleRunbook.summary?.userActionReady || "unknown",
+      consoleTasks: (consoleRunbook.consoleTasks || []).map((item) => `${item.id}:${item.status}`),
+      actionTimeConfirmationRequired: consoleRunbook.summary?.actionTimeConfirmationRequired || [],
+    },
     operatorHandoff: {
       report: audit.outputFiles.operatorHandoffJson,
       markdown: audit.outputFiles.operatorHandoffMarkdown,
@@ -1016,6 +1057,8 @@ function main() {
     resourcesMatrixMarkdown: audit.outputFiles.resourcesMatrixMarkdown,
     userActionBriefJson: audit.outputFiles.userActionBriefJson,
     userActionBriefMarkdown: audit.outputFiles.userActionBriefMarkdown,
+    consoleRunbookJson: audit.outputFiles.consoleRunbookJson,
+    consoleRunbookMarkdown: audit.outputFiles.consoleRunbookMarkdown,
     operatorHandoffJson: audit.outputFiles.operatorHandoffJson,
     operatorHandoffMarkdown: audit.outputFiles.operatorHandoffMarkdown,
   }, null, 2))

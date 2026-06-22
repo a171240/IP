@@ -75,6 +75,8 @@
 
 `corepack pnpm aliyun:sensitive:blockers` 当前固定输出 6 类密钥/密码/token/付款阻塞：微信移动 App 凭证、Apple Team ID、ACR 付费、ACR/SAE 镜像认证、OSS RAM Secret 或 STS、以及 ready 敏感环境变量导入。该报告不读取也不输出任何 value。
 
+`corepack pnpm aliyun:console:runbook` 当前固定输出 7 项阿里云控制台任务：SAE runtime、ACR 镜像与 SAE 拉取、api-cn 域名、assets-cn 域名、OSS/RAM/STS、SAE/KMS/Secrets Manager 环境变量导入、SLS 告警。该 runbook 会把每项的目标字段、当前 blocker、当前非密钥证据、写入目标和验证命令集中输出；它不创建资源、不付款、不修改 DNS、不导入环境变量、不推送镜像、不部署。
+
 ## 可执行检查
 
 本地只读检查：
@@ -83,6 +85,7 @@
 corepack pnpm aliyun:status
 corepack pnpm aliyun:env:checklist
 corepack pnpm aliyun:operator:handoff
+corepack pnpm aliyun:console:runbook
 corepack pnpm aliyun:cloud:confirmations
 corepack pnpm aliyun:readiness
 corepack pnpm aliyun:predeploy
