@@ -200,7 +200,7 @@ function buildReport(operatorTasks) {
 
 function renderMarkdown(report) {
   const lines = [
-    "# 美业话镜 APP production-cn 密钥/密码类阻塞项",
+    "# 美业话镜 APP production-cn 密钥/密码/token/付款/受控标识符阻塞项",
     "",
     `Generated: ${report.generatedAt}`,
     "",

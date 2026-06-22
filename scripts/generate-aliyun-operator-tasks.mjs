@@ -677,7 +677,7 @@ function renderMarkdown(report) {
         ])
       : ["- requiredBlocking: none", ""]),
     "",
-    "## 密钥/密码/付款类人工介入项",
+    "## 密钥/密码/token/付款/受控标识符类人工介入项",
     "",
     ...(report.sensitiveActionItems.length
       ? report.sensitiveActionItems.flatMap((item) => [

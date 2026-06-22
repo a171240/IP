@@ -35,6 +35,8 @@ test("APP production-cn checklist records current blockers without secret values
     "CNY 117.00",
     "¥117.00",
     "secretNotInImage=true",
+    "受控标识符",
+    "Apple Team ID 是 Apple Developer 受控标识符，不是密钥",
     "U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE",
     "U09_DEPLOY_AUTHORIZATION",
     "aliyun:console:runbook",

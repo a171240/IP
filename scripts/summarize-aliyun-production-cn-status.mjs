@@ -148,7 +148,7 @@ function buildStatus({ readiness, operatorTasks, args }) {
     `阿里云云资源确认：${cloudReady.ready}/${cloudReady.total} ready；还缺 SAE、DNS/HTTPS/ICP、OSS/CORS/RAM、微信开放平台 approved、env import、SLS 中未完成项。`,
     `域名门禁：${operatorTasks.domain?.ok ? "ready" : "blocked"}；当前 api-cn/assets-cn 仍未证明解析到阿里云 HTTPS 入口。`,
     `镜像发布计划：${imagePlan?.ready ? "ready" : "blocked"}；本地 Docker 镜像 ${imagePlan?.localDockerImage?.status || operatorTasks.imagePublishPlan?.localDockerImage || "unknown"}，ACR/runtime 拉取证据未完成。`,
-    `密钥/密码/付款类人工介入项：${sensitiveActionItems.length} 项；脚本只输出变量名、控制台路径和动作，不输出任何 value。`,
+    `密钥/密码/token/付款/受控标识符类人工介入项：${sensitiveActionItems.length} 项；脚本只输出变量名、控制台路径和动作，不输出任何 value。`,
   ]
 
   return {
@@ -314,7 +314,7 @@ function renderMarkdown(status) {
       `- Blockers: ${task.blockerCodes.length ? task.blockerCodes.join(", ") : "none"}`,
       "",
     ]),
-    "## Sensitive / Payment Action Items",
+    "## Sensitive / Token / Payment / Controlled Identifier Action Items",
     "",
     ...status.tasks.sensitiveActionItems.flatMap((item) => [
       `### ${item.id}`,

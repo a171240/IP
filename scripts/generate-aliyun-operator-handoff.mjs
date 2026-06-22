@@ -813,7 +813,7 @@ function renderMarkdown(handoff) {
     "## 优先任务",
     "",
     ...handoff.priorityTasks.flatMap((task) => renderTask(task)),
-    "## 密钥/密码/付款类人工介入项",
+    "## 密钥/密码/token/付款/受控标识符类人工介入项",
     "",
     ...(handoff.sensitiveActionItems.length
       ? handoff.sensitiveActionItems.flatMap((item) => renderSensitiveActionItem(item))
