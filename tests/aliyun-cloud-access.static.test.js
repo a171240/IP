@@ -73,6 +73,7 @@ test("Aliyun cloud access report preserves current non-secret console evidence",
   })
   const report = JSON.parse(output)
   const checklistIds = report.consoleEvidenceChecklist.map((item) => item.id)
+  const statusById = new Map(report.observedResourceStatuses.map((item) => [item.id, item]))
   const resourcesObserved = report.cloudShellObservation.browserConsole.resourcesObserved.join("\n")
 
   assert.equal(report.ok, true)
@@ -87,6 +88,20 @@ test("Aliyun cloud access report preserves current non-secret console evidence",
   assert.match(resourcesObserved, /OSS bucket meiye-huajing-service-records-production-cn overview visible in oss-cn-hangzhou/)
   assert.match(resourcesObserved, /DNS ipgongchang\.xin visible; no explicit api-cn\/assets-cn records shown/)
   assert.match(resourcesObserved, /SLS logsearch URL visible for project meiye-huajing-app-prod-cn and logstore app-api/)
+  assert.equal(report.observedResourceStatusSummary.total, 7)
+  assert.equal(report.observedResourceStatusSummary.ready, 0)
+  assert.equal(report.observedResourceStatusSummary.partial, 2)
+  assert.equal(report.observedResourceStatusSummary.blocked, 5)
+  assert.equal(report.observedResourceStatusSummary.observed, 7)
+  assert.equal(statusById.get("saeRuntime").status, "not_created_or_not_confirmed")
+  assert.equal(statusById.get("saeRuntime").readiness, "blocked")
+  assert.equal(statusById.get("acrPurchase").status, "purchase_candidate_visible_not_purchased")
+  assert.equal(statusById.get("domainDns").status, "domain_visible_records_missing")
+  assert.equal(statusById.get("ossAudio").status, "bucket_visible_unconfirmed")
+  assert.equal(statusById.get("ossAudio").readiness, "partial")
+  assert.equal(statusById.get("slsAlerts").status, "project_logstore_visible_alerts_pending")
+  assert.equal(statusById.get("cloudShellInventory").status, "cloudshell_disconnected_or_config_missing")
+  assert.match(statusById.get("domainDns").writeTarget, /apiDomainHttps/)
   assert.deepEqual(checklistIds, [
     "saeRuntime",
     "acrImage",

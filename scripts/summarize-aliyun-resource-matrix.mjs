@@ -214,14 +214,18 @@ function buildReport(args) {
     Object.entries(cloudConfirmations.local?.itemStatus || {}).map(([key, value]) => [key, value]),
   )
   const cloudChecklistById = new Map((cloudAccess.consoleEvidenceChecklist || []).map((item) => [item.id, item]))
+  const observedStatusById = new Map((cloudAccess.observedResourceStatuses || []).map((item) => [item.id, item]))
 
   const resources = RESOURCE_DEFINITIONS.map((definition) => {
     const task = taskById.get(definition.operatorTaskId) || null
     const confirmation = definition.cloudConfirmationKey ? confirmationByKey.get(definition.cloudConfirmationKey) || null : null
     const checklist = cloudChecklistById.get(definition.cloudAccessChecklistId) || null
+    const observedResourceStatus = observedStatusFor(definition, observedStatusById)
     const currentEvidence = unique([
       isUsableEvidence(checklist?.currentLocalEvidence) ? checklist.currentLocalEvidence : "",
       ...(definition.imagePublish ? imagePublishEvidence(imagePublishPlan) : []),
+      observedResourceStatus?.status ? `observedResourceStatus=${observedResourceStatus.status}` : "",
+      observedResourceStatus?.readiness ? `observedResourceReadiness=${observedResourceStatus.readiness}` : "",
     ])
     const blockers = unique([
       ...(task?.blockerCodes || []),
@@ -244,6 +248,7 @@ function buildReport(args) {
       operatorTaskId: definition.operatorTaskId,
       cloudConfirmationKey: definition.cloudConfirmationKey,
       consolePath: task?.consolePath || checklist?.consolePath || "",
+      observedResourceStatus,
       writeTargets: definition.writeTargets,
       nonSecretFieldsToRecord: checklist?.nonSecretFieldsToRecord || [],
       currentLocalEvidence: checklist?.currentLocalEvidence || "",
@@ -292,11 +297,21 @@ function buildReport(args) {
       cloudConfirmationsTotalBlockers: cloudConfirmations.summary?.totalBlockers ?? 0,
       imagePublishTotalBlockers: imagePublishPlan.summary?.totalBlockers ?? 0,
       cloudAccessCanReadNow: cloudAccess.canReadCloudNow === true,
+      observedResourceStatuses: cloudAccess.observedResourceStatusSummary || {
+        total: 0,
+        ready: 0,
+        partial: 0,
+        blocked: 0,
+        observed: 0,
+        notObserved: 0,
+        blockedIds: [],
+      },
     },
     cloudAccess: {
       canReadCloudNow: cloudAccess.canReadCloudNow === true,
       blockers: cloudAccess.blockers || [],
       checklistItems: cloudAccess.consoleEvidenceChecklist?.length || 0,
+      observedResourceStatusSummary: cloudAccess.observedResourceStatusSummary || null,
     },
     resources,
     nextActions: [
@@ -327,6 +342,20 @@ function unique(values) {
 function isUsableEvidence(value) {
   const text = String(value || "").trim()
   return Boolean(text) && !/^TODO_/i.test(text)
+}
+
+function observedStatusFor(definition, observedStatusById) {
+  const aliases = {
+    saeRuntime: "saeRuntime",
+    acrImage: "acrPurchase",
+    apiDomain: "domainDns",
+    assetDomain: "domainDns",
+    ossAudio: "ossAudio",
+    envImport: "cloudShellInventory",
+    slsAlerts: "slsAlerts",
+  }
+  const id = aliases[definition.cloudAccessChecklistId]
+  return id ? observedStatusById.get(id) || null : null
 }
 
 function imagePublishEvidence(imagePublishPlan) {
@@ -411,6 +440,7 @@ function renderMarkdown(report) {
       `- consolePath: ${item.consolePath}`,
       `- writeTargets: ${item.writeTargets.join("; ")}`,
       `- actionTimeConfirmationRequired: ${item.requiresActionTimeConfirmation}`,
+      `- observedResourceStatus: ${item.observedResourceStatus?.status || "none"} / ${item.observedResourceStatus?.readiness || "none"}`,
       `- blockers: ${item.blockers.length ? item.blockers.join(", ") : "none"}`,
       `- currentEvidence: ${item.currentEvidence.length ? item.currentEvidence.join("; ") : "none"}`,
       `- verifyCommands: ${item.verifyCommands.join("; ")}`,

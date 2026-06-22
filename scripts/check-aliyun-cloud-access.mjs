@@ -220,6 +220,126 @@ function normalizeCloudAccessObservation(observation) {
   }
 }
 
+function buildObservedResourceStatuses(cloudAccessObservation) {
+  const lines = cloudAccessObservation.browserConsole?.resourcesObserved || []
+  const saeLine = findObservedLine(lines, /SAE console accessible/i)
+  const acrLine = findObservedLine(lines, /ACR Enterprise Economic/i)
+  const ossLine = findObservedLine(lines, /OSS bucket/i)
+  const dnsLine = findObservedLine(lines, /DNS ipgongchang\.xin/i)
+  const slsLine = findObservedLine(lines, /SLS logsearch URL visible/i)
+  const cloudShellLine = findObservedLine(lines, /Cloud Shell tab/i)
+  const localCliLine = findObservedLine(lines, /Local macOS aliyun CLI installed/i)
+
+  return [
+    {
+      id: "localAliyunCli",
+      title: "本机 Aliyun CLI",
+      status: localCliLine ? "cli_installed_config_missing_or_unread" : "not_observed",
+      readiness: "blocked",
+      observed: Boolean(localCliLine),
+      currentObservation: localCliLine,
+      nextAction: "通过阿里云官方登录/配置方式补齐只读 inventory 所需 CLI 配置；不要把 AccessKeySecret 写入仓库。",
+      writeTarget: "deploy/aliyun-production-cn.cloud-access.local.json -> cloudShell / browserConsole non-secret evidence",
+    },
+    {
+      id: "saeRuntime",
+      title: "SAE production-cn 自定义容器应用",
+      status: saeLine
+        ? /not created|暂无实例|not proven created/i.test(saeLine)
+          ? "not_created_or_not_confirmed"
+          : "console_accessible_unconfirmed"
+        : "not_observed",
+      readiness: "blocked",
+      observed: Boolean(saeLine),
+      currentObservation: saeLine,
+      nextAction: "创建或确认 cn-hangzhou SAE 应用 meiye-huajing-app-api-production-cn，容器端口 3000，健康检查 /api/healthz。",
+      writeTarget: "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.runtime",
+    },
+    {
+      id: "acrPurchase",
+      title: "ACR 企业版实例和镜像仓库",
+      status: acrLine
+        ? /not purchased/i.test(acrLine)
+          ? "purchase_candidate_visible_not_purchased"
+          : "purchase_or_instance_visible_unconfirmed"
+        : "not_observed",
+      readiness: "blocked",
+      observed: Boolean(acrLine),
+      currentObservation: acrLine,
+      nextAction: "动作时确认 ACR Enterprise Economic / cn-hangzhou / 1 month / CNY 117.00 后，购买实例并创建 namespace/repository。",
+      writeTarget: "deploy/aliyun-production-cn.image-publish.local.json -> acr.purchaseCandidate / acr non-secret evidence",
+    },
+    {
+      id: "ossAudio",
+      title: "服务记录音频 OSS Bucket",
+      status: ossLine ? "bucket_visible_unconfirmed" : "not_observed",
+      readiness: "partial",
+      observed: Boolean(ossLine),
+      currentObservation: ossLine,
+      nextAction: "继续确认 CORS、RAM 最小权限和 service-records/production-cn 前缀；只记录 bucket/region/布尔证据。",
+      writeTarget: "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss",
+    },
+    {
+      id: "domainDns",
+      title: "ipgongchang.xin DNS 与 api-cn/assets-cn 记录",
+      status: dnsLine
+        ? /no explicit api-cn\/assets-cn|no api-cn\/assets-cn host record/i.test(dnsLine)
+          ? "domain_visible_records_missing"
+          : "domain_visible_unconfirmed"
+        : "not_observed",
+      readiness: "blocked",
+      observed: Boolean(dnsLine),
+      currentObservation: dnsLine,
+      nextAction: "补齐 api-cn.ipgongchang.xin 与 assets-cn.ipgongchang.xin 解析到阿里云入口，并确认 HTTPS/ICP。",
+      writeTarget: "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps / items.assetDomainHttps",
+    },
+    {
+      id: "slsAlerts",
+      title: "SLS 日志项目和 health/5xx 告警",
+      status: slsLine
+        ? /alerts still pending/i.test(slsLine)
+          ? "project_logstore_visible_alerts_pending"
+          : "project_logstore_visible_unconfirmed"
+        : "not_observed",
+      readiness: "partial",
+      observed: Boolean(slsLine),
+      currentObservation: slsLine,
+      nextAction: "SAE runtime ready 后配置日志采集、/api/healthz 健康告警和 5xx 告警。",
+      writeTarget: "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.slsAlerts",
+    },
+    {
+      id: "cloudShellInventory",
+      title: "Cloud Shell 只读盘点能力",
+      status: cloudAccessObservation.cloudShell?.canRunReadOnlyInventory === true
+        ? "readonly_inventory_ready"
+        : cloudShellLine
+          ? "cloudshell_disconnected_or_config_missing"
+          : "not_observed",
+      readiness: cloudAccessObservation.cloudShell?.canRunReadOnlyInventory === true ? "ready" : "blocked",
+      observed: Boolean(cloudShellLine) || cloudAccessObservation.cloudShell?.connected === true,
+      currentObservation: cloudShellLine || cloudAccessObservation.cloudShell?.evidence || "",
+      nextAction: "只有 Cloud Shell/CLI 配置 ready 后，才运行受控只读 inventory runner；否则继续用控制台人工证据。",
+      writeTarget: "deploy/aliyun-production-cn.cloud-inventory-results.local.json",
+    },
+  ]
+}
+
+function findObservedLine(lines, pattern) {
+  return lines.find((line) => pattern.test(line)) || ""
+}
+
+function summarizeObservedResourceStatuses(items) {
+  return {
+    total: items.length,
+    ready: items.filter((item) => item.readiness === "ready").length,
+    partial: items.filter((item) => item.readiness === "partial").length,
+    blocked: items.filter((item) => item.readiness === "blocked").length,
+    observed: items.filter((item) => item.observed === true).length,
+    notObserved: items.filter((item) => item.observed !== true).length,
+    blockedIds: items.filter((item) => item.readiness === "blocked").map((item) => item.id),
+  }
+}
+
 function buildConsoleChecklist(runtimePlan, cloudConfirmations, imagePublish) {
   const target = runtimePlan?.target || {}
   const image = runtimePlan?.image || {}
@@ -352,6 +472,7 @@ function main() {
   const configFiles = candidateAliyunConfigFiles()
   const cliConfigExists = configFiles.some((item) => item.exists)
   const cliAvailable = Boolean(aliyunPath || aliyuncliPath)
+  const observedResourceStatuses = buildObservedResourceStatuses(cloudAccessObservation)
   const report = {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -381,6 +502,8 @@ function main() {
       note: "No Aliyun cloud API is called by this script. It only checks whether this machine can plausibly run read-only Aliyun CLI inventory later.",
     },
     cloudShellObservation: cloudAccessObservation,
+    observedResourceStatusSummary: summarizeObservedResourceStatuses(observedResourceStatuses),
+    observedResourceStatuses,
     targets: {
       provider: runtimePlan?.target?.provider || "SAE",
       region: runtimePlan?.target?.region || EXPECTED_ALIYUN_REGION,
