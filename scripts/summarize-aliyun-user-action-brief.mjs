@@ -420,7 +420,7 @@ function buildActions({ sensitiveById, resourcesById, status, cloudItems }) {
     requiredUserAction: "创建或确认 SAE 自定义容器应用，绑定日志采集，并配置 /api/healthz 和 5xx 告警。",
     unblockCondition: "runtime.confirmed=true，slsAlerts.confirmed=true，healthAlertConfigured=true，serverErrorAlertConfigured=true。",
     variableNames: [],
-    requiresUserAction: false,
+    requiresUserAction: true,
     requiresActionTimeConfirmation: true,
     nonSecretEvidenceOnly: true,
     sourceIds: ["R01_SAE_RUNTIME", "R07_SLS_ALERTS"],
