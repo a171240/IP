@@ -465,7 +465,7 @@ corepack pnpm aliyun:env:checklist
 
 Markdown 清单会按“必填阻塞变量 / 可直接导入的 Plain Env / 可直接导入的 Secret Env / 可后置或空缺变量”分组，只包含变量名、状态、来源、获取位置、导入目标和动作，不包含任何 value。
 
-`corepack pnpm aliyun:operator:tasks`、`corepack pnpm aliyun:status` 和 `corepack pnpm aliyun:operator:handoff` 还会额外输出 `sensitiveActionItems`，专门回答“还需要用户介入哪些密钥、密码、token 或付款动作”。该字段只列变量名、控制台路径、动作、解除条件和禁止事项，不输出任何 value。当前会把微信开放平台 AppID/AppSecret、Apple Team ID、ACR 企业版付费确认、ACR/SAE 镜像拉取认证、OSS RAM Secret 或 STS 注入、以及本地已有 ready 值但尚未导入阿里云的敏感/连接类变量组分开列出。
+`corepack pnpm aliyun:operator:tasks`、`corepack pnpm aliyun:status` 和 `corepack pnpm aliyun:operator:handoff` 还会额外输出 `sensitiveActionItems`，专门回答“还需要用户介入哪些密钥、密码、token 或付款动作”。该字段只列变量名、控制台路径、动作、解除条件和禁止事项，不输出任何 value。当前会把微信开放平台移动应用 AppID/AppSecret、Apple Team ID、ACR 企业版付费确认、ACR/SAE 镜像拉取认证、OSS RAM Secret 或 STS 注入、以及本地已有 ready 值但尚未导入阿里云的敏感/连接类变量组分开列出；其中 `WECHAT_OPEN_APP_ID` 是服务端标识符，导入阿里云 SAE plain env，`WECHAT_OPEN_APP_SECRET` 才走 KMS/Secrets Manager/SAE secret env。
 
 校验模板变量名覆盖：
 

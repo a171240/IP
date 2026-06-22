@@ -11,7 +11,7 @@
 | 变量 | 获取位置 | 导入位置 | 密钥 | 当前状态 |
 | --- | --- | --- | --- | --- |
 | `WECHAT_OPEN_APP_REVIEW_STATUS` | 微信开放平台 -> 管理中心 -> 移动应用 -> 美业话镜 -> 审核状态 | 本机 `.env.production-cn.local`、阿里云 SAE 普通环境变量 | 否 | 用户已确认 `reviewing` |
-| `WECHAT_OPEN_APP_ID` | 审核通过后，微信开放平台 -> 移动应用 -> 美业话镜 -> 开发信息/AppID | 阿里云 SAE 环境变量或 KMS/Secrets Manager 引用 | 否，但不要写进 App 包 | 审核通过后才能获取 |
+| `WECHAT_OPEN_APP_ID` | 审核通过后，微信开放平台 -> 移动应用 -> 美业话镜 -> 开发信息/AppID | 阿里云 SAE 服务端普通环境变量；不能写进 App 包 | 否，但不要写进 App 包 | 审核通过后才能获取 |
 | `WECHAT_OPEN_APP_SECRET` | 审核通过后，微信开放平台 -> 移动应用 -> 美业话镜 -> 开发信息/AppSecret | 只导入阿里云 SAE secret/KMS/Secrets Manager | 是 | 审核通过后才能获取 |
 
 不要用小程序的 `WECHAT_MINI_APPID` / `WECHAT_MINI_SECRET` 替代移动应用 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`。APP 微信登录链路是：原生 iOS/Android 微信 SDK 取授权 `code`，APP 调 `POST /api/app/auth/wechat`，阿里云后端用 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET` 向微信换取登录态。

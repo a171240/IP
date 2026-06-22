@@ -48,3 +48,23 @@ test("Aliyun env import plan has no ready public variables targeting secret env"
 
   assert.deepEqual(mismatches, [])
 })
+
+test("Aliyun env import plan splits WeChat Open AppID and AppSecret import targets", async () => {
+  const plan = await buildPlan({
+    WECHAT_OPEN_APP_ID: "wx-open-app-id-placeholder",
+    WECHAT_OPEN_APP_SECRET: "wechat-open-secret-placeholder",
+  })
+
+  const appId = byName(plan, "WECHAT_OPEN_APP_ID")
+  assert.equal(appId.status, "ready")
+  assert.equal(appId.sensitivity, "identifier_or_connection")
+  assert.equal(appId.importTarget, "阿里云 SAE plain env")
+  assert.match(appId.notes, /不能写进 App 包/)
+  assert.equal(appId.action, "导入阿里云运行环境变量")
+
+  const appSecret = byName(plan, "WECHAT_OPEN_APP_SECRET")
+  assert.equal(appSecret.status, "ready")
+  assert.equal(appSecret.sensitivity, "secret")
+  assert.equal(appSecret.importTarget, "阿里云 KMS/Secrets Manager/SAE secret env")
+  assert.equal(appSecret.action, "通过阿里云 KMS/Secrets Manager/SAE 密钥环境变量导入")
+})

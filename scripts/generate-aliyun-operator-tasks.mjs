@@ -444,7 +444,7 @@ function buildSensitiveActionItems({ envPlan, readiness, imagePublishPlan }) {
   if (wechatMissing.length > 0 || wechatOpenPlatform.reviewStatus !== "approved") {
     items.push({
       id: "S01_WECHAT_OPEN_APP_LOGIN",
-      type: "external_secret_after_review",
+      type: "external_credential_after_review",
       status: wechatOpenPlatform.reviewStatus === "approved" && wechatMissing.length === 0 ? "ready" : "blocked",
       owner: "用户/微信开放平台操作员",
       consolePath: "微信开放平台 -> 管理中心 -> 移动应用 -> 美业话镜 App",
@@ -453,9 +453,9 @@ function buildSensitiveActionItems({ envPlan, readiness, imagePublishPlan }) {
         "WECHAT_OPEN_APP_ID",
         "WECHAT_OPEN_APP_SECRET",
       ])),
-      requiredUserAction: "等待移动应用审核通过后读取 AppID/AppSecret，并只导入阿里云 KMS/Secrets Manager/SAE secret env。",
+      requiredUserAction: "等待移动应用审核通过后读取 AppID/AppSecret；AppID 只导入阿里云 SAE 服务端 plain env，AppSecret 只导入 KMS/Secrets Manager/SAE secret env。",
       unblockCondition: "reviewStatus=approved 且 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET ready。",
-      forbidden: "不能用小程序 AppID/Secret 替代，不能把 AppSecret 写入文档、镜像或 git。",
+      forbidden: "不能用小程序 AppID/Secret 替代，不能把 AppID 写进 App 包，也不能把 AppSecret 写入文档、镜像或 git。",
     })
   }
 

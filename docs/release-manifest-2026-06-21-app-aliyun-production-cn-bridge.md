@@ -729,6 +729,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 14:33 CST 追加：修正 env import plan 的非密钥分类，`ALIYUN_OSS_BUCKET`、`ALIYUN_OSS_REGION` 和 `SERVICE_RECORD_ASR_PROVIDER` 现在明确归入 `阿里云 SAE plain env`，不再出现在 Secret Env 分组；新增 `tests/aliyun-env-import-plan.static.test.mjs` 与 `corepack pnpm aliyun:env:classification:test`，确保 ready 且 public 的变量不会误指向 secret env。`aliyun:predeploy` 已纳入该测试，部署规格 `localPredeployChecks` 更新为 27 项。
 
+2026-06-22 14:41 CST 追加：继续修正微信开放平台移动应用变量导入分类，`WECHAT_OPEN_APP_ID` 现在明确作为服务端标识符导入 `阿里云 SAE plain env`，但仍禁止写进 App 包；`WECHAT_OPEN_APP_SECRET` 继续只能导入 KMS/Secrets Manager/SAE secret env。`sensitiveActionItems` 的微信任务文案也同步拆分 AppID 与 AppSecret 的导入目标，避免把非密钥 AppID 误读成 secret env，或误读成可以写入客户端。该变更不改变发布阻塞结论：微信开放平台移动应用仍需审核通过后才能取得 AppID/AppSecret。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：

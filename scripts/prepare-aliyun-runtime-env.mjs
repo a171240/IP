@@ -329,7 +329,7 @@ function buildPlanItem(env, key, required) {
     importTarget: metadata.importTarget,
     cloudConfirmationKey: metadata.cloudConfirmationKey,
     notes: metadata.notes,
-    action: actionFor(key, status, required),
+    action: actionFor(key, status, required, metadata.importTarget),
   }
 }
 
@@ -450,14 +450,18 @@ function sourceMetadataOf(key) {
     })
   }
   if (/^WECHAT_OPEN_/.test(key)) {
+    const isReviewStatus = key === "WECHAT_OPEN_APP_REVIEW_STATUS"
+    const isAppId = key === "WECHAT_OPEN_APP_ID"
     return metadata({
       category: "wechat_open_platform",
       owner: "用户/微信开放平台操作员",
       consolePath: "微信开放平台 -> 管理中心 -> 移动应用 -> 美业话镜 App",
       obtain: "移动应用审核通过后读取 AppID/AppSecret；审核状态填 WECHAT_OPEN_APP_REVIEW_STATUS。",
-      importTarget: key === "WECHAT_OPEN_APP_REVIEW_STATUS" ? "阿里云 SAE plain env" : "阿里云 KMS/Secrets Manager/SAE secret env",
+      importTarget: isReviewStatus || isAppId ? "阿里云 SAE plain env" : "阿里云 KMS/Secrets Manager/SAE secret env",
       cloudConfirmationKey: "wechatOpenPlatform",
-      notes: "小程序 AppID/Secret 不能替代 APP 微信登录。",
+      notes: isAppId
+        ? "非密钥标识符，但只能放服务端运行环境，不能写进 App 包；小程序 AppID/Secret 不能替代 APP 微信登录。"
+        : "小程序 AppID/Secret 不能替代 APP 微信登录。",
     })
   }
   if (key === "APPLE_TEAM_ID") {
@@ -605,9 +609,9 @@ function metadata(item) {
   }
 }
 
-function actionFor(key, status, required) {
+function actionFor(key, status, required, importTarget) {
   if (status === "ready") {
-    return sensitivityOf(key) === "public"
+    return importTarget === "阿里云 SAE plain env"
       ? "导入阿里云运行环境变量"
       : "通过阿里云 KMS/Secrets Manager/SAE 密钥环境变量导入"
   }
