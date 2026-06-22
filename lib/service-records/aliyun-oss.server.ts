@@ -51,6 +51,10 @@ export function getAliyunOssAccessKeySecret() {
   return envText("ALIYUN_OSS_ACCESS_KEY_SECRET", "ALIBABA_CLOUD_ACCESS_KEY_SECRET")
 }
 
+export function getAliyunOssSecurityToken() {
+  return envText("ALIYUN_OSS_SECURITY_TOKEN", "ALIBABA_CLOUD_SECURITY_TOKEN", "SERVICE_RECORD_OSS_SECURITY_TOKEN")
+}
+
 export function getAliyunOssBucket() {
   return envText("ALIYUN_OSS_BUCKET", "SERVICE_RECORD_OSS_BUCKET")
 }
@@ -101,21 +105,24 @@ export function createAliyunOssPostPolicy(opts: {
 }) {
   const accessKeyId = requireEnv("ALIYUN_OSS_ACCESS_KEY_ID", getAliyunOssAccessKeyId())
   const accessKeySecret = requireEnv("ALIYUN_OSS_ACCESS_KEY_SECRET", getAliyunOssAccessKeySecret())
+  const securityToken = getAliyunOssSecurityToken()
   const bucket = requireEnv("ALIYUN_OSS_BUCKET", getAliyunOssBucket())
   const endpoint = getAliyunOssEndpoint()
   const maxBytes = integerValue(opts.maxBytes, getAliyunOssMaxDirectUploadBytes())
   const expiresSeconds = envNumber("SERVICE_RECORD_OSS_UPLOAD_POLICY_SECONDS", opts.expiresSeconds || 15 * 60, 60, 60 * 60)
   const expiresAt = new Date(Date.now() + expiresSeconds * 1000).toISOString()
   const contentType = cleanText(opts.contentType, 120) || "audio/ogg"
+  const conditions: Array<Array<string | number>> = [
+    ["eq", "$key", opts.objectKey],
+    ["eq", "$success_action_status", "200"],
+    ["content-length-range", 1, maxBytes],
+    ["eq", "$Content-Type", contentType],
+  ]
+  if (securityToken) conditions.push(["eq", "$x-oss-security-token", securityToken])
 
   const policy = {
     expiration: expiresAt,
-    conditions: [
-      ["eq", "$key", opts.objectKey],
-      ["eq", "$success_action_status", "200"],
-      ["content-length-range", 1, maxBytes],
-      ["eq", "$Content-Type", contentType],
-    ],
+    conditions,
   }
   const policyBase64 = Buffer.from(JSON.stringify(policy), "utf8").toString("base64")
   const signature = hmacSha1Base64(accessKeySecret, policyBase64)
@@ -127,6 +134,7 @@ export function createAliyunOssPostPolicy(opts: {
     success_action_status: "200",
     "Content-Type": contentType,
   }
+  if (securityToken) fields["x-oss-security-token"] = securityToken
 
   return {
     provider: "aliyun_oss" as const,
@@ -143,6 +151,7 @@ export function createAliyunOssPostPolicy(opts: {
 export function createAliyunOssSignedGetUrl(objectKey: string, expiresSeconds?: number) {
   const accessKeyId = requireEnv("ALIYUN_OSS_ACCESS_KEY_ID", getAliyunOssAccessKeyId())
   const accessKeySecret = requireEnv("ALIYUN_OSS_ACCESS_KEY_SECRET", getAliyunOssAccessKeySecret())
+  const securityToken = getAliyunOssSecurityToken()
   const bucket = requireEnv("ALIYUN_OSS_BUCKET", getAliyunOssBucket())
   const endpoint = getAliyunOssEndpoint()
   const ttl = envNumber("BAILIAN_ASR_AUDIO_URL_EXPIRES_SECONDS", expiresSeconds || 6 * 60 * 60, 600, 48 * 60 * 60)
@@ -155,5 +164,6 @@ export function createAliyunOssSignedGetUrl(objectKey: string, expiresSeconds?: 
     Expires: String(expires),
     Signature: signature,
   })
+  if (securityToken) params.set("security-token", securityToken)
   return `${endpoint}/${ossPathEncode(objectKey)}?${params.toString()}`
 }

@@ -709,6 +709,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 追加：尝试开通日志服务 SLS。控制台开通页显示“仅开通 SLS 不会产生费用”，进入订单/收银台后实付金额为 `￥0.00`，但最后一步仍是“支付”确认动作；按浏览器安全边界已停在支付页，未点击最终支付，未创建 SLS Project，未配置日志采集、健康检查失败告警或 5xx 告警。`deploy/aliyun-production-cn.cloud-confirmations.local.json` 只记录该非密钥停点证据，`slsAlerts.confirmed`、`healthAlertConfigured` 和 `serverErrorAlertConfigured` 继续保持 false。
 
+2026-06-22 追加：后端 OSS 签名链路新增可选 `ALIYUN_OSS_SECURITY_TOKEN` 支持。长期或受限 AccessKey 模式保持兼容；如果运行环境注入 STS token，`createAliyunOssPostPolicy` 会把 `x-oss-security-token` 写入表单字段和 policy 条件，`createAliyunOssSignedGetUrl` 会追加 `security-token` 查询参数。`scripts/prepare-aliyun-runtime-env.mjs` 已把 `ALIYUN_OSS_SECURITY_TOKEN` 作为 optional secret 纳入 env plan，`tests/aliyun-oss-sts.static.test.js` 覆盖该契约。同轮已执行 `node --test tests/aliyun-oss-sts.static.test.js`、`corepack pnpm exec tsc --noEmit --pretty false`、`corepack pnpm aliyun:env:plan` 和 `corepack pnpm aliyun:health:smoke`，均通过或符合预期；`aliyun:env:plan` 仍只阻塞 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`，`aliyun:health:smoke` 仍只缺 `appWechatLogin`。这不代表 RAM 已完成，`oss:ramLeastPrivilege` 仍必须等策略创建/绑定和密钥或 STS 安全导入后才能改为 ready。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：

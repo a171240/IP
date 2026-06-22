@@ -40,6 +40,7 @@ export const REQUIRED_KEYS = [
 export const OPTIONAL_KEYS = [
   "DATABASE_URL_CN",
   "REDIS_URL_CN",
+  "ALIYUN_OSS_SECURITY_TOKEN",
   "BAILIAN_ASR_LANGUAGE_HINTS",
   "BAILIAN_ASR_DIARIZATION_ENABLED",
   "BAILIAN_ASR_SPEAKER_COUNT",
@@ -396,6 +397,17 @@ function sourceMetadataOf(key) {
     })
   }
   if (/^ALIYUN_OSS|SERVICE_RECORD_OSS_PREFIX/.test(key)) {
+    if (key === "ALIYUN_OSS_SECURITY_TOKEN") {
+      return metadata({
+        category: "aliyun_oss",
+        owner: "阿里云 OSS/RAM 操作员",
+        consolePath: "阿里云 RAM / STS / SAE 运行时角色",
+        obtain: "使用临时 STS 凭证或运行时角色链路时注入；长期 AccessKey 模式可以留空。",
+        importTarget: "阿里云 KMS/Secrets Manager/SAE secret env",
+        cloudConfirmationKey: "oss",
+        notes: "可选临时凭证 token；不能写入镜像、文档或 git。",
+      })
+    }
     return metadata({
       category: "aliyun_oss",
       owner: "阿里云 OSS/RAM 操作员",

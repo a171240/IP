@@ -592,6 +592,17 @@ deploy/aliyun-production-cn.oss-ram-policy.json
 创建/绑定 RAM 用户或角色、生成 `ALIYUN_OSS_ACCESS_KEY_SECRET`、导入 SAE/KMS/Secrets Manager
 都属于密钥动作，不写入文档、JSON 或 git。
 
+后端 OSS 签名链路兼容两种凭证形态：
+
+```text
+长期或受限 AccessKey：ALIYUN_OSS_ACCESS_KEY_ID + ALIYUN_OSS_ACCESS_KEY_SECRET
+临时 STS 凭证：额外注入 ALIYUN_OSS_SECURITY_TOKEN
+```
+
+如果 `ALIYUN_OSS_SECURITY_TOKEN` 存在，直传 POST policy 会返回 `x-oss-security-token`
+表单字段，临时 GET 签名 URL 会追加 `security-token` 查询参数。该 token 仍按密钥处理，
+只能进入 SAE/KMS/Secrets Manager，不能写入镜像、文档或 git。
+
 ### 4.5 日志与告警
 
 建议补：

@@ -303,7 +303,7 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan }) {
       "确认服务记录音频使用的 OSS Bucket 名称和 region。",
       "确认 CORS 允许 APP 所需上传/下载方法和 Header。",
       "确认 RAM 权限限制到服务记录音频前缀 service-records/production-cn。",
-      "确认 ALIYUN_OSS_ACCESS_KEY_ID、ALIYUN_OSS_ACCESS_KEY_SECRET、ALIYUN_OSS_BUCKET、ALIYUN_OSS_REGION 已通过密钥环境变量导入。",
+      "确认 ALIYUN_OSS_ACCESS_KEY_ID、ALIYUN_OSS_ACCESS_KEY_SECRET、ALIYUN_OSS_BUCKET、ALIYUN_OSS_REGION 已通过密钥环境变量导入；使用临时 STS 凭证时额外导入 ALIYUN_OSS_SECURITY_TOKEN。",
       "在 cloud-confirmations.local.json 的 oss 项记录 Bucket、region 和非密钥证据。",
     ],
     evidence: [
