@@ -2,6 +2,7 @@ export const LOCAL_PREDEPLOY_COMMANDS = Object.freeze([
   Object.freeze(["run", "aliyun:env:check"]),
   Object.freeze(["run", "aliyun:env:plan"]),
   Object.freeze(["run", "aliyun:env:sources"]),
+  Object.freeze(["run", "aliyun:env:classification:test"]),
   Object.freeze(["run", "aliyun:deploy:spec"]),
   Object.freeze(["run", "aliyun:runtime:plan"]),
   Object.freeze(["run", "aliyun:image:plan"]),

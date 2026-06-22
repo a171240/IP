@@ -800,6 +800,7 @@ corepack pnpm aliyun:predeploy
 corepack pnpm run aliyun:env:check
 corepack pnpm run aliyun:env:plan
 corepack pnpm run aliyun:env:sources
+corepack pnpm run aliyun:env:classification:test
 corepack pnpm run aliyun:deploy:spec
 corepack pnpm run aliyun:runtime:plan
 corepack pnpm run aliyun:image:plan
@@ -940,7 +941,7 @@ node -e "JSON.parse(require('fs').readFileSync('deploy/app-api-production-cn.bri
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.image-publish.example.json','utf8'))"
 node -e "JSON.parse(require('fs').readFileSync('deploy/aliyun-production-cn.cloud-confirmations.example.json','utf8'))"
 corepack pnpm aliyun:readiness
-corepack pnpm aliyun:env:sources（62 variables / 62 source metadata ready）
+corepack pnpm aliyun:env:sources（63 variables / 63 source metadata ready）
 corepack pnpm aliyun:image:plan（template ready / local missing）
 corepack pnpm aliyun:legal:check（/privacy 与 /terms route files ready；正式 URL env 仍允许缺失）
 corepack pnpm aliyun:operator:tasks
@@ -959,7 +960,7 @@ corepack pnpm aliyun:docker:check（7 files / 24 dockerignore patterns / sensiti
 corepack pnpm aliyun:container:smoke（Docker health + 30 APP API probes / sanitized env deleted）
 node --check scripts/check-aliyun-domain-readiness.mjs
 corepack pnpm aliyun:domain:check（状态看板 exit 0；当前 ok=false）
-corepack pnpm aliyun:deploy:spec（image meiye-huajing-app-api:production-cn / port 3000 / localPredeploy 26 / predeploy 22 / postdeploy 5）
+corepack pnpm aliyun:deploy:spec（image meiye-huajing-app-api:production-cn / port 3000 / localPredeploy 27 / predeploy 22 / postdeploy 5）
 corepack pnpm aliyun:runtime:plan（SAE / cn-hangzhou / meiye-huajing-app-api-production-cn / port 3000）
 corepack pnpm aliyun:remote:smoke -- --base-url http://127.0.0.1:3022 --allow-missing appWechatLogin,legalLinks
 corepack pnpm aliyun:env:check

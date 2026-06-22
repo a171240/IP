@@ -687,7 +687,7 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 10:07 CST 追加：`aliyun:release:artifacts` 现在会生成 `cloud-access.json`，并把 `cloudAccess.canReadCloudNow`、CLI 状态、blockers 和控制台证据清单数量写入 `release-audit.json/md` 与控制台摘要。这样交付包本身可以解释为什么当前云侧仍是人工控制台确认，而不是误认为阿里云 CLI 自动 inventory 已可用。
 
-2026-06-22 追加：新增 `scripts/aliyun-predeploy-commands.mjs` 与 `deploy/aliyun-production-cn.example.json.localPredeployChecks`，把本地 `aliyun:predeploy` 的 26 项代码级检查从正式 `predeployChecks` 的 22 项严格部署顺序里拆出。`aliyun:deploy:spec` 会校验两份清单：本地 predeploy 继续允许在微信开放平台/阿里云云侧未完成时作为代码级总检通过；正式部署前仍必须单独通过 `aliyun:cloud:confirmations:strict`、`aliyun:readiness:cloud-ready`、`aliyun:release:artifacts`、`aliyun:docker:build` 和 `aliyun:container:smoke`。
+2026-06-22 追加：新增 `scripts/aliyun-predeploy-commands.mjs` 与 `deploy/aliyun-production-cn.example.json.localPredeployChecks`，把本地 `aliyun:predeploy` 的代码级检查从正式 `predeployChecks` 的 22 项严格部署顺序里拆出。2026-06-22 14:33 CST 后本地 predeploy 为 27 项，会额外覆盖 `aliyun:env:classification:test`。`aliyun:deploy:spec` 会校验两份清单：本地 predeploy 继续允许在微信开放平台/阿里云云侧未完成时作为代码级总检通过；正式部署前仍必须单独通过 `aliyun:cloud:confirmations:strict`、`aliyun:readiness:cloud-ready`、`aliyun:release:artifacts`、`aliyun:docker:build` 和 `aliyun:container:smoke`。
 
 2026-06-22 10:11 CST 追加：`corepack pnpm aliyun:operator:handoff` 现在内置 `cloudAccess` 摘要，会直接说明本机是否有 `aliyun` CLI、是否已具备只读云 inventory 条件、是否调用过云 API/执行过云修改，以及 SAE/ACR/DNS/OSS/env/SLS 需要从阿里云控制台抄录到 `.local.json` 的非密钥字段。`aliyun:status` 和 `operator:tasks` 的正式下一步命令顺序同步补上 `aliyun:cloud:confirmations:strict`、`aliyun:release:artifacts` 和 `aliyun:container:smoke`，避免只跑本地代码门禁后误认为可以部署。
 
@@ -726,6 +726,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 2026-06-22 14:18 CST 追加：重新执行 `corepack pnpm aliyun:domain:check`，当前 `api-cn.ipgongchang.xin` 已有 A 记录 `198.18.0.7`，`assets-cn.ipgongchang.xin` 已有 A 记录 `198.18.0.8`，但二者均属于特殊用途地址，HTTPS 探测均为 `ECONNRESET`，因此仍不能作为阿里云 production-cn 公网入口证据。本地 ignored 的 `deploy/aliyun-production-cn.cloud-confirmations.local.json` 已把域名证据从旧的“记录缺失”更新为这次实测状态，`confirmed`、`dnsResolvedToAliyun`、`httpsEnabled`、`icpReady` 继续保持 `false`。
 
 2026-06-22 14:25 CST 追加：新增 `corepack pnpm aliyun:env:checklist`，复用无值 env import plan 生成 `/tmp/meiye-aliyun-env-import-checklist.md`。该 Markdown 清单按“必填阻塞变量 / 可直接导入的 Plain Env / 可直接导入的 Secret Env / 可后置或空缺变量”分组，只列变量名、状态、敏感等级、来源分类、获取位置、导入目标和动作，不输出任何真实 value。`aliyun:release:artifacts` 也会把 `env-import-checklist.md` 放进审计包，方便阿里云 SAE/KMS/Secrets Manager 导入时逐项核对。
+
+2026-06-22 14:33 CST 追加：修正 env import plan 的非密钥分类，`ALIYUN_OSS_BUCKET`、`ALIYUN_OSS_REGION` 和 `SERVICE_RECORD_ASR_PROVIDER` 现在明确归入 `阿里云 SAE plain env`，不再出现在 Secret Env 分组；新增 `tests/aliyun-env-import-plan.static.test.mjs` 与 `corepack pnpm aliyun:env:classification:test`，确保 ready 且 public 的变量不会误指向 secret env。`aliyun:predeploy` 已纳入该测试，部署规格 `localPredeployChecks` 更新为 27 项。
 
 ## 11. 真正部署时的命令顺序
 
