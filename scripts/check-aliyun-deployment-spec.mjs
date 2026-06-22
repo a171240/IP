@@ -26,6 +26,7 @@ const REQUIRED_PREDEPLOY_CHECKS = [
   "corepack pnpm aliyun:status",
   "corepack pnpm aliyun:cloud:access",
   "corepack pnpm aliyun:cloud:inventory-plan",
+  "corepack pnpm aliyun:cloud:inventory-run",
   "corepack pnpm aliyun:cloud:inventory-results",
   "corepack pnpm aliyun:cloud:confirmations",
   "corepack pnpm aliyun:readiness",
@@ -235,6 +236,23 @@ function validateSpec(spec) {
   }
   if (!String(cloudInventoryPlan.secretsPolicy || "").includes("AppSecret")) {
     blockers.push("cloudInventoryPlan.secretsPolicy")
+  }
+
+  const cloudInventoryRunner = spec.cloudInventoryRunner || {}
+  if (cloudInventoryRunner.checkCommand !== "corepack pnpm aliyun:cloud:inventory-run") {
+    blockers.push("cloudInventoryRunner.checkCommand")
+  }
+  if (cloudInventoryRunner.script !== "scripts/run-aliyun-cli-inventory.mjs") {
+    blockers.push("cloudInventoryRunner.script")
+  }
+  if (cloudInventoryRunner.writesLocalFileOnlyWhenExplicit !== true) {
+    blockers.push("cloudInventoryRunner.writesLocalFileOnlyWhenExplicit")
+  }
+  if (!String(cloudInventoryRunner.scope || "").includes("dry-run by default")) {
+    blockers.push("cloudInventoryRunner.scope")
+  }
+  if (!String(cloudInventoryRunner.secretsPolicy || "").includes("never writes raw stdout/stderr")) {
+    blockers.push("cloudInventoryRunner.secretsPolicy")
   }
 
   const cloudInventoryResults = spec.cloudInventoryResults || {}

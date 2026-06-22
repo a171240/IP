@@ -59,6 +59,13 @@
     "requiresConfiguredCli": true,
     "secretsPolicy": "Do not pass AccessKeySecret, AppSecret, registry password, STS token, cookie, or Supabase service role key on the command line or into reports."
   },
+  "cloudInventoryRunner": {
+    "checkCommand": "corepack pnpm aliyun:cloud:inventory-run",
+    "script": "scripts/run-aliyun-cli-inventory.mjs",
+    "scope": "dry-run by default; executes only allowlisted read-only Aliyun CLI commands with --execute-readonly and MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1",
+    "writesLocalFileOnlyWhenExplicit": true,
+    "secretsPolicy": "The runner never writes raw stdout/stderr. It records command names, exit status, line counts, SHA-256 evidence handles, timestamps, and booleans only."
+  },
   "cloudInventoryResults": {
     "exampleFile": "deploy/aliyun-production-cn.cloud-inventory-results.example.json",
     "localFile": "deploy/aliyun-production-cn.cloud-inventory-results.local.json",
@@ -80,6 +87,7 @@
     "corepack pnpm run aliyun:domain:test",
     "corepack pnpm run aliyun:cloud-access:test",
     "corepack pnpm run aliyun:cloud:inventory-plan:test",
+    "corepack pnpm run aliyun:cloud:inventory-run:test",
     "corepack pnpm run aliyun:cloud:inventory-results:test",
     "corepack pnpm run aliyun:sensitive:blockers:test",
     "corepack pnpm run aliyun:resources:matrix:test",
@@ -105,6 +113,7 @@
     "corepack pnpm run aliyun:legal:check",
     "corepack pnpm run aliyun:cloud:access",
     "corepack pnpm run aliyun:cloud:inventory-plan",
+    "corepack pnpm run aliyun:cloud:inventory-run",
     "corepack pnpm run aliyun:cloud:inventory-results",
     "corepack pnpm run aliyun:cloud:confirmations",
     "corepack pnpm run aliyun:domain:check",
@@ -141,6 +150,7 @@
     "corepack pnpm aliyun:status",
     "corepack pnpm aliyun:cloud:access",
     "corepack pnpm aliyun:cloud:inventory-plan",
+    "corepack pnpm aliyun:cloud:inventory-run",
     "corepack pnpm aliyun:cloud:inventory-results",
     "corepack pnpm aliyun:cloud:confirmations",
     "corepack pnpm aliyun:readiness",

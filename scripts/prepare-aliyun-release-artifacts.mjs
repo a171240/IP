@@ -196,6 +196,7 @@ function renderMarkdown(audit) {
   const domain = audit.checks.domain
   const cloudAccess = audit.checks.cloudAccess
   const cloudInventoryPlan = audit.checks.cloudInventoryPlan
+  const cloudInventoryRunner = audit.checks.cloudInventoryRunner
   const cloudInventoryResults = audit.checks.cloudInventoryResults
   const deploymentSpec = audit.checks.deploymentSpec
   const runtimePlan = audit.checks.runtimePlan
@@ -245,6 +246,7 @@ function renderMarkdown(audit) {
     `- domainReadiness: ${domain.ok ? "ok" : "not ready"} (${domain.targetReady} / ${domain.targetTotal})`,
     `- cloudAccess: ${cloudAccess.canReadCloudNow ? "cli-ready" : "manual-console"} (${cloudAccess.blockers?.length || 0} blockers)`,
     `- cloudInventoryPlan: ${cloudInventoryPlan.canRunReadOnlyInventoryNow ? "ready" : "blocked"} (${cloudInventoryPlan.summary?.totalOperations || 0} operations)`,
+    `- cloudInventoryRunner: ${cloudInventoryRunner.executionMode}, executed ${cloudInventoryRunner.summary.executedCommands}/${cloudInventoryRunner.summary.commands}`,
     `- cloudInventoryResults: ${cloudInventoryResults.local?.ready ? "ready" : "not ready"} (${cloudInventoryResults.local?.checkedOperations || 0} local operations)`,
     `- appRuntimeConfig: ${appRuntimeConfig?.ok === true ? "ready" : "not ready"}`,
     `- appNativeRelease: ${appNativeRelease?.ok === true ? "ready" : "not ready"}`,
@@ -322,6 +324,23 @@ function renderMarkdown(audit) {
     `- commandTemplates: ${cloudInventoryPlan.summary?.commandTemplates ?? 0}`,
     ...(cloudInventoryPlan.blockers?.length
       ? cloudInventoryPlan.blockers.map((item) => `- ${item}`)
+      : ["- blockers: none"]),
+    "",
+    "## 阿里云 CLI 只读资源盘点 Runner",
+    "",
+    `- json: ${audit.outputFiles.cloudInventoryRunnerJson}`,
+    `- markdown: ${audit.outputFiles.cloudInventoryRunnerMarkdown}`,
+    `- executionMode: ${cloudInventoryRunner.executionMode}`,
+    `- executeReadonlyRequested: ${cloudInventoryRunner.executeReadonlyRequested === true}`,
+    `- executeReadonlyAllowed: ${cloudInventoryRunner.executeReadonlyAllowed === true}`,
+    `- readOnlyOnly: ${cloudInventoryRunner.readOnlyOnly === true}`,
+    `- cloudApiCalled: ${cloudInventoryRunner.cloudApiCalled === true}`,
+    `- cloudMutationPerformed: ${cloudInventoryRunner.cloudMutationPerformed === true}`,
+    `- commands: ${cloudInventoryRunner.summary.commands}`,
+    `- executedCommands: ${cloudInventoryRunner.summary.executedCommands}`,
+    `- dryRunCommands: ${cloudInventoryRunner.summary.dryRunCommands}`,
+    ...(cloudInventoryRunner.blockers?.length
+      ? cloudInventoryRunner.blockers.map((item) => `- ${item}`)
       : ["- blockers: none"]),
     "",
     "## 阿里云 CLI 只读盘点结果",
@@ -790,6 +809,15 @@ function main() {
     "--markdown",
     cloudInventoryPlanMarkdownPath,
   ])
+  const cloudInventoryRunnerJsonPath = resolve(args.outDir, "cloud-inventory-runner.json")
+  const cloudInventoryRunnerMarkdownPath = resolve(args.outDir, "cloud-inventory-runner.md")
+  const cloudInventoryRunner = runJson("cloud_inventory_runner", [
+    "scripts/run-aliyun-cli-inventory.mjs",
+    "--out",
+    cloudInventoryRunnerJsonPath,
+    "--markdown",
+    cloudInventoryRunnerMarkdownPath,
+  ])
   const cloudInventoryResultsJsonPath = resolve(args.outDir, "cloud-inventory-results.json")
   const cloudInventoryResultsMarkdownPath = resolve(args.outDir, "cloud-inventory-results.md")
   const cloudInventoryResults = runJson("cloud_inventory_results", [
@@ -992,6 +1020,7 @@ function main() {
       domain,
       cloudAccess,
       cloudInventoryPlan,
+      cloudInventoryRunner,
       cloudInventoryResults,
       deploymentSpec,
       runtimePlan,
@@ -1030,6 +1059,8 @@ function main() {
       cloudAccess: cloudAccessPath,
       cloudInventoryPlanJson: cloudInventoryPlanJsonPath,
       cloudInventoryPlanMarkdown: cloudInventoryPlanMarkdownPath,
+      cloudInventoryRunnerJson: cloudInventoryRunnerJsonPath,
+      cloudInventoryRunnerMarkdown: cloudInventoryRunnerMarkdownPath,
       cloudInventoryResultsJson: cloudInventoryResultsJsonPath,
       cloudInventoryResultsMarkdown: cloudInventoryResultsMarkdownPath,
       cloudConfirmationsCheck: cloudConfirmationsCheckPath,
@@ -1104,6 +1135,22 @@ function main() {
       totalOperations: cloudInventoryPlan.summary?.totalOperations ?? 0,
       commandTemplates: cloudInventoryPlan.summary?.commandTemplates ?? 0,
       blockers: cloudInventoryPlan.blockers || [],
+    },
+    cloudInventoryRunner: {
+      report: audit.outputFiles.cloudInventoryRunnerJson,
+      markdown: audit.outputFiles.cloudInventoryRunnerMarkdown,
+      ok: cloudInventoryRunner.ok === true,
+      executionMode: cloudInventoryRunner.executionMode,
+      executeReadonlyRequested: cloudInventoryRunner.executeReadonlyRequested === true,
+      executeReadonlyAllowed: cloudInventoryRunner.executeReadonlyAllowed === true,
+      readOnlyOnly: cloudInventoryRunner.readOnlyOnly === true,
+      cloudApiCalled: cloudInventoryRunner.cloudApiCalled === true,
+      cloudMutationPerformed: cloudInventoryRunner.cloudMutationPerformed === true,
+      commands: cloudInventoryRunner.summary.commands,
+      executedCommands: cloudInventoryRunner.summary.executedCommands,
+      successfulCommands: cloudInventoryRunner.summary.successfulCommands,
+      dryRunCommands: cloudInventoryRunner.summary.dryRunCommands,
+      blockers: cloudInventoryRunner.blockers || [],
     },
     cloudInventoryResults: {
       report: audit.outputFiles.cloudInventoryResultsJson,
@@ -1407,6 +1454,8 @@ function main() {
     cloudAccessReport: audit.outputFiles.cloudAccess,
     cloudInventoryPlanJson: audit.outputFiles.cloudInventoryPlanJson,
     cloudInventoryPlanMarkdown: audit.outputFiles.cloudInventoryPlanMarkdown,
+    cloudInventoryRunnerJson: audit.outputFiles.cloudInventoryRunnerJson,
+    cloudInventoryRunnerMarkdown: audit.outputFiles.cloudInventoryRunnerMarkdown,
     cloudInventoryResultsJson: audit.outputFiles.cloudInventoryResultsJson,
     cloudInventoryResultsMarkdown: audit.outputFiles.cloudInventoryResultsMarkdown,
     cloudConfirmationsCheckReport: audit.outputFiles.cloudConfirmationsCheck,
