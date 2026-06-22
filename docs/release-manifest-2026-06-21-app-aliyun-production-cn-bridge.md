@@ -780,6 +780,8 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 18:24 CST 追加：新增 `corepack pnpm aliyun:console:runbook` 和 `tests/aliyun-console-runbook.static.test.js`，把阿里云控制台要填/确认的 7 项任务单独汇总为非密钥 JSON/Markdown：SAE runtime、ACR 镜像与 SAE 拉取、api-cn、assets-cn、OSS/RAM/STS、env import、SLS。`aliyun:release:artifacts` 现在会随包输出 `console-runbook.json` 和 `console-runbook.md`；本地 predeploy 增至 40 项，正式 predeployChecks 增至 25 项。该 runbook 只输出目标字段、当前 blocker、当前非密钥证据、写入目标和验证命令，不创建资源、不付款、不修改 DNS、不导入环境变量、不推送镜像、不部署。
 
+2026-06-22 18:37 CST 追加：新增 `corepack pnpm aliyun:wechat-open:package` 和 `tests/aliyun-wechat-open-mobile-app-package.static.test.js`，把微信开放平台“移动应用”创建材料单独机器化输出，防止误用小程序凭证。该材料包会从当前 RN 原生配置和 `cloud-confirmations.local.json` 非密钥证据中汇总 App 名称、Android 包名、iOS Bundle ID、Universal Link、AASA URL、当前 `accountVerified=true / mobileAppCreated=false / reviewStatus=not_started` 状态、审核前缺口、审核通过后 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET` 写入阿里云的位置和禁止事项；`aliyun:release:artifacts` 会随包输出 `wechat-open-mobile-app-package.json` 和 `wechat-open-mobile-app-package.md`。本地 predeploy 增至 42 项，正式 predeployChecks 增至 26 项。该命令不创建微信移动 App、不读取 AppSecret、不导入环境变量、不部署。
+
 ## 11. 真正部署时的命令顺序
 
 生产动作必须另行授权。授权后建议顺序：

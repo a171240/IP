@@ -77,6 +77,8 @@
 
 `corepack pnpm aliyun:console:runbook` 当前固定输出 7 项阿里云控制台任务：SAE runtime、ACR 镜像与 SAE 拉取、api-cn 域名、assets-cn 域名、OSS/RAM/STS、SAE/KMS/Secrets Manager 环境变量导入、SLS 告警。该 runbook 会把每项的目标字段、当前 blocker、当前非密钥证据、写入目标和验证命令集中输出；它不创建资源、不付款、不修改 DNS、不导入环境变量、不推送镜像、不部署。
 
+`corepack pnpm aliyun:wechat-open:package` 当前固定输出微信开放平台移动应用创建材料包：App 名称、Android 包名、iOS Bundle ID、Universal Link、AASA URL、当前移动 App 未创建状态、审核前缺口、审核通过后 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET` 的阿里云写入目标和禁止事项。该材料包只输出非密钥字段，不创建移动应用、不读取 AppSecret、不导入环境变量。
+
 ## 可执行检查
 
 本地只读检查：
@@ -86,6 +88,7 @@ corepack pnpm aliyun:status
 corepack pnpm aliyun:env:checklist
 corepack pnpm aliyun:operator:handoff
 corepack pnpm aliyun:console:runbook
+corepack pnpm aliyun:wechat-open:package
 corepack pnpm aliyun:cloud:confirmations
 corepack pnpm aliyun:readiness
 corepack pnpm aliyun:predeploy

@@ -13,6 +13,8 @@
     "aliyun:env:classification:test": "node --test tests/aliyun-env-import-plan.static.test.mjs",
     "aliyun:wechat-state:test": "node --test tests/aliyun-wechat-open-platform-state.static.test.js",
     "aliyun:app-native:test": "node --test tests/aliyun-app-native-release.static.test.js",
+    "aliyun:wechat-open:package": "node ./scripts/generate-wechat-open-mobile-app-package.mjs",
+    "aliyun:wechat-open:package:test": "node --test tests/aliyun-wechat-open-mobile-app-package.static.test.js",
     "aliyun:domain:test": "node --test tests/aliyun-domain-readiness.static.test.js",
     "aliyun:cloud-access:test": "node --test tests/aliyun-cloud-access.static.test.js",
     "aliyun:sensitive:blockers": "node ./scripts/summarize-aliyun-sensitive-blockers.mjs",

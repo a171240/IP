@@ -199,6 +199,7 @@ function renderMarkdown(audit) {
   const resourcesMatrix = audit.checks.resourcesMatrix
   const userActionBrief = audit.checks.userActionBrief
   const consoleRunbook = audit.checks.consoleRunbook
+  const wechatOpenMobileAppPackage = audit.checks.wechatOpenMobileAppPackage
   const operatorHandoff = audit.checks.operatorHandoff
   const productionStatus = audit.checks.productionStatus
   const cloudConfirmationsCheck = audit.checks.cloudConfirmationsCheck
@@ -444,6 +445,20 @@ function renderMarkdown(audit) {
       ? consoleRunbook.consoleTasks.map((item) => `- ${item.id}: ${item.status} (${item.consolePath})`)
       : ["- none"]),
     "",
+    "## 微信开放平台移动应用材料包",
+    "",
+    `- json: ${audit.outputFiles.wechatOpenMobileAppPackageJson}`,
+    `- markdown: ${audit.outputFiles.wechatOpenMobileAppPackageMarkdown}`,
+    `- ok: ${wechatOpenMobileAppPackage.ok === true}`,
+    `- containsValues: ${wechatOpenMobileAppPackage.containsValues === true}`,
+    `- mutationPerformed: ${wechatOpenMobileAppPackage.mutationPerformed === true}`,
+    `- accountVerified: ${wechatOpenMobileAppPackage.summary?.accountVerified === true}`,
+    `- mobileAppCreated: ${wechatOpenMobileAppPackage.summary?.mobileAppCreated === true}`,
+    `- reviewStatus: ${wechatOpenMobileAppPackage.summary?.reviewStatus || "unknown"}`,
+    `- readyToSubmitForReview: ${wechatOpenMobileAppPackage.summary?.readyToSubmitForReview === true}`,
+    `- androidPackageName: ${wechatOpenMobileAppPackage.mobileAppCreationPackage?.android?.packageName || "unknown"}`,
+    `- iosBundleId: ${wechatOpenMobileAppPackage.mobileAppCreationPackage?.ios?.bundleId || "unknown"}`,
+    "",
     "## 操作员操作包",
     "",
     `- json: ${audit.outputFiles.operatorHandoffJson}`,
@@ -672,6 +687,8 @@ function main() {
   const userActionBriefMarkdownPath = resolve(args.outDir, "user-action-brief.md")
   const consoleRunbookJsonPath = resolve(args.outDir, "console-runbook.json")
   const consoleRunbookMarkdownPath = resolve(args.outDir, "console-runbook.md")
+  const wechatOpenMobileAppPackageJsonPath = resolve(args.outDir, "wechat-open-mobile-app-package.json")
+  const wechatOpenMobileAppPackageMarkdownPath = resolve(args.outDir, "wechat-open-mobile-app-package.md")
   const operatorHandoffJsonPath = resolve(args.outDir, "operator-handoff.json")
   const operatorHandoffMarkdownPath = resolve(args.outDir, "operator-handoff.md")
   const productionStatusJsonPath = resolve(args.outDir, "production-cn-status.json")
@@ -726,6 +743,16 @@ function main() {
     consoleRunbookJsonPath,
     "--markdown",
     consoleRunbookMarkdownPath,
+  ])
+  const wechatOpenMobileAppPackage = runJson("wechat_open_mobile_app_package", [
+    "scripts/generate-wechat-open-mobile-app-package.mjs",
+    "--env-file",
+    args.envFile,
+    ...(args.cloudConfirmationsFile ? ["--cloud-confirmations", args.cloudConfirmationsFile] : []),
+    "--out",
+    wechatOpenMobileAppPackageJsonPath,
+    "--markdown",
+    wechatOpenMobileAppPackageMarkdownPath,
   ])
   const operatorHandoff = runJson("operator_handoff", [
     "scripts/generate-aliyun-operator-handoff.mjs",
@@ -786,6 +813,7 @@ function main() {
       resourcesMatrix,
       userActionBrief,
       consoleRunbook,
+      wechatOpenMobileAppPackage,
       operatorHandoff,
       productionStatus,
       cloudConfirmationsCheck,
@@ -820,6 +848,8 @@ function main() {
       userActionBriefMarkdown: userActionBriefMarkdownPath,
       consoleRunbookJson: consoleRunbookJsonPath,
       consoleRunbookMarkdown: consoleRunbookMarkdownPath,
+      wechatOpenMobileAppPackageJson: wechatOpenMobileAppPackageJsonPath,
+      wechatOpenMobileAppPackageMarkdown: wechatOpenMobileAppPackageMarkdownPath,
       operatorHandoffJson: operatorHandoffJsonPath,
       operatorHandoffMarkdown: operatorHandoffMarkdownPath,
       productionStatusJson: productionStatusJsonPath,
@@ -963,6 +993,19 @@ function main() {
       consoleTasks: (consoleRunbook.consoleTasks || []).map((item) => `${item.id}:${item.status}`),
       actionTimeConfirmationRequired: consoleRunbook.summary?.actionTimeConfirmationRequired || [],
     },
+    wechatOpenMobileAppPackage: {
+      report: audit.outputFiles.wechatOpenMobileAppPackageJson,
+      markdown: audit.outputFiles.wechatOpenMobileAppPackageMarkdown,
+      ok: wechatOpenMobileAppPackage.ok === true,
+      containsValues: wechatOpenMobileAppPackage.containsValues === true,
+      mutationPerformed: wechatOpenMobileAppPackage.mutationPerformed === true,
+      accountVerified: wechatOpenMobileAppPackage.summary?.accountVerified === true,
+      mobileAppCreated: wechatOpenMobileAppPackage.summary?.mobileAppCreated === true,
+      reviewStatus: wechatOpenMobileAppPackage.summary?.reviewStatus || "unknown",
+      readyToSubmitForReview: wechatOpenMobileAppPackage.summary?.readyToSubmitForReview === true,
+      androidPackageName: wechatOpenMobileAppPackage.mobileAppCreationPackage?.android?.packageName || "",
+      iosBundleId: wechatOpenMobileAppPackage.mobileAppCreationPackage?.ios?.bundleId || "",
+    },
     operatorHandoff: {
       report: audit.outputFiles.operatorHandoffJson,
       markdown: audit.outputFiles.operatorHandoffMarkdown,
@@ -1059,6 +1102,8 @@ function main() {
     userActionBriefMarkdown: audit.outputFiles.userActionBriefMarkdown,
     consoleRunbookJson: audit.outputFiles.consoleRunbookJson,
     consoleRunbookMarkdown: audit.outputFiles.consoleRunbookMarkdown,
+    wechatOpenMobileAppPackageJson: audit.outputFiles.wechatOpenMobileAppPackageJson,
+    wechatOpenMobileAppPackageMarkdown: audit.outputFiles.wechatOpenMobileAppPackageMarkdown,
     operatorHandoffJson: audit.outputFiles.operatorHandoffJson,
     operatorHandoffMarkdown: audit.outputFiles.operatorHandoffMarkdown,
   }, null, 2))
