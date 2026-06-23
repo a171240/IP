@@ -184,6 +184,7 @@ function buildPackage(args) {
       readySecretEnvVariableCount: cloudActionClosureBrief.readySecretEnvVariableCount,
       resourceEvidenceReady: cloudActionClosureBrief.resourceEvidenceReady,
       blockedResourceEvidenceIds: cloudActionClosureBrief.blockedResourceEvidenceIds,
+      partiallyObservedResourceEvidenceIds: cloudActionClosureBrief.partiallyObservedResourceEvidenceIds,
     },
     cloudActionClosureBrief,
     firstCloudPhase,
@@ -276,6 +277,11 @@ function buildCloudActionClosureBrief({
     readySecretEnvVariableNames,
     resourceEvidenceReady: runbookBrief.resourceEvidenceReady || consoleRunbook.summary?.resourceEvidenceReady || "unknown",
     blockedResourceEvidenceIds,
+    partiallyObservedResourceEvidenceIds:
+      runbookBrief.partiallyObservedResourceEvidenceIds ||
+      consoleRunbook.summary?.partiallyObservedResourceEvidenceIds ||
+      [],
+    blockedResourceEvidence: runbookBrief.blockedResourceEvidence || [],
     strictReadonlyInventoryReady: cloudInventorySummary.ready === true,
     cloudInventoryReadyLocalOperations: `${cloudInventorySummary.readyLocalOperations}/${cloudInventorySummary.localOperations}`,
     cloudInventoryExecutedCommandResults: `${cloudInventorySummary.executedCommandResults}/${cloudInventorySummary.commandResults}`,
@@ -615,6 +621,7 @@ function renderMarkdown(report) {
     `- readySecretEnvVariableCount: ${report.summary.readySecretEnvVariableCount}`,
     `- resourceEvidenceReady: ${report.summary.resourceEvidenceReady}`,
     `- blockedResourceEvidenceIds: ${report.summary.blockedResourceEvidenceIds.length ? report.summary.blockedResourceEvidenceIds.join(", ") : "none"}`,
+    `- partiallyObservedResourceEvidenceIds: ${report.summary.partiallyObservedResourceEvidenceIds.length ? report.summary.partiallyObservedResourceEvidenceIds.join(", ") : "none"}`,
     "",
     "## 目标闭环证据简表",
     "",
@@ -625,6 +632,7 @@ function renderMarkdown(report) {
     `- readySecretEnvVariableCount: ${report.cloudActionClosureBrief.readySecretEnvVariableCount}`,
     `- resourceEvidenceReady: ${report.cloudActionClosureBrief.resourceEvidenceReady}`,
     `- blockedResourceEvidenceIds: ${report.cloudActionClosureBrief.blockedResourceEvidenceIds.length ? report.cloudActionClosureBrief.blockedResourceEvidenceIds.join(", ") : "none"}`,
+    `- partiallyObservedResourceEvidenceIds: ${report.cloudActionClosureBrief.partiallyObservedResourceEvidenceIds.length ? report.cloudActionClosureBrief.partiallyObservedResourceEvidenceIds.join(", ") : "none"}`,
     `- strictReadonlyInventoryReady: ${report.cloudActionClosureBrief.strictReadonlyInventoryReady}`,
     `- cloudInventoryReadyLocalOperations: ${report.cloudActionClosureBrief.cloudInventoryReadyLocalOperations}`,
     `- cloudInventoryExecutedCommandResults: ${report.cloudActionClosureBrief.cloudInventoryExecutedCommandResults}`,

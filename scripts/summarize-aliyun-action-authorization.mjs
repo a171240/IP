@@ -473,6 +473,7 @@ function buildReport(args) {
       readySecretEnvVariableCount: authorizationClosureBrief.readySecretEnvVariableCount,
       resourceEvidenceReady: authorizationClosureBrief.resourceEvidenceReady,
       blockedResourceEvidenceIds: authorizationClosureBrief.blockedResourceEvidenceIds,
+      partiallyObservedResourceEvidenceIds: authorizationClosureBrief.partiallyObservedResourceEvidenceIds,
       blockedByPacketDependencies: authorizationPackets
         .filter((packet) => packet.blockingDependencies.length > 0)
         .map((packet) => packet.packetId),
@@ -537,6 +538,11 @@ function buildAuthorizationClosureBrief({
     readySecretEnvVariableNames,
     resourceEvidenceReady: runbookBrief.resourceEvidenceReady || consoleRunbook.summary?.resourceEvidenceReady || "unknown",
     blockedResourceEvidenceIds: runbookBrief.blockedResourceEvidenceIds || consoleRunbook.summary?.blockedResourceEvidenceIds || [],
+    partiallyObservedResourceEvidenceIds:
+      runbookBrief.partiallyObservedResourceEvidenceIds ||
+      consoleRunbook.summary?.partiallyObservedResourceEvidenceIds ||
+      [],
+    blockedResourceEvidence: runbookBrief.blockedResourceEvidence || [],
     canStartNowPackets,
     canStartNowConsoleTasks: consoleRunbook.summary?.canStartNowConsoleTasks || [],
     blockedByPacketDependencies,
@@ -683,6 +689,7 @@ function renderMarkdown(report) {
     `- readySecretEnvVariableCount: ${report.summary.readySecretEnvVariableCount}`,
     `- resourceEvidenceReady: ${report.summary.resourceEvidenceReady}`,
     `- blockedResourceEvidenceIds: ${report.summary.blockedResourceEvidenceIds.length ? report.summary.blockedResourceEvidenceIds.join(", ") : "none"}`,
+    `- partiallyObservedResourceEvidenceIds: ${report.summary.partiallyObservedResourceEvidenceIds.length ? report.summary.partiallyObservedResourceEvidenceIds.join(", ") : "none"}`,
     "",
     "## 目标闭环证据简表",
     "",
@@ -694,6 +701,7 @@ function renderMarkdown(report) {
     `- readySecretEnvVariableCount: ${report.authorizationClosureBrief.readySecretEnvVariableCount}`,
     `- resourceEvidenceReady: ${report.authorizationClosureBrief.resourceEvidenceReady}`,
     `- blockedResourceEvidenceIds: ${report.authorizationClosureBrief.blockedResourceEvidenceIds.length ? report.authorizationClosureBrief.blockedResourceEvidenceIds.join(", ") : "none"}`,
+    `- partiallyObservedResourceEvidenceIds: ${report.authorizationClosureBrief.partiallyObservedResourceEvidenceIds.length ? report.authorizationClosureBrief.partiallyObservedResourceEvidenceIds.join(", ") : "none"}`,
     `- canStartNowPackets: ${report.authorizationClosureBrief.canStartNowPackets.length ? report.authorizationClosureBrief.canStartNowPackets.join(", ") : "none"}`,
     `- canStartNowConsoleTasks: ${report.authorizationClosureBrief.canStartNowConsoleTasks.length ? report.authorizationClosureBrief.canStartNowConsoleTasks.join(", ") : "none"}`,
     `- blockedByPacketDependencies: ${report.authorizationClosureBrief.blockedByPacketDependencies.length ? report.authorizationClosureBrief.blockedByPacketDependencies.join(", ") : "none"}`,

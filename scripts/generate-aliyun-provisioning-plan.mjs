@@ -208,6 +208,7 @@ function buildPlan(args) {
       readySecretEnvVariableCount: provisioningClosureBrief.readySecretEnvVariableCount,
       resourceEvidenceReady: provisioningClosureBrief.resourceEvidenceReady,
       blockedResourceEvidenceIds: provisioningClosureBrief.blockedResourceEvidenceIds,
+      partiallyObservedResourceEvidenceIds: provisioningClosureBrief.partiallyObservedResourceEvidenceIds,
     },
     provisioningClosureBrief,
     phases,
@@ -266,6 +267,11 @@ function buildProvisioningClosureBrief({
     readySecretEnvVariableNames,
     resourceEvidenceReady: runbookBrief.resourceEvidenceReady || consoleRunbook.summary?.resourceEvidenceReady || "unknown",
     blockedResourceEvidenceIds: runbookBrief.blockedResourceEvidenceIds || consoleRunbook.summary?.blockedResourceEvidenceIds || [],
+    partiallyObservedResourceEvidenceIds:
+      runbookBrief.partiallyObservedResourceEvidenceIds ||
+      consoleRunbook.summary?.partiallyObservedResourceEvidenceIds ||
+      [],
+    blockedResourceEvidence: runbookBrief.blockedResourceEvidence || [],
     readyToStartPhases,
     blockedPhases,
     canStartNowAuthorizationPackets: actionAuthorization.summary?.canStartNowPackets || [],
@@ -445,6 +451,7 @@ function renderMarkdown(report) {
     `- Ready secret env variable count: ${report.summary.readySecretEnvVariableCount}`,
     `- Resource evidence ready: ${report.summary.resourceEvidenceReady}`,
     `- Blocked resource evidence ids: ${report.summary.blockedResourceEvidenceIds.length ? report.summary.blockedResourceEvidenceIds.join(", ") : "none"}`,
+    `- Partially observed resource evidence ids: ${report.summary.partiallyObservedResourceEvidenceIds.length ? report.summary.partiallyObservedResourceEvidenceIds.join(", ") : "none"}`,
     "",
     "## 目标闭环证据简表",
     "",
@@ -456,6 +463,7 @@ function renderMarkdown(report) {
     `- Ready secret env variable count: ${report.provisioningClosureBrief.readySecretEnvVariableCount}`,
     `- Resource evidence ready: ${report.provisioningClosureBrief.resourceEvidenceReady}`,
     `- Blocked resource evidence ids: ${report.provisioningClosureBrief.blockedResourceEvidenceIds.length ? report.provisioningClosureBrief.blockedResourceEvidenceIds.join(", ") : "none"}`,
+    `- Partially observed resource evidence ids: ${report.provisioningClosureBrief.partiallyObservedResourceEvidenceIds.length ? report.provisioningClosureBrief.partiallyObservedResourceEvidenceIds.join(", ") : "none"}`,
     `- Ready to start phases: ${report.provisioningClosureBrief.readyToStartPhases.length ? report.provisioningClosureBrief.readyToStartPhases.join(", ") : "none"}`,
     `- Blocked phases: ${report.provisioningClosureBrief.blockedPhases.length ? report.provisioningClosureBrief.blockedPhases.join(", ") : "none"}`,
     `- Can start now authorization packets: ${report.provisioningClosureBrief.canStartNowAuthorizationPackets.length ? report.provisioningClosureBrief.canStartNowAuthorizationPackets.join(", ") : "none"}`,

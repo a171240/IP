@@ -28,6 +28,7 @@ test("Aliyun provisioning plan command is wired into scripts, predeploy, deploy 
   assert.match(releaseArtifacts, /provisioningClosureBrief/)
   assert.match(releaseArtifacts, /blockedCredentialCount/)
   assert.match(releaseArtifacts, /resourceEvidenceReady/)
+  assert.match(releaseArtifacts, /partiallyObservedResourceEvidenceIds/)
 })
 
 test("Aliyun provisioning plan renders phase order without executing cloud actions", () => {
@@ -61,6 +62,8 @@ test("Aliyun provisioning plan renders phase order without executing cloud actio
   assert.equal(report.summary.resourceEvidenceReady, "0/7")
   assert.ok(report.summary.blockedResourceEvidenceIds.includes("R01_SAE_RUNTIME"))
   assert.ok(report.summary.blockedResourceEvidenceIds.includes("R06_ENV_IMPORT"))
+  assert.ok(report.summary.partiallyObservedResourceEvidenceIds.includes("R05_OSS_AUDIO_STORAGE"))
+  assert.ok(report.summary.partiallyObservedResourceEvidenceIds.includes("R07_SLS_ALERTS"))
   assert.equal(report.provisioningClosureBrief.canDeployNow, false)
   assert.equal(report.provisioningClosureBrief.canCodexExecuteNow, false)
   assert.equal(report.provisioningClosureBrief.blockedCredentialCount, 8)
@@ -70,6 +73,13 @@ test("Aliyun provisioning plan renders phase order without executing cloud actio
   assert.equal(report.provisioningClosureBrief.resourceEvidenceReady, "0/7")
   assert.ok(report.provisioningClosureBrief.blockedResourceEvidenceIds.includes("R02_ACR_IMAGE_REGISTRY"))
   assert.ok(report.provisioningClosureBrief.blockedResourceEvidenceIds.includes("R07_SLS_ALERTS"))
+  assert.ok(report.provisioningClosureBrief.partiallyObservedResourceEvidenceIds.includes("R05_OSS_AUDIO_STORAGE"))
+  assert.ok(report.provisioningClosureBrief.partiallyObservedResourceEvidenceIds.includes("R07_SLS_ALERTS"))
+  assert.ok(report.provisioningClosureBrief.blockedResourceEvidence.some((item) =>
+    item.id === "R05_OSS_AUDIO_STORAGE" &&
+    item.observedReadiness === "partial" &&
+    item.currentEvidence.some((evidence) => /bucket_exists/.test(evidence))
+  ))
   assert.deepEqual(report.provisioningClosureBrief.readyToStartPhases, [
     "PH01_EXTERNAL_APP_IDENTIFIERS",
     "PH02_BASE_CLOUD_RESOURCES",
@@ -180,6 +190,7 @@ test("Aliyun provisioning plan markdown preserves ACR current scope and deferred
   assert.match(markdown, /Ready secret env variable count: 17/)
   assert.match(markdown, /Resource evidence ready: 0\/7/)
   assert.match(markdown, /Blocked resource evidence ids: .*R02_ACR_IMAGE_REGISTRY/)
+  assert.match(markdown, /Partially observed resource evidence ids: R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS/)
   assert.match(markdown, /Can Codex execute now: false/)
   assert.match(markdown, /Ready authorization packets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID, P03_ACR_PURCHASE, P05_OSS_RAM_STS/)
   assert.match(markdown, /Ready console action packets: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS/)

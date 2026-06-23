@@ -27,6 +27,7 @@ test("Aliyun cloud actions package command is wired into scripts, predeploy, dep
   assert.match(releaseArtifacts, /cloudActionClosureBrief/)
   assert.match(releaseArtifacts, /blockedCredentialCount/)
   assert.match(releaseArtifacts, /resourceEvidenceReady/)
+  assert.match(releaseArtifacts, /partiallyObservedResourceEvidenceIds/)
   assert.match(releaseArtifacts, /cloudInventoryResultsReady/)
   assert.match(releaseArtifacts, /cloudInventoryReadyLocalOperations/)
   assert.match(releaseArtifacts, /cloudInventoryExecutedCommandResults/)
@@ -73,6 +74,8 @@ test("Aliyun cloud actions package summarizes current cloud console action order
   assert.equal(report.summary.resourceEvidenceReady, "0/7")
   assert.ok(report.summary.blockedResourceEvidenceIds.includes("R01_SAE_RUNTIME"))
   assert.ok(report.summary.blockedResourceEvidenceIds.includes("R06_ENV_IMPORT"))
+  assert.ok(report.summary.partiallyObservedResourceEvidenceIds.includes("R05_OSS_AUDIO_STORAGE"))
+  assert.ok(report.summary.partiallyObservedResourceEvidenceIds.includes("R07_SLS_ALERTS"))
   assert.equal(report.cloudActionClosureBrief.canDeployNow, false)
   assert.equal(report.cloudActionClosureBrief.blockedCredentialCount, 8)
   assert.ok(report.cloudActionClosureBrief.blockedCredentialNames.includes("WECHAT_OPEN_APP_ID"))
@@ -81,6 +84,13 @@ test("Aliyun cloud actions package summarizes current cloud console action order
   assert.equal(report.cloudActionClosureBrief.resourceEvidenceReady, "0/7")
   assert.ok(report.cloudActionClosureBrief.blockedResourceEvidenceIds.includes("R02_ACR_IMAGE_REGISTRY"))
   assert.ok(report.cloudActionClosureBrief.blockedResourceEvidenceIds.includes("R07_SLS_ALERTS"))
+  assert.ok(report.cloudActionClosureBrief.partiallyObservedResourceEvidenceIds.includes("R05_OSS_AUDIO_STORAGE"))
+  assert.ok(report.cloudActionClosureBrief.partiallyObservedResourceEvidenceIds.includes("R07_SLS_ALERTS"))
+  assert.ok(report.cloudActionClosureBrief.blockedResourceEvidence.some((item) =>
+    item.id === "R07_SLS_ALERTS" &&
+    item.observedReadiness === "partial" &&
+    item.currentEvidence.some((evidence) => /project_meiye-huajing-app-prod-cn/.test(evidence))
+  ))
   assert.equal(report.cloudActionClosureBrief.strictReadonlyInventoryReady, true)
   assert.equal(report.cloudActionClosureBrief.cloudInventoryReadyLocalOperations, "9/9")
   assert.equal(report.cloudActionClosureBrief.cloudInventoryExecutedCommandResults, "12/12")
@@ -176,6 +186,7 @@ test("Aliyun cloud actions package markdown renders compact action order without
   assert.match(markdown, /readySecretEnvVariableCount: 17/)
   assert.match(markdown, /resourceEvidenceReady: 0\/7/)
   assert.match(markdown, /blockedResourceEvidenceIds: .*R02_ACR_IMAGE_REGISTRY/)
+  assert.match(markdown, /partiallyObservedResourceEvidenceIds: R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS/)
   assert.match(markdown, /strictReadonlyInventoryReady: true/)
   assert.match(markdown, /mutationPerformedCommandResults: 0/)
   assert.match(markdown, /C02_ACR_IMAGE_AND_PULL/)

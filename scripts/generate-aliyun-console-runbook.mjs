@@ -352,6 +352,7 @@ function buildRunbook(args) {
       readySecretEnvVariableCount: consoleClosureBrief.readySecretEnvVariableCount,
       resourceEvidenceReady: consoleClosureBrief.resourceEvidenceReady,
       blockedResourceEvidenceIds: consoleClosureBrief.blockedResourceEvidenceIds,
+      partiallyObservedResourceEvidenceIds: consoleClosureBrief.partiallyObservedResourceEvidenceIds,
       blockedByTaskDependencies: tasks
         .filter((task) => task.blockingDependencies.length > 0)
         .map((task) => task.id),
@@ -425,6 +426,21 @@ function buildConsoleClosureBrief({
   const blockedResourceEvidence =
     resourceEvidenceBrief.blockedResourceEvidence ||
     (resourcesMatrix.resources || []).filter((resource) => resource.ready !== true)
+  const compactedBlockedResourceEvidence = blockedResourceEvidence.map((item) => ({
+    id: item.id,
+    status: item.status,
+    observedStatus: item.observedStatus || "",
+    observedReadiness: item.observedReadiness || "",
+    requiredAuthorizationPackets: item.requiredAuthorizationPackets || [],
+    consoleTaskIds: item.consoleTaskIds || [],
+    currentEvidence: item.currentEvidence || [],
+    missingEvidence: item.missingEvidence || [],
+    writeTargets: item.writeTargets || [],
+    nextEvidenceAction: item.nextEvidenceAction || "",
+  }))
+  const partiallyObservedResourceEvidenceIds = compactedBlockedResourceEvidence
+    .filter((item) => item.observedReadiness === "partial")
+    .map((item) => item.id)
 
   return {
     conclusion: "现在不能部署；必须先补齐微信开放平台移动 App 凭证、Android/iOS 发布凭证、阿里云资源证据和 secret env 导入证据。",
@@ -441,16 +457,8 @@ function buildConsoleClosureBrief({
       resourceEvidenceBrief.blockedIds ||
       resourcesMatrix.summary?.blockedIds ||
       [],
-    blockedResourceEvidence: blockedResourceEvidence.map((item) => ({
-      id: item.id,
-      status: item.status,
-      observedStatus: item.observedStatus || "",
-      requiredAuthorizationPackets: item.requiredAuthorizationPackets || [],
-      consoleTaskIds: item.consoleTaskIds || [],
-      missingEvidence: item.missingEvidence || [],
-      writeTargets: item.writeTargets || [],
-      nextEvidenceAction: item.nextEvidenceAction || "",
-    })),
+    partiallyObservedResourceEvidenceIds,
+    blockedResourceEvidence: compactedBlockedResourceEvidence,
     canStartNowConsoleTasks: tasks
       .filter((task) => task.canStartNow)
       .map((task) => task.id),
@@ -565,6 +573,7 @@ function renderMarkdown(runbook) {
     `- readySecretEnvVariableCount: ${runbook.summary.readySecretEnvVariableCount}`,
     `- resourceEvidenceReady: ${runbook.summary.resourceEvidenceReady}`,
     `- blockedResourceEvidenceIds: ${runbook.summary.blockedResourceEvidenceIds.length ? runbook.summary.blockedResourceEvidenceIds.join(", ") : "none"}`,
+    `- partiallyObservedResourceEvidenceIds: ${runbook.summary.partiallyObservedResourceEvidenceIds.length ? runbook.summary.partiallyObservedResourceEvidenceIds.join(", ") : "none"}`,
     `- blockedByTaskDependencies: ${runbook.summary.blockedByTaskDependencies.length ? runbook.summary.blockedByTaskDependencies.join(", ") : "none"}`,
     `- actionTimeConfirmationRequired: ${runbook.summary.actionTimeConfirmationRequired.length ? runbook.summary.actionTimeConfirmationRequired.join(", ") : "none"}`,
     "",
@@ -577,6 +586,7 @@ function renderMarkdown(runbook) {
     `- readySecretEnvVariableCount: ${runbook.consoleClosureBrief.readySecretEnvVariableCount}`,
     `- resourceEvidenceReady: ${runbook.consoleClosureBrief.resourceEvidenceReady}`,
     `- blockedResourceEvidenceIds: ${runbook.consoleClosureBrief.blockedResourceEvidenceIds.length ? runbook.consoleClosureBrief.blockedResourceEvidenceIds.join(", ") : "none"}`,
+    `- partiallyObservedResourceEvidenceIds: ${runbook.consoleClosureBrief.partiallyObservedResourceEvidenceIds.length ? runbook.consoleClosureBrief.partiallyObservedResourceEvidenceIds.join(", ") : "none"}`,
     `- canStartNowConsoleTasks: ${runbook.consoleClosureBrief.canStartNowConsoleTasks.length ? runbook.consoleClosureBrief.canStartNowConsoleTasks.join(", ") : "none"}`,
     `- readyActionPacketIds: ${runbook.consoleClosureBrief.readyActionPacketIds.length ? runbook.consoleClosureBrief.readyActionPacketIds.join(", ") : "none"}`,
     `- nextActionTimeConfirmations: ${runbook.consoleClosureBrief.nextActionTimeConfirmations.length ? runbook.consoleClosureBrief.nextActionTimeConfirmations.join(", ") : "none"}`,
