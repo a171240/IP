@@ -9,6 +9,32 @@ const root = process.cwd()
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), "utf8")
 const readJson = (...parts) => JSON.parse(read(...parts))
 
+function buildConsoleObservationOperation(id, status) {
+  return {
+    id,
+    title: `${id} console observation`,
+    product: "aliyun",
+    readOnly: true,
+    status,
+    commandResults: [
+      {
+        command: `aliyun readonly ${id}`,
+        executed: false,
+        exitStatus: null,
+        cloudApiCalled: false,
+        mutationPerformed: false,
+        observedAt: "2026-06-23T02:00:00+08:00",
+        outputSummary: "Console-only non-secret observation; CLI/OpenAPI inventory not executed.",
+        evidence: `console_only_${id.toLowerCase()}_non_secret_handle`,
+      },
+    ],
+    writesTo: [
+      "deploy/aliyun-production-cn.cloud-confirmations.local.json",
+    ],
+    evidence: `${id} non-secret console evidence`,
+  }
+}
+
 test("Aliyun operator handoff command is wired into scripts and local predeploy", () => {
   const pkg = readJson("package.json")
   const predeploy = read("scripts", "aliyun-predeploy-commands.mjs")
@@ -91,4 +117,74 @@ test("Aliyun operator handoff maps ACR and SAE evidence gaps to the correct cons
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
+})
+
+test("Aliyun operator handoff exposes console-only inventory observation summary", () => {
+  const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-operator-handoff-console-observation-"))
+  const inventoryResults = path.join(tmpdir, "cloud-inventory-results.local.json")
+  const markdown = path.join(tmpdir, "operator-handoff.md")
+  fs.writeFileSync(inventoryResults, JSON.stringify({
+    schemaVersion: 1,
+    environment: "production-cn",
+    updatedAt: "2026-06-23T02:00:00+08:00",
+    operator: "test",
+    sourcePlanCommand: "corepack pnpm aliyun:cloud:inventory-plan",
+    notes: "Test fixture with console-only observations and no cloud API calls.",
+    operations: [
+      buildConsoleObservationOperation("I01_SAE_RUNTIME", "not_found"),
+      buildConsoleObservationOperation("I02_ACR_IMAGE", "blocked"),
+      buildConsoleObservationOperation("I03_DNS_API_DOMAIN", "not_found"),
+      buildConsoleObservationOperation("I04_DNS_ASSET_DOMAIN", "not_found"),
+      buildConsoleObservationOperation("I05_OSS_AUDIO_BUCKET", "observed"),
+      buildConsoleObservationOperation("I06_SLS_ALERTS", "observed"),
+      buildConsoleObservationOperation("I07_CERT_HTTPS", "blocked"),
+    ],
+  }, null, 2))
+
+  const output = execFileSync(process.execPath, [
+    "scripts/generate-aliyun-operator-handoff.mjs",
+    "--skip-vercel-env-coverage",
+    "--cloud-inventory-results",
+    inventoryResults,
+    "--markdown",
+    markdown,
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 40,
+  })
+  const report = JSON.parse(output)
+  const summary = report.localEvidenceGaps.cloudInventoryResults.observationSummary
+  const markdownOutput = fs.readFileSync(markdown, "utf8")
+
+  assert.equal(report.localEvidenceGaps.cloudInventoryResults.exists, true)
+  assert.equal(report.localEvidenceGaps.cloudInventoryResults.ready, false)
+  assert.equal(summary.safeConsoleOnly, true)
+  assert.equal(summary.operations, 7)
+  assert.equal(summary.consoleObservationOperations, 7)
+  assert.equal(summary.commandResults, 7)
+  assert.equal(summary.executedCommandResults, 0)
+  assert.equal(summary.cloudApiCalledCommandResults, 0)
+  assert.equal(summary.mutationPerformedCommandResults, 0)
+  assert.deepEqual(summary.observedOperationIds, [
+    "I05_OSS_AUDIO_BUCKET",
+    "I06_SLS_ALERTS",
+  ])
+  assert.deepEqual(summary.notFoundOperationIds, [
+    "I01_SAE_RUNTIME",
+    "I03_DNS_API_DOMAIN",
+    "I04_DNS_ASSET_DOMAIN",
+  ])
+  assert.deepEqual(summary.blockedOperationIds, [
+    "I02_ACR_IMAGE",
+    "I07_CERT_HTTPS",
+  ])
+  assert.match(markdownOutput, /safeConsoleOnly: true/)
+  assert.match(markdownOutput, /consoleObservationOperations: 7\/7/)
+  assert.match(markdownOutput, /executedCommandResults: 0\/7/)
+  assert.match(markdownOutput, /cloudApiCalledCommandResults: 0/)
+  assert.match(markdownOutput, /mutationPerformedCommandResults: 0/)
+  assert.doesNotMatch(output + markdownOutput, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(output + markdownOutput, /LTAI[A-Za-z0-9]{12,}/)
+  assert.doesNotMatch(output + markdownOutput, /:\/\/[^\s:@]+:[^\s@]+@/)
 })

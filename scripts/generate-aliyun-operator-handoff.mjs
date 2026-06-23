@@ -502,6 +502,7 @@ function buildLocalEvidenceGaps({ args, status, cloudAccess, cloudConfirmationsC
       exists: cloudInventoryResults.localExists === true,
       ready: cloudInventoryResults.localReady === true,
       checkedOperations: cloudInventoryResults.localCheckedOperations || 0,
+      observationSummary: compactCloudInventoryObservationSummary(cloudInventoryResults.observationSummary),
       totalBlockers: (cloudInventoryResults.localBlockers || []).length,
       gaps: buildCloudInventoryResultGaps(cloudInventoryResults),
     },
@@ -518,6 +519,23 @@ function buildLocalEvidenceGaps({ args, status, cloudAccess, cloudConfirmationsC
       localDockerImage: imagePublishPlan.localDockerImage?.status || "unknown",
       gaps: buildImagePublishGaps(imagePublishPlan, cloudAccess),
     },
+  }
+}
+
+function compactCloudInventoryObservationSummary(summary = {}) {
+  return {
+    safeConsoleOnly: summary.safeConsoleOnly === true,
+    operations: summary.operations || 0,
+    strictReadyOperations: summary.strictReadyOperations || 0,
+    evidenceReadyOperations: summary.evidenceReadyOperations || 0,
+    consoleObservationOperations: summary.consoleObservationOperations || 0,
+    commandResults: summary.commandResults || 0,
+    executedCommandResults: summary.executedCommandResults || 0,
+    cloudApiCalledCommandResults: summary.cloudApiCalledCommandResults || 0,
+    mutationPerformedCommandResults: summary.mutationPerformedCommandResults || 0,
+    observedOperationIds: summary.observedOperationIds || [],
+    notFoundOperationIds: summary.notFoundOperationIds || [],
+    blockedOperationIds: summary.blockedOperationIds || [],
   }
 }
 
@@ -812,6 +830,11 @@ function renderMarkdown(handoff) {
     `- exists: ${handoff.localEvidenceGaps.cloudInventoryResults.exists}`,
     `- ready: ${handoff.localEvidenceGaps.cloudInventoryResults.ready}`,
     `- checkedOperations: ${handoff.localEvidenceGaps.cloudInventoryResults.checkedOperations}`,
+    `- safeConsoleOnly: ${handoff.localEvidenceGaps.cloudInventoryResults.observationSummary.safeConsoleOnly}`,
+    `- consoleObservationOperations: ${handoff.localEvidenceGaps.cloudInventoryResults.observationSummary.consoleObservationOperations}/${handoff.localEvidenceGaps.cloudInventoryResults.observationSummary.operations}`,
+    `- executedCommandResults: ${handoff.localEvidenceGaps.cloudInventoryResults.observationSummary.executedCommandResults}/${handoff.localEvidenceGaps.cloudInventoryResults.observationSummary.commandResults}`,
+    `- cloudApiCalledCommandResults: ${handoff.localEvidenceGaps.cloudInventoryResults.observationSummary.cloudApiCalledCommandResults}`,
+    `- mutationPerformedCommandResults: ${handoff.localEvidenceGaps.cloudInventoryResults.observationSummary.mutationPerformedCommandResults}`,
     `- totalBlockers: ${handoff.localEvidenceGaps.cloudInventoryResults.totalBlockers}`,
     "",
     ...(handoff.localEvidenceGaps.cloudInventoryResults.gaps.length
