@@ -59,6 +59,34 @@ test("Aliyun sensitive blockers output has current blocked action ids but no sec
   assert.ok(report.summary.userIntervention.readySecretEnvVariableNames.includes("SUPABASE_SERVICE_ROLE_KEY"))
   assert.ok(report.summary.userIntervention.readySecretEnvVariableNames.includes("DASHSCOPE_API_KEY"))
   assert.ok(report.summary.userIntervention.readySecretEnvVariableCount >= 1)
+  assert.equal(report.credentialInterventionBrief.blockedCredentialCount, 8)
+  assert.equal(report.credentialInterventionBrief.readySecretEnvVariableCount, 17)
+  assert.ok(report.credentialInterventionBrief.blockedCredentialNames.includes("WECHAT_OPEN_APP_ID"))
+  assert.ok(report.credentialInterventionBrief.blockedCredentialNames.includes("MEIYE_RELEASE_KEY_PASSWORD"))
+  assert.ok(report.credentialInterventionBrief.readySecretEnvVariableNames.includes("SUPABASE_SERVICE_ROLE_KEY"))
+  assert.deepEqual(
+    report.credentialInterventionBrief.actionTimeConfirmationRequiredIds,
+    report.summary.actionTimeConfirmationRequired,
+  )
+  assert.ok(report.credentialInterventionBrief.forbiddenStorage.includes("Docker image"))
+  assert.ok(report.credentialInterventionBrief.groups.some((group) =>
+    group.category === "wechat_open_mobile_app" &&
+    group.actionId === "S01_WECHAT_OPEN_APP_LOGIN" &&
+    group.blockedCredentialNames.includes("WECHAT_OPEN_APP_SECRET") &&
+    /微信开放平台/.test(group.obtainFrom)
+  ))
+  assert.ok(report.credentialInterventionBrief.groups.some((group) =>
+    group.category === "ready_secret_env_import" &&
+    group.actionId === "S06_READY_SENSITIVE_ENV_IMPORT" &&
+    group.readySecretEnvVariableNames.includes("SUPABASE_SERVICE_ROLE_KEY") &&
+    group.requiresActionTimeConfirmation === true
+  ))
+  assert.ok(report.credentialInterventionBrief.groups.some((group) =>
+    group.category === "android_release_signing" &&
+    group.actionId === "S07_ANDROID_RELEASE_SIGNING" &&
+    group.blockedCredentialNames.includes("MEIYE_RELEASE_STORE_PASSWORD") &&
+    /signing secret store/.test(group.valueHandling)
+  ))
   assert.deepEqual(report.summary.userIntervention.groups.external_review_then_app_credentials, ["S01_WECHAT_OPEN_APP_LOGIN"])
   assert.deepEqual(report.summary.userIntervention.groups.external_identifier_lookup, ["S02_APPLE_TEAM_ID"])
   assert.deepEqual(report.summary.userIntervention.groups.paid_purchase_confirmation, ["S03_ACR_PAID_PURCHASE"])
@@ -213,6 +241,12 @@ test("Aliyun sensitive blockers markdown renders value-free variable acquisition
 
   assert.match(markdown, /#### 变量获取和导入明细/)
   assert.match(markdown, /## 用户介入分层/)
+  assert.match(markdown, /## 用户介入密钥\/密码简表/)
+  assert.match(markdown, /blockedCredentialCount: 8/)
+  assert.match(markdown, /readySecretEnvVariableCount: 17/)
+  assert.match(markdown, /wechat_open_mobile_app/)
+  assert.match(markdown, /ready_secret_env_import/)
+  assert.match(markdown, /android_release_signing/)
   assert.match(markdown, /blockedVariableNames: .*WECHAT_OPEN_APP_ID/)
   assert.match(markdown, /readySecretEnvVariableNames: .*SUPABASE_SERVICE_ROLE_KEY/)
   assert.match(markdown, /external_review_then_app_credentials: S01_WECHAT_OPEN_APP_LOGIN/)
@@ -239,6 +273,7 @@ test("Aliyun release artifacts summary surfaces sensitive blocker acquisition de
   assert.match(releaseArtifacts, /variableDetailsSummary/)
   assert.match(releaseArtifacts, /formatSensitiveVariableSummary/)
   assert.match(releaseArtifacts, /userIntervention: sensitiveBlockers\.summary\.userIntervention/)
+  assert.match(releaseArtifacts, /credentialInterventionBrief/)
   assert.match(releaseArtifacts, /blockedVariableNames/)
   assert.match(releaseArtifacts, /readySecretEnvVariableCount/)
   assert.match(releaseArtifacts, /formatUserInterventionGroups/)

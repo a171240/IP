@@ -112,6 +112,13 @@ function summarize(items) {
     variable.sensitivity !== "public" &&
     String(variable.importTarget || "").includes("secret env"),
   )
+  const userIntervention = buildUserInterventionSummary(items, blockedVariableRows, readySecretEnvVariableRows)
+  const credentialInterventionBrief = buildCredentialInterventionBrief(
+    items,
+    blockedVariableRows,
+    readySecretEnvVariableRows,
+    userIntervention,
+  )
   return {
     total: items.length,
     ready: items.length - blocked.length,
@@ -123,7 +130,8 @@ function summarize(items) {
       .filter((item) => item.requiresActionTimeConfirmation === true)
       .map((item) => item.id),
     variableNames: unique(items.flatMap((item) => item.variableNames || [])).sort(),
-    userIntervention: buildUserInterventionSummary(items, blockedVariableRows, readySecretEnvVariableRows),
+    userIntervention,
+    credentialInterventionBrief,
     readySensitiveEnvVariableGroups: items
       .filter((item) => item.id === "S06_READY_SENSITIVE_ENV_IMPORT")
       .flatMap((item) => item.variableGroups || [])
@@ -144,6 +152,106 @@ function summarize(items) {
         sum + (item.variableDetails || []).filter((variable) => variable.sensitivity !== "public").length, 0),
     },
   }
+}
+
+const CREDENTIAL_GROUP_METADATA = Object.freeze({
+  S01_WECHAT_OPEN_APP_LOGIN: Object.freeze({
+    category: "wechat_open_mobile_app",
+    userQuestion: "微信登录环境变量从哪里获得",
+  }),
+  S02_APPLE_TEAM_ID: Object.freeze({
+    category: "ios_universal_link",
+    userQuestion: "iOS Universal Link 需要哪个 Apple Team ID",
+  }),
+  S03_ACR_PAID_PURCHASE: Object.freeze({
+    category: "acr_paid_purchase",
+    userQuestion: "阿里云 ACR 是否需要购买和确认规格",
+  }),
+  S04_ACR_REGISTRY_AUTH: Object.freeze({
+    category: "acr_registry_auth",
+    userQuestion: "镜像推送和 SAE 拉取凭证放在哪里",
+  }),
+  S05_OSS_RAM_SECRET_OR_STS: Object.freeze({
+    category: "oss_ram_sts",
+    userQuestion: "OSS/RAM/STS 密钥如何导入阿里云运行环境",
+  }),
+  S06_READY_SENSITIVE_ENV_IMPORT: Object.freeze({
+    category: "ready_secret_env_import",
+    userQuestion: "本机已有 API key 如何迁到阿里云 secret env",
+  }),
+  S07_ANDROID_RELEASE_SIGNING: Object.freeze({
+    category: "android_release_signing",
+    userQuestion: "国内 Android release 签名和微信开放平台签名如何补齐",
+  }),
+})
+
+function buildCredentialInterventionBrief(items, blockedVariableRows, readySecretEnvVariableRows, userIntervention) {
+  const blockedCredentialNames = unique(blockedVariableRows.map((variable) => variable.name)).sort()
+  const readySecretEnvVariableNames = unique(readySecretEnvVariableRows.map((variable) => variable.name)).sort()
+  return {
+    canCodexProceedWithoutUser: false,
+    blockedCredentialCount: blockedCredentialNames.length,
+    blockedCredentialNames,
+    readySecretEnvVariableCount: readySecretEnvVariableNames.length,
+    readySecretEnvVariableNames,
+    actionTimeConfirmationRequiredIds: userIntervention.actionTimeConfirmationRequired,
+    groups: items.map((item) => buildCredentialGroup(item)),
+    valueHandlingRules: userIntervention.valueHandlingRules,
+    forbiddenStorage: [
+      "git",
+      "JSON/Markdown 报告",
+      "Docker image",
+      "App bundle",
+      "小程序或 App 前端包",
+    ],
+  }
+}
+
+function buildCredentialGroup(item) {
+  const metadata = CREDENTIAL_GROUP_METADATA[item.id] || {}
+  const variableDetails = item.variableDetails || []
+  return {
+    category: metadata.category || interventionMode(item),
+    actionId: item.id,
+    userQuestion: metadata.userQuestion || "",
+    status: item.status,
+    owner: item.owner,
+    type: item.type,
+    blockedCredentialNames: unique(variableDetails
+      .filter((variable) => variable.status !== "ready")
+      .map((variable) => variable.name)).sort(),
+    readySecretEnvVariableNames: unique(variableDetails
+      .filter((variable) =>
+        variable.status === "ready" &&
+        variable.sensitivity !== "public" &&
+        String(variable.importTarget || "").includes("secret env"))
+      .map((variable) => variable.name)).sort(),
+    variableNames: item.variableNames || [],
+    obtainFrom: item.obtainFrom || item.consolePath || "",
+    importTargets: unique(variableDetails.map((variable) => variable.importTarget)).sort(),
+    writeTargets: item.writeTargets || [],
+    requiresActionTimeConfirmation: item.requiresActionTimeConfirmation === true,
+    valueHandling: valueHandlingForItem(item, variableDetails),
+    forbiddenStorage: forbiddenStorageForItem(item),
+    verifyCommands: item.verifyCommands || [],
+    unblockCondition: item.unblockCondition,
+  }
+}
+
+function valueHandlingForItem(item, variableDetails) {
+  if (item.id === "S03_ACR_PAID_PURCHASE") return "只记录 ACR 规格、地域、命名空间、仓库名和付款确认状态；不记录付款凭据。"
+  if (item.id === "S04_ACR_REGISTRY_AUTH") return "镜像仓库登录和 SAE 拉取凭证只能进入 Docker credential helper、RAM/KMS/Secrets Manager 或阿里云运行时 secret 配置。"
+  if (item.id === "S07_ANDROID_RELEASE_SIGNING") return "release keystore 和密码只进入本机/CI signing secret store；微信开放平台只填写签名摘要。"
+  if (variableDetails.some((variable) => String(variable.importTarget || "").includes("plain env"))) {
+    return "公开标识符可导入 SAE plain env；secret value 仍必须走 KMS/Secrets Manager/SAE secret env。"
+  }
+  return "只在动作时导入 KMS/Secrets Manager/SAE secret env；报告中只保留变量名和非密钥证据。"
+}
+
+function forbiddenStorageForItem(item) {
+  if (item.id === "S07_ANDROID_RELEASE_SIGNING") return ["git", "JSON/Markdown 报告", "Docker image", "App bundle", "debug.keystore"]
+  if (item.id === "S04_ACR_REGISTRY_AUTH") return ["git", "JSON/Markdown 报告", "Docker image", "shell history"]
+  return ["git", "JSON/Markdown 报告", "Docker image", "App bundle", "小程序或 App 前端包"]
 }
 
 function buildUserInterventionSummary(items, blockedVariableRows, readySecretEnvVariableRows) {
@@ -243,6 +351,7 @@ function buildReport(operatorTasks) {
       ? "当前仍有密钥、密码、token、付款或受控标识符类人工介入项；本报告只列变量名和控制台路径，不输出任何 value。"
       : "当前没有未完成的密钥、密码、token、付款或受控标识符类人工介入项。",
     summary,
+    credentialInterventionBrief: summary.credentialInterventionBrief,
     items,
     nextActions: [
       "先处理 S01 微信开放平台移动应用创建/审核；审核通过后再获取 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET。",
@@ -283,6 +392,15 @@ function renderMarkdown(report) {
     `- blockedVariableNames: ${report.summary.userIntervention.blockedVariableNames.length ? report.summary.userIntervention.blockedVariableNames.join(", ") : "none"}`,
     `- readySecretEnvVariableNames: ${report.summary.userIntervention.readySecretEnvVariableNames.length ? report.summary.userIntervention.readySecretEnvVariableNames.join(", ") : "none"}`,
     "",
+    "## 用户介入密钥/密码简表",
+    "",
+    `- blockedCredentialCount: ${report.credentialInterventionBrief.blockedCredentialCount}`,
+    `- blockedCredentialNames: ${report.credentialInterventionBrief.blockedCredentialNames.length ? report.credentialInterventionBrief.blockedCredentialNames.join(", ") : "none"}`,
+    `- readySecretEnvVariableCount: ${report.credentialInterventionBrief.readySecretEnvVariableCount}`,
+    `- readySecretEnvVariableNames: ${report.credentialInterventionBrief.readySecretEnvVariableNames.length ? report.credentialInterventionBrief.readySecretEnvVariableNames.join(", ") : "none"}`,
+    `- forbiddenStorage: ${report.credentialInterventionBrief.forbiddenStorage.join(", ")}`,
+    "",
+    ...renderCredentialInterventionGroups(report.credentialInterventionBrief.groups),
     "## 用户介入分层",
     "",
     ...Object.entries(report.summary.userIntervention.groups).map(([mode, ids]) => `- ${mode}: ${ids.join(", ")}`),
@@ -336,6 +454,24 @@ function renderMarkdown(report) {
     "",
   )
   return `${lines.join("\n")}\n`
+}
+
+function renderCredentialInterventionGroups(groups) {
+  if (!groups.length) return ["- none", ""]
+  return [
+    "| 类别 | 动作 ID | 状态 | 还缺变量 | 已 ready 但需导入 secret env | 获取位置 | 导入/写入目标 |",
+    "| --- | --- | --- | --- | --- | --- | --- |",
+    ...groups.map((group) => [
+      codeCell(group.category),
+      codeCell(group.actionId),
+      escapeTableCell(group.status),
+      escapeTableCell(group.blockedCredentialNames.join(", ") || "none"),
+      escapeTableCell(group.readySecretEnvVariableNames.join(", ") || "none"),
+      escapeTableCell(group.obtainFrom),
+      escapeTableCell((group.writeTargets || []).join("; ") || (group.importTargets || []).join("; ") || "none"),
+    ].join(" | ").replace(/^/, "| ").replace(/$/, " |")),
+    "",
+  ]
 }
 
 function renderVariableDetailTable(items) {

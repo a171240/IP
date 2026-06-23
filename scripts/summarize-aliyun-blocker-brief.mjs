@@ -161,6 +161,9 @@ function buildReport(args) {
   const sensitiveBlockerSummaries = compactSensitiveBlockers(sensitiveBlockers)
   const blockedVariableAcquisitionPlan = buildBlockedVariableAcquisitionPlan(sensitiveBlockers)
   const readySecretEnvImportGroups = sensitiveBlockers.summary?.readySensitiveEnvVariableGroups || []
+  const credentialInterventionBrief = sensitiveBlockers.credentialInterventionBrief
+    || sensitiveBlockers.summary?.credentialInterventionBrief
+    || {}
   const wechatOpenMobileApp = compactWechatOpenMobileApp(wechatOpenMobileAppPackage)
   const cloudInventoryReadinessInterpretation = buildCloudInventoryReadinessInterpretation(status, cloudAccess)
   const report = {
@@ -192,6 +195,10 @@ function buildReport(args) {
         .filter((item) => item.status !== "ready")
         .map((item) => item.id),
       requiredEnvBlockers: requiredEnvBlockers.map((item) => item.name),
+      blockedCredentialCount: credentialInterventionBrief.blockedCredentialCount || 0,
+      blockedCredentialNames: credentialInterventionBrief.blockedCredentialNames || [],
+      readySecretEnvVariableCount: credentialInterventionBrief.readySecretEnvVariableCount || 0,
+      readySecretEnvVariableNames: credentialInterventionBrief.readySecretEnvVariableNames || [],
       blockedVariableAcquisitionCount: blockedVariableAcquisitionPlan.length,
       readySecretEnvImportGroupCount: readySecretEnvImportGroups.length,
       immediateAuthorizationPackets: actionAuthorization.summary?.nextActionTimeConfirmations || [],
@@ -210,6 +217,7 @@ function buildReport(args) {
     requiredEnvBlockers,
     blockedVariableAcquisitionPlan,
     readySecretEnvImportGroups,
+    credentialInterventionBrief,
     wechatOpenMobileApp,
     cloudInventoryReadinessInterpretation,
     cloudAccess: {
@@ -420,6 +428,8 @@ function renderMarkdown(report) {
     `- completion: proved ${report.summary.completion.proved}/${report.summary.completion.requirements}, blocked ${report.summary.completion.blocked}, partial ${report.summary.completion.partial}`,
     `- sensitiveBlocked: ${report.summary.sensitiveBlocked}`,
     `- sensitiveBlockedIds: ${report.summary.sensitiveBlockedIds.join(", ") || "none"}`,
+    `- blockedCredentialCount: ${report.summary.blockedCredentialCount}`,
+    `- readySecretEnvVariableCount: ${report.summary.readySecretEnvVariableCount}`,
     `- blockedVariableAcquisitionCount: ${report.summary.blockedVariableAcquisitionCount}`,
     `- readySecretEnvImportGroupCount: ${report.summary.readySecretEnvImportGroupCount}`,
     `- cloudInventoryStrictReady: ${report.summary.cloudInventoryStrictReady}`,
@@ -468,6 +478,9 @@ function renderMarkdown(report) {
     "## 密钥/密码/token/付款/受控标识符阻塞项",
     "",
     ...renderSensitiveBlockers(report.sensitiveBlockers),
+    "## 用户介入密钥/密码简表",
+    "",
+    ...renderCredentialInterventionBrief(report.credentialInterventionBrief),
     "## 必填/发布阻塞变量",
     "",
     ...renderVariableTable(report.requiredEnvBlockers),
@@ -516,6 +529,30 @@ function renderMarkdown(report) {
     ...report.prohibitedWithoutActionTimeConfirmation.map((item) => `- ${item}`),
     "",
   ].join("\n")
+}
+
+function renderCredentialInterventionBrief(brief) {
+  if (!brief || !Array.isArray(brief.groups)) return ["- none", ""]
+  return [
+    `- blockedCredentialCount: ${brief.blockedCredentialCount || 0}`,
+    `- blockedCredentialNames: ${(brief.blockedCredentialNames || []).join(", ") || "none"}`,
+    `- readySecretEnvVariableCount: ${brief.readySecretEnvVariableCount || 0}`,
+    `- readySecretEnvVariableNames: ${(brief.readySecretEnvVariableNames || []).join(", ") || "none"}`,
+    `- forbiddenStorage: ${(brief.forbiddenStorage || []).join(", ") || "none"}`,
+    "",
+    "| 类别 | 动作 ID | 状态 | 还缺变量 | 已 ready 但需导入 secret env | 获取位置 | 导入/写入目标 |",
+    "| --- | --- | --- | --- | --- | --- | --- |",
+    ...brief.groups.map((group) => [
+      codeCell(group.category),
+      codeCell(group.actionId),
+      escapeTableCell(group.status),
+      escapeTableCell((group.blockedCredentialNames || []).join(", ") || "none"),
+      escapeTableCell((group.readySecretEnvVariableNames || []).join(", ") || "none"),
+      escapeTableCell(group.obtainFrom),
+      escapeTableCell((group.writeTargets || []).join("; ") || (group.importTargets || []).join("; ") || "none"),
+    ].join(" | ").replace(/^/, "| ").replace(/$/, " |")),
+    "",
+  ]
 }
 
 function renderBlockedVariableAcquisitionPlan(items) {

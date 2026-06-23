@@ -1747,6 +1747,9 @@ function main() {
       blockedIds: sensitiveBlockers.summary.blockedIds,
       variableDetails: sensitiveBlockers.summary.variableDetails || {},
       userIntervention: sensitiveBlockers.summary.userIntervention || {},
+      credentialInterventionBrief: sensitiveBlockers.credentialInterventionBrief
+        || sensitiveBlockers.summary.credentialInterventionBrief
+        || {},
       items: (sensitiveBlockers.items || []).map(compactSensitiveBlockerForAudit),
     },
     resourcesMatrix: {
@@ -1855,6 +1858,10 @@ function main() {
       cloudConfirmationsReady: blockerBrief.summary.cloudConfirmationsReady,
       operatorTasksReady: blockerBrief.summary.operatorTasksReady,
       sensitiveBlocked: blockerBrief.summary.sensitiveBlocked,
+      blockedCredentialCount: blockerBrief.summary.blockedCredentialCount || 0,
+      blockedCredentialNames: blockerBrief.summary.blockedCredentialNames || [],
+      readySecretEnvVariableCount: blockerBrief.summary.readySecretEnvVariableCount || 0,
+      readySecretEnvVariableNames: blockerBrief.summary.readySecretEnvVariableNames || [],
       blockedVariableAcquisitionCount: blockerBrief.summary.blockedVariableAcquisitionCount || 0,
       readySecretEnvImportGroupCount: blockerBrief.summary.readySecretEnvImportGroupCount || 0,
       immediateAuthorizationPackets: blockerBrief.summary.immediateAuthorizationPackets,
@@ -1870,6 +1877,7 @@ function main() {
       wechatOpenCanCreateDraft: blockerBrief.summary.wechatOpenCanCreateDraft === true,
       wechatOpenReadyToSubmitForReview: blockerBrief.summary.wechatOpenReadyToSubmitForReview === true,
       wechatOpenMobileApp: blockerBrief.wechatOpenMobileApp || null,
+      credentialInterventionBrief: blockerBrief.credentialInterventionBrief || {},
       requiredEnvBlockers: blockerBrief.requiredEnvBlockers.map((item) => `${item.name}:${item.status}:${item.importTarget}`),
       blockedVariableAcquisitionPlan: (blockerBrief.blockedVariableAcquisitionPlan || []).map((item) =>
         `${item.name}:${(item.requiredAuthorizationPackets || []).join("|")}:${item.importTarget}`),
