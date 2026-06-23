@@ -574,6 +574,10 @@ function renderMarkdown(audit) {
     `- requirements: proved ${completionAudit.summary.proved}/${completionAudit.summary.requirements}, blocked ${completionAudit.summary.blocked}, partial ${completionAudit.summary.partial}`,
     `- canStartNowConsoleTasks: ${completionAudit.summary.canStartNowConsoleTasks.length ? completionAudit.summary.canStartNowConsoleTasks.join(", ") : "none"}`,
     `- canStartNowAuthorizationPackets: ${completionAudit.summary.canStartNowAuthorizationPackets.length ? completionAudit.summary.canStartNowAuthorizationPackets.join(", ") : "none"}`,
+    `- nextActionTimeConfirmations: ${completionAudit.summary.nextActionTimeConfirmations.length ? completionAudit.summary.nextActionTimeConfirmations.map((item) => item.packetId).join(", ") : "none"}`,
+    ...(completionAudit.summary.nextActionTimeConfirmations?.length
+      ? completionAudit.summary.nextActionTimeConfirmations.map((item) => `- ${item.packetId}: ${item.minimumUserPhrase}`)
+      : ["- nextActionTimeConfirmations: none"]),
     ...(completionAudit.requirements?.length
       ? completionAudit.requirements.map((item) => `- ${item.id}: ${item.status}${item.blockers?.length ? ` (${item.blockers.join(", ")})` : ""}`)
       : ["- none"]),
@@ -1388,6 +1392,7 @@ function main() {
       partial: completionAudit.summary.partial,
       canStartNowConsoleTasks: completionAudit.summary.canStartNowConsoleTasks,
       canStartNowAuthorizationPackets: completionAudit.summary.canStartNowAuthorizationPackets,
+      nextActionTimeConfirmations: completionAudit.summary.nextActionTimeConfirmations || [],
       requirementStatuses: (completionAudit.requirements || []).map((item) => `${item.id}:${item.status}`),
     },
     wechatOpenMobileAppPackage: {

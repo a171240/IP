@@ -73,6 +73,7 @@ test("Aliyun completion audit command is wired into scripts, predeploy, deploy s
   assert.match(releaseArtifacts, /completionAudit/)
   assert.match(releaseArtifacts, /cloudInventoryConsoleOnly/)
   assert.match(releaseArtifacts, /observationSummary/)
+  assert.match(releaseArtifacts, /nextActionTimeConfirmations/)
 })
 
 test("Aliyun completion audit reports the current goal as blocked without secret values", () => {
@@ -117,6 +118,29 @@ test("Aliyun completion audit reports the current goal as blocked without secret
   assert.ok(report.nextActions.canStartNowConsoleTasks.includes("C05_OSS_AUDIO_RAM_STS"))
   assert.ok(report.nextActions.canStartNowAuthorizationPackets.includes("P01_WECHAT_OPEN_MOBILE_APP"))
   assert.ok(report.nextActions.canStartNowAuthorizationPackets.includes("P03_ACR_PURCHASE"))
+  assert.deepEqual(
+    report.summary.nextActionTimeConfirmations.map((item) => item.packetId),
+    [
+      "P01_WECHAT_OPEN_MOBILE_APP",
+      "P02_APPLE_TEAM_ID",
+      "P03_ACR_PURCHASE",
+      "P05_OSS_RAM_STS",
+    ],
+  )
+  assert.match(
+    report.summary.nextActionTimeConfirmations.find((item) => item.packetId === "P01_WECHAT_OPEN_MOBILE_APP").minimumUserPhrase,
+    /微信开放平台创建\/补全美业话镜移动应用资料/,
+  )
+  assert.ok(
+    report.summary.nextActionTimeConfirmations
+      .find((item) => item.packetId === "P03_ACR_PURCHASE")
+      .explicitlyExcluded.some((item) => item.includes("未明确确认金额前不点击付款")),
+  )
+  assert.ok(
+    report.nextActions.nextActionTimeConfirmations
+      .find((item) => item.packetId === "P05_OSS_RAM_STS")
+      .completionEvidence.includes("oss.ramLeastPrivilege=true"),
+  )
   assert.ok(report.nextActions.sensitiveBlockedIds.includes("S01_WECHAT_OPEN_APP_LOGIN"))
   assert.ok(report.nextActions.sensitiveBlockedIds.includes("S06_READY_SENSITIVE_ENV_IMPORT"))
   assert.ok(report.safetyBoundary.some((item) => item.includes("不购买 ACR")))
