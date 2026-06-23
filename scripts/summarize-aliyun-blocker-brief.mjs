@@ -401,9 +401,11 @@ function extractRequiredEnvBlockers(sensitiveBlockers) {
       sourceCategory: item.sourceCategory,
       owner: item.owner,
       consolePath: item.consolePath,
+      obtainFrom: item.consolePath,
       obtain: item.obtain,
       importTarget: item.importTarget,
       action: item.action,
+      valueHandling: valueHandlingForVariable(item),
     }))
 }
 
@@ -620,15 +622,17 @@ function renderPacket(packet) {
 function renderVariableTable(items) {
   if (!items.length) return ["- none", ""]
   return [
-    "| 变量 | 必填 | 状态 | 敏感等级 | 获取位置 | 导入目标 |",
-    "| --- | --- | --- | --- | --- | --- |",
+    "| 变量 | 必填 | 状态 | 敏感等级 | 获取位置 | 获取方式 | 导入目标 | 处理规则 |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ...items.map((item) => [
       codeCell(item.name),
       item.required ? "是" : "否",
       escapeTableCell(item.status),
       escapeTableCell(item.sensitivity),
-      escapeTableCell(item.consolePath),
+      escapeTableCell(item.obtainFrom || item.consolePath),
+      escapeTableCell(item.obtain),
       escapeTableCell(item.importTarget),
+      escapeTableCell(item.valueHandling),
     ].join(" | ").replace(/^/, "| ").replace(/$/, " |")),
     "",
   ]

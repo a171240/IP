@@ -734,7 +734,9 @@ function renderMarkdown(audit) {
       ? blockerBrief.immediateAuthorizationPackets.map((item) => `- ${item.packetId}: ${item.minimumUserPhrase}`)
       : ["- immediateAuthorizationPackets: none"]),
     ...(blockerBrief.requiredEnvBlockers?.length
-      ? blockerBrief.requiredEnvBlockers.map((item) => `- ${item.name}: ${item.status} -> ${item.importTarget}`)
+      ? blockerBrief.requiredEnvBlockers.map((item) => (
+        `- ${item.name}: ${item.status}; obtainFrom=${item.obtainFrom || item.consolePath || "unknown"}; importTarget=${item.importTarget}; valueHandling=${item.valueHandling || "unknown"}`
+      ))
       : ["- requiredEnvBlockers: none"]),
     ...(blockerBrief.blockedVariableAcquisitionPlan?.length
       ? blockerBrief.blockedVariableAcquisitionPlan.map((item) => `- ${item.name}: packets=${(item.requiredAuthorizationPackets || []).join(", ") || "none"}; obtainFrom=${item.obtainFrom}; importTarget=${item.importTarget}`)
@@ -1948,6 +1950,17 @@ function main() {
       wechatOpenMobileApp: blockerBrief.wechatOpenMobileApp || null,
       credentialInterventionBrief: blockerBrief.credentialInterventionBrief || {},
       requiredEnvBlockers: blockerBrief.requiredEnvBlockers.map((item) => `${item.name}:${item.status}:${item.importTarget}`),
+      requiredEnvBlockerDetails: blockerBrief.requiredEnvBlockers.map((item) => ({
+        name: item.name,
+        status: item.status,
+        required: item.required === true,
+        sensitivity: item.sensitivity || "",
+        obtainFrom: item.obtainFrom || item.consolePath || "",
+        obtain: item.obtain || "",
+        importTarget: item.importTarget || "",
+        valueHandling: item.valueHandling || "",
+        action: item.action || "",
+      })),
       blockedVariableAcquisitionPlan: (blockerBrief.blockedVariableAcquisitionPlan || []).map((item) =>
         `${item.name}:${(item.requiredAuthorizationPackets || []).join("|")}:${item.importTarget}`),
       readySecretEnvImportGroups: (blockerBrief.readySecretEnvImportGroups || []).map((group) =>

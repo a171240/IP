@@ -36,6 +36,7 @@ test("Aliyun blocker brief command is wired into scripts, predeploy, deploy spec
   assert.match(releaseArtifacts, /readySecretEnvImportGroupCount/)
   assert.match(releaseArtifacts, /blockedVariableAcquisitionPlan/)
   assert.match(releaseArtifacts, /readySecretEnvImportGroups/)
+  assert.match(releaseArtifacts, /requiredEnvBlockerDetails/)
 })
 
 test("Aliyun blocker brief is concise, value-free, and names current hard blockers", () => {
@@ -87,9 +88,13 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.ok(report.summary.readySecretEnvVariableNames.includes("SUPABASE_SERVICE_ROLE_KEY"))
   assert.equal(report.summary.readySecretEnvImportGroupCount, 9)
   assert.ok(report.requiredEnvBlockers.some((item) => item.name === "WECHAT_OPEN_APP_ID" && /微信开放平台/.test(item.consolePath)))
+  assert.ok(report.requiredEnvBlockers.some((item) => item.name === "WECHAT_OPEN_APP_ID" && /微信开放平台/.test(item.obtainFrom)))
+  assert.ok(report.requiredEnvBlockers.some((item) => item.name === "WECHAT_OPEN_APP_ID" && /plain env/.test(item.valueHandling)))
   assert.ok(report.requiredEnvBlockers.some((item) => item.name === "WECHAT_OPEN_APP_SECRET" && /secret env/.test(item.importTarget)))
+  assert.ok(report.requiredEnvBlockers.some((item) => item.name === "WECHAT_OPEN_APP_SECRET" && /secret env/.test(item.valueHandling)))
   assert.ok(report.requiredEnvBlockers.some((item) => item.name === "APPLE_TEAM_ID" && /Apple Developer/.test(item.consolePath)))
   assert.ok(report.requiredEnvBlockers.some((item) => item.name === "MEIYE_RELEASE_KEY_PASSWORD" && /Android signing secret store/.test(item.importTarget)))
+  assert.ok(report.requiredEnvBlockers.some((item) => item.name === "MEIYE_RELEASE_KEY_PASSWORD" && /本机\/CI signing secret store/.test(item.valueHandling)))
   assert.ok(report.sensitiveBlockers.some((item) =>
     item.id === "S07_ANDROID_RELEASE_SIGNING" &&
     item.type === "android_keystore_password_or_signature" &&
@@ -203,6 +208,8 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.match(markdown, /ready_secret_env_import/)
   assert.match(markdown, /阻塞变量获取与导入计划/)
   assert.match(markdown, /已 ready 但仍需导入阿里云 secret env 的变量组/)
+  assert.match(markdown, /处理规则/)
+  assert.match(markdown, /只保存在本机\/CI signing secret store/)
   assert.match(markdown, /P01_WECHAT_OPEN_MOBILE_APP/)
   assert.match(markdown, /SUPABASE_SERVICE_ROLE_KEY/)
   assert.doesNotMatch(output, secretLike)
