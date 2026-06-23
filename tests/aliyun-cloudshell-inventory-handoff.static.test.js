@@ -34,14 +34,20 @@ test("Aliyun CloudShell handoff is wired into scripts, predeploy, deploy spec, a
   assert.match(releaseArtifacts, /cloudshell-inventory-handoff\.json/)
   assert.match(releaseArtifacts, /cloudshell-inventory-handoff\.md/)
   assert.match(releaseArtifacts, /cloudshellInventoryHandoff/)
+  assert.match(releaseArtifacts, /currentBrowserCanUseCurrentConsole/)
+  assert.match(releaseArtifacts, /strictInventoryAlreadyReady/)
 })
 
 test("Aliyun CloudShell handoff produces value-free local JSON and Markdown", () => {
   const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-cloudshell-handoff-"))
+  const inventoryPath = path.join(tmpdir, "inventory.local.json")
   const jsonPath = path.join(tmpdir, "handoff.json")
   const markdownPath = path.join(tmpdir, "handoff.md")
+  writeStrictInventoryFixture(inventoryPath)
   const output = execFileSync(process.execPath, [
     "scripts/generate-aliyun-cloudshell-inventory-handoff.mjs",
+    "--cloud-inventory-results",
+    inventoryPath,
     "--out",
     jsonPath,
     "--markdown",
@@ -65,8 +71,24 @@ test("Aliyun CloudShell handoff produces value-free local JSON and Markdown", ()
   assert.equal(report.cloudApiCalled, false)
   assert.equal(report.mutationPerformed, false)
   assert.equal(report.secretLeakCheck.ok, true)
+  assert.equal(report.currentBrowser.checked, true)
+  assert.equal(typeof report.currentBrowser.canUseCurrentConsole, "boolean")
+  assert.ok(Array.isArray(report.currentBrowser.aliyunConsoleHostPaths))
+  assert.equal(report.currentBrowser.cloudApiCalled, false)
+  assert.equal(report.currentBrowser.cloudMutationPerformed, false)
   assert.equal(typeof report.cliReadiness.canReadCloudNow, "boolean")
   assert.equal(typeof report.cliReadiness.configProbe.ready, "boolean")
+  assert.equal(report.cliReadiness.strictInventoryAlreadyReady, true)
+  assert.equal(report.existingInventoryEvidence.ready, true)
+  assert.equal(report.existingInventoryEvidence.localOperations, 9)
+  assert.equal(report.existingInventoryEvidence.readyLocalOperations, 9)
+  assert.equal(report.existingInventoryEvidence.commandResults, 9)
+  assert.equal(report.existingInventoryEvidence.executedCommandResults, 9)
+  assert.equal(report.existingInventoryEvidence.cloudApiCalledCommandResults, 9)
+  assert.equal(report.existingInventoryEvidence.mutationPerformedCommandResults, 0)
+  assert.ok(report.existingInventoryEvidence.observedOperationIds.includes("I05_OSS_AUDIO_BUCKET"))
+  assert.ok(report.existingInventoryEvidence.notFoundOperationIds.includes("I01_SAE_RUNTIME"))
+  assert.deepEqual(report.existingInventoryEvidence.blockedOperationIds, [])
   assert.equal(report.inventoryPlan.totalOperations, 9)
   assert.equal(report.inventoryPlan.commandTemplates, 23)
   assert.ok(operatorPathIds.includes("local_cli"))
@@ -82,6 +104,11 @@ test("Aliyun CloudShell handoff produces value-free local JSON and Markdown", ()
   assert.ok(report.strictVerificationOrder.includes("corepack pnpm aliyun:cloud:inventory-results:strict"))
   assert.ok(report.strictVerificationOrder.includes("corepack pnpm aliyun:predeploy"))
   assert.match(markdown, /CloudShell\/CLI 只读盘点交接包/)
+  assert.match(markdown, /strictInventoryAlreadyReady: true/)
+  assert.match(markdown, /strictInventoryReadyLocalOperations: 9\/9/)
+  assert.match(markdown, /strictInventoryMutationPerformedCommandResults: 0/)
+  assert.match(markdown, /currentBrowserCanUseCurrentConsole:/)
+  assert.match(markdown, /已有 strict inventory 证据/)
   assert.match(markdown, /I01_SAE_RUNTIME/)
   assert.match(markdown, /Strict 验证顺序/)
   assert.doesNotMatch(output, secretLike)
@@ -90,4 +117,31 @@ test("Aliyun CloudShell handoff produces value-free local JSON and Markdown", ()
 
 function readJsonFromPath(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"))
+}
+
+function writeStrictInventoryFixture(filePath) {
+  const template = readJson("deploy", "aliyun-production-cn.cloud-inventory-results.example.json")
+  const observedIds = new Set(["I05_OSS_AUDIO_BUCKET", "I06_SLS_ALERTS"])
+  const ready = {
+    ...template,
+    updatedAt: "2026-06-24T00:30:00+08:00",
+    operator: "codex-test-non-secret",
+    notes: "synthetic non-secret strict inventory fixture",
+    operations: template.operations.map((operation) => ({
+      ...operation,
+      status: observedIds.has(operation.id) ? "observed" : "not_found",
+      evidence: `${operation.id}_strict_inventory_evidence_handle`,
+      commandResults: operation.commandResults.map((result) => ({
+        ...result,
+        executed: true,
+        exitStatus: 0,
+        cloudApiCalled: true,
+        mutationPerformed: false,
+        observedAt: "2026-06-24T00:30:00+08:00",
+        outputSummary: `${operation.id} strict inventory completed with non-secret summary`,
+        evidence: `${operation.id}_command_evidence_handle`,
+      })),
+    })),
+  }
+  fs.writeFileSync(filePath, JSON.stringify(ready, null, 2))
 }

@@ -27,6 +27,7 @@ function parseArgs(argv) {
   const args = {
     out: DEFAULT_OUT,
     markdown: DEFAULT_MARKDOWN,
+    cloudInventoryResultsFile: "",
   }
   for (let index = 2; index < argv.length; index += 1) {
     const arg = argv[index]
@@ -37,6 +38,10 @@ function parseArgs(argv) {
     }
     if (arg === "--markdown") {
       args.markdown = resolveValue(argv[++index], "--markdown")
+      continue
+    }
+    if (arg === "--cloud-inventory-results") {
+      args.cloudInventoryResultsFile = resolveValue(argv[++index], "--cloud-inventory-results")
       continue
     }
     if (arg === "--help" || arg === "-h") {
@@ -88,11 +93,101 @@ function compactOperation(operation) {
   }
 }
 
-function buildReport() {
+function summarizeCurrentBrowserProbe(probe = {}) {
+  const tabs = Array.isArray(probe.aliyunConsoleTabs) ? probe.aliyunConsoleTabs : []
+  return {
+    checked: probe.checked === true,
+    browser: probe.browser || "",
+    running: probe.running === true,
+    canUseCurrentConsole: probe.canUseCurrentConsole === true,
+    tabCount: toNumber(probe.tabCount),
+    aliyunConsoleTabCount: toNumber(probe.aliyunConsoleTabCount),
+    aliyunConsoleHostPaths: tabs.map((item) => item.hostPath).filter(Boolean),
+    evidence: probe.evidence || "",
+    cloudApiCalled: probe.cloudApiCalled === true,
+    cloudMutationPerformed: probe.cloudMutationPerformed === true,
+    blockers: Array.isArray(probe.blockers) ? probe.blockers : [],
+    note: probe.note || "",
+  }
+}
+
+function summarizeCloudInventoryResults(cloudInventoryResults = {}) {
+  const local = cloudInventoryResults.local || {}
+  const observationSummary = local.observationSummary || {}
+  const summary = cloudInventoryResults.summary || {}
+  const localOperations = firstNumber(summary.localOperations, observationSummary.operations, local.checkedOperations)
+  const readyLocalOperations = firstNumber(summary.readyLocalOperations, observationSummary.strictReadyOperations)
+  const commandResults = firstNumber(observationSummary.commandResults)
+  const executedCommandResults = firstNumber(observationSummary.executedCommandResults)
+  const cloudApiCalledCommandResults = firstNumber(observationSummary.cloudApiCalledCommandResults)
+  const mutationPerformedCommandResults = firstNumber(observationSummary.mutationPerformedCommandResults)
+  const ready = local.exists === true &&
+    local.ready === true &&
+    localOperations > 0 &&
+    readyLocalOperations === localOperations &&
+    commandResults > 0 &&
+    executedCommandResults === commandResults &&
+    cloudApiCalledCommandResults === commandResults &&
+    mutationPerformedCommandResults === 0
+
+  return {
+    exists: local.exists === true,
+    ready,
+    localReady: local.ready === true,
+    localOperations,
+    readyLocalOperations,
+    commandResults,
+    executedCommandResults,
+    cloudApiCalledCommandResults,
+    mutationPerformedCommandResults,
+    observedOperationIds: Array.isArray(observationSummary.observedOperationIds) ? observationSummary.observedOperationIds : [],
+    notFoundOperationIds: Array.isArray(observationSummary.notFoundOperationIds) ? observationSummary.notFoundOperationIds : [],
+    blockedOperationIds: Array.isArray(observationSummary.blockedOperationIds) ? observationSummary.blockedOperationIds : [],
+    blockers: Array.isArray(local.blockers) ? local.blockers : [],
+    evidence: ready ? [
+      `readyLocalOperations=${readyLocalOperations}/${localOperations}`,
+      `executedCommandResults=${executedCommandResults}/${commandResults}`,
+      `cloudApiCalledCommandResults=${cloudApiCalledCommandResults}`,
+      `mutationPerformedCommandResults=${mutationPerformedCommandResults}`,
+    ] : [],
+  }
+}
+
+function buildCurrentAnswer(cloudAccess, existingInventoryEvidence) {
+  if (cloudAccess.canReadCloudNow === true) {
+    return "Aliyun CLI/CloudShell read-only inventory can be attempted after action-time confirmation."
+  }
+  if (existingInventoryEvidence.ready === true) {
+    return "Existing strict inventory evidence is ready, but current Aliyun CLI/CloudShell identity is not ready for refresh; do not treat later cloud changes as verified until inventory is rerun."
+  }
+  return "Aliyun CLI/CloudShell read-only inventory is still blocked by local CLI/CloudShell configuration; do not treat cloud resources as ready."
+}
+
+function firstNumber(...values) {
+  for (const value of values) {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return 0
+}
+
+function toNumber(value) {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function buildReport(options = {}) {
   const cloudAccess = runJson("cloud_access", ["scripts/check-aliyun-cloud-access.mjs"])
   const inventoryPlan = runJson("cloud_inventory_plan", ["scripts/generate-aliyun-cli-inventory-plan.mjs"])
+  const cloudInventoryResults = runJson("cloud_inventory_results", [
+    "scripts/check-aliyun-cli-inventory-results.mjs",
+    "--allow-incomplete",
+    ...(options.cloudInventoryResultsFile ? ["--local", options.cloudInventoryResultsFile] : []),
+  ])
   const cliProbe = cloudAccess.cli?.configProbe || {}
   const workbenchTerminal = cloudAccess.terminalAccess?.workbenchTerminal || cloudAccess.cloudShellObservation?.workbenchTerminal || {}
+  const currentBrowser = summarizeCurrentBrowserProbe(cloudAccess.localBrowserProbe || {})
+  const existingInventoryEvidence = summarizeCloudInventoryResults(cloudInventoryResults)
   const operations = (inventoryPlan.operations || []).map(compactOperation)
   const report = {
     ok: true,
@@ -104,9 +199,7 @@ function buildReport() {
     cloudApiCalled: false,
     mutationPerformed: false,
     executionMode: "handoff_only",
-    currentAnswer: cloudAccess.canReadCloudNow === true
-      ? "Aliyun CLI/CloudShell read-only inventory can be attempted after action-time confirmation."
-      : "Aliyun CLI/CloudShell read-only inventory is still blocked by local CLI/CloudShell configuration; do not treat cloud resources as ready.",
+    currentAnswer: buildCurrentAnswer(cloudAccess, existingInventoryEvidence),
     cliReadiness: {
       canReadCloudNow: cloudAccess.canReadCloudNow === true,
       cliAvailable: cloudAccess.cli?.available === true,
@@ -114,7 +207,10 @@ function buildReport() {
       cliConfigFileExists: cloudAccess.cli?.configFileExists === true,
       configProbe: cliProbe,
       blockers: cloudAccess.blockers || [],
+      strictInventoryAlreadyReady: existingInventoryEvidence.ready === true,
     },
+    currentBrowser,
+    existingInventoryEvidence,
     inventoryPlan: {
       status: inventoryPlan.status,
       canRunReadOnlyInventoryNow: inventoryPlan.canRunReadOnlyInventoryNow === true,
@@ -146,6 +242,11 @@ function buildReport() {
         id: "aliyun_cloudshell",
         title: "阿里云 CloudShell",
         currentStatus: cloudAccess.cloudShellObservation?.ready === true ? "ready" : "cloudshell_cli_config_missing_or_unread",
+        currentBrowserCanUseCurrentConsole: currentBrowser.canUseCurrentConsole === true,
+        currentBrowserAliyunConsoleHostPaths: currentBrowser.aliyunConsoleHostPaths,
+        currentBrowserCloudApiCalled: currentBrowser.cloudApiCalled === true,
+        currentBrowserCloudMutationPerformed: currentBrowser.cloudMutationPerformed === true,
+        currentBrowserEvidence: currentBrowser.evidence,
         consolePath: "阿里云控制台 -> CloudShell -> cn-hangzhou / 华东1或华东2账号上下文",
         allowedActions: [
           "只运行 inventoryPlan.operations 中列出的 List/Describe/stat/get 类只读命令。",
@@ -233,9 +334,33 @@ function renderMarkdown(report) {
     `- canReadCloudNow: ${report.cliReadiness.canReadCloudNow}`,
     `- cliConfigProbeReady: ${report.cliReadiness.configProbe?.ready === true}`,
     `- cliConfigProbeFailureCategory: ${report.cliReadiness.configProbe?.failureCategory || "none"}`,
+    `- strictInventoryAlreadyReady: ${report.existingInventoryEvidence.ready === true}`,
+    `- strictInventoryReadyLocalOperations: ${report.existingInventoryEvidence.readyLocalOperations}/${report.existingInventoryEvidence.localOperations}`,
+    `- strictInventoryExecutedCommandResults: ${report.existingInventoryEvidence.executedCommandResults}/${report.existingInventoryEvidence.commandResults}`,
+    `- strictInventoryCloudApiCalledCommandResults: ${report.existingInventoryEvidence.cloudApiCalledCommandResults}`,
+    `- strictInventoryMutationPerformedCommandResults: ${report.existingInventoryEvidence.mutationPerformedCommandResults}`,
+    `- currentBrowserCanUseCurrentConsole: ${report.currentBrowser.canUseCurrentConsole === true}`,
+    `- currentBrowserAliyunConsoleTabCount: ${report.currentBrowser.aliyunConsoleTabCount}`,
+    `- currentBrowserAliyunConsoleHostPaths: ${formatList(report.currentBrowser.aliyunConsoleHostPaths)}`,
+    `- currentBrowserCloudApiCalled: ${report.currentBrowser.cloudApiCalled === true}`,
+    `- currentBrowserCloudMutationPerformed: ${report.currentBrowser.cloudMutationPerformed === true}`,
     `- inventoryPlanStatus: ${report.inventoryPlan.status}`,
     `- totalOperations: ${report.inventoryPlan.totalOperations}`,
     `- commandTemplates: ${report.inventoryPlan.commandTemplates}`,
+    "",
+    "## 已有 strict inventory 证据",
+    "",
+    `- exists: ${report.existingInventoryEvidence.exists === true}`,
+    `- ready: ${report.existingInventoryEvidence.ready === true}`,
+    `- localOperations: ${report.existingInventoryEvidence.readyLocalOperations}/${report.existingInventoryEvidence.localOperations}`,
+    `- commandResults: ${report.existingInventoryEvidence.executedCommandResults}/${report.existingInventoryEvidence.commandResults}`,
+    `- mutationPerformedCommandResults: ${report.existingInventoryEvidence.mutationPerformedCommandResults}`,
+    `- observedOperationIds: ${formatList(report.existingInventoryEvidence.observedOperationIds)}`,
+    `- notFoundOperationIds: ${formatList(report.existingInventoryEvidence.notFoundOperationIds)}`,
+    `- blockedOperationIds: ${formatList(report.existingInventoryEvidence.blockedOperationIds)}`,
+    ...(report.existingInventoryEvidence.blockers.length
+      ? report.existingInventoryEvidence.blockers.map((item) => `- ${item}`)
+      : ["- blockers: none"]),
     "",
     "## 操作路径",
     "",
@@ -264,6 +389,11 @@ function renderOperatorPath(item) {
     `- id: ${item.id}`,
     `- currentStatus: ${item.currentStatus}`,
     ...(item.consolePath ? [`- consolePath: ${item.consolePath}`] : []),
+    ...(typeof item.currentBrowserCanUseCurrentConsole === "boolean" ? [`- currentBrowserCanUseCurrentConsole: ${item.currentBrowserCanUseCurrentConsole}`] : []),
+    ...(Array.isArray(item.currentBrowserAliyunConsoleHostPaths) ? [`- currentBrowserAliyunConsoleHostPaths: ${formatList(item.currentBrowserAliyunConsoleHostPaths)}`] : []),
+    ...(typeof item.currentBrowserCloudApiCalled === "boolean" ? [`- currentBrowserCloudApiCalled: ${item.currentBrowserCloudApiCalled}`] : []),
+    ...(typeof item.currentBrowserCloudMutationPerformed === "boolean" ? [`- currentBrowserCloudMutationPerformed: ${item.currentBrowserCloudMutationPerformed}`] : []),
+    ...(item.currentBrowserEvidence ? [`- currentBrowserEvidence: ${item.currentBrowserEvidence}`] : []),
     "- allowedActions:",
     ...item.allowedActions.map((value) => `  - ${value}`),
     "- forbidden:",
@@ -272,6 +402,10 @@ function renderOperatorPath(item) {
     ...item.verifyCommands.map((value) => `  - ${value}`),
     "",
   ]
+}
+
+function formatList(items) {
+  return Array.isArray(items) && items.length ? items.join(", ") : "none"
 }
 
 function renderOperation(operation) {
@@ -315,14 +449,15 @@ function printHelp() {
   console.log(`Usage: node scripts/generate-aliyun-cloudshell-inventory-handoff.mjs [options]
 
 Options:
-  --out <path>       write JSON handoff
-  --markdown <path>  write Markdown handoff
+  --out <path>                      write JSON handoff
+  --markdown <path>                 write Markdown handoff
+  --cloud-inventory-results <path>  use a specific local inventory results file
 `)
 }
 
 function main() {
   const args = parseArgs(process.argv)
-  const report = buildReport()
+  const report = buildReport(args)
   const json = JSON.stringify(report, null, 2)
   if (args.out) writeText(args.out, json)
   if (args.markdown) writeText(args.markdown, renderMarkdown(report))

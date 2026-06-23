@@ -258,7 +258,7 @@ function renderMarkdown(audit) {
     `- cloudInventoryPlan: ${cloudInventoryPlan.canRunReadOnlyInventoryNow ? "ready" : "blocked"} (${cloudInventoryPlan.summary?.totalOperations || 0} operations)`,
     `- cloudInventoryRunner: ${cloudInventoryRunner.executionMode}, executed ${cloudInventoryRunner.summary.executedCommands}/${cloudInventoryRunner.summary.commands}`,
     `- cloudInventoryRunnerFailureCategories: ${Object.keys(cloudInventoryRunner.summary.failureCategories || {}).length ? JSON.stringify(cloudInventoryRunner.summary.failureCategories) : "none"}`,
-    `- cloudshellInventoryHandoff: canReadCloudNow ${cloudshellInventoryHandoff.cliReadiness.canReadCloudNow}, operations ${cloudshellInventoryHandoff.inventoryPlan.totalOperations}`,
+    `- cloudshellInventoryHandoff: canReadCloudNow ${cloudshellInventoryHandoff.cliReadiness.canReadCloudNow}, strictInventoryAlreadyReady ${cloudshellInventoryHandoff.existingInventoryEvidence?.ready === true}, operations ${cloudshellInventoryHandoff.inventoryPlan.totalOperations}`,
     `- cloudInventoryResults: ${cloudInventoryResults.local?.ready ? "ready" : "not ready"} (${cloudInventoryResults.local?.checkedOperations || 0} local operations)`,
     `- cloudInventoryConsoleOnly: safe ${cloudInventoryObservation.safeConsoleOnly === true}, console observations ${cloudInventoryObservation.consoleObservationOperations || 0}/${cloudInventoryObservation.operations || 0}, executed commands ${cloudInventoryObservation.executedCommandResults || 0}/${cloudInventoryObservation.commandResults || 0}, cloud API calls ${cloudInventoryObservation.cloudApiCalledCommandResults || 0}`,
     `- appRuntimeConfig: ${appRuntimeConfig?.ok === true ? "ready" : "not ready"}`,
@@ -382,6 +382,16 @@ function renderMarkdown(audit) {
     `- canReadCloudNow: ${cloudshellInventoryHandoff.cliReadiness.canReadCloudNow}`,
     `- cliConfigProbeReady: ${cloudshellInventoryHandoff.cliReadiness.configProbe?.ready === true}`,
     `- cliConfigProbeFailureCategory: ${cloudshellInventoryHandoff.cliReadiness.configProbe?.failureCategory || "none"}`,
+    `- currentBrowserCanUseCurrentConsole: ${cloudshellInventoryHandoff.currentBrowser?.canUseCurrentConsole === true}`,
+    `- currentBrowserAliyunConsoleTabCount: ${cloudshellInventoryHandoff.currentBrowser?.aliyunConsoleTabCount || 0}`,
+    `- currentBrowserAliyunConsoleHostPaths: ${formatStringList(cloudshellInventoryHandoff.currentBrowser?.aliyunConsoleHostPaths || [])}`,
+    `- currentBrowserCloudApiCalled: ${cloudshellInventoryHandoff.currentBrowser?.cloudApiCalled === true}`,
+    `- currentBrowserCloudMutationPerformed: ${cloudshellInventoryHandoff.currentBrowser?.cloudMutationPerformed === true}`,
+    `- strictInventoryAlreadyReady: ${cloudshellInventoryHandoff.existingInventoryEvidence?.ready === true}`,
+    `- strictInventoryReadyLocalOperations: ${cloudshellInventoryHandoff.existingInventoryEvidence?.readyLocalOperations || 0}/${cloudshellInventoryHandoff.existingInventoryEvidence?.localOperations || 0}`,
+    `- strictInventoryExecutedCommandResults: ${cloudshellInventoryHandoff.existingInventoryEvidence?.executedCommandResults || 0}/${cloudshellInventoryHandoff.existingInventoryEvidence?.commandResults || 0}`,
+    `- strictInventoryCloudApiCalledCommandResults: ${cloudshellInventoryHandoff.existingInventoryEvidence?.cloudApiCalledCommandResults || 0}`,
+    `- strictInventoryMutationPerformedCommandResults: ${cloudshellInventoryHandoff.existingInventoryEvidence?.mutationPerformedCommandResults || 0}`,
     `- inventoryPlanStatus: ${cloudshellInventoryHandoff.inventoryPlan.status}`,
     `- totalOperations: ${cloudshellInventoryHandoff.inventoryPlan.totalOperations}`,
     `- commandTemplates: ${cloudshellInventoryHandoff.inventoryPlan.commandTemplates}`,
@@ -996,6 +1006,10 @@ function formatCurrentBrowserHostPaths(tabs) {
   return hostPaths.length ? hostPaths.join(", ") : "none"
 }
 
+function formatStringList(items) {
+  return Array.isArray(items) && items.length ? items.join(", ") : "none"
+}
+
 function compactSensitiveBlockerForAudit(item) {
   const variableDetails = item.variableDetails || []
   return {
@@ -1557,6 +1571,21 @@ function main() {
       canReadCloudNow: cloudshellInventoryHandoff.cliReadiness.canReadCloudNow === true,
       cliConfigProbeReady: cloudshellInventoryHandoff.cliReadiness.configProbe?.ready === true,
       cliConfigProbeFailureCategory: cloudshellInventoryHandoff.cliReadiness.configProbe?.failureCategory || "",
+      currentBrowserCanUseCurrentConsole: cloudshellInventoryHandoff.currentBrowser?.canUseCurrentConsole === true,
+      currentBrowserAliyunConsoleTabCount: cloudshellInventoryHandoff.currentBrowser?.aliyunConsoleTabCount || 0,
+      currentBrowserAliyunConsoleHostPaths: cloudshellInventoryHandoff.currentBrowser?.aliyunConsoleHostPaths || [],
+      currentBrowserCloudApiCalled: cloudshellInventoryHandoff.currentBrowser?.cloudApiCalled === true,
+      currentBrowserCloudMutationPerformed: cloudshellInventoryHandoff.currentBrowser?.cloudMutationPerformed === true,
+      strictInventoryAlreadyReady: cloudshellInventoryHandoff.existingInventoryEvidence?.ready === true,
+      strictInventoryReadyLocalOperations: cloudshellInventoryHandoff.existingInventoryEvidence?.readyLocalOperations || 0,
+      strictInventoryLocalOperations: cloudshellInventoryHandoff.existingInventoryEvidence?.localOperations || 0,
+      strictInventoryExecutedCommandResults: cloudshellInventoryHandoff.existingInventoryEvidence?.executedCommandResults || 0,
+      strictInventoryCommandResults: cloudshellInventoryHandoff.existingInventoryEvidence?.commandResults || 0,
+      strictInventoryCloudApiCalledCommandResults: cloudshellInventoryHandoff.existingInventoryEvidence?.cloudApiCalledCommandResults || 0,
+      strictInventoryMutationPerformedCommandResults: cloudshellInventoryHandoff.existingInventoryEvidence?.mutationPerformedCommandResults || 0,
+      strictInventoryObservedOperationIds: cloudshellInventoryHandoff.existingInventoryEvidence?.observedOperationIds || [],
+      strictInventoryNotFoundOperationIds: cloudshellInventoryHandoff.existingInventoryEvidence?.notFoundOperationIds || [],
+      strictInventoryBlockedOperationIds: cloudshellInventoryHandoff.existingInventoryEvidence?.blockedOperationIds || [],
       operatorPathIds: (cloudshellInventoryHandoff.operatorPaths || []).map((item) => item.id),
       totalOperations: cloudshellInventoryHandoff.inventoryPlan.totalOperations,
       commandTemplates: cloudshellInventoryHandoff.inventoryPlan.commandTemplates,
