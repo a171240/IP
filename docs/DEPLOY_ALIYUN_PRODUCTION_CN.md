@@ -35,6 +35,8 @@ SAE 应用名：meiye-huajing-app-api-production-cn
 
 最终版 production-cn 还需要把数据层迁到阿里云 RDS PostgreSQL。当前代码仍以 Supabase SDK 为主，不要只填 `DATABASE_URL_CN` 就认为数据库已迁移完成。
 
+2026-06-24 CloudShell 只读盘点补充：`cn-hangzhou` 下 RDS PostgreSQL 实例数为 0，RDS 全量实例数为 0，Redis/Tair 实例数为 0。该结果不改变第一版桥接部署口径：`DATABASE_URL_CN` / `REDIS_URL_CN` 仍可后置；完整 production-cn 数据层迁移仍需要单独创建资源、迁移脚本、回滚方案和验收。
+
 ## 2. 本轮新增的后端部署入口
 
 ### 2.0 阿里云 SAE 运行时计划

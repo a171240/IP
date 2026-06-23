@@ -20,6 +20,9 @@
 - SLS alerts：0 条，健康检查和 5xx 告警未配置。
 - SLS dashboards：0 个。
 - CAS 证书订单：0 条，HTTPS 证书/绑定未确认。
+- RDS PostgreSQL：`cn-hangzhou` 下实例数 0。
+- RDS 全量实例：`cn-hangzhou` 下实例数 0。
+- Redis/Tair：`cn-hangzhou` 下实例数 0。
 
 ## 执行边界
 
@@ -38,6 +41,9 @@
 - `aliyun cas ListUserCertificateOrder --region cn-hangzhou`
 - `aliyun ram ListPolicies --PolicyType Custom`
 - `aliyun ram ListRoles`
+- `aliyun rds DescribeDBInstances --RegionId cn-hangzhou --Engine PostgreSQL`
+- `aliyun rds DescribeDBInstances --RegionId cn-hangzhou`
+- `aliyun r-kvstore DescribeInstances --RegionId cn-hangzhou`
 
 未执行：
 
@@ -74,6 +80,7 @@ corepack pnpm aliyun:cloud:inventory-results:strict
 
 - `/tmp/meiye-aliyun-cloudshell-inventory-probe-20260624.txt`
 - `/tmp/meiye-aliyun-cloudshell-oss-ram-sls-probe-20260624.txt`
+- `/tmp/meiye-aliyun-cloudshell-data-layer-probe-20260624.txt`
 
 该临时文件不应提交；如需长期留痕，只保留本文件中的非密钥摘要。
 
@@ -129,3 +136,27 @@ RAM/SLS 补充结论：
 - `slsAlerts.confirmed=false`
 - `slsAlerts.healthAlertConfigured=false`
 - `slsAlerts.serverErrorAlertConfigured=false`
+
+## 2026-06-24 数据层补充盘点
+
+第一版 APP production-cn 后端仍是桥接部署：API 容器跑在阿里云，数据层暂时沿用现有 Supabase。以下盘点用于证明完整国内数据层迁移的当前状态，不作为第一版桥接部署的立即阻塞项。
+
+只读命令：
+
+```bash
+aliyun rds DescribeDBInstances --RegionId cn-hangzhou --Engine PostgreSQL
+aliyun rds DescribeDBInstances --RegionId cn-hangzhou
+aliyun r-kvstore DescribeInstances --RegionId cn-hangzhou
+```
+
+非密钥摘要：
+
+- PostgreSQL RDS: `TotalRecordCount=0`
+- RDS all engines: `TotalRecordCount=0`
+- Redis/Tair: `TotalCount=0`
+
+结论：
+
+- `DATABASE_URL_CN` 不能标 ready，因为没有 production-cn RDS PostgreSQL 实例或连接串。
+- `REDIS_URL_CN` 不能标 ready，因为没有 Redis/Tair 实例。
+- 即使以后填入 `DATABASE_URL_CN`，也不能等同于数据层迁移完成；后端当前仍以 Supabase SDK 为主，正式完整 production-cn 需要单独迁移方案、脚本、回滚和验收。
