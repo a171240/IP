@@ -131,6 +131,15 @@ function buildPackage(args) {
     cliConfigProbeFailureCategory,
     cloudInventorySummary,
   )
+  const cloudActionClosureBrief = buildCloudActionClosureBrief({
+    consoleRunbook,
+    immediateConsoleTasks,
+    blockedConsoleTasks,
+    cloudConsolePackets,
+    externalAppPackets,
+    cloudInventorySummary,
+    imagePublishWritebackPlan,
+  })
   const currentBlockers = uniqueStrings([
     ...(blockerBrief.summary?.requiredBlocking || []).map((name) => `requiredEnv:${name}`),
     ...(blockedConsoleTasks || []).map((item) => `blockedConsoleTask:${item.id}`),
@@ -171,7 +180,12 @@ function buildPackage(args) {
       cloudInventoryExecutedCommandResults: `${cloudInventorySummary.executedCommandResults}/${cloudInventorySummary.commandResults}`,
       imagePublishWritebackBlockingGroups: imagePublishWritebackPlan.blockingGroups,
       cliConfigProbeFailureCategory,
+      blockedCredentialCount: cloudActionClosureBrief.blockedCredentialCount,
+      readySecretEnvVariableCount: cloudActionClosureBrief.readySecretEnvVariableCount,
+      resourceEvidenceReady: cloudActionClosureBrief.resourceEvidenceReady,
+      blockedResourceEvidenceIds: cloudActionClosureBrief.blockedResourceEvidenceIds,
     },
+    cloudActionClosureBrief,
     firstCloudPhase,
     executionQueue,
     immediateConsoleTasks: immediateConsoleTasks.map((task) => compactConsoleTask(task, imagePublishWritebackPlan)),
@@ -230,6 +244,53 @@ function buildPackage(args) {
     report.containsValues = true
   }
   return report
+}
+
+function buildCloudActionClosureBrief({
+  consoleRunbook,
+  immediateConsoleTasks,
+  blockedConsoleTasks,
+  cloudConsolePackets,
+  externalAppPackets,
+  cloudInventorySummary,
+  imagePublishWritebackPlan,
+}) {
+  const runbookBrief = consoleRunbook.consoleClosureBrief || {}
+  const blockedCredentialNames =
+    runbookBrief.blockedCredentialNames ||
+    []
+  const readySecretEnvVariableNames =
+    runbookBrief.readySecretEnvVariableNames ||
+    []
+  const blockedResourceEvidenceIds =
+    runbookBrief.blockedResourceEvidenceIds ||
+    consoleRunbook.summary?.blockedResourceEvidenceIds ||
+    []
+
+  return {
+    conclusion: "现在不能部署；本动作包只能进入 C02/C05 的动作时确认，其余资源、微信开放平台移动 App、iOS/Android 发布凭证和 secret env 导入仍未闭环。",
+    canDeployNow: consoleRunbook.summary?.canDeployNow === true,
+    blockedCredentialCount: runbookBrief.blockedCredentialCount ?? blockedCredentialNames.length,
+    blockedCredentialNames,
+    readySecretEnvVariableCount: runbookBrief.readySecretEnvVariableCount ?? readySecretEnvVariableNames.length,
+    readySecretEnvVariableNames,
+    resourceEvidenceReady: runbookBrief.resourceEvidenceReady || consoleRunbook.summary?.resourceEvidenceReady || "unknown",
+    blockedResourceEvidenceIds,
+    strictReadonlyInventoryReady: cloudInventorySummary.ready === true,
+    cloudInventoryReadyLocalOperations: `${cloudInventorySummary.readyLocalOperations}/${cloudInventorySummary.localOperations}`,
+    cloudInventoryExecutedCommandResults: `${cloudInventorySummary.executedCommandResults}/${cloudInventorySummary.commandResults}`,
+    mutationPerformedCommandResults: cloudInventorySummary.mutationPerformedCommandResults,
+    canStartNowConsoleTasks: immediateConsoleTasks.map((item) => item.id),
+    cloudConsolePackets: cloudConsolePackets.map((item) => item.packetId),
+    externalAppPackets: externalAppPackets.map((item) => item.packetId),
+    blockedByDependencies: blockedConsoleTasks.map((item) => item.id),
+    imagePublishWritebackBlockingGroups: imagePublishWritebackPlan.blockingGroups,
+    stillRequiresActionTimeConfirmation: uniqueStrings([
+      ...(runbookBrief.actionTimeConfirmationRequiredIds || []),
+      ...cloudConsolePackets.map((item) => item.packetId),
+      ...externalAppPackets.map((item) => item.packetId),
+    ]),
+  }
 }
 
 function buildExecutionQueue(immediateConsoleTasks, blockedConsoleTasks, externalAppPackets, imagePublishWritebackPlan) {
@@ -550,6 +611,29 @@ function renderMarkdown(report) {
     `- containsValues: ${report.containsValues}`,
     `- mutationPerformed: ${report.mutationPerformed}`,
     `- cloudApiCalled: ${report.cloudApiCalled}`,
+    `- blockedCredentialCount: ${report.summary.blockedCredentialCount}`,
+    `- readySecretEnvVariableCount: ${report.summary.readySecretEnvVariableCount}`,
+    `- resourceEvidenceReady: ${report.summary.resourceEvidenceReady}`,
+    `- blockedResourceEvidenceIds: ${report.summary.blockedResourceEvidenceIds.length ? report.summary.blockedResourceEvidenceIds.join(", ") : "none"}`,
+    "",
+    "## 目标闭环证据简表",
+    "",
+    `- conclusion: ${report.cloudActionClosureBrief.conclusion}`,
+    `- canDeployNow: ${report.cloudActionClosureBrief.canDeployNow}`,
+    `- blockedCredentialCount: ${report.cloudActionClosureBrief.blockedCredentialCount}`,
+    `- blockedCredentialNames: ${report.cloudActionClosureBrief.blockedCredentialNames.length ? report.cloudActionClosureBrief.blockedCredentialNames.join(", ") : "none"}`,
+    `- readySecretEnvVariableCount: ${report.cloudActionClosureBrief.readySecretEnvVariableCount}`,
+    `- resourceEvidenceReady: ${report.cloudActionClosureBrief.resourceEvidenceReady}`,
+    `- blockedResourceEvidenceIds: ${report.cloudActionClosureBrief.blockedResourceEvidenceIds.length ? report.cloudActionClosureBrief.blockedResourceEvidenceIds.join(", ") : "none"}`,
+    `- strictReadonlyInventoryReady: ${report.cloudActionClosureBrief.strictReadonlyInventoryReady}`,
+    `- cloudInventoryReadyLocalOperations: ${report.cloudActionClosureBrief.cloudInventoryReadyLocalOperations}`,
+    `- cloudInventoryExecutedCommandResults: ${report.cloudActionClosureBrief.cloudInventoryExecutedCommandResults}`,
+    `- mutationPerformedCommandResults: ${report.cloudActionClosureBrief.mutationPerformedCommandResults}`,
+    `- canStartNowConsoleTasks: ${report.cloudActionClosureBrief.canStartNowConsoleTasks.length ? report.cloudActionClosureBrief.canStartNowConsoleTasks.join(", ") : "none"}`,
+    `- cloudConsolePackets: ${report.cloudActionClosureBrief.cloudConsolePackets.length ? report.cloudActionClosureBrief.cloudConsolePackets.join(", ") : "none"}`,
+    `- externalAppPackets: ${report.cloudActionClosureBrief.externalAppPackets.length ? report.cloudActionClosureBrief.externalAppPackets.join(", ") : "none"}`,
+    `- blockedByDependencies: ${report.cloudActionClosureBrief.blockedByDependencies.length ? report.cloudActionClosureBrief.blockedByDependencies.join(", ") : "none"}`,
+    `- imagePublishWritebackBlockingGroups: ${report.cloudActionClosureBrief.imagePublishWritebackBlockingGroups.length ? report.cloudActionClosureBrief.imagePublishWritebackBlockingGroups.join(", ") : "none"}`,
     "",
     "## 下一步执行队列",
     "",
