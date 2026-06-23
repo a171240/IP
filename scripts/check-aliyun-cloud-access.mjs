@@ -112,6 +112,118 @@ function commandVersion(binary) {
   return result.stdout.split(/\r?\n/).filter(Boolean).slice(0, 3).join(" | ")
 }
 
+function localBrowserProbe() {
+  const pgrep = shell("pgrep -x 'Google Chrome' >/dev/null 2>&1")
+  if (pgrep.status !== 0) {
+    return {
+      checked: true,
+      browser: "Google Chrome",
+      running: false,
+      canUseCurrentConsole: false,
+      tabCount: 0,
+      aliyunConsoleTabCount: 0,
+      aliyunConsoleTabs: [],
+      cloudApiCalled: false,
+      cloudMutationPerformed: false,
+      evidence: "current_chrome_not_running",
+      blockers: ["current_chrome_not_running"],
+      note: "Current browser probe only enumerates Chrome tab titles and sanitized host/path values; it does not read cookies, form fields, localStorage, secrets, or page content.",
+    }
+  }
+
+  const script = [
+    "const chrome = Application('Google Chrome');",
+    "const rows = [];",
+    "for (const win of chrome.windows()) {",
+    "  for (const tab of win.tabs()) {",
+    "    rows.push(JSON.stringify({ title: tab.title(), url: tab.url() }));",
+    "  }",
+    "}",
+    "rows.join('\\n');",
+  ].join("\n")
+  const result = spawnSync("osascript", ["-l", "JavaScript", "-e", script], {
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024,
+  })
+  if (result.error || result.status !== 0) {
+    return {
+      checked: true,
+      browser: "Google Chrome",
+      running: true,
+      canUseCurrentConsole: false,
+      tabCount: 0,
+      aliyunConsoleTabCount: 0,
+      aliyunConsoleTabs: [],
+      cloudApiCalled: false,
+      cloudMutationPerformed: false,
+      evidence: "current_chrome_tab_probe_failed",
+      blockers: ["current_chrome_tab_probe_failed"],
+      note: "Chrome is running, but AppleScript/JXA tab enumeration failed. No raw stderr is stored because browser automation errors may include local paths or account hints.",
+    }
+  }
+
+  const tabs = result.stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map(parseBrowserTabLine)
+    .filter(Boolean)
+  const aliyunConsoleTabs = tabs
+    .filter((tab) => isAliyunConsoleHostPath(tab.hostPath))
+    .map((tab) => ({
+      title: truncateText(tab.title, 120),
+      hostPath: tab.hostPath,
+    }))
+
+  return {
+    checked: true,
+    browser: "Google Chrome",
+    running: true,
+    canUseCurrentConsole: aliyunConsoleTabs.length > 0,
+    tabCount: tabs.length,
+    aliyunConsoleTabCount: aliyunConsoleTabs.length,
+    aliyunConsoleTabs,
+    cloudApiCalled: false,
+    cloudMutationPerformed: false,
+    evidence: aliyunConsoleTabs.length
+      ? `current_chrome_aliyun_console_tabs_${aliyunConsoleTabs.length}`
+      : "current_chrome_no_aliyun_console_tabs",
+    blockers: aliyunConsoleTabs.length ? [] : ["current_aliyun_console_browser_tab_not_observed"],
+    note: "Current browser probe only enumerates Chrome tab titles and sanitized host/path values; it does not read cookies, form fields, localStorage, secrets, or page content.",
+  }
+}
+
+function parseBrowserTabLine(line) {
+  try {
+    const raw = JSON.parse(line)
+    return {
+      title: String(raw.title || ""),
+      hostPath: sanitizeUrlHostPath(raw.url),
+    }
+  } catch {
+    return null
+  }
+}
+
+function sanitizeUrlHostPath(value) {
+  try {
+    const url = new URL(String(value || ""))
+    return `${url.hostname}${url.pathname}`.replace(/\/$/, "")
+  } catch {
+    return ""
+  }
+}
+
+function isAliyunConsoleHostPath(hostPath) {
+  const value = String(hostPath || "")
+  return /(^|\.)aliyun\.com(\/|$)/i.test(value)
+}
+
+function truncateText(value, maxLength) {
+  const text = String(value || "").replace(/\s+/g, " ").trim()
+  return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text
+}
+
 function cliConfigProbe(binary) {
   if (!binary) {
     return {
@@ -575,6 +687,7 @@ function main() {
   const cloudConfirmations = readJsonIfExists(args.cloudConfirmationsFile)
   const imagePublish = readJsonIfExists(args.imagePublishFile)
   const cloudAccessObservation = normalizeCloudAccessObservation(readJsonIfExists(args.cloudAccessObservationFile))
+  const browserProbe = localBrowserProbe()
   const configFiles = candidateAliyunConfigFiles()
   const cliConfigExists = configFiles.some((item) => item.exists)
   const cliAvailable = Boolean(aliyunPath || aliyuncliPath)
@@ -608,6 +721,7 @@ function main() {
       configProbe,
       note: "No Aliyun cloud API is called by this script. It only checks whether this machine can plausibly run read-only Aliyun CLI inventory later.",
     },
+    localBrowserProbe: browserProbe,
     cloudShellObservation: cloudAccessObservation,
     terminalAccess: {
       workbenchTerminal: cloudAccessObservation.workbenchTerminal,
@@ -656,6 +770,10 @@ function main() {
     if (cloudAccessObservation.workbenchTerminal?.connected === true && cloudAccessObservation.workbenchTerminal?.cliInventoryAttempted !== true) {
       report.nextActions.push("Chrome 中可见的 ECS Workbench 终端只证明远程终端已连接；未运行 allowlisted inventory 前，不能把它当作 CloudShell/OpenAPI 只读盘点 ready。")
     }
+  }
+  if (browserProbe.canUseCurrentConsole !== true) {
+    report.blockers.push(...browserProbe.blockers)
+    report.nextActions.push("当前 Chrome 没有可复用的阿里云控制台标签页；需要重新打开控制台页面，或改用 CloudShell/CLI 只读 inventory 后再回填证据。")
   }
   if (!cloudAccessObservation.exists) {
     report.nextActions.push("如使用已登录 Chrome 或 Cloud Shell 做云侧只读核验，把非密钥观察写入 deploy/aliyun-production-cn.cloud-access.local.json。")

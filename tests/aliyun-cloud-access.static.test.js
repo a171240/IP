@@ -17,12 +17,23 @@ function writeFakeAliyun(binaryPath, lines) {
   ].join("\n"), { mode: 0o700 })
 }
 
+function writeFakeExecutable(binaryPath, lines) {
+  fs.writeFileSync(binaryPath, [
+    "#!/bin/sh",
+    ...lines,
+    "",
+  ].join("\n"), { mode: 0o700 })
+}
+
 test("Aliyun cloud access supports non-secret Cloud Shell observations", () => {
   const source = read("scripts", "check-aliyun-cloud-access.mjs")
   const template = readJson("deploy", "aliyun-production-cn.cloud-access.example.json")
 
   assert.match(source, /DEFAULT_CLOUD_ACCESS_OBSERVATION_FILE/)
   assert.match(source, /--cloud-access-observation/)
+  assert.match(source, /localBrowserProbe/)
+  assert.match(source, /current_aliyun_console_browser_tab_not_observed/)
+  assert.match(source, /sanitizeUrlHostPath/)
   assert.match(source, /cloudShellObservation/)
   assert.match(source, /workbenchTerminal/)
   assert.match(source, /workbench_terminal_api_called_without_inventory_context/)
@@ -111,6 +122,13 @@ test("Aliyun cloud access report preserves current non-secret console evidence",
   assert.equal(report.cloudApiCalled, false)
   assert.equal(report.cli.configProbe.cloudApiCalled, false)
   assert.equal(report.cli.configProbe.mutationPerformed, false)
+  assert.equal(report.localBrowserProbe.checked, true)
+  assert.equal(report.localBrowserProbe.cloudApiCalled, false)
+  assert.equal(report.localBrowserProbe.cloudMutationPerformed, false)
+  assert.equal(typeof report.localBrowserProbe.canUseCurrentConsole, "boolean")
+  assert.equal(typeof report.localBrowserProbe.aliyunConsoleTabCount, "number")
+  assert.ok(Array.isArray(report.localBrowserProbe.aliyunConsoleTabs))
+  assert.ok(report.localBrowserProbe.note.includes("does not read cookies"))
   assert.ok([
     "aliyun_cli_profile_not_configured",
     "aliyun_cli_config_incomplete",
@@ -155,6 +173,35 @@ test("Aliyun cloud access report preserves current non-secret console evidence",
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
+})
+
+test("Aliyun cloud access current browser probe records only sanitized Aliyun host paths", () => {
+  const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-cloud-access-browser-probe-"))
+  writeFakeExecutable(path.join(tmpdir, "pgrep"), ["exit 0"])
+  writeFakeExecutable(path.join(tmpdir, "osascript"), [
+    "printf '%s\\n' '{\"title\":\"阿里云 SAE token tab\",\"url\":\"https://sae.console.aliyun.com/cn-hangzhou/applications?token=SHOULD_NOT_APPEAR#secret\"}'",
+    "printf '%s\\n' '{\"title\":\"Other\",\"url\":\"about:blank\"}'",
+  ])
+  const output = execFileSync(process.execPath, ["scripts/check-aliyun-cloud-access.mjs"], {
+    cwd: root,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      PATH: `${tmpdir}:${process.env.PATH}`,
+      HOME: tmpdir,
+    },
+    maxBuffer: 1024 * 1024 * 30,
+  })
+  const report = JSON.parse(output)
+
+  assert.equal(report.localBrowserProbe.checked, true)
+  assert.equal(report.localBrowserProbe.running, true)
+  assert.equal(report.localBrowserProbe.canUseCurrentConsole, true)
+  assert.equal(report.localBrowserProbe.aliyunConsoleTabCount, 1)
+  assert.equal(report.localBrowserProbe.aliyunConsoleTabs[0].hostPath, "sae.console.aliyun.com/cn-hangzhou/applications")
+  assert.doesNotMatch(output, /SHOULD_NOT_APPEAR/)
+  assert.doesNotMatch(output, /token=/)
+  assert.doesNotMatch(output, /#secret/)
 })
 
 test("Aliyun cloud access classifies local CLI profile probe without storing raw output", () => {
