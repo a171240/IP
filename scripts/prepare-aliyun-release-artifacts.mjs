@@ -549,7 +549,11 @@ function renderMarkdown(audit) {
     `- authorizationPackets: ${actionAuthorization.summary.authorizationPackets || 0}`,
     `- authorizationPacketIds: ${(actionAuthorization.authorizationPackets || []).map((item) => item.packetId).join(", ") || "none"}`,
     `- canStartNowPackets: ${(actionAuthorization.summary.canStartNowPackets || []).join(", ") || "none"}`,
+    `- nextActionTimeConfirmations: ${(actionAuthorization.summary.nextActionTimeConfirmations || []).join(", ") || "none"}`,
     `- actionTimeConfirmationRequired: ${actionAuthorization.summary.actionTimeConfirmationRequired.join(", ")}`,
+    ...(actionAuthorization.nextActionTimeConfirmations?.length
+      ? actionAuthorization.nextActionTimeConfirmations.map((item) => `- ${item.packetId}: ${item.minimumUserPhrase}`)
+      : ["- nextActionTimeConfirmations: none"]),
     ...(actionAuthorization.actions?.length
       ? actionAuthorization.actions.map((item) => `- ${item.id}: ${item.automationPolicy} (${item.blockerClass})`)
       : ["- none"]),
@@ -1362,6 +1366,7 @@ function main() {
       authorizationPackets: actionAuthorization.summary.authorizationPackets || 0,
       authorizationPacketIds: (actionAuthorization.authorizationPackets || []).map((item) => item.packetId),
       canStartNowPackets: actionAuthorization.summary.canStartNowPackets || [],
+      nextActionTimeConfirmations: actionAuthorization.nextActionTimeConfirmations || [],
       blockedByPacketDependencies: actionAuthorization.summary.blockedByPacketDependencies || [],
       canCodexProceedWithoutUser: actionAuthorization.summary.canCodexProceedWithoutUser,
       currentExternalBlockers: actionAuthorization.summary.currentExternalBlockers,

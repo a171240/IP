@@ -24,6 +24,7 @@ test("Aliyun action authorization command is wired into scripts and predeploy", 
   assert.match(releaseArtifacts, /authorizationPackets/)
   assert.match(releaseArtifacts, /authorizationPacketIds/)
   assert.match(releaseArtifacts, /canStartNowPackets/)
+  assert.match(releaseArtifacts, /nextActionTimeConfirmations/)
   assert.match(releaseArtifacts, /blockedByPacketDependencies/)
 })
 
@@ -50,6 +51,7 @@ test("Aliyun action authorization matrix separates local-safe work from external
     "P03_ACR_PURCHASE",
     "P05_OSS_RAM_STS",
   ])
+  assert.deepEqual(report.summary.nextActionTimeConfirmations, report.summary.canStartNowPackets)
   assert.ok(report.summary.blockedByPacketDependencies.includes("P04_ACR_IMAGE_AND_PULL"))
   assert.ok(report.summary.blockedByPacketDependencies.includes("P09_PRODUCTION_DEPLOY"))
   assert.deepEqual(report.summary.canCodexProceedWithoutUser, [])
@@ -88,6 +90,36 @@ test("Aliyun action authorization matrix separates local-safe work from external
   assert.ok(report.prohibitedWithoutActionTimeConfirmation.some((item) => item.includes("创建/修改 SAE")))
   assert.ok(report.prohibitedWithoutActionTimeConfirmation.some((item) => item.includes("读取、复制、粘贴、导入或输出")))
   assert.ok(report.safeLocalWorkStillAllowed.some((item) => item.includes("运行本地检查")))
+
+  assert.equal(report.nextActionTimeConfirmations.length, 4)
+  const nextConfirmationsById = new Map(report.nextActionTimeConfirmations.map((item) => [item.packetId, item]))
+  assert.match(
+    nextConfirmationsById.get("P01_WECHAT_OPEN_MOBILE_APP").minimumUserPhrase,
+    /微信开放平台创建\/补全美业话镜移动应用资料/,
+  )
+  assert.ok(
+    nextConfirmationsById.get("P01_WECHAT_OPEN_MOBILE_APP").explicitlyExcluded.some((item) =>
+      item.includes("不把 AppSecret 写入 JSON"),
+    ),
+  )
+  assert.ok(
+    nextConfirmationsById.get("P02_APPLE_TEAM_ID").writeTargets.includes("APPLE_TEAM_ID -> 阿里云 SAE plain env"),
+  )
+  assert.match(nextConfirmationsById.get("P03_ACR_PURCHASE").minimumUserPhrase, /CNY 117\.00/)
+  assert.ok(
+    nextConfirmationsById.get("P03_ACR_PURCHASE").explicitlyExcluded.some((item) =>
+      item.includes("未明确确认金额前不点击付款"),
+    ),
+  )
+  assert.equal(nextConfirmationsById.get("P03_ACR_PURCHASE").nonSecretEvidenceOnly, true)
+  assert.ok(
+    nextConfirmationsById.get("P05_OSS_RAM_STS").completionEvidence.includes("oss.ramLeastPrivilege=true"),
+  )
+  assert.ok(
+    nextConfirmationsById.get("P05_OSS_RAM_STS").explicitlyExcluded.some((item) =>
+      item.includes("不把 AccessKeySecret"),
+    ),
+  )
 
   assert.equal(report.authorizationPackets.length, 9)
   const packetsById = new Map(report.authorizationPackets.map((item) => [item.packetId, item]))

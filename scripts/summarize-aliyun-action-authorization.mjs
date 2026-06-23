@@ -391,6 +391,9 @@ function buildReport(args) {
   const canStartNowPackets = authorizationPackets
     .filter((packet) => packet.canStartNow)
     .map((packet) => packet.packetId)
+  const nextActionTimeConfirmations = authorizationPackets
+    .filter((packet) => packet.canStartNow && packet.requiresActionTimeConfirmation)
+    .map((packet) => compactActionTimeConfirmation(packet))
   const actionTimeConfirmationRequired = actions
     .filter((action) => action.requiresActionTimeConfirmation)
     .map((action) => action.id)
@@ -430,10 +433,12 @@ function buildReport(args) {
       sensitiveActionItems: status.summary?.sensitiveActionItems || {},
       authorizationPackets: authorizationPackets.length,
       canStartNowPackets,
+      nextActionTimeConfirmations: nextActionTimeConfirmations.map((item) => item.packetId),
       blockedByPacketDependencies: authorizationPackets
         .filter((packet) => packet.blockingDependencies.length > 0)
         .map((packet) => packet.packetId),
     },
+    nextActionTimeConfirmations,
     safeLocalWorkStillAllowed: [
       "运行本地检查和 smoke。",
       "生成不含 value 的 env checklist、user action brief、console runbook、operator handoff 和 release artifacts。",
@@ -467,6 +472,23 @@ function buildReport(args) {
   }
   report.ok = report.secretLeakCheck.ok
   return report
+}
+
+function compactActionTimeConfirmation(packet) {
+  return {
+    packetId: packet.packetId,
+    actionId: packet.actionId,
+    title: packet.title,
+    owner: packet.owner,
+    sequenceGroup: packet.sequenceGroup,
+    minimumUserPhrase: packet.minimumUserPhrase,
+    allowedActions: packet.allowedActions,
+    explicitlyExcluded: packet.explicitlyExcluded,
+    completionEvidence: packet.completionEvidence,
+    writeTargets: packet.writeTargets,
+    verifyCommands: packet.verifyCommands,
+    nonSecretEvidenceOnly: packet.nonSecretEvidenceOnly === true,
+  }
 }
 
 function classifyAction(action) {
@@ -580,6 +602,7 @@ function renderMarkdown(report) {
     `- containsValues: ${report.containsValues}`,
     `- secretLeakCheck: ${report.secretLeakCheck.ok}`,
     `- actionTimeConfirmationRequired: ${report.summary.actionTimeConfirmationRequired.join(", ")}`,
+    `- nextActionTimeConfirmations: ${report.summary.nextActionTimeConfirmations.join(", ") || "none"}`,
     "",
     "## 允许的本地工作",
     "",
@@ -589,9 +612,32 @@ function renderMarkdown(report) {
     "",
     ...report.prohibitedWithoutActionTimeConfirmation.map((item) => `- ${item}`),
     "",
-    "## 动作分类",
+    "## 当前可开始的动作时确认",
     "",
   ]
+
+  for (const item of report.nextActionTimeConfirmations) {
+    lines.push(
+      `### ${item.packetId} ${item.title}`,
+      "",
+      `- actionId: ${item.actionId}`,
+      `- owner: ${item.owner}`,
+      `- sequenceGroup: ${item.sequenceGroup}`,
+      `- minimumUserPhrase: ${item.minimumUserPhrase}`,
+      `- allowedActions: ${item.allowedActions.join("; ") || "none"}`,
+      `- explicitlyExcluded: ${item.explicitlyExcluded.join("; ") || "none"}`,
+      `- completionEvidence: ${item.completionEvidence.join("; ") || "none"}`,
+      `- writeTargets: ${item.writeTargets.join("; ") || "none"}`,
+      `- verifyCommands: ${item.verifyCommands.join("; ") || "none"}`,
+      `- nonSecretEvidenceOnly: ${item.nonSecretEvidenceOnly}`,
+      "",
+    )
+  }
+
+  lines.push(
+    "## 动作分类",
+    "",
+  )
 
   for (const action of report.actions) {
     lines.push(
