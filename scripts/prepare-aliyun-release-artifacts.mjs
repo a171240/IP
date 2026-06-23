@@ -739,6 +739,12 @@ function renderMarkdown(audit) {
     `- wechatOpenMobileAppCreated: ${blockerBrief.summary.wechatOpenMobileAppCreated === true}`,
     `- wechatOpenCanCreateDraft: ${blockerBrief.summary.wechatOpenCanCreateDraft === true}`,
     `- wechatOpenReadyToSubmitForReview: ${blockerBrief.summary.wechatOpenReadyToSubmitForReview === true}`,
+    `- envSourceVercelRequiredCovered: ${blockerBrief.summary.envSourceVercelRequiredCovered || "unknown"}`,
+    `- envSourceCanMigrateFromVercelProduction: ${blockerBrief.summary.envSourceCanMigrateFromVercelProduction || 0}`,
+    `- envSourceAppAliyunOwnedNotInVercel: ${blockerBrief.summary.envSourceAppAliyunOwnedNotInVercel || 0}`,
+    `- envSourceBlockedExternalRequired: ${blockerBrief.summary.envSourceBlockedExternalRequired?.length ? blockerBrief.summary.envSourceBlockedExternalRequired.join(", ") : "none"}`,
+    `- envSourceReadyLocalButMissingFromVercel: ${blockerBrief.summary.envSourceReadyLocalButMissingFromVercel?.length ? blockerBrief.summary.envSourceReadyLocalButMissingFromVercel.join(", ") : "none"}`,
+    `- envSourceSecretOrSensitiveToImport: ${blockerBrief.summary.envSourceSecretOrSensitiveToImport || 0}`,
     ...(blockerBrief.wechatOpenMobileApp
       ? [
         `- wechatOpenReviewStatus: ${blockerBrief.wechatOpenMobileApp.reviewStatus || "unknown"}`,
@@ -1241,6 +1247,7 @@ function main() {
   const envHandoffMarkdownPath = resolve(args.outDir, "env-handoff.md")
   const envSourceMapJsonPath = resolve(args.outDir, "env-source-map.json")
   const envSourceMapMarkdownPath = resolve(args.outDir, "env-source-map.md")
+  const vercelEnvCoveragePath = resolve(args.outDir, "vercel-env-coverage.json")
   const sensitiveBlockersJsonPath = resolve(args.outDir, "sensitive-blockers.json")
   const sensitiveBlockersMarkdownPath = resolve(args.outDir, "sensitive-blockers.md")
   const resourcesMatrixJsonPath = resolve(args.outDir, "resource-matrix.json")
@@ -1372,11 +1379,21 @@ function main() {
     "--markdown",
     completionAuditMarkdownPath,
   ])
+  const vercelEnvCoverage = runVercelEnvCoverage(args, vercelEnvCoveragePath)
   const blockerBrief = runJson("blocker_brief", [
     "scripts/summarize-aliyun-blocker-brief.mjs",
     "--env-file",
     args.envFile,
     ...(args.cloudConfirmationsFile ? ["--cloud-confirmations", args.cloudConfirmationsFile] : []),
+    ...(vercelEnvCoverage.ok
+      ? ["--vercel-env-coverage-report", vercelEnvCoveragePath]
+      : []),
+    ...(args.skipVercelEnvCoverage && !vercelEnvCoverage.ok
+      ? ["--skip-vercel-env-coverage"]
+      : []),
+    ...(args.vercelEnvCoverageInput && !vercelEnvCoverage.ok && !args.skipVercelEnvCoverage
+      ? ["--vercel-env-coverage-input", args.vercelEnvCoverageInput]
+      : []),
     "--out",
     blockerBriefJsonPath,
     "--markdown",
@@ -1458,8 +1475,6 @@ function main() {
   const appClientContract = runJson("app_client_contract", ["scripts/check-app-client-api-contract.mjs"])
   const appApiSmokeCoverage = runJson("app_api_smoke_coverage", ["scripts/check-app-api-smoke-coverage.mjs"])
   const dockerContext = runJson("docker_context", ["scripts/check-aliyun-docker-context.mjs"])
-  const vercelEnvCoveragePath = resolve(args.outDir, "vercel-env-coverage.json")
-  const vercelEnvCoverage = runVercelEnvCoverage(args, vercelEnvCoveragePath)
   const envSourceMap = runJson("env_source_map", [
     "scripts/summarize-aliyun-env-source-map.mjs",
     "--env-file",
@@ -1972,6 +1987,12 @@ function main() {
       readySecretEnvVariableNames: blockerBrief.summary.readySecretEnvVariableNames || [],
       blockedVariableAcquisitionCount: blockerBrief.summary.blockedVariableAcquisitionCount || 0,
       readySecretEnvImportGroupCount: blockerBrief.summary.readySecretEnvImportGroupCount || 0,
+      envSourceVercelRequiredCovered: blockerBrief.summary.envSourceVercelRequiredCovered || "unknown",
+      envSourceCanMigrateFromVercelProduction: blockerBrief.summary.envSourceCanMigrateFromVercelProduction || 0,
+      envSourceAppAliyunOwnedNotInVercel: blockerBrief.summary.envSourceAppAliyunOwnedNotInVercel || 0,
+      envSourceBlockedExternalRequired: blockerBrief.summary.envSourceBlockedExternalRequired || [],
+      envSourceReadyLocalButMissingFromVercel: blockerBrief.summary.envSourceReadyLocalButMissingFromVercel || [],
+      envSourceSecretOrSensitiveToImport: blockerBrief.summary.envSourceSecretOrSensitiveToImport || 0,
       immediateAuthorizationPackets: blockerBrief.summary.immediateAuthorizationPackets,
       cloudInventoryStrictReady: blockerBrief.summary.cloudInventoryStrictReady,
       cloudInventoryInterpretation: blockerBrief.summary.cloudInventoryInterpretation || "",
@@ -1985,6 +2006,7 @@ function main() {
       wechatOpenCanCreateDraft: blockerBrief.summary.wechatOpenCanCreateDraft === true,
       wechatOpenReadyToSubmitForReview: blockerBrief.summary.wechatOpenReadyToSubmitForReview === true,
       wechatOpenMobileApp: blockerBrief.wechatOpenMobileApp || null,
+      envSourceMap: blockerBrief.envSourceMap || null,
       credentialInterventionBrief: blockerBrief.credentialInterventionBrief || {},
       requiredEnvBlockers: blockerBrief.requiredEnvBlockers.map((item) => `${item.name}:${item.status}:${item.importTarget}`),
       requiredEnvBlockerDetails: blockerBrief.requiredEnvBlockers.map((item) => ({

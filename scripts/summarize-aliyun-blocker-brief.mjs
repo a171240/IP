@@ -30,6 +30,9 @@ function parseArgs(argv) {
     cloudConfirmationsFile: DEFAULT_CLOUD_CONFIRMATIONS_FILE,
     outPath: "",
     markdownPath: "",
+    skipVercelEnvCoverage: false,
+    vercelEnvCoverageInput: "",
+    vercelEnvCoverageReport: "",
   }
   for (let index = 2; index < argv.length; index += 1) {
     const arg = argv[index]
@@ -48,6 +51,18 @@ function parseArgs(argv) {
     }
     if (arg === "--markdown") {
       args.markdownPath = resolveValue(argv[++index], "--markdown")
+      continue
+    }
+    if (arg === "--skip-vercel-env-coverage") {
+      args.skipVercelEnvCoverage = true
+      continue
+    }
+    if (arg === "--vercel-env-coverage-input") {
+      args.vercelEnvCoverageInput = resolveValue(argv[++index], "--vercel-env-coverage-input")
+      continue
+    }
+    if (arg === "--vercel-env-coverage-report") {
+      args.vercelEnvCoverageReport = resolveValue(argv[++index], "--vercel-env-coverage-report")
       continue
     }
     if (arg === "--help" || arg === "-h") {
@@ -168,6 +183,20 @@ function buildReport(args) {
     "scripts/generate-wechat-open-mobile-app-package.mjs",
     ...envArgs(args),
   ])
+  const envSourceMap = runJson("env_source_map", [
+    "scripts/summarize-aliyun-env-source-map.mjs",
+    "--env-file",
+    args.envFile,
+    ...(args.vercelEnvCoverageReport
+      ? ["--vercel-env-coverage-report", args.vercelEnvCoverageReport]
+      : []),
+    ...(args.vercelEnvCoverageInput && !args.vercelEnvCoverageReport
+      ? ["--vercel-env-coverage-input", args.vercelEnvCoverageInput]
+      : []),
+    ...(args.skipVercelEnvCoverage && !args.vercelEnvCoverageReport
+      ? ["--skip-vercel-env-coverage"]
+      : []),
+  ])
 
   const requiredEnvBlockers = extractRequiredEnvBlockers(sensitiveBlockers)
   const sensitiveBlockerSummaries = compactSensitiveBlockers(sensitiveBlockers)
@@ -182,6 +211,7 @@ function buildReport(args) {
   const nextActionSequencing = compactNextActionSequencing(completionAudit)
   const canStartNowWritebackPlan = compactCanStartNowWritebackPlan(consoleRunbook, imagePublishPlan)
   const cloudInventoryReadinessInterpretation = buildCloudInventoryReadinessInterpretation(status, cloudAccess)
+  const envSourceMapSummary = compactEnvSourceMap(envSourceMap)
   const report = {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -249,6 +279,12 @@ function buildReport(args) {
       wechatOpenMobileAppCreated: wechatOpenMobileApp.mobileAppCreated,
       wechatOpenCanCreateDraft: wechatOpenMobileApp.canCreateDraftInWechatOpenPlatform,
       wechatOpenReadyToSubmitForReview: wechatOpenMobileApp.readyToSubmitForReview,
+      envSourceVercelRequiredCovered: envSourceMapSummary.vercelCoverage.requiredCovered,
+      envSourceCanMigrateFromVercelProduction: envSourceMapSummary.canMigrateFromVercelProduction,
+      envSourceAppAliyunOwnedNotInVercel: envSourceMapSummary.appAliyunOwnedNotInVercel,
+      envSourceBlockedExternalRequired: envSourceMapSummary.blockedExternalRequired,
+      envSourceReadyLocalButMissingFromVercel: envSourceMapSummary.readyLocalButMissingFromVercel,
+      envSourceSecretOrSensitiveToImport: envSourceMapSummary.secretOrSensitiveToImport,
     },
     immediateAuthorizationPackets: actionAuthorization.nextActionTimeConfirmations || [],
     requiredEnvBlockers,
@@ -256,6 +292,7 @@ function buildReport(args) {
     readySecretEnvImportGroups,
     credentialInterventionBrief,
     wechatOpenMobileApp,
+    envSourceMap: envSourceMapSummary,
     bridgeDataLayer,
     cloudResourceObservations,
     nextActionSequencing,
@@ -505,6 +542,78 @@ function compactWechatOpenMobileApp(report) {
   }
 }
 
+function compactEnvSourceMap(report = {}) {
+  const summary = report.summary || {}
+  const vercelCoverage = report.vercelCoverage || {}
+  const groups = report.groups || {}
+  return {
+    ok: report.ok === true,
+    containsValues: report.containsValues === true,
+    total: summary.total || 0,
+    requiredReady: summary.requiredReady || "unknown",
+    requiredBlocking: summary.requiredBlocking || [],
+    appLaunchBlocking: summary.appLaunchBlocking || [],
+    vercelCoverageStatus: summary.vercelCoverageStatus || "unknown",
+    canMigrateFromVercelProduction: summary.canMigrateFromVercelProduction || 0,
+    appAliyunOwnedNotInVercel: summary.appAliyunOwnedNotInVercel || 0,
+    blockedExternalRequired: summary.blockedExternalRequired || [],
+    readyLocalButMissingFromVercel: summary.readyLocalButMissingFromVercel || [],
+    miniProgramCompatOnly: summary.miniProgramCompatOnly || [],
+    deferredOptional: summary.deferredOptional || 0,
+    secretOrSensitiveToImport: summary.secretOrSensitiveToImport || 0,
+    requiredMissingInVercelProduction: summary.requiredMissingInVercelProduction || [],
+    appSpecificMissingInVercelProduction: summary.appSpecificMissingInVercelProduction || [],
+    vercelCoverage: {
+      ok: vercelCoverage.ok === true,
+      skipped: vercelCoverage.skipped === true,
+      source: vercelCoverage.source || "",
+      project: vercelCoverage.project || "",
+      scope: vercelCoverage.scope || "",
+      environment: vercelCoverage.environment || "",
+      requiredCovered: vercelCoverage.requiredCovered || summary.vercelRequiredCovered || "unknown",
+      productionNames: vercelCoverage.productionNames || "unknown",
+      requiredMissingInVercelProduction: vercelCoverage.requiredMissingInVercelProduction || [],
+      appSpecificKeysMissingInVercelProduction: vercelCoverage.appSpecificKeysMissingInVercelProduction || [],
+      bridgeKeysPresentInVercelProduction: vercelCoverage.bridgeKeysPresentInVercelProduction || [],
+      error: vercelCoverage.error || "",
+    },
+    groups: {
+      migrateFromVercelProduction: compactEnvSourceNameGroup(groups.migrateFromVercelProduction),
+      appAliyunOwnedNotInVercel: compactEnvSourceNameGroup(groups.appAliyunOwnedNotInVercel),
+      blockedExternalRequired: compactEnvSourceVariables(groups.blockedExternalRequired),
+      readyLocalButMissingFromVercel: compactEnvSourceVariables(groups.readyLocalButMissingFromVercel),
+      miniProgramCompatOnly: compactEnvSourceVariables(groups.miniProgramCompatOnly),
+      deferredOptional: compactEnvSourceNameGroup(groups.deferredOptional),
+    },
+  }
+}
+
+function compactEnvSourceNameGroup(items = []) {
+  return {
+    count: items.length,
+    variableNames: items.map((item) => item.name).filter(Boolean),
+  }
+}
+
+function compactEnvSourceVariables(items = []) {
+  return items.map((item) => ({
+    name: item.name,
+    required: item.required === true,
+    status: item.status,
+    sensitivity: item.sensitivity,
+    sourceCategory: item.sourceCategory,
+    owner: item.owner,
+    consolePath: item.consolePath,
+    obtain: item.obtain,
+    importTarget: item.importTarget,
+    cloudConfirmationKey: item.cloudConfirmationKey,
+    vercelProductionNameStatus: item.vercelProductionNameStatus,
+    sourceDecision: item.sourceDecision,
+    action: item.action,
+    forbidden: item.forbidden,
+  }))
+}
+
 function compactSensitiveBlockers(sensitiveBlockers) {
   return (sensitiveBlockers.items || []).map((item) => ({
     id: item.id,
@@ -645,6 +754,12 @@ function renderMarkdown(report) {
     `- wechatOpenMobileAppCreated: ${report.summary.wechatOpenMobileAppCreated}`,
     `- wechatOpenCanCreateDraft: ${report.summary.wechatOpenCanCreateDraft}`,
     `- wechatOpenReadyToSubmitForReview: ${report.summary.wechatOpenReadyToSubmitForReview}`,
+    `- envSourceVercelRequiredCovered: ${report.summary.envSourceVercelRequiredCovered}`,
+    `- envSourceCanMigrateFromVercelProduction: ${report.summary.envSourceCanMigrateFromVercelProduction}`,
+    `- envSourceAppAliyunOwnedNotInVercel: ${report.summary.envSourceAppAliyunOwnedNotInVercel}`,
+    `- envSourceBlockedExternalRequired: ${report.summary.envSourceBlockedExternalRequired.join(", ") || "none"}`,
+    `- envSourceReadyLocalButMissingFromVercel: ${report.summary.envSourceReadyLocalButMissingFromVercel.join(", ") || "none"}`,
+    `- envSourceSecretOrSensitiveToImport: ${report.summary.envSourceSecretOrSensitiveToImport}`,
     "",
     "## 微信开放平台移动应用链路",
     "",
@@ -673,6 +788,9 @@ function renderMarkdown(report) {
     "- backendWriteTargetsAfterApproval:",
     ...report.wechatOpenMobileApp.backendWriteTargetsAfterApproval.map((item) => `  - ${item}`),
     "",
+    "## 环境变量来源与 Vercel 覆盖",
+    "",
+    ...renderEnvSourceMap(report.envSourceMap),
     "## 数据层边界",
     "",
     `- current: ${report.bridgeDataLayer.current}`,
@@ -797,6 +915,72 @@ function renderMarkdown(report) {
     ...report.prohibitedWithoutActionTimeConfirmation.map((item) => `- ${item}`),
     "",
   ].join("\n")
+}
+
+function renderEnvSourceMap(envSourceMap) {
+  if (!envSourceMap) return ["- none", ""]
+  const vercel = envSourceMap.vercelCoverage || {}
+  return [
+    `- total: ${envSourceMap.total}`,
+    `- requiredReady: ${envSourceMap.requiredReady}`,
+    `- requiredBlocking: ${envSourceMap.requiredBlocking.join(", ") || "none"}`,
+    `- appLaunchBlocking: ${envSourceMap.appLaunchBlocking.join(", ") || "none"}`,
+    `- vercelCoverageStatus: ${envSourceMap.vercelCoverageStatus}`,
+    `- vercelCoverageOk: ${vercel.ok === true}`,
+    `- vercelProject: ${vercel.project || "unknown"}`,
+    `- vercelEnvironment: ${vercel.environment || "unknown"}`,
+    `- vercelProductionNames: ${vercel.productionNames || "unknown"}`,
+    `- vercelRequiredCovered: ${vercel.requiredCovered || "unknown"}`,
+    `- requiredMissingInVercelProduction: ${(vercel.requiredMissingInVercelProduction || []).join(", ") || "none"}`,
+    `- appSpecificKeysMissingInVercelProduction: ${(vercel.appSpecificKeysMissingInVercelProduction || []).join(", ") || "none"}`,
+    `- bridgeKeysPresentInVercelProduction: ${(vercel.bridgeKeysPresentInVercelProduction || []).join(", ") || "none"}`,
+    `- canMigrateFromVercelProduction: ${envSourceMap.canMigrateFromVercelProduction}`,
+    `- appAliyunOwnedNotInVercel: ${envSourceMap.appAliyunOwnedNotInVercel}`,
+    `- blockedExternalRequired: ${envSourceMap.blockedExternalRequired.join(", ") || "none"}`,
+    `- readyLocalButMissingFromVercel: ${envSourceMap.readyLocalButMissingFromVercel.join(", ") || "none"}`,
+    `- miniProgramCompatOnly: ${envSourceMap.miniProgramCompatOnly.join(", ") || "none"}`,
+    `- deferredOptional: ${envSourceMap.deferredOptional}`,
+    `- secretOrSensitiveToImport: ${envSourceMap.secretOrSensitiveToImport}`,
+    "",
+    "### 可按同名从 Vercel Production 迁移",
+    "",
+    `- count: ${envSourceMap.groups.migrateFromVercelProduction.count}`,
+    `- variableNames: ${envSourceMap.groups.migrateFromVercelProduction.variableNames.join(", ") || "none"}`,
+    "",
+    "### APP/阿里云新增或云侧确认值",
+    "",
+    `- count: ${envSourceMap.groups.appAliyunOwnedNotInVercel.count}`,
+    `- variableNames: ${envSourceMap.groups.appAliyunOwnedNotInVercel.variableNames.join(", ") || "none"}`,
+    "",
+    "### 外部阻塞值",
+    "",
+    ...renderEnvSourceVariableTable(envSourceMap.groups.blockedExternalRequired),
+    "### 本机 ready 但 Vercel Production 名称缺失",
+    "",
+    ...renderEnvSourceVariableTable(envSourceMap.groups.readyLocalButMissingFromVercel),
+    "### 小程序兼容变量",
+    "",
+    ...renderEnvSourceVariableTable(envSourceMap.groups.miniProgramCompatOnly),
+  ]
+}
+
+function renderEnvSourceVariableTable(items = []) {
+  if (!items.length) return ["- none", ""]
+  return [
+    "| 变量 | 状态 | 敏感等级 | 来源分类 | 来源判断 | 获取位置 | 导入目标 | 禁止事项 |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    ...items.map((item) => [
+      codeCell(item.name),
+      escapeTableCell(item.status),
+      escapeTableCell(item.sensitivity),
+      escapeTableCell(item.sourceCategory),
+      escapeTableCell(item.sourceDecision),
+      escapeTableCell(item.consolePath),
+      escapeTableCell(item.importTarget),
+      escapeTableCell(item.forbidden),
+    ].join(" | ").replace(/^/, "| ").replace(/$/, " |")),
+    "",
+  ]
 }
 
 function renderCredentialInterventionBrief(brief) {
