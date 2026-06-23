@@ -34,6 +34,7 @@ test("Aliyun sensitive blockers output has current blocked action ids but no sec
   const appleItem = report.items.find((item) => item.id === "S02_APPLE_TEAM_ID")
   const acrPurchaseItem = report.items.find((item) => item.id === "S03_ACR_PAID_PURCHASE")
   const envImportItem = report.items.find((item) => item.id === "S06_READY_SENSITIVE_ENV_IMPORT")
+  const androidSigningItem = report.items.find((item) => item.id === "S07_ANDROID_RELEASE_SIGNING")
 
   assert.equal(report.ok, true)
   assert.equal(report.containsValues, false)
@@ -73,6 +74,7 @@ test("Aliyun sensitive blockers output has current blocked action ids but no sec
   ))
   assert.ok(ids.includes("S03_ACR_PAID_PURCHASE"))
   assert.ok(ids.includes("S06_READY_SENSITIVE_ENV_IMPORT"))
+  assert.ok(ids.includes("S07_ANDROID_RELEASE_SIGNING"))
   assert.equal(acrPurchaseItem.requiresActionTimeConfirmation, true)
   assert.ok(acrPurchaseItem.writeTargets.some((target) => target.includes("image-publish.local.json")))
   assert.match(acrPurchaseItem.completionEvidence.join("\n"), /acr\.purchaseCandidate\.confirmed=true/)
@@ -93,9 +95,24 @@ test("Aliyun sensitive blockers output has current blocked action ids but no sec
       "S04_ACR_REGISTRY_AUTH",
       "S05_OSS_RAM_SECRET_OR_STS",
       "S06_READY_SENSITIVE_ENV_IMPORT",
+      "S07_ANDROID_RELEASE_SIGNING",
     ],
   )
+  assert.equal(androidSigningItem.type, "android_keystore_password_or_signature")
+  assert.equal(androidSigningItem.requiresActionTimeConfirmation, true)
+  assert.ok(androidSigningItem.variableNames.includes("MEIYE_RELEASE_STORE_FILE"))
+  assert.ok(androidSigningItem.variableNames.includes("MEIYE_RELEASE_STORE_PASSWORD"))
+  assert.ok(androidSigningItem.variableNames.includes("MEIYE_RELEASE_KEY_ALIAS"))
+  assert.ok(androidSigningItem.variableNames.includes("MEIYE_RELEASE_KEY_PASSWORD"))
+  assert.ok(androidSigningItem.variableDetails.some((item) =>
+    item.name === "MEIYE_RELEASE_STORE_PASSWORD" &&
+    item.sensitivity === "secret" &&
+    /Android signing secret store/.test(item.importTarget)
+  ))
+  assert.match(androidSigningItem.unblockCondition, /assembleRelease 成功/)
+  assert.match(androidSigningItem.forbidden, /debug\.keystore/)
   assert.ok(report.summary.variableNames.includes("WECHAT_OPEN_APP_SECRET"))
+  assert.ok(report.summary.variableNames.includes("MEIYE_RELEASE_KEY_PASSWORD"))
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
@@ -128,6 +145,7 @@ test("Aliyun operator status and handoff inherit sensitive action metadata", () 
   const operatorApple = operatorTasks.sensitiveActionItems.find((item) => item.id === "S02_APPLE_TEAM_ID")
   const statusAcrPurchase = status.tasks.sensitiveActionItems.find((item) => item.id === "S03_ACR_PAID_PURCHASE")
   const handoffEnvImport = handoff.sensitiveActionItems.find((item) => item.id === "S06_READY_SENSITIVE_ENV_IMPORT")
+  const handoffAndroidSigning = handoff.sensitiveActionItems.find((item) => item.id === "S07_ANDROID_RELEASE_SIGNING")
 
   assert.match(operatorWechat.obtainFrom, /微信开放平台/)
   assert.ok(operatorWechat.variableDetails.some((item) => item.name === "WECHAT_OPEN_APP_SECRET"))
@@ -145,6 +163,9 @@ test("Aliyun operator status and handoff inherit sensitive action metadata", () 
   assert.ok(handoffEnvImport.variableDetails.some((item) => item.name === "SUPABASE_SERVICE_ROLE_KEY"))
   assert.ok(handoffEnvImport.verifyCommands.includes("corepack pnpm aliyun:readiness:cloud-ready"))
   assert.match(handoffEnvImport.completionEvidence.join("\n"), /envImport\.secretNotInImage=true/)
+  assert.equal(handoffAndroidSigning.requiresActionTimeConfirmation, true)
+  assert.ok(handoffAndroidSigning.variableDetails.some((item) => item.name === "MEIYE_RELEASE_KEY_PASSWORD"))
+  assert.match(handoffAndroidSigning.obtainFrom, /Android release keystore/)
   assert.doesNotMatch(operatorTasksOutput + statusOutput + handoffOutput, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(operatorTasksOutput + statusOutput + handoffOutput, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(operatorTasksOutput + statusOutput + handoffOutput, /:\/\/[^\s:@]+:[^\s@]+@/)
@@ -165,7 +186,9 @@ test("Aliyun sensitive blockers markdown renders value-free variable acquisition
 
   assert.match(markdown, /#### 变量获取和导入明细/)
   assert.match(markdown, /`WECHAT_OPEN_APP_ID`/)
+  assert.match(markdown, /`MEIYE_RELEASE_KEY_PASSWORD`/)
   assert.match(markdown, /微信开放平台 -> 管理中心 -> 移动应用 -> 美业话镜 App/)
+  assert.match(markdown, /Android signing secret store/)
   assert.match(markdown, /阿里云 KMS\/Secrets Manager\/SAE secret env/)
   assert.doesNotMatch(markdown, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(markdown, /LTAI[A-Za-z0-9]{12,}/)

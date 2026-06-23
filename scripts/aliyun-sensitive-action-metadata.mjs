@@ -110,4 +110,25 @@ export const SENSITIVE_ACTION_METADATA = {
       "importedAt records a non-secret timestamp/evidence handle",
     ],
   },
+  S07_ANDROID_RELEASE_SIGNING: {
+    obtainFrom: "Android release keystore 管理位置 / CI Secret Store；微信开放平台 -> 移动应用 -> Android 应用签名",
+    writeTargets: [
+      "MEIYE_RELEASE_STORE_FILE / MEIYE_RELEASE_STORE_PASSWORD / MEIYE_RELEASE_KEY_ALIAS / MEIYE_RELEASE_KEY_PASSWORD -> 本机或 CI 受控 signing secret store",
+      "微信开放平台 -> 移动应用 -> Android 应用签名",
+      "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.wechatOpenPlatform.androidSignature / androidConfigured",
+    ],
+    verifyCommands: [
+      "cd /Users/Admin/Documents/美业话镜APP/meiye-huajing-app/android && ANDROID_HOME=\"$HOME/Library/Android/sdk\" ANDROID_SDK_ROOT=\"$HOME/Library/Android/sdk\" ./gradlew assembleRelease",
+      "ANDROID_HOME=\"$HOME/Library/Android/sdk\" ANDROID_SDK_ROOT=\"$HOME/Library/Android/sdk\" $ANDROID_HOME/build-tools/<version>/apksigner verify --print-certs app/build/outputs/apk/release/*.apk",
+      "corepack pnpm aliyun:wechat-open:package",
+      "corepack pnpm aliyun:app-native:check",
+    ],
+    requiresActionTimeConfirmation: true,
+    completionEvidence: [
+      "Android release build succeeds with signingConfigs.release",
+      "release APK/AAB exists and is not signed with debug.keystore",
+      "wechatOpenPlatform.androidSignature records release signature evidence only",
+      "wechatOpenPlatform.androidConfigured=true",
+    ],
+  },
 }

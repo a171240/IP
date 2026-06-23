@@ -465,7 +465,7 @@ function summarizeTasks(tasks) {
   }
 }
 
-function buildSensitiveActionItems({ envPlan, readiness, imagePublishPlan }) {
+function buildSensitiveActionItems({ envPlan, readiness, imagePublishPlan, nativeRelease }) {
   const variables = envPlan.variables || []
   const envImport = readiness.checks?.cloudConfirmations?.items?.find((item) => item.key === "envImport")
   const oss = readiness.checks?.cloudConfirmations?.items?.find((item) => item.key === "oss")
@@ -578,7 +578,79 @@ function buildSensitiveActionItems({ envPlan, readiness, imagePublishPlan }) {
     })
   }
 
+  const androidSigningItem = buildAndroidReleaseSigningSensitiveItem({ nativeRelease, wechatOpenPlatform })
+  if (androidSigningItem) items.push(androidSigningItem)
+
   return items.map(withSensitiveActionMetadata)
+}
+
+function buildAndroidReleaseSigningSensitiveItem({ nativeRelease, wechatOpenPlatform }) {
+  const android = nativeRelease?.android || {}
+  const androidSignature = String(wechatOpenPlatform.androidSignature || "").trim()
+  const hasReleaseWechatSignature = Boolean(androidSignature && !/^TODO_|^pending_/i.test(androidSignature))
+  const androidConfigured = wechatOpenPlatform.androidConfigured === true
+  const releaseSigningConfigReady = android.releaseSigningConfigReady === true
+  const releaseUsesDebugSigning = android.releaseUsesDebugSigning === true
+  const status = releaseSigningConfigReady && !releaseUsesDebugSigning && hasReleaseWechatSignature && androidConfigured
+    ? "ready"
+    : "blocked"
+
+  if (status === "ready") return null
+
+  const variableNames = [
+    "MEIYE_RELEASE_STORE_FILE",
+    "MEIYE_RELEASE_STORE_PASSWORD",
+    "MEIYE_RELEASE_KEY_ALIAS",
+    "MEIYE_RELEASE_KEY_PASSWORD",
+  ]
+
+  return {
+    id: "S07_ANDROID_RELEASE_SIGNING",
+    type: "android_keystore_password_or_signature",
+    status,
+    owner: "Android 发布操作员 / 微信开放平台操作员",
+    consolePath: "本机 Android release signing / CI Secret Store；微信开放平台 -> 移动应用 -> Android 应用签名",
+    variableNames,
+    variableDetails: androidReleaseSigningVariableDetails({
+      variableNames,
+      releaseSigningConfigReady,
+      releaseUsesDebugSigning,
+      hasReleaseWechatSignature,
+      androidConfigured,
+    }),
+    requiredUserAction: "提供或确认 Android release keystore、store password、key alias、key password；用 release APK/AAB 生成微信开放平台 Android 应用签名并回填。",
+    unblockCondition: "assembleRelease 成功，release 包不是 debug keystore 签名，微信开放平台记录 release 签名且 androidConfigured=true。",
+    forbidden: "不能使用 debug.keystore；不能把 keystore 文件、store password、key password、证书私钥或微信 AppSecret 写入 JSON、Markdown、Docker 镜像或 git。",
+  }
+}
+
+function androidReleaseSigningVariableDetails({
+  variableNames,
+  releaseSigningConfigReady,
+  releaseUsesDebugSigning,
+  hasReleaseWechatSignature,
+  androidConfigured,
+}) {
+  const status = releaseSigningConfigReady && !releaseUsesDebugSigning ? "required_at_build_time" : "native_release_config_blocked"
+  return variableNames.map((name) => ({
+    name,
+    required: true,
+    status,
+    sensitivity: name.endsWith("_FILE") || name.endsWith("_ALIAS") ? "controlled_identifier" : "secret",
+    sourceCategory: "android_release_signing",
+    owner: "Android 发布操作员 / CI Secret Store",
+    consolePath: "本机 ~/.gradle/gradle.properties、环境变量或 CI Secret Store；不要写入仓库。",
+    obtain: "从已有 Android release keystore 管理位置或发布负责人处确认；若尚未生成，需要按公司发布流程创建并安全保存。",
+    importTarget: "本机/CI Android signing secret store，不导入阿里云 SAE env。",
+    cloudConfirmationKey: "wechatOpenPlatform",
+    action: "动作时用于 assembleRelease；随后用 release APK/AAB 读取微信开放平台 Android 应用签名。",
+    notes: [
+      `releaseSigningConfigReady=${releaseSigningConfigReady}`,
+      `releaseUsesDebugSigning=${releaseUsesDebugSigning}`,
+      `wechatSignatureRecorded=${hasReleaseWechatSignature}`,
+      `androidConfigured=${androidConfigured}`,
+    ].join("; "),
+  }))
 }
 
 function variableDetailsFor(variables, names) {
@@ -828,8 +900,12 @@ function main() {
     "scripts/check-aliyun-image-publish-plan.mjs",
     "--allow-incomplete",
   ])
+  const nativeRelease = runJson("app_native_release", [
+    "scripts/check-app-native-release-config.mjs",
+    "--allow-blocking",
+  ])
   const tasks = buildTasks({ envPlan, readiness, domain, cloudConfirmations, imagePublishPlan })
-  const sensitiveActionItems = buildSensitiveActionItems({ envPlan, readiness, imagePublishPlan })
+  const sensitiveActionItems = buildSensitiveActionItems({ envPlan, readiness, imagePublishPlan, nativeRelease })
   const report = {
     generatedAt: new Date().toISOString(),
     containsValues: false,
@@ -856,6 +932,13 @@ function main() {
       localReady: imagePublishPlan.summary?.localReady === true,
       totalBlockers: imagePublishPlan.summary?.totalBlockers ?? 0,
       localDockerImage: imagePublishPlan.localDockerImage?.status || "unknown",
+    },
+    nativeRelease: {
+      androidReady: nativeRelease.android?.ready === true,
+      androidReleaseSigningConfig: nativeRelease.android?.releaseSigningConfig || "",
+      androidReleaseUsesDebugSigning: nativeRelease.android?.releaseUsesDebugSigning === true,
+      androidReleaseSigningConfigReady: nativeRelease.android?.releaseSigningConfigReady === true,
+      iosReady: nativeRelease.ios?.ready === true,
     },
     bridgeDataLayer: readiness.checks?.bridgeDataLayer || defaultBridgeDataLayer(),
     env: {
