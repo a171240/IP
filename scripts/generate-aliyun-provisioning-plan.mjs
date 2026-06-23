@@ -173,6 +173,11 @@ function buildPlan(args) {
   const packetsById = new Map((actionAuthorization.authorizationPackets || []).map((item) => [item.packetId, item]))
   const consoleTasksById = new Map((consoleRunbook.consoleTasks || []).map((item) => [item.id, item]))
   const phases = PHASES.map((phase) => buildPhase(phase, packetsById, consoleTasksById))
+  const provisioningClosureBrief = buildProvisioningClosureBrief({
+    consoleRunbook,
+    actionAuthorization,
+    phases,
+  })
   const report = {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -199,7 +204,12 @@ function buildPlan(args) {
       requiredBlocking: actionAuthorization.summary?.requiredBlocking || [],
       cloudResourceReady: consoleRunbook.summary?.resourceReady || "unknown",
       userActionReady: consoleRunbook.summary?.userActionReady || "unknown",
+      blockedCredentialCount: provisioningClosureBrief.blockedCredentialCount,
+      readySecretEnvVariableCount: provisioningClosureBrief.readySecretEnvVariableCount,
+      resourceEvidenceReady: provisioningClosureBrief.resourceEvidenceReady,
+      blockedResourceEvidenceIds: provisioningClosureBrief.blockedResourceEvidenceIds,
     },
+    provisioningClosureBrief,
     phases,
     readyAuthorizationPackets: (actionAuthorization.authorizationPackets || [])
       .filter((packet) => packet.canStartNow === true)
@@ -229,6 +239,44 @@ function buildPlan(args) {
     report.containsValues = true
   }
   return report
+}
+
+function buildProvisioningClosureBrief({
+  consoleRunbook,
+  actionAuthorization,
+  phases,
+}) {
+  const runbookBrief = consoleRunbook.consoleClosureBrief || {}
+  const blockedCredentialNames = runbookBrief.blockedCredentialNames || []
+  const readySecretEnvVariableNames = runbookBrief.readySecretEnvVariableNames || []
+  const readyToStartPhases = phases
+    .filter((item) => item.canStartNow)
+    .map((item) => item.id)
+  const blockedPhases = phases
+    .filter((item) => !item.canStartNow)
+    .map((item) => item.id)
+
+  return {
+    conclusion: "现在不能部署；PH01/PH02 只表示可进入动作时确认，不代表微信移动 App、Android/iOS 发布凭证、阿里云资源证据或 secret env 已闭环。",
+    canDeployNow: consoleRunbook.summary?.canDeployNow === true,
+    canCodexExecuteNow: false,
+    blockedCredentialCount: runbookBrief.blockedCredentialCount ?? blockedCredentialNames.length,
+    blockedCredentialNames,
+    readySecretEnvVariableCount: runbookBrief.readySecretEnvVariableCount ?? readySecretEnvVariableNames.length,
+    readySecretEnvVariableNames,
+    resourceEvidenceReady: runbookBrief.resourceEvidenceReady || consoleRunbook.summary?.resourceEvidenceReady || "unknown",
+    blockedResourceEvidenceIds: runbookBrief.blockedResourceEvidenceIds || consoleRunbook.summary?.blockedResourceEvidenceIds || [],
+    readyToStartPhases,
+    blockedPhases,
+    canStartNowAuthorizationPackets: actionAuthorization.summary?.canStartNowPackets || [],
+    canStartNowConsoleTasks: consoleRunbook.summary?.canStartNowConsoleTasks || [],
+    nextActionTimeConfirmations: actionAuthorization.summary?.nextActionTimeConfirmations || [],
+    requiredBlocking: actionAuthorization.summary?.requiredBlocking || [],
+    actionTimeConfirmationRequired: uniqueStrings([
+      ...(runbookBrief.actionTimeConfirmationRequiredIds || []),
+      ...(actionAuthorization.summary?.actionTimeConfirmationRequired || []),
+    ]),
+  }
 }
 
 function buildPhase(phase, packetsById, consoleTasksById) {
@@ -393,6 +441,26 @@ function renderMarkdown(report) {
     `- Required blocking env: ${report.summary.requiredBlocking.length ? report.summary.requiredBlocking.join(", ") : "none"}`,
     `- Ready authorization packets: ${report.readyAuthorizationPackets.length ? report.readyAuthorizationPackets.map((item) => item.packetId).join(", ") : "none"}`,
     `- Ready console action packets: ${report.readyActionPackets.length ? report.readyActionPackets.map((item) => item.taskId).join(", ") : "none"}`,
+    `- Blocked credential count: ${report.summary.blockedCredentialCount}`,
+    `- Ready secret env variable count: ${report.summary.readySecretEnvVariableCount}`,
+    `- Resource evidence ready: ${report.summary.resourceEvidenceReady}`,
+    `- Blocked resource evidence ids: ${report.summary.blockedResourceEvidenceIds.length ? report.summary.blockedResourceEvidenceIds.join(", ") : "none"}`,
+    "",
+    "## 目标闭环证据简表",
+    "",
+    `- Conclusion: ${report.provisioningClosureBrief.conclusion}`,
+    `- Can deploy now: ${report.provisioningClosureBrief.canDeployNow}`,
+    `- Can Codex execute now: ${report.provisioningClosureBrief.canCodexExecuteNow}`,
+    `- Blocked credential count: ${report.provisioningClosureBrief.blockedCredentialCount}`,
+    `- Blocked credential names: ${report.provisioningClosureBrief.blockedCredentialNames.length ? report.provisioningClosureBrief.blockedCredentialNames.join(", ") : "none"}`,
+    `- Ready secret env variable count: ${report.provisioningClosureBrief.readySecretEnvVariableCount}`,
+    `- Resource evidence ready: ${report.provisioningClosureBrief.resourceEvidenceReady}`,
+    `- Blocked resource evidence ids: ${report.provisioningClosureBrief.blockedResourceEvidenceIds.length ? report.provisioningClosureBrief.blockedResourceEvidenceIds.join(", ") : "none"}`,
+    `- Ready to start phases: ${report.provisioningClosureBrief.readyToStartPhases.length ? report.provisioningClosureBrief.readyToStartPhases.join(", ") : "none"}`,
+    `- Blocked phases: ${report.provisioningClosureBrief.blockedPhases.length ? report.provisioningClosureBrief.blockedPhases.join(", ") : "none"}`,
+    `- Can start now authorization packets: ${report.provisioningClosureBrief.canStartNowAuthorizationPackets.length ? report.provisioningClosureBrief.canStartNowAuthorizationPackets.join(", ") : "none"}`,
+    `- Can start now console tasks: ${report.provisioningClosureBrief.canStartNowConsoleTasks.length ? report.provisioningClosureBrief.canStartNowConsoleTasks.join(", ") : "none"}`,
+    `- Next action-time confirmations: ${report.provisioningClosureBrief.nextActionTimeConfirmations.length ? report.provisioningClosureBrief.nextActionTimeConfirmations.join(", ") : "none"}`,
     "",
     "## Ready Authorization Packets",
     "",

@@ -25,6 +25,9 @@ test("Aliyun provisioning plan command is wired into scripts, predeploy, deploy 
   assert.match(releaseArtifacts, /provisioning-plan\.json/)
   assert.match(releaseArtifacts, /provisioning-plan\.md/)
   assert.match(releaseArtifacts, /provisioningPlan/)
+  assert.match(releaseArtifacts, /provisioningClosureBrief/)
+  assert.match(releaseArtifacts, /blockedCredentialCount/)
+  assert.match(releaseArtifacts, /resourceEvidenceReady/)
 })
 
 test("Aliyun provisioning plan renders phase order without executing cloud actions", () => {
@@ -53,6 +56,31 @@ test("Aliyun provisioning plan renders phase order without executing cloud actio
   assert.ok(report.summary.blockedPhases.includes("PH07_PRODUCTION_DEPLOY"))
   assert.ok(report.summary.requiredBlocking.includes("WECHAT_OPEN_APP_ID"))
   assert.ok(report.summary.requiredBlocking.includes("WECHAT_OPEN_APP_SECRET"))
+  assert.equal(report.summary.blockedCredentialCount, 8)
+  assert.equal(report.summary.readySecretEnvVariableCount, 17)
+  assert.equal(report.summary.resourceEvidenceReady, "0/7")
+  assert.ok(report.summary.blockedResourceEvidenceIds.includes("R01_SAE_RUNTIME"))
+  assert.ok(report.summary.blockedResourceEvidenceIds.includes("R06_ENV_IMPORT"))
+  assert.equal(report.provisioningClosureBrief.canDeployNow, false)
+  assert.equal(report.provisioningClosureBrief.canCodexExecuteNow, false)
+  assert.equal(report.provisioningClosureBrief.blockedCredentialCount, 8)
+  assert.ok(report.provisioningClosureBrief.blockedCredentialNames.includes("WECHAT_OPEN_APP_ID"))
+  assert.ok(report.provisioningClosureBrief.blockedCredentialNames.includes("WECHAT_OPEN_APP_SECRET"))
+  assert.equal(report.provisioningClosureBrief.readySecretEnvVariableCount, 17)
+  assert.equal(report.provisioningClosureBrief.resourceEvidenceReady, "0/7")
+  assert.ok(report.provisioningClosureBrief.blockedResourceEvidenceIds.includes("R02_ACR_IMAGE_REGISTRY"))
+  assert.ok(report.provisioningClosureBrief.blockedResourceEvidenceIds.includes("R07_SLS_ALERTS"))
+  assert.deepEqual(report.provisioningClosureBrief.readyToStartPhases, [
+    "PH01_EXTERNAL_APP_IDENTIFIERS",
+    "PH02_BASE_CLOUD_RESOURCES",
+  ])
+  assert.ok(report.provisioningClosureBrief.blockedPhases.includes("PH07_PRODUCTION_DEPLOY"))
+  assert.ok(report.provisioningClosureBrief.canStartNowAuthorizationPackets.includes("P01_WECHAT_OPEN_MOBILE_APP"))
+  assert.deepEqual(report.provisioningClosureBrief.canStartNowConsoleTasks, [
+    "C02_ACR_IMAGE_AND_PULL",
+    "C05_OSS_AUDIO_RAM_STS",
+  ])
+  assert.ok(report.provisioningClosureBrief.nextActionTimeConfirmations.includes("P03_ACR_PURCHASE"))
   assert.deepEqual(report.readyAuthorizationPackets.map((item) => item.packetId), [
     "P01_WECHAT_OPEN_MOBILE_APP",
     "P10_ANDROID_RELEASE_SIGNING",
@@ -147,6 +175,12 @@ test("Aliyun provisioning plan markdown preserves ACR current scope and deferred
   })
   const markdown = fs.readFileSync(markdownPath, "utf8")
 
+  assert.match(markdown, /## 目标闭环证据简表/)
+  assert.match(markdown, /Blocked credential count: 8/)
+  assert.match(markdown, /Ready secret env variable count: 17/)
+  assert.match(markdown, /Resource evidence ready: 0\/7/)
+  assert.match(markdown, /Blocked resource evidence ids: .*R02_ACR_IMAGE_REGISTRY/)
+  assert.match(markdown, /Can Codex execute now: false/)
   assert.match(markdown, /Ready authorization packets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID, P03_ACR_PURCHASE, P05_OSS_RAM_STS/)
   assert.match(markdown, /Ready console action packets: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS/)
   assert.match(markdown, /## Ready Authorization Packets/)
