@@ -69,7 +69,11 @@ test("Aliyun evidence writeback checklist exposes local JSON write targets witho
   assert.ok(report.summary.requiredAuthorizationPackets.includes("P07_DOMAIN_DNS_HTTPS_ICP"))
   assert.ok(report.summary.requiredAuthorizationPackets.includes("P08_SAE_RUNTIME_SLS"))
   assert.ok(report.summary.requiredAuthorizationPackets.includes("P10_ANDROID_RELEASE_SIGNING"))
-  assert.ok(report.summary.requiredAuthorizationPackets.includes("P11_ALIYUN_READONLY_INVENTORY_IDENTITY"))
+  if (report.summary.cloudInventoryResultGaps > 0) {
+    assert.ok(report.summary.requiredAuthorizationPackets.includes("P11_ALIYUN_READONLY_INVENTORY_IDENTITY"))
+  } else {
+    assert.equal(report.writebackGroups.cloudInventoryResults.ready, true)
+  }
   assert.match(report.writebackGroups.cloudInventoryResults.file, /cloud-inventory-results\.local\.json/)
   assert.match(report.writebackGroups.cloudConfirmations.file, /cloud-confirmations\.local\.json/)
   assert.match(report.writebackGroups.imagePublish.file, /image-publish\.local\.json/)
@@ -79,7 +83,11 @@ test("Aliyun evidence writeback checklist exposes local JSON write targets witho
   assert.ok(cloudConfirmationPaths.includes("items.wechatOpenPlatform.mobileAppSecretReady"))
   assert.ok(imagePublishPaths.includes("acr.registryHost"))
   assert.ok(imagePublishPaths.includes("runtime.confirmed"))
-  assert.ok(report.writebackGroups.cloudInventoryResults.requiredAuthorizationPackets.includes("P11_ALIYUN_READONLY_INVENTORY_IDENTITY"))
+  if (report.writebackGroups.cloudInventoryResults.gaps.length > 0) {
+    assert.ok(report.writebackGroups.cloudInventoryResults.requiredAuthorizationPackets.includes("P11_ALIYUN_READONLY_INVENTORY_IDENTITY"))
+  } else {
+    assert.equal(report.writebackGroups.cloudInventoryResults.requiredAuthorizationPackets.length, 0)
+  }
   assert.ok(findGap(report.writebackGroups.cloudConfirmations, "items.wechatOpenPlatform.mobileAppSecretReady").requiredAuthorizationPackets.includes("P01_WECHAT_OPEN_MOBILE_APP"))
   assert.ok(findGap(report.writebackGroups.cloudConfirmations, "items.wechatOpenPlatform.androidSignature").requiredAuthorizationPackets.includes("P10_ANDROID_RELEASE_SIGNING"))
   assert.ok(findGap(report.writebackGroups.cloudConfirmations, "items.wechatOpenPlatform.iosConfigured").requiredAuthorizationPackets.includes("P02_APPLE_TEAM_ID"))
@@ -94,6 +102,56 @@ test("Aliyun evidence writeback checklist exposes local JSON write targets witho
   assert.ok(report.strictVerificationOrder.includes("corepack pnpm aliyun:predeploy"))
   assert.ok(report.safetyBoundary.some((item) => item.includes("不会调用阿里云 API")))
   assert.ok(report.safetyBoundary.some((item) => item.includes("禁止写入 AppSecret")))
+  assertNoSecretLikeValues(output)
+})
+
+test("Aliyun image publish plan groups ACR and SAE writeback blockers by execution step", () => {
+  const output = execFileSync(process.execPath, [
+    "scripts/check-aliyun-image-publish-plan.mjs",
+    "--allow-incomplete",
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 20,
+  })
+  const report = JSON.parse(output)
+  const groupsById = new Map(report.writebackPlan.groups.map((item) => [item.id, item]))
+
+  assert.equal(report.ok, false)
+  assert.equal(report.containsValues, false)
+  assert.deepEqual(report.summary.writebackBlockingGroups, [
+    "acrPurchaseAndRepository",
+    "imagePushAndDigest",
+    "saeRuntimeImagePull",
+  ])
+  assert.ok(report.summary.requiredAuthorizationPackets.includes("P03_ACR_PURCHASE"))
+  assert.ok(report.summary.requiredAuthorizationPackets.includes("P04_ACR_IMAGE_AND_PULL"))
+  assert.ok(report.summary.requiredAuthorizationPackets.includes("P08_SAE_RUNTIME_SLS"))
+
+  const acrPurchase = groupsById.get("acrPurchaseAndRepository")
+  const imagePush = groupsById.get("imagePushAndDigest")
+  const saeRuntime = groupsById.get("saeRuntimeImagePull")
+
+  assert.equal(acrPurchase.canStartNow, true)
+  assert.equal(acrPurchase.requiresActionTimeConfirmation, true)
+  assert.ok(acrPurchase.requiredAuthorizationPackets.includes("P03_ACR_PURCHASE"))
+  assert.ok(acrPurchase.writeTargets.some((item) => item.includes("acr.registryHost")))
+  assert.ok(acrPurchase.forbidden.some((item) => item.includes("docker push")))
+
+  assert.equal(imagePush.canStartNow, false)
+  assert.deepEqual(imagePush.dependsOnGroups, ["acrPurchaseAndRepository"])
+  assert.ok(imagePush.blockers.includes("acr.remoteDigest=sha256"))
+  assert.ok(imagePush.requiredAuthorizationPackets.includes("P04_ACR_IMAGE_AND_PULL"))
+  assert.ok(imagePush.verifyCommands.includes("corepack pnpm aliyun:image:plan:strict"))
+
+  assert.equal(saeRuntime.canStartNow, false)
+  assert.deepEqual(saeRuntime.dependsOnGroups, ["acrPurchaseAndRepository", "imagePushAndDigest"])
+  assert.ok(saeRuntime.requiredAuthorizationPackets.includes("P08_SAE_RUNTIME_SLS"))
+  assert.ok(saeRuntime.requiredAuthorizationPackets.includes("P04_ACR_IMAGE_AND_PULL"))
+  assert.ok(saeRuntime.writeTargets.some((item) => item.includes("runtime.imagePullConfigured")))
+
+  assert.ok(report.writebackPlan.strictVerificationOrder.includes("corepack pnpm aliyun:predeploy"))
+  assert.ok(report.writebackPlan.safetyBoundary.some((item) => item.includes("does not call Aliyun APIs")))
   assertNoSecretLikeValues(output)
 })
 
@@ -124,7 +182,11 @@ test("Aliyun evidence writeback markdown renders the same writeback boundaries",
   assert.match(markdownOutput, /cloud-confirmations\.local\.json/)
   assert.match(markdownOutput, /image-publish\.local\.json/)
   assert.match(markdownOutput, /requiredAuthorizationPackets/)
-  assert.match(markdownOutput, /P11_ALIYUN_READONLY_INVENTORY_IDENTITY/)
+  if (report.writebackGroups.cloudInventoryResults.gaps.length > 0) {
+    assert.match(markdownOutput, /P11_ALIYUN_READONLY_INVENTORY_IDENTITY/)
+  } else {
+    assert.match(markdownOutput, /cloudInventoryResultGaps: 0/)
+  }
   assert.match(markdownOutput, /P10_ANDROID_RELEASE_SIGNING/)
   assert.match(markdownOutput, /P07_DOMAIN_DNS_HTTPS_ICP/)
   assert.match(markdownOutput, /Strict 验证顺序/)

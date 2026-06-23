@@ -404,12 +404,188 @@ function inspectLocalDockerImage(tag) {
 }
 
 function summarize(template, local) {
+  const writebackPlan = buildImageWritebackPlan(local)
   return {
     templateReady: template.ready,
     localExists: local.exists,
     localReady: local.ready,
     totalBlockers: template.blockers.length + local.blockers.length,
     totalWarnings: template.warnings.length + local.warnings.length,
+    writebackBlockingGroups: writebackPlan.blockingGroups,
+    requiredAuthorizationPackets: writebackPlan.requiredAuthorizationPackets,
+  }
+}
+
+function fieldFromBlocker(value) {
+  const blocker = String(value || "")
+  const prefixed = blocker.match(/^(?:missing|todo|empty):(.+)$/)
+  if (prefixed) return prefixed[1]
+  const expected = blocker.match(/^([^=]+)=/)
+  if (expected) return expected[1]
+  return blocker
+}
+
+function uniqueStrings(values) {
+  const seen = new Set()
+  const result = []
+  for (const value of values) {
+    const item = String(value || "").trim()
+    if (!item || seen.has(item)) continue
+    seen.add(item)
+    result.push(item)
+  }
+  return result
+}
+
+const WRITEBACK_GROUP_DEFINITIONS = Object.freeze([
+  Object.freeze({
+    id: "acrPurchaseAndRepository",
+    title: "ACR 购买确认和镜像仓库基础信息",
+    source: "阿里云控制台 -> 容器镜像服务 ACR -> 企业版实例/命名空间/镜像仓库",
+    actionScope: "purchase_and_repository_only",
+    canStartNow: true,
+    requiresActionTimeConfirmation: true,
+    requiredAuthorizationPackets: Object.freeze(["P03_ACR_PURCHASE"]),
+    consoleTaskIds: Object.freeze(["C02_ACR_IMAGE_AND_PULL"]),
+    blockerFields: Object.freeze(["acr.confirmed", "acr.registryHost", "acr.namespace"]),
+    writeTargets: Object.freeze([
+      "deploy/aliyun-production-cn.image-publish.local.json: acr.confirmed=true",
+      "deploy/aliyun-production-cn.image-publish.local.json: acr.registryHost=<cn-hangzhou aliyuncs.com host>",
+      "deploy/aliyun-production-cn.image-publish.local.json: acr.namespace=<actual namespace>",
+    ]),
+    expectedEvidence: Object.freeze([
+      "ACR Enterprise Economic / cn-hangzhou / 1 month 购买或已开通确认",
+      "registryHost 必须是真实 aliyuncs.com host，不能保留 TODO",
+      "namespace 和 repository=meiye-huajing-app-api 已确认",
+    ]),
+    forbidden: Object.freeze([
+      "不要写入 ACR 用户名、密码、临时 token 或 RAM Secret",
+      "当前动作不执行 docker login、docker push 或 SAE 镜像拉取配置",
+    ]),
+    verifyCommands: Object.freeze(["corepack pnpm aliyun:image:plan"]),
+  }),
+  Object.freeze({
+    id: "imagePushAndDigest",
+    title: "镜像推送/导入 ACR 和 digest 核对",
+    source: "本机 Docker + 阿里云 ACR 镜像仓库",
+    actionScope: "image_push_or_import_and_digest_verification",
+    canStartNow: false,
+    dependsOnGroups: Object.freeze(["acrPurchaseAndRepository"]),
+    requiresActionTimeConfirmation: true,
+    requiredAuthorizationPackets: Object.freeze(["P04_ACR_IMAGE_AND_PULL"]),
+    consoleTaskIds: Object.freeze(["C02_ACR_IMAGE_AND_PULL"]),
+    blockerFields: Object.freeze([
+      "acr.remoteImage",
+      "acr.remoteDigest",
+      "acr.evidence",
+      "acr.imagePushed",
+      "acr.digestVerified",
+    ]),
+    writeTargets: Object.freeze([
+      "deploy/aliyun-production-cn.image-publish.local.json: acr.remoteImage=<registryHost>/<namespace>/meiye-huajing-app-api:production-cn",
+      "deploy/aliyun-production-cn.image-publish.local.json: acr.remoteDigest=sha256:<64 hex>",
+      "deploy/aliyun-production-cn.image-publish.local.json: acr.imagePushed=true",
+      "deploy/aliyun-production-cn.image-publish.local.json: acr.digestVerified=true",
+      "deploy/aliyun-production-cn.image-publish.local.json: acr.evidence=<non-secret evidence handle>",
+    ]),
+    expectedEvidence: Object.freeze([
+      "远端 ACR 镜像已推送或导入",
+      "远端 digest 与推送后的 sha256 digest 已核对",
+      "本地镜像仍可通过 corepack pnpm aliyun:container:smoke",
+    ]),
+    forbidden: Object.freeze([
+      "不要把 docker login 命令、registry 密码或临时 token 写入 JSON/Markdown/git",
+      "P03_ACR_PURCHASE 未完成前不要执行镜像推送动作",
+    ]),
+    verifyCommands: Object.freeze([
+      "corepack pnpm aliyun:container:smoke",
+      "corepack pnpm aliyun:image:plan:strict",
+    ]),
+  }),
+  Object.freeze({
+    id: "saeRuntimeImagePull",
+    title: "SAE runtime 指向 ACR 镜像并具备拉取权限",
+    source: "阿里云控制台 -> SAE -> meiye-huajing-app-api-production-cn -> 镜像部署/拉取配置",
+    actionScope: "sae_runtime_remote_image_and_pull_permission",
+    canStartNow: false,
+    dependsOnGroups: Object.freeze(["acrPurchaseAndRepository", "imagePushAndDigest"]),
+    requiresActionTimeConfirmation: true,
+    requiredAuthorizationPackets: Object.freeze(["P08_SAE_RUNTIME_SLS", "P04_ACR_IMAGE_AND_PULL"]),
+    consoleTaskIds: Object.freeze(["C01_SAE_RUNTIME", "C02_ACR_IMAGE_AND_PULL"]),
+    blockerFields: Object.freeze([
+      "runtime.confirmed",
+      "runtime.remoteImageConfigured",
+      "runtime.imagePullConfigured",
+      "runtime.evidence",
+    ]),
+    writeTargets: Object.freeze([
+      "deploy/aliyun-production-cn.image-publish.local.json: runtime.confirmed=true",
+      "deploy/aliyun-production-cn.image-publish.local.json: runtime.remoteImageConfigured=true",
+      "deploy/aliyun-production-cn.image-publish.local.json: runtime.imagePullConfigured=true",
+      "deploy/aliyun-production-cn.image-publish.local.json: runtime.evidence=<non-secret SAE evidence handle>",
+    ]),
+    expectedEvidence: Object.freeze([
+      "SAE production-cn 自定义容器应用存在",
+      "SAE 已指向 ACR remote image",
+      "SAE 镜像拉取权限已配置且不需要把凭证写入本地文件",
+    ]),
+    forbidden: Object.freeze([
+      "不要把 SAE 镜像拉取凭证、RAM Secret 或 AccessKeySecret 写入 JSON/Markdown/git",
+      "不要在 env import、SLS 告警和域名完成前宣称 production-cn 可部署",
+    ]),
+    verifyCommands: Object.freeze([
+      "corepack pnpm aliyun:image:plan:strict",
+      "corepack pnpm aliyun:readiness:cloud-ready",
+    ]),
+  }),
+])
+
+function buildImageWritebackPlan(local) {
+  const blockers = Array.isArray(local.blockers) ? local.blockers : []
+  const groups = WRITEBACK_GROUP_DEFINITIONS.map((definition) => {
+    const fields = new Set(definition.blockerFields)
+    const groupBlockers = blockers.filter((blocker) => fields.has(fieldFromBlocker(blocker)))
+    return {
+      id: definition.id,
+      title: definition.title,
+      source: definition.source,
+      actionScope: definition.actionScope,
+      ready: groupBlockers.length === 0,
+      canStartNow: Boolean(definition.canStartNow),
+      dependsOnGroups: definition.dependsOnGroups || [],
+      requiresActionTimeConfirmation: definition.requiresActionTimeConfirmation,
+      requiredAuthorizationPackets: definition.requiredAuthorizationPackets,
+      consoleTaskIds: definition.consoleTaskIds,
+      blockers: groupBlockers,
+      writeTargets: definition.writeTargets,
+      expectedEvidence: definition.expectedEvidence,
+      forbidden: definition.forbidden,
+      verifyCommands: definition.verifyCommands,
+      nonSecretEvidenceOnly: true,
+    }
+  })
+  const blockingGroups = groups.filter((group) => !group.ready).map((group) => group.id)
+
+  return {
+    file: local.file,
+    exists: local.exists,
+    ready: local.ready,
+    totalBlockers: blockers.length,
+    blockingGroups,
+    groups,
+    requiredAuthorizationPackets: uniqueStrings(groups.flatMap((group) => group.ready ? [] : group.requiredAuthorizationPackets)),
+    strictVerificationOrder: [
+      "corepack pnpm aliyun:container:smoke",
+      "corepack pnpm aliyun:image:plan:strict",
+      "corepack pnpm aliyun:cloud:confirmations:strict",
+      "corepack pnpm aliyun:readiness:cloud-ready",
+      "corepack pnpm aliyun:predeploy",
+    ],
+    safetyBoundary: [
+      "This report is local and value-free; it does not call Aliyun APIs, buy ACR, push images, configure SAE, import env, or deploy.",
+      "Write only non-secret evidence handles and booleans into image-publish.local.json.",
+      "Never store registry passwords, docker login output, RAM Secret, AccessKeySecret, AppSecret, STS token, or cookies.",
+    ],
   }
 }
 
@@ -419,6 +595,7 @@ function main() {
   const local = validateFile(args.localFile, "local")
   const localDockerImage = inspectLocalDockerImage(EXPECTED_LOCAL_TAG)
   const ready = template.ready && local.ready
+  const writebackPlan = buildImageWritebackPlan(local)
   const report = {
     ok: ready,
     ready,
@@ -428,6 +605,7 @@ function main() {
     template,
     local,
     localDockerImage,
+    writebackPlan,
     nextActions: [
       "Copy deploy/aliyun-production-cn.image-publish.example.json to deploy/aliyun-production-cn.image-publish.local.json after ACR is chosen.",
       "If the ACR buy page is still waiting for payment, record only the non-secret purchase candidate quote and do not mark ACR as confirmed.",
