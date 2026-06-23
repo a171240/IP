@@ -471,9 +471,7 @@ function renderMarkdown(audit) {
     `- containsValues: ${sensitiveBlockers.containsValues === true}`,
     `- secretLeakCheck: ${sensitiveBlockers.secretLeakCheck?.ok === true}`,
     `- blocked: ${sensitiveBlockers.summary.blocked} / ${sensitiveBlockers.summary.total}`,
-    ...(sensitiveBlockers.items?.length
-      ? sensitiveBlockers.items.map((item) => `- ${item.id}: ${item.status} (${item.type})`)
-      : ["- none"]),
+    ...renderSensitiveBlockerSummaryLines(sensitiveBlockers.items || []),
     "",
     "## 阿里云资源矩阵",
     "",
@@ -808,6 +806,68 @@ function renderMarkdown(audit) {
     "corepack pnpm aliyun:app-api:smoke -- --base-url https://api-cn.ipgongchang.xin",
     "```",
   ].join("\n")
+}
+
+function renderSensitiveBlockerSummaryLines(items) {
+  if (!items.length) return ["- none"]
+  return items.flatMap((item) => {
+    const variableDetails = item.variableDetails || []
+    const blockedVariables = variableDetails.filter((variable) => variable.status !== "ready")
+    const secretOrSensitive = variableDetails.filter((variable) => variable.sensitivity !== "public")
+    return [
+      `- ${item.id}: ${item.status} (${item.type})`,
+      `  - owner: ${item.owner || "unknown"}`,
+      `  - obtainFrom: ${item.obtainFrom || item.consolePath || "none"}`,
+      `  - writeTargets: ${(item.writeTargets || []).length ? item.writeTargets.join("; ") : "none"}`,
+      `  - verifyCommands: ${(item.verifyCommands || []).length ? item.verifyCommands.join("; ") : "none"}`,
+      `  - completionEvidence: ${(item.completionEvidence || []).length ? item.completionEvidence.join("; ") : "none"}`,
+      `  - variableDetails: total=${variableDetails.length}, blocked=${blockedVariables.length}, secretOrSensitive=${secretOrSensitive.length}`,
+      `  - variables: ${variableDetails.length ? variableDetails.map(formatSensitiveVariableSummary).join("; ") : "none"}`,
+    ]
+  })
+}
+
+function formatSensitiveVariableSummary(variable) {
+  const target = variable.importTarget || "unknown target"
+  return `${variable.name}:${variable.status}->${target}`
+}
+
+function compactSensitiveBlockerForAudit(item) {
+  const variableDetails = item.variableDetails || []
+  return {
+    id: item.id,
+    type: item.type,
+    status: item.status,
+    owner: item.owner,
+    obtainFrom: item.obtainFrom || item.consolePath || "",
+    writeTargets: item.writeTargets || [],
+    verifyCommands: item.verifyCommands || [],
+    requiresActionTimeConfirmation: item.requiresActionTimeConfirmation === true,
+    completionEvidence: item.completionEvidence || [],
+    variableNames: item.variableNames || [],
+    variableDetailsSummary: {
+      total: variableDetails.length,
+      blocked: variableDetails.filter((variable) => variable.status !== "ready").length,
+      ready: variableDetails.filter((variable) => variable.status === "ready").length,
+      secretOrSensitive: variableDetails.filter((variable) => variable.sensitivity !== "public").length,
+    },
+    variableDetails: variableDetails.map((variable) => ({
+      name: variable.name,
+      status: variable.status,
+      sensitivity: variable.sensitivity,
+      sourceCategory: variable.sourceCategory,
+      owner: variable.owner,
+      consolePath: variable.consolePath,
+      obtain: variable.obtain,
+      importTarget: variable.importTarget,
+      cloudConfirmationKey: variable.cloudConfirmationKey,
+      action: variable.action,
+      notes: variable.notes,
+    })),
+    requiredUserAction: item.requiredUserAction,
+    unblockCondition: item.unblockCondition,
+    forbidden: item.forbidden,
+  }
 }
 
 function main() {
@@ -1310,6 +1370,8 @@ function main() {
       blocked: sensitiveBlockers.summary.blocked,
       total: sensitiveBlockers.summary.total,
       blockedIds: sensitiveBlockers.summary.blockedIds,
+      variableDetails: sensitiveBlockers.summary.variableDetails || {},
+      items: (sensitiveBlockers.items || []).map(compactSensitiveBlockerForAudit),
     },
     resourcesMatrix: {
       report: audit.outputFiles.resourcesMatrixJson,

@@ -171,3 +171,16 @@ test("Aliyun sensitive blockers markdown renders value-free variable acquisition
   assert.doesNotMatch(markdown, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(markdown, /:\/\/[^\s:@]+:[^\s@]+@/)
 })
+
+test("Aliyun release artifacts summary surfaces sensitive blocker acquisition details", () => {
+  const releaseArtifacts = read("scripts", "prepare-aliyun-release-artifacts.mjs")
+
+  assert.match(releaseArtifacts, /renderSensitiveBlockerSummaryLines\(sensitiveBlockers\.items \|\| \[\]\)/)
+  assert.match(releaseArtifacts, /items: \(sensitiveBlockers\.items \|\| \[\]\)\.map\(compactSensitiveBlockerForAudit\)/)
+  assert.match(releaseArtifacts, /obtainFrom: item\.obtainFrom \|\| item\.consolePath/)
+  assert.match(releaseArtifacts, /writeTargets: item\.writeTargets \|\| \[\]/)
+  assert.match(releaseArtifacts, /verifyCommands: item\.verifyCommands \|\| \[\]/)
+  assert.match(releaseArtifacts, /completionEvidence: item\.completionEvidence \|\| \[\]/)
+  assert.match(releaseArtifacts, /variableDetailsSummary/)
+  assert.match(releaseArtifacts, /formatSensitiveVariableSummary/)
+})
