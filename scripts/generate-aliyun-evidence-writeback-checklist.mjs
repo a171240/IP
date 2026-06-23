@@ -281,6 +281,35 @@ function compactGroup(key, group, strictVerifyCommands) {
   }
 }
 
+function buildEvidenceClosureBrief(handoff, writebackGroups, allGaps, requiredAuthorizationPackets, strictVerifyCommands) {
+  const operatorClosureBrief = handoff.operatorClosureBrief || {}
+  const groups = Object.values(writebackGroups)
+  const readyFiles = groups.filter((group) => group.ready).length
+  return {
+    conclusion: handoff.canDeployNow === true && allGaps.length === 0
+      ? "本地证据已闭环；进入外部部署动作前仍需动作时确认。"
+      : "本地证据尚未闭环；部署前必须补齐本地 .local.json 证据并通过 strict 验证。",
+    source: "operatorClosureBrief + localEvidenceGaps",
+    canDeployNow: handoff.canDeployNow === true,
+    evidenceWritebackReady: `${readyFiles}/${groups.length}`,
+    files: groups.length,
+    readyFiles,
+    totalGaps: allGaps.length,
+    cloudInventoryResultGaps: writebackGroups.cloudInventoryResults.gaps.length,
+    cloudConfirmationGaps: writebackGroups.cloudConfirmations.gaps.length,
+    imagePublishGaps: writebackGroups.imagePublish.gaps.length,
+    blockedCredentialCount: operatorClosureBrief.blockedCredentialCount || 0,
+    blockedCredentialNames: operatorClosureBrief.blockedCredentialNames || [],
+    readySecretEnvVariableCount: operatorClosureBrief.readySecretEnvVariableCount || 0,
+    readySecretEnvVariableNames: operatorClosureBrief.readySecretEnvVariableNames || [],
+    resourceEvidenceReady: operatorClosureBrief.resourceEvidenceReady || "0/0",
+    blockedResourceEvidenceIds: operatorClosureBrief.blockedResourceEvidenceIds || [],
+    requiredAuthorizationPackets,
+    strictVerifyCommands,
+    writeTargets: uniqueStrings(groups.map((group) => group.file)),
+  }
+}
+
 function buildReport(args) {
   const handoff = buildOperatorHandoff(args)
   const gaps = handoff.localEvidenceGaps || {}
@@ -299,6 +328,13 @@ function buildReport(args) {
   const forbiddenValueClasses = [...new Set(allGaps.flatMap((item) => item.forbidden || []))].sort()
   const strictVerifyCommands = [...new Set(Object.values(writebackGroups).flatMap((group) => group.strictVerifyCommands))]
   const requiredAuthorizationPackets = uniqueStrings(allGaps.flatMap((item) => item.requiredAuthorizationPackets || []))
+  const evidenceClosureBrief = buildEvidenceClosureBrief(
+    handoff,
+    writebackGroups,
+    allGaps,
+    requiredAuthorizationPackets,
+    strictVerifyCommands,
+  )
   const report = {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -338,7 +374,15 @@ function buildReport(args) {
       requiredAuthorizationPackets,
       strictVerifyCommands,
       canDeployNow: handoff.canDeployNow === true,
+      evidenceWritebackReady: evidenceClosureBrief.evidenceWritebackReady,
+      blockedCredentialCount: evidenceClosureBrief.blockedCredentialCount,
+      blockedCredentialNames: evidenceClosureBrief.blockedCredentialNames,
+      readySecretEnvVariableCount: evidenceClosureBrief.readySecretEnvVariableCount,
+      readySecretEnvVariableNames: evidenceClosureBrief.readySecretEnvVariableNames,
+      resourceEvidenceReady: evidenceClosureBrief.resourceEvidenceReady,
+      blockedResourceEvidenceIds: evidenceClosureBrief.blockedResourceEvidenceIds,
     },
+    evidenceClosureBrief,
     writebackGroups,
     strictVerificationOrder: STRICT_VERIFICATION_ORDER,
     safetyBoundary: [
@@ -375,6 +419,19 @@ function renderMarkdown(report) {
     `- containsValues: ${report.containsValues}`,
     `- mutationPerformed: ${report.mutationPerformed}`,
     `- cloudApiCalled: ${report.cloudApiCalled}`,
+    "",
+    "## 证据闭环摘要",
+    "",
+    `- conclusion: ${report.evidenceClosureBrief.conclusion}`,
+    `- evidenceWritebackReady: ${report.evidenceClosureBrief.evidenceWritebackReady}`,
+    `- totalGaps: ${report.evidenceClosureBrief.totalGaps}`,
+    `- blockedCredentialCount: ${report.evidenceClosureBrief.blockedCredentialCount}`,
+    `- blockedCredentialNames: ${report.evidenceClosureBrief.blockedCredentialNames.join(", ") || "none"}`,
+    `- readySecretEnvVariableCount: ${report.evidenceClosureBrief.readySecretEnvVariableCount}`,
+    `- readySecretEnvVariableNames: ${report.evidenceClosureBrief.readySecretEnvVariableNames.join(", ") || "none"}`,
+    `- resourceEvidenceReady: ${report.evidenceClosureBrief.resourceEvidenceReady}`,
+    `- blockedResourceEvidenceIds: ${report.evidenceClosureBrief.blockedResourceEvidenceIds.join(", ") || "none"}`,
+    `- writeTargets: ${report.evidenceClosureBrief.writeTargets.join(", ") || "none"}`,
     "",
     "## 汇总",
     "",
