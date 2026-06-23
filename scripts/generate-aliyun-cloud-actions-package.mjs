@@ -110,6 +110,10 @@ function buildPackage(args) {
     "scripts/check-aliyun-cli-inventory-results.mjs",
     "--allow-incomplete",
   ])
+  const imagePublishPlan = runJson("image_publish_plan", [
+    "scripts/check-aliyun-image-publish-plan.mjs",
+    "--allow-incomplete",
+  ])
 
   const consoleTasks = consoleRunbook.consoleTasks || []
   const immediateConsoleTasks = consoleTasks.filter((item) => item.canStartNow === true)
@@ -121,6 +125,7 @@ function buildPackage(args) {
   const firstCloudPhase = phases.find((item) => item.id === "PH02_BASE_CLOUD_RESOURCES") || null
   const cliConfigProbeFailureCategory = cloudAccess.cli?.configProbe?.failureCategory || cloudAccess.cliConfigProbeFailureCategory || "none"
   const cloudInventorySummary = summarizeCloudInventoryResults(cloudInventoryResults)
+  const imagePublishWritebackPlan = compactImagePublishWritebackPlan(imagePublishPlan.writebackPlan)
   const readonlyInventoryUnblock = buildReadonlyInventoryUnblock(
     cloudAccess,
     cliConfigProbeFailureCategory,
@@ -132,7 +137,12 @@ function buildPackage(args) {
     ...(cloudInventorySummary.ready ? [] : (cloudAccess.blockers || [])),
     ...(cloudInventorySummary.ready ? [] : cloudInventorySummary.blockers.map((item) => `cloudInventory:${item}`)),
   ])
-  const executionQueue = buildExecutionQueue(immediateConsoleTasks, blockedConsoleTasks, externalAppPackets)
+  const executionQueue = buildExecutionQueue(
+    immediateConsoleTasks,
+    blockedConsoleTasks,
+    externalAppPackets,
+    imagePublishWritebackPlan,
+  )
 
   const report = {
     ok: true,
@@ -159,12 +169,13 @@ function buildPackage(args) {
       cloudInventoryResultsReady: cloudInventorySummary.ready,
       cloudInventoryReadyLocalOperations: `${cloudInventorySummary.readyLocalOperations}/${cloudInventorySummary.localOperations}`,
       cloudInventoryExecutedCommandResults: `${cloudInventorySummary.executedCommandResults}/${cloudInventorySummary.commandResults}`,
+      imagePublishWritebackBlockingGroups: imagePublishWritebackPlan.blockingGroups,
       cliConfigProbeFailureCategory,
     },
     firstCloudPhase,
     executionQueue,
-    immediateConsoleTasks: immediateConsoleTasks.map(compactConsoleTask),
-    blockedConsoleTasks: blockedConsoleTasks.map(compactConsoleTask),
+    immediateConsoleTasks: immediateConsoleTasks.map((task) => compactConsoleTask(task, imagePublishWritebackPlan)),
+    blockedConsoleTasks: blockedConsoleTasks.map((task) => compactConsoleTask(task, imagePublishWritebackPlan)),
     cloudConsoleAuthorizationPackets: cloudConsolePackets.map(compactPacket),
     externalAppPrerequisitePackets: externalAppPackets.map(compactPacket),
     phaseOrder: phases,
@@ -179,6 +190,7 @@ function buildPackage(args) {
       blockers: cloudAccess.blockers || [],
     },
     cloudInventoryResults: cloudInventorySummary,
+    imagePublishWritebackPlan,
     writeTargets: [
       "deploy/aliyun-production-cn.image-publish.local.json -> acr purchase/runtime non-secret evidence",
       "deploy/aliyun-production-cn.cloud-confirmations.local.json -> runtime/apiDomainHttps/assetDomainHttps/oss/envImport/slsAlerts non-secret evidence",
@@ -220,10 +232,13 @@ function buildPackage(args) {
   return report
 }
 
-function buildExecutionQueue(immediateConsoleTasks, blockedConsoleTasks, externalAppPackets) {
+function buildExecutionQueue(immediateConsoleTasks, blockedConsoleTasks, externalAppPackets, imagePublishWritebackPlan) {
   return {
     canStartNow: immediateConsoleTasks.map((task) => {
-      const compact = compactConsoleTask(task)
+      const compact = compactConsoleTask(task, imagePublishWritebackPlan)
+      const currentActionAcceptanceEvidence = compact.currentActionAcceptanceEvidence?.length
+        ? compact.currentActionAcceptanceEvidence
+        : compact.completionEvidence
       return {
         id: compact.id,
         kind: "aliyun_console_task",
@@ -231,10 +246,14 @@ function buildExecutionQueue(immediateConsoleTasks, blockedConsoleTasks, externa
         owner: task.owner || "阿里云操作员",
         requiresActionTimeConfirmation: true,
         minimumAuthorizationPhrase: compact.minimumAuthorizationPhrase,
+        currentActionScope: compact.currentActionScope || "full_task",
+        currentActionAcceptanceEvidence,
         consolePath: compact.consolePath,
         writeTargets: compact.writeTargets,
         verifyCommands: compact.verifyCommands,
-        completionEvidence: compact.completionEvidence,
+        completionEvidence: currentActionAcceptanceEvidence,
+        deferredActions: compact.deferredActions,
+        deferredWritebackGroups: compact.deferredWritebackGroups || [],
         forbidden: compact.forbidden,
       }
     }),
@@ -254,7 +273,7 @@ function buildExecutionQueue(immediateConsoleTasks, blockedConsoleTasks, externa
       }
     }),
     blockedByDependencies: blockedConsoleTasks.map((task) => {
-      const compact = compactConsoleTask(task)
+      const compact = compactConsoleTask(task, imagePublishWritebackPlan)
       return {
         id: compact.id,
         kind: "aliyun_console_task",
@@ -269,6 +288,36 @@ function buildExecutionQueue(immediateConsoleTasks, blockedConsoleTasks, externa
       }
     }),
   }
+}
+
+function compactImagePublishWritebackPlan(writebackPlan = {}) {
+  const groups = (writebackPlan.groups || []).map((group) => ({
+    id: group.id,
+    title: group.title,
+    actionScope: group.actionScope,
+    ready: group.ready === true,
+    canStartNow: group.canStartNow === true,
+    dependsOnGroups: group.dependsOnGroups || [],
+    requiredAuthorizationPackets: group.requiredAuthorizationPackets || [],
+    blockers: group.blockers || [],
+    writeTargets: group.writeTargets || [],
+    expectedEvidence: group.expectedEvidence || [],
+    forbidden: group.forbidden || [],
+    verifyCommands: group.verifyCommands || [],
+    nonSecretEvidenceOnly: group.nonSecretEvidenceOnly === true,
+  }))
+  return {
+    ready: writebackPlan.ready === true,
+    totalBlockers: Number(writebackPlan.totalBlockers || 0),
+    blockingGroups: writebackPlan.blockingGroups || groups.filter((group) => !group.ready).map((group) => group.id),
+    requiredAuthorizationPackets: writebackPlan.requiredAuthorizationPackets || [],
+    strictVerificationOrder: writebackPlan.strictVerificationOrder || [],
+    groups,
+  }
+}
+
+function imageWritebackGroup(plan, id) {
+  return (plan.groups || []).find((group) => group.id === id) || null
 }
 
 function summarizeCloudInventoryResults(cloudInventoryResults) {
@@ -380,8 +429,8 @@ function buildReadonlyInventoryUnblock(cloudAccess, cliConfigProbeFailureCategor
   }
 }
 
-function compactConsoleTask(task) {
-  return {
+function compactConsoleTask(task, imagePublishWritebackPlan = {}) {
+  const base = {
     id: task.id,
     title: task.title,
     status: task.status,
@@ -391,6 +440,7 @@ function compactConsoleTask(task) {
     consolePath: task.consolePath || "",
     minimumAuthorizationPhrase: matchingAuthorizationPhrase(task),
     currentActionScope: task.currentActionScope || "",
+    currentActionAcceptanceEvidence: task.currentActionAcceptanceEvidence || [],
     targetFields: task.targetFields || [],
     writeTargets: task.writeTargets || [],
     currentBlockers: task.currentBlockers || [],
@@ -400,6 +450,42 @@ function compactConsoleTask(task) {
     deferredActions: task.deferredActions || [],
     forbidden: task.forbidden || [],
     mutationPerformedByThisCommand: task.mutationPerformedByThisCommand === true,
+  }
+  if (task.id !== "C02_ACR_IMAGE_AND_PULL") return base
+
+  const currentGroup = imageWritebackGroup(imagePublishWritebackPlan, "acrPurchaseAndRepository")
+  const deferredGroups = ["imagePushAndDigest", "saeRuntimeImagePull"]
+    .map((id) => imageWritebackGroup(imagePublishWritebackPlan, id))
+    .filter(Boolean)
+  const currentActionAcceptanceEvidence = base.currentActionAcceptanceEvidence.length
+    ? base.currentActionAcceptanceEvidence
+    : currentGroup?.expectedEvidence || []
+  const deferredGroupLines = deferredGroups.map((group) => {
+    const packets = group.requiredAuthorizationPackets.join(", ") || "none"
+    const blockers = group.blockers.join(", ") || "none"
+    return `${group.id} 需等待 ${packets}；当前 blockers: ${blockers}`
+  })
+
+  return {
+    ...base,
+    currentActionScope: currentGroup?.actionScope || base.currentActionScope || "purchase_and_repository_only",
+    currentActionAcceptanceEvidence,
+    currentActionBlockers: currentGroup?.blockers || [],
+    writeTargets: currentGroup?.writeTargets?.length ? currentGroup.writeTargets : base.writeTargets,
+    verifyCommands: currentGroup?.verifyCommands?.length ? currentGroup.verifyCommands : base.verifyCommands,
+    completionEvidence: currentActionAcceptanceEvidence,
+    deferredActions: uniqueStrings([
+      ...base.deferredActions,
+      ...deferredGroupLines,
+    ]),
+    deferredWritebackGroups: deferredGroups.map((group) => ({
+      id: group.id,
+      actionScope: group.actionScope,
+      requiredAuthorizationPackets: group.requiredAuthorizationPackets,
+      blockers: group.blockers,
+      writeTargets: group.writeTargets,
+      verifyCommands: group.verifyCommands,
+    })),
   }
 }
 
@@ -471,7 +557,7 @@ function renderMarkdown(report) {
     `- externalAppPrerequisites: ${report.executionQueue.externalAppPrerequisites.map((item) => item.packetId).join(", ") || "none"}`,
     `- blockedByDependencies: ${report.executionQueue.blockedByDependencies.map((item) => item.id).join(", ") || "none"}`,
     ...(report.executionQueue.canStartNow.length
-      ? report.executionQueue.canStartNow.map((item) => `- ${item.id}: kind=${item.kind}; phrase=${item.minimumAuthorizationPhrase}`)
+      ? report.executionQueue.canStartNow.map((item) => `- ${item.id}: kind=${item.kind}; scope=${item.currentActionScope}; phrase=${item.minimumAuthorizationPhrase}`)
       : ["- canStartNowItems: none"]),
     ...(report.executionQueue.externalAppPrerequisites.length
       ? report.executionQueue.externalAppPrerequisites.map((item) => `- ${item.packetId}: kind=${item.kind}; phrase=${item.minimumAuthorizationPhrase}`)
@@ -497,6 +583,8 @@ function renderMarkdown(report) {
           "",
           `- consolePath: ${task.consolePath}`,
           `- minimumAuthorizationPhrase: ${task.minimumAuthorizationPhrase}`,
+          `- currentActionScope: ${task.currentActionScope || "full_task"}`,
+          `- currentActionAcceptanceEvidence: ${task.currentActionAcceptanceEvidence.join("；") || "none"}`,
           `- writeTargets: ${task.writeTargets.join("；") || "none"}`,
           `- verifyCommands: ${task.verifyCommands.join("；") || "none"}`,
           `- deferredActions: ${task.deferredActions.join("；") || "none"}`,

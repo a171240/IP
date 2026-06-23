@@ -595,10 +595,11 @@ function renderMarkdown(audit) {
     `- cloudInventoryResultsReady: ${cloudActionsPackage.summary?.cloudInventoryResultsReady === true}`,
     `- cloudInventoryReadyLocalOperations: ${cloudActionsPackage.summary?.cloudInventoryReadyLocalOperations || "unknown"}`,
     `- cloudInventoryExecutedCommandResults: ${cloudActionsPackage.summary?.cloudInventoryExecutedCommandResults || "unknown"}`,
+    `- imagePublishWritebackBlockingGroups: ${cloudActionsPackage.summary?.imagePublishWritebackBlockingGroups?.length ? cloudActionsPackage.summary.imagePublishWritebackBlockingGroups.join(", ") : "none"}`,
     `- readonlyInventoryStatus: ${cloudActionsPackage.readonlyInventoryUnblock?.status || "unknown"}`,
     `- cliConfigProbeFailureCategory: ${cloudActionsPackage.summary?.cliConfigProbeFailureCategory || "none"}`,
     ...(cloudActionsPackage.immediateConsoleTasks?.length
-      ? cloudActionsPackage.immediateConsoleTasks.map((item) => `- ${item.id}: canStartNow=${item.canStartNow}, phrase=${item.minimumAuthorizationPhrase}`)
+      ? cloudActionsPackage.immediateConsoleTasks.map((item) => `- ${item.id}: canStartNow=${item.canStartNow}, scope=${item.currentActionScope || "full_task"}, phrase=${item.minimumAuthorizationPhrase}`)
       : ["- immediateConsoleTasks: none"]),
     "",
     "## 阿里云 Provisioning Plan",
@@ -1651,6 +1652,8 @@ function main() {
       localExists: imagePublishPlan.summary?.localExists === true,
       localReady: imagePublishPlan.summary?.localReady === true,
       totalBlockers: imagePublishPlan.summary?.totalBlockers ?? 0,
+      writebackBlockingGroups: imagePublishPlan.summary?.writebackBlockingGroups || [],
+      requiredAuthorizationPackets: imagePublishPlan.summary?.requiredAuthorizationPackets || [],
       localDockerImage: imagePublishPlan.localDockerImage?.status || "unknown",
     },
     legalPages: {
@@ -1893,6 +1896,7 @@ function main() {
       cloudInventoryResultsReady: cloudActionsPackage.summary?.cloudInventoryResultsReady === true,
       cloudInventoryReadyLocalOperations: cloudActionsPackage.summary?.cloudInventoryReadyLocalOperations || "unknown",
       cloudInventoryExecutedCommandResults: cloudActionsPackage.summary?.cloudInventoryExecutedCommandResults || "unknown",
+      imagePublishWritebackBlockingGroups: cloudActionsPackage.summary?.imagePublishWritebackBlockingGroups || [],
       readonlyInventoryStatus: cloudActionsPackage.readonlyInventoryUnblock?.status || "unknown",
       readonlyInventoryCurrentEvidence: cloudActionsPackage.readonlyInventoryUnblock?.currentEvidence || [],
       cliConfigProbeFailureCategory: cloudActionsPackage.summary?.cliConfigProbeFailureCategory || "none",
