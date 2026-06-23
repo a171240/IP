@@ -42,6 +42,8 @@
     "aliyun:user:actions:test": "node --test tests/aliyun-user-action-brief.static.test.js",
     "aliyun:console:runbook": "node ./scripts/generate-aliyun-console-runbook.mjs",
     "aliyun:console:runbook:test": "node --test tests/aliyun-console-runbook.static.test.js",
+    "aliyun:cloud-actions:package": "node ./scripts/generate-aliyun-cloud-actions-package.mjs",
+    "aliyun:cloud-actions:package:test": "node --test tests/aliyun-cloud-actions-package.static.test.js",
     "aliyun:provisioning:plan": "node ./scripts/generate-aliyun-provisioning-plan.mjs",
     "aliyun:provisioning:plan:test": "node --test tests/aliyun-provisioning-plan.static.test.js",
     "aliyun:action:authorization": "node ./scripts/summarize-aliyun-action-authorization.mjs",

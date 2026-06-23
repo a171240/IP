@@ -210,6 +210,7 @@ function renderMarkdown(audit) {
   const resourcesMatrix = audit.checks.resourcesMatrix
   const userActionBrief = audit.checks.userActionBrief
   const consoleRunbook = audit.checks.consoleRunbook
+  const cloudActionsPackage = audit.checks.cloudActionsPackage
   const provisioningPlan = audit.checks.provisioningPlan
   const actionAuthorization = audit.checks.actionAuthorization
   const completionAudit = audit.checks.completionAudit
@@ -555,6 +556,24 @@ function renderMarkdown(audit) {
     ...(consoleRunbook.consoleTasks?.length
       ? consoleRunbook.consoleTasks.map((item) => `- ${item.id}: ${item.status}, canStartNow=${item.canStartNow}, dependsOn=${item.dependsOn?.join(", ") || "none"} (${item.consolePath})`)
       : ["- none"]),
+    "",
+    "## 阿里云控制台短动作包",
+    "",
+    `- json: ${audit.outputFiles.cloudActionsPackageJson}`,
+    `- markdown: ${audit.outputFiles.cloudActionsPackageMarkdown}`,
+    `- ok: ${cloudActionsPackage.ok === true}`,
+    `- packageId: ${cloudActionsPackage.packageId}`,
+    `- containsValues: ${cloudActionsPackage.containsValues === true}`,
+    `- mutationPerformed: ${cloudActionsPackage.mutationPerformed === true}`,
+    `- cloudApiCalled: ${cloudActionsPackage.cloudApiCalled === true}`,
+    `- canStartNowConsoleTasks: ${cloudActionsPackage.summary?.canStartNowConsoleTasks?.length ? cloudActionsPackage.summary.canStartNowConsoleTasks.join(", ") : "none"}`,
+    `- blockedByDependencies: ${cloudActionsPackage.summary?.blockedByDependencies?.length ? cloudActionsPackage.summary.blockedByDependencies.join(", ") : "none"}`,
+    `- cloudConsolePackets: ${cloudActionsPackage.summary?.cloudConsolePackets?.length ? cloudActionsPackage.summary.cloudConsolePackets.join(", ") : "none"}`,
+    `- canReadCloudNow: ${cloudActionsPackage.summary?.canReadCloudNow === true}`,
+    `- cliConfigProbeFailureCategory: ${cloudActionsPackage.summary?.cliConfigProbeFailureCategory || "none"}`,
+    ...(cloudActionsPackage.immediateConsoleTasks?.length
+      ? cloudActionsPackage.immediateConsoleTasks.map((item) => `- ${item.id}: canStartNow=${item.canStartNow}, phrase=${item.minimumAuthorizationPhrase}`)
+      : ["- immediateConsoleTasks: none"]),
     "",
     "## 阿里云 Provisioning Plan",
     "",
@@ -1090,6 +1109,8 @@ function main() {
   const userActionBriefMarkdownPath = resolve(args.outDir, "user-action-brief.md")
   const consoleRunbookJsonPath = resolve(args.outDir, "console-runbook.json")
   const consoleRunbookMarkdownPath = resolve(args.outDir, "console-runbook.md")
+  const cloudActionsPackageJsonPath = resolve(args.outDir, "cloud-actions-package.json")
+  const cloudActionsPackageMarkdownPath = resolve(args.outDir, "cloud-actions-package.md")
   const provisioningPlanJsonPath = resolve(args.outDir, "provisioning-plan.json")
   const provisioningPlanMarkdownPath = resolve(args.outDir, "provisioning-plan.md")
   const actionAuthorizationJsonPath = resolve(args.outDir, "action-authorization.json")
@@ -1169,6 +1190,16 @@ function main() {
     consoleRunbookJsonPath,
     "--markdown",
     consoleRunbookMarkdownPath,
+  ])
+  const cloudActionsPackage = runJson("cloud_actions_package", [
+    "scripts/generate-aliyun-cloud-actions-package.mjs",
+    "--env-file",
+    args.envFile,
+    ...(args.cloudConfirmationsFile ? ["--cloud-confirmations", args.cloudConfirmationsFile] : []),
+    "--out",
+    cloudActionsPackageJsonPath,
+    "--markdown",
+    cloudActionsPackageMarkdownPath,
   ])
   const provisioningPlan = runJson("provisioning_plan", [
     "scripts/generate-aliyun-provisioning-plan.mjs",
@@ -1334,6 +1365,7 @@ function main() {
       resourcesMatrix,
       userActionBrief,
       consoleRunbook,
+      cloudActionsPackage,
       provisioningPlan,
       actionAuthorization,
       completionAudit,
@@ -1388,6 +1420,8 @@ function main() {
       userActionBriefMarkdown: userActionBriefMarkdownPath,
       consoleRunbookJson: consoleRunbookJsonPath,
       consoleRunbookMarkdown: consoleRunbookMarkdownPath,
+      cloudActionsPackageJson: cloudActionsPackageJsonPath,
+      cloudActionsPackageMarkdown: cloudActionsPackageMarkdownPath,
       provisioningPlanJson: provisioningPlanJsonPath,
       provisioningPlanMarkdown: provisioningPlanMarkdownPath,
       actionAuthorizationJson: actionAuthorizationJsonPath,
@@ -1757,6 +1791,20 @@ function main() {
       androidWechatSignatureRecorded: wechatOpenMobileAppPackage.mobileAppCreationPackage?.androidSignaturePackage?.wechatSignatureRecorded === true,
       iosBundleId: wechatOpenMobileAppPackage.mobileAppCreationPackage?.ios?.bundleId || "",
     },
+    cloudActionsPackage: {
+      report: audit.outputFiles.cloudActionsPackageJson,
+      markdown: audit.outputFiles.cloudActionsPackageMarkdown,
+      ok: cloudActionsPackage.ok === true,
+      packageId: cloudActionsPackage.packageId || "",
+      containsValues: cloudActionsPackage.containsValues === true,
+      mutationPerformed: cloudActionsPackage.mutationPerformed === true,
+      cloudApiCalled: cloudActionsPackage.cloudApiCalled === true,
+      canStartNowConsoleTasks: cloudActionsPackage.summary?.canStartNowConsoleTasks || [],
+      blockedByDependencies: cloudActionsPackage.summary?.blockedByDependencies || [],
+      cloudConsolePackets: cloudActionsPackage.summary?.cloudConsolePackets || [],
+      canReadCloudNow: cloudActionsPackage.summary?.canReadCloudNow === true,
+      cliConfigProbeFailureCategory: cloudActionsPackage.summary?.cliConfigProbeFailureCategory || "none",
+    },
     androidReleaseSigningPackage: {
       report: audit.outputFiles.androidReleaseSigningPackageJson,
       markdown: audit.outputFiles.androidReleaseSigningPackageMarkdown,
@@ -1920,6 +1968,8 @@ function main() {
     userActionBriefMarkdown: audit.outputFiles.userActionBriefMarkdown,
     consoleRunbookJson: audit.outputFiles.consoleRunbookJson,
     consoleRunbookMarkdown: audit.outputFiles.consoleRunbookMarkdown,
+    cloudActionsPackageJson: audit.outputFiles.cloudActionsPackageJson,
+    cloudActionsPackageMarkdown: audit.outputFiles.cloudActionsPackageMarkdown,
     provisioningPlanJson: audit.outputFiles.provisioningPlanJson,
     provisioningPlanMarkdown: audit.outputFiles.provisioningPlanMarkdown,
     actionAuthorizationJson: audit.outputFiles.actionAuthorizationJson,
