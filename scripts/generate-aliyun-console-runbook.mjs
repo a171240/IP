@@ -133,6 +133,9 @@ function buildTask({
   userAction,
   targetFields,
   actionTimeConfirmationReason = "",
+  currentActionScope = "",
+  currentActionAcceptanceEvidence = [],
+  deferredActions = [],
 }) {
   return {
     id,
@@ -145,6 +148,7 @@ function buildTask({
     requiresActionTimeConfirmation: resource?.requiresActionTimeConfirmation === true || userAction?.requiresActionTimeConfirmation === true,
     actionTimeConfirmationReason,
     targetFields,
+    currentActionScope,
     writeTargets: unique([...(resource?.writeTargets || []), ...(userAction?.writeTargets || [])]),
     nonSecretFieldsToRecord: resource?.nonSecretFieldsToRecord || [],
     currentBlockers: unique([...(resource?.blockers || []), ...(userAction?.currentBlockers || [])]),
@@ -152,6 +156,8 @@ function buildTask({
     nextActions: unique([...(resource?.nextActions || []), userAction?.requiredUserAction].filter(Boolean)),
     verifyCommands: unique([...(resource?.verifyCommands || []), ...(userAction?.verifyCommands || [])]),
     completionEvidence: resource?.evidenceExpected || [],
+    currentActionAcceptanceEvidence,
+    deferredActions,
     forbidden: unique([...(resource?.forbidden || []), ...(userAction?.forbidden || [])]),
   }
 }
@@ -208,10 +214,23 @@ function buildRunbook(args) {
     }),
     buildTask({
       id: "C02_ACR_IMAGE_AND_PULL",
-      title: "购买/确认 ACR 并配置镜像仓库、push digest 和 SAE 拉取权限",
+      title: "购买/确认 ACR 企业版实例和镜像仓库基础信息",
       resource: resources.get("R02_ACR_IMAGE_REGISTRY"),
       userAction: actions.get("U03_ACR_PURCHASE_CONFIRMATION"),
       actionTimeConfirmationReason: "ACR 购买页当前候选为付费动作；付款前必须由用户确认规格和金额。",
+      currentActionScope: "purchase_and_repository_only",
+      currentActionAcceptanceEvidence: [
+        "acr.purchaseCandidate.confirmed=true",
+        "acr.registryHost actual aliyuncs.com host",
+        "acr.namespace created",
+        "repository=meiye-huajing-app-api",
+      ],
+      deferredActions: [
+        "P04_ACR_IMAGE_AND_PULL 依赖 P03_ACR_PURCHASE 完成后再执行。",
+        "当前确认包不执行 docker login/push。",
+        "当前确认包不配置 SAE runtime image pull credentials。",
+        "imagePushed=true、digestVerified=true、runtime.remoteImageConfigured=true、runtime.imagePullConfigured=true 都属于后置验收。",
+      ],
       targetFields: [
         field("edition", purchaseCandidate.edition || "ACR Enterprise Economic", "image publish plan"),
         field("region", purchaseCandidate.region || "cn-hangzhou", "image publish plan"),
@@ -375,8 +394,12 @@ function buildReadyActionPacket(task) {
     consolePath: task.consolePath,
     minimumAuthorizationPhrase: minimumAuthorizationPhrase(task),
     actionTimeConfirmationReason: task.actionTimeConfirmationReason || "",
+    currentActionScope: task.currentActionScope || "full_task",
     targetFields: task.targetFields,
-    acceptanceEvidence: task.completionEvidence || [],
+    acceptanceEvidence: task.currentActionAcceptanceEvidence?.length
+      ? task.currentActionAcceptanceEvidence
+      : task.completionEvidence || [],
+    deferredActions: task.deferredActions || [],
     writeTargets: task.writeTargets,
     verifyCommands: task.verifyCommands,
     currentBlockers: task.currentBlockers,
@@ -389,7 +412,7 @@ function buildReadyActionPacket(task) {
 function minimumAuthorizationPhrase(task) {
   if (task.id === "C02_ACR_IMAGE_AND_PULL") {
     const amount = task.targetFields.find((item) => item.name === "quotedAmount")?.value || "当前报价"
-    return `授权购买或确认 ACR Enterprise Economic，cn-hangzhou，1 个月，${amount}；只记录 registry/image/digest 非密钥证据，不输出 registry 密码。`
+    return `授权购买或确认 ACR Enterprise Economic，cn-hangzhou，1 个月，${amount}；本次只记录 ACR 实例、namespace、repository 和 registry host 非密钥证据，不执行 docker login/push。`
   }
   if (task.id === "C05_OSS_AUDIO_RAM_STS") {
     return "授权为服务记录音频 OSS 配置最小权限 RAM/STS 或运行时角色；凭据只进入阿里云受控 secret env，不写入仓库、文档或镜像。"
@@ -494,10 +517,13 @@ function renderMarkdown(runbook) {
         `- consolePath: ${packet.consolePath}`,
         `- minimumAuthorizationPhrase: ${packet.minimumAuthorizationPhrase}`,
         packet.actionTimeConfirmationReason ? `- actionTimeConfirmationReason: ${packet.actionTimeConfirmationReason}` : "",
+        `- currentActionScope: ${packet.currentActionScope}`,
         "- targetFields:",
         ...packet.targetFields.map((item) => `  - ${item.name}: ${item.value} (${item.source})`),
         "- acceptanceEvidence:",
         ...(packet.acceptanceEvidence.length ? packet.acceptanceEvidence.map((item) => `  - ${item}`) : ["  - none"]),
+        "- deferredActions:",
+        ...(packet.deferredActions.length ? packet.deferredActions.map((item) => `  - ${item}`) : ["  - none"]),
         "- writeTargets:",
         ...(packet.writeTargets.length ? packet.writeTargets.map((item) => `  - ${item}`) : ["  - none"]),
         "- verifyCommands:",
@@ -529,6 +555,7 @@ function renderMarkdown(runbook) {
       `- mutationPerformedByThisCommand: ${task.mutationPerformedByThisCommand}`,
       `- requiresActionTimeConfirmation: ${task.requiresActionTimeConfirmation}`,
       task.actionTimeConfirmationReason ? `- actionTimeConfirmationReason: ${task.actionTimeConfirmationReason}` : "",
+      task.currentActionScope ? `- currentActionScope: ${task.currentActionScope}` : "",
       "- targetFields:",
       ...task.targetFields.map((item) => `  - ${item.name}: ${item.value} (${item.source})`),
       "- writeTargets:",
@@ -539,6 +566,8 @@ function renderMarkdown(runbook) {
       ...(task.currentEvidence.length ? task.currentEvidence.map((item) => `  - ${item}`) : ["  - none"]),
       "- completionEvidence:",
       ...(task.completionEvidence.length ? task.completionEvidence.map((item) => `  - ${item}`) : ["  - none"]),
+      "- deferredActions:",
+      ...(task.deferredActions.length ? task.deferredActions.map((item) => `  - ${item}`) : ["  - none"]),
       "- verifyCommands:",
       ...(task.verifyCommands.length ? task.verifyCommands.map((item) => `  - ${item}`) : ["  - none"]),
       "- forbidden:",
