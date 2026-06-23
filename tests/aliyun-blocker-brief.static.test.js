@@ -49,6 +49,7 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.equal(report.containsValues, false)
   assert.equal(report.mutationPerformed, false)
   assert.equal(report.canDeployNow, false)
+  assert.match(report.currentAnswer, /Android release signing/)
   assert.equal(report.summary.requiredEnv, "24/26")
   assert.deepEqual(report.summary.requiredBlocking, ["WECHAT_OPEN_APP_ID", "WECHAT_OPEN_APP_SECRET"])
   assert.deepEqual(report.summary.sensitiveBlockedIds, [
@@ -85,6 +86,7 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.equal(report.cloudInventory.strictReadyOperations, 0)
   assert.ok(report.strictVerificationOrder.includes("corepack pnpm aliyun:predeploy"))
   assert.match(markdown, /当前阻塞简报/)
+  assert.match(markdown, /Android release signing/)
   assert.match(markdown, /P01_WECHAT_OPEN_MOBILE_APP/)
   assert.match(markdown, /P10_ANDROID_RELEASE_SIGNING/)
   assert.match(markdown, /S07_ANDROID_RELEASE_SIGNING/)

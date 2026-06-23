@@ -132,7 +132,7 @@ function buildReport(args) {
     verdict: status.verdict || completionAudit.verdict || "blocked",
     currentAnswer: status.canDeployNow === true
       ? "本地门禁接近可部署，但生产动作仍需动作时确认。"
-      : "现在不能部署；先补微信开放平台移动应用、Apple Team ID、ACR/OSS/SAE/DNS/SLS 和阿里云环境变量导入证据。",
+      : "现在不能部署；先补微信开放平台移动应用、Android release signing、Apple Team ID、ACR/OSS/SAE/DNS/SLS 和阿里云环境变量导入证据。",
     summary: {
       requiredEnv: `${status.summary?.requiredReady || 0}/${status.summary?.requiredTotal || 0}`,
       requiredBlocking: status.summary?.requiredBlocking || [],
