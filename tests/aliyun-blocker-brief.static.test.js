@@ -37,6 +37,8 @@ test("Aliyun blocker brief command is wired into scripts, predeploy, deploy spec
   assert.match(releaseArtifacts, /blockedVariableAcquisitionPlan/)
   assert.match(releaseArtifacts, /readySecretEnvImportGroups/)
   assert.match(releaseArtifacts, /requiredEnvBlockerDetails/)
+  assert.match(releaseArtifacts, /localCodeReady/)
+  assert.match(releaseArtifacts, /machineBlocking/)
 })
 
 test("Aliyun blocker brief is concise, value-free, and names current hard blockers", () => {
@@ -64,6 +66,11 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.match(report.currentAnswer, /Android release signing/)
   assert.equal(report.summary.requiredEnv, "24/26")
   assert.deepEqual(report.summary.requiredBlocking, ["WECHAT_OPEN_APP_ID", "WECHAT_OPEN_APP_SECRET"])
+  assert.equal(report.summary.localCodeReady, false)
+  assert.equal(report.summary.releaseEvidenceUsable, true)
+  assert.ok(report.summary.machineBlocking.includes("missing_required_env:WECHAT_OPEN_APP_ID"))
+  assert.ok(report.summary.machineBlocking.includes("app_universal_link:apple_team_id_missing"))
+  assert.equal(report.summary.manualBlockingCount, 8)
   assert.deepEqual(report.summary.sensitiveBlockedIds, [
     "S01_WECHAT_OPEN_APP_LOGIN",
     "S02_APPLE_TEAM_ID",
@@ -193,6 +200,8 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.match(markdown, /currentBrowserCanUseCurrentConsole/)
   assert.match(markdown, /currentBrowserCloudApiCalled: false/)
   assert.match(markdown, /cloudInventoryInterpretation: existing_strict_inventory_ready_but_fresh_cli_profile_unavailable/)
+  assert.match(markdown, /localCodeReady: false/)
+  assert.match(markdown, /machineBlocking: .*missing_required_env:WECHAT_OPEN_APP_ID/)
   assert.match(markdown, /notACloudResourceReadyProof: true/)
   assert.match(markdown, /nextEvidenceAction: configure_aliyun_cli_profile_or_use_cloudshell_for_fresh_readonly_inventory/)
   assert.match(markdown, /微信开放平台移动应用链路/)

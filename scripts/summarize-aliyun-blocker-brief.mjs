@@ -182,6 +182,10 @@ function buildReport(args) {
     summary: {
       requiredEnv: `${status.summary?.requiredReady || 0}/${status.summary?.requiredTotal || 0}`,
       requiredBlocking: status.summary?.requiredBlocking || [],
+      localCodeReady: status.summary?.localCodeReady === true,
+      releaseEvidenceUsable: status.summary?.releaseEvidenceUsable === true,
+      machineBlocking: status.summary?.machineBlocking || [],
+      manualBlockingCount: status.summary?.manualBlocking?.length || 0,
       cloudConfirmationsReady: `${status.summary?.cloudConfirmations?.ready || 0}/${status.summary?.cloudConfirmations?.total || 0}`,
       operatorTasksReady: `${status.summary?.operatorTasks?.ready || 0}/${status.summary?.operatorTasks?.total || 0}`,
       completion: {
@@ -425,6 +429,10 @@ function renderMarkdown(report) {
     `- secretLeakCheck: ${report.secretLeakCheck.ok}`,
     `- requiredEnv: ${report.summary.requiredEnv}`,
     `- requiredBlocking: ${report.summary.requiredBlocking.join(", ") || "none"}`,
+    `- localCodeReady: ${report.summary.localCodeReady}`,
+    `- releaseEvidenceUsable: ${report.summary.releaseEvidenceUsable}`,
+    `- machineBlocking: ${report.summary.machineBlocking.join(", ") || "none"}`,
+    `- manualBlockingCount: ${report.summary.manualBlockingCount}`,
     `- cloudConfirmationsReady: ${report.summary.cloudConfirmationsReady}`,
     `- operatorTasksReady: ${report.summary.operatorTasksReady}`,
     `- completion: proved ${report.summary.completion.proved}/${report.summary.completion.requirements}, blocked ${report.summary.completion.blocked}, partial ${report.summary.completion.partial}`,
