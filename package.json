@@ -42,6 +42,8 @@
     "aliyun:action:authorization:test": "node --test tests/aliyun-action-authorization.static.test.js",
     "aliyun:completion:audit": "node ./scripts/summarize-aliyun-completion-audit.mjs",
     "aliyun:completion:audit:test": "node --test tests/aliyun-completion-audit.static.test.js",
+    "aliyun:evidence:writeback": "node ./scripts/generate-aliyun-evidence-writeback-checklist.mjs",
+    "aliyun:evidence:writeback:test": "node --test tests/aliyun-evidence-writeback.static.test.js",
     "aliyun:operator:handoff:test": "node --test tests/aliyun-operator-handoff.static.test.js",
     "aliyun:app-cn-checklist:test": "node --test tests/aliyun-app-cn-checklist.static.test.js",
     "aliyun:vercel-env:coverage": "node ./scripts/check-vercel-env-coverage.mjs --write-report /tmp/meiye-vercel-env-coverage.json",

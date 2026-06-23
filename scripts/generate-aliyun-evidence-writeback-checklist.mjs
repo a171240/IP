@@ -1,0 +1,334 @@
+#!/usr/bin/env node
+
+import { writeFileSync } from "node:fs"
+import { spawnSync } from "node:child_process"
+import { dirname, isAbsolute, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+const BACKEND_ROOT = resolve(__dirname, "..")
+const WORKSPACE_ROOT = resolve(BACKEND_ROOT, "../..")
+const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
+const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
+const DEFAULT_CLOUD_INVENTORY_RESULTS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-inventory-results.local.json")
+
+const STRICT_VERIFICATION_ORDER = Object.freeze([
+  "corepack pnpm aliyun:cloud:inventory-results:strict",
+  "corepack pnpm aliyun:cloud:confirmations:strict",
+  "corepack pnpm aliyun:image:plan:strict",
+  "corepack pnpm aliyun:domain:strict",
+  "corepack pnpm aliyun:readiness:cloud-ready",
+  "corepack pnpm aliyun:completion:audit",
+  "corepack pnpm aliyun:predeploy",
+])
+
+const SECRET_VALUE_PATTERNS = [
+  /sk-[A-Za-z0-9_-]{20,}/,
+  /gh[pousr]_[A-Za-z0-9_]{30,}/,
+  /xox[baprs]-[A-Za-z0-9-]{20,}/,
+  /AKIA[0-9A-Z]{16}/,
+  /LTAI[A-Za-z0-9]{12,}/,
+  /secret_[A-Za-z0-9]{20,}/,
+  /eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}/,
+  /:\/\/[^\s:@]+:[^\s@]+@/,
+  /(password|passwd|pwd|token|secret|access[_-]?key)\s*[:=]\s*[^,\s]{8,}/i,
+]
+
+function parseArgs(argv) {
+  const args = {
+    envFile: DEFAULT_ENV_FILE,
+    cloudConfirmationsFile: DEFAULT_CLOUD_CONFIRMATIONS_FILE,
+    cloudInventoryResultsFile: DEFAULT_CLOUD_INVENTORY_RESULTS_FILE,
+    outPath: "",
+    markdownPath: "",
+    skipVercelEnvCoverage: false,
+    vercelEnvCoverageInput: "",
+  }
+
+  for (let index = 2; index < argv.length; index += 1) {
+    const arg = argv[index]
+    if (arg === "--") continue
+    if (arg === "--env-file") {
+      args.envFile = resolveValue(argv[++index], "--env-file")
+      continue
+    }
+    if (arg === "--cloud-confirmations") {
+      args.cloudConfirmationsFile = resolveValue(argv[++index], "--cloud-confirmations")
+      continue
+    }
+    if (arg === "--cloud-inventory-results") {
+      args.cloudInventoryResultsFile = resolveValue(argv[++index], "--cloud-inventory-results")
+      continue
+    }
+    if (arg === "--out") {
+      args.outPath = resolveValue(argv[++index], "--out")
+      continue
+    }
+    if (arg === "--markdown") {
+      args.markdownPath = resolveValue(argv[++index], "--markdown")
+      continue
+    }
+    if (arg === "--skip-vercel-env-coverage") {
+      args.skipVercelEnvCoverage = true
+      continue
+    }
+    if (arg === "--vercel-env-coverage-input") {
+      args.vercelEnvCoverageInput = resolveValue(argv[++index], "--vercel-env-coverage-input")
+      continue
+    }
+    if (arg === "--help" || arg === "-h") {
+      printHelp()
+      process.exit(0)
+    }
+    throw new Error(`unknown_arg:${arg}`)
+  }
+
+  return args
+}
+
+function resolveValue(value, name) {
+  if (!value) throw new Error(`missing_value:${name}`)
+  return isAbsolute(value) ? value : resolve(process.cwd(), value)
+}
+
+function runJson(label, scriptArgs) {
+  const result = spawnSync(process.execPath, scriptArgs, {
+    cwd: BACKEND_ROOT,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 40,
+  })
+  if (result.error) throw result.error
+  if (result.status !== 0) {
+    throw new Error(`${label}_failed:${result.status}\n${result.stderr || result.stdout}`)
+  }
+  try {
+    return JSON.parse(result.stdout)
+  } catch (error) {
+    throw new Error(`invalid_json_from_${label}:${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
+function buildOperatorHandoff(args) {
+  return runJson("operator_handoff", [
+    "scripts/generate-aliyun-operator-handoff.mjs",
+    "--env-file",
+    args.envFile,
+    "--cloud-confirmations",
+    args.cloudConfirmationsFile,
+    "--cloud-inventory-results",
+    args.cloudInventoryResultsFile,
+    ...(args.skipVercelEnvCoverage ? ["--skip-vercel-env-coverage"] : []),
+    ...(args.vercelEnvCoverageInput ? ["--vercel-env-coverage-input", args.vercelEnvCoverageInput] : []),
+  ])
+}
+
+function compactGap(item) {
+  return {
+    jsonPath: item.jsonPath || "$",
+    blocker: item.blocker || "unknown",
+    source: item.source || "unknown",
+    writeTo: item.writeTo || "",
+    expected: item.expected || "",
+    forbidden: item.forbidden || [],
+    nonSecretOnly: true,
+  }
+}
+
+function compactGroup(key, group, strictVerifyCommands) {
+  const gaps = (group?.gaps || []).map(compactGap)
+  return {
+    key,
+    file: group?.file || "",
+    exists: group?.exists === true,
+    ready: group?.ready === true,
+    totalBlockers: group?.totalBlockers ?? gaps.length,
+    checkedOperations: group?.checkedOperations ?? null,
+    localDockerImage: group?.localDockerImage || null,
+    observationSummary: group?.observationSummary || null,
+    gaps,
+    strictVerifyCommands,
+  }
+}
+
+function buildReport(args) {
+  const handoff = buildOperatorHandoff(args)
+  const gaps = handoff.localEvidenceGaps || {}
+  const writebackGroups = {
+    cloudInventoryResults: compactGroup("cloudInventoryResults", gaps.cloudInventoryResults, [
+      "corepack pnpm aliyun:cloud:inventory-results:strict",
+    ]),
+    cloudConfirmations: compactGroup("cloudConfirmations", gaps.cloudConfirmations, [
+      "corepack pnpm aliyun:cloud:confirmations:strict",
+    ]),
+    imagePublish: compactGroup("imagePublish", gaps.imagePublish, [
+      "corepack pnpm aliyun:image:plan:strict",
+    ]),
+  }
+  const allGaps = Object.values(writebackGroups).flatMap((group) => group.gaps)
+  const forbiddenValueClasses = [...new Set(allGaps.flatMap((item) => item.forbidden || []))].sort()
+  const strictVerifyCommands = [...new Set(Object.values(writebackGroups).flatMap((group) => group.strictVerifyCommands))]
+  const report = {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    environment: "production-cn",
+    objective: "阿里云 production-cn 本地证据回填清单",
+    verdict: handoff.verdict || "unknown",
+    canDeployNow: handoff.canDeployNow === true,
+    currentAnswer: handoff.canDeployNow === true
+      ? "本地证据显示可以进入受控部署确认；仍需动作时授权后才能执行外部发布。"
+      : "现在还不能部署或上传；请先按本清单补齐阿里云/微信/镜像相关本地证据，再跑 strict 验证。",
+    containsValues: false,
+    readOnlyOnly: true,
+    mutationPerformed: false,
+    cloudApiCalled: false,
+    executionMode: "writeback_checklist_only",
+    files: {
+      envFile: args.envFile,
+      cloudConfirmationsFile: args.cloudConfirmationsFile,
+      cloudInventoryResultsFile: args.cloudInventoryResultsFile,
+      imagePublishLocalFile: gaps.imagePublish?.file || resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.image-publish.local.json"),
+    },
+    sourceCommands: {
+      operatorHandoff: "corepack pnpm aliyun:operator:handoff -- --skip-vercel-env-coverage",
+      cloudInventoryResultsStrict: "corepack pnpm aliyun:cloud:inventory-results:strict",
+      cloudConfirmationsStrict: "corepack pnpm aliyun:cloud:confirmations:strict",
+      imagePublishStrict: "corepack pnpm aliyun:image:plan:strict",
+      completionAudit: "corepack pnpm aliyun:completion:audit",
+    },
+    summary: {
+      files: Object.keys(writebackGroups).length,
+      readyFiles: Object.values(writebackGroups).filter((group) => group.ready).length,
+      totalGaps: allGaps.length,
+      cloudInventoryResultGaps: writebackGroups.cloudInventoryResults.gaps.length,
+      cloudConfirmationGaps: writebackGroups.cloudConfirmations.gaps.length,
+      imagePublishGaps: writebackGroups.imagePublish.gaps.length,
+      forbiddenValueClasses,
+      strictVerifyCommands,
+      canDeployNow: handoff.canDeployNow === true,
+    },
+    writebackGroups,
+    strictVerificationOrder: STRICT_VERIFICATION_ORDER,
+    safetyBoundary: [
+      "本命令只读取本地门禁报告并生成回填清单。",
+      "本命令不会改写 cloud-confirmations.local.json、cloud-inventory-results.local.json 或 image-publish.local.json。",
+      "本命令不会调用阿里云 API，不会购买 ACR，不会 push 镜像，不会部署 SAE，不会改 DNS/HTTPS/ICP。",
+      "回填本地证据时只能写资源名、布尔状态、时间戳、控制台路径、digest 和非密钥 evidence handle。",
+      "禁止写入 AppSecret、AccessKeySecret、registry password、RAM Secret、STS token、cookie、证书私钥或 Supabase service role key。",
+    ],
+  }
+  const secretLeakCheck = findSecretLikeValues(report)
+  return {
+    ...report,
+    ok: secretLeakCheck.length === 0,
+    secretLeakCheck: {
+      ok: secretLeakCheck.length === 0,
+      matches: secretLeakCheck,
+    },
+  }
+}
+
+function renderMarkdown(report) {
+  return [
+    "# 美业话镜 APP production-cn 阿里云证据回填清单",
+    "",
+    `Generated: ${report.generatedAt}`,
+    "",
+    "## 当前结论",
+    "",
+    `- ${report.currentAnswer}`,
+    `- verdict: ${report.verdict}`,
+    `- canDeployNow: ${report.canDeployNow}`,
+    `- executionMode: ${report.executionMode}`,
+    `- containsValues: ${report.containsValues}`,
+    `- mutationPerformed: ${report.mutationPerformed}`,
+    `- cloudApiCalled: ${report.cloudApiCalled}`,
+    "",
+    "## 汇总",
+    "",
+    `- files: ${report.summary.files}`,
+    `- readyFiles: ${report.summary.readyFiles}/${report.summary.files}`,
+    `- totalGaps: ${report.summary.totalGaps}`,
+    `- cloudInventoryResultGaps: ${report.summary.cloudInventoryResultGaps}`,
+    `- cloudConfirmationGaps: ${report.summary.cloudConfirmationGaps}`,
+    `- imagePublishGaps: ${report.summary.imagePublishGaps}`,
+    `- forbiddenValueClasses: ${report.summary.forbiddenValueClasses.join(", ") || "none"}`,
+    "",
+    ...Object.values(report.writebackGroups).flatMap(renderGroup),
+    "## Strict 验证顺序",
+    "",
+    ...report.strictVerificationOrder.map((command) => `- \`${command}\``),
+    "",
+    "## 安全边界",
+    "",
+    ...report.safetyBoundary.map((item) => `- ${item}`),
+  ].join("\n") + "\n"
+}
+
+function renderGroup(group) {
+  return [
+    `## ${group.key}`,
+    "",
+    `- file: ${group.file}`,
+    `- exists: ${group.exists}`,
+    `- ready: ${group.ready}`,
+    `- totalBlockers: ${group.totalBlockers}`,
+    ...(group.checkedOperations === null ? [] : [`- checkedOperations: ${group.checkedOperations}`]),
+    ...(group.localDockerImage ? [`- localDockerImage: ${group.localDockerImage}`] : []),
+    `- strictVerifyCommands: ${group.strictVerifyCommands.join("; ")}`,
+    "",
+    ...(group.gaps.length
+      ? group.gaps.flatMap(renderGap)
+      : ["- none"]),
+    "",
+  ]
+}
+
+function renderGap(item) {
+  return [
+    `- \`${item.jsonPath}\``,
+    `  - blocker: ${item.blocker}`,
+    `  - source: ${item.source}`,
+    `  - writeTo: ${item.writeTo}`,
+    `  - expected: ${item.expected}`,
+    `  - forbidden: ${(item.forbidden || []).join(", ") || "none"}`,
+  ]
+}
+
+function findSecretLikeValues(value) {
+  const text = JSON.stringify(value)
+  return SECRET_VALUE_PATTERNS
+    .map((pattern) => text.match(pattern)?.[0] || "")
+    .filter(Boolean)
+    .map((match) => match.slice(0, 80))
+}
+
+function writeText(filePath, content) {
+  writeFileSync(filePath, content.endsWith("\n") ? content : `${content}\n`, { mode: 0o600 })
+}
+
+function printHelp() {
+  console.log(`Usage: node scripts/generate-aliyun-evidence-writeback-checklist.mjs [options]
+
+Options:
+  --env-file <path>                 production-cn env file used for local readiness reads
+  --cloud-confirmations <path>      local cloud confirmations file
+  --cloud-inventory-results <path>  local read-only inventory results file
+  --out <path>                      write JSON report
+  --markdown <path>                 write Markdown report
+  --skip-vercel-env-coverage        skip Vercel env name coverage while reading operator handoff
+  --vercel-env-coverage-input <path> use a captured Vercel env coverage fixture
+`)
+}
+
+function main() {
+  const args = parseArgs(process.argv)
+  const report = buildReport(args)
+  const json = JSON.stringify(report, null, 2)
+  if (args.outPath) writeText(args.outPath, json)
+  if (args.markdownPath) writeText(args.markdownPath, renderMarkdown(report))
+  console.log(json)
+  if (!report.secretLeakCheck.ok) process.exitCode = 1
+}
+
+main()

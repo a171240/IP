@@ -211,6 +211,7 @@ function renderMarkdown(audit) {
   const provisioningPlan = audit.checks.provisioningPlan
   const actionAuthorization = audit.checks.actionAuthorization
   const completionAudit = audit.checks.completionAudit
+  const evidenceWriteback = audit.checks.evidenceWriteback
   const wechatOpenMobileAppPackage = audit.checks.wechatOpenMobileAppPackage
   const appleTeamAasaPackage = audit.checks.appleTeamAasaPackage
   const operatorHandoff = audit.checks.operatorHandoff
@@ -265,6 +266,7 @@ function renderMarkdown(audit) {
     `- actionAuthorization: ${actionAuthorization.summary.actions} actions, ${actionAuthorization.summary.actionTimeConfirmationRequired.length} action-time confirmations`,
     `- provisioningPlan: ${provisioningPlan.summary.readyToStartPhases.length}/${provisioningPlan.summary.phases} phases ready to start, executionMode ${provisioningPlan.executionMode}`,
     `- completionAudit: ${completionAudit.verdict}, complete ${completionAudit.complete === true}, proved ${completionAudit.summary.proved}/${completionAudit.summary.requirements}`,
+    `- evidenceWriteback: ${evidenceWriteback.summary.readyFiles}/${evidenceWriteback.summary.files} files ready, gaps ${evidenceWriteback.summary.totalGaps}`,
     `- cloudConfirmations: ${cloudConfirmations?.ready ? "ready" : "not ready"}`,
     `- cloudConfirmationsCheck: template ${cloudConfirmationsCheck?.template?.ready ? "ready" : "not ready"}, local ${cloudConfirmationsCheck?.local?.ready ? "ready" : "not ready"}`,
     `- vercelEnvCoverage: ${vercelEnvCoverage?.ok ? "ok" : vercelEnvCoverage?.skipped ? "skipped" : "not ok"}`,
@@ -582,6 +584,25 @@ function renderMarkdown(audit) {
       : ["- nextActionTimeConfirmations: none"]),
     ...(completionAudit.requirements?.length
       ? completionAudit.requirements.map((item) => `- ${item.id}: ${item.status}${item.blockers?.length ? ` (${item.blockers.join(", ")})` : ""}`)
+      : ["- none"]),
+    "",
+    "## 本地证据回填清单",
+    "",
+    `- json: ${audit.outputFiles.evidenceWritebackJson}`,
+    `- markdown: ${audit.outputFiles.evidenceWritebackMarkdown}`,
+    `- ok: ${evidenceWriteback.ok === true}`,
+    `- executionMode: ${evidenceWriteback.executionMode}`,
+    `- containsValues: ${evidenceWriteback.containsValues === true}`,
+    `- mutationPerformed: ${evidenceWriteback.mutationPerformed === true}`,
+    `- cloudApiCalled: ${evidenceWriteback.cloudApiCalled === true}`,
+    `- readyFiles: ${evidenceWriteback.summary.readyFiles} / ${evidenceWriteback.summary.files}`,
+    `- totalGaps: ${evidenceWriteback.summary.totalGaps}`,
+    `- cloudInventoryResultGaps: ${evidenceWriteback.summary.cloudInventoryResultGaps}`,
+    `- cloudConfirmationGaps: ${evidenceWriteback.summary.cloudConfirmationGaps}`,
+    `- imagePublishGaps: ${evidenceWriteback.summary.imagePublishGaps}`,
+    `- strictVerifyCommands: ${evidenceWriteback.summary.strictVerifyCommands.join("; ")}`,
+    ...(Object.values(evidenceWriteback.writebackGroups || {}).length
+      ? Object.values(evidenceWriteback.writebackGroups).map((group) => `- ${group.key}: ready=${group.ready}, blockers=${group.totalBlockers}, file=${group.file}`)
       : ["- none"]),
     "",
     "## 微信开放平台移动应用材料包",
@@ -966,6 +987,8 @@ function main() {
   const actionAuthorizationMarkdownPath = resolve(args.outDir, "action-authorization.md")
   const completionAuditJsonPath = resolve(args.outDir, "completion-audit.json")
   const completionAuditMarkdownPath = resolve(args.outDir, "completion-audit.md")
+  const evidenceWritebackJsonPath = resolve(args.outDir, "evidence-writeback.json")
+  const evidenceWritebackMarkdownPath = resolve(args.outDir, "evidence-writeback.md")
   const wechatOpenMobileAppPackageJsonPath = resolve(args.outDir, "wechat-open-mobile-app-package.json")
   const wechatOpenMobileAppPackageMarkdownPath = resolve(args.outDir, "wechat-open-mobile-app-package.md")
   const appleTeamAasaPackageJsonPath = resolve(args.outDir, "apple-team-aasa-package.json")
@@ -1065,6 +1088,19 @@ function main() {
     "--markdown",
     completionAuditMarkdownPath,
   ])
+  const evidenceWriteback = runJson("evidence_writeback", [
+    "scripts/generate-aliyun-evidence-writeback-checklist.mjs",
+    "--env-file",
+    args.envFile,
+    ...(args.cloudConfirmationsFile ? ["--cloud-confirmations", args.cloudConfirmationsFile] : []),
+    ...(args.cloudInventoryResultsFile ? ["--cloud-inventory-results", args.cloudInventoryResultsFile] : []),
+    ...(args.skipVercelEnvCoverage ? ["--skip-vercel-env-coverage"] : []),
+    ...(args.vercelEnvCoverageInput ? ["--vercel-env-coverage-input", args.vercelEnvCoverageInput] : []),
+    "--out",
+    evidenceWritebackJsonPath,
+    "--markdown",
+    evidenceWritebackMarkdownPath,
+  ])
   const wechatOpenMobileAppPackage = runJson("wechat_open_mobile_app_package", [
     "scripts/generate-wechat-open-mobile-app-package.mjs",
     "--env-file",
@@ -1153,6 +1189,7 @@ function main() {
       provisioningPlan,
       actionAuthorization,
       completionAudit,
+      evidenceWriteback,
       wechatOpenMobileAppPackage,
       appleTeamAasaPackage,
       operatorHandoff,
@@ -1203,6 +1240,8 @@ function main() {
       actionAuthorizationMarkdown: actionAuthorizationMarkdownPath,
       completionAuditJson: completionAuditJsonPath,
       completionAuditMarkdown: completionAuditMarkdownPath,
+      evidenceWritebackJson: evidenceWritebackJsonPath,
+      evidenceWritebackMarkdown: evidenceWritebackMarkdownPath,
       wechatOpenMobileAppPackageJson: wechatOpenMobileAppPackageJsonPath,
       wechatOpenMobileAppPackageMarkdown: wechatOpenMobileAppPackageMarkdownPath,
       appleTeamAasaPackageJson: appleTeamAasaPackageJsonPath,
@@ -1462,6 +1501,23 @@ function main() {
       nextActionTimeConfirmations: completionAudit.summary.nextActionTimeConfirmations || [],
       requirementStatuses: (completionAudit.requirements || []).map((item) => `${item.id}:${item.status}`),
     },
+    evidenceWriteback: {
+      report: audit.outputFiles.evidenceWritebackJson,
+      markdown: audit.outputFiles.evidenceWritebackMarkdown,
+      ok: evidenceWriteback.ok === true,
+      executionMode: evidenceWriteback.executionMode,
+      containsValues: evidenceWriteback.containsValues === true,
+      secretLeakCheck: evidenceWriteback.secretLeakCheck?.ok === true,
+      mutationPerformed: evidenceWriteback.mutationPerformed === true,
+      cloudApiCalled: evidenceWriteback.cloudApiCalled === true,
+      readyFiles: `${evidenceWriteback.summary.readyFiles}/${evidenceWriteback.summary.files}`,
+      totalGaps: evidenceWriteback.summary.totalGaps,
+      cloudInventoryResultGaps: evidenceWriteback.summary.cloudInventoryResultGaps,
+      cloudConfirmationGaps: evidenceWriteback.summary.cloudConfirmationGaps,
+      imagePublishGaps: evidenceWriteback.summary.imagePublishGaps,
+      strictVerificationOrder: evidenceWriteback.strictVerificationOrder || [],
+      writebackGroups: Object.values(evidenceWriteback.writebackGroups || {}).map((group) => `${group.key}:ready=${group.ready}:blockers=${group.totalBlockers}`),
+    },
     wechatOpenMobileAppPackage: {
       report: audit.outputFiles.wechatOpenMobileAppPackageJson,
       markdown: audit.outputFiles.wechatOpenMobileAppPackageMarkdown,
@@ -1628,6 +1684,8 @@ function main() {
     actionAuthorizationMarkdown: audit.outputFiles.actionAuthorizationMarkdown,
     completionAuditJson: audit.outputFiles.completionAuditJson,
     completionAuditMarkdown: audit.outputFiles.completionAuditMarkdown,
+    evidenceWritebackJson: audit.outputFiles.evidenceWritebackJson,
+    evidenceWritebackMarkdown: audit.outputFiles.evidenceWritebackMarkdown,
     wechatOpenMobileAppPackageJson: audit.outputFiles.wechatOpenMobileAppPackageJson,
     wechatOpenMobileAppPackageMarkdown: audit.outputFiles.wechatOpenMobileAppPackageMarkdown,
     appleTeamAasaPackageJson: audit.outputFiles.appleTeamAasaPackageJson,
