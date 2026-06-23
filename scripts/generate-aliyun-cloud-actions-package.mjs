@@ -106,6 +106,10 @@ function buildPackage(args) {
     "scripts/check-aliyun-cloud-access.mjs",
     ...envArgs(args),
   ])
+  const cloudInventoryResults = runJson("cloud_inventory_results", [
+    "scripts/check-aliyun-cli-inventory-results.mjs",
+    "--allow-incomplete",
+  ])
 
   const consoleTasks = consoleRunbook.consoleTasks || []
   const immediateConsoleTasks = consoleTasks.filter((item) => item.canStartNow === true)
@@ -116,11 +120,17 @@ function buildPackage(args) {
   const phases = (provisioningPlan.phases || []).map(compactPhase)
   const firstCloudPhase = phases.find((item) => item.id === "PH02_BASE_CLOUD_RESOURCES") || null
   const cliConfigProbeFailureCategory = cloudAccess.cli?.configProbe?.failureCategory || cloudAccess.cliConfigProbeFailureCategory || "none"
-  const readonlyInventoryUnblock = buildReadonlyInventoryUnblock(cloudAccess, cliConfigProbeFailureCategory)
+  const cloudInventorySummary = summarizeCloudInventoryResults(cloudInventoryResults)
+  const readonlyInventoryUnblock = buildReadonlyInventoryUnblock(
+    cloudAccess,
+    cliConfigProbeFailureCategory,
+    cloudInventorySummary,
+  )
   const currentBlockers = uniqueStrings([
     ...(blockerBrief.summary?.requiredBlocking || []).map((name) => `requiredEnv:${name}`),
     ...(blockedConsoleTasks || []).map((item) => `blockedConsoleTask:${item.id}`),
-    ...(cloudAccess.blockers || []),
+    ...(cloudInventorySummary.ready ? [] : (cloudAccess.blockers || [])),
+    ...(cloudInventorySummary.ready ? [] : cloudInventorySummary.blockers.map((item) => `cloudInventory:${item}`)),
   ])
 
   const report = {
@@ -145,6 +155,9 @@ function buildPackage(args) {
       requiredBlocking: blockerBrief.summary?.requiredBlocking || [],
       sensitiveBlocked: blockerBrief.summary?.sensitiveBlocked || "unknown",
       canReadCloudNow: cloudAccess.canReadCloudNow === true,
+      cloudInventoryResultsReady: cloudInventorySummary.ready,
+      cloudInventoryReadyLocalOperations: `${cloudInventorySummary.readyLocalOperations}/${cloudInventorySummary.localOperations}`,
+      cloudInventoryExecutedCommandResults: `${cloudInventorySummary.executedCommandResults}/${cloudInventorySummary.commandResults}`,
       cliConfigProbeFailureCategory,
     },
     firstCloudPhase,
@@ -163,6 +176,7 @@ function buildPackage(args) {
       workbenchTerminalReadiness: cloudAccess.terminalAccess?.workbenchTerminal?.readiness || cloudAccess.workbenchTerminalReadiness || "unknown",
       blockers: cloudAccess.blockers || [],
     },
+    cloudInventoryResults: cloudInventorySummary,
     writeTargets: [
       "deploy/aliyun-production-cn.image-publish.local.json -> acr purchase/runtime non-secret evidence",
       "deploy/aliyun-production-cn.cloud-confirmations.local.json -> runtime/apiDomainHttps/assetDomainHttps/oss/envImport/slsAlerts non-secret evidence",
@@ -204,12 +218,62 @@ function buildPackage(args) {
   return report
 }
 
-function buildReadonlyInventoryUnblock(cloudAccess, cliConfigProbeFailureCategory) {
-  const workbenchTerminal = cloudAccess.terminalAccess?.workbenchTerminal || {}
+function summarizeCloudInventoryResults(cloudInventoryResults) {
+  const local = cloudInventoryResults.local || {}
+  const observationSummary = local.observationSummary || {}
+  const summary = cloudInventoryResults.summary || {}
+  const localOperations = Number(summary.localOperations || observationSummary.operations || local.checkedOperations || 0)
+  const readyLocalOperations = Number(summary.readyLocalOperations || observationSummary.strictReadyOperations || 0)
+  const commandResults = Number(observationSummary.commandResults || 0)
+  const executedCommandResults = Number(observationSummary.executedCommandResults || 0)
+  const cloudApiCalledCommandResults = Number(observationSummary.cloudApiCalledCommandResults || 0)
+  const mutationPerformedCommandResults = Number(observationSummary.mutationPerformedCommandResults || 0)
+  const ready =
+    local.exists === true &&
+    local.ready === true &&
+    localOperations > 0 &&
+    readyLocalOperations === localOperations &&
+    commandResults > 0 &&
+    executedCommandResults === commandResults &&
+    cloudApiCalledCommandResults === commandResults &&
+    mutationPerformedCommandResults === 0
   return {
-    status: cloudAccess.canReadCloudNow === true ? "ready_to_execute_allowlisted_readonly_inventory" : "blocked_until_cli_or_cloudshell_identity_ready",
-    currentBlocker: cliConfigProbeFailureCategory || "unknown",
-    whyConsoleLoginIsNotEnough: "浏览器控制台登录、ECS Workbench 终端可见、或 OSS/SLS 页面可见，只能作为人工观察证据；严格云证据必须来自 allowlisted Aliyun CLI/CloudShell List/Describe/stat/get 命令结果，且不记录原始敏感输出。",
+    exists: local.exists === true,
+    ready,
+    localReady: local.ready === true,
+    localOperations,
+    readyLocalOperations,
+    commandResults,
+    executedCommandResults,
+    cloudApiCalledCommandResults,
+    mutationPerformedCommandResults,
+    observedOperationIds: observationSummary.observedOperationIds || [],
+    notFoundOperationIds: observationSummary.notFoundOperationIds || [],
+    blockedOperationIds: observationSummary.blockedOperationIds || [],
+    blockers: local.blockers || [],
+    evidence: ready
+      ? [
+          `readyLocalOperations=${readyLocalOperations}/${localOperations}`,
+          `executedCommandResults=${executedCommandResults}/${commandResults}`,
+          `cloudApiCalledCommandResults=${cloudApiCalledCommandResults}`,
+          `mutationPerformedCommandResults=${mutationPerformedCommandResults}`,
+        ]
+      : [],
+  }
+}
+
+function buildReadonlyInventoryUnblock(cloudAccess, cliConfigProbeFailureCategory, cloudInventorySummary) {
+  const workbenchTerminal = cloudAccess.terminalAccess?.workbenchTerminal || {}
+  const inventoryReady = cloudInventorySummary.ready === true
+  return {
+    status: inventoryReady
+      ? "strict_inventory_evidence_ready"
+      : (cloudAccess.canReadCloudNow === true ? "ready_to_execute_allowlisted_readonly_inventory" : "blocked_until_cli_or_cloudshell_identity_ready"),
+    currentBlocker: inventoryReady ? "none" : (cliConfigProbeFailureCategory || "unknown"),
+    currentEvidence: cloudInventorySummary.evidence,
+    whyConsoleLoginIsNotEnough: inventoryReady
+      ? "严格云证据已来自 allowlisted Aliyun CLI/CloudShell List/Describe/stat/get 命令摘要；后续云资源创建、购买、DNS、密钥导入和部署仍需动作时确认。"
+      : "浏览器控制台登录、ECS Workbench 终端可见、或 OSS/SLS 页面可见，只能作为人工观察证据；严格云证据必须来自 allowlisted Aliyun CLI/CloudShell List/Describe/stat/get 命令结果，且不记录原始敏感输出。",
     minimumAuthorizationPhrase: "授权在本机 Aliyun CLI 或阿里云 CloudShell 中配置只读身份，并只运行 allowlisted production-cn inventory 命令；不输出 AccessKeySecret、STS token、cookie、registry password 或证书私钥。",
     allowedIdentityPaths: [
       {
@@ -250,9 +314,9 @@ function buildReadonlyInventoryUnblock(cloudAccess, cliConfigProbeFailureCategor
       "corepack pnpm aliyun:completion:audit",
     ],
     expectedNonSecretEvidenceAfterUnlock: [
-      "executedCommandResults > 0",
-      "cloudApiCalledCommandResults > 0",
-      "mutationPerformedCommandResults = 0",
+      inventoryReady ? `readyLocalOperations = ${cloudInventorySummary.readyLocalOperations}/${cloudInventorySummary.localOperations}` : "executedCommandResults > 0",
+      inventoryReady ? `executedCommandResults = ${cloudInventorySummary.executedCommandResults}/${cloudInventorySummary.commandResults}` : "cloudApiCalledCommandResults > 0",
+      `mutationPerformedCommandResults = ${cloudInventorySummary.mutationPerformedCommandResults}`,
       "each command output stored only as summary counts, exit code, sha256 fingerprint, timestamp, and evidence handle",
     ],
     forbidden: [
@@ -340,6 +404,9 @@ function renderMarkdown(report) {
     `- cloudConfirmationsReady: ${report.summary.cloudConfirmationsReady}`,
     `- operatorTasksReady: ${report.summary.operatorTasksReady}`,
     `- canReadCloudNow: ${report.summary.canReadCloudNow}`,
+    `- cloudInventoryResultsReady: ${report.summary.cloudInventoryResultsReady}`,
+    `- cloudInventoryReadyLocalOperations: ${report.summary.cloudInventoryReadyLocalOperations}`,
+    `- cloudInventoryExecutedCommandResults: ${report.summary.cloudInventoryExecutedCommandResults}`,
     `- cliConfigProbeFailureCategory: ${report.summary.cliConfigProbeFailureCategory}`,
     `- containsValues: ${report.containsValues}`,
     `- mutationPerformed: ${report.mutationPerformed}`,
@@ -349,6 +416,7 @@ function renderMarkdown(report) {
     "",
     `- status: ${report.readonlyInventoryUnblock.status}`,
     `- currentBlocker: ${report.readonlyInventoryUnblock.currentBlocker}`,
+    `- currentEvidence: ${report.readonlyInventoryUnblock.currentEvidence.join("；") || "none"}`,
     `- minimumAuthorizationPhrase: ${report.readonlyInventoryUnblock.minimumAuthorizationPhrase}`,
     `- whyConsoleLoginIsNotEnough: ${report.readonlyInventoryUnblock.whyConsoleLoginIsNotEnough}`,
     "- unlockCommands:",
