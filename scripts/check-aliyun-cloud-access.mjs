@@ -317,8 +317,16 @@ function normalizeCloudAccessObservation(observation) {
 
 function buildObservedResourceStatuses(cloudAccessObservation) {
   const lines = cloudAccessObservation.browserConsole?.resourcesObserved || []
-  const saeLine = findObservedLine(lines, /SAE console accessible/i)
-  const acrLine = findObservedLine(lines, /ACR Enterprise Economic/i)
+  const saeLine = findObservedLine(lines, [
+    /SAE console accessible/i,
+    /SAE .*app list visible/i,
+    /target app .*not (present|proven created)/i,
+  ])
+  const acrLine = findObservedLine(lines, [
+    /ACR Enterprise Economic/i,
+    /ACR .*instances page visible/i,
+    /create enterprise instance button visible/i,
+  ])
   const ossLine = findObservedLine(lines, /OSS bucket/i)
   const dnsLine = findObservedLine(lines, /DNS ipgongchang\.xin/i)
   const slsLine = findObservedLine(lines, /SLS logsearch URL visible/i)
@@ -340,7 +348,7 @@ function buildObservedResourceStatuses(cloudAccessObservation) {
       id: "saeRuntime",
       title: "SAE production-cn 自定义容器应用",
       status: saeLine
-        ? /not created|暂无实例|not proven created/i.test(saeLine)
+        ? /not created|暂无实例|not present|not proven created/i.test(saeLine)
           ? "not_created_or_not_confirmed"
           : "console_accessible_unconfirmed"
         : "not_observed",
@@ -354,7 +362,7 @@ function buildObservedResourceStatuses(cloudAccessObservation) {
       id: "acrPurchase",
       title: "ACR 企业版实例和镜像仓库",
       status: acrLine
-        ? /not purchased/i.test(acrLine)
+        ? /not purchased|purchase\/repository still action-time confirmation|no .*target instance|no .*repository/i.test(acrLine)
           ? "purchase_candidate_visible_not_purchased"
           : "purchase_or_instance_visible_unconfirmed"
         : "not_observed",
@@ -378,7 +386,7 @@ function buildObservedResourceStatuses(cloudAccessObservation) {
       id: "domainDns",
       title: "ipgongchang.xin DNS 与 api-cn/assets-cn 记录",
       status: dnsLine
-        ? /no explicit api-cn\/assets-cn|no api-cn\/assets-cn host record/i.test(dnsLine)
+        ? /no explicit api-cn\/assets-cn|no api-cn\/assets-cn host record|returns 没有数据|public DNS still resolves/i.test(dnsLine)
           ? "domain_visible_records_missing"
           : "domain_visible_unconfirmed"
         : "not_observed",
@@ -392,7 +400,7 @@ function buildObservedResourceStatuses(cloudAccessObservation) {
       id: "slsAlerts",
       title: "SLS 日志项目和 health/5xx 告警",
       status: slsLine
-        ? /alerts still pending/i.test(slsLine)
+        ? /alerts (still|remain) pending/i.test(slsLine)
           ? "project_logstore_visible_alerts_pending"
           : "project_logstore_visible_unconfirmed"
         : "not_observed",
@@ -419,8 +427,9 @@ function buildObservedResourceStatuses(cloudAccessObservation) {
   ]
 }
 
-function findObservedLine(lines, pattern) {
-  return lines.find((line) => pattern.test(line)) || ""
+function findObservedLine(lines, patternOrPatterns) {
+  const patterns = Array.isArray(patternOrPatterns) ? patternOrPatterns : [patternOrPatterns]
+  return lines.find((line) => patterns.some((pattern) => pattern.test(line))) || ""
 }
 
 function summarizeObservedResourceStatuses(items) {
