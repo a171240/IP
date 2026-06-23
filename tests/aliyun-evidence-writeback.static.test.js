@@ -155,6 +155,60 @@ test("Aliyun image publish plan groups ACR and SAE writeback blockers by executi
   assertNoSecretLikeValues(output)
 })
 
+test("Aliyun cloud confirmations groups local evidence blockers by authorization packet", () => {
+  const output = execFileSync(process.execPath, [
+    "scripts/check-aliyun-cloud-confirmations.mjs",
+    "--allow-incomplete",
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 20,
+  })
+  const report = JSON.parse(output)
+  const groupsById = new Map(report.writebackPlan.groups.map((item) => [item.id, item]))
+
+  assert.equal(report.ok, false)
+  assert.equal(report.containsValues, false)
+  assert.deepEqual(report.summary.writebackBlockingGroups, [
+    "runtime",
+    "apiDomainHttps",
+    "assetDomainHttps",
+    "oss",
+    "wechatOpenPlatform",
+    "envImport",
+    "slsAlerts",
+  ])
+  assert.ok(report.summary.requiredAuthorizationPackets.includes("P01_WECHAT_OPEN_MOBILE_APP"))
+  assert.ok(report.summary.requiredAuthorizationPackets.includes("P02_APPLE_TEAM_ID"))
+  assert.ok(report.summary.requiredAuthorizationPackets.includes("P05_OSS_RAM_STS"))
+  assert.ok(report.summary.requiredAuthorizationPackets.includes("P06_ENV_IMPORT"))
+  assert.ok(report.summary.requiredAuthorizationPackets.includes("P07_DOMAIN_DNS_HTTPS_ICP"))
+  assert.ok(report.summary.requiredAuthorizationPackets.includes("P08_SAE_RUNTIME_SLS"))
+  assert.ok(report.summary.requiredAuthorizationPackets.includes("P10_ANDROID_RELEASE_SIGNING"))
+
+  const oss = groupsById.get("oss")
+  const wechat = groupsById.get("wechatOpenPlatform")
+  const envImport = groupsById.get("envImport")
+  const apiDomain = groupsById.get("apiDomainHttps")
+
+  assert.equal(oss.canStartNow, true)
+  assert.ok(oss.blockers.includes("oss:ramLeastPrivilege"))
+  assert.ok(oss.requiredAuthorizationPackets.includes("P05_OSS_RAM_STS"))
+  assert.ok(oss.expectedEvidence.some((item) => item.includes("ramLeastPrivilege=true")))
+
+  assert.equal(wechat.canStartNow, false)
+  assert.ok(wechat.requiredAuthorizationPackets.includes("P01_WECHAT_OPEN_MOBILE_APP"))
+  assert.ok(wechat.requiredAuthorizationPackets.includes("P10_ANDROID_RELEASE_SIGNING"))
+  assert.ok(wechat.requiredAuthorizationPackets.includes("P02_APPLE_TEAM_ID"))
+  assert.ok(wechat.forbidden.some((item) => item.includes("小程序 AppID/Secret")))
+
+  assert.ok(envImport.requiredAuthorizationPackets.includes("P06_ENV_IMPORT"))
+  assert.ok(apiDomain.requiredAuthorizationPackets.includes("P07_DOMAIN_DNS_HTTPS_ICP"))
+  assert.ok(report.writebackPlan.strictVerificationOrder.includes("corepack pnpm aliyun:predeploy"))
+  assert.ok(report.writebackPlan.safetyBoundary.some((item) => item.includes("does not call Aliyun APIs")))
+  assertNoSecretLikeValues(output)
+})
+
 test("Aliyun evidence writeback markdown renders the same writeback boundaries", () => {
   const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-evidence-writeback-"))
   const markdown = path.join(tmpdir, "evidence-writeback.md")

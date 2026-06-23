@@ -184,6 +184,111 @@ const DEFINITIONS = [
 ]
 
 const TOP_LEVEL_FIELDS = new Set(["schemaVersion", "environment", "updatedAt", "operator", "notes", "items"])
+const CLOUD_CONFIRMATION_GROUP_METADATA = Object.freeze({
+  runtime: Object.freeze({
+    title: "SAE runtime 与健康检查",
+    source: "阿里云控制台 -> SAE -> cn-hangzhou -> 应用列表/部署配置",
+    actionScope: "sae_runtime_confirmation",
+    canStartNow: false,
+    requiredAuthorizationPackets: Object.freeze(["P08_SAE_RUNTIME_SLS"]),
+    blockedUntil: "ACR/OSS/env 前置完成后创建或确认 SAE runtime",
+    expectedEvidence: Object.freeze([
+      "SAE production-cn 自定义容器应用存在",
+      "containerPort=3000",
+      "healthPath=/api/healthz",
+      "非密钥控制台证据编号已记录",
+    ]),
+  }),
+  apiDomainHttps: Object.freeze({
+    title: "api-cn DNS、HTTPS 和 ICP",
+    source: "阿里云控制台 -> 云解析 DNS / 数字证书 / SAE 或网关公网入口",
+    actionScope: "api_domain_dns_https_icp",
+    canStartNow: false,
+    requiredAuthorizationPackets: Object.freeze(["P07_DOMAIN_DNS_HTTPS_ICP"]),
+    blockedUntil: "SAE runtime 公网入口存在后配置 api-cn 域名",
+    expectedEvidence: Object.freeze([
+      "api-cn.ipgongchang.xin 解析到阿里云公网入口",
+      "HTTPS 证书启用并可访问",
+      "ICP备案满足国内正式访问要求",
+    ]),
+  }),
+  assetDomainHttps: Object.freeze({
+    title: "assets-cn DNS、HTTPS 和 ICP",
+    source: "阿里云控制台 -> 云解析 DNS / OSS 或 CDN 自定义域名 / 数字证书",
+    actionScope: "asset_domain_dns_https_icp",
+    canStartNow: false,
+    requiredAuthorizationPackets: Object.freeze(["P07_DOMAIN_DNS_HTTPS_ICP"]),
+    blockedUntil: "OSS/CDN 资源入口确认后配置 assets-cn 域名",
+    expectedEvidence: Object.freeze([
+      "assets-cn.ipgongchang.xin 解析到阿里云资源入口",
+      "HTTPS 证书启用并可访问",
+      "ICP备案满足国内正式访问要求",
+    ]),
+  }),
+  oss: Object.freeze({
+    title: "OSS Bucket、CORS 和 RAM/STS 最小权限",
+    source: "阿里云控制台 -> OSS Bucket / RAM 访问控制 / SAE 运行身份",
+    actionScope: "oss_audio_bucket_cors_ram_sts",
+    canStartNow: true,
+    requiredAuthorizationPackets: Object.freeze(["P05_OSS_RAM_STS"]),
+    blockedUntil: "OSS bucket、CORS、服务记录前缀和最小权限 RAM/STS 均确认",
+    expectedEvidence: Object.freeze([
+      "bucket=meiye-huajing-service-records-production-cn",
+      "region=cn-hangzhou",
+      "corsConfigured=true",
+      "ramLeastPrivilege=true",
+      "serviceRecordPrefix=service-records/production-cn",
+    ]),
+  }),
+  wechatOpenPlatform: Object.freeze({
+    title: "微信开放平台移动应用",
+    source: "微信开放平台 -> 管理中心 -> 移动应用 -> 美业话镜",
+    actionScope: "wechat_open_platform_mobile_app",
+    canStartNow: false,
+    requiredAuthorizationPackets: Object.freeze([
+      "P01_WECHAT_OPEN_MOBILE_APP",
+      "P10_ANDROID_RELEASE_SIGNING",
+      "P02_APPLE_TEAM_ID",
+    ]),
+    blockedUntil: "移动应用创建并审核通过，Android release 签名和 iOS Universal Link 均配置完成",
+    expectedEvidence: Object.freeze([
+      "mobileAppCreated=true",
+      "reviewStatus=approved",
+      "mobileAppIdReady=true",
+      "mobileAppSecretReady=true",
+      "androidConfigured=true",
+      "iosConfigured=true",
+    ]),
+  }),
+  envImport: Object.freeze({
+    title: "production-cn 运行环境变量导入",
+    source: "阿里云控制台 -> SAE 环境变量 / KMS / Secrets Manager",
+    actionScope: "runtime_env_import",
+    canStartNow: false,
+    requiredAuthorizationPackets: Object.freeze(["P06_ENV_IMPORT"]),
+    blockedUntil: "微信移动应用、OSS/RAM 和运行时目标明确后导入变量",
+    expectedEvidence: Object.freeze([
+      "confirmed=true",
+      "importedAt 为实际导入时间或证据编号",
+      "secretNotInImage=true",
+      "只记录非密钥 evidence handle",
+    ]),
+  }),
+  slsAlerts: Object.freeze({
+    title: "SLS 日志采集和告警",
+    source: "阿里云控制台 -> 日志服务 SLS / 应用监控告警",
+    actionScope: "sls_health_and_5xx_alerts",
+    canStartNow: false,
+    requiredAuthorizationPackets: Object.freeze(["P08_SAE_RUNTIME_SLS"]),
+    blockedUntil: "SAE runtime 存在并接入日志后配置 health/5xx 告警",
+    expectedEvidence: Object.freeze([
+      "SLS project/logstore 存在",
+      "healthAlertConfigured=true",
+      "serverErrorAlertConfigured=true",
+      "非密钥控制台证据编号已记录",
+    ]),
+  }),
+})
 const SECRET_VALUE_PATTERNS = [
   /sk-[A-Za-z0-9_-]{20,}/,
   /gh[pousr]_[A-Za-z0-9_]{30,}/,
@@ -350,12 +455,94 @@ function findSecretLikeValues(value, path = "$") {
 }
 
 function summarize(files) {
+  const local = files.find((file) => file.mode === "local")
+  const writebackPlan = local ? buildCloudConfirmationWritebackPlan(local) : null
   return {
     files: files.length,
     readyFiles: files.filter((file) => file.ready).length,
     blockingFiles: files.filter((file) => !file.ready).length,
     totalBlockers: files.reduce((sum, file) => sum + file.blockers.length, 0),
     totalWarnings: files.reduce((sum, file) => sum + file.warnings.length, 0),
+    ...(writebackPlan ? {
+      writebackBlockingGroups: writebackPlan.blockingGroups,
+      requiredAuthorizationPackets: writebackPlan.requiredAuthorizationPackets,
+    } : {}),
+  }
+}
+
+function uniqueStrings(values) {
+  const seen = new Set()
+  const result = []
+  for (const value of values) {
+    const item = String(value || "").trim()
+    if (!item || seen.has(item)) continue
+    seen.add(item)
+    result.push(item)
+  }
+  return result
+}
+
+function authorizationPacketsForBlocker(key, blocker) {
+  if (key !== "wechatOpenPlatform") {
+    return CLOUD_CONFIRMATION_GROUP_METADATA[key]?.requiredAuthorizationPackets || []
+  }
+  const textValue = String(blocker || "")
+  if (textValue.includes("android")) return ["P10_ANDROID_RELEASE_SIGNING"]
+  if (textValue.includes("ios")) return ["P01_WECHAT_OPEN_MOBILE_APP", "P02_APPLE_TEAM_ID"]
+  return ["P01_WECHAT_OPEN_MOBILE_APP"]
+}
+
+function buildCloudConfirmationWritebackPlan(local) {
+  const groups = (local.items || []).map((item) => {
+    const metadata = CLOUD_CONFIRMATION_GROUP_METADATA[item.key] || {}
+    const requiredAuthorizationPackets = uniqueStrings(
+      item.blockers.flatMap((blocker) => authorizationPacketsForBlocker(item.key, blocker)),
+    )
+    return {
+      id: item.key,
+      title: metadata.title || item.label,
+      source: metadata.source || "unknown",
+      actionScope: metadata.actionScope || item.key,
+      ready: item.ready === true,
+      canStartNow: metadata.canStartNow === true,
+      blockers: item.blockers.map((blocker) => `${item.key}:${blocker}`),
+      requiredAuthorizationPackets,
+      writeTargets: [`deploy/aliyun-production-cn.cloud-confirmations.local.json: items.${item.key}`],
+      expectedEvidence: metadata.expectedEvidence || [],
+      blockedUntil: item.ready ? "ready" : metadata.blockedUntil || "补齐该组非密钥证据",
+      forbidden: [
+        "不要写入 AccessKeySecret、AppSecret、registry password、RAM Secret、STS token、cookie 或 Supabase service role key",
+        "不要把云控制台已登录误标记为资源 ready",
+        "不要把小程序 AppID/Secret 当作微信开放平台移动应用凭证",
+      ],
+      verifyCommands: [
+        "corepack pnpm aliyun:cloud:confirmations",
+        "corepack pnpm aliyun:cloud:confirmations:strict",
+      ],
+      nonSecretEvidenceOnly: true,
+    }
+  })
+  const blockingGroups = groups.filter((group) => !group.ready).map((group) => group.id)
+  return {
+    file: local.file,
+    exists: local.exists,
+    ready: local.ready,
+    totalBlockers: local.blockers.length,
+    blockingGroups,
+    groups,
+    requiredAuthorizationPackets: uniqueStrings(groups.flatMap((group) => group.requiredAuthorizationPackets)),
+    strictVerificationOrder: [
+      "corepack pnpm aliyun:cloud:confirmations:strict",
+      "corepack pnpm aliyun:image:plan:strict",
+      "corepack pnpm aliyun:domain:strict",
+      "corepack pnpm aliyun:readiness:cloud-ready",
+      "corepack pnpm aliyun:predeploy",
+    ],
+    safetyBoundary: [
+      "This report is local and value-free; it does not call Aliyun APIs, create resources, import secrets, mutate DNS, or deploy.",
+      "Write only resource names, booleans, timestamps, console paths, and non-secret evidence handles into cloud-confirmations.local.json.",
+      "Never store AppSecret, AccessKeySecret, RAM Secret, registry password, STS token, cookies, certificate private keys, or Supabase service role keys.",
+    ],
   }
 }
 
@@ -364,6 +551,7 @@ function main() {
   const template = validateFile(args.templateFile, "template")
   const local = validateFile(args.localFile, "local")
   const ok = template.ready && local.ready
+  const writebackPlan = buildCloudConfirmationWritebackPlan(local)
   const report = {
     ok,
     allowIncomplete: args.allowIncomplete,
@@ -388,6 +576,7 @@ function main() {
         blockers: item.blockers,
       }])),
     },
+    writebackPlan,
     nextActions: [
       "保持 example 模板只放 TODO 和非密钥字段。",
       "在 .local.json 里只填资源名、布尔状态、证据编号或控制台路径，不填任何 secret/token/key/password 值。",

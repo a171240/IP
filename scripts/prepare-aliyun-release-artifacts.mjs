@@ -309,6 +309,8 @@ function renderMarkdown(audit) {
     `- templateReady: ${cloudConfirmationsCheck?.template?.ready === true}`,
     `- localReady: ${cloudConfirmationsCheck?.local?.ready === true}`,
     `- totalBlockers: ${cloudConfirmationsCheck?.summary?.totalBlockers ?? 0}`,
+    `- writebackBlockingGroups: ${cloudConfirmationsCheck?.summary?.writebackBlockingGroups?.length ? cloudConfirmationsCheck.summary.writebackBlockingGroups.join(", ") : "none"}`,
+    `- requiredAuthorizationPackets: ${cloudConfirmationsCheck?.summary?.requiredAuthorizationPackets?.length ? cloudConfirmationsCheck.summary.requiredAuthorizationPackets.join(", ") : "none"}`,
     ...(cloudConfirmationsCheck?.local?.blockers?.length
       ? cloudConfirmationsCheck.local.blockers.map((item) => `- ${item}`)
       : ["- none"]),
@@ -1672,6 +1674,8 @@ function main() {
       templateReady: cloudConfirmationsCheck.template?.ready === true,
       localReady: cloudConfirmationsCheck.local?.ready === true,
       totalBlockers: cloudConfirmationsCheck.summary?.totalBlockers ?? 0,
+      writebackBlockingGroups: cloudConfirmationsCheck.summary?.writebackBlockingGroups || [],
+      requiredAuthorizationPackets: cloudConfirmationsCheck.summary?.requiredAuthorizationPackets || [],
     },
     productionStatus: {
       report: audit.outputFiles.productionStatusJson,
