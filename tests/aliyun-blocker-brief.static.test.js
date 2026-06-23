@@ -109,6 +109,17 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   ))
   assert.equal(report.cloudAccess.canReadCloudNow, false)
   assert.equal(report.cloudAccess.cliConfigProbeFailureCategory, "aliyun_cli_profile_not_configured")
+  assert.equal(report.summary.cloudInventoryInterpretation, "existing_strict_inventory_ready_but_fresh_cli_profile_unavailable")
+  assert.equal(
+    report.cloudInventoryReadinessInterpretation.interpretation,
+    "existing_strict_inventory_ready_but_fresh_cli_profile_unavailable",
+  )
+  assert.equal(report.cloudInventoryReadinessInterpretation.strictInventoryEvidenceReady, true)
+  assert.equal(report.cloudInventoryReadinessInterpretation.freshCloudReadAvailableNow, false)
+  assert.equal(report.cloudInventoryReadinessInterpretation.currentCliProfileReady, false)
+  assert.equal(report.cloudInventoryReadinessInterpretation.currentBrowserConsoleUsable, true)
+  assert.equal(report.cloudInventoryReadinessInterpretation.notACloudResourceReadyProof, true)
+  assert.match(report.cloudInventoryReadinessInterpretation.nextEvidenceAction, /cloudshell|aliyun_cli_profile/)
   assert.equal(report.cloudAccess.currentBrowserChecked, true)
   assert.equal(typeof report.cloudAccess.currentBrowserCanUseCurrentConsole, "boolean")
   assert.equal(typeof report.cloudAccess.currentBrowserAliyunConsoleTabCount, "number")
@@ -154,6 +165,9 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.match(markdown, /workbenchTerminalReadiness/)
   assert.match(markdown, /currentBrowserCanUseCurrentConsole/)
   assert.match(markdown, /currentBrowserCloudApiCalled: false/)
+  assert.match(markdown, /cloudInventoryInterpretation: existing_strict_inventory_ready_but_fresh_cli_profile_unavailable/)
+  assert.match(markdown, /notACloudResourceReadyProof: true/)
+  assert.match(markdown, /nextEvidenceAction: configure_aliyun_cli_profile_or_use_cloudshell_for_fresh_readonly_inventory/)
   assert.match(markdown, /微信开放平台移动应用链路/)
   assert.match(markdown, /canCreateDraftInWechatOpenPlatform: true/)
   assert.match(markdown, /readyToSubmitForReview: false/)

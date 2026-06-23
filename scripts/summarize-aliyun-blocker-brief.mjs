@@ -90,6 +90,41 @@ function runJson(label, scriptArgs) {
   }
 }
 
+function buildCloudInventoryReadinessInterpretation(status, cloudAccess) {
+  const inventory = status.summary?.cloudInventoryResults || {}
+  const observation = inventory.observationSummary || {}
+  const operations = observation.operations || inventory.localOperations || 0
+  const strictReadyOperations = observation.strictReadyOperations || inventory.readyLocalOperations || 0
+  const strictInventoryEvidenceReady = operations > 0 && strictReadyOperations === operations
+  const freshCloudReadAvailableNow = cloudAccess.canReadCloudNow === true
+  const currentCliProfileReady = cloudAccess.cli?.configProbe?.ready === true
+  const currentBrowserConsoleUsable = cloudAccess.localBrowserProbe?.canUseCurrentConsole === true
+
+  let interpretation = "strict_inventory_incomplete_and_fresh_read_unavailable"
+  if (strictInventoryEvidenceReady && freshCloudReadAvailableNow) {
+    interpretation = "existing_strict_inventory_ready_and_fresh_read_available"
+  } else if (strictInventoryEvidenceReady && !freshCloudReadAvailableNow) {
+    interpretation = "existing_strict_inventory_ready_but_fresh_cli_profile_unavailable"
+  } else if (!strictInventoryEvidenceReady && freshCloudReadAvailableNow) {
+    interpretation = "fresh_read_available_but_strict_inventory_incomplete"
+  }
+
+  return {
+    strictInventoryEvidenceReady,
+    freshCloudReadAvailableNow,
+    currentCliProfileReady,
+    currentBrowserConsoleUsable,
+    interpretation,
+    notACloudResourceReadyProof: true,
+    proofScope: strictInventoryEvidenceReady
+      ? "existing_local_cloud_inventory_evidence_only"
+      : "strict_cloud_inventory_evidence_incomplete",
+    nextEvidenceAction: freshCloudReadAvailableNow
+      ? "rerun_readonly_cloud_inventory_before_any_production_action"
+      : "configure_aliyun_cli_profile_or_use_cloudshell_for_fresh_readonly_inventory",
+  }
+}
+
 function buildReport(args) {
   const status = runJson("production_status", [
     "scripts/summarize-aliyun-production-cn-status.mjs",
@@ -127,6 +162,7 @@ function buildReport(args) {
   const blockedVariableAcquisitionPlan = buildBlockedVariableAcquisitionPlan(sensitiveBlockers)
   const readySecretEnvImportGroups = sensitiveBlockers.summary?.readySensitiveEnvVariableGroups || []
   const wechatOpenMobileApp = compactWechatOpenMobileApp(wechatOpenMobileAppPackage)
+  const cloudInventoryReadinessInterpretation = buildCloudInventoryReadinessInterpretation(status, cloudAccess)
   const report = {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -160,6 +196,7 @@ function buildReport(args) {
       readySecretEnvImportGroupCount: readySecretEnvImportGroups.length,
       immediateAuthorizationPackets: actionAuthorization.summary?.nextActionTimeConfirmations || [],
       cloudInventoryStrictReady: `${status.summary?.cloudInventoryResults?.readyLocalOperations || 0}/${status.summary?.cloudInventoryResults?.localOperations || 0}`,
+      cloudInventoryInterpretation: cloudInventoryReadinessInterpretation.interpretation,
       canReadCloudNow: cloudAccess.canReadCloudNow === true,
       cliConfigProbeFailureCategory: cloudAccess.cli?.configProbe?.failureCategory || "",
       currentBrowserCanUseCurrentConsole: cloudAccess.localBrowserProbe?.canUseCurrentConsole === true,
@@ -174,6 +211,7 @@ function buildReport(args) {
     blockedVariableAcquisitionPlan,
     readySecretEnvImportGroups,
     wechatOpenMobileApp,
+    cloudInventoryReadinessInterpretation,
     cloudAccess: {
       canReadCloudNow: cloudAccess.canReadCloudNow === true,
       cliAvailable: cloudAccess.cli?.available === true,
@@ -385,6 +423,7 @@ function renderMarkdown(report) {
     `- blockedVariableAcquisitionCount: ${report.summary.blockedVariableAcquisitionCount}`,
     `- readySecretEnvImportGroupCount: ${report.summary.readySecretEnvImportGroupCount}`,
     `- cloudInventoryStrictReady: ${report.summary.cloudInventoryStrictReady}`,
+    `- cloudInventoryInterpretation: ${report.summary.cloudInventoryInterpretation}`,
     `- canReadCloudNow: ${report.summary.canReadCloudNow}`,
     `- cliConfigProbeFailureCategory: ${report.summary.cliConfigProbeFailureCategory || "none"}`,
     `- currentBrowserCanUseCurrentConsole: ${report.summary.currentBrowserCanUseCurrentConsole}`,
@@ -440,6 +479,14 @@ function renderMarkdown(report) {
     ...renderReadySecretEnvImportGroups(report.readySecretEnvImportGroups),
     "## CloudShell / CLI 只读盘点",
     "",
+    `- interpretation: ${report.cloudInventoryReadinessInterpretation.interpretation}`,
+    `- strictInventoryEvidenceReady: ${report.cloudInventoryReadinessInterpretation.strictInventoryEvidenceReady}`,
+    `- freshCloudReadAvailableNow: ${report.cloudInventoryReadinessInterpretation.freshCloudReadAvailableNow}`,
+    `- currentCliProfileReady: ${report.cloudInventoryReadinessInterpretation.currentCliProfileReady}`,
+    `- currentBrowserConsoleUsable: ${report.cloudInventoryReadinessInterpretation.currentBrowserConsoleUsable}`,
+    `- notACloudResourceReadyProof: ${report.cloudInventoryReadinessInterpretation.notACloudResourceReadyProof}`,
+    `- proofScope: ${report.cloudInventoryReadinessInterpretation.proofScope}`,
+    `- nextEvidenceAction: ${report.cloudInventoryReadinessInterpretation.nextEvidenceAction}`,
     `- canReadCloudNow: ${report.cloudAccess.canReadCloudNow}`,
     `- cliConfigProbeReady: ${report.cloudAccess.cliConfigProbeReady}`,
     `- cliConfigProbeFailureCategory: ${report.cloudAccess.cliConfigProbeFailureCategory || "none"}`,
