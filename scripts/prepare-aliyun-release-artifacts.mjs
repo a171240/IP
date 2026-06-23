@@ -570,6 +570,10 @@ function renderMarkdown(audit) {
     `- blockedByDependencies: ${cloudActionsPackage.summary?.blockedByDependencies?.length ? cloudActionsPackage.summary.blockedByDependencies.join(", ") : "none"}`,
     `- cloudConsolePackets: ${cloudActionsPackage.summary?.cloudConsolePackets?.length ? cloudActionsPackage.summary.cloudConsolePackets.join(", ") : "none"}`,
     `- canReadCloudNow: ${cloudActionsPackage.summary?.canReadCloudNow === true}`,
+    `- cloudInventoryResultsReady: ${cloudActionsPackage.summary?.cloudInventoryResultsReady === true}`,
+    `- cloudInventoryReadyLocalOperations: ${cloudActionsPackage.summary?.cloudInventoryReadyLocalOperations || "unknown"}`,
+    `- cloudInventoryExecutedCommandResults: ${cloudActionsPackage.summary?.cloudInventoryExecutedCommandResults || "unknown"}`,
+    `- readonlyInventoryStatus: ${cloudActionsPackage.readonlyInventoryUnblock?.status || "unknown"}`,
     `- cliConfigProbeFailureCategory: ${cloudActionsPackage.summary?.cliConfigProbeFailureCategory || "none"}`,
     ...(cloudActionsPackage.immediateConsoleTasks?.length
       ? cloudActionsPackage.immediateConsoleTasks.map((item) => `- ${item.id}: canStartNow=${item.canStartNow}, phrase=${item.minimumAuthorizationPhrase}`)
@@ -1803,6 +1807,11 @@ function main() {
       blockedByDependencies: cloudActionsPackage.summary?.blockedByDependencies || [],
       cloudConsolePackets: cloudActionsPackage.summary?.cloudConsolePackets || [],
       canReadCloudNow: cloudActionsPackage.summary?.canReadCloudNow === true,
+      cloudInventoryResultsReady: cloudActionsPackage.summary?.cloudInventoryResultsReady === true,
+      cloudInventoryReadyLocalOperations: cloudActionsPackage.summary?.cloudInventoryReadyLocalOperations || "unknown",
+      cloudInventoryExecutedCommandResults: cloudActionsPackage.summary?.cloudInventoryExecutedCommandResults || "unknown",
+      readonlyInventoryStatus: cloudActionsPackage.readonlyInventoryUnblock?.status || "unknown",
+      readonlyInventoryCurrentEvidence: cloudActionsPackage.readonlyInventoryUnblock?.currentEvidence || [],
       cliConfigProbeFailureCategory: cloudActionsPackage.summary?.cliConfigProbeFailureCategory || "none",
     },
     androidReleaseSigningPackage: {

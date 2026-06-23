@@ -24,6 +24,11 @@ test("Aliyun cloud actions package command is wired into scripts, predeploy, dep
   assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:cloud-actions:package"))
   assert.ok(deploySpec.predeployChecks.includes("corepack pnpm aliyun:cloud-actions:package"))
   assert.match(releaseArtifacts, /cloudActionsPackage/)
+  assert.match(releaseArtifacts, /cloudInventoryResultsReady/)
+  assert.match(releaseArtifacts, /cloudInventoryReadyLocalOperations/)
+  assert.match(releaseArtifacts, /cloudInventoryExecutedCommandResults/)
+  assert.match(releaseArtifacts, /readonlyInventoryStatus/)
+  assert.match(releaseArtifacts, /readonlyInventoryCurrentEvidence/)
   assert.match(releaseArtifacts, /cloud-actions-package\.json/)
 })
 
