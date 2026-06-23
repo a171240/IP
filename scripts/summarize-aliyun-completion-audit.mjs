@@ -246,6 +246,7 @@ function buildAudit(args, inputs) {
 
 function buildLocalAppBackendRequirement(status, operatorHandoff) {
   const localReady = operatorHandoff.localReady || {}
+  const localCodeReady = status.summary?.localCodeReady === true
   const booleanReadyFields = [
     "appApiBridgeMap",
     "appRuntimeConfig",
@@ -254,13 +255,14 @@ function buildLocalAppBackendRequirement(status, operatorHandoff) {
     "docker",
   ]
   const blockers = booleanReadyFields.filter((key) => localReady[key] !== true)
-  const statusValue = blockers.length === 0 ? "proved" : "partial"
+  if (!localCodeReady) blockers.unshift("localCodeReady=false")
+  const statusValue = localCodeReady && blockers.length === 0 ? "proved" : "partial"
   return requirement({
     id: "G01_LOCAL_APP_BACKEND_READY",
     title: "APP/后端本地代码和 API 桥接证据 ready",
     status: statusValue,
     evidence: [
-      `localCodeReady=${status.summary?.localCodeReady === true}`,
+      `localCodeReady=${localCodeReady}`,
       `appApiBridgeMap=${localReady.appApiBridgeMap === true}`,
       `appRuntimeConfig=${localReady.appRuntimeConfig === true}`,
       `appRuntimeApiBaseUrl=${localReady.appRuntimeApiBaseUrl || "unknown"}`,
