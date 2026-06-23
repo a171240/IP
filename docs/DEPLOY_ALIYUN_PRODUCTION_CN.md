@@ -1144,6 +1144,8 @@ appApiSmokeCoverage: 29 / 29 business routes
 
 2026-06-22 21:08 CST 更新：新增 `corepack pnpm aliyun:cloud:inventory-results`，用于校验阿里云 CLI 只读盘点结果摘要文件 `deploy/aliyun-production-cn.cloud-inventory-results.local.json`。该校验器不运行 Aliyun CLI、不读取凭据、不调用云 API，只检查结果摘要是否覆盖 7 个盘点项、是否保持 `mutationPerformed=false`、是否没有密钥形态。当前 local 结果文件尚未生成，因此结果状态仍是 not ready；这一步是把后续只读命令输出转成 `cloud-confirmations.local.json` 前的中间证据层。
 
+2026-06-24 CST 更新：`cloud-inventory-results` 的盘点项已扩展为 9 项，新增 `I08_RDS_POSTGRES` 与 `I09_TAIR_REDIS`，用于把 RDS PostgreSQL 和 Redis/Tair 的只读存在性结果纳入机器校验。当前本机 ignored 的 `cloud-inventory-results.local.json` 已由 CloudShell 只读命令补齐，strict 结果为 `readyLocalOperations=9/9`、`executedCommandResults=12/12`、`cloudApiCalledCommandResults=12/12`、`mutationPerformedCommandResults=0`；结论是 RDS PostgreSQL、RDS 全量和 Redis/Tair 在 `cn-hangzhou` 均为 0 实例。这仍不表示可以部署，只表示数据层后置缺口已经有非密钥只读证据。
+
 本轮为 `--skip-bundle` 审计，未重新生成 context tar；Docker context 和镜像已由 `aliyun:docker:check`、`aliyun:docker:build`、`aliyun:container:smoke` 覆盖。
 
 2026-06-22 08:24 CST 更新：云确认模板从 6 项扩展为 7 项，新增 `assetDomainHttps`，用于单独确认 `assets-cn.ipgongchang.xin` 的 DNS、HTTPS 和 ICP 证据。`corepack pnpm aliyun:cloud:confirmations` 当前显示 example checkedItems=7 且模板通过，local checkedItems=7、totalBlockers=25；新增的 4 个 local blocker 是 `assetDomainHttps:confirmed`、`assetDomainHttps:dnsResolvedToAliyun`、`assetDomainHttps:httpsEnabled`、`assetDomainHttps:icpReady`。

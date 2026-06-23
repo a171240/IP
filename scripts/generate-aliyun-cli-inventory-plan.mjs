@@ -304,6 +304,47 @@ function buildInventoryPlan(cloudAccess) {
       ],
       forbiddenCommands: ["GetUserCertificateDetail", "CreateCertificate", "DeleteCertificate", "CreateDeploymentJob"],
     },
+    {
+      id: "I08_RDS_POSTGRES",
+      title: "RDS PostgreSQL production-cn data-layer inventory",
+      product: "rds",
+      region: EXPECTED_REGION,
+      readOnly: true,
+      status,
+      consoleFallback: "阿里云控制台 -> RDS -> cn-hangzhou -> PostgreSQL 实例",
+      commandPlan: [
+        {
+          command: "aliyun rds DescribeDBInstances --RegionId cn-hangzhou --Engine PostgreSQL",
+          purpose: "Verify whether a production-cn PostgreSQL RDS instance exists before treating DATABASE_URL_CN as available.",
+          helpCommand: "aliyun rds DescribeDBInstances --help",
+        },
+        {
+          command: "aliyun rds DescribeDBInstances --RegionId cn-hangzhou",
+          purpose: "Cross-check all RDS engines in cn-hangzhou without reading connection strings or credentials.",
+          helpCommand: "aliyun rds DescribeDBInstances --help",
+        },
+      ],
+      writeTargets: ["release artifacts -> bridgeDataLayer.databaseUrlCnStatus"],
+      forbiddenCommands: ["CreateDBInstance", "ModifyDBInstance", "DeleteDBInstance", "CreateDatabase", "CreateAccount"],
+    },
+    {
+      id: "I09_TAIR_REDIS",
+      title: "Redis/Tair production-cn cache inventory",
+      product: "r-kvstore",
+      region: EXPECTED_REGION,
+      readOnly: true,
+      status,
+      consoleFallback: "阿里云控制台 -> Tair/Redis -> cn-hangzhou -> 实例",
+      commandPlan: [
+        {
+          command: "aliyun r-kvstore DescribeInstances --RegionId cn-hangzhou",
+          purpose: "Verify whether a production-cn Redis/Tair instance exists before treating REDIS_URL_CN as available.",
+          helpCommand: "aliyun r-kvstore DescribeInstances --help",
+        },
+      ],
+      writeTargets: ["release artifacts -> bridgeDataLayer.redisUrlCnStatus"],
+      forbiddenCommands: ["CreateInstance", "ModifyInstanceAttribute", "DeleteInstance", "RestartInstance", "TransformToPrePaid"],
+    },
   ]
 
   return {

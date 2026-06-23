@@ -71,9 +71,9 @@ corepack pnpm aliyun:cloud:inventory-results:strict
 当前结果：
 
 - `localReady=true`
-- `readyLocalOperations=7/7`
-- `executedCommandResults=9`
-- `cloudApiCalledCommandResults=9`
+- `readyLocalOperations=9/9`
+- `executedCommandResults=12/12`
+- `cloudApiCalledCommandResults=12/12`
 - `mutationPerformedCommandResults=0`
 
 原始终端输出保存在本机临时文件：

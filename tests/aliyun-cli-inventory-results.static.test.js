@@ -21,6 +21,46 @@ function run(args) {
   }
 }
 
+function writeConsoleOnlyLocalFixture() {
+  const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-inventory-results-console-only-"))
+  const localFile = path.join(tmpdir, "inventory.local.json")
+  const template = readJson("deploy", "aliyun-production-cn.cloud-inventory-results.example.json")
+  const statusById = new Map([
+    ["I01_SAE_RUNTIME", "not_found"],
+    ["I02_ACR_IMAGE", "blocked"],
+    ["I03_DNS_API_DOMAIN", "not_found"],
+    ["I04_DNS_ASSET_DOMAIN", "not_found"],
+    ["I05_OSS_AUDIO_BUCKET", "observed"],
+    ["I06_SLS_ALERTS", "observed"],
+    ["I07_CERT_HTTPS", "blocked"],
+    ["I08_RDS_POSTGRES", "not_found"],
+    ["I09_TAIR_REDIS", "not_found"],
+  ])
+  const local = {
+    ...template,
+    updatedAt: "2026-06-24T01:30:00+08:00",
+    operator: "codex-test-console-only",
+    notes: "synthetic non-secret console-only fixture",
+    operations: template.operations.map((operation) => ({
+      ...operation,
+      status: statusById.get(operation.id) || "blocked",
+      evidence: `${operation.id}_console_only_non_secret_evidence`,
+      commandResults: operation.commandResults.map((result) => ({
+        ...result,
+        executed: false,
+        exitStatus: null,
+        cloudApiCalled: false,
+        mutationPerformed: false,
+        observedAt: "2026-06-24T01:30:00+08:00",
+        outputSummary: `${operation.id} console-only non-secret observation`,
+        evidence: `${operation.id}_console_only_command_evidence`,
+      })),
+    })),
+  }
+  fs.writeFileSync(localFile, JSON.stringify(local, null, 2))
+  return localFile
+}
+
 test("Aliyun CLI inventory results command is wired into scripts, predeploy, and deploy spec", () => {
   const pkg = readJson("package.json")
   const predeploy = read("scripts", "aliyun-predeploy-commands.mjs")
@@ -55,8 +95,8 @@ test("Aliyun CLI inventory results reports incomplete local evidence without cal
   assert.equal(report.readOnlyOnly, true)
   assert.equal(report.cloudMutationPerformed, false)
   assert.equal(report.template.ready, true)
-  assert.equal(report.template.checkedOperations, 7)
-  assert.equal(report.summary.readyTemplateOperations, 7)
+  assert.equal(report.template.checkedOperations, 9)
+  assert.equal(report.summary.readyTemplateOperations, 9)
   assert.equal(report.summary.localOperations, 0)
   assert.equal(report.summary.readyLocalOperations, 0)
   assert.equal(report.local.exists, false)
@@ -102,26 +142,35 @@ test("Aliyun production status surfaces CLI inventory result blockers", () => {
 })
 
 test("Aliyun production status surfaces safe console-only inventory observations", () => {
-  const output = execFileSync(process.execPath, ["scripts/summarize-aliyun-production-cn-status.mjs"], {
-    cwd: root,
-    encoding: "utf8",
-    maxBuffer: 1024 * 1024 * 30,
-  })
+  const localFile = writeConsoleOnlyLocalFixture()
+  const output = execFileSync(
+    process.execPath,
+    [
+      "scripts/summarize-aliyun-production-cn-status.mjs",
+      "--cloud-inventory-results",
+      localFile,
+    ],
+    {
+      cwd: root,
+      encoding: "utf8",
+      maxBuffer: 1024 * 1024 * 30,
+    },
+  )
   const report = JSON.parse(output)
   const summary = report.summary.cloudInventoryResults.observationSummary
   const local = report.localReadiness.cloudInventoryResults.observationSummary
 
   assert.equal(report.summary.cloudInventoryResults.localReady, false)
   assert.equal(summary.safeConsoleOnly, true)
-  assert.equal(summary.operations, 7)
-  assert.equal(summary.consoleObservationOperations, 7)
+  assert.equal(summary.operations, 9)
+  assert.equal(summary.consoleObservationOperations, 9)
   assert.equal(summary.strictReadyOperations, 0)
   assert.equal(summary.executedCommandResults, 0)
   assert.equal(summary.cloudApiCalledCommandResults, 0)
   assert.equal(summary.mutationPerformedCommandResults, 0)
   assert.deepEqual(local, summary)
   assert.ok(report.summary.cloudInventoryResults.localBlockers.includes("console_only_observation_not_strict_inventory"))
-  assert.ok(report.summary.cloudInventoryResults.localBlockers.includes("readonly_inventory_commands_executed=0/7"))
+  assert.ok(report.summary.cloudInventoryResults.localBlockers.includes("readonly_inventory_commands_executed=0/9"))
   assert.ok(!report.summary.cloudInventoryResults.localBlockers.some((item) => item.includes("commandResults[0]:executed=true")))
   assert.ok(report.humanSummary.some((line) => /阿里云控制台观察证据/.test(line)))
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
@@ -130,7 +179,8 @@ test("Aliyun production status surfaces safe console-only inventory observations
 })
 
 test("Aliyun CLI inventory results separates console observations from strict CLI readiness", () => {
-  const { output, report } = run(["--allow-incomplete"])
+  const localFile = writeConsoleOnlyLocalFixture()
+  const { output, report } = run(["--local", localFile, "--allow-incomplete"])
   const summary = report.local.observationSummary
   const oss = report.local.operationStatus.I05_OSS_AUDIO_BUCKET
   const sls = report.local.operationStatus.I06_SLS_ALERTS
@@ -138,28 +188,30 @@ test("Aliyun CLI inventory results separates console observations from strict CL
 
   assert.equal(report.ok, false)
   assert.equal(report.local.ready, false)
-  assert.equal(report.local.checkedOperations, 7)
-  assert.equal(summary.operations, 7)
+  assert.equal(report.local.checkedOperations, 9)
+  assert.equal(summary.operations, 9)
   assert.equal(summary.strictReadyOperations, 0)
-  assert.equal(summary.evidenceReadyOperations, 7)
-  assert.equal(summary.consoleObservationOperations, 7)
+  assert.equal(summary.evidenceReadyOperations, 9)
+  assert.equal(summary.consoleObservationOperations, 9)
   assert.equal(summary.safeConsoleOnly, true)
-  assert.equal(summary.commandResults, 7)
+  assert.equal(summary.commandResults, 9)
   assert.equal(summary.executedCommandResults, 0)
   assert.equal(summary.cloudApiCalledCommandResults, 0)
   assert.equal(summary.mutationPerformedCommandResults, 0)
-  assert.ok(report.local.blockers.includes("readonly_inventory_strict_ready=0/7"))
-  assert.ok(report.local.blockers.includes("readonly_inventory_commands_executed=0/7"))
-  assert.ok(report.local.blockers.includes("readonly_inventory_cloud_api_called=0/7"))
+  assert.ok(report.local.blockers.includes("readonly_inventory_strict_ready=0/9"))
+  assert.ok(report.local.blockers.includes("readonly_inventory_commands_executed=0/9"))
+  assert.ok(report.local.blockers.includes("readonly_inventory_cloud_api_called=0/9"))
   assert.ok(report.local.blockers.includes("console_only_observation_not_strict_inventory"))
   assert.ok(report.local.technicalBlockers.some((item) => item.includes("commandResults[0]:executed=true")))
   assert.deepEqual(summary.statusCounts, {
-    not_found: 3,
+    not_found: 5,
     blocked: 2,
     observed: 2,
   })
   assert.deepEqual(summary.observedOperationIds, ["I05_OSS_AUDIO_BUCKET", "I06_SLS_ALERTS"])
   assert.ok(summary.notFoundOperationIds.includes("I01_SAE_RUNTIME"))
+  assert.ok(summary.notFoundOperationIds.includes("I08_RDS_POSTGRES"))
+  assert.ok(summary.notFoundOperationIds.includes("I09_TAIR_REDIS"))
   assert.ok(summary.blockedOperationIds.includes("I02_ACR_IMAGE"))
   assert.equal(oss.status, "observed")
   assert.equal(oss.evidenceReady, true)
@@ -203,9 +255,9 @@ test("Aliyun CLI inventory results strict mode accepts complete non-secret local
   const { output, report } = run(["--local", localFile])
   assert.equal(report.ok, true)
   assert.equal(report.local.ready, true)
-  assert.equal(report.local.checkedOperations, 7)
-  assert.equal(report.summary.readyTemplateOperations, 7)
-  assert.equal(report.summary.readyLocalOperations, 7)
+  assert.equal(report.local.checkedOperations, 9)
+  assert.equal(report.summary.readyTemplateOperations, 9)
+  assert.equal(report.summary.readyLocalOperations, 9)
   assert.equal(report.summary.totalBlockers, 0)
   assert.equal(report.cloudMutationPerformed, false)
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)

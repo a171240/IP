@@ -50,8 +50,10 @@ test("APP production-cn checklist records current blockers without secret values
     "微信开放平台移动应用创建材料包",
     "aliyun:env:handoff",
     "环境变量获取与导入手册",
-    "readonly_inventory_strict_ready=0/7",
-    "console_only_observation_not_strict_inventory",
+    "readyLocalOperations=9/9",
+    "executedCommandResults=12/12",
+    "CloudShell 只读盘点显示 `cn-hangzhou` 实例数 0",
+    "数据层可后置变量",
   ]) {
     assert.match(doc, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
   }

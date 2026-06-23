@@ -16,7 +16,7 @@
 
 2026-06-22 21:08 CST 复核：已新增 `corepack pnpm aliyun:cloud:inventory-results` 和严格版 `corepack pnpm aliyun:cloud:inventory-results:strict`。该命令只校验 `deploy/aliyun-production-cn.cloud-inventory-results.local.json` 里的只读盘点结果摘要，不运行 Aliyun CLI、不调用云 API、不读取凭据。当前 local 结果文件尚未生成，所以 `inventory-results` 只作为缺口报告；后续 CLI/Cloud Shell 盘点完成后，把非密钥摘要写入该 ignored local 文件，再用 strict 校验通过后，才能把最终布尔证据同步到 `cloud-confirmations.local.json`。
 
-2026-06-24 CST 复核：`deploy/aliyun-production-cn.cloud-inventory-results.local.json` 已存在，且已由 CloudShell Aliyun CLI 只读命令补齐。`cloudInventoryResults` 当前为 `localReady=true`、`readyLocalOperations=7/7`、`executedCommandResults=9/9`、`cloudApiCalledCommandResults=9/9`、`mutationPerformedCommandResults=0`；这证明只读盘点已完成，但不等于云资源可部署，因为 `cloudConfirmations` 仍为 `0/7` ready。
+2026-06-24 CST 复核：`deploy/aliyun-production-cn.cloud-inventory-results.local.json` 已存在，且已由 CloudShell Aliyun CLI 只读命令补齐。`cloudInventoryResults` 当前为 `localReady=true`、`readyLocalOperations=9/9`、`executedCommandResults=12/12`、`cloudApiCalledCommandResults=12/12`、`mutationPerformedCommandResults=0`；这证明只读盘点已完成，但不等于云资源可部署，因为 `cloudConfirmations` 仍为 `0/7` ready。
 
 2026-06-24 数据层只读盘点补充：`cn-hangzhou` 下 RDS PostgreSQL 实例数为 0，RDS 全量实例数为 0，Redis/Tair 实例数为 0。第一版 APP production-cn 后端仍是阿里云 API 容器 + 现有 Supabase 的桥接部署；`DATABASE_URL_CN` / `REDIS_URL_CN` 可后置，不能把它们填入就等同于完成完整国内数据层迁移。
 
@@ -137,7 +137,7 @@ corepack pnpm aliyun:predeploy
 
 `aliyun:env:handoff` 会输出无值的环境变量获取与导入手册，按 `blockedRequired`、`appLaunchBlocking`、`readyPlainEnv`、`readySecretEnv` 和 `deferred` 分组回答“从哪里取得、写到阿里云哪里、当前是否阻塞、禁止写到哪里”。该手册会明确 `WECHAT_OPEN_APP_ID` 只能作为服务端 SAE plain env，`WECHAT_OPEN_APP_SECRET` 只能进入 KMS/Secrets Manager/SAE secret env，`APPLE_TEAM_ID` 是受控标识符且不能猜测。
 
-`aliyun:status` 现在也会读取 `cloud-inventory-results.local.json` 的非密钥摘要，并在 `cloudInventoryResults` 里显示 CLI/Cloud Shell 只读盘点结果是否已落地、local operations ready 数量和 blocker；当前本机已有控制台观察结果，但严格只读 inventory 仍是 `0/7` ready，不能当作云侧资源完成证明。
+`aliyun:status` 现在也会读取 `cloud-inventory-results.local.json` 的非密钥摘要，并在 `cloudInventoryResults` 里显示 CLI/Cloud Shell 只读盘点结果是否已落地、local operations ready 数量和 blocker；当前 strict 只读 inventory 已经覆盖 9 项并 ready，但它只证明“资源存在/不存在/未配置”的只读事实，仍不能替代云侧 `cloudConfirmations`、ACR 镜像发布、密钥导入或生产部署授权。
 
 正式部署前必须满足：
 

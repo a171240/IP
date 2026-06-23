@@ -55,17 +55,19 @@ test("Aliyun CLI inventory runner dry-run does not call cloud APIs or write raw 
   assert.equal(report.cloudApiCalled, false)
   assert.equal(report.cloudMutationPerformed, false)
   assert.equal(report.secretLeakCheck.ok, true)
-  assert.equal(report.summary.operations, 7)
-  assert.equal(report.summary.commands, 7)
+  assert.equal(report.summary.operations, 9)
+  assert.equal(report.summary.commands, 9)
   assert.equal(report.summary.executedCommands, 0)
-  assert.equal(report.summary.dryRunCommands, 7)
+  assert.equal(report.summary.dryRunCommands, 9)
   assert.deepEqual(report.summary.failureCategories, {})
   assert.deepEqual(report.executionDiagnostics.failedCommands, [])
-  assert.equal(local.operations.length, 7)
+  assert.equal(local.operations.length, 9)
   assert.ok(local.operations.every((operation) => operation.status === "skipped"))
   assert.ok(local.operations.every((operation) => operation.commandResults[0].executed === false))
   assert.ok(report.allowedCommandCatalog.some((item) => item.command.includes("aliyun sae ListApplications")))
   assert.ok(report.allowedCommandCatalog.some((item) => item.command.includes("aliyun oss stat")))
+  assert.ok(report.allowedCommandCatalog.some((item) => item.command.includes("aliyun rds DescribeDBInstances")))
+  assert.ok(report.allowedCommandCatalog.some((item) => item.command.includes("aliyun r-kvstore DescribeInstances")))
   assert.ok(report.safetyBoundary.some((item) => item.includes("Default mode is dry_run")))
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
@@ -101,12 +103,12 @@ test("Aliyun CLI inventory runner classifies missing CLI profile without storing
   assert.equal(report.ok, true)
   assert.equal(report.executionMode, "execute_readonly")
   assert.equal(report.executeReadonlyAllowed, true)
-  assert.equal(report.summary.executedCommands, 7)
-  assert.equal(report.summary.failedCommands, 7)
+  assert.equal(report.summary.executedCommands, 9)
+  assert.equal(report.summary.failedCommands, 9)
   assert.deepEqual(report.summary.failureCategories, {
-    aliyun_cli_profile_not_configured: 7,
+    aliyun_cli_profile_not_configured: 9,
   })
-  assert.equal(report.executionDiagnostics.failedCommands.length, 7)
+  assert.equal(report.executionDiagnostics.failedCommands.length, 9)
   assert.ok(report.executionDiagnostics.failedCommands.every((item) =>
     item.failureCategory === "aliyun_cli_profile_not_configured" &&
     /Do not paste AccessKeySecret/.test(item.failureHint)
@@ -148,7 +150,7 @@ test("Aliyun CLI inventory runner classifies incomplete CLI config without stori
   const report = JSON.parse(output)
 
   assert.deepEqual(report.summary.failureCategories, {
-    aliyun_cli_config_incomplete: 7,
+    aliyun_cli_config_incomplete: 9,
   })
   assert.ok(report.executionDiagnostics.failedCommands.every((item) =>
     item.failureCategory === "aliyun_cli_config_incomplete" &&

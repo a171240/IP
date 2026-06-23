@@ -18,6 +18,8 @@ const EXPECTED_OPERATIONS = Object.freeze([
   ["I05_OSS_AUDIO_BUCKET", "oss"],
   ["I06_SLS_ALERTS", "sls"],
   ["I07_CERT_HTTPS", "cas"],
+  ["I08_RDS_POSTGRES", "rds"],
+  ["I09_TAIR_REDIS", "r-kvstore"],
 ])
 
 const TOP_LEVEL_FIELDS = new Set([

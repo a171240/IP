@@ -144,6 +144,8 @@ test("Aliyun operator handoff exposes console-only inventory observation summary
       buildConsoleObservationOperation("I05_OSS_AUDIO_BUCKET", "observed"),
       buildConsoleObservationOperation("I06_SLS_ALERTS", "observed"),
       buildConsoleObservationOperation("I07_CERT_HTTPS", "blocked"),
+      buildConsoleObservationOperation("I08_RDS_POSTGRES", "not_found"),
+      buildConsoleObservationOperation("I09_TAIR_REDIS", "not_found"),
     ],
   }, null, 2))
 
@@ -167,9 +169,9 @@ test("Aliyun operator handoff exposes console-only inventory observation summary
   assert.equal(report.localEvidenceGaps.cloudInventoryResults.exists, true)
   assert.equal(report.localEvidenceGaps.cloudInventoryResults.ready, false)
   assert.equal(summary.safeConsoleOnly, true)
-  assert.equal(summary.operations, 7)
-  assert.equal(summary.consoleObservationOperations, 7)
-  assert.equal(summary.commandResults, 7)
+  assert.equal(summary.operations, 9)
+  assert.equal(summary.consoleObservationOperations, 9)
+  assert.equal(summary.commandResults, 9)
   assert.equal(summary.executedCommandResults, 0)
   assert.equal(summary.cloudApiCalledCommandResults, 0)
   assert.equal(summary.mutationPerformedCommandResults, 0)
@@ -181,6 +183,8 @@ test("Aliyun operator handoff exposes console-only inventory observation summary
     "I01_SAE_RUNTIME",
     "I03_DNS_API_DOMAIN",
     "I04_DNS_ASSET_DOMAIN",
+    "I08_RDS_POSTGRES",
+    "I09_TAIR_REDIS",
   ])
   assert.deepEqual(summary.blockedOperationIds, [
     "I02_ACR_IMAGE",
@@ -190,8 +194,8 @@ test("Aliyun operator handoff exposes console-only inventory observation summary
   assert.ok(inventoryGaps.every((item) => item.jsonPath === "operations[*].commandResults[*]" || item.jsonPath === "$"))
   assert.ok(inventoryGaps.some((item) => /控制台人工观察/.test(item.expected)))
   assert.match(markdownOutput, /safeConsoleOnly: true/)
-  assert.match(markdownOutput, /consoleObservationOperations: 7\/7/)
-  assert.match(markdownOutput, /executedCommandResults: 0\/7/)
+  assert.match(markdownOutput, /consoleObservationOperations: 9\/9/)
+  assert.match(markdownOutput, /executedCommandResults: 0\/9/)
   assert.match(markdownOutput, /cloudApiCalledCommandResults: 0/)
   assert.match(markdownOutput, /mutationPerformedCommandResults: 0/)
   assert.doesNotMatch(output + markdownOutput, /sk-[A-Za-z0-9_-]{20,}/)

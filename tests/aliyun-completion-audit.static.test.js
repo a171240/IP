@@ -51,6 +51,8 @@ function writeConsoleOnlyInventoryFixture(filePath) {
       buildConsoleObservationOperation("I05_OSS_AUDIO_BUCKET", "observed"),
       buildConsoleObservationOperation("I06_SLS_ALERTS", "observed"),
       buildConsoleObservationOperation("I07_CERT_HTTPS", "blocked"),
+      buildConsoleObservationOperation("I08_RDS_POSTGRES", "not_found"),
+      buildConsoleObservationOperation("I09_TAIR_REDIS", "not_found"),
     ],
   }, null, 2))
 }
@@ -103,7 +105,9 @@ test("Aliyun completion audit reports the current goal as blocked without secret
   assert.ok(byId.get("G01_LOCAL_APP_BACKEND_READY").evidence.includes("localCodeReady=false"))
   assert.ok(byId.get("G01_LOCAL_APP_BACKEND_READY").blockers.includes("localCodeReady=false"))
   assert.equal(byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").status, "blocked")
-  assert.equal(byId.get("G03_CLOUD_INVENTORY_PROVED").status, "blocked")
+  assert.equal(byId.get("G03_CLOUD_INVENTORY_PROVED").status, "proved")
+  assert.ok(byId.get("G03_CLOUD_INVENTORY_PROVED").evidence.includes("readyLocalOperations=9/9"))
+  assert.ok(byId.get("G03_CLOUD_INVENTORY_PROVED").evidence.includes("executedCommandResults=12/12"))
   assert.equal(byId.get("G04_IMAGE_PUBLISH_READY").status, "blocked")
   assert.equal(byId.get("G05_DOMAIN_HTTPS_ICP_READY").status, "blocked")
   assert.equal(byId.get("G06_WECHAT_APP_LOGIN_READY").status, "blocked")
@@ -186,18 +190,18 @@ test("Aliyun completion audit carries console-only inventory evidence into G03 a
 
   assert.equal(cloudInventory.status, "blocked")
   assert.match(evidence, /safeConsoleOnly=true/)
-  assert.match(evidence, /consoleObservationOperations=7\/7/)
-  assert.match(evidence, /executedCommandResults=0\/7/)
+  assert.match(evidence, /consoleObservationOperations=9\/9/)
+  assert.match(evidence, /executedCommandResults=0\/9/)
   assert.match(evidence, /cloudApiCalledCommandResults=0/)
   assert.match(evidence, /mutationPerformedCommandResults=0/)
   assert.ok(cloudInventory.blockers.includes("console_only_observation_not_strict_inventory"))
-  assert.ok(cloudInventory.blockers.includes("readonly_inventory_commands_executed=0/7"))
+  assert.ok(cloudInventory.blockers.includes("readonly_inventory_commands_executed=0/9"))
   assert.ok(!cloudInventory.blockers.some((item) => item.includes("commandResults[0]:executed=true")))
   assert.equal(report.summary.cloudInventoryResults.observationSummary.safeConsoleOnly, true)
-  assert.equal(report.summary.cloudInventoryResults.observationSummary.consoleObservationOperations, 7)
+  assert.equal(report.summary.cloudInventoryResults.observationSummary.consoleObservationOperations, 9)
   assert.equal(report.summary.cloudInventoryResults.observationSummary.executedCommandResults, 0)
   assert.equal(report.summary.cloudInventoryResults.observationSummary.cloudApiCalledCommandResults, 0)
-  assert.match(markdownOutput, /Cloud inventory console-only: safe true, console observations 7\/7, executed commands 0\/7, cloud API calls 0/)
+  assert.match(markdownOutput, /Cloud inventory console-only: safe true, console observations 9\/9, executed commands 0\/9, cloud API calls 0/)
   assert.match(markdownOutput, /safeConsoleOnly=true/)
   assert.doesNotMatch(output + markdownOutput, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output + markdownOutput, /LTAI[A-Za-z0-9]{12,}/)

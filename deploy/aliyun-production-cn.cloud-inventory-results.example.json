@@ -168,6 +168,52 @@
         "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps"
       ],
       "evidence": "TODO_NON_SECRET_CERT_EVIDENCE"
+    },
+    {
+      "id": "I08_RDS_POSTGRES",
+      "title": "RDS PostgreSQL production-cn data-layer inventory",
+      "product": "rds",
+      "readOnly": true,
+      "status": "pending",
+      "commandResults": [
+        {
+          "command": "aliyun rds DescribeDBInstances --RegionId cn-hangzhou --Engine PostgreSQL",
+          "executed": false,
+          "exitStatus": null,
+          "cloudApiCalled": false,
+          "mutationPerformed": false,
+          "observedAt": "TODO_YYYY-MM-DDTHH:mm:ss+08:00",
+          "outputSummary": "TODO_NON_SECRET_RESULT_SUMMARY",
+          "evidence": "TODO_NON_SECRET_EVIDENCE_HANDLE"
+        }
+      ],
+      "writesTo": [
+        "release artifacts -> bridgeDataLayer.databaseUrlCnStatus"
+      ],
+      "evidence": "TODO_NON_SECRET_RDS_POSTGRES_EVIDENCE"
+    },
+    {
+      "id": "I09_TAIR_REDIS",
+      "title": "Redis/Tair production-cn cache inventory",
+      "product": "r-kvstore",
+      "readOnly": true,
+      "status": "pending",
+      "commandResults": [
+        {
+          "command": "aliyun r-kvstore DescribeInstances --RegionId cn-hangzhou",
+          "executed": false,
+          "exitStatus": null,
+          "cloudApiCalled": false,
+          "mutationPerformed": false,
+          "observedAt": "TODO_YYYY-MM-DDTHH:mm:ss+08:00",
+          "outputSummary": "TODO_NON_SECRET_RESULT_SUMMARY",
+          "evidence": "TODO_NON_SECRET_EVIDENCE_HANDLE"
+        }
+      ],
+      "writesTo": [
+        "release artifacts -> bridgeDataLayer.redisUrlCnStatus"
+      ],
+      "evidence": "TODO_NON_SECRET_TAIR_REDIS_EVIDENCE"
     }
   ]
 }
