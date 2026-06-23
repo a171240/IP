@@ -212,6 +212,7 @@ function renderMarkdown(audit) {
   const provisioningPlan = audit.checks.provisioningPlan
   const actionAuthorization = audit.checks.actionAuthorization
   const completionAudit = audit.checks.completionAudit
+  const blockerBrief = audit.checks.blockerBrief
   const evidenceWriteback = audit.checks.evidenceWriteback
   const wechatOpenMobileAppPackage = audit.checks.wechatOpenMobileAppPackage
   const appleTeamAasaPackage = audit.checks.appleTeamAasaPackage
@@ -269,6 +270,7 @@ function renderMarkdown(audit) {
     `- actionAuthorization: ${actionAuthorization.summary.actions} actions, ${actionAuthorization.summary.actionTimeConfirmationRequired.length} action-time confirmations`,
     `- provisioningPlan: ${provisioningPlan.summary.readyToStartPhases.length}/${provisioningPlan.summary.phases} phases ready to start, executionMode ${provisioningPlan.executionMode}`,
     `- completionAudit: ${completionAudit.verdict}, complete ${completionAudit.complete === true}, proved ${completionAudit.summary.proved}/${completionAudit.summary.requirements}`,
+    `- blockerBrief: requiredEnv ${blockerBrief.summary.requiredEnv}, immediate packets ${blockerBrief.summary.immediateAuthorizationPackets.join(", ") || "none"}`,
     `- evidenceWriteback: ${evidenceWriteback.summary.readyFiles}/${evidenceWriteback.summary.files} files ready, gaps ${evidenceWriteback.summary.totalGaps}`,
     `- cloudConfirmations: ${cloudConfirmations?.ready ? "ready" : "not ready"}`,
     `- cloudConfirmationsCheck: template ${cloudConfirmationsCheck?.template?.ready ? "ready" : "not ready"}, local ${cloudConfirmationsCheck?.local?.ready ? "ready" : "not ready"}`,
@@ -608,6 +610,30 @@ function renderMarkdown(audit) {
     ...(completionAudit.requirements?.length
       ? completionAudit.requirements.map((item) => `- ${item.id}: ${item.status}${item.blockers?.length ? ` (${item.blockers.join(", ")})` : ""}`)
       : ["- none"]),
+    "",
+    "## 当前阻塞简报",
+    "",
+    `- json: ${audit.outputFiles.blockerBriefJson}`,
+    `- markdown: ${audit.outputFiles.blockerBriefMarkdown}`,
+    `- ok: ${blockerBrief.ok === true}`,
+    `- verdict: ${blockerBrief.verdict}`,
+    `- canDeployNow: ${blockerBrief.canDeployNow === true}`,
+    `- containsValues: ${blockerBrief.containsValues === true}`,
+    `- mutationPerformed: ${blockerBrief.mutationPerformed === true}`,
+    `- requiredEnv: ${blockerBrief.summary.requiredEnv}`,
+    `- requiredBlocking: ${blockerBrief.summary.requiredBlocking.join(", ") || "none"}`,
+    `- cloudConfirmationsReady: ${blockerBrief.summary.cloudConfirmationsReady}`,
+    `- sensitiveBlocked: ${blockerBrief.summary.sensitiveBlocked}`,
+    `- immediateAuthorizationPackets: ${blockerBrief.summary.immediateAuthorizationPackets.join(", ") || "none"}`,
+    `- cloudInventoryStrictReady: ${blockerBrief.summary.cloudInventoryStrictReady}`,
+    `- canReadCloudNow: ${blockerBrief.summary.canReadCloudNow}`,
+    `- cliConfigProbeFailureCategory: ${blockerBrief.summary.cliConfigProbeFailureCategory || "none"}`,
+    ...(blockerBrief.immediateAuthorizationPackets?.length
+      ? blockerBrief.immediateAuthorizationPackets.map((item) => `- ${item.packetId}: ${item.minimumUserPhrase}`)
+      : ["- immediateAuthorizationPackets: none"]),
+    ...(blockerBrief.requiredEnvBlockers?.length
+      ? blockerBrief.requiredEnvBlockers.map((item) => `- ${item.name}: ${item.status} -> ${item.importTarget}`)
+      : ["- requiredEnvBlockers: none"]),
     "",
     "## 本地证据回填清单",
     "",
@@ -1019,6 +1045,8 @@ function main() {
   const actionAuthorizationMarkdownPath = resolve(args.outDir, "action-authorization.md")
   const completionAuditJsonPath = resolve(args.outDir, "completion-audit.json")
   const completionAuditMarkdownPath = resolve(args.outDir, "completion-audit.md")
+  const blockerBriefJsonPath = resolve(args.outDir, "blocker-brief.json")
+  const blockerBriefMarkdownPath = resolve(args.outDir, "blocker-brief.md")
   const evidenceWritebackJsonPath = resolve(args.outDir, "evidence-writeback.json")
   const evidenceWritebackMarkdownPath = resolve(args.outDir, "evidence-writeback.md")
   const wechatOpenMobileAppPackageJsonPath = resolve(args.outDir, "wechat-open-mobile-app-package.json")
@@ -1119,6 +1147,16 @@ function main() {
     completionAuditJsonPath,
     "--markdown",
     completionAuditMarkdownPath,
+  ])
+  const blockerBrief = runJson("blocker_brief", [
+    "scripts/summarize-aliyun-blocker-brief.mjs",
+    "--env-file",
+    args.envFile,
+    ...(args.cloudConfirmationsFile ? ["--cloud-confirmations", args.cloudConfirmationsFile] : []),
+    "--out",
+    blockerBriefJsonPath,
+    "--markdown",
+    blockerBriefMarkdownPath,
   ])
   const evidenceWriteback = runJson("evidence_writeback", [
     "scripts/generate-aliyun-evidence-writeback-checklist.mjs",
@@ -1222,6 +1260,7 @@ function main() {
       provisioningPlan,
       actionAuthorization,
       completionAudit,
+      blockerBrief,
       evidenceWriteback,
       wechatOpenMobileAppPackage,
       appleTeamAasaPackage,
@@ -1275,6 +1314,8 @@ function main() {
       actionAuthorizationMarkdown: actionAuthorizationMarkdownPath,
       completionAuditJson: completionAuditJsonPath,
       completionAuditMarkdown: completionAuditMarkdownPath,
+      blockerBriefJson: blockerBriefJsonPath,
+      blockerBriefMarkdown: blockerBriefMarkdownPath,
       evidenceWritebackJson: evidenceWritebackJsonPath,
       evidenceWritebackMarkdown: evidenceWritebackMarkdownPath,
       wechatOpenMobileAppPackageJson: wechatOpenMobileAppPackageJsonPath,
@@ -1557,6 +1598,25 @@ function main() {
       canStartNowAuthorizationPackets: completionAudit.summary.canStartNowAuthorizationPackets,
       nextActionTimeConfirmations: completionAudit.summary.nextActionTimeConfirmations || [],
       requirementStatuses: (completionAudit.requirements || []).map((item) => `${item.id}:${item.status}`),
+    },
+    blockerBrief: {
+      report: audit.outputFiles.blockerBriefJson,
+      markdown: audit.outputFiles.blockerBriefMarkdown,
+      ok: blockerBrief.ok === true,
+      verdict: blockerBrief.verdict,
+      canDeployNow: blockerBrief.canDeployNow === true,
+      containsValues: blockerBrief.containsValues === true,
+      mutationPerformed: blockerBrief.mutationPerformed === true,
+      requiredEnv: blockerBrief.summary.requiredEnv,
+      requiredBlocking: blockerBrief.summary.requiredBlocking,
+      cloudConfirmationsReady: blockerBrief.summary.cloudConfirmationsReady,
+      operatorTasksReady: blockerBrief.summary.operatorTasksReady,
+      sensitiveBlocked: blockerBrief.summary.sensitiveBlocked,
+      immediateAuthorizationPackets: blockerBrief.summary.immediateAuthorizationPackets,
+      cloudInventoryStrictReady: blockerBrief.summary.cloudInventoryStrictReady,
+      canReadCloudNow: blockerBrief.summary.canReadCloudNow === true,
+      cliConfigProbeFailureCategory: blockerBrief.summary.cliConfigProbeFailureCategory,
+      requiredEnvBlockers: blockerBrief.requiredEnvBlockers.map((item) => `${item.name}:${item.status}:${item.importTarget}`),
     },
     evidenceWriteback: {
       report: audit.outputFiles.evidenceWritebackJson,
