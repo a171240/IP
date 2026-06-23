@@ -8,7 +8,7 @@
 
 2026-06-22 17:31 CST 复核：现在仍不能部署。`corepack pnpm aliyun:user:actions` 当前为 `ready 0/9`，`corepack pnpm aliyun:resources:matrix` 当前为阿里云资源 `ready 0/7`。本机和 Vercel 可确认的是：本地后端容器镜像存在，APP API 桥接路由和本地 smoke 通过，Vercel production 只能提供旧后端变量名来源；阿里云 production-cn 仍缺云侧资源确认、密钥导入和移动 App 登录凭证。
 
-2026-06-24 CST 复核：现在仍不能部署。`corepack pnpm aliyun:user:actions` 当前为 `ready 0/10`，新增阻塞项是 Android release signing 与微信开放平台 Android 应用签名；`corepack pnpm aliyun:resources:matrix` 当前仍为阿里云资源 `ready 0/7`。本机 required env 仍是 `24/26` ready，缺 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；云资源侧仍缺 SAE、ACR、api-cn/assets-cn DNS/HTTPS/ICP、OSS RAM/STS、环境变量导入和 SLS 告警的最终确认。
+2026-06-24 CST 复核：现在仍不能部署。`corepack pnpm aliyun:user:actions` 当前为 `ready 0/10`，新增阻塞项是 Android release signing 与微信开放平台 Android 应用签名；`corepack pnpm aliyun:resources:matrix` 当前仍为阿里云资源 `ready 0/7`。本机 required env 仍是 `24/26` ready，缺 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；CloudShell 只读盘点证据已落地并通过 strict 校验，但云资源侧仍缺 SAE、ACR、api-cn/assets-cn DNS/HTTPS/ICP、OSS RAM/STS、环境变量导入和 SLS 告警的最终确认。
 
 2026-06-22 20:37 CST 复核：本机已通过 Homebrew 安装阿里云 CLI，`aliyun version` 为 `3.3.23`，路径为 `/opt/homebrew/bin/aliyun`。`corepack pnpm aliyun:cloud:access` 当前不再报 `aliyun_cli_missing`，但仍报 `aliyun_cli_config_missing_or_unread` 与 `cloudshell_cli_config_missing_or_unread`；脚本未读取任何配置文件内容、未调用云 API、未创建或修改阿里云资源。该状态只表示本机具备后续只读 inventory 的 CLI 前置工具，不表示阿里云资源 ready。
 
@@ -16,7 +16,9 @@
 
 2026-06-22 21:08 CST 复核：已新增 `corepack pnpm aliyun:cloud:inventory-results` 和严格版 `corepack pnpm aliyun:cloud:inventory-results:strict`。该命令只校验 `deploy/aliyun-production-cn.cloud-inventory-results.local.json` 里的只读盘点结果摘要，不运行 Aliyun CLI、不调用云 API、不读取凭据。当前 local 结果文件尚未生成，所以 `inventory-results` 只作为缺口报告；后续 CLI/Cloud Shell 盘点完成后，把非密钥摘要写入该 ignored local 文件，再用 strict 校验通过后，才能把最终布尔证据同步到 `cloud-confirmations.local.json`。
 
-2026-06-24 CST 复核：`deploy/aliyun-production-cn.cloud-inventory-results.local.json` 已存在，但当前只证明控制台观察记录已落地，不是严格 CLI/Cloud API 盘点完成。`cloudInventoryResults` 当前为 `readonly_inventory_strict_ready=0/7`、`readonly_inventory_commands_executed=0/7`、`readonly_inventory_cloud_api_called=0/7`、`console_only_observation_not_strict_inventory`；因此它只能作为安全观察证据，不能作为可部署证明。
+2026-06-24 CST 复核：`deploy/aliyun-production-cn.cloud-inventory-results.local.json` 已存在，且已由 CloudShell Aliyun CLI 只读命令补齐。`cloudInventoryResults` 当前为 `localReady=true`、`readyLocalOperations=7/7`、`executedCommandResults=9/9`、`cloudApiCalledCommandResults=9/9`、`mutationPerformedCommandResults=0`；这证明只读盘点已完成，但不等于云资源可部署，因为 `cloudConfirmations` 仍为 `0/7` ready。
+
+2026-06-24 数据层只读盘点补充：`cn-hangzhou` 下 RDS PostgreSQL 实例数为 0，RDS 全量实例数为 0，Redis/Tair 实例数为 0。第一版 APP production-cn 后端仍是阿里云 API 容器 + 现有 Supabase 的桥接部署；`DATABASE_URL_CN` / `REDIS_URL_CN` 可后置，不能把它们填入就等同于完成完整国内数据层迁移。
 
 当前 Vercel production 只读覆盖检查 `corepack pnpm aliyun:vercel-env:coverage` 显示 required `17/26` 已存在，缺 `APP_ENV`、`APP_REGION`、`APP_API_BASE_URL`、`APP_ASSET_BASE_URL`、`NEXT_PUBLIC_SITE_URL`、`PRIVACY_POLICY_URL`、`TERMS_URL`、`WECHAT_OPEN_APP_ID`、`WECHAT_OPEN_APP_SECRET`。前 7 个是国内 APP/阿里云运行配置；后 2 个必须等微信开放平台移动应用创建并审核通过后获得。
 
@@ -57,7 +59,17 @@
 | ACR 镜像仓库 | 阿里云控制台 -> 容器镜像服务 ACR -> 命名空间/仓库 | `deploy/aliyun-production-cn.image-publish.local.json` 非密钥证据；Docker credential helper 或 RAM | 认证信息是密钥 | 未确认 ready；企业版经济版 `cn-hangzhou` 1 个月候选报价已核到 `CNY 117.00` / `¥117.00`，购买前需用户对金额和规格动作确认 |
 | OSS Bucket | 阿里云控制台 -> OSS -> Bucket、地域、CORS、RAM 最小权限 | `ALIYUN_OSS_BUCKET`、`ALIYUN_OSS_REGION`、`SERVICE_RECORD_OSS_PREFIX`；密钥走 KMS/Secrets Manager | Bucket/Region 否，AccessKey Secret 是 | Bucket/CORS 已建；RAM 策略模板见 `deploy/aliyun-production-cn.oss-ram-policy.json`，AccessKey/Secret 仍未创建导入 |
 | SLS 日志 | 阿里云控制台 -> SLS -> Project/Logstore/告警 | `deploy/aliyun-production-cn.cloud-confirmations.local.json` 非密钥证据 | 否 | 已记录 project/logstore 非密钥证据，但 health/5xx 告警未配置，`slsAlerts.confirmed=false` |
-| RDS PostgreSQL | 阿里云控制台 -> RDS -> PostgreSQL 实例 | 后续 `DATABASE_URL_CN` 或等价连接串走 KMS/Secrets Manager | 是 | 第一版桥接部署不包含迁移，需用户确认实例/方案 |
+| RDS PostgreSQL | 阿里云控制台 -> RDS -> PostgreSQL 实例 | 后续 `DATABASE_URL_CN` 或等价连接串走 KMS/Secrets Manager | 是 | CloudShell 只读盘点显示 `cn-hangzhou` 实例数 0；第一版桥接部署不包含迁移，完整 production-cn 数据层需另开方案 |
+| Redis/Tair | 阿里云控制台 -> Tair/Redis -> 实例 | 后续 `REDIS_URL_CN` 或等价连接串走 KMS/Secrets Manager | 是 | CloudShell 只读盘点显示 `cn-hangzhou` 实例数 0；第一版桥接部署可后置 |
+
+## 数据层可后置变量
+
+第一版 APP production-cn 目标是把 API 容器部署到阿里云，数据层暂时沿用现有 Supabase。下面两个变量只属于完整 production-cn 数据层迁移，不是第一版桥接部署的立即阻塞项。
+
+| 变量 | 获取位置 | 导入位置 | 密钥 | 当前状态 |
+| --- | --- | --- | --- | --- |
+| `DATABASE_URL_CN` | 创建或确认阿里云 RDS PostgreSQL 后生成连接串 | 阿里云 SAE secret/KMS/Secrets Manager | 是 | `todo`；当前 `cn-hangzhou` 无 RDS 实例，且后端仍以 Supabase SDK 为主 |
+| `REDIS_URL_CN` | 创建或确认阿里云 Tair/Redis 后生成连接串 | 阿里云 SAE secret/KMS/Secrets Manager | 是 | `todo`；当前 `cn-hangzhou` 无 Redis/Tair 实例 |
 
 ## 后端密钥
 
