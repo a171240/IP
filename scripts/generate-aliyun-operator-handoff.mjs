@@ -430,6 +430,8 @@ function buildHandoff({
   cloudConfirmationsCheck,
   imagePublishPlan,
   consoleRunbook,
+  sensitiveBlockers,
+  resourcesMatrix,
   vercelEnvCoverage,
 }) {
   const tasks = operatorTasks.tasks || []
@@ -453,6 +455,7 @@ function buildHandoff({
     "T07_ALIYUN_SLS_ALERTS",
     "T08_POSTDEPLOY_REMOTE_SMOKE",
   ]
+  const operatorClosureBrief = buildOperatorClosureBrief(sensitiveBlockers, resourcesMatrix)
 
   return {
     generatedAt: new Date().toISOString(),
@@ -484,6 +487,7 @@ function buildHandoff({
     },
     cloudAccess: compactCloudAccess(cloudAccess),
     localEvidenceGaps: buildLocalEvidenceGaps({ args, status, cloudAccess, cloudConfirmationsCheck, imagePublishPlan }),
+    operatorClosureBrief,
     vercelEnvCoverage: compactVercelEnvCoverage(vercelEnvCoverage),
     bridgeDataLayer: status.summary?.bridgeDataLayer || status.localReadiness?.bridgeDataLayer || {
       current: "Supabase",
@@ -571,6 +575,47 @@ function buildLocalEvidenceGaps({ args, status, cloudAccess, cloudConfirmationsC
       localDockerImage: imagePublishPlan.localDockerImage?.status || "unknown",
       gaps: buildImagePublishGaps(imagePublishPlan, cloudAccess),
     },
+  }
+}
+
+function buildOperatorClosureBrief(sensitiveBlockers = {}, resourcesMatrix = {}) {
+  const credential = sensitiveBlockers.credentialInterventionBrief
+    || sensitiveBlockers.summary?.credentialInterventionBrief
+    || {}
+  const resourceEvidence = resourcesMatrix.resourceEvidenceBrief || {}
+  return {
+    blockedCredentialCount: credential.blockedCredentialCount || 0,
+    blockedCredentialNames: credential.blockedCredentialNames || [],
+    readySecretEnvVariableCount: credential.readySecretEnvVariableCount || 0,
+    readySecretEnvVariableNames: credential.readySecretEnvVariableNames || [],
+    credentialGroups: (credential.groups || []).map((group) => ({
+      category: group.category,
+      actionId: group.actionId,
+      status: group.status,
+      blockedCredentialNames: group.blockedCredentialNames || [],
+      readySecretEnvVariableNames: group.readySecretEnvVariableNames || [],
+      obtainFrom: group.obtainFrom,
+      writeTargets: group.writeTargets || [],
+      verifyCommands: group.verifyCommands || [],
+    })),
+    resourceEvidenceReady: `${resourceEvidence.ready || 0}/${resourceEvidence.total || 0}`,
+    blockedResourceEvidenceIds: resourceEvidence.blockedIds || [],
+    blockedResourceEvidence: (resourceEvidence.blockedResourceEvidence || []).map((item) => ({
+      id: item.id,
+      status: item.status,
+      observedStatus: item.observedStatus,
+      observedReadiness: item.observedReadiness,
+      requiredAuthorizationPackets: item.requiredAuthorizationPackets || [],
+      consoleTaskIds: item.consoleTaskIds || [],
+      missingEvidence: item.missingEvidence || [],
+      writeTargets: item.writeTargets || [],
+      verifyCommands: item.verifyCommands || [],
+      nextEvidenceAction: item.nextEvidenceAction,
+    })),
+    valueHandlingRules: [
+      ...((credential.valueHandlingRules || []).slice(0, 3)),
+      ...((resourceEvidence.valueHandlingRules || []).slice(0, 3)),
+    ],
   }
 }
 
@@ -840,6 +885,20 @@ function renderMarkdown(handoff) {
     `- ${handoff.currentAnswer}`,
     `- verdict: ${handoff.verdict}`,
     `- canDeployNow: ${handoff.canDeployNow}`,
+    `- blockedCredentialCount: ${handoff.operatorClosureBrief.blockedCredentialCount}`,
+    `- readySecretEnvVariableCount: ${handoff.operatorClosureBrief.readySecretEnvVariableCount}`,
+    `- resourceEvidenceReady: ${handoff.operatorClosureBrief.resourceEvidenceReady}`,
+    "",
+    "## 目标闭环证据简表",
+    "",
+    `- blockedCredentialNames: ${handoff.operatorClosureBrief.blockedCredentialNames.length ? handoff.operatorClosureBrief.blockedCredentialNames.join(", ") : "none"}`,
+    `- readySecretEnvVariableNames: ${handoff.operatorClosureBrief.readySecretEnvVariableNames.length ? handoff.operatorClosureBrief.readySecretEnvVariableNames.join(", ") : "none"}`,
+    `- blockedResourceEvidenceIds: ${handoff.operatorClosureBrief.blockedResourceEvidenceIds.length ? handoff.operatorClosureBrief.blockedResourceEvidenceIds.join(", ") : "none"}`,
+    "",
+    ...(handoff.operatorClosureBrief.blockedResourceEvidence.length
+      ? handoff.operatorClosureBrief.blockedResourceEvidence.map((item) =>
+        `- ${item.id}: observed=${item.observedStatus}/${item.observedReadiness}; packets=${item.requiredAuthorizationPackets.join(", ") || "none"}; tasks=${item.consoleTaskIds.join(", ") || "none"}; missing=${item.missingEvidence.slice(0, 4).join(", ") || "none"}`)
+      : ["- resourceEvidenceBlocked: none"]),
     "",
     "## 本地已经 ready",
     "",
@@ -1197,6 +1256,20 @@ function main() {
     "--cloud-confirmations",
     args.cloudConfirmationsFile,
   ])
+  const sensitiveBlockers = runJson("sensitive_blockers", [
+    resolve(BACKEND_ROOT, "scripts/summarize-aliyun-sensitive-blockers.mjs"),
+    "--env-file",
+    args.envFile,
+    "--cloud-confirmations",
+    args.cloudConfirmationsFile,
+  ])
+  const resourcesMatrix = runJson("resources_matrix", [
+    resolve(BACKEND_ROOT, "scripts/summarize-aliyun-resource-matrix.mjs"),
+    "--env-file",
+    args.envFile,
+    "--cloud-confirmations",
+    args.cloudConfirmationsFile,
+  ])
   const vercelEnvCoverage = runVercelEnvCoverage(args)
   const handoff = buildHandoff({
     args,
@@ -1207,6 +1280,8 @@ function main() {
     cloudConfirmationsCheck,
     imagePublishPlan,
     consoleRunbook,
+    sensitiveBlockers,
+    resourcesMatrix,
     vercelEnvCoverage,
   })
   const output = `${JSON.stringify(handoff, null, 2)}\n`

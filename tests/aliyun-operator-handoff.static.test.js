@@ -52,6 +52,11 @@ test("Aliyun operator handoff command is wired into scripts and local predeploy"
   assert.match(releaseArtifacts, /blockedByConsoleTaskDependencies/)
   assert.match(releaseArtifacts, /currentBrowserCanUseCurrentConsole/)
   assert.match(releaseArtifacts, /currentBrowserAliyunConsoleHostPaths/)
+  assert.match(releaseArtifacts, /operatorClosureBrief/)
+  assert.match(releaseArtifacts, /blockedCredentialCount/)
+  assert.match(releaseArtifacts, /readySecretEnvVariableCount/)
+  assert.match(releaseArtifacts, /resourceEvidenceReady/)
+  assert.match(releaseArtifacts, /blockedResourceEvidenceIds/)
 })
 
 test("Aliyun operator handoff maps ACR and SAE evidence gaps to the correct consoles", () => {
@@ -78,6 +83,21 @@ test("Aliyun operator handoff maps ACR and SAE evidence gaps to the correct cons
   const imagePullConfigured = byPath.get("runtime.imagePullConfigured")
 
   assert.equal(report.containsValues, false)
+  assert.equal(report.operatorClosureBrief.blockedCredentialCount, 8)
+  assert.equal(report.operatorClosureBrief.readySecretEnvVariableCount, 17)
+  assert.equal(report.operatorClosureBrief.resourceEvidenceReady, "0/7")
+  assert.ok(report.operatorClosureBrief.blockedCredentialNames.includes("WECHAT_OPEN_APP_SECRET"))
+  assert.ok(report.operatorClosureBrief.readySecretEnvVariableNames.includes("SUPABASE_SERVICE_ROLE_KEY"))
+  assert.ok(report.operatorClosureBrief.blockedResourceEvidenceIds.includes("R01_SAE_RUNTIME"))
+  assert.ok(report.operatorClosureBrief.blockedResourceEvidenceIds.includes("R06_ENV_IMPORT"))
+  assert.ok(report.operatorClosureBrief.credentialGroups.some((group) =>
+    group.category === "wechat_open_mobile_app" &&
+    group.blockedCredentialNames.includes("WECHAT_OPEN_APP_ID")
+  ))
+  assert.ok(report.operatorClosureBrief.blockedResourceEvidence.some((item) =>
+    item.id === "R02_ACR_IMAGE_REGISTRY" &&
+    item.requiredAuthorizationPackets.includes("P03_ACR_PURCHASE")
+  ))
   assert.equal(report.cloudAccess.currentBrowser.checked, true)
   assert.equal(typeof report.cloudAccess.currentBrowser.canUseCurrentConsole, "boolean")
   assert.equal(typeof report.cloudAccess.currentBrowser.aliyunConsoleTabCount, "number")
@@ -209,6 +229,12 @@ test("Aliyun operator handoff exposes console-only inventory observation summary
   assert.match(markdownOutput, /currentBrowserCanUseCurrentConsole/)
   assert.match(markdownOutput, /currentBrowserAliyunConsoleTabCount/)
   assert.match(markdownOutput, /currentBrowserCloudApiCalled: false/)
+  assert.match(markdownOutput, /目标闭环证据简表/)
+  assert.match(markdownOutput, /blockedCredentialCount: 8/)
+  assert.match(markdownOutput, /readySecretEnvVariableCount: 17/)
+  assert.match(markdownOutput, /resourceEvidenceReady: 0\/7/)
+  assert.match(markdownOutput, /WECHAT_OPEN_APP_SECRET/)
+  assert.match(markdownOutput, /R02_ACR_IMAGE_REGISTRY: observed=purchase_candidate_visible_not_purchased\/blocked/)
   assert.doesNotMatch(output + markdownOutput, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output + markdownOutput, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(output + markdownOutput, /:\/\/[^\s:@]+:[^\s@]+@/)
