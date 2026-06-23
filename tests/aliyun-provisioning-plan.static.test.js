@@ -2,6 +2,7 @@ const test = require("node:test")
 const assert = require("node:assert/strict")
 const { execFileSync } = require("node:child_process")
 const fs = require("node:fs")
+const os = require("node:os")
 const path = require("node:path")
 
 const root = process.cwd()
@@ -62,17 +63,35 @@ test("Aliyun provisioning plan renders phase order without executing cloud actio
   assert.ok(identifiers.explicitlyExcluded.some((item) => item.includes("不使用小程序 AppID")))
 
   const baseCloud = byId.get("PH02_BASE_CLOUD_RESOURCES")
+  const baseAcr = baseCloud.consoleTasks.find((item) => item.id === "C02_ACR_IMAGE_AND_PULL")
   assert.equal(baseCloud.canStartNow, true)
   assert.deepEqual(baseCloud.consoleTasks.map((item) => item.id), [
     "C02_ACR_IMAGE_AND_PULL",
     "C05_OSS_AUDIO_RAM_STS",
   ])
+  assert.equal(baseAcr.currentActionScope, "purchase_and_repository_only")
+  assert.ok(baseCloud.currentActionScopes.some((item) => (
+    item.taskId === "C02_ACR_IMAGE_AND_PULL" && item.scope === "purchase_and_repository_only"
+  )))
+  assert.ok(baseAcr.acceptanceEvidence.includes("acr.purchaseCandidate.confirmed=true"))
+  assert.ok(baseAcr.acceptanceEvidence.includes("acr.registryHost actual aliyuncs.com host"))
+  assert.ok(!baseAcr.acceptanceEvidence.includes("digestVerified=true"))
+  assert.ok(baseAcr.deferredActions.some((item) => item.includes("P04_ACR_IMAGE_AND_PULL")))
+  assert.ok(baseAcr.deferredActions.some((item) => item.includes("不执行 docker login/push")))
+  assert.ok(baseAcr.deferredActions.some((item) => item.includes("imagePushed=true")))
+  assert.ok(baseCloud.currentActionAcceptanceEvidence.includes("acr.registryHost actual aliyuncs.com host"))
+  assert.ok(baseCloud.deferredActions.some((item) => item.includes("runtime.imagePullConfigured=true")))
   assert.ok(baseCloud.completionEvidence.some((item) => item.includes("ACR")))
   assert.ok(baseCloud.completionEvidence.some((item) => item.includes("OSS")))
 
   const image = byId.get("PH03_IMAGE_PUSH_AND_PULL")
+  const imagePacket = image.authorizationPackets.find((item) => item.packetId === "P04_ACR_IMAGE_AND_PULL")
   assert.equal(image.canStartNow, false)
   assert.ok(image.blockingDependencies.includes("P03_ACR_PURCHASE"))
+  assert.ok(imagePacket.completionEvidence.includes("acr.imagePushed=true"))
+  assert.ok(imagePacket.completionEvidence.includes("runtime.imagePullConfigured=true"))
+  assert.ok(imagePacket.verifyCommands.includes("corepack pnpm aliyun:image:plan:strict"))
+  assert.ok(image.deferredActions.some((item) => item.includes("P04_ACR_IMAGE_AND_PULL")))
   assert.ok(image.explicitlyExcluded.some((item) => item.includes("registry username/password")))
 
   const env = byId.get("PH04_ENV_IMPORT")
@@ -90,4 +109,37 @@ test("Aliyun provisioning plan renders phase order without executing cloud actio
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
+})
+
+test("Aliyun provisioning plan markdown preserves ACR current scope and deferred image actions", () => {
+  const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-provisioning-plan-"))
+  const markdownPath = path.join(tmpdir, "provisioning-plan.md")
+  const output = execFileSync(process.execPath, [
+    "scripts/generate-aliyun-provisioning-plan.mjs",
+    "--markdown",
+    markdownPath,
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 50,
+  })
+  const markdown = fs.readFileSync(markdownPath, "utf8")
+
+  assert.match(markdown, /Current action scopes: C02_ACR_IMAGE_AND_PULL=purchase_and_repository_only/)
+  assert.match(markdown, /Current action acceptance evidence:/)
+  assert.match(markdown, /acr\.registryHost actual aliyuncs\.com host/)
+  assert.match(markdown, /Deferred actions:/)
+  assert.match(markdown, /P04_ACR_IMAGE_AND_PULL/)
+  assert.match(markdown, /不执行 docker login\/push/)
+  assert.match(markdown, /imagePushed=true/)
+  const baseCloudSection = markdown
+    .split("### PH02_BASE_CLOUD_RESOURCES")[1]
+    .split("### PH03_IMAGE_PUSH_AND_PULL")[0]
+  const acceptanceBlock = baseCloudSection
+    .split("- Current action acceptance evidence:")[1]
+    .split("- Deferred actions:")[0]
+  assert.doesNotMatch(acceptanceBlock, /digestVerified=true/)
+  assert.doesNotMatch(output + markdown, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(output + markdown, /LTAI[A-Za-z0-9]{12,}/)
+  assert.doesNotMatch(output + markdown, /:\/\/[^\s:@]+:[^\s@]+@/)
 })

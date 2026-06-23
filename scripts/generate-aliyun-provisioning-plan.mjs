@@ -200,6 +200,7 @@ function buildPlan(args) {
       userActionReady: consoleRunbook.summary?.userActionReady || "unknown",
     },
     phases,
+    readyActionPackets: (consoleRunbook.readyActionPackets || []).map(compactReadyActionPacket),
     writeTargets: [
       "deploy/aliyun-production-cn.cloud-confirmations.local.json",
       "deploy/aliyun-production-cn.cloud-inventory-results.local.json",
@@ -246,6 +247,7 @@ function buildPhase(phase, packetsById, consoleTasksById) {
     && consoleTasks.every((item) => item.canStartNow === true)
     && missingPackets.length === 0
     && missingConsoleTasks.length === 0
+  const compactedConsoleTasks = consoleTasks.map(compactConsoleTask)
   return {
     id: phase.id,
     title: phase.title,
@@ -253,7 +255,15 @@ function buildPhase(phase, packetsById, consoleTasksById) {
     canStartNow,
     requiresActionTimeConfirmation: true,
     authorizationPackets: packets.map(compactPacket),
-    consoleTasks: consoleTasks.map(compactConsoleTask),
+    consoleTasks: compactedConsoleTasks,
+    currentActionScopes: compactedConsoleTasks
+      .filter((item) => item.currentActionScope)
+      .map((item) => ({
+        taskId: item.id,
+        scope: item.currentActionScope,
+      })),
+    currentActionAcceptanceEvidence: uniqueStrings(compactedConsoleTasks.flatMap((item) => item.acceptanceEvidence || [])),
+    deferredActions: uniqueStrings(compactedConsoleTasks.flatMap((item) => item.deferredActions || [])),
     blockingDependencies,
     currentBlockers,
     allowedActions: uniqueStrings(packets.flatMap((item) => item.allowedActions || [])),
@@ -274,10 +284,19 @@ function compactPacket(packet) {
     dependsOn: packet.dependsOn || [],
     blockingDependencies: packet.blockingDependencies || [],
     minimumUserPhrase: packet.minimumUserPhrase,
+    allowedActions: packet.allowedActions || [],
+    explicitlyExcluded: packet.explicitlyExcluded || [],
+    completionEvidence: packet.completionEvidence || [],
+    writeTargets: packet.writeTargets || [],
+    verifyCommands: packet.verifyCommands || [],
+    nonSecretEvidenceOnly: packet.nonSecretEvidenceOnly === true,
   }
 }
 
 function compactConsoleTask(task) {
+  const acceptanceEvidence = task.currentActionAcceptanceEvidence?.length
+    ? task.currentActionAcceptanceEvidence
+    : task.completionEvidence || []
   return {
     id: task.id,
     title: task.title,
@@ -286,7 +305,32 @@ function compactConsoleTask(task) {
     dependsOn: task.dependsOn || [],
     blockingDependencies: task.blockingDependencies || [],
     consolePath: task.consolePath,
+    requiresActionTimeConfirmation: task.requiresActionTimeConfirmation === true,
+    actionTimeConfirmationReason: task.actionTimeConfirmationReason || "",
+    currentActionScope: task.currentActionScope || "",
     targetFields: task.targetFields || [],
+    acceptanceEvidence,
+    completionEvidence: task.completionEvidence || [],
+    deferredActions: task.deferredActions || [],
+    writeTargets: task.writeTargets || [],
+    verifyCommands: task.verifyCommands || [],
+    forbidden: task.forbidden || [],
+  }
+}
+
+function compactReadyActionPacket(packet) {
+  return {
+    taskId: packet.taskId,
+    title: packet.title,
+    currentActionScope: packet.currentActionScope || "full_task",
+    minimumAuthorizationPhrase: packet.minimumAuthorizationPhrase,
+    actionTimeConfirmationReason: packet.actionTimeConfirmationReason || "",
+    acceptanceEvidence: packet.acceptanceEvidence || [],
+    deferredActions: packet.deferredActions || [],
+    writeTargets: packet.writeTargets || [],
+    verifyCommands: packet.verifyCommands || [],
+    forbidden: packet.forbidden || [],
+    nonSecretEvidenceOnly: packet.nonSecretEvidenceOnly === true,
   }
 }
 
@@ -338,9 +382,14 @@ function renderMarkdown(report) {
       `- Requires action-time confirmation: ${phase.requiresActionTimeConfirmation}`,
       `- Authorization packets: ${phase.authorizationPackets.map((item) => item.packetId).join(", ") || "none"}`,
       `- Console tasks: ${phase.consoleTasks.map((item) => item.id).join(", ") || "none"}`,
+      `- Current action scopes: ${phase.currentActionScopes.length ? phase.currentActionScopes.map((item) => `${item.taskId}=${item.scope}`).join(", ") : "none"}`,
       `- Blocking dependencies: ${phase.blockingDependencies.length ? phase.blockingDependencies.join(", ") : "none"}`,
       `- Current blockers: ${phase.currentBlockers.length ? phase.currentBlockers.join("; ") : "none"}`,
       `- Verify commands: ${phase.verifyCommands.length ? phase.verifyCommands.map((command) => `\`${command}\``).join("; ") : "none"}`,
+      "- Current action acceptance evidence:",
+      ...(phase.currentActionAcceptanceEvidence.length ? phase.currentActionAcceptanceEvidence.map((item) => `  - ${item}`) : ["  - none"]),
+      "- Deferred actions:",
+      ...(phase.deferredActions.length ? phase.deferredActions.map((item) => `  - ${item}`) : ["  - none"]),
       "- Completion evidence:",
       ...phase.completionEvidence.map((item) => `  - ${item}`),
       "- Explicitly excluded:",
