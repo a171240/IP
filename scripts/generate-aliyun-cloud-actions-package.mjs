@@ -116,6 +116,7 @@ function buildPackage(args) {
   const phases = (provisioningPlan.phases || []).map(compactPhase)
   const firstCloudPhase = phases.find((item) => item.id === "PH02_BASE_CLOUD_RESOURCES") || null
   const cliConfigProbeFailureCategory = cloudAccess.cli?.configProbe?.failureCategory || cloudAccess.cliConfigProbeFailureCategory || "none"
+  const readonlyInventoryUnblock = buildReadonlyInventoryUnblock(cloudAccess, cliConfigProbeFailureCategory)
   const currentBlockers = uniqueStrings([
     ...(blockerBrief.summary?.requiredBlocking || []).map((name) => `requiredEnv:${name}`),
     ...(blockedConsoleTasks || []).map((item) => `blockedConsoleTask:${item.id}`),
@@ -152,6 +153,7 @@ function buildPackage(args) {
     cloudConsoleAuthorizationPackets: cloudConsolePackets.map(compactPacket),
     externalAppPrerequisitePackets: externalAppPackets.map(compactPacket),
     phaseOrder: phases,
+    readonlyInventoryUnblock,
     cloudAccess: {
       canReadCloudNow: cloudAccess.canReadCloudNow === true,
       cliAvailable: cloudAccess.cli?.available === true || cloudAccess.cliAvailable === true,
@@ -200,6 +202,65 @@ function buildPackage(args) {
     report.containsValues = true
   }
   return report
+}
+
+function buildReadonlyInventoryUnblock(cloudAccess, cliConfigProbeFailureCategory) {
+  const workbenchTerminal = cloudAccess.terminalAccess?.workbenchTerminal || {}
+  return {
+    status: cloudAccess.canReadCloudNow === true ? "ready_to_execute_allowlisted_readonly_inventory" : "blocked_until_cli_or_cloudshell_identity_ready",
+    currentBlocker: cliConfigProbeFailureCategory || "unknown",
+    whyConsoleLoginIsNotEnough: "浏览器控制台登录、ECS Workbench 终端可见、或 OSS/SLS 页面可见，只能作为人工观察证据；严格云证据必须来自 allowlisted Aliyun CLI/CloudShell List/Describe/stat/get 命令结果，且不记录原始敏感输出。",
+    minimumAuthorizationPhrase: "授权在本机 Aliyun CLI 或阿里云 CloudShell 中配置只读身份，并只运行 allowlisted production-cn inventory 命令；不输出 AccessKeySecret、STS token、cookie、registry password 或证书私钥。",
+    allowedIdentityPaths: [
+      {
+        id: "local_aliyun_cli",
+        title: "本机 Aliyun CLI default profile",
+        currentStatus: cloudAccess.cli?.configProbe?.ready === true ? "ready" : cliConfigProbeFailureCategory || "not_ready",
+        allowedActions: [
+          "使用阿里云官方 CLI 登录或受控 RAM/STS 只读凭据配置 default profile。",
+          "region 使用 cn-hangzhou。",
+          "配置完成后只运行本仓库 inventory runner 生成非密钥摘要。",
+        ],
+      },
+      {
+        id: "aliyun_cloudshell",
+        title: "阿里云 CloudShell 登录身份",
+        currentStatus: cloudAccess.cloudShellObservation?.ready === true ? "ready" : "not_ready_or_unread",
+        allowedActions: [
+          "在 CloudShell 中运行 inventory 计划中的 List/Describe/stat/get 类命令。",
+          "只抄录资源名、状态、digest、时间戳和非密钥 evidence handle。",
+          "如果 CloudShell 无法访问本仓库，就回到本机手工回填 ignored 的 .local.json。",
+        ],
+      },
+      {
+        id: "ecs_workbench_terminal",
+        title: "ECS Workbench 终端",
+        currentStatus: workbenchTerminal.connected === true ? "connected_not_inventory_ready" : "not_ready",
+        allowedActions: [
+          "只把连接状态作为人工观察证据。",
+          "只有确认该终端有 Aliyun CLI 只读身份，并运行 allowlisted inventory 命令后，才可回填严格证据。",
+        ],
+      },
+    ],
+    unlockCommands: [
+      "corepack pnpm aliyun:cloud:access",
+      "MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1 corepack pnpm aliyun:cloud:inventory-run -- --execute-readonly --write-local deploy/aliyun-production-cn.cloud-inventory-results.local.json",
+      "corepack pnpm aliyun:cloud:inventory-results:strict",
+      "corepack pnpm aliyun:evidence:writeback -- --skip-vercel-env-coverage",
+      "corepack pnpm aliyun:completion:audit",
+    ],
+    expectedNonSecretEvidenceAfterUnlock: [
+      "executedCommandResults > 0",
+      "cloudApiCalledCommandResults > 0",
+      "mutationPerformedCommandResults = 0",
+      "each command output stored only as summary counts, exit code, sha256 fingerprint, timestamp, and evidence handle",
+    ],
+    forbidden: [
+      "不要把 AccessKeySecret、STS token、cookie、registry password、RAM Secret、Supabase service role key 或证书私钥写入 JSON、Markdown、Docker 镜像、截图、聊天或 git。",
+      "不要运行 Create/Update/Delete/Deploy/Start/Stop/GetAuthorizationToken/docker login/docker push/oss cp/oss cat/oss sign。",
+      "不要把控制台页面可见或 Workbench 已连接误标记成 cloudInventory strict ready。",
+    ],
+  }
 }
 
 function compactConsoleTask(task) {
@@ -283,6 +344,17 @@ function renderMarkdown(report) {
     `- containsValues: ${report.containsValues}`,
     `- mutationPerformed: ${report.mutationPerformed}`,
     `- cloudApiCalled: ${report.cloudApiCalled}`,
+    "",
+    "## 只读盘点解锁",
+    "",
+    `- status: ${report.readonlyInventoryUnblock.status}`,
+    `- currentBlocker: ${report.readonlyInventoryUnblock.currentBlocker}`,
+    `- minimumAuthorizationPhrase: ${report.readonlyInventoryUnblock.minimumAuthorizationPhrase}`,
+    `- whyConsoleLoginIsNotEnough: ${report.readonlyInventoryUnblock.whyConsoleLoginIsNotEnough}`,
+    "- unlockCommands:",
+    ...report.readonlyInventoryUnblock.unlockCommands.map((command) => `  - ${command}`),
+    "- forbidden:",
+    ...report.readonlyInventoryUnblock.forbidden.map((item) => `  - ${item}`),
     "",
     "## 当前可先做",
     "",
