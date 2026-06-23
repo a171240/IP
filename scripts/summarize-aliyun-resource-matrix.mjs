@@ -391,6 +391,7 @@ function buildResourceEvidenceBrief(resources) {
       observedReadiness: item.observedReadiness,
       requiredAuthorizationPackets: item.requiredAuthorizationPackets,
       consoleTaskIds: item.consoleTaskIds,
+      currentEvidence: item.currentEvidence,
       missingEvidence: item.missingEvidence,
       writeTargets: item.writeTargets,
       verifyCommands: item.verifyCommands,

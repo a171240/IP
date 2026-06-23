@@ -36,6 +36,8 @@ test("Aliyun evidence writeback command is wired into scripts, predeploy, deploy
   assert.match(releaseArtifacts, /evidence-writeback\.md/)
   assert.match(releaseArtifacts, /evidenceWriteback/)
   assert.match(releaseArtifacts, /evidenceClosureBrief/)
+  assert.match(releaseArtifacts, /partiallyObservedResourceEvidenceIds/)
+  assert.match(releaseArtifacts, /blockedResourceEvidence/)
 })
 
 test("Aliyun evidence writeback checklist exposes local JSON write targets without secret values", () => {
@@ -72,6 +74,18 @@ test("Aliyun evidence writeback checklist exposes local JSON write targets witho
   assert.ok(report.evidenceClosureBrief.readySecretEnvVariableNames.includes("SUPABASE_SERVICE_ROLE_KEY"))
   assert.ok(report.evidenceClosureBrief.blockedResourceEvidenceIds.includes("R01_SAE_RUNTIME"))
   assert.ok(report.evidenceClosureBrief.blockedResourceEvidenceIds.includes("R06_ENV_IMPORT"))
+  assert.ok(report.evidenceClosureBrief.partiallyObservedResourceEvidenceIds.includes("R05_OSS_AUDIO_STORAGE"))
+  assert.ok(report.evidenceClosureBrief.partiallyObservedResourceEvidenceIds.includes("R07_SLS_ALERTS"))
+  const ossResourceEvidence = report.evidenceClosureBrief.blockedResourceEvidence.find((item) =>
+    item.id === "R05_OSS_AUDIO_STORAGE")
+  const slsResourceEvidence = report.evidenceClosureBrief.blockedResourceEvidence.find((item) =>
+    item.id === "R07_SLS_ALERTS")
+  assert.equal(ossResourceEvidence.observedReadiness, "partial")
+  assert.ok(ossResourceEvidence.currentEvidence.some((item) => /bucket_exists/.test(item)))
+  assert.ok(ossResourceEvidence.missingEvidence.includes("oss:ramLeastPrivilege"))
+  assert.equal(slsResourceEvidence.observedReadiness, "partial")
+  assert.ok(slsResourceEvidence.currentEvidence.some((item) => /project_meiye-huajing-app-prod-cn/.test(item)))
+  assert.ok(slsResourceEvidence.missingEvidence.includes("slsAlerts:healthAlertConfigured"))
   assert.ok(report.evidenceClosureBrief.writeTargets.some((item) => item.includes("cloud-confirmations.local.json")))
   assert.ok(report.evidenceClosureBrief.writeTargets.some((item) => item.includes("image-publish.local.json")))
   assert.ok(report.summary.requiredAuthorizationPackets.includes("P01_WECHAT_OPEN_MOBILE_APP"))
@@ -252,6 +266,10 @@ test("Aliyun evidence writeback markdown renders the same writeback boundaries",
   assert.match(markdownOutput, /readySecretEnvVariableCount: 17/)
   assert.match(markdownOutput, /resourceEvidenceReady: 0\/7/)
   assert.match(markdownOutput, /R01_SAE_RUNTIME/)
+  assert.match(markdownOutput, /已观测但未闭环的资源证据/)
+  assert.match(markdownOutput, /partiallyObservedResourceEvidenceIds: R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS/)
+  assert.match(markdownOutput, /bucket_exists/)
+  assert.match(markdownOutput, /project_meiye-huajing-app-prod-cn/)
   assert.match(markdownOutput, /cloud-confirmations\.local\.json/)
   assert.match(markdownOutput, /image-publish\.local\.json/)
   assert.match(markdownOutput, /requiredAuthorizationPackets/)

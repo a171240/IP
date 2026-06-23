@@ -98,6 +98,16 @@ test("Aliyun operator handoff maps ACR and SAE evidence gaps to the correct cons
     item.id === "R02_ACR_IMAGE_REGISTRY" &&
     item.requiredAuthorizationPackets.includes("P03_ACR_PURCHASE")
   ))
+  const ossResourceEvidence = report.operatorClosureBrief.blockedResourceEvidence.find((item) =>
+    item.id === "R05_OSS_AUDIO_STORAGE")
+  const slsResourceEvidence = report.operatorClosureBrief.blockedResourceEvidence.find((item) =>
+    item.id === "R07_SLS_ALERTS")
+  assert.equal(ossResourceEvidence.observedReadiness, "partial")
+  assert.ok(ossResourceEvidence.currentEvidence.some((item) => /bucket_exists/.test(item)))
+  assert.ok(ossResourceEvidence.missingEvidence.includes("oss:ramLeastPrivilege"))
+  assert.equal(slsResourceEvidence.observedReadiness, "partial")
+  assert.ok(slsResourceEvidence.currentEvidence.some((item) => /project_meiye-huajing-app-prod-cn/.test(item)))
+  assert.ok(slsResourceEvidence.missingEvidence.includes("slsAlerts:healthAlertConfigured"))
   assert.equal(report.cloudAccess.currentBrowser.checked, true)
   assert.equal(typeof report.cloudAccess.currentBrowser.canUseCurrentConsole, "boolean")
   assert.equal(typeof report.cloudAccess.currentBrowser.aliyunConsoleTabCount, "number")

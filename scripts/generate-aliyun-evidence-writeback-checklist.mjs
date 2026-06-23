@@ -285,6 +285,18 @@ function buildEvidenceClosureBrief(handoff, writebackGroups, allGaps, requiredAu
   const operatorClosureBrief = handoff.operatorClosureBrief || {}
   const groups = Object.values(writebackGroups)
   const readyFiles = groups.filter((group) => group.ready).length
+  const blockedResourceEvidence = (operatorClosureBrief.blockedResourceEvidence || []).map((item) => ({
+    id: item.id,
+    observedStatus: item.observedStatus || "unknown",
+    observedReadiness: item.observedReadiness || "unknown",
+    currentEvidence: item.currentEvidence || [],
+    missingEvidence: item.missingEvidence || [],
+    writeTargets: item.writeTargets || [],
+    nextEvidenceAction: item.nextEvidenceAction || "",
+  }))
+  const partiallyObservedResourceEvidenceIds = blockedResourceEvidence
+    .filter((item) => item.observedReadiness === "partial")
+    .map((item) => item.id)
   return {
     conclusion: handoff.canDeployNow === true && allGaps.length === 0
       ? "本地证据已闭环；进入外部部署动作前仍需动作时确认。"
@@ -304,6 +316,8 @@ function buildEvidenceClosureBrief(handoff, writebackGroups, allGaps, requiredAu
     readySecretEnvVariableNames: operatorClosureBrief.readySecretEnvVariableNames || [],
     resourceEvidenceReady: operatorClosureBrief.resourceEvidenceReady || "0/0",
     blockedResourceEvidenceIds: operatorClosureBrief.blockedResourceEvidenceIds || [],
+    partiallyObservedResourceEvidenceIds,
+    blockedResourceEvidence,
     requiredAuthorizationPackets,
     strictVerifyCommands,
     writeTargets: uniqueStrings(groups.map((group) => group.file)),
@@ -381,6 +395,7 @@ function buildReport(args) {
       readySecretEnvVariableNames: evidenceClosureBrief.readySecretEnvVariableNames,
       resourceEvidenceReady: evidenceClosureBrief.resourceEvidenceReady,
       blockedResourceEvidenceIds: evidenceClosureBrief.blockedResourceEvidenceIds,
+      partiallyObservedResourceEvidenceIds: evidenceClosureBrief.partiallyObservedResourceEvidenceIds,
     },
     evidenceClosureBrief,
     writebackGroups,
@@ -431,7 +446,14 @@ function renderMarkdown(report) {
     `- readySecretEnvVariableNames: ${report.evidenceClosureBrief.readySecretEnvVariableNames.join(", ") || "none"}`,
     `- resourceEvidenceReady: ${report.evidenceClosureBrief.resourceEvidenceReady}`,
     `- blockedResourceEvidenceIds: ${report.evidenceClosureBrief.blockedResourceEvidenceIds.join(", ") || "none"}`,
+    `- partiallyObservedResourceEvidenceIds: ${report.evidenceClosureBrief.partiallyObservedResourceEvidenceIds.join(", ") || "none"}`,
     `- writeTargets: ${report.evidenceClosureBrief.writeTargets.join(", ") || "none"}`,
+    "",
+    "## 已观测但未闭环的资源证据",
+    "",
+    ...(report.evidenceClosureBrief.blockedResourceEvidence.length
+      ? report.evidenceClosureBrief.blockedResourceEvidence.flatMap(renderResourceEvidence)
+      : ["- none"]),
     "",
     "## 汇总",
     "",
@@ -453,6 +475,16 @@ function renderMarkdown(report) {
     "",
     ...report.safetyBoundary.map((item) => `- ${item}`),
   ].join("\n") + "\n"
+}
+
+function renderResourceEvidence(item) {
+  return [
+    `- ${item.id}: observed=${item.observedStatus}, readiness=${item.observedReadiness}`,
+    `  - currentEvidence: ${(item.currentEvidence || []).join("; ") || "none"}`,
+    `  - missingEvidence: ${(item.missingEvidence || []).join("; ") || "none"}`,
+    `  - writeTargets: ${(item.writeTargets || []).join("; ") || "none"}`,
+    `  - nextEvidenceAction: ${item.nextEvidenceAction || "none"}`,
+  ]
 }
 
 function renderGroup(group) {

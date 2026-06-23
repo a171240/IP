@@ -759,6 +759,7 @@ function renderMarkdown(audit) {
     `- readySecretEnvVariableCount: ${evidenceWriteback.evidenceClosureBrief?.readySecretEnvVariableCount ?? evidenceWriteback.summary.readySecretEnvVariableCount ?? 0}`,
     `- resourceEvidenceReady: ${evidenceWriteback.evidenceClosureBrief?.resourceEvidenceReady || evidenceWriteback.summary.resourceEvidenceReady || "unknown"}`,
     `- blockedResourceEvidenceIds: ${evidenceWriteback.evidenceClosureBrief?.blockedResourceEvidenceIds?.length ? evidenceWriteback.evidenceClosureBrief.blockedResourceEvidenceIds.join(", ") : evidenceWriteback.summary.blockedResourceEvidenceIds?.length ? evidenceWriteback.summary.blockedResourceEvidenceIds.join(", ") : "none"}`,
+    `- partiallyObservedResourceEvidenceIds: ${evidenceWriteback.evidenceClosureBrief?.partiallyObservedResourceEvidenceIds?.length ? evidenceWriteback.evidenceClosureBrief.partiallyObservedResourceEvidenceIds.join(", ") : "none"}`,
     `- strictVerifyCommands: ${evidenceWriteback.summary.strictVerifyCommands.join("; ")}`,
     ...(Object.values(evidenceWriteback.writebackGroups || {}).length
       ? Object.values(evidenceWriteback.writebackGroups).map((group) => `- ${group.key}: ready=${group.ready}, blockers=${group.totalBlockers}, file=${group.file}`)
@@ -1966,6 +1967,9 @@ function main() {
       readySecretEnvVariableNames: evidenceWriteback.evidenceClosureBrief?.readySecretEnvVariableNames || evidenceWriteback.summary?.readySecretEnvVariableNames || [],
       resourceEvidenceReady: evidenceWriteback.evidenceClosureBrief?.resourceEvidenceReady || evidenceWriteback.summary?.resourceEvidenceReady || "",
       blockedResourceEvidenceIds: evidenceWriteback.evidenceClosureBrief?.blockedResourceEvidenceIds || evidenceWriteback.summary?.blockedResourceEvidenceIds || [],
+      partiallyObservedResourceEvidenceIds: evidenceWriteback.evidenceClosureBrief?.partiallyObservedResourceEvidenceIds || evidenceWriteback.summary?.partiallyObservedResourceEvidenceIds || [],
+      blockedResourceEvidence: (evidenceWriteback.evidenceClosureBrief?.blockedResourceEvidence || []).map((item) =>
+        `${item.id}:observed=${item.observedStatus}:readiness=${item.observedReadiness}`),
       strictVerificationOrder: evidenceWriteback.strictVerificationOrder || [],
       writebackGroups: Object.values(evidenceWriteback.writebackGroups || {}).map((group) => `${group.key}:ready=${group.ready}:blockers=${group.totalBlockers}`),
     },
