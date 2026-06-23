@@ -525,12 +525,14 @@ function buildLocalEvidenceGaps({ args, status, cloudAccess, cloudConfirmationsC
     },
     cloudConfirmations: {
       file: args.cloudConfirmationsFile,
+      exists: cloudConfirmationsCheck.local?.exists === true,
       ready: cloudConfirmationsCheck.local?.ready === true,
       totalBlockers: cloudConfirmationsCheck.summary?.totalBlockers ?? 0,
       gaps: buildCloudConfirmationGaps(cloudConfirmationsCheck, cloudChecklistByTarget),
     },
     imagePublish: {
-      file: resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.image-publish.local.json"),
+      file: imagePublishPlan.local?.file || resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.image-publish.local.json"),
+      exists: imagePublishPlan.local?.exists === true,
       ready: imagePublishPlan.local?.ready === true,
       totalBlockers: imagePublishPlan.summary?.totalBlockers ?? 0,
       localDockerImage: imagePublishPlan.localDockerImage?.status || "unknown",

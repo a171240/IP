@@ -59,6 +59,8 @@ test("Aliyun evidence writeback checklist exposes local JSON write targets witho
   assert.match(report.writebackGroups.cloudInventoryResults.file, /cloud-inventory-results\.local\.json/)
   assert.match(report.writebackGroups.cloudConfirmations.file, /cloud-confirmations\.local\.json/)
   assert.match(report.writebackGroups.imagePublish.file, /image-publish\.local\.json/)
+  assert.equal(report.writebackGroups.cloudConfirmations.exists, true)
+  assert.equal(report.writebackGroups.imagePublish.exists, true)
   assert.ok(cloudConfirmationPaths.includes("items.wechatOpenPlatform.mobileAppCreated"))
   assert.ok(cloudConfirmationPaths.includes("items.wechatOpenPlatform.mobileAppSecretReady"))
   assert.ok(imagePublishPaths.includes("acr.registryHost"))
