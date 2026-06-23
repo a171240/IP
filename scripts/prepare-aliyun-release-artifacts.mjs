@@ -315,6 +315,8 @@ function renderMarkdown(audit) {
     `- cliAvailable: ${cloudAccess.cli?.available === true}`,
     `- cliBinary: ${cloudAccess.cli?.binary || "missing"}`,
     `- cliConfigFileExists: ${cloudAccess.cli?.configFileExists === true}`,
+    `- cliConfigProbeReady: ${cloudAccess.cli?.configProbe?.ready === true}`,
+    `- cliConfigProbeFailureCategory: ${cloudAccess.cli?.configProbe?.failureCategory || "none"}`,
     `- checklistItems: ${cloudAccess.consoleEvidenceChecklist?.length || 0}`,
     ...(cloudAccess.blockers?.length
       ? cloudAccess.blockers.map((item) => `- ${item}`)
@@ -1286,6 +1288,8 @@ function main() {
       canReadCloudNow: cloudAccess.canReadCloudNow === true,
       cliAvailable: cloudAccess.cli?.available === true,
       cliConfigFileExists: cloudAccess.cli?.configFileExists === true,
+      cliConfigProbeReady: cloudAccess.cli?.configProbe?.ready === true,
+      cliConfigProbeFailureCategory: cloudAccess.cli?.configProbe?.failureCategory || "",
       blockers: cloudAccess.blockers || [],
       checklistItems: cloudAccess.consoleEvidenceChecklist?.length || 0,
     },

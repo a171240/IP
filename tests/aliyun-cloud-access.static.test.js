@@ -9,6 +9,14 @@ const root = process.cwd()
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), "utf8")
 const readJson = (...parts) => JSON.parse(read(...parts))
 
+function writeFakeAliyun(binaryPath, lines) {
+  fs.writeFileSync(binaryPath, [
+    "#!/bin/sh",
+    ...lines,
+    "",
+  ].join("\n"), { mode: 0o700 })
+}
+
 test("Aliyun cloud access supports non-secret Cloud Shell observations", () => {
   const source = read("scripts", "check-aliyun-cloud-access.mjs")
   const template = readJson("deploy", "aliyun-production-cn.cloud-access.example.json")
@@ -16,6 +24,7 @@ test("Aliyun cloud access supports non-secret Cloud Shell observations", () => {
   assert.match(source, /DEFAULT_CLOUD_ACCESS_OBSERVATION_FILE/)
   assert.match(source, /--cloud-access-observation/)
   assert.match(source, /cloudShellObservation/)
+  assert.match(source, /configProbe/)
   assert.match(source, /cloudshell_cli_config_missing_or_unread/)
   assert.equal(template.schemaVersion, 1)
   assert.equal(template.environment, "production-cn")
@@ -29,6 +38,7 @@ test("Aliyun operator handoff exposes Cloud Shell inventory readiness", () => {
   assert.match(source, /browserConsoleChromeLoggedIn/)
   assert.match(source, /cloudShellConnected/)
   assert.match(source, /cloudShellCanRunReadOnlyInventory/)
+  assert.match(source, /cliConfigProbeFailureCategory/)
 })
 
 test("Aliyun cloud access does not mark invalid Cloud Shell observations ready", () => {
@@ -81,6 +91,13 @@ test("Aliyun cloud access report preserves current non-secret console evidence",
   assert.equal(report.readOnlyOnly, true)
   assert.equal(report.cloudMutationPerformed, false)
   assert.equal(report.cloudApiCalled, false)
+  assert.equal(report.cli.configProbe.cloudApiCalled, false)
+  assert.equal(report.cli.configProbe.mutationPerformed, false)
+  assert.ok([
+    "aliyun_cli_profile_not_configured",
+    "aliyun_cli_config_incomplete",
+    "aliyun_cli_config_probe_failed",
+  ].includes(report.cli.configProbe.failureCategory))
   assert.equal(report.cloudShellObservation.exists, true)
   assert.equal(report.cloudShellObservation.browserConsole.chromeLoggedIn, true)
   assert.match(resourcesObserved, /ACR Enterprise Economic cn-hangzhou 1 month purchase page visible, CNY 117\.00, instance name meiye-huajing, not purchased/)
@@ -112,7 +129,45 @@ test("Aliyun cloud access report preserves current non-secret console evidence",
     "slsAlerts",
   ])
   assert.ok(report.blockers.includes("cloudshell_cli_config_missing_or_unread"))
+  assert.ok(report.blockers.includes(report.cli.configProbe.failureCategory))
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
+})
+
+test("Aliyun cloud access classifies local CLI profile probe without storing raw output", () => {
+  const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-cloud-access-fake-cli-"))
+  const fakeAliyun = path.join(tmpdir, "aliyun")
+  writeFakeAliyun(fakeAliyun, [
+    "if [ \"$1\" = 'version' ]; then echo '3.3.23'; exit 0; fi",
+    "if [ \"$1\" = 'configure' ] && [ \"$2\" = 'list' ]; then",
+    "  echo 'ERROR: load configure failed: stat /tmp/.aliyun/config.json: no such file or directory' >&2",
+    "  echo 'Configuration failed, use `aliyun configure` to configure it' >&2",
+    "  exit 3",
+    "fi",
+    "exit 0",
+  ])
+  const output = execFileSync(process.execPath, ["scripts/check-aliyun-cloud-access.mjs"], {
+    cwd: root,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      PATH: `${tmpdir}:${process.env.PATH}`,
+      HOME: tmpdir,
+    },
+    maxBuffer: 1024 * 1024 * 30,
+  })
+  const report = JSON.parse(output)
+
+  assert.equal(report.cli.available, true)
+  assert.equal(report.cli.configProbe.executed, true)
+  assert.equal(report.cli.configProbe.ready, false)
+  assert.equal(report.cli.configProbe.cloudApiCalled, false)
+  assert.equal(report.cli.configProbe.failureCategory, "aliyun_cli_profile_not_configured")
+  assert.ok(report.blockers.includes("aliyun_cli_profile_not_configured"))
+  assert.ok(report.nextActions.some((item) => /default profile/.test(item)))
+  assert.doesNotMatch(output, /load configure failed/)
+  assert.doesNotMatch(output, /Configuration failed/)
+  assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
 })

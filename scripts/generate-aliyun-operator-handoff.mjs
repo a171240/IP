@@ -233,6 +233,7 @@ function compactCloudAccess(report) {
     cliAvailable: report.cli?.available === true,
     cliBinary: report.cli?.binary || "",
     cliConfigFileExists: report.cli?.configFileExists === true,
+    cliConfigProbe: report.cli?.configProbe || null,
     blockers: report.blockers || [],
     targets: report.targets || {},
     browserConsole: {
@@ -801,6 +802,8 @@ function renderMarkdown(handoff) {
     `- canReadCloudNow: ${handoff.cloudAccess.canReadCloudNow}`,
     `- cliAvailable: ${handoff.cloudAccess.cliAvailable}`,
     `- cliConfigFileExists: ${handoff.cloudAccess.cliConfigFileExists}`,
+    `- cliConfigProbeReady: ${handoff.cloudAccess.cliConfigProbe?.ready === true}`,
+    `- cliConfigProbeFailureCategory: ${handoff.cloudAccess.cliConfigProbe?.failureCategory || "none"}`,
     `- browserConsoleChromeLoggedIn: ${handoff.cloudAccess.browserConsole.chromeLoggedIn}`,
     `- cloudShellConnected: ${handoff.cloudAccess.cloudShell.connected}`,
     `- cloudShellCliAvailable: ${handoff.cloudAccess.cloudShell.cliAvailable}`,

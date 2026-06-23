@@ -112,6 +112,56 @@ function commandVersion(binary) {
   return result.stdout.split(/\r?\n/).filter(Boolean).slice(0, 3).join(" | ")
 }
 
+function cliConfigProbe(binary) {
+  if (!binary) {
+    return {
+      executed: false,
+      exitStatus: null,
+      stdoutLines: 0,
+      stderrLines: 0,
+      failureCategory: "aliyun_cli_binary_missing",
+      ready: false,
+      cloudApiCalled: false,
+      mutationPerformed: false,
+      note: "Aliyun CLI binary was not found. No cloud API was called.",
+    }
+  }
+  const result = shell(`${quoteShell(binary)} configure list`)
+  const failureCategory = classifyCliProbeFailure(result)
+  return {
+    executed: true,
+    exitStatus: result.status,
+    stdoutLines: lineCount(result.stdout),
+    stderrLines: lineCount(result.stderr),
+    failureCategory,
+    ready: result.status === 0 && failureCategory === "",
+    cloudApiCalled: false,
+    mutationPerformed: false,
+    note: "Runs local `aliyun configure list` only. Raw stdout/stderr are not stored because they may contain account identifiers.",
+  }
+}
+
+function lineCount(value) {
+  const text = String(value || "").trim()
+  return text ? text.split(/\r?\n/).filter(Boolean).length : 0
+}
+
+function classifyCliProbeFailure(result) {
+  if (result.status === 0) return ""
+  const combined = `${result.stdout || ""}\n${result.stderr || ""}`
+  if (/config failed|region can't be empty|region cannot be empty|missing region/i.test(combined)) {
+    return "aliyun_cli_config_incomplete"
+  }
+  if (/profile\s+default\s+is\s+not\s+configure|Configuration failed|aliyun configure|load configure failed|config\.json: no such file/i.test(combined)) {
+    return "aliyun_cli_profile_not_configured"
+  }
+  if (/command not found|ENOENT|not recognized/i.test(combined)) return "aliyun_cli_binary_missing"
+  if (/InvalidAccessKeyId|SignatureDoesNotMatch|Forbidden|Unauthorized|AccessDenied|NoPermission/i.test(combined)) {
+    return "aliyun_cli_auth_or_permission_failed"
+  }
+  return "aliyun_cli_config_probe_failed"
+}
+
 function quoteShell(value) {
   return `'${String(value).replace(/'/g, "'\\''")}'`
 }
@@ -465,6 +515,8 @@ function main() {
   const args = parseArgs(process.argv)
   const aliyunPath = commandPath("aliyun")
   const aliyuncliPath = commandPath("aliyuncli")
+  const aliyunBinary = aliyunPath || aliyuncliPath || ""
+  const configProbe = cliConfigProbe(aliyunBinary)
   const runtimePlan = readJsonIfExists(args.runtimePlanFile)
   const cloudConfirmations = readJsonIfExists(args.cloudConfirmationsFile)
   const imagePublish = readJsonIfExists(args.imagePublishFile)
@@ -495,10 +547,11 @@ function main() {
     },
     cli: {
       available: cliAvailable,
-      binary: aliyunPath || aliyuncliPath || "",
-      version: commandVersion(aliyunPath || aliyuncliPath),
+      binary: aliyunBinary,
+      version: commandVersion(aliyunBinary),
       configFileExists: cliConfigExists,
       configFiles,
+      configProbe,
       note: "No Aliyun cloud API is called by this script. It only checks whether this machine can plausibly run read-only Aliyun CLI inventory later.",
     },
     cloudShellObservation: cloudAccessObservation,
@@ -525,6 +578,16 @@ function main() {
   if (cliAvailable && !cliConfigExists) {
     report.blockers.push("aliyun_cli_config_missing_or_unread")
     report.nextActions.push("本机发现 aliyun CLI，但未发现常见配置文件；不要把 AccessKey 写入仓库，优先使用阿里云官方登录/配置方式。")
+  }
+  if (cliAvailable && configProbe.ready !== true) {
+    report.blockers.push(configProbe.failureCategory)
+    if (configProbe.failureCategory === "aliyun_cli_profile_not_configured") {
+      report.nextActions.push("Aliyun CLI default profile 未配置；请在安全终端或 CloudShell 完成官方登录/配置后再跑只读 inventory，不要把 AccessKeySecret 写进仓库。")
+    } else if (configProbe.failureCategory === "aliyun_cli_config_incomplete") {
+      report.nextActions.push("Aliyun CLI 配置不完整，至少缺 region；请补齐 cn-hangzhou 或改用 CloudShell 后再跑只读 inventory。")
+    } else {
+      report.nextActions.push("Aliyun CLI 配置探针未通过；请先修复本机 CLI/CloudShell 配置，再跑只读 inventory。")
+    }
   }
   if (cloudAccessObservation.exists && cloudAccessObservation.ready !== true) {
     report.blockers.push(...cloudAccessObservation.blockers)
