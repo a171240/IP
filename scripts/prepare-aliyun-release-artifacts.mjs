@@ -216,6 +216,7 @@ function renderMarkdown(audit) {
   const blockerBrief = audit.checks.blockerBrief
   const evidenceWriteback = audit.checks.evidenceWriteback
   const wechatOpenMobileAppPackage = audit.checks.wechatOpenMobileAppPackage
+  const androidReleaseSigningPackage = audit.checks.androidReleaseSigningPackage
   const appleTeamAasaPackage = audit.checks.appleTeamAasaPackage
   const operatorHandoff = audit.checks.operatorHandoff
   const productionStatus = audit.checks.productionStatus
@@ -678,6 +679,25 @@ function renderMarkdown(audit) {
     `- androidWechatSignatureRecorded: ${wechatOpenMobileAppPackage.mobileAppCreationPackage?.androidSignaturePackage?.wechatSignatureRecorded === true}`,
     `- iosBundleId: ${wechatOpenMobileAppPackage.mobileAppCreationPackage?.ios?.bundleId || "unknown"}`,
     "",
+    "## Android Release Signing 动作确认包",
+    "",
+    `- json: ${audit.outputFiles.androidReleaseSigningPackageJson}`,
+    `- markdown: ${audit.outputFiles.androidReleaseSigningPackageMarkdown}`,
+    `- ok: ${androidReleaseSigningPackage.ok === true}`,
+    `- containsValues: ${androidReleaseSigningPackage.containsValues === true}`,
+    `- mutationPerformed: ${androidReleaseSigningPackage.mutationPerformed === true}`,
+    `- canStartNow: ${androidReleaseSigningPackage.summary?.canStartNow === true}`,
+    `- readyForWechatAndroidSignature: ${androidReleaseSigningPackage.summary?.readyForWechatAndroidSignature === true}`,
+    `- androidPackageName: ${androidReleaseSigningPackage.summary?.androidPackageName || "unknown"}`,
+    `- releaseSigningConfig: ${androidReleaseSigningPackage.summary?.releaseSigningConfig || "unknown"}`,
+    `- releaseSigningConfigReady: ${androidReleaseSigningPackage.summary?.releaseSigningConfigReady === true}`,
+    `- releaseUsesDebugSigning: ${androidReleaseSigningPackage.summary?.releaseUsesDebugSigning === true}`,
+    `- releaseArtifactReady: ${androidReleaseSigningPackage.summary?.releaseArtifactReady === true}`,
+    `- wechatSignatureRecorded: ${androidReleaseSigningPackage.summary?.wechatSignatureRecorded === true}`,
+    `- androidConfigured: ${androidReleaseSigningPackage.summary?.androidConfigured === true}`,
+    `- currentBlockers: ${androidReleaseSigningPackage.currentBlockers?.length ? androidReleaseSigningPackage.currentBlockers.join(", ") : "none"}`,
+    `- actionPacket: ${androidReleaseSigningPackage.actionPacket?.packetId || "none"}`,
+    "",
     "## Apple Team ID / AASA 动作确认包",
     "",
     `- json: ${audit.outputFiles.appleTeamAasaPackageJson}`,
@@ -1082,6 +1102,8 @@ function main() {
   const evidenceWritebackMarkdownPath = resolve(args.outDir, "evidence-writeback.md")
   const wechatOpenMobileAppPackageJsonPath = resolve(args.outDir, "wechat-open-mobile-app-package.json")
   const wechatOpenMobileAppPackageMarkdownPath = resolve(args.outDir, "wechat-open-mobile-app-package.md")
+  const androidReleaseSigningPackageJsonPath = resolve(args.outDir, "android-release-signing-package.json")
+  const androidReleaseSigningPackageMarkdownPath = resolve(args.outDir, "android-release-signing-package.md")
   const appleTeamAasaPackageJsonPath = resolve(args.outDir, "apple-team-aasa-package.json")
   const appleTeamAasaPackageMarkdownPath = resolve(args.outDir, "apple-team-aasa-package.md")
   const operatorHandoffJsonPath = resolve(args.outDir, "operator-handoff.json")
@@ -1212,6 +1234,16 @@ function main() {
     "--markdown",
     wechatOpenMobileAppPackageMarkdownPath,
   ])
+  const androidReleaseSigningPackage = runJson("android_release_signing_package", [
+    "scripts/generate-android-release-signing-package.mjs",
+    "--env-file",
+    args.envFile,
+    ...(args.cloudConfirmationsFile ? ["--cloud-confirmations", args.cloudConfirmationsFile] : []),
+    "--out",
+    androidReleaseSigningPackageJsonPath,
+    "--markdown",
+    androidReleaseSigningPackageMarkdownPath,
+  ])
   const appleTeamAasaPackage = runJson("apple_team_aasa_package", [
     "scripts/generate-apple-team-aasa-package.mjs",
     "--env-file",
@@ -1308,6 +1340,7 @@ function main() {
       blockerBrief,
       evidenceWriteback,
       wechatOpenMobileAppPackage,
+      androidReleaseSigningPackage,
       appleTeamAasaPackage,
       operatorHandoff,
       productionStatus,
@@ -1367,6 +1400,8 @@ function main() {
       evidenceWritebackMarkdown: evidenceWritebackMarkdownPath,
       wechatOpenMobileAppPackageJson: wechatOpenMobileAppPackageJsonPath,
       wechatOpenMobileAppPackageMarkdown: wechatOpenMobileAppPackageMarkdownPath,
+      androidReleaseSigningPackageJson: androidReleaseSigningPackageJsonPath,
+      androidReleaseSigningPackageMarkdown: androidReleaseSigningPackageMarkdownPath,
       appleTeamAasaPackageJson: appleTeamAasaPackageJsonPath,
       appleTeamAasaPackageMarkdown: appleTeamAasaPackageMarkdownPath,
       operatorHandoffJson: operatorHandoffJsonPath,
@@ -1721,6 +1756,25 @@ function main() {
       androidReleaseArtifactReady: wechatOpenMobileAppPackage.mobileAppCreationPackage?.androidSignaturePackage?.releaseArtifactReady === true,
       androidWechatSignatureRecorded: wechatOpenMobileAppPackage.mobileAppCreationPackage?.androidSignaturePackage?.wechatSignatureRecorded === true,
       iosBundleId: wechatOpenMobileAppPackage.mobileAppCreationPackage?.ios?.bundleId || "",
+    },
+    androidReleaseSigningPackage: {
+      report: audit.outputFiles.androidReleaseSigningPackageJson,
+      markdown: audit.outputFiles.androidReleaseSigningPackageMarkdown,
+      ok: androidReleaseSigningPackage.ok === true,
+      containsValues: androidReleaseSigningPackage.containsValues === true,
+      mutationPerformed: androidReleaseSigningPackage.mutationPerformed === true,
+      canStartNow: androidReleaseSigningPackage.summary?.canStartNow === true,
+      readyForWechatAndroidSignature: androidReleaseSigningPackage.summary?.readyForWechatAndroidSignature === true,
+      androidPackageName: androidReleaseSigningPackage.summary?.androidPackageName || "",
+      releaseSigningConfig: androidReleaseSigningPackage.summary?.releaseSigningConfig || "",
+      releaseSigningConfigReady: androidReleaseSigningPackage.summary?.releaseSigningConfigReady === true,
+      releaseUsesDebugSigning: androidReleaseSigningPackage.summary?.releaseUsesDebugSigning === true,
+      releaseArtifactReady: androidReleaseSigningPackage.summary?.releaseArtifactReady === true,
+      wechatSignatureRecorded: androidReleaseSigningPackage.summary?.wechatSignatureRecorded === true,
+      androidConfigured: androidReleaseSigningPackage.summary?.androidConfigured === true,
+      currentBlockers: androidReleaseSigningPackage.currentBlockers || [],
+      variableNames: androidReleaseSigningPackage.signingInputs?.variableNames || [],
+      actionPacket: androidReleaseSigningPackage.actionPacket || null,
     },
     appleTeamAasaPackage: {
       report: audit.outputFiles.appleTeamAasaPackageJson,
