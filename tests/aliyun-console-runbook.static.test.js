@@ -25,6 +25,9 @@ test("Aliyun console runbook command is wired into scripts and predeploy", () =>
   assert.match(releaseArtifacts, /canStartNowConsoleTasks/)
   assert.match(releaseArtifacts, /readyActionPackets/)
   assert.match(releaseArtifacts, /blockedByTaskDependencies/)
+  assert.match(releaseArtifacts, /consoleClosureBrief/)
+  assert.match(releaseArtifacts, /blockedCredentialCount/)
+  assert.match(releaseArtifacts, /resourceEvidenceReady/)
 })
 
 test("Aliyun console runbook renders current console fields without secret values", () => {
@@ -66,6 +69,28 @@ test("Aliyun console runbook renders current console fields without secret value
     "C05_OSS_AUDIO_RAM_STS",
   ])
   assert.equal(report.summary.readyActionPackets, 2)
+  assert.equal(report.summary.blockedCredentialCount, 8)
+  assert.equal(report.summary.readySecretEnvVariableCount, 17)
+  assert.equal(report.summary.resourceEvidenceReady, "0/7")
+  assert.ok(report.summary.blockedResourceEvidenceIds.includes("R01_SAE_RUNTIME"))
+  assert.ok(report.summary.blockedResourceEvidenceIds.includes("R06_ENV_IMPORT"))
+  assert.equal(report.consoleClosureBrief.blockedCredentialCount, 8)
+  assert.ok(report.consoleClosureBrief.blockedCredentialNames.includes("WECHAT_OPEN_APP_ID"))
+  assert.ok(report.consoleClosureBrief.blockedCredentialNames.includes("WECHAT_OPEN_APP_SECRET"))
+  assert.equal(report.consoleClosureBrief.readySecretEnvVariableCount, 17)
+  assert.equal(report.consoleClosureBrief.resourceEvidenceReady, "0/7")
+  assert.ok(report.consoleClosureBrief.blockedResourceEvidenceIds.includes("R02_ACR_IMAGE_REGISTRY"))
+  assert.ok(report.consoleClosureBrief.blockedResourceEvidenceIds.includes("R07_SLS_ALERTS"))
+  assert.deepEqual(report.consoleClosureBrief.canStartNowConsoleTasks, [
+    "C02_ACR_IMAGE_AND_PULL",
+    "C05_OSS_AUDIO_RAM_STS",
+  ])
+  assert.deepEqual(report.consoleClosureBrief.readyActionPacketIds, [
+    "C02_ACR_IMAGE_AND_PULL",
+    "C05_OSS_AUDIO_RAM_STS",
+  ])
+  assert.ok(report.consoleClosureBrief.nextActionTimeConfirmations.includes("P03_ACR_PURCHASE"))
+  assert.ok(report.consoleClosureBrief.blockedResourceEvidence.some((item) => item.id === "R02_ACR_IMAGE_REGISTRY"))
   assert.deepEqual(readyPacketIds, [
     "C02_ACR_IMAGE_AND_PULL",
     "C05_OSS_AUDIO_RAM_STS",
@@ -137,6 +162,11 @@ test("Aliyun console runbook markdown includes action packets and completion evi
   const markdown = fs.readFileSync(markdownPath, "utf8")
 
   assert.match(markdown, /## 当前可进入动作确认的包/)
+  assert.match(markdown, /## 目标闭环证据简表/)
+  assert.match(markdown, /blockedCredentialCount: 8/)
+  assert.match(markdown, /readySecretEnvVariableCount: 17/)
+  assert.match(markdown, /resourceEvidenceReady: 0\/7/)
+  assert.match(markdown, /blockedResourceEvidenceIds: .*R02_ACR_IMAGE_REGISTRY/)
   assert.match(markdown, /minimumAuthorizationPhrase: 授权购买或确认 ACR Enterprise Economic/)
   assert.match(markdown, /currentActionScope: purchase_and_repository_only/)
   assert.match(markdown, /不执行 docker login\/push/)

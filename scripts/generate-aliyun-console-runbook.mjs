@@ -173,6 +173,10 @@ function buildRunbook(args) {
     "scripts/summarize-aliyun-user-action-brief.mjs",
     ...envArgs(args),
   ])
+  const sensitiveBlockers = runJson("sensitive_blockers", [
+    "scripts/summarize-aliyun-sensitive-blockers.mjs",
+    ...envArgs(args),
+  ])
   const cloudAccess = runJson("cloud_access", [
     "scripts/check-aliyun-cloud-access.mjs",
     "--env-file",
@@ -315,6 +319,13 @@ function buildRunbook(args) {
   const readyActionPackets = tasks
     .filter((task) => task.canStartNow)
     .map((task) => buildReadyActionPacket(task))
+  const consoleClosureBrief = buildConsoleClosureBrief({
+    resourcesMatrix,
+    sensitiveBlockers,
+    userActions,
+    tasks,
+    readyActionPackets,
+  })
 
   const runbook = {
     ok: true,
@@ -337,6 +348,10 @@ function buildRunbook(args) {
         .filter((task) => task.canStartNow)
         .map((task) => task.id),
       readyActionPackets: readyActionPackets.length,
+      blockedCredentialCount: consoleClosureBrief.blockedCredentialCount,
+      readySecretEnvVariableCount: consoleClosureBrief.readySecretEnvVariableCount,
+      resourceEvidenceReady: consoleClosureBrief.resourceEvidenceReady,
+      blockedResourceEvidenceIds: consoleClosureBrief.blockedResourceEvidenceIds,
       blockedByTaskDependencies: tasks
         .filter((task) => task.blockingDependencies.length > 0)
         .map((task) => task.id),
@@ -360,6 +375,7 @@ function buildRunbook(args) {
       apiHost: runtimePlan.apiHost,
       assetHost: runtimePlan.assetHost,
     },
+    consoleClosureBrief,
     readyActionPackets,
     consoleTasks: tasks,
     nextVerifyCommands: [
@@ -384,6 +400,68 @@ function buildRunbook(args) {
   }
   runbook.ok = runbook.secretLeakCheck.ok
   return runbook
+}
+
+function buildConsoleClosureBrief({
+  resourcesMatrix,
+  sensitiveBlockers,
+  userActions,
+  tasks,
+  readyActionPackets,
+}) {
+  const credentialBrief =
+    sensitiveBlockers.credentialInterventionBrief ||
+    sensitiveBlockers.summary?.credentialInterventionBrief ||
+    {}
+  const blockedCredentialNames =
+    credentialBrief.blockedCredentialNames ||
+    sensitiveBlockers.summary?.userIntervention?.blockedVariableNames ||
+    []
+  const readySecretEnvVariableNames =
+    credentialBrief.readySecretEnvVariableNames ||
+    sensitiveBlockers.summary?.userIntervention?.readySecretEnvVariableNames ||
+    []
+  const resourceEvidenceBrief = resourcesMatrix.resourceEvidenceBrief || {}
+  const blockedResourceEvidence =
+    resourceEvidenceBrief.blockedResourceEvidence ||
+    (resourcesMatrix.resources || []).filter((resource) => resource.ready !== true)
+
+  return {
+    conclusion: "现在不能部署；必须先补齐微信开放平台移动 App 凭证、Android/iOS 发布凭证、阿里云资源证据和 secret env 导入证据。",
+    canCodexProceedWithoutUser: credentialBrief.canCodexProceedWithoutUser === true,
+    blockedCredentialCount: credentialBrief.blockedCredentialCount ?? blockedCredentialNames.length,
+    blockedCredentialNames,
+    readySecretEnvVariableCount: credentialBrief.readySecretEnvVariableCount ?? readySecretEnvVariableNames.length,
+    readySecretEnvVariableNames,
+    resourceEvidenceReady:
+      resourcesMatrix.summary?.resourceEvidenceReady ||
+      `${resourceEvidenceBrief.ready ?? resourcesMatrix.summary?.ready ?? 0}/${resourceEvidenceBrief.total ?? resourcesMatrix.summary?.total ?? 0}`,
+    blockedResourceEvidenceIds:
+      resourcesMatrix.summary?.blockedResourceEvidenceIds ||
+      resourceEvidenceBrief.blockedIds ||
+      resourcesMatrix.summary?.blockedIds ||
+      [],
+    blockedResourceEvidence: blockedResourceEvidence.map((item) => ({
+      id: item.id,
+      status: item.status,
+      observedStatus: item.observedStatus || "",
+      requiredAuthorizationPackets: item.requiredAuthorizationPackets || [],
+      consoleTaskIds: item.consoleTaskIds || [],
+      missingEvidence: item.missingEvidence || [],
+      writeTargets: item.writeTargets || [],
+      nextEvidenceAction: item.nextEvidenceAction || "",
+    })),
+    canStartNowConsoleTasks: tasks
+      .filter((task) => task.canStartNow)
+      .map((task) => task.id),
+    readyActionPacketIds: readyActionPackets.map((packet) => packet.taskId),
+    nextActionTimeConfirmations: userActions.summary?.nextActionTimeConfirmations || [],
+    actionTimeConfirmationRequiredIds: unique([
+      ...(credentialBrief.actionTimeConfirmationRequiredIds || []),
+      ...(resourcesMatrix.summary?.actionTimeConfirmationRequired || []),
+      ...(userActions.summary?.actionTimeConfirmationRequired || []),
+    ]),
+  }
 }
 
 function buildReadyActionPacket(task) {
@@ -483,8 +561,25 @@ function renderMarkdown(runbook) {
     `- requiredBlocking: ${runbook.summary.requiredBlocking.length ? runbook.summary.requiredBlocking.join(", ") : "none"}`,
     `- canStartNowConsoleTasks: ${runbook.summary.canStartNowConsoleTasks.length ? runbook.summary.canStartNowConsoleTasks.join(", ") : "none"}`,
     `- readyActionPackets: ${runbook.summary.readyActionPackets}`,
+    `- blockedCredentialCount: ${runbook.summary.blockedCredentialCount}`,
+    `- readySecretEnvVariableCount: ${runbook.summary.readySecretEnvVariableCount}`,
+    `- resourceEvidenceReady: ${runbook.summary.resourceEvidenceReady}`,
+    `- blockedResourceEvidenceIds: ${runbook.summary.blockedResourceEvidenceIds.length ? runbook.summary.blockedResourceEvidenceIds.join(", ") : "none"}`,
     `- blockedByTaskDependencies: ${runbook.summary.blockedByTaskDependencies.length ? runbook.summary.blockedByTaskDependencies.join(", ") : "none"}`,
     `- actionTimeConfirmationRequired: ${runbook.summary.actionTimeConfirmationRequired.length ? runbook.summary.actionTimeConfirmationRequired.join(", ") : "none"}`,
+    "",
+    "## 目标闭环证据简表",
+    "",
+    `- conclusion: ${runbook.consoleClosureBrief.conclusion}`,
+    `- canCodexProceedWithoutUser: ${runbook.consoleClosureBrief.canCodexProceedWithoutUser}`,
+    `- blockedCredentialCount: ${runbook.consoleClosureBrief.blockedCredentialCount}`,
+    `- blockedCredentialNames: ${runbook.consoleClosureBrief.blockedCredentialNames.length ? runbook.consoleClosureBrief.blockedCredentialNames.join(", ") : "none"}`,
+    `- readySecretEnvVariableCount: ${runbook.consoleClosureBrief.readySecretEnvVariableCount}`,
+    `- resourceEvidenceReady: ${runbook.consoleClosureBrief.resourceEvidenceReady}`,
+    `- blockedResourceEvidenceIds: ${runbook.consoleClosureBrief.blockedResourceEvidenceIds.length ? runbook.consoleClosureBrief.blockedResourceEvidenceIds.join(", ") : "none"}`,
+    `- canStartNowConsoleTasks: ${runbook.consoleClosureBrief.canStartNowConsoleTasks.length ? runbook.consoleClosureBrief.canStartNowConsoleTasks.join(", ") : "none"}`,
+    `- readyActionPacketIds: ${runbook.consoleClosureBrief.readyActionPacketIds.length ? runbook.consoleClosureBrief.readyActionPacketIds.join(", ") : "none"}`,
+    `- nextActionTimeConfirmations: ${runbook.consoleClosureBrief.nextActionTimeConfirmations.length ? runbook.consoleClosureBrief.nextActionTimeConfirmations.join(", ") : "none"}`,
     "",
     "## 目标",
     "",
