@@ -122,6 +122,13 @@ function runInputs(args) {
       "--cloud-confirmations",
       args.cloudConfirmationsFile,
     ]),
+    resourcesMatrix: runJson("resources_matrix", [
+      "scripts/summarize-aliyun-resource-matrix.mjs",
+      "--env-file",
+      args.envFile,
+      "--cloud-confirmations",
+      args.cloudConfirmationsFile,
+    ]),
     actionAuthorization: runJson("action_authorization", [
       "scripts/summarize-aliyun-action-authorization.mjs",
       "--env-file",
@@ -152,13 +159,15 @@ function buildAudit(args, inputs) {
     operatorHandoff,
     envHandoff,
     sensitiveBlockers,
+    resourcesMatrix,
     actionAuthorization,
     consoleRunbook,
     wechatOpenMobileAppPackage,
   } = inputs
+  const goalClosureEvidenceBrief = buildGoalClosureEvidenceBrief(sensitiveBlockers, resourcesMatrix)
   const requirements = [
     buildLocalAppBackendRequirement(productionStatus, operatorHandoff),
-    buildAliyunCloudResourceRequirement(productionStatus, operatorHandoff),
+    buildAliyunCloudResourceRequirement(productionStatus, operatorHandoff, resourcesMatrix),
     buildCloudInventoryRequirement(productionStatus, operatorHandoff),
     buildImagePublishRequirement(operatorHandoff),
     buildDomainRequirement(actionAuthorization, consoleRunbook),
@@ -204,7 +213,14 @@ function buildAudit(args, inputs) {
       nextActionTimeConfirmations: actionAuthorization.nextActionTimeConfirmations || [],
       blockedByAuthorizationPacketDependencies: actionAuthorization.summary?.blockedByPacketDependencies || [],
       sensitiveBlockedIds: sensitiveBlockers.summary?.blockedIds || [],
+      blockedCredentialCount: goalClosureEvidenceBrief.credentialIntervention.blockedCredentialCount,
+      blockedCredentialNames: goalClosureEvidenceBrief.credentialIntervention.blockedCredentialNames,
+      readySecretEnvVariableCount: goalClosureEvidenceBrief.credentialIntervention.readySecretEnvVariableCount,
+      readySecretEnvVariableNames: goalClosureEvidenceBrief.credentialIntervention.readySecretEnvVariableNames,
+      resourceEvidenceReady: goalClosureEvidenceBrief.resourceEvidence.ready,
+      blockedResourceEvidenceIds: goalClosureEvidenceBrief.resourceEvidence.blockedIds,
     },
+    goalClosureEvidenceBrief,
     requirements,
     nextActions: {
       userActionNow: operatorHandoff.userActionNow || [],
@@ -215,12 +231,14 @@ function buildAudit(args, inputs) {
       nextActionTimeConfirmations: actionAuthorization.nextActionTimeConfirmations || [],
       blockedByAuthorizationPacketDependencies: actionAuthorization.summary?.blockedByPacketDependencies || [],
       sensitiveBlockedIds: sensitiveBlockers.summary?.blockedIds || [],
+      blockedResourceEvidenceIds: goalClosureEvidenceBrief.resourceEvidence.blockedIds,
     },
     sourceCommands: {
       productionStatus: "corepack pnpm aliyun:status",
       operatorHandoff: "corepack pnpm aliyun:operator:handoff -- --skip-vercel-env-coverage",
       envHandoff: "corepack pnpm aliyun:env:handoff",
       sensitiveBlockers: "corepack pnpm aliyun:sensitive:blockers",
+      resourcesMatrix: "corepack pnpm aliyun:resources:matrix",
       actionAuthorization: "corepack pnpm aliyun:action:authorization",
       consoleRunbook: "corepack pnpm aliyun:console:runbook",
       wechatOpenMobileAppPackage: "corepack pnpm aliyun:wechat-open:package",
@@ -279,16 +297,64 @@ function buildLocalAppBackendRequirement(status, operatorHandoff) {
   })
 }
 
-function buildAliyunCloudResourceRequirement(status, operatorHandoff) {
+function buildGoalClosureEvidenceBrief(sensitiveBlockers, resourcesMatrix) {
+  const credentialIntervention = sensitiveBlockers.credentialInterventionBrief
+    || sensitiveBlockers.summary?.credentialInterventionBrief
+    || {}
+  const resourceEvidence = resourcesMatrix.resourceEvidenceBrief || {}
+  return {
+    credentialIntervention: {
+      blockedCredentialCount: credentialIntervention.blockedCredentialCount || 0,
+      blockedCredentialNames: credentialIntervention.blockedCredentialNames || [],
+      readySecretEnvVariableCount: credentialIntervention.readySecretEnvVariableCount || 0,
+      readySecretEnvVariableNames: credentialIntervention.readySecretEnvVariableNames || [],
+      actionTimeConfirmationRequiredIds: credentialIntervention.actionTimeConfirmationRequiredIds || [],
+      groups: (credentialIntervention.groups || []).map((group) => ({
+        category: group.category,
+        actionId: group.actionId,
+        status: group.status,
+        blockedCredentialNames: group.blockedCredentialNames || [],
+        readySecretEnvVariableNames: group.readySecretEnvVariableNames || [],
+        obtainFrom: group.obtainFrom,
+        writeTargets: group.writeTargets || [],
+        verifyCommands: group.verifyCommands || [],
+      })),
+    },
+    resourceEvidence: {
+      ready: `${resourceEvidence.ready || 0}/${resourceEvidence.total || 0}`,
+      blocked: resourceEvidence.blocked || 0,
+      blockedIds: resourceEvidence.blockedIds || [],
+      blockedResourceEvidence: (resourceEvidence.blockedResourceEvidence || []).map((item) => ({
+        id: item.id,
+        status: item.status,
+        observedStatus: item.observedStatus,
+        observedReadiness: item.observedReadiness,
+        requiredAuthorizationPackets: item.requiredAuthorizationPackets || [],
+        consoleTaskIds: item.consoleTaskIds || [],
+        missingEvidence: item.missingEvidence || [],
+        writeTargets: item.writeTargets || [],
+        verifyCommands: item.verifyCommands || [],
+        nextEvidenceAction: item.nextEvidenceAction,
+      })),
+      valueHandlingRules: resourceEvidence.valueHandlingRules || [],
+    },
+  }
+}
+
+function buildAliyunCloudResourceRequirement(status, operatorHandoff, resourcesMatrix) {
   const cloud = status.summary?.cloudConfirmations || {}
   const ready = Number(cloud.ready || 0)
   const total = Number(cloud.total || 0)
+  const resourceEvidence = resourcesMatrix.resourceEvidenceBrief || {}
+  const blockedResourceEvidence = resourceEvidence.blockedResourceEvidence || []
   return requirement({
     id: "G02_ALIYUN_CLOUD_RESOURCES_READY",
     title: "阿里云 production-cn 云资源完成并有非密钥证据",
     status: total > 0 && ready === total ? "proved" : "blocked",
     evidence: [
       `cloudConfirmations ${ready}/${total} ready`,
+      `resourceEvidenceReady=${resourceEvidence.ready || 0}/${resourceEvidence.total || 0}`,
+      `resourceEvidenceBlocked=${resourceEvidence.blocked || 0}`,
       `operatorTasks ready ${status.summary?.operatorTasks?.ready || 0}/${status.summary?.operatorTasks?.total || 0}`,
       `cloudConfirmations.ready=${operatorHandoff.localEvidenceGaps?.cloudConfirmations?.ready === true}`,
     ],
@@ -296,6 +362,9 @@ function buildAliyunCloudResourceRequirement(status, operatorHandoff) {
       operatorHandoff.localEvidenceGaps?.cloudConfirmations?.totalBlockers
         ? [`cloudConfirmations.totalBlockers=${operatorHandoff.localEvidenceGaps.cloudConfirmations.totalBlockers}`]
         : [],
+      blockedResourceEvidence.flatMap((item) =>
+        (item.missingEvidence || []).map((evidence) => `${item.id}:${evidence}`),
+      ),
     ),
     authoritativeCommands: [
       "corepack pnpm aliyun:status",
@@ -456,12 +525,17 @@ function buildSensitiveBlockersRequirement(sensitiveBlockers) {
   const ok = sensitiveBlockers.ok === true
     && sensitiveBlockers.containsValues === false
     && sensitiveBlockers.secretLeakCheck?.ok === true
+  const credentialIntervention = sensitiveBlockers.credentialInterventionBrief
+    || sensitiveBlockers.summary?.credentialInterventionBrief
+    || {}
   return requirement({
     id: "G09_SENSITIVE_BLOCKERS_EXPLICIT",
     title: "密钥/密码/token/付款项已明确列出且不泄露值",
     status: ok ? "proved" : "blocked",
     evidence: [
       `blocked=${sensitiveBlockers.summary?.blocked ?? 0}/${sensitiveBlockers.summary?.total ?? 0}`,
+      `blockedCredentialCount=${credentialIntervention.blockedCredentialCount || 0}`,
+      `readySecretEnvVariableCount=${credentialIntervention.readySecretEnvVariableCount || 0}`,
       `containsValues=${sensitiveBlockers.containsValues === true}`,
       `secretLeakCheck=${sensitiveBlockers.secretLeakCheck?.ok === true}`,
     ],
@@ -571,6 +645,22 @@ function renderMarkdown(report) {
     `- Can start now console tasks: ${report.summary.canStartNowConsoleTasks.length ? report.summary.canStartNowConsoleTasks.join(", ") : "none"}`,
     `- Can start now authorization packets: ${report.summary.canStartNowAuthorizationPackets.length ? report.summary.canStartNowAuthorizationPackets.join(", ") : "none"}`,
     `- Next action-time confirmations: ${report.summary.nextActionTimeConfirmations.length ? report.summary.nextActionTimeConfirmations.map((item) => item.packetId).join(", ") : "none"}`,
+    `- Blocked credential count: ${report.summary.blockedCredentialCount}`,
+    `- Ready secret env variable count: ${report.summary.readySecretEnvVariableCount}`,
+    `- Resource evidence ready: ${report.summary.resourceEvidenceReady}`,
+    `- Blocked resource evidence ids: ${report.summary.blockedResourceEvidenceIds.length ? report.summary.blockedResourceEvidenceIds.join(", ") : "none"}`,
+    "",
+    "## 目标闭环证据简表",
+    "",
+    `- blockedCredentialNames: ${report.summary.blockedCredentialNames.length ? report.summary.blockedCredentialNames.join(", ") : "none"}`,
+    `- readySecretEnvVariableNames: ${report.summary.readySecretEnvVariableNames.length ? report.summary.readySecretEnvVariableNames.join(", ") : "none"}`,
+    `- resourceEvidenceReady: ${report.summary.resourceEvidenceReady}`,
+    `- blockedResourceEvidenceIds: ${report.summary.blockedResourceEvidenceIds.length ? report.summary.blockedResourceEvidenceIds.join(", ") : "none"}`,
+    "",
+    ...(report.goalClosureEvidenceBrief.resourceEvidence.blockedResourceEvidence.length
+      ? report.goalClosureEvidenceBrief.resourceEvidence.blockedResourceEvidence.map((item) =>
+        `- ${item.id}: observed=${item.observedStatus}/${item.observedReadiness}; packets=${item.requiredAuthorizationPackets.join(", ") || "none"}; missing=${item.missingEvidence.slice(0, 4).join(", ") || "none"}`)
+      : ["- resourceEvidenceBlocked: none"]),
     "",
     "## 当前可开始的动作时确认",
     "",

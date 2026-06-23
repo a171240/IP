@@ -76,6 +76,11 @@ test("Aliyun completion audit command is wired into scripts, predeploy, deploy s
   assert.match(releaseArtifacts, /cloudInventoryConsoleOnly/)
   assert.match(releaseArtifacts, /observationSummary/)
   assert.match(releaseArtifacts, /nextActionTimeConfirmations/)
+  assert.match(releaseArtifacts, /blockedCredentialCount/)
+  assert.match(releaseArtifacts, /readySecretEnvVariableCount/)
+  assert.match(releaseArtifacts, /resourceEvidenceReady/)
+  assert.match(releaseArtifacts, /blockedResourceEvidenceIds/)
+  assert.match(releaseArtifacts, /goalClosureEvidenceBrief/)
 })
 
 test("Aliyun completion audit reports the current goal as blocked without secret values", () => {
@@ -100,11 +105,32 @@ test("Aliyun completion audit reports the current goal as blocked without secret
   assert.ok(report.summary.blocked >= 6)
   assert.ok(report.summary.proved >= 1)
   assert.ok(report.summary.partial >= 1)
+  assert.equal(report.summary.blockedCredentialCount, 8)
+  assert.equal(report.summary.readySecretEnvVariableCount, 17)
+  assert.ok(report.summary.blockedCredentialNames.includes("WECHAT_OPEN_APP_SECRET"))
+  assert.ok(report.summary.readySecretEnvVariableNames.includes("SUPABASE_SERVICE_ROLE_KEY"))
+  assert.equal(report.summary.resourceEvidenceReady, "0/7")
+  assert.ok(report.summary.blockedResourceEvidenceIds.includes("R01_SAE_RUNTIME"))
+  assert.ok(report.summary.blockedResourceEvidenceIds.includes("R06_ENV_IMPORT"))
+  assert.equal(report.goalClosureEvidenceBrief.credentialIntervention.blockedCredentialCount, 8)
+  assert.equal(report.goalClosureEvidenceBrief.resourceEvidence.ready, "0/7")
+  assert.ok(report.goalClosureEvidenceBrief.credentialIntervention.groups.some((group) =>
+    group.category === "wechat_open_mobile_app" &&
+    group.blockedCredentialNames.includes("WECHAT_OPEN_APP_SECRET")
+  ))
+  assert.ok(report.goalClosureEvidenceBrief.resourceEvidence.blockedResourceEvidence.some((item) =>
+    item.id === "R02_ACR_IMAGE_REGISTRY" &&
+    item.requiredAuthorizationPackets.includes("P03_ACR_PURCHASE")
+  ))
 
   assert.equal(byId.get("G01_LOCAL_APP_BACKEND_READY").status, "partial")
   assert.ok(byId.get("G01_LOCAL_APP_BACKEND_READY").evidence.includes("localCodeReady=false"))
   assert.ok(byId.get("G01_LOCAL_APP_BACKEND_READY").blockers.includes("localCodeReady=false"))
   assert.equal(byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").status, "blocked")
+  assert.ok(byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").evidence.includes("resourceEvidenceReady=0/7"))
+  assert.ok(byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").blockers.some((item) =>
+    item.includes("R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.registryHost")
+  ))
   assert.equal(byId.get("G03_CLOUD_INVENTORY_PROVED").status, "proved")
   assert.ok(byId.get("G03_CLOUD_INVENTORY_PROVED").evidence.includes("readyLocalOperations=9/9"))
   assert.ok(byId.get("G03_CLOUD_INVENTORY_PROVED").evidence.includes("executedCommandResults=12/12"))
@@ -113,6 +139,8 @@ test("Aliyun completion audit reports the current goal as blocked without secret
   assert.equal(byId.get("G06_WECHAT_APP_LOGIN_READY").status, "blocked")
   assert.equal(byId.get("G08_ENV_IMPORT_READY").status, "blocked")
   assert.equal(byId.get("G09_SENSITIVE_BLOCKERS_EXPLICIT").status, "proved")
+  assert.ok(byId.get("G09_SENSITIVE_BLOCKERS_EXPLICIT").evidence.includes("blockedCredentialCount=8"))
+  assert.ok(byId.get("G09_SENSITIVE_BLOCKERS_EXPLICIT").evidence.includes("readySecretEnvVariableCount=17"))
   assert.equal(byId.get("G10_PRODUCTION_DEPLOY_AND_POSTDEPLOY_SMOKE").status, "blocked")
 
   assert.ok(byId.get("G06_WECHAT_APP_LOGIN_READY").blockers.includes("WECHAT_OPEN_APP_ID"))
@@ -202,6 +230,10 @@ test("Aliyun completion audit carries console-only inventory evidence into G03 a
   assert.equal(report.summary.cloudInventoryResults.observationSummary.executedCommandResults, 0)
   assert.equal(report.summary.cloudInventoryResults.observationSummary.cloudApiCalledCommandResults, 0)
   assert.match(markdownOutput, /Cloud inventory console-only: safe true, console observations 9\/9, executed commands 0\/9, cloud API calls 0/)
+  assert.match(markdownOutput, /目标闭环证据简表/)
+  assert.match(markdownOutput, /blockedCredentialNames: .*WECHAT_OPEN_APP_SECRET/)
+  assert.match(markdownOutput, /resourceEvidenceReady: 0\/7/)
+  assert.match(markdownOutput, /R02_ACR_IMAGE_REGISTRY: observed=purchase_candidate_visible_not_purchased\/blocked/)
   assert.match(markdownOutput, /safeConsoleOnly=true/)
   assert.doesNotMatch(output + markdownOutput, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output + markdownOutput, /LTAI[A-Za-z0-9]{12,}/)
