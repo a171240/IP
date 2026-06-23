@@ -201,6 +201,9 @@ function buildPlan(args) {
       userActionReady: consoleRunbook.summary?.userActionReady || "unknown",
     },
     phases,
+    readyAuthorizationPackets: (actionAuthorization.authorizationPackets || [])
+      .filter((packet) => packet.canStartNow === true)
+      .map(compactReadyAuthorizationPacket),
     readyActionPackets: (consoleRunbook.readyActionPackets || []).map(compactReadyActionPacket),
     writeTargets: [
       "deploy/aliyun-production-cn.cloud-confirmations.local.json",
@@ -335,6 +338,22 @@ function compactReadyActionPacket(packet) {
   }
 }
 
+function compactReadyAuthorizationPacket(packet) {
+  return {
+    packetId: packet.packetId,
+    actionId: packet.actionId,
+    title: packet.title,
+    sequenceGroup: packet.sequenceGroup || "",
+    minimumUserPhrase: packet.minimumUserPhrase,
+    allowedActions: packet.allowedActions || [],
+    explicitlyExcluded: packet.explicitlyExcluded || [],
+    completionEvidence: packet.completionEvidence || [],
+    writeTargets: packet.writeTargets || [],
+    verifyCommands: packet.verifyCommands || [],
+    nonSecretEvidenceOnly: packet.nonSecretEvidenceOnly === true,
+  }
+}
+
 function uniqueStrings(values) {
   return Array.from(new Set((values || [])
     .filter((item) => item !== null && item !== undefined && String(item).trim())
@@ -372,6 +391,28 @@ function renderMarkdown(report) {
     `- Ready phases: ${report.summary.readyToStartPhases.length ? report.summary.readyToStartPhases.join(", ") : "none"}`,
     `- Blocked phases: ${report.summary.blockedPhases.join(", ")}`,
     `- Required blocking env: ${report.summary.requiredBlocking.length ? report.summary.requiredBlocking.join(", ") : "none"}`,
+    `- Ready authorization packets: ${report.readyAuthorizationPackets.length ? report.readyAuthorizationPackets.map((item) => item.packetId).join(", ") : "none"}`,
+    `- Ready console action packets: ${report.readyActionPackets.length ? report.readyActionPackets.map((item) => item.taskId).join(", ") : "none"}`,
+    "",
+    "## Ready Authorization Packets",
+    "",
+    ...(report.readyAuthorizationPackets.length
+      ? report.readyAuthorizationPackets.flatMap((packet) => [
+        `### ${packet.packetId} ${packet.title}`,
+        "",
+        `- Action id: ${packet.actionId}`,
+        `- Sequence group: ${packet.sequenceGroup || "none"}`,
+        `- Minimum user phrase: ${packet.minimumUserPhrase}`,
+        `- Non-secret evidence only: ${packet.nonSecretEvidenceOnly}`,
+        "- Completion evidence:",
+        ...(packet.completionEvidence.length ? packet.completionEvidence.map((item) => `  - ${item}`) : ["  - none"]),
+        "- Write targets:",
+        ...(packet.writeTargets.length ? packet.writeTargets.map((item) => `  - ${item}`) : ["  - none"]),
+        "- Explicitly excluded:",
+        ...(packet.explicitlyExcluded.length ? packet.explicitlyExcluded.map((item) => `  - ${item}`) : ["  - none"]),
+        "",
+      ])
+      : ["- none", ""]),
     "",
     "## Phases",
     "",

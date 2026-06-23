@@ -615,6 +615,8 @@ function renderMarkdown(audit) {
     `- secretLeakCheck: ${provisioningPlan.secretLeakCheck?.ok === true}`,
     `- readyToStartPhases: ${provisioningPlan.summary.readyToStartPhases.length ? provisioningPlan.summary.readyToStartPhases.join(", ") : "none"}`,
     `- blockedPhases: ${provisioningPlan.summary.blockedPhases.length ? provisioningPlan.summary.blockedPhases.join(", ") : "none"}`,
+    `- readyAuthorizationPackets: ${provisioningPlan.readyAuthorizationPackets?.length ? provisioningPlan.readyAuthorizationPackets.map((item) => item.packetId).join(", ") : "none"}`,
+    `- readyActionPackets: ${provisioningPlan.readyActionPackets?.length ? provisioningPlan.readyActionPackets.map((item) => item.taskId).join(", ") : "none"}`,
     ...(provisioningPlan.phases?.length
       ? provisioningPlan.phases.map((item) => `- ${item.id}: ${item.status}, canStartNow=${item.canStartNow}`)
       : ["- none"]),
@@ -1798,6 +1800,10 @@ function main() {
       readyToStartPhases: provisioningPlan.summary.readyToStartPhases,
       blockedPhases: provisioningPlan.summary.blockedPhases,
       requiredBlocking: provisioningPlan.summary.requiredBlocking,
+      readyAuthorizationPackets: (provisioningPlan.readyAuthorizationPackets || []).map((item) =>
+        `${item.packetId}:${item.actionId}:${item.nonSecretEvidenceOnly ? "non_secret" : "controlled"}`),
+      readyActionPackets: (provisioningPlan.readyActionPackets || []).map((item) =>
+        `${item.taskId}:${item.currentActionScope}:${item.nonSecretEvidenceOnly ? "non_secret" : "controlled"}`),
     },
     actionAuthorization: {
       report: audit.outputFiles.actionAuthorizationJson,

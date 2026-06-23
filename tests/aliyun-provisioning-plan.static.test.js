@@ -53,6 +53,26 @@ test("Aliyun provisioning plan renders phase order without executing cloud actio
   assert.ok(report.summary.blockedPhases.includes("PH07_PRODUCTION_DEPLOY"))
   assert.ok(report.summary.requiredBlocking.includes("WECHAT_OPEN_APP_ID"))
   assert.ok(report.summary.requiredBlocking.includes("WECHAT_OPEN_APP_SECRET"))
+  assert.deepEqual(report.readyAuthorizationPackets.map((item) => item.packetId), [
+    "P01_WECHAT_OPEN_MOBILE_APP",
+    "P10_ANDROID_RELEASE_SIGNING",
+    "P02_APPLE_TEAM_ID",
+    "P03_ACR_PURCHASE",
+    "P05_OSS_RAM_STS",
+  ])
+  assert.ok(report.readyAuthorizationPackets.some((item) =>
+    item.packetId === "P01_WECHAT_OPEN_MOBILE_APP" &&
+    item.minimumUserPhrase.includes("不读取或输出 AppSecret")
+  ))
+  assert.ok(report.readyAuthorizationPackets.some((item) =>
+    item.packetId === "P03_ACR_PURCHASE" &&
+    item.nonSecretEvidenceOnly === true &&
+    item.completionEvidence.includes("acr.registryHost actual aliyuncs.com host")
+  ))
+  assert.deepEqual(report.readyActionPackets.map((item) => item.taskId), [
+    "C02_ACR_IMAGE_AND_PULL",
+    "C05_OSS_AUDIO_RAM_STS",
+  ])
 
   const identifiers = byId.get("PH01_EXTERNAL_APP_IDENTIFIERS")
   assert.equal(identifiers.canStartNow, true)
@@ -127,6 +147,11 @@ test("Aliyun provisioning plan markdown preserves ACR current scope and deferred
   })
   const markdown = fs.readFileSync(markdownPath, "utf8")
 
+  assert.match(markdown, /Ready authorization packets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID, P03_ACR_PURCHASE, P05_OSS_RAM_STS/)
+  assert.match(markdown, /Ready console action packets: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS/)
+  assert.match(markdown, /## Ready Authorization Packets/)
+  assert.match(markdown, /### P01_WECHAT_OPEN_MOBILE_APP/)
+  assert.match(markdown, /### P03_ACR_PURCHASE/)
   assert.match(markdown, /Current action scopes: C02_ACR_IMAGE_AND_PULL=purchase_and_repository_only/)
   assert.match(markdown, /Current action acceptance evidence:/)
   assert.match(markdown, /acr\.registryHost actual aliyuncs\.com host/)
