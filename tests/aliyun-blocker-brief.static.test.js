@@ -41,6 +41,7 @@ test("Aliyun blocker brief command is wired into scripts, predeploy, deploy spec
   assert.match(releaseArtifacts, /machineBlocking/)
   assert.match(releaseArtifacts, /bridgeDataLayer/)
   assert.match(releaseArtifacts, /rdsMigrationIncludedInThisRelease/)
+  assert.match(releaseArtifacts, /cloudResourceObservations/)
 })
 
 test("Aliyun blocker brief is concise, value-free, and names current hard blockers", () => {
@@ -86,6 +87,38 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.equal(report.bridgeDataLayer.rdsMigrationIncludedInThisRelease, false)
   assert.equal(report.bridgeDataLayer.rdsMigrationRequiredForFinalProductionCn, true)
   assert.ok(report.bridgeDataLayer.notes.some((item) => /桥接部署/.test(item)))
+  assert.equal(report.summary.cloudResourceEvidenceReady, "0/7")
+  assert.equal(report.summary.cloudResourceObservedReady, 0)
+  assert.equal(report.summary.cloudResourceObservedPartial, 2)
+  assert.equal(report.summary.cloudResourceObservedBlocked, 5)
+  assert.equal(report.summary.cloudResourceObservedTotal, 7)
+  assert.ok(report.summary.cloudResourceBlockedIds.includes("R01_SAE_RUNTIME"))
+  assert.ok(report.summary.cloudResourceBlockedIds.includes("R07_SLS_ALERTS"))
+  assert.ok(report.summary.cloudResourceActionTimeConfirmations.includes("R02_ACR_IMAGE_REGISTRY"))
+  assert.equal(report.cloudResourceObservations.evidenceReady, "0/7")
+  assert.equal(report.cloudResourceObservations.observedStatuses.ready, 0)
+  assert.equal(report.cloudResourceObservations.observedStatuses.partial, 2)
+  assert.equal(report.cloudResourceObservations.observedStatuses.blocked, 5)
+  assert.equal(report.cloudResourceObservations.observedStatuses.total, 7)
+  assert.equal(report.cloudResourceObservations.items.length, 7)
+  assert.ok(report.cloudResourceObservations.items.some((item) =>
+    item.id === "R01_SAE_RUNTIME" &&
+    item.observedStatus === "not_created_or_not_confirmed" &&
+    item.observedReadiness === "blocked"
+  ))
+  assert.ok(report.cloudResourceObservations.items.some((item) =>
+    item.id === "R02_ACR_IMAGE_REGISTRY" &&
+    item.requiresActionTimeConfirmation === true &&
+    item.observedStatus === "purchase_candidate_visible_not_purchased"
+  ))
+  assert.ok(report.cloudResourceObservations.items.some((item) =>
+    item.id === "R05_OSS_AUDIO_STORAGE" &&
+    item.observedReadiness === "partial"
+  ))
+  assert.ok(report.cloudResourceObservations.items.some((item) =>
+    item.id === "R07_SLS_ALERTS" &&
+    item.observedReadiness === "partial"
+  ))
   assert.deepEqual(report.summary.sensitiveBlockedIds, [
     "S01_WECHAT_OPEN_APP_LOGIN",
     "S02_APPLE_TEAM_ID",
@@ -222,6 +255,15 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.match(markdown, /target: Aliyun RDS PostgreSQL/)
   assert.match(markdown, /rdsMigrationIncludedInThisRelease: false/)
   assert.match(markdown, /rdsMigrationRequiredForFinalProductionCn: true/)
+  assert.match(markdown, /阿里云资源观察结果/)
+  assert.match(markdown, /evidenceReady: 0\/7/)
+  assert.match(markdown, /observedReady: 0\/7/)
+  assert.match(markdown, /observedPartial: 2/)
+  assert.match(markdown, /observedBlocked: 5/)
+  assert.match(markdown, /R01_SAE_RUNTIME/)
+  assert.match(markdown, /not_created_or_not_confirmed/)
+  assert.match(markdown, /R05_OSS_AUDIO_STORAGE/)
+  assert.match(markdown, /bucket_visible_unconfirmed/)
   assert.match(markdown, /notACloudResourceReadyProof: true/)
   assert.match(markdown, /nextEvidenceAction: configure_aliyun_cli_profile_or_use_cloudshell_for_fresh_readonly_inventory/)
   assert.match(markdown, /微信开放平台移动应用链路/)

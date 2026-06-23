@@ -711,6 +711,10 @@ function renderMarkdown(audit) {
     `- bridgeDataLayerStatus: ${blockerBrief.summary.bridgeDataLayerStatus || "unknown"}`,
     `- rdsMigrationIncludedInThisRelease: ${blockerBrief.summary.rdsMigrationIncludedInThisRelease === true}`,
     `- rdsMigrationRequiredForFinalProductionCn: ${blockerBrief.summary.rdsMigrationRequiredForFinalProductionCn === true}`,
+    `- cloudResourceEvidenceReady: ${blockerBrief.summary.cloudResourceEvidenceReady || "unknown"}`,
+    `- cloudResourceObserved: ready ${blockerBrief.summary.cloudResourceObservedReady || 0}/${blockerBrief.summary.cloudResourceObservedTotal || 0}, partial ${blockerBrief.summary.cloudResourceObservedPartial || 0}, blocked ${blockerBrief.summary.cloudResourceObservedBlocked || 0}`,
+    `- cloudResourceBlockedIds: ${blockerBrief.summary.cloudResourceBlockedIds?.length ? blockerBrief.summary.cloudResourceBlockedIds.join(", ") : "none"}`,
+    `- cloudResourceActionTimeConfirmations: ${blockerBrief.summary.cloudResourceActionTimeConfirmations?.length ? blockerBrief.summary.cloudResourceActionTimeConfirmations.join(", ") : "none"}`,
     `- cloudConfirmationsReady: ${blockerBrief.summary.cloudConfirmationsReady}`,
     `- sensitiveBlocked: ${blockerBrief.summary.sensitiveBlocked}`,
     `- blockedVariableAcquisitionCount: ${blockerBrief.summary.blockedVariableAcquisitionCount || 0}`,
@@ -737,6 +741,14 @@ function renderMarkdown(audit) {
         `- wechatOpenAndroidPackageName: ${blockerBrief.wechatOpenMobileApp.androidPackageName || "unknown"}`,
         `- wechatOpenAndroidSignatureStatus: ${blockerBrief.wechatOpenMobileApp.androidSignatureStatus || "unknown"}`,
         `- wechatOpenAppleTeamIdMissing: ${blockerBrief.wechatOpenMobileApp.appleTeamIdMissing === true}`,
+      ]
+      : []),
+    ...(blockerBrief.cloudResourceObservations
+      ? [
+        `- cloudResourceObservedReady: ${blockerBrief.cloudResourceObservations.observedStatuses?.ready || 0}/${blockerBrief.cloudResourceObservations.observedStatuses?.total || 0}`,
+        `- cloudResourceObservedPartial: ${blockerBrief.cloudResourceObservations.observedStatuses?.partial || 0}`,
+        `- cloudResourceObservedBlocked: ${blockerBrief.cloudResourceObservations.observedStatuses?.blocked || 0}`,
+        ...(blockerBrief.cloudResourceObservations.items || []).map((item) => `- ${item.id}: observed=${item.observedStatus}; readiness=${item.observedReadiness}; ready=${item.ready === true}; actionTimeConfirmation=${item.requiresActionTimeConfirmation === true}`),
       ]
       : []),
     ...(blockerBrief.immediateAuthorizationPackets?.length
@@ -1940,6 +1952,7 @@ function main() {
       machineBlocking: blockerBrief.summary.machineBlocking || [],
       manualBlockingCount: blockerBrief.summary.manualBlockingCount || 0,
       bridgeDataLayer: blockerBrief.bridgeDataLayer || null,
+      cloudResourceObservations: blockerBrief.cloudResourceObservations || null,
       cloudConfirmationsReady: blockerBrief.summary.cloudConfirmationsReady,
       operatorTasksReady: blockerBrief.summary.operatorTasksReady,
       sensitiveBlocked: blockerBrief.summary.sensitiveBlocked,

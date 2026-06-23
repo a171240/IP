@@ -142,6 +142,10 @@ function buildReport(args) {
     "scripts/summarize-aliyun-action-authorization.mjs",
     ...envArgs(args),
   ])
+  const resourcesMatrix = runJson("resources_matrix", [
+    "scripts/summarize-aliyun-resource-matrix.mjs",
+    ...envArgs(args),
+  ])
   const cloudAccess = runJson("cloud_access", [
     "scripts/check-aliyun-cloud-access.mjs",
     "--env-file",
@@ -166,6 +170,7 @@ function buildReport(args) {
     || {}
   const wechatOpenMobileApp = compactWechatOpenMobileApp(wechatOpenMobileAppPackage)
   const bridgeDataLayer = compactBridgeDataLayer(status.summary?.bridgeDataLayer || {})
+  const cloudResourceObservations = compactCloudResourceObservations(resourcesMatrix)
   const cloudInventoryReadinessInterpretation = buildCloudInventoryReadinessInterpretation(status, cloudAccess)
   const report = {
     ok: true,
@@ -192,6 +197,13 @@ function buildReport(args) {
       bridgeDataLayerStatus: bridgeDataLayer.status,
       rdsMigrationIncludedInThisRelease: bridgeDataLayer.rdsMigrationIncludedInThisRelease,
       rdsMigrationRequiredForFinalProductionCn: bridgeDataLayer.rdsMigrationRequiredForFinalProductionCn,
+      cloudResourceEvidenceReady: cloudResourceObservations.evidenceReady,
+      cloudResourceObservedReady: cloudResourceObservations.observedStatuses.ready,
+      cloudResourceObservedPartial: cloudResourceObservations.observedStatuses.partial,
+      cloudResourceObservedBlocked: cloudResourceObservations.observedStatuses.blocked,
+      cloudResourceObservedTotal: cloudResourceObservations.observedStatuses.total,
+      cloudResourceBlockedIds: cloudResourceObservations.blockedIds,
+      cloudResourceActionTimeConfirmations: cloudResourceObservations.actionTimeConfirmationRequired,
       cloudConfirmationsReady: `${status.summary?.cloudConfirmations?.ready || 0}/${status.summary?.cloudConfirmations?.total || 0}`,
       operatorTasksReady: `${status.summary?.operatorTasks?.ready || 0}/${status.summary?.operatorTasks?.total || 0}`,
       completion: {
@@ -230,6 +242,7 @@ function buildReport(args) {
     credentialInterventionBrief,
     wechatOpenMobileApp,
     bridgeDataLayer,
+    cloudResourceObservations,
     cloudInventoryReadinessInterpretation,
     cloudAccess: {
       canReadCloudNow: cloudAccess.canReadCloudNow === true,
@@ -294,6 +307,49 @@ function buildReport(args) {
   }
   report.ok = report.secretLeakCheck.ok
   return report
+}
+
+function compactCloudResourceObservations(resourcesMatrix) {
+  const summary = resourcesMatrix.summary || {}
+  const observedStatuses = summary.observedResourceStatuses || {}
+  return {
+    evidenceReady: summary.resourceEvidenceReady || `${summary.ready || 0}/${summary.total || 0}`,
+    total: summary.total || 0,
+    ready: summary.ready || 0,
+    blocked: summary.blocked || 0,
+    blockedIds: summary.blockedIds || [],
+    actionTimeConfirmationRequired: summary.actionTimeConfirmationRequired || [],
+    cloudConfirmationsTotalBlockers: summary.cloudConfirmationsTotalBlockers || 0,
+    imagePublishTotalBlockers: summary.imagePublishTotalBlockers || 0,
+    cloudAccessCanReadNow: summary.cloudAccessCanReadNow === true,
+    observedStatuses: {
+      total: observedStatuses.total || 0,
+      ready: observedStatuses.ready || 0,
+      partial: observedStatuses.partial || 0,
+      blocked: observedStatuses.blocked || 0,
+      observed: observedStatuses.observed || 0,
+      notObserved: observedStatuses.notObserved || 0,
+      blockedIds: observedStatuses.blockedIds || [],
+    },
+    items: (resourcesMatrix.resources || []).map((item) => {
+      const observed = item.observedResourceStatus || {}
+      return {
+        id: item.id,
+        title: item.title,
+        status: item.status,
+        ready: item.ready === true,
+        requiresActionTimeConfirmation: item.requiresActionTimeConfirmation === true,
+        observedStatus: observed.status || "unknown",
+        observedReadiness: observed.readiness || "unknown",
+        observed: observed.observed === true,
+        currentObservation: observed.currentObservation || "",
+        nextAction: observed.nextAction || "",
+        writeTarget: observed.writeTarget || "",
+        currentLocalEvidence: item.currentLocalEvidence || "",
+        blockers: (item.blockers || []).slice(0, 8),
+      }
+    }),
+  }
 }
 
 function compactBridgeDataLayer(bridge = {}) {
@@ -461,6 +517,10 @@ function renderMarkdown(report) {
     `- bridgeDataLayerStatus: ${report.summary.bridgeDataLayerStatus}`,
     `- rdsMigrationIncludedInThisRelease: ${report.summary.rdsMigrationIncludedInThisRelease}`,
     `- rdsMigrationRequiredForFinalProductionCn: ${report.summary.rdsMigrationRequiredForFinalProductionCn}`,
+    `- cloudResourceEvidenceReady: ${report.summary.cloudResourceEvidenceReady}`,
+    `- cloudResourceObserved: ready ${report.summary.cloudResourceObservedReady}/${report.summary.cloudResourceObservedTotal}, partial ${report.summary.cloudResourceObservedPartial}, blocked ${report.summary.cloudResourceObservedBlocked}`,
+    `- cloudResourceBlockedIds: ${report.summary.cloudResourceBlockedIds.join(", ") || "none"}`,
+    `- cloudResourceActionTimeConfirmations: ${report.summary.cloudResourceActionTimeConfirmations.join(", ") || "none"}`,
     `- cloudConfirmationsReady: ${report.summary.cloudConfirmationsReady}`,
     `- operatorTasksReady: ${report.summary.operatorTasksReady}`,
     `- completion: proved ${report.summary.completion.proved}/${report.summary.completion.requirements}, blocked ${report.summary.completion.blocked}, partial ${report.summary.completion.partial}`,
@@ -522,6 +582,32 @@ function renderMarkdown(report) {
     `- rdsMigrationRequiredForFinalProductionCn: ${report.bridgeDataLayer.rdsMigrationRequiredForFinalProductionCn}`,
     "- notes:",
     ...(report.bridgeDataLayer.notes.length ? report.bridgeDataLayer.notes.map((item) => `  - ${item}`) : ["  - none"]),
+    "",
+    "## 阿里云资源观察结果",
+    "",
+    `- evidenceReady: ${report.cloudResourceObservations.evidenceReady}`,
+    `- matrixReady: ${report.cloudResourceObservations.ready}/${report.cloudResourceObservations.total}`,
+    `- matrixBlocked: ${report.cloudResourceObservations.blocked}`,
+    `- observedReady: ${report.cloudResourceObservations.observedStatuses.ready}/${report.cloudResourceObservations.observedStatuses.total}`,
+    `- observedPartial: ${report.cloudResourceObservations.observedStatuses.partial}`,
+    `- observedBlocked: ${report.cloudResourceObservations.observedStatuses.blocked}`,
+    `- observedCount: ${report.cloudResourceObservations.observedStatuses.observed}`,
+    `- notObservedCount: ${report.cloudResourceObservations.observedStatuses.notObserved}`,
+    `- cloudConfirmationsTotalBlockers: ${report.cloudResourceObservations.cloudConfirmationsTotalBlockers}`,
+    `- imagePublishTotalBlockers: ${report.cloudResourceObservations.imagePublishTotalBlockers}`,
+    `- actionTimeConfirmationRequired: ${report.cloudResourceObservations.actionTimeConfirmationRequired.join(", ") || "none"}`,
+    "",
+    "| 资源 | ready | 观察状态 | 观察成熟度 | 动作时确认 | 下一步 | 写入目标 |",
+    "| --- | --- | --- | --- | --- | --- | --- |",
+    ...report.cloudResourceObservations.items.map((item) => [
+      codeCell(item.id),
+      item.ready ? "true" : "false",
+      escapeTableCell(item.observedStatus),
+      escapeTableCell(item.observedReadiness),
+      item.requiresActionTimeConfirmation ? "true" : "false",
+      escapeTableCell(item.nextAction),
+      escapeTableCell(item.writeTarget),
+    ].join(" | ").replace(/^/, "| ").replace(/$/, " |")),
     "",
     "## 当前可开始但必须动作时确认",
     "",
