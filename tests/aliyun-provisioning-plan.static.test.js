@@ -58,9 +58,11 @@ test("Aliyun provisioning plan renders phase order without executing cloud actio
   assert.equal(identifiers.canStartNow, true)
   assert.deepEqual(identifiers.authorizationPackets.map((item) => item.packetId), [
     "P01_WECHAT_OPEN_MOBILE_APP",
+    "P10_ANDROID_RELEASE_SIGNING",
     "P02_APPLE_TEAM_ID",
   ])
   assert.ok(identifiers.explicitlyExcluded.some((item) => item.includes("不使用小程序 AppID")))
+  assert.ok(identifiers.explicitlyExcluded.some((item) => item.includes("debug.keystore")))
 
   const baseCloud = byId.get("PH02_BASE_CLOUD_RESOURCES")
   const baseAcr = baseCloud.consoleTasks.find((item) => item.id === "C02_ACR_IMAGE_AND_PULL")

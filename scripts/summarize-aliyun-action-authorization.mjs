@@ -32,6 +32,13 @@ const POLICY_BY_ACTION_ID = Object.freeze({
     blockerClass: "external_identifier_and_secret_after_review",
     why: "微信开放平台账号认证不等于移动应用已创建；移动应用审核通过前没有 APP 登录 AppID/AppSecret。",
   }),
+  U10_ANDROID_RELEASE_SIGNING: Object.freeze({
+    automationPolicy: "android_release_signing_requires_action_time_confirmation",
+    canCodexProceedWithoutUser: false,
+    requiresActionTimeConfirmation: true,
+    blockerClass: "android_keystore_password_or_signature",
+    why: "Android release keystore、签名密码和微信开放平台 Android 应用签名必须来自受控发布链路，不能用 debug 签名或写入仓库。",
+  }),
   U02_APPLE_TEAM_ID: Object.freeze({
     automationPolicy: "external_identifier_required",
     canCodexProceedWithoutUser: false,
@@ -111,6 +118,28 @@ const AUTHORIZATION_PACKET_BY_ACTION_ID = Object.freeze({
       "wechatOpenPlatform.reviewStatus=approved",
       "WECHAT_OPEN_APP_ID ready",
       "WECHAT_OPEN_APP_SECRET imported through secret env only",
+    ],
+  }),
+  U10_ANDROID_RELEASE_SIGNING: Object.freeze({
+    packetId: "P10_ANDROID_RELEASE_SIGNING",
+    sequenceGroup: "app_signing",
+    dependsOn: [],
+    minimumUserPhrase: "授权使用受控 Android release keystore 构建/签名 release 包并读取微信开放平台 Android 应用签名；不输出 keystore 密码。",
+    allowedActions: [
+      "只在本机或 CI 受控 signing secret store 配置 MEIYE_RELEASE_STORE_FILE、MEIYE_RELEASE_STORE_PASSWORD、MEIYE_RELEASE_KEY_ALIAS、MEIYE_RELEASE_KEY_PASSWORD。",
+      "运行 assembleRelease 或等价 release 包构建，并用 apksigner/微信签名工具从 release APK/AAB 读取 Android 应用签名。",
+      "只把签名 hash、非密钥证据句柄和 androidConfigured 布尔状态记录到微信开放平台与 .local.json。",
+    ],
+    explicitlyExcluded: [
+      "不使用 debug.keystore、debug APK 或 debug 签名。",
+      "不把 keystore 文件、store password、key password、证书私钥或微信 AppSecret 写入 JSON、Markdown、Docker 镜像或 git。",
+      "不创建微信开放平台移动应用、不提交审核；这些必须由 P01 单独授权。",
+    ],
+    completionEvidence: [
+      "Android release build succeeds with signingConfigs.release",
+      "release APK/AAB exists and is not signed with debug.keystore",
+      "wechatOpenPlatform.androidSignature records release signature evidence only",
+      "wechatOpenPlatform.androidConfigured=true",
     ],
   }),
   U02_APPLE_TEAM_ID: Object.freeze({
@@ -275,6 +304,7 @@ const AUTHORIZATION_PACKET_BY_ACTION_ID = Object.freeze({
     sequenceGroup: "production_release",
     dependsOn: [
       "P01_WECHAT_OPEN_MOBILE_APP",
+      "P10_ANDROID_RELEASE_SIGNING",
       "P02_APPLE_TEAM_ID",
       "P03_ACR_PURCHASE",
       "P04_ACR_IMAGE_AND_PULL",

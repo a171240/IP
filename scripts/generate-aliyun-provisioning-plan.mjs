@@ -26,11 +26,12 @@ const SECRET_VALUE_PATTERNS = [
 const PHASES = Object.freeze([
   Object.freeze({
     id: "PH01_EXTERNAL_APP_IDENTIFIERS",
-    title: "补齐微信移动应用和 Apple Team ID",
-    authorizationPackets: ["P01_WECHAT_OPEN_MOBILE_APP", "P02_APPLE_TEAM_ID"],
+    title: "补齐微信移动应用、Android release 签名和 Apple Team ID",
+    authorizationPackets: ["P01_WECHAT_OPEN_MOBILE_APP", "P10_ANDROID_RELEASE_SIGNING", "P02_APPLE_TEAM_ID"],
     consoleTasks: [],
     completionEvidence: [
       "微信开放平台移动应用审核通过后 only 记录 AppID ready；AppSecret 只导入 secret env。",
+      "Android release 包必须用受控 release keystore 签名，并只记录微信 Android 签名非密钥证据。",
       "APPLE_TEAM_ID 从 Apple Developer 读取并导入 plain env。",
     ],
   }),

@@ -62,6 +62,7 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   ])
   assert.deepEqual(report.summary.immediateAuthorizationPackets, [
     "P01_WECHAT_OPEN_MOBILE_APP",
+    "P10_ANDROID_RELEASE_SIGNING",
     "P02_APPLE_TEAM_ID",
     "P03_ACR_PURCHASE",
     "P05_OSS_RAM_STS",
@@ -85,6 +86,7 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.ok(report.strictVerificationOrder.includes("corepack pnpm aliyun:predeploy"))
   assert.match(markdown, /当前阻塞简报/)
   assert.match(markdown, /P01_WECHAT_OPEN_MOBILE_APP/)
+  assert.match(markdown, /P10_ANDROID_RELEASE_SIGNING/)
   assert.match(markdown, /S07_ANDROID_RELEASE_SIGNING/)
   assert.match(markdown, /MEIYE_RELEASE_KEY_PASSWORD/)
   assert.match(markdown, /workbenchTerminalReadiness/)

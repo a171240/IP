@@ -42,18 +42,21 @@ test("Aliyun user action brief is value-free and includes the expected blockers"
   assert.equal(report.canDeployNow, false)
   assert.equal(report.secretLeakCheck.ok, true)
   assert.ok(ids.includes("U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE"))
+  assert.ok(ids.includes("U10_ANDROID_RELEASE_SIGNING"))
   assert.ok(ids.includes("U03_ACR_PURCHASE_CONFIRMATION"))
   assert.ok(ids.includes("U06_ENV_IMPORT"))
   assert.ok(ids.includes("U09_DEPLOY_AUTHORIZATION"))
   assert.ok(report.summary.userMustAct.includes("U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE"))
   assert.ok(report.summary.userMustAct.includes("U08_SAE_RUNTIME_AND_SLS"))
   assert.ok(report.summary.actionTimeConfirmationRequired.includes("U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE"))
+  assert.ok(report.summary.actionTimeConfirmationRequired.includes("U10_ANDROID_RELEASE_SIGNING"))
   assert.ok(report.summary.actionTimeConfirmationRequired.includes("U02_APPLE_TEAM_ID"))
   assert.ok(report.summary.actionTimeConfirmationRequired.includes("U03_ACR_PURCHASE_CONFIRMATION"))
   assert.ok(report.summary.actionTimeConfirmationRequired.includes("U04_ACR_RUNTIME_AUTH"))
   assert.ok(report.summary.actionTimeConfirmationRequired.includes("U05_OSS_RAM_OR_STS"))
   assert.deepEqual(report.summary.nextActionTimeConfirmations, [
     "P01_WECHAT_OPEN_MOBILE_APP",
+    "P10_ANDROID_RELEASE_SIGNING",
     "P02_APPLE_TEAM_ID",
     "P03_ACR_PURCHASE",
     "P05_OSS_RAM_STS",
@@ -67,6 +70,7 @@ test("Aliyun user action brief is value-free and includes the expected blockers"
     authorization.nextActionTimeConfirmations.map((item) => item.minimumUserPhrase),
   )
   const wechatAction = report.actions.find((item) => item.id === "U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE")
+  const androidSigningAction = report.actions.find((item) => item.id === "U10_ANDROID_RELEASE_SIGNING")
   const acrPurchaseAction = report.actions.find((item) => item.id === "U03_ACR_PURCHASE_CONFIRMATION")
   const acrRuntimeAction = report.actions.find((item) => item.id === "U04_ACR_RUNTIME_AUTH")
   const domainAction = report.actions.find((item) => item.id === "U07_DOMAIN_DNS_HTTPS_ICP")
@@ -80,6 +84,22 @@ test("Aliyun user action brief is value-free and includes the expected blockers"
   assert.ok(
     nextConfirmationsById.get("P01_WECHAT_OPEN_MOBILE_APP").explicitlyExcluded.some((item) =>
       item.includes("不把 AppSecret 写入 JSON"),
+    ),
+  )
+  assert.ok(androidSigningAction.variableNames.includes("MEIYE_RELEASE_STORE_PASSWORD"))
+  assert.ok(androidSigningAction.variableNames.includes("MEIYE_RELEASE_KEY_PASSWORD"))
+  assert.equal(androidSigningAction.requiresActionTimeConfirmation, true)
+  assert.ok(androidSigningAction.currentBlockers.includes("S07_ANDROID_RELEASE_SIGNING:blocked"))
+  assert.ok(androidSigningAction.currentBlockers.includes("wechatOpenPlatform:androidSignature"))
+  assert.ok(androidSigningAction.currentEvidence.includes("S07_ANDROID_RELEASE_SIGNING:releaseSigningConfigReady=true; releaseUsesDebugSigning=false; wechatSignatureRecorded=false; androidConfigured=false"))
+  assert.ok(
+    nextConfirmationsById.get("P10_ANDROID_RELEASE_SIGNING").writeTargets.some((item) =>
+      item.includes("微信开放平台 -> 移动应用 -> Android 应用签名"),
+    ),
+  )
+  assert.ok(
+    nextConfirmationsById.get("P10_ANDROID_RELEASE_SIGNING").explicitlyExcluded.some((item) =>
+      item.includes("debug.keystore"),
     ),
   )
   assert.ok(!acrPurchaseAction.currentEvidence.some((item) => item.includes("TODO_")))

@@ -26,6 +26,7 @@ const SECRET_VALUE_PATTERNS = [
 
 const ACTION_ORDER = [
   "U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE",
+  "U10_ANDROID_RELEASE_SIGNING",
   "U02_APPLE_TEAM_ID",
   "U03_ACR_PURCHASE_CONFIRMATION",
   "U04_ACR_RUNTIME_AUTH",
@@ -56,6 +57,27 @@ const NEXT_ACTION_TIME_CONFIRMATION_BY_ACTION_ID = Object.freeze({
       "wechatOpenPlatform.reviewStatus=approved",
       "WECHAT_OPEN_APP_ID ready",
       "WECHAT_OPEN_APP_SECRET imported through secret env only",
+    ],
+  }),
+  U10_ANDROID_RELEASE_SIGNING: Object.freeze({
+    packetId: "P10_ANDROID_RELEASE_SIGNING",
+    sequenceGroup: "app_signing",
+    minimumUserPhrase: "授权使用受控 Android release keystore 构建/签名 release 包并读取微信开放平台 Android 应用签名；不输出 keystore 密码。",
+    allowedActions: [
+      "只在本机或 CI 受控 signing secret store 配置 MEIYE_RELEASE_STORE_FILE、MEIYE_RELEASE_STORE_PASSWORD、MEIYE_RELEASE_KEY_ALIAS、MEIYE_RELEASE_KEY_PASSWORD。",
+      "运行 assembleRelease 或等价 release 包构建，并用 apksigner/微信签名工具从 release APK/AAB 读取 Android 应用签名。",
+      "只把签名 hash、非密钥证据句柄和 androidConfigured 布尔状态记录到微信开放平台与 .local.json。",
+    ],
+    explicitlyExcluded: [
+      "不使用 debug.keystore、debug APK 或 debug 签名。",
+      "不把 keystore 文件、store password、key password、证书私钥或微信 AppSecret 写入 JSON、Markdown、Docker 镜像或 git。",
+      "不创建微信开放平台移动应用、不提交审核；这些必须由 P01 单独授权。",
+    ],
+    completionEvidence: [
+      "Android release build succeeds with signingConfigs.release",
+      "release APK/AAB exists and is not signed with debug.keystore",
+      "wechatOpenPlatform.androidSignature records release signature evidence only",
+      "wechatOpenPlatform.androidConfigured=true",
     ],
   }),
   U02_APPLE_TEAM_ID: Object.freeze({
@@ -316,6 +338,46 @@ function buildActions({ sensitiveById, resourcesById, status, cloudItems }) {
       "mobileAppSecretReady",
     ]),
     verifyCommands: ["corepack pnpm aliyun:wechat-state:test", "corepack pnpm aliyun:readiness"],
+  })
+
+  const androidSigning = sensitiveById.get("S07_ANDROID_RELEASE_SIGNING")
+  addAction(actionMap, {
+    id: "U10_ANDROID_RELEASE_SIGNING",
+    title: "配置 Android release signing 并生成微信开放平台 Android 签名",
+    status: androidSigning?.status || "blocked",
+    owner: androidSigning?.owner || "Android 发布操作员 / 微信开放平台操作员",
+    obtainFrom: androidSigning?.obtainFrom || "Android release keystore 管理位置 / CI Secret Store；微信开放平台 -> 移动应用 -> Android 应用签名",
+    writeTargets: androidSigning?.writeTargets || [
+      "MEIYE_RELEASE_STORE_FILE / MEIYE_RELEASE_STORE_PASSWORD / MEIYE_RELEASE_KEY_ALIAS / MEIYE_RELEASE_KEY_PASSWORD -> 本机或 CI 受控 signing secret store",
+      "微信开放平台 -> 移动应用 -> Android 应用签名",
+      "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.wechatOpenPlatform.androidSignature / androidConfigured",
+    ],
+    requiredUserAction: androidSigning?.requiredUserAction,
+    unblockCondition: androidSigning?.unblockCondition,
+    variableNames: androidSigning?.variableNames || [],
+    requiresUserAction: true,
+    requiresActionTimeConfirmation: true,
+    nonSecretEvidenceOnly: false,
+    sourceIds: ["S07_ANDROID_RELEASE_SIGNING"],
+    currentBlockers: [
+      ...sensitiveStatusBlockers(sensitiveById, ["S07_ANDROID_RELEASE_SIGNING"]),
+      ...cloudMissing(status, "wechatOpenPlatform").filter((item) =>
+        item.includes("androidSignature") || item.includes("androidConfigured")
+      ),
+    ],
+    currentEvidence: [
+      ...cloudEvidence(cloudItems, "wechatOpenPlatform", [
+        "androidSignature",
+        "androidConfigured",
+      ]),
+      ...sensitiveVariableNotes(androidSigning),
+    ],
+    verifyCommands: androidSigning?.verifyCommands || [
+      "cd /Users/Admin/Documents/美业话镜APP/meiye-huajing-app/android && ANDROID_HOME=\"$HOME/Library/Android/sdk\" ANDROID_SDK_ROOT=\"$HOME/Library/Android/sdk\" ./gradlew assembleRelease",
+      "ANDROID_HOME=\"$HOME/Library/Android/sdk\" ANDROID_SDK_ROOT=\"$HOME/Library/Android/sdk\" $ANDROID_HOME/build-tools/<version>/apksigner verify --print-certs app/build/outputs/apk/release/*.apk",
+      "corepack pnpm aliyun:wechat-open:package",
+      "corepack pnpm aliyun:app-native:check",
+    ],
   })
 
   addAction(actionMap, {
@@ -645,6 +707,13 @@ function resourceEvidence(resourcesById, ids) {
       .filter(Boolean)
       .map((item) => `${id}:${item}`)
   })
+}
+
+function sensitiveVariableNotes(item) {
+  const notes = (item?.variableDetails || [])
+    .map((detail) => detail?.notes)
+    .filter(Boolean)
+  return uniqueStrings(notes.map((note) => `S07_ANDROID_RELEASE_SIGNING:${note}`))
 }
 
 function cloudEvidence(cloudItems, key, fields) {

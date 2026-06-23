@@ -43,10 +43,11 @@ test("Aliyun action authorization matrix separates local-safe work from external
   assert.equal(report.mutationPerformed, false)
   assert.equal(report.canDeployNow, false)
   assert.equal(report.secretLeakCheck.ok, true)
-  assert.equal(report.summary.actions, 9)
-  assert.equal(report.summary.authorizationPackets, 9)
+  assert.equal(report.summary.actions, 10)
+  assert.equal(report.summary.authorizationPackets, 10)
   assert.deepEqual(report.summary.canStartNowPackets, [
     "P01_WECHAT_OPEN_MOBILE_APP",
+    "P10_ANDROID_RELEASE_SIGNING",
     "P02_APPLE_TEAM_ID",
     "P03_ACR_PURCHASE",
     "P05_OSS_RAM_STS",
@@ -63,6 +64,13 @@ test("Aliyun action authorization matrix separates local-safe work from external
   assert.equal(byId.get("U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE").requiresActionTimeConfirmation, true)
   assert.ok(byId.get("U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE").currentEvidence.includes("wechatOpenPlatform.mobileAppCreated=false"))
   assert.ok(byId.get("U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE").currentBlockers.includes("wechatOpenPlatform:mobileAppCreated"))
+
+  assert.equal(byId.get("U10_ANDROID_RELEASE_SIGNING").automationPolicy, "android_release_signing_requires_action_time_confirmation")
+  assert.equal(byId.get("U10_ANDROID_RELEASE_SIGNING").blockerClass, "android_keystore_password_or_signature")
+  assert.equal(byId.get("U10_ANDROID_RELEASE_SIGNING").requiresActionTimeConfirmation, true)
+  assert.ok(byId.get("U10_ANDROID_RELEASE_SIGNING").variableNames.includes("MEIYE_RELEASE_KEY_PASSWORD"))
+  assert.ok(byId.get("U10_ANDROID_RELEASE_SIGNING").currentBlockers.includes("S07_ANDROID_RELEASE_SIGNING:blocked"))
+  assert.ok(byId.get("U10_ANDROID_RELEASE_SIGNING").currentBlockers.includes("wechatOpenPlatform:androidSignature"))
 
   assert.equal(byId.get("U02_APPLE_TEAM_ID").requiresActionTimeConfirmation, true)
 
@@ -91,7 +99,7 @@ test("Aliyun action authorization matrix separates local-safe work from external
   assert.ok(report.prohibitedWithoutActionTimeConfirmation.some((item) => item.includes("读取、复制、粘贴、导入或输出")))
   assert.ok(report.safeLocalWorkStillAllowed.some((item) => item.includes("运行本地检查")))
 
-  assert.equal(report.nextActionTimeConfirmations.length, 4)
+  assert.equal(report.nextActionTimeConfirmations.length, 5)
   const nextConfirmationsById = new Map(report.nextActionTimeConfirmations.map((item) => [item.packetId, item]))
   assert.match(
     nextConfirmationsById.get("P01_WECHAT_OPEN_MOBILE_APP").minimumUserPhrase,
@@ -100,6 +108,17 @@ test("Aliyun action authorization matrix separates local-safe work from external
   assert.ok(
     nextConfirmationsById.get("P01_WECHAT_OPEN_MOBILE_APP").explicitlyExcluded.some((item) =>
       item.includes("不把 AppSecret 写入 JSON"),
+    ),
+  )
+  assert.ok(
+    nextConfirmationsById.get("P10_ANDROID_RELEASE_SIGNING").writeTargets.some((item) =>
+      item.includes("MEIYE_RELEASE_STORE_PASSWORD"),
+    ),
+  )
+  assert.match(nextConfirmationsById.get("P10_ANDROID_RELEASE_SIGNING").minimumUserPhrase, /Android release keystore/)
+  assert.ok(
+    nextConfirmationsById.get("P10_ANDROID_RELEASE_SIGNING").explicitlyExcluded.some((item) =>
+      item.includes("debug.keystore"),
     ),
   )
   assert.ok(
@@ -121,8 +140,11 @@ test("Aliyun action authorization matrix separates local-safe work from external
     ),
   )
 
-  assert.equal(report.authorizationPackets.length, 9)
+  assert.equal(report.authorizationPackets.length, 10)
   const packetsById = new Map(report.authorizationPackets.map((item) => [item.packetId, item]))
+  assert.equal(packetsById.get("P10_ANDROID_RELEASE_SIGNING").actionId, "U10_ANDROID_RELEASE_SIGNING")
+  assert.equal(packetsById.get("P10_ANDROID_RELEASE_SIGNING").canStartNow, true)
+  assert.ok(packetsById.get("P10_ANDROID_RELEASE_SIGNING").completionEvidence.includes("wechatOpenPlatform.androidConfigured=true"))
   assert.equal(packetsById.get("P03_ACR_PURCHASE").actionId, "U03_ACR_PURCHASE_CONFIRMATION")
   assert.equal(packetsById.get("P03_ACR_PURCHASE").canStartNow, true)
   assert.match(packetsById.get("P03_ACR_PURCHASE").minimumUserPhrase, /CNY 117\.00/)
@@ -140,6 +162,7 @@ test("Aliyun action authorization matrix separates local-safe work from external
   assert.deepEqual(packetsById.get("P07_DOMAIN_DNS_HTTPS").dependsOn, ["P08_SAE_RUNTIME_SLS"])
   assert.ok(packetsById.get("P07_DOMAIN_DNS_HTTPS").allowedActions.some((item) => item.includes("api-cn.ipgongchang.xin")))
   assert.ok(packetsById.get("P08_SAE_RUNTIME_SLS").explicitlyExcluded.some((item) => item.includes("不推送镜像")))
+  assert.ok(packetsById.get("P09_PRODUCTION_DEPLOY").dependsOn.includes("P10_ANDROID_RELEASE_SIGNING"))
   assert.ok(packetsById.get("P09_PRODUCTION_DEPLOY").dependsOn.includes("P08_SAE_RUNTIME_SLS"))
   assert.equal(packetsById.get("P09_PRODUCTION_DEPLOY").canStartNow, false)
   assert.ok(packetsById.get("P09_PRODUCTION_DEPLOY").explicitlyExcluded.some((item) => item.includes("不 git push")))

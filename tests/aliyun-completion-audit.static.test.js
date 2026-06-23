@@ -120,11 +120,13 @@ test("Aliyun completion audit reports the current goal as blocked without secret
   assert.ok(report.nextActions.canStartNowConsoleTasks.includes("C02_ACR_IMAGE_AND_PULL"))
   assert.ok(report.nextActions.canStartNowConsoleTasks.includes("C05_OSS_AUDIO_RAM_STS"))
   assert.ok(report.nextActions.canStartNowAuthorizationPackets.includes("P01_WECHAT_OPEN_MOBILE_APP"))
+  assert.ok(report.nextActions.canStartNowAuthorizationPackets.includes("P10_ANDROID_RELEASE_SIGNING"))
   assert.ok(report.nextActions.canStartNowAuthorizationPackets.includes("P03_ACR_PURCHASE"))
   assert.deepEqual(
     report.summary.nextActionTimeConfirmations.map((item) => item.packetId),
     [
       "P01_WECHAT_OPEN_MOBILE_APP",
+      "P10_ANDROID_RELEASE_SIGNING",
       "P02_APPLE_TEAM_ID",
       "P03_ACR_PURCHASE",
       "P05_OSS_RAM_STS",
@@ -133,6 +135,11 @@ test("Aliyun completion audit reports the current goal as blocked without secret
   assert.match(
     report.summary.nextActionTimeConfirmations.find((item) => item.packetId === "P01_WECHAT_OPEN_MOBILE_APP").minimumUserPhrase,
     /微信开放平台创建\/补全美业话镜移动应用资料/,
+  )
+  assert.ok(
+    report.summary.nextActionTimeConfirmations
+      .find((item) => item.packetId === "P10_ANDROID_RELEASE_SIGNING")
+      .explicitlyExcluded.some((item) => item.includes("debug.keystore")),
   )
   assert.ok(
     report.summary.nextActionTimeConfirmations
