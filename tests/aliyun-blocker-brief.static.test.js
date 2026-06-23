@@ -51,6 +51,15 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.equal(report.canDeployNow, false)
   assert.equal(report.summary.requiredEnv, "24/26")
   assert.deepEqual(report.summary.requiredBlocking, ["WECHAT_OPEN_APP_ID", "WECHAT_OPEN_APP_SECRET"])
+  assert.deepEqual(report.summary.sensitiveBlockedIds, [
+    "S01_WECHAT_OPEN_APP_LOGIN",
+    "S02_APPLE_TEAM_ID",
+    "S03_ACR_PAID_PURCHASE",
+    "S04_ACR_REGISTRY_AUTH",
+    "S05_OSS_RAM_SECRET_OR_STS",
+    "S06_READY_SENSITIVE_ENV_IMPORT",
+    "S07_ANDROID_RELEASE_SIGNING",
+  ])
   assert.deepEqual(report.summary.immediateAuthorizationPackets, [
     "P01_WECHAT_OPEN_MOBILE_APP",
     "P02_APPLE_TEAM_ID",
@@ -60,6 +69,12 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.ok(report.requiredEnvBlockers.some((item) => item.name === "WECHAT_OPEN_APP_ID" && /微信开放平台/.test(item.consolePath)))
   assert.ok(report.requiredEnvBlockers.some((item) => item.name === "WECHAT_OPEN_APP_SECRET" && /secret env/.test(item.importTarget)))
   assert.ok(report.requiredEnvBlockers.some((item) => item.name === "APPLE_TEAM_ID" && /Apple Developer/.test(item.consolePath)))
+  assert.ok(report.requiredEnvBlockers.some((item) => item.name === "MEIYE_RELEASE_KEY_PASSWORD" && /Android signing secret store/.test(item.importTarget)))
+  assert.ok(report.sensitiveBlockers.some((item) =>
+    item.id === "S07_ANDROID_RELEASE_SIGNING" &&
+    item.type === "android_keystore_password_or_signature" &&
+    item.variableNames.includes("MEIYE_RELEASE_STORE_PASSWORD")
+  ))
   assert.equal(report.cloudAccess.canReadCloudNow, false)
   assert.equal(report.cloudAccess.cliConfigProbeFailureCategory, "aliyun_cli_profile_not_configured")
   assert.equal(typeof report.cloudAccess.workbenchTerminalConnected, "boolean")
@@ -70,6 +85,8 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.ok(report.strictVerificationOrder.includes("corepack pnpm aliyun:predeploy"))
   assert.match(markdown, /当前阻塞简报/)
   assert.match(markdown, /P01_WECHAT_OPEN_MOBILE_APP/)
+  assert.match(markdown, /S07_ANDROID_RELEASE_SIGNING/)
+  assert.match(markdown, /MEIYE_RELEASE_KEY_PASSWORD/)
   assert.match(markdown, /workbenchTerminalReadiness/)
   assert.match(markdown, /WECHAT_OPEN_APP_SECRET/)
   assert.doesNotMatch(output, secretLike)

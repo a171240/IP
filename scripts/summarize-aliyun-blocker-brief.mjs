@@ -119,6 +119,7 @@ function buildReport(args) {
   ])
 
   const requiredEnvBlockers = extractRequiredEnvBlockers(sensitiveBlockers)
+  const sensitiveBlockerSummaries = compactSensitiveBlockers(sensitiveBlockers)
   const report = {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -144,6 +145,9 @@ function buildReport(args) {
         requirements: completionAudit.summary?.requirements || 0,
       },
       sensitiveBlocked: `${sensitiveBlockers.summary?.blocked || 0}/${sensitiveBlockers.summary?.total || 0}`,
+      sensitiveBlockedIds: sensitiveBlockerSummaries
+        .filter((item) => item.status !== "ready")
+        .map((item) => item.id),
       requiredEnvBlockers: requiredEnvBlockers.map((item) => item.name),
       immediateAuthorizationPackets: actionAuthorization.summary?.nextActionTimeConfirmations || [],
       cloudInventoryStrictReady: `${status.summary?.cloudInventoryResults?.readyLocalOperations || 0}/${status.summary?.cloudInventoryResults?.localOperations || 0}`,
@@ -179,17 +183,7 @@ function buildReport(args) {
       notFoundOperationIds: status.summary?.cloudInventoryResults?.observationSummary?.notFoundOperationIds || [],
       observedOperationIds: status.summary?.cloudInventoryResults?.observationSummary?.observedOperationIds || [],
     },
-    sensitiveBlockers: (sensitiveBlockers.items || []).map((item) => ({
-      id: item.id,
-      type: item.type,
-      status: item.status,
-      owner: item.owner,
-      obtainFrom: item.obtainFrom,
-      writeTargets: item.writeTargets || [],
-      verifyCommands: item.verifyCommands || [],
-      variableNames: item.variableNames || [],
-      requiresActionTimeConfirmation: item.requiresActionTimeConfirmation === true,
-    })),
+    sensitiveBlockers: sensitiveBlockerSummaries,
     strictVerificationOrder: cloudShellHandoff.strictVerificationOrder || [
       "corepack pnpm aliyun:cloud:access",
       "corepack pnpm aliyun:cloud:inventory-results:strict",
@@ -215,6 +209,20 @@ function buildReport(args) {
   }
   report.ok = report.secretLeakCheck.ok
   return report
+}
+
+function compactSensitiveBlockers(sensitiveBlockers) {
+  return (sensitiveBlockers.items || []).map((item) => ({
+    id: item.id,
+    type: item.type,
+    status: item.status,
+    owner: item.owner,
+    obtainFrom: item.obtainFrom,
+    writeTargets: item.writeTargets || [],
+    verifyCommands: item.verifyCommands || [],
+    variableNames: item.variableNames || [],
+    requiresActionTimeConfirmation: item.requiresActionTimeConfirmation === true,
+  }))
 }
 
 function extractRequiredEnvBlockers(sensitiveBlockers) {
@@ -257,6 +265,7 @@ function renderMarkdown(report) {
     `- operatorTasksReady: ${report.summary.operatorTasksReady}`,
     `- completion: proved ${report.summary.completion.proved}/${report.summary.completion.requirements}, blocked ${report.summary.completion.blocked}, partial ${report.summary.completion.partial}`,
     `- sensitiveBlocked: ${report.summary.sensitiveBlocked}`,
+    `- sensitiveBlockedIds: ${report.summary.sensitiveBlockedIds.join(", ") || "none"}`,
     `- cloudInventoryStrictReady: ${report.summary.cloudInventoryStrictReady}`,
     `- canReadCloudNow: ${report.summary.canReadCloudNow}`,
     `- cliConfigProbeFailureCategory: ${report.summary.cliConfigProbeFailureCategory || "none"}`,
@@ -266,6 +275,9 @@ function renderMarkdown(report) {
     ...(report.immediateAuthorizationPackets.length
       ? report.immediateAuthorizationPackets.flatMap(renderPacket)
       : ["- none", ""]),
+    "## 密钥/密码/token/付款/受控标识符阻塞项",
+    "",
+    ...renderSensitiveBlockers(report.sensitiveBlockers),
     "## 必填/发布阻塞变量",
     "",
     ...renderVariableTable(report.requiredEnvBlockers),
@@ -292,6 +304,22 @@ function renderMarkdown(report) {
     ...report.prohibitedWithoutActionTimeConfirmation.map((item) => `- ${item}`),
     "",
   ].join("\n")
+}
+
+function renderSensitiveBlockers(items) {
+  if (!items.length) return ["- none", ""]
+  return [
+    "| ID | 状态 | 类型 | owner | 变量名 |",
+    "| --- | --- | --- | --- | --- |",
+    ...items.map((item) => [
+      codeCell(item.id),
+      escapeTableCell(item.status),
+      escapeTableCell(item.type),
+      escapeTableCell(item.owner),
+      escapeTableCell((item.variableNames || []).join(", ") || "none"),
+    ].join(" | ").replace(/^/, "| ").replace(/$/, " |")),
+    "",
+  ]
 }
 
 function renderPacket(packet) {
