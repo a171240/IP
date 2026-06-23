@@ -123,7 +123,132 @@ function buildOperatorHandoff(args) {
   ])
 }
 
-function compactGap(item) {
+function uniqueStrings(values) {
+  const seen = new Set()
+  const result = []
+  for (const value of values) {
+    const item = typeof value === "string" ? value.trim() : ""
+    if (!item || seen.has(item)) continue
+    seen.add(item)
+    result.push(item)
+  }
+  return result
+}
+
+function buildPrerequisites(requiredAuthorizationPackets, requiredEvidence, blockedUntil) {
+  return {
+    requiredAuthorizationPackets,
+    requiredEvidence,
+    blockedUntil,
+  }
+}
+
+function writebackPrerequisites(groupKey, item) {
+  const jsonPath = String(item?.jsonPath || "")
+
+  if (groupKey === "cloudInventoryResults") {
+    return buildPrerequisites(
+      ["P11_ALIYUN_READONLY_INVENTORY_IDENTITY"],
+      ["受控只读 Aliyun CLI/CloudShell inventory 结果：executed=true、cloudApiCalled=true、mutationPerformed=false"],
+      ["阿里云 CLI profile 或 CloudShell 只读身份可用"],
+    )
+  }
+
+  if (groupKey === "imagePublish") {
+    if (jsonPath === "acr.registryHost" || jsonPath === "acr.namespace" || jsonPath === "acr.confirmed") {
+      return buildPrerequisites(
+        ["P03_ACR_PURCHASE"],
+        ["ACR 实例、命名空间、仓库和非密钥控制台证据"],
+        ["ACR 已开通并确认仓库位置"],
+      )
+    }
+    if (jsonPath.startsWith("acr.")) {
+      return buildPrerequisites(
+        ["P04_ACR_IMAGE_AND_PULL"],
+        ["ACR 远端镜像地址、sha256 digest、push/import 证据和 digest 核对证据"],
+        ["镜像已进入 ACR 且远端 digest 已核对"],
+      )
+    }
+    if (jsonPath === "runtime.confirmed") {
+      return buildPrerequisites(
+        ["P08_SAE_RUNTIME_SLS"],
+        ["SAE production-cn runtime 控制台非密钥证据"],
+        ["SAE runtime 已确认"],
+      )
+    }
+    if (jsonPath.startsWith("runtime.")) {
+      return buildPrerequisites(
+        ["P04_ACR_IMAGE_AND_PULL"],
+        ["SAE 已指向 ACR 远端镜像并具备镜像拉取权限的非密钥证据"],
+        ["SAE 镜像地址和拉取权限已配置"],
+      )
+    }
+  }
+
+  if (jsonPath.startsWith("items.apiDomainHttps") || jsonPath.startsWith("items.assetDomainHttps")) {
+    return buildPrerequisites(
+      ["P07_DOMAIN_DNS_HTTPS_ICP"],
+      ["域名解析到阿里云入口、HTTPS 证书启用、ICP备案满足国内正式访问要求的证据"],
+      ["域名 DNS、HTTPS 和 ICP 均就绪"],
+    )
+  }
+
+  if (jsonPath.startsWith("items.oss")) {
+    return buildPrerequisites(
+      ["P05_OSS_RAM_STS"],
+      ["OSS bucket/CORS、服务记录前缀最小权限 RAM 或 STS/role 证据"],
+      ["OSS 与最小权限 RAM/STS 已配置"],
+    )
+  }
+
+  if (jsonPath.startsWith("items.envImport")) {
+    return buildPrerequisites(
+      ["P06_ENV_IMPORT"],
+      ["production-cn 环境变量已导入 SAE/KMS/Secrets Manager，且 secretNotInImage=true 的证据"],
+      ["密钥类环境变量已导入运行时密钥系统且未写入镜像"],
+    )
+  }
+
+  if (jsonPath.startsWith("items.slsAlerts") || jsonPath.startsWith("items.runtime")) {
+    return buildPrerequisites(
+      ["P08_SAE_RUNTIME_SLS"],
+      ["SAE runtime、健康检查和 SLS 告警的非密钥控制台证据"],
+      ["SAE runtime 与 SLS 告警已确认"],
+    )
+  }
+
+  if (
+    jsonPath === "items.wechatOpenPlatform.androidSignature" ||
+    jsonPath === "items.wechatOpenPlatform.androidConfigured"
+  ) {
+    return buildPrerequisites(
+      ["P10_ANDROID_RELEASE_SIGNING"],
+      ["Android release APK/AAB 签名证据和微信开放平台 Android 包名/签名配置证据，不能使用 debug keystore"],
+      ["Android release 签名已生成并配置到微信开放平台"],
+    )
+  }
+
+  if (jsonPath === "items.wechatOpenPlatform.iosConfigured") {
+    return buildPrerequisites(
+      ["P01_WECHAT_OPEN_MOBILE_APP", "P02_APPLE_TEAM_ID"],
+      ["微信开放平台移动应用 AppID 证据、Apple Team ID、Bundle ID 和 Universal Link/AASA 证据"],
+      ["微信移动应用已创建且 Apple Team/Universal Link 已确认"],
+    )
+  }
+
+  if (jsonPath.startsWith("items.wechatOpenPlatform")) {
+    return buildPrerequisites(
+      ["P01_WECHAT_OPEN_MOBILE_APP"],
+      ["微信开放平台移动应用创建、提交、审核通过、AppID ready、AppSecret 仅以密钥方式导入的证据"],
+      ["微信开放平台移动应用审核通过并取得 AppID/AppSecret"],
+    )
+  }
+
+  return buildPrerequisites([], [], [])
+}
+
+function compactGap(item, groupKey) {
+  const prerequisites = writebackPrerequisites(groupKey, item)
   return {
     jsonPath: item.jsonPath || "$",
     blocker: item.blocker || "unknown",
@@ -132,11 +257,14 @@ function compactGap(item) {
     expected: item.expected || "",
     forbidden: item.forbidden || [],
     nonSecretOnly: true,
+    requiredAuthorizationPackets: prerequisites.requiredAuthorizationPackets,
+    requiredEvidence: prerequisites.requiredEvidence,
+    blockedUntil: prerequisites.blockedUntil,
   }
 }
 
 function compactGroup(key, group, strictVerifyCommands) {
-  const gaps = (group?.gaps || []).map(compactGap)
+  const gaps = (group?.gaps || []).map((item) => compactGap(item, key))
   return {
     key,
     file: group?.file || "",
@@ -147,6 +275,8 @@ function compactGroup(key, group, strictVerifyCommands) {
     localDockerImage: group?.localDockerImage || null,
     observationSummary: group?.observationSummary || null,
     gaps,
+    requiredAuthorizationPackets: uniqueStrings(gaps.flatMap((gap) => gap.requiredAuthorizationPackets || [])),
+    blockedUntil: uniqueStrings(gaps.flatMap((gap) => gap.blockedUntil || [])),
     strictVerifyCommands,
   }
 }
@@ -168,6 +298,7 @@ function buildReport(args) {
   const allGaps = Object.values(writebackGroups).flatMap((group) => group.gaps)
   const forbiddenValueClasses = [...new Set(allGaps.flatMap((item) => item.forbidden || []))].sort()
   const strictVerifyCommands = [...new Set(Object.values(writebackGroups).flatMap((group) => group.strictVerifyCommands))]
+  const requiredAuthorizationPackets = uniqueStrings(allGaps.flatMap((item) => item.requiredAuthorizationPackets || []))
   const report = {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -204,6 +335,7 @@ function buildReport(args) {
       cloudConfirmationGaps: writebackGroups.cloudConfirmations.gaps.length,
       imagePublishGaps: writebackGroups.imagePublish.gaps.length,
       forbiddenValueClasses,
+      requiredAuthorizationPackets,
       strictVerifyCommands,
       canDeployNow: handoff.canDeployNow === true,
     },
@@ -253,6 +385,7 @@ function renderMarkdown(report) {
     `- cloudConfirmationGaps: ${report.summary.cloudConfirmationGaps}`,
     `- imagePublishGaps: ${report.summary.imagePublishGaps}`,
     `- forbiddenValueClasses: ${report.summary.forbiddenValueClasses.join(", ") || "none"}`,
+    `- requiredAuthorizationPackets: ${report.summary.requiredAuthorizationPackets.join(", ") || "none"}`,
     "",
     ...Object.values(report.writebackGroups).flatMap(renderGroup),
     "## Strict 验证顺序",
@@ -275,6 +408,8 @@ function renderGroup(group) {
     `- totalBlockers: ${group.totalBlockers}`,
     ...(group.checkedOperations === null ? [] : [`- checkedOperations: ${group.checkedOperations}`]),
     ...(group.localDockerImage ? [`- localDockerImage: ${group.localDockerImage}`] : []),
+    `- requiredAuthorizationPackets: ${group.requiredAuthorizationPackets.join(", ") || "none"}`,
+    `- blockedUntil: ${group.blockedUntil.join("; ") || "none"}`,
     `- strictVerifyCommands: ${group.strictVerifyCommands.join("; ")}`,
     "",
     ...(group.gaps.length
@@ -292,6 +427,9 @@ function renderGap(item) {
     `  - writeTo: ${item.writeTo}`,
     `  - expected: ${item.expected}`,
     `  - forbidden: ${(item.forbidden || []).join(", ") || "none"}`,
+    `  - requiredAuthorizationPackets: ${(item.requiredAuthorizationPackets || []).join(", ") || "none"}`,
+    `  - requiredEvidence: ${(item.requiredEvidence || []).join("; ") || "none"}`,
+    `  - blockedUntil: ${(item.blockedUntil || []).join("; ") || "none"}`,
   ]
 }
 
