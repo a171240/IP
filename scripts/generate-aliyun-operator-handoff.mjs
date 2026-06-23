@@ -225,6 +225,7 @@ function compactCloudAccess(report) {
   const checklist = report.consoleEvidenceChecklist || []
   const cloudShell = report.cloudShellObservation?.cloudShell || {}
   const browserConsole = report.cloudShellObservation?.browserConsole || {}
+  const workbenchTerminal = report.terminalAccess?.workbenchTerminal || report.cloudShellObservation?.workbenchTerminal || {}
   return {
     readOnlyOnly: report.readOnlyOnly === true,
     cloudApiCalled: report.cloudApiCalled === true,
@@ -253,6 +254,21 @@ function compactCloudAccess(report) {
       cloudMutationPerformed: cloudShell.cloudMutationPerformed === true,
       blockers: cloudShell.blockers || [],
       evidence: cloudShell.evidence || "",
+    },
+    workbenchTerminal: {
+      observed: workbenchTerminal.observed === true,
+      connected: workbenchTerminal.connected === true,
+      title: workbenchTerminal.title || "",
+      urlHostPath: workbenchTerminal.urlHostPath || "",
+      loginUser: workbenchTerminal.loginUser || "",
+      hostLabel: workbenchTerminal.hostLabel || "",
+      observedAt: workbenchTerminal.observedAt || "",
+      cliInventoryAttempted: workbenchTerminal.cliInventoryAttempted === true,
+      cloudApiCalled: workbenchTerminal.cloudApiCalled === true,
+      cloudMutationPerformed: workbenchTerminal.cloudMutationPerformed === true,
+      readiness: workbenchTerminal.readiness || "not_observed",
+      blockers: workbenchTerminal.blockers || [],
+      evidence: workbenchTerminal.evidence || "",
     },
     consoleEvidenceChecklist: checklist.map((item) => ({
       id: item.id,
@@ -809,6 +825,9 @@ function renderMarkdown(handoff) {
     `- cloudShellCliAvailable: ${handoff.cloudAccess.cloudShell.cliAvailable}`,
     `- cloudShellCliConfigFileExists: ${handoff.cloudAccess.cloudShell.cliConfigFileExists}`,
     `- cloudShellCanRunReadOnlyInventory: ${handoff.cloudAccess.cloudShell.canRunReadOnlyInventory}`,
+    `- workbenchTerminalConnected: ${handoff.cloudAccess.workbenchTerminal.connected}`,
+    `- workbenchTerminalReadiness: ${handoff.cloudAccess.workbenchTerminal.readiness || "not_observed"}`,
+    `- workbenchTerminalCliInventoryAttempted: ${handoff.cloudAccess.workbenchTerminal.cliInventoryAttempted}`,
     `- blockers: ${handoff.cloudAccess.blockers.length ? handoff.cloudAccess.blockers.join(", ") : "none"}`,
     `- target: ${handoff.cloudAccess.targets.provider || "unknown"} / ${handoff.cloudAccess.targets.region || "unknown"} / ${handoff.cloudAccess.targets.appName || "unknown"}`,
     "",

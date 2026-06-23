@@ -24,12 +24,17 @@ test("Aliyun cloud access supports non-secret Cloud Shell observations", () => {
   assert.match(source, /DEFAULT_CLOUD_ACCESS_OBSERVATION_FILE/)
   assert.match(source, /--cloud-access-observation/)
   assert.match(source, /cloudShellObservation/)
+  assert.match(source, /workbenchTerminal/)
+  assert.match(source, /workbench_terminal_api_called_without_inventory_context/)
   assert.match(source, /configProbe/)
   assert.match(source, /cloudshell_cli_config_missing_or_unread/)
   assert.equal(template.schemaVersion, 1)
   assert.equal(template.environment, "production-cn")
   assert.equal(template.cloudShell.cloudApiCalled, false)
   assert.equal(template.cloudShell.cloudMutationPerformed, false)
+  assert.equal(template.workbenchTerminal.cloudApiCalled, false)
+  assert.equal(template.workbenchTerminal.cloudMutationPerformed, false)
+  assert.ok(template.workbenchTerminal.blockers.includes("workbench_terminal_not_cloudshell_inventory"))
 })
 
 test("Aliyun operator handoff exposes Cloud Shell inventory readiness", () => {
@@ -38,6 +43,8 @@ test("Aliyun operator handoff exposes Cloud Shell inventory readiness", () => {
   assert.match(source, /browserConsoleChromeLoggedIn/)
   assert.match(source, /cloudShellConnected/)
   assert.match(source, /cloudShellCanRunReadOnlyInventory/)
+  assert.match(source, /workbenchTerminalConnected/)
+  assert.match(source, /workbenchTerminalReadiness/)
   assert.match(source, /cliConfigProbeFailureCategory/)
 })
 
@@ -59,6 +66,14 @@ test("Aliyun cloud access does not mark invalid Cloud Shell observations ready",
           cloudApiCalled: false,
           cloudMutationPerformed: false,
         },
+        workbenchTerminal: {
+          observed: true,
+          connected: true,
+          cliInventoryAttempted: false,
+          cloudApiCalled: false,
+          cloudMutationPerformed: false,
+          blockers: ["workbench_terminal_not_cloudshell_inventory"],
+        },
       },
       null,
       2,
@@ -72,6 +87,9 @@ test("Aliyun cloud access does not mark invalid Cloud Shell observations ready",
   )
   const report = JSON.parse(output)
   assert.equal(report.cloudShellObservation.ready, false)
+  assert.equal(report.cloudShellObservation.workbenchTerminal.connected, true)
+  assert.equal(report.cloudShellObservation.workbenchTerminal.readiness, "connected_not_inventory_ready")
+  assert.equal(report.terminalAccess.workbenchTerminal.connected, true)
   assert.match(report.cloudShellObservation.blockers.join(","), /schemaVersion=1/)
 })
 
@@ -100,6 +118,10 @@ test("Aliyun cloud access report preserves current non-secret console evidence",
   ].includes(report.cli.configProbe.failureCategory))
   assert.equal(report.cloudShellObservation.exists, true)
   assert.equal(report.cloudShellObservation.browserConsole.chromeLoggedIn, true)
+  assert.equal(typeof report.cloudShellObservation.workbenchTerminal.connected, "boolean")
+  assert.equal(report.terminalAccess.inventoryReady, false)
+  assert.equal(report.terminalAccess.workbenchTerminal.cloudMutationPerformed, false)
+  assert.equal(report.terminalAccess.workbenchTerminal.cloudApiCalled, false)
   assert.match(resourcesObserved, /ACR Enterprise Economic cn-hangzhou 1 month purchase page visible, CNY 117\.00, instance name meiye-huajing, not purchased/)
   assert.match(resourcesObserved, /SAE console accessible; target app not proven created/)
   assert.match(resourcesObserved, /OSS bucket meiye-huajing-service-records-production-cn overview visible in oss-cn-hangzhou/)

@@ -323,6 +323,9 @@ function renderMarkdown(audit) {
     `- cliConfigFileExists: ${cloudAccess.cli?.configFileExists === true}`,
     `- cliConfigProbeReady: ${cloudAccess.cli?.configProbe?.ready === true}`,
     `- cliConfigProbeFailureCategory: ${cloudAccess.cli?.configProbe?.failureCategory || "none"}`,
+    `- workbenchTerminalConnected: ${cloudAccess.terminalAccess?.workbenchTerminal?.connected === true}`,
+    `- workbenchTerminalReadiness: ${cloudAccess.terminalAccess?.workbenchTerminal?.readiness || "not_observed"}`,
+    `- workbenchTerminalCliInventoryAttempted: ${cloudAccess.terminalAccess?.workbenchTerminal?.cliInventoryAttempted === true}`,
     `- checklistItems: ${cloudAccess.consoleEvidenceChecklist?.length || 0}`,
     ...(cloudAccess.blockers?.length
       ? cloudAccess.blockers.map((item) => `- ${item}`)
@@ -1403,6 +1406,9 @@ function main() {
       cliConfigFileExists: cloudAccess.cli?.configFileExists === true,
       cliConfigProbeReady: cloudAccess.cli?.configProbe?.ready === true,
       cliConfigProbeFailureCategory: cloudAccess.cli?.configProbe?.failureCategory || "",
+      workbenchTerminalConnected: cloudAccess.terminalAccess?.workbenchTerminal?.connected === true,
+      workbenchTerminalReadiness: cloudAccess.terminalAccess?.workbenchTerminal?.readiness || "not_observed",
+      workbenchTerminalCliInventoryAttempted: cloudAccess.terminalAccess?.workbenchTerminal?.cliInventoryAttempted === true,
       blockers: cloudAccess.blockers || [],
       checklistItems: cloudAccess.consoleEvidenceChecklist?.length || 0,
     },
@@ -1449,6 +1455,7 @@ function main() {
       canReadCloudNow: cloudshellInventoryHandoff.cliReadiness.canReadCloudNow === true,
       cliConfigProbeReady: cloudshellInventoryHandoff.cliReadiness.configProbe?.ready === true,
       cliConfigProbeFailureCategory: cloudshellInventoryHandoff.cliReadiness.configProbe?.failureCategory || "",
+      operatorPathIds: (cloudshellInventoryHandoff.operatorPaths || []).map((item) => item.id),
       totalOperations: cloudshellInventoryHandoff.inventoryPlan.totalOperations,
       commandTemplates: cloudshellInventoryHandoff.inventoryPlan.commandTemplates,
       writebackTargets: cloudshellInventoryHandoff.writebackTargets,

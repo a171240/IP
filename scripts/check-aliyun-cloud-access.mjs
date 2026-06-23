@@ -198,6 +198,22 @@ function findSecretLikeValues(value, path = "$", matches = []) {
 }
 
 function normalizeCloudAccessObservation(observation) {
+  const defaultWorkbenchTerminal = {
+    observed: false,
+    connected: false,
+    title: "",
+    urlHostPath: "",
+    loginUser: "",
+    hostLabel: "",
+    observedAt: "",
+    cliInventoryAttempted: false,
+    cloudApiCalled: false,
+    cloudMutationPerformed: false,
+    evidence: "",
+    blockers: [],
+    readiness: "not_observed",
+    note: "ECS Workbench terminal visibility is not the same as Aliyun CloudShell/OpenAPI inventory readiness.",
+  }
   if (!observation) {
     return {
       exists: false,
@@ -223,6 +239,7 @@ function normalizeCloudAccessObservation(observation) {
         blockers: [],
         evidence: "",
       },
+      workbenchTerminal: defaultWorkbenchTerminal,
     }
   }
 
@@ -240,6 +257,33 @@ function normalizeCloudAccessObservation(observation) {
     blockers.push("cloudshell_cli_config_missing_or_unread")
   }
   const canRunReadOnlyInventory = cloudShell.canRunReadOnlyInventory === true
+  const workbenchTerminal = observation.workbenchTerminal || {}
+  if (workbenchTerminal.cloudMutationPerformed === true) blockers.push("workbench_terminal_mutation_observed")
+  if (workbenchTerminal.cloudApiCalled === true && workbenchTerminal.cliInventoryAttempted !== true) {
+    warnings.push("workbench_terminal_api_called_without_inventory_context")
+  }
+  const normalizedWorkbenchTerminal = {
+    observed: workbenchTerminal.observed === true,
+    connected: workbenchTerminal.connected === true,
+    title: String(workbenchTerminal.title || ""),
+    urlHostPath: String(workbenchTerminal.urlHostPath || ""),
+    loginUser: String(workbenchTerminal.loginUser || ""),
+    hostLabel: String(workbenchTerminal.hostLabel || ""),
+    observedAt: String(workbenchTerminal.observedAt || ""),
+    cliInventoryAttempted: workbenchTerminal.cliInventoryAttempted === true,
+    cloudApiCalled: workbenchTerminal.cloudApiCalled === true,
+    cloudMutationPerformed: workbenchTerminal.cloudMutationPerformed === true,
+    evidence: String(workbenchTerminal.evidence || ""),
+    blockers: Array.isArray(workbenchTerminal.blockers) ? workbenchTerminal.blockers.map((item) => String(item)) : [],
+    readiness: workbenchTerminal.cliInventoryAttempted === true && workbenchTerminal.cloudApiCalled === true
+      ? "inventory_attempted"
+      : workbenchTerminal.connected === true
+        ? "connected_not_inventory_ready"
+        : workbenchTerminal.observed === true
+          ? "observed_not_connected"
+          : "not_observed",
+    note: "ECS Workbench terminal visibility is not the same as Aliyun CloudShell/OpenAPI inventory readiness.",
+  }
 
   return {
     exists: true,
@@ -267,6 +311,7 @@ function normalizeCloudAccessObservation(observation) {
       blockers: Array.isArray(cloudShell.blockers) ? cloudShell.blockers.map((item) => String(item)) : [],
       evidence: String(cloudShell.evidence || ""),
     },
+    workbenchTerminal: normalizedWorkbenchTerminal,
   }
 }
 
@@ -555,6 +600,11 @@ function main() {
       note: "No Aliyun cloud API is called by this script. It only checks whether this machine can plausibly run read-only Aliyun CLI inventory later.",
     },
     cloudShellObservation: cloudAccessObservation,
+    terminalAccess: {
+      workbenchTerminal: cloudAccessObservation.workbenchTerminal,
+      inventoryReady: cloudAccessObservation.ready === true,
+      note: "A connected ECS Workbench terminal is only a manual observation surface until allowlisted Aliyun CLI/OpenAPI inventory is explicitly run and recorded.",
+    },
     observedResourceStatusSummary: summarizeObservedResourceStatuses(observedResourceStatuses),
     observedResourceStatuses,
     targets: {
@@ -593,6 +643,9 @@ function main() {
     report.blockers.push(...cloudAccessObservation.blockers)
     if (cloudAccessObservation.cloudShell.connected && cloudAccessObservation.cloudShell.cliAvailable) {
       report.nextActions.push("Cloud Shell 已能启动 aliyun CLI，但当前观察显示缺 CLI 配置；只能继续用控制台页面核验证据，不能声称已具备自动云 API inventory。")
+    }
+    if (cloudAccessObservation.workbenchTerminal?.connected === true && cloudAccessObservation.workbenchTerminal?.cliInventoryAttempted !== true) {
+      report.nextActions.push("Chrome 中可见的 ECS Workbench 终端只证明远程终端已连接；未运行 allowlisted inventory 前，不能把它当作 CloudShell/OpenAPI 只读盘点 ready。")
     }
   }
   if (!cloudAccessObservation.exists) {

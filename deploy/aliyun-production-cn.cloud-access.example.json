@@ -22,5 +22,22 @@
     "lastReadOnlyCommand": "TODO_COMMAND_SUMMARY_NO_VALUES",
     "blockers": [],
     "evidence": "TODO_NON_SECRET_CLOUDSHELL_EVIDENCE"
+  },
+  "workbenchTerminal": {
+    "observed": false,
+    "connected": false,
+    "title": "TODO_TERMINAL_TITLE_OR_EMPTY",
+    "urlHostPath": "TODO_HOST_AND_PATH_ONLY_NO_QUERY",
+    "loginUser": "TODO_LOGIN_USER_OR_EMPTY",
+    "hostLabel": "TODO_HOST_LABEL_OR_EMPTY",
+    "observedAt": "TODO_YYYY-MM-DDTHH:mm:ss+08:00",
+    "cliInventoryAttempted": false,
+    "cloudApiCalled": false,
+    "cloudMutationPerformed": false,
+    "evidence": "TODO_NON_SECRET_WORKBENCH_TERMINAL_EVIDENCE",
+    "blockers": [
+      "workbench_terminal_not_cloudshell_inventory",
+      "readonly_inventory_not_executed"
+    ]
   }
 }

@@ -92,6 +92,7 @@ function buildReport() {
   const cloudAccess = runJson("cloud_access", ["scripts/check-aliyun-cloud-access.mjs"])
   const inventoryPlan = runJson("cloud_inventory_plan", ["scripts/generate-aliyun-cli-inventory-plan.mjs"])
   const cliProbe = cloudAccess.cli?.configProbe || {}
+  const workbenchTerminal = cloudAccess.terminalAccess?.workbenchTerminal || cloudAccess.cloudShellObservation?.workbenchTerminal || {}
   const operations = (inventoryPlan.operations || []).map(compactOperation)
   const report = {
     ok: true,
@@ -159,6 +160,32 @@ function buildReport() {
           "corepack pnpm aliyun:cloud:inventory-results:strict",
           "corepack pnpm aliyun:evidence:writeback -- --skip-vercel-env-coverage",
           "corepack pnpm aliyun:completion:audit",
+        ],
+      },
+      {
+        id: "ecs_workbench_terminal",
+        title: "阿里云 ECS Workbench 终端",
+        currentStatus: workbenchTerminal.connected === true
+          ? "connected_not_inventory_ready"
+          : workbenchTerminal.observed === true
+            ? "observed_not_connected"
+            : "not_observed",
+        consolePath: "阿里云控制台 -> ECS Workbench / 终端",
+        currentEvidence: workbenchTerminal.evidence || "",
+        allowedActions: [
+          "只把可见终端连接状态、标题、非敏感主机标签和时间戳记录为人工观察证据。",
+          "如果后续要在该终端运行 Aliyun CLI，只能运行 inventoryPlan.operations 中列出的只读命令。",
+          "未记录 allowlisted inventory 执行结果前，不把 Workbench 终端视为 CloudShell/OpenAPI readiness。",
+        ],
+        forbidden: [
+          "不要在 Workbench 终端里执行购买、创建、更新、删除、部署、DNS 修改、docker login/push 或 OSS 对象读写命令。",
+          "不要复制终端里的 AccessKeySecret、STS token、cookie、registry password、RAM Secret 或证书私钥。",
+          "不要把普通远程终端连接状态当成阿里云 CloudShell 已配置或云资源已验收。",
+        ],
+        verifyCommands: [
+          "corepack pnpm aliyun:cloud:access",
+          "corepack pnpm aliyun:cloud:inventory-results:strict",
+          "corepack pnpm aliyun:blockers:brief",
         ],
       },
     ],
