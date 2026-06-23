@@ -76,6 +76,12 @@ test("Aliyun operator handoff maps ACR and SAE evidence gaps to the correct cons
   const imagePullConfigured = byPath.get("runtime.imagePullConfigured")
 
   assert.equal(report.containsValues, false)
+  assert.match(report.currentAnswer, /Android release signing/)
+  assert.match(report.currentAnswer, /Apple Team ID/)
+  assert.ok(report.userActionNow.some((item) => /Android release signing/.test(item.title)))
+  const androidAction = report.userActionNow.find((item) => /Android release signing/.test(item.title))
+  assert.ok(androidAction.needAfterApproval.includes("MEIYE_RELEASE_STORE_PASSWORD"))
+  assert.ok(androidAction.mustNotUse.some((item) => /debug\.keystore/.test(item)))
   assert.deepEqual(report.aliyunConsoleTaskOrder.canStartNow, [
     "C02_ACR_IMAGE_AND_PULL",
     "C05_OSS_AUDIO_RAM_STS",

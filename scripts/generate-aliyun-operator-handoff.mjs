@@ -445,8 +445,8 @@ function buildHandoff({
     currentAnswer: status.canDeployNow === true
       ? "机器门禁显示可部署，但仍需要单独授权生产部署。"
       : waitingWechatReview > 0
-        ? "现在不能上线/部署；微信开放平台移动应用已在审核中，审核通过前不能取得生产 AppID/AppSecret，同时还要补阿里云运行资源、DNS/HTTPS/ICP、OSS、环境变量导入和 SLS 证据。"
-      : "现在不能上线/部署；先补微信开放平台移动应用、阿里云运行资源、DNS/HTTPS/ICP、OSS、环境变量导入和 SLS 证据。",
+        ? "现在不能上线/部署；微信开放平台移动应用已在审核中，审核通过前不能取得生产 AppID/AppSecret，同时还要补 Android release signing、Apple Team ID、阿里云运行资源、DNS/HTTPS/ICP、OSS、环境变量导入和 SLS 证据。"
+      : "现在不能上线/部署；先补微信开放平台移动应用、Android release signing、Apple Team ID、阿里云运行资源、DNS/HTTPS/ICP、OSS、环境变量导入和 SLS 证据。",
     files: {
       envFile: args.envFile,
       envFileExists: existsSync(args.envFile),
@@ -488,6 +488,22 @@ function buildHandoff({
     sensitiveActionItems: operatorTasks.sensitiveActionItems || status.tasks?.sensitiveActionItems || [],
     userActionNow: [
       buildWechatUserActionNow(machineBlocking),
+      {
+        title: "配置 Android release signing 并生成微信开放平台 Android 应用签名",
+        owner: "Android 发布操作员 / 微信开放平台操作员",
+        where: "本机 Android release signing / CI Secret Store；微信开放平台 -> 移动应用 -> Android 应用签名",
+        needAfterApproval: [
+          "MEIYE_RELEASE_STORE_FILE",
+          "MEIYE_RELEASE_STORE_PASSWORD",
+          "MEIYE_RELEASE_KEY_ALIAS",
+          "MEIYE_RELEASE_KEY_PASSWORD",
+          "微信开放平台 Android release 签名证据",
+        ],
+        mustNotUse: [
+          "不能使用 debug.keystore、debug APK 或 debug 签名。",
+          "不能把 keystore 文件、store password、key password、证书私钥或微信 AppSecret 写入 JSON、Markdown、Docker 镜像或 git。",
+        ],
+      },
       {
         title: "确认 Apple Team ID",
         owner: "Apple Developer 操作员",
