@@ -22,7 +22,9 @@ test("APP production-cn checklist records current blockers without secret values
 
   for (const expected of [
     "ready 0/9",
+    "ready 0/10",
     "ready 0/7",
+    "Android release signing",
     "required `17/26`",
     "本机 required env 是 `24/26` ready",
     "后端必填阻塞只剩",
@@ -37,16 +39,19 @@ test("APP production-cn checklist records current blockers without secret values
     "secretNotInImage=true",
     "受控标识符",
     "Apple Team ID 是 Apple Developer 受控标识符，不是密钥",
+    "U10_ANDROID_RELEASE_SIGNING",
     "U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE",
     "U09_DEPLOY_AUTHORIZATION",
     "aliyun:console:runbook",
     "aliyun:action:authorization",
     "7 项阿里云控制台任务",
-    "所有 9 项都不能在没有动作时确认的情况下自动执行",
+    "所有 10 项都不能在没有动作时确认的情况下自动执行",
     "aliyun:wechat-open:package",
     "微信开放平台移动应用创建材料包",
     "aliyun:env:handoff",
     "环境变量获取与导入手册",
+    "readonly_inventory_strict_ready=0/7",
+    "console_only_observation_not_strict_inventory",
   ]) {
     assert.match(doc, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
   }

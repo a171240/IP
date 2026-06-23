@@ -1,6 +1,6 @@
 # APP production-cn 环境变量与云资源获取清单
 
-更新时间：2026-06-22
+更新时间：2026-06-24
 
 本清单只记录变量名、获取位置和导入位置，不记录真实密钥值。当前后端主部署目标是阿里云 SAE `cn-hangzhou` 自定义容器应用 `meiye-huajing-app-api-production-cn`，端口 `3000`；镜像进入阿里云 ACR 后由 SAE 拉取。Vercel 只作为现有后端能力来源和对照，不作为国内正式 APP 的生产运行环境。
 
@@ -8,11 +8,15 @@
 
 2026-06-22 17:31 CST 复核：现在仍不能部署。`corepack pnpm aliyun:user:actions` 当前为 `ready 0/9`，`corepack pnpm aliyun:resources:matrix` 当前为阿里云资源 `ready 0/7`。本机和 Vercel 可确认的是：本地后端容器镜像存在，APP API 桥接路由和本地 smoke 通过，Vercel production 只能提供旧后端变量名来源；阿里云 production-cn 仍缺云侧资源确认、密钥导入和移动 App 登录凭证。
 
+2026-06-24 CST 复核：现在仍不能部署。`corepack pnpm aliyun:user:actions` 当前为 `ready 0/10`，新增阻塞项是 Android release signing 与微信开放平台 Android 应用签名；`corepack pnpm aliyun:resources:matrix` 当前仍为阿里云资源 `ready 0/7`。本机 required env 仍是 `24/26` ready，缺 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；云资源侧仍缺 SAE、ACR、api-cn/assets-cn DNS/HTTPS/ICP、OSS RAM/STS、环境变量导入和 SLS 告警的最终确认。
+
 2026-06-22 20:37 CST 复核：本机已通过 Homebrew 安装阿里云 CLI，`aliyun version` 为 `3.3.23`，路径为 `/opt/homebrew/bin/aliyun`。`corepack pnpm aliyun:cloud:access` 当前不再报 `aliyun_cli_missing`，但仍报 `aliyun_cli_config_missing_or_unread` 与 `cloudshell_cli_config_missing_or_unread`；脚本未读取任何配置文件内容、未调用云 API、未创建或修改阿里云资源。该状态只表示本机具备后续只读 inventory 的 CLI 前置工具，不表示阿里云资源 ready。
 
 2026-06-22 20:53 CST 复核：已新增 `corepack pnpm aliyun:cloud:inventory-plan`。该命令只生成阿里云 CLI 只读资源盘点计划，不调用云 API、不执行 `Create/Update/Delete/Deploy/Start/Stop`、不读取或输出密钥。当前因为 CLI 账号配置仍未就绪，计划状态为 `blocked_until_cli_configured`；等 CLI/Cloud Shell 配置完成后，才能按计划核验 SAE、ACR、DNS、OSS、SLS、HTTPS 证书等云侧证据。
 
 2026-06-22 21:08 CST 复核：已新增 `corepack pnpm aliyun:cloud:inventory-results` 和严格版 `corepack pnpm aliyun:cloud:inventory-results:strict`。该命令只校验 `deploy/aliyun-production-cn.cloud-inventory-results.local.json` 里的只读盘点结果摘要，不运行 Aliyun CLI、不调用云 API、不读取凭据。当前 local 结果文件尚未生成，所以 `inventory-results` 只作为缺口报告；后续 CLI/Cloud Shell 盘点完成后，把非密钥摘要写入该 ignored local 文件，再用 strict 校验通过后，才能把最终布尔证据同步到 `cloud-confirmations.local.json`。
+
+2026-06-24 CST 复核：`deploy/aliyun-production-cn.cloud-inventory-results.local.json` 已存在，但当前只证明控制台观察记录已落地，不是严格 CLI/Cloud API 盘点完成。`cloudInventoryResults` 当前为 `readonly_inventory_strict_ready=0/7`、`readonly_inventory_commands_executed=0/7`、`readonly_inventory_cloud_api_called=0/7`、`console_only_observation_not_strict_inventory`；因此它只能作为安全观察证据，不能作为可部署证明。
 
 当前 Vercel production 只读覆盖检查 `corepack pnpm aliyun:vercel-env:coverage` 显示 required `17/26` 已存在，缺 `APP_ENV`、`APP_REGION`、`APP_API_BASE_URL`、`APP_ASSET_BASE_URL`、`NEXT_PUBLIC_SITE_URL`、`PRIVACY_POLICY_URL`、`TERMS_URL`、`WECHAT_OPEN_APP_ID`、`WECHAT_OPEN_APP_SECRET`。前 7 个是国内 APP/阿里云运行配置；后 2 个必须等微信开放平台移动应用创建并审核通过后获得。
 
@@ -67,25 +71,33 @@
 | `VOLC_SPEECH_ACCESS_TOKEN` | 火山引擎 OpenSpeech 控制台 | 阿里云 SAE secret/KMS/Secrets Manager | 是 | 不写入 App 包 |
 | `DEEPSEEK_API_KEY` | DeepSeek 平台控制台 | 阿里云 SAE secret/KMS/Secrets Manager | 是 | 文本生成链路使用 |
 
+## APP 发布签名
+
+| 项目 | 获取位置 | 导入/填写位置 | 密钥 | 当前状态 |
+| --- | --- | --- | --- | --- |
+| Android release keystore | Android release keystore 管理位置、本机 `~/.gradle/gradle.properties`、环境变量或 CI Secret Store | 只进入本机或 CI 受控 signing secret store，不导入阿里云 SAE | keystore/password 是密钥 | `releaseSigningConfigReady=true`，但微信开放平台 Android 应用签名尚未记录，`androidConfigured=false` |
+| 微信开放平台 Android 应用签名 | 用 release APK/AAB 通过 `apksigner` 或微信签名工具读取 | 微信开放平台 -> 移动应用 -> Android 应用签名；`deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.wechatOpenPlatform.androidSignature` 只记录非密钥证据 | 签名 hash 不是密钥，keystore 密码是密钥 | 不能用 debug.keystore；必须等 release 包签名后回填 |
+
 ## 当前用户介入项
 
-`corepack pnpm aliyun:user:actions` 当前固定输出 9 项，每项只含变量名、控制台路径、写入目标和解除条件：
+`corepack pnpm aliyun:user:actions` 当前固定输出 10 项，每项只含变量名、控制台路径、写入目标和解除条件：
 
 1. `U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE`：微信开放平台账号已认证，但移动 App 未创建；先创建“美业话镜”移动应用并提交审核，审核通过后再取得 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`。
-2. `U02_APPLE_TEAM_ID`：从 Apple Developer 读取 10 位 Team ID，导入 SAE plain env，用于 AASA。
-3. `U03_ACR_PURCHASE_CONFIRMATION`：ACR Enterprise Economic / `cn-hangzhou` / 1 month / `CNY 117.00` 需要动作时付款确认。
-4. `U04_ACR_RUNTIME_AUTH`：ACR 实例 ready 后配置镜像仓库、push digest 和 SAE 拉取权限；registry password/token 不能写入文件。
-5. `U05_OSS_RAM_OR_STS`：OSS 最小权限策略已创建，仍需绑定运行身份并选择受限 AccessKey 或 STS/运行时角色注入。
-6. `U06_ENV_IMPORT`：把本地/Vercel/Supabase/阿里云/DeepSeek/火山等 ready 变量导入 SAE/KMS/Secrets Manager，并确认 `secretNotInImage=true`。
-7. `U07_DOMAIN_DNS_HTTPS_ICP`：配置 `api-cn.ipgongchang.xin` 和 `assets-cn.ipgongchang.xin` 的阿里云入口、HTTPS 和 ICP 证据。
-8. `U08_SAE_RUNTIME_AND_SLS`：创建 SAE 自定义容器应用，绑定日志采集，配置 `/api/healthz` 和 5xx 告警。
-9. `U09_DEPLOY_AUTHORIZATION`：上述前置条件 ready 后，再由用户明确授权生产部署、ACR push、DNS 变更或 git push。
+2. `U10_ANDROID_RELEASE_SIGNING`：配置 Android release signing，用 release APK/AAB 读取微信开放平台 Android 应用签名；keystore 和密码不能写入 JSON、Markdown、镜像或 git。
+3. `U02_APPLE_TEAM_ID`：从 Apple Developer 读取 10 位 Team ID，导入 SAE plain env，用于 AASA。
+4. `U03_ACR_PURCHASE_CONFIRMATION`：ACR Enterprise Economic / `cn-hangzhou` / 1 month / `CNY 117.00` 需要动作时付款确认。
+5. `U04_ACR_RUNTIME_AUTH`：ACR 实例 ready 后配置镜像仓库、push digest 和 SAE 拉取权限；registry password/token 不能写入文件。
+6. `U05_OSS_RAM_OR_STS`：OSS 最小权限策略已创建，仍需绑定运行身份并选择受限 AccessKey 或 STS/运行时角色注入。
+7. `U06_ENV_IMPORT`：把本地/Vercel/Supabase/阿里云/DeepSeek/火山等 ready 变量导入 SAE/KMS/Secrets Manager，并确认 `secretNotInImage=true`。
+8. `U07_DOMAIN_DNS_HTTPS_ICP`：配置 `api-cn.ipgongchang.xin` 和 `assets-cn.ipgongchang.xin` 的阿里云入口、HTTPS 和 ICP 证据。
+9. `U08_SAE_RUNTIME_AND_SLS`：创建 SAE 自定义容器应用，绑定日志采集，配置 `/api/healthz` 和 5xx 告警。
+10. `U09_DEPLOY_AUTHORIZATION`：上述前置条件 ready 后，再由用户明确授权生产部署、ACR push、DNS 变更或 git push。
 
-`corepack pnpm aliyun:sensitive:blockers` 当前固定输出 6 类密钥/密码/token/付款/受控标识符阻塞：微信移动 App 凭证、Apple Team ID、ACR 付费、ACR/SAE 镜像认证、OSS RAM Secret 或 STS、以及 ready 敏感环境变量导入。Apple Team ID 是 Apple Developer 受控标识符，不是密钥；仍需从当前团队读取，不能猜测。该报告不读取也不输出任何 value。
+`corepack pnpm aliyun:sensitive:blockers` 当前固定输出 7 类密钥/密码/token/付款/受控标识符阻塞：微信移动 App 凭证、Android release signing、Apple Team ID、ACR 付费、ACR/SAE 镜像认证、OSS RAM Secret 或 STS、以及 ready 敏感环境变量导入。Apple Team ID 是 Apple Developer 受控标识符，不是密钥；Android keystore password 是密钥。该报告不读取也不输出任何 value。
 
 `corepack pnpm aliyun:console:runbook` 当前固定输出 7 项阿里云控制台任务：SAE runtime、ACR 镜像与 SAE 拉取、api-cn 域名、assets-cn 域名、OSS/RAM/STS、SAE/KMS/Secrets Manager 环境变量导入、SLS 告警。该 runbook 会把每项的目标字段、当前 blocker、当前非密钥证据、写入目标和验证命令集中输出；它不创建资源、不付款、不修改 DNS、不导入环境变量、不推送镜像、不部署。
 
-`corepack pnpm aliyun:action:authorization` 当前固定输出 9 项动作授权矩阵，把微信移动应用、Apple Team ID、ACR 付款、ACR/SAE 镜像认证、OSS RAM/STS、环境变量导入、DNS/HTTPS/ICP、SAE/SLS、生产部署授权分别归类。当前所有 9 项都不能在没有动作时确认的情况下自动执行；Codex 可以继续做的只限本地检查、报告、非密钥证据记录和本地提交。
+`corepack pnpm aliyun:action:authorization` 当前固定输出 10 项动作授权矩阵，把微信移动应用、Android release signing、Apple Team ID、ACR 付款、ACR/SAE 镜像认证、OSS RAM/STS、环境变量导入、DNS/HTTPS/ICP、SAE/SLS、生产部署授权分别归类。当前所有 10 项都不能在没有动作时确认的情况下自动执行；Codex 可以继续做的只限本地检查、报告、非密钥证据记录和本地提交。
 
 `corepack pnpm aliyun:wechat-open:package` 当前固定输出微信开放平台移动应用创建材料包：App 名称、Android 包名、iOS Bundle ID、Universal Link、AASA URL、当前移动 App 未创建状态、审核前缺口、审核通过后 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET` 的阿里云写入目标和禁止事项。该材料包只输出非密钥字段，不创建移动应用、不读取 AppSecret、不导入环境变量。
 
@@ -113,7 +125,7 @@ corepack pnpm aliyun:predeploy
 
 `aliyun:env:handoff` 会输出无值的环境变量获取与导入手册，按 `blockedRequired`、`appLaunchBlocking`、`readyPlainEnv`、`readySecretEnv` 和 `deferred` 分组回答“从哪里取得、写到阿里云哪里、当前是否阻塞、禁止写到哪里”。该手册会明确 `WECHAT_OPEN_APP_ID` 只能作为服务端 SAE plain env，`WECHAT_OPEN_APP_SECRET` 只能进入 KMS/Secrets Manager/SAE secret env，`APPLE_TEAM_ID` 是受控标识符且不能猜测。
 
-`aliyun:status` 现在也会读取 `cloud-inventory-results.local.json` 的非密钥摘要，并在 `cloudInventoryResults` 里显示 CLI/Cloud Shell 只读盘点结果是否已落地、local operations ready 数量和 blocker；当前 local 结果文件未生成时，状态仍会明确显示 `file_missing`。
+`aliyun:status` 现在也会读取 `cloud-inventory-results.local.json` 的非密钥摘要，并在 `cloudInventoryResults` 里显示 CLI/Cloud Shell 只读盘点结果是否已落地、local operations ready 数量和 blocker；当前本机已有控制台观察结果，但严格只读 inventory 仍是 `0/7` ready，不能当作云侧资源完成证明。
 
 正式部署前必须满足：
 
