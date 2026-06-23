@@ -252,6 +252,7 @@ function renderMarkdown(audit) {
     `- cloudAccess: ${cloudAccess.canReadCloudNow ? "cli-ready" : "manual-console"} (${cloudAccess.blockers?.length || 0} blockers)`,
     `- cloudInventoryPlan: ${cloudInventoryPlan.canRunReadOnlyInventoryNow ? "ready" : "blocked"} (${cloudInventoryPlan.summary?.totalOperations || 0} operations)`,
     `- cloudInventoryRunner: ${cloudInventoryRunner.executionMode}, executed ${cloudInventoryRunner.summary.executedCommands}/${cloudInventoryRunner.summary.commands}`,
+    `- cloudInventoryRunnerFailureCategories: ${Object.keys(cloudInventoryRunner.summary.failureCategories || {}).length ? JSON.stringify(cloudInventoryRunner.summary.failureCategories) : "none"}`,
     `- cloudInventoryResults: ${cloudInventoryResults.local?.ready ? "ready" : "not ready"} (${cloudInventoryResults.local?.checkedOperations || 0} local operations)`,
     `- cloudInventoryConsoleOnly: safe ${cloudInventoryObservation.safeConsoleOnly === true}, console observations ${cloudInventoryObservation.consoleObservationOperations || 0}/${cloudInventoryObservation.operations || 0}, executed commands ${cloudInventoryObservation.executedCommandResults || 0}/${cloudInventoryObservation.commandResults || 0}, cloud API calls ${cloudInventoryObservation.cloudApiCalledCommandResults || 0}`,
     `- appRuntimeConfig: ${appRuntimeConfig?.ok === true ? "ready" : "not ready"}`,
@@ -346,9 +347,13 @@ function renderMarkdown(audit) {
     `- commands: ${cloudInventoryRunner.summary.commands}`,
     `- executedCommands: ${cloudInventoryRunner.summary.executedCommands}`,
     `- dryRunCommands: ${cloudInventoryRunner.summary.dryRunCommands}`,
+    `- failureCategories: ${Object.keys(cloudInventoryRunner.summary.failureCategories || {}).length ? JSON.stringify(cloudInventoryRunner.summary.failureCategories) : "none"}`,
     ...(cloudInventoryRunner.blockers?.length
       ? cloudInventoryRunner.blockers.map((item) => `- ${item}`)
       : ["- blockers: none"]),
+    ...(cloudInventoryRunner.executionDiagnostics?.nextActions?.length
+      ? cloudInventoryRunner.executionDiagnostics.nextActions.map((item) => `- nextAction: ${item}`)
+      : []),
     "",
     "## 阿里云 CLI 只读盘点结果",
     "",
@@ -1309,7 +1314,10 @@ function main() {
       commands: cloudInventoryRunner.summary.commands,
       executedCommands: cloudInventoryRunner.summary.executedCommands,
       successfulCommands: cloudInventoryRunner.summary.successfulCommands,
+      failedCommands: cloudInventoryRunner.summary.failedCommands,
       dryRunCommands: cloudInventoryRunner.summary.dryRunCommands,
+      failureCategories: cloudInventoryRunner.summary.failureCategories || {},
+      diagnosticsNextActions: cloudInventoryRunner.executionDiagnostics?.nextActions || [],
       blockers: cloudInventoryRunner.blockers || [],
     },
     cloudInventoryResults: {

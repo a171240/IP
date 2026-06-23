@@ -27,6 +27,8 @@ test("Aliyun CLI inventory runner is wired into scripts, predeploy, deploy spec,
   assert.ok(deploySpec.predeployChecks.includes("corepack pnpm aliyun:cloud:inventory-run"))
   assert.match(releaseArtifacts, /cloud-inventory-runner\.json/)
   assert.match(releaseArtifacts, /cloudInventoryRunner/)
+  assert.match(releaseArtifacts, /failureCategories/)
+  assert.match(releaseArtifacts, /diagnosticsNextActions/)
 })
 
 test("Aliyun CLI inventory runner dry-run does not call cloud APIs or write raw output", () => {
@@ -57,6 +59,8 @@ test("Aliyun CLI inventory runner dry-run does not call cloud APIs or write raw 
   assert.equal(report.summary.commands, 7)
   assert.equal(report.summary.executedCommands, 0)
   assert.equal(report.summary.dryRunCommands, 7)
+  assert.deepEqual(report.summary.failureCategories, {})
+  assert.deepEqual(report.executionDiagnostics.failedCommands, [])
   assert.equal(local.operations.length, 7)
   assert.ok(local.operations.every((operation) => operation.status === "skipped"))
   assert.ok(local.operations.every((operation) => operation.commandResults[0].executed === false))
@@ -66,6 +70,97 @@ test("Aliyun CLI inventory runner dry-run does not call cloud APIs or write raw 
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
+})
+
+test("Aliyun CLI inventory runner classifies missing CLI profile without storing raw stderr", () => {
+  const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-inventory-runner-profile-missing-"))
+  const fakeAliyun = path.join(tmpdir, "aliyun")
+  fs.writeFileSync(fakeAliyun, [
+    "#!/bin/sh",
+    "echo 'ERROR: profile default is not configure yet, run `aliyun configure --profile default` first' >&2",
+    "echo 'Configuration failed, use `aliyun configure` to configure it' >&2",
+    "exit 3",
+    "",
+  ].join("\n"), { mode: 0o700 })
+
+  const output = execFileSync(process.execPath, [
+    "scripts/run-aliyun-cli-inventory.mjs",
+    "--execute-readonly",
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      PATH: `${tmpdir}:${process.env.PATH}`,
+      MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY: "1",
+    },
+    maxBuffer: 1024 * 1024 * 20,
+  })
+  const report = JSON.parse(output)
+
+  assert.equal(report.ok, true)
+  assert.equal(report.executionMode, "execute_readonly")
+  assert.equal(report.executeReadonlyAllowed, true)
+  assert.equal(report.summary.executedCommands, 7)
+  assert.equal(report.summary.failedCommands, 7)
+  assert.deepEqual(report.summary.failureCategories, {
+    aliyun_cli_profile_not_configured: 7,
+  })
+  assert.equal(report.executionDiagnostics.failedCommands.length, 7)
+  assert.ok(report.executionDiagnostics.failedCommands.every((item) =>
+    item.failureCategory === "aliyun_cli_profile_not_configured" &&
+    /Do not paste AccessKeySecret/.test(item.failureHint)
+  ))
+  assert.ok(report.executionDiagnostics.nextActions.some((item) =>
+    item.includes("Configure Aliyun CLI default profile securely")
+  ))
+  assert.match(report.localResults.operations[0].commandResults[0].outputSummary, /failureCategory=aliyun_cli_profile_not_configured/)
+  assert.doesNotMatch(output, /profile default is not configure yet/)
+  assert.doesNotMatch(output, /Configuration failed/)
+  assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
+  assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
+})
+
+test("Aliyun CLI inventory runner classifies incomplete CLI config without storing raw stderr", () => {
+  const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-inventory-runner-config-incomplete-"))
+  const fakeAliyun = path.join(tmpdir, "aliyun")
+  fs.writeFileSync(fakeAliyun, [
+    "#!/bin/sh",
+    "echo \"ERROR: config failed: region can't be empty\" >&2",
+    "exit 1",
+    "",
+  ].join("\n"), { mode: 0o700 })
+
+  const output = execFileSync(process.execPath, [
+    "scripts/run-aliyun-cli-inventory.mjs",
+    "--execute-readonly",
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      PATH: `${tmpdir}:${process.env.PATH}`,
+      MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY: "1",
+    },
+    maxBuffer: 1024 * 1024 * 20,
+  })
+  const report = JSON.parse(output)
+
+  assert.deepEqual(report.summary.failureCategories, {
+    aliyun_cli_config_incomplete: 7,
+  })
+  assert.ok(report.executionDiagnostics.failedCommands.every((item) =>
+    item.failureCategory === "aliyun_cli_config_incomplete" &&
+    /including region/.test(item.failureHint)
+  ))
+  assert.ok(report.executionDiagnostics.nextActions.some((item) =>
+    item.includes("Complete Aliyun CLI default profile configuration")
+  ))
+  assert.match(report.localResults.operations[0].commandResults[0].outputSummary, /failureCategory=aliyun_cli_config_incomplete/)
+  assert.doesNotMatch(output, /config failed: region can't be empty/)
+  assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
 })
 
 test("Aliyun CLI inventory runner refuses execution without explicit env gate", () => {

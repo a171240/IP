@@ -133,6 +133,7 @@ function executeOperation(operation) {
   const fingerprint = commandFingerprint(command, stdout, stderr)
   const stdoutLines = stdout ? stdout.trim().split(/\r?\n/).filter(Boolean).length : 0
   const stderrLines = stderr ? stderr.trim().split(/\r?\n/).filter(Boolean).length : 0
+  const failure = classifyCommandFailure({ stdout, stderr, status })
   return {
     command,
     executed: true,
@@ -140,8 +141,53 @@ function executeOperation(operation) {
     cloudApiCalled: true,
     mutationPerformed: false,
     observedAt: startedAt,
-    outputSummary: `exit=${status}; stdoutLines=${stdoutLines}; stderrLines=${stderrLines}; outputSha256=${fingerprint}`,
+    outputSummary: [
+      `exit=${status}`,
+      `stdoutLines=${stdoutLines}`,
+      `stderrLines=${stderrLines}`,
+      `outputSha256=${fingerprint}`,
+      ...(failure.category ? [`failureCategory=${failure.category}`] : []),
+    ].join("; "),
     evidence: `readonly_cli_${operation.id}_${startedAt.replace(/[:.]/g, "-")}_${fingerprint.slice(0, 16)}`,
+  }
+}
+
+function classifyCommandFailure({ stdout, stderr, status }) {
+  if (status === 0) return { category: "", hint: "" }
+  const combined = `${stdout || ""}\n${stderr || ""}`
+  if (/config failed|region can't be empty|region cannot be empty|missing region/i.test(combined)) {
+    return {
+      category: "aliyun_cli_config_incomplete",
+      hint: "Complete the Aliyun CLI default profile, including region, in a secure terminal or use Aliyun CloudShell. Do not paste AccessKeySecret into repo docs, JSON, logs, or screenshots.",
+    }
+  }
+  if (/profile\s+default\s+is\s+not\s+configure|Configuration failed|aliyun configure/i.test(combined)) {
+    return {
+      category: "aliyun_cli_profile_not_configured",
+      hint: "Configure the Aliyun CLI default profile in a secure terminal or use Aliyun CloudShell, then rerun the read-only inventory. Do not paste AccessKeySecret into repo docs, JSON, logs, or screenshots.",
+    }
+  }
+  if (/command not found|ENOENT|not recognized/i.test(combined)) {
+    return {
+      category: "aliyun_cli_binary_missing",
+      hint: "Install the Aliyun CLI and rerun the read-only inventory.",
+    }
+  }
+  if (/InvalidAccessKeyId|SignatureDoesNotMatch|Forbidden|Unauthorized|AccessDenied|NoPermission/i.test(combined)) {
+    return {
+      category: "aliyun_cli_auth_or_permission_failed",
+      hint: "Use a least-privilege Aliyun credential or CloudShell identity that can run the required read-only describe/list/stat commands.",
+    }
+  }
+  if (/Unknown|InvalidAction|not support|unsupported|No such command/i.test(combined)) {
+    return {
+      category: "aliyun_cli_command_or_api_not_supported",
+      hint: "Check the Aliyun CLI product module and API command name before rerunning the inventory.",
+    }
+  }
+  return {
+    category: "aliyun_cli_readonly_command_failed",
+    hint: "Inspect the command locally with sensitive values redacted, then rerun the read-only inventory.",
   }
 }
 
@@ -198,6 +244,7 @@ function buildReport(args) {
     throw new Error(`execute_readonly_requires_env:${ALLOW_ENV}=1`)
   }
   const localResults = buildLocalResults(template, args)
+  const executionDiagnostics = buildExecutionDiagnostics(localResults)
   const commandCount = localResults.operations.reduce((total, operation) => total + operation.commandResults.length, 0)
   const report = {
     ok: templateBlockers.length === 0,
@@ -221,7 +268,9 @@ function buildReport(args) {
       successfulCommands: localResults.operations.flatMap((operation) => operation.commandResults).filter((result) => result.exitStatus === 0).length,
       failedCommands: localResults.operations.flatMap((operation) => operation.commandResults).filter((result) => result.executed && result.exitStatus !== 0).length,
       dryRunCommands: localResults.operations.flatMap((operation) => operation.commandResults).filter((result) => !result.executed).length,
+      failureCategories: executionDiagnostics.failureCategories,
     },
+    executionDiagnostics,
     allowedCommandCatalog: localResults.operations.map((operation) => ({
       id: operation.id,
       product: operation.product,
@@ -251,6 +300,71 @@ function buildReport(args) {
   return report
 }
 
+function buildExecutionDiagnostics(localResults) {
+  const failedCommands = []
+  const failureCategories = {}
+  for (const operation of localResults.operations || []) {
+    for (const result of operation.commandResults || []) {
+      if (!result.executed || result.exitStatus === 0) continue
+      const failureCategory = parseFailureCategory(result.outputSummary)
+      const item = {
+        operationId: operation.id,
+        product: operation.product,
+        command: result.command,
+        exitStatus: result.exitStatus,
+        failureCategory,
+        failureHint: failureHintForCategory(failureCategory),
+        evidence: result.evidence,
+      }
+      failedCommands.push(item)
+      failureCategories[failureCategory] = (failureCategories[failureCategory] || 0) + 1
+    }
+  }
+  return {
+    failedCommands,
+    failureCategories,
+    nextActions: buildDiagnosticsNextActions(failureCategories),
+  }
+}
+
+function parseFailureCategory(outputSummary) {
+  const match = String(outputSummary || "").match(/failureCategory=([^;\s]+)/)
+  return match?.[1] || "aliyun_cli_readonly_command_failed"
+}
+
+function failureHintForCategory(category) {
+  if (category === "aliyun_cli_profile_not_configured") {
+    return "Configure the Aliyun CLI default profile in a secure terminal or use Aliyun CloudShell, then rerun the read-only inventory. Do not paste AccessKeySecret into repo docs, JSON, logs, or screenshots."
+  }
+  if (category === "aliyun_cli_config_incomplete") {
+    return "Complete the Aliyun CLI default profile, including region, in a secure terminal or use Aliyun CloudShell. Do not paste AccessKeySecret into repo docs, JSON, logs, or screenshots."
+  }
+  if (category === "aliyun_cli_binary_missing") return "Install the Aliyun CLI and rerun the read-only inventory."
+  if (category === "aliyun_cli_auth_or_permission_failed") return "Use a least-privilege Aliyun credential or CloudShell identity that can run the required read-only describe/list/stat commands."
+  if (category === "aliyun_cli_command_or_api_not_supported") return "Check the Aliyun CLI product module and API command name before rerunning the inventory."
+  return "Inspect the command locally with sensitive values redacted, then rerun the read-only inventory."
+}
+
+function buildDiagnosticsNextActions(failureCategories) {
+  const actions = []
+  if (failureCategories.aliyun_cli_profile_not_configured) {
+    actions.push("Configure Aliyun CLI default profile securely or run the same allowlisted read-only commands in Aliyun CloudShell; do not write AccessKeySecret, STS token, or cookies into repo files.")
+  }
+  if (failureCategories.aliyun_cli_config_incomplete) {
+    actions.push("Complete Aliyun CLI default profile configuration, including region, or run the same allowlisted read-only commands in Aliyun CloudShell; keep AccessKeySecret and STS token out of repo files.")
+  }
+  if (failureCategories.aliyun_cli_auth_or_permission_failed) {
+    actions.push("Grant or switch to a least-privilege read-only Aliyun identity for SAE/ACR/DNS/OSS/SLS/CAS inventory, then rerun the inventory runner.")
+  }
+  if (failureCategories.aliyun_cli_command_or_api_not_supported) {
+    actions.push("Review Aliyun CLI module/API command names before treating inventory failures as resource absence.")
+  }
+  if (!actions.length && Object.keys(failureCategories).length) {
+    actions.push("Inspect failed commands with sensitive values redacted, then rerun the read-only inventory runner.")
+  }
+  return actions
+}
+
 function renderMarkdown(report) {
   return [
     "# 阿里云 CLI 只读 Inventory Runner",
@@ -267,6 +381,23 @@ function renderMarkdown(report) {
     `- successfulCommands: ${report.summary.successfulCommands}`,
     `- failedCommands: ${report.summary.failedCommands}`,
     `- dryRunCommands: ${report.summary.dryRunCommands}`,
+    `- failureCategories: ${Object.keys(report.summary.failureCategories).length ? JSON.stringify(report.summary.failureCategories) : "none"}`,
+    "",
+    "## Execution Diagnostics",
+    "",
+    ...(report.executionDiagnostics.failedCommands.length
+      ? report.executionDiagnostics.failedCommands.flatMap((item) => [
+          `- ${item.operationId}: ${item.failureCategory}`,
+          `  - exitStatus: ${item.exitStatus}`,
+          `  - hint: ${item.failureHint}`,
+        ])
+      : ["- none"]),
+    "",
+    "## Next Actions",
+    "",
+    ...(report.executionDiagnostics.nextActions.length
+      ? report.executionDiagnostics.nextActions.map((item) => `- ${item}`)
+      : ["- none"]),
     "",
     "## Allowed Commands",
     "",
