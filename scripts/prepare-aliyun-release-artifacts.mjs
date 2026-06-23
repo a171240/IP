@@ -678,6 +678,19 @@ function renderMarkdown(audit) {
     `- cliConfigProbeFailureCategory: ${blockerBrief.summary.cliConfigProbeFailureCategory || "none"}`,
     `- currentBrowserCanUseCurrentConsole: ${blockerBrief.summary.currentBrowserCanUseCurrentConsole === true}`,
     `- currentBrowserAliyunConsoleTabCount: ${blockerBrief.summary.currentBrowserAliyunConsoleTabCount || 0}`,
+    `- wechatOpenAccountVerified: ${blockerBrief.summary.wechatOpenAccountVerified === true}`,
+    `- wechatOpenMobileAppCreated: ${blockerBrief.summary.wechatOpenMobileAppCreated === true}`,
+    `- wechatOpenCanCreateDraft: ${blockerBrief.summary.wechatOpenCanCreateDraft === true}`,
+    `- wechatOpenReadyToSubmitForReview: ${blockerBrief.summary.wechatOpenReadyToSubmitForReview === true}`,
+    ...(blockerBrief.wechatOpenMobileApp
+      ? [
+        `- wechatOpenReviewStatus: ${blockerBrief.wechatOpenMobileApp.reviewStatus || "unknown"}`,
+        `- wechatOpenSubmissionBlockers: ${blockerBrief.wechatOpenMobileApp.submissionBlockers?.length ? blockerBrief.wechatOpenMobileApp.submissionBlockers.join(", ") : "none"}`,
+        `- wechatOpenAndroidPackageName: ${blockerBrief.wechatOpenMobileApp.androidPackageName || "unknown"}`,
+        `- wechatOpenAndroidSignatureStatus: ${blockerBrief.wechatOpenMobileApp.androidSignatureStatus || "unknown"}`,
+        `- wechatOpenAppleTeamIdMissing: ${blockerBrief.wechatOpenMobileApp.appleTeamIdMissing === true}`,
+      ]
+      : []),
     ...(blockerBrief.immediateAuthorizationPackets?.length
       ? blockerBrief.immediateAuthorizationPackets.map((item) => `- ${item.packetId}: ${item.minimumUserPhrase}`)
       : ["- immediateAuthorizationPackets: none"]),
@@ -1819,6 +1832,11 @@ function main() {
       cliConfigProbeFailureCategory: blockerBrief.summary.cliConfigProbeFailureCategory,
       currentBrowserCanUseCurrentConsole: blockerBrief.summary.currentBrowserCanUseCurrentConsole === true,
       currentBrowserAliyunConsoleTabCount: blockerBrief.summary.currentBrowserAliyunConsoleTabCount || 0,
+      wechatOpenAccountVerified: blockerBrief.summary.wechatOpenAccountVerified === true,
+      wechatOpenMobileAppCreated: blockerBrief.summary.wechatOpenMobileAppCreated === true,
+      wechatOpenCanCreateDraft: blockerBrief.summary.wechatOpenCanCreateDraft === true,
+      wechatOpenReadyToSubmitForReview: blockerBrief.summary.wechatOpenReadyToSubmitForReview === true,
+      wechatOpenMobileApp: blockerBrief.wechatOpenMobileApp || null,
       requiredEnvBlockers: blockerBrief.requiredEnvBlockers.map((item) => `${item.name}:${item.status}:${item.importTarget}`),
     },
     evidenceWriteback: {

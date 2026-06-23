@@ -117,9 +117,14 @@ function buildReport(args) {
   const cloudShellHandoff = runJson("cloudshell_handoff", [
     "scripts/generate-aliyun-cloudshell-inventory-handoff.mjs",
   ])
+  const wechatOpenMobileAppPackage = runJson("wechat_open_mobile_app_package", [
+    "scripts/generate-wechat-open-mobile-app-package.mjs",
+    ...envArgs(args),
+  ])
 
   const requiredEnvBlockers = extractRequiredEnvBlockers(sensitiveBlockers)
   const sensitiveBlockerSummaries = compactSensitiveBlockers(sensitiveBlockers)
+  const wechatOpenMobileApp = compactWechatOpenMobileApp(wechatOpenMobileAppPackage)
   const report = {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -155,9 +160,14 @@ function buildReport(args) {
       cliConfigProbeFailureCategory: cloudAccess.cli?.configProbe?.failureCategory || "",
       currentBrowserCanUseCurrentConsole: cloudAccess.localBrowserProbe?.canUseCurrentConsole === true,
       currentBrowserAliyunConsoleTabCount: cloudAccess.localBrowserProbe?.aliyunConsoleTabCount || 0,
+      wechatOpenAccountVerified: wechatOpenMobileApp.accountVerified,
+      wechatOpenMobileAppCreated: wechatOpenMobileApp.mobileAppCreated,
+      wechatOpenCanCreateDraft: wechatOpenMobileApp.canCreateDraftInWechatOpenPlatform,
+      wechatOpenReadyToSubmitForReview: wechatOpenMobileApp.readyToSubmitForReview,
     },
     immediateAuthorizationPackets: actionAuthorization.nextActionTimeConfirmations || [],
     requiredEnvBlockers,
+    wechatOpenMobileApp,
     cloudAccess: {
       canReadCloudNow: cloudAccess.canReadCloudNow === true,
       cliAvailable: cloudAccess.cli?.available === true,
@@ -223,6 +233,43 @@ function buildReport(args) {
   return report
 }
 
+function compactWechatOpenMobileApp(report) {
+  const summary = report.summary || {}
+  const packageInfo = report.mobileAppCreationPackage || {}
+  const android = packageInfo.android || {}
+  const androidSignaturePackage = packageInfo.androidSignaturePackage || {}
+  const ios = packageInfo.ios || {}
+  const actionPacket = report.actionPacket || {}
+  return {
+    accountVerified: summary.accountVerified === true,
+    mobileAppCreated: summary.mobileAppCreated === true,
+    mobileAppSubmitted: summary.mobileAppSubmitted === true,
+    reviewStatus: summary.reviewStatus || "unknown",
+    canCreateDraftInWechatOpenPlatform: summary.canCreateDraftInWechatOpenPlatform === true,
+    readyToSubmitForReview: summary.readyToSubmitForReview === true,
+    submissionBlockers: summary.submissionBlockers || [],
+    mobileAppCredentialsAvailable: summary.mobileAppCredentialsAvailable === true,
+    requiredBlocking: summary.requiredBlocking || [],
+    machineBlocking: summary.machineBlocking || [],
+    androidPackageName: android.packageName || "",
+    androidReleaseSigningConfigReady: android.releaseSigningConfigReady === true,
+    androidReleaseUsesDebugSigning: android.releaseUsesDebugSigning === true,
+    androidSignatureStatus: androidSignaturePackage.status || "unknown",
+    androidReleaseArtifactReady: androidSignaturePackage.releaseArtifactReady === true,
+    androidWechatSignatureRecorded: androidSignaturePackage.wechatSignatureRecorded === true,
+    iosBundleId: ios.bundleId || "",
+    iosUniversalLink: ios.universalLink || "",
+    iosAssociatedDomain: ios.associatedDomain || "",
+    appleTeamIdMissing: ios.appleTeamIdMissing === true,
+    actionPacketId: actionPacket.packetId || "",
+    minimumAuthorizationPhrase: actionPacket.minimumAuthorizationPhrase || "",
+    createDraftFields: actionPacket.createDraftFields || [],
+    backendWriteTargetsAfterApproval: actionPacket.backendWriteTargetsAfterApproval || [],
+    verifyCommands: actionPacket.verifyCommands || report.verifyCommands || [],
+    forbidden: actionPacket.forbidden || report.forbidden || [],
+  }
+}
+
 function compactSensitiveBlockers(sensitiveBlockers) {
   return (sensitiveBlockers.items || []).map((item) => ({
     id: item.id,
@@ -283,6 +330,37 @@ function renderMarkdown(report) {
     `- cliConfigProbeFailureCategory: ${report.summary.cliConfigProbeFailureCategory || "none"}`,
     `- currentBrowserCanUseCurrentConsole: ${report.summary.currentBrowserCanUseCurrentConsole}`,
     `- currentBrowserAliyunConsoleTabCount: ${report.summary.currentBrowserAliyunConsoleTabCount}`,
+    `- wechatOpenAccountVerified: ${report.summary.wechatOpenAccountVerified}`,
+    `- wechatOpenMobileAppCreated: ${report.summary.wechatOpenMobileAppCreated}`,
+    `- wechatOpenCanCreateDraft: ${report.summary.wechatOpenCanCreateDraft}`,
+    `- wechatOpenReadyToSubmitForReview: ${report.summary.wechatOpenReadyToSubmitForReview}`,
+    "",
+    "## 微信开放平台移动应用链路",
+    "",
+    `- accountVerified: ${report.wechatOpenMobileApp.accountVerified}`,
+    `- mobileAppCreated: ${report.wechatOpenMobileApp.mobileAppCreated}`,
+    `- mobileAppSubmitted: ${report.wechatOpenMobileApp.mobileAppSubmitted}`,
+    `- reviewStatus: ${report.wechatOpenMobileApp.reviewStatus}`,
+    `- canCreateDraftInWechatOpenPlatform: ${report.wechatOpenMobileApp.canCreateDraftInWechatOpenPlatform}`,
+    `- readyToSubmitForReview: ${report.wechatOpenMobileApp.readyToSubmitForReview}`,
+    `- mobileAppCredentialsAvailable: ${report.wechatOpenMobileApp.mobileAppCredentialsAvailable}`,
+    `- submissionBlockers: ${report.wechatOpenMobileApp.submissionBlockers.join(", ") || "none"}`,
+    `- androidPackageName: ${report.wechatOpenMobileApp.androidPackageName || "unknown"}`,
+    `- androidReleaseSigningConfigReady: ${report.wechatOpenMobileApp.androidReleaseSigningConfigReady}`,
+    `- androidReleaseUsesDebugSigning: ${report.wechatOpenMobileApp.androidReleaseUsesDebugSigning}`,
+    `- androidSignatureStatus: ${report.wechatOpenMobileApp.androidSignatureStatus}`,
+    `- androidReleaseArtifactReady: ${report.wechatOpenMobileApp.androidReleaseArtifactReady}`,
+    `- androidWechatSignatureRecorded: ${report.wechatOpenMobileApp.androidWechatSignatureRecorded}`,
+    `- iosBundleId: ${report.wechatOpenMobileApp.iosBundleId || "unknown"}`,
+    `- iosUniversalLink: ${report.wechatOpenMobileApp.iosUniversalLink || "unknown"}`,
+    `- iosAssociatedDomain: ${report.wechatOpenMobileApp.iosAssociatedDomain || "unknown"}`,
+    `- appleTeamIdMissing: ${report.wechatOpenMobileApp.appleTeamIdMissing}`,
+    `- actionPacketId: ${report.wechatOpenMobileApp.actionPacketId || "none"}`,
+    `- minimumAuthorizationPhrase: ${report.wechatOpenMobileApp.minimumAuthorizationPhrase || "none"}`,
+    "- createDraftFields:",
+    ...report.wechatOpenMobileApp.createDraftFields.map((item) => `  - ${item.name}: ${item.value}`),
+    "- backendWriteTargetsAfterApproval:",
+    ...report.wechatOpenMobileApp.backendWriteTargetsAfterApproval.map((item) => `  - ${item}`),
     "",
     "## 当前可开始但必须动作时确认",
     "",
