@@ -132,6 +132,7 @@ function buildPackage(args) {
     ...(cloudInventorySummary.ready ? [] : (cloudAccess.blockers || [])),
     ...(cloudInventorySummary.ready ? [] : cloudInventorySummary.blockers.map((item) => `cloudInventory:${item}`)),
   ])
+  const executionQueue = buildExecutionQueue(immediateConsoleTasks, blockedConsoleTasks, externalAppPackets)
 
   const report = {
     ok: true,
@@ -161,6 +162,7 @@ function buildPackage(args) {
       cliConfigProbeFailureCategory,
     },
     firstCloudPhase,
+    executionQueue,
     immediateConsoleTasks: immediateConsoleTasks.map(compactConsoleTask),
     blockedConsoleTasks: blockedConsoleTasks.map(compactConsoleTask),
     cloudConsoleAuthorizationPackets: cloudConsolePackets.map(compactPacket),
@@ -216,6 +218,57 @@ function buildPackage(args) {
     report.containsValues = true
   }
   return report
+}
+
+function buildExecutionQueue(immediateConsoleTasks, blockedConsoleTasks, externalAppPackets) {
+  return {
+    canStartNow: immediateConsoleTasks.map((task) => {
+      const compact = compactConsoleTask(task)
+      return {
+        id: compact.id,
+        kind: "aliyun_console_task",
+        title: compact.title,
+        owner: task.owner || "阿里云操作员",
+        requiresActionTimeConfirmation: true,
+        minimumAuthorizationPhrase: compact.minimumAuthorizationPhrase,
+        consolePath: compact.consolePath,
+        writeTargets: compact.writeTargets,
+        verifyCommands: compact.verifyCommands,
+        completionEvidence: compact.completionEvidence,
+        forbidden: compact.forbidden,
+      }
+    }),
+    externalAppPrerequisites: externalAppPackets.map((packet) => {
+      const compact = compactPacket(packet)
+      return {
+        packetId: compact.packetId,
+        kind: "external_platform_prerequisite",
+        title: compact.title,
+        owner: compact.owner,
+        requiresActionTimeConfirmation: true,
+        minimumAuthorizationPhrase: compact.minimumAuthorizationPhrase,
+        writeTargets: compact.writeTargets,
+        verifyCommands: compact.verifyCommands,
+        completionEvidence: compact.completionEvidence,
+        explicitlyExcluded: compact.explicitlyExcluded,
+      }
+    }),
+    blockedByDependencies: blockedConsoleTasks.map((task) => {
+      const compact = compactConsoleTask(task)
+      return {
+        id: compact.id,
+        kind: "aliyun_console_task",
+        title: compact.title,
+        owner: task.owner || "阿里云操作员",
+        status: compact.status,
+        dependsOn: compact.dependsOn,
+        blockingDependencies: compact.blockingDependencies,
+        currentBlockers: compact.currentBlockers,
+        nextActions: compact.nextActions,
+        verifyCommands: compact.verifyCommands,
+      }
+    }),
+  }
 }
 
 function summarizeCloudInventoryResults(cloudInventoryResults) {
@@ -411,6 +464,18 @@ function renderMarkdown(report) {
     `- containsValues: ${report.containsValues}`,
     `- mutationPerformed: ${report.mutationPerformed}`,
     `- cloudApiCalled: ${report.cloudApiCalled}`,
+    "",
+    "## 下一步执行队列",
+    "",
+    `- canStartNow: ${report.executionQueue.canStartNow.map((item) => item.id).join(", ") || "none"}`,
+    `- externalAppPrerequisites: ${report.executionQueue.externalAppPrerequisites.map((item) => item.packetId).join(", ") || "none"}`,
+    `- blockedByDependencies: ${report.executionQueue.blockedByDependencies.map((item) => item.id).join(", ") || "none"}`,
+    ...(report.executionQueue.canStartNow.length
+      ? report.executionQueue.canStartNow.map((item) => `- ${item.id}: kind=${item.kind}; phrase=${item.minimumAuthorizationPhrase}`)
+      : ["- canStartNowItems: none"]),
+    ...(report.executionQueue.externalAppPrerequisites.length
+      ? report.executionQueue.externalAppPrerequisites.map((item) => `- ${item.packetId}: kind=${item.kind}; phrase=${item.minimumAuthorizationPhrase}`)
+      : ["- externalAppPrerequisiteItems: none"]),
     "",
     "## 只读盘点解锁",
     "",
