@@ -430,6 +430,11 @@ function buildReport(args) {
   const currentExternalBlockers = actions
     .filter((action) => action.status !== "ready")
     .map((action) => action.id)
+  const authorizationClosureBrief = buildAuthorizationClosureBrief({
+    consoleRunbook,
+    authorizationPackets,
+    nextActionTimeConfirmations,
+  })
   const report = {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -464,10 +469,15 @@ function buildReport(args) {
       authorizationPackets: authorizationPackets.length,
       canStartNowPackets,
       nextActionTimeConfirmations: nextActionTimeConfirmations.map((item) => item.packetId),
+      blockedCredentialCount: authorizationClosureBrief.blockedCredentialCount,
+      readySecretEnvVariableCount: authorizationClosureBrief.readySecretEnvVariableCount,
+      resourceEvidenceReady: authorizationClosureBrief.resourceEvidenceReady,
+      blockedResourceEvidenceIds: authorizationClosureBrief.blockedResourceEvidenceIds,
       blockedByPacketDependencies: authorizationPackets
         .filter((packet) => packet.blockingDependencies.length > 0)
         .map((packet) => packet.packetId),
     },
+    authorizationClosureBrief,
     nextActionTimeConfirmations,
     safeLocalWorkStillAllowed: [
       "运行本地检查和 smoke。",
@@ -502,6 +512,42 @@ function buildReport(args) {
   }
   report.ok = report.secretLeakCheck.ok
   return report
+}
+
+function buildAuthorizationClosureBrief({
+  consoleRunbook,
+  authorizationPackets,
+  nextActionTimeConfirmations,
+}) {
+  const runbookBrief = consoleRunbook.consoleClosureBrief || {}
+  const blockedCredentialNames = runbookBrief.blockedCredentialNames || []
+  const readySecretEnvVariableNames = runbookBrief.readySecretEnvVariableNames || []
+  const canStartNowPackets = nextActionTimeConfirmations.map((item) => item.packetId)
+  const blockedByPacketDependencies = authorizationPackets
+    .filter((packet) => packet.blockingDependencies.length > 0)
+    .map((packet) => packet.packetId)
+
+  return {
+    conclusion: "现在不能部署；这些 packet 只是动作时确认入口，不能替代微信移动 App、Android/iOS 发布凭证、阿里云资源证据和 secret env 导入闭环。",
+    canDeployNow: consoleRunbook.summary?.canDeployNow === true,
+    canCodexProceedWithoutUser: false,
+    blockedCredentialCount: runbookBrief.blockedCredentialCount ?? blockedCredentialNames.length,
+    blockedCredentialNames,
+    readySecretEnvVariableCount: runbookBrief.readySecretEnvVariableCount ?? readySecretEnvVariableNames.length,
+    readySecretEnvVariableNames,
+    resourceEvidenceReady: runbookBrief.resourceEvidenceReady || consoleRunbook.summary?.resourceEvidenceReady || "unknown",
+    blockedResourceEvidenceIds: runbookBrief.blockedResourceEvidenceIds || consoleRunbook.summary?.blockedResourceEvidenceIds || [],
+    canStartNowPackets,
+    canStartNowConsoleTasks: consoleRunbook.summary?.canStartNowConsoleTasks || [],
+    blockedByPacketDependencies,
+    blockedByTaskDependencies: consoleRunbook.summary?.blockedByTaskDependencies || [],
+    actionTimeConfirmationRequired: unique([
+      ...(runbookBrief.actionTimeConfirmationRequiredIds || []),
+      ...authorizationPackets
+        .filter((packet) => packet.requiresActionTimeConfirmation)
+        .map((packet) => packet.packetId),
+    ]),
+  }
 }
 
 function compactActionTimeConfirmation(packet) {
@@ -633,6 +679,24 @@ function renderMarkdown(report) {
     `- secretLeakCheck: ${report.secretLeakCheck.ok}`,
     `- actionTimeConfirmationRequired: ${report.summary.actionTimeConfirmationRequired.join(", ")}`,
     `- nextActionTimeConfirmations: ${report.summary.nextActionTimeConfirmations.join(", ") || "none"}`,
+    `- blockedCredentialCount: ${report.summary.blockedCredentialCount}`,
+    `- readySecretEnvVariableCount: ${report.summary.readySecretEnvVariableCount}`,
+    `- resourceEvidenceReady: ${report.summary.resourceEvidenceReady}`,
+    `- blockedResourceEvidenceIds: ${report.summary.blockedResourceEvidenceIds.length ? report.summary.blockedResourceEvidenceIds.join(", ") : "none"}`,
+    "",
+    "## 目标闭环证据简表",
+    "",
+    `- conclusion: ${report.authorizationClosureBrief.conclusion}`,
+    `- canDeployNow: ${report.authorizationClosureBrief.canDeployNow}`,
+    `- canCodexProceedWithoutUser: ${report.authorizationClosureBrief.canCodexProceedWithoutUser}`,
+    `- blockedCredentialCount: ${report.authorizationClosureBrief.blockedCredentialCount}`,
+    `- blockedCredentialNames: ${report.authorizationClosureBrief.blockedCredentialNames.length ? report.authorizationClosureBrief.blockedCredentialNames.join(", ") : "none"}`,
+    `- readySecretEnvVariableCount: ${report.authorizationClosureBrief.readySecretEnvVariableCount}`,
+    `- resourceEvidenceReady: ${report.authorizationClosureBrief.resourceEvidenceReady}`,
+    `- blockedResourceEvidenceIds: ${report.authorizationClosureBrief.blockedResourceEvidenceIds.length ? report.authorizationClosureBrief.blockedResourceEvidenceIds.join(", ") : "none"}`,
+    `- canStartNowPackets: ${report.authorizationClosureBrief.canStartNowPackets.length ? report.authorizationClosureBrief.canStartNowPackets.join(", ") : "none"}`,
+    `- canStartNowConsoleTasks: ${report.authorizationClosureBrief.canStartNowConsoleTasks.length ? report.authorizationClosureBrief.canStartNowConsoleTasks.join(", ") : "none"}`,
+    `- blockedByPacketDependencies: ${report.authorizationClosureBrief.blockedByPacketDependencies.length ? report.authorizationClosureBrief.blockedByPacketDependencies.join(", ") : "none"}`,
     "",
     "## 允许的本地工作",
     "",

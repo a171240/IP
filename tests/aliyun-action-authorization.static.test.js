@@ -26,6 +26,9 @@ test("Aliyun action authorization command is wired into scripts and predeploy", 
   assert.match(releaseArtifacts, /canStartNowPackets/)
   assert.match(releaseArtifacts, /nextActionTimeConfirmations/)
   assert.match(releaseArtifacts, /blockedByPacketDependencies/)
+  assert.match(releaseArtifacts, /authorizationClosureBrief/)
+  assert.match(releaseArtifacts, /blockedCredentialCount/)
+  assert.match(releaseArtifacts, /resourceEvidenceReady/)
 })
 
 test("Aliyun action authorization matrix separates local-safe work from external actions", () => {
@@ -59,6 +62,33 @@ test("Aliyun action authorization matrix separates local-safe work from external
   assert.equal(report.summary.cloudConsoleTasks, 7)
   assert.ok(report.summary.requiredBlocking.includes("WECHAT_OPEN_APP_ID"))
   assert.ok(report.summary.requiredBlocking.includes("WECHAT_OPEN_APP_SECRET"))
+  assert.equal(report.summary.blockedCredentialCount, 8)
+  assert.equal(report.summary.readySecretEnvVariableCount, 17)
+  assert.equal(report.summary.resourceEvidenceReady, "0/7")
+  assert.ok(report.summary.blockedResourceEvidenceIds.includes("R01_SAE_RUNTIME"))
+  assert.ok(report.summary.blockedResourceEvidenceIds.includes("R06_ENV_IMPORT"))
+  assert.equal(report.authorizationClosureBrief.canDeployNow, false)
+  assert.equal(report.authorizationClosureBrief.canCodexProceedWithoutUser, false)
+  assert.equal(report.authorizationClosureBrief.blockedCredentialCount, 8)
+  assert.ok(report.authorizationClosureBrief.blockedCredentialNames.includes("WECHAT_OPEN_APP_ID"))
+  assert.ok(report.authorizationClosureBrief.blockedCredentialNames.includes("WECHAT_OPEN_APP_SECRET"))
+  assert.equal(report.authorizationClosureBrief.readySecretEnvVariableCount, 17)
+  assert.equal(report.authorizationClosureBrief.resourceEvidenceReady, "0/7")
+  assert.ok(report.authorizationClosureBrief.blockedResourceEvidenceIds.includes("R02_ACR_IMAGE_REGISTRY"))
+  assert.ok(report.authorizationClosureBrief.blockedResourceEvidenceIds.includes("R07_SLS_ALERTS"))
+  assert.deepEqual(report.authorizationClosureBrief.canStartNowPackets, [
+    "P01_WECHAT_OPEN_MOBILE_APP",
+    "P10_ANDROID_RELEASE_SIGNING",
+    "P02_APPLE_TEAM_ID",
+    "P03_ACR_PURCHASE",
+    "P05_OSS_RAM_STS",
+  ])
+  assert.deepEqual(report.authorizationClosureBrief.canStartNowConsoleTasks, [
+    "C02_ACR_IMAGE_AND_PULL",
+    "C05_OSS_AUDIO_RAM_STS",
+  ])
+  assert.ok(report.authorizationClosureBrief.blockedByPacketDependencies.includes("P04_ACR_IMAGE_AND_PULL"))
+  assert.ok(report.authorizationClosureBrief.blockedByTaskDependencies.includes("C01_SAE_RUNTIME"))
 
   assert.equal(byId.get("U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE").automationPolicy, "external_platform_review_required")
   assert.equal(byId.get("U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE").requiresActionTimeConfirmation, true)
@@ -170,4 +200,30 @@ test("Aliyun action authorization matrix separates local-safe work from external
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
+})
+
+test("Aliyun action authorization markdown includes closure brief without secret values", () => {
+  const markdownPath = "/tmp/meiye-aliyun-action-authorization-test.md"
+  const output = execFileSync(process.execPath, [
+    "scripts/summarize-aliyun-action-authorization.mjs",
+    "--markdown",
+    markdownPath,
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 50,
+  })
+  const markdown = fs.readFileSync(markdownPath, "utf8")
+
+  assert.match(markdown, /## 目标闭环证据简表/)
+  assert.match(markdown, /blockedCredentialCount: 8/)
+  assert.match(markdown, /readySecretEnvVariableCount: 17/)
+  assert.match(markdown, /resourceEvidenceReady: 0\/7/)
+  assert.match(markdown, /blockedResourceEvidenceIds: .*R02_ACR_IMAGE_REGISTRY/)
+  assert.match(markdown, /canStartNowPackets: P01_WECHAT_OPEN_MOBILE_APP/)
+  assert.match(markdown, /canStartNowConsoleTasks: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS/)
+  assert.match(markdown, /blockedByPacketDependencies: .*P04_ACR_IMAGE_AND_PULL/)
+  assert.doesNotMatch(output + markdown, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(output + markdown, /LTAI[A-Za-z0-9]{12,}/)
+  assert.doesNotMatch(output + markdown, /:\/\/[^\s:@]+:[^\s@]+@/)
 })
