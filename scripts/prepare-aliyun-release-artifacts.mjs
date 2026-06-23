@@ -325,6 +325,11 @@ function renderMarkdown(audit) {
     `- cliConfigFileExists: ${cloudAccess.cli?.configFileExists === true}`,
     `- cliConfigProbeReady: ${cloudAccess.cli?.configProbe?.ready === true}`,
     `- cliConfigProbeFailureCategory: ${cloudAccess.cli?.configProbe?.failureCategory || "none"}`,
+    `- currentBrowserCanUseCurrentConsole: ${cloudAccess.localBrowserProbe?.canUseCurrentConsole === true}`,
+    `- currentBrowserAliyunConsoleTabCount: ${cloudAccess.localBrowserProbe?.aliyunConsoleTabCount || 0}`,
+    `- currentBrowserAliyunConsoleHostPaths: ${formatCurrentBrowserHostPaths(cloudAccess.localBrowserProbe?.aliyunConsoleTabs || [])}`,
+    `- currentBrowserCloudApiCalled: ${cloudAccess.localBrowserProbe?.cloudApiCalled === true}`,
+    `- currentBrowserCloudMutationPerformed: ${cloudAccess.localBrowserProbe?.cloudMutationPerformed === true}`,
     `- workbenchTerminalConnected: ${cloudAccess.terminalAccess?.workbenchTerminal?.connected === true}`,
     `- workbenchTerminalReadiness: ${cloudAccess.terminalAccess?.workbenchTerminal?.readiness || "not_observed"}`,
     `- workbenchTerminalCliInventoryAttempted: ${cloudAccess.terminalAccess?.workbenchTerminal?.cliInventoryAttempted === true}`,
@@ -661,6 +666,8 @@ function renderMarkdown(audit) {
     `- cloudInventoryStrictReady: ${blockerBrief.summary.cloudInventoryStrictReady}`,
     `- canReadCloudNow: ${blockerBrief.summary.canReadCloudNow}`,
     `- cliConfigProbeFailureCategory: ${blockerBrief.summary.cliConfigProbeFailureCategory || "none"}`,
+    `- currentBrowserCanUseCurrentConsole: ${blockerBrief.summary.currentBrowserCanUseCurrentConsole === true}`,
+    `- currentBrowserAliyunConsoleTabCount: ${blockerBrief.summary.currentBrowserAliyunConsoleTabCount || 0}`,
     ...(blockerBrief.immediateAuthorizationPackets?.length
       ? blockerBrief.immediateAuthorizationPackets.map((item) => `- ${item.packetId}: ${item.minimumUserPhrase}`)
       : ["- immediateAuthorizationPackets: none"]),
@@ -982,6 +989,11 @@ function formatUserInterventionGroups(groups) {
   const entries = Object.entries(groups)
   if (!entries.length) return "none"
   return entries.map(([mode, ids]) => `${mode}=${Array.isArray(ids) ? ids.join("|") : String(ids)}`).join("; ")
+}
+
+function formatCurrentBrowserHostPaths(tabs) {
+  const hostPaths = (tabs || []).map((item) => item.hostPath).filter(Boolean)
+  return hostPaths.length ? hostPaths.join(", ") : "none"
 }
 
 function compactSensitiveBlockerForAudit(item) {
@@ -1489,6 +1501,13 @@ function main() {
       cliConfigFileExists: cloudAccess.cli?.configFileExists === true,
       cliConfigProbeReady: cloudAccess.cli?.configProbe?.ready === true,
       cliConfigProbeFailureCategory: cloudAccess.cli?.configProbe?.failureCategory || "",
+      currentBrowserCanUseCurrentConsole: cloudAccess.localBrowserProbe?.canUseCurrentConsole === true,
+      currentBrowserAliyunConsoleTabCount: cloudAccess.localBrowserProbe?.aliyunConsoleTabCount || 0,
+      currentBrowserAliyunConsoleHostPaths: (cloudAccess.localBrowserProbe?.aliyunConsoleTabs || [])
+        .map((item) => item.hostPath)
+        .filter(Boolean),
+      currentBrowserCloudApiCalled: cloudAccess.localBrowserProbe?.cloudApiCalled === true,
+      currentBrowserCloudMutationPerformed: cloudAccess.localBrowserProbe?.cloudMutationPerformed === true,
       workbenchTerminalConnected: cloudAccess.terminalAccess?.workbenchTerminal?.connected === true,
       workbenchTerminalReadiness: cloudAccess.terminalAccess?.workbenchTerminal?.readiness || "not_observed",
       workbenchTerminalCliInventoryAttempted: cloudAccess.terminalAccess?.workbenchTerminal?.cliInventoryAttempted === true,
@@ -1769,6 +1788,8 @@ function main() {
       cloudInventoryStrictReady: blockerBrief.summary.cloudInventoryStrictReady,
       canReadCloudNow: blockerBrief.summary.canReadCloudNow === true,
       cliConfigProbeFailureCategory: blockerBrief.summary.cliConfigProbeFailureCategory,
+      currentBrowserCanUseCurrentConsole: blockerBrief.summary.currentBrowserCanUseCurrentConsole === true,
+      currentBrowserAliyunConsoleTabCount: blockerBrief.summary.currentBrowserAliyunConsoleTabCount || 0,
       requiredEnvBlockers: blockerBrief.requiredEnvBlockers.map((item) => `${item.name}:${item.status}:${item.importTarget}`),
     },
     evidenceWriteback: {

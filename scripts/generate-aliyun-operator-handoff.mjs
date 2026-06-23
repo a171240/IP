@@ -225,6 +225,7 @@ function compactCloudAccess(report) {
   const checklist = report.consoleEvidenceChecklist || []
   const cloudShell = report.cloudShellObservation?.cloudShell || {}
   const browserConsole = report.cloudShellObservation?.browserConsole || {}
+  const localBrowserProbe = report.localBrowserProbe || {}
   const workbenchTerminal = report.terminalAccess?.workbenchTerminal || report.cloudShellObservation?.workbenchTerminal || {}
   return {
     readOnlyOnly: report.readOnlyOnly === true,
@@ -242,6 +243,22 @@ function compactCloudAccess(report) {
       observedAt: browserConsole.observedAt || "",
       evidence: browserConsole.evidence || "",
       resourcesObserved: browserConsole.resourcesObserved || [],
+    },
+    currentBrowser: {
+      checked: localBrowserProbe.checked === true,
+      browser: localBrowserProbe.browser || "",
+      running: localBrowserProbe.running === true,
+      canUseCurrentConsole: localBrowserProbe.canUseCurrentConsole === true,
+      tabCount: localBrowserProbe.tabCount || 0,
+      aliyunConsoleTabCount: localBrowserProbe.aliyunConsoleTabCount || 0,
+      aliyunConsoleTabs: (localBrowserProbe.aliyunConsoleTabs || []).map((item) => ({
+        title: item.title || "",
+        hostPath: item.hostPath || "",
+      })),
+      cloudApiCalled: localBrowserProbe.cloudApiCalled === true,
+      cloudMutationPerformed: localBrowserProbe.cloudMutationPerformed === true,
+      blockers: localBrowserProbe.blockers || [],
+      evidence: localBrowserProbe.evidence || "",
     },
     cloudShell: {
       connected: cloudShell.connected === true,
@@ -845,6 +862,13 @@ function renderMarkdown(handoff) {
     `- cliConfigProbeReady: ${handoff.cloudAccess.cliConfigProbe?.ready === true}`,
     `- cliConfigProbeFailureCategory: ${handoff.cloudAccess.cliConfigProbe?.failureCategory || "none"}`,
     `- browserConsoleChromeLoggedIn: ${handoff.cloudAccess.browserConsole.chromeLoggedIn}`,
+    `- currentBrowserChecked: ${handoff.cloudAccess.currentBrowser.checked}`,
+    `- currentBrowserRunning: ${handoff.cloudAccess.currentBrowser.running}`,
+    `- currentBrowserCanUseCurrentConsole: ${handoff.cloudAccess.currentBrowser.canUseCurrentConsole}`,
+    `- currentBrowserAliyunConsoleTabCount: ${handoff.cloudAccess.currentBrowser.aliyunConsoleTabCount}`,
+    `- currentBrowserAliyunConsoleHostPaths: ${formatCurrentBrowserHostPaths(handoff.cloudAccess.currentBrowser.aliyunConsoleTabs)}`,
+    `- currentBrowserCloudApiCalled: ${handoff.cloudAccess.currentBrowser.cloudApiCalled}`,
+    `- currentBrowserCloudMutationPerformed: ${handoff.cloudAccess.currentBrowser.cloudMutationPerformed}`,
     `- cloudShellConnected: ${handoff.cloudAccess.cloudShell.connected}`,
     `- cloudShellCliAvailable: ${handoff.cloudAccess.cloudShell.cliAvailable}`,
     `- cloudShellCliConfigFileExists: ${handoff.cloudAccess.cloudShell.cliConfigFileExists}`,
@@ -1067,6 +1091,11 @@ function renderEvidenceGap(item) {
     `  - expected: ${item.expected}`,
     ...(item.forbidden?.length ? [`  - forbidden: ${item.forbidden.join(", ")}`] : []),
   ]
+}
+
+function formatCurrentBrowserHostPaths(tabs) {
+  const hostPaths = (tabs || []).map((item) => item.hostPath).filter(Boolean)
+  return hostPaths.length ? hostPaths.join(", ") : "none"
 }
 
 function renderVariable(item) {

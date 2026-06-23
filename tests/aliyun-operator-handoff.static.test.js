@@ -50,6 +50,8 @@ test("Aliyun operator handoff command is wired into scripts and local predeploy"
   assert.ok(deploySpec.predeployChecks.includes("corepack pnpm aliyun:operator:handoff"))
   assert.match(releaseArtifacts, /canStartNowConsoleTasks/)
   assert.match(releaseArtifacts, /blockedByConsoleTaskDependencies/)
+  assert.match(releaseArtifacts, /currentBrowserCanUseCurrentConsole/)
+  assert.match(releaseArtifacts, /currentBrowserAliyunConsoleHostPaths/)
 })
 
 test("Aliyun operator handoff maps ACR and SAE evidence gaps to the correct consoles", () => {
@@ -76,6 +78,12 @@ test("Aliyun operator handoff maps ACR and SAE evidence gaps to the correct cons
   const imagePullConfigured = byPath.get("runtime.imagePullConfigured")
 
   assert.equal(report.containsValues, false)
+  assert.equal(report.cloudAccess.currentBrowser.checked, true)
+  assert.equal(typeof report.cloudAccess.currentBrowser.canUseCurrentConsole, "boolean")
+  assert.equal(typeof report.cloudAccess.currentBrowser.aliyunConsoleTabCount, "number")
+  assert.ok(Array.isArray(report.cloudAccess.currentBrowser.aliyunConsoleTabs))
+  assert.equal(report.cloudAccess.currentBrowser.cloudApiCalled, false)
+  assert.equal(report.cloudAccess.currentBrowser.cloudMutationPerformed, false)
   assert.match(report.currentAnswer, /Android release signing/)
   assert.match(report.currentAnswer, /Apple Team ID/)
   assert.ok(report.userActionNow.some((item) => /Android release signing/.test(item.title)))
@@ -198,6 +206,9 @@ test("Aliyun operator handoff exposes console-only inventory observation summary
   assert.match(markdownOutput, /executedCommandResults: 0\/9/)
   assert.match(markdownOutput, /cloudApiCalledCommandResults: 0/)
   assert.match(markdownOutput, /mutationPerformedCommandResults: 0/)
+  assert.match(markdownOutput, /currentBrowserCanUseCurrentConsole/)
+  assert.match(markdownOutput, /currentBrowserAliyunConsoleTabCount/)
+  assert.match(markdownOutput, /currentBrowserCloudApiCalled: false/)
   assert.doesNotMatch(output + markdownOutput, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output + markdownOutput, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(output + markdownOutput, /:\/\/[^\s:@]+:[^\s@]+@/)
