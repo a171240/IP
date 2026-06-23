@@ -1761,6 +1761,9 @@ function main() {
       mutationPerformed: resourcesMatrix.mutationPerformed === true,
       ready: `${resourcesMatrix.summary.ready}/${resourcesMatrix.summary.total}`,
       blockedIds: resourcesMatrix.summary.blockedIds,
+      resourceEvidenceReady: resourcesMatrix.summary.resourceEvidenceReady || "",
+      blockedResourceEvidenceIds: resourcesMatrix.summary.blockedResourceEvidenceIds || [],
+      resourceEvidenceBrief: resourcesMatrix.resourceEvidenceBrief || {},
       actionTimeConfirmationRequired: resourcesMatrix.summary.actionTimeConfirmationRequired,
     },
     userActionBrief: {

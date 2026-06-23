@@ -119,6 +119,26 @@ const RESOURCE_DEFINITIONS = [
   },
 ]
 
+const RESOURCE_AUTHORIZATION_PACKETS = Object.freeze({
+  R01_SAE_RUNTIME: Object.freeze(["P08_SAE_RUNTIME_SLS"]),
+  R02_ACR_IMAGE_REGISTRY: Object.freeze(["P03_ACR_PURCHASE", "P04_ACR_IMAGE_AND_PULL"]),
+  R03_API_DOMAIN_HTTPS: Object.freeze(["P07_DOMAIN_DNS_HTTPS"]),
+  R04_ASSET_DOMAIN_HTTPS: Object.freeze(["P07_DOMAIN_DNS_HTTPS"]),
+  R05_OSS_AUDIO_STORAGE: Object.freeze(["P05_OSS_RAM_STS"]),
+  R06_ENV_IMPORT: Object.freeze(["P06_ENV_IMPORT"]),
+  R07_SLS_ALERTS: Object.freeze(["P08_SAE_RUNTIME_SLS"]),
+})
+
+const RESOURCE_CONSOLE_TASKS = Object.freeze({
+  R01_SAE_RUNTIME: Object.freeze(["C01_SAE_RUNTIME"]),
+  R02_ACR_IMAGE_REGISTRY: Object.freeze(["C02_ACR_IMAGE_AND_PULL"]),
+  R03_API_DOMAIN_HTTPS: Object.freeze(["C03_API_DOMAIN_HTTPS_ICP"]),
+  R04_ASSET_DOMAIN_HTTPS: Object.freeze(["C04_ASSET_DOMAIN_HTTPS_ICP"]),
+  R05_OSS_AUDIO_STORAGE: Object.freeze(["C05_OSS_AUDIO_RAM_STS"]),
+  R06_ENV_IMPORT: Object.freeze(["C06_ENV_IMPORT"]),
+  R07_SLS_ALERTS: Object.freeze(["C07_SLS_ALERTS"]),
+})
+
 function parseArgs(argv) {
   const args = {
     envFile: DEFAULT_ENV_FILE,
@@ -270,6 +290,7 @@ function buildReport(args) {
   })
 
   const blocked = resources.filter((item) => !item.ready)
+  const resourceEvidenceBrief = buildResourceEvidenceBrief(resources)
   const report = {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -306,6 +327,8 @@ function buildReport(args) {
         notObserved: 0,
         blockedIds: [],
       },
+      resourceEvidenceReady: `${resourceEvidenceBrief.ready}/${resourceEvidenceBrief.total}`,
+      blockedResourceEvidenceIds: resourceEvidenceBrief.blockedIds,
     },
     cloudAccess: {
       canReadCloudNow: cloudAccess.canReadCloudNow === true,
@@ -313,6 +336,7 @@ function buildReport(args) {
       checklistItems: cloudAccess.consoleEvidenceChecklist?.length || 0,
       observedResourceStatusSummary: cloudAccess.observedResourceStatusSummary || null,
     },
+    resourceEvidenceBrief,
     resources,
     nextActions: [
       "先用本矩阵确认哪些阿里云资源只差非密钥证据，哪些需要动作时授权。",
@@ -333,6 +357,70 @@ function buildReport(args) {
   }
   report.ok = report.secretLeakCheck.ok
   return report
+}
+
+function buildResourceEvidenceBrief(resources) {
+  const rows = resources.map((item) => ({
+    id: item.id,
+    title: item.title,
+    provider: item.provider,
+    status: item.status,
+    ready: item.ready === true,
+    observedStatus: item.observedResourceStatus?.status || "none",
+    observedReadiness: item.observedResourceStatus?.readiness || "none",
+    requiredAuthorizationPackets: RESOURCE_AUTHORIZATION_PACKETS[item.id] || [],
+    consoleTaskIds: RESOURCE_CONSOLE_TASKS[item.id] || [],
+    requiresActionTimeConfirmation: item.requiresActionTimeConfirmation === true,
+    currentEvidence: item.currentEvidence || [],
+    missingEvidence: buildMissingEvidence(item),
+    writeTargets: item.writeTargets || [],
+    verifyCommands: item.verifyCommands || [],
+    nextEvidenceAction: nextEvidenceActionForResource(item),
+    forbidden: item.forbidden || [],
+  }))
+  const blocked = rows.filter((item) => !item.ready)
+  return {
+    total: rows.length,
+    ready: rows.length - blocked.length,
+    blocked: blocked.length,
+    blockedIds: blocked.map((item) => item.id),
+    blockedResourceEvidence: blocked.map((item) => ({
+      id: item.id,
+      status: item.status,
+      observedStatus: item.observedStatus,
+      observedReadiness: item.observedReadiness,
+      requiredAuthorizationPackets: item.requiredAuthorizationPackets,
+      consoleTaskIds: item.consoleTaskIds,
+      missingEvidence: item.missingEvidence,
+      writeTargets: item.writeTargets,
+      verifyCommands: item.verifyCommands,
+      nextEvidenceAction: item.nextEvidenceAction,
+    })),
+    rows,
+    valueHandlingRules: [
+      "本简表只记录资源名、状态、控制台路径、digest、布尔值、证据编号和变量名。",
+      "所有 AppSecret、AccessKeySecret、registry password、RAM Secret、STS token、cookie、Supabase service role key 必须留在受控密钥环境。",
+      "资源 ready 不能只靠浏览器已登录或控制台页面可见，必须有 strict/readiness 命令或 .local.json 非密钥证据闭环。",
+    ],
+  }
+}
+
+function buildMissingEvidence(item) {
+  return unique([
+    ...(item.blockers || []),
+    item.observedResourceStatus?.status && item.observedResourceStatus?.readiness !== "ready"
+      ? `observed:${item.observedResourceStatus.status}`
+      : "",
+    item.currentEvidence?.length ? "" : "non_secret_current_evidence_missing",
+  ])
+}
+
+function nextEvidenceActionForResource(item) {
+  if (item.ready) return "run_strict_verification_to_preserve_ready_state"
+  if (item.id === "R02_ACR_IMAGE_REGISTRY") return "complete ACR purchase/repository evidence first, then image push/digest and SAE pull evidence after action-time confirmation"
+  if (item.id === "R06_ENV_IMPORT") return "import ready variables through SAE/KMS/Secrets Manager secret env after action-time confirmation, then run env/checklist and sensitive/blockers"
+  if (item.requiresActionTimeConfirmation) return "obtain action-time confirmation, perform only the named console action, then write non-secret evidence to the configured .local.json target"
+  return "confirm resource in Aliyun console or allowlisted readonly inventory, then write non-secret evidence to the configured .local.json target"
 }
 
 function unique(values) {
@@ -426,6 +514,12 @@ function renderMarkdown(report) {
     `- secretLeakCheck: ${report.secretLeakCheck.ok}`,
     `- mutationPerformed: ${report.mutationPerformed}`,
     `- cloudAccessCanReadNow: ${report.summary.cloudAccessCanReadNow}`,
+    `- resourceEvidenceReady: ${report.summary.resourceEvidenceReady}`,
+    `- blockedResourceEvidenceIds: ${report.summary.blockedResourceEvidenceIds.join(", ") || "none"}`,
+    "",
+    "## 资源证据简表",
+    "",
+    ...renderResourceEvidenceBrief(report.resourceEvidenceBrief),
     "",
     "## 资源清单",
     "",
@@ -455,6 +549,34 @@ function renderMarkdown(report) {
     "",
   )
   return `${lines.join("\n")}\n`
+}
+
+function renderResourceEvidenceBrief(brief) {
+  if (!brief || !Array.isArray(brief.rows)) return ["- none", ""]
+  return [
+    "| 资源 | 状态 | 观察状态 | 授权包 | 控制台任务 | 缺失证据 | 写回目标 |",
+    "| --- | --- | --- | --- | --- | --- | --- |",
+    ...brief.rows.map((item) => [
+      codeCell(item.id),
+      escapeTableCell(item.status),
+      escapeTableCell(`${item.observedStatus}/${item.observedReadiness}`),
+      escapeTableCell((item.requiredAuthorizationPackets || []).join(", ") || "none"),
+      escapeTableCell((item.consoleTaskIds || []).join(", ") || "none"),
+      escapeTableCell((item.missingEvidence || []).join(", ") || "none"),
+      escapeTableCell((item.writeTargets || []).join("; ") || "none"),
+    ].join(" | ").replace(/^/, "| ").replace(/$/, " |")),
+    "",
+  ]
+}
+
+function codeCell(value) {
+  return `\`${escapeTableCell(value)}\``
+}
+
+function escapeTableCell(value) {
+  return String(value || "")
+    .replace(/\|/g, "\\|")
+    .replace(/\r?\n/g, " ")
 }
 
 function writeOutput(filePath, content) {

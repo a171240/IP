@@ -11,6 +11,7 @@ const readJson = (...parts) => JSON.parse(read(...parts))
 test("Aliyun resource matrix command is wired into scripts and predeploy", () => {
   const pkg = readJson("package.json")
   const predeploy = read("scripts", "aliyun-predeploy-commands.mjs")
+  const releaseArtifacts = read("scripts", "prepare-aliyun-release-artifacts.mjs")
   const deploySpec = readJson("deploy", "aliyun-production-cn.example.json")
 
   assert.equal(pkg.scripts["aliyun:resources:matrix"], "node ./scripts/summarize-aliyun-resource-matrix.mjs")
@@ -20,6 +21,9 @@ test("Aliyun resource matrix command is wired into scripts and predeploy", () =>
   assert.ok(deploySpec.predeployChecks.includes("corepack pnpm aliyun:resources:matrix"))
   assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:resources:matrix:test"))
   assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:resources:matrix"))
+  assert.match(releaseArtifacts, /resourceEvidenceReady/)
+  assert.match(releaseArtifacts, /blockedResourceEvidenceIds/)
+  assert.match(releaseArtifacts, /resourceEvidenceBrief/)
 })
 
 test("Aliyun resource matrix names required cloud resources without secret values", () => {
@@ -44,6 +48,14 @@ test("Aliyun resource matrix names required cloud resources without secret value
   assert.equal(report.secretLeakCheck.ok, true)
   assert.equal(report.summary.total, 7)
   assert.ok(report.summary.blocked >= 1)
+  assert.equal(report.summary.resourceEvidenceReady, "0/7")
+  assert.ok(report.summary.blockedResourceEvidenceIds.includes("R01_SAE_RUNTIME"))
+  assert.ok(report.summary.blockedResourceEvidenceIds.includes("R06_ENV_IMPORT"))
+  assert.equal(report.resourceEvidenceBrief.total, 7)
+  assert.equal(report.resourceEvidenceBrief.ready, 0)
+  assert.equal(report.resourceEvidenceBrief.blocked, 7)
+  assert.ok(report.resourceEvidenceBrief.blockedIds.includes("R02_ACR_IMAGE_REGISTRY"))
+  assert.ok(report.resourceEvidenceBrief.valueHandlingRules.some((item) => /受控密钥环境/.test(item)))
   assert.equal(report.summary.observedResourceStatuses.total, 7)
   assert.equal(report.summary.observedResourceStatuses.ready, 0)
   assert.equal(report.summary.observedResourceStatuses.partial, 2)
@@ -61,6 +73,20 @@ test("Aliyun resource matrix names required cloud resources without secret value
   ])
   assert.equal(runtime.observedResourceStatus.status, "not_created_or_not_confirmed")
   assert.equal(runtime.observedResourceStatus.readiness, "blocked")
+  const runtimeBrief = report.resourceEvidenceBrief.rows.find((item) => item.id === "R01_SAE_RUNTIME")
+  const acrBrief = report.resourceEvidenceBrief.rows.find((item) => item.id === "R02_ACR_IMAGE_REGISTRY")
+  const envBrief = report.resourceEvidenceBrief.rows.find((item) => item.id === "R06_ENV_IMPORT")
+  assert.deepEqual(runtimeBrief.requiredAuthorizationPackets, ["P08_SAE_RUNTIME_SLS"])
+  assert.deepEqual(runtimeBrief.consoleTaskIds, ["C01_SAE_RUNTIME"])
+  assert.ok(runtimeBrief.missingEvidence.some((item) => item.includes("runtime:")))
+  assert.ok(runtimeBrief.writeTargets.some((item) => item.includes("items.runtime")))
+  assert.deepEqual(acrBrief.requiredAuthorizationPackets, ["P03_ACR_PURCHASE", "P04_ACR_IMAGE_AND_PULL"])
+  assert.deepEqual(acrBrief.consoleTaskIds, ["C02_ACR_IMAGE_AND_PULL"])
+  assert.ok(acrBrief.currentEvidence.includes("acr.purchaseCandidate.quotedAmount=CNY 117.00"))
+  assert.match(acrBrief.nextEvidenceAction, /ACR purchase/)
+  assert.deepEqual(envBrief.requiredAuthorizationPackets, ["P06_ENV_IMPORT"])
+  assert.ok(envBrief.missingEvidence.some((item) => item.includes("envImport:")))
+  assert.match(envBrief.nextEvidenceAction, /SAE\/KMS\/Secrets Manager/)
   assert.equal(acr.requiresActionTimeConfirmation, true)
   assert.equal(acr.mutationAllowedByThisCommand, false)
   assert.match(acr.consolePath, /容器镜像服务 ACR/)
@@ -86,4 +112,29 @@ test("Aliyun resource matrix names required cloud resources without secret value
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
+})
+
+test("Aliyun resource matrix markdown renders the resource evidence brief without values", () => {
+  const markdownPath = "/tmp/meiye-aliyun-resource-matrix-evidence-brief.md"
+  const output = execFileSync(process.execPath, [
+    "scripts/summarize-aliyun-resource-matrix.mjs",
+    "--markdown",
+    markdownPath,
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 30,
+  })
+  const markdown = fs.readFileSync(markdownPath, "utf8")
+
+  assert.match(markdown, /## 资源证据简表/)
+  assert.match(markdown, /resourceEvidenceReady: 0\/7/)
+  assert.match(markdown, /blockedResourceEvidenceIds: R01_SAE_RUNTIME/)
+  assert.match(markdown, /R02_ACR_IMAGE_REGISTRY/)
+  assert.match(markdown, /P03_ACR_PURCHASE, P04_ACR_IMAGE_AND_PULL/)
+  assert.match(markdown, /C05_OSS_AUDIO_RAM_STS/)
+  assert.match(markdown, /deploy\/aliyun-production-cn\.cloud-confirmations\.local\.json/)
+  assert.doesNotMatch(output + markdown, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(output + markdown, /LTAI[A-Za-z0-9]{12,}/)
+  assert.doesNotMatch(output + markdown, /:\/\/[^\s:@]+:[^\s@]+@/)
 })
