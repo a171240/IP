@@ -13,6 +13,8 @@
     "aliyun:env:classification:test": "node --test tests/aliyun-env-import-plan.static.test.mjs",
     "aliyun:env:handoff": "node ./scripts/summarize-aliyun-env-handoff.mjs",
     "aliyun:env:handoff:test": "node --test tests/aliyun-env-handoff.static.test.js",
+    "aliyun:env:source-map": "node ./scripts/summarize-aliyun-env-source-map.mjs",
+    "aliyun:env:source-map:test": "node --test tests/aliyun-env-source-map.static.test.js",
     "aliyun:wechat-state:test": "node --test tests/aliyun-wechat-open-platform-state.static.test.js",
     "aliyun:app-native:test": "node --test tests/aliyun-app-native-release.static.test.js",
     "aliyun:wechat-open:package": "node ./scripts/generate-wechat-open-mobile-app-package.mjs",

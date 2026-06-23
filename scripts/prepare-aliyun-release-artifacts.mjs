@@ -205,6 +205,7 @@ function renderMarkdown(audit) {
   const imagePublishPlan = audit.checks.imagePublishPlan
   const operatorTasks = audit.checks.operatorTasks
   const envHandoff = audit.checks.envHandoff
+  const envSourceMap = audit.checks.envSourceMap
   const sensitiveBlockers = audit.checks.sensitiveBlockers
   const resourcesMatrix = audit.checks.resourcesMatrix
   const userActionBrief = audit.checks.userActionBrief
@@ -264,6 +265,7 @@ function renderMarkdown(audit) {
     `- operatorHandoff: ${operatorHandoff.verdict}, missing required env ${operatorHandoff.missingVariables.required.length}`,
     `- productionStatus: ${productionStatus.verdict}, canDeployNow ${productionStatus.canDeployNow === true}`,
     `- envHandoff: ${envHandoff.summary.requiredBlocking.length} required blocked, ${envHandoff.summary.appLaunchBlocking.length} app launch blocked, ${envHandoff.summary.readySecretEnv} ready secret env`,
+    `- envSourceMap: Vercel ${envSourceMap.vercelCoverage.ok ? "checked" : envSourceMap.vercelCoverage.skipped ? "skipped" : "not ok"}, migrate ${envSourceMap.summary.canMigrateFromVercelProduction}, app/Aliyun new ${envSourceMap.summary.appAliyunOwnedNotInVercel}`,
     `- sensitiveActionItems: ${sensitiveBlockers.summary.total} total, ${sensitiveBlockers.summary.blocked} blocked`,
     `- aliyunResources: ${resourcesMatrix.summary.ready} / ${resourcesMatrix.summary.total} ready, ${resourcesMatrix.summary.blocked} blocked`,
     `- userActionBrief: ${userActionBrief.summary.ready} / ${userActionBrief.summary.total} ready, ${userActionBrief.summary.blocked} blocked`,
@@ -839,6 +841,30 @@ function renderMarkdown(audit) {
     `- readySecretEnv: ${envHandoff.summary.readySecretEnv}`,
     `- deferred: ${envHandoff.summary.deferred}`,
     "",
+    "## Vercel 到阿里云环境变量来源映射",
+    "",
+    `- json: ${audit.outputFiles.envSourceMapJson}`,
+    `- markdown: ${audit.outputFiles.envSourceMapMarkdown}`,
+    `- ok: ${envSourceMap.ok === true}`,
+    `- containsValues: ${envSourceMap.containsValues === false ? "false" : "unknown"}`,
+    `- vercelCoverage: ${envSourceMap.vercelCoverage.ok ? "checked" : envSourceMap.vercelCoverage.skipped ? "skipped" : "failed"}`,
+    `- vercelRequiredCovered: ${envSourceMap.summary.vercelRequiredCovered}`,
+    `- canMigrateFromVercelProduction: ${envSourceMap.summary.canMigrateFromVercelProduction}`,
+    `- appAliyunOwnedNotInVercel: ${envSourceMap.summary.appAliyunOwnedNotInVercel}`,
+    `- blockedExternalRequired: ${envSourceMap.summary.blockedExternalRequired.length ? envSourceMap.summary.blockedExternalRequired.join(", ") : "none"}`,
+    ...(envSourceMap.summary.requiredMissingInVercelProduction.length
+      ? [
+          "- requiredMissingInVercelProduction:",
+          ...envSourceMap.summary.requiredMissingInVercelProduction.map((item) => `  - ${item}`),
+        ]
+      : ["- requiredMissingInVercelProduction: none"]),
+    ...(envSourceMap.groups.miniProgramCompatOnly.length
+      ? [
+          "- miniProgramCompatOnly:",
+          ...envSourceMap.groups.miniProgramCompatOnly.map((item) => `  - ${item.name}: ${item.forbidden}`),
+        ]
+      : ["- miniProgramCompatOnly: none"]),
+    "",
     "## Vercel production 变量名覆盖",
     "",
     vercelEnvCoverage?.ok
@@ -1031,6 +1057,8 @@ function main() {
   const operatorTasksMarkdownPath = resolve(args.outDir, "operator-tasks.md")
   const envHandoffJsonPath = resolve(args.outDir, "env-handoff.json")
   const envHandoffMarkdownPath = resolve(args.outDir, "env-handoff.md")
+  const envSourceMapJsonPath = resolve(args.outDir, "env-source-map.json")
+  const envSourceMapMarkdownPath = resolve(args.outDir, "env-source-map.md")
   const sensitiveBlockersJsonPath = resolve(args.outDir, "sensitive-blockers.json")
   const sensitiveBlockersMarkdownPath = resolve(args.outDir, "sensitive-blockers.md")
   const resourcesMatrixJsonPath = resolve(args.outDir, "resource-matrix.json")
@@ -1224,7 +1252,20 @@ function main() {
   const appClientContract = runJson("app_client_contract", ["scripts/check-app-client-api-contract.mjs"])
   const appApiSmokeCoverage = runJson("app_api_smoke_coverage", ["scripts/check-app-api-smoke-coverage.mjs"])
   const dockerContext = runJson("docker_context", ["scripts/check-aliyun-docker-context.mjs"])
-  const vercelEnvCoverage = runVercelEnvCoverage(args, resolve(args.outDir, "vercel-env-coverage.json"))
+  const vercelEnvCoveragePath = resolve(args.outDir, "vercel-env-coverage.json")
+  const vercelEnvCoverage = runVercelEnvCoverage(args, vercelEnvCoveragePath)
+  const envSourceMap = runJson("env_source_map", [
+    "scripts/summarize-aliyun-env-source-map.mjs",
+    "--env-file",
+    args.envFile,
+    ...(vercelEnvCoverage.ok
+      ? ["--vercel-env-coverage-report", vercelEnvCoveragePath]
+      : ["--skip-vercel-env-coverage"]),
+    "--out",
+    envSourceMapJsonPath,
+    "--markdown",
+    envSourceMapMarkdownPath,
+  ])
 
   const bundle = args.skipBundle ? null : createArchive(args.outDir)
   const audit = {
@@ -1253,6 +1294,7 @@ function main() {
       imagePublishPlan,
       operatorTasks,
       envHandoff,
+      envSourceMap,
       sensitiveBlockers,
       resourcesMatrix,
       userActionBrief,
@@ -1282,7 +1324,9 @@ function main() {
       envImportChecklist: resolve(args.outDir, "env-import-checklist.md"),
       envHandoffJson: envHandoffJsonPath,
       envHandoffMarkdown: envHandoffMarkdownPath,
-      vercelEnvCoverage: vercelEnvCoverage.ok ? resolve(args.outDir, "vercel-env-coverage.json") : null,
+      envSourceMapJson: envSourceMapJsonPath,
+      envSourceMapMarkdown: envSourceMapMarkdownPath,
+      vercelEnvCoverage: vercelEnvCoverage.ok ? vercelEnvCoveragePath : null,
       domainReadiness: resolve(args.outDir, "domain-readiness.json"),
       cloudAccess: cloudAccessPath,
       cloudInventoryPlanJson: cloudInventoryPlanJsonPath,
@@ -1497,6 +1541,24 @@ function main() {
       readySecretEnv: envHandoff.summary.readySecretEnv,
       deferred: envHandoff.summary.deferred,
       acquisitionOrder: envHandoff.acquisitionOrder.map((item) => `${item.name}:${item.reason}`),
+    },
+    envSourceMap: {
+      report: audit.outputFiles.envSourceMapJson,
+      markdown: audit.outputFiles.envSourceMapMarkdown,
+      ok: envSourceMap.ok === true,
+      containsValues: envSourceMap.containsValues === true,
+      secretLeakCheck: envSourceMap.secretLeakCheck?.ok === true,
+      vercelCoverage: {
+        ok: envSourceMap.vercelCoverage.ok === true,
+        skipped: envSourceMap.vercelCoverage.skipped === true,
+        requiredCovered: envSourceMap.vercelCoverage.requiredCovered,
+        productionNames: envSourceMap.vercelCoverage.productionNames,
+      },
+      canMigrateFromVercelProduction: envSourceMap.summary.canMigrateFromVercelProduction,
+      appAliyunOwnedNotInVercel: envSourceMap.summary.appAliyunOwnedNotInVercel,
+      requiredMissingInVercelProduction: envSourceMap.summary.requiredMissingInVercelProduction,
+      blockedExternalRequired: envSourceMap.summary.blockedExternalRequired,
+      miniProgramCompatOnly: envSourceMap.summary.miniProgramCompatOnly,
     },
     sensitiveBlockers: {
       report: audit.outputFiles.sensitiveBlockersJson,
@@ -1775,6 +1837,8 @@ function main() {
     envImportChecklist: audit.outputFiles.envImportChecklist,
     envHandoffJson: audit.outputFiles.envHandoffJson,
     envHandoffMarkdown: audit.outputFiles.envHandoffMarkdown,
+    envSourceMapJson: audit.outputFiles.envSourceMapJson,
+    envSourceMapMarkdown: audit.outputFiles.envSourceMapMarkdown,
     vercelEnvCoverageReport: audit.outputFiles.vercelEnvCoverage,
     domainReadinessReport: audit.outputFiles.domainReadiness,
     cloudAccessReport: audit.outputFiles.cloudAccess,

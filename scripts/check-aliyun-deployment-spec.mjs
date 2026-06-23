@@ -33,6 +33,7 @@ const REQUIRED_PREDEPLOY_CHECKS = [
   "corepack pnpm aliyun:readiness",
   "corepack pnpm aliyun:env:sources",
   "corepack pnpm aliyun:env:handoff",
+  "corepack pnpm aliyun:env:source-map",
   "corepack pnpm aliyun:domain:check",
   "corepack pnpm aliyun:runtime:plan",
   "corepack pnpm aliyun:cloud:check",
