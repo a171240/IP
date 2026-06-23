@@ -303,6 +303,7 @@ function buildAliyunCloudResourceRequirement(status, operatorHandoff) {
 function buildCloudInventoryRequirement(status, operatorHandoff) {
   const inventory = status.summary?.cloudInventoryResults || {}
   const handoffInventory = operatorHandoff.localEvidenceGaps?.cloudInventoryResults || {}
+  const observationSummary = inventory.observationSummary || handoffInventory.observationSummary || {}
   return requirement({
     id: "G03_CLOUD_INVENTORY_PROVED",
     title: "阿里云 CLI/Cloud Shell 只读盘点结果已落地",
@@ -312,6 +313,11 @@ function buildCloudInventoryRequirement(status, operatorHandoff) {
       `localReady=${inventory.localReady === true}`,
       `readyLocalOperations=${inventory.readyLocalOperations || 0}/${inventory.localOperations || 0}`,
       `checkedOperations=${handoffInventory.checkedOperations || 0}`,
+      `safeConsoleOnly=${observationSummary.safeConsoleOnly === true}`,
+      `consoleObservationOperations=${observationSummary.consoleObservationOperations || 0}/${observationSummary.operations || 0}`,
+      `executedCommandResults=${observationSummary.executedCommandResults || 0}/${observationSummary.commandResults || 0}`,
+      `cloudApiCalledCommandResults=${observationSummary.cloudApiCalledCommandResults || 0}`,
+      `mutationPerformedCommandResults=${observationSummary.mutationPerformedCommandResults || 0}`,
     ],
     blockers: inventory.localBlockers || handoffInventory.gaps?.map((item) => item.blocker) || [],
     authoritativeCommands: [
@@ -557,6 +563,7 @@ function renderMarkdown(report) {
     `- Required env: ${report.summary.requiredEnv}`,
     `- Cloud confirmations: ${report.summary.cloudConfirmations.ready || 0}/${report.summary.cloudConfirmations.total || 0} ready`,
     `- Cloud inventory results: localReady ${report.summary.cloudInventoryResults.localReady === true}, ready operations ${report.summary.cloudInventoryResults.readyLocalOperations || 0}/${report.summary.cloudInventoryResults.localOperations || 0}`,
+    `- Cloud inventory console-only: safe ${report.summary.cloudInventoryResults.observationSummary?.safeConsoleOnly === true}, console observations ${report.summary.cloudInventoryResults.observationSummary?.consoleObservationOperations || 0}/${report.summary.cloudInventoryResults.observationSummary?.operations || 0}, executed commands ${report.summary.cloudInventoryResults.observationSummary?.executedCommandResults || 0}/${report.summary.cloudInventoryResults.observationSummary?.commandResults || 0}, cloud API calls ${report.summary.cloudInventoryResults.observationSummary?.cloudApiCalledCommandResults || 0}`,
     `- Can start now console tasks: ${report.summary.canStartNowConsoleTasks.length ? report.summary.canStartNowConsoleTasks.join(", ") : "none"}`,
     `- Can start now authorization packets: ${report.summary.canStartNowAuthorizationPackets.length ? report.summary.canStartNowAuthorizationPackets.join(", ") : "none"}`,
     "",

@@ -2,11 +2,58 @@ const test = require("node:test")
 const assert = require("node:assert/strict")
 const { execFileSync } = require("node:child_process")
 const fs = require("node:fs")
+const os = require("node:os")
 const path = require("node:path")
 
 const root = process.cwd()
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), "utf8")
 const readJson = (...parts) => JSON.parse(read(...parts))
+
+function buildConsoleObservationOperation(id, status) {
+  return {
+    id,
+    title: `${id} console observation`,
+    product: "aliyun",
+    readOnly: true,
+    status,
+    commandResults: [
+      {
+        command: `aliyun readonly ${id}`,
+        executed: false,
+        exitStatus: null,
+        cloudApiCalled: false,
+        mutationPerformed: false,
+        observedAt: "2026-06-23T02:30:00+08:00",
+        outputSummary: "Console-only non-secret observation; CLI/OpenAPI inventory not executed.",
+        evidence: `completion_audit_console_only_${id.toLowerCase()}_handle`,
+      },
+    ],
+    writesTo: [
+      "deploy/aliyun-production-cn.cloud-confirmations.local.json",
+    ],
+    evidence: `${id} non-secret console evidence`,
+  }
+}
+
+function writeConsoleOnlyInventoryFixture(filePath) {
+  fs.writeFileSync(filePath, JSON.stringify({
+    schemaVersion: 1,
+    environment: "production-cn",
+    updatedAt: "2026-06-23T02:30:00+08:00",
+    operator: "test",
+    sourcePlanCommand: "corepack pnpm aliyun:cloud:inventory-plan",
+    notes: "Test fixture with console-only observations and no cloud API calls.",
+    operations: [
+      buildConsoleObservationOperation("I01_SAE_RUNTIME", "not_found"),
+      buildConsoleObservationOperation("I02_ACR_IMAGE", "blocked"),
+      buildConsoleObservationOperation("I03_DNS_API_DOMAIN", "not_found"),
+      buildConsoleObservationOperation("I04_DNS_ASSET_DOMAIN", "not_found"),
+      buildConsoleObservationOperation("I05_OSS_AUDIO_BUCKET", "observed"),
+      buildConsoleObservationOperation("I06_SLS_ALERTS", "observed"),
+      buildConsoleObservationOperation("I07_CERT_HTTPS", "blocked"),
+    ],
+  }, null, 2))
+}
 
 test("Aliyun completion audit command is wired into scripts, predeploy, deploy spec, and artifacts", () => {
   const pkg = readJson("package.json")
@@ -24,6 +71,8 @@ test("Aliyun completion audit command is wired into scripts, predeploy, deploy s
   assert.match(releaseArtifacts, /completion-audit\.json/)
   assert.match(releaseArtifacts, /completion-audit\.md/)
   assert.match(releaseArtifacts, /completionAudit/)
+  assert.match(releaseArtifacts, /cloudInventoryConsoleOnly/)
+  assert.match(releaseArtifacts, /observationSummary/)
 })
 
 test("Aliyun completion audit reports the current goal as blocked without secret values", () => {
@@ -76,4 +125,44 @@ test("Aliyun completion audit reports the current goal as blocked without secret
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
+})
+
+test("Aliyun completion audit carries console-only inventory evidence into G03 and markdown", () => {
+  const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-completion-audit-console-observation-"))
+  const inventoryResults = path.join(tmpdir, "cloud-inventory-results.local.json")
+  const markdown = path.join(tmpdir, "completion-audit.md")
+  writeConsoleOnlyInventoryFixture(inventoryResults)
+
+  const output = execFileSync(process.execPath, [
+    "scripts/summarize-aliyun-completion-audit.mjs",
+    "--cloud-inventory-results",
+    inventoryResults,
+    "--markdown",
+    markdown,
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 50,
+  })
+  const report = JSON.parse(output)
+  const byId = new Map(report.requirements.map((item) => [item.id, item]))
+  const cloudInventory = byId.get("G03_CLOUD_INVENTORY_PROVED")
+  const evidence = cloudInventory.evidence.join("; ")
+  const markdownOutput = fs.readFileSync(markdown, "utf8")
+
+  assert.equal(cloudInventory.status, "blocked")
+  assert.match(evidence, /safeConsoleOnly=true/)
+  assert.match(evidence, /consoleObservationOperations=7\/7/)
+  assert.match(evidence, /executedCommandResults=0\/7/)
+  assert.match(evidence, /cloudApiCalledCommandResults=0/)
+  assert.match(evidence, /mutationPerformedCommandResults=0/)
+  assert.equal(report.summary.cloudInventoryResults.observationSummary.safeConsoleOnly, true)
+  assert.equal(report.summary.cloudInventoryResults.observationSummary.consoleObservationOperations, 7)
+  assert.equal(report.summary.cloudInventoryResults.observationSummary.executedCommandResults, 0)
+  assert.equal(report.summary.cloudInventoryResults.observationSummary.cloudApiCalledCommandResults, 0)
+  assert.match(markdownOutput, /Cloud inventory console-only: safe true, console observations 7\/7, executed commands 0\/7, cloud API calls 0/)
+  assert.match(markdownOutput, /safeConsoleOnly=true/)
+  assert.doesNotMatch(output + markdownOutput, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(output + markdownOutput, /LTAI[A-Za-z0-9]{12,}/)
+  assert.doesNotMatch(output + markdownOutput, /:\/\/[^\s:@]+:[^\s@]+@/)
 })

@@ -217,6 +217,9 @@ function renderMarkdown(audit) {
   const productionStatus = audit.checks.productionStatus
   const cloudConfirmationsCheck = audit.checks.cloudConfirmationsCheck
   const cloudConfirmations = readiness.checks?.cloudConfirmations
+  const cloudInventoryObservation = cloudInventoryResults.local?.observationSummary || {}
+  const productionCloudInventoryObservation = productionStatus.summary.cloudInventoryResults?.observationSummary || {}
+  const operatorHandoffCloudInventoryObservation = operatorHandoff.localEvidenceGaps?.cloudInventoryResults?.observationSummary || {}
   const appProductionConfig = readiness.checks?.appProductionConfig
   const appEnvTemplate = appProductionConfig?.envTemplate
   const appRuntimeConfig = appProductionConfig?.runtimeConfig
@@ -249,6 +252,7 @@ function renderMarkdown(audit) {
     `- cloudInventoryPlan: ${cloudInventoryPlan.canRunReadOnlyInventoryNow ? "ready" : "blocked"} (${cloudInventoryPlan.summary?.totalOperations || 0} operations)`,
     `- cloudInventoryRunner: ${cloudInventoryRunner.executionMode}, executed ${cloudInventoryRunner.summary.executedCommands}/${cloudInventoryRunner.summary.commands}`,
     `- cloudInventoryResults: ${cloudInventoryResults.local?.ready ? "ready" : "not ready"} (${cloudInventoryResults.local?.checkedOperations || 0} local operations)`,
+    `- cloudInventoryConsoleOnly: safe ${cloudInventoryObservation.safeConsoleOnly === true}, console observations ${cloudInventoryObservation.consoleObservationOperations || 0}/${cloudInventoryObservation.operations || 0}, executed commands ${cloudInventoryObservation.executedCommandResults || 0}/${cloudInventoryObservation.commandResults || 0}, cloud API calls ${cloudInventoryObservation.cloudApiCalledCommandResults || 0}`,
     `- appRuntimeConfig: ${appRuntimeConfig?.ok === true ? "ready" : "not ready"}`,
     `- appNativeRelease: ${appNativeRelease?.ok === true ? "ready" : "not ready"}`,
     `- operatorTasks: ${operatorTasks.summary.ready} / ${operatorTasks.summary.total} ready`,
@@ -353,6 +357,11 @@ function renderMarkdown(audit) {
     `- localExists: ${cloudInventoryResults.local?.exists === true}`,
     `- localReady: ${cloudInventoryResults.local?.ready === true}`,
     `- localCheckedOperations: ${cloudInventoryResults.local?.checkedOperations ?? 0}`,
+    `- safeConsoleOnly: ${cloudInventoryObservation.safeConsoleOnly === true}`,
+    `- consoleObservationOperations: ${cloudInventoryObservation.consoleObservationOperations || 0}/${cloudInventoryObservation.operations || 0}`,
+    `- executedCommandResults: ${cloudInventoryObservation.executedCommandResults || 0}/${cloudInventoryObservation.commandResults || 0}`,
+    `- cloudApiCalledCommandResults: ${cloudInventoryObservation.cloudApiCalledCommandResults || 0}`,
+    `- mutationPerformedCommandResults: ${cloudInventoryObservation.mutationPerformedCommandResults || 0}`,
     ...(cloudInventoryResults.local?.blockers?.length
       ? cloudInventoryResults.local.blockers.map((item) => `- ${item}`)
       : ["- blockers: none"]),
@@ -614,6 +623,7 @@ function renderMarkdown(audit) {
     `- sensitiveActionItems: ${operatorHandoff.sensitiveActionItems?.length || 0}`,
     `- canStartNowConsoleTasks: ${operatorHandoff.aliyunConsoleTaskOrder?.canStartNow?.length ? operatorHandoff.aliyunConsoleTaskOrder.canStartNow.join(", ") : "none"}`,
     `- blockedByConsoleTaskDependencies: ${operatorHandoff.aliyunConsoleTaskOrder?.blockedByDependencies?.length ? operatorHandoff.aliyunConsoleTaskOrder.blockedByDependencies.join(", ") : "none"}`,
+    `- cloudInventoryConsoleOnly: safe ${operatorHandoffCloudInventoryObservation.safeConsoleOnly === true}, console observations ${operatorHandoffCloudInventoryObservation.consoleObservationOperations || 0}/${operatorHandoffCloudInventoryObservation.operations || 0}, executed commands ${operatorHandoffCloudInventoryObservation.executedCommandResults || 0}/${operatorHandoffCloudInventoryObservation.commandResults || 0}, cloud API calls ${operatorHandoffCloudInventoryObservation.cloudApiCalledCommandResults || 0}`,
     "",
     "## 发布负责人状态总览",
     "",
@@ -624,6 +634,7 @@ function renderMarkdown(audit) {
     `- requiredEnv: ${productionStatus.summary.requiredReady} / ${productionStatus.summary.requiredTotal}`,
     `- requiredBlocking: ${productionStatus.summary.requiredBlocking?.length ? productionStatus.summary.requiredBlocking.join(", ") : "none"}`,
     `- cloudInventoryResults: local ${productionStatus.summary.cloudInventoryResults?.readyLocalOperations || 0} / ${productionStatus.summary.cloudInventoryResults?.localOperations || 0} operations ready, localReady ${productionStatus.summary.cloudInventoryResults?.localReady === true}`,
+    `- cloudInventoryConsoleOnly: safe ${productionCloudInventoryObservation.safeConsoleOnly === true}, console observations ${productionCloudInventoryObservation.consoleObservationOperations || 0}/${productionCloudInventoryObservation.operations || 0}, executed commands ${productionCloudInventoryObservation.executedCommandResults || 0}/${productionCloudInventoryObservation.commandResults || 0}, cloud API calls ${productionCloudInventoryObservation.cloudApiCalledCommandResults || 0}`,
     `- cloudInventoryResultBlockers: ${productionStatus.summary.cloudInventoryResults?.localBlockers?.length ? productionStatus.summary.cloudInventoryResults.localBlockers.join(", ") : "none"}`,
     `- sensitiveActionItems: ${productionStatus.summary.sensitiveActionItems?.total || 0} total, ${productionStatus.summary.sensitiveActionItems?.blocked || 0} blocked`,
     ...(productionStatus.humanSummary?.length
@@ -1199,6 +1210,7 @@ function main() {
       localExists: cloudInventoryResults.local?.exists === true,
       localReady: cloudInventoryResults.local?.ready === true,
       localCheckedOperations: cloudInventoryResults.local?.checkedOperations ?? 0,
+      observationSummary: cloudInventoryResults.local?.observationSummary || {},
       localBlockers: cloudInventoryResults.local?.blockers || [],
     },
     deploymentSpec: {
@@ -1427,6 +1439,8 @@ function main() {
         cloudInventoryResults: {
           exists: operatorHandoff.localEvidenceGaps?.cloudInventoryResults?.exists === true,
           ready: operatorHandoff.localEvidenceGaps?.cloudInventoryResults?.ready === true,
+          checkedOperations: operatorHandoff.localEvidenceGaps?.cloudInventoryResults?.checkedOperations ?? 0,
+          observationSummary: operatorHandoff.localEvidenceGaps?.cloudInventoryResults?.observationSummary || {},
           totalBlockers: operatorHandoff.localEvidenceGaps?.cloudInventoryResults?.totalBlockers ?? 0,
         },
         cloudConfirmations: {
