@@ -25,6 +25,8 @@
     "aliyun:cloud:inventory-plan:test": "node --test tests/aliyun-cli-inventory-plan.static.test.js",
     "aliyun:cloud:inventory-run": "node ./scripts/run-aliyun-cli-inventory.mjs",
     "aliyun:cloud:inventory-run:test": "node --test tests/aliyun-cli-inventory-runner.static.test.js",
+    "aliyun:cloudshell:handoff": "node ./scripts/generate-aliyun-cloudshell-inventory-handoff.mjs",
+    "aliyun:cloudshell:handoff:test": "node --test tests/aliyun-cloudshell-inventory-handoff.static.test.js",
     "aliyun:cloud:inventory-results": "node ./scripts/check-aliyun-cli-inventory-results.mjs --allow-incomplete",
     "aliyun:cloud:inventory-results:strict": "node ./scripts/check-aliyun-cli-inventory-results.mjs",
     "aliyun:cloud:inventory-results:test": "node --test tests/aliyun-cli-inventory-results.static.test.js",

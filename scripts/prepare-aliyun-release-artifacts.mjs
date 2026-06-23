@@ -197,6 +197,7 @@ function renderMarkdown(audit) {
   const cloudAccess = audit.checks.cloudAccess
   const cloudInventoryPlan = audit.checks.cloudInventoryPlan
   const cloudInventoryRunner = audit.checks.cloudInventoryRunner
+  const cloudshellInventoryHandoff = audit.checks.cloudshellInventoryHandoff
   const cloudInventoryResults = audit.checks.cloudInventoryResults
   const deploymentSpec = audit.checks.deploymentSpec
   const runtimePlan = audit.checks.runtimePlan
@@ -253,6 +254,7 @@ function renderMarkdown(audit) {
     `- cloudInventoryPlan: ${cloudInventoryPlan.canRunReadOnlyInventoryNow ? "ready" : "blocked"} (${cloudInventoryPlan.summary?.totalOperations || 0} operations)`,
     `- cloudInventoryRunner: ${cloudInventoryRunner.executionMode}, executed ${cloudInventoryRunner.summary.executedCommands}/${cloudInventoryRunner.summary.commands}`,
     `- cloudInventoryRunnerFailureCategories: ${Object.keys(cloudInventoryRunner.summary.failureCategories || {}).length ? JSON.stringify(cloudInventoryRunner.summary.failureCategories) : "none"}`,
+    `- cloudshellInventoryHandoff: canReadCloudNow ${cloudshellInventoryHandoff.cliReadiness.canReadCloudNow}, operations ${cloudshellInventoryHandoff.inventoryPlan.totalOperations}`,
     `- cloudInventoryResults: ${cloudInventoryResults.local?.ready ? "ready" : "not ready"} (${cloudInventoryResults.local?.checkedOperations || 0} local operations)`,
     `- cloudInventoryConsoleOnly: safe ${cloudInventoryObservation.safeConsoleOnly === true}, console observations ${cloudInventoryObservation.consoleObservationOperations || 0}/${cloudInventoryObservation.operations || 0}, executed commands ${cloudInventoryObservation.executedCommandResults || 0}/${cloudInventoryObservation.commandResults || 0}, cloud API calls ${cloudInventoryObservation.cloudApiCalledCommandResults || 0}`,
     `- appRuntimeConfig: ${appRuntimeConfig?.ok === true ? "ready" : "not ready"}`,
@@ -356,6 +358,20 @@ function renderMarkdown(audit) {
     ...(cloudInventoryRunner.executionDiagnostics?.nextActions?.length
       ? cloudInventoryRunner.executionDiagnostics.nextActions.map((item) => `- nextAction: ${item}`)
       : []),
+    "",
+    "## CloudShell / CLI 只读盘点交接包",
+    "",
+    `- json: ${audit.outputFiles.cloudshellInventoryHandoffJson}`,
+    `- markdown: ${audit.outputFiles.cloudshellInventoryHandoffMarkdown}`,
+    `- ok: ${cloudshellInventoryHandoff.ok === true}`,
+    `- executionMode: ${cloudshellInventoryHandoff.executionMode}`,
+    `- canReadCloudNow: ${cloudshellInventoryHandoff.cliReadiness.canReadCloudNow}`,
+    `- cliConfigProbeReady: ${cloudshellInventoryHandoff.cliReadiness.configProbe?.ready === true}`,
+    `- cliConfigProbeFailureCategory: ${cloudshellInventoryHandoff.cliReadiness.configProbe?.failureCategory || "none"}`,
+    `- inventoryPlanStatus: ${cloudshellInventoryHandoff.inventoryPlan.status}`,
+    `- totalOperations: ${cloudshellInventoryHandoff.inventoryPlan.totalOperations}`,
+    `- commandTemplates: ${cloudshellInventoryHandoff.inventoryPlan.commandTemplates}`,
+    `- writebackTargets: ${cloudshellInventoryHandoff.writebackTargets.join("; ")}`,
     "",
     "## 阿里云 CLI 只读盘点结果",
     "",
@@ -953,6 +969,15 @@ function main() {
     "--markdown",
     cloudInventoryRunnerMarkdownPath,
   ])
+  const cloudshellInventoryHandoffJsonPath = resolve(args.outDir, "cloudshell-inventory-handoff.json")
+  const cloudshellInventoryHandoffMarkdownPath = resolve(args.outDir, "cloudshell-inventory-handoff.md")
+  const cloudshellInventoryHandoff = runJson("cloudshell_inventory_handoff", [
+    "scripts/generate-aliyun-cloudshell-inventory-handoff.mjs",
+    "--out",
+    cloudshellInventoryHandoffJsonPath,
+    "--markdown",
+    cloudshellInventoryHandoffMarkdownPath,
+  ])
   const cloudInventoryResultsJsonPath = resolve(args.outDir, "cloud-inventory-results.json")
   const cloudInventoryResultsMarkdownPath = resolve(args.outDir, "cloud-inventory-results.md")
   const cloudInventoryResults = runJson("cloud_inventory_results", [
@@ -1182,6 +1207,7 @@ function main() {
       cloudAccess,
       cloudInventoryPlan,
       cloudInventoryRunner,
+      cloudshellInventoryHandoff,
       cloudInventoryResults,
       deploymentSpec,
       runtimePlan,
@@ -1224,6 +1250,8 @@ function main() {
       cloudInventoryPlanMarkdown: cloudInventoryPlanMarkdownPath,
       cloudInventoryRunnerJson: cloudInventoryRunnerJsonPath,
       cloudInventoryRunnerMarkdown: cloudInventoryRunnerMarkdownPath,
+      cloudshellInventoryHandoffJson: cloudshellInventoryHandoffJsonPath,
+      cloudshellInventoryHandoffMarkdown: cloudshellInventoryHandoffMarkdownPath,
       cloudInventoryResultsJson: cloudInventoryResultsJsonPath,
       cloudInventoryResultsMarkdown: cloudInventoryResultsMarkdownPath,
       cloudConfirmationsCheck: cloudConfirmationsCheckPath,
@@ -1323,6 +1351,23 @@ function main() {
       failureCategories: cloudInventoryRunner.summary.failureCategories || {},
       diagnosticsNextActions: cloudInventoryRunner.executionDiagnostics?.nextActions || [],
       blockers: cloudInventoryRunner.blockers || [],
+    },
+    cloudshellInventoryHandoff: {
+      report: audit.outputFiles.cloudshellInventoryHandoffJson,
+      markdown: audit.outputFiles.cloudshellInventoryHandoffMarkdown,
+      ok: cloudshellInventoryHandoff.ok === true,
+      executionMode: cloudshellInventoryHandoff.executionMode,
+      containsValues: cloudshellInventoryHandoff.containsValues === true,
+      readOnlyOnly: cloudshellInventoryHandoff.readOnlyOnly === true,
+      cloudApiCalled: cloudshellInventoryHandoff.cloudApiCalled === true,
+      mutationPerformed: cloudshellInventoryHandoff.mutationPerformed === true,
+      canReadCloudNow: cloudshellInventoryHandoff.cliReadiness.canReadCloudNow === true,
+      cliConfigProbeReady: cloudshellInventoryHandoff.cliReadiness.configProbe?.ready === true,
+      cliConfigProbeFailureCategory: cloudshellInventoryHandoff.cliReadiness.configProbe?.failureCategory || "",
+      totalOperations: cloudshellInventoryHandoff.inventoryPlan.totalOperations,
+      commandTemplates: cloudshellInventoryHandoff.inventoryPlan.commandTemplates,
+      writebackTargets: cloudshellInventoryHandoff.writebackTargets,
+      strictVerificationOrder: cloudshellInventoryHandoff.strictVerificationOrder,
     },
     cloudInventoryResults: {
       report: audit.outputFiles.cloudInventoryResultsJson,
