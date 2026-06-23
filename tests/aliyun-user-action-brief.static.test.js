@@ -27,7 +27,13 @@ test("Aliyun user action brief is value-free and includes the expected blockers"
     encoding: "utf8",
     maxBuffer: 1024 * 1024 * 30,
   })
+  const authorizationOutput = execFileSync(process.execPath, ["scripts/summarize-aliyun-action-authorization.mjs"], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 40,
+  })
   const report = JSON.parse(output)
+  const authorization = JSON.parse(authorizationOutput)
   const ids = report.actions.map((item) => item.id)
 
   assert.equal(report.ok, true)
@@ -46,22 +52,49 @@ test("Aliyun user action brief is value-free and includes the expected blockers"
   assert.ok(report.summary.actionTimeConfirmationRequired.includes("U03_ACR_PURCHASE_CONFIRMATION"))
   assert.ok(report.summary.actionTimeConfirmationRequired.includes("U04_ACR_RUNTIME_AUTH"))
   assert.ok(report.summary.actionTimeConfirmationRequired.includes("U05_OSS_RAM_OR_STS"))
+  assert.deepEqual(report.summary.nextActionTimeConfirmations, [
+    "P01_WECHAT_OPEN_MOBILE_APP",
+    "P02_APPLE_TEAM_ID",
+    "P03_ACR_PURCHASE",
+    "P05_OSS_RAM_STS",
+  ])
+  assert.deepEqual(
+    report.nextActionTimeConfirmations.map((item) => item.packetId),
+    authorization.nextActionTimeConfirmations.map((item) => item.packetId),
+  )
+  assert.deepEqual(
+    report.nextActionTimeConfirmations.map((item) => item.minimumUserPhrase),
+    authorization.nextActionTimeConfirmations.map((item) => item.minimumUserPhrase),
+  )
   const wechatAction = report.actions.find((item) => item.id === "U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE")
   const acrPurchaseAction = report.actions.find((item) => item.id === "U03_ACR_PURCHASE_CONFIRMATION")
   const acrRuntimeAction = report.actions.find((item) => item.id === "U04_ACR_RUNTIME_AUTH")
   const domainAction = report.actions.find((item) => item.id === "U07_DOMAIN_DNS_HTTPS_ICP")
   const deployAction = report.actions.find((item) => item.id === "U09_DEPLOY_AUTHORIZATION")
+  const nextConfirmationsById = new Map(report.nextActionTimeConfirmations.map((item) => [item.packetId, item]))
   assert.ok(wechatAction.variableNames.includes("WECHAT_OPEN_APP_SECRET"))
   assert.equal(wechatAction.requiresActionTimeConfirmation, true)
   assert.ok(wechatAction.currentEvidence.includes("wechatOpenPlatform.accountVerified=true"))
   assert.ok(wechatAction.currentEvidence.includes("wechatOpenPlatform.mobileAppCreated=false"))
   assert.ok(wechatAction.currentBlockers.includes("wechatOpenPlatform:mobileAppCreated"))
+  assert.ok(
+    nextConfirmationsById.get("P01_WECHAT_OPEN_MOBILE_APP").explicitlyExcluded.some((item) =>
+      item.includes("不把 AppSecret 写入 JSON"),
+    ),
+  )
   assert.ok(!acrPurchaseAction.currentEvidence.some((item) => item.includes("TODO_")))
   assert.ok(!acrRuntimeAction.currentEvidence.some((item) => item.includes("TODO_")))
   assert.ok(acrPurchaseAction.currentEvidence.includes("R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.quotedAmount=CNY 117.00"))
   assert.ok(acrPurchaseAction.currentEvidence.includes("R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.requiresActionTimePurchaseConfirmation=true"))
+  assert.match(nextConfirmationsById.get("P03_ACR_PURCHASE").minimumUserPhrase, /CNY 117\.00/)
+  assert.equal(nextConfirmationsById.get("P03_ACR_PURCHASE").nonSecretEvidenceOnly, true)
   assert.equal(acrRuntimeAction.requiresActionTimeConfirmation, true)
   assert.equal(report.actions.find((item) => item.id === "U05_OSS_RAM_OR_STS").requiresActionTimeConfirmation, true)
+  assert.ok(
+    nextConfirmationsById.get("P05_OSS_RAM_STS").writeTargets.some((item) =>
+      item.includes("ALIYUN_OSS_ACCESS_KEY_SECRET"),
+    ),
+  )
   assert.equal(report.actions.find((item) => item.id === "U08_SAE_RUNTIME_AND_SLS").requiresActionTimeConfirmation, true)
   assert.equal(report.actions.find((item) => item.id === "U08_SAE_RUNTIME_AND_SLS").requiresUserAction, true)
   assert.ok(acrRuntimeAction.currentEvidence.includes("R02_ACR_IMAGE_REGISTRY:localDockerImage.status=ready"))

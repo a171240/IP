@@ -500,6 +500,10 @@ function renderMarkdown(audit) {
     `- canDeployNow: ${userActionBrief.canDeployNow === true}`,
     `- ready: ${userActionBrief.summary.ready} / ${userActionBrief.summary.total}`,
     `- blocked: ${userActionBrief.summary.blocked}`,
+    `- nextActionTimeConfirmations: ${(userActionBrief.summary.nextActionTimeConfirmations || []).join(", ") || "none"}`,
+    ...(userActionBrief.nextActionTimeConfirmations?.length
+      ? userActionBrief.nextActionTimeConfirmations.map((item) => `- ${item.packetId}: ${item.minimumUserPhrase}`)
+      : ["- nextActionTimeConfirmations: none"]),
     ...(userActionBrief.actions?.length
       ? userActionBrief.actions.map((item) => `- ${item.id}: ${item.status} (${item.owner})`)
       : ["- none"]),
@@ -1330,6 +1334,7 @@ function main() {
       blockedIds: userActionBrief.summary.blockedIds,
       userMustAct: userActionBrief.summary.userMustAct,
       actionTimeConfirmationRequired: userActionBrief.summary.actionTimeConfirmationRequired,
+      nextActionTimeConfirmations: userActionBrief.nextActionTimeConfirmations || [],
     },
     consoleRunbook: {
       report: audit.outputFiles.consoleRunbookJson,

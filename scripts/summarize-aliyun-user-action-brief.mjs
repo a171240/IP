@@ -36,6 +36,90 @@ const ACTION_ORDER = [
   "U09_DEPLOY_AUTHORIZATION",
 ]
 
+const NEXT_ACTION_TIME_CONFIRMATION_BY_ACTION_ID = Object.freeze({
+  U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE: Object.freeze({
+    packetId: "P01_WECHAT_OPEN_MOBILE_APP",
+    sequenceGroup: "identity",
+    minimumUserPhrase: "授权在微信开放平台创建/补全美业话镜移动应用资料并提交审核；不读取或输出 AppSecret。",
+    allowedActions: [
+      "只在微信开放平台移动应用页面填写 APP 资料、Android 包名/签名、iOS Bundle ID/Universal Link。",
+      "提交移动应用审核，并在审核通过后记录 AppID ready 状态。",
+      "只把 AppID 导入 SAE plain env；AppSecret 只能在动作时导入 KMS/Secrets Manager/SAE secret env。",
+    ],
+    explicitlyExcluded: [
+      "不使用小程序 AppID/Secret 替代移动应用凭证。",
+      "不把 AppSecret 写入 JSON、Markdown、Docker 镜像或 git。",
+      "不做小程序上传或 APP 商店提交。",
+    ],
+    completionEvidence: [
+      "wechatOpenPlatform.mobileAppCreated=true",
+      "wechatOpenPlatform.reviewStatus=approved",
+      "WECHAT_OPEN_APP_ID ready",
+      "WECHAT_OPEN_APP_SECRET imported through secret env only",
+    ],
+  }),
+  U02_APPLE_TEAM_ID: Object.freeze({
+    packetId: "P02_APPLE_TEAM_ID",
+    sequenceGroup: "identity",
+    minimumUserPhrase: "授权读取 Apple Developer Team ID 并导入阿里云 plain env。",
+    allowedActions: [
+      "从 Apple Developer Membership 或 Identifiers 页面读取 10 位 Team ID。",
+      "把 APPLE_TEAM_ID 导入 SAE plain env，用于 AASA appID。",
+      "记录非密钥证据句柄。",
+    ],
+    explicitlyExcluded: [
+      "不猜测 Team ID。",
+      "不创建/修改证书、描述文件或 App Store Connect 记录。",
+    ],
+    completionEvidence: [
+      "APPLE_TEAM_ID ready",
+      "aliyun:aasa:check no longer reports apple_team_id_missing",
+    ],
+  }),
+  U03_ACR_PURCHASE_CONFIRMATION: Object.freeze({
+    packetId: "P03_ACR_PURCHASE",
+    sequenceGroup: "cloud_foundation",
+    minimumUserPhrase: "授权购买 ACR Enterprise Economic，cn-hangzhou，1 个月，当前报价 CNY 117.00。",
+    allowedActions: [
+      "在阿里云 ACR 企业版购买页确认规格、地域、时长和金额。",
+      "完成购买后创建或确认实例、namespace 和 repository。",
+      "只记录 registry host、namespace、repository 和非密钥购买证据。",
+    ],
+    explicitlyExcluded: [
+      "未明确确认金额前不点击付款。",
+      "不执行 docker login/push。",
+      "不记录 registry password、RAM Secret 或 token。",
+    ],
+    completionEvidence: [
+      "acr.purchaseCandidate.confirmed=true",
+      "acr.registryHost actual aliyuncs.com host",
+      "acr.namespace created",
+      "repository=meiye-huajing-app-api",
+    ],
+  }),
+  U05_OSS_RAM_OR_STS: Object.freeze({
+    packetId: "P05_OSS_RAM_STS",
+    sequenceGroup: "cloud_foundation",
+    minimumUserPhrase: "授权为服务记录音频 OSS 配置最小权限 RAM/STS 或运行时角色，并只通过密钥环境注入。",
+    allowedActions: [
+      "确认 bucket、region、CORS 和 service-records/production-cn 前缀。",
+      "绑定最小权限 RAM 策略或配置 STS/运行时角色。",
+      "只把 AccessKeySecret 或 STS token 导入 KMS/Secrets Manager/SAE secret env。",
+    ],
+    explicitlyExcluded: [
+      "不创建可提交的长期明文 Secret。",
+      "不下载 OSS 对象内容。",
+      "不把 AccessKeySecret 或 STS token 写入 JSON、Markdown、镜像或 git。",
+    ],
+    completionEvidence: [
+      "oss.confirmed=true",
+      "oss.ramLeastPrivilege=true",
+      "serviceRecordPrefix=service-records/production-cn",
+      "secret imported through Aliyun controlled secret env only",
+    ],
+  }),
+})
+
 function parseArgs(argv) {
   const args = {
     envFile: DEFAULT_ENV_FILE,
@@ -127,6 +211,7 @@ function buildReport(args) {
     status,
     cloudItems: cloudConfirmations?.items || {},
   })
+  const nextActionTimeConfirmations = buildNextActionTimeConfirmations(actions)
   const blocked = actions.filter((item) => item.status !== "ready")
   const report = {
     ok: true,
@@ -154,6 +239,7 @@ function buildReport(args) {
       actionTimeConfirmationRequired: actions
         .filter((item) => item.requiresActionTimeConfirmation)
         .map((item) => item.id),
+      nextActionTimeConfirmations: nextActionTimeConfirmations.map((item) => item.packetId),
       canBeRecordedAsNonSecretEvidence: actions
         .filter((item) => item.nonSecretEvidenceOnly)
         .map((item) => item.id),
@@ -162,6 +248,7 @@ function buildReport(args) {
     },
     currentAnswer: "现在不能部署；本简报只列用户/操作员还要做什么、从哪里取得、写到哪里，不输出任何密钥值。",
     actions,
+    nextActionTimeConfirmations,
     nextSafeLocalCommands: [
       "corepack pnpm aliyun:user:actions",
       "corepack pnpm aliyun:sensitive:blockers",
@@ -476,6 +563,30 @@ function buildActions({ sensitiveById, resourcesById, status, cloudItems }) {
   return ACTION_ORDER.map((id) => actionMap.get(id)).filter(Boolean)
 }
 
+function buildNextActionTimeConfirmations(actions) {
+  return actions
+    .filter((action) => action.status !== "ready" && action.requiresActionTimeConfirmation)
+    .map((action) => {
+      const packet = NEXT_ACTION_TIME_CONFIRMATION_BY_ACTION_ID[action.id]
+      if (!packet) return null
+      return {
+        packetId: packet.packetId,
+        actionId: action.id,
+        title: action.title,
+        owner: action.owner,
+        sequenceGroup: packet.sequenceGroup,
+        minimumUserPhrase: packet.minimumUserPhrase,
+        allowedActions: packet.allowedActions,
+        explicitlyExcluded: packet.explicitlyExcluded,
+        completionEvidence: packet.completionEvidence,
+        writeTargets: action.writeTargets,
+        verifyCommands: action.verifyCommands,
+        nonSecretEvidenceOnly: action.nonSecretEvidenceOnly === true,
+      }
+    })
+    .filter(Boolean)
+}
+
 function addAction(actionMap, action) {
   actionMap.set(action.id, {
     id: action.id,
@@ -594,13 +705,36 @@ function renderMarkdown(report) {
     `- canDeployNow: ${report.canDeployNow}`,
     `- ready: ${report.summary.ready} / ${report.summary.total}`,
     `- blocked: ${report.summary.blocked}`,
+    `- nextActionTimeConfirmations: ${report.summary.nextActionTimeConfirmations.join(", ") || "none"}`,
     `- containsValues: ${report.containsValues}`,
     `- secretLeakCheck: ${report.secretLeakCheck.ok}`,
     `- mutationPerformed: ${report.mutationPerformed}`,
     "",
-    "## 动作清单",
+    "## 当前可开始的动作时确认",
     "",
   ]
+
+  for (const item of report.nextActionTimeConfirmations) {
+    lines.push(
+      `### ${item.packetId} ${item.title}`,
+      "",
+      `- actionId: ${item.actionId}`,
+      `- owner: ${item.owner}`,
+      `- minimumUserPhrase: ${item.minimumUserPhrase}`,
+      `- allowedActions: ${item.allowedActions.join("; ") || "none"}`,
+      `- explicitlyExcluded: ${item.explicitlyExcluded.join("; ") || "none"}`,
+      `- completionEvidence: ${item.completionEvidence.join("; ") || "none"}`,
+      `- writeTargets: ${item.writeTargets.join("; ") || "none"}`,
+      `- verifyCommands: ${item.verifyCommands.join("; ") || "none"}`,
+      `- nonSecretEvidenceOnly: ${item.nonSecretEvidenceOnly}`,
+      "",
+    )
+  }
+
+  lines.push(
+    "## 动作清单",
+    "",
+  )
 
   for (const item of report.actions) {
     lines.push(
