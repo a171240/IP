@@ -580,6 +580,9 @@ function buildCloudInventoryResultGaps(cloudInventoryResults) {
 function cloudInventoryResultJsonPath(blocker) {
   const value = String(blocker || "")
   if (value === "file_missing") return "$"
+  if (value.startsWith("readonly_inventory_") || value === "console_only_observation_not_strict_inventory") {
+    return "operations[*].commandResults[*]"
+  }
   const operation = value.match(/^(I\d{2}_[A-Z0-9_]+):/)
   if (operation) return `operations.${operation[1]}`
   const missingOperation = value.match(/^missing_operation:(I\d{2}_[A-Z0-9_]+)$/)
@@ -590,6 +593,9 @@ function cloudInventoryResultJsonPath(blocker) {
 function expectedCloudInventoryResultEvidence(blocker) {
   if (blocker === "file_missing") {
     return "复制 deploy/aliyun-production-cn.cloud-inventory-results.example.json 到 ignored 的 .local.json；在 CLI/Cloud Shell 只读盘点后只填写 executed、exitStatus、cloudApiCalled、mutationPerformed=false、observedAt、outputSummary 和非密钥 evidence。"
+  }
+  if (String(blocker || "").startsWith("readonly_inventory_") || blocker === "console_only_observation_not_strict_inventory") {
+    return "当前只有控制台人工观察或不完整 CLI 结果；等 Aliyun CLI/Cloud Shell 具备安全配置后，运行受控只读 inventory，并只写 executed、exitStatus、cloudApiCalled、mutationPerformed=false、observedAt、outputSummary 和非密钥 evidence。"
   }
   return "补齐对应只读盘点项的非密钥摘要；不能粘贴完整命令输出里的凭据、token、registry password、证书私钥或 cookie。"
 }

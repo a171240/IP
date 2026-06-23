@@ -120,6 +120,9 @@ test("Aliyun production status surfaces safe console-only inventory observations
   assert.equal(summary.cloudApiCalledCommandResults, 0)
   assert.equal(summary.mutationPerformedCommandResults, 0)
   assert.deepEqual(local, summary)
+  assert.ok(report.summary.cloudInventoryResults.localBlockers.includes("console_only_observation_not_strict_inventory"))
+  assert.ok(report.summary.cloudInventoryResults.localBlockers.includes("readonly_inventory_commands_executed=0/7"))
+  assert.ok(!report.summary.cloudInventoryResults.localBlockers.some((item) => item.includes("commandResults[0]:executed=true")))
   assert.ok(report.humanSummary.some((line) => /阿里云控制台观察证据/.test(line)))
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
@@ -145,6 +148,11 @@ test("Aliyun CLI inventory results separates console observations from strict CL
   assert.equal(summary.executedCommandResults, 0)
   assert.equal(summary.cloudApiCalledCommandResults, 0)
   assert.equal(summary.mutationPerformedCommandResults, 0)
+  assert.ok(report.local.blockers.includes("readonly_inventory_strict_ready=0/7"))
+  assert.ok(report.local.blockers.includes("readonly_inventory_commands_executed=0/7"))
+  assert.ok(report.local.blockers.includes("readonly_inventory_cloud_api_called=0/7"))
+  assert.ok(report.local.blockers.includes("console_only_observation_not_strict_inventory"))
+  assert.ok(report.local.technicalBlockers.some((item) => item.includes("commandResults[0]:executed=true")))
   assert.deepEqual(summary.statusCounts, {
     not_found: 3,
     blocked: 2,

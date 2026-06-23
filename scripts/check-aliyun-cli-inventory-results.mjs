@@ -343,6 +343,27 @@ function summarizeLocalObservation(localFile) {
   }
 }
 
+function buildHumanLocalBlockers(localFile) {
+  if (!localFile.exists) return localFile.blockers
+  const summary = summarizeLocalObservation(localFile)
+  const blockers = []
+  if (summary.operations === 0) blockers.push("readonly_inventory_operations_missing")
+  if (summary.strictReadyOperations < summary.operations) {
+    blockers.push(`readonly_inventory_strict_ready=${summary.strictReadyOperations}/${summary.operations}`)
+  }
+  if (summary.executedCommandResults < summary.commandResults) {
+    blockers.push(`readonly_inventory_commands_executed=${summary.executedCommandResults}/${summary.commandResults}`)
+  }
+  if (summary.cloudApiCalledCommandResults < summary.commandResults) {
+    blockers.push(`readonly_inventory_cloud_api_called=${summary.cloudApiCalledCommandResults}/${summary.commandResults}`)
+  }
+  if (summary.safeConsoleOnly === true && summary.strictReadyOperations === 0) {
+    blockers.push("console_only_observation_not_strict_inventory")
+  }
+  if (!blockers.length && localFile.blockers.length) return localFile.blockers
+  return blockers
+}
+
 function renderMarkdown(report) {
   return [
     "# 阿里云 CLI 只读盘点结果校验",
@@ -363,6 +384,10 @@ function renderMarkdown(report) {
     "",
     ...(report.local.blockers.length ? report.local.blockers.map((item) => `- ${item}`) : ["- none"]),
     "",
+    "## Technical Blockers",
+    "",
+    ...(report.local.technicalBlockers.length ? report.local.technicalBlockers.map((item) => `- ${item}`) : ["- none"]),
+    "",
     "## Operation Status",
     "",
     ...Object.entries(report.local.operationStatus).map(([id, status]) => `- ${id}: ${status.ready ? "ready" : "blocked"} (${status.blockers.join(", ") || "none"})`),
@@ -374,6 +399,8 @@ function main() {
   const args = parseArgs(process.argv)
   const template = validateFile(args.templateFile, "template")
   const local = validateFile(args.localFile, "local")
+  const localObservationSummary = summarizeLocalObservation(local)
+  const localHumanBlockers = buildHumanLocalBlockers(local)
   const ok = template.ready && local.ready
   const report = {
     ok,
@@ -393,10 +420,11 @@ function main() {
       file: local.file,
       exists: local.exists,
       ready: local.ready,
-      blockers: local.blockers,
+      blockers: localHumanBlockers,
+      technicalBlockers: local.blockers,
       warnings: local.warnings,
       checkedOperations: local.operations.length,
-      observationSummary: summarizeLocalObservation(local),
+      observationSummary: localObservationSummary,
       operationStatus: Object.fromEntries(local.operations.map((operation) => [operation.id, {
         status: operation.status,
         ready: operation.ready,

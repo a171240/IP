@@ -155,6 +155,7 @@ test("Aliyun operator handoff exposes console-only inventory observation summary
   })
   const report = JSON.parse(output)
   const summary = report.localEvidenceGaps.cloudInventoryResults.observationSummary
+  const inventoryGaps = report.localEvidenceGaps.cloudInventoryResults.gaps
   const markdownOutput = fs.readFileSync(markdown, "utf8")
 
   assert.equal(report.localEvidenceGaps.cloudInventoryResults.exists, true)
@@ -179,6 +180,9 @@ test("Aliyun operator handoff exposes console-only inventory observation summary
     "I02_ACR_IMAGE",
     "I07_CERT_HTTPS",
   ])
+  assert.ok(inventoryGaps.some((item) => item.blocker === "console_only_observation_not_strict_inventory"))
+  assert.ok(inventoryGaps.every((item) => item.jsonPath === "operations[*].commandResults[*]" || item.jsonPath === "$"))
+  assert.ok(inventoryGaps.some((item) => /控制台人工观察/.test(item.expected)))
   assert.match(markdownOutput, /safeConsoleOnly: true/)
   assert.match(markdownOutput, /consoleObservationOperations: 7\/7/)
   assert.match(markdownOutput, /executedCommandResults: 0\/7/)
