@@ -171,6 +171,7 @@ function buildReport(args) {
   const wechatOpenMobileApp = compactWechatOpenMobileApp(wechatOpenMobileAppPackage)
   const bridgeDataLayer = compactBridgeDataLayer(status.summary?.bridgeDataLayer || {})
   const cloudResourceObservations = compactCloudResourceObservations(resourcesMatrix)
+  const nextActionSequencing = compactNextActionSequencing(completionAudit)
   const cloudInventoryReadinessInterpretation = buildCloudInventoryReadinessInterpretation(status, cloudAccess)
   const report = {
     ok: true,
@@ -204,6 +205,10 @@ function buildReport(args) {
       cloudResourceObservedTotal: cloudResourceObservations.observedStatuses.total,
       cloudResourceBlockedIds: cloudResourceObservations.blockedIds,
       cloudResourceActionTimeConfirmations: cloudResourceObservations.actionTimeConfirmationRequired,
+      canStartNowConsoleTasks: nextActionSequencing.canStartNowConsoleTasks,
+      blockedByConsoleTaskDependencies: nextActionSequencing.blockedByConsoleTaskDependencies,
+      canStartNowAuthorizationPackets: nextActionSequencing.canStartNowAuthorizationPackets,
+      blockedByAuthorizationPacketDependencies: nextActionSequencing.blockedByAuthorizationPacketDependencies,
       cloudConfirmationsReady: `${status.summary?.cloudConfirmations?.ready || 0}/${status.summary?.cloudConfirmations?.total || 0}`,
       operatorTasksReady: `${status.summary?.operatorTasks?.ready || 0}/${status.summary?.operatorTasks?.total || 0}`,
       completion: {
@@ -243,6 +248,7 @@ function buildReport(args) {
     wechatOpenMobileApp,
     bridgeDataLayer,
     cloudResourceObservations,
+    nextActionSequencing,
     cloudInventoryReadinessInterpretation,
     cloudAccess: {
       canReadCloudNow: cloudAccess.canReadCloudNow === true,
@@ -307,6 +313,28 @@ function buildReport(args) {
   }
   report.ok = report.secretLeakCheck.ok
   return report
+}
+
+function compactNextActionSequencing(completionAudit) {
+  const summary = completionAudit.summary || {}
+  return {
+    canStartNowConsoleTasks: summary.canStartNowConsoleTasks || [],
+    blockedByConsoleTaskDependencies: summary.blockedByConsoleTaskDependencies || [],
+    canStartNowAuthorizationPackets: summary.canStartNowAuthorizationPackets || [],
+    blockedByAuthorizationPacketDependencies: summary.blockedByAuthorizationPacketDependencies || [],
+    nextActionTimeConfirmations: (summary.nextActionTimeConfirmations || []).map((item) => ({
+      packetId: item.packetId,
+      actionId: item.actionId,
+      title: item.title,
+      owner: item.owner,
+      sequenceGroup: item.sequenceGroup,
+      minimumUserPhrase: item.minimumUserPhrase,
+      nonSecretEvidenceOnly: item.nonSecretEvidenceOnly === true,
+      writeTargets: item.writeTargets || [],
+      verifyCommands: item.verifyCommands || [],
+      explicitlyExcluded: item.explicitlyExcluded || [],
+    })),
+  }
 }
 
 function compactCloudResourceObservations(resourcesMatrix) {
@@ -521,6 +549,10 @@ function renderMarkdown(report) {
     `- cloudResourceObserved: ready ${report.summary.cloudResourceObservedReady}/${report.summary.cloudResourceObservedTotal}, partial ${report.summary.cloudResourceObservedPartial}, blocked ${report.summary.cloudResourceObservedBlocked}`,
     `- cloudResourceBlockedIds: ${report.summary.cloudResourceBlockedIds.join(", ") || "none"}`,
     `- cloudResourceActionTimeConfirmations: ${report.summary.cloudResourceActionTimeConfirmations.join(", ") || "none"}`,
+    `- canStartNowConsoleTasks: ${report.summary.canStartNowConsoleTasks.join(", ") || "none"}`,
+    `- blockedByConsoleTaskDependencies: ${report.summary.blockedByConsoleTaskDependencies.join(", ") || "none"}`,
+    `- canStartNowAuthorizationPackets: ${report.summary.canStartNowAuthorizationPackets.join(", ") || "none"}`,
+    `- blockedByAuthorizationPacketDependencies: ${report.summary.blockedByAuthorizationPacketDependencies.join(", ") || "none"}`,
     `- cloudConfirmationsReady: ${report.summary.cloudConfirmationsReady}`,
     `- operatorTasksReady: ${report.summary.operatorTasksReady}`,
     `- completion: proved ${report.summary.completion.proved}/${report.summary.completion.requirements}, blocked ${report.summary.completion.blocked}, partial ${report.summary.completion.partial}`,
@@ -608,6 +640,25 @@ function renderMarkdown(report) {
       escapeTableCell(item.nextAction),
       escapeTableCell(item.writeTarget),
     ].join(" | ").replace(/^/, "| ").replace(/$/, " |")),
+    "",
+    "## 下一步动作排序",
+    "",
+    `- canStartNowConsoleTasks: ${report.nextActionSequencing.canStartNowConsoleTasks.join(", ") || "none"}`,
+    `- blockedByConsoleTaskDependencies: ${report.nextActionSequencing.blockedByConsoleTaskDependencies.join(", ") || "none"}`,
+    `- canStartNowAuthorizationPackets: ${report.nextActionSequencing.canStartNowAuthorizationPackets.join(", ") || "none"}`,
+    `- blockedByAuthorizationPacketDependencies: ${report.nextActionSequencing.blockedByAuthorizationPacketDependencies.join(", ") || "none"}`,
+    "",
+    "| 授权包 | 动作 | owner | 最小确认语 | 非密钥证据 |",
+    "| --- | --- | --- | --- | --- |",
+    ...(report.nextActionSequencing.nextActionTimeConfirmations.length
+      ? report.nextActionSequencing.nextActionTimeConfirmations.map((item) => [
+        codeCell(item.packetId),
+        escapeTableCell(item.title),
+        escapeTableCell(item.owner),
+        escapeTableCell(item.minimumUserPhrase),
+        item.nonSecretEvidenceOnly ? "true" : "false",
+      ].join(" | ").replace(/^/, "| ").replace(/$/, " |"))
+      : ["| none | none | none | none | none |"]),
     "",
     "## 当前可开始但必须动作时确认",
     "",

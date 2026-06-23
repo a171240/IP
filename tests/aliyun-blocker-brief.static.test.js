@@ -42,6 +42,7 @@ test("Aliyun blocker brief command is wired into scripts, predeploy, deploy spec
   assert.match(releaseArtifacts, /bridgeDataLayer/)
   assert.match(releaseArtifacts, /rdsMigrationIncludedInThisRelease/)
   assert.match(releaseArtifacts, /cloudResourceObservations/)
+  assert.match(releaseArtifacts, /nextActionSequencing/)
 })
 
 test("Aliyun blocker brief is concise, value-free, and names current hard blockers", () => {
@@ -118,6 +119,44 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.ok(report.cloudResourceObservations.items.some((item) =>
     item.id === "R07_SLS_ALERTS" &&
     item.observedReadiness === "partial"
+  ))
+  assert.deepEqual(report.summary.canStartNowConsoleTasks, [
+    "C02_ACR_IMAGE_AND_PULL",
+    "C05_OSS_AUDIO_RAM_STS",
+  ])
+  assert.deepEqual(report.summary.blockedByConsoleTaskDependencies, [
+    "C01_SAE_RUNTIME",
+    "C03_API_DOMAIN_HTTPS_ICP",
+    "C04_ASSET_DOMAIN_HTTPS_ICP",
+    "C06_ENV_IMPORT",
+    "C07_SLS_ALERTS",
+  ])
+  assert.deepEqual(report.summary.canStartNowAuthorizationPackets, [
+    "P01_WECHAT_OPEN_MOBILE_APP",
+    "P10_ANDROID_RELEASE_SIGNING",
+    "P02_APPLE_TEAM_ID",
+    "P03_ACR_PURCHASE",
+    "P05_OSS_RAM_STS",
+  ])
+  assert.deepEqual(report.summary.blockedByAuthorizationPacketDependencies, [
+    "P04_ACR_IMAGE_AND_PULL",
+    "P06_ENV_IMPORT",
+    "P07_DOMAIN_DNS_HTTPS",
+    "P08_SAE_RUNTIME_SLS",
+    "P09_PRODUCTION_DEPLOY",
+  ])
+  assert.deepEqual(report.nextActionSequencing.canStartNowConsoleTasks, report.summary.canStartNowConsoleTasks)
+  assert.deepEqual(report.nextActionSequencing.blockedByConsoleTaskDependencies, report.summary.blockedByConsoleTaskDependencies)
+  assert.deepEqual(report.nextActionSequencing.canStartNowAuthorizationPackets, report.summary.canStartNowAuthorizationPackets)
+  assert.ok(report.nextActionSequencing.nextActionTimeConfirmations.some((item) =>
+    item.packetId === "P03_ACR_PURCHASE" &&
+    item.nonSecretEvidenceOnly === true &&
+    /ACR/.test(item.minimumUserPhrase)
+  ))
+  assert.ok(report.nextActionSequencing.nextActionTimeConfirmations.some((item) =>
+    item.packetId === "P05_OSS_RAM_STS" &&
+    item.nonSecretEvidenceOnly === false &&
+    /OSS/.test(item.minimumUserPhrase)
   ))
   assert.deepEqual(report.summary.sensitiveBlockedIds, [
     "S01_WECHAT_OPEN_APP_LOGIN",
@@ -264,6 +303,12 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.match(markdown, /not_created_or_not_confirmed/)
   assert.match(markdown, /R05_OSS_AUDIO_STORAGE/)
   assert.match(markdown, /bucket_visible_unconfirmed/)
+  assert.match(markdown, /下一步动作排序/)
+  assert.match(markdown, /canStartNowConsoleTasks: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS/)
+  assert.match(markdown, /blockedByConsoleTaskDependencies: C01_SAE_RUNTIME/)
+  assert.match(markdown, /canStartNowAuthorizationPackets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID, P03_ACR_PURCHASE, P05_OSS_RAM_STS/)
+  assert.match(markdown, /P03_ACR_PURCHASE/)
+  assert.match(markdown, /授权购买/)
   assert.match(markdown, /notACloudResourceReadyProof: true/)
   assert.match(markdown, /nextEvidenceAction: configure_aliyun_cli_profile_or_use_cloudshell_for_fresh_readonly_inventory/)
   assert.match(markdown, /微信开放平台移动应用链路/)
