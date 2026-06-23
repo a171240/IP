@@ -165,6 +165,7 @@ function buildReport(args) {
     || sensitiveBlockers.summary?.credentialInterventionBrief
     || {}
   const wechatOpenMobileApp = compactWechatOpenMobileApp(wechatOpenMobileAppPackage)
+  const bridgeDataLayer = compactBridgeDataLayer(status.summary?.bridgeDataLayer || {})
   const cloudInventoryReadinessInterpretation = buildCloudInventoryReadinessInterpretation(status, cloudAccess)
   const report = {
     ok: true,
@@ -186,6 +187,11 @@ function buildReport(args) {
       releaseEvidenceUsable: status.summary?.releaseEvidenceUsable === true,
       machineBlocking: status.summary?.machineBlocking || [],
       manualBlockingCount: status.summary?.manualBlocking?.length || 0,
+      bridgeDataLayerCurrent: bridgeDataLayer.current,
+      bridgeDataLayerTarget: bridgeDataLayer.target,
+      bridgeDataLayerStatus: bridgeDataLayer.status,
+      rdsMigrationIncludedInThisRelease: bridgeDataLayer.rdsMigrationIncludedInThisRelease,
+      rdsMigrationRequiredForFinalProductionCn: bridgeDataLayer.rdsMigrationRequiredForFinalProductionCn,
       cloudConfirmationsReady: `${status.summary?.cloudConfirmations?.ready || 0}/${status.summary?.cloudConfirmations?.total || 0}`,
       operatorTasksReady: `${status.summary?.operatorTasks?.ready || 0}/${status.summary?.operatorTasks?.total || 0}`,
       completion: {
@@ -223,6 +229,7 @@ function buildReport(args) {
     readySecretEnvImportGroups,
     credentialInterventionBrief,
     wechatOpenMobileApp,
+    bridgeDataLayer,
     cloudInventoryReadinessInterpretation,
     cloudAccess: {
       canReadCloudNow: cloudAccess.canReadCloudNow === true,
@@ -287,6 +294,22 @@ function buildReport(args) {
   }
   report.ok = report.secretLeakCheck.ok
   return report
+}
+
+function compactBridgeDataLayer(bridge = {}) {
+  return {
+    current: bridge.current || "unknown",
+    target: bridge.target || "unknown",
+    status: bridge.status || "unknown",
+    firstBridgeDeploymentUses: bridge.firstBridgeDeploymentUses || "unknown",
+    supabaseBridgeReady: bridge.supabaseBridgeReady === true,
+    supabaseKeys: bridge.supabaseKeys || [],
+    databaseUrlCnStatus: bridge.databaseUrlCnStatus || "unknown",
+    redisUrlCnStatus: bridge.redisUrlCnStatus || "unknown",
+    rdsMigrationIncludedInThisRelease: bridge.rdsMigrationIncludedInThisRelease === true,
+    rdsMigrationRequiredForFinalProductionCn: bridge.rdsMigrationRequiredForFinalProductionCn === true,
+    notes: bridge.notes || [],
+  }
 }
 
 function compactWechatOpenMobileApp(report) {
@@ -433,6 +456,11 @@ function renderMarkdown(report) {
     `- releaseEvidenceUsable: ${report.summary.releaseEvidenceUsable}`,
     `- machineBlocking: ${report.summary.machineBlocking.join(", ") || "none"}`,
     `- manualBlockingCount: ${report.summary.manualBlockingCount}`,
+    `- bridgeDataLayerCurrent: ${report.summary.bridgeDataLayerCurrent}`,
+    `- bridgeDataLayerTarget: ${report.summary.bridgeDataLayerTarget}`,
+    `- bridgeDataLayerStatus: ${report.summary.bridgeDataLayerStatus}`,
+    `- rdsMigrationIncludedInThisRelease: ${report.summary.rdsMigrationIncludedInThisRelease}`,
+    `- rdsMigrationRequiredForFinalProductionCn: ${report.summary.rdsMigrationRequiredForFinalProductionCn}`,
     `- cloudConfirmationsReady: ${report.summary.cloudConfirmationsReady}`,
     `- operatorTasksReady: ${report.summary.operatorTasksReady}`,
     `- completion: proved ${report.summary.completion.proved}/${report.summary.completion.requirements}, blocked ${report.summary.completion.blocked}, partial ${report.summary.completion.partial}`,
@@ -479,6 +507,21 @@ function renderMarkdown(report) {
     ...report.wechatOpenMobileApp.createDraftFields.map((item) => `  - ${item.name}: ${item.value}`),
     "- backendWriteTargetsAfterApproval:",
     ...report.wechatOpenMobileApp.backendWriteTargetsAfterApproval.map((item) => `  - ${item}`),
+    "",
+    "## 数据层边界",
+    "",
+    `- current: ${report.bridgeDataLayer.current}`,
+    `- target: ${report.bridgeDataLayer.target}`,
+    `- status: ${report.bridgeDataLayer.status}`,
+    `- firstBridgeDeploymentUses: ${report.bridgeDataLayer.firstBridgeDeploymentUses}`,
+    `- supabaseBridgeReady: ${report.bridgeDataLayer.supabaseBridgeReady}`,
+    `- supabaseKeys: ${report.bridgeDataLayer.supabaseKeys.join(", ") || "none"}`,
+    `- databaseUrlCnStatus: ${report.bridgeDataLayer.databaseUrlCnStatus}`,
+    `- redisUrlCnStatus: ${report.bridgeDataLayer.redisUrlCnStatus}`,
+    `- rdsMigrationIncludedInThisRelease: ${report.bridgeDataLayer.rdsMigrationIncludedInThisRelease}`,
+    `- rdsMigrationRequiredForFinalProductionCn: ${report.bridgeDataLayer.rdsMigrationRequiredForFinalProductionCn}`,
+    "- notes:",
+    ...(report.bridgeDataLayer.notes.length ? report.bridgeDataLayer.notes.map((item) => `  - ${item}`) : ["  - none"]),
     "",
     "## 当前可开始但必须动作时确认",
     "",

@@ -39,6 +39,8 @@ test("Aliyun blocker brief command is wired into scripts, predeploy, deploy spec
   assert.match(releaseArtifacts, /requiredEnvBlockerDetails/)
   assert.match(releaseArtifacts, /localCodeReady/)
   assert.match(releaseArtifacts, /machineBlocking/)
+  assert.match(releaseArtifacts, /bridgeDataLayer/)
+  assert.match(releaseArtifacts, /rdsMigrationIncludedInThisRelease/)
 })
 
 test("Aliyun blocker brief is concise, value-free, and names current hard blockers", () => {
@@ -71,6 +73,19 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.ok(report.summary.machineBlocking.includes("missing_required_env:WECHAT_OPEN_APP_ID"))
   assert.ok(report.summary.machineBlocking.includes("app_universal_link:apple_team_id_missing"))
   assert.equal(report.summary.manualBlockingCount, 8)
+  assert.equal(report.summary.bridgeDataLayerCurrent, "Supabase")
+  assert.equal(report.summary.bridgeDataLayerTarget, "Aliyun RDS PostgreSQL")
+  assert.equal(report.summary.rdsMigrationIncludedInThisRelease, false)
+  assert.equal(report.summary.rdsMigrationRequiredForFinalProductionCn, true)
+  assert.equal(report.bridgeDataLayer.current, "Supabase")
+  assert.equal(report.bridgeDataLayer.target, "Aliyun RDS PostgreSQL")
+  assert.equal(report.bridgeDataLayer.firstBridgeDeploymentUses, "Supabase bridge env")
+  assert.equal(report.bridgeDataLayer.supabaseBridgeReady, true)
+  assert.equal(report.bridgeDataLayer.databaseUrlCnStatus, "todo")
+  assert.equal(report.bridgeDataLayer.redisUrlCnStatus, "todo")
+  assert.equal(report.bridgeDataLayer.rdsMigrationIncludedInThisRelease, false)
+  assert.equal(report.bridgeDataLayer.rdsMigrationRequiredForFinalProductionCn, true)
+  assert.ok(report.bridgeDataLayer.notes.some((item) => /桥接部署/.test(item)))
   assert.deepEqual(report.summary.sensitiveBlockedIds, [
     "S01_WECHAT_OPEN_APP_LOGIN",
     "S02_APPLE_TEAM_ID",
@@ -202,6 +217,11 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.match(markdown, /cloudInventoryInterpretation: existing_strict_inventory_ready_but_fresh_cli_profile_unavailable/)
   assert.match(markdown, /localCodeReady: false/)
   assert.match(markdown, /machineBlocking: .*missing_required_env:WECHAT_OPEN_APP_ID/)
+  assert.match(markdown, /数据层边界/)
+  assert.match(markdown, /current: Supabase/)
+  assert.match(markdown, /target: Aliyun RDS PostgreSQL/)
+  assert.match(markdown, /rdsMigrationIncludedInThisRelease: false/)
+  assert.match(markdown, /rdsMigrationRequiredForFinalProductionCn: true/)
   assert.match(markdown, /notACloudResourceReadyProof: true/)
   assert.match(markdown, /nextEvidenceAction: configure_aliyun_cli_profile_or_use_cloudshell_for_fresh_readonly_inventory/)
   assert.match(markdown, /微信开放平台移动应用链路/)
