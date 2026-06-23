@@ -678,6 +678,8 @@ function renderMarkdown(audit) {
     `- requiredBlocking: ${blockerBrief.summary.requiredBlocking.join(", ") || "none"}`,
     `- cloudConfirmationsReady: ${blockerBrief.summary.cloudConfirmationsReady}`,
     `- sensitiveBlocked: ${blockerBrief.summary.sensitiveBlocked}`,
+    `- blockedVariableAcquisitionCount: ${blockerBrief.summary.blockedVariableAcquisitionCount || 0}`,
+    `- readySecretEnvImportGroupCount: ${blockerBrief.summary.readySecretEnvImportGroupCount || 0}`,
     `- immediateAuthorizationPackets: ${blockerBrief.summary.immediateAuthorizationPackets.join(", ") || "none"}`,
     `- cloudInventoryStrictReady: ${blockerBrief.summary.cloudInventoryStrictReady}`,
     `- canReadCloudNow: ${blockerBrief.summary.canReadCloudNow}`,
@@ -703,6 +705,12 @@ function renderMarkdown(audit) {
     ...(blockerBrief.requiredEnvBlockers?.length
       ? blockerBrief.requiredEnvBlockers.map((item) => `- ${item.name}: ${item.status} -> ${item.importTarget}`)
       : ["- requiredEnvBlockers: none"]),
+    ...(blockerBrief.blockedVariableAcquisitionPlan?.length
+      ? blockerBrief.blockedVariableAcquisitionPlan.map((item) => `- ${item.name}: packets=${(item.requiredAuthorizationPackets || []).join(", ") || "none"}; obtainFrom=${item.obtainFrom}; importTarget=${item.importTarget}`)
+      : ["- blockedVariableAcquisitionPlan: none"]),
+    ...(blockerBrief.readySecretEnvImportGroups?.length
+      ? blockerBrief.readySecretEnvImportGroups.map((group) => `- ${group.category}: count=${group.count}; target=${group.importTarget}`)
+      : ["- readySecretEnvImportGroups: none"]),
     "",
     "## 本地证据回填清单",
     "",
@@ -1836,6 +1844,8 @@ function main() {
       cloudConfirmationsReady: blockerBrief.summary.cloudConfirmationsReady,
       operatorTasksReady: blockerBrief.summary.operatorTasksReady,
       sensitiveBlocked: blockerBrief.summary.sensitiveBlocked,
+      blockedVariableAcquisitionCount: blockerBrief.summary.blockedVariableAcquisitionCount || 0,
+      readySecretEnvImportGroupCount: blockerBrief.summary.readySecretEnvImportGroupCount || 0,
       immediateAuthorizationPackets: blockerBrief.summary.immediateAuthorizationPackets,
       cloudInventoryStrictReady: blockerBrief.summary.cloudInventoryStrictReady,
       canReadCloudNow: blockerBrief.summary.canReadCloudNow === true,
@@ -1848,6 +1858,10 @@ function main() {
       wechatOpenReadyToSubmitForReview: blockerBrief.summary.wechatOpenReadyToSubmitForReview === true,
       wechatOpenMobileApp: blockerBrief.wechatOpenMobileApp || null,
       requiredEnvBlockers: blockerBrief.requiredEnvBlockers.map((item) => `${item.name}:${item.status}:${item.importTarget}`),
+      blockedVariableAcquisitionPlan: (blockerBrief.blockedVariableAcquisitionPlan || []).map((item) =>
+        `${item.name}:${(item.requiredAuthorizationPackets || []).join("|")}:${item.importTarget}`),
+      readySecretEnvImportGroups: (blockerBrief.readySecretEnvImportGroups || []).map((group) =>
+        `${group.category}:${group.count}:${group.importTarget}`),
     },
     evidenceWriteback: {
       report: audit.outputFiles.evidenceWritebackJson,

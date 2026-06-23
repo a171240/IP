@@ -29,6 +29,10 @@ test("Aliyun blocker brief command is wired into scripts, predeploy, deploy spec
   assert.match(releaseArtifacts, /currentBrowserAliyunConsoleTabCount/)
   assert.match(releaseArtifacts, /wechatOpenCanCreateDraft/)
   assert.match(releaseArtifacts, /wechatOpenMobileApp/)
+  assert.match(releaseArtifacts, /blockedVariableAcquisitionCount/)
+  assert.match(releaseArtifacts, /readySecretEnvImportGroupCount/)
+  assert.match(releaseArtifacts, /blockedVariableAcquisitionPlan/)
+  assert.match(releaseArtifacts, /readySecretEnvImportGroups/)
 })
 
 test("Aliyun blocker brief is concise, value-free, and names current hard blockers", () => {
@@ -72,6 +76,8 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
     "P03_ACR_PURCHASE",
     "P05_OSS_RAM_STS",
   ])
+  assert.equal(report.summary.blockedVariableAcquisitionCount, 8)
+  assert.equal(report.summary.readySecretEnvImportGroupCount, 9)
   assert.ok(report.requiredEnvBlockers.some((item) => item.name === "WECHAT_OPEN_APP_ID" && /微信开放平台/.test(item.consolePath)))
   assert.ok(report.requiredEnvBlockers.some((item) => item.name === "WECHAT_OPEN_APP_SECRET" && /secret env/.test(item.importTarget)))
   assert.ok(report.requiredEnvBlockers.some((item) => item.name === "APPLE_TEAM_ID" && /Apple Developer/.test(item.consolePath)))
@@ -80,6 +86,26 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
     item.id === "S07_ANDROID_RELEASE_SIGNING" &&
     item.type === "android_keystore_password_or_signature" &&
     item.variableNames.includes("MEIYE_RELEASE_STORE_PASSWORD")
+  ))
+  const acquisitionByName = new Map(report.blockedVariableAcquisitionPlan.map((item) => [item.name, item]))
+  assert.equal(acquisitionByName.get("WECHAT_OPEN_APP_ID").requiredAuthorizationPackets[0], "P01_WECHAT_OPEN_MOBILE_APP")
+  assert.match(acquisitionByName.get("WECHAT_OPEN_APP_ID").obtainFrom, /微信开放平台/)
+  assert.match(acquisitionByName.get("WECHAT_OPEN_APP_ID").importTarget, /plain env/)
+  assert.match(acquisitionByName.get("WECHAT_OPEN_APP_ID").valueHandling, /plain env/)
+  assert.equal(acquisitionByName.get("WECHAT_OPEN_APP_SECRET").requiredAuthorizationPackets[0], "P01_WECHAT_OPEN_MOBILE_APP")
+  assert.match(acquisitionByName.get("WECHAT_OPEN_APP_SECRET").importTarget, /secret env/)
+  assert.equal(acquisitionByName.get("APPLE_TEAM_ID").requiredAuthorizationPackets[0], "P02_APPLE_TEAM_ID")
+  assert.match(acquisitionByName.get("APPLE_TEAM_ID").obtainFrom, /Apple Developer/)
+  assert.equal(acquisitionByName.get("MEIYE_RELEASE_KEY_PASSWORD").requiredAuthorizationPackets[0], "P10_ANDROID_RELEASE_SIGNING")
+  assert.match(acquisitionByName.get("MEIYE_RELEASE_KEY_PASSWORD").importTarget, /Android signing secret store/)
+  assert.match(acquisitionByName.get("MEIYE_RELEASE_KEY_PASSWORD").valueHandling, /本机\/CI signing secret store/)
+  assert.ok(report.readySecretEnvImportGroups.some((group) =>
+    group.category === "bridge_database" &&
+    group.variableNames.includes("SUPABASE_SERVICE_ROLE_KEY")
+  ))
+  assert.ok(report.readySecretEnvImportGroups.some((group) =>
+    group.category === "volc_speech" &&
+    group.variableNames.includes("VOLC_SPEECH_SECRET_KEY")
   ))
   assert.equal(report.cloudAccess.canReadCloudNow, false)
   assert.equal(report.cloudAccess.cliConfigProbeFailureCategory, "aliyun_cli_profile_not_configured")
@@ -134,6 +160,10 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.match(markdown, /androidSignatureStatus: missing_release_wechat_signature/)
   assert.match(markdown, /appleTeamIdMissing: true/)
   assert.match(markdown, /WECHAT_OPEN_APP_SECRET/)
+  assert.match(markdown, /阻塞变量获取与导入计划/)
+  assert.match(markdown, /已 ready 但仍需导入阿里云 secret env 的变量组/)
+  assert.match(markdown, /P01_WECHAT_OPEN_MOBILE_APP/)
+  assert.match(markdown, /SUPABASE_SERVICE_ROLE_KEY/)
   assert.doesNotMatch(output, secretLike)
   assert.doesNotMatch(markdown, secretLike)
 })

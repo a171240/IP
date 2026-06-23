@@ -124,6 +124,8 @@ function buildReport(args) {
 
   const requiredEnvBlockers = extractRequiredEnvBlockers(sensitiveBlockers)
   const sensitiveBlockerSummaries = compactSensitiveBlockers(sensitiveBlockers)
+  const blockedVariableAcquisitionPlan = buildBlockedVariableAcquisitionPlan(sensitiveBlockers)
+  const readySecretEnvImportGroups = sensitiveBlockers.summary?.readySensitiveEnvVariableGroups || []
   const wechatOpenMobileApp = compactWechatOpenMobileApp(wechatOpenMobileAppPackage)
   const report = {
     ok: true,
@@ -154,6 +156,8 @@ function buildReport(args) {
         .filter((item) => item.status !== "ready")
         .map((item) => item.id),
       requiredEnvBlockers: requiredEnvBlockers.map((item) => item.name),
+      blockedVariableAcquisitionCount: blockedVariableAcquisitionPlan.length,
+      readySecretEnvImportGroupCount: readySecretEnvImportGroups.length,
       immediateAuthorizationPackets: actionAuthorization.summary?.nextActionTimeConfirmations || [],
       cloudInventoryStrictReady: `${status.summary?.cloudInventoryResults?.readyLocalOperations || 0}/${status.summary?.cloudInventoryResults?.localOperations || 0}`,
       canReadCloudNow: cloudAccess.canReadCloudNow === true,
@@ -167,6 +171,8 @@ function buildReport(args) {
     },
     immediateAuthorizationPackets: actionAuthorization.nextActionTimeConfirmations || [],
     requiredEnvBlockers,
+    blockedVariableAcquisitionPlan,
+    readySecretEnvImportGroups,
     wechatOpenMobileApp,
     cloudAccess: {
       canReadCloudNow: cloudAccess.canReadCloudNow === true,
@@ -284,6 +290,57 @@ function compactSensitiveBlockers(sensitiveBlockers) {
   }))
 }
 
+const SENSITIVE_BLOCKER_TO_PACKET_IDS = Object.freeze({
+  S01_WECHAT_OPEN_APP_LOGIN: Object.freeze(["P01_WECHAT_OPEN_MOBILE_APP"]),
+  S02_APPLE_TEAM_ID: Object.freeze(["P02_APPLE_TEAM_ID"]),
+  S03_ACR_PAID_PURCHASE: Object.freeze(["P03_ACR_PURCHASE"]),
+  S04_ACR_REGISTRY_AUTH: Object.freeze(["P04_ACR_IMAGE_AND_PULL"]),
+  S05_OSS_RAM_SECRET_OR_STS: Object.freeze(["P05_OSS_RAM_STS"]),
+  S06_READY_SENSITIVE_ENV_IMPORT: Object.freeze(["P06_ENV_IMPORT"]),
+  S07_ANDROID_RELEASE_SIGNING: Object.freeze(["P10_ANDROID_RELEASE_SIGNING"]),
+})
+
+function buildBlockedVariableAcquisitionPlan(sensitiveBlockers) {
+  return (sensitiveBlockers.items || []).flatMap((item) => {
+    const packetIds = SENSITIVE_BLOCKER_TO_PACKET_IDS[item.id] || []
+    return (item.variableDetails || [])
+      .filter((variable) => variable.status !== "ready")
+      .map((variable) => ({
+        name: variable.name,
+        required: variable.required === true,
+        status: variable.status,
+        sensitivity: variable.sensitivity,
+        sourceCategory: variable.sourceCategory,
+        sourceBlockerId: item.id,
+        requiredAuthorizationPackets: packetIds,
+        owner: variable.owner || item.owner,
+        obtainFrom: variable.consolePath || item.obtainFrom || item.consolePath || "",
+        obtain: variable.obtain || "",
+        importTarget: variable.importTarget || "",
+        cloudConfirmationKey: variable.cloudConfirmationKey || "",
+        action: variable.action || item.requiredUserAction || "",
+        writeTargets: item.writeTargets || [],
+        verifyCommands: item.verifyCommands || [],
+        notes: variable.notes || "",
+        valueHandling: valueHandlingForVariable(variable),
+      }))
+  })
+}
+
+function valueHandlingForVariable(variable) {
+  const importTarget = String(variable.importTarget || "")
+  if (importTarget.includes("plain env")) {
+    return "只记录标识符和非密钥证据，导入 SAE plain env；不要写入 App 包。"
+  }
+  if (importTarget.includes("Android signing secret store") || importTarget.includes("本机/CI")) {
+    return "只保存在本机/CI signing secret store；不要写入 JSON、Markdown、Docker 镜像或 git。"
+  }
+  if (variable.sensitivity === "public") {
+    return "只记录标识符和非密钥证据，不写入 App 包。"
+  }
+  return "只在动作时导入 KMS/Secrets Manager/SAE secret env；不要写入 JSON、Markdown、Docker 镜像或 git。"
+}
+
 function extractRequiredEnvBlockers(sensitiveBlockers) {
   const variableDetails = (sensitiveBlockers.items || [])
     .flatMap((item) => item.variableDetails || [])
@@ -325,6 +382,8 @@ function renderMarkdown(report) {
     `- completion: proved ${report.summary.completion.proved}/${report.summary.completion.requirements}, blocked ${report.summary.completion.blocked}, partial ${report.summary.completion.partial}`,
     `- sensitiveBlocked: ${report.summary.sensitiveBlocked}`,
     `- sensitiveBlockedIds: ${report.summary.sensitiveBlockedIds.join(", ") || "none"}`,
+    `- blockedVariableAcquisitionCount: ${report.summary.blockedVariableAcquisitionCount}`,
+    `- readySecretEnvImportGroupCount: ${report.summary.readySecretEnvImportGroupCount}`,
     `- cloudInventoryStrictReady: ${report.summary.cloudInventoryStrictReady}`,
     `- canReadCloudNow: ${report.summary.canReadCloudNow}`,
     `- cliConfigProbeFailureCategory: ${report.summary.cliConfigProbeFailureCategory || "none"}`,
@@ -373,6 +432,12 @@ function renderMarkdown(report) {
     "## 必填/发布阻塞变量",
     "",
     ...renderVariableTable(report.requiredEnvBlockers),
+    "## 阻塞变量获取与导入计划",
+    "",
+    ...renderBlockedVariableAcquisitionPlan(report.blockedVariableAcquisitionPlan),
+    "## 已 ready 但仍需导入阿里云 secret env 的变量组",
+    "",
+    ...renderReadySecretEnvImportGroups(report.readySecretEnvImportGroups),
     "## CloudShell / CLI 只读盘点",
     "",
     `- canReadCloudNow: ${report.cloudAccess.canReadCloudNow}`,
@@ -404,6 +469,38 @@ function renderMarkdown(report) {
     ...report.prohibitedWithoutActionTimeConfirmation.map((item) => `- ${item}`),
     "",
   ].join("\n")
+}
+
+function renderBlockedVariableAcquisitionPlan(items) {
+  if (!items.length) return ["- none", ""]
+  return [
+    "| 变量 | 授权包 | 获取位置 | 获取方式 | 导入目标 | 禁止写入 |",
+    "| --- | --- | --- | --- | --- | --- |",
+    ...items.map((item) => [
+      codeCell(item.name),
+      escapeTableCell((item.requiredAuthorizationPackets || []).join(", ") || "none"),
+      escapeTableCell(item.obtainFrom),
+      escapeTableCell(item.obtain),
+      escapeTableCell(item.importTarget),
+      escapeTableCell(item.valueHandling),
+    ].join(" | ").replace(/^/, "| ").replace(/$/, " |")),
+    "",
+  ]
+}
+
+function renderReadySecretEnvImportGroups(groups) {
+  if (!groups.length) return ["- none", ""]
+  return [
+    "| 类别 | owner | 导入目标 | 变量名 |",
+    "| --- | --- | --- | --- |",
+    ...groups.map((group) => [
+      codeCell(group.category),
+      escapeTableCell(group.owner),
+      escapeTableCell(group.importTarget),
+      escapeTableCell((group.variableNames || []).join(", ")),
+    ].join(" | ").replace(/^/, "| ").replace(/$/, " |")),
+    "",
+  ]
 }
 
 function renderSensitiveBlockers(items) {
