@@ -98,6 +98,20 @@ function summarize(items) {
     byType[item.type] = (byType[item.type] || 0) + 1
     byOwner[item.owner] = (byOwner[item.owner] || 0) + 1
   }
+  const variableRows = items.flatMap((item) =>
+    (item.variableDetails || []).map((variable) => ({
+      actionId: item.id,
+      blockerType: item.type,
+      owner: item.owner,
+      ...variable,
+    })),
+  )
+  const blockedVariableRows = variableRows.filter((variable) => variable.status !== "ready")
+  const readySecretEnvVariableRows = variableRows.filter((variable) =>
+    variable.status === "ready" &&
+    variable.sensitivity !== "public" &&
+    String(variable.importTarget || "").includes("secret env"),
+  )
   return {
     total: items.length,
     ready: items.length - blocked.length,
@@ -109,6 +123,7 @@ function summarize(items) {
       .filter((item) => item.requiresActionTimeConfirmation === true)
       .map((item) => item.id),
     variableNames: unique(items.flatMap((item) => item.variableNames || [])).sort(),
+    userIntervention: buildUserInterventionSummary(items, blockedVariableRows, readySecretEnvVariableRows),
     readySensitiveEnvVariableGroups: items
       .filter((item) => item.id === "S06_READY_SENSITIVE_ENV_IMPORT")
       .flatMap((item) => item.variableGroups || [])
@@ -129,6 +144,48 @@ function summarize(items) {
         sum + (item.variableDetails || []).filter((variable) => variable.sensitivity !== "public").length, 0),
     },
   }
+}
+
+function buildUserInterventionSummary(items, blockedVariableRows, readySecretEnvVariableRows) {
+  const groups = {}
+  for (const item of items) {
+    const mode = interventionMode(item)
+    if (!groups[mode]) groups[mode] = []
+    groups[mode].push(item.id)
+  }
+  return {
+    canCodexProceedWithoutUser: false,
+    actionTimeConfirmationRequired: items
+      .filter((item) => item.requiresActionTimeConfirmation === true)
+      .map((item) => item.id),
+    userMustObtainOrConfirmIds: items
+      .filter((item) => item.status !== "ready")
+      .map((item) => item.id),
+    blockedVariableNames: unique(blockedVariableRows.map((variable) => variable.name)).sort(),
+    readySecretEnvVariableNames: unique(readySecretEnvVariableRows.map((variable) => variable.name)).sort(),
+    readySecretEnvVariableCount: unique(readySecretEnvVariableRows.map((variable) => variable.name)).length,
+    groups,
+    valueHandlingRules: [
+      "blockedVariableNames 只说明还缺哪些变量名，不包含 value。",
+      "readySecretEnvVariableNames 表示本机已有 ready 状态但仍只能通过 KMS/Secrets Manager/SAE secret env 导入。",
+      "AppSecret、AccessKeySecret、registry password、RAM Secret、STS token、keystore password 和 Supabase service role key 不能写入 JSON、Markdown、Docker 镜像或 git。",
+    ],
+  }
+}
+
+function interventionMode(item) {
+  if (item.type === "external_credential_after_review") return "external_review_then_app_credentials"
+  if (item.type === "external_identifier") return "external_identifier_lookup"
+  if (item.type === "paid_purchase_confirmation") return "paid_purchase_confirmation"
+  if (item.type === "android_keystore_password_or_signature") return "android_release_signing_secret"
+  if (
+    item.type === "registry_password_or_runtime_pull_secret" ||
+    item.type === "ram_secret_or_sts_import" ||
+    item.type === "ready_sensitive_env_need_cloud_import"
+  ) {
+    return "controlled_secret_channel"
+  }
+  return "other_user_intervention"
 }
 
 function compactItem(item) {
@@ -222,6 +279,13 @@ function renderMarkdown(report) {
     `- blocked: ${report.summary.blocked} / ${report.summary.total}`,
     `- actionTimeConfirmationRequired: ${report.summary.actionTimeConfirmationRequired.length ? report.summary.actionTimeConfirmationRequired.join(", ") : "none"}`,
     `- secretLeakCheck: ${report.secretLeakCheck.ok}`,
+    `- canCodexProceedWithoutUser: ${report.summary.userIntervention.canCodexProceedWithoutUser}`,
+    `- blockedVariableNames: ${report.summary.userIntervention.blockedVariableNames.length ? report.summary.userIntervention.blockedVariableNames.join(", ") : "none"}`,
+    `- readySecretEnvVariableNames: ${report.summary.userIntervention.readySecretEnvVariableNames.length ? report.summary.userIntervention.readySecretEnvVariableNames.join(", ") : "none"}`,
+    "",
+    "## 用户介入分层",
+    "",
+    ...Object.entries(report.summary.userIntervention.groups).map(([mode, ids]) => `- ${mode}: ${ids.join(", ")}`),
     "",
     "## 按类型汇总",
     "",

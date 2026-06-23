@@ -505,6 +505,10 @@ function renderMarkdown(audit) {
     `- containsValues: ${sensitiveBlockers.containsValues === true}`,
     `- secretLeakCheck: ${sensitiveBlockers.secretLeakCheck?.ok === true}`,
     `- blocked: ${sensitiveBlockers.summary.blocked} / ${sensitiveBlockers.summary.total}`,
+    `- canCodexProceedWithoutUser: ${sensitiveBlockers.summary.userIntervention?.canCodexProceedWithoutUser === true}`,
+    `- blockedVariableNames: ${sensitiveBlockers.summary.userIntervention?.blockedVariableNames?.length ? sensitiveBlockers.summary.userIntervention.blockedVariableNames.join(", ") : "none"}`,
+    `- readySecretEnvVariableCount: ${sensitiveBlockers.summary.userIntervention?.readySecretEnvVariableCount ?? 0}`,
+    `- userInterventionGroups: ${formatUserInterventionGroups(sensitiveBlockers.summary.userIntervention?.groups || {})}`,
     ...renderSensitiveBlockerSummaryLines(sensitiveBlockers.items || []),
     "",
     "## 阿里云资源矩阵",
@@ -972,6 +976,12 @@ function renderSensitiveBlockerSummaryLines(items) {
 function formatSensitiveVariableSummary(variable) {
   const target = variable.importTarget || "unknown target"
   return `${variable.name}:${variable.status}->${target}`
+}
+
+function formatUserInterventionGroups(groups) {
+  const entries = Object.entries(groups)
+  if (!entries.length) return "none"
+  return entries.map(([mode, ids]) => `${mode}=${Array.isArray(ids) ? ids.join("|") : String(ids)}`).join("; ")
 }
 
 function compactSensitiveBlockerForAudit(item) {
@@ -1650,6 +1660,7 @@ function main() {
       total: sensitiveBlockers.summary.total,
       blockedIds: sensitiveBlockers.summary.blockedIds,
       variableDetails: sensitiveBlockers.summary.variableDetails || {},
+      userIntervention: sensitiveBlockers.summary.userIntervention || {},
       items: (sensitiveBlockers.items || []).map(compactSensitiveBlockerForAudit),
     },
     resourcesMatrix: {
