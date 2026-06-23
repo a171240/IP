@@ -716,6 +716,7 @@ function renderMarkdown(audit) {
     `- cloudResourceBlockedIds: ${blockerBrief.summary.cloudResourceBlockedIds?.length ? blockerBrief.summary.cloudResourceBlockedIds.join(", ") : "none"}`,
     `- cloudResourceActionTimeConfirmations: ${blockerBrief.summary.cloudResourceActionTimeConfirmations?.length ? blockerBrief.summary.cloudResourceActionTimeConfirmations.join(", ") : "none"}`,
     `- canStartNowConsoleTasks: ${blockerBrief.summary.canStartNowConsoleTasks?.length ? blockerBrief.summary.canStartNowConsoleTasks.join(", ") : "none"}`,
+    `- canStartNowWritebackTaskCount: ${blockerBrief.summary.canStartNowWritebackTaskCount || 0}`,
     `- blockedByConsoleTaskDependencies: ${blockerBrief.summary.blockedByConsoleTaskDependencies?.length ? blockerBrief.summary.blockedByConsoleTaskDependencies.join(", ") : "none"}`,
     `- canStartNowAuthorizationPackets: ${blockerBrief.summary.canStartNowAuthorizationPackets?.length ? blockerBrief.summary.canStartNowAuthorizationPackets.join(", ") : "none"}`,
     `- blockedByAuthorizationPacketDependencies: ${blockerBrief.summary.blockedByAuthorizationPacketDependencies?.length ? blockerBrief.summary.blockedByAuthorizationPacketDependencies.join(", ") : "none"}`,
@@ -755,6 +756,9 @@ function renderMarkdown(audit) {
         ...(blockerBrief.cloudResourceObservations.items || []).map((item) => `- ${item.id}: observed=${item.observedStatus}; readiness=${item.observedReadiness}; ready=${item.ready === true}; actionTimeConfirmation=${item.requiresActionTimeConfirmation === true}`),
       ]
       : []),
+    ...(blockerBrief.canStartNowWritebackPlan?.length
+      ? blockerBrief.canStartNowWritebackPlan.map((item) => `- writeback ${item.id}: targets=${(item.writeTargets || []).join("; ") || "none"}; acceptance=${(item.acceptanceEvidence || []).join("; ") || "none"}`)
+      : ["- canStartNowWritebackPlan: none"]),
     ...(blockerBrief.immediateAuthorizationPackets?.length
       ? blockerBrief.immediateAuthorizationPackets.map((item) => `- ${item.packetId}: ${item.minimumUserPhrase}`)
       : ["- immediateAuthorizationPackets: none"]),
@@ -1958,6 +1962,7 @@ function main() {
       bridgeDataLayer: blockerBrief.bridgeDataLayer || null,
       cloudResourceObservations: blockerBrief.cloudResourceObservations || null,
       nextActionSequencing: blockerBrief.nextActionSequencing || null,
+      canStartNowWritebackPlan: blockerBrief.canStartNowWritebackPlan || [],
       cloudConfirmationsReady: blockerBrief.summary.cloudConfirmationsReady,
       operatorTasksReady: blockerBrief.summary.operatorTasksReady,
       sensitiveBlocked: blockerBrief.summary.sensitiveBlocked,

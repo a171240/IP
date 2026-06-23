@@ -146,6 +146,14 @@ function buildReport(args) {
     "scripts/summarize-aliyun-resource-matrix.mjs",
     ...envArgs(args),
   ])
+  const consoleRunbook = runJson("console_runbook", [
+    "scripts/generate-aliyun-console-runbook.mjs",
+    ...envArgs(args),
+  ])
+  const imagePublishPlan = runJson("image_publish_plan", [
+    "scripts/check-aliyun-image-publish-plan.mjs",
+    "--allow-incomplete",
+  ])
   const cloudAccess = runJson("cloud_access", [
     "scripts/check-aliyun-cloud-access.mjs",
     "--env-file",
@@ -172,6 +180,7 @@ function buildReport(args) {
   const bridgeDataLayer = compactBridgeDataLayer(status.summary?.bridgeDataLayer || {})
   const cloudResourceObservations = compactCloudResourceObservations(resourcesMatrix)
   const nextActionSequencing = compactNextActionSequencing(completionAudit)
+  const canStartNowWritebackPlan = compactCanStartNowWritebackPlan(consoleRunbook, imagePublishPlan)
   const cloudInventoryReadinessInterpretation = buildCloudInventoryReadinessInterpretation(status, cloudAccess)
   const report = {
     ok: true,
@@ -206,6 +215,7 @@ function buildReport(args) {
       cloudResourceBlockedIds: cloudResourceObservations.blockedIds,
       cloudResourceActionTimeConfirmations: cloudResourceObservations.actionTimeConfirmationRequired,
       canStartNowConsoleTasks: nextActionSequencing.canStartNowConsoleTasks,
+      canStartNowWritebackTaskCount: canStartNowWritebackPlan.length,
       blockedByConsoleTaskDependencies: nextActionSequencing.blockedByConsoleTaskDependencies,
       canStartNowAuthorizationPackets: nextActionSequencing.canStartNowAuthorizationPackets,
       blockedByAuthorizationPacketDependencies: nextActionSequencing.blockedByAuthorizationPacketDependencies,
@@ -249,6 +259,7 @@ function buildReport(args) {
     bridgeDataLayer,
     cloudResourceObservations,
     nextActionSequencing,
+    canStartNowWritebackPlan,
     cloudInventoryReadinessInterpretation,
     cloudAccess: {
       canReadCloudNow: cloudAccess.canReadCloudNow === true,
@@ -335,6 +346,67 @@ function compactNextActionSequencing(completionAudit) {
       explicitlyExcluded: item.explicitlyExcluded || [],
     })),
   }
+}
+
+function compactCanStartNowWritebackPlan(consoleRunbook, imagePublishPlan) {
+  const imageGroups = new Map((imagePublishPlan.writebackPlan?.groups || []).map((group) => [group.id, group]))
+  return (consoleRunbook.consoleTasks || [])
+    .filter((task) => task.canStartNow === true)
+    .map((task) => {
+      const imageGroup = task.id === "C02_ACR_IMAGE_AND_PULL"
+        ? imageGroups.get("acrPurchaseAndRepository")
+        : null
+      const deferredGroups = task.id === "C02_ACR_IMAGE_AND_PULL"
+        ? ["imagePushAndDigest", "saeRuntimeImagePull"]
+          .map((id) => imageGroups.get(id))
+          .filter(Boolean)
+        : []
+      const writeTargets = imageGroup?.writeTargets?.length
+        ? imageGroup.writeTargets
+        : task.writeTargets || []
+      const acceptanceEvidence = imageGroup?.expectedEvidence?.length
+        ? imageGroup.expectedEvidence
+        : (task.currentActionAcceptanceEvidence?.length
+          ? task.currentActionAcceptanceEvidence
+          : task.completionEvidence || [])
+      const forbidden = uniqueStrings([
+        ...(imageGroup?.forbidden || []),
+        ...(task.forbidden || []),
+      ])
+      return {
+        id: task.id,
+        title: task.title,
+        status: task.status,
+        currentActionScope: imageGroup?.actionScope || task.currentActionScope || "full_task",
+        requiresActionTimeConfirmation: task.requiresActionTimeConfirmation === true,
+        nonSecretEvidenceOnly: imageGroup
+          ? imageGroup.nonSecretEvidenceOnly === true
+          : false,
+        consolePath: task.consolePath || "",
+        targetFields: (task.targetFields || []).map((field) => ({
+          name: field.name,
+          value: field.value,
+          source: field.source,
+        })),
+        writeTargets,
+        nonSecretFieldsToRecord: task.nonSecretFieldsToRecord || [],
+        acceptanceEvidence,
+        currentBlockers: (imageGroup?.blockers?.length ? imageGroup.blockers : task.currentBlockers || []).slice(0, 12),
+        deferredWritebackGroups: deferredGroups.map((group) => ({
+          id: group.id,
+          actionScope: group.actionScope,
+          requiredAuthorizationPackets: group.requiredAuthorizationPackets || [],
+          blockers: group.blockers || [],
+          writeTargets: group.writeTargets || [],
+          verifyCommands: group.verifyCommands || [],
+        })),
+        deferredActions: task.deferredActions || [],
+        forbidden,
+        verifyCommands: imageGroup?.verifyCommands?.length
+          ? imageGroup.verifyCommands
+          : task.verifyCommands || [],
+      }
+    })
 }
 
 function compactCloudResourceObservations(resourcesMatrix) {
@@ -550,6 +622,7 @@ function renderMarkdown(report) {
     `- cloudResourceBlockedIds: ${report.summary.cloudResourceBlockedIds.join(", ") || "none"}`,
     `- cloudResourceActionTimeConfirmations: ${report.summary.cloudResourceActionTimeConfirmations.join(", ") || "none"}`,
     `- canStartNowConsoleTasks: ${report.summary.canStartNowConsoleTasks.join(", ") || "none"}`,
+    `- canStartNowWritebackTaskCount: ${report.summary.canStartNowWritebackTaskCount}`,
     `- blockedByConsoleTaskDependencies: ${report.summary.blockedByConsoleTaskDependencies.join(", ") || "none"}`,
     `- canStartNowAuthorizationPackets: ${report.summary.canStartNowAuthorizationPackets.join(", ") || "none"}`,
     `- blockedByAuthorizationPacketDependencies: ${report.summary.blockedByAuthorizationPacketDependencies.join(", ") || "none"}`,
@@ -660,6 +733,11 @@ function renderMarkdown(report) {
       ].join(" | ").replace(/^/, "| ").replace(/$/, " |"))
       : ["| none | none | none | none | none |"]),
     "",
+    "## 当前可做动作回填清单",
+    "",
+    ...(report.canStartNowWritebackPlan.length
+      ? report.canStartNowWritebackPlan.flatMap(renderWritebackTask)
+      : ["- none", ""]),
     "## 当前可开始但必须动作时确认",
     "",
     ...(report.immediateAuthorizationPackets.length
@@ -793,6 +871,39 @@ function renderSensitiveBlockers(items) {
   ]
 }
 
+function renderWritebackTask(task) {
+  return [
+    `### ${task.id}`,
+    "",
+    `- title: ${task.title}`,
+    `- currentActionScope: ${task.currentActionScope}`,
+    `- requiresActionTimeConfirmation: ${task.requiresActionTimeConfirmation}`,
+    `- nonSecretEvidenceOnly: ${task.nonSecretEvidenceOnly}`,
+    `- consolePath: ${task.consolePath || "none"}`,
+    "- targetFields:",
+    ...(task.targetFields.length
+      ? task.targetFields.map((field) => `  - ${field.name}: ${field.value} (${field.source || "unknown"})`)
+      : ["  - none"]),
+    "- writeTargets:",
+    ...(task.writeTargets.length ? task.writeTargets.map((item) => `  - ${item}`) : ["  - none"]),
+    "- acceptanceEvidence:",
+    ...(task.acceptanceEvidence.length ? task.acceptanceEvidence.map((item) => `  - ${item}`) : ["  - none"]),
+    "- currentBlockers:",
+    ...(task.currentBlockers.length ? task.currentBlockers.map((item) => `  - ${item}`) : ["  - none"]),
+    "- deferredWritebackGroups:",
+    ...(task.deferredWritebackGroups.length
+      ? task.deferredWritebackGroups.map((group) => `  - ${group.id}: waits=${group.requiredAuthorizationPackets.join(", ") || "none"}; blockers=${group.blockers.join(", ") || "none"}`)
+      : ["  - none"]),
+    "- deferredActions:",
+    ...(task.deferredActions.length ? task.deferredActions.map((item) => `  - ${item}`) : ["  - none"]),
+    "- forbidden:",
+    ...(task.forbidden.length ? task.forbidden.map((item) => `  - ${item}`) : ["  - none"]),
+    "- verifyCommands:",
+    ...(task.verifyCommands.length ? task.verifyCommands.map((item) => `  - ${item}`) : ["  - none"]),
+    "",
+  ]
+}
+
 function renderPacket(packet) {
   return [
     `### ${packet.packetId}`,
@@ -834,6 +945,10 @@ function escapeTableCell(value) {
   return String(value || "")
     .replace(/\|/g, "\\|")
     .replace(/\r?\n/g, " ")
+}
+
+function uniqueStrings(items) {
+  return [...new Set((items || []).filter(Boolean))]
 }
 
 function findSecretLikeValues(value, path = "$", matches = []) {
