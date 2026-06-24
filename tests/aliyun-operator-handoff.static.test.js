@@ -35,6 +35,22 @@ function buildConsoleObservationOperation(id, status) {
   }
 }
 
+function initRdsMigrationLocal(tmpdir) {
+  const localPath = path.join(tmpdir, "rds-migration.local.json")
+  execFileSync(process.execPath, [
+    "scripts/check-aliyun-rds-migration-evidence.mjs",
+    "--allow-incomplete",
+    "--init-local",
+    "--local",
+    localPath,
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 60,
+  })
+  return localPath
+}
+
 test("Aliyun operator handoff command is wired into scripts and local predeploy", () => {
   const pkg = readJson("package.json")
   const predeploy = read("scripts", "aliyun-predeploy-commands.mjs")
@@ -61,10 +77,14 @@ test("Aliyun operator handoff command is wired into scripts and local predeploy"
 })
 
 test("Aliyun operator handoff backend-only mode excludes deferred APP launch work", () => {
+  const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-operator-handoff-backend-rds-"))
+  const rdsMigrationLocal = initRdsMigrationLocal(tmpdir)
   const output = execFileSync(process.execPath, [
     "scripts/generate-aliyun-operator-handoff.mjs",
     "--backend-only",
     "--skip-vercel-env-coverage",
+    "--rds-migration",
+    rdsMigrationLocal,
   ], {
     cwd: root,
     encoding: "utf8",
@@ -72,6 +92,7 @@ test("Aliyun operator handoff backend-only mode excludes deferred APP launch wor
   })
   const report = JSON.parse(output)
   const cloudConfirmationPaths = report.localEvidenceGaps.cloudConfirmations.gaps.map((item) => item.jsonPath)
+  const rdsMigrationPaths = report.localEvidenceGaps.rdsMigration.gaps.map((item) => item.jsonPath)
   const userActionTitles = report.userActionNow.map((item) => item.title)
   const priorityTaskIds = report.priorityTasks.map((item) => item.id)
   const requiredVariableNames = report.missingVariables.required.map((item) => item.name)
@@ -87,6 +108,25 @@ test("Aliyun operator handoff backend-only mode excludes deferred APP launch wor
   assert.equal(report.localEvidenceGaps.cloudConfirmations.totalBlockers, cloudConfirmationPaths.length)
   assert.equal(report.localEvidenceGaps.cloudConfirmations.totalBlockers, 18)
   assert.ok(!cloudConfirmationPaths.some((item) => item.includes("wechatOpenPlatform")))
+  assert.equal(report.localEvidenceGaps.rdsMigration.exists, true)
+  assert.equal(report.localEvidenceGaps.rdsMigration.ready, false)
+  assert.equal(report.localEvidenceGaps.rdsMigration.totalBlockers, rdsMigrationPaths.length)
+  assert.equal(report.localEvidenceGaps.rdsMigration.totalBlockers, 17)
+  assert.ok(!rdsMigrationPaths.includes("file_missing"))
+  assert.ok(rdsMigrationPaths.includes("rdsPostgres.databaseUrlCnSecretImported"))
+  assert.ok(rdsMigrationPaths.includes("migration.dataAccessAdapterReady"))
+  assert.ok(rdsMigrationPaths.includes("migration.rollbackValidationPassed"))
+  assert.equal(report.localEvidenceGaps.rdsMigration.appApiRoutesWithSupabase, 30)
+  assert.equal(report.localEvidenceGaps.rdsMigration.firstVersionRdsRoutesWithSupabaseDataAccess, 25)
+  assert.equal(report.localEvidenceGaps.rdsMigration.postgresDataAccessAdapterDetected, true)
+  const databaseUrlGap = report.localEvidenceGaps.rdsMigration.gaps.find((item) =>
+    item.jsonPath === "rdsPostgres.databaseUrlCnSecretImported"
+  )
+  assert.ok(databaseUrlGap.requiredAuthorizationPackets.includes("P11_ALIYUN_RDS_DATA_MIGRATION"))
+  assert.match(databaseUrlGap.writeTo, /rds-migration\.local\.json -> rdsPostgres/)
+  assert.match(databaseUrlGap.expected, /DATABASE_URL_CN/)
+  assert.ok(databaseUrlGap.forbidden.includes("database password"))
+  assert.ok(databaseUrlGap.forbidden.includes("Supabase service role key"))
   assert.deepEqual(requiredVariableNames, ["DATABASE_URL_CN"])
   assert.deepEqual(userActionTitles, [
     "授权 RDS PostgreSQL 和数据迁移",
@@ -209,6 +249,7 @@ test("Aliyun operator handoff maps ACR and SAE evidence gaps to the correct cons
 test("Aliyun operator handoff exposes console-only inventory observation summary", () => {
   const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-operator-handoff-console-observation-"))
   const inventoryResults = path.join(tmpdir, "cloud-inventory-results.local.json")
+  const rdsMigrationLocal = initRdsMigrationLocal(tmpdir)
   const markdown = path.join(tmpdir, "operator-handoff.md")
   fs.writeFileSync(inventoryResults, JSON.stringify({
     schemaVersion: 1,
@@ -235,6 +276,8 @@ test("Aliyun operator handoff exposes console-only inventory observation summary
     "--skip-vercel-env-coverage",
     "--cloud-inventory-results",
     inventoryResults,
+    "--rds-migration",
+    rdsMigrationLocal,
     "--markdown",
     markdown,
   ], {
@@ -279,6 +322,9 @@ test("Aliyun operator handoff exposes console-only inventory observation summary
   assert.match(markdownOutput, /executedCommandResults: 0\/9/)
   assert.match(markdownOutput, /cloudApiCalledCommandResults: 0/)
   assert.match(markdownOutput, /mutationPerformedCommandResults: 0/)
+  assert.match(markdownOutput, /### rds-migration\.local\.json/)
+  assert.match(markdownOutput, /rdsPostgres\.databaseUrlCnSecretImported/)
+  assert.match(markdownOutput, /P11_ALIYUN_RDS_DATA_MIGRATION/)
   assert.match(markdownOutput, /currentBrowserCanUseCurrentConsole/)
   assert.match(markdownOutput, /currentBrowserAliyunConsoleTabCount/)
   assert.match(markdownOutput, /currentBrowserCloudApiCalled: false/)

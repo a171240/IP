@@ -13,6 +13,7 @@ const WORKSPACE_ROOT = resolve(BACKEND_ROOT, "../..")
 const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
 const DEFAULT_CLOUD_INVENTORY_RESULTS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-inventory-results.local.json")
+const DEFAULT_RDS_MIGRATION_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.rds-migration.local.json")
 const APP_LAUNCH_BLOCKING_VARIABLE_NAMES = new Set(["APPLE_TEAM_ID"])
 const APP_LAUNCH_DEFERRED_VARIABLE_NAMES = new Set([
   "APPLE_TEAM_ID",
@@ -48,6 +49,7 @@ function parseArgs(argv) {
     envFile: DEFAULT_ENV_FILE,
     cloudConfirmationsFile: DEFAULT_CLOUD_CONFIRMATIONS_FILE,
     cloudInventoryResultsFile: DEFAULT_CLOUD_INVENTORY_RESULTS_FILE,
+    rdsMigrationFile: DEFAULT_RDS_MIGRATION_FILE,
     outPath: "",
     markdownPath: "",
     skipVercelEnvCoverage: false,
@@ -68,6 +70,10 @@ function parseArgs(argv) {
     }
     if (arg === "--cloud-inventory-results") {
       args.cloudInventoryResultsFile = resolveValue(argv[++index], "--cloud-inventory-results")
+      continue
+    }
+    if (arg === "--rds-migration") {
+      args.rdsMigrationFile = resolveValue(argv[++index], "--rds-migration")
       continue
     }
     if (arg === "--out") {
@@ -462,6 +468,7 @@ function buildHandoff({
   cloudAccess,
   cloudConfirmationsCheck,
   imagePublishPlan,
+  rdsMigrationEvidence,
   consoleRunbook,
   sensitiveBlockers,
   resourcesMatrix,
@@ -505,6 +512,8 @@ function buildHandoff({
       cloudConfirmationsFileExists: existsSync(args.cloudConfirmationsFile),
       cloudInventoryResultsFile: args.cloudInventoryResultsFile,
       cloudInventoryResultsFileExists: existsSync(args.cloudInventoryResultsFile),
+      rdsMigrationFile: args.rdsMigrationFile,
+      rdsMigrationFileExists: existsSync(args.rdsMigrationFile),
       imagePublishLocalFile: resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.image-publish.local.json"),
     },
     localReady: {
@@ -523,6 +532,7 @@ function buildHandoff({
       cloudAccess,
       cloudConfirmationsCheck,
       imagePublishPlan,
+      rdsMigrationEvidence,
       backendOnly: args.backendOnly,
     }),
     operatorClosureBrief,
@@ -589,18 +599,20 @@ function buildHandoff({
       "本操作包不代表已授权阿里云部署、ACR push、DNS 修改、微信操作、Supabase 生产写入、微信上传或 git push。",
       "cloud-confirmations.local.json 只能写资源名、布尔值、控制台路径或证据编号。",
       "cloud-inventory-results.local.json 只能写只读 CLI/Cloud Shell 盘点摘要、退出码、布尔值和非密钥 evidence handle。",
+      "rds-migration.local.json 只能写 RDS 实例/迁移/回滚验收的非密钥 evidence handle，不能写 DATABASE_URL_CN、数据库密码或 dump 内容。",
       "image-publish.local.json 只能写镜像名、digest、布尔状态和证据编号，不能写 registry 密码或 RAM Secret。",
     ],
   }
 }
 
-function buildLocalEvidenceGaps({ args, status, cloudAccess, cloudConfirmationsCheck, imagePublishPlan, backendOnly = false }) {
+function buildLocalEvidenceGaps({ args, status, cloudAccess, cloudConfirmationsCheck, imagePublishPlan, rdsMigrationEvidence, backendOnly = false }) {
   const cloudChecklistByTarget = buildCloudChecklistByTarget(cloudAccess)
   const cloudInventoryResults = status.localReadiness?.cloudInventoryResults || {}
   const cloudConfirmationGaps = buildCloudConfirmationGaps(cloudConfirmationsCheck, cloudChecklistByTarget, {
     backendOnly,
   })
   const imagePublishGaps = buildImagePublishGaps(imagePublishPlan, cloudAccess)
+  const rdsMigrationGaps = buildRdsMigrationGaps(rdsMigrationEvidence)
   return {
     cloudInventoryResults: {
       file: cloudInventoryResults.localFile || args.cloudInventoryResultsFile,
@@ -617,6 +629,16 @@ function buildLocalEvidenceGaps({ args, status, cloudAccess, cloudConfirmationsC
       ready: cloudConfirmationsCheck.local?.ready === true,
       totalBlockers: cloudConfirmationGaps.length,
       gaps: cloudConfirmationGaps,
+    },
+    rdsMigration: {
+      file: rdsMigrationEvidence.local?.file || args.rdsMigrationFile,
+      exists: rdsMigrationEvidence.local?.exists === true,
+      ready: rdsMigrationEvidence.local?.ready === true,
+      totalBlockers: rdsMigrationGaps.length,
+      appApiRoutesWithSupabase: rdsMigrationEvidence.summary?.appApiRoutesWithSupabase || 0,
+      firstVersionRdsRoutesWithSupabaseDataAccess: rdsMigrationEvidence.summary?.firstVersionRdsRoutesWithSupabaseDataAccess || 0,
+      postgresDataAccessAdapterDetected: rdsMigrationEvidence.summary?.postgresDataAccessAdapterDetected === true,
+      gaps: rdsMigrationGaps,
     },
     imagePublish: {
       file: imagePublishPlan.local?.file || resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.image-publish.local.json"),
@@ -792,6 +814,72 @@ function buildImagePublishGaps(imagePublishPlan, cloudAccess) {
     expected: expectedImagePublishEvidence(blocker),
     forbidden: acrChecklist.forbidden || [],
   }))
+}
+
+function buildRdsMigrationGaps(rdsMigrationEvidence) {
+  const blockers = rdsMigrationEvidence.local?.blockers || []
+  return blockers.map((blocker) => {
+    const jsonPath = fieldFromBlocker(blocker)
+    return {
+      jsonPath,
+      blocker,
+      source: rdsMigrationGapSource(jsonPath),
+      writeTo: rdsMigrationGapWriteTarget(jsonPath),
+      expected: expectedRdsMigrationEvidence(jsonPath, blocker),
+      requiredAuthorizationPackets: ["P11_ALIYUN_RDS_DATA_MIGRATION"],
+      forbidden: [
+        "DATABASE_URL_CN",
+        "database password",
+        "migration dump contents",
+        "Supabase service role key",
+        "AccessKeySecret",
+        "RAM Secret",
+        "token",
+        "cookie",
+      ],
+    }
+  })
+}
+
+function rdsMigrationGapSource(jsonPath) {
+  if (jsonPath === "file_missing") return "本机 ignored RDS migration evidence scaffold"
+  if (jsonPath.startsWith("rdsPostgres.")) return "阿里云控制台 -> 云数据库 RDS -> PostgreSQL -> cn-hangzhou"
+  if (jsonPath.startsWith("sourceInventory.")) return "corepack pnpm aliyun:rds:migration:plan"
+  if (jsonPath.startsWith("migration.")) return "RDS schema/data migration runbook + APP API smoke + rollback validation"
+  if (jsonPath.startsWith("security.")) return "Aliyun KMS / Secrets Manager / SAE secret env policy review"
+  return "Aliyun RDS PostgreSQL migration evidence"
+}
+
+function rdsMigrationGapWriteTarget(jsonPath) {
+  if (jsonPath === "file_missing") return "deploy/aliyun-production-cn.rds-migration.local.json"
+  const group = String(jsonPath || "").split(".")[0]
+  if (["rdsPostgres", "sourceInventory", "migration", "security"].includes(group)) {
+    return `deploy/aliyun-production-cn.rds-migration.local.json -> ${group}`
+  }
+  return "deploy/aliyun-production-cn.rds-migration.local.json"
+}
+
+function expectedRdsMigrationEvidence(jsonPath, blocker) {
+  if (jsonPath === "file_missing") {
+    return "运行 corepack pnpm aliyun:rds:migration:evidence:init 初始化 ignored 的本地 RDS 证据文件。"
+  }
+  const expectedByPath = {
+    "rdsPostgres.confirmed": "RDS PostgreSQL 实例已在 cn-hangzhou 创建或确认后填 true。",
+    "rdsPostgres.databaseAccountReady": "数据库账号和目标数据库已创建并验证后填 true。",
+    "rdsPostgres.databaseUrlCnSecretImported": "DATABASE_URL_CN 只导入 Aliyun KMS / Secrets Manager / SAE secret env 后填 true，不能写入值。",
+    "migration.dataAccessAdapterReady": "APP API production-cn 数据访问 adapter 指向 RDS/PostgreSQL 后填 true。",
+    "migration.schemaMigrated": "schema 已迁到 RDS 并留存非密钥证据后填 true。",
+    "migration.dataMigrated": "数据已迁到 RDS 并留存非密钥证据后填 true。",
+    "migration.rowCountValidationPassed": "关键表 row count 校验通过后填 true。",
+    "migration.criticalRecordValidationPassed": "关键业务记录抽样校验通过后填 true。",
+    "migration.appApiSmokeOnRdsPassed": "APP API 已在 RDS 数据层上完成 smoke 后填 true。",
+    "migration.supabaseNoLongerFormalTarget": "确认 Supabase 只作为迁移来源或兼容链路，不再是 production-cn 正式数据库目标。",
+    "migration.rollbackRunbookReviewed": "迁移回滚预案已审核后填 true。",
+    "migration.rollbackValidationPassed": "回滚验证通过并留存非密钥证据后填 true。",
+  }
+  if (expectedByPath[jsonPath]) return expectedByPath[jsonPath]
+  if (String(blocker || "").startsWith("todo:")) return "填真实非密钥证据，不能保留 TODO 占位。"
+  return "填 RDS/PostgreSQL 迁移闭环的非密钥 evidence handle 或布尔验收结果。"
 }
 
 function filterSensitiveActionItems(items, backendOnly) {
@@ -1093,6 +1181,20 @@ function renderMarkdown(handoff) {
       ? handoff.localEvidenceGaps.cloudConfirmations.gaps.flatMap((item) => renderEvidenceGap(item))
       : ["- none"]),
     "",
+    "### rds-migration.local.json",
+    "",
+    `- file: ${handoff.localEvidenceGaps.rdsMigration.file}`,
+    `- exists: ${handoff.localEvidenceGaps.rdsMigration.exists}`,
+    `- ready: ${handoff.localEvidenceGaps.rdsMigration.ready}`,
+    `- totalBlockers: ${handoff.localEvidenceGaps.rdsMigration.totalBlockers}`,
+    `- appApiRoutesWithSupabase: ${handoff.localEvidenceGaps.rdsMigration.appApiRoutesWithSupabase}`,
+    `- firstVersionRdsRoutesWithSupabaseDataAccess: ${handoff.localEvidenceGaps.rdsMigration.firstVersionRdsRoutesWithSupabaseDataAccess}`,
+    `- postgresDataAccessAdapterDetected: ${handoff.localEvidenceGaps.rdsMigration.postgresDataAccessAdapterDetected}`,
+    "",
+    ...(handoff.localEvidenceGaps.rdsMigration.gaps.length
+      ? handoff.localEvidenceGaps.rdsMigration.gaps.flatMap((item) => renderEvidenceGap(item))
+      : ["- none"]),
+    "",
     "### image-publish.local.json",
     "",
     `- file: ${handoff.localEvidenceGaps.imagePublish.file}`,
@@ -1262,6 +1364,7 @@ function renderEvidenceGap(item) {
     `  - writeTo: ${item.writeTo}`,
     `  - expected: ${item.expected}`,
     ...(item.forbidden?.length ? [`  - forbidden: ${item.forbidden.join(", ")}`] : []),
+    ...(item.requiredAuthorizationPackets?.length ? [`  - requiredAuthorizationPackets: ${item.requiredAuthorizationPackets.join(", ")}`] : []),
   ]
 }
 
@@ -1362,6 +1465,12 @@ function main() {
     resolve(BACKEND_ROOT, "scripts/check-aliyun-image-publish-plan.mjs"),
     "--allow-incomplete",
   ])
+  const rdsMigrationEvidence = runJson("rds_migration_evidence", [
+    resolve(BACKEND_ROOT, "scripts/check-aliyun-rds-migration-evidence.mjs"),
+    "--allow-incomplete",
+    "--local",
+    args.rdsMigrationFile,
+  ])
   const consoleRunbook = runJson("console_runbook", [
     resolve(BACKEND_ROOT, "scripts/generate-aliyun-console-runbook.mjs"),
     "--env-file",
@@ -1392,6 +1501,7 @@ function main() {
     cloudAccess,
     cloudConfirmationsCheck,
     imagePublishPlan,
+    rdsMigrationEvidence,
     consoleRunbook,
     sensitiveBlockers,
     resourcesMatrix,
@@ -1406,7 +1516,7 @@ function main() {
 function printHelp() {
   console.log([
     "Usage:",
-    "  node scripts/generate-aliyun-operator-handoff.mjs [--env-file path] [--cloud-confirmations path] [--cloud-inventory-results path] [--out /tmp/handoff.json] [--markdown /tmp/handoff.md] [--skip-vercel-env-coverage] [--vercel-env-coverage-input /tmp/vercel-env.json] [--backend-only]",
+    "  node scripts/generate-aliyun-operator-handoff.mjs [--env-file path] [--cloud-confirmations path] [--cloud-inventory-results path] [--rds-migration path] [--out /tmp/handoff.json] [--markdown /tmp/handoff.md] [--skip-vercel-env-coverage] [--vercel-env-coverage-input /tmp/vercel-env.json] [--backend-only]",
     "",
     "Generates a concise non-secret handoff for the user, Aliyun operator, WeChat Open Platform operator, and release owner.",
     "--backend-only excludes deferred WeChat/Android/Apple launch work from the current Aliyun backend handoff.",
