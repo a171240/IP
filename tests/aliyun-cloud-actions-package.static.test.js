@@ -213,3 +213,47 @@ test("Aliyun cloud actions package markdown renders compact action order without
   assert.doesNotMatch(output + markdown, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(output + markdown, /:\/\/[^\s:@]+:[^\s@]+@/)
 })
+
+test("APP production-cn action queue documents the current authorized next-step boundary", () => {
+  const doc = read("docs", "app-production-cn-action-queue.md")
+
+  for (const expected of [
+    "Production-cn cannot be deployed now.",
+    "cloudConfirmationsReady=0/7",
+    "requiredEnv=24/26",
+    "requiredBlocking=WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET",
+    "strictReadonlyInventoryReady=true",
+    "cloudInventoryReadyLocalOperations=9/9",
+    "mutationPerformedCommandResults=0",
+    "C02_ACR_IMAGE_AND_PULL",
+    "purchase and repository only",
+    "quoted price=CNY 117.00",
+    "repository=meiye-huajing-app-api",
+    "acr.registryHost=<actual cn-hangzhou aliyuncs.com host>",
+    "Deferred to a separate later authorization",
+    "P04_ACR_IMAGE_AND_PULL",
+    "C05_OSS_AUDIO_RAM_STS",
+    "bucket=meiye-huajing-service-records-production-cn",
+    "AttachmentCount=0",
+    "ramLeastPrivilege=true",
+    "serviceRecordPrefix=service-records/production-cn",
+    "P01_WECHAT_OPEN_MOBILE_APP",
+    "P10_ANDROID_RELEASE_SIGNING",
+    "P02_APPLE_TEAM_ID",
+    "reviewStatus=not_started",
+    "miniProgramCredentialsReusableForAppLogin=false",
+    "C06_ENV_IMPORT",
+    "corepack pnpm aliyun:completion:audit",
+    "Do not run docker login or docker push.",
+    "Do not deploy production-cn.",
+    "requiredEnv:WECHAT_OPEN_APP_ID",
+    "requiredEnv:WECHAT_OPEN_APP_SECRET",
+  ]) {
+    assert.match(doc, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
+  }
+
+  assert.doesNotMatch(doc, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(doc, /LTAI[A-Za-z0-9]{12,}/)
+  assert.doesNotMatch(doc, /:\/\/[^\s:@]+:[^\s@]+@/)
+  assert.doesNotMatch(doc, /AccessKeySecret\s*[:=]\s*["'][^"']+["']/)
+})
