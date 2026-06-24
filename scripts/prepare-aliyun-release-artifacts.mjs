@@ -220,6 +220,7 @@ function renderMarkdown(audit) {
   const actionAuthorization = audit.checks.actionAuthorization
   const completionAudit = audit.checks.completionAudit
   const rdsMigrationPlan = audit.checks.rdsMigrationPlan
+  const rdsMigrationPackage = audit.checks.rdsMigrationPackage
   const rdsMigrationEvidence = audit.checks.rdsMigrationEvidence
   const backendCnStatus = audit.checks.backendCnStatus
   const backendApplyPackage = audit.checks.backendApplyPackage
@@ -294,6 +295,7 @@ function renderMarkdown(audit) {
     `- provisioningPlan: ${provisioningPlan.summary.readyToStartPhases.length}/${provisioningPlan.summary.phases} phases ready to start, executionMode ${provisioningPlan.executionMode}`,
     `- completionAudit: ${completionAudit.verdict}, complete ${completionAudit.complete === true}, proved ${completionAudit.summary.proved}/${completionAudit.summary.requirements}`,
     `- rdsMigrationPlan: first-version RDS routes ${rdsMigrationPlan.summary.firstVersionRdsRoutesWithSupabaseDataAccess}/${rdsMigrationPlan.summary.firstVersionRdsRouteCount} still use Supabase data access; full app routes ${rdsMigrationPlan.summary.appApiRoutesWithSupabase}/${rdsMigrationPlan.summary.appApiRouteCount} touch Supabase, migrationReady ${rdsMigrationPlan.migrationReady}`,
+    `- rdsMigrationPackage: ${rdsMigrationPackage.ok === true ? "ready" : "not ready"} (${rdsMigrationPackage.summary.sourceFileCount} source files, ${rdsMigrationPackage.summary.requiredTableCount} tables)`,
     `- rdsMigrationEvidence: localExists ${rdsMigrationEvidence.summary.localExists === true}, localReady ${rdsMigrationEvidence.summary.localReady === true}, required packets ${rdsMigrationEvidence.summary.requiredAuthorizationPackets.join(", ") || "none"}`,
     `- backendCnStatus: ${backendCnStatus.currentScope}, canDeployBackendNow ${backendCnStatus.canDeployBackendNow === true}, blockers ${backendCnStatus.summary.backendRequiredBlockingCount}`,
     `- backendApplyPackage: immediate ${backendApplyPackage.summary.immediateBackendSteps.join(", ") || "none"}, blocked ${backendApplyPackage.summary.blockedBackendSteps.length}`,
@@ -743,6 +745,24 @@ function renderMarkdown(audit) {
     ...(rdsMigrationPlan.migrationPhases?.length
       ? rdsMigrationPlan.migrationPhases.map((item) => `- ${item.id}: canStartNow=${item.canStartNow}`)
       : ["- phases: none"]),
+    "",
+    "## RDS/PostgreSQL 迁移包",
+    "",
+    `- dir: ${audit.outputFiles.rdsMigrationPackageDir}`,
+    `- json: ${audit.outputFiles.rdsMigrationPackageJson}`,
+    `- markdown: ${audit.outputFiles.rdsMigrationPackageMarkdown}`,
+    `- schemaSql: ${audit.outputFiles.rdsMigrationPackageSchemaSql}`,
+    `- validationSql: ${audit.outputFiles.rdsMigrationPackageValidationSql}`,
+    `- rollbackChecklist: ${audit.outputFiles.rdsMigrationPackageRollbackChecklist}`,
+    `- ok: ${rdsMigrationPackage.ok === true}`,
+    `- containsValues: ${rdsMigrationPackage.containsValues === true}`,
+    `- sourceFileCount: ${rdsMigrationPackage.summary.sourceFileCount}`,
+    `- requiredTableCount: ${rdsMigrationPackage.summary.requiredTableCount}`,
+    `- requiredFunctionCount: ${rdsMigrationPackage.summary.requiredFunctionCount}`,
+    `- requiredStorageCount: ${rdsMigrationPackage.summary.requiredStorageCount}`,
+    `- schemaSqlSha256: ${rdsMigrationPackage.summary.schemaSqlSha256}`,
+    `- blockers: ${rdsMigrationPackage.blockers?.length ? rdsMigrationPackage.blockers.join(", ") : "none"}`,
+    `- warnings: ${rdsMigrationPackage.warnings?.length ? rdsMigrationPackage.warnings.join(", ") : "none"}`,
     "",
     "## RDS/PostgreSQL 迁移证据",
     "",
@@ -1385,6 +1405,12 @@ function main() {
   const completionAuditMarkdownPath = resolve(args.outDir, "completion-audit.md")
   const rdsMigrationPlanJsonPath = resolve(args.outDir, "rds-migration-plan.json")
   const rdsMigrationPlanMarkdownPath = resolve(args.outDir, "rds-migration-plan.md")
+  const rdsMigrationPackageDir = resolve(args.outDir, "rds-migration-package")
+  const rdsMigrationPackageJsonPath = resolve(rdsMigrationPackageDir, "rds-migration-package.json")
+  const rdsMigrationPackageMarkdownPath = resolve(rdsMigrationPackageDir, "rds-migration-package.md")
+  const rdsMigrationPackageSchemaSqlPath = resolve(rdsMigrationPackageDir, "rds-schema.sql")
+  const rdsMigrationPackageValidationSqlPath = resolve(rdsMigrationPackageDir, "rds-validation.sql")
+  const rdsMigrationPackageRollbackChecklistPath = resolve(rdsMigrationPackageDir, "rds-rollback-checklist.md")
   const rdsMigrationEvidenceJsonPath = resolve(args.outDir, "rds-migration-evidence.json")
   const rdsMigrationEvidenceMarkdownPath = resolve(args.outDir, "rds-migration-evidence.md")
   const backendCnStatusJsonPath = resolve(args.outDir, "backend-cn-status.json")
@@ -1512,6 +1538,11 @@ function main() {
     rdsMigrationPlanJsonPath,
     "--markdown",
     rdsMigrationPlanMarkdownPath,
+  ])
+  const rdsMigrationPackage = runJson("rds_migration_package", [
+    "scripts/generate-aliyun-rds-migration-package.mjs",
+    "--out-dir",
+    rdsMigrationPackageDir,
   ])
   const rdsMigrationEvidence = runJson("rds_migration_evidence", [
     "scripts/check-aliyun-rds-migration-evidence.mjs",
@@ -1693,6 +1724,7 @@ function main() {
       actionAuthorization,
       completionAudit,
       rdsMigrationPlan,
+      rdsMigrationPackage,
       rdsMigrationEvidence,
       backendCnStatus,
       backendApplyPackage,
@@ -1757,6 +1789,12 @@ function main() {
       completionAuditMarkdown: completionAuditMarkdownPath,
       rdsMigrationPlanJson: rdsMigrationPlanJsonPath,
       rdsMigrationPlanMarkdown: rdsMigrationPlanMarkdownPath,
+      rdsMigrationPackageDir,
+      rdsMigrationPackageJson: rdsMigrationPackageJsonPath,
+      rdsMigrationPackageMarkdown: rdsMigrationPackageMarkdownPath,
+      rdsMigrationPackageSchemaSql: rdsMigrationPackageSchemaSqlPath,
+      rdsMigrationPackageValidationSql: rdsMigrationPackageValidationSqlPath,
+      rdsMigrationPackageRollbackChecklist: rdsMigrationPackageRollbackChecklistPath,
       rdsMigrationEvidenceJson: rdsMigrationEvidenceJsonPath,
       rdsMigrationEvidenceMarkdown: rdsMigrationEvidenceMarkdownPath,
       backendCnStatusJson: backendCnStatusJsonPath,
@@ -2182,6 +2220,27 @@ function main() {
       requiredBlocking: rdsMigrationPlan.summary.requiredBlocking || [],
       migrationPhases: (rdsMigrationPlan.migrationPhases || []).map((item) => `${item.id}:canStartNow=${item.canStartNow}`),
     },
+    rdsMigrationPackage: {
+      dir: audit.outputFiles.rdsMigrationPackageDir,
+      report: audit.outputFiles.rdsMigrationPackageJson,
+      markdown: audit.outputFiles.rdsMigrationPackageMarkdown,
+      schemaSql: audit.outputFiles.rdsMigrationPackageSchemaSql,
+      validationSql: audit.outputFiles.rdsMigrationPackageValidationSql,
+      rollbackChecklist: audit.outputFiles.rdsMigrationPackageRollbackChecklist,
+      ok: rdsMigrationPackage.ok === true,
+      containsValues: rdsMigrationPackage.containsValues === true,
+      readOnlyOnly: rdsMigrationPackage.readOnlyOnly === true,
+      cloudApiCalled: rdsMigrationPackage.cloudApiCalled === true,
+      mutationPerformed: rdsMigrationPackage.mutationPerformed === true,
+      sourceFileCount: rdsMigrationPackage.summary.sourceFileCount,
+      requiredTableCount: rdsMigrationPackage.summary.requiredTableCount,
+      requiredFunctionCount: rdsMigrationPackage.summary.requiredFunctionCount,
+      requiredStorageCount: rdsMigrationPackage.summary.requiredStorageCount,
+      schemaSqlSha256: rdsMigrationPackage.summary.schemaSqlSha256,
+      validationSqlSha256: rdsMigrationPackage.summary.validationSqlSha256,
+      blockers: rdsMigrationPackage.blockers || [],
+      warnings: rdsMigrationPackage.warnings || [],
+    },
     rdsMigrationEvidence: {
       report: audit.outputFiles.rdsMigrationEvidenceJson,
       markdown: audit.outputFiles.rdsMigrationEvidenceMarkdown,
@@ -2571,6 +2630,12 @@ function main() {
     completionAuditMarkdown: audit.outputFiles.completionAuditMarkdown,
     rdsMigrationPlanJson: audit.outputFiles.rdsMigrationPlanJson,
     rdsMigrationPlanMarkdown: audit.outputFiles.rdsMigrationPlanMarkdown,
+    rdsMigrationPackageDir: audit.outputFiles.rdsMigrationPackageDir,
+    rdsMigrationPackageJson: audit.outputFiles.rdsMigrationPackageJson,
+    rdsMigrationPackageMarkdown: audit.outputFiles.rdsMigrationPackageMarkdown,
+    rdsMigrationPackageSchemaSql: audit.outputFiles.rdsMigrationPackageSchemaSql,
+    rdsMigrationPackageValidationSql: audit.outputFiles.rdsMigrationPackageValidationSql,
+    rdsMigrationPackageRollbackChecklist: audit.outputFiles.rdsMigrationPackageRollbackChecklist,
     rdsMigrationEvidenceJson: audit.outputFiles.rdsMigrationEvidenceJson,
     rdsMigrationEvidenceMarkdown: audit.outputFiles.rdsMigrationEvidenceMarkdown,
     backendCnStatusJson: audit.outputFiles.backendCnStatusJson,
