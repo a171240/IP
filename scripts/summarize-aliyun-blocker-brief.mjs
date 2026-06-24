@@ -243,6 +243,8 @@ function buildReport(args) {
       cloudResourceObservedBlocked: cloudResourceObservations.observedStatuses.blocked,
       cloudResourceObservedTotal: cloudResourceObservations.observedStatuses.total,
       cloudResourceBlockedIds: cloudResourceObservations.blockedIds,
+      cloudResourceObservedPartialIds: cloudResourceObservations.observedPartialIds,
+      cloudResourceObservedBlockedIds: cloudResourceObservations.observedBlockedIds,
       cloudResourceActionTimeConfirmations: cloudResourceObservations.actionTimeConfirmationRequired,
       canStartNowConsoleTasks: nextActionSequencing.canStartNowConsoleTasks,
       canStartNowWritebackTaskCount: canStartNowWritebackPlan.length,
@@ -449,6 +451,24 @@ function compactCanStartNowWritebackPlan(consoleRunbook, imagePublishPlan) {
 function compactCloudResourceObservations(resourcesMatrix) {
   const summary = resourcesMatrix.summary || {}
   const observedStatuses = summary.observedResourceStatuses || {}
+  const items = (resourcesMatrix.resources || []).map((item) => {
+    const observed = item.observedResourceStatus || {}
+    return {
+      id: item.id,
+      title: item.title,
+      status: item.status,
+      ready: item.ready === true,
+      requiresActionTimeConfirmation: item.requiresActionTimeConfirmation === true,
+      observedStatus: observed.status || "unknown",
+      observedReadiness: observed.readiness || "unknown",
+      observed: observed.observed === true,
+      currentObservation: observed.currentObservation || "",
+      nextAction: observed.nextAction || "",
+      writeTarget: observed.writeTarget || "",
+      currentLocalEvidence: item.currentLocalEvidence || "",
+      blockers: (item.blockers || []).slice(0, 8),
+    }
+  })
   return {
     evidenceReady: summary.resourceEvidenceReady || `${summary.ready || 0}/${summary.total || 0}`,
     total: summary.total || 0,
@@ -468,24 +488,19 @@ function compactCloudResourceObservations(resourcesMatrix) {
       notObserved: observedStatuses.notObserved || 0,
       blockedIds: observedStatuses.blockedIds || [],
     },
-    items: (resourcesMatrix.resources || []).map((item) => {
-      const observed = item.observedResourceStatus || {}
-      return {
-        id: item.id,
-        title: item.title,
-        status: item.status,
-        ready: item.ready === true,
-        requiresActionTimeConfirmation: item.requiresActionTimeConfirmation === true,
-        observedStatus: observed.status || "unknown",
-        observedReadiness: observed.readiness || "unknown",
-        observed: observed.observed === true,
-        currentObservation: observed.currentObservation || "",
-        nextAction: observed.nextAction || "",
-        writeTarget: observed.writeTarget || "",
-        currentLocalEvidence: item.currentLocalEvidence || "",
-        blockers: (item.blockers || []).slice(0, 8),
-      }
-    }),
+    observedReadyIds: items
+      .filter((item) => item.observedReadiness === "ready")
+      .map((item) => item.id),
+    observedPartialIds: items
+      .filter((item) => item.observedReadiness === "partial")
+      .map((item) => item.id),
+    observedBlockedIds: items
+      .filter((item) => item.observedReadiness === "blocked")
+      .map((item) => item.id),
+    observedNotReadyIds: items
+      .filter((item) => item.observedReadiness !== "ready")
+      .map((item) => item.id),
+    items,
   }
 }
 
@@ -729,6 +744,8 @@ function renderMarkdown(report) {
     `- cloudResourceEvidenceReady: ${report.summary.cloudResourceEvidenceReady}`,
     `- cloudResourceObserved: ready ${report.summary.cloudResourceObservedReady}/${report.summary.cloudResourceObservedTotal}, partial ${report.summary.cloudResourceObservedPartial}, blocked ${report.summary.cloudResourceObservedBlocked}`,
     `- cloudResourceBlockedIds: ${report.summary.cloudResourceBlockedIds.join(", ") || "none"}`,
+    `- cloudResourceObservedPartialIds: ${report.summary.cloudResourceObservedPartialIds.join(", ") || "none"}`,
+    `- cloudResourceObservedBlockedIds: ${report.summary.cloudResourceObservedBlockedIds.join(", ") || "none"}`,
     `- cloudResourceActionTimeConfirmations: ${report.summary.cloudResourceActionTimeConfirmations.join(", ") || "none"}`,
     `- canStartNowConsoleTasks: ${report.summary.canStartNowConsoleTasks.join(", ") || "none"}`,
     `- canStartNowWritebackTaskCount: ${report.summary.canStartNowWritebackTaskCount}`,
@@ -814,6 +831,9 @@ function renderMarkdown(report) {
     `- observedReady: ${report.cloudResourceObservations.observedStatuses.ready}/${report.cloudResourceObservations.observedStatuses.total}`,
     `- observedPartial: ${report.cloudResourceObservations.observedStatuses.partial}`,
     `- observedBlocked: ${report.cloudResourceObservations.observedStatuses.blocked}`,
+    `- observedPartialIds: ${report.cloudResourceObservations.observedPartialIds.join(", ") || "none"}`,
+    `- observedBlockedIds: ${report.cloudResourceObservations.observedBlockedIds.join(", ") || "none"}`,
+    `- observedNotReadyIds: ${report.cloudResourceObservations.observedNotReadyIds.join(", ") || "none"}`,
     `- observedCount: ${report.cloudResourceObservations.observedStatuses.observed}`,
     `- notObservedCount: ${report.cloudResourceObservations.observedStatuses.notObserved}`,
     `- cloudConfirmationsTotalBlockers: ${report.cloudResourceObservations.cloudConfirmationsTotalBlockers}`,
