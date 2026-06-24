@@ -238,3 +238,52 @@ test("Aliyun action authorization markdown includes closure brief without secret
   assert.doesNotMatch(output + markdown, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(output + markdown, /:\/\/[^\s:@]+:[^\s@]+@/)
 })
+
+test("Aliyun action authorization packet handoff documents the current packet gate", () => {
+  const handoff = read("docs", "app-production-cn-action-authorization-packets.md")
+  const output = execFileSync(process.execPath, ["scripts/summarize-aliyun-action-authorization.mjs"], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 40,
+  })
+  const report = JSON.parse(output)
+
+  assert.match(handoff, /Production-cn cannot be deployed now\./)
+  assert.match(handoff, /canDeployNow=false/)
+  assert.match(handoff, /canCodexProceedWithoutUser=\[\]/)
+  assert.match(handoff, /authorizationPackets=10/)
+  assert.match(handoff, /userActionReady=0\/10/)
+  assert.match(handoff, /resourceEvidenceReady=0\/7/)
+  assert.match(handoff, /blockedCredentialCount=8/)
+  assert.match(handoff, /readySecretEnvVariableCount=17/)
+  assert.match(handoff, /secretLeakCheck\.ok=true/)
+  assert.match(handoff, /The WeChat mini-program AppID\/Secret cannot be reused as APP login credentials\./)
+
+  for (const packet of report.authorizationPackets) {
+    assert.match(handoff, new RegExp(packet.packetId))
+    assert.match(handoff, new RegExp(packet.actionId))
+    for (const dependency of packet.dependsOn || []) {
+      assert.match(handoff, new RegExp(dependency))
+    }
+  }
+
+  for (const packetId of report.summary.canStartNowPackets) {
+    assert.ok(handoff.includes(`| \`${packetId}\` |`))
+  }
+  for (const packetId of report.summary.blockedByPacketDependencies) {
+    assert.ok(handoff.includes(`| \`${packetId}\` |`))
+  }
+  for (const resourceId of report.summary.blockedResourceEvidenceIds) {
+    assert.match(handoff, new RegExp(resourceId))
+  }
+  for (const resourceId of report.summary.partiallyObservedResourceEvidenceIds) {
+    assert.match(handoff, new RegExp(resourceId))
+  }
+  for (const name of report.authorizationClosureBrief.blockedCredentialNames) {
+    assert.match(handoff, new RegExp(name))
+  }
+
+  assert.doesNotMatch(handoff, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(handoff, /LTAI[A-Za-z0-9]{12,}/)
+  assert.doesNotMatch(handoff, /:\/\/[^\s:@]+:[^\s@]+@/)
+})

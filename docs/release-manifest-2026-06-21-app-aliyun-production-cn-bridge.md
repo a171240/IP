@@ -154,6 +154,15 @@ lib/app-universal-link/aasa.ts
 docs/release-manifest-2026-06-21-app-aliyun-production-cn-bridge.md
 ```
 
+2026-06-24 追加的 production-cn 授权包证据：
+
+```text
+docs/app-production-cn-action-authorization-packets.md
+tests/aliyun-action-authorization.static.test.js
+```
+
+该追加只固化本地只读门禁：`authorizationPackets=10`、`canStartNowPackets=5`、`blockedByPacketDependencies=5`、`resourceEvidenceReady=0/7`、`canCodexProceedWithoutUser=[]`。它不包含阿里云购买、云资源修改、微信开放平台创建/审核、Android signing secret 读取、Apple Developer 修改、密钥导入、镜像推送、production-cn 部署、小程序上传、APP 商店提交或 git push。
+
 ## 4. 明确不包含
 
 - 不包含 App 内支付、苹果 IAP、安卓应用市场支付。
