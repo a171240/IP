@@ -30,8 +30,10 @@ test("Aliyun backend apply package command is wired into scripts and deploy spec
   assert.match(releaseArtifacts, /backend-apply-package\.json/)
   assert.match(releaseArtifacts, /backendApplyPackage/)
   assert.match(script, /B00_ALIYUN_BACKEND_APPLY_PACKAGE/)
+  assert.match(script, /BAP00_READONLY_INVENTORY_IDENTITY/)
   assert.match(script, /BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE/)
   assert.match(script, /BAP09_POSTDEPLOY_SMOKE/)
+  assert.match(applyPackageDoc, /BAP00_READONLY_INVENTORY_IDENTITY/)
   assert.match(applyPackageDoc, /rdsLocalExists=true/)
   assert.match(applyPackageDoc, /rdsEvidence:rdsPostgres\.confirmed/)
   assert.doesNotMatch(applyPackageDoc, /rdsEvidence:file_missing/)
@@ -60,6 +62,7 @@ test("Aliyun backend apply package separates immediate backend work from deferre
   assert.equal(report.secretLeakCheck.ok, true)
 
   assert.deepEqual(report.summary.immediateBackendSteps, [
+    "BAP00_READONLY_INVENTORY_IDENTITY",
     "BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE",
     "BAP02_OSS_RAM_STS_CLOSE",
     "BAP03_ACR_PURCHASE_AND_REPOSITORY",
@@ -82,6 +85,14 @@ test("Aliyun backend apply package separates immediate backend work from deferre
   assert.ok(!report.userIntervention.blockedCredentialNames.includes("WECHAT_OPEN_APP_SECRET"))
   assert.ok(!report.userIntervention.blockedCredentialNames.includes("MEIYE_RELEASE_KEY_PASSWORD"))
 
+  assert.equal(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").canStartAfterActionTimeConfirmation, true)
+  assert.ok(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").currentBlockers.includes("cloudInventory:readonly_inventory_strict_ready=0/9"))
+  assert.ok(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").currentBlockers.includes("aliyun_cli_profile_not_configured"))
+  assert.ok(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").requiredAuthorizationPackets.includes("P11_ALIYUN_READONLY_INVENTORY_IDENTITY"))
+  assert.ok(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").writeTargets.some((item) => item.includes("cloud-inventory-results.local.json")))
+  assert.ok(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").userMustHandle.some((item) => item.includes("Aliyun CLI default profile")))
+  assert.ok(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").verifyCommands.includes("corepack pnpm aliyun:cloudshell:handoff"))
+  assert.ok(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").verifyCommands.some((item) => item.includes("MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1")))
   assert.equal(steps.get("BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE").canStartAfterActionTimeConfirmation, true)
   assert.ok(steps.get("BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE").currentBlockers.includes("DATABASE_URL_CN"))
   assert.ok(steps.get("BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE").userMustHandle.includes("database account password"))
@@ -101,8 +112,13 @@ test("Aliyun backend apply package separates immediate backend work from deferre
 
   assert.ok(report.userIntervention.paymentOrBillingConfirmations.some((item) => /ACR Enterprise/.test(item)))
   assert.ok(report.userIntervention.paymentOrBillingConfirmations.some((item) => /RDS PostgreSQL/.test(item)))
+  assert.ok(report.userIntervention.requiredIds.includes("USER_CONFIRM_ALIYUN_READONLY_INVENTORY_IDENTITY"))
+  assert.ok(report.userIntervention.secretOrPasswordHandling.some((item) => /read-only inventory/.test(item)))
   assert.ok(report.userIntervention.secretOrPasswordHandling.includes("DATABASE_URL_CN"))
   assert.ok(report.userIntervention.secretOrPasswordHandling.includes("database account password"))
+  assert.ok(report.evidenceWritebackTargets.includes("deploy/aliyun-production-cn.cloud-inventory-results.local.json"))
+  assert.ok(report.verificationOrder.includes("corepack pnpm aliyun:cloudshell:handoff"))
+  assert.ok(report.verificationOrder.includes("corepack pnpm aliyun:cloud:inventory-results:strict"))
   assert.ok(report.userIntervention.backendNowExcludes.includes("WECHAT_OPEN_APP_ID"))
   assert.ok(report.verificationOrder.includes("corepack pnpm aliyun:evidence:writeback:backend"))
   assert.ok(report.verificationOrder.includes("corepack pnpm aliyun:operator:handoff:backend"))
@@ -165,11 +181,15 @@ test("Aliyun backend apply package markdown is value-free and actionable", () =>
   const markdown = fs.readFileSync(markdownPath, "utf8")
 
   assert.match(markdown, /currentScope: backend_aliyun_only/)
+  assert.match(markdown, /BAP00_READONLY_INVENTORY_IDENTITY/)
   assert.match(markdown, /BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE/)
   assert.match(markdown, /BAP02_OSS_RAM_STS_CLOSE/)
   assert.match(markdown, /BAP03_ACR_PURCHASE_AND_REPOSITORY/)
   assert.match(markdown, /BAP09_POSTDEPLOY_SMOKE/)
   assert.match(markdown, /database account password/)
+  assert.match(markdown, /USER_CONFIRM_ALIYUN_READONLY_INVENTORY_IDENTITY/)
+  assert.match(markdown, /cloudInventory:readonly_inventory_strict_ready=0\/9/)
+  assert.match(markdown, /MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1/)
   assert.match(markdown, /corepack pnpm aliyun:evidence:writeback:backend/)
   assert.match(markdown, /corepack pnpm aliyun:operator:handoff:backend/)
   assert.match(markdown, /WECHAT_OPEN_APP_ID/)

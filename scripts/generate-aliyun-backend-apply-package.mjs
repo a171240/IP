@@ -164,6 +164,7 @@ function buildReport(args) {
     applySteps: steps,
     userIntervention,
     evidenceWritebackTargets: [
+      "deploy/aliyun-production-cn.cloud-inventory-results.local.json",
       "deploy/aliyun-production-cn.rds-migration.local.json",
       "deploy/aliyun-production-cn.cloud-confirmations.local.json",
       "deploy/aliyun-production-cn.image-publish.local.json",
@@ -172,6 +173,8 @@ function buildReport(args) {
     ],
     verificationOrder: [
       "corepack pnpm aliyun:backend-cn:status",
+      "corepack pnpm aliyun:cloudshell:handoff",
+      "corepack pnpm aliyun:cloud:inventory-results:strict",
       "corepack pnpm aliyun:rds:migration:evidence",
       "corepack pnpm aliyun:cloud:confirmations",
       "corepack pnpm aliyun:image:plan",
@@ -207,8 +210,53 @@ function buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEv
   const blockedCredentialNames = new Set(sensitiveBlockers.credentialInterventionBrief?.blockedCredentialNames || [])
   const readySecretEnvVariableNames = sensitiveBlockers.credentialInterventionBrief?.readySecretEnvVariableNames || []
   const cloudInventory = backendStatus.cloudInventory?.backendMeaning || {}
+  const cloudInventoryReady = backendStatus.cloudInventory?.strictReady === true
+  const cloudInventoryReadyLocalOperations = backendStatus.cloudInventory?.readyLocalOperations || "unknown"
+  const cloudInventoryExecutedCommandResults = backendStatus.cloudInventory?.executedCommandResults || "unknown"
+  const cliConfigFailureCategory = cloudActions.summary?.cliConfigProbeFailureCategory || "unknown"
 
   return [
+    {
+      id: "BAP00_READONLY_INVENTORY_IDENTITY",
+      title: "Restore Aliyun CLI or CloudShell read-only inventory evidence",
+      canStartAfterActionTimeConfirmation: !cloudInventoryReady,
+      requiresActionTimeConfirmation: true,
+      mutationType: "readonly_inventory_identity_and_non_secret_writeback",
+      requiredAuthorizationPackets: ["P11_ALIYUN_READONLY_INVENTORY_IDENTITY"],
+      consolePath: "本机 Aliyun CLI default profile 或阿里云控制台 -> CloudShell",
+      currentEvidence: [
+        `cloudInventoryStrictReady=${cloudInventoryReady}`,
+        `readyLocalOperations=${cloudInventoryReadyLocalOperations}`,
+        `executedCommandResults=${cloudInventoryExecutedCommandResults}`,
+        `cliConfigProbeFailureCategory=${cliConfigFailureCategory}`,
+      ],
+      currentBlockers: cloudInventoryReady ? [] : [
+        `cloudInventory:readonly_inventory_strict_ready=${cloudInventoryReadyLocalOperations}`,
+        ...(cliConfigFailureCategory === "unknown" ? [] : [cliConfigFailureCategory]),
+      ],
+      writeTargets: [
+        "deploy/aliyun-production-cn.cloud-inventory-results.local.json -> non-secret read-only inventory summaries",
+      ],
+      userMustHandle: [
+        "Aliyun CLI default profile or CloudShell logged-in read-only identity",
+        "AccessKeySecret or STS token must never be copied into JSON, Markdown, chat, git, or shell history",
+      ],
+      nonSecretEvidenceToRecord: [
+        "readyLocalOperations count",
+        "executedCommandResults count",
+        "cloudApiCalledCommandResults count",
+        "mutationPerformedCommandResults=0",
+        "observed/not_found/blocked operation ids",
+        "timestamp and evidence handles only",
+      ],
+      verifyCommands: [
+        "corepack pnpm aliyun:cloudshell:handoff",
+        "corepack pnpm aliyun:cloud:access",
+        "MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1 corepack pnpm aliyun:cloud:inventory-run -- --execute-readonly --write-local deploy/aliyun-production-cn.cloud-inventory-results.local.json",
+        "corepack pnpm aliyun:cloud:inventory-results:strict",
+        "corepack pnpm aliyun:evidence:writeback:backend",
+      ],
+    },
     {
       id: "BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE",
       title: "Create Aliyun RDS PostgreSQL and close Supabase-to-RDS migration",
@@ -536,6 +584,7 @@ function buildUserIntervention({ sensitiveBlockers, backendStatus, cloudActions 
   const readySecretEnvVariableNames = credentialBrief.readySecretEnvVariableNames || []
   const appLaunchDeferred = backendStatus.summary.appLaunchDeferredBlocking || []
   const requiredIds = [
+    "USER_CONFIRM_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "USER_CONFIRM_RDS_PURCHASE_AND_DATABASE_PASSWORD",
     "USER_CONFIRM_ACR_PAID_PURCHASE",
     "USER_CONFIRM_OSS_RAM_STS_SECRET_OR_RUNTIME_ROLE",
@@ -551,6 +600,7 @@ function buildUserIntervention({ sensitiveBlockers, backendStatus, cloudActions 
       "SAE runtime/public ingress/SLS/certificate costs if prompted by Aliyun",
     ],
     secretOrPasswordHandling: [
+      "Aliyun CLI profile, CloudShell session, AccessKeySecret or STS token if needed for read-only inventory",
       "DATABASE_URL_CN",
       "database account password",
       "ALIYUN_OSS_ACCESS_KEY_SECRET or STS token if runtime role is not used",

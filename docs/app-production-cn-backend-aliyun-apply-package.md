@@ -1,6 +1,6 @@
 # APP production-cn Aliyun backend apply package
 
-Generated at: 2026-06-24T15:06:56.043Z
+Generated at: 2026-06-24T15:27:48.112Z
 
 ## Scope
 
@@ -13,7 +13,7 @@ Generated at: 2026-06-24T15:06:56.043Z
 
 ## Immediate Backend Steps After Confirmation
 
-- BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP03_ACR_PURCHASE_AND_REPOSITORY
+- BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP03_ACR_PURCHASE_AND_REPOSITORY
 
 ## Blocked Backend Steps
 
@@ -21,14 +21,29 @@ Generated at: 2026-06-24T15:06:56.043Z
 
 ## User Intervention
 
-- requiredIds: USER_CONFIRM_RDS_PURCHASE_AND_DATABASE_PASSWORD, USER_CONFIRM_ACR_PAID_PURCHASE, USER_CONFIRM_OSS_RAM_STS_SECRET_OR_RUNTIME_ROLE, USER_CONFIRM_SECRET_ENV_IMPORT, USER_CONFIRM_DNS_HTTPS_ICP_CHANGE, USER_CONFIRM_PRODUCTION_DEPLOY
+- requiredIds: USER_CONFIRM_ALIYUN_READONLY_INVENTORY_IDENTITY, USER_CONFIRM_RDS_PURCHASE_AND_DATABASE_PASSWORD, USER_CONFIRM_ACR_PAID_PURCHASE, USER_CONFIRM_OSS_RAM_STS_SECRET_OR_RUNTIME_ROLE, USER_CONFIRM_SECRET_ENV_IMPORT, USER_CONFIRM_DNS_HTTPS_ICP_CHANGE, USER_CONFIRM_PRODUCTION_DEPLOY
 - paymentOrBillingConfirmations: RDS PostgreSQL instance/spec purchase or existing instance confirmation; ACR Enterprise Economic cn-hangzhou 1 month quoted CNY 117.00; SAE runtime/public ingress/SLS/certificate costs if prompted by Aliyun
-- secretOrPasswordHandling: DATABASE_URL_CN; database account password; ALIYUN_OSS_ACCESS_KEY_SECRET or STS token if runtime role is not used; ACR registry password or credential helper; ready secret env import values; SUPABASE_SERVICE_ROLE_KEY only for controlled migration/export compatibility
+- secretOrPasswordHandling: Aliyun CLI profile, CloudShell session, AccessKeySecret or STS token if needed for read-only inventory; DATABASE_URL_CN; database account password; ALIYUN_OSS_ACCESS_KEY_SECRET or STS token if runtime role is not used; ACR registry password or credential helper; ready secret env import values; SUPABASE_SERVICE_ROLE_KEY only for controlled migration/export compatibility
 - blockedCredentialCount: 1
 - blockedCredentialNames: ALIYUN_OSS_SECURITY_TOKEN
 - backendNowExcludes: WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET, WECHAT_OPEN_PLATFORM_MOBILE_APP, ANDROID_RELEASE_WECHAT_SIGNATURE
 
 ## Apply Steps
+
+### BAP00_READONLY_INVENTORY_IDENTITY
+
+- title: Restore Aliyun CLI or CloudShell read-only inventory evidence
+- canStartAfterActionTimeConfirmation: true
+- blockedUntil: none
+- mutationType: readonly_inventory_identity_and_non_secret_writeback
+- requiredAuthorizationPackets: P11_ALIYUN_READONLY_INVENTORY_IDENTITY
+- consolePath: 本机 Aliyun CLI default profile 或阿里云控制台 -> CloudShell
+- currentEvidence: cloudInventoryStrictReady=false; readyLocalOperations=0/9; executedCommandResults=9/9; cliConfigProbeFailureCategory=aliyun_cli_profile_not_configured
+- currentBlockers: cloudInventory:readonly_inventory_strict_ready=0/9, aliyun_cli_profile_not_configured
+- writeTargets: deploy/aliyun-production-cn.cloud-inventory-results.local.json -> non-secret read-only inventory summaries
+- userMustHandle: Aliyun CLI default profile or CloudShell logged-in read-only identity; AccessKeySecret or STS token must never be copied into JSON, Markdown, chat, git, or shell history
+- nonSecretEvidenceToRecord: readyLocalOperations count; executedCommandResults count; cloudApiCalledCommandResults count; mutationPerformedCommandResults=0; observed/not_found/blocked operation ids; timestamp and evidence handles only
+- verifyCommands: corepack pnpm aliyun:cloudshell:handoff; corepack pnpm aliyun:cloud:access; MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1 corepack pnpm aliyun:cloud:inventory-run -- --execute-readonly --write-local deploy/aliyun-production-cn.cloud-inventory-results.local.json; corepack pnpm aliyun:cloud:inventory-results:strict; corepack pnpm aliyun:evidence:writeback:backend
 
 ### BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE
 
@@ -168,6 +183,8 @@ Generated at: 2026-06-24T15:06:56.043Z
 ## Verification Order
 
 - corepack pnpm aliyun:backend-cn:status
+- corepack pnpm aliyun:cloudshell:handoff
+- corepack pnpm aliyun:cloud:inventory-results:strict
 - corepack pnpm aliyun:rds:migration:evidence
 - corepack pnpm aliyun:cloud:confirmations
 - corepack pnpm aliyun:image:plan
