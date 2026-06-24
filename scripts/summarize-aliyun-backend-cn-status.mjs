@@ -295,6 +295,9 @@ function buildReport(args) {
       },
     },
     nextBackendOrder: [
+      ...(cloudInventory.strictReady ? [] : [
+        "0. Restore Aliyun CLI/CloudShell read-only inventory evidence and write non-secret summaries only.",
+      ]),
       "1. Create or confirm Aliyun RDS PostgreSQL in cn-hangzhou and close Supabase-to-RDS migration evidence.",
       "2. Confirm OSS RAM/STS least-privilege runtime access.",
       "3. Purchase/confirm ACR, build/push the backend image, and record non-secret digest evidence.",
@@ -306,6 +309,8 @@ function buildReport(args) {
     ],
     strictVerificationOrder: [
       "corepack pnpm aliyun:backend-cn:status",
+      "corepack pnpm aliyun:cloudshell:handoff",
+      "corepack pnpm aliyun:cloud:inventory-results:strict",
       "corepack pnpm aliyun:rds:migration:evidence:strict",
       "corepack pnpm aliyun:cloud:confirmations:strict",
       "corepack pnpm aliyun:image:plan:strict",

@@ -60,7 +60,6 @@ test("Aliyun backend-cn status excludes WeChat mobile app from current backend b
 
   for (const blocker of [
     "DATABASE_URL_CN",
-    "RDS_POSTGRES_NOT_READY",
     "RDS_MIGRATION_EVIDENCE_NOT_READY",
     "ACR_IMAGE_REGISTRY_NOT_READY",
     "SAE_RUNTIME_NOT_READY",
@@ -74,6 +73,7 @@ test("Aliyun backend-cn status excludes WeChat mobile app from current backend b
     assert.ok(report.summary.backendRequiredBlocking.includes(blocker), blocker)
   }
 
+  assert.ok(!report.summary.backendRequiredBlocking.includes("RDS_POSTGRES_NOT_READY"))
   assert.ok(!report.summary.backendRequiredBlocking.includes("WECHAT_OPEN_APP_ID"))
   assert.ok(!report.summary.backendRequiredBlocking.includes("WECHAT_OPEN_APP_SECRET"))
   assert.ok(report.summary.wechatDeferredBlocking.includes("WECHAT_OPEN_APP_ID"))
@@ -81,13 +81,20 @@ test("Aliyun backend-cn status excludes WeChat mobile app from current backend b
   assert.equal(report.deferredScope.wechatOpenMobileApp.excludedFromBackendRequiredBlocking, true)
   assert.equal(report.deferredScope.wechatOpenMobileApp.status, "deferred_after_backend_online")
 
-  assert.equal(report.cloudInventory.strictReady, true)
-  assert.ok(report.cloudInventory.notFoundOperationIds.includes("I08_RDS_POSTGRES"))
-  assert.ok(report.cloudInventory.notFoundOperationIds.includes("I01_SAE_RUNTIME"))
-  assert.ok(report.cloudInventory.notFoundOperationIds.includes("I02_ACR_IMAGE"))
-  assert.ok(report.cloudInventory.observedOperationIds.includes("I05_OSS_AUDIO_BUCKET"))
-  assert.ok(report.cloudInventory.observedOperationIds.includes("I06_SLS_ALERTS"))
+  assert.equal(report.cloudInventory.strictReady, false)
+  assert.equal(report.cloudInventory.readyLocalOperations, "0/9")
+  assert.equal(report.cloudInventory.executedCommandResults, "9/9")
+  assert.deepEqual(report.cloudInventory.notFoundOperationIds, [])
+  assert.deepEqual(report.cloudInventory.observedOperationIds, [])
+  assert.equal(report.cloudInventory.backendMeaning.rdsPostgres, "observed_or_unknown")
+  assert.equal(report.cloudInventory.backendMeaning.saeRuntime, "observed_or_unknown")
+  assert.equal(report.cloudInventory.backendMeaning.acrImage, "observed_or_unknown")
+  assert.equal(report.cloudInventory.backendMeaning.ossAudioBucket, "not_observed")
+  assert.equal(report.cloudInventory.backendMeaning.slsProject, "not_observed")
   assert.equal(report.cloudInventory.mutationPerformedCommandResults, 0)
+  assert.match(report.nextBackendOrder[0], /^0\. Restore Aliyun CLI\/CloudShell read-only inventory evidence/)
+  assert.ok(report.strictVerificationOrder.includes("corepack pnpm aliyun:cloudshell:handoff"))
+  assert.ok(report.strictVerificationOrder.includes("corepack pnpm aliyun:cloud:inventory-results:strict"))
   assert.equal(report.rdsMigration.localExists, true)
   assert.equal(report.rdsMigration.localReady, false)
   assert.ok(report.rdsMigration.blockers.includes("rdsPostgres.confirmed"))
@@ -107,6 +114,7 @@ test("Aliyun backend-cn status excludes WeChat mobile app from current backend b
   assert.ok(report.cloudResources.blockedIds.includes("R07_SLS_ALERTS"))
 
   assert.ok(targetById.get("B01_RDS_POSTGRES_DATA_LAYER").blockers.includes("DATABASE_URL_CN"))
+  assert.ok(!targetById.get("B01_RDS_POSTGRES_DATA_LAYER").blockers.includes("RDS_POSTGRES_NOT_READY"))
   assert.ok(!targetById.get("B01_RDS_POSTGRES_DATA_LAYER").blockers.includes("APP_API_POSTGRES_ADAPTER_MISSING"))
   assert.ok(targetById.get("B02_ACR_IMAGE_REGISTRY").blockers.includes("ACR_IMAGE_REGISTRY_NOT_READY"))
   assert.ok(targetById.get("B03_SAE_RUNTIME").blockers.includes("SAE_RUNTIME_NOT_READY"))
@@ -142,6 +150,9 @@ test("Aliyun backend-cn status markdown states the backend-only target", () => {
   assert.match(markdown, /wechatOpenMobileApp: deferred_after_backend_online/)
   assert.match(markdown, /WECHAT_OPEN_APP_ID/)
   assert.match(markdown, /WECHAT_OPEN_APP_SECRET/)
+  assert.match(markdown, /0\. Restore Aliyun CLI\/CloudShell read-only inventory evidence/)
+  assert.match(markdown, /corepack pnpm aliyun:cloudshell:handoff/)
+  assert.match(markdown, /corepack pnpm aliyun:cloud:inventory-results:strict/)
   assert.match(markdown, /corepack pnpm aliyun:rds:migration:evidence:strict/)
   assert.doesNotMatch(output + markdown, secretLike)
 })
