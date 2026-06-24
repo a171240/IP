@@ -103,6 +103,12 @@ test("Aliyun cloud actions package summarizes current cloud console action order
     item.observedReadiness === "partial" &&
     item.currentEvidence.some((evidence) => /project_meiye-huajing-app-prod-cn/.test(evidence))
   ))
+  const envImportEvidence = report.cloudActionClosureBrief.blockedResourceEvidence.find((item) => item.id === "R06_ENV_IMPORT")
+  assert.ok(envImportEvidence.missingEvidence.includes("missing_required_env:DATABASE_URL_CN"))
+  assert.ok(!envImportEvidence.missingEvidence.some((item) => /WECHAT_OPEN|APPLE_TEAM|ANDROID_RELEASE|MEIYE_RELEASE/.test(item)))
+  assert.ok(!report.cloudActionClosureBrief.stillRequiresActionTimeConfirmation.some((item) =>
+    /WECHAT_OPEN|APPLE_TEAM|ANDROID_RELEASE|MEIYE_RELEASE|S01_WECHAT|S02_APPLE|S07_ANDROID/.test(item)
+  ))
   assert.equal(report.cloudActionClosureBrief.strictReadonlyInventoryReady, false)
   assert.equal(report.cloudActionClosureBrief.cloudInventoryReadyLocalOperations, "0/9")
   assert.equal(report.cloudActionClosureBrief.cloudInventoryExecutedCommandResults, "9/9")

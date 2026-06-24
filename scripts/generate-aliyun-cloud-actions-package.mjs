@@ -26,6 +26,17 @@ const DEFERRED_APP_LAUNCH_CREDENTIAL_NAMES = new Set([
   "WECHAT_OPEN_APP_SECRET",
   "WECHAT_OPEN_APP_REVIEW_STATUS",
 ])
+const DEFERRED_APP_LAUNCH_ID_NAMES = new Set([
+  "P01_WECHAT_OPEN_MOBILE_APP",
+  "P10_ANDROID_RELEASE_SIGNING",
+  "P02_APPLE_TEAM_ID",
+  "S01_WECHAT_OPEN_APP_LOGIN",
+  "S02_APPLE_TEAM_ID",
+  "S07_ANDROID_RELEASE_SIGNING",
+  "U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE",
+  "U10_ANDROID_RELEASE_SIGNING",
+  "U02_APPLE_TEAM_ID",
+])
 
 const SECRET_VALUE_PATTERNS = [
   /sk-[A-Za-z0-9_-]{20,}/,
@@ -336,7 +347,7 @@ function buildCloudActionClosureBrief({
       runbookBrief.partiallyObservedResourceEvidenceIds ||
       consoleRunbook.summary?.partiallyObservedResourceEvidenceIds ||
       [],
-    blockedResourceEvidence: runbookBrief.blockedResourceEvidence || [],
+    blockedResourceEvidence: (runbookBrief.blockedResourceEvidence || []).map(scopeBackendOnlyResourceEvidence),
     strictReadonlyInventoryReady: cloudInventorySummary.ready === true,
     cloudInventoryReadyLocalOperations: `${cloudInventorySummary.readyLocalOperations}/${cloudInventorySummary.localOperations}`,
     cloudInventoryExecutedCommandResults: `${cloudInventorySummary.executedCommandResults}/${cloudInventorySummary.commandResults}`,
@@ -350,7 +361,7 @@ function buildCloudActionClosureBrief({
     stillRequiresActionTimeConfirmation: uniqueStrings([
       ...(runbookBrief.actionTimeConfirmationRequiredIds || []),
       ...cloudConsolePackets.map((item) => item.packetId),
-    ]),
+    ]).filter((item) => !isDeferredAppLaunchBlocker(item)),
   }
 }
 
@@ -361,8 +372,19 @@ function scopeBackendOnlyConsoleTask(task) {
   }
 }
 
+function scopeBackendOnlyResourceEvidence(item) {
+  return {
+    ...item,
+    currentEvidence: (item.currentEvidence || []).filter((value) => !isDeferredAppLaunchBlocker(value)),
+    missingEvidence: (item.missingEvidence || []).filter((value) => !isDeferredAppLaunchBlocker(value)),
+    writeTargets: (item.writeTargets || []).filter((value) => !isDeferredAppLaunchBlocker(value)),
+  }
+}
+
 function isDeferredAppLaunchBlocker(value) {
-  return /WECHAT_OPEN_APP_|wechat_open_platform|APPLE_TEAM_ID|apple_team_id|MEIYE_RELEASE_|Android release signing|app_universal_link/i.test(String(value || ""))
+  const text = String(value || "")
+  return DEFERRED_APP_LAUNCH_ID_NAMES.has(text) ||
+    /WECHAT_OPEN_|wechat_open_platform|APPLE_TEAM_ID|apple_team_id|ANDROID_RELEASE|MEIYE_RELEASE_|Android release signing|app_universal_link/i.test(text)
 }
 
 function buildExecutionQueue(immediateConsoleTasks, blockedConsoleTasks, externalAppPackets, imagePublishWritebackPlan) {
@@ -654,10 +676,12 @@ function compactPhase(phase) {
     title: phase.title,
     status: phase.status,
     canStartNow: phase.canStartNow === true,
-    authorizationPackets: (phase.authorizationPackets || []).map((item) => item.packetId),
+    authorizationPackets: (phase.authorizationPackets || [])
+      .map((item) => item.packetId)
+      .filter((item) => !isDeferredAppLaunchBlocker(item)),
     consoleTasks: (phase.consoleTasks || []).map((item) => item.id),
-    blockingDependencies: phase.blockingDependencies || [],
-    currentBlockers: phase.currentBlockers || [],
+    blockingDependencies: (phase.blockingDependencies || []).filter((item) => !isDeferredAppLaunchBlocker(item)),
+    currentBlockers: (phase.currentBlockers || []).filter((item) => !isDeferredAppLaunchBlocker(item)),
     completionEvidence: phase.completionEvidence || [],
   }
 }
