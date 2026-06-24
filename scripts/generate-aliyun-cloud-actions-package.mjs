@@ -90,16 +90,16 @@ function envArgs(args) {
 }
 
 function buildPackage(args) {
+  const productionStatus = runJson("production_status", [
+    "scripts/summarize-aliyun-production-cn-status.mjs",
+    ...envArgs(args),
+  ])
   const consoleRunbook = runJson("console_runbook", [
     "scripts/generate-aliyun-console-runbook.mjs",
     ...envArgs(args),
   ])
   const provisioningPlan = runJson("provisioning_plan", [
     "scripts/generate-aliyun-provisioning-plan.mjs",
-    ...envArgs(args),
-  ])
-  const blockerBrief = runJson("blocker_brief", [
-    "scripts/summarize-aliyun-blocker-brief.mjs",
     ...envArgs(args),
   ])
   const cloudAccess = runJson("cloud_access", [
@@ -118,7 +118,7 @@ function buildPackage(args) {
   const consoleTasks = consoleRunbook.consoleTasks || []
   const immediateConsoleTasks = consoleTasks.filter((item) => item.canStartNow === true)
   const blockedConsoleTasks = consoleTasks.filter((item) => item.canStartNow !== true)
-  const immediatePackets = blockerBrief.immediateAuthorizationPackets || []
+  const immediatePackets = provisioningPlan.readyAuthorizationPackets || []
   const cloudConsolePackets = immediatePackets.filter((item) => CLOUD_CONSOLE_PACKET_IDS.has(item.packetId))
   const externalAppPackets = immediatePackets.filter((item) => EXTERNAL_APP_PACKET_IDS.has(item.packetId))
   const phases = (provisioningPlan.phases || []).map(compactPhase)
@@ -141,7 +141,7 @@ function buildPackage(args) {
     imagePublishWritebackPlan,
   })
   const currentBlockers = uniqueStrings([
-    ...(blockerBrief.summary?.requiredBlocking || []).map((name) => `requiredEnv:${name}`),
+    ...(productionStatus.summary?.requiredBlocking || []).map((name) => `requiredEnv:${name}`),
     ...(blockedConsoleTasks || []).map((item) => `blockedConsoleTask:${item.id}`),
     ...(cloudInventorySummary.ready ? [] : (cloudAccess.blockers || [])),
     ...(cloudInventorySummary.ready ? [] : cloudInventorySummary.blockers.map((item) => `cloudInventory:${item}`)),
@@ -164,16 +164,19 @@ function buildPackage(args) {
     cloudApiCalled: false,
     currentAnswer: "现在不能部署；本包只把阿里云控制台可先做/需暂缓的动作拆成短清单，不创建资源、不付款、不导入密钥、不部署。",
     summary: {
-      canDeployNow: blockerBrief.canDeployNow === true,
-      verdict: blockerBrief.verdict || "blocked",
-      cloudConfirmationsReady: blockerBrief.summary?.cloudConfirmationsReady || "unknown",
-      operatorTasksReady: blockerBrief.summary?.operatorTasksReady || "unknown",
+      canDeployNow: productionStatus.canDeployNow === true,
+      verdict: productionStatus.verdict || "blocked",
+      cloudConfirmationsReady: formatReadyTotal(productionStatus.summary?.cloudConfirmations),
+      operatorTasksReady: formatReadyTotal(productionStatus.summary?.operatorTasks),
       canStartNowConsoleTasks: immediateConsoleTasks.map((item) => item.id),
       blockedByDependencies: blockedConsoleTasks.map((item) => item.id),
       cloudConsolePackets: cloudConsolePackets.map((item) => item.packetId),
       externalAppPackets: externalAppPackets.map((item) => item.packetId),
-      requiredBlocking: blockerBrief.summary?.requiredBlocking || [],
-      sensitiveBlocked: blockerBrief.summary?.sensitiveBlocked || "unknown",
+      requiredBlocking: productionStatus.summary?.requiredBlocking || [],
+      sensitiveBlocked: formatReadyTotal({
+        ready: (productionStatus.summary?.sensitiveActionItems?.total || 0) - (productionStatus.summary?.sensitiveActionItems?.blocked || 0),
+        total: productionStatus.summary?.sensitiveActionItems?.total || 0,
+      }),
       canReadCloudNow: cloudAccess.canReadCloudNow === true,
       cloudInventoryResultsReady: cloudInventorySummary.ready,
       cloudInventoryReadyLocalOperations: `${cloudInventorySummary.readyLocalOperations}/${cloudInventorySummary.localOperations}`,
@@ -212,7 +215,7 @@ function buildPackage(args) {
       "阿里云 SAE plain env -> only public identifiers and URLs",
       "阿里云 KMS/Secrets Manager/SAE secret env -> secrets only, never in reports",
     ],
-    strictVerificationOrder: blockerBrief.strictVerificationOrder || [
+    strictVerificationOrder: [
       "corepack pnpm aliyun:cloud:access",
       "corepack pnpm aliyun:cloud:inventory-results:strict",
       "corepack pnpm aliyun:cloud:confirmations:strict",
@@ -222,9 +225,17 @@ function buildPackage(args) {
     ],
     nextSafeLocalCommands: uniqueStrings([
       "corepack pnpm aliyun:cloud-actions:package",
-      ...(blockerBrief.nextSafeLocalCommands || []),
+      "corepack pnpm aliyun:cloud:access",
+      "corepack pnpm aliyun:evidence:writeback -- --skip-vercel-env-coverage",
+      "corepack pnpm aliyun:completion:audit",
     ]),
-    prohibitedWithoutActionTimeConfirmation: blockerBrief.prohibitedWithoutActionTimeConfirmation || [],
+    prohibitedWithoutActionTimeConfirmation: [
+      "购买 ACR 或任何付费资源。",
+      "创建/修改 SAE、SLS、OSS、RAM、KMS、Secrets Manager、DNS、证书、CDN 或公网入口。",
+      "读取、复制、粘贴、导入或输出 AppSecret、AccessKeySecret、registry password、RAM Secret、STS token、cookie、Supabase service role key。",
+      "推送镜像到 ACR、部署 production-cn、修改正式域名解析、git push。",
+      "创建微信开放平台移动应用或读取审核通过后的 AppSecret，除非用户在动作时明确授权并提供相应账号上下文。",
+    ],
     currentBlockers,
     safetyBoundary: [
       "本命令只读本地无值报告，不调用阿里云 API。",
@@ -245,6 +256,15 @@ function buildPackage(args) {
     report.containsValues = true
   }
   return report
+}
+
+function formatReadyTotal(value = {}) {
+  if (typeof value === "string") return value
+  if (!value || typeof value !== "object") return "unknown"
+  const ready = value.ready
+  const total = value.total
+  if (ready === undefined || total === undefined) return "unknown"
+  return `${ready}/${total}`
 }
 
 function buildCloudActionClosureBrief({
