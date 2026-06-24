@@ -73,10 +73,14 @@ test("Aliyun backend apply package separates immediate backend work from deferre
     "BAP09_POSTDEPLOY_SMOKE",
   ])
   assert.equal(report.summary.wechatExcludedFromBackend, true)
+  assert.equal(report.summary.blockedCredentialCount, 1)
+  assert.deepEqual(report.userIntervention.blockedCredentialNames, ["ALIYUN_OSS_SECURITY_TOKEN"])
   assert.ok(report.summary.deferredAppLaunchBlocking.includes("WECHAT_OPEN_APP_ID"))
   assert.ok(report.summary.deferredAppLaunchBlocking.includes("WECHAT_OPEN_APP_SECRET"))
   assert.ok(!report.summary.backendRequiredBlocking.includes("WECHAT_OPEN_APP_ID"))
   assert.ok(!report.summary.backendRequiredBlocking.includes("WECHAT_OPEN_APP_SECRET"))
+  assert.ok(!report.userIntervention.blockedCredentialNames.includes("WECHAT_OPEN_APP_SECRET"))
+  assert.ok(!report.userIntervention.blockedCredentialNames.includes("MEIYE_RELEASE_KEY_PASSWORD"))
 
   assert.equal(steps.get("BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE").canStartAfterActionTimeConfirmation, true)
   assert.ok(steps.get("BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE").currentBlockers.includes("DATABASE_URL_CN"))
@@ -169,6 +173,7 @@ test("Aliyun backend apply package markdown is value-free and actionable", () =>
   assert.match(markdown, /corepack pnpm aliyun:evidence:writeback:backend/)
   assert.match(markdown, /corepack pnpm aliyun:operator:handoff:backend/)
   assert.match(markdown, /WECHAT_OPEN_APP_ID/)
+  assert.match(markdown, /blockedCredentialNames: ALIYUN_OSS_SECURITY_TOKEN/)
   assert.match(markdown, /Every apply step still needs action-time confirmation/)
   assert.doesNotMatch(output + markdown, secretLike)
 })

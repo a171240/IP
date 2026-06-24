@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 当前阻塞简报
 
-Generated: 2026-06-24T10:40:00.563Z
+Generated: 2026-06-24T15:06:14.377Z
 
 ## 结论
 
@@ -15,7 +15,7 @@ Generated: 2026-06-24T10:40:00.563Z
 - mutationPerformed: false
 - secretLeakCheck: true
 - requiredEnv: 24/27
-- requiredBlocking: ACR_IMAGE_REGISTRY_NOT_READY, API_DOMAIN_HTTPS_ICP_NOT_READY, ASSET_DOMAIN_HTTPS_ICP_NOT_READY, DATABASE_URL_CN, ENV_IMPORT_NOT_READY, OSS_RAM_STS_NOT_READY, POSTDEPLOY_SMOKE_NOT_RUN, RDS_MIGRATION_EVIDENCE_NOT_READY, RDS_POSTGRES_NOT_READY, SAE_RUNTIME_NOT_READY, SLS_ALERTS_NOT_READY
+- requiredBlocking: ACR_IMAGE_REGISTRY_NOT_READY, API_DOMAIN_HTTPS_ICP_NOT_READY, ASSET_DOMAIN_HTTPS_ICP_NOT_READY, DATABASE_URL_CN, ENV_IMPORT_NOT_READY, OSS_RAM_STS_NOT_READY, POSTDEPLOY_SMOKE_NOT_RUN, RDS_MIGRATION_EVIDENCE_NOT_READY, SAE_RUNTIME_NOT_READY, SLS_ALERTS_NOT_READY
 - fullAppRequiredBlocking: DATABASE_URL_CN, WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET
 - deferredAppLaunchBlocking: WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET, WECHAT_OPEN_PLATFORM_MOBILE_APP, ANDROID_RELEASE_SIGNING, APPLE_TEAM_ID, IOS_UNIVERSAL_LINK_AASA
 - localCodeReady: false
@@ -41,17 +41,17 @@ Generated: 2026-06-24T10:40:00.563Z
 - blockedByAuthorizationPacketDependencies: P04_ACR_IMAGE_AND_PULL, P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS, P09_PRODUCTION_DEPLOY
 - cloudConfirmationsReady: 0/7
 - operatorTasksReady: 1/9
-- completion: proved 2/11, blocked 6, partial 1
-- sensitiveBlocked: 7/7
+- completion: proved 1/11, blocked 7, partial 1
+- sensitiveBlocked: 4/4
 - sensitiveBlockedIds: S03_ACR_PAID_PURCHASE, S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S06_READY_SENSITIVE_ENV_IMPORT
 - deferredAppLaunchSensitiveBlockedIds: S01_WECHAT_OPEN_APP_LOGIN, S02_APPLE_TEAM_ID, S07_ANDROID_RELEASE_SIGNING
-- blockedCredentialCount: 8
+- blockedCredentialCount: 1
 - readySecretEnvVariableCount: 17
 - blockedVariableAcquisitionCount: 1
 - deferredAppLaunchVariableAcquisitionCount: 7
 - readySecretEnvImportGroupCount: 9
-- cloudInventoryStrictReady: 9/9
-- cloudInventoryInterpretation: existing_strict_inventory_ready_but_fresh_cli_profile_unavailable
+- cloudInventoryStrictReady: 0/9
+- cloudInventoryInterpretation: strict_inventory_incomplete_and_fresh_read_unavailable
 - canReadCloudNow: false
 - cliConfigProbeFailureCategory: aliyun_cli_profile_not_configured
 - currentBrowserCanUseCurrentConsole: true
@@ -370,31 +370,25 @@ Generated: 2026-06-24T10:40:00.563Z
 
 | ID | 状态 | 类型 | owner | 变量名 |
 | --- | --- | --- | --- | --- |
-| `S01_WECHAT_OPEN_APP_LOGIN` | blocked | external_credential_after_review | 用户/微信开放平台操作员 | WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET, WECHAT_OPEN_APP_REVIEW_STATUS |
-| `S02_APPLE_TEAM_ID` | blocked | external_identifier | Apple Developer / iOS 发布操作员 | APPLE_TEAM_ID |
 | `S03_ACR_PAID_PURCHASE` | blocked | paid_purchase_confirmation | 用户/阿里云 ACR 操作员 | none |
 | `S04_ACR_REGISTRY_AUTH` | blocked | registry_password_or_runtime_pull_secret | 阿里云 ACR/SAE 操作员 | none |
 | `S05_OSS_RAM_SECRET_OR_STS` | blocked | ram_secret_or_sts_import | 阿里云 OSS/RAM 操作员 | ALIYUN_OSS_ACCESS_KEY_ID, ALIYUN_OSS_ACCESS_KEY_SECRET, ALIYUN_OSS_SECURITY_TOKEN |
 | `S06_READY_SENSITIVE_ENV_IMPORT` | blocked | ready_sensitive_env_need_cloud_import | 阿里云运行环境/密钥操作员 | NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, WECHAT_LOGIN_SECRET, ALIYUN_OSS_ACCESS_KEY_ID, ALIYUN_OSS_ACCESS_KEY_SECRET, DASHSCOPE_API_KEY, DEEPSEEK_API_KEY, SERVICE_RECORD_DEEPSEEK_API_KEY, VOLC_SPEECH_ACCESS_TOKEN, VOLC_SPEECH_APP_ID, VOLC_SPEECH_SECRET_KEY, ADMIN_USER_IDS, CREDITS_IP_SALT, APIMART_API_KEY, WECHAT_MINI_APPID, WECHAT_MINI_SECRET |
-| `S07_ANDROID_RELEASE_SIGNING` | blocked | android_keystore_password_or_signature | Android 发布操作员 / 微信开放平台操作员 | MEIYE_RELEASE_STORE_FILE, MEIYE_RELEASE_STORE_PASSWORD, MEIYE_RELEASE_KEY_ALIAS, MEIYE_RELEASE_KEY_PASSWORD |
 
 ## 用户介入密钥/密码简表
 
-- blockedCredentialCount: 8
-- blockedCredentialNames: ALIYUN_OSS_SECURITY_TOKEN, APPLE_TEAM_ID, MEIYE_RELEASE_KEY_ALIAS, MEIYE_RELEASE_KEY_PASSWORD, MEIYE_RELEASE_STORE_FILE, MEIYE_RELEASE_STORE_PASSWORD, WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET
+- blockedCredentialCount: 1
+- blockedCredentialNames: ALIYUN_OSS_SECURITY_TOKEN
 - readySecretEnvVariableCount: 17
 - readySecretEnvVariableNames: ADMIN_USER_IDS, ALIYUN_OSS_ACCESS_KEY_ID, ALIYUN_OSS_ACCESS_KEY_SECRET, APIMART_API_KEY, CREDITS_IP_SALT, DASHSCOPE_API_KEY, DEEPSEEK_API_KEY, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_SUPABASE_URL, SERVICE_RECORD_DEEPSEEK_API_KEY, SUPABASE_SERVICE_ROLE_KEY, VOLC_SPEECH_ACCESS_TOKEN, VOLC_SPEECH_APP_ID, VOLC_SPEECH_SECRET_KEY, WECHAT_LOGIN_SECRET, WECHAT_MINI_APPID, WECHAT_MINI_SECRET
 - forbiddenStorage: git, JSON/Markdown 报告, Docker image, App bundle, 小程序或 App 前端包
 
 | 类别 | 动作 ID | 状态 | 还缺变量 | 已 ready 但需导入 secret env | 获取位置 | 导入/写入目标 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `wechat_open_mobile_app` | `S01_WECHAT_OPEN_APP_LOGIN` | blocked | WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET | none | 微信开放平台 -> 管理中心 -> 移动应用 -> 美业话镜 App -> 开发信息 | WECHAT_OPEN_APP_ID -> 阿里云 SAE plain env; WECHAT_OPEN_APP_SECRET -> 阿里云 KMS/Secrets Manager/SAE secret env; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.wechatOpenPlatform |
-| `ios_universal_link` | `S02_APPLE_TEAM_ID` | blocked | APPLE_TEAM_ID | none | Apple Developer -> Membership 或 Certificates, Identifiers & Profiles -> Identifiers -> 美业话镜 App ID | APPLE_TEAM_ID -> 阿里云 SAE plain env; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.wechatOpenPlatform / iOS evidence |
 | `acr_paid_purchase` | `S03_ACR_PAID_PURCHASE` | blocked | none | none | 阿里云控制台 -> 容器镜像服务 ACR -> 企业版购买页 | deploy/aliyun-production-cn.image-publish.local.json -> acr.purchaseCandidate / acr non-secret evidence |
 | `acr_registry_auth` | `S04_ACR_REGISTRY_AUTH` | blocked | none | none | 阿里云控制台 -> ACR 命名空间/镜像仓库；SAE 应用 -> 镜像拉取配置 | deploy/aliyun-production-cn.image-publish.local.json -> acr + runtime non-secret fields; SAE runtime image pull credentials -> Aliyun runtime secret settings only |
 | `oss_ram_sts` | `S05_OSS_RAM_SECRET_OR_STS` | blocked | ALIYUN_OSS_SECURITY_TOKEN | ALIYUN_OSS_ACCESS_KEY_ID, ALIYUN_OSS_ACCESS_KEY_SECRET | 阿里云控制台 -> RAM 访问控制 / OSS Bucket / SAE 环境变量或 Secrets Manager | ALIYUN_OSS_ACCESS_KEY_ID / ALIYUN_OSS_ACCESS_KEY_SECRET / ALIYUN_OSS_SECURITY_TOKEN -> KMS/Secrets Manager/SAE secret env; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss |
 | `ready_secret_env_import` | `S06_READY_SENSITIVE_ENV_IMPORT` | blocked | none | ADMIN_USER_IDS, ALIYUN_OSS_ACCESS_KEY_ID, ALIYUN_OSS_ACCESS_KEY_SECRET, APIMART_API_KEY, CREDITS_IP_SALT, DASHSCOPE_API_KEY, DEEPSEEK_API_KEY, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_SUPABASE_URL, SERVICE_RECORD_DEEPSEEK_API_KEY, SUPABASE_SERVICE_ROLE_KEY, VOLC_SPEECH_ACCESS_TOKEN, VOLC_SPEECH_APP_ID, VOLC_SPEECH_SECRET_KEY, WECHAT_LOGIN_SECRET, WECHAT_MINI_APPID, WECHAT_MINI_SECRET | 现有 Vercel production / Supabase / 阿里云百炼 / DeepSeek / 火山引擎 / 微信公众平台等控制台 | SAE plain env for non-secret identifiers only; KMS/Secrets Manager/SAE secret env for secret or connection values; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport |
-| `android_release_signing` | `S07_ANDROID_RELEASE_SIGNING` | blocked | MEIYE_RELEASE_KEY_ALIAS, MEIYE_RELEASE_KEY_PASSWORD, MEIYE_RELEASE_STORE_FILE, MEIYE_RELEASE_STORE_PASSWORD | none | Android release keystore 管理位置 / CI Secret Store；微信开放平台 -> 移动应用 -> Android 应用签名 | MEIYE_RELEASE_STORE_FILE / MEIYE_RELEASE_STORE_PASSWORD / MEIYE_RELEASE_KEY_ALIAS / MEIYE_RELEASE_KEY_PASSWORD -> 本机或 CI 受控 signing secret store; 微信开放平台 -> 移动应用 -> Android 应用签名; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.wechatOpenPlatform.androidSignature / androidConfigured |
 
 ## 必填/发布阻塞变量
 
@@ -434,13 +428,13 @@ Generated: 2026-06-24T10:40:00.563Z
 
 ## CloudShell / CLI 只读盘点
 
-- interpretation: existing_strict_inventory_ready_but_fresh_cli_profile_unavailable
-- strictInventoryEvidenceReady: true
+- interpretation: strict_inventory_incomplete_and_fresh_read_unavailable
+- strictInventoryEvidenceReady: false
 - freshCloudReadAvailableNow: false
 - currentCliProfileReady: false
 - currentBrowserConsoleUsable: true
 - notACloudResourceReadyProof: true
-- proofScope: existing_local_cloud_inventory_evidence_only
+- proofScope: strict_cloud_inventory_evidence_incomplete
 - nextEvidenceAction: configure_aliyun_cli_profile_or_use_cloudshell_for_fresh_readonly_inventory
 - canReadCloudNow: false
 - cliConfigProbeReady: false
@@ -458,9 +452,9 @@ Generated: 2026-06-24T10:40:00.563Z
 - workbenchTerminalCliInventoryAttempted: false
 - blockers: aliyun_cli_config_missing_or_unread, aliyun_cli_profile_not_configured, cloudshell_cli_config_missing_or_unread
 - safeConsoleOnly: false
-- strictReadyOperations: 9/9
+- strictReadyOperations: 0/9
 - consoleObservationOperations: 9
-- executedCommandResults: 12
+- executedCommandResults: 9
 
 ## Strict 验证顺序
 

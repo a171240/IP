@@ -115,6 +115,7 @@ function buildReport(args) {
   ])
   const sensitiveBlockers = runJson("sensitive_blockers", [
     "scripts/summarize-aliyun-sensitive-blockers.mjs",
+    "--backend-only",
     "--env-file",
     args.envFile,
     "--cloud-confirmations",
@@ -602,6 +603,8 @@ function renderMarkdown(report) {
     `- requiredIds: ${report.userIntervention.requiredIds.join(", ")}`,
     `- paymentOrBillingConfirmations: ${report.userIntervention.paymentOrBillingConfirmations.join("; ")}`,
     `- secretOrPasswordHandling: ${report.userIntervention.secretOrPasswordHandling.join("; ")}`,
+    `- blockedCredentialCount: ${report.userIntervention.blockedCredentialNames.length}`,
+    `- blockedCredentialNames: ${report.userIntervention.blockedCredentialNames.join(", ") || "none"}`,
     `- backendNowExcludes: ${report.userIntervention.backendNowExcludes.join(", ")}`,
     "",
     "## Apply Steps",

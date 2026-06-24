@@ -1,6 +1,6 @@
 # APP production-cn Aliyun backend apply package
 
-Generated at: 2026-06-24T13:23:06.826Z
+Generated at: 2026-06-24T15:06:56.043Z
 
 ## Scope
 
@@ -24,6 +24,8 @@ Generated at: 2026-06-24T13:23:06.826Z
 - requiredIds: USER_CONFIRM_RDS_PURCHASE_AND_DATABASE_PASSWORD, USER_CONFIRM_ACR_PAID_PURCHASE, USER_CONFIRM_OSS_RAM_STS_SECRET_OR_RUNTIME_ROLE, USER_CONFIRM_SECRET_ENV_IMPORT, USER_CONFIRM_DNS_HTTPS_ICP_CHANGE, USER_CONFIRM_PRODUCTION_DEPLOY
 - paymentOrBillingConfirmations: RDS PostgreSQL instance/spec purchase or existing instance confirmation; ACR Enterprise Economic cn-hangzhou 1 month quoted CNY 117.00; SAE runtime/public ingress/SLS/certificate costs if prompted by Aliyun
 - secretOrPasswordHandling: DATABASE_URL_CN; database account password; ALIYUN_OSS_ACCESS_KEY_SECRET or STS token if runtime role is not used; ACR registry password or credential helper; ready secret env import values; SUPABASE_SERVICE_ROLE_KEY only for controlled migration/export compatibility
+- blockedCredentialCount: 1
+- blockedCredentialNames: ALIYUN_OSS_SECURITY_TOKEN
 - backendNowExcludes: WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET, WECHAT_OPEN_PLATFORM_MOBILE_APP, ANDROID_RELEASE_WECHAT_SIGNATURE
 
 ## Apply Steps
@@ -36,8 +38,8 @@ Generated at: 2026-06-24T13:23:06.826Z
 - mutationType: paid_resource_create_and_data_migration
 - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
 - consolePath: 阿里云控制台 -> 云数据库 RDS -> PostgreSQL -> cn-hangzhou
-- currentEvidence: inventory.rdsPostgres=not_found; rdsLocalExists=true; rdsLocalReady=false; appApiRoutesWithSupabase=30/30; firstVersionRdsRoutesWithSupabaseDataAccess=25/25; postgresDataAccessAdapterDetected=true
-- currentBlockers: DATABASE_URL_CN, RDS_POSTGRES_NOT_READY, RDS_MIGRATION_EVIDENCE_NOT_READY, rdsEvidence:todo:rdsPostgres.instanceId, rdsEvidence:todo:rdsPostgres.engineVersion, rdsEvidence:todo:rdsPostgres.networkAccess, rdsEvidence:todo:rdsPostgres.databaseName, rdsEvidence:todo:rdsPostgres.evidence, rdsEvidence:rdsPostgres.confirmed, rdsEvidence:rdsPostgres.databaseAccountReady, rdsEvidence:rdsPostgres.databaseUrlCnSecretImported, rdsEvidence:migration.dataAccessAdapterReady, rdsEvidence:migration.schemaMigrated, rdsEvidence:migration.dataMigrated, rdsEvidence:migration.rowCountValidationPassed, rdsEvidence:migration.criticalRecordValidationPassed, rdsEvidence:migration.appApiSmokeOnRdsPassed, rdsEvidence:migration.supabaseNoLongerFormalTarget, rdsEvidence:migration.rollbackRunbookReviewed, rdsEvidence:migration.rollbackValidationPassed
+- currentEvidence: inventory.rdsPostgres=observed_or_unknown; rdsLocalExists=true; rdsLocalReady=false; appApiRoutesWithSupabase=30/30; firstVersionRdsRoutesWithSupabaseDataAccess=25/25; postgresDataAccessAdapterDetected=true
+- currentBlockers: DATABASE_URL_CN, RDS_MIGRATION_EVIDENCE_NOT_READY, rdsEvidence:todo:rdsPostgres.instanceId, rdsEvidence:todo:rdsPostgres.engineVersion, rdsEvidence:todo:rdsPostgres.networkAccess, rdsEvidence:todo:rdsPostgres.databaseName, rdsEvidence:todo:rdsPostgres.evidence, rdsEvidence:rdsPostgres.confirmed, rdsEvidence:rdsPostgres.databaseAccountReady, rdsEvidence:rdsPostgres.databaseUrlCnSecretImported, rdsEvidence:migration.dataAccessAdapterReady, rdsEvidence:migration.schemaMigrated, rdsEvidence:migration.dataMigrated, rdsEvidence:migration.rowCountValidationPassed, rdsEvidence:migration.criticalRecordValidationPassed, rdsEvidence:migration.appApiSmokeOnRdsPassed, rdsEvidence:migration.supabaseNoLongerFormalTarget, rdsEvidence:migration.rollbackRunbookReviewed, rdsEvidence:migration.rollbackValidationPassed
 - writeTargets: deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres/sourceInventory/migration/security; DATABASE_URL_CN -> Aliyun KMS / Secrets Manager / SAE secret env only
 - userMustHandle: RDS purchase/spec confirmation if billed; database account password; DATABASE_URL_CN secret value; Supabase export/import credentials during migration; migration rollback confirmation
 - nonSecretEvidenceToRecord: RDS instance id/name/region/engine version; database name; database account ready=true; DATABASE_URL_CN secret imported=true without value; schema/data/row-count/critical-record/rollback validation handles
@@ -51,7 +53,7 @@ Generated at: 2026-06-24T13:23:06.826Z
 - mutationType: ram_policy_binding_or_secret_runtime_role
 - requiredAuthorizationPackets: P05_OSS_RAM_STS
 - consolePath: 阿里云控制台 -> OSS / RAM / STS
-- currentEvidence: inventory.ossAudioBucket=partial_observed; bucket=meiye-huajing-service-records-production-cn; serviceRecordPrefix=service-records/production-cn
+- currentEvidence: inventory.ossAudioBucket=not_observed; bucket=meiye-huajing-service-records-production-cn; serviceRecordPrefix=service-records/production-cn
 - currentBlockers: OSS_RAM_STS_NOT_READY
 - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss; ALIYUN_OSS_ACCESS_KEY_SECRET / STS token -> KMS/Secrets Manager/SAE secret env only if runtime role is not used
 - userMustHandle: AccessKeySecret or STS token if runtime role is not selected; RAM policy attachment or runtime role authorization
@@ -66,7 +68,7 @@ Generated at: 2026-06-24T13:23:06.826Z
 - mutationType: paid_resource_purchase_or_confirmation
 - requiredAuthorizationPackets: P03_ACR_PURCHASE
 - consolePath: 阿里云控制台 -> 容器镜像服务 ACR -> 企业版实例/命名空间/镜像仓库
-- currentEvidence: inventory.acrImage=not_found; edition=ACR Enterprise Economic; region=cn-hangzhou; term=1 month; quotedAmount=CNY 117.00; repository=meiye-huajing-app-api
+- currentEvidence: inventory.acrImage=observed_or_unknown; edition=ACR Enterprise Economic; region=cn-hangzhou; term=1 month; quotedAmount=CNY 117.00; repository=meiye-huajing-app-api
 - currentBlockers: ACR_IMAGE_REGISTRY_NOT_READY
 - writeTargets: deploy/aliyun-production-cn.image-publish.local.json -> acr.confirmed/registryHost/namespace/repository
 - userMustHandle: ACR paid purchase confirmation; registry password only later through docker login or controlled credential helper
@@ -111,7 +113,7 @@ Generated at: 2026-06-24T13:23:06.826Z
 - mutationType: runtime_create_or_update
 - requiredAuthorizationPackets: P08_SAE_RUNTIME_SLS
 - consolePath: 阿里云控制台 -> SAE -> cn-hangzhou
-- currentEvidence: inventory.saeRuntime=not_found
+- currentEvidence: inventory.saeRuntime=observed_or_unknown
 - currentBlockers: SAE_RUNTIME_NOT_READY
 - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.runtime
 - userMustHandle: SAE paid/runtime resource confirmation if prompted; runtime env visibility check without exposing values
@@ -141,7 +143,7 @@ Generated at: 2026-06-24T13:23:06.826Z
 - mutationType: observability_alert_create
 - requiredAuthorizationPackets: P08_SAE_RUNTIME_SLS
 - consolePath: 阿里云控制台 -> 日志服务 SLS
-- currentEvidence: inventory.slsProject=partial_observed; alerts=0
+- currentEvidence: inventory.slsProject=not_observed; alerts=0
 - currentBlockers: SLS_ALERTS_NOT_READY
 - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.slsAlerts
 - userMustHandle: alert recipient/channel confirmation if needed

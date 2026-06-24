@@ -58,12 +58,14 @@ test("APP production-cn current blocker brief records the go-no-go boundary", ()
 
   assert.match(doc, /现在不能部署；当前只推进阿里云后端/)
   assert.match(doc, /requiredEnv: 24\/27/)
-  assert.match(doc, /requiredBlocking:[\s\S]*DATABASE_URL_CN[\s\S]*RDS_POSTGRES_NOT_READY/)
+  assert.match(doc, /requiredBlocking:[\s\S]*DATABASE_URL_CN[\s\S]*RDS_MIGRATION_EVIDENCE_NOT_READY/)
   assert.match(doc, /deferredAppLaunchBlocking:[\s\S]*WECHAT_OPEN_APP_ID[\s\S]*ANDROID_RELEASE_SIGNING[\s\S]*APPLE_TEAM_ID/)
   assert.match(doc, /localCodeReady: false/)
   assert.match(doc, /releaseEvidenceUsable: true/)
   assert.match(doc, /cloudResourceEvidenceReady: 0\/7/)
-  assert.match(doc, /blockedCredentialCount: 8/)
+  assert.match(doc, /sensitiveBlocked: 4\/4/)
+  assert.match(doc, /blockedCredentialCount: 1/)
+  assert.match(doc, /blockedCredentialNames: ALIYUN_OSS_SECURITY_TOKEN/)
   assert.match(doc, /readySecretEnvVariableCount: 17/)
   assert.match(doc, /currentBrowserCanUseCurrentConsole: true/)
   assert.match(doc, /canReadCloudNow: false/)
@@ -133,7 +135,7 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.match(report.currentAnswer, /当前只推进阿里云后端/)
   assert.equal(report.summary.requiredEnv, "24/27")
   assert.ok(report.summary.requiredBlocking.includes("DATABASE_URL_CN"))
-  assert.ok(report.summary.requiredBlocking.includes("RDS_POSTGRES_NOT_READY"))
+  assert.ok(report.summary.requiredBlocking.includes("RDS_MIGRATION_EVIDENCE_NOT_READY"))
   assert.ok(!report.summary.requiredBlocking.includes("WECHAT_OPEN_APP_ID"))
   assert.deepEqual(report.summary.deferredAppLaunchBlocking, [
     "WECHAT_OPEN_APP_ID",
@@ -285,18 +287,14 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   ])
   assert.equal(report.summary.blockedVariableAcquisitionCount, 1)
   assert.equal(report.summary.deferredAppLaunchVariableAcquisitionCount, 7)
-  assert.equal(report.summary.blockedCredentialCount, 8)
+  assert.equal(report.summary.sensitiveBlocked, "4/4")
+  assert.equal(report.summary.blockedCredentialCount, 1)
   assert.equal(report.summary.readySecretEnvVariableCount, 17)
-  assert.ok(report.summary.blockedCredentialNames.includes("WECHAT_OPEN_APP_SECRET"))
-  assert.ok(report.summary.blockedCredentialNames.includes("MEIYE_RELEASE_KEY_PASSWORD"))
+  assert.deepEqual(report.summary.blockedCredentialNames, ["ALIYUN_OSS_SECURITY_TOKEN"])
   assert.ok(report.summary.readySecretEnvVariableNames.includes("SUPABASE_SERVICE_ROLE_KEY"))
   assert.equal(report.summary.readySecretEnvImportGroupCount, 9)
   assert.deepEqual(report.requiredEnvBlockers, [])
-  assert.ok(report.sensitiveBlockers.some((item) =>
-    item.id === "S07_ANDROID_RELEASE_SIGNING" &&
-    item.type === "android_keystore_password_or_signature" &&
-    item.variableNames.includes("MEIYE_RELEASE_STORE_PASSWORD")
-  ))
+  assert.ok(!report.sensitiveBlockers.some((item) => item.id === "S07_ANDROID_RELEASE_SIGNING"))
   const acquisitionByName = new Map(report.blockedVariableAcquisitionPlan.map((item) => [item.name, item]))
   assert.deepEqual(Array.from(acquisitionByName.keys()), ["ALIYUN_OSS_SECURITY_TOKEN"])
   assert.equal(acquisitionByName.get("ALIYUN_OSS_SECURITY_TOKEN").requiredAuthorizationPackets[0], "P05_OSS_RAM_STS")
@@ -320,28 +318,22 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
     group.category === "volc_speech" &&
     group.variableNames.includes("VOLC_SPEECH_SECRET_KEY")
   ))
-  assert.equal(report.credentialInterventionBrief.blockedCredentialCount, 8)
-  assert.ok(report.credentialInterventionBrief.groups.some((group) =>
-    group.category === "wechat_open_mobile_app" &&
-    group.blockedCredentialNames.includes("WECHAT_OPEN_APP_ID") &&
-    /微信开放平台/.test(group.obtainFrom)
-  ))
+  assert.equal(report.credentialInterventionBrief.blockedCredentialCount, 1)
+  assert.deepEqual(report.credentialInterventionBrief.blockedCredentialNames, ["ALIYUN_OSS_SECURITY_TOKEN"])
+  assert.ok(!report.credentialInterventionBrief.groups.some((group) => group.category === "wechat_open_mobile_app"))
   assert.ok(report.credentialInterventionBrief.groups.some((group) =>
     group.category === "ready_secret_env_import" &&
     group.readySecretEnvVariableNames.includes("DASHSCOPE_API_KEY")
   ))
-  assert.ok(report.credentialInterventionBrief.groups.some((group) =>
-    group.category === "android_release_signing" &&
-    group.blockedCredentialNames.includes("MEIYE_RELEASE_KEY_PASSWORD")
-  ))
+  assert.ok(!report.credentialInterventionBrief.groups.some((group) => group.category === "android_release_signing"))
   assert.equal(report.cloudAccess.canReadCloudNow, false)
   assert.equal(report.cloudAccess.cliConfigProbeFailureCategory, "aliyun_cli_profile_not_configured")
-  assert.equal(report.summary.cloudInventoryInterpretation, "existing_strict_inventory_ready_but_fresh_cli_profile_unavailable")
+  assert.equal(report.summary.cloudInventoryInterpretation, "strict_inventory_incomplete_and_fresh_read_unavailable")
   assert.equal(
     report.cloudInventoryReadinessInterpretation.interpretation,
-    "existing_strict_inventory_ready_but_fresh_cli_profile_unavailable",
+    "strict_inventory_incomplete_and_fresh_read_unavailable",
   )
-  assert.equal(report.cloudInventoryReadinessInterpretation.strictInventoryEvidenceReady, true)
+  assert.equal(report.cloudInventoryReadinessInterpretation.strictInventoryEvidenceReady, false)
   assert.equal(report.cloudInventoryReadinessInterpretation.freshCloudReadAvailableNow, false)
   assert.equal(report.cloudInventoryReadinessInterpretation.currentCliProfileReady, false)
   assert.equal(report.cloudInventoryReadinessInterpretation.currentBrowserConsoleUsable, true)
@@ -441,7 +433,7 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.match(markdown, /workbenchTerminalReadiness/)
   assert.match(markdown, /currentBrowserCanUseCurrentConsole/)
   assert.match(markdown, /currentBrowserCloudApiCalled: false/)
-  assert.match(markdown, /cloudInventoryInterpretation: existing_strict_inventory_ready_but_fresh_cli_profile_unavailable/)
+  assert.match(markdown, /cloudInventoryInterpretation: strict_inventory_incomplete_and_fresh_read_unavailable/)
   assert.match(markdown, /localCodeReady: false/)
   assert.match(markdown, /machineBlocking: missing_required_env:DATABASE_URL_CN/)
   assert.match(markdown, /fullAppMachineBlocking: .*missing_required_env:WECHAT_OPEN_APP_ID/)
@@ -499,9 +491,11 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.match(markdown, /SUPABASE_SERVICE_ROLE_KEY/)
   assert.match(markdown, /WECHAT_OPEN_APP_SECRET/)
   assert.match(markdown, /用户介入密钥\/密码简表/)
-  assert.match(markdown, /blockedCredentialCount: 8/)
+  assert.match(markdown, /sensitiveBlocked: 4\/4/)
+  assert.match(markdown, /blockedCredentialCount: 1/)
+  assert.match(markdown, /blockedCredentialNames: ALIYUN_OSS_SECURITY_TOKEN/)
   assert.match(markdown, /readySecretEnvVariableCount: 17/)
-  assert.match(markdown, /wechat_open_mobile_app/)
+  assert.doesNotMatch(markdown, /`wechat_open_mobile_app` \| `S01_WECHAT_OPEN_APP_LOGIN`/)
   assert.match(markdown, /ready_secret_env_import/)
   assert.match(markdown, /当前后端阻塞变量获取与导入计划/)
   assert.match(markdown, /延期的完整 APP 发布变量/)

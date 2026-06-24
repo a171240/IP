@@ -185,6 +185,11 @@ function buildReport(args) {
   ])
   const sensitiveBlockers = runJson("sensitive_blockers", [
     "scripts/summarize-aliyun-sensitive-blockers.mjs",
+    "--backend-only",
+    ...envArgs(args),
+  ])
+  const fullAppSensitiveBlockers = runJson("full_app_sensitive_blockers", [
+    "scripts/summarize-aliyun-sensitive-blockers.mjs",
     ...envArgs(args),
   ])
   const actionAuthorization = runJson("action_authorization", [
@@ -234,14 +239,15 @@ function buildReport(args) {
 
   const requiredEnvBlockers = extractRequiredEnvBlockers(sensitiveBlockers)
   const sensitiveBlockerSummaries = compactSensitiveBlockers(sensitiveBlockers)
+  const fullAppSensitiveBlockerSummaries = compactSensitiveBlockers(fullAppSensitiveBlockers)
   const currentSensitiveBlockerSummaries = sensitiveBlockerSummaries
     .filter((item) => !APP_LAUNCH_SENSITIVE_BLOCKER_IDS.has(item.id))
-  const deferredAppLaunchSensitiveBlockerSummaries = sensitiveBlockerSummaries
+  const deferredAppLaunchSensitiveBlockerSummaries = fullAppSensitiveBlockerSummaries
     .filter((item) => APP_LAUNCH_SENSITIVE_BLOCKER_IDS.has(item.id))
   const blockedVariableAcquisitionPlan = buildBlockedVariableAcquisitionPlan(sensitiveBlockers, {
     deferredAppLaunchOnly: false,
   })
-  const deferredAppLaunchVariableAcquisitionPlan = buildBlockedVariableAcquisitionPlan(sensitiveBlockers, {
+  const deferredAppLaunchVariableAcquisitionPlan = buildBlockedVariableAcquisitionPlan(fullAppSensitiveBlockers, {
     deferredAppLaunchOnly: true,
   })
   const readySecretEnvImportGroups = sensitiveBlockers.summary?.readySensitiveEnvVariableGroups || []
