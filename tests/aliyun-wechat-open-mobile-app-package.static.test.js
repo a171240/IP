@@ -23,6 +23,8 @@ test("WeChat Open mobile app package command is wired into scripts and predeploy
   assert.ok(deploySpec.predeployChecks.includes("corepack pnpm aliyun:wechat-open:package"))
   assert.match(releaseArtifacts, /actionPacket/)
   assert.match(releaseArtifacts, /submissionBlockers/)
+  assert.match(releaseArtifacts, /credentialBoundary/)
+  assert.match(releaseArtifacts, /miniProgramCredentialsReusableForAppLogin/)
 })
 
 test("WeChat Open mobile app package reports current not-created state without secret values", () => {
@@ -44,6 +46,21 @@ test("WeChat Open mobile app package reports current not-created state without s
   assert.equal(report.summary.mobileAppCreated, false)
   assert.equal(report.summary.reviewStatus, "not_started")
   assert.equal(report.summary.mobileAppCredentialsAvailable, false)
+  assert.equal(report.summary.miniProgramCredentialsReusableForAppLogin, false)
+  assert.match(report.summary.appLoginCredentialSource, /微信开放平台 -> 管理中心 -> 移动应用/)
+  assert.equal(report.credentialBoundary.miniProgramCredentialsReusableForAppLogin, false)
+  assert.deepEqual(report.credentialBoundary.appLoginVariableNames, [
+    "WECHAT_OPEN_APP_ID",
+    "WECHAT_OPEN_APP_SECRET",
+    "WECHAT_OPEN_APP_REVIEW_STATUS",
+  ])
+  assert.deepEqual(report.credentialBoundary.miniProgramCompatVariableNames, [
+    "WECHAT_MINI_APPID",
+    "WECHAT_MINI_SECRET",
+    "WECHAT_LOGIN_SECRET",
+  ])
+  assert.ok(report.credentialBoundary.whyNotReusable.some((item) => item.includes("小程序 WECHAT_MINI_*")))
+  assert.ok(report.credentialBoundary.appLoginImportTargets.includes("WECHAT_OPEN_APP_SECRET -> 阿里云 KMS/Secrets Manager/SAE secret env"))
   assert.ok(report.summary.submissionBlockers.includes("android_release_wechat_signature_missing"))
   assert.ok(report.summary.submissionBlockers.includes("wechat_android_package_signature_not_recorded"))
   assert.ok(report.summary.submissionBlockers.includes("wechat_ios_bundle_universal_link_not_recorded"))
@@ -97,6 +114,11 @@ test("WeChat Open mobile app package markdown renders action packet without valu
   const markdown = fs.readFileSync("/tmp/meiye-wechat-open-package-test.md", "utf8")
 
   assert.match(markdown, /## 动作确认包/)
+  assert.match(markdown, /## 凭证边界/)
+  assert.match(markdown, /appLoginVariableNames: WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET, WECHAT_OPEN_APP_REVIEW_STATUS/)
+  assert.match(markdown, /miniProgramCompatVariableNames: WECHAT_MINI_APPID, WECHAT_MINI_SECRET, WECHAT_LOGIN_SECRET/)
+  assert.match(markdown, /miniProgramCredentialsReusableForAppLogin: false/)
+  assert.match(markdown, /阿里云 SAE 后端在 APP 微信登录回调中使用移动应用 AppID\/AppSecret/)
   assert.match(markdown, /packetId: P01_WECHAT_OPEN_MOBILE_APP/)
   assert.match(markdown, /minimumAuthorizationPhrase: 授权在微信开放平台创建“美业话镜”移动应用草稿/)
   assert.match(markdown, /submissionBlockers: android_release_wechat_signature_missing/)
