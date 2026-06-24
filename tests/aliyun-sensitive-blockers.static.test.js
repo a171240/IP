@@ -14,12 +14,69 @@ test("Aliyun sensitive blockers command is wired into scripts and predeploy", ()
   const deploySpec = readJson("deploy", "aliyun-production-cn.example.json")
 
   assert.equal(pkg.scripts["aliyun:sensitive:blockers"], "node ./scripts/summarize-aliyun-sensitive-blockers.mjs")
+  assert.equal(pkg.scripts["aliyun:sensitive:blockers:backend"], "node ./scripts/summarize-aliyun-sensitive-blockers.mjs --backend-only")
   assert.equal(pkg.scripts["aliyun:sensitive:blockers:test"], "node --test tests/aliyun-sensitive-blockers.static.test.js")
   assert.match(predeploy, /aliyun:sensitive:blockers:test/)
   assert.match(predeploy, /aliyun:sensitive:blockers/)
   assert.ok(deploySpec.predeployChecks.includes("corepack pnpm aliyun:sensitive:blockers"))
   assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:sensitive:blockers:test"))
   assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:sensitive:blockers"))
+})
+
+test("Aliyun sensitive blockers backend-only mode excludes deferred APP launch credentials", () => {
+  const output = execFileSync(process.execPath, [
+    "scripts/summarize-aliyun-sensitive-blockers.mjs",
+    "--backend-only",
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 20,
+  })
+  const report = JSON.parse(output)
+  const ids = report.items.map((item) => item.id)
+
+  assert.equal(report.ok, true)
+  assert.equal(report.currentScope, "backend_aliyun_only")
+  assert.equal(report.backendOnly, true)
+  assert.equal(report.containsValues, false)
+  assert.equal(report.secretLeakCheck.ok, true)
+  assert.deepEqual(report.deferredAppLaunchSensitiveActionIds, [
+    "S01_WECHAT_OPEN_APP_LOGIN",
+    "S02_APPLE_TEAM_ID",
+    "S07_ANDROID_RELEASE_SIGNING",
+  ])
+  assert.deepEqual(ids, [
+    "S03_ACR_PAID_PURCHASE",
+    "S04_ACR_REGISTRY_AUTH",
+    "S05_OSS_RAM_SECRET_OR_STS",
+    "S06_READY_SENSITIVE_ENV_IMPORT",
+  ])
+  assert.equal(report.summary.total, 4)
+  assert.equal(report.summary.blocked, 4)
+  assert.deepEqual(report.summary.blockedIds, ids)
+  assert.deepEqual(report.summary.actionTimeConfirmationRequired, ids)
+  assert.deepEqual(report.credentialInterventionBrief.actionTimeConfirmationRequiredIds, ids)
+  assert.equal(report.credentialInterventionBrief.blockedCredentialCount, 1)
+  assert.deepEqual(report.credentialInterventionBrief.blockedCredentialNames, ["ALIYUN_OSS_SECURITY_TOKEN"])
+  assert.equal(report.credentialInterventionBrief.readySecretEnvVariableCount, 17)
+  assert.ok(report.credentialInterventionBrief.readySecretEnvVariableNames.includes("SUPABASE_SERVICE_ROLE_KEY"))
+  assert.ok(report.summary.userIntervention.groups.paid_purchase_confirmation.includes("S03_ACR_PAID_PURCHASE"))
+  assert.ok(report.summary.userIntervention.groups.controlled_secret_channel.includes("S04_ACR_REGISTRY_AUTH"))
+  assert.ok(report.summary.userIntervention.groups.controlled_secret_channel.includes("S05_OSS_RAM_SECRET_OR_STS"))
+  assert.ok(report.summary.userIntervention.groups.controlled_secret_channel.includes("S06_READY_SENSITIVE_ENV_IMPORT"))
+  assert.ok(!report.summary.userIntervention.blockedVariableNames.includes("WECHAT_OPEN_APP_ID"))
+  assert.ok(!report.summary.userIntervention.blockedVariableNames.includes("WECHAT_OPEN_APP_SECRET"))
+  assert.ok(!report.summary.userIntervention.blockedVariableNames.includes("APPLE_TEAM_ID"))
+  assert.ok(!report.summary.userIntervention.blockedVariableNames.includes("MEIYE_RELEASE_KEY_PASSWORD"))
+  assert.ok(!ids.includes("S01_WECHAT_OPEN_APP_LOGIN"))
+  assert.ok(!ids.includes("S02_APPLE_TEAM_ID"))
+  assert.ok(!ids.includes("S07_ANDROID_RELEASE_SIGNING"))
+  assert.match(report.currentAnswer, /阿里云后端-only/)
+  assert.ok(report.nextActions.some((item) => item.includes("S03/S04/S05/S06")))
+  assert.ok(report.nextActions.some((item) => item.includes("APP 发布阶段延期项")))
+  assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
+  assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
 })
 
 test("Aliyun sensitive blockers output has current blocked action ids but no secret values", () => {
@@ -315,8 +372,10 @@ test("Aliyun credential acquisition runbook stays aligned with sensitive blocker
 
 test("Aliyun release artifacts summary surfaces sensitive blocker acquisition details", () => {
   const releaseArtifacts = read("scripts", "prepare-aliyun-release-artifacts.mjs")
+  const doc = read("docs", "DEPLOY_ALIYUN_PRODUCTION_CN.md")
 
   assert.match(releaseArtifacts, /renderSensitiveBlockerSummaryLines\(sensitiveBlockers\.items \|\| \[\]\)/)
+  assert.match(releaseArtifacts, /\.\.\.backendOnlyArg[\s\S]*"--out"[\s\S]*sensitiveBlockersJsonPath/)
   assert.match(releaseArtifacts, /items: \(sensitiveBlockers\.items \|\| \[\]\)\.map\(compactSensitiveBlockerForAudit\)/)
   assert.match(releaseArtifacts, /obtainFrom: item\.obtainFrom \|\| item\.consolePath/)
   assert.match(releaseArtifacts, /writeTargets: item\.writeTargets \|\| \[\]/)
@@ -332,6 +391,8 @@ test("Aliyun release artifacts summary surfaces sensitive blocker acquisition de
   assert.match(releaseArtifacts, /blockedVariableNames/)
   assert.match(releaseArtifacts, /readySecretEnvVariableCount/)
   assert.match(releaseArtifacts, /formatUserInterventionGroups/)
+  assert.match(doc, /aliyun:sensitive:blockers:backend/)
+  assert.match(doc, /blocked credential name 只应是 `ALIYUN_OSS_SECURITY_TOKEN`/)
 })
 
 test("APP production-cn sensitive blockers handoff documents user-intervention credential boundaries", () => {

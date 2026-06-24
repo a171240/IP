@@ -1456,6 +1456,7 @@ function main() {
     "--env-file",
     args.envFile,
     ...(args.cloudConfirmationsFile ? ["--cloud-confirmations", args.cloudConfirmationsFile] : []),
+    ...backendOnlyArg,
     "--out",
     sensitiveBlockersJsonPath,
     "--markdown",

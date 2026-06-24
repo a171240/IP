@@ -12,6 +12,12 @@ const BACKEND_ROOT = resolve(__dirname, "..")
 const WORKSPACE_ROOT = resolve(BACKEND_ROOT, "../..")
 const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
+const APP_LAUNCH_DEFERRED_SENSITIVE_ACTION_IDS = Object.freeze([
+  "S01_WECHAT_OPEN_APP_LOGIN",
+  "S02_APPLE_TEAM_ID",
+  "S07_ANDROID_RELEASE_SIGNING",
+])
+const APP_LAUNCH_DEFERRED_SENSITIVE_ACTION_ID_SET = new Set(APP_LAUNCH_DEFERRED_SENSITIVE_ACTION_IDS)
 
 const SECRET_VALUE_PATTERNS = [
   /sk-[A-Za-z0-9_-]{20,}/,
@@ -31,6 +37,7 @@ function parseArgs(argv) {
     cloudConfirmationsFile: DEFAULT_CLOUD_CONFIRMATIONS_FILE,
     outPath: "",
     markdownPath: "",
+    backendOnly: false,
   }
 
   for (let index = 2; index < argv.length; index += 1) {
@@ -50,6 +57,10 @@ function parseArgs(argv) {
     }
     if (arg === "--markdown") {
       args.markdownPath = resolveValue(argv[++index], "--markdown")
+      continue
+    }
+    if (arg === "--backend-only") {
+      args.backendOnly = true
       continue
     }
     if (arg === "--help" || arg === "-h") {
@@ -338,25 +349,46 @@ function findSecretLikeValues(value, path = "$", matches = []) {
   return matches
 }
 
-function buildReport(operatorTasks) {
-  const items = (operatorTasks.sensitiveActionItems || []).map(compactItem)
+function filterItemsForScope(items, args) {
+  if (!args.backendOnly) return items
+  return items.filter((item) => !APP_LAUNCH_DEFERRED_SENSITIVE_ACTION_ID_SET.has(item.id))
+}
+
+function buildReport(operatorTasks, args) {
+  const currentScope = args.backendOnly ? "backend_aliyun_only" : "full_app_launch"
+  const rawItems = (operatorTasks.sensitiveActionItems || []).map(compactItem)
+  const items = filterItemsForScope(rawItems, args)
   const summary = summarize(items)
   const report = {
     ok: true,
     generatedAt: new Date().toISOString(),
+    currentScope,
+    backendOnly: args.backendOnly,
     containsValues: false,
     readOnlyOnly: true,
-    sourceCommand: "corepack pnpm aliyun:operator:tasks",
+    sourceCommand: args.backendOnly
+      ? "corepack pnpm aliyun:operator:tasks filtered by --backend-only"
+      : "corepack pnpm aliyun:operator:tasks",
+    deferredAppLaunchSensitiveActionIds: args.backendOnly ? APP_LAUNCH_DEFERRED_SENSITIVE_ACTION_IDS : [],
     currentAnswer: summary.blocked
-      ? "当前仍有密钥、密码、token、付款或受控标识符类人工介入项；本报告只列变量名和控制台路径，不输出任何 value。"
+      ? (args.backendOnly
+        ? "当前阿里云后端-only 仍有付款、secret/token 或受控运行环境类人工介入项；微信/Apple/Android 发布密钥已从当前后端范围延期。"
+        : "当前仍有密钥、密码、token、付款或受控标识符类人工介入项；本报告只列变量名和控制台路径，不输出任何 value。")
       : "当前没有未完成的密钥、密码、token、付款或受控标识符类人工介入项。",
     summary,
     credentialInterventionBrief: summary.credentialInterventionBrief,
     items,
     nextActions: [
-      "先处理 S01 微信开放平台移动应用创建/审核；审核通过后再获取 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET。",
-      "确认 APPLE_TEAM_ID 后只导入 plain env，用于 AASA；不要猜测。",
-      "ACR 付费、registry 登录、RAM Secret、STS token 和环境变量导入都必须在阿里云官方控制台或受控密钥环境完成。",
+      ...(args.backendOnly
+        ? [
+          "当前后端-only 先处理 S03/S04/S05/S06：ACR 付款、registry/SAE 拉取认证、OSS RAM/STS、ready secret env 导入。",
+          "微信开放平台、Apple Team ID 和 Android release signing 保留为 APP 发布阶段延期项，不作为当前阿里云后端阻塞。",
+        ]
+        : [
+          "先处理 S01 微信开放平台移动应用创建/审核；审核通过后再获取 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET。",
+          "确认 APPLE_TEAM_ID 后只导入 plain env，用于 AASA；不要猜测。",
+          "ACR 付费、registry 登录、RAM Secret、STS token 和环境变量导入都必须在阿里云官方控制台或受控密钥环境完成。",
+        ]),
       "导入完成后只在 ignored 的 .local.json 里记录资源名、布尔状态和非密钥证据编号。",
     ],
     safetyBoundary: [
@@ -383,10 +415,12 @@ function renderMarkdown(report) {
     "## 结论",
     "",
     `- ${report.currentAnswer}`,
+    `- currentScope: ${report.currentScope}`,
     `- ok: ${report.ok}`,
     `- containsValues: ${report.containsValues}`,
     `- blocked: ${report.summary.blocked} / ${report.summary.total}`,
     `- actionTimeConfirmationRequired: ${report.summary.actionTimeConfirmationRequired.length ? report.summary.actionTimeConfirmationRequired.join(", ") : "none"}`,
+    `- deferredAppLaunchSensitiveActionIds: ${report.deferredAppLaunchSensitiveActionIds?.length ? report.deferredAppLaunchSensitiveActionIds.join(", ") : "none"}`,
     `- secretLeakCheck: ${report.secretLeakCheck.ok}`,
     `- canCodexProceedWithoutUser: ${report.summary.userIntervention.canCodexProceedWithoutUser}`,
     `- blockedVariableNames: ${report.summary.userIntervention.blockedVariableNames.length ? report.summary.userIntervention.blockedVariableNames.join(", ") : "none"}`,
@@ -511,7 +545,7 @@ function writeOutput(filePath, content) {
 function main() {
   const args = parseArgs(process.argv)
   const operatorTasks = runOperatorTasks(args)
-  const report = buildReport(operatorTasks)
+  const report = buildReport(operatorTasks, args)
   const json = JSON.stringify(report, null, 2)
   writeOutput(args.outPath, json)
   writeOutput(args.markdownPath, renderMarkdown(report))
@@ -522,9 +556,10 @@ function main() {
 function printHelp() {
   console.log([
     "Usage:",
-    "  node scripts/summarize-aliyun-sensitive-blockers.mjs [--out /tmp/blockers.json] [--markdown /tmp/blockers.md]",
+    "  node scripts/summarize-aliyun-sensitive-blockers.mjs [--backend-only] [--out /tmp/blockers.json] [--markdown /tmp/blockers.md]",
     "",
     "Prints a value-free summary of credential/password/token/payment blockers",
+    "--backend-only excludes deferred WeChat Open Platform, Apple Team ID, and Android release signing actions from the current backend deployment scope.",
     "from aliyun:operator:tasks. It does not create resources, import secrets,",
     "change DNS, deploy, push images, or call Aliyun write APIs.",
   ].join("\n"))

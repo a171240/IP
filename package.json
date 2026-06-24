@@ -35,6 +35,7 @@
     "aliyun:cloud:inventory-results:strict": "node ./scripts/check-aliyun-cli-inventory-results.mjs",
     "aliyun:cloud:inventory-results:test": "node --test tests/aliyun-cli-inventory-results.static.test.js",
     "aliyun:sensitive:blockers": "node ./scripts/summarize-aliyun-sensitive-blockers.mjs",
+    "aliyun:sensitive:blockers:backend": "node ./scripts/summarize-aliyun-sensitive-blockers.mjs --backend-only",
     "aliyun:sensitive:blockers:test": "node --test tests/aliyun-sensitive-blockers.static.test.js",
     "aliyun:resources:matrix": "node ./scripts/summarize-aliyun-resource-matrix.mjs",
     "aliyun:resources:matrix:test": "node --test tests/aliyun-resource-matrix.static.test.js",
