@@ -281,3 +281,51 @@ test("Aliyun release artifacts summary surfaces sensitive blocker acquisition de
   assert.match(releaseArtifacts, /readySecretEnvVariableCount/)
   assert.match(releaseArtifacts, /formatUserInterventionGroups/)
 })
+
+test("APP production-cn sensitive blockers handoff documents user-intervention credential boundaries", () => {
+  const doc = read("docs", "app-production-cn-sensitive-blockers.md")
+
+  for (const expected of [
+    "Production-cn cannot be deployed now.",
+    "total=7",
+    "blocked=7",
+    "blockedCredentialCount=8",
+    "readySecretEnvVariableCount=17",
+    "canCodexProceedWithoutUser=false",
+    "ALIYUN_OSS_SECURITY_TOKEN",
+    "APPLE_TEAM_ID",
+    "MEIYE_RELEASE_KEY_PASSWORD",
+    "WECHAT_OPEN_APP_ID",
+    "WECHAT_OPEN_APP_SECRET",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "DASHSCOPE_API_KEY",
+    "WECHAT_MINI_SECRET",
+    "S01_WECHAT_OPEN_APP_LOGIN",
+    "微信开放平台 -> 管理中心 -> 移动应用 -> 美业话镜 App -> 开发信息",
+    "WECHAT_OPEN_APP_SECRET -> Aliyun KMS / Secrets Manager / SAE secret env",
+    "mini-program credentials `WECHAT_MINI_APPID`, `WECHAT_MINI_SECRET`, and `WECHAT_LOGIN_SECRET` do not unblock APP WeChat login",
+    "S02_APPLE_TEAM_ID",
+    "com.ipgongchang.meiyehuajing",
+    "S03_ACR_PAID_PURCHASE",
+    "quoted price=CNY 117.00",
+    "S04_ACR_REGISTRY_AUTH",
+    "runtime.imagePullConfigured=true",
+    "S05_OSS_RAM_SECRET_OR_STS",
+    "ALIYUN_OSS_ACCESS_KEY_SECRET",
+    "S06_READY_SENSITIVE_ENV_IMPORT",
+    "envImport.secretNotInImage=true",
+    "S07_ANDROID_RELEASE_SIGNING",
+    "MEIYE_RELEASE_STORE_PASSWORD",
+    "debug.keystore",
+    "corepack pnpm aliyun:predeploy",
+    "Do not read or output WECHAT_OPEN_APP_SECRET.",
+    "Do not buy ACR, create secrets, import env values, run docker login/push, deploy production-cn, or git push.",
+  ]) {
+    assert.match(doc, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
+  }
+
+  assert.doesNotMatch(doc, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(doc, /LTAI[A-Za-z0-9]{12,}/)
+  assert.doesNotMatch(doc, /:\/\/[^\s:@]+:[^\s@]+@/)
+  assert.doesNotMatch(doc, /AccessKeySecret\s*[:=]\s*["'][^"']+["']/)
+})
