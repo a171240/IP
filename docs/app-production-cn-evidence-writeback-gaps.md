@@ -19,10 +19,11 @@ Current evidence gate:
 ```text
 canDeployNow=false
 verdict=blocked
-evidenceWritebackReady=1/3
-files=3
+evidenceWritebackReady=1/4
+files=4
 readyFiles=1
-totalGaps=39
+totalGaps=56
+rdsMigrationGaps=17
 cloudInventoryResultGaps=0
 cloudConfirmationGaps=27
 imagePublishGaps=12
@@ -31,21 +32,23 @@ readySecretEnvVariableCount=17
 resourceEvidenceReady=0/7
 ```
 
-The read-only inventory results are now strict-ready, but that is only one of the three local evidence files. It does not replace cloud confirmations, ACR image publish evidence, WeChat Open Platform mobile-app credentials, Android release signing evidence, or secret-env import evidence.
+The read-only inventory results are now strict-ready, but that is only one of the four local evidence files. It does not replace RDS migration closure, cloud confirmations, ACR image publish evidence, WeChat Open Platform mobile-app credentials, Android release signing evidence, or secret-env import evidence.
 
 ## Evidence Files
 
 | Evidence file | Current state | Gaps | Meaning |
 | --- | --- | ---: | --- |
 | `deploy/aliyun-production-cn.cloud-inventory-results.local.json` | ready | 0 | Read-only inventory summary is present and strict-ready. |
+| `deploy/aliyun-production-cn.rds-migration.local.json` | not ready | 17 | RDS PostgreSQL instance, DATABASE_URL_CN secret import, schema/data migration, RDS APP API smoke, and rollback validation are not closed. |
 | `deploy/aliyun-production-cn.cloud-confirmations.local.json` | not ready | 27 | Cloud runtime, domain, OSS, WeChat Open Platform, env import, and SLS confirmations are not closed. |
 | `deploy/aliyun-production-cn.image-publish.local.json` | not ready | 12 | ACR registry, remote image digest, and SAE image-pull runtime evidence are not closed. |
 
 ## Required Authorization Packets
 
-These packets are still required before the 39 gaps can close:
+These packets are still required before the 56 gaps can close:
 
 ```text
+P11_ALIYUN_RDS_DATA_MIGRATION
 P08_SAE_RUNTIME_SLS
 P07_DOMAIN_DNS_HTTPS_ICP
 P05_OSS_RAM_STS
@@ -62,6 +65,7 @@ The immediate cloud-side packets that can be prepared next still require action-
 ```text
 P03_ACR_PURCHASE
 P05_OSS_RAM_STS
+P11_ALIYUN_RDS_DATA_MIGRATION
 ```
 
 The immediate non-Aliyun APP release packets also require action-time confirmation:
@@ -133,12 +137,15 @@ WECHAT_MINI_SECRET
 
 The mini-program variables are compatibility inputs for the old mini-program/backend path. They do not replace `WECHAT_OPEN_APP_ID` or `WECHAT_OPEN_APP_SECRET` for APP WeChat login.
 
+RDS production-cn data layer values are controlled separately. `DATABASE_URL_CN`, database passwords, dump contents, customer data, and Supabase service role values must not be written to JSON, Markdown, Docker images, app bundles, shell history, or git. `DATABASE_URL_CN` can only be imported through Aliyun KMS / Secrets Manager / SAE secret env.
+
 ## Strict Verification Order
 
 After any authorized external action, rerun:
 
 ```bash
 corepack pnpm aliyun:cloud:inventory-results:strict
+corepack pnpm aliyun:rds:migration:evidence:strict
 corepack pnpm aliyun:cloud:confirmations:strict
 corepack pnpm aliyun:image:plan:strict
 corepack pnpm aliyun:domain:strict
@@ -147,7 +154,7 @@ corepack pnpm aliyun:completion:audit
 corepack pnpm aliyun:predeploy
 ```
 
-The deploy gate remains blocked until the three evidence files are ready and the strict commands pass.
+The deploy gate remains blocked until the four evidence files are ready and the strict commands pass.
 
 ## Forbidden Without Fresh Confirmation
 
@@ -156,6 +163,7 @@ Do not purchase ACR or any paid resource.
 Do not create or modify SAE, SLS, OSS, RAM, KMS, Secrets Manager, DNS, certificate, CDN, or public ingress.
 Do not create or submit the WeChat Open Platform mobile app.
 Do not read, copy, paste, import, or output AppSecret, AccessKeySecret, registry password, RAM Secret, STS token, cookie, or Supabase service role key.
+Do not read, copy, paste, import, or output DATABASE_URL_CN, database passwords, dump contents, or customer data into local reports.
 Do not run docker login or docker push.
 Do not import production-cn env values.
 Do not build/sign release artifacts with keystore material.

@@ -14,8 +14,9 @@ It tells the operator which local evidence field to update after an authorized e
 
 ```text
 Production-cn cannot be deployed now.
-evidenceWritebackReady=1/3
-totalGaps=39
+evidenceWritebackReady=1/4
+totalGaps=56
+rdsMigrationGaps=17
 cloudInventoryResultGaps=0
 cloudConfirmationGaps=27
 imagePublishGaps=12
@@ -24,6 +25,36 @@ imagePublishGaps=12
 ## Ready Evidence File
 
 `deploy/aliyun-production-cn.cloud-inventory-results.local.json` is ready with `0` current blockers. It proves read-only inventory results only. It does not close the cloud confirmation or image publish gates.
+
+## rds-migration.local.json
+
+Target file:
+
+```text
+deploy/aliyun-production-cn.rds-migration.local.json
+```
+
+Current field blockers: `17`.
+
+| JSON path | Authorization packet | Expected non-secret evidence |
+| --- | --- | --- |
+| `rdsPostgres.instanceId` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Record the non-secret RDS instance ID after the cn-hangzhou PostgreSQL instance exists. |
+| `rdsPostgres.engineVersion` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Record the PostgreSQL version shown by RDS. |
+| `rdsPostgres.networkAccess` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Record the VPC or SAE internal access evidence without connection strings. |
+| `rdsPostgres.databaseName` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Record the database name only; never record account password or connection string. |
+| `rdsPostgres.evidence` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Record a console path, screenshot ID, ticket ID, or other non-secret RDS evidence handle. |
+| `rdsPostgres.confirmed` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after RDS PostgreSQL exists and matches the production-cn target. |
+| `rdsPostgres.databaseAccountReady` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after the database account and privileges are ready; never record the password. |
+| `rdsPostgres.databaseUrlCnSecretImported` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after `DATABASE_URL_CN` is imported through Aliyun KMS, Secrets Manager, or SAE secret env. |
+| `migration.dataAccessAdapterReady` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after first-version APP API production-cn data access no longer formally depends on Supabase. |
+| `migration.schemaMigrated` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after schema migration is applied to RDS and validated without secret values. |
+| `migration.dataMigrated` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after required data is migrated to RDS and validated without customer data in reports. |
+| `migration.rowCountValidationPassed` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after required table row counts have been validated. |
+| `migration.criticalRecordValidationPassed` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after profile, tenant, store, invite, customer, and service-record critical records validate. |
+| `migration.appApiSmokeOnRdsPassed` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after profile, tenant, invite, and service-record APP API smoke passes against RDS. |
+| `migration.supabaseNoLongerFormalTarget` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after Supabase is migration source or legacy compatibility only, not the formal production-cn database target. |
+| `migration.rollbackRunbookReviewed` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after the rollback runbook is reviewed. |
+| `migration.rollbackValidationPassed` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after rollback validation or recovery rehearsal passes. |
 
 ## cloud-confirmations.local.json
 
@@ -97,6 +128,10 @@ Never write these values into JSON, Markdown, Docker images, app bundles, shell 
 ```text
 AppSecret
 AccessKeySecret
+DATABASE_URL_CN value
+database password
+dump contents
+customer data
 registry password
 RAM Secret
 STS token
@@ -112,10 +147,11 @@ Run the strict command for the touched file first, then the completion gates:
 
 ```bash
 corepack pnpm aliyun:cloud:confirmations:strict
+corepack pnpm aliyun:rds:migration:evidence:strict
 corepack pnpm aliyun:image:plan:strict
 corepack pnpm aliyun:evidence:writeback -- --skip-vercel-env-coverage
 corepack pnpm aliyun:completion:audit
 corepack pnpm aliyun:predeploy
 ```
 
-Do not deploy production-cn until all three evidence files are ready and the strict gates pass.
+Do not deploy production-cn until all four evidence files are ready and the strict gates pass.
