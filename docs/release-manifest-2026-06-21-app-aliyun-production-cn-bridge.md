@@ -172,6 +172,15 @@ tests/aliyun-sensitive-blockers.static.test.js
 
 该追加只把 `S01`-`S07` 密钥/密码/token/付款/受控标识符项固化成获得入口、允许导入位置、验证命令和禁止存储位置。它不包含任何 value，也不授权读取 AppSecret、Android keystore password、AccessKeySecret、registry password、RAM Secret、STS token、Supabase service role key，或执行阿里云/微信/Apple 外部写操作。
 
+2026-06-24 追加的阿里云 provisioning 阶段证据：
+
+```text
+docs/app-production-cn-provisioning-sequence.md
+tests/aliyun-provisioning-plan.static.test.js
+```
+
+该追加只固化 plan-only 阶段顺序：第一版后端部署目标为 `cn-hangzhou` 的阿里云 SAE 自定义容器 `meiye-huajing-app-api-production-cn`，端口 3000；当前只有 `PH01_EXTERNAL_APP_IDENTIFIERS` 和 `PH02_BASE_CLOUD_RESOURCES` 可在动作时确认后开始，`PH03`-`PH07` 仍被依赖阻塞。它不包含阿里云购买、资源创建、DNS/HTTPS 修改、密钥导入、镜像推送、production-cn 部署、微信/Apple 外部写操作或 git push。
+
 ## 4. 明确不包含
 
 - 不包含 App 内支付、苹果 IAP、安卓应用市场支付。

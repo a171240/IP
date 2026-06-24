@@ -215,3 +215,60 @@ test("Aliyun provisioning plan markdown preserves ACR current scope and deferred
   assert.doesNotMatch(output + markdown, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(output + markdown, /:\/\/[^\s:@]+:[^\s@]+@/)
 })
+
+test("APP production-cn provisioning sequence handoff matches the current plan", () => {
+  const handoff = read("docs", "app-production-cn-provisioning-sequence.md")
+  const output = execFileSync(process.execPath, ["scripts/generate-aliyun-provisioning-plan.mjs"], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 50,
+  })
+  const report = JSON.parse(output)
+
+  assert.match(handoff, /Production-cn cannot be deployed now\./)
+  assert.match(handoff, /executionMode=plan_only/)
+  assert.match(handoff, /canCodexExecuteNow=false/)
+  assert.match(handoff, /canDeployNow=false/)
+  assert.match(handoff, /provider=Aliyun SAE/)
+  assert.match(handoff, /region=cn-hangzhou/)
+  assert.match(handoff, /appName=meiye-huajing-app-api-production-cn/)
+  assert.match(handoff, /containerPort=3000/)
+  assert.match(handoff, /healthPath=\/api\/healthz/)
+  assert.match(handoff, /strictHealthPath=\/api\/app\/health\?strict=1/)
+  assert.match(handoff, /apiHost=api-cn\.ipgongchang\.xin/)
+  assert.match(handoff, /assetHost=assets-cn\.ipgongchang\.xin/)
+  assert.match(handoff, /ECS is a fallback only/)
+  assert.match(handoff, /Supabase as the data layer/)
+
+  for (const phase of report.phases) {
+    assert.match(handoff, new RegExp(phase.id))
+    assert.match(handoff, new RegExp(phase.status))
+    for (const dependency of phase.blockingDependencies || []) {
+      assert.match(handoff, new RegExp(dependency))
+    }
+  }
+  for (const phaseId of report.summary.readyToStartPhases) {
+    assert.match(handoff, new RegExp(phaseId))
+  }
+  for (const phaseId of report.summary.blockedPhases) {
+    assert.match(handoff, new RegExp(phaseId))
+  }
+  for (const packetId of report.summary.canStartNowPackets) {
+    assert.match(handoff, new RegExp(packetId))
+  }
+  for (const taskId of report.summary.canStartNowConsoleTasks) {
+    assert.match(handoff, new RegExp(taskId))
+  }
+  for (const id of report.summary.blockedResourceEvidenceIds) {
+    assert.match(handoff, new RegExp(id))
+  }
+
+  assert.match(handoff, /currentActionScope=purchase_and_repository_only/)
+  assert.match(handoff, /acr\.registryHost actual aliyuncs\.com host/)
+  assert.match(handoff, /P04_ACR_IMAGE_AND_PULL/)
+  assert.match(handoff, /imagePushed=true/)
+  assert.match(handoff, /runtime\.imagePullConfigured=true/)
+  assert.doesNotMatch(handoff, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(handoff, /LTAI[A-Za-z0-9]{12,}/)
+  assert.doesNotMatch(handoff, /:\/\/[^\s:@]+:[^\s@]+@/)
+})
