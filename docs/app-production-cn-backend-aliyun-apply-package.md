@@ -1,6 +1,6 @@
 # APP production-cn Aliyun backend apply package
 
-Generated at: 2026-06-24T12:48:23.396Z
+Generated at: 2026-06-24T13:23:06.826Z
 
 ## Scope
 
@@ -36,7 +36,8 @@ Generated at: 2026-06-24T12:48:23.396Z
 - mutationType: paid_resource_create_and_data_migration
 - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
 - consolePath: 阿里云控制台 -> 云数据库 RDS -> PostgreSQL -> cn-hangzhou
-- currentBlockers: DATABASE_URL_CN, RDS_POSTGRES_NOT_READY, RDS_MIGRATION_EVIDENCE_NOT_READY, rdsEvidence:file_missing
+- currentEvidence: inventory.rdsPostgres=not_found; rdsLocalExists=true; rdsLocalReady=false; appApiRoutesWithSupabase=30/30; firstVersionRdsRoutesWithSupabaseDataAccess=25/25; postgresDataAccessAdapterDetected=true
+- currentBlockers: DATABASE_URL_CN, RDS_POSTGRES_NOT_READY, RDS_MIGRATION_EVIDENCE_NOT_READY, rdsEvidence:todo:rdsPostgres.instanceId, rdsEvidence:todo:rdsPostgres.engineVersion, rdsEvidence:todo:rdsPostgres.networkAccess, rdsEvidence:todo:rdsPostgres.databaseName, rdsEvidence:todo:rdsPostgres.evidence, rdsEvidence:rdsPostgres.confirmed, rdsEvidence:rdsPostgres.databaseAccountReady, rdsEvidence:rdsPostgres.databaseUrlCnSecretImported, rdsEvidence:migration.dataAccessAdapterReady, rdsEvidence:migration.schemaMigrated, rdsEvidence:migration.dataMigrated, rdsEvidence:migration.rowCountValidationPassed, rdsEvidence:migration.criticalRecordValidationPassed, rdsEvidence:migration.appApiSmokeOnRdsPassed, rdsEvidence:migration.supabaseNoLongerFormalTarget, rdsEvidence:migration.rollbackRunbookReviewed, rdsEvidence:migration.rollbackValidationPassed
 - writeTargets: deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres/sourceInventory/migration/security; DATABASE_URL_CN -> Aliyun KMS / Secrets Manager / SAE secret env only
 - userMustHandle: RDS purchase/spec confirmation if billed; database account password; DATABASE_URL_CN secret value; Supabase export/import credentials during migration; migration rollback confirmation
 - nonSecretEvidenceToRecord: RDS instance id/name/region/engine version; database name; database account ready=true; DATABASE_URL_CN secret imported=true without value; schema/data/row-count/critical-record/rollback validation handles
@@ -50,6 +51,7 @@ Generated at: 2026-06-24T12:48:23.396Z
 - mutationType: ram_policy_binding_or_secret_runtime_role
 - requiredAuthorizationPackets: P05_OSS_RAM_STS
 - consolePath: 阿里云控制台 -> OSS / RAM / STS
+- currentEvidence: inventory.ossAudioBucket=partial_observed; bucket=meiye-huajing-service-records-production-cn; serviceRecordPrefix=service-records/production-cn
 - currentBlockers: OSS_RAM_STS_NOT_READY
 - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss; ALIYUN_OSS_ACCESS_KEY_SECRET / STS token -> KMS/Secrets Manager/SAE secret env only if runtime role is not used
 - userMustHandle: AccessKeySecret or STS token if runtime role is not selected; RAM policy attachment or runtime role authorization
@@ -64,6 +66,7 @@ Generated at: 2026-06-24T12:48:23.396Z
 - mutationType: paid_resource_purchase_or_confirmation
 - requiredAuthorizationPackets: P03_ACR_PURCHASE
 - consolePath: 阿里云控制台 -> 容器镜像服务 ACR -> 企业版实例/命名空间/镜像仓库
+- currentEvidence: inventory.acrImage=not_found; edition=ACR Enterprise Economic; region=cn-hangzhou; term=1 month; quotedAmount=CNY 117.00; repository=meiye-huajing-app-api
 - currentBlockers: ACR_IMAGE_REGISTRY_NOT_READY
 - writeTargets: deploy/aliyun-production-cn.image-publish.local.json -> acr.confirmed/registryHost/namespace/repository
 - userMustHandle: ACR paid purchase confirmation; registry password only later through docker login or controlled credential helper
@@ -78,6 +81,7 @@ Generated at: 2026-06-24T12:48:23.396Z
 - mutationType: docker_login_push_and_runtime_pull_secret
 - requiredAuthorizationPackets: P04_ACR_IMAGE_AND_PULL
 - consolePath: 本机 Docker + 阿里云 ACR + SAE runtime image pull
+- currentEvidence: localDockerImage.status=ready
 - currentBlockers: ACR_IMAGE_REGISTRY_NOT_READY, SAE_RUNTIME_NOT_READY
 - writeTargets: deploy/aliyun-production-cn.image-publish.local.json -> image/runtime; SAE runtime image pull config
 - userMustHandle: docker login / registry password or credential helper; SAE image pull credential if not using internal authorization
@@ -92,6 +96,7 @@ Generated at: 2026-06-24T12:48:23.396Z
 - mutationType: secret_env_import
 - requiredAuthorizationPackets: P06_ENV_IMPORT
 - consolePath: 阿里云控制台 -> SAE 环境变量 / KMS / Secrets Manager
+- currentEvidence: readySecretEnvVariableCount=17; wechatExcludedFromBackend=true
 - currentBlockers: DATABASE_URL_CN, ENV_IMPORT_NOT_READY
 - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport; Aliyun KMS / Secrets Manager / SAE secret env
 - userMustHandle: DATABASE_URL_CN; ready secret env import; ALIYUN_OSS_ACCESS_KEY_SECRET or STS token if runtime role is not used; SUPABASE_SERVICE_ROLE_KEY only if migration compatibility remains temporarily needed
@@ -106,6 +111,7 @@ Generated at: 2026-06-24T12:48:23.396Z
 - mutationType: runtime_create_or_update
 - requiredAuthorizationPackets: P08_SAE_RUNTIME_SLS
 - consolePath: 阿里云控制台 -> SAE -> cn-hangzhou
+- currentEvidence: inventory.saeRuntime=not_found
 - currentBlockers: SAE_RUNTIME_NOT_READY
 - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.runtime
 - userMustHandle: SAE paid/runtime resource confirmation if prompted; runtime env visibility check without exposing values
@@ -120,6 +126,7 @@ Generated at: 2026-06-24T12:48:23.396Z
 - mutationType: dns_https_certificate_binding
 - requiredAuthorizationPackets: P07_DOMAIN_DNS_HTTPS
 - consolePath: 阿里云控制台 -> 云解析 DNS / 数字证书 / SAE 或 OSS-CDN 自定义域名
+- currentEvidence: api-cn.ipgongchang.xin=not_ready; assets-cn.ipgongchang.xin=not_ready
 - currentBlockers: API_DOMAIN_HTTPS_ICP_NOT_READY, ASSET_DOMAIN_HTTPS_ICP_NOT_READY
 - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps
 - userMustHandle: DNS change confirmation; certificate issuance/binding confirmation; ICP compliance confirmation
@@ -134,6 +141,7 @@ Generated at: 2026-06-24T12:48:23.396Z
 - mutationType: observability_alert_create
 - requiredAuthorizationPackets: P08_SAE_RUNTIME_SLS
 - consolePath: 阿里云控制台 -> 日志服务 SLS
+- currentEvidence: inventory.slsProject=partial_observed; alerts=0
 - currentBlockers: SLS_ALERTS_NOT_READY
 - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.slsAlerts
 - userMustHandle: alert recipient/channel confirmation if needed
@@ -148,6 +156,7 @@ Generated at: 2026-06-24T12:48:23.396Z
 - mutationType: production_deploy_and_smoke
 - requiredAuthorizationPackets: P09_PRODUCTION_DEPLOY
 - consolePath: Aliyun SAE deployment + local smoke commands
+- currentEvidence: baseUrl=https://api-cn.ipgongchang.xin; expected unauthenticated business routes return 401
 - currentBlockers: POSTDEPLOY_SMOKE_NOT_RUN
 - writeTargets: release artifacts -> postdeploy smoke evidence
 - userMustHandle: production deploy authorization; rollback decision if smoke fails

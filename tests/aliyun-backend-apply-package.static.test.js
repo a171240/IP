@@ -17,6 +17,7 @@ test("Aliyun backend apply package command is wired into scripts and deploy spec
   const deploySpecChecker = read("scripts", "check-aliyun-deployment-spec.mjs")
   const releaseArtifacts = read("scripts", "prepare-aliyun-release-artifacts.mjs")
   const script = read("scripts", "generate-aliyun-backend-apply-package.mjs")
+  const applyPackageDoc = read("docs", "app-production-cn-backend-aliyun-apply-package.md")
 
   assert.equal(pkg.scripts["aliyun:backend-cn:apply-package"], "node ./scripts/generate-aliyun-backend-apply-package.mjs")
   assert.equal(pkg.scripts["aliyun:backend-cn:apply-package:test"], "node --test tests/aliyun-backend-apply-package.static.test.js")
@@ -31,6 +32,9 @@ test("Aliyun backend apply package command is wired into scripts and deploy spec
   assert.match(script, /B00_ALIYUN_BACKEND_APPLY_PACKAGE/)
   assert.match(script, /BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE/)
   assert.match(script, /BAP09_POSTDEPLOY_SMOKE/)
+  assert.match(applyPackageDoc, /rdsLocalExists=true/)
+  assert.match(applyPackageDoc, /rdsEvidence:rdsPostgres\.confirmed/)
+  assert.doesNotMatch(applyPackageDoc, /rdsEvidence:file_missing/)
   assert.doesNotMatch(script, secretLike)
 })
 
@@ -100,6 +104,44 @@ test("Aliyun backend apply package separates immediate backend work from deferre
   assert.ok(report.verificationOrder.includes("corepack pnpm aliyun:operator:handoff:backend"))
   assert.ok(!report.verificationOrder.includes("corepack pnpm aliyun:evidence:writeback -- --skip-vercel-env-coverage"))
   assert.ok(report.safetyBoundary.some((item) => /does not create/.test(item)))
+
+  assert.doesNotMatch(output, secretLike)
+})
+
+test("Aliyun backend apply package reports field-level RDS blockers after local scaffold exists", () => {
+  const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-backend-apply-package-rds-"))
+  const localPath = path.join(tmpdir, "rds-migration.local.json")
+  execFileSync(process.execPath, [
+    "scripts/check-aliyun-rds-migration-evidence.mjs",
+    "--allow-incomplete",
+    "--init-local",
+    "--local",
+    localPath,
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 100,
+  })
+
+  const output = execFileSync(process.execPath, [
+    "scripts/generate-aliyun-backend-apply-package.mjs",
+    "--rds-migration",
+    localPath,
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 100,
+  })
+  const report = JSON.parse(output)
+  const rdsStep = report.applySteps.find((item) => item.id === "BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE")
+
+  assert.equal(report.summary.rdsMigrationEvidenceReady, false)
+  assert.ok(rdsStep.currentEvidence.includes("rdsLocalExists=true"))
+  assert.ok(rdsStep.currentEvidence.includes("rdsLocalReady=false"))
+  assert.ok(!rdsStep.currentBlockers.includes("rdsEvidence:file_missing"))
+  assert.ok(rdsStep.currentBlockers.includes("rdsEvidence:rdsPostgres.confirmed"))
+  assert.ok(rdsStep.currentBlockers.includes("rdsEvidence:rdsPostgres.databaseUrlCnSecretImported"))
+  assert.ok(rdsStep.currentBlockers.includes("rdsEvidence:migration.dataAccessAdapterReady"))
 
   assert.doesNotMatch(output, secretLike)
 })

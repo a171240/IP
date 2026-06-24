@@ -615,6 +615,7 @@ function renderMarkdown(report) {
       `- mutationType: ${step.mutationType}`,
       `- requiredAuthorizationPackets: ${step.requiredAuthorizationPackets.join(", ")}`,
       `- consolePath: ${step.consolePath}`,
+      `- currentEvidence: ${step.currentEvidence.join("; ") || "none"}`,
       `- currentBlockers: ${step.currentBlockers.join(", ") || "none"}`,
       `- writeTargets: ${step.writeTargets.join("; ")}`,
       `- userMustHandle: ${step.userMustHandle.join("; ")}`,
