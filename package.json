@@ -12,6 +12,7 @@
     "aliyun:env:checklist": "node ./scripts/prepare-aliyun-runtime-env.mjs --allow-todo --write-plan /tmp/meiye-aliyun-env-import-plan.json --write-plan-markdown /tmp/meiye-aliyun-env-import-checklist.md",
     "aliyun:env:classification:test": "node --test tests/aliyun-env-import-plan.static.test.mjs",
     "aliyun:env:handoff": "node ./scripts/summarize-aliyun-env-handoff.mjs",
+    "aliyun:env:handoff:backend": "node ./scripts/summarize-aliyun-env-handoff.mjs --backend-only",
     "aliyun:env:handoff:test": "node --test tests/aliyun-env-handoff.static.test.js",
     "aliyun:env:source-map": "node ./scripts/summarize-aliyun-env-source-map.mjs",
     "aliyun:env:source-map:test": "node --test tests/aliyun-env-source-map.static.test.js",

@@ -36,11 +36,14 @@ const FULL_APP_LAUNCH_SCOPE = "deferred_after_backend_online"
 const APP_LAUNCH_DEFERRED_NAMES = new Set([
   "WECHAT_OPEN_APP_ID",
   "WECHAT_OPEN_APP_SECRET",
+  "WECHAT_OPEN_APP_REVIEW_STATUS",
   "APPLE_TEAM_ID",
   "MEIYE_RELEASE_STORE_FILE",
   "MEIYE_RELEASE_STORE_PASSWORD",
   "MEIYE_RELEASE_KEY_ALIAS",
   "MEIYE_RELEASE_KEY_PASSWORD",
+  "PRIVACY_POLICY_URL",
+  "TERMS_URL",
 ])
 
 function parseArgs(argv) {
@@ -48,6 +51,7 @@ function parseArgs(argv) {
     envFile: DEFAULT_ENV_FILE,
     outPath: "",
     markdownPath: "",
+    backendOnly: false,
   }
 
   for (let index = 2; index < argv.length; index += 1) {
@@ -63,6 +67,10 @@ function parseArgs(argv) {
     }
     if (arg === "--markdown") {
       args.markdownPath = resolveValue(argv[++index], "--markdown")
+      continue
+    }
+    if (arg === "--backend-only") {
+      args.backendOnly = true
       continue
     }
     if (arg === "--help" || arg === "-h") {
@@ -92,7 +100,7 @@ function buildReport(args) {
     mutationPerformed: false,
     currentScope: CURRENT_SCOPE,
     fullAppLaunchScope: FULL_APP_LAUNCH_SCOPE,
-    sourceCommand: "corepack pnpm aliyun:env:handoff",
+    sourceCommand: args.backendOnly ? "corepack pnpm aliyun:env:handoff:backend" : "corepack pnpm aliyun:env:handoff",
     sourcePlanCommand: "corepack pnpm aliyun:env:checklist",
     files: {
       envFile: args.envFile,
@@ -123,7 +131,13 @@ function buildReport(args) {
     },
     acquisitionOrder: buildAcquisitionOrder(groups),
     groups,
-    verificationCommands: [
+    verificationCommands: args.backendOnly ? [
+      "corepack pnpm aliyun:env:handoff:backend",
+      "corepack pnpm aliyun:sensitive:blockers:backend",
+      "corepack pnpm aliyun:operator:tasks:backend",
+      "corepack pnpm aliyun:backend-cn:status",
+      "corepack pnpm aliyun:evidence:writeback:backend",
+    ] : [
       "corepack pnpm aliyun:env:checklist",
       "corepack pnpm aliyun:sensitive:blockers",
       "corepack pnpm aliyun:user:actions",
@@ -141,6 +155,7 @@ function buildReport(args) {
       "AppSecret、AccessKeySecret、registry password、RAM Secret、STS token、cookie 和 Supabase service role key 不能写入 JSON、Markdown、镜像或 git。",
     ],
   }
+  if (args.backendOnly) applyBackendOnlyScope(report)
   const secretLikePaths = findSecretLikeValues(report)
   report.secretLeakCheck = {
     ok: secretLikePaths.length === 0,
@@ -148,6 +163,44 @@ function buildReport(args) {
   }
   report.ok = report.secretLeakCheck.ok
   return report
+}
+
+function applyBackendOnlyScope(report) {
+  const excluded = new Set()
+  for (const group of Object.values(report.groups)) {
+    for (const item of group) {
+      if (APP_LAUNCH_DEFERRED_NAMES.has(item.name)) excluded.add(item.name)
+    }
+  }
+
+  for (const key of Object.keys(report.groups)) {
+    report.groups[key] = report.groups[key].filter((item) => !APP_LAUNCH_DEFERRED_NAMES.has(item.name))
+  }
+
+  report.currentAnswer = "现在只处理阿里云后端环境变量；后端必填阻塞只剩 DATABASE_URL_CN，微信移动应用、Apple/Android 发布和 APP 协议页变量全部后置。"
+  report.summary.requiredTotal = Math.max(0, report.summary.requiredTotal - 2)
+  report.summary.requiredBlocking = report.groups.blockedRequired.map((item) => item.name)
+  report.summary.fullAppRequiredBlocking = report.summary.requiredBlocking
+  report.summary.appLaunchBlocking = []
+  report.summary.readyPlainEnv = report.groups.readyPlainEnv.length
+  report.summary.readySecretEnv = report.groups.readySecretEnv.length
+  report.summary.deferred = report.groups.deferred.length
+  report.summary.groupCounts = Object.fromEntries(GROUPS.map(([key]) => [key, report.groups[key].length]))
+  report.summary.actionTimeConfirmationRequiredGroups = [
+    "blockedRequired",
+    "readyPlainEnv",
+    "readySecretEnv",
+  ]
+  report.acquisitionOrder = buildAcquisitionOrder(report.groups)
+  report.completionEvidence = [
+    "DATABASE_URL_CN 只能在 RDS PostgreSQL 创建/迁移完成后导入 KMS/Secrets Manager/SAE secret env。",
+    "readySecretEnv 组只能导入 KMS/Secrets Manager/SAE secret env，不能写进文档、镜像或 git。",
+    "导入完成后只记录 envImport.confirmed=true、envImport.secretNotInImage=true、importedAt 和非密钥 evidence handle。",
+  ]
+  report.backendOnlyExclusions = {
+    envNames: Array.from(excluded).sort(),
+    reason: "微信开放平台移动应用、Apple/Android 发布和 APP 协议页变量不参与当前阿里云后端补齐。",
+  }
 }
 
 function groupVariables(plan) {
@@ -361,6 +414,7 @@ function printHelp() {
   console.log(`Usage: node scripts/summarize-aliyun-env-handoff.mjs [options]
 
 Options:
+  --backend-only     Exclude deferred WeChat Open Platform, Apple/Android signing, and APP legal-page variables from the current backend handoff.
   --env-file <path>  Env file to inspect. Defaults to workspace .env.production-cn.local.
   --out <path>       Write value-free JSON handoff to a file.
   --markdown <path>  Write value-free Markdown handoff to a file.

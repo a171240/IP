@@ -5,6 +5,7 @@ export const LOCAL_PREDEPLOY_COMMANDS = Object.freeze([
   Object.freeze(["run", "aliyun:env:classification:test"]),
   Object.freeze(["run", "aliyun:env:handoff:test"]),
   Object.freeze(["run", "aliyun:env:handoff"]),
+  Object.freeze(["run", "aliyun:env:handoff:backend"]),
   Object.freeze(["run", "aliyun:env:source-map:test"]),
   Object.freeze(["run", "aliyun:env:source-map", "--", "--skip-vercel-env-coverage"]),
   Object.freeze(["run", "aliyun:wechat-state:test"]),

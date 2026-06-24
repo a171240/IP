@@ -15,13 +15,18 @@ test("Aliyun env handoff command is wired into scripts and deployment spec", () 
   const deploymentSpecChecker = read("scripts", "check-aliyun-deployment-spec.mjs")
 
   assert.equal(pkg.scripts["aliyun:env:handoff"], "node ./scripts/summarize-aliyun-env-handoff.mjs")
+  assert.equal(pkg.scripts["aliyun:env:handoff:backend"], "node ./scripts/summarize-aliyun-env-handoff.mjs --backend-only")
   assert.equal(pkg.scripts["aliyun:env:handoff:test"], "node --test tests/aliyun-env-handoff.static.test.js")
   assert.match(predeploy, /aliyun:env:handoff:test/)
   assert.match(predeploy, /aliyun:env:handoff/)
+  assert.match(predeploy, /aliyun:env:handoff:backend/)
   assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:env:handoff:test"))
   assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:env:handoff"))
+  assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:env:handoff:backend"))
   assert.ok(deploySpec.predeployChecks.includes("corepack pnpm aliyun:env:handoff"))
+  assert.ok(deploySpec.predeployChecks.includes("corepack pnpm aliyun:env:handoff:backend"))
   assert.match(deploymentSpecChecker, /corepack pnpm aliyun:env:handoff/)
+  assert.match(deploymentSpecChecker, /corepack pnpm aliyun:env:handoff:backend/)
 })
 
 test("Aliyun env handoff groups current variables without printing values", () => {
@@ -67,6 +72,51 @@ test("Aliyun env handoff groups current variables without printing values", () =
   assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
 })
 
+test("Aliyun env handoff backend-only mode excludes deferred app launch variables", () => {
+  const output = execFileSync(process.execPath, [
+    "scripts/summarize-aliyun-env-handoff.mjs",
+    "--backend-only",
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 20,
+  })
+  const report = JSON.parse(output)
+  const groupNames = Object.fromEntries(Object.entries(report.groups).map(([key, items]) => [
+    key,
+    items.map((item) => item.name),
+  ]))
+
+  assert.equal(report.ok, true)
+  assert.equal(report.currentScope, "backend_aliyun_only")
+  assert.equal(report.sourceCommand, "corepack pnpm aliyun:env:handoff:backend")
+  assert.equal(report.containsValues, false)
+  assert.deepEqual(report.summary.requiredBlocking, ["DATABASE_URL_CN"])
+  assert.deepEqual(report.summary.fullAppRequiredBlocking, ["DATABASE_URL_CN"])
+  assert.deepEqual(report.summary.appLaunchBlocking, [])
+  assert.equal(report.summary.requiredTotal, 25)
+  assert.equal(report.summary.requiredReady, 24)
+  assert.deepEqual(groupNames.blockedRequired, ["DATABASE_URL_CN"])
+  assert.deepEqual(groupNames.appLaunchBlocking, [])
+  assert.ok(!groupNames.readyPlainEnv.includes("WECHAT_OPEN_APP_REVIEW_STATUS"))
+  assert.ok(!groupNames.readyPlainEnv.includes("PRIVACY_POLICY_URL"))
+  assert.ok(!groupNames.readyPlainEnv.includes("TERMS_URL"))
+  assert.ok(report.backendOnlyExclusions.envNames.includes("WECHAT_OPEN_APP_ID"))
+  assert.ok(report.backendOnlyExclusions.envNames.includes("WECHAT_OPEN_APP_SECRET"))
+  assert.ok(report.backendOnlyExclusions.envNames.includes("APPLE_TEAM_ID"))
+  assert.ok(report.backendOnlyExclusions.envNames.includes("PRIVACY_POLICY_URL"))
+  assert.deepEqual(report.acquisitionOrder.map((item) => item.name), [
+    "DATABASE_URL_CN",
+    "readySecretEnv",
+    "readyPlainEnv",
+  ])
+  assert.ok(report.verificationCommands.includes("corepack pnpm aliyun:sensitive:blockers:backend"))
+  assert.ok(report.verificationCommands.includes("corepack pnpm aliyun:operator:tasks:backend"))
+  assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
+  assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
+})
+
 test("Aliyun env handoff markdown keeps operator instructions value-free", () => {
   const outDir = fs.mkdtempSync("/tmp/meiye-env-handoff-test-")
   const jsonPath = path.join(outDir, "env-handoff.json")
@@ -96,6 +146,36 @@ test("Aliyun env handoff markdown keeps operator instructions value-free", () =>
   assert.match(markdown, /DATABASE_URL_CN/)
   assert.match(markdown, /APPLE_TEAM_ID/)
   assert.match(markdown, /可导入 KMS\/Secrets Manager\/SAE secret env/)
+  assert.doesNotMatch(markdown, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(markdown, /LTAI[A-Za-z0-9]{12,}/)
+  assert.doesNotMatch(markdown, /:\/\/[^\s:@]+:[^\s@]+@/)
+})
+
+test("Aliyun env handoff backend-only markdown omits deferred app launch variables", () => {
+  const outDir = fs.mkdtempSync("/tmp/meiye-env-handoff-backend-test-")
+  const markdownPath = path.join(outDir, "env-handoff-backend.md")
+  execFileSync(process.execPath, [
+    "scripts/summarize-aliyun-env-handoff.mjs",
+    "--backend-only",
+    "--markdown",
+    markdownPath,
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 20,
+  })
+  const markdown = fs.readFileSync(markdownPath, "utf8")
+
+  assert.match(markdown, /currentScope: backend_aliyun_only/)
+  assert.match(markdown, /requiredBlocking: DATABASE_URL_CN/)
+  assert.match(markdown, /fullAppRequiredBlocking: DATABASE_URL_CN/)
+  assert.match(markdown, /appLaunchBlocking: none/)
+  assert.match(markdown, /corepack pnpm aliyun:sensitive:blockers:backend/)
+  assert.match(markdown, /corepack pnpm aliyun:operator:tasks:backend/)
+  assert.doesNotMatch(markdown, /WECHAT_OPEN_APP_ID/)
+  assert.doesNotMatch(markdown, /WECHAT_OPEN_APP_SECRET/)
+  assert.doesNotMatch(markdown, /APPLE_TEAM_ID/)
+  assert.doesNotMatch(markdown, /PRIVACY_POLICY_URL/)
   assert.doesNotMatch(markdown, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(markdown, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(markdown, /:\/\/[^\s:@]+:[^\s@]+@/)
