@@ -107,6 +107,13 @@ test("Aliyun completion audit reports the current goal as blocked without secret
   assert.ok(report.summary.partial >= 1)
   assert.equal(report.summary.blockedCredentialCount, 8)
   assert.equal(report.summary.readySecretEnvVariableCount, 17)
+  assert.equal(report.summary.localImplementationReady, true)
+  assert.deepEqual(report.summary.localImplementationBlockingFields, [])
+  assert.ok(report.summary.localImplementationReadyFields.includes("appApiBridgeMap"))
+  assert.ok(report.summary.localImplementationReadyFields.includes("appRuntimeConfig"))
+  assert.ok(report.summary.localCodeMachineBlockers.includes("missing_required_env:WECHAT_OPEN_APP_ID"))
+  assert.ok(report.summary.localCodeMachineBlockers.includes("missing_required_env:WECHAT_OPEN_APP_SECRET"))
+  assert.ok(report.summary.localCodeMachineBlockers.includes("app_universal_link:apple_team_id_missing"))
   assert.equal(report.bridgeDataLayer.current, "Supabase")
   assert.equal(report.bridgeDataLayer.target, "Aliyun RDS PostgreSQL")
   assert.equal(report.bridgeDataLayer.firstBridgeDeploymentUses, "Supabase bridge env")
@@ -134,7 +141,16 @@ test("Aliyun completion audit reports the current goal as blocked without secret
 
   assert.equal(byId.get("G01_LOCAL_APP_BACKEND_READY").status, "partial")
   assert.ok(byId.get("G01_LOCAL_APP_BACKEND_READY").evidence.includes("localCodeReady=false"))
+  assert.ok(byId.get("G01_LOCAL_APP_BACKEND_READY").evidence.includes("localImplementationReady=true"))
+  assert.ok(byId.get("G01_LOCAL_APP_BACKEND_READY").evidence.includes("localImplementationBlockingFields=none"))
+  assert.ok(byId.get("G01_LOCAL_APP_BACKEND_READY").evidence.some((item) =>
+    item.includes("localCodeMachineBlockers=") &&
+    item.includes("missing_required_env:WECHAT_OPEN_APP_ID") &&
+    item.includes("app_universal_link:apple_team_id_missing")
+  ))
   assert.ok(byId.get("G01_LOCAL_APP_BACKEND_READY").blockers.includes("localCodeReady=false"))
+  assert.ok(!byId.get("G01_LOCAL_APP_BACKEND_READY").blockers.includes("appApiBridgeMap"))
+  assert.ok(!byId.get("G01_LOCAL_APP_BACKEND_READY").blockers.includes("appRuntimeConfig"))
   assert.equal(byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").status, "blocked")
   assert.ok(byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").evidence.includes("resourceEvidenceReady=0/7"))
   assert.ok(byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").blockers.some((item) =>

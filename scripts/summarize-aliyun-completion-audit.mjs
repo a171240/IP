@@ -166,8 +166,9 @@ function buildAudit(args, inputs) {
   } = inputs
   const goalClosureEvidenceBrief = buildGoalClosureEvidenceBrief(sensitiveBlockers, resourcesMatrix)
   const bridgeDataLayer = buildBridgeDataLayerBoundary(productionStatus, operatorHandoff)
+  const localImplementation = buildLocalImplementationEvidence(productionStatus, operatorHandoff)
   const requirements = [
-    buildLocalAppBackendRequirement(productionStatus, operatorHandoff),
+    buildLocalAppBackendRequirement(productionStatus, operatorHandoff, localImplementation),
     buildAliyunCloudResourceRequirement(productionStatus, operatorHandoff, resourcesMatrix),
     buildCloudInventoryRequirement(productionStatus, operatorHandoff),
     buildImagePublishRequirement(operatorHandoff),
@@ -204,6 +205,10 @@ function buildAudit(args, inputs) {
     summary: {
       ...summary,
       localEvidenceUsable: productionStatus.releaseEvidenceUsable !== false,
+      localImplementationReady: localImplementation.ready,
+      localImplementationReadyFields: localImplementation.readyFields,
+      localImplementationBlockingFields: localImplementation.blockingFields,
+      localCodeMachineBlockers: localImplementation.machineBlockers,
       requiredEnv: `${productionStatus.summary?.requiredReady || 0}/${productionStatus.summary?.requiredTotal || 0}`,
       requiredBlocking: productionStatus.summary?.requiredBlocking || [],
       cloudConfirmations: productionStatus.summary?.cloudConfirmations || {},
@@ -293,9 +298,8 @@ function buildBridgeDataLayerBoundary(productionStatus, operatorHandoff) {
   }
 }
 
-function buildLocalAppBackendRequirement(status, operatorHandoff) {
+function buildLocalImplementationEvidence(status, operatorHandoff) {
   const localReady = operatorHandoff.localReady || {}
-  const localCodeReady = status.summary?.localCodeReady === true
   const booleanReadyFields = [
     "appApiBridgeMap",
     "appRuntimeConfig",
@@ -303,7 +307,20 @@ function buildLocalAppBackendRequirement(status, operatorHandoff) {
     "nativeRelease",
     "docker",
   ]
-  const blockers = booleanReadyFields.filter((key) => localReady[key] !== true)
+  const blockingFields = booleanReadyFields.filter((key) => localReady[key] !== true)
+  const machineBlockers = status.summary?.machineBlocking || []
+  return {
+    ready: blockingFields.length === 0,
+    readyFields: booleanReadyFields.filter((key) => localReady[key] === true),
+    blockingFields,
+    machineBlockers,
+  }
+}
+
+function buildLocalAppBackendRequirement(status, operatorHandoff, localImplementation) {
+  const localReady = operatorHandoff.localReady || {}
+  const localCodeReady = status.summary?.localCodeReady === true
+  const blockers = [...localImplementation.blockingFields]
   if (!localCodeReady) blockers.unshift("localCodeReady=false")
   const statusValue = localCodeReady && blockers.length === 0 ? "proved" : "partial"
   return requirement({
@@ -312,6 +329,10 @@ function buildLocalAppBackendRequirement(status, operatorHandoff) {
     status: statusValue,
     evidence: [
       `localCodeReady=${localCodeReady}`,
+      `localImplementationReady=${localImplementation.ready}`,
+      `localImplementationReadyFields=${localImplementation.readyFields.join(",") || "none"}`,
+      `localImplementationBlockingFields=${localImplementation.blockingFields.join(",") || "none"}`,
+      `localCodeMachineBlockers=${localImplementation.machineBlockers.join(",") || "none"}`,
       `appApiBridgeMap=${localReady.appApiBridgeMap === true}`,
       `appRuntimeConfig=${localReady.appRuntimeConfig === true}`,
       `appRuntimeApiBaseUrl=${localReady.appRuntimeApiBaseUrl || "unknown"}`,
@@ -669,6 +690,9 @@ function renderMarkdown(report) {
     `- Can deploy now: ${report.canDeployNow}`,
     `- Current answer: ${report.currentAnswer}`,
     `- Requirements: proved ${report.summary.proved}/${report.summary.requirements}, blocked ${report.summary.blocked}, partial ${report.summary.partial}`,
+    `- Local implementation ready: ${report.summary.localImplementationReady}`,
+    `- Local implementation blocking fields: ${report.summary.localImplementationBlockingFields.length ? report.summary.localImplementationBlockingFields.join(", ") : "none"}`,
+    `- Local code machine blockers: ${report.summary.localCodeMachineBlockers.length ? report.summary.localCodeMachineBlockers.join(", ") : "none"}`,
     `- Required env: ${report.summary.requiredEnv}`,
     `- Cloud confirmations: ${report.summary.cloudConfirmations.ready || 0}/${report.summary.cloudConfirmations.total || 0} ready`,
     `- Cloud inventory results: localReady ${report.summary.cloudInventoryResults.localReady === true}, ready operations ${report.summary.cloudInventoryResults.readyLocalOperations || 0}/${report.summary.cloudInventoryResults.localOperations || 0}`,
