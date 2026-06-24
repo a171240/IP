@@ -62,6 +62,7 @@ function parseArgs(argv) {
     skipBundle: false,
     skipVercelEnvCoverage: false,
     vercelEnvCoverageInput: "",
+    backendOnly: false,
   }
   for (let index = 2; index < argv.length; index += 1) {
     const arg = argv[index]
@@ -88,6 +89,10 @@ function parseArgs(argv) {
     }
     if (arg === "--skip-vercel-env-coverage") {
       args.skipVercelEnvCoverage = true
+      continue
+    }
+    if (arg === "--backend-only") {
+      args.backendOnly = true
       continue
     }
     if (arg === "--vercel-env-coverage-input") {
@@ -235,6 +240,12 @@ function renderMarkdown(audit) {
   const appRuntimeConfig = appProductionConfig?.runtimeConfig
   const appNativeRelease = appProductionConfig?.nativeRelease
   const bridgeDataLayer = readiness.checks?.bridgeDataLayer || {}
+  const currentScopeReady = audit.currentScope === "backend_aliyun_only"
+    ? backendCnStatus.canDeployBackendNow === true
+    : readiness.productionReady === true
+  const currentScopeBlocking = audit.currentScope === "backend_aliyun_only"
+    ? backendCnStatus.summary.backendRequiredBlocking || []
+    : readiness.machineBlocking || []
   return [
     "# 美业话镜 APP production-cn 阿里云发布审计",
     "",
@@ -242,6 +253,10 @@ function renderMarkdown(audit) {
     "",
     "## 结论",
     "",
+    `- currentScope: ${audit.currentScope}`,
+    `- currentScopeReady: ${currentScopeReady}`,
+    `- currentScopeBlocking: ${currentScopeBlocking.join(", ") || "none"}`,
+    `- deferredAppLaunchBlocking: ${(backendCnStatus.summary.appLaunchDeferredBlocking || []).join(", ") || "none"}`,
     `- productionReady: ${readiness.productionReady}`,
     `- diagnosticOnly: ${readiness.diagnosticOnly === true}`,
     `- releaseEvidenceUsable: ${readiness.releaseEvidenceUsable !== false}`,
@@ -1258,6 +1273,8 @@ function compactSensitiveBlockerForAudit(item) {
 
 function main() {
   const args = parseArgs(process.argv)
+  const currentScope = args.backendOnly ? "backend_aliyun_only" : "full_app_launch"
+  const backendOnlyArg = args.backendOnly ? ["--backend-only"] : []
   if (existsSync(args.outDir)) throw new Error(`out_dir_already_exists:${args.outDir}`)
   mkdirSync(args.outDir, { recursive: false, mode: 0o700 })
 
@@ -1554,6 +1571,7 @@ function main() {
     ...(args.cloudInventoryResultsFile ? ["--cloud-inventory-results", args.cloudInventoryResultsFile] : []),
     ...(args.skipVercelEnvCoverage ? ["--skip-vercel-env-coverage"] : []),
     ...(args.vercelEnvCoverageInput ? ["--vercel-env-coverage-input", args.vercelEnvCoverageInput] : []),
+    ...backendOnlyArg,
     "--out",
     evidenceWritebackJsonPath,
     "--markdown",
@@ -1596,6 +1614,7 @@ function main() {
     ...(args.cloudInventoryResultsFile ? ["--cloud-inventory-results", args.cloudInventoryResultsFile] : []),
     ...(args.skipVercelEnvCoverage ? ["--skip-vercel-env-coverage"] : []),
     ...(args.vercelEnvCoverageInput ? ["--vercel-env-coverage-input", args.vercelEnvCoverageInput] : []),
+    ...backendOnlyArg,
     "--out",
     operatorHandoffJsonPath,
     "--markdown",
@@ -1638,6 +1657,8 @@ function main() {
   const bundle = args.skipBundle ? null : createArchive(args.outDir)
   const audit = {
     generatedAt: new Date().toISOString(),
+    currentScope,
+    backendOnly: args.backendOnly,
     backendRoot: BACKEND_ROOT,
     envFile: args.envFile,
     cloudConfirmationsFile: args.cloudConfirmationsFile || null,
@@ -1775,11 +1796,18 @@ function main() {
   console.log(JSON.stringify({
     ok: true,
     outDir: args.outDir,
+    currentScope,
+    currentScopeReady: args.backendOnly ? backendCnStatus.canDeployBackendNow === true : readiness.productionReady === true,
+    currentScopeBlocking: args.backendOnly
+      ? backendCnStatus.summary.backendRequiredBlocking || []
+      : readiness.machineBlocking || [],
+    deferredAppLaunchBlocking: backendCnStatus.summary.appLaunchDeferredBlocking || [],
     productionReady: readiness.productionReady,
     diagnosticOnly: readiness.diagnosticOnly === true,
     releaseEvidenceUsable: readiness.releaseEvidenceUsable !== false,
-    localCodeReady: readiness.localCodeReady,
-    machineBlocking: readiness.machineBlocking,
+    localCodeReady: args.backendOnly ? blockerBrief.summary.localCodeReady === true : readiness.localCodeReady,
+    machineBlocking: args.backendOnly ? blockerBrief.summary.machineBlocking || [] : readiness.machineBlocking,
+    fullAppMachineBlocking: readiness.machineBlocking,
     manualBlockingCount: readiness.manualBlocking.length,
     cloudConfirmationsReady: readiness.checks?.cloudConfirmations?.ready === true,
     cloudAccess: {
@@ -2600,9 +2628,10 @@ function runVercelEnvCoverage(args, reportPath) {
 function printHelp() {
   console.log([
     "Usage:",
-    "  node scripts/prepare-aliyun-release-artifacts.mjs [--env-file path] [--cloud-confirmations path] [--cloud-inventory-results path] [--out-dir /tmp/path] [--skip-bundle] [--skip-vercel-env-coverage] [--vercel-env-coverage-input /tmp/vercel-env.json]",
+    "  node scripts/prepare-aliyun-release-artifacts.mjs [--env-file path] [--cloud-confirmations path] [--cloud-inventory-results path] [--out-dir /tmp/path] [--skip-bundle] [--skip-vercel-env-coverage] [--vercel-env-coverage-input /tmp/vercel-env.json] [--backend-only]",
     "",
     "Creates non-secret production-cn release audit files and a Docker context tarball outside the repo by default.",
+    "--backend-only keeps deferred WeChat/Android/Apple launch gaps out of the current backend deployment scope.",
     "Vercel env coverage is metadata-only and non-blocking; it never includes values.",
     "The tarball is scanned for forbidden entries such as .env files, .git, node_modules, .next, and logs.",
   ].join("\n"))

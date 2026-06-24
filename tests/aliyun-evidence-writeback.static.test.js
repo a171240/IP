@@ -27,6 +27,7 @@ test("Aliyun evidence writeback command is wired into scripts, predeploy, deploy
 
   assert.equal(pkg.scripts["aliyun:evidence:writeback"], "node ./scripts/generate-aliyun-evidence-writeback-checklist.mjs")
   assert.equal(pkg.scripts["aliyun:evidence:writeback:backend"], "node ./scripts/generate-aliyun-evidence-writeback-checklist.mjs --backend-only --skip-vercel-env-coverage")
+  assert.equal(pkg.scripts["aliyun:release:artifacts:backend"], "node ./scripts/prepare-aliyun-release-artifacts.mjs --backend-only --skip-vercel-env-coverage")
   assert.equal(pkg.scripts["aliyun:evidence:writeback:test"], "node --test tests/aliyun-evidence-writeback.static.test.js")
   assert.match(predeploy, /aliyun:evidence:writeback:test/)
   assert.match(predeploy, /aliyun:evidence:writeback", "--", "--skip-vercel-env-coverage/)
@@ -36,6 +37,9 @@ test("Aliyun evidence writeback command is wired into scripts, predeploy, deploy
   assert.match(releaseArtifacts, /evidence-writeback\.json/)
   assert.match(releaseArtifacts, /evidence-writeback\.md/)
   assert.match(releaseArtifacts, /evidenceWriteback/)
+  assert.match(releaseArtifacts, /arg === "--backend-only"/)
+  assert.match(releaseArtifacts, /\.\.\.backendOnlyArg/)
+  assert.match(releaseArtifacts, /currentScopeReady/)
   assert.match(releaseArtifacts, /rdsMigrationGaps: evidenceWriteback\.summary\.rdsMigrationGaps/)
   assert.match(releaseArtifacts, /evidenceClosureBrief/)
   assert.match(releaseArtifacts, /partiallyObservedResourceEvidenceIds/)
