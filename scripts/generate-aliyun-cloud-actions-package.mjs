@@ -16,6 +16,16 @@ const CLOUD_CONSOLE_PACKET_IDS = new Set(["P03_ACR_PURCHASE", "P05_OSS_RAM_STS",
 const EXTERNAL_APP_PACKET_IDS = new Set(["P01_WECHAT_OPEN_MOBILE_APP", "P10_ANDROID_RELEASE_SIGNING", "P02_APPLE_TEAM_ID"])
 const CURRENT_SCOPE = "backend_aliyun_only"
 const FULL_APP_LAUNCH_SCOPE = "deferred_after_backend_online"
+const DEFERRED_APP_LAUNCH_CREDENTIAL_NAMES = new Set([
+  "APPLE_TEAM_ID",
+  "MEIYE_RELEASE_KEY_ALIAS",
+  "MEIYE_RELEASE_KEY_PASSWORD",
+  "MEIYE_RELEASE_STORE_FILE",
+  "MEIYE_RELEASE_STORE_PASSWORD",
+  "WECHAT_OPEN_APP_ID",
+  "WECHAT_OPEN_APP_SECRET",
+  "WECHAT_OPEN_APP_REVIEW_STATUS",
+])
 
 const SECRET_VALUE_PATTERNS = [
   /sk-[A-Za-z0-9_-]{20,}/,
@@ -121,7 +131,7 @@ function buildPackage(args) {
     "--allow-incomplete",
   ])
 
-  const consoleTasks = consoleRunbook.consoleTasks || []
+  const consoleTasks = (consoleRunbook.consoleTasks || []).map(scopeBackendOnlyConsoleTask)
   const immediateConsoleTasks = consoleTasks.filter((item) => item.canStartNow === true)
   const blockedConsoleTasks = consoleTasks.filter((item) => item.canStartNow !== true)
   const immediatePackets = provisioningPlan.readyAuthorizationPackets || []
@@ -300,6 +310,9 @@ function buildCloudActionClosureBrief({
   const blockedCredentialNames =
     runbookBrief.blockedCredentialNames ||
     []
+  const backendBlockedCredentialNames = blockedCredentialNames.filter((name) =>
+    !DEFERRED_APP_LAUNCH_CREDENTIAL_NAMES.has(name)
+  )
   const readySecretEnvVariableNames =
     runbookBrief.readySecretEnvVariableNames ||
     []
@@ -313,8 +326,8 @@ function buildCloudActionClosureBrief({
     currentScope: CURRENT_SCOPE,
     fullAppLaunchScope: FULL_APP_LAUNCH_SCOPE,
     canDeployNow: consoleRunbook.summary?.canDeployNow === true,
-    blockedCredentialCount: runbookBrief.blockedCredentialCount ?? blockedCredentialNames.length,
-    blockedCredentialNames,
+    blockedCredentialCount: backendBlockedCredentialNames.length,
+    blockedCredentialNames: backendBlockedCredentialNames,
     readySecretEnvVariableCount: runbookBrief.readySecretEnvVariableCount ?? readySecretEnvVariableNames.length,
     readySecretEnvVariableNames,
     resourceEvidenceReady: runbookBrief.resourceEvidenceReady || consoleRunbook.summary?.resourceEvidenceReady || "unknown",
@@ -339,6 +352,17 @@ function buildCloudActionClosureBrief({
       ...cloudConsolePackets.map((item) => item.packetId),
     ]),
   }
+}
+
+function scopeBackendOnlyConsoleTask(task) {
+  return {
+    ...task,
+    currentBlockers: (task.currentBlockers || []).filter((item) => !isDeferredAppLaunchBlocker(item)),
+  }
+}
+
+function isDeferredAppLaunchBlocker(value) {
+  return /WECHAT_OPEN_APP_|wechat_open_platform|APPLE_TEAM_ID|apple_team_id|MEIYE_RELEASE_|Android release signing|app_universal_link/i.test(String(value || ""))
 }
 
 function buildExecutionQueue(immediateConsoleTasks, blockedConsoleTasks, externalAppPackets, imagePublishWritebackPlan) {

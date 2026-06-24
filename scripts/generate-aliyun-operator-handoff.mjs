@@ -1432,6 +1432,7 @@ function writeOutput(filePath, content) {
 function main() {
   const args = parseArgs(process.argv)
   const envPlan = buildImportPlan(parseEnvFile(args.envFile))
+  const backendOnlyArgs = args.backendOnly ? ["--backend-only"] : []
   const status = runJson("status", [
     resolve(BACKEND_ROOT, "scripts/summarize-aliyun-production-cn-status.mjs"),
     "--env-file",
@@ -1447,6 +1448,7 @@ function main() {
     args.envFile,
     "--cloud-confirmations",
     args.cloudConfirmationsFile,
+    ...backendOnlyArgs,
   ])
   const cloudAccess = runJson("cloud_access", [
     resolve(BACKEND_ROOT, "scripts/check-aliyun-cloud-access.mjs"),

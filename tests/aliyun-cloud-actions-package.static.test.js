@@ -82,7 +82,7 @@ test("Aliyun cloud actions package summarizes current cloud console action order
   assert.equal(report.summary.cloudInventoryResultsReady, false)
   assert.equal(report.summary.cloudInventoryReadyLocalOperations, "0/9")
   assert.equal(report.summary.cloudInventoryExecutedCommandResults, "9/9")
-  assert.equal(report.summary.blockedCredentialCount, 8)
+  assert.equal(report.summary.blockedCredentialCount, 1)
   assert.equal(report.summary.readySecretEnvVariableCount, 17)
   assert.equal(report.summary.resourceEvidenceReady, "0/7")
   assert.ok(report.summary.blockedResourceEvidenceIds.includes("R01_SAE_RUNTIME"))
@@ -90,9 +90,8 @@ test("Aliyun cloud actions package summarizes current cloud console action order
   assert.ok(report.summary.partiallyObservedResourceEvidenceIds.includes("R05_OSS_AUDIO_STORAGE"))
   assert.ok(report.summary.partiallyObservedResourceEvidenceIds.includes("R07_SLS_ALERTS"))
   assert.equal(report.cloudActionClosureBrief.canDeployNow, false)
-  assert.equal(report.cloudActionClosureBrief.blockedCredentialCount, 8)
-  assert.ok(report.cloudActionClosureBrief.blockedCredentialNames.includes("WECHAT_OPEN_APP_ID"))
-  assert.ok(report.cloudActionClosureBrief.blockedCredentialNames.includes("WECHAT_OPEN_APP_SECRET"))
+  assert.equal(report.cloudActionClosureBrief.blockedCredentialCount, 1)
+  assert.deepEqual(report.cloudActionClosureBrief.blockedCredentialNames, ["ALIYUN_OSS_SECURITY_TOKEN"])
   assert.equal(report.cloudActionClosureBrief.readySecretEnvVariableCount, 17)
   assert.equal(report.cloudActionClosureBrief.resourceEvidenceReady, "0/7")
   assert.ok(report.cloudActionClosureBrief.blockedResourceEvidenceIds.includes("R02_ACR_IMAGE_REGISTRY"))
@@ -143,6 +142,9 @@ test("Aliyun cloud actions package summarizes current cloud console action order
   assert.ok(report.deferredAppLaunchPrerequisitePackets.some((item) => item.packetId === "P10_ANDROID_RELEASE_SIGNING"))
   assert.ok(report.executionQueue.blockedByDependencies.some((item) => item.id === "C01_SAE_RUNTIME"))
   assert.ok(report.executionQueue.blockedByDependencies.some((item) => item.blockingDependencies.includes("C05_OSS_AUDIO_RAM_STS")))
+  const envImportTask = report.executionQueue.blockedByDependencies.find((item) => item.id === "C06_ENV_IMPORT")
+  assert.ok(envImportTask.currentBlockers.includes("missing_required_env:DATABASE_URL_CN"))
+  assert.ok(!envImportTask.currentBlockers.some((item) => /WECHAT_OPEN_APP|APPLE_TEAM_ID|MEIYE_RELEASE/.test(item)))
   assert.equal(report.cloudInventoryResults.ready, false)
   assert.equal(report.cloudInventoryResults.readyLocalOperations, 0)
   assert.equal(report.cloudInventoryResults.localOperations, 9)
@@ -206,7 +208,8 @@ test("Aliyun cloud actions package markdown renders compact action order without
   assert.match(markdown, /# 阿里云控制台动作包/)
   assert.match(markdown, /packageId: C00_ALIYUN_CLOUD_ACTIONS/)
   assert.match(markdown, /## 目标闭环证据简表/)
-  assert.match(markdown, /blockedCredentialCount: 8/)
+  assert.match(markdown, /blockedCredentialCount: 1/)
+  assert.match(markdown, /blockedCredentialNames: ALIYUN_OSS_SECURITY_TOKEN/)
   assert.match(markdown, /readySecretEnvVariableCount: 17/)
   assert.match(markdown, /resourceEvidenceReady: 0\/7/)
   assert.match(markdown, /blockedResourceEvidenceIds: .*R02_ACR_IMAGE_REGISTRY/)
@@ -235,6 +238,8 @@ test("Aliyun cloud actions package markdown renders compact action order without
   assert.match(markdown, /MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1/)
   assert.match(markdown, /浏览器控制台登录/)
   assert.match(markdown, /C03_API_DOMAIN_HTTPS_ICP: dependsOn=C01_SAE_RUNTIME/)
+  assert.match(markdown, /C06_ENV_IMPORT: dependsOn=C05_OSS_AUDIO_RAM_STS; blockers=missing_required_env:DATABASE_URL_CN, envImport:confirmed, envImport:secretNotInImage/)
+  assert.doesNotMatch(markdown, /C06_ENV_IMPORT:[^\n]*WECHAT_OPEN_APP/)
   assert.match(markdown, /不购买 ACR/)
   assert.match(markdown, /不推送镜像/)
   assert.doesNotMatch(output + markdown, /sk-[A-Za-z0-9_-]{20,}/)
@@ -255,6 +260,7 @@ test("APP production-cn action queue documents the current authorized next-step 
     "cloudInventoryReadyLocalOperations: 0/9",
     "cloudInventoryExecutedCommandResults: 9/9",
     "mutationPerformedCommandResults: 0",
+    "blockedCredentialNames: ALIYUN_OSS_SECURITY_TOKEN",
     "canStartNow: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS",
     "cloudConsolePackets: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION",
     "externalAppPackets: none",
@@ -281,6 +287,8 @@ test("APP production-cn action queue documents the current authorized next-step 
     assert.match(doc, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
   }
 
+  assert.doesNotMatch(doc, /C06_ENV_IMPORT:[^\n]*WECHAT_OPEN_APP/)
+  assert.doesNotMatch(doc, /blockedCredentialNames: .*WECHAT_OPEN_APP/)
   assert.doesNotMatch(doc, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(doc, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(doc, /:\/\/[^\s:@]+:[^\s@]+@/)

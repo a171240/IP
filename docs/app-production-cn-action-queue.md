@@ -1,6 +1,6 @@
 # 阿里云控制台动作包
 
-生成时间：2026-06-24T15:18:25.380Z
+生成时间：2026-06-24T16:51:36.339Z
 
 ## 结论
 
@@ -21,7 +21,7 @@
 - containsValues: false
 - mutationPerformed: false
 - cloudApiCalled: false
-- blockedCredentialCount: 8
+- blockedCredentialCount: 1
 - readySecretEnvVariableCount: 17
 - resourceEvidenceReady: 0/7
 - blockedResourceEvidenceIds: R01_SAE_RUNTIME, R02_ACR_IMAGE_REGISTRY, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R05_OSS_AUDIO_STORAGE, R06_ENV_IMPORT, R07_SLS_ALERTS
@@ -31,8 +31,8 @@
 
 - conclusion: 现在不能部署；本动作包当前只覆盖阿里云后端，能进入 C02/C05/P11 的动作时确认，其余 ACR push/SAE/DNS/env/SLS/smoke 仍未闭环。
 - canDeployNow: false
-- blockedCredentialCount: 8
-- blockedCredentialNames: ALIYUN_OSS_SECURITY_TOKEN, APPLE_TEAM_ID, MEIYE_RELEASE_KEY_ALIAS, MEIYE_RELEASE_KEY_PASSWORD, MEIYE_RELEASE_STORE_FILE, MEIYE_RELEASE_STORE_PASSWORD, WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET
+- blockedCredentialCount: 1
+- blockedCredentialNames: ALIYUN_OSS_SECURITY_TOKEN
 - readySecretEnvVariableCount: 17
 - resourceEvidenceReady: 0/7
 - blockedResourceEvidenceIds: R01_SAE_RUNTIME, R02_ACR_IMAGE_REGISTRY, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R05_OSS_AUDIO_STORAGE, R06_ENV_IMPORT, R07_SLS_ALERTS
@@ -103,7 +103,7 @@
 - C01_SAE_RUNTIME: dependsOn=C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS, C06_ENV_IMPORT; blockers=runtime:confirmed, R01_SAE_RUNTIME:runtime:confirmed, R07_SLS_ALERTS:slsAlerts:confirmed, R07_SLS_ALERTS:slsAlerts:healthAlertConfigured, R07_SLS_ALERTS:slsAlerts:serverErrorAlertConfigured, slsAlerts:confirmed
 - C03_API_DOMAIN_HTTPS_ICP: dependsOn=C01_SAE_RUNTIME; blockers=APP_API_BASE_URL:dns_special_use_wildcard_ip, APP_API_BASE_URL:https_not_ready:ECONNRESET, NEXT_PUBLIC_SITE_URL:dns_special_use_wildcard_ip, NEXT_PUBLIC_SITE_URL:https_not_ready:ECONNRESET, APP_ASSET_BASE_URL:dns_special_use_wildcard_ip, APP_ASSET_BASE_URL:https_not_ready:ECONNRESET
 - C04_ASSET_DOMAIN_HTTPS_ICP: dependsOn=C05_OSS_AUDIO_RAM_STS; blockers=APP_API_BASE_URL:dns_special_use_wildcard_ip, APP_API_BASE_URL:https_not_ready:ECONNRESET, NEXT_PUBLIC_SITE_URL:dns_special_use_wildcard_ip, NEXT_PUBLIC_SITE_URL:https_not_ready:ECONNRESET, APP_ASSET_BASE_URL:dns_special_use_wildcard_ip, APP_ASSET_BASE_URL:https_not_ready:ECONNRESET
-- C06_ENV_IMPORT: dependsOn=C05_OSS_AUDIO_RAM_STS; blockers=missing_required_env:DATABASE_URL_CN, missing_required_env:WECHAT_OPEN_APP_ID, missing_required_env:WECHAT_OPEN_APP_SECRET, envImport:confirmed, envImport:secretNotInImage, envImport:placeholder:importedAt
+- C06_ENV_IMPORT: dependsOn=C05_OSS_AUDIO_RAM_STS; blockers=missing_required_env:DATABASE_URL_CN, envImport:confirmed, envImport:secretNotInImage, envImport:placeholder:importedAt, envImport:placeholder:evidence, S06_READY_SENSITIVE_ENV_IMPORT:blocked
 - C07_SLS_ALERTS: dependsOn=C01_SAE_RUNTIME; blockers=slsAlerts:confirmed, slsAlerts:healthAlertConfigured, slsAlerts:serverErrorAlertConfigured, R01_SAE_RUNTIME:runtime:confirmed, R07_SLS_ALERTS:slsAlerts:confirmed, R07_SLS_ALERTS:slsAlerts:healthAlertConfigured
 
 ## 云侧动作授权包

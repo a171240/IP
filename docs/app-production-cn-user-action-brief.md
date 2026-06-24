@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 用户动作简报
 
-Generated: 2026-06-24T10:39:11.556Z
+Generated: 2026-06-24T16:57:18.938Z
 
 ## 结论
 
@@ -8,11 +8,11 @@ Generated: 2026-06-24T10:39:11.556Z
 - currentScope: backend_aliyun_only
 - fullAppLaunchScope: deferred_after_backend_online
 - canDeployNow: false
-- ready: 0 / 11
-- blocked: 11
+- ready: 0 / 8
+- blocked: 8
 - nextActionTimeConfirmations: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
 - deferredAppLaunchConfirmations: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID
-- blockedCredentialCount: 8
+- blockedCredentialCount: 1
 - readySecretEnvVariableCount: 17
 - containsValues: false
 - secretLeakCheck: true
@@ -21,22 +21,19 @@ Generated: 2026-06-24T10:39:11.556Z
 ## 密钥/密码/受控变量获取摘要
 
 - canCodexProceedWithoutUser: false
-- blockedCredentialCount: 8
-- blockedCredentialNames: ALIYUN_OSS_SECURITY_TOKEN, APPLE_TEAM_ID, MEIYE_RELEASE_KEY_ALIAS, MEIYE_RELEASE_KEY_PASSWORD, MEIYE_RELEASE_STORE_FILE, MEIYE_RELEASE_STORE_PASSWORD, WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET
+- blockedCredentialCount: 1
+- blockedCredentialNames: ALIYUN_OSS_SECURITY_TOKEN
 - readySecretEnvVariableCount: 17
 - readySecretEnvVariableNames: ADMIN_USER_IDS, ALIYUN_OSS_ACCESS_KEY_ID, ALIYUN_OSS_ACCESS_KEY_SECRET, APIMART_API_KEY, CREDITS_IP_SALT, DASHSCOPE_API_KEY, DEEPSEEK_API_KEY, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_SUPABASE_URL, SERVICE_RECORD_DEEPSEEK_API_KEY, SUPABASE_SERVICE_ROLE_KEY, VOLC_SPEECH_ACCESS_TOKEN, VOLC_SPEECH_APP_ID, VOLC_SPEECH_SECRET_KEY, WECHAT_LOGIN_SECRET, WECHAT_MINI_APPID, WECHAT_MINI_SECRET
-- actionTimeConfirmationRequiredIds: S01_WECHAT_OPEN_APP_LOGIN, S02_APPLE_TEAM_ID, S03_ACR_PAID_PURCHASE, S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S06_READY_SENSITIVE_ENV_IMPORT, S07_ANDROID_RELEASE_SIGNING
+- actionTimeConfirmationRequiredIds: S03_ACR_PAID_PURCHASE, S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S06_READY_SENSITIVE_ENV_IMPORT
 - forbiddenStorage: git, JSON/Markdown 报告, Docker image, App bundle, 小程序或 App 前端包
 
 | 类别 | 动作 ID | 状态 | 缺失变量 | 已 ready 但需导入 secret env | 获取位置 | 导入/写入目标 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `wechat_open_mobile_app` | `S01_WECHAT_OPEN_APP_LOGIN` | blocked | WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET | none | 微信开放平台 -> 管理中心 -> 移动应用 -> 美业话镜 App -> 开发信息 | WECHAT_OPEN_APP_ID -> 阿里云 SAE plain env; WECHAT_OPEN_APP_SECRET -> 阿里云 KMS/Secrets Manager/SAE secret env; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.wechatOpenPlatform |
-| `ios_universal_link` | `S02_APPLE_TEAM_ID` | blocked | APPLE_TEAM_ID | none | Apple Developer -> Membership 或 Certificates, Identifiers & Profiles -> Identifiers -> 美业话镜 App ID | APPLE_TEAM_ID -> 阿里云 SAE plain env; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.wechatOpenPlatform / iOS evidence |
 | `acr_paid_purchase` | `S03_ACR_PAID_PURCHASE` | blocked | none | none | 阿里云控制台 -> 容器镜像服务 ACR -> 企业版购买页 | deploy/aliyun-production-cn.image-publish.local.json -> acr.purchaseCandidate / acr non-secret evidence |
 | `acr_registry_auth` | `S04_ACR_REGISTRY_AUTH` | blocked | none | none | 阿里云控制台 -> ACR 命名空间/镜像仓库；SAE 应用 -> 镜像拉取配置 | deploy/aliyun-production-cn.image-publish.local.json -> acr + runtime non-secret fields; SAE runtime image pull credentials -> Aliyun runtime secret settings only |
 | `oss_ram_sts` | `S05_OSS_RAM_SECRET_OR_STS` | blocked | ALIYUN_OSS_SECURITY_TOKEN | ALIYUN_OSS_ACCESS_KEY_ID, ALIYUN_OSS_ACCESS_KEY_SECRET | 阿里云控制台 -> RAM 访问控制 / OSS Bucket / SAE 环境变量或 Secrets Manager | ALIYUN_OSS_ACCESS_KEY_ID / ALIYUN_OSS_ACCESS_KEY_SECRET / ALIYUN_OSS_SECURITY_TOKEN -> KMS/Secrets Manager/SAE secret env; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss |
 | `ready_secret_env_import` | `S06_READY_SENSITIVE_ENV_IMPORT` | blocked | none | ADMIN_USER_IDS, ALIYUN_OSS_ACCESS_KEY_ID, ALIYUN_OSS_ACCESS_KEY_SECRET, APIMART_API_KEY, CREDITS_IP_SALT, DASHSCOPE_API_KEY, DEEPSEEK_API_KEY, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_SUPABASE_URL, SERVICE_RECORD_DEEPSEEK_API_KEY, SUPABASE_SERVICE_ROLE_KEY, VOLC_SPEECH_ACCESS_TOKEN, VOLC_SPEECH_APP_ID, VOLC_SPEECH_SECRET_KEY, WECHAT_LOGIN_SECRET, WECHAT_MINI_APPID, WECHAT_MINI_SECRET | 现有 Vercel production / Supabase / 阿里云百炼 / DeepSeek / 火山引擎 / 微信公众平台等控制台 | SAE plain env for non-secret identifiers only; KMS/Secrets Manager/SAE secret env for secret or connection values; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport |
-| `android_release_signing` | `S07_ANDROID_RELEASE_SIGNING` | blocked | MEIYE_RELEASE_KEY_ALIAS, MEIYE_RELEASE_KEY_PASSWORD, MEIYE_RELEASE_STORE_FILE, MEIYE_RELEASE_STORE_PASSWORD | none | Android release keystore 管理位置 / CI Secret Store；微信开放平台 -> 移动应用 -> Android 应用签名 | MEIYE_RELEASE_STORE_FILE / MEIYE_RELEASE_STORE_PASSWORD / MEIYE_RELEASE_KEY_ALIAS / MEIYE_RELEASE_KEY_PASSWORD -> 本机或 CI 受控 signing secret store; 微信开放平台 -> 移动应用 -> Android 应用签名; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.wechatOpenPlatform.androidSignature / androidConfigured |
 
 ### 已 ready 但仍需导入阿里云 secret env 的变量组
 
@@ -98,73 +95,10 @@ Generated: 2026-06-24T10:39:11.556Z
 
 ## 延期的完整 APP 发布项
 
-### P01_WECHAT_OPEN_MOBILE_APP 创建微信开放平台移动应用并审核通过
-
-- actionId: U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE
-- owner: 用户/微信开放平台操作员
-- minimumUserPhrase: 授权在微信开放平台创建/补全美业话镜移动应用资料并提交审核；不读取或输出 AppSecret。
-- writeTargets: WECHAT_OPEN_APP_ID -> 阿里云 SAE plain env; WECHAT_OPEN_APP_SECRET -> KMS/Secrets Manager/SAE secret env; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.wechatOpenPlatform
-- verifyCommands: corepack pnpm aliyun:wechat-state:test; corepack pnpm aliyun:readiness
-
-### P10_ANDROID_RELEASE_SIGNING 配置 Android release signing 并生成微信开放平台 Android 签名
-
-- actionId: U10_ANDROID_RELEASE_SIGNING
-- owner: Android 发布操作员 / 微信开放平台操作员
-- minimumUserPhrase: 授权使用受控 Android release keystore 构建/签名 release 包并读取微信开放平台 Android 应用签名；不输出 keystore 密码。
-- writeTargets: MEIYE_RELEASE_STORE_FILE / MEIYE_RELEASE_STORE_PASSWORD / MEIYE_RELEASE_KEY_ALIAS / MEIYE_RELEASE_KEY_PASSWORD -> 本机或 CI 受控 signing secret store; 微信开放平台 -> 移动应用 -> Android 应用签名; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.wechatOpenPlatform.androidSignature / androidConfigured
-- verifyCommands: cd /Users/Admin/Documents/美业话镜APP/meiye-huajing-app/android && ANDROID_HOME="$HOME/Library/Android/sdk" ANDROID_SDK_ROOT="$HOME/Library/Android/sdk" ./gradlew assembleRelease; ANDROID_HOME="$HOME/Library/Android/sdk" ANDROID_SDK_ROOT="$HOME/Library/Android/sdk" $ANDROID_HOME/build-tools/<version>/apksigner verify --print-certs app/build/outputs/apk/release/*.apk; corepack pnpm aliyun:wechat-open:package; corepack pnpm aliyun:app-native:check
-
-### P02_APPLE_TEAM_ID 确认 Apple Team ID 用于 iOS Universal Link AASA
-
-- actionId: U02_APPLE_TEAM_ID
-- owner: Apple Developer / iOS 发布操作员
-- minimumUserPhrase: 授权读取 Apple Developer Team ID 并导入阿里云 plain env。
-- writeTargets: APPLE_TEAM_ID -> 阿里云 SAE plain env
-- verifyCommands: corepack pnpm aliyun:aasa:check; corepack pnpm aliyun:app-native:check
+- 微信开放平台移动应用、Android release signing 和 Apple Team ID 已延期到阿里云后端上线后处理；本 backend-only 输出不列这些延期项的密钥、密码或签名环境变量。
+- deferredAppLaunchConfirmations: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID
 
 ## 动作清单
-
-### U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE 创建微信开放平台移动应用并审核通过
-
-- status: blocked
-- owner: 用户/微信开放平台操作员
-- obtainFrom: 微信开放平台 -> 管理中心 -> 移动应用 -> 创建“美业话镜”移动应用
-- writeTargets: WECHAT_OPEN_APP_ID -> 阿里云 SAE plain env; WECHAT_OPEN_APP_SECRET -> KMS/Secrets Manager/SAE secret env; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.wechatOpenPlatform
-- variableNames: WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET, WECHAT_OPEN_APP_REVIEW_STATUS
-- currentBlockers: missing_required_env:WECHAT_OPEN_APP_ID; missing_required_env:WECHAT_OPEN_APP_SECRET; wechat_open_platform_mobile_app_not_ready; wechatOpenPlatform:confirmed; wechatOpenPlatform:mobileAppCreated; wechatOpenPlatform:mobileAppSubmitted; wechatOpenPlatform:mobileAppIdReady; wechatOpenPlatform:mobileAppSecretReady; wechatOpenPlatform:androidSignature; wechatOpenPlatform:androidConfigured; wechatOpenPlatform:iosConfigured; wechatOpenPlatform:reviewStatus=approved
-- currentEvidence: wechatOpenPlatform.accountVerified=true; wechatOpenPlatform.mobileAppCreated=false; wechatOpenPlatform.mobileAppSubmitted=false; wechatOpenPlatform.reviewStatus=not_started; wechatOpenPlatform.mobileAppIdReady=false; wechatOpenPlatform.mobileAppSecretReady=false
-- requiresActionTimeConfirmation: true
-- requiredUserAction: 先在微信开放平台创建“美业话镜”移动应用并提交审核；审核通过后读取 AppID/AppSecret；AppID 只导入阿里云 SAE 服务端 plain env，AppSecret 只导入 KMS/Secrets Manager/SAE secret env。
-- unblockCondition: reviewStatus=approved 且 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET ready。
-- verifyCommands: corepack pnpm aliyun:wechat-state:test; corepack pnpm aliyun:readiness
-
-### U10_ANDROID_RELEASE_SIGNING 配置 Android release signing 并生成微信开放平台 Android 签名
-
-- status: blocked
-- owner: Android 发布操作员 / 微信开放平台操作员
-- obtainFrom: Android release keystore 管理位置 / CI Secret Store；微信开放平台 -> 移动应用 -> Android 应用签名
-- writeTargets: MEIYE_RELEASE_STORE_FILE / MEIYE_RELEASE_STORE_PASSWORD / MEIYE_RELEASE_KEY_ALIAS / MEIYE_RELEASE_KEY_PASSWORD -> 本机或 CI 受控 signing secret store; 微信开放平台 -> 移动应用 -> Android 应用签名; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.wechatOpenPlatform.androidSignature / androidConfigured
-- variableNames: MEIYE_RELEASE_STORE_FILE, MEIYE_RELEASE_STORE_PASSWORD, MEIYE_RELEASE_KEY_ALIAS, MEIYE_RELEASE_KEY_PASSWORD
-- currentBlockers: S07_ANDROID_RELEASE_SIGNING:blocked; wechatOpenPlatform:androidSignature; wechatOpenPlatform:androidConfigured
-- currentEvidence: wechatOpenPlatform.androidSignature=TODO_ANDROID_RELEASE_WECHAT_SIGNATURE; wechatOpenPlatform.androidConfigured=false; S07_ANDROID_RELEASE_SIGNING:releaseSigningConfigReady=true; releaseUsesDebugSigning=false; wechatSignatureRecorded=false; androidConfigured=false
-- requiresActionTimeConfirmation: true
-- requiredUserAction: 提供或确认 Android release keystore、store password、key alias、key password；用 release APK/AAB 生成微信开放平台 Android 应用签名并回填。
-- unblockCondition: assembleRelease 成功，release 包不是 debug keystore 签名，微信开放平台记录 release 签名且 androidConfigured=true。
-- verifyCommands: cd /Users/Admin/Documents/美业话镜APP/meiye-huajing-app/android && ANDROID_HOME="$HOME/Library/Android/sdk" ANDROID_SDK_ROOT="$HOME/Library/Android/sdk" ./gradlew assembleRelease; ANDROID_HOME="$HOME/Library/Android/sdk" ANDROID_SDK_ROOT="$HOME/Library/Android/sdk" $ANDROID_HOME/build-tools/<version>/apksigner verify --print-certs app/build/outputs/apk/release/*.apk; corepack pnpm aliyun:wechat-open:package; corepack pnpm aliyun:app-native:check
-
-### U02_APPLE_TEAM_ID 确认 Apple Team ID 用于 iOS Universal Link AASA
-
-- status: blocked
-- owner: Apple Developer / iOS 发布操作员
-- obtainFrom: Apple Developer -> Membership 或 Certificates, Identifiers & Profiles -> Identifiers
-- writeTargets: APPLE_TEAM_ID -> 阿里云 SAE plain env
-- variableNames: APPLE_TEAM_ID
-- currentBlockers: invalid_app_universal_link_config; app_universal_link:apple_team_id_missing
-- currentEvidence: APPLE_TEAM_ID=missing
-- requiresActionTimeConfirmation: true
-- requiredUserAction: 从 Apple Developer 确认 10 位 Team ID 后导入阿里云 plain env，用于 AASA appID。
-- unblockCondition: APPLE_TEAM_ID ready 且 aliyun:aasa:check 不再报 apple_team_id_missing。
-- verifyCommands: corepack pnpm aliyun:aasa:check; corepack pnpm aliyun:app-native:check
 
 ### U03_ACR_PURCHASE_CONFIRMATION 确认 ACR 企业版付费购买
 
@@ -229,7 +163,7 @@ Generated: 2026-06-24T10:39:11.556Z
 - obtainFrom: 现有 Vercel/Supabase/阿里云/DeepSeek/火山/微信平台变量源；只由有权限的操作员导入，不在报告中显示值
 - writeTargets: 阿里云 SAE 环境变量 / KMS / Secrets Manager; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport
 - variableNames: NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, WECHAT_LOGIN_SECRET, ALIYUN_OSS_ACCESS_KEY_ID, ALIYUN_OSS_ACCESS_KEY_SECRET, DASHSCOPE_API_KEY, DEEPSEEK_API_KEY, SERVICE_RECORD_DEEPSEEK_API_KEY, VOLC_SPEECH_ACCESS_TOKEN, VOLC_SPEECH_APP_ID, VOLC_SPEECH_SECRET_KEY, ADMIN_USER_IDS, CREDITS_IP_SALT, APIMART_API_KEY, WECHAT_MINI_APPID, WECHAT_MINI_SECRET
-- currentBlockers: S06_READY_SENSITIVE_ENV_IMPORT:blocked; R06_ENV_IMPORT:missing_required_env:DATABASE_URL_CN; R06_ENV_IMPORT:missing_required_env:WECHAT_OPEN_APP_ID; R06_ENV_IMPORT:missing_required_env:WECHAT_OPEN_APP_SECRET; R06_ENV_IMPORT:envImport:confirmed; R06_ENV_IMPORT:envImport:secretNotInImage; R06_ENV_IMPORT:envImport:placeholder:importedAt; R06_ENV_IMPORT:envImport:placeholder:evidence; envImport:confirmed; envImport:secretNotInImage; requiredEnv:DATABASE_URL_CN; requiredEnv:WECHAT_OPEN_APP_ID; requiredEnv:WECHAT_OPEN_APP_SECRET
+- currentBlockers: S06_READY_SENSITIVE_ENV_IMPORT:blocked; R06_ENV_IMPORT:missing_required_env:DATABASE_URL_CN; R06_ENV_IMPORT:envImport:confirmed; R06_ENV_IMPORT:envImport:secretNotInImage; R06_ENV_IMPORT:envImport:placeholder:importedAt; R06_ENV_IMPORT:envImport:placeholder:evidence; envImport:confirmed; envImport:secretNotInImage; requiredEnv:DATABASE_URL_CN
 - currentEvidence: envImport.confirmed=false; envImport.target=SAE; envImport.secretNotInImage=false
 - requiresActionTimeConfirmation: true
 - requiredUserAction: 这些敏感或连接类变量名在本地已有 ready 值，但仍需导入阿里云运行环境；脚本只输出变量名，不输出值。
@@ -271,12 +205,12 @@ Generated: 2026-06-24T10:39:11.556Z
 - obtainFrom: 本 Codex 线程的明确动作时授权
 - writeTargets: release manifest / deployment log
 - variableNames: none
-- currentBlockers: canDeployNow=false; productionReady=false; requiredEnv:DATABASE_URL_CN; requiredEnv:WECHAT_OPEN_APP_ID; requiredEnv:WECHAT_OPEN_APP_SECRET; missing_required_env:DATABASE_URL_CN; missing_required_env:WECHAT_OPEN_APP_ID; missing_required_env:WECHAT_OPEN_APP_SECRET; wechat_open_platform_mobile_app_not_ready; invalid_app_universal_link_config; app_universal_link:apple_team_id_missing; manual:阿里云 ACR 镜像发布和运行时镜像拉取配置已确认; manual:阿里云 SAE 容器应用已创建，运行端口 3000; manual:api-cn 域名已备案、解析到阿里云入口并配置 HTTPS; manual:assets-cn 域名已备案、解析到阿里云入口并配置 HTTPS; manual:OSS Bucket CORS、RAM 最小权限和服务记录音频前缀已确认; manual:微信开放平台移动应用审核已通过，并已取得 AppID/AppSecret、Android 包名/签名、iOS Bundle ID/Universal Link 配置; manual:生产环境变量已通过阿里云控制台、KMS 或 Secrets Manager 导入，未把密钥写进镜像; manual:SLS 日志、健康检查失败告警和 5xx 告警已配置
+- currentBlockers: canDeployNow=false; productionReady=false; requiredEnv:DATABASE_URL_CN; missing_required_env:DATABASE_URL_CN; manual:阿里云 ACR 镜像发布和运行时镜像拉取配置已确认; manual:阿里云 SAE 容器应用已创建，运行端口 3000; manual:api-cn 域名已备案、解析到阿里云入口并配置 HTTPS; manual:assets-cn 域名已备案、解析到阿里云入口并配置 HTTPS; manual:OSS Bucket CORS、RAM 最小权限和服务记录音频前缀已确认; manual:生产环境变量已通过阿里云控制台、KMS 或 Secrets Manager 导入，未把密钥写进镜像; manual:SLS 日志、健康检查失败告警和 5xx 告警已配置
 - currentEvidence: verdict=blocked; canDeployNow=false; productionReady=false; cloudConfirmations=0/7
 - requiresActionTimeConfirmation: true
 - requiredUserAction: 所有前置资源 ready 后，再明确授权生产部署、ACR push、DNS 修改或 git push；本简报不自动推断授权。
 - unblockCondition: cloud confirmations strict、readiness cloud-ready、image plan strict、domain strict 和 predeploy 全部通过后，由用户明确授权对应外部动作。
-- verifyCommands: corepack pnpm aliyun:predeploy; corepack pnpm aliyun:cloud:confirmations:strict
+- verifyCommands: corepack pnpm aliyun:predeploy; corepack pnpm aliyun:cloud:confirmations:backend:strict
 
 ## 安全边界
 

@@ -301,7 +301,7 @@ test("Aliyun action authorization backend-only mode excludes deferred APP launch
 
 test("Aliyun action authorization packet handoff documents the current packet gate", () => {
   const handoff = read("docs", "app-production-cn-action-authorization-packets.md")
-  const output = execFileSync(process.execPath, ["scripts/summarize-aliyun-action-authorization.mjs"], {
+  const output = execFileSync(process.execPath, ["scripts/summarize-aliyun-action-authorization.mjs", "--backend-only"], {
     cwd: root,
     encoding: "utf8",
     maxBuffer: 1024 * 1024 * 40,
@@ -314,11 +314,13 @@ test("Aliyun action authorization packet handoff documents the current packet ga
   assert.match(handoff, /canDeployNow: false/)
   assert.match(handoff, /secretLeakCheck: true/)
   assert.match(handoff, /resourceEvidenceReady: 0\/7/)
-  assert.match(handoff, /blockedCredentialCount: 8/)
+  assert.match(handoff, /blockedCredentialCount: 1/)
+  assert.match(handoff, /blockedCredentialNames: ALIYUN_OSS_SECURITY_TOKEN/)
   assert.match(handoff, /readySecretEnvVariableCount: 17/)
   assert.match(handoff, /canStartNowPackets: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION/)
   assert.match(handoff, /deferredAppLaunchPackets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID/)
-  assert.match(handoff, /不使用小程序 AppID\/Secret 替代移动应用凭证/)
+  assert.doesNotMatch(handoff, /blockedCredentialNames: .*WECHAT_OPEN_APP/)
+  assert.doesNotMatch(handoff, /currentBlockers: .*WECHAT_OPEN_APP/)
 
   for (const packet of report.authorizationPackets) {
     assert.match(handoff, new RegExp(packet.packetId))
