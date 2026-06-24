@@ -147,3 +147,46 @@ test("Aliyun resource matrix markdown renders the resource evidence brief withou
   assert.doesNotMatch(output + markdown, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(output + markdown, /:\/\/[^\s:@]+:[^\s@]+@/)
 })
+
+test("tracked APP production-cn resource matrix doc pins the current blocked Aliyun resource evidence state", () => {
+  const doc = read("docs", "app-production-cn-resource-evidence-matrix.md")
+  const manifest = read("docs", "release-manifest-2026-06-21-app-aliyun-production-cn-bridge.md")
+
+  for (const expected of [
+    "Production-cn cannot be deployed now.",
+    "resourceEvidenceReady=0/7",
+    "cloudConfirmationsTotalBlockers=27",
+    "imagePublishTotalBlockers=12",
+    "cloudAccessCanReadNow=false",
+    "observedPartial=2",
+    "observedBlocked=5",
+    "R01_SAE_RUNTIME",
+    "R02_ACR_IMAGE_REGISTRY",
+    "R03_API_DOMAIN_HTTPS",
+    "R04_ASSET_DOMAIN_HTTPS",
+    "R05_OSS_AUDIO_STORAGE",
+    "R06_ENV_IMPORT",
+    "R07_SLS_ALERTS",
+    "not_created_or_not_confirmed",
+    "purchase_candidate_visible_not_purchased",
+    "domain_visible_records_missing",
+    "bucket_visible_unconfirmed",
+    "cloudshell_disconnected_or_config_missing",
+    "project_logstore_visible_alerts_pending",
+    "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.runtime",
+    "deploy/aliyun-production-cn.image-publish.local.json -> acr + runtime",
+    "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport",
+    "corepack pnpm aliyun:resources:matrix",
+    "corepack pnpm aliyun:evidence:writeback -- --skip-vercel-env-coverage",
+    "Do not purchase ACR or any paid resource.",
+    "Do not deploy production-cn until resourceEvidenceReady=7/7 and strict gates pass.",
+  ]) {
+    assert.match(doc, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
+  }
+
+  assert.match(manifest, /app-production-cn-resource-evidence-matrix\.md/)
+  assert.doesNotMatch(doc, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(doc, /LTAI[A-Za-z0-9]{12,}/)
+  assert.doesNotMatch(doc, /:\/\/[^\s:@]+:[^\s@]+@/)
+  assert.doesNotMatch(doc, /AccessKeySecret\s*[:=]\s*["'][^"']+["']/)
+})
