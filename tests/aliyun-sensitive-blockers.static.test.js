@@ -261,6 +261,58 @@ test("Aliyun sensitive blockers markdown renders value-free variable acquisition
   assert.doesNotMatch(markdown, /:\/\/[^\s:@]+:[^\s@]+@/)
 })
 
+test("Aliyun credential acquisition runbook stays aligned with sensitive blockers", () => {
+  const runbook = read("docs", "app-production-cn-credential-acquisition-runbook.md")
+  const output = execFileSync(process.execPath, ["scripts/summarize-aliyun-sensitive-blockers.mjs"], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 20,
+  })
+  const report = JSON.parse(output)
+
+  assert.match(runbook, /Production-cn cannot be deployed now\./)
+  assert.match(runbook, /blockedCredentialCount=8/)
+  assert.match(runbook, /readySecretEnvVariableCount=17/)
+  assert.match(runbook, /canCodexProceedWithoutUser=false/)
+  assert.match(runbook, /actionTimeConfirmationRequired=true/)
+  assert.match(runbook, /阿里云不是 APP 的创建平台/)
+  assert.match(runbook, /不能用小程序 AppID\/Secret 替代/)
+  assert.match(runbook, /P01_WECHAT_OPEN_MOBILE_APP/)
+  assert.match(runbook, /P09_PRODUCTION_DEPLOY/)
+
+  for (const item of report.items) {
+    assert.match(runbook, new RegExp(item.id))
+    for (const name of item.variableNames || []) {
+      assert.match(runbook, new RegExp(name))
+    }
+    for (const command of item.verifyCommands || []) {
+      assert.ok(runbook.includes(command))
+    }
+  }
+
+  for (const name of report.credentialInterventionBrief.blockedCredentialNames) {
+    assert.match(runbook, new RegExp(name))
+  }
+  for (const name of report.credentialInterventionBrief.readySecretEnvVariableNames) {
+    assert.match(runbook, new RegExp(name))
+  }
+  for (const forbidden of [
+    "AppSecret",
+    "AccessKeySecret",
+    "registry password",
+    "RAM Secret",
+    "STS token",
+    "Android keystore password",
+    "Supabase service role key",
+  ]) {
+    assert.match(runbook, new RegExp(forbidden))
+  }
+
+  assert.doesNotMatch(runbook, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(runbook, /LTAI[A-Za-z0-9]{12,}/)
+  assert.doesNotMatch(runbook, /:\/\/[^\s:@]+:[^\s@]+@/)
+})
+
 test("Aliyun release artifacts summary surfaces sensitive blocker acquisition details", () => {
   const releaseArtifacts = read("scripts", "prepare-aliyun-release-artifacts.mjs")
 
