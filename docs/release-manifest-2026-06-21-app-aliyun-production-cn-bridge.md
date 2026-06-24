@@ -181,6 +181,15 @@ tests/aliyun-provisioning-plan.static.test.js
 
 该追加只固化 plan-only 阶段顺序：第一版后端部署目标为 `cn-hangzhou` 的阿里云 SAE 自定义容器 `meiye-huajing-app-api-production-cn`，端口 3000；当前只有 `PH01_EXTERNAL_APP_IDENTIFIERS` 和 `PH02_BASE_CLOUD_RESOURCES` 可在动作时确认后开始，`PH03`-`PH07` 仍被依赖阻塞。它不包含阿里云购买、资源创建、DNS/HTTPS 修改、密钥导入、镜像推送、production-cn 部署、微信/Apple 外部写操作或 git push。
 
+2026-06-24 追加的当前阻塞简报证据：
+
+```text
+docs/app-production-cn-current-blocker-brief.md
+tests/aliyun-blocker-brief.static.test.js
+```
+
+该追加把 `corepack pnpm aliyun:blockers:brief` 的当前 go/no-go 口径固化成一页式 handoff：现在不能部署/上线；必填环境变量为 `24/26`，硬阻塞是 `WECHAT_OPEN_APP_ID` 和 `WECHAT_OPEN_APP_SECRET`；微信开放平台账号已认证但移动应用未创建；小程序 `WECHAT_MINI_*` 凭证不能替代 APP 登录凭证；阿里云资源证据仍为 `0/7`；当前仅 `C02_ACR_IMAGE_AND_PULL` 和 `C05_OSS_AUDIO_RAM_STS` 可在动作时确认后继续补非密钥证据。它不包含任何密钥 value，也不授权阿里云购买、资源创建、密钥导入、镜像推送、production-cn 部署、微信开放平台创建/提交、Apple Developer 写操作、Supabase 写入或 git push。
+
 ## 4. 明确不包含
 
 - 不包含 App 内支付、苹果 IAP、安卓应用市场支付。
