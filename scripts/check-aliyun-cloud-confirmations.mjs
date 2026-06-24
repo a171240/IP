@@ -13,6 +13,12 @@ const EXPECTED_WECHAT_MOBILE_APP_NAME = "美业话镜"
 const EXPECTED_ANDROID_PACKAGE_NAME = "com.ipgongchang.meiyehuajing"
 const EXPECTED_IOS_BUNDLE_ID = "com.ipgongchang.meiyehuajing"
 const EXPECTED_ALIYUN_REGION = "cn-hangzhou"
+const APP_LAUNCH_DEFERRED_CONFIRMATION_KEYS = new Set(["wechatOpenPlatform"])
+const APP_LAUNCH_DEFERRED_AUTHORIZATION_PACKETS = Object.freeze([
+  "P01_WECHAT_OPEN_MOBILE_APP",
+  "P10_ANDROID_RELEASE_SIGNING",
+  "P02_APPLE_TEAM_ID",
+])
 
 const DEFINITIONS = [
   {
@@ -305,6 +311,7 @@ function parseArgs(argv) {
     templateFile: DEFAULT_TEMPLATE_FILE,
     localFile: DEFAULT_LOCAL_FILE,
     allowIncomplete: false,
+    backendOnly: false,
   }
   for (let index = 2; index < argv.length; index += 1) {
     const arg = argv[index]
@@ -319,6 +326,10 @@ function parseArgs(argv) {
     }
     if (arg === "--allow-incomplete") {
       args.allowIncomplete = true
+      continue
+    }
+    if (arg === "--backend-only") {
+      args.backendOnly = true
       continue
     }
     if (arg === "--help" || arg === "-h") {
@@ -339,11 +350,31 @@ function readJson(filePath) {
   return JSON.parse(readFileSync(filePath, "utf8"))
 }
 
-function validateFile(filePath, mode) {
+function definitionsForScope(args) {
+  if (!args.backendOnly) return DEFINITIONS
+  return DEFINITIONS.filter((definition) => !APP_LAUNCH_DEFERRED_CONFIRMATION_KEYS.has(definition.key))
+}
+
+function cloudConfirmationCommandsForScope(currentScope) {
+  if (currentScope === "backend_aliyun_only") {
+    return {
+      check: "corepack pnpm aliyun:cloud:confirmations:backend",
+      strict: "corepack pnpm aliyun:cloud:confirmations:backend:strict",
+    }
+  }
+  return {
+    check: "corepack pnpm aliyun:cloud:confirmations",
+    strict: "corepack pnpm aliyun:cloud:confirmations:strict",
+  }
+}
+
+function validateFile(filePath, mode, options = {}) {
+  const definitions = options.definitions || DEFINITIONS
   if (!existsSync(filePath)) {
     return {
       file: filePath,
       mode,
+      currentScope: options.currentScope || "full_app_launch",
       exists: false,
       ready: false,
       blockers: ["file_missing"],
@@ -369,7 +400,7 @@ function validateFile(filePath, mode) {
   const unknownItems = Object.keys(rawItems).filter((key) => !knownKeys.has(key))
   if (unknownItems.length) warnings.push(`unknown_items:${unknownItems.join(",")}`)
 
-  const items = DEFINITIONS.map((definition) => validateItem(rawItems[definition.key], definition, mode))
+  const items = definitions.map((definition) => validateItem(rawItems[definition.key], definition, mode))
   const itemBlockers = items.flatMap((item) => item.blockers.map((blocker) => `${item.key}:${blocker}`))
   const itemWarnings = items.flatMap((item) => item.warnings.map((warning) => `${item.key}:${warning}`))
   warnings.push(...itemWarnings)
@@ -378,6 +409,7 @@ function validateFile(filePath, mode) {
   return {
     file: filePath,
     mode,
+    currentScope: options.currentScope || "full_app_launch",
     exists: true,
     ready: blockers.length === 0,
     blockers,
@@ -493,6 +525,8 @@ function authorizationPacketsForBlocker(key, blocker) {
 }
 
 function buildCloudConfirmationWritebackPlan(local) {
+  const currentScope = local.currentScope || "full_app_launch"
+  const commands = cloudConfirmationCommandsForScope(currentScope)
   const groups = (local.items || []).map((item) => {
     const metadata = CLOUD_CONFIRMATION_GROUP_METADATA[item.key] || {}
     const requiredAuthorizationPackets = uniqueStrings(
@@ -516,8 +550,8 @@ function buildCloudConfirmationWritebackPlan(local) {
         "不要把小程序 AppID/Secret 当作微信开放平台移动应用凭证",
       ],
       verifyCommands: [
-        "corepack pnpm aliyun:cloud:confirmations",
-        "corepack pnpm aliyun:cloud:confirmations:strict",
+        commands.check,
+        commands.strict,
       ],
       nonSecretEvidenceOnly: true,
     }
@@ -532,7 +566,7 @@ function buildCloudConfirmationWritebackPlan(local) {
     groups,
     requiredAuthorizationPackets: uniqueStrings(groups.flatMap((group) => group.requiredAuthorizationPackets)),
     strictVerificationOrder: [
-      "corepack pnpm aliyun:cloud:confirmations:strict",
+      commands.strict,
       "corepack pnpm aliyun:image:plan:strict",
       "corepack pnpm aliyun:domain:strict",
       "corepack pnpm aliyun:readiness:cloud-ready",
@@ -548,14 +582,20 @@ function buildCloudConfirmationWritebackPlan(local) {
 
 function main() {
   const args = parseArgs(process.argv)
-  const template = validateFile(args.templateFile, "template")
-  const local = validateFile(args.localFile, "local")
+  const currentScope = args.backendOnly ? "backend_aliyun_only" : "full_app_launch"
+  const definitions = definitionsForScope(args)
+  const template = validateFile(args.templateFile, "template", { currentScope, definitions })
+  const local = validateFile(args.localFile, "local", { currentScope, definitions })
   const ok = template.ready && local.ready
   const writebackPlan = buildCloudConfirmationWritebackPlan(local)
   const report = {
     ok,
+    currentScope,
+    backendOnly: args.backendOnly,
     allowIncomplete: args.allowIncomplete,
     containsValues: false,
+    deferredAppLaunchConfirmationKeys: args.backendOnly ? [...APP_LAUNCH_DEFERRED_CONFIRMATION_KEYS] : [],
+    deferredAppLaunchAuthorizationPackets: args.backendOnly ? [...APP_LAUNCH_DEFERRED_AUTHORIZATION_PACKETS] : [],
     summary: summarize([template, local]),
     template: {
       file: template.file,
@@ -580,6 +620,9 @@ function main() {
     nextActions: [
       "保持 example 模板只放 TODO 和非密钥字段。",
       "在 .local.json 里只填资源名、布尔状态、证据编号或控制台路径，不填任何 secret/token/key/password 值。",
+      ...(args.backendOnly
+        ? ["当前 backend-only 口径下微信开放平台移动应用、Android 签名和 iOS AASA 只作为上线后延期项，不阻塞阿里云后端资源补齐。"]
+        : []),
       "所有 local item ready 后再运行 corepack pnpm aliyun:readiness:cloud-ready。",
       "正式部署后再运行 corepack pnpm aliyun:postdeploy:smoke -- --base-url https://api-cn.ipgongchang.xin。",
     ],
@@ -592,9 +635,10 @@ function main() {
 function printHelp() {
   console.log([
     "Usage:",
-    "  node scripts/check-aliyun-cloud-confirmations.mjs [--allow-incomplete] [--template path] [--local path]",
+    "  node scripts/check-aliyun-cloud-confirmations.mjs [--allow-incomplete] [--backend-only] [--template path] [--local path]",
     "",
     "Checks the non-secret Aliyun/WeChat cloud confirmation template and local evidence file.",
+    "--backend-only excludes deferred WeChat Open Platform mobile app, Android signing, and iOS AASA evidence from the current backend deployment scope.",
     "It never reads or prints secret values, and fails strict mode until all local confirmations are complete.",
   ].join("\n"))
 }

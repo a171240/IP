@@ -1665,6 +1665,7 @@ function main() {
   const cloudConfirmationsCheck = runJson("cloud_confirmations", [
     "scripts/check-aliyun-cloud-confirmations.mjs",
     ...(args.cloudConfirmationsFile ? ["--local", args.cloudConfirmationsFile] : []),
+    ...backendOnlyArg,
     "--allow-incomplete",
   ])
   const routes = runJson("routes", ["scripts/check-app-api-production-cn-routes.mjs"])

@@ -160,7 +160,7 @@ corepack pnpm aliyun:container:smoke（Docker image health + 30 APP API probes�
 
 `aliyun:app-api:bridge-map` 是小程序链路复用门禁：它读取 `deploy/app-api-production-cn.bridge-map.json`，逐条校验 31 个 APP API route、App route 文件、源小程序 API 文件和小程序源页面是否一致。当前分类是 22 条 `mp_reexport`、5 条 `mp_adapter`、1 条 `app_native`、1 条 `app_alias`、2 条 `native_health`。微信登录必须保持 `app_native/app_alias`，不能回退复用小程序 `wx.login` 链路。
 
-`aliyun:app-client:contract` 是静态门禁：它读取 App 工程 `src/api` 里的 `apiRequest(...)` 调用，归一化动态路径后和后端 production-cn route 清单匹配。第一版范围包括登录、profile、entitlements、门店管理、邀请、顾客/场景/门店上下文和服务记录；Package 2 的 `knowledge-spaces` 调用只报告为 deferred，不作为第一版阻断。
+`aliyun:app-client:contract` 是静态门禁：它读取 App 工程 `src/api` 里的 `apiRequest(...)` 调用，归一化动态路径后和后端 production-cn route 清单匹配。第一版范围包括登录、profile、entitlements、门店管理、邀请、顾客/场景/门店上下文和服务记录；Package 2 的 `knowledge-spaces`、`assets/sign-read`、`content-drafts` 调用只报告为 deferred，不作为第一版阻断。
 
 `aliyun:app-api:coverage` 是静态门禁：它把 APP API route 清单和 smoke 探针清单做匹配，要求除 health 外的每个业务 route 至少有一个 smoke 探针覆盖。
 

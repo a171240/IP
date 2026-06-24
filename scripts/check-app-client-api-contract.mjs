@@ -28,6 +28,14 @@ const DEFERRED_PREFIXES = [
     prefix: "/api/app/knowledge-spaces",
     reason: "package-2 knowledge space template is outside production-cn first-version backend scope",
   },
+  {
+    prefix: "/api/app/assets/sign-read",
+    reason: "package-2 signed media asset read is outside production-cn first-version backend scope",
+  },
+  {
+    prefix: "/api/app/content-drafts",
+    reason: "package-2 content drafts for poster/xhs/private copy are outside production-cn first-version backend scope",
+  },
 ]
 
 function parseArgs(argv) {
