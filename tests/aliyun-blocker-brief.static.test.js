@@ -14,6 +14,7 @@ test("Aliyun blocker brief command is wired into scripts, predeploy, deploy spec
   const pkg = readJson("package.json")
   const predeploy = read("scripts", "aliyun-predeploy-commands.mjs")
   const releaseArtifacts = read("scripts", "prepare-aliyun-release-artifacts.mjs")
+  const blockerBrief = read("scripts", "summarize-aliyun-blocker-brief.mjs")
   const deploySpec = readJson("deploy", "aliyun-production-cn.example.json")
 
   assert.equal(pkg.scripts["aliyun:blockers:brief"], "node ./scripts/summarize-aliyun-blocker-brief.mjs")
@@ -48,6 +49,8 @@ test("Aliyun blocker brief command is wired into scripts, predeploy, deploy spec
   assert.match(releaseArtifacts, /canStartNowWritebackPlan/)
   assert.match(releaseArtifacts, /envSourceVercelRequiredCovered/)
   assert.match(releaseArtifacts, /envSourceMap/)
+  assert.match(blockerBrief, /wechatCredentialBoundary/)
+  assert.match(blockerBrief, /wechatMiniProgramCredentialsReusableForAppLogin/)
 })
 
 test("Aliyun blocker brief is concise, value-free, and names current hard blockers", () => {
@@ -295,10 +298,32 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.equal(report.summary.wechatOpenMobileAppCreated, false)
   assert.equal(report.summary.wechatOpenCanCreateDraft, true)
   assert.equal(report.summary.wechatOpenReadyToSubmitForReview, false)
+  assert.match(report.summary.wechatAppLoginCredentialSource, /微信开放平台 -> 管理中心 -> 移动应用/)
+  assert.equal(report.summary.wechatMiniProgramCredentialsReusableForAppLogin, false)
+  assert.deepEqual(report.summary.wechatMiniProgramCompatVariableNames, [
+    "WECHAT_MINI_APPID",
+    "WECHAT_MINI_SECRET",
+    "WECHAT_LOGIN_SECRET",
+  ])
   assert.equal(report.wechatOpenMobileApp.accountVerified, true)
   assert.equal(report.wechatOpenMobileApp.mobileAppCreated, false)
   assert.equal(report.wechatOpenMobileApp.canCreateDraftInWechatOpenPlatform, true)
   assert.equal(report.wechatOpenMobileApp.readyToSubmitForReview, false)
+  assert.equal(report.wechatOpenMobileApp.miniProgramCredentialsReusableForAppLogin, false)
+  assert.match(report.wechatOpenMobileApp.appLoginCredentialSource, /微信开放平台 -> 管理中心 -> 移动应用/)
+  assert.equal(report.wechatCredentialBoundary.miniProgramCredentialsReusableForAppLogin, false)
+  assert.deepEqual(report.wechatCredentialBoundary.appLoginVariableNames, [
+    "WECHAT_OPEN_APP_ID",
+    "WECHAT_OPEN_APP_SECRET",
+    "WECHAT_OPEN_APP_REVIEW_STATUS",
+  ])
+  assert.deepEqual(report.wechatCredentialBoundary.miniProgramCompatVariableNames, [
+    "WECHAT_MINI_APPID",
+    "WECHAT_MINI_SECRET",
+    "WECHAT_LOGIN_SECRET",
+  ])
+  assert.ok(report.wechatCredentialBoundary.whyNotReusable.some((item) => item.includes("不能解除 WECHAT_OPEN_APP_ID")))
+  assert.ok(report.wechatCredentialBoundary.appLoginImportTargets.includes("WECHAT_OPEN_APP_SECRET -> 阿里云 KMS/Secrets Manager/SAE secret env"))
   assert.ok(report.wechatOpenMobileApp.submissionBlockers.includes("android_release_wechat_signature_missing"))
   assert.ok(report.wechatOpenMobileApp.submissionBlockers.includes("apple_team_id_missing_for_aasa"))
   assert.equal(report.wechatOpenMobileApp.androidPackageName, "com.ipgongchang.meiyehuajing")
@@ -392,6 +417,11 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.match(markdown, /readyToSubmitForReview: false/)
   assert.match(markdown, /androidSignatureStatus: missing_release_wechat_signature/)
   assert.match(markdown, /appleTeamIdMissing: true/)
+  assert.match(markdown, /APP 微信登录凭证边界/)
+  assert.match(markdown, /appLoginVariableNames: WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET, WECHAT_OPEN_APP_REVIEW_STATUS/)
+  assert.match(markdown, /miniProgramCompatVariableNames: WECHAT_MINI_APPID, WECHAT_MINI_SECRET, WECHAT_LOGIN_SECRET/)
+  assert.match(markdown, /miniProgramCredentialsReusableForAppLogin: false/)
+  assert.match(markdown, /阿里云 SAE 后端在 APP 微信登录回调中使用移动应用 AppID\/AppSecret/)
   assert.match(markdown, /环境变量来源与 Vercel 覆盖/)
   assert.match(markdown, /vercelRequiredCovered: 17\/26/)
   assert.match(markdown, /canMigrateFromVercelProduction: 46/)

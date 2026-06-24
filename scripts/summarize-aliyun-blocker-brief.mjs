@@ -206,6 +206,7 @@ function buildReport(args) {
     || sensitiveBlockers.summary?.credentialInterventionBrief
     || {}
   const wechatOpenMobileApp = compactWechatOpenMobileApp(wechatOpenMobileAppPackage)
+  const wechatCredentialBoundary = wechatOpenMobileApp.credentialBoundary
   const bridgeDataLayer = compactBridgeDataLayer(status.summary?.bridgeDataLayer || {})
   const cloudResourceObservations = compactCloudResourceObservations(resourcesMatrix)
   const nextActionSequencing = compactNextActionSequencing(completionAudit)
@@ -281,6 +282,9 @@ function buildReport(args) {
       wechatOpenMobileAppCreated: wechatOpenMobileApp.mobileAppCreated,
       wechatOpenCanCreateDraft: wechatOpenMobileApp.canCreateDraftInWechatOpenPlatform,
       wechatOpenReadyToSubmitForReview: wechatOpenMobileApp.readyToSubmitForReview,
+      wechatAppLoginCredentialSource: wechatCredentialBoundary.appLoginCredentialSource,
+      wechatMiniProgramCredentialsReusableForAppLogin: wechatCredentialBoundary.miniProgramCredentialsReusableForAppLogin,
+      wechatMiniProgramCompatVariableNames: wechatCredentialBoundary.miniProgramCompatVariableNames,
       envSourceVercelRequiredCovered: envSourceMapSummary.vercelCoverage.requiredCovered,
       envSourceCanMigrateFromVercelProduction: envSourceMapSummary.canMigrateFromVercelProduction,
       envSourceAppAliyunOwnedNotInVercel: envSourceMapSummary.appAliyunOwnedNotInVercel,
@@ -294,6 +298,7 @@ function buildReport(args) {
     readySecretEnvImportGroups,
     credentialInterventionBrief,
     wechatOpenMobileApp,
+    wechatCredentialBoundary,
     envSourceMap: envSourceMapSummary,
     bridgeDataLayer,
     cloudResourceObservations,
@@ -527,6 +532,7 @@ function compactWechatOpenMobileApp(report) {
   const androidSignaturePackage = packageInfo.androidSignaturePackage || {}
   const ios = packageInfo.ios || {}
   const actionPacket = report.actionPacket || {}
+  const credentialBoundary = compactWechatCredentialBoundary(report.credentialBoundary || {})
   return {
     accountVerified: summary.accountVerified === true,
     mobileAppCreated: summary.mobileAppCreated === true,
@@ -536,6 +542,9 @@ function compactWechatOpenMobileApp(report) {
     readyToSubmitForReview: summary.readyToSubmitForReview === true,
     submissionBlockers: summary.submissionBlockers || [],
     mobileAppCredentialsAvailable: summary.mobileAppCredentialsAvailable === true,
+    miniProgramCredentialsReusableForAppLogin: summary.miniProgramCredentialsReusableForAppLogin === true,
+    appLoginCredentialSource: summary.appLoginCredentialSource || credentialBoundary.appLoginCredentialSource,
+    credentialBoundary,
     requiredBlocking: summary.requiredBlocking || [],
     machineBlocking: summary.machineBlocking || [],
     androidPackageName: android.packageName || "",
@@ -554,6 +563,42 @@ function compactWechatOpenMobileApp(report) {
     backendWriteTargetsAfterApproval: actionPacket.backendWriteTargetsAfterApproval || [],
     verifyCommands: actionPacket.verifyCommands || report.verifyCommands || [],
     forbidden: actionPacket.forbidden || report.forbidden || [],
+  }
+}
+
+function compactWechatCredentialBoundary(boundary) {
+  return {
+    purpose: boundary.purpose || "APP 微信登录服务端凭证边界",
+    appLoginCredentialSource: boundary.appLoginCredentialSource || "微信开放平台 -> 管理中心 -> 移动应用 -> 美业话镜 App -> 开发信息",
+    appLoginVariableNames: boundary.appLoginVariableNames || [
+      "WECHAT_OPEN_APP_ID",
+      "WECHAT_OPEN_APP_SECRET",
+      "WECHAT_OPEN_APP_REVIEW_STATUS",
+    ],
+    appLoginImportTargets: boundary.appLoginImportTargets || [
+      "WECHAT_OPEN_APP_ID -> 阿里云 SAE plain env",
+      "WECHAT_OPEN_APP_SECRET -> 阿里云 KMS/Secrets Manager/SAE secret env",
+      "WECHAT_OPEN_APP_REVIEW_STATUS -> 阿里云 SAE plain env",
+    ],
+    miniProgramCredentialSource: boundary.miniProgramCredentialSource || "微信公众平台小程序 -> 开发管理 -> 开发设置",
+    miniProgramCompatVariableNames: boundary.miniProgramCompatVariableNames || [
+      "WECHAT_MINI_APPID",
+      "WECHAT_MINI_SECRET",
+      "WECHAT_LOGIN_SECRET",
+    ],
+    miniProgramCredentialsReusableForAppLogin: boundary.miniProgramCredentialsReusableForAppLogin === true,
+    miniProgramCompatibilityUse: boundary.miniProgramCompatibilityUse || "仅用于旧小程序/兼容后端链路，不能用于 React Native APP 微信开放平台移动应用登录。",
+    aliyunRuntimeUse: boundary.aliyunRuntimeUse || "阿里云 SAE 后端在 APP 微信登录回调中使用移动应用 AppID/AppSecret 调微信登录接口；React Native APP 包内不内置 AppSecret。",
+    whyNotReusable: boundary.whyNotReusable || [
+      "微信开放平台移动应用和微信小程序是不同应用类型，AppID/AppSecret 不是同一套凭证。",
+      "小程序 WECHAT_MINI_* 可以保留给旧小程序 API 兼容，但不能解除 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET 阻塞。",
+      "移动应用审核通过前不能把 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET 标记为 ready。",
+    ],
+    forbidden: boundary.forbidden || [
+      "不能用小程序 AppID/Secret 替代移动应用 AppID/AppSecret。",
+      "不能把 WECHAT_OPEN_APP_SECRET 写入 App 包、JSON、Markdown、Docker 镜像或 git。",
+      "不能在移动应用未审核通过前把 APP 登录凭证导入为生产 ready。",
+    ],
   }
 }
 
@@ -771,6 +816,9 @@ function renderMarkdown(report) {
     `- wechatOpenMobileAppCreated: ${report.summary.wechatOpenMobileAppCreated}`,
     `- wechatOpenCanCreateDraft: ${report.summary.wechatOpenCanCreateDraft}`,
     `- wechatOpenReadyToSubmitForReview: ${report.summary.wechatOpenReadyToSubmitForReview}`,
+    `- wechatAppLoginCredentialSource: ${report.summary.wechatAppLoginCredentialSource}`,
+    `- wechatMiniProgramCredentialsReusableForAppLogin: ${report.summary.wechatMiniProgramCredentialsReusableForAppLogin}`,
+    `- wechatMiniProgramCompatVariableNames: ${report.summary.wechatMiniProgramCompatVariableNames.join(", ") || "none"}`,
     `- envSourceVercelRequiredCovered: ${report.summary.envSourceVercelRequiredCovered}`,
     `- envSourceCanMigrateFromVercelProduction: ${report.summary.envSourceCanMigrateFromVercelProduction}`,
     `- envSourceAppAliyunOwnedNotInVercel: ${report.summary.envSourceAppAliyunOwnedNotInVercel}`,
@@ -804,6 +852,22 @@ function renderMarkdown(report) {
     ...report.wechatOpenMobileApp.createDraftFields.map((item) => `  - ${item.name}: ${item.value}`),
     "- backendWriteTargetsAfterApproval:",
     ...report.wechatOpenMobileApp.backendWriteTargetsAfterApproval.map((item) => `  - ${item}`),
+    "",
+    "## APP 微信登录凭证边界",
+    "",
+    `- purpose: ${report.wechatCredentialBoundary.purpose}`,
+    `- appLoginCredentialSource: ${report.wechatCredentialBoundary.appLoginCredentialSource}`,
+    `- appLoginVariableNames: ${report.wechatCredentialBoundary.appLoginVariableNames.join(", ")}`,
+    `- appLoginImportTargets: ${report.wechatCredentialBoundary.appLoginImportTargets.join("; ")}`,
+    `- miniProgramCredentialSource: ${report.wechatCredentialBoundary.miniProgramCredentialSource}`,
+    `- miniProgramCompatVariableNames: ${report.wechatCredentialBoundary.miniProgramCompatVariableNames.join(", ")}`,
+    `- miniProgramCredentialsReusableForAppLogin: ${report.wechatCredentialBoundary.miniProgramCredentialsReusableForAppLogin}`,
+    `- miniProgramCompatibilityUse: ${report.wechatCredentialBoundary.miniProgramCompatibilityUse}`,
+    `- aliyunRuntimeUse: ${report.wechatCredentialBoundary.aliyunRuntimeUse}`,
+    "- whyNotReusable:",
+    ...report.wechatCredentialBoundary.whyNotReusable.map((item) => `  - ${item}`),
+    "- forbidden:",
+    ...report.wechatCredentialBoundary.forbidden.map((item) => `  - ${item}`),
     "",
     "## 环境变量来源与 Vercel 覆盖",
     "",
