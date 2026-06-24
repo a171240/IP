@@ -1,6 +1,6 @@
 # 阿里云控制台动作包
 
-生成时间：2026-06-24T10:39:43.136Z
+生成时间：2026-06-24T15:18:25.380Z
 
 ## 结论
 
@@ -14,9 +14,9 @@
 - cloudConfirmationsReady: 0/7
 - operatorTasksReady: 1/9
 - canReadCloudNow: false
-- cloudInventoryResultsReady: true
-- cloudInventoryReadyLocalOperations: 9/9
-- cloudInventoryExecutedCommandResults: 12/12
+- cloudInventoryResultsReady: false
+- cloudInventoryReadyLocalOperations: 0/9
+- cloudInventoryExecutedCommandResults: 9/9
 - cliConfigProbeFailureCategory: aliyun_cli_profile_not_configured
 - containsValues: false
 - mutationPerformed: false
@@ -37,9 +37,9 @@
 - resourceEvidenceReady: 0/7
 - blockedResourceEvidenceIds: R01_SAE_RUNTIME, R02_ACR_IMAGE_REGISTRY, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R05_OSS_AUDIO_STORAGE, R06_ENV_IMPORT, R07_SLS_ALERTS
 - partiallyObservedResourceEvidenceIds: R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS
-- strictReadonlyInventoryReady: true
-- cloudInventoryReadyLocalOperations: 9/9
-- cloudInventoryExecutedCommandResults: 12/12
+- strictReadonlyInventoryReady: false
+- cloudInventoryReadyLocalOperations: 0/9
+- cloudInventoryExecutedCommandResults: 9/9
 - mutationPerformedCommandResults: 0
 - canStartNowConsoleTasks: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS
 - cloudConsolePackets: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
@@ -60,11 +60,11 @@
 
 ## 只读盘点解锁
 
-- status: strict_inventory_evidence_ready
-- currentBlocker: none
-- currentEvidence: readyLocalOperations=9/9；executedCommandResults=12/12；cloudApiCalledCommandResults=12；mutationPerformedCommandResults=0
+- status: blocked_until_cli_or_cloudshell_identity_ready
+- currentBlocker: aliyun_cli_profile_not_configured
+- currentEvidence: none
 - minimumAuthorizationPhrase: 授权在本机 Aliyun CLI 或阿里云 CloudShell 中配置只读身份，并只运行 allowlisted production-cn inventory 命令；不输出 AccessKeySecret、STS token、cookie、registry password 或证书私钥。
-- whyConsoleLoginIsNotEnough: 严格云证据已来自 allowlisted Aliyun CLI/CloudShell List/Describe/stat/get 命令摘要；后续云资源创建、购买、DNS、密钥导入和部署仍需动作时确认。
+- whyConsoleLoginIsNotEnough: 浏览器控制台登录、ECS Workbench 终端可见、或 OSS/SLS 页面可见，只能作为人工观察证据；严格云证据必须来自 allowlisted Aliyun CLI/CloudShell List/Describe/stat/get 命令结果，且不记录原始敏感输出。
 - unlockCommands:
   - corepack pnpm aliyun:cloud:access
   - MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1 corepack pnpm aliyun:cloud:inventory-run -- --execute-readonly --write-local deploy/aliyun-production-cn.cloud-inventory-results.local.json
@@ -150,7 +150,6 @@
 - backendRequired:OSS_RAM_STS_NOT_READY
 - backendRequired:POSTDEPLOY_SMOKE_NOT_RUN
 - backendRequired:RDS_MIGRATION_EVIDENCE_NOT_READY
-- backendRequired:RDS_POSTGRES_NOT_READY
 - backendRequired:SAE_RUNTIME_NOT_READY
 - backendRequired:SLS_ALERTS_NOT_READY
 - blockedConsoleTask:C01_SAE_RUNTIME
@@ -158,3 +157,7 @@
 - blockedConsoleTask:C04_ASSET_DOMAIN_HTTPS_ICP
 - blockedConsoleTask:C06_ENV_IMPORT
 - blockedConsoleTask:C07_SLS_ALERTS
+- aliyun_cli_config_missing_or_unread
+- aliyun_cli_profile_not_configured
+- cloudshell_cli_config_missing_or_unread
+- cloudInventory:readonly_inventory_strict_ready=0/9

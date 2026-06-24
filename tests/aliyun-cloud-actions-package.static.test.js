@@ -76,12 +76,12 @@ test("Aliyun cloud actions package summarizes current cloud console action order
   assert.deepEqual(report.summary.externalAppPackets, [])
   assert.ok(report.summary.deferredAppLaunchPackets.includes("P01_WECHAT_OPEN_MOBILE_APP"))
   assert.ok(report.summary.requiredBlocking.includes("DATABASE_URL_CN"))
-  assert.ok(report.summary.requiredBlocking.includes("RDS_POSTGRES_NOT_READY"))
+  assert.ok(!report.summary.requiredBlocking.includes("RDS_POSTGRES_NOT_READY"))
   assert.equal(report.cloudAccess.canReadCloudNow, false)
   assert.equal(report.cloudAccess.cliConfigProbeFailureCategory, "aliyun_cli_profile_not_configured")
-  assert.equal(report.summary.cloudInventoryResultsReady, true)
-  assert.equal(report.summary.cloudInventoryReadyLocalOperations, "9/9")
-  assert.equal(report.summary.cloudInventoryExecutedCommandResults, "12/12")
+  assert.equal(report.summary.cloudInventoryResultsReady, false)
+  assert.equal(report.summary.cloudInventoryReadyLocalOperations, "0/9")
+  assert.equal(report.summary.cloudInventoryExecutedCommandResults, "9/9")
   assert.equal(report.summary.blockedCredentialCount, 8)
   assert.equal(report.summary.readySecretEnvVariableCount, 17)
   assert.equal(report.summary.resourceEvidenceReady, "0/7")
@@ -104,9 +104,9 @@ test("Aliyun cloud actions package summarizes current cloud console action order
     item.observedReadiness === "partial" &&
     item.currentEvidence.some((evidence) => /project_meiye-huajing-app-prod-cn/.test(evidence))
   ))
-  assert.equal(report.cloudActionClosureBrief.strictReadonlyInventoryReady, true)
-  assert.equal(report.cloudActionClosureBrief.cloudInventoryReadyLocalOperations, "9/9")
-  assert.equal(report.cloudActionClosureBrief.cloudInventoryExecutedCommandResults, "12/12")
+  assert.equal(report.cloudActionClosureBrief.strictReadonlyInventoryReady, false)
+  assert.equal(report.cloudActionClosureBrief.cloudInventoryReadyLocalOperations, "0/9")
+  assert.equal(report.cloudActionClosureBrief.cloudInventoryExecutedCommandResults, "9/9")
   assert.equal(report.cloudActionClosureBrief.mutationPerformedCommandResults, 0)
   assert.deepEqual(report.cloudActionClosureBrief.canStartNowConsoleTasks, ["C02_ACR_IMAGE_AND_PULL", "C05_OSS_AUDIO_RAM_STS"])
   assert.deepEqual(report.cloudActionClosureBrief.cloudConsolePackets, [
@@ -143,22 +143,23 @@ test("Aliyun cloud actions package summarizes current cloud console action order
   assert.ok(report.deferredAppLaunchPrerequisitePackets.some((item) => item.packetId === "P10_ANDROID_RELEASE_SIGNING"))
   assert.ok(report.executionQueue.blockedByDependencies.some((item) => item.id === "C01_SAE_RUNTIME"))
   assert.ok(report.executionQueue.blockedByDependencies.some((item) => item.blockingDependencies.includes("C05_OSS_AUDIO_RAM_STS")))
-  assert.equal(report.cloudInventoryResults.ready, true)
-  assert.equal(report.cloudInventoryResults.readyLocalOperations, 9)
+  assert.equal(report.cloudInventoryResults.ready, false)
+  assert.equal(report.cloudInventoryResults.readyLocalOperations, 0)
   assert.equal(report.cloudInventoryResults.localOperations, 9)
-  assert.equal(report.cloudInventoryResults.executedCommandResults, 12)
-  assert.equal(report.cloudInventoryResults.commandResults, 12)
-  assert.equal(report.cloudInventoryResults.cloudApiCalledCommandResults, 12)
+  assert.equal(report.cloudInventoryResults.executedCommandResults, 9)
+  assert.equal(report.cloudInventoryResults.commandResults, 9)
+  assert.equal(report.cloudInventoryResults.cloudApiCalledCommandResults, 9)
   assert.equal(report.cloudInventoryResults.mutationPerformedCommandResults, 0)
-  assert.deepEqual(report.cloudInventoryResults.observedOperationIds, ["I05_OSS_AUDIO_BUCKET", "I06_SLS_ALERTS"])
-  assert.ok(report.cloudInventoryResults.notFoundOperationIds.includes("I08_RDS_POSTGRES"))
-  assert.ok(report.cloudInventoryResults.notFoundOperationIds.includes("I09_TAIR_REDIS"))
-  assert.equal(report.readonlyInventoryUnblock.status, "strict_inventory_evidence_ready")
-  assert.equal(report.readonlyInventoryUnblock.currentBlocker, "none")
-  assert.ok(report.readonlyInventoryUnblock.currentEvidence.includes("readyLocalOperations=9/9"))
-  assert.ok(report.readonlyInventoryUnblock.currentEvidence.includes("executedCommandResults=12/12"))
+  assert.deepEqual(report.cloudInventoryResults.observedOperationIds, [])
+  assert.deepEqual(report.cloudInventoryResults.notFoundOperationIds, [])
+  assert.ok(report.cloudInventoryResults.blockedOperationIds.includes("I08_RDS_POSTGRES"))
+  assert.ok(report.cloudInventoryResults.blockedOperationIds.includes("I09_TAIR_REDIS"))
+  assert.ok(report.cloudInventoryResults.blockers.includes("readonly_inventory_strict_ready=0/9"))
+  assert.equal(report.readonlyInventoryUnblock.status, "blocked_until_cli_or_cloudshell_identity_ready")
+  assert.equal(report.readonlyInventoryUnblock.currentBlocker, "aliyun_cli_profile_not_configured")
+  assert.deepEqual(report.readonlyInventoryUnblock.currentEvidence, [])
   assert.match(report.readonlyInventoryUnblock.minimumAuthorizationPhrase, /只读身份/)
-  assert.match(report.readonlyInventoryUnblock.whyConsoleLoginIsNotEnough, /严格云证据已来自/)
+  assert.match(report.readonlyInventoryUnblock.whyConsoleLoginIsNotEnough, /浏览器控制台登录/)
   assert.ok(report.readonlyInventoryUnblock.allowedIdentityPaths.some((item) => item.id === "local_aliyun_cli"))
   assert.ok(report.readonlyInventoryUnblock.allowedIdentityPaths.some((item) => item.id === "aliyun_cloudshell"))
   assert.ok(report.readonlyInventoryUnblock.allowedIdentityPaths.some((item) => item.id === "ecs_workbench_terminal"))
@@ -210,7 +211,9 @@ test("Aliyun cloud actions package markdown renders compact action order without
   assert.match(markdown, /resourceEvidenceReady: 0\/7/)
   assert.match(markdown, /blockedResourceEvidenceIds: .*R02_ACR_IMAGE_REGISTRY/)
   assert.match(markdown, /partiallyObservedResourceEvidenceIds: R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS/)
-  assert.match(markdown, /strictReadonlyInventoryReady: true/)
+  assert.match(markdown, /strictReadonlyInventoryReady: false/)
+  assert.match(markdown, /cloudInventoryReadyLocalOperations: 0\/9/)
+  assert.match(markdown, /cloudInventoryExecutedCommandResults: 9\/9/)
   assert.match(markdown, /mutationPerformedCommandResults: 0/)
   assert.match(markdown, /C02_ACR_IMAGE_AND_PULL/)
   assert.match(markdown, /C05_OSS_AUDIO_RAM_STS/)
@@ -218,9 +221,9 @@ test("Aliyun cloud actions package markdown renders compact action order without
   assert.match(markdown, /P05_OSS_RAM_STS/)
   assert.match(markdown, /P11_ALIYUN_RDS_DATA_MIGRATION/)
   assert.match(markdown, /只读盘点解锁/)
-  assert.match(markdown, /strict_inventory_evidence_ready/)
-  assert.match(markdown, /cloudInventoryReadyLocalOperations: 9\/9/)
-  assert.match(markdown, /cloudInventoryExecutedCommandResults: 12\/12/)
+  assert.match(markdown, /blocked_until_cli_or_cloudshell_identity_ready/)
+  assert.match(markdown, /cloudInventoryReadyLocalOperations: 0\/9/)
+  assert.match(markdown, /cloudInventoryExecutedCommandResults: 9\/9/)
   assert.match(markdown, /下一步执行队列/)
   assert.match(markdown, /canStartNow: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS/)
   assert.match(markdown, /scope=purchase_and_repository_only/)
@@ -228,9 +231,9 @@ test("Aliyun cloud actions package markdown renders compact action order without
   assert.match(markdown, /externalAppPrerequisites: none/)
   assert.match(markdown, /deferredAppLaunchPrerequisites: P01_WECHAT_OPEN_MOBILE_APP/)
   assert.match(markdown, /blockedByDependencies: C01_SAE_RUNTIME/)
-  assert.match(markdown, /currentEvidence: readyLocalOperations=9\/9/)
+  assert.match(markdown, /currentEvidence: none/)
   assert.match(markdown, /MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1/)
-  assert.match(markdown, /严格云证据已来自/)
+  assert.match(markdown, /浏览器控制台登录/)
   assert.match(markdown, /C03_API_DOMAIN_HTTPS_ICP: dependsOn=C01_SAE_RUNTIME/)
   assert.match(markdown, /不购买 ACR/)
   assert.match(markdown, /不推送镜像/)
@@ -248,8 +251,9 @@ test("APP production-cn action queue documents the current authorized next-step 
     "canDeployNow: false",
     "canProceedWithoutWechat: true",
     "cloudConfirmationsReady: 0/7",
-    "strictReadonlyInventoryReady: true",
-    "cloudInventoryReadyLocalOperations: 9/9",
+    "strictReadonlyInventoryReady: false",
+    "cloudInventoryReadyLocalOperations: 0/9",
+    "cloudInventoryExecutedCommandResults: 9/9",
     "mutationPerformedCommandResults: 0",
     "canStartNow: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS",
     "cloudConsolePackets: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION",
@@ -272,7 +276,7 @@ test("APP production-cn action queue documents the current authorized next-step 
     "corepack pnpm aliyun:completion:audit",
     "当前后端-only 目标不创建微信开放平台移动应用",
     "backendRequired:DATABASE_URL_CN",
-    "backendRequired:RDS_POSTGRES_NOT_READY",
+    "cloudInventory:readonly_inventory_strict_ready=0/9",
   ]) {
     assert.match(doc, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
   }

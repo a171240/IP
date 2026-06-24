@@ -605,7 +605,7 @@ function buildReport() {
         status: "not_verified",
         obtainFrom: "Aliyun console -> RDS -> PostgreSQL instance in cn-hangzhou",
         importTarget: "deploy/aliyun-production-cn.cloud-inventory-results.local.json and cloud confirmations",
-        note: "Existing read-only inventory currently proves RDS PostgreSQL is not present in cn-hangzhou.",
+        note: "Current strict read-only inventory is incomplete, so RDS PostgreSQL presence or absence is unverified; confirm in Aliyun console or allowlisted read-only inventory before treating DATABASE_URL_CN as available.",
       },
       {
         id: "SUPABASE_TO_RDS_DATA_ACCESS_MIGRATION",

@@ -85,6 +85,11 @@ test("Aliyun RDS migration plan inventories APP API Supabase dependency without 
   assert.ok(report.summary.requiredBlocking.includes("first_version_supabase_data_access_still_present"))
   assert.ok(!report.summary.requiredBlocking.includes("postgres_data_access_adapter_missing"))
   assert.ok(report.summary.requiredBlocking.includes("schema_migration_not_verified"))
+  assert.ok(report.requiredBlocking.some((item) => (
+    item.id === "ALIYUN_RDS_POSTGRES" &&
+    item.status === "not_verified" &&
+    /presence or absence is unverified/.test(item.note)
+  )))
   assert.deepEqual(report.inventory.databaseUrlCnFiles, ["lib/aliyun-rds/postgres.server.ts"])
   assert.deepEqual(report.inventory.postgresAdapterFiles, ["lib/aliyun-rds/postgres.server.ts"])
   assert.equal(report.inventory.schemaMap.file, "deploy/aliyun-production-cn.rds-first-version-schema-map.json")

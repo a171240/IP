@@ -38,33 +38,30 @@ API 域名: https://api-cn.ipgongchang.xin
 
 ## 当前阿里云证据
 
-已完成只读盘点：
+当前只读盘点状态：
 
 ```text
-cloudInventoryReadyLocalOperations=9/9
-cloudInventoryExecutedCommandResults=12/12
+cloudInventoryStrictReady=false
+cloudInventoryReadyLocalOperations=0/9
+cloudInventoryExecutedCommandResults=9/9
 mutationPerformedCommandResults=0
+cliConfigProbeFailureCategory=aliyun_cli_profile_not_configured
 ```
 
-盘点结果：
+当前含义：
 
 ```text
-OSS bucket: 已存在，但 RAM/STS 最小权限未闭环
-SLS project/logstore: 已存在，但 health/5xx alerts 未配置
-SAE runtime: 未发现
-ACR instance/repository: 未发现
-api-cn DNS/HTTPS/ICP: 未就绪
-assets-cn DNS/HTTPS/ICP: 未就绪
-CAS certificate: 未发现
-RDS PostgreSQL: 未发现
-Tair/Redis: 未发现，第一版可继续后置
+本地存在 cloud-inventory-results.local.json 摘要，但当前 strict 校验未通过
+现有摘要不能作为 SAE/ACR/DNS/OSS/SLS/证书/RDS/Redis 存在或不存在的最终证据
+浏览器控制台登录或 Workbench 可见只能作为人工观察，不能替代 strict inventory
+需要恢复本机 Aliyun CLI 或 CloudShell 只读身份后重新生成非密钥摘要
+云资源证据当前仍是 0/7
 ```
 
 ## 当前后端阻塞项
 
 ```text
 DATABASE_URL_CN
-RDS_POSTGRES_NOT_READY
 RDS_MIGRATION_EVIDENCE_NOT_READY
 ACR_IMAGE_REGISTRY_NOT_READY
 SAE_RUNTIME_NOT_READY
