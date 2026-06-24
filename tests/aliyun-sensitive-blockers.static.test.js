@@ -284,6 +284,7 @@ test("Aliyun release artifacts summary surfaces sensitive blocker acquisition de
 
 test("APP production-cn sensitive blockers handoff documents user-intervention credential boundaries", () => {
   const doc = read("docs", "app-production-cn-sensitive-blockers.md")
+  const importBatches = read("docs", "app-production-cn-secret-env-import-batches.md")
 
   for (const expected of [
     "Production-cn cannot be deployed now.",
@@ -328,4 +329,49 @@ test("APP production-cn sensitive blockers handoff documents user-intervention c
   assert.doesNotMatch(doc, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(doc, /:\/\/[^\s:@]+:[^\s@]+@/)
   assert.doesNotMatch(doc, /AccessKeySecret\s*[:=]\s*["'][^"']+["']/)
+
+  for (const expected of [
+    "Production-cn cannot be deployed now.",
+    "blockedCredentialCount=8",
+    "readySecretEnvVariableCount=17",
+    "readySecretEnvVariableGroupCount=9",
+    "WECHAT_OPEN_APP_ID",
+    "WECHAT_OPEN_APP_SECRET",
+    "APPLE_TEAM_ID",
+    "ALIYUN_OSS_SECURITY_TOKEN",
+    "MEIYE_RELEASE_STORE_PASSWORD",
+    "bridge_database",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "app_auth",
+    "WECHAT_LOGIN_SECRET",
+    "aliyun_oss",
+    "ALIYUN_OSS_ACCESS_KEY_SECRET",
+    "bailian_asr",
+    "DASHSCOPE_API_KEY",
+    "deepseek_summary",
+    "SERVICE_RECORD_DEEPSEEK_API_KEY",
+    "volc_speech",
+    "VOLC_SPEECH_SECRET_KEY",
+    "backend_ops",
+    "CREDITS_IP_SALT",
+    "legacy_content_provider",
+    "APIMART_API_KEY",
+    "mini_program_compat",
+    "WECHAT_MINI_SECRET",
+    "WECHAT_OPEN_APP_REVIEW_STATUS=approved",
+    "items.envImport.secretNotInImage=true",
+    "corepack pnpm aliyun:env:checklist",
+    "corepack pnpm aliyun:predeploy",
+    "Do not import env values without action-time authorization.",
+  ]) {
+    assert.match(importBatches, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
+  }
+
+  assert.match(importBatches, /They do not unblock native APP WeChat login/)
+  assert.match(importBatches, /Do not deploy production-cn after env import alone/)
+  assert.doesNotMatch(importBatches, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(importBatches, /LTAI[A-Za-z0-9]{12,}/)
+  assert.doesNotMatch(importBatches, /:\/\/[^\s:@]+:[^\s@]+@/)
+  assert.doesNotMatch(importBatches, /AccessKeySecret\s*[:=]\s*["'][^"']+["']/)
 })
