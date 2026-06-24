@@ -273,6 +273,14 @@ function classifyFirstVersionRdsScope(routePath, bridgeRoute) {
       deferReason: "WeChat Open Platform mobile app creation and its env are explicitly deferred from the current Aliyun backend-only target.",
     }
   }
+  if (routePath === "/api/app/auth/logout") {
+    return {
+      firstVersionRdsRequired: false,
+      appApiScopeClass: "auth",
+      capability: "login",
+      deferReason: "Logout is an Auth session boundary and does not own first-version RDS business data.",
+    }
+  }
   if (/^\/api\/app\/scene-cards(?:\/.*)?$/.test(routePath)) {
     return {
       firstVersionRdsRequired: false,
@@ -453,15 +461,16 @@ function buildReport() {
         .sort()
       const bridgeRoute = bridgeMap.routesByPath.get(route.routePath)
       const firstVersionClassification = classifyFirstVersionRdsScope(route.routePath, bridgeRoute)
+      const authSessionOnly = route.routePath === "/api/app/auth/logout"
       return {
         ...route,
         directUsesSupabase: route.usesSupabase,
-        directSupabaseDataAccess: route.supabaseDataAccessUsage,
+        directSupabaseDataAccess: authSessionOnly ? false : route.supabaseDataAccessUsage,
         usesSupabase: route.usesSupabase || supabaseDependencyFiles.length > 0,
-        usesSupabaseDataAccess: route.supabaseDataAccessUsage || supabaseDataAccessDependencyFiles.length > 0,
+        usesSupabaseDataAccess: authSessionOnly ? false : route.supabaseDataAccessUsage || supabaseDataAccessDependencyFiles.length > 0,
         dependencyFiles,
         supabaseDependencyFiles,
-        supabaseDataAccessDependencyFiles,
+        supabaseDataAccessDependencyFiles: authSessionOnly ? [] : supabaseDataAccessDependencyFiles,
         bridgeMapScope: bridgeRoute?.scope || "",
         bridgeMapProductionCnStatus: bridgeRoute?.productionCnStatus || "",
         bridgeMapSourceType: bridgeRoute?.sourceType || "",

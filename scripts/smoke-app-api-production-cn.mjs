@@ -22,6 +22,13 @@ export const PROBES = [
   {
     scope: "auth",
     method: "POST",
+    path: "/api/app/auth/logout",
+    body: {},
+    expected: [{ status: 401, code: "auth_required" }],
+  },
+  {
+    scope: "auth",
+    method: "POST",
     path: "/api/app/wechat/login",
     body: {},
     expected: [{ status: 400, code: "missing_code" }],

@@ -87,6 +87,20 @@
     },
     {
       "scope": "auth",
+      "route": "/api/app/auth/logout",
+      "methods": [
+        "POST"
+      ],
+      "appFile": "app/api/app/auth/logout/route.ts",
+      "sourceType": "app_native",
+      "sourceFiles": [
+        "app/api/app/auth/logout/route.ts"
+      ],
+      "productionCnStatus": "bridge_ready",
+      "note": "APP logout verifies the current Bearer token and performs best-effort Supabase Auth sign-out; no mini-program credential is reused."
+    },
+    {
+      "scope": "auth",
       "route": "/api/app/wechat/login",
       "methods": [
         "POST"

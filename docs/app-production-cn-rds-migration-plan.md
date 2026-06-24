@@ -16,18 +16,18 @@
 currentDataLayer: Supabase migration source / legacy compatibility only
 formalTarget: Aliyun RDS PostgreSQL
 migrationReady: false
-appApiRouteCount: 30
-appApiRoutesWithSupabase: 30
+appApiRouteCount: 31
+appApiRoutesWithSupabase: 31
 appApiRoutesWithSupabaseDataAccess: 29
 firstVersionRdsRouteCount: 25
 firstVersionRdsRoutesWithSupabase: 25
 firstVersionRdsRoutesWithSupabaseDataAccess: 25/25
-deferredAppApiRouteCount: 5
+deferredAppApiRouteCount: 6
 deferredAppApiRoutesWithSupabaseDataAccess: 4
-appApiRoutesWithDirectSupabase: 2
+appApiRoutesWithDirectSupabase: 3
 sharedSupabaseFileCount: 93
 sharedSupabaseDataAccessFileCount: 92
-supabaseUsageFileCount: 95
+supabaseUsageFileCount: 96
 tableCount: 44
 rpcCount: 3
 storageBucketCount: 1
@@ -37,7 +37,16 @@ schemaMapReady: true
 schemaMapRequiredTableCount: 9
 ```
 
-这表示 APP 的 30 条 `app/api/app` 路由虽然多数是复用 `app/api/mp` 和 `lib` 的既有链路，但最终仍触达 Supabase 数据访问。只填写 `DATABASE_URL_CN`，或只创建微信移动应用，都不能算完成“全部迁到阿里云”。
+Human-readable summary used by release checks:
+
+```text
+APP API routes using Supabase: 31
+First-version RDS required routes using Supabase data access: 25
+DATABASE_URL_CN referenced in source: true
+PostgreSQL data access adapter detected: true
+```
+
+这表示 APP 的 31 条 `app/api/app` 路由虽然多数是复用 `app/api/mp` 和 `lib` 的既有链路，但正式 production-cn 数据层仍不能停留在 Supabase。只填写 `DATABASE_URL_CN`，或只创建微信移动应用，都不能算完成“全部迁到阿里云”。
 
 已具备的本地代码落点：
 
@@ -53,10 +62,11 @@ bridgeMap: deploy/app-api-production-cn.bridge-map.json
 
 当前必须迁 RDS 的是一阶段 25 条路由。
 
-延期的 5 条路由：
+延期的 6 条路由：
 
 ```text
 /api/app/health
+/api/app/auth/logout
 /api/app/auth/wechat
 /api/app/wechat/login
 /api/app/scene-cards
@@ -65,6 +75,7 @@ bridgeMap: deploy/app-api-production-cn.bridge-map.json
 
 延期原因：
 
+- `/api/app/auth/logout` 是 APP Auth session 边界，只校验 Bearer token 并做 best-effort sign-out；它依赖 Supabase Auth，但不拥有第一版 RDS 业务数据。
 - 微信登录两条按当前目标等后端上线后再做微信开放平台移动应用。
 - `scene-cards` 属于 A3 话术训练/顾客项目资料迁移。
 - `/api/app/health` 是 SAE 环境和健康检查，不作为 RDS 数据访问迁移 blocker。

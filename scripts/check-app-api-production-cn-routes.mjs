@@ -25,6 +25,12 @@ export const REQUIRED_ROUTES = [
   },
   {
     scope: "auth",
+    route: "/api/app/auth/logout",
+    file: "app/api/app/auth/logout/route.ts",
+    methods: ["POST"],
+  },
+  {
+    scope: "auth",
     route: "/api/app/wechat/login",
     file: "app/api/app/wechat/login/route.ts",
     methods: ["POST"],

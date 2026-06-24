@@ -24,8 +24,8 @@ test("APP client API contract defers package-2 content and media APIs outside fi
   const deferredRoutes = report.deferredRoutes.map((item) => `${item.method} ${item.route}`)
 
   assert.equal(report.ok, true)
-  assert.equal(report.auditedClientApiCalls, 40)
-  assert.equal(report.uniqueAuditedClientRoutes, 34)
+  assert.equal(report.auditedClientApiCalls, 41)
+  assert.equal(report.uniqueAuditedClientRoutes, 35)
   assert.equal(report.deferredClientApiCalls, 7)
   assert.deepEqual(report.failures.unclassifiedRoutes, [])
   assert.ok(deferredRoutes.includes("POST /api/app/assets/sign-read"))
