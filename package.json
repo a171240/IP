@@ -53,6 +53,7 @@
     "aliyun:rds:migration:plan": "node ./scripts/summarize-aliyun-rds-migration-plan.mjs",
     "aliyun:rds:migration:plan:test": "node --test tests/aliyun-rds-migration-plan.static.test.js",
     "aliyun:rds:migration:evidence": "node ./scripts/check-aliyun-rds-migration-evidence.mjs --allow-incomplete",
+    "aliyun:rds:migration:evidence:init": "node ./scripts/check-aliyun-rds-migration-evidence.mjs --allow-incomplete --init-local",
     "aliyun:rds:migration:evidence:strict": "node ./scripts/check-aliyun-rds-migration-evidence.mjs",
     "aliyun:rds:migration:evidence:test": "node --test tests/aliyun-rds-migration-evidence.static.test.js",
     "aliyun:backend-cn:status": "node ./scripts/summarize-aliyun-backend-cn-status.mjs",

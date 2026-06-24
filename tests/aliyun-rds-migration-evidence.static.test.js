@@ -19,6 +19,7 @@ test("Aliyun RDS migration evidence command is wired into package scripts", () =
   const template = readJson("deploy", "aliyun-production-cn.rds-migration.example.json")
 
   assert.equal(pkg.scripts["aliyun:rds:migration:evidence"], "node ./scripts/check-aliyun-rds-migration-evidence.mjs --allow-incomplete")
+  assert.equal(pkg.scripts["aliyun:rds:migration:evidence:init"], "node ./scripts/check-aliyun-rds-migration-evidence.mjs --allow-incomplete --init-local")
   assert.equal(pkg.scripts["aliyun:rds:migration:evidence:strict"], "node ./scripts/check-aliyun-rds-migration-evidence.mjs")
   assert.equal(pkg.scripts["aliyun:rds:migration:evidence:test"], "node --test tests/aliyun-rds-migration-evidence.static.test.js")
   assert.match(predeploy, /aliyun:rds:migration:evidence:test/)
@@ -57,9 +58,13 @@ test("Aliyun RDS migration evidence command is wired into package scripts", () =
 })
 
 test("Aliyun RDS migration evidence check reports missing local closure without values", () => {
+  const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-rds-evidence-missing-"))
+  const missingLocalPath = path.join(tmpdir, "missing-rds-migration.local.json")
   const output = execFileSync(process.execPath, [
     "scripts/check-aliyun-rds-migration-evidence.mjs",
     "--allow-incomplete",
+    "--local",
+    missingLocalPath,
   ], {
     cwd: root,
     encoding: "utf8",
@@ -96,12 +101,150 @@ test("Aliyun RDS migration evidence check reports missing local closure without 
   assert.doesNotMatch(output, secretLike)
 })
 
+test("Aliyun RDS migration evidence init creates a non-secret local evidence scaffold", () => {
+  const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-rds-evidence-init-"))
+  const localPath = path.join(tmpdir, "rds-migration.local.json")
+  const output = execFileSync(process.execPath, [
+    "scripts/check-aliyun-rds-migration-evidence.mjs",
+    "--allow-incomplete",
+    "--init-local",
+    "--local",
+    localPath,
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 60,
+  })
+  const report = JSON.parse(output)
+  const local = JSON.parse(fs.readFileSync(localPath, "utf8"))
+
+  assert.equal(report.ok, false)
+  assert.equal(report.localInit.requested, true)
+  assert.equal(report.localInit.written, true)
+  assert.equal(report.localInit.skipped, false)
+  assert.equal(report.local.exists, true)
+  assert.equal(report.local.ready, false)
+  assert.ok(!report.local.blockers.includes("file_missing"))
+  assert.ok(report.local.blockers.includes("rdsPostgres.confirmed"))
+  assert.ok(report.local.blockers.includes("rdsPostgres.databaseUrlCnSecretImported"))
+  assert.ok(report.local.blockers.includes("migration.dataAccessAdapterReady"))
+  assert.equal(local.schemaVersion, 1)
+  assert.equal(local.environment, "production-cn")
+  assert.equal(local.operator, "codex-local-rds-evidence-init")
+  assert.equal(local.rdsPostgres.confirmed, false)
+  assert.equal(local.rdsPostgres.provider, "Aliyun RDS PostgreSQL")
+  assert.equal(local.rdsPostgres.region, "cn-hangzhou")
+  assert.equal(local.rdsPostgres.databaseUrlCnSecretImported, false)
+  assert.equal(local.sourceInventory.generatedBy, "corepack pnpm aliyun:rds:migration:plan")
+  assert.equal(local.sourceInventory.appApiRouteCount, 30)
+  assert.equal(local.sourceInventory.firstVersionRdsRoutesWithSupabaseDataAccess, 25)
+  assert.equal(local.sourceInventory.databaseUrlCnReferencedInSource, true)
+  assert.equal(local.sourceInventory.postgresDataAccessAdapterDetected, true)
+  assert.equal(local.migration.schemaInventoryReviewed, true)
+  assert.equal(local.migration.dataAccessAdapterReady, false)
+  assert.equal(local.security.containsDatabasePassword, false)
+  assert.equal(local.security.containsConnectionString, false)
+  assert.equal(local.security.containsSupabaseServiceRoleKey, false)
+
+  assert.doesNotMatch(output + JSON.stringify(local), secretLike)
+})
+
+test("Aliyun RDS migration evidence init does not overwrite an existing local evidence file", () => {
+  const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-rds-evidence-init-existing-"))
+  const localPath = path.join(tmpdir, "rds-migration.local.json")
+  const existing = {
+    schemaVersion: 1,
+    environment: "production-cn",
+    updatedAt: "2026-06-24T00:00:00.000Z",
+    operator: "existing-operator",
+    notes: "existing non-secret local evidence",
+    rdsPostgres: {
+      confirmed: false,
+      provider: "Aliyun RDS PostgreSQL",
+      region: "cn-hangzhou",
+      instanceId: "TODO_NON_SECRET_RDS_INSTANCE_ID",
+      instanceName: "meiye-huajing-app-api-production-cn",
+      engine: "PostgreSQL",
+      engineVersion: "TODO_POSTGRES_VERSION",
+      networkAccess: "TODO_VPC_OR_SAE_INTERNAL_ACCESS",
+      databaseName: "TODO_DATABASE_NAME",
+      databaseAccountReady: false,
+      databaseUrlCnSecretImported: false,
+      databaseUrlCnSecretTarget: "Aliyun KMS / Secrets Manager / SAE secret env",
+      evidence: "TODO_NON_SECRET_RDS_CONSOLE_EVIDENCE",
+    },
+    sourceInventory: {
+      generatedBy: "corepack pnpm aliyun:rds:migration:plan",
+      appApiRouteCount: 30,
+      appApiRoutesWithSupabase: 30,
+      appApiRoutesWithSupabaseDataAccess: 29,
+      firstVersionRdsRouteCount: 25,
+      firstVersionRdsRoutesWithSupabase: 25,
+      firstVersionRdsRoutesWithSupabaseDataAccess: 25,
+      deferredAppApiRouteCount: 5,
+      deferredAppApiRoutesWithSupabaseDataAccess: 4,
+      tableCount: 44,
+      rpcCount: 3,
+      storageBucketCount: 1,
+      databaseUrlCnReferencedInSource: true,
+      postgresDataAccessAdapterDetected: true,
+      evidence: "existing_non_secret_source_inventory_evidence",
+    },
+    migration: {
+      schemaInventoryReviewed: false,
+      dataAccessAdapterReady: false,
+      schemaMigrated: false,
+      dataMigrated: false,
+      rowCountValidationPassed: false,
+      criticalRecordValidationPassed: false,
+      appApiSmokeOnRdsPassed: false,
+      supabaseNoLongerFormalTarget: false,
+      rollbackRunbookReviewed: false,
+      rollbackValidationPassed: false,
+      evidence: "TODO_NON_SECRET_MIGRATION_AND_ROLLBACK_EVIDENCE",
+    },
+    security: {
+      containsDatabasePassword: false,
+      containsConnectionString: false,
+      containsSupabaseServiceRoleKey: false,
+      secretPolicy: "Do not store DATABASE_URL_CN, database password, dump contents, Supabase service role key, AccessKeySecret, AppSecret, STS token, or cookie in git, JSON, Markdown, Docker image, APP bundle, or mini-program package.",
+    },
+    verifyCommands: ["corepack pnpm aliyun:rds:migration:evidence:strict"],
+  }
+  fs.writeFileSync(localPath, JSON.stringify(existing, null, 2))
+
+  const output = execFileSync(process.execPath, [
+    "scripts/check-aliyun-rds-migration-evidence.mjs",
+    "--allow-incomplete",
+    "--init-local",
+    "--local",
+    localPath,
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 60,
+  })
+  const report = JSON.parse(output)
+  const after = JSON.parse(fs.readFileSync(localPath, "utf8"))
+
+  assert.equal(report.localInit.requested, true)
+  assert.equal(report.localInit.written, false)
+  assert.equal(report.localInit.skipped, true)
+  assert.equal(report.localInit.reason, "local_file_already_exists")
+  assert.equal(after.operator, "existing-operator")
+  assert.deepEqual(after, existing)
+  assert.doesNotMatch(output + JSON.stringify(after), secretLike)
+})
+
 test("Aliyun RDS migration evidence markdown is value-free", () => {
   const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-rds-evidence-"))
+  const missingLocalPath = path.join(tmpdir, "missing-rds-migration.local.json")
   const markdownPath = path.join(tmpdir, "rds-evidence.md")
   const output = execFileSync(process.execPath, [
     "scripts/check-aliyun-rds-migration-evidence.mjs",
     "--allow-incomplete",
+    "--local",
+    missingLocalPath,
     "--markdown",
     markdownPath,
   ], {
