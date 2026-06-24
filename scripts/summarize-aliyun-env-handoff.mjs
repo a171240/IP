@@ -31,6 +31,17 @@ const GROUPS = Object.freeze([
   ["readySecretEnv", "可导入 KMS/Secrets Manager/SAE secret env"],
   ["deferred", "可后置或空缺变量"],
 ])
+const CURRENT_SCOPE = "backend_aliyun_only"
+const FULL_APP_LAUNCH_SCOPE = "deferred_after_backend_online"
+const APP_LAUNCH_DEFERRED_NAMES = new Set([
+  "WECHAT_OPEN_APP_ID",
+  "WECHAT_OPEN_APP_SECRET",
+  "APPLE_TEAM_ID",
+  "MEIYE_RELEASE_STORE_FILE",
+  "MEIYE_RELEASE_STORE_PASSWORD",
+  "MEIYE_RELEASE_KEY_ALIAS",
+  "MEIYE_RELEASE_KEY_PASSWORD",
+])
 
 function parseArgs(argv) {
   const args = {
@@ -79,18 +90,23 @@ function buildReport(args) {
     containsValues: false,
     readOnlyOnly: true,
     mutationPerformed: false,
+    currentScope: CURRENT_SCOPE,
+    fullAppLaunchScope: FULL_APP_LAUNCH_SCOPE,
     sourceCommand: "corepack pnpm aliyun:env:handoff",
     sourcePlanCommand: "corepack pnpm aliyun:env:checklist",
     files: {
       envFile: args.envFile,
       envFileExists: existsSync(args.envFile),
     },
-    currentAnswer: "现在不能部署；本手册只回答每个变量从哪里取得、写到阿里云哪里、当前是否阻塞，不输出任何 value。",
+    currentAnswer: "现在不能部署；当前只推进阿里云后端，后端必填阻塞只剩 DATABASE_URL_CN，微信移动应用/Android/Apple 发布变量延期到后端上线后。",
     summary: {
+      currentScope: CURRENT_SCOPE,
+      fullAppLaunchScope: FULL_APP_LAUNCH_SCOPE,
       total: plan.summary.total,
       requiredReady: plan.summary.requiredReady,
       requiredTotal: plan.summary.requiredTotal,
       requiredBlocking: groups.blockedRequired.map((item) => item.name),
+      fullAppRequiredBlocking: plan.summary.requiredBlocking || [],
       appLaunchBlocking: groups.appLaunchBlocking.map((item) => item.name),
       readyPlainEnv: groups.readyPlainEnv.length,
       readySecretEnv: groups.readySecretEnv.length,
@@ -135,17 +151,20 @@ function buildReport(args) {
 }
 
 function groupVariables(plan) {
-  const appLaunchBlockingNames = new Set(plan.summary.appLaunchBlocking || [])
+  const appLaunchBlockingNames = new Set([
+    ...(plan.summary.appLaunchBlocking || []),
+    ...APP_LAUNCH_DEFERRED_NAMES,
+  ])
   const groups = Object.fromEntries(GROUPS.map(([key]) => [key, []]))
 
   for (const variable of plan.variables) {
     const compact = compactVariable(variable)
-    if (variable.required && variable.status !== "ready") {
-      groups.blockedRequired.push(compact)
+    if (variable.status !== "ready" && appLaunchBlockingNames.has(variable.name)) {
+      groups.appLaunchBlocking.push(compact)
       continue
     }
-    if (!variable.required && variable.status !== "ready" && appLaunchBlockingNames.has(variable.name)) {
-      groups.appLaunchBlocking.push(compact)
+    if (variable.required && variable.status !== "ready") {
+      groups.blockedRequired.push(compact)
       continue
     }
     if (variable.status === "ready" && variable.importTarget === "阿里云 SAE plain env") {
@@ -257,10 +276,13 @@ function renderMarkdown(report) {
     "",
     `- ${report.currentAnswer}`,
     `- ok: ${report.ok}`,
+    `- currentScope: ${report.currentScope}`,
+    `- fullAppLaunchScope: ${report.fullAppLaunchScope}`,
     `- containsValues: ${report.containsValues}`,
     `- mutationPerformed: ${report.mutationPerformed}`,
     `- requiredReady: ${report.summary.requiredReady} / ${report.summary.requiredTotal}`,
     `- requiredBlocking: ${report.summary.requiredBlocking.length ? report.summary.requiredBlocking.join(", ") : "none"}`,
+    `- fullAppRequiredBlocking: ${report.summary.fullAppRequiredBlocking.length ? report.summary.fullAppRequiredBlocking.join(", ") : "none"}`,
     `- appLaunchBlocking: ${report.summary.appLaunchBlocking.length ? report.summary.appLaunchBlocking.join(", ") : "none"}`,
     `- readyPlainEnv: ${report.summary.readyPlainEnv}`,
     `- readySecretEnv: ${report.summary.readySecretEnv}`,

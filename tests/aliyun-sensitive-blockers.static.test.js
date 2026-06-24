@@ -392,7 +392,7 @@ test("APP production-cn sensitive blockers handoff documents user-intervention c
     "APPLE_TEAM_ID",
     "ALIYUN_OSS_SECURITY_TOKEN",
     "MEIYE_RELEASE_STORE_PASSWORD",
-    "bridge_database",
+    "legacy_database_migration_source",
     "NEXT_PUBLIC_SUPABASE_ANON_KEY",
     "SUPABASE_SERVICE_ROLE_KEY",
     "app_auth",

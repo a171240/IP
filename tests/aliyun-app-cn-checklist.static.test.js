@@ -22,12 +22,13 @@ test("APP production-cn checklist records current blockers without secret values
 
   for (const expected of [
     "ready 0/9",
-    "ready 0/10",
+    "ready 0/11",
     "ready 0/7",
     "Android release signing",
-    "required `17/26`",
-    "本机 required env 是 `24/26` ready",
-    "后端必填阻塞只剩",
+    "required `17/27`",
+    "本机 full APP required env 现在是 `24/27` ready",
+    "当前阿里云后端-only 口径只把 `DATABASE_URL_CN` 作为后端必填阻塞",
+    "后端必填阻塞是",
     "APP 发布阻塞但非后端必填",
     "WECHAT_OPEN_APP_ID",
     "WECHAT_OPEN_APP_SECRET",
@@ -45,7 +46,7 @@ test("APP production-cn checklist records current blockers without secret values
     "aliyun:console:runbook",
     "aliyun:action:authorization",
     "7 项阿里云控制台任务",
-    "所有 10 项都不能在没有动作时确认的情况下自动执行",
+    "所有 11 项都不能在没有动作时确认的情况下自动执行",
     "aliyun:wechat-open:package",
     "微信开放平台移动应用创建材料包",
     "aliyun:env:handoff",
@@ -53,7 +54,7 @@ test("APP production-cn checklist records current blockers without secret values
     "readyLocalOperations=9/9",
     "executedCommandResults=12/12",
     "CloudShell 只读盘点显示 `cn-hangzhou` 实例数 0",
-    "数据层可后置变量",
+    "正式数据层必填与可后置变量",
   ]) {
     assert.match(doc, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
   }
@@ -79,8 +80,8 @@ test("APP production-cn checklist records current blockers without secret values
 test("APP production-cn release manifest keeps Vercel coverage aligned with required env count", () => {
   const manifest = read("docs", "release-manifest-2026-06-21-app-aliyun-production-cn-bridge.md")
 
-  assert.match(manifest, /required APP production-cn variables covered by Vercel production: 17 \/ 26/)
-  assert.match(manifest, /缺失的 9 个必填项/)
+  assert.match(manifest, /required APP production-cn variables covered by Vercel production: 17 \/ 27/)
+  assert.match(manifest, /缺失的 10 个必填项/)
   assert.match(manifest, /`api-cn`\/`assets-cn` 域名变量/)
   assert.match(manifest, /required missing in Vercel production:[\s\S]*APP_ASSET_BASE_URL/)
   assert.doesNotMatch(manifest, /required APP production-cn variables covered by Vercel production: 17 \/ 25/)

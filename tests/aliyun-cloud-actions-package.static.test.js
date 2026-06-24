@@ -62,12 +62,21 @@ test("Aliyun cloud actions package summarizes current cloud console action order
   assert.equal(report.mutationPerformed, false)
   assert.equal(report.cloudApiCalled, false)
   assert.equal(report.secretLeakCheck.ok, true)
+  assert.equal(report.currentScope, "backend_aliyun_only")
   assert.equal(report.summary.canDeployNow, false)
+  assert.equal(report.summary.canProceedWithoutWechat, true)
   assert.deepEqual(report.summary.canStartNowConsoleTasks, ["C02_ACR_IMAGE_AND_PULL", "C05_OSS_AUDIO_RAM_STS"])
   assert.ok(report.summary.blockedByDependencies.includes("C01_SAE_RUNTIME"))
   assert.ok(report.summary.blockedByDependencies.includes("C06_ENV_IMPORT"))
-  assert.deepEqual(report.summary.cloudConsolePackets, ["P03_ACR_PURCHASE", "P05_OSS_RAM_STS"])
-  assert.ok(report.summary.externalAppPackets.includes("P01_WECHAT_OPEN_MOBILE_APP"))
+  assert.deepEqual(report.summary.cloudConsolePackets, [
+    "P03_ACR_PURCHASE",
+    "P05_OSS_RAM_STS",
+    "P11_ALIYUN_RDS_DATA_MIGRATION",
+  ])
+  assert.deepEqual(report.summary.externalAppPackets, [])
+  assert.ok(report.summary.deferredAppLaunchPackets.includes("P01_WECHAT_OPEN_MOBILE_APP"))
+  assert.ok(report.summary.requiredBlocking.includes("DATABASE_URL_CN"))
+  assert.ok(report.summary.requiredBlocking.includes("RDS_POSTGRES_NOT_READY"))
   assert.equal(report.cloudAccess.canReadCloudNow, false)
   assert.equal(report.cloudAccess.cliConfigProbeFailureCategory, "aliyun_cli_profile_not_configured")
   assert.equal(report.summary.cloudInventoryResultsReady, true)
@@ -100,8 +109,13 @@ test("Aliyun cloud actions package summarizes current cloud console action order
   assert.equal(report.cloudActionClosureBrief.cloudInventoryExecutedCommandResults, "12/12")
   assert.equal(report.cloudActionClosureBrief.mutationPerformedCommandResults, 0)
   assert.deepEqual(report.cloudActionClosureBrief.canStartNowConsoleTasks, ["C02_ACR_IMAGE_AND_PULL", "C05_OSS_AUDIO_RAM_STS"])
-  assert.deepEqual(report.cloudActionClosureBrief.cloudConsolePackets, ["P03_ACR_PURCHASE", "P05_OSS_RAM_STS"])
-  assert.ok(report.cloudActionClosureBrief.externalAppPackets.includes("P01_WECHAT_OPEN_MOBILE_APP"))
+  assert.deepEqual(report.cloudActionClosureBrief.cloudConsolePackets, [
+    "P03_ACR_PURCHASE",
+    "P05_OSS_RAM_STS",
+    "P11_ALIYUN_RDS_DATA_MIGRATION",
+  ])
+  assert.deepEqual(report.cloudActionClosureBrief.externalAppPackets, [])
+  assert.ok(report.cloudActionClosureBrief.deferredAppLaunchPackets.includes("P01_WECHAT_OPEN_MOBILE_APP"))
   assert.ok(report.cloudActionClosureBrief.blockedByDependencies.includes("C01_SAE_RUNTIME"))
   assert.ok(report.cloudActionClosureBrief.imagePublishWritebackBlockingGroups.includes("imagePushAndDigest"))
   assert.deepEqual(report.summary.imagePublishWritebackBlockingGroups, [
@@ -124,9 +138,9 @@ test("Aliyun cloud actions package summarizes current cloud console action order
   assert.ok(queueAcr.deferredActions.some((item) => item.includes("imagePushed=true")))
   assert.ok(!queueAcr.completionEvidence.some((item) => item.includes("imagePushed=true")))
   assert.ok(!queueAcr.completionEvidence.some((item) => item.includes("runtime.imagePullConfigured=true")))
-  assert.ok(report.executionQueue.externalAppPrerequisites.some((item) => item.packetId === "P01_WECHAT_OPEN_MOBILE_APP"))
-  assert.ok(report.executionQueue.externalAppPrerequisites.some((item) => item.packetId === "P10_ANDROID_RELEASE_SIGNING"))
-  assert.ok(report.executionQueue.externalAppPrerequisites.every((item) => item.kind === "external_platform_prerequisite"))
+  assert.deepEqual(report.executionQueue.externalAppPrerequisites, [])
+  assert.ok(report.deferredAppLaunchPrerequisitePackets.some((item) => item.packetId === "P01_WECHAT_OPEN_MOBILE_APP"))
+  assert.ok(report.deferredAppLaunchPrerequisitePackets.some((item) => item.packetId === "P10_ANDROID_RELEASE_SIGNING"))
   assert.ok(report.executionQueue.blockedByDependencies.some((item) => item.id === "C01_SAE_RUNTIME"))
   assert.ok(report.executionQueue.blockedByDependencies.some((item) => item.blockingDependencies.includes("C05_OSS_AUDIO_RAM_STS")))
   assert.equal(report.cloudInventoryResults.ready, true)
@@ -152,8 +166,9 @@ test("Aliyun cloud actions package summarizes current cloud console action order
   assert.ok(report.readonlyInventoryUnblock.unlockCommands.some((item) => item.includes("MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1")))
   assert.ok(report.readonlyInventoryUnblock.expectedNonSecretEvidenceAfterUnlock.some((item) => item.includes("mutationPerformedCommandResults = 0")))
   assert.ok(report.readonlyInventoryUnblock.forbidden.some((item) => item.includes("不要把 AccessKeySecret")))
-  assert.ok(report.currentBlockers.includes("requiredEnv:WECHAT_OPEN_APP_ID"))
-  assert.ok(report.currentBlockers.includes("requiredEnv:WECHAT_OPEN_APP_SECRET"))
+  assert.ok(!report.currentBlockers.includes("requiredEnv:WECHAT_OPEN_APP_ID"))
+  assert.ok(!report.currentBlockers.includes("requiredEnv:WECHAT_OPEN_APP_SECRET"))
+  assert.ok(report.currentBlockers.includes("backendRequired:DATABASE_URL_CN"))
   const immediateAcr = report.immediateConsoleTasks.find((item) => item.id === "C02_ACR_IMAGE_AND_PULL")
   assert.ok(immediateAcr.consolePath.includes("ACR"))
   assert.equal(immediateAcr.currentActionScope, "purchase_and_repository_only")
@@ -162,6 +177,10 @@ test("Aliyun cloud actions package summarizes current cloud console action order
   assert.ok(report.blockedConsoleTasks.some((item) => item.id === "C03_API_DOMAIN_HTTPS_ICP" && item.blockingDependencies.includes("C01_SAE_RUNTIME")))
   assert.ok(report.cloudConsoleAuthorizationPackets.some((item) => item.packetId === "P03_ACR_PURCHASE" && item.minimumAuthorizationPhrase.includes("CNY 117.00")))
   assert.ok(report.cloudConsoleAuthorizationPackets.some((item) => item.packetId === "P05_OSS_RAM_STS" && item.minimumAuthorizationPhrase.includes("OSS")))
+  assert.ok(report.cloudConsoleAuthorizationPackets.some((item) => (
+    item.packetId === "P11_ALIYUN_RDS_DATA_MIGRATION" &&
+    item.minimumAuthorizationPhrase.includes("DATABASE_URL_CN")
+  )))
   assert.ok(report.strictVerificationOrder.includes("corepack pnpm aliyun:cloud:access"))
   assert.ok(report.nextSafeLocalCommands.includes("corepack pnpm aliyun:cloud-actions:package"))
   assert.ok(report.safetyBoundary.some((item) => item.includes("不购买 ACR")))
@@ -197,6 +216,7 @@ test("Aliyun cloud actions package markdown renders compact action order without
   assert.match(markdown, /C05_OSS_AUDIO_RAM_STS/)
   assert.match(markdown, /P03_ACR_PURCHASE/)
   assert.match(markdown, /P05_OSS_RAM_STS/)
+  assert.match(markdown, /P11_ALIYUN_RDS_DATA_MIGRATION/)
   assert.match(markdown, /只读盘点解锁/)
   assert.match(markdown, /strict_inventory_evidence_ready/)
   assert.match(markdown, /cloudInventoryReadyLocalOperations: 9\/9/)
@@ -205,7 +225,8 @@ test("Aliyun cloud actions package markdown renders compact action order without
   assert.match(markdown, /canStartNow: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS/)
   assert.match(markdown, /scope=purchase_and_repository_only/)
   assert.match(markdown, /currentActionAcceptanceEvidence: acr\.purchaseCandidate\.confirmed=true/)
-  assert.match(markdown, /externalAppPrerequisites: P01_WECHAT_OPEN_MOBILE_APP/)
+  assert.match(markdown, /externalAppPrerequisites: none/)
+  assert.match(markdown, /deferredAppLaunchPrerequisites: P01_WECHAT_OPEN_MOBILE_APP/)
   assert.match(markdown, /blockedByDependencies: C01_SAE_RUNTIME/)
   assert.match(markdown, /currentEvidence: readyLocalOperations=9\/9/)
   assert.match(markdown, /MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1/)
@@ -222,36 +243,36 @@ test("APP production-cn action queue documents the current authorized next-step 
   const doc = read("docs", "app-production-cn-action-queue.md")
 
   for (const expected of [
-    "Production-cn cannot be deployed now.",
-    "cloudConfirmationsReady=0/7",
-    "requiredEnv=24/26",
-    "requiredBlocking=WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET",
-    "strictReadonlyInventoryReady=true",
-    "cloudInventoryReadyLocalOperations=9/9",
-    "mutationPerformedCommandResults=0",
+    "currentScope: backend_aliyun_only",
+    "fullAppLaunchScope: deferred_after_backend_online",
+    "canDeployNow: false",
+    "canProceedWithoutWechat: true",
+    "cloudConfirmationsReady: 0/7",
+    "strictReadonlyInventoryReady: true",
+    "cloudInventoryReadyLocalOperations: 9/9",
+    "mutationPerformedCommandResults: 0",
+    "canStartNow: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS",
+    "cloudConsolePackets: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION",
+    "externalAppPackets: none",
+    "deferredAppLaunchPackets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID",
     "C02_ACR_IMAGE_AND_PULL",
-    "purchase and repository only",
-    "quoted price=CNY 117.00",
+    "purchase_and_repository_only",
+    "当前报价 CNY 117.00",
     "repository=meiye-huajing-app-api",
-    "acr.registryHost=<actual cn-hangzhou aliyuncs.com host>",
-    "Deferred to a separate later authorization",
+    "acr.registryHost=<cn-hangzhou aliyuncs.com host>",
     "P04_ACR_IMAGE_AND_PULL",
     "C05_OSS_AUDIO_RAM_STS",
-    "bucket=meiye-huajing-service-records-production-cn",
-    "AttachmentCount=0",
-    "ramLeastPrivilege=true",
-    "serviceRecordPrefix=service-records/production-cn",
+    "ALIYUN_OSS_SECURITY_TOKEN -> KMS/Secrets Manager/SAE secret env",
+    "RAM 最小权限",
+    "OSS 音频 bucket",
     "P01_WECHAT_OPEN_MOBILE_APP",
     "P10_ANDROID_RELEASE_SIGNING",
     "P02_APPLE_TEAM_ID",
-    "reviewStatus=not_started",
-    "miniProgramCredentialsReusableForAppLogin=false",
     "C06_ENV_IMPORT",
     "corepack pnpm aliyun:completion:audit",
-    "Do not run docker login or docker push.",
-    "Do not deploy production-cn.",
-    "requiredEnv:WECHAT_OPEN_APP_ID",
-    "requiredEnv:WECHAT_OPEN_APP_SECRET",
+    "当前后端-only 目标不创建微信开放平台移动应用",
+    "backendRequired:DATABASE_URL_CN",
+    "backendRequired:RDS_POSTGRES_NOT_READY",
   ]) {
     assert.match(doc, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
   }

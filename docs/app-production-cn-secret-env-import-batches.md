@@ -45,7 +45,7 @@ These variables are ready by name, but their values still must be imported only 
 
 | Batch | Owner | Count | Import target | Variable names |
 | --- | --- | ---: | --- | --- |
-| `bridge_database` | Vercel/Supabase operator | 3 | Aliyun KMS / Secrets Manager / SAE secret env | `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` |
+| `legacy_database_migration_source` | Vercel/Supabase operator | 3 | migration source / legacy compatibility only; formal database target is Aliyun RDS PostgreSQL | `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` |
 | `app_auth` | Backend release operator | 1 | Aliyun KMS / Secrets Manager / SAE secret env | `WECHAT_LOGIN_SECRET` |
 | `aliyun_oss` | Aliyun OSS/RAM operator | 2 | Aliyun KMS / Secrets Manager / SAE secret env | `ALIYUN_OSS_ACCESS_KEY_ID`, `ALIYUN_OSS_ACCESS_KEY_SECRET` |
 | `bailian_asr` | Aliyun Bailian / DashScope operator | 1 | Aliyun KMS / Secrets Manager / SAE secret env | `DASHSCOPE_API_KEY` |

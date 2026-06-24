@@ -1,218 +1,160 @@
-# APP production-cn action queue
+# 阿里云控制台动作包
 
-Date: 2026-06-24
+生成时间：2026-06-24T10:39:43.136Z
 
-This file is a value-free operator queue derived from:
+## 结论
 
-```bash
-corepack pnpm aliyun:cloud-actions:package -- --markdown /tmp/meiye-cloud-actions-package-current.md
-```
+- packageId: C00_ALIYUN_CLOUD_ACTIONS
+- currentScope: backend_aliyun_only
+- fullAppLaunchScope: deferred_after_backend_online
+- canDeployNow: false
+- canProceedWithoutWechat: true
+- backendTargetReady: 0/8
+- verdict: blocked
+- cloudConfirmationsReady: 0/7
+- operatorTasksReady: 1/9
+- canReadCloudNow: false
+- cloudInventoryResultsReady: true
+- cloudInventoryReadyLocalOperations: 9/9
+- cloudInventoryExecutedCommandResults: 12/12
+- cliConfigProbeFailureCategory: aliyun_cli_profile_not_configured
+- containsValues: false
+- mutationPerformed: false
+- cloudApiCalled: false
+- blockedCredentialCount: 8
+- readySecretEnvVariableCount: 17
+- resourceEvidenceReady: 0/7
+- blockedResourceEvidenceIds: R01_SAE_RUNTIME, R02_ACR_IMAGE_REGISTRY, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R05_OSS_AUDIO_STORAGE, R06_ENV_IMPORT, R07_SLS_ALERTS
+- partiallyObservedResourceEvidenceIds: R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS
 
-It records what can be prepared next, what is still blocked, and which local evidence fields must be updated after an authorized external action. It does not authorize Aliyun purchase, cloud mutation, WeChat Open Platform mutation, secret import, image push, deployment, or git push.
+## 目标闭环证据简表
 
-## Current Verdict
+- conclusion: 现在不能部署；本动作包当前只覆盖阿里云后端，能进入 C02/C05/P11 的动作时确认，其余 ACR push/SAE/DNS/env/SLS/smoke 仍未闭环。
+- canDeployNow: false
+- blockedCredentialCount: 8
+- blockedCredentialNames: ALIYUN_OSS_SECURITY_TOKEN, APPLE_TEAM_ID, MEIYE_RELEASE_KEY_ALIAS, MEIYE_RELEASE_KEY_PASSWORD, MEIYE_RELEASE_STORE_FILE, MEIYE_RELEASE_STORE_PASSWORD, WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET
+- readySecretEnvVariableCount: 17
+- resourceEvidenceReady: 0/7
+- blockedResourceEvidenceIds: R01_SAE_RUNTIME, R02_ACR_IMAGE_REGISTRY, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R05_OSS_AUDIO_STORAGE, R06_ENV_IMPORT, R07_SLS_ALERTS
+- partiallyObservedResourceEvidenceIds: R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS
+- strictReadonlyInventoryReady: true
+- cloudInventoryReadyLocalOperations: 9/9
+- cloudInventoryExecutedCommandResults: 12/12
+- mutationPerformedCommandResults: 0
+- canStartNowConsoleTasks: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS
+- cloudConsolePackets: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
+- externalAppPackets: none
+- deferredAppLaunchPackets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID
+- blockedByDependencies: C01_SAE_RUNTIME, C03_API_DOMAIN_HTTPS_ICP, C04_ASSET_DOMAIN_HTTPS_ICP, C06_ENV_IMPORT, C07_SLS_ALERTS
+- imagePublishWritebackBlockingGroups: acrPurchaseAndRepository, imagePushAndDigest, saeRuntimeImagePull
 
-Production-cn cannot be deployed now.
+## 下一步执行队列
 
-Current gate:
+- canStartNow: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS
+- externalAppPrerequisites: none
+- deferredAppLaunchPrerequisites: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID
+- blockedByDependencies: C01_SAE_RUNTIME, C03_API_DOMAIN_HTTPS_ICP, C04_ASSET_DOMAIN_HTTPS_ICP, C06_ENV_IMPORT, C07_SLS_ALERTS
+- C02_ACR_IMAGE_AND_PULL: kind=aliyun_console_task; scope=purchase_and_repository_only; phrase=授权购买/确认 ACR 企业版实例和镜像仓库基础信息；不执行 docker login/push，不记录 registry password。
+- C05_OSS_AUDIO_RAM_STS: kind=aliyun_console_task; scope=full_task; phrase=授权确认 OSS 音频 bucket、CORS、RAM 最小权限或 STS/运行时角色；Secret 只进阿里云受控密钥环境。
+- externalAppPrerequisiteItems: none
 
-```text
-canDeployNow=false
-productionReady=false
-cloudConfirmationsReady=0/7
-operatorTasksReady=1/9
-requiredEnv=24/26
-requiredBlocking=WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET
-resourceEvidenceReady=0/7
-strictReadonlyInventoryReady=true
-cloudInventoryReadyLocalOperations=9/9
-cloudInventoryExecutedCommandResults=12/12
-mutationPerformedCommandResults=0
-```
+## 只读盘点解锁
 
-The read-only CloudShell inventory is already strict-ready. That evidence proves current resource state only; it does not replace cloud confirmations, ACR image publish evidence, secret import evidence, or production deploy authorization.
+- status: strict_inventory_evidence_ready
+- currentBlocker: none
+- currentEvidence: readyLocalOperations=9/9；executedCommandResults=12/12；cloudApiCalledCommandResults=12；mutationPerformedCommandResults=0
+- minimumAuthorizationPhrase: 授权在本机 Aliyun CLI 或阿里云 CloudShell 中配置只读身份，并只运行 allowlisted production-cn inventory 命令；不输出 AccessKeySecret、STS token、cookie、registry password 或证书私钥。
+- whyConsoleLoginIsNotEnough: 严格云证据已来自 allowlisted Aliyun CLI/CloudShell List/Describe/stat/get 命令摘要；后续云资源创建、购买、DNS、密钥导入和部署仍需动作时确认。
+- unlockCommands:
+  - corepack pnpm aliyun:cloud:access
+  - MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1 corepack pnpm aliyun:cloud:inventory-run -- --execute-readonly --write-local deploy/aliyun-production-cn.cloud-inventory-results.local.json
+  - corepack pnpm aliyun:cloud:inventory-results:strict
+  - corepack pnpm aliyun:evidence:writeback -- --skip-vercel-env-coverage
+  - corepack pnpm aliyun:completion:audit
+- forbidden:
+  - 不要把 AccessKeySecret、STS token、cookie、registry password、RAM Secret、Supabase service role key 或证书私钥写入 JSON、Markdown、Docker 镜像、截图、聊天或 git。
+  - 不要运行 Create/Update/Delete/Deploy/Start/Stop/GetAuthorizationToken/docker login/docker push/oss cp/oss cat/oss sign。
+  - 不要把控制台页面可见或 Workbench 已连接误标记成 cloudInventory strict ready。
 
-## Can Start After Action-Time Confirmation
+## 当前可先做
 
-These are the only Aliyun console tasks that can be started next, and each still requires explicit action-time confirmation.
+### C02_ACR_IMAGE_AND_PULL 购买/确认 ACR 企业版实例和镜像仓库基础信息
 
-### C02_ACR_IMAGE_AND_PULL
+- consolePath: 阿里云控制台 -> 容器镜像服务 ACR -> 企业版购买页
+- minimumAuthorizationPhrase: 授权购买/确认 ACR 企业版实例和镜像仓库基础信息；不执行 docker login/push，不记录 registry password。
+- currentActionScope: purchase_and_repository_only
+- currentActionAcceptanceEvidence: acr.purchaseCandidate.confirmed=true；acr.registryHost actual aliyuncs.com host；acr.namespace created；repository=meiye-huajing-app-api
+- writeTargets: deploy/aliyun-production-cn.image-publish.local.json: acr.confirmed=true；deploy/aliyun-production-cn.image-publish.local.json: acr.registryHost=<cn-hangzhou aliyuncs.com host>；deploy/aliyun-production-cn.image-publish.local.json: acr.namespace=<actual namespace>
+- verifyCommands: corepack pnpm aliyun:image:plan
+- deferredActions: P04_ACR_IMAGE_AND_PULL 依赖 P03_ACR_PURCHASE 完成后再执行。；当前确认包不执行 docker login/push。；当前确认包不配置 SAE runtime image pull credentials。；imagePushed=true、digestVerified=true、runtime.remoteImageConfigured=true、runtime.imagePullConfigured=true 都属于后置验收。；imagePushAndDigest 需等待 P04_ACR_IMAGE_AND_PULL；当前 blockers: todo:acr.remoteImage, todo:acr.remoteDigest, todo:acr.evidence, acr.imagePushed, acr.digestVerified, acr.remoteDigest=sha256；saeRuntimeImagePull 需等待 P08_SAE_RUNTIME_SLS, P04_ACR_IMAGE_AND_PULL；当前 blockers: runtime.confirmed, runtime.remoteImageConfigured, runtime.imagePullConfigured
 
-Current scope: purchase and repository only.
+### C05_OSS_AUDIO_RAM_STS 确认 OSS 音频 bucket、CORS、RAM 最小权限或 STS/运行时角色
 
-Authorization phrase:
+- consolePath: 阿里云控制台 -> OSS Bucket / RAM 访问控制 / SAE 运行身份
+- minimumAuthorizationPhrase: 授权确认 OSS 音频 bucket、CORS、RAM 最小权限或 STS/运行时角色；Secret 只进阿里云受控密钥环境。
+- currentActionScope: full_task
+- currentActionAcceptanceEvidence: none
+- writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss；ALIYUN_OSS_ACCESS_KEY_ID / ALIYUN_OSS_ACCESS_KEY_SECRET / ALIYUN_OSS_SECURITY_TOKEN -> KMS/Secrets Manager/SAE secret env
+- verifyCommands: corepack pnpm aliyun:cloud:confirmations；corepack pnpm aliyun:health:smoke；corepack pnpm aliyun:app-api:smoke；postdeploy service-records upload smoke after API deployment
+- deferredActions: none
 
-```text
-Authorize purchase/confirmation of the ACR Enterprise instance and base image repository information; do not run docker login/push and do not record registry password.
-```
+## 必须暂缓
 
-Allowed in this current step:
+- C01_SAE_RUNTIME: dependsOn=C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS, C06_ENV_IMPORT; blockers=runtime:confirmed, R01_SAE_RUNTIME:runtime:confirmed, R07_SLS_ALERTS:slsAlerts:confirmed, R07_SLS_ALERTS:slsAlerts:healthAlertConfigured, R07_SLS_ALERTS:slsAlerts:serverErrorAlertConfigured, slsAlerts:confirmed
+- C03_API_DOMAIN_HTTPS_ICP: dependsOn=C01_SAE_RUNTIME; blockers=APP_API_BASE_URL:dns_special_use_wildcard_ip, APP_API_BASE_URL:https_not_ready:ECONNRESET, NEXT_PUBLIC_SITE_URL:dns_special_use_wildcard_ip, NEXT_PUBLIC_SITE_URL:https_not_ready:ECONNRESET, APP_ASSET_BASE_URL:dns_special_use_wildcard_ip, APP_ASSET_BASE_URL:https_not_ready:ECONNRESET
+- C04_ASSET_DOMAIN_HTTPS_ICP: dependsOn=C05_OSS_AUDIO_RAM_STS; blockers=APP_API_BASE_URL:dns_special_use_wildcard_ip, APP_API_BASE_URL:https_not_ready:ECONNRESET, NEXT_PUBLIC_SITE_URL:dns_special_use_wildcard_ip, NEXT_PUBLIC_SITE_URL:https_not_ready:ECONNRESET, APP_ASSET_BASE_URL:dns_special_use_wildcard_ip, APP_ASSET_BASE_URL:https_not_ready:ECONNRESET
+- C06_ENV_IMPORT: dependsOn=C05_OSS_AUDIO_RAM_STS; blockers=missing_required_env:DATABASE_URL_CN, missing_required_env:WECHAT_OPEN_APP_ID, missing_required_env:WECHAT_OPEN_APP_SECRET, envImport:confirmed, envImport:secretNotInImage, envImport:placeholder:importedAt
+- C07_SLS_ALERTS: dependsOn=C01_SAE_RUNTIME; blockers=slsAlerts:confirmed, slsAlerts:healthAlertConfigured, slsAlerts:serverErrorAlertConfigured, R01_SAE_RUNTIME:runtime:confirmed, R07_SLS_ALERTS:slsAlerts:confirmed, R07_SLS_ALERTS:slsAlerts:healthAlertConfigured
 
-```text
-ACR Enterprise Economic
-region=cn-hangzhou
-term=1 month
-quoted price=CNY 117.00
-repository=meiye-huajing-app-api
-record non-secret registry host and namespace
-```
+## 云侧动作授权包
 
-Write back only non-secret evidence:
+- P03_ACR_PURCHASE: 授权购买 ACR Enterprise Economic，cn-hangzhou，1 个月，当前报价 CNY 117.00。
+- P05_OSS_RAM_STS: 授权为服务记录音频 OSS 配置最小权限 RAM/STS 或运行时角色，并只通过密钥环境注入。
+- P11_ALIYUN_RDS_DATA_MIGRATION: 授权创建/确认阿里云 RDS PostgreSQL production-cn 数据库并完成数据迁移；DATABASE_URL_CN 只能进入阿里云 secret env。
 
-```text
-deploy/aliyun-production-cn.image-publish.local.json -> acr.confirmed=true
-deploy/aliyun-production-cn.image-publish.local.json -> acr.registryHost=<actual cn-hangzhou aliyuncs.com host>
-deploy/aliyun-production-cn.image-publish.local.json -> acr.namespace=<actual namespace>
-```
+## 延期的外部 App 前置项
 
-Verify:
+- P01_WECHAT_OPEN_MOBILE_APP: 授权在微信开放平台创建/补全美业话镜移动应用资料并提交审核；不读取或输出 AppSecret。
+- P10_ANDROID_RELEASE_SIGNING: 授权使用受控 Android release keystore 构建/签名 release 包并读取微信开放平台 Android 应用签名；不输出 keystore 密码。
+- P02_APPLE_TEAM_ID: 授权读取 Apple Developer Team ID 并导入阿里云 plain env。
 
-```bash
-corepack pnpm aliyun:image:plan
-```
+## 严格验证顺序
 
-Deferred to a separate later authorization:
+- corepack pnpm aliyun:cloud:access
+- corepack pnpm aliyun:cloud:inventory-results:strict
+- corepack pnpm aliyun:cloud:confirmations:strict
+- corepack pnpm aliyun:image:plan:strict
+- corepack pnpm aliyun:completion:audit
+- corepack pnpm aliyun:predeploy
 
-```text
-P04_ACR_IMAGE_AND_PULL
-docker login
-docker push
-remote image digest
-runtime.remoteImageConfigured=true
-runtime.imagePullConfigured=true
-SAE image pull credential configuration
-```
+## 禁止项
 
-### C05_OSS_AUDIO_RAM_STS
+- 本命令只读本地无值报告，不调用阿里云 API。
+- 不购买 ACR，不创建或修改 SAE/SLS/OSS/RAM/KMS/Secrets Manager/DNS/证书/CDN。
+- 不读取、复制、粘贴或导入 AppSecret、AccessKeySecret、registry password、RAM Secret、STS token、cookie、Supabase service role key。
+- 不推送镜像、不部署 production-cn、不 git push。
+- 所有 .local.json 只能写资源名、布尔值、时间、控制台路径、digest 和非密钥 evidence handle。
+- 购买 ACR 或任何付费资源。
+- 创建/修改 SAE、SLS、OSS、RAM、KMS、Secrets Manager、DNS、证书、CDN 或公网入口。
+- 读取、复制、粘贴、导入或输出 AppSecret、AccessKeySecret、registry password、RAM Secret、STS token、cookie、Supabase service role key。
+- 推送镜像到 ACR、部署 production-cn、修改正式域名解析、git push。
+- 当前后端-only 目标不创建微信开放平台移动应用；微信/Apple/Android 发布项延期到后端上线后单独处理。
 
-Current scope: OSS runtime access closure.
+## 当前阻塞
 
-Authorization phrase:
-
-```text
-Authorize confirmation of the OSS audio bucket, CORS, and least-privilege RAM/STS or runtime role; secrets must enter only Aliyun controlled secret env.
-```
-
-Already observed as partial evidence:
-
-```text
-bucket=meiye-huajing-service-records-production-cn
-region=oss-cn-hangzhou
-acl=private
-CORS origins include https://api-cn.ipgongchang.xin and https://assets-cn.ipgongchang.xin
-CORS methods include GET, POST, PUT, HEAD
-RAM policy MeiYeHuajingServiceRecordsOssPolicy exists
-AttachmentCount=0
-```
-
-Missing closure evidence:
-
-```text
-ramLeastPrivilege=true
-runtime role or restricted RAM/STS injection path selected
-serviceRecordPrefix=service-records/production-cn
-confirmed=true
-```
-
-Write back only non-secret evidence:
-
-```text
-deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss
-ALIYUN_OSS_ACCESS_KEY_ID / ALIYUN_OSS_ACCESS_KEY_SECRET / ALIYUN_OSS_SECURITY_TOKEN -> KMS, Secrets Manager, or SAE secret env only
-```
-
-Verify:
-
-```bash
-corepack pnpm aliyun:cloud:confirmations
-corepack pnpm aliyun:evidence:writeback -- --skip-vercel-env-coverage
-```
-
-Post-deploy service-record upload smoke is required later; it cannot be proven before the API is deployed.
-
-## External App Prerequisites
-
-These are outside Aliyun and still require action-time confirmation.
-
-```text
-P01_WECHAT_OPEN_MOBILE_APP
-  Create or complete the WeChat Open Platform mobile app "美业话镜" and submit for review.
-  Do not read or output AppSecret.
-
-P10_ANDROID_RELEASE_SIGNING
-  Use controlled Android release keystore to build/sign the release artifact and read the WeChat Android app signature.
-  Do not output keystore password or store password.
-
-P02_APPLE_TEAM_ID
-  Read the Apple Developer Team ID and import only as plain env for AASA.
-```
-
-Current WeChat state:
-
-```text
-accountVerified=true
-mobileAppCreated=false
-mobileAppSubmitted=false
-reviewStatus=not_started
-mobileAppIdReady=false
-mobileAppSecretReady=false
-miniProgramCredentialsReusableForAppLogin=false
-```
-
-## Blocked Until Dependencies Close
-
-```text
-C01_SAE_RUNTIME
-  depends on C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS, C06_ENV_IMPORT
-
-C03_API_DOMAIN_HTTPS_ICP
-  depends on C01_SAE_RUNTIME
-
-C04_ASSET_DOMAIN_HTTPS_ICP
-  depends on C05_OSS_AUDIO_RAM_STS
-
-C06_ENV_IMPORT
-  depends on C05_OSS_AUDIO_RAM_STS and WeChat Open Platform mobile app credentials
-
-C07_SLS_ALERTS
-  depends on C01_SAE_RUNTIME
-```
-
-## Strict Verification Order
-
-After any authorized external action, run the relevant checks in this order:
-
-```bash
-corepack pnpm aliyun:cloud:access
-corepack pnpm aliyun:cloud:inventory-results:strict
-corepack pnpm aliyun:evidence:writeback -- --skip-vercel-env-coverage
-corepack pnpm aliyun:cloud:confirmations:strict
-corepack pnpm aliyun:image:plan:strict
-corepack pnpm aliyun:completion:audit
-corepack pnpm aliyun:predeploy
-```
-
-## Forbidden Without Fresh Confirmation
-
-```text
-Do not purchase ACR or any paid resource.
-Do not create or modify SAE, SLS, OSS, RAM, KMS, Secrets Manager, DNS, certificate, CDN, or public ingress.
-Do not read, copy, paste, import, or output AppSecret, AccessKeySecret, registry password, RAM Secret, STS token, cookie, or Supabase service role key.
-Do not run docker login or docker push.
-Do not deploy production-cn.
-Do not modify production DNS.
-Do not git push.
-Do not create the WeChat Open Platform mobile app unless the user explicitly confirms at action time.
-```
-
-## Current Blockers
-
-```text
-requiredEnv:WECHAT_OPEN_APP_ID
-requiredEnv:WECHAT_OPEN_APP_SECRET
-blockedConsoleTask:C01_SAE_RUNTIME
-blockedConsoleTask:C03_API_DOMAIN_HTTPS_ICP
-blockedConsoleTask:C04_ASSET_DOMAIN_HTTPS_ICP
-blockedConsoleTask:C06_ENV_IMPORT
-blockedConsoleTask:C07_SLS_ALERTS
-```
+- backendRequired:ACR_IMAGE_REGISTRY_NOT_READY
+- backendRequired:API_DOMAIN_HTTPS_ICP_NOT_READY
+- backendRequired:ASSET_DOMAIN_HTTPS_ICP_NOT_READY
+- backendRequired:DATABASE_URL_CN
+- backendRequired:ENV_IMPORT_NOT_READY
+- backendRequired:OSS_RAM_STS_NOT_READY
+- backendRequired:POSTDEPLOY_SMOKE_NOT_RUN
+- backendRequired:RDS_MIGRATION_EVIDENCE_NOT_READY
+- backendRequired:RDS_POSTGRES_NOT_READY
+- backendRequired:SAE_RUNTIME_NOT_READY
+- backendRequired:SLS_ALERTS_NOT_READY
+- blockedConsoleTask:C01_SAE_RUNTIME
+- blockedConsoleTask:C03_API_DOMAIN_HTTPS_ICP
+- blockedConsoleTask:C04_ASSET_DOMAIN_HTTPS_ICP
+- blockedConsoleTask:C06_ENV_IMPORT
+- blockedConsoleTask:C07_SLS_ALERTS

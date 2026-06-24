@@ -16,6 +16,7 @@ export const REQUIRED_KEYS = [
   "NEXT_PUBLIC_SITE_URL",
   "PRIVACY_POLICY_URL",
   "TERMS_URL",
+  "DATABASE_URL_CN",
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_ANON_KEY",
   "SUPABASE_SERVICE_ROLE_KEY",
@@ -38,7 +39,6 @@ export const REQUIRED_KEYS = [
 ]
 
 export const OPTIONAL_KEYS = [
-  "DATABASE_URL_CN",
   "REDIS_URL_CN",
   "ALIYUN_OSS_SECURITY_TOKEN",
   "BAILIAN_ASR_LANGUAGE_HINTS",
@@ -424,24 +424,24 @@ function sourceMetadataOf(key) {
   }
   if (/SUPABASE/.test(key)) {
     return metadata({
-      category: "bridge_database",
+      category: "legacy_database_migration_source",
       owner: "Vercel/Supabase 操作员",
       consolePath: "Vercel 项目 ip -> Settings -> Environment Variables；Supabase 项目 -> Settings -> API",
-      obtain: "从现有 Vercel production 或 Supabase 项目读取对应变量值，桥接期迁入阿里云运行环境。",
+      obtain: "从现有 Vercel production 或 Supabase 项目读取对应变量值，只作为迁移来源或旧链路兼容。",
       importTarget: sensitivityOf(key) === "public" ? "阿里云 SAE plain env" : "阿里云 KMS/Secrets Manager/SAE secret env",
       cloudConfirmationKey: "envImport",
-      notes: "桥接期仍使用 Supabase；最终 production-cn RDS 迁移另行处理。",
+      notes: "正式国内 production-cn 数据库必须迁到阿里云 RDS PostgreSQL；这些 Supabase 变量不能作为正式数据库目标。",
     })
   }
   if (key === "DATABASE_URL_CN") {
     return metadata({
-      category: "future_rds",
+      category: "aliyun_rds_postgresql",
       owner: "阿里云 RDS 操作员",
       consolePath: "阿里云控制台 -> RDS PostgreSQL -> 数据库连接",
-      obtain: "创建或确认 production-cn RDS PostgreSQL 后生成连接串；第一版桥接部署可后置。",
+      obtain: "创建或确认 production-cn RDS PostgreSQL 后生成连接串，并配套完成数据迁移/回滚验收。",
       importTarget: "阿里云 KMS/Secrets Manager/SAE secret env",
       cloudConfirmationKey: "envImport",
-      notes: "可后置；不能把存在该变量等同于完成数据层迁移。",
+      notes: "正式全阿里云 production-cn 必填；不能只填连接串而不完成数据访问层迁移。",
     })
   }
   if (key === "REDIS_URL_CN") {

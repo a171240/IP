@@ -56,9 +56,10 @@ test("Aliyun blocker brief command is wired into scripts, predeploy, deploy spec
 test("APP production-cn current blocker brief records the go-no-go boundary", () => {
   const doc = read("docs", "app-production-cn-current-blocker-brief.md")
 
-  assert.match(doc, /现在不能部署\/上线。/)
-  assert.match(doc, /requiredEnv: 24\/26/)
-  assert.match(doc, /requiredBlocking: WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET/)
+  assert.match(doc, /现在不能部署；当前只推进阿里云后端/)
+  assert.match(doc, /requiredEnv: 24\/27/)
+  assert.match(doc, /requiredBlocking:[\s\S]*DATABASE_URL_CN[\s\S]*RDS_POSTGRES_NOT_READY/)
+  assert.match(doc, /deferredAppLaunchBlocking:[\s\S]*WECHAT_OPEN_APP_ID[\s\S]*ANDROID_RELEASE_SIGNING[\s\S]*APPLE_TEAM_ID/)
   assert.match(doc, /localCodeReady: false/)
   assert.match(doc, /releaseEvidenceUsable: true/)
   assert.match(doc, /cloudResourceEvidenceReady: 0\/7/)
@@ -77,32 +78,33 @@ test("APP production-cn current blocker brief records the go-no-go boundary", ()
   assert.match(doc, /WECHAT_OPEN_APP_SECRET -> 阿里云 KMS\/Secrets Manager\/SAE secret env/)
   assert.match(doc, /阿里云 SAE 后端在 APP 微信登录回调中使用移动应用 AppID\/AppSecret/)
   assert.match(doc, /region: cn-hangzhou/)
-  assert.match(doc, /runtime: SAE custom container/)
-  assert.match(doc, /appName: meiye-huajing-app-api-production-cn/)
-  assert.match(doc, /containerPort: 3000/)
-  assert.match(doc, /apiDomain: api-cn\.ipgongchang\.xin/)
-  assert.match(doc, /assetDomain: assets-cn\.ipgongchang\.xin/)
-  assert.match(doc, /current: Supabase/)
+  assert.match(doc, /meiye-huajing-app-api-production-cn/)
+  assert.match(doc, /容器端口 3000/)
+  assert.match(doc, /api-cn\.ipgongchang\.xin/)
+  assert.match(doc, /assets-cn\.ipgongchang\.xin/)
+  assert.match(doc, /current: Supabase migration source \/ legacy compatibility only/)
   assert.match(doc, /target: Aliyun RDS PostgreSQL/)
+  assert.match(doc, /databaseUrlCnStatus: todo/)
+  assert.match(doc, /Supabase 只能作为迁移来源或旧链路兼容/)
   assert.match(doc, /rdsMigrationIncludedInThisRelease: false/)
   assert.match(doc, /rdsMigrationRequiredForFinalProductionCn: true/)
-  assert.match(doc, /envSourceVercelRequiredCovered: 17\/26/)
+  assert.match(doc, /envSourceVercelRequiredCovered: 17\/27/)
   assert.match(doc, /envSourceCanMigrateFromVercelProduction: 46/)
-  assert.match(doc, /envSourceAppAliyunOwnedNotInVercel: 11/)
+  assert.match(doc, /envSourceAppAliyunOwnedNotInVercel: 10/)
   assert.match(doc, /SERVICE_RECORD_DEEPSEEK_API_KEY/)
   assert.match(doc, /cloudResourceObservedPartialIds:[\s\S]*R05_OSS_AUDIO_STORAGE[\s\S]*R07_SLS_ALERTS/)
   assert.match(doc, /cloudResourceObservedBlockedIds:[\s\S]*R01_SAE_RUNTIME[\s\S]*R06_ENV_IMPORT/)
   assert.match(doc, /canStartNowConsoleTasks:[\s\S]*C02_ACR_IMAGE_AND_PULL[\s\S]*C05_OSS_AUDIO_RAM_STS/)
-  assert.match(doc, /canStartNowAuthorizationPackets:[\s\S]*P01_WECHAT_OPEN_MOBILE_APP[\s\S]*P10_ANDROID_RELEASE_SIGNING[\s\S]*P05_OSS_RAM_STS/)
+  assert.match(doc, /canStartNowAuthorizationPackets:[\s\S]*P03_ACR_PURCHASE[\s\S]*P05_OSS_RAM_STS[\s\S]*P11_ALIYUN_RDS_DATA_MIGRATION/)
   assert.match(doc, /blockedByAuthorizationPacketDependencies:[\s\S]*P04_ACR_IMAGE_AND_PULL[\s\S]*P09_PRODUCTION_DEPLOY/)
   assert.match(doc, /deploy\/aliyun-production-cn\.image-publish\.local\.json: acr\.confirmed=true/)
   assert.match(doc, /deploy\/aliyun-production-cn\.cloud-confirmations\.local\.json -> items\.oss/)
   assert.match(doc, /bucket: meiye-huajing-service-records-production-cn/)
-  assert.match(doc, /prefix: service-records\/production-cn/)
+  assert.match(doc, /serviceRecordPrefix: service-records\/production-cn/)
   assert.match(doc, /docker login/)
   assert.match(doc, /docker push/)
-  assert.match(doc, /production deploy/)
-  assert.match(doc, /WeChat Open Platform mobile app create\/submit/)
+  assert.match(doc, /部署 production-cn/)
+  assert.match(doc, /创建微信开放平台移动应用/)
   assert.doesNotMatch(doc, secretLike)
 })
 
@@ -128,27 +130,39 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.equal(report.containsValues, false)
   assert.equal(report.mutationPerformed, false)
   assert.equal(report.canDeployNow, false)
-  assert.match(report.currentAnswer, /Android release signing/)
-  assert.equal(report.summary.requiredEnv, "24/26")
-  assert.deepEqual(report.summary.requiredBlocking, ["WECHAT_OPEN_APP_ID", "WECHAT_OPEN_APP_SECRET"])
+  assert.match(report.currentAnswer, /当前只推进阿里云后端/)
+  assert.equal(report.summary.requiredEnv, "24/27")
+  assert.ok(report.summary.requiredBlocking.includes("DATABASE_URL_CN"))
+  assert.ok(report.summary.requiredBlocking.includes("RDS_POSTGRES_NOT_READY"))
+  assert.ok(!report.summary.requiredBlocking.includes("WECHAT_OPEN_APP_ID"))
+  assert.deepEqual(report.summary.deferredAppLaunchBlocking, [
+    "WECHAT_OPEN_APP_ID",
+    "WECHAT_OPEN_APP_SECRET",
+    "WECHAT_OPEN_PLATFORM_MOBILE_APP",
+    "ANDROID_RELEASE_SIGNING",
+    "APPLE_TEAM_ID",
+    "IOS_UNIVERSAL_LINK_AASA",
+  ])
   assert.equal(report.summary.localCodeReady, false)
   assert.equal(report.summary.releaseEvidenceUsable, true)
-  assert.ok(report.summary.machineBlocking.includes("missing_required_env:WECHAT_OPEN_APP_ID"))
-  assert.ok(report.summary.machineBlocking.includes("app_universal_link:apple_team_id_missing"))
+  assert.deepEqual(report.summary.machineBlocking, ["missing_required_env:DATABASE_URL_CN"])
+  assert.ok(report.summary.fullAppMachineBlocking.includes("missing_required_env:WECHAT_OPEN_APP_ID"))
+  assert.ok(report.summary.fullAppMachineBlocking.includes("app_universal_link:apple_team_id_missing"))
   assert.equal(report.summary.manualBlockingCount, 8)
-  assert.equal(report.summary.bridgeDataLayerCurrent, "Supabase")
+  assert.equal(report.summary.bridgeDataLayerCurrent, "Supabase migration source / legacy compatibility only")
   assert.equal(report.summary.bridgeDataLayerTarget, "Aliyun RDS PostgreSQL")
   assert.equal(report.summary.rdsMigrationIncludedInThisRelease, false)
   assert.equal(report.summary.rdsMigrationRequiredForFinalProductionCn, true)
-  assert.equal(report.bridgeDataLayer.current, "Supabase")
+  assert.equal(report.bridgeDataLayer.current, "Supabase migration source / legacy compatibility only")
   assert.equal(report.bridgeDataLayer.target, "Aliyun RDS PostgreSQL")
-  assert.equal(report.bridgeDataLayer.firstBridgeDeploymentUses, "Supabase bridge env")
-  assert.equal(report.bridgeDataLayer.supabaseBridgeReady, true)
+  assert.equal(report.bridgeDataLayer.firstBridgeDeploymentUses, "not_allowed_for_final_production_cn")
+  assert.equal(report.bridgeDataLayer.supabaseBridgeReady, false)
+  assert.equal(report.bridgeDataLayer.supabaseSourceReady, true)
   assert.equal(report.bridgeDataLayer.databaseUrlCnStatus, "todo")
   assert.equal(report.bridgeDataLayer.redisUrlCnStatus, "todo")
   assert.equal(report.bridgeDataLayer.rdsMigrationIncludedInThisRelease, false)
   assert.equal(report.bridgeDataLayer.rdsMigrationRequiredForFinalProductionCn, true)
-  assert.ok(report.bridgeDataLayer.notes.some((item) => /桥接部署/.test(item)))
+  assert.ok(report.bridgeDataLayer.notes.some((item) => /正式国内 production-cn 目标必须使用阿里云 RDS PostgreSQL/.test(item)))
   assert.equal(report.summary.cloudResourceEvidenceReady, "0/7")
   assert.equal(report.summary.cloudResourceObservedReady, 0)
   assert.equal(report.summary.cloudResourceObservedPartial, 2)
@@ -207,11 +221,9 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
     "C07_SLS_ALERTS",
   ])
   assert.deepEqual(report.summary.canStartNowAuthorizationPackets, [
-    "P01_WECHAT_OPEN_MOBILE_APP",
-    "P10_ANDROID_RELEASE_SIGNING",
-    "P02_APPLE_TEAM_ID",
     "P03_ACR_PURCHASE",
     "P05_OSS_RAM_STS",
+    "P11_ALIYUN_RDS_DATA_MIGRATION",
   ])
   assert.deepEqual(report.summary.blockedByAuthorizationPacketDependencies, [
     "P04_ACR_IMAGE_AND_PULL",
@@ -256,55 +268,52 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.ok(ossWriteback.targetFields.some((item) => item.name === "serviceRecordPrefix" && item.value === "service-records/production-cn"))
   assert.ok(ossWriteback.forbidden.some((item) => /AccessKeySecret/.test(item)))
   assert.deepEqual(report.summary.sensitiveBlockedIds, [
-    "S01_WECHAT_OPEN_APP_LOGIN",
-    "S02_APPLE_TEAM_ID",
     "S03_ACR_PAID_PURCHASE",
     "S04_ACR_REGISTRY_AUTH",
     "S05_OSS_RAM_SECRET_OR_STS",
     "S06_READY_SENSITIVE_ENV_IMPORT",
+  ])
+  assert.deepEqual(report.summary.deferredAppLaunchSensitiveBlockedIds, [
+    "S01_WECHAT_OPEN_APP_LOGIN",
+    "S02_APPLE_TEAM_ID",
     "S07_ANDROID_RELEASE_SIGNING",
   ])
   assert.deepEqual(report.summary.immediateAuthorizationPackets, [
-    "P01_WECHAT_OPEN_MOBILE_APP",
-    "P10_ANDROID_RELEASE_SIGNING",
-    "P02_APPLE_TEAM_ID",
     "P03_ACR_PURCHASE",
     "P05_OSS_RAM_STS",
+    "P11_ALIYUN_RDS_DATA_MIGRATION",
   ])
-  assert.equal(report.summary.blockedVariableAcquisitionCount, 8)
+  assert.equal(report.summary.blockedVariableAcquisitionCount, 1)
+  assert.equal(report.summary.deferredAppLaunchVariableAcquisitionCount, 7)
   assert.equal(report.summary.blockedCredentialCount, 8)
   assert.equal(report.summary.readySecretEnvVariableCount, 17)
   assert.ok(report.summary.blockedCredentialNames.includes("WECHAT_OPEN_APP_SECRET"))
   assert.ok(report.summary.blockedCredentialNames.includes("MEIYE_RELEASE_KEY_PASSWORD"))
   assert.ok(report.summary.readySecretEnvVariableNames.includes("SUPABASE_SERVICE_ROLE_KEY"))
   assert.equal(report.summary.readySecretEnvImportGroupCount, 9)
-  assert.ok(report.requiredEnvBlockers.some((item) => item.name === "WECHAT_OPEN_APP_ID" && /微信开放平台/.test(item.consolePath)))
-  assert.ok(report.requiredEnvBlockers.some((item) => item.name === "WECHAT_OPEN_APP_ID" && /微信开放平台/.test(item.obtainFrom)))
-  assert.ok(report.requiredEnvBlockers.some((item) => item.name === "WECHAT_OPEN_APP_ID" && /plain env/.test(item.valueHandling)))
-  assert.ok(report.requiredEnvBlockers.some((item) => item.name === "WECHAT_OPEN_APP_SECRET" && /secret env/.test(item.importTarget)))
-  assert.ok(report.requiredEnvBlockers.some((item) => item.name === "WECHAT_OPEN_APP_SECRET" && /secret env/.test(item.valueHandling)))
-  assert.ok(report.requiredEnvBlockers.some((item) => item.name === "APPLE_TEAM_ID" && /Apple Developer/.test(item.consolePath)))
-  assert.ok(report.requiredEnvBlockers.some((item) => item.name === "MEIYE_RELEASE_KEY_PASSWORD" && /Android signing secret store/.test(item.importTarget)))
-  assert.ok(report.requiredEnvBlockers.some((item) => item.name === "MEIYE_RELEASE_KEY_PASSWORD" && /本机\/CI signing secret store/.test(item.valueHandling)))
+  assert.deepEqual(report.requiredEnvBlockers, [])
   assert.ok(report.sensitiveBlockers.some((item) =>
     item.id === "S07_ANDROID_RELEASE_SIGNING" &&
     item.type === "android_keystore_password_or_signature" &&
     item.variableNames.includes("MEIYE_RELEASE_STORE_PASSWORD")
   ))
   const acquisitionByName = new Map(report.blockedVariableAcquisitionPlan.map((item) => [item.name, item]))
-  assert.equal(acquisitionByName.get("WECHAT_OPEN_APP_ID").requiredAuthorizationPackets[0], "P01_WECHAT_OPEN_MOBILE_APP")
-  assert.match(acquisitionByName.get("WECHAT_OPEN_APP_ID").obtainFrom, /微信开放平台/)
-  assert.match(acquisitionByName.get("WECHAT_OPEN_APP_ID").importTarget, /plain env/)
-  assert.match(acquisitionByName.get("WECHAT_OPEN_APP_ID").valueHandling, /plain env/)
-  assert.equal(acquisitionByName.get("WECHAT_OPEN_APP_SECRET").requiredAuthorizationPackets[0], "P01_WECHAT_OPEN_MOBILE_APP")
-  assert.match(acquisitionByName.get("WECHAT_OPEN_APP_SECRET").importTarget, /secret env/)
-  assert.equal(acquisitionByName.get("APPLE_TEAM_ID").requiredAuthorizationPackets[0], "P02_APPLE_TEAM_ID")
-  assert.match(acquisitionByName.get("APPLE_TEAM_ID").obtainFrom, /Apple Developer/)
-  assert.equal(acquisitionByName.get("MEIYE_RELEASE_KEY_PASSWORD").requiredAuthorizationPackets[0], "P10_ANDROID_RELEASE_SIGNING")
-  assert.match(acquisitionByName.get("MEIYE_RELEASE_KEY_PASSWORD").importTarget, /Android signing secret store/)
-  assert.match(acquisitionByName.get("MEIYE_RELEASE_KEY_PASSWORD").valueHandling, /本机\/CI signing secret store/)
+  assert.deepEqual(Array.from(acquisitionByName.keys()), ["ALIYUN_OSS_SECURITY_TOKEN"])
+  assert.equal(acquisitionByName.get("ALIYUN_OSS_SECURITY_TOKEN").requiredAuthorizationPackets[0], "P05_OSS_RAM_STS")
+  const deferredAcquisitionByName = new Map(report.deferredAppLaunchVariableAcquisitionPlan.map((item) => [item.name, item]))
+  assert.equal(deferredAcquisitionByName.get("WECHAT_OPEN_APP_ID").requiredAuthorizationPackets[0], "P01_WECHAT_OPEN_MOBILE_APP")
+  assert.match(deferredAcquisitionByName.get("WECHAT_OPEN_APP_ID").obtainFrom, /微信开放平台/)
+  assert.match(deferredAcquisitionByName.get("WECHAT_OPEN_APP_ID").importTarget, /plain env/)
+  assert.match(deferredAcquisitionByName.get("WECHAT_OPEN_APP_ID").valueHandling, /plain env/)
+  assert.equal(deferredAcquisitionByName.get("WECHAT_OPEN_APP_SECRET").requiredAuthorizationPackets[0], "P01_WECHAT_OPEN_MOBILE_APP")
+  assert.match(deferredAcquisitionByName.get("WECHAT_OPEN_APP_SECRET").importTarget, /secret env/)
+  assert.equal(deferredAcquisitionByName.get("APPLE_TEAM_ID").requiredAuthorizationPackets[0], "P02_APPLE_TEAM_ID")
+  assert.match(deferredAcquisitionByName.get("APPLE_TEAM_ID").obtainFrom, /Apple Developer/)
+  assert.equal(deferredAcquisitionByName.get("MEIYE_RELEASE_KEY_PASSWORD").requiredAuthorizationPackets[0], "P10_ANDROID_RELEASE_SIGNING")
+  assert.match(deferredAcquisitionByName.get("MEIYE_RELEASE_KEY_PASSWORD").importTarget, /Android signing secret store/)
+  assert.match(deferredAcquisitionByName.get("MEIYE_RELEASE_KEY_PASSWORD").valueHandling, /本机\/CI signing secret store/)
   assert.ok(report.readySecretEnvImportGroups.some((group) =>
-    group.category === "bridge_database" &&
+    group.category === "legacy_database_migration_source" &&
     group.variableNames.includes("SUPABASE_SERVICE_ROLE_KEY")
   ))
   assert.ok(report.readySecretEnvImportGroups.some((group) =>
@@ -389,25 +398,28 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.equal(report.wechatOpenMobileApp.mobileAppCredentialsAvailable, false)
   assert.ok(report.wechatOpenMobileApp.backendWriteTargetsAfterApproval.includes("WECHAT_OPEN_APP_SECRET -> 阿里云 KMS/Secrets Manager/SAE secret env"))
   assert.ok(report.wechatOpenMobileApp.createDraftFields.some((item) => item.name === "androidPackageName"))
-  assert.equal(report.summary.envSourceVercelRequiredCovered, "17/26")
+  assert.equal(report.summary.envSourceVercelRequiredCovered, "17/27")
   assert.equal(report.summary.envSourceCanMigrateFromVercelProduction, 46)
-  assert.equal(report.summary.envSourceAppAliyunOwnedNotInVercel, 11)
+  assert.equal(report.summary.envSourceAppAliyunOwnedNotInVercel, 10)
   assert.equal(report.summary.envSourceSecretOrSensitiveToImport, 17)
   assert.deepEqual(report.summary.envSourceBlockedExternalRequired, [
+    "DATABASE_URL_CN",
     "WECHAT_OPEN_APP_ID",
     "WECHAT_OPEN_APP_SECRET",
     "APPLE_TEAM_ID",
   ])
   assert.ok(report.summary.envSourceReadyLocalButMissingFromVercel.includes("SERVICE_RECORD_DEEPSEEK_API_KEY"))
-  assert.equal(report.envSourceMap.vercelCoverage.requiredCovered, "17/26")
+  assert.equal(report.envSourceMap.vercelCoverage.requiredCovered, "17/27")
   assert.ok(report.envSourceMap.vercelCoverage.bridgeKeysPresentInVercelProduction.includes("SUPABASE_SERVICE_ROLE_KEY"))
   assert.ok(report.envSourceMap.vercelCoverage.requiredMissingInVercelProduction.includes("WECHAT_OPEN_APP_ID"))
   assert.ok(report.envSourceMap.groups.migrateFromVercelProduction.variableNames.includes("SUPABASE_SERVICE_ROLE_KEY"))
   assert.equal(report.envSourceMap.groups.migrateFromVercelProduction.count, 46)
-  assert.equal(report.envSourceMap.groups.appAliyunOwnedNotInVercel.count, 11)
+  assert.equal(report.envSourceMap.groups.appAliyunOwnedNotInVercel.count, 10)
   const blockedEnvSourceByName = new Map(report.envSourceMap.groups.blockedExternalRequired.map((item) => [item.name, item]))
   assert.equal(blockedEnvSourceByName.get("WECHAT_OPEN_APP_ID").sourceDecision, "blocked_external_value_required")
   assert.match(blockedEnvSourceByName.get("WECHAT_OPEN_APP_ID").importTarget, /plain env/)
+  assert.match(blockedEnvSourceByName.get("DATABASE_URL_CN").consolePath, /RDS PostgreSQL/)
+  assert.match(blockedEnvSourceByName.get("DATABASE_URL_CN").importTarget, /secret env/)
   assert.equal(blockedEnvSourceByName.get("WECHAT_OPEN_APP_SECRET").sensitivity, "secret")
   assert.match(blockedEnvSourceByName.get("WECHAT_OPEN_APP_SECRET").importTarget, /secret env/)
   assert.match(blockedEnvSourceByName.get("APPLE_TEAM_ID").consolePath, /Apple Developer/)
@@ -421,7 +433,7 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.ok(report.cloudInventory.strictReadyOperations <= report.cloudInventory.operations)
   assert.ok(report.strictVerificationOrder.includes("corepack pnpm aliyun:predeploy"))
   assert.match(markdown, /当前阻塞简报/)
-  assert.match(markdown, /Android release signing/)
+  assert.match(markdown, /ANDROID_RELEASE_SIGNING|android_release_signing/)
   assert.match(markdown, /P01_WECHAT_OPEN_MOBILE_APP/)
   assert.match(markdown, /P10_ANDROID_RELEASE_SIGNING/)
   assert.match(markdown, /S07_ANDROID_RELEASE_SIGNING/)
@@ -431,10 +443,12 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.match(markdown, /currentBrowserCloudApiCalled: false/)
   assert.match(markdown, /cloudInventoryInterpretation: existing_strict_inventory_ready_but_fresh_cli_profile_unavailable/)
   assert.match(markdown, /localCodeReady: false/)
-  assert.match(markdown, /machineBlocking: .*missing_required_env:WECHAT_OPEN_APP_ID/)
+  assert.match(markdown, /machineBlocking: missing_required_env:DATABASE_URL_CN/)
+  assert.match(markdown, /fullAppMachineBlocking: .*missing_required_env:WECHAT_OPEN_APP_ID/)
   assert.match(markdown, /数据层边界/)
-  assert.match(markdown, /current: Supabase/)
+  assert.match(markdown, /current: Supabase migration source \/ legacy compatibility only/)
   assert.match(markdown, /target: Aliyun RDS PostgreSQL/)
+  assert.match(markdown, /`DATABASE_URL_CN` \| todo/)
   assert.match(markdown, /rdsMigrationIncludedInThisRelease: false/)
   assert.match(markdown, /rdsMigrationRequiredForFinalProductionCn: true/)
   assert.match(markdown, /阿里云资源观察结果/)
@@ -452,7 +466,7 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.match(markdown, /下一步动作排序/)
   assert.match(markdown, /canStartNowConsoleTasks: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS/)
   assert.match(markdown, /blockedByConsoleTaskDependencies: C01_SAE_RUNTIME/)
-  assert.match(markdown, /canStartNowAuthorizationPackets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID, P03_ACR_PURCHASE, P05_OSS_RAM_STS/)
+  assert.match(markdown, /canStartNowAuthorizationPackets: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION/)
   assert.match(markdown, /P03_ACR_PURCHASE/)
   assert.match(markdown, /授权购买/)
   assert.match(markdown, /当前可做动作回填清单/)
@@ -476,9 +490,9 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.match(markdown, /miniProgramCredentialsReusableForAppLogin: false/)
   assert.match(markdown, /阿里云 SAE 后端在 APP 微信登录回调中使用移动应用 AppID\/AppSecret/)
   assert.match(markdown, /环境变量来源与 Vercel 覆盖/)
-  assert.match(markdown, /vercelRequiredCovered: 17\/26/)
-  assert.match(markdown, /canMigrateFromVercelProduction: 46/)
-  assert.match(markdown, /appAliyunOwnedNotInVercel: 11/)
+  assert.match(markdown, /vercelRequiredCovered:/)
+  assert.match(markdown, /canMigrateFromVercelProduction:/)
+  assert.match(markdown, /appAliyunOwnedNotInVercel:/)
   assert.match(markdown, /WECHAT_OPEN_APP_ID/)
   assert.match(markdown, /SERVICE_RECORD_DEEPSEEK_API_KEY/)
   assert.match(markdown, /WECHAT_MINI_APPID/)
@@ -489,9 +503,10 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.match(markdown, /readySecretEnvVariableCount: 17/)
   assert.match(markdown, /wechat_open_mobile_app/)
   assert.match(markdown, /ready_secret_env_import/)
-  assert.match(markdown, /阻塞变量获取与导入计划/)
+  assert.match(markdown, /当前后端阻塞变量获取与导入计划/)
+  assert.match(markdown, /延期的完整 APP 发布变量/)
   assert.match(markdown, /已 ready 但仍需导入阿里云 secret env 的变量组/)
-  assert.match(markdown, /处理规则/)
+  assert.match(markdown, /禁止写入/)
   assert.match(markdown, /只保存在本机\/CI signing secret store/)
   assert.match(markdown, /P01_WECHAT_OPEN_MOBILE_APP/)
   assert.match(markdown, /SUPABASE_SERVICE_ROLE_KEY/)

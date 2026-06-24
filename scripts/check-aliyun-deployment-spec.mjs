@@ -22,6 +22,10 @@ const REQUIRED_PREDEPLOY_CHECKS = [
   "corepack pnpm aliyun:provisioning:plan",
   "corepack pnpm aliyun:action:authorization",
   "corepack pnpm aliyun:completion:audit",
+  "corepack pnpm aliyun:rds:migration:plan",
+  "corepack pnpm aliyun:rds:migration:evidence",
+  "corepack pnpm aliyun:backend-cn:status",
+  "corepack pnpm aliyun:backend-cn:apply-package",
   "corepack pnpm aliyun:operator:handoff",
   "corepack pnpm aliyun:wechat-open:package",
   "corepack pnpm aliyun:apple-team:package",
@@ -64,6 +68,7 @@ const REQUIRED_EXTERNAL_CONFIRMATIONS = [
   "api-cn DNS, HTTPS, and ICP configured",
   "assets-cn DNS, HTTPS, and ICP configured",
   "OSS CORS and RAM least-privilege policy confirmed",
+  "Aliyun RDS PostgreSQL migration confirmed",
   "WeChat Open Platform mobile app credentials configured",
   "Production environment variables imported without secrets in image",
   "SLS logging and alerts configured",
@@ -310,9 +315,13 @@ function validateSpec(spec) {
   }
 
   const bridgeDataLayer = spec.bridgeDataLayer || {}
-  if (bridgeDataLayer.current !== "Supabase") blockers.push("bridgeDataLayer.current")
+  if (bridgeDataLayer.current !== "Supabase migration source / legacy compatibility only") {
+    blockers.push("bridgeDataLayer.current")
+  }
   if (bridgeDataLayer.target !== "Aliyun RDS PostgreSQL") blockers.push("bridgeDataLayer.target")
-  if (!String(bridgeDataLayer.status || "").includes("not included")) blockers.push("bridgeDataLayer.status")
+  if (bridgeDataLayer.status !== "blocked_until_aliyun_rds_postgresql_migration_ready") {
+    blockers.push("bridgeDataLayer.status")
+  }
 
   const secretLikePaths = assertNoSecretLikeValues(spec)
   if (secretLikePaths.length) blockers.push(`contains_secret_like_values:${secretLikePaths.join(",")}`)

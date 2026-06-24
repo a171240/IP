@@ -12,8 +12,10 @@ const WORKSPACE_ROOT = resolve(BACKEND_ROOT, "../..")
 const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
 
-const CLOUD_CONSOLE_PACKET_IDS = new Set(["P03_ACR_PURCHASE", "P05_OSS_RAM_STS"])
+const CLOUD_CONSOLE_PACKET_IDS = new Set(["P03_ACR_PURCHASE", "P05_OSS_RAM_STS", "P11_ALIYUN_RDS_DATA_MIGRATION"])
 const EXTERNAL_APP_PACKET_IDS = new Set(["P01_WECHAT_OPEN_MOBILE_APP", "P10_ANDROID_RELEASE_SIGNING", "P02_APPLE_TEAM_ID"])
+const CURRENT_SCOPE = "backend_aliyun_only"
+const FULL_APP_LAUNCH_SCOPE = "deferred_after_backend_online"
 
 const SECRET_VALUE_PATTERNS = [
   /sk-[A-Za-z0-9_-]{20,}/,
@@ -94,6 +96,10 @@ function buildPackage(args) {
     "scripts/summarize-aliyun-production-cn-status.mjs",
     ...envArgs(args),
   ])
+  const backendStatus = runJson("backend_status", [
+    "scripts/summarize-aliyun-backend-cn-status.mjs",
+    ...envArgs(args),
+  ])
   const consoleRunbook = runJson("console_runbook", [
     "scripts/generate-aliyun-console-runbook.mjs",
     ...envArgs(args),
@@ -120,7 +126,9 @@ function buildPackage(args) {
   const blockedConsoleTasks = consoleTasks.filter((item) => item.canStartNow !== true)
   const immediatePackets = provisioningPlan.readyAuthorizationPackets || []
   const cloudConsolePackets = immediatePackets.filter((item) => CLOUD_CONSOLE_PACKET_IDS.has(item.packetId))
-  const externalAppPackets = immediatePackets.filter((item) => EXTERNAL_APP_PACKET_IDS.has(item.packetId))
+  const deferredAppLaunchPackets = (provisioningPlan.deferredAppLaunchAuthorizationPackets || [])
+    .filter((item) => EXTERNAL_APP_PACKET_IDS.has(item.packetId))
+  const externalAppPackets = []
   const phases = (provisioningPlan.phases || []).map(compactPhase)
   const firstCloudPhase = phases.find((item) => item.id === "PH02_BASE_CLOUD_RESOURCES") || null
   const cliConfigProbeFailureCategory = cloudAccess.cli?.configProbe?.failureCategory || cloudAccess.cliConfigProbeFailureCategory || "none"
@@ -137,11 +145,12 @@ function buildPackage(args) {
     blockedConsoleTasks,
     cloudConsolePackets,
     externalAppPackets,
+    deferredAppLaunchPackets,
     cloudInventorySummary,
     imagePublishWritebackPlan,
   })
   const currentBlockers = uniqueStrings([
-    ...(productionStatus.summary?.requiredBlocking || []).map((name) => `requiredEnv:${name}`),
+    ...(backendStatus.summary?.backendRequiredBlocking || []).map((name) => `backendRequired:${name}`),
     ...(blockedConsoleTasks || []).map((item) => `blockedConsoleTask:${item.id}`),
     ...(cloudInventorySummary.ready ? [] : (cloudAccess.blockers || [])),
     ...(cloudInventorySummary.ready ? [] : cloudInventorySummary.blockers.map((item) => `cloudInventory:${item}`)),
@@ -158,21 +167,30 @@ function buildPackage(args) {
     generatedAt: new Date().toISOString(),
     packageId: "C00_ALIYUN_CLOUD_ACTIONS",
     environment: "production-cn",
+    currentScope: CURRENT_SCOPE,
+    fullAppLaunchScope: FULL_APP_LAUNCH_SCOPE,
     containsValues: false,
     readOnlyOnly: true,
     mutationPerformed: false,
     cloudApiCalled: false,
     currentAnswer: "现在不能部署；本包只把阿里云控制台可先做/需暂缓的动作拆成短清单，不创建资源、不付款、不导入密钥、不部署。",
     summary: {
-      canDeployNow: productionStatus.canDeployNow === true,
+      currentScope: CURRENT_SCOPE,
+      fullAppLaunchScope: FULL_APP_LAUNCH_SCOPE,
+      canDeployNow: backendStatus.canDeployBackendNow === true,
+      canProceedWithoutWechat: backendStatus.canProceedWithoutWechat === true,
       verdict: productionStatus.verdict || "blocked",
+      backendTargetReady: backendStatus.summary?.backendTargetReady || "unknown",
       cloudConfirmationsReady: formatReadyTotal(productionStatus.summary?.cloudConfirmations),
       operatorTasksReady: formatReadyTotal(productionStatus.summary?.operatorTasks),
       canStartNowConsoleTasks: immediateConsoleTasks.map((item) => item.id),
       blockedByDependencies: blockedConsoleTasks.map((item) => item.id),
       cloudConsolePackets: cloudConsolePackets.map((item) => item.packetId),
       externalAppPackets: externalAppPackets.map((item) => item.packetId),
-      requiredBlocking: productionStatus.summary?.requiredBlocking || [],
+      deferredAppLaunchPackets: deferredAppLaunchPackets.map((item) => item.packetId),
+      requiredBlocking: backendStatus.summary?.backendRequiredBlocking || [],
+      fullAppRequiredBlocking: productionStatus.summary?.requiredBlocking || [],
+      deferredAppLaunchBlocking: backendStatus.summary?.appLaunchDeferredBlocking || [],
       sensitiveBlocked: formatReadyTotal({
         ready: (productionStatus.summary?.sensitiveActionItems?.total || 0) - (productionStatus.summary?.sensitiveActionItems?.blocked || 0),
         total: productionStatus.summary?.sensitiveActionItems?.total || 0,
@@ -196,6 +214,7 @@ function buildPackage(args) {
     blockedConsoleTasks: blockedConsoleTasks.map((task) => compactConsoleTask(task, imagePublishWritebackPlan)),
     cloudConsoleAuthorizationPackets: cloudConsolePackets.map(compactPacket),
     externalAppPrerequisitePackets: externalAppPackets.map(compactPacket),
+    deferredAppLaunchPrerequisitePackets: deferredAppLaunchPackets.map(compactPacket),
     phaseOrder: phases,
     readonlyInventoryUnblock,
     cloudAccess: {
@@ -234,7 +253,7 @@ function buildPackage(args) {
       "创建/修改 SAE、SLS、OSS、RAM、KMS、Secrets Manager、DNS、证书、CDN 或公网入口。",
       "读取、复制、粘贴、导入或输出 AppSecret、AccessKeySecret、registry password、RAM Secret、STS token、cookie、Supabase service role key。",
       "推送镜像到 ACR、部署 production-cn、修改正式域名解析、git push。",
-      "创建微信开放平台移动应用或读取审核通过后的 AppSecret，除非用户在动作时明确授权并提供相应账号上下文。",
+      "当前后端-only 目标不创建微信开放平台移动应用；微信/Apple/Android 发布项延期到后端上线后单独处理。",
     ],
     currentBlockers,
     safetyBoundary: [
@@ -273,6 +292,7 @@ function buildCloudActionClosureBrief({
   blockedConsoleTasks,
   cloudConsolePackets,
   externalAppPackets,
+  deferredAppLaunchPackets,
   cloudInventorySummary,
   imagePublishWritebackPlan,
 }) {
@@ -289,7 +309,9 @@ function buildCloudActionClosureBrief({
     []
 
   return {
-    conclusion: "现在不能部署；本动作包只能进入 C02/C05 的动作时确认，其余资源、微信开放平台移动 App、iOS/Android 发布凭证和 secret env 导入仍未闭环。",
+    conclusion: "现在不能部署；本动作包当前只覆盖阿里云后端，能进入 C02/C05/P11 的动作时确认，其余 ACR push/SAE/DNS/env/SLS/smoke 仍未闭环。",
+    currentScope: CURRENT_SCOPE,
+    fullAppLaunchScope: FULL_APP_LAUNCH_SCOPE,
     canDeployNow: consoleRunbook.summary?.canDeployNow === true,
     blockedCredentialCount: runbookBrief.blockedCredentialCount ?? blockedCredentialNames.length,
     blockedCredentialNames,
@@ -309,12 +331,12 @@ function buildCloudActionClosureBrief({
     canStartNowConsoleTasks: immediateConsoleTasks.map((item) => item.id),
     cloudConsolePackets: cloudConsolePackets.map((item) => item.packetId),
     externalAppPackets: externalAppPackets.map((item) => item.packetId),
+    deferredAppLaunchPackets: deferredAppLaunchPackets.map((item) => item.packetId),
     blockedByDependencies: blockedConsoleTasks.map((item) => item.id),
     imagePublishWritebackBlockingGroups: imagePublishWritebackPlan.blockingGroups,
     stillRequiresActionTimeConfirmation: uniqueStrings([
       ...(runbookBrief.actionTimeConfirmationRequiredIds || []),
       ...cloudConsolePackets.map((item) => item.packetId),
-      ...externalAppPackets.map((item) => item.packetId),
     ]),
   }
 }
@@ -625,7 +647,11 @@ function renderMarkdown(report) {
     "## 结论",
     "",
     `- packageId: ${report.packageId}`,
+    `- currentScope: ${report.currentScope}`,
+    `- fullAppLaunchScope: ${report.fullAppLaunchScope}`,
     `- canDeployNow: ${report.summary.canDeployNow}`,
+    `- canProceedWithoutWechat: ${report.summary.canProceedWithoutWechat}`,
+    `- backendTargetReady: ${report.summary.backendTargetReady}`,
     `- verdict: ${report.summary.verdict}`,
     `- cloudConfirmationsReady: ${report.summary.cloudConfirmationsReady}`,
     `- operatorTasksReady: ${report.summary.operatorTasksReady}`,
@@ -660,6 +686,7 @@ function renderMarkdown(report) {
     `- canStartNowConsoleTasks: ${report.cloudActionClosureBrief.canStartNowConsoleTasks.length ? report.cloudActionClosureBrief.canStartNowConsoleTasks.join(", ") : "none"}`,
     `- cloudConsolePackets: ${report.cloudActionClosureBrief.cloudConsolePackets.length ? report.cloudActionClosureBrief.cloudConsolePackets.join(", ") : "none"}`,
     `- externalAppPackets: ${report.cloudActionClosureBrief.externalAppPackets.length ? report.cloudActionClosureBrief.externalAppPackets.join(", ") : "none"}`,
+    `- deferredAppLaunchPackets: ${report.cloudActionClosureBrief.deferredAppLaunchPackets.length ? report.cloudActionClosureBrief.deferredAppLaunchPackets.join(", ") : "none"}`,
     `- blockedByDependencies: ${report.cloudActionClosureBrief.blockedByDependencies.length ? report.cloudActionClosureBrief.blockedByDependencies.join(", ") : "none"}`,
     `- imagePublishWritebackBlockingGroups: ${report.cloudActionClosureBrief.imagePublishWritebackBlockingGroups.length ? report.cloudActionClosureBrief.imagePublishWritebackBlockingGroups.join(", ") : "none"}`,
     "",
@@ -667,6 +694,7 @@ function renderMarkdown(report) {
     "",
     `- canStartNow: ${report.executionQueue.canStartNow.map((item) => item.id).join(", ") || "none"}`,
     `- externalAppPrerequisites: ${report.executionQueue.externalAppPrerequisites.map((item) => item.packetId).join(", ") || "none"}`,
+    `- deferredAppLaunchPrerequisites: ${report.deferredAppLaunchPrerequisitePackets.map((item) => item.packetId).join(", ") || "none"}`,
     `- blockedByDependencies: ${report.executionQueue.blockedByDependencies.map((item) => item.id).join(", ") || "none"}`,
     ...(report.executionQueue.canStartNow.length
       ? report.executionQueue.canStartNow.map((item) => `- ${item.id}: kind=${item.kind}; scope=${item.currentActionScope}; phrase=${item.minimumAuthorizationPhrase}`)
@@ -715,10 +743,10 @@ function renderMarkdown(report) {
       ? report.cloudConsoleAuthorizationPackets.map((packet) => `- ${packet.packetId}: ${packet.minimumAuthorizationPhrase}`)
       : ["- none"]),
     "",
-    "## 外部 App 前置项",
+    "## 延期的外部 App 前置项",
     "",
-    ...(report.externalAppPrerequisitePackets.length
-      ? report.externalAppPrerequisitePackets.map((packet) => `- ${packet.packetId}: ${packet.minimumAuthorizationPhrase}`)
+    ...(report.deferredAppLaunchPrerequisitePackets.length
+      ? report.deferredAppLaunchPrerequisitePackets.map((packet) => `- ${packet.packetId}: ${packet.minimumAuthorizationPhrase}`)
       : ["- none"]),
     "",
     "## 严格验证顺序",

@@ -103,6 +103,10 @@
     "corepack pnpm run aliyun:provisioning:plan:test",
     "corepack pnpm run aliyun:action:authorization:test",
     "corepack pnpm run aliyun:completion:audit:test",
+    "corepack pnpm run aliyun:rds:migration:plan:test",
+    "corepack pnpm run aliyun:rds:migration:evidence:test",
+    "corepack pnpm run aliyun:backend-cn:status:test",
+    "corepack pnpm run aliyun:backend-cn:apply-package:test",
     "corepack pnpm run aliyun:blockers:brief:test",
     "corepack pnpm run aliyun:evidence:writeback:test",
     "corepack pnpm run aliyun:operator:handoff:test",
@@ -115,6 +119,10 @@
     "corepack pnpm run aliyun:provisioning:plan",
     "corepack pnpm run aliyun:action:authorization",
     "corepack pnpm run aliyun:completion:audit",
+    "corepack pnpm run aliyun:rds:migration:plan",
+    "corepack pnpm run aliyun:rds:migration:evidence",
+    "corepack pnpm run aliyun:backend-cn:status",
+    "corepack pnpm run aliyun:backend-cn:apply-package",
     "corepack pnpm run aliyun:blockers:brief",
     "corepack pnpm run aliyun:evidence:writeback -- --skip-vercel-env-coverage",
     "corepack pnpm run aliyun:operator:handoff -- --skip-vercel-env-coverage",
@@ -160,6 +168,10 @@
     "corepack pnpm aliyun:provisioning:plan",
     "corepack pnpm aliyun:action:authorization",
     "corepack pnpm aliyun:completion:audit",
+    "corepack pnpm aliyun:rds:migration:plan",
+    "corepack pnpm aliyun:rds:migration:evidence",
+    "corepack pnpm aliyun:backend-cn:status",
+    "corepack pnpm aliyun:backend-cn:apply-package",
     "corepack pnpm aliyun:blockers:brief",
     "corepack pnpm aliyun:evidence:writeback",
     "corepack pnpm aliyun:operator:handoff",
@@ -204,13 +216,14 @@
     "api-cn DNS, HTTPS, and ICP configured",
     "assets-cn DNS, HTTPS, and ICP configured",
     "OSS CORS and RAM least-privilege policy confirmed",
+    "Aliyun RDS PostgreSQL migration confirmed",
     "WeChat Open Platform mobile app credentials configured",
     "Production environment variables imported without secrets in image",
     "SLS logging and alerts configured"
   ],
   "bridgeDataLayer": {
-    "current": "Supabase",
+    "current": "Supabase migration source / legacy compatibility only",
     "target": "Aliyun RDS PostgreSQL",
-    "status": "RDS migration is not included in the first bridge deployment"
+    "status": "blocked_until_aliyun_rds_postgresql_migration_ready"
   }
 }

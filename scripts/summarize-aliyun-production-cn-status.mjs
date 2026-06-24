@@ -165,7 +165,7 @@ function buildStatus({ readiness, operatorTasks, cloudInventoryResults, args }) 
         : `微信开放平台移动应用状态：${wechatReviewStatus}；AppID/Secret 只能等移动应用审核通过后从微信开放平台获取。`,
     `Apple Universal Link：${universalLink?.ok ? "ready" : "blocked"}；${(universalLink?.blockers || []).join(", ") || "no blockers"}。`,
     bridgeDataLayer
-      ? `数据层：第一版桥接使用 ${bridgeDataLayer.current}；目标 ${bridgeDataLayer.target}，RDS migration included=${bridgeDataLayer.rdsMigrationIncludedInThisRelease === true}，DATABASE_URL_CN=${bridgeDataLayer.databaseUrlCnStatus || "unknown"}。`
+      ? `数据层：正式 production-cn 目标 ${bridgeDataLayer.target}，当前 ${bridgeDataLayer.current}；RDS migration included=${bridgeDataLayer.rdsMigrationIncludedInThisRelease === true}，DATABASE_URL_CN=${bridgeDataLayer.databaseUrlCnStatus || "unknown"}。`
       : "数据层：unknown。",
     `阿里云云资源确认：${cloudReady.ready}/${cloudReady.total} ready；还缺 SAE、DNS/HTTPS/ICP、OSS/CORS/RAM、微信开放平台 approved、env import、SLS 中未完成项。`,
     `阿里云 CLI 只读盘点结果：${cloudInventoryLocal.ready ? "ready" : "not ready"}；localExists=${cloudInventoryLocal.exists === true}，local operations ${cloudInventorySummary.readyLocalOperations || 0}/${cloudInventorySummary.localOperations || 0} ready，blockers ${(cloudInventoryLocal.blockers || []).join(", ") || "none"}。`,

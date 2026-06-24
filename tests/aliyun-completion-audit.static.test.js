@@ -101,7 +101,9 @@ test("Aliyun completion audit reports the current goal as blocked without secret
   assert.equal(report.mutationPerformed, false)
   assert.equal(report.cloudApiCalled, false)
   assert.equal(report.secretLeakCheck.ok, true)
-  assert.equal(report.summary.requirements, 10)
+  assert.equal(report.summary.requirements, 11)
+  assert.equal(report.currentScope, "backend_aliyun_only")
+  assert.equal(report.summary.deferred, 2)
   assert.ok(report.summary.blocked >= 6)
   assert.ok(report.summary.proved >= 1)
   assert.ok(report.summary.partial >= 1)
@@ -111,18 +113,20 @@ test("Aliyun completion audit reports the current goal as blocked without secret
   assert.deepEqual(report.summary.localImplementationBlockingFields, [])
   assert.ok(report.summary.localImplementationReadyFields.includes("appApiBridgeMap"))
   assert.ok(report.summary.localImplementationReadyFields.includes("appRuntimeConfig"))
-  assert.ok(report.summary.localCodeMachineBlockers.includes("missing_required_env:WECHAT_OPEN_APP_ID"))
-  assert.ok(report.summary.localCodeMachineBlockers.includes("missing_required_env:WECHAT_OPEN_APP_SECRET"))
-  assert.ok(report.summary.localCodeMachineBlockers.includes("app_universal_link:apple_team_id_missing"))
-  assert.equal(report.bridgeDataLayer.current, "Supabase")
+  assert.ok(report.summary.localCodeMachineBlockers.includes("missing_required_env:DATABASE_URL_CN"))
+  assert.ok(!report.summary.localCodeMachineBlockers.includes("missing_required_env:WECHAT_OPEN_APP_ID"))
+  assert.ok(!report.summary.localCodeMachineBlockers.includes("app_universal_link:apple_team_id_missing"))
+  assert.equal(report.bridgeDataLayer.current, "Supabase migration source / legacy compatibility only")
   assert.equal(report.bridgeDataLayer.target, "Aliyun RDS PostgreSQL")
-  assert.equal(report.bridgeDataLayer.firstBridgeDeploymentUses, "Supabase bridge env")
-  assert.equal(report.bridgeDataLayer.supabaseBridgeReady, true)
+  assert.equal(report.bridgeDataLayer.firstBridgeDeploymentUses, "not_allowed_for_final_production_cn")
+  assert.equal(report.bridgeDataLayer.supabaseBridgeReady, false)
+  assert.equal(report.bridgeDataLayer.supabaseSourceReady, true)
+  assert.equal(report.bridgeDataLayer.databaseUrlCnStatus, "todo")
   assert.equal(report.bridgeDataLayer.rdsMigrationIncludedInThisRelease, false)
   assert.equal(report.bridgeDataLayer.rdsMigrationRequiredForFinalProductionCn, true)
-  assert.equal(report.summary.bridgeDataLayer.current, "Supabase")
+  assert.equal(report.summary.bridgeDataLayer.current, "Supabase migration source / legacy compatibility only")
   assert.equal(report.summary.bridgeDataLayer.rdsMigrationIncludedInThisRelease, false)
-  assert.ok(report.bridgeDataLayer.notes.some((item) => item.includes("第一版 APP production-cn 后端是桥接部署")))
+  assert.ok(report.bridgeDataLayer.notes.some((item) => item.includes("正式国内 production-cn 目标必须使用阿里云 RDS PostgreSQL")))
   assert.ok(report.summary.blockedCredentialNames.includes("WECHAT_OPEN_APP_SECRET"))
   assert.ok(report.summary.readySecretEnvVariableNames.includes("SUPABASE_SERVICE_ROLE_KEY"))
   assert.equal(report.summary.resourceEvidenceReady, "0/7")
@@ -145,8 +149,8 @@ test("Aliyun completion audit reports the current goal as blocked without secret
   assert.ok(byId.get("G01_LOCAL_APP_BACKEND_READY").evidence.includes("localImplementationBlockingFields=none"))
   assert.ok(byId.get("G01_LOCAL_APP_BACKEND_READY").evidence.some((item) =>
     item.includes("localCodeMachineBlockers=") &&
-    item.includes("missing_required_env:WECHAT_OPEN_APP_ID") &&
-    item.includes("app_universal_link:apple_team_id_missing")
+    item.includes("missing_required_env:DATABASE_URL_CN") &&
+    !item.includes("missing_required_env:WECHAT_OPEN_APP_ID")
   ))
   assert.ok(byId.get("G01_LOCAL_APP_BACKEND_READY").blockers.includes("localCodeReady=false"))
   assert.ok(!byId.get("G01_LOCAL_APP_BACKEND_READY").blockers.includes("appApiBridgeMap"))
@@ -156,12 +160,16 @@ test("Aliyun completion audit reports the current goal as blocked without secret
   assert.ok(byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").blockers.some((item) =>
     item.includes("R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.registryHost")
   ))
+  assert.equal(byId.get("G02B_ALIYUN_RDS_DATA_LAYER_READY").status, "blocked")
+  assert.ok(byId.get("G02B_ALIYUN_RDS_DATA_LAYER_READY").blockers.includes("DATABASE_URL_CN"))
+  assert.ok(byId.get("G02B_ALIYUN_RDS_DATA_LAYER_READY").blockers.includes("rdsMigrationIncludedInThisRelease=false"))
   assert.equal(byId.get("G03_CLOUD_INVENTORY_PROVED").status, "proved")
   assert.ok(byId.get("G03_CLOUD_INVENTORY_PROVED").evidence.includes("readyLocalOperations=9/9"))
   assert.ok(byId.get("G03_CLOUD_INVENTORY_PROVED").evidence.includes("executedCommandResults=12/12"))
   assert.equal(byId.get("G04_IMAGE_PUBLISH_READY").status, "blocked")
   assert.equal(byId.get("G05_DOMAIN_HTTPS_ICP_READY").status, "blocked")
-  assert.equal(byId.get("G06_WECHAT_APP_LOGIN_READY").status, "blocked")
+  assert.equal(byId.get("G06_WECHAT_APP_LOGIN_READY").status, "deferred")
+  assert.equal(byId.get("G07_APPLE_AASA_READY").status, "deferred")
   assert.equal(byId.get("G08_ENV_IMPORT_READY").status, "blocked")
   assert.equal(byId.get("G09_SENSITIVE_BLOCKERS_EXPLICIT").status, "proved")
   assert.ok(byId.get("G09_SENSITIVE_BLOCKERS_EXPLICIT").evidence.includes("blockedCredentialCount=8"))
@@ -170,33 +178,22 @@ test("Aliyun completion audit reports the current goal as blocked without secret
 
   assert.ok(byId.get("G06_WECHAT_APP_LOGIN_READY").blockers.includes("WECHAT_OPEN_APP_ID"))
   assert.ok(byId.get("G06_WECHAT_APP_LOGIN_READY").blockers.includes("WECHAT_OPEN_APP_SECRET"))
-  assert.ok(byId.get("G08_ENV_IMPORT_READY").blockers.includes("WECHAT_OPEN_APP_ID"))
-  assert.ok(byId.get("G08_ENV_IMPORT_READY").blockers.includes("WECHAT_OPEN_APP_SECRET"))
+  assert.ok(!byId.get("G08_ENV_IMPORT_READY").blockers.includes("WECHAT_OPEN_APP_ID"))
+  assert.ok(!byId.get("G08_ENV_IMPORT_READY").blockers.includes("WECHAT_OPEN_APP_SECRET"))
   assert.ok(byId.get("G10_PRODUCTION_DEPLOY_AND_POSTDEPLOY_SMOKE").blockers.includes("canDeployNow=false"))
 
   assert.ok(report.nextActions.canStartNowConsoleTasks.includes("C02_ACR_IMAGE_AND_PULL"))
   assert.ok(report.nextActions.canStartNowConsoleTasks.includes("C05_OSS_AUDIO_RAM_STS"))
-  assert.ok(report.nextActions.canStartNowAuthorizationPackets.includes("P01_WECHAT_OPEN_MOBILE_APP"))
-  assert.ok(report.nextActions.canStartNowAuthorizationPackets.includes("P10_ANDROID_RELEASE_SIGNING"))
+  assert.ok(!report.nextActions.canStartNowAuthorizationPackets.includes("P01_WECHAT_OPEN_MOBILE_APP"))
+  assert.ok(!report.nextActions.canStartNowAuthorizationPackets.includes("P10_ANDROID_RELEASE_SIGNING"))
   assert.ok(report.nextActions.canStartNowAuthorizationPackets.includes("P03_ACR_PURCHASE"))
   assert.deepEqual(
     report.summary.nextActionTimeConfirmations.map((item) => item.packetId),
     [
-      "P01_WECHAT_OPEN_MOBILE_APP",
-      "P10_ANDROID_RELEASE_SIGNING",
-      "P02_APPLE_TEAM_ID",
       "P03_ACR_PURCHASE",
       "P05_OSS_RAM_STS",
+      "P11_ALIYUN_RDS_DATA_MIGRATION",
     ],
-  )
-  assert.match(
-    report.summary.nextActionTimeConfirmations.find((item) => item.packetId === "P01_WECHAT_OPEN_MOBILE_APP").minimumUserPhrase,
-    /微信开放平台创建\/补全美业话镜移动应用资料/,
-  )
-  assert.ok(
-    report.summary.nextActionTimeConfirmations
-      .find((item) => item.packetId === "P10_ANDROID_RELEASE_SIGNING")
-      .explicitlyExcluded.some((item) => item.includes("debug.keystore")),
   )
   assert.ok(
     report.summary.nextActionTimeConfirmations
@@ -255,7 +252,8 @@ test("Aliyun completion audit carries console-only inventory evidence into G03 a
   assert.equal(report.summary.cloudInventoryResults.observationSummary.executedCommandResults, 0)
   assert.equal(report.summary.cloudInventoryResults.observationSummary.cloudApiCalledCommandResults, 0)
   assert.match(markdownOutput, /Cloud inventory console-only: safe true, console observations 9\/9, executed commands 0\/9, cloud API calls 0/)
-  assert.match(markdownOutput, /Bridge data layer: current Supabase, target Aliyun RDS PostgreSQL, first bridge uses Supabase bridge env/)
+  assert.match(markdownOutput, /Bridge data layer: current Supabase migration source \/ legacy compatibility only, target Aliyun RDS PostgreSQL, first bridge uses not_allowed_for_final_production_cn/)
+  assert.match(markdownOutput, /G02B_ALIYUN_RDS_DATA_LAYER_READY/)
   assert.match(markdownOutput, /## 数据层边界/)
   assert.match(markdownOutput, /rdsMigrationIncludedInThisRelease: false/)
   assert.match(markdownOutput, /rdsMigrationRequiredForFinalProductionCn: true/)

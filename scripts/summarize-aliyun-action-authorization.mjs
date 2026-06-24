@@ -24,6 +24,24 @@ const SECRET_VALUE_PATTERNS = [
   /(password|passwd|pwd|token|secret|access[_-]?key)\s*[:=]\s*[^,\s]{8,}/i,
 ]
 
+const CURRENT_SCOPE = "backend_aliyun_only"
+const FULL_APP_LAUNCH_SCOPE = "deferred_after_backend_online"
+const APP_LAUNCH_ACTION_IDS = new Set([
+  "U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE",
+  "U10_ANDROID_RELEASE_SIGNING",
+  "U02_APPLE_TEAM_ID",
+])
+const APP_LAUNCH_PACKET_IDS = new Set([
+  "P01_WECHAT_OPEN_MOBILE_APP",
+  "P10_ANDROID_RELEASE_SIGNING",
+  "P02_APPLE_TEAM_ID",
+])
+const APP_LAUNCH_REQUIRED_NAMES = new Set([
+  "WECHAT_OPEN_APP_ID",
+  "WECHAT_OPEN_APP_SECRET",
+  "APPLE_TEAM_ID",
+])
+
 const POLICY_BY_ACTION_ID = Object.freeze({
   U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE: Object.freeze({
     automationPolicy: "external_platform_review_required",
@@ -66,6 +84,13 @@ const POLICY_BY_ACTION_ID = Object.freeze({
     requiresActionTimeConfirmation: true,
     blockerClass: "ram_secret_or_sts_import",
     why: "OSS 最小权限绑定需要选择受控 AccessKey、STS 或运行时角色；Secret 只能进 KMS/Secrets Manager/SAE secret env。",
+  }),
+  U11_ALIYUN_RDS_DATA_MIGRATION: Object.freeze({
+    automationPolicy: "rds_creation_and_database_migration_requires_action_time_confirmation",
+    canCodexProceedWithoutUser: false,
+    requiresActionTimeConfirmation: true,
+    blockerClass: "database_secret_and_migration",
+    why: "正式国内 production-cn 数据库目标必须是阿里云 RDS PostgreSQL；创建实例、导入 DATABASE_URL_CN 和迁移数据都需要动作时确认。",
   }),
   U06_ENV_IMPORT: Object.freeze({
     automationPolicy: "secret_import_requires_action_time_confirmation",
@@ -228,10 +253,32 @@ const AUTHORIZATION_PACKET_BY_ACTION_ID = Object.freeze({
       "secret imported through Aliyun controlled secret env only",
     ],
   }),
+  U11_ALIYUN_RDS_DATA_MIGRATION: Object.freeze({
+    packetId: "P11_ALIYUN_RDS_DATA_MIGRATION",
+    sequenceGroup: "cloud_foundation",
+    dependsOn: [],
+    minimumUserPhrase: "授权创建/确认阿里云 RDS PostgreSQL production-cn 数据库并完成数据迁移；DATABASE_URL_CN 只能进入阿里云 secret env。",
+    allowedActions: [
+      "创建或确认 cn-hangzhou RDS PostgreSQL 实例、数据库、账号和网络白名单/内网访问策略。",
+      "执行 Supabase 到 RDS/PostgreSQL 的 schema/data 迁移与回滚验收。",
+      "只把 DATABASE_URL_CN 导入 KMS/Secrets Manager/SAE secret env，并记录非密钥迁移证据。",
+    ],
+    explicitlyExcluded: [
+      "不把数据库密码、连接串 value 或 Supabase service role key 写入 JSON、Markdown、Docker 镜像或 git。",
+      "不把 Supabase 当作正式 production-cn 数据库目标。",
+      "不执行破坏性数据迁移，除非迁移计划和回滚验收已单独确认。",
+    ],
+    completionEvidence: [
+      "Aliyun RDS PostgreSQL instance exists in cn-hangzhou",
+      "DATABASE_URL_CN imported through secret env only",
+      "backend production-cn data access no longer depends on Supabase as formal database target",
+      "migration and rollback validation pass",
+    ],
+  }),
   U06_ENV_IMPORT: Object.freeze({
     packetId: "P06_ENV_IMPORT",
     sequenceGroup: "runtime_config",
-    dependsOn: ["P01_WECHAT_OPEN_MOBILE_APP", "P02_APPLE_TEAM_ID", "P05_OSS_RAM_STS"],
+    dependsOn: ["P05_OSS_RAM_STS", "P11_ALIYUN_RDS_DATA_MIGRATION"],
     minimumUserPhrase: "授权把已准备好的 production-cn 环境变量导入 SAE/KMS/Secrets Manager；不在报告中显示任何 value。",
     allowedActions: [
       "按 env handoff 清单导入 plain env 和 secret env。",
@@ -303,12 +350,10 @@ const AUTHORIZATION_PACKET_BY_ACTION_ID = Object.freeze({
     packetId: "P09_PRODUCTION_DEPLOY",
     sequenceGroup: "production_release",
     dependsOn: [
-      "P01_WECHAT_OPEN_MOBILE_APP",
-      "P10_ANDROID_RELEASE_SIGNING",
-      "P02_APPLE_TEAM_ID",
       "P03_ACR_PURCHASE",
       "P04_ACR_IMAGE_AND_PULL",
       "P05_OSS_RAM_STS",
+      "P11_ALIYUN_RDS_DATA_MIGRATION",
       "P06_ENV_IMPORT",
       "P07_DOMAIN_DNS_HTTPS",
       "P08_SAE_RUNTIME_SLS",
@@ -418,34 +463,53 @@ function buildReport(args) {
 
   const actions = (userActions.actions || []).map((action) => classifyAction(action))
   const authorizationPackets = buildAuthorizationPackets(actions)
-  const canStartNowPackets = authorizationPackets
+  const backendAuthorizationPackets = authorizationPackets.filter((packet) => !APP_LAUNCH_PACKET_IDS.has(packet.packetId))
+  const deferredAppLaunchPackets = authorizationPackets.filter((packet) => APP_LAUNCH_PACKET_IDS.has(packet.packetId))
+  const canStartNowPackets = backendAuthorizationPackets
     .filter((packet) => packet.canStartNow)
     .map((packet) => packet.packetId)
-  const nextActionTimeConfirmations = authorizationPackets
+  const allCanStartNowPackets = authorizationPackets
+    .filter((packet) => packet.canStartNow)
+    .map((packet) => packet.packetId)
+  const nextActionTimeConfirmations = backendAuthorizationPackets
     .filter((packet) => packet.canStartNow && packet.requiresActionTimeConfirmation)
+    .map((packet) => compactActionTimeConfirmation(packet))
+  const deferredAppLaunchConfirmations = deferredAppLaunchPackets
+    .filter((packet) => packet.requiresActionTimeConfirmation)
     .map((packet) => compactActionTimeConfirmation(packet))
   const actionTimeConfirmationRequired = actions
     .filter((action) => action.requiresActionTimeConfirmation)
     .map((action) => action.id)
-  const currentExternalBlockers = actions
+  const backendActions = actions.filter((action) => !APP_LAUNCH_ACTION_IDS.has(action.id))
+  const deferredAppLaunchActions = actions.filter((action) => APP_LAUNCH_ACTION_IDS.has(action.id))
+  const currentExternalBlockers = backendActions
+    .filter((action) => action.status !== "ready")
+    .map((action) => action.id)
+  const deferredExternalBlockers = deferredAppLaunchActions
     .filter((action) => action.status !== "ready")
     .map((action) => action.id)
   const authorizationClosureBrief = buildAuthorizationClosureBrief({
     consoleRunbook,
     authorizationPackets,
     nextActionTimeConfirmations,
+    deferredAppLaunchConfirmations,
   })
+  const requiredBlocking = status.summary?.requiredBlocking || []
+  const backendRequiredBlocking = requiredBlocking.filter((name) => !APP_LAUNCH_REQUIRED_NAMES.has(name))
+  const deferredAppLaunchBlocking = requiredBlocking.filter((name) => APP_LAUNCH_REQUIRED_NAMES.has(name))
   const report = {
     ok: true,
     generatedAt: new Date().toISOString(),
+    currentScope: CURRENT_SCOPE,
+    fullAppLaunchScope: FULL_APP_LAUNCH_SCOPE,
     containsValues: false,
     readOnlyOnly: true,
     mutationPerformed: false,
     canDeployNow: status.canDeployNow === true,
     verdict: status.verdict || "blocked",
     currentAnswer: status.canDeployNow === true
-      ? "机器门禁接近可部署，但生产动作仍需逐项授权。"
-      : "现在不能部署；阿里云资源、付款、DNS、密钥导入和生产发布动作仍需动作时确认或外部账号完成。",
+      ? "阿里云后端门禁接近可部署，但生产动作仍需逐项授权。"
+      : "现在不能部署；当前只推进阿里云后端，微信/Apple/Android 发布项已延期，后端仍缺 RDS、ACR、OSS、SAE、DNS、env、SLS 和 smoke 证据。",
     sourceCommands: [
       "corepack pnpm aliyun:user:actions",
       "corepack pnpm aliyun:console:runbook",
@@ -456,30 +520,39 @@ function buildReport(args) {
       cloudConfirmationsFile: args.cloudConfirmationsFile,
     },
     summary: {
+      currentScope: CURRENT_SCOPE,
+      fullAppLaunchScope: FULL_APP_LAUNCH_SCOPE,
       actions: actions.length,
       canCodexProceedWithoutUser: actions.filter((action) => action.canCodexProceedWithoutUser).map((action) => action.id),
       currentExternalBlockers,
+      deferredExternalBlockers,
       actionTimeConfirmationRequired,
       policyClasses: unique(actions.map((action) => action.blockerClass)),
       cloudConsoleTasks: consoleRunbook.consoleTasks?.length || 0,
       cloudResourceReady: consoleRunbook.summary?.resourceReady || "unknown",
       userActionReady: userActions.summary ? `${userActions.summary.ready}/${userActions.summary.total}` : "unknown",
-      requiredBlocking: status.summary?.requiredBlocking || [],
+      requiredBlocking: backendRequiredBlocking,
+      fullAppRequiredBlocking: requiredBlocking,
+      deferredAppLaunchBlocking,
       sensitiveActionItems: status.summary?.sensitiveActionItems || {},
       authorizationPackets: authorizationPackets.length,
       canStartNowPackets,
+      allCanStartNowPackets,
       nextActionTimeConfirmations: nextActionTimeConfirmations.map((item) => item.packetId),
+      deferredAppLaunchPackets: deferredAppLaunchPackets.map((item) => item.packetId),
+      deferredAppLaunchConfirmations: deferredAppLaunchConfirmations.map((item) => item.packetId),
       blockedCredentialCount: authorizationClosureBrief.blockedCredentialCount,
       readySecretEnvVariableCount: authorizationClosureBrief.readySecretEnvVariableCount,
       resourceEvidenceReady: authorizationClosureBrief.resourceEvidenceReady,
       blockedResourceEvidenceIds: authorizationClosureBrief.blockedResourceEvidenceIds,
       partiallyObservedResourceEvidenceIds: authorizationClosureBrief.partiallyObservedResourceEvidenceIds,
       blockedByPacketDependencies: authorizationPackets
-        .filter((packet) => packet.blockingDependencies.length > 0)
+        .filter((packet) => !APP_LAUNCH_PACKET_IDS.has(packet.packetId) && packet.blockingDependencies.length > 0)
         .map((packet) => packet.packetId),
     },
     authorizationClosureBrief,
     nextActionTimeConfirmations,
+    deferredAppLaunchConfirmations,
     safeLocalWorkStillAllowed: [
       "运行本地检查和 smoke。",
       "生成不含 value 的 env checklist、user action brief、console runbook、operator handoff 和 release artifacts。",
@@ -495,6 +568,8 @@ function buildReport(args) {
     ],
     actions,
     authorizationPackets,
+    backendAuthorizationPackets,
+    deferredAppLaunchPackets,
     nextVerifyCommands: [
       "corepack pnpm aliyun:action:authorization",
       "corepack pnpm aliyun:user:actions",
@@ -519,6 +594,7 @@ function buildAuthorizationClosureBrief({
   consoleRunbook,
   authorizationPackets,
   nextActionTimeConfirmations,
+  deferredAppLaunchConfirmations,
 }) {
   const runbookBrief = consoleRunbook.consoleClosureBrief || {}
   const blockedCredentialNames = runbookBrief.blockedCredentialNames || []
@@ -529,7 +605,9 @@ function buildAuthorizationClosureBrief({
     .map((packet) => packet.packetId)
 
   return {
-    conclusion: "现在不能部署；这些 packet 只是动作时确认入口，不能替代微信移动 App、Android/iOS 发布凭证、阿里云资源证据和 secret env 导入闭环。",
+    conclusion: "现在不能部署；这些 packet 只是阿里云后端动作时确认入口，不能替代 RDS/ACR/OSS/SAE/DNS/env/SLS/smoke 证据闭环。",
+    currentScope: CURRENT_SCOPE,
+    fullAppLaunchScope: FULL_APP_LAUNCH_SCOPE,
     canDeployNow: consoleRunbook.summary?.canDeployNow === true,
     canCodexProceedWithoutUser: false,
     blockedCredentialCount: runbookBrief.blockedCredentialCount ?? blockedCredentialNames.length,
@@ -544,13 +622,14 @@ function buildAuthorizationClosureBrief({
       [],
     blockedResourceEvidence: runbookBrief.blockedResourceEvidence || [],
     canStartNowPackets,
+    deferredAppLaunchPackets: deferredAppLaunchConfirmations.map((item) => item.packetId),
     canStartNowConsoleTasks: consoleRunbook.summary?.canStartNowConsoleTasks || [],
     blockedByPacketDependencies,
     blockedByTaskDependencies: consoleRunbook.summary?.blockedByTaskDependencies || [],
     actionTimeConfirmationRequired: unique([
       ...(runbookBrief.actionTimeConfirmationRequiredIds || []),
       ...authorizationPackets
-        .filter((packet) => packet.requiresActionTimeConfirmation)
+        .filter((packet) => packet.requiresActionTimeConfirmation && !APP_LAUNCH_PACKET_IDS.has(packet.packetId))
         .map((packet) => packet.packetId),
     ]),
   }
@@ -679,6 +758,8 @@ function renderMarkdown(report) {
     "",
     `- ${report.currentAnswer}`,
     `- verdict: ${report.verdict}`,
+    `- currentScope: ${report.currentScope}`,
+    `- fullAppLaunchScope: ${report.fullAppLaunchScope}`,
     `- canDeployNow: ${report.canDeployNow}`,
     `- mutationPerformed: ${report.mutationPerformed}`,
     `- containsValues: ${report.containsValues}`,
@@ -703,6 +784,7 @@ function renderMarkdown(report) {
     `- blockedResourceEvidenceIds: ${report.authorizationClosureBrief.blockedResourceEvidenceIds.length ? report.authorizationClosureBrief.blockedResourceEvidenceIds.join(", ") : "none"}`,
     `- partiallyObservedResourceEvidenceIds: ${report.authorizationClosureBrief.partiallyObservedResourceEvidenceIds.length ? report.authorizationClosureBrief.partiallyObservedResourceEvidenceIds.join(", ") : "none"}`,
     `- canStartNowPackets: ${report.authorizationClosureBrief.canStartNowPackets.length ? report.authorizationClosureBrief.canStartNowPackets.join(", ") : "none"}`,
+    `- deferredAppLaunchPackets: ${report.authorizationClosureBrief.deferredAppLaunchPackets.length ? report.authorizationClosureBrief.deferredAppLaunchPackets.join(", ") : "none"}`,
     `- canStartNowConsoleTasks: ${report.authorizationClosureBrief.canStartNowConsoleTasks.length ? report.authorizationClosureBrief.canStartNowConsoleTasks.join(", ") : "none"}`,
     `- blockedByPacketDependencies: ${report.authorizationClosureBrief.blockedByPacketDependencies.length ? report.authorizationClosureBrief.blockedByPacketDependencies.join(", ") : "none"}`,
     "",

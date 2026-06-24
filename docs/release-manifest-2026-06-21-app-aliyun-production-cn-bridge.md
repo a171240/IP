@@ -4,6 +4,29 @@
 
 本文只记录 APP 国内 production-cn 后端桥接包的本地准备状态，不包含任何密钥值，也不代表已经执行阿里云生产部署。
 
+## 2026-06-24 后端目标更新
+
+当前用户目标已从“完整 APP 发布前置项全部闭环”收窄为“先把后端补到阿里云上补齐”。微信开放平台移动应用、Android 微信签名、Apple Team ID 暂时后置，不再作为当前 `backend_aliyun_only` 门禁。
+
+当前后端部署目标和缺口文档：
+
+```text
+docs/app-production-cn-backend-aliyun-target.md
+corepack pnpm aliyun:backend-cn:status
+corepack pnpm aliyun:backend-cn:apply-package
+```
+
+当前后端门禁：
+
+```text
+canProceedWithoutWechat=true
+canDeployBackendNow=false
+backendTargetReady=0/8
+backendRequiredBlocking=DATABASE_URL_CN, RDS_POSTGRES_NOT_READY, RDS_MIGRATION_EVIDENCE_NOT_READY, ACR_IMAGE_REGISTRY_NOT_READY, SAE_RUNTIME_NOT_READY, API_DOMAIN_HTTPS_ICP_NOT_READY, ASSET_DOMAIN_HTTPS_ICP_NOT_READY, OSS_RAM_STS_NOT_READY, ENV_IMPORT_NOT_READY, SLS_ALERTS_NOT_READY, POSTDEPLOY_SMOKE_NOT_RUN
+```
+
+2026-06-24 追加复核：本地已补 `lib/aliyun-rds/postgres.server.ts` 和第一版 schema map，`APP_API_POSTGRES_ADAPTER_MISSING` 不再是当前后端 blocker。RDS 数据访问 blocker 已按 APP 第一版范围重算：完整 `app/api/app` inventory 保留 30 条路由，其中当前必须迁 RDS 的一阶段路由为 25 条，延期 5 条是 `/api/app/health`、微信登录两条和 `scene-cards` 两条；微信开放平台移动应用已按用户要求从本轮 `backend_aliyun_only` 目标排除。
+
 ## 1. 基本信息
 
 - Release lane: APP production-cn backend bridge
@@ -190,6 +213,15 @@ tests/aliyun-blocker-brief.static.test.js
 
 该追加把 `corepack pnpm aliyun:blockers:brief` 的当前 go/no-go 口径固化成一页式 handoff：现在不能部署/上线；必填环境变量为 `24/26`，硬阻塞是 `WECHAT_OPEN_APP_ID` 和 `WECHAT_OPEN_APP_SECRET`；微信开放平台账号已认证但移动应用未创建；小程序 `WECHAT_MINI_*` 凭证不能替代 APP 登录凭证；阿里云资源证据仍为 `0/7`；当前仅 `C02_ACR_IMAGE_AND_PULL` 和 `C05_OSS_AUDIO_RAM_STS` 可在动作时确认后继续补非密钥证据。它不包含任何密钥 value，也不授权阿里云购买、资源创建、密钥导入、镜像推送、production-cn 部署、微信开放平台创建/提交、Apple Developer 写操作、Supabase 写入或 git push。
 
+2026-06-24 追加的用户动作和凭证介入简报证据：
+
+```text
+docs/app-production-cn-user-action-brief.md
+tests/aliyun-user-action-brief.static.test.js
+```
+
+该追加把 `corepack pnpm aliyun:user:actions` 的用户/操作员介入口径固化成 handoff：当前 `10/10` 个用户动作仍需动作时确认，`blockedCredentialCount=8`，`readySecretEnvVariableCount=17`；最前置动作包是 `P01_WECHAT_OPEN_MOBILE_APP`、`P10_ANDROID_RELEASE_SIGNING`、`P02_APPLE_TEAM_ID`、`P03_ACR_PURCHASE`、`P05_OSS_RAM_STS`。它明确每个阻塞凭证的获得位置、导入位置、禁止存储位置和最小确认语，但不包含任何密钥 value，也不授权微信开放平台写操作、Android release signing、Apple Developer 写操作、阿里云购买/创建/密钥导入、镜像推送、production-cn 部署或 git push。
+
 ## 4. 明确不包含
 
 - 不包含 App 内支付、苹果 IAP、安卓应用市场支付。
@@ -304,17 +336,17 @@ optional/app-launch missing in Vercel production:
 
 ## 7. Supabase / 数据层状态
 
-当前 APP production-cn 是桥接版：
+当前 APP production-cn 正式目标是全阿里云版：
 
 ```text
-数据库：暂时沿用现有 Supabase
+数据库：阿里云 RDS PostgreSQL
 对象存储：阿里云 OSS
 长录音 ASR：百炼 / DashScope
 服务复盘总结：DeepSeek
 语音对练：火山语音 + DeepSeek
 ```
 
-本清单没有 Supabase migration 文件，也没有授权 Supabase production schema/data write。
+Supabase 只能作为迁移来源或旧链路兼容，不能作为正式 production-cn 数据库目标。本清单没有授权 Supabase production schema/data write；正式发布前必须完成 RDS PostgreSQL 实例、`DATABASE_URL_CN` secret env、后端数据访问层迁移、schema/data 迁移和回滚验收。
 
 最终完整 production-cn 仍需要独立的数据层迁移：
 
@@ -628,7 +660,7 @@ sanitizedEnvFileDeleted: true
 
 2026-06-22 07:02 CST 追加：新增 `corepack pnpm aliyun:operator:handoff` 和 `scripts/generate-aliyun-operator-handoff.mjs`，把 `aliyun:status`、`aliyun:operator:tasks` 和 env import plan 合并成一个非密钥操作包。微信开放平台已提交审核时，当前动作是等待移动应用审核通过后读取 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；阿里云侧继续补 SAE/ECS、ACR、DNS/HTTPS/ICP、OSS/RAM、env import 和 SLS 证据。`aliyun:release:artifacts` 会随包输出 `operator-handoff.json` 和 `operator-handoff.md`。同轮已执行 `node --check scripts/generate-aliyun-operator-handoff.mjs`、`corepack pnpm aliyun:operator:handoff`、`corepack pnpm aliyun:readiness`、`corepack pnpm aliyun:release:artifacts -- --skip-bundle --skip-vercel-env-coverage` 和 `corepack pnpm aliyun:predeploy`，全部通过；`predeploy` 仍只剩 `appWechatLogin` 外部阻塞，APP API smoke `30 probes / 0 failures`。
 
-2026-06-22 07:10 CST 追加：`operator-handoff` 现在把 `APPLE_TEAM_ID` 从普通可后置变量中拆出，列为 `appLaunchBlocking.variables`。当时分类应读作：后端必填变量缺 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；APP 发布/AASA 阻塞缺 `APPLE_TEAM_ID`，并且 `WECHAT_OPEN_APP_REVIEW_STATUS=reviewing`；`DATABASE_URL_CN` / `REDIS_URL_CN` 等仍是可后置变量，不应被误读为第一版 APP 登录链路阻塞。2026-06-22 14:52 CST 后当前状态已修正为 `WECHAT_OPEN_APP_REVIEW_STATUS=not_started`。同轮已重新执行 `node --check scripts/generate-aliyun-operator-handoff.mjs`、`node --check scripts/prepare-aliyun-release-artifacts.mjs`、`git diff --check`、`corepack pnpm aliyun:operator:handoff`、`corepack pnpm aliyun:release:artifacts -- --skip-bundle --skip-vercel-env-coverage`、`corepack pnpm aliyun:readiness` 和 `corepack pnpm aliyun:predeploy`，全部通过；`predeploy` 仍显示 health strict 只缺 `appWechatLogin`，APP API smoke `30 probes / 0 failures`。
+2026-06-22 07:10 CST 历史快照：`operator-handoff` 当时把 `APPLE_TEAM_ID` 从普通可后置变量中拆出，列为 `appLaunchBlocking.variables`，并把 `DATABASE_URL_CN` / `REDIS_URL_CN` 等作为可后置变量处理。该数据库口径已被 2026-06-24 的“APP 国内正式版全部迁到阿里云”门禁覆盖；当前 `DATABASE_URL_CN` 是后端必填阻塞项，只有 `REDIS_URL_CN` 仍按实际队列/缓存依赖后置。2026-06-22 14:52 CST 后微信状态已修正为 `WECHAT_OPEN_APP_REVIEW_STATUS=not_started`。同轮已重新执行 `node --check scripts/generate-aliyun-operator-handoff.mjs`、`node --check scripts/prepare-aliyun-release-artifacts.mjs`、`git diff --check`、`corepack pnpm aliyun:operator:handoff`、`corepack pnpm aliyun:release:artifacts -- --skip-bundle --skip-vercel-env-coverage`、`corepack pnpm aliyun:readiness` 和 `corepack pnpm aliyun:predeploy`，当时全部通过；该通过结果不是当前全阿里云数据层发布证据。
 
 2026-06-22 07:18 CST 追加：`aliyun:readiness:assume-cloud-ready` 已降为显式诊断命令，package script 会带 `--allow-blocking`，输出固定包含 `diagnosticOnly=true` 与 `releaseEvidenceUsable=false`；即使本地机器项全部通过，也不能让 `productionReady` 变成正式可发布证据。正式发布仍只能用 `aliyun:readiness:cloud-ready`、`aliyun:cloud:confirmations:strict` 和部署后远端 smoke 证明。
 
@@ -687,7 +719,7 @@ APPLE_TEAM_ID：Apple Developer 10 位 Team ID
 
 `APP_API_BASE_URL`、`NEXT_PUBLIC_SITE_URL`、`APP_ASSET_BASE_URL`、`PRIVACY_POLICY_URL`、`TERMS_URL` 已写入本机 `.env.production-cn.local`。协议 URL 形态已通过本机 strict 检查；正式生产仍需阿里云 DNS/HTTPS/ICP 证据、页面可公网 GET、运营者复核文本，并在阿里云运行环境中导入同一组 URL。
 
-变量获取位置、导入位置和是否密钥的操作清单见 `docs/app-production-cn-env-checklist.md`。该清单明确：阿里云不是缺一个 APP，缺的是微信开放平台移动应用审核通过后的 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`，以及阿里云 SAE/ACR/DNS/OSS/SLS/env import 的外部确认。
+变量获取位置、导入位置和是否密钥的操作清单见 `docs/app-production-cn-env-checklist.md`。该清单明确：阿里云不是缺一个 APP，缺的是微信开放平台移动应用审核通过后的 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`、阿里云 RDS PostgreSQL 数据迁移闭环，以及阿里云 SAE/ACR/DNS/OSS/SLS/env import 的外部确认。
 
 ### 10.3 微信开放平台
 
@@ -738,9 +770,9 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 08:34 CST 追加：`APP_ASSET_BASE_URL` 的 env source catalog 归属从 `oss` 改为 `assetDomainHttps`，`aliyun:domain:check` 的 nextAction 也同步要求分别写入 `apiDomainHttps` 与 `assetDomainHttps` 证据。这样操作员清单会把 assets-cn 域名 DNS/HTTPS/ICP 与 OSS Bucket CORS/RAM 分开确认：前者对应 `assetDomainHttps`，后者对应 `oss`，避免把静态资源域名证据误写到 Bucket 权限证据里。
 
-2026-06-22 08:41 CST 追加：`deploy/aliyun-production-cn.example.json` 的 `requiredExternalConfirmations` 从 6 项扩展为 8 项，并由 `aliyun:deploy:spec` 精确校验。新增/拆分点是：`api-cn` 域名证据、`assets-cn` 域名证据分别确认；production-cn 环境变量导入且密钥未进镜像作为独立外部确认。这样部署规格、`cloud-confirmations`、`operator:tasks` 和 `status` 的阻塞口径一致。
+2026-06-22 08:41 CST 历史快照：`deploy/aliyun-production-cn.example.json` 的 `requiredExternalConfirmations` 当时从 6 项扩展为 8 项，并由 `aliyun:deploy:spec` 精确校验。2026-06-24 全阿里云正式版口径下已升为 9 项，新增 `Aliyun RDS PostgreSQL migration confirmed`；RDS/PostgreSQL 迁移、`DATABASE_URL_CN` secret env、后端数据访问层迁移和回滚验收现在都是 production-cn 前置门禁。
 
-2026-06-22 08:53 CST 追加：`aliyun:release:artifacts` 的控制台摘要和 `release-audit.md` 现在也输出 `assetHost` 与 `requiredExternalConfirmations=8`，不用再打开完整 `release-audit.json` 才能确认部署规格是否覆盖 assets-cn 和 8 项外部确认。
+2026-06-22 08:53 CST 历史快照：`aliyun:release:artifacts` 的控制台摘要和 `release-audit.md` 当时输出 `assetHost` 与 `requiredExternalConfirmations=8`。2026-06-24 当前口径应读作 `requiredExternalConfirmations=9`，新增 RDS/PostgreSQL 数据迁移确认。
 
 2026-06-22 09:31 CST 追加：`APP_ASSET_BASE_URL` 已从 optional 调整为 production-cn 必填 env，与 App build/runtime 门禁保持一致。复核命令显示：`aliyun:env:plan` requiredReady `24/26`，`aliyun:readiness` requiredReady `24/26`，requiredBlocking 仍只剩 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；真实 Vercel 只读覆盖 `aliyun:vercel-env:coverage` 为 `17/26`，`APP_ASSET_BASE_URL` 被归为国内 APP 新增必填变量。
 
@@ -820,7 +852,7 @@ WECHAT_OPEN_APP_SECRET：审核通过后读取，只能导入阿里云 secret/KM
 
 2026-06-22 17:28 CST 追加：增强 `aliyun:resources:matrix` 与 `aliyun:user:actions` 的 ACR/SAE 非密钥证据输出。`R02_ACR_IMAGE_REGISTRY`、`U03_ACR_PURCHASE_CONFIRMATION` 和 `U04_ACR_RUNTIME_AUTH` 现在会直接列出本地镜像 `repoDigest=meiye-huajing-app-api@sha256:494907a4f9e7342064dda55fe30e0e48dd245b6d6ae753bdbb3945f77c0f518d`、`localDockerImage.status=ready`、ACR 企业版经济版 `cn-hangzhou` 1 个月候选报价 `CNY 117.00`、`requiresActionTimePurchaseConfirmation=true`、以及 SAE runtime 目标 `meiye-huajing-app-api-production-cn`。同时过滤 `TODO_*` 占位，避免把占位符误当作可用证据。该变更不改变 ready 判定：阿里云资源仍为 `0/7 ready`，用户动作仍为 `0/9 ready`，生产状态仍为 `blocked`。同轮已执行 `node --check scripts/summarize-aliyun-resource-matrix.mjs`、`node --check scripts/summarize-aliyun-user-action-brief.mjs`、`corepack pnpm aliyun:resources:matrix:test`、`corepack pnpm aliyun:user:actions:test`、`corepack pnpm aliyun:resources:matrix`、`corepack pnpm aliyun:user:actions`、`corepack pnpm aliyun:status`、`corepack pnpm aliyun:release:artifacts -- --skip-bundle --skip-vercel-env-coverage`、`git diff --check` 和完整 `corepack pnpm aliyun:predeploy`，全部通过；`predeploy` 仍显示 health strict 只缺 `appWechatLogin`，APP API smoke `30 probes / 0 failures`。
 
-2026-06-22 17:34 CST 追加：修正 `aliyun:env:checklist` 的 APP 发布口径。`APPLE_TEAM_ID` 现在从“可后置或空缺变量”拆到独立的“APP 发布阻塞但非后端必填”分组，Markdown 摘要新增 `appLaunchBlocking: APPLE_TEAM_ID`，动作说明固定为“APP 发布/AASA 阻塞：从 Apple Developer 获取 10 位 Team ID 后导入阿里云 SAE plain env”。这不改变后端必填 env 判定：`requiredBlocking` 仍只剩 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；`DATABASE_URL_CN` / `REDIS_URL_CN` 仍是第一版桥接部署可后置的数据层变量。同轮已执行 `node --check scripts/prepare-aliyun-runtime-env.mjs`、`corepack pnpm aliyun:env:classification:test`、`corepack pnpm aliyun:app-cn-checklist:test`、`corepack pnpm aliyun:env:checklist`、`corepack pnpm aliyun:status`、新增行密钥形态扫描、`git diff --check` 和完整 `corepack pnpm aliyun:predeploy`，全部通过；`predeploy` 仍显示状态为 `blocked`，后端必填 env blocker 仍只剩 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`，用户动作仍阻塞在微信移动 App 未创建、Apple Team ID/AASA、ACR/SAE、DNS/HTTPS/ICP、OSS/RAM、env import 与 SLS。
+2026-06-22 17:34 CST 历史快照：当时修正 `aliyun:env:checklist` 的 APP 发布口径，把 `APPLE_TEAM_ID` 从“可后置或空缺变量”拆到独立的“APP 发布阻塞但非后端必填”分组。该段里的 `DATABASE_URL_CN` 可后置判断已被 2026-06-24 的全阿里云正式版门禁覆盖；当前后端必填 env blocker 是 `DATABASE_URL_CN`、`WECHAT_OPEN_APP_ID`、`WECHAT_OPEN_APP_SECRET`。同轮已执行 `node --check scripts/prepare-aliyun-runtime-env.mjs`、`corepack pnpm aliyun:env:classification:test`、`corepack pnpm aliyun:app-cn-checklist:test`、`corepack pnpm aliyun:env:checklist`、`corepack pnpm aliyun:status`、新增行密钥形态扫描、`git diff --check` 和完整 `corepack pnpm aliyun:predeploy`，当时全部通过；该通过结果不是当前 RDS/PostgreSQL 迁移闭环证据。
 
 2026-06-22 17:47 CST 追加：通过已登录 Chrome 只读复核阿里云页面并更新 ignored 本地证据文件，不执行购买、DNS 修改、env import、镜像 push 或部署。当前 ACR 购买页仍为企业版经济版 `cn-hangzhou`、实例名 `meiye-huajing`、1 个月、应付 `CNY 117.00`，未购买且需要动作时确认；OSS bucket overview 可打开，显示 `meiye-huajing-service-records-production-cn` / `oss-cn-hangzhou`，未见 AccessDenied 或 NoSuchBucket，但 RAM 最小权限/STS 或运行时 Secret 仍未完成；SLS logsearch URL 可打开，显示 project `meiye-huajing-app-prod-cn` 和 logstore `app-api`，但 health/5xx 告警仍 pending SAE runtime。微信开放平台移动应用列表仍被浏览器安全策略阻止自动读取，本地状态继续以用户确认的“账号认证通过、移动 App 未创建”为准。复核后 `corepack pnpm aliyun:resources:matrix` 和 `corepack pnpm aliyun:user:actions` 已读到新证据，但阿里云资源仍为 `0/7 ready`，用户动作仍为 `0/9 ready`，生产状态仍为 `blocked`。
 
@@ -1020,3 +1052,7 @@ corepack pnpm aliyun:postdeploy:smoke -- \
 2026-06-24 11:58 CST 追加：新增 `docs/app-production-cn-secret-env-import-batches.md`，把 `corepack pnpm aliyun:sensitive:blockers` 的 `readySecretEnvVariableGroups` 固化为 9 组阿里云 secret-env 导入批次：`bridge_database`、`app_auth`、`aliyun_oss`、`bailian_asr`、`deepseek_summary`、`volc_speech`、`backend_ops`、`legacy_content_provider`、`mini_program_compat`，合计 17 个 ready-by-name 变量。文档同时把仍不可导入的 8 个阻塞变量单独列出：`WECHAT_OPEN_APP_ID`、`WECHAT_OPEN_APP_SECRET`、`APPLE_TEAM_ID`、`ALIYUN_OSS_SECURITY_TOKEN`、`MEIYE_RELEASE_STORE_FILE`、`MEIYE_RELEASE_STORE_PASSWORD`、`MEIYE_RELEASE_KEY_ALIAS`、`MEIYE_RELEASE_KEY_PASSWORD`；明确小程序兼容变量不能解除 APP 微信开放平台移动应用凭证阻塞，且 env import 只允许写 `items.envImport.*` 的非密钥证据。`tests/aliyun-sensitive-blockers.static.test.js` 已新增静态断言和 secret-like 扫描。本次只新增本地无值导入批次文档和测试，不导入环境变量、不读取或输出 secret、不创建/购买/修改阿里云或微信资源、不执行 docker login/push、不部署 production-cn、不 git push。
 
 2026-06-24 12:24 CST 追加：新增 `docs/app-production-cn-resource-evidence-matrix.md`，把 `corepack pnpm aliyun:resources:matrix` 当前 7 项阿里云资源证据固化成可提交无值矩阵。当前真实口径仍为 `resourceEvidenceReady=0/7`、`cloudConfirmationsTotalBlockers=27`、`imagePublishTotalBlockers=12`、`cloudAccessCanReadNow=false`、`observedPartial=2`、`observedBlocked=5`；七项资源分别是 SAE runtime、ACR 镜像仓库/SAE 拉取、api-cn DNS/HTTPS/ICP、assets-cn DNS/HTTPS/ICP、OSS 音频存储、SAE/KMS/Secrets Manager env import、SLS health/5xx 告警。文档明确 OSS bucket 与 SLS logstore 只是 partial observation，不等于 ready；`tests/aliyun-resource-matrix.static.test.js` 已新增静态断言和 secret-like 扫描。本次只新增本地无值资源证据矩阵和测试，不购买 ACR、不创建或修改 SAE/SLS/OSS/RAM/KMS/DNS/证书/CDN、不导入环境变量、不执行 docker login/push、不部署 production-cn、不 git push。
+
+2026-06-24 12:58 CST 追加：按“APP 国内正式版全部迁到阿里云”的产品口径，修正 production-cn 数据层门禁。当前权威脚本口径为：`DATABASE_URL_CN` 从可后置变量提升为 required env；本机 required env 为 `24/27` ready；required APP production-cn variables covered by Vercel production: 17 / 27；缺失的 10 个必填项是 `APP_ENV`、`APP_REGION`、`APP_API_BASE_URL`、`APP_ASSET_BASE_URL`、`NEXT_PUBLIC_SITE_URL`、`PRIVACY_POLICY_URL`、`TERMS_URL`、`DATABASE_URL_CN`、`WECHAT_OPEN_APP_ID`、`WECHAT_OPEN_APP_SECRET`。required missing in Vercel production: `APP_ENV`、`APP_REGION`、`APP_API_BASE_URL`、`APP_ASSET_BASE_URL`、`NEXT_PUBLIC_SITE_URL`、`PRIVACY_POLICY_URL`、`TERMS_URL`、`DATABASE_URL_CN`、`WECHAT_OPEN_APP_ID`、`WECHAT_OPEN_APP_SECRET`。`corepack pnpm aliyun:user:actions` 当前为 `ready=0/11`、`blocked=11`，新增 `U11_ALIYUN_RDS_DATA_MIGRATION` / `P11_ALIYUN_RDS_DATA_MIGRATION`；`nextActionTimeConfirmations` 当前为 `P01_WECHAT_OPEN_MOBILE_APP`、`P10_ANDROID_RELEASE_SIGNING`、`P02_APPLE_TEAM_ID`、`P03_ACR_PURCHASE`、`P05_OSS_RAM_STS`、`P11_ALIYUN_RDS_DATA_MIGRATION`。Supabase 变量组更名为 `legacy_database_migration_source`，只能作为迁移来源或旧链路兼容，不能作为正式 production-cn 数据库目标。本次只修正本地无值脚本、文档和测试口径，不读取或输出 secret value、不创建微信移动应用、不创建或购买 RDS/ACR/SAE/OSS/SLS/RAM/KMS/DNS/证书/CDN、不导入环境变量、不推送镜像、不部署 production-cn、不 git push。
+
+2026-06-24 13:18 CST 追加：新增 `corepack pnpm aliyun:rds:migration:plan`、`tests/aliyun-rds-migration-plan.static.test.js` 和 `docs/app-production-cn-rds-migration-plan.md`，把“为什么不是只差微信移动应用”转成可执行证据。新脚本只读扫描 `app/api/app`、复用的 `app/api/mp` 和 `lib`，当前真实结果为 `appApiRouteCount=30`、`appApiRoutesWithSupabase=30`、`appApiRoutesWithDirectSupabase=2`、`sharedSupabaseFileCount=93`、`supabaseUsageFileCount=95`、`tableCount=44`、`rpcCount=3`、`storageBucketCount=1`、`databaseUrlCnReferencedInSource=false`、`postgresDataAccessAdapterDetected=false`。命令已接入 `package.json`、`scripts/aliyun-predeploy-commands.mjs`、`deploy/aliyun-production-cn.example.json`、`scripts/check-aliyun-deployment-spec.mjs` 和 `aliyun:release:artifacts`，当前权威门禁口径升为 `localPredeployChecks=74`、`predeployChecks=42`。结论是微信移动应用只解除 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`，正式全阿里云还必须完成 RDS PostgreSQL、`DATABASE_URL_CN`、PostgreSQL data access adapter、schema/data migration 和 rollback validation。本次只新增本地无值扫描、文档和测试，不读取 `.env` 值，不连接 Supabase/RDS，不调用云 API，不创建微信移动应用，不创建或购买 RDS/ACR/SAE/OSS/SLS/RAM/KMS/DNS/证书/CDN，不导入环境变量，不推送镜像，不部署 production-cn，不 git push。

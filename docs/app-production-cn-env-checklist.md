@@ -8,7 +8,7 @@
 
 2026-06-22 17:31 CST 复核：现在仍不能部署。`corepack pnpm aliyun:user:actions` 当前为 `ready 0/9`，`corepack pnpm aliyun:resources:matrix` 当前为阿里云资源 `ready 0/7`。本机和 Vercel 可确认的是：本地后端容器镜像存在，APP API 桥接路由和本地 smoke 通过，Vercel production 只能提供旧后端变量名来源；阿里云 production-cn 仍缺云侧资源确认、密钥导入和移动 App 登录凭证。
 
-2026-06-24 CST 复核：现在仍不能部署。`corepack pnpm aliyun:user:actions` 当前为 `ready 0/10`，新增阻塞项是 Android release signing 与微信开放平台 Android 应用签名；`corepack pnpm aliyun:resources:matrix` 当前仍为阿里云资源 `ready 0/7`。本机 required env 仍是 `24/26` ready，缺 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；CloudShell 只读盘点证据已落地并通过 strict 校验，但云资源侧仍缺 SAE、ACR、api-cn/assets-cn DNS/HTTPS/ICP、OSS RAM/STS、环境变量导入和 SLS 告警的最终确认。
+2026-06-24 CST 复核：现在仍不能部署。`corepack pnpm aliyun:user:actions` 当前为 `ready 0/11`，新增阻塞项是正式阿里云 RDS PostgreSQL 数据层迁移、Android release signing 与微信开放平台 Android 应用签名；`corepack pnpm aliyun:resources:matrix` 当前仍为阿里云资源 `ready 0/7`。本机 full APP required env 现在是 `24/27` ready，缺 `DATABASE_URL_CN` / `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；当前阿里云后端-only 口径只把 `DATABASE_URL_CN` 作为后端必填阻塞，`WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET` 已延期到后端上线后的 APP 发布/微信移动应用阶段。CloudShell 只读盘点证据已落地并通过 strict 校验，但云资源侧仍缺 SAE、ACR、api-cn/assets-cn DNS/HTTPS/ICP、OSS RAM/STS、环境变量导入和 SLS 告警的最终确认。
 
 2026-06-22 20:37 CST 复核：本机已通过 Homebrew 安装阿里云 CLI，`aliyun version` 为 `3.3.23`，路径为 `/opt/homebrew/bin/aliyun`。`corepack pnpm aliyun:cloud:access` 当前不再报 `aliyun_cli_missing`，但仍报 `aliyun_cli_config_missing_or_unread` 与 `cloudshell_cli_config_missing_or_unread`；脚本未读取任何配置文件内容、未调用云 API、未创建或修改阿里云资源。该状态只表示本机具备后续只读 inventory 的 CLI 前置工具，不表示阿里云资源 ready。
 
@@ -18,11 +18,11 @@
 
 2026-06-24 CST 复核：`deploy/aliyun-production-cn.cloud-inventory-results.local.json` 已存在，且已由 CloudShell Aliyun CLI 只读命令补齐。`cloudInventoryResults` 当前为 `localReady=true`、`readyLocalOperations=9/9`、`executedCommandResults=12/12`、`cloudApiCalledCommandResults=12/12`、`mutationPerformedCommandResults=0`；这证明只读盘点已完成，但不等于云资源可部署，因为 `cloudConfirmations` 仍为 `0/7` ready。
 
-2026-06-24 数据层只读盘点补充：`cn-hangzhou` 下 RDS PostgreSQL 实例数为 0，RDS 全量实例数为 0，Redis/Tair 实例数为 0。第一版 APP production-cn 后端仍是阿里云 API 容器 + 现有 Supabase 的桥接部署；`DATABASE_URL_CN` / `REDIS_URL_CN` 可后置，不能把它们填入就等同于完成完整国内数据层迁移。
+2026-06-24 数据层只读盘点补充：`cn-hangzhou` 下 RDS PostgreSQL 实例数为 0，RDS 全量实例数为 0，Redis/Tair 实例数为 0。按正式全阿里云 production-cn 口径，`DATABASE_URL_CN` 是必填阻塞项，必须配套 RDS PostgreSQL 实例、后端数据访问层迁移、schema/data 迁移和回滚验收；Supabase 只能作为迁移来源或旧链路兼容。`REDIS_URL_CN` 仍可按实际队列/缓存依赖后置。
 
-当前 Vercel production 只读覆盖检查 `corepack pnpm aliyun:vercel-env:coverage` 显示 required `17/26` 已存在，缺 `APP_ENV`、`APP_REGION`、`APP_API_BASE_URL`、`APP_ASSET_BASE_URL`、`NEXT_PUBLIC_SITE_URL`、`PRIVACY_POLICY_URL`、`TERMS_URL`、`WECHAT_OPEN_APP_ID`、`WECHAT_OPEN_APP_SECRET`。前 7 个是国内 APP/阿里云运行配置；后 2 个必须等微信开放平台移动应用创建并审核通过后获得。
+当前 Vercel production 只读覆盖检查 `corepack pnpm aliyun:vercel-env:coverage` 显示 required `17/27` 已存在，缺 `APP_ENV`、`APP_REGION`、`APP_API_BASE_URL`、`APP_ASSET_BASE_URL`、`NEXT_PUBLIC_SITE_URL`、`PRIVACY_POLICY_URL`、`TERMS_URL`、`DATABASE_URL_CN`、`WECHAT_OPEN_APP_ID`、`WECHAT_OPEN_APP_SECRET`。前 7 个是国内 APP/阿里云运行配置；`DATABASE_URL_CN` 必须来自阿里云 RDS PostgreSQL 和迁移验收；后 2 个必须等微信开放平台移动应用创建并审核通过后获得。
 
-当前 `/tmp/meiye-aliyun-env-import-checklist.md` 由 `corepack pnpm aliyun:env:checklist` 生成，包含 63 个变量的导入目标和来源说明，不包含真实 value。当前本机 required env 是 `24/26` ready，后端必填阻塞只剩 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；`APPLE_TEAM_ID` 会单独出现在“APP 发布阻塞但非后端必填”分组，用于 iOS Universal Link / AASA 验收。上述状态不等于云侧环境变量已经导入阿里云。
+当前 `/tmp/meiye-aliyun-env-import-checklist.md` 由 `corepack pnpm aliyun:env:checklist` 生成，包含 63 个变量的导入目标和来源说明，不包含真实 value。当前本机 full APP required env 是 `24/27` ready；当前阿里云后端-only 的后端必填阻塞是 `DATABASE_URL_CN`，`WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET` / `APPLE_TEAM_ID` 会出现在“APP 发布阻塞但非后端必填”分组，用于微信移动应用登录与 iOS Universal Link / AASA 验收。上述状态不等于云侧环境变量已经导入阿里云。
 
 ## 微信登录
 
@@ -59,16 +59,16 @@
 | ACR 镜像仓库 | 阿里云控制台 -> 容器镜像服务 ACR -> 命名空间/仓库 | `deploy/aliyun-production-cn.image-publish.local.json` 非密钥证据；Docker credential helper 或 RAM | 认证信息是密钥 | 未确认 ready；企业版经济版 `cn-hangzhou` 1 个月候选报价已核到 `CNY 117.00` / `¥117.00`，购买前需用户对金额和规格动作确认 |
 | OSS Bucket | 阿里云控制台 -> OSS -> Bucket、地域、CORS、RAM 最小权限 | `ALIYUN_OSS_BUCKET`、`ALIYUN_OSS_REGION`、`SERVICE_RECORD_OSS_PREFIX`；密钥走 KMS/Secrets Manager | Bucket/Region 否，AccessKey Secret 是 | Bucket/CORS 已建；RAM 策略模板见 `deploy/aliyun-production-cn.oss-ram-policy.json`，AccessKey/Secret 仍未创建导入 |
 | SLS 日志 | 阿里云控制台 -> SLS -> Project/Logstore/告警 | `deploy/aliyun-production-cn.cloud-confirmations.local.json` 非密钥证据 | 否 | 已记录 project/logstore 非密钥证据，但 health/5xx 告警未配置，`slsAlerts.confirmed=false` |
-| RDS PostgreSQL | 阿里云控制台 -> RDS -> PostgreSQL 实例 | 后续 `DATABASE_URL_CN` 或等价连接串走 KMS/Secrets Manager | 是 | CloudShell 只读盘点显示 `cn-hangzhou` 实例数 0；第一版桥接部署不包含迁移，完整 production-cn 数据层需另开方案 |
+| RDS PostgreSQL | 阿里云控制台 -> RDS -> PostgreSQL 实例 | `DATABASE_URL_CN` 或等价连接串走 KMS/Secrets Manager | 是 | CloudShell 只读盘点显示 `cn-hangzhou` 实例数 0；正式 production-cn 必填，必须完成 RDS 实例、代码迁移、数据迁移和回滚验收 |
 | Redis/Tair | 阿里云控制台 -> Tair/Redis -> 实例 | 后续 `REDIS_URL_CN` 或等价连接串走 KMS/Secrets Manager | 是 | CloudShell 只读盘点显示 `cn-hangzhou` 实例数 0；第一版桥接部署可后置 |
 
-## 数据层可后置变量
+## 正式数据层必填与可后置变量
 
-第一版 APP production-cn 目标是把 API 容器部署到阿里云，数据层暂时沿用现有 Supabase。下面两个变量只属于完整 production-cn 数据层迁移，不是第一版桥接部署的立即阻塞项。
+正式 APP production-cn 目标是阿里云 API 容器 + 阿里云 RDS PostgreSQL 数据层。`DATABASE_URL_CN` 是必填阻塞项，不能继续用 Supabase 作为正式数据库目标；Supabase 变量只保留为迁移来源或旧链路兼容。`REDIS_URL_CN` 只有在生产队列/缓存依赖明确后才成为必填。
 
 | 变量 | 获取位置 | 导入位置 | 密钥 | 当前状态 |
 | --- | --- | --- | --- | --- |
-| `DATABASE_URL_CN` | 创建或确认阿里云 RDS PostgreSQL 后生成连接串 | 阿里云 SAE secret/KMS/Secrets Manager | 是 | `todo`；当前 `cn-hangzhou` 无 RDS 实例，且后端仍以 Supabase SDK 为主 |
+| `DATABASE_URL_CN` | 创建或确认阿里云 RDS PostgreSQL 后生成连接串，并完成迁移验收 | 阿里云 SAE secret/KMS/Secrets Manager | 是 | `todo`；当前 `cn-hangzhou` 无 RDS 实例，且后端仍需完成 Supabase 到 RDS/PostgreSQL 迁移 |
 | `REDIS_URL_CN` | 创建或确认阿里云 Tair/Redis 后生成连接串 | 阿里云 SAE secret/KMS/Secrets Manager | 是 | `todo`；当前 `cn-hangzhou` 无 Redis/Tair 实例 |
 
 ## 后端密钥
@@ -92,7 +92,7 @@
 
 ## 当前用户介入项
 
-`corepack pnpm aliyun:user:actions` 当前固定输出 10 项，每项只含变量名、控制台路径、写入目标和解除条件：
+`corepack pnpm aliyun:user:actions` 当前固定输出 11 项，每项只含变量名、控制台路径、写入目标和解除条件：
 
 1. `U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE`：微信开放平台账号已认证，但移动 App 未创建；先创建“美业话镜”移动应用并提交审核，审核通过后再取得 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`。
 2. `U10_ANDROID_RELEASE_SIGNING`：配置 Android release signing，用 release APK/AAB 读取微信开放平台 Android 应用签名；keystore 和密码不能写入 JSON、Markdown、镜像或 git。
@@ -100,16 +100,17 @@
 4. `U03_ACR_PURCHASE_CONFIRMATION`：ACR Enterprise Economic / `cn-hangzhou` / 1 month / `CNY 117.00` 需要动作时付款确认。
 5. `U04_ACR_RUNTIME_AUTH`：ACR 实例 ready 后配置镜像仓库、push digest 和 SAE 拉取权限；registry password/token 不能写入文件。
 6. `U05_OSS_RAM_OR_STS`：OSS 最小权限策略已创建，仍需绑定运行身份并选择受限 AccessKey 或 STS/运行时角色注入。
-7. `U06_ENV_IMPORT`：把本地/Vercel/Supabase/阿里云/DeepSeek/火山等 ready 变量导入 SAE/KMS/Secrets Manager，并确认 `secretNotInImage=true`。
-8. `U07_DOMAIN_DNS_HTTPS_ICP`：配置 `api-cn.ipgongchang.xin` 和 `assets-cn.ipgongchang.xin` 的阿里云入口、HTTPS 和 ICP 证据。
-9. `U08_SAE_RUNTIME_AND_SLS`：创建 SAE 自定义容器应用，绑定日志采集，配置 `/api/healthz` 和 5xx 告警。
-10. `U09_DEPLOY_AUTHORIZATION`：上述前置条件 ready 后，再由用户明确授权生产部署、ACR push、DNS 变更或 git push。
+7. `U11_ALIYUN_RDS_DATA_MIGRATION`：创建/确认阿里云 RDS PostgreSQL，完成 Supabase 到 RDS/PostgreSQL 的 schema/data 迁移、`DATABASE_URL_CN` secret env 导入和回滚验收。
+8. `U06_ENV_IMPORT`：把本地/Vercel/Supabase/阿里云/DeepSeek/火山等 ready 变量导入 SAE/KMS/Secrets Manager，并确认 `secretNotInImage=true`。
+9. `U07_DOMAIN_DNS_HTTPS_ICP`：配置 `api-cn.ipgongchang.xin` 和 `assets-cn.ipgongchang.xin` 的阿里云入口、HTTPS 和 ICP 证据。
+10. `U08_SAE_RUNTIME_AND_SLS`：创建 SAE 自定义容器应用，绑定日志采集，配置 `/api/healthz` 和 5xx 告警。
+11. `U09_DEPLOY_AUTHORIZATION`：上述前置条件 ready 后，再由用户明确授权生产部署、ACR push、DNS 变更或 git push。
 
 `corepack pnpm aliyun:sensitive:blockers` 当前固定输出 7 类密钥/密码/token/付款/受控标识符阻塞：微信移动 App 凭证、Android release signing、Apple Team ID、ACR 付费、ACR/SAE 镜像认证、OSS RAM Secret 或 STS、以及 ready 敏感环境变量导入。Apple Team ID 是 Apple Developer 受控标识符，不是密钥；Android keystore password 是密钥。该报告不读取也不输出任何 value。
 
 `corepack pnpm aliyun:console:runbook` 当前固定输出 7 项阿里云控制台任务：SAE runtime、ACR 镜像与 SAE 拉取、api-cn 域名、assets-cn 域名、OSS/RAM/STS、SAE/KMS/Secrets Manager 环境变量导入、SLS 告警。该 runbook 会把每项的目标字段、当前 blocker、当前非密钥证据、写入目标和验证命令集中输出；它不创建资源、不付款、不修改 DNS、不导入环境变量、不推送镜像、不部署。
 
-`corepack pnpm aliyun:action:authorization` 当前固定输出 10 项动作授权矩阵，把微信移动应用、Android release signing、Apple Team ID、ACR 付款、ACR/SAE 镜像认证、OSS RAM/STS、环境变量导入、DNS/HTTPS/ICP、SAE/SLS、生产部署授权分别归类。当前所有 10 项都不能在没有动作时确认的情况下自动执行；Codex 可以继续做的只限本地检查、报告、非密钥证据记录和本地提交。
+`corepack pnpm aliyun:action:authorization` 当前固定输出 11 项动作授权矩阵，把微信移动应用、Android release signing、Apple Team ID、ACR 付款、ACR/SAE 镜像认证、OSS RAM/STS、RDS PostgreSQL 数据迁移、环境变量导入、DNS/HTTPS/ICP、SAE/SLS、生产部署授权分别归类。当前所有 11 项都不能在没有动作时确认的情况下自动执行；Codex 可以继续做的只限本地检查、报告、非密钥证据记录和本地提交。
 
 `corepack pnpm aliyun:wechat-open:package` 当前固定输出微信开放平台移动应用创建材料包：App 名称、Android 包名、iOS Bundle ID、Universal Link、AASA URL、当前移动 App 未创建状态、审核前缺口、审核通过后 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET` 的阿里云写入目标和禁止事项。该材料包只输出非密钥字段，不创建移动应用、不读取 AppSecret、不导入环境变量。
 
@@ -135,11 +136,11 @@ corepack pnpm aliyun:predeploy
 
 `aliyun:env:checklist` 会生成 `/tmp/meiye-aliyun-env-import-checklist.md`，按必填阻塞变量、APP 发布阻塞但非后端必填、可直接导入的 plain env、可直接导入的 secret env、可后置或空缺变量分组；它只包含变量名、获取位置、导入目标和动作，不包含真实 value。
 
-`aliyun:env:handoff` 会输出无值的环境变量获取与导入手册，按 `blockedRequired`、`appLaunchBlocking`、`readyPlainEnv`、`readySecretEnv` 和 `deferred` 分组回答“从哪里取得、写到阿里云哪里、当前是否阻塞、禁止写到哪里”。该手册会明确 `WECHAT_OPEN_APP_ID` 只能作为服务端 SAE plain env，`WECHAT_OPEN_APP_SECRET` 只能进入 KMS/Secrets Manager/SAE secret env，`APPLE_TEAM_ID` 是受控标识符且不能猜测。
+`aliyun:env:handoff` 会输出无值的环境变量获取与导入手册，按 `blockedRequired`、`appLaunchBlocking`、`readyPlainEnv`、`readySecretEnv` 和 `deferred` 分组回答“从哪里取得、写到阿里云哪里、当前是否阻塞、禁止写到哪里”。当前后端-only 口径下，`blockedRequired` 只包含 `DATABASE_URL_CN`；`WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET` / `APPLE_TEAM_ID` 进入 `appLaunchBlocking`。该手册会明确 `WECHAT_OPEN_APP_ID` 只能作为服务端 SAE plain env，`WECHAT_OPEN_APP_SECRET` 只能进入 KMS/Secrets Manager/SAE secret env，`APPLE_TEAM_ID` 是受控标识符且不能猜测。
 
 `aliyun:status` 现在也会读取 `cloud-inventory-results.local.json` 的非密钥摘要，并在 `cloudInventoryResults` 里显示 CLI/Cloud Shell 只读盘点结果是否已落地、local operations ready 数量和 blocker；当前 strict 只读 inventory 已经覆盖 9 项并 ready，但它只证明“资源存在/不存在/未配置”的只读事实，仍不能替代云侧 `cloudConfirmations`、ACR 镜像发布、密钥导入或生产部署授权。
 
-正式部署前必须满足：
+后端-only 上线前必须先满足阿里云 RDS、SAE、ACR、DNS/HTTPS/ICP、OSS/RAM/STS、env import、SLS 和 smoke 证据；完整 APP 发布/上架前还必须满足：
 
 ```text
 WECHAT_OPEN_APP_REVIEW_STATUS=approved

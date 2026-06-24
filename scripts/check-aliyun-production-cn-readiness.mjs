@@ -28,6 +28,7 @@ const REQUIRED_ENV_KEYS = [
   "NEXT_PUBLIC_SITE_URL",
   "PRIVACY_POLICY_URL",
   "TERMS_URL",
+  "DATABASE_URL_CN",
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_ANON_KEY",
   "SUPABASE_SERVICE_ROLE_KEY",
@@ -50,7 +51,6 @@ const REQUIRED_ENV_KEYS = [
 ]
 
 const OPTIONAL_ENV_KEYS = [
-  "DATABASE_URL_CN",
   "REDIS_URL_CN",
   "BAILIAN_ASR_LANGUAGE_HINTS",
   "BAILIAN_ASR_DIARIZATION_ENABLED",
@@ -436,21 +436,24 @@ function buildBridgeDataLayer(env) {
     "NEXT_PUBLIC_SUPABASE_ANON_KEY",
     "SUPABASE_SERVICE_ROLE_KEY",
   ]
+  const databaseUrlCnStatus = envStatus(env.get("DATABASE_URL_CN"))
+  const redisUrlCnStatus = envStatus(env.get("REDIS_URL_CN"))
   return {
-    current: configured.current || "Supabase",
+    current: configured.current || "Supabase migration source / legacy compatibility only",
     target: configured.target || "Aliyun RDS PostgreSQL",
-    status: configured.status || "RDS migration is not included in the first bridge deployment",
-    firstBridgeDeploymentUses: "Supabase bridge env",
-    supabaseBridgeReady: supabaseKeys.every((key) => envStatus(env.get(key)) === "ready"),
+    status: configured.status || "blocked_until_aliyun_rds_postgresql_migration_ready",
+    firstBridgeDeploymentUses: "not_allowed_for_final_production_cn",
+    supabaseBridgeReady: false,
+    supabaseSourceReady: supabaseKeys.every((key) => envStatus(env.get(key)) === "ready"),
     supabaseKeys,
-    databaseUrlCnStatus: envStatus(env.get("DATABASE_URL_CN")),
-    redisUrlCnStatus: envStatus(env.get("REDIS_URL_CN")),
-    rdsMigrationIncludedInThisRelease: false,
+    databaseUrlCnStatus,
+    redisUrlCnStatus,
+    rdsMigrationIncludedInThisRelease: databaseUrlCnStatus === "ready",
     rdsMigrationRequiredForFinalProductionCn: true,
     notes: [
-      "第一版 APP production-cn 后端是桥接部署：API 容器跑在阿里云，数据层暂时沿用现有 Supabase。",
-      "DATABASE_URL_CN / REDIS_URL_CN 目前可后置；即使填写，也不代表已完成 Supabase SDK 到 RDS/Postgres 的数据层迁移。",
-      "正式完整 production-cn 数据层迁移需要单独 RDS PostgreSQL/Tair 方案、迁移脚本、回滚方案和授权。",
+      "正式国内 production-cn 目标必须使用阿里云 RDS PostgreSQL；Supabase 只能作为迁移来源或旧链路兼容，不是正式数据库。",
+      "DATABASE_URL_CN 是正式全阿里云数据层的必填阻塞项；仅填写连接串仍不等于完成 Supabase SDK 到 RDS/PostgreSQL 的代码和数据迁移。",
+      "REDIS_URL_CN 只有在 production-cn 队列/缓存实现明确依赖 Tair/Redis 时才升级为必填阻塞项。",
     ],
   }
 }

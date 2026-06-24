@@ -24,6 +24,36 @@ const SECRET_VALUE_PATTERNS = [
   /(password|passwd|pwd|token|secret|access[_-]?key)\s*[:=]\s*[^,\s]{8,}/i,
 ]
 
+const CURRENT_SCOPE = "backend_aliyun_only"
+const FULL_APP_LAUNCH_SCOPE = "deferred_after_backend_online"
+const APP_LAUNCH_REQUIRED_NAMES = new Set([
+  "WECHAT_OPEN_APP_ID",
+  "WECHAT_OPEN_APP_SECRET",
+  "APPLE_TEAM_ID",
+])
+const APP_LAUNCH_SENSITIVE_BLOCKER_IDS = new Set([
+  "S01_WECHAT_OPEN_APP_LOGIN",
+  "S02_APPLE_TEAM_ID",
+  "S07_ANDROID_RELEASE_SIGNING",
+])
+const APP_LAUNCH_VARIABLE_PATTERNS = [
+  /^WECHAT_OPEN_APP_/,
+  /^MEIYE_RELEASE_/,
+  /^APPLE_TEAM_ID$/,
+]
+const APP_LAUNCH_MACHINE_BLOCKER_PATTERNS = [
+  /WECHAT_OPEN_APP_/,
+  /wechat_open_platform_mobile_app/i,
+  /wechatOpenPlatform/i,
+  /微信开放平台/,
+  /app_universal_link:apple_team_id_missing/i,
+  /invalid_app_universal_link_config/i,
+  /Android release signing/i,
+  /APPLE_TEAM_ID/,
+  /Apple Team ID/i,
+  /iOS Universal Link/i,
+]
+
 function parseArgs(argv) {
   const args = {
     envFile: DEFAULT_ENV_FILE,
@@ -145,6 +175,10 @@ function buildReport(args) {
     "scripts/summarize-aliyun-production-cn-status.mjs",
     ...envArgs(args),
   ])
+  const backendStatus = runJson("backend_status", [
+    "scripts/summarize-aliyun-backend-cn-status.mjs",
+    ...envArgs(args),
+  ])
   const completionAudit = runJson("completion_audit", [
     "scripts/summarize-aliyun-completion-audit.mjs",
     ...envArgs(args),
@@ -200,7 +234,16 @@ function buildReport(args) {
 
   const requiredEnvBlockers = extractRequiredEnvBlockers(sensitiveBlockers)
   const sensitiveBlockerSummaries = compactSensitiveBlockers(sensitiveBlockers)
-  const blockedVariableAcquisitionPlan = buildBlockedVariableAcquisitionPlan(sensitiveBlockers)
+  const currentSensitiveBlockerSummaries = sensitiveBlockerSummaries
+    .filter((item) => !APP_LAUNCH_SENSITIVE_BLOCKER_IDS.has(item.id))
+  const deferredAppLaunchSensitiveBlockerSummaries = sensitiveBlockerSummaries
+    .filter((item) => APP_LAUNCH_SENSITIVE_BLOCKER_IDS.has(item.id))
+  const blockedVariableAcquisitionPlan = buildBlockedVariableAcquisitionPlan(sensitiveBlockers, {
+    deferredAppLaunchOnly: false,
+  })
+  const deferredAppLaunchVariableAcquisitionPlan = buildBlockedVariableAcquisitionPlan(sensitiveBlockers, {
+    deferredAppLaunchOnly: true,
+  })
   const readySecretEnvImportGroups = sensitiveBlockers.summary?.readySensitiveEnvVariableGroups || []
   const credentialInterventionBrief = sensitiveBlockers.credentialInterventionBrief
     || sensitiveBlockers.summary?.credentialInterventionBrief
@@ -213,25 +256,37 @@ function buildReport(args) {
   const canStartNowWritebackPlan = compactCanStartNowWritebackPlan(consoleRunbook, imagePublishPlan)
   const cloudInventoryReadinessInterpretation = buildCloudInventoryReadinessInterpretation(status, cloudAccess)
   const envSourceMapSummary = compactEnvSourceMap(envSourceMap)
+  const backendRequiredBlocking = backendStatus.summary?.backendRequiredBlocking || []
+  const deferredAppLaunchBlocking = backendStatus.summary?.appLaunchDeferredBlocking || []
   const report = {
     ok: true,
     generatedAt: new Date().toISOString(),
     environment: "production-cn",
+    currentScope: CURRENT_SCOPE,
+    fullAppLaunchScope: FULL_APP_LAUNCH_SCOPE,
     containsValues: false,
     readOnlyOnly: true,
     cloudApiCalled: false,
     mutationPerformed: false,
     canDeployNow: status.canDeployNow === true,
     verdict: status.verdict || completionAudit.verdict || "blocked",
-    currentAnswer: status.canDeployNow === true
-      ? "本地门禁接近可部署，但生产动作仍需动作时确认。"
-      : "现在不能部署；先补微信开放平台移动应用、Android release signing、Apple Team ID、ACR/OSS/SAE/DNS/SLS 和阿里云环境变量导入证据。",
+    currentAnswer: backendStatus.canDeployBackendNow === true
+      ? "阿里云后端门禁接近可部署，但生产动作仍需动作时确认。"
+      : "现在不能部署；当前只推进阿里云后端，微信/Android/Apple 发布项已延期，先补 RDS、ACR、OSS、SAE、DNS/HTTPS/ICP、env、SLS 和 smoke 证据。",
     summary: {
+      currentScope: CURRENT_SCOPE,
+      fullAppLaunchScope: FULL_APP_LAUNCH_SCOPE,
       requiredEnv: `${status.summary?.requiredReady || 0}/${status.summary?.requiredTotal || 0}`,
-      requiredBlocking: status.summary?.requiredBlocking || [],
+      requiredBlocking: backendRequiredBlocking,
+      fullAppRequiredBlocking: status.summary?.requiredBlocking || [],
+      deferredAppLaunchBlocking,
+      backendTargetReady: backendStatus.summary?.backendTargetReady || "unknown",
+      canProceedWithoutWechat: backendStatus.canProceedWithoutWechat === true,
       localCodeReady: status.summary?.localCodeReady === true,
       releaseEvidenceUsable: status.summary?.releaseEvidenceUsable === true,
-      machineBlocking: status.summary?.machineBlocking || [],
+      machineBlocking: (status.summary?.machineBlocking || [])
+        .filter((item) => !APP_LAUNCH_MACHINE_BLOCKER_PATTERNS.some((pattern) => pattern.test(String(item)))),
+      fullAppMachineBlocking: status.summary?.machineBlocking || [],
       manualBlockingCount: status.summary?.manualBlocking?.length || 0,
       bridgeDataLayerCurrent: bridgeDataLayer.current,
       bridgeDataLayerTarget: bridgeDataLayer.target,
@@ -261,7 +316,10 @@ function buildReport(args) {
         requirements: completionAudit.summary?.requirements || 0,
       },
       sensitiveBlocked: `${sensitiveBlockers.summary?.blocked || 0}/${sensitiveBlockers.summary?.total || 0}`,
-      sensitiveBlockedIds: sensitiveBlockerSummaries
+      sensitiveBlockedIds: currentSensitiveBlockerSummaries
+        .filter((item) => item.status !== "ready")
+        .map((item) => item.id),
+      deferredAppLaunchSensitiveBlockedIds: deferredAppLaunchSensitiveBlockerSummaries
         .filter((item) => item.status !== "ready")
         .map((item) => item.id),
       requiredEnvBlockers: requiredEnvBlockers.map((item) => item.name),
@@ -270,6 +328,7 @@ function buildReport(args) {
       readySecretEnvVariableCount: credentialInterventionBrief.readySecretEnvVariableCount || 0,
       readySecretEnvVariableNames: credentialInterventionBrief.readySecretEnvVariableNames || [],
       blockedVariableAcquisitionCount: blockedVariableAcquisitionPlan.length,
+      deferredAppLaunchVariableAcquisitionCount: deferredAppLaunchVariableAcquisitionPlan.length,
       readySecretEnvImportGroupCount: readySecretEnvImportGroups.length,
       immediateAuthorizationPackets: actionAuthorization.summary?.nextActionTimeConfirmations || [],
       cloudInventoryStrictReady: `${status.summary?.cloudInventoryResults?.readyLocalOperations || 0}/${status.summary?.cloudInventoryResults?.localOperations || 0}`,
@@ -295,6 +354,7 @@ function buildReport(args) {
     immediateAuthorizationPackets: actionAuthorization.nextActionTimeConfirmations || [],
     requiredEnvBlockers,
     blockedVariableAcquisitionPlan,
+    deferredAppLaunchVariableAcquisitionPlan,
     readySecretEnvImportGroups,
     credentialInterventionBrief,
     wechatOpenMobileApp,
@@ -516,6 +576,7 @@ function compactBridgeDataLayer(bridge = {}) {
     status: bridge.status || "unknown",
     firstBridgeDeploymentUses: bridge.firstBridgeDeploymentUses || "unknown",
     supabaseBridgeReady: bridge.supabaseBridgeReady === true,
+    supabaseSourceReady: bridge.supabaseSourceReady === true,
     supabaseKeys: bridge.supabaseKeys || [],
     databaseUrlCnStatus: bridge.databaseUrlCnStatus || "unknown",
     redisUrlCnStatus: bridge.redisUrlCnStatus || "unknown",
@@ -698,11 +759,15 @@ const SENSITIVE_BLOCKER_TO_PACKET_IDS = Object.freeze({
   S07_ANDROID_RELEASE_SIGNING: Object.freeze(["P10_ANDROID_RELEASE_SIGNING"]),
 })
 
-function buildBlockedVariableAcquisitionPlan(sensitiveBlockers) {
+function buildBlockedVariableAcquisitionPlan(sensitiveBlockers, options = {}) {
   return (sensitiveBlockers.items || []).flatMap((item) => {
     const packetIds = SENSITIVE_BLOCKER_TO_PACKET_IDS[item.id] || []
     return (item.variableDetails || [])
       .filter((variable) => variable.status !== "ready")
+      .filter((variable) => {
+        const deferred = isDeferredAppLaunchVariable(item, variable)
+        return options.deferredAppLaunchOnly ? deferred : !deferred
+      })
       .map((variable) => ({
         name: variable.name,
         required: variable.required === true,
@@ -725,6 +790,12 @@ function buildBlockedVariableAcquisitionPlan(sensitiveBlockers) {
   })
 }
 
+function isDeferredAppLaunchVariable(item, variable) {
+  return APP_LAUNCH_SENSITIVE_BLOCKER_IDS.has(item.id)
+    || APP_LAUNCH_REQUIRED_NAMES.has(variable.name)
+    || APP_LAUNCH_VARIABLE_PATTERNS.some((pattern) => pattern.test(String(variable.name || "")))
+}
+
 function valueHandlingForVariable(variable) {
   const importTarget = String(variable.importTarget || "")
   if (importTarget.includes("plain env")) {
@@ -741,10 +812,10 @@ function valueHandlingForVariable(variable) {
 
 function extractRequiredEnvBlockers(sensitiveBlockers) {
   const variableDetails = (sensitiveBlockers.items || [])
+    .filter((item) => !APP_LAUNCH_SENSITIVE_BLOCKER_IDS.has(item.id))
     .flatMap((item) => item.variableDetails || [])
-  const wanted = new Set(["WECHAT_OPEN_APP_ID", "WECHAT_OPEN_APP_SECRET", "APPLE_TEAM_ID"])
   return variableDetails
-    .filter((item) => wanted.has(item.name) || item.required === true && item.status !== "ready")
+    .filter((item) => !APP_LAUNCH_REQUIRED_NAMES.has(item.name) && item.required === true && item.status !== "ready")
     .map((item) => ({
       name: item.name,
       required: item.required === true,
@@ -771,15 +842,22 @@ function renderMarkdown(report) {
     "",
     `- ${report.currentAnswer}`,
     `- verdict: ${report.verdict}`,
+    `- currentScope: ${report.currentScope}`,
+    `- fullAppLaunchScope: ${report.fullAppLaunchScope}`,
     `- canDeployNow: ${report.canDeployNow}`,
+    `- canProceedWithoutWechat: ${report.summary.canProceedWithoutWechat}`,
+    `- backendTargetReady: ${report.summary.backendTargetReady}`,
     `- containsValues: ${report.containsValues}`,
     `- mutationPerformed: ${report.mutationPerformed}`,
     `- secretLeakCheck: ${report.secretLeakCheck.ok}`,
     `- requiredEnv: ${report.summary.requiredEnv}`,
     `- requiredBlocking: ${report.summary.requiredBlocking.join(", ") || "none"}`,
+    `- fullAppRequiredBlocking: ${report.summary.fullAppRequiredBlocking.join(", ") || "none"}`,
+    `- deferredAppLaunchBlocking: ${report.summary.deferredAppLaunchBlocking.join(", ") || "none"}`,
     `- localCodeReady: ${report.summary.localCodeReady}`,
     `- releaseEvidenceUsable: ${report.summary.releaseEvidenceUsable}`,
     `- machineBlocking: ${report.summary.machineBlocking.join(", ") || "none"}`,
+    `- fullAppMachineBlocking: ${report.summary.fullAppMachineBlocking.join(", ") || "none"}`,
     `- manualBlockingCount: ${report.summary.manualBlockingCount}`,
     `- bridgeDataLayerCurrent: ${report.summary.bridgeDataLayerCurrent}`,
     `- bridgeDataLayerTarget: ${report.summary.bridgeDataLayerTarget}`,
@@ -802,9 +880,11 @@ function renderMarkdown(report) {
     `- completion: proved ${report.summary.completion.proved}/${report.summary.completion.requirements}, blocked ${report.summary.completion.blocked}, partial ${report.summary.completion.partial}`,
     `- sensitiveBlocked: ${report.summary.sensitiveBlocked}`,
     `- sensitiveBlockedIds: ${report.summary.sensitiveBlockedIds.join(", ") || "none"}`,
+    `- deferredAppLaunchSensitiveBlockedIds: ${report.summary.deferredAppLaunchSensitiveBlockedIds.join(", ") || "none"}`,
     `- blockedCredentialCount: ${report.summary.blockedCredentialCount}`,
     `- readySecretEnvVariableCount: ${report.summary.readySecretEnvVariableCount}`,
     `- blockedVariableAcquisitionCount: ${report.summary.blockedVariableAcquisitionCount}`,
+    `- deferredAppLaunchVariableAcquisitionCount: ${report.summary.deferredAppLaunchVariableAcquisitionCount}`,
     `- readySecretEnvImportGroupCount: ${report.summary.readySecretEnvImportGroupCount}`,
     `- cloudInventoryStrictReady: ${report.summary.cloudInventoryStrictReady}`,
     `- cloudInventoryInterpretation: ${report.summary.cloudInventoryInterpretation}`,
@@ -954,9 +1034,12 @@ function renderMarkdown(report) {
     "## 必填/发布阻塞变量",
     "",
     ...renderVariableTable(report.requiredEnvBlockers),
-    "## 阻塞变量获取与导入计划",
+    "## 当前后端阻塞变量获取与导入计划",
     "",
     ...renderBlockedVariableAcquisitionPlan(report.blockedVariableAcquisitionPlan),
+    "## 延期的完整 APP 发布变量",
+    "",
+    ...renderBlockedVariableAcquisitionPlan(report.deferredAppLaunchVariableAcquisitionPlan),
     "## 已 ready 但仍需导入阿里云 secret env 的变量组",
     "",
     ...renderReadySecretEnvImportGroups(report.readySecretEnvImportGroups),

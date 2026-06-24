@@ -258,6 +258,7 @@ function isAppOrAliyunOwned(variable) {
     "wechat_open_platform",
     "ios_universal_link",
     "aliyun_oss",
+    "aliyun_rds_postgresql",
     "bailian_asr",
     "future_rds",
     "future_cache",

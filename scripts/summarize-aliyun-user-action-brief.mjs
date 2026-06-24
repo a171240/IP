@@ -31,11 +31,25 @@ const ACTION_ORDER = [
   "U03_ACR_PURCHASE_CONFIRMATION",
   "U04_ACR_RUNTIME_AUTH",
   "U05_OSS_RAM_OR_STS",
+  "U11_ALIYUN_RDS_DATA_MIGRATION",
   "U06_ENV_IMPORT",
   "U07_DOMAIN_DNS_HTTPS_ICP",
   "U08_SAE_RUNTIME_AND_SLS",
   "U09_DEPLOY_AUTHORIZATION",
 ]
+
+const CURRENT_SCOPE = "backend_aliyun_only"
+const FULL_APP_LAUNCH_SCOPE = "deferred_after_backend_online"
+const APP_LAUNCH_ACTION_IDS = new Set([
+  "U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE",
+  "U10_ANDROID_RELEASE_SIGNING",
+  "U02_APPLE_TEAM_ID",
+])
+const APP_LAUNCH_PACKET_IDS = new Set([
+  "P01_WECHAT_OPEN_MOBILE_APP",
+  "P10_ANDROID_RELEASE_SIGNING",
+  "P02_APPLE_TEAM_ID",
+])
 
 const NEXT_ACTION_TIME_CONFIRMATION_BY_ACTION_ID = Object.freeze({
   U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE: Object.freeze({
@@ -140,6 +154,27 @@ const NEXT_ACTION_TIME_CONFIRMATION_BY_ACTION_ID = Object.freeze({
       "secret imported through Aliyun controlled secret env only",
     ],
   }),
+  U11_ALIYUN_RDS_DATA_MIGRATION: Object.freeze({
+    packetId: "P11_ALIYUN_RDS_DATA_MIGRATION",
+    sequenceGroup: "cloud_foundation",
+    minimumUserPhrase: "授权创建/确认阿里云 RDS PostgreSQL production-cn 数据库并完成数据迁移；DATABASE_URL_CN 只能进入阿里云 secret env。",
+    allowedActions: [
+      "创建或确认 cn-hangzhou RDS PostgreSQL 实例、数据库、账号和网络白名单/内网访问策略。",
+      "执行 Supabase 到 RDS/PostgreSQL 的 schema/data 迁移与回滚验收。",
+      "只把 DATABASE_URL_CN 导入 KMS/Secrets Manager/SAE secret env，并记录非密钥迁移证据。",
+    ],
+    explicitlyExcluded: [
+      "不把数据库密码、连接串 value 或 Supabase service role key 写入 JSON、Markdown、Docker 镜像或 git。",
+      "不把 Supabase 当作正式 production-cn 数据库目标。",
+      "不执行破坏性数据迁移，除非迁移计划和回滚验收已单独确认。",
+    ],
+    completionEvidence: [
+      "Aliyun RDS PostgreSQL instance exists in cn-hangzhou",
+      "DATABASE_URL_CN imported through secret env only",
+      "backend production-cn data access no longer depends on Supabase as formal database target",
+      "migration and rollback validation pass",
+    ],
+  }),
 })
 
 function parseArgs(argv) {
@@ -233,12 +268,17 @@ function buildReport(args) {
     status,
     cloudItems: cloudConfirmations?.items || {},
   })
-  const nextActionTimeConfirmations = buildNextActionTimeConfirmations(actions)
+  const backendActions = actions.filter((action) => !APP_LAUNCH_ACTION_IDS.has(action.id))
+  const deferredAppLaunchActions = actions.filter((action) => APP_LAUNCH_ACTION_IDS.has(action.id))
+  const nextActionTimeConfirmations = buildNextActionTimeConfirmations(backendActions)
+  const deferredAppLaunchConfirmations = buildNextActionTimeConfirmations(deferredAppLaunchActions)
   const credentialAcquisitionSummary = buildCredentialAcquisitionSummary(sensitive)
   const blocked = actions.filter((item) => item.status !== "ready")
   const report = {
     ok: true,
     generatedAt: new Date().toISOString(),
+    currentScope: CURRENT_SCOPE,
+    fullAppLaunchScope: FULL_APP_LAUNCH_SCOPE,
     containsValues: false,
     readOnlyOnly: true,
     mutationPerformed: false,
@@ -254,15 +294,20 @@ function buildReport(args) {
       cloudConfirmationsFile: args.cloudConfirmationsFile,
     },
     summary: {
+      currentScope: CURRENT_SCOPE,
+      fullAppLaunchScope: FULL_APP_LAUNCH_SCOPE,
       total: actions.length,
       ready: actions.length - blocked.length,
       blocked: blocked.length,
       blockedIds: blocked.map((item) => item.id),
+      backendActions: backendActions.map((item) => item.id),
+      deferredAppLaunchActions: deferredAppLaunchActions.map((item) => item.id),
       userMustAct: actions.filter((item) => item.requiresUserAction).map((item) => item.id),
       actionTimeConfirmationRequired: actions
         .filter((item) => item.requiresActionTimeConfirmation)
         .map((item) => item.id),
       nextActionTimeConfirmations: nextActionTimeConfirmations.map((item) => item.packetId),
+      deferredAppLaunchConfirmations: deferredAppLaunchConfirmations.map((item) => item.packetId),
       canBeRecordedAsNonSecretEvidence: actions
         .filter((item) => item.nonSecretEvidenceOnly)
         .map((item) => item.id),
@@ -273,10 +318,13 @@ function buildReport(args) {
       readySecretEnvVariableNames: credentialAcquisitionSummary.readySecretEnvVariableNames,
       aliyunResourcesReady: resources.summary ? `${resources.summary.ready}/${resources.summary.total}` : "unknown",
     },
-    currentAnswer: "现在不能部署；本简报只列用户/操作员还要做什么、从哪里取得、写到哪里，不输出任何密钥值。",
+    currentAnswer: "现在不能部署；当前只推进阿里云后端，微信/Android/Apple 发布项已延期，本简报只列用户/操作员还要做什么、从哪里取得、写到哪里，不输出任何密钥值。",
     credentialAcquisitionSummary,
     actions,
+    backendActions,
+    deferredAppLaunchActions,
     nextActionTimeConfirmations,
+    deferredAppLaunchConfirmations,
     nextSafeLocalCommands: [
       "corepack pnpm aliyun:user:actions",
       "corepack pnpm aliyun:sensitive:blockers",
@@ -483,6 +531,44 @@ function buildActions({ sensitiveById, resourcesById, status, cloudItems }) {
       ...resourceEvidence(resourcesById, ["R05_OSS_AUDIO_STORAGE"]),
     ],
     verifyCommands: ["corepack pnpm aliyun:cloud:confirmations", "corepack pnpm aliyun:health:smoke"],
+  })
+
+  const bridgeDataLayer = status.summary?.bridgeDataLayer || {}
+  const rdsMigrationIncluded = bridgeDataLayer.rdsMigrationIncludedInThisRelease === true
+  addAction(actionMap, {
+    id: "U11_ALIYUN_RDS_DATA_MIGRATION",
+    title: "创建阿里云 RDS PostgreSQL 并完成正式数据层迁移",
+    status: rdsMigrationIncluded && bridgeDataLayer.databaseUrlCnStatus === "ready" ? "ready" : "blocked",
+    owner: "阿里云 RDS/后端数据迁移操作员",
+    obtainFrom: "阿里云控制台 -> RDS PostgreSQL -> cn-hangzhou 实例；后端 Supabase 到 RDS/PostgreSQL 迁移 runbook",
+    writeTargets: [
+      "DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env",
+      "RDS PostgreSQL 实例、schema/data migration、rollback validation -> 非密钥证据报告",
+    ],
+    requiredUserAction: "创建或确认阿里云 RDS PostgreSQL，生成受控连接串，完成 Supabase 到 RDS/PostgreSQL 的代码、schema、数据和回滚迁移验收。",
+    unblockCondition: "DATABASE_URL_CN ready，RDS PostgreSQL 迁移和回滚验收通过，production-cn 后端正式数据库目标不再是 Supabase。",
+    variableNames: ["DATABASE_URL_CN"],
+    requiresUserAction: true,
+    requiresActionTimeConfirmation: true,
+    nonSecretEvidenceOnly: false,
+    sourceIds: ["G02B_ALIYUN_RDS_DATA_LAYER_READY", "DATABASE_URL_CN"],
+    currentBlockers: uniqueStrings([
+      ...requiredBlocking(status).filter((item) => item.includes("DATABASE_URL_CN")),
+      ...(bridgeDataLayer.databaseUrlCnStatus === "ready" ? [] : [`DATABASE_URL_CN=${bridgeDataLayer.databaseUrlCnStatus || "unknown"}`]),
+      ...(rdsMigrationIncluded ? [] : ["rdsMigrationIncludedInThisRelease=false"]),
+    ]),
+    currentEvidence: [
+      `bridgeDataLayer.current=${bridgeDataLayer.current || "unknown"}`,
+      `bridgeDataLayer.target=${bridgeDataLayer.target || "unknown"}`,
+      `databaseUrlCnStatus=${bridgeDataLayer.databaseUrlCnStatus || "unknown"}`,
+      `rdsMigrationIncludedInThisRelease=${rdsMigrationIncluded}`,
+      `rdsMigrationRequiredForFinalProductionCn=${bridgeDataLayer.rdsMigrationRequiredForFinalProductionCn === true}`,
+    ],
+    verifyCommands: [
+      "corepack pnpm aliyun:readiness",
+      "corepack pnpm aliyun:completion:audit",
+      "corepack pnpm aliyun:predeploy",
+    ],
   })
 
   addAction(actionMap, {
@@ -836,10 +922,13 @@ function renderMarkdown(report) {
     "## 结论",
     "",
     `- ${report.currentAnswer}`,
+    `- currentScope: ${report.currentScope}`,
+    `- fullAppLaunchScope: ${report.fullAppLaunchScope}`,
     `- canDeployNow: ${report.canDeployNow}`,
     `- ready: ${report.summary.ready} / ${report.summary.total}`,
     `- blocked: ${report.summary.blocked}`,
     `- nextActionTimeConfirmations: ${report.summary.nextActionTimeConfirmations.join(", ") || "none"}`,
+    `- deferredAppLaunchConfirmations: ${report.deferredAppLaunchConfirmations.map((item) => item.packetId).join(", ") || "none"}`,
     `- blockedCredentialCount: ${report.summary.blockedCredentialCount}`,
     `- readySecretEnvVariableCount: ${report.summary.readySecretEnvVariableCount}`,
     `- containsValues: ${report.containsValues}`,
@@ -866,6 +955,23 @@ function renderMarkdown(report) {
       `- writeTargets: ${item.writeTargets.join("; ") || "none"}`,
       `- verifyCommands: ${item.verifyCommands.join("; ") || "none"}`,
       `- nonSecretEvidenceOnly: ${item.nonSecretEvidenceOnly}`,
+      "",
+    )
+  }
+
+  lines.push(
+    "## 延期的完整 APP 发布项",
+    "",
+  )
+  for (const item of report.deferredAppLaunchConfirmations) {
+    lines.push(
+      `### ${item.packetId} ${item.title}`,
+      "",
+      `- actionId: ${item.actionId}`,
+      `- owner: ${item.owner}`,
+      `- minimumUserPhrase: ${item.minimumUserPhrase}`,
+      `- writeTargets: ${item.writeTargets.join("; ") || "none"}`,
+      `- verifyCommands: ${item.verifyCommands.join("; ") || "none"}`,
       "",
     )
   }

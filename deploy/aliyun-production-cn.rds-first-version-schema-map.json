@@ -1,0 +1,196 @@
+{
+  "schemaVersion": 1,
+  "environment": "production-cn",
+  "scope": "first-version-app-backend",
+  "formalTarget": "Aliyun RDS PostgreSQL",
+  "currentSource": "Supabase migration source / legacy compatibility only",
+  "containsValues": false,
+  "readOnlyOnly": true,
+  "notes": [
+    "This map is a non-secret migration inventory for the first APP release scope only.",
+    "It does not contain DATABASE_URL_CN, database passwords, customer data, dump contents, Supabase service role keys, AccessKeySecret, cookies, or tokens.",
+    "Supabase remains the migration source until RDS schema, data, APP API smoke, and rollback validation are completed."
+  ],
+  "firstVersionCapabilities": [
+    "login_test_token",
+    "profile_multi_tenant_permissions",
+    "store_invite",
+    "service_record_long_recording",
+    "store_manager_service_record_read"
+  ],
+  "outOfScope": [
+    "app_payments",
+    "apple_iap",
+    "android_market_payments",
+    "poster_full_migration",
+    "xiaohongshu_full_migration",
+    "video_task_full_migration",
+    "wechat_open_platform_mobile_app_creation"
+  ],
+  "sourceMigrations": [
+    "lib/supabase/schema.sql",
+    "supabase/migrations/20260412_add_voice_coach_profiles_and_scene_cards.sql",
+    "supabase/migrations/20260506_add_mp_ai_points_backend.sql",
+    "supabase/migrations/20260511_add_mp_account_invites_and_org_snapshots.sql",
+    "supabase/migrations/20260511_harden_mp_account_invites_access.sql",
+    "supabase/migrations/20260513085315_add_service_record_sessions.sql"
+  ],
+  "requiredTables": [
+    {
+      "name": "profiles",
+      "source": "lib/supabase/schema.sql",
+      "capabilities": [
+        "login_test_token",
+        "profile_multi_tenant_permissions"
+      ],
+      "validation": [
+        "row_count_matches_source",
+        "critical_test_user_profile_exists",
+        "credits_columns_present"
+      ]
+    },
+    {
+      "name": "mp_companies",
+      "source": "supabase/migrations/20260506_add_mp_ai_points_backend.sql",
+      "capabilities": [
+        "profile_multi_tenant_permissions",
+        "store_invite",
+        "store_manager_service_record_read"
+      ],
+      "validation": [
+        "row_count_matches_source",
+        "company_admin_membership_resolves"
+      ]
+    },
+    {
+      "name": "mp_stores",
+      "source": "supabase/migrations/20260506_add_mp_ai_points_backend.sql",
+      "capabilities": [
+        "profile_multi_tenant_permissions",
+        "store_invite",
+        "service_record_long_recording",
+        "store_manager_service_record_read"
+      ],
+      "validation": [
+        "row_count_matches_source",
+        "store_manager_membership_resolves_store"
+      ]
+    },
+    {
+      "name": "mp_account_memberships",
+      "source": "supabase/migrations/20260506_add_mp_ai_points_backend.sql",
+      "capabilities": [
+        "profile_multi_tenant_permissions",
+        "store_invite",
+        "store_manager_service_record_read"
+      ],
+      "validation": [
+        "row_count_matches_source",
+        "company_scope_and_store_scope_indexes_present",
+        "active_memberships_resolve_profile_company_store"
+      ]
+    },
+    {
+      "name": "mp_account_invites",
+      "source": "supabase/migrations/20260511_add_mp_account_invites_and_org_snapshots.sql",
+      "capabilities": [
+        "store_invite"
+      ],
+      "validation": [
+        "row_count_matches_source",
+        "token_hash_index_present",
+        "expired_invite_rejected_by_api_smoke"
+      ]
+    },
+    {
+      "name": "voice_coach_customer_profiles",
+      "source": "supabase/migrations/20260412_add_voice_coach_profiles_and_scene_cards.sql",
+      "capabilities": [
+        "service_record_long_recording",
+        "store_manager_service_record_read"
+      ],
+      "validation": [
+        "row_count_matches_source",
+        "service_record_customer_fk_resolves"
+      ]
+    },
+    {
+      "name": "service_record_sessions",
+      "source": "supabase/migrations/20260513085315_add_service_record_sessions.sql",
+      "capabilities": [
+        "service_record_long_recording",
+        "store_manager_service_record_read"
+      ],
+      "validation": [
+        "row_count_matches_source",
+        "unique_user_client_session_key_present",
+        "company_store_started_indexes_present"
+      ]
+    },
+    {
+      "name": "service_record_segments",
+      "source": "supabase/migrations/20260513085315_add_service_record_sessions.sql",
+      "capabilities": [
+        "service_record_long_recording",
+        "store_manager_service_record_read"
+      ],
+      "validation": [
+        "row_count_matches_source",
+        "unique_session_client_segment_key_present",
+        "asr_status_index_present"
+      ]
+    },
+    {
+      "name": "service_record_markers",
+      "source": "supabase/migrations/20260513085315_add_service_record_sessions.sql",
+      "capabilities": [
+        "service_record_long_recording"
+      ],
+      "validation": [
+        "row_count_matches_source",
+        "session_offset_index_present"
+      ]
+    }
+  ],
+  "requiredFunctions": [
+    {
+      "name": "consume_credits",
+      "source": "lib/supabase/schema.sql",
+      "capabilities": [
+        "profile_multi_tenant_permissions"
+      ],
+      "validation": [
+        "function_exists",
+        "credit_balance_transaction_smoke_passes"
+      ]
+    }
+  ],
+  "requiredStorage": [
+    {
+      "sourceBucket": "delivery-packs",
+      "productionCnTarget": "Aliyun OSS service-record audio prefix and delivery artifacts if still used by first-version routes",
+      "validation": [
+        "oss_bucket_prefix_ready",
+        "ram_sts_policy_minimum_scope_confirmed",
+        "signed_upload_download_smoke_passes"
+      ]
+    }
+  ],
+  "migrationOrder": [
+    "create_or_confirm_rds_postgres_instance",
+    "apply_schema_without_secret_values",
+    "migrate_reference_and_identity_rows",
+    "migrate_tenant_membership_and_invite_rows",
+    "migrate_voice_customer_and_service_record_rows",
+    "validate_counts_and_foreign_keys",
+    "run_first_version_app_api_smoke_on_rds",
+    "rehearse_rollback_before_production_switch"
+  ],
+  "completionEvidence": [
+    "DATABASE_URL_CN imported only through Aliyun KMS / Secrets Manager / SAE secret env",
+    "RDS schema migration report contains no customer data or secret values",
+    "row count and critical record validation passed",
+    "profile / tenant / invite / service-record API smoke passed against RDS",
+    "rollback validation passed"
+  ]
+}

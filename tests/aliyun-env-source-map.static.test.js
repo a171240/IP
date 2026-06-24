@@ -16,6 +16,7 @@ const REQUIRED_MISSING = [
   "NEXT_PUBLIC_SITE_URL",
   "PRIVACY_POLICY_URL",
   "TERMS_URL",
+  "DATABASE_URL_CN",
   "WECHAT_OPEN_APP_ID",
   "WECHAT_OPEN_APP_SECRET",
 ]
@@ -71,7 +72,7 @@ test("Aliyun env source map classifies Vercel migration names without printing v
   assert.equal(report.mutationPerformed, false)
   assert.equal(report.secretLeakCheck.ok, true)
   assert.equal(report.vercelCoverage.ok, true)
-  assert.equal(report.summary.vercelRequiredCovered, "17/26")
+  assert.equal(report.summary.vercelRequiredCovered, "17/27")
   assert.deepEqual(report.summary.requiredMissingInVercelProduction, REQUIRED_MISSING)
   assert.ok(migrateNames.includes("SUPABASE_SERVICE_ROLE_KEY"))
   assert.ok(migrateNames.includes("DEEPSEEK_API_KEY"))
@@ -79,6 +80,7 @@ test("Aliyun env source map classifies Vercel migration names without printing v
   assert.ok(appAliyunNames.includes("APP_ASSET_BASE_URL"))
   assert.ok(blockedNames.includes("WECHAT_OPEN_APP_ID"))
   assert.ok(blockedNames.includes("WECHAT_OPEN_APP_SECRET"))
+  assert.ok(blockedNames.includes("DATABASE_URL_CN"))
   assert.ok(blockedNames.includes("APPLE_TEAM_ID"))
   assert.ok(miniCompatNames.includes("WECHAT_MINI_APPID"))
   assert.ok(miniCompatNames.includes("WECHAT_MINI_SECRET"))
@@ -120,7 +122,7 @@ function fakeVercelCoverage() {
       vercelEntries: 130,
       uniqueNames: 130,
       productionNames: 130,
-      requiredTotal: 26,
+      requiredTotal: 27,
       requiredPresentInVercelProduction: 17,
       optionalTotal: 37,
       optionalPresentInVercelProduction: 29,
@@ -128,7 +130,6 @@ function fakeVercelCoverage() {
     },
     requiredMissingInVercelProduction: REQUIRED_MISSING,
     optionalMissingInVercelProduction: [
-      "DATABASE_URL_CN",
       "REDIS_URL_CN",
       "ALIYUN_OSS_SECURITY_TOKEN",
       "VOICE_COACH_ALLOW_USER_IDS",

@@ -1,55 +1,62 @@
-# 美业话镜 APP production-cn 阿里云动作授权矩阵
+# 美业话镜 APP production-cn 用户动作简报
 
-Generated: 2026-06-24T10:39:19.362Z
+Generated: 2026-06-24T10:39:11.556Z
 
 ## 结论
 
-- 现在不能部署；当前只推进阿里云后端，微信/Apple/Android 发布项已延期，后端仍缺 RDS、ACR、OSS、SAE、DNS、env、SLS 和 smoke 证据。
-- verdict: blocked
+- 现在不能部署；当前只推进阿里云后端，微信/Android/Apple 发布项已延期，本简报只列用户/操作员还要做什么、从哪里取得、写到哪里，不输出任何密钥值。
 - currentScope: backend_aliyun_only
 - fullAppLaunchScope: deferred_after_backend_online
 - canDeployNow: false
-- mutationPerformed: false
-- containsValues: false
-- secretLeakCheck: true
-- actionTimeConfirmationRequired: U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE, U10_ANDROID_RELEASE_SIGNING, U02_APPLE_TEAM_ID, U03_ACR_PURCHASE_CONFIRMATION, U04_ACR_RUNTIME_AUTH, U05_OSS_RAM_OR_STS, U11_ALIYUN_RDS_DATA_MIGRATION, U06_ENV_IMPORT, U07_DOMAIN_DNS_HTTPS_ICP, U08_SAE_RUNTIME_AND_SLS, U09_DEPLOY_AUTHORIZATION
+- ready: 0 / 11
+- blocked: 11
 - nextActionTimeConfirmations: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
+- deferredAppLaunchConfirmations: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID
 - blockedCredentialCount: 8
 - readySecretEnvVariableCount: 17
-- resourceEvidenceReady: 0/7
-- blockedResourceEvidenceIds: R01_SAE_RUNTIME, R02_ACR_IMAGE_REGISTRY, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R05_OSS_AUDIO_STORAGE, R06_ENV_IMPORT, R07_SLS_ALERTS
-- partiallyObservedResourceEvidenceIds: R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS
+- containsValues: false
+- secretLeakCheck: true
+- mutationPerformed: false
 
-## 目标闭环证据简表
+## 密钥/密码/受控变量获取摘要
 
-- conclusion: 现在不能部署；这些 packet 只是阿里云后端动作时确认入口，不能替代 RDS/ACR/OSS/SAE/DNS/env/SLS/smoke 证据闭环。
-- canDeployNow: false
 - canCodexProceedWithoutUser: false
 - blockedCredentialCount: 8
 - blockedCredentialNames: ALIYUN_OSS_SECURITY_TOKEN, APPLE_TEAM_ID, MEIYE_RELEASE_KEY_ALIAS, MEIYE_RELEASE_KEY_PASSWORD, MEIYE_RELEASE_STORE_FILE, MEIYE_RELEASE_STORE_PASSWORD, WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET
 - readySecretEnvVariableCount: 17
-- resourceEvidenceReady: 0/7
-- blockedResourceEvidenceIds: R01_SAE_RUNTIME, R02_ACR_IMAGE_REGISTRY, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R05_OSS_AUDIO_STORAGE, R06_ENV_IMPORT, R07_SLS_ALERTS
-- partiallyObservedResourceEvidenceIds: R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS
-- canStartNowPackets: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
-- deferredAppLaunchPackets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID
-- canStartNowConsoleTasks: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS
-- blockedByPacketDependencies: P04_ACR_IMAGE_AND_PULL, P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS, P09_PRODUCTION_DEPLOY
+- readySecretEnvVariableNames: ADMIN_USER_IDS, ALIYUN_OSS_ACCESS_KEY_ID, ALIYUN_OSS_ACCESS_KEY_SECRET, APIMART_API_KEY, CREDITS_IP_SALT, DASHSCOPE_API_KEY, DEEPSEEK_API_KEY, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_SUPABASE_URL, SERVICE_RECORD_DEEPSEEK_API_KEY, SUPABASE_SERVICE_ROLE_KEY, VOLC_SPEECH_ACCESS_TOKEN, VOLC_SPEECH_APP_ID, VOLC_SPEECH_SECRET_KEY, WECHAT_LOGIN_SECRET, WECHAT_MINI_APPID, WECHAT_MINI_SECRET
+- actionTimeConfirmationRequiredIds: S01_WECHAT_OPEN_APP_LOGIN, S02_APPLE_TEAM_ID, S03_ACR_PAID_PURCHASE, S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S06_READY_SENSITIVE_ENV_IMPORT, S07_ANDROID_RELEASE_SIGNING
+- forbiddenStorage: git, JSON/Markdown 报告, Docker image, App bundle, 小程序或 App 前端包
 
-## 允许的本地工作
+| 类别 | 动作 ID | 状态 | 缺失变量 | 已 ready 但需导入 secret env | 获取位置 | 导入/写入目标 |
+| --- | --- | --- | --- | --- | --- | --- |
+| `wechat_open_mobile_app` | `S01_WECHAT_OPEN_APP_LOGIN` | blocked | WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET | none | 微信开放平台 -> 管理中心 -> 移动应用 -> 美业话镜 App -> 开发信息 | WECHAT_OPEN_APP_ID -> 阿里云 SAE plain env; WECHAT_OPEN_APP_SECRET -> 阿里云 KMS/Secrets Manager/SAE secret env; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.wechatOpenPlatform |
+| `ios_universal_link` | `S02_APPLE_TEAM_ID` | blocked | APPLE_TEAM_ID | none | Apple Developer -> Membership 或 Certificates, Identifiers & Profiles -> Identifiers -> 美业话镜 App ID | APPLE_TEAM_ID -> 阿里云 SAE plain env; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.wechatOpenPlatform / iOS evidence |
+| `acr_paid_purchase` | `S03_ACR_PAID_PURCHASE` | blocked | none | none | 阿里云控制台 -> 容器镜像服务 ACR -> 企业版购买页 | deploy/aliyun-production-cn.image-publish.local.json -> acr.purchaseCandidate / acr non-secret evidence |
+| `acr_registry_auth` | `S04_ACR_REGISTRY_AUTH` | blocked | none | none | 阿里云控制台 -> ACR 命名空间/镜像仓库；SAE 应用 -> 镜像拉取配置 | deploy/aliyun-production-cn.image-publish.local.json -> acr + runtime non-secret fields; SAE runtime image pull credentials -> Aliyun runtime secret settings only |
+| `oss_ram_sts` | `S05_OSS_RAM_SECRET_OR_STS` | blocked | ALIYUN_OSS_SECURITY_TOKEN | ALIYUN_OSS_ACCESS_KEY_ID, ALIYUN_OSS_ACCESS_KEY_SECRET | 阿里云控制台 -> RAM 访问控制 / OSS Bucket / SAE 环境变量或 Secrets Manager | ALIYUN_OSS_ACCESS_KEY_ID / ALIYUN_OSS_ACCESS_KEY_SECRET / ALIYUN_OSS_SECURITY_TOKEN -> KMS/Secrets Manager/SAE secret env; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss |
+| `ready_secret_env_import` | `S06_READY_SENSITIVE_ENV_IMPORT` | blocked | none | ADMIN_USER_IDS, ALIYUN_OSS_ACCESS_KEY_ID, ALIYUN_OSS_ACCESS_KEY_SECRET, APIMART_API_KEY, CREDITS_IP_SALT, DASHSCOPE_API_KEY, DEEPSEEK_API_KEY, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_SUPABASE_URL, SERVICE_RECORD_DEEPSEEK_API_KEY, SUPABASE_SERVICE_ROLE_KEY, VOLC_SPEECH_ACCESS_TOKEN, VOLC_SPEECH_APP_ID, VOLC_SPEECH_SECRET_KEY, WECHAT_LOGIN_SECRET, WECHAT_MINI_APPID, WECHAT_MINI_SECRET | 现有 Vercel production / Supabase / 阿里云百炼 / DeepSeek / 火山引擎 / 微信公众平台等控制台 | SAE plain env for non-secret identifiers only; KMS/Secrets Manager/SAE secret env for secret or connection values; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport |
+| `android_release_signing` | `S07_ANDROID_RELEASE_SIGNING` | blocked | MEIYE_RELEASE_KEY_ALIAS, MEIYE_RELEASE_KEY_PASSWORD, MEIYE_RELEASE_STORE_FILE, MEIYE_RELEASE_STORE_PASSWORD | none | Android release keystore 管理位置 / CI Secret Store；微信开放平台 -> 移动应用 -> Android 应用签名 | MEIYE_RELEASE_STORE_FILE / MEIYE_RELEASE_STORE_PASSWORD / MEIYE_RELEASE_KEY_ALIAS / MEIYE_RELEASE_KEY_PASSWORD -> 本机或 CI 受控 signing secret store; 微信开放平台 -> 移动应用 -> Android 应用签名; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.wechatOpenPlatform.androidSignature / androidConfigured |
 
-- 运行本地检查和 smoke。
-- 生成不含 value 的 env checklist、user action brief、console runbook、operator handoff 和 release artifacts。
-- 把已从控制台只读确认到的资源名、布尔状态、digest 或截图编号写入 ignored 的 .local.json。
-- 更新 release manifest、脚本和测试，提交本地安全门禁改动。
+### 已 ready 但仍需导入阿里云 secret env 的变量组
 
-## 未获动作时确认前禁止
+| 类别 | owner | 导入目标 | 变量名 |
+| --- | --- | --- | --- |
+| `legacy_database_migration_source` | Vercel/Supabase 操作员 | 阿里云 KMS/Secrets Manager/SAE secret env | NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY |
+| `app_auth` | 后端发布操作员 | 阿里云 KMS/Secrets Manager/SAE secret env | WECHAT_LOGIN_SECRET |
+| `aliyun_oss` | 阿里云 OSS/RAM 操作员 | 阿里云 KMS/Secrets Manager/SAE secret env | ALIYUN_OSS_ACCESS_KEY_ID, ALIYUN_OSS_ACCESS_KEY_SECRET |
+| `bailian_asr` | 阿里云百炼/DashScope 操作员 | 阿里云 KMS/Secrets Manager/SAE secret env | DASHSCOPE_API_KEY |
+| `deepseek_summary` | DeepSeek/API 操作员 | 阿里云 KMS/Secrets Manager/SAE secret env | DEEPSEEK_API_KEY, SERVICE_RECORD_DEEPSEEK_API_KEY |
+| `volc_speech` | 火山引擎语音操作员 | 阿里云 KMS/Secrets Manager/SAE secret env | VOLC_SPEECH_ACCESS_TOKEN, VOLC_SPEECH_APP_ID, VOLC_SPEECH_SECRET_KEY |
+| `backend_ops` | 后端运维/管理员 | 阿里云 KMS/Secrets Manager/SAE secret env | ADMIN_USER_IDS, CREDITS_IP_SALT |
+| `legacy_content_provider` | 旧内容供应商/API 操作员 | 阿里云 KMS/Secrets Manager/SAE secret env | APIMART_API_KEY |
+| `mini_program_compat` | 微信公众平台小程序操作员 | 阿里云 KMS/Secrets Manager/SAE secret env | WECHAT_MINI_APPID, WECHAT_MINI_SECRET |
 
-- 购买 ACR 或任何付费资源。
-- 创建/修改 SAE、SLS、OSS、RAM、KMS、Secrets Manager、DNS、证书、CDN 或公网入口。
-- 读取、复制、粘贴、导入或输出 AppSecret、AccessKeySecret、registry password、RAM Secret、STS token、cookie、Supabase service role key。
-- 推送镜像到 ACR、部署 production-cn、修改正式域名解析、git push。
-- 创建微信开放平台移动应用或读取审核通过后的 AppSecret，除非用户在动作时明确授权并提供相应账号上下文。
+### 处理规则
+
+- blockedVariableNames 只说明还缺哪些变量名，不包含 value。
+- readySecretEnvVariableNames 表示本机已有 ready 状态但仍只能通过 KMS/Secrets Manager/SAE secret env 导入。
+- AppSecret、AccessKeySecret、registry password、RAM Secret、STS token、keystore password 和 Supabase service role key 不能写入 JSON、Markdown、Docker 镜像或 git。
 
 ## 当前可开始的动作时确认
 
@@ -57,7 +64,6 @@ Generated: 2026-06-24T10:39:19.362Z
 
 - actionId: U03_ACR_PURCHASE_CONFIRMATION
 - owner: 用户/阿里云 ACR 操作员
-- sequenceGroup: cloud_foundation
 - minimumUserPhrase: 授权购买 ACR Enterprise Economic，cn-hangzhou，1 个月，当前报价 CNY 117.00。
 - allowedActions: 在阿里云 ACR 企业版购买页确认规格、地域、时长和金额。; 完成购买后创建或确认实例、namespace 和 repository。; 只记录 registry host、namespace、repository 和非密钥购买证据。
 - explicitlyExcluded: 未明确确认金额前不点击付款。; 不执行 docker login/push。; 不记录 registry password、RAM Secret 或 token。
@@ -70,7 +76,6 @@ Generated: 2026-06-24T10:39:19.362Z
 
 - actionId: U05_OSS_RAM_OR_STS
 - owner: 阿里云 OSS/RAM 操作员
-- sequenceGroup: cloud_foundation
 - minimumUserPhrase: 授权为服务记录音频 OSS 配置最小权限 RAM/STS 或运行时角色，并只通过密钥环境注入。
 - allowedActions: 确认 bucket、region、CORS 和 service-records/production-cn 前缀。; 绑定最小权限 RAM 策略或配置 STS/运行时角色。; 只把 AccessKeySecret 或 STS token 导入 KMS/Secrets Manager/SAE secret env。
 - explicitlyExcluded: 不创建可提交的长期明文 Secret。; 不下载 OSS 对象内容。; 不把 AccessKeySecret 或 STS token 写入 JSON、Markdown、镜像或 git。
@@ -83,7 +88,6 @@ Generated: 2026-06-24T10:39:19.362Z
 
 - actionId: U11_ALIYUN_RDS_DATA_MIGRATION
 - owner: 阿里云 RDS/后端数据迁移操作员
-- sequenceGroup: cloud_foundation
 - minimumUserPhrase: 授权创建/确认阿里云 RDS PostgreSQL production-cn 数据库并完成数据迁移；DATABASE_URL_CN 只能进入阿里云 secret env。
 - allowedActions: 创建或确认 cn-hangzhou RDS PostgreSQL 实例、数据库、账号和网络白名单/内网访问策略。; 执行 Supabase 到 RDS/PostgreSQL 的 schema/data 迁移与回滚验收。; 只把 DATABASE_URL_CN 导入 KMS/Secrets Manager/SAE secret env，并记录非密钥迁移证据。
 - explicitlyExcluded: 不把数据库密码、连接串 value 或 Supabase service role key 写入 JSON、Markdown、Docker 镜像或 git。; 不把 Supabase 当作正式 production-cn 数据库目标。; 不执行破坏性数据迁移，除非迁移计划和回滚验收已单独确认。
@@ -92,390 +96,190 @@ Generated: 2026-06-24T10:39:19.362Z
 - verifyCommands: corepack pnpm aliyun:readiness; corepack pnpm aliyun:completion:audit; corepack pnpm aliyun:predeploy
 - nonSecretEvidenceOnly: false
 
-## 动作分类
+## 延期的完整 APP 发布项
+
+### P01_WECHAT_OPEN_MOBILE_APP 创建微信开放平台移动应用并审核通过
+
+- actionId: U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE
+- owner: 用户/微信开放平台操作员
+- minimumUserPhrase: 授权在微信开放平台创建/补全美业话镜移动应用资料并提交审核；不读取或输出 AppSecret。
+- writeTargets: WECHAT_OPEN_APP_ID -> 阿里云 SAE plain env; WECHAT_OPEN_APP_SECRET -> KMS/Secrets Manager/SAE secret env; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.wechatOpenPlatform
+- verifyCommands: corepack pnpm aliyun:wechat-state:test; corepack pnpm aliyun:readiness
+
+### P10_ANDROID_RELEASE_SIGNING 配置 Android release signing 并生成微信开放平台 Android 签名
+
+- actionId: U10_ANDROID_RELEASE_SIGNING
+- owner: Android 发布操作员 / 微信开放平台操作员
+- minimumUserPhrase: 授权使用受控 Android release keystore 构建/签名 release 包并读取微信开放平台 Android 应用签名；不输出 keystore 密码。
+- writeTargets: MEIYE_RELEASE_STORE_FILE / MEIYE_RELEASE_STORE_PASSWORD / MEIYE_RELEASE_KEY_ALIAS / MEIYE_RELEASE_KEY_PASSWORD -> 本机或 CI 受控 signing secret store; 微信开放平台 -> 移动应用 -> Android 应用签名; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.wechatOpenPlatform.androidSignature / androidConfigured
+- verifyCommands: cd /Users/Admin/Documents/美业话镜APP/meiye-huajing-app/android && ANDROID_HOME="$HOME/Library/Android/sdk" ANDROID_SDK_ROOT="$HOME/Library/Android/sdk" ./gradlew assembleRelease; ANDROID_HOME="$HOME/Library/Android/sdk" ANDROID_SDK_ROOT="$HOME/Library/Android/sdk" $ANDROID_HOME/build-tools/<version>/apksigner verify --print-certs app/build/outputs/apk/release/*.apk; corepack pnpm aliyun:wechat-open:package; corepack pnpm aliyun:app-native:check
+
+### P02_APPLE_TEAM_ID 确认 Apple Team ID 用于 iOS Universal Link AASA
+
+- actionId: U02_APPLE_TEAM_ID
+- owner: Apple Developer / iOS 发布操作员
+- minimumUserPhrase: 授权读取 Apple Developer Team ID 并导入阿里云 plain env。
+- writeTargets: APPLE_TEAM_ID -> 阿里云 SAE plain env
+- verifyCommands: corepack pnpm aliyun:aasa:check; corepack pnpm aliyun:app-native:check
+
+## 动作清单
 
 ### U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE 创建微信开放平台移动应用并审核通过
 
 - status: blocked
-- automationPolicy: external_platform_review_required
-- canCodexProceedWithoutUser: false
-- requiresActionTimeConfirmation: true
-- blockerClass: external_identifier_and_secret_after_review
-- why: 微信开放平台账号认证不等于移动应用已创建；移动应用审核通过前没有 APP 登录 AppID/AppSecret。
 - owner: 用户/微信开放平台操作员
 - obtainFrom: 微信开放平台 -> 管理中心 -> 移动应用 -> 创建“美业话镜”移动应用
 - writeTargets: WECHAT_OPEN_APP_ID -> 阿里云 SAE plain env; WECHAT_OPEN_APP_SECRET -> KMS/Secrets Manager/SAE secret env; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.wechatOpenPlatform
 - variableNames: WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET, WECHAT_OPEN_APP_REVIEW_STATUS
 - currentBlockers: missing_required_env:WECHAT_OPEN_APP_ID; missing_required_env:WECHAT_OPEN_APP_SECRET; wechat_open_platform_mobile_app_not_ready; wechatOpenPlatform:confirmed; wechatOpenPlatform:mobileAppCreated; wechatOpenPlatform:mobileAppSubmitted; wechatOpenPlatform:mobileAppIdReady; wechatOpenPlatform:mobileAppSecretReady; wechatOpenPlatform:androidSignature; wechatOpenPlatform:androidConfigured; wechatOpenPlatform:iosConfigured; wechatOpenPlatform:reviewStatus=approved
 - currentEvidence: wechatOpenPlatform.accountVerified=true; wechatOpenPlatform.mobileAppCreated=false; wechatOpenPlatform.mobileAppSubmitted=false; wechatOpenPlatform.reviewStatus=not_started; wechatOpenPlatform.mobileAppIdReady=false; wechatOpenPlatform.mobileAppSecretReady=false
+- requiresActionTimeConfirmation: true
+- requiredUserAction: 先在微信开放平台创建“美业话镜”移动应用并提交审核；审核通过后读取 AppID/AppSecret；AppID 只导入阿里云 SAE 服务端 plain env，AppSecret 只导入 KMS/Secrets Manager/SAE secret env。
+- unblockCondition: reviewStatus=approved 且 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET ready。
 - verifyCommands: corepack pnpm aliyun:wechat-state:test; corepack pnpm aliyun:readiness
 
 ### U10_ANDROID_RELEASE_SIGNING 配置 Android release signing 并生成微信开放平台 Android 签名
 
 - status: blocked
-- automationPolicy: android_release_signing_requires_action_time_confirmation
-- canCodexProceedWithoutUser: false
-- requiresActionTimeConfirmation: true
-- blockerClass: android_keystore_password_or_signature
-- why: Android release keystore、签名密码和微信开放平台 Android 应用签名必须来自受控发布链路，不能用 debug 签名或写入仓库。
 - owner: Android 发布操作员 / 微信开放平台操作员
 - obtainFrom: Android release keystore 管理位置 / CI Secret Store；微信开放平台 -> 移动应用 -> Android 应用签名
 - writeTargets: MEIYE_RELEASE_STORE_FILE / MEIYE_RELEASE_STORE_PASSWORD / MEIYE_RELEASE_KEY_ALIAS / MEIYE_RELEASE_KEY_PASSWORD -> 本机或 CI 受控 signing secret store; 微信开放平台 -> 移动应用 -> Android 应用签名; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.wechatOpenPlatform.androidSignature / androidConfigured
 - variableNames: MEIYE_RELEASE_STORE_FILE, MEIYE_RELEASE_STORE_PASSWORD, MEIYE_RELEASE_KEY_ALIAS, MEIYE_RELEASE_KEY_PASSWORD
 - currentBlockers: S07_ANDROID_RELEASE_SIGNING:blocked; wechatOpenPlatform:androidSignature; wechatOpenPlatform:androidConfigured
 - currentEvidence: wechatOpenPlatform.androidSignature=TODO_ANDROID_RELEASE_WECHAT_SIGNATURE; wechatOpenPlatform.androidConfigured=false; S07_ANDROID_RELEASE_SIGNING:releaseSigningConfigReady=true; releaseUsesDebugSigning=false; wechatSignatureRecorded=false; androidConfigured=false
+- requiresActionTimeConfirmation: true
+- requiredUserAction: 提供或确认 Android release keystore、store password、key alias、key password；用 release APK/AAB 生成微信开放平台 Android 应用签名并回填。
+- unblockCondition: assembleRelease 成功，release 包不是 debug keystore 签名，微信开放平台记录 release 签名且 androidConfigured=true。
 - verifyCommands: cd /Users/Admin/Documents/美业话镜APP/meiye-huajing-app/android && ANDROID_HOME="$HOME/Library/Android/sdk" ANDROID_SDK_ROOT="$HOME/Library/Android/sdk" ./gradlew assembleRelease; ANDROID_HOME="$HOME/Library/Android/sdk" ANDROID_SDK_ROOT="$HOME/Library/Android/sdk" $ANDROID_HOME/build-tools/<version>/apksigner verify --print-certs app/build/outputs/apk/release/*.apk; corepack pnpm aliyun:wechat-open:package; corepack pnpm aliyun:app-native:check
 
 ### U02_APPLE_TEAM_ID 确认 Apple Team ID 用于 iOS Universal Link AASA
 
 - status: blocked
-- automationPolicy: external_identifier_required
-- canCodexProceedWithoutUser: false
-- requiresActionTimeConfirmation: true
-- blockerClass: external_identifier
-- why: Apple Team ID 必须来自 Apple Developer 账号，不能猜测。
 - owner: Apple Developer / iOS 发布操作员
 - obtainFrom: Apple Developer -> Membership 或 Certificates, Identifiers & Profiles -> Identifiers
 - writeTargets: APPLE_TEAM_ID -> 阿里云 SAE plain env
 - variableNames: APPLE_TEAM_ID
 - currentBlockers: invalid_app_universal_link_config; app_universal_link:apple_team_id_missing
 - currentEvidence: APPLE_TEAM_ID=missing
+- requiresActionTimeConfirmation: true
+- requiredUserAction: 从 Apple Developer 确认 10 位 Team ID 后导入阿里云 plain env，用于 AASA appID。
+- unblockCondition: APPLE_TEAM_ID ready 且 aliyun:aasa:check 不再报 apple_team_id_missing。
 - verifyCommands: corepack pnpm aliyun:aasa:check; corepack pnpm aliyun:app-native:check
 
 ### U03_ACR_PURCHASE_CONFIRMATION 确认 ACR 企业版付费购买
 
 - status: blocked
-- automationPolicy: paid_purchase_requires_action_time_confirmation
-- canCodexProceedWithoutUser: false
-- requiresActionTimeConfirmation: true
-- blockerClass: paid_purchase
-- why: ACR 企业版购买是付费动作；当前只可记录报价候选，付款前必须确认金额和规格。
 - owner: 用户/阿里云 ACR 操作员
 - obtainFrom: 阿里云控制台 -> 容器镜像服务 ACR -> 企业版购买页
 - writeTargets: deploy/aliyun-production-cn.image-publish.local.json -> acr.purchaseCandidate / acr confirmed evidence
 - variableNames: none
 - currentBlockers: S03_ACR_PAID_PURCHASE:blocked; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.registryHost; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.namespace; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.remoteImage; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.remoteDigest; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.evidence; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.confirmed; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.imagePushed; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.digestVerified; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.remoteDigest=sha256; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:runtime.confirmed; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:runtime.remoteImageConfigured; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:runtime.imagePullConfigured
 - currentEvidence: R02_ACR_IMAGE_REGISTRY:imagePublish.localExists=true; R02_ACR_IMAGE_REGISTRY:imagePublish.localReady=false; R02_ACR_IMAGE_REGISTRY:image.localDigestReady=true; R02_ACR_IMAGE_REGISTRY:localDockerImage.status=ready; R02_ACR_IMAGE_REGISTRY:localDockerImage.repoDigest=meiye-huajing-app-api@sha256:494907a4f9e7342064dda55fe30e0e48dd245b6d6ae753bdbb3945f77c0f518d; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.edition=ACR Enterprise Economic; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.region=cn-hangzhou; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.duration=1 month; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.quotedAmount=CNY 117.00; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.confirmed=false; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.requiresActionTimePurchaseConfirmation=true; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.evidence=chrome_acr_buy_page_2026-06-22T19:08_CST_enterprise_economic_cn-hangzhou_instance_meiye-huajing_duration_1month_payable_cny117_not_purchased_action_time_confirmation_required; R02_ACR_IMAGE_REGISTRY:runtime.target=SAE; R02_ACR_IMAGE_REGISTRY:runtime.appName=meiye-huajing-app-api-production-cn; R02_ACR_IMAGE_REGISTRY:runtime.remoteImageConfigured=false; R02_ACR_IMAGE_REGISTRY:runtime.imagePullConfigured=false; R02_ACR_IMAGE_REGISTRY:observedResourceStatus=purchase_candidate_visible_not_purchased; R02_ACR_IMAGE_REGISTRY:observedResourceReadiness=blocked
+- requiresActionTimeConfirmation: true
+- requiredUserAction: 确认是否购买 ACR Enterprise Economic / cn-hangzhou / 1 month / CNY 117.00。
+- unblockCondition: 完成 ACR 企业版实例购买并创建 namespace/repository 后，填入非密钥 registry/image/digest 证据。
 - verifyCommands: corepack pnpm aliyun:image:plan
 
 ### U04_ACR_RUNTIME_AUTH 配置 ACR 镜像推送和 SAE 镜像拉取权限
 
 - status: blocked
-- automationPolicy: registry_auth_requires_runtime_secret_channel
-- canCodexProceedWithoutUser: false
-- requiresActionTimeConfirmation: true
-- blockerClass: registry_password_or_runtime_pull_secret
-- why: 镜像推送和 SAE 拉取配置会涉及 registry 凭证或 RAM/运行时 Secret，不能写入仓库或报告。
 - owner: 阿里云 ACR/SAE 操作员
 - obtainFrom: 阿里云控制台 -> ACR 命名空间/镜像仓库；SAE 应用 -> 镜像拉取配置
 - writeTargets: deploy/aliyun-production-cn.image-publish.local.json -> acr + runtime
 - variableNames: none
 - currentBlockers: S04_ACR_REGISTRY_AUTH:blocked; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.registryHost; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.namespace; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.remoteImage; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.remoteDigest; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.evidence; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.confirmed; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.imagePushed; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.digestVerified; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.remoteDigest=sha256; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:runtime.confirmed; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:runtime.remoteImageConfigured; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:runtime.imagePullConfigured
 - currentEvidence: R02_ACR_IMAGE_REGISTRY:imagePublish.localExists=true; R02_ACR_IMAGE_REGISTRY:imagePublish.localReady=false; R02_ACR_IMAGE_REGISTRY:image.localDigestReady=true; R02_ACR_IMAGE_REGISTRY:localDockerImage.status=ready; R02_ACR_IMAGE_REGISTRY:localDockerImage.repoDigest=meiye-huajing-app-api@sha256:494907a4f9e7342064dda55fe30e0e48dd245b6d6ae753bdbb3945f77c0f518d; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.edition=ACR Enterprise Economic; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.region=cn-hangzhou; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.duration=1 month; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.quotedAmount=CNY 117.00; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.confirmed=false; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.requiresActionTimePurchaseConfirmation=true; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.evidence=chrome_acr_buy_page_2026-06-22T19:08_CST_enterprise_economic_cn-hangzhou_instance_meiye-huajing_duration_1month_payable_cny117_not_purchased_action_time_confirmation_required; R02_ACR_IMAGE_REGISTRY:runtime.target=SAE; R02_ACR_IMAGE_REGISTRY:runtime.appName=meiye-huajing-app-api-production-cn; R02_ACR_IMAGE_REGISTRY:runtime.remoteImageConfigured=false; R02_ACR_IMAGE_REGISTRY:runtime.imagePullConfigured=false; R02_ACR_IMAGE_REGISTRY:observedResourceStatus=purchase_candidate_visible_not_purchased; R02_ACR_IMAGE_REGISTRY:observedResourceReadiness=blocked
+- requiresActionTimeConfirmation: true
+- requiredUserAction: ACR 实例 ready 后，通过 docker credential helper、RAM、或 SAE 运行时镜像拉取配置完成认证。
+- unblockCondition: imagePushed=true、digestVerified=true、runtime.remoteImageConfigured=true、runtime.imagePullConfigured=true。
 - verifyCommands: corepack pnpm aliyun:image:plan:strict; corepack pnpm aliyun:container:smoke
 
 ### U05_OSS_RAM_OR_STS 绑定 OSS RAM 最小权限或 STS/运行时角色方案
 
 - status: blocked
-- automationPolicy: oss_ram_or_sts_secret_channel_required
-- canCodexProceedWithoutUser: false
-- requiresActionTimeConfirmation: true
-- blockerClass: ram_secret_or_sts_import
-- why: OSS 最小权限绑定需要选择受控 AccessKey、STS 或运行时角色；Secret 只能进 KMS/Secrets Manager/SAE secret env。
 - owner: 阿里云 OSS/RAM 操作员
 - obtainFrom: 阿里云控制台 -> OSS Bucket / RAM 访问控制 / SAE 运行身份
 - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss; ALIYUN_OSS_ACCESS_KEY_ID / ALIYUN_OSS_ACCESS_KEY_SECRET / ALIYUN_OSS_SECURITY_TOKEN -> KMS/Secrets Manager/SAE secret env
 - variableNames: ALIYUN_OSS_ACCESS_KEY_ID, ALIYUN_OSS_ACCESS_KEY_SECRET, ALIYUN_OSS_SECURITY_TOKEN
 - currentBlockers: S05_OSS_RAM_SECRET_OR_STS:blocked; R05_OSS_AUDIO_STORAGE:oss:confirmed; R05_OSS_AUDIO_STORAGE:oss:ramLeastPrivilege; oss:confirmed; oss:ramLeastPrivilege
 - currentEvidence: oss.confirmed=false; oss.bucket=meiye-huajing-service-records-production-cn; oss.region=cn-hangzhou; oss.corsConfigured=true; oss.ramLeastPrivilege=false; oss.serviceRecordPrefix=service-records/production-cn; R05_OSS_AUDIO_STORAGE:cloudshell_oss_cors_ram_2026-06-24T01:30_CST_bucket_exists_acl_private_cors_allowed_origins_api-cn_assets-cn_methods_GET_POST_PUT_HEAD_policy_MeiyeHuajingServiceRecordsOssPolicy_exists_attachmentCount_0_ram_least_privilege_not_bound; R05_OSS_AUDIO_STORAGE:observedResourceStatus=bucket_visible_unconfirmed; R05_OSS_AUDIO_STORAGE:observedResourceReadiness=partial
+- requiresActionTimeConfirmation: true
+- requiredUserAction: 把已创建的 OSS 最小权限策略绑定到实际运行身份，并选择受限 AccessKey 或 STS/运行时角色注入方案。
+- unblockCondition: oss.ramLeastPrivilege=true，且对应 secret/token 只通过阿里云密钥环境注入。
 - verifyCommands: corepack pnpm aliyun:cloud:confirmations; corepack pnpm aliyun:health:smoke
 
 ### U11_ALIYUN_RDS_DATA_MIGRATION 创建阿里云 RDS PostgreSQL 并完成正式数据层迁移
 
 - status: blocked
-- automationPolicy: rds_creation_and_database_migration_requires_action_time_confirmation
-- canCodexProceedWithoutUser: false
-- requiresActionTimeConfirmation: true
-- blockerClass: database_secret_and_migration
-- why: 正式国内 production-cn 数据库目标必须是阿里云 RDS PostgreSQL；创建实例、导入 DATABASE_URL_CN 和迁移数据都需要动作时确认。
 - owner: 阿里云 RDS/后端数据迁移操作员
 - obtainFrom: 阿里云控制台 -> RDS PostgreSQL -> cn-hangzhou 实例；后端 Supabase 到 RDS/PostgreSQL 迁移 runbook
 - writeTargets: DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env; RDS PostgreSQL 实例、schema/data migration、rollback validation -> 非密钥证据报告
 - variableNames: DATABASE_URL_CN
 - currentBlockers: requiredEnv:DATABASE_URL_CN; DATABASE_URL_CN=todo; rdsMigrationIncludedInThisRelease=false
 - currentEvidence: bridgeDataLayer.current=Supabase migration source / legacy compatibility only; bridgeDataLayer.target=Aliyun RDS PostgreSQL; databaseUrlCnStatus=todo; rdsMigrationIncludedInThisRelease=false; rdsMigrationRequiredForFinalProductionCn=true
+- requiresActionTimeConfirmation: true
+- requiredUserAction: 创建或确认阿里云 RDS PostgreSQL，生成受控连接串，完成 Supabase 到 RDS/PostgreSQL 的代码、schema、数据和回滚迁移验收。
+- unblockCondition: DATABASE_URL_CN ready，RDS PostgreSQL 迁移和回滚验收通过，production-cn 后端正式数据库目标不再是 Supabase。
 - verifyCommands: corepack pnpm aliyun:readiness; corepack pnpm aliyun:completion:audit; corepack pnpm aliyun:predeploy
 
 ### U06_ENV_IMPORT 把 ready 环境变量导入 SAE/KMS/Secrets Manager
 
 - status: blocked
-- automationPolicy: secret_import_requires_action_time_confirmation
-- canCodexProceedWithoutUser: false
-- requiresActionTimeConfirmation: true
-- blockerClass: ready_sensitive_env_need_cloud_import
-- why: 本地已有部分 ready 变量，但真实 value 只能导入阿里云受控环境，不能输出到文档、JSON、镜像或 git。
 - owner: 阿里云运行环境/密钥操作员
 - obtainFrom: 现有 Vercel/Supabase/阿里云/DeepSeek/火山/微信平台变量源；只由有权限的操作员导入，不在报告中显示值
 - writeTargets: 阿里云 SAE 环境变量 / KMS / Secrets Manager; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport
 - variableNames: NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, WECHAT_LOGIN_SECRET, ALIYUN_OSS_ACCESS_KEY_ID, ALIYUN_OSS_ACCESS_KEY_SECRET, DASHSCOPE_API_KEY, DEEPSEEK_API_KEY, SERVICE_RECORD_DEEPSEEK_API_KEY, VOLC_SPEECH_ACCESS_TOKEN, VOLC_SPEECH_APP_ID, VOLC_SPEECH_SECRET_KEY, ADMIN_USER_IDS, CREDITS_IP_SALT, APIMART_API_KEY, WECHAT_MINI_APPID, WECHAT_MINI_SECRET
 - currentBlockers: S06_READY_SENSITIVE_ENV_IMPORT:blocked; R06_ENV_IMPORT:missing_required_env:DATABASE_URL_CN; R06_ENV_IMPORT:missing_required_env:WECHAT_OPEN_APP_ID; R06_ENV_IMPORT:missing_required_env:WECHAT_OPEN_APP_SECRET; R06_ENV_IMPORT:envImport:confirmed; R06_ENV_IMPORT:envImport:secretNotInImage; R06_ENV_IMPORT:envImport:placeholder:importedAt; R06_ENV_IMPORT:envImport:placeholder:evidence; envImport:confirmed; envImport:secretNotInImage; requiredEnv:DATABASE_URL_CN; requiredEnv:WECHAT_OPEN_APP_ID; requiredEnv:WECHAT_OPEN_APP_SECRET
 - currentEvidence: envImport.confirmed=false; envImport.target=SAE; envImport.secretNotInImage=false
+- requiresActionTimeConfirmation: true
+- requiredUserAction: 这些敏感或连接类变量名在本地已有 ready 值，但仍需导入阿里云运行环境；脚本只输出变量名，不输出值。
+- unblockCondition: envImport.confirmed=true 且 envImport.secretNotInImage=true。
 - verifyCommands: corepack pnpm aliyun:env:checklist; corepack pnpm aliyun:readiness:cloud-ready
 
 ### U07_DOMAIN_DNS_HTTPS_ICP 配置 api-cn/assets-cn DNS、HTTPS 和 ICP 证据
 
 - status: blocked
-- automationPolicy: dns_https_icp_requires_action_time_confirmation
-- canCodexProceedWithoutUser: false
-- requiresActionTimeConfirmation: true
-- blockerClass: public_domain_mutation
-- why: DNS/HTTPS/ICP 会改变 APP production-cn 公网入口，动作时必须确认目标入口和证书。
 - owner: 阿里云域名/证书操作员
 - obtainFrom: 阿里云控制台 -> 云解析 DNS / 数字证书管理服务 / SAE 或 OSS/CDN 入口
 - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps
 - variableNames: none
 - currentBlockers: R03_API_DOMAIN_HTTPS:APP_API_BASE_URL:dns_special_use_wildcard_ip; R03_API_DOMAIN_HTTPS:APP_API_BASE_URL:https_not_ready:ECONNRESET; R03_API_DOMAIN_HTTPS:NEXT_PUBLIC_SITE_URL:dns_special_use_wildcard_ip; R03_API_DOMAIN_HTTPS:NEXT_PUBLIC_SITE_URL:https_not_ready:ECONNRESET; R03_API_DOMAIN_HTTPS:APP_ASSET_BASE_URL:dns_special_use_wildcard_ip; R03_API_DOMAIN_HTTPS:APP_ASSET_BASE_URL:https_not_ready:ECONNRESET; R03_API_DOMAIN_HTTPS:apiDomainHttps:confirmed; R03_API_DOMAIN_HTTPS:apiDomainHttps:dnsResolvedToAliyun; R03_API_DOMAIN_HTTPS:apiDomainHttps:httpsEnabled; R03_API_DOMAIN_HTTPS:apiDomainHttps:icpReady; R03_API_DOMAIN_HTTPS:assetDomainHttps:confirmed; R03_API_DOMAIN_HTTPS:assetDomainHttps:dnsResolvedToAliyun; R03_API_DOMAIN_HTTPS:assetDomainHttps:httpsEnabled; R03_API_DOMAIN_HTTPS:assetDomainHttps:icpReady; R04_ASSET_DOMAIN_HTTPS:APP_API_BASE_URL:dns_special_use_wildcard_ip; R04_ASSET_DOMAIN_HTTPS:APP_API_BASE_URL:https_not_ready:ECONNRESET; R04_ASSET_DOMAIN_HTTPS:NEXT_PUBLIC_SITE_URL:dns_special_use_wildcard_ip; R04_ASSET_DOMAIN_HTTPS:NEXT_PUBLIC_SITE_URL:https_not_ready:ECONNRESET; R04_ASSET_DOMAIN_HTTPS:APP_ASSET_BASE_URL:dns_special_use_wildcard_ip; R04_ASSET_DOMAIN_HTTPS:APP_ASSET_BASE_URL:https_not_ready:ECONNRESET; R04_ASSET_DOMAIN_HTTPS:apiDomainHttps:confirmed; R04_ASSET_DOMAIN_HTTPS:apiDomainHttps:dnsResolvedToAliyun; R04_ASSET_DOMAIN_HTTPS:apiDomainHttps:httpsEnabled; R04_ASSET_DOMAIN_HTTPS:apiDomainHttps:icpReady; R04_ASSET_DOMAIN_HTTPS:assetDomainHttps:confirmed; R04_ASSET_DOMAIN_HTTPS:assetDomainHttps:dnsResolvedToAliyun; R04_ASSET_DOMAIN_HTTPS:assetDomainHttps:httpsEnabled; R04_ASSET_DOMAIN_HTTPS:assetDomainHttps:icpReady; apiDomainHttps:confirmed; apiDomainHttps:dnsResolvedToAliyun; apiDomainHttps:httpsEnabled; apiDomainHttps:icpReady; assetDomainHttps:confirmed; assetDomainHttps:dnsResolvedToAliyun; assetDomainHttps:httpsEnabled; assetDomainHttps:icpReady
 - currentEvidence: apiDomainHttps.confirmed=false; apiDomainHttps.host=api-cn.ipgongchang.xin; apiDomainHttps.dnsResolvedToAliyun=false; apiDomainHttps.httpsEnabled=false; apiDomainHttps.icpReady=false; assetDomainHttps.confirmed=false; assetDomainHttps.host=assets-cn.ipgongchang.xin; assetDomainHttps.dnsResolvedToAliyun=false; assetDomainHttps.httpsEnabled=false; assetDomainHttps.icpReady=false; R03_API_DOMAIN_HTTPS:chrome_dns_console_2026-06-24T00:05_CST_ipgongchang_xin_search_api-cn_no_data_existing_api_A_106.14.241.129_public_dns_api-cn_198.18.0.30_https_ECONNRESET_no_sae_endpoint_no_https_icp_ready; R03_API_DOMAIN_HTTPS:observedResourceStatus=domain_visible_records_missing; R03_API_DOMAIN_HTTPS:observedResourceReadiness=blocked; R04_ASSET_DOMAIN_HTTPS:chrome_dns_console_2026-06-24T00:05_CST_ipgongchang_xin_search_assets-cn_no_data_public_dns_assets-cn_198.18.0.32_https_ECONNRESET_no_cdn_or_oss_custom_domain_no_https_icp_ready; R04_ASSET_DOMAIN_HTTPS:observedResourceStatus=domain_visible_records_missing; R04_ASSET_DOMAIN_HTTPS:observedResourceReadiness=blocked
+- requiresActionTimeConfirmation: true
+- requiredUserAction: 把 api-cn.ipgongchang.xin 和 assets-cn.ipgongchang.xin 指向阿里云公网入口，配置 HTTPS，并记录 ICP 证据。
+- unblockCondition: apiDomainHttps 和 assetDomainHttps confirmed=true、dnsResolvedToAliyun=true、httpsEnabled=true、icpReady=true。
 - verifyCommands: corepack pnpm aliyun:domain:strict; corepack pnpm aliyun:remote:smoke -- --base-url https://api-cn.ipgongchang.xin
 
 ### U08_SAE_RUNTIME_AND_SLS 确认 SAE runtime 和 SLS health/5xx 告警
 
 - status: pending_cloud
-- automationPolicy: cloud_resource_creation_requires_action_time_confirmation
-- canCodexProceedWithoutUser: false
-- requiresActionTimeConfirmation: true
-- blockerClass: cloud_resource_mutation
-- why: SAE/SLS 创建或配置是阿里云写操作，可能产生资源和计费影响；本脚本只列目标字段和验收方式。
 - owner: 阿里云操作员/运维操作员
 - obtainFrom: 阿里云控制台 -> SAE / 日志服务 SLS / 应用监控告警
 - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.runtime; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.slsAlerts
 - variableNames: none
 - currentBlockers: R01_SAE_RUNTIME:runtime:confirmed; R07_SLS_ALERTS:slsAlerts:confirmed; R07_SLS_ALERTS:slsAlerts:healthAlertConfigured; R07_SLS_ALERTS:slsAlerts:serverErrorAlertConfigured; runtime:confirmed; slsAlerts:confirmed; slsAlerts:healthAlertConfigured; slsAlerts:serverErrorAlertConfigured
 - currentEvidence: runtime.confirmed=false; runtime.provider=SAE; runtime.region=cn-hangzhou; runtime.appName=meiye-huajing-app-api-production-cn; runtime.containerPort=3000; runtime.healthPath=/api/healthz; slsAlerts.confirmed=false; slsAlerts.slsProject=meiye-huajing-app-prod-cn; slsAlerts.healthAlertConfigured=false; slsAlerts.serverErrorAlertConfigured=false; R01_SAE_RUNTIME:chrome_sae_app_list_2026-06-24T00:00_CST_cn-hangzhou_huadong1_hangzhou_no_instances_target_app_meiye-huajing-app-api-production-cn_not_present_runtime_not_confirmed; R01_SAE_RUNTIME:observedResourceStatus=not_created_or_not_confirmed; R01_SAE_RUNTIME:observedResourceReadiness=blocked; R07_SLS_ALERTS:cloudshell_sls_2026-06-24T01:30_CST_project_meiye-huajing-app-prod-cn_logstore_app-api_exists_alerts_0_dashboards_0_health_5xx_alerts_not_configured; R07_SLS_ALERTS:observedResourceStatus=project_logstore_visible_alerts_pending; R07_SLS_ALERTS:observedResourceReadiness=partial
+- requiresActionTimeConfirmation: true
+- requiredUserAction: 创建或确认 SAE 自定义容器应用，绑定日志采集，并配置 /api/healthz 和 5xx 告警。
+- unblockCondition: runtime.confirmed=true，slsAlerts.confirmed=true，healthAlertConfigured=true，serverErrorAlertConfigured=true。
 - verifyCommands: corepack pnpm aliyun:runtime:plan; corepack pnpm aliyun:cloud:confirmations:strict
 
 ### U09_DEPLOY_AUTHORIZATION 生产部署、镜像推送、DNS 变更、git push 的动作时授权
 
 - status: blocked
-- automationPolicy: production_release_requires_explicit_authorization
-- canCodexProceedWithoutUser: false
-- requiresActionTimeConfirmation: true
-- blockerClass: production_release
-- why: 生产部署、ACR push、DNS 变更和 git push 都必须在云侧严格门禁通过后再单独授权。
 - owner: 用户/发布负责人
 - obtainFrom: 本 Codex 线程的明确动作时授权
 - writeTargets: release manifest / deployment log
 - variableNames: none
 - currentBlockers: canDeployNow=false; productionReady=false; requiredEnv:DATABASE_URL_CN; requiredEnv:WECHAT_OPEN_APP_ID; requiredEnv:WECHAT_OPEN_APP_SECRET; missing_required_env:DATABASE_URL_CN; missing_required_env:WECHAT_OPEN_APP_ID; missing_required_env:WECHAT_OPEN_APP_SECRET; wechat_open_platform_mobile_app_not_ready; invalid_app_universal_link_config; app_universal_link:apple_team_id_missing; manual:阿里云 ACR 镜像发布和运行时镜像拉取配置已确认; manual:阿里云 SAE 容器应用已创建，运行端口 3000; manual:api-cn 域名已备案、解析到阿里云入口并配置 HTTPS; manual:assets-cn 域名已备案、解析到阿里云入口并配置 HTTPS; manual:OSS Bucket CORS、RAM 最小权限和服务记录音频前缀已确认; manual:微信开放平台移动应用审核已通过，并已取得 AppID/AppSecret、Android 包名/签名、iOS Bundle ID/Universal Link 配置; manual:生产环境变量已通过阿里云控制台、KMS 或 Secrets Manager 导入，未把密钥写进镜像; manual:SLS 日志、健康检查失败告警和 5xx 告警已配置
 - currentEvidence: verdict=blocked; canDeployNow=false; productionReady=false; cloudConfirmations=0/7
+- requiresActionTimeConfirmation: true
+- requiredUserAction: 所有前置资源 ready 后，再明确授权生产部署、ACR push、DNS 修改或 git push；本简报不自动推断授权。
+- unblockCondition: cloud confirmations strict、readiness cloud-ready、image plan strict、domain strict 和 predeploy 全部通过后，由用户明确授权对应外部动作。
 - verifyCommands: corepack pnpm aliyun:predeploy; corepack pnpm aliyun:cloud:confirmations:strict
 
-## 最小授权动作包
+## 安全边界
 
-### P01_WECHAT_OPEN_MOBILE_APP 创建微信开放平台移动应用并审核通过
-
-- actionId: U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE
-- status: blocked
-- owner: 用户/微信开放平台操作员
-- sequenceGroup: identity
-- dependsOn: none
-- blockingDependencies: none
-- canStartNow: true
-- requiresActionTimeConfirmation: true
-- minimumUserPhrase: 授权在微信开放平台创建/补全美业话镜移动应用资料并提交审核；不读取或输出 AppSecret。
-- allowedActions: 只在微信开放平台移动应用页面填写 APP 资料、Android 包名/签名、iOS Bundle ID/Universal Link。; 提交移动应用审核，并在审核通过后记录 AppID ready 状态。; 只把 AppID 导入 SAE plain env；AppSecret 只能在动作时导入 KMS/Secrets Manager/SAE secret env。
-- explicitlyExcluded: 不使用小程序 AppID/Secret 替代移动应用凭证。; 不把 AppSecret 写入 JSON、Markdown、Docker 镜像或 git。; 不做小程序上传或 APP 商店提交。
-- completionEvidence: wechatOpenPlatform.mobileAppCreated=true; wechatOpenPlatform.reviewStatus=approved; WECHAT_OPEN_APP_ID ready; WECHAT_OPEN_APP_SECRET imported through secret env only
-- writeTargets: WECHAT_OPEN_APP_ID -> 阿里云 SAE plain env; WECHAT_OPEN_APP_SECRET -> KMS/Secrets Manager/SAE secret env; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.wechatOpenPlatform
-- variableNames: WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET, WECHAT_OPEN_APP_REVIEW_STATUS
-- verifyCommands: corepack pnpm aliyun:wechat-state:test; corepack pnpm aliyun:readiness
-
-### P10_ANDROID_RELEASE_SIGNING 配置 Android release signing 并生成微信开放平台 Android 签名
-
-- actionId: U10_ANDROID_RELEASE_SIGNING
-- status: blocked
-- owner: Android 发布操作员 / 微信开放平台操作员
-- sequenceGroup: app_signing
-- dependsOn: none
-- blockingDependencies: none
-- canStartNow: true
-- requiresActionTimeConfirmation: true
-- minimumUserPhrase: 授权使用受控 Android release keystore 构建/签名 release 包并读取微信开放平台 Android 应用签名；不输出 keystore 密码。
-- allowedActions: 只在本机或 CI 受控 signing secret store 配置 MEIYE_RELEASE_STORE_FILE、MEIYE_RELEASE_STORE_PASSWORD、MEIYE_RELEASE_KEY_ALIAS、MEIYE_RELEASE_KEY_PASSWORD。; 运行 assembleRelease 或等价 release 包构建，并用 apksigner/微信签名工具从 release APK/AAB 读取 Android 应用签名。; 只把签名 hash、非密钥证据句柄和 androidConfigured 布尔状态记录到微信开放平台与 .local.json。
-- explicitlyExcluded: 不使用 debug.keystore、debug APK 或 debug 签名。; 不把 keystore 文件、store password、key password、证书私钥或微信 AppSecret 写入 JSON、Markdown、Docker 镜像或 git。; 不创建微信开放平台移动应用、不提交审核；这些必须由 P01 单独授权。
-- completionEvidence: Android release build succeeds with signingConfigs.release; release APK/AAB exists and is not signed with debug.keystore; wechatOpenPlatform.androidSignature records release signature evidence only; wechatOpenPlatform.androidConfigured=true
-- writeTargets: MEIYE_RELEASE_STORE_FILE / MEIYE_RELEASE_STORE_PASSWORD / MEIYE_RELEASE_KEY_ALIAS / MEIYE_RELEASE_KEY_PASSWORD -> 本机或 CI 受控 signing secret store; 微信开放平台 -> 移动应用 -> Android 应用签名; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.wechatOpenPlatform.androidSignature / androidConfigured
-- variableNames: MEIYE_RELEASE_STORE_FILE, MEIYE_RELEASE_STORE_PASSWORD, MEIYE_RELEASE_KEY_ALIAS, MEIYE_RELEASE_KEY_PASSWORD
-- verifyCommands: cd /Users/Admin/Documents/美业话镜APP/meiye-huajing-app/android && ANDROID_HOME="$HOME/Library/Android/sdk" ANDROID_SDK_ROOT="$HOME/Library/Android/sdk" ./gradlew assembleRelease; ANDROID_HOME="$HOME/Library/Android/sdk" ANDROID_SDK_ROOT="$HOME/Library/Android/sdk" $ANDROID_HOME/build-tools/<version>/apksigner verify --print-certs app/build/outputs/apk/release/*.apk; corepack pnpm aliyun:wechat-open:package; corepack pnpm aliyun:app-native:check
-
-### P02_APPLE_TEAM_ID 确认 Apple Team ID 用于 iOS Universal Link AASA
-
-- actionId: U02_APPLE_TEAM_ID
-- status: blocked
-- owner: Apple Developer / iOS 发布操作员
-- sequenceGroup: identity
-- dependsOn: none
-- blockingDependencies: none
-- canStartNow: true
-- requiresActionTimeConfirmation: true
-- minimumUserPhrase: 授权读取 Apple Developer Team ID 并导入阿里云 plain env。
-- allowedActions: 从 Apple Developer Membership 或 Identifiers 页面读取 10 位 Team ID。; 把 APPLE_TEAM_ID 导入 SAE plain env，用于 AASA appID。; 记录非密钥证据句柄。
-- explicitlyExcluded: 不猜测 Team ID。; 不创建/修改证书、描述文件或 App Store Connect 记录。
-- completionEvidence: APPLE_TEAM_ID ready; aliyun:aasa:check no longer reports apple_team_id_missing
-- writeTargets: APPLE_TEAM_ID -> 阿里云 SAE plain env
-- variableNames: APPLE_TEAM_ID
-- verifyCommands: corepack pnpm aliyun:aasa:check; corepack pnpm aliyun:app-native:check
-
-### P03_ACR_PURCHASE 确认 ACR 企业版付费购买
-
-- actionId: U03_ACR_PURCHASE_CONFIRMATION
-- status: blocked
-- owner: 用户/阿里云 ACR 操作员
-- sequenceGroup: cloud_foundation
-- dependsOn: none
-- blockingDependencies: none
-- canStartNow: true
-- requiresActionTimeConfirmation: true
-- minimumUserPhrase: 授权购买 ACR Enterprise Economic，cn-hangzhou，1 个月，当前报价 CNY 117.00。
-- allowedActions: 在阿里云 ACR 企业版购买页确认规格、地域、时长和金额。; 完成购买后创建或确认实例、namespace 和 repository。; 只记录 registry host、namespace、repository 和非密钥购买证据。
-- explicitlyExcluded: 未明确确认金额前不点击付款。; 不执行 docker login/push。; 不记录 registry password、RAM Secret 或 token。
-- completionEvidence: acr.purchaseCandidate.confirmed=true; acr.registryHost actual aliyuncs.com host; acr.namespace created; repository=meiye-huajing-app-api
-- writeTargets: deploy/aliyun-production-cn.image-publish.local.json -> acr.purchaseCandidate / acr confirmed evidence
-- variableNames: none
-- verifyCommands: corepack pnpm aliyun:image:plan
-
-### P04_ACR_IMAGE_AND_PULL 配置 ACR 镜像推送和 SAE 镜像拉取权限
-
-- actionId: U04_ACR_RUNTIME_AUTH
-- status: blocked
-- owner: 阿里云 ACR/SAE 操作员
-- sequenceGroup: image_runtime
-- dependsOn: P03_ACR_PURCHASE
-- blockingDependencies: P03_ACR_PURCHASE
-- canStartNow: false
-- requiresActionTimeConfirmation: true
-- minimumUserPhrase: 授权把后端镜像推送到已创建的 ACR，并配置 SAE 拉取该镜像；不输出 registry 密码。
-- allowedActions: 构建并 smoke 本地 Docker 镜像。; 通过受控 docker credential helper、RAM 或阿里云运行时配置完成镜像推送/拉取。; 在 image-publish.local.json 记录 remote image、sha256 digest 和布尔证据。
-- explicitlyExcluded: 不购买 ACR。; 不把 registry username/password、RAM Secret 或 token 写入文件、镜像或 git。; 不部署 production-cn，除非 U09 单独授权。
-- completionEvidence: acr.imagePushed=true; acr.digestVerified=true; runtime.remoteImageConfigured=true; runtime.imagePullConfigured=true; remoteDigest sha256 verified
-- writeTargets: deploy/aliyun-production-cn.image-publish.local.json -> acr + runtime
-- variableNames: none
-- verifyCommands: corepack pnpm aliyun:image:plan:strict; corepack pnpm aliyun:container:smoke
-
-### P05_OSS_RAM_STS 绑定 OSS RAM 最小权限或 STS/运行时角色方案
-
-- actionId: U05_OSS_RAM_OR_STS
-- status: blocked
-- owner: 阿里云 OSS/RAM 操作员
-- sequenceGroup: cloud_foundation
-- dependsOn: none
-- blockingDependencies: none
-- canStartNow: true
-- requiresActionTimeConfirmation: true
-- minimumUserPhrase: 授权为服务记录音频 OSS 配置最小权限 RAM/STS 或运行时角色，并只通过密钥环境注入。
-- allowedActions: 确认 bucket、region、CORS 和 service-records/production-cn 前缀。; 绑定最小权限 RAM 策略或配置 STS/运行时角色。; 只把 AccessKeySecret 或 STS token 导入 KMS/Secrets Manager/SAE secret env。
-- explicitlyExcluded: 不创建可提交的长期明文 Secret。; 不下载 OSS 对象内容。; 不把 AccessKeySecret 或 STS token 写入 JSON、Markdown、镜像或 git。
-- completionEvidence: oss.confirmed=true; oss.ramLeastPrivilege=true; serviceRecordPrefix=service-records/production-cn; secret imported through Aliyun controlled secret env only
-- writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss; ALIYUN_OSS_ACCESS_KEY_ID / ALIYUN_OSS_ACCESS_KEY_SECRET / ALIYUN_OSS_SECURITY_TOKEN -> KMS/Secrets Manager/SAE secret env
-- variableNames: ALIYUN_OSS_ACCESS_KEY_ID, ALIYUN_OSS_ACCESS_KEY_SECRET, ALIYUN_OSS_SECURITY_TOKEN
-- verifyCommands: corepack pnpm aliyun:cloud:confirmations; corepack pnpm aliyun:health:smoke
-
-### P11_ALIYUN_RDS_DATA_MIGRATION 创建阿里云 RDS PostgreSQL 并完成正式数据层迁移
-
-- actionId: U11_ALIYUN_RDS_DATA_MIGRATION
-- status: blocked
-- owner: 阿里云 RDS/后端数据迁移操作员
-- sequenceGroup: cloud_foundation
-- dependsOn: none
-- blockingDependencies: none
-- canStartNow: true
-- requiresActionTimeConfirmation: true
-- minimumUserPhrase: 授权创建/确认阿里云 RDS PostgreSQL production-cn 数据库并完成数据迁移；DATABASE_URL_CN 只能进入阿里云 secret env。
-- allowedActions: 创建或确认 cn-hangzhou RDS PostgreSQL 实例、数据库、账号和网络白名单/内网访问策略。; 执行 Supabase 到 RDS/PostgreSQL 的 schema/data 迁移与回滚验收。; 只把 DATABASE_URL_CN 导入 KMS/Secrets Manager/SAE secret env，并记录非密钥迁移证据。
-- explicitlyExcluded: 不把数据库密码、连接串 value 或 Supabase service role key 写入 JSON、Markdown、Docker 镜像或 git。; 不把 Supabase 当作正式 production-cn 数据库目标。; 不执行破坏性数据迁移，除非迁移计划和回滚验收已单独确认。
-- completionEvidence: Aliyun RDS PostgreSQL instance exists in cn-hangzhou; DATABASE_URL_CN imported through secret env only; backend production-cn data access no longer depends on Supabase as formal database target; migration and rollback validation pass
-- writeTargets: DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env; RDS PostgreSQL 实例、schema/data migration、rollback validation -> 非密钥证据报告
-- variableNames: DATABASE_URL_CN
-- verifyCommands: corepack pnpm aliyun:readiness; corepack pnpm aliyun:completion:audit; corepack pnpm aliyun:predeploy
-
-### P06_ENV_IMPORT 把 ready 环境变量导入 SAE/KMS/Secrets Manager
-
-- actionId: U06_ENV_IMPORT
-- status: blocked
-- owner: 阿里云运行环境/密钥操作员
-- sequenceGroup: runtime_config
-- dependsOn: P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
-- blockingDependencies: P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
-- canStartNow: false
-- requiresActionTimeConfirmation: true
-- minimumUserPhrase: 授权把已准备好的 production-cn 环境变量导入 SAE/KMS/Secrets Manager；不在报告中显示任何 value。
-- allowedActions: 按 env handoff 清单导入 plain env 和 secret env。; plain env 只放非密钥标识符和公开配置。; secret env 通过 KMS/Secrets Manager/SAE secret env 导入。; 完成后只记录 importedAt、target 和 secretNotInImage=true。
-- explicitlyExcluded: 不把任何 value 粘贴到 Markdown、JSON、Dockerfile、镜像或 git。; 不导入 WECHAT_OPEN_APP_ID/SECRET，除非移动应用审核已通过并单独授权。; 不部署 production-cn。
-- completionEvidence: envImport.confirmed=true; envImport.secretNotInImage=true; importedAt actual timestamp; corepack pnpm aliyun:readiness:cloud-ready no longer reports envImport blockers
-- writeTargets: 阿里云 SAE 环境变量 / KMS / Secrets Manager; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport
-- variableNames: NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, WECHAT_LOGIN_SECRET, ALIYUN_OSS_ACCESS_KEY_ID, ALIYUN_OSS_ACCESS_KEY_SECRET, DASHSCOPE_API_KEY, DEEPSEEK_API_KEY, SERVICE_RECORD_DEEPSEEK_API_KEY, VOLC_SPEECH_ACCESS_TOKEN, VOLC_SPEECH_APP_ID, VOLC_SPEECH_SECRET_KEY, ADMIN_USER_IDS, CREDITS_IP_SALT, APIMART_API_KEY, WECHAT_MINI_APPID, WECHAT_MINI_SECRET
-- verifyCommands: corepack pnpm aliyun:env:checklist; corepack pnpm aliyun:readiness:cloud-ready
-
-### P07_DOMAIN_DNS_HTTPS 配置 api-cn/assets-cn DNS、HTTPS 和 ICP 证据
-
-- actionId: U07_DOMAIN_DNS_HTTPS_ICP
-- status: blocked
-- owner: 阿里云域名/证书操作员
-- sequenceGroup: public_entry
-- dependsOn: P08_SAE_RUNTIME_SLS
-- blockingDependencies: P08_SAE_RUNTIME_SLS
-- canStartNow: false
-- requiresActionTimeConfirmation: true
-- minimumUserPhrase: 授权配置 api-cn/assets-cn 的 DNS、HTTPS 和 ICP 证据，目标必须是阿里云公网入口。
-- allowedActions: 把 api-cn.ipgongchang.xin 指向 SAE/SLB/API 公网入口。; 把 assets-cn.ipgongchang.xin 指向 OSS/CDN 静态资源入口。; 绑定 HTTPS 证书并记录 ICP ready 证据。
-- explicitlyExcluded: 不指向 Vercel、localhost、example 或 198.18.0.x 特殊用途地址。; 不下载证书私钥。; 不部署 production-cn。
-- completionEvidence: apiDomainHttps.dnsResolvedToAliyun=true; apiDomainHttps.httpsEnabled=true; apiDomainHttps.icpReady=true; assetDomainHttps.dnsResolvedToAliyun=true; assetDomainHttps.httpsEnabled=true; assetDomainHttps.icpReady=true
-- writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps
-- variableNames: none
-- verifyCommands: corepack pnpm aliyun:domain:strict; corepack pnpm aliyun:remote:smoke -- --base-url https://api-cn.ipgongchang.xin
-
-### P08_SAE_RUNTIME_SLS 确认 SAE runtime 和 SLS health/5xx 告警
-
-- actionId: U08_SAE_RUNTIME_AND_SLS
-- status: pending_cloud
-- owner: 阿里云操作员/运维操作员
-- sequenceGroup: runtime_observability
-- dependsOn: P03_ACR_PURCHASE, P04_ACR_IMAGE_AND_PULL, P05_OSS_RAM_STS, P06_ENV_IMPORT
-- blockingDependencies: P03_ACR_PURCHASE, P04_ACR_IMAGE_AND_PULL, P05_OSS_RAM_STS, P06_ENV_IMPORT
-- canStartNow: false
-- requiresActionTimeConfirmation: true
-- minimumUserPhrase: 授权创建/确认 SAE production-cn 应用和 SLS health/5xx 告警；不导入密钥、不部署镜像。
-- allowedActions: 创建或确认 cn-hangzhou SAE 自定义容器应用，端口 3000，健康检查 /api/healthz。; 绑定 SLS 日志采集。; 配置 /api/healthz 健康失败告警和 5xx 告警。; 只记录资源名、布尔状态和非密钥证据。
-- explicitlyExcluded: 不购买 ACR。; 不导入环境变量 value。; 不推送镜像、不执行生产部署。
-- completionEvidence: runtime.confirmed=true; runtime.containerPort=3000; runtime.healthPath=/api/healthz; slsAlerts.healthAlertConfigured=true; slsAlerts.serverErrorAlertConfigured=true
-- writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.runtime; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.slsAlerts
-- variableNames: none
-- verifyCommands: corepack pnpm aliyun:runtime:plan; corepack pnpm aliyun:cloud:confirmations:strict
-
-### P09_PRODUCTION_DEPLOY 生产部署、镜像推送、DNS 变更、git push 的动作时授权
-
-- actionId: U09_DEPLOY_AUTHORIZATION
-- status: blocked
-- owner: 用户/发布负责人
-- sequenceGroup: production_release
-- dependsOn: P03_ACR_PURCHASE, P04_ACR_IMAGE_AND_PULL, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION, P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS
-- blockingDependencies: P03_ACR_PURCHASE, P04_ACR_IMAGE_AND_PULL, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION, P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS
-- canStartNow: false
-- requiresActionTimeConfirmation: true
-- minimumUserPhrase: 授权在所有 strict 门禁通过后执行 production-cn 部署；不包含 git push 或小程序上传。
-- allowedActions: 确认 cloud confirmations、image plan、domain、readiness 和 predeploy strict 全部通过。; 执行 production-cn 后端部署。; 运行 postdeploy smoke 并记录部署证据。
-- explicitlyExcluded: 不 git push，除非单独授权。; 不上传微信小程序或 APP 商店包。; 不修改 Supabase production schema/data。
-- completionEvidence: corepack pnpm aliyun:cloud:confirmations:strict pass; corepack pnpm aliyun:image:plan:strict pass; corepack pnpm aliyun:domain:strict pass; corepack pnpm aliyun:readiness:cloud-ready pass; corepack pnpm aliyun:postdeploy:smoke pass
-- writeTargets: release manifest / deployment log
-- variableNames: none
-- verifyCommands: corepack pnpm aliyun:predeploy; corepack pnpm aliyun:cloud:confirmations:strict
-
-## 下一组验证命令
-
-- `corepack pnpm aliyun:action:authorization`
-- `corepack pnpm aliyun:user:actions`
-- `corepack pnpm aliyun:console:runbook`
-- `corepack pnpm aliyun:cloud:confirmations:strict`
-- `corepack pnpm aliyun:image:plan:strict`
-- `corepack pnpm aliyun:domain:strict`
-- `corepack pnpm aliyun:readiness:cloud-ready`
+- 本命令不创建阿里云资源、不付款、不修改 DNS、不导入环境变量、不推送镜像、不部署、不 git push。
+- 本命令不读取或输出 secret value；只输出变量名、资源名、控制台路径、写入目标和解除条件。
+- AppSecret、AccessKeySecret、registry password、RAM Secret、STS token、cookie 和 Supabase service role key 不能写入文档、镜像或 git。
