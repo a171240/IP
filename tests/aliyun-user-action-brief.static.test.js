@@ -19,6 +19,10 @@ test("Aliyun user action brief command is wired into scripts and local predeploy
   assert.match(predeploy, /aliyun:user:actions/)
   assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:user:actions:test"))
   assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:user:actions"))
+  const releaseArtifacts = read("scripts", "prepare-aliyun-release-artifacts.mjs")
+  assert.match(releaseArtifacts, /credentialAcquisitionSummary/)
+  assert.match(releaseArtifacts, /blockedCredentialNames/)
+  assert.match(releaseArtifacts, /readySecretEnvVariableNames/)
 })
 
 test("Aliyun user action brief is value-free and includes the expected blockers", () => {
@@ -41,6 +45,30 @@ test("Aliyun user action brief is value-free and includes the expected blockers"
   assert.equal(report.mutationPerformed, false)
   assert.equal(report.canDeployNow, false)
   assert.equal(report.secretLeakCheck.ok, true)
+  assert.equal(report.summary.blockedCredentialCount, 8)
+  assert.equal(report.summary.readySecretEnvVariableCount, 17)
+  assert.ok(report.summary.blockedCredentialNames.includes("WECHAT_OPEN_APP_SECRET"))
+  assert.ok(report.summary.blockedCredentialNames.includes("MEIYE_RELEASE_KEY_PASSWORD"))
+  assert.ok(report.summary.readySecretEnvVariableNames.includes("SUPABASE_SERVICE_ROLE_KEY"))
+  assert.equal(report.credentialAcquisitionSummary.blockedCredentialCount, 8)
+  assert.equal(report.credentialAcquisitionSummary.readySecretEnvVariableCount, 17)
+  assert.ok(report.credentialAcquisitionSummary.blockedCredentialNames.includes("WECHAT_OPEN_APP_ID"))
+  assert.ok(report.credentialAcquisitionSummary.blockedCredentialNames.includes("APPLE_TEAM_ID"))
+  assert.ok(report.credentialAcquisitionSummary.readySecretEnvVariableNames.includes("DASHSCOPE_API_KEY"))
+  assert.ok(report.credentialAcquisitionSummary.forbiddenStorage.includes("Docker image"))
+  assert.ok(report.credentialAcquisitionSummary.valueHandlingRules.some((item) => item.includes("不能写入 JSON")))
+  assert.ok(report.credentialAcquisitionSummary.readySecretEnvVariableGroups.some((group) =>
+    group.category === "bridge_database" &&
+    group.variableNames.includes("SUPABASE_SERVICE_ROLE_KEY")
+  ))
+  const credentialGroupsByCategory = new Map(report.credentialAcquisitionSummary.groups.map((group) => [group.category, group]))
+  assert.match(credentialGroupsByCategory.get("wechat_open_mobile_app").obtainFrom, /微信开放平台/)
+  assert.ok(credentialGroupsByCategory.get("wechat_open_mobile_app").blockedCredentialNames.includes("WECHAT_OPEN_APP_SECRET"))
+  assert.ok(credentialGroupsByCategory.get("wechat_open_mobile_app").writeTargets.some((item) => item.includes("WECHAT_OPEN_APP_SECRET")))
+  assert.ok(credentialGroupsByCategory.get("android_release_signing").blockedCredentialNames.includes("MEIYE_RELEASE_STORE_PASSWORD"))
+  assert.match(credentialGroupsByCategory.get("android_release_signing").obtainFrom, /Android release keystore/)
+  assert.ok(credentialGroupsByCategory.get("ready_secret_env_import").readySecretEnvVariableNames.includes("SUPABASE_SERVICE_ROLE_KEY"))
+  assert.ok(credentialGroupsByCategory.get("ready_secret_env_import").variableNames.includes("WECHAT_MINI_SECRET"))
   assert.ok(ids.includes("U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE"))
   assert.ok(ids.includes("U10_ANDROID_RELEASE_SIGNING"))
   assert.ok(ids.includes("U03_ACR_PURCHASE_CONFIRMATION"))
@@ -124,4 +152,25 @@ test("Aliyun user action brief is value-free and includes the expected blockers"
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
+
+  const tmpMarkdown = path.join(fs.mkdtempSync(path.join(require("node:os").tmpdir(), "aliyun-user-actions-")), "brief.md")
+  execFileSync(process.execPath, [
+    "scripts/summarize-aliyun-user-action-brief.mjs",
+    "--markdown",
+    tmpMarkdown,
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 30,
+  })
+  const markdown = fs.readFileSync(tmpMarkdown, "utf8")
+  assert.match(markdown, /密钥\/密码\/受控变量获取摘要/)
+  assert.match(markdown, /blockedCredentialCount: 8/)
+  assert.match(markdown, /readySecretEnvVariableCount: 17/)
+  assert.match(markdown, /WECHAT_OPEN_APP_ID/)
+  assert.match(markdown, /MEIYE_RELEASE_KEY_PASSWORD/)
+  assert.match(markdown, /SUPABASE_SERVICE_ROLE_KEY/)
+  assert.match(markdown, /不能写入 JSON/)
+  assert.doesNotMatch(markdown, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(markdown, /LTAI[A-Za-z0-9]{12,}/)
 })

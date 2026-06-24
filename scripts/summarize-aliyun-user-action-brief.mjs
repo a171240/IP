@@ -234,6 +234,7 @@ function buildReport(args) {
     cloudItems: cloudConfirmations?.items || {},
   })
   const nextActionTimeConfirmations = buildNextActionTimeConfirmations(actions)
+  const credentialAcquisitionSummary = buildCredentialAcquisitionSummary(sensitive)
   const blocked = actions.filter((item) => item.status !== "ready")
   const report = {
     ok: true,
@@ -266,9 +267,14 @@ function buildReport(args) {
         .filter((item) => item.nonSecretEvidenceOnly)
         .map((item) => item.id),
       sensitiveBlockers: sensitive.summary?.blocked || 0,
+      blockedCredentialCount: credentialAcquisitionSummary.blockedCredentialCount,
+      blockedCredentialNames: credentialAcquisitionSummary.blockedCredentialNames,
+      readySecretEnvVariableCount: credentialAcquisitionSummary.readySecretEnvVariableCount,
+      readySecretEnvVariableNames: credentialAcquisitionSummary.readySecretEnvVariableNames,
       aliyunResourcesReady: resources.summary ? `${resources.summary.ready}/${resources.summary.total}` : "unknown",
     },
     currentAnswer: "现在不能部署；本简报只列用户/操作员还要做什么、从哪里取得、写到哪里，不输出任何密钥值。",
+    credentialAcquisitionSummary,
     actions,
     nextActionTimeConfirmations,
     nextSafeLocalCommands: [
@@ -649,6 +655,65 @@ function buildNextActionTimeConfirmations(actions) {
     .filter(Boolean)
 }
 
+function buildCredentialAcquisitionSummary(sensitive) {
+  const brief = sensitive.credentialInterventionBrief
+    || sensitive.summary?.credentialInterventionBrief
+    || sensitive.summary?.userIntervention
+    || {}
+  return {
+    canCodexProceedWithoutUser: brief.canCodexProceedWithoutUser === true,
+    blockedCredentialCount: brief.blockedCredentialCount || 0,
+    blockedCredentialNames: brief.blockedCredentialNames || [],
+    readySecretEnvVariableCount: brief.readySecretEnvVariableCount || 0,
+    readySecretEnvVariableNames: brief.readySecretEnvVariableNames || [],
+    actionTimeConfirmationRequiredIds: brief.actionTimeConfirmationRequiredIds
+      || brief.actionTimeConfirmationRequired
+      || [],
+    forbiddenStorage: brief.forbiddenStorage || [
+      "git",
+      "JSON/Markdown 报告",
+      "Docker image",
+      "App bundle",
+      "小程序或 App 前端包",
+    ],
+    valueHandlingRules: brief.valueHandlingRules || [
+      "blockedCredentialNames 只说明还缺哪些变量名，不包含 value。",
+      "readySecretEnvVariableNames 表示本机已有 ready 状态但仍只能通过 KMS/Secrets Manager/SAE secret env 导入。",
+      "AppSecret、AccessKeySecret、registry password、RAM Secret、STS token、keystore password 和 Supabase service role key 不能写入 JSON、Markdown、Docker 镜像或 git。",
+    ],
+    groups: (brief.groups || []).map((group) => ({
+      category: group.category,
+      actionId: group.actionId,
+      userQuestion: group.userQuestion || "",
+      status: group.status,
+      owner: group.owner || "",
+      type: group.type || "",
+      blockedCredentialNames: group.blockedCredentialNames || [],
+      readySecretEnvVariableNames: group.readySecretEnvVariableNames || [],
+      variableNames: group.variableNames || [],
+      obtainFrom: group.obtainFrom || "",
+      importTargets: group.importTargets || [],
+      writeTargets: group.writeTargets || [],
+      requiresActionTimeConfirmation: group.requiresActionTimeConfirmation === true,
+      valueHandling: group.valueHandling || "",
+      forbiddenStorage: group.forbiddenStorage || [],
+      verifyCommands: group.verifyCommands || [],
+      unblockCondition: group.unblockCondition || "",
+    })),
+    readySecretEnvVariableGroups: (
+      sensitive.readySensitiveEnvVariableGroups
+      || sensitive.summary?.readySensitiveEnvVariableGroups
+      || []
+    ).map((group) => ({
+      category: group.category,
+      owner: group.owner,
+      importTarget: group.importTarget,
+      count: group.count,
+      variableNames: group.variableNames || [],
+    })),
+  }
+}
+
 function addAction(actionMap, action) {
   actionMap.set(action.id, {
     id: action.id,
@@ -775,10 +840,15 @@ function renderMarkdown(report) {
     `- ready: ${report.summary.ready} / ${report.summary.total}`,
     `- blocked: ${report.summary.blocked}`,
     `- nextActionTimeConfirmations: ${report.summary.nextActionTimeConfirmations.join(", ") || "none"}`,
+    `- blockedCredentialCount: ${report.summary.blockedCredentialCount}`,
+    `- readySecretEnvVariableCount: ${report.summary.readySecretEnvVariableCount}`,
     `- containsValues: ${report.containsValues}`,
     `- secretLeakCheck: ${report.secretLeakCheck.ok}`,
     `- mutationPerformed: ${report.mutationPerformed}`,
     "",
+    "## 密钥/密码/受控变量获取摘要",
+    "",
+    ...renderCredentialAcquisitionSummary(report.credentialAcquisitionSummary),
     "## 当前可开始的动作时确认",
     "",
   ]
@@ -831,6 +901,63 @@ function renderMarkdown(report) {
     "",
   )
   return `${lines.join("\n")}\n`
+}
+
+function renderCredentialAcquisitionSummary(summary) {
+  if (!summary) return ["- none", ""]
+  return [
+    `- canCodexProceedWithoutUser: ${summary.canCodexProceedWithoutUser}`,
+    `- blockedCredentialCount: ${summary.blockedCredentialCount}`,
+    `- blockedCredentialNames: ${summary.blockedCredentialNames.join(", ") || "none"}`,
+    `- readySecretEnvVariableCount: ${summary.readySecretEnvVariableCount}`,
+    `- readySecretEnvVariableNames: ${summary.readySecretEnvVariableNames.join(", ") || "none"}`,
+    `- actionTimeConfirmationRequiredIds: ${summary.actionTimeConfirmationRequiredIds.join(", ") || "none"}`,
+    `- forbiddenStorage: ${summary.forbiddenStorage.join(", ") || "none"}`,
+    "",
+    "| 类别 | 动作 ID | 状态 | 缺失变量 | 已 ready 但需导入 secret env | 获取位置 | 导入/写入目标 |",
+    "| --- | --- | --- | --- | --- | --- | --- |",
+    ...summary.groups.map((group) => [
+      codeCell(group.category),
+      codeCell(group.actionId),
+      escapeTableCell(group.status),
+      escapeTableCell((group.blockedCredentialNames || []).join(", ") || "none"),
+      escapeTableCell((group.readySecretEnvVariableNames || []).join(", ") || "none"),
+      escapeTableCell(group.obtainFrom),
+      escapeTableCell((group.writeTargets || group.importTargets || []).join("; ") || "none"),
+    ].join(" | ").replace(/^/, "| ").replace(/$/, " |")),
+    "",
+    "### 已 ready 但仍需导入阿里云 secret env 的变量组",
+    "",
+    ...(summary.readySecretEnvVariableGroups.length
+      ? [
+        "| 类别 | owner | 导入目标 | 变量名 |",
+        "| --- | --- | --- | --- |",
+        ...summary.readySecretEnvVariableGroups.map((group) => [
+          codeCell(group.category),
+          escapeTableCell(group.owner),
+          escapeTableCell(group.importTarget),
+          escapeTableCell((group.variableNames || []).join(", ") || "none"),
+        ].join(" | ").replace(/^/, "| ").replace(/$/, " |")),
+        "",
+      ]
+      : ["- none", ""]),
+    "### 处理规则",
+    "",
+    ...(summary.valueHandlingRules.length
+      ? summary.valueHandlingRules.map((item) => `- ${item}`)
+      : ["- none"]),
+    "",
+  ]
+}
+
+function codeCell(value) {
+  return `\`${escapeTableCell(value)}\``
+}
+
+function escapeTableCell(value) {
+  return String(value || "")
+    .replace(/\|/g, "\\|")
+    .replace(/\r?\n/g, " ")
 }
 
 function writeOutput(filePath, content) {

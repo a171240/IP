@@ -554,6 +554,10 @@ function renderMarkdown(audit) {
     `- ready: ${userActionBrief.summary.ready} / ${userActionBrief.summary.total}`,
     `- blocked: ${userActionBrief.summary.blocked}`,
     `- nextActionTimeConfirmations: ${(userActionBrief.summary.nextActionTimeConfirmations || []).join(", ") || "none"}`,
+    `- blockedCredentialCount: ${userActionBrief.summary.blockedCredentialCount || 0}`,
+    `- readySecretEnvVariableCount: ${userActionBrief.summary.readySecretEnvVariableCount || 0}`,
+    `- blockedCredentialNames: ${userActionBrief.summary.blockedCredentialNames?.length ? userActionBrief.summary.blockedCredentialNames.join(", ") : "none"}`,
+    `- readySecretEnvVariableNames: ${userActionBrief.summary.readySecretEnvVariableNames?.length ? userActionBrief.summary.readySecretEnvVariableNames.join(", ") : "none"}`,
     ...(userActionBrief.nextActionTimeConfirmations?.length
       ? userActionBrief.nextActionTimeConfirmations.map((item) => `- ${item.packetId}: ${item.minimumUserPhrase}`)
       : ["- nextActionTimeConfirmations: none"]),
@@ -1861,6 +1865,11 @@ function main() {
       blockedIds: userActionBrief.summary.blockedIds,
       userMustAct: userActionBrief.summary.userMustAct,
       actionTimeConfirmationRequired: userActionBrief.summary.actionTimeConfirmationRequired,
+      credentialAcquisitionSummary: userActionBrief.credentialAcquisitionSummary || null,
+      blockedCredentialCount: userActionBrief.summary.blockedCredentialCount || 0,
+      blockedCredentialNames: userActionBrief.summary.blockedCredentialNames || [],
+      readySecretEnvVariableCount: userActionBrief.summary.readySecretEnvVariableCount || 0,
+      readySecretEnvVariableNames: userActionBrief.summary.readySecretEnvVariableNames || [],
       nextActionTimeConfirmations: userActionBrief.nextActionTimeConfirmations || [],
     },
     consoleRunbook: {
