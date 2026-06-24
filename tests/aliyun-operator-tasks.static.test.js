@@ -91,6 +91,8 @@ test("Aliyun operator tasks backend-only mode excludes deferred app launch work"
   assert.deepEqual(t08.blockerCodes, ["requires_runtime_domain_env_cloud_confirmations"])
   assert.equal(report.nextCommandOrder[0], "corepack pnpm aliyun:operator:tasks:backend")
   assert.ok(report.nextCommandOrder.includes("corepack pnpm aliyun:env:handoff:backend"))
+  assert.ok(report.nextCommandOrder.includes("corepack pnpm aliyun:user:actions:backend"))
+  assert.ok(report.nextCommandOrder.includes("corepack pnpm aliyun:action:authorization:backend"))
   assert.ok(report.nextCommandOrder.includes("corepack pnpm aliyun:backend-cn:status"))
   assert.ok(report.nextCommandOrder.includes("corepack pnpm aliyun:cloud:confirmations:backend:strict"))
   assert.doesNotMatch(output, secretLike)

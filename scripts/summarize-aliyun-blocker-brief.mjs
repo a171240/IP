@@ -63,10 +63,15 @@ function parseArgs(argv) {
     skipVercelEnvCoverage: false,
     vercelEnvCoverageInput: "",
     vercelEnvCoverageReport: "",
+    backendOnly: false,
   }
   for (let index = 2; index < argv.length; index += 1) {
     const arg = argv[index]
     if (arg === "--") continue
+    if (arg === "--backend-only") {
+      args.backendOnly = true
+      continue
+    }
     if (arg === "--env-file") {
       args.envFile = resolveValue(argv[++index], "--env-file")
       continue
@@ -194,6 +199,7 @@ function buildReport(args) {
   ])
   const actionAuthorization = runJson("action_authorization", [
     "scripts/summarize-aliyun-action-authorization.mjs",
+    "--backend-only",
     ...envArgs(args),
   ])
   const resourcesMatrix = runJson("resources_matrix", [

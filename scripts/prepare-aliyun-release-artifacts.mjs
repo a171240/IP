@@ -1444,6 +1444,7 @@ function main() {
   ])
   const envHandoff = runJson("env_handoff", [
     "scripts/summarize-aliyun-env-handoff.mjs",
+    ...backendOnlyArg,
     "--env-file",
     args.envFile,
     "--out",
@@ -1474,6 +1475,7 @@ function main() {
   ])
   const userActionBrief = runJson("user_action_brief", [
     "scripts/summarize-aliyun-user-action-brief.mjs",
+    ...backendOnlyArg,
     "--env-file",
     args.envFile,
     ...(args.cloudConfirmationsFile ? ["--cloud-confirmations", args.cloudConfirmationsFile] : []),
@@ -1514,6 +1516,7 @@ function main() {
   ])
   const actionAuthorization = runJson("action_authorization", [
     "scripts/summarize-aliyun-action-authorization.mjs",
+    ...backendOnlyArg,
     "--env-file",
     args.envFile,
     ...(args.cloudConfirmationsFile ? ["--cloud-confirmations", args.cloudConfirmationsFile] : []),
@@ -1578,6 +1581,7 @@ function main() {
   const vercelEnvCoverage = runVercelEnvCoverage(args, vercelEnvCoveragePath)
   const blockerBrief = runJson("blocker_brief", [
     "scripts/summarize-aliyun-blocker-brief.mjs",
+    ...backendOnlyArg,
     "--env-file",
     args.envFile,
     ...(args.cloudConfirmationsFile ? ["--cloud-confirmations", args.cloudConfirmationsFile] : []),

@@ -174,6 +174,8 @@ function buildReport(args) {
     verificationOrder: [
       "corepack pnpm aliyun:backend-cn:status",
       "corepack pnpm aliyun:env:handoff:backend",
+      "corepack pnpm aliyun:user:actions:backend",
+      "corepack pnpm aliyun:action:authorization:backend",
       "corepack pnpm aliyun:cloudshell:handoff",
       "corepack pnpm aliyun:cloud:inventory-results:strict",
       "corepack pnpm aliyun:rds:migration:evidence",

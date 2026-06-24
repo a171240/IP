@@ -182,6 +182,8 @@ function applyBackendOnlyScope(report) {
     nextCommandOrder: [
       "corepack pnpm aliyun:operator:tasks:backend",
       "corepack pnpm aliyun:env:handoff:backend",
+      "corepack pnpm aliyun:user:actions:backend",
+      "corepack pnpm aliyun:action:authorization:backend",
       "corepack pnpm aliyun:backend-cn:status",
       "corepack pnpm aliyun:backend-cn:apply-package",
       "corepack pnpm aliyun:cloudshell:handoff",

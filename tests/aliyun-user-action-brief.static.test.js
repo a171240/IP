@@ -14,12 +14,17 @@ test("Aliyun user action brief command is wired into scripts and local predeploy
   const deploySpec = readJson("deploy", "aliyun-production-cn.example.json")
 
   assert.equal(pkg.scripts["aliyun:user:actions"], "node ./scripts/summarize-aliyun-user-action-brief.mjs")
+  assert.equal(pkg.scripts["aliyun:user:actions:backend"], "node ./scripts/summarize-aliyun-user-action-brief.mjs --backend-only")
   assert.equal(pkg.scripts["aliyun:user:actions:test"], "node --test tests/aliyun-user-action-brief.static.test.js")
   assert.match(predeploy, /aliyun:user:actions:test/)
   assert.match(predeploy, /aliyun:user:actions/)
+  assert.match(predeploy, /aliyun:user:actions:backend/)
   assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:user:actions:test"))
   assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:user:actions"))
+  assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:user:actions:backend"))
+  assert.ok(deploySpec.predeployChecks.includes("corepack pnpm aliyun:user:actions:backend"))
   const releaseArtifacts = read("scripts", "prepare-aliyun-release-artifacts.mjs")
+  assert.match(releaseArtifacts, /scripts\/summarize-aliyun-user-action-brief\.mjs"[\s\S]*\.\.\.backendOnlyArg/)
   assert.match(releaseArtifacts, /credentialAcquisitionSummary/)
   assert.match(releaseArtifacts, /blockedCredentialNames/)
   assert.match(releaseArtifacts, /readySecretEnvVariableNames/)
@@ -238,4 +243,45 @@ test("Aliyun user action brief is value-free and includes the expected blockers"
   assert.match(markdown, /不能写入 JSON/)
   assert.doesNotMatch(markdown, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(markdown, /LTAI[A-Za-z0-9]{12,}/)
+})
+
+test("Aliyun user action brief backend-only mode excludes deferred APP launch blockers", () => {
+  const markdownPath = "/tmp/meiye-aliyun-user-actions-backend-test.md"
+  const output = execFileSync(process.execPath, [
+    "scripts/summarize-aliyun-user-action-brief.mjs",
+    "--backend-only",
+    "--markdown",
+    markdownPath,
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 40,
+  })
+  const report = JSON.parse(output)
+  const markdown = fs.readFileSync(markdownPath, "utf8")
+  const ids = report.actions.map((item) => item.id)
+  const deployAction = report.actions.find((item) => item.id === "U09_DEPLOY_AUTHORIZATION")
+  const envImportAction = report.actions.find((item) => item.id === "U06_ENV_IMPORT")
+
+  assert.equal(report.backendOnly, true)
+  assert.equal(report.summary.total, 8)
+  assert.equal(report.summary.blocked, 8)
+  assert.deepEqual(report.summary.blockedCredentialNames, ["ALIYUN_OSS_SECURITY_TOKEN"])
+  assert.equal(report.credentialAcquisitionSummary.blockedCredentialCount, 1)
+  assert.deepEqual(report.credentialAcquisitionSummary.blockedCredentialNames, ["ALIYUN_OSS_SECURITY_TOKEN"])
+  assert.deepEqual(report.summary.nextActionTimeConfirmations, [
+    "P03_ACR_PURCHASE",
+    "P05_OSS_RAM_STS",
+    "P11_ALIYUN_RDS_DATA_MIGRATION",
+  ])
+  assert.ok(!ids.includes("U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE"))
+  assert.ok(!ids.includes("U10_ANDROID_RELEASE_SIGNING"))
+  assert.ok(!ids.includes("U02_APPLE_TEAM_ID"))
+  assert.ok(envImportAction.currentBlockers.includes("requiredEnv:DATABASE_URL_CN"))
+  assert.ok(!envImportAction.currentBlockers.some((item) => /WECHAT_OPEN_APP_ID|WECHAT_OPEN_APP_SECRET/.test(item)))
+  assert.ok(deployAction.currentBlockers.includes("missing_required_env:DATABASE_URL_CN"))
+  assert.ok(!deployAction.currentBlockers.some((item) => /WECHAT_OPEN_APP_ID|WECHAT_OPEN_APP_SECRET|微信开放平台移动应用/.test(item)))
+  assert.match(markdown, /blockedCredentialNames: ALIYUN_OSS_SECURITY_TOKEN/)
+  assert.doesNotMatch(output + markdown, /WECHAT_OPEN_APP_ID|WECHAT_OPEN_APP_SECRET/)
+  assert.doesNotMatch(output + markdown, /MEIYE_RELEASE_STORE_PASSWORD|MEIYE_RELEASE_KEY_PASSWORD/)
 })

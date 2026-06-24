@@ -41,6 +41,17 @@ const APP_LAUNCH_REQUIRED_NAMES = new Set([
   "WECHAT_OPEN_APP_SECRET",
   "APPLE_TEAM_ID",
 ])
+const APP_LAUNCH_BLOCKER_PATTERNS = [
+  /WECHAT_OPEN_APP_ID/,
+  /WECHAT_OPEN_APP_SECRET/,
+  /APPLE_TEAM_ID/,
+  /MEIYE_RELEASE_/,
+  /wechat_open_platform/i,
+  /app_universal_link/i,
+  /微信开放平台移动应用/,
+  /Apple Developer Team ID/,
+  /Android release signing/i,
+]
 
 const POLICY_BY_ACTION_ID = Object.freeze({
   U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE: Object.freeze({
@@ -385,11 +396,16 @@ function parseArgs(argv) {
     cloudConfirmationsFile: DEFAULT_CLOUD_CONFIRMATIONS_FILE,
     outPath: "",
     markdownPath: "",
+    backendOnly: false,
   }
 
   for (let index = 2; index < argv.length; index += 1) {
     const arg = argv[index]
     if (arg === "--") continue
+    if (arg === "--backend-only") {
+      args.backendOnly = true
+      continue
+    }
     if (arg === "--env-file") {
       args.envFile = resolveValue(argv[++index], "--env-file")
       continue
@@ -448,8 +464,10 @@ function runJson(label, scriptArgs) {
 }
 
 function buildReport(args) {
+  const backendOnlyArg = args.backendOnly ? ["--backend-only"] : []
   const userActions = runJson("user_actions", [
     "scripts/summarize-aliyun-user-action-brief.mjs",
+    ...backendOnlyArg,
     ...envArgs(args),
   ])
   const consoleRunbook = runJson("console_runbook", [
@@ -463,8 +481,12 @@ function buildReport(args) {
 
   const actions = (userActions.actions || []).map((action) => classifyAction(action))
   const authorizationPackets = buildAuthorizationPackets(actions)
+    .map((packet) => args.backendOnly ? filterBackendOnlyPacket(packet) : packet)
   const backendAuthorizationPackets = authorizationPackets.filter((packet) => !APP_LAUNCH_PACKET_IDS.has(packet.packetId))
   const deferredAppLaunchPackets = authorizationPackets.filter((packet) => APP_LAUNCH_PACKET_IDS.has(packet.packetId))
+  const reportedDeferredAppLaunchPackets = args.backendOnly
+    ? (userActions.deferredAppLaunchConfirmations || []).map(compactDeferredPacket)
+    : deferredAppLaunchPackets
   const canStartNowPackets = backendAuthorizationPackets
     .filter((packet) => packet.canStartNow)
     .map((packet) => packet.packetId)
@@ -477,6 +499,9 @@ function buildReport(args) {
   const deferredAppLaunchConfirmations = deferredAppLaunchPackets
     .filter((packet) => packet.requiresActionTimeConfirmation)
     .map((packet) => compactActionTimeConfirmation(packet))
+  const reportedDeferredAppLaunchConfirmations = args.backendOnly
+    ? (userActions.deferredAppLaunchConfirmations || []).map(compactDeferredConfirmation)
+    : deferredAppLaunchConfirmations
   const actionTimeConfirmationRequired = actions
     .filter((action) => action.requiresActionTimeConfirmation)
     .map((action) => action.id)
@@ -490,9 +515,11 @@ function buildReport(args) {
     .map((action) => action.id)
   const authorizationClosureBrief = buildAuthorizationClosureBrief({
     consoleRunbook,
+    userActions,
     authorizationPackets,
     nextActionTimeConfirmations,
-    deferredAppLaunchConfirmations,
+    deferredAppLaunchConfirmations: reportedDeferredAppLaunchConfirmations,
+    backendOnly: args.backendOnly,
   })
   const requiredBlocking = status.summary?.requiredBlocking || []
   const backendRequiredBlocking = requiredBlocking.filter((name) => !APP_LAUNCH_REQUIRED_NAMES.has(name))
@@ -502,6 +529,7 @@ function buildReport(args) {
     generatedAt: new Date().toISOString(),
     currentScope: CURRENT_SCOPE,
     fullAppLaunchScope: FULL_APP_LAUNCH_SCOPE,
+    backendOnly: args.backendOnly,
     containsValues: false,
     readOnlyOnly: true,
     mutationPerformed: false,
@@ -511,7 +539,7 @@ function buildReport(args) {
       ? "阿里云后端门禁接近可部署，但生产动作仍需逐项授权。"
       : "现在不能部署；当前只推进阿里云后端，微信/Apple/Android 发布项已延期，后端仍缺 RDS、ACR、OSS、SAE、DNS、env、SLS 和 smoke 证据。",
     sourceCommands: [
-      "corepack pnpm aliyun:user:actions",
+      args.backendOnly ? "corepack pnpm aliyun:user:actions:backend" : "corepack pnpm aliyun:user:actions",
       "corepack pnpm aliyun:console:runbook",
       "corepack pnpm aliyun:status",
     ],
@@ -522,6 +550,7 @@ function buildReport(args) {
     summary: {
       currentScope: CURRENT_SCOPE,
       fullAppLaunchScope: FULL_APP_LAUNCH_SCOPE,
+      backendOnly: args.backendOnly,
       actions: actions.length,
       canCodexProceedWithoutUser: actions.filter((action) => action.canCodexProceedWithoutUser).map((action) => action.id),
       currentExternalBlockers,
@@ -532,15 +561,21 @@ function buildReport(args) {
       cloudResourceReady: consoleRunbook.summary?.resourceReady || "unknown",
       userActionReady: userActions.summary ? `${userActions.summary.ready}/${userActions.summary.total}` : "unknown",
       requiredBlocking: backendRequiredBlocking,
-      fullAppRequiredBlocking: requiredBlocking,
-      deferredAppLaunchBlocking,
-      sensitiveActionItems: status.summary?.sensitiveActionItems || {},
+      fullAppRequiredBlocking: args.backendOnly ? backendRequiredBlocking : requiredBlocking,
+      deferredAppLaunchBlocking: args.backendOnly ? [] : deferredAppLaunchBlocking,
+      deferredAppLaunchBlockingCount: deferredAppLaunchBlocking.length,
+      sensitiveActionItems: args.backendOnly
+        ? {
+          currentScope: CURRENT_SCOPE,
+          blocked: userActions.summary?.sensitiveBlockers || 0,
+        }
+        : status.summary?.sensitiveActionItems || {},
       authorizationPackets: authorizationPackets.length,
       canStartNowPackets,
       allCanStartNowPackets,
       nextActionTimeConfirmations: nextActionTimeConfirmations.map((item) => item.packetId),
-      deferredAppLaunchPackets: deferredAppLaunchPackets.map((item) => item.packetId),
-      deferredAppLaunchConfirmations: deferredAppLaunchConfirmations.map((item) => item.packetId),
+      deferredAppLaunchPackets: reportedDeferredAppLaunchPackets.map((item) => item.packetId),
+      deferredAppLaunchConfirmations: reportedDeferredAppLaunchConfirmations.map((item) => item.packetId),
       blockedCredentialCount: authorizationClosureBrief.blockedCredentialCount,
       readySecretEnvVariableCount: authorizationClosureBrief.readySecretEnvVariableCount,
       resourceEvidenceReady: authorizationClosureBrief.resourceEvidenceReady,
@@ -552,7 +587,7 @@ function buildReport(args) {
     },
     authorizationClosureBrief,
     nextActionTimeConfirmations,
-    deferredAppLaunchConfirmations,
+    deferredAppLaunchConfirmations: reportedDeferredAppLaunchConfirmations,
     safeLocalWorkStillAllowed: [
       "运行本地检查和 smoke。",
       "生成不含 value 的 env checklist、user action brief、console runbook、operator handoff 和 release artifacts。",
@@ -569,16 +604,25 @@ function buildReport(args) {
     actions,
     authorizationPackets,
     backendAuthorizationPackets,
-    deferredAppLaunchPackets,
-    nextVerifyCommands: [
-      "corepack pnpm aliyun:action:authorization",
-      "corepack pnpm aliyun:user:actions",
-      "corepack pnpm aliyun:console:runbook",
-      "corepack pnpm aliyun:cloud:confirmations:strict",
-      "corepack pnpm aliyun:image:plan:strict",
-      "corepack pnpm aliyun:domain:strict",
-      "corepack pnpm aliyun:readiness:cloud-ready",
-    ],
+    deferredAppLaunchPackets: reportedDeferredAppLaunchPackets,
+    nextVerifyCommands: args.backendOnly
+      ? [
+        "corepack pnpm aliyun:action:authorization:backend",
+        "corepack pnpm aliyun:user:actions:backend",
+        "corepack pnpm aliyun:sensitive:blockers:backend",
+        "corepack pnpm aliyun:env:handoff:backend",
+        "corepack pnpm aliyun:operator:tasks:backend",
+        "corepack pnpm aliyun:backend-cn:status",
+      ]
+      : [
+        "corepack pnpm aliyun:action:authorization",
+        "corepack pnpm aliyun:user:actions",
+        "corepack pnpm aliyun:console:runbook",
+        "corepack pnpm aliyun:cloud:confirmations:strict",
+        "corepack pnpm aliyun:image:plan:strict",
+        "corepack pnpm aliyun:domain:strict",
+        "corepack pnpm aliyun:readiness:cloud-ready",
+      ],
   }
 
   const secretLikePaths = findSecretLikeValues(report)
@@ -592,13 +636,21 @@ function buildReport(args) {
 
 function buildAuthorizationClosureBrief({
   consoleRunbook,
+  userActions,
   authorizationPackets,
   nextActionTimeConfirmations,
   deferredAppLaunchConfirmations,
+  backendOnly,
 }) {
   const runbookBrief = consoleRunbook.consoleClosureBrief || {}
-  const blockedCredentialNames = runbookBrief.blockedCredentialNames || []
-  const readySecretEnvVariableNames = runbookBrief.readySecretEnvVariableNames || []
+  const credentialSummary = userActions.credentialAcquisitionSummary || {}
+  const blockedCredentialNames = backendOnly
+    ? credentialSummary.blockedCredentialNames || []
+    : runbookBrief.blockedCredentialNames || []
+  const readySecretEnvVariableNames = backendOnly
+    ? credentialSummary.readySecretEnvVariableNames || []
+    : runbookBrief.readySecretEnvVariableNames || []
+  const blockedResourceEvidence = runbookBrief.blockedResourceEvidence || []
   const canStartNowPackets = nextActionTimeConfirmations.map((item) => item.packetId)
   const blockedByPacketDependencies = authorizationPackets
     .filter((packet) => packet.blockingDependencies.length > 0)
@@ -610,9 +662,13 @@ function buildAuthorizationClosureBrief({
     fullAppLaunchScope: FULL_APP_LAUNCH_SCOPE,
     canDeployNow: consoleRunbook.summary?.canDeployNow === true,
     canCodexProceedWithoutUser: false,
-    blockedCredentialCount: runbookBrief.blockedCredentialCount ?? blockedCredentialNames.length,
+    blockedCredentialCount: backendOnly
+      ? blockedCredentialNames.length
+      : runbookBrief.blockedCredentialCount ?? blockedCredentialNames.length,
     blockedCredentialNames,
-    readySecretEnvVariableCount: runbookBrief.readySecretEnvVariableCount ?? readySecretEnvVariableNames.length,
+    readySecretEnvVariableCount: backendOnly
+      ? readySecretEnvVariableNames.length
+      : runbookBrief.readySecretEnvVariableCount ?? readySecretEnvVariableNames.length,
     readySecretEnvVariableNames,
     resourceEvidenceReady: runbookBrief.resourceEvidenceReady || consoleRunbook.summary?.resourceEvidenceReady || "unknown",
     blockedResourceEvidenceIds: runbookBrief.blockedResourceEvidenceIds || consoleRunbook.summary?.blockedResourceEvidenceIds || [],
@@ -620,19 +676,74 @@ function buildAuthorizationClosureBrief({
       runbookBrief.partiallyObservedResourceEvidenceIds ||
       consoleRunbook.summary?.partiallyObservedResourceEvidenceIds ||
       [],
-    blockedResourceEvidence: runbookBrief.blockedResourceEvidence || [],
+    blockedResourceEvidence: backendOnly
+      ? blockedResourceEvidence.map((item) => filterBackendOnlyResourceEvidence(item))
+      : blockedResourceEvidence,
     canStartNowPackets,
     deferredAppLaunchPackets: deferredAppLaunchConfirmations.map((item) => item.packetId),
     canStartNowConsoleTasks: consoleRunbook.summary?.canStartNowConsoleTasks || [],
     blockedByPacketDependencies,
     blockedByTaskDependencies: consoleRunbook.summary?.blockedByTaskDependencies || [],
     actionTimeConfirmationRequired: unique([
-      ...(runbookBrief.actionTimeConfirmationRequiredIds || []),
+      ...(backendOnly ? [] : runbookBrief.actionTimeConfirmationRequiredIds || []),
       ...authorizationPackets
         .filter((packet) => packet.requiresActionTimeConfirmation && !APP_LAUNCH_PACKET_IDS.has(packet.packetId))
         .map((packet) => packet.packetId),
     ]),
   }
+}
+
+function compactDeferredPacket(item) {
+  return {
+    packetId: item.packetId,
+    actionId: item.actionId,
+    title: item.title,
+    owner: item.owner,
+    sequenceGroup: item.sequenceGroup,
+    deferredUntil: FULL_APP_LAUNCH_SCOPE,
+    deferReason: "不属于当前阿里云后端补齐目标。",
+  }
+}
+
+function compactDeferredConfirmation(item) {
+  return {
+    packetId: item.packetId,
+    actionId: item.actionId,
+    title: item.title,
+    owner: item.owner,
+    sequenceGroup: item.sequenceGroup,
+    deferredUntil: FULL_APP_LAUNCH_SCOPE,
+    deferReason: "微信开放平台移动应用、Android release signing 和 Apple Team ID 已延期到阿里云后端上线后处理。",
+  }
+}
+
+function filterBackendOnlyPacket(packet) {
+  return {
+    ...packet,
+    explicitlyExcluded: (packet.explicitlyExcluded || []).filter((item) => !isDeferredAppLaunchText(item)),
+    completionEvidence: (packet.completionEvidence || []).filter((item) => !isDeferredAppLaunchText(item)),
+    writeTargets: (packet.writeTargets || []).filter((item) => !isDeferredAppLaunchText(item)),
+    variableNames: (packet.variableNames || []).filter((item) => !isDeferredAppLaunchText(item)),
+    verifyCommands: (packet.verifyCommands || []).map((item) =>
+      item === "corepack pnpm aliyun:cloud:confirmations:strict"
+        ? "corepack pnpm aliyun:cloud:confirmations:backend:strict"
+        : item,
+    ),
+  }
+}
+
+function filterBackendOnlyResourceEvidence(item) {
+  return {
+    ...item,
+    currentEvidence: (item.currentEvidence || []).filter((value) => !isDeferredAppLaunchText(value)),
+    missingEvidence: (item.missingEvidence || []).filter((value) => !isDeferredAppLaunchText(value)),
+    writeTargets: (item.writeTargets || []).filter((value) => !isDeferredAppLaunchText(value)),
+  }
+}
+
+function isDeferredAppLaunchText(value) {
+  const text = String(value || "")
+  return APP_LAUNCH_BLOCKER_PATTERNS.some((pattern) => pattern.test(text))
 }
 
 function compactActionTimeConfirmation(packet) {
@@ -898,9 +1009,10 @@ function main() {
 function printHelp() {
   console.log([
     "Usage:",
-    "  node scripts/summarize-aliyun-action-authorization.mjs [--env-file path] [--cloud-confirmations path] [--out /tmp/report.json] [--markdown /tmp/report.md]",
+    "  node scripts/summarize-aliyun-action-authorization.mjs [--backend-only] [--env-file path] [--cloud-confirmations path] [--out /tmp/report.json] [--markdown /tmp/report.md]",
     "",
     "Builds a non-secret action-time authorization matrix for APP production-cn Aliyun work.",
+    "--backend-only excludes deferred WeChat Open Platform mobile app, Android signing, and Apple Team ID launch work from the current authorization matrix.",
     "It does not create resources, pay, change DNS, import env values, push images, deploy, or git push.",
   ].join("\n"))
 }

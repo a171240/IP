@@ -15,12 +15,17 @@ test("Aliyun action authorization command is wired into scripts and predeploy", 
   const deploySpec = readJson("deploy", "aliyun-production-cn.example.json")
 
   assert.equal(pkg.scripts["aliyun:action:authorization"], "node ./scripts/summarize-aliyun-action-authorization.mjs")
+  assert.equal(pkg.scripts["aliyun:action:authorization:backend"], "node ./scripts/summarize-aliyun-action-authorization.mjs --backend-only")
   assert.equal(pkg.scripts["aliyun:action:authorization:test"], "node --test tests/aliyun-action-authorization.static.test.js")
   assert.match(predeploy, /aliyun:action:authorization:test/)
   assert.match(predeploy, /aliyun:action:authorization/)
+  assert.match(predeploy, /aliyun:action:authorization:backend/)
   assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:action:authorization:test"))
   assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:action:authorization"))
+  assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:action:authorization:backend"))
   assert.ok(deploySpec.predeployChecks.includes("corepack pnpm aliyun:action:authorization"))
+  assert.ok(deploySpec.predeployChecks.includes("corepack pnpm aliyun:action:authorization:backend"))
+  assert.match(releaseArtifacts, /scripts\/summarize-aliyun-action-authorization\.mjs"[\s\S]*\.\.\.backendOnlyArg/)
   assert.match(releaseArtifacts, /authorizationPackets/)
   assert.match(releaseArtifacts, /authorizationPacketIds/)
   assert.match(releaseArtifacts, /canStartNowPackets/)
@@ -243,6 +248,55 @@ test("Aliyun action authorization markdown includes closure brief without secret
   assert.doesNotMatch(output + markdown, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output + markdown, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(output + markdown, /:\/\/[^\s:@]+:[^\s@]+@/)
+})
+
+test("Aliyun action authorization backend-only mode excludes deferred APP launch blockers", () => {
+  const markdownPath = "/tmp/meiye-aliyun-action-authorization-backend-test.md"
+  const output = execFileSync(process.execPath, [
+    "scripts/summarize-aliyun-action-authorization.mjs",
+    "--backend-only",
+    "--markdown",
+    markdownPath,
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 50,
+  })
+  const report = JSON.parse(output)
+  const markdown = fs.readFileSync(markdownPath, "utf8")
+  const actionIds = report.actions.map((item) => item.id)
+  const packetIds = report.authorizationPackets.map((item) => item.packetId)
+  const envImportEvidence = report.authorizationClosureBrief.blockedResourceEvidence
+    .find((item) => item.id === "R06_ENV_IMPORT")
+  const envImportPacket = report.authorizationPackets.find((item) => item.packetId === "P06_ENV_IMPORT")
+
+  assert.equal(report.backendOnly, true)
+  assert.equal(report.summary.actions, 8)
+  assert.equal(report.summary.authorizationPackets, 8)
+  assert.deepEqual(report.summary.requiredBlocking, ["DATABASE_URL_CN"])
+  assert.deepEqual(report.summary.fullAppRequiredBlocking, ["DATABASE_URL_CN"])
+  assert.deepEqual(report.summary.deferredAppLaunchBlocking, [])
+  assert.equal(report.summary.deferredAppLaunchBlockingCount, 2)
+  assert.equal(report.summary.blockedCredentialCount, 1)
+  assert.deepEqual(report.authorizationClosureBrief.blockedCredentialNames, ["ALIYUN_OSS_SECURITY_TOKEN"])
+  assert.equal(report.authorizationClosureBrief.blockedCredentialCount, 1)
+  assert.deepEqual(report.summary.nextActionTimeConfirmations, [
+    "P03_ACR_PURCHASE",
+    "P05_OSS_RAM_STS",
+    "P11_ALIYUN_RDS_DATA_MIGRATION",
+  ])
+  assert.ok(!actionIds.includes("U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE"))
+  assert.ok(!actionIds.includes("U10_ANDROID_RELEASE_SIGNING"))
+  assert.ok(!actionIds.includes("U02_APPLE_TEAM_ID"))
+  assert.ok(!packetIds.includes("P01_WECHAT_OPEN_MOBILE_APP"))
+  assert.ok(!packetIds.includes("P10_ANDROID_RELEASE_SIGNING"))
+  assert.ok(!packetIds.includes("P02_APPLE_TEAM_ID"))
+  assert.ok(envImportEvidence.missingEvidence.includes("missing_required_env:DATABASE_URL_CN"))
+  assert.ok(!envImportEvidence.missingEvidence.some((item) => /WECHAT_OPEN_APP_ID|WECHAT_OPEN_APP_SECRET/.test(item)))
+  assert.ok(!envImportPacket.explicitlyExcluded.some((item) => /WECHAT_OPEN_APP_ID|WECHAT_OPEN_APP_SECRET/.test(item)))
+  assert.match(markdown, /blockedCredentialNames: ALIYUN_OSS_SECURITY_TOKEN/)
+  assert.doesNotMatch(output + markdown, /WECHAT_OPEN_APP_ID|WECHAT_OPEN_APP_SECRET/)
+  assert.doesNotMatch(output + markdown, /MEIYE_RELEASE_STORE_PASSWORD|MEIYE_RELEASE_KEY_PASSWORD/)
 })
 
 test("Aliyun action authorization packet handoff documents the current packet gate", () => {
