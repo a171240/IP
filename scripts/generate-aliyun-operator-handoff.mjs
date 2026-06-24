@@ -14,6 +14,34 @@ const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
 const DEFAULT_CLOUD_INVENTORY_RESULTS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-inventory-results.local.json")
 const APP_LAUNCH_BLOCKING_VARIABLE_NAMES = new Set(["APPLE_TEAM_ID"])
+const APP_LAUNCH_DEFERRED_VARIABLE_NAMES = new Set([
+  "APPLE_TEAM_ID",
+  "MEIYE_RELEASE_KEY_ALIAS",
+  "MEIYE_RELEASE_KEY_PASSWORD",
+  "MEIYE_RELEASE_STORE_FILE",
+  "MEIYE_RELEASE_STORE_PASSWORD",
+  "WECHAT_OPEN_APP_ID",
+  "WECHAT_OPEN_APP_SECRET",
+  "WECHAT_OPEN_APP_REVIEW_STATUS",
+])
+const APP_LAUNCH_DEFERRED_ACTION_IDS = new Set([
+  "S01_WECHAT_OPEN_APP_LOGIN",
+  "S02_APPLE_TEAM_ID",
+  "S07_ANDROID_RELEASE_SIGNING",
+])
+const BACKEND_ONLY_PRIORITY_TASK_IDS = Object.freeze([
+  "T04_ALIYUN_DOMAIN_DNS_HTTPS",
+  "T03_ALIYUN_RUNTIME_CONTAINER",
+  "T03B_ALIYUN_ACR_IMAGE_PUBLISH",
+  "T05_ALIYUN_OSS_AUDIO_STORAGE",
+  "T06_ALIYUN_ENV_IMPORT",
+  "T07_ALIYUN_SLS_ALERTS",
+  "T08_POSTDEPLOY_REMOTE_SMOKE",
+])
+const FULL_APP_PRIORITY_TASK_IDS = Object.freeze([
+  "T01_WECHAT_OPEN_PLATFORM_APP_LOGIN",
+  ...BACKEND_ONLY_PRIORITY_TASK_IDS,
+])
 
 function parseArgs(argv) {
   const args = {
@@ -24,6 +52,7 @@ function parseArgs(argv) {
     markdownPath: "",
     skipVercelEnvCoverage: false,
     vercelEnvCoverageInput: "",
+    backendOnly: false,
   }
 
   for (let index = 2; index < argv.length; index += 1) {
@@ -51,6 +80,10 @@ function parseArgs(argv) {
     }
     if (arg === "--skip-vercel-env-coverage") {
       args.skipVercelEnvCoverage = true
+      continue
+    }
+    if (arg === "--backend-only") {
+      args.backendOnly = true
       continue
     }
     if (arg === "--vercel-env-coverage-input") {
@@ -441,30 +474,28 @@ function buildHandoff({
   const appLaunchBlocking = buildAppLaunchBlocking(envPlan.variables, machineBlocking)
   const blockingRequiredVariables = envPlan.variables
     .filter((item) => item.required && item.status !== "ready")
+    .filter((item) => !args.backendOnly || !APP_LAUNCH_DEFERRED_VARIABLE_NAMES.has(item.name))
     .map(compactVariable)
   const optionalDeferredVariables = envPlan.variables
     .filter((item) => !item.required && item.status !== "ready" && !APP_LAUNCH_BLOCKING_VARIABLE_NAMES.has(item.name))
+    .filter((item) => !args.backendOnly || !APP_LAUNCH_DEFERRED_VARIABLE_NAMES.has(item.name))
     .map(compactVariable)
-  const priorityTaskIds = [
-    "T01_WECHAT_OPEN_PLATFORM_APP_LOGIN",
-    "T04_ALIYUN_DOMAIN_DNS_HTTPS",
-    "T03_ALIYUN_RUNTIME_CONTAINER",
-    "T03B_ALIYUN_ACR_IMAGE_PUBLISH",
-    "T05_ALIYUN_OSS_AUDIO_STORAGE",
-    "T06_ALIYUN_ENV_IMPORT",
-    "T07_ALIYUN_SLS_ALERTS",
-    "T08_POSTDEPLOY_REMOTE_SMOKE",
-  ]
-  const operatorClosureBrief = buildOperatorClosureBrief(sensitiveBlockers, resourcesMatrix)
+  const priorityTaskIds = args.backendOnly ? BACKEND_ONLY_PRIORITY_TASK_IDS : FULL_APP_PRIORITY_TASK_IDS
+  const operatorClosureBrief = buildOperatorClosureBrief(sensitiveBlockers, resourcesMatrix, {
+    backendOnly: args.backendOnly,
+  })
 
   return {
     generatedAt: new Date().toISOString(),
+    currentScope: args.backendOnly ? "backend_aliyun_only" : "full_app_launch",
     containsValues: false,
     canDeployNow: status.canDeployNow === true,
     verdict: status.verdict,
     currentAnswer: status.canDeployNow === true
       ? "机器门禁显示可部署，但仍需要单独授权生产部署。"
-      : waitingWechatReview > 0
+      : args.backendOnly
+        ? "现在只处理阿里云后端；微信移动应用、Android 签名和 Apple Team ID 已后置，当前仍缺 RDS/ACR/SAE/DNS/OSS/env/SLS/smoke 证据。"
+        : waitingWechatReview > 0
         ? "现在不能上线/部署；微信开放平台移动应用已在审核中，审核通过前不能取得生产 AppID/AppSecret，同时还要补 Android release signing、Apple Team ID、阿里云运行资源、DNS/HTTPS/ICP、OSS、环境变量导入和 SLS 证据。"
       : "现在不能上线/部署；先补微信开放平台移动应用、Android release signing、Apple Team ID、阿里云运行资源、DNS/HTTPS/ICP、OSS、环境变量导入和 SLS 证据。",
     files: {
@@ -486,7 +517,14 @@ function buildHandoff({
       docker: status.localReadiness?.docker?.ready === true,
     },
     cloudAccess: compactCloudAccess(cloudAccess),
-    localEvidenceGaps: buildLocalEvidenceGaps({ args, status, cloudAccess, cloudConfirmationsCheck, imagePublishPlan }),
+    localEvidenceGaps: buildLocalEvidenceGaps({
+      args,
+      status,
+      cloudAccess,
+      cloudConfirmationsCheck,
+      imagePublishPlan,
+      backendOnly: args.backendOnly,
+    }),
     operatorClosureBrief,
     vercelEnvCoverage: compactVercelEnvCoverage(vercelEnvCoverage),
     bridgeDataLayer: status.summary?.bridgeDataLayer || status.localReadiness?.bridgeDataLayer || {
@@ -510,32 +548,37 @@ function buildHandoff({
       optionalDeferred: optionalDeferredVariables,
     },
     appLaunchBlocking,
-    sensitiveActionItems: operatorTasks.sensitiveActionItems || status.tasks?.sensitiveActionItems || [],
+    sensitiveActionItems: filterSensitiveActionItems(
+      operatorTasks.sensitiveActionItems || status.tasks?.sensitiveActionItems || [],
+      args.backendOnly,
+    ),
     userActionNow: [
-      buildWechatUserActionNow(machineBlocking),
-      {
-        title: "配置 Android release signing 并生成微信开放平台 Android 应用签名",
-        owner: "Android 发布操作员 / 微信开放平台操作员",
-        where: "本机 Android release signing / CI Secret Store；微信开放平台 -> 移动应用 -> Android 应用签名",
-        needAfterApproval: [
-          "MEIYE_RELEASE_STORE_FILE",
-          "MEIYE_RELEASE_STORE_PASSWORD",
-          "MEIYE_RELEASE_KEY_ALIAS",
-          "MEIYE_RELEASE_KEY_PASSWORD",
-          "微信开放平台 Android release 签名证据",
-        ],
-        mustNotUse: [
-          "不能使用 debug.keystore、debug APK 或 debug 签名。",
-          "不能把 keystore 文件、store password、key password、证书私钥或微信 AppSecret 写入 JSON、Markdown、Docker 镜像或 git。",
-        ],
-      },
-      {
-        title: "确认 Apple Team ID",
-        owner: "Apple Developer 操作员",
-        where: "Apple Developer -> Membership 或 Certificates, Identifiers & Profiles -> Identifiers -> 美业话镜 App ID",
-        needAfterApproval: ["APPLE_TEAM_ID"],
-        mustNotUse: ["APPLE_TEAM_ID 不是密钥，但仍不要猜测；必须从 Apple Developer 当前团队读取"],
-      },
+      ...(args.backendOnly ? buildBackendOnlyUserActionNow() : [
+        buildWechatUserActionNow(machineBlocking),
+        {
+          title: "配置 Android release signing 并生成微信开放平台 Android 应用签名",
+          owner: "Android 发布操作员 / 微信开放平台操作员",
+          where: "本机 Android release signing / CI Secret Store；微信开放平台 -> 移动应用 -> Android 应用签名",
+          needAfterApproval: [
+            "MEIYE_RELEASE_STORE_FILE",
+            "MEIYE_RELEASE_STORE_PASSWORD",
+            "MEIYE_RELEASE_KEY_ALIAS",
+            "MEIYE_RELEASE_KEY_PASSWORD",
+            "微信开放平台 Android release 签名证据",
+          ],
+          mustNotUse: [
+            "不能使用 debug.keystore、debug APK 或 debug 签名。",
+            "不能把 keystore 文件、store password、key password、证书私钥或微信 AppSecret 写入 JSON、Markdown、Docker 镜像或 git。",
+          ],
+        },
+        {
+          title: "确认 Apple Team ID",
+          owner: "Apple Developer 操作员",
+          where: "Apple Developer -> Membership 或 Certificates, Identifiers & Profiles -> Identifiers -> 美业话镜 App ID",
+          needAfterApproval: ["APPLE_TEAM_ID"],
+          mustNotUse: ["APPLE_TEAM_ID 不是密钥，但仍不要猜测；必须从 Apple Developer 当前团队读取"],
+        },
+      ]),
     ],
     aliyunConsoleTaskOrder,
     aliyunConsoleActionNow: buildAliyunConsoleActionNow(aliyunConsoleTaskOrder),
@@ -551,9 +594,13 @@ function buildHandoff({
   }
 }
 
-function buildLocalEvidenceGaps({ args, status, cloudAccess, cloudConfirmationsCheck, imagePublishPlan }) {
+function buildLocalEvidenceGaps({ args, status, cloudAccess, cloudConfirmationsCheck, imagePublishPlan, backendOnly = false }) {
   const cloudChecklistByTarget = buildCloudChecklistByTarget(cloudAccess)
   const cloudInventoryResults = status.localReadiness?.cloudInventoryResults || {}
+  const cloudConfirmationGaps = buildCloudConfirmationGaps(cloudConfirmationsCheck, cloudChecklistByTarget, {
+    backendOnly,
+  })
+  const imagePublishGaps = buildImagePublishGaps(imagePublishPlan, cloudAccess)
   return {
     cloudInventoryResults: {
       file: cloudInventoryResults.localFile || args.cloudInventoryResultsFile,
@@ -568,31 +615,39 @@ function buildLocalEvidenceGaps({ args, status, cloudAccess, cloudConfirmationsC
       file: args.cloudConfirmationsFile,
       exists: cloudConfirmationsCheck.local?.exists === true,
       ready: cloudConfirmationsCheck.local?.ready === true,
-      totalBlockers: cloudConfirmationsCheck.summary?.totalBlockers ?? 0,
-      gaps: buildCloudConfirmationGaps(cloudConfirmationsCheck, cloudChecklistByTarget),
+      totalBlockers: cloudConfirmationGaps.length,
+      gaps: cloudConfirmationGaps,
     },
     imagePublish: {
       file: imagePublishPlan.local?.file || resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.image-publish.local.json"),
       exists: imagePublishPlan.local?.exists === true,
       ready: imagePublishPlan.local?.ready === true,
-      totalBlockers: imagePublishPlan.summary?.totalBlockers ?? 0,
+      totalBlockers: imagePublishGaps.length,
       localDockerImage: imagePublishPlan.localDockerImage?.status || "unknown",
-      gaps: buildImagePublishGaps(imagePublishPlan, cloudAccess),
+      gaps: imagePublishGaps,
     },
   }
 }
 
-function buildOperatorClosureBrief(sensitiveBlockers = {}, resourcesMatrix = {}) {
+function buildOperatorClosureBrief(sensitiveBlockers = {}, resourcesMatrix = {}, options = {}) {
   const credential = sensitiveBlockers.credentialInterventionBrief
     || sensitiveBlockers.summary?.credentialInterventionBrief
     || {}
   const resourceEvidence = resourcesMatrix.resourceEvidenceBrief || {}
+  const blockedCredentialNames = credential.blockedCredentialNames || []
+  const credentialGroups = credential.groups || []
+  const scopedBlockedCredentialNames = options.backendOnly
+    ? blockedCredentialNames.filter((name) => !APP_LAUNCH_DEFERRED_VARIABLE_NAMES.has(name))
+    : blockedCredentialNames
+  const scopedCredentialGroups = options.backendOnly
+    ? credentialGroups.filter((group) => !APP_LAUNCH_DEFERRED_ACTION_IDS.has(group.actionId))
+    : credentialGroups
   return {
-    blockedCredentialCount: credential.blockedCredentialCount || 0,
-    blockedCredentialNames: credential.blockedCredentialNames || [],
+    blockedCredentialCount: scopedBlockedCredentialNames.length,
+    blockedCredentialNames: scopedBlockedCredentialNames,
     readySecretEnvVariableCount: credential.readySecretEnvVariableCount || 0,
     readySecretEnvVariableNames: credential.readySecretEnvVariableNames || [],
-    credentialGroups: (credential.groups || []).map((group) => ({
+    credentialGroups: scopedCredentialGroups.map((group) => ({
       category: group.category,
       actionId: group.actionId,
       status: group.status,
@@ -709,9 +764,10 @@ function buildCloudChecklistByTarget(cloudAccess) {
   return result
 }
 
-function buildCloudConfirmationGaps(check, checklistByTarget) {
+function buildCloudConfirmationGaps(check, checklistByTarget, options = {}) {
   const itemStatus = check.local?.itemStatus || {}
   return Object.entries(itemStatus).flatMap(([key, status]) => {
+    if (options.backendOnly && key === "wechatOpenPlatform") return []
     const checklist = checklistByTarget.get(key) || {}
     return (status.blockers || []).map((blocker) => ({
       jsonPath: `items.${key}.${fieldFromBlocker(blocker)}`,
@@ -736,6 +792,57 @@ function buildImagePublishGaps(imagePublishPlan, cloudAccess) {
     expected: expectedImagePublishEvidence(blocker),
     forbidden: acrChecklist.forbidden || [],
   }))
+}
+
+function filterSensitiveActionItems(items, backendOnly) {
+  if (!backendOnly) return items
+  return items.filter((item) => !APP_LAUNCH_DEFERRED_ACTION_IDS.has(item.id))
+}
+
+function buildBackendOnlyUserActionNow() {
+  return [
+    {
+      title: "授权 RDS PostgreSQL 和数据迁移",
+      owner: "阿里云 RDS/后端数据迁移操作员",
+      where: "阿里云控制台 -> 云数据库 RDS -> PostgreSQL -> cn-hangzhou",
+      needAfterApproval: [
+        "RDS PostgreSQL 实例、数据库和账号",
+        "DATABASE_URL_CN 只导入阿里云 secret env",
+        "Supabase 到 RDS 的 schema/data/rollback 非密钥证据",
+      ],
+      mustNotUse: [
+        "不要把 DATABASE_URL_CN、数据库密码或 Supabase service role key 写入 JSON、Markdown、Docker 镜像、git 或 shell history。",
+        "不要把 Supabase 当作 production-cn 正式数据库目标。",
+      ],
+    },
+    {
+      title: "确认 OSS RAM/STS 最小权限",
+      owner: "阿里云 OSS/RAM 操作员",
+      where: "阿里云控制台 -> OSS / RAM / STS / SAE runtime role",
+      needAfterApproval: [
+        "service-records/production-cn 前缀最小权限",
+        "RAM/STS 或运行时角色方案",
+        "OSS 非密钥证据写入 cloud-confirmations.local.json",
+      ],
+      mustNotUse: [
+        "不要把 AccessKeySecret、RAM Secret 或 STS token 写入 JSON、Markdown、Docker 镜像、git 或 shell history。",
+      ],
+    },
+    {
+      title: "授权 ACR 企业版实例/仓库",
+      owner: "阿里云 ACR/后端发布操作员",
+      where: "阿里云控制台 -> 容器镜像服务 ACR -> 企业版实例/命名空间/镜像仓库",
+      needAfterApproval: [
+        "ACR Enterprise Economic cn-hangzhou 购买/确认",
+        "namespace 和 repository=meiye-huajing-app-api",
+        "非密钥 registryHost/namespace/repository 证据",
+      ],
+      mustNotUse: [
+        "不要在未确认金额和规格前点击付款。",
+        "不要把 registry password、RAM Secret 或 token 写入 JSON、Markdown、Docker 镜像、git 或 shell history。",
+      ],
+    },
+  ]
 }
 
 function imagePublishGapSource(blocker, acrChecklist) {
@@ -888,6 +995,7 @@ function renderMarkdown(handoff) {
     "## 当前结论",
     "",
     `- ${handoff.currentAnswer}`,
+    `- currentScope: ${handoff.currentScope}`,
     `- verdict: ${handoff.verdict}`,
     `- canDeployNow: ${handoff.canDeployNow}`,
     `- blockedCredentialCount: ${handoff.operatorClosureBrief.blockedCredentialCount}`,
@@ -1298,9 +1406,10 @@ function main() {
 function printHelp() {
   console.log([
     "Usage:",
-    "  node scripts/generate-aliyun-operator-handoff.mjs [--env-file path] [--cloud-confirmations path] [--cloud-inventory-results path] [--out /tmp/handoff.json] [--markdown /tmp/handoff.md] [--skip-vercel-env-coverage] [--vercel-env-coverage-input /tmp/vercel-env.json]",
+    "  node scripts/generate-aliyun-operator-handoff.mjs [--env-file path] [--cloud-confirmations path] [--cloud-inventory-results path] [--out /tmp/handoff.json] [--markdown /tmp/handoff.md] [--skip-vercel-env-coverage] [--vercel-env-coverage-input /tmp/vercel-env.json] [--backend-only]",
     "",
     "Generates a concise non-secret handoff for the user, Aliyun operator, WeChat Open Platform operator, and release owner.",
+    "--backend-only excludes deferred WeChat/Android/Apple launch work from the current Aliyun backend handoff.",
     "Vercel env coverage is metadata-only, non-blocking, and never includes values.",
     "It does not create resources, import secrets, deploy, upload, or push.",
   ].join("\n"))

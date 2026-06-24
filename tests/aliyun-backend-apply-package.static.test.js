@@ -96,6 +96,9 @@ test("Aliyun backend apply package separates immediate backend work from deferre
   assert.ok(report.userIntervention.secretOrPasswordHandling.includes("DATABASE_URL_CN"))
   assert.ok(report.userIntervention.secretOrPasswordHandling.includes("database account password"))
   assert.ok(report.userIntervention.backendNowExcludes.includes("WECHAT_OPEN_APP_ID"))
+  assert.ok(report.verificationOrder.includes("corepack pnpm aliyun:evidence:writeback:backend"))
+  assert.ok(report.verificationOrder.includes("corepack pnpm aliyun:operator:handoff:backend"))
+  assert.ok(!report.verificationOrder.includes("corepack pnpm aliyun:evidence:writeback -- --skip-vercel-env-coverage"))
   assert.ok(report.safetyBoundary.some((item) => /does not create/.test(item)))
 
   assert.doesNotMatch(output, secretLike)
@@ -121,6 +124,8 @@ test("Aliyun backend apply package markdown is value-free and actionable", () =>
   assert.match(markdown, /BAP03_ACR_PURCHASE_AND_REPOSITORY/)
   assert.match(markdown, /BAP09_POSTDEPLOY_SMOKE/)
   assert.match(markdown, /database account password/)
+  assert.match(markdown, /corepack pnpm aliyun:evidence:writeback:backend/)
+  assert.match(markdown, /corepack pnpm aliyun:operator:handoff:backend/)
   assert.match(markdown, /WECHAT_OPEN_APP_ID/)
   assert.match(markdown, /Every apply step still needs action-time confirmation/)
   assert.doesNotMatch(output + markdown, secretLike)

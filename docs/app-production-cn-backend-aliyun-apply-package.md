@@ -1,6 +1,6 @@
 # APP production-cn Aliyun backend apply package
 
-Generated at: 2026-06-24T10:39:40.429Z
+Generated at: 2026-06-24T12:48:23.396Z
 
 ## Scope
 
@@ -160,7 +160,8 @@ Generated at: 2026-06-24T10:39:40.429Z
 - corepack pnpm aliyun:rds:migration:evidence
 - corepack pnpm aliyun:cloud:confirmations
 - corepack pnpm aliyun:image:plan
-- corepack pnpm aliyun:evidence:writeback -- --skip-vercel-env-coverage
+- corepack pnpm aliyun:evidence:writeback:backend
+- corepack pnpm aliyun:operator:handoff:backend
 - corepack pnpm aliyun:backend-cn:apply-package
 - corepack pnpm aliyun:predeploy
 

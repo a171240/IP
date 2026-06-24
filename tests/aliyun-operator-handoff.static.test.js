@@ -42,6 +42,7 @@ test("Aliyun operator handoff command is wired into scripts and local predeploy"
   const deploySpec = readJson("deploy", "aliyun-production-cn.example.json")
 
   assert.equal(pkg.scripts["aliyun:operator:handoff"], "node ./scripts/generate-aliyun-operator-handoff.mjs")
+  assert.equal(pkg.scripts["aliyun:operator:handoff:backend"], "node ./scripts/generate-aliyun-operator-handoff.mjs --backend-only --skip-vercel-env-coverage")
   assert.equal(pkg.scripts["aliyun:operator:handoff:test"], "node --test tests/aliyun-operator-handoff.static.test.js")
   assert.match(predeploy, /aliyun:operator:handoff:test/)
   assert.match(predeploy, /aliyun:operator:handoff", "--", "--skip-vercel-env-coverage/)
@@ -57,6 +58,48 @@ test("Aliyun operator handoff command is wired into scripts and local predeploy"
   assert.match(releaseArtifacts, /readySecretEnvVariableCount/)
   assert.match(releaseArtifacts, /resourceEvidenceReady/)
   assert.match(releaseArtifacts, /blockedResourceEvidenceIds/)
+})
+
+test("Aliyun operator handoff backend-only mode excludes deferred APP launch work", () => {
+  const output = execFileSync(process.execPath, [
+    "scripts/generate-aliyun-operator-handoff.mjs",
+    "--backend-only",
+    "--skip-vercel-env-coverage",
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 40,
+  })
+  const report = JSON.parse(output)
+  const cloudConfirmationPaths = report.localEvidenceGaps.cloudConfirmations.gaps.map((item) => item.jsonPath)
+  const userActionTitles = report.userActionNow.map((item) => item.title)
+  const priorityTaskIds = report.priorityTasks.map((item) => item.id)
+  const requiredVariableNames = report.missingVariables.required.map((item) => item.name)
+
+  assert.equal(report.currentScope, "backend_aliyun_only")
+  assert.equal(report.containsValues, false)
+  assert.equal(report.operatorClosureBrief.blockedCredentialCount, 1)
+  assert.deepEqual(report.operatorClosureBrief.blockedCredentialNames, ["ALIYUN_OSS_SECURITY_TOKEN"])
+  assert.ok(!report.operatorClosureBrief.blockedCredentialNames.includes("WECHAT_OPEN_APP_ID"))
+  assert.ok(!report.operatorClosureBrief.blockedCredentialNames.includes("WECHAT_OPEN_APP_SECRET"))
+  assert.ok(!report.operatorClosureBrief.credentialGroups.some((group) => group.actionId === "S01_WECHAT_OPEN_APP_LOGIN"))
+  assert.ok(!report.operatorClosureBrief.credentialGroups.some((group) => group.actionId === "S07_ANDROID_RELEASE_SIGNING"))
+  assert.equal(report.localEvidenceGaps.cloudConfirmations.totalBlockers, cloudConfirmationPaths.length)
+  assert.equal(report.localEvidenceGaps.cloudConfirmations.totalBlockers, 18)
+  assert.ok(!cloudConfirmationPaths.some((item) => item.includes("wechatOpenPlatform")))
+  assert.deepEqual(requiredVariableNames, ["DATABASE_URL_CN"])
+  assert.deepEqual(userActionTitles, [
+    "授权 RDS PostgreSQL 和数据迁移",
+    "确认 OSS RAM/STS 最小权限",
+    "授权 ACR 企业版实例/仓库",
+  ])
+  assert.ok(!userActionTitles.some((item) => /微信开放平台移动应用|Android release signing|Apple Team ID/.test(item)))
+  assert.ok(!priorityTaskIds.includes("T01_WECHAT_OPEN_PLATFORM_APP_LOGIN"))
+  assert.ok(priorityTaskIds.includes("T03B_ALIYUN_ACR_IMAGE_PUBLISH"))
+  assert.ok(report.currentAnswer.includes("现在只处理阿里云后端"))
+  assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
+  assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
 })
 
 test("Aliyun operator handoff maps ACR and SAE evidence gaps to the correct consoles", () => {

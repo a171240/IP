@@ -44,6 +44,7 @@ function parseArgs(argv) {
     markdownPath: "",
     skipVercelEnvCoverage: false,
     vercelEnvCoverageInput: "",
+    backendOnly: false,
   }
 
   for (let index = 2; index < argv.length; index += 1) {
@@ -71,6 +72,10 @@ function parseArgs(argv) {
     }
     if (arg === "--skip-vercel-env-coverage") {
       args.skipVercelEnvCoverage = true
+      continue
+    }
+    if (arg === "--backend-only") {
+      args.backendOnly = true
       continue
     }
     if (arg === "--vercel-env-coverage-input") {
@@ -119,6 +124,7 @@ function buildOperatorHandoff(args) {
     "--cloud-inventory-results",
     args.cloudInventoryResultsFile,
     ...(args.skipVercelEnvCoverage ? ["--skip-vercel-env-coverage"] : []),
+    ...(args.backendOnly ? ["--backend-only"] : []),
     ...(args.vercelEnvCoverageInput ? ["--vercel-env-coverage-input", args.vercelEnvCoverageInput] : []),
   ])
 }
@@ -353,12 +359,15 @@ function buildReport(args) {
     ok: true,
     generatedAt: new Date().toISOString(),
     environment: "production-cn",
+    currentScope: args.backendOnly ? "backend_aliyun_only" : "full_app_launch",
     objective: "阿里云 production-cn 本地证据回填清单",
     verdict: handoff.verdict || "unknown",
     canDeployNow: handoff.canDeployNow === true,
     currentAnswer: handoff.canDeployNow === true
       ? "本地证据显示可以进入受控部署确认；仍需动作时授权后才能执行外部发布。"
-      : "现在还不能部署或上传；请先按本清单补齐阿里云/微信/镜像相关本地证据，再跑 strict 验证。",
+      : args.backendOnly
+        ? "现在还不能部署阿里云后端；微信/Android/Apple 发布项已后置，请先按本清单补齐 RDS/ACR/SAE/DNS/OSS/env/SLS/smoke 证据。"
+        : "现在还不能部署或上传；请先按本清单补齐阿里云/微信/镜像相关本地证据，再跑 strict 验证。",
     containsValues: false,
     readOnlyOnly: true,
     mutationPerformed: false,
@@ -428,6 +437,7 @@ function renderMarkdown(report) {
     "## 当前结论",
     "",
     `- ${report.currentAnswer}`,
+    `- currentScope: ${report.currentScope}`,
     `- verdict: ${report.verdict}`,
     `- canDeployNow: ${report.canDeployNow}`,
     `- executionMode: ${report.executionMode}`,
@@ -545,6 +555,7 @@ Options:
   --markdown <path>                 write Markdown report
   --skip-vercel-env-coverage        skip Vercel env name coverage while reading operator handoff
   --vercel-env-coverage-input <path> use a captured Vercel env coverage fixture
+  --backend-only                    exclude deferred WeChat/Android/Apple launch evidence from the current report
 `)
 }
 

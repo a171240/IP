@@ -26,6 +26,7 @@ test("Aliyun evidence writeback command is wired into scripts, predeploy, deploy
   const deploySpec = readJson("deploy", "aliyun-production-cn.example.json")
 
   assert.equal(pkg.scripts["aliyun:evidence:writeback"], "node ./scripts/generate-aliyun-evidence-writeback-checklist.mjs")
+  assert.equal(pkg.scripts["aliyun:evidence:writeback:backend"], "node ./scripts/generate-aliyun-evidence-writeback-checklist.mjs --backend-only --skip-vercel-env-coverage")
   assert.equal(pkg.scripts["aliyun:evidence:writeback:test"], "node --test tests/aliyun-evidence-writeback.static.test.js")
   assert.match(predeploy, /aliyun:evidence:writeback:test/)
   assert.match(predeploy, /aliyun:evidence:writeback", "--", "--skip-vercel-env-coverage/)
@@ -38,6 +39,41 @@ test("Aliyun evidence writeback command is wired into scripts, predeploy, deploy
   assert.match(releaseArtifacts, /evidenceClosureBrief/)
   assert.match(releaseArtifacts, /partiallyObservedResourceEvidenceIds/)
   assert.match(releaseArtifacts, /blockedResourceEvidence/)
+})
+
+test("Aliyun evidence writeback backend-only mode excludes deferred APP launch gaps", () => {
+  const output = execFileSync(process.execPath, [
+    "scripts/generate-aliyun-evidence-writeback-checklist.mjs",
+    "--backend-only",
+    "--skip-vercel-env-coverage",
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 50,
+  })
+  const report = JSON.parse(output)
+  const cloudConfirmationPaths = report.writebackGroups.cloudConfirmations.gaps.map((item) => item.jsonPath)
+
+  assert.equal(report.ok, true)
+  assert.equal(report.currentScope, "backend_aliyun_only")
+  assert.equal(report.containsValues, false)
+  assert.equal(report.readOnlyOnly, true)
+  assert.equal(report.summary.blockedCredentialCount, 1)
+  assert.deepEqual(report.summary.blockedCredentialNames, ["ALIYUN_OSS_SECURITY_TOKEN"])
+  assert.equal(report.summary.cloudConfirmationGaps, 18)
+  assert.equal(report.summary.totalGaps, 30)
+  assert.equal(report.summary.cloudConfirmationGaps, report.writebackGroups.cloudConfirmations.gaps.length)
+  assert.ok(!cloudConfirmationPaths.some((item) => item.includes("wechatOpenPlatform")))
+  assert.ok(!report.summary.requiredAuthorizationPackets.includes("P01_WECHAT_OPEN_MOBILE_APP"))
+  assert.ok(!report.summary.requiredAuthorizationPackets.includes("P02_APPLE_TEAM_ID"))
+  assert.ok(!report.summary.requiredAuthorizationPackets.includes("P10_ANDROID_RELEASE_SIGNING"))
+  assert.ok(report.summary.requiredAuthorizationPackets.includes("P03_ACR_PURCHASE"))
+  assert.ok(report.summary.requiredAuthorizationPackets.includes("P05_OSS_RAM_STS"))
+  assert.ok(report.summary.requiredAuthorizationPackets.includes("P06_ENV_IMPORT"))
+  assert.ok(report.summary.requiredAuthorizationPackets.includes("P07_DOMAIN_DNS_HTTPS_ICP"))
+  assert.ok(report.summary.requiredAuthorizationPackets.includes("P08_SAE_RUNTIME_SLS"))
+  assert.ok(report.currentAnswer.includes("还不能部署阿里云后端"))
+  assertNoSecretLikeValues(output)
 })
 
 test("Aliyun evidence writeback checklist exposes local JSON write targets without secret values", () => {
