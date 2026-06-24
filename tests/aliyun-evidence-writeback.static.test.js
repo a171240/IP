@@ -36,6 +36,7 @@ test("Aliyun evidence writeback command is wired into scripts, predeploy, deploy
   assert.match(releaseArtifacts, /evidence-writeback\.json/)
   assert.match(releaseArtifacts, /evidence-writeback\.md/)
   assert.match(releaseArtifacts, /evidenceWriteback/)
+  assert.match(releaseArtifacts, /rdsMigrationGaps: evidenceWriteback\.summary\.rdsMigrationGaps/)
   assert.match(releaseArtifacts, /evidenceClosureBrief/)
   assert.match(releaseArtifacts, /partiallyObservedResourceEvidenceIds/)
   assert.match(releaseArtifacts, /blockedResourceEvidence/)

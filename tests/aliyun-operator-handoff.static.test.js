@@ -74,6 +74,8 @@ test("Aliyun operator handoff command is wired into scripts and local predeploy"
   assert.match(releaseArtifacts, /readySecretEnvVariableCount/)
   assert.match(releaseArtifacts, /resourceEvidenceReady/)
   assert.match(releaseArtifacts, /blockedResourceEvidenceIds/)
+  assert.match(releaseArtifacts, /localEvidenceGaps:[\s\S]*rdsMigration/)
+  assert.match(releaseArtifacts, /operatorHandoff\.localEvidenceGaps\?\.rdsMigration/)
 })
 
 test("Aliyun operator handoff backend-only mode excludes deferred APP launch work", () => {

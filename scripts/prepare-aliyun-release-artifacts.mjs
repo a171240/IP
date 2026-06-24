@@ -888,6 +888,7 @@ function renderMarkdown(audit) {
     `- cloudApiCalled: ${evidenceWriteback.cloudApiCalled === true}`,
     `- readyFiles: ${evidenceWriteback.summary.readyFiles} / ${evidenceWriteback.summary.files}`,
     `- totalGaps: ${evidenceWriteback.summary.totalGaps}`,
+    `- rdsMigrationGaps: ${evidenceWriteback.summary.rdsMigrationGaps}`,
     `- cloudInventoryResultGaps: ${evidenceWriteback.summary.cloudInventoryResultGaps}`,
     `- cloudConfirmationGaps: ${evidenceWriteback.summary.cloudConfirmationGaps}`,
     `- imagePublishGaps: ${evidenceWriteback.summary.imagePublishGaps}`,
@@ -976,6 +977,7 @@ function renderMarkdown(audit) {
     `- readySecretEnvVariableCount: ${operatorHandoff.operatorClosureBrief?.readySecretEnvVariableCount ?? 0}`,
     `- resourceEvidenceReady: ${operatorHandoff.operatorClosureBrief?.resourceEvidenceReady || "unknown"}`,
     `- blockedResourceEvidenceIds: ${operatorHandoff.operatorClosureBrief?.blockedResourceEvidenceIds?.length ? operatorHandoff.operatorClosureBrief.blockedResourceEvidenceIds.join(", ") : "none"}`,
+    `- localEvidenceGaps: cloudInventoryResults=${operatorHandoff.localEvidenceGaps?.cloudInventoryResults?.totalBlockers ?? 0}; cloudConfirmations=${operatorHandoff.localEvidenceGaps?.cloudConfirmations?.totalBlockers ?? 0}; rdsMigration=${operatorHandoff.localEvidenceGaps?.rdsMigration?.totalBlockers ?? 0}; imagePublish=${operatorHandoff.localEvidenceGaps?.imagePublish?.totalBlockers ?? 0}`,
     `- canStartNowConsoleTasks: ${operatorHandoff.aliyunConsoleTaskOrder?.canStartNow?.length ? operatorHandoff.aliyunConsoleTaskOrder.canStartNow.join(", ") : "none"}`,
     `- blockedByConsoleTaskDependencies: ${operatorHandoff.aliyunConsoleTaskOrder?.blockedByDependencies?.length ? operatorHandoff.aliyunConsoleTaskOrder.blockedByDependencies.join(", ") : "none"}`,
     `- cloudInventoryConsoleOnly: safe ${operatorHandoffCloudInventoryObservation.safeConsoleOnly === true}, console observations ${operatorHandoffCloudInventoryObservation.consoleObservationOperations || 0}/${operatorHandoffCloudInventoryObservation.operations || 0}, executed commands ${operatorHandoffCloudInventoryObservation.executedCommandResults || 0}/${operatorHandoffCloudInventoryObservation.commandResults || 0}, cloud API calls ${operatorHandoffCloudInventoryObservation.cloudApiCalledCommandResults || 0}`,
@@ -2290,6 +2292,7 @@ function main() {
       cloudApiCalled: evidenceWriteback.cloudApiCalled === true,
       readyFiles: `${evidenceWriteback.summary.readyFiles}/${evidenceWriteback.summary.files}`,
       totalGaps: evidenceWriteback.summary.totalGaps,
+      rdsMigrationGaps: evidenceWriteback.summary.rdsMigrationGaps,
       cloudInventoryResultGaps: evidenceWriteback.summary.cloudInventoryResultGaps,
       cloudConfirmationGaps: evidenceWriteback.summary.cloudConfirmationGaps,
       imagePublishGaps: evidenceWriteback.summary.imagePublishGaps,
@@ -2421,6 +2424,14 @@ function main() {
         cloudConfirmations: {
           ready: operatorHandoff.localEvidenceGaps?.cloudConfirmations?.ready === true,
           totalBlockers: operatorHandoff.localEvidenceGaps?.cloudConfirmations?.totalBlockers ?? 0,
+        },
+        rdsMigration: {
+          exists: operatorHandoff.localEvidenceGaps?.rdsMigration?.exists === true,
+          ready: operatorHandoff.localEvidenceGaps?.rdsMigration?.ready === true,
+          totalBlockers: operatorHandoff.localEvidenceGaps?.rdsMigration?.totalBlockers ?? 0,
+          appApiRoutesWithSupabase: operatorHandoff.localEvidenceGaps?.rdsMigration?.appApiRoutesWithSupabase ?? 0,
+          firstVersionRdsRoutesWithSupabaseDataAccess: operatorHandoff.localEvidenceGaps?.rdsMigration?.firstVersionRdsRoutesWithSupabaseDataAccess ?? 0,
+          postgresDataAccessAdapterDetected: operatorHandoff.localEvidenceGaps?.rdsMigration?.postgresDataAccessAdapterDetected === true,
         },
         imagePublish: {
           ready: operatorHandoff.localEvidenceGaps?.imagePublish?.ready === true,
