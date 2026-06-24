@@ -27,6 +27,7 @@ const REQUIRED_PREDEPLOY_CHECKS = [
   "corepack pnpm aliyun:rds:migration:evidence",
   "corepack pnpm aliyun:backend-cn:status",
   "corepack pnpm aliyun:backend-cn:apply-package",
+  "corepack pnpm aliyun:operator:tasks:backend",
   "corepack pnpm aliyun:operator:handoff",
   "corepack pnpm aliyun:wechat-open:package",
   "corepack pnpm aliyun:apple-team:package",
@@ -225,6 +226,9 @@ function validateSpec(spec) {
   }
   if (cloudConfirmations.operatorTasksCommand !== "corepack pnpm aliyun:operator:tasks") {
     blockers.push("cloudConfirmations.operatorTasksCommand")
+  }
+  if (cloudConfirmations.backendOperatorTasksCommand !== "corepack pnpm aliyun:operator:tasks:backend") {
+    blockers.push("cloudConfirmations.backendOperatorTasksCommand")
   }
   if (cloudConfirmations.statusCommand !== "corepack pnpm aliyun:status") {
     blockers.push("cloudConfirmations.statusCommand")

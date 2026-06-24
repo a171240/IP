@@ -78,6 +78,8 @@
     "aliyun:domain:check": "node ./scripts/check-aliyun-domain-readiness.mjs --allow-blocking",
     "aliyun:domain:strict": "node ./scripts/check-aliyun-domain-readiness.mjs",
     "aliyun:operator:tasks": "node ./scripts/generate-aliyun-operator-tasks.mjs",
+    "aliyun:operator:tasks:backend": "node ./scripts/generate-aliyun-operator-tasks.mjs --backend-only",
+    "aliyun:operator:tasks:test": "node --test tests/aliyun-operator-tasks.static.test.js",
     "aliyun:operator:handoff": "node ./scripts/generate-aliyun-operator-handoff.mjs",
     "aliyun:operator:handoff:backend": "node ./scripts/generate-aliyun-operator-handoff.mjs --backend-only --skip-vercel-env-coverage",
     "aliyun:status": "node ./scripts/summarize-aliyun-production-cn-status.mjs",

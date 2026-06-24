@@ -20,6 +20,7 @@ function parseArgs(argv) {
     cloudConfirmationsFile: DEFAULT_CLOUD_CONFIRMATIONS_FILE,
     outPath: "",
     markdownPath: "",
+    backendOnly: false,
   }
 
   for (let index = 2; index < argv.length; index += 1) {
@@ -41,6 +42,10 @@ function parseArgs(argv) {
       args.markdownPath = resolveValue(argv[++index], "--markdown")
       continue
     }
+    if (arg === "--backend-only") {
+      args.backendOnly = true
+      continue
+    }
     if (arg === "--help" || arg === "-h") {
       printHelp()
       process.exit(0)
@@ -49,6 +54,144 @@ function parseArgs(argv) {
   }
 
   return args
+}
+
+const APP_LAUNCH_TASK_IDS = new Set([
+  "T01_WECHAT_OPEN_PLATFORM_APP_LOGIN",
+  "T02_APP_LEGAL_LINKS",
+])
+
+const APP_LAUNCH_SENSITIVE_ACTION_IDS = new Set([
+  "S01_WECHAT_OPEN_APP_LOGIN",
+  "S02_APPLE_TEAM_ID",
+  "S07_ANDROID_RELEASE_SIGNING",
+])
+
+const APP_LAUNCH_ENV_NAMES = new Set([
+  "APPLE_TEAM_ID",
+  "MEIYE_RELEASE_KEY_ALIAS",
+  "MEIYE_RELEASE_KEY_PASSWORD",
+  "MEIYE_RELEASE_STORE_FILE",
+  "MEIYE_RELEASE_STORE_PASSWORD",
+  "PRIVACY_POLICY_URL",
+  "TERMS_URL",
+  "WECHAT_OPEN_APP_ID",
+  "WECHAT_OPEN_APP_SECRET",
+  "WECHAT_OPEN_APP_REVIEW_STATUS",
+])
+
+function isAppLaunchBlocker(blocker) {
+  const value = String(blocker || "")
+  return /WECHAT_OPEN|wechat_open_platform|APPLE_TEAM_ID|apple_team_id|app_native|app_universal_link|legalLinks|PRIVACY_POLICY_URL|TERMS_URL|Android release signing|MEIYE_RELEASE_/i.test(value)
+}
+
+function backendOnlyTask(task, scopedEnvSummary) {
+  const blockerCodes = task.blockerCodes
+    .map((item) => item === "requires_runtime_domain_env_wechat_cloud_confirmations"
+      ? "requires_runtime_domain_env_cloud_confirmations"
+      : item)
+    .filter((item) => !isAppLaunchBlocker(item))
+  const actions = task.actions.map((item) => {
+    if (task.id === "T06_ALIYUN_ENV_IMPORT") {
+      return item.replace("、微信开放平台", "")
+    }
+    if (task.id === "T08_POSTDEPLOY_REMOTE_SMOKE") {
+      return item
+        .replace("完成前置微信、协议、运行时、ACR 镜像、域名、OSS、环境变量和 SLS 任务后部署 production-cn 后端。", "完成运行时、ACR 镜像、域名、OSS、环境变量和 SLS 任务后部署 production-cn 后端。")
+        .replace("微信开放平台或正式协议 URL 未补齐时只能使用 --allow-missing appWechatLogin,legalLinks 做桥接调试，不能作为正式上线结论。", "本 backend-only 清单不把 APP 登录和协议页作为阿里云后端补齐前置项；正式 APP 发布前再补齐完整 strict health。")
+    }
+    return item
+  })
+  const evidence = task.evidence.map((item) => {
+    if (task.id === "T06_ALIYUN_ENV_IMPORT" && item.startsWith("requiredReady=")) {
+      return `requiredReady=${scopedEnvSummary.requiredReady}/${scopedEnvSummary.requiredTotal}`
+    }
+    if (task.id === "T06_ALIYUN_ENV_IMPORT" && item.startsWith("requiredBlocking=")) {
+      return `requiredBlocking=${scopedEnvSummary.requiredBlocking.length ? scopedEnvSummary.requiredBlocking.join(",") : "none"}`
+    }
+    if (task.id === "T08_POSTDEPLOY_REMOTE_SMOKE") {
+      return item.replace("strict health 不再缺 appWechatLogin 或 legalLinks", "backend health and APP API smoke pass")
+    }
+    return item
+  })
+  return {
+    ...task,
+    actions,
+    evidence,
+    blockerCodes,
+    ready: task.status === "ready",
+  }
+}
+
+function applyBackendOnlyScope(report) {
+  const excludedTaskIds = report.tasks
+    .filter((task) => APP_LAUNCH_TASK_IDS.has(task.id))
+    .map((task) => task.id)
+  const excludedSensitiveActionIds = report.sensitiveActionItems
+    .filter((item) => APP_LAUNCH_SENSITIVE_ACTION_IDS.has(item.id))
+    .map((item) => item.id)
+  const excludedRequiredBlocking = report.env.summary.requiredBlocking
+    .filter((name) => APP_LAUNCH_ENV_NAMES.has(name))
+  const backendRequiredBlocking = report.env.summary.requiredBlocking
+    .filter((name) => !APP_LAUNCH_ENV_NAMES.has(name))
+
+  const scopedEnvSummary = {
+    ...report.env.summary,
+    requiredTotal: Math.max(0, report.env.summary.requiredTotal - excludedRequiredBlocking.length),
+    requiredBlocking: backendRequiredBlocking,
+    appLaunchBlocking: Array.from(new Set([
+      ...(report.env.summary.appLaunchBlocking || []),
+      ...excludedRequiredBlocking,
+    ])),
+  }
+  const tasks = report.tasks
+    .filter((task) => !APP_LAUNCH_TASK_IDS.has(task.id))
+    .map((task) => backendOnlyTask(task, scopedEnvSummary))
+  const sensitiveActionItems = report.sensitiveActionItems
+    .filter((item) => !APP_LAUNCH_SENSITIVE_ACTION_IDS.has(item.id))
+
+  return {
+    ...report,
+    currentScope: "backend_aliyun_only",
+    fullAppLaunchScope: "deferred_after_backend_online",
+    canProceedWithoutWechat: true,
+    summary: summarizeTasks(tasks),
+    sensitiveActionItems,
+    env: {
+      ...report.env,
+      summary: scopedEnvSummary,
+      requiredBlocking: backendRequiredBlocking,
+      requiredBlockingDetails: report.env.requiredBlockingDetails
+        .filter((item) => !APP_LAUNCH_ENV_NAMES.has(item.name)),
+    },
+    readiness: {
+      ...report.readiness,
+      machineBlocking: report.readiness.machineBlocking.filter((item) => !isAppLaunchBlocker(item)),
+      manualBlocking: report.readiness.manualBlocking.filter((item) => !isAppLaunchBlocker(item)),
+    },
+    tasks,
+    backendOnlyExclusions: {
+      taskIds: excludedTaskIds,
+      sensitiveActionIds: excludedSensitiveActionIds,
+      envNames: Array.from(new Set([
+        ...(report.env.summary.appLaunchBlocking || []),
+        ...excludedRequiredBlocking,
+      ])).filter((name) => APP_LAUNCH_ENV_NAMES.has(name)),
+      reason: "APP launch, WeChat Open Platform, Apple Team ID, Android release signing, and legal-page publishing are deferred until after the Aliyun backend is online.",
+    },
+    nextCommandOrder: [
+      "corepack pnpm aliyun:operator:tasks:backend",
+      "corepack pnpm aliyun:backend-cn:status",
+      "corepack pnpm aliyun:backend-cn:apply-package",
+      "corepack pnpm aliyun:cloudshell:handoff",
+      "corepack pnpm aliyun:cloud:inventory-results:strict",
+      "corepack pnpm aliyun:rds:migration:evidence:strict",
+      "corepack pnpm aliyun:cloud:confirmations:backend:strict",
+      "corepack pnpm aliyun:image:plan:strict",
+      "corepack pnpm aliyun:domain:strict",
+      "corepack pnpm aliyun:evidence:writeback:backend",
+    ],
+  }
 }
 
 function resolveValue(value, name) {
@@ -763,6 +906,11 @@ function renderMarkdown(report) {
     "",
     "## 结论",
     "",
+    ...(report.currentScope ? [
+      `- currentScope: ${report.currentScope}`,
+      `- fullAppLaunchScope: ${report.fullAppLaunchScope}`,
+      `- canProceedWithoutWechat: ${report.canProceedWithoutWechat}`,
+    ] : []),
     `- productionReady: ${report.readiness.productionReady}`,
     `- localCodeReady: ${report.readiness.localCodeReady}`,
     `- domainReady: ${report.domain.ok}`,
@@ -910,7 +1058,7 @@ function main() {
   ])
   const tasks = buildTasks({ envPlan, readiness, domain, cloudConfirmations, imagePublishPlan })
   const sensitiveActionItems = buildSensitiveActionItems({ envPlan, readiness, imagePublishPlan, nativeRelease })
-  const report = {
+  let report = {
     generatedAt: new Date().toISOString(),
     containsValues: false,
     envFile: args.envFile,
@@ -975,6 +1123,7 @@ function main() {
       "corepack pnpm aliyun:postdeploy:smoke -- --base-url https://api-cn.ipgongchang.xin",
     ],
   }
+  if (args.backendOnly) report = applyBackendOnlyScope(report)
 
   const json = JSON.stringify(report, null, 2)
   console.log(json)
@@ -985,9 +1134,10 @@ function main() {
 function printHelp() {
   console.log([
     "Usage:",
-    "  node scripts/generate-aliyun-operator-tasks.mjs [--env-file path] [--cloud-confirmations path] [--out /tmp/tasks.json] [--markdown /tmp/tasks.md]",
+    "  node scripts/generate-aliyun-operator-tasks.mjs [--backend-only] [--env-file path] [--cloud-confirmations path] [--out /tmp/tasks.json] [--markdown /tmp/tasks.md]",
     "",
     "Generates a non-secret Aliyun/WeChat operator task list from env plan, readiness, cloud confirmations, and domain probes.",
+    "--backend-only excludes deferred WeChat Open Platform, Apple Team ID, Android signing, and APP legal-page publishing tasks.",
     "It does not create cloud resources, import secrets, deploy, or push.",
   ].join("\n"))
 }

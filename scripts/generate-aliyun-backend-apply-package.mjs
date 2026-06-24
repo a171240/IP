@@ -179,6 +179,7 @@ function buildReport(args) {
       "corepack pnpm aliyun:cloud:confirmations",
       "corepack pnpm aliyun:image:plan",
       "corepack pnpm aliyun:evidence:writeback:backend",
+      "corepack pnpm aliyun:operator:tasks:backend",
       "corepack pnpm aliyun:operator:handoff:backend",
       "corepack pnpm aliyun:backend-cn:apply-package",
       "corepack pnpm aliyun:predeploy",
