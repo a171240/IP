@@ -165,6 +165,7 @@ function buildAudit(args, inputs) {
     wechatOpenMobileAppPackage,
   } = inputs
   const goalClosureEvidenceBrief = buildGoalClosureEvidenceBrief(sensitiveBlockers, resourcesMatrix)
+  const bridgeDataLayer = buildBridgeDataLayerBoundary(productionStatus, operatorHandoff)
   const requirements = [
     buildLocalAppBackendRequirement(productionStatus, operatorHandoff),
     buildAliyunCloudResourceRequirement(productionStatus, operatorHandoff, resourcesMatrix),
@@ -196,6 +197,7 @@ function buildAudit(args, inputs) {
       cloudConfirmationsFile: args.cloudConfirmationsFile,
       cloudInventoryResultsFile: args.cloudInventoryResultsFile,
     },
+    bridgeDataLayer,
     currentAnswer: complete
       ? "目标完成；仍需按发布流程单独授权生产部署动作。"
       : "现在目标还没完成，不能上线/部署；本地证据基本可用，但阿里云云资源、微信开放平台移动 App、production-cn 环境变量导入、域名 HTTPS/ICP 和生产部署冒烟仍未完成。",
@@ -206,6 +208,7 @@ function buildAudit(args, inputs) {
       requiredBlocking: productionStatus.summary?.requiredBlocking || [],
       cloudConfirmations: productionStatus.summary?.cloudConfirmations || {},
       cloudInventoryResults: productionStatus.summary?.cloudInventoryResults || {},
+      bridgeDataLayer,
       operatorTasks: productionStatus.summary?.operatorTasks || {},
       canStartNowConsoleTasks: operatorHandoff.aliyunConsoleTaskOrder?.canStartNow || [],
       blockedByConsoleTaskDependencies: operatorHandoff.aliyunConsoleTaskOrder?.blockedByDependencies || [],
@@ -260,6 +263,34 @@ function buildAudit(args, inputs) {
     report.containsValues = true
   }
   return report
+}
+
+function buildBridgeDataLayerBoundary(productionStatus, operatorHandoff) {
+  const source = operatorHandoff.bridgeDataLayer
+    || productionStatus.summary?.bridgeDataLayer
+    || productionStatus.localReadiness?.bridgeDataLayer
+    || {}
+  return {
+    current: source.current || "Supabase",
+    target: source.target || "Aliyun RDS PostgreSQL",
+    status: source.status || "RDS migration is not included in the first bridge deployment",
+    firstBridgeDeploymentUses: source.firstBridgeDeploymentUses || "Supabase bridge env",
+    supabaseBridgeReady: source.supabaseBridgeReady === true,
+    supabaseKeys: source.supabaseKeys || [
+      "NEXT_PUBLIC_SUPABASE_URL",
+      "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      "SUPABASE_SERVICE_ROLE_KEY",
+    ],
+    databaseUrlCnStatus: source.databaseUrlCnStatus || "todo",
+    redisUrlCnStatus: source.redisUrlCnStatus || "todo",
+    rdsMigrationIncludedInThisRelease: source.rdsMigrationIncludedInThisRelease === true,
+    rdsMigrationRequiredForFinalProductionCn: source.rdsMigrationRequiredForFinalProductionCn !== false,
+    notes: source.notes || [
+      "第一版 APP production-cn 后端是桥接部署：API 容器跑在阿里云，数据层暂时沿用现有 Supabase。",
+      "DATABASE_URL_CN / REDIS_URL_CN 目前可后置；即使填写，也不代表已完成 Supabase SDK 到 RDS/Postgres 的数据层迁移。",
+      "正式完整 production-cn 数据层迁移需要单独 RDS PostgreSQL/Tair 方案、迁移脚本、回滚方案和授权。",
+    ],
+  }
 }
 
 function buildLocalAppBackendRequirement(status, operatorHandoff) {
@@ -642,6 +673,9 @@ function renderMarkdown(report) {
     `- Cloud confirmations: ${report.summary.cloudConfirmations.ready || 0}/${report.summary.cloudConfirmations.total || 0} ready`,
     `- Cloud inventory results: localReady ${report.summary.cloudInventoryResults.localReady === true}, ready operations ${report.summary.cloudInventoryResults.readyLocalOperations || 0}/${report.summary.cloudInventoryResults.localOperations || 0}`,
     `- Cloud inventory console-only: safe ${report.summary.cloudInventoryResults.observationSummary?.safeConsoleOnly === true}, console observations ${report.summary.cloudInventoryResults.observationSummary?.consoleObservationOperations || 0}/${report.summary.cloudInventoryResults.observationSummary?.operations || 0}, executed commands ${report.summary.cloudInventoryResults.observationSummary?.executedCommandResults || 0}/${report.summary.cloudInventoryResults.observationSummary?.commandResults || 0}, cloud API calls ${report.summary.cloudInventoryResults.observationSummary?.cloudApiCalledCommandResults || 0}`,
+    `- Bridge data layer: current ${report.bridgeDataLayer.current}, target ${report.bridgeDataLayer.target}, first bridge uses ${report.bridgeDataLayer.firstBridgeDeploymentUses}`,
+    `- RDS migration included in this release: ${report.bridgeDataLayer.rdsMigrationIncludedInThisRelease}`,
+    `- RDS migration required for final production-cn: ${report.bridgeDataLayer.rdsMigrationRequiredForFinalProductionCn}`,
     `- Can start now console tasks: ${report.summary.canStartNowConsoleTasks.length ? report.summary.canStartNowConsoleTasks.join(", ") : "none"}`,
     `- Can start now authorization packets: ${report.summary.canStartNowAuthorizationPackets.length ? report.summary.canStartNowAuthorizationPackets.join(", ") : "none"}`,
     `- Next action-time confirmations: ${report.summary.nextActionTimeConfirmations.length ? report.summary.nextActionTimeConfirmations.map((item) => item.packetId).join(", ") : "none"}`,
@@ -661,6 +695,19 @@ function renderMarkdown(report) {
       ? report.goalClosureEvidenceBrief.resourceEvidence.blockedResourceEvidence.map((item) =>
         `- ${item.id}: observed=${item.observedStatus}/${item.observedReadiness}; packets=${item.requiredAuthorizationPackets.join(", ") || "none"}; missing=${item.missingEvidence.slice(0, 4).join(", ") || "none"}`)
       : ["- resourceEvidenceBlocked: none"]),
+    "",
+    "## 数据层边界",
+    "",
+    `- current: ${report.bridgeDataLayer.current}`,
+    `- target: ${report.bridgeDataLayer.target}`,
+    `- status: ${report.bridgeDataLayer.status}`,
+    `- firstBridgeDeploymentUses: ${report.bridgeDataLayer.firstBridgeDeploymentUses}`,
+    `- supabaseBridgeReady: ${report.bridgeDataLayer.supabaseBridgeReady}`,
+    `- DATABASE_URL_CN: ${report.bridgeDataLayer.databaseUrlCnStatus}`,
+    `- REDIS_URL_CN: ${report.bridgeDataLayer.redisUrlCnStatus}`,
+    `- rdsMigrationIncludedInThisRelease: ${report.bridgeDataLayer.rdsMigrationIncludedInThisRelease}`,
+    `- rdsMigrationRequiredForFinalProductionCn: ${report.bridgeDataLayer.rdsMigrationRequiredForFinalProductionCn}`,
+    ...(report.bridgeDataLayer.notes || []).map((item) => `- ${item}`),
     "",
     "## 当前可开始的动作时确认",
     "",
