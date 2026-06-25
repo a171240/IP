@@ -277,15 +277,17 @@
         "POST"
       ],
       "appFile": "app/api/app/store-profiles/route.ts",
-      "sourceType": "mp_adapter",
-      "sourceRoute": "/api/mp/store-profiles",
+      "sourceType": "app_native",
       "sourceFiles": [
-        "app/api/mp/store-profiles/route.ts"
+        "app/api/app/store-profiles/route.ts",
+        "lib/aliyun-rds/repositories/store-profiles.server.ts",
+        "lib/aliyun-rds/postgres.server.ts"
       ],
       "sourcePages": [
         "../meiye-huajing-miniprogram/pages/store-profiles/index.js"
       ],
-      "productionCnStatus": "bridge_ready"
+      "productionCnStatus": "bridge_ready",
+      "note": "APP store profile list/create now keeps Bearer token auth but reads and writes store_profiles through Aliyun RDS."
     },
     {
       "scope": "context",
@@ -296,15 +298,17 @@
         "DELETE"
       ],
       "appFile": "app/api/app/store-profiles/[profileId]/route.ts",
-      "sourceType": "mp_adapter",
-      "sourceRoute": "/api/mp/store-profiles/[profileId]",
+      "sourceType": "app_native",
       "sourceFiles": [
-        "app/api/mp/store-profiles/[profileId]/route.ts"
+        "app/api/app/store-profiles/[profileId]/route.ts",
+        "lib/aliyun-rds/repositories/store-profiles.server.ts",
+        "lib/aliyun-rds/postgres.server.ts"
       ],
       "sourcePages": [
         "../meiye-huajing-miniprogram/pages/store-profile-editor/index.js"
       ],
-      "productionCnStatus": "bridge_ready"
+      "productionCnStatus": "bridge_ready",
+      "note": "APP store profile detail/update/delete now uses the Aliyun RDS store profile repository."
     },
     {
       "scope": "context",
@@ -314,15 +318,17 @@
         "POST"
       ],
       "appFile": "app/api/app/customer-profiles/route.ts",
-      "sourceType": "mp_reexport",
-      "sourceRoute": "/api/mp/voice-coach/customer-profiles",
+      "sourceType": "app_native",
       "sourceFiles": [
-        "app/api/mp/voice-coach/customer-profiles/route.ts"
+        "app/api/app/customer-profiles/route.ts",
+        "lib/aliyun-rds/repositories/customer-profiles.server.ts",
+        "lib/aliyun-rds/postgres.server.ts"
       ],
       "sourcePages": [
         "../meiye-huajing-miniprogram/pages/voice-coach/customer-profiles/index.js"
       ],
-      "productionCnStatus": "bridge_ready"
+      "productionCnStatus": "bridge_ready",
+      "note": "APP customer profile list/create now uses the Aliyun RDS customer profile repository."
     },
     {
       "scope": "context",
@@ -333,15 +339,17 @@
         "DELETE"
       ],
       "appFile": "app/api/app/customer-profiles/[profileId]/route.ts",
-      "sourceType": "mp_reexport",
-      "sourceRoute": "/api/mp/voice-coach/customer-profiles/[profileId]",
+      "sourceType": "app_native",
       "sourceFiles": [
-        "app/api/mp/voice-coach/customer-profiles/[profileId]/route.ts"
+        "app/api/app/customer-profiles/[profileId]/route.ts",
+        "lib/aliyun-rds/repositories/customer-profiles.server.ts",
+        "lib/aliyun-rds/postgres.server.ts"
       ],
       "sourcePages": [
         "../meiye-huajing-miniprogram/pages/voice-coach/customer-profile-editor/index.js"
       ],
-      "productionCnStatus": "bridge_ready"
+      "productionCnStatus": "bridge_ready",
+      "note": "APP customer profile detail/update/delete now uses the Aliyun RDS customer profile repository."
     },
     {
       "scope": "context",

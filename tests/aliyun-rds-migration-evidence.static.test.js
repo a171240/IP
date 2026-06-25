@@ -38,10 +38,10 @@ test("Aliyun RDS migration evidence command is wired into package scripts", () =
   assert.equal(template.rdsPostgres.databaseUrlCnSecretTarget, "Aliyun KMS / Secrets Manager / SAE secret env")
   assert.equal(template.sourceInventory.appApiRouteCount, 31)
   assert.equal(template.sourceInventory.appApiRoutesWithSupabase, 31)
-  assert.equal(template.sourceInventory.appApiRoutesWithSupabaseDataAccess, 27)
+  assert.equal(template.sourceInventory.appApiRoutesWithSupabaseDataAccess, 23)
   assert.equal(template.sourceInventory.firstVersionRdsRouteCount, 25)
   assert.equal(template.sourceInventory.firstVersionRdsRoutesWithSupabase, 25)
-  assert.equal(template.sourceInventory.firstVersionRdsRoutesWithSupabaseDataAccess, 23)
+  assert.equal(template.sourceInventory.firstVersionRdsRoutesWithSupabaseDataAccess, 19)
   assert.equal(template.sourceInventory.deferredAppApiRouteCount, 6)
   assert.equal(template.sourceInventory.deferredAppApiRoutesWithSupabaseDataAccess, 4)
   assert.equal(template.sourceInventory.databaseUrlCnReferencedInSource, true)
@@ -83,10 +83,10 @@ test("Aliyun RDS migration evidence check reports missing local closure without 
   assert.deepEqual(report.local.blockers, ["file_missing"])
   assert.equal(report.summary.appApiRouteCount, 31)
   assert.equal(report.summary.appApiRoutesWithSupabase, 31)
-  assert.equal(report.summary.appApiRoutesWithSupabaseDataAccess, 27)
+  assert.equal(report.summary.appApiRoutesWithSupabaseDataAccess, 23)
   assert.equal(report.summary.firstVersionRdsRouteCount, 25)
   assert.equal(report.summary.firstVersionRdsRoutesWithSupabase, 25)
-  assert.equal(report.summary.firstVersionRdsRoutesWithSupabaseDataAccess, 23)
+  assert.equal(report.summary.firstVersionRdsRoutesWithSupabaseDataAccess, 19)
   assert.equal(report.summary.deferredAppApiRouteCount, 6)
   assert.equal(report.summary.deferredAppApiRoutesWithSupabaseDataAccess, 4)
   assert.equal(report.summary.databaseUrlCnReferencedInSource, true)
@@ -137,7 +137,7 @@ test("Aliyun RDS migration evidence init creates a non-secret local evidence sca
   assert.equal(local.rdsPostgres.databaseUrlCnSecretImported, false)
   assert.equal(local.sourceInventory.generatedBy, "corepack pnpm aliyun:rds:migration:plan")
   assert.equal(local.sourceInventory.appApiRouteCount, 31)
-  assert.equal(local.sourceInventory.firstVersionRdsRoutesWithSupabaseDataAccess, 23)
+  assert.equal(local.sourceInventory.firstVersionRdsRoutesWithSupabaseDataAccess, 19)
   assert.equal(local.sourceInventory.databaseUrlCnReferencedInSource, true)
   assert.equal(local.sourceInventory.postgresDataAccessAdapterDetected, true)
   assert.equal(local.migration.schemaInventoryReviewed, true)
@@ -177,10 +177,10 @@ test("Aliyun RDS migration evidence init does not overwrite an existing local ev
       generatedBy: "corepack pnpm aliyun:rds:migration:plan",
       appApiRouteCount: 31,
       appApiRoutesWithSupabase: 31,
-      appApiRoutesWithSupabaseDataAccess: 27,
+      appApiRoutesWithSupabaseDataAccess: 23,
       firstVersionRdsRouteCount: 25,
       firstVersionRdsRoutesWithSupabase: 25,
-      firstVersionRdsRoutesWithSupabaseDataAccess: 23,
+      firstVersionRdsRoutesWithSupabaseDataAccess: 19,
       deferredAppApiRouteCount: 6,
       deferredAppApiRoutesWithSupabaseDataAccess: 4,
       tableCount: 44,
@@ -257,7 +257,7 @@ test("Aliyun RDS migration evidence markdown is value-free", () => {
   assert.match(markdown, /RDS migration evidence check/)
   assert.match(markdown, /localExists: false/)
   assert.match(markdown, /writebackBlockingGroups: rdsInstanceAndSecret/)
-  assert.match(markdown, /firstVersionRdsRoutesWithSupabaseDataAccess: 23\/25/)
+  assert.match(markdown, /firstVersionRdsRoutesWithSupabaseDataAccess: 19\/25/)
   assert.match(markdown, /deferredAppApiRoutesWithSupabaseDataAccess: 4\/6/)
   assert.match(markdown, /P11_ALIYUN_RDS_DATA_MIGRATION/)
   assert.match(markdown, /DATABASE_URL_CN/)

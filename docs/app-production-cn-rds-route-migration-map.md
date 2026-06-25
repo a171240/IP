@@ -9,10 +9,10 @@
 - formalTarget: Aliyun RDS PostgreSQL
 - currentSource: Supabase migration source / legacy compatibility only
 - firstVersionRouteCount: 25
-- routesStillUsingSupabaseDataAccess: 23
-- routesUsingAliyunRdsDataAccess: 2
-- sharedDataAccessFileCount: 25
-- sharedRdsDataAccessFileCount: 3
+- routesStillUsingSupabaseDataAccess: 19
+- routesUsingAliyunRdsDataAccess: 6
+- sharedDataAccessFileCount: 21
+- sharedRdsDataAccessFileCount: 9
 - implementationWorkPackageCount: 5
 - proposedRepositoryFileCount: 11
 - observedTables: entitlements, mp_account_invites, mp_account_memberships, mp_ai_point_ledger, mp_companies, mp_stores, profiles, service_record_markers, service_record_segments, service_record_sessions, store_profiles, voice_coach_customer_profiles, voice_coach_sessions, voice_coach_turns
@@ -62,11 +62,11 @@
 ### context
 
 - routeCount: 4
-- routesStillUsingSupabaseDataAccess: 4
+- routesStillUsingSupabaseDataAccess: 0
 - tableNames: profiles, store_profiles, voice_coach_customer_profiles
 - rpcNames: none
-- dataAccessFiles: app/api/mp/store-profiles/[profileId]/route.ts, app/api/mp/store-profiles/route.ts, app/api/mp/voice-coach/customer-profiles/[profileId]/route.ts, app/api/mp/voice-coach/customer-profiles/route.ts
-- rdsDataAccessFiles: none
+- dataAccessFiles: none
+- rdsDataAccessFiles: app/api/app/customer-profiles/[profileId]/route.ts, app/api/app/customer-profiles/route.ts, app/api/app/store-profiles/[profileId]/route.ts, app/api/app/store-profiles/route.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/customer-profiles.server.ts, lib/aliyun-rds/repositories/store-profiles.server.ts
 - /api/app/store-profiles
 - /api/app/store-profiles/[profileId]
 - /api/app/customer-profiles
@@ -118,15 +118,15 @@
 
 - order: 2
 - title: Store profile and customer profile repositories
-- status: blocked_until_repository_uses_database_url_cn
+- status: rds_repository_in_source_pending_runtime_evidence
 - scope: context
 - routeCount: 4
-- routesStillUsingSupabaseDataAccess: 4
+- routesStillUsingSupabaseDataAccess: 0
 - routes: /api/app/store-profiles, /api/app/store-profiles/[profileId], /api/app/customer-profiles, /api/app/customer-profiles/[profileId]
 - tableNames: profiles, store_profiles, voice_coach_customer_profiles
 - rpcNames: none
-- currentSupabaseDataAccessFiles: app/api/mp/store-profiles/[profileId]/route.ts, app/api/mp/store-profiles/route.ts, app/api/mp/voice-coach/customer-profiles/[profileId]/route.ts, app/api/mp/voice-coach/customer-profiles/route.ts
-- rdsDataAccessFiles: none
+- currentSupabaseDataAccessFiles: none
+- rdsDataAccessFiles: app/api/app/customer-profiles/[profileId]/route.ts, app/api/app/customer-profiles/route.ts, app/api/app/store-profiles/[profileId]/route.ts, app/api/app/store-profiles/route.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/customer-profiles.server.ts, lib/aliyun-rds/repositories/store-profiles.server.ts
 - proposedRepositoryFiles: lib/aliyun-rds/repositories/store-profiles.server.ts, lib/aliyun-rds/repositories/customer-profiles.server.ts
 - blockedBy: DATABASE_URL_CN, request_auth_identity_boundary_ready, schema_data_rollback_validation, store_profiles_and_customer_profiles_migrated
 - acceptanceGate: /api/app/store-profiles and /api/app/customer-profiles CRUD use DATABASE_URL_CN-backed repositories.
@@ -197,8 +197,8 @@
 - methods: GET
 - scope: account
 - appFile: app/api/app/profile/route.ts
-- sourceRoute: /api/mp/profile
-- sourceFiles: app/api/mp/profile/route.ts
+- sourceRoute: none
+- sourceFiles: app/api/app/profile/route.ts, lib/aliyun-rds/repositories/account-profile.server.ts, lib/aliyun-rds/postgres.server.ts
 - tableNames: none
 - rpcNames: none
 - rdsTableNames: entitlements, mp_account_memberships, mp_companies, mp_stores, profiles
@@ -211,8 +211,8 @@
 - methods: GET
 - scope: account
 - appFile: app/api/app/entitlements/route.ts
-- sourceRoute: /api/mp/profile
-- sourceFiles: app/api/mp/profile/route.ts
+- sourceRoute: /api/app/profile
+- sourceFiles: app/api/app/profile/route.ts
 - tableNames: none
 - rpcNames: none
 - rdsTableNames: entitlements, mp_account_memberships, mp_companies, mp_stores, profiles
@@ -323,56 +323,56 @@
 - methods: GET, POST
 - scope: context
 - appFile: app/api/app/store-profiles/route.ts
-- sourceRoute: /api/mp/store-profiles
-- sourceFiles: app/api/mp/store-profiles/route.ts
-- tableNames: profiles, store_profiles
+- sourceRoute: none
+- sourceFiles: app/api/app/store-profiles/route.ts, lib/aliyun-rds/repositories/store-profiles.server.ts, lib/aliyun-rds/postgres.server.ts
+- tableNames: none
 - rpcNames: none
-- rdsTableNames: none
-- dataAccessFiles: app/api/mp/store-profiles/route.ts
-- rdsDataAccessFiles: none
-- rdsMigrationStatus: blocked_until_route_repository_uses_database_url_cn
+- rdsTableNames: profiles, store_profiles
+- dataAccessFiles: none
+- rdsDataAccessFiles: app/api/app/store-profiles/route.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/store-profiles.server.ts
+- rdsMigrationStatus: rds_repository_in_source_pending_runtime_evidence
 
 ### /api/app/store-profiles/[profileId]
 
 - methods: GET, PUT, DELETE
 - scope: context
 - appFile: app/api/app/store-profiles/[profileId]/route.ts
-- sourceRoute: /api/mp/store-profiles/[profileId]
-- sourceFiles: app/api/mp/store-profiles/[profileId]/route.ts
-- tableNames: store_profiles
+- sourceRoute: none
+- sourceFiles: app/api/app/store-profiles/[profileId]/route.ts, lib/aliyun-rds/repositories/store-profiles.server.ts, lib/aliyun-rds/postgres.server.ts
+- tableNames: none
 - rpcNames: none
-- rdsTableNames: none
-- dataAccessFiles: app/api/mp/store-profiles/[profileId]/route.ts
-- rdsDataAccessFiles: none
-- rdsMigrationStatus: blocked_until_route_repository_uses_database_url_cn
+- rdsTableNames: profiles, store_profiles
+- dataAccessFiles: none
+- rdsDataAccessFiles: app/api/app/store-profiles/[profileId]/route.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/store-profiles.server.ts
+- rdsMigrationStatus: rds_repository_in_source_pending_runtime_evidence
 
 ### /api/app/customer-profiles
 
 - methods: GET, POST
 - scope: context
 - appFile: app/api/app/customer-profiles/route.ts
-- sourceRoute: /api/mp/voice-coach/customer-profiles
-- sourceFiles: app/api/mp/voice-coach/customer-profiles/route.ts
-- tableNames: voice_coach_customer_profiles
+- sourceRoute: none
+- sourceFiles: app/api/app/customer-profiles/route.ts, lib/aliyun-rds/repositories/customer-profiles.server.ts, lib/aliyun-rds/postgres.server.ts
+- tableNames: none
 - rpcNames: none
-- rdsTableNames: none
-- dataAccessFiles: app/api/mp/voice-coach/customer-profiles/route.ts
-- rdsDataAccessFiles: none
-- rdsMigrationStatus: blocked_until_route_repository_uses_database_url_cn
+- rdsTableNames: voice_coach_customer_profiles
+- dataAccessFiles: none
+- rdsDataAccessFiles: app/api/app/customer-profiles/route.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/customer-profiles.server.ts
+- rdsMigrationStatus: rds_repository_in_source_pending_runtime_evidence
 
 ### /api/app/customer-profiles/[profileId]
 
 - methods: GET, PUT, DELETE
 - scope: context
 - appFile: app/api/app/customer-profiles/[profileId]/route.ts
-- sourceRoute: /api/mp/voice-coach/customer-profiles/[profileId]
-- sourceFiles: app/api/mp/voice-coach/customer-profiles/[profileId]/route.ts
-- tableNames: voice_coach_customer_profiles
+- sourceRoute: none
+- sourceFiles: app/api/app/customer-profiles/[profileId]/route.ts, lib/aliyun-rds/repositories/customer-profiles.server.ts, lib/aliyun-rds/postgres.server.ts
+- tableNames: none
 - rpcNames: none
-- rdsTableNames: none
-- dataAccessFiles: app/api/mp/voice-coach/customer-profiles/[profileId]/route.ts
-- rdsDataAccessFiles: none
-- rdsMigrationStatus: blocked_until_route_repository_uses_database_url_cn
+- rdsTableNames: voice_coach_customer_profiles
+- dataAccessFiles: none
+- rdsDataAccessFiles: app/api/app/customer-profiles/[profileId]/route.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/customer-profiles.server.ts
+- rdsMigrationStatus: rds_repository_in_source_pending_runtime_evidence
 
 ### /api/app/service-records/sessions
 
