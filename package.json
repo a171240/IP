@@ -91,6 +91,7 @@
     "aliyun:operator:handoff": "node ./scripts/generate-aliyun-operator-handoff.mjs",
     "aliyun:operator:handoff:backend": "node ./scripts/generate-aliyun-operator-handoff.mjs --backend-only --skip-vercel-env-coverage",
     "aliyun:status": "node ./scripts/summarize-aliyun-production-cn-status.mjs",
+    "aliyun:status:backend": "node ./scripts/summarize-aliyun-production-cn-status.mjs --backend-only",
     "aliyun:legal:check": "node ./scripts/check-app-legal-pages.mjs --allow-missing-env",
     "aliyun:legal:strict": "node ./scripts/check-app-legal-pages.mjs",
     "aliyun:cloud:access": "node ./scripts/check-aliyun-cloud-access.mjs",

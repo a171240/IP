@@ -28,6 +28,7 @@ test("Aliyun evidence writeback command is wired into scripts, predeploy, deploy
   assert.equal(pkg.scripts["aliyun:evidence:writeback"], "node ./scripts/generate-aliyun-evidence-writeback-checklist.mjs")
   assert.equal(pkg.scripts["aliyun:evidence:writeback:backend"], "node ./scripts/generate-aliyun-evidence-writeback-checklist.mjs --backend-only --skip-vercel-env-coverage")
   assert.equal(pkg.scripts["aliyun:release:artifacts:backend"], "node ./scripts/prepare-aliyun-release-artifacts.mjs --backend-only --skip-vercel-env-coverage")
+  assert.equal(pkg.scripts["aliyun:status:backend"], "node ./scripts/summarize-aliyun-production-cn-status.mjs --backend-only")
   assert.equal(pkg.scripts["aliyun:evidence:writeback:test"], "node --test tests/aliyun-evidence-writeback.static.test.js")
   assert.match(predeploy, /aliyun:evidence:writeback:test/)
   assert.match(predeploy, /aliyun:evidence:writeback", "--", "--skip-vercel-env-coverage/)
@@ -62,8 +63,49 @@ test("Aliyun backend-only release artifacts defer APP launch packages instead of
   assert.match(releaseArtifacts, /machineBlockingForScope[\s\S]*blockerBrief\.summary\.machineBlocking/)
   assert.match(releaseArtifacts, /manualBlockingForScope[\s\S]*backendApplyPackage\.applySteps/)
   assert.match(releaseArtifacts, /cloudConfirmationLinesForScope[\s\S]*cloudConfirmationsCheck\?\.local\?\.itemStatus/)
+  assert.match(releaseArtifacts, /scripts\/generate-aliyun-operator-tasks\.mjs"[\s\S]*\.\.\.backendOnlyArg[\s\S]*"--out"[\s\S]*operatorTasksJsonPath/)
+  assert.match(releaseArtifacts, /scripts\/summarize-aliyun-production-cn-status\.mjs"[\s\S]*\.\.\.backendOnlyArg[\s\S]*"--out"[\s\S]*productionStatusJsonPath/)
   assert.doesNotMatch(releaseArtifacts, /\.\.\.readiness\.machineBlocking\.map/)
   assert.doesNotMatch(releaseArtifacts, /\.\.\.readiness\.manualBlocking\.map/)
+})
+
+test("Aliyun production status backend-only mode scopes current blockers to Aliyun backend", () => {
+  const output = execFileSync(process.execPath, [
+    "scripts/summarize-aliyun-production-cn-status.mjs",
+    "--backend-only",
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 50,
+  })
+  const report = JSON.parse(output)
+  const currentBlockerSurface = JSON.stringify({
+    requiredBlocking: report.summary.requiredBlocking,
+    machineBlocking: report.summary.machineBlocking,
+    manualBlocking: report.summary.manualBlocking,
+    cloudPendingKeys: report.summary.cloudConfirmations.pending.map((item) => item.key),
+    taskIds: report.tasks.notReady.map((item) => item.id),
+    keyBlocked: report.tasks.keyBlocked.map((item) => item.id),
+    humanSummary: report.humanSummary,
+  })
+
+  assert.equal(report.currentScope, "backend_aliyun_only")
+  assert.equal(report.backendOnly, true)
+  assert.equal(report.canProceedWithoutWechat, true)
+  assert.deepEqual(report.summary.requiredBlocking, ["DATABASE_URL_CN"])
+  assert.deepEqual(report.summary.machineBlocking, ["missing_required_env:DATABASE_URL_CN"])
+  assert.equal(report.summary.cloudConfirmations.total, 6)
+  assert.ok(!report.summary.cloudConfirmations.pending.some((item) => item.key === "wechatOpenPlatform"))
+  assert.ok(!report.tasks.notReady.some((item) => item.id === "T01_WECHAT_OPEN_PLATFORM_APP_LOGIN"))
+  assert.ok(!report.tasks.keyBlocked.some((item) => item.id === "T01_WECHAT_OPEN_PLATFORM_APP_LOGIN"))
+  assert.ok(report.summary.fullAppRequiredBlocking.includes("WECHAT_OPEN_APP_ID"))
+  assert.ok(report.summary.fullAppRequiredBlocking.includes("WECHAT_OPEN_APP_SECRET"))
+  assert.ok(report.summary.deferredAppLaunchBlocking.includes("WECHAT_OPEN_APP_ID"))
+  assert.ok(report.summary.deferredAppLaunchBlocking.includes("WECHAT_OPEN_APP_SECRET"))
+  assert.doesNotMatch(currentBlockerSurface, /WECHAT_OPEN_APP_ID/)
+  assert.doesNotMatch(currentBlockerSurface, /WECHAT_OPEN_APP_SECRET/)
+  assert.doesNotMatch(currentBlockerSurface, /APPLE_TEAM_ID/)
+  assertNoSecretLikeValues(output)
 })
 
 test("Aliyun evidence writeback backend-only mode excludes deferred APP launch gaps", () => {

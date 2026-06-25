@@ -1608,6 +1608,7 @@ function main() {
   const cloudConfirmationsCheckPath = resolve(args.outDir, "cloud-confirmations-check.json")
   const operatorTasks = runJson("operator_tasks", [
     "scripts/generate-aliyun-operator-tasks.mjs",
+    ...backendOnlyArg,
     "--env-file",
     args.envFile,
     ...(args.cloudConfirmationsFile ? ["--cloud-confirmations", args.cloudConfirmationsFile] : []),
@@ -1839,6 +1840,7 @@ function main() {
   ])
   const productionStatus = runJson("production_status", [
     "scripts/summarize-aliyun-production-cn-status.mjs",
+    ...backendOnlyArg,
     "--env-file",
     args.envFile,
     ...(args.cloudConfirmationsFile ? ["--cloud-confirmations", args.cloudConfirmationsFile] : []),

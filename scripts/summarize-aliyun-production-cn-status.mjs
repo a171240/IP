@@ -12,6 +12,24 @@ const WORKSPACE_ROOT = resolve(BACKEND_ROOT, "../..")
 const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
 const DEFAULT_CLOUD_INVENTORY_RESULTS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-inventory-results.local.json")
+const BACKEND_ONLY_ENV_BLOCKERS = new Set(["DATABASE_URL_CN"])
+const BACKEND_ONLY_DEFERRED_APP_LAUNCH_BLOCKING = [
+  "WECHAT_OPEN_PLATFORM_MOBILE_APP",
+  "WECHAT_OPEN_APP_ID",
+  "WECHAT_OPEN_APP_SECRET",
+  "ANDROID_RELEASE_SIGNING",
+  "APPLE_TEAM_ID",
+  "IOS_UNIVERSAL_LINK_AASA",
+]
+const CLOUD_CONFIRMATION_LABELS = {
+  runtime: "阿里云 SAE 容器应用已创建，运行端口 3000",
+  apiDomainHttps: "api-cn 域名已备案、解析到阿里云入口并配置 HTTPS",
+  assetDomainHttps: "assets-cn 域名已备案、解析到阿里云入口并配置 HTTPS",
+  oss: "OSS Bucket CORS、RAM 最小权限和服务记录音频前缀已确认",
+  wechatOpenPlatform: "微信开放平台移动应用审核已通过，并已取得 AppID/AppSecret、Android 包名/签名、iOS Bundle ID/Universal Link 配置",
+  envImport: "生产环境变量已通过阿里云控制台、KMS 或 Secrets Manager 导入，未把密钥写进镜像",
+  slsAlerts: "SLS 日志、健康检查失败告警和 5xx 告警已配置",
+}
 
 function parseArgs(argv) {
   const args = {
@@ -20,11 +38,16 @@ function parseArgs(argv) {
     cloudInventoryResultsFile: DEFAULT_CLOUD_INVENTORY_RESULTS_FILE,
     outPath: "",
     markdownPath: "",
+    backendOnly: false,
   }
 
   for (let index = 2; index < argv.length; index += 1) {
     const arg = argv[index]
     if (arg === "--") continue
+    if (arg === "--backend-only") {
+      args.backendOnly = true
+      continue
+    }
     if (arg === "--env-file") {
       args.envFile = resolveValue(argv[++index], "--env-file")
       continue
@@ -96,6 +119,27 @@ function countCloudReady(readiness) {
   }
 }
 
+function countScopedCloudReady(cloudConfirmationsCheck) {
+  const itemStatus = cloudConfirmationsCheck?.local?.itemStatus || {}
+  const items = Object.entries(itemStatus).map(([key, status]) => ({
+    key,
+    label: CLOUD_CONFIRMATION_LABELS[key] || key,
+    ready: status?.ready === true,
+    missing: status?.blockers || [],
+  }))
+  return {
+    ready: items.filter((item) => item.ready).length,
+    total: items.length,
+    pending: items
+      .filter((item) => !item.ready)
+      .map((item) => ({
+        key: item.key,
+        label: item.label,
+        missing: item.missing,
+      })),
+  }
+}
+
 function compactTask(task) {
   return {
     id: task.id,
@@ -109,15 +153,16 @@ function compactTask(task) {
   }
 }
 
-function buildStatus({ readiness, operatorTasks, cloudInventoryResults, args }) {
+function buildStatus({ readiness, operatorTasks, cloudInventoryResults, cloudConfirmationsCheck, args }) {
   const tasks = operatorTasks.tasks || []
   const notReadyTasks = tasks.filter((task) => !task.ready)
   const readyTasks = tasks.filter((task) => task.ready)
+  const currentScope = args.backendOnly ? "backend_aliyun_only" : "full_app_launch"
   const wechatTask = taskById(tasks, "T01_WECHAT_OPEN_PLATFORM_APP_LOGIN")
   const legalTask = taskById(tasks, "T02_APP_LEGAL_LINKS")
   const domainTask = taskById(tasks, "T04_ALIYUN_DOMAIN_DNS_HTTPS")
   const envTask = taskById(tasks, "T06_ALIYUN_ENV_IMPORT")
-  const cloudReady = countCloudReady(readiness)
+  const cloudReady = args.backendOnly ? countScopedCloudReady(cloudConfirmationsCheck) : countCloudReady(readiness)
   const cloudInventoryLocal = cloudInventoryResults.local || {}
   const cloudInventorySummary = cloudInventoryResults.summary || {}
   const cloudInventoryObservationSummary = cloudInventoryLocal.observationSummary || {
@@ -134,9 +179,18 @@ function buildStatus({ readiness, operatorTasks, cloudInventoryResults, args }) 
     notFoundOperationIds: [],
     blockedOperationIds: [],
   }
-  const missingRequiredEnv = readiness.checks?.env?.missingRequired || operatorTasks.env?.requiredBlocking || []
-  const machineBlocking = readiness.machineBlocking || []
-  const manualBlocking = readiness.manualBlocking || []
+  const fullAppMissingRequiredEnv = readiness.checks?.env?.missingRequired || operatorTasks.env?.requiredBlocking || []
+  const missingRequiredEnv = args.backendOnly
+    ? (operatorTasks.env?.requiredBlocking || fullAppMissingRequiredEnv).filter((name) => BACKEND_ONLY_ENV_BLOCKERS.has(name))
+    : fullAppMissingRequiredEnv
+  const fullAppMachineBlocking = readiness.machineBlocking || []
+  const machineBlocking = args.backendOnly
+    ? missingRequiredEnv.map((name) => `missing_required_env:${name}`)
+    : fullAppMachineBlocking
+  const fullAppManualBlocking = readiness.manualBlocking || []
+  const manualBlocking = args.backendOnly
+    ? notReadyTasks.map((task) => `${task.id}:${task.status}`)
+    : fullAppManualBlocking
   const bridgeMap = readiness.checks?.backend?.appApiBridgeMap || null
   const legalPages = readiness.checks?.backend?.legalPages || null
   const appRuntimeConfig = readiness.checks?.appProductionConfig?.runtimeConfig || null
@@ -152,7 +206,24 @@ function buildStatus({ readiness, operatorTasks, cloudInventoryResults, args }) 
   const canDeployNow = false
   const authorizationNote = "本命令只读汇总状态，不代表已授权阿里云部署、ACR push、DNS 修改、微信操作或 git push。"
 
-  const humanSummary = [
+  const backendOnlyHumanSummary = [
+    `当前口径：${currentScope}；微信开放平台移动应用、Android 签名、iOS AASA 已延期到 APP 上架阶段，不阻塞本轮阿里云后端补齐。`,
+    readiness.productionReady
+      ? "机器门禁显示 productionReady=true；仍需单独取得生产部署授权。"
+      : `现在不能部署阿里云后端：operator tasks ${operatorTasks.summary?.ready || 0}/${operatorTasks.summary?.total || tasks.length} ready。`,
+    `后端必填环境变量缺口：${missingRequiredEnv.length ? missingRequiredEnv.join(", ") : "none"}。`,
+    bridgeDataLayer
+      ? `数据层：正式 production-cn 目标 ${bridgeDataLayer.target}，当前 ${bridgeDataLayer.current}；RDS migration included=${bridgeDataLayer.rdsMigrationIncludedInThisRelease === true}，DATABASE_URL_CN=${bridgeDataLayer.databaseUrlCnStatus || "unknown"}。`
+      : "数据层：unknown。",
+    `阿里云云资源确认：${cloudReady.ready}/${cloudReady.total} ready；还缺 SAE、DNS/HTTPS/ICP、OSS/CORS/RAM、env import、SLS 中未完成项。`,
+    `阿里云 CLI 只读盘点结果：${cloudInventoryLocal.ready ? "ready" : "not ready"}；localExists=${cloudInventoryLocal.exists === true}，local operations ${cloudInventorySummary.readyLocalOperations || 0}/${cloudInventorySummary.localOperations || 0} ready，blockers ${(cloudInventoryLocal.blockers || []).join(", ") || "none"}。`,
+    `阿里云控制台观察证据：safeConsoleOnly=${cloudInventoryObservationSummary.safeConsoleOnly === true}，consoleObservationOperations=${cloudInventoryObservationSummary.consoleObservationOperations || 0}/${cloudInventoryObservationSummary.operations || 0}，executedCommandResults=${cloudInventoryObservationSummary.executedCommandResults || 0}/${cloudInventoryObservationSummary.commandResults || 0}，cloudApiCalledCommandResults=${cloudInventoryObservationSummary.cloudApiCalledCommandResults || 0}。`,
+    `域名门禁：${operatorTasks.domain?.ok ? "ready" : "blocked"}；当前 api-cn/assets-cn 仍未证明解析到阿里云 HTTPS 入口。`,
+    `镜像发布计划：${imagePlan?.ready ? "ready" : "blocked"}；本地 Docker 镜像 ${imagePlan?.localDockerImage?.status || operatorTasks.imagePublishPlan?.localDockerImage || "unknown"}，ACR/runtime 拉取证据未完成。`,
+    `密钥/密码/token/付款/受控标识符类人工介入项：${sensitiveActionItems.length} 项；脚本只输出变量名、控制台路径和动作，不输出任何 value。`,
+  ]
+
+  const fullAppHumanSummary = [
     readiness.productionReady
       ? "机器门禁显示 productionReady=true；仍需单独取得生产部署授权。"
       : `现在不能上线/部署：productionReady=false，operator tasks ${operatorTasks.summary?.ready || 0}/${operatorTasks.summary?.total || tasks.length} ready。`,
@@ -174,9 +245,15 @@ function buildStatus({ readiness, operatorTasks, cloudInventoryResults, args }) 
     `镜像发布计划：${imagePlan?.ready ? "ready" : "blocked"}；本地 Docker 镜像 ${imagePlan?.localDockerImage?.status || operatorTasks.imagePublishPlan?.localDockerImage || "unknown"}，ACR/runtime 拉取证据未完成。`,
     `密钥/密码/token/付款/受控标识符类人工介入项：${sensitiveActionItems.length} 项；脚本只输出变量名、控制台路径和动作，不输出任何 value。`,
   ]
+  const humanSummary = args.backendOnly ? backendOnlyHumanSummary : fullAppHumanSummary
 
   return {
     generatedAt: new Date().toISOString(),
+    currentScope,
+    fullAppLaunchScope: args.backendOnly ? "deferred_after_backend_online" : "current",
+    canProceedWithoutWechat: args.backendOnly === true,
+    backendOnly: args.backendOnly === true,
+    deferredAppLaunchBlocking: args.backendOnly ? BACKEND_ONLY_DEFERRED_APP_LAUNCH_BLOCKING : [],
     containsValues: false,
     diagnosticOnly: readiness.diagnosticOnly === true,
     releaseEvidenceUsable: readiness.releaseEvidenceUsable !== false,
@@ -192,6 +269,9 @@ function buildStatus({ readiness, operatorTasks, cloudInventoryResults, args }) 
       cloudInventoryResultsFileExists: existsSync(args.cloudInventoryResultsFile),
     },
     summary: {
+      currentScope,
+      fullAppLaunchScope: args.backendOnly ? "deferred_after_backend_online" : "current",
+      canProceedWithoutWechat: args.backendOnly === true,
       productionReady: readiness.productionReady,
       diagnosticOnly: readiness.diagnosticOnly === true,
       releaseEvidenceUsable: readiness.releaseEvidenceUsable !== false,
@@ -199,8 +279,12 @@ function buildStatus({ readiness, operatorTasks, cloudInventoryResults, args }) 
       requiredReady: readiness.checks?.env?.requiredReady || 0,
       requiredTotal: readiness.checks?.env?.requiredTotal || 0,
       requiredBlocking: missingRequiredEnv,
+      fullAppRequiredBlocking: fullAppMissingRequiredEnv,
       machineBlocking,
+      fullAppMachineBlocking,
       manualBlocking,
+      fullAppManualBlocking,
+      deferredAppLaunchBlocking: args.backendOnly ? BACKEND_ONLY_DEFERRED_APP_LAUNCH_BLOCKING : [],
       sensitiveActionItems: {
         total: sensitiveActionItems.length,
         blocked: sensitiveActionItems.filter((item) => item.status !== "ready").length,
@@ -288,7 +372,7 @@ function buildStatus({ readiness, operatorTasks, cloudInventoryResults, args }) 
     tasks: {
       ready: readyTasks.map(compactTask),
       notReady: notReadyTasks.map(compactTask),
-      keyBlocked: [wechatTask, domainTask, envTask].filter(Boolean).map(compactTask),
+      keyBlocked: (args.backendOnly ? [domainTask, envTask] : [wechatTask, domainTask, envTask]).filter(Boolean).map(compactTask),
       sensitiveActionItems: sensitiveActionItems.map(compactSensitiveActionItem),
       legal: legalTask ? compactTask(legalTask) : null,
       waitingWechatReview: wechatTask?.status === "waiting_wechat_review" ? compactTask(wechatTask) : null,
@@ -338,6 +422,9 @@ function renderMarkdown(status) {
     `Generated: ${status.generatedAt}`,
     "",
     `- Verdict: ${status.verdict}`,
+    `- Current scope: ${status.currentScope}`,
+    `- Full APP launch scope: ${status.fullAppLaunchScope}`,
+    `- Can proceed without WeChat mobile app: ${status.canProceedWithoutWechat ? "yes" : "no"}`,
     `- Can deploy now: ${status.canDeployNow ? "yes" : "no"}`,
     `- Diagnostic only: ${status.diagnosticOnly ? "yes" : "no"}`,
     `- Release evidence usable: ${status.releaseEvidenceUsable ? "yes" : "no"}`,
@@ -411,6 +498,7 @@ function printHelp() {
   console.log(`Usage: node scripts/summarize-aliyun-production-cn-status.mjs [options]
 
 Options:
+  --backend-only                Scope the current blockers to Aliyun backend completion only.
   --env-file <path>              Env file to check. Defaults to workspace .env.production-cn.local.
   --cloud-confirmations <path>   Non-secret cloud confirmation file.
   --cloud-inventory-results <path>
@@ -423,6 +511,7 @@ Options:
 
 function main() {
   const args = parseArgs(process.argv)
+  const backendOnlyArg = args.backendOnly ? ["--backend-only"] : []
   const readiness = runJson("readiness", [
     resolve(BACKEND_ROOT, "scripts/check-aliyun-production-cn-readiness.mjs"),
     "--allow-blocking",
@@ -433,6 +522,7 @@ function main() {
   ])
   const operatorTasks = runJson("operator_tasks", [
     resolve(BACKEND_ROOT, "scripts/generate-aliyun-operator-tasks.mjs"),
+    ...backendOnlyArg,
     "--env-file",
     args.envFile,
     "--cloud-confirmations",
@@ -444,8 +534,17 @@ function main() {
     "--local",
     args.cloudInventoryResultsFile,
   ])
+  const cloudConfirmationsCheck = args.backendOnly
+    ? runJson("cloud_confirmations", [
+      resolve(BACKEND_ROOT, "scripts/check-aliyun-cloud-confirmations.mjs"),
+      ...backendOnlyArg,
+      "--allow-incomplete",
+      "--local",
+      args.cloudConfirmationsFile,
+    ])
+    : null
 
-  const status = buildStatus({ readiness, operatorTasks, cloudInventoryResults, args })
+  const status = buildStatus({ readiness, operatorTasks, cloudInventoryResults, cloudConfirmationsCheck, args })
   const output = `${JSON.stringify(status, null, 2)}\n`
   if (args.outPath) writeFileSync(args.outPath, output)
   if (args.markdownPath) writeFileSync(args.markdownPath, renderMarkdown(status))
