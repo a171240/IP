@@ -1,10 +1,10 @@
 # 美业话镜 APP production-cn CloudShell/CLI 只读盘点交接包
 
-Generated: 2026-06-25T07:08:55.439Z
+Generated: 2026-06-25T21:44:35.767Z
 
 ## 当前结论
 
-- Aliyun CLI/CloudShell read-only inventory is still blocked by local CLI/CloudShell configuration; do not treat cloud resources as ready.
+- Aliyun CloudShell read-only inventory is blocked because the current CloudShell tab is disconnected and the page shows a restart-instance confirmation; do not confirm it without action-time approval.
 - canReadCloudNow: false
 - cliConfigProbeReady: false
 - cliConfigProbeFailureCategory: aliyun_cli_profile_not_configured
@@ -15,9 +15,17 @@ Generated: 2026-06-25T07:08:55.439Z
 - strictInventoryMutationPerformedCommandResults: 0
 - currentBrowserCanUseCurrentConsole: true
 - currentBrowserAliyunConsoleTabCount: 1
-- currentBrowserAliyunConsoleHostPaths: home.console.aliyun.com/home/dashboard/ProductAndService
+- currentBrowserAliyunConsoleHostPaths: shell.aliyun.com
 - currentBrowserCloudApiCalled: false
 - currentBrowserCloudMutationPerformed: false
+- cloudShellCurrentStatus: disconnected_restart_instance_confirmation_required
+- cloudShellRequiresActionTimeConfirmation: true
+- cloudShellRequiresActionTimeOpenConfirmation: false
+- cloudShellRequiresActionTimeRestartConfirmation: true
+- cloudShellConfirmationKinds: restart_instance
+- cloudShellBillingWarning: none
+- cloudShellRestartWarning: CloudShell restart confirmation says it will terminate current sessions and create a new session; do not confirm it without action-time approval.
+- cloudShellBlockers: cloudshell_disconnected_restart_instance_confirmation_required
 - inventoryPlanStatus: blocked_until_cli_configured
 - totalOperations: 9
 - commandTemplates: 23
@@ -55,14 +63,25 @@ Generated: 2026-06-25T07:08:55.439Z
 ### 阿里云 CloudShell
 
 - id: aliyun_cloudshell
-- currentStatus: cloudshell_cli_config_missing_or_unread
+- currentStatus: disconnected_restart_instance_confirmation_required
 - consolePath: 阿里云控制台 -> CloudShell -> cn-hangzhou / 华东1或华东2账号上下文
 - currentBrowserCanUseCurrentConsole: true
-- currentBrowserAliyunConsoleHostPaths: home.console.aliyun.com/home/dashboard/ProductAndService
+- cloudShellConnected: false
+- cloudShellCanRunReadOnlyInventory: false
+- requiresActionTimeConfirmation: true
+- requiresActionTimeOpenConfirmation: false
+- requiresActionTimeRestartConfirmation: true
+- confirmationKinds: restart_instance
+- cloudShellBlockers: cloudshell_disconnected_restart_instance_confirmation_required
+- restartWarning: CloudShell restart confirmation says it will terminate current sessions and create a new session; do not confirm it without action-time approval.
+- cloudShellEvidence: local_macos_aliyun_cli_installed_homebrew_2026-06-22T20:37_CST_version_3.3.23_binary_/opt/homebrew/bin/aliyun_config_missing_no_cloud_api_called; chrome_cloudshell_tab_2026-06-26T01:21_CST_disconnected_restart_instance_confirmation_visible_cancelled_no_restart_no_inventory
+- currentBrowserAliyunConsoleHostPaths: shell.aliyun.com
 - currentBrowserCloudApiCalled: false
 - currentBrowserCloudMutationPerformed: false
 - currentBrowserEvidence: current_chrome_aliyun_console_tabs_1
 - allowedActions:
+  - 如果页面要求点击开通，必须先获得动作时确认，因为当前页面提示可能创建性能型 NAS 并产生少量费用。
+  - 如果页面弹出重启实例确认，必须先获得动作时确认，因为该操作会终止当前 CloudShell 会话并创建新会话。
   - 只运行 inventoryPlan.operations 中列出的 List/Describe/stat/get 类只读命令。
   - 只把资源名、布尔状态、digest、exit 状态、时间戳和非密钥 evidence handle 回填到 ignored 的 .local.json。
   - 如 CloudShell 无法访问本地 repo，则按命令计划人工记录非密钥摘要，再回到本机回填。

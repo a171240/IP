@@ -1,8 +1,37 @@
 # 美业话镜 APP production-cn 阿里云 CloudShell 只读盘点
 
 日期：2026-06-24
+当前复核：2026-06-26
 
-## 结论
+## 当前复核结论（2026-06-26）
+
+当前 strict inventory 不能视为 ready。以本机当前权威文件和门禁为准：
+
+- `deploy/aliyun-production-cn.cloud-inventory-results.local.json` 当前 9 个 operation 均为 `DRY_RUN_NOT_EXECUTED`。
+- `corepack pnpm aliyun:cloud:inventory-results` 当前显示 `readyLocalOperations=0/9`。
+- `corepack pnpm aliyun:backend-cn:status` 当前仍显示 `cloudInventoryStrictReady=false`、`cloudInventoryResultGaps=1`。
+- 已登录 Chrome 中的阿里云 CloudShell 标签页可见，但终端处于 `Disconnected`；点击重连会弹出“重启实例”确认，说明会终止当前会话并创建新会话。本轮已点击“取消”，未确认重启，未运行 inventory，未调用阿里云 OpenAPI。
+
+因此，下方 2026-06-24 的 strict ready 记录只能作为历史盘点摘要，不能作为当前可部署证据。要重新恢复该证据，必须先获得动作时确认后重启/恢复 CloudShell，或配置安全的本机 Aliyun CLI profile，然后运行：
+
+```bash
+corepack pnpm aliyun:cloudshell:collector:bootstrap | pbcopy
+```
+
+再把 CloudShell 输出的非密钥 JSON 回填到：
+
+```text
+deploy/aliyun-production-cn.cloud-inventory-results.local.json
+```
+
+最后用以下命令验收：
+
+```bash
+corepack pnpm aliyun:cloud:inventory-results:strict
+corepack pnpm aliyun:backend-cn:status
+```
+
+## 2026-06-24 历史盘点记录（当前不可直接复用）
 
 本次只读盘点已经证明：阿里云账号可以通过 CloudShell 执行 allowlisted CLI 查询，`deploy/aliyun-production-cn.cloud-inventory-results.local.json` 已回填为 strict ready。
 
