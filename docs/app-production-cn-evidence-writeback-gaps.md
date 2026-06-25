@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 阿里云证据回填清单
 
-Generated: 2026-06-25T17:54:37.636Z
+Generated: 2026-06-25T18:55:14.122Z
 
 ## 当前结论
 
@@ -17,8 +17,8 @@ Generated: 2026-06-25T17:54:37.636Z
 
 - conclusion: 本地证据尚未闭环；部署前必须补齐本地 .local.json 证据并通过 strict 验证。
 - evidenceWritebackReady: 0/4
-- totalGaps: 47
-- rdsMigrationGaps: 16
+- totalGaps: 50
+- rdsMigrationGaps: 19
 - blockedCredentialCount: 1
 - blockedCredentialNames: DATABASE_URL_CN
 - readySecretEnvVariableCount: 17
@@ -71,10 +71,10 @@ Generated: 2026-06-25T17:54:37.636Z
 
 - status: can_start_after_action_time_confirmation
 - nonSecretEvidenceOnly: false
-- gapCount: 16
+- gapCount: 19
 - groupKeys: rdsMigration
-- jsonPaths: rdsPostgres.instanceId, rdsPostgres.engineVersion, rdsPostgres.networkAccess, rdsPostgres.databaseName, rdsPostgres.evidence, rdsPostgres.confirmed, rdsPostgres.databaseAccountReady, rdsPostgres.databaseUrlCnSecretImported, migration.schemaMigrated, migration.dataMigrated, migration.rowCountValidationPassed, migration.criticalRecordValidationPassed, migration.appApiSmokeOnRdsPassed, migration.supabaseNoLongerFormalTarget, migration.rollbackRunbookReviewed, migration.rollbackValidationPassed
-- writeTargets: deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.instanceId; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.engineVersion; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.networkAccess; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.databaseName; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.evidence; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.confirmed; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.databaseAccountReady; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.databaseUrlCnSecretImported; deploy/aliyun-production-cn.rds-migration.local.json -> migration.schemaMigrated; deploy/aliyun-production-cn.rds-migration.local.json -> migration.dataMigrated; deploy/aliyun-production-cn.rds-migration.local.json -> migration.rowCountValidationPassed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.criticalRecordValidationPassed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.appApiSmokeOnRdsPassed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.supabaseNoLongerFormalTarget; deploy/aliyun-production-cn.rds-migration.local.json -> migration.rollbackRunbookReviewed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.rollbackValidationPassed
+- jsonPaths: rdsPostgres.instanceId, rdsPostgres.engineVersion, rdsPostgres.networkAccess, rdsPostgres.databaseName, rdsPostgres.evidence, rdsPostgres.confirmed, rdsPostgres.databaseAccountReady, rdsPostgres.databaseUrlCnSecretImported, migration.schemaCompatibilityReviewed, migration.supabaseSpecificSqlResolved, migration.rdsExtensionSupportConfirmed, migration.schemaMigrated, migration.dataMigrated, migration.rowCountValidationPassed, migration.criticalRecordValidationPassed, migration.appApiSmokeOnRdsPassed, migration.supabaseNoLongerFormalTarget, migration.rollbackRunbookReviewed, migration.rollbackValidationPassed
+- writeTargets: deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.instanceId; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.engineVersion; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.networkAccess; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.databaseName; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.evidence; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.confirmed; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.databaseAccountReady; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.databaseUrlCnSecretImported; deploy/aliyun-production-cn.rds-migration.local.json -> migration.schemaCompatibilityReviewed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.supabaseSpecificSqlResolved; deploy/aliyun-production-cn.rds-migration.local.json -> migration.rdsExtensionSupportConfirmed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.schemaMigrated; deploy/aliyun-production-cn.rds-migration.local.json -> migration.dataMigrated; deploy/aliyun-production-cn.rds-migration.local.json -> migration.rowCountValidationPassed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.criticalRecordValidationPassed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.appApiSmokeOnRdsPassed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.supabaseNoLongerFormalTarget; deploy/aliyun-production-cn.rds-migration.local.json -> migration.rollbackRunbookReviewed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.rollbackValidationPassed
 - forbiddenValueClasses: AccessKeySecret, DATABASE_URL_CN value, Supabase service role key, customer data, database password, dump contents, token
 - strictVerifyCommands: corepack pnpm aliyun:rds:migration:evidence:strict
 
@@ -165,8 +165,8 @@ Generated: 2026-06-25T17:54:37.636Z
 
 - files: 4
 - readyFiles: 0/4
-- totalGaps: 47
-- rdsMigrationGaps: 16
+- totalGaps: 50
+- rdsMigrationGaps: 19
 - cloudInventoryResultGaps: 1
 - cloudConfirmationGaps: 18
 - imagePublishGaps: 12
@@ -178,7 +178,7 @@ Generated: 2026-06-25T17:54:37.636Z
 - file: /Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.rds-migration.local.json
 - exists: true
 - ready: false
-- totalBlockers: 16
+- totalBlockers: 19
 - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
 - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
 - strictVerifyCommands: corepack pnpm aliyun:rds:migration:evidence:strict
@@ -255,6 +255,33 @@ Generated: 2026-06-25T17:54:37.636Z
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
   - requiredEvidence: RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据
   - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env
+- `migration.schemaCompatibilityReviewed`
+  - blocker: migration.schemaCompatibilityReviewed
+  - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
+  - writeTo: deploy/aliyun-production-cn.rds-migration.local.json -> migration.schemaCompatibilityReviewed
+  - expected: 填真实非密钥证据，不能保留 TODO、pending 或 TBD 占位值。
+  - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
+  - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
+  - requiredEvidence: Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+- `migration.supabaseSpecificSqlResolved`
+  - blocker: migration.supabaseSpecificSqlResolved
+  - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
+  - writeTo: deploy/aliyun-production-cn.rds-migration.local.json -> migration.supabaseSpecificSqlResolved
+  - expected: 填真实非密钥证据，不能保留 TODO、pending 或 TBD 占位值。
+  - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
+  - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
+  - requiredEvidence: Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+- `migration.rdsExtensionSupportConfirmed`
+  - blocker: migration.rdsExtensionSupportConfirmed
+  - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
+  - writeTo: deploy/aliyun-production-cn.rds-migration.local.json -> migration.rdsExtensionSupportConfirmed
+  - expected: 填真实非密钥证据，不能保留 TODO、pending 或 TBD 占位值。
+  - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
+  - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
+  - requiredEvidence: Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: schema/data 迁移、RDS API smoke 和 rollback 验收已完成
 - `migration.schemaMigrated`
   - blocker: migration.schemaMigrated
   - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收

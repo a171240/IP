@@ -38,6 +38,9 @@
   },
   "migration": {
     "schemaInventoryReviewed": false,
+    "schemaCompatibilityReviewed": false,
+    "supabaseSpecificSqlResolved": false,
+    "rdsExtensionSupportConfirmed": false,
     "dataAccessAdapterReady": false,
     "schemaMigrated": false,
     "dataMigrated": false,

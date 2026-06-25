@@ -69,6 +69,9 @@ const REQUIRED_FIELDS = {
   ],
   migration: [
     "schemaInventoryReviewed",
+    "schemaCompatibilityReviewed",
+    "supabaseSpecificSqlResolved",
+    "rdsExtensionSupportConfirmed",
     "dataAccessAdapterReady",
     "schemaMigrated",
     "dataMigrated",
@@ -249,6 +252,9 @@ function validateFile(filePath, mode, sourceInventory) {
     },
     migration: {
       schemaInventoryReviewed: data.migration?.schemaInventoryReviewed === true,
+      schemaCompatibilityReviewed: data.migration?.schemaCompatibilityReviewed === true,
+      supabaseSpecificSqlResolved: data.migration?.supabaseSpecificSqlResolved === true,
+      rdsExtensionSupportConfirmed: data.migration?.rdsExtensionSupportConfirmed === true,
       dataAccessAdapterReady: data.migration?.dataAccessAdapterReady === true,
       schemaMigrated: data.migration?.schemaMigrated === true,
       dataMigrated: data.migration?.dataMigrated === true,
@@ -352,6 +358,9 @@ function validateLocalValues(data, blockers) {
 
   for (const field of [
     "schemaInventoryReviewed",
+    "schemaCompatibilityReviewed",
+    "supabaseSpecificSqlResolved",
+    "rdsExtensionSupportConfirmed",
     "dataAccessAdapterReady",
     "schemaMigrated",
     "dataMigrated",
@@ -431,6 +440,9 @@ function buildInitialLocalEvidence(sourceInventory) {
     },
     migration: {
       schemaInventoryReviewed: schemaMapReady && bridgeMapReady,
+      schemaCompatibilityReviewed: false,
+      supabaseSpecificSqlResolved: false,
+      rdsExtensionSupportConfirmed: false,
       dataAccessAdapterReady: firstVersionDataAccessReady,
       schemaMigrated: false,
       dataMigrated: false,
@@ -536,6 +548,9 @@ function buildWritebackPlan(localValidation) {
       ],
       expectedEvidence: [
         "APP API data access adapter uses RDS/PostgreSQL as formal production-cn data layer",
+        "Supabase SQL compatibility review completed before applying schema to Aliyun RDS",
+        "Supabase-specific auth/storage/RLS/service_role SQL resolved or rewritten for Aliyun RDS",
+        "Aliyun RDS PostgreSQL extension support confirmed for required functions",
         "schema and data migration validated",
         "row counts, critical records, APP API smoke, and rollback validation passed",
       ],

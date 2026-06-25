@@ -1,6 +1,6 @@
 # APP production-cn evidence field map
 
-Date: 2026-06-24
+Date: 2026-06-26
 
 This is the field-level, value-free map for the current production-cn evidence gaps. It is derived from:
 
@@ -15,8 +15,8 @@ It tells the operator which local evidence field to update after an authorized e
 ```text
 Production-cn cannot be deployed now.
 evidenceWritebackReady=0/4
-totalGaps=47
-rdsMigrationGaps=16
+totalGaps=50
+rdsMigrationGaps=19
 cloudInventoryResultGaps=1
 cloudConfirmationGaps=18
 imagePublishGaps=12
@@ -36,7 +36,7 @@ Target file:
 deploy/aliyun-production-cn.rds-migration.local.json
 ```
 
-Current field blockers: `16`.
+Current field blockers: `19`.
 
 | JSON path | Authorization packet | Expected non-secret evidence |
 | --- | --- | --- |
@@ -48,6 +48,9 @@ Current field blockers: `16`.
 | `rdsPostgres.confirmed` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after RDS PostgreSQL exists and matches the production-cn target. |
 | `rdsPostgres.databaseAccountReady` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after the database account and privileges are ready; never record the password. |
 | `rdsPostgres.databaseUrlCnSecretImported` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after `DATABASE_URL_CN` is imported through Aliyun KMS, Secrets Manager, or SAE secret env. |
+| `migration.schemaCompatibilityReviewed` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after the Supabase SQL compatibility review is recorded before applying schema SQL to Aliyun RDS. |
+| `migration.supabaseSpecificSqlResolved` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after Supabase-specific auth, storage, RLS, and service_role SQL has been rewritten or explicitly resolved for Aliyun RDS. |
+| `migration.rdsExtensionSupportConfirmed` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after required PostgreSQL extensions and functions are confirmed on the target Aliyun RDS engine. |
 | `migration.schemaMigrated` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after schema migration is applied to RDS and validated without secret values. |
 | `migration.dataMigrated` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after required data is migrated to RDS and validated without customer data in reports. |
 | `migration.rowCountValidationPassed` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after required table row counts have been validated. |

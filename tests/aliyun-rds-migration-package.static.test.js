@@ -90,6 +90,7 @@ test("Aliyun RDS migration package generates non-secret SQL and validation artif
   assert.match(markdown, /RDS Compatibility Review/)
   assert.match(markdown, /supabase_auth_uid/)
   assert.match(markdown, /supabase_storage_schema/)
+  assert.match(markdown, /schemaCompatibilityReviewed, supabaseSpecificSqlResolved, and rdsExtensionSupportConfirmed/)
   assert.doesNotMatch(output + schemaSql + validationSql + rollback + markdown, secretLike)
 })
 
@@ -113,6 +114,9 @@ test("tracked Aliyun RDS migration package handoff pins non-secret package diges
   assert.match(doc, /supabase_storage_schema/)
   assert.match(doc, /row_level_security/)
   assert.match(doc, /The package is not authorization to apply unreviewed Supabase SQL to Aliyun RDS/)
+  assert.match(doc, /migration\.schemaCompatibilityReviewed=true/)
+  assert.match(doc, /migration\.supabaseSpecificSqlResolved=true/)
+  assert.match(doc, /migration\.rdsExtensionSupportConfirmed=true/)
   assert.match(doc, /service_record_sessions/)
   assert.match(doc, /credit_transactions/)
   assert.match(doc, /consume_credits/)

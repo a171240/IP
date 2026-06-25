@@ -107,6 +107,9 @@ Only after this compatibility review is recorded may the operator treat `rds-sch
 - `rdsPostgres.databaseName`
 - `rdsPostgres.databaseAccountReady=true`
 - `rdsPostgres.databaseUrlCnSecretImported=true`
+- `migration.schemaCompatibilityReviewed=true`
+- `migration.supabaseSpecificSqlResolved=true`
+- `migration.rdsExtensionSupportConfirmed=true`
 - `migration.schemaMigrated=true`
 - `migration.dataMigrated=true`
 - `migration.rowCountValidationPassed=true`

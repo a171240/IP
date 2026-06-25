@@ -386,6 +386,7 @@ function renderMarkdown(report) {
     "",
     "- Create or confirm Aliyun RDS PostgreSQL in cn-hangzhou.",
     "- Import DATABASE_URL_CN only through Aliyun KMS / Secrets Manager / SAE secret env.",
+    "- Record schemaCompatibilityReviewed, supabaseSpecificSqlResolved, and rdsExtensionSupportConfirmed before applying schema SQL.",
     "- Apply reviewed schema and migrate data without writing data dumps into git or reports.",
     "- Run row-count, critical-record, APP API smoke, and rollback validation.",
   ].join("\n")
