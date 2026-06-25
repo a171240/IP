@@ -2,7 +2,7 @@ import "server-only"
 
 import { NextRequest, NextResponse } from "next/server"
 
-import { AliyunRdsConfigurationError, queryAliyunRds } from "@/lib/aliyun-rds/postgres.server"
+import { AliyunRdsConfigurationError, queryAliyunRds, withAliyunRdsTransaction } from "@/lib/aliyun-rds/postgres.server"
 import {
   accountContextPayload,
   getAliyunRdsAppAccountContext,
@@ -12,8 +12,9 @@ import {
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 
 export const SERVICE_RECORD_RESUME_WINDOW_MS = 5 * 60 * 1000
+export const SERVICE_RECORD_MAX_SEGMENT_BYTES = 12 * 1024 * 1024
 
-type ServiceRecordSessionRow = {
+export type ServiceRecordSessionRow = {
   id: string
   created_at: string | null
   updated_at: string | null
@@ -46,7 +47,7 @@ type ServiceRecordSessionRow = {
   metadata: unknown
 }
 
-type ServiceRecordSegmentRow = {
+export type ServiceRecordSegmentRow = {
   id: string
   session_id: string
   client_segment_id: string
@@ -67,7 +68,7 @@ type ServiceRecordSegmentRow = {
   metadata: unknown
 }
 
-type ServiceRecordMarkerRow = {
+export type ServiceRecordMarkerRow = {
   id: string
   created_at: string | null
   session_id: string
@@ -126,9 +127,67 @@ export function numberValue(value: unknown, fallback = 0) {
   return Number.isFinite(n) ? n : fallback
 }
 
+export function integerValue(value: unknown, fallback = 0) {
+  return Math.max(0, Math.round(numberValue(value, fallback)))
+}
+
+export function isoOrNull(value: unknown) {
+  const text = cleanText(value, 80)
+  if (!text) return null
+  const date = new Date(text)
+  if (Number.isNaN(date.getTime())) return null
+  return date.toISOString()
+}
+
+export function pathSafe(value: unknown, fallback = "unknown") {
+  const text = cleanText(value, 160).replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "")
+  return text || fallback
+}
+
 export function normalizeJsonArray(value: unknown) {
   if (!Array.isArray(value)) return []
   return value.map((item) => cleanText(item, 80)).filter(Boolean).slice(0, 12)
+}
+
+function integerMeta(value: unknown) {
+  const n = Number(value)
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : 0
+}
+
+export function serviceRecordAppendClosed(status: unknown) {
+  return ["completed", "failed", "cancelled"].includes(cleanText(status, 40))
+}
+
+export function sourceFileMetadataFromPayload(payload: Record<string, unknown>) {
+  const sourceFileKey = cleanText(payload?.source_file_key, 360)
+  const meta: Record<string, unknown> = {}
+  if (sourceFileKey) meta.source_file_key = sourceFileKey
+  const deviceId = cleanText(payload?.device_id, 180)
+  const deviceName = cleanText(payload?.device_name, 120)
+  const deviceFileName = cleanText(payload?.device_file_name, 220)
+  const deviceFileTime = integerMeta(payload?.device_file_time)
+  const deviceFileSize = integerMeta(payload?.device_file_size)
+  if (deviceId) meta.device_id = deviceId
+  if (deviceName) meta.device_name = deviceName
+  if (deviceFileName) meta.device_file_name = deviceFileName
+  if (deviceFileTime) meta.device_file_time = deviceFileTime
+  if (deviceFileSize) meta.device_file_size = deviceFileSize
+  return meta
+}
+
+export function reusableSegmentHasAudio(segment: ServiceRecordSegmentRow | null | undefined) {
+  return Boolean(segment && cleanText(segment.storage_path, 2000))
+}
+
+export function reusableSegmentAsrSnapshot(segment: ServiceRecordSegmentRow | null | undefined) {
+  if (!segment) return null
+  const status = cleanText(segment.asr_status, 40)
+  if (!["done", "running", "skipped"].includes(status)) return null
+  return {
+    asr_status: status,
+    transcript_text: cleanText(segment.transcript_text, 100000) || null,
+    asr_json: isRecord(segment.asr_json) ? segment.asr_json : null,
+  }
 }
 
 function jsonbParam(value: unknown) {
@@ -257,7 +316,7 @@ export function toPublicSegment(row: ServiceRecordSegmentRow) {
     reused_upload: Boolean(metadata.reused_upload),
     reused_from_segment_id: cleanText(metadata.reused_from_segment_id, 160),
     playback_api_url: row.session_id && row.id
-      ? `/api/mp/service-records/sessions/${encodeURIComponent(String(row.session_id))}/audio/${encodeURIComponent(String(row.id))}`
+      ? `/api/app/service-records/sessions/${encodeURIComponent(String(row.session_id))}/audio/${encodeURIComponent(String(row.id))}`
       : "",
   }
 }
@@ -288,7 +347,7 @@ export function buildServiceRecordAudioEvidence(segments: ServiceRecordSegmentRo
       content_type: cleanText(segment.content_type, 120) || "audio/ogg",
       audio_bytes: Number(segment.audio_bytes || 0),
       duration_seconds: Number(segment.client_audio_seconds || 0),
-      playback_api_url: `/api/mp/service-records/sessions/${encodeURIComponent(opts.sessionId)}/audio/${encodeURIComponent(segment.id)}`,
+      playback_api_url: `/api/app/service-records/sessions/${encodeURIComponent(opts.sessionId)}/audio/${encodeURIComponent(segment.id)}`,
     })),
   }
 }
@@ -574,5 +633,307 @@ export async function createAliyunRdsServiceRecordMarker(args: {
     ],
   )
   if (!result.rows[0]) throw new Error("marker_insert_failed")
+  return result.rows[0]
+}
+
+function reusableSegmentScopeClauses(scope: {
+  user_id?: unknown
+  userId?: unknown
+  company_id?: unknown
+  companyId?: unknown
+  store_id?: unknown
+  storeId?: unknown
+}) {
+  const clauses: string[] = ["storage_path is not null", "storage_path <> ''"]
+  const values: unknown[] = []
+  const companyId = cleanText(scope.company_id ?? scope.companyId, 80)
+  const storeId = cleanText(scope.store_id ?? scope.storeId, 80)
+  const userId = cleanText(scope.user_id ?? scope.userId, 80)
+
+  if (companyId) {
+    values.push(companyId)
+    clauses.push(`company_id = $${values.length}`)
+  } else if (userId) {
+    values.push(userId)
+    clauses.push(`user_id = $${values.length}`)
+  }
+  if (storeId) {
+    values.push(storeId)
+    clauses.push(`store_id = $${values.length}`)
+  }
+
+  return { clauses, values }
+}
+
+export async function findReusableAliyunRdsServiceRecordSegment(
+  scope: { user_id?: unknown; userId?: unknown; company_id?: unknown; companyId?: unknown; store_id?: unknown; storeId?: unknown },
+  sourceFileKey: string,
+) {
+  const key = cleanText(sourceFileKey, 360)
+  if (!key) return null
+  const scoped = reusableSegmentScopeClauses(scope)
+  const values = [...scoped.values, jsonbParam({ source_file_key: key })]
+  const result = await queryAliyunRds<ServiceRecordSegmentRow>(
+    `
+      select *
+      from public.service_record_segments
+      where ${scoped.clauses.join(" and ")}
+        and metadata @> $${values.length}::jsonb
+      order by uploaded_at desc
+      limit 1
+    `,
+    values,
+  )
+  return result.rows[0] || null
+}
+
+export async function findReusableAliyunRdsServiceRecordSegmentBySourceMeta(
+  scope: { user_id?: unknown; userId?: unknown; company_id?: unknown; companyId?: unknown; store_id?: unknown; storeId?: unknown },
+  sourceMeta: Record<string, unknown>,
+) {
+  const deviceFileName = cleanText(sourceMeta?.device_file_name, 220)
+  const deviceFileTime = integerMeta(sourceMeta?.device_file_time)
+  const deviceFileSize = integerMeta(sourceMeta?.device_file_size)
+  if (!deviceFileName || (!deviceFileTime && !deviceFileSize)) return null
+
+  const contains: Record<string, unknown> = {
+    device_file_name: deviceFileName,
+  }
+  if (deviceFileTime) contains.device_file_time = deviceFileTime
+  if (deviceFileSize) contains.device_file_size = deviceFileSize
+
+  const scoped = reusableSegmentScopeClauses(scope)
+  const values = [...scoped.values, jsonbParam(contains)]
+  const result = await queryAliyunRds<ServiceRecordSegmentRow>(
+    `
+      select *
+      from public.service_record_segments
+      where ${scoped.clauses.join(" and ")}
+        and metadata @> $${values.length}::jsonb
+      order by uploaded_at desc
+      limit 1
+    `,
+    values,
+  )
+  return result.rows[0] || null
+}
+
+export async function refreshAliyunRdsServiceRecordSessionAggregate(sessionId: string) {
+  const now = new Date().toISOString()
+  const result = await queryAliyunRds<ServiceRecordSessionRow>(
+    `
+      with aggregate as (
+        select
+          count(*)::int as segment_count,
+          coalesce(sum(client_audio_seconds), 0)::numeric as audio_seconds
+        from public.service_record_segments
+        where session_id = $1
+      )
+      update public.service_record_sessions s
+      set segment_count = aggregate.segment_count,
+          audio_seconds = round(aggregate.audio_seconds),
+          updated_at = $2
+      from aggregate
+      where s.id = $1
+      returning s.*
+    `,
+    [sessionId, now],
+  )
+  return result.rows[0] || null
+}
+
+export async function upsertAliyunRdsServiceRecordSegment(args: {
+  ctx: AppAccountContext
+  session: ServiceRecordSessionRow
+  clientSegmentId: string
+  segmentIndex: number
+  storageBucket: string
+  storagePath: string
+  contentType: string
+  format: string
+  audioBytes: number
+  clientAudioSeconds?: unknown
+  startedAt?: unknown
+  endedAt?: unknown
+  asrStatus?: string
+  transcriptText?: string | null
+  asrJson?: unknown
+  metadata?: Record<string, unknown>
+}) {
+  return withAliyunRdsTransaction(async (client) => {
+    const now = new Date().toISOString()
+    const result = await client.query<ServiceRecordSegmentRow>(
+      `
+        insert into public.service_record_segments (
+          session_id,
+          user_id,
+          company_id,
+          store_id,
+          client_segment_id,
+          segment_index,
+          status,
+          storage_bucket,
+          storage_path,
+          content_type,
+          format,
+          audio_bytes,
+          client_audio_seconds,
+          started_at,
+          ended_at,
+          uploaded_at,
+          updated_at,
+          asr_status,
+          transcript_text,
+          asr_json,
+          metadata
+        )
+        values (
+          $1, $2, $3, $4, $5, $6, 'uploaded', $7, $8, $9, $10, $11, $12, $13, $14,
+          $15, $15, $16, $17, $18::jsonb, $19::jsonb
+        )
+        on conflict (session_id, client_segment_id)
+        do update set
+          segment_index = excluded.segment_index,
+          status = excluded.status,
+          storage_bucket = excluded.storage_bucket,
+          storage_path = excluded.storage_path,
+          content_type = excluded.content_type,
+          format = excluded.format,
+          audio_bytes = excluded.audio_bytes,
+          client_audio_seconds = excluded.client_audio_seconds,
+          started_at = excluded.started_at,
+          ended_at = excluded.ended_at,
+          uploaded_at = excluded.uploaded_at,
+          updated_at = excluded.updated_at,
+          asr_status = excluded.asr_status,
+          transcript_text = excluded.transcript_text,
+          asr_json = excluded.asr_json,
+          metadata = excluded.metadata
+        returning *
+      `,
+      [
+        args.session.id,
+        args.ctx.userId,
+        args.session.company_id || null,
+        args.session.store_id || null,
+        args.clientSegmentId,
+        args.segmentIndex,
+        args.storageBucket,
+        args.storagePath,
+        args.contentType,
+        args.format,
+        Math.max(0, Math.round(numberValue(args.audioBytes, 0))),
+        numberValue(args.clientAudioSeconds, 0) || null,
+        isoOrNull(args.startedAt),
+        isoOrNull(args.endedAt),
+        now,
+        cleanText(args.asrStatus, 40) || "pending",
+        args.transcriptText || null,
+        jsonbParam(args.asrJson || null),
+        jsonbParam(args.metadata || {}),
+      ],
+    )
+    const segment = result.rows[0]
+    if (!segment) throw new Error("segment_upsert_failed")
+
+    await client.query(
+      `
+        with aggregate as (
+          select
+            count(*)::int as segment_count,
+            coalesce(sum(client_audio_seconds), 0)::numeric as audio_seconds
+          from public.service_record_segments
+          where session_id = $1
+        )
+        update public.service_record_sessions s
+        set segment_count = aggregate.segment_count,
+            audio_seconds = round(aggregate.audio_seconds),
+            updated_at = $2
+        from aggregate
+        where s.id = $1
+      `,
+      [args.session.id, now],
+    )
+    return segment
+  })
+}
+
+export async function listAliyunRdsServiceRecordAsrCandidates(sessionId: string, limit = 20) {
+  const result = await queryAliyunRds<ServiceRecordSegmentRow>(
+    `
+      select *
+      from public.service_record_segments
+      where session_id = $1
+        and asr_status = any($2::text[])
+      order by segment_index asc
+      limit $3
+    `,
+    [sessionId, ["pending", "running", "failed"], Math.max(1, Math.min(100, Math.round(limit)))],
+  )
+  return result.rows
+}
+
+export async function updateAliyunRdsServiceRecordSegmentAsr(args: {
+  segmentId: string
+  asrStatus: string
+  transcriptText?: string | null
+  asrJson?: unknown
+}) {
+  const result = await queryAliyunRds<ServiceRecordSegmentRow>(
+    `
+      update public.service_record_segments
+      set asr_status = $2,
+          transcript_text = $3,
+          asr_json = $4::jsonb,
+          updated_at = $5
+      where id = $1
+      returning *
+    `,
+    [
+      args.segmentId,
+      cleanText(args.asrStatus, 40),
+      args.transcriptText || null,
+      jsonbParam(args.asrJson || null),
+      new Date().toISOString(),
+    ],
+  )
+  return result.rows[0] || null
+}
+
+export async function getAliyunRdsServiceRecordSegment(sessionId: string, segmentId: string) {
+  const result = await queryAliyunRds<ServiceRecordSegmentRow>(
+    `
+      select *
+      from public.service_record_segments
+      where session_id = $1 and id = $2
+      limit 1
+    `,
+    [sessionId, segmentId],
+  )
+  return result.rows[0] || null
+}
+
+export async function updateAliyunRdsServiceRecordSessionProcessing(args: {
+  session: ServiceRecordSessionRow
+  status: "processing" | "completed"
+  noteMarkdown: string
+  resultJson: Record<string, unknown>
+}) {
+  const now = new Date().toISOString()
+  const result = await queryAliyunRds<ServiceRecordSessionRow>(
+    `
+      update public.service_record_sessions
+      set status = $2,
+          processing_started_at = coalesce(processing_started_at, $3),
+          completed_at = case when $2 = 'completed' then $3 else null end,
+          note_markdown = $4,
+          result_json = $5::jsonb,
+          updated_at = $3
+      where id = $1
+      returning *
+    `,
+    [args.session.id, args.status, now, args.noteMarkdown, jsonbParam(args.resultJson)],
+  )
+  if (!result.rows[0]) throw new Error("session_process_failed")
   return result.rows[0]
 }

@@ -9,10 +9,10 @@
 - formalTarget: Aliyun RDS PostgreSQL
 - currentSource: Supabase migration source / legacy compatibility only
 - firstVersionRouteCount: 25
-- routesStillUsingSupabaseDataAccess: 14
-- routesUsingAliyunRdsDataAccess: 11
-- sharedDataAccessFileCount: 16
-- sharedRdsDataAccessFileCount: 15
+- routesStillUsingSupabaseDataAccess: 7
+- routesUsingAliyunRdsDataAccess: 18
+- sharedDataAccessFileCount: 9
+- sharedRdsDataAccessFileCount: 25
 - implementationWorkPackageCount: 5
 - proposedRepositoryFileCount: 11
 - observedTables: entitlements, mp_account_invites, mp_account_memberships, mp_ai_point_ledger, mp_companies, mp_stores, profiles, service_record_markers, service_record_segments, service_record_sessions, store_profiles, voice_coach_customer_profiles, voice_coach_sessions, voice_coach_turns
@@ -75,11 +75,11 @@
 ### service-records
 
 - routeCount: 12
-- routesStillUsingSupabaseDataAccess: 7
+- routesStillUsingSupabaseDataAccess: 0
 - tableNames: entitlements, mp_account_memberships, mp_companies, mp_stores, profiles, service_record_markers, service_record_segments, service_record_sessions
 - rpcNames: none
-- dataAccessFiles: app/api/mp/service-records/sessions/[sessionId]/asr/poll/route.ts, app/api/mp/service-records/sessions/[sessionId]/audio/[segmentId]/route.ts, app/api/mp/service-records/sessions/[sessionId]/segments/oss/route.ts, app/api/mp/service-records/sessions/[sessionId]/segments/route.ts, lib/mp/account-context.server.ts, lib/service-records/processing.server.ts, lib/service-records/segments.server.ts, lib/service-records/server.ts
-- rdsDataAccessFiles: app/api/app/service-records/sessions/[sessionId]/end/route.ts, app/api/app/service-records/sessions/[sessionId]/markers/route.ts, app/api/app/service-records/sessions/[sessionId]/resume/route.ts, app/api/app/service-records/sessions/[sessionId]/route.ts, app/api/app/service-records/sessions/route.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts, lib/aliyun-rds/repositories/service-records.server.ts
+- dataAccessFiles: none
+- rdsDataAccessFiles: app/api/app/service-records/device-files/check/route.ts, app/api/app/service-records/sessions/[sessionId]/asr/poll/route.ts, app/api/app/service-records/sessions/[sessionId]/audio/[segmentId]/route.ts, app/api/app/service-records/sessions/[sessionId]/end/route.ts, app/api/app/service-records/sessions/[sessionId]/markers/route.ts, app/api/app/service-records/sessions/[sessionId]/oss-upload/route.ts, app/api/app/service-records/sessions/[sessionId]/process/route.ts, app/api/app/service-records/sessions/[sessionId]/resume/route.ts, app/api/app/service-records/sessions/[sessionId]/route.ts, app/api/app/service-records/sessions/[sessionId]/segments/oss/route.ts, app/api/app/service-records/sessions/[sessionId]/segments/route.ts, app/api/app/service-records/sessions/route.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts, lib/aliyun-rds/repositories/service-record-processing.server.ts, lib/aliyun-rds/repositories/service-records.server.ts, lib/aliyun-rds/service-record-asr.server.ts, lib/aliyun-rds/service-record-oss.server.ts
 - /api/app/service-records/sessions
 - /api/app/service-records/sessions/[sessionId]
 - /api/app/service-records/device-files/check
@@ -137,15 +137,15 @@
 
 - order: 3
 - title: Service record session, segment, marker, and playback repositories
-- status: blocked_until_repository_uses_database_url_cn
+- status: rds_repository_in_source_pending_runtime_evidence
 - scope: service-records
 - routeCount: 12
-- routesStillUsingSupabaseDataAccess: 7
+- routesStillUsingSupabaseDataAccess: 0
 - routes: /api/app/service-records/sessions, /api/app/service-records/sessions/[sessionId], /api/app/service-records/device-files/check, /api/app/service-records/sessions/[sessionId]/segments, /api/app/service-records/sessions/[sessionId]/oss-upload, /api/app/service-records/sessions/[sessionId]/segments/oss, /api/app/service-records/sessions/[sessionId]/markers, /api/app/service-records/sessions/[sessionId]/resume, /api/app/service-records/sessions/[sessionId]/end, /api/app/service-records/sessions/[sessionId]/process, /api/app/service-records/sessions/[sessionId]/asr/poll, /api/app/service-records/sessions/[sessionId]/audio/[segmentId]
 - tableNames: entitlements, mp_account_memberships, mp_companies, mp_stores, profiles, service_record_markers, service_record_segments, service_record_sessions
 - rpcNames: none
-- currentSupabaseDataAccessFiles: app/api/mp/service-records/sessions/[sessionId]/asr/poll/route.ts, app/api/mp/service-records/sessions/[sessionId]/audio/[segmentId]/route.ts, app/api/mp/service-records/sessions/[sessionId]/segments/oss/route.ts, app/api/mp/service-records/sessions/[sessionId]/segments/route.ts, lib/mp/account-context.server.ts, lib/service-records/processing.server.ts, lib/service-records/segments.server.ts, lib/service-records/server.ts
-- rdsDataAccessFiles: app/api/app/service-records/sessions/[sessionId]/end/route.ts, app/api/app/service-records/sessions/[sessionId]/markers/route.ts, app/api/app/service-records/sessions/[sessionId]/resume/route.ts, app/api/app/service-records/sessions/[sessionId]/route.ts, app/api/app/service-records/sessions/route.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts, lib/aliyun-rds/repositories/service-records.server.ts
+- currentSupabaseDataAccessFiles: none
+- rdsDataAccessFiles: app/api/app/service-records/device-files/check/route.ts, app/api/app/service-records/sessions/[sessionId]/asr/poll/route.ts, app/api/app/service-records/sessions/[sessionId]/audio/[segmentId]/route.ts, app/api/app/service-records/sessions/[sessionId]/end/route.ts, app/api/app/service-records/sessions/[sessionId]/markers/route.ts, app/api/app/service-records/sessions/[sessionId]/oss-upload/route.ts, app/api/app/service-records/sessions/[sessionId]/process/route.ts, app/api/app/service-records/sessions/[sessionId]/resume/route.ts, app/api/app/service-records/sessions/[sessionId]/route.ts, app/api/app/service-records/sessions/[sessionId]/segments/oss/route.ts, app/api/app/service-records/sessions/[sessionId]/segments/route.ts, app/api/app/service-records/sessions/route.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts, lib/aliyun-rds/repositories/service-record-processing.server.ts, lib/aliyun-rds/repositories/service-records.server.ts, lib/aliyun-rds/service-record-asr.server.ts, lib/aliyun-rds/service-record-oss.server.ts
 - proposedRepositoryFiles: lib/aliyun-rds/repositories/service-records.server.ts, lib/aliyun-rds/repositories/service-record-segments.server.ts, lib/aliyun-rds/repositories/service-record-processing.server.ts
 - blockedBy: DATABASE_URL_CN, oss_audio_runtime_access_ready, request_auth_identity_boundary_ready, schema_data_rollback_validation, service_record_tables_migrated
 - acceptanceGate: Long-recording create/resume/end/process/poll/audio routes persist and read sessions through DATABASE_URL_CN.
@@ -407,56 +407,56 @@
 - methods: POST
 - scope: service-records
 - appFile: app/api/app/service-records/device-files/check/route.ts
-- sourceRoute: /api/mp/service-records/device-files/check
-- sourceFiles: app/api/mp/service-records/device-files/check/route.ts
-- tableNames: mp_account_memberships, mp_companies, mp_stores, profiles, service_record_segments, service_record_sessions
+- sourceRoute: none
+- sourceFiles: app/api/app/service-records/device-files/check/route.ts, lib/aliyun-rds/repositories/service-records.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts, lib/aliyun-rds/postgres.server.ts
+- tableNames: none
 - rpcNames: none
-- rdsTableNames: none
-- dataAccessFiles: lib/service-records/segments.server.ts, lib/service-records/server.ts, lib/mp/account-context.server.ts
-- rdsDataAccessFiles: none
-- rdsMigrationStatus: blocked_until_route_repository_uses_database_url_cn
+- rdsTableNames: entitlements, mp_account_memberships, mp_companies, mp_stores, profiles, service_record_markers, service_record_segments, service_record_sessions
+- dataAccessFiles: none
+- rdsDataAccessFiles: app/api/app/service-records/device-files/check/route.ts, lib/aliyun-rds/repositories/service-records.server.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts
+- rdsMigrationStatus: rds_repository_in_source_pending_runtime_evidence
 
 ### /api/app/service-records/sessions/[sessionId]/segments
 
 - methods: POST
 - scope: service-records
 - appFile: app/api/app/service-records/sessions/[sessionId]/segments/route.ts
-- sourceRoute: /api/mp/service-records/sessions/[sessionId]/segments
-- sourceFiles: app/api/mp/service-records/sessions/[sessionId]/segments/route.ts
-- tableNames: mp_account_memberships, mp_companies, mp_stores, profiles, service_record_segments, service_record_sessions
+- sourceRoute: none
+- sourceFiles: app/api/app/service-records/sessions/[sessionId]/segments/route.ts, lib/aliyun-rds/repositories/service-records.server.ts, lib/aliyun-rds/service-record-oss.server.ts, lib/aliyun-rds/service-record-asr.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts, lib/aliyun-rds/postgres.server.ts
+- tableNames: none
 - rpcNames: none
-- rdsTableNames: none
-- dataAccessFiles: app/api/mp/service-records/sessions/[sessionId]/segments/route.ts, lib/service-records/segments.server.ts, lib/service-records/server.ts, lib/mp/account-context.server.ts
-- rdsDataAccessFiles: none
-- rdsMigrationStatus: blocked_until_route_repository_uses_database_url_cn
+- rdsTableNames: entitlements, mp_account_memberships, mp_companies, mp_stores, profiles, service_record_markers, service_record_segments, service_record_sessions
+- dataAccessFiles: none
+- rdsDataAccessFiles: app/api/app/service-records/sessions/[sessionId]/segments/route.ts, lib/aliyun-rds/repositories/service-records.server.ts, lib/aliyun-rds/service-record-asr.server.ts, lib/aliyun-rds/service-record-oss.server.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts
+- rdsMigrationStatus: rds_repository_in_source_pending_runtime_evidence
 
 ### /api/app/service-records/sessions/[sessionId]/oss-upload
 
 - methods: POST
 - scope: service-records
 - appFile: app/api/app/service-records/sessions/[sessionId]/oss-upload/route.ts
-- sourceRoute: /api/mp/service-records/sessions/[sessionId]/oss-upload
-- sourceFiles: app/api/mp/service-records/sessions/[sessionId]/oss-upload/route.ts
-- tableNames: mp_account_memberships, mp_companies, mp_stores, profiles, service_record_segments, service_record_sessions
+- sourceRoute: none
+- sourceFiles: app/api/app/service-records/sessions/[sessionId]/oss-upload/route.ts, lib/aliyun-rds/repositories/service-records.server.ts, lib/aliyun-rds/service-record-oss.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts, lib/aliyun-rds/postgres.server.ts
+- tableNames: none
 - rpcNames: none
-- rdsTableNames: none
-- dataAccessFiles: lib/service-records/segments.server.ts, lib/service-records/server.ts, lib/mp/account-context.server.ts
-- rdsDataAccessFiles: none
-- rdsMigrationStatus: blocked_until_route_repository_uses_database_url_cn
+- rdsTableNames: entitlements, mp_account_memberships, mp_companies, mp_stores, profiles, service_record_markers, service_record_segments, service_record_sessions
+- dataAccessFiles: none
+- rdsDataAccessFiles: app/api/app/service-records/sessions/[sessionId]/oss-upload/route.ts, lib/aliyun-rds/repositories/service-records.server.ts, lib/aliyun-rds/service-record-oss.server.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts
+- rdsMigrationStatus: rds_repository_in_source_pending_runtime_evidence
 
 ### /api/app/service-records/sessions/[sessionId]/segments/oss
 
 - methods: POST
 - scope: service-records
 - appFile: app/api/app/service-records/sessions/[sessionId]/segments/oss/route.ts
-- sourceRoute: /api/mp/service-records/sessions/[sessionId]/segments/oss
-- sourceFiles: app/api/mp/service-records/sessions/[sessionId]/segments/oss/route.ts
-- tableNames: mp_account_memberships, mp_companies, mp_stores, profiles, service_record_segments, service_record_sessions
+- sourceRoute: none
+- sourceFiles: app/api/app/service-records/sessions/[sessionId]/segments/oss/route.ts, lib/aliyun-rds/repositories/service-records.server.ts, lib/aliyun-rds/service-record-oss.server.ts, lib/aliyun-rds/service-record-asr.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts, lib/aliyun-rds/postgres.server.ts
+- tableNames: none
 - rpcNames: none
-- rdsTableNames: none
-- dataAccessFiles: app/api/mp/service-records/sessions/[sessionId]/segments/oss/route.ts, lib/service-records/segments.server.ts, lib/service-records/server.ts, lib/mp/account-context.server.ts
-- rdsDataAccessFiles: none
-- rdsMigrationStatus: blocked_until_route_repository_uses_database_url_cn
+- rdsTableNames: entitlements, mp_account_memberships, mp_companies, mp_stores, profiles, service_record_markers, service_record_segments, service_record_sessions
+- dataAccessFiles: none
+- rdsDataAccessFiles: app/api/app/service-records/sessions/[sessionId]/segments/oss/route.ts, lib/aliyun-rds/repositories/service-records.server.ts, lib/aliyun-rds/service-record-asr.server.ts, lib/aliyun-rds/service-record-oss.server.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts
+- rdsMigrationStatus: rds_repository_in_source_pending_runtime_evidence
 
 ### /api/app/service-records/sessions/[sessionId]/markers
 
@@ -505,42 +505,42 @@
 - methods: POST
 - scope: service-records
 - appFile: app/api/app/service-records/sessions/[sessionId]/process/route.ts
-- sourceRoute: /api/mp/service-records/sessions/[sessionId]/process
-- sourceFiles: app/api/mp/service-records/sessions/[sessionId]/process/route.ts
-- tableNames: mp_account_memberships, mp_companies, mp_stores, profiles, service_record_markers, service_record_segments, service_record_sessions
+- sourceRoute: none
+- sourceFiles: app/api/app/service-records/sessions/[sessionId]/process/route.ts, lib/aliyun-rds/repositories/service-record-processing.server.ts, lib/aliyun-rds/repositories/service-records.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts, lib/aliyun-rds/postgres.server.ts
+- tableNames: none
 - rpcNames: none
-- rdsTableNames: none
-- dataAccessFiles: lib/service-records/processing.server.ts, lib/service-records/server.ts, lib/mp/account-context.server.ts
-- rdsDataAccessFiles: none
-- rdsMigrationStatus: blocked_until_route_repository_uses_database_url_cn
+- rdsTableNames: entitlements, mp_account_memberships, mp_companies, mp_stores, profiles, service_record_markers, service_record_segments, service_record_sessions
+- dataAccessFiles: none
+- rdsDataAccessFiles: app/api/app/service-records/sessions/[sessionId]/process/route.ts, lib/aliyun-rds/repositories/service-record-processing.server.ts, lib/aliyun-rds/repositories/service-records.server.ts, lib/aliyun-rds/service-record-asr.server.ts, lib/aliyun-rds/service-record-oss.server.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts
+- rdsMigrationStatus: rds_repository_in_source_pending_runtime_evidence
 
 ### /api/app/service-records/sessions/[sessionId]/asr/poll
 
 - methods: POST
 - scope: service-records
 - appFile: app/api/app/service-records/sessions/[sessionId]/asr/poll/route.ts
-- sourceRoute: /api/mp/service-records/sessions/[sessionId]/asr/poll
-- sourceFiles: app/api/mp/service-records/sessions/[sessionId]/asr/poll/route.ts
-- tableNames: mp_account_memberships, mp_companies, mp_stores, profiles, service_record_segments, service_record_sessions
+- sourceRoute: none
+- sourceFiles: app/api/app/service-records/sessions/[sessionId]/asr/poll/route.ts, lib/aliyun-rds/repositories/service-record-processing.server.ts, lib/aliyun-rds/repositories/service-records.server.ts, lib/aliyun-rds/service-record-asr.server.ts, lib/aliyun-rds/service-record-oss.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts, lib/aliyun-rds/postgres.server.ts
+- tableNames: none
 - rpcNames: none
-- rdsTableNames: none
-- dataAccessFiles: app/api/mp/service-records/sessions/[sessionId]/asr/poll/route.ts, lib/service-records/server.ts, lib/mp/account-context.server.ts
-- rdsDataAccessFiles: none
-- rdsMigrationStatus: blocked_until_route_repository_uses_database_url_cn
+- rdsTableNames: entitlements, mp_account_memberships, mp_companies, mp_stores, profiles, service_record_markers, service_record_segments, service_record_sessions
+- dataAccessFiles: none
+- rdsDataAccessFiles: app/api/app/service-records/sessions/[sessionId]/asr/poll/route.ts, lib/aliyun-rds/repositories/service-record-processing.server.ts, lib/aliyun-rds/repositories/service-records.server.ts, lib/aliyun-rds/service-record-asr.server.ts, lib/aliyun-rds/service-record-oss.server.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts
+- rdsMigrationStatus: rds_repository_in_source_pending_runtime_evidence
 
 ### /api/app/service-records/sessions/[sessionId]/audio/[segmentId]
 
 - methods: GET
 - scope: service-records
 - appFile: app/api/app/service-records/sessions/[sessionId]/audio/[segmentId]/route.ts
-- sourceRoute: /api/mp/service-records/sessions/[sessionId]/audio/[segmentId]
-- sourceFiles: app/api/mp/service-records/sessions/[sessionId]/audio/[segmentId]/route.ts
-- tableNames: mp_account_memberships, mp_companies, mp_stores, profiles, service_record_segments, service_record_sessions
+- sourceRoute: none
+- sourceFiles: app/api/app/service-records/sessions/[sessionId]/audio/[segmentId]/route.ts, lib/aliyun-rds/repositories/service-record-processing.server.ts, lib/aliyun-rds/repositories/service-records.server.ts, lib/aliyun-rds/service-record-oss.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts, lib/aliyun-rds/postgres.server.ts
+- tableNames: none
 - rpcNames: none
-- rdsTableNames: none
-- dataAccessFiles: app/api/mp/service-records/sessions/[sessionId]/audio/[segmentId]/route.ts, lib/service-records/server.ts, lib/mp/account-context.server.ts
-- rdsDataAccessFiles: none
-- rdsMigrationStatus: blocked_until_route_repository_uses_database_url_cn
+- rdsTableNames: entitlements, mp_account_memberships, mp_companies, mp_stores, profiles, service_record_markers, service_record_segments, service_record_sessions
+- dataAccessFiles: none
+- rdsDataAccessFiles: app/api/app/service-records/sessions/[sessionId]/audio/[segmentId]/route.ts, lib/aliyun-rds/repositories/service-record-processing.server.ts, lib/aliyun-rds/repositories/service-records.server.ts, lib/aliyun-rds/service-record-asr.server.ts, lib/aliyun-rds/service-record-oss.server.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts
+- rdsMigrationStatus: rds_repository_in_source_pending_runtime_evidence
 
 ## Next Required Actions
 

@@ -83,9 +83,9 @@ RDS 数据访问仍未闭环，但当前 blocker 口径已按 APP 第一版范�
 
 ```text
 appApiRouteCount=31
-appApiRoutesWithSupabaseDataAccess=18
+appApiRoutesWithSupabaseDataAccess=11
 firstVersionRdsRouteCount=25
-firstVersionRdsRoutesWithSupabaseDataAccess=14/25
+firstVersionRdsRoutesWithSupabaseDataAccess=7/25
 deferredAppApiRouteCount=6
 ```
 

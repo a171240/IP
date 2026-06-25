@@ -1,6 +1,6 @@
 # APP production-cn RDS/PostgreSQL migration inventory
 
-Generated at: 2026-06-25T05:41:43.517Z
+Generated at: 2026-06-25T06:07:47.856Z
 
 ## Conclusion
 
@@ -9,10 +9,10 @@ Generated at: 2026-06-25T05:41:43.517Z
 - Migration ready: false
 - APP API routes: 31
 - APP API routes using Supabase: 31
-- APP API routes using Supabase data access: 18
+- APP API routes using Supabase data access: 11
 - First-version RDS required APP API routes: 25
 - First-version RDS required routes using Supabase: 25
-- First-version RDS required routes using Supabase data access: 14
+- First-version RDS required routes using Supabase data access: 7
 - Deferred APP API routes: 6
 - Deferred APP API routes using Supabase data access: 4
 - Shared Supabase files: 94
@@ -27,7 +27,7 @@ Generated at: 2026-06-25T05:41:43.517Z
 - Tables: activation_requests, analytics_events, content_rewrites, content_sources, conversations, credit_transactions, delivery_packs, distribution_jobs, distribution_tasks, entitlements, knowledge_docs, mp_account_invites, mp_account_memberships, mp_ai_point_ledger, mp_companies, mp_knowledge_space_access, mp_knowledge_spaces, mp_stores, platform_connections, poster_generations, private_copy_drafts, profiles, reports, service_record_markers, service_record_segments, service_record_sessions, store_profiles, video_render_jobs, voice_coach_customer_profiles, voice_coach_events, voice_coach_jobs, voice_coach_knowledge_spaces, voice_coach_opening_preparations, voice_coach_scene_cards, voice_coach_sessions, voice_coach_training_packs, voice_coach_training_progress, voice_coach_turns, voice_training_packs, voice_training_progress, voice_training_tasks, wechatpay_orders, workflow_progress, xhs_drafts
 - RPCs: consume_credits, grant_trial_credits, update_profile_public
 - Storage buckets: delivery-packs
-- RDS adapter files: app/api/app/customer-profiles/[profileId]/route.ts, app/api/app/customer-profiles/route.ts, app/api/app/profile/route.ts, app/api/app/service-records/sessions/[sessionId]/end/route.ts, app/api/app/service-records/sessions/[sessionId]/markers/route.ts, app/api/app/service-records/sessions/[sessionId]/resume/route.ts, app/api/app/service-records/sessions/[sessionId]/route.ts, app/api/app/service-records/sessions/route.ts, app/api/app/store-profiles/[profileId]/route.ts, app/api/app/store-profiles/route.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts, lib/aliyun-rds/repositories/customer-profiles.server.ts, lib/aliyun-rds/repositories/service-records.server.ts, lib/aliyun-rds/repositories/store-profiles.server.ts
+- RDS adapter files: app/api/app/customer-profiles/[profileId]/route.ts, app/api/app/customer-profiles/route.ts, app/api/app/profile/route.ts, app/api/app/service-records/device-files/check/route.ts, app/api/app/service-records/sessions/[sessionId]/asr/poll/route.ts, app/api/app/service-records/sessions/[sessionId]/audio/[segmentId]/route.ts, app/api/app/service-records/sessions/[sessionId]/end/route.ts, app/api/app/service-records/sessions/[sessionId]/markers/route.ts, app/api/app/service-records/sessions/[sessionId]/oss-upload/route.ts, app/api/app/service-records/sessions/[sessionId]/process/route.ts, app/api/app/service-records/sessions/[sessionId]/resume/route.ts, app/api/app/service-records/sessions/[sessionId]/route.ts, app/api/app/service-records/sessions/[sessionId]/segments/oss/route.ts, app/api/app/service-records/sessions/[sessionId]/segments/route.ts, app/api/app/service-records/sessions/route.ts, app/api/app/store-profiles/[profileId]/route.ts, app/api/app/store-profiles/route.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts, lib/aliyun-rds/repositories/customer-profiles.server.ts, lib/aliyun-rds/repositories/service-record-processing.server.ts, lib/aliyun-rds/repositories/service-records.server.ts, lib/aliyun-rds/repositories/store-profiles.server.ts, lib/aliyun-rds/service-record-asr.server.ts, lib/aliyun-rds/service-record-oss.server.ts
 - RDS schema map file: deploy/aliyun-production-cn.rds-first-version-schema-map.json
 
 ## Required Blockers
@@ -62,62 +62,6 @@ Generated at: 2026-06-25T05:41:43.517Z
 
 ## First-version RDS Supabase Data Access Routes
 
-- /api/app/service-records/device-files/check
-  - file: app/api/app/service-records/device-files/check/route.ts
-  - capability: service_record_long_recording
-  - scopeClass: service-records
-  - tables: none
-  - rpcs: none
-  - storageBuckets: none
-  - envKeys: none
-- /api/app/service-records/sessions/[sessionId]/asr/poll
-  - file: app/api/app/service-records/sessions/[sessionId]/asr/poll/route.ts
-  - capability: service_record_long_recording
-  - scopeClass: service-records
-  - tables: none
-  - rpcs: none
-  - storageBuckets: none
-  - envKeys: none
-- /api/app/service-records/sessions/[sessionId]/audio/[segmentId]
-  - file: app/api/app/service-records/sessions/[sessionId]/audio/[segmentId]/route.ts
-  - capability: service_record_long_recording
-  - scopeClass: service-records
-  - tables: none
-  - rpcs: none
-  - storageBuckets: none
-  - envKeys: none
-- /api/app/service-records/sessions/[sessionId]/oss-upload
-  - file: app/api/app/service-records/sessions/[sessionId]/oss-upload/route.ts
-  - capability: service_record_long_recording
-  - scopeClass: service-records
-  - tables: none
-  - rpcs: none
-  - storageBuckets: none
-  - envKeys: none
-- /api/app/service-records/sessions/[sessionId]/process
-  - file: app/api/app/service-records/sessions/[sessionId]/process/route.ts
-  - capability: service_record_long_recording
-  - scopeClass: service-records
-  - tables: none
-  - rpcs: none
-  - storageBuckets: none
-  - envKeys: none
-- /api/app/service-records/sessions/[sessionId]/segments/oss
-  - file: app/api/app/service-records/sessions/[sessionId]/segments/oss/route.ts
-  - capability: service_record_long_recording
-  - scopeClass: service-records
-  - tables: none
-  - rpcs: none
-  - storageBuckets: none
-  - envKeys: none
-- /api/app/service-records/sessions/[sessionId]/segments
-  - file: app/api/app/service-records/sessions/[sessionId]/segments/route.ts
-  - capability: service_record_long_recording
-  - scopeClass: service-records
-  - tables: none
-  - rpcs: none
-  - storageBuckets: none
-  - envKeys: none
 - /api/app/store-admin/analytics
   - file: app/api/app/store-admin/analytics/route.ts
   - capability: store_manager_service_record_read

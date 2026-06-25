@@ -49,8 +49,8 @@ test("Aliyun RDS route migration map covers first-version APP route data access 
   assert.equal(report.secretLeakCheck.ok, true)
 
   assert.equal(report.summary.firstVersionRouteCount, 25)
-  assert.equal(report.summary.routesStillUsingSupabaseDataAccess, 14)
-  assert.equal(report.summary.routesUsingAliyunRdsDataAccess, 11)
+  assert.equal(report.summary.routesStillUsingSupabaseDataAccess, 7)
+  assert.equal(report.summary.routesUsingAliyunRdsDataAccess, 18)
   assert.equal(report.summary.observedTableCount, 14)
   assert.equal(report.summary.requiredTableCount, 15)
   assert.equal(report.summary.observedRpcCount, 0)
@@ -75,18 +75,28 @@ test("Aliyun RDS route migration map covers first-version APP route data access 
     "app/api/app/customer-profiles/[profileId]/route.ts",
     "app/api/app/customer-profiles/route.ts",
     "app/api/app/profile/route.ts",
+    "app/api/app/service-records/device-files/check/route.ts",
+    "app/api/app/service-records/sessions/[sessionId]/asr/poll/route.ts",
+    "app/api/app/service-records/sessions/[sessionId]/audio/[segmentId]/route.ts",
     "app/api/app/service-records/sessions/[sessionId]/end/route.ts",
     "app/api/app/service-records/sessions/[sessionId]/markers/route.ts",
+    "app/api/app/service-records/sessions/[sessionId]/oss-upload/route.ts",
+    "app/api/app/service-records/sessions/[sessionId]/process/route.ts",
     "app/api/app/service-records/sessions/[sessionId]/resume/route.ts",
     "app/api/app/service-records/sessions/[sessionId]/route.ts",
+    "app/api/app/service-records/sessions/[sessionId]/segments/oss/route.ts",
+    "app/api/app/service-records/sessions/[sessionId]/segments/route.ts",
     "app/api/app/service-records/sessions/route.ts",
     "app/api/app/store-profiles/[profileId]/route.ts",
     "app/api/app/store-profiles/route.ts",
     "lib/aliyun-rds/postgres.server.ts",
     "lib/aliyun-rds/repositories/account-profile.server.ts",
     "lib/aliyun-rds/repositories/customer-profiles.server.ts",
+    "lib/aliyun-rds/repositories/service-record-processing.server.ts",
     "lib/aliyun-rds/repositories/service-records.server.ts",
     "lib/aliyun-rds/repositories/store-profiles.server.ts",
+    "lib/aliyun-rds/service-record-asr.server.ts",
+    "lib/aliyun-rds/service-record-oss.server.ts",
   ])
 
   assert.equal(byRoute.get("/api/app/profile").stillUsesSupabaseDataAccess, false)
@@ -102,9 +112,16 @@ test("Aliyun RDS route migration map covers first-version APP route data access 
   for (const routePath of [
     "/api/app/service-records/sessions",
     "/api/app/service-records/sessions/[sessionId]",
+    "/api/app/service-records/device-files/check",
+    "/api/app/service-records/sessions/[sessionId]/segments",
+    "/api/app/service-records/sessions/[sessionId]/oss-upload",
+    "/api/app/service-records/sessions/[sessionId]/segments/oss",
     "/api/app/service-records/sessions/[sessionId]/markers",
     "/api/app/service-records/sessions/[sessionId]/resume",
     "/api/app/service-records/sessions/[sessionId]/end",
+    "/api/app/service-records/sessions/[sessionId]/process",
+    "/api/app/service-records/sessions/[sessionId]/asr/poll",
+    "/api/app/service-records/sessions/[sessionId]/audio/[segmentId]",
   ]) {
     const route = byRoute.get(routePath)
     assert.equal(route.stillUsesSupabaseDataAccess, false, routePath)
@@ -115,8 +132,6 @@ test("Aliyun RDS route migration map covers first-version APP route data access 
       item.file === "lib/aliyun-rds/repositories/service-records.server.ts"
     ), routePath)
   }
-  assert.ok(byRoute.get("/api/app/service-records/sessions/[sessionId]/segments").tableNames.includes("service_record_sessions"))
-  assert.ok(byRoute.get("/api/app/service-records/sessions/[sessionId]/segments").dataAccessFiles.some((item) => item.file === "lib/service-records/server.ts"))
   assert.ok(byRoute.get("/api/app/store-admin/overview").tableNames.includes("voice_coach_sessions"))
   assert.ok(byRoute.get("/api/app/store-admin/members").tableNames.includes("voice_coach_turns"))
   for (const routePath of [
@@ -183,19 +198,24 @@ test("Aliyun RDS route migration map covers first-version APP route data access 
       .get("RDS_WP02_CONTEXT_PROFILES")
       .rdsDataAccessFiles.includes("lib/aliyun-rds/repositories/customer-profiles.server.ts"),
   )
-  assert.ok(
-    workPackages
-      .get("RDS_WP03_SERVICE_RECORDS_CORE")
-      .currentSupabaseDataAccessFiles.includes("lib/service-records/server.ts"),
-  )
+  assert.deepEqual(workPackages.get("RDS_WP03_SERVICE_RECORDS_CORE").currentSupabaseDataAccessFiles, [])
   assert.equal(
     workPackages.get("RDS_WP03_SERVICE_RECORDS_CORE").routesStillUsingSupabaseDataAccess,
-    7,
+    0,
+  )
+  assert.equal(
+    workPackages.get("RDS_WP03_SERVICE_RECORDS_CORE").status,
+    "rds_repository_in_source_pending_runtime_evidence",
   )
   assert.ok(
     workPackages
       .get("RDS_WP03_SERVICE_RECORDS_CORE")
       .rdsDataAccessFiles.includes("lib/aliyun-rds/repositories/service-records.server.ts"),
+  )
+  assert.ok(
+    workPackages
+      .get("RDS_WP03_SERVICE_RECORDS_CORE")
+      .rdsDataAccessFiles.includes("lib/aliyun-rds/repositories/service-record-processing.server.ts"),
   )
   assert.ok(
     workPackages
@@ -209,7 +229,7 @@ test("Aliyun RDS route migration map covers first-version APP route data access 
   )
   assert.equal(
     report.implementationWorkPackages.filter((item) => item.status === "blocked_until_repository_uses_database_url_cn").length,
-    3,
+    2,
   )
 
   assert.doesNotMatch(output, secretLike)
@@ -235,8 +255,8 @@ test("Aliyun RDS route migration map markdown is actionable and value-free", () 
 
   assert.equal(report.summary.firstVersionRouteCount, 25)
   assert.match(markdown, /Aliyun RDS Route Migration Map/)
-  assert.match(markdown, /routesStillUsingSupabaseDataAccess: 14/)
-  assert.match(markdown, /routesUsingAliyunRdsDataAccess: 11/)
+  assert.match(markdown, /routesStillUsingSupabaseDataAccess: 7/)
+  assert.match(markdown, /routesUsingAliyunRdsDataAccess: 18/)
   assert.match(markdown, /implementationWorkPackageCount: 5/)
   assert.match(markdown, /requiredTablesWithoutRouteObservation: credit_transactions/)
   assert.match(markdown, /RDS_WP01_ACCOUNT_PROFILE_ENTITLEMENTS/)
@@ -247,8 +267,8 @@ test("Aliyun RDS route migration map markdown is actionable and value-free", () 
   assert.match(markdown, /lib\/aliyun-rds\/repositories\/customer-profiles\.server\.ts/)
   assert.match(markdown, /RDS_WP03_SERVICE_RECORDS_CORE/)
   assert.match(markdown, /\/api\/app\/service-records\/sessions/)
-  assert.match(markdown, /lib\/service-records\/server\.ts/)
   assert.match(markdown, /lib\/aliyun-rds\/repositories\/service-records\.server\.ts/)
+  assert.match(markdown, /lib\/aliyun-rds\/repositories\/service-record-processing\.server\.ts/)
   assert.match(markdown, /Create or confirm Aliyun RDS PostgreSQL/)
   assert.doesNotMatch(output + markdown, secretLike)
 })
@@ -303,24 +323,37 @@ test("Aliyun APP context profile routes use RDS repositories instead of mini-pro
   assert.doesNotMatch(storeRepository + customerRepository, /@\/lib\/supabase|@supabase\/supabase-js/)
 })
 
-test("Aliyun APP service record session routes use RDS repository for the first WP03 batch", () => {
+test("Aliyun APP service record routes use RDS, OSS, and ASR helpers for WP03", () => {
   const routeFiles = [
+    read("app", "api", "app", "service-records", "device-files", "check", "route.ts"),
     read("app", "api", "app", "service-records", "sessions", "route.ts"),
     read("app", "api", "app", "service-records", "sessions", "[sessionId]", "route.ts"),
+    read("app", "api", "app", "service-records", "sessions", "[sessionId]", "segments", "route.ts"),
+    read("app", "api", "app", "service-records", "sessions", "[sessionId]", "oss-upload", "route.ts"),
+    read("app", "api", "app", "service-records", "sessions", "[sessionId]", "segments", "oss", "route.ts"),
     read("app", "api", "app", "service-records", "sessions", "[sessionId]", "markers", "route.ts"),
     read("app", "api", "app", "service-records", "sessions", "[sessionId]", "resume", "route.ts"),
     read("app", "api", "app", "service-records", "sessions", "[sessionId]", "end", "route.ts"),
+    read("app", "api", "app", "service-records", "sessions", "[sessionId]", "process", "route.ts"),
+    read("app", "api", "app", "service-records", "sessions", "[sessionId]", "asr", "poll", "route.ts"),
+    read("app", "api", "app", "service-records", "sessions", "[sessionId]", "audio", "[segmentId]", "route.ts"),
   ]
   const repository = read("lib", "aliyun-rds", "repositories", "service-records.server.ts")
+  const processingRepository = read("lib", "aliyun-rds", "repositories", "service-record-processing.server.ts")
+  const ossHelper = read("lib", "aliyun-rds", "service-record-oss.server.ts")
+  const asrHelper = read("lib", "aliyun-rds", "service-record-asr.server.ts")
 
   for (const route of routeFiles) {
     assert.doesNotMatch(route, /@\/app\/api\/mp\//)
-    assert.match(route, /@\/lib\/aliyun-rds\/repositories\/service-records\.server/)
+    assert.match(route, /@\/lib\/aliyun-rds/)
   }
 
   assert.match(repository, /public\.service_record_sessions/)
   assert.match(repository, /public\.service_record_segments/)
   assert.match(repository, /public\.service_record_markers/)
   assert.match(repository, /getAliyunRdsAppAccountContext/)
-  assert.doesNotMatch(repository, /@\/lib\/supabase\/admin|@supabase\/supabase-js/)
+  assert.match(processingRepository, /processAliyunRdsServiceRecordSession/)
+  assert.match(ossHelper, /ALIYUN_OSS_BUCKET|SERVICE_RECORD_OSS_BUCKET/)
+  assert.match(asrHelper, /DASHSCOPE_API_KEY|BAILIAN_API_KEY/)
+  assert.doesNotMatch(repository + processingRepository + ossHelper + asrHelper, /@\/lib\/supabase\/admin|@supabase\/supabase-js/)
 })

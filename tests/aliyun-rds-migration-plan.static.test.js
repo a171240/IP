@@ -29,8 +29,8 @@ test("Aliyun RDS migration plan command is wired into scripts, predeploy, deploy
   assert.match(releaseArtifacts, /rds-migration-plan\.md/)
   assert.match(releaseArtifacts, /rdsMigrationPlan/)
   assert.match(rdsDoc, /APP API routes using Supabase: 31/)
-  assert.match(rdsDoc, /APP API routes using Supabase data access: 18/)
-  assert.match(rdsDoc, /First-version RDS required routes using Supabase data access: 14/)
+  assert.match(rdsDoc, /APP API routes using Supabase data access: 11/)
+  assert.match(rdsDoc, /First-version RDS required routes using Supabase data access: 7/)
   assert.match(rdsDoc, /DATABASE_URL_CN/)
   assert.match(rdsDoc, /lib\/aliyun-rds\/postgres\.server\.ts/)
   assert.match(rdsDoc, /lib\/aliyun-rds\/repositories\/account-profile\.server\.ts/)
@@ -65,12 +65,12 @@ test("Aliyun RDS migration plan inventories APP API Supabase dependency without 
 
   assert.equal(report.summary.appApiRouteCount, 31)
   assert.equal(report.summary.appApiRoutesWithSupabase, 31)
-  assert.equal(report.summary.appApiRoutesWithSupabaseDataAccess, 18)
+  assert.equal(report.summary.appApiRoutesWithSupabaseDataAccess, 11)
   assert.ok(report.summary.appApiRoutesWithDirectSupabase >= 3)
   assert.equal(report.summary.appApiRoutesWithDirectSupabaseDataAccess, 1)
   assert.equal(report.summary.firstVersionRdsRouteCount, 25)
   assert.equal(report.summary.firstVersionRdsRoutesWithSupabase, 25)
-  assert.equal(report.summary.firstVersionRdsRoutesWithSupabaseDataAccess, 14)
+  assert.equal(report.summary.firstVersionRdsRoutesWithSupabaseDataAccess, 7)
   assert.equal(report.summary.deferredAppApiRouteCount, 6)
   assert.equal(report.summary.deferredAppApiRoutesWithSupabase, 6)
   assert.equal(report.summary.deferredAppApiRoutesWithSupabaseDataAccess, 4)
@@ -103,18 +103,28 @@ test("Aliyun RDS migration plan inventories APP API Supabase dependency without 
     "app/api/app/customer-profiles/[profileId]/route.ts",
     "app/api/app/customer-profiles/route.ts",
     "app/api/app/profile/route.ts",
+    "app/api/app/service-records/device-files/check/route.ts",
+    "app/api/app/service-records/sessions/[sessionId]/asr/poll/route.ts",
+    "app/api/app/service-records/sessions/[sessionId]/audio/[segmentId]/route.ts",
     "app/api/app/service-records/sessions/[sessionId]/end/route.ts",
     "app/api/app/service-records/sessions/[sessionId]/markers/route.ts",
+    "app/api/app/service-records/sessions/[sessionId]/oss-upload/route.ts",
+    "app/api/app/service-records/sessions/[sessionId]/process/route.ts",
     "app/api/app/service-records/sessions/[sessionId]/resume/route.ts",
     "app/api/app/service-records/sessions/[sessionId]/route.ts",
+    "app/api/app/service-records/sessions/[sessionId]/segments/oss/route.ts",
+    "app/api/app/service-records/sessions/[sessionId]/segments/route.ts",
     "app/api/app/service-records/sessions/route.ts",
     "app/api/app/store-profiles/[profileId]/route.ts",
     "app/api/app/store-profiles/route.ts",
     "lib/aliyun-rds/postgres.server.ts",
     "lib/aliyun-rds/repositories/account-profile.server.ts",
     "lib/aliyun-rds/repositories/customer-profiles.server.ts",
+    "lib/aliyun-rds/repositories/service-record-processing.server.ts",
     "lib/aliyun-rds/repositories/service-records.server.ts",
     "lib/aliyun-rds/repositories/store-profiles.server.ts",
+    "lib/aliyun-rds/service-record-asr.server.ts",
+    "lib/aliyun-rds/service-record-oss.server.ts",
   ])
   assert.equal(report.inventory.schemaMap.file, "deploy/aliyun-production-cn.rds-first-version-schema-map.json")
   assert.equal(report.inventory.bridgeMap.file, "deploy/app-api-production-cn.bridge-map.json")
@@ -172,9 +182,16 @@ test("Aliyun RDS migration plan inventories APP API Supabase dependency without 
   for (const routePath of [
     "/api/app/service-records/sessions",
     "/api/app/service-records/sessions/[sessionId]",
+    "/api/app/service-records/device-files/check",
+    "/api/app/service-records/sessions/[sessionId]/segments",
+    "/api/app/service-records/sessions/[sessionId]/oss-upload",
+    "/api/app/service-records/sessions/[sessionId]/segments/oss",
     "/api/app/service-records/sessions/[sessionId]/markers",
     "/api/app/service-records/sessions/[sessionId]/resume",
     "/api/app/service-records/sessions/[sessionId]/end",
+    "/api/app/service-records/sessions/[sessionId]/process",
+    "/api/app/service-records/sessions/[sessionId]/asr/poll",
+    "/api/app/service-records/sessions/[sessionId]/audio/[segmentId]",
   ]) {
     const route = byRoute.get(routePath)
     assert.equal(route.firstVersionRdsRequired, true, routePath)
@@ -182,7 +199,6 @@ test("Aliyun RDS migration plan inventories APP API Supabase dependency without 
     assert.equal(route.directSupabaseDataAccess, false, routePath)
     assert.deepEqual(route.supabaseDataAccessDependencyFiles, [], routePath)
   }
-  assert.ok(byRoute.get("/api/app/service-records/sessions/[sessionId]/segments").supabaseDependencyFiles.includes("lib/service-records/server.ts"))
   assert.ok(!byRoute.get("/api/app/profile").supabaseDependencyFiles.includes("lib/mp/account-context.server.ts"))
 
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
@@ -207,8 +223,8 @@ test("Aliyun RDS migration plan markdown explains blockers and phases without va
   assert.match(markdown, /Formal target: Aliyun RDS PostgreSQL/)
   assert.match(markdown, /APP API routes: 31/)
   assert.match(markdown, /APP API routes using Supabase: 31/)
-  assert.match(markdown, /APP API routes using Supabase data access: 18/)
-  assert.match(markdown, /First-version RDS required routes using Supabase data access: 14/)
+  assert.match(markdown, /APP API routes using Supabase data access: 11/)
+  assert.match(markdown, /First-version RDS required routes using Supabase data access: 7/)
   assert.match(markdown, /Deferred APP API routes: 6/)
   assert.match(markdown, /DATABASE_URL_CN/)
   assert.match(markdown, /PostgreSQL data access adapter detected: true/)
