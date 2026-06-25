@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 阿里云证据回填清单
 
-Generated: 2026-06-25T13:55:25.440Z
+Generated: 2026-06-25T17:54:37.636Z
 
 ## 当前结论
 
@@ -150,9 +150,9 @@ Generated: 2026-06-25T13:55:25.440Z
   - missingEvidence: oss:confirmed; oss:ramLeastPrivilege; observed:bucket_visible_unconfirmed
   - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss
   - nextEvidenceAction: confirm resource in Aliyun console or allowlisted readonly inventory, then write non-secret evidence to the configured .local.json target
-- R06_ENV_IMPORT: observed=cloudshell_disconnected_or_config_missing, readiness=blocked
-  - currentEvidence: pending_aliyun_env_import_confirmation; observedResourceStatus=cloudshell_disconnected_or_config_missing; observedResourceReadiness=blocked
-  - missingEvidence: missing_required_env:DATABASE_URL_CN; envImport:confirmed; envImport:secretNotInImage; envImport:placeholder:importedAt; envImport:placeholder:evidence; observed:cloudshell_disconnected_or_config_missing
+- R06_ENV_IMPORT: observed=cloudshell_disconnected_restart_confirmation_required, readiness=blocked
+  - currentEvidence: pending_aliyun_env_import_confirmation; observedResourceStatus=cloudshell_disconnected_restart_confirmation_required; observedResourceReadiness=blocked
+  - missingEvidence: missing_required_env:DATABASE_URL_CN; envImport:confirmed; envImport:secretNotInImage; envImport:placeholder:importedAt; envImport:placeholder:evidence; observed:cloudshell_disconnected_restart_confirmation_required
   - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport; 阿里云 SAE 环境变量 / KMS / Secrets Manager
   - nextEvidenceAction: import ready variables through SAE/KMS/Secrets Manager secret env after action-time confirmation, then run env/checklist and sensitive/blockers
 - R07_SLS_ALERTS: observed=project_logstore_visible_alerts_pending, readiness=partial

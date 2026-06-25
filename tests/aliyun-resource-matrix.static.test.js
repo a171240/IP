@@ -122,11 +122,10 @@ test("Aliyun resource matrix names required cloud resources without secret value
   assert.equal(oss.observedResourceStatus.status, "bucket_visible_unconfirmed")
   assert.equal(oss.observedResourceStatus.readiness, "partial")
   assert.match(env.consolePath, /KMS|Secrets Manager|SAE/)
-  assert.ok([
+  assert.equal(
+    env.observedResourceStatus.status,
     "cloudshell_disconnected_restart_confirmation_required",
-    "cloudshell_not_opened_nas_fee_confirmation_required",
-    "cloudshell_disconnected_or_config_missing",
-  ].includes(env.observedResourceStatus.status))
+  )
   assert.equal(sls.observedResourceStatus.status, "project_logstore_visible_alerts_pending")
   assert.equal(sls.observedResourceStatus.readiness, "partial")
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
@@ -164,14 +163,17 @@ test("tracked APP production-cn resource matrix doc pins the current blocked Ali
   const manifest = read("docs", "release-manifest-2026-06-21-app-aliyun-production-cn-bridge.md")
 
   for (const expected of [
-    "Production-cn cannot be deployed now.",
-    "Current scope is `backend_aliyun_only`.",
-    "resourceEvidenceReady=0/7",
-    "cloudConfirmationsTotalBlockers=27",
-    "imagePublishTotalBlockers=12",
-    "cloudAccessCanReadNow=false",
-    "observedPartial=2",
-    "observedBlocked=5",
+    "美业话镜 APP production-cn 阿里云资源矩阵",
+    "currentScope: backend_aliyun_only",
+    "fullAppLaunchScope: deferred_after_backend_online",
+    "ready: 0 / 7",
+    "blocked: 7",
+    "containsValues: false",
+    "secretLeakCheck: true",
+    "mutationPerformed: false",
+    "cloudAccessCanReadNow: false",
+    "resourceEvidenceReady: 0/7",
+    "blockedResourceEvidenceIds: R01_SAE_RUNTIME, R02_ACR_IMAGE_REGISTRY, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R05_OSS_AUDIO_STORAGE, R06_ENV_IMPORT, R07_SLS_ALERTS",
     "R01_SAE_RUNTIME",
     "R02_ACR_IMAGE_REGISTRY",
     "R03_API_DOMAIN_HTTPS",
@@ -183,16 +185,15 @@ test("tracked APP production-cn resource matrix doc pins the current blocked Ali
     "purchase_candidate_visible_not_purchased",
     "domain_visible_records_missing",
     "bucket_visible_unconfirmed",
-    "cloudshell_disconnected_or_config_missing",
-    "missing `DATABASE_URL_CN`",
+    "cloudshell_disconnected_restart_confirmation_required",
+    "missing_required_env:DATABASE_URL_CN",
     "project_logstore_visible_alerts_pending",
     "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.runtime",
     "deploy/aliyun-production-cn.image-publish.local.json -> acr + runtime",
     "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport",
-    "corepack pnpm aliyun:resources:matrix",
-    "corepack pnpm aliyun:evidence:writeback -- --skip-vercel-env-coverage",
-    "Do not purchase ACR or any paid resource.",
-    "Do not deploy production-cn until resourceEvidenceReady=7/7 and strict gates pass.",
+    "corepack pnpm aliyun:domain:strict",
+    "corepack pnpm aliyun:app-api:smoke",
+    "本命令不创建阿里云资源、不付款、不修改 DNS、不导入环境变量、不推送镜像、不部署。",
   ]) {
     assert.match(doc, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
   }
