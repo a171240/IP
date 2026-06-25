@@ -1,6 +1,6 @@
 # APP production-cn Aliyun backend apply package
 
-Generated at: 2026-06-25T19:55:59.513Z
+Generated at: 2026-06-25T21:03:58.884Z
 
 ## Scope
 
@@ -97,6 +97,26 @@ Generated at: 2026-06-25T19:55:59.513Z
 | 3 | `oss_ram_sts` | `S05_OSS_RAM_SECRET_OR_STS` | OSS/RAM/STS 密钥如何导入阿里云运行环境 | 阿里云控制台 -> RAM 访问控制 / OSS Bucket / SAE 环境变量或 Secrets Manager | ALIYUN_OSS_ACCESS_KEY_ID / ALIYUN_OSS_ACCESS_KEY_SECRET / ALIYUN_OSS_SECURITY_TOKEN -> KMS/Secrets Manager/SAE secret env; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss | corepack pnpm aliyun:cloud:confirmations; corepack pnpm aliyun:health:smoke |
 | 4 | `rds_database_secret_and_migration` | `S08_ALIYUN_RDS_DATABASE_URL` | DATABASE_URL_CN 从哪里获得并导入到哪里 | 阿里云控制台 -> RDS PostgreSQL -> 实例/数据库/账号/连接信息；SAE/KMS/Secrets Manager -> secret env | DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env only; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres / migration non-secret evidence; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport non-secret confirmation | corepack pnpm aliyun:rds:migration:evidence:strict; corepack pnpm aliyun:sensitive:blockers:backend; corepack pnpm aliyun:backend-cn:status; corepack pnpm aliyun:completion:audit |
 | 5 | `ready_secret_env_import` | `S06_READY_SENSITIVE_ENV_IMPORT` | 本机已有 API key 如何迁到阿里云 secret env | 现有 Vercel production / Supabase / 阿里云百炼 / DeepSeek / 火山引擎 / 微信公众平台等控制台 | SAE plain env for non-secret identifiers only; KMS/Secrets Manager/SAE secret env for secret or connection values; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport | corepack pnpm aliyun:env:checklist; corepack pnpm aliyun:sensitive:blockers; corepack pnpm aliyun:readiness:cloud-ready |
+
+## Backend Resource Evidence Matrix
+
+- rows: 10
+- immediateRows: 4
+- blockedRows: 6
+- credentialOrPasswordRows: 6
+
+| order | step | phase | packets | local evidence targets | secret/password handling | verify |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | `BAP00_READONLY_INVENTORY_IDENTITY` | `first_batch_after_action_time_confirmation` | P00_ALIYUN_READONLY_INVENTORY_IDENTITY | deploy/aliyun-production-cn.cloud-inventory-results.local.json -> non-secret read-only inventory summaries | AccessKeySecret or STS token must never be copied into JSON, Markdown, chat, git, or shell history | corepack pnpm aliyun:cloudshell:handoff; corepack pnpm aliyun:cloud:access; MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1 corepack pnpm aliyun:cloud:inventory-run -- --execute-readonly --write-local deploy/aliyun-production-cn.cloud-inventory-results.local.json; corepack pnpm aliyun:cloud:inventory-results:strict; corepack pnpm aliyun:evidence:writeback:backend |
+| 2 | `BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE` | `first_batch_after_action_time_confirmation` | P11_ALIYUN_RDS_DATA_MIGRATION | docs/app-production-cn-rds-migration-package.md -> non-secret schema/validation/rollback package digest handoff; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres/sourceInventory/migration/security | database account password; DATABASE_URL_CN secret value; Supabase export/import credentials during migration; DATABASE_URL_CN -> Aliyun KMS / Secrets Manager / SAE secret env only | corepack pnpm aliyun:rds:migration:package; corepack pnpm aliyun:rds:migration:plan; corepack pnpm aliyun:rds:migration:evidence:strict; corepack pnpm aliyun:backend-cn:status |
+| 3 | `BAP02_OSS_RAM_STS_CLOSE` | `first_batch_after_action_time_confirmation` | P05_OSS_RAM_STS | deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss | AccessKeySecret or STS token if runtime role is not selected; ALIYUN_OSS_ACCESS_KEY_SECRET / STS token -> KMS/Secrets Manager/SAE secret env only if runtime role is not used | corepack pnpm aliyun:cloud:confirmations; corepack pnpm aliyun:backend-cn:status |
+| 4 | `BAP03_ACR_PURCHASE_AND_REPOSITORY` | `first_batch_after_action_time_confirmation` | P03_ACR_PURCHASE | deploy/aliyun-production-cn.image-publish.local.json -> acr.confirmed/registryHost/namespace/repository | registry password only later through docker login or controlled credential helper | corepack pnpm aliyun:image:plan; corepack pnpm aliyun:backend-cn:status |
+| 5 | `BAP04_ACR_IMAGE_PUSH_AND_PULL` | `blocked_until_dependencies_close` | P04_ACR_IMAGE_AND_PULL | deploy/aliyun-production-cn.image-publish.local.json -> image/runtime | docker login / registry password or credential helper; SAE image pull credential if not using internal authorization | corepack pnpm aliyun:image:plan:strict; corepack pnpm aliyun:backend-cn:status |
+| 6 | `BAP05_BACKEND_ENV_IMPORT` | `blocked_until_dependencies_close` | P06_ENV_IMPORT | deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport | DATABASE_URL_CN; ALIYUN_OSS_ACCESS_KEY_SECRET or STS token if runtime role is not used | corepack pnpm aliyun:env:checklist; corepack pnpm aliyun:sensitive:blockers; corepack pnpm aliyun:backend-cn:status |
+| 7 | `BAP06_SAE_RUNTIME_CREATE` | `blocked_until_dependencies_close` | P08_SAE_RUNTIME_SLS | deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.runtime | none | corepack pnpm aliyun:runtime:plan; corepack pnpm aliyun:cloud:confirmations; corepack pnpm aliyun:backend-cn:status |
+| 8 | `BAP07_DOMAINS_HTTPS_ICP` | `blocked_until_dependencies_close` | P07_DOMAIN_DNS_HTTPS | deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps | none | corepack pnpm aliyun:domain:strict; corepack pnpm aliyun:backend-cn:status |
+| 9 | `BAP08_SLS_ALERTS` | `blocked_until_dependencies_close` | P08_SAE_RUNTIME_SLS | deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.slsAlerts | none | corepack pnpm aliyun:cloud:confirmations; corepack pnpm aliyun:backend-cn:status |
+| 10 | `BAP09_POSTDEPLOY_SMOKE` | `blocked_until_dependencies_close` | P09_PRODUCTION_DEPLOY | release artifacts -> postdeploy smoke evidence | none | corepack pnpm aliyun:postdeploy:smoke -- --base-url https://api-cn.ipgongchang.xin; corepack pnpm aliyun:remote:smoke -- --base-url https://api-cn.ipgongchang.xin; corepack pnpm aliyun:app-api:smoke -- --base-url https://api-cn.ipgongchang.xin |
 
 ## Apply Steps
 

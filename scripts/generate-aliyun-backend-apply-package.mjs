@@ -150,6 +150,7 @@ function buildReport(args) {
   const credentialPasswordIntervention = buildCredentialPasswordIntervention(sensitiveBlockers)
   const credentialAcquisitionQueue = buildCredentialAcquisitionQueue(sensitiveBlockers)
   const actionTimeAuthorizationRequest = buildActionTimeAuthorizationRequest(steps)
+  const backendResourceEvidenceMatrix = buildBackendResourceEvidenceMatrix(steps)
   const report = {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -183,8 +184,13 @@ function buildReport(args) {
       paidPurchaseConfirmationActionIds: credentialPasswordIntervention.paidPurchaseConfirmationActionIds,
       controlledSecretChannelActionIds: credentialPasswordIntervention.controlledSecretChannelActionIds,
       onlyMissingBackendCredentialValue: credentialAcquisitionQueue.onlyMissingBackendCredentialValue,
+      backendResourceEvidenceMatrixRows: backendResourceEvidenceMatrix.length,
+      backendResourceEvidenceMatrixImmediateRows: backendResourceEvidenceMatrix.filter((item) => item.canStartAfterActionTimeConfirmation).length,
+      backendResourceEvidenceMatrixBlockedRows: backendResourceEvidenceMatrix.filter((item) => !item.canStartAfterActionTimeConfirmation).length,
+      backendResourceEvidenceMatrixCredentialOrPasswordRows: backendResourceEvidenceMatrix.filter((item) => item.requiresCredentialOrPasswordHandling).length,
     },
     actionTimeAuthorizationRequest,
+    backendResourceEvidenceMatrix,
     applySteps: steps,
     userIntervention,
     credentialPasswordIntervention,
@@ -266,6 +272,73 @@ function buildActionTimeAuthorizationRequest(steps) {
     writeTargets: firstActionSteps.flatMap((step) => step.writeTargets || []),
     verifyCommands: Array.from(new Set(firstActionSteps.flatMap((step) => step.verifyCommands || []))),
   }
+}
+
+function buildBackendResourceEvidenceMatrix(steps) {
+  return steps.map((step, index) => {
+    const credentialOrPasswordItems = extractCredentialOrPasswordItems(step)
+    return {
+      order: index + 1,
+      stepId: step.id,
+      title: step.title,
+      phase: step.canStartAfterActionTimeConfirmation
+        ? "first_batch_after_action_time_confirmation"
+        : "blocked_until_dependencies_close",
+      canStartAfterActionTimeConfirmation: step.canStartAfterActionTimeConfirmation === true,
+      blockedUntil: step.blockedUntil || [],
+      mutationType: step.mutationType,
+      requiredAuthorizationPackets: step.requiredAuthorizationPackets || [],
+      consolePath: step.consolePath,
+      localEvidenceTargets: localEvidenceTargetsForStep(step),
+      cloudSecretOrRuntimeTargets: cloudSecretOrRuntimeTargetsForStep(step),
+      nonSecretEvidenceToRecord: step.nonSecretEvidenceToRecord || [],
+      requiresCredentialOrPasswordHandling: credentialOrPasswordItems.length > 0,
+      credentialOrPasswordItems,
+      userInterventionClass: classifyUserIntervention(step, credentialOrPasswordItems),
+      verifyCommands: step.verifyCommands || [],
+    }
+  })
+}
+
+function extractCredentialOrPasswordItems(step) {
+  const candidates = [
+    ...(step.userMustHandle || []),
+    ...(step.writeTargets || []),
+  ]
+  return uniqueStrings(candidates.filter((item) => isCredentialOrPasswordItem(item)))
+}
+
+function isCredentialOrPasswordItem(value) {
+  const text = String(value || "").replace(/non-secret/gi, "")
+  return /(DATABASE_URL_CN|password|passwd|token|credential|AccessKeySecret|STS|registry password|keystore|service role|ALIYUN_OSS_ACCESS_KEY_SECRET|数据库密码|密钥|凭证)/i.test(text)
+}
+
+function localEvidenceTargetsForStep(step) {
+  return uniqueStrings((step.writeTargets || []).filter((item) =>
+    /^(deploy\/|docs\/|release artifacts)/.test(item)
+  ))
+}
+
+function cloudSecretOrRuntimeTargetsForStep(step) {
+  return uniqueStrings((step.writeTargets || []).filter((item) =>
+    /(KMS|Secrets Manager|SAE secret env|SAE runtime|runtime image pull|Docker credential helper|Aliyun runtime secret|secret env)/i.test(item)
+  ))
+}
+
+function classifyUserIntervention(step, credentialOrPasswordItems) {
+  const classes = []
+  if (step.canStartAfterActionTimeConfirmation === true) classes.push("first_batch_action_time_confirmation")
+  if ((step.requiredAuthorizationPackets || []).some((packetId) => packetId === "P09_PRODUCTION_DEPLOY")) classes.push("production_deploy")
+  if (/paid|purchase/i.test(step.mutationType) || (step.userMustHandle || []).some((item) => /purchase|付款|费用|billed|paid/i.test(item))) {
+    classes.push("billing_or_purchase")
+  }
+  if (credentialOrPasswordItems.length > 0 || /secret|password|credential|docker_login/i.test(step.mutationType)) {
+    classes.push("secret_or_password")
+  }
+  if (/dns|certificate|icp/i.test(step.mutationType)) classes.push("dns_https_icp")
+  if (/readonly_inventory/i.test(step.mutationType)) classes.push("readonly_inventory_identity")
+  if (/runtime_create|observability_alert/i.test(step.mutationType)) classes.push("cloud_runtime_or_observability")
+  return uniqueStrings(classes)
 }
 
 function buildCredentialPasswordIntervention(sensitiveBlockers) {
@@ -799,6 +872,18 @@ function filterPresent(blockerSet, names) {
   return names.filter((name) => blockerSet.has(name))
 }
 
+function uniqueStrings(values) {
+  const seen = new Set()
+  const result = []
+  for (const value of values) {
+    const item = typeof value === "string" ? value.trim() : ""
+    if (!item || seen.has(item)) continue
+    seen.add(item)
+    result.push(item)
+  }
+  return result
+}
+
 function formatResourceEvidence(prefix, evidence) {
   if (!evidence) return []
   return [
@@ -864,6 +949,10 @@ function renderMarkdown(report) {
     "",
     ...renderCredentialAcquisitionQueue(report.credentialAcquisitionQueue),
     "",
+    "## Backend Resource Evidence Matrix",
+    "",
+    ...renderBackendResourceEvidenceMatrix(report.backendResourceEvidenceMatrix),
+    "",
     "## Apply Steps",
     "",
     ...report.applySteps.flatMap((step) => [
@@ -897,6 +986,28 @@ function renderMarkdown(report) {
     ...report.safetyBoundary.map((item) => `- ${item}`),
     "",
   ].join("\n")
+}
+
+function renderBackendResourceEvidenceMatrix(matrix) {
+  if (!matrix || !matrix.length) return ["- none"]
+  return [
+    `- rows: ${matrix.length}`,
+    `- immediateRows: ${matrix.filter((item) => item.canStartAfterActionTimeConfirmation).length}`,
+    `- blockedRows: ${matrix.filter((item) => !item.canStartAfterActionTimeConfirmation).length}`,
+    `- credentialOrPasswordRows: ${matrix.filter((item) => item.requiresCredentialOrPasswordHandling).length}`,
+    "",
+    "| order | step | phase | packets | local evidence targets | secret/password handling | verify |",
+    "| --- | --- | --- | --- | --- | --- | --- |",
+    ...matrix.map((item) => [
+      String(item.order || ""),
+      codeCell(item.stepId),
+      codeCell(item.phase),
+      escapeTableCell((item.requiredAuthorizationPackets || []).join(", ") || "none"),
+      escapeTableCell((item.localEvidenceTargets || []).join("; ") || "none"),
+      escapeTableCell((item.credentialOrPasswordItems || []).join("; ") || "none"),
+      escapeTableCell((item.verifyCommands || []).join("; ") || "none"),
+    ].join(" | ").replace(/^/, "| ").replace(/$/, " |")),
+  ]
 }
 
 function renderOperatorQuickStart(report) {

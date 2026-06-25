@@ -1017,9 +1017,17 @@ function renderMarkdown(audit) {
     `- readySecretsPendingCloudImport: ${backendApplyPackage.credentialPasswordIntervention?.readySecretsPendingCloudImport?.count ?? 0}`,
     `- paidPurchaseConfirmationActionIds: ${backendApplyPackage.credentialPasswordIntervention?.paidPurchaseConfirmationActionIds?.join(", ") || "none"}`,
     `- controlledSecretChannelActionIds: ${backendApplyPackage.credentialPasswordIntervention?.controlledSecretChannelActionIds?.join(", ") || "none"}`,
+    `- backendResourceEvidenceMatrixRows: ${backendApplyPackage.summary.backendResourceEvidenceMatrixRows || 0}`,
+    `- backendResourceEvidenceMatrixImmediateRows: ${backendApplyPackage.summary.backendResourceEvidenceMatrixImmediateRows || 0}`,
+    `- backendResourceEvidenceMatrixBlockedRows: ${backendApplyPackage.summary.backendResourceEvidenceMatrixBlockedRows || 0}`,
+    `- backendResourceEvidenceMatrixCredentialOrPasswordRows: ${backendApplyPackage.summary.backendResourceEvidenceMatrixCredentialOrPasswordRows || 0}`,
     `- actionTimeAuthorizationRequest.required: ${backendApplyPackage.actionTimeAuthorizationRequest?.required === true}`,
     `- actionTimeAuthorizationRequest.packetIds: ${backendApplyPackage.actionTimeAuthorizationRequest?.packetIds?.join(", ") || "none"}`,
     `- actionTimeAuthorizationRequest.recommendedUserReply: ${backendApplyPackage.actionTimeAuthorizationRequest?.recommendedUserReply || "none"}`,
+    ...(backendApplyPackage.backendResourceEvidenceMatrix?.length
+      ? backendApplyPackage.backendResourceEvidenceMatrix.map((item) =>
+        `- matrix ${item.stepId}: phase=${item.phase}; packets=${item.requiredAuthorizationPackets?.join(", ") || "none"}; credentialOrPassword=${item.requiresCredentialOrPasswordHandling === true}; localEvidenceTargets=${item.localEvidenceTargets?.join(" | ") || "none"}`)
+      : ["- backendResourceEvidenceMatrix: none"]),
     ...(backendApplyPackage.applySteps?.length
       ? backendApplyPackage.applySteps.map((item) => `- ${item.id}: canStart=${item.canStartAfterActionTimeConfirmation === true}; mutationType=${item.mutationType}; blockers=${item.currentBlockers?.length ? item.currentBlockers.join(", ") : "none"}`)
       : ["- applySteps: none"]),
@@ -2644,6 +2652,11 @@ function main() {
       readySecretsPendingCloudImportActionIds: backendApplyPackage.credentialPasswordIntervention?.readySecretsPendingCloudImport?.actionIds || [],
       paidPurchaseConfirmationActionIds: backendApplyPackage.credentialPasswordIntervention?.paidPurchaseConfirmationActionIds || [],
       controlledSecretChannelActionIds: backendApplyPackage.credentialPasswordIntervention?.controlledSecretChannelActionIds || [],
+      backendResourceEvidenceMatrixRows: backendApplyPackage.summary.backendResourceEvidenceMatrixRows || 0,
+      backendResourceEvidenceMatrixImmediateRows: backendApplyPackage.summary.backendResourceEvidenceMatrixImmediateRows || 0,
+      backendResourceEvidenceMatrixBlockedRows: backendApplyPackage.summary.backendResourceEvidenceMatrixBlockedRows || 0,
+      backendResourceEvidenceMatrixCredentialOrPasswordRows: backendApplyPackage.summary.backendResourceEvidenceMatrixCredentialOrPasswordRows || 0,
+      backendResourceEvidenceMatrix: backendApplyPackage.backendResourceEvidenceMatrix || [],
       credentialPasswordIntervention: backendApplyPackage.credentialPasswordIntervention || {},
       actionTimeAuthorizationRequest: backendApplyPackage.actionTimeAuthorizationRequest || null,
       applySteps: (backendApplyPackage.applySteps || []).map((item) =>
