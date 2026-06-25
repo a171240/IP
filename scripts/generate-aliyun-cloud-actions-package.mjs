@@ -16,6 +16,100 @@ const CLOUD_CONSOLE_PACKET_IDS = new Set(["P03_ACR_PURCHASE", "P05_OSS_RAM_STS",
 const EXTERNAL_APP_PACKET_IDS = new Set(["P01_WECHAT_OPEN_MOBILE_APP", "P10_ANDROID_RELEASE_SIGNING", "P02_APPLE_TEAM_ID"])
 const CURRENT_SCOPE = "backend_aliyun_only"
 const FULL_APP_LAUNCH_SCOPE = "deferred_after_backend_online"
+const BACKEND_FIRST_STEPS = [
+  {
+    id: "BAP00_READONLY_INVENTORY_IDENTITY",
+    title: "Restore Aliyun CLI or CloudShell read-only inventory evidence",
+    orderLine: "0. Restore Aliyun CLI/CloudShell read-only inventory evidence and write non-secret summaries only.",
+    requiredAuthorizationPackets: ["P00_ALIYUN_READONLY_INVENTORY_IDENTITY"],
+    blockingDependencies: [],
+    userIntervention: "USER_CONFIRM_ALIYUN_READONLY_INVENTORY_IDENTITY",
+  },
+  {
+    id: "BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE",
+    title: "Create Aliyun RDS PostgreSQL and close Supabase-to-RDS migration",
+    orderLine: "1. Create or confirm Aliyun RDS PostgreSQL in cn-hangzhou and close Supabase-to-RDS migration evidence.",
+    requiredAuthorizationPackets: ["P11_ALIYUN_RDS_DATA_MIGRATION"],
+    blockingDependencies: [],
+    userIntervention: "USER_CONFIRM_RDS_PURCHASE_AND_DATABASE_PASSWORD",
+  },
+  {
+    id: "BAP02_OSS_RAM_STS_CLOSE",
+    title: "Close OSS audio bucket RAM least privilege or STS/runtime role",
+    orderLine: "2. Confirm OSS RAM/STS least-privilege runtime access.",
+    requiredAuthorizationPackets: ["P05_OSS_RAM_STS"],
+    blockingDependencies: [],
+    userIntervention: "USER_CONFIRM_OSS_RAM_STS_SECRET_OR_RUNTIME_ROLE",
+  },
+  {
+    id: "BAP03_ACR_PURCHASE_AND_REPOSITORY",
+    title: "Confirm ACR Enterprise instance, namespace, and repository",
+    orderLine: "3. Purchase/confirm ACR Enterprise instance, namespace, and repository.",
+    requiredAuthorizationPackets: ["P03_ACR_PURCHASE"],
+    blockingDependencies: [],
+    userIntervention: "USER_CONFIRM_ACR_PAID_PURCHASE",
+  },
+  {
+    id: "BAP04_ACR_IMAGE_PUSH_AND_PULL",
+    title: "Push backend image and configure SAE pull authorization",
+    orderLine: "4. Push backend image to ACR, verify digest, and configure SAE image pull authorization.",
+    requiredAuthorizationPackets: ["P04_ACR_IMAGE_AND_PULL"],
+    blockingDependencies: ["BAP03_ACR_PURCHASE_AND_REPOSITORY"],
+    userIntervention: "USER_CONFIRM_ACR_PAID_PURCHASE",
+  },
+  {
+    id: "BAP05_BACKEND_ENV_IMPORT",
+    title: "Import backend env through SAE/KMS/Secrets Manager",
+    orderLine: "5. Import backend env through SAE/KMS/Secrets Manager, including DATABASE_URL_CN only as a secret env.",
+    requiredAuthorizationPackets: ["P06_ENV_IMPORT"],
+    blockingDependencies: [
+      "BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE",
+      "BAP02_OSS_RAM_STS_CLOSE",
+      "BAP04_ACR_IMAGE_PUSH_AND_PULL",
+    ],
+    userIntervention: "USER_CONFIRM_SECRET_ENV_IMPORT",
+  },
+  {
+    id: "BAP06_SAE_RUNTIME_CREATE",
+    title: "Create SAE runtime with container port 3000 and /api/healthz",
+    orderLine: "6. Create SAE runtime with container port 3000 and /api/healthz.",
+    requiredAuthorizationPackets: ["P08_SAE_RUNTIME_SLS"],
+    blockingDependencies: [
+      "BAP02_OSS_RAM_STS_CLOSE",
+      "BAP04_ACR_IMAGE_PUSH_AND_PULL",
+      "BAP05_BACKEND_ENV_IMPORT",
+    ],
+    userIntervention: "USER_CONFIRM_PRODUCTION_DEPLOY",
+  },
+  {
+    id: "BAP07_DOMAINS_HTTPS_ICP",
+    title: "Bind api-cn/assets-cn DNS, HTTPS certificate, and ICP access",
+    orderLine: "7. Bind api-cn/assets-cn DNS, HTTPS certificate, and ICP-compliant public access.",
+    requiredAuthorizationPackets: ["P07_DOMAIN_DNS_HTTPS"],
+    blockingDependencies: ["BAP06_SAE_RUNTIME_CREATE"],
+    userIntervention: "USER_CONFIRM_DNS_HTTPS_ICP_CHANGE",
+  },
+  {
+    id: "BAP08_SLS_ALERTS",
+    title: "Configure SLS health and 5xx alerts",
+    orderLine: "8. Configure SLS health and 5xx alerts.",
+    requiredAuthorizationPackets: ["P08_SAE_RUNTIME_SLS"],
+    blockingDependencies: ["BAP06_SAE_RUNTIME_CREATE"],
+    userIntervention: "USER_CONFIRM_PRODUCTION_DEPLOY",
+  },
+  {
+    id: "BAP09_POSTDEPLOY_SMOKE",
+    title: "Run backend health and APP API smoke tests against Aliyun",
+    orderLine: "9. Run backend health and APP API smoke tests against Aliyun.",
+    requiredAuthorizationPackets: ["P09_PRODUCTION_DEPLOY"],
+    blockingDependencies: [
+      "BAP06_SAE_RUNTIME_CREATE",
+      "BAP07_DOMAINS_HTTPS_ICP",
+      "BAP08_SLS_ALERTS",
+    ],
+    userIntervention: "USER_CONFIRM_PRODUCTION_DEPLOY",
+  },
+]
 const DEFERRED_APP_LAUNCH_CREDENTIAL_NAMES = new Set([
   "APPLE_TEAM_ID",
   "MEIYE_RELEASE_KEY_ALIAS",
@@ -182,6 +276,7 @@ function buildPackage(args) {
     externalAppPackets,
     imagePublishWritebackPlan,
   )
+  const backendFirstOrder = buildBackendFirstOrder(backendStatus)
   const sensitiveActionTotal = productionStatus.summary?.sensitiveActionItems?.total || 0
   const sensitiveActionBlocked = productionStatus.summary?.sensitiveActionItems?.blocked || 0
   const sensitiveActionReady = Math.max(sensitiveActionTotal - sensitiveActionBlocked, 0)
@@ -228,9 +323,13 @@ function buildPackage(args) {
       resourceEvidenceReady: cloudActionClosureBrief.resourceEvidenceReady,
       blockedResourceEvidenceIds: cloudActionClosureBrief.blockedResourceEvidenceIds,
       partiallyObservedResourceEvidenceIds: cloudActionClosureBrief.partiallyObservedResourceEvidenceIds,
+      immediateBackendSteps: backendFirstOrder.immediateBackendSteps,
+      blockedBackendSteps: backendFirstOrder.blockedBackendSteps,
+      backendFirstUserInterventionRequired: backendFirstOrder.userInterventionRequired,
     },
     cloudActionClosureBrief,
     firstCloudPhase,
+    backendFirstOrder,
     executionQueue,
     immediateConsoleTasks: immediateConsoleTasks.map((task) => compactConsoleTask(task, imagePublishWritebackPlan)),
     blockedConsoleTasks: blockedConsoleTasks.map((task) => compactConsoleTask(task, imagePublishWritebackPlan)),
@@ -443,6 +542,37 @@ function buildExecutionQueue(immediateConsoleTasks, blockedConsoleTasks, externa
         verifyCommands: compact.verifyCommands,
       }
     }),
+  }
+}
+
+function buildBackendFirstOrder(backendStatus) {
+  const immediateBackendSteps = BACKEND_FIRST_STEPS
+    .filter((step) => step.blockingDependencies.length === 0)
+    .map((step) => step.id)
+  const blockedBackendSteps = BACKEND_FIRST_STEPS
+    .filter((step) => step.blockingDependencies.length > 0)
+    .map((step) => step.id)
+  return {
+    sourceCommand: "corepack pnpm aliyun:backend-cn:status",
+    purpose: "backend_first_apply_order_over_console_task_canStartNow",
+    note: "Console canStartNow only means a console task can begin after action-time confirmation; backend-first apply order still starts with BAP00/BAP01 so RDS and read-only inventory are not skipped.",
+    sourceOrderLines: backendStatus.nextBackendOrder || [],
+    immediateBackendSteps,
+    blockedBackendSteps,
+    actionTimeConfirmationRequired: BACKEND_FIRST_STEPS.map((step) => step.id),
+    userInterventionRequired: uniqueStrings(BACKEND_FIRST_STEPS.map((step) => step.userIntervention)),
+    steps: BACKEND_FIRST_STEPS.map((step) => ({
+      id: step.id,
+      title: step.title,
+      orderLine: step.orderLine,
+      status: step.blockingDependencies.length === 0
+        ? "ready_for_action_time_confirmation"
+        : "blocked_by_dependencies",
+      requiresActionTimeConfirmation: true,
+      requiredAuthorizationPackets: step.requiredAuthorizationPackets,
+      blockingDependencies: step.blockingDependencies,
+      userIntervention: step.userIntervention,
+    })),
   }
 }
 
@@ -719,6 +849,8 @@ function renderMarkdown(report) {
     `- resourceEvidenceReady: ${report.summary.resourceEvidenceReady}`,
     `- blockedResourceEvidenceIds: ${report.summary.blockedResourceEvidenceIds.length ? report.summary.blockedResourceEvidenceIds.join(", ") : "none"}`,
     `- partiallyObservedResourceEvidenceIds: ${report.summary.partiallyObservedResourceEvidenceIds.length ? report.summary.partiallyObservedResourceEvidenceIds.join(", ") : "none"}`,
+    `- immediateBackendSteps: ${report.summary.immediateBackendSteps.length ? report.summary.immediateBackendSteps.join(", ") : "none"}`,
+    `- blockedBackendSteps: ${report.summary.blockedBackendSteps.length ? report.summary.blockedBackendSteps.join(", ") : "none"}`,
     "",
     "## 目标闭环证据简表",
     "",
@@ -740,6 +872,19 @@ function renderMarkdown(report) {
     `- deferredAppLaunchPackets: ${report.cloudActionClosureBrief.deferredAppLaunchPackets.length ? report.cloudActionClosureBrief.deferredAppLaunchPackets.join(", ") : "none"}`,
     `- blockedByDependencies: ${report.cloudActionClosureBrief.blockedByDependencies.length ? report.cloudActionClosureBrief.blockedByDependencies.join(", ") : "none"}`,
     `- imagePublishWritebackBlockingGroups: ${report.cloudActionClosureBrief.imagePublishWritebackBlockingGroups.length ? report.cloudActionClosureBrief.imagePublishWritebackBlockingGroups.join(", ") : "none"}`,
+    "",
+    "## 后端优先执行顺序",
+    "",
+    `- sourceCommand: ${report.backendFirstOrder.sourceCommand}`,
+    `- purpose: ${report.backendFirstOrder.purpose}`,
+    `- note: ${report.backendFirstOrder.note}`,
+    `- immediateBackendSteps: ${report.backendFirstOrder.immediateBackendSteps.join(", ") || "none"}`,
+    `- blockedBackendSteps: ${report.backendFirstOrder.blockedBackendSteps.join(", ") || "none"}`,
+    `- actionTimeConfirmationRequired: ${report.backendFirstOrder.actionTimeConfirmationRequired.join(", ") || "none"}`,
+    `- userInterventionRequired: ${report.backendFirstOrder.userInterventionRequired.join(", ") || "none"}`,
+    ...(report.backendFirstOrder.steps.map((step) =>
+      `- ${step.id}: status=${step.status}; packets=${step.requiredAuthorizationPackets.join(", ") || "none"}; dependsOn=${step.blockingDependencies.join(", ") || "none"}; order=${step.orderLine}`
+    )),
     "",
     "## 下一步执行队列",
     "",
@@ -797,7 +942,9 @@ function renderMarkdown(report) {
     "## 延期的外部 App 前置项",
     "",
     ...(report.deferredAppLaunchPrerequisitePackets.length
-      ? report.deferredAppLaunchPrerequisitePackets.map((packet) => `- ${packet.packetId}: ${packet.minimumAuthorizationPhrase}`)
+      ? report.deferredAppLaunchPrerequisitePackets.map((packet) =>
+        `- ${packet.packetId}: ${packet.minimumAuthorizationPhrase || packet.title || "deferred full App launch item"}`
+      )
       : ["- none"]),
     "",
     "## 严格验证顺序",
@@ -812,7 +959,6 @@ function renderMarkdown(report) {
     "## 当前阻塞",
     "",
     ...(report.currentBlockers.length ? report.currentBlockers.map((item) => `- ${item}`) : ["- none"]),
-    "",
   ].join("\n")
 }
 

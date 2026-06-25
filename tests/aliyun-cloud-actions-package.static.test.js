@@ -92,6 +92,34 @@ test("Aliyun cloud actions package summarizes current cloud console action order
   assert.ok(report.summary.blockedResourceEvidenceIds.includes("R06_ENV_IMPORT"))
   assert.ok(report.summary.partiallyObservedResourceEvidenceIds.includes("R05_OSS_AUDIO_STORAGE"))
   assert.ok(report.summary.partiallyObservedResourceEvidenceIds.includes("R07_SLS_ALERTS"))
+  assert.deepEqual(report.summary.immediateBackendSteps, [
+    "BAP00_READONLY_INVENTORY_IDENTITY",
+    "BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE",
+    "BAP02_OSS_RAM_STS_CLOSE",
+    "BAP03_ACR_PURCHASE_AND_REPOSITORY",
+  ])
+  assert.ok(report.summary.blockedBackendSteps.includes("BAP05_BACKEND_ENV_IMPORT"))
+  assert.ok(report.summary.backendFirstUserInterventionRequired.includes("USER_CONFIRM_RDS_PURCHASE_AND_DATABASE_PASSWORD"))
+  assert.equal(report.backendFirstOrder.sourceCommand, "corepack pnpm aliyun:backend-cn:status")
+  assert.match(report.backendFirstOrder.note, /backend-first apply order/)
+  assert.deepEqual(report.backendFirstOrder.immediateBackendSteps, report.summary.immediateBackendSteps)
+  assert.ok(report.backendFirstOrder.steps.find((item) =>
+    item.id === "BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE" &&
+    item.status === "ready_for_action_time_confirmation" &&
+    item.requiredAuthorizationPackets.includes("P11_ALIYUN_RDS_DATA_MIGRATION") &&
+    item.orderLine.includes("RDS PostgreSQL")
+  ))
+  assert.ok(report.backendFirstOrder.steps.find((item) =>
+    item.id === "BAP05_BACKEND_ENV_IMPORT" &&
+    item.status === "blocked_by_dependencies" &&
+    item.blockingDependencies.includes("BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE") &&
+    item.orderLine.includes("Import backend env")
+  ))
+  assert.ok(report.backendFirstOrder.steps.find((item) =>
+    item.id === "BAP04_ACR_IMAGE_PUSH_AND_PULL" &&
+    item.orderLine.includes("Push backend image")
+  ))
+  assert.ok(report.backendFirstOrder.sourceOrderLines.some((line) => line.includes("Create or confirm Aliyun RDS PostgreSQL")))
   assert.equal(report.cloudActionClosureBrief.canDeployNow, false)
   assert.equal(report.cloudActionClosureBrief.blockedCredentialCount, 1)
   assert.deepEqual(report.cloudActionClosureBrief.blockedCredentialNames, ["DATABASE_URL_CN"])
@@ -226,6 +254,8 @@ test("Aliyun cloud actions package markdown renders compact action order without
   assert.match(markdown, /resourceEvidenceReady: 0\/7/)
   assert.match(markdown, /blockedResourceEvidenceIds: .*R02_ACR_IMAGE_REGISTRY/)
   assert.match(markdown, /partiallyObservedResourceEvidenceIds: R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS/)
+  assert.match(markdown, /immediateBackendSteps: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP03_ACR_PURCHASE_AND_REPOSITORY/)
+  assert.match(markdown, /blockedBackendSteps: BAP04_ACR_IMAGE_PUSH_AND_PULL, BAP05_BACKEND_ENV_IMPORT/)
   assert.match(markdown, /strictReadonlyInventoryReady: false/)
   assert.match(markdown, /cloudInventoryReadyLocalOperations: 0\/9/)
   assert.match(markdown, /cloudInventoryExecutedCommandResults: 9\/9/)
@@ -240,6 +270,13 @@ test("Aliyun cloud actions package markdown renders compact action order without
   assert.match(markdown, /cloudInventoryReadyLocalOperations: 0\/9/)
   assert.match(markdown, /cloudInventoryExecutedCommandResults: 9\/9/)
   assert.match(markdown, /下一步执行队列/)
+  assert.match(markdown, /后端优先执行顺序/)
+  assert.match(markdown, /sourceCommand: corepack pnpm aliyun:backend-cn:status/)
+  assert.match(markdown, /BAP00_READONLY_INVENTORY_IDENTITY: status=ready_for_action_time_confirmation/)
+  assert.match(markdown, /BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE: status=ready_for_action_time_confirmation; packets=P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(markdown, /BAP04_ACR_IMAGE_PUSH_AND_PULL: status=blocked_by_dependencies; packets=P04_ACR_IMAGE_AND_PULL; dependsOn=BAP03_ACR_PURCHASE_AND_REPOSITORY; order=4\. Push backend image to ACR/)
+  assert.match(markdown, /BAP05_BACKEND_ENV_IMPORT: status=blocked_by_dependencies/)
+  assert.match(markdown, /BAP05_BACKEND_ENV_IMPORT:[^\n]*order=5\. Import backend env/)
   assert.match(markdown, /canStartNow: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS/)
   assert.match(markdown, /scope=purchase_and_repository_only/)
   assert.match(markdown, /currentActionAcceptanceEvidence: acr\.purchaseCandidate\.confirmed=true/)
@@ -273,6 +310,17 @@ test("APP production-cn action queue documents the current authorized next-step 
     "cloudInventoryExecutedCommandResults: 9/9",
     "mutationPerformedCommandResults: 0",
     "blockedCredentialNames: DATABASE_URL_CN",
+    "immediateBackendSteps: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP03_ACR_PURCHASE_AND_REPOSITORY",
+    "blockedBackendSteps: BAP04_ACR_IMAGE_PUSH_AND_PULL, BAP05_BACKEND_ENV_IMPORT",
+    "## 后端优先执行顺序",
+    "sourceCommand: corepack pnpm aliyun:backend-cn:status",
+    "BAP00_READONLY_INVENTORY_IDENTITY: status=ready_for_action_time_confirmation",
+    "BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE: status=ready_for_action_time_confirmation; packets=P11_ALIYUN_RDS_DATA_MIGRATION",
+    "BAP02_OSS_RAM_STS_CLOSE: status=ready_for_action_time_confirmation; packets=P05_OSS_RAM_STS",
+    "BAP03_ACR_PURCHASE_AND_REPOSITORY: status=ready_for_action_time_confirmation; packets=P03_ACR_PURCHASE",
+    "BAP04_ACR_IMAGE_PUSH_AND_PULL: status=blocked_by_dependencies; packets=P04_ACR_IMAGE_AND_PULL; dependsOn=BAP03_ACR_PURCHASE_AND_REPOSITORY; order=4. Push backend image to ACR",
+    "BAP05_BACKEND_ENV_IMPORT: status=blocked_by_dependencies",
+    "order=5. Import backend env through SAE/KMS/Secrets Manager",
     "canStartNow: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS",
     "cloudConsolePackets: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION",
     "externalAppPackets: none",

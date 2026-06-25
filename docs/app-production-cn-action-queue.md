@@ -1,6 +1,6 @@
 # 阿里云控制台动作包
 
-生成时间：2026-06-25T08:41:34.096Z
+生成时间：2026-06-25T10:47:02.829Z
 
 ## 结论
 
@@ -28,6 +28,8 @@
 - resourceEvidenceReady: 0/7
 - blockedResourceEvidenceIds: R01_SAE_RUNTIME, R02_ACR_IMAGE_REGISTRY, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R05_OSS_AUDIO_STORAGE, R06_ENV_IMPORT, R07_SLS_ALERTS
 - partiallyObservedResourceEvidenceIds: R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS
+- immediateBackendSteps: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP03_ACR_PURCHASE_AND_REPOSITORY
+- blockedBackendSteps: BAP04_ACR_IMAGE_PUSH_AND_PULL, BAP05_BACKEND_ENV_IMPORT, BAP06_SAE_RUNTIME_CREATE, BAP07_DOMAINS_HTTPS_ICP, BAP08_SLS_ALERTS, BAP09_POSTDEPLOY_SMOKE
 
 ## 目标闭环证据简表
 
@@ -49,6 +51,26 @@
 - deferredAppLaunchPackets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID
 - blockedByDependencies: C01_SAE_RUNTIME, C03_API_DOMAIN_HTTPS_ICP, C04_ASSET_DOMAIN_HTTPS_ICP, C06_ENV_IMPORT, C07_SLS_ALERTS
 - imagePublishWritebackBlockingGroups: acrPurchaseAndRepository, imagePushAndDigest, saeRuntimeImagePull
+
+## 后端优先执行顺序
+
+- sourceCommand: corepack pnpm aliyun:backend-cn:status
+- purpose: backend_first_apply_order_over_console_task_canStartNow
+- note: Console canStartNow only means a console task can begin after action-time confirmation; backend-first apply order still starts with BAP00/BAP01 so RDS and read-only inventory are not skipped.
+- immediateBackendSteps: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP03_ACR_PURCHASE_AND_REPOSITORY
+- blockedBackendSteps: BAP04_ACR_IMAGE_PUSH_AND_PULL, BAP05_BACKEND_ENV_IMPORT, BAP06_SAE_RUNTIME_CREATE, BAP07_DOMAINS_HTTPS_ICP, BAP08_SLS_ALERTS, BAP09_POSTDEPLOY_SMOKE
+- actionTimeConfirmationRequired: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP03_ACR_PURCHASE_AND_REPOSITORY, BAP04_ACR_IMAGE_PUSH_AND_PULL, BAP05_BACKEND_ENV_IMPORT, BAP06_SAE_RUNTIME_CREATE, BAP07_DOMAINS_HTTPS_ICP, BAP08_SLS_ALERTS, BAP09_POSTDEPLOY_SMOKE
+- userInterventionRequired: USER_CONFIRM_ALIYUN_READONLY_INVENTORY_IDENTITY, USER_CONFIRM_RDS_PURCHASE_AND_DATABASE_PASSWORD, USER_CONFIRM_OSS_RAM_STS_SECRET_OR_RUNTIME_ROLE, USER_CONFIRM_ACR_PAID_PURCHASE, USER_CONFIRM_SECRET_ENV_IMPORT, USER_CONFIRM_PRODUCTION_DEPLOY, USER_CONFIRM_DNS_HTTPS_ICP_CHANGE
+- BAP00_READONLY_INVENTORY_IDENTITY: status=ready_for_action_time_confirmation; packets=P00_ALIYUN_READONLY_INVENTORY_IDENTITY; dependsOn=none; order=0. Restore Aliyun CLI/CloudShell read-only inventory evidence and write non-secret summaries only.
+- BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE: status=ready_for_action_time_confirmation; packets=P11_ALIYUN_RDS_DATA_MIGRATION; dependsOn=none; order=1. Create or confirm Aliyun RDS PostgreSQL in cn-hangzhou and close Supabase-to-RDS migration evidence.
+- BAP02_OSS_RAM_STS_CLOSE: status=ready_for_action_time_confirmation; packets=P05_OSS_RAM_STS; dependsOn=none; order=2. Confirm OSS RAM/STS least-privilege runtime access.
+- BAP03_ACR_PURCHASE_AND_REPOSITORY: status=ready_for_action_time_confirmation; packets=P03_ACR_PURCHASE; dependsOn=none; order=3. Purchase/confirm ACR Enterprise instance, namespace, and repository.
+- BAP04_ACR_IMAGE_PUSH_AND_PULL: status=blocked_by_dependencies; packets=P04_ACR_IMAGE_AND_PULL; dependsOn=BAP03_ACR_PURCHASE_AND_REPOSITORY; order=4. Push backend image to ACR, verify digest, and configure SAE image pull authorization.
+- BAP05_BACKEND_ENV_IMPORT: status=blocked_by_dependencies; packets=P06_ENV_IMPORT; dependsOn=BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP04_ACR_IMAGE_PUSH_AND_PULL; order=5. Import backend env through SAE/KMS/Secrets Manager, including DATABASE_URL_CN only as a secret env.
+- BAP06_SAE_RUNTIME_CREATE: status=blocked_by_dependencies; packets=P08_SAE_RUNTIME_SLS; dependsOn=BAP02_OSS_RAM_STS_CLOSE, BAP04_ACR_IMAGE_PUSH_AND_PULL, BAP05_BACKEND_ENV_IMPORT; order=6. Create SAE runtime with container port 3000 and /api/healthz.
+- BAP07_DOMAINS_HTTPS_ICP: status=blocked_by_dependencies; packets=P07_DOMAIN_DNS_HTTPS; dependsOn=BAP06_SAE_RUNTIME_CREATE; order=7. Bind api-cn/assets-cn DNS, HTTPS certificate, and ICP-compliant public access.
+- BAP08_SLS_ALERTS: status=blocked_by_dependencies; packets=P08_SAE_RUNTIME_SLS; dependsOn=BAP06_SAE_RUNTIME_CREATE; order=8. Configure SLS health and 5xx alerts.
+- BAP09_POSTDEPLOY_SMOKE: status=blocked_by_dependencies; packets=P09_PRODUCTION_DEPLOY; dependsOn=BAP06_SAE_RUNTIME_CREATE, BAP07_DOMAINS_HTTPS_ICP, BAP08_SLS_ALERTS; order=9. Run backend health and APP API smoke tests against Aliyun.
 
 ## 下一步执行队列
 
@@ -116,9 +138,9 @@
 
 ## 延期的外部 App 前置项
 
-- P01_WECHAT_OPEN_MOBILE_APP: 授权在微信开放平台创建/补全美业话镜移动应用资料并提交审核；不读取或输出 AppSecret。
-- P10_ANDROID_RELEASE_SIGNING: 授权使用受控 Android release keystore 构建/签名 release 包并读取微信开放平台 Android 应用签名；不输出 keystore 密码。
-- P02_APPLE_TEAM_ID: 授权读取 Apple Developer Team ID 并导入阿里云 plain env。
+- P01_WECHAT_OPEN_MOBILE_APP: 创建微信开放平台移动应用并审核通过
+- P10_ANDROID_RELEASE_SIGNING: 配置 Android release signing 并生成微信开放平台 Android 签名
+- P02_APPLE_TEAM_ID: 确认 Apple Team ID 用于 iOS Universal Link AASA
 
 ## 严格验证顺序
 
