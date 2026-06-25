@@ -112,6 +112,13 @@ test("Aliyun user action brief is value-free and includes the expected blockers"
   assert.ok(report.credentialAcquisitionSummary.readySecretEnvVariableNames.includes("DASHSCOPE_API_KEY"))
   assert.ok(report.credentialAcquisitionSummary.forbiddenStorage.includes("Docker image"))
   assert.ok(report.credentialAcquisitionSummary.valueHandlingRules.some((item) => item.includes("不能写入 JSON")))
+  assert.equal(report.credentialAcquisitionSummary.credentialAcquisitionQueue.queueScope, "full_app_launch")
+  assert.equal(report.credentialAcquisitionSummary.credentialAcquisitionQueue.onlyMissingBackendCredentialValue, "")
+  assert.ok(report.credentialAcquisitionSummary.credentialAcquisitionQueue.items.some((item) =>
+    item.actionId === "S08_ALIYUN_RDS_DATABASE_URL" &&
+    item.userQuestion === "DATABASE_URL_CN 从哪里获得并导入到哪里" &&
+    item.destinationSummary.some((target) => target.includes("DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env only"))
+  ))
   assert.ok(report.credentialAcquisitionSummary.readySecretEnvVariableGroups.some((group) =>
     group.category === "legacy_database_migration_source" &&
     group.variableNames.includes("SUPABASE_SERVICE_ROLE_KEY")
@@ -254,6 +261,9 @@ test("Aliyun user action brief is value-free and includes the expected blockers"
   })
   const markdown = fs.readFileSync(tmpMarkdown, "utf8")
   assert.match(markdown, /密钥\/密码\/受控变量获取摘要/)
+  assert.match(markdown, /### 获取\/导入队列/)
+  assert.match(markdown, /queueScope: full_app_launch/)
+  assert.match(markdown, /DATABASE_URL_CN 从哪里获得并导入到哪里/)
   assert.match(markdown, /blockedCredentialCount: 8/)
   assert.match(markdown, /readySecretEnvVariableCount: 17/)
   assert.match(markdown, /WECHAT_OPEN_APP_ID/)
@@ -288,6 +298,15 @@ test("Aliyun user action brief backend-only mode excludes deferred APP launch bl
   assert.deepEqual(report.summary.blockedCredentialNames, ["DATABASE_URL_CN"])
   assert.equal(report.credentialAcquisitionSummary.blockedCredentialCount, 1)
   assert.deepEqual(report.credentialAcquisitionSummary.blockedCredentialNames, ["DATABASE_URL_CN"])
+  assert.equal(report.credentialAcquisitionSummary.credentialAcquisitionQueue.queueScope, "backend_aliyun_only")
+  assert.equal(report.credentialAcquisitionSummary.credentialAcquisitionQueue.onlyMissingBackendCredentialValue, "DATABASE_URL_CN")
+  assert.deepEqual(report.credentialAcquisitionSummary.credentialAcquisitionQueue.items.map((item) => item.actionId), [
+    "S03_ACR_PAID_PURCHASE",
+    "S04_ACR_REGISTRY_AUTH",
+    "S05_OSS_RAM_SECRET_OR_STS",
+    "S08_ALIYUN_RDS_DATABASE_URL",
+    "S06_READY_SENSITIVE_ENV_IMPORT",
+  ])
   assert.deepEqual(report.summary.nextActionTimeConfirmations, [
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "P03_ACR_PURCHASE",
@@ -314,6 +333,9 @@ test("Aliyun user action brief backend-only mode excludes deferred APP launch bl
   assert.ok(deployAction.currentBlockers.includes("missing_required_env:DATABASE_URL_CN"))
   assert.ok(!deployAction.currentBlockers.some((item) => /WECHAT_OPEN_APP_ID|WECHAT_OPEN_APP_SECRET|微信开放平台移动应用/.test(item)))
   assert.match(markdown, /blockedCredentialNames: DATABASE_URL_CN/)
+  assert.match(markdown, /### 后端-only 获取\/导入队列/)
+  assert.match(markdown, /onlyMissingBackendCredentialValue: DATABASE_URL_CN/)
+  assert.match(markdown, /DATABASE_URL_CN 从哪里获得并导入到哪里/)
   assert.match(markdown, /## 动作时授权请求/)
   assert.match(markdown, /recommendedUserReply: 授权本轮只做阿里云后端第一批动作/)
   assert.match(markdown, /packetIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION/)

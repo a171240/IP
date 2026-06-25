@@ -885,6 +885,11 @@ function buildCredentialAcquisitionSummary(sensitive) {
     || sensitive.summary?.credentialInterventionBrief
     || sensitive.summary?.userIntervention
     || {}
+  const credentialAcquisitionQueue = compactCredentialAcquisitionQueue(
+    sensitive.credentialAcquisitionQueue
+      || sensitive.summary?.credentialAcquisitionQueue
+      || {},
+  )
   return {
     canCodexProceedWithoutUser: brief.canCodexProceedWithoutUser === true,
     blockedCredentialCount: brief.blockedCredentialCount || 0,
@@ -906,6 +911,7 @@ function buildCredentialAcquisitionSummary(sensitive) {
       "readySecretEnvVariableNames 表示本机已有 ready 状态但仍只能通过 KMS/Secrets Manager/SAE secret env 导入。",
       "AppSecret、AccessKeySecret、registry password、RAM Secret、STS token、keystore password 和 Supabase service role key 不能写入 JSON、Markdown、Docker 镜像或 git。",
     ],
+    credentialAcquisitionQueue,
     groups: (brief.groups || []).map((group) => ({
       category: group.category,
       actionId: group.actionId,
@@ -935,6 +941,34 @@ function buildCredentialAcquisitionSummary(sensitive) {
       importTarget: group.importTarget,
       count: group.count,
       variableNames: group.variableNames || [],
+    })),
+  }
+}
+
+function compactCredentialAcquisitionQueue(queue) {
+  return {
+    currentScope: queue.currentScope || CURRENT_SCOPE,
+    queueScope: queue.queueScope || queue.currentScope || CURRENT_SCOPE,
+    missingCredentialNames: queue.missingCredentialNames || [],
+    onlyMissingBackendCredentialValue: queue.onlyMissingBackendCredentialValue || "",
+    readySecretEnvVariableCount: queue.readySecretEnvVariableCount || 0,
+    readySecretEnvVariableNames: queue.readySecretEnvVariableNames || [],
+    requiresActionTimeConfirmationIds: queue.requiresActionTimeConfirmationIds || [],
+    valueHandlingRules: queue.valueHandlingRules || [],
+    items: (queue.items || []).map((item) => ({
+      order: item.order,
+      actionId: item.actionId,
+      category: item.category,
+      status: item.status,
+      owner: item.owner,
+      userQuestion: item.userQuestion || "",
+      obtainFrom: item.obtainFrom || "",
+      blockedCredentialNames: item.blockedCredentialNames || [],
+      readySecretEnvVariableNames: item.readySecretEnvVariableNames || [],
+      destinationSummary: item.destinationSummary || item.writeTargets || item.importTargets || [],
+      verifyCommands: item.verifyCommands || [],
+      requiresActionTimeConfirmation: item.requiresActionTimeConfirmation === true,
+      unblockCondition: item.unblockCondition || "",
     })),
   }
 }
@@ -1235,6 +1269,7 @@ function renderCredentialAcquisitionSummary(summary) {
       escapeTableCell((group.writeTargets || group.importTargets || []).join("; ") || "none"),
     ].join(" | ").replace(/^/, "| ").replace(/$/, " |")),
     "",
+    ...renderCredentialAcquisitionQueue(summary.credentialAcquisitionQueue),
     "### 已 ready 但仍需导入阿里云 secret env 的变量组",
     "",
     ...(summary.readySecretEnvVariableGroups.length
@@ -1255,6 +1290,32 @@ function renderCredentialAcquisitionSummary(summary) {
     ...(summary.valueHandlingRules.length
       ? summary.valueHandlingRules.map((item) => `- ${item}`)
       : ["- none"]),
+    "",
+  ]
+}
+
+function renderCredentialAcquisitionQueue(queue) {
+  if (!queue || !(queue.items || []).length) return []
+  return [
+    queue.queueScope === "backend_aliyun_only" ? "### 后端-only 获取/导入队列" : "### 获取/导入队列",
+    "",
+    `- queueScope: ${queue.queueScope}`,
+    `- missingCredentialNames: ${(queue.missingCredentialNames || []).join(", ") || "none"}`,
+    `- onlyMissingBackendCredentialValue: ${queue.onlyMissingBackendCredentialValue || "n/a"}`,
+    `- readySecretsPendingCloudImport: ${queue.readySecretEnvVariableCount || 0}`,
+    `- requiresActionTimeConfirmationIds: ${(queue.requiresActionTimeConfirmationIds || []).join(", ") || "none"}`,
+    "",
+    "| 顺序 | 类别 | 动作 ID | 要回答的问题 | 获取位置 | 导入/写入目标 | 验证 |",
+    "| --- | --- | --- | --- | --- | --- | --- |",
+    ...queue.items.map((item) => [
+      String(item.order || ""),
+      codeCell(item.category),
+      codeCell(item.actionId),
+      escapeTableCell(item.userQuestion || "none"),
+      escapeTableCell(item.obtainFrom || "none"),
+      escapeTableCell((item.destinationSummary || []).join("; ") || "none"),
+      escapeTableCell((item.verifyCommands || []).join("; ") || "none"),
+    ].join(" | ").replace(/^/, "| ").replace(/$/, " |")),
     "",
   ]
 }
