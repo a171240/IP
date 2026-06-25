@@ -1,6 +1,6 @@
 # APP production-cn Aliyun backend apply package
 
-Generated at: 2026-06-24T15:27:48.112Z
+Generated at: 2026-06-25T02:22:51.267Z
 
 ## Scope
 
@@ -53,7 +53,7 @@ Generated at: 2026-06-24T15:27:48.112Z
 - mutationType: paid_resource_create_and_data_migration
 - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
 - consolePath: 阿里云控制台 -> 云数据库 RDS -> PostgreSQL -> cn-hangzhou
-- currentEvidence: inventory.rdsPostgres=observed_or_unknown; rdsLocalExists=true; rdsLocalReady=false; appApiRoutesWithSupabase=30/30; firstVersionRdsRoutesWithSupabaseDataAccess=25/25; postgresDataAccessAdapterDetected=true
+- currentEvidence: inventory.rdsPostgres=observed_or_unknown; rdsLocalExists=true; rdsLocalReady=false; appApiRoutesWithSupabase=31/31; firstVersionRdsRoutesWithSupabaseDataAccess=25/25; postgresDataAccessAdapterDetected=true
 - currentBlockers: DATABASE_URL_CN, RDS_MIGRATION_EVIDENCE_NOT_READY, rdsEvidence:todo:rdsPostgres.instanceId, rdsEvidence:todo:rdsPostgres.engineVersion, rdsEvidence:todo:rdsPostgres.networkAccess, rdsEvidence:todo:rdsPostgres.databaseName, rdsEvidence:todo:rdsPostgres.evidence, rdsEvidence:rdsPostgres.confirmed, rdsEvidence:rdsPostgres.databaseAccountReady, rdsEvidence:rdsPostgres.databaseUrlCnSecretImported, rdsEvidence:migration.dataAccessAdapterReady, rdsEvidence:migration.schemaMigrated, rdsEvidence:migration.dataMigrated, rdsEvidence:migration.rowCountValidationPassed, rdsEvidence:migration.criticalRecordValidationPassed, rdsEvidence:migration.appApiSmokeOnRdsPassed, rdsEvidence:migration.supabaseNoLongerFormalTarget, rdsEvidence:migration.rollbackRunbookReviewed, rdsEvidence:migration.rollbackValidationPassed
 - writeTargets: deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres/sourceInventory/migration/security; DATABASE_URL_CN -> Aliyun KMS / Secrets Manager / SAE secret env only
 - userMustHandle: RDS purchase/spec confirmation if billed; database account password; DATABASE_URL_CN secret value; Supabase export/import credentials during migration; migration rollback confirmation
@@ -183,12 +183,16 @@ Generated at: 2026-06-24T15:27:48.112Z
 ## Verification Order
 
 - corepack pnpm aliyun:backend-cn:status
+- corepack pnpm aliyun:env:handoff:backend
+- corepack pnpm aliyun:user:actions:backend
+- corepack pnpm aliyun:action:authorization:backend
 - corepack pnpm aliyun:cloudshell:handoff
 - corepack pnpm aliyun:cloud:inventory-results:strict
 - corepack pnpm aliyun:rds:migration:evidence
 - corepack pnpm aliyun:cloud:confirmations
 - corepack pnpm aliyun:image:plan
 - corepack pnpm aliyun:evidence:writeback:backend
+- corepack pnpm aliyun:operator:tasks:backend
 - corepack pnpm aliyun:operator:handoff:backend
 - corepack pnpm aliyun:backend-cn:apply-package
 - corepack pnpm aliyun:predeploy
