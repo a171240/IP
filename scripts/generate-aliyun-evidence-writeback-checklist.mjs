@@ -13,6 +13,7 @@ const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
 const DEFAULT_CLOUD_INVENTORY_RESULTS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-inventory-results.local.json")
 const DEFAULT_RDS_MIGRATION_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.rds-migration.local.json")
+const READONLY_INVENTORY_AUTH_PACKET = "P00_ALIYUN_READONLY_INVENTORY_IDENTITY"
 
 const STRICT_VERIFICATION_ORDER = Object.freeze([
   "corepack pnpm aliyun:rds:migration:evidence:strict",
@@ -199,7 +200,7 @@ function writebackPrerequisites(groupKey, item) {
 
   if (groupKey === "cloudInventoryResults") {
     return buildPrerequisites(
-      ["P11_ALIYUN_READONLY_INVENTORY_IDENTITY"],
+      [READONLY_INVENTORY_AUTH_PACKET],
       ["受控只读 Aliyun CLI/CloudShell inventory 结果：executed=true、cloudApiCalled=true、mutationPerformed=false"],
       ["阿里云 CLI profile 或 CloudShell 只读身份可用"],
     )

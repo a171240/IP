@@ -165,7 +165,8 @@ test("Aliyun evidence writeback checklist exposes local JSON write targets witho
   assert.ok(report.summary.requiredAuthorizationPackets.includes("P10_ANDROID_RELEASE_SIGNING"))
   assert.ok(report.summary.requiredAuthorizationPackets.includes("P11_ALIYUN_RDS_DATA_MIGRATION"))
   if (report.summary.cloudInventoryResultGaps > 0) {
-    assert.ok(report.summary.requiredAuthorizationPackets.includes("P11_ALIYUN_READONLY_INVENTORY_IDENTITY"))
+    assert.ok(report.summary.requiredAuthorizationPackets.includes("P00_ALIYUN_READONLY_INVENTORY_IDENTITY"))
+    assert.ok(!report.summary.requiredAuthorizationPackets.includes("P11_ALIYUN_READONLY_INVENTORY_IDENTITY"))
   } else {
     assert.equal(report.writebackGroups.cloudInventoryResults.ready, true)
   }
@@ -183,7 +184,8 @@ test("Aliyun evidence writeback checklist exposes local JSON write targets witho
   assert.ok(imagePublishPaths.includes("acr.registryHost"))
   assert.ok(imagePublishPaths.includes("runtime.confirmed"))
   if (report.writebackGroups.cloudInventoryResults.gaps.length > 0) {
-    assert.ok(report.writebackGroups.cloudInventoryResults.requiredAuthorizationPackets.includes("P11_ALIYUN_READONLY_INVENTORY_IDENTITY"))
+    assert.ok(report.writebackGroups.cloudInventoryResults.requiredAuthorizationPackets.includes("P00_ALIYUN_READONLY_INVENTORY_IDENTITY"))
+    assert.ok(!report.writebackGroups.cloudInventoryResults.requiredAuthorizationPackets.includes("P11_ALIYUN_READONLY_INVENTORY_IDENTITY"))
   } else {
     assert.equal(report.writebackGroups.cloudInventoryResults.requiredAuthorizationPackets.length, 0)
   }
@@ -350,7 +352,8 @@ test("Aliyun evidence writeback markdown renders the same writeback boundaries",
   assert.match(markdownOutput, /requiredAuthorizationPackets/)
   assert.match(markdownOutput, /P11_ALIYUN_RDS_DATA_MIGRATION/)
   if (report.writebackGroups.cloudInventoryResults.gaps.length > 0) {
-    assert.match(markdownOutput, /P11_ALIYUN_READONLY_INVENTORY_IDENTITY/)
+  assert.match(markdownOutput, /P00_ALIYUN_READONLY_INVENTORY_IDENTITY/)
+  assert.doesNotMatch(markdownOutput, /P11_ALIYUN_READONLY_INVENTORY_IDENTITY/)
   } else {
     assert.match(markdownOutput, /cloudInventoryResultGaps: 0/)
   }
@@ -388,7 +391,8 @@ test("tracked APP production-cn evidence gap doc pins the current non-deployable
   assert.match(doc, /P07_DOMAIN_DNS_HTTPS_ICP/)
   assert.match(doc, /P08_SAE_RUNTIME_SLS/)
   assert.match(doc, /P11_ALIYUN_RDS_DATA_MIGRATION/)
-  assert.match(doc, /P11_ALIYUN_READONLY_INVENTORY_IDENTITY/)
+  assert.match(doc, /P00_ALIYUN_READONLY_INVENTORY_IDENTITY/)
+  assert.doesNotMatch(doc, /P11_ALIYUN_READONLY_INVENTORY_IDENTITY/)
   assert.match(doc, /R01_SAE_RUNTIME/)
   assert.match(doc, /R02_ACR_IMAGE_REGISTRY/)
   assert.match(doc, /R03_API_DOMAIN_HTTPS/)

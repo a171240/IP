@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 阿里云证据回填清单
 
-Generated: 2026-06-25T08:04:22.955Z
+Generated: 2026-06-25T09:42:24.362Z
 
 ## 当前结论
 
@@ -76,7 +76,7 @@ Generated: 2026-06-25T08:04:22.955Z
 - cloudConfirmationGaps: 18
 - imagePublishGaps: 12
 - forbiddenValueClasses: AccessKeySecret, AppSecret, DATABASE_URL_CN value, RAM Secret, Supabase service role key, cookie, customer data, database password, dump contents, registry password, token, 证书私钥
-- requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION, P11_ALIYUN_READONLY_INVENTORY_IDENTITY, P08_SAE_RUNTIME_SLS, P07_DOMAIN_DNS_HTTPS_ICP, P05_OSS_RAM_STS, P06_ENV_IMPORT, P03_ACR_PURCHASE, P04_ACR_IMAGE_AND_PULL
+- requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION, P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P08_SAE_RUNTIME_SLS, P07_DOMAIN_DNS_HTTPS_ICP, P05_OSS_RAM_STS, P06_ENV_IMPORT, P03_ACR_PURCHASE, P04_ACR_IMAGE_AND_PULL
 
 ## rdsMigration
 
@@ -240,7 +240,7 @@ Generated: 2026-06-25T08:04:22.955Z
 - ready: false
 - totalBlockers: 1
 - checkedOperations: 9
-- requiredAuthorizationPackets: P11_ALIYUN_READONLY_INVENTORY_IDENTITY
+- requiredAuthorizationPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY
 - blockedUntil: 阿里云 CLI profile 或 CloudShell 只读身份可用
 - strictVerifyCommands: corepack pnpm aliyun:cloud:inventory-results:strict
 
@@ -250,7 +250,7 @@ Generated: 2026-06-25T08:04:22.955Z
   - writeTo: deploy/aliyun-production-cn.cloud-inventory-results.local.json
   - expected: 当前只有控制台人工观察或不完整 CLI 结果；等 Aliyun CLI/Cloud Shell 具备安全配置后，运行受控只读 inventory，并只写 executed、exitStatus、cloudApiCalled、mutationPerformed=false、observedAt、outputSummary 和非密钥 evidence。
   - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, 证书私钥, Supabase service role key
-  - requiredAuthorizationPackets: P11_ALIYUN_READONLY_INVENTORY_IDENTITY
+  - requiredAuthorizationPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY
   - requiredEvidence: 受控只读 Aliyun CLI/CloudShell inventory 结果：executed=true、cloudApiCalled=true、mutationPerformed=false
   - blockedUntil: 阿里云 CLI profile 或 CloudShell 只读身份可用
 

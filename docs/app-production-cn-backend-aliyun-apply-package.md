@@ -1,6 +1,6 @@
 # APP production-cn Aliyun backend apply package
 
-Generated at: 2026-06-25T08:34:11.150Z
+Generated at: 2026-06-25T09:42:40.204Z
 
 ## Scope
 
@@ -36,7 +36,7 @@ Generated at: 2026-06-25T08:34:11.150Z
 - canStartAfterActionTimeConfirmation: true
 - blockedUntil: none
 - mutationType: readonly_inventory_identity_and_non_secret_writeback
-- requiredAuthorizationPackets: P11_ALIYUN_READONLY_INVENTORY_IDENTITY
+- requiredAuthorizationPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY
 - consolePath: 本机 Aliyun CLI default profile 或阿里云控制台 -> CloudShell
 - currentEvidence: cloudInventoryStrictReady=false; readyLocalOperations=0/9; executedCommandResults=9/9; cliConfigProbeFailureCategory=aliyun_cli_profile_not_configured
 - currentBlockers: cloudInventory:readonly_inventory_strict_ready=0/9, aliyun_cli_profile_not_configured

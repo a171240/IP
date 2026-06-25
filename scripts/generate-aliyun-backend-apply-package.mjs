@@ -13,6 +13,7 @@ const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
 const DEFAULT_CLOUD_INVENTORY_RESULTS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-inventory-results.local.json")
 const DEFAULT_RDS_MIGRATION_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.rds-migration.local.json")
+const READONLY_INVENTORY_AUTH_PACKET = "P00_ALIYUN_READONLY_INVENTORY_IDENTITY"
 
 const SECRET_VALUE_PATTERNS = [
   /sk-[A-Za-z0-9_-]{20,}/,
@@ -227,7 +228,7 @@ function buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEv
       canStartAfterActionTimeConfirmation: !cloudInventoryReady,
       requiresActionTimeConfirmation: true,
       mutationType: "readonly_inventory_identity_and_non_secret_writeback",
-      requiredAuthorizationPackets: ["P11_ALIYUN_READONLY_INVENTORY_IDENTITY"],
+      requiredAuthorizationPackets: [READONLY_INVENTORY_AUTH_PACKET],
       consolePath: "本机 Aliyun CLI default profile 或阿里云控制台 -> CloudShell",
       currentEvidence: [
         `cloudInventoryStrictReady=${cloudInventoryReady}`,
