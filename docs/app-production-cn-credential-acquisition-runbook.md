@@ -13,11 +13,38 @@ corepack pnpm aliyun:completion:audit
 
 It answers where each missing credential, controlled identifier, password, token, or paid confirmation comes from, where it may be imported, and how to verify it. It does not contain secret values and does not authorize any external write action.
 
+## Current Backend-Only Scope
+
+As of 2026-06-25, the active target is `backend_aliyun_only`: only the Aliyun backend is being completed now. WeChat Open Platform mobile app credentials, Android release signing, and Apple Team ID are deferred until after the Aliyun backend is online.
+
+Use the backend-only handoffs for the current work:
+
+```bash
+corepack pnpm aliyun:sensitive:blockers:backend
+node scripts/summarize-aliyun-user-action-brief.mjs --backend-only
+```
+
+Current backend-only credential gate:
+
+```text
+blockedCredentialCount=2
+blockedCredentialNames=ALIYUN_OSS_SECURITY_TOKEN, DATABASE_URL_CN
+readySecretEnvVariableCount=17
+deferredAppLaunchSensitiveActionIds=S01_WECHAT_OPEN_APP_LOGIN, S02_APPLE_TEAM_ID, S07_ANDROID_RELEASE_SIGNING
+```
+
+Backend-only docs:
+
+```text
+docs/app-production-cn-backend-sensitive-blockers.md
+docs/app-production-cn-backend-user-action-brief.md
+```
+
 ## Current Verdict
 
 Production-cn cannot be deployed now.
 
-Current credential gate:
+Full App launch credential gate, including deferred WeChat/Android/Apple launch items:
 
 ```text
 blockedCredentialCount=9

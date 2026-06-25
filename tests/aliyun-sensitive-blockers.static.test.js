@@ -345,6 +345,12 @@ test("Aliyun credential acquisition runbook stays aligned with sensitive blocker
   const report = JSON.parse(output)
 
   assert.match(runbook, /Production-cn cannot be deployed now\./)
+  assert.match(runbook, /Current Backend-Only Scope/)
+  assert.match(runbook, /backend_aliyun_only/)
+  assert.match(runbook, /corepack pnpm aliyun:sensitive:blockers:backend/)
+  assert.match(runbook, /blockedCredentialCount=2/)
+  assert.match(runbook, /blockedCredentialNames=ALIYUN_OSS_SECURITY_TOKEN, DATABASE_URL_CN/)
+  assert.match(runbook, /docs\/app-production-cn-backend-sensitive-blockers\.md/)
   assert.match(runbook, /blockedCredentialCount=9/)
   assert.match(runbook, /readySecretEnvVariableCount=17/)
   assert.match(runbook, /canCodexProceedWithoutUser=false/)
@@ -385,6 +391,55 @@ test("Aliyun credential acquisition runbook stays aligned with sensitive blocker
   assert.doesNotMatch(runbook, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(runbook, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(runbook, /:\/\/[^\s:@]+:[^\s@]+@/)
+})
+
+test("APP production-cn backend-only sensitive docs reflect current Aliyun backend scope", () => {
+  const sensitiveDoc = read("docs", "app-production-cn-backend-sensitive-blockers.md")
+  const actionDoc = read("docs", "app-production-cn-backend-user-action-brief.md")
+  const output = execFileSync(process.execPath, [
+    "scripts/summarize-aliyun-sensitive-blockers.mjs",
+    "--backend-only",
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 20,
+  })
+  const report = JSON.parse(output)
+
+  for (const doc of [sensitiveDoc, actionDoc]) {
+    assert.match(doc, /currentScope: backend_aliyun_only/)
+    assert.match(doc, /blockedCredentialCount: 2|blockedCredentialCount=2/)
+    assert.match(doc, /readySecretEnvVariableCount: 17|readySecretEnvVariableCount=17/)
+    assert.match(doc, /ALIYUN_OSS_SECURITY_TOKEN/)
+    assert.match(doc, /DATABASE_URL_CN/)
+    assert.match(doc, /S03_ACR_PAID_PURCHASE/)
+    assert.match(doc, /S05_OSS_RAM_SECRET_OR_STS/)
+    assert.match(doc, /S08_ALIYUN_RDS_DATABASE_URL/)
+    assert.match(doc, /S06_READY_SENSITIVE_ENV_IMPORT/)
+    assert.match(doc, /延期/)
+    assert.doesNotMatch(doc, /sk-[A-Za-z0-9_-]{20,}/)
+    assert.doesNotMatch(doc, /LTAI[A-Za-z0-9]{12,}/)
+    assert.doesNotMatch(doc, /:\/\/[^\s:@]+:[^\s@]+@/)
+    assert.doesNotMatch(doc, /AccessKeySecret\s*[:=]\s*["'][^"']+["']/)
+  }
+
+  assert.match(
+    sensitiveDoc,
+    /deferredAppLaunchSensitiveActionIds: S01_WECHAT_OPEN_APP_LOGIN, S02_APPLE_TEAM_ID, S07_ANDROID_RELEASE_SIGNING/,
+  )
+  assert.match(
+    actionDoc,
+    /deferredAppLaunchConfirmations: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID/,
+  )
+  assert.match(actionDoc, /nextActionTimeConfirmations: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.deepEqual(report.credentialInterventionBrief.blockedCredentialNames, [
+    "ALIYUN_OSS_SECURITY_TOKEN",
+    "DATABASE_URL_CN",
+  ])
+  for (const name of report.credentialInterventionBrief.readySecretEnvVariableNames) {
+    assert.match(sensitiveDoc, new RegExp(name))
+    assert.match(actionDoc, new RegExp(name))
+  }
 })
 
 test("Aliyun release artifacts summary surfaces sensitive blocker acquisition details", () => {
