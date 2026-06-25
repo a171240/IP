@@ -9,6 +9,9 @@ const __dirname = dirname(__filename)
 const BACKEND_ROOT = resolve(__dirname, "..")
 const DEFAULT_TEMPLATE_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-inventory-results.example.json")
 const DEFAULT_SCRIPT_FILE = "/tmp/meiye-aliyun-cloudshell-readonly-collector.py"
+const DEFAULT_BOOTSTRAP_FILE = "/tmp/meiye-aliyun-cloudshell-readonly-bootstrap.sh"
+const DEFAULT_CLOUDSHELL_SCRIPT_FILE = "/tmp/meiye-aliyun-cloudshell-readonly-collector.py"
+const DEFAULT_CLOUDSHELL_OUTPUT_FILE = "/tmp/meiye-aliyun-readonly-inventory.local.json"
 const ALLOW_ENV = "MEIYE_ALLOW_ALIYUN_CLOUDSHELL_READONLY"
 const EXPECTED_SOURCE_PLAN_COMMAND = "corepack pnpm aliyun:cloud:inventory-plan"
 
@@ -30,7 +33,11 @@ function parseArgs(argv) {
     out: DEFAULT_SCRIPT_FILE,
     report: "",
     markdown: "",
+    bootstrap: DEFAULT_BOOTSTRAP_FILE,
+    cloudshellScriptFile: DEFAULT_CLOUDSHELL_SCRIPT_FILE,
+    cloudshellOutputFile: DEFAULT_CLOUDSHELL_OUTPUT_FILE,
     printScript: false,
+    printBootstrap: false,
   }
   for (let index = 2; index < argv.length; index += 1) {
     const arg = argv[index]
@@ -51,8 +58,26 @@ function parseArgs(argv) {
       args.markdown = resolveValue(argv[++index], "--markdown")
       continue
     }
+    if (arg === "--bootstrap") {
+      args.bootstrap = resolveValue(argv[++index], "--bootstrap")
+      continue
+    }
+    if (arg === "--cloudshell-script-file") {
+      args.cloudshellScriptFile = argv[++index] || ""
+      if (!args.cloudshellScriptFile) throw new Error("missing_value:--cloudshell-script-file")
+      continue
+    }
+    if (arg === "--cloudshell-output-file") {
+      args.cloudshellOutputFile = argv[++index] || ""
+      if (!args.cloudshellOutputFile) throw new Error("missing_value:--cloudshell-output-file")
+      continue
+    }
     if (arg === "--print-script") {
       args.printScript = true
+      continue
+    }
+    if (arg === "--print-bootstrap") {
+      args.printBootstrap = true
       continue
     }
     if (arg === "--help" || arg === "-h") {
@@ -266,7 +291,24 @@ if __name__ == "__main__":
 `
 }
 
-function buildReport(args, template, extraction, script) {
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, "'\\''")}'`
+}
+
+function buildBootstrapScript(args, collectorScript) {
+  return `#!/usr/bin/env bash
+set -euo pipefail
+
+cat > ${shellQuote(args.cloudshellScriptFile)} <<'PY'
+${collectorScript}
+PY
+
+chmod 700 ${shellQuote(args.cloudshellScriptFile)}
+${ALLOW_ENV}=1 python3 ${shellQuote(args.cloudshellScriptFile)} ${shellQuote(args.cloudshellOutputFile)}
+`
+}
+
+function buildReport(args, template, extraction, script, bootstrap) {
   const report = {
     ok: extraction.blockers.length === 0,
     generatedAt: new Date().toISOString(),
@@ -275,6 +317,9 @@ function buildReport(args, template, extraction, script) {
     executionMode: "generator_only",
     templateFile: args.templateFile,
     scriptFile: args.out,
+    bootstrapFile: args.bootstrap,
+    cloudShellScriptFile: args.cloudshellScriptFile,
+    cloudShellOutputFile: args.cloudshellOutputFile,
     containsValues: false,
     readOnlyOnly: true,
     cloudApiCalled: false,
@@ -293,20 +338,23 @@ function buildReport(args, template, extraction, script) {
       sourcePlanCommand: template.sourcePlanCommand || "",
     },
     blockers: extraction.blockers,
+    clipboardCommand: "corepack pnpm aliyun:cloudshell:collector:bootstrap | pbcopy",
     runInstructions: [
-      `Copy ${args.out} into Aliyun CloudShell only after the terminal prompt is connected.`,
-      `Run: ${ALLOW_ENV}=1 python3 ${args.out}`,
+      "Run locally: corepack pnpm aliyun:cloudshell:collector:bootstrap | pbcopy",
+      "Paste the clipboard content into Aliyun CloudShell only after the terminal prompt is connected.",
+      "The pasted bootstrap writes the Python collector inside CloudShell and runs it with the explicit allow env.",
       "Copy only the JSON between MEIYE_CLOUDSHELL_READONLY_INVENTORY_JSON_BEGIN/END into deploy/aliyun-production-cn.cloud-inventory-results.local.json.",
       "Do not copy raw Aliyun CLI stdout/stderr, AccessKeySecret, STS token, cookies, registry password, certificate private key, or database password.",
     ],
     safetyBoundary: [
       "This generator never calls Aliyun cloud APIs.",
+      "The generated bootstrap only writes the collector file inside CloudShell and runs the same read-only collector.",
       "The generated CloudShell collector refuses to run unless the explicit allow env is set.",
       "The generated CloudShell collector runs only allowlisted read-only commands from the inventory-results example file.",
       "The generated CloudShell collector stores and prints no raw stdout/stderr.",
     ],
   }
-  const secretMatches = findSecretLikeValues({ report, script })
+  const secretMatches = findSecretLikeValues({ report, script, bootstrap })
   report.secretLeakCheck = {
     ok: secretMatches.length === 0,
     matches: secretMatches,
@@ -327,6 +375,9 @@ function renderMarkdown(report) {
     `- currentScope: ${report.currentScope}`,
     `- executionMode: ${report.executionMode}`,
     `- scriptFile: ${report.scriptFile}`,
+    `- bootstrapFile: ${report.bootstrapFile}`,
+    `- cloudShellScriptFile: ${report.cloudShellScriptFile}`,
+    `- cloudShellOutputFile: ${report.cloudShellOutputFile}`,
     `- allowEnv: ${report.allowEnv}`,
     `- cloudApiCalled: ${report.cloudApiCalled}`,
     `- mutationPerformed: ${report.mutationPerformed}`,
@@ -336,6 +387,7 @@ function renderMarkdown(report) {
     "",
     "## 运行方式",
     "",
+    `- clipboardCommand: \`${report.clipboardCommand}\``,
     ...report.runInstructions.map((item) => `- ${item}`),
     "",
     "## 命令清单",
@@ -368,7 +420,7 @@ function findSecretLikeValues(value, path = "$", matches = []) {
 function printHelp() {
   console.log([
     "Usage:",
-    "  node scripts/generate-aliyun-cloudshell-readonly-collector.mjs [--out /tmp/collector.py] [--report report.json] [--markdown report.md] [--print-script]",
+    "  node scripts/generate-aliyun-cloudshell-readonly-collector.mjs [--out /tmp/collector.py] [--bootstrap /tmp/bootstrap.sh] [--report report.json] [--markdown report.md] [--print-script] [--print-bootstrap]",
     "",
     "Generates a self-contained Python collector for Aliyun CloudShell read-only inventory.",
     "The generator never calls Aliyun APIs. The generated collector requires MEIYE_ALLOW_ALIYUN_CLOUDSHELL_READONLY=1.",
@@ -380,12 +432,15 @@ function main() {
   const template = readJson(args.templateFile)
   const extraction = extractOperations(template)
   const script = buildCollectorScript(extraction.operations)
+  const bootstrap = buildBootstrapScript(args, script)
   writeText(args.out, script, 0o700)
-  const report = buildReport(args, template, extraction, script)
+  writeText(args.bootstrap, bootstrap, 0o700)
+  const report = buildReport(args, template, extraction, script, bootstrap)
   const output = `${JSON.stringify(report, null, 2)}\n`
   if (args.report) writeText(args.report, output)
   if (args.markdown) writeText(args.markdown, renderMarkdown(report))
-  if (args.printScript) process.stdout.write(script)
+  if (args.printBootstrap) process.stdout.write(bootstrap)
+  else if (args.printScript) process.stdout.write(script)
   else process.stdout.write(output)
   if (!report.ok) process.exit(1)
 }

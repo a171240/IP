@@ -545,6 +545,7 @@ function renderMarkdown(audit) {
     "## CloudShell 只读采集器",
     "",
     `- script: ${audit.outputFiles.cloudshellReadonlyCollectorScript}`,
+    `- bootstrap: ${audit.outputFiles.cloudshellReadonlyCollectorBootstrap}`,
     `- json: ${audit.outputFiles.cloudshellReadonlyCollectorJson}`,
     `- markdown: ${audit.outputFiles.cloudshellReadonlyCollectorMarkdown}`,
     `- ok: ${cloudshellReadonlyCollector.ok === true}`,
@@ -554,6 +555,7 @@ function renderMarkdown(audit) {
     `- readOnlyOnly: ${cloudshellReadonlyCollector.readOnlyOnly === true}`,
     `- cloudApiCalled: ${cloudshellReadonlyCollector.cloudApiCalled === true}`,
     `- mutationPerformed: ${cloudshellReadonlyCollector.mutationPerformed === true}`,
+    `- clipboardCommand: ${cloudshellReadonlyCollector.clipboardCommand || "none"}`,
     `- commands: ${cloudshellReadonlyCollector.summary?.commands || 0}`,
     `- secretLeakCheck: ${cloudshellReadonlyCollector.secretLeakCheck?.ok === true}`,
     ...(cloudshellReadonlyCollector.blockers?.length
@@ -1639,10 +1641,13 @@ function main() {
   const cloudshellReadonlyCollectorJsonPath = resolve(args.outDir, "cloudshell-readonly-collector.json")
   const cloudshellReadonlyCollectorMarkdownPath = resolve(args.outDir, "cloudshell-readonly-collector.md")
   const cloudshellReadonlyCollectorScriptPath = resolve(args.outDir, "cloudshell-readonly-collector.py")
+  const cloudshellReadonlyCollectorBootstrapPath = resolve(args.outDir, "cloudshell-readonly-bootstrap.sh")
   const cloudshellReadonlyCollector = runJson("cloudshell_readonly_collector", [
     "scripts/generate-aliyun-cloudshell-readonly-collector.mjs",
     "--out",
     cloudshellReadonlyCollectorScriptPath,
+    "--bootstrap",
+    cloudshellReadonlyCollectorBootstrapPath,
     "--report",
     cloudshellReadonlyCollectorJsonPath,
     "--markdown",
@@ -2094,6 +2099,7 @@ function main() {
       cloudshellReadonlyCollectorJson: cloudshellReadonlyCollectorJsonPath,
       cloudshellReadonlyCollectorMarkdown: cloudshellReadonlyCollectorMarkdownPath,
       cloudshellReadonlyCollectorScript: cloudshellReadonlyCollectorScriptPath,
+      cloudshellReadonlyCollectorBootstrap: cloudshellReadonlyCollectorBootstrapPath,
       cloudshellInventoryHandoffJson: cloudshellInventoryHandoffJsonPath,
       cloudshellInventoryHandoffMarkdown: cloudshellInventoryHandoffMarkdownPath,
       cloudInventoryResultsJson: cloudInventoryResultsJsonPath,
@@ -2239,9 +2245,13 @@ function main() {
       report: audit.outputFiles.cloudshellReadonlyCollectorJson,
       markdown: audit.outputFiles.cloudshellReadonlyCollectorMarkdown,
       script: audit.outputFiles.cloudshellReadonlyCollectorScript,
+      bootstrap: audit.outputFiles.cloudshellReadonlyCollectorBootstrap,
       ok: cloudshellReadonlyCollector.ok === true,
       executionMode: cloudshellReadonlyCollector.executionMode,
       allowEnv: cloudshellReadonlyCollector.allowEnv,
+      clipboardCommand: cloudshellReadonlyCollector.clipboardCommand || "",
+      cloudShellScriptFile: cloudshellReadonlyCollector.cloudShellScriptFile || "",
+      cloudShellOutputFile: cloudshellReadonlyCollector.cloudShellOutputFile || "",
       containsValues: cloudshellReadonlyCollector.containsValues === true,
       readOnlyOnly: cloudshellReadonlyCollector.readOnlyOnly === true,
       cloudApiCalled: cloudshellReadonlyCollector.cloudApiCalled === true,
@@ -3028,6 +3038,7 @@ function main() {
     cloudshellReadonlyCollectorJson: audit.outputFiles.cloudshellReadonlyCollectorJson,
     cloudshellReadonlyCollectorMarkdown: audit.outputFiles.cloudshellReadonlyCollectorMarkdown,
     cloudshellReadonlyCollectorScript: audit.outputFiles.cloudshellReadonlyCollectorScript,
+    cloudshellReadonlyCollectorBootstrap: audit.outputFiles.cloudshellReadonlyCollectorBootstrap,
     cloudInventoryResultsJson: audit.outputFiles.cloudInventoryResultsJson,
     cloudInventoryResultsMarkdown: audit.outputFiles.cloudInventoryResultsMarkdown,
     cloudConfirmationsCheckReport: audit.outputFiles.cloudConfirmationsCheck,

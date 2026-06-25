@@ -12,6 +12,7 @@ const secretLike = /(sk-[A-Za-z0-9_-]{20,}|LTAI[A-Za-z0-9]{12,}|:\/\/[^\s:@]+:[^
 
 test("Aliyun CloudShell readonly collector is wired into scripts and deploy gates", () => {
   const pkg = readJson("package.json")
+  const source = read("scripts", "generate-aliyun-cloudshell-readonly-collector.mjs")
   const predeploy = read("scripts", "aliyun-predeploy-commands.mjs")
   const releaseArtifacts = read("scripts", "prepare-aliyun-release-artifacts.mjs")
   const deploySpec = readJson("deploy", "aliyun-production-cn.example.json")
@@ -25,7 +26,11 @@ test("Aliyun CloudShell readonly collector is wired into scripts and deploy gate
   const specCheck = JSON.parse(specCheckOutput)
 
   assert.equal(pkg.scripts["aliyun:cloudshell:collector"], "node ./scripts/generate-aliyun-cloudshell-readonly-collector.mjs")
+  assert.equal(pkg.scripts["aliyun:cloudshell:collector:bootstrap"], "node ./scripts/generate-aliyun-cloudshell-readonly-collector.mjs --print-bootstrap")
   assert.equal(pkg.scripts["aliyun:cloudshell:collector:test"], "node --test tests/aliyun-cloudshell-readonly-collector.static.test.js")
+  assert.match(source, /--print-bootstrap/)
+  assert.match(source, /buildBootstrapScript/)
+  assert.match(source, /clipboardCommand/)
   assert.match(predeploy, /aliyun:cloudshell:collector:test/)
   assert.match(predeploy, /aliyun:cloudshell:collector/)
   assert.equal(deploySpec.cloudShellCollector.checkCommand, "corepack pnpm aliyun:cloudshell:collector")
@@ -34,6 +39,8 @@ test("Aliyun CloudShell readonly collector is wired into scripts and deploy gate
   assert.match(deploySpec.cloudShellCollector.scope, /never calls Aliyun cloud APIs/)
   assert.match(deploySpec.cloudShellCollector.secretsPolicy, /prints\/stores no raw stdout or stderr/)
   assert.match(releaseArtifacts, /cloudshell-readonly-collector\.py/)
+  assert.match(releaseArtifacts, /cloudshell-readonly-bootstrap\.sh/)
+  assert.match(releaseArtifacts, /cloudshellReadonlyCollectorBootstrap/)
   assert.match(releaseArtifacts, /cloudshellReadonlyCollector/)
   assert.match(releaseArtifacts, /cloudshell_readonly_collector/)
   assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:cloudshell:collector:test"))
@@ -53,12 +60,15 @@ test("Aliyun CloudShell readonly collector is wired into scripts and deploy gate
 test("Aliyun CloudShell readonly collector generator produces a value-free script", () => {
   const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-cloudshell-collector-"))
   const scriptPath = path.join(tmpdir, "collector.py")
+  const bootstrapPath = path.join(tmpdir, "bootstrap.sh")
   const reportPath = path.join(tmpdir, "collector.json")
   const markdownPath = path.join(tmpdir, "collector.md")
   const output = execFileSync(process.execPath, [
     "scripts/generate-aliyun-cloudshell-readonly-collector.mjs",
     "--out",
     scriptPath,
+    "--bootstrap",
+    bootstrapPath,
     "--report",
     reportPath,
     "--markdown",
@@ -71,13 +81,26 @@ test("Aliyun CloudShell readonly collector generator produces a value-free scrip
   const report = JSON.parse(output)
   const writtenReport = JSON.parse(fs.readFileSync(reportPath, "utf8"))
   const script = fs.readFileSync(scriptPath, "utf8")
+  const bootstrap = fs.readFileSync(bootstrapPath, "utf8")
   const markdown = fs.readFileSync(markdownPath, "utf8")
+  const printedBootstrap = execFileSync(process.execPath, [
+    "scripts/generate-aliyun-cloudshell-readonly-collector.mjs",
+    "--print-bootstrap",
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 20,
+  })
   const commands = report.operations.map((item) => item.command)
 
   assert.deepEqual(writtenReport, report)
   assert.equal(report.ok, true)
   assert.equal(report.currentScope, "backend_aliyun_only")
   assert.equal(report.executionMode, "generator_only")
+  assert.equal(report.bootstrapFile, bootstrapPath)
+  assert.equal(report.cloudShellScriptFile, "/tmp/meiye-aliyun-cloudshell-readonly-collector.py")
+  assert.equal(report.cloudShellOutputFile, "/tmp/meiye-aliyun-readonly-inventory.local.json")
+  assert.equal(report.clipboardCommand, "corepack pnpm aliyun:cloudshell:collector:bootstrap | pbcopy")
   assert.equal(report.containsValues, false)
   assert.equal(report.readOnlyOnly, true)
   assert.equal(report.cloudApiCalled, false)
@@ -87,7 +110,8 @@ test("Aliyun CloudShell readonly collector generator produces a value-free scrip
   assert.equal(report.summary.commands, 9)
   assert.equal(report.summary.forbiddenMutationCommands, 0)
   assert.equal(report.secretLeakCheck.ok, true)
-  assert.ok(report.runInstructions.some((item) => item.includes("MEIYE_ALLOW_ALIYUN_CLOUDSHELL_READONLY=1")))
+  assert.ok(report.runInstructions.some((item) => item.includes("aliyun:cloudshell:collector:bootstrap | pbcopy")))
+  assert.ok(report.runInstructions.some((item) => item.includes("Paste the clipboard content into Aliyun CloudShell")))
   assert.ok(commands.includes("aliyun sae ListApplications --region cn-hangzhou"))
   assert.ok(commands.includes("aliyun cr ListInstance --region cn-hangzhou"))
   assert.ok(commands.includes("aliyun alidns DescribeSubDomainRecords --SubDomain api-cn.ipgongchang.xin"))
@@ -104,10 +128,19 @@ test("Aliyun CloudShell readonly collector generator produces a value-free scrip
   assert.match(script, /Raw stdout\/stderr are not stored or printed/)
   assert.doesNotMatch(script, /print\(stdout|print\(stderr/)
   assert.doesNotMatch(script, /DescribeApplicationConfig/)
+  assert.match(bootstrap, /cat > '\/tmp\/meiye-aliyun-cloudshell-readonly-collector\.py' <<'PY'/)
+  assert.match(bootstrap, /MEIYE_ALLOW_ALIYUN_CLOUDSHELL_READONLY=1 python3/)
+  assert.match(bootstrap, /MEIYE_CLOUDSHELL_READONLY_INVENTORY_JSON_BEGIN/)
+  assert.match(printedBootstrap, /cat > '\/tmp\/meiye-aliyun-cloudshell-readonly-collector\.py' <<'PY'/)
+  assert.match(printedBootstrap, /MEIYE_ALLOW_ALIYUN_CLOUDSHELL_READONLY=1 python3/)
   assert.match(markdown, /阿里云 CloudShell 只读采集器/)
+  assert.match(markdown, /clipboardCommand: `corepack pnpm aliyun:cloudshell:collector:bootstrap \| pbcopy`/)
+  assert.match(markdown, /bootstrapFile:/)
   assert.match(markdown, /secretLeakCheck: true/)
   assert.doesNotMatch(output, secretLike)
   assert.doesNotMatch(script, secretLike)
+  assert.doesNotMatch(bootstrap, secretLike)
+  assert.doesNotMatch(printedBootstrap, secretLike)
   assert.doesNotMatch(markdown, secretLike)
 })
 

@@ -33,6 +33,7 @@
     "aliyun:cloud:inventory-run:test": "node --test tests/aliyun-cli-inventory-runner.static.test.js",
     "aliyun:cloudshell:handoff": "node ./scripts/generate-aliyun-cloudshell-inventory-handoff.mjs",
     "aliyun:cloudshell:collector": "node ./scripts/generate-aliyun-cloudshell-readonly-collector.mjs",
+    "aliyun:cloudshell:collector:bootstrap": "node ./scripts/generate-aliyun-cloudshell-readonly-collector.mjs --print-bootstrap",
     "aliyun:cloudshell:collector:test": "node --test tests/aliyun-cloudshell-readonly-collector.static.test.js",
     "aliyun:cloudshell:handoff:test": "node --test tests/aliyun-cloudshell-inventory-handoff.static.test.js",
     "aliyun:cloud:inventory-results": "node ./scripts/check-aliyun-cli-inventory-results.mjs --allow-incomplete",
