@@ -105,6 +105,16 @@ test("Aliyun provisioning plan renders phase order without executing cloud actio
     "P10_ANDROID_RELEASE_SIGNING",
     "P02_APPLE_TEAM_ID",
   ])
+  assert.ok(!report.provisioningClosureBrief.actionTimeConfirmationRequired.includes("S01_WECHAT_OPEN_APP_LOGIN"))
+  assert.ok(!report.provisioningClosureBrief.actionTimeConfirmationRequired.includes("S02_APPLE_TEAM_ID"))
+  assert.ok(!report.provisioningClosureBrief.actionTimeConfirmationRequired.includes("S07_ANDROID_RELEASE_SIGNING"))
+  assert.ok(!report.provisioningClosureBrief.actionTimeConfirmationRequired.includes("U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE"))
+  assert.ok(!report.provisioningClosureBrief.actionTimeConfirmationRequired.includes("U02_APPLE_TEAM_ID"))
+  assert.ok(!report.provisioningClosureBrief.actionTimeConfirmationRequired.includes("U10_ANDROID_RELEASE_SIGNING"))
+  assert.ok(report.provisioningClosureBrief.actionTimeConfirmationRequired.includes("S03_ACR_PAID_PURCHASE"))
+  assert.ok(report.provisioningClosureBrief.actionTimeConfirmationRequired.includes("S08_ALIYUN_RDS_DATABASE_URL"))
+  assert.ok(report.provisioningClosureBrief.actionTimeConfirmationRequired.includes("U00_ALIYUN_READONLY_INVENTORY_IDENTITY"))
+  assert.ok(report.provisioningClosureBrief.actionTimeConfirmationRequired.includes("U11_ALIYUN_RDS_DATA_MIGRATION"))
   assert.deepEqual(report.provisioningClosureBrief.canStartNowConsoleTasks, [
     "C02_ACR_IMAGE_AND_PULL",
     "C05_OSS_AUDIO_RAM_STS",

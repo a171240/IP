@@ -22,6 +22,15 @@ const DEFAULT_DEFERRED_APP_LAUNCH_ENV_NAMES = Object.freeze([
   "ANDROID_RELEASE_WECHAT_SIGNATURE",
   "IOS_UNIVERSAL_LINK_AASA",
 ])
+const DEFERRED_APP_LAUNCH_ACTION_IDS = Object.freeze([
+  "S01_WECHAT_OPEN_APP_LOGIN",
+  "S02_APPLE_TEAM_ID",
+  "S07_ANDROID_RELEASE_SIGNING",
+  "U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE",
+  "U02_APPLE_TEAM_ID",
+  "U10_ANDROID_RELEASE_SIGNING",
+])
+const DEFERRED_APP_LAUNCH_ACTION_ID_SET = new Set(DEFERRED_APP_LAUNCH_ACTION_IDS)
 const TARGET_RUNTIME = Object.freeze({
   provider: "Aliyun SAE",
   region: "cn-hangzhou",
@@ -331,12 +340,16 @@ function buildProvisioningClosureBrief({
     canStartNowConsoleTasks: consoleRunbook.summary?.canStartNowConsoleTasks || [],
     nextActionTimeConfirmations: actionAuthorization.summary?.nextActionTimeConfirmations || [],
     requiredBlocking: actionAuthorization.summary?.requiredBlocking || [],
-    actionTimeConfirmationRequired: uniqueStrings([
+    actionTimeConfirmationRequired: filterDeferredAppLaunchActionIds(uniqueStrings([
       ...(runbookBrief.actionTimeConfirmationRequiredIds || []),
       ...(authorizationBrief.actionTimeConfirmationRequiredIds || []),
       ...(actionAuthorization.summary?.actionTimeConfirmationRequired || []),
-    ]),
+    ])),
   }
+}
+
+function filterDeferredAppLaunchActionIds(ids) {
+  return (ids || []).filter((id) => !DEFERRED_APP_LAUNCH_ACTION_ID_SET.has(id))
 }
 
 function buildPhase(phase, packetsById, consoleTasksById, {
