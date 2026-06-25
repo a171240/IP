@@ -16,6 +16,7 @@ test("Aliyun CloudShell handoff is wired into scripts, predeploy, deploy spec, a
   const predeploy = read("scripts", "aliyun-predeploy-commands.mjs")
   const releaseArtifacts = read("scripts", "prepare-aliyun-release-artifacts.mjs")
   const deploySpec = readJson("deploy", "aliyun-production-cn.example.json")
+  const readonlyInventoryDoc = read("docs", "aliyun-cloudshell-readonly-inventory-2026-06-24.md")
 
   assert.equal(pkg.scripts["aliyun:cloudshell:handoff"], "node ./scripts/generate-aliyun-cloudshell-inventory-handoff.mjs")
   assert.equal(pkg.scripts["aliyun:cloudshell:handoff:test"], "node --test tests/aliyun-cloudshell-inventory-handoff.static.test.js")
@@ -40,6 +41,10 @@ test("Aliyun CloudShell handoff is wired into scripts, predeploy, deploy spec, a
   assert.match(releaseArtifacts, /cloudshellInventoryHandoff/)
   assert.match(releaseArtifacts, /currentBrowserCanUseCurrentConsole/)
   assert.match(releaseArtifacts, /strictInventoryAlreadyReady/)
+  assert.match(readonlyInventoryDoc, /历史口径说明/)
+  assert.match(readonlyInventoryDoc, /APP 国内正式版全部迁到阿里云/)
+  assert.match(readonlyInventoryDoc, /DATABASE_URL_CN/)
+  assert.doesNotMatch(readonlyInventoryDoc, /数据层暂时沿用现有 Supabase/)
 })
 
 test("Aliyun CloudShell handoff produces value-free local JSON and Markdown", () => {

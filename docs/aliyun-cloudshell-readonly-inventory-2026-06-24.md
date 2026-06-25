@@ -139,7 +139,9 @@ RAM/SLS 补充结论：
 
 ## 2026-06-24 数据层补充盘点
 
-第一版 APP production-cn 后端仍是桥接部署：API 容器跑在阿里云，数据层暂时沿用现有 Supabase。以下盘点用于证明完整国内数据层迁移的当前状态，不作为第一版桥接部署的立即阻塞项。
+历史口径说明：2026-06-22 曾把第一版 APP production-cn 描述为阿里云 API 容器加 Supabase 旧数据层兼容。该口径已经被 2026-06-24 的“APP 国内正式版全部迁到阿里云”门禁覆盖。
+
+当前执行口径：正式 APP production-cn 后端必须使用阿里云 RDS PostgreSQL；Supabase 只能作为迁移来源或旧链路兼容，不能作为正式数据库目标。以下盘点用于证明 RDS/Tair 当前资源状态，其中 RDS PostgreSQL、`DATABASE_URL_CN`、schema/data 迁移、RDS smoke 和回滚验收都属于当前阿里云后端阻塞项。
 
 只读命令：
 
