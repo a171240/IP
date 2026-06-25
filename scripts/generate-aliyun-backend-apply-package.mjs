@@ -243,8 +243,22 @@ function buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEv
       ],
       userMustHandle: [
         "Aliyun CLI default profile or CloudShell logged-in read-only identity",
+        "If the current CloudShell tab is disconnected, reconnecting it still requires action-time confirmation.",
         "AccessKeySecret or STS token must never be copied into JSON, Markdown, chat, git, or shell history",
       ],
+      actionTimeConfirmation: {
+        minimumUserPhrase: "授权重新连接阿里云 CloudShell 或配置 Aliyun CLI，只运行 allowlisted 只读盘点命令并写入非密钥 evidence。",
+        allowedActions: [
+          "Reconnect the existing Aliyun CloudShell session or configure the official Aliyun CLI profile.",
+          "Run only the generated List/Describe/stat/get inventory commands.",
+          "Write only resource names, booleans, timestamps, command status, digest handles, and non-secret evidence handles.",
+        ],
+        explicitlyExcluded: [
+          "No Create/Update/Delete/Deploy/Start/Stop/Purchase/DNS mutation commands.",
+          "No docker login/push, registry password, AccessKeySecret, STS token, cookie, or certificate private key capture.",
+          "No production-cn deploy, env import, resource creation, or billing action.",
+        ],
+      },
       nonSecretEvidenceToRecord: [
         "readyLocalOperations count",
         "executedCommandResults count",
@@ -676,6 +690,11 @@ function renderMarkdown(report) {
       `- currentBlockers: ${step.currentBlockers.join(", ") || "none"}`,
       `- writeTargets: ${step.writeTargets.join("; ")}`,
       `- userMustHandle: ${step.userMustHandle.join("; ")}`,
+      ...(step.actionTimeConfirmation ? [
+        `- actionTimeConfirmation.minimumUserPhrase: ${step.actionTimeConfirmation.minimumUserPhrase}`,
+        `- actionTimeConfirmation.allowedActions: ${step.actionTimeConfirmation.allowedActions.join("; ")}`,
+        `- actionTimeConfirmation.explicitlyExcluded: ${step.actionTimeConfirmation.explicitlyExcluded.join("; ")}`,
+      ] : []),
       `- nonSecretEvidenceToRecord: ${step.nonSecretEvidenceToRecord.join("; ")}`,
       `- verifyCommands: ${step.verifyCommands.join("; ")}`,
       "",

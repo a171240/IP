@@ -1,6 +1,6 @@
 # APP production-cn Aliyun backend apply package
 
-Generated at: 2026-06-25T02:22:51.267Z
+Generated at: 2026-06-25T04:03:15.325Z
 
 ## Scope
 
@@ -41,7 +41,10 @@ Generated at: 2026-06-25T02:22:51.267Z
 - currentEvidence: cloudInventoryStrictReady=false; readyLocalOperations=0/9; executedCommandResults=9/9; cliConfigProbeFailureCategory=aliyun_cli_profile_not_configured
 - currentBlockers: cloudInventory:readonly_inventory_strict_ready=0/9, aliyun_cli_profile_not_configured
 - writeTargets: deploy/aliyun-production-cn.cloud-inventory-results.local.json -> non-secret read-only inventory summaries
-- userMustHandle: Aliyun CLI default profile or CloudShell logged-in read-only identity; AccessKeySecret or STS token must never be copied into JSON, Markdown, chat, git, or shell history
+- userMustHandle: Aliyun CLI default profile or CloudShell logged-in read-only identity; If the current CloudShell tab is disconnected, reconnecting it still requires action-time confirmation.; AccessKeySecret or STS token must never be copied into JSON, Markdown, chat, git, or shell history
+- actionTimeConfirmation.minimumUserPhrase: 授权重新连接阿里云 CloudShell 或配置 Aliyun CLI，只运行 allowlisted 只读盘点命令并写入非密钥 evidence。
+- actionTimeConfirmation.allowedActions: Reconnect the existing Aliyun CloudShell session or configure the official Aliyun CLI profile.; Run only the generated List/Describe/stat/get inventory commands.; Write only resource names, booleans, timestamps, command status, digest handles, and non-secret evidence handles.
+- actionTimeConfirmation.explicitlyExcluded: No Create/Update/Delete/Deploy/Start/Stop/Purchase/DNS mutation commands.; No docker login/push, registry password, AccessKeySecret, STS token, cookie, or certificate private key capture.; No production-cn deploy, env import, resource creation, or billing action.
 - nonSecretEvidenceToRecord: readyLocalOperations count; executedCommandResults count; cloudApiCalledCommandResults count; mutationPerformedCommandResults=0; observed/not_found/blocked operation ids; timestamp and evidence handles only
 - verifyCommands: corepack pnpm aliyun:cloudshell:handoff; corepack pnpm aliyun:cloud:access; MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1 corepack pnpm aliyun:cloud:inventory-run -- --execute-readonly --write-local deploy/aliyun-production-cn.cloud-inventory-results.local.json; corepack pnpm aliyun:cloud:inventory-results:strict; corepack pnpm aliyun:evidence:writeback:backend
 
