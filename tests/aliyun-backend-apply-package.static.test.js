@@ -29,6 +29,8 @@ test("Aliyun backend apply package command is wired into scripts and deploy spec
   assert.ok(deploySpec.predeployChecks.includes("corepack pnpm aliyun:backend-cn:apply-package"))
   assert.match(releaseArtifacts, /backend-apply-package\.json/)
   assert.match(releaseArtifacts, /backendApplyPackage/)
+  assert.match(releaseArtifacts, /missingCredentialValues: \$\{backendApplyPackage\.credentialPasswordIntervention/)
+  assert.match(releaseArtifacts, /credentialPasswordIntervention: backendApplyPackage\.credentialPasswordIntervention/)
   assert.match(script, /B00_ALIYUN_BACKEND_APPLY_PACKAGE/)
   assert.match(script, /BAP00_READONLY_INVENTORY_IDENTITY/)
   assert.match(script, /BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE/)

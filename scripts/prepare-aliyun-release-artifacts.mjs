@@ -965,6 +965,10 @@ function renderMarkdown(audit) {
     `- userInterventionRequired: ${backendApplyPackage.summary.userInterventionRequired.join(", ") || "none"}`,
     `- blockedCredentialCount: ${backendApplyPackage.summary.blockedCredentialCount || 0}`,
     `- readySecretEnvVariableCount: ${backendApplyPackage.summary.readySecretEnvVariableCount || 0}`,
+    `- missingCredentialValues: ${backendApplyPackage.credentialPasswordIntervention?.missingCredentialValues?.names?.join(", ") || "none"}`,
+    `- readySecretsPendingCloudImport: ${backendApplyPackage.credentialPasswordIntervention?.readySecretsPendingCloudImport?.count ?? 0}`,
+    `- paidPurchaseConfirmationActionIds: ${backendApplyPackage.credentialPasswordIntervention?.paidPurchaseConfirmationActionIds?.join(", ") || "none"}`,
+    `- controlledSecretChannelActionIds: ${backendApplyPackage.credentialPasswordIntervention?.controlledSecretChannelActionIds?.join(", ") || "none"}`,
     ...(backendApplyPackage.applySteps?.length
       ? backendApplyPackage.applySteps.map((item) => `- ${item.id}: canStart=${item.canStartAfterActionTimeConfirmation === true}; mutationType=${item.mutationType}; blockers=${item.currentBlockers?.length ? item.currentBlockers.join(", ") : "none"}`)
       : ["- applySteps: none"]),
@@ -2487,6 +2491,13 @@ function main() {
       deferredAppLaunchBlocking: backendApplyPackage.summary.deferredAppLaunchBlocking || [],
       blockedCredentialCount: backendApplyPackage.summary.blockedCredentialCount || 0,
       readySecretEnvVariableCount: backendApplyPackage.summary.readySecretEnvVariableCount || 0,
+      missingCredentialValues: backendApplyPackage.credentialPasswordIntervention?.missingCredentialValues?.names || [],
+      missingCredentialValueActionIds: backendApplyPackage.credentialPasswordIntervention?.missingCredentialValues?.actionIds || [],
+      readySecretsPendingCloudImport: backendApplyPackage.credentialPasswordIntervention?.readySecretsPendingCloudImport?.count || 0,
+      readySecretsPendingCloudImportActionIds: backendApplyPackage.credentialPasswordIntervention?.readySecretsPendingCloudImport?.actionIds || [],
+      paidPurchaseConfirmationActionIds: backendApplyPackage.credentialPasswordIntervention?.paidPurchaseConfirmationActionIds || [],
+      controlledSecretChannelActionIds: backendApplyPackage.credentialPasswordIntervention?.controlledSecretChannelActionIds || [],
+      credentialPasswordIntervention: backendApplyPackage.credentialPasswordIntervention || {},
       applySteps: (backendApplyPackage.applySteps || []).map((item) =>
         `${item.id}:canStart=${item.canStartAfterActionTimeConfirmation === true}:mutationType=${item.mutationType}:blockers=${(item.currentBlockers || []).join("|") || "none"}`),
     },
