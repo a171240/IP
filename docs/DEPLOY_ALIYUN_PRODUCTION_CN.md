@@ -33,7 +33,7 @@ SAE 应用名：meiye-huajing-app-api-production-cn
 语音对练：火山语音 + DeepSeek
 ```
 
-Supabase 只能作为迁移来源或旧链路兼容，不能作为正式 production-cn 数据库目标。当前代码仍以 Supabase SDK 为主，因此不要只填 `DATABASE_URL_CN` 就认为数据库已迁移完成；还必须完成 RDS PostgreSQL 实例、后端数据访问层迁移、schema/data 迁移、回滚方案和验收。
+Supabase 只能作为迁移来源或旧链路兼容，不能作为正式 production-cn 数据库目标。首版 APP 业务数据访问已经有 APP-native RDS repository；但不要只填 `DATABASE_URL_CN` 就认为数据库已迁移完成。正式 production-cn 仍必须完成 RDS PostgreSQL 实例、数据库账号、secret env 导入、schema/data 迁移、RDS smoke、回滚方案和验收。当前 `29/31` 的 Supabase 触碰是兼容/会话/helper 盘点口径，真正的数据访问门禁看 `appApiRoutesWithSupabaseDataAccess=4/31` 和 `firstVersionRdsRoutesWithSupabaseDataAccess=0/25`。
 
 2026-06-24 CloudShell 只读盘点补充：`cn-hangzhou` 下 RDS PostgreSQL 实例数为 0，RDS 全量实例数为 0，Redis/Tair 实例数为 0。按当前“APP 国内正式版全部迁到阿里云”的口径，`DATABASE_URL_CN` 已经是后端必填阻塞项；`REDIS_URL_CN` 仍只有在 production-cn 队列/缓存明确依赖 Tair/Redis 时才升级为必填。
 

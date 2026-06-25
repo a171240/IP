@@ -89,6 +89,14 @@ firstVersionRdsRoutesWithSupabaseDataAccess=0/25
 deferredAppApiRouteCount=6
 ```
 
+口径说明：
+
+```text
+appApiRoutesWithSupabase=29/31 只表示兼容/会话/helper 层仍触碰 Supabase。
+它不是正式 production-cn 数据库目标，也不是首版业务数据访问阻塞项。
+当前后端补齐只按 data access 指标和 RDS migration evidence 判定。
+```
+
 不在当前后端阻塞项里：
 
 ```text

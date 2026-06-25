@@ -172,6 +172,9 @@ test("Aliyun backend apply package reports field-level RDS blockers after local 
   assert.ok(rdsStep.currentBlockers.includes("rdsEvidence:rdsPostgres.confirmed"))
   assert.ok(rdsStep.currentBlockers.includes("rdsEvidence:rdsPostgres.databaseUrlCnSecretImported"))
   assert.ok(!rdsStep.currentBlockers.includes("rdsEvidence:migration.dataAccessAdapterReady"))
+  assert.ok(rdsStep.currentEvidence.includes("appApiRoutesTouchingSupabaseCompatibility=29/31"))
+  assert.ok(rdsStep.currentEvidence.includes("appApiRoutesWithSupabaseDataAccess=4/31"))
+  assert.ok(rdsStep.currentEvidence.includes("firstVersionRdsRoutesTouchingSupabaseCompatibility=23/25"))
   assert.ok(rdsStep.currentEvidence.includes("firstVersionRdsRoutesWithSupabaseDataAccess=0/25"))
 
   assert.doesNotMatch(output, secretLike)

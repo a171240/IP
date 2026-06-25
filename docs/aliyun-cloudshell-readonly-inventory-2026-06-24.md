@@ -159,4 +159,4 @@ aliyun r-kvstore DescribeInstances --RegionId cn-hangzhou
 
 - `DATABASE_URL_CN` 不能标 ready，因为没有 production-cn RDS PostgreSQL 实例或连接串。
 - `REDIS_URL_CN` 不能标 ready，因为没有 Redis/Tair 实例。
-- 即使以后填入 `DATABASE_URL_CN`，也不能等同于数据层迁移完成；后端当前仍以 Supabase SDK 为主，正式完整 production-cn 需要单独迁移方案、脚本、回滚和验收。
+- 即使以后填入 `DATABASE_URL_CN`，也不能等同于数据层迁移完成；首版 APP 业务数据访问代码侧已经有 APP-native RDS repository，但正式完整 production-cn 仍需要阿里云 RDS 实例、schema/data 迁移、RDS smoke、回滚和验收。`29/31` Supabase 触碰只代表兼容/会话/helper 盘点口径，不等同于业务数据仍走 Supabase。
