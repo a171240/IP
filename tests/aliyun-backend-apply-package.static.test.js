@@ -31,6 +31,8 @@ test("Aliyun backend apply package command is wired into scripts and deploy spec
   assert.match(releaseArtifacts, /backendApplyPackage/)
   assert.match(releaseArtifacts, /missingCredentialValues: \$\{backendApplyPackage\.credentialPasswordIntervention/)
   assert.match(releaseArtifacts, /credentialPasswordIntervention: backendApplyPackage\.credentialPasswordIntervention/)
+  assert.match(releaseArtifacts, /backendApplyPackage\.actionTimeAuthorizationRequest/)
+  assert.match(releaseArtifacts, /actionTimeAuthorizationRequest\.recommendedUserReply/)
   assert.match(script, /B00_ALIYUN_BACKEND_APPLY_PACKAGE/)
   assert.match(script, /BAP00_READONLY_INVENTORY_IDENTITY/)
   assert.match(script, /BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE/)

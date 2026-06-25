@@ -972,6 +972,9 @@ function renderMarkdown(audit) {
     `- readySecretsPendingCloudImport: ${backendApplyPackage.credentialPasswordIntervention?.readySecretsPendingCloudImport?.count ?? 0}`,
     `- paidPurchaseConfirmationActionIds: ${backendApplyPackage.credentialPasswordIntervention?.paidPurchaseConfirmationActionIds?.join(", ") || "none"}`,
     `- controlledSecretChannelActionIds: ${backendApplyPackage.credentialPasswordIntervention?.controlledSecretChannelActionIds?.join(", ") || "none"}`,
+    `- actionTimeAuthorizationRequest.required: ${backendApplyPackage.actionTimeAuthorizationRequest?.required === true}`,
+    `- actionTimeAuthorizationRequest.packetIds: ${backendApplyPackage.actionTimeAuthorizationRequest?.packetIds?.join(", ") || "none"}`,
+    `- actionTimeAuthorizationRequest.recommendedUserReply: ${backendApplyPackage.actionTimeAuthorizationRequest?.recommendedUserReply || "none"}`,
     ...(backendApplyPackage.applySteps?.length
       ? backendApplyPackage.applySteps.map((item) => `- ${item.id}: canStart=${item.canStartAfterActionTimeConfirmation === true}; mutationType=${item.mutationType}; blockers=${item.currentBlockers?.length ? item.currentBlockers.join(", ") : "none"}`)
       : ["- applySteps: none"]),
@@ -2505,6 +2508,7 @@ function main() {
       paidPurchaseConfirmationActionIds: backendApplyPackage.credentialPasswordIntervention?.paidPurchaseConfirmationActionIds || [],
       controlledSecretChannelActionIds: backendApplyPackage.credentialPasswordIntervention?.controlledSecretChannelActionIds || [],
       credentialPasswordIntervention: backendApplyPackage.credentialPasswordIntervention || {},
+      actionTimeAuthorizationRequest: backendApplyPackage.actionTimeAuthorizationRequest || null,
       applySteps: (backendApplyPackage.applySteps || []).map((item) =>
         `${item.id}:canStart=${item.canStartAfterActionTimeConfirmation === true}:mutationType=${item.mutationType}:blockers=${(item.currentBlockers || []).join("|") || "none"}`),
     },
