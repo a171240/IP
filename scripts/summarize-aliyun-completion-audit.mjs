@@ -21,6 +21,16 @@ const APP_LAUNCH_REQUIRED_NAMES = new Set([
   "WECHAT_OPEN_APP_SECRET",
   "APPLE_TEAM_ID",
 ])
+const APP_LAUNCH_SENSITIVE_ACTION_IDS = new Set([
+  "S01_WECHAT_OPEN_APP_LOGIN",
+  "S02_APPLE_TEAM_ID",
+  "S07_ANDROID_RELEASE_SIGNING",
+])
+const APP_LAUNCH_CREDENTIAL_NAME_PATTERNS = [
+  /^WECHAT_OPEN_APP_/,
+  /^APPLE_TEAM_ID$/,
+  /^MEIYE_RELEASE_/,
+]
 const APP_LAUNCH_MACHINE_BLOCKER_PATTERNS = [
   /WECHAT_OPEN_APP_/,
   /wechat_open_platform_mobile_app/i,
@@ -168,10 +178,24 @@ function runInputs(args) {
   ])
   const envHandoff = runJson("env_handoff", [
     "scripts/summarize-aliyun-env-handoff.mjs",
+    "--backend-only",
+    "--env-file",
+    args.envFile,
+  ])
+  const fullAppEnvHandoff = runJson("full_app_env_handoff", [
+    "scripts/summarize-aliyun-env-handoff.mjs",
     "--env-file",
     args.envFile,
   ])
   const sensitiveBlockers = runJson("sensitive_blockers", [
+    "scripts/summarize-aliyun-sensitive-blockers.mjs",
+    "--backend-only",
+    "--env-file",
+    args.envFile,
+    "--cloud-confirmations",
+    args.cloudConfirmationsFile,
+  ])
+  const fullAppSensitiveBlockers = runJson("full_app_sensitive_blockers", [
     "scripts/summarize-aliyun-sensitive-blockers.mjs",
     "--env-file",
     args.envFile,
@@ -187,6 +211,7 @@ function runInputs(args) {
   ])
   const actionAuthorization = runJson("action_authorization", [
     "scripts/summarize-aliyun-action-authorization.mjs",
+    "--backend-only",
     "--env-file",
     args.envFile,
     "--cloud-confirmations",
@@ -210,7 +235,7 @@ function runInputs(args) {
     productionStatus,
     resourcesMatrix,
     consoleRunbook,
-    envHandoff,
+    envHandoff: fullAppEnvHandoff,
     operatorHandoffError: "operator_handoff_skipped_for_backend_only_completion_audit",
   })
 
@@ -219,7 +244,9 @@ function runInputs(args) {
     backendStatus,
     operatorHandoff,
     envHandoff,
+    fullAppEnvHandoff,
     sensitiveBlockers,
+    fullAppSensitiveBlockers,
     resourcesMatrix,
     actionAuthorization,
     consoleRunbook,
@@ -302,13 +329,18 @@ function buildAudit(args, inputs) {
     backendStatus,
     operatorHandoff,
     envHandoff,
+    fullAppEnvHandoff,
     sensitiveBlockers,
+    fullAppSensitiveBlockers,
     resourcesMatrix,
     actionAuthorization,
     consoleRunbook,
     wechatOpenMobileAppPackage,
   } = inputs
   const goalClosureEvidenceBrief = buildGoalClosureEvidenceBrief(sensitiveBlockers, resourcesMatrix)
+  const fullAppCredentialIntervention = credentialInterventionFromSensitiveBlockers(fullAppSensitiveBlockers)
+  const deferredAppLaunchBlockedCredentialNames = fullAppCredentialIntervention.blockedCredentialNames
+    .filter((name) => APP_LAUNCH_CREDENTIAL_NAME_PATTERNS.some((pattern) => pattern.test(String(name))))
   const bridgeDataLayer = buildBridgeDataLayerBoundary(productionStatus, operatorHandoff)
   const localImplementation = buildLocalImplementationEvidence(productionStatus, operatorHandoff)
   const requirements = [
@@ -319,7 +351,7 @@ function buildAudit(args, inputs) {
     buildImagePublishRequirement(operatorHandoff),
     buildDomainRequirement(actionAuthorization, consoleRunbook),
     buildWechatRequirement(productionStatus, wechatOpenMobileAppPackage),
-    buildAppleRequirement(productionStatus, operatorHandoff, envHandoff),
+    buildAppleRequirement(productionStatus, operatorHandoff, fullAppEnvHandoff),
     buildEnvImportRequirement(productionStatus, operatorHandoff, envHandoff),
     buildSensitiveBlockersRequirement(sensitiveBlockers),
     buildProductionDeployRequirement(productionStatus, operatorHandoff, actionAuthorization),
@@ -372,8 +404,13 @@ function buildAudit(args, inputs) {
       nextActionTimeConfirmations: actionAuthorization.nextActionTimeConfirmations || [],
       blockedByAuthorizationPacketDependencies: actionAuthorization.summary?.blockedByPacketDependencies || [],
       sensitiveBlockedIds: sensitiveBlockers.summary?.blockedIds || [],
+      deferredAppLaunchSensitiveBlockedIds: (fullAppSensitiveBlockers.summary?.blockedIds || [])
+        .filter((id) => APP_LAUNCH_SENSITIVE_ACTION_IDS.has(id)),
       blockedCredentialCount: goalClosureEvidenceBrief.credentialIntervention.blockedCredentialCount,
       blockedCredentialNames: goalClosureEvidenceBrief.credentialIntervention.blockedCredentialNames,
+      fullAppBlockedCredentialCount: fullAppCredentialIntervention.blockedCredentialCount,
+      fullAppBlockedCredentialNames: fullAppCredentialIntervention.blockedCredentialNames,
+      deferredAppLaunchBlockedCredentialNames,
       readySecretEnvVariableCount: goalClosureEvidenceBrief.credentialIntervention.readySecretEnvVariableCount,
       readySecretEnvVariableNames: goalClosureEvidenceBrief.credentialIntervention.readySecretEnvVariableNames,
       resourceEvidenceReady: goalClosureEvidenceBrief.resourceEvidence.ready,
@@ -390,15 +427,19 @@ function buildAudit(args, inputs) {
       nextActionTimeConfirmations: actionAuthorization.nextActionTimeConfirmations || [],
       blockedByAuthorizationPacketDependencies: actionAuthorization.summary?.blockedByPacketDependencies || [],
       sensitiveBlockedIds: sensitiveBlockers.summary?.blockedIds || [],
+      deferredAppLaunchSensitiveBlockedIds: (fullAppSensitiveBlockers.summary?.blockedIds || [])
+        .filter((id) => APP_LAUNCH_SENSITIVE_ACTION_IDS.has(id)),
       blockedResourceEvidenceIds: goalClosureEvidenceBrief.resourceEvidence.blockedIds,
     },
     sourceCommands: {
       productionStatus: "corepack pnpm aliyun:status",
       operatorHandoff: "corepack pnpm aliyun:operator:handoff -- --skip-vercel-env-coverage",
-      envHandoff: "corepack pnpm aliyun:env:handoff",
-      sensitiveBlockers: "corepack pnpm aliyun:sensitive:blockers",
+      envHandoff: "corepack pnpm aliyun:env:handoff:backend",
+      fullAppEnvHandoff: "corepack pnpm aliyun:env:handoff",
+      sensitiveBlockers: "corepack pnpm aliyun:sensitive:blockers:backend",
+      fullAppSensitiveBlockers: "corepack pnpm aliyun:sensitive:blockers",
       resourcesMatrix: "corepack pnpm aliyun:resources:matrix",
-      actionAuthorization: "corepack pnpm aliyun:action:authorization",
+      actionAuthorization: "corepack pnpm aliyun:action:authorization:backend",
       consoleRunbook: "corepack pnpm aliyun:console:runbook",
       wechatOpenMobileAppPackage: "corepack pnpm aliyun:wechat-open:package",
     },
@@ -571,6 +612,18 @@ function buildGoalClosureEvidenceBrief(sensitiveBlockers, resourcesMatrix) {
       })),
       valueHandlingRules: resourceEvidence.valueHandlingRules || [],
     },
+  }
+}
+
+function credentialInterventionFromSensitiveBlockers(sensitiveBlockers) {
+  const credentialIntervention = sensitiveBlockers?.credentialInterventionBrief
+    || sensitiveBlockers?.summary?.credentialInterventionBrief
+    || {}
+  return {
+    blockedCredentialCount: credentialIntervention.blockedCredentialCount || 0,
+    blockedCredentialNames: credentialIntervention.blockedCredentialNames || [],
+    readySecretEnvVariableCount: credentialIntervention.readySecretEnvVariableCount || 0,
+    readySecretEnvVariableNames: credentialIntervention.readySecretEnvVariableNames || [],
   }
 }
 
@@ -896,6 +949,8 @@ function renderMarkdown(report) {
     `- Can start now authorization packets: ${report.summary.canStartNowAuthorizationPackets.length ? report.summary.canStartNowAuthorizationPackets.join(", ") : "none"}`,
     `- Next action-time confirmations: ${report.summary.nextActionTimeConfirmations.length ? report.summary.nextActionTimeConfirmations.map((item) => item.packetId).join(", ") : "none"}`,
     `- Blocked credential count: ${report.summary.blockedCredentialCount}`,
+    `- Full app blocked credential count: ${report.summary.fullAppBlockedCredentialCount}`,
+    `- Deferred app launch blocked credentials: ${report.summary.deferredAppLaunchBlockedCredentialNames.length ? report.summary.deferredAppLaunchBlockedCredentialNames.join(", ") : "none"}`,
     `- Ready secret env variable count: ${report.summary.readySecretEnvVariableCount}`,
     `- Resource evidence ready: ${report.summary.resourceEvidenceReady}`,
     `- Blocked resource evidence ids: ${report.summary.blockedResourceEvidenceIds.length ? report.summary.blockedResourceEvidenceIds.join(", ") : "none"}`,
@@ -903,6 +958,8 @@ function renderMarkdown(report) {
     "## 目标闭环证据简表",
     "",
     `- blockedCredentialNames: ${report.summary.blockedCredentialNames.length ? report.summary.blockedCredentialNames.join(", ") : "none"}`,
+    `- fullAppBlockedCredentialNames: ${report.summary.fullAppBlockedCredentialNames.length ? report.summary.fullAppBlockedCredentialNames.join(", ") : "none"}`,
+    `- deferredAppLaunchBlockedCredentialNames: ${report.summary.deferredAppLaunchBlockedCredentialNames.length ? report.summary.deferredAppLaunchBlockedCredentialNames.join(", ") : "none"}`,
     `- readySecretEnvVariableNames: ${report.summary.readySecretEnvVariableNames.length ? report.summary.readySecretEnvVariableNames.join(", ") : "none"}`,
     `- resourceEvidenceReady: ${report.summary.resourceEvidenceReady}`,
     `- blockedResourceEvidenceIds: ${report.summary.blockedResourceEvidenceIds.length ? report.summary.blockedResourceEvidenceIds.join(", ") : "none"}`,

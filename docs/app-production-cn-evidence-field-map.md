@@ -5,7 +5,7 @@ Date: 2026-06-24
 This is the field-level, value-free map for the current production-cn evidence gaps. It is derived from:
 
 ```bash
-corepack pnpm aliyun:evidence:writeback -- --skip-vercel-env-coverage
+corepack pnpm aliyun:evidence:writeback:backend
 ```
 
 It tells the operator which local evidence field to update after an authorized external action. It does not contain secret values and does not authorize cloud mutation.
@@ -14,17 +14,19 @@ It tells the operator which local evidence field to update after an authorized e
 
 ```text
 Production-cn cannot be deployed now.
-evidenceWritebackReady=1/4
-totalGaps=56
+evidenceWritebackReady=0/4
+totalGaps=48
 rdsMigrationGaps=17
-cloudInventoryResultGaps=0
-cloudConfirmationGaps=27
+cloudInventoryResultGaps=1
+cloudConfirmationGaps=18
 imagePublishGaps=12
 ```
 
-## Ready Evidence File
+Current scope is `backend_aliyun_only`. WeChat Open Platform mobile app, Apple, and Android release-signing evidence fields are deferred and are not current Aliyun backend blockers.
 
-`deploy/aliyun-production-cn.cloud-inventory-results.local.json` is ready with `0` current blockers. It proves read-only inventory results only. It does not close the cloud confirmation or image publish gates.
+## No Ready Evidence File
+
+All four evidence files still have current backend blockers. The read-only inventory file exists, but strict-ready inventory is still blocked by `readonly_inventory_strict_ready=0/9`.
 
 ## rds-migration.local.json
 
@@ -64,7 +66,7 @@ Target file:
 deploy/aliyun-production-cn.cloud-confirmations.local.json
 ```
 
-Current field blockers: `27`.
+Current field blockers: `18`.
 
 | JSON path | Authorization packet | Expected non-secret evidence |
 | --- | --- | --- |
@@ -79,15 +81,6 @@ Current field blockers: `27`.
 | `items.assetDomainHttps.icpReady` | `P07_DOMAIN_DNS_HTTPS_ICP` | Set `true` only after ICP is ready for domestic production access. |
 | `items.oss.confirmed` | `P05_OSS_RAM_STS` | Set `true` only after OSS bucket, CORS, and runtime access are confirmed. |
 | `items.oss.ramLeastPrivilege` | `P05_OSS_RAM_STS` | Set `true` only after RAM, STS, or runtime role access is limited to the service-record prefix. |
-| `items.wechatOpenPlatform.androidSignature` | `P10_ANDROID_RELEASE_SIGNING` | Record Android release signature evidence or evidence ID; never use debug keystore evidence. |
-| `items.wechatOpenPlatform.confirmed` | `P01_WECHAT_OPEN_MOBILE_APP` | Set `true` only after the WeChat Open Platform mobile app evidence is complete. |
-| `items.wechatOpenPlatform.mobileAppCreated` | `P01_WECHAT_OPEN_MOBILE_APP` | Set `true` only after the "美业话镜" mobile app exists in WeChat Open Platform. |
-| `items.wechatOpenPlatform.mobileAppSubmitted` | `P01_WECHAT_OPEN_MOBILE_APP` | Set `true` only after the mobile app is submitted for review. |
-| `items.wechatOpenPlatform.reviewStatus` | `P01_WECHAT_OPEN_MOBILE_APP` | Set `approved` only after the WeChat Open Platform mobile app review passes. |
-| `items.wechatOpenPlatform.mobileAppIdReady` | `P01_WECHAT_OPEN_MOBILE_APP` | Set `true` only after the reviewed mobile app AppID is ready. |
-| `items.wechatOpenPlatform.mobileAppSecretReady` | `P01_WECHAT_OPEN_MOBILE_APP` | Set `true` only after the reviewed mobile app AppSecret has been imported through secret env. |
-| `items.wechatOpenPlatform.androidConfigured` | `P10_ANDROID_RELEASE_SIGNING` | Set `true` only after Android package name and release signature are configured in WeChat Open Platform. |
-| `items.wechatOpenPlatform.iosConfigured` | `P01_WECHAT_OPEN_MOBILE_APP`, `P02_APPLE_TEAM_ID` | Set `true` only after iOS Bundle ID, Apple Team ID, Universal Link, and AASA evidence are complete. |
 | `items.envImport.importedAt` | `P06_ENV_IMPORT` | Record the import time or a non-secret console evidence ID. |
 | `items.envImport.evidence` | `P06_ENV_IMPORT` | Record a console path, screenshot ID, ticket ID, or other non-secret evidence handle. |
 | `items.envImport.confirmed` | `P06_ENV_IMPORT` | Set `true` only after production-cn env values are imported into Aliyun runtime env. |
@@ -147,9 +140,10 @@ Run the strict command for the touched file first, then the completion gates:
 
 ```bash
 corepack pnpm aliyun:cloud:confirmations:strict
+corepack pnpm aliyun:cloud:inventory-results:strict
 corepack pnpm aliyun:rds:migration:evidence:strict
 corepack pnpm aliyun:image:plan:strict
-corepack pnpm aliyun:evidence:writeback -- --skip-vercel-env-coverage
+corepack pnpm aliyun:evidence:writeback:backend
 corepack pnpm aliyun:completion:audit
 corepack pnpm aliyun:predeploy
 ```

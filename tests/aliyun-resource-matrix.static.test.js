@@ -46,7 +46,12 @@ test("Aliyun resource matrix names required cloud resources without secret value
   assert.equal(report.containsValues, false)
   assert.equal(report.mutationPerformed, false)
   assert.equal(report.secretLeakCheck.ok, true)
+  assert.equal(report.currentScope, "backend_aliyun_only")
+  assert.equal(report.fullAppLaunchScope, "deferred_after_backend_online")
   assert.equal(report.summary.total, 7)
+  assert.deepEqual(report.summary.backendRequiredBlocking, ["DATABASE_URL_CN"])
+  assert.ok(report.summary.backendOnlyExclusions.includes("WECHAT_OPEN_APP_ID"))
+  assert.ok(report.summary.backendOnlyExclusions.includes("WECHAT_OPEN_APP_SECRET"))
   assert.ok(report.summary.blocked >= 1)
   assert.equal(report.summary.resourceEvidenceReady, "0/7")
   assert.ok(report.summary.blockedResourceEvidenceIds.includes("R01_SAE_RUNTIME"))
@@ -91,6 +96,8 @@ test("Aliyun resource matrix names required cloud resources without secret value
   assert.ok(ossBrief.currentEvidence.some((item) => /bucket_exists/.test(item)))
   assert.ok(blockedBriefsById.get("R05_OSS_AUDIO_STORAGE").currentEvidence.some((item) => /bucket_exists/.test(item)))
   assert.deepEqual(envBrief.requiredAuthorizationPackets, ["P06_ENV_IMPORT"])
+  assert.ok(envBrief.missingEvidence.includes("missing_required_env:DATABASE_URL_CN"))
+  assert.ok(!envBrief.missingEvidence.some((item) => /WECHAT_OPEN_APP_ID|WECHAT_OPEN_APP_SECRET/.test(item)))
   assert.ok(envBrief.missingEvidence.some((item) => item.includes("envImport:")))
   assert.match(envBrief.nextEvidenceAction, /SAE\/KMS\/Secrets Manager/)
   assert.equal(slsBrief.observedReadiness, "partial")
@@ -154,6 +161,7 @@ test("tracked APP production-cn resource matrix doc pins the current blocked Ali
 
   for (const expected of [
     "Production-cn cannot be deployed now.",
+    "Current scope is `backend_aliyun_only`.",
     "resourceEvidenceReady=0/7",
     "cloudConfirmationsTotalBlockers=27",
     "imagePublishTotalBlockers=12",
@@ -172,6 +180,7 @@ test("tracked APP production-cn resource matrix doc pins the current blocked Ali
     "domain_visible_records_missing",
     "bucket_visible_unconfirmed",
     "cloudshell_disconnected_or_config_missing",
+    "missing `DATABASE_URL_CN`",
     "project_logstore_visible_alerts_pending",
     "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.runtime",
     "deploy/aliyun-production-cn.image-publish.local.json -> acr + runtime",
@@ -185,6 +194,8 @@ test("tracked APP production-cn resource matrix doc pins the current blocked Ali
   }
 
   assert.match(manifest, /app-production-cn-resource-evidence-matrix\.md/)
+  assert.doesNotMatch(doc, /missing `WECHAT_OPEN_APP_ID`/)
+  assert.doesNotMatch(doc, /missing `WECHAT_OPEN_APP_SECRET`/)
   assert.doesNotMatch(doc, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(doc, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(doc, /:\/\/[^\s:@]+:[^\s@]+@/)

@@ -11,6 +11,8 @@ const BACKEND_ROOT = resolve(__dirname, "..")
 const WORKSPACE_ROOT = resolve(BACKEND_ROOT, "../..")
 const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
+const CURRENT_SCOPE = "backend_aliyun_only"
+const FULL_APP_LAUNCH_SCOPE = "deferred_after_backend_online"
 
 const SECRET_VALUE_PATTERNS = [
   /sk-[A-Za-z0-9_-]{20,}/,
@@ -103,7 +105,11 @@ const RESOURCE_DEFINITIONS = [
       "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport",
       "阿里云 SAE 环境变量 / KMS / Secrets Manager",
     ],
-    verifyCommands: ["corepack pnpm aliyun:env:checklist", "corepack pnpm aliyun:sensitive:blockers"],
+    verifyCommands: [
+      "corepack pnpm aliyun:env:handoff:backend",
+      "corepack pnpm aliyun:sensitive:blockers:backend",
+      "corepack pnpm aliyun:env:checklist",
+    ],
   },
   {
     id: "R07_SLS_ALERTS",
@@ -228,6 +234,12 @@ function buildReport(args) {
     "--cloud-confirmations",
     args.cloudConfirmationsFile,
   ])
+  const backendEnvHandoff = runJson("backend_env_handoff", [
+    "scripts/summarize-aliyun-env-handoff.mjs",
+    "--backend-only",
+    "--env-file",
+    args.envFile,
+  ])
 
   const taskById = new Map((operatorTasks.tasks || []).map((task) => [task.id, task]))
   const confirmationByKey = new Map(
@@ -247,10 +259,7 @@ function buildReport(args) {
       observedResourceStatus?.status ? `observedResourceStatus=${observedResourceStatus.status}` : "",
       observedResourceStatus?.readiness ? `observedResourceReadiness=${observedResourceStatus.readiness}` : "",
     ])
-    const blockers = unique([
-      ...(task?.blockerCodes || []),
-      ...(confirmation?.blockers || []).map((blocker) => `${definition.cloudConfirmationKey}:${blocker}`),
-    ])
+    const blockers = buildResourceBlockers(definition, task, confirmation, backendEnvHandoff)
     const status = task?.ready || confirmation?.ready || (definition.imagePublish && imagePublishPlan.ready)
       ? "ready"
       : task?.status || "pending_cloud"
@@ -294,6 +303,8 @@ function buildReport(args) {
   const report = {
     ok: true,
     generatedAt: new Date().toISOString(),
+    currentScope: CURRENT_SCOPE,
+    fullAppLaunchScope: FULL_APP_LAUNCH_SCOPE,
     containsValues: false,
     readOnlyOnly: true,
     mutationPerformed: false,
@@ -302,6 +313,7 @@ function buildReport(args) {
       "corepack pnpm aliyun:cloud:confirmations",
       "corepack pnpm aliyun:image:plan",
       "corepack pnpm aliyun:cloud:access",
+      "corepack pnpm aliyun:env:handoff:backend",
     ],
     files: {
       envFile: args.envFile,
@@ -309,6 +321,8 @@ function buildReport(args) {
     },
     summary: {
       total: resources.length,
+      currentScope: CURRENT_SCOPE,
+      fullAppLaunchScope: FULL_APP_LAUNCH_SCOPE,
       ready: resources.length - blocked.length,
       blocked: blocked.length,
       blockedIds: blocked.map((item) => item.id),
@@ -329,6 +343,9 @@ function buildReport(args) {
       },
       resourceEvidenceReady: `${resourceEvidenceBrief.ready}/${resourceEvidenceBrief.total}`,
       blockedResourceEvidenceIds: resourceEvidenceBrief.blockedIds,
+      backendRequiredBlocking: backendEnvHandoff.summary?.requiredBlocking || [],
+      deferredAppLaunchBlocking: backendEnvHandoff.summary?.appLaunchBlocking || [],
+      backendOnlyExclusions: backendEnvHandoff.backendOnlyExclusions?.envNames || [],
     },
     cloudAccess: {
       canReadCloudNow: cloudAccess.canReadCloudNow === true,
@@ -404,6 +421,21 @@ function buildResourceEvidenceBrief(resources) {
       "资源 ready 不能只靠浏览器已登录或控制台页面可见，必须有 strict/readiness 命令或 .local.json 非密钥证据闭环。",
     ],
   }
+}
+
+function buildResourceBlockers(definition, task, confirmation, backendEnvHandoff) {
+  const blockers = unique([
+    ...(task?.blockerCodes || []),
+    ...(confirmation?.blockers || []).map((blocker) => `${definition.cloudConfirmationKey}:${blocker}`),
+  ])
+  if (definition.id !== "R06_ENV_IMPORT") return blockers
+
+  const backendRequiredBlocking = new Set(backendEnvHandoff.summary?.requiredBlocking || [])
+  return blockers.filter((blocker) => {
+    const match = String(blocker).match(/^missing_required_env:(.+)$/)
+    if (!match) return true
+    return backendRequiredBlocking.has(match[1])
+  })
 }
 
 function buildMissingEvidence(item) {
@@ -509,6 +541,8 @@ function renderMarkdown(report) {
     "",
     "## 结论",
     "",
+    `- currentScope: ${report.currentScope}`,
+    `- fullAppLaunchScope: ${report.fullAppLaunchScope}`,
     `- ready: ${report.summary.ready} / ${report.summary.total}`,
     `- blocked: ${report.summary.blocked}`,
     `- containsValues: ${report.containsValues}`,
