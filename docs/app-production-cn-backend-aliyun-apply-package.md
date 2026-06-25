@@ -1,6 +1,6 @@
 # APP production-cn Aliyun backend apply package
 
-Generated at: 2026-06-25T22:47:10.707Z
+Generated at: 2026-06-25T23:20:39.884Z
 
 ## Scope
 
@@ -51,8 +51,8 @@ Generated at: 2026-06-25T22:47:10.707Z
 
 - required: true
 - currentScope: backend_aliyun_only
-- stepIds: BAP00_READONLY_INVENTORY_IDENTITY, BAP03_ACR_PURCHASE_AND_REPOSITORY, BAP02_OSS_RAM_STS_CLOSE, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE
-- packetIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
+- stepIds: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP03_ACR_PURCHASE_AND_REPOSITORY
+- packetIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE
 - recommendedUserReply: 授权本轮只做阿里云后端第一批动作：只读盘点、创建/确认 RDS PostgreSQL 并处理数据库密码、确认 OSS RAM/STS，购买/确认 ACR Enterprise Economic cn-hangzhou 1个月 CNY117；密钥只进入阿里云 KMS/Secrets Manager/SAE secret env，不写文档/代码/git；仅处理 RDS/OSS 所需的受控 secret env，暂不执行全量 SAE env import；不做微信/Android/iOS、不部署上线、不改 DNS。
 - allowedActions: 恢复阿里云 CLI/CloudShell 只读盘点身份，只运行 allowlisted List/Describe/stat/get inventory 命令。; 创建或确认 cn-hangzhou RDS PostgreSQL、数据库、账号和网络访问策略，并只把 DATABASE_URL_CN 写入阿里云受控 secret env。; 确认 OSS bucket/CORS/service-records 前缀，绑定最小权限 RAM/STS 或运行时角色。; 购买或确认 ACR Enterprise Economic cn-hangzhou 1个月 CNY117，并记录 registry host、namespace、repository 等非密钥证据。
 - explicitlyExcluded: 不创建微信开放平台移动应用，不处理 Android release signing，不读取 Apple Team ID/AASA。; 不执行 production-cn 部署、postdeploy smoke、DNS/HTTPS/ICP 变更或 git push。; 不执行 docker login/push，不配置 SAE 镜像拉取。; 不执行全量 SAE 环境变量导入；只允许本批 RDS/OSS 动作要求的受控 secret env 写入。; 不把 DATABASE_URL_CN、数据库密码、AccessKeySecret、STS token、registry password、Supabase service role key、cookie 或证书私钥写入 JSON、Markdown、Docker 镜像、App 包、小程序包、shell history 或 git。

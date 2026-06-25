@@ -159,15 +159,15 @@ test("Aliyun backend apply package separates immediate backend work from deferre
   assert.equal(report.actionTimeAuthorizationRequest.currentScope, "backend_aliyun_only")
   assert.deepEqual(report.actionTimeAuthorizationRequest.packetIds, [
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
-    "P03_ACR_PURCHASE",
-    "P05_OSS_RAM_STS",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
+    "P05_OSS_RAM_STS",
+    "P03_ACR_PURCHASE",
   ])
   assert.deepEqual(report.actionTimeAuthorizationRequest.stepIds, [
     "BAP00_READONLY_INVENTORY_IDENTITY",
-    "BAP03_ACR_PURCHASE_AND_REPOSITORY",
-    "BAP02_OSS_RAM_STS_CLOSE",
     "BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE",
+    "BAP02_OSS_RAM_STS_CLOSE",
+    "BAP03_ACR_PURCHASE_AND_REPOSITORY",
   ])
   assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /阿里云后端第一批动作/)
   assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /RDS PostgreSQL/)
@@ -359,7 +359,7 @@ test("Aliyun backend apply package markdown is value-free and actionable", () =>
   assert.match(markdown, /USER_CONFIRM_ALIYUN_READONLY_INVENTORY_IDENTITY/)
   assert.match(markdown, /## Action-Time Authorization Request/)
   assert.match(markdown, /recommendedUserReply: 授权本轮只做阿里云后端第一批动作/)
-  assert.match(markdown, /packetIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(markdown, /packetIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE/)
   assert.match(markdown, /不做微信\/Android\/iOS、不部署上线、不改 DNS/)
   assert.match(markdown, /不执行 docker login\/push/)
   assert.match(markdown, /actionTimeConfirmation\.minimumUserPhrase: .*CloudShell/)
