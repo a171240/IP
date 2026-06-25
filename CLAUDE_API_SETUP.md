@@ -10,7 +10,7 @@
 
 ```env
 # Claude API 配置（用于 IP传记采访）
-CLAUDE_API_KEY=sk-jDtkItBb4pDmc6V8pvM68VGQ19oLdh4K0sbXjG1H5fxOxAgD
+CLAUDE_API_KEY=sk-xxx
 CLAUDE_BASE_URL=https://api.evolink.ai/v1
 CLAUDE_MODEL=claude-3-5-haiku-20241022
 ```

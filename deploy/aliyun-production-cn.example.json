@@ -86,6 +86,7 @@
     "corepack pnpm run aliyun:env:check",
     "corepack pnpm run aliyun:env:plan",
     "corepack pnpm run aliyun:env:sources",
+    "corepack pnpm run aliyun:release-docs:secret-test",
     "corepack pnpm run aliyun:env:classification:test",
     "corepack pnpm run aliyun:env:handoff:test",
     "corepack pnpm run aliyun:env:handoff",

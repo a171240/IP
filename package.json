@@ -10,6 +10,7 @@
     "aliyun:env:plan": "node ./scripts/prepare-aliyun-runtime-env.mjs --allow-todo --write-plan /tmp/meiye-aliyun-env-import-plan.json",
     "aliyun:env:sources": "node ./scripts/prepare-aliyun-runtime-env.mjs --allow-todo --write-plan /tmp/meiye-aliyun-env-source-catalog.json",
     "aliyun:env:checklist": "node ./scripts/prepare-aliyun-runtime-env.mjs --allow-todo --write-plan /tmp/meiye-aliyun-env-import-plan.json --write-plan-markdown /tmp/meiye-aliyun-env-import-checklist.md",
+    "aliyun:release-docs:secret-test": "node --test tests/release-doc-secret-values.static.test.js",
     "aliyun:env:classification:test": "node --test tests/aliyun-env-import-plan.static.test.mjs",
     "aliyun:env:handoff": "node ./scripts/summarize-aliyun-env-handoff.mjs",
     "aliyun:env:handoff:backend": "node ./scripts/summarize-aliyun-env-handoff.mjs --backend-only",
