@@ -81,22 +81,27 @@ test("Aliyun operator handoff command is wired into scripts and local predeploy"
 test("Aliyun operator handoff backend-only mode excludes deferred APP launch work", () => {
   const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-operator-handoff-backend-rds-"))
   const rdsMigrationLocal = initRdsMigrationLocal(tmpdir)
+  const markdown = path.join(tmpdir, "operator-handoff-backend.md")
   const output = execFileSync(process.execPath, [
     "scripts/generate-aliyun-operator-handoff.mjs",
     "--backend-only",
     "--skip-vercel-env-coverage",
     "--rds-migration",
     rdsMigrationLocal,
+    "--markdown",
+    markdown,
   ], {
     cwd: root,
     encoding: "utf8",
     maxBuffer: 1024 * 1024 * 40,
   })
   const report = JSON.parse(output)
+  const markdownOutput = fs.readFileSync(markdown, "utf8")
   const cloudConfirmationPaths = report.localEvidenceGaps.cloudConfirmations.gaps.map((item) => item.jsonPath)
   const rdsMigrationPaths = report.localEvidenceGaps.rdsMigration.gaps.map((item) => item.jsonPath)
   const userActionTitles = report.userActionNow.map((item) => item.title)
   const priorityTaskIds = report.priorityTasks.map((item) => item.id)
+  const backendNextActionIds = report.backendNextActionOrder.map((item) => item.id)
   const envImportTask = report.priorityTasks.find((item) => item.id === "T06_ALIYUN_ENV_IMPORT")
   const consoleEnvImportTask = report.aliyunConsoleTaskOrder.tasks.find((item) => item.id === "C06_ENV_IMPORT")
   const requiredVariableNames = report.missingVariables.required.map((item) => item.name)
@@ -109,6 +114,26 @@ test("Aliyun operator handoff backend-only mode excludes deferred APP launch wor
   assert.ok(!report.operatorClosureBrief.blockedCredentialNames.includes("WECHAT_OPEN_APP_SECRET"))
   assert.ok(!report.operatorClosureBrief.credentialGroups.some((group) => group.actionId === "S01_WECHAT_OPEN_APP_LOGIN"))
   assert.ok(!report.operatorClosureBrief.credentialGroups.some((group) => group.actionId === "S07_ANDROID_RELEASE_SIGNING"))
+  assert.deepEqual(backendNextActionIds, [
+    "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
+    "P11_ALIYUN_RDS_DATA_MIGRATION",
+    "P05_OSS_RAM_STS",
+    "P03_P04_ACR_IMAGE_AND_PULL",
+    "P06_ENV_IMPORT",
+    "P08_SAE_RUNTIME",
+    "P07_DOMAIN_DNS_HTTPS",
+    "P08_SLS_ALERTS",
+    "P09_PRODUCTION_DEPLOY_SMOKE",
+  ])
+  assert.equal(report.backendNextActionOrder[0].status, "blocked")
+  assert.ok(report.backendNextActionOrder[0].currentBlockers.includes("readonly_inventory_strict_ready=0/9"))
+  assert.ok(report.backendNextActionOrder[1].currentBlockers.includes("DATABASE_URL_CN"))
+  assert.ok(report.backendNextActionOrder[1].currentBlockers.includes("RDS_MIGRATION_EVIDENCE_NOT_READY"))
+  assert.ok(report.backendNextActionOrder[1].requiredAuthorizationPackets.includes("P11_ALIYUN_RDS_DATA_MIGRATION"))
+  assert.ok(report.backendNextActionOrder[4].currentBlockers.includes("missing_required_env:DATABASE_URL_CN"))
+  assert.ok(report.backendNextActionOrder[6].requiredAuthorizationPackets.includes("P07_DOMAIN_DNS_HTTPS"))
+  assert.equal(report.backendNextActionOrder[8].status, "waiting_for_deploy")
+  assert.ok(report.backendNextActionOrder[8].currentBlockers.includes("BACKEND_ALIYUN_DEPLOY_NOT_READY"))
   assert.equal(report.localEvidenceGaps.cloudConfirmations.totalBlockers, cloudConfirmationPaths.length)
   assert.equal(report.localEvidenceGaps.cloudConfirmations.totalBlockers, 18)
   assert.ok(!cloudConfirmationPaths.some((item) => item.includes("wechatOpenPlatform")))
@@ -153,6 +178,10 @@ test("Aliyun operator handoff backend-only mode excludes deferred APP launch wor
   assert.ok(!priorityTaskIds.includes("T01_WECHAT_OPEN_PLATFORM_APP_LOGIN"))
   assert.ok(priorityTaskIds.includes("T03B_ALIYUN_ACR_IMAGE_PUBLISH"))
   assert.ok(report.currentAnswer.includes("现在只处理阿里云后端"))
+  assert.match(markdownOutput, /## 后端下一步顺序/)
+  assert.match(markdownOutput, /0\. P00_ALIYUN_READONLY_INVENTORY_IDENTITY/)
+  assert.match(markdownOutput, /1\. P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(markdownOutput, /6\. P07_DOMAIN_DNS_HTTPS/)
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)

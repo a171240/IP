@@ -609,6 +609,13 @@ function buildHandoff({
     ],
     aliyunConsoleTaskOrder,
     aliyunConsoleActionNow: buildAliyunConsoleActionNow(aliyunConsoleTaskOrder),
+    backendNextActionOrder: buildBackendNextActionOrder({
+      backendOnly: args.backendOnly,
+      status,
+      rdsMigrationEvidence,
+      cloudConfirmationsCheck,
+      imagePublishPlan,
+    }),
     priorityTasks: priorityTaskIds.map((id) => compactTask(taskById(tasks, id))).filter(Boolean),
     nextCommandOrder: status.nextCommandOrder || [],
     safetyBoundary: [
@@ -620,6 +627,169 @@ function buildHandoff({
       "image-publish.local.json 只能写镜像名、digest、布尔状态和证据编号，不能写 registry 密码或 RAM Secret。",
     ],
   }
+}
+
+function buildBackendNextActionOrder({ backendOnly, status, rdsMigrationEvidence, cloudConfirmationsCheck, imagePublishPlan }) {
+  if (!backendOnly) return []
+  const backendBlockers = new Set(status.summary?.backendRequiredBlocking || [])
+  const cloudInventory = status.localReadiness?.cloudInventoryResults || {}
+  const cloudInventoryReady = cloudInventory.ready === true || cloudInventory.localReady === true || cloudInventory.local?.ready === true
+  const cloudInventoryBlockers = cloudInventory.localBlockers || cloudInventory.blockers || []
+  const cloudInventoryStrictBlocker = cloudInventoryBlockers.find((item) => String(item).startsWith("readonly_inventory_"))
+    || `readonly_inventory_strict_ready=${cloudInventory.readyLocalOperations || 0}/${cloudInventory.localOperations || 9}`
+  const cloudConfirmations = cloudConfirmationsCheck.local || cloudConfirmationsCheck.template || {}
+  const cloudItems = new Map((cloudConfirmations.items || []).map((item) => [item.key, item]))
+  const imagePublishReady = imagePublishPlan.ready === true || imagePublishPlan.local?.ready === true
+  const rdsEvidenceReady = rdsMigrationEvidence.local?.ready === true || rdsMigrationEvidence.summary?.localReady === true
+  const rdsEvidenceBlockers = rdsMigrationEvidence.local?.blockers || []
+  const rdsSourceBlockers = new Set(rdsMigrationEvidence.sourceInventory?.summary?.blockers || [])
+  const rdsNeedsDatabaseUrlCn = backendBlockers.has("DATABASE_URL_CN")
+    || rdsSourceBlockers.has("DATABASE_URL_CN")
+    || rdsEvidenceBlockers.includes("rdsPostgres.databaseUrlCnSecretImported")
+  const postdeploySmokeReady = status.canDeployNow === true && !backendBlockers.has("POSTDEPLOY_SMOKE_NOT_RUN")
+
+  return [
+    {
+      order: 0,
+      id: "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
+      title: "Restore Aliyun CLI/CloudShell read-only inventory evidence",
+      status: cloudInventoryReady ? "ready" : "blocked",
+      owner: "阿里云只读盘点操作员",
+      evidenceTarget: "deploy/aliyun-production-cn.cloud-inventory-results.local.json",
+      requiredAuthorizationPackets: ["P00_ALIYUN_READONLY_INVENTORY_IDENTITY"],
+      currentBlockers: cloudInventoryReady ? [] : [cloudInventoryStrictBlocker],
+      verifyCommands: [
+        "corepack pnpm aliyun:cloudshell:handoff",
+        "corepack pnpm aliyun:cloud:inventory-results:strict",
+      ],
+    },
+    {
+      order: 1,
+      id: "P11_ALIYUN_RDS_DATA_MIGRATION",
+      title: "Create or confirm Aliyun RDS PostgreSQL and close Supabase-to-RDS evidence",
+      status: rdsMigrationEvidence.local?.ready ? "ready" : "blocked",
+      owner: "阿里云 RDS/后端数据迁移操作员",
+      evidenceTarget: "deploy/aliyun-production-cn.rds-migration.local.json",
+      requiredAuthorizationPackets: ["P11_ALIYUN_RDS_DATA_MIGRATION"],
+      currentBlockers: [
+        ...(rdsNeedsDatabaseUrlCn ? ["DATABASE_URL_CN"] : []),
+        ...(!rdsEvidenceReady || backendBlockers.has("RDS_MIGRATION_EVIDENCE_NOT_READY") ? ["RDS_MIGRATION_EVIDENCE_NOT_READY"] : []),
+        ...(rdsEvidenceBlockers.slice(0, 8).map((item) => `rdsEvidence:${item}`)),
+      ],
+      verifyCommands: [
+        "corepack pnpm aliyun:rds:migration:package",
+        "corepack pnpm aliyun:rds:migration:evidence:strict",
+        "corepack pnpm aliyun:backend-cn:status",
+      ],
+    },
+    {
+      order: 2,
+      id: "P05_OSS_RAM_STS",
+      title: "Confirm OSS audio bucket CORS and RAM/STS least privilege",
+      status: cloudItems.get("oss")?.ready ? "ready" : "blocked",
+      owner: "阿里云 OSS/RAM 操作员",
+      evidenceTarget: "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss",
+      requiredAuthorizationPackets: ["P05_OSS_RAM_STS"],
+      currentBlockers: cloudItems.get("oss")?.missing || ["oss:confirmed", "oss:ramLeastPrivilege"],
+      verifyCommands: [
+        "corepack pnpm aliyun:cloud:confirmations:backend",
+        "corepack pnpm aliyun:backend-cn:status",
+      ],
+    },
+    {
+      order: 3,
+      id: "P03_P04_ACR_IMAGE_AND_PULL",
+      title: "Purchase/confirm ACR, push backend image, and configure SAE pull",
+      status: imagePublishReady ? "ready" : "blocked",
+      owner: "阿里云 ACR/后端发布操作员",
+      evidenceTarget: "deploy/aliyun-production-cn.image-publish.local.json",
+      requiredAuthorizationPackets: ["P03_ACR_PURCHASE", "P04_ACR_IMAGE_AND_PULL"],
+      currentBlockers: imagePublishPlan.local?.blockers || imagePublishPlan.blockers || ["ACR_IMAGE_REGISTRY_NOT_READY"],
+      verifyCommands: [
+        "corepack pnpm aliyun:image:plan:strict",
+        "corepack pnpm aliyun:container:smoke",
+      ],
+    },
+    {
+      order: 4,
+      id: "P06_ENV_IMPORT",
+      title: "Import backend env through SAE/KMS/Secrets Manager",
+      status: cloudItems.get("envImport")?.ready ? "ready" : "blocked",
+      owner: "阿里云运行环境/密钥操作员",
+      evidenceTarget: "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport",
+      requiredAuthorizationPackets: ["P06_ENV_IMPORT"],
+      currentBlockers: [
+        ...(rdsNeedsDatabaseUrlCn ? ["missing_required_env:DATABASE_URL_CN"] : []),
+        ...(cloudItems.get("envImport")?.missing || ["envImport:confirmed", "envImport:secretNotInImage"]),
+      ],
+      verifyCommands: [
+        "corepack pnpm aliyun:env:handoff:backend",
+        "corepack pnpm aliyun:sensitive:blockers:backend",
+        "corepack pnpm aliyun:env:checklist",
+      ],
+    },
+    {
+      order: 5,
+      id: "P08_SAE_RUNTIME",
+      title: "Create SAE runtime with container port 3000 and /api/healthz",
+      status: cloudItems.get("runtime")?.ready ? "ready" : "blocked",
+      owner: "阿里云 SAE 操作员",
+      evidenceTarget: "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.runtime",
+      requiredAuthorizationPackets: ["P08_SAE_RUNTIME_SLS"],
+      currentBlockers: cloudItems.get("runtime")?.missing || ["runtime:confirmed"],
+      verifyCommands: [
+        "corepack pnpm aliyun:runtime:plan",
+        "corepack pnpm aliyun:health:smoke",
+      ],
+    },
+    {
+      order: 6,
+      id: "P07_DOMAIN_DNS_HTTPS",
+      title: "Bind api-cn/assets-cn DNS, HTTPS certificate, and ICP evidence",
+      status: cloudItems.get("apiDomainHttps")?.ready && cloudItems.get("assetDomainHttps")?.ready ? "ready" : "blocked",
+      owner: "阿里云域名/证书操作员",
+      evidenceTarget: "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps/items.assetDomainHttps",
+      requiredAuthorizationPackets: ["P07_DOMAIN_DNS_HTTPS"],
+      currentBlockers: [
+        ...(cloudItems.get("apiDomainHttps")?.missing || ["apiDomainHttps:confirmed"]),
+        ...(cloudItems.get("assetDomainHttps")?.missing || ["assetDomainHttps:confirmed"]),
+      ],
+      verifyCommands: [
+        "corepack pnpm aliyun:domain:strict",
+      ],
+    },
+    {
+      order: 7,
+      id: "P08_SLS_ALERTS",
+      title: "Configure SLS health and 5xx alerts",
+      status: cloudItems.get("slsAlerts")?.ready ? "ready" : "blocked",
+      owner: "阿里云 SLS/运维操作员",
+      evidenceTarget: "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.slsAlerts",
+      requiredAuthorizationPackets: ["P08_SAE_RUNTIME_SLS"],
+      currentBlockers: cloudItems.get("slsAlerts")?.missing || [
+        "slsAlerts:confirmed",
+        "slsAlerts:healthAlertConfigured",
+        "slsAlerts:serverErrorAlertConfigured",
+      ],
+      verifyCommands: [
+        "corepack pnpm aliyun:cloud:check",
+      ],
+    },
+    {
+      order: 8,
+      id: "P09_PRODUCTION_DEPLOY_SMOKE",
+      title: "Run backend health and APP API smoke against Aliyun",
+      status: postdeploySmokeReady ? "ready" : "waiting_for_deploy",
+      owner: "后端发布操作员",
+      evidenceTarget: "postdeploy smoke evidence",
+      requiredAuthorizationPackets: ["P09_PRODUCTION_DEPLOY"],
+      currentBlockers: postdeploySmokeReady ? [] : ["BACKEND_ALIYUN_DEPLOY_NOT_READY", "POSTDEPLOY_SMOKE_NOT_RUN"],
+      verifyCommands: [
+        "corepack pnpm aliyun:postdeploy:smoke -- --base-url https://api-cn.ipgongchang.xin",
+        "corepack pnpm aliyun:app-api:smoke -- --base-url https://api-cn.ipgongchang.xin",
+      ],
+    },
+  ]
 }
 
 function buildLocalEvidenceGaps({ args, status, cloudAccess, cloudConfirmationsCheck, imagePublishPlan, rdsMigrationEvidence, backendOnly = false }) {
@@ -1328,6 +1498,20 @@ function renderMarkdown(handoff) {
     `- cloud inventory results: ${handoff.files.cloudInventoryResultsFile}`,
     `- cloud confirmations: ${handoff.files.cloudConfirmationsFile}`,
     `- image publish plan: ${handoff.files.imagePublishLocalFile}`,
+    "",
+    "## 后端下一步顺序",
+    "",
+    ...(handoff.backendNextActionOrder.length
+      ? handoff.backendNextActionOrder.flatMap((item) => [
+        `- ${item.order}. ${item.id}: ${item.title}`,
+        `  - status: ${item.status}`,
+        `  - owner: ${item.owner}`,
+        `  - evidenceTarget: ${item.evidenceTarget}`,
+        `  - requiredAuthorizationPackets: ${item.requiredAuthorizationPackets.join(", ") || "none"}`,
+        `  - currentBlockers: ${item.currentBlockers.length ? item.currentBlockers.join(", ") : "none"}`,
+        `  - verifyCommands: ${item.verifyCommands.join("; ")}`,
+      ])
+      : ["- see full-app launch order", ""]),
     "",
     "## 优先任务",
     "",
