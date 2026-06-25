@@ -38,6 +38,8 @@
     "aliyun:sensitive:blockers": "node ./scripts/summarize-aliyun-sensitive-blockers.mjs",
     "aliyun:sensitive:blockers:backend": "node ./scripts/summarize-aliyun-sensitive-blockers.mjs --backend-only",
     "aliyun:sensitive:blockers:test": "node --test tests/aliyun-sensitive-blockers.static.test.js",
+    "aliyun:backend-env-import:batches": "node ./scripts/generate-aliyun-backend-env-import-batches.mjs",
+    "aliyun:backend-env-import:batches:test": "node --test tests/aliyun-backend-env-import-batches.static.test.js",
     "aliyun:resources:matrix": "node ./scripts/summarize-aliyun-resource-matrix.mjs",
     "aliyun:resources:matrix:test": "node --test tests/aliyun-resource-matrix.static.test.js",
     "aliyun:user:actions": "node ./scripts/summarize-aliyun-user-action-brief.mjs",
