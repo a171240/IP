@@ -371,6 +371,19 @@ function renderMarkdown(audit) {
   const currentScopeBlocking = audit.currentScope === "backend_aliyun_only"
     ? backendCnStatus.summary.backendRequiredBlocking || []
     : readiness.machineBlocking || []
+  const machineBlockingForScope = audit.currentScope === "backend_aliyun_only"
+    ? blockerBrief.summary.machineBlocking || []
+    : readiness.machineBlocking || []
+  const manualBlockingForScope = audit.currentScope === "backend_aliyun_only"
+    ? (backendApplyPackage.applySteps || []).map((item) =>
+      `${item.id}: canStart=${item.canStartAfterActionTimeConfirmation === true}; blockers=${item.currentBlockers?.length ? item.currentBlockers.join(", ") : "none"}`)
+    : readiness.manualBlocking || []
+  const cloudConfirmationLinesForScope = audit.currentScope === "backend_aliyun_only"
+    ? Object.entries(cloudConfirmationsCheck?.local?.itemStatus || {}).map(([key, item]) =>
+      `- ${key}: ${item.ready ? "ready" : "incomplete"}${item.blockers?.length ? ` (${item.blockers.join(", ")})` : ""}`)
+    : (cloudConfirmations?.items?.length
+      ? cloudConfirmations.items.map((item) => `- ${item.key}: ${item.status}${item.missing?.length ? ` (${item.missing.join(", ")})` : ""}`)
+      : ["- none"])
   return [
     "# 美业话镜 APP production-cn 阿里云发布审计",
     "",
@@ -434,14 +447,14 @@ function renderMarkdown(audit) {
     "",
     "## 机器可验证阻塞",
     "",
-    ...(readiness.machineBlocking.length
-      ? readiness.machineBlocking.map((item) => `- ${item}`)
+    ...(machineBlockingForScope.length
+      ? machineBlockingForScope.map((item) => `- ${item}`)
       : ["- none"]),
     "",
     "## 仍需人工确认",
     "",
-    ...(readiness.manualBlocking.length
-      ? readiness.manualBlocking.map((item) => `- ${item}`)
+    ...(manualBlockingForScope.length
+      ? manualBlockingForScope.map((item) => `- ${item}`)
       : ["- none"]),
     "",
     "## 云资源确认文件",
@@ -450,9 +463,7 @@ function renderMarkdown(audit) {
     `- path: ${cloudConfirmations?.path || "not provided"}`,
     `- ready: ${cloudConfirmations?.ready === true}`,
     "",
-    ...(cloudConfirmations?.items?.length
-      ? cloudConfirmations.items.map((item) => `- ${item.key}: ${item.status}${item.missing?.length ? ` (${item.missing.join(", ")})` : ""}`)
-      : ["- none"]),
+    ...cloudConfirmationLinesForScope,
     "",
     "## 云确认文件结构校验",
     "",

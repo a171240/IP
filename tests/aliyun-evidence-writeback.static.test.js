@@ -59,6 +59,11 @@ test("Aliyun backend-only release artifacts defer APP launch packages instead of
   assert.match(releaseArtifacts, /runAppLaunchPackage\(args, "android", "android_release_signing_package"/)
   assert.match(releaseArtifacts, /runAppLaunchPackage\(args, "apple", "apple_team_aasa_package"/)
   assert.match(releaseArtifacts, /当前 backend-only 总包不生成这些专项材料/)
+  assert.match(releaseArtifacts, /machineBlockingForScope[\s\S]*blockerBrief\.summary\.machineBlocking/)
+  assert.match(releaseArtifacts, /manualBlockingForScope[\s\S]*backendApplyPackage\.applySteps/)
+  assert.match(releaseArtifacts, /cloudConfirmationLinesForScope[\s\S]*cloudConfirmationsCheck\?\.local\?\.itemStatus/)
+  assert.doesNotMatch(releaseArtifacts, /\.\.\.readiness\.machineBlocking\.map/)
+  assert.doesNotMatch(releaseArtifacts, /\.\.\.readiness\.manualBlocking\.map/)
 })
 
 test("Aliyun evidence writeback backend-only mode excludes deferred APP launch gaps", () => {
