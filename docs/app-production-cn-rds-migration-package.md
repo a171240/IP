@@ -1,6 +1,6 @@
 # APP production-cn RDS Migration Package Handoff
 
-Generated from local non-secret package report: 2026-06-25T08:28:55.154Z
+Generated from local non-secret package report: 2026-06-25T12:34:41.144Z
 
 ## Verdict
 
@@ -71,6 +71,24 @@ node scripts/generate-aliyun-rds-migration-package.mjs --out-dir /tmp/meiye-huaj
 - supabase/migrations/20260511_add_mp_account_invites_and_org_snapshots.sql: 228b26e164a130edafa6ce544b088f02dab48a25af029e0c98681df49d9b47ed
 - supabase/migrations/20260511_harden_mp_account_invites_access.sql: 2efe570c4d98a98b8640c5d5ff7ba578fe5c418f6d362fa04f970c5ae5660cf2
 - supabase/migrations/20260513085315_add_service_record_sessions.sql: 6b3b929032010946d363eec0c5bb4130cf68891bd6a487d57c284293e6ecc4f3
+
+## RDS SQL Compatibility Review
+
+- reviewRequired: true
+- affectedSourceFiles: 9
+- appliesTo: schema_sql_before_aliyun_rds_apply
+- categories: extension_review, policy_statement, row_level_security, supabase_auth_uid, supabase_service_role, supabase_storage_schema
+- policy: The package is not authorization to apply unreviewed Supabase SQL to Aliyun RDS.
+
+Required review before running schema SQL on Aliyun RDS:
+
+- `supabase_auth_uid`: replace Supabase `auth.uid()` policy dependencies with backend-enforced user, company, store, and role checks.
+- `supabase_storage_schema`: replace `storage.*` / `storage.buckets` usage with Aliyun OSS bucket, prefix, CORS, RAM/STS, and application-level access checks.
+- `supabase_service_role`: replace Supabase `service_role` grants and policies with Aliyun RDS roles plus backend service credentials.
+- `row_level_security` and `policy_statement`: decide whether RLS remains in Aliyun RDS or whether all tenant authorization is enforced in the `lib/aliyun-rds` repository layer.
+- `extension_review`: confirm target Aliyun RDS PostgreSQL supports required extensions such as `pgcrypto` before applying SQL.
+
+Only after this compatibility review is recorded may the operator treat `rds-schema.sql` as an apply candidate. Until then, it is a non-secret review package, not a production migration script.
 
 ## Execution Boundary
 

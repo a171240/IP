@@ -24,6 +24,45 @@ const SECRET_VALUE_PATTERNS = [
   /AccessKeySecret\s*[:=]\s*\S{8,}/i,
 ]
 
+const RDS_SQL_COMPATIBILITY_RULES = Object.freeze([
+  {
+    code: "supabase_auth_uid",
+    pattern: /\bauth\.uid\s*\(/i,
+    severity: "rewrite_or_replace_before_apply",
+    action: "Replace Supabase auth.uid dependent predicates with backend-enforced user or tenant checks before applying to Aliyun RDS.",
+  },
+  {
+    code: "supabase_storage_schema",
+    pattern: /\bstorage\./i,
+    severity: "replace_with_oss_boundary",
+    action: "Replace Supabase storage schema statements with Aliyun OSS bucket/prefix/RAM/STS evidence and application code checks.",
+  },
+  {
+    code: "supabase_service_role",
+    pattern: /\bservice_role\b/i,
+    severity: "replace_role_model",
+    action: "Replace Supabase service_role grants or policies with Aliyun RDS roles and backend service credentials.",
+  },
+  {
+    code: "row_level_security",
+    pattern: /\benable\s+row\s+level\s+security\b/i,
+    severity: "review_authorization_model",
+    action: "Review whether RLS remains enabled on Aliyun RDS or whether the backend repository layer owns tenant authorization.",
+  },
+  {
+    code: "policy_statement",
+    pattern: /\bcreate\s+policy\b/i,
+    severity: "review_authorization_model",
+    action: "Review every Supabase policy statement before applying it to Aliyun RDS.",
+  },
+  {
+    code: "extension_review",
+    pattern: /\bcreate\s+extension\b|\bgen_random_uuid\s*\(/i,
+    severity: "confirm_rds_extension_support",
+    action: "Confirm the target Aliyun RDS PostgreSQL engine supports the required extension before applying schema SQL.",
+  },
+])
+
 function parseArgs(argv) {
   const args = {
     schemaMap: DEFAULT_SCHEMA_MAP,
@@ -106,6 +145,98 @@ function findSecretLikeValues(text) {
     if (match) matches.push(match[0].slice(0, 80))
   }
   return matches
+}
+
+function lineNumbersForPattern(text, pattern) {
+  return text
+    .split(/\r?\n/)
+    .map((line, index) => pattern.test(line) ? index + 1 : 0)
+    .filter(Boolean)
+}
+
+function auditRdsSqlCompatibility(sourcePath, content) {
+  const findings = []
+  for (const rule of RDS_SQL_COMPATIBILITY_RULES) {
+    const lineNumbers = lineNumbersForPattern(content, rule.pattern)
+    if (!lineNumbers.length) continue
+    findings.push({
+      sourcePath,
+      code: rule.code,
+      severity: rule.severity,
+      lineCount: lineNumbers.length,
+      sampleLineNumbers: lineNumbers.slice(0, 8),
+      action: rule.action,
+    })
+  }
+  return findings
+}
+
+function summarizeCompatibilityReview(findings) {
+  const codes = new Map()
+  const sources = new Map()
+
+  for (const finding of findings) {
+    if (!codes.has(finding.code)) {
+      codes.set(finding.code, {
+        code: finding.code,
+        severity: finding.severity,
+        findingCount: 0,
+        affectedSourceCount: 0,
+        action: finding.action,
+        sourcePaths: new Set(),
+      })
+    }
+    const codeSummary = codes.get(finding.code)
+    codeSummary.findingCount += finding.lineCount
+    codeSummary.sourcePaths.add(finding.sourcePath)
+    codeSummary.affectedSourceCount = codeSummary.sourcePaths.size
+
+    if (!sources.has(finding.sourcePath)) {
+      sources.set(finding.sourcePath, {
+        sourcePath: finding.sourcePath,
+        codes: [],
+        findingCount: 0,
+      })
+    }
+    const sourceSummary = sources.get(finding.sourcePath)
+    sourceSummary.codes.push(finding.code)
+    sourceSummary.findingCount += finding.lineCount
+  }
+
+  return {
+    required: findings.length > 0,
+    appliesTo: "schema_sql_before_aliyun_rds_apply",
+    policy: "The package can be generated locally, but schema SQL must not be applied to Aliyun RDS until these compatibility findings are reviewed or rewritten.",
+    findingCount: findings.reduce((sum, finding) => sum + finding.lineCount, 0),
+    affectedSourceCount: sources.size,
+    categories: [...codes.keys()].sort(),
+    byCode: [...codes.values()]
+      .map((item) => ({
+        code: item.code,
+        severity: item.severity,
+        findingCount: item.findingCount,
+        affectedSourceCount: item.affectedSourceCount,
+        action: item.action,
+      }))
+      .sort((a, b) => a.code.localeCompare(b.code)),
+    bySource: [...sources.values()]
+      .map((item) => ({
+        sourcePath: item.sourcePath,
+        codes: [...new Set(item.codes)].sort(),
+        findingCount: item.findingCount,
+      }))
+      .sort((a, b) => a.sourcePath.localeCompare(b.sourcePath)),
+    findings: findings
+      .map((finding) => ({
+        sourcePath: finding.sourcePath,
+        code: finding.code,
+        severity: finding.severity,
+        lineCount: finding.lineCount,
+        sampleLineNumbers: finding.sampleLineNumbers,
+        action: finding.action,
+      }))
+      .sort((a, b) => `${a.sourcePath}:${a.code}`.localeCompare(`${b.sourcePath}:${b.code}`)),
+  }
 }
 
 function renderSchemaSql(schemaMap, sourceFiles) {
@@ -224,6 +355,9 @@ function renderMarkdown(report) {
     `- validationSqlSha256: ${report.summary.validationSqlSha256}`,
     `- blockers: ${report.blockers.length ? report.blockers.join(", ") : "none"}`,
     `- warnings: ${report.warnings.length ? report.warnings.join(", ") : "none"}`,
+    `- rdsCompatibilityReviewRequired: ${report.compatibilityReview.required}`,
+    `- rdsCompatibilityFindingCount: ${report.compatibilityReview.findingCount}`,
+    `- rdsCompatibilityAffectedSourceCount: ${report.compatibilityReview.affectedSourceCount}`,
     "",
     "## Files",
     "",
@@ -236,6 +370,17 @@ function renderMarkdown(report) {
     "## Source Files",
     "",
     ...report.sourceFiles.map((item) => `- ${item.path}: ${item.sha256}`),
+    "",
+    "## RDS Compatibility Review",
+    "",
+    `- required: ${report.compatibilityReview.required}`,
+    `- appliesTo: ${report.compatibilityReview.appliesTo}`,
+    `- categories: ${report.compatibilityReview.categories.join(", ") || "none"}`,
+    `- policy: ${report.compatibilityReview.policy}`,
+    "",
+    ...report.compatibilityReview.byCode.map((item) =>
+      `- ${item.code}: findings=${item.findingCount}, sources=${item.affectedSourceCount}, action=${item.action}`,
+    ),
     "",
     "## Next Required Evidence",
     "",
@@ -261,6 +406,7 @@ function buildReport(args) {
   if (!Array.isArray(schemaMap.sourceMigrations) || schemaMap.sourceMigrations.length === 0) blockers.push("sourceMigrations")
 
   const sourceFiles = []
+  const compatibilityFindings = []
   for (const sourcePath of schemaMap.sourceMigrations || []) {
     const filePath = resolveRepoPath(sourcePath)
     if (!existsSync(filePath)) {
@@ -270,8 +416,11 @@ function buildReport(args) {
     const content = readText(filePath)
     const secretMatches = findSecretLikeValues(content)
     if (secretMatches.length) blockers.push(`source_contains_secret_like_values:${sourcePath}`)
-    if (/\bauth\.uid\(\)|\bstorage\.|to service_role\b/i.test(content)) {
-      warnings.push(`review_supabase_specific_sql:${sourcePath}`)
+    const sourceCompatibilityFindings = auditRdsSqlCompatibility(sourcePath, content)
+    compatibilityFindings.push(...sourceCompatibilityFindings)
+    if (sourceCompatibilityFindings.length) {
+      const codes = sourceCompatibilityFindings.map((finding) => finding.code).sort().join("+")
+      warnings.push(`rds_sql_compatibility_review_required:${sourcePath}:${codes}`)
     }
     sourceFiles.push({
       path: rel(filePath),
@@ -287,6 +436,7 @@ function buildReport(args) {
   const combinedGenerated = `${schemaSql}\n${validationSql}\n${rollbackChecklist}`
   const generatedSecretMatches = findSecretLikeValues(combinedGenerated)
   if (generatedSecretMatches.length) blockers.push("generated_package_contains_secret_like_values")
+  const compatibilityReview = summarizeCompatibilityReview(compatibilityFindings)
 
   const manifestPath = resolve(args.outDir, "rds-migration-package.json")
   const markdownPath = resolve(args.outDir, "rds-migration-package.md")
@@ -317,7 +467,11 @@ function buildReport(args) {
       schemaSqlSha256: sha256(schemaSql),
       validationSqlSha256: sha256(validationSql),
       rollbackChecklistSha256: sha256(rollbackChecklist),
+      compatibilityReviewRequired: compatibilityReview.required,
+      compatibilityFindingCount: compatibilityReview.findingCount,
+      compatibilityAffectedSourceFileCount: compatibilityReview.affectedSourceCount,
     },
+    compatibilityReview,
     files: {
       manifest: manifestPath,
       markdown: markdownPath,

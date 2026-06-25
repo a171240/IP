@@ -80,6 +80,9 @@ test("Aliyun completion audit command is wired into scripts, predeploy, deploy s
   assert.match(releaseArtifacts, /readySecretEnvVariableCount/)
   assert.match(releaseArtifacts, /resourceEvidenceReady/)
   assert.match(releaseArtifacts, /blockedResourceEvidenceIds/)
+  assert.match(releaseArtifacts, /compatibilityReviewRequired/)
+  assert.match(releaseArtifacts, /compatibilityFindingCount/)
+  assert.match(releaseArtifacts, /compatibilityCategories/)
   assert.match(releaseArtifacts, /goalClosureEvidenceBrief/)
 })
 
