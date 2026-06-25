@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 当前阻塞简报
 
-Generated: 2026-06-24T15:06:14.377Z
+Generated: 2026-06-25T01:54:11.225Z
 
 ## 结论
 
@@ -8,6 +8,7 @@ Generated: 2026-06-24T15:06:14.377Z
 - verdict: blocked
 - currentScope: backend_aliyun_only
 - fullAppLaunchScope: deferred_after_backend_online
+- currentBackendScopeNote: 当前阿里云后端阻塞只看 requiredBlocking、machineBlocking、canStartNowConsoleTasks 和 canStartNowAuthorizationPackets；fullApp* 与 deferredAppLaunch* 只保留完整 App 发布延期上下文，不是当前后端部署阻塞。
 - canDeployNow: false
 - canProceedWithoutWechat: true
 - backendTargetReady: 0/8
@@ -69,6 +70,12 @@ Generated: 2026-06-24T15:06:14.377Z
 - envSourceBlockedExternalRequired: DATABASE_URL_CN, WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET, APPLE_TEAM_ID
 - envSourceReadyLocalButMissingFromVercel: SERVICE_RECORD_DEEPSEEK_API_KEY, SERVICE_RECORD_DEEPSEEK_BASE_URL, SERVICE_RECORD_DEEPSEEK_MODEL
 - envSourceSecretOrSensitiveToImport: 17
+
+## 当前口径说明
+
+- 当前目标只补阿里云后端：RDS/ACR/OSS/SAE/DNS/HTTPS/ICP/env/SLS/smoke。
+- 当前后端阻塞只看 `requiredBlocking`、`machineBlocking`、`canStartNowConsoleTasks`、`canStartNowAuthorizationPackets`。
+- `fullAppRequiredBlocking`、`fullAppMachineBlocking`、`deferredAppLaunchBlocking` 是完整 App 发布延期上下文；微信开放平台移动应用、Android 签名、Apple Team ID 不属于当前阿里云后端补齐目标。
 
 ## 微信开放平台移动应用链路
 

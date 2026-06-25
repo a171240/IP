@@ -57,6 +57,10 @@ test("APP production-cn current blocker brief records the go-no-go boundary", ()
   const doc = read("docs", "app-production-cn-current-blocker-brief.md")
 
   assert.match(doc, /现在不能部署；当前只推进阿里云后端/)
+  assert.match(doc, /currentBackendScopeNote: 当前阿里云后端阻塞只看 requiredBlocking、machineBlocking、canStartNowConsoleTasks 和 canStartNowAuthorizationPackets/)
+  assert.match(doc, /当前口径说明/)
+  assert.match(doc, /当前后端阻塞只看 `requiredBlocking`、`machineBlocking`、`canStartNowConsoleTasks`、`canStartNowAuthorizationPackets`/)
+  assert.match(doc, /微信开放平台移动应用、Android 签名、Apple Team ID 不属于当前阿里云后端补齐目标/)
   assert.match(doc, /requiredEnv: 24\/27/)
   assert.match(doc, /requiredBlocking:[\s\S]*DATABASE_URL_CN[\s\S]*RDS_MIGRATION_EVIDENCE_NOT_READY/)
   assert.match(doc, /deferredAppLaunchBlocking:[\s\S]*WECHAT_OPEN_APP_ID[\s\S]*ANDROID_RELEASE_SIGNING[\s\S]*APPLE_TEAM_ID/)
@@ -425,6 +429,13 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.ok(report.cloudInventory.strictReadyOperations <= report.cloudInventory.operations)
   assert.ok(report.strictVerificationOrder.includes("corepack pnpm aliyun:predeploy"))
   assert.match(markdown, /当前阻塞简报/)
+  assert.equal(
+    report.summary.currentBackendScopeNote,
+    "当前阿里云后端阻塞只看 requiredBlocking、machineBlocking、canStartNowConsoleTasks 和 canStartNowAuthorizationPackets；fullApp* 与 deferredAppLaunch* 只保留完整 App 发布延期上下文，不是当前后端部署阻塞。",
+  )
+  assert.match(markdown, /当前口径说明/)
+  assert.match(markdown, /当前后端阻塞只看 `requiredBlocking`、`machineBlocking`、`canStartNowConsoleTasks`、`canStartNowAuthorizationPackets`/)
+  assert.match(markdown, /微信开放平台移动应用、Android 签名、Apple Team ID 不属于当前阿里云后端补齐目标/)
   assert.match(markdown, /ANDROID_RELEASE_SIGNING|android_release_signing/)
   assert.match(markdown, /P01_WECHAT_OPEN_MOBILE_APP/)
   assert.match(markdown, /P10_ANDROID_RELEASE_SIGNING/)
