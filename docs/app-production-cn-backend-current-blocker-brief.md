@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 阿里云后端-only 当前执行简报
 
-Generated: 2026-06-25T12:14:45.248Z
+Generated: 2026-06-25T16:21:59.615Z
 
 ## 结论
 
@@ -11,8 +11,8 @@ Generated: 2026-06-25T12:14:45.248Z
 - canProceedWithoutWechat: true
 - backendTargetReady: 0/8
 - cloudResourceEvidenceReady: 0/7
-- cloudConfirmationsReady: 0/7
-- operatorTasksReady: 1/9
+- cloudConfirmationsReady: 0/6
+- operatorTasksReady: 0/7
 - sensitiveBlocked: 5/5
 - blockedCredentialCount: 1
 - blockedCredentialNames: DATABASE_URL_CN

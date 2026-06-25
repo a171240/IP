@@ -1,6 +1,6 @@
 # 阿里云控制台动作包
 
-生成时间：2026-06-25T11:18:10.322Z
+生成时间：2026-06-25T16:19:22.501Z
 
 ## 结论
 
@@ -11,10 +11,10 @@
 - canProceedWithoutWechat: true
 - backendTargetReady: 0/8
 - verdict: blocked
-- cloudConfirmationsReady: 0/7
-- operatorTasksReady: 1/9
-- sensitiveActionReady: 0/8
-- sensitiveActionBlocked: 8/8
+- cloudConfirmationsReady: 0/6
+- operatorTasksReady: 0/7
+- sensitiveActionReady: 0/5
+- sensitiveActionBlocked: 5/5
 - canReadCloudNow: false
 - cloudInventoryResultsReady: false
 - cloudInventoryReadyLocalOperations: 0/9
@@ -132,7 +132,7 @@
 
 ## 云侧动作授权包
 
-- P00_ALIYUN_READONLY_INVENTORY_IDENTITY: 授权重新连接阿里云 CloudShell 或配置 Aliyun CLI，只运行 allowlisted 只读盘点命令并写入非密钥 evidence。
+- P00_ALIYUN_READONLY_INVENTORY_IDENTITY: 授权开通/重新连接阿里云 CloudShell 或配置 Aliyun CLI；如 CloudShell 提示会创建性能型 NAS 并可能产生费用，确认后才可点击开通；只运行 allowlisted 只读盘点命令并写入非密钥 evidence。
 - P03_ACR_PURCHASE: 授权购买 ACR Enterprise Economic，cn-hangzhou，1 个月，当前报价 CNY 117.00。
 - P05_OSS_RAM_STS: 授权为服务记录音频 OSS 配置最小权限 RAM/STS 或运行时角色，并只通过密钥环境注入。
 - P11_ALIYUN_RDS_DATA_MIGRATION: 授权创建/确认阿里云 RDS PostgreSQL production-cn 数据库并完成数据迁移；DATABASE_URL_CN 只能进入阿里云 secret env。
@@ -184,5 +184,4 @@
 - blockedConsoleTask:C07_SLS_ALERTS
 - aliyun_cli_config_missing_or_unread
 - aliyun_cli_profile_not_configured
-- cloudshell_cli_config_missing_or_unread
 - cloudInventory:readonly_inventory_strict_ready=0/9

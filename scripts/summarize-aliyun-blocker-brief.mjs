@@ -178,6 +178,7 @@ function buildCloudInventoryReadinessInterpretation(status, cloudAccess) {
 function buildReport(args) {
   const status = runJson("production_status", [
     "scripts/summarize-aliyun-production-cn-status.mjs",
+    ...(args.backendOnly ? ["--backend-only"] : []),
     ...envArgs(args),
   ])
   const backendStatus = runJson("backend_status", [

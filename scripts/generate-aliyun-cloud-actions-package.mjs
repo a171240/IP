@@ -214,6 +214,7 @@ function envArgs(args) {
 function buildPackage(args) {
   const productionStatus = runJson("production_status", [
     "scripts/summarize-aliyun-production-cn-status.mjs",
+    "--backend-only",
     ...envArgs(args),
   ])
   const backendStatus = runJson("backend_status", [
@@ -313,7 +314,7 @@ function buildPackage(args) {
       externalAppPackets: externalAppPackets.map((item) => item.packetId),
       deferredAppLaunchPackets: deferredAppLaunchPackets.map((item) => item.packetId),
       requiredBlocking: backendStatus.summary?.backendRequiredBlocking || [],
-      fullAppRequiredBlocking: productionStatus.summary?.requiredBlocking || [],
+      fullAppRequiredBlocking: productionStatus.summary?.fullAppRequiredBlocking || productionStatus.summary?.requiredBlocking || [],
       deferredAppLaunchBlocking: backendStatus.summary?.appLaunchDeferredBlocking || [],
       sensitiveActionReady: `${sensitiveActionReady}/${sensitiveActionTotal}`,
       sensitiveActionBlocked: `${sensitiveActionBlocked}/${sensitiveActionTotal}`,
