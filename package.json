@@ -71,6 +71,7 @@
     "aliyun:backend-cn:apply-package": "node ./scripts/generate-aliyun-backend-apply-package.mjs",
     "aliyun:backend-cn:apply-package:test": "node --test tests/aliyun-backend-apply-package.static.test.js",
     "aliyun:blockers:brief": "node ./scripts/summarize-aliyun-blocker-brief.mjs",
+    "aliyun:blockers:brief:backend": "node ./scripts/summarize-aliyun-blocker-brief.mjs --backend-only",
     "aliyun:blockers:brief:test": "node --test tests/aliyun-blocker-brief.static.test.js",
     "aliyun:evidence:writeback": "node ./scripts/generate-aliyun-evidence-writeback-checklist.mjs",
     "aliyun:evidence:writeback:backend": "node ./scripts/generate-aliyun-evidence-writeback-checklist.mjs --backend-only --skip-vercel-env-coverage",

@@ -18,6 +18,7 @@ test("Aliyun blocker brief command is wired into scripts, predeploy, deploy spec
   const deploySpec = readJson("deploy", "aliyun-production-cn.example.json")
 
   assert.equal(pkg.scripts["aliyun:blockers:brief"], "node ./scripts/summarize-aliyun-blocker-brief.mjs")
+  assert.equal(pkg.scripts["aliyun:blockers:brief:backend"], "node ./scripts/summarize-aliyun-blocker-brief.mjs --backend-only")
   assert.equal(pkg.scripts["aliyun:blockers:brief:test"], "node --test tests/aliyun-blocker-brief.static.test.js")
   assert.match(predeploy, /aliyun:blockers:brief:test/)
   assert.match(predeploy, /aliyun:blockers:brief/)
@@ -51,6 +52,98 @@ test("Aliyun blocker brief command is wired into scripts, predeploy, deploy spec
   assert.match(releaseArtifacts, /envSourceMap/)
   assert.match(blockerBrief, /wechatCredentialBoundary/)
   assert.match(blockerBrief, /wechatMiniProgramCredentialsReusableForAppLogin/)
+  assert.match(blockerBrief, /renderBackendOnlyMarkdown/)
+})
+
+test("Aliyun blocker brief backend-only markdown stays focused on backend resources", () => {
+  const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-backend-blocker-brief-"))
+  const markdownPath = path.join(tmpdir, "backend-blocker-brief.md")
+  const output = execFileSync(process.execPath, [
+    "scripts/summarize-aliyun-blocker-brief.mjs",
+    "--backend-only",
+    "--markdown",
+    markdownPath,
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 50,
+  })
+  const report = JSON.parse(output)
+  const markdown = fs.readFileSync(markdownPath, "utf8")
+
+  assert.equal(report.ok, true)
+  assert.equal(report.backendOnly, true)
+  assert.equal(report.currentScope, "backend_aliyun_only")
+  assert.equal(report.summary.canProceedWithoutWechat, true)
+  assert.deepEqual(report.summary.blockedCredentialNames, ["DATABASE_URL_CN"])
+  assert.deepEqual(report.summary.canStartNowAuthorizationPackets, [
+    "P03_ACR_PURCHASE",
+    "P05_OSS_RAM_STS",
+    "P11_ALIYUN_RDS_DATA_MIGRATION",
+  ])
+
+  assert.match(markdown, /阿里云后端-only 当前执行简报/)
+  assert.match(markdown, /当前只做/)
+  assert.match(markdown, /阿里云后端：RDS\/ACR\/OSS\/SAE\/DNS\/HTTPS\/ICP\/env\/SLS\/smoke/)
+  assert.match(markdown, /当前不做/)
+  assert.match(markdown, /移动应用开放平台、Android 签名、Apple Team ID：延期到后端上线后/)
+  assert.match(markdown, /blockedCredentialNames: DATABASE_URL_CN/)
+  assert.match(markdown, /target: Aliyun RDS PostgreSQL/)
+  assert.match(markdown, /databaseUrlCnStatus: todo/)
+  assert.match(markdown, /requiredBlocking:[\s\S]*DATABASE_URL_CN[\s\S]*RDS_MIGRATION_EVIDENCE_NOT_READY/)
+  assert.match(markdown, /canStartNowAuthorizationPackets: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(markdown, /P03_ACR_PURCHASE/)
+  assert.match(markdown, /P05_OSS_RAM_STS/)
+  assert.match(markdown, /P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(markdown, /R01_SAE_RUNTIME/)
+  assert.match(markdown, /R02_ACR_IMAGE_REGISTRY/)
+  assert.match(markdown, /R05_OSS_AUDIO_STORAGE/)
+  assert.match(markdown, /R07_SLS_ALERTS/)
+  assert.match(markdown, /`DATABASE_URL_CN`/)
+  assert.match(markdown, /vercelRequiredCovered: 17\/27/)
+  assert.match(markdown, /notACloudResourceReadyProof: true/)
+  assert.match(markdown, /Strict 验证顺序/)
+  assert.doesNotMatch(markdown, /微信开放平台移动应用链路/)
+  assert.doesNotMatch(markdown, /APP 微信登录凭证边界/)
+  assert.doesNotMatch(markdown, /WECHAT_OPEN_APP_ID/)
+  assert.doesNotMatch(markdown, /WECHAT_OPEN_APP_SECRET/)
+  assert.doesNotMatch(markdown, /P01_WECHAT_OPEN_MOBILE_APP/)
+  assert.doesNotMatch(markdown, /P10_ANDROID_RELEASE_SIGNING/)
+  assert.doesNotMatch(markdown, /MEIYE_RELEASE_KEY_PASSWORD/)
+  assert.doesNotMatch(markdown, secretLike)
+})
+
+test("APP production-cn backend-only current blocker brief is the active backend handoff", () => {
+  const doc = read("docs", "app-production-cn-backend-current-blocker-brief.md")
+
+  assert.match(doc, /阿里云后端-only 当前执行简报/)
+  assert.match(doc, /currentScope: backend_aliyun_only/)
+  assert.match(doc, /backendOnly: true/)
+  assert.match(doc, /canProceedWithoutWechat: true/)
+  assert.match(doc, /backendTargetReady: 0\/8/)
+  assert.match(doc, /cloudResourceEvidenceReady: 0\/7/)
+  assert.match(doc, /blockedCredentialNames: DATABASE_URL_CN/)
+  assert.match(doc, /当前只做/)
+  assert.match(doc, /阿里云后端：RDS\/ACR\/OSS\/SAE\/DNS\/HTTPS\/ICP\/env\/SLS\/smoke/)
+  assert.match(doc, /当前不做/)
+  assert.match(doc, /移动应用开放平台、Android 签名、Apple Team ID：延期到后端上线后/)
+  assert.match(doc, /requiredBlocking:[\s\S]*ACR_IMAGE_REGISTRY_NOT_READY[\s\S]*DATABASE_URL_CN[\s\S]*SAE_RUNTIME_NOT_READY/)
+  assert.match(doc, /canStartNowConsoleTasks: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS/)
+  assert.match(doc, /canStartNowAuthorizationPackets: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(doc, /target: Aliyun RDS PostgreSQL/)
+  assert.match(doc, /databaseUrlCnStatus: todo/)
+  assert.match(doc, /`DATABASE_URL_CN` \| P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(doc, /vercelRequiredCovered: 17\/27/)
+  assert.match(doc, /notACloudResourceReadyProof: true/)
+  assert.match(doc, /未获动作时确认前禁止/)
+  assert.doesNotMatch(doc, /微信开放平台移动应用链路/)
+  assert.doesNotMatch(doc, /APP 微信登录凭证边界/)
+  assert.doesNotMatch(doc, /WECHAT_OPEN_APP_ID/)
+  assert.doesNotMatch(doc, /WECHAT_OPEN_APP_SECRET/)
+  assert.doesNotMatch(doc, /P01_WECHAT_OPEN_MOBILE_APP/)
+  assert.doesNotMatch(doc, /P10_ANDROID_RELEASE_SIGNING/)
+  assert.doesNotMatch(doc, /MEIYE_RELEASE_KEY_PASSWORD/)
+  assert.doesNotMatch(doc, secretLike)
 })
 
 test("APP production-cn current blocker brief records the go-no-go boundary", () => {
