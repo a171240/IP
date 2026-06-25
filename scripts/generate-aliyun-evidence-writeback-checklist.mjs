@@ -239,7 +239,7 @@ function writebackPrerequisites(groupKey, item) {
 
   if (jsonPath.startsWith("items.apiDomainHttps") || jsonPath.startsWith("items.assetDomainHttps")) {
     return buildPrerequisites(
-      ["P07_DOMAIN_DNS_HTTPS_ICP"],
+      ["P07_DOMAIN_DNS_HTTPS"],
       ["域名解析到阿里云入口、HTTPS 证书启用、ICP备案满足国内正式访问要求的证据"],
       ["域名 DNS、HTTPS 和 ICP 均就绪"],
     )

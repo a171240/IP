@@ -98,7 +98,7 @@ corepack pnpm aliyun:cloud:inventory-results:strict
 
 - `P04_ACR_IMAGE_AND_PULL`：推送/导入 ACR 镜像并配置 SAE 拉取。
 - `P06_ENV_IMPORT`：导入 production-cn 环境变量。
-- `P07_DOMAIN_DNS_HTTPS_ICP`：配置 api-cn/assets-cn DNS、HTTPS、ICP备案状态。
+- `P07_DOMAIN_DNS_HTTPS`：配置 api-cn/assets-cn DNS、HTTPS、ICP备案状态。
 - `P08_SAE_RUNTIME_SLS`：创建 SAE runtime 并配置 SLS 告警。
 - `P09_PRODUCTION_DEPLOY`：生产部署和远端冒烟。
 

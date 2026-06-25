@@ -210,7 +210,7 @@ const CLOUD_CONFIRMATION_GROUP_METADATA = Object.freeze({
     source: "阿里云控制台 -> 云解析 DNS / 数字证书 / SAE 或网关公网入口",
     actionScope: "api_domain_dns_https_icp",
     canStartNow: false,
-    requiredAuthorizationPackets: Object.freeze(["P07_DOMAIN_DNS_HTTPS_ICP"]),
+    requiredAuthorizationPackets: Object.freeze(["P07_DOMAIN_DNS_HTTPS"]),
     blockedUntil: "SAE runtime 公网入口存在后配置 api-cn 域名",
     expectedEvidence: Object.freeze([
       "api-cn.ipgongchang.xin 解析到阿里云公网入口",
@@ -223,7 +223,7 @@ const CLOUD_CONFIRMATION_GROUP_METADATA = Object.freeze({
     source: "阿里云控制台 -> 云解析 DNS / OSS 或 CDN 自定义域名 / 数字证书",
     actionScope: "asset_domain_dns_https_icp",
     canStartNow: false,
-    requiredAuthorizationPackets: Object.freeze(["P07_DOMAIN_DNS_HTTPS_ICP"]),
+    requiredAuthorizationPackets: Object.freeze(["P07_DOMAIN_DNS_HTTPS"]),
     blockedUntil: "OSS/CDN 资源入口确认后配置 assets-cn 域名",
     expectedEvidence: Object.freeze([
       "assets-cn.ipgongchang.xin 解析到阿里云资源入口",

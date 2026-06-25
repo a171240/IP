@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 阿里云证据回填清单
 
-Generated: 2026-06-25T09:42:24.362Z
+Generated: 2026-06-25T09:49:40.799Z
 
 ## 当前结论
 
@@ -76,7 +76,7 @@ Generated: 2026-06-25T09:42:24.362Z
 - cloudConfirmationGaps: 18
 - imagePublishGaps: 12
 - forbiddenValueClasses: AccessKeySecret, AppSecret, DATABASE_URL_CN value, RAM Secret, Supabase service role key, cookie, customer data, database password, dump contents, registry password, token, 证书私钥
-- requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION, P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P08_SAE_RUNTIME_SLS, P07_DOMAIN_DNS_HTTPS_ICP, P05_OSS_RAM_STS, P06_ENV_IMPORT, P03_ACR_PURCHASE, P04_ACR_IMAGE_AND_PULL
+- requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION, P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P08_SAE_RUNTIME_SLS, P07_DOMAIN_DNS_HTTPS, P05_OSS_RAM_STS, P06_ENV_IMPORT, P03_ACR_PURCHASE, P04_ACR_IMAGE_AND_PULL
 
 ## rdsMigration
 
@@ -260,7 +260,7 @@ Generated: 2026-06-25T09:42:24.362Z
 - exists: true
 - ready: false
 - totalBlockers: 18
-- requiredAuthorizationPackets: P08_SAE_RUNTIME_SLS, P07_DOMAIN_DNS_HTTPS_ICP, P05_OSS_RAM_STS, P06_ENV_IMPORT
+- requiredAuthorizationPackets: P08_SAE_RUNTIME_SLS, P07_DOMAIN_DNS_HTTPS, P05_OSS_RAM_STS, P06_ENV_IMPORT
 - blockedUntil: SAE runtime 与 SLS 告警已确认; 域名 DNS、HTTPS 和 ICP 均就绪; OSS 与最小权限 RAM/STS 已配置; 密钥类环境变量已导入运行时密钥系统且未写入镜像
 - strictVerifyCommands: corepack pnpm aliyun:cloud:confirmations:strict
 
@@ -279,7 +279,7 @@ Generated: 2026-06-25T09:42:24.362Z
   - writeTo: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps
   - expected: 确认完成后填 true。
   - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
-  - requiredAuthorizationPackets: P07_DOMAIN_DNS_HTTPS_ICP
+  - requiredAuthorizationPackets: P07_DOMAIN_DNS_HTTPS
   - requiredEvidence: 域名解析到阿里云入口、HTTPS 证书启用、ICP备案满足国内正式访问要求的证据
   - blockedUntil: 域名 DNS、HTTPS 和 ICP 均就绪
 - `items.apiDomainHttps.dnsResolvedToAliyun`
@@ -288,7 +288,7 @@ Generated: 2026-06-25T09:42:24.362Z
   - writeTo: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps
   - expected: 域名已解析到阿里云公网入口后填 true。
   - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
-  - requiredAuthorizationPackets: P07_DOMAIN_DNS_HTTPS_ICP
+  - requiredAuthorizationPackets: P07_DOMAIN_DNS_HTTPS
   - requiredEvidence: 域名解析到阿里云入口、HTTPS 证书启用、ICP备案满足国内正式访问要求的证据
   - blockedUntil: 域名 DNS、HTTPS 和 ICP 均就绪
 - `items.apiDomainHttps.httpsEnabled`
@@ -297,7 +297,7 @@ Generated: 2026-06-25T09:42:24.362Z
   - writeTo: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps
   - expected: HTTPS 证书已启用并可访问后填 true。
   - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
-  - requiredAuthorizationPackets: P07_DOMAIN_DNS_HTTPS_ICP
+  - requiredAuthorizationPackets: P07_DOMAIN_DNS_HTTPS
   - requiredEvidence: 域名解析到阿里云入口、HTTPS 证书启用、ICP备案满足国内正式访问要求的证据
   - blockedUntil: 域名 DNS、HTTPS 和 ICP 均就绪
 - `items.apiDomainHttps.icpReady`
@@ -306,7 +306,7 @@ Generated: 2026-06-25T09:42:24.362Z
   - writeTo: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps
   - expected: 备案状态满足国内正式访问要求后填 true。
   - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
-  - requiredAuthorizationPackets: P07_DOMAIN_DNS_HTTPS_ICP
+  - requiredAuthorizationPackets: P07_DOMAIN_DNS_HTTPS
   - requiredEvidence: 域名解析到阿里云入口、HTTPS 证书启用、ICP备案满足国内正式访问要求的证据
   - blockedUntil: 域名 DNS、HTTPS 和 ICP 均就绪
 - `items.assetDomainHttps.confirmed`
@@ -315,7 +315,7 @@ Generated: 2026-06-25T09:42:24.362Z
   - writeTo: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps
   - expected: 确认完成后填 true。
   - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
-  - requiredAuthorizationPackets: P07_DOMAIN_DNS_HTTPS_ICP
+  - requiredAuthorizationPackets: P07_DOMAIN_DNS_HTTPS
   - requiredEvidence: 域名解析到阿里云入口、HTTPS 证书启用、ICP备案满足国内正式访问要求的证据
   - blockedUntil: 域名 DNS、HTTPS 和 ICP 均就绪
 - `items.assetDomainHttps.dnsResolvedToAliyun`
@@ -324,7 +324,7 @@ Generated: 2026-06-25T09:42:24.362Z
   - writeTo: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps
   - expected: 域名已解析到阿里云公网入口后填 true。
   - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
-  - requiredAuthorizationPackets: P07_DOMAIN_DNS_HTTPS_ICP
+  - requiredAuthorizationPackets: P07_DOMAIN_DNS_HTTPS
   - requiredEvidence: 域名解析到阿里云入口、HTTPS 证书启用、ICP备案满足国内正式访问要求的证据
   - blockedUntil: 域名 DNS、HTTPS 和 ICP 均就绪
 - `items.assetDomainHttps.httpsEnabled`
@@ -333,7 +333,7 @@ Generated: 2026-06-25T09:42:24.362Z
   - writeTo: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps
   - expected: HTTPS 证书已启用并可访问后填 true。
   - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
-  - requiredAuthorizationPackets: P07_DOMAIN_DNS_HTTPS_ICP
+  - requiredAuthorizationPackets: P07_DOMAIN_DNS_HTTPS
   - requiredEvidence: 域名解析到阿里云入口、HTTPS 证书启用、ICP备案满足国内正式访问要求的证据
   - blockedUntil: 域名 DNS、HTTPS 和 ICP 均就绪
 - `items.assetDomainHttps.icpReady`
@@ -342,7 +342,7 @@ Generated: 2026-06-25T09:42:24.362Z
   - writeTo: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps
   - expected: 备案状态满足国内正式访问要求后填 true。
   - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
-  - requiredAuthorizationPackets: P07_DOMAIN_DNS_HTTPS_ICP
+  - requiredAuthorizationPackets: P07_DOMAIN_DNS_HTTPS
   - requiredEvidence: 域名解析到阿里云入口、HTTPS 证书启用、ICP备案满足国内正式访问要求的证据
   - blockedUntil: 域名 DNS、HTTPS 和 ICP 均就绪
 - `items.oss.confirmed`

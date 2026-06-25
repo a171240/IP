@@ -85,7 +85,7 @@ test("Aliyun cloud confirmations backend-only mode excludes deferred APP launch 
   assert.ok(!report.summary.requiredAuthorizationPackets.includes("P10_ANDROID_RELEASE_SIGNING"))
   assert.ok(!report.summary.requiredAuthorizationPackets.includes("P02_APPLE_TEAM_ID"))
   assert.ok(report.summary.requiredAuthorizationPackets.includes("P08_SAE_RUNTIME_SLS"))
-  assert.ok(report.summary.requiredAuthorizationPackets.includes("P07_DOMAIN_DNS_HTTPS_ICP"))
+  assert.ok(report.summary.requiredAuthorizationPackets.includes("P07_DOMAIN_DNS_HTTPS"))
   assert.ok(report.summary.requiredAuthorizationPackets.includes("P05_OSS_RAM_STS"))
   assert.ok(report.summary.requiredAuthorizationPackets.includes("P06_ENV_IMPORT"))
   assert.ok(!report.local.blockers.some((item) => item.startsWith("wechatOpenPlatform:")))

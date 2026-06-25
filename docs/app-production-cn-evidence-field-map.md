@@ -70,14 +70,14 @@ Current field blockers: `18`.
 | JSON path | Authorization packet | Expected non-secret evidence |
 | --- | --- | --- |
 | `items.runtime.confirmed` | `P08_SAE_RUNTIME_SLS` | Set `true` only after SAE runtime is confirmed. |
-| `items.apiDomainHttps.confirmed` | `P07_DOMAIN_DNS_HTTPS_ICP` | Set `true` only after the API domain evidence is complete. |
-| `items.apiDomainHttps.dnsResolvedToAliyun` | `P07_DOMAIN_DNS_HTTPS_ICP` | Set `true` only after DNS resolves to the Aliyun public entry. |
-| `items.apiDomainHttps.httpsEnabled` | `P07_DOMAIN_DNS_HTTPS_ICP` | Set `true` only after HTTPS is enabled and reachable. |
-| `items.apiDomainHttps.icpReady` | `P07_DOMAIN_DNS_HTTPS_ICP` | Set `true` only after ICP is ready for domestic production access. |
-| `items.assetDomainHttps.confirmed` | `P07_DOMAIN_DNS_HTTPS_ICP` | Set `true` only after the asset domain evidence is complete. |
-| `items.assetDomainHttps.dnsResolvedToAliyun` | `P07_DOMAIN_DNS_HTTPS_ICP` | Set `true` only after DNS resolves to the Aliyun public entry. |
-| `items.assetDomainHttps.httpsEnabled` | `P07_DOMAIN_DNS_HTTPS_ICP` | Set `true` only after HTTPS is enabled and reachable. |
-| `items.assetDomainHttps.icpReady` | `P07_DOMAIN_DNS_HTTPS_ICP` | Set `true` only after ICP is ready for domestic production access. |
+| `items.apiDomainHttps.confirmed` | `P07_DOMAIN_DNS_HTTPS` | Set `true` only after the API domain evidence is complete. |
+| `items.apiDomainHttps.dnsResolvedToAliyun` | `P07_DOMAIN_DNS_HTTPS` | Set `true` only after DNS resolves to the Aliyun public entry. |
+| `items.apiDomainHttps.httpsEnabled` | `P07_DOMAIN_DNS_HTTPS` | Set `true` only after HTTPS is enabled and reachable. |
+| `items.apiDomainHttps.icpReady` | `P07_DOMAIN_DNS_HTTPS` | Set `true` only after ICP is ready for domestic production access. |
+| `items.assetDomainHttps.confirmed` | `P07_DOMAIN_DNS_HTTPS` | Set `true` only after the asset domain evidence is complete. |
+| `items.assetDomainHttps.dnsResolvedToAliyun` | `P07_DOMAIN_DNS_HTTPS` | Set `true` only after DNS resolves to the Aliyun public entry. |
+| `items.assetDomainHttps.httpsEnabled` | `P07_DOMAIN_DNS_HTTPS` | Set `true` only after HTTPS is enabled and reachable. |
+| `items.assetDomainHttps.icpReady` | `P07_DOMAIN_DNS_HTTPS` | Set `true` only after ICP is ready for domestic production access. |
 | `items.oss.confirmed` | `P05_OSS_RAM_STS` | Set `true` only after OSS bucket, CORS, and runtime access are confirmed. |
 | `items.oss.ramLeastPrivilege` | `P05_OSS_RAM_STS` | Set `true` only after RAM, STS, or runtime role access is limited to the service-record prefix. |
 | `items.envImport.importedAt` | `P06_ENV_IMPORT` | Record the import time or a non-secret console evidence ID. |
