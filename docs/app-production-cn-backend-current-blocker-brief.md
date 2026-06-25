@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 阿里云后端-only 当前执行简报
 
-Generated: 2026-06-25T09:31:28.063Z
+Generated: 2026-06-25T10:27:02.856Z
 
 ## 结论
 
@@ -31,6 +31,12 @@ Generated: 2026-06-25T09:31:28.063Z
 
 - 移动应用开放平台、Android 签名、Apple Team ID：延期到后端上线后，不在本后端清单中展开。
 - 不购买、不创建云资源、不导入密钥、不推送镜像、不部署 production-cn、不 git push，除非有动作时授权。
+
+## 状态来源与一致性
+
+- 主门禁来源：`corepack pnpm aliyun:backend-cn:status`，用于判断 `canDeployBackendNow`、`backendTargetReady`、后端 requiredBlocking 和当前后端 credential 摘要。
+- 密钥/密码字段来源：`corepack pnpm aliyun:sensitive:blockers:backend`，用于列出 `DATABASE_URL_CN`、已 ready 但仍需导入阿里云 secret env 的变量、获取位置、导入目标和禁止写入位置。
+- 本简报来源：`corepack pnpm aliyun:blockers:brief:backend`，只聚合本地 value-free 证据，不调用阿里云写 API，不购买、不创建、不导入、不部署。
 
 ## 后端阻塞
 
