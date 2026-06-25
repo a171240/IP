@@ -708,6 +708,9 @@ function renderMarkdown(audit) {
     `- readySecretEnvVariableCount: ${userActionBrief.summary.readySecretEnvVariableCount || 0}`,
     `- blockedCredentialNames: ${userActionBrief.summary.blockedCredentialNames?.length ? userActionBrief.summary.blockedCredentialNames.join(", ") : "none"}`,
     `- readySecretEnvVariableNames: ${userActionBrief.summary.readySecretEnvVariableNames?.length ? userActionBrief.summary.readySecretEnvVariableNames.join(", ") : "none"}`,
+    `- actionTimeAuthorizationRequest.required: ${userActionBrief.actionTimeAuthorizationRequest?.required === true}`,
+    `- actionTimeAuthorizationRequest.packetIds: ${userActionBrief.actionTimeAuthorizationRequest?.packetIds?.join(", ") || "none"}`,
+    `- actionTimeAuthorizationRequest.recommendedUserReply: ${userActionBrief.actionTimeAuthorizationRequest?.recommendedUserReply || "none"}`,
     ...(userActionBrief.nextActionTimeConfirmations?.length
       ? userActionBrief.nextActionTimeConfirmations.map((item) => `- ${item.packetId}: ${item.minimumUserPhrase}`)
       : ["- nextActionTimeConfirmations: none"]),
@@ -2260,6 +2263,7 @@ function main() {
       readySecretEnvVariableCount: userActionBrief.summary.readySecretEnvVariableCount || 0,
       readySecretEnvVariableNames: userActionBrief.summary.readySecretEnvVariableNames || [],
       nextActionTimeConfirmations: userActionBrief.nextActionTimeConfirmations || [],
+      actionTimeAuthorizationRequest: userActionBrief.actionTimeAuthorizationRequest || null,
     },
     consoleRunbook: {
       report: audit.outputFiles.consoleRunbookJson,

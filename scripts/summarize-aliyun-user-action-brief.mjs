@@ -323,6 +323,10 @@ function buildReport(args) {
   const reportDeferredAppLaunchConfirmations = args.backendOnly
     ? deferredAppLaunchConfirmations.map(compactDeferredConfirmation)
     : deferredAppLaunchConfirmations
+  const actionTimeAuthorizationRequest = buildActionTimeAuthorizationRequest({
+    backendOnly: args.backendOnly,
+    nextActionTimeConfirmations,
+  })
   const blocked = currentActions.filter((item) => item.status !== "ready")
   const report = {
     ok: true,
@@ -372,6 +376,7 @@ function buildReport(args) {
     },
     currentAnswer: "现在不能部署；当前只推进阿里云后端，微信/Android/Apple 发布项已延期，本简报只列用户/操作员还要做什么、从哪里取得、写到哪里，不输出任何密钥值。",
     credentialAcquisitionSummary,
+    actionTimeAuthorizationRequest,
     actions: currentActions,
     backendActions: reportBackendActions,
     deferredAppLaunchActions: reportDeferredAppLaunchActions,
@@ -416,6 +421,41 @@ function buildReport(args) {
 function readOptionalJson(filePath) {
   if (!filePath || !existsSync(filePath)) return null
   return JSON.parse(readFileSync(filePath, "utf8"))
+}
+
+function buildActionTimeAuthorizationRequest({ backendOnly, nextActionTimeConfirmations }) {
+  const packetIds = nextActionTimeConfirmations.map((item) => item.packetId)
+  const allowedActions = uniqueStrings(nextActionTimeConfirmations.flatMap((item) => item.allowedActions || []))
+  const explicitlyExcluded = uniqueStrings(nextActionTimeConfirmations.flatMap((item) => item.explicitlyExcluded || []))
+  const writeTargets = uniqueStrings(nextActionTimeConfirmations.flatMap((item) => item.writeTargets || []))
+  const verifyCommands = uniqueStrings(nextActionTimeConfirmations.flatMap((item) => item.verifyCommands || []))
+  const minimumUserPhrases = nextActionTimeConfirmations.map((item) => item.minimumUserPhrase)
+
+  return {
+    required: packetIds.length > 0,
+    currentScope: CURRENT_SCOPE,
+    backendOnly,
+    packetIds,
+    recommendedUserReply: backendOnly
+      ? "授权本轮只做阿里云后端第一批动作：只读盘点、创建/确认 RDS PostgreSQL 并处理数据库密码、确认 OSS RAM/STS，购买/确认 ACR Enterprise Economic cn-hangzhou 1个月 CNY117；密钥只进入阿里云 KMS/Secrets Manager/SAE secret env，不写文档/代码/git；仅处理 RDS/OSS 所需的受控 secret env，暂不执行全量 SAE env import；不做微信/Android/iOS、不部署上线、不改 DNS。"
+      : "请逐项明确授权 nextActionTimeConfirmations 中的动作；未明确授权前不做云端变更、购买、密钥导入、部署、DNS 或 git push。",
+    minimumUserPhrases,
+    allowedActions,
+    explicitlyExcluded: backendOnly
+      ? uniqueStrings([
+        ...explicitlyExcluded,
+        "不创建微信开放平台移动应用，不处理 Android release signing，不读取 Apple Team ID/AASA。",
+        "不执行 production-cn 部署、postdeploy smoke、DNS/HTTPS/ICP 变更或 git push。",
+        "不执行全量 SAE 环境变量导入；只允许本批 RDS/OSS 动作要求的受控 secret env 写入。",
+      ])
+      : explicitlyExcluded,
+    writeTargets,
+    verifyCommands,
+    valueHandling: [
+      "只允许记录变量名、资源名、布尔值、时间戳、digest、控制台路径和非密钥 evidence handle。",
+      "DATABASE_URL_CN、数据库密码、AccessKeySecret、STS token、registry password、Supabase service role key、cookie 和证书私钥不得写入 JSON、Markdown、Docker 镜像、App 包、小程序包、shell history 或 git。",
+    ],
+  }
 }
 
 function buildActions({ sensitiveById, resourcesById, status, cloudItems }) {
@@ -1078,6 +1118,15 @@ function renderMarkdown(report) {
     `- containsValues: ${report.containsValues}`,
     `- secretLeakCheck: ${report.secretLeakCheck.ok}`,
     `- mutationPerformed: ${report.mutationPerformed}`,
+    "",
+    "## 动作时授权请求",
+    "",
+    `- required: ${report.actionTimeAuthorizationRequest.required}`,
+    `- currentScope: ${report.actionTimeAuthorizationRequest.currentScope}`,
+    `- packetIds: ${report.actionTimeAuthorizationRequest.packetIds.join(", ") || "none"}`,
+    `- recommendedUserReply: ${report.actionTimeAuthorizationRequest.recommendedUserReply}`,
+    `- valueHandling: ${report.actionTimeAuthorizationRequest.valueHandling.join("; ")}`,
+    `- explicitlyExcluded: ${report.actionTimeAuthorizationRequest.explicitlyExcluded.join("; ") || "none"}`,
     "",
     "## 密钥/密码/受控变量获取摘要",
     "",

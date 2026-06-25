@@ -28,6 +28,8 @@ test("Aliyun user action brief command is wired into scripts and local predeploy
   assert.match(releaseArtifacts, /credentialAcquisitionSummary/)
   assert.match(releaseArtifacts, /blockedCredentialNames/)
   assert.match(releaseArtifacts, /readySecretEnvVariableNames/)
+  assert.match(releaseArtifacts, /actionTimeAuthorizationRequest/)
+  assert.match(releaseArtifacts, /recommendedUserReply/)
 })
 
 test("APP production-cn user action brief documents credential and operator handoff", () => {
@@ -292,6 +294,17 @@ test("Aliyun user action brief backend-only mode excludes deferred APP launch bl
     "P05_OSS_RAM_STS",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
   ])
+  assert.equal(report.actionTimeAuthorizationRequest.required, true)
+  assert.equal(report.actionTimeAuthorizationRequest.currentScope, "backend_aliyun_only")
+  assert.deepEqual(report.actionTimeAuthorizationRequest.packetIds, report.summary.nextActionTimeConfirmations)
+  assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /阿里云后端第一批动作/)
+  assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /RDS PostgreSQL/)
+  assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /CNY117/)
+  assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /不做微信\/Android\/iOS/)
+  assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /不部署上线、不改 DNS/)
+  assert.ok(report.actionTimeAuthorizationRequest.explicitlyExcluded.some((item) => /不创建微信开放平台移动应用/.test(item)))
+  assert.ok(report.actionTimeAuthorizationRequest.explicitlyExcluded.some((item) => /不执行全量 SAE 环境变量导入/.test(item)))
+  assert.ok(report.actionTimeAuthorizationRequest.valueHandling.some((item) => /DATABASE_URL_CN/.test(item)))
   assert.ok(ids.includes("U00_ALIYUN_READONLY_INVENTORY_IDENTITY"))
   assert.ok(!ids.includes("U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE"))
   assert.ok(!ids.includes("U10_ANDROID_RELEASE_SIGNING"))
@@ -301,6 +314,9 @@ test("Aliyun user action brief backend-only mode excludes deferred APP launch bl
   assert.ok(deployAction.currentBlockers.includes("missing_required_env:DATABASE_URL_CN"))
   assert.ok(!deployAction.currentBlockers.some((item) => /WECHAT_OPEN_APP_ID|WECHAT_OPEN_APP_SECRET|微信开放平台移动应用/.test(item)))
   assert.match(markdown, /blockedCredentialNames: DATABASE_URL_CN/)
+  assert.match(markdown, /## 动作时授权请求/)
+  assert.match(markdown, /recommendedUserReply: 授权本轮只做阿里云后端第一批动作/)
+  assert.match(markdown, /packetIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION/)
   assert.doesNotMatch(output + markdown, /WECHAT_OPEN_APP_ID|WECHAT_OPEN_APP_SECRET/)
   assert.doesNotMatch(output + markdown, /MEIYE_RELEASE_STORE_PASSWORD|MEIYE_RELEASE_KEY_PASSWORD/)
 })
