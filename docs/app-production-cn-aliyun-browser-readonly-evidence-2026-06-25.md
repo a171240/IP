@@ -1,6 +1,6 @@
 # APP production-cn Aliyun browser read-only evidence
 
-Observed at: 2026-06-25T16:52:37+08:00
+Observed at: 2026-06-25T17:57:08+08:00
 
 ## Scope
 
@@ -20,9 +20,23 @@ Observed at: 2026-06-25T16:52:37+08:00
 
 ## Evidence summary
 
+### Current browser recheck
+
+- observedAt: 2026-06-25T17:57:08+08:00
+- mode: Aliyun console visible DOM, read-only navigation
+- SAE app list URL reached: https://saenext.console.aliyun.com/cn-hangzhou/app-list/micro?namespaceId=all
+- ACR instance list URL reached: https://cr.console.aliyun.com/cn-hangzhou/instances
+- RDS cn-hangzhou list URL reached: https://rdsnext.console.aliyun.com/rdsList/cn-hangzhou
+- OSS bucket overview URL reached: https://oss.console.aliyun.com/bucket/oss-cn-hangzhou/meiye-huajing-service-records-production-cn/overview
+- SLS profile URL reached: https://sls.console.aliyun.com/lognext/profile
+- DNS ipgongchang.xin records URL reached: https://dnsnext.console.aliyun.com/authoritative/domains/ipgongchang.xin
+- latestNonSecretFindings: RDS list shows "暂无符合条件的资源"; OSS bucket overview shows "meiye-huajing-service-records-production-cn / 华东1（杭州）"; SLS project list shows "meiye-huajing-app-prod-cn"; DNS records still show api A 106.14.241.129 and ip A 106.14.241.129, with no visible api-cn/assets-cn rows in the captured table.
+- latestBackendMeaning: current browser evidence still supports partial OSS/SLS evidence only; it does not close RDS, ACR, SAE runtime, DNS/HTTPS/ICP, RAM/STS, env import, SLS alert, or smoke gates.
+
 ### SAE runtime
 
 - consoleUrl: https://saenext.console.aliyun.com/overview
+- latestConsoleUrl: https://saenext.console.aliyun.com/cn-hangzhou/app-list/micro?namespaceId=all
 - regionVisible: 华东1（杭州）
 - targetApp: meiye-huajing-app-api-production-cn
 - targetAppVisible: false
@@ -34,6 +48,7 @@ Observed at: 2026-06-25T16:52:37+08:00
 ### ACR image registry
 
 - consoleUrl: https://cr.console.aliyun.com/cn-hangzhou/instances
+- latestConsoleUrl: https://cr.console.aliyun.com/cn-hangzhou/instances
 - targetRepository: meiye-huajing-app-api
 - targetRepositoryVisible: false
 - pageState: enterprise instance list shows create enterprise instance entry
@@ -42,26 +57,32 @@ Observed at: 2026-06-25T16:52:37+08:00
 ### RDS PostgreSQL
 
 - consoleUrl: https://rdsnext.console.aliyun.com/rdsList/cn-hangzhou
+- latestConsoleUrl: https://rdsnext.console.aliyun.com/rdsList/cn-hangzhou
 - targetDatabaseUrlEnv: DATABASE_URL_CN
 - targetProductionPostgresConfirmed: false
 - visibleTargetInstance: false
+- latestVisibleState: 暂无符合条件的资源
 - caveat: the RDS instance list route was reachable, but the table body did not expose a production PostgreSQL instance in the readable DOM.
 - backendMeaning: keep RDS PostgreSQL creation/confirmation and Supabase-to-RDS migration as required backend blockers.
 
 ### OSS audio storage
 
 - consoleUrl: https://oss.console.aliyun.com/bucket
+- latestConsoleUrl: https://oss.console.aliyun.com/bucket/oss-cn-hangzhou/meiye-huajing-service-records-production-cn/overview
 - bucket: meiye-huajing-service-records-production-cn
 - bucketVisible: true
 - regionVisible: 华东1（杭州）
+- latestVisibleState: meiye-huajing-service-records-production-cn / 华东1（杭州）
 - serviceRecordPrefix: service-records/production-cn
 - backendMeaning: bucket exists as partial evidence, but RAM least privilege, runtime role or STS path, and final upload smoke are not closed.
 
 ### SLS logging
 
 - consoleUrl: https://sls.console.aliyun.com/lognext/profile
+- latestConsoleUrl: https://sls.console.aliyun.com/lognext/profile
 - slsProject: meiye-huajing-app-prod-cn
 - slsProjectVisible: true
+- latestVisibleState: meiye-huajing-app-prod-cn 美业话镜 APP production-cn API logs 华东1（杭州）
 - logstorePathVisible: lognext/project/meiye-huajing-app-prod-cn/logsearch/app-api?slsRegion=cn-hangzhou
 - healthAlertConfigured: false
 - serverErrorAlertConfigured: false
@@ -70,10 +91,12 @@ Observed at: 2026-06-25T16:52:37+08:00
 ### DNS and public domains
 
 - consoleUrl: https://dnsnext.console.aliyun.com/authoritative/domains/ipgongchang.xin
+- latestConsoleUrl: https://dnsnext.console.aliyun.com/authoritative/domains/ipgongchang.xin
 - domain: ipgongchang.xin
 - domainVisible: true
 - recordCountVisible: 13
 - existingRecords: api A 106.14.241.129; ip A 106.14.241.129
+- latestVisibleRecords: api A 106.14.241.129; ip A 106.14.241.129; no visible api-cn/assets-cn rows in the captured table.
 - apiCnHost: api-cn.ipgongchang.xin
 - apiCnRecordVisible: false
 - assetsCnHost: assets-cn.ipgongchang.xin
@@ -90,4 +113,3 @@ Observed at: 2026-06-25T16:52:37+08:00
 ## Safety boundary
 
 This evidence was collected from visible Aliyun console pages only. It did not call Aliyun OpenAPI, reconnect CloudShell, configure CLI credentials, buy resources, create resources, change DNS, import env vars, push images, deploy production-cn, inspect cookies, read localStorage, or copy secrets.
-

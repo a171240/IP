@@ -21,6 +21,14 @@ test("Aliyun browser read-only evidence records backend-only console findings", 
   assert.match(doc, /purchaseCreatedOrUpdated: false/)
   assert.match(doc, /secretsReadOrWritten: false/)
 
+  assert.match(doc, /observedAt: 2026-06-25T17:57:08\+08:00/)
+  assert.match(doc, /mode: Aliyun console visible DOM, read-only navigation/)
+  assert.match(doc, /RDS list shows "暂无符合条件的资源"/)
+  assert.match(doc, /OSS bucket overview shows "meiye-huajing-service-records-production-cn \/ 华东1（杭州）"/)
+  assert.match(doc, /SLS project list shows "meiye-huajing-app-prod-cn"/)
+  assert.match(doc, /no visible api-cn\/assets-cn rows/)
+  assert.match(doc, /does not close RDS, ACR, SAE runtime, DNS\/HTTPS\/ICP, RAM\/STS, env import, SLS alert, or smoke gates/)
+
   assert.match(doc, /targetApp: meiye-huajing-app-api-production-cn/)
   assert.match(doc, /targetAppVisible: false/)
   assert.match(doc, /applicationCount: 0/)
@@ -30,19 +38,23 @@ test("Aliyun browser read-only evidence records backend-only console findings", 
   assert.match(doc, /targetRepositoryVisible: false/)
   assert.match(doc, /targetProductionPostgresConfirmed: false/)
   assert.match(doc, /visibleTargetInstance: false/)
+  assert.match(doc, /latestVisibleState: 暂无符合条件的资源/)
 
   assert.match(doc, /bucket: meiye-huajing-service-records-production-cn/)
   assert.match(doc, /bucketVisible: true/)
   assert.match(doc, /serviceRecordPrefix: service-records\/production-cn/)
+  assert.match(doc, /latestVisibleState: meiye-huajing-service-records-production-cn \/ 华东1（杭州）/)
 
   assert.match(doc, /slsProject: meiye-huajing-app-prod-cn/)
   assert.match(doc, /slsProjectVisible: true/)
   assert.match(doc, /logsearch\/app-api/)
   assert.match(doc, /healthAlertConfigured: false/)
   assert.match(doc, /serverErrorAlertConfigured: false/)
+  assert.match(doc, /latestVisibleState: meiye-huajing-app-prod-cn 美业话镜 APP production-cn API logs 华东1（杭州）/)
 
   assert.match(doc, /domain: ipgongchang\.xin/)
   assert.match(doc, /existingRecords: api A 106\.14\.241\.129; ip A 106\.14\.241\.129/)
+  assert.match(doc, /latestVisibleRecords: api A 106\.14\.241\.129; ip A 106\.14\.241\.129; no visible api-cn\/assets-cn rows/)
   assert.match(doc, /apiCnRecordVisible: false/)
   assert.match(doc, /assetsCnRecordVisible: false/)
   assert.match(doc, /formal production-cn APP hosts are not bound/)
