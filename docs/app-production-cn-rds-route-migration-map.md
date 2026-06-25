@@ -9,10 +9,10 @@
 - formalTarget: Aliyun RDS PostgreSQL
 - currentSource: Supabase migration source / legacy compatibility only
 - firstVersionRouteCount: 25
-- routesStillUsingSupabaseDataAccess: 7
-- routesUsingAliyunRdsDataAccess: 18
-- sharedDataAccessFileCount: 9
-- sharedRdsDataAccessFileCount: 25
+- routesStillUsingSupabaseDataAccess: 0
+- routesUsingAliyunRdsDataAccess: 25
+- sharedDataAccessFileCount: 0
+- sharedRdsDataAccessFileCount: 34
 - implementationWorkPackageCount: 5
 - proposedRepositoryFileCount: 11
 - observedTables: entitlements, mp_account_invites, mp_account_memberships, mp_ai_point_ledger, mp_companies, mp_stores, profiles, service_record_markers, service_record_segments, service_record_sessions, store_profiles, voice_coach_customer_profiles, voice_coach_sessions, voice_coach_turns
@@ -37,11 +37,11 @@
 ### store-admin
 
 - routeCount: 3
-- routesStillUsingSupabaseDataAccess: 3
-- tableNames: mp_account_memberships, mp_ai_point_ledger, mp_companies, mp_stores, profiles, voice_coach_sessions, voice_coach_turns
+- routesStillUsingSupabaseDataAccess: 0
+- tableNames: entitlements, mp_account_memberships, mp_ai_point_ledger, mp_companies, mp_stores, profiles, voice_coach_sessions, voice_coach_turns
 - rpcNames: none
-- dataAccessFiles: app/api/mp/store-admin/analytics/route.ts, app/api/mp/store-admin/members/route.ts, app/api/mp/store-admin/overview/route.ts, lib/mp/account-context.server.ts, lib/mp/org-analytics.server.ts
-- rdsDataAccessFiles: none
+- dataAccessFiles: none
+- rdsDataAccessFiles: app/api/app/store-admin/analytics/route.ts, app/api/app/store-admin/members/route.ts, app/api/app/store-admin/overview/route.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts, lib/aliyun-rds/repositories/store-admin.server.ts
 - /api/app/store-admin/overview
 - /api/app/store-admin/members
 - /api/app/store-admin/analytics
@@ -49,11 +49,11 @@
 ### invites
 
 - routeCount: 4
-- routesStillUsingSupabaseDataAccess: 4
-- tableNames: mp_account_invites, mp_account_memberships, mp_companies, mp_stores, profiles
+- routesStillUsingSupabaseDataAccess: 0
+- tableNames: entitlements, mp_account_invites, mp_account_memberships, mp_ai_point_ledger, mp_companies, mp_stores, profiles, voice_coach_sessions, voice_coach_turns
 - rpcNames: none
-- dataAccessFiles: app/api/mp/store-admin/invites/[token]/accept/route.ts, app/api/mp/store-admin/invites/[token]/preview/route.ts, app/api/mp/store-admin/invites/[token]/qrcode/route.ts, app/api/mp/store-admin/invites/route.ts, lib/mp/account-context.server.ts
-- rdsDataAccessFiles: none
+- dataAccessFiles: none
+- rdsDataAccessFiles: app/api/app/store-admin/invites/[token]/accept/route.ts, app/api/app/store-admin/invites/[token]/preview/route.ts, app/api/app/store-admin/invites/[token]/qrcode/route.ts, app/api/app/store-admin/invites/route.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts, lib/aliyun-rds/repositories/store-admin.server.ts, lib/aliyun-rds/repositories/store-invites.server.ts
 - /api/app/store-admin/invites
 - /api/app/store-admin/invites/[token]/preview
 - /api/app/store-admin/invites/[token]/accept
@@ -156,15 +156,15 @@
 
 - order: 4
 - title: Store-admin overview, member, and analytics read models
-- status: blocked_until_repository_uses_database_url_cn
+- status: rds_repository_in_source_pending_runtime_evidence
 - scope: store-admin
 - routeCount: 3
-- routesStillUsingSupabaseDataAccess: 3
+- routesStillUsingSupabaseDataAccess: 0
 - routes: /api/app/store-admin/overview, /api/app/store-admin/members, /api/app/store-admin/analytics
-- tableNames: mp_account_memberships, mp_ai_point_ledger, mp_companies, mp_stores, profiles, voice_coach_sessions, voice_coach_turns
+- tableNames: entitlements, mp_account_memberships, mp_ai_point_ledger, mp_companies, mp_stores, profiles, voice_coach_sessions, voice_coach_turns
 - rpcNames: none
-- currentSupabaseDataAccessFiles: app/api/mp/store-admin/analytics/route.ts, app/api/mp/store-admin/members/route.ts, app/api/mp/store-admin/overview/route.ts, lib/mp/account-context.server.ts, lib/mp/org-analytics.server.ts
-- rdsDataAccessFiles: none
+- currentSupabaseDataAccessFiles: none
+- rdsDataAccessFiles: app/api/app/store-admin/analytics/route.ts, app/api/app/store-admin/members/route.ts, app/api/app/store-admin/overview/route.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts, lib/aliyun-rds/repositories/store-admin.server.ts
 - proposedRepositoryFiles: lib/aliyun-rds/repositories/store-admin.server.ts, lib/aliyun-rds/repositories/org-analytics.server.ts
 - blockedBy: DATABASE_URL_CN, account_context_repository_ready, schema_data_rollback_validation, voice_session_history_rows_migrated
 - acceptanceGate: Store manager overview, members, and analytics routes query RDS with tenant/company/store scoping.
@@ -175,15 +175,15 @@
 
 - order: 5
 - title: Store invitation repositories and token lookup
-- status: blocked_until_repository_uses_database_url_cn
+- status: rds_repository_in_source_pending_runtime_evidence
 - scope: invites
 - routeCount: 4
-- routesStillUsingSupabaseDataAccess: 4
+- routesStillUsingSupabaseDataAccess: 0
 - routes: /api/app/store-admin/invites, /api/app/store-admin/invites/[token]/preview, /api/app/store-admin/invites/[token]/accept, /api/app/store-admin/invites/[token]/qrcode
-- tableNames: mp_account_invites, mp_account_memberships, mp_companies, mp_stores, profiles
+- tableNames: entitlements, mp_account_invites, mp_account_memberships, mp_ai_point_ledger, mp_companies, mp_stores, profiles, voice_coach_sessions, voice_coach_turns
 - rpcNames: none
-- currentSupabaseDataAccessFiles: app/api/mp/store-admin/invites/[token]/accept/route.ts, app/api/mp/store-admin/invites/[token]/preview/route.ts, app/api/mp/store-admin/invites/[token]/qrcode/route.ts, app/api/mp/store-admin/invites/route.ts, lib/mp/account-context.server.ts
-- rdsDataAccessFiles: none
+- currentSupabaseDataAccessFiles: none
+- rdsDataAccessFiles: app/api/app/store-admin/invites/[token]/accept/route.ts, app/api/app/store-admin/invites/[token]/preview/route.ts, app/api/app/store-admin/invites/[token]/qrcode/route.ts, app/api/app/store-admin/invites/route.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts, lib/aliyun-rds/repositories/store-admin.server.ts, lib/aliyun-rds/repositories/store-invites.server.ts
 - proposedRepositoryFiles: lib/aliyun-rds/repositories/store-invites.server.ts
 - blockedBy: DATABASE_URL_CN, account_context_repository_ready, mp_account_invites_rows_migrated, production_cn_public_base_url_ready, schema_data_rollback_validation
 - acceptanceGate: Invite create, preview, accept, and qrcode routes use RDS invite rows and existing hashed-token semantics.
@@ -225,98 +225,98 @@
 - methods: GET
 - scope: store-admin
 - appFile: app/api/app/store-admin/overview/route.ts
-- sourceRoute: /api/mp/store-admin/overview
-- sourceFiles: app/api/mp/store-admin/overview/route.ts
-- tableNames: mp_account_memberships, mp_companies, mp_stores, profiles, voice_coach_sessions, voice_coach_turns
+- sourceRoute: none
+- sourceFiles: app/api/app/store-admin/overview/route.ts, lib/aliyun-rds/repositories/store-admin.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts, lib/aliyun-rds/postgres.server.ts
+- tableNames: none
 - rpcNames: none
-- rdsTableNames: none
-- dataAccessFiles: app/api/mp/store-admin/overview/route.ts, lib/mp/account-context.server.ts
-- rdsDataAccessFiles: none
-- rdsMigrationStatus: blocked_until_route_repository_uses_database_url_cn
+- rdsTableNames: entitlements, mp_account_memberships, mp_ai_point_ledger, mp_companies, mp_stores, profiles, voice_coach_sessions, voice_coach_turns
+- dataAccessFiles: none
+- rdsDataAccessFiles: app/api/app/store-admin/overview/route.ts, lib/aliyun-rds/repositories/store-admin.server.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts
+- rdsMigrationStatus: rds_repository_in_source_pending_runtime_evidence
 
 ### /api/app/store-admin/members
 
 - methods: GET
 - scope: store-admin
 - appFile: app/api/app/store-admin/members/route.ts
-- sourceRoute: /api/mp/store-admin/members
-- sourceFiles: app/api/mp/store-admin/members/route.ts
-- tableNames: mp_account_memberships, mp_companies, mp_stores, profiles, voice_coach_sessions, voice_coach_turns
+- sourceRoute: none
+- sourceFiles: app/api/app/store-admin/members/route.ts, lib/aliyun-rds/repositories/store-admin.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts, lib/aliyun-rds/postgres.server.ts
+- tableNames: none
 - rpcNames: none
-- rdsTableNames: none
-- dataAccessFiles: app/api/mp/store-admin/members/route.ts, lib/mp/account-context.server.ts
-- rdsDataAccessFiles: none
-- rdsMigrationStatus: blocked_until_route_repository_uses_database_url_cn
+- rdsTableNames: entitlements, mp_account_memberships, mp_ai_point_ledger, mp_companies, mp_stores, profiles, voice_coach_sessions, voice_coach_turns
+- dataAccessFiles: none
+- rdsDataAccessFiles: app/api/app/store-admin/members/route.ts, lib/aliyun-rds/repositories/store-admin.server.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts
+- rdsMigrationStatus: rds_repository_in_source_pending_runtime_evidence
 
 ### /api/app/store-admin/analytics
 
 - methods: GET
 - scope: store-admin
 - appFile: app/api/app/store-admin/analytics/route.ts
-- sourceRoute: /api/mp/store-admin/analytics
-- sourceFiles: app/api/mp/store-admin/analytics/route.ts
-- tableNames: mp_account_memberships, mp_ai_point_ledger, mp_companies, mp_stores, profiles, voice_coach_sessions, voice_coach_turns
+- sourceRoute: none
+- sourceFiles: app/api/app/store-admin/analytics/route.ts, lib/aliyun-rds/repositories/store-admin.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts, lib/aliyun-rds/postgres.server.ts
+- tableNames: none
 - rpcNames: none
-- rdsTableNames: none
-- dataAccessFiles: app/api/mp/store-admin/analytics/route.ts, lib/mp/account-context.server.ts, lib/mp/org-analytics.server.ts
-- rdsDataAccessFiles: none
-- rdsMigrationStatus: blocked_until_route_repository_uses_database_url_cn
+- rdsTableNames: entitlements, mp_account_memberships, mp_ai_point_ledger, mp_companies, mp_stores, profiles, voice_coach_sessions, voice_coach_turns
+- dataAccessFiles: none
+- rdsDataAccessFiles: app/api/app/store-admin/analytics/route.ts, lib/aliyun-rds/repositories/store-admin.server.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts
+- rdsMigrationStatus: rds_repository_in_source_pending_runtime_evidence
 
 ### /api/app/store-admin/invites
 
 - methods: POST
 - scope: invites
 - appFile: app/api/app/store-admin/invites/route.ts
-- sourceRoute: /api/mp/store-admin/invites
-- sourceFiles: app/api/mp/store-admin/invites/route.ts
-- tableNames: mp_account_invites, mp_account_memberships, mp_companies, mp_stores, profiles
+- sourceRoute: none
+- sourceFiles: app/api/app/store-admin/invites/route.ts, lib/aliyun-rds/repositories/store-invites.server.ts, lib/aliyun-rds/repositories/store-admin.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts, lib/aliyun-rds/postgres.server.ts
+- tableNames: none
 - rpcNames: none
-- rdsTableNames: none
-- dataAccessFiles: app/api/mp/store-admin/invites/route.ts, lib/mp/account-context.server.ts
-- rdsDataAccessFiles: none
-- rdsMigrationStatus: blocked_until_route_repository_uses_database_url_cn
+- rdsTableNames: entitlements, mp_account_invites, mp_account_memberships, mp_ai_point_ledger, mp_companies, mp_stores, profiles, voice_coach_sessions, voice_coach_turns
+- dataAccessFiles: none
+- rdsDataAccessFiles: app/api/app/store-admin/invites/route.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/store-admin.server.ts, lib/aliyun-rds/repositories/store-invites.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts
+- rdsMigrationStatus: rds_repository_in_source_pending_runtime_evidence
 
 ### /api/app/store-admin/invites/[token]/preview
 
 - methods: GET
 - scope: invites
 - appFile: app/api/app/store-admin/invites/[token]/preview/route.ts
-- sourceRoute: /api/mp/store-admin/invites/[token]/preview
-- sourceFiles: app/api/mp/store-admin/invites/[token]/preview/route.ts
-- tableNames: mp_account_invites, mp_account_memberships, mp_companies, mp_stores, profiles
+- sourceRoute: none
+- sourceFiles: app/api/app/store-admin/invites/[token]/preview/route.ts, lib/aliyun-rds/repositories/store-invites.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts, lib/aliyun-rds/postgres.server.ts
+- tableNames: none
 - rpcNames: none
-- rdsTableNames: none
-- dataAccessFiles: app/api/mp/store-admin/invites/[token]/preview/route.ts, lib/mp/account-context.server.ts
-- rdsDataAccessFiles: none
-- rdsMigrationStatus: blocked_until_route_repository_uses_database_url_cn
+- rdsTableNames: entitlements, mp_account_invites, mp_account_memberships, mp_companies, mp_stores, profiles
+- dataAccessFiles: none
+- rdsDataAccessFiles: app/api/app/store-admin/invites/[token]/preview/route.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/store-invites.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts
+- rdsMigrationStatus: rds_repository_in_source_pending_runtime_evidence
 
 ### /api/app/store-admin/invites/[token]/accept
 
 - methods: POST
 - scope: invites
 - appFile: app/api/app/store-admin/invites/[token]/accept/route.ts
-- sourceRoute: /api/mp/store-admin/invites/[token]/accept
-- sourceFiles: app/api/mp/store-admin/invites/[token]/accept/route.ts
-- tableNames: mp_account_invites, mp_account_memberships, mp_companies, mp_stores, profiles
+- sourceRoute: none
+- sourceFiles: app/api/app/store-admin/invites/[token]/accept/route.ts, lib/aliyun-rds/repositories/store-invites.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts, lib/aliyun-rds/postgres.server.ts
+- tableNames: none
 - rpcNames: none
-- rdsTableNames: none
-- dataAccessFiles: app/api/mp/store-admin/invites/[token]/accept/route.ts, lib/mp/account-context.server.ts
-- rdsDataAccessFiles: none
-- rdsMigrationStatus: blocked_until_route_repository_uses_database_url_cn
+- rdsTableNames: entitlements, mp_account_invites, mp_account_memberships, mp_companies, mp_stores, profiles
+- dataAccessFiles: none
+- rdsDataAccessFiles: app/api/app/store-admin/invites/[token]/accept/route.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/store-invites.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts
+- rdsMigrationStatus: rds_repository_in_source_pending_runtime_evidence
 
 ### /api/app/store-admin/invites/[token]/qrcode
 
 - methods: GET
 - scope: invites
 - appFile: app/api/app/store-admin/invites/[token]/qrcode/route.ts
-- sourceRoute: /api/mp/store-admin/invites/[token]/qrcode
-- sourceFiles: app/api/mp/store-admin/invites/[token]/qrcode/route.ts
-- tableNames: mp_account_invites, mp_account_memberships, mp_companies, mp_stores, profiles
+- sourceRoute: none
+- sourceFiles: app/api/app/store-admin/invites/[token]/qrcode/route.ts, lib/aliyun-rds/repositories/store-invites.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts, lib/aliyun-rds/postgres.server.ts
+- tableNames: none
 - rpcNames: none
-- rdsTableNames: none
-- dataAccessFiles: app/api/mp/store-admin/invites/[token]/qrcode/route.ts, lib/mp/account-context.server.ts
-- rdsDataAccessFiles: none
-- rdsMigrationStatus: blocked_until_route_repository_uses_database_url_cn
+- rdsTableNames: entitlements, mp_account_invites, mp_account_memberships, mp_companies, mp_stores, profiles
+- dataAccessFiles: none
+- rdsDataAccessFiles: app/api/app/store-admin/invites/[token]/qrcode/route.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/store-invites.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts
+- rdsMigrationStatus: rds_repository_in_source_pending_runtime_evidence
 
 ### /api/app/store-profiles
 
@@ -545,6 +545,5 @@
 ## Next Required Actions
 
 - Create or confirm Aliyun RDS PostgreSQL in cn-hangzhou before importing DATABASE_URL_CN.
-- Implement the RDS work packages in order: account, context, service-records, store-admin, then invites.
-- Replace first-version APP API shared Supabase data access with PostgreSQL repositories backed by DATABASE_URL_CN.
+- Keep the APP-native RDS work packages in place and validate account, context, service-records, store-admin, and invites against migrated RDS data.
 - Run schema/data migration, row-count validation, critical-record validation, APP API smoke, and rollback rehearsal.

@@ -158,7 +158,7 @@ corepack pnpm aliyun:container:smoke（Docker image health + 30 APP API probes�
 
 `aliyun:app-api:smoke` 会启动本地 production server，用未登录或假 token 请求验证第一版 APP 后端入口已经接到业务 guard，不是 404/405，也不会写入业务数据。覆盖范围包括登录、profile、门店管理、门店邀请、知识上下文和服务记录入口。
 
-`aliyun:app-api:bridge-map` 是小程序链路复用门禁：它读取 `deploy/app-api-production-cn.bridge-map.json`，逐条校验 32 个 APP API route、App route 文件、源小程序 API 文件和小程序源页面是否一致。当前分类是 19 条 `app_native`、9 条 `mp_reexport`、2 条 `app_alias`、2 条 `native_health`。微信登录必须保持 `app_native/app_alias`，不能回退复用小程序 `wx.login` 链路；`/api/app/profile` 已切到 APP-native RDS repository，`/api/app/entitlements` 作为 APP alias 复用该 RDS 链路；服务记录长录音 12 条 APP API 已切到 RDS/OSS/ASR 原生链路。
+`aliyun:app-api:bridge-map` 是小程序链路复用门禁：它读取 `deploy/app-api-production-cn.bridge-map.json`，逐条校验 32 个 APP API route、App route 文件、源小程序 API 文件和小程序源页面是否一致。当前分类是 26 条 `app_native`、2 条 `mp_reexport`、2 条 `app_alias`、2 条 `native_health`。微信登录必须保持 `app_native/app_alias`，不能回退复用小程序 `wx.login` 链路；`/api/app/profile` 已切到 APP-native RDS repository，`/api/app/entitlements` 作为 APP alias 复用该 RDS 链路；服务记录长录音 12 条、店长看板 3 条、门店邀请 4 条 APP API 已切到 RDS/OSS/ASR 或 RDS 原生链路。
 
 `aliyun:app-client:contract` 是静态门禁：它读取 App 工程 `src/api` 里的 `apiRequest(...)` 调用，归一化动态路径后和后端 production-cn route 清单匹配。第一版范围包括登录、profile、entitlements、门店管理、邀请、顾客/场景/门店上下文和服务记录；Package 2 的 `knowledge-spaces`、`assets/sign-read`、`content-drafts` 调用只报告为 deferred，不作为第一版阻断。
 
@@ -678,7 +678,7 @@ RDS PostgreSQL：替代 Supabase 数据层
 Tair / Redis：任务队列、轮询和重试
 ```
 
-`corepack pnpm aliyun:rds:migration:plan` 当前证明 APP 的 30 条 `app/api/app` 路由通过直接或间接依赖仍全部触达 Supabase；`DATABASE_URL_CN` 尚未在源码中出现，也没有 PostgreSQL/RDS data access adapter。迁移清单见 `docs/app-production-cn-rds-migration-plan.md`。`REDIS_URL_CN` 仍只有在 production-cn 队列/缓存实现明确依赖 Tair/Redis 时才升级为必填阻塞项。
+`corepack pnpm aliyun:rds:migration:plan` 当前证明 APP 第一版 25 条 RDS 必需业务路由已经全部指向 `DATABASE_URL_CN` 支撑的 APP-native RDS repository，首版 Supabase 业务数据访问剩余为 0；完整 APP API 仍有 4 条延期范围路由保留 Supabase 业务数据访问。迁移清单见 `docs/app-production-cn-rds-migration-plan.md`。`REDIS_URL_CN` 仍只有在 production-cn 队列/缓存实现明确依赖 Tair/Redis 时才升级为必填阻塞项。
 
 ### 4.7 云资源确认文件
 
@@ -992,7 +992,7 @@ corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:release:artifacts
 corepack pnpm aliyun:predeploy
 corepack pnpm aliyun:routes:check（31 routes / 0 failures）
-corepack pnpm aliyun:app-api:bridge-map（32 mapped routes / sourceTypes: app_native 19, mp_reexport 9, app_alias 2, native_health 2）
+corepack pnpm aliyun:app-api:bridge-map（32 mapped routes / sourceTypes: app_native 26, mp_reexport 2, app_alias 2, native_health 2）
 corepack pnpm aliyun:app-client:contract（40 audited calls / 34 unique client routes）
 corepack pnpm aliyun:app-config:check（production-cn runtime config ok=true / containsSecretValues=false / apiBaseUrl https://api-cn.ipgongchang.xin / assetBaseUrl https://assets-cn.ipgongchang.xin）
 corepack pnpm aliyun:app-native:check（当前 ok=true；Android release 已切到 signingConfigs.release；iOS Associated Domains 已配置 applinks:api-cn.ipgongchang.xin；真实 Android keystore 值仍需由本机 Gradle properties 或环境变量提供）

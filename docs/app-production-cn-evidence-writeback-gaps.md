@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 阿里云证据回填清单
 
-Generated: 2026-06-25T04:02:56.010Z
+Generated: 2026-06-25T06:45:32.999Z
 
 ## 当前结论
 
@@ -17,8 +17,8 @@ Generated: 2026-06-25T04:02:56.010Z
 
 - conclusion: 本地证据尚未闭环；部署前必须补齐本地 .local.json 证据并通过 strict 验证。
 - evidenceWritebackReady: 0/4
-- totalGaps: 48
-- rdsMigrationGaps: 17
+- totalGaps: 47
+- rdsMigrationGaps: 16
 - blockedCredentialCount: 2
 - blockedCredentialNames: ALIYUN_OSS_SECURITY_TOKEN, DATABASE_URL_CN
 - readySecretEnvVariableCount: 17
@@ -70,8 +70,8 @@ Generated: 2026-06-25T04:02:56.010Z
 
 - files: 4
 - readyFiles: 0/4
-- totalGaps: 48
-- rdsMigrationGaps: 17
+- totalGaps: 47
+- rdsMigrationGaps: 16
 - cloudInventoryResultGaps: 1
 - cloudConfirmationGaps: 18
 - imagePublishGaps: 12
@@ -83,7 +83,7 @@ Generated: 2026-06-25T04:02:56.010Z
 - file: /Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.rds-migration.local.json
 - exists: true
 - ready: false
-- totalBlockers: 17
+- totalBlockers: 16
 - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
 - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
 - strictVerifyCommands: corepack pnpm aliyun:rds:migration:evidence:strict
@@ -160,15 +160,6 @@ Generated: 2026-06-25T04:02:56.010Z
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
   - requiredEvidence: RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据
   - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env
-- `migration.dataAccessAdapterReady`
-  - blocker: migration.dataAccessAdapterReady
-  - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
-  - writeTo: deploy/aliyun-production-cn.rds-migration.local.json -> migration.dataAccessAdapterReady
-  - expected: 第一版 APP API 正式 production-cn 数据访问不再依赖 Supabase 后填 true。
-  - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
-  - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
-  - blockedUntil: schema/data 迁移、RDS API smoke 和 rollback 验收已完成
 - `migration.schemaMigrated`
   - blocker: migration.schemaMigrated
   - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收

@@ -13,11 +13,11 @@ const DEFAULT_LOCAL_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.rd
 const EXPECTED_REGION = "cn-hangzhou"
 const EXPECTED_PROVIDER = "Aliyun RDS PostgreSQL"
 const EXPECTED_APP_API_ROUTE_COUNT = 31
-const EXPECTED_APP_API_ROUTES_WITH_SUPABASE = 31
-const EXPECTED_APP_API_ROUTES_WITH_SUPABASE_DATA_ACCESS = 11
+const EXPECTED_APP_API_ROUTES_WITH_SUPABASE = 29
+const EXPECTED_APP_API_ROUTES_WITH_SUPABASE_DATA_ACCESS = 4
 const EXPECTED_FIRST_VERSION_RDS_ROUTE_COUNT = 25
-const EXPECTED_FIRST_VERSION_RDS_ROUTES_WITH_SUPABASE = 25
-const EXPECTED_FIRST_VERSION_RDS_ROUTES_WITH_SUPABASE_DATA_ACCESS = 7
+const EXPECTED_FIRST_VERSION_RDS_ROUTES_WITH_SUPABASE = 23
+const EXPECTED_FIRST_VERSION_RDS_ROUTES_WITH_SUPABASE_DATA_ACCESS = 0
 const EXPECTED_DEFERRED_APP_API_ROUTE_COUNT = 6
 const EXPECTED_DEFERRED_APP_API_ROUTES_WITH_SUPABASE_DATA_ACCESS = 4
 
@@ -383,6 +383,11 @@ function buildInitialLocalEvidence(sourceInventory) {
   const summary = sourceInventory.summary || {}
   const schemaMapReady = summary.schemaMapReady === true
   const bridgeMapReady = sourceInventory.inventory?.bridgeMap?.ready === true
+  const firstVersionDataAccessReady = (
+    Number(summary.firstVersionRdsRoutesWithSupabaseDataAccess || 0) === 0 &&
+    summary.postgresDataAccessAdapterDetected === true &&
+    summary.databaseUrlCnReferencedInSource === true
+  )
   const schemaMapFile = sourceInventory.inventory?.schemaMap?.file || "deploy/aliyun-production-cn.rds-first-version-schema-map.json"
   const bridgeMapFile = sourceInventory.inventory?.bridgeMap?.file || "deploy/app-api-production-cn.bridge-map.json"
 
@@ -426,7 +431,7 @@ function buildInitialLocalEvidence(sourceInventory) {
     },
     migration: {
       schemaInventoryReviewed: schemaMapReady && bridgeMapReady,
-      dataAccessAdapterReady: false,
+      dataAccessAdapterReady: firstVersionDataAccessReady,
       schemaMigrated: false,
       dataMigrated: false,
       rowCountValidationPassed: false,
@@ -436,7 +441,7 @@ function buildInitialLocalEvidence(sourceInventory) {
       rollbackRunbookReviewed: false,
       rollbackValidationPassed: false,
       evidence: schemaMapReady && bridgeMapReady
-        ? "local_schema_inventory_ready; schema and bridge maps are non-secret and tracked; TODO_NON_SECRET_MIGRATION_AND_ROLLBACK_EVIDENCE_AFTER_RDS_AUTHORIZATION"
+        ? `local_schema_inventory_ready; schema and bridge maps are non-secret and tracked; dataAccessAdapterReady=${firstVersionDataAccessReady}; TODO_NON_SECRET_MIGRATION_AND_ROLLBACK_EVIDENCE_AFTER_RDS_AUTHORIZATION`
         : "TODO_NON_SECRET_MIGRATION_AND_ROLLBACK_EVIDENCE_AFTER_RDS_AUTHORIZATION",
     },
     security: {

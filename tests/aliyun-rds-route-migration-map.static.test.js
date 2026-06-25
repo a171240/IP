@@ -49,8 +49,10 @@ test("Aliyun RDS route migration map covers first-version APP route data access 
   assert.equal(report.secretLeakCheck.ok, true)
 
   assert.equal(report.summary.firstVersionRouteCount, 25)
-  assert.equal(report.summary.routesStillUsingSupabaseDataAccess, 7)
-  assert.equal(report.summary.routesUsingAliyunRdsDataAccess, 18)
+  assert.equal(report.summary.routesStillUsingSupabaseDataAccess, 0)
+  assert.equal(report.summary.routesUsingAliyunRdsDataAccess, 25)
+  assert.equal(report.summary.sharedDataAccessFileCount, 0)
+  assert.equal(report.summary.sharedRdsDataAccessFileCount, 34)
   assert.equal(report.summary.observedTableCount, 14)
   assert.equal(report.summary.requiredTableCount, 15)
   assert.equal(report.summary.observedRpcCount, 0)
@@ -61,7 +63,7 @@ test("Aliyun RDS route migration map covers first-version APP route data access 
   assert.deepEqual(report.summary.schemaMapMissingObservedRpcs, [])
   assert.deepEqual(report.summary.requiredTablesWithoutRouteObservation, ["credit_transactions"])
   assert.deepEqual(report.summary.blockedCredentialNames, ["DATABASE_URL_CN"])
-  assert.ok(report.summary.rdsPlanRequiredBlocking.includes("first_version_supabase_data_access_still_present"))
+  assert.ok(!report.summary.rdsPlanRequiredBlocking.includes("first_version_supabase_data_access_still_present"))
 
   assert.ok(report.observedTables.includes("profiles"))
   assert.ok(report.observedTables.includes("entitlements"))
@@ -87,6 +89,13 @@ test("Aliyun RDS route migration map covers first-version APP route data access 
     "app/api/app/service-records/sessions/[sessionId]/segments/oss/route.ts",
     "app/api/app/service-records/sessions/[sessionId]/segments/route.ts",
     "app/api/app/service-records/sessions/route.ts",
+    "app/api/app/store-admin/analytics/route.ts",
+    "app/api/app/store-admin/invites/[token]/accept/route.ts",
+    "app/api/app/store-admin/invites/[token]/preview/route.ts",
+    "app/api/app/store-admin/invites/[token]/qrcode/route.ts",
+    "app/api/app/store-admin/invites/route.ts",
+    "app/api/app/store-admin/members/route.ts",
+    "app/api/app/store-admin/overview/route.ts",
     "app/api/app/store-profiles/[profileId]/route.ts",
     "app/api/app/store-profiles/route.ts",
     "lib/aliyun-rds/postgres.server.ts",
@@ -94,6 +103,8 @@ test("Aliyun RDS route migration map covers first-version APP route data access 
     "lib/aliyun-rds/repositories/customer-profiles.server.ts",
     "lib/aliyun-rds/repositories/service-record-processing.server.ts",
     "lib/aliyun-rds/repositories/service-records.server.ts",
+    "lib/aliyun-rds/repositories/store-admin.server.ts",
+    "lib/aliyun-rds/repositories/store-invites.server.ts",
     "lib/aliyun-rds/repositories/store-profiles.server.ts",
     "lib/aliyun-rds/service-record-asr.server.ts",
     "lib/aliyun-rds/service-record-oss.server.ts",
@@ -132,8 +143,36 @@ test("Aliyun RDS route migration map covers first-version APP route data access 
       item.file === "lib/aliyun-rds/repositories/service-records.server.ts"
     ), routePath)
   }
-  assert.ok(byRoute.get("/api/app/store-admin/overview").tableNames.includes("voice_coach_sessions"))
-  assert.ok(byRoute.get("/api/app/store-admin/members").tableNames.includes("voice_coach_turns"))
+  for (const routePath of [
+    "/api/app/store-admin/overview",
+    "/api/app/store-admin/members",
+    "/api/app/store-admin/analytics",
+  ]) {
+    const route = byRoute.get(routePath)
+    assert.equal(route.stillUsesSupabaseDataAccess, false, routePath)
+    assert.equal(route.usesAliyunRdsDataAccess, true, routePath)
+    assert.deepEqual(route.tableNames, [], routePath)
+    assert.ok(route.rdsTableNames.includes("voice_coach_sessions"), routePath)
+    assert.ok(route.rdsTableNames.includes("voice_coach_turns"), routePath)
+    assert.ok(route.rdsDataAccessFiles.some((item) =>
+      item.file === "lib/aliyun-rds/repositories/store-admin.server.ts"
+    ), routePath)
+  }
+  for (const routePath of [
+    "/api/app/store-admin/invites",
+    "/api/app/store-admin/invites/[token]/preview",
+    "/api/app/store-admin/invites/[token]/accept",
+    "/api/app/store-admin/invites/[token]/qrcode",
+  ]) {
+    const route = byRoute.get(routePath)
+    assert.equal(route.stillUsesSupabaseDataAccess, false, routePath)
+    assert.equal(route.usesAliyunRdsDataAccess, true, routePath)
+    assert.deepEqual(route.tableNames, [], routePath)
+    assert.ok(route.rdsTableNames.includes("mp_account_invites"), routePath)
+    assert.ok(route.rdsDataAccessFiles.some((item) =>
+      item.file === "lib/aliyun-rds/repositories/store-invites.server.ts"
+    ), routePath)
+  }
   for (const routePath of [
     "/api/app/store-profiles",
     "/api/app/store-profiles/[profileId]",
@@ -227,9 +266,25 @@ test("Aliyun RDS route migration map covers first-version APP route data access 
       .get("RDS_WP05_STORE_INVITES")
       .blockedBy.includes("production_cn_public_base_url_ready"),
   )
+  assert.equal(workPackages.get("RDS_WP04_STORE_ADMIN_READ_MODELS").routesStillUsingSupabaseDataAccess, 0)
+  assert.equal(workPackages.get("RDS_WP04_STORE_ADMIN_READ_MODELS").status, "rds_repository_in_source_pending_runtime_evidence")
+  assert.deepEqual(workPackages.get("RDS_WP04_STORE_ADMIN_READ_MODELS").currentSupabaseDataAccessFiles, [])
+  assert.ok(
+    workPackages
+      .get("RDS_WP04_STORE_ADMIN_READ_MODELS")
+      .rdsDataAccessFiles.includes("lib/aliyun-rds/repositories/store-admin.server.ts"),
+  )
+  assert.equal(workPackages.get("RDS_WP05_STORE_INVITES").routesStillUsingSupabaseDataAccess, 0)
+  assert.equal(workPackages.get("RDS_WP05_STORE_INVITES").status, "rds_repository_in_source_pending_runtime_evidence")
+  assert.deepEqual(workPackages.get("RDS_WP05_STORE_INVITES").currentSupabaseDataAccessFiles, [])
+  assert.ok(
+    workPackages
+      .get("RDS_WP05_STORE_INVITES")
+      .rdsDataAccessFiles.includes("lib/aliyun-rds/repositories/store-invites.server.ts"),
+  )
   assert.equal(
     report.implementationWorkPackages.filter((item) => item.status === "blocked_until_repository_uses_database_url_cn").length,
-    2,
+    0,
   )
 
   assert.doesNotMatch(output, secretLike)
@@ -255,8 +310,8 @@ test("Aliyun RDS route migration map markdown is actionable and value-free", () 
 
   assert.equal(report.summary.firstVersionRouteCount, 25)
   assert.match(markdown, /Aliyun RDS Route Migration Map/)
-  assert.match(markdown, /routesStillUsingSupabaseDataAccess: 7/)
-  assert.match(markdown, /routesUsingAliyunRdsDataAccess: 18/)
+  assert.match(markdown, /routesStillUsingSupabaseDataAccess: 0/)
+  assert.match(markdown, /routesUsingAliyunRdsDataAccess: 25/)
   assert.match(markdown, /implementationWorkPackageCount: 5/)
   assert.match(markdown, /requiredTablesWithoutRouteObservation: credit_transactions/)
   assert.match(markdown, /RDS_WP01_ACCOUNT_PROFILE_ENTITLEMENTS/)
@@ -269,6 +324,10 @@ test("Aliyun RDS route migration map markdown is actionable and value-free", () 
   assert.match(markdown, /\/api\/app\/service-records\/sessions/)
   assert.match(markdown, /lib\/aliyun-rds\/repositories\/service-records\.server\.ts/)
   assert.match(markdown, /lib\/aliyun-rds\/repositories\/service-record-processing\.server\.ts/)
+  assert.match(markdown, /RDS_WP04_STORE_ADMIN_READ_MODELS/)
+  assert.match(markdown, /lib\/aliyun-rds\/repositories\/store-admin\.server\.ts/)
+  assert.match(markdown, /RDS_WP05_STORE_INVITES/)
+  assert.match(markdown, /lib\/aliyun-rds\/repositories\/store-invites\.server\.ts/)
   assert.match(markdown, /Create or confirm Aliyun RDS PostgreSQL/)
   assert.doesNotMatch(output + markdown, secretLike)
 })
@@ -356,4 +415,38 @@ test("Aliyun APP service record routes use RDS, OSS, and ASR helpers for WP03", 
   assert.match(ossHelper, /ALIYUN_OSS_BUCKET|SERVICE_RECORD_OSS_BUCKET/)
   assert.match(asrHelper, /DASHSCOPE_API_KEY|BAILIAN_API_KEY/)
   assert.doesNotMatch(repository + processingRepository + ossHelper + asrHelper, /@\/lib\/supabase\/admin|@supabase\/supabase-js/)
+})
+
+test("Aliyun APP store admin and invite routes use RDS repositories for WP04 and WP05", () => {
+  const routeFiles = [
+    read("app", "api", "app", "store-admin", "overview", "route.ts"),
+    read("app", "api", "app", "store-admin", "members", "route.ts"),
+    read("app", "api", "app", "store-admin", "analytics", "route.ts"),
+    read("app", "api", "app", "store-admin", "invites", "route.ts"),
+    read("app", "api", "app", "store-admin", "invites", "[token]", "preview", "route.ts"),
+    read("app", "api", "app", "store-admin", "invites", "[token]", "accept", "route.ts"),
+    read("app", "api", "app", "store-admin", "invites", "[token]", "qrcode", "route.ts"),
+  ]
+  const storeAdminRepository = read("lib", "aliyun-rds", "repositories", "store-admin.server.ts")
+  const inviteRepository = read("lib", "aliyun-rds", "repositories", "store-invites.server.ts")
+
+  for (const route of routeFiles) {
+    assert.doesNotMatch(route, /@\/app\/api\/mp\//)
+    assert.match(route, /@\/lib\/aliyun-rds/)
+  }
+
+  assert.match(routeFiles[0], /getAliyunRdsStoreAdminOverview/)
+  assert.match(routeFiles[1], /getAliyunRdsStoreAdminMembers/)
+  assert.match(routeFiles[2], /getAliyunRdsStoreAdminAnalytics/)
+  assert.match(routeFiles[3], /createAliyunRdsStoreInvite/)
+  assert.match(routeFiles[4], /getAliyunRdsStoreInvitePreview/)
+  assert.match(routeFiles[5], /acceptAliyunRdsStoreInvite/)
+  assert.match(routeFiles[6], /assertAliyunRdsStoreInviteUsable/)
+  assert.match(storeAdminRepository, /queryAliyunRds/)
+  assert.match(storeAdminRepository, /public\.voice_coach_sessions/)
+  assert.match(storeAdminRepository, /public\.voice_coach_turns/)
+  assert.match(inviteRepository, /queryAliyunRds|withAliyunRdsTransaction/)
+  assert.match(inviteRepository, /public\.mp_account_invites/)
+  assert.match(inviteRepository, /public\.mp_account_memberships/)
+  assert.doesNotMatch(storeAdminRepository + inviteRepository, /@\/lib\/supabase\/admin|createAdminSupabaseClient|@supabase\/supabase-js|supabase\.from\(/)
 })

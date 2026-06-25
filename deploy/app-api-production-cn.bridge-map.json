@@ -157,10 +157,13 @@
         "GET"
       ],
       "appFile": "app/api/app/store-admin/overview/route.ts",
-      "sourceType": "mp_reexport",
-      "sourceRoute": "/api/mp/store-admin/overview",
+      "sourceType": "app_native",
+      "sourceRoute": "",
       "sourceFiles": [
-        "app/api/mp/store-admin/overview/route.ts"
+        "app/api/app/store-admin/overview/route.ts",
+        "lib/aliyun-rds/repositories/store-admin.server.ts",
+        "lib/aliyun-rds/repositories/account-profile.server.ts",
+        "lib/aliyun-rds/postgres.server.ts"
       ],
       "sourcePages": [
         "../meiye-huajing-miniprogram/pages/store-admin/index.js"
@@ -174,10 +177,13 @@
         "GET"
       ],
       "appFile": "app/api/app/store-admin/members/route.ts",
-      "sourceType": "mp_reexport",
-      "sourceRoute": "/api/mp/store-admin/members",
+      "sourceType": "app_native",
+      "sourceRoute": "",
       "sourceFiles": [
-        "app/api/mp/store-admin/members/route.ts"
+        "app/api/app/store-admin/members/route.ts",
+        "lib/aliyun-rds/repositories/store-admin.server.ts",
+        "lib/aliyun-rds/repositories/account-profile.server.ts",
+        "lib/aliyun-rds/postgres.server.ts"
       ],
       "sourcePages": [
         "../meiye-huajing-miniprogram/pages/store-admin/members/index.js"
@@ -191,10 +197,13 @@
         "GET"
       ],
       "appFile": "app/api/app/store-admin/analytics/route.ts",
-      "sourceType": "mp_reexport",
-      "sourceRoute": "/api/mp/store-admin/analytics",
+      "sourceType": "app_native",
+      "sourceRoute": "",
       "sourceFiles": [
-        "app/api/mp/store-admin/analytics/route.ts"
+        "app/api/app/store-admin/analytics/route.ts",
+        "lib/aliyun-rds/repositories/store-admin.server.ts",
+        "lib/aliyun-rds/repositories/account-profile.server.ts",
+        "lib/aliyun-rds/postgres.server.ts"
       ],
       "sourcePages": [
         "../meiye-huajing-miniprogram/pages/store-admin/index.js"
@@ -208,10 +217,14 @@
         "POST"
       ],
       "appFile": "app/api/app/store-admin/invites/route.ts",
-      "sourceType": "mp_reexport",
-      "sourceRoute": "/api/mp/store-admin/invites",
+      "sourceType": "app_native",
+      "sourceRoute": "",
       "sourceFiles": [
-        "app/api/mp/store-admin/invites/route.ts"
+        "app/api/app/store-admin/invites/route.ts",
+        "lib/aliyun-rds/repositories/store-invites.server.ts",
+        "lib/aliyun-rds/repositories/store-admin.server.ts",
+        "lib/aliyun-rds/repositories/account-profile.server.ts",
+        "lib/aliyun-rds/postgres.server.ts"
       ],
       "sourcePages": [
         "../meiye-huajing-miniprogram/pages/store-admin/members/index.js"
@@ -225,10 +238,13 @@
         "GET"
       ],
       "appFile": "app/api/app/store-admin/invites/[token]/preview/route.ts",
-      "sourceType": "mp_reexport",
-      "sourceRoute": "/api/mp/store-admin/invites/[token]/preview",
+      "sourceType": "app_native",
+      "sourceRoute": "",
       "sourceFiles": [
-        "app/api/mp/store-admin/invites/[token]/preview/route.ts"
+        "app/api/app/store-admin/invites/[token]/preview/route.ts",
+        "lib/aliyun-rds/repositories/store-invites.server.ts",
+        "lib/aliyun-rds/repositories/account-profile.server.ts",
+        "lib/aliyun-rds/postgres.server.ts"
       ],
       "sourcePages": [
         "../meiye-huajing-miniprogram/pages/store-admin/invite-accept/index.js"
@@ -242,10 +258,13 @@
         "POST"
       ],
       "appFile": "app/api/app/store-admin/invites/[token]/accept/route.ts",
-      "sourceType": "mp_reexport",
-      "sourceRoute": "/api/mp/store-admin/invites/[token]/accept",
+      "sourceType": "app_native",
+      "sourceRoute": "",
       "sourceFiles": [
-        "app/api/mp/store-admin/invites/[token]/accept/route.ts"
+        "app/api/app/store-admin/invites/[token]/accept/route.ts",
+        "lib/aliyun-rds/repositories/store-invites.server.ts",
+        "lib/aliyun-rds/repositories/account-profile.server.ts",
+        "lib/aliyun-rds/postgres.server.ts"
       ],
       "sourcePages": [
         "../meiye-huajing-miniprogram/pages/store-admin/invite-accept/index.js"
@@ -259,10 +278,13 @@
         "GET"
       ],
       "appFile": "app/api/app/store-admin/invites/[token]/qrcode/route.ts",
-      "sourceType": "mp_reexport",
-      "sourceRoute": "/api/mp/store-admin/invites/[token]/qrcode",
+      "sourceType": "app_native",
+      "sourceRoute": "",
       "sourceFiles": [
-        "app/api/mp/store-admin/invites/[token]/qrcode/route.ts"
+        "app/api/app/store-admin/invites/[token]/qrcode/route.ts",
+        "lib/aliyun-rds/repositories/store-invites.server.ts",
+        "lib/aliyun-rds/repositories/account-profile.server.ts",
+        "lib/aliyun-rds/postgres.server.ts"
       ],
       "sourcePages": [
         "../meiye-huajing-miniprogram/pages/store-admin/members/index.js"

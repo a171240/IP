@@ -114,13 +114,13 @@ test("Aliyun operator handoff backend-only mode excludes deferred APP launch wor
   assert.equal(report.localEvidenceGaps.rdsMigration.exists, true)
   assert.equal(report.localEvidenceGaps.rdsMigration.ready, false)
   assert.equal(report.localEvidenceGaps.rdsMigration.totalBlockers, rdsMigrationPaths.length)
-  assert.equal(report.localEvidenceGaps.rdsMigration.totalBlockers, 17)
+  assert.equal(report.localEvidenceGaps.rdsMigration.totalBlockers, 16)
   assert.ok(!rdsMigrationPaths.includes("file_missing"))
   assert.ok(rdsMigrationPaths.includes("rdsPostgres.databaseUrlCnSecretImported"))
-  assert.ok(rdsMigrationPaths.includes("migration.dataAccessAdapterReady"))
+  assert.ok(!rdsMigrationPaths.includes("migration.dataAccessAdapterReady"))
   assert.ok(rdsMigrationPaths.includes("migration.rollbackValidationPassed"))
-  assert.equal(report.localEvidenceGaps.rdsMigration.appApiRoutesWithSupabase, 31)
-  assert.equal(report.localEvidenceGaps.rdsMigration.firstVersionRdsRoutesWithSupabaseDataAccess, 7)
+  assert.equal(report.localEvidenceGaps.rdsMigration.appApiRoutesWithSupabase, 29)
+  assert.equal(report.localEvidenceGaps.rdsMigration.firstVersionRdsRoutesWithSupabaseDataAccess, 0)
   assert.equal(report.localEvidenceGaps.rdsMigration.postgresDataAccessAdapterDetected, true)
   const databaseUrlGap = report.localEvidenceGaps.rdsMigration.gaps.find((item) =>
     item.jsonPath === "rdsPostgres.databaseUrlCnSecretImported"

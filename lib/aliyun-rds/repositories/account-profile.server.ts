@@ -169,6 +169,7 @@ const COMPANY_MANAGER_ROLES = new Set<MpAccountRole>([
 ])
 const STORE_MANAGER_ROLES = new Set<MpAccountRole>(["store_owner", "store_admin"])
 const MANAGER_ROLES = new Set<MpAccountRole>([...COMPANY_MANAGER_ROLES, ...STORE_MANAGER_ROLES])
+const STORE_SCOPED_ROLES = new Set<MpAccountRole>(["store_owner", "store_admin", "staff", "employee"])
 const STORE_BILLING_OWNER_ROLES = new Set(["store_owner", "store_admin"])
 const COMPANY_BILLING_OWNER_ROLES = new Set(["company_owner", "company_admin", "merchant_owner", "merchant_admin"])
 const BILLING_OWNER_ROLE_PRIORITY: Record<string, number> = {
@@ -200,6 +201,25 @@ const PROFILE_COLUMNS = [
 function normalizeRole(role: unknown): MpAccountRole {
   const text = String(role || "").trim()
   return (MP_ACCOUNT_ROLES as readonly string[]).includes(text) ? (text as MpAccountRole) : "staff"
+}
+
+export function getAliyunRdsAppAccountRoleLabel(role: unknown) {
+  return ROLE_LABELS[normalizeRole(role)] || "当前账号"
+}
+
+export function isAliyunRdsStoreScopedRole(role: unknown) {
+  return STORE_SCOPED_ROLES.has(normalizeRole(role))
+}
+
+export function canAliyunRdsInviteRole(ctx: AppAccountContext, role: MpAccountRole) {
+  if (ctx.isPlatformAdmin) return true
+  if (ctx.isCompanyManager) {
+    return role !== "service_operator" && role !== "company_owner" && role !== "merchant_owner"
+  }
+  if (ctx.isStoreManager) {
+    return role === "staff" || role === "employee"
+  }
+  return false
 }
 
 function firstText(...values: unknown[]) {

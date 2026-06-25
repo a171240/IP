@@ -507,6 +507,7 @@ function buildReport() {
   const postgresDataAccessAdapterDetected = postgresAdapterFiles.some((file) =>
     file.postgresPackageImport || /DATABASE_URL_CN/.test(file.envKeys.join(",")),
   )
+  const firstVersionDataAccessReady = postgresDataAccessAdapterDetected && firstVersionRdsSupabaseDataAccessRoutes.length === 0
   const schemaMap = buildSchemaMapSummary()
   const requiredBlockers = uniqueSorted([
     ...ALWAYS_REQUIRED_BLOCKERS,
@@ -619,12 +620,18 @@ function buildReport() {
       },
       {
         id: "SUPABASE_TO_RDS_DATA_ACCESS_MIGRATION",
-        status: postgresDataAccessAdapterDetected ? "adapter_scaffolded_first_version_routes_still_using_supabase" : "not_started",
+        status: !postgresDataAccessAdapterDetected
+          ? "not_started"
+          : firstVersionRdsSupabaseDataAccessRoutes.length > 0
+            ? "adapter_scaffolded_first_version_routes_still_using_supabase"
+            : "first_version_routes_switched_pending_runtime_evidence",
         obtainFrom: "Code migration from Supabase SDK calls to a PostgreSQL/RDS data access layer",
         importTarget: "backend source plus migration manifest",
-        note: postgresDataAccessAdapterDetected
-          ? "A DATABASE_URL_CN/PostgreSQL server adapter exists, but first-version APP API routes still depend on Supabase business data access."
-          : "Current APP API inventory still has Supabase usage in production-cn business routes and has no PostgreSQL adapter.",
+        note: !postgresDataAccessAdapterDetected
+          ? "Current APP API inventory still has Supabase usage in production-cn business routes and has no PostgreSQL adapter."
+          : firstVersionRdsSupabaseDataAccessRoutes.length > 0
+            ? "A DATABASE_URL_CN/PostgreSQL server adapter exists, but first-version APP API routes still depend on Supabase business data access."
+            : "First-version APP API business data access has switched to DATABASE_URL_CN-backed repositories; runtime, schema, data, smoke, and rollback evidence are still required.",
       },
       {
         id: "SCHEMA_DATA_ROLLBACK_VALIDATION",
@@ -655,8 +662,12 @@ function buildReport() {
       },
       {
         id: "RDS03_BUILD_POSTGRES_DATA_ACCESS_ADAPTER",
-        canStartNow: !postgresDataAccessAdapterDetected,
-        status: postgresDataAccessAdapterDetected ? "adapter_scaffolded_routes_not_switched" : "todo",
+        canStartNow: !firstVersionDataAccessReady,
+        status: !postgresDataAccessAdapterDetected
+          ? "todo"
+          : firstVersionDataAccessReady
+            ? "first_version_routes_switched_pending_runtime_evidence"
+            : "adapter_scaffolded_routes_not_switched",
         blockedBy: ["RDS01_FREEZE_SCHEMA_INVENTORY"],
         expectedEvidence: [
           "First-version APP API routes no longer depend on Supabase as formal production-cn data layer",
@@ -666,7 +677,9 @@ function buildReport() {
       {
         id: "RDS04_MIGRATE_SCHEMA_AND_DATA",
         canStartNow: false,
-        blockedBy: ["RDS02_CREATE_ALIYUN_RDS_POSTGRES", "RDS03_BUILD_POSTGRES_DATA_ACCESS_ADAPTER"],
+        blockedBy: firstVersionDataAccessReady
+          ? ["RDS02_CREATE_ALIYUN_RDS_POSTGRES"]
+          : ["RDS02_CREATE_ALIYUN_RDS_POSTGRES", "RDS03_BUILD_POSTGRES_DATA_ACCESS_ADAPTER"],
         expectedEvidence: [
           "schema migration completed",
           "data migration completed",
@@ -700,7 +713,9 @@ function buildReport() {
     nextActions: [
       "Create or confirm Aliyun RDS PostgreSQL in cn-hangzhou before importing DATABASE_URL_CN.",
       "Keep Supabase variables only as migration-source or legacy-compatibility env, not as the final production-cn database target.",
-      "Plan code migration for the first-version APP API routes and shared Supabase data access files listed in this report.",
+      firstVersionDataAccessReady
+        ? "Keep the first-version APP-native RDS repositories in place and validate them against migrated RDS data."
+        : "Plan code migration for the first-version APP API routes and shared Supabase data access files listed in this report.",
       "Add schema/data migration and rollback evidence before marking Aliyun RDS PostgreSQL migration confirmed.",
     ],
   }

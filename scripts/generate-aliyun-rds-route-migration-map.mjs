@@ -457,12 +457,18 @@ function buildReport(args) {
     sharedDataAccessFiles,
     sharedRdsDataAccessFiles,
     rdsAdapterFiles: rdsPlan.inventory?.postgresAdapterFiles || [],
-    nextRequiredActions: [
-      "Create or confirm Aliyun RDS PostgreSQL in cn-hangzhou before importing DATABASE_URL_CN.",
-      "Implement the RDS work packages in order: account, context, service-records, store-admin, then invites.",
-      "Replace first-version APP API shared Supabase data access with PostgreSQL repositories backed by DATABASE_URL_CN.",
-      "Run schema/data migration, row-count validation, critical-record validation, APP API smoke, and rollback rehearsal.",
-    ],
+    nextRequiredActions: routes.filter((route) => route.stillUsesSupabaseDataAccess).length === 0
+      ? [
+          "Create or confirm Aliyun RDS PostgreSQL in cn-hangzhou before importing DATABASE_URL_CN.",
+          "Keep the APP-native RDS work packages in place and validate account, context, service-records, store-admin, and invites against migrated RDS data.",
+          "Run schema/data migration, row-count validation, critical-record validation, APP API smoke, and rollback rehearsal.",
+        ]
+      : [
+          "Create or confirm Aliyun RDS PostgreSQL in cn-hangzhou before importing DATABASE_URL_CN.",
+          "Implement the RDS work packages in order: account, context, service-records, store-admin, then invites.",
+          "Replace first-version APP API shared Supabase data access with PostgreSQL repositories backed by DATABASE_URL_CN.",
+          "Run schema/data migration, row-count validation, critical-record validation, APP API smoke, and rollback rehearsal.",
+        ],
     safetyBoundary: [
       "This report scans local source and non-secret maps only.",
       "It does not connect to Supabase, Aliyun RDS, Vercel, or WeChat.",

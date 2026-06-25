@@ -15,8 +15,8 @@ It tells the operator which local evidence field to update after an authorized e
 ```text
 Production-cn cannot be deployed now.
 evidenceWritebackReady=0/4
-totalGaps=48
-rdsMigrationGaps=17
+totalGaps=47
+rdsMigrationGaps=16
 cloudInventoryResultGaps=1
 cloudConfirmationGaps=18
 imagePublishGaps=12
@@ -36,7 +36,7 @@ Target file:
 deploy/aliyun-production-cn.rds-migration.local.json
 ```
 
-Current field blockers: `17`.
+Current field blockers: `16`.
 
 | JSON path | Authorization packet | Expected non-secret evidence |
 | --- | --- | --- |
@@ -48,7 +48,6 @@ Current field blockers: `17`.
 | `rdsPostgres.confirmed` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after RDS PostgreSQL exists and matches the production-cn target. |
 | `rdsPostgres.databaseAccountReady` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after the database account and privileges are ready; never record the password. |
 | `rdsPostgres.databaseUrlCnSecretImported` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after `DATABASE_URL_CN` is imported through Aliyun KMS, Secrets Manager, or SAE secret env. |
-| `migration.dataAccessAdapterReady` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after first-version APP API production-cn data access no longer formally depends on Supabase. |
 | `migration.schemaMigrated` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after schema migration is applied to RDS and validated without secret values. |
 | `migration.dataMigrated` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after required data is migrated to RDS and validated without customer data in reports. |
 | `migration.rowCountValidationPassed` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after required table row counts have been validated. |

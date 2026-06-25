@@ -79,13 +79,13 @@ POSTDEPLOY_SMOKE_NOT_RUN
 APP_API_POSTGRES_ADAPTER_MISSING
 ```
 
-RDS 数据访问仍未闭环，但当前 blocker 口径已按 APP 第一版范围计算：
+RDS 代码侧首版业务数据访问已经全部指向 APP-native RDS repository；仍未闭环的是阿里云 RDS 实例、连接串密钥、schema/data 迁移、RDS smoke 和 rollback 验证：
 
 ```text
 appApiRouteCount=31
-appApiRoutesWithSupabaseDataAccess=11
+appApiRoutesWithSupabaseDataAccess=4
 firstVersionRdsRouteCount=25
-firstVersionRdsRoutesWithSupabaseDataAccess=7/25
+firstVersionRdsRoutesWithSupabaseDataAccess=0/25
 deferredAppApiRouteCount=6
 ```
 

@@ -37,11 +37,11 @@ test("Aliyun RDS migration evidence command is wired into package scripts", () =
   assert.equal(template.rdsPostgres.region, "cn-hangzhou")
   assert.equal(template.rdsPostgres.databaseUrlCnSecretTarget, "Aliyun KMS / Secrets Manager / SAE secret env")
   assert.equal(template.sourceInventory.appApiRouteCount, 31)
-  assert.equal(template.sourceInventory.appApiRoutesWithSupabase, 31)
-  assert.equal(template.sourceInventory.appApiRoutesWithSupabaseDataAccess, 11)
+  assert.equal(template.sourceInventory.appApiRoutesWithSupabase, 29)
+  assert.equal(template.sourceInventory.appApiRoutesWithSupabaseDataAccess, 4)
   assert.equal(template.sourceInventory.firstVersionRdsRouteCount, 25)
-  assert.equal(template.sourceInventory.firstVersionRdsRoutesWithSupabase, 25)
-  assert.equal(template.sourceInventory.firstVersionRdsRoutesWithSupabaseDataAccess, 7)
+  assert.equal(template.sourceInventory.firstVersionRdsRoutesWithSupabase, 23)
+  assert.equal(template.sourceInventory.firstVersionRdsRoutesWithSupabaseDataAccess, 0)
   assert.equal(template.sourceInventory.deferredAppApiRouteCount, 6)
   assert.equal(template.sourceInventory.deferredAppApiRoutesWithSupabaseDataAccess, 4)
   assert.equal(template.sourceInventory.databaseUrlCnReferencedInSource, true)
@@ -82,11 +82,11 @@ test("Aliyun RDS migration evidence check reports missing local closure without 
   assert.equal(report.local.exists, false)
   assert.deepEqual(report.local.blockers, ["file_missing"])
   assert.equal(report.summary.appApiRouteCount, 31)
-  assert.equal(report.summary.appApiRoutesWithSupabase, 31)
-  assert.equal(report.summary.appApiRoutesWithSupabaseDataAccess, 11)
+  assert.equal(report.summary.appApiRoutesWithSupabase, 29)
+  assert.equal(report.summary.appApiRoutesWithSupabaseDataAccess, 4)
   assert.equal(report.summary.firstVersionRdsRouteCount, 25)
-  assert.equal(report.summary.firstVersionRdsRoutesWithSupabase, 25)
-  assert.equal(report.summary.firstVersionRdsRoutesWithSupabaseDataAccess, 7)
+  assert.equal(report.summary.firstVersionRdsRoutesWithSupabase, 23)
+  assert.equal(report.summary.firstVersionRdsRoutesWithSupabaseDataAccess, 0)
   assert.equal(report.summary.deferredAppApiRouteCount, 6)
   assert.equal(report.summary.deferredAppApiRoutesWithSupabaseDataAccess, 4)
   assert.equal(report.summary.databaseUrlCnReferencedInSource, true)
@@ -127,7 +127,7 @@ test("Aliyun RDS migration evidence init creates a non-secret local evidence sca
   assert.ok(!report.local.blockers.includes("file_missing"))
   assert.ok(report.local.blockers.includes("rdsPostgres.confirmed"))
   assert.ok(report.local.blockers.includes("rdsPostgres.databaseUrlCnSecretImported"))
-  assert.ok(report.local.blockers.includes("migration.dataAccessAdapterReady"))
+  assert.ok(!report.local.blockers.includes("migration.dataAccessAdapterReady"))
   assert.equal(local.schemaVersion, 1)
   assert.equal(local.environment, "production-cn")
   assert.equal(local.operator, "codex-local-rds-evidence-init")
@@ -137,11 +137,11 @@ test("Aliyun RDS migration evidence init creates a non-secret local evidence sca
   assert.equal(local.rdsPostgres.databaseUrlCnSecretImported, false)
   assert.equal(local.sourceInventory.generatedBy, "corepack pnpm aliyun:rds:migration:plan")
   assert.equal(local.sourceInventory.appApiRouteCount, 31)
-  assert.equal(local.sourceInventory.firstVersionRdsRoutesWithSupabaseDataAccess, 7)
+  assert.equal(local.sourceInventory.firstVersionRdsRoutesWithSupabaseDataAccess, 0)
   assert.equal(local.sourceInventory.databaseUrlCnReferencedInSource, true)
   assert.equal(local.sourceInventory.postgresDataAccessAdapterDetected, true)
   assert.equal(local.migration.schemaInventoryReviewed, true)
-  assert.equal(local.migration.dataAccessAdapterReady, false)
+  assert.equal(local.migration.dataAccessAdapterReady, true)
   assert.equal(local.security.containsDatabasePassword, false)
   assert.equal(local.security.containsConnectionString, false)
   assert.equal(local.security.containsSupabaseServiceRoleKey, false)
@@ -176,11 +176,11 @@ test("Aliyun RDS migration evidence init does not overwrite an existing local ev
     sourceInventory: {
       generatedBy: "corepack pnpm aliyun:rds:migration:plan",
       appApiRouteCount: 31,
-      appApiRoutesWithSupabase: 31,
-      appApiRoutesWithSupabaseDataAccess: 11,
+      appApiRoutesWithSupabase: 29,
+      appApiRoutesWithSupabaseDataAccess: 4,
       firstVersionRdsRouteCount: 25,
-      firstVersionRdsRoutesWithSupabase: 25,
-      firstVersionRdsRoutesWithSupabaseDataAccess: 7,
+      firstVersionRdsRoutesWithSupabase: 23,
+      firstVersionRdsRoutesWithSupabaseDataAccess: 0,
       deferredAppApiRouteCount: 6,
       deferredAppApiRoutesWithSupabaseDataAccess: 4,
       tableCount: 44,
@@ -257,7 +257,7 @@ test("Aliyun RDS migration evidence markdown is value-free", () => {
   assert.match(markdown, /RDS migration evidence check/)
   assert.match(markdown, /localExists: false/)
   assert.match(markdown, /writebackBlockingGroups: rdsInstanceAndSecret/)
-  assert.match(markdown, /firstVersionRdsRoutesWithSupabaseDataAccess: 7\/25/)
+  assert.match(markdown, /firstVersionRdsRoutesWithSupabaseDataAccess: 0\/25/)
   assert.match(markdown, /deferredAppApiRoutesWithSupabaseDataAccess: 4\/6/)
   assert.match(markdown, /P11_ALIYUN_RDS_DATA_MIGRATION/)
   assert.match(markdown, /DATABASE_URL_CN/)
