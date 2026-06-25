@@ -334,6 +334,7 @@ function renderMarkdown(audit) {
   const imagePublishPlan = audit.checks.imagePublishPlan
   const operatorTasks = audit.checks.operatorTasks
   const envHandoff = audit.checks.envHandoff
+  const backendEnvImportBatches = audit.checks.backendEnvImportBatches
   const envSourceMap = audit.checks.envSourceMap
   const sensitiveBlockers = audit.checks.sensitiveBlockers
   const resourcesMatrix = audit.checks.resourcesMatrix
@@ -428,6 +429,7 @@ function renderMarkdown(audit) {
     `- operatorHandoff: ${operatorHandoff.verdict}, missing required env ${operatorHandoff.missingVariables.required.length}`,
     `- productionStatus: ${productionStatus.verdict}, canDeployNow ${productionStatus.canDeployNow === true}`,
     `- envHandoff: ${envHandoff.summary.requiredBlocking.length} required blocked, ${envHandoff.summary.appLaunchBlocking.length} app launch blocked, ${envHandoff.summary.readySecretEnv} ready secret env`,
+    `- backendEnvImportBatches: blocked ${backendEnvImportBatches.blockedCredentialCount || 0}, ready secret env ${backendEnvImportBatches.readySecretEnvVariableCount || 0}, groups ${backendEnvImportBatches.readySecretEnvVariableGroupCount || 0}`,
     `- envSourceMap: Vercel ${envSourceMap.vercelCoverage.ok ? "checked" : envSourceMap.vercelCoverage.skipped ? "skipped" : "not ok"}, migrate ${envSourceMap.summary.canMigrateFromVercelProduction}, app/Aliyun new ${envSourceMap.summary.appAliyunOwnedNotInVercel}`,
     `- sensitiveActionItems: ${sensitiveBlockers.summary.total} total, ${sensitiveBlockers.summary.blocked} blocked`,
     `- aliyunResources: ${resourcesMatrix.summary.ready} / ${resourcesMatrix.summary.total} ready, ${resourcesMatrix.summary.blocked} blocked`,
@@ -1365,6 +1367,24 @@ function renderMarkdown(audit) {
     `- readySecretEnv: ${envHandoff.summary.readySecretEnv}`,
     `- deferred: ${envHandoff.summary.deferred}`,
     "",
+    "## backend-cn Secret Env 导入批次",
+    "",
+    `- json: ${audit.outputFiles.backendEnvImportBatchesJson}`,
+    `- markdown: ${audit.outputFiles.backendEnvImportBatchesMarkdown}`,
+    `- ok: ${backendEnvImportBatches.ok === true}`,
+    `- currentScope: ${backendEnvImportBatches.currentScope}`,
+    `- containsValues: ${backendEnvImportBatches.containsValues === false ? "false" : "unknown"}`,
+    `- secretLeakCheck: ${backendEnvImportBatches.secretLeakCheck?.ok === true}`,
+    `- blockedCredentialNames: ${backendEnvImportBatches.blockedCredentialNames?.join(", ") || "none"}`,
+    `- blockedCredentialCount: ${backendEnvImportBatches.blockedCredentialCount || 0}`,
+    `- readySecretEnvVariableCount: ${backendEnvImportBatches.readySecretEnvVariableCount || 0}`,
+    `- readySecretEnvVariableGroupCount: ${backendEnvImportBatches.readySecretEnvVariableGroupCount || 0}`,
+    `- notYetImportable: ${backendEnvImportBatches.notYetImportable?.map((item) => `${item.variable}:${item.blockingAction}`).join(", ") || "none"}`,
+    `- deferredFullAppLaunchVariables: ${backendEnvImportBatches.deferredFullAppLaunchVariables?.map((item) => item.variable).join(", ") || "none"}`,
+    ...(backendEnvImportBatches.readySecretEnvVariableGroups?.length
+      ? backendEnvImportBatches.readySecretEnvVariableGroups.map((group) => `- ${group.category}: count=${group.count}; target=${group.importTarget}`)
+      : ["- readySecretEnvVariableGroups: none"]),
+    "",
     "## Vercel 到阿里云环境变量来源映射",
     "",
     `- json: ${audit.outputFiles.envSourceMapJson}`,
@@ -1664,6 +1684,8 @@ function main() {
   const operatorTasksMarkdownPath = resolve(args.outDir, "operator-tasks.md")
   const envHandoffJsonPath = resolve(args.outDir, "env-handoff.json")
   const envHandoffMarkdownPath = resolve(args.outDir, "env-handoff.md")
+  const backendEnvImportBatchesJsonPath = resolve(args.outDir, "backend-env-import-batches.json")
+  const backendEnvImportBatchesMarkdownPath = resolve(args.outDir, "backend-env-import-batches.md")
   const envSourceMapJsonPath = resolve(args.outDir, "env-source-map.json")
   const envSourceMapMarkdownPath = resolve(args.outDir, "env-source-map.md")
   const vercelEnvCoveragePath = resolve(args.outDir, "vercel-env-coverage.json")
@@ -1734,6 +1756,13 @@ function main() {
     envHandoffJsonPath,
     "--markdown",
     envHandoffMarkdownPath,
+  ])
+  const backendEnvImportBatches = runJson("backend_env_import_batches", [
+    "scripts/generate-aliyun-backend-env-import-batches.mjs",
+    "--out",
+    backendEnvImportBatchesJsonPath,
+    "--markdown",
+    backendEnvImportBatchesMarkdownPath,
   ])
   const sensitiveBlockers = runJson("sensitive_blockers", [
     "scripts/summarize-aliyun-sensitive-blockers.mjs",
@@ -2012,6 +2041,7 @@ function main() {
       imagePublishPlan,
       operatorTasks,
       envHandoff,
+      backendEnvImportBatches,
       envSourceMap,
       sensitiveBlockers,
       resourcesMatrix,
@@ -2050,6 +2080,8 @@ function main() {
       envImportChecklist: resolve(args.outDir, "env-import-checklist.md"),
       envHandoffJson: envHandoffJsonPath,
       envHandoffMarkdown: envHandoffMarkdownPath,
+      backendEnvImportBatchesJson: backendEnvImportBatchesJsonPath,
+      backendEnvImportBatchesMarkdown: backendEnvImportBatchesMarkdownPath,
       envSourceMapJson: envSourceMapJsonPath,
       envSourceMapMarkdown: envSourceMapMarkdownPath,
       vercelEnvCoverage: vercelEnvCoverage.ok ? vercelEnvCoveragePath : null,
@@ -2342,6 +2374,23 @@ function main() {
       readySecretEnv: envHandoff.summary.readySecretEnv,
       deferred: envHandoff.summary.deferred,
       acquisitionOrder: envHandoff.acquisitionOrder.map((item) => `${item.name}:${item.reason}`),
+    },
+    backendEnvImportBatches: {
+      report: audit.outputFiles.backendEnvImportBatchesJson,
+      markdown: audit.outputFiles.backendEnvImportBatchesMarkdown,
+      ok: backendEnvImportBatches.ok === true,
+      currentScope: backendEnvImportBatches.currentScope,
+      containsValues: backendEnvImportBatches.containsValues === true,
+      secretLeakCheck: backendEnvImportBatches.secretLeakCheck?.ok === true,
+      blockedCredentialCount: backendEnvImportBatches.blockedCredentialCount || 0,
+      blockedCredentialNames: backendEnvImportBatches.blockedCredentialNames || [],
+      readySecretEnvVariableCount: backendEnvImportBatches.readySecretEnvVariableCount || 0,
+      readySecretEnvVariableGroupCount: backendEnvImportBatches.readySecretEnvVariableGroupCount || 0,
+      notYetImportableVariableNames: (backendEnvImportBatches.notYetImportable || []).map((item) => item.variable),
+      deferredFullAppLaunchVariables: (backendEnvImportBatches.deferredFullAppLaunchVariables || []).map((item) => item.variable),
+      sourceCommands: backendEnvImportBatches.sourceCommands || [],
+      readySecretEnvVariableGroups: (backendEnvImportBatches.readySecretEnvVariableGroups || []).map((group) =>
+        `${group.category}:${group.count}:${group.importTarget}`),
     },
     envSourceMap: {
       report: audit.outputFiles.envSourceMapJson,
@@ -2965,6 +3014,8 @@ function main() {
     envImportChecklist: audit.outputFiles.envImportChecklist,
     envHandoffJson: audit.outputFiles.envHandoffJson,
     envHandoffMarkdown: audit.outputFiles.envHandoffMarkdown,
+    backendEnvImportBatchesJson: audit.outputFiles.backendEnvImportBatchesJson,
+    backendEnvImportBatchesMarkdown: audit.outputFiles.backendEnvImportBatchesMarkdown,
     envSourceMapJson: audit.outputFiles.envSourceMapJson,
     envSourceMapMarkdown: audit.outputFiles.envSourceMapMarkdown,
     vercelEnvCoverageReport: audit.outputFiles.vercelEnvCoverage,

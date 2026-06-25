@@ -13,11 +13,24 @@ const secretLike = /(sk-[A-Za-z0-9_-]{20,}|LTAI[A-Za-z0-9]{12,}|:\/\/[^\s:@]+:[^
 test("Aliyun backend env import batches command is wired into package scripts", () => {
   const pkg = readJson("package.json")
   const script = read("scripts", "generate-aliyun-backend-env-import-batches.mjs")
+  const predeploy = read("scripts", "aliyun-predeploy-commands.mjs")
+  const deploySpec = readJson("deploy", "aliyun-production-cn.example.json")
+  const deploySpecChecker = read("scripts", "check-aliyun-deployment-spec.mjs")
+  const releaseArtifacts = read("scripts", "prepare-aliyun-release-artifacts.mjs")
 
   assert.equal(pkg.scripts["aliyun:backend-env-import:batches"], "node ./scripts/generate-aliyun-backend-env-import-batches.mjs")
   assert.equal(pkg.scripts["aliyun:backend-env-import:batches:test"], "node --test tests/aliyun-backend-env-import-batches.static.test.js")
   assert.match(script, /summarize-aliyun-sensitive-blockers\.mjs/)
   assert.match(script, /--backend-only/)
+  assert.match(predeploy, /aliyun:backend-env-import:batches:test/)
+  assert.match(predeploy, /aliyun:backend-env-import:batches/)
+  assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:backend-env-import:batches:test"))
+  assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:backend-env-import:batches"))
+  assert.ok(deploySpec.predeployChecks.includes("corepack pnpm aliyun:backend-env-import:batches"))
+  assert.match(deploySpecChecker, /corepack pnpm aliyun:backend-env-import:batches/)
+  assert.match(releaseArtifacts, /backend-env-import-batches\.json/)
+  assert.match(releaseArtifacts, /backendEnvImportBatches/)
+  assert.match(releaseArtifacts, /readySecretEnvVariableGroupCount/)
 })
 
 test("Aliyun backend env import batches report is value-free and backend-only", () => {
