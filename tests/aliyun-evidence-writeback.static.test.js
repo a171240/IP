@@ -39,11 +39,26 @@ test("Aliyun evidence writeback command is wired into scripts, predeploy, deploy
   assert.match(releaseArtifacts, /evidenceWriteback/)
   assert.match(releaseArtifacts, /arg === "--backend-only"/)
   assert.match(releaseArtifacts, /\.\.\.backendOnlyArg/)
+  assert.match(releaseArtifacts, /MEIYE_RELEASE_ARTIFACTS_PROGRESS/)
+  assert.match(releaseArtifacts, /progressLine\("start", label\)/)
+  assert.match(releaseArtifacts, /function runAppLaunchPackage/)
+  assert.match(releaseArtifacts, /buildDeferredAppLaunchPackage/)
+  assert.match(releaseArtifacts, /deferred_after_backend_online/)
   assert.match(releaseArtifacts, /currentScopeReady/)
   assert.match(releaseArtifacts, /rdsMigrationGaps: evidenceWriteback\.summary\.rdsMigrationGaps/)
   assert.match(releaseArtifacts, /evidenceClosureBrief/)
   assert.match(releaseArtifacts, /partiallyObservedResourceEvidenceIds/)
   assert.match(releaseArtifacts, /blockedResourceEvidence/)
+})
+
+test("Aliyun backend-only release artifacts defer APP launch packages instead of generating them", () => {
+  const releaseArtifacts = read("scripts", "prepare-aliyun-release-artifacts.mjs")
+
+  assert.match(releaseArtifacts, /if \(args\.backendOnly\) \{[\s\S]*buildDeferredAppLaunchPackage/)
+  assert.match(releaseArtifacts, /runAppLaunchPackage\(args, "wechat", "wechat_open_mobile_app_package"/)
+  assert.match(releaseArtifacts, /runAppLaunchPackage\(args, "android", "android_release_signing_package"/)
+  assert.match(releaseArtifacts, /runAppLaunchPackage\(args, "apple", "apple_team_aasa_package"/)
+  assert.match(releaseArtifacts, /当前 backend-only 总包不生成这些专项材料/)
 })
 
 test("Aliyun evidence writeback backend-only mode excludes deferred APP launch gaps", () => {

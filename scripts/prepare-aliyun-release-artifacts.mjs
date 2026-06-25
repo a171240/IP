@@ -144,8 +144,23 @@ function parseJsonOutput(label, output) {
   }
 }
 
+function progressLine(phase, label, details = "") {
+  if (process.env.MEIYE_RELEASE_ARTIFACTS_PROGRESS === "0") return
+  const suffix = details ? ` ${details}` : ""
+  process.stderr.write(`[aliyun-release-artifacts] ${phase} ${label}${suffix}\n`)
+}
+
 function runJson(label, args, opts = {}) {
-  return parseJsonOutput(label, run(process.execPath, args, opts))
+  const startedAt = Date.now()
+  progressLine("start", label)
+  try {
+    const parsed = parseJsonOutput(label, run(process.execPath, args, opts))
+    progressLine("done", label, `${Date.now() - startedAt}ms`)
+    return parsed
+  } catch (error) {
+    progressLine("failed", label, `${Date.now() - startedAt}ms`)
+    throw error
+  }
 }
 
 function git(args) {
@@ -186,6 +201,114 @@ function listArchiveEntries(archivePath) {
 
 function writeText(filePath, content) {
   writeFileSync(filePath, content.endsWith("\n") ? content : `${content}\n`, { mode: 0o600 })
+}
+
+function buildDeferredAppLaunchPackage(kind, jsonPath, markdownPath) {
+  const titleByKind = {
+    wechat: "微信开放平台移动应用材料包",
+    android: "Android Release Signing 动作确认包",
+    apple: "Apple Team ID / AASA 动作确认包",
+  }
+  const title = titleByKind[kind] || "APP 发布延期材料包"
+  const reason = "微信开放平台移动应用、Android release signing、Apple Team ID/AASA 已延期到阿里云后端上线后处理；当前 backend-only 总包不生成这些专项材料。"
+  const base = {
+    ok: true,
+    deferred: true,
+    status: "deferred_after_backend_online",
+    currentScope: "backend_aliyun_only",
+    generatedAt: new Date().toISOString(),
+    containsValues: false,
+    readOnlyOnly: true,
+    cloudApiCalled: false,
+    mutationPerformed: false,
+    reason,
+    summary: {
+      status: "deferred_after_backend_online",
+      blockers: ["deferred_after_backend_online"],
+    },
+    actionPacket: null,
+  }
+  const report = {
+    ...base,
+    ...(kind === "wechat"
+      ? {
+          summary: {
+            ...base.summary,
+            accountVerified: false,
+            mobileAppCreated: false,
+            reviewStatus: "deferred_after_backend_online",
+            readyToSubmitForReview: false,
+            submissionBlockers: ["deferred_after_backend_online"],
+          },
+          credentialBoundary: {
+            appLoginCredentialSource: "deferred_after_backend_online",
+            miniProgramCredentialsReusableForAppLogin: false,
+            miniProgramCompatVariableNames: [],
+          },
+          mobileAppCreationPackage: {
+            android: { packageName: "deferred_after_backend_online" },
+            androidSignaturePackage: {
+              status: "deferred_after_backend_online",
+              releaseArtifactReady: false,
+              wechatSignatureRecorded: false,
+            },
+            ios: { bundleId: "deferred_after_backend_online" },
+          },
+        }
+      : {}),
+    ...(kind === "android"
+      ? {
+          summary: {
+            ...base.summary,
+            canStartNow: false,
+            readyForWechatAndroidSignature: false,
+            androidPackageName: "deferred_after_backend_online",
+            releaseSigningConfig: "deferred_after_backend_online",
+            releaseSigningConfigReady: false,
+            releaseUsesDebugSigning: false,
+            releaseArtifactReady: false,
+            wechatSignatureRecorded: false,
+            androidConfigured: false,
+          },
+          currentBlockers: ["deferred_after_backend_online"],
+          signingInputs: { variableNames: [] },
+        }
+      : {}),
+    ...(kind === "apple"
+      ? {
+          summary: {
+            ...base.summary,
+            teamIdStatus: "deferred_after_backend_online",
+            aasaOk: false,
+            routeFilesReady: false,
+            iosNativeReady: false,
+            expectedIosBundleId: "deferred_after_backend_online",
+            associatedDomain: "deferred_after_backend_online",
+            universalLink: "deferred_after_backend_online",
+            aasaUrl: "deferred_after_backend_online",
+          },
+        }
+      : {}),
+  }
+  writeText(jsonPath, JSON.stringify(report, null, 2))
+  writeText(markdownPath, [
+    `# ${title}`,
+    "",
+    "- status: deferred_after_backend_online",
+    "- currentScope: backend_aliyun_only",
+    "- containsValues: false",
+    "- mutationPerformed: false",
+    `- reason: ${reason}`,
+  ].join("\n"))
+  return report
+}
+
+function runAppLaunchPackage(args, kind, label, scriptArgs, jsonPath, markdownPath) {
+  if (args.backendOnly) {
+    progressLine("defer", label, "backend-only")
+    return buildDeferredAppLaunchPackage(kind, jsonPath, markdownPath)
+  }
+  return runJson(label, scriptArgs)
 }
 
 function renderMarkdown(audit) {
@@ -1613,7 +1736,7 @@ function main() {
     "--markdown",
     evidenceWritebackMarkdownPath,
   ])
-  const wechatOpenMobileAppPackage = runJson("wechat_open_mobile_app_package", [
+  const wechatOpenMobileAppPackage = runAppLaunchPackage(args, "wechat", "wechat_open_mobile_app_package", [
     "scripts/generate-wechat-open-mobile-app-package.mjs",
     "--env-file",
     args.envFile,
@@ -1622,8 +1745,8 @@ function main() {
     wechatOpenMobileAppPackageJsonPath,
     "--markdown",
     wechatOpenMobileAppPackageMarkdownPath,
-  ])
-  const androidReleaseSigningPackage = runJson("android_release_signing_package", [
+  ], wechatOpenMobileAppPackageJsonPath, wechatOpenMobileAppPackageMarkdownPath)
+  const androidReleaseSigningPackage = runAppLaunchPackage(args, "android", "android_release_signing_package", [
     "scripts/generate-android-release-signing-package.mjs",
     "--env-file",
     args.envFile,
@@ -1632,8 +1755,8 @@ function main() {
     androidReleaseSigningPackageJsonPath,
     "--markdown",
     androidReleaseSigningPackageMarkdownPath,
-  ])
-  const appleTeamAasaPackage = runJson("apple_team_aasa_package", [
+  ], androidReleaseSigningPackageJsonPath, androidReleaseSigningPackageMarkdownPath)
+  const appleTeamAasaPackage = runAppLaunchPackage(args, "apple", "apple_team_aasa_package", [
     "scripts/generate-apple-team-aasa-package.mjs",
     "--env-file",
     args.envFile,
@@ -1641,7 +1764,7 @@ function main() {
     appleTeamAasaPackageJsonPath,
     "--markdown",
     appleTeamAasaPackageMarkdownPath,
-  ])
+  ], appleTeamAasaPackageJsonPath, appleTeamAasaPackageMarkdownPath)
   const operatorHandoff = runJson("operator_handoff", [
     "scripts/generate-aliyun-operator-handoff.mjs",
     "--env-file",
@@ -2703,6 +2826,7 @@ function printHelp() {
     "",
     "Creates non-secret production-cn release audit files and a Docker context tarball outside the repo by default.",
     "--backend-only keeps deferred WeChat/Android/Apple launch gaps out of the current backend deployment scope.",
+    "Progress is written to stderr by default; set MEIYE_RELEASE_ARTIFACTS_PROGRESS=0 to suppress it.",
     "Vercel env coverage is metadata-only and non-blocking; it never includes values.",
     "The tarball is scanned for forbidden entries such as .env files, .git, node_modules, .next, and logs.",
   ].join("\n"))
