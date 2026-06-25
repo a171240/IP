@@ -1,0 +1,689 @@
+# 美业话镜 APP production-cn 阿里云证据回填清单
+
+Generated: 2026-06-25T21:53:22.932Z
+
+## 当前结论
+
+- 现在还不能部署阿里云后端；微信/Android/Apple 发布项已后置，请先按本清单补齐 RDS/ACR/SAE/DNS/OSS/env/SLS/smoke 证据。
+- currentScope: backend_aliyun_only
+- verdict: blocked
+- canDeployNow: false
+- executionMode: writeback_checklist_only
+- containsValues: false
+- mutationPerformed: false
+- cloudApiCalled: false
+
+## 证据闭环摘要
+
+- conclusion: 本地证据尚未闭环；部署前必须补齐本地 .local.json 证据并通过 strict 验证。
+- evidenceWritebackReady: 0/4
+- totalGaps: 50
+- rdsMigrationGaps: 19
+- blockedCredentialCount: 1
+- blockedCredentialNames: DATABASE_URL_CN
+- readySecretEnvVariableCount: 17
+- readySecretEnvVariableNames: ADMIN_USER_IDS, ALIYUN_OSS_ACCESS_KEY_ID, ALIYUN_OSS_ACCESS_KEY_SECRET, APIMART_API_KEY, CREDITS_IP_SALT, DASHSCOPE_API_KEY, DEEPSEEK_API_KEY, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_SUPABASE_URL, SERVICE_RECORD_DEEPSEEK_API_KEY, SUPABASE_SERVICE_ROLE_KEY, VOLC_SPEECH_ACCESS_TOKEN, VOLC_SPEECH_APP_ID, VOLC_SPEECH_SECRET_KEY, WECHAT_LOGIN_SECRET, WECHAT_MINI_APPID, WECHAT_MINI_SECRET
+- resourceEvidenceReady: 0/7
+- blockedResourceEvidenceIds: R01_SAE_RUNTIME, R02_ACR_IMAGE_REGISTRY, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R05_OSS_AUDIO_STORAGE, R06_ENV_IMPORT, R07_SLS_ALERTS
+- partiallyObservedResourceEvidenceIds: R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS
+- writeTargets: /Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.rds-migration.local.json, /Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.cloud-inventory-results.local.json, /Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.cloud-confirmations.local.json, /Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.image-publish.local.json
+
+## 按动作包排序的证据回填
+
+- canStartNowPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
+- blockedByDependencyPacketIds: P04_ACR_IMAGE_AND_PULL, P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS
+- secretOrCredentialPacketIds: P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION, P06_ENV_IMPORT
+
+### P00_ALIYUN_READONLY_INVENTORY_IDENTITY
+
+- status: can_start_after_action_time_confirmation
+- nonSecretEvidenceOnly: true
+- gapCount: 1
+- groupKeys: cloudInventoryResults
+- jsonPaths: operations[*].commandResults[*]
+- writeTargets: deploy/aliyun-production-cn.cloud-inventory-results.local.json
+- forbiddenValueClasses: AccessKeySecret, AppSecret, RAM Secret, Supabase service role key, cookie, registry password, token, 证书私钥
+- strictVerifyCommands: corepack pnpm aliyun:cloud:inventory-results:strict
+
+### P03_ACR_PURCHASE
+
+- status: can_start_after_action_time_confirmation
+- nonSecretEvidenceOnly: true
+- gapCount: 3
+- groupKeys: imagePublish
+- jsonPaths: acr.registryHost, acr.namespace, acr.confirmed
+- writeTargets: deploy/aliyun-production-cn.image-publish.local.json -> acr
+- forbiddenValueClasses: AccessKeySecret, AppSecret, RAM Secret, Supabase service role key, cookie, registry password, token
+- strictVerifyCommands: corepack pnpm aliyun:image:plan:strict
+
+### P05_OSS_RAM_STS
+
+- status: can_start_after_action_time_confirmation
+- nonSecretEvidenceOnly: false
+- gapCount: 2
+- groupKeys: cloudConfirmations
+- jsonPaths: items.oss.confirmed, items.oss.ramLeastPrivilege
+- writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss
+- forbiddenValueClasses: AccessKeySecret, AppSecret, RAM Secret, Supabase service role key, cookie, registry password, token
+- strictVerifyCommands: corepack pnpm aliyun:cloud:confirmations:strict
+
+### P11_ALIYUN_RDS_DATA_MIGRATION
+
+- status: can_start_after_action_time_confirmation
+- nonSecretEvidenceOnly: false
+- gapCount: 19
+- groupKeys: rdsMigration
+- jsonPaths: rdsPostgres.instanceId, rdsPostgres.engineVersion, rdsPostgres.networkAccess, rdsPostgres.databaseName, rdsPostgres.evidence, rdsPostgres.confirmed, rdsPostgres.databaseAccountReady, rdsPostgres.databaseUrlCnSecretImported, migration.schemaCompatibilityReviewed, migration.supabaseSpecificSqlResolved, migration.rdsExtensionSupportConfirmed, migration.schemaMigrated, migration.dataMigrated, migration.rowCountValidationPassed, migration.criticalRecordValidationPassed, migration.appApiSmokeOnRdsPassed, migration.supabaseNoLongerFormalTarget, migration.rollbackRunbookReviewed, migration.rollbackValidationPassed
+- writeTargets: deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.instanceId; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.engineVersion; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.networkAccess; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.databaseName; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.evidence; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.confirmed; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.databaseAccountReady; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.databaseUrlCnSecretImported; deploy/aliyun-production-cn.rds-migration.local.json -> migration.schemaCompatibilityReviewed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.supabaseSpecificSqlResolved; deploy/aliyun-production-cn.rds-migration.local.json -> migration.rdsExtensionSupportConfirmed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.schemaMigrated; deploy/aliyun-production-cn.rds-migration.local.json -> migration.dataMigrated; deploy/aliyun-production-cn.rds-migration.local.json -> migration.rowCountValidationPassed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.criticalRecordValidationPassed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.appApiSmokeOnRdsPassed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.supabaseNoLongerFormalTarget; deploy/aliyun-production-cn.rds-migration.local.json -> migration.rollbackRunbookReviewed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.rollbackValidationPassed
+- forbiddenValueClasses: AccessKeySecret, DATABASE_URL_CN value, Supabase service role key, customer data, database password, dump contents, token
+- strictVerifyCommands: corepack pnpm aliyun:rds:migration:evidence:strict
+
+### P04_ACR_IMAGE_AND_PULL
+
+- status: blocked_by_dependency
+- nonSecretEvidenceOnly: true
+- gapCount: 8
+- groupKeys: imagePublish
+- jsonPaths: acr.remoteImage, acr.remoteDigest, acr.evidence, acr.imagePushed, acr.digestVerified, runtime.remoteImageConfigured, runtime.imagePullConfigured
+- writeTargets: deploy/aliyun-production-cn.image-publish.local.json -> acr; deploy/aliyun-production-cn.image-publish.local.json -> runtime
+- forbiddenValueClasses: AccessKeySecret, AppSecret, RAM Secret, Supabase service role key, cookie, registry password, token
+- strictVerifyCommands: corepack pnpm aliyun:image:plan:strict
+
+### P06_ENV_IMPORT
+
+- status: blocked_by_dependency
+- nonSecretEvidenceOnly: false
+- gapCount: 4
+- groupKeys: cloudConfirmations
+- jsonPaths: items.envImport.importedAt, items.envImport.evidence, items.envImport.confirmed, items.envImport.secretNotInImage
+- writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport
+- forbiddenValueClasses: AccessKeySecret, AppSecret, RAM Secret, Supabase service role key, cookie, registry password, token
+- strictVerifyCommands: corepack pnpm aliyun:cloud:confirmations:strict
+
+### P07_DOMAIN_DNS_HTTPS
+
+- status: blocked_by_dependency
+- nonSecretEvidenceOnly: true
+- gapCount: 8
+- groupKeys: cloudConfirmations
+- jsonPaths: items.apiDomainHttps.confirmed, items.apiDomainHttps.dnsResolvedToAliyun, items.apiDomainHttps.httpsEnabled, items.apiDomainHttps.icpReady, items.assetDomainHttps.confirmed, items.assetDomainHttps.dnsResolvedToAliyun, items.assetDomainHttps.httpsEnabled, items.assetDomainHttps.icpReady
+- writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps
+- forbiddenValueClasses: AccessKeySecret, AppSecret, RAM Secret, Supabase service role key, cookie, registry password, token
+- strictVerifyCommands: corepack pnpm aliyun:cloud:confirmations:strict
+
+### P08_SAE_RUNTIME_SLS
+
+- status: blocked_by_dependency
+- nonSecretEvidenceOnly: true
+- gapCount: 5
+- groupKeys: cloudConfirmations, imagePublish
+- jsonPaths: items.runtime.confirmed, items.slsAlerts.confirmed, items.slsAlerts.healthAlertConfigured, items.slsAlerts.serverErrorAlertConfigured, runtime.confirmed
+- writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.runtime; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.slsAlerts; deploy/aliyun-production-cn.image-publish.local.json -> runtime
+- forbiddenValueClasses: AccessKeySecret, AppSecret, RAM Secret, Supabase service role key, cookie, registry password, token
+- strictVerifyCommands: corepack pnpm aliyun:cloud:confirmations:strict; corepack pnpm aliyun:image:plan:strict
+
+
+## 已观测但未闭环的资源证据
+
+- R01_SAE_RUNTIME: observed=not_created_or_not_confirmed, readiness=blocked
+  - currentEvidence: chrome_sae_app_list_2026-06-25T19:47_CST_cn-hangzhou_huadong1_hangzhou_no_instances_target_app_meiye-huajing-app-api-production-cn_not_present_runtime_not_confirmed; observedResourceStatus=not_created_or_not_confirmed; observedResourceReadiness=blocked
+  - missingEvidence: runtime:confirmed; observed:not_created_or_not_confirmed
+  - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.runtime
+  - nextEvidenceAction: confirm resource in Aliyun console or allowlisted readonly inventory, then write non-secret evidence to the configured .local.json target
+- R02_ACR_IMAGE_REGISTRY: observed=purchase_candidate_visible_not_purchased, readiness=blocked
+  - currentEvidence: imagePublish.localExists=true; imagePublish.localReady=false; image.localDigestReady=true; localDockerImage.status=ready; localDockerImage.repoDigest=meiye-huajing-app-api@sha256:494907a4f9e7342064dda55fe30e0e48dd245b6d6ae753bdbb3945f77c0f518d; acr.purchaseCandidate.edition=ACR Enterprise Economic; acr.purchaseCandidate.region=cn-hangzhou; acr.purchaseCandidate.duration=1 month; acr.purchaseCandidate.quotedAmount=CNY 117.00; acr.purchaseCandidate.confirmed=false; acr.purchaseCandidate.requiresActionTimePurchaseConfirmation=true; acr.purchaseCandidate.evidence=chrome_acr_instances_2026-06-25T19:47_CST_enterprise_instance_list_visible_create_enterprise_instance_entry_visible_no_meiye_target_instance_or_repository_confirmed_not_purchased_action_time_confirmation_required; runtime.target=SAE; runtime.appName=meiye-huajing-app-api-production-cn; runtime.remoteImageConfigured=false; runtime.imagePullConfigured=false; observedResourceStatus=purchase_candidate_visible_not_purchased; observedResourceReadiness=blocked
+  - missingEvidence: imagePublishLocal:todo:acr.registryHost; imagePublishLocal:todo:acr.namespace; imagePublishLocal:todo:acr.remoteImage; imagePublishLocal:todo:acr.remoteDigest; imagePublishLocal:todo:acr.evidence; imagePublishLocal:acr.confirmed; imagePublishLocal:acr.imagePushed; imagePublishLocal:acr.digestVerified; imagePublishLocal:acr.remoteDigest=sha256; imagePublishLocal:runtime.confirmed; imagePublishLocal:runtime.remoteImageConfigured; imagePublishLocal:runtime.imagePullConfigured; observed:purchase_candidate_visible_not_purchased
+  - writeTargets: deploy/aliyun-production-cn.image-publish.local.json -> acr + runtime
+  - nextEvidenceAction: complete ACR purchase/repository evidence first, then image push/digest and SAE pull evidence after action-time confirmation
+- R03_API_DOMAIN_HTTPS: observed=domain_visible_records_missing, readiness=blocked
+  - currentEvidence: chrome_dns_console_2026-06-25T19:47_CST_ipgongchang_xin_exact_search_api-cn_no_data_total_0_existing_api_A_106.14.241.129_no_sae_endpoint_no_https_icp_ready; observedResourceStatus=domain_visible_records_missing; observedResourceReadiness=blocked
+  - missingEvidence: APP_API_BASE_URL:dns_special_use_wildcard_ip; APP_API_BASE_URL:https_not_ready:ECONNRESET; NEXT_PUBLIC_SITE_URL:dns_special_use_wildcard_ip; NEXT_PUBLIC_SITE_URL:https_not_ready:ECONNRESET; APP_ASSET_BASE_URL:dns_special_use_wildcard_ip; APP_ASSET_BASE_URL:https_not_ready:ECONNRESET; apiDomainHttps:confirmed; apiDomainHttps:dnsResolvedToAliyun; apiDomainHttps:httpsEnabled; apiDomainHttps:icpReady; assetDomainHttps:confirmed; assetDomainHttps:dnsResolvedToAliyun; assetDomainHttps:httpsEnabled; assetDomainHttps:icpReady; observed:domain_visible_records_missing
+  - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps
+  - nextEvidenceAction: obtain action-time confirmation, perform only the named console action, then write non-secret evidence to the configured .local.json target
+- R04_ASSET_DOMAIN_HTTPS: observed=domain_visible_records_missing, readiness=blocked
+  - currentEvidence: chrome_dns_console_2026-06-25T19:47_CST_ipgongchang_xin_exact_search_assets-cn_no_data_total_0_no_cdn_or_oss_custom_domain_no_https_icp_ready; observedResourceStatus=domain_visible_records_missing; observedResourceReadiness=blocked
+  - missingEvidence: APP_API_BASE_URL:dns_special_use_wildcard_ip; APP_API_BASE_URL:https_not_ready:ECONNRESET; NEXT_PUBLIC_SITE_URL:dns_special_use_wildcard_ip; NEXT_PUBLIC_SITE_URL:https_not_ready:ECONNRESET; APP_ASSET_BASE_URL:dns_special_use_wildcard_ip; APP_ASSET_BASE_URL:https_not_ready:ECONNRESET; apiDomainHttps:confirmed; apiDomainHttps:dnsResolvedToAliyun; apiDomainHttps:httpsEnabled; apiDomainHttps:icpReady; assetDomainHttps:confirmed; assetDomainHttps:dnsResolvedToAliyun; assetDomainHttps:httpsEnabled; assetDomainHttps:icpReady; observed:domain_visible_records_missing
+  - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps
+  - nextEvidenceAction: obtain action-time confirmation, perform only the named console action, then write non-secret evidence to the configured .local.json target
+- R05_OSS_AUDIO_STORAGE: observed=bucket_visible_unconfirmed, readiness=partial
+  - currentEvidence: chrome_oss_bucket_2026-06-25T19:47_CST_bucket_exists_meiye-huajing-service-records-production-cn_visible_oss-cn-hangzhou_overview_object_page_prefix_service-records-production-cn_ram_sts_not_confirmed; observedResourceStatus=bucket_visible_unconfirmed; observedResourceReadiness=partial
+  - missingEvidence: oss:confirmed; oss:ramLeastPrivilege; observed:bucket_visible_unconfirmed
+  - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss
+  - nextEvidenceAction: confirm resource in Aliyun console or allowlisted readonly inventory, then write non-secret evidence to the configured .local.json target
+- R06_ENV_IMPORT: observed=cloudshell_disconnected_restart_confirmation_required, readiness=blocked
+  - currentEvidence: pending_aliyun_env_import_confirmation; observedResourceStatus=cloudshell_disconnected_restart_confirmation_required; observedResourceReadiness=blocked
+  - missingEvidence: missing_required_env:DATABASE_URL_CN; envImport:confirmed; envImport:secretNotInImage; envImport:placeholder:importedAt; envImport:placeholder:evidence; observed:cloudshell_disconnected_restart_confirmation_required
+  - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport; 阿里云 SAE 环境变量 / KMS / Secrets Manager
+  - nextEvidenceAction: import ready variables through SAE/KMS/Secrets Manager secret env after action-time confirmation, then run env/checklist and sensitive/blockers
+- R07_SLS_ALERTS: observed=project_logstore_visible_alerts_pending, readiness=partial
+  - currentEvidence: chrome_sls_2026-06-25T19:47_CST_project_meiye-huajing-app-prod-cn_logstore_app-api_visible_logstore_empty_index_not_enabled_health_5xx_alerts_not_configured; observedResourceStatus=project_logstore_visible_alerts_pending; observedResourceReadiness=partial
+  - missingEvidence: slsAlerts:confirmed; slsAlerts:healthAlertConfigured; slsAlerts:serverErrorAlertConfigured; observed:project_logstore_visible_alerts_pending
+  - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.slsAlerts
+  - nextEvidenceAction: confirm resource in Aliyun console or allowlisted readonly inventory, then write non-secret evidence to the configured .local.json target
+
+## 汇总
+
+- files: 4
+- readyFiles: 0/4
+- totalGaps: 50
+- rdsMigrationGaps: 19
+- cloudInventoryResultGaps: 1
+- cloudConfirmationGaps: 18
+- imagePublishGaps: 12
+- forbiddenValueClasses: AccessKeySecret, AppSecret, DATABASE_URL_CN value, RAM Secret, Supabase service role key, cookie, customer data, database password, dump contents, registry password, token, 证书私钥
+- requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION, P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P08_SAE_RUNTIME_SLS, P07_DOMAIN_DNS_HTTPS, P05_OSS_RAM_STS, P06_ENV_IMPORT, P03_ACR_PURCHASE, P04_ACR_IMAGE_AND_PULL
+
+## rdsMigration
+
+- file: /Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.rds-migration.local.json
+- exists: true
+- ready: false
+- totalBlockers: 19
+- requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
+- blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+- strictVerifyCommands: corepack pnpm aliyun:rds:migration:evidence:strict
+
+- `rdsPostgres.instanceId`
+  - blocker: todo:rdsPostgres.instanceId
+  - source: 阿里云控制台 -> RDS PostgreSQL / SAE secret env
+  - writeTo: deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.instanceId
+  - expected: 填入 RDS 控制台可见的非密钥实例 ID。
+  - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
+  - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
+  - requiredEvidence: RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据
+  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env
+- `rdsPostgres.engineVersion`
+  - blocker: todo:rdsPostgres.engineVersion
+  - source: 阿里云控制台 -> RDS PostgreSQL / SAE secret env
+  - writeTo: deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.engineVersion
+  - expected: 填入 RDS PostgreSQL 版本号。
+  - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
+  - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
+  - requiredEvidence: RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据
+  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env
+- `rdsPostgres.networkAccess`
+  - blocker: todo:rdsPostgres.networkAccess
+  - source: 阿里云控制台 -> RDS PostgreSQL / SAE secret env
+  - writeTo: deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.networkAccess
+  - expected: 填入 SAE 到 RDS 的 VPC/内网访问方式说明。
+  - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
+  - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
+  - requiredEvidence: RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据
+  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env
+- `rdsPostgres.databaseName`
+  - blocker: todo:rdsPostgres.databaseName
+  - source: 阿里云控制台 -> RDS PostgreSQL / SAE secret env
+  - writeTo: deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.databaseName
+  - expected: 填入生产数据库名，不包含账号密码或连接串。
+  - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
+  - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
+  - requiredEvidence: RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据
+  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env
+- `rdsPostgres.evidence`
+  - blocker: todo:rdsPostgres.evidence
+  - source: 阿里云控制台 -> RDS PostgreSQL / SAE secret env
+  - writeTo: deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.evidence
+  - expected: 填控制台路径、截图编号、工单号或其它非密钥证据编号。
+  - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
+  - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
+  - requiredEvidence: RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据
+  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env
+- `rdsPostgres.confirmed`
+  - blocker: rdsPostgres.confirmed
+  - source: 阿里云控制台 -> RDS PostgreSQL / SAE secret env
+  - writeTo: deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.confirmed
+  - expected: RDS PostgreSQL 实例确认存在后填 true。
+  - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
+  - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
+  - requiredEvidence: RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据
+  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env
+- `rdsPostgres.databaseAccountReady`
+  - blocker: rdsPostgres.databaseAccountReady
+  - source: 阿里云控制台 -> RDS PostgreSQL / SAE secret env
+  - writeTo: deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.databaseAccountReady
+  - expected: 数据库账号和权限就绪后填 true，不记录密码。
+  - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
+  - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
+  - requiredEvidence: RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据
+  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env
+- `rdsPostgres.databaseUrlCnSecretImported`
+  - blocker: rdsPostgres.databaseUrlCnSecretImported
+  - source: 阿里云控制台 -> RDS PostgreSQL / SAE secret env
+  - writeTo: deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.databaseUrlCnSecretImported
+  - expected: DATABASE_URL_CN 已只导入阿里云 KMS/Secrets Manager/SAE secret env 后填 true。
+  - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
+  - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
+  - requiredEvidence: RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据
+  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env
+- `migration.schemaCompatibilityReviewed`
+  - blocker: migration.schemaCompatibilityReviewed
+  - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
+  - writeTo: deploy/aliyun-production-cn.rds-migration.local.json -> migration.schemaCompatibilityReviewed
+  - expected: 填真实非密钥证据，不能保留 TODO、pending 或 TBD 占位值。
+  - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
+  - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
+  - requiredEvidence: Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+- `migration.supabaseSpecificSqlResolved`
+  - blocker: migration.supabaseSpecificSqlResolved
+  - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
+  - writeTo: deploy/aliyun-production-cn.rds-migration.local.json -> migration.supabaseSpecificSqlResolved
+  - expected: 填真实非密钥证据，不能保留 TODO、pending 或 TBD 占位值。
+  - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
+  - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
+  - requiredEvidence: Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+- `migration.rdsExtensionSupportConfirmed`
+  - blocker: migration.rdsExtensionSupportConfirmed
+  - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
+  - writeTo: deploy/aliyun-production-cn.rds-migration.local.json -> migration.rdsExtensionSupportConfirmed
+  - expected: 填真实非密钥证据，不能保留 TODO、pending 或 TBD 占位值。
+  - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
+  - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
+  - requiredEvidence: Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+- `migration.schemaMigrated`
+  - blocker: migration.schemaMigrated
+  - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
+  - writeTo: deploy/aliyun-production-cn.rds-migration.local.json -> migration.schemaMigrated
+  - expected: schema 已迁到 RDS/PostgreSQL 并通过非密钥验收后填 true。
+  - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
+  - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
+  - requiredEvidence: Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+- `migration.dataMigrated`
+  - blocker: migration.dataMigrated
+  - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
+  - writeTo: deploy/aliyun-production-cn.rds-migration.local.json -> migration.dataMigrated
+  - expected: 数据已按迁移计划进入 RDS/PostgreSQL 并通过非密钥验收后填 true。
+  - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
+  - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
+  - requiredEvidence: Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+- `migration.rowCountValidationPassed`
+  - blocker: migration.rowCountValidationPassed
+  - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
+  - writeTo: deploy/aliyun-production-cn.rds-migration.local.json -> migration.rowCountValidationPassed
+  - expected: 关键表 row count 校验通过后填 true。
+  - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
+  - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
+  - requiredEvidence: Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+- `migration.criticalRecordValidationPassed`
+  - blocker: migration.criticalRecordValidationPassed
+  - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
+  - writeTo: deploy/aliyun-production-cn.rds-migration.local.json -> migration.criticalRecordValidationPassed
+  - expected: 关键记录、租户/门店/服务记录关系校验通过后填 true。
+  - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
+  - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
+  - requiredEvidence: Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+- `migration.appApiSmokeOnRdsPassed`
+  - blocker: migration.appApiSmokeOnRdsPassed
+  - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
+  - writeTo: deploy/aliyun-production-cn.rds-migration.local.json -> migration.appApiSmokeOnRdsPassed
+  - expected: profile / tenant / invite / service-record APP API 在 RDS 上冒烟通过后填 true。
+  - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
+  - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
+  - requiredEvidence: Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+- `migration.supabaseNoLongerFormalTarget`
+  - blocker: migration.supabaseNoLongerFormalTarget
+  - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
+  - writeTo: deploy/aliyun-production-cn.rds-migration.local.json -> migration.supabaseNoLongerFormalTarget
+  - expected: Supabase 已仅作为迁移来源或旧兼容，不再作为 production-cn 正式数据库目标后填 true。
+  - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
+  - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
+  - requiredEvidence: Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+- `migration.rollbackRunbookReviewed`
+  - blocker: migration.rollbackRunbookReviewed
+  - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
+  - writeTo: deploy/aliyun-production-cn.rds-migration.local.json -> migration.rollbackRunbookReviewed
+  - expected: 回滚 runbook 已评审后填 true。
+  - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
+  - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
+  - requiredEvidence: Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+- `migration.rollbackValidationPassed`
+  - blocker: migration.rollbackValidationPassed
+  - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
+  - writeTo: deploy/aliyun-production-cn.rds-migration.local.json -> migration.rollbackValidationPassed
+  - expected: 回滚演练或可恢复性验证通过后填 true。
+  - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
+  - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
+  - requiredEvidence: Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+
+## cloudInventoryResults
+
+- file: /Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.cloud-inventory-results.local.json
+- exists: true
+- ready: false
+- totalBlockers: 1
+- checkedOperations: 9
+- requiredAuthorizationPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY
+- blockedUntil: 阿里云 CLI profile 或 CloudShell 只读身份可用
+- strictVerifyCommands: corepack pnpm aliyun:cloud:inventory-results:strict
+
+- `operations[*].commandResults[*]`
+  - blocker: readonly_inventory_strict_ready=0/9
+  - source: 阿里云 CLI 或 Cloud Shell 只读资源盘点
+  - writeTo: deploy/aliyun-production-cn.cloud-inventory-results.local.json
+  - expected: 当前只有控制台人工观察或不完整 CLI 结果；等 Aliyun CLI/Cloud Shell 具备安全配置后，运行受控只读 inventory，并只写 executed、exitStatus、cloudApiCalled、mutationPerformed=false、observedAt、outputSummary 和非密钥 evidence。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, 证书私钥, Supabase service role key
+  - requiredAuthorizationPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY
+  - requiredEvidence: 受控只读 Aliyun CLI/CloudShell inventory 结果：executed=true、cloudApiCalled=true、mutationPerformed=false
+  - blockedUntil: 阿里云 CLI profile 或 CloudShell 只读身份可用
+
+## cloudConfirmations
+
+- file: /Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.cloud-confirmations.local.json
+- exists: true
+- ready: false
+- totalBlockers: 18
+- requiredAuthorizationPackets: P08_SAE_RUNTIME_SLS, P07_DOMAIN_DNS_HTTPS, P05_OSS_RAM_STS, P06_ENV_IMPORT
+- blockedUntil: SAE runtime 与 SLS 告警已确认; 域名 DNS、HTTPS 和 ICP 均就绪; OSS 与最小权限 RAM/STS 已配置; 密钥类环境变量已导入运行时密钥系统且未写入镜像
+- strictVerifyCommands: corepack pnpm aliyun:cloud:confirmations:strict
+
+- `items.runtime.confirmed`
+  - blocker: confirmed
+  - source: 阿里云控制台 -> SAE -> cn-hangzhou -> 应用列表
+  - writeTo: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.runtime
+  - expected: 确认完成后填 true。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
+  - requiredAuthorizationPackets: P08_SAE_RUNTIME_SLS
+  - requiredEvidence: SAE runtime、健康检查和 SLS 告警的非密钥控制台证据
+  - blockedUntil: SAE runtime 与 SLS 告警已确认
+- `items.apiDomainHttps.confirmed`
+  - blocker: confirmed
+  - source: 阿里云控制台 -> 云解析 DNS / 数字证书管理服务 / SAE 或网关入口
+  - writeTo: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps
+  - expected: 确认完成后填 true。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
+  - requiredAuthorizationPackets: P07_DOMAIN_DNS_HTTPS
+  - requiredEvidence: 域名解析到阿里云入口、HTTPS 证书启用、ICP备案满足国内正式访问要求的证据
+  - blockedUntil: 域名 DNS、HTTPS 和 ICP 均就绪
+- `items.apiDomainHttps.dnsResolvedToAliyun`
+  - blocker: dnsResolvedToAliyun
+  - source: 阿里云控制台 -> 云解析 DNS / 数字证书管理服务 / SAE 或网关入口
+  - writeTo: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps
+  - expected: 域名已解析到阿里云公网入口后填 true。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
+  - requiredAuthorizationPackets: P07_DOMAIN_DNS_HTTPS
+  - requiredEvidence: 域名解析到阿里云入口、HTTPS 证书启用、ICP备案满足国内正式访问要求的证据
+  - blockedUntil: 域名 DNS、HTTPS 和 ICP 均就绪
+- `items.apiDomainHttps.httpsEnabled`
+  - blocker: httpsEnabled
+  - source: 阿里云控制台 -> 云解析 DNS / 数字证书管理服务 / SAE 或网关入口
+  - writeTo: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps
+  - expected: HTTPS 证书已启用并可访问后填 true。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
+  - requiredAuthorizationPackets: P07_DOMAIN_DNS_HTTPS
+  - requiredEvidence: 域名解析到阿里云入口、HTTPS 证书启用、ICP备案满足国内正式访问要求的证据
+  - blockedUntil: 域名 DNS、HTTPS 和 ICP 均就绪
+- `items.apiDomainHttps.icpReady`
+  - blocker: icpReady
+  - source: 阿里云控制台 -> 云解析 DNS / 数字证书管理服务 / SAE 或网关入口
+  - writeTo: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps
+  - expected: 备案状态满足国内正式访问要求后填 true。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
+  - requiredAuthorizationPackets: P07_DOMAIN_DNS_HTTPS
+  - requiredEvidence: 域名解析到阿里云入口、HTTPS 证书启用、ICP备案满足国内正式访问要求的证据
+  - blockedUntil: 域名 DNS、HTTPS 和 ICP 均就绪
+- `items.assetDomainHttps.confirmed`
+  - blocker: confirmed
+  - source: 阿里云控制台 -> 云解析 DNS / CDN 或 OSS 自定义域名 / 数字证书管理服务
+  - writeTo: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps
+  - expected: 确认完成后填 true。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
+  - requiredAuthorizationPackets: P07_DOMAIN_DNS_HTTPS
+  - requiredEvidence: 域名解析到阿里云入口、HTTPS 证书启用、ICP备案满足国内正式访问要求的证据
+  - blockedUntil: 域名 DNS、HTTPS 和 ICP 均就绪
+- `items.assetDomainHttps.dnsResolvedToAliyun`
+  - blocker: dnsResolvedToAliyun
+  - source: 阿里云控制台 -> 云解析 DNS / CDN 或 OSS 自定义域名 / 数字证书管理服务
+  - writeTo: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps
+  - expected: 域名已解析到阿里云公网入口后填 true。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
+  - requiredAuthorizationPackets: P07_DOMAIN_DNS_HTTPS
+  - requiredEvidence: 域名解析到阿里云入口、HTTPS 证书启用、ICP备案满足国内正式访问要求的证据
+  - blockedUntil: 域名 DNS、HTTPS 和 ICP 均就绪
+- `items.assetDomainHttps.httpsEnabled`
+  - blocker: httpsEnabled
+  - source: 阿里云控制台 -> 云解析 DNS / CDN 或 OSS 自定义域名 / 数字证书管理服务
+  - writeTo: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps
+  - expected: HTTPS 证书已启用并可访问后填 true。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
+  - requiredAuthorizationPackets: P07_DOMAIN_DNS_HTTPS
+  - requiredEvidence: 域名解析到阿里云入口、HTTPS 证书启用、ICP备案满足国内正式访问要求的证据
+  - blockedUntil: 域名 DNS、HTTPS 和 ICP 均就绪
+- `items.assetDomainHttps.icpReady`
+  - blocker: icpReady
+  - source: 阿里云控制台 -> 云解析 DNS / CDN 或 OSS 自定义域名 / 数字证书管理服务
+  - writeTo: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps
+  - expected: 备案状态满足国内正式访问要求后填 true。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
+  - requiredAuthorizationPackets: P07_DOMAIN_DNS_HTTPS
+  - requiredEvidence: 域名解析到阿里云入口、HTTPS 证书启用、ICP备案满足国内正式访问要求的证据
+  - blockedUntil: 域名 DNS、HTTPS 和 ICP 均就绪
+- `items.oss.confirmed`
+  - blocker: confirmed
+  - source: 阿里云控制台 -> OSS Bucket / RAM 访问控制
+  - writeTo: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss
+  - expected: 确认完成后填 true。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
+  - requiredAuthorizationPackets: P05_OSS_RAM_STS
+  - requiredEvidence: OSS bucket/CORS、服务记录前缀最小权限 RAM 或 STS/role 证据
+  - blockedUntil: OSS 与最小权限 RAM/STS 已配置
+- `items.oss.ramLeastPrivilege`
+  - blocker: ramLeastPrivilege
+  - source: 阿里云控制台 -> OSS Bucket / RAM 访问控制
+  - writeTo: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss
+  - expected: RAM 权限已限制到服务记录前缀后填 true。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
+  - requiredAuthorizationPackets: P05_OSS_RAM_STS
+  - requiredEvidence: OSS bucket/CORS、服务记录前缀最小权限 RAM 或 STS/role 证据
+  - blockedUntil: OSS 与最小权限 RAM/STS 已配置
+- `items.envImport.importedAt`
+  - blocker: placeholder:importedAt
+  - source: 阿里云控制台 -> SAE 应用 -> 环境变量 / KMS / Secrets Manager
+  - writeTo: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport
+  - expected: 填实际导入 production-cn env 的时间或控制台证据编号。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
+  - requiredAuthorizationPackets: P06_ENV_IMPORT
+  - requiredEvidence: production-cn 环境变量已导入 SAE/KMS/Secrets Manager，且 secretNotInImage=true 的证据
+  - blockedUntil: 密钥类环境变量已导入运行时密钥系统且未写入镜像
+- `items.envImport.evidence`
+  - blocker: placeholder:evidence
+  - source: 阿里云控制台 -> SAE 应用 -> 环境变量 / KMS / Secrets Manager
+  - writeTo: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport
+  - expected: 填控制台路径、截图编号、工单号或其它非密钥证据编号。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
+  - requiredAuthorizationPackets: P06_ENV_IMPORT
+  - requiredEvidence: production-cn 环境变量已导入 SAE/KMS/Secrets Manager，且 secretNotInImage=true 的证据
+  - blockedUntil: 密钥类环境变量已导入运行时密钥系统且未写入镜像
+- `items.envImport.confirmed`
+  - blocker: confirmed
+  - source: 阿里云控制台 -> SAE 应用 -> 环境变量 / KMS / Secrets Manager
+  - writeTo: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport
+  - expected: 确认完成后填 true。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
+  - requiredAuthorizationPackets: P06_ENV_IMPORT
+  - requiredEvidence: production-cn 环境变量已导入 SAE/KMS/Secrets Manager，且 secretNotInImage=true 的证据
+  - blockedUntil: 密钥类环境变量已导入运行时密钥系统且未写入镜像
+- `items.envImport.secretNotInImage`
+  - blocker: secretNotInImage
+  - source: 阿里云控制台 -> SAE 应用 -> 环境变量 / KMS / Secrets Manager
+  - writeTo: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport
+  - expected: 确认密钥只在 SAE/KMS/Secrets Manager 中，未写入镜像后填 true。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
+  - requiredAuthorizationPackets: P06_ENV_IMPORT
+  - requiredEvidence: production-cn 环境变量已导入 SAE/KMS/Secrets Manager，且 secretNotInImage=true 的证据
+  - blockedUntil: 密钥类环境变量已导入运行时密钥系统且未写入镜像
+- `items.slsAlerts.confirmed`
+  - blocker: confirmed
+  - source: 阿里云控制台 -> 日志服务 SLS / 应用监控告警
+  - writeTo: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.slsAlerts
+  - expected: 确认完成后填 true。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
+  - requiredAuthorizationPackets: P08_SAE_RUNTIME_SLS
+  - requiredEvidence: SAE runtime、健康检查和 SLS 告警的非密钥控制台证据
+  - blockedUntil: SAE runtime 与 SLS 告警已确认
+- `items.slsAlerts.healthAlertConfigured`
+  - blocker: healthAlertConfigured
+  - source: 阿里云控制台 -> 日志服务 SLS / 应用监控告警
+  - writeTo: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.slsAlerts
+  - expected: 填真实非密钥控制台证据，不能保留 TODO、pending 或 TBD 占位值。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
+  - requiredAuthorizationPackets: P08_SAE_RUNTIME_SLS
+  - requiredEvidence: SAE runtime、健康检查和 SLS 告警的非密钥控制台证据
+  - blockedUntil: SAE runtime 与 SLS 告警已确认
+- `items.slsAlerts.serverErrorAlertConfigured`
+  - blocker: serverErrorAlertConfigured
+  - source: 阿里云控制台 -> 日志服务 SLS / 应用监控告警
+  - writeTo: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.slsAlerts
+  - expected: 填真实非密钥控制台证据，不能保留 TODO、pending 或 TBD 占位值。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
+  - requiredAuthorizationPackets: P08_SAE_RUNTIME_SLS
+  - requiredEvidence: SAE runtime、健康检查和 SLS 告警的非密钥控制台证据
+  - blockedUntil: SAE runtime 与 SLS 告警已确认
+
+## imagePublish
+
+- file: /Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.image-publish.local.json
+- exists: true
+- ready: false
+- totalBlockers: 12
+- localDockerImage: ready
+- requiredAuthorizationPackets: P03_ACR_PURCHASE, P04_ACR_IMAGE_AND_PULL, P08_SAE_RUNTIME_SLS
+- blockedUntil: ACR 已开通并确认仓库位置; 镜像已进入 ACR 且远端 digest 已核对; SAE runtime 已确认; SAE 镜像地址和拉取权限已配置
+- strictVerifyCommands: corepack pnpm aliyun:image:plan:strict
+
+- `acr.registryHost`
+  - blocker: todo:acr.registryHost
+  - source: 阿里云控制台 -> 容器镜像服务 ACR -> cn-hangzhou -> 命名空间/仓库
+  - writeTo: deploy/aliyun-production-cn.image-publish.local.json -> acr
+  - expected: 填阿里云 ACR registry host。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
+  - requiredAuthorizationPackets: P03_ACR_PURCHASE
+  - requiredEvidence: ACR 实例、命名空间、仓库和非密钥控制台证据
+  - blockedUntil: ACR 已开通并确认仓库位置
+- `acr.namespace`
+  - blocker: todo:acr.namespace
+  - source: 阿里云控制台 -> 容器镜像服务 ACR -> cn-hangzhou -> 命名空间/仓库
+  - writeTo: deploy/aliyun-production-cn.image-publish.local.json -> acr
+  - expected: 填阿里云 ACR namespace。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
+  - requiredAuthorizationPackets: P03_ACR_PURCHASE
+  - requiredEvidence: ACR 实例、命名空间、仓库和非密钥控制台证据
+  - blockedUntil: ACR 已开通并确认仓库位置
+- `acr.remoteImage`
+  - blocker: todo:acr.remoteImage
+  - source: 阿里云控制台 -> 容器镜像服务 ACR -> cn-hangzhou -> 命名空间/仓库
+  - writeTo: deploy/aliyun-production-cn.image-publish.local.json -> acr
+  - expected: 填 production-cn 远端镜像完整地址。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
+  - requiredAuthorizationPackets: P04_ACR_IMAGE_AND_PULL
+  - requiredEvidence: ACR 远端镜像地址、sha256 digest、push/import 证据和 digest 核对证据
+  - blockedUntil: 镜像已进入 ACR 且远端 digest 已核对
+- `acr.remoteDigest`
+  - blocker: todo:acr.remoteDigest
+  - source: 阿里云控制台 -> 容器镜像服务 ACR -> cn-hangzhou -> 命名空间/仓库
+  - writeTo: deploy/aliyun-production-cn.image-publish.local.json -> acr
+  - expected: 填 sha256:<64 hex> 镜像 digest。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
+  - requiredAuthorizationPackets: P04_ACR_IMAGE_AND_PULL
+  - requiredEvidence: ACR 远端镜像地址、sha256 digest、push/import 证据和 digest 核对证据
+  - blockedUntil: 镜像已进入 ACR 且远端 digest 已核对
+- `acr.evidence`
+  - blocker: todo:acr.evidence
+  - source: 阿里云控制台 -> 容器镜像服务 ACR -> cn-hangzhou -> 命名空间/仓库
+  - writeTo: deploy/aliyun-production-cn.image-publish.local.json -> acr
+  - expected: 填 ACR 推送/导入证据编号。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
+  - requiredAuthorizationPackets: P04_ACR_IMAGE_AND_PULL
+  - requiredEvidence: ACR 远端镜像地址、sha256 digest、push/import 证据和 digest 核对证据
+  - blockedUntil: 镜像已进入 ACR 且远端 digest 已核对
+- `acr.confirmed`
+  - blocker: acr.confirmed
+  - source: 阿里云控制台 -> 容器镜像服务 ACR -> cn-hangzhou -> 命名空间/仓库
+  - writeTo: deploy/aliyun-production-cn.image-publish.local.json -> acr
+  - expected: ACR 仓库确认后填 true。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
+  - requiredAuthorizationPackets: P03_ACR_PURCHASE
+  - requiredEvidence: ACR 实例、命名空间、仓库和非密钥控制台证据
+  - blockedUntil: ACR 已开通并确认仓库位置
+- `acr.imagePushed`
+  - blocker: acr.imagePushed
+  - source: 阿里云控制台 -> 容器镜像服务 ACR -> cn-hangzhou -> 命名空间/仓库
+  - writeTo: deploy/aliyun-production-cn.image-publish.local.json -> acr
+  - expected: 镜像已推送或导入 ACR 后填 true。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
+  - requiredAuthorizationPackets: P04_ACR_IMAGE_AND_PULL
+  - requiredEvidence: ACR 远端镜像地址、sha256 digest、push/import 证据和 digest 核对证据
+  - blockedUntil: 镜像已进入 ACR 且远端 digest 已核对
+- `acr.digestVerified`
+  - blocker: acr.digestVerified
+  - source: 阿里云控制台 -> 容器镜像服务 ACR -> cn-hangzhou -> 命名空间/仓库
+  - writeTo: deploy/aliyun-production-cn.image-publish.local.json -> acr
+  - expected: 远端 digest 已核对后填 true。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
+  - requiredAuthorizationPackets: P04_ACR_IMAGE_AND_PULL
+  - requiredEvidence: ACR 远端镜像地址、sha256 digest、push/import 证据和 digest 核对证据
+  - blockedUntil: 镜像已进入 ACR 且远端 digest 已核对
+- `acr.remoteDigest`
+  - blocker: acr.remoteDigest=sha256
+  - source: 阿里云控制台 -> 容器镜像服务 ACR -> cn-hangzhou -> 命名空间/仓库
+  - writeTo: deploy/aliyun-production-cn.image-publish.local.json -> acr
+  - expected: 填 sha256:<64 hex> 镜像 digest。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
+  - requiredAuthorizationPackets: P04_ACR_IMAGE_AND_PULL
+  - requiredEvidence: ACR 远端镜像地址、sha256 digest、push/import 证据和 digest 核对证据
+  - blockedUntil: 镜像已进入 ACR 且远端 digest 已核对
+- `runtime.confirmed`
+  - blocker: runtime.confirmed
+  - source: 阿里云控制台 -> SAE -> cn-hangzhou -> 应用 -> 镜像部署 / 镜像拉取配置
+  - writeTo: deploy/aliyun-production-cn.image-publish.local.json -> runtime
+  - expected: SAE runtime 已确认后填 true。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
+  - requiredAuthorizationPackets: P08_SAE_RUNTIME_SLS
+  - requiredEvidence: SAE production-cn runtime 控制台非密钥证据
+  - blockedUntil: SAE runtime 已确认
+- `runtime.remoteImageConfigured`
+  - blocker: runtime.remoteImageConfigured
+  - source: 阿里云控制台 -> SAE -> cn-hangzhou -> 应用 -> 镜像部署 / 镜像拉取配置
+  - writeTo: deploy/aliyun-production-cn.image-publish.local.json -> runtime
+  - expected: SAE 已指向 ACR remote image 后填 true。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
+  - requiredAuthorizationPackets: P04_ACR_IMAGE_AND_PULL
+  - requiredEvidence: SAE 已指向 ACR 远端镜像并具备镜像拉取权限的非密钥证据
+  - blockedUntil: SAE 镜像地址和拉取权限已配置
+- `runtime.imagePullConfigured`
+  - blocker: runtime.imagePullConfigured
+  - source: 阿里云控制台 -> SAE -> cn-hangzhou -> 应用 -> 镜像部署 / 镜像拉取配置
+  - writeTo: deploy/aliyun-production-cn.image-publish.local.json -> runtime
+  - expected: SAE 镜像拉取权限配置完成后填 true。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
+  - requiredAuthorizationPackets: P04_ACR_IMAGE_AND_PULL
+  - requiredEvidence: SAE 已指向 ACR 远端镜像并具备镜像拉取权限的非密钥证据
+  - blockedUntil: SAE 镜像地址和拉取权限已配置
+
+## Strict 验证顺序
+
+- `corepack pnpm aliyun:rds:migration:evidence:strict`
+- `corepack pnpm aliyun:cloud:inventory-results:strict`
+- `corepack pnpm aliyun:cloud:confirmations:strict`
+- `corepack pnpm aliyun:image:plan:strict`
+- `corepack pnpm aliyun:domain:strict`
+- `corepack pnpm aliyun:readiness:cloud-ready`
+- `corepack pnpm aliyun:completion:audit`
+- `corepack pnpm aliyun:predeploy`
+
+## 安全边界
+
+- 本命令只读取本地门禁报告并生成回填清单。
+- 本命令不会改写 rds-migration.local.json、cloud-confirmations.local.json、cloud-inventory-results.local.json 或 image-publish.local.json。
+- 本命令不会调用阿里云 API，不会购买 ACR，不会 push 镜像，不会部署 SAE，不会改 DNS/HTTPS/ICP。
+- 回填本地证据时只能写资源名、布尔状态、时间戳、控制台路径、digest、row-count 结论和非密钥 evidence handle。
+- 禁止写入 AppSecret、AccessKeySecret、registry password、RAM Secret、STS token、cookie、证书私钥、DATABASE_URL_CN value、database password、dump contents、customer data 或 Supabase service role key。
