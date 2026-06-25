@@ -271,6 +271,7 @@ function buildReport(args) {
   const envSourceMapSummary = compactEnvSourceMap(envSourceMap)
   const backendRequiredBlocking = backendStatus.summary?.backendRequiredBlocking || []
   const deferredAppLaunchBlocking = backendStatus.summary?.appLaunchDeferredBlocking || []
+  const currentOperatorTasks = completionAudit.summary?.operatorTasks || status.summary?.operatorTasks || {}
   const report = {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -323,7 +324,7 @@ function buildReport(args) {
       canStartNowAuthorizationPackets: nextActionSequencing.canStartNowAuthorizationPackets,
       blockedByAuthorizationPacketDependencies: nextActionSequencing.blockedByAuthorizationPacketDependencies,
       cloudConfirmationsReady: `${status.summary?.cloudConfirmations?.ready || 0}/${status.summary?.cloudConfirmations?.total || 0}`,
-      operatorTasksReady: `${status.summary?.operatorTasks?.ready || 0}/${status.summary?.operatorTasks?.total || 0}`,
+      operatorTasksReady: `${currentOperatorTasks.ready || 0}/${currentOperatorTasks.total || 0}`,
       completion: {
         proved: completionAudit.summary?.proved || 0,
         blocked: completionAudit.summary?.blocked || 0,

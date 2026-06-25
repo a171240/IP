@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 当前阻塞简报
 
-Generated: 2026-06-25T11:09:04.627Z
+Generated: 2026-06-25T18:43:14.388Z
 
 ## 结论
 
@@ -41,7 +41,7 @@ Generated: 2026-06-25T11:09:04.627Z
 - canStartNowAuthorizationPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
 - blockedByAuthorizationPacketDependencies: P04_ACR_IMAGE_AND_PULL, P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS, P09_PRODUCTION_DEPLOY
 - cloudConfirmationsReady: 0/7
-- operatorTasksReady: 1/9
+- operatorTasksReady: 0/7
 - completion: proved 1/11, blocked 7, partial 1
 - sensitiveBlocked: 5/5
 - sensitiveBlockedIds: S03_ACR_PAID_PURCHASE, S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT
@@ -230,7 +230,7 @@ Generated: 2026-06-25T11:09:04.627Z
 | `R03_API_DOMAIN_HTTPS` | false | domain_visible_records_missing | blocked | true | 补齐 api-cn.ipgongchang.xin 与 assets-cn.ipgongchang.xin 解析到阿里云入口，并确认 HTTPS/ICP。 | deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps / items.assetDomainHttps |
 | `R04_ASSET_DOMAIN_HTTPS` | false | domain_visible_records_missing | blocked | true | 补齐 api-cn.ipgongchang.xin 与 assets-cn.ipgongchang.xin 解析到阿里云入口，并确认 HTTPS/ICP。 | deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps / items.assetDomainHttps |
 | `R05_OSS_AUDIO_STORAGE` | false | bucket_visible_unconfirmed | partial | false | 继续确认 CORS、RAM 最小权限和 service-records/production-cn 前缀；只记录 bucket/region/布尔证据。 | deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss |
-| `R06_ENV_IMPORT` | false | cloudshell_disconnected_or_config_missing | blocked | true | 只有 Cloud Shell/CLI 配置 ready 后，才运行受控只读 inventory runner；否则继续用控制台人工证据。 | deploy/aliyun-production-cn.cloud-inventory-results.local.json |
+| `R06_ENV_IMPORT` | false | cloudshell_disconnected_restart_confirmation_required | blocked | true | 只有 Cloud Shell/CLI 配置 ready 后，才运行受控只读 inventory runner；否则继续用控制台人工证据。 | deploy/aliyun-production-cn.cloud-inventory-results.local.json |
 | `R07_SLS_ALERTS` | false | project_logstore_visible_alerts_pending | partial | false | SAE runtime ready 后配置日志采集、/api/healthz 健康告警和 5xx 告警。 | deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.slsAlerts |
 
 ## 下一步动作排序
@@ -242,7 +242,7 @@ Generated: 2026-06-25T11:09:04.627Z
 
 | 授权包 | 动作 | owner | 最小确认语 | 非密钥证据 |
 | --- | --- | --- | --- | --- |
-| `P00_ALIYUN_READONLY_INVENTORY_IDENTITY` | 恢复阿里云 CLI/CloudShell 只读盘点身份 | 用户/阿里云只读盘点操作员 | 授权重新连接阿里云 CloudShell 或配置 Aliyun CLI，只运行 allowlisted 只读盘点命令并写入非密钥 evidence。 | true |
+| `P00_ALIYUN_READONLY_INVENTORY_IDENTITY` | 恢复阿里云 CLI/CloudShell 只读盘点身份 | 用户/阿里云只读盘点操作员 | 授权开通/重新连接阿里云 CloudShell 或配置 Aliyun CLI；如 CloudShell 提示会创建性能型 NAS 并可能产生费用，确认后才可点击开通；只运行 allowlisted 只读盘点命令并写入非密钥 evidence。 | true |
 | `P03_ACR_PURCHASE` | 确认 ACR 企业版付费购买 | 用户/阿里云 ACR 操作员 | 授权购买 ACR Enterprise Economic，cn-hangzhou，1 个月，当前报价 CNY 117.00。 | true |
 | `P05_OSS_RAM_STS` | 绑定 OSS RAM 最小权限或 STS/运行时角色方案 | 阿里云 OSS/RAM 操作员 | 授权为服务记录音频 OSS 配置最小权限 RAM/STS 或运行时角色，并只通过密钥环境注入。 | false |
 | `P11_ALIYUN_RDS_DATA_MIGRATION` | 创建阿里云 RDS PostgreSQL 并完成正式数据层迁移 | 阿里云 RDS/后端数据迁移操作员 | 授权创建/确认阿里云 RDS PostgreSQL production-cn 数据库并完成数据迁移；DATABASE_URL_CN 只能进入阿里云 secret env。 | false |
@@ -351,7 +351,7 @@ Generated: 2026-06-25T11:09:04.627Z
 
 - title: 恢复阿里云 CLI/CloudShell 只读盘点身份
 - owner: 用户/阿里云只读盘点操作员
-- minimumUserPhrase: 授权重新连接阿里云 CloudShell 或配置 Aliyun CLI，只运行 allowlisted 只读盘点命令并写入非密钥 evidence。
+- minimumUserPhrase: 授权开通/重新连接阿里云 CloudShell 或配置 Aliyun CLI；如 CloudShell 提示会创建性能型 NAS 并可能产生费用，确认后才可点击开通；只运行 allowlisted 只读盘点命令并写入非密钥 evidence。
 - writeTargets: deploy/aliyun-production-cn.cloud-inventory-results.local.json -> non-secret read-only inventory summaries
 - verifyCommands: corepack pnpm aliyun:cloud:access; MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1 corepack pnpm aliyun:cloud:inventory-run -- --execute-readonly --write-local deploy/aliyun-production-cn.cloud-inventory-results.local.json; corepack pnpm aliyun:cloud:inventory-results:strict; corepack pnpm aliyun:evidence:writeback:backend
 - nonSecretEvidenceOnly: true
@@ -464,14 +464,14 @@ Generated: 2026-06-25T11:09:04.627Z
 - currentBrowserRunning: true
 - currentBrowserCanUseCurrentConsole: true
 - currentBrowserAliyunConsoleTabCount: 1
-- currentBrowserAliyunConsoleHostPaths: saenext.console.aliyun.com/overview
+- currentBrowserAliyunConsoleHostPaths: shell.aliyun.com
 - currentBrowserCloudApiCalled: false
 - currentBrowserCloudMutationPerformed: false
 - currentBrowserBlockers: none
 - workbenchTerminalConnected: true
 - workbenchTerminalReadiness: connected_not_inventory_ready
 - workbenchTerminalCliInventoryAttempted: false
-- blockers: aliyun_cli_config_missing_or_unread, aliyun_cli_profile_not_configured, cloudshell_cli_config_missing_or_unread
+- blockers: aliyun_cli_config_missing_or_unread, aliyun_cli_profile_not_configured
 - safeConsoleOnly: false
 - strictReadyOperations: 0/9
 - consoleObservationOperations: 9

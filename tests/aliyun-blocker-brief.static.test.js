@@ -403,6 +403,8 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
     "P05_OSS_RAM_STS",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
   ])
+  assert.equal(report.summary.operatorTasksReady, "0/7")
+  assert.match(markdown, /operatorTasksReady: 0\/7/)
   assert.equal(report.summary.blockedVariableAcquisitionCount, 1)
   assert.equal(report.summary.deferredAppLaunchVariableAcquisitionCount, 7)
   assert.equal(report.summary.sensitiveBlocked, "5/5")
