@@ -127,7 +127,13 @@ test("Aliyun sensitive blockers backend-only mode excludes deferred APP launch c
   assert.equal(rdsQueueItem.userQuestion, "DATABASE_URL_CN 从哪里获得并导入到哪里")
   assert.ok(rdsQueueItem.obtainFrom.includes("阿里云控制台 -> RDS PostgreSQL"))
   assert.ok(rdsQueueItem.destinationSummary.some((item) => item.includes("DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env only")))
+  assert.ok(rdsQueueItem.verifyCommands.includes("corepack pnpm aliyun:rds:migration:package"))
   assert.ok(rdsQueueItem.verifyCommands.includes("corepack pnpm aliyun:rds:migration:evidence:strict"))
+  const rdsSensitiveItem = report.items.find((item) => item.id === "S08_ALIYUN_RDS_DATABASE_URL")
+  assert.match(rdsSensitiveItem.requiredUserAction, /compatibilityReviewChecklist 6 类/)
+  assert.match(rdsSensitiveItem.unblockCondition, /migration\.schemaCompatibilityReviewed=true/)
+  assert.ok(rdsSensitiveItem.completionEvidence.includes("compatibilityReviewChecklistItemCount=6 is reviewed and closed before schema apply"))
+  assert.ok(rdsSensitiveItem.completionEvidence.includes("migration.supabaseSpecificSqlResolved=true"))
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
@@ -157,7 +163,18 @@ test("APP production-cn credential acquisition runbook pins backend-only passwor
     "credentialBlockedByDependencyIds: S04_ACR_REGISTRY_AUTH, S06_READY_SENSITIVE_ENV_IMPORT",
     "nonCredentialCanStartPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "Import the DATABASE_URL_CN value directly into Aliyun KMS / Secrets Manager / SAE secret env.",
+    "Required before treating it as complete: close the 6-item RDS compatibilityReviewChecklist",
+    "corepack pnpm aliyun:rds:migration:package",
+    "supabase_auth_uid",
+    "supabase_storage_schema",
+    "supabase_service_role",
+    "row_level_security",
+    "policy_statement",
+    "extension_review",
     "rdsPostgres.databaseUrlCnSecretImported=true",
+    "migration.schemaCompatibilityReviewed=true",
+    "migration.supabaseSpecificSqlResolved=true",
+    "migration.rdsExtensionSupportConfirmed=true",
     "migration.supabaseNoLongerFormalTarget=true",
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "P03_ACR_PURCHASE",
@@ -256,6 +273,11 @@ test("Aliyun sensitive blockers output has current blocked action ids but no sec
     group.blockedCredentialNames.includes("DATABASE_URL_CN") &&
     /RDS PostgreSQL/.test(group.obtainFrom)
   ))
+  const fullRdsItem = report.items.find((item) => item.id === "S08_ALIYUN_RDS_DATABASE_URL")
+  assert.ok(fullRdsItem.verifyCommands.includes("corepack pnpm aliyun:rds:migration:package"))
+  assert.match(fullRdsItem.requiredUserAction, /compatibilityReviewChecklist 6 类/)
+  assert.match(fullRdsItem.unblockCondition, /migration\.supabaseSpecificSqlResolved=true/)
+  assert.match(fullRdsItem.completionEvidence.join("\n"), /extension_review dispositions are recorded without secrets/)
   assert.ok(report.credentialInterventionBrief.groups.some((group) =>
     group.category === "android_release_signing" &&
     group.actionId === "S07_ANDROID_RELEASE_SIGNING" &&
@@ -584,6 +606,13 @@ test("APP production-cn backend-only sensitive docs reflect current Aliyun backe
   assert.match(sensitiveDoc, /readySecretsPendingCloudImport: 17/)
   assert.match(sensitiveDoc, /paidPurchaseConfirmationActionIds: S03_ACR_PAID_PURCHASE/)
   assert.match(sensitiveDoc, /controlledSecretChannelActionIds: S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT/)
+  assert.match(sensitiveDoc, /corepack pnpm aliyun:rds:migration:package/)
+  assert.match(sensitiveDoc, /compatibilityReviewChecklist 6 类/)
+  assert.match(sensitiveDoc, /compatibilityReviewChecklistItemCount=6 is reviewed and closed before schema apply/)
+  assert.match(sensitiveDoc, /supabase_auth_uid\/supabase_storage_schema\/supabase_service_role\/row_level_security\/policy_statement\/extension_review/)
+  assert.match(sensitiveDoc, /migration\.schemaCompatibilityReviewed=true/)
+  assert.match(sensitiveDoc, /migration\.supabaseSpecificSqlResolved=true/)
+  assert.match(sensitiveDoc, /migration\.rdsExtensionSupportConfirmed=true/)
   assert.match(sensitiveDoc, /## 后端-only 动作顺序口径/)
   assert.match(sensitiveDoc, /nonCredentialCanStartPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY/)
   assert.match(sensitiveDoc, /credentialCanStartAfterActionTimeConfirmationIds: S03_ACR_PAID_PURCHASE, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL/)

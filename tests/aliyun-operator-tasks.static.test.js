@@ -125,6 +125,8 @@ test("Aliyun operator tasks backend-only mode excludes deferred app launch work"
   assert.ok(taskById.get("T02B_ALIYUN_RDS_DATA_MIGRATION").evidence.includes("totalBlockers=19"))
   assert.ok(taskById.get("T02B_ALIYUN_RDS_DATA_MIGRATION").evidence.includes("appApiRoutesWithSupabase=29/31"))
   assert.ok(taskById.get("T02B_ALIYUN_RDS_DATA_MIGRATION").evidence.includes("firstVersionRdsRoutesWithSupabaseDataAccess=0/25"))
+  assert.ok(taskById.get("T02B_ALIYUN_RDS_DATA_MIGRATION").actions.some((item) => /compatibilityReviewChecklist/.test(item)))
+  assert.ok(taskById.get("T02B_ALIYUN_RDS_DATA_MIGRATION").verifyCommands.includes("corepack pnpm aliyun:rds:migration:package"))
   assert.ok(taskById.get("T02B_ALIYUN_RDS_DATA_MIGRATION").verifyCommands.includes("corepack pnpm aliyun:rds:migration:evidence:strict"))
   assert.ok(taskById.get("T02B_ALIYUN_RDS_DATA_MIGRATION").writeTargets.some((item) => /DATABASE_URL_CN/.test(item)))
   assert.deepEqual(taskById.get("T03B_ALIYUN_ACR_IMAGE_PUBLISH").actionPacketIds, [
@@ -207,6 +209,8 @@ test("Aliyun operator tasks backend-only markdown omits deferred app launch task
   assert.match(markdown, /## RDS PostgreSQL 数据层迁移证据/)
   assert.match(markdown, /totalBlockers: 19/)
   assert.match(markdown, /blocker: migration\.schemaCompatibilityReviewed/)
+  assert.match(markdown, /compatibilityReviewChecklist/)
+  assert.match(markdown, /corepack pnpm aliyun:rds:migration:package/)
   assert.match(markdown, /T02B_ALIYUN_RDS_DATA_MIGRATION/)
   assert.match(markdown, /actionPacketIds: P11_ALIYUN_RDS_DATA_MIGRATION/)
   assert.match(markdown, /T03_ALIYUN_RUNTIME_CONTAINER/)

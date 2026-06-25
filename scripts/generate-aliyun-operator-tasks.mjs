@@ -509,6 +509,7 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan, rdsMigration
       "创建或确认 production-cn RDS PostgreSQL 实例、数据库、账号和网络访问策略。",
       "把 DATABASE_URL_CN 只导入阿里云 KMS/Secrets Manager/SAE secret env，不写入 JSON、Markdown、Docker 镜像、APP 包、小程序包或 git。",
       "迁移前完成 Supabase schema 兼容性复核、Supabase-specific SQL 改写和阿里云 RDS PostgreSQL extension 支持确认。",
+      "先关闭 RDS migration package 的 6 类 compatibilityReviewChecklist：supabase_auth_uid、supabase_storage_schema、supabase_service_role、row_level_security、policy_statement、extension_review。",
       "按 RDS migration package 执行 schema/data 迁移、行数校验、关键记录校验、APP API smoke 和 rollback 验收。",
       "只把实例 id/name/region、迁移报告句柄、校验结果布尔值等非密钥证据写入 deploy/aliyun-production-cn.rds-migration.local.json。",
     ],
@@ -527,6 +528,7 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan, rdsMigration
       `rdsExtensionSupportConfirmed=${rdsMigration.rdsExtensionSupportConfirmed === true}`,
     ],
     verifyCommands: [
+      "corepack pnpm aliyun:rds:migration:package",
       "corepack pnpm aliyun:rds:migration:plan",
       "corepack pnpm aliyun:rds:migration:evidence",
       "corepack pnpm aliyun:rds:migration:evidence:strict",
@@ -1027,8 +1029,8 @@ function buildSensitiveActionItems({ envPlan, readiness, imagePublishPlan, nativ
       consolePath: "阿里云控制台 -> RDS PostgreSQL -> 实例/数据库/账号/连接信息；SAE/KMS/Secrets Manager",
       variableNames: ["DATABASE_URL_CN"],
       variableDetails: variableDetailsFor(variables, ["DATABASE_URL_CN"]),
-      requiredUserAction: "创建或确认 production-cn RDS PostgreSQL、数据库账号和网络访问策略；完成 Supabase 到 RDS/PostgreSQL 的迁移验收；只把 DATABASE_URL_CN 导入阿里云 secret env。",
-      unblockCondition: "rdsPostgres.databaseUrlCnSecretImported=true，migration.* 验收通过，且 APP 首版后端数据访问不再把 Supabase 作为正式 production-cn 数据库目标。",
+      requiredUserAction: "创建或确认 production-cn RDS PostgreSQL、数据库账号和网络访问策略；先关闭 RDS compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查；完成 Supabase 到 RDS/PostgreSQL 的迁移验收；只把 DATABASE_URL_CN 导入阿里云 secret env。",
+      unblockCondition: "rdsPostgres.databaseUrlCnSecretImported=true，compatibilityReviewChecklist 6 类已处理，migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true，且 APP 首版后端数据访问不再把 Supabase 作为正式 production-cn 数据库目标。",
       forbidden: "不能把 DATABASE_URL_CN、数据库密码、dump 内容、Supabase service role key、AccessKeySecret 或 token 写入 JSON、Markdown、Docker 镜像、APP 包、小程序包或 git。",
     })
   }

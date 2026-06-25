@@ -49,6 +49,7 @@ Short answer for the current backend-only run:
 Only missing backend credential/password item: DATABASE_URL_CN.
 Where to get it: Aliyun Console -> RDS PostgreSQL -> cn-hangzhou instance -> database/account/connection information, after the RDS instance and database account are created or confirmed.
 Where to put it: Aliyun KMS / Secrets Manager / SAE secret env only.
+Required before treating it as complete: close the 6-item RDS compatibilityReviewChecklist (`supabase_auth_uid`, `supabase_storage_schema`, `supabase_service_role`, `row_level_security`, `policy_statement`, `extension_review`) and record only non-secret dispositions.
 What not to do: do not write DATABASE_URL_CN value, database password, dump contents, Supabase service role key, AccessKeySecret, token, screenshots with values, shell history, JSON, Markdown, Docker image, App bundle, mini-program package, or git.
 ```
 
@@ -98,7 +99,7 @@ CloudShell action-time phrase for the current state:
 | `S03_ACR_PAID_PURCHASE` | ACR Enterprise Economic purchase confirmation, registry host, namespace, repository | 阿里云控制台 -> 容器镜像服务 ACR -> 企业版购买页 | Non-secret purchase and repository evidence -> `deploy/aliyun-production-cn.image-publish.local.json` | `corepack pnpm aliyun:image:plan`; `corepack pnpm aliyun:resources:matrix`; `corepack pnpm aliyun:user:actions` | Do not click purchase until amount, region, edition, and term are confirmed at action time. Current candidate is cn-hangzhou, 1 month, CNY 117.00. |
 | `S04_ACR_REGISTRY_AUTH` | Registry push and SAE pull credential path | 阿里云控制台 -> ACR namespace/repository; SAE app -> image pull configuration | Docker credential helper, RAM/KMS/Secrets Manager, or Aliyun runtime secret settings only; non-secret digest evidence -> image-publish local file | `corepack pnpm aliyun:image:plan:strict`; `corepack pnpm aliyun:container:smoke` | Do not store registry username/password, RAM Secret, or token in files, images, reports, shell history, or git. |
 | `S05_OSS_RAM_SECRET_OR_STS` | `ALIYUN_OSS_SECURITY_TOKEN` if STS is selected; OSS bucket/CORS/prefix/RAM least privilege closure | 阿里云控制台 -> OSS Bucket / RAM 访问控制 / SAE runtime identity / Secrets Manager | OSS AccessKey/STS material -> KMS/Secrets Manager/SAE secret env only; non-secret evidence -> `items.oss` | `corepack pnpm aliyun:cloud:confirmations`; `corepack pnpm aliyun:health:smoke` | Do not create commit-ready long-lived plaintext secrets. Do not download OSS object contents. |
-| `S08_ALIYUN_RDS_DATABASE_URL` | `DATABASE_URL_CN` plus RDS PostgreSQL schema/data/API smoke/rollback migration evidence | 阿里云控制台 -> RDS PostgreSQL -> 实例/数据库/账号/连接信息；SAE/KMS/Secrets Manager -> secret env | `DATABASE_URL_CN` -> KMS/Secrets Manager/SAE secret env only; non-secret migration evidence -> `rds-migration.local.json` and `items.envImport` | `corepack pnpm aliyun:rds:migration:evidence:strict`; `corepack pnpm aliyun:sensitive:blockers:backend`; `corepack pnpm aliyun:backend-cn:status`; `corepack pnpm aliyun:completion:audit` | Do not store DATABASE_URL_CN, database password, dump contents, customer data, Supabase service role key, AccessKeySecret, token, reports, images, shell history, or git. |
+| `S08_ALIYUN_RDS_DATABASE_URL` | `DATABASE_URL_CN` plus RDS PostgreSQL schema/data/API smoke/rollback migration evidence | 阿里云控制台 -> RDS PostgreSQL -> 实例/数据库/账号/连接信息；SAE/KMS/Secrets Manager -> secret env | `DATABASE_URL_CN` -> KMS/Secrets Manager/SAE secret env only; non-secret migration evidence -> `rds-migration.local.json` and `items.envImport` | `corepack pnpm aliyun:rds:migration:package`; `corepack pnpm aliyun:rds:migration:evidence:strict`; `corepack pnpm aliyun:sensitive:blockers:backend`; `corepack pnpm aliyun:backend-cn:status`; `corepack pnpm aliyun:completion:audit` | Do not store DATABASE_URL_CN, database password, dump contents, customer data, Supabase service role key, AccessKeySecret, token, reports, images, shell history, or git. |
 | `S06_READY_SENSITIVE_ENV_IMPORT` | Ready local/Vercel/Supabase/API provider env values imported into Aliyun runtime | Existing Vercel production, Supabase, Aliyun Bailian/DashScope, DeepSeek, Volcengine, WeChat mini-program consoles | Plain env only for public identifiers; KMS/Secrets Manager/SAE secret env for secret values; non-secret evidence -> `items.envImport` | `corepack pnpm aliyun:env:checklist`; `corepack pnpm aliyun:sensitive:blockers`; `corepack pnpm aliyun:readiness:cloud-ready` | Do not paste any value into reports. Do not import WECHAT_OPEN_APP_ID/SECRET before the WeChat mobile app is approved and separately authorized. |
 
 ## DATABASE_URL_CN Acquisition Steps
@@ -110,10 +111,22 @@ Required sequence:
 ```text
 1. Confirm or create an Aliyun RDS PostgreSQL instance in cn-hangzhou.
 2. Create or confirm the production database name and least-privilege database account.
-3. Confirm VPC/network access from the SAE runtime path; do not expose a broad public database endpoint unless separately approved.
-4. Import the DATABASE_URL_CN value directly into Aliyun KMS / Secrets Manager / SAE secret env.
-5. Record only non-secret evidence in deploy/aliyun-production-cn.rds-migration.local.json.
-6. Run schema/data migration, APP API smoke on RDS, and rollback validation.
+3. Run corepack pnpm aliyun:rds:migration:package and close the 6 compatibilityReviewChecklist items before schema apply.
+4. Confirm VPC/network access from the SAE runtime path; do not expose a broad public database endpoint unless separately approved.
+5. Import the DATABASE_URL_CN value directly into Aliyun KMS / Secrets Manager / SAE secret env.
+6. Record only non-secret evidence in deploy/aliyun-production-cn.rds-migration.local.json.
+7. Run schema/data migration, APP API smoke on RDS, and rollback validation.
+```
+
+The six RDS compatibility checklist items are:
+
+```text
+supabase_auth_uid
+supabase_storage_schema
+supabase_service_role
+row_level_security
+policy_statement
+extension_review
 ```
 
 Required non-secret evidence fields:
@@ -122,6 +135,9 @@ Required non-secret evidence fields:
 rdsPostgres.confirmed=true
 rdsPostgres.databaseAccountReady=true
 rdsPostgres.databaseUrlCnSecretImported=true
+migration.schemaCompatibilityReviewed=true
+migration.supabaseSpecificSqlResolved=true
+migration.rdsExtensionSupportConfirmed=true
 migration.schemaMigrated=true
 migration.dataMigrated=true
 migration.rowCountValidationPassed=true
