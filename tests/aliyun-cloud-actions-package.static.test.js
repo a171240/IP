@@ -438,3 +438,33 @@ test("APP production-cn action queue documents the current authorized next-step 
   assert.doesNotMatch(doc, /:\/\/[^\s:@]+:[^\s@]+@/)
   assert.doesNotMatch(doc, /AccessKeySecret\s*[:=]\s*["'][^"']+["']/)
 })
+
+test("release manifest supersedes historical cloud action queue inventory snapshot", () => {
+  const manifest = read("docs", "release-manifest-2026-06-21-app-aliyun-production-cn-bridge.md")
+
+  for (const expected of [
+    "2026-06-24 09:05 CST",
+    "strictReadonlyInventoryReady=true",
+    "2026-06-26 追加复核",
+    "corepack pnpm aliyun:cloud-actions:package",
+    "docs/app-production-cn-action-queue.md",
+    "currentScope=backend_aliyun_only",
+    "strictReadonlyInventoryReady=false",
+    "cloudInventoryReadyLocalOperations=0/9",
+    "cloudInventoryExecutedCommandResults=9/9",
+    "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
+    "P03_ACR_PURCHASE",
+    "P05_OSS_RAM_STS",
+    "P11_ALIYUN_RDS_DATA_MIGRATION",
+    "onlyMissingBackendCredentialValue=DATABASE_URL_CN",
+    "仅为历史快照",
+    "不能作为当前部署证据",
+  ]) {
+    assert.match(manifest, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
+  }
+
+  assert.match(manifest, /微信\/Android\/Apple 阻塞项描述仅为历史快照/)
+  assert.doesNotMatch(manifest, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(manifest, /LTAI[A-Za-z0-9]{12,}/)
+  assert.doesNotMatch(manifest, /:\/\/[^\s:@]+:[^\s@]+@/)
+})
