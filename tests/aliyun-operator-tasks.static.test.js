@@ -41,6 +41,7 @@ test("Aliyun operator tasks backend-only mode excludes deferred app launch work"
   const report = JSON.parse(output)
   const taskIds = report.tasks.map((item) => item.id)
   const sensitiveActionIds = report.sensitiveActionItems.map((item) => item.id)
+  const taskById = new Map(report.tasks.map((item) => [item.id, item]))
   const t06 = report.tasks.find((item) => item.id === "T06_ALIYUN_ENV_IMPORT")
   const t08 = report.tasks.find((item) => item.id === "T08_POSTDEPLOY_REMOTE_SMOKE")
 
@@ -71,7 +72,66 @@ test("Aliyun operator tasks backend-only mode excludes deferred app launch work"
     waitingWechatReview: 0,
     pendingCloud: 4,
     waitingForDeploy: 1,
+    operatorActionPacketSummary: {
+      currentScope: "backend_aliyun_only",
+      canStartNowPacketIds: [
+        "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
+        "P03_ACR_PURCHASE",
+        "P05_OSS_RAM_STS",
+        "P11_ALIYUN_RDS_DATA_MIGRATION",
+      ],
+      blockedByPacketDependencies: [
+        "P08_SAE_RUNTIME_SLS",
+        "P04_ACR_IMAGE_AND_PULL",
+        "P07_DOMAIN_DNS_HTTPS",
+        "P06_ENV_IMPORT",
+        "P09_PRODUCTION_DEPLOY",
+      ],
+      deferredAppLaunchPacketIds: [
+        "P01_WECHAT_OPEN_MOBILE_APP",
+        "P10_ANDROID_RELEASE_SIGNING",
+        "P02_APPLE_TEAM_ID",
+      ],
+      taskPacketBindingCount: 7,
+      secretOrCredentialPacketIds: [
+        "P05_OSS_RAM_STS",
+        "P11_ALIYUN_RDS_DATA_MIGRATION",
+        "P06_ENV_IMPORT",
+      ],
+      taskPacketBindings: report.summary.operatorActionPacketSummary.taskPacketBindings,
+    },
   })
+  assert.equal(report.summary.operatorActionPacketSummary.taskPacketBindings.length, 7)
+  assert.deepEqual(report.actionAuthorization.nextActionTimeConfirmationPacketIds, [
+    "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
+    "P03_ACR_PURCHASE",
+    "P05_OSS_RAM_STS",
+    "P11_ALIYUN_RDS_DATA_MIGRATION",
+  ])
+  assert.equal(report.actionAuthorization.verdict, "blocked")
+  assert.deepEqual(taskById.get("T03B_ALIYUN_ACR_IMAGE_PUBLISH").actionPacketIds, [
+    "P03_ACR_PURCHASE",
+    "P04_ACR_IMAGE_AND_PULL",
+  ])
+  assert.deepEqual(taskById.get("T03B_ALIYUN_ACR_IMAGE_PUBLISH").canStartNowAuthorizationPacketIds, [
+    "P03_ACR_PURCHASE",
+  ])
+  assert.deepEqual(taskById.get("T03B_ALIYUN_ACR_IMAGE_PUBLISH").blockedByAuthorizationPacketIds, [
+    "P04_ACR_IMAGE_AND_PULL",
+  ])
+  assert.equal(taskById.get("T03B_ALIYUN_ACR_IMAGE_PUBLISH").nonSecretEvidenceOnly, true)
+  assert.ok(taskById.get("T03B_ALIYUN_ACR_IMAGE_PUBLISH").writeTargets.some((item) => /image-publish\.local\.json/.test(item)))
+  assert.deepEqual(taskById.get("T05_ALIYUN_OSS_AUDIO_STORAGE").canStartNowAuthorizationPacketIds, ["P05_OSS_RAM_STS"])
+  assert.equal(taskById.get("T05_ALIYUN_OSS_AUDIO_STORAGE").nonSecretEvidenceOnly, false)
+  assert.ok(taskById.get("T05_ALIYUN_OSS_AUDIO_STORAGE").writeTargets.some((item) => /ALIYUN_OSS_ACCESS_KEY_SECRET/.test(item)))
+  assert.deepEqual(taskById.get("T06_ALIYUN_ENV_IMPORT").actionPacketIds, [
+    "P11_ALIYUN_RDS_DATA_MIGRATION",
+    "P06_ENV_IMPORT",
+  ])
+  assert.deepEqual(taskById.get("T06_ALIYUN_ENV_IMPORT").canStartNowAuthorizationPacketIds, ["P11_ALIYUN_RDS_DATA_MIGRATION"])
+  assert.deepEqual(taskById.get("T06_ALIYUN_ENV_IMPORT").blockedByAuthorizationPacketIds, ["P06_ENV_IMPORT"])
+  assert.ok(taskById.get("T06_ALIYUN_ENV_IMPORT").writeTargets.some((item) => /DATABASE_URL_CN/.test(item)))
+  assert.deepEqual(taskById.get("T08_POSTDEPLOY_REMOTE_SMOKE").blockedByAuthorizationPacketIds, ["P09_PRODUCTION_DEPLOY"])
   assert.deepEqual(report.env.summary.requiredBlocking, ["DATABASE_URL_CN"])
   assert.equal(report.env.summary.requiredTotal, 25)
   assert.equal(report.env.summary.requiredReady, 24)
@@ -116,8 +176,14 @@ test("Aliyun operator tasks backend-only markdown omits deferred app launch task
 
   assert.match(markdown, /currentScope: backend_aliyun_only/)
   assert.match(markdown, /canProceedWithoutWechat: true/)
+  assert.match(markdown, /## 动作包总览/)
+  assert.match(markdown, /nextActionTimeConfirmationPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(markdown, /blockedByPacketDependencies: P08_SAE_RUNTIME_SLS, P04_ACR_IMAGE_AND_PULL, P07_DOMAIN_DNS_HTTPS, P06_ENV_IMPORT, P09_PRODUCTION_DEPLOY/)
   assert.match(markdown, /T03_ALIYUN_RUNTIME_CONTAINER/)
+  assert.match(markdown, /actionPacketIds: P08_SAE_RUNTIME_SLS/)
+  assert.match(markdown, /writeTargets: deploy\/aliyun-production-cn\.cloud-confirmations\.local\.json -> items\.runtime/)
   assert.match(markdown, /T08_POSTDEPLOY_REMOTE_SMOKE/)
+  assert.match(markdown, /actionPacketIds: P09_PRODUCTION_DEPLOY/)
   assert.doesNotMatch(markdown, /T01_WECHAT_OPEN_PLATFORM_APP_LOGIN/)
   assert.doesNotMatch(markdown, /S01_WECHAT_OPEN_APP_LOGIN/)
   assert.doesNotMatch(markdown, /WECHAT_OPEN_APP_ID/)

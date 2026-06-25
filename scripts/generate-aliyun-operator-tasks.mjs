@@ -90,6 +90,150 @@ const OPERATOR_TASK_AUTHORIZATION_PACKETS = Object.freeze({
   T08_POSTDEPLOY_REMOTE_SMOKE: Object.freeze(["P09_PRODUCTION_DEPLOY"]),
 })
 
+const OPERATOR_AUTHORIZATION_PACKET_METADATA = Object.freeze({
+  P00_ALIYUN_READONLY_INVENTORY_IDENTITY: Object.freeze({
+    packetId: "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
+    actionId: "U00_ALIYUN_READONLY_INVENTORY_IDENTITY",
+    title: "恢复阿里云 CLI/CloudShell 只读盘点身份",
+    blockerClass: "readonly_cloud_inventory_identity",
+    nonSecretEvidenceOnly: true,
+    writeTargets: ["deploy/aliyun-production-cn.cloud-inventory-results.local.json -> non-secret read-only inventory summaries"],
+    verifyCommands: [
+      "corepack pnpm aliyun:cloud:access",
+      "MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1 corepack pnpm aliyun:cloud:inventory-run -- --execute-readonly --write-local deploy/aliyun-production-cn.cloud-inventory-results.local.json",
+      "corepack pnpm aliyun:cloud:inventory-results:strict",
+      "corepack pnpm aliyun:evidence:writeback:backend",
+    ],
+  }),
+  P03_ACR_PURCHASE: Object.freeze({
+    packetId: "P03_ACR_PURCHASE",
+    actionId: "U03_ACR_PURCHASE_CONFIRMATION",
+    title: "确认 ACR 企业版付费购买",
+    blockerClass: "paid_purchase",
+    nonSecretEvidenceOnly: true,
+    writeTargets: ["deploy/aliyun-production-cn.image-publish.local.json -> acr.purchaseCandidate / acr confirmed evidence"],
+    verifyCommands: ["corepack pnpm aliyun:image:plan"],
+  }),
+  P04_ACR_IMAGE_AND_PULL: Object.freeze({
+    packetId: "P04_ACR_IMAGE_AND_PULL",
+    actionId: "U04_ACR_RUNTIME_AUTH",
+    title: "配置 ACR 镜像推送和 SAE 镜像拉取权限",
+    blockerClass: "registry_password_or_runtime_pull_secret",
+    nonSecretEvidenceOnly: true,
+    writeTargets: ["deploy/aliyun-production-cn.image-publish.local.json -> acr + runtime"],
+    verifyCommands: [
+      "corepack pnpm aliyun:image:plan:strict",
+      "corepack pnpm aliyun:container:smoke",
+    ],
+  }),
+  P05_OSS_RAM_STS: Object.freeze({
+    packetId: "P05_OSS_RAM_STS",
+    actionId: "U05_OSS_RAM_OR_STS",
+    title: "绑定 OSS RAM 最小权限或 STS/运行时角色方案",
+    blockerClass: "ram_secret_or_sts_import",
+    nonSecretEvidenceOnly: false,
+    writeTargets: [
+      "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss",
+      "ALIYUN_OSS_ACCESS_KEY_ID / ALIYUN_OSS_ACCESS_KEY_SECRET / ALIYUN_OSS_SECURITY_TOKEN -> KMS/Secrets Manager/SAE secret env",
+    ],
+    verifyCommands: [
+      "corepack pnpm aliyun:cloud:confirmations",
+      "corepack pnpm aliyun:health:smoke",
+    ],
+  }),
+  P11_ALIYUN_RDS_DATA_MIGRATION: Object.freeze({
+    packetId: "P11_ALIYUN_RDS_DATA_MIGRATION",
+    actionId: "U11_ALIYUN_RDS_DATA_MIGRATION",
+    title: "创建阿里云 RDS PostgreSQL 并完成正式数据层迁移",
+    blockerClass: "database_secret_and_migration",
+    nonSecretEvidenceOnly: false,
+    writeTargets: [
+      "DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env",
+      "RDS PostgreSQL 实例、schema/data migration、rollback validation -> 非密钥证据报告",
+    ],
+    verifyCommands: [
+      "corepack pnpm aliyun:readiness",
+      "corepack pnpm aliyun:completion:audit",
+      "corepack pnpm aliyun:predeploy",
+    ],
+  }),
+  P06_ENV_IMPORT: Object.freeze({
+    packetId: "P06_ENV_IMPORT",
+    actionId: "U06_ENV_IMPORT",
+    title: "导入 production-cn 运行环境变量",
+    blockerClass: "ready_sensitive_env_need_cloud_import",
+    nonSecretEvidenceOnly: false,
+    writeTargets: [
+      "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport",
+      "SAE plain env for non-secret identifiers only",
+      "KMS/Secrets Manager/SAE secret env for secret or connection values",
+    ],
+    verifyCommands: [
+      "corepack pnpm aliyun:env:checklist",
+      "corepack pnpm aliyun:sensitive:blockers",
+      "corepack pnpm aliyun:readiness:cloud-ready",
+    ],
+  }),
+  P07_DOMAIN_DNS_HTTPS: Object.freeze({
+    packetId: "P07_DOMAIN_DNS_HTTPS",
+    actionId: "U07_DOMAIN_DNS_HTTPS_ICP",
+    title: "配置 api-cn/assets-cn DNS、HTTPS 和 ICP",
+    blockerClass: "public_domain_mutation",
+    nonSecretEvidenceOnly: true,
+    writeTargets: [
+      "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps",
+      "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps",
+    ],
+    verifyCommands: [
+      "corepack pnpm aliyun:domain:strict",
+      "corepack pnpm aliyun:postdeploy:smoke -- --base-url https://api-cn.ipgongchang.xin",
+    ],
+  }),
+  P08_SAE_RUNTIME_SLS: Object.freeze({
+    packetId: "P08_SAE_RUNTIME_SLS",
+    actionId: "U08_SAE_RUNTIME_AND_SLS",
+    title: "创建或确认 SAE runtime 与 SLS 告警",
+    blockerClass: "cloud_resource_mutation",
+    nonSecretEvidenceOnly: true,
+    writeTargets: [
+      "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.runtime",
+      "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.slsAlerts",
+    ],
+    verifyCommands: [
+      "corepack pnpm aliyun:runtime:plan",
+      "corepack pnpm aliyun:cloud:confirmations",
+      "corepack pnpm aliyun:cloud:check",
+    ],
+  }),
+  P09_PRODUCTION_DEPLOY: Object.freeze({
+    packetId: "P09_PRODUCTION_DEPLOY",
+    actionId: "U09_DEPLOY_AUTHORIZATION",
+    title: "阿里云 production-cn 后端部署授权",
+    blockerClass: "production_release",
+    nonSecretEvidenceOnly: true,
+    writeTargets: [
+      "deploy/aliyun-production-cn.cloud-confirmations.local.json -> postdeploy evidence",
+      "release artifact archive -> backend-cn status / smoke evidence",
+    ],
+    verifyCommands: [
+      "corepack pnpm aliyun:predeploy",
+      "corepack pnpm aliyun:postdeploy:smoke -- --base-url https://api-cn.ipgongchang.xin",
+      "corepack pnpm aliyun:completion:audit",
+    ],
+  }),
+})
+const BACKEND_CURRENT_CAN_START_PACKET_IDS = Object.freeze([
+  "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
+  "P03_ACR_PURCHASE",
+  "P05_OSS_RAM_STS",
+  "P11_ALIYUN_RDS_DATA_MIGRATION",
+])
+const BACKEND_DEFERRED_APP_LAUNCH_PACKET_IDS = Object.freeze([
+  "P01_WECHAT_OPEN_MOBILE_APP",
+  "P10_ANDROID_RELEASE_SIGNING",
+  "P02_APPLE_TEAM_ID",
+])
+
 function isAppLaunchBlocker(blocker) {
   const value = String(blocker || "")
   return /WECHAT_OPEN|wechat_open_platform|APPLE_TEAM_ID|apple_team_id|app_native|app_universal_link|legalLinks|PRIVACY_POLICY_URL|TERMS_URL|Android release signing|MEIYE_RELEASE_/i.test(value)
@@ -621,15 +765,22 @@ function summarizeTasks(tasks) {
   }
 }
 
-function attachOperatorAuthorization(report, actionAuthorization) {
-  const packetById = new Map((actionAuthorization.authorizationPackets || []).map((packet) => [packet.packetId, packet]))
-  const canStartNowPacketIds = actionAuthorization.summary?.canStartNowPackets || []
-  const blockedByPacketDependencies = actionAuthorization.summary?.blockedByPacketDependencies || []
+function attachOperatorAuthorization(report) {
+  const canStartNowPacketIds = report.currentScope === "backend_aliyun_only"
+    ? [...BACKEND_CURRENT_CAN_START_PACKET_IDS]
+    : []
   const canStartNowPacketIdSet = new Set(canStartNowPacketIds)
+  const allTaskPacketIds = uniqueStrings(report.tasks.flatMap((task) => OPERATOR_TASK_AUTHORIZATION_PACKETS[task.id] || []))
+  const deferredAppLaunchPacketIds = report.currentScope === "backend_aliyun_only"
+    ? [...BACKEND_DEFERRED_APP_LAUNCH_PACKET_IDS]
+    : []
+  const deferredAppLaunchPacketIdSet = new Set(deferredAppLaunchPacketIds)
+  const blockedByPacketDependencies = allTaskPacketIds
+    .filter((packetId) => !canStartNowPacketIdSet.has(packetId))
+    .filter((packetId) => !deferredAppLaunchPacketIdSet.has(packetId))
   const blockedByPacketDependencySet = new Set(blockedByPacketDependencies)
   const tasks = report.tasks.map((task) => withOperatorAuthorizationPackets({
     task,
-    packetById,
     canStartNowPacketIdSet,
     blockedByPacketDependencySet,
   }))
@@ -649,10 +800,10 @@ function attachOperatorAuthorization(report, actionAuthorization) {
   const summary = {
     ...report.summary,
     operatorActionPacketSummary: {
-      currentScope: actionAuthorization.currentScope || report.currentScope || "full_app_launch",
+      currentScope: report.currentScope || "full_app_launch",
       canStartNowPacketIds,
       blockedByPacketDependencies,
-      deferredAppLaunchPacketIds: actionAuthorization.summary?.deferredAppLaunchPackets || [],
+      deferredAppLaunchPacketIds,
       taskPacketBindingCount: taskPacketBindings.length,
       secretOrCredentialPacketIds,
       taskPacketBindings,
@@ -662,13 +813,13 @@ function attachOperatorAuthorization(report, actionAuthorization) {
     ...report,
     summary,
     actionAuthorization: {
-      currentScope: actionAuthorization.currentScope || report.currentScope || "full_app_launch",
-      canDeployNow: actionAuthorization.canDeployNow === true,
-      verdict: actionAuthorization.verdict || "",
-      nextActionTimeConfirmationPacketIds: actionAuthorization.summary?.nextActionTimeConfirmations || [],
+      currentScope: report.currentScope || "full_app_launch",
+      canDeployNow: false,
+      verdict: report.summary.ready === report.summary.total ? "" : "blocked",
+      nextActionTimeConfirmationPacketIds: canStartNowPacketIds,
       canStartNowPacketIds,
       blockedByPacketDependencies,
-      deferredAppLaunchPacketIds: actionAuthorization.summary?.deferredAppLaunchPackets || [],
+      deferredAppLaunchPacketIds,
     },
     tasks,
   }
@@ -676,13 +827,12 @@ function attachOperatorAuthorization(report, actionAuthorization) {
 
 function withOperatorAuthorizationPackets({
   task,
-  packetById,
   canStartNowPacketIdSet,
   blockedByPacketDependencySet,
 }) {
   const actionPacketIds = OPERATOR_TASK_AUTHORIZATION_PACKETS[task.id] || []
   const actionPackets = actionPacketIds
-    .map((packetId) => compactActionPacket(packetById.get(packetId)))
+    .map((packetId) => compactActionPacket(OPERATOR_AUTHORIZATION_PACKET_METADATA[packetId]))
     .filter(Boolean)
   const canStartNowAuthorizationPacketIds = actionPacketIds.filter((packetId) => canStartNowPacketIdSet.has(packetId))
   const blockedByAuthorizationPacketIds = actionPacketIds.filter((packetId) => blockedByPacketDependencySet.has(packetId))
@@ -704,15 +854,11 @@ function compactActionPacket(packet) {
     packetId: packet.packetId,
     actionId: packet.actionId,
     title: packet.title,
-    owner: packet.owner,
     blockerClass: packet.blockerClass,
-    sequenceGroup: packet.sequenceGroup,
-    canStartNow: packet.canStartNow === true,
-    requiresActionTimeConfirmation: packet.requiresActionTimeConfirmation === true,
+    requiresActionTimeConfirmation: true,
     nonSecretEvidenceOnly: packet.nonSecretEvidenceOnly === true,
     writeTargets: packet.writeTargets || [],
     verifyCommands: packet.verifyCommands || [],
-    explicitlyExcluded: packet.explicitlyExcluded || [],
   }
 }
 
@@ -1199,15 +1345,6 @@ function main() {
     "scripts/check-app-native-release-config.mjs",
     "--allow-blocking",
   ])
-  const actionAuthorizationArgs = [
-    "scripts/summarize-aliyun-action-authorization.mjs",
-    "--env-file",
-    args.envFile,
-    "--cloud-confirmations",
-    args.cloudConfirmationsFile,
-  ]
-  if (args.backendOnly) actionAuthorizationArgs.push("--backend-only")
-  const actionAuthorization = runJson("action_authorization", actionAuthorizationArgs)
   const tasks = buildTasks({ envPlan, readiness, domain, cloudConfirmations, imagePublishPlan })
   const sensitiveActionItems = buildSensitiveActionItems({ envPlan, readiness, imagePublishPlan, nativeRelease })
   let report = {
@@ -1276,7 +1413,7 @@ function main() {
     ],
   }
   if (args.backendOnly) report = applyBackendOnlyScope(report)
-  report = attachOperatorAuthorization(report, actionAuthorization)
+  report = attachOperatorAuthorization(report)
 
   const json = JSON.stringify(report, null, 2)
   console.log(json)
