@@ -54,6 +54,8 @@ test("Aliyun RDS route migration map covers first-version APP route data access 
   assert.equal(report.summary.requiredTableCount, 15)
   assert.equal(report.summary.observedRpcCount, 2)
   assert.equal(report.summary.requiredFunctionCount, 2)
+  assert.equal(report.summary.implementationWorkPackageCount, 5)
+  assert.equal(report.summary.proposedRepositoryFileCount, 11)
   assert.deepEqual(report.summary.schemaMapMissingObservedTables, [])
   assert.deepEqual(report.summary.schemaMapMissingObservedRpcs, [])
   assert.deepEqual(report.summary.requiredTablesWithoutRouteObservation, [])
@@ -82,6 +84,41 @@ test("Aliyun RDS route migration map covers first-version APP route data access 
   assert.ok(byRoute.get("/api/app/store-admin/members").tableNames.includes("voice_coach_turns"))
   assert.ok(byRoute.get("/api/app/store-profiles").tableNames.includes("store_profiles"))
 
+  const workPackages = new Map(report.implementationWorkPackages.map((item) => [item.id, item]))
+  assert.deepEqual(Array.from(workPackages.keys()), [
+    "RDS_WP01_ACCOUNT_PROFILE_ENTITLEMENTS",
+    "RDS_WP02_CONTEXT_PROFILES",
+    "RDS_WP03_SERVICE_RECORDS_CORE",
+    "RDS_WP04_STORE_ADMIN_READ_MODELS",
+    "RDS_WP05_STORE_INVITES",
+  ])
+  assert.equal(workPackages.get("RDS_WP01_ACCOUNT_PROFILE_ENTITLEMENTS").routeCount, 2)
+  assert.ok(
+    workPackages
+      .get("RDS_WP01_ACCOUNT_PROFILE_ENTITLEMENTS")
+      .proposedRepositoryFiles.includes("lib/aliyun-rds/repositories/account-context.server.ts"),
+  )
+  assert.ok(
+    workPackages
+      .get("RDS_WP03_SERVICE_RECORDS_CORE")
+      .currentSupabaseDataAccessFiles.includes("lib/service-records/server.ts"),
+  )
+  assert.ok(
+    workPackages
+      .get("RDS_WP03_SERVICE_RECORDS_CORE")
+      .proposedRepositoryFiles.includes("lib/aliyun-rds/repositories/service-records.server.ts"),
+  )
+  assert.ok(
+    workPackages
+      .get("RDS_WP05_STORE_INVITES")
+      .blockedBy.includes("production_cn_public_base_url_ready"),
+  )
+  assert.ok(
+    report.implementationWorkPackages.every(
+      (item) => item.status === "blocked_until_repository_uses_database_url_cn",
+    ),
+  )
+
   assert.doesNotMatch(output, secretLike)
 })
 
@@ -106,9 +143,12 @@ test("Aliyun RDS route migration map markdown is actionable and value-free", () 
   assert.equal(report.summary.firstVersionRouteCount, 25)
   assert.match(markdown, /Aliyun RDS Route Migration Map/)
   assert.match(markdown, /routesStillUsingSupabaseDataAccess: 25/)
+  assert.match(markdown, /implementationWorkPackageCount: 5/)
   assert.match(markdown, /schemaMapMissingObservedTables: none/)
+  assert.match(markdown, /RDS_WP03_SERVICE_RECORDS_CORE/)
   assert.match(markdown, /\/api\/app\/service-records\/sessions/)
   assert.match(markdown, /lib\/service-records\/server\.ts/)
+  assert.match(markdown, /lib\/aliyun-rds\/repositories\/service-records\.server\.ts/)
   assert.match(markdown, /Create or confirm Aliyun RDS PostgreSQL/)
   assert.doesNotMatch(output + markdown, secretLike)
 })

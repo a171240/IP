@@ -24,6 +24,102 @@ const SECRET_VALUE_PATTERNS = [
   /AccessKeySecret\s*[:=]\s*\S{8,}/i,
 ]
 
+const IMPLEMENTATION_WORK_PACKAGE_TEMPLATES = [
+  {
+    id: "RDS_WP01_ACCOUNT_PROFILE_ENTITLEMENTS",
+    scope: "account",
+    title: "Profile, entitlement, account context, and AI point billing repositories",
+    proposedRepositoryFiles: [
+      "lib/aliyun-rds/repositories/account-context.server.ts",
+      "lib/aliyun-rds/repositories/ai-points.server.ts",
+      "lib/aliyun-rds/repositories/pricing-profile.server.ts",
+    ],
+    blockedBy: [
+      "request_auth_identity_boundary_ready",
+      "profiles_entitlements_membership_rows_migrated",
+    ],
+    acceptanceGates: [
+      "/api/app/profile and /api/app/entitlements read profile, membership, entitlement, and point data through DATABASE_URL_CN.",
+      "First-version account routes no longer require Supabase SDK business data access files.",
+      "consume_credits and grant_trial_credits are implemented as PostgreSQL functions or equivalent transactions on RDS.",
+    ],
+  },
+  {
+    id: "RDS_WP02_CONTEXT_PROFILES",
+    scope: "context",
+    title: "Store profile and customer profile repositories",
+    proposedRepositoryFiles: [
+      "lib/aliyun-rds/repositories/store-profiles.server.ts",
+      "lib/aliyun-rds/repositories/customer-profiles.server.ts",
+    ],
+    blockedBy: [
+      "request_auth_identity_boundary_ready",
+      "store_profiles_and_customer_profiles_migrated",
+    ],
+    acceptanceGates: [
+      "/api/app/store-profiles and /api/app/customer-profiles CRUD use DATABASE_URL_CN-backed repositories.",
+      "Profile ownership and tenant filters are enforced in SQL or repository guards before returning rows.",
+      "Create/update/delete paths preserve existing API response shapes used by the APP bridge.",
+    ],
+  },
+  {
+    id: "RDS_WP03_SERVICE_RECORDS_CORE",
+    scope: "service-records",
+    title: "Service record session, segment, marker, and playback repositories",
+    proposedRepositoryFiles: [
+      "lib/aliyun-rds/repositories/service-records.server.ts",
+      "lib/aliyun-rds/repositories/service-record-segments.server.ts",
+      "lib/aliyun-rds/repositories/service-record-processing.server.ts",
+    ],
+    blockedBy: [
+      "request_auth_identity_boundary_ready",
+      "oss_audio_runtime_access_ready",
+      "service_record_tables_migrated",
+    ],
+    acceptanceGates: [
+      "Long-recording create/resume/end/process/poll/audio routes persist and read sessions through DATABASE_URL_CN.",
+      "Segment and marker mutations run in PostgreSQL transactions where the previous Supabase chain used multiple writes.",
+      "Playback routes use RDS metadata plus Aliyun OSS storage access and keep unauthenticated access blocked.",
+    ],
+  },
+  {
+    id: "RDS_WP04_STORE_ADMIN_READ_MODELS",
+    scope: "store-admin",
+    title: "Store-admin overview, member, and analytics read models",
+    proposedRepositoryFiles: [
+      "lib/aliyun-rds/repositories/store-admin.server.ts",
+      "lib/aliyun-rds/repositories/org-analytics.server.ts",
+    ],
+    blockedBy: [
+      "account_context_repository_ready",
+      "voice_session_history_rows_migrated",
+    ],
+    acceptanceGates: [
+      "Store manager overview, members, and analytics routes query RDS with tenant/company/store scoping.",
+      "Manager-only access remains enforced before analytics or member lists are returned.",
+      "APP smoke confirms store managers can view their own store records and cannot view other tenant records.",
+    ],
+  },
+  {
+    id: "RDS_WP05_STORE_INVITES",
+    scope: "invites",
+    title: "Store invitation repositories and token lookup",
+    proposedRepositoryFiles: [
+      "lib/aliyun-rds/repositories/store-invites.server.ts",
+    ],
+    blockedBy: [
+      "account_context_repository_ready",
+      "mp_account_invites_rows_migrated",
+      "production_cn_public_base_url_ready",
+    ],
+    acceptanceGates: [
+      "Invite create, preview, accept, and qrcode routes use RDS invite rows and existing hashed-token semantics.",
+      "Accept flow inserts or updates memberships in a PostgreSQL transaction.",
+      "Generated invite links point to the production-cn backend/app base URL without exposing token hashes.",
+    ],
+  },
+]
+
 function parseArgs(argv) {
   const args = {
     schemaMap: DEFAULT_SCHEMA_MAP,
@@ -194,6 +290,36 @@ function capabilityForRoute(route) {
   return []
 }
 
+function buildImplementationWorkPackages(routeGroups) {
+  const byScope = new Map(routeGroups.map((group) => [group.scope, group]))
+  return IMPLEMENTATION_WORK_PACKAGE_TEMPLATES.map((template, index) => {
+    const group = byScope.get(template.scope) || {
+      routeCount: 0,
+      routes: [],
+      tableNames: [],
+      rpcNames: [],
+      dataAccessFiles: [],
+    }
+    return {
+      id: template.id,
+      order: index + 1,
+      title: template.title,
+      scope: template.scope,
+      status: group.routeCount
+        ? "blocked_until_repository_uses_database_url_cn"
+        : "no_first_version_routes_observed",
+      routeCount: group.routeCount,
+      routes: group.routes,
+      tableNames: group.tableNames,
+      rpcNames: group.rpcNames,
+      currentSupabaseDataAccessFiles: group.dataAccessFiles,
+      proposedRepositoryFiles: template.proposedRepositoryFiles,
+      blockedBy: unique(["DATABASE_URL_CN", "schema_data_rollback_validation", ...template.blockedBy]),
+      acceptanceGates: template.acceptanceGates,
+    }
+  })
+}
+
 function buildReport(args) {
   const schemaMap = readJson(args.schemaMap)
   const bridgeMap = readJson(args.bridgeMap)
@@ -262,8 +388,10 @@ function buildReport(args) {
       routeCount: group.length,
       routes: group.map((route) => route.route),
       tableNames: unique(group.flatMap((route) => route.tableNames)),
+      rpcNames: unique(group.flatMap((route) => route.rpcNames)),
       dataAccessFiles: unique(group.flatMap((route) => route.dataAccessFiles.map((item) => item.file))),
     }))
+  const implementationWorkPackages = buildImplementationWorkPackages(routeGroups)
 
   const report = {
     ok: true,
@@ -288,10 +416,15 @@ function buildReport(args) {
       schemaMapMissingObservedTables,
       schemaMapMissingObservedRpcs,
       requiredTablesWithoutRouteObservation,
+      implementationWorkPackageCount: implementationWorkPackages.length,
+      proposedRepositoryFileCount: unique(
+        implementationWorkPackages.flatMap((item) => item.proposedRepositoryFiles),
+      ).length,
       rdsPlanRequiredBlocking: rdsPlan.summary?.requiredBlocking || [],
       blockedCredentialNames: ["DATABASE_URL_CN"],
     },
     routeGroups,
+    implementationWorkPackages,
     routes,
     observedTables,
     observedRpcs,
@@ -299,6 +432,7 @@ function buildReport(args) {
     rdsAdapterFiles: rdsPlan.inventory?.postgresAdapterFiles || [],
     nextRequiredActions: [
       "Create or confirm Aliyun RDS PostgreSQL in cn-hangzhou before importing DATABASE_URL_CN.",
+      "Implement the RDS work packages in order: account, context, service-records, store-admin, then invites.",
       "Replace first-version APP API shared Supabase data access with PostgreSQL repositories backed by DATABASE_URL_CN.",
       "Run schema/data migration, row-count validation, critical-record validation, APP API smoke, and rollback rehearsal.",
     ],
@@ -343,6 +477,8 @@ function renderMarkdown(report) {
     `- firstVersionRouteCount: ${report.summary.firstVersionRouteCount}`,
     `- routesStillUsingSupabaseDataAccess: ${report.summary.routesStillUsingSupabaseDataAccess}`,
     `- sharedDataAccessFileCount: ${report.summary.sharedDataAccessFileCount}`,
+    `- implementationWorkPackageCount: ${report.summary.implementationWorkPackageCount}`,
+    `- proposedRepositoryFileCount: ${report.summary.proposedRepositoryFileCount}`,
     `- observedTables: ${report.observedTables.join(", ") || "none"}`,
     `- observedRpcs: ${report.observedRpcs.join(", ") || "none"}`,
     `- schemaMapMissingObservedTables: ${report.summary.schemaMapMissingObservedTables.join(", ") || "none"}`,
@@ -356,8 +492,28 @@ function renderMarkdown(report) {
       "",
       `- routeCount: ${group.routeCount}`,
       `- tableNames: ${group.tableNames.join(", ") || "none"}`,
+      `- rpcNames: ${group.rpcNames.join(", ") || "none"}`,
       `- dataAccessFiles: ${group.dataAccessFiles.join(", ") || "none"}`,
       ...group.routes.map((route) => `- ${route}`),
+      "",
+    ]),
+    "## Implementation Work Packages",
+    "",
+    ...report.implementationWorkPackages.flatMap((item) => [
+      `### ${item.id}`,
+      "",
+      `- order: ${item.order}`,
+      `- title: ${item.title}`,
+      `- status: ${item.status}`,
+      `- scope: ${item.scope}`,
+      `- routeCount: ${item.routeCount}`,
+      `- routes: ${item.routes.join(", ") || "none"}`,
+      `- tableNames: ${item.tableNames.join(", ") || "none"}`,
+      `- rpcNames: ${item.rpcNames.join(", ") || "none"}`,
+      `- currentSupabaseDataAccessFiles: ${item.currentSupabaseDataAccessFiles.join(", ") || "none"}`,
+      `- proposedRepositoryFiles: ${item.proposedRepositoryFiles.join(", ") || "none"}`,
+      `- blockedBy: ${item.blockedBy.join(", ") || "none"}`,
+      ...item.acceptanceGates.map((gate) => `- acceptanceGate: ${gate}`),
       "",
     ]),
     "## Route Details",
