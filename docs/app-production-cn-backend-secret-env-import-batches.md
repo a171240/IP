@@ -1,6 +1,6 @@
 # APP production-cn backend-only secret env import batches
 
-Generated: 2026-06-25T04:34:22.091Z
+Generated: 2026-06-25T08:07:57.871Z
 
 Source command: `corepack pnpm aliyun:sensitive:blockers:backend`
 
@@ -13,7 +13,7 @@ Production-cn backend cannot be deployed now.
 Current backend-only sensitive gate:
 
 ```text
-blockedCredentialCount=2
+blockedCredentialCount=1
 readySecretEnvVariableCount=17
 readySecretEnvVariableGroupCount=9
 canCodexProceedWithoutUser=false
@@ -35,12 +35,15 @@ These names are still blocked by Aliyun backend resource or credential decisions
 
 | Variable | Blocking action | Owner | Import target after unblock |
 | --- | --- | --- | --- |
-| `ALIYUN_OSS_SECURITY_TOKEN` | `S05_OSS_RAM_SECRET_OR_STS` | 阿里云 OSS/RAM 操作员 | 阿里云 KMS/Secrets Manager/SAE secret env |
 | `DATABASE_URL_CN` | `S08_ALIYUN_RDS_DATABASE_URL` | 阿里云 RDS/后端数据迁移操作员 | 阿里云 KMS/Secrets Manager/SAE secret env |
 
 - S03_ACR_PAID_PURCHASE and S04_ACR_REGISTRY_AUTH remain backend blockers, but registry secret material stays in ACR/Docker credential helper, RAM/KMS/Secrets Manager, or SAE runtime pull settings.
 - Supabase variables in legacy_database_migration_source are migration source / legacy compatibility only; formal production-cn database target is Aliyun RDS PostgreSQL.
 - WeChat Open Platform mobile app, Apple Team ID, and Android release signing variables are deferred full App launch items, not current backend import blockers.
+
+## Conditional OSS STS Token
+
+`ALIYUN_OSS_SECURITY_TOKEN` is optional. Import it only when the OSS runtime path uses temporary STS credentials. If the backend uses a least-privilege RAM AccessKey or an SAE runtime role path that does not issue an STS session token to the app, leave this variable empty and do not count it as a backend-only blocked credential.
 
 ## Ready Secret Env Import Batches
 

@@ -774,10 +774,16 @@ const SENSITIVE_BLOCKER_TO_PACKET_IDS = Object.freeze({
 })
 
 function buildBlockedVariableAcquisitionPlan(sensitiveBlockers, options = {}) {
+  const blockedCredentialNames = new Set(
+    sensitiveBlockers.credentialInterventionBrief?.blockedCredentialNames
+    || sensitiveBlockers.summary?.credentialInterventionBrief?.blockedCredentialNames
+    || [],
+  )
   return (sensitiveBlockers.items || []).flatMap((item) => {
     const packetIds = SENSITIVE_BLOCKER_TO_PACKET_IDS[item.id] || []
     return (item.variableDetails || [])
       .filter((variable) => variable.status !== "ready")
+      .filter((variable) => blockedCredentialNames.size === 0 || blockedCredentialNames.has(variable.name))
       .filter((variable) => {
         const deferred = isDeferredAppLaunchVariable(item, variable)
         return options.deferredAppLaunchOnly ? deferred : !deferred

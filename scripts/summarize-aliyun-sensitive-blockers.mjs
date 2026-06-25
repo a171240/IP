@@ -18,6 +18,9 @@ const APP_LAUNCH_DEFERRED_SENSITIVE_ACTION_IDS = Object.freeze([
   "S07_ANDROID_RELEASE_SIGNING",
 ])
 const APP_LAUNCH_DEFERRED_SENSITIVE_ACTION_ID_SET = new Set(APP_LAUNCH_DEFERRED_SENSITIVE_ACTION_IDS)
+const CONDITIONAL_OPTIONAL_CREDENTIAL_NAMES = new Set([
+  "ALIYUN_OSS_SECURITY_TOKEN",
+])
 
 const SECRET_VALUE_PATTERNS = [
   /sk-[A-Za-z0-9_-]{20,}/,
@@ -117,7 +120,7 @@ function summarize(items) {
       ...variable,
     })),
   )
-  const blockedVariableRows = variableRows.filter((variable) => variable.status !== "ready")
+  const blockedVariableRows = variableRows.filter(isBlockedCredentialVariable)
   const readySecretEnvVariableRows = variableRows.filter((variable) =>
     variable.status === "ready" &&
     variable.sensitivity !== "public" &&
@@ -156,7 +159,7 @@ function summarize(items) {
     variableDetails: {
       total: items.reduce((sum, item) => sum + (item.variableDetails || []).length, 0),
       blocked: items.reduce((sum, item) =>
-        sum + (item.variableDetails || []).filter((variable) => variable.status !== "ready").length, 0),
+        sum + (item.variableDetails || []).filter(isBlockedCredentialVariable).length, 0),
       ready: items.reduce((sum, item) =>
         sum + (item.variableDetails || []).filter((variable) => variable.status === "ready").length, 0),
       secretOrSensitive: items.reduce((sum, item) =>
@@ -233,7 +236,7 @@ function buildCredentialGroup(item) {
     owner: item.owner,
     type: item.type,
     blockedCredentialNames: unique(variableDetails
-      .filter((variable) => variable.status !== "ready")
+      .filter(isBlockedCredentialVariable)
       .map((variable) => variable.name)).sort(),
     readySecretEnvVariableNames: unique(variableDetails
       .filter((variable) =>
@@ -251,6 +254,12 @@ function buildCredentialGroup(item) {
     verifyCommands: item.verifyCommands || [],
     unblockCondition: item.unblockCondition,
   }
+}
+
+function isBlockedCredentialVariable(variable) {
+  if (!variable || variable.status === "ready") return false
+  if (CONDITIONAL_OPTIONAL_CREDENTIAL_NAMES.has(variable.name)) return false
+  return true
 }
 
 function valueHandlingForItem(item, variableDetails) {

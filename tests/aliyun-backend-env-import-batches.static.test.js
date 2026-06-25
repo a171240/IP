@@ -35,15 +35,15 @@ test("Aliyun backend env import batches report is value-free and backend-only", 
   assert.equal(report.cloudApiCalled, false)
   assert.equal(report.mutationPerformed, false)
   assert.equal(report.secretLeakCheck.ok, true)
-  assert.equal(report.blockedCredentialCount, 2)
-  assert.deepEqual(report.blockedCredentialNames, ["ALIYUN_OSS_SECURITY_TOKEN", "DATABASE_URL_CN"])
+  assert.equal(report.blockedCredentialCount, 1)
+  assert.deepEqual(report.blockedCredentialNames, ["DATABASE_URL_CN"])
   assert.equal(report.readySecretEnvVariableCount, 17)
   assert.equal(report.readySecretEnvVariableGroupCount, 9)
   assert.ok(report.actionTimeConfirmationRequiredIds.includes("S03_ACR_PAID_PURCHASE"))
   assert.ok(report.actionTimeConfirmationRequiredIds.includes("S08_ALIYUN_RDS_DATABASE_URL"))
   assert.ok(report.deferredAppLaunchSensitiveActionIds.includes("S01_WECHAT_OPEN_APP_LOGIN"))
   assert.ok(report.deferredAppLaunchSensitiveActionIds.includes("S07_ANDROID_RELEASE_SIGNING"))
-  assert.deepEqual(report.summary.notYetImportableVariableNames, ["ALIYUN_OSS_SECURITY_TOKEN", "DATABASE_URL_CN"])
+  assert.deepEqual(report.summary.notYetImportableVariableNames, ["DATABASE_URL_CN"])
   assert.ok(report.readySecretEnvVariableGroups.some((group) =>
     group.category === "legacy_database_migration_source" &&
     group.variableNames.includes("SUPABASE_SERVICE_ROLE_KEY") &&
@@ -77,7 +77,7 @@ test("Aliyun backend env import batches markdown matches committed handoff shape
 
   assert.equal(report.summary.readySecretEnvVariableGroupCount, 9)
   assert.match(markdown, /backend-only secret env import batches/)
-  assert.match(markdown, /blockedCredentialCount=2/)
+  assert.match(markdown, /blockedCredentialCount=1/)
   assert.match(markdown, /readySecretEnvVariableGroupCount=9/)
   assert.match(markdown, /ALIYUN_OSS_SECURITY_TOKEN/)
   assert.match(markdown, /DATABASE_URL_CN/)
@@ -85,7 +85,7 @@ test("Aliyun backend env import batches markdown matches committed handoff shape
   assert.match(markdown, /S01_WECHAT_OPEN_APP_LOGIN/)
   assert.match(markdown, /They do not unblock native APP WeChat login/)
   assert.match(committed, /backend-only secret env import batches/)
-  assert.match(committed, /blockedCredentialCount=2/)
+  assert.match(committed, /blockedCredentialCount=1/)
   assert.match(committed, /readySecretEnvVariableGroupCount=9/)
   assert.doesNotMatch(markdown + committed, secretLike)
 })

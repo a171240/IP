@@ -1,106 +1,116 @@
-# APP production-cn secret env import batches
+# APP production-cn backend-only secret env import batches
 
-Date: 2026-06-24
+Generated: 2026-06-25T08:07:57.911Z
 
-This file is a value-free import batching guide derived from:
+Source command: `corepack pnpm aliyun:sensitive:blockers:backend`
 
-```bash
-corepack pnpm aliyun:sensitive:blockers
-```
+This file is the backend-only import batching guide for the current `backend_aliyun_only` target. It lists variable names, owners, and allowed import targets only. It does not contain secret values and does not authorize Aliyun env import, resource creation, image push, DNS changes, or production deployment.
 
-It lists variable names, owners, and allowed import targets only. It does not contain secret values and does not authorize Aliyun env import.
+## Current Backend Verdict
 
-## Current Verdict
+Production-cn backend cannot be deployed now.
 
-Production-cn cannot be deployed now.
-
-Current sensitive gate:
+Current backend-only sensitive gate:
 
 ```text
-blockedCredentialCount=9
+blockedCredentialCount=1
 readySecretEnvVariableCount=17
 readySecretEnvVariableGroupCount=9
 canCodexProceedWithoutUser=false
 actionTimeConfirmationRequired=true
+actionTimeConfirmationRequiredIds=S03_ACR_PAID_PURCHASE, S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT
 ```
 
-## Not Yet Importable
+Deferred full App launch sensitive actions:
 
-These names are still blocked by external review, controlled identifier lookup, release signing material, or controlled STS/token decisions. Do not mark them ready until their owner action is complete.
+```text
+S01_WECHAT_OPEN_APP_LOGIN
+S02_APPLE_TEAM_ID
+S07_ANDROID_RELEASE_SIGNING
+```
+
+## Not Yet Importable For Current Backend
+
+These names are still blocked by Aliyun backend resource or credential decisions. Do not mark them ready until their owner action is complete.
 
 | Variable | Blocking action | Owner | Import target after unblock |
 | --- | --- | --- | --- |
-| `WECHAT_OPEN_APP_ID` | `S01_WECHAT_OPEN_APP_LOGIN` | WeChat Open Platform operator | Aliyun SAE plain env |
-| `WECHAT_OPEN_APP_SECRET` | `S01_WECHAT_OPEN_APP_LOGIN` | WeChat Open Platform operator | Aliyun KMS / Secrets Manager / SAE secret env |
-| `APPLE_TEAM_ID` | `S02_APPLE_TEAM_ID` | Apple Developer / iOS release operator | Aliyun SAE plain env |
-| `ALIYUN_OSS_SECURITY_TOKEN` | `S05_OSS_RAM_SECRET_OR_STS` | Aliyun OSS/RAM operator | Aliyun KMS / Secrets Manager / SAE secret env |
-| `DATABASE_URL_CN` | `S08_ALIYUN_RDS_DATABASE_URL` | Aliyun RDS / backend data migration operator | Aliyun KMS / Secrets Manager / SAE secret env |
-| `MEIYE_RELEASE_STORE_FILE` | `S07_ANDROID_RELEASE_SIGNING` | Android release operator | Local or CI Android signing secret store |
-| `MEIYE_RELEASE_STORE_PASSWORD` | `S07_ANDROID_RELEASE_SIGNING` | Android release operator | Local or CI Android signing secret store |
-| `MEIYE_RELEASE_KEY_ALIAS` | `S07_ANDROID_RELEASE_SIGNING` | Android release operator | Local or CI Android signing secret store |
-| `MEIYE_RELEASE_KEY_PASSWORD` | `S07_ANDROID_RELEASE_SIGNING` | Android release operator | Local or CI Android signing secret store |
+| `DATABASE_URL_CN` | `S08_ALIYUN_RDS_DATABASE_URL` | 阿里云 RDS/后端数据迁移操作员 | 阿里云 KMS/Secrets Manager/SAE secret env |
+
+- S03_ACR_PAID_PURCHASE and S04_ACR_REGISTRY_AUTH remain backend blockers, but registry secret material stays in ACR/Docker credential helper, RAM/KMS/Secrets Manager, or SAE runtime pull settings.
+- Supabase variables in legacy_database_migration_source are migration source / legacy compatibility only; formal production-cn database target is Aliyun RDS PostgreSQL.
+- WeChat Open Platform mobile app, Apple Team ID, and Android release signing variables are deferred full App launch items, not current backend import blockers.
+
+## Conditional OSS STS Token
+
+`ALIYUN_OSS_SECURITY_TOKEN` is optional. Import it only when the OSS runtime path uses temporary STS credentials. If the backend uses a least-privilege RAM AccessKey or an SAE runtime role path that does not issue an STS session token to the app, leave this variable empty and do not count it as a backend-only blocked credential.
 
 ## Ready Secret Env Import Batches
 
-These variables are ready by name, but their values still must be imported only during an authorized secret-env action. They must not be written to JSON, Markdown, Docker images, app bundles, shell history, or git.
+These variables are ready by name, but their values still must be imported only during an authorized backend secret-env action. They must not be written to JSON, Markdown, Docker images, App bundles, shell history, or git.
 
 | Batch | Owner | Count | Import target | Variable names |
 | --- | --- | ---: | --- | --- |
-| `legacy_database_migration_source` | Vercel/Supabase operator | 3 | migration source / legacy compatibility only; formal database target is Aliyun RDS PostgreSQL | `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` |
-| `app_auth` | Backend release operator | 1 | Aliyun KMS / Secrets Manager / SAE secret env | `WECHAT_LOGIN_SECRET` |
-| `aliyun_oss` | Aliyun OSS/RAM operator | 2 | Aliyun KMS / Secrets Manager / SAE secret env | `ALIYUN_OSS_ACCESS_KEY_ID`, `ALIYUN_OSS_ACCESS_KEY_SECRET` |
-| `bailian_asr` | Aliyun Bailian / DashScope operator | 1 | Aliyun KMS / Secrets Manager / SAE secret env | `DASHSCOPE_API_KEY` |
-| `deepseek_summary` | DeepSeek/API operator | 2 | Aliyun KMS / Secrets Manager / SAE secret env | `DEEPSEEK_API_KEY`, `SERVICE_RECORD_DEEPSEEK_API_KEY` |
-| `volc_speech` | Volcengine speech operator | 3 | Aliyun KMS / Secrets Manager / SAE secret env | `VOLC_SPEECH_ACCESS_TOKEN`, `VOLC_SPEECH_APP_ID`, `VOLC_SPEECH_SECRET_KEY` |
-| `backend_ops` | Backend ops / admin | 2 | Aliyun KMS / Secrets Manager / SAE secret env | `ADMIN_USER_IDS`, `CREDITS_IP_SALT` |
-| `legacy_content_provider` | Legacy content provider/API operator | 1 | Aliyun KMS / Secrets Manager / SAE secret env | `APIMART_API_KEY` |
-| `mini_program_compat` | WeChat mini-program operator | 2 | Aliyun KMS / Secrets Manager / SAE secret env | `WECHAT_MINI_APPID`, `WECHAT_MINI_SECRET` |
+| `legacy_database_migration_source` | Vercel/Supabase 操作员 | 3 | migration source / legacy compatibility only; formal database target is Aliyun RDS PostgreSQL | `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` |
+| `app_auth` | 后端发布操作员 | 1 | 阿里云 KMS/Secrets Manager/SAE secret env | `WECHAT_LOGIN_SECRET` |
+| `aliyun_oss` | 阿里云 OSS/RAM 操作员 | 2 | 阿里云 KMS/Secrets Manager/SAE secret env | `ALIYUN_OSS_ACCESS_KEY_ID`, `ALIYUN_OSS_ACCESS_KEY_SECRET` |
+| `bailian_asr` | 阿里云百炼/DashScope 操作员 | 1 | 阿里云 KMS/Secrets Manager/SAE secret env | `DASHSCOPE_API_KEY` |
+| `deepseek_summary` | DeepSeek/API 操作员 | 2 | 阿里云 KMS/Secrets Manager/SAE secret env | `DEEPSEEK_API_KEY`, `SERVICE_RECORD_DEEPSEEK_API_KEY` |
+| `volc_speech` | 火山引擎语音操作员 | 3 | 阿里云 KMS/Secrets Manager/SAE secret env | `VOLC_SPEECH_ACCESS_TOKEN`, `VOLC_SPEECH_APP_ID`, `VOLC_SPEECH_SECRET_KEY` |
+| `backend_ops` | 后端运维/管理员 | 2 | 阿里云 KMS/Secrets Manager/SAE secret env | `ADMIN_USER_IDS`, `CREDITS_IP_SALT` |
+| `legacy_content_provider` | 旧内容供应商/API 操作员 | 1 | 阿里云 KMS/Secrets Manager/SAE secret env | `APIMART_API_KEY` |
+| `mini_program_compat` | 微信公众平台小程序操作员 | 2 | 阿里云 KMS/Secrets Manager/SAE secret env | `WECHAT_MINI_APPID`, `WECHAT_MINI_SECRET` |
 
-## APP WeChat Login Boundary
+## Deferred Full App Launch Variables
+
+The following names are not current backend import blockers. They remain deferred until the App launch phase.
+
+| Variable | Deferred action | Current backend meaning |
+| --- | --- | --- |
+| `WECHAT_OPEN_APP_ID` | `S01_WECHAT_OPEN_APP_LOGIN` | deferred_until_wechat_open_mobile_app_created_and_approved |
+| `WECHAT_OPEN_APP_SECRET` | `S01_WECHAT_OPEN_APP_LOGIN` | deferred_until_wechat_open_mobile_app_created_and_approved |
+| `APPLE_TEAM_ID` | `S02_APPLE_TEAM_ID` | deferred_until_ios_universal_link_aasa_work_resumes |
+| `MEIYE_RELEASE_STORE_FILE` | `S07_ANDROID_RELEASE_SIGNING` | deferred_until_android_release_signing_work_resumes |
+| `MEIYE_RELEASE_STORE_PASSWORD` | `S07_ANDROID_RELEASE_SIGNING` | deferred_until_android_release_signing_work_resumes |
+| `MEIYE_RELEASE_KEY_ALIAS` | `S07_ANDROID_RELEASE_SIGNING` | deferred_until_android_release_signing_work_resumes |
+| `MEIYE_RELEASE_KEY_PASSWORD` | `S07_ANDROID_RELEASE_SIGNING` | deferred_until_android_release_signing_work_resumes |
 
 `WECHAT_MINI_APPID`, `WECHAT_MINI_SECRET`, and `WECHAT_LOGIN_SECRET` may remain necessary for old mini-program or compatibility paths. They do not unblock native APP WeChat login.
 
-Native APP WeChat login still requires:
-
-```text
-WECHAT_OPEN_APP_ID
-WECHAT_OPEN_APP_SECRET
-WECHAT_OPEN_APP_REVIEW_STATUS=approved
-```
-
-`WECHAT_OPEN_APP_SECRET` must be imported only through Aliyun KMS, Secrets Manager, or SAE secret env after the WeChat Open Platform mobile app is created and approved.
-
 ## Import Evidence To Record
 
-After an authorized import action, record only non-secret evidence:
+After an authorized backend import action, record only non-secret evidence:
 
 ```text
 deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport.importedAt
 deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport.evidence
 deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport.confirmed=true
 deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport.secretNotInImage=true
+deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.databaseUrlCnSecretImported=true
+deploy/aliyun-production-cn.rds-migration.local.json -> migration.* non-secret validation handles
 ```
 
 ## Verification After Import
 
-Run:
+Run the backend-only checks first, then strict production gates before deployment:
 
 ```bash
+corepack pnpm aliyun:sensitive:blockers:backend
 corepack pnpm aliyun:env:checklist
-corepack pnpm aliyun:sensitive:blockers
+corepack pnpm aliyun:backend-cn:status
+corepack pnpm aliyun:rds:migration:evidence:strict
 corepack pnpm aliyun:cloud:confirmations:strict
+corepack pnpm aliyun:image:plan:strict
+corepack pnpm aliyun:domain:strict
 corepack pnpm aliyun:readiness:cloud-ready
-corepack pnpm aliyun:completion:audit
 corepack pnpm aliyun:predeploy
 ```
-
-The import is not production-ready until `envImport.confirmed=true`, `envImport.secretNotInImage=true`, and the strict gates pass.
 
 ## Forbidden
 
 ```text
 Do not output, paste, or commit secret values.
 Do not import env values without action-time authorization.
-Do not store AppSecret, AccessKeySecret, registry password, RAM Secret, STS token, Supabase service role key, Android keystore password, or certificate private key in JSON, Markdown, Docker images, app bundles, shell history, or git.
-Do not deploy production-cn after env import alone; cloud confirmations and image publish evidence must also pass strict gates.
+Do not store AppSecret, AccessKeySecret, registry password, RAM Secret, STS token, database password, DATABASE_URL_CN value, Supabase service role key, Android keystore password, or certificate private key in JSON, Markdown, Docker images, App bundles, shell history, or git.
+Do not deploy production-cn after env import alone; RDS migration, cloud confirmations, image publish, domain, and smoke evidence must also pass strict gates.
 ```

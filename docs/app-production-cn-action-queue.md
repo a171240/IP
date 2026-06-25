@@ -1,6 +1,6 @@
 # 阿里云控制台动作包
 
-生成时间：2026-06-24T16:51:36.339Z
+生成时间：2026-06-25T08:04:35.811Z
 
 ## 结论
 
@@ -21,7 +21,7 @@
 - containsValues: false
 - mutationPerformed: false
 - cloudApiCalled: false
-- blockedCredentialCount: 2
+- blockedCredentialCount: 1
 - readySecretEnvVariableCount: 17
 - resourceEvidenceReady: 0/7
 - blockedResourceEvidenceIds: R01_SAE_RUNTIME, R02_ACR_IMAGE_REGISTRY, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R05_OSS_AUDIO_STORAGE, R06_ENV_IMPORT, R07_SLS_ALERTS
@@ -31,8 +31,8 @@
 
 - conclusion: 现在不能部署；本动作包当前只覆盖阿里云后端，能进入 C02/C05/P11 的动作时确认，其余 ACR push/SAE/DNS/env/SLS/smoke 仍未闭环。
 - canDeployNow: false
-- blockedCredentialCount: 2
-- blockedCredentialNames: ALIYUN_OSS_SECURITY_TOKEN, DATABASE_URL_CN
+- blockedCredentialCount: 1
+- blockedCredentialNames: DATABASE_URL_CN
 - readySecretEnvVariableCount: 17
 - resourceEvidenceReady: 0/7
 - blockedResourceEvidenceIds: R01_SAE_RUNTIME, R02_ACR_IMAGE_REGISTRY, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R05_OSS_AUDIO_STORAGE, R06_ENV_IMPORT, R07_SLS_ALERTS

@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 当前阻塞简报
 
-Generated: 2026-06-25T07:08:24.879Z
+Generated: 2026-06-25T08:21:04.383Z
 
 ## 结论
 
@@ -46,9 +46,9 @@ Generated: 2026-06-25T07:08:24.879Z
 - sensitiveBlocked: 5/5
 - sensitiveBlockedIds: S03_ACR_PAID_PURCHASE, S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT
 - deferredAppLaunchSensitiveBlockedIds: S01_WECHAT_OPEN_APP_LOGIN, S02_APPLE_TEAM_ID, S07_ANDROID_RELEASE_SIGNING
-- blockedCredentialCount: 2
+- blockedCredentialCount: 1
 - readySecretEnvVariableCount: 17
-- blockedVariableAcquisitionCount: 2
+- blockedVariableAcquisitionCount: 1
 - deferredAppLaunchVariableAcquisitionCount: 7
 - readySecretEnvImportGroupCount: 9
 - cloudInventoryStrictReady: 0/9
@@ -385,8 +385,8 @@ Generated: 2026-06-25T07:08:24.879Z
 
 ## 用户介入密钥/密码简表
 
-- blockedCredentialCount: 2
-- blockedCredentialNames: ALIYUN_OSS_SECURITY_TOKEN, DATABASE_URL_CN
+- blockedCredentialCount: 1
+- blockedCredentialNames: DATABASE_URL_CN
 - readySecretEnvVariableCount: 17
 - readySecretEnvVariableNames: ADMIN_USER_IDS, ALIYUN_OSS_ACCESS_KEY_ID, ALIYUN_OSS_ACCESS_KEY_SECRET, APIMART_API_KEY, CREDITS_IP_SALT, DASHSCOPE_API_KEY, DEEPSEEK_API_KEY, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_SUPABASE_URL, SERVICE_RECORD_DEEPSEEK_API_KEY, SUPABASE_SERVICE_ROLE_KEY, VOLC_SPEECH_ACCESS_TOKEN, VOLC_SPEECH_APP_ID, VOLC_SPEECH_SECRET_KEY, WECHAT_LOGIN_SECRET, WECHAT_MINI_APPID, WECHAT_MINI_SECRET
 - forbiddenStorage: git, JSON/Markdown 报告, Docker image, App bundle, 小程序或 App 前端包
@@ -395,7 +395,7 @@ Generated: 2026-06-25T07:08:24.879Z
 | --- | --- | --- | --- | --- | --- | --- |
 | `acr_paid_purchase` | `S03_ACR_PAID_PURCHASE` | blocked | none | none | 阿里云控制台 -> 容器镜像服务 ACR -> 企业版购买页 | deploy/aliyun-production-cn.image-publish.local.json -> acr.purchaseCandidate / acr non-secret evidence |
 | `acr_registry_auth` | `S04_ACR_REGISTRY_AUTH` | blocked | none | none | 阿里云控制台 -> ACR 命名空间/镜像仓库；SAE 应用 -> 镜像拉取配置 | deploy/aliyun-production-cn.image-publish.local.json -> acr + runtime non-secret fields; SAE runtime image pull credentials -> Aliyun runtime secret settings only |
-| `oss_ram_sts` | `S05_OSS_RAM_SECRET_OR_STS` | blocked | ALIYUN_OSS_SECURITY_TOKEN | ALIYUN_OSS_ACCESS_KEY_ID, ALIYUN_OSS_ACCESS_KEY_SECRET | 阿里云控制台 -> RAM 访问控制 / OSS Bucket / SAE 环境变量或 Secrets Manager | ALIYUN_OSS_ACCESS_KEY_ID / ALIYUN_OSS_ACCESS_KEY_SECRET / ALIYUN_OSS_SECURITY_TOKEN -> KMS/Secrets Manager/SAE secret env; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss |
+| `oss_ram_sts` | `S05_OSS_RAM_SECRET_OR_STS` | blocked | none | ALIYUN_OSS_ACCESS_KEY_ID, ALIYUN_OSS_ACCESS_KEY_SECRET | 阿里云控制台 -> RAM 访问控制 / OSS Bucket / SAE 环境变量或 Secrets Manager | ALIYUN_OSS_ACCESS_KEY_ID / ALIYUN_OSS_ACCESS_KEY_SECRET / ALIYUN_OSS_SECURITY_TOKEN -> KMS/Secrets Manager/SAE secret env; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss |
 | `rds_database_secret_and_migration` | `S08_ALIYUN_RDS_DATABASE_URL` | blocked | DATABASE_URL_CN | none | 阿里云控制台 -> RDS PostgreSQL -> 实例/数据库/账号/连接信息；SAE/KMS/Secrets Manager -> secret env | DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env only; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres / migration non-secret evidence; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport non-secret confirmation |
 | `ready_secret_env_import` | `S06_READY_SENSITIVE_ENV_IMPORT` | blocked | none | ADMIN_USER_IDS, ALIYUN_OSS_ACCESS_KEY_ID, ALIYUN_OSS_ACCESS_KEY_SECRET, APIMART_API_KEY, CREDITS_IP_SALT, DASHSCOPE_API_KEY, DEEPSEEK_API_KEY, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_SUPABASE_URL, SERVICE_RECORD_DEEPSEEK_API_KEY, SUPABASE_SERVICE_ROLE_KEY, VOLC_SPEECH_ACCESS_TOKEN, VOLC_SPEECH_APP_ID, VOLC_SPEECH_SECRET_KEY, WECHAT_LOGIN_SECRET, WECHAT_MINI_APPID, WECHAT_MINI_SECRET | 现有 Vercel production / Supabase / 阿里云百炼 / DeepSeek / 火山引擎 / 微信公众平台等控制台 | SAE plain env for non-secret identifiers only; KMS/Secrets Manager/SAE secret env for secret or connection values; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport |
 
@@ -409,7 +409,6 @@ Generated: 2026-06-25T07:08:24.879Z
 
 | 变量 | 授权包 | 获取位置 | 获取方式 | 导入目标 | 禁止写入 |
 | --- | --- | --- | --- | --- | --- |
-| `ALIYUN_OSS_SECURITY_TOKEN` | P05_OSS_RAM_STS | 阿里云 RAM / STS / SAE 运行时角色 | 使用临时 STS 凭证或运行时角色链路时注入；长期 AccessKey 模式可以留空。 | 阿里云 KMS/Secrets Manager/SAE secret env | 只在动作时导入 KMS/Secrets Manager/SAE secret env；不要写入 JSON、Markdown、Docker 镜像或 git。 |
 | `DATABASE_URL_CN` | P11_ALIYUN_RDS_DATA_MIGRATION | 阿里云控制台 -> RDS PostgreSQL -> 数据库连接 | 创建或确认 production-cn RDS PostgreSQL 后生成连接串，并配套完成数据迁移/回滚验收。 | 阿里云 KMS/Secrets Manager/SAE secret env | 只在动作时导入 KMS/Secrets Manager/SAE secret env；不要写入 JSON、Markdown、Docker 镜像或 git。 |
 
 ## 延期的完整 APP 发布变量

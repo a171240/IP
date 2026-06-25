@@ -27,8 +27,8 @@ node scripts/summarize-aliyun-user-action-brief.mjs --backend-only
 Current backend-only credential gate:
 
 ```text
-blockedCredentialCount=2
-blockedCredentialNames=ALIYUN_OSS_SECURITY_TOKEN, DATABASE_URL_CN
+blockedCredentialCount=1
+blockedCredentialNames=DATABASE_URL_CN
 readySecretEnvVariableCount=17
 deferredAppLaunchSensitiveActionIds=S01_WECHAT_OPEN_APP_LOGIN, S02_APPLE_TEAM_ID, S07_ANDROID_RELEASE_SIGNING
 ```
@@ -48,7 +48,7 @@ Production-cn cannot be deployed now.
 Full App launch credential gate, including deferred WeChat/Android/Apple launch items:
 
 ```text
-blockedCredentialCount=9
+blockedCredentialCount=8
 readySecretEnvVariableCount=17
 canCodexProceedWithoutUser=false
 actionTimeConfirmationRequired=true

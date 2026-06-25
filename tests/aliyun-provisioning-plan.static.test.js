@@ -63,7 +63,7 @@ test("Aliyun provisioning plan renders phase order without executing cloud actio
     "P10_ANDROID_RELEASE_SIGNING",
     "P02_APPLE_TEAM_ID",
   ])
-  assert.equal(report.summary.blockedCredentialCount, 9)
+  assert.equal(report.summary.blockedCredentialCount, 8)
   assert.equal(report.summary.readySecretEnvVariableCount, 17)
   assert.equal(report.summary.resourceEvidenceReady, "0/7")
   assert.ok(report.summary.blockedResourceEvidenceIds.includes("R01_SAE_RUNTIME"))
@@ -72,7 +72,7 @@ test("Aliyun provisioning plan renders phase order without executing cloud actio
   assert.ok(report.summary.partiallyObservedResourceEvidenceIds.includes("R07_SLS_ALERTS"))
   assert.equal(report.provisioningClosureBrief.canDeployNow, false)
   assert.equal(report.provisioningClosureBrief.canCodexExecuteNow, false)
-  assert.equal(report.provisioningClosureBrief.blockedCredentialCount, 9)
+  assert.equal(report.provisioningClosureBrief.blockedCredentialCount, 8)
   assert.ok(report.provisioningClosureBrief.blockedCredentialNames.includes("DATABASE_URL_CN"))
   assert.ok(report.provisioningClosureBrief.blockedCredentialNames.includes("WECHAT_OPEN_APP_ID"))
   assert.ok(report.provisioningClosureBrief.blockedCredentialNames.includes("WECHAT_OPEN_APP_SECRET"))
@@ -212,7 +212,7 @@ test("Aliyun provisioning plan markdown preserves ACR current scope and deferred
   assert.match(markdown, /Full APP launch scope: deferred_after_backend_online/)
   assert.match(markdown, /Required blocking env: DATABASE_URL_CN/)
   assert.match(markdown, /Deferred APP launch packets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID/)
-  assert.match(markdown, /Blocked credential count: 9/)
+  assert.match(markdown, /Blocked credential count: 8/)
   assert.match(markdown, /Ready secret env variable count: 17/)
   assert.match(markdown, /Resource evidence ready: 0\/7/)
   assert.match(markdown, /Blocked resource evidence ids: .*R02_ACR_IMAGE_REGISTRY/)

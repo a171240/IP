@@ -57,8 +57,9 @@ test("Aliyun sensitive blockers backend-only mode excludes deferred APP launch c
   assert.deepEqual(report.summary.blockedIds, ids)
   assert.deepEqual(report.summary.actionTimeConfirmationRequired, ids)
   assert.deepEqual(report.credentialInterventionBrief.actionTimeConfirmationRequiredIds, ids)
-  assert.equal(report.credentialInterventionBrief.blockedCredentialCount, 2)
-  assert.deepEqual(report.credentialInterventionBrief.blockedCredentialNames, ["ALIYUN_OSS_SECURITY_TOKEN", "DATABASE_URL_CN"])
+  assert.equal(report.credentialInterventionBrief.blockedCredentialCount, 1)
+  assert.deepEqual(report.credentialInterventionBrief.blockedCredentialNames, ["DATABASE_URL_CN"])
+  assert.ok(!report.summary.userIntervention.blockedVariableNames.includes("ALIYUN_OSS_SECURITY_TOKEN"))
   assert.equal(report.credentialInterventionBrief.readySecretEnvVariableCount, 17)
   assert.ok(report.credentialInterventionBrief.readySecretEnvVariableNames.includes("SUPABASE_SERVICE_ROLE_KEY"))
   assert.ok(report.summary.userIntervention.groups.paid_purchase_confirmation.includes("S03_ACR_PAID_PURCHASE"))
@@ -121,8 +122,9 @@ test("Aliyun sensitive blockers output has current blocked action ids but no sec
   assert.ok(report.summary.userIntervention.readySecretEnvVariableNames.includes("SUPABASE_SERVICE_ROLE_KEY"))
   assert.ok(report.summary.userIntervention.readySecretEnvVariableNames.includes("DASHSCOPE_API_KEY"))
   assert.ok(report.summary.userIntervention.readySecretEnvVariableCount >= 1)
-  assert.equal(report.credentialInterventionBrief.blockedCredentialCount, 9)
+  assert.equal(report.credentialInterventionBrief.blockedCredentialCount, 8)
   assert.equal(report.credentialInterventionBrief.readySecretEnvVariableCount, 17)
+  assert.ok(!report.credentialInterventionBrief.blockedCredentialNames.includes("ALIYUN_OSS_SECURITY_TOKEN"))
   assert.ok(report.credentialInterventionBrief.blockedCredentialNames.includes("DATABASE_URL_CN"))
   assert.ok(report.credentialInterventionBrief.blockedCredentialNames.includes("WECHAT_OPEN_APP_ID"))
   assert.ok(report.credentialInterventionBrief.blockedCredentialNames.includes("MEIYE_RELEASE_KEY_PASSWORD"))
@@ -314,7 +316,7 @@ test("Aliyun sensitive blockers markdown renders value-free variable acquisition
   assert.match(markdown, /#### 变量获取和导入明细/)
   assert.match(markdown, /## 用户介入分层/)
   assert.match(markdown, /## 用户介入密钥\/密码简表/)
-  assert.match(markdown, /blockedCredentialCount: 9/)
+  assert.match(markdown, /blockedCredentialCount: 8/)
   assert.match(markdown, /readySecretEnvVariableCount: 17/)
   assert.match(markdown, /wechat_open_mobile_app/)
   assert.match(markdown, /rds_database_secret_and_migration/)
@@ -348,11 +350,11 @@ test("Aliyun credential acquisition runbook stays aligned with sensitive blocker
   assert.match(runbook, /Current Backend-Only Scope/)
   assert.match(runbook, /backend_aliyun_only/)
   assert.match(runbook, /corepack pnpm aliyun:sensitive:blockers:backend/)
-  assert.match(runbook, /blockedCredentialCount=2/)
-  assert.match(runbook, /blockedCredentialNames=ALIYUN_OSS_SECURITY_TOKEN, DATABASE_URL_CN/)
+  assert.match(runbook, /blockedCredentialCount=1/)
+  assert.match(runbook, /blockedCredentialNames=DATABASE_URL_CN/)
   assert.match(runbook, /docs\/app-production-cn-backend-sensitive-blockers\.md/)
   assert.match(runbook, /docs\/app-production-cn-backend-secret-env-import-batches\.md/)
-  assert.match(runbook, /blockedCredentialCount=9/)
+  assert.match(runbook, /blockedCredentialCount=8/)
   assert.match(runbook, /readySecretEnvVariableCount=17/)
   assert.match(runbook, /canCodexProceedWithoutUser=false/)
   assert.match(runbook, /actionTimeConfirmationRequired=true/)
@@ -410,7 +412,7 @@ test("APP production-cn backend-only sensitive docs reflect current Aliyun backe
 
   for (const doc of [sensitiveDoc, actionDoc]) {
     assert.match(doc, /currentScope: backend_aliyun_only/)
-    assert.match(doc, /blockedCredentialCount: 2|blockedCredentialCount=2/)
+    assert.match(doc, /blockedCredentialCount: 1|blockedCredentialCount=1/)
     assert.match(doc, /readySecretEnvVariableCount: 17|readySecretEnvVariableCount=17/)
     assert.match(doc, /ALIYUN_OSS_SECURITY_TOKEN/)
     assert.match(doc, /DATABASE_URL_CN/)
@@ -435,7 +437,7 @@ test("APP production-cn backend-only sensitive docs reflect current Aliyun backe
   )
   assert.match(actionDoc, /nextActionTimeConfirmations: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION/)
   assert.match(importBatches, /Current backend-only sensitive gate/)
-  assert.match(importBatches, /blockedCredentialCount=2/)
+  assert.match(importBatches, /blockedCredentialCount=1/)
   assert.match(importBatches, /readySecretEnvVariableCount=17/)
   assert.match(importBatches, /readySecretEnvVariableGroupCount=9/)
   assert.match(importBatches, /ALIYUN_OSS_SECURITY_TOKEN/)
@@ -457,10 +459,7 @@ test("APP production-cn backend-only sensitive docs reflect current Aliyun backe
   assert.doesNotMatch(importBatches, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(importBatches, /:\/\/[^\s:@]+:[^\s@]+@/)
   assert.doesNotMatch(importBatches, /AccessKeySecret\s*[:=]\s*["'][^"']+["']/)
-  assert.deepEqual(report.credentialInterventionBrief.blockedCredentialNames, [
-    "ALIYUN_OSS_SECURITY_TOKEN",
-    "DATABASE_URL_CN",
-  ])
+  assert.deepEqual(report.credentialInterventionBrief.blockedCredentialNames, ["DATABASE_URL_CN"])
   assert.equal(report.summary.readySensitiveEnvVariableGroups.length, 9)
   for (const group of report.summary.readySensitiveEnvVariableGroups) {
     assert.match(importBatches, new RegExp(group.category))
@@ -498,7 +497,7 @@ test("Aliyun release artifacts summary surfaces sensitive blocker acquisition de
   assert.match(releaseArtifacts, /readySecretEnvVariableCount/)
   assert.match(releaseArtifacts, /formatUserInterventionGroups/)
   assert.match(doc, /aliyun:sensitive:blockers:backend/)
-  assert.match(doc, /blocked credential name 应为 `ALIYUN_OSS_SECURITY_TOKEN` 和 `DATABASE_URL_CN`/)
+  assert.match(doc, /blocked credential name 应为 `DATABASE_URL_CN`/)
 })
 
 test("APP production-cn sensitive blockers handoff documents user-intervention credential boundaries", () => {
@@ -506,12 +505,13 @@ test("APP production-cn sensitive blockers handoff documents user-intervention c
   const importBatches = read("docs", "app-production-cn-secret-env-import-batches.md")
 
   for (const expected of [
-    "Production-cn cannot be deployed now.",
-    "total=8",
-    "blocked=8",
-    "blockedCredentialCount=9",
-    "readySecretEnvVariableCount=17",
-    "canCodexProceedWithoutUser=false",
+    "# 美业话镜 APP production-cn 密钥/密码/token/付款/受控标识符阻塞项",
+    "currentScope: full_app_launch",
+    "blocked: 8 / 8",
+    "blockedCredentialCount: 8",
+    "blockedCredentialNames: APPLE_TEAM_ID, DATABASE_URL_CN",
+    "readySecretEnvVariableCount: 17",
+    "canCodexProceedWithoutUser: false",
     "ALIYUN_OSS_SECURITY_TOKEN",
     "DATABASE_URL_CN",
     "APPLE_TEAM_ID",
@@ -522,27 +522,24 @@ test("APP production-cn sensitive blockers handoff documents user-intervention c
     "DASHSCOPE_API_KEY",
     "WECHAT_MINI_SECRET",
     "S01_WECHAT_OPEN_APP_LOGIN",
-    "微信开放平台 -> 管理中心 -> 移动应用 -> 美业话镜 App -> 开发信息",
-    "WECHAT_OPEN_APP_SECRET -> Aliyun KMS / Secrets Manager / SAE secret env",
-    "mini-program credentials `WECHAT_MINI_APPID`, `WECHAT_MINI_SECRET`, and `WECHAT_LOGIN_SECRET` do not unblock APP WeChat login",
+    "微信开放平台 -> 管理中心 -> 移动应用 -> 美业话镜 App",
+    "WECHAT_OPEN_APP_SECRET -> 阿里云 KMS/Secrets Manager/SAE secret env",
     "S02_APPLE_TEAM_ID",
     "com.ipgongchang.meiyehuajing",
     "S03_ACR_PAID_PURCHASE",
-    "quoted price=CNY 117.00",
+    "CNY 117.00",
     "S04_ACR_REGISTRY_AUTH",
     "runtime.imagePullConfigured=true",
     "S05_OSS_RAM_SECRET_OR_STS",
     "ALIYUN_OSS_ACCESS_KEY_SECRET",
     "S08_ALIYUN_RDS_DATABASE_URL",
-    "DATABASE_URL_CN -> Aliyun KMS / Secrets Manager / SAE secret env",
+    "DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env",
     "S06_READY_SENSITIVE_ENV_IMPORT",
     "envImport.secretNotInImage=true",
     "S07_ANDROID_RELEASE_SIGNING",
     "MEIYE_RELEASE_STORE_PASSWORD",
     "debug.keystore",
-    "corepack pnpm aliyun:predeploy",
-    "Do not read or output WECHAT_OPEN_APP_SECRET.",
-    "Do not buy ACR, create secrets, import env values, run docker login/push, deploy production-cn, or git push.",
+    "本报告不创建资源、不付款、不修改 DNS、不导入环境变量、不调用阿里云写 API。",
   ]) {
     assert.match(doc, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
   }
@@ -553,14 +550,15 @@ test("APP production-cn sensitive blockers handoff documents user-intervention c
   assert.doesNotMatch(doc, /AccessKeySecret\s*[:=]\s*["'][^"']+["']/)
 
   for (const expected of [
-    "Production-cn cannot be deployed now.",
-    "blockedCredentialCount=9",
+    "Production-cn backend cannot be deployed now.",
+    "blockedCredentialCount=1",
     "readySecretEnvVariableCount=17",
     "readySecretEnvVariableGroupCount=9",
     "WECHAT_OPEN_APP_ID",
     "WECHAT_OPEN_APP_SECRET",
     "APPLE_TEAM_ID",
     "ALIYUN_OSS_SECURITY_TOKEN",
+    "Conditional OSS STS Token",
     "DATABASE_URL_CN",
     "MEIYE_RELEASE_STORE_PASSWORD",
     "legacy_database_migration_source",
@@ -582,7 +580,6 @@ test("APP production-cn sensitive blockers handoff documents user-intervention c
     "APIMART_API_KEY",
     "mini_program_compat",
     "WECHAT_MINI_SECRET",
-    "WECHAT_OPEN_APP_REVIEW_STATUS=approved",
     "items.envImport.secretNotInImage=true",
     "corepack pnpm aliyun:env:checklist",
     "corepack pnpm aliyun:predeploy",

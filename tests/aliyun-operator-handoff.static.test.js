@@ -102,8 +102,8 @@ test("Aliyun operator handoff backend-only mode excludes deferred APP launch wor
 
   assert.equal(report.currentScope, "backend_aliyun_only")
   assert.equal(report.containsValues, false)
-  assert.equal(report.operatorClosureBrief.blockedCredentialCount, 2)
-  assert.deepEqual(report.operatorClosureBrief.blockedCredentialNames, ["ALIYUN_OSS_SECURITY_TOKEN", "DATABASE_URL_CN"])
+  assert.equal(report.operatorClosureBrief.blockedCredentialCount, 1)
+  assert.deepEqual(report.operatorClosureBrief.blockedCredentialNames, ["DATABASE_URL_CN"])
   assert.ok(!report.operatorClosureBrief.blockedCredentialNames.includes("WECHAT_OPEN_APP_ID"))
   assert.ok(!report.operatorClosureBrief.blockedCredentialNames.includes("WECHAT_OPEN_APP_SECRET"))
   assert.ok(!report.operatorClosureBrief.credentialGroups.some((group) => group.actionId === "S01_WECHAT_OPEN_APP_LOGIN"))
@@ -178,7 +178,7 @@ test("Aliyun operator handoff maps ACR and SAE evidence gaps to the correct cons
   const imagePullConfigured = byPath.get("runtime.imagePullConfigured")
 
   assert.equal(report.containsValues, false)
-  assert.equal(report.operatorClosureBrief.blockedCredentialCount, 9)
+  assert.equal(report.operatorClosureBrief.blockedCredentialCount, 8)
   assert.equal(report.operatorClosureBrief.readySecretEnvVariableCount, 17)
   assert.equal(report.operatorClosureBrief.resourceEvidenceReady, "0/7")
   assert.ok(report.operatorClosureBrief.blockedCredentialNames.includes("DATABASE_URL_CN"))
@@ -342,7 +342,7 @@ test("Aliyun operator handoff exposes console-only inventory observation summary
   assert.match(markdownOutput, /currentBrowserAliyunConsoleTabCount/)
   assert.match(markdownOutput, /currentBrowserCloudApiCalled: false/)
   assert.match(markdownOutput, /目标闭环证据简表/)
-  assert.match(markdownOutput, /blockedCredentialCount: 9/)
+  assert.match(markdownOutput, /blockedCredentialCount: 8/)
   assert.match(markdownOutput, /readySecretEnvVariableCount: 17/)
   assert.match(markdownOutput, /resourceEvidenceReady: 0\/7/)
   assert.match(markdownOutput, /WECHAT_OPEN_APP_SECRET/)
