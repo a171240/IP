@@ -489,30 +489,76 @@ function compactCredentialIntervention(report) {
       summary.actionTimeConfirmationRequired ||
       [],
   ).sort()
+  const groups = (credentialBrief.groups || []).map((group) => ({
+    category: group.category,
+    actionId: group.actionId,
+    status: group.status,
+    owner: group.owner,
+    type: group.type,
+    blockedCredentialNames: group.blockedCredentialNames || [],
+    readySecretEnvVariableNames: group.readySecretEnvVariableNames || [],
+    variableNames: group.variableNames || [],
+    obtainFrom: group.obtainFrom || "",
+    importTargets: group.importTargets || [],
+    writeTargets: group.writeTargets || [],
+    requiresActionTimeConfirmation: group.requiresActionTimeConfirmation === true,
+    verifyCommands: group.verifyCommands || [],
+    unblockCondition: group.unblockCondition || "",
+  }))
   return {
     canCodexProceedWithoutUser: credentialBrief.canCodexProceedWithoutUser === true,
     sensitiveActionBlockedIds: summary.blockedIds || [],
     actionTimeConfirmationRequiredIds,
     blockedCredentialNames,
     readySecretEnvVariableNames,
+    interventionBreakdown: buildCredentialInterventionBreakdown({
+      blockedCredentialNames,
+      readySecretEnvVariableNames,
+      actionTimeConfirmationRequiredIds,
+      groups,
+    }),
     valueHandlingRules: credentialBrief.valueHandlingRules || userIntervention.valueHandlingRules || [],
     forbiddenStorage: credentialBrief.forbiddenStorage || [],
-    groups: (credentialBrief.groups || []).map((group) => ({
-      category: group.category,
-      actionId: group.actionId,
-      status: group.status,
-      owner: group.owner,
-      type: group.type,
-      blockedCredentialNames: group.blockedCredentialNames || [],
-      readySecretEnvVariableNames: group.readySecretEnvVariableNames || [],
-      variableNames: group.variableNames || [],
-      obtainFrom: group.obtainFrom || "",
-      importTargets: group.importTargets || [],
-      writeTargets: group.writeTargets || [],
-      requiresActionTimeConfirmation: group.requiresActionTimeConfirmation === true,
-      verifyCommands: group.verifyCommands || [],
-      unblockCondition: group.unblockCondition || "",
-    })),
+    groups,
+  }
+}
+
+function buildCredentialInterventionBreakdown({
+  blockedCredentialNames,
+  readySecretEnvVariableNames,
+  actionTimeConfirmationRequiredIds,
+  groups,
+}) {
+  return {
+    missingCredentialValues: {
+      count: blockedCredentialNames.length,
+      names: blockedCredentialNames,
+      actionIds: groups
+        .filter((group) => group.blockedCredentialNames.length > 0)
+        .map((group) => group.actionId),
+    },
+    readySecretsPendingCloudImport: {
+      count: readySecretEnvVariableNames.length,
+      names: readySecretEnvVariableNames,
+      actionIds: groups
+        .filter((group) => group.readySecretEnvVariableNames.length > 0)
+        .map((group) => group.actionId),
+    },
+    actionTimeConfirmationRequired: {
+      count: actionTimeConfirmationRequiredIds.length,
+      actionIds: actionTimeConfirmationRequiredIds,
+    },
+    paidPurchaseConfirmationActionIds: groups
+      .filter((group) => group.type === "paid_purchase_confirmation")
+      .map((group) => group.actionId),
+    controlledSecretChannelActionIds: groups
+      .filter((group) => [
+        "registry_password_or_runtime_pull_secret",
+        "ram_secret_or_sts_import",
+        "database_secret_and_migration",
+        "ready_sensitive_env_need_cloud_import",
+      ].includes(group.type))
+      .map((group) => group.actionId),
   }
 }
 
@@ -649,6 +695,10 @@ function renderMarkdown(report) {
     `- blockedCredentialNames: ${report.credentialIntervention.blockedCredentialNames.join(", ") || "none"}`,
     `- readySecretEnvVariableCount: ${report.credentialIntervention.readySecretEnvVariableNames.length}`,
     `- actionTimeConfirmationRequiredIds: ${report.credentialIntervention.actionTimeConfirmationRequiredIds.join(", ") || "none"}`,
+    `- missingCredentialValues: ${report.credentialIntervention.interventionBreakdown.missingCredentialValues.names.join(", ") || "none"}`,
+    `- readySecretsPendingCloudImport: ${report.credentialIntervention.interventionBreakdown.readySecretsPendingCloudImport.count}`,
+    `- paidPurchaseConfirmationActionIds: ${report.credentialIntervention.interventionBreakdown.paidPurchaseConfirmationActionIds.join(", ") || "none"}`,
+    `- controlledSecretChannelActionIds: ${report.credentialIntervention.interventionBreakdown.controlledSecretChannelActionIds.join(", ") || "none"}`,
     ...report.credentialIntervention.groups.flatMap((group) => [
       `- ${group.actionId}: ${group.category}; status=${group.status}; obtainFrom=${group.obtainFrom}; importTargets=${group.importTargets.join(", ") || "none"}`,
     ]),

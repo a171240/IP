@@ -76,6 +76,19 @@ test("Aliyun backend-cn status excludes WeChat mobile app from current backend b
   assert.ok(credentialGroupById.get("S08_ALIYUN_RDS_DATABASE_URL").blockedCredentialNames.includes("DATABASE_URL_CN"))
   assert.ok(credentialGroupById.get("S08_ALIYUN_RDS_DATABASE_URL").importTargets.includes("阿里云 KMS/Secrets Manager/SAE secret env"))
   assert.ok(credentialGroupById.get("S06_READY_SENSITIVE_ENV_IMPORT").readySecretEnvVariableNames.includes("DASHSCOPE_API_KEY"))
+  assert.deepEqual(report.credentialIntervention.interventionBreakdown.missingCredentialValues.names, ["DATABASE_URL_CN"])
+  assert.deepEqual(report.credentialIntervention.interventionBreakdown.missingCredentialValues.actionIds, ["S08_ALIYUN_RDS_DATABASE_URL"])
+  assert.equal(report.credentialIntervention.interventionBreakdown.readySecretsPendingCloudImport.count, 17)
+  assert.ok(report.credentialIntervention.interventionBreakdown.readySecretsPendingCloudImport.names.includes("SUPABASE_SERVICE_ROLE_KEY"))
+  assert.ok(report.credentialIntervention.interventionBreakdown.readySecretsPendingCloudImport.actionIds.includes("S05_OSS_RAM_SECRET_OR_STS"))
+  assert.ok(report.credentialIntervention.interventionBreakdown.readySecretsPendingCloudImport.actionIds.includes("S06_READY_SENSITIVE_ENV_IMPORT"))
+  assert.deepEqual(report.credentialIntervention.interventionBreakdown.paidPurchaseConfirmationActionIds, ["S03_ACR_PAID_PURCHASE"])
+  assert.deepEqual(report.credentialIntervention.interventionBreakdown.controlledSecretChannelActionIds, [
+    "S04_ACR_REGISTRY_AUTH",
+    "S05_OSS_RAM_SECRET_OR_STS",
+    "S08_ALIYUN_RDS_DATABASE_URL",
+    "S06_READY_SENSITIVE_ENV_IMPORT",
+  ])
 
   for (const blocker of [
     "DATABASE_URL_CN",
@@ -200,6 +213,10 @@ test("Aliyun backend-cn status markdown states the backend-only target", () => {
   assert.match(markdown, /Credential Intervention/)
   assert.match(markdown, /blockedCredentialNames: DATABASE_URL_CN/)
   assert.match(markdown, /readySecretEnvVariableCount: 17/)
+  assert.match(markdown, /missingCredentialValues: DATABASE_URL_CN/)
+  assert.match(markdown, /readySecretsPendingCloudImport: 17/)
+  assert.match(markdown, /paidPurchaseConfirmationActionIds: S03_ACR_PAID_PURCHASE/)
+  assert.match(markdown, /controlledSecretChannelActionIds: S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT/)
   assert.match(markdown, /S08_ALIYUN_RDS_DATABASE_URL/)
   assert.match(markdown, /阿里云 KMS\/Secrets Manager\/SAE secret env/)
   assert.match(markdown, /wechatOpenMobileApp: deferred_after_backend_online/)
