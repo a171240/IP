@@ -128,6 +128,21 @@ test("Aliyun backend-cn status excludes WeChat mobile app from current backend b
   assert.equal(report.rdsMigration.deferredAppApiRoutesWithSupabaseDataAccess, 4)
   assert.equal(report.rdsMigration.databaseUrlCnReferencedInSource, true)
   assert.equal(report.rdsMigration.postgresDataAccessAdapterDetected, true)
+  assert.equal(report.cloudConfirmations.backendReady, "0/6")
+  assert.deepEqual(report.cloudConfirmations.backendMissingItems, [
+    "runtime",
+    "apiDomainHttps",
+    "assetDomainHttps",
+    "oss",
+    "envImport",
+    "slsAlerts",
+  ])
+  assert.ok(report.cloudConfirmations.backendBlockers.includes("runtime:missing_cloud_confirmation_item"))
+  assert.ok(report.cloudConfirmations.backendBlockers.includes("apiDomainHttps:missing_cloud_confirmation_item"))
+  assert.ok(report.cloudConfirmations.backendBlockers.includes("assetDomainHttps:missing_cloud_confirmation_item"))
+  assert.ok(report.cloudConfirmations.backendBlockers.includes("oss:missing_cloud_confirmation_item"))
+  assert.ok(report.cloudConfirmations.backendBlockers.includes("envImport:missing_cloud_confirmation_item"))
+  assert.ok(report.cloudConfirmations.backendBlockers.includes("slsAlerts:missing_cloud_confirmation_item"))
   assert.equal(report.cloudResources.evidenceReady, "0/7")
   assert.ok(report.cloudResources.blockedIds.includes("R01_SAE_RUNTIME"))
   assert.ok(report.cloudResources.blockedIds.includes("R07_SLS_ALERTS"))
@@ -173,6 +188,11 @@ test("Aliyun backend-cn status markdown states the backend-only target", () => {
   assert.match(markdown, /canProceedWithoutWechat: true/)
   assert.match(markdown, /canDeployBackendNow: false/)
   assert.match(markdown, /backendRequiredBlocking: ACR_IMAGE_REGISTRY_NOT_READY/)
+  assert.match(markdown, /## Cloud Confirmations/)
+  assert.match(markdown, /backendReady: 0\/6/)
+  assert.match(markdown, /backendMissingItems: runtime, apiDomainHttps, assetDomainHttps, oss, envImport, slsAlerts/)
+  assert.match(markdown, /runtime:missing_cloud_confirmation_item/)
+  assert.match(markdown, /envImport:missing_cloud_confirmation_item/)
   assert.match(markdown, /B01_RDS_POSTGRES_DATA_LAYER/)
   assert.match(markdown, /R05_OSS_AUDIO_STORAGE\.observedReadiness=partial/)
   assert.match(markdown, /R07_SLS_ALERTS\.observedReadiness=partial/)

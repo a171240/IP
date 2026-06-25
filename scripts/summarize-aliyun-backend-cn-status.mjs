@@ -590,10 +590,19 @@ function compactImagePublish(report) {
 function compactCloudConfirmations(report) {
   const localItems = report.local?.items || {}
   const backendKeys = ["runtime", "apiDomainHttps", "assetDomainHttps", "oss", "envImport", "slsAlerts"]
+  const backendMissingItems = backendKeys.filter((key) => !localItems[key])
+  const backendBlockers = backendKeys.flatMap((key) => {
+    const item = localItems[key]
+    if (!item) return [`${key}:missing_cloud_confirmation_item`]
+    if (item.ready === true) return []
+    const blockers = item.blockers || item.missing || []
+    if (!blockers.length) return [`${key}:not_ready`]
+    return blockers.map((blocker) => `${key}:${blocker}`)
+  })
   return {
     backendReady: `${backendKeys.filter((key) => localItems[key]?.ready === true).length}/${backendKeys.length}`,
-    backendBlockers: backendKeys.flatMap((key) =>
-      (localItems[key]?.blockers || []).map((blocker) => `${key}:${blocker}`)),
+    backendMissingItems,
+    backendBlockers,
     wechatExcludedBlockers: localItems.wechatOpenPlatform?.blockers || [],
   }
 }
@@ -612,6 +621,13 @@ function renderMarkdown(report) {
     `- canDeployBackendNow: ${report.canDeployBackendNow}`,
     `- backendRequiredBlocking: ${report.summary.backendRequiredBlocking.join(", ") || "none"}`,
     `- wechatDeferredBlocking: ${report.summary.wechatDeferredBlocking.join(", ")}`,
+    "",
+    "## Cloud Confirmations",
+    "",
+    `- backendReady: ${report.cloudConfirmations.backendReady}`,
+    `- backendMissingItems: ${report.cloudConfirmations.backendMissingItems.join(", ") || "none"}`,
+    `- backendBlockers: ${report.cloudConfirmations.backendBlockers.join(", ") || "none"}`,
+    `- wechatExcludedBlockers: ${report.cloudConfirmations.wechatExcludedBlockers.join(", ") || "none"}`,
     "",
     "## Backend Targets",
     "",
