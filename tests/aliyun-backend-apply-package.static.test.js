@@ -39,9 +39,11 @@ test("Aliyun backend apply package command is wired into scripts and deploy spec
   assert.match(script, /BAP09_POSTDEPLOY_SMOKE/)
   assert.match(script, /FIRST_BACKEND_ACTION_RECOMMENDED_REPLY/)
   assert.match(script, /buildActionTimeAuthorizationRequest/)
+  assert.match(script, /buildCredentialAcquisitionQueue/)
   assert.match(script, /renderOperatorQuickStart/)
   assert.match(applyPackageDoc, /BAP00_READONLY_INVENTORY_IDENTITY/)
   assert.match(applyPackageDoc, /## Operator Quick Start/)
+  assert.match(applyPackageDoc, /## Backend Credential Acquisition Queue/)
   assert.match(applyPackageDoc, /当前结论：不能部署；这不是微信移动应用阻塞/)
   assert.match(applyPackageDoc, /rdsLocalExists=true/)
   assert.match(applyPackageDoc, /rdsEvidence:rdsPostgres\.confirmed/)
@@ -88,6 +90,7 @@ test("Aliyun backend apply package separates immediate backend work from deferre
   assert.equal(report.summary.blockedCredentialCount, 1)
   assert.deepEqual(report.summary.missingCredentialValues, ["DATABASE_URL_CN"])
   assert.equal(report.summary.readySecretsPendingCloudImport, 17)
+  assert.equal(report.summary.onlyMissingBackendCredentialValue, "DATABASE_URL_CN")
   assert.deepEqual(report.summary.paidPurchaseConfirmationActionIds, ["S03_ACR_PAID_PURCHASE"])
   assert.deepEqual(report.summary.controlledSecretChannelActionIds, [
     "S04_ACR_REGISTRY_AUTH",
@@ -104,6 +107,21 @@ test("Aliyun backend apply package separates immediate backend work from deferre
   assert.deepEqual(report.credentialPasswordIntervention.paidPurchaseConfirmationActionIds, ["S03_ACR_PAID_PURCHASE"])
   assert.ok(report.credentialPasswordIntervention.controlledSecretChannelActionIds.includes("S08_ALIYUN_RDS_DATABASE_URL"))
   assert.ok(report.credentialPasswordIntervention.userMustProvideOrConfirm.some((item) => /DATABASE_URL_CN/.test(item)))
+  assert.equal(report.credentialAcquisitionQueue.queueScope, "backend_aliyun_only")
+  assert.equal(report.credentialAcquisitionQueue.onlyMissingBackendCredentialValue, "DATABASE_URL_CN")
+  assert.deepEqual(report.credentialAcquisitionQueue.items.map((item) => item.actionId), [
+    "S03_ACR_PAID_PURCHASE",
+    "S04_ACR_REGISTRY_AUTH",
+    "S05_OSS_RAM_SECRET_OR_STS",
+    "S08_ALIYUN_RDS_DATABASE_URL",
+    "S06_READY_SENSITIVE_ENV_IMPORT",
+  ])
+  const rdsQueueItem = report.credentialAcquisitionQueue.items.find((item) => item.actionId === "S08_ALIYUN_RDS_DATABASE_URL")
+  assert.ok(rdsQueueItem)
+  assert.equal(rdsQueueItem.userQuestion, "DATABASE_URL_CN 从哪里获得并导入到哪里")
+  assert.ok(rdsQueueItem.obtainFrom.includes("阿里云控制台 -> RDS PostgreSQL"))
+  assert.ok(rdsQueueItem.destinationSummary.some((item) => item.includes("DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env only")))
+  assert.ok(rdsQueueItem.verifyCommands.includes("corepack pnpm aliyun:rds:migration:evidence:strict"))
   assert.ok(report.summary.deferredAppLaunchBlocking.includes("WECHAT_OPEN_APP_ID"))
   assert.ok(report.summary.deferredAppLaunchBlocking.includes("WECHAT_OPEN_APP_SECRET"))
   assert.ok(!report.summary.backendRequiredBlocking.includes("WECHAT_OPEN_APP_ID"))
@@ -338,6 +356,11 @@ test("Aliyun backend apply package markdown is value-free and actionable", () =>
   assert.match(markdown, /readySecretsPendingCloudImport: 17/)
   assert.match(markdown, /paidPurchaseConfirmationActionIds: S03_ACR_PAID_PURCHASE/)
   assert.match(markdown, /controlledSecretChannelActionIds: S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT/)
+  assert.match(markdown, /## Backend Credential Acquisition Queue/)
+  assert.match(markdown, /queueScope: backend_aliyun_only/)
+  assert.match(markdown, /onlyMissingBackendCredentialValue: DATABASE_URL_CN/)
+  assert.match(markdown, /DATABASE_URL_CN 从哪里获得并导入到哪里/)
+  assert.match(markdown, /DATABASE_URL_CN -> 阿里云 KMS\/Secrets Manager\/SAE secret env only/)
   assert.match(markdown, /Every apply step still needs action-time confirmation/)
   assert.doesNotMatch(output + markdown, secretLike)
 })

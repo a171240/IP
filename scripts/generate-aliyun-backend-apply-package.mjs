@@ -148,6 +148,7 @@ function buildReport(args) {
   const blockedBackendSteps = steps.filter((step) => !step.canStartAfterActionTimeConfirmation).map((step) => step.id)
   const userIntervention = buildUserIntervention({ sensitiveBlockers, backendStatus, cloudActions })
   const credentialPasswordIntervention = buildCredentialPasswordIntervention(sensitiveBlockers)
+  const credentialAcquisitionQueue = buildCredentialAcquisitionQueue(sensitiveBlockers)
   const actionTimeAuthorizationRequest = buildActionTimeAuthorizationRequest(steps)
   const report = {
     ok: true,
@@ -181,11 +182,13 @@ function buildReport(args) {
       readySecretsPendingCloudImport: credentialPasswordIntervention.readySecretsPendingCloudImport.count,
       paidPurchaseConfirmationActionIds: credentialPasswordIntervention.paidPurchaseConfirmationActionIds,
       controlledSecretChannelActionIds: credentialPasswordIntervention.controlledSecretChannelActionIds,
+      onlyMissingBackendCredentialValue: credentialAcquisitionQueue.onlyMissingBackendCredentialValue,
     },
     actionTimeAuthorizationRequest,
     applySteps: steps,
     userIntervention,
     credentialPasswordIntervention,
+    credentialAcquisitionQueue,
     evidenceWritebackTargets: [
       "deploy/aliyun-production-cn.cloud-inventory-results.local.json",
       "deploy/aliyun-production-cn.rds-migration.local.json",
@@ -309,6 +312,34 @@ function buildCredentialPasswordIntervention(sensitiveBlockers) {
       "ACR purchase and registry/runtime pull credentials require action-time confirmation.",
     ],
     forbiddenStorage: intervention.forbiddenStorage || brief.forbiddenStorage || [],
+  }
+}
+
+function buildCredentialAcquisitionQueue(sensitiveBlockers) {
+  const queue = sensitiveBlockers.credentialAcquisitionQueue || {}
+  return {
+    currentScope: queue.currentScope || "backend_aliyun_only",
+    queueScope: queue.queueScope || queue.currentScope || "backend_aliyun_only",
+    missingCredentialNames: queue.missingCredentialNames || [],
+    onlyMissingBackendCredentialValue: queue.onlyMissingBackendCredentialValue || "",
+    readySecretEnvVariableCount: queue.readySecretEnvVariableCount || 0,
+    readySecretEnvVariableNames: queue.readySecretEnvVariableNames || [],
+    requiresActionTimeConfirmationIds: queue.requiresActionTimeConfirmationIds || [],
+    items: (queue.items || []).map((item) => ({
+      order: item.order,
+      actionId: item.actionId,
+      category: item.category,
+      status: item.status,
+      owner: item.owner,
+      userQuestion: item.userQuestion || "",
+      obtainFrom: item.obtainFrom || "",
+      blockedCredentialNames: item.blockedCredentialNames || [],
+      readySecretEnvVariableNames: item.readySecretEnvVariableNames || [],
+      destinationSummary: item.destinationSummary || item.writeTargets || item.importTargets || [],
+      verifyCommands: item.verifyCommands || [],
+      requiresActionTimeConfirmation: item.requiresActionTimeConfirmation === true,
+      unblockCondition: item.unblockCondition || "",
+    })),
   }
 }
 
@@ -829,6 +860,10 @@ function renderMarkdown(report) {
     "",
     ...renderCredentialPasswordIntervention(report.credentialPasswordIntervention),
     "",
+    "## Backend Credential Acquisition Queue",
+    "",
+    ...renderCredentialAcquisitionQueue(report.credentialAcquisitionQueue),
+    "",
     "## Apply Steps",
     "",
     ...report.applySteps.flatMap((step) => [
@@ -907,6 +942,39 @@ function renderCredentialPasswordIntervention(intervention) {
     `- forbiddenStorage: ${intervention.forbiddenStorage.join(", ") || "none"}`,
     ...intervention.userMustProvideOrConfirm.map((item) => `- ${item}`),
   ]
+}
+
+function renderCredentialAcquisitionQueue(queue) {
+  if (!queue || !(queue.items || []).length) return ["- none"]
+  return [
+    `- queueScope: ${queue.queueScope}`,
+    `- missingCredentialNames: ${(queue.missingCredentialNames || []).join(", ") || "none"}`,
+    `- onlyMissingBackendCredentialValue: ${queue.onlyMissingBackendCredentialValue || "n/a"}`,
+    `- readySecretsPendingCloudImport: ${queue.readySecretEnvVariableCount || 0}`,
+    `- requiresActionTimeConfirmationIds: ${(queue.requiresActionTimeConfirmationIds || []).join(", ") || "none"}`,
+    "",
+    "| order | category | actionId | question | obtainFrom | destination | verify |",
+    "| --- | --- | --- | --- | --- | --- | --- |",
+    ...queue.items.map((item) => [
+      String(item.order || ""),
+      codeCell(item.category),
+      codeCell(item.actionId),
+      escapeTableCell(item.userQuestion || "none"),
+      escapeTableCell(item.obtainFrom || "none"),
+      escapeTableCell((item.destinationSummary || []).join("; ") || "none"),
+      escapeTableCell((item.verifyCommands || []).join("; ") || "none"),
+    ].join(" | ").replace(/^/, "| ").replace(/$/, " |")),
+  ]
+}
+
+function codeCell(value) {
+  return `\`${escapeTableCell(value)}\``
+}
+
+function escapeTableCell(value) {
+  return String(value || "")
+    .replace(/\|/g, "\\|")
+    .replace(/\r?\n/g, " ")
 }
 
 function findSecretLikeValues(value, path = "$") {
