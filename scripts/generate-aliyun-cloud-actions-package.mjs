@@ -12,7 +12,12 @@ const WORKSPACE_ROOT = resolve(BACKEND_ROOT, "../..")
 const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
 
-const CLOUD_CONSOLE_PACKET_IDS = new Set(["P03_ACR_PURCHASE", "P05_OSS_RAM_STS", "P11_ALIYUN_RDS_DATA_MIGRATION"])
+const CLOUD_CONSOLE_PACKET_IDS = new Set([
+  "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
+  "P03_ACR_PURCHASE",
+  "P05_OSS_RAM_STS",
+  "P11_ALIYUN_RDS_DATA_MIGRATION",
+])
 const EXTERNAL_APP_PACKET_IDS = new Set(["P01_WECHAT_OPEN_MOBILE_APP", "P10_ANDROID_RELEASE_SIGNING", "P02_APPLE_TEAM_ID"])
 const CURRENT_SCOPE = "backend_aliyun_only"
 const FULL_APP_LAUNCH_SCOPE = "deferred_after_backend_online"

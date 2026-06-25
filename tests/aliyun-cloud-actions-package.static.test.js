@@ -69,6 +69,7 @@ test("Aliyun cloud actions package summarizes current cloud console action order
   assert.ok(report.summary.blockedByDependencies.includes("C01_SAE_RUNTIME"))
   assert.ok(report.summary.blockedByDependencies.includes("C06_ENV_IMPORT"))
   assert.deepEqual(report.summary.cloudConsolePackets, [
+    "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "P03_ACR_PURCHASE",
     "P05_OSS_RAM_STS",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
@@ -146,6 +147,7 @@ test("Aliyun cloud actions package summarizes current cloud console action order
   assert.equal(report.cloudActionClosureBrief.mutationPerformedCommandResults, 0)
   assert.deepEqual(report.cloudActionClosureBrief.canStartNowConsoleTasks, ["C02_ACR_IMAGE_AND_PULL", "C05_OSS_AUDIO_RAM_STS"])
   assert.deepEqual(report.cloudActionClosureBrief.cloudConsolePackets, [
+    "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "P03_ACR_PURCHASE",
     "P05_OSS_RAM_STS",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
@@ -322,7 +324,7 @@ test("APP production-cn action queue documents the current authorized next-step 
     "BAP05_BACKEND_ENV_IMPORT: status=blocked_by_dependencies",
     "order=5. Import backend env through SAE/KMS/Secrets Manager",
     "canStartNow: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS",
-    "cloudConsolePackets: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION",
+    "cloudConsolePackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION",
     "externalAppPackets: none",
     "deferredAppLaunchPackets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID",
     "C02_ACR_IMAGE_AND_PULL",

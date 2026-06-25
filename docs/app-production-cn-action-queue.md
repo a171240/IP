@@ -1,6 +1,6 @@
 # 阿里云控制台动作包
 
-生成时间：2026-06-25T10:47:02.829Z
+生成时间：2026-06-25T11:18:10.322Z
 
 ## 结论
 
@@ -46,7 +46,7 @@
 - cloudInventoryExecutedCommandResults: 9/9
 - mutationPerformedCommandResults: 0
 - canStartNowConsoleTasks: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS
-- cloudConsolePackets: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
+- cloudConsolePackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
 - externalAppPackets: none
 - deferredAppLaunchPackets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID
 - blockedByDependencies: C01_SAE_RUNTIME, C03_API_DOMAIN_HTTPS_ICP, C04_ASSET_DOMAIN_HTTPS_ICP, C06_ENV_IMPORT, C07_SLS_ALERTS
@@ -132,6 +132,7 @@
 
 ## 云侧动作授权包
 
+- P00_ALIYUN_READONLY_INVENTORY_IDENTITY: 授权重新连接阿里云 CloudShell 或配置 Aliyun CLI，只运行 allowlisted 只读盘点命令并写入非密钥 evidence。
 - P03_ACR_PURCHASE: 授权购买 ACR Enterprise Economic，cn-hangzhou，1 个月，当前报价 CNY 117.00。
 - P05_OSS_RAM_STS: 授权为服务记录音频 OSS 配置最小权限 RAM/STS 或运行时角色，并只通过密钥环境注入。
 - P11_ALIYUN_RDS_DATA_MIGRATION: 授权创建/确认阿里云 RDS PostgreSQL production-cn 数据库并完成数据迁移；DATABASE_URL_CN 只能进入阿里云 secret env。

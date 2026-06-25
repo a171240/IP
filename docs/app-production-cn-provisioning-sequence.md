@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 阿里云 Provisioning Plan
 
-Generated: 2026-06-25T09:09:38.668Z
+Generated: 2026-06-25T11:17:54.222Z
 
 ## 结论
 
@@ -24,12 +24,12 @@ Generated: 2026-06-25T09:09:38.668Z
 - ECS is a fallback only
 - Aliyun RDS PostgreSQL as the formal data layer
 - Cloud resource ready: 0/7
-- User action ready: 0/11
+- User action ready: 0/12
 - Ready phases: PH02_BASE_CLOUD_RESOURCES
 - Blocked phases: PH01_EXTERNAL_APP_IDENTIFIERS, PH03_IMAGE_PUSH_AND_PULL, PH04_ENV_IMPORT, PH05_SAE_RUNTIME_AND_SLS, PH06_DOMAIN_HTTPS_ICP, PH07_PRODUCTION_DEPLOY
 - Required blocking env: DATABASE_URL_CN
 - Deferred APP launch packets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID
-- Ready authorization packets: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
+- Ready authorization packets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
 - Deferred APP launch authorization packets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID
 - Ready console action packets: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS
 - Blocked credential count: 1
@@ -51,12 +51,31 @@ Generated: 2026-06-25T09:09:38.668Z
 - Partially observed resource evidence ids: R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS
 - Ready to start phases: PH02_BASE_CLOUD_RESOURCES
 - Blocked phases: PH01_EXTERNAL_APP_IDENTIFIERS, PH03_IMAGE_PUSH_AND_PULL, PH04_ENV_IMPORT, PH05_SAE_RUNTIME_AND_SLS, PH06_DOMAIN_HTTPS_ICP, PH07_PRODUCTION_DEPLOY
-- Can start now authorization packets: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
+- Can start now authorization packets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
 - Deferred APP launch packets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID
 - Can start now console tasks: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS
-- Next action-time confirmations: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
+- Next action-time confirmations: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
 
 ## Ready Authorization Packets
+
+### P00_ALIYUN_READONLY_INVENTORY_IDENTITY 恢复阿里云 CLI/CloudShell 只读盘点身份
+
+- Action id: U00_ALIYUN_READONLY_INVENTORY_IDENTITY
+- Sequence group: readonly_inventory
+- Minimum user phrase: 授权重新连接阿里云 CloudShell 或配置 Aliyun CLI，只运行 allowlisted 只读盘点命令并写入非密钥 evidence。
+- Non-secret evidence only: true
+- Completion evidence:
+  - cloudInventoryResults.localReady=true
+  - readyLocalOperations=9/9
+  - executedCommandResults=9/9
+  - mutationPerformedCommandResults=0
+- Write targets:
+  - deploy/aliyun-production-cn.cloud-inventory-results.local.json -> non-secret read-only inventory summaries
+- Explicitly excluded:
+  - 不运行 Create/Update/Delete/Deploy/Start/Stop/Purchase/DNS mutation 命令。
+  - 不执行 docker login/push。
+  - 不读取、复制、粘贴或输出 AccessKeySecret、STS token、cookie、registry password、RAM Secret 或证书私钥。
+  - 不做 production-cn deploy、env import、资源创建或计费动作。
 
 ### P03_ACR_PURCHASE 确认 ACR 企业版付费购买
 
