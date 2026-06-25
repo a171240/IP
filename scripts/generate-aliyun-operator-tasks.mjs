@@ -80,6 +80,16 @@ const APP_LAUNCH_ENV_NAMES = new Set([
   "WECHAT_OPEN_APP_REVIEW_STATUS",
 ])
 
+const OPERATOR_TASK_AUTHORIZATION_PACKETS = Object.freeze({
+  T03_ALIYUN_RUNTIME_CONTAINER: Object.freeze(["P08_SAE_RUNTIME_SLS"]),
+  T03B_ALIYUN_ACR_IMAGE_PUBLISH: Object.freeze(["P03_ACR_PURCHASE", "P04_ACR_IMAGE_AND_PULL"]),
+  T04_ALIYUN_DOMAIN_DNS_HTTPS: Object.freeze(["P07_DOMAIN_DNS_HTTPS"]),
+  T05_ALIYUN_OSS_AUDIO_STORAGE: Object.freeze(["P05_OSS_RAM_STS"]),
+  T06_ALIYUN_ENV_IMPORT: Object.freeze(["P11_ALIYUN_RDS_DATA_MIGRATION", "P06_ENV_IMPORT"]),
+  T07_ALIYUN_SLS_ALERTS: Object.freeze(["P08_SAE_RUNTIME_SLS"]),
+  T08_POSTDEPLOY_REMOTE_SMOKE: Object.freeze(["P09_PRODUCTION_DEPLOY"]),
+})
+
 function isAppLaunchBlocker(blocker) {
   const value = String(blocker || "")
   return /WECHAT_OPEN|wechat_open_platform|APPLE_TEAM_ID|apple_team_id|app_native|app_universal_link|legalLinks|PRIVACY_POLICY_URL|TERMS_URL|Android release signing|MEIYE_RELEASE_/i.test(value)
@@ -611,6 +621,105 @@ function summarizeTasks(tasks) {
   }
 }
 
+function attachOperatorAuthorization(report, actionAuthorization) {
+  const packetById = new Map((actionAuthorization.authorizationPackets || []).map((packet) => [packet.packetId, packet]))
+  const canStartNowPacketIds = actionAuthorization.summary?.canStartNowPackets || []
+  const blockedByPacketDependencies = actionAuthorization.summary?.blockedByPacketDependencies || []
+  const canStartNowPacketIdSet = new Set(canStartNowPacketIds)
+  const blockedByPacketDependencySet = new Set(blockedByPacketDependencies)
+  const tasks = report.tasks.map((task) => withOperatorAuthorizationPackets({
+    task,
+    packetById,
+    canStartNowPacketIdSet,
+    blockedByPacketDependencySet,
+  }))
+  const taskPacketBindings = tasks.map((task) => ({
+    taskId: task.id,
+    actionPacketIds: task.actionPacketIds,
+    canStartNowAuthorizationPacketIds: task.canStartNowAuthorizationPacketIds,
+    blockedByAuthorizationPacketIds: task.blockedByAuthorizationPacketIds,
+    requiresActionTimeConfirmation: task.requiresActionTimeConfirmation === true,
+    nonSecretEvidenceOnly: task.nonSecretEvidenceOnly === true,
+    writeTargets: task.writeTargets,
+  }))
+  const secretOrCredentialPacketIds = uniqueStrings(tasks
+    .flatMap((task) => task.actionPackets || [])
+    .filter((packet) => packet.nonSecretEvidenceOnly !== true)
+    .map((packet) => packet.packetId))
+  const summary = {
+    ...report.summary,
+    operatorActionPacketSummary: {
+      currentScope: actionAuthorization.currentScope || report.currentScope || "full_app_launch",
+      canStartNowPacketIds,
+      blockedByPacketDependencies,
+      deferredAppLaunchPacketIds: actionAuthorization.summary?.deferredAppLaunchPackets || [],
+      taskPacketBindingCount: taskPacketBindings.length,
+      secretOrCredentialPacketIds,
+      taskPacketBindings,
+    },
+  }
+  return {
+    ...report,
+    summary,
+    actionAuthorization: {
+      currentScope: actionAuthorization.currentScope || report.currentScope || "full_app_launch",
+      canDeployNow: actionAuthorization.canDeployNow === true,
+      verdict: actionAuthorization.verdict || "",
+      nextActionTimeConfirmationPacketIds: actionAuthorization.summary?.nextActionTimeConfirmations || [],
+      canStartNowPacketIds,
+      blockedByPacketDependencies,
+      deferredAppLaunchPacketIds: actionAuthorization.summary?.deferredAppLaunchPackets || [],
+    },
+    tasks,
+  }
+}
+
+function withOperatorAuthorizationPackets({
+  task,
+  packetById,
+  canStartNowPacketIdSet,
+  blockedByPacketDependencySet,
+}) {
+  const actionPacketIds = OPERATOR_TASK_AUTHORIZATION_PACKETS[task.id] || []
+  const actionPackets = actionPacketIds
+    .map((packetId) => compactActionPacket(packetById.get(packetId)))
+    .filter(Boolean)
+  const canStartNowAuthorizationPacketIds = actionPacketIds.filter((packetId) => canStartNowPacketIdSet.has(packetId))
+  const blockedByAuthorizationPacketIds = actionPacketIds.filter((packetId) => blockedByPacketDependencySet.has(packetId))
+  return {
+    ...task,
+    actionPacketIds,
+    canStartNowAuthorizationPacketIds,
+    blockedByAuthorizationPacketIds,
+    requiresActionTimeConfirmation: actionPackets.some((packet) => packet.requiresActionTimeConfirmation),
+    nonSecretEvidenceOnly: actionPackets.length > 0 && actionPackets.every((packet) => packet.nonSecretEvidenceOnly),
+    writeTargets: uniqueStrings(actionPackets.flatMap((packet) => packet.writeTargets)),
+    actionPackets,
+  }
+}
+
+function compactActionPacket(packet) {
+  if (!packet) return null
+  return {
+    packetId: packet.packetId,
+    actionId: packet.actionId,
+    title: packet.title,
+    owner: packet.owner,
+    blockerClass: packet.blockerClass,
+    sequenceGroup: packet.sequenceGroup,
+    canStartNow: packet.canStartNow === true,
+    requiresActionTimeConfirmation: packet.requiresActionTimeConfirmation === true,
+    nonSecretEvidenceOnly: packet.nonSecretEvidenceOnly === true,
+    writeTargets: packet.writeTargets || [],
+    verifyCommands: packet.verifyCommands || [],
+    explicitlyExcluded: packet.explicitlyExcluded || [],
+  }
+}
+
+function uniqueStrings(values) {
+  return [...new Set((values || []).filter((value) => typeof value === "string" && value.trim()))]
+}
+
 function buildSensitiveActionItems({ envPlan, readiness, imagePublishPlan, nativeRelease }) {
   const variables = envPlan.variables || []
   const envImport = readiness.checks?.cloudConfirmations?.items?.find((item) => item.key === "envImport")
@@ -940,6 +1049,15 @@ function renderMarkdown(report) {
     `- sensitiveActionItems: ${report.sensitiveActionItems.length}`,
     `- bridgeDataLayer: ${report.bridgeDataLayer.current} -> ${report.bridgeDataLayer.target}`,
     "",
+    "## 动作包总览",
+    "",
+    ...(report.actionAuthorization ? [
+      `- nextActionTimeConfirmationPacketIds: ${report.actionAuthorization.nextActionTimeConfirmationPacketIds.join(", ") || "none"}`,
+      `- canStartNowPacketIds: ${report.actionAuthorization.canStartNowPacketIds.join(", ") || "none"}`,
+      `- blockedByPacketDependencies: ${report.actionAuthorization.blockedByPacketDependencies.join(", ") || "none"}`,
+      `- secretOrCredentialPacketIds: ${report.summary.operatorActionPacketSummary.secretOrCredentialPacketIds.join(", ") || "none"}`,
+      "",
+    ] : []),
     "## 当前阻塞",
     "",
     "### Readiness / env / APP native",
@@ -1021,6 +1139,12 @@ function renderMarkdown(report) {
       `- owner: ${task.owner}`,
       `- consolePath: ${task.consolePath}`,
       `- blockers: ${task.blockerCodes.length ? task.blockerCodes.join(", ") : "none"}`,
+      `- actionPacketIds: ${(task.actionPacketIds || []).length ? task.actionPacketIds.join(", ") : "none"}`,
+      `- canStartNowAuthorizationPacketIds: ${(task.canStartNowAuthorizationPacketIds || []).length ? task.canStartNowAuthorizationPacketIds.join(", ") : "none"}`,
+      `- blockedByAuthorizationPacketIds: ${(task.blockedByAuthorizationPacketIds || []).length ? task.blockedByAuthorizationPacketIds.join(", ") : "none"}`,
+      `- requiresActionTimeConfirmation: ${task.requiresActionTimeConfirmation === true}`,
+      `- nonSecretEvidenceOnly: ${task.nonSecretEvidenceOnly === true}`,
+      `- writeTargets: ${(task.writeTargets || []).length ? task.writeTargets.join("; ") : "none"}`,
       "- actions:",
       ...task.actions.map((item) => `  - ${item}`),
       "- evidence:",
@@ -1075,6 +1199,15 @@ function main() {
     "scripts/check-app-native-release-config.mjs",
     "--allow-blocking",
   ])
+  const actionAuthorizationArgs = [
+    "scripts/summarize-aliyun-action-authorization.mjs",
+    "--env-file",
+    args.envFile,
+    "--cloud-confirmations",
+    args.cloudConfirmationsFile,
+  ]
+  if (args.backendOnly) actionAuthorizationArgs.push("--backend-only")
+  const actionAuthorization = runJson("action_authorization", actionAuthorizationArgs)
   const tasks = buildTasks({ envPlan, readiness, domain, cloudConfirmations, imagePublishPlan })
   const sensitiveActionItems = buildSensitiveActionItems({ envPlan, readiness, imagePublishPlan, nativeRelease })
   let report = {
@@ -1143,6 +1276,7 @@ function main() {
     ],
   }
   if (args.backendOnly) report = applyBackendOnlyScope(report)
+  report = attachOperatorAuthorization(report, actionAuthorization)
 
   const json = JSON.stringify(report, null, 2)
   console.log(json)
