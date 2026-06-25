@@ -166,6 +166,21 @@ test("Aliyun completion audit reports the current goal as blocked without secret
   assert.equal(report.summary.resourceEvidenceReady, "0/7")
   assert.ok(report.summary.blockedResourceEvidenceIds.includes("R01_SAE_RUNTIME"))
   assert.ok(report.summary.blockedResourceEvidenceIds.includes("R06_ENV_IMPORT"))
+  assert.equal(report.summary.operatorTasks.total, 7)
+  assert.equal(report.summary.operatorTasks.ready, 0)
+  assert.equal(report.summary.operatorTasks.operatorActionPacketSummary.currentScope, "backend_aliyun_only")
+  assert.deepEqual(report.summary.operatorTasks.operatorActionPacketSummary.canStartNowPacketIds, [
+    "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
+    "P03_ACR_PURCHASE",
+    "P05_OSS_RAM_STS",
+    "P11_ALIYUN_RDS_DATA_MIGRATION",
+  ])
+  assert.deepEqual(report.summary.operatorTasks.operatorActionPacketSummary.deferredAppLaunchPacketIds, [
+    "P01_WECHAT_OPEN_MOBILE_APP",
+    "P10_ANDROID_RELEASE_SIGNING",
+    "P02_APPLE_TEAM_ID",
+  ])
+  assert.ok(!report.summary.operatorTasks.operatorActionPacketSummary.canStartNowPacketIds.includes("P01_WECHAT_OPEN_MOBILE_APP"))
   assert.equal(report.goalClosureEvidenceBrief.credentialIntervention.blockedCredentialCount, 1)
   assert.deepEqual(report.goalClosureEvidenceBrief.credentialIntervention.blockedCredentialNames, ["DATABASE_URL_CN"])
   assert.equal(report.goalClosureEvidenceBrief.resourceEvidence.ready, "0/7")
@@ -192,6 +207,8 @@ test("Aliyun completion audit reports the current goal as blocked without secret
   assert.equal(byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").status, "blocked")
   assert.ok(byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").evidence.includes("cloudConfirmationScope=backend_aliyun_only"))
   assert.ok(byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").evidence.includes("cloudConfirmations 0/6 ready"))
+  assert.ok(byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").evidence.includes("operatorTasks ready 0/7"))
+  assert.ok(!byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").evidence.includes("operatorTasks ready 1/9"))
   assert.ok(!byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").blockers.some((item) =>
     item.startsWith("wechatOpenPlatform:")
   ))
@@ -237,6 +254,7 @@ test("Aliyun completion audit reports the current goal as blocked without secret
     ],
   )
   assert.equal(report.sourceCommands.cloudConfirmations, "corepack pnpm aliyun:cloud:confirmations:backend")
+  assert.equal(report.sourceCommands.operatorTasks, "corepack pnpm aliyun:operator:tasks:backend")
   assert.ok(
     report.summary.nextActionTimeConfirmations
       .find((item) => item.packetId === "P03_ACR_PURCHASE")

@@ -224,6 +224,14 @@ function runInputs(args) {
     "--cloud-confirmations",
     args.cloudConfirmationsFile,
   ])
+  const backendOperatorTasks = runJson("backend_operator_tasks", [
+    "scripts/generate-aliyun-operator-tasks.mjs",
+    "--backend-only",
+    "--env-file",
+    args.envFile,
+    "--cloud-confirmations",
+    args.cloudConfirmationsFile,
+  ])
   const consoleRunbook = runJson("console_runbook", [
     "scripts/generate-aliyun-console-runbook.mjs",
     "--env-file",
@@ -258,6 +266,7 @@ function runInputs(args) {
     resourcesMatrix,
     backendCloudConfirmations,
     actionAuthorization,
+    backendOperatorTasks,
     consoleRunbook,
     wechatOpenMobileAppPackage,
   }
@@ -345,6 +354,7 @@ function buildAudit(args, inputs) {
     resourcesMatrix,
     backendCloudConfirmations,
     actionAuthorization,
+    backendOperatorTasks,
     consoleRunbook,
     wechatOpenMobileAppPackage,
   } = inputs
@@ -357,7 +367,7 @@ function buildAudit(args, inputs) {
   const localImplementation = buildLocalImplementationEvidence(productionStatus, operatorHandoff)
   const requirements = [
     buildLocalAppBackendRequirement(productionStatus, operatorHandoff, localImplementation),
-    buildAliyunCloudResourceRequirement(productionStatus, operatorHandoff, resourcesMatrix, backendCloudConfirmationSummary),
+    buildAliyunCloudResourceRequirement(operatorHandoff, resourcesMatrix, backendCloudConfirmationSummary, backendOperatorTasks),
     buildAliyunDataLayerRequirement(bridgeDataLayer),
     buildCloudInventoryRequirement(productionStatus, operatorHandoff),
     buildImagePublishRequirement(operatorHandoff),
@@ -415,7 +425,7 @@ function buildAudit(args, inputs) {
       fullAppCloudConfirmations: productionStatus.summary?.cloudConfirmations || {},
       cloudInventoryResults: productionStatus.summary?.cloudInventoryResults || {},
       bridgeDataLayer,
-      operatorTasks: productionStatus.summary?.operatorTasks || {},
+      operatorTasks: backendOperatorTasks.summary || {},
       canStartNowConsoleTasks: operatorHandoff.aliyunConsoleTaskOrder?.canStartNow || [],
       blockedByConsoleTaskDependencies: operatorHandoff.aliyunConsoleTaskOrder?.blockedByDependencies || [],
       canStartNowAuthorizationPackets: actionAuthorization.summary?.canStartNowPackets || [],
@@ -457,6 +467,7 @@ function buildAudit(args, inputs) {
       sensitiveBlockers: "corepack pnpm aliyun:sensitive:blockers:backend",
       fullAppSensitiveBlockers: "corepack pnpm aliyun:sensitive:blockers",
       resourcesMatrix: "corepack pnpm aliyun:resources:matrix",
+      operatorTasks: "corepack pnpm aliyun:operator:tasks:backend",
       actionAuthorization: "corepack pnpm aliyun:action:authorization:backend",
       cloudConfirmations: "corepack pnpm aliyun:cloud:confirmations:backend",
       consoleRunbook: "corepack pnpm aliyun:console:runbook",
@@ -686,13 +697,14 @@ function stripCloudBlockerPrefix(key, blocker) {
   return value.startsWith(prefix) ? value.slice(prefix.length) : value
 }
 
-function buildAliyunCloudResourceRequirement(status, operatorHandoff, resourcesMatrix, backendCloudConfirmationSummary) {
+function buildAliyunCloudResourceRequirement(operatorHandoff, resourcesMatrix, backendCloudConfirmationSummary, backendOperatorTasks) {
   const cloud = backendCloudConfirmationSummary || {}
   const ready = Number(cloud.ready || 0)
   const total = Number(cloud.total || 0)
   const resourceEvidence = resourcesMatrix.resourceEvidenceBrief || {}
   const blockedResourceEvidence = resourceEvidence.blockedResourceEvidence || []
   const backendCloudPending = cloud.pending || []
+  const operatorTasksSummary = backendOperatorTasks?.summary || {}
   return requirement({
     id: "G02_ALIYUN_CLOUD_RESOURCES_READY",
     title: "阿里云 production-cn 云资源完成并有非密钥证据",
@@ -703,7 +715,7 @@ function buildAliyunCloudResourceRequirement(status, operatorHandoff, resourcesM
       `cloudConfirmations.totalBlockers=${cloud.totalBlockers || 0}`,
       `resourceEvidenceReady=${resourceEvidence.ready || 0}/${resourceEvidence.total || 0}`,
       `resourceEvidenceBlocked=${resourceEvidence.blocked || 0}`,
-      `operatorTasks ready ${status.summary?.operatorTasks?.ready || 0}/${status.summary?.operatorTasks?.total || 0}`,
+      `operatorTasks ready ${operatorTasksSummary.ready || 0}/${operatorTasksSummary.total || 0}`,
       `cloudConfirmations.ready=${operatorHandoff.localEvidenceGaps?.cloudConfirmations?.ready === true}`,
     ],
     blockers: compactCloudPending(backendCloudPending).concat(
