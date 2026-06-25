@@ -168,7 +168,13 @@ test("Aliyun cloud access report preserves current non-secret console evidence",
     "envImport",
     "slsAlerts",
   ])
-  assert.ok(report.blockers.includes("cloudshell_cli_config_missing_or_unread"))
+  assert.ok(report.blockers.includes("aliyun_cli_config_missing_or_unread"))
+  assert.ok(
+    report.cloudShellObservation.cloudShell.blockers.includes(
+      "cloudshell_not_opened_action_time_confirmation_required_for_nas_fee_warning",
+    ),
+  )
+  assert.match(report.cloudShellObservation.cloudShell.evidence, /performance_nas_may_generate_small_usage_fees/)
   assert.ok(report.blockers.includes(report.cli.configProbe.failureCategory))
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)

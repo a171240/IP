@@ -1,6 +1,6 @@
 # APP production-cn Aliyun browser read-only evidence
 
-Observed at: 2026-06-25T17:57:08+08:00
+Observed at: 2026-06-25T19:47:30+08:00
 
 ## Scope
 
@@ -22,15 +22,15 @@ Observed at: 2026-06-25T17:57:08+08:00
 
 ### Current browser recheck
 
-- observedAt: 2026-06-25T17:57:08+08:00
+- observedAt: 2026-06-25T19:47:30+08:00
 - mode: Aliyun console visible DOM, read-only navigation
 - SAE app list URL reached: https://saenext.console.aliyun.com/cn-hangzhou/app-list/micro?namespaceId=all
 - ACR instance list URL reached: https://cr.console.aliyun.com/cn-hangzhou/instances
 - RDS cn-hangzhou list URL reached: https://rdsnext.console.aliyun.com/rdsList/cn-hangzhou
-- OSS bucket overview URL reached: https://oss.console.aliyun.com/bucket/oss-cn-hangzhou/meiye-huajing-service-records-production-cn/overview
-- SLS profile URL reached: https://sls.console.aliyun.com/lognext/profile
+- OSS bucket object URL reached: https://oss.console.aliyun.com/bucket/oss-cn-hangzhou/meiye-huajing-service-records-production-cn/object
+- SLS logsearch URL reached: https://sls.console.aliyun.com/lognext/project/meiye-huajing-app-prod-cn/logsearch/app-api?slsRegion=cn-hangzhou
 - DNS ipgongchang.xin records URL reached: https://dnsnext.console.aliyun.com/authoritative/domains/ipgongchang.xin
-- latestNonSecretFindings: RDS list shows "暂无符合条件的资源"; OSS bucket overview shows "meiye-huajing-service-records-production-cn / 华东1（杭州）"; SLS project list shows "meiye-huajing-app-prod-cn"; DNS records still show api A 106.14.241.129 and ip A 106.14.241.129, with no visible api-cn/assets-cn rows in the captured table.
+- latestNonSecretFindings: RDS instance list route is reachable but the table body stayed on skeleton loading and did not expose any production PostgreSQL instance; OSS bucket page shows "meiye-huajing-service-records-production-cn / 华东1（杭州）"; SLS project/logstore path shows "meiye-huajing-app-prod-cn/app-api", with the logstore currently empty and index not enabled; DNS exact search for api-cn and assets-cn both returns "没有数据 / 共 0 条".
 - latestBackendMeaning: current browser evidence still supports partial OSS/SLS evidence only; it does not close RDS, ACR, SAE runtime, DNS/HTTPS/ICP, RAM/STS, env import, SLS alert, or smoke gates.
 
 ### SAE runtime
@@ -61,14 +61,14 @@ Observed at: 2026-06-25T17:57:08+08:00
 - targetDatabaseUrlEnv: DATABASE_URL_CN
 - targetProductionPostgresConfirmed: false
 - visibleTargetInstance: false
-- latestVisibleState: 暂无符合条件的资源
-- caveat: the RDS instance list route was reachable, but the table body did not expose a production PostgreSQL instance in the readable DOM.
+- latestVisibleState: instance list route reachable; table body stayed on skeleton loading and did not expose a production PostgreSQL instance.
+- caveat: the RDS instance list route was reachable, but this browser pass cannot prove whether a PostgreSQL instance exists; keep RDS unconfirmed until CLI/OpenAPI inventory or a readable console table confirms it.
 - backendMeaning: keep RDS PostgreSQL creation/confirmation and Supabase-to-RDS migration as required backend blockers.
 
 ### OSS audio storage
 
 - consoleUrl: https://oss.console.aliyun.com/bucket
-- latestConsoleUrl: https://oss.console.aliyun.com/bucket/oss-cn-hangzhou/meiye-huajing-service-records-production-cn/overview
+- latestConsoleUrl: https://oss.console.aliyun.com/bucket/oss-cn-hangzhou/meiye-huajing-service-records-production-cn/object
 - bucket: meiye-huajing-service-records-production-cn
 - bucketVisible: true
 - regionVisible: 华东1（杭州）
@@ -79,11 +79,15 @@ Observed at: 2026-06-25T17:57:08+08:00
 ### SLS logging
 
 - consoleUrl: https://sls.console.aliyun.com/lognext/profile
-- latestConsoleUrl: https://sls.console.aliyun.com/lognext/profile
+- latestConsoleUrl: https://sls.console.aliyun.com/lognext/project/meiye-huajing-app-prod-cn/logsearch/app-api?slsRegion=cn-hangzhou
 - slsProject: meiye-huajing-app-prod-cn
 - slsProjectVisible: true
-- latestVisibleState: meiye-huajing-app-prod-cn 美业话镜 APP production-cn API logs 华东1（杭州）
+- logstore: app-api
+- logstoreVisible: true
+- latestVisibleState: meiye-huajing-app-prod-cn / app-api visible; logstore currently has no content and reports index not enabled.
 - logstorePathVisible: lognext/project/meiye-huajing-app-prod-cn/logsearch/app-api?slsRegion=cn-hangzhou
+- logstoreHasContent: false
+- logstoreIndexEnabled: false
 - healthAlertConfigured: false
 - serverErrorAlertConfigured: false
 - backendMeaning: SLS project/logstore are partial evidence; health and 5xx alerts still depend on SAE runtime.
@@ -96,12 +100,20 @@ Observed at: 2026-06-25T17:57:08+08:00
 - domainVisible: true
 - recordCountVisible: 13
 - existingRecords: api A 106.14.241.129; ip A 106.14.241.129
-- latestVisibleRecords: api A 106.14.241.129; ip A 106.14.241.129; no visible api-cn/assets-cn rows in the captured table.
+- latestVisibleRecords: api A 106.14.241.129; ip A 106.14.241.129; exact search api-cn returned 没有数据 / 共 0 条; exact search assets-cn returned 没有数据 / 共 0 条.
 - apiCnHost: api-cn.ipgongchang.xin
 - apiCnRecordVisible: false
 - assetsCnHost: assets-cn.ipgongchang.xin
 - assetsCnRecordVisible: false
 - backendMeaning: formal production-cn APP hosts are not bound to Aliyun backend/assets entry yet.
+
+### CloudShell
+
+- consoleUrl: https://shell.aliyun.com/
+- latestVisibleState: Cloud Shell page requires clicking "开通" and says it will create a performance NAS instance that may generate small NAS usage fees.
+- openedOrPurchased: false
+- readonlyInventoryRun: false
+- backendMeaning: strict Aliyun CLI/OpenAPI inventory remains blocked until the user gives action-time authorization to open CloudShell or configures a safe local Aliyun CLI profile.
 
 ## Backend action queue impact
 
