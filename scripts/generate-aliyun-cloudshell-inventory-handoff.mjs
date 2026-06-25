@@ -111,6 +111,30 @@ function summarizeCurrentBrowserProbe(probe = {}) {
   }
 }
 
+function summarizeCloudShellGate(cloudShell = {}) {
+  const blockers = Array.isArray(cloudShell.blockers) ? cloudShell.blockers.map((item) => String(item)) : []
+  const evidence = String(cloudShell.evidence || "")
+  const requiresOpenConfirmation = blockers.includes("cloudshell_not_opened_action_time_confirmation_required_for_nas_fee_warning") ||
+    /performance_nas_may_generate_small_usage_fees|NAS|费用|开通/.test(evidence)
+  return {
+    connected: cloudShell.connected === true,
+    cliAvailable: cloudShell.cliAvailable === true,
+    cliConfigFileExists: cloudShell.cliConfigFileExists === true,
+    canRunReadOnlyInventory: cloudShell.canRunReadOnlyInventory === true,
+    blockers,
+    evidence,
+    requiresActionTimeOpenConfirmation: requiresOpenConfirmation,
+    billingWarning: requiresOpenConfirmation
+      ? "CloudShell page requires clicking 开通 and warns that it may create a performance NAS instance with possible usage fees."
+      : "",
+    currentStatus: cloudShell.canRunReadOnlyInventory === true
+      ? "ready"
+      : requiresOpenConfirmation
+        ? "not_opened_nas_fee_confirmation_required"
+        : "cloudshell_cli_config_missing_or_unread",
+  }
+}
+
 function summarizeCloudInventoryResults(cloudInventoryResults = {}) {
   const local = cloudInventoryResults.local || {}
   const observationSummary = local.observationSummary || {}
@@ -157,6 +181,10 @@ function buildCurrentAnswer(cloudAccess, existingInventoryEvidence) {
   if (cloudAccess.canReadCloudNow === true) {
     return "Aliyun CLI/CloudShell read-only inventory can be attempted after action-time confirmation."
   }
+  const cloudShell = summarizeCloudShellGate(cloudAccess.cloudShellObservation?.cloudShell || {})
+  if (cloudShell.requiresActionTimeOpenConfirmation) {
+    return "Aliyun CloudShell read-only inventory is blocked because the current CloudShell page requires 开通 and warns about possible performance NAS usage fees; do not click it without action-time confirmation."
+  }
   if (existingInventoryEvidence.ready === true) {
     return "Existing strict inventory evidence is ready, but current Aliyun CLI/CloudShell identity is not ready for refresh; do not treat later cloud changes as verified until inventory is rerun."
   }
@@ -187,6 +215,7 @@ function buildReport(options = {}) {
   const cliProbe = cloudAccess.cli?.configProbe || {}
   const workbenchTerminal = cloudAccess.terminalAccess?.workbenchTerminal || cloudAccess.cloudShellObservation?.workbenchTerminal || {}
   const currentBrowser = summarizeCurrentBrowserProbe(cloudAccess.localBrowserProbe || {})
+  const cloudShellGate = summarizeCloudShellGate(cloudAccess.cloudShellObservation?.cloudShell || {})
   const existingInventoryEvidence = summarizeCloudInventoryResults(cloudInventoryResults)
   const operations = (inventoryPlan.operations || []).map(compactOperation)
   const report = {
@@ -210,6 +239,7 @@ function buildReport(options = {}) {
       strictInventoryAlreadyReady: existingInventoryEvidence.ready === true,
     },
     currentBrowser,
+    cloudShellGate,
     existingInventoryEvidence,
     inventoryPlan: {
       status: inventoryPlan.status,
@@ -241,7 +271,15 @@ function buildReport(options = {}) {
       {
         id: "aliyun_cloudshell",
         title: "阿里云 CloudShell",
-        currentStatus: cloudAccess.cloudShellObservation?.ready === true ? "ready" : "cloudshell_cli_config_missing_or_unread",
+        currentStatus: cloudShellGate.currentStatus,
+        cloudShellConnected: cloudShellGate.connected,
+        cloudShellCliAvailable: cloudShellGate.cliAvailable,
+        cloudShellCliConfigFileExists: cloudShellGate.cliConfigFileExists,
+        cloudShellCanRunReadOnlyInventory: cloudShellGate.canRunReadOnlyInventory,
+        cloudShellBlockers: cloudShellGate.blockers,
+        cloudShellEvidence: cloudShellGate.evidence,
+        requiresActionTimeOpenConfirmation: cloudShellGate.requiresActionTimeOpenConfirmation,
+        billingWarning: cloudShellGate.billingWarning,
         currentBrowserCanUseCurrentConsole: currentBrowser.canUseCurrentConsole === true,
         currentBrowserAliyunConsoleHostPaths: currentBrowser.aliyunConsoleHostPaths,
         currentBrowserCloudApiCalled: currentBrowser.cloudApiCalled === true,
@@ -249,6 +287,7 @@ function buildReport(options = {}) {
         currentBrowserEvidence: currentBrowser.evidence,
         consolePath: "阿里云控制台 -> CloudShell -> cn-hangzhou / 华东1或华东2账号上下文",
         allowedActions: [
+          "如果页面要求点击开通，必须先获得动作时确认，因为当前页面提示可能创建性能型 NAS 并产生少量费用。",
           "只运行 inventoryPlan.operations 中列出的 List/Describe/stat/get 类只读命令。",
           "只把资源名、布尔状态、digest、exit 状态、时间戳和非密钥 evidence handle 回填到 ignored 的 .local.json。",
           "如 CloudShell 无法访问本地 repo，则按命令计划人工记录非密钥摘要，再回到本机回填。",
@@ -344,6 +383,10 @@ function renderMarkdown(report) {
     `- currentBrowserAliyunConsoleHostPaths: ${formatList(report.currentBrowser.aliyunConsoleHostPaths)}`,
     `- currentBrowserCloudApiCalled: ${report.currentBrowser.cloudApiCalled === true}`,
     `- currentBrowserCloudMutationPerformed: ${report.currentBrowser.cloudMutationPerformed === true}`,
+    `- cloudShellCurrentStatus: ${report.cloudShellGate.currentStatus}`,
+    `- cloudShellRequiresActionTimeOpenConfirmation: ${report.cloudShellGate.requiresActionTimeOpenConfirmation === true}`,
+    `- cloudShellBillingWarning: ${report.cloudShellGate.billingWarning || "none"}`,
+    `- cloudShellBlockers: ${formatList(report.cloudShellGate.blockers)}`,
     `- inventoryPlanStatus: ${report.inventoryPlan.status}`,
     `- totalOperations: ${report.inventoryPlan.totalOperations}`,
     `- commandTemplates: ${report.inventoryPlan.commandTemplates}`,
@@ -390,6 +433,12 @@ function renderOperatorPath(item) {
     `- currentStatus: ${item.currentStatus}`,
     ...(item.consolePath ? [`- consolePath: ${item.consolePath}`] : []),
     ...(typeof item.currentBrowserCanUseCurrentConsole === "boolean" ? [`- currentBrowserCanUseCurrentConsole: ${item.currentBrowserCanUseCurrentConsole}`] : []),
+    ...(typeof item.cloudShellConnected === "boolean" ? [`- cloudShellConnected: ${item.cloudShellConnected}`] : []),
+    ...(typeof item.cloudShellCanRunReadOnlyInventory === "boolean" ? [`- cloudShellCanRunReadOnlyInventory: ${item.cloudShellCanRunReadOnlyInventory}`] : []),
+    ...(typeof item.requiresActionTimeOpenConfirmation === "boolean" ? [`- requiresActionTimeOpenConfirmation: ${item.requiresActionTimeOpenConfirmation}`] : []),
+    ...(Array.isArray(item.cloudShellBlockers) ? [`- cloudShellBlockers: ${formatList(item.cloudShellBlockers)}`] : []),
+    ...(item.billingWarning ? [`- billingWarning: ${item.billingWarning}`] : []),
+    ...(item.cloudShellEvidence ? [`- cloudShellEvidence: ${item.cloudShellEvidence}`] : []),
     ...(Array.isArray(item.currentBrowserAliyunConsoleHostPaths) ? [`- currentBrowserAliyunConsoleHostPaths: ${formatList(item.currentBrowserAliyunConsoleHostPaths)}`] : []),
     ...(typeof item.currentBrowserCloudApiCalled === "boolean" ? [`- currentBrowserCloudApiCalled: ${item.currentBrowserCloudApiCalled}`] : []),
     ...(typeof item.currentBrowserCloudMutationPerformed === "boolean" ? [`- currentBrowserCloudMutationPerformed: ${item.currentBrowserCloudMutationPerformed}`] : []),

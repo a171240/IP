@@ -76,6 +76,11 @@ test("Aliyun CloudShell handoff produces value-free local JSON and Markdown", ()
   assert.ok(Array.isArray(report.currentBrowser.aliyunConsoleHostPaths))
   assert.equal(report.currentBrowser.cloudApiCalled, false)
   assert.equal(report.currentBrowser.cloudMutationPerformed, false)
+  assert.equal(typeof report.cloudShellGate.requiresActionTimeOpenConfirmation, "boolean")
+  assert.equal(typeof report.cloudShellGate.currentStatus, "string")
+  assert.ok(Array.isArray(report.cloudShellGate.blockers))
+  assert.equal(typeof report.cloudShellGate.evidence, "string")
+  assert.equal(typeof report.cloudShellGate.billingWarning, "string")
   assert.equal(typeof report.cliReadiness.canReadCloudNow, "boolean")
   assert.equal(typeof report.cliReadiness.configProbe.ready, "boolean")
   assert.equal(report.cliReadiness.strictInventoryAlreadyReady, true)
@@ -121,6 +126,8 @@ test("Aliyun CloudShell handoff produces value-free local JSON and Markdown", ()
   assert.match(markdown, /strictInventoryReadyLocalOperations: 9\/9/)
   assert.match(markdown, /strictInventoryMutationPerformedCommandResults: 0/)
   assert.match(markdown, /currentBrowserCanUseCurrentConsole:/)
+  assert.match(markdown, /cloudShellRequiresActionTimeOpenConfirmation:/)
+  assert.match(markdown, /cloudShellCurrentStatus:/)
   assert.match(markdown, /已有 strict inventory 证据/)
   assert.match(markdown, /I01_SAE_RUNTIME/)
   assert.match(markdown, /items\.apiDomainHttps/)
@@ -131,6 +138,27 @@ test("Aliyun CloudShell handoff produces value-free local JSON and Markdown", ()
   assert.doesNotMatch(markdown, /items\.(apiDomain|assetDomain|ossAudio)\b/)
   assert.doesNotMatch(output, secretLike)
   assert.doesNotMatch(markdown, secretLike)
+})
+
+test("Aliyun CloudShell handoff preserves current activation and NAS fee warning", () => {
+  const output = execFileSync(process.execPath, ["scripts/generate-aliyun-cloudshell-inventory-handoff.mjs"], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 30,
+  })
+  const report = JSON.parse(output)
+  const cloudShellPath = report.operatorPaths.find((item) => item.id === "aliyun_cloudshell")
+
+  assert.ok(cloudShellPath, "missing aliyun_cloudshell operator path")
+  assert.equal(report.cloudShellGate.requiresActionTimeOpenConfirmation, true)
+  assert.equal(report.cloudShellGate.currentStatus, "not_opened_nas_fee_confirmation_required")
+  assert.ok(report.cloudShellGate.blockers.includes("cloudshell_not_opened_action_time_confirmation_required_for_nas_fee_warning"))
+  assert.match(report.cloudShellGate.billingWarning, /performance NAS/)
+  assert.match(report.cloudShellGate.billingWarning, /usage fees/)
+  assert.equal(cloudShellPath.requiresActionTimeOpenConfirmation, true)
+  assert.match(cloudShellPath.billingWarning, /performance NAS/)
+  assert.ok(cloudShellPath.allowedActions.some((item) => item.includes("性能型 NAS")))
+  assert.doesNotMatch(output, secretLike)
 })
 
 function findOperation(report, id) {

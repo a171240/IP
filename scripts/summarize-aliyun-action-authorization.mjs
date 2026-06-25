@@ -145,8 +145,9 @@ const AUTHORIZATION_PACKET_BY_ACTION_ID = Object.freeze({
     packetId: "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     sequenceGroup: "readonly_inventory",
     dependsOn: [],
-    minimumUserPhrase: "授权重新连接阿里云 CloudShell 或配置 Aliyun CLI，只运行 allowlisted 只读盘点命令并写入非密钥 evidence。",
+    minimumUserPhrase: "授权开通/重新连接阿里云 CloudShell 或配置 Aliyun CLI；如 CloudShell 提示会创建性能型 NAS 并可能产生费用，确认后才可点击开通；只运行 allowlisted 只读盘点命令并写入非密钥 evidence。",
     allowedActions: [
+      "如 CloudShell 页面要求开通，先确认性能型 NAS 费用提示，再进入只读盘点。",
       "使用阿里云官方 CLI 或 CloudShell 的只读身份。",
       "只运行本仓库生成的 List/Describe/stat/get inventory 命令。",
       "只记录资源名、布尔值、时间戳、命令状态、sha256 指纹和非密钥 evidence handle。",
@@ -155,7 +156,7 @@ const AUTHORIZATION_PACKET_BY_ACTION_ID = Object.freeze({
       "不运行 Create/Update/Delete/Deploy/Start/Stop/Purchase/DNS mutation 命令。",
       "不执行 docker login/push。",
       "不读取、复制、粘贴或输出 AccessKeySecret、STS token、cookie、registry password、RAM Secret 或证书私钥。",
-      "不做 production-cn deploy、env import、资源创建或计费动作。",
+      "除用户明确确认 CloudShell 开通页的性能型 NAS 费用提示外，不做任何 production-cn deploy、env import、资源创建或计费动作。",
     ],
     completionEvidence: [
       "cloudInventoryResults.localReady=true",

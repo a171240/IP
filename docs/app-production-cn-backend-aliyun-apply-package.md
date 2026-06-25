@@ -1,6 +1,6 @@
 # APP production-cn Aliyun backend apply package
 
-Generated at: 2026-06-25T10:07:45.833Z
+Generated at: 2026-06-25T12:14:22.691Z
 
 ## Scope
 
@@ -41,10 +41,10 @@ Generated at: 2026-06-25T10:07:45.833Z
 - currentEvidence: cloudInventoryStrictReady=false; readyLocalOperations=0/9; executedCommandResults=9/9; cliConfigProbeFailureCategory=aliyun_cli_profile_not_configured
 - currentBlockers: cloudInventory:readonly_inventory_strict_ready=0/9, aliyun_cli_profile_not_configured
 - writeTargets: deploy/aliyun-production-cn.cloud-inventory-results.local.json -> non-secret read-only inventory summaries
-- userMustHandle: Aliyun CLI default profile or CloudShell logged-in read-only identity; If the current CloudShell tab is disconnected, reconnecting it still requires action-time confirmation.; AccessKeySecret or STS token must never be copied into JSON, Markdown, chat, git, or shell history
-- actionTimeConfirmation.minimumUserPhrase: 授权重新连接阿里云 CloudShell 或配置 Aliyun CLI，只运行 allowlisted 只读盘点命令并写入非密钥 evidence。
-- actionTimeConfirmation.allowedActions: Reconnect the existing Aliyun CloudShell session or configure the official Aliyun CLI profile.; Run only the generated List/Describe/stat/get inventory commands.; Write only resource names, booleans, timestamps, command status, digest handles, and non-secret evidence handles.
-- actionTimeConfirmation.explicitlyExcluded: No Create/Update/Delete/Deploy/Start/Stop/Purchase/DNS mutation commands.; No docker login/push, registry password, AccessKeySecret, STS token, cookie, or certificate private key capture.; No production-cn deploy, env import, resource creation, or billing action.
+- userMustHandle: Aliyun CLI default profile or CloudShell logged-in read-only identity; If CloudShell shows an 开通 page with a performance NAS usage-fee warning, confirm that warning before clicking 开通.; If the current CloudShell tab is disconnected, reconnecting it still requires action-time confirmation.; AccessKeySecret or STS token must never be copied into JSON, Markdown, chat, git, or shell history
+- actionTimeConfirmation.minimumUserPhrase: 授权开通/重新连接阿里云 CloudShell 或配置 Aliyun CLI；如 CloudShell 提示会创建性能型 NAS 并可能产生费用，确认后才可点击开通；只运行 allowlisted 只读盘点命令并写入非密钥 evidence。
+- actionTimeConfirmation.allowedActions: If CloudShell requires service activation, confirm the performance NAS usage-fee warning before clicking 开通.; Reconnect the existing Aliyun CloudShell session or configure the official Aliyun CLI profile.; Run only the generated List/Describe/stat/get inventory commands.; Write only resource names, booleans, timestamps, command status, digest handles, and non-secret evidence handles.
+- actionTimeConfirmation.explicitlyExcluded: No Create/Update/Delete/Deploy/Start/Stop/Purchase/DNS mutation commands.; No docker login/push, registry password, AccessKeySecret, STS token, cookie, or certificate private key capture.; No production-cn deploy, env import, business resource creation, or billing action beyond the explicitly confirmed CloudShell activation warning.
 - nonSecretEvidenceToRecord: readyLocalOperations count; executedCommandResults count; cloudApiCalledCommandResults count; mutationPerformedCommandResults=0; observed/not_found/blocked operation ids; timestamp and evidence handles only
 - verifyCommands: corepack pnpm aliyun:cloudshell:handoff; corepack pnpm aliyun:cloud:access; MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1 corepack pnpm aliyun:cloud:inventory-run -- --execute-readonly --write-local deploy/aliyun-production-cn.cloud-inventory-results.local.json; corepack pnpm aliyun:cloud:inventory-results:strict; corepack pnpm aliyun:evidence:writeback:backend
 
@@ -71,7 +71,7 @@ Generated at: 2026-06-25T10:07:45.833Z
 - mutationType: ram_policy_binding_or_secret_runtime_role
 - requiredAuthorizationPackets: P05_OSS_RAM_STS
 - consolePath: 阿里云控制台 -> OSS / RAM / STS
-- currentEvidence: inventory.ossAudioBucket=not_observed; ossResource.observedStatus=bucket_visible_unconfirmed; ossResource.observedReadiness=partial; ossResource.currentEvidence1=cloudshell_oss_cors_ram_2026-06-24T01:30_CST_bucket_exists_acl_private_cors_allowed_origins_api-cn_assets-cn_methods_GET_POST_PUT_HEAD_policy_MeiyeHuajingServiceRecordsOssPolicy_exists_attachmentCount_0_ram_least_privilege_not_bound; ossResource.currentEvidence2=observedResourceStatus=bucket_visible_unconfirmed; ossResource.currentEvidence3=observedResourceReadiness=partial; ossResource.missing=oss:confirmed; ossResource.missing=oss:ramLeastPrivilege; ossResource.missing=observed:bucket_visible_unconfirmed; bucket=meiye-huajing-service-records-production-cn; serviceRecordPrefix=service-records/production-cn
+- currentEvidence: inventory.ossAudioBucket=not_observed; ossResource.observedStatus=bucket_visible_unconfirmed; ossResource.observedReadiness=partial; ossResource.currentEvidence1=chrome_oss_bucket_2026-06-25T19:47_CST_bucket_exists_meiye-huajing-service-records-production-cn_visible_oss-cn-hangzhou_overview_object_page_prefix_service-records-production-cn_ram_sts_not_confirmed; ossResource.currentEvidence2=observedResourceStatus=bucket_visible_unconfirmed; ossResource.currentEvidence3=observedResourceReadiness=partial; ossResource.missing=oss:confirmed; ossResource.missing=oss:ramLeastPrivilege; ossResource.missing=observed:bucket_visible_unconfirmed; bucket=meiye-huajing-service-records-production-cn; serviceRecordPrefix=service-records/production-cn
 - currentBlockers: OSS_RAM_STS_NOT_READY
 - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss; ALIYUN_OSS_ACCESS_KEY_SECRET / STS token -> KMS/Secrets Manager/SAE secret env only if runtime role is not used
 - userMustHandle: AccessKeySecret or STS token if runtime role is not selected; RAM policy attachment or runtime role authorization
@@ -161,7 +161,7 @@ Generated at: 2026-06-25T10:07:45.833Z
 - mutationType: observability_alert_create
 - requiredAuthorizationPackets: P08_SAE_RUNTIME_SLS
 - consolePath: 阿里云控制台 -> 日志服务 SLS
-- currentEvidence: inventory.slsProject=not_observed; slsResource.observedStatus=project_logstore_visible_alerts_pending; slsResource.observedReadiness=partial; slsResource.currentEvidence1=cloudshell_sls_2026-06-24T01:30_CST_project_meiye-huajing-app-prod-cn_logstore_app-api_exists_alerts_0_dashboards_0_health_5xx_alerts_not_configured; slsResource.currentEvidence2=observedResourceStatus=project_logstore_visible_alerts_pending; slsResource.currentEvidence3=observedResourceReadiness=partial; slsResource.missing=slsAlerts:confirmed; slsResource.missing=slsAlerts:healthAlertConfigured; slsResource.missing=slsAlerts:serverErrorAlertConfigured; slsResource.missing=observed:project_logstore_visible_alerts_pending; alerts=0
+- currentEvidence: inventory.slsProject=not_observed; slsResource.observedStatus=project_logstore_visible_alerts_pending; slsResource.observedReadiness=partial; slsResource.currentEvidence1=chrome_sls_2026-06-25T19:47_CST_project_meiye-huajing-app-prod-cn_logstore_app-api_visible_logstore_empty_index_not_enabled_health_5xx_alerts_not_configured; slsResource.currentEvidence2=observedResourceStatus=project_logstore_visible_alerts_pending; slsResource.currentEvidence3=observedResourceReadiness=partial; slsResource.missing=slsAlerts:confirmed; slsResource.missing=slsAlerts:healthAlertConfigured; slsResource.missing=slsAlerts:serverErrorAlertConfigured; slsResource.missing=observed:project_logstore_visible_alerts_pending; alerts=0
 - currentBlockers: SLS_ALERTS_NOT_READY
 - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.slsAlerts
 - userMustHandle: alert recipient/channel confirmation if needed

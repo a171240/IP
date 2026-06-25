@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 阿里云后端-only 当前执行简报
 
-Generated: 2026-06-25T11:09:03.520Z
+Generated: 2026-06-25T12:14:45.248Z
 
 ## 结论
 
@@ -80,7 +80,7 @@ Generated: 2026-06-25T11:09:03.520Z
 
 - title: 恢复阿里云 CLI/CloudShell 只读盘点身份
 - owner: 用户/阿里云只读盘点操作员
-- minimumUserPhrase: 授权重新连接阿里云 CloudShell 或配置 Aliyun CLI，只运行 allowlisted 只读盘点命令并写入非密钥 evidence。
+- minimumUserPhrase: 授权开通/重新连接阿里云 CloudShell 或配置 Aliyun CLI；如 CloudShell 提示会创建性能型 NAS 并可能产生费用，确认后才可点击开通；只运行 allowlisted 只读盘点命令并写入非密钥 evidence。
 - writeTargets: deploy/aliyun-production-cn.cloud-inventory-results.local.json -> non-secret read-only inventory summaries
 - verifyCommands: corepack pnpm aliyun:cloud:access; MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1 corepack pnpm aliyun:cloud:inventory-run -- --execute-readonly --write-local deploy/aliyun-production-cn.cloud-inventory-results.local.json; corepack pnpm aliyun:cloud:inventory-results:strict; corepack pnpm aliyun:evidence:writeback:backend
 - nonSecretEvidenceOnly: true

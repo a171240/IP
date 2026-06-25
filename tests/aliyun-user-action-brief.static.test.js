@@ -175,6 +175,10 @@ test("Aliyun user action brief is value-free and includes the expected blockers"
   assert.ok(readonlyInventoryAction.currentBlockers.includes("cloudInventory:I08_RDS_POSTGRES"))
   assert.ok(readonlyInventoryAction.currentEvidence.includes("mutationPerformedCommandResults=0"))
   assert.match(nextConfirmationsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").minimumUserPhrase, /只读盘点命令/)
+  assert.match(nextConfirmationsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").minimumUserPhrase, /性能型 NAS/)
+  assert.ok(nextConfirmationsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").allowedActions.some((item) =>
+    item.includes("性能型 NAS 费用提示")
+  ))
   assert.ok(nextConfirmationsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").explicitlyExcluded.some((item) =>
     item.includes("Create/Update/Delete/Deploy")
   ))

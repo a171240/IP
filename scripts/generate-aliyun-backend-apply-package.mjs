@@ -250,12 +250,14 @@ function buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEv
       ],
       userMustHandle: [
         "Aliyun CLI default profile or CloudShell logged-in read-only identity",
+        "If CloudShell shows an 开通 page with a performance NAS usage-fee warning, confirm that warning before clicking 开通.",
         "If the current CloudShell tab is disconnected, reconnecting it still requires action-time confirmation.",
         "AccessKeySecret or STS token must never be copied into JSON, Markdown, chat, git, or shell history",
       ],
       actionTimeConfirmation: {
-        minimumUserPhrase: "授权重新连接阿里云 CloudShell 或配置 Aliyun CLI，只运行 allowlisted 只读盘点命令并写入非密钥 evidence。",
+        minimumUserPhrase: "授权开通/重新连接阿里云 CloudShell 或配置 Aliyun CLI；如 CloudShell 提示会创建性能型 NAS 并可能产生费用，确认后才可点击开通；只运行 allowlisted 只读盘点命令并写入非密钥 evidence。",
         allowedActions: [
+          "If CloudShell requires service activation, confirm the performance NAS usage-fee warning before clicking 开通.",
           "Reconnect the existing Aliyun CloudShell session or configure the official Aliyun CLI profile.",
           "Run only the generated List/Describe/stat/get inventory commands.",
           "Write only resource names, booleans, timestamps, command status, digest handles, and non-secret evidence handles.",
@@ -263,7 +265,7 @@ function buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEv
         explicitlyExcluded: [
           "No Create/Update/Delete/Deploy/Start/Stop/Purchase/DNS mutation commands.",
           "No docker login/push, registry password, AccessKeySecret, STS token, cookie, or certificate private key capture.",
-          "No production-cn deploy, env import, resource creation, or billing action.",
+          "No production-cn deploy, env import, business resource creation, or billing action beyond the explicitly confirmed CloudShell activation warning.",
         ],
       },
       nonSecretEvidenceToRecord: [

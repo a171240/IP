@@ -175,6 +175,10 @@ test("Aliyun action authorization matrix separates local-safe work from external
   const nextConfirmationsById = new Map(report.nextActionTimeConfirmations.map((item) => [item.packetId, item]))
   const deferredConfirmationsById = new Map(report.deferredAppLaunchConfirmations.map((item) => [item.packetId, item]))
   assert.match(nextConfirmationsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").minimumUserPhrase, /allowlisted 只读盘点命令/)
+  assert.match(nextConfirmationsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").minimumUserPhrase, /性能型 NAS/)
+  assert.ok(nextConfirmationsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").allowedActions.some((item) =>
+    item.includes("性能型 NAS 费用提示")
+  ))
   assert.ok(nextConfirmationsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").explicitlyExcluded.some((item) =>
     item.includes("Create/Update/Delete/Deploy")
   ))
@@ -209,6 +213,7 @@ test("Aliyun action authorization matrix separates local-safe work from external
   assert.equal(packetsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").canStartNow, true)
   assert.equal(packetsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").nonSecretEvidenceOnly, true)
   assert.ok(packetsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").completionEvidence.includes("mutationPerformedCommandResults=0"))
+  assert.match(packetsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").minimumUserPhrase, /性能型 NAS/)
   assert.equal(packetsById.get("P10_ANDROID_RELEASE_SIGNING").actionId, "U10_ANDROID_RELEASE_SIGNING")
   assert.equal(packetsById.get("P10_ANDROID_RELEASE_SIGNING").canStartNow, true)
   assert.ok(packetsById.get("P10_ANDROID_RELEASE_SIGNING").completionEvidence.includes("wechatOpenPlatform.androidConfigured=true"))
