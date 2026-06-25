@@ -33,9 +33,11 @@ corepack pnpm aliyun:backend-cn:status
 
 ## 2026-06-24 历史盘点记录（当前不可直接复用）
 
-本次只读盘点已经证明：阿里云账号可以通过 CloudShell 执行 allowlisted CLI 查询，`deploy/aliyun-production-cn.cloud-inventory-results.local.json` 已回填为 strict ready。
+以下是 2026-06-24 当时的只读盘点结论，仅用于解释历史观察。它不能覆盖 2026-06-26 当前门禁；当前门禁仍以顶部“当前复核结论”为准。
 
-这不代表可以部署。当前云资源实际状态仍然是：
+当时只读盘点曾证明：阿里云账号可以通过 CloudShell 执行 allowlisted CLI 查询，`deploy/aliyun-production-cn.cloud-inventory-results.local.json` 曾回填为 strict ready。
+
+即使在该历史盘点时，这也不代表可以部署。当时云资源实际状态仍然是：
 
 - SAE production-cn 应用：未创建。
 - ACR 实例/镜像仓库：未创建。
@@ -85,9 +87,9 @@ corepack pnpm aliyun:backend-cn:status
 - SAE/KMS/Secrets Manager 环境变量导入。
 - 微信开放平台移动 App 创建或提交审核。
 
-## 本地证据
+## 2026-06-24 本地历史证据
 
-已更新本机忽略文件：
+当时曾更新本机忽略文件：
 
 - `deploy/aliyun-production-cn.cloud-inventory-results.local.json`
 
@@ -97,13 +99,15 @@ corepack pnpm aliyun:backend-cn:status
 corepack pnpm aliyun:cloud:inventory-results:strict
 ```
 
-当前结果：
+当时结果：
 
 - `localReady=true`
 - `readyLocalOperations=9/9`
 - `executedCommandResults=12/12`
 - `cloudApiCalledCommandResults=12/12`
 - `mutationPerformedCommandResults=0`
+
+2026-06-26 当前门禁已经覆盖该历史结果：本机当前 `cloud-inventory-results.local.json` 为 `DRY_RUN_NOT_EXECUTED`，`readyLocalOperations=0/9`，`cloudInventoryStrictReady=false`。必须重新获得动作时确认后恢复 CloudShell/CLI 并重新运行只读 inventory，才能把 P00 当作已闭环。
 
 原始终端输出保存在本机临时文件：
 
@@ -113,15 +117,20 @@ corepack pnpm aliyun:cloud:inventory-results:strict
 
 该临时文件不应提交；如需长期留痕，只保留本文件中的非密钥摘要。
 
-## 仍需用户介入或动作时确认的事项
+## 2026-06-26 仍需用户介入或动作时确认的事项
 
-当前可以继续准备但不能自动执行的动作包：
+当前 backend-only 目标可以继续准备但不能自动执行的第一批动作包：
+
+- `P00_ALIYUN_READONLY_INVENTORY_IDENTITY`：恢复 Aliyun CLI / CloudShell 只读盘点；如 CloudShell 要求重启实例或开通性能型 NAS，必须动作时确认。
+- `P11_ALIYUN_RDS_DATA_MIGRATION`：创建或确认 RDS PostgreSQL，完成 `DATABASE_URL_CN` secret env 导入和 RDS 迁移证据。
+- `P05_OSS_RAM_STS`：OSS RAM 最小权限或 STS/运行时角色；Secret 只能进入阿里云受控 secret env。
+- `P03_ACR_PURCHASE`：ACR 企业版付费购买，付款前必须由用户确认规格和金额。
+
+完整 APP 发布项已后置，不属于当前 backend-only 阻塞：
 
 - `P01_WECHAT_OPEN_MOBILE_APP`：微信开放平台移动 App 创建、提交审核、审核通过后取得 AppID/AppSecret。
 - `P10_ANDROID_RELEASE_SIGNING`：Android release keystore/签名，不可使用 debug keystore。
 - `P02_APPLE_TEAM_ID`：Apple Developer Team ID，用于 iOS Universal Link/AASA。
-- `P03_ACR_PURCHASE`：ACR 企业版付费购买，付款前必须由用户确认规格和金额。
-- `P05_OSS_RAM_STS`：OSS RAM 最小权限或 STS/运行时角色；Secret 只能进入阿里云受控 secret env。
 
 依赖上述动作后才能继续：
 
