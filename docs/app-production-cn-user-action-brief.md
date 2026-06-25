@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 用户动作简报
 
-Generated: 2026-06-25T12:15:45.766Z
+Generated: 2026-06-25T14:57:38.110Z
 
 ## 结论
 
@@ -17,6 +17,15 @@ Generated: 2026-06-25T12:15:45.766Z
 - containsValues: false
 - secretLeakCheck: true
 - mutationPerformed: false
+
+## 动作时授权请求
+
+- required: true
+- currentScope: backend_aliyun_only
+- packetIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
+- recommendedUserReply: 请逐项明确授权 nextActionTimeConfirmations 中的动作；未明确授权前不做云端变更、购买、密钥导入、部署、DNS 或 git push。
+- valueHandling: 只允许记录变量名、资源名、布尔值、时间戳、digest、控制台路径和非密钥 evidence handle。; DATABASE_URL_CN、数据库密码、AccessKeySecret、STS token、registry password、Supabase service role key、cookie 和证书私钥不得写入 JSON、Markdown、Docker 镜像、App 包、小程序包、shell history 或 git。
+- explicitlyExcluded: 不运行 Create/Update/Delete/Deploy/Start/Stop/Purchase/DNS mutation 命令。; 不执行 docker login/push。; 不读取、复制、粘贴或输出 AccessKeySecret、STS token、cookie、registry password、RAM Secret 或证书私钥。; 除用户明确确认 CloudShell 开通页的性能型 NAS 费用提示外，不做任何 production-cn deploy、env import、资源创建或计费动作。; 未明确确认金额前不点击付款。; 不记录 registry password、RAM Secret 或 token。; 不创建可提交的长期明文 Secret。; 不下载 OSS 对象内容。; 不把 AccessKeySecret 或 STS token 写入 JSON、Markdown、镜像或 git。; 不把数据库密码、连接串 value 或 Supabase service role key 写入 JSON、Markdown、Docker 镜像或 git。; 不把 Supabase 当作正式 production-cn 数据库目标。; 不执行破坏性数据迁移，除非迁移计划和回滚验收已单独确认。
 
 ## 密钥/密码/受控变量获取摘要
 

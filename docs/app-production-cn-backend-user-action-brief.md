@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 用户动作简报
 
-Generated: 2026-06-25T12:15:45.768Z
+Generated: 2026-06-25T14:57:37.875Z
 
 ## 结论
 
@@ -17,6 +17,15 @@ Generated: 2026-06-25T12:15:45.768Z
 - containsValues: false
 - secretLeakCheck: true
 - mutationPerformed: false
+
+## 动作时授权请求
+
+- required: true
+- currentScope: backend_aliyun_only
+- packetIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
+- recommendedUserReply: 授权本轮只做阿里云后端第一批动作：只读盘点、创建/确认 RDS PostgreSQL 并处理数据库密码、确认 OSS RAM/STS，购买/确认 ACR Enterprise Economic cn-hangzhou 1个月 CNY117；密钥只进入阿里云 KMS/Secrets Manager/SAE secret env，不写文档/代码/git；仅处理 RDS/OSS 所需的受控 secret env，暂不执行全量 SAE env import；不做微信/Android/iOS、不部署上线、不改 DNS。
+- valueHandling: 只允许记录变量名、资源名、布尔值、时间戳、digest、控制台路径和非密钥 evidence handle。; DATABASE_URL_CN、数据库密码、AccessKeySecret、STS token、registry password、Supabase service role key、cookie 和证书私钥不得写入 JSON、Markdown、Docker 镜像、App 包、小程序包、shell history 或 git。
+- explicitlyExcluded: 不运行 Create/Update/Delete/Deploy/Start/Stop/Purchase/DNS mutation 命令。; 不执行 docker login/push。; 不读取、复制、粘贴或输出 AccessKeySecret、STS token、cookie、registry password、RAM Secret 或证书私钥。; 除用户明确确认 CloudShell 开通页的性能型 NAS 费用提示外，不做任何 production-cn deploy、env import、资源创建或计费动作。; 未明确确认金额前不点击付款。; 不记录 registry password、RAM Secret 或 token。; 不创建可提交的长期明文 Secret。; 不下载 OSS 对象内容。; 不把 AccessKeySecret 或 STS token 写入 JSON、Markdown、镜像或 git。; 不把数据库密码、连接串 value 或 Supabase service role key 写入 JSON、Markdown、Docker 镜像或 git。; 不把 Supabase 当作正式 production-cn 数据库目标。; 不执行破坏性数据迁移，除非迁移计划和回滚验收已单独确认。; 不创建微信开放平台移动应用，不处理 Android release signing，不读取 Apple Team ID/AASA。; 不执行 production-cn 部署、postdeploy smoke、DNS/HTTPS/ICP 变更或 git push。; 不执行全量 SAE 环境变量导入；只允许本批 RDS/OSS 动作要求的受控 secret env 写入。
 
 ## 密钥/密码/受控变量获取摘要
 
