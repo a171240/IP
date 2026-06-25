@@ -30,6 +30,39 @@ const APP_LAUNCH_DEFERRED_BLOCKERS = Object.freeze([
   "IOS_UNIVERSAL_LINK_AASA",
 ])
 
+const EVIDENCE_WRITEBACK_PACKET_ORDER = Object.freeze([
+  "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
+  "P03_ACR_PURCHASE",
+  "P05_OSS_RAM_STS",
+  "P11_ALIYUN_RDS_DATA_MIGRATION",
+  "P04_ACR_IMAGE_AND_PULL",
+  "P06_ENV_IMPORT",
+  "P07_DOMAIN_DNS_HTTPS",
+  "P08_SAE_RUNTIME_SLS",
+])
+
+const EVIDENCE_WRITEBACK_SECRET_OR_CREDENTIAL_PACKET_IDS = new Set([
+  "P05_OSS_RAM_STS",
+  "P11_ALIYUN_RDS_DATA_MIGRATION",
+  "P06_ENV_IMPORT",
+])
+const BACKEND_CLOUD_CONFIRMATION_KEYS = Object.freeze([
+  "runtime",
+  "apiDomainHttps",
+  "assetDomainHttps",
+  "oss",
+  "envImport",
+  "slsAlerts",
+])
+const BACKEND_CLOUD_CONFIRMATION_PACKETS_BY_KEY = Object.freeze({
+  runtime: ["P08_SAE_RUNTIME_SLS"],
+  apiDomainHttps: ["P07_DOMAIN_DNS_HTTPS"],
+  assetDomainHttps: ["P07_DOMAIN_DNS_HTTPS"],
+  oss: ["P05_OSS_RAM_STS"],
+  envImport: ["P06_ENV_IMPORT"],
+  slsAlerts: ["P08_SAE_RUNTIME_SLS"],
+})
+
 const BACKEND_TARGETS = Object.freeze([
   {
     id: "B01_RDS_POSTGRES_DATA_LAYER",
@@ -250,7 +283,6 @@ function buildReport(args) {
     "--cloud-confirmations",
     args.cloudConfirmationsFile,
   ])
-
   const backendRequiredBlocking = buildBackendRequiredBlocking({
     cloudConfirmations,
     imagePublishPlan,
@@ -279,6 +311,14 @@ function buildReport(args) {
     imagePublish: imagePublishBrief,
   })
   const credentialPasswordIntervention = buildCredentialPasswordIntervention(credentialIntervention)
+  const evidenceWritebackBrief = buildEvidenceWritebackBrief({
+    args,
+    rdsMigration,
+    cloudInventoryResults,
+    cloudConfirmations,
+    imagePublishPlan,
+    actionAuthorization: actionAuthorizationSummary,
+  })
 
   const report = {
     ok: true,
@@ -310,6 +350,11 @@ function buildReport(args) {
       rdsMigrationReady: rdsMigration.localReady === true || rdsMigration.local?.ready === true,
       rdsLocalExists: rdsMigration.localExists === true || rdsMigration.local?.exists === true,
       imagePublishReady: imagePublishPlan.ready === true || imagePublishPlan.local?.ready === true,
+      evidenceWritebackReady: evidenceWritebackBrief.evidenceWritebackReady,
+      evidenceWritebackTotalGaps: evidenceWritebackBrief.totalGaps,
+      evidenceWritebackGapSummary: evidenceWritebackBrief.gapSummary,
+      evidenceWritebackCanStartNowPacketIds: evidenceWritebackBrief.canStartNowPacketIds,
+      evidenceWritebackBlockedByDependencyPacketIds: evidenceWritebackBrief.blockedByDependencyPacketIds,
       sensitiveActionBlockedIds: credentialIntervention.sensitiveActionBlockedIds,
       actionTimeConfirmationRequiredIds: credentialIntervention.actionTimeConfirmationRequiredIds,
       nextActionTimeConfirmationPacketIds: actionAuthorizationSummary.nextActionTimeConfirmationPacketIds,
@@ -329,6 +374,7 @@ function buildReport(args) {
     rdsMigration: rdsMigrationBrief,
     imagePublish: imagePublishBrief,
     cloudConfirmations: cloudConfirmationsBrief,
+    evidenceWriteback: evidenceWritebackBrief,
     credentialIntervention,
     credentialPasswordIntervention,
     actionAuthorization: actionAuthorizationSummary,
@@ -797,6 +843,132 @@ function compactCloudConfirmations(report) {
   }
 }
 
+function buildEvidenceWritebackBrief({
+  args,
+  rdsMigration,
+  cloudInventoryResults,
+  cloudConfirmations,
+  imagePublishPlan,
+  actionAuthorization,
+}) {
+  const backendCloudConfirmations = buildBackendCloudConfirmationWritebackStatus(cloudConfirmations)
+  const groups = [
+    {
+      key: "rdsMigration",
+      file: args.rdsMigrationFile,
+      ready: rdsMigration.local?.ready === true,
+      gaps: rdsMigration.summary?.totalBlockers || rdsMigration.local?.blockers?.length || 0,
+      requiredAuthorizationPackets: rdsMigration.summary?.requiredAuthorizationPackets || ["P11_ALIYUN_RDS_DATA_MIGRATION"],
+      strictVerifyCommands: ["corepack pnpm aliyun:rds:migration:evidence:strict"],
+    },
+    {
+      key: "cloudInventoryResults",
+      file: args.cloudInventoryResultsFile,
+      ready: cloudInventoryResults.local?.ready === true,
+      gaps: cloudInventoryResults.local?.ready === true ? 0 : (cloudInventoryResults.local?.blockers || []).length,
+      requiredAuthorizationPackets: cloudInventoryResults.local?.ready === true ? [] : ["P00_ALIYUN_READONLY_INVENTORY_IDENTITY"],
+      strictVerifyCommands: ["corepack pnpm aliyun:cloud:inventory-results:strict"],
+    },
+    {
+      key: "cloudConfirmations",
+      file: args.cloudConfirmationsFile,
+      ready: backendCloudConfirmations.ready,
+      gaps: backendCloudConfirmations.gaps,
+      requiredAuthorizationPackets: backendCloudConfirmations.requiredAuthorizationPackets,
+      strictVerifyCommands: ["corepack pnpm aliyun:cloud:confirmations:strict"],
+    },
+    {
+      key: "imagePublish",
+      file: resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.image-publish.local.json"),
+      ready: imagePublishPlan.ready === true || imagePublishPlan.local?.ready === true,
+      gaps: imagePublishPlan.writebackPlan?.totalBlockers || imagePublishPlan.summary?.totalBlockers || 0,
+      requiredAuthorizationPackets: imagePublishPlan.summary?.requiredAuthorizationPackets || [],
+      strictVerifyCommands: ["corepack pnpm aliyun:image:plan:strict"],
+    },
+  ]
+  const totalGaps = groups.reduce((sum, group) => sum + group.gaps, 0)
+  const readyFiles = groups.filter((group) => group.ready).length
+  const canStartNowPacketIds = sortEvidencePackets(actionAuthorization.canStartNowPackets || actionAuthorization.nextActionTimeConfirmationPacketIds || [])
+  const canStartNowPacketIdSet = new Set(canStartNowPacketIds)
+  const requiredPacketIds = sortEvidencePackets(uniqueStrings(groups.flatMap((group) => group.requiredAuthorizationPackets)))
+  const blockedByDependencyPacketIds = requiredPacketIds.filter((packetId) => !canStartNowPacketIdSet.has(packetId))
+  return {
+    ready: totalGaps === 0,
+    evidenceWritebackReady: `${readyFiles}/${groups.length}`,
+    totalGaps,
+    gapSummary: {
+      rdsMigrationGaps: groups.find((group) => group.key === "rdsMigration")?.gaps || 0,
+      cloudInventoryResultGaps: groups.find((group) => group.key === "cloudInventoryResults")?.gaps || 0,
+      cloudConfirmationGaps: groups.find((group) => group.key === "cloudConfirmations")?.gaps || 0,
+      imagePublishGaps: groups.find((group) => group.key === "imagePublish")?.gaps || 0,
+    },
+    canStartNowPacketIds,
+    blockedByDependencyPacketIds,
+    secretOrCredentialPacketIds: requiredPacketIds.filter((packetId) =>
+      EVIDENCE_WRITEBACK_SECRET_OR_CREDENTIAL_PACKET_IDS.has(packetId)
+    ),
+    writeTargets: groups.map((group) => group.file).filter(Boolean),
+    groupStatus: groups.map((group) => ({
+      key: group.key,
+      ready: group.ready === true,
+      gaps: group.gaps,
+      requiredAuthorizationPackets: group.requiredAuthorizationPackets || [],
+      strictVerifyCommands: group.strictVerifyCommands || [],
+    })),
+    strictVerifyCommands: uniqueStrings(groups.flatMap((group) => group.strictVerifyCommands)),
+  }
+}
+
+function buildBackendCloudConfirmationWritebackStatus(cloudConfirmations) {
+  if (cloudConfirmations.local?.ready === true) {
+    return {
+      ready: true,
+      gaps: 0,
+      requiredAuthorizationPackets: [],
+    }
+  }
+
+  const localBlockers = cloudConfirmations.local?.blockers || []
+  const backendBlockers = localBlockers.filter((blocker) =>
+    BACKEND_CLOUD_CONFIRMATION_KEYS.some((key) => String(blocker || "").startsWith(`${key}:`))
+  )
+  if (backendBlockers.length > 0) {
+    return {
+      ready: false,
+      gaps: backendBlockers.length,
+      requiredAuthorizationPackets: packetsForCloudConfirmationBlockers(backendBlockers),
+    }
+  }
+
+  const localItems = cloudConfirmations.local?.items || {}
+  const missingOrUnreadyKeys = BACKEND_CLOUD_CONFIRMATION_KEYS.filter((key) => localItems[key]?.ready !== true)
+  return {
+    ready: false,
+    gaps: missingOrUnreadyKeys.length,
+    requiredAuthorizationPackets: uniqueStrings(missingOrUnreadyKeys.flatMap((key) =>
+      BACKEND_CLOUD_CONFIRMATION_PACKETS_BY_KEY[key] || []
+    )),
+  }
+}
+
+function packetsForCloudConfirmationBlockers(blockers) {
+  return uniqueStrings(blockers.flatMap((blocker) => {
+    const key = String(blocker || "").split(":")[0]
+    return BACKEND_CLOUD_CONFIRMATION_PACKETS_BY_KEY[key] || []
+  }))
+}
+
+function sortEvidencePackets(packetIds) {
+  return uniqueStrings(packetIds).sort((left, right) =>
+    evidencePacketSortIndex(left) - evidencePacketSortIndex(right)
+  )
+}
+
+function evidencePacketSortIndex(packetId) {
+  const index = EVIDENCE_WRITEBACK_PACKET_ORDER.indexOf(packetId)
+  return index === -1 ? EVIDENCE_WRITEBACK_PACKET_ORDER.length : index
+}
+
 function renderMarkdown(report) {
   return [
     "# APP production-cn Aliyun backend status",
@@ -818,6 +990,22 @@ function renderMarkdown(report) {
     `- backendMissingItems: ${report.cloudConfirmations.backendMissingItems.join(", ") || "none"}`,
     `- backendBlockers: ${report.cloudConfirmations.backendBlockers.join(", ") || "none"}`,
     `- wechatExcludedBlockers: ${report.cloudConfirmations.wechatExcludedBlockers.join(", ") || "none"}`,
+    "",
+    "## Evidence Writeback",
+    "",
+    `- evidenceWritebackReady: ${report.evidenceWriteback.evidenceWritebackReady}`,
+    `- totalGaps: ${report.evidenceWriteback.totalGaps}`,
+    `- rdsMigrationGaps: ${report.evidenceWriteback.gapSummary.rdsMigrationGaps}`,
+    `- cloudInventoryResultGaps: ${report.evidenceWriteback.gapSummary.cloudInventoryResultGaps}`,
+    `- cloudConfirmationGaps: ${report.evidenceWriteback.gapSummary.cloudConfirmationGaps}`,
+    `- imagePublishGaps: ${report.evidenceWriteback.gapSummary.imagePublishGaps}`,
+    `- canStartNowPacketIds: ${report.evidenceWriteback.canStartNowPacketIds.join(", ") || "none"}`,
+    `- blockedByDependencyPacketIds: ${report.evidenceWriteback.blockedByDependencyPacketIds.join(", ") || "none"}`,
+    `- secretOrCredentialPacketIds: ${report.evidenceWriteback.secretOrCredentialPacketIds.join(", ") || "none"}`,
+    `- writeTargets: ${report.evidenceWriteback.writeTargets.join(", ") || "none"}`,
+    ...report.evidenceWriteback.groupStatus.map((group) =>
+      `- ${group.key}: ready=${group.ready}; gaps=${group.gaps}; packets=${group.requiredAuthorizationPackets.join(", ") || "none"}`
+    ),
     "",
     "## Evidence Scope Breakdown",
     "",

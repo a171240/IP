@@ -992,6 +992,11 @@ function renderMarkdown(audit) {
     `- cloudResourceEvidenceReady: ${backendCnStatus.summary.cloudResourceEvidenceReady || "unknown"}`,
     `- rdsMigrationReady: ${backendCnStatus.summary.rdsMigrationReady === true}`,
     `- imagePublishReady: ${backendCnStatus.summary.imagePublishReady === true}`,
+    `- evidenceWritebackReady: ${backendCnStatus.summary.evidenceWritebackReady || "unknown"}`,
+    `- evidenceWritebackTotalGaps: ${backendCnStatus.summary.evidenceWritebackTotalGaps ?? "unknown"}`,
+    `- evidenceWritebackGapSummary: ${formatJsonSummary(backendCnStatus.summary.evidenceWritebackGapSummary)}`,
+    `- evidenceWritebackCanStartNowPacketIds: ${backendCnStatus.summary.evidenceWritebackCanStartNowPacketIds?.join(", ") || "none"}`,
+    `- evidenceWritebackBlockedByDependencyPacketIds: ${backendCnStatus.summary.evidenceWritebackBlockedByDependencyPacketIds?.join(", ") || "none"}`,
     ...(backendCnStatus.backendTargets?.length
       ? backendCnStatus.backendTargets.map((item) => `- ${item.id}: ready=${item.ready === true}; blockers=${item.blockers?.length ? item.blockers.join(", ") : "none"}`)
       : ["- backendTargets: none"]),
@@ -1452,6 +1457,11 @@ function formatCurrentBrowserHostPaths(tabs) {
 
 function formatStringList(items) {
   return Array.isArray(items) && items.length ? items.join(", ") : "none"
+}
+
+function formatJsonSummary(value) {
+  if (!value || typeof value !== "object") return "none"
+  return Object.entries(value).map(([key, entry]) => `${key}=${entry}`).join(", ") || "none"
 }
 
 function cloudOnlyMissingBackendCredentialValue(cloudActionsPackage) {
@@ -2606,6 +2616,11 @@ function main() {
       rdsMigrationReady: backendCnStatus.summary.rdsMigrationReady === true,
       rdsLocalExists: backendCnStatus.summary.rdsLocalExists === true,
       imagePublishReady: backendCnStatus.summary.imagePublishReady === true,
+      evidenceWritebackReady: backendCnStatus.summary.evidenceWritebackReady || "",
+      evidenceWritebackTotalGaps: backendCnStatus.summary.evidenceWritebackTotalGaps || 0,
+      evidenceWritebackGapSummary: backendCnStatus.summary.evidenceWritebackGapSummary || {},
+      evidenceWritebackCanStartNowPacketIds: backendCnStatus.summary.evidenceWritebackCanStartNowPacketIds || [],
+      evidenceWritebackBlockedByDependencyPacketIds: backendCnStatus.summary.evidenceWritebackBlockedByDependencyPacketIds || [],
       backendTargets: (backendCnStatus.backendTargets || []).map((item) => `${item.id}:ready=${item.ready === true}:blockers=${(item.blockers || []).join("|") || "none"}`),
     },
     backendApplyPackage: {

@@ -28,6 +28,9 @@ test("Aliyun backend-cn status command is wired into package scripts", () => {
   assert.ok(deploySpec.predeployChecks.includes("corepack pnpm aliyun:backend-cn:status"))
   assert.match(releaseArtifacts, /backend-cn-status\.json/)
   assert.match(releaseArtifacts, /backendCnStatus/)
+  assert.match(releaseArtifacts, /evidenceWritebackReady: \$\{backendCnStatus\.summary\.evidenceWritebackReady/)
+  assert.match(releaseArtifacts, /evidenceWritebackGapSummary: \$\{formatJsonSummary\(backendCnStatus\.summary\.evidenceWritebackGapSummary\)/)
+  assert.match(releaseArtifacts, /evidenceWritebackCanStartNowPacketIds/)
   assert.match(script, /backend_aliyun_only/)
   assert.match(script, /deferred_after_backend_online/)
   assert.match(script, /WECHAT_OPEN_APP_ID/)
@@ -63,6 +66,26 @@ test("Aliyun backend-cn status excludes WeChat mobile app from current backend b
   assert.equal(report.summary.backendEvidenceScope.cloudResourceEvidenceReady, "0/7")
   assert.equal(report.summary.backendEvidenceScope.acrTrackedOutsideCloudConfirmations, true)
   assert.equal(report.summary.backendEvidenceScope.deferredAppLaunchExcluded, true)
+  assert.equal(report.summary.evidenceWritebackReady, "0/4")
+  assert.equal(report.summary.evidenceWritebackTotalGaps, 50)
+  assert.deepEqual(report.summary.evidenceWritebackGapSummary, {
+    rdsMigrationGaps: 19,
+    cloudInventoryResultGaps: 1,
+    cloudConfirmationGaps: 18,
+    imagePublishGaps: 12,
+  })
+  assert.deepEqual(report.summary.evidenceWritebackCanStartNowPacketIds, [
+    "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
+    "P03_ACR_PURCHASE",
+    "P05_OSS_RAM_STS",
+    "P11_ALIYUN_RDS_DATA_MIGRATION",
+  ])
+  assert.deepEqual(report.summary.evidenceWritebackBlockedByDependencyPacketIds, [
+    "P04_ACR_IMAGE_AND_PULL",
+    "P06_ENV_IMPORT",
+    "P07_DOMAIN_DNS_HTTPS",
+    "P08_SAE_RUNTIME_SLS",
+  ])
   assert.equal(report.summary.credentialPasswordInterventionRequired, true)
   assert.deepEqual(report.summary.credentialPasswordInterventionActionIds, [
     "S08_ALIYUN_RDS_DATABASE_URL",
@@ -215,6 +238,22 @@ test("Aliyun backend-cn status excludes WeChat mobile app from current backend b
   assert.ok(report.cloudResources.blockedIds.includes("R07_SLS_ALERTS"))
   assert.ok(report.cloudResources.observedPartial.includes("R05_OSS_AUDIO_STORAGE"))
   assert.ok(report.cloudResources.observedPartial.includes("R07_SLS_ALERTS"))
+  assert.equal(report.evidenceWriteback.evidenceWritebackReady, "0/4")
+  assert.equal(report.evidenceWriteback.totalGaps, 50)
+  assert.equal(report.evidenceWriteback.gapSummary.rdsMigrationGaps, 19)
+  assert.equal(report.evidenceWriteback.gapSummary.cloudInventoryResultGaps, 1)
+  assert.equal(report.evidenceWriteback.gapSummary.cloudConfirmationGaps, 18)
+  assert.equal(report.evidenceWriteback.gapSummary.imagePublishGaps, 12)
+  assert.ok(report.evidenceWriteback.writeTargets.some((item) => item.endsWith("deploy/aliyun-production-cn.rds-migration.local.json")))
+  assert.ok(report.evidenceWriteback.writeTargets.some((item) => item.endsWith("deploy/aliyun-production-cn.cloud-confirmations.local.json")))
+  assert.ok(report.evidenceWriteback.writeTargets.some((item) => item.endsWith("deploy/aliyun-production-cn.image-publish.local.json")))
+  const evidenceGroupByKey = new Map(report.evidenceWriteback.groupStatus.map((item) => [item.key, item]))
+  assert.equal(evidenceGroupByKey.get("rdsMigration").gaps, 19)
+  assert.ok(evidenceGroupByKey.get("rdsMigration").requiredAuthorizationPackets.includes("P11_ALIYUN_RDS_DATA_MIGRATION"))
+  assert.equal(evidenceGroupByKey.get("cloudInventoryResults").gaps, 1)
+  assert.ok(evidenceGroupByKey.get("cloudInventoryResults").requiredAuthorizationPackets.includes("P00_ALIYUN_READONLY_INVENTORY_IDENTITY"))
+  assert.equal(evidenceGroupByKey.get("cloudConfirmations").gaps, 18)
+  assert.equal(evidenceGroupByKey.get("imagePublish").gaps, 12)
 
   assert.ok(targetById.get("B01_RDS_POSTGRES_DATA_LAYER").blockers.includes("DATABASE_URL_CN"))
   assert.ok(!targetById.get("B01_RDS_POSTGRES_DATA_LAYER").blockers.includes("RDS_POSTGRES_NOT_READY"))
@@ -260,6 +299,17 @@ test("Aliyun backend-cn status markdown states the backend-only target", () => {
   assert.match(markdown, /backendMissingItems: runtime, apiDomainHttps, assetDomainHttps, oss, envImport, slsAlerts/)
   assert.match(markdown, /runtime:missing_cloud_confirmation_item/)
   assert.match(markdown, /envImport:missing_cloud_confirmation_item/)
+  assert.match(markdown, /## Evidence Writeback/)
+  assert.match(markdown, /evidenceWritebackReady: 0\/4/)
+  assert.match(markdown, /totalGaps: 50/)
+  assert.match(markdown, /rdsMigrationGaps: 19/)
+  assert.match(markdown, /cloudInventoryResultGaps: 1/)
+  assert.match(markdown, /cloudConfirmationGaps: 18/)
+  assert.match(markdown, /imagePublishGaps: 12/)
+  assert.match(markdown, /canStartNowPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(markdown, /blockedByDependencyPacketIds: P04_ACR_IMAGE_AND_PULL, P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS/)
+  assert.match(markdown, /rdsMigration: ready=false; gaps=19; packets=P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(markdown, /cloudInventoryResults: ready=false; gaps=1; packets=P00_ALIYUN_READONLY_INVENTORY_IDENTITY/)
   assert.match(markdown, /## Evidence Scope Breakdown/)
   assert.match(markdown, /cloudConfirmationsBackendReady: 0\/6/)
   assert.match(markdown, /cloudResourceEvidenceReady: 0\/7/)
