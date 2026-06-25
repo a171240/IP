@@ -59,6 +59,18 @@ test("Aliyun backend-cn status excludes WeChat mobile app from current backend b
   assert.equal(report.canProceedWithoutWechat, true)
   assert.equal(report.canDeployBackendNow, false)
   assert.equal(report.summary.backendTargetReady, "0/8")
+  assert.equal(report.summary.backendEvidenceScope.cloudConfirmationsBackendReady, "0/6")
+  assert.equal(report.summary.backendEvidenceScope.cloudResourceEvidenceReady, "0/7")
+  assert.equal(report.summary.backendEvidenceScope.acrTrackedOutsideCloudConfirmations, true)
+  assert.equal(report.summary.backendEvidenceScope.deferredAppLaunchExcluded, true)
+  assert.equal(report.summary.credentialPasswordInterventionRequired, true)
+  assert.deepEqual(report.summary.credentialPasswordInterventionActionIds, [
+    "S08_ALIYUN_RDS_DATABASE_URL",
+    "S05_OSS_RAM_SECRET_OR_STS",
+    "S06_READY_SENSITIVE_ENV_IMPORT",
+    "S04_ACR_REGISTRY_AUTH",
+    "S03_ACR_PAID_PURCHASE",
+  ])
   assert.deepEqual(report.summary.blockedCredentialNames, ["DATABASE_URL_CN"])
   assert.equal(report.summary.readySecretEnvVariableCount, 17)
   assert.ok(report.summary.readySecretEnvVariableNames.includes("ALIYUN_OSS_ACCESS_KEY_SECRET"))
@@ -106,6 +118,31 @@ test("Aliyun backend-cn status excludes WeChat mobile app from current backend b
     "S08_ALIYUN_RDS_DATABASE_URL",
     "S06_READY_SENSITIVE_ENV_IMPORT",
   ])
+  assert.equal(report.backendEvidenceScopeBreakdown.summary.cloudConfirmationsBackendReady, "0/6")
+  assert.equal(report.backendEvidenceScopeBreakdown.summary.cloudResourceEvidenceReady, "0/7")
+  assert.equal(report.backendEvidenceScopeBreakdown.summary.acrTrackedOutsideCloudConfirmations, true)
+  assert.equal(report.backendEvidenceScopeBreakdown.summary.rdsMigrationEvidenceReady, false)
+  assert.equal(report.backendEvidenceScopeBreakdown.summary.imagePublishEvidenceReady, false)
+  assert.equal(report.backendEvidenceScopeBreakdown.summary.deferredAppLaunchExcluded, true)
+  assert.deepEqual(report.backendEvidenceScopeBreakdown.cloudConfirmationsBackendItems, [
+    "runtime",
+    "apiDomainHttps",
+    "assetDomainHttps",
+    "oss",
+    "envImport",
+    "slsAlerts",
+  ])
+  assert.ok(report.backendEvidenceScopeBreakdown.cloudResourceEvidenceItems.includes("R02_ACR_IMAGE_REGISTRY"))
+  assert.ok(report.backendEvidenceScopeBreakdown.interpretation.some((item) => /denominator is seven/.test(item)))
+  assert.equal(report.credentialPasswordIntervention.required, true)
+  assert.deepEqual(report.credentialPasswordIntervention.missingCredentialValues.names, ["DATABASE_URL_CN"])
+  assert.deepEqual(report.credentialPasswordIntervention.missingCredentialValues.actionIds, ["S08_ALIYUN_RDS_DATABASE_URL"])
+  assert.equal(report.credentialPasswordIntervention.readySecretsPendingCloudImport.count, 17)
+  assert.ok(report.credentialPasswordIntervention.readySecretsPendingCloudImport.names.includes("ALIYUN_OSS_ACCESS_KEY_SECRET"))
+  assert.ok(report.credentialPasswordIntervention.controlledSecretChannelActionIds.includes("S08_ALIYUN_RDS_DATABASE_URL"))
+  assert.ok(report.credentialPasswordIntervention.paidPurchaseConfirmationActionIds.includes("S03_ACR_PAID_PURCHASE"))
+  assert.ok(report.credentialPasswordIntervention.userMustProvideOrConfirm.some((item) => /DATABASE_URL_CN/.test(item)))
+  assert.ok(report.credentialPasswordIntervention.forbiddenStorage.includes("Docker image"))
 
   for (const blocker of [
     "DATABASE_URL_CN",
@@ -223,6 +260,11 @@ test("Aliyun backend-cn status markdown states the backend-only target", () => {
   assert.match(markdown, /backendMissingItems: runtime, apiDomainHttps, assetDomainHttps, oss, envImport, slsAlerts/)
   assert.match(markdown, /runtime:missing_cloud_confirmation_item/)
   assert.match(markdown, /envImport:missing_cloud_confirmation_item/)
+  assert.match(markdown, /## Evidence Scope Breakdown/)
+  assert.match(markdown, /cloudConfirmationsBackendReady: 0\/6/)
+  assert.match(markdown, /cloudResourceEvidenceReady: 0\/7/)
+  assert.match(markdown, /acrTrackedOutsideCloudConfirmations: true/)
+  assert.match(markdown, /deferredAppLaunchExcluded: true/)
   assert.match(markdown, /B01_RDS_POSTGRES_DATA_LAYER/)
   assert.match(markdown, /R05_OSS_AUDIO_STORAGE\.observedReadiness=partial/)
   assert.match(markdown, /R07_SLS_ALERTS\.observedReadiness=partial/)
@@ -236,6 +278,10 @@ test("Aliyun backend-cn status markdown states the backend-only target", () => {
   assert.match(markdown, /controlledSecretChannelActionIds: S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT/)
   assert.match(markdown, /S08_ALIYUN_RDS_DATABASE_URL/)
   assert.match(markdown, /阿里云 KMS\/Secrets Manager\/SAE secret env/)
+  assert.match(markdown, /## Credential \/ Password Intervention/)
+  assert.match(markdown, /required: true/)
+  assert.match(markdown, /missingCredentialValues: DATABASE_URL_CN/)
+  assert.match(markdown, /readySecretsPendingCloudImport: 17/)
   assert.match(markdown, /wechatOpenMobileApp: deferred_after_backend_online/)
   assert.match(markdown, /WECHAT_OPEN_APP_ID/)
   assert.match(markdown, /WECHAT_OPEN_APP_SECRET/)

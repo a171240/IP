@@ -269,6 +269,16 @@ function buildReport(args) {
   const cloudResources = compactCloudResources(resourceMatrix)
   const credentialIntervention = compactCredentialIntervention(sensitiveBlockers)
   const actionAuthorizationSummary = compactActionAuthorization(actionAuthorization)
+  const rdsMigrationBrief = compactRdsMigration(rdsMigration)
+  const imagePublishBrief = compactImagePublish(imagePublishPlan)
+  const cloudConfirmationsBrief = compactCloudConfirmations(cloudConfirmations)
+  const backendEvidenceScopeBreakdown = buildBackendEvidenceScopeBreakdown({
+    cloudConfirmations: cloudConfirmationsBrief,
+    cloudResources,
+    rdsMigration: rdsMigrationBrief,
+    imagePublish: imagePublishBrief,
+  })
+  const credentialPasswordIntervention = buildCredentialPasswordIntervention(credentialIntervention)
 
   const report = {
     ok: true,
@@ -306,16 +316,21 @@ function buildReport(args) {
       blockedCredentialNames: credentialIntervention.blockedCredentialNames,
       readySecretEnvVariableCount: credentialIntervention.readySecretEnvVariableNames.length,
       readySecretEnvVariableNames: credentialIntervention.readySecretEnvVariableNames,
+      backendEvidenceScope: backendEvidenceScopeBreakdown.summary,
+      credentialPasswordInterventionRequired: credentialPasswordIntervention.required,
+      credentialPasswordInterventionActionIds: credentialPasswordIntervention.actionIds,
       wechatDeferredBlocking: [...WECHAT_DEFERRED_BLOCKERS],
       appLaunchDeferredBlocking: [...APP_LAUNCH_DEFERRED_BLOCKERS],
     },
     backendTargets,
+    backendEvidenceScopeBreakdown,
     cloudResources,
     cloudInventory,
-    rdsMigration: compactRdsMigration(rdsMigration),
-    imagePublish: compactImagePublish(imagePublishPlan),
-    cloudConfirmations: compactCloudConfirmations(cloudConfirmations),
+    rdsMigration: rdsMigrationBrief,
+    imagePublish: imagePublishBrief,
+    cloudConfirmations: cloudConfirmationsBrief,
     credentialIntervention,
+    credentialPasswordIntervention,
     actionAuthorization: actionAuthorizationSummary,
     deferredScope: {
       wechatOpenMobileApp: {
@@ -573,6 +588,82 @@ function buildCredentialInterventionBreakdown({
   }
 }
 
+function buildBackendEvidenceScopeBreakdown({ cloudConfirmations, cloudResources, rdsMigration, imagePublish }) {
+  const backendCloudConfirmationItemIds = [
+    "runtime",
+    "apiDomainHttps",
+    "assetDomainHttps",
+    "oss",
+    "envImport",
+    "slsAlerts",
+  ]
+  const cloudResourceEvidenceItemIds = [
+    "R01_SAE_RUNTIME",
+    "R02_ACR_IMAGE_REGISTRY",
+    "R03_API_DOMAIN_HTTPS",
+    "R04_ASSET_DOMAIN_HTTPS",
+    "R05_OSS_AUDIO_STORAGE",
+    "R06_ENV_IMPORT",
+    "R07_SLS_ALERTS",
+  ]
+  const acrTrackedOutsideCloudConfirmations = cloudResources.blockedIds.includes("R02_ACR_IMAGE_REGISTRY") ||
+    cloudResources.rows.some((row) => row.id === "R02_ACR_IMAGE_REGISTRY")
+  return {
+    summary: {
+      currentScope: "backend_aliyun_only",
+      cloudConfirmationsBackendReady: cloudConfirmations.backendReady,
+      cloudResourceEvidenceReady: cloudResources.evidenceReady,
+      acrTrackedOutsideCloudConfirmations,
+      rdsMigrationEvidenceReady: rdsMigration.localReady === true,
+      imagePublishEvidenceReady: imagePublish.ready === true,
+      deferredAppLaunchExcluded: true,
+    },
+    cloudConfirmationsBackendItems: backendCloudConfirmationItemIds,
+    cloudResourceEvidenceItems: cloudResourceEvidenceItemIds,
+    interpretation: [
+      "cloudConfirmationsBackendReady tracks six Aliyun backend runtime confirmations: SAE, API domain, asset domain, OSS, env import, and SLS.",
+      "cloudResourceEvidenceReady tracks those backend resources plus the ACR image registry evidence, so its denominator is seven.",
+      "WeChat Open Platform mobile app, Apple Team ID, and Android release signing stay deferred after backend online and are not counted as current backend blockers.",
+    ],
+  }
+}
+
+function buildCredentialPasswordIntervention(credentialIntervention) {
+  const breakdown = credentialIntervention.interventionBreakdown || {}
+  const missingCredentialValues = breakdown.missingCredentialValues || { count: 0, names: [], actionIds: [] }
+  const readySecretsPendingCloudImport = breakdown.readySecretsPendingCloudImport || { count: 0, names: [], actionIds: [] }
+  const controlledSecretChannelActionIds = breakdown.controlledSecretChannelActionIds || []
+  const paidPurchaseConfirmationActionIds = breakdown.paidPurchaseConfirmationActionIds || []
+  const actionIds = uniqueStrings([
+    ...(missingCredentialValues.actionIds || []),
+    ...(readySecretsPendingCloudImport.actionIds || []),
+    ...controlledSecretChannelActionIds,
+    ...paidPurchaseConfirmationActionIds,
+  ])
+  return {
+    required: actionIds.length > 0,
+    missingCredentialValues: {
+      count: missingCredentialValues.count || 0,
+      names: missingCredentialValues.names || [],
+      actionIds: missingCredentialValues.actionIds || [],
+    },
+    readySecretsPendingCloudImport: {
+      count: readySecretsPendingCloudImport.count || 0,
+      names: readySecretsPendingCloudImport.names || [],
+      actionIds: readySecretsPendingCloudImport.actionIds || [],
+    },
+    paidPurchaseConfirmationActionIds,
+    controlledSecretChannelActionIds,
+    actionIds,
+    userMustProvideOrConfirm: [
+      "DATABASE_URL_CN must come from Aliyun RDS PostgreSQL after schema/data migration validation and must only enter KMS/Secrets Manager/SAE secret env.",
+      "Ready local secret variables still need controlled Aliyun secret-env import; names can be reported, values must not be copied into JSON, Markdown, Docker images, git, chat, or shell history.",
+      "ACR purchase and registry/runtime pull credentials require action-time confirmation; registry password or pull secret must stay in Docker credential helper, RAM/KMS/Secrets Manager, or Aliyun runtime secret settings.",
+    ],
+    forbiddenStorage: credentialIntervention.forbiddenStorage || [],
+  }
+}
+
 function compactActionAuthorization(report) {
   const summary = report.summary || {}
   const closure = report.authorizationClosureBrief || {}
@@ -728,6 +819,14 @@ function renderMarkdown(report) {
     `- backendBlockers: ${report.cloudConfirmations.backendBlockers.join(", ") || "none"}`,
     `- wechatExcludedBlockers: ${report.cloudConfirmations.wechatExcludedBlockers.join(", ") || "none"}`,
     "",
+    "## Evidence Scope Breakdown",
+    "",
+    `- cloudConfirmationsBackendReady: ${report.backendEvidenceScopeBreakdown.summary.cloudConfirmationsBackendReady}`,
+    `- cloudResourceEvidenceReady: ${report.backendEvidenceScopeBreakdown.summary.cloudResourceEvidenceReady}`,
+    `- acrTrackedOutsideCloudConfirmations: ${report.backendEvidenceScopeBreakdown.summary.acrTrackedOutsideCloudConfirmations}`,
+    `- deferredAppLaunchExcluded: ${report.backendEvidenceScopeBreakdown.summary.deferredAppLaunchExcluded}`,
+    `- interpretation: ${report.backendEvidenceScopeBreakdown.interpretation.join(" ")}`,
+    "",
     "## Backend Targets",
     "",
     ...report.backendTargets.flatMap((target) => [
@@ -767,6 +866,15 @@ function renderMarkdown(report) {
     ...report.credentialIntervention.groups.flatMap((group) => [
       `- ${group.actionId}: ${group.category}; status=${group.status}; obtainFrom=${group.obtainFrom}; importTargets=${group.importTargets.join(", ") || "none"}`,
     ]),
+    "",
+    "## Credential / Password Intervention",
+    "",
+    `- required: ${report.credentialPasswordIntervention.required}`,
+    `- missingCredentialValues: ${report.credentialPasswordIntervention.missingCredentialValues.names.join(", ") || "none"}`,
+    `- readySecretsPendingCloudImport: ${report.credentialPasswordIntervention.readySecretsPendingCloudImport.count}`,
+    `- paidPurchaseConfirmationActionIds: ${report.credentialPasswordIntervention.paidPurchaseConfirmationActionIds.join(", ") || "none"}`,
+    `- controlledSecretChannelActionIds: ${report.credentialPasswordIntervention.controlledSecretChannelActionIds.join(", ") || "none"}`,
+    ...report.credentialPasswordIntervention.userMustProvideOrConfirm.map((item) => `- ${item}`),
     "",
     "## Deferred App Launch Scope",
     "",
