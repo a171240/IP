@@ -1,6 +1,6 @@
 # APP production-cn Aliyun backend apply package
 
-Generated at: 2026-06-25T12:14:22.691Z
+Generated at: 2026-06-25T14:13:38.797Z
 
 ## Scope
 
@@ -27,6 +27,21 @@ Generated at: 2026-06-25T12:14:22.691Z
 - blockedCredentialCount: 1
 - blockedCredentialNames: DATABASE_URL_CN
 - backendNowExcludes: WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET, WECHAT_OPEN_PLATFORM_MOBILE_APP, ANDROID_RELEASE_WECHAT_SIGNATURE
+
+## Credential / Password Intervention
+
+- required: true
+- missingCredentialValues: DATABASE_URL_CN
+- missingCredentialValueActionIds: S08_ALIYUN_RDS_DATABASE_URL
+- readySecretsPendingCloudImport: 17
+- readySecretsPendingCloudImportActionIds: S05_OSS_RAM_SECRET_OR_STS, S06_READY_SENSITIVE_ENV_IMPORT
+- paidPurchaseConfirmationActionIds: S03_ACR_PAID_PURCHASE
+- controlledSecretChannelActionIds: S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT
+- actionIds: S08_ALIYUN_RDS_DATABASE_URL, S05_OSS_RAM_SECRET_OR_STS, S06_READY_SENSITIVE_ENV_IMPORT, S04_ACR_REGISTRY_AUTH, S03_ACR_PAID_PURCHASE
+- forbiddenStorage: git, JSON/Markdown 报告, Docker image, App bundle, 小程序或 App 前端包
+- DATABASE_URL_CN must come from Aliyun RDS PostgreSQL after schema/data migration validation and must only enter KMS/Secrets Manager/SAE secret env.
+- Ready local secret variables still need controlled Aliyun secret-env import; names can be reported, values must not be copied into JSON, Markdown, Docker images, git, chat, or shell history.
+- ACR purchase and registry/runtime pull credentials require action-time confirmation; registry password or pull secret must stay in Docker credential helper, RAM/KMS/Secrets Manager, or Aliyun runtime secret settings.
 
 ## Apply Steps
 

@@ -77,7 +77,24 @@ test("Aliyun backend apply package separates immediate backend work from deferre
   ])
   assert.equal(report.summary.wechatExcludedFromBackend, true)
   assert.equal(report.summary.blockedCredentialCount, 1)
+  assert.deepEqual(report.summary.missingCredentialValues, ["DATABASE_URL_CN"])
+  assert.equal(report.summary.readySecretsPendingCloudImport, 17)
+  assert.deepEqual(report.summary.paidPurchaseConfirmationActionIds, ["S03_ACR_PAID_PURCHASE"])
+  assert.deepEqual(report.summary.controlledSecretChannelActionIds, [
+    "S04_ACR_REGISTRY_AUTH",
+    "S05_OSS_RAM_SECRET_OR_STS",
+    "S08_ALIYUN_RDS_DATABASE_URL",
+    "S06_READY_SENSITIVE_ENV_IMPORT",
+  ])
   assert.deepEqual(report.userIntervention.blockedCredentialNames, ["DATABASE_URL_CN"])
+  assert.equal(report.credentialPasswordIntervention.required, true)
+  assert.deepEqual(report.credentialPasswordIntervention.missingCredentialValues.names, ["DATABASE_URL_CN"])
+  assert.deepEqual(report.credentialPasswordIntervention.missingCredentialValues.actionIds, ["S08_ALIYUN_RDS_DATABASE_URL"])
+  assert.equal(report.credentialPasswordIntervention.readySecretsPendingCloudImport.count, 17)
+  assert.ok(report.credentialPasswordIntervention.readySecretsPendingCloudImport.names.includes("SUPABASE_SERVICE_ROLE_KEY"))
+  assert.deepEqual(report.credentialPasswordIntervention.paidPurchaseConfirmationActionIds, ["S03_ACR_PAID_PURCHASE"])
+  assert.ok(report.credentialPasswordIntervention.controlledSecretChannelActionIds.includes("S08_ALIYUN_RDS_DATABASE_URL"))
+  assert.ok(report.credentialPasswordIntervention.userMustProvideOrConfirm.some((item) => /DATABASE_URL_CN/.test(item)))
   assert.ok(report.summary.deferredAppLaunchBlocking.includes("WECHAT_OPEN_APP_ID"))
   assert.ok(report.summary.deferredAppLaunchBlocking.includes("WECHAT_OPEN_APP_SECRET"))
   assert.ok(!report.summary.backendRequiredBlocking.includes("WECHAT_OPEN_APP_ID"))
@@ -233,6 +250,12 @@ test("Aliyun backend apply package markdown is value-free and actionable", () =>
   assert.match(markdown, /corepack pnpm aliyun:operator:handoff:backend/)
   assert.match(markdown, /WECHAT_OPEN_APP_ID/)
   assert.match(markdown, /blockedCredentialNames: DATABASE_URL_CN/)
+  assert.match(markdown, /## Credential \/ Password Intervention/)
+  assert.match(markdown, /missingCredentialValues: DATABASE_URL_CN/)
+  assert.match(markdown, /missingCredentialValueActionIds: S08_ALIYUN_RDS_DATABASE_URL/)
+  assert.match(markdown, /readySecretsPendingCloudImport: 17/)
+  assert.match(markdown, /paidPurchaseConfirmationActionIds: S03_ACR_PAID_PURCHASE/)
+  assert.match(markdown, /controlledSecretChannelActionIds: S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT/)
   assert.match(markdown, /Every apply step still needs action-time confirmation/)
   assert.doesNotMatch(output + markdown, secretLike)
 })

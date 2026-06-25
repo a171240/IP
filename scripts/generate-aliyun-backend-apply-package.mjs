@@ -133,6 +133,7 @@ function buildReport(args) {
   const immediateBackendSteps = steps.filter((step) => step.canStartAfterActionTimeConfirmation).map((step) => step.id)
   const blockedBackendSteps = steps.filter((step) => !step.canStartAfterActionTimeConfirmation).map((step) => step.id)
   const userIntervention = buildUserIntervention({ sensitiveBlockers, backendStatus, cloudActions })
+  const credentialPasswordIntervention = buildCredentialPasswordIntervention(sensitiveBlockers)
   const report = {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -161,9 +162,14 @@ function buildReport(args) {
       rdsMigrationEvidenceReady: rdsEvidence.local?.ready === true,
       blockedCredentialCount: userIntervention.blockedCredentialNames.length,
       readySecretEnvVariableCount: userIntervention.readySecretEnvVariableNames.length,
+      missingCredentialValues: credentialPasswordIntervention.missingCredentialValues.names,
+      readySecretsPendingCloudImport: credentialPasswordIntervention.readySecretsPendingCloudImport.count,
+      paidPurchaseConfirmationActionIds: credentialPasswordIntervention.paidPurchaseConfirmationActionIds,
+      controlledSecretChannelActionIds: credentialPasswordIntervention.controlledSecretChannelActionIds,
     },
     applySteps: steps,
     userIntervention,
+    credentialPasswordIntervention,
     evidenceWritebackTargets: [
       "deploy/aliyun-production-cn.cloud-inventory-results.local.json",
       "deploy/aliyun-production-cn.rds-migration.local.json",
@@ -207,6 +213,53 @@ function buildReport(args) {
     report.containsValues = true
   }
   return report
+}
+
+function buildCredentialPasswordIntervention(sensitiveBlockers) {
+  const intervention = sensitiveBlockers.credentialPasswordIntervention || {}
+  const brief = sensitiveBlockers.credentialInterventionBrief || {}
+  const breakdown = brief.interventionBreakdown || {}
+  const missingCredentialValues = intervention.missingCredentialValues ||
+    breakdown.missingCredentialValues ||
+    { count: (brief.blockedCredentialNames || []).length, names: brief.blockedCredentialNames || [], actionIds: [] }
+  const readySecretsPendingCloudImport = intervention.readySecretsPendingCloudImport ||
+    breakdown.readySecretsPendingCloudImport ||
+    { count: (brief.readySecretEnvVariableNames || []).length, names: brief.readySecretEnvVariableNames || [], actionIds: [] }
+  const paidPurchaseConfirmationActionIds = intervention.paidPurchaseConfirmationActionIds ||
+    breakdown.paidPurchaseConfirmationActionIds ||
+    []
+  const controlledSecretChannelActionIds = intervention.controlledSecretChannelActionIds ||
+    breakdown.controlledSecretChannelActionIds ||
+    []
+  const actionIds = intervention.actionIds || [
+    ...(missingCredentialValues.actionIds || []),
+    ...(readySecretsPendingCloudImport.actionIds || []),
+    ...paidPurchaseConfirmationActionIds,
+    ...controlledSecretChannelActionIds,
+  ].filter((item, index, items) => item && items.indexOf(item) === index)
+
+  return {
+    required: intervention.required !== false && actionIds.length > 0,
+    missingCredentialValues: {
+      count: missingCredentialValues.count || 0,
+      names: missingCredentialValues.names || [],
+      actionIds: missingCredentialValues.actionIds || [],
+    },
+    readySecretsPendingCloudImport: {
+      count: readySecretsPendingCloudImport.count || 0,
+      names: readySecretsPendingCloudImport.names || [],
+      actionIds: readySecretsPendingCloudImport.actionIds || [],
+    },
+    paidPurchaseConfirmationActionIds,
+    controlledSecretChannelActionIds,
+    actionIds,
+    userMustProvideOrConfirm: intervention.userMustProvideOrConfirm || [
+      "DATABASE_URL_CN must come from Aliyun RDS PostgreSQL and must only enter KMS/Secrets Manager/SAE secret env.",
+      "Ready local secret variables still need controlled Aliyun secret-env import; values must not be copied into reports, images, git, chat, or shell history.",
+      "ACR purchase and registry/runtime pull credentials require action-time confirmation.",
+    ],
+    forbiddenStorage: intervention.forbiddenStorage || brief.forbiddenStorage || [],
+  }
 }
 
 function buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEvidence }) {
@@ -701,6 +754,10 @@ function renderMarkdown(report) {
     `- blockedCredentialNames: ${report.userIntervention.blockedCredentialNames.join(", ") || "none"}`,
     `- backendNowExcludes: ${report.userIntervention.backendNowExcludes.join(", ")}`,
     "",
+    "## Credential / Password Intervention",
+    "",
+    ...renderCredentialPasswordIntervention(report.credentialPasswordIntervention),
+    "",
     "## Apply Steps",
     "",
     ...report.applySteps.flatMap((step) => [
@@ -734,6 +791,21 @@ function renderMarkdown(report) {
     ...report.safetyBoundary.map((item) => `- ${item}`),
     "",
   ].join("\n")
+}
+
+function renderCredentialPasswordIntervention(intervention) {
+  return [
+    `- required: ${intervention.required}`,
+    `- missingCredentialValues: ${intervention.missingCredentialValues.names.join(", ") || "none"}`,
+    `- missingCredentialValueActionIds: ${intervention.missingCredentialValues.actionIds.join(", ") || "none"}`,
+    `- readySecretsPendingCloudImport: ${intervention.readySecretsPendingCloudImport.count}`,
+    `- readySecretsPendingCloudImportActionIds: ${intervention.readySecretsPendingCloudImport.actionIds.join(", ") || "none"}`,
+    `- paidPurchaseConfirmationActionIds: ${intervention.paidPurchaseConfirmationActionIds.join(", ") || "none"}`,
+    `- controlledSecretChannelActionIds: ${intervention.controlledSecretChannelActionIds.join(", ") || "none"}`,
+    `- actionIds: ${intervention.actionIds.join(", ") || "none"}`,
+    `- forbiddenStorage: ${intervention.forbiddenStorage.join(", ") || "none"}`,
+    ...intervention.userMustProvideOrConfirm.map((item) => `- ${item}`),
+  ]
 }
 
 function findSecretLikeValues(value, path = "$") {
