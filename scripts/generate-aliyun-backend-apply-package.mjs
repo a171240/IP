@@ -178,6 +178,7 @@ function buildReport(args) {
       "corepack pnpm aliyun:action:authorization:backend",
       "corepack pnpm aliyun:cloudshell:handoff",
       "corepack pnpm aliyun:cloud:inventory-results:strict",
+      "corepack pnpm aliyun:rds:migration:package",
       "corepack pnpm aliyun:rds:migration:evidence",
       "corepack pnpm aliyun:cloud:confirmations",
       "corepack pnpm aliyun:image:plan",
@@ -292,6 +293,7 @@ function buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEv
         `firstVersionRdsRoutesTouchingSupabaseCompatibility=${rdsEvidence.summary?.firstVersionRdsRoutesWithSupabase || 0}/${rdsEvidence.summary?.firstVersionRdsRouteCount || 0}`,
         `firstVersionRdsRoutesWithSupabaseDataAccess=${rdsEvidence.summary?.firstVersionRdsRoutesWithSupabaseDataAccess || 0}/${rdsEvidence.summary?.firstVersionRdsRouteCount || 0}`,
         `postgresDataAccessAdapterDetected=${rdsEvidence.summary?.postgresDataAccessAdapterDetected === true}`,
+        "rdsMigrationPackageHandoff=docs/app-production-cn-rds-migration-package.md",
       ],
       currentBlockers: [
         ...filterPresent(statusBlockers, [
@@ -303,6 +305,7 @@ function buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEv
         ...(rdsEvidence.local?.blockers || []).map((item) => `rdsEvidence:${item}`),
       ],
       writeTargets: [
+        "docs/app-production-cn-rds-migration-package.md -> non-secret schema/validation/rollback package digest handoff",
         "deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres/sourceInventory/migration/security",
         "DATABASE_URL_CN -> Aliyun KMS / Secrets Manager / SAE secret env only",
       ],
@@ -321,6 +324,7 @@ function buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEv
         "schema/data/row-count/critical-record/rollback validation handles",
       ],
       verifyCommands: [
+        "corepack pnpm aliyun:rds:migration:package",
         "corepack pnpm aliyun:rds:migration:plan",
         "corepack pnpm aliyun:rds:migration:evidence:strict",
         "corepack pnpm aliyun:backend-cn:status",
