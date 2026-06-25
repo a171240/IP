@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 当前阻塞简报
 
-Generated: 2026-06-25T08:21:04.383Z
+Generated: 2026-06-25T11:09:04.627Z
 
 ## 结论
 
@@ -38,7 +38,7 @@ Generated: 2026-06-25T08:21:04.383Z
 - canStartNowConsoleTasks: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS
 - canStartNowWritebackTaskCount: 2
 - blockedByConsoleTaskDependencies: C01_SAE_RUNTIME, C03_API_DOMAIN_HTTPS_ICP, C04_ASSET_DOMAIN_HTTPS_ICP, C06_ENV_IMPORT, C07_SLS_ALERTS
-- canStartNowAuthorizationPackets: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
+- canStartNowAuthorizationPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
 - blockedByAuthorizationPacketDependencies: P04_ACR_IMAGE_AND_PULL, P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS, P09_PRODUCTION_DEPLOY
 - cloudConfirmationsReady: 0/7
 - operatorTasksReady: 1/9
@@ -237,11 +237,12 @@ Generated: 2026-06-25T08:21:04.383Z
 
 - canStartNowConsoleTasks: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS
 - blockedByConsoleTaskDependencies: C01_SAE_RUNTIME, C03_API_DOMAIN_HTTPS_ICP, C04_ASSET_DOMAIN_HTTPS_ICP, C06_ENV_IMPORT, C07_SLS_ALERTS
-- canStartNowAuthorizationPackets: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
+- canStartNowAuthorizationPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
 - blockedByAuthorizationPacketDependencies: P04_ACR_IMAGE_AND_PULL, P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS, P09_PRODUCTION_DEPLOY
 
 | 授权包 | 动作 | owner | 最小确认语 | 非密钥证据 |
 | --- | --- | --- | --- | --- |
+| `P00_ALIYUN_READONLY_INVENTORY_IDENTITY` | 恢复阿里云 CLI/CloudShell 只读盘点身份 | 用户/阿里云只读盘点操作员 | 授权重新连接阿里云 CloudShell 或配置 Aliyun CLI，只运行 allowlisted 只读盘点命令并写入非密钥 evidence。 | true |
 | `P03_ACR_PURCHASE` | 确认 ACR 企业版付费购买 | 用户/阿里云 ACR 操作员 | 授权购买 ACR Enterprise Economic，cn-hangzhou，1 个月，当前报价 CNY 117.00。 | true |
 | `P05_OSS_RAM_STS` | 绑定 OSS RAM 最小权限或 STS/运行时角色方案 | 阿里云 OSS/RAM 操作员 | 授权为服务记录音频 OSS 配置最小权限 RAM/STS 或运行时角色，并只通过密钥环境注入。 | false |
 | `P11_ALIYUN_RDS_DATA_MIGRATION` | 创建阿里云 RDS PostgreSQL 并完成正式数据层迁移 | 阿里云 RDS/后端数据迁移操作员 | 授权创建/确认阿里云 RDS PostgreSQL production-cn 数据库并完成数据迁移；DATABASE_URL_CN 只能进入阿里云 secret env。 | false |
@@ -345,6 +346,15 @@ Generated: 2026-06-25T08:21:04.383Z
   - postdeploy service-records upload smoke after API deployment
 
 ## 当前可开始但必须动作时确认
+
+### P00_ALIYUN_READONLY_INVENTORY_IDENTITY
+
+- title: 恢复阿里云 CLI/CloudShell 只读盘点身份
+- owner: 用户/阿里云只读盘点操作员
+- minimumUserPhrase: 授权重新连接阿里云 CloudShell 或配置 Aliyun CLI，只运行 allowlisted 只读盘点命令并写入非密钥 evidence。
+- writeTargets: deploy/aliyun-production-cn.cloud-inventory-results.local.json -> non-secret read-only inventory summaries
+- verifyCommands: corepack pnpm aliyun:cloud:access; MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1 corepack pnpm aliyun:cloud:inventory-run -- --execute-readonly --write-local deploy/aliyun-production-cn.cloud-inventory-results.local.json; corepack pnpm aliyun:cloud:inventory-results:strict; corepack pnpm aliyun:evidence:writeback:backend
+- nonSecretEvidenceOnly: true
 
 ### P03_ACR_PURCHASE
 
@@ -454,7 +464,7 @@ Generated: 2026-06-25T08:21:04.383Z
 - currentBrowserRunning: true
 - currentBrowserCanUseCurrentConsole: true
 - currentBrowserAliyunConsoleTabCount: 1
-- currentBrowserAliyunConsoleHostPaths: home.console.aliyun.com/home/dashboard/ProductAndService
+- currentBrowserAliyunConsoleHostPaths: saenext.console.aliyun.com/overview
 - currentBrowserCloudApiCalled: false
 - currentBrowserCloudMutationPerformed: false
 - currentBrowserBlockers: none
