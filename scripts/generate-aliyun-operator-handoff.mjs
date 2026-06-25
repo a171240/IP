@@ -30,6 +30,7 @@ const APP_LAUNCH_DEFERRED_ACTION_IDS = new Set([
   "S02_APPLE_TEAM_ID",
   "S07_ANDROID_RELEASE_SIGNING",
 ])
+const APP_LAUNCH_BLOCKER_PATTERN = /WECHAT_OPEN|wechat_open_platform|APPLE_TEAM_ID|apple_team_id|app_native|app_universal_link|legalLinks|PRIVACY_POLICY_URL|TERMS_URL|Android release signing|MEIYE_RELEASE_/i
 const BACKEND_ONLY_PRIORITY_TASK_IDS = Object.freeze([
   "T04_ALIYUN_DOMAIN_DNS_HTTPS",
   "T03_ALIYUN_RUNTIME_CONTAINER",
@@ -377,8 +378,22 @@ function compactConsoleTask(task) {
   }
 }
 
-function buildAliyunConsoleTaskOrder(consoleRunbook) {
-  const tasks = (consoleRunbook.consoleTasks || []).map(compactConsoleTask)
+function isAppLaunchBlocker(value) {
+  return APP_LAUNCH_BLOCKER_PATTERN.test(String(value || ""))
+}
+
+function scopeConsoleTask(task, options = {}) {
+  if (!options.backendOnly) return task
+  return {
+    ...task,
+    currentBlockers: (task.currentBlockers || []).filter((item) => !isAppLaunchBlocker(item)),
+  }
+}
+
+function buildAliyunConsoleTaskOrder(consoleRunbook, options = {}) {
+  const tasks = (consoleRunbook.consoleTasks || [])
+    .map((task) => scopeConsoleTask(task, options))
+    .map(compactConsoleTask)
   return {
     sourceCommand: "corepack pnpm aliyun:console:runbook",
     resourceReady: consoleRunbook.summary?.resourceReady || "unknown",
@@ -475,7 +490,9 @@ function buildHandoff({
   vercelEnvCoverage,
 }) {
   const tasks = operatorTasks.tasks || []
-  const aliyunConsoleTaskOrder = buildAliyunConsoleTaskOrder(consoleRunbook)
+  const aliyunConsoleTaskOrder = buildAliyunConsoleTaskOrder(consoleRunbook, {
+    backendOnly: args.backendOnly,
+  })
   const machineBlocking = status.summary?.machineBlocking || []
   const waitingWechatReview = status.summary?.operatorTasks?.waitingWechatReview || 0
   const appLaunchBlocking = buildAppLaunchBlocking(envPlan.variables, machineBlocking)

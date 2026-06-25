@@ -98,6 +98,7 @@ test("Aliyun operator handoff backend-only mode excludes deferred APP launch wor
   const userActionTitles = report.userActionNow.map((item) => item.title)
   const priorityTaskIds = report.priorityTasks.map((item) => item.id)
   const envImportTask = report.priorityTasks.find((item) => item.id === "T06_ALIYUN_ENV_IMPORT")
+  const consoleEnvImportTask = report.aliyunConsoleTaskOrder.tasks.find((item) => item.id === "C06_ENV_IMPORT")
   const requiredVariableNames = report.missingVariables.required.map((item) => item.name)
 
   assert.equal(report.currentScope, "backend_aliyun_only")
@@ -140,6 +141,9 @@ test("Aliyun operator handoff backend-only mode excludes deferred APP launch wor
   assert.ok(envImportTask.evidence.includes("requiredBlocking=DATABASE_URL_CN"))
   assert.ok(!envImportTask.blockerCodes.some((item) => /WECHAT_OPEN_APP|APPLE_TEAM_ID/.test(item)))
   assert.ok(!envImportTask.actions.some((item) => /微信开放平台/.test(item)))
+  assert.ok(consoleEnvImportTask)
+  assert.ok(consoleEnvImportTask.currentBlockers.includes("requiredEnv:DATABASE_URL_CN"))
+  assert.ok(!consoleEnvImportTask.currentBlockers.some((item) => /WECHAT_OPEN_APP|APPLE_TEAM_ID|MEIYE_RELEASE_/.test(item)))
   assert.deepEqual(userActionTitles, [
     "授权 RDS PostgreSQL 和数据迁移",
     "确认 OSS RAM/STS 最小权限",
