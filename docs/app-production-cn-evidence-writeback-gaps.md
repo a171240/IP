@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 阿里云证据回填清单
 
-Generated: 2026-06-25T09:49:40.799Z
+Generated: 2026-06-25T13:55:25.440Z
 
 ## 当前结论
 
@@ -28,30 +28,125 @@ Generated: 2026-06-25T09:49:40.799Z
 - partiallyObservedResourceEvidenceIds: R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS
 - writeTargets: /Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.rds-migration.local.json, /Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.cloud-inventory-results.local.json, /Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.cloud-confirmations.local.json, /Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.image-publish.local.json
 
+## 按动作包排序的证据回填
+
+- canStartNowPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
+- blockedByDependencyPacketIds: P04_ACR_IMAGE_AND_PULL, P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS
+- secretOrCredentialPacketIds: P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION, P06_ENV_IMPORT
+
+### P00_ALIYUN_READONLY_INVENTORY_IDENTITY
+
+- status: can_start_after_action_time_confirmation
+- nonSecretEvidenceOnly: true
+- gapCount: 1
+- groupKeys: cloudInventoryResults
+- jsonPaths: operations[*].commandResults[*]
+- writeTargets: deploy/aliyun-production-cn.cloud-inventory-results.local.json
+- forbiddenValueClasses: AccessKeySecret, AppSecret, RAM Secret, Supabase service role key, cookie, registry password, token, 证书私钥
+- strictVerifyCommands: corepack pnpm aliyun:cloud:inventory-results:strict
+
+### P03_ACR_PURCHASE
+
+- status: can_start_after_action_time_confirmation
+- nonSecretEvidenceOnly: true
+- gapCount: 3
+- groupKeys: imagePublish
+- jsonPaths: acr.registryHost, acr.namespace, acr.confirmed
+- writeTargets: deploy/aliyun-production-cn.image-publish.local.json -> acr
+- forbiddenValueClasses: AccessKeySecret, AppSecret, RAM Secret, Supabase service role key, cookie, registry password, token
+- strictVerifyCommands: corepack pnpm aliyun:image:plan:strict
+
+### P05_OSS_RAM_STS
+
+- status: can_start_after_action_time_confirmation
+- nonSecretEvidenceOnly: false
+- gapCount: 2
+- groupKeys: cloudConfirmations
+- jsonPaths: items.oss.confirmed, items.oss.ramLeastPrivilege
+- writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss
+- forbiddenValueClasses: AccessKeySecret, AppSecret, RAM Secret, Supabase service role key, cookie, registry password, token
+- strictVerifyCommands: corepack pnpm aliyun:cloud:confirmations:strict
+
+### P11_ALIYUN_RDS_DATA_MIGRATION
+
+- status: can_start_after_action_time_confirmation
+- nonSecretEvidenceOnly: false
+- gapCount: 16
+- groupKeys: rdsMigration
+- jsonPaths: rdsPostgres.instanceId, rdsPostgres.engineVersion, rdsPostgres.networkAccess, rdsPostgres.databaseName, rdsPostgres.evidence, rdsPostgres.confirmed, rdsPostgres.databaseAccountReady, rdsPostgres.databaseUrlCnSecretImported, migration.schemaMigrated, migration.dataMigrated, migration.rowCountValidationPassed, migration.criticalRecordValidationPassed, migration.appApiSmokeOnRdsPassed, migration.supabaseNoLongerFormalTarget, migration.rollbackRunbookReviewed, migration.rollbackValidationPassed
+- writeTargets: deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.instanceId; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.engineVersion; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.networkAccess; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.databaseName; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.evidence; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.confirmed; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.databaseAccountReady; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.databaseUrlCnSecretImported; deploy/aliyun-production-cn.rds-migration.local.json -> migration.schemaMigrated; deploy/aliyun-production-cn.rds-migration.local.json -> migration.dataMigrated; deploy/aliyun-production-cn.rds-migration.local.json -> migration.rowCountValidationPassed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.criticalRecordValidationPassed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.appApiSmokeOnRdsPassed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.supabaseNoLongerFormalTarget; deploy/aliyun-production-cn.rds-migration.local.json -> migration.rollbackRunbookReviewed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.rollbackValidationPassed
+- forbiddenValueClasses: AccessKeySecret, DATABASE_URL_CN value, Supabase service role key, customer data, database password, dump contents, token
+- strictVerifyCommands: corepack pnpm aliyun:rds:migration:evidence:strict
+
+### P04_ACR_IMAGE_AND_PULL
+
+- status: blocked_by_dependency
+- nonSecretEvidenceOnly: true
+- gapCount: 8
+- groupKeys: imagePublish
+- jsonPaths: acr.remoteImage, acr.remoteDigest, acr.evidence, acr.imagePushed, acr.digestVerified, runtime.remoteImageConfigured, runtime.imagePullConfigured
+- writeTargets: deploy/aliyun-production-cn.image-publish.local.json -> acr; deploy/aliyun-production-cn.image-publish.local.json -> runtime
+- forbiddenValueClasses: AccessKeySecret, AppSecret, RAM Secret, Supabase service role key, cookie, registry password, token
+- strictVerifyCommands: corepack pnpm aliyun:image:plan:strict
+
+### P06_ENV_IMPORT
+
+- status: blocked_by_dependency
+- nonSecretEvidenceOnly: false
+- gapCount: 4
+- groupKeys: cloudConfirmations
+- jsonPaths: items.envImport.importedAt, items.envImport.evidence, items.envImport.confirmed, items.envImport.secretNotInImage
+- writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport
+- forbiddenValueClasses: AccessKeySecret, AppSecret, RAM Secret, Supabase service role key, cookie, registry password, token
+- strictVerifyCommands: corepack pnpm aliyun:cloud:confirmations:strict
+
+### P07_DOMAIN_DNS_HTTPS
+
+- status: blocked_by_dependency
+- nonSecretEvidenceOnly: true
+- gapCount: 8
+- groupKeys: cloudConfirmations
+- jsonPaths: items.apiDomainHttps.confirmed, items.apiDomainHttps.dnsResolvedToAliyun, items.apiDomainHttps.httpsEnabled, items.apiDomainHttps.icpReady, items.assetDomainHttps.confirmed, items.assetDomainHttps.dnsResolvedToAliyun, items.assetDomainHttps.httpsEnabled, items.assetDomainHttps.icpReady
+- writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps
+- forbiddenValueClasses: AccessKeySecret, AppSecret, RAM Secret, Supabase service role key, cookie, registry password, token
+- strictVerifyCommands: corepack pnpm aliyun:cloud:confirmations:strict
+
+### P08_SAE_RUNTIME_SLS
+
+- status: blocked_by_dependency
+- nonSecretEvidenceOnly: true
+- gapCount: 5
+- groupKeys: cloudConfirmations, imagePublish
+- jsonPaths: items.runtime.confirmed, items.slsAlerts.confirmed, items.slsAlerts.healthAlertConfigured, items.slsAlerts.serverErrorAlertConfigured, runtime.confirmed
+- writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.runtime; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.slsAlerts; deploy/aliyun-production-cn.image-publish.local.json -> runtime
+- forbiddenValueClasses: AccessKeySecret, AppSecret, RAM Secret, Supabase service role key, cookie, registry password, token
+- strictVerifyCommands: corepack pnpm aliyun:cloud:confirmations:strict; corepack pnpm aliyun:image:plan:strict
+
+
 ## 已观测但未闭环的资源证据
 
 - R01_SAE_RUNTIME: observed=not_created_or_not_confirmed, readiness=blocked
-  - currentEvidence: chrome_sae_app_list_2026-06-24T00:00_CST_cn-hangzhou_huadong1_hangzhou_no_instances_target_app_meiye-huajing-app-api-production-cn_not_present_runtime_not_confirmed; observedResourceStatus=not_created_or_not_confirmed; observedResourceReadiness=blocked
+  - currentEvidence: chrome_sae_app_list_2026-06-25T19:47_CST_cn-hangzhou_huadong1_hangzhou_no_instances_target_app_meiye-huajing-app-api-production-cn_not_present_runtime_not_confirmed; observedResourceStatus=not_created_or_not_confirmed; observedResourceReadiness=blocked
   - missingEvidence: runtime:confirmed; observed:not_created_or_not_confirmed
   - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.runtime
   - nextEvidenceAction: confirm resource in Aliyun console or allowlisted readonly inventory, then write non-secret evidence to the configured .local.json target
 - R02_ACR_IMAGE_REGISTRY: observed=purchase_candidate_visible_not_purchased, readiness=blocked
-  - currentEvidence: imagePublish.localExists=true; imagePublish.localReady=false; image.localDigestReady=true; localDockerImage.status=ready; localDockerImage.repoDigest=meiye-huajing-app-api@sha256:494907a4f9e7342064dda55fe30e0e48dd245b6d6ae753bdbb3945f77c0f518d; acr.purchaseCandidate.edition=ACR Enterprise Economic; acr.purchaseCandidate.region=cn-hangzhou; acr.purchaseCandidate.duration=1 month; acr.purchaseCandidate.quotedAmount=CNY 117.00; acr.purchaseCandidate.confirmed=false; acr.purchaseCandidate.requiresActionTimePurchaseConfirmation=true; acr.purchaseCandidate.evidence=chrome_acr_buy_page_2026-06-22T19:08_CST_enterprise_economic_cn-hangzhou_instance_meiye-huajing_duration_1month_payable_cny117_not_purchased_action_time_confirmation_required; runtime.target=SAE; runtime.appName=meiye-huajing-app-api-production-cn; runtime.remoteImageConfigured=false; runtime.imagePullConfigured=false; observedResourceStatus=purchase_candidate_visible_not_purchased; observedResourceReadiness=blocked
+  - currentEvidence: imagePublish.localExists=true; imagePublish.localReady=false; image.localDigestReady=true; localDockerImage.status=ready; localDockerImage.repoDigest=meiye-huajing-app-api@sha256:494907a4f9e7342064dda55fe30e0e48dd245b6d6ae753bdbb3945f77c0f518d; acr.purchaseCandidate.edition=ACR Enterprise Economic; acr.purchaseCandidate.region=cn-hangzhou; acr.purchaseCandidate.duration=1 month; acr.purchaseCandidate.quotedAmount=CNY 117.00; acr.purchaseCandidate.confirmed=false; acr.purchaseCandidate.requiresActionTimePurchaseConfirmation=true; acr.purchaseCandidate.evidence=chrome_acr_instances_2026-06-25T19:47_CST_enterprise_instance_list_visible_create_enterprise_instance_entry_visible_no_meiye_target_instance_or_repository_confirmed_not_purchased_action_time_confirmation_required; runtime.target=SAE; runtime.appName=meiye-huajing-app-api-production-cn; runtime.remoteImageConfigured=false; runtime.imagePullConfigured=false; observedResourceStatus=purchase_candidate_visible_not_purchased; observedResourceReadiness=blocked
   - missingEvidence: imagePublishLocal:todo:acr.registryHost; imagePublishLocal:todo:acr.namespace; imagePublishLocal:todo:acr.remoteImage; imagePublishLocal:todo:acr.remoteDigest; imagePublishLocal:todo:acr.evidence; imagePublishLocal:acr.confirmed; imagePublishLocal:acr.imagePushed; imagePublishLocal:acr.digestVerified; imagePublishLocal:acr.remoteDigest=sha256; imagePublishLocal:runtime.confirmed; imagePublishLocal:runtime.remoteImageConfigured; imagePublishLocal:runtime.imagePullConfigured; observed:purchase_candidate_visible_not_purchased
   - writeTargets: deploy/aliyun-production-cn.image-publish.local.json -> acr + runtime
   - nextEvidenceAction: complete ACR purchase/repository evidence first, then image push/digest and SAE pull evidence after action-time confirmation
 - R03_API_DOMAIN_HTTPS: observed=domain_visible_records_missing, readiness=blocked
-  - currentEvidence: chrome_dns_console_2026-06-24T00:05_CST_ipgongchang_xin_search_api-cn_no_data_existing_api_A_106.14.241.129_public_dns_api-cn_198.18.0.30_https_ECONNRESET_no_sae_endpoint_no_https_icp_ready; observedResourceStatus=domain_visible_records_missing; observedResourceReadiness=blocked
+  - currentEvidence: chrome_dns_console_2026-06-25T19:47_CST_ipgongchang_xin_exact_search_api-cn_no_data_total_0_existing_api_A_106.14.241.129_no_sae_endpoint_no_https_icp_ready; observedResourceStatus=domain_visible_records_missing; observedResourceReadiness=blocked
   - missingEvidence: APP_API_BASE_URL:dns_special_use_wildcard_ip; APP_API_BASE_URL:https_not_ready:ECONNRESET; NEXT_PUBLIC_SITE_URL:dns_special_use_wildcard_ip; NEXT_PUBLIC_SITE_URL:https_not_ready:ECONNRESET; APP_ASSET_BASE_URL:dns_special_use_wildcard_ip; APP_ASSET_BASE_URL:https_not_ready:ECONNRESET; apiDomainHttps:confirmed; apiDomainHttps:dnsResolvedToAliyun; apiDomainHttps:httpsEnabled; apiDomainHttps:icpReady; assetDomainHttps:confirmed; assetDomainHttps:dnsResolvedToAliyun; assetDomainHttps:httpsEnabled; assetDomainHttps:icpReady; observed:domain_visible_records_missing
   - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps
   - nextEvidenceAction: obtain action-time confirmation, perform only the named console action, then write non-secret evidence to the configured .local.json target
 - R04_ASSET_DOMAIN_HTTPS: observed=domain_visible_records_missing, readiness=blocked
-  - currentEvidence: chrome_dns_console_2026-06-24T00:05_CST_ipgongchang_xin_search_assets-cn_no_data_public_dns_assets-cn_198.18.0.32_https_ECONNRESET_no_cdn_or_oss_custom_domain_no_https_icp_ready; observedResourceStatus=domain_visible_records_missing; observedResourceReadiness=blocked
+  - currentEvidence: chrome_dns_console_2026-06-25T19:47_CST_ipgongchang_xin_exact_search_assets-cn_no_data_total_0_no_cdn_or_oss_custom_domain_no_https_icp_ready; observedResourceStatus=domain_visible_records_missing; observedResourceReadiness=blocked
   - missingEvidence: APP_API_BASE_URL:dns_special_use_wildcard_ip; APP_API_BASE_URL:https_not_ready:ECONNRESET; NEXT_PUBLIC_SITE_URL:dns_special_use_wildcard_ip; NEXT_PUBLIC_SITE_URL:https_not_ready:ECONNRESET; APP_ASSET_BASE_URL:dns_special_use_wildcard_ip; APP_ASSET_BASE_URL:https_not_ready:ECONNRESET; apiDomainHttps:confirmed; apiDomainHttps:dnsResolvedToAliyun; apiDomainHttps:httpsEnabled; apiDomainHttps:icpReady; assetDomainHttps:confirmed; assetDomainHttps:dnsResolvedToAliyun; assetDomainHttps:httpsEnabled; assetDomainHttps:icpReady; observed:domain_visible_records_missing
   - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps
   - nextEvidenceAction: obtain action-time confirmation, perform only the named console action, then write non-secret evidence to the configured .local.json target
 - R05_OSS_AUDIO_STORAGE: observed=bucket_visible_unconfirmed, readiness=partial
-  - currentEvidence: cloudshell_oss_cors_ram_2026-06-24T01:30_CST_bucket_exists_acl_private_cors_allowed_origins_api-cn_assets-cn_methods_GET_POST_PUT_HEAD_policy_MeiyeHuajingServiceRecordsOssPolicy_exists_attachmentCount_0_ram_least_privilege_not_bound; observedResourceStatus=bucket_visible_unconfirmed; observedResourceReadiness=partial
+  - currentEvidence: chrome_oss_bucket_2026-06-25T19:47_CST_bucket_exists_meiye-huajing-service-records-production-cn_visible_oss-cn-hangzhou_overview_object_page_prefix_service-records-production-cn_ram_sts_not_confirmed; observedResourceStatus=bucket_visible_unconfirmed; observedResourceReadiness=partial
   - missingEvidence: oss:confirmed; oss:ramLeastPrivilege; observed:bucket_visible_unconfirmed
   - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss
   - nextEvidenceAction: confirm resource in Aliyun console or allowlisted readonly inventory, then write non-secret evidence to the configured .local.json target
@@ -61,7 +156,7 @@ Generated: 2026-06-25T09:49:40.799Z
   - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport; 阿里云 SAE 环境变量 / KMS / Secrets Manager
   - nextEvidenceAction: import ready variables through SAE/KMS/Secrets Manager secret env after action-time confirmation, then run env/checklist and sensitive/blockers
 - R07_SLS_ALERTS: observed=project_logstore_visible_alerts_pending, readiness=partial
-  - currentEvidence: cloudshell_sls_2026-06-24T01:30_CST_project_meiye-huajing-app-prod-cn_logstore_app-api_exists_alerts_0_dashboards_0_health_5xx_alerts_not_configured; observedResourceStatus=project_logstore_visible_alerts_pending; observedResourceReadiness=partial
+  - currentEvidence: chrome_sls_2026-06-25T19:47_CST_project_meiye-huajing-app-prod-cn_logstore_app-api_visible_logstore_empty_index_not_enabled_health_5xx_alerts_not_configured; observedResourceStatus=project_logstore_visible_alerts_pending; observedResourceReadiness=partial
   - missingEvidence: slsAlerts:confirmed; slsAlerts:healthAlertConfigured; slsAlerts:serverErrorAlertConfigured; observed:project_logstore_visible_alerts_pending
   - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.slsAlerts
   - nextEvidenceAction: confirm resource in Aliyun console or allowlisted readonly inventory, then write non-secret evidence to the configured .local.json target

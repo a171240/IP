@@ -86,6 +86,41 @@ test("Aliyun evidence writeback backend-only mode excludes deferred APP launch g
   assert.equal(report.summary.cloudInventoryResultGaps, 1)
   assert.equal(report.summary.cloudConfirmationGaps, 18)
   assert.equal(report.summary.totalGaps, 47)
+  assert.deepEqual(report.summary.actionableCanStartNowPacketIds, [
+    "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
+    "P03_ACR_PURCHASE",
+    "P05_OSS_RAM_STS",
+    "P11_ALIYUN_RDS_DATA_MIGRATION",
+  ])
+  assert.deepEqual(report.summary.actionableBlockedByDependencyPacketIds, [
+    "P04_ACR_IMAGE_AND_PULL",
+    "P06_ENV_IMPORT",
+    "P07_DOMAIN_DNS_HTTPS",
+    "P08_SAE_RUNTIME_SLS",
+  ])
+  assert.deepEqual(report.summary.actionableSecretOrCredentialPacketIds, [
+    "P05_OSS_RAM_STS",
+    "P11_ALIYUN_RDS_DATA_MIGRATION",
+    "P06_ENV_IMPORT",
+  ])
+  assert.equal(report.actionableWritebackSequence.currentScope, "backend_aliyun_only")
+  assert.equal(report.actionableWritebackSequence.packetCount, 8)
+  assert.deepEqual(report.actionableWritebackSequence.canStartNowPacketIds, report.summary.actionableCanStartNowPacketIds)
+  assert.deepEqual(report.actionableWritebackSequence.blockedByDependencyPacketIds, report.summary.actionableBlockedByDependencyPacketIds)
+  const packetById = new Map(report.actionableWritebackSequence.packets.map((item) => [item.packetId, item]))
+  assert.equal(packetById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").status, "can_start_after_action_time_confirmation")
+  assert.equal(packetById.get("P03_ACR_PURCHASE").gapCount, 3)
+  assert.deepEqual(packetById.get("P03_ACR_PURCHASE").groupKeys, ["imagePublish"])
+  assert.equal(packetById.get("P05_OSS_RAM_STS").nonSecretEvidenceOnly, false)
+  assert.ok(packetById.get("P05_OSS_RAM_STS").jsonPaths.includes("items.oss.ramLeastPrivilege"))
+  assert.equal(packetById.get("P11_ALIYUN_RDS_DATA_MIGRATION").gapCount, 16)
+  assert.ok(packetById.get("P11_ALIYUN_RDS_DATA_MIGRATION").jsonPaths.includes("rdsPostgres.databaseUrlCnSecretImported"))
+  assert.equal(packetById.get("P04_ACR_IMAGE_AND_PULL").status, "blocked_by_dependency")
+  assert.equal(packetById.get("P06_ENV_IMPORT").nonSecretEvidenceOnly, false)
+  assert.ok(packetById.get("P06_ENV_IMPORT").jsonPaths.includes("items.envImport.secretNotInImage"))
+  assert.equal(packetById.get("P08_SAE_RUNTIME_SLS").status, "blocked_by_dependency")
+  assert.ok(packetById.get("P08_SAE_RUNTIME_SLS").groupKeys.includes("cloudConfirmations"))
+  assert.ok(packetById.get("P08_SAE_RUNTIME_SLS").groupKeys.includes("imagePublish"))
   assert.equal(report.summary.rdsMigrationGaps, report.writebackGroups.rdsMigration.gaps.length)
   assert.equal(report.summary.cloudConfirmationGaps, report.writebackGroups.cloudConfirmations.gaps.length)
   assert.ok(rdsPaths.includes("rdsPostgres.databaseUrlCnSecretImported"))
@@ -129,6 +164,11 @@ test("Aliyun evidence writeback checklist exposes local JSON write targets witho
   assert.equal(report.summary.cloudConfirmationGaps, report.writebackGroups.cloudConfirmations.gaps.length)
   assert.equal(report.summary.imagePublishGaps, report.writebackGroups.imagePublish.gaps.length)
   assert.equal(report.summary.evidenceWritebackReady, report.evidenceClosureBrief.evidenceWritebackReady)
+  assert.ok(report.actionableWritebackSequence.packets.some((item) => item.packetId === "P01_WECHAT_OPEN_MOBILE_APP"))
+  assert.ok(report.actionableWritebackSequence.packets.some((item) => item.packetId === "P10_ANDROID_RELEASE_SIGNING"))
+  assert.ok(report.actionableWritebackSequence.packets.some((item) => item.packetId === "P02_APPLE_TEAM_ID"))
+  assert.ok(report.summary.actionableSecretOrCredentialPacketIds.includes("P01_WECHAT_OPEN_MOBILE_APP"))
+  assert.ok(report.summary.actionableSecretOrCredentialPacketIds.includes("P10_ANDROID_RELEASE_SIGNING"))
   assert.equal(report.evidenceClosureBrief.blockedCredentialCount, 8)
   assert.equal(report.evidenceClosureBrief.readySecretEnvVariableCount, 17)
   assert.equal(report.evidenceClosureBrief.resourceEvidenceReady, "0/7")
@@ -338,6 +378,9 @@ test("Aliyun evidence writeback markdown renders the same writeback boundaries",
   assert.match(markdownOutput, /imagePublish/)
   assert.match(markdownOutput, /rdsMigrationGaps: 16/)
   assert.match(markdownOutput, /证据闭环摘要/)
+  assert.match(markdownOutput, /按动作包排序的证据回填/)
+  assert.match(markdownOutput, /canStartNowPacketIds: none/)
+  assert.match(markdownOutput, /secretOrCredentialPacketIds: P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION, P06_ENV_IMPORT, P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING/)
   assert.match(markdownOutput, /blockedCredentialCount: 8/)
   assert.match(markdownOutput, /readySecretEnvVariableCount: 17/)
   assert.match(markdownOutput, /resourceEvidenceReady: 0\/7/)
@@ -380,6 +423,13 @@ test("tracked APP production-cn evidence gap doc pins the current non-deployable
   assert.match(doc, /blockedCredentialCount: 1/)
   assert.match(doc, /blockedCredentialNames: DATABASE_URL_CN/)
   assert.match(doc, /resourceEvidenceReady: 0\/7/)
+  assert.match(doc, /按动作包排序的证据回填/)
+  assert.match(doc, /canStartNowPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(doc, /blockedByDependencyPacketIds: P04_ACR_IMAGE_AND_PULL, P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS/)
+  assert.match(doc, /secretOrCredentialPacketIds: P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION, P06_ENV_IMPORT/)
+  assert.match(doc, /### P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(doc, /gapCount: 16/)
+  assert.match(doc, /### P04_ACR_IMAGE_AND_PULL/)
   assert.match(doc, /deploy\/aliyun-production-cn\.cloud-inventory-results\.local\.json/)
   assert.match(doc, /deploy\/aliyun-production-cn\.rds-migration\.local\.json/)
   assert.match(doc, /deploy\/aliyun-production-cn\.cloud-confirmations\.local\.json/)

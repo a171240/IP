@@ -14,6 +14,38 @@ const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-pr
 const DEFAULT_CLOUD_INVENTORY_RESULTS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-inventory-results.local.json")
 const DEFAULT_RDS_MIGRATION_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.rds-migration.local.json")
 const READONLY_INVENTORY_AUTH_PACKET = "P00_ALIYUN_READONLY_INVENTORY_IDENTITY"
+const BACKEND_CURRENT_CAN_START_PACKET_IDS = Object.freeze([
+  "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
+  "P03_ACR_PURCHASE",
+  "P05_OSS_RAM_STS",
+  "P11_ALIYUN_RDS_DATA_MIGRATION",
+])
+const BACKEND_DEFERRED_APP_LAUNCH_PACKET_IDS = Object.freeze([
+  "P01_WECHAT_OPEN_MOBILE_APP",
+  "P10_ANDROID_RELEASE_SIGNING",
+  "P02_APPLE_TEAM_ID",
+])
+const SECRET_OR_CREDENTIAL_PACKET_IDS = new Set([
+  "P01_WECHAT_OPEN_MOBILE_APP",
+  "P05_OSS_RAM_STS",
+  "P06_ENV_IMPORT",
+  "P10_ANDROID_RELEASE_SIGNING",
+  "P11_ALIYUN_RDS_DATA_MIGRATION",
+])
+const WRITEBACK_PACKET_ORDER = Object.freeze([
+  "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
+  "P03_ACR_PURCHASE",
+  "P05_OSS_RAM_STS",
+  "P11_ALIYUN_RDS_DATA_MIGRATION",
+  "P04_ACR_IMAGE_AND_PULL",
+  "P06_ENV_IMPORT",
+  "P07_DOMAIN_DNS_HTTPS",
+  "P08_SAE_RUNTIME_SLS",
+  "P09_PRODUCTION_DEPLOY",
+  "P01_WECHAT_OPEN_MOBILE_APP",
+  "P10_ANDROID_RELEASE_SIGNING",
+  "P02_APPLE_TEAM_ID",
+])
 
 const STRICT_VERIFICATION_ORDER = Object.freeze([
   "corepack pnpm aliyun:rds:migration:evidence:strict",
@@ -456,6 +488,77 @@ function buildEvidenceClosureBrief(handoff, writebackGroups, allGaps, requiredAu
   }
 }
 
+function buildActionableWritebackSequence(writebackGroups, currentScope) {
+  const canStartNowPacketIds = currentScope === "backend_aliyun_only"
+    ? [...BACKEND_CURRENT_CAN_START_PACKET_IDS]
+    : []
+  const deferredAppLaunchPacketIds = currentScope === "backend_aliyun_only"
+    ? [...BACKEND_DEFERRED_APP_LAUNCH_PACKET_IDS]
+    : []
+  const canStartNowPacketIdSet = new Set(canStartNowPacketIds)
+  const deferredAppLaunchPacketIdSet = new Set(deferredAppLaunchPacketIds)
+  const packetRecords = new Map()
+
+  for (const group of Object.values(writebackGroups)) {
+    for (const gap of group.gaps) {
+      for (const packetId of gap.requiredAuthorizationPackets || []) {
+        const record = packetRecords.get(packetId) || {
+          packetId,
+          status: "blocked_by_dependency",
+          nonSecretEvidenceOnly: !SECRET_OR_CREDENTIAL_PACKET_IDS.has(packetId),
+          gapCount: 0,
+          groupKeys: [],
+          jsonPaths: [],
+          writeTargets: [],
+          forbiddenValueClasses: [],
+          strictVerifyCommands: [],
+          requiredEvidence: [],
+          blockedUntil: [],
+        }
+        record.gapCount += 1
+        record.groupKeys = uniqueStrings([...record.groupKeys, group.key])
+        record.jsonPaths = uniqueStrings([...record.jsonPaths, gap.jsonPath])
+        record.writeTargets = uniqueStrings([...record.writeTargets, gap.writeTo])
+        record.forbiddenValueClasses = uniqueStrings([...record.forbiddenValueClasses, ...(gap.forbidden || [])]).sort()
+        record.strictVerifyCommands = uniqueStrings([...record.strictVerifyCommands, ...(group.strictVerifyCommands || [])])
+        record.requiredEvidence = uniqueStrings([...record.requiredEvidence, ...(gap.requiredEvidence || [])])
+        record.blockedUntil = uniqueStrings([...record.blockedUntil, ...(gap.blockedUntil || [])])
+        packetRecords.set(packetId, record)
+      }
+    }
+  }
+
+  const packets = [...packetRecords.values()]
+    .map((record) => ({
+      ...record,
+      status: canStartNowPacketIdSet.has(record.packetId)
+        ? "can_start_after_action_time_confirmation"
+        : deferredAppLaunchPacketIdSet.has(record.packetId)
+          ? "deferred_app_launch"
+          : "blocked_by_dependency",
+    }))
+    .sort((left, right) => packetSortIndex(left.packetId) - packetSortIndex(right.packetId))
+
+  return {
+    currentScope,
+    canStartNowPacketIds,
+    blockedByDependencyPacketIds: packets
+      .filter((packet) => packet.status === "blocked_by_dependency")
+      .map((packet) => packet.packetId),
+    deferredAppLaunchPacketIds,
+    secretOrCredentialPacketIds: packets
+      .filter((packet) => packet.nonSecretEvidenceOnly !== true)
+      .map((packet) => packet.packetId),
+    packetCount: packets.length,
+    packets,
+  }
+}
+
+function packetSortIndex(packetId) {
+  const index = WRITEBACK_PACKET_ORDER.indexOf(packetId)
+  return index === -1 ? WRITEBACK_PACKET_ORDER.length : index
+}
+
 function buildReport(args) {
   const handoff = buildOperatorHandoff(args)
   const rdsMigrationEvidence = buildRdsMigrationEvidence(args)
@@ -476,6 +579,8 @@ function buildReport(args) {
   const forbiddenValueClasses = [...new Set(allGaps.flatMap((item) => item.forbidden || []))].sort()
   const strictVerifyCommands = [...new Set(Object.values(writebackGroups).flatMap((group) => group.strictVerifyCommands))]
   const requiredAuthorizationPackets = uniqueStrings(allGaps.flatMap((item) => item.requiredAuthorizationPackets || []))
+  const currentScope = args.backendOnly ? "backend_aliyun_only" : "full_app_launch"
+  const actionableWritebackSequence = buildActionableWritebackSequence(writebackGroups, currentScope)
   const evidenceClosureBrief = buildEvidenceClosureBrief(
     handoff,
     writebackGroups,
@@ -487,7 +592,7 @@ function buildReport(args) {
     ok: true,
     generatedAt: new Date().toISOString(),
     environment: "production-cn",
-    currentScope: args.backendOnly ? "backend_aliyun_only" : "full_app_launch",
+    currentScope,
     objective: "阿里云 production-cn 本地证据回填清单",
     verdict: handoff.verdict || "unknown",
     canDeployNow: handoff.canDeployNow === true,
@@ -526,6 +631,9 @@ function buildReport(args) {
       imagePublishGaps: writebackGroups.imagePublish.gaps.length,
       forbiddenValueClasses,
       requiredAuthorizationPackets,
+      actionableCanStartNowPacketIds: actionableWritebackSequence.canStartNowPacketIds,
+      actionableBlockedByDependencyPacketIds: actionableWritebackSequence.blockedByDependencyPacketIds,
+      actionableSecretOrCredentialPacketIds: actionableWritebackSequence.secretOrCredentialPacketIds,
       strictVerifyCommands,
       canDeployNow: handoff.canDeployNow === true,
       evidenceWritebackReady: evidenceClosureBrief.evidenceWritebackReady,
@@ -538,6 +646,7 @@ function buildReport(args) {
       partiallyObservedResourceEvidenceIds: evidenceClosureBrief.partiallyObservedResourceEvidenceIds,
     },
     evidenceClosureBrief,
+    actionableWritebackSequence,
     writebackGroups,
     strictVerificationOrder: STRICT_VERIFICATION_ORDER,
     safetyBoundary: [
@@ -591,6 +700,12 @@ function renderMarkdown(report) {
     `- partiallyObservedResourceEvidenceIds: ${report.evidenceClosureBrief.partiallyObservedResourceEvidenceIds.join(", ") || "none"}`,
     `- writeTargets: ${report.evidenceClosureBrief.writeTargets.join(", ") || "none"}`,
     "",
+    "## 按动作包排序的证据回填",
+    "",
+    ...renderActionableWritebackSummaryLines(report),
+    "",
+    ...report.actionableWritebackSequence.packets.flatMap(renderActionableWritebackPacket),
+    "",
     "## 已观测但未闭环的资源证据",
     "",
     ...(report.evidenceClosureBrief.blockedResourceEvidence.length
@@ -618,6 +733,37 @@ function renderMarkdown(report) {
     "",
     ...report.safetyBoundary.map((item) => `- ${item}`),
   ].join("\n") + "\n"
+}
+
+function renderActionableWritebackPacket(packet) {
+  return [
+    `### ${packet.packetId}`,
+    "",
+    `- status: ${packet.status}`,
+    `- nonSecretEvidenceOnly: ${packet.nonSecretEvidenceOnly}`,
+    `- gapCount: ${packet.gapCount}`,
+    `- groupKeys: ${packet.groupKeys.join(", ") || "none"}`,
+    `- jsonPaths: ${packet.jsonPaths.join(", ") || "none"}`,
+    `- writeTargets: ${packet.writeTargets.join("; ") || "none"}`,
+    `- forbiddenValueClasses: ${packet.forbiddenValueClasses.join(", ") || "none"}`,
+    `- strictVerifyCommands: ${packet.strictVerifyCommands.join("; ") || "none"}`,
+    "",
+  ]
+}
+
+function renderActionableWritebackSummaryLines(report) {
+  const sequence = report.actionableWritebackSequence
+  const lines = [
+    `- canStartNowPacketIds: ${sequence.canStartNowPacketIds.join(", ") || "none"}`,
+    `- blockedByDependencyPacketIds: ${sequence.blockedByDependencyPacketIds.join(", ") || "none"}`,
+    `- secretOrCredentialPacketIds: ${sequence.secretOrCredentialPacketIds.join(", ") || "none"}`,
+  ]
+
+  if (report.currentScope !== "backend_aliyun_only" && sequence.deferredAppLaunchPacketIds.length > 0) {
+    lines.splice(2, 0, `- deferredAppLaunchPacketIds: ${sequence.deferredAppLaunchPacketIds.join(", ")}`)
+  }
+
+  return lines
 }
 
 function renderResourceEvidence(item) {
