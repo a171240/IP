@@ -93,6 +93,7 @@
     "aliyun:legal:check": "node ./scripts/check-app-legal-pages.mjs --allow-missing-env",
     "aliyun:legal:strict": "node ./scripts/check-app-legal-pages.mjs",
     "aliyun:cloud:access": "node ./scripts/check-aliyun-cloud-access.mjs",
+    "aliyun:browser-evidence:test": "node --test tests/aliyun-browser-readonly-evidence.static.test.js",
     "aliyun:cloud:confirmations": "node ./scripts/check-aliyun-cloud-confirmations.mjs --allow-incomplete",
     "aliyun:cloud:confirmations:backend": "node ./scripts/check-aliyun-cloud-confirmations.mjs --backend-only --allow-incomplete",
     "aliyun:cloud:confirmations:backend:strict": "node ./scripts/check-aliyun-cloud-confirmations.mjs --backend-only",
