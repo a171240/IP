@@ -206,14 +206,23 @@ const CREDENTIAL_GROUP_METADATA = Object.freeze({
 function buildCredentialInterventionBrief(items, blockedVariableRows, readySecretEnvVariableRows, userIntervention) {
   const blockedCredentialNames = unique(blockedVariableRows.map((variable) => variable.name)).sort()
   const readySecretEnvVariableNames = unique(readySecretEnvVariableRows.map((variable) => variable.name)).sort()
+  const actionTimeConfirmationRequiredIds = userIntervention.actionTimeConfirmationRequired || []
+  const groups = items.map((item) => buildCredentialGroup(item))
+  const interventionBreakdown = buildCredentialInterventionBreakdown({
+    blockedCredentialNames,
+    readySecretEnvVariableNames,
+    actionTimeConfirmationRequiredIds,
+    groups,
+  })
   return {
     canCodexProceedWithoutUser: false,
     blockedCredentialCount: blockedCredentialNames.length,
     blockedCredentialNames,
     readySecretEnvVariableCount: readySecretEnvVariableNames.length,
     readySecretEnvVariableNames,
-    actionTimeConfirmationRequiredIds: userIntervention.actionTimeConfirmationRequired,
-    groups: items.map((item) => buildCredentialGroup(item)),
+    actionTimeConfirmationRequiredIds,
+    groups,
+    interventionBreakdown,
     valueHandlingRules: userIntervention.valueHandlingRules,
     forbiddenStorage: [
       "git",
@@ -222,6 +231,82 @@ function buildCredentialInterventionBrief(items, blockedVariableRows, readySecre
       "App bundle",
       "小程序或 App 前端包",
     ],
+  }
+}
+
+function buildCredentialInterventionBreakdown({
+  blockedCredentialNames,
+  readySecretEnvVariableNames,
+  actionTimeConfirmationRequiredIds,
+  groups,
+}) {
+  return {
+    missingCredentialValues: {
+      count: blockedCredentialNames.length,
+      names: blockedCredentialNames,
+      actionIds: groups
+        .filter((group) => group.blockedCredentialNames.length > 0)
+        .map((group) => group.actionId),
+    },
+    readySecretsPendingCloudImport: {
+      count: readySecretEnvVariableNames.length,
+      names: readySecretEnvVariableNames,
+      actionIds: groups
+        .filter((group) => group.readySecretEnvVariableNames.length > 0)
+        .map((group) => group.actionId),
+    },
+    actionTimeConfirmationRequired: {
+      count: actionTimeConfirmationRequiredIds.length,
+      actionIds: actionTimeConfirmationRequiredIds,
+    },
+    paidPurchaseConfirmationActionIds: groups
+      .filter((group) => group.type === "paid_purchase_confirmation")
+      .map((group) => group.actionId),
+    controlledSecretChannelActionIds: groups
+      .filter((group) => [
+        "registry_password_or_runtime_pull_secret",
+        "ram_secret_or_sts_import",
+        "database_secret_and_migration",
+        "ready_sensitive_env_need_cloud_import",
+      ].includes(group.type))
+      .map((group) => group.actionId),
+  }
+}
+
+function buildCredentialPasswordIntervention(credentialBrief) {
+  const breakdown = credentialBrief.interventionBreakdown || {}
+  const missingCredentialValues = breakdown.missingCredentialValues || { count: 0, names: [], actionIds: [] }
+  const readySecretsPendingCloudImport = breakdown.readySecretsPendingCloudImport || { count: 0, names: [], actionIds: [] }
+  const controlledSecretChannelActionIds = breakdown.controlledSecretChannelActionIds || []
+  const paidPurchaseConfirmationActionIds = breakdown.paidPurchaseConfirmationActionIds || []
+  const actionIds = unique([
+    ...(missingCredentialValues.actionIds || []),
+    ...(readySecretsPendingCloudImport.actionIds || []),
+    ...controlledSecretChannelActionIds,
+    ...paidPurchaseConfirmationActionIds,
+  ])
+
+  return {
+    required: actionIds.length > 0,
+    missingCredentialValues: {
+      count: missingCredentialValues.count || 0,
+      names: missingCredentialValues.names || [],
+      actionIds: missingCredentialValues.actionIds || [],
+    },
+    readySecretsPendingCloudImport: {
+      count: readySecretsPendingCloudImport.count || 0,
+      names: readySecretsPendingCloudImport.names || [],
+      actionIds: readySecretsPendingCloudImport.actionIds || [],
+    },
+    paidPurchaseConfirmationActionIds,
+    controlledSecretChannelActionIds,
+    actionIds,
+    userMustProvideOrConfirm: [
+      "DATABASE_URL_CN must come from Aliyun RDS PostgreSQL after schema/data migration validation and must only enter KMS/Secrets Manager/SAE secret env.",
+      "Ready local secret variables still need controlled Aliyun secret-env import; names can be reported, values must not be copied into JSON, Markdown, Docker images, git, chat, or shell history.",
+      "ACR purchase and registry/runtime pull credentials require action-time confirmation; registry password or pull secret must stay in Docker credential helper, RAM/KMS/Secrets Manager, or Aliyun runtime secret settings.",
+    ],
+    forbiddenStorage: credentialBrief.forbiddenStorage || [],
   }
 }
 
@@ -393,6 +478,7 @@ function buildReport(operatorTasks, args) {
       : "当前没有未完成的密钥、密码、token、付款或受控标识符类人工介入项。",
     summary,
     credentialInterventionBrief: summary.credentialInterventionBrief,
+    credentialPasswordIntervention: buildCredentialPasswordIntervention(summary.credentialInterventionBrief),
     items,
     nextActions: [
       ...(args.backendOnly
@@ -450,6 +536,10 @@ function renderMarkdown(report) {
     `- readySecretEnvVariableNames: ${report.credentialInterventionBrief.readySecretEnvVariableNames.length ? report.credentialInterventionBrief.readySecretEnvVariableNames.join(", ") : "none"}`,
     `- forbiddenStorage: ${report.credentialInterventionBrief.forbiddenStorage.join(", ")}`,
     "",
+    "## 密钥/密码介入拆解",
+    "",
+    ...renderCredentialPasswordIntervention(report.credentialPasswordIntervention),
+    "",
     ...renderCredentialInterventionGroups(report.credentialInterventionBrief.groups),
     "## 用户介入分层",
     "",
@@ -503,7 +593,22 @@ function renderMarkdown(report) {
     ...report.safetyBoundary.map((item) => `- ${item}`),
     "",
   )
-  return `${lines.join("\n")}\n`
+  return `${lines.join("\n").replace(/\n+$/u, "")}\n`
+}
+
+function renderCredentialPasswordIntervention(intervention) {
+  return [
+    `- required: ${intervention.required}`,
+    `- missingCredentialValues: ${intervention.missingCredentialValues.names.join(", ") || "none"}`,
+    `- missingCredentialValueActionIds: ${intervention.missingCredentialValues.actionIds.join(", ") || "none"}`,
+    `- readySecretsPendingCloudImport: ${intervention.readySecretsPendingCloudImport.count}`,
+    `- readySecretsPendingCloudImportActionIds: ${intervention.readySecretsPendingCloudImport.actionIds.join(", ") || "none"}`,
+    `- paidPurchaseConfirmationActionIds: ${intervention.paidPurchaseConfirmationActionIds.join(", ") || "none"}`,
+    `- controlledSecretChannelActionIds: ${intervention.controlledSecretChannelActionIds.join(", ") || "none"}`,
+    `- actionIds: ${intervention.actionIds.join(", ") || "none"}`,
+    `- forbiddenStorage: ${intervention.forbiddenStorage.join(", ") || "none"}`,
+    ...intervention.userMustProvideOrConfirm.map((item) => `- ${item}`),
+  ]
 }
 
 function renderCredentialInterventionGroups(groups) {

@@ -59,6 +59,24 @@ test("Aliyun sensitive blockers backend-only mode excludes deferred APP launch c
   assert.deepEqual(report.credentialInterventionBrief.actionTimeConfirmationRequiredIds, ids)
   assert.equal(report.credentialInterventionBrief.blockedCredentialCount, 1)
   assert.deepEqual(report.credentialInterventionBrief.blockedCredentialNames, ["DATABASE_URL_CN"])
+  assert.deepEqual(report.credentialInterventionBrief.interventionBreakdown.missingCredentialValues.names, ["DATABASE_URL_CN"])
+  assert.deepEqual(report.credentialInterventionBrief.interventionBreakdown.missingCredentialValues.actionIds, ["S08_ALIYUN_RDS_DATABASE_URL"])
+  assert.equal(report.credentialInterventionBrief.interventionBreakdown.readySecretsPendingCloudImport.count, 17)
+  assert.deepEqual(report.credentialInterventionBrief.interventionBreakdown.paidPurchaseConfirmationActionIds, ["S03_ACR_PAID_PURCHASE"])
+  assert.deepEqual(report.credentialInterventionBrief.interventionBreakdown.controlledSecretChannelActionIds, [
+    "S04_ACR_REGISTRY_AUTH",
+    "S05_OSS_RAM_SECRET_OR_STS",
+    "S08_ALIYUN_RDS_DATABASE_URL",
+    "S06_READY_SENSITIVE_ENV_IMPORT",
+  ])
+  assert.equal(report.credentialPasswordIntervention.required, true)
+  assert.deepEqual(report.credentialPasswordIntervention.missingCredentialValues.names, ["DATABASE_URL_CN"])
+  assert.deepEqual(report.credentialPasswordIntervention.missingCredentialValues.actionIds, ["S08_ALIYUN_RDS_DATABASE_URL"])
+  assert.equal(report.credentialPasswordIntervention.readySecretsPendingCloudImport.count, 17)
+  assert.ok(report.credentialPasswordIntervention.readySecretsPendingCloudImport.names.includes("SUPABASE_SERVICE_ROLE_KEY"))
+  assert.deepEqual(report.credentialPasswordIntervention.paidPurchaseConfirmationActionIds, ["S03_ACR_PAID_PURCHASE"])
+  assert.ok(report.credentialPasswordIntervention.controlledSecretChannelActionIds.includes("S08_ALIYUN_RDS_DATABASE_URL"))
+  assert.ok(report.credentialPasswordIntervention.userMustProvideOrConfirm.some((item) => /DATABASE_URL_CN/.test(item)))
   assert.ok(!report.summary.userIntervention.blockedVariableNames.includes("ALIYUN_OSS_SECURITY_TOKEN"))
   assert.equal(report.credentialInterventionBrief.readySecretEnvVariableCount, 17)
   assert.ok(report.credentialInterventionBrief.readySecretEnvVariableNames.includes("SUPABASE_SERVICE_ROLE_KEY"))
@@ -124,6 +142,12 @@ test("Aliyun sensitive blockers output has current blocked action ids but no sec
   assert.ok(report.summary.userIntervention.readySecretEnvVariableCount >= 1)
   assert.equal(report.credentialInterventionBrief.blockedCredentialCount, 8)
   assert.equal(report.credentialInterventionBrief.readySecretEnvVariableCount, 17)
+  assert.equal(report.credentialPasswordIntervention.missingCredentialValues.count, 8)
+  assert.ok(report.credentialPasswordIntervention.missingCredentialValues.names.includes("DATABASE_URL_CN"))
+  assert.ok(report.credentialPasswordIntervention.missingCredentialValues.names.includes("WECHAT_OPEN_APP_SECRET"))
+  assert.ok(report.credentialPasswordIntervention.readySecretsPendingCloudImport.names.includes("SUPABASE_SERVICE_ROLE_KEY"))
+  assert.ok(report.credentialPasswordIntervention.paidPurchaseConfirmationActionIds.includes("S03_ACR_PAID_PURCHASE"))
+  assert.ok(report.credentialPasswordIntervention.controlledSecretChannelActionIds.includes("S08_ALIYUN_RDS_DATABASE_URL"))
   assert.ok(!report.credentialInterventionBrief.blockedCredentialNames.includes("ALIYUN_OSS_SECURITY_TOKEN"))
   assert.ok(report.credentialInterventionBrief.blockedCredentialNames.includes("DATABASE_URL_CN"))
   assert.ok(report.credentialInterventionBrief.blockedCredentialNames.includes("WECHAT_OPEN_APP_ID"))
@@ -316,8 +340,13 @@ test("Aliyun sensitive blockers markdown renders value-free variable acquisition
   assert.match(markdown, /#### 变量获取和导入明细/)
   assert.match(markdown, /## 用户介入分层/)
   assert.match(markdown, /## 用户介入密钥\/密码简表/)
+  assert.match(markdown, /## 密钥\/密码介入拆解/)
   assert.match(markdown, /blockedCredentialCount: 8/)
   assert.match(markdown, /readySecretEnvVariableCount: 17/)
+  assert.match(markdown, /missingCredentialValues: .*DATABASE_URL_CN/)
+  assert.match(markdown, /readySecretsPendingCloudImport: 17/)
+  assert.match(markdown, /paidPurchaseConfirmationActionIds: S03_ACR_PAID_PURCHASE/)
+  assert.match(markdown, /controlledSecretChannelActionIds: .*S08_ALIYUN_RDS_DATABASE_URL/)
   assert.match(markdown, /wechat_open_mobile_app/)
   assert.match(markdown, /rds_database_secret_and_migration/)
   assert.match(markdown, /ready_secret_env_import/)
@@ -459,6 +488,13 @@ test("APP production-cn backend-only sensitive docs reflect current Aliyun backe
     assert.doesNotMatch(doc, /AccessKeySecret\s*[:=]\s*["'][^"']+["']/)
   }
 
+  assert.match(sensitiveDoc, /## 密钥\/密码介入拆解/)
+  assert.match(sensitiveDoc, /missingCredentialValues: DATABASE_URL_CN/)
+  assert.match(sensitiveDoc, /missingCredentialValueActionIds: S08_ALIYUN_RDS_DATABASE_URL/)
+  assert.match(sensitiveDoc, /readySecretsPendingCloudImport: 17/)
+  assert.match(sensitiveDoc, /paidPurchaseConfirmationActionIds: S03_ACR_PAID_PURCHASE/)
+  assert.match(sensitiveDoc, /controlledSecretChannelActionIds: S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT/)
+
   assert.match(
     sensitiveDoc,
     /deferredAppLaunchSensitiveActionIds: S01_WECHAT_OPEN_APP_LOGIN, S02_APPLE_TEAM_ID, S07_ANDROID_RELEASE_SIGNING/,
@@ -544,6 +580,11 @@ test("APP production-cn sensitive blockers handoff documents user-intervention c
     "blockedCredentialNames: APPLE_TEAM_ID, DATABASE_URL_CN",
     "readySecretEnvVariableCount: 17",
     "canCodexProceedWithoutUser: false",
+    "## 密钥/密码介入拆解",
+    "missingCredentialValues: APPLE_TEAM_ID, DATABASE_URL_CN",
+    "readySecretsPendingCloudImport: 17",
+    "paidPurchaseConfirmationActionIds: S03_ACR_PAID_PURCHASE",
+    "controlledSecretChannelActionIds: S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT",
     "ALIYUN_OSS_SECURITY_TOKEN",
     "DATABASE_URL_CN",
     "APPLE_TEAM_ID",
