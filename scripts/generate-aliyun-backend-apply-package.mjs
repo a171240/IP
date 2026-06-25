@@ -14,6 +14,20 @@ const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-pr
 const DEFAULT_CLOUD_INVENTORY_RESULTS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-inventory-results.local.json")
 const DEFAULT_RDS_MIGRATION_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.rds-migration.local.json")
 const READONLY_INVENTORY_AUTH_PACKET = "P00_ALIYUN_READONLY_INVENTORY_IDENTITY"
+const FIRST_BACKEND_ACTION_PACKET_IDS = [
+  READONLY_INVENTORY_AUTH_PACKET,
+  "P03_ACR_PURCHASE",
+  "P05_OSS_RAM_STS",
+  "P11_ALIYUN_RDS_DATA_MIGRATION",
+]
+const FIRST_BACKEND_ACTION_STEP_IDS = [
+  "BAP00_READONLY_INVENTORY_IDENTITY",
+  "BAP03_ACR_PURCHASE_AND_REPOSITORY",
+  "BAP02_OSS_RAM_STS_CLOSE",
+  "BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE",
+]
+const FIRST_BACKEND_ACTION_RECOMMENDED_REPLY =
+  "授权本轮只做阿里云后端第一批动作：只读盘点、创建/确认 RDS PostgreSQL 并处理数据库密码、确认 OSS RAM/STS，购买/确认 ACR Enterprise Economic cn-hangzhou 1个月 CNY117；密钥只进入阿里云 KMS/Secrets Manager/SAE secret env，不写文档/代码/git；仅处理 RDS/OSS 所需的受控 secret env，暂不执行全量 SAE env import；不做微信/Android/iOS、不部署上线、不改 DNS。"
 
 const SECRET_VALUE_PATTERNS = [
   /sk-[A-Za-z0-9_-]{20,}/,
@@ -134,6 +148,7 @@ function buildReport(args) {
   const blockedBackendSteps = steps.filter((step) => !step.canStartAfterActionTimeConfirmation).map((step) => step.id)
   const userIntervention = buildUserIntervention({ sensitiveBlockers, backendStatus, cloudActions })
   const credentialPasswordIntervention = buildCredentialPasswordIntervention(sensitiveBlockers)
+  const actionTimeAuthorizationRequest = buildActionTimeAuthorizationRequest(steps)
   const report = {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -167,6 +182,7 @@ function buildReport(args) {
       paidPurchaseConfirmationActionIds: credentialPasswordIntervention.paidPurchaseConfirmationActionIds,
       controlledSecretChannelActionIds: credentialPasswordIntervention.controlledSecretChannelActionIds,
     },
+    actionTimeAuthorizationRequest,
     applySteps: steps,
     userIntervention,
     credentialPasswordIntervention,
@@ -213,6 +229,40 @@ function buildReport(args) {
     report.containsValues = true
   }
   return report
+}
+
+function buildActionTimeAuthorizationRequest(steps) {
+  const stepsById = new Map(steps.map((step) => [step.id, step]))
+  const firstActionSteps = FIRST_BACKEND_ACTION_STEP_IDS
+    .map((id) => stepsById.get(id))
+    .filter(Boolean)
+  return {
+    required: true,
+    currentScope: "backend_aliyun_only",
+    backendOnly: true,
+    stepIds: FIRST_BACKEND_ACTION_STEP_IDS,
+    packetIds: FIRST_BACKEND_ACTION_PACKET_IDS,
+    recommendedUserReply: FIRST_BACKEND_ACTION_RECOMMENDED_REPLY,
+    allowedActions: [
+      "恢复阿里云 CLI/CloudShell 只读盘点身份，只运行 allowlisted List/Describe/stat/get inventory 命令。",
+      "创建或确认 cn-hangzhou RDS PostgreSQL、数据库、账号和网络访问策略，并只把 DATABASE_URL_CN 写入阿里云受控 secret env。",
+      "确认 OSS bucket/CORS/service-records 前缀，绑定最小权限 RAM/STS 或运行时角色。",
+      "购买或确认 ACR Enterprise Economic cn-hangzhou 1个月 CNY117，并记录 registry host、namespace、repository 等非密钥证据。",
+    ],
+    explicitlyExcluded: [
+      "不创建微信开放平台移动应用，不处理 Android release signing，不读取 Apple Team ID/AASA。",
+      "不执行 production-cn 部署、postdeploy smoke、DNS/HTTPS/ICP 变更或 git push。",
+      "不执行 docker login/push，不配置 SAE 镜像拉取。",
+      "不执行全量 SAE 环境变量导入；只允许本批 RDS/OSS 动作要求的受控 secret env 写入。",
+      "不把 DATABASE_URL_CN、数据库密码、AccessKeySecret、STS token、registry password、Supabase service role key、cookie 或证书私钥写入 JSON、Markdown、Docker 镜像、App 包、小程序包、shell history 或 git。",
+    ],
+    valueHandling: [
+      "只允许记录变量名、资源名、布尔值、时间戳、digest、控制台路径和非密钥 evidence handle。",
+      "密钥和密码只进入阿里云 KMS/Secrets Manager/SAE secret env 或受控凭证通道。",
+    ],
+    writeTargets: firstActionSteps.flatMap((step) => step.writeTargets || []),
+    verifyCommands: Array.from(new Set(firstActionSteps.flatMap((step) => step.verifyCommands || []))),
+  }
 }
 
 function buildCredentialPasswordIntervention(sensitiveBlockers) {
@@ -744,6 +794,17 @@ function renderMarkdown(report) {
     "## Blocked Backend Steps",
     "",
     `- ${report.summary.blockedBackendSteps.join(", ") || "none"}`,
+    "",
+    "## Action-Time Authorization Request",
+    "",
+    `- required: ${report.actionTimeAuthorizationRequest.required}`,
+    `- currentScope: ${report.actionTimeAuthorizationRequest.currentScope}`,
+    `- stepIds: ${report.actionTimeAuthorizationRequest.stepIds.join(", ")}`,
+    `- packetIds: ${report.actionTimeAuthorizationRequest.packetIds.join(", ")}`,
+    `- recommendedUserReply: ${report.actionTimeAuthorizationRequest.recommendedUserReply}`,
+    `- allowedActions: ${report.actionTimeAuthorizationRequest.allowedActions.join("; ")}`,
+    `- explicitlyExcluded: ${report.actionTimeAuthorizationRequest.explicitlyExcluded.join("; ")}`,
+    `- valueHandling: ${report.actionTimeAuthorizationRequest.valueHandling.join("; ")}`,
     "",
     "## User Intervention",
     "",

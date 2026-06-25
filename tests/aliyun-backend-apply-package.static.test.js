@@ -35,6 +35,8 @@ test("Aliyun backend apply package command is wired into scripts and deploy spec
   assert.match(script, /BAP00_READONLY_INVENTORY_IDENTITY/)
   assert.match(script, /BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE/)
   assert.match(script, /BAP09_POSTDEPLOY_SMOKE/)
+  assert.match(script, /FIRST_BACKEND_ACTION_RECOMMENDED_REPLY/)
+  assert.match(script, /buildActionTimeAuthorizationRequest/)
   assert.match(applyPackageDoc, /BAP00_READONLY_INVENTORY_IDENTITY/)
   assert.match(applyPackageDoc, /rdsLocalExists=true/)
   assert.match(applyPackageDoc, /rdsEvidence:rdsPostgres\.confirmed/)
@@ -103,6 +105,34 @@ test("Aliyun backend apply package separates immediate backend work from deferre
   assert.ok(!report.summary.backendRequiredBlocking.includes("WECHAT_OPEN_APP_SECRET"))
   assert.ok(!report.userIntervention.blockedCredentialNames.includes("WECHAT_OPEN_APP_SECRET"))
   assert.ok(!report.userIntervention.blockedCredentialNames.includes("MEIYE_RELEASE_KEY_PASSWORD"))
+  assert.equal(report.actionTimeAuthorizationRequest.required, true)
+  assert.equal(report.actionTimeAuthorizationRequest.currentScope, "backend_aliyun_only")
+  assert.deepEqual(report.actionTimeAuthorizationRequest.packetIds, [
+    "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
+    "P03_ACR_PURCHASE",
+    "P05_OSS_RAM_STS",
+    "P11_ALIYUN_RDS_DATA_MIGRATION",
+  ])
+  assert.deepEqual(report.actionTimeAuthorizationRequest.stepIds, [
+    "BAP00_READONLY_INVENTORY_IDENTITY",
+    "BAP03_ACR_PURCHASE_AND_REPOSITORY",
+    "BAP02_OSS_RAM_STS_CLOSE",
+    "BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE",
+  ])
+  assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /阿里云后端第一批动作/)
+  assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /RDS PostgreSQL/)
+  assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /CNY117/)
+  assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /不做微信\/Android\/iOS/)
+  assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /不部署上线、不改 DNS/)
+  assert.ok(report.actionTimeAuthorizationRequest.allowedActions.some((item) => /RDS PostgreSQL/.test(item)))
+  assert.ok(report.actionTimeAuthorizationRequest.allowedActions.some((item) => /OSS/.test(item)))
+  assert.ok(report.actionTimeAuthorizationRequest.allowedActions.some((item) => /ACR Enterprise/.test(item)))
+  assert.ok(report.actionTimeAuthorizationRequest.explicitlyExcluded.some((item) => /不创建微信开放平台移动应用/.test(item)))
+  assert.ok(report.actionTimeAuthorizationRequest.explicitlyExcluded.some((item) => /git push/.test(item)))
+  assert.ok(report.actionTimeAuthorizationRequest.explicitlyExcluded.some((item) => /不执行 docker login\/push/.test(item)))
+  assert.ok(report.actionTimeAuthorizationRequest.valueHandling.some((item) => /非密钥 evidence handle/.test(item)))
+  assert.ok(report.actionTimeAuthorizationRequest.writeTargets.some((item) => /DATABASE_URL_CN/.test(item)))
+  assert.ok(report.actionTimeAuthorizationRequest.verifyCommands.includes("corepack pnpm aliyun:rds:migration:package"))
 
   assert.equal(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").canStartAfterActionTimeConfirmation, true)
   assert.ok(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").currentBlockers.includes("cloudInventory:readonly_inventory_strict_ready=0/9"))
@@ -237,6 +267,11 @@ test("Aliyun backend apply package markdown is value-free and actionable", () =>
   assert.match(markdown, /slsResource\.observedReadiness=partial/)
   assert.match(markdown, /database account password/)
   assert.match(markdown, /USER_CONFIRM_ALIYUN_READONLY_INVENTORY_IDENTITY/)
+  assert.match(markdown, /## Action-Time Authorization Request/)
+  assert.match(markdown, /recommendedUserReply: 授权本轮只做阿里云后端第一批动作/)
+  assert.match(markdown, /packetIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(markdown, /不做微信\/Android\/iOS、不部署上线、不改 DNS/)
+  assert.match(markdown, /不执行 docker login\/push/)
   assert.match(markdown, /actionTimeConfirmation\.minimumUserPhrase: .*CloudShell/)
   assert.match(markdown, /actionTimeConfirmation\.minimumUserPhrase: .*性能型 NAS/)
   assert.match(markdown, /performance NAS usage-fee warning/)
