@@ -260,8 +260,10 @@ function buildPackage(args) {
     cliConfigProbeFailureCategory,
     cloudInventorySummary,
   )
+  const backendFirstOrder = buildBackendFirstOrder(backendStatus)
   const cloudActionClosureBrief = buildCloudActionClosureBrief({
     consoleRunbook,
+    backendFirstOrder,
     immediateConsoleTasks,
     blockedConsoleTasks,
     cloudConsolePackets,
@@ -277,12 +279,12 @@ function buildPackage(args) {
     ...(cloudInventorySummary.ready ? [] : cloudInventorySummary.blockers.map((item) => `cloudInventory:${item}`)),
   ])
   const executionQueue = buildExecutionQueue(
+    backendFirstOrder,
     immediateConsoleTasks,
     blockedConsoleTasks,
     externalAppPackets,
     imagePublishWritebackPlan,
   )
-  const backendFirstOrder = buildBackendFirstOrder(backendStatus)
   const sensitiveActionTotal = productionStatus.summary?.sensitiveActionItems?.total || 0
   const sensitiveActionBlocked = productionStatus.summary?.sensitiveActionItems?.blocked || 0
   const sensitiveActionReady = Math.max(sensitiveActionTotal - sensitiveActionBlocked, 0)
@@ -308,6 +310,7 @@ function buildPackage(args) {
       backendTargetReady: backendStatus.summary?.backendTargetReady || "unknown",
       cloudConfirmationsReady: formatReadyTotal(productionStatus.summary?.cloudConfirmations),
       operatorTasksReady: formatReadyTotal(productionStatus.summary?.operatorTasks),
+      backendCanStartNowSteps: backendFirstOrder.immediateBackendSteps,
       canStartNowConsoleTasks: immediateConsoleTasks.map((item) => item.id),
       blockedByDependencies: blockedConsoleTasks.map((item) => item.id),
       cloudConsolePackets: cloudConsolePackets.map((item) => item.packetId),
@@ -415,6 +418,7 @@ function formatReadyTotal(value = {}) {
 
 function buildCloudActionClosureBrief({
   consoleRunbook,
+  backendFirstOrder,
   immediateConsoleTasks,
   blockedConsoleTasks,
   cloudConsolePackets,
@@ -458,6 +462,8 @@ function buildCloudActionClosureBrief({
     cloudInventoryReadyLocalOperations: `${cloudInventorySummary.readyLocalOperations}/${cloudInventorySummary.localOperations}`,
     cloudInventoryExecutedCommandResults: `${cloudInventorySummary.executedCommandResults}/${cloudInventorySummary.commandResults}`,
     mutationPerformedCommandResults: cloudInventorySummary.mutationPerformedCommandResults,
+    backendCanStartNowSteps: backendFirstOrder.immediateBackendSteps,
+    backendBlockedByDependencies: backendFirstOrder.blockedBackendSteps,
     canStartNowConsoleTasks: immediateConsoleTasks.map((item) => item.id),
     cloudConsolePackets: cloudConsolePackets.map((item) => item.packetId),
     externalAppPackets: externalAppPackets.map((item) => item.packetId),
@@ -493,8 +499,19 @@ function isDeferredAppLaunchBlocker(value) {
     /WECHAT_OPEN_|wechat_open_platform|APPLE_TEAM_ID|apple_team_id|ANDROID_RELEASE|MEIYE_RELEASE_|Android release signing|app_universal_link/i.test(text)
 }
 
-function buildExecutionQueue(immediateConsoleTasks, blockedConsoleTasks, externalAppPackets, imagePublishWritebackPlan) {
+function buildExecutionQueue(backendFirstOrder, immediateConsoleTasks, blockedConsoleTasks, externalAppPackets, imagePublishWritebackPlan) {
   return {
+    backendCanStartNow: backendFirstOrder.steps
+      .filter((step) => step.status === "ready_for_action_time_confirmation")
+      .map((step) => ({
+        id: step.id,
+        kind: "backend_apply_step",
+        title: step.title,
+        requiresActionTimeConfirmation: true,
+        requiredAuthorizationPackets: step.requiredAuthorizationPackets,
+        userIntervention: step.userIntervention,
+        orderLine: step.orderLine,
+      })),
     canStartNow: immediateConsoleTasks.map((task) => {
       const compact = compactConsoleTask(task, imagePublishWritebackPlan)
       const currentActionAcceptanceEvidence = compact.currentActionAcceptanceEvidence?.length
@@ -518,6 +535,17 @@ function buildExecutionQueue(immediateConsoleTasks, blockedConsoleTasks, externa
         forbidden: compact.forbidden,
       }
     }),
+    backendBlockedByDependencies: backendFirstOrder.steps
+      .filter((step) => step.status === "blocked_by_dependencies")
+      .map((step) => ({
+        id: step.id,
+        kind: "backend_apply_step",
+        title: step.title,
+        requiredAuthorizationPackets: step.requiredAuthorizationPackets,
+        blockingDependencies: step.blockingDependencies,
+        userIntervention: step.userIntervention,
+        orderLine: step.orderLine,
+      })),
     externalAppPrerequisites: externalAppPackets.map((packet) => {
       const compact = compactPacket(packet)
       return {
@@ -855,6 +883,7 @@ function renderMarkdown(report) {
     `- resourceEvidenceReady: ${report.summary.resourceEvidenceReady}`,
     `- blockedResourceEvidenceIds: ${report.summary.blockedResourceEvidenceIds.length ? report.summary.blockedResourceEvidenceIds.join(", ") : "none"}`,
     `- partiallyObservedResourceEvidenceIds: ${report.summary.partiallyObservedResourceEvidenceIds.length ? report.summary.partiallyObservedResourceEvidenceIds.join(", ") : "none"}`,
+    `- backendCanStartNowSteps: ${report.summary.backendCanStartNowSteps.length ? report.summary.backendCanStartNowSteps.join(", ") : "none"}`,
     `- immediateBackendSteps: ${report.summary.immediateBackendSteps.length ? report.summary.immediateBackendSteps.join(", ") : "none"}`,
     `- blockedBackendSteps: ${report.summary.blockedBackendSteps.length ? report.summary.blockedBackendSteps.join(", ") : "none"}`,
     "",
@@ -872,6 +901,8 @@ function renderMarkdown(report) {
     `- cloudInventoryReadyLocalOperations: ${report.cloudActionClosureBrief.cloudInventoryReadyLocalOperations}`,
     `- cloudInventoryExecutedCommandResults: ${report.cloudActionClosureBrief.cloudInventoryExecutedCommandResults}`,
     `- mutationPerformedCommandResults: ${report.cloudActionClosureBrief.mutationPerformedCommandResults}`,
+    `- backendCanStartNowSteps: ${report.cloudActionClosureBrief.backendCanStartNowSteps.length ? report.cloudActionClosureBrief.backendCanStartNowSteps.join(", ") : "none"}`,
+    `- backendBlockedByDependencies: ${report.cloudActionClosureBrief.backendBlockedByDependencies.length ? report.cloudActionClosureBrief.backendBlockedByDependencies.join(", ") : "none"}`,
     `- canStartNowConsoleTasks: ${report.cloudActionClosureBrief.canStartNowConsoleTasks.length ? report.cloudActionClosureBrief.canStartNowConsoleTasks.join(", ") : "none"}`,
     `- cloudConsolePackets: ${report.cloudActionClosureBrief.cloudConsolePackets.length ? report.cloudActionClosureBrief.cloudConsolePackets.join(", ") : "none"}`,
     `- externalAppPackets: ${report.cloudActionClosureBrief.externalAppPackets.length ? report.cloudActionClosureBrief.externalAppPackets.join(", ") : "none"}`,
@@ -894,10 +925,16 @@ function renderMarkdown(report) {
     "",
     "## 下一步执行队列",
     "",
+    `- backendCanStartNow: ${report.executionQueue.backendCanStartNow.map((item) => item.id).join(", ") || "none"}`,
+    `- consoleCanStartNow: ${report.executionQueue.canStartNow.map((item) => item.id).join(", ") || "none"}`,
     `- canStartNow: ${report.executionQueue.canStartNow.map((item) => item.id).join(", ") || "none"}`,
     `- externalAppPrerequisites: ${report.executionQueue.externalAppPrerequisites.map((item) => item.packetId).join(", ") || "none"}`,
     `- deferredAppLaunchPrerequisites: ${report.deferredAppLaunchPrerequisitePackets.map((item) => item.packetId).join(", ") || "none"}`,
+    `- backendBlockedByDependencies: ${report.executionQueue.backendBlockedByDependencies.map((item) => item.id).join(", ") || "none"}`,
     `- blockedByDependencies: ${report.executionQueue.blockedByDependencies.map((item) => item.id).join(", ") || "none"}`,
+    ...(report.executionQueue.backendCanStartNow.length
+      ? report.executionQueue.backendCanStartNow.map((item) => `- ${item.id}: kind=${item.kind}; packets=${item.requiredAuthorizationPackets.join(", ") || "none"}; userIntervention=${item.userIntervention}; order=${item.orderLine}`)
+      : ["- backendCanStartNowItems: none"]),
     ...(report.executionQueue.canStartNow.length
       ? report.executionQueue.canStartNow.map((item) => `- ${item.id}: kind=${item.kind}; scope=${item.currentActionScope}; phrase=${item.minimumAuthorizationPhrase}`)
       : ["- canStartNowItems: none"]),

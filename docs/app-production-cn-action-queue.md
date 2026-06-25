@@ -1,6 +1,6 @@
 # 阿里云控制台动作包
 
-生成时间：2026-06-25T19:20:52.746Z
+生成时间：2026-06-25T19:34:24.089Z
 
 ## 结论
 
@@ -28,6 +28,7 @@
 - resourceEvidenceReady: 0/7
 - blockedResourceEvidenceIds: R01_SAE_RUNTIME, R02_ACR_IMAGE_REGISTRY, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R05_OSS_AUDIO_STORAGE, R06_ENV_IMPORT, R07_SLS_ALERTS
 - partiallyObservedResourceEvidenceIds: R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS
+- backendCanStartNowSteps: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP03_ACR_PURCHASE_AND_REPOSITORY
 - immediateBackendSteps: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP03_ACR_PURCHASE_AND_REPOSITORY
 - blockedBackendSteps: BAP04_ACR_IMAGE_PUSH_AND_PULL, BAP05_BACKEND_ENV_IMPORT, BAP06_SAE_RUNTIME_CREATE, BAP07_DOMAINS_HTTPS_ICP, BAP08_SLS_ALERTS, BAP09_POSTDEPLOY_SMOKE
 
@@ -45,6 +46,8 @@
 - cloudInventoryReadyLocalOperations: 0/9
 - cloudInventoryExecutedCommandResults: 9/9
 - mutationPerformedCommandResults: 0
+- backendCanStartNowSteps: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP03_ACR_PURCHASE_AND_REPOSITORY
+- backendBlockedByDependencies: BAP04_ACR_IMAGE_PUSH_AND_PULL, BAP05_BACKEND_ENV_IMPORT, BAP06_SAE_RUNTIME_CREATE, BAP07_DOMAINS_HTTPS_ICP, BAP08_SLS_ALERTS, BAP09_POSTDEPLOY_SMOKE
 - canStartNowConsoleTasks: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS
 - cloudConsolePackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
 - externalAppPackets: none
@@ -74,10 +77,17 @@
 
 ## 下一步执行队列
 
+- backendCanStartNow: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP03_ACR_PURCHASE_AND_REPOSITORY
+- consoleCanStartNow: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS
 - canStartNow: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS
 - externalAppPrerequisites: none
 - deferredAppLaunchPrerequisites: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID
+- backendBlockedByDependencies: BAP04_ACR_IMAGE_PUSH_AND_PULL, BAP05_BACKEND_ENV_IMPORT, BAP06_SAE_RUNTIME_CREATE, BAP07_DOMAINS_HTTPS_ICP, BAP08_SLS_ALERTS, BAP09_POSTDEPLOY_SMOKE
 - blockedByDependencies: C01_SAE_RUNTIME, C03_API_DOMAIN_HTTPS_ICP, C04_ASSET_DOMAIN_HTTPS_ICP, C06_ENV_IMPORT, C07_SLS_ALERTS
+- BAP00_READONLY_INVENTORY_IDENTITY: kind=backend_apply_step; packets=P00_ALIYUN_READONLY_INVENTORY_IDENTITY; userIntervention=USER_CONFIRM_ALIYUN_READONLY_INVENTORY_IDENTITY; order=0. Restore Aliyun CLI/CloudShell read-only inventory evidence and write non-secret summaries only.
+- BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE: kind=backend_apply_step; packets=P11_ALIYUN_RDS_DATA_MIGRATION; userIntervention=USER_CONFIRM_RDS_PURCHASE_AND_DATABASE_PASSWORD; order=1. Create or confirm Aliyun RDS PostgreSQL in cn-hangzhou and close Supabase-to-RDS migration evidence.
+- BAP02_OSS_RAM_STS_CLOSE: kind=backend_apply_step; packets=P05_OSS_RAM_STS; userIntervention=USER_CONFIRM_OSS_RAM_STS_SECRET_OR_RUNTIME_ROLE; order=2. Confirm OSS RAM/STS least-privilege runtime access.
+- BAP03_ACR_PURCHASE_AND_REPOSITORY: kind=backend_apply_step; packets=P03_ACR_PURCHASE; userIntervention=USER_CONFIRM_ACR_PAID_PURCHASE; order=3. Purchase/confirm ACR Enterprise instance, namespace, and repository.
 - C02_ACR_IMAGE_AND_PULL: kind=aliyun_console_task; scope=purchase_and_repository_only; phrase=授权购买/确认 ACR 企业版实例和镜像仓库基础信息；不执行 docker login/push，不记录 registry password。
 - C05_OSS_AUDIO_RAM_STS: kind=aliyun_console_task; scope=full_task; phrase=授权确认 OSS 音频 bucket、CORS、RAM 最小权限或 STS/运行时角色；Secret 只进阿里云受控密钥环境。
 - externalAppPrerequisiteItems: none
