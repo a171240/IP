@@ -14,7 +14,7 @@ Generated: 2026-06-24T16:57:26.566Z
 - secretLeakCheck: true
 - actionTimeConfirmationRequired: U03_ACR_PURCHASE_CONFIRMATION, U04_ACR_RUNTIME_AUTH, U05_OSS_RAM_OR_STS, U11_ALIYUN_RDS_DATA_MIGRATION, U06_ENV_IMPORT, U07_DOMAIN_DNS_HTTPS_ICP, U08_SAE_RUNTIME_AND_SLS, U09_DEPLOY_AUTHORIZATION
 - nextActionTimeConfirmations: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
-- blockedCredentialCount: 1
+- blockedCredentialCount: 2
 - readySecretEnvVariableCount: 17
 - resourceEvidenceReady: 0/7
 - blockedResourceEvidenceIds: R01_SAE_RUNTIME, R02_ACR_IMAGE_REGISTRY, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R05_OSS_AUDIO_STORAGE, R06_ENV_IMPORT, R07_SLS_ALERTS
@@ -25,8 +25,8 @@ Generated: 2026-06-24T16:57:26.566Z
 - conclusion: 现在不能部署；这些 packet 只是阿里云后端动作时确认入口，不能替代 RDS/ACR/OSS/SAE/DNS/env/SLS/smoke 证据闭环。
 - canDeployNow: false
 - canCodexProceedWithoutUser: false
-- blockedCredentialCount: 1
-- blockedCredentialNames: ALIYUN_OSS_SECURITY_TOKEN
+- blockedCredentialCount: 2
+- blockedCredentialNames: ALIYUN_OSS_SECURITY_TOKEN, DATABASE_URL_CN
 - readySecretEnvVariableCount: 17
 - resourceEvidenceReady: 0/7
 - blockedResourceEvidenceIds: R01_SAE_RUNTIME, R02_ACR_IMAGE_REGISTRY, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R05_OSS_AUDIO_STORAGE, R06_ENV_IMPORT, R07_SLS_ALERTS

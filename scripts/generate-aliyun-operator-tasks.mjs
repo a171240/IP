@@ -708,6 +708,22 @@ function buildSensitiveActionItems({ envPlan, readiness, imagePublishPlan, nativ
     })
   }
 
+  const databaseUrlCn = variables.find((item) => item.name === "DATABASE_URL_CN")
+  if (!databaseUrlCn || databaseUrlCn.status !== "ready") {
+    items.push({
+      id: "S08_ALIYUN_RDS_DATABASE_URL",
+      type: "database_secret_and_migration",
+      status: "blocked",
+      owner: "阿里云 RDS/后端数据迁移操作员",
+      consolePath: "阿里云控制台 -> RDS PostgreSQL -> 实例/数据库/账号/连接信息；SAE/KMS/Secrets Manager",
+      variableNames: ["DATABASE_URL_CN"],
+      variableDetails: variableDetailsFor(variables, ["DATABASE_URL_CN"]),
+      requiredUserAction: "创建或确认 production-cn RDS PostgreSQL、数据库账号和网络访问策略；完成 Supabase 到 RDS/PostgreSQL 的迁移验收；只把 DATABASE_URL_CN 导入阿里云 secret env。",
+      unblockCondition: "rdsPostgres.databaseUrlCnSecretImported=true，migration.* 验收通过，且 APP 首版后端数据访问不再把 Supabase 作为正式 production-cn 数据库目标。",
+      forbidden: "不能把 DATABASE_URL_CN、数据库密码、dump 内容、Supabase service role key、AccessKeySecret 或 token 写入 JSON、Markdown、Docker 镜像、APP 包、小程序包或 git。",
+    })
+  }
+
   if (!envImport?.ready && readySecretGroups.length > 0) {
     items.push({
       id: "S06_READY_SENSITIVE_ENV_IMPORT",

@@ -24,8 +24,8 @@ Generated at: 2026-06-25T02:22:51.267Z
 - requiredIds: USER_CONFIRM_ALIYUN_READONLY_INVENTORY_IDENTITY, USER_CONFIRM_RDS_PURCHASE_AND_DATABASE_PASSWORD, USER_CONFIRM_ACR_PAID_PURCHASE, USER_CONFIRM_OSS_RAM_STS_SECRET_OR_RUNTIME_ROLE, USER_CONFIRM_SECRET_ENV_IMPORT, USER_CONFIRM_DNS_HTTPS_ICP_CHANGE, USER_CONFIRM_PRODUCTION_DEPLOY
 - paymentOrBillingConfirmations: RDS PostgreSQL instance/spec purchase or existing instance confirmation; ACR Enterprise Economic cn-hangzhou 1 month quoted CNY 117.00; SAE runtime/public ingress/SLS/certificate costs if prompted by Aliyun
 - secretOrPasswordHandling: Aliyun CLI profile, CloudShell session, AccessKeySecret or STS token if needed for read-only inventory; DATABASE_URL_CN; database account password; ALIYUN_OSS_ACCESS_KEY_SECRET or STS token if runtime role is not used; ACR registry password or credential helper; ready secret env import values; SUPABASE_SERVICE_ROLE_KEY only for controlled migration/export compatibility
-- blockedCredentialCount: 1
-- blockedCredentialNames: ALIYUN_OSS_SECURITY_TOKEN
+- blockedCredentialCount: 2
+- blockedCredentialNames: ALIYUN_OSS_SECURITY_TOKEN, DATABASE_URL_CN
 - backendNowExcludes: WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET, WECHAT_OPEN_PLATFORM_MOBILE_APP, ANDROID_RELEASE_WECHAT_SIGNATURE
 
 ## Apply Steps

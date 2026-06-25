@@ -82,7 +82,7 @@ test("Aliyun cloud actions package summarizes current cloud console action order
   assert.equal(report.summary.cloudInventoryResultsReady, false)
   assert.equal(report.summary.cloudInventoryReadyLocalOperations, "0/9")
   assert.equal(report.summary.cloudInventoryExecutedCommandResults, "9/9")
-  assert.equal(report.summary.blockedCredentialCount, 1)
+  assert.equal(report.summary.blockedCredentialCount, 2)
   assert.equal(report.summary.readySecretEnvVariableCount, 17)
   assert.equal(report.summary.resourceEvidenceReady, "0/7")
   assert.ok(report.summary.blockedResourceEvidenceIds.includes("R01_SAE_RUNTIME"))
@@ -90,8 +90,8 @@ test("Aliyun cloud actions package summarizes current cloud console action order
   assert.ok(report.summary.partiallyObservedResourceEvidenceIds.includes("R05_OSS_AUDIO_STORAGE"))
   assert.ok(report.summary.partiallyObservedResourceEvidenceIds.includes("R07_SLS_ALERTS"))
   assert.equal(report.cloudActionClosureBrief.canDeployNow, false)
-  assert.equal(report.cloudActionClosureBrief.blockedCredentialCount, 1)
-  assert.deepEqual(report.cloudActionClosureBrief.blockedCredentialNames, ["ALIYUN_OSS_SECURITY_TOKEN"])
+  assert.equal(report.cloudActionClosureBrief.blockedCredentialCount, 2)
+  assert.deepEqual(report.cloudActionClosureBrief.blockedCredentialNames, ["ALIYUN_OSS_SECURITY_TOKEN", "DATABASE_URL_CN"])
   assert.equal(report.cloudActionClosureBrief.readySecretEnvVariableCount, 17)
   assert.equal(report.cloudActionClosureBrief.resourceEvidenceReady, "0/7")
   assert.ok(report.cloudActionClosureBrief.blockedResourceEvidenceIds.includes("R02_ACR_IMAGE_REGISTRY"))
@@ -214,8 +214,8 @@ test("Aliyun cloud actions package markdown renders compact action order without
   assert.match(markdown, /# 阿里云控制台动作包/)
   assert.match(markdown, /packageId: C00_ALIYUN_CLOUD_ACTIONS/)
   assert.match(markdown, /## 目标闭环证据简表/)
-  assert.match(markdown, /blockedCredentialCount: 1/)
-  assert.match(markdown, /blockedCredentialNames: ALIYUN_OSS_SECURITY_TOKEN/)
+  assert.match(markdown, /blockedCredentialCount: 2/)
+  assert.match(markdown, /blockedCredentialNames: ALIYUN_OSS_SECURITY_TOKEN, DATABASE_URL_CN/)
   assert.match(markdown, /readySecretEnvVariableCount: 17/)
   assert.match(markdown, /resourceEvidenceReady: 0\/7/)
   assert.match(markdown, /blockedResourceEvidenceIds: .*R02_ACR_IMAGE_REGISTRY/)
@@ -266,7 +266,7 @@ test("APP production-cn action queue documents the current authorized next-step 
     "cloudInventoryReadyLocalOperations: 0/9",
     "cloudInventoryExecutedCommandResults: 9/9",
     "mutationPerformedCommandResults: 0",
-    "blockedCredentialNames: ALIYUN_OSS_SECURITY_TOKEN",
+    "blockedCredentialNames: ALIYUN_OSS_SECURITY_TOKEN, DATABASE_URL_CN",
     "canStartNow: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS",
     "cloudConsolePackets: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION",
     "externalAppPackets: none",

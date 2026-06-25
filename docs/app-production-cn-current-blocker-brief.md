@@ -43,12 +43,12 @@ Generated: 2026-06-25T01:54:11.225Z
 - cloudConfirmationsReady: 0/7
 - operatorTasksReady: 1/9
 - completion: proved 1/11, blocked 7, partial 1
-- sensitiveBlocked: 4/4
-- sensitiveBlockedIds: S03_ACR_PAID_PURCHASE, S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S06_READY_SENSITIVE_ENV_IMPORT
+- sensitiveBlocked: 5/5
+- sensitiveBlockedIds: S03_ACR_PAID_PURCHASE, S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT
 - deferredAppLaunchSensitiveBlockedIds: S01_WECHAT_OPEN_APP_LOGIN, S02_APPLE_TEAM_ID, S07_ANDROID_RELEASE_SIGNING
-- blockedCredentialCount: 1
+- blockedCredentialCount: 2
 - readySecretEnvVariableCount: 17
-- blockedVariableAcquisitionCount: 1
+- blockedVariableAcquisitionCount: 2
 - deferredAppLaunchVariableAcquisitionCount: 7
 - readySecretEnvImportGroupCount: 9
 - cloudInventoryStrictReady: 0/9
@@ -380,12 +380,13 @@ Generated: 2026-06-25T01:54:11.225Z
 | `S03_ACR_PAID_PURCHASE` | blocked | paid_purchase_confirmation | 用户/阿里云 ACR 操作员 | none |
 | `S04_ACR_REGISTRY_AUTH` | blocked | registry_password_or_runtime_pull_secret | 阿里云 ACR/SAE 操作员 | none |
 | `S05_OSS_RAM_SECRET_OR_STS` | blocked | ram_secret_or_sts_import | 阿里云 OSS/RAM 操作员 | ALIYUN_OSS_ACCESS_KEY_ID, ALIYUN_OSS_ACCESS_KEY_SECRET, ALIYUN_OSS_SECURITY_TOKEN |
+| `S08_ALIYUN_RDS_DATABASE_URL` | blocked | database_secret_and_migration | 阿里云 RDS/后端数据迁移操作员 | DATABASE_URL_CN |
 | `S06_READY_SENSITIVE_ENV_IMPORT` | blocked | ready_sensitive_env_need_cloud_import | 阿里云运行环境/密钥操作员 | NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, WECHAT_LOGIN_SECRET, ALIYUN_OSS_ACCESS_KEY_ID, ALIYUN_OSS_ACCESS_KEY_SECRET, DASHSCOPE_API_KEY, DEEPSEEK_API_KEY, SERVICE_RECORD_DEEPSEEK_API_KEY, VOLC_SPEECH_ACCESS_TOKEN, VOLC_SPEECH_APP_ID, VOLC_SPEECH_SECRET_KEY, ADMIN_USER_IDS, CREDITS_IP_SALT, APIMART_API_KEY, WECHAT_MINI_APPID, WECHAT_MINI_SECRET |
 
 ## 用户介入密钥/密码简表
 
-- blockedCredentialCount: 1
-- blockedCredentialNames: ALIYUN_OSS_SECURITY_TOKEN
+- blockedCredentialCount: 2
+- blockedCredentialNames: ALIYUN_OSS_SECURITY_TOKEN, DATABASE_URL_CN
 - readySecretEnvVariableCount: 17
 - readySecretEnvVariableNames: ADMIN_USER_IDS, ALIYUN_OSS_ACCESS_KEY_ID, ALIYUN_OSS_ACCESS_KEY_SECRET, APIMART_API_KEY, CREDITS_IP_SALT, DASHSCOPE_API_KEY, DEEPSEEK_API_KEY, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_SUPABASE_URL, SERVICE_RECORD_DEEPSEEK_API_KEY, SUPABASE_SERVICE_ROLE_KEY, VOLC_SPEECH_ACCESS_TOKEN, VOLC_SPEECH_APP_ID, VOLC_SPEECH_SECRET_KEY, WECHAT_LOGIN_SECRET, WECHAT_MINI_APPID, WECHAT_MINI_SECRET
 - forbiddenStorage: git, JSON/Markdown 报告, Docker image, App bundle, 小程序或 App 前端包

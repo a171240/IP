@@ -770,6 +770,7 @@ const SENSITIVE_BLOCKER_TO_PACKET_IDS = Object.freeze({
   S05_OSS_RAM_SECRET_OR_STS: Object.freeze(["P05_OSS_RAM_STS"]),
   S06_READY_SENSITIVE_ENV_IMPORT: Object.freeze(["P06_ENV_IMPORT"]),
   S07_ANDROID_RELEASE_SIGNING: Object.freeze(["P10_ANDROID_RELEASE_SIGNING"]),
+  S08_ALIYUN_RDS_DATABASE_URL: Object.freeze(["P11_ALIYUN_RDS_DATA_MIGRATION"]),
 })
 
 function buildBlockedVariableAcquisitionPlan(sensitiveBlockers, options = {}) {

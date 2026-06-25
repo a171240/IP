@@ -20,7 +20,7 @@ Production-cn cannot be deployed now.
 Current credential gate:
 
 ```text
-blockedCredentialCount=8
+blockedCredentialCount=9
 readySecretEnvVariableCount=17
 canCodexProceedWithoutUser=false
 actionTimeConfirmationRequired=true
@@ -43,6 +43,7 @@ If a console is already logged in, the operator may navigate and inspect non-sec
 | `S03_ACR_PAID_PURCHASE` | ACR Enterprise Economic purchase confirmation, registry host, namespace, repository | 阿里云控制台 -> 容器镜像服务 ACR -> 企业版购买页 | Non-secret purchase and repository evidence -> `deploy/aliyun-production-cn.image-publish.local.json` | `corepack pnpm aliyun:image:plan`; `corepack pnpm aliyun:resources:matrix`; `corepack pnpm aliyun:user:actions` | Do not click purchase until amount, region, edition, and term are confirmed at action time. Current candidate is cn-hangzhou, 1 month, CNY 117.00. |
 | `S04_ACR_REGISTRY_AUTH` | Registry push and SAE pull credential path | 阿里云控制台 -> ACR namespace/repository; SAE app -> image pull configuration | Docker credential helper, RAM/KMS/Secrets Manager, or Aliyun runtime secret settings only; non-secret digest evidence -> image-publish local file | `corepack pnpm aliyun:image:plan:strict`; `corepack pnpm aliyun:container:smoke` | Do not store registry username/password, RAM Secret, or token in files, images, reports, shell history, or git. |
 | `S05_OSS_RAM_SECRET_OR_STS` | `ALIYUN_OSS_SECURITY_TOKEN` if STS is selected; OSS bucket/CORS/prefix/RAM least privilege closure | 阿里云控制台 -> OSS Bucket / RAM 访问控制 / SAE runtime identity / Secrets Manager | OSS AccessKey/STS material -> KMS/Secrets Manager/SAE secret env only; non-secret evidence -> `items.oss` | `corepack pnpm aliyun:cloud:confirmations`; `corepack pnpm aliyun:health:smoke` | Do not create commit-ready long-lived plaintext secrets. Do not download OSS object contents. |
+| `S08_ALIYUN_RDS_DATABASE_URL` | `DATABASE_URL_CN` plus RDS PostgreSQL schema/data/API smoke/rollback migration evidence | 阿里云控制台 -> RDS PostgreSQL -> 实例/数据库/账号/连接信息；SAE/KMS/Secrets Manager -> secret env | `DATABASE_URL_CN` -> KMS/Secrets Manager/SAE secret env only; non-secret migration evidence -> `rds-migration.local.json` and `items.envImport` | `corepack pnpm aliyun:rds:migration:evidence:strict`; `corepack pnpm aliyun:sensitive:blockers:backend`; `corepack pnpm aliyun:backend-cn:status`; `corepack pnpm aliyun:completion:audit` | Do not store DATABASE_URL_CN, database password, dump contents, customer data, Supabase service role key, AccessKeySecret, token, reports, images, shell history, or git. |
 | `S06_READY_SENSITIVE_ENV_IMPORT` | Ready local/Vercel/Supabase/API provider env values imported into Aliyun runtime | Existing Vercel production, Supabase, Aliyun Bailian/DashScope, DeepSeek, Volcengine, WeChat mini-program consoles | Plain env only for public identifiers; KMS/Secrets Manager/SAE secret env for secret values; non-secret evidence -> `items.envImport` | `corepack pnpm aliyun:env:checklist`; `corepack pnpm aliyun:sensitive:blockers`; `corepack pnpm aliyun:readiness:cloud-ready` | Do not paste any value into reports. Do not import WECHAT_OPEN_APP_ID/SECRET before the WeChat mobile app is approved and separately authorized. |
 
 ## Ready Env Names Still Requiring Controlled Import
@@ -81,6 +82,7 @@ P10_ANDROID_RELEASE_SIGNING
 P02_APPLE_TEAM_ID
 P03_ACR_PURCHASE
 P05_OSS_RAM_STS
+P11_ALIYUN_RDS_DATA_MIGRATION
 ```
 
 These are still dependency-blocked:

@@ -17,7 +17,7 @@ Production-cn cannot be deployed now.
 Current sensitive gate:
 
 ```text
-blockedCredentialCount=8
+blockedCredentialCount=9
 readySecretEnvVariableCount=17
 readySecretEnvVariableGroupCount=9
 canCodexProceedWithoutUser=false
@@ -34,6 +34,7 @@ These names are still blocked by external review, controlled identifier lookup, 
 | `WECHAT_OPEN_APP_SECRET` | `S01_WECHAT_OPEN_APP_LOGIN` | WeChat Open Platform operator | Aliyun KMS / Secrets Manager / SAE secret env |
 | `APPLE_TEAM_ID` | `S02_APPLE_TEAM_ID` | Apple Developer / iOS release operator | Aliyun SAE plain env |
 | `ALIYUN_OSS_SECURITY_TOKEN` | `S05_OSS_RAM_SECRET_OR_STS` | Aliyun OSS/RAM operator | Aliyun KMS / Secrets Manager / SAE secret env |
+| `DATABASE_URL_CN` | `S08_ALIYUN_RDS_DATABASE_URL` | Aliyun RDS / backend data migration operator | Aliyun KMS / Secrets Manager / SAE secret env |
 | `MEIYE_RELEASE_STORE_FILE` | `S07_ANDROID_RELEASE_SIGNING` | Android release operator | Local or CI Android signing secret store |
 | `MEIYE_RELEASE_STORE_PASSWORD` | `S07_ANDROID_RELEASE_SIGNING` | Android release operator | Local or CI Android signing secret store |
 | `MEIYE_RELEASE_KEY_ALIAS` | `S07_ANDROID_RELEASE_SIGNING` | Android release operator | Local or CI Android signing secret store |

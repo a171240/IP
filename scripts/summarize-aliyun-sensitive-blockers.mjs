@@ -186,6 +186,10 @@ const CREDENTIAL_GROUP_METADATA = Object.freeze({
     category: "oss_ram_sts",
     userQuestion: "OSS/RAM/STS 密钥如何导入阿里云运行环境",
   }),
+  S08_ALIYUN_RDS_DATABASE_URL: Object.freeze({
+    category: "rds_database_secret_and_migration",
+    userQuestion: "DATABASE_URL_CN 从哪里获得并导入到哪里",
+  }),
   S06_READY_SENSITIVE_ENV_IMPORT: Object.freeze({
     category: "ready_secret_env_import",
     userQuestion: "本机已有 API key 如何迁到阿里云 secret env",
@@ -252,6 +256,7 @@ function buildCredentialGroup(item) {
 function valueHandlingForItem(item, variableDetails) {
   if (item.id === "S03_ACR_PAID_PURCHASE") return "只记录 ACR 规格、地域、命名空间、仓库名和付款确认状态；不记录付款凭据。"
   if (item.id === "S04_ACR_REGISTRY_AUTH") return "镜像仓库登录和 SAE 拉取凭证只能进入 Docker credential helper、RAM/KMS/Secrets Manager 或阿里云运行时 secret 配置。"
+  if (item.id === "S08_ALIYUN_RDS_DATABASE_URL") return "DATABASE_URL_CN 和数据库密码只能进入 KMS/Secrets Manager/SAE secret env；报告只记录 RDS 实例、数据库名、布尔状态和迁移验收证据。"
   if (item.id === "S07_ANDROID_RELEASE_SIGNING") return "release keystore 和密码只进入本机/CI signing secret store；微信开放平台只填写签名摘要。"
   if (variableDetails.some((variable) => String(variable.importTarget || "").includes("plain env"))) {
     return "公开标识符可导入 SAE plain env；secret value 仍必须走 KMS/Secrets Manager/SAE secret env。"
@@ -262,6 +267,7 @@ function valueHandlingForItem(item, variableDetails) {
 function forbiddenStorageForItem(item) {
   if (item.id === "S07_ANDROID_RELEASE_SIGNING") return ["git", "JSON/Markdown 报告", "Docker image", "App bundle", "debug.keystore"]
   if (item.id === "S04_ACR_REGISTRY_AUTH") return ["git", "JSON/Markdown 报告", "Docker image", "shell history"]
+  if (item.id === "S08_ALIYUN_RDS_DATABASE_URL") return ["git", "JSON/Markdown 报告", "Docker image", "APP bundle", "小程序或 App 前端包", "shell history"]
   return ["git", "JSON/Markdown 报告", "Docker image", "App bundle", "小程序或 App 前端包"]
 }
 
@@ -300,6 +306,7 @@ function interventionMode(item) {
   if (
     item.type === "registry_password_or_runtime_pull_secret" ||
     item.type === "ram_secret_or_sts_import" ||
+    item.type === "database_secret_and_migration" ||
     item.type === "ready_sensitive_env_need_cloud_import"
   ) {
     return "controlled_secret_channel"
@@ -381,7 +388,7 @@ function buildReport(operatorTasks, args) {
     nextActions: [
       ...(args.backendOnly
         ? [
-          "当前后端-only 先处理 S03/S04/S05/S06：ACR 付款、registry/SAE 拉取认证、OSS RAM/STS、ready secret env 导入。",
+          "当前后端-only 先处理 S03/S04/S05/S08/S06：ACR 付款、registry/SAE 拉取认证、OSS RAM/STS、RDS DATABASE_URL_CN、ready secret env 导入。",
           "微信开放平台、Apple Team ID 和 Android release signing 保留为 APP 发布阶段延期项，不作为当前阿里云后端阻塞。",
         ]
         : [

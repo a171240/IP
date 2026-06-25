@@ -17,10 +17,10 @@ Production-cn cannot be deployed now.
 Current sensitive gate:
 
 ```text
-total=7
+total=8
 ready=0
-blocked=7
-blockedCredentialCount=8
+blocked=8
+blockedCredentialCount=9
 readySecretEnvVariableCount=17
 canCodexProceedWithoutUser=false
 actionTimeConfirmationRequired=true
@@ -31,6 +31,7 @@ Blocked credential or controlled identifier names:
 ```text
 ALIYUN_OSS_SECURITY_TOKEN
 APPLE_TEAM_ID
+DATABASE_URL_CN
 MEIYE_RELEASE_KEY_ALIAS
 MEIYE_RELEASE_KEY_PASSWORD
 MEIYE_RELEASE_STORE_FILE
@@ -223,6 +224,43 @@ Unblock condition:
 oss.ramLeastPrivilege=true
 secret or STS token injected only through Aliyun controlled secret env
 ```
+
+### S08_ALIYUN_RDS_DATABASE_URL
+
+Type: database secret and migration.
+
+Owner: Aliyun RDS / backend data migration operator.
+
+Obtain from:
+
+```text
+阿里云控制台 -> RDS PostgreSQL -> 实例/数据库/账号/连接信息
+SAE / KMS / Secrets Manager -> secret env
+```
+
+Variable:
+
+```text
+DATABASE_URL_CN
+```
+
+Write targets:
+
+```text
+DATABASE_URL_CN -> Aliyun KMS / Secrets Manager / SAE secret env
+deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres / migration non-secret evidence
+deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport
+```
+
+Unblock condition:
+
+```text
+rdsPostgres.databaseUrlCnSecretImported=true
+schema/data/APP API smoke/rollback validation passed
+Supabase is no longer the formal production-cn database target
+```
+
+Do not write DATABASE_URL_CN, database password, dump contents, Supabase service role key, AccessKeySecret, token, or customer data into JSON, Markdown, Docker image, shell history, APP bundle, mini-program package, or git.
 
 ### S06_READY_SENSITIVE_ENV_IMPORT
 

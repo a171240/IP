@@ -91,6 +91,28 @@ export const SENSITIVE_ACTION_METADATA = {
       "secret/token imported only through Aliyun controlled secret env",
     ],
   },
+  S08_ALIYUN_RDS_DATABASE_URL: {
+    obtainFrom: "阿里云控制台 -> RDS PostgreSQL -> 实例/数据库/账号/连接信息；SAE/KMS/Secrets Manager -> secret env",
+    writeTargets: [
+      "DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env only",
+      "deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres / migration non-secret evidence",
+      "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport non-secret confirmation",
+    ],
+    verifyCommands: [
+      "corepack pnpm aliyun:rds:migration:evidence:strict",
+      "corepack pnpm aliyun:sensitive:blockers:backend",
+      "corepack pnpm aliyun:backend-cn:status",
+      "corepack pnpm aliyun:completion:audit",
+    ],
+    requiresActionTimeConfirmation: true,
+    completionEvidence: [
+      "Aliyun RDS PostgreSQL instance exists in cn-hangzhou",
+      "database account and least-privilege access are ready",
+      "DATABASE_URL_CN imported through secret env only",
+      "schema/data/APP API smoke/rollback validation passed",
+      "backend production-cn no longer depends on Supabase as formal database target",
+    ],
+  },
   S06_READY_SENSITIVE_ENV_IMPORT: {
     obtainFrom: "现有 Vercel production / Supabase / 阿里云百炼 / DeepSeek / 火山引擎 / 微信公众平台等控制台",
     writeTargets: [
