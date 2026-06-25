@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 阿里云 Provisioning Plan
 
-Generated: 2026-06-24T09:07:36.282Z
+Generated: 2026-06-25T07:07:45.970Z
 
 ## 结论
 
@@ -32,7 +32,7 @@ Generated: 2026-06-24T09:07:36.282Z
 - Ready authorization packets: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
 - Deferred APP launch authorization packets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID
 - Ready console action packets: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS
-- Blocked credential count: 8
+- Blocked credential count: 9
 - Ready secret env variable count: 17
 - Resource evidence ready: 0/7
 - Blocked resource evidence ids: R01_SAE_RUNTIME, R02_ACR_IMAGE_REGISTRY, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R05_OSS_AUDIO_STORAGE, R06_ENV_IMPORT, R07_SLS_ALERTS
@@ -43,8 +43,8 @@ Generated: 2026-06-24T09:07:36.282Z
 - Conclusion: 现在不能部署；当前只推进阿里云后端，PH02 可进入动作时确认，微信移动 App、Android/iOS 发布凭证延期到后端上线后。
 - Can deploy now: false
 - Can Codex execute now: false
-- Blocked credential count: 8
-- Blocked credential names: ALIYUN_OSS_SECURITY_TOKEN, APPLE_TEAM_ID, MEIYE_RELEASE_KEY_ALIAS, MEIYE_RELEASE_KEY_PASSWORD, MEIYE_RELEASE_STORE_FILE, MEIYE_RELEASE_STORE_PASSWORD, WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET
+- Blocked credential count: 9
+- Blocked credential names: ALIYUN_OSS_SECURITY_TOKEN, APPLE_TEAM_ID, DATABASE_URL_CN, MEIYE_RELEASE_KEY_ALIAS, MEIYE_RELEASE_KEY_PASSWORD, MEIYE_RELEASE_STORE_FILE, MEIYE_RELEASE_STORE_PASSWORD, WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET
 - Ready secret env variable count: 17
 - Resource evidence ready: 0/7
 - Blocked resource evidence ids: R01_SAE_RUNTIME, R02_ACR_IMAGE_REGISTRY, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R05_OSS_AUDIO_STORAGE, R06_ENV_IMPORT, R07_SLS_ALERTS
@@ -178,7 +178,7 @@ Generated: 2026-06-24T09:07:36.282Z
   - imagePushed=true、digestVerified=true、runtime.remoteImageConfigured=true、runtime.imagePullConfigured=true 都属于后置验收。
 - Completion evidence:
   - ACR 只记录 registry host、namespace、repository、remote tag 和购买证据。
-  - RDS PostgreSQL 必须完成实例、DATABASE_URL_CN secret env、数据访问层迁移和回滚验收。
+  - RDS PostgreSQL 必须完成实例、DATABASE_URL_CN secret env、schema/data 迁移、APP API smoke 和回滚验收；首版业务数据访问代码侧已切到 RDS repository。
   - OSS 只记录 bucket、region、CORS、RAM/STS 最小权限布尔证据。
 - Explicitly excluded:
   - 未明确确认金额前不点击付款。
@@ -248,7 +248,7 @@ Generated: 2026-06-24T09:07:36.282Z
 - Current action scope handles: none
 - Blocking dependencies: P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION, C05_OSS_AUDIO_RAM_STS, notReadyForCurrentScope:P06_ENV_IMPORT
 - Current blockers: missing_required_env:DATABASE_URL_CN; envImport:confirmed; envImport:secretNotInImage; envImport:placeholder:importedAt; envImport:placeholder:evidence; S06_READY_SENSITIVE_ENV_IMPORT:blocked; R06_ENV_IMPORT:missing_required_env:DATABASE_URL_CN; R06_ENV_IMPORT:envImport:confirmed; R06_ENV_IMPORT:envImport:secretNotInImage; R06_ENV_IMPORT:envImport:placeholder:importedAt; R06_ENV_IMPORT:envImport:placeholder:evidence; requiredEnv:DATABASE_URL_CN; dependsOn:P05_OSS_RAM_STS; dependsOn:P11_ALIYUN_RDS_DATA_MIGRATION; dependsOn:C05_OSS_AUDIO_RAM_STS; dependsOn:notReadyForCurrentScope:P06_ENV_IMPORT
-- Verify commands: `corepack pnpm aliyun:env:checklist`; `corepack pnpm aliyun:sensitive:blockers`; `corepack pnpm aliyun:env:check`; `corepack pnpm aliyun:readiness:strict`; `corepack pnpm aliyun:readiness:cloud-ready`
+- Verify commands: `corepack pnpm aliyun:env:handoff:backend`; `corepack pnpm aliyun:sensitive:blockers:backend`; `corepack pnpm aliyun:env:checklist`; `corepack pnpm aliyun:env:check`; `corepack pnpm aliyun:readiness:strict`; `corepack pnpm aliyun:readiness:cloud-ready`
 - Current action acceptance evidence:
   - secretNotInImage=true
   - importedAt=实际导入时间

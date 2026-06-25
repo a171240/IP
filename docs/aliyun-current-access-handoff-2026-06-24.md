@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn CloudShell/CLI 只读盘点交接包
 
-Generated: 2026-06-24T14:54:59.856Z
+Generated: 2026-06-25T07:08:55.439Z
 
 ## 当前结论
 
@@ -15,7 +15,7 @@ Generated: 2026-06-24T14:54:59.856Z
 - strictInventoryMutationPerformedCommandResults: 0
 - currentBrowserCanUseCurrentConsole: true
 - currentBrowserAliyunConsoleTabCount: 1
-- currentBrowserAliyunConsoleHostPaths: shell.aliyun.com
+- currentBrowserAliyunConsoleHostPaths: home.console.aliyun.com/home/dashboard/ProductAndService
 - currentBrowserCloudApiCalled: false
 - currentBrowserCloudMutationPerformed: false
 - inventoryPlanStatus: blocked_until_cli_configured
@@ -58,7 +58,7 @@ Generated: 2026-06-24T14:54:59.856Z
 - currentStatus: cloudshell_cli_config_missing_or_unread
 - consolePath: 阿里云控制台 -> CloudShell -> cn-hangzhou / 华东1或华东2账号上下文
 - currentBrowserCanUseCurrentConsole: true
-- currentBrowserAliyunConsoleHostPaths: shell.aliyun.com
+- currentBrowserAliyunConsoleHostPaths: home.console.aliyun.com/home/dashboard/ProductAndService
 - currentBrowserCloudApiCalled: false
 - currentBrowserCloudMutationPerformed: false
 - currentBrowserEvidence: current_chrome_aliyun_console_tabs_1

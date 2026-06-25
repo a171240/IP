@@ -485,7 +485,7 @@ function buildBridgeDataLayerBoundary(productionStatus, operatorHandoff) {
     rdsMigrationRequiredForFinalProductionCn: source.rdsMigrationRequiredForFinalProductionCn !== false,
     notes: source.notes || [
       "正式国内 production-cn 目标必须使用阿里云 RDS PostgreSQL；Supabase 只能作为迁移来源或旧链路兼容，不是正式数据库。",
-      "DATABASE_URL_CN 是正式全阿里云数据层的必填阻塞项；仅填写连接串仍不等于完成 Supabase SDK 到 RDS/PostgreSQL 的代码和数据迁移。",
+      "DATABASE_URL_CN 是正式全阿里云数据层的必填阻塞项；首版 APP 业务数据访问代码侧已切到 RDS repository，但仅填写连接串仍不等于完成 RDS 实例、schema/data、smoke 和 rollback 验收。",
       "REDIS_URL_CN 只有在 production-cn 队列/缓存实现明确依赖 Tair/Redis 时才升级为必填阻塞项。",
     ],
   }

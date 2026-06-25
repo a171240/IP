@@ -18,7 +18,7 @@
 
 2026-06-24 CST 复核：`deploy/aliyun-production-cn.cloud-inventory-results.local.json` 已存在，但当前严格校验未就绪。`cloudInventoryResults` 当前为 `localReady=false`、`readyLocalOperations=0/9`、`executedCommandResults=9/9`、`cloudApiCalledCommandResults=9/9`、`mutationPerformedCommandResults=0`，阻塞项为 `readonly_inventory_strict_ready=0/9`；这表示现有本地摘要不能作为“资源存在/不存在”的最终 strict 证据。
 
-2026-06-24 数据层补充：当前 strict inventory 不完整，不能再把旧快照中的 RDS PostgreSQL / Redis/Tair 数量当作当前事实。按正式全阿里云 production-cn 口径，`DATABASE_URL_CN` 仍是必填阻塞项，必须配套 RDS PostgreSQL 实例、后端数据访问层迁移、schema/data 迁移和回滚验收；Supabase 只能作为迁移来源或旧链路兼容。`REDIS_URL_CN` 仍可按实际队列/缓存依赖后置。
+2026-06-25 数据层补充：当前 strict inventory 不完整，不能再把旧快照中的 RDS PostgreSQL / Redis/Tair 数量当作当前事实。按正式全阿里云 production-cn 口径，`DATABASE_URL_CN` 仍是必填阻塞项；首版 APP 业务数据访问代码侧已经切到 APP-native RDS repository，但还必须配套 RDS PostgreSQL 实例、数据库账号、secret env 导入、schema/data 迁移、APP API smoke 和回滚验收。Supabase 只能作为迁移来源或旧链路兼容。`REDIS_URL_CN` 仍可按实际队列/缓存依赖后置。
 
 当前 Vercel production 只读覆盖检查 `corepack pnpm aliyun:vercel-env:coverage` 显示 required `17/27` 已存在，缺 `APP_ENV`、`APP_REGION`、`APP_API_BASE_URL`、`APP_ASSET_BASE_URL`、`NEXT_PUBLIC_SITE_URL`、`PRIVACY_POLICY_URL`、`TERMS_URL`、`DATABASE_URL_CN`、`WECHAT_OPEN_APP_ID`、`WECHAT_OPEN_APP_SECRET`。前 7 个是国内 APP/阿里云运行配置；`DATABASE_URL_CN` 必须来自阿里云 RDS PostgreSQL 和迁移验收；后 2 个必须等微信开放平台移动应用创建并审核通过后获得。
 
@@ -59,7 +59,7 @@
 | ACR 镜像仓库 | 阿里云控制台 -> 容器镜像服务 ACR -> 命名空间/仓库 | `deploy/aliyun-production-cn.image-publish.local.json` 非密钥证据；Docker credential helper 或 RAM | 认证信息是密钥 | 未确认 ready；企业版经济版 `cn-hangzhou` 1 个月候选报价已核到 `CNY 117.00` / `¥117.00`，购买前需用户对金额和规格动作确认 |
 | OSS Bucket | 阿里云控制台 -> OSS -> Bucket、地域、CORS、RAM 最小权限 | `ALIYUN_OSS_BUCKET`、`ALIYUN_OSS_REGION`、`SERVICE_RECORD_OSS_PREFIX`；密钥走 KMS/Secrets Manager | Bucket/Region 否，AccessKey Secret 是 | Bucket/CORS 已建；RAM 策略模板见 `deploy/aliyun-production-cn.oss-ram-policy.json`，AccessKey/Secret 仍未创建导入 |
 | SLS 日志 | 阿里云控制台 -> SLS -> Project/Logstore/告警 | `deploy/aliyun-production-cn.cloud-confirmations.local.json` 非密钥证据 | 否 | 已记录 project/logstore 非密钥证据，但 health/5xx 告警未配置，`slsAlerts.confirmed=false` |
-| RDS PostgreSQL | 阿里云控制台 -> RDS -> PostgreSQL 实例 | `DATABASE_URL_CN` 或等价连接串走 KMS/Secrets Manager | 是 | 当前 strict inventory 未就绪，实例存在性未验证；正式 production-cn 必填，必须完成 RDS 实例、代码迁移、数据迁移和回滚验收 |
+| RDS PostgreSQL | 阿里云控制台 -> RDS -> PostgreSQL 实例 | `DATABASE_URL_CN` 或等价连接串走 KMS/Secrets Manager | 是 | 当前 strict inventory 未就绪，实例存在性未验证；正式 production-cn 必填；首版业务数据访问代码侧已切到 RDS repository，但仍必须完成 RDS 实例、schema/data 迁移、APP API smoke 和回滚验收 |
 | Redis/Tair | 阿里云控制台 -> Tair/Redis -> 实例 | 后续 `REDIS_URL_CN` 或等价连接串走 KMS/Secrets Manager | 是 | 当前 strict inventory 未就绪，实例存在性未验证；第一版桥接部署可后置 |
 
 ## 正式数据层必填与可后置变量
@@ -68,7 +68,7 @@
 
 | 变量 | 获取位置 | 导入位置 | 密钥 | 当前状态 |
 | --- | --- | --- | --- | --- |
-| `DATABASE_URL_CN` | 创建或确认阿里云 RDS PostgreSQL 后生成连接串，并完成迁移验收 | 阿里云 SAE secret/KMS/Secrets Manager | 是 | `todo`；当前 RDS 存在性未由 strict inventory 验证，且后端仍需完成 Supabase 到 RDS/PostgreSQL 迁移 |
+| `DATABASE_URL_CN` | 创建或确认阿里云 RDS PostgreSQL 后生成连接串，并完成迁移验收 | 阿里云 SAE secret/KMS/Secrets Manager | 是 | `todo`；当前 RDS 存在性未由 strict inventory 验证；代码侧首版 RDS repository 已就绪，但 RDS 实例、连接串密钥、schema/data、smoke 和 rollback 证据未完成 |
 | `REDIS_URL_CN` | 创建或确认阿里云 Tair/Redis 后生成连接串 | 阿里云 SAE secret/KMS/Secrets Manager | 是 | `todo`；当前 Redis/Tair 存在性未由 strict inventory 验证 |
 
 ## 后端密钥

@@ -55,7 +55,7 @@ const PHASES = Object.freeze([
     consoleTasks: ["C02_ACR_IMAGE_AND_PULL", "C05_OSS_AUDIO_RAM_STS"],
     completionEvidence: [
       "ACR 只记录 registry host、namespace、repository、remote tag 和购买证据。",
-      "RDS PostgreSQL 必须完成实例、DATABASE_URL_CN secret env、数据访问层迁移和回滚验收。",
+      "RDS PostgreSQL 必须完成实例、DATABASE_URL_CN secret env、schema/data 迁移、APP API smoke 和回滚验收；首版业务数据访问代码侧已切到 RDS repository。",
       "OSS 只记录 bucket、region、CORS、RAM/STS 最小权限布尔证据。",
     ],
   }),

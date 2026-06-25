@@ -1036,7 +1036,7 @@ app_universal_link:apple_team_id_missing
 
 2026-06-22 追加：`aliyun:operator:handoff` 现在也内置 Vercel production 变量名覆盖摘要，会输出 `requiredCovered`、`optionalCovered`、可迁移桥接变量名、Vercel 仍缺的 production-cn 必填变量名，以及其中属于国内 APP/微信开放平台/正式域名的新变量。该摘要只来自 `vercel env ls --format json` 的元数据，`containsValues=false`，不会展示或写出任何环境变量值；`aliyun:release:artifacts -- --skip-vercel-env-coverage` 会把跳过参数透传给 `operator-handoff`，离线生成审计包时不会隐式访问 Vercel。
 
-2026-06-22 历史快照：当时结构化 `bridgeDataLayer` 仍把第一版 APP production-cn 描述为阿里云 API 容器 + 现有 Supabase 数据层的桥接部署，并把 `DATABASE_URL_CN` / `REDIS_URL_CN` 可后置。该口径已被 2026-06-24 的全阿里云正式版门禁覆盖；当前 Supabase 只能作为迁移来源或旧链路兼容，`DATABASE_URL_CN`、RDS PostgreSQL、代码迁移、数据迁移和回滚验收都必须在 production-cn 发布前闭环。
+2026-06-22 历史快照：当时结构化 `bridgeDataLayer` 仍把第一版 APP production-cn 描述为阿里云 API 容器 + 现有 Supabase 数据层的桥接部署，并把 `DATABASE_URL_CN` / `REDIS_URL_CN` 可后置。该口径已被 2026-06-24 的全阿里云正式版门禁覆盖；当前 Supabase 只能作为迁移来源或旧链路兼容。首版业务数据访问代码侧已切到 APP-native RDS repository，仍必须在 production-cn 发布前闭环 `DATABASE_URL_CN`、RDS PostgreSQL 实例、schema/data 迁移、APP API smoke 和回滚验收。
 
 2026-06-22 05:57 CST 复核：协议 URL ready 后重新运行 `corepack pnpm aliyun:predeploy`，通过；env requiredReady 23/25，health smoke 只缺 `appWechatLogin`，App API smoke 30 probes / 0 failures。
 

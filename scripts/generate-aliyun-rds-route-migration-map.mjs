@@ -466,7 +466,7 @@ function buildReport(args) {
       : [
           "Create or confirm Aliyun RDS PostgreSQL in cn-hangzhou before importing DATABASE_URL_CN.",
           "Implement the RDS work packages in order: account, context, service-records, store-admin, then invites.",
-          "Replace first-version APP API shared Supabase data access with PostgreSQL repositories backed by DATABASE_URL_CN.",
+          "For any first-version APP API route that still reports Supabase data access, replace that shared access with PostgreSQL repositories backed by DATABASE_URL_CN.",
           "Run schema/data migration, row-count validation, critical-record validation, APP API smoke, and rollback rehearsal.",
         ],
     safetyBoundary: [
