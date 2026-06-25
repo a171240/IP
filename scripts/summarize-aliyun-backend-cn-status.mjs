@@ -242,6 +242,14 @@ function buildReport(args) {
     "--cloud-confirmations",
     args.cloudConfirmationsFile,
   ])
+  const actionAuthorization = runJson("action_authorization", [
+    "scripts/summarize-aliyun-action-authorization.mjs",
+    "--backend-only",
+    "--env-file",
+    args.envFile,
+    "--cloud-confirmations",
+    args.cloudConfirmationsFile,
+  ])
 
   const backendRequiredBlocking = buildBackendRequiredBlocking({
     cloudConfirmations,
@@ -260,6 +268,7 @@ function buildReport(args) {
   const cloudInventory = compactCloudInventory(cloudInventoryResults)
   const cloudResources = compactCloudResources(resourceMatrix)
   const credentialIntervention = compactCredentialIntervention(sensitiveBlockers)
+  const actionAuthorizationSummary = compactActionAuthorization(actionAuthorization)
 
   const report = {
     ok: true,
@@ -293,6 +302,7 @@ function buildReport(args) {
       imagePublishReady: imagePublishPlan.ready === true || imagePublishPlan.local?.ready === true,
       sensitiveActionBlockedIds: credentialIntervention.sensitiveActionBlockedIds,
       actionTimeConfirmationRequiredIds: credentialIntervention.actionTimeConfirmationRequiredIds,
+      nextActionTimeConfirmationPacketIds: actionAuthorizationSummary.nextActionTimeConfirmationPacketIds,
       blockedCredentialNames: credentialIntervention.blockedCredentialNames,
       readySecretEnvVariableCount: credentialIntervention.readySecretEnvVariableNames.length,
       readySecretEnvVariableNames: credentialIntervention.readySecretEnvVariableNames,
@@ -306,6 +316,7 @@ function buildReport(args) {
     imagePublish: compactImagePublish(imagePublishPlan),
     cloudConfirmations: compactCloudConfirmations(cloudConfirmations),
     credentialIntervention,
+    actionAuthorization: actionAuthorizationSummary,
     deferredScope: {
       wechatOpenMobileApp: {
         status: "deferred_after_backend_online",
@@ -562,6 +573,48 @@ function buildCredentialInterventionBreakdown({
   }
 }
 
+function compactActionAuthorization(report) {
+  const summary = report.summary || {}
+  const closure = report.authorizationClosureBrief || {}
+  const packetById = new Map((report.authorizationPackets || []).map((packet) => [packet.packetId, packet]))
+  const nextPacketIds = summary.nextActionTimeConfirmations || closure.canStartNowPackets || []
+  return {
+    currentScope: report.currentScope || summary.currentScope || "",
+    canDeployNow: report.canDeployNow === true || closure.canDeployNow === true,
+    canCodexProceedWithoutUser: closure.canCodexProceedWithoutUser === true,
+    nextActionTimeConfirmationPacketIds: nextPacketIds,
+    canStartNowPackets: summary.canStartNowPackets || closure.canStartNowPackets || [],
+    blockedByPacketDependencies: summary.blockedByPacketDependencies || closure.blockedByPacketDependencies || [],
+    actionTimeConfirmationRequired: summary.actionTimeConfirmationRequired || closure.actionTimeConfirmationRequired || [],
+    deferredAppLaunchPackets: summary.deferredAppLaunchPackets || closure.deferredAppLaunchPackets || [],
+    nextActionTimeConfirmations: nextPacketIds
+      .map((packetId) => compactAuthorizationPacket(packetById.get(packetId)))
+      .filter(Boolean),
+  }
+}
+
+function compactAuthorizationPacket(packet) {
+  if (!packet) return null
+  return {
+    packetId: packet.packetId,
+    actionId: packet.actionId,
+    title: packet.title,
+    status: packet.status,
+    owner: packet.owner,
+    blockerClass: packet.blockerClass,
+    sequenceGroup: packet.sequenceGroup,
+    canStartNow: packet.canStartNow === true,
+    requiresActionTimeConfirmation: packet.requiresActionTimeConfirmation === true,
+    minimumUserPhrase: packet.minimumUserPhrase || "",
+    allowedActions: packet.allowedActions || [],
+    explicitlyExcluded: packet.explicitlyExcluded || [],
+    completionEvidence: packet.completionEvidence || [],
+    writeTargets: packet.writeTargets || [],
+    verifyCommands: packet.verifyCommands || [],
+    nonSecretEvidenceOnly: packet.nonSecretEvidenceOnly === true,
+  }
+}
+
 function uniqueStrings(values) {
   return [...new Set((values || []).filter((value) => typeof value === "string" && value.trim()))]
 }
@@ -689,6 +742,18 @@ function renderMarkdown(report) {
     "## Next Backend Order",
     "",
     ...report.nextBackendOrder.map((item) => `- ${item}`),
+    "",
+    "## Action-Time Authorization Packets",
+    "",
+    `- nextActionTimeConfirmationPacketIds: ${report.actionAuthorization.nextActionTimeConfirmationPacketIds.join(", ") || "none"}`,
+    `- canStartNowPackets: ${report.actionAuthorization.canStartNowPackets.join(", ") || "none"}`,
+    `- blockedByPacketDependencies: ${report.actionAuthorization.blockedByPacketDependencies.join(", ") || "none"}`,
+    ...report.actionAuthorization.nextActionTimeConfirmations.flatMap((packet) => [
+      `- ${packet.packetId}: ${packet.title}`,
+      `  - owner: ${packet.owner}`,
+      `  - minimumUserPhrase: ${packet.minimumUserPhrase}`,
+      `  - verifyCommands: ${packet.verifyCommands.join("; ") || "none"}`,
+    ]),
     "",
     "## Credential Intervention",
     "",

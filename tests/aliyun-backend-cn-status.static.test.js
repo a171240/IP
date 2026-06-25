@@ -67,6 +67,23 @@ test("Aliyun backend-cn status excludes WeChat mobile app from current backend b
   assert.ok(report.summary.actionTimeConfirmationRequiredIds.includes("S03_ACR_PAID_PURCHASE"))
   assert.ok(report.summary.actionTimeConfirmationRequiredIds.includes("S05_OSS_RAM_SECRET_OR_STS"))
   assert.ok(report.summary.actionTimeConfirmationRequiredIds.includes("S08_ALIYUN_RDS_DATABASE_URL"))
+  assert.deepEqual(report.summary.nextActionTimeConfirmationPacketIds, [
+    "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
+    "P03_ACR_PURCHASE",
+    "P05_OSS_RAM_STS",
+    "P11_ALIYUN_RDS_DATA_MIGRATION",
+  ])
+  assert.deepEqual(report.actionAuthorization.canStartNowPackets, report.summary.nextActionTimeConfirmationPacketIds)
+  assert.ok(report.actionAuthorization.blockedByPacketDependencies.includes("P04_ACR_IMAGE_AND_PULL"))
+  assert.ok(report.actionAuthorization.blockedByPacketDependencies.includes("P09_PRODUCTION_DEPLOY"))
+  const packetById = new Map(report.actionAuthorization.nextActionTimeConfirmations.map((item) => [item.packetId, item]))
+  assert.match(packetById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").minimumUserPhrase, /CloudShell/)
+  assert.match(packetById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").minimumUserPhrase, /只读盘点/)
+  assert.ok(packetById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").explicitlyExcluded.some((item) => /Create\/Update\/Delete/.test(item)))
+  assert.match(packetById.get("P03_ACR_PURCHASE").minimumUserPhrase, /CNY 117\.00/)
+  assert.equal(packetById.get("P03_ACR_PURCHASE").nonSecretEvidenceOnly, true)
+  assert.match(packetById.get("P11_ALIYUN_RDS_DATA_MIGRATION").minimumUserPhrase, /DATABASE_URL_CN/)
+  assert.equal(packetById.get("P11_ALIYUN_RDS_DATA_MIGRATION").nonSecretEvidenceOnly, false)
   assert.deepEqual(report.credentialIntervention.blockedCredentialNames, ["DATABASE_URL_CN"])
   assert.equal(report.credentialIntervention.readySecretEnvVariableNames.length, 17)
   assert.ok(report.credentialIntervention.valueHandlingRules.some((item) => item.includes("不包含 value")))
@@ -223,6 +240,11 @@ test("Aliyun backend-cn status markdown states the backend-only target", () => {
   assert.match(markdown, /WECHAT_OPEN_APP_ID/)
   assert.match(markdown, /WECHAT_OPEN_APP_SECRET/)
   assert.match(markdown, /0\. Restore Aliyun CLI\/CloudShell read-only inventory evidence/)
+  assert.match(markdown, /## Action-Time Authorization Packets/)
+  assert.match(markdown, /nextActionTimeConfirmationPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(markdown, /blockedByPacketDependencies: P04_ACR_IMAGE_AND_PULL, P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS, P09_PRODUCTION_DEPLOY/)
+  assert.match(markdown, /P00_ALIYUN_READONLY_INVENTORY_IDENTITY: 恢复阿里云 CLI\/CloudShell 只读盘点身份/)
+  assert.match(markdown, /P11_ALIYUN_RDS_DATA_MIGRATION: 创建阿里云 RDS PostgreSQL 并完成正式数据层迁移/)
   assert.match(markdown, /corepack pnpm aliyun:cloudshell:handoff/)
   assert.match(markdown, /corepack pnpm aliyun:cloud:inventory-results:strict/)
   assert.match(markdown, /corepack pnpm aliyun:rds:migration:evidence:strict/)
