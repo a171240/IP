@@ -75,7 +75,9 @@ node scripts/generate-aliyun-rds-migration-package.mjs --out-dir /tmp/meiye-huaj
 ## RDS SQL Compatibility Review
 
 - reviewRequired: true
+- reviewChecklistItems: 6
 - affectedSourceFiles: 9
+- compatibilityFindingCount: 169
 - appliesTo: schema_sql_before_aliyun_rds_apply
 - categories: extension_review, policy_statement, row_level_security, supabase_auth_uid, supabase_service_role, supabase_storage_schema
 - policy: The package is not authorization to apply unreviewed Supabase SQL to Aliyun RDS.
@@ -89,6 +91,67 @@ Required review before running schema SQL on Aliyun RDS:
 - `extension_review`: confirm target Aliyun RDS PostgreSQL supports required extensions such as `pgcrypto` before applying SQL.
 
 Only after this compatibility review is recorded may the operator treat `rds-schema.sql` as an apply candidate. Until then, it is a non-secret review package, not a production migration script.
+
+## RDS SQL Compatibility Review Checklist
+
+Each item below must be resolved before P11 treats `rds-schema.sql` as an Aliyun RDS apply candidate. These are operator review tasks, not permission to apply SQL.
+
+### extension_review
+
+- statusBeforeP11Apply: must_resolve_before_schema_apply
+- findingCount: 22
+- affectedSourceCount: 8
+- sourcePaths: lib/supabase/schema.sql; supabase/migrations/20250213_add_activation_requests_and_entitlements.sql; supabase/migrations/20260209_xhs_v4_store_profiles_and_draft_fields.sql; supabase/migrations/20260210_add_voice_coach_sessions_and_turns.sql; supabase/migrations/20260412_add_voice_coach_profiles_and_scene_cards.sql; supabase/migrations/20260506_add_mp_ai_points_backend.sql; supabase/migrations/20260511_add_mp_account_invites_and_org_snapshots.sql; supabase/migrations/20260513085315_add_service_record_sessions.sql
+- requiredOperatorDecision: Confirm Aliyun RDS PostgreSQL engine/version supports required extensions before applying schema SQL.
+- evidenceWriteBackFields: migration.rdsExtensionSupportConfirmed
+- acceptanceEvidence: Target RDS engine/version and extension support evidence are recorded without secrets.
+
+### policy_statement
+
+- statusBeforeP11Apply: must_resolve_before_schema_apply
+- findingCount: 56
+- affectedSourceCount: 8
+- sourcePaths: lib/supabase/schema.sql; supabase/migrations/20250213_add_activation_requests_and_entitlements.sql; supabase/migrations/20260209_xhs_v4_store_profiles_and_draft_fields.sql; supabase/migrations/20260210_add_voice_coach_sessions_and_turns.sql; supabase/migrations/20260412_add_voice_coach_profiles_and_scene_cards.sql; supabase/migrations/20260506_add_mp_ai_points_backend.sql; supabase/migrations/20260511_harden_mp_account_invites_access.sql; supabase/migrations/20260513085315_add_service_record_sessions.sql
+- requiredOperatorDecision: Review every Supabase create policy statement and rewrite, remove, or replace it with backend-enforced tenant authorization.
+- evidenceWriteBackFields: migration.schemaCompatibilityReviewed, migration.supabaseSpecificSqlResolved
+- acceptanceEvidence: Every policy statement has a recorded disposition before schema apply.
+
+### row_level_security
+
+- statusBeforeP11Apply: must_resolve_before_schema_apply
+- findingCount: 23
+- affectedSourceCount: 8
+- requiredOperatorDecision: Decide and document whether RLS stays in Aliyun RDS or whether tenant authorization is fully enforced in `lib/aliyun-rds` repositories.
+- evidenceWriteBackFields: migration.schemaCompatibilityReviewed, migration.supabaseSpecificSqlResolved
+- acceptanceEvidence: Every RLS statement has an RDS-compatible authorization model before schema apply.
+
+### supabase_auth_uid
+
+- statusBeforeP11Apply: must_resolve_before_schema_apply
+- findingCount: 56
+- affectedSourceCount: 7
+- requiredOperatorDecision: Replace `auth.uid()` dependent SQL with backend-enforced user, company, store, and role checks before applying schema SQL.
+- evidenceWriteBackFields: migration.schemaCompatibilityReviewed, migration.supabaseSpecificSqlResolved
+- acceptanceEvidence: All `auth.uid()` findings have a reviewed rewrite, removal, or backend-owned authorization note.
+
+### supabase_service_role
+
+- statusBeforeP11Apply: must_resolve_before_schema_apply
+- findingCount: 10
+- affectedSourceCount: 5
+- requiredOperatorDecision: Replace Supabase `service_role` grants or policy references with Aliyun RDS roles plus backend service credentials.
+- evidenceWriteBackFields: migration.schemaCompatibilityReviewed, migration.supabaseSpecificSqlResolved
+- acceptanceEvidence: No Supabase `service_role` grant or policy remains in the reviewed RDS apply candidate.
+
+### supabase_storage_schema
+
+- statusBeforeP11Apply: must_resolve_before_schema_apply
+- findingCount: 2
+- affectedSourceCount: 2
+- sourcePaths: supabase/migrations/20260210_add_voice_coach_sessions_and_turns.sql; supabase/migrations/20260513085315_add_service_record_sessions.sql
+- requiredOperatorDecision: Replace Supabase storage schema usage with Aliyun OSS bucket/prefix/CORS/RAM/STS evidence and application-level access checks.
+- evidenceWriteBackFields: migration.supabaseSpecificSqlResolved, cloudConfirmations.items.oss
+- acceptanceEvidence: No `storage.*` SQL is applied to RDS; OSS/RAM/STS evidence covers the equivalent storage boundary.
 
 ## Execution Boundary
 

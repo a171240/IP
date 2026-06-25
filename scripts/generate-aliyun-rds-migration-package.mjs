@@ -63,6 +63,56 @@ const RDS_SQL_COMPATIBILITY_RULES = Object.freeze([
   },
 ])
 
+const RDS_SQL_COMPATIBILITY_DISPOSITIONS = Object.freeze({
+  supabase_auth_uid: {
+    requiredOperatorDecision: "Replace auth.uid() dependent SQL with backend-enforced user, company, store, and role checks before applying schema SQL.",
+    writeBackFields: [
+      "migration.schemaCompatibilityReviewed",
+      "migration.supabaseSpecificSqlResolved",
+    ],
+    acceptanceEvidence: "All auth.uid() findings have a reviewed rewrite, removal, or backend-owned authorization note.",
+  },
+  supabase_storage_schema: {
+    requiredOperatorDecision: "Replace Supabase storage schema usage with Aliyun OSS bucket/prefix/CORS/RAM/STS evidence and application-level access checks.",
+    writeBackFields: [
+      "migration.supabaseSpecificSqlResolved",
+      "cloudConfirmations.items.oss",
+    ],
+    acceptanceEvidence: "No storage.* SQL is applied to RDS; OSS/RAM/STS evidence covers the equivalent storage boundary.",
+  },
+  supabase_service_role: {
+    requiredOperatorDecision: "Replace Supabase service_role grants or policy references with Aliyun RDS roles plus backend service credentials.",
+    writeBackFields: [
+      "migration.schemaCompatibilityReviewed",
+      "migration.supabaseSpecificSqlResolved",
+    ],
+    acceptanceEvidence: "No Supabase service_role grant or policy remains in the reviewed RDS apply candidate.",
+  },
+  row_level_security: {
+    requiredOperatorDecision: "Decide and document whether RLS stays in Aliyun RDS or whether tenant authorization is fully enforced in lib/aliyun-rds repositories.",
+    writeBackFields: [
+      "migration.schemaCompatibilityReviewed",
+      "migration.supabaseSpecificSqlResolved",
+    ],
+    acceptanceEvidence: "Every RLS statement has an RDS-compatible authorization model before schema apply.",
+  },
+  policy_statement: {
+    requiredOperatorDecision: "Review every Supabase create policy statement and rewrite, remove, or replace it with backend-enforced tenant authorization.",
+    writeBackFields: [
+      "migration.schemaCompatibilityReviewed",
+      "migration.supabaseSpecificSqlResolved",
+    ],
+    acceptanceEvidence: "Every policy statement has a recorded disposition before schema apply.",
+  },
+  extension_review: {
+    requiredOperatorDecision: "Confirm Aliyun RDS PostgreSQL engine/version supports required extensions before applying schema SQL.",
+    writeBackFields: [
+      "migration.rdsExtensionSupportConfirmed",
+    ],
+    acceptanceEvidence: "Target RDS engine/version and extension support evidence are recorded without secrets.",
+  },
+})
+
 function parseArgs(argv) {
   const args = {
     schemaMap: DEFAULT_SCHEMA_MAP,
@@ -216,6 +266,7 @@ function summarizeCompatibilityReview(findings) {
         severity: item.severity,
         findingCount: item.findingCount,
         affectedSourceCount: item.affectedSourceCount,
+        sourcePaths: [...item.sourcePaths].sort(),
         action: item.action,
       }))
       .sort((a, b) => a.code.localeCompare(b.code)),
@@ -237,6 +288,32 @@ function summarizeCompatibilityReview(findings) {
       }))
       .sort((a, b) => `${a.sourcePath}:${a.code}`.localeCompare(`${b.sourcePath}:${b.code}`)),
   }
+}
+
+function buildCompatibilityReviewChecklist(compatibilityReview) {
+  return compatibilityReview.byCode.map((item) => {
+    const disposition = RDS_SQL_COMPATIBILITY_DISPOSITIONS[item.code] || {}
+    return {
+      code: item.code,
+      statusBeforeP11Apply: "must_resolve_before_schema_apply",
+      severity: item.severity,
+      findingCount: item.findingCount,
+      affectedSourceCount: item.affectedSourceCount,
+      sourcePaths: item.sourcePaths || [],
+      requiredOperatorDecision: disposition.requiredOperatorDecision || item.action,
+      evidenceWriteBackFields: disposition.writeBackFields || ["migration.schemaCompatibilityReviewed"],
+      acceptanceEvidence: disposition.acceptanceEvidence || "Record a non-secret compatibility disposition before applying schema SQL.",
+      forbiddenValues: [
+        "DATABASE_URL_CN value",
+        "database password",
+        "customer row payloads",
+        "dump contents",
+        "Supabase service role key",
+        "AccessKeySecret",
+        "STS token",
+      ],
+    }
+  })
 }
 
 function renderSchemaSql(schemaMap, sourceFiles) {
@@ -382,6 +459,21 @@ function renderMarkdown(report) {
       `- ${item.code}: findings=${item.findingCount}, sources=${item.affectedSourceCount}, action=${item.action}`,
     ),
     "",
+    "## RDS Compatibility Review Checklist",
+    "",
+    ...report.compatibilityReviewChecklist.flatMap((item) => [
+      `### ${item.code}`,
+      "",
+      `- statusBeforeP11Apply: ${item.statusBeforeP11Apply}`,
+      `- findingCount: ${item.findingCount}`,
+      `- affectedSourceCount: ${item.affectedSourceCount}`,
+      `- sourcePaths: ${item.sourcePaths.join(", ") || "none"}`,
+      `- requiredOperatorDecision: ${item.requiredOperatorDecision}`,
+      `- evidenceWriteBackFields: ${item.evidenceWriteBackFields.join(", ")}`,
+      `- acceptanceEvidence: ${item.acceptanceEvidence}`,
+      `- forbiddenValues: ${item.forbiddenValues.join(", ")}`,
+      "",
+    ]),
     "## Next Required Evidence",
     "",
     "- Create or confirm Aliyun RDS PostgreSQL in cn-hangzhou.",
@@ -438,6 +530,7 @@ function buildReport(args) {
   const generatedSecretMatches = findSecretLikeValues(combinedGenerated)
   if (generatedSecretMatches.length) blockers.push("generated_package_contains_secret_like_values")
   const compatibilityReview = summarizeCompatibilityReview(compatibilityFindings)
+  const compatibilityReviewChecklist = buildCompatibilityReviewChecklist(compatibilityReview)
 
   const manifestPath = resolve(args.outDir, "rds-migration-package.json")
   const markdownPath = resolve(args.outDir, "rds-migration-package.md")
@@ -471,8 +564,10 @@ function buildReport(args) {
       compatibilityReviewRequired: compatibilityReview.required,
       compatibilityFindingCount: compatibilityReview.findingCount,
       compatibilityAffectedSourceFileCount: compatibilityReview.affectedSourceCount,
+      compatibilityReviewChecklistItemCount: compatibilityReviewChecklist.length,
     },
     compatibilityReview,
+    compatibilityReviewChecklist,
     files: {
       manifest: manifestPath,
       markdown: markdownPath,
