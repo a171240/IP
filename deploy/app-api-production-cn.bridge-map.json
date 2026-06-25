@@ -396,10 +396,13 @@
         "POST"
       ],
       "appFile": "app/api/app/service-records/sessions/route.ts",
-      "sourceType": "mp_reexport",
-      "sourceRoute": "/api/mp/service-records/sessions",
+      "sourceType": "app_native",
+      "sourceRoute": "",
       "sourceFiles": [
-        "app/api/mp/service-records/sessions/route.ts"
+        "app/api/app/service-records/sessions/route.ts",
+        "lib/aliyun-rds/repositories/service-records.server.ts",
+        "lib/aliyun-rds/repositories/account-profile.server.ts",
+        "lib/aliyun-rds/postgres.server.ts"
       ],
       "sourcePages": [
         "../meiye-huajing-miniprogram/pages/service-record/index.js",
@@ -414,10 +417,13 @@
         "GET"
       ],
       "appFile": "app/api/app/service-records/sessions/[sessionId]/route.ts",
-      "sourceType": "mp_reexport",
-      "sourceRoute": "/api/mp/service-records/sessions/[sessionId]",
+      "sourceType": "app_native",
+      "sourceRoute": "",
       "sourceFiles": [
-        "app/api/mp/service-records/sessions/[sessionId]/route.ts"
+        "app/api/app/service-records/sessions/[sessionId]/route.ts",
+        "lib/aliyun-rds/repositories/service-records.server.ts",
+        "lib/aliyun-rds/repositories/account-profile.server.ts",
+        "lib/aliyun-rds/postgres.server.ts"
       ],
       "sourcePages": [
         "../meiye-huajing-miniprogram/pages/service-record/detail/index.js",
@@ -500,10 +506,13 @@
         "POST"
       ],
       "appFile": "app/api/app/service-records/sessions/[sessionId]/markers/route.ts",
-      "sourceType": "mp_reexport",
-      "sourceRoute": "/api/mp/service-records/sessions/[sessionId]/markers",
+      "sourceType": "app_native",
+      "sourceRoute": "",
       "sourceFiles": [
-        "app/api/mp/service-records/sessions/[sessionId]/markers/route.ts"
+        "app/api/app/service-records/sessions/[sessionId]/markers/route.ts",
+        "lib/aliyun-rds/repositories/service-records.server.ts",
+        "lib/aliyun-rds/repositories/account-profile.server.ts",
+        "lib/aliyun-rds/postgres.server.ts"
       ],
       "sourcePages": [
         "../meiye-huajing-miniprogram/pages/service-record/detail/index.js"
@@ -517,10 +526,13 @@
         "POST"
       ],
       "appFile": "app/api/app/service-records/sessions/[sessionId]/resume/route.ts",
-      "sourceType": "mp_reexport",
-      "sourceRoute": "/api/mp/service-records/sessions/[sessionId]/resume",
+      "sourceType": "app_native",
+      "sourceRoute": "",
       "sourceFiles": [
-        "app/api/mp/service-records/sessions/[sessionId]/resume/route.ts"
+        "app/api/app/service-records/sessions/[sessionId]/resume/route.ts",
+        "lib/aliyun-rds/repositories/service-records.server.ts",
+        "lib/aliyun-rds/repositories/account-profile.server.ts",
+        "lib/aliyun-rds/postgres.server.ts"
       ],
       "sourcePages": [
         "../meiye-huajing-miniprogram/pages/service-record/detail/index.js"
@@ -534,10 +546,13 @@
         "POST"
       ],
       "appFile": "app/api/app/service-records/sessions/[sessionId]/end/route.ts",
-      "sourceType": "mp_reexport",
-      "sourceRoute": "/api/mp/service-records/sessions/[sessionId]/end",
+      "sourceType": "app_native",
+      "sourceRoute": "",
       "sourceFiles": [
-        "app/api/mp/service-records/sessions/[sessionId]/end/route.ts"
+        "app/api/app/service-records/sessions/[sessionId]/end/route.ts",
+        "lib/aliyun-rds/repositories/service-records.server.ts",
+        "lib/aliyun-rds/repositories/account-profile.server.ts",
+        "lib/aliyun-rds/postgres.server.ts"
       ],
       "sourcePages": [
         "../meiye-huajing-miniprogram/pages/service-record/detail/index.js"

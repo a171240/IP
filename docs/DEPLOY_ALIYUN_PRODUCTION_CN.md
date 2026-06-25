@@ -992,7 +992,7 @@ corepack pnpm aliyun:cloud:check
 corepack pnpm aliyun:release:artifacts
 corepack pnpm aliyun:predeploy
 corepack pnpm aliyun:routes:check（31 routes / 0 failures）
-corepack pnpm aliyun:app-api:bridge-map（32 mapped routes / sourceTypes: mp_reexport 18, mp_adapter 3, app_native 7, app_alias 2, native_health 2）
+corepack pnpm aliyun:app-api:bridge-map（32 mapped routes / sourceTypes: mp_reexport 13, mp_adapter 3, app_native 12, app_alias 2, native_health 2）
 corepack pnpm aliyun:app-client:contract（40 audited calls / 34 unique client routes）
 corepack pnpm aliyun:app-config:check（production-cn runtime config ok=true / containsSecretValues=false / apiBaseUrl https://api-cn.ipgongchang.xin / assetBaseUrl https://assets-cn.ipgongchang.xin）
 corepack pnpm aliyun:app-native:check（当前 ok=true；Android release 已切到 signingConfigs.release；iOS Associated Domains 已配置 applinks:api-cn.ipgongchang.xin；真实 Android keystore 值仍需由本机 Gradle properties 或环境变量提供）

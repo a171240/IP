@@ -76,7 +76,7 @@ export type AppAuthUser = {
   user_metadata?: unknown
 }
 
-type AppAccountMembership = {
+export type AppAccountMembership = {
   id: string
   userId: string
   companyId: string | null
@@ -92,7 +92,7 @@ type AppAccountMembership = {
   createdAt: string | null
 }
 
-type AppAccountContext = {
+export type AppAccountContext = {
   userId: string
   userEmail: string | null
   membershipId: string | null
@@ -323,7 +323,7 @@ function buildFallbackContext(args: {
   }
 }
 
-function accountContextPayload(ctx: AppAccountContext) {
+export function accountContextPayload(ctx: AppAccountContext) {
   return {
     membership_id: ctx.membershipId,
     account_role: ctx.role,
@@ -579,4 +579,10 @@ export async function getAliyunRdsAppProfileResponse(user: AppAuthUser) {
       : null,
     account: accountContextPayload(account),
   }
+}
+
+export async function getAliyunRdsAppAccountContext(user: AppAuthUser) {
+  const profileRow = await getOrCreateProfileRow(user)
+  const membershipRows = await getMembershipRows(user.id)
+  return buildAccountContext({ user, profile: profileRow, membershipRows })
 }
