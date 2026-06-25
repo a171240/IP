@@ -17,6 +17,30 @@ export class AliyunRdsConfigurationError extends Error {
   }
 }
 
+export function isAliyunRdsRuntimeUnavailableError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false
+  const code = String((error as { code?: unknown }).code || "")
+  const message = String((error as { message?: unknown }).message || "")
+  return [
+    "ECONNABORTED",
+    "ECONNREFUSED",
+    "ECONNRESET",
+    "EAI_AGAIN",
+    "ENOTFOUND",
+    "ETIMEDOUT",
+    "08000",
+    "08001",
+    "08003",
+    "08004",
+    "08006",
+    "53300",
+    "57P01",
+    "57P02",
+    "57P03",
+  ].includes(code) ||
+    /Connection terminated unexpectedly|terminating connection|connection timeout|connect ETIMEDOUT|connect ECONNREFUSED|Client has encountered a connection error|no pg_hba\.conf entry|password authentication failed|database .* does not exist|role .* does not exist/i.test(message)
+}
+
 export function isAliyunRdsConfigured(): boolean {
   return Boolean(readDatabaseUrl({ allowMissing: true }))
 }

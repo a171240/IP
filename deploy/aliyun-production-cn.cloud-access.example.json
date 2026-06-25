@@ -20,6 +20,11 @@
     "cloudApiCalled": false,
     "cloudMutationPerformed": false,
     "lastReadOnlyCommand": "TODO_COMMAND_SUMMARY_NO_VALUES",
+    "requiresActionTimeOpenConfirmation": false,
+    "requiresActionTimeRestartConfirmation": false,
+    "confirmationKinds": [],
+    "billingWarning": "",
+    "restartWarning": "",
     "blockers": [],
     "evidence": "TODO_NON_SECRET_CLOUDSHELL_EVIDENCE"
   },

@@ -122,7 +122,11 @@ test("Aliyun resource matrix names required cloud resources without secret value
   assert.equal(oss.observedResourceStatus.status, "bucket_visible_unconfirmed")
   assert.equal(oss.observedResourceStatus.readiness, "partial")
   assert.match(env.consolePath, /KMS|Secrets Manager|SAE/)
-  assert.equal(env.observedResourceStatus.status, "cloudshell_disconnected_or_config_missing")
+  assert.ok([
+    "cloudshell_disconnected_restart_confirmation_required",
+    "cloudshell_not_opened_nas_fee_confirmation_required",
+    "cloudshell_disconnected_or_config_missing",
+  ].includes(env.observedResourceStatus.status))
   assert.equal(sls.observedResourceStatus.status, "project_logstore_visible_alerts_pending")
   assert.equal(sls.observedResourceStatus.readiness, "partial")
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)

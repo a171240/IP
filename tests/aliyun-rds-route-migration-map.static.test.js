@@ -427,6 +427,7 @@ test("Aliyun APP store admin and invite routes use RDS repositories for WP04 and
     read("app", "api", "app", "store-admin", "invites", "[token]", "accept", "route.ts"),
     read("app", "api", "app", "store-admin", "invites", "[token]", "qrcode", "route.ts"),
   ]
+  const postgresAdapter = read("lib", "aliyun-rds", "postgres.server.ts")
   const storeAdminRepository = read("lib", "aliyun-rds", "repositories", "store-admin.server.ts")
   const inviteRepository = read("lib", "aliyun-rds", "repositories", "store-invites.server.ts")
 
@@ -442,7 +443,15 @@ test("Aliyun APP store admin and invite routes use RDS repositories for WP04 and
   assert.match(routeFiles[4], /getAliyunRdsStoreInvitePreview/)
   assert.match(routeFiles[5], /acceptAliyunRdsStoreInvite/)
   assert.match(routeFiles[6], /assertAliyunRdsStoreInviteUsable/)
+  for (const inviteRoute of routeFiles.slice(3)) {
+    assert.match(inviteRoute, /isAliyunRdsRuntimeUnavailableError/)
+    assert.match(inviteRoute, /rds_unavailable/)
+  }
+  assert.match(postgresAdapter, /isAliyunRdsRuntimeUnavailableError/)
+  assert.match(postgresAdapter, /Connection terminated unexpectedly/)
   assert.match(storeAdminRepository, /queryAliyunRds/)
+  assert.match(storeAdminRepository, /isAliyunRdsRuntimeUnavailableError/)
+  assert.match(storeAdminRepository, /rds_unavailable/)
   assert.match(storeAdminRepository, /public\.voice_coach_sessions/)
   assert.match(storeAdminRepository, /public\.voice_coach_turns/)
   assert.match(inviteRepository, /queryAliyunRds|withAliyunRdsTransaction/)

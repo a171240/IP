@@ -2,7 +2,11 @@ import "server-only"
 
 import { NextRequest, NextResponse } from "next/server"
 
-import { AliyunRdsConfigurationError, queryAliyunRds } from "@/lib/aliyun-rds/postgres.server"
+import {
+  AliyunRdsConfigurationError,
+  isAliyunRdsRuntimeUnavailableError,
+  queryAliyunRds,
+} from "@/lib/aliyun-rds/postgres.server"
 import {
   accountContextPayload,
   getAliyunRdsAppAccountContext,
@@ -107,6 +111,9 @@ export function jsonError(status: number, error: string, code = error, extra?: R
 export function rdsStoreAdminErrorResponse(error: unknown, fallbackCode: string) {
   if (error instanceof AliyunRdsConfigurationError) {
     return jsonError(503, "DATABASE_URL_CN is required", "rds_not_configured")
+  }
+  if (isAliyunRdsRuntimeUnavailableError(error)) {
+    return jsonError(503, "Aliyun RDS is not reachable", "rds_unavailable")
   }
   return jsonError(500, error instanceof Error ? error.message : fallbackCode, fallbackCode)
 }

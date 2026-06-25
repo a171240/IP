@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
-import { AliyunRdsConfigurationError } from "@/lib/aliyun-rds/postgres.server"
+import { AliyunRdsConfigurationError, isAliyunRdsRuntimeUnavailableError } from "@/lib/aliyun-rds/postgres.server"
 import {
   acceptAliyunRdsStoreInvite,
   StoreInviteHttpError,
@@ -15,6 +15,9 @@ function inviteErrorResponse(error: unknown) {
   }
   if (error instanceof AliyunRdsConfigurationError) {
     return NextResponse.json({ ok: false, error: "DATABASE_URL_CN is required", code: "rds_not_configured" }, { status: 503 })
+  }
+  if (isAliyunRdsRuntimeUnavailableError(error)) {
+    return NextResponse.json({ ok: false, error: "Aliyun RDS is not reachable", code: "rds_unavailable" }, { status: 503 })
   }
   return NextResponse.json(
     { ok: false, error: error instanceof Error ? error.message : "invite_accept_failed", code: "invite_accept_failed" },

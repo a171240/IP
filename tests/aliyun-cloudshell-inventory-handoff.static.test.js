@@ -12,12 +12,16 @@ const secretLike = /(sk-[A-Za-z0-9_-]{20,}|LTAI[A-Za-z0-9]{12,}|:\/\/[^\s:@]+:[^
 
 test("Aliyun CloudShell handoff is wired into scripts, predeploy, deploy spec, and artifacts", () => {
   const pkg = readJson("package.json")
+  const source = read("scripts", "generate-aliyun-cloudshell-inventory-handoff.mjs")
   const predeploy = read("scripts", "aliyun-predeploy-commands.mjs")
   const releaseArtifacts = read("scripts", "prepare-aliyun-release-artifacts.mjs")
   const deploySpec = readJson("deploy", "aliyun-production-cn.example.json")
 
   assert.equal(pkg.scripts["aliyun:cloudshell:handoff"], "node ./scripts/generate-aliyun-cloudshell-inventory-handoff.mjs")
   assert.equal(pkg.scripts["aliyun:cloudshell:handoff:test"], "node --test tests/aliyun-cloudshell-inventory-handoff.static.test.js")
+  assert.match(source, /--cloud-access-observation/)
+  assert.match(source, /requiresActionTimeRestartConfirmation/)
+  assert.match(source, /disconnected_restart_instance_confirmation_required/)
   assert.match(predeploy, /aliyun:cloudshell:handoff:test/)
   assert.match(predeploy, /aliyun:cloudshell:handoff/)
   assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:cloudshell:handoff:test"))
@@ -77,10 +81,14 @@ test("Aliyun CloudShell handoff produces value-free local JSON and Markdown", ()
   assert.equal(report.currentBrowser.cloudApiCalled, false)
   assert.equal(report.currentBrowser.cloudMutationPerformed, false)
   assert.equal(typeof report.cloudShellGate.requiresActionTimeOpenConfirmation, "boolean")
+  assert.equal(typeof report.cloudShellGate.requiresActionTimeRestartConfirmation, "boolean")
+  assert.equal(typeof report.cloudShellGate.requiresActionTimeConfirmation, "boolean")
+  assert.ok(Array.isArray(report.cloudShellGate.confirmationKinds))
   assert.equal(typeof report.cloudShellGate.currentStatus, "string")
   assert.ok(Array.isArray(report.cloudShellGate.blockers))
   assert.equal(typeof report.cloudShellGate.evidence, "string")
   assert.equal(typeof report.cloudShellGate.billingWarning, "string")
+  assert.equal(typeof report.cloudShellGate.restartWarning, "string")
   assert.equal(typeof report.cliReadiness.canReadCloudNow, "boolean")
   assert.equal(typeof report.cliReadiness.configProbe.ready, "boolean")
   assert.equal(report.cliReadiness.strictInventoryAlreadyReady, true)
@@ -126,7 +134,10 @@ test("Aliyun CloudShell handoff produces value-free local JSON and Markdown", ()
   assert.match(markdown, /strictInventoryReadyLocalOperations: 9\/9/)
   assert.match(markdown, /strictInventoryMutationPerformedCommandResults: 0/)
   assert.match(markdown, /currentBrowserCanUseCurrentConsole:/)
+  assert.match(markdown, /cloudShellRequiresActionTimeConfirmation:/)
   assert.match(markdown, /cloudShellRequiresActionTimeOpenConfirmation:/)
+  assert.match(markdown, /cloudShellRequiresActionTimeRestartConfirmation:/)
+  assert.match(markdown, /cloudShellConfirmationKinds:/)
   assert.match(markdown, /cloudShellCurrentStatus:/)
   assert.match(markdown, /已有 strict inventory 证据/)
   assert.match(markdown, /I01_SAE_RUNTIME/)
@@ -140,8 +151,23 @@ test("Aliyun CloudShell handoff produces value-free local JSON and Markdown", ()
   assert.doesNotMatch(markdown, secretLike)
 })
 
-test("Aliyun CloudShell handoff preserves current activation and NAS fee warning", () => {
-  const output = execFileSync(process.execPath, ["scripts/generate-aliyun-cloudshell-inventory-handoff.mjs"], {
+test("Aliyun CloudShell handoff preserves activation and NAS fee warning", () => {
+  const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-cloudshell-handoff-nas-"))
+  const observationPath = path.join(tmpdir, "cloud-access.local.json")
+  writeCloudAccessObservationFixture(observationPath, {
+    resourcesObserved: [
+      "Cloud Shell tab page currently requires 开通 and states it will create a performance NAS instance that may generate small NAS usage fees; did not click 开通.",
+    ],
+    cloudShell: {
+      blockers: ["cloudshell_not_opened_action_time_confirmation_required_for_nas_fee_warning"],
+      evidence: "chrome_cloudshell_tab_page_requires_open_service_and_warns_performance_nas_may_generate_small_usage_fees_no_open_no_inventory",
+    },
+  })
+  const output = execFileSync(process.execPath, [
+    "scripts/generate-aliyun-cloudshell-inventory-handoff.mjs",
+    "--cloud-access-observation",
+    observationPath,
+  ], {
     cwd: root,
     encoding: "utf8",
     maxBuffer: 1024 * 1024 * 30,
@@ -150,14 +176,62 @@ test("Aliyun CloudShell handoff preserves current activation and NAS fee warning
   const cloudShellPath = report.operatorPaths.find((item) => item.id === "aliyun_cloudshell")
 
   assert.ok(cloudShellPath, "missing aliyun_cloudshell operator path")
+  assert.equal(report.cloudShellGate.requiresActionTimeConfirmation, true)
   assert.equal(report.cloudShellGate.requiresActionTimeOpenConfirmation, true)
+  assert.equal(report.cloudShellGate.requiresActionTimeRestartConfirmation, false)
   assert.equal(report.cloudShellGate.currentStatus, "not_opened_nas_fee_confirmation_required")
+  assert.deepEqual(report.cloudShellGate.confirmationKinds, ["open_service_nas_fee"])
   assert.ok(report.cloudShellGate.blockers.includes("cloudshell_not_opened_action_time_confirmation_required_for_nas_fee_warning"))
   assert.match(report.cloudShellGate.billingWarning, /performance NAS/)
   assert.match(report.cloudShellGate.billingWarning, /usage fees/)
+  assert.equal(report.cloudShellGate.restartWarning, "")
+  assert.equal(cloudShellPath.requiresActionTimeConfirmation, true)
   assert.equal(cloudShellPath.requiresActionTimeOpenConfirmation, true)
+  assert.equal(cloudShellPath.requiresActionTimeRestartConfirmation, false)
   assert.match(cloudShellPath.billingWarning, /performance NAS/)
   assert.ok(cloudShellPath.allowedActions.some((item) => item.includes("性能型 NAS")))
+  assert.doesNotMatch(output, secretLike)
+})
+
+test("Aliyun CloudShell handoff preserves disconnected restart confirmation", () => {
+  const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-cloudshell-handoff-restart-"))
+  const observationPath = path.join(tmpdir, "cloud-access.local.json")
+  writeCloudAccessObservationFixture(observationPath, {
+    resourcesObserved: [
+      "CloudShell tab shows Disconnected; clicking reconnect opens 重启实例 confirmation saying current sessions will be terminated and a new session will be created; did not click 确认.",
+    ],
+    cloudShell: {
+      requiresActionTimeRestartConfirmation: true,
+      blockers: ["cloudshell_disconnected_restart_instance_confirmation_required"],
+      evidence: "cloudshell_disconnected_restart_instance_confirmation_visible_no_confirm_no_inventory",
+    },
+  })
+  const output = execFileSync(process.execPath, [
+    "scripts/generate-aliyun-cloudshell-inventory-handoff.mjs",
+    "--cloud-access-observation",
+    observationPath,
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 30,
+  })
+  const report = JSON.parse(output)
+  const cloudShellPath = report.operatorPaths.find((item) => item.id === "aliyun_cloudshell")
+
+  assert.ok(cloudShellPath, "missing aliyun_cloudshell operator path")
+  assert.equal(report.cloudShellGate.requiresActionTimeConfirmation, true)
+  assert.equal(report.cloudShellGate.requiresActionTimeOpenConfirmation, false)
+  assert.equal(report.cloudShellGate.requiresActionTimeRestartConfirmation, true)
+  assert.equal(report.cloudShellGate.currentStatus, "disconnected_restart_instance_confirmation_required")
+  assert.deepEqual(report.cloudShellGate.confirmationKinds, ["restart_instance"])
+  assert.ok(report.cloudShellGate.blockers.includes("cloudshell_disconnected_restart_instance_confirmation_required"))
+  assert.match(report.cloudShellGate.restartWarning, /terminate current sessions/)
+  assert.equal(report.cloudShellGate.billingWarning, "")
+  assert.equal(cloudShellPath.requiresActionTimeConfirmation, true)
+  assert.equal(cloudShellPath.requiresActionTimeOpenConfirmation, false)
+  assert.equal(cloudShellPath.requiresActionTimeRestartConfirmation, true)
+  assert.match(cloudShellPath.restartWarning, /terminate current sessions/)
+  assert.ok(cloudShellPath.allowedActions.some((item) => item.includes("重启实例")))
   assert.doesNotMatch(output, secretLike)
 })
 
@@ -196,4 +270,52 @@ function writeStrictInventoryFixture(filePath) {
     })),
   }
   fs.writeFileSync(filePath, JSON.stringify(ready, null, 2))
+}
+
+function writeCloudAccessObservationFixture(filePath, options = {}) {
+  const cloudShell = options.cloudShell || {}
+  fs.writeFileSync(
+    filePath,
+    JSON.stringify(
+      {
+        schemaVersion: 1,
+        environment: "production-cn",
+        updatedAt: "2026-06-26T01:20:00+08:00",
+        operator: "codex-test-non-secret",
+        notes: "synthetic non-secret CloudShell observation fixture",
+        browserConsole: {
+          chromeLoggedIn: true,
+          observedAt: "2026-06-26T01:20:00+08:00",
+          evidence: "chrome_cloudshell_non_secret_fixture",
+          resourcesObserved: options.resourcesObserved || [],
+        },
+        cloudShell: {
+          connected: false,
+          regionLabel: "",
+          cliAvailable: false,
+          cliVersion: "",
+          cliConfigFileExists: false,
+          canRunReadOnlyInventory: false,
+          cloudApiCalled: false,
+          cloudMutationPerformed: false,
+          lastReadOnlyCommand: "",
+          requiresActionTimeOpenConfirmation: cloudShell.requiresActionTimeOpenConfirmation === true,
+          requiresActionTimeRestartConfirmation: cloudShell.requiresActionTimeRestartConfirmation === true,
+          blockers: cloudShell.blockers || [],
+          evidence: cloudShell.evidence || "",
+        },
+        workbenchTerminal: {
+          observed: false,
+          connected: false,
+          cliInventoryAttempted: false,
+          cloudApiCalled: false,
+          cloudMutationPerformed: false,
+          evidence: "",
+          blockers: ["workbench_terminal_not_cloudshell_inventory"],
+        },
+      },
+      null,
+      2,
+    ),
+  )
 }

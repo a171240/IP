@@ -37,12 +37,16 @@ test("Aliyun cloud access supports non-secret Cloud Shell observations", () => {
   assert.match(source, /cloudShellObservation/)
   assert.match(source, /workbenchTerminal/)
   assert.match(source, /workbench_terminal_api_called_without_inventory_context/)
+  assert.match(source, /cloudshell_disconnected_restart_instance_confirmation_required/)
+  assert.match(source, /requiresActionTimeRestartConfirmation/)
   assert.match(source, /configProbe/)
   assert.match(source, /cloudshell_cli_config_missing_or_unread/)
   assert.equal(template.schemaVersion, 1)
   assert.equal(template.environment, "production-cn")
   assert.equal(template.cloudShell.cloudApiCalled, false)
   assert.equal(template.cloudShell.cloudMutationPerformed, false)
+  assert.equal(template.cloudShell.requiresActionTimeOpenConfirmation, false)
+  assert.equal(template.cloudShell.requiresActionTimeRestartConfirmation, false)
   assert.equal(template.workbenchTerminal.cloudApiCalled, false)
   assert.equal(template.workbenchTerminal.cloudMutationPerformed, false)
   assert.ok(template.workbenchTerminal.blockers.includes("workbench_terminal_not_cloudshell_inventory"))
@@ -104,6 +108,67 @@ test("Aliyun cloud access does not mark invalid Cloud Shell observations ready",
   assert.match(report.cloudShellObservation.blockers.join(","), /schemaVersion=1/)
 })
 
+test("Aliyun cloud access classifies disconnected CloudShell restart confirmation", () => {
+  const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-cloud-access-restart-"))
+  const observationFile = path.join(tmpdir, "cloud-access.local.json")
+  fs.writeFileSync(
+    observationFile,
+    JSON.stringify(
+      {
+        schemaVersion: 1,
+        environment: "production-cn",
+        browserConsole: {
+          chromeLoggedIn: true,
+          observedAt: "2026-06-26T01:20:00+08:00",
+          evidence: "chrome_cloudshell_restart_dialog_visible_no_click_no_cloud_api_no_secret",
+          resourcesObserved: [
+            "CloudShell tab shows Disconnected; clicking reconnect opens 重启实例 confirmation saying current sessions will be terminated and a new session will be created; did not click 确认.",
+          ],
+        },
+        cloudShell: {
+          connected: false,
+          cliAvailable: false,
+          cliConfigFileExists: false,
+          canRunReadOnlyInventory: false,
+          cloudApiCalled: false,
+          cloudMutationPerformed: false,
+          requiresActionTimeRestartConfirmation: true,
+          blockers: ["cloudshell_disconnected_restart_instance_confirmation_required"],
+          evidence: "cloudshell_disconnected_restart_instance_confirmation_visible_no_confirm_no_inventory",
+        },
+        workbenchTerminal: {
+          observed: false,
+          connected: false,
+          cliInventoryAttempted: false,
+          cloudApiCalled: false,
+          cloudMutationPerformed: false,
+          blockers: ["workbench_terminal_not_cloudshell_inventory"],
+        },
+      },
+      null,
+      2,
+    ),
+  )
+
+  const output = execFileSync(
+    process.execPath,
+    ["scripts/check-aliyun-cloud-access.mjs", "--cloud-access-observation", observationFile],
+    { cwd: root, encoding: "utf8", maxBuffer: 1024 * 1024 * 30 },
+  )
+  const report = JSON.parse(output)
+  const cloudShellStatus = report.observedResourceStatuses.find((item) => item.id === "cloudShellInventory")
+
+  assert.equal(report.cloudShellObservation.cloudShell.requiresActionTimeRestartConfirmation, true)
+  assert.equal(report.cloudShellObservation.cloudShell.requiresActionTimeOpenConfirmation, false)
+  assert.deepEqual(report.cloudShellObservation.cloudShell.confirmationKinds, ["restart_instance"])
+  assert.ok(report.cloudShellObservation.cloudShell.blockers.includes("cloudshell_disconnected_restart_instance_confirmation_required"))
+  assert.match(report.cloudShellObservation.cloudShell.restartWarning, /terminate current sessions/)
+  assert.equal(cloudShellStatus.status, "cloudshell_disconnected_restart_confirmation_required")
+  assert.equal(cloudShellStatus.readiness, "blocked")
+  assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
+})
+
 test("Aliyun cloud access report preserves current non-secret console evidence", () => {
   const output = execFileSync(process.execPath, ["scripts/check-aliyun-cloud-access.mjs"], {
     cwd: root,
@@ -157,7 +222,11 @@ test("Aliyun cloud access report preserves current non-secret console evidence",
   assert.equal(statusById.get("ossAudio").status, "bucket_visible_unconfirmed")
   assert.equal(statusById.get("ossAudio").readiness, "partial")
   assert.equal(statusById.get("slsAlerts").status, "project_logstore_visible_alerts_pending")
-  assert.equal(statusById.get("cloudShellInventory").status, "cloudshell_disconnected_or_config_missing")
+  assert.ok([
+    "cloudshell_disconnected_restart_confirmation_required",
+    "cloudshell_not_opened_nas_fee_confirmation_required",
+    "cloudshell_disconnected_or_config_missing",
+  ].includes(statusById.get("cloudShellInventory").status))
   assert.match(statusById.get("domainDns").writeTarget, /apiDomainHttps/)
   assert.deepEqual(checklistIds, [
     "saeRuntime",
@@ -169,12 +238,18 @@ test("Aliyun cloud access report preserves current non-secret console evidence",
     "slsAlerts",
   ])
   assert.ok(report.blockers.includes("aliyun_cli_config_missing_or_unread"))
-  assert.ok(
-    report.cloudShellObservation.cloudShell.blockers.includes(
-      "cloudshell_not_opened_action_time_confirmation_required_for_nas_fee_warning",
-    ),
-  )
-  assert.match(report.cloudShellObservation.cloudShell.evidence, /performance_nas_may_generate_small_usage_fees/)
+  const cloudShellBlockers = report.cloudShellObservation.cloudShell.blockers
+  const hasNasOpenConfirmation = cloudShellBlockers.includes("cloudshell_not_opened_action_time_confirmation_required_for_nas_fee_warning")
+  const hasRestartConfirmation = cloudShellBlockers.includes("cloudshell_disconnected_restart_instance_confirmation_required")
+  assert.ok(hasNasOpenConfirmation || hasRestartConfirmation)
+  if (hasNasOpenConfirmation) {
+    assert.equal(report.cloudShellObservation.cloudShell.requiresActionTimeOpenConfirmation, true)
+    assert.match(report.cloudShellObservation.cloudShell.evidence, /performance_nas_may_generate_small_usage_fees|NAS|开通/)
+  }
+  if (hasRestartConfirmation) {
+    assert.equal(report.cloudShellObservation.cloudShell.requiresActionTimeRestartConfirmation, true)
+    assert.match(report.cloudShellObservation.cloudShell.evidence, /restart_instance|Disconnected|重启实例/)
+  }
   assert.ok(report.blockers.includes(report.cli.configProbe.failureCategory))
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)

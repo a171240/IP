@@ -348,6 +348,11 @@ function normalizeCloudAccessObservation(observation) {
         cloudApiCalled: false,
         cloudMutationPerformed: false,
         lastReadOnlyCommand: "",
+        requiresActionTimeOpenConfirmation: false,
+        requiresActionTimeRestartConfirmation: false,
+        confirmationKinds: [],
+        billingWarning: "",
+        restartWarning: "",
         blockers: [],
         evidence: "",
       },
@@ -361,6 +366,28 @@ function normalizeCloudAccessObservation(observation) {
   if (observation.environment !== "production-cn") blockers.push("environment=production-cn")
   const browserConsole = observation.browserConsole || {}
   const cloudShell = observation.cloudShell || {}
+  const cloudShellBlockers = Array.isArray(cloudShell.blockers) ? cloudShell.blockers.map((item) => String(item)) : []
+  const resourcesObserved = Array.isArray(browserConsole.resourcesObserved)
+    ? browserConsole.resourcesObserved.map((item) => String(item))
+    : []
+  const cloudShellEvidence = String(cloudShell.evidence || "")
+  const cloudShellText = [
+    cloudShellEvidence,
+    ...cloudShellBlockers,
+    ...resourcesObserved.filter((line) => /Cloud\s*Shell|CloudShell|shell\.aliyun\.com|重启实例|Disconnected/i.test(line)),
+  ].join("\n")
+  const requiresOpenConfirmation = cloudShell.requiresActionTimeOpenConfirmation === true ||
+    cloudShellBlockers.includes("cloudshell_not_opened_action_time_confirmation_required_for_nas_fee_warning") ||
+    /performance_nas_may_generate_small_usage_fees|performance NAS|性能型 NAS|usage fees|费用提示|点击开通|requires 开通/i.test(cloudShellText)
+  const requiresRestartConfirmation = cloudShell.requiresActionTimeRestartConfirmation === true ||
+    cloudShellBlockers.includes("cloudshell_disconnected_restart_instance_confirmation_required") ||
+    /Disconnected|restart instance|restart_instance|重启实例|terminate all sessions|中止.*会话|终止.*会话|create a new session|创建.*新.*会话/i.test(cloudShellText)
+  if (requiresOpenConfirmation && !cloudShellBlockers.includes("cloudshell_not_opened_action_time_confirmation_required_for_nas_fee_warning")) {
+    cloudShellBlockers.push("cloudshell_not_opened_action_time_confirmation_required_for_nas_fee_warning")
+  }
+  if (requiresRestartConfirmation && !cloudShellBlockers.includes("cloudshell_disconnected_restart_instance_confirmation_required")) {
+    cloudShellBlockers.push("cloudshell_disconnected_restart_instance_confirmation_required")
+  }
   if (cloudShell.cloudMutationPerformed === true) blockers.push("cloudshell_mutation_observed")
   if (cloudShell.cloudApiCalled === true && cloudShell.canRunReadOnlyInventory !== true) {
     warnings.push("cloudshell_api_called_but_inventory_not_ready")
@@ -420,8 +447,20 @@ function normalizeCloudAccessObservation(observation) {
       cloudApiCalled: cloudShell.cloudApiCalled === true,
       cloudMutationPerformed: cloudShell.cloudMutationPerformed === true,
       lastReadOnlyCommand: String(cloudShell.lastReadOnlyCommand || ""),
-      blockers: Array.isArray(cloudShell.blockers) ? cloudShell.blockers.map((item) => String(item)) : [],
-      evidence: String(cloudShell.evidence || ""),
+      requiresActionTimeOpenConfirmation: requiresOpenConfirmation,
+      requiresActionTimeRestartConfirmation: requiresRestartConfirmation,
+      confirmationKinds: [
+        ...(requiresOpenConfirmation ? ["open_service_nas_fee"] : []),
+        ...(requiresRestartConfirmation ? ["restart_instance"] : []),
+      ],
+      billingWarning: requiresOpenConfirmation
+        ? "CloudShell page requires clicking 开通 and warns that it may create a performance NAS instance with possible usage fees."
+        : "",
+      restartWarning: requiresRestartConfirmation
+        ? "CloudShell restart confirmation says it will terminate current sessions and create a new session; do not confirm it without action-time approval."
+        : "",
+      blockers: cloudShellBlockers,
+      evidence: cloudShellEvidence,
     },
     workbenchTerminal: normalizedWorkbenchTerminal,
   }
@@ -442,8 +481,9 @@ function buildObservedResourceStatuses(cloudAccessObservation) {
   const ossLine = findObservedLine(lines, /OSS bucket/i)
   const dnsLine = findObservedLine(lines, /DNS ipgongchang\.xin/i)
   const slsLine = findObservedLine(lines, /SLS logsearch URL visible/i)
-  const cloudShellLine = findObservedLine(lines, /Cloud Shell tab/i)
+  const cloudShellLine = findObservedLine(lines, /Cloud Shell tab|CloudShell tab|CloudShell|shell\.aliyun\.com/i)
   const localCliLine = findObservedLine(lines, /Local macOS aliyun CLI installed/i)
+  const cloudShellInventoryStatus = classifyCloudShellInventoryStatus(cloudAccessObservation.cloudShell, cloudShellLine)
 
   return [
     {
@@ -525,11 +565,7 @@ function buildObservedResourceStatuses(cloudAccessObservation) {
     {
       id: "cloudShellInventory",
       title: "Cloud Shell 只读盘点能力",
-      status: cloudAccessObservation.cloudShell?.canRunReadOnlyInventory === true
-        ? "readonly_inventory_ready"
-        : cloudShellLine
-          ? "cloudshell_disconnected_or_config_missing"
-          : "not_observed",
+      status: cloudShellInventoryStatus,
       readiness: cloudAccessObservation.cloudShell?.canRunReadOnlyInventory === true ? "ready" : "blocked",
       observed: Boolean(cloudShellLine) || cloudAccessObservation.cloudShell?.connected === true,
       currentObservation: cloudShellLine || cloudAccessObservation.cloudShell?.evidence || "",
@@ -542,6 +578,26 @@ function buildObservedResourceStatuses(cloudAccessObservation) {
 function findObservedLine(lines, patternOrPatterns) {
   const patterns = Array.isArray(patternOrPatterns) ? patternOrPatterns : [patternOrPatterns]
   return lines.find((line) => patterns.some((pattern) => pattern.test(line))) || ""
+}
+
+function classifyCloudShellInventoryStatus(cloudShell = {}, observedLine = "") {
+  if (cloudShell?.canRunReadOnlyInventory === true) return "readonly_inventory_ready"
+  const text = [
+    String(observedLine || ""),
+    String(cloudShell?.evidence || ""),
+    ...(Array.isArray(cloudShell?.blockers) ? cloudShell.blockers.map((item) => String(item)) : []),
+  ].join("\n")
+  if (/cloudshell_disconnected_restart_instance_confirmation_required|Disconnected|restart instance|restart_instance|重启实例|terminate all sessions|中止.*会话|终止.*会话|create a new session|创建.*新.*会话/i.test(text)) {
+    return "cloudshell_disconnected_restart_confirmation_required"
+  }
+  if (/cloudshell_not_opened_action_time_confirmation_required_for_nas_fee_warning|performance_nas_may_generate_small_usage_fees|performance NAS|性能型 NAS|usage fees|费用提示|点击开通|requires 开通/i.test(text)) {
+    return "cloudshell_not_opened_nas_fee_confirmation_required"
+  }
+  const hasAnyObservation = Boolean(observedLine) ||
+    cloudShell?.connected === true ||
+    Boolean(String(cloudShell?.evidence || "")) ||
+    (Array.isArray(cloudShell?.blockers) && cloudShell.blockers.length > 0)
+  return hasAnyObservation ? "cloudshell_disconnected_or_config_missing" : "not_observed"
 }
 
 function summarizeObservedResourceStatuses(items) {
