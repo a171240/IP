@@ -1,6 +1,6 @@
 # APP production-cn Aliyun backend apply package
 
-Generated at: 2026-06-25T18:23:54.535Z
+Generated at: 2026-06-25T19:03:11.442Z
 
 ## Scope
 
@@ -24,7 +24,7 @@ Generated at: 2026-06-25T18:23:54.535Z
 拿到动作时授权后，本批只做这四件事：
 
 - P00: 恢复 Aliyun CLI/CloudShell 只读盘点，只运行 allowlisted List/Describe/stat/get inventory 命令，并只写非密钥 evidence。
-- P11: 创建或确认 cn-hangzhou RDS PostgreSQL、数据库、账号和网络访问策略；DATABASE_URL_CN 只进入 KMS/Secrets Manager/SAE secret env。
+- P11: 创建或确认 cn-hangzhou RDS PostgreSQL、数据库、账号和网络访问策略；先记录 Supabase SQL 兼容审查、Supabase-specific SQL 处理和 RDS extension 支持，再迁移 schema/data；DATABASE_URL_CN 只进入 KMS/Secrets Manager/SAE secret env。
 - P05: 确认 OSS bucket/CORS/service-records 前缀，并绑定最小权限 RAM/STS 或运行时角色。
 - P03: 购买或确认 ACR Enterprise Economic cn-hangzhou 1个月 CNY117，并创建/确认 namespace 和 repository。
 
@@ -111,10 +111,10 @@ Generated at: 2026-06-25T18:23:54.535Z
 - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
 - consolePath: 阿里云控制台 -> 云数据库 RDS -> PostgreSQL -> cn-hangzhou
 - currentEvidence: inventory.rdsPostgres=observed_or_unknown; rdsLocalExists=true; rdsLocalReady=false; appApiRoutesTouchingSupabaseCompatibility=29/31; appApiRoutesWithSupabaseDataAccess=4/31; firstVersionRdsRoutesTouchingSupabaseCompatibility=23/25; firstVersionRdsRoutesWithSupabaseDataAccess=0/25; postgresDataAccessAdapterDetected=true; rdsMigrationPackageHandoff=docs/app-production-cn-rds-migration-package.md
-- currentBlockers: DATABASE_URL_CN, RDS_MIGRATION_EVIDENCE_NOT_READY, rdsEvidence:todo:rdsPostgres.instanceId, rdsEvidence:todo:rdsPostgres.engineVersion, rdsEvidence:todo:rdsPostgres.networkAccess, rdsEvidence:todo:rdsPostgres.databaseName, rdsEvidence:todo:rdsPostgres.evidence, rdsEvidence:rdsPostgres.confirmed, rdsEvidence:rdsPostgres.databaseAccountReady, rdsEvidence:rdsPostgres.databaseUrlCnSecretImported, rdsEvidence:migration.schemaMigrated, rdsEvidence:migration.dataMigrated, rdsEvidence:migration.rowCountValidationPassed, rdsEvidence:migration.criticalRecordValidationPassed, rdsEvidence:migration.appApiSmokeOnRdsPassed, rdsEvidence:migration.supabaseNoLongerFormalTarget, rdsEvidence:migration.rollbackRunbookReviewed, rdsEvidence:migration.rollbackValidationPassed
+- currentBlockers: DATABASE_URL_CN, RDS_MIGRATION_EVIDENCE_NOT_READY, rdsEvidence:todo:rdsPostgres.instanceId, rdsEvidence:todo:rdsPostgres.engineVersion, rdsEvidence:todo:rdsPostgres.networkAccess, rdsEvidence:todo:rdsPostgres.databaseName, rdsEvidence:todo:rdsPostgres.evidence, rdsEvidence:rdsPostgres.confirmed, rdsEvidence:rdsPostgres.databaseAccountReady, rdsEvidence:rdsPostgres.databaseUrlCnSecretImported, rdsEvidence:migration.schemaCompatibilityReviewed, rdsEvidence:migration.supabaseSpecificSqlResolved, rdsEvidence:migration.rdsExtensionSupportConfirmed, rdsEvidence:migration.schemaMigrated, rdsEvidence:migration.dataMigrated, rdsEvidence:migration.rowCountValidationPassed, rdsEvidence:migration.criticalRecordValidationPassed, rdsEvidence:migration.appApiSmokeOnRdsPassed, rdsEvidence:migration.supabaseNoLongerFormalTarget, rdsEvidence:migration.rollbackRunbookReviewed, rdsEvidence:migration.rollbackValidationPassed
 - writeTargets: docs/app-production-cn-rds-migration-package.md -> non-secret schema/validation/rollback package digest handoff; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres/sourceInventory/migration/security; DATABASE_URL_CN -> Aliyun KMS / Secrets Manager / SAE secret env only
-- userMustHandle: RDS purchase/spec confirmation if billed; database account password; DATABASE_URL_CN secret value; Supabase export/import credentials during migration; migration rollback confirmation
-- nonSecretEvidenceToRecord: RDS instance id/name/region/engine version; database name; database account ready=true; DATABASE_URL_CN secret imported=true without value; schema/data/row-count/critical-record/rollback validation handles
+- userMustHandle: RDS purchase/spec confirmation if billed; database account password; DATABASE_URL_CN secret value; Supabase SQL compatibility review before applying schema to Aliyun RDS; Supabase-specific auth/storage/RLS/service_role SQL rewrite or explicit resolution; Aliyun RDS PostgreSQL extension support confirmation; Supabase export/import credentials during migration; migration rollback confirmation
+- nonSecretEvidenceToRecord: RDS instance id/name/region/engine version; database name; database account ready=true; DATABASE_URL_CN secret imported=true without value; schemaCompatibilityReviewed=true; supabaseSpecificSqlResolved=true; rdsExtensionSupportConfirmed=true; schema/data/row-count/critical-record/rollback validation handles
 - verifyCommands: corepack pnpm aliyun:rds:migration:package; corepack pnpm aliyun:rds:migration:plan; corepack pnpm aliyun:rds:migration:evidence:strict; corepack pnpm aliyun:backend-cn:status
 
 ### BAP02_OSS_RAM_STS_CLOSE
