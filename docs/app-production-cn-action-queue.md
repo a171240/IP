@@ -1,6 +1,6 @@
 # 阿里云控制台动作包
 
-生成时间：2026-06-25T16:19:22.501Z
+生成时间：2026-06-25T19:20:52.746Z
 
 ## 结论
 
@@ -12,7 +12,7 @@
 - backendTargetReady: 0/8
 - verdict: blocked
 - cloudConfirmationsReady: 0/6
-- operatorTasksReady: 0/7
+- operatorTasksReady: 0/8
 - sensitiveActionReady: 0/5
 - sensitiveActionBlocked: 5/5
 - canReadCloudNow: false

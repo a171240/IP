@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 当前阻塞简报
 
-Generated: 2026-06-25T18:43:14.388Z
+Generated: 2026-06-25T19:21:31.518Z
 
 ## 结论
 
@@ -41,7 +41,7 @@ Generated: 2026-06-25T18:43:14.388Z
 - canStartNowAuthorizationPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
 - blockedByAuthorizationPacketDependencies: P04_ACR_IMAGE_AND_PULL, P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS, P09_PRODUCTION_DEPLOY
 - cloudConfirmationsReady: 0/7
-- operatorTasksReady: 0/7
+- operatorTasksReady: 0/8
 - completion: proved 1/11, blocked 7, partial 1
 - sensitiveBlocked: 5/5
 - sensitiveBlockedIds: S03_ACR_PAID_PURCHASE, S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT

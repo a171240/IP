@@ -84,7 +84,7 @@ test("Aliyun cloud actions package summarizes current cloud console action order
   assert.equal(report.summary.cloudInventoryReadyLocalOperations, "0/9")
   assert.equal(report.summary.cloudInventoryExecutedCommandResults, "9/9")
   assert.equal(report.summary.cloudConfirmationsReady, "0/6")
-  assert.equal(report.summary.operatorTasksReady, "0/7")
+  assert.equal(report.summary.operatorTasksReady, "0/8")
   assert.equal(report.summary.sensitiveActionReady, "0/5")
   assert.equal(report.summary.sensitiveActionBlocked, "5/5")
   assert.equal(Object.hasOwn(report.summary, "sensitiveBlocked"), false)
@@ -251,7 +251,7 @@ test("Aliyun cloud actions package markdown renders compact action order without
   assert.match(markdown, /## 目标闭环证据简表/)
   assert.match(markdown, /blockedCredentialCount: 1/)
   assert.match(markdown, /cloudConfirmationsReady: 0\/6/)
-  assert.match(markdown, /operatorTasksReady: 0\/7/)
+  assert.match(markdown, /operatorTasksReady: 0\/8/)
   assert.match(markdown, /sensitiveActionReady: 0\/5/)
   assert.match(markdown, /sensitiveActionBlocked: 5\/5/)
   assert.doesNotMatch(markdown, /sensitiveBlocked:/)
@@ -311,7 +311,7 @@ test("APP production-cn action queue documents the current authorized next-step 
     "canDeployNow: false",
     "canProceedWithoutWechat: true",
     "cloudConfirmationsReady: 0/6",
-    "operatorTasksReady: 0/7",
+    "operatorTasksReady: 0/8",
     "sensitiveActionBlocked: 5/5",
     "strictReadonlyInventoryReady: false",
     "cloudInventoryReadyLocalOperations: 0/9",

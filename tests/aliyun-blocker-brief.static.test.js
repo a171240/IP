@@ -76,7 +76,7 @@ test("Aliyun blocker brief backend-only markdown stays focused on backend resour
   assert.equal(report.currentScope, "backend_aliyun_only")
   assert.equal(report.summary.canProceedWithoutWechat, true)
   assert.equal(report.summary.cloudConfirmationsReady, "0/6")
-  assert.equal(report.summary.operatorTasksReady, "0/7")
+  assert.equal(report.summary.operatorTasksReady, "0/8")
   assert.deepEqual(report.summary.blockedCredentialNames, ["DATABASE_URL_CN"])
   assert.deepEqual(report.summary.canStartNowAuthorizationPackets, [
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
@@ -97,7 +97,7 @@ test("Aliyun blocker brief backend-only markdown stays focused on backend resour
   assert.match(markdown, /只聚合本地 value-free 证据/)
   assert.match(markdown, /blockedCredentialNames: DATABASE_URL_CN/)
   assert.match(markdown, /cloudConfirmationsReady: 0\/6/)
-  assert.match(markdown, /operatorTasksReady: 0\/7/)
+  assert.match(markdown, /operatorTasksReady: 0\/8/)
   assert.match(markdown, /target: Aliyun RDS PostgreSQL/)
   assert.match(markdown, /databaseUrlCnStatus: todo/)
   assert.match(markdown, /requiredBlocking:[\s\S]*DATABASE_URL_CN[\s\S]*RDS_MIGRATION_EVIDENCE_NOT_READY/)
@@ -133,7 +133,7 @@ test("APP production-cn backend-only current blocker brief is the active backend
   assert.match(doc, /canProceedWithoutWechat: true/)
   assert.match(doc, /backendTargetReady: 0\/8/)
   assert.match(doc, /cloudConfirmationsReady: 0\/6/)
-  assert.match(doc, /operatorTasksReady: 0\/7/)
+  assert.match(doc, /operatorTasksReady: 0\/8/)
   assert.match(doc, /cloudResourceEvidenceReady: 0\/7/)
   assert.match(doc, /blockedCredentialNames: DATABASE_URL_CN/)
   assert.match(doc, /当前只做/)
@@ -403,8 +403,8 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
     "P05_OSS_RAM_STS",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
   ])
-  assert.equal(report.summary.operatorTasksReady, "0/7")
-  assert.match(markdown, /operatorTasksReady: 0\/7/)
+  assert.equal(report.summary.operatorTasksReady, "0/8")
+  assert.match(markdown, /operatorTasksReady: 0\/8/)
   assert.equal(report.summary.blockedVariableAcquisitionCount, 1)
   assert.equal(report.summary.deferredAppLaunchVariableAcquisitionCount, 7)
   assert.equal(report.summary.sensitiveBlocked, "5/5")

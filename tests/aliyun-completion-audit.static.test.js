@@ -166,7 +166,7 @@ test("Aliyun completion audit reports the current goal as blocked without secret
   assert.equal(report.summary.resourceEvidenceReady, "0/7")
   assert.ok(report.summary.blockedResourceEvidenceIds.includes("R01_SAE_RUNTIME"))
   assert.ok(report.summary.blockedResourceEvidenceIds.includes("R06_ENV_IMPORT"))
-  assert.equal(report.summary.operatorTasks.total, 7)
+  assert.equal(report.summary.operatorTasks.total, 8)
   assert.equal(report.summary.operatorTasks.ready, 0)
   assert.equal(report.summary.operatorTasks.operatorActionPacketSummary.currentScope, "backend_aliyun_only")
   assert.deepEqual(report.summary.operatorTasks.operatorActionPacketSummary.canStartNowPacketIds, [
@@ -207,7 +207,7 @@ test("Aliyun completion audit reports the current goal as blocked without secret
   assert.equal(byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").status, "blocked")
   assert.ok(byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").evidence.includes("cloudConfirmationScope=backend_aliyun_only"))
   assert.ok(byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").evidence.includes("cloudConfirmations 0/6 ready"))
-  assert.ok(byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").evidence.includes("operatorTasks ready 0/7"))
+  assert.ok(byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").evidence.includes("operatorTasks ready 0/8"))
   assert.ok(!byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").evidence.includes("operatorTasks ready 1/9"))
   assert.ok(!byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").blockers.some((item) =>
     item.startsWith("wechatOpenPlatform:")

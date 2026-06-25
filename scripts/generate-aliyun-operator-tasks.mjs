@@ -13,11 +13,13 @@ const BACKEND_ROOT = resolve(__dirname, "..")
 const WORKSPACE_ROOT = resolve(BACKEND_ROOT, "../..")
 const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
+const DEFAULT_RDS_MIGRATION_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.rds-migration.local.json")
 
 function parseArgs(argv) {
   const args = {
     envFile: DEFAULT_ENV_FILE,
     cloudConfirmationsFile: DEFAULT_CLOUD_CONFIRMATIONS_FILE,
+    rdsMigrationFile: DEFAULT_RDS_MIGRATION_FILE,
     outPath: "",
     markdownPath: "",
     backendOnly: false,
@@ -32,6 +34,10 @@ function parseArgs(argv) {
     }
     if (arg === "--cloud-confirmations") {
       args.cloudConfirmationsFile = resolveValue(argv[++index], "--cloud-confirmations")
+      continue
+    }
+    if (arg === "--rds-migration") {
+      args.rdsMigrationFile = resolveValue(argv[++index], "--rds-migration")
       continue
     }
     if (arg === "--out") {
@@ -81,6 +87,7 @@ const APP_LAUNCH_ENV_NAMES = new Set([
 ])
 
 const OPERATOR_TASK_AUTHORIZATION_PACKETS = Object.freeze({
+  T02B_ALIYUN_RDS_DATA_MIGRATION: Object.freeze(["P11_ALIYUN_RDS_DATA_MIGRATION"]),
   T03_ALIYUN_RUNTIME_CONTAINER: Object.freeze(["P08_SAE_RUNTIME_SLS"]),
   T03B_ALIYUN_ACR_IMAGE_PUBLISH: Object.freeze(["P03_ACR_PURCHASE", "P04_ACR_IMAGE_AND_PULL"]),
   T04_ALIYUN_DOMAIN_DNS_HTTPS: Object.freeze(["P07_DOMAIN_DNS_HTTPS"]),
@@ -152,6 +159,8 @@ const OPERATOR_AUTHORIZATION_PACKET_METADATA = Object.freeze({
       "RDS PostgreSQL 实例、schema/data migration、rollback validation -> 非密钥证据报告",
     ],
     verifyCommands: [
+      "corepack pnpm aliyun:rds:migration:evidence",
+      "corepack pnpm aliyun:rds:migration:evidence:strict",
       "corepack pnpm aliyun:readiness",
       "corepack pnpm aliyun:completion:audit",
       "corepack pnpm aliyun:predeploy",
@@ -383,7 +392,7 @@ function buildCloudConfirmationIndex(readiness) {
   return new Map(items.map((item) => [item.key, item]))
 }
 
-function buildTasks({ envPlan, readiness, domain, imagePublishPlan }) {
+function buildTasks({ envPlan, readiness, domain, imagePublishPlan, rdsMigrationEvidence }) {
   const cloud = buildCloudConfirmationIndex(readiness)
   const tasks = []
   const wechatOpenPlatform = readiness.checks?.wechatOpenPlatform || {}
@@ -482,6 +491,51 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan }) {
       "corepack pnpm aliyun:env:check",
       "corepack pnpm aliyun:health:smoke",
       "corepack pnpm aliyun:remote:smoke -- --base-url https://api-cn.ipgongchang.xin",
+    ],
+  })
+
+  const rdsLocal = rdsMigrationEvidence.local || {}
+  const rdsSourceInventory = rdsLocal.sourceInventory || {}
+  const rdsMigration = rdsLocal.migration || {}
+  const rdsSummary = rdsMigrationEvidence.summary || {}
+  addTask(tasks, {
+    id: "T02B_ALIYUN_RDS_DATA_MIGRATION",
+    title: "创建阿里云 RDS PostgreSQL 并完成正式数据层迁移",
+    status: rdsLocal.ready ? "ready" : "blocked",
+    blockerCodes: (rdsLocal.blockers || []).map((item) => `rdsMigration:${item}`),
+    owner: "阿里云 RDS/后端数据迁移操作员",
+    consolePath: "阿里云控制台 -> RDS PostgreSQL -> cn-hangzhou；本机 RDS migration runbook",
+    actions: [
+      "创建或确认 production-cn RDS PostgreSQL 实例、数据库、账号和网络访问策略。",
+      "把 DATABASE_URL_CN 只导入阿里云 KMS/Secrets Manager/SAE secret env，不写入 JSON、Markdown、Docker 镜像、APP 包、小程序包或 git。",
+      "迁移前完成 Supabase schema 兼容性复核、Supabase-specific SQL 改写和阿里云 RDS PostgreSQL extension 支持确认。",
+      "按 RDS migration package 执行 schema/data 迁移、行数校验、关键记录校验、APP API smoke 和 rollback 验收。",
+      "只把实例 id/name/region、迁移报告句柄、校验结果布尔值等非密钥证据写入 deploy/aliyun-production-cn.rds-migration.local.json。",
+    ],
+    evidence: [
+      `localFile=${rdsLocal.file || DEFAULT_RDS_MIGRATION_FILE}`,
+      `localExists=${rdsLocal.exists === true}`,
+      `localReady=${rdsLocal.ready === true}`,
+      `totalBlockers=${rdsSummary.totalBlockers ?? (rdsLocal.blockers || []).length}`,
+      `appApiRoutesWithSupabase=${rdsSummary.appApiRoutesWithSupabase ?? rdsSourceInventory.appApiRoutesWithSupabase}/${rdsSummary.appApiRouteCount ?? rdsSourceInventory.appApiRouteCount}`,
+      `appApiRoutesWithSupabaseDataAccess=${rdsSummary.appApiRoutesWithSupabaseDataAccess ?? rdsSourceInventory.appApiRoutesWithSupabaseDataAccess}/${rdsSummary.appApiRouteCount ?? rdsSourceInventory.appApiRouteCount}`,
+      `firstVersionRdsRoutesWithSupabaseDataAccess=${rdsSummary.firstVersionRdsRoutesWithSupabaseDataAccess ?? rdsSourceInventory.firstVersionRdsRoutesWithSupabaseDataAccess}/${rdsSummary.firstVersionRdsRouteCount ?? rdsSourceInventory.firstVersionRdsRouteCount}`,
+      `postgresDataAccessAdapterDetected=${rdsSummary.postgresDataAccessAdapterDetected === true}`,
+      `databaseUrlCnSecretImported=${rdsLocal.rdsPostgres?.databaseUrlCnSecretImported === true}`,
+      `schemaCompatibilityReviewed=${rdsMigration.schemaCompatibilityReviewed === true}`,
+      `supabaseSpecificSqlResolved=${rdsMigration.supabaseSpecificSqlResolved === true}`,
+      `rdsExtensionSupportConfirmed=${rdsMigration.rdsExtensionSupportConfirmed === true}`,
+    ],
+    verifyCommands: [
+      "corepack pnpm aliyun:rds:migration:plan",
+      "corepack pnpm aliyun:rds:migration:evidence",
+      "corepack pnpm aliyun:rds:migration:evidence:strict",
+      "corepack pnpm aliyun:app-api:smoke -- --base-url https://api-cn.ipgongchang.xin",
+      "corepack pnpm aliyun:completion:audit",
+    ],
+    notes: [
+      "Supabase 只能作为迁移来源或旧链路兼容；正式 production-cn 后端必须以阿里云 RDS PostgreSQL 为数据层。",
+      "RDS 创建、数据迁移、DATABASE_URL_CN 导入和任何生产数据动作都需要动作时确认。",
     ],
   })
 
@@ -1237,6 +1291,20 @@ function renderMarkdown(report) {
         ])
       : ["- requiredBlocking: none", ""]),
     "",
+    "## RDS PostgreSQL 数据层迁移证据",
+    "",
+    `- file: ${report.rdsMigrationEvidence.file}`,
+    `- exists: ${report.rdsMigrationEvidence.exists}`,
+    `- ready: ${report.rdsMigrationEvidence.ready}`,
+    `- totalBlockers: ${report.rdsMigrationEvidence.totalBlockers}`,
+    `- appApiRoutesWithSupabase: ${report.rdsMigrationEvidence.appApiRoutesWithSupabase}`,
+    `- appApiRoutesWithSupabaseDataAccess: ${report.rdsMigrationEvidence.appApiRoutesWithSupabaseDataAccess}`,
+    `- firstVersionRdsRoutesWithSupabaseDataAccess: ${report.rdsMigrationEvidence.firstVersionRdsRoutesWithSupabaseDataAccess}`,
+    `- postgresDataAccessAdapterDetected: ${report.rdsMigrationEvidence.postgresDataAccessAdapterDetected}`,
+    ...(report.rdsMigrationEvidence.blockers.length
+      ? report.rdsMigrationEvidence.blockers.map((item) => `- blocker: ${item}`)
+      : ["- blocker: none"]),
+    "",
     "## 密钥/密码/token/付款/受控标识符类人工介入项",
     "",
     ...(report.sensitiveActionItems.length
@@ -1341,11 +1409,17 @@ function main() {
     "scripts/check-aliyun-image-publish-plan.mjs",
     "--allow-incomplete",
   ])
+  const rdsMigrationEvidence = runJson("rds_migration_evidence", [
+    "scripts/check-aliyun-rds-migration-evidence.mjs",
+    "--allow-incomplete",
+    "--local",
+    args.rdsMigrationFile,
+  ])
   const nativeRelease = runJson("app_native_release", [
     "scripts/check-app-native-release-config.mjs",
     "--allow-blocking",
   ])
-  const tasks = buildTasks({ envPlan, readiness, domain, cloudConfirmations, imagePublishPlan })
+  const tasks = buildTasks({ envPlan, readiness, domain, cloudConfirmations, imagePublishPlan, rdsMigrationEvidence })
   const sensitiveActionItems = buildSensitiveActionItems({ envPlan, readiness, imagePublishPlan, nativeRelease })
   let report = {
     generatedAt: new Date().toISOString(),
@@ -1373,6 +1447,17 @@ function main() {
       localReady: imagePublishPlan.summary?.localReady === true,
       totalBlockers: imagePublishPlan.summary?.totalBlockers ?? 0,
       localDockerImage: imagePublishPlan.localDockerImage?.status || "unknown",
+    },
+    rdsMigrationEvidence: {
+      file: rdsMigrationEvidence.local?.file || args.rdsMigrationFile,
+      exists: rdsMigrationEvidence.local?.exists === true,
+      ready: rdsMigrationEvidence.local?.ready === true,
+      totalBlockers: rdsMigrationEvidence.summary?.totalBlockers ?? (rdsMigrationEvidence.local?.blockers || []).length,
+      blockers: rdsMigrationEvidence.local?.blockers || [],
+      appApiRoutesWithSupabase: rdsMigrationEvidence.summary?.appApiRoutesWithSupabase || 0,
+      appApiRoutesWithSupabaseDataAccess: rdsMigrationEvidence.summary?.appApiRoutesWithSupabaseDataAccess || 0,
+      firstVersionRdsRoutesWithSupabaseDataAccess: rdsMigrationEvidence.summary?.firstVersionRdsRoutesWithSupabaseDataAccess || 0,
+      postgresDataAccessAdapterDetected: rdsMigrationEvidence.summary?.postgresDataAccessAdapterDetected === true,
     },
     nativeRelease: {
       androidReady: nativeRelease.android?.ready === true,
@@ -1424,7 +1509,7 @@ function main() {
 function printHelp() {
   console.log([
     "Usage:",
-    "  node scripts/generate-aliyun-operator-tasks.mjs [--backend-only] [--env-file path] [--cloud-confirmations path] [--out /tmp/tasks.json] [--markdown /tmp/tasks.md]",
+    "  node scripts/generate-aliyun-operator-tasks.mjs [--backend-only] [--env-file path] [--cloud-confirmations path] [--rds-migration path] [--out /tmp/tasks.json] [--markdown /tmp/tasks.md]",
     "",
     "Generates a non-secret Aliyun/WeChat operator task list from env plan, readiness, cloud confirmations, and domain probes.",
     "--backend-only excludes deferred WeChat Open Platform, Apple Team ID, Android signing, and APP legal-page publishing tasks.",
