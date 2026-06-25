@@ -787,6 +787,10 @@ function renderMarkdown(report) {
     `- backendTargetReady: ${report.summary.backendTargetReady}`,
     `- resourceEvidenceReady: ${report.summary.resourceEvidenceReady}`,
     "",
+    "## Operator Quick Start",
+    "",
+    ...renderOperatorQuickStart(report),
+    "",
     "## Immediate Backend Steps After Confirmation",
     "",
     `- ${report.summary.immediateBackendSteps.join(", ") || "none"}`,
@@ -852,6 +856,36 @@ function renderMarkdown(report) {
     ...report.safetyBoundary.map((item) => `- ${item}`),
     "",
   ].join("\n")
+}
+
+function renderOperatorQuickStart(report) {
+  return [
+    "当前结论：不能部署；这不是微信移动应用阻塞，而是阿里云后端资源和证据还没有闭环。",
+    "",
+    `- current backend scope: ${report.currentScope}`,
+    `- resource evidence: ${report.summary.resourceEvidenceReady}`,
+    `- deploy gate: canDeployBackendNow=${report.canDeployBackendNow}`,
+    `- missing backend credential/password: ${report.credentialPasswordIntervention.missingCredentialValues.names.join(", ") || "none"}`,
+    `- deferred app launch items: ${report.userIntervention.deferredAppLaunchBlocking.join(", ") || "none"}`,
+    "",
+    "拿到动作时授权后，本批只做这四件事：",
+    "",
+    "- P00: 恢复 Aliyun CLI/CloudShell 只读盘点，只运行 allowlisted List/Describe/stat/get inventory 命令，并只写非密钥 evidence。",
+    "- P11: 创建或确认 cn-hangzhou RDS PostgreSQL、数据库、账号和网络访问策略；DATABASE_URL_CN 只进入 KMS/Secrets Manager/SAE secret env。",
+    "- P05: 确认 OSS bucket/CORS/service-records 前缀，并绑定最小权限 RAM/STS 或运行时角色。",
+    "- P03: 购买或确认 ACR Enterprise Economic cn-hangzhou 1个月 CNY117，并创建/确认 namespace 和 repository。",
+    "",
+    "本批明确不做：微信开放平台移动应用、Android release signing、Apple Team ID/AASA、docker login/push、SAE runtime 创建、全量 env import、DNS/HTTPS/ICP 变更、production deploy、postdeploy smoke、git push。",
+    "",
+    "必须停手等用户确认的点：",
+    "",
+    "- CloudShell 如出现性能型 NAS 费用提示，确认后才可点击开通。",
+    "- RDS 如涉及规格购买、实例费用、数据库账号密码或迁移执行，动作前确认。",
+    "- ACR 付款页必须再次确认规格、地域、1个月和 CNY117 金额。",
+    "- AccessKeySecret、STS token、registry password、DATABASE_URL_CN、数据库密码、Supabase service role key 只能进入受控 secret 通道，不能写文档、JSON、镜像、shell history 或 git。",
+    "",
+    `授权口径：${report.actionTimeAuthorizationRequest.recommendedUserReply}`,
+  ]
 }
 
 function renderCredentialPasswordIntervention(intervention) {
