@@ -205,6 +205,14 @@ function dryRunOperation(operation) {
   }
 }
 
+function operationEvidence(operation, result, executing) {
+  if (!executing) return "DRY_RUN_NOT_EXECUTED"
+  if (result.exitStatus === 0) {
+    return `readonly_cli_${operation.id}_${result.observedAt.replace(/[:.]/g, "-")}`
+  }
+  return result.evidence || `readonly_cli_failed_${operation.id}_${String(result.observedAt || new Date().toISOString()).replace(/[:.]/g, "-")}`
+}
+
 function buildLocalResults(template, args) {
   const executing = args.executeReadonly === true
   const operations = (template.operations || []).map((operation) => {
@@ -217,9 +225,7 @@ function buildLocalResults(template, args) {
       status: executing && result.exitStatus === 0 ? "observed" : executing ? "blocked" : "skipped",
       commandResults: [result],
       writesTo: operation.writesTo || [],
-      evidence: executing && result.exitStatus === 0
-        ? `readonly_cli_${operation.id}_${result.observedAt.replace(/[:.]/g, "-")}`
-        : "DRY_RUN_NOT_EXECUTED",
+      evidence: operationEvidence(operation, result, executing),
     }
   })
   return {
@@ -260,6 +266,10 @@ function buildReport(args) {
     mutationPerformed: false,
     templateFile: args.templateFile,
     writeLocal: args.writeLocal || null,
+    files: {
+      templateFile: args.templateFile,
+      localResultsFile: args.writeLocal || "",
+    },
     blockers: templateBlockers,
     summary: {
       operations: localResults.operations.length,
