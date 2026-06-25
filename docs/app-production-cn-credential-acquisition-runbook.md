@@ -33,6 +33,17 @@ readySecretEnvVariableCount=17
 deferredAppLaunchSensitiveActionIds=S01_WECHAT_OPEN_APP_LOGIN, S02_APPLE_TEAM_ID, S07_ANDROID_RELEASE_SIGNING
 ```
 
+Short answer for the current backend-only run:
+
+```text
+Only missing backend credential/password item: DATABASE_URL_CN.
+Where to get it: Aliyun Console -> RDS PostgreSQL -> cn-hangzhou instance -> database/account/connection information, after the RDS instance and database account are created or confirmed.
+Where to put it: Aliyun KMS / Secrets Manager / SAE secret env only.
+What not to do: do not write DATABASE_URL_CN value, database password, dump contents, Supabase service role key, AccessKeySecret, token, screenshots with values, shell history, JSON, Markdown, Docker image, App bundle, mini-program package, or git.
+```
+
+CloudShell is not a credential source. It is only an inventory surface. The current CloudShell page requires clicking `开通` and warns it may create a performance NAS instance with possible usage fees. Do not click `开通` unless the user gives action-time authorization for that exact warning, and then run only allowlisted read-only inventory commands.
+
 Backend-only docs:
 
 ```text
@@ -61,6 +72,12 @@ canDeployNow=false
 
 If a console is already logged in, the operator may navigate and inspect non-secret state. The operator still must not click purchase, create resources, submit review, import secrets, run docker login/push, read AppSecret, read keystore passwords, deploy production-cn, or git push without fresh action-time confirmation for that exact action.
 
+CloudShell action-time phrase for the current state:
+
+```text
+授权开通/重新连接阿里云 CloudShell；我确认如页面提示会创建性能型 NAS 并可能产生费用，可以点击开通；只运行 allowlisted 只读盘点命令并写入非密钥 evidence，不创建业务资源、不购买 ACR、不导入密钥、不部署。
+```
+
 ## Credentials And Controlled Actions
 
 | ID | What is needed | Obtain from | Where it may go | Verify | Hard boundary |
@@ -73,6 +90,39 @@ If a console is already logged in, the operator may navigate and inspect non-sec
 | `S05_OSS_RAM_SECRET_OR_STS` | `ALIYUN_OSS_SECURITY_TOKEN` if STS is selected; OSS bucket/CORS/prefix/RAM least privilege closure | 阿里云控制台 -> OSS Bucket / RAM 访问控制 / SAE runtime identity / Secrets Manager | OSS AccessKey/STS material -> KMS/Secrets Manager/SAE secret env only; non-secret evidence -> `items.oss` | `corepack pnpm aliyun:cloud:confirmations`; `corepack pnpm aliyun:health:smoke` | Do not create commit-ready long-lived plaintext secrets. Do not download OSS object contents. |
 | `S08_ALIYUN_RDS_DATABASE_URL` | `DATABASE_URL_CN` plus RDS PostgreSQL schema/data/API smoke/rollback migration evidence | 阿里云控制台 -> RDS PostgreSQL -> 实例/数据库/账号/连接信息；SAE/KMS/Secrets Manager -> secret env | `DATABASE_URL_CN` -> KMS/Secrets Manager/SAE secret env only; non-secret migration evidence -> `rds-migration.local.json` and `items.envImport` | `corepack pnpm aliyun:rds:migration:evidence:strict`; `corepack pnpm aliyun:sensitive:blockers:backend`; `corepack pnpm aliyun:backend-cn:status`; `corepack pnpm aliyun:completion:audit` | Do not store DATABASE_URL_CN, database password, dump contents, customer data, Supabase service role key, AccessKeySecret, token, reports, images, shell history, or git. |
 | `S06_READY_SENSITIVE_ENV_IMPORT` | Ready local/Vercel/Supabase/API provider env values imported into Aliyun runtime | Existing Vercel production, Supabase, Aliyun Bailian/DashScope, DeepSeek, Volcengine, WeChat mini-program consoles | Plain env only for public identifiers; KMS/Secrets Manager/SAE secret env for secret values; non-secret evidence -> `items.envImport` | `corepack pnpm aliyun:env:checklist`; `corepack pnpm aliyun:sensitive:blockers`; `corepack pnpm aliyun:readiness:cloud-ready` | Do not paste any value into reports. Do not import WECHAT_OPEN_APP_ID/SECRET before the WeChat mobile app is approved and separately authorized. |
+
+## DATABASE_URL_CN Acquisition Steps
+
+`DATABASE_URL_CN` is the only current backend-only blocked credential. It becomes available only after the Aliyun RDS PostgreSQL target is real enough to produce a production connection string.
+
+Required sequence:
+
+```text
+1. Confirm or create an Aliyun RDS PostgreSQL instance in cn-hangzhou.
+2. Create or confirm the production database name and least-privilege database account.
+3. Confirm VPC/network access from the SAE runtime path; do not expose a broad public database endpoint unless separately approved.
+4. Import the DATABASE_URL_CN value directly into Aliyun KMS / Secrets Manager / SAE secret env.
+5. Record only non-secret evidence in deploy/aliyun-production-cn.rds-migration.local.json.
+6. Run schema/data migration, APP API smoke on RDS, and rollback validation.
+```
+
+Required non-secret evidence fields:
+
+```text
+rdsPostgres.confirmed=true
+rdsPostgres.databaseAccountReady=true
+rdsPostgres.databaseUrlCnSecretImported=true
+migration.schemaMigrated=true
+migration.dataMigrated=true
+migration.rowCountValidationPassed=true
+migration.criticalRecordValidationPassed=true
+migration.appApiSmokeOnRdsPassed=true
+migration.supabaseNoLongerFormalTarget=true
+migration.rollbackRunbookReviewed=true
+migration.rollbackValidationPassed=true
+```
+
+Do not count `DATABASE_URL_CN` as solved just because an RDS page is visible. It is solved only when the secret is imported through the Aliyun controlled secret channel and the RDS migration evidence passes strict verification.
 
 ## Ready Env Names Still Requiring Controlled Import
 
@@ -110,6 +160,8 @@ P03_ACR_PURCHASE
 P05_OSS_RAM_STS
 P11_ALIYUN_RDS_DATA_MIGRATION
 ```
+
+`P00_ALIYUN_READONLY_INVENTORY_IDENTITY` is allowed to start only under the CloudShell/NAS warning rule above. It does not authorize RDS creation, ACR purchase, OSS/RAM changes, env import, image push, DNS mutation, deployment, or git push.
 
 These backend packets are still dependency-blocked:
 
@@ -155,6 +207,10 @@ Valid evidence handles include console path, screenshot ID, ticket ID, resource 
 Run the narrow verifier first, then the full gate:
 
 ```bash
+corepack pnpm aliyun:sensitive:blockers:backend
+corepack pnpm aliyun:env:handoff:backend
+corepack pnpm aliyun:rds:migration:evidence
+corepack pnpm aliyun:backend-cn:status
 corepack pnpm aliyun:sensitive:blockers
 corepack pnpm aliyun:env:source-map -- --skip-vercel-env-coverage
 corepack pnpm aliyun:action:authorization

@@ -352,6 +352,14 @@ test("Aliyun credential acquisition runbook stays aligned with sensitive blocker
   assert.match(runbook, /corepack pnpm aliyun:sensitive:blockers:backend/)
   assert.match(runbook, /blockedCredentialCount=1/)
   assert.match(runbook, /blockedCredentialNames=DATABASE_URL_CN/)
+  assert.match(runbook, /Only missing backend credential\/password item: DATABASE_URL_CN/)
+  assert.match(runbook, /Where to get it: Aliyun Console -> RDS PostgreSQL -> cn-hangzhou instance/)
+  assert.match(runbook, /Where to put it: Aliyun KMS \/ Secrets Manager \/ SAE secret env only/)
+  assert.match(runbook, /CloudShell is not a credential source/)
+  assert.match(runbook, /性能型 NAS/)
+  assert.match(runbook, /DATABASE_URL_CN Acquisition Steps/)
+  assert.match(runbook, /rdsPostgres\.databaseUrlCnSecretImported=true/)
+  assert.match(runbook, /migration\.appApiSmokeOnRdsPassed=true/)
   assert.match(runbook, /docs\/app-production-cn-backend-sensitive-blockers\.md/)
   assert.match(runbook, /docs\/app-production-cn-backend-secret-env-import-batches\.md/)
   assert.match(runbook, /blockedCredentialCount=8/)
@@ -364,6 +372,9 @@ test("Aliyun credential acquisition runbook stays aligned with sensitive blocker
   assert.match(runbook, /Backend-Only Actions That Can Start Next/)
   assert.match(runbook, /P00_ALIYUN_READONLY_INVENTORY_IDENTITY/)
   assert.match(runbook, /P09_PRODUCTION_DEPLOY/)
+  assert.match(runbook, /corepack pnpm aliyun:env:handoff:backend/)
+  assert.match(runbook, /corepack pnpm aliyun:rds:migration:evidence/)
+  assert.match(runbook, /corepack pnpm aliyun:backend-cn:status/)
 
   const backendStartSection = runbook.match(
     /## Backend-Only Actions That Can Start Next[\s\S]*?```text\n([\s\S]*?)```/,
