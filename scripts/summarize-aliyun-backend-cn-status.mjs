@@ -114,6 +114,15 @@ const BACKEND_TARGETS = Object.freeze([
   },
 ])
 
+const RESOURCE_EVIDENCE_BY_BACKEND_TARGET = Object.freeze({
+  B02_ACR_IMAGE_REGISTRY: Object.freeze(["R02_ACR_IMAGE_REGISTRY"]),
+  B03_SAE_RUNTIME: Object.freeze(["R01_SAE_RUNTIME"]),
+  B04_DOMAINS_HTTPS_ICP: Object.freeze(["R03_API_DOMAIN_HTTPS", "R04_ASSET_DOMAIN_HTTPS"]),
+  B05_OSS_RAM_STS: Object.freeze(["R05_OSS_AUDIO_STORAGE"]),
+  B06_ENV_IMPORT: Object.freeze(["R06_ENV_IMPORT"]),
+  B07_SLS_ALERTS: Object.freeze(["R07_SLS_ALERTS"]),
+})
+
 const SECRET_VALUE_PATTERNS = [
   /sk-[A-Za-z0-9_-]{20,}/,
   /gh[pousr]_[A-Za-z0-9_]{30,}/,
@@ -384,9 +393,10 @@ function buildBackendTargets(backendRequiredBlocking, reports) {
   })
 }
 
-function currentEvidenceForTarget(id, { cloudConfirmations, imagePublishPlan, cloudInventoryResults, rdsMigration }) {
+function currentEvidenceForTarget(id, { cloudConfirmations, imagePublishPlan, cloudInventoryResults, resourceMatrix, rdsMigration }) {
   const cloudItems = cloudConfirmations.local?.items || {}
   const observation = cloudInventoryResults.local?.observationSummary || {}
+  const resourceEvidence = evidenceForResourceRows(resourceMatrix, RESOURCE_EVIDENCE_BY_BACKEND_TARGET[id] || [])
   if (id === "B01_RDS_POSTGRES_DATA_LAYER") {
     return [
       `rdsLocalExists=${rdsMigration.local?.exists === true}`,
@@ -401,18 +411,20 @@ function currentEvidenceForTarget(id, { cloudConfirmations, imagePublishPlan, cl
     return [
       `imagePlanReady=${imagePublishPlan.ready === true || imagePublishPlan.local?.ready === true}`,
       `imageWritebackGroups=${(imagePublishPlan.summary?.writebackBlockingGroups || []).join(",") || "none"}`,
+      ...resourceEvidence,
     ]
   }
-  if (id === "B03_SAE_RUNTIME") return evidenceForCloudItem(cloudItems.runtime)
+  if (id === "B03_SAE_RUNTIME") return [...evidenceForCloudItem(cloudItems.runtime), ...resourceEvidence]
   if (id === "B04_DOMAINS_HTTPS_ICP") {
     return [
       ...evidenceForCloudItem(cloudItems.apiDomainHttps).map((item) => `api:${item}`),
       ...evidenceForCloudItem(cloudItems.assetDomainHttps).map((item) => `asset:${item}`),
+      ...resourceEvidence,
     ]
   }
-  if (id === "B05_OSS_RAM_STS") return evidenceForCloudItem(cloudItems.oss)
-  if (id === "B06_ENV_IMPORT") return evidenceForCloudItem(cloudItems.envImport)
-  if (id === "B07_SLS_ALERTS") return evidenceForCloudItem(cloudItems.slsAlerts)
+  if (id === "B05_OSS_RAM_STS") return [...evidenceForCloudItem(cloudItems.oss), ...resourceEvidence]
+  if (id === "B06_ENV_IMPORT") return [...evidenceForCloudItem(cloudItems.envImport), ...resourceEvidence]
+  if (id === "B07_SLS_ALERTS") return [...evidenceForCloudItem(cloudItems.slsAlerts), ...resourceEvidence]
   if (id === "B08_POSTDEPLOY_SMOKE") return ["requires deployed Aliyun backend base URL"]
   return []
 }
@@ -424,6 +436,22 @@ function evidenceForCloudItem(item) {
     `blockers=${(item.blockers || []).join(",") || "none"}`,
     `evidenceReady=${Boolean(String(item.evidence || "").trim())}`,
   ]
+}
+
+function evidenceForResourceRows(resourceMatrix, ids) {
+  if (!ids.length) return []
+  const rows = resourceMatrix.resourceEvidenceBrief?.rows || []
+  const rowById = new Map(rows.map((row) => [row.id, row]))
+  return ids.flatMap((id) => {
+    const row = rowById.get(id)
+    if (!row) return [`${id}:missing_resource_matrix_row`]
+    return [
+      `${id}.observedStatus=${row.observedStatus || "unknown"}`,
+      `${id}.observedReadiness=${row.observedReadiness || "unknown"}`,
+      ...(row.currentEvidence || []).slice(0, 2).map((item, index) => `${id}.currentEvidence${index + 1}=${item}`),
+      ...(row.missingEvidence || []).slice(0, 3).map((item) => `${id}.missing=${item}`),
+    ]
+  })
 }
 
 function compactCloudInventory(report) {
