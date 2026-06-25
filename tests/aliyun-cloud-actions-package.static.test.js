@@ -45,6 +45,13 @@ test("Aliyun cloud actions package command is wired into scripts, predeploy, dep
   assert.match(releaseArtifacts, /executionQueueExternalAppPrerequisites/)
   assert.match(releaseArtifacts, /executionQueueBlockedByDependencies/)
   assert.match(releaseArtifacts, /cloud-actions-package\.json/)
+  assert.match(releaseArtifacts, /onlyMissingBackendCredentialValue: \$\{cloudOnlyMissingBackendCredentialValue\(cloudActionsPackage\)/)
+  assert.match(releaseArtifacts, /credentialAcquisitionQueueActionIds/)
+  assert.match(releaseArtifacts, /credentialAcquisitionQueue: compactCredentialAcquisitionQueueForAudit/)
+  assert.match(releaseArtifacts, /credentialAcquisitionQueueScope/)
+  assert.match(releaseArtifacts, /credential \$\{item\.actionId\}: question=\$\{item\.userQuestion/)
+  assert.match(releaseArtifacts, /function formatCloudCredentialQueueActionIds/)
+  assert.match(releaseArtifacts, /function compactCredentialAcquisitionQueueForAudit/)
   assert.match(packageScript, /buildCredentialAcquisitionQueue/)
 })
 

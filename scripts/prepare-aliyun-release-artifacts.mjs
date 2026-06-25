@@ -340,6 +340,8 @@ function renderMarkdown(audit) {
   const userActionBrief = audit.checks.userActionBrief
   const consoleRunbook = audit.checks.consoleRunbook
   const cloudActionsPackage = audit.checks.cloudActionsPackage
+  const cloudCredentialQueue = cloudActionsPackage.credentialAcquisitionQueue || {}
+  const cloudCredentialQueueItems = cloudCredentialQueue.items || []
   const provisioningPlan = audit.checks.provisioningPlan
   const actionAuthorization = audit.checks.actionAuthorization
   const completionAudit = audit.checks.completionAudit
@@ -783,6 +785,8 @@ function renderMarkdown(audit) {
     `- cloudApiCalled: ${cloudActionsPackage.cloudApiCalled === true}`,
     `- cloudActionClosureBrief: ${cloudActionsPackage.cloudActionClosureBrief ? "present" : "missing"}`,
     `- blockedCredentialCount: ${cloudActionsPackage.cloudActionClosureBrief?.blockedCredentialCount ?? cloudActionsPackage.summary?.blockedCredentialCount ?? 0}`,
+    `- onlyMissingBackendCredentialValue: ${cloudOnlyMissingBackendCredentialValue(cloudActionsPackage) || "n/a"}`,
+    `- credentialAcquisitionQueueActionIds: ${formatCloudCredentialQueueActionIds(cloudActionsPackage)}`,
     `- readySecretEnvVariableCount: ${cloudActionsPackage.cloudActionClosureBrief?.readySecretEnvVariableCount ?? cloudActionsPackage.summary?.readySecretEnvVariableCount ?? 0}`,
     `- resourceEvidenceReady: ${cloudActionsPackage.cloudActionClosureBrief?.resourceEvidenceReady || cloudActionsPackage.summary?.resourceEvidenceReady || "unknown"}`,
     `- blockedResourceEvidenceIds: ${cloudActionsPackage.cloudActionClosureBrief?.blockedResourceEvidenceIds?.length ? cloudActionsPackage.cloudActionClosureBrief.blockedResourceEvidenceIds.join(", ") : cloudActionsPackage.summary?.blockedResourceEvidenceIds?.length ? cloudActionsPackage.summary.blockedResourceEvidenceIds.join(", ") : "none"}`,
@@ -800,6 +804,11 @@ function renderMarkdown(audit) {
     `- imagePublishWritebackBlockingGroups: ${cloudActionsPackage.summary?.imagePublishWritebackBlockingGroups?.length ? cloudActionsPackage.summary.imagePublishWritebackBlockingGroups.join(", ") : "none"}`,
     `- readonlyInventoryStatus: ${cloudActionsPackage.readonlyInventoryUnblock?.status || "unknown"}`,
     `- cliConfigProbeFailureCategory: ${cloudActionsPackage.summary?.cliConfigProbeFailureCategory || "none"}`,
+    `- credentialAcquisitionQueue: ${cloudActionsPackage.credentialAcquisitionQueue ? "present" : "missing"}`,
+    `- credentialAcquisitionQueueScope: ${cloudCredentialQueue.queueScope || "unknown"}`,
+    ...(cloudCredentialQueueItems.length
+      ? cloudCredentialQueueItems.map(formatCredentialAcquisitionQueueItem)
+      : ["- credentialAcquisitionQueueItems: none"]),
     ...(cloudActionsPackage.immediateConsoleTasks?.length
       ? cloudActionsPackage.immediateConsoleTasks.map((item) => `- ${item.id}: canStartNow=${item.canStartNow}, scope=${item.currentActionScope || "full_task"}, phrase=${item.minimumAuthorizationPhrase}`)
       : ["- immediateConsoleTasks: none"]),
@@ -1445,6 +1454,28 @@ function formatStringList(items) {
   return Array.isArray(items) && items.length ? items.join(", ") : "none"
 }
 
+function cloudOnlyMissingBackendCredentialValue(cloudActionsPackage) {
+  return cloudActionsPackage.cloudActionClosureBrief?.onlyMissingBackendCredentialValue ||
+    cloudActionsPackage.summary?.onlyMissingBackendCredentialValue ||
+    ""
+}
+
+function formatCloudCredentialQueueActionIds(cloudActionsPackage) {
+  const actionIds =
+    cloudActionsPackage.cloudActionClosureBrief?.credentialAcquisitionQueueActionIds ||
+    (cloudActionsPackage.credentialAcquisitionQueue?.items || []).map((item) => item.actionId)
+  return formatStringList(actionIds)
+}
+
+function formatCredentialAcquisitionQueueItem(item) {
+  return [
+    `- credential ${item.actionId}: question=${item.userQuestion || "none"}`,
+    `obtainFrom=${item.obtainFrom || "none"}`,
+    `destination=${formatStringList(item.destinationSummary).replace(/, /g, "; ")}`,
+    `verify=${formatStringList(item.verifyCommands).replace(/, /g, "; ")}`,
+  ].join("; ")
+}
+
 function compactSensitiveBlockerForAudit(item) {
   const variableDetails = item.variableDetails || []
   return {
@@ -1480,6 +1511,33 @@ function compactSensitiveBlockerForAudit(item) {
     requiredUserAction: item.requiredUserAction,
     unblockCondition: item.unblockCondition,
     forbidden: item.forbidden,
+  }
+}
+
+function compactCredentialAcquisitionQueueForAudit(queue = {}) {
+  return {
+    currentScope: queue.currentScope || "",
+    queueScope: queue.queueScope || queue.currentScope || "",
+    missingCredentialNames: queue.missingCredentialNames || [],
+    onlyMissingBackendCredentialValue: queue.onlyMissingBackendCredentialValue || "",
+    readySecretEnvVariableCount: queue.readySecretEnvVariableCount || 0,
+    readySecretEnvVariableNames: queue.readySecretEnvVariableNames || [],
+    requiresActionTimeConfirmationIds: queue.requiresActionTimeConfirmationIds || [],
+    items: (queue.items || []).map((item) => ({
+      order: item.order,
+      actionId: item.actionId,
+      category: item.category,
+      status: item.status,
+      owner: item.owner,
+      userQuestion: item.userQuestion || "",
+      obtainFrom: item.obtainFrom || "",
+      blockedCredentialNames: item.blockedCredentialNames || [],
+      readySecretEnvVariableNames: item.readySecretEnvVariableNames || [],
+      destinationSummary: item.destinationSummary || item.writeTargets || item.importTargets || [],
+      verifyCommands: item.verifyCommands || [],
+      requiresActionTimeConfirmation: item.requiresActionTimeConfirmation === true,
+      unblockCondition: item.unblockCondition || "",
+    })),
   }
 }
 
@@ -2701,6 +2759,11 @@ function main() {
       cloudActionClosureBrief: cloudActionsPackage.cloudActionClosureBrief || {},
       blockedCredentialCount: cloudActionsPackage.cloudActionClosureBrief?.blockedCredentialCount ?? cloudActionsPackage.summary?.blockedCredentialCount ?? 0,
       blockedCredentialNames: cloudActionsPackage.cloudActionClosureBrief?.blockedCredentialNames || [],
+      onlyMissingBackendCredentialValue: cloudActionsPackage.cloudActionClosureBrief?.onlyMissingBackendCredentialValue || cloudActionsPackage.summary?.onlyMissingBackendCredentialValue || "",
+      credentialAcquisitionQueueActionIds:
+        cloudActionsPackage.cloudActionClosureBrief?.credentialAcquisitionQueueActionIds ||
+        (cloudActionsPackage.credentialAcquisitionQueue?.items || []).map((item) => item.actionId),
+      credentialAcquisitionQueue: compactCredentialAcquisitionQueueForAudit(cloudActionsPackage.credentialAcquisitionQueue),
       readySecretEnvVariableCount: cloudActionsPackage.cloudActionClosureBrief?.readySecretEnvVariableCount ?? cloudActionsPackage.summary?.readySecretEnvVariableCount ?? 0,
       readySecretEnvVariableNames: cloudActionsPackage.cloudActionClosureBrief?.readySecretEnvVariableNames || [],
       resourceEvidenceReady: cloudActionsPackage.cloudActionClosureBrief?.resourceEvidenceReady || cloudActionsPackage.summary?.resourceEvidenceReady || "",
