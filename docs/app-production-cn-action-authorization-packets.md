@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 阿里云动作授权矩阵
 
-Generated: 2026-06-25T08:04:17.287Z
+Generated: 2026-06-25T10:57:19.051Z
 
 ## 结论
 
@@ -12,8 +12,8 @@ Generated: 2026-06-25T08:04:17.287Z
 - mutationPerformed: false
 - containsValues: false
 - secretLeakCheck: true
-- actionTimeConfirmationRequired: U03_ACR_PURCHASE_CONFIRMATION, U04_ACR_RUNTIME_AUTH, U05_OSS_RAM_OR_STS, U11_ALIYUN_RDS_DATA_MIGRATION, U06_ENV_IMPORT, U07_DOMAIN_DNS_HTTPS_ICP, U08_SAE_RUNTIME_AND_SLS, U09_DEPLOY_AUTHORIZATION
-- nextActionTimeConfirmations: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
+- actionTimeConfirmationRequired: U00_ALIYUN_READONLY_INVENTORY_IDENTITY, U03_ACR_PURCHASE_CONFIRMATION, U04_ACR_RUNTIME_AUTH, U05_OSS_RAM_OR_STS, U11_ALIYUN_RDS_DATA_MIGRATION, U06_ENV_IMPORT, U07_DOMAIN_DNS_HTTPS_ICP, U08_SAE_RUNTIME_AND_SLS, U09_DEPLOY_AUTHORIZATION
+- nextActionTimeConfirmations: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
 - blockedCredentialCount: 1
 - readySecretEnvVariableCount: 17
 - resourceEvidenceReady: 0/7
@@ -31,7 +31,7 @@ Generated: 2026-06-25T08:04:17.287Z
 - resourceEvidenceReady: 0/7
 - blockedResourceEvidenceIds: R01_SAE_RUNTIME, R02_ACR_IMAGE_REGISTRY, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R05_OSS_AUDIO_STORAGE, R06_ENV_IMPORT, R07_SLS_ALERTS
 - partiallyObservedResourceEvidenceIds: R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS
-- canStartNowPackets: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
+- canStartNowPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
 - deferredAppLaunchPackets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID
 - canStartNowConsoleTasks: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS
 - blockedByPacketDependencies: P04_ACR_IMAGE_AND_PULL, P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS, P09_PRODUCTION_DEPLOY
@@ -52,6 +52,19 @@ Generated: 2026-06-25T08:04:17.287Z
 - 创建微信开放平台移动应用或读取审核通过后的 AppSecret，除非用户在动作时明确授权并提供相应账号上下文。
 
 ## 当前可开始的动作时确认
+
+### P00_ALIYUN_READONLY_INVENTORY_IDENTITY 恢复阿里云 CLI/CloudShell 只读盘点身份
+
+- actionId: U00_ALIYUN_READONLY_INVENTORY_IDENTITY
+- owner: 用户/阿里云只读盘点操作员
+- sequenceGroup: readonly_inventory
+- minimumUserPhrase: 授权重新连接阿里云 CloudShell 或配置 Aliyun CLI，只运行 allowlisted 只读盘点命令并写入非密钥 evidence。
+- allowedActions: 使用阿里云官方 CLI 或 CloudShell 的只读身份。; 只运行本仓库生成的 List/Describe/stat/get inventory 命令。; 只记录资源名、布尔值、时间戳、命令状态、sha256 指纹和非密钥 evidence handle。
+- explicitlyExcluded: 不运行 Create/Update/Delete/Deploy/Start/Stop/Purchase/DNS mutation 命令。; 不执行 docker login/push。; 不读取、复制、粘贴或输出 AccessKeySecret、STS token、cookie、registry password、RAM Secret 或证书私钥。; 不做 production-cn deploy、env import、资源创建或计费动作。
+- completionEvidence: cloudInventoryResults.localReady=true; readyLocalOperations=9/9; executedCommandResults=9/9; mutationPerformedCommandResults=0
+- writeTargets: deploy/aliyun-production-cn.cloud-inventory-results.local.json -> non-secret read-only inventory summaries
+- verifyCommands: corepack pnpm aliyun:cloud:access; MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1 corepack pnpm aliyun:cloud:inventory-run -- --execute-readonly --write-local deploy/aliyun-production-cn.cloud-inventory-results.local.json; corepack pnpm aliyun:cloud:inventory-results:strict; corepack pnpm aliyun:evidence:writeback:backend
+- nonSecretEvidenceOnly: true
 
 ### P03_ACR_PURCHASE 确认 ACR 企业版付费购买
 
@@ -93,6 +106,22 @@ Generated: 2026-06-25T08:04:17.287Z
 - nonSecretEvidenceOnly: false
 
 ## 动作分类
+
+### U00_ALIYUN_READONLY_INVENTORY_IDENTITY 恢复阿里云 CLI/CloudShell 只读盘点身份
+
+- status: blocked
+- automationPolicy: readonly_inventory_identity_requires_action_time_confirmation
+- canCodexProceedWithoutUser: false
+- requiresActionTimeConfirmation: true
+- blockerClass: readonly_cloud_inventory_identity
+- why: 严格云证据必须来自 allowlisted Aliyun CLI/CloudShell 只读盘点；浏览器已登录不能直接等同于 cloudInventory strict ready。
+- owner: 用户/阿里云只读盘点操作员
+- obtainFrom: 本机 Aliyun CLI default profile 或阿里云控制台 -> CloudShell
+- writeTargets: deploy/aliyun-production-cn.cloud-inventory-results.local.json -> non-secret read-only inventory summaries
+- variableNames: none
+- currentBlockers: readonly_inventory_strict_ready=0/9; cloudInventory:I01_SAE_RUNTIME; cloudInventory:I02_ACR_IMAGE; cloudInventory:I03_DNS_API_DOMAIN; cloudInventory:I04_DNS_ASSET_DOMAIN; cloudInventory:I05_OSS_AUDIO_BUCKET; cloudInventory:I06_SLS_ALERTS; cloudInventory:I07_CERT_HTTPS; cloudInventory:I08_RDS_POSTGRES; cloudInventory:I09_TAIR_REDIS
+- currentEvidence: cloudInventoryResults.templateReady=true; cloudInventoryResults.localExists=true; cloudInventoryResults.localReady=false; readyLocalOperations=0/9; executedCommandResults=9/9; cloudApiCalledCommandResults=9; mutationPerformedCommandResults=0
+- verifyCommands: corepack pnpm aliyun:cloud:access; MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1 corepack pnpm aliyun:cloud:inventory-run -- --execute-readonly --write-local deploy/aliyun-production-cn.cloud-inventory-results.local.json; corepack pnpm aliyun:cloud:inventory-results:strict; corepack pnpm aliyun:evidence:writeback:backend
 
 ### U03_ACR_PURCHASE_CONFIRMATION 确认 ACR 企业版付费购买
 
@@ -154,7 +183,7 @@ Generated: 2026-06-25T08:04:17.287Z
 - obtainFrom: 阿里云控制台 -> RDS PostgreSQL -> cn-hangzhou 实例；后端 Supabase 到 RDS/PostgreSQL 迁移 runbook
 - writeTargets: DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env; RDS PostgreSQL 实例、schema/data migration、rollback validation -> 非密钥证据报告
 - variableNames: DATABASE_URL_CN
-- currentBlockers: requiredEnv:DATABASE_URL_CN; DATABASE_URL_CN=todo; rdsMigrationIncludedInThisRelease=false
+- currentBlockers: requiredEnv:DATABASE_URL_CN; DATABASE_URL_CN_status:todo; rdsMigrationIncludedInThisRelease=false
 - currentEvidence: bridgeDataLayer.current=Supabase migration source / legacy compatibility only; bridgeDataLayer.target=Aliyun RDS PostgreSQL; databaseUrlCnStatus=todo; rdsMigrationIncludedInThisRelease=false; rdsMigrationRequiredForFinalProductionCn=true
 - verifyCommands: corepack pnpm aliyun:readiness; corepack pnpm aliyun:completion:audit; corepack pnpm aliyun:predeploy
 
@@ -223,6 +252,24 @@ Generated: 2026-06-25T08:04:17.287Z
 - verifyCommands: corepack pnpm aliyun:predeploy; corepack pnpm aliyun:cloud:confirmations:backend:strict
 
 ## 最小授权动作包
+
+### P00_ALIYUN_READONLY_INVENTORY_IDENTITY 恢复阿里云 CLI/CloudShell 只读盘点身份
+
+- actionId: U00_ALIYUN_READONLY_INVENTORY_IDENTITY
+- status: blocked
+- owner: 用户/阿里云只读盘点操作员
+- sequenceGroup: readonly_inventory
+- dependsOn: none
+- blockingDependencies: none
+- canStartNow: true
+- requiresActionTimeConfirmation: true
+- minimumUserPhrase: 授权重新连接阿里云 CloudShell 或配置 Aliyun CLI，只运行 allowlisted 只读盘点命令并写入非密钥 evidence。
+- allowedActions: 使用阿里云官方 CLI 或 CloudShell 的只读身份。; 只运行本仓库生成的 List/Describe/stat/get inventory 命令。; 只记录资源名、布尔值、时间戳、命令状态、sha256 指纹和非密钥 evidence handle。
+- explicitlyExcluded: 不运行 Create/Update/Delete/Deploy/Start/Stop/Purchase/DNS mutation 命令。; 不执行 docker login/push。; 不读取、复制、粘贴或输出 AccessKeySecret、STS token、cookie、registry password、RAM Secret 或证书私钥。; 不做 production-cn deploy、env import、资源创建或计费动作。
+- completionEvidence: cloudInventoryResults.localReady=true; readyLocalOperations=9/9; executedCommandResults=9/9; mutationPerformedCommandResults=0
+- writeTargets: deploy/aliyun-production-cn.cloud-inventory-results.local.json -> non-secret read-only inventory summaries
+- variableNames: none
+- verifyCommands: corepack pnpm aliyun:cloud:access; MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1 corepack pnpm aliyun:cloud:inventory-run -- --execute-readonly --write-local deploy/aliyun-production-cn.cloud-inventory-results.local.json; corepack pnpm aliyun:cloud:inventory-results:strict; corepack pnpm aliyun:evidence:writeback:backend
 
 ### P03_ACR_PURCHASE 确认 ACR 企业版付费购买
 

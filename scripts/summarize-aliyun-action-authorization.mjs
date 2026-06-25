@@ -54,6 +54,13 @@ const APP_LAUNCH_BLOCKER_PATTERNS = [
 ]
 
 const POLICY_BY_ACTION_ID = Object.freeze({
+  U00_ALIYUN_READONLY_INVENTORY_IDENTITY: Object.freeze({
+    automationPolicy: "readonly_inventory_identity_requires_action_time_confirmation",
+    canCodexProceedWithoutUser: false,
+    requiresActionTimeConfirmation: true,
+    blockerClass: "readonly_cloud_inventory_identity",
+    why: "严格云证据必须来自 allowlisted Aliyun CLI/CloudShell 只读盘点；浏览器已登录不能直接等同于 cloudInventory strict ready。",
+  }),
   U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE: Object.freeze({
     automationPolicy: "external_platform_review_required",
     canCodexProceedWithoutUser: false,
@@ -134,6 +141,29 @@ const POLICY_BY_ACTION_ID = Object.freeze({
 })
 
 const AUTHORIZATION_PACKET_BY_ACTION_ID = Object.freeze({
+  U00_ALIYUN_READONLY_INVENTORY_IDENTITY: Object.freeze({
+    packetId: "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
+    sequenceGroup: "readonly_inventory",
+    dependsOn: [],
+    minimumUserPhrase: "授权重新连接阿里云 CloudShell 或配置 Aliyun CLI，只运行 allowlisted 只读盘点命令并写入非密钥 evidence。",
+    allowedActions: [
+      "使用阿里云官方 CLI 或 CloudShell 的只读身份。",
+      "只运行本仓库生成的 List/Describe/stat/get inventory 命令。",
+      "只记录资源名、布尔值、时间戳、命令状态、sha256 指纹和非密钥 evidence handle。",
+    ],
+    explicitlyExcluded: [
+      "不运行 Create/Update/Delete/Deploy/Start/Stop/Purchase/DNS mutation 命令。",
+      "不执行 docker login/push。",
+      "不读取、复制、粘贴或输出 AccessKeySecret、STS token、cookie、registry password、RAM Secret 或证书私钥。",
+      "不做 production-cn deploy、env import、资源创建或计费动作。",
+    ],
+    completionEvidence: [
+      "cloudInventoryResults.localReady=true",
+      "readyLocalOperations=9/9",
+      "executedCommandResults=9/9",
+      "mutationPerformedCommandResults=0",
+    ],
+  }),
   U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE: Object.freeze({
     packetId: "P01_WECHAT_OPEN_MOBILE_APP",
     sequenceGroup: "identity",
@@ -989,7 +1019,7 @@ function renderMarkdown(report) {
     ...report.nextVerifyCommands.map((command) => `- \`${command}\``),
     "",
   )
-  return `${lines.join("\n")}\n`
+  return `${lines.join("\n").trimEnd()}\n`
 }
 
 function writeOutput(filePath, content) {

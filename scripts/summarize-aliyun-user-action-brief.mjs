@@ -28,6 +28,7 @@ const ACTION_ORDER = [
   "U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE",
   "U10_ANDROID_RELEASE_SIGNING",
   "U02_APPLE_TEAM_ID",
+  "U00_ALIYUN_READONLY_INVENTORY_IDENTITY",
   "U03_ACR_PURCHASE_CONFIRMATION",
   "U04_ACR_RUNTIME_AUTH",
   "U05_OSS_RAM_OR_STS",
@@ -63,6 +64,28 @@ const APP_LAUNCH_BLOCKER_PATTERNS = [
 ]
 
 const NEXT_ACTION_TIME_CONFIRMATION_BY_ACTION_ID = Object.freeze({
+  U00_ALIYUN_READONLY_INVENTORY_IDENTITY: Object.freeze({
+    packetId: "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
+    sequenceGroup: "readonly_inventory",
+    minimumUserPhrase: "授权重新连接阿里云 CloudShell 或配置 Aliyun CLI，只运行 allowlisted 只读盘点命令并写入非密钥 evidence。",
+    allowedActions: [
+      "使用阿里云官方 CLI 或 CloudShell 的只读身份。",
+      "只运行本仓库生成的 List/Describe/stat/get inventory 命令。",
+      "只记录资源名、布尔值、时间戳、命令状态、sha256 指纹和非密钥 evidence handle。",
+    ],
+    explicitlyExcluded: [
+      "不运行 Create/Update/Delete/Deploy/Start/Stop/Purchase/DNS mutation 命令。",
+      "不执行 docker login/push。",
+      "不读取、复制、粘贴或输出 AccessKeySecret、STS token、cookie、registry password、RAM Secret 或证书私钥。",
+      "不做 production-cn deploy、env import、资源创建或计费动作。",
+    ],
+    completionEvidence: [
+      "cloudInventoryResults.localReady=true",
+      "readyLocalOperations=9/9",
+      "executedCommandResults=9/9",
+      "mutationPerformedCommandResults=0",
+    ],
+  }),
   U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE: Object.freeze({
     packetId: "P01_WECHAT_OPEN_MOBILE_APP",
     sequenceGroup: "identity",
@@ -396,6 +419,45 @@ function readOptionalJson(filePath) {
 
 function buildActions({ sensitiveById, resourcesById, status, cloudItems }) {
   const actionMap = new Map()
+  const cloudInventoryResults = status.summary?.cloudInventoryResults || {}
+  const cloudInventoryObservation = cloudInventoryResults.observationSummary || {}
+
+  addAction(actionMap, {
+    id: "U00_ALIYUN_READONLY_INVENTORY_IDENTITY",
+    title: "恢复阿里云 CLI/CloudShell 只读盘点身份",
+    status: cloudInventoryResults.localReady === true ? "ready" : "blocked",
+    owner: "用户/阿里云只读盘点操作员",
+    obtainFrom: "本机 Aliyun CLI default profile 或阿里云控制台 -> CloudShell",
+    writeTargets: [
+      "deploy/aliyun-production-cn.cloud-inventory-results.local.json -> non-secret read-only inventory summaries",
+    ],
+    requiredUserAction: "授权重新连接阿里云 CloudShell 或配置 Aliyun CLI，只运行 allowlisted 只读盘点命令并写入非密钥 evidence。",
+    unblockCondition: "cloudInventoryResults.localReady=true，readyLocalOperations=9/9，executedCommandResults=9/9，mutationPerformedCommandResults=0。",
+    variableNames: [],
+    requiresUserAction: true,
+    requiresActionTimeConfirmation: true,
+    nonSecretEvidenceOnly: true,
+    sourceIds: ["cloudInventoryResults", "BAP00_READONLY_INVENTORY_IDENTITY"],
+    currentBlockers: [
+      ...(cloudInventoryResults.localReady === true ? [] : cloudInventoryResults.localBlockers || []),
+      ...(cloudInventoryObservation.blockedOperationIds || []).map((id) => `cloudInventory:${id}`),
+    ],
+    currentEvidence: [
+      `cloudInventoryResults.templateReady=${cloudInventoryResults.templateReady === true}`,
+      `cloudInventoryResults.localExists=${cloudInventoryResults.localExists === true}`,
+      `cloudInventoryResults.localReady=${cloudInventoryResults.localReady === true}`,
+      `readyLocalOperations=${cloudInventoryResults.readyLocalOperations || 0}/${cloudInventoryResults.localOperations || 0}`,
+      `executedCommandResults=${cloudInventoryObservation.executedCommandResults || 0}/${cloudInventoryObservation.commandResults || 0}`,
+      `cloudApiCalledCommandResults=${cloudInventoryObservation.cloudApiCalledCommandResults || 0}`,
+      `mutationPerformedCommandResults=${cloudInventoryObservation.mutationPerformedCommandResults || 0}`,
+    ],
+    verifyCommands: [
+      "corepack pnpm aliyun:cloud:access",
+      "MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1 corepack pnpm aliyun:cloud:inventory-run -- --execute-readonly --write-local deploy/aliyun-production-cn.cloud-inventory-results.local.json",
+      "corepack pnpm aliyun:cloud:inventory-results:strict",
+      "corepack pnpm aliyun:evidence:writeback:backend",
+    ],
+  })
 
   addAction(actionMap, {
     id: "U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE",
@@ -590,7 +652,7 @@ function buildActions({ sensitiveById, resourcesById, status, cloudItems }) {
     sourceIds: ["G02B_ALIYUN_RDS_DATA_LAYER_READY", "DATABASE_URL_CN"],
     currentBlockers: uniqueStrings([
       ...requiredBlocking(status).filter((item) => item.includes("DATABASE_URL_CN")),
-      ...(bridgeDataLayer.databaseUrlCnStatus === "ready" ? [] : [`DATABASE_URL_CN=${bridgeDataLayer.databaseUrlCnStatus || "unknown"}`]),
+      ...(bridgeDataLayer.databaseUrlCnStatus === "ready" ? [] : [`DATABASE_URL_CN_status:${bridgeDataLayer.databaseUrlCnStatus || "unknown"}`]),
       ...(rdsMigrationIncluded ? [] : ["rdsMigrationIncludedInThisRelease=false"]),
     ]),
     currentEvidence: [
@@ -1097,7 +1159,7 @@ function renderMarkdown(report) {
     ...report.safetyBoundary.map((item) => `- ${item}`),
     "",
   )
-  return `${lines.join("\n")}\n`
+  return `${lines.join("\n").trimEnd()}\n`
 }
 
 function renderCredentialAcquisitionSummary(summary) {

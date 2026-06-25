@@ -36,9 +36,9 @@ test("APP production-cn user action brief documents credential and operator hand
   assert.match(doc, /现在不能部署；当前只推进阿里云后端/)
   assert.match(doc, /currentScope: backend_aliyun_only/)
   assert.match(doc, /fullAppLaunchScope: deferred_after_backend_online/)
-  assert.match(doc, /ready: 0 \/ 11/)
-  assert.match(doc, /blocked: 11/)
-  assert.match(doc, /nextActionTimeConfirmations: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(doc, /ready: 0 \/ 12/)
+  assert.match(doc, /blocked: 12/)
+  assert.match(doc, /nextActionTimeConfirmations: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION/)
   assert.match(doc, /deferredAppLaunchConfirmations: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID/)
   assert.match(doc, /blockedCredentialCount: 8/)
   assert.match(doc, /blockedCredentialNames: .*DATABASE_URL_CN/)
@@ -48,6 +48,8 @@ test("APP production-cn user action brief documents credential and operator hand
   assert.match(doc, /P01_WECHAT_OPEN_MOBILE_APP/)
   assert.match(doc, /P10_ANDROID_RELEASE_SIGNING/)
   assert.match(doc, /P02_APPLE_TEAM_ID/)
+  assert.match(doc, /P00_ALIYUN_READONLY_INVENTORY_IDENTITY/)
+  assert.match(doc, /allowlisted 只读盘点命令/)
   assert.match(doc, /P03_ACR_PURCHASE/)
   assert.match(doc, /P05_OSS_RAM_STS/)
   assert.match(doc, /P11_ALIYUN_RDS_DATA_MIGRATION/)
@@ -120,14 +122,17 @@ test("Aliyun user action brief is value-free and includes the expected blockers"
   assert.match(credentialGroupsByCategory.get("android_release_signing").obtainFrom, /Android release keystore/)
   assert.ok(credentialGroupsByCategory.get("ready_secret_env_import").readySecretEnvVariableNames.includes("SUPABASE_SERVICE_ROLE_KEY"))
   assert.ok(credentialGroupsByCategory.get("ready_secret_env_import").variableNames.includes("WECHAT_MINI_SECRET"))
+  assert.ok(ids.includes("U00_ALIYUN_READONLY_INVENTORY_IDENTITY"))
   assert.ok(ids.includes("U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE"))
   assert.ok(ids.includes("U10_ANDROID_RELEASE_SIGNING"))
   assert.ok(ids.includes("U03_ACR_PURCHASE_CONFIRMATION"))
   assert.ok(ids.includes("U06_ENV_IMPORT"))
   assert.ok(ids.includes("U09_DEPLOY_AUTHORIZATION"))
   assert.ok(ids.includes("U11_ALIYUN_RDS_DATA_MIGRATION"))
+  assert.ok(report.summary.userMustAct.includes("U00_ALIYUN_READONLY_INVENTORY_IDENTITY"))
   assert.ok(report.summary.userMustAct.includes("U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE"))
   assert.ok(report.summary.userMustAct.includes("U08_SAE_RUNTIME_AND_SLS"))
+  assert.ok(report.summary.actionTimeConfirmationRequired.includes("U00_ALIYUN_READONLY_INVENTORY_IDENTITY"))
   assert.ok(report.summary.actionTimeConfirmationRequired.includes("U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE"))
   assert.ok(report.summary.actionTimeConfirmationRequired.includes("U10_ANDROID_RELEASE_SIGNING"))
   assert.ok(report.summary.actionTimeConfirmationRequired.includes("U02_APPLE_TEAM_ID"))
@@ -136,6 +141,7 @@ test("Aliyun user action brief is value-free and includes the expected blockers"
   assert.ok(report.summary.actionTimeConfirmationRequired.includes("U05_OSS_RAM_OR_STS"))
   assert.ok(report.summary.actionTimeConfirmationRequired.includes("U11_ALIYUN_RDS_DATA_MIGRATION"))
   assert.deepEqual(report.summary.nextActionTimeConfirmations, [
+    "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "P03_ACR_PURCHASE",
     "P05_OSS_RAM_STS",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
@@ -153,6 +159,7 @@ test("Aliyun user action brief is value-free and includes the expected blockers"
     report.nextActionTimeConfirmations.map((item) => item.minimumUserPhrase),
     authorization.nextActionTimeConfirmations.map((item) => item.minimumUserPhrase),
   )
+  const readonlyInventoryAction = report.actions.find((item) => item.id === "U00_ALIYUN_READONLY_INVENTORY_IDENTITY")
   const wechatAction = report.actions.find((item) => item.id === "U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE")
   const androidSigningAction = report.actions.find((item) => item.id === "U10_ANDROID_RELEASE_SIGNING")
   const acrPurchaseAction = report.actions.find((item) => item.id === "U03_ACR_PURCHASE_CONFIRMATION")
@@ -162,6 +169,15 @@ test("Aliyun user action brief is value-free and includes the expected blockers"
   const rdsAction = report.actions.find((item) => item.id === "U11_ALIYUN_RDS_DATA_MIGRATION")
   const nextConfirmationsById = new Map(report.nextActionTimeConfirmations.map((item) => [item.packetId, item]))
   const deferredConfirmationsById = new Map(report.deferredAppLaunchConfirmations.map((item) => [item.packetId, item]))
+  assert.equal(readonlyInventoryAction.requiresActionTimeConfirmation, true)
+  assert.equal(readonlyInventoryAction.nonSecretEvidenceOnly, true)
+  assert.ok(readonlyInventoryAction.currentBlockers.includes("readonly_inventory_strict_ready=0/9"))
+  assert.ok(readonlyInventoryAction.currentBlockers.includes("cloudInventory:I08_RDS_POSTGRES"))
+  assert.ok(readonlyInventoryAction.currentEvidence.includes("mutationPerformedCommandResults=0"))
+  assert.match(nextConfirmationsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").minimumUserPhrase, /只读盘点命令/)
+  assert.ok(nextConfirmationsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").explicitlyExcluded.some((item) =>
+    item.includes("Create/Update/Delete/Deploy")
+  ))
   assert.ok(wechatAction.variableNames.includes("WECHAT_OPEN_APP_SECRET"))
   assert.equal(wechatAction.requiresActionTimeConfirmation, true)
   assert.ok(wechatAction.currentEvidence.includes("wechatOpenPlatform.accountVerified=true"))
@@ -261,16 +277,18 @@ test("Aliyun user action brief backend-only mode excludes deferred APP launch bl
   const envImportAction = report.actions.find((item) => item.id === "U06_ENV_IMPORT")
 
   assert.equal(report.backendOnly, true)
-  assert.equal(report.summary.total, 8)
-  assert.equal(report.summary.blocked, 8)
+  assert.equal(report.summary.total, 9)
+  assert.equal(report.summary.blocked, 9)
   assert.deepEqual(report.summary.blockedCredentialNames, ["DATABASE_URL_CN"])
   assert.equal(report.credentialAcquisitionSummary.blockedCredentialCount, 1)
   assert.deepEqual(report.credentialAcquisitionSummary.blockedCredentialNames, ["DATABASE_URL_CN"])
   assert.deepEqual(report.summary.nextActionTimeConfirmations, [
+    "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "P03_ACR_PURCHASE",
     "P05_OSS_RAM_STS",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
   ])
+  assert.ok(ids.includes("U00_ALIYUN_READONLY_INVENTORY_IDENTITY"))
   assert.ok(!ids.includes("U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE"))
   assert.ok(!ids.includes("U10_ANDROID_RELEASE_SIGNING"))
   assert.ok(!ids.includes("U02_APPLE_TEAM_ID"))
