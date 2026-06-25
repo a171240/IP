@@ -182,6 +182,9 @@ function buildPackage(args) {
     externalAppPackets,
     imagePublishWritebackPlan,
   )
+  const sensitiveActionTotal = productionStatus.summary?.sensitiveActionItems?.total || 0
+  const sensitiveActionBlocked = productionStatus.summary?.sensitiveActionItems?.blocked || 0
+  const sensitiveActionReady = Math.max(sensitiveActionTotal - sensitiveActionBlocked, 0)
 
   const report = {
     ok: true,
@@ -212,10 +215,8 @@ function buildPackage(args) {
       requiredBlocking: backendStatus.summary?.backendRequiredBlocking || [],
       fullAppRequiredBlocking: productionStatus.summary?.requiredBlocking || [],
       deferredAppLaunchBlocking: backendStatus.summary?.appLaunchDeferredBlocking || [],
-      sensitiveBlocked: formatReadyTotal({
-        ready: (productionStatus.summary?.sensitiveActionItems?.total || 0) - (productionStatus.summary?.sensitiveActionItems?.blocked || 0),
-        total: productionStatus.summary?.sensitiveActionItems?.total || 0,
-      }),
+      sensitiveActionReady: `${sensitiveActionReady}/${sensitiveActionTotal}`,
+      sensitiveActionBlocked: `${sensitiveActionBlocked}/${sensitiveActionTotal}`,
       canReadCloudNow: cloudAccess.canReadCloudNow === true,
       cloudInventoryResultsReady: cloudInventorySummary.ready,
       cloudInventoryReadyLocalOperations: `${cloudInventorySummary.readyLocalOperations}/${cloudInventorySummary.localOperations}`,
@@ -703,6 +704,8 @@ function renderMarkdown(report) {
     `- verdict: ${report.summary.verdict}`,
     `- cloudConfirmationsReady: ${report.summary.cloudConfirmationsReady}`,
     `- operatorTasksReady: ${report.summary.operatorTasksReady}`,
+    `- sensitiveActionReady: ${report.summary.sensitiveActionReady}`,
+    `- sensitiveActionBlocked: ${report.summary.sensitiveActionBlocked}`,
     `- canReadCloudNow: ${report.summary.canReadCloudNow}`,
     `- cloudInventoryResultsReady: ${report.summary.cloudInventoryResultsReady}`,
     `- cloudInventoryReadyLocalOperations: ${report.summary.cloudInventoryReadyLocalOperations}`,
