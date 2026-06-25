@@ -310,6 +310,50 @@ function buildCredentialPasswordIntervention(credentialBrief) {
   }
 }
 
+function buildCredentialAcquisitionQueue(credentialBrief, currentScope) {
+  const groups = credentialBrief.groups || []
+  const missingCredentialNames = credentialBrief.blockedCredentialNames || []
+  const readySecretEnvVariableNames = credentialBrief.readySecretEnvVariableNames || []
+  return {
+    currentScope,
+    queueScope: currentScope,
+    missingCredentialNames,
+    onlyMissingBackendCredentialValue:
+      currentScope === "backend_aliyun_only" && missingCredentialNames.length === 1
+        ? missingCredentialNames[0]
+        : "",
+    readySecretEnvVariableCount: readySecretEnvVariableNames.length,
+    readySecretEnvVariableNames,
+    requiresActionTimeConfirmationIds: credentialBrief.actionTimeConfirmationRequiredIds || [],
+    valueHandlingRules: credentialBrief.valueHandlingRules || [],
+    items: groups.map((group, index) => ({
+      order: index + 1,
+      actionId: group.actionId,
+      category: group.category,
+      status: group.status,
+      owner: group.owner,
+      userQuestion: group.userQuestion,
+      obtainFrom: group.obtainFrom,
+      blockedCredentialNames: group.blockedCredentialNames || [],
+      readySecretEnvVariableNames: group.readySecretEnvVariableNames || [],
+      importTargets: group.importTargets || [],
+      writeTargets: group.writeTargets || [],
+      destinationSummary: destinationSummaryForGroup(group),
+      verifyCommands: group.verifyCommands || [],
+      requiresActionTimeConfirmation: group.requiresActionTimeConfirmation,
+      valueHandling: group.valueHandling,
+      forbiddenStorage: group.forbiddenStorage || [],
+      unblockCondition: group.unblockCondition,
+    })),
+  }
+}
+
+function destinationSummaryForGroup(group) {
+  const writeTargets = group.writeTargets || []
+  if (writeTargets.length) return writeTargets
+  return group.importTargets || []
+}
+
 function buildCredentialGroup(item) {
   const metadata = CREDENTIAL_GROUP_METADATA[item.id] || {}
   const variableDetails = item.variableDetails || []
@@ -460,6 +504,8 @@ function buildReport(operatorTasks, args) {
   const rawItems = (operatorTasks.sensitiveActionItems || []).map(compactItem)
   const items = filterItemsForScope(rawItems, args)
   const summary = summarize(items)
+  const credentialPasswordIntervention = buildCredentialPasswordIntervention(summary.credentialInterventionBrief)
+  const credentialAcquisitionQueue = buildCredentialAcquisitionQueue(summary.credentialInterventionBrief, currentScope)
   const report = {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -478,7 +524,8 @@ function buildReport(operatorTasks, args) {
       : "当前没有未完成的密钥、密码、token、付款或受控标识符类人工介入项。",
     summary,
     credentialInterventionBrief: summary.credentialInterventionBrief,
-    credentialPasswordIntervention: buildCredentialPasswordIntervention(summary.credentialInterventionBrief),
+    credentialPasswordIntervention,
+    credentialAcquisitionQueue,
     items,
     nextActions: [
       ...(args.backendOnly
@@ -539,6 +586,10 @@ function renderMarkdown(report) {
     "## 密钥/密码介入拆解",
     "",
     ...renderCredentialPasswordIntervention(report.credentialPasswordIntervention),
+    "",
+    report.backendOnly ? "## 后端-only 获取/导入队列" : "## 获取/导入队列",
+    "",
+    ...renderCredentialAcquisitionQueue(report.credentialAcquisitionQueue),
     "",
     ...renderCredentialInterventionGroups(report.credentialInterventionBrief.groups),
     "## 用户介入分层",
@@ -608,6 +659,31 @@ function renderCredentialPasswordIntervention(intervention) {
     `- actionIds: ${intervention.actionIds.join(", ") || "none"}`,
     `- forbiddenStorage: ${intervention.forbiddenStorage.join(", ") || "none"}`,
     ...intervention.userMustProvideOrConfirm.map((item) => `- ${item}`),
+  ]
+}
+
+function renderCredentialAcquisitionQueue(queue) {
+  const items = queue.items || []
+  return [
+    `- queueScope: ${queue.queueScope}`,
+    `- missingCredentialNames: ${queue.missingCredentialNames.join(", ") || "none"}`,
+    `- onlyMissingBackendCredentialValue: ${queue.onlyMissingBackendCredentialValue || "n/a"}`,
+    `- readySecretsPendingCloudImport: ${queue.readySecretEnvVariableCount}`,
+    `- requiresActionTimeConfirmationIds: ${queue.requiresActionTimeConfirmationIds.join(", ") || "none"}`,
+    "",
+    ...(items.length ? [
+      "| 顺序 | 类别 | 动作 ID | 要回答的问题 | 获取位置 | 导入/写入目标 | 验证 |",
+      "| --- | --- | --- | --- | --- | --- | --- |",
+      ...items.map((item) => [
+        String(item.order),
+        codeCell(item.category),
+        codeCell(item.actionId),
+        escapeTableCell(item.userQuestion || "none"),
+        escapeTableCell(item.obtainFrom || "none"),
+        escapeTableCell((item.destinationSummary || []).join("; ") || "none"),
+        escapeTableCell((item.verifyCommands || []).join("; ") || "none"),
+      ].join(" | ").replace(/^/, "| ").replace(/$/, " |")),
+    ] : ["- none"]),
   ]
 }
 
