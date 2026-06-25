@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 当前阻塞简报
 
-Generated: 2026-06-25T19:21:31.518Z
+Generated: 2026-06-25T23:06:21.724Z
 
 ## 结论
 
@@ -379,8 +379,8 @@ Generated: 2026-06-25T19:21:31.518Z
 - title: 创建阿里云 RDS PostgreSQL 并完成正式数据层迁移
 - owner: 阿里云 RDS/后端数据迁移操作员
 - minimumUserPhrase: 授权创建/确认阿里云 RDS PostgreSQL production-cn 数据库并完成数据迁移；DATABASE_URL_CN 只能进入阿里云 secret env。
-- writeTargets: DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env; RDS PostgreSQL 实例、schema/data migration、rollback validation -> 非密钥证据报告
-- verifyCommands: corepack pnpm aliyun:readiness; corepack pnpm aliyun:completion:audit; corepack pnpm aliyun:predeploy
+- writeTargets: docs/app-production-cn-rds-migration-package.md -> non-secret schema/validation/rollback package digest handoff; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres / migration non-secret evidence; DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env only
+- verifyCommands: corepack pnpm aliyun:rds:migration:package; corepack pnpm aliyun:rds:migration:evidence:strict; corepack pnpm aliyun:sensitive:blockers:backend; corepack pnpm aliyun:backend-cn:status; corepack pnpm aliyun:completion:audit; corepack pnpm aliyun:predeploy
 - nonSecretEvidenceOnly: false
 
 ## 密钥/密码/token/付款/受控标识符阻塞项
@@ -413,13 +413,13 @@ Generated: 2026-06-25T19:21:31.518Z
 
 | 变量 | 必填 | 状态 | 敏感等级 | 获取位置 | 获取方式 | 导入目标 | 处理规则 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `DATABASE_URL_CN` | 是 | todo | identifier_or_connection | 阿里云控制台 -> RDS PostgreSQL -> 数据库连接 | 创建或确认 production-cn RDS PostgreSQL 后生成连接串，并配套完成数据迁移/回滚验收。 | 阿里云 KMS/Secrets Manager/SAE secret env | 只在动作时导入 KMS/Secrets Manager/SAE secret env；不要写入 JSON、Markdown、Docker 镜像或 git。 |
+| `DATABASE_URL_CN` | 是 | todo | identifier_or_connection | 阿里云控制台 -> RDS PostgreSQL -> 数据库连接 | 先生成并核对 docs/app-production-cn-rds-migration-package.md，创建或确认 production-cn RDS PostgreSQL，关闭 compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查，完成 schema/data、APP API smoke 和 rollback 验收后，只把连接串导入 secret env。 | 阿里云 KMS/Secrets Manager/SAE secret env | 只在动作时导入 KMS/Secrets Manager/SAE secret env；不要写入 JSON、Markdown、Docker 镜像或 git。 |
 
 ## 当前后端阻塞变量获取与导入计划
 
 | 变量 | 授权包 | 获取位置 | 获取方式 | 导入目标 | 禁止写入 |
 | --- | --- | --- | --- | --- | --- |
-| `DATABASE_URL_CN` | P11_ALIYUN_RDS_DATA_MIGRATION | 阿里云控制台 -> RDS PostgreSQL -> 数据库连接 | 创建或确认 production-cn RDS PostgreSQL 后生成连接串，并配套完成数据迁移/回滚验收。 | 阿里云 KMS/Secrets Manager/SAE secret env | 只在动作时导入 KMS/Secrets Manager/SAE secret env；不要写入 JSON、Markdown、Docker 镜像或 git。 |
+| `DATABASE_URL_CN` | P11_ALIYUN_RDS_DATA_MIGRATION | 阿里云控制台 -> RDS PostgreSQL -> 数据库连接 | 先生成并核对 docs/app-production-cn-rds-migration-package.md，创建或确认 production-cn RDS PostgreSQL，关闭 compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查，完成 schema/data、APP API smoke 和 rollback 验收后，只把连接串导入 secret env。 | 阿里云 KMS/Secrets Manager/SAE secret env | 只在动作时导入 KMS/Secrets Manager/SAE secret env；不要写入 JSON、Markdown、Docker 镜像或 git。 |
 
 ## 延期的完整 APP 发布变量
 

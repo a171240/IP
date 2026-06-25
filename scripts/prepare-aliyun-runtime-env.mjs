@@ -438,7 +438,7 @@ function sourceMetadataOf(key) {
       category: "aliyun_rds_postgresql",
       owner: "阿里云 RDS 操作员",
       consolePath: "阿里云控制台 -> RDS PostgreSQL -> 数据库连接",
-      obtain: "创建或确认 production-cn RDS PostgreSQL 后生成连接串，并配套完成数据迁移/回滚验收。",
+      obtain: "先生成并核对 docs/app-production-cn-rds-migration-package.md，创建或确认 production-cn RDS PostgreSQL，关闭 compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查，完成 schema/data、APP API smoke 和 rollback 验收后，只把连接串导入 secret env。",
       importTarget: "阿里云 KMS/Secrets Manager/SAE secret env",
       cloudConfirmationKey: "envImport",
       notes: "正式全阿里云 production-cn 必填；首版 APP 业务数据访问代码侧已切到 RDS repository，但不能只填连接串而不完成 RDS 实例、schema/data、smoke 和 rollback 验收。",

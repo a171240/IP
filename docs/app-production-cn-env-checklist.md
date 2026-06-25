@@ -18,7 +18,7 @@
 
 2026-06-24 CST 复核：`deploy/aliyun-production-cn.cloud-inventory-results.local.json` 已存在，但当前严格校验未就绪。`cloudInventoryResults` 当前为 `localReady=false`、`readyLocalOperations=0/9`、`executedCommandResults=9/9`、`cloudApiCalledCommandResults=9/9`、`mutationPerformedCommandResults=0`，阻塞项为 `readonly_inventory_strict_ready=0/9`；这表示现有本地摘要不能作为“资源存在/不存在”的最终 strict 证据。
 
-2026-06-25 数据层补充：当前 strict inventory 不完整，不能再把旧快照中的 RDS PostgreSQL / Redis/Tair 数量当作当前事实。按正式全阿里云 production-cn 口径，`DATABASE_URL_CN` 仍是必填阻塞项；首版 APP 业务数据访问代码侧已经切到 APP-native RDS repository，但还必须配套 RDS PostgreSQL 实例、数据库账号、secret env 导入、schema/data 迁移、APP API smoke 和回滚验收。Supabase 只能作为迁移来源或旧链路兼容。`REDIS_URL_CN` 仍可按实际队列/缓存依赖后置。
+2026-06-25 数据层补充：当前 strict inventory 不完整，不能再把旧快照中的 RDS PostgreSQL / Redis/Tair 数量当作当前事实。按正式全阿里云 production-cn 口径，`DATABASE_URL_CN` 仍是必填阻塞项；首版 APP 业务数据访问代码侧已经切到 APP-native RDS repository，但还必须先生成并核对 `docs/app-production-cn-rds-migration-package.md`，配套 RDS PostgreSQL 实例、数据库账号、secret env 导入、`compatibilityReviewChecklist` 6 类 Supabase SQL 兼容审查、schema/data 迁移、APP API smoke 和回滚验收。Supabase 只能作为迁移来源或旧链路兼容。`REDIS_URL_CN` 仍可按实际队列/缓存依赖后置。
 
 当前 Vercel production 只读覆盖检查 `corepack pnpm aliyun:vercel-env:coverage` 显示 required `17/27` 已存在，缺 `APP_ENV`、`APP_REGION`、`APP_API_BASE_URL`、`APP_ASSET_BASE_URL`、`NEXT_PUBLIC_SITE_URL`、`PRIVACY_POLICY_URL`、`TERMS_URL`、`DATABASE_URL_CN`、`WECHAT_OPEN_APP_ID`、`WECHAT_OPEN_APP_SECRET`。前 7 个是国内 APP/阿里云运行配置；`DATABASE_URL_CN` 必须来自阿里云 RDS PostgreSQL 和迁移验收；后 2 个必须等微信开放平台移动应用创建并审核通过后获得。
 
@@ -59,7 +59,7 @@
 | ACR 镜像仓库 | 阿里云控制台 -> 容器镜像服务 ACR -> 命名空间/仓库 | `deploy/aliyun-production-cn.image-publish.local.json` 非密钥证据；Docker credential helper 或 RAM | 认证信息是密钥 | 未确认 ready；企业版经济版 `cn-hangzhou` 1 个月候选报价已核到 `CNY 117.00` / `¥117.00`，购买前需用户对金额和规格动作确认 |
 | OSS Bucket | 阿里云控制台 -> OSS -> Bucket、地域、CORS、RAM 最小权限 | `ALIYUN_OSS_BUCKET`、`ALIYUN_OSS_REGION`、`SERVICE_RECORD_OSS_PREFIX`；密钥走 KMS/Secrets Manager | Bucket/Region 否，AccessKey Secret 是 | Bucket/CORS 已建；RAM 策略模板见 `deploy/aliyun-production-cn.oss-ram-policy.json`，AccessKey/Secret 仍未创建导入 |
 | SLS 日志 | 阿里云控制台 -> SLS -> Project/Logstore/告警 | `deploy/aliyun-production-cn.cloud-confirmations.local.json` 非密钥证据 | 否 | 已记录 project/logstore 非密钥证据，但 health/5xx 告警未配置，`slsAlerts.confirmed=false` |
-| RDS PostgreSQL | 阿里云控制台 -> RDS -> PostgreSQL 实例 | `DATABASE_URL_CN` 或等价连接串走 KMS/Secrets Manager | 是 | 当前 strict inventory 未就绪，实例存在性未验证；正式 production-cn 必填；首版业务数据访问代码侧已切到 RDS repository，但仍必须完成 RDS 实例、schema/data 迁移、APP API smoke 和回滚验收 |
+| RDS PostgreSQL | 阿里云控制台 -> RDS -> PostgreSQL 实例 | `DATABASE_URL_CN` 或等价连接串走 KMS/Secrets Manager | 是 | 当前 strict inventory 未就绪，实例存在性未验证；正式 production-cn 必填；首版业务数据访问代码侧已切到 RDS repository，但仍必须完成迁移 package、6 类兼容审查、RDS 实例、schema/data 迁移、APP API smoke 和回滚验收 |
 | Redis/Tair | 阿里云控制台 -> Tair/Redis -> 实例 | 后续 `REDIS_URL_CN` 或等价连接串走 KMS/Secrets Manager | 是 | 当前 strict inventory 未就绪，实例存在性未验证；第一版桥接部署可后置 |
 
 ## 正式数据层必填与可后置变量
@@ -68,7 +68,7 @@
 
 | 变量 | 获取位置 | 导入位置 | 密钥 | 当前状态 |
 | --- | --- | --- | --- | --- |
-| `DATABASE_URL_CN` | 创建或确认阿里云 RDS PostgreSQL 后生成连接串，并完成迁移验收 | 阿里云 SAE secret/KMS/Secrets Manager | 是 | `todo`；当前 RDS 存在性未由 strict inventory 验证；代码侧首版 RDS repository 已就绪，但 RDS 实例、连接串密钥、schema/data、smoke 和 rollback 证据未完成 |
+| `DATABASE_URL_CN` | 先生成并核对 `docs/app-production-cn-rds-migration-package.md`，创建或确认阿里云 RDS PostgreSQL，关闭 `compatibilityReviewChecklist` 6 类 Supabase SQL 兼容审查，并完成 schema/data、APP API smoke 与 rollback 验收后生成连接串 | 阿里云 SAE secret/KMS/Secrets Manager | 是 | `todo`；当前 RDS 存在性未由 strict inventory 验证；代码侧首版 RDS repository 已就绪，但 RDS 实例、连接串密钥、兼容审查、schema/data、smoke 和 rollback 证据未完成 |
 | `REDIS_URL_CN` | 创建或确认阿里云 Tair/Redis 后生成连接串 | 阿里云 SAE secret/KMS/Secrets Manager | 是 | `todo`；当前 Redis/Tair 存在性未由 strict inventory 验证 |
 
 ## 后端密钥
@@ -100,7 +100,7 @@
 4. `U03_ACR_PURCHASE_CONFIRMATION`：ACR Enterprise Economic / `cn-hangzhou` / 1 month / `CNY 117.00` 需要动作时付款确认。
 5. `U04_ACR_RUNTIME_AUTH`：ACR 实例 ready 后配置镜像仓库、push digest 和 SAE 拉取权限；registry password/token 不能写入文件。
 6. `U05_OSS_RAM_OR_STS`：OSS 最小权限策略已创建，仍需绑定运行身份并选择受限 AccessKey 或 STS/运行时角色注入。
-7. `U11_ALIYUN_RDS_DATA_MIGRATION`：创建/确认阿里云 RDS PostgreSQL，完成 Supabase 到 RDS/PostgreSQL 的 schema/data 迁移、`DATABASE_URL_CN` secret env 导入和回滚验收。
+7. `U11_ALIYUN_RDS_DATA_MIGRATION`：先生成并核对 RDS migration package，创建/确认阿里云 RDS PostgreSQL，关闭 6 类 Supabase SQL 兼容审查，完成 Supabase 到 RDS/PostgreSQL 的 schema/data 迁移、`DATABASE_URL_CN` secret env 导入、APP API smoke 和回滚验收。
 8. `U06_ENV_IMPORT`：把本地/Vercel/Supabase/阿里云/DeepSeek/火山等 ready 变量导入 SAE/KMS/Secrets Manager，并确认 `secretNotInImage=true`。
 9. `U07_DOMAIN_DNS_HTTPS_ICP`：配置 `api-cn.ipgongchang.xin` 和 `assets-cn.ipgongchang.xin` 的阿里云入口、HTTPS 和 ICP 证据。
 10. `U08_SAE_RUNTIME_AND_SLS`：创建 SAE 自定义容器应用，绑定日志采集，配置 `/api/healthz` 和 5xx 告警。

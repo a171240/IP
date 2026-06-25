@@ -205,15 +205,29 @@ function writebackPrerequisites(groupKey, item) {
     if (jsonPath.startsWith("rdsPostgres.")) {
       return buildPrerequisites(
         ["P11_ALIYUN_RDS_DATA_MIGRATION"],
-        ["RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据"],
-        ["RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env"],
+        [
+          "docs/app-production-cn-rds-migration-package.md 已生成并核对",
+          "RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据",
+          "compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查已关闭",
+        ],
+        [
+          "RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env",
+          "compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true",
+        ],
       )
     }
     if (jsonPath.startsWith("migration.")) {
       return buildPrerequisites(
         ["P11_ALIYUN_RDS_DATA_MIGRATION"],
-        ["Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据"],
-        ["schema/data 迁移、RDS API smoke 和 rollback 验收已完成"],
+        [
+          "docs/app-production-cn-rds-migration-package.md 已生成并核对",
+          "compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查处置结果",
+          "Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据",
+        ],
+        [
+          "compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true",
+          "schema/data 迁移、RDS API smoke 和 rollback 验收已完成",
+        ],
       )
     }
     if (jsonPath.startsWith("sourceInventory.")) {
@@ -386,6 +400,9 @@ function expectedForRdsField(field) {
   if (field === "rdsPostgres.databaseAccountReady") return "数据库账号和权限就绪后填 true，不记录密码。"
   if (field === "rdsPostgres.databaseUrlCnSecretImported") return "DATABASE_URL_CN 已只导入阿里云 KMS/Secrets Manager/SAE secret env 后填 true。"
   if (field === "migration.dataAccessAdapterReady") return "第一版 APP API 正式 production-cn 数据访问不再依赖 Supabase 后填 true。"
+  if (field === "migration.schemaCompatibilityReviewed") return "compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查完成并记录非密钥处置结果后填 true。"
+  if (field === "migration.supabaseSpecificSqlResolved") return "supabase_auth_uid / storage / service_role / RLS / policy 等 Supabase-specific SQL 已改写或明确处置后填 true。"
+  if (field === "migration.rdsExtensionSupportConfirmed") return "Aliyun RDS PostgreSQL extension 支持和替代方案已确认后填 true。"
   if (field === "migration.schemaMigrated") return "schema 已迁到 RDS/PostgreSQL 并通过非密钥验收后填 true。"
   if (field === "migration.dataMigrated") return "数据已按迁移计划进入 RDS/PostgreSQL 并通过非密钥验收后填 true。"
   if (field === "migration.rowCountValidationPassed") return "关键表 row count 校验通过后填 true。"

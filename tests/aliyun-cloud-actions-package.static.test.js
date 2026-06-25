@@ -197,6 +197,7 @@ test("Aliyun cloud actions package summarizes current cloud console action order
   assert.equal(rdsQueueItem.userQuestion, "DATABASE_URL_CN 从哪里获得并导入到哪里")
   assert.ok(rdsQueueItem.obtainFrom.includes("阿里云控制台 -> RDS PostgreSQL"))
   assert.ok(rdsQueueItem.destinationSummary.some((item) => item.includes("DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env only")))
+  assert.ok(rdsQueueItem.verifyCommands.includes("corepack pnpm aliyun:rds:migration:package"))
   assert.ok(rdsQueueItem.verifyCommands.includes("corepack pnpm aliyun:rds:migration:evidence:strict"))
   assert.deepEqual(report.summary.imagePublishWritebackBlockingGroups, [
     "acrPurchaseAndRepository",
@@ -401,6 +402,7 @@ test("APP production-cn action queue documents the current authorized next-step 
     "DATABASE_URL_CN 从哪里获得并导入到哪里",
     "阿里云控制台 -> RDS PostgreSQL",
     "DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env only",
+    "corepack pnpm aliyun:rds:migration:package",
     "corepack pnpm aliyun:rds:migration:evidence:strict",
     "backendCanStartNow: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP03_ACR_PURCHASE_AND_REPOSITORY",
     "consoleCanStartNow: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS",

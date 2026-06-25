@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 阿里云证据回填清单
 
-Generated: 2026-06-25T21:53:22.932Z
+Generated: 2026-06-25T23:05:19.191Z
 
 ## 当前结论
 
@@ -180,7 +180,7 @@ Generated: 2026-06-25T21:53:22.932Z
 - ready: false
 - totalBlockers: 19
 - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-- blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+- blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env; compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
 - strictVerifyCommands: corepack pnpm aliyun:rds:migration:evidence:strict
 
 - `rdsPostgres.instanceId`
@@ -190,8 +190,8 @@ Generated: 2026-06-25T21:53:22.932Z
   - expected: 填入 RDS 控制台可见的非密钥实例 ID。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据
-  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查已关闭
+  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env; compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true
 - `rdsPostgres.engineVersion`
   - blocker: todo:rdsPostgres.engineVersion
   - source: 阿里云控制台 -> RDS PostgreSQL / SAE secret env
@@ -199,8 +199,8 @@ Generated: 2026-06-25T21:53:22.932Z
   - expected: 填入 RDS PostgreSQL 版本号。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据
-  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查已关闭
+  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env; compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true
 - `rdsPostgres.networkAccess`
   - blocker: todo:rdsPostgres.networkAccess
   - source: 阿里云控制台 -> RDS PostgreSQL / SAE secret env
@@ -208,8 +208,8 @@ Generated: 2026-06-25T21:53:22.932Z
   - expected: 填入 SAE 到 RDS 的 VPC/内网访问方式说明。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据
-  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查已关闭
+  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env; compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true
 - `rdsPostgres.databaseName`
   - blocker: todo:rdsPostgres.databaseName
   - source: 阿里云控制台 -> RDS PostgreSQL / SAE secret env
@@ -217,8 +217,8 @@ Generated: 2026-06-25T21:53:22.932Z
   - expected: 填入生产数据库名，不包含账号密码或连接串。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据
-  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查已关闭
+  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env; compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true
 - `rdsPostgres.evidence`
   - blocker: todo:rdsPostgres.evidence
   - source: 阿里云控制台 -> RDS PostgreSQL / SAE secret env
@@ -226,8 +226,8 @@ Generated: 2026-06-25T21:53:22.932Z
   - expected: 填控制台路径、截图编号、工单号或其它非密钥证据编号。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据
-  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查已关闭
+  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env; compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true
 - `rdsPostgres.confirmed`
   - blocker: rdsPostgres.confirmed
   - source: 阿里云控制台 -> RDS PostgreSQL / SAE secret env
@@ -235,8 +235,8 @@ Generated: 2026-06-25T21:53:22.932Z
   - expected: RDS PostgreSQL 实例确认存在后填 true。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据
-  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查已关闭
+  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env; compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true
 - `rdsPostgres.databaseAccountReady`
   - blocker: rdsPostgres.databaseAccountReady
   - source: 阿里云控制台 -> RDS PostgreSQL / SAE secret env
@@ -244,8 +244,8 @@ Generated: 2026-06-25T21:53:22.932Z
   - expected: 数据库账号和权限就绪后填 true，不记录密码。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据
-  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查已关闭
+  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env; compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true
 - `rdsPostgres.databaseUrlCnSecretImported`
   - blocker: rdsPostgres.databaseUrlCnSecretImported
   - source: 阿里云控制台 -> RDS PostgreSQL / SAE secret env
@@ -253,35 +253,35 @@ Generated: 2026-06-25T21:53:22.932Z
   - expected: DATABASE_URL_CN 已只导入阿里云 KMS/Secrets Manager/SAE secret env 后填 true。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据
-  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查已关闭
+  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env; compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true
 - `migration.schemaCompatibilityReviewed`
   - blocker: migration.schemaCompatibilityReviewed
   - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
   - writeTo: deploy/aliyun-production-cn.rds-migration.local.json -> migration.schemaCompatibilityReviewed
-  - expected: 填真实非密钥证据，不能保留 TODO、pending 或 TBD 占位值。
+  - expected: compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查完成并记录非密钥处置结果后填 true。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
-  - blockedUntil: schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
 - `migration.supabaseSpecificSqlResolved`
   - blocker: migration.supabaseSpecificSqlResolved
   - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
   - writeTo: deploy/aliyun-production-cn.rds-migration.local.json -> migration.supabaseSpecificSqlResolved
-  - expected: 填真实非密钥证据，不能保留 TODO、pending 或 TBD 占位值。
+  - expected: supabase_auth_uid / storage / service_role / RLS / policy 等 Supabase-specific SQL 已改写或明确处置后填 true。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
-  - blockedUntil: schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
 - `migration.rdsExtensionSupportConfirmed`
   - blocker: migration.rdsExtensionSupportConfirmed
   - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
   - writeTo: deploy/aliyun-production-cn.rds-migration.local.json -> migration.rdsExtensionSupportConfirmed
-  - expected: 填真实非密钥证据，不能保留 TODO、pending 或 TBD 占位值。
+  - expected: Aliyun RDS PostgreSQL extension 支持和替代方案已确认后填 true。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
-  - blockedUntil: schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
 - `migration.schemaMigrated`
   - blocker: migration.schemaMigrated
   - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
@@ -289,8 +289,8 @@ Generated: 2026-06-25T21:53:22.932Z
   - expected: schema 已迁到 RDS/PostgreSQL 并通过非密钥验收后填 true。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
-  - blockedUntil: schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
 - `migration.dataMigrated`
   - blocker: migration.dataMigrated
   - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
@@ -298,8 +298,8 @@ Generated: 2026-06-25T21:53:22.932Z
   - expected: 数据已按迁移计划进入 RDS/PostgreSQL 并通过非密钥验收后填 true。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
-  - blockedUntil: schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
 - `migration.rowCountValidationPassed`
   - blocker: migration.rowCountValidationPassed
   - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
@@ -307,8 +307,8 @@ Generated: 2026-06-25T21:53:22.932Z
   - expected: 关键表 row count 校验通过后填 true。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
-  - blockedUntil: schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
 - `migration.criticalRecordValidationPassed`
   - blocker: migration.criticalRecordValidationPassed
   - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
@@ -316,8 +316,8 @@ Generated: 2026-06-25T21:53:22.932Z
   - expected: 关键记录、租户/门店/服务记录关系校验通过后填 true。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
-  - blockedUntil: schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
 - `migration.appApiSmokeOnRdsPassed`
   - blocker: migration.appApiSmokeOnRdsPassed
   - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
@@ -325,8 +325,8 @@ Generated: 2026-06-25T21:53:22.932Z
   - expected: profile / tenant / invite / service-record APP API 在 RDS 上冒烟通过后填 true。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
-  - blockedUntil: schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
 - `migration.supabaseNoLongerFormalTarget`
   - blocker: migration.supabaseNoLongerFormalTarget
   - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
@@ -334,8 +334,8 @@ Generated: 2026-06-25T21:53:22.932Z
   - expected: Supabase 已仅作为迁移来源或旧兼容，不再作为 production-cn 正式数据库目标后填 true。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
-  - blockedUntil: schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
 - `migration.rollbackRunbookReviewed`
   - blocker: migration.rollbackRunbookReviewed
   - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
@@ -343,8 +343,8 @@ Generated: 2026-06-25T21:53:22.932Z
   - expected: 回滚 runbook 已评审后填 true。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
-  - blockedUntil: schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
 - `migration.rollbackValidationPassed`
   - blocker: migration.rollbackValidationPassed
   - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
@@ -352,8 +352,8 @@ Generated: 2026-06-25T21:53:22.932Z
   - expected: 回滚演练或可恢复性验证通过后填 true。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
-  - blockedUntil: schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
 
 ## cloudInventoryResults
 

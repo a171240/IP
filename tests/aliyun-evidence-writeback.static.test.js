@@ -165,6 +165,9 @@ test("Aliyun evidence writeback backend-only mode excludes deferred APP launch g
   assert.ok(packetById.get("P11_ALIYUN_RDS_DATA_MIGRATION").jsonPaths.includes("migration.schemaCompatibilityReviewed"))
   assert.ok(packetById.get("P11_ALIYUN_RDS_DATA_MIGRATION").jsonPaths.includes("migration.supabaseSpecificSqlResolved"))
   assert.ok(packetById.get("P11_ALIYUN_RDS_DATA_MIGRATION").jsonPaths.includes("migration.rdsExtensionSupportConfirmed"))
+  assert.ok(packetById.get("P11_ALIYUN_RDS_DATA_MIGRATION").blockedUntil.some((item) =>
+    item.includes("compatibilityReviewChecklist 6 类"),
+  ))
   assert.equal(packetById.get("P04_ACR_IMAGE_AND_PULL").status, "blocked_by_dependency")
   assert.equal(packetById.get("P06_ENV_IMPORT").nonSecretEvidenceOnly, false)
   assert.ok(packetById.get("P06_ENV_IMPORT").jsonPaths.includes("items.envImport.secretNotInImage"))
@@ -175,6 +178,10 @@ test("Aliyun evidence writeback backend-only mode excludes deferred APP launch g
   assert.equal(report.summary.cloudConfirmationGaps, report.writebackGroups.cloudConfirmations.gaps.length)
   assert.ok(rdsPaths.includes("rdsPostgres.databaseUrlCnSecretImported"))
   assert.ok(rdsPaths.includes("migration.appApiSmokeOnRdsPassed"))
+  const schemaCompatibilityGap = findGap(report.writebackGroups.rdsMigration, "migration.schemaCompatibilityReviewed")
+  assert.match(schemaCompatibilityGap.expected, /compatibilityReviewChecklist 6 类/)
+  assert.ok(schemaCompatibilityGap.requiredEvidence.some((item) => item.includes("compatibilityReviewChecklist 6 类")))
+  assert.ok(schemaCompatibilityGap.blockedUntil.some((item) => item.includes("migration.schemaCompatibilityReviewed=true")))
   assert.ok(!cloudConfirmationPaths.some((item) => item.includes("wechatOpenPlatform")))
   assert.ok(!report.summary.requiredAuthorizationPackets.includes("P01_WECHAT_OPEN_MOBILE_APP"))
   assert.ok(!report.summary.requiredAuthorizationPackets.includes("P02_APPLE_TEAM_ID"))
@@ -268,7 +275,11 @@ test("Aliyun evidence writeback checklist exposes local JSON write targets witho
   assert.equal(report.writebackGroups.cloudConfirmations.exists, true)
   assert.equal(report.writebackGroups.imagePublish.exists, true)
   assert.ok(findGap(report.writebackGroups.rdsMigration, "rdsPostgres.databaseUrlCnSecretImported").requiredAuthorizationPackets.includes("P11_ALIYUN_RDS_DATA_MIGRATION"))
+  assert.ok(findGap(report.writebackGroups.rdsMigration, "rdsPostgres.databaseUrlCnSecretImported").blockedUntil.some((item) =>
+    item.includes("compatibilityReviewChecklist 6 类"),
+  ))
   assert.ok(findGap(report.writebackGroups.rdsMigration, "migration.supabaseNoLongerFormalTarget").requiredAuthorizationPackets.includes("P11_ALIYUN_RDS_DATA_MIGRATION"))
+  assert.ok(findGap(report.writebackGroups.rdsMigration, "migration.rdsExtensionSupportConfirmed").expected.includes("extension"))
   assert.ok(cloudConfirmationPaths.includes("items.wechatOpenPlatform.mobileAppCreated"))
   assert.ok(cloudConfirmationPaths.includes("items.wechatOpenPlatform.mobileAppSecretReady"))
   assert.ok(imagePublishPaths.includes("acr.registryHost"))
