@@ -58,6 +58,17 @@ const SECRET_VALUE_PATTERNS = [
 
 const PHASES = Object.freeze([
   Object.freeze({
+    id: "PH00_READONLY_INVENTORY_IDENTITY",
+    title: "恢复阿里云 CLI/CloudShell 只读盘点身份",
+    authorizationPackets: ["P00_ALIYUN_READONLY_INVENTORY_IDENTITY"],
+    consoleTasks: [],
+    completionEvidence: [
+      "只运行 allowlisted List/Describe/stat/get inventory 命令。",
+      "cloud-inventory-results.local.json 只记录资源名、布尔值、时间戳、命令状态和非密钥 evidence handle。",
+      "CloudShell 若提示开通性能型 NAS 并可能产生费用，必须动作时确认后才能点击开通。",
+    ],
+  }),
+  Object.freeze({
     id: "PH01_EXTERNAL_APP_IDENTIFIERS",
     title: "补齐微信移动应用、Android release 签名和 Apple Team ID",
     authorizationPackets: ["P01_WECHAT_OPEN_MOBILE_APP", "P10_ANDROID_RELEASE_SIGNING", "P02_APPLE_TEAM_ID"],
@@ -226,6 +237,13 @@ function buildPlan(args) {
     actionAuthorization,
     phases,
   })
+  const currentReadyPhases = phases.filter((item) => item.canStartNow).map((item) => item.id)
+  const currentBlockedPhases = phases
+    .filter((item) => !item.canStartNow && !item.deferredAfterBackendOnline)
+    .map((item) => item.id)
+  const deferredPhases = phases
+    .filter((item) => item.deferredAfterBackendOnline)
+    .map((item) => item.id)
   const report = {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -246,8 +264,9 @@ function buildPlan(args) {
     targetRuntime: TARGET_RUNTIME,
     summary: {
       phases: phases.length,
-      readyToStartPhases: phases.filter((item) => item.canStartNow).map((item) => item.id),
-      blockedPhases: phases.filter((item) => !item.canStartNow).map((item) => item.id),
+      readyToStartPhases: currentReadyPhases,
+      blockedPhases: currentBlockedPhases,
+      deferredPhases,
       authorizationPackets: actionAuthorization.summary?.authorizationPackets || 0,
       consoleTasks: consoleRunbook.consoleTasks?.length || 0,
       canStartNowPackets: actionAuthorization.summary?.canStartNowPackets || [],
@@ -255,7 +274,7 @@ function buildPlan(args) {
       canStartNowConsoleTasks: consoleRunbook.summary?.canStartNowConsoleTasks || [],
       requiredBlocking: actionAuthorization.summary?.requiredBlocking || [],
       cloudResourceReady: consoleRunbook.summary?.resourceReady || "unknown",
-      userActionReady: consoleRunbook.summary?.userActionReady || "unknown",
+      userActionReady: actionAuthorization.summary?.userActionReady || consoleRunbook.summary?.userActionReady || "unknown",
       blockedCredentialCount: provisioningClosureBrief.blockedCredentialCount,
       readySecretEnvVariableCount: provisioningClosureBrief.readySecretEnvVariableCount,
       resourceEvidenceReady: provisioningClosureBrief.resourceEvidenceReady,
@@ -315,11 +334,14 @@ function buildProvisioningClosureBrief({
     .filter((item) => item.canStartNow)
     .map((item) => item.id)
   const blockedPhases = phases
-    .filter((item) => !item.canStartNow)
+    .filter((item) => !item.canStartNow && !item.deferredAfterBackendOnline)
+    .map((item) => item.id)
+  const deferredPhases = phases
+    .filter((item) => item.deferredAfterBackendOnline)
     .map((item) => item.id)
 
   return {
-    conclusion: "现在不能部署；当前只推进阿里云后端，PH02 可进入动作时确认，微信移动 App、Android/iOS 发布凭证延期到后端上线后。",
+    conclusion: "现在不能部署；当前只推进阿里云后端，PH00/PH02 可进入动作时确认，微信移动 App、Android/iOS 发布凭证延期到后端上线后且不计入当前阻塞。",
     canDeployNow: consoleRunbook.summary?.canDeployNow === true,
     canCodexExecuteNow: false,
     blockedCredentialCount: closureBrief.blockedCredentialCount ?? blockedCredentialNames.length,
@@ -335,6 +357,7 @@ function buildProvisioningClosureBrief({
     blockedResourceEvidence: closureBrief.blockedResourceEvidence || [],
     readyToStartPhases,
     blockedPhases,
+    deferredPhases,
     canStartNowAuthorizationPackets: actionAuthorization.summary?.canStartNowPackets || [],
     deferredAppLaunchPackets: actionAuthorization.summary?.deferredAppLaunchPackets || [],
     canStartNowConsoleTasks: consoleRunbook.summary?.canStartNowConsoleTasks || [],
@@ -420,7 +443,10 @@ function buildPhase(phase, packetsById, consoleTasksById, {
         "这些延期项只在阿里云后端上线后单独授权处理。",
       ] : []),
     ]),
-    verifyCommands: uniqueStrings(consoleTasks.flatMap((item) => item.verifyCommands || [])),
+    verifyCommands: uniqueStrings([
+      ...packets.flatMap((item) => item.verifyCommands || []),
+      ...consoleTasks.flatMap((item) => item.verifyCommands || []),
+    ]),
     completionEvidence: phase.completionEvidence,
   }
 }
@@ -591,7 +617,8 @@ function renderMarkdown(report) {
     `- Cloud resource ready: ${report.summary.cloudResourceReady}`,
     `- User action ready: ${report.summary.userActionReady}`,
     `- Ready phases: ${report.summary.readyToStartPhases.length ? report.summary.readyToStartPhases.join(", ") : "none"}`,
-    `- Blocked phases: ${report.summary.blockedPhases.join(", ")}`,
+    `- Blocked phases: ${report.summary.blockedPhases.length ? report.summary.blockedPhases.join(", ") : "none"}`,
+    `- Deferred phases: ${report.summary.deferredPhases.length ? report.summary.deferredPhases.join(", ") : "none"}`,
     `- Required blocking env: ${report.summary.requiredBlocking.length ? report.summary.requiredBlocking.join(", ") : "none"}`,
     `- Deferred APP launch packets: ${report.summary.deferredAppLaunchPackets.length ? report.summary.deferredAppLaunchPackets.join(", ") : "none"}`,
     `- Ready authorization packets: ${report.readyAuthorizationPackets.length ? report.readyAuthorizationPackets.map((item) => item.packetId).join(", ") : "none"}`,
@@ -616,6 +643,7 @@ function renderMarkdown(report) {
     `- Partially observed resource evidence ids: ${report.provisioningClosureBrief.partiallyObservedResourceEvidenceIds.length ? report.provisioningClosureBrief.partiallyObservedResourceEvidenceIds.join(", ") : "none"}`,
     `- Ready to start phases: ${report.provisioningClosureBrief.readyToStartPhases.length ? report.provisioningClosureBrief.readyToStartPhases.join(", ") : "none"}`,
     `- Blocked phases: ${report.provisioningClosureBrief.blockedPhases.length ? report.provisioningClosureBrief.blockedPhases.join(", ") : "none"}`,
+    `- Deferred phases: ${report.provisioningClosureBrief.deferredPhases.length ? report.provisioningClosureBrief.deferredPhases.join(", ") : "none"}`,
     `- Can start now authorization packets: ${report.provisioningClosureBrief.canStartNowAuthorizationPackets.length ? report.provisioningClosureBrief.canStartNowAuthorizationPackets.join(", ") : "none"}`,
     `- Deferred APP launch packets: ${report.provisioningClosureBrief.deferredAppLaunchPackets.length ? report.provisioningClosureBrief.deferredAppLaunchPackets.join(", ") : "none"}`,
     `- Can start now console tasks: ${report.provisioningClosureBrief.canStartNowConsoleTasks.length ? report.provisioningClosureBrief.canStartNowConsoleTasks.join(", ") : "none"}`,

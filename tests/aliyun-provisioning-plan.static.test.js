@@ -51,13 +51,16 @@ test("Aliyun provisioning plan renders phase order without executing cloud actio
   assert.equal(report.fullAppLaunchScope, "deferred_after_backend_online")
   assert.equal(report.sourceCommands.actionAuthorization, "corepack pnpm aliyun:action:authorization:backend")
   assert.equal(report.secretLeakCheck.ok, true)
-  assert.equal(report.summary.phases, 7)
+  assert.equal(report.summary.phases, 8)
   assert.deepEqual(report.summary.readyToStartPhases, [
+    "PH00_READONLY_INVENTORY_IDENTITY",
     "PH02_BASE_CLOUD_RESOURCES",
   ])
-  assert.ok(report.summary.blockedPhases.includes("PH01_EXTERNAL_APP_IDENTIFIERS"))
+  assert.ok(!report.summary.blockedPhases.includes("PH01_EXTERNAL_APP_IDENTIFIERS"))
   assert.ok(report.summary.blockedPhases.includes("PH03_IMAGE_PUSH_AND_PULL"))
   assert.ok(report.summary.blockedPhases.includes("PH07_PRODUCTION_DEPLOY"))
+  assert.deepEqual(report.summary.deferredPhases, ["PH01_EXTERNAL_APP_IDENTIFIERS"])
+  assert.equal(report.summary.userActionReady, "0/9")
   assert.deepEqual(report.summary.requiredBlocking, ["DATABASE_URL_CN"])
   assert.deepEqual(report.summary.deferredAppLaunchPackets, [
     "P01_WECHAT_OPEN_MOBILE_APP",
@@ -90,10 +93,12 @@ test("Aliyun provisioning plan renders phase order without executing cloud actio
     item.currentEvidence.some((evidence) => /bucket_exists/.test(evidence))
   ))
   assert.deepEqual(report.provisioningClosureBrief.readyToStartPhases, [
+    "PH00_READONLY_INVENTORY_IDENTITY",
     "PH02_BASE_CLOUD_RESOURCES",
   ])
-  assert.ok(report.provisioningClosureBrief.blockedPhases.includes("PH01_EXTERNAL_APP_IDENTIFIERS"))
+  assert.ok(!report.provisioningClosureBrief.blockedPhases.includes("PH01_EXTERNAL_APP_IDENTIFIERS"))
   assert.ok(report.provisioningClosureBrief.blockedPhases.includes("PH07_PRODUCTION_DEPLOY"))
+  assert.deepEqual(report.provisioningClosureBrief.deferredPhases, ["PH01_EXTERNAL_APP_IDENTIFIERS"])
   assert.deepEqual(report.provisioningClosureBrief.canStartNowAuthorizationPackets, [
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "P03_ACR_PURCHASE",
@@ -137,6 +142,16 @@ test("Aliyun provisioning plan renders phase order without executing cloud actio
   ))
   assert.ok(report.phases.find((item) => item.id === "PH01_EXTERNAL_APP_IDENTIFIERS")
     .authorizationPackets.every((item) => item.deferredUntil === "deferred_after_backend_online"))
+  const readonly = byId.get("PH00_READONLY_INVENTORY_IDENTITY")
+  assert.equal(readonly.status, "ready_for_action_time_confirmation")
+  assert.equal(readonly.canStartNow, true)
+  assert.equal(readonly.deferredAfterBackendOnline, false)
+  assert.deepEqual(readonly.authorizationPackets.map((item) => item.packetId), [
+    "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
+  ])
+  assert.ok(readonly.verifyCommands.includes("corepack pnpm aliyun:cloud:access"))
+  assert.ok(readonly.verifyCommands.some((item) => item.includes("MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1")))
+  assert.ok(readonly.completionEvidence.some((item) => item.includes("List/Describe/stat/get")))
   assert.ok(report.readyAuthorizationPackets.some((item) =>
     item.packetId === "P03_ACR_PURCHASE" &&
     item.nonSecretEvidenceOnly === true &&
@@ -254,6 +269,9 @@ test("Aliyun provisioning plan markdown preserves ACR current scope and deferred
   assert.match(markdown, /Can Codex execute now: false/)
   assert.match(markdown, /Ready authorization packets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION/)
   assert.match(markdown, /Deferred APP launch authorization packets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID/)
+  assert.match(markdown, /Ready phases: PH00_READONLY_INVENTORY_IDENTITY, PH02_BASE_CLOUD_RESOURCES/)
+  assert.match(markdown, /Deferred phases: PH01_EXTERNAL_APP_IDENTIFIERS/)
+  assert.doesNotMatch(markdown, /Blocked phases: .*PH01_EXTERNAL_APP_IDENTIFIERS/)
   assert.doesNotMatch(markdown, /Blocked credential names: .*WECHAT_OPEN_APP_ID/)
   assert.doesNotMatch(markdown, /Blocked credential names: .*WECHAT_OPEN_APP_SECRET/)
   assert.match(markdown, /P11_ALIYUN_RDS_DATA_MIGRATION/)
@@ -261,6 +279,7 @@ test("Aliyun provisioning plan markdown preserves ACR current scope and deferred
   assert.match(markdown, /## Ready Authorization Packets/)
   assert.match(markdown, /### P00_ALIYUN_READONLY_INVENTORY_IDENTITY/)
   assert.match(markdown, /### P03_ACR_PURCHASE/)
+  assert.match(markdown, /### PH00_READONLY_INVENTORY_IDENTITY/)
   assert.match(markdown, /### PH01_EXTERNAL_APP_IDENTIFIERS/)
   assert.match(markdown, /Deferred after backend online: true/)
   assert.match(markdown, /Current action scopes: C02_ACR_IMAGE_AND_PULL=purchase_and_repository_only/)
