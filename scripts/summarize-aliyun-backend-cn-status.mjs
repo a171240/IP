@@ -234,6 +234,14 @@ function buildReport(args) {
     args.rdsMigrationFile,
     "--allow-incomplete",
   ])
+  const sensitiveBlockers = runJson("sensitive_blockers", [
+    "scripts/summarize-aliyun-sensitive-blockers.mjs",
+    "--backend-only",
+    "--env-file",
+    args.envFile,
+    "--cloud-confirmations",
+    args.cloudConfirmationsFile,
+  ])
 
   const backendRequiredBlocking = buildBackendRequiredBlocking({
     cloudConfirmations,
@@ -251,6 +259,7 @@ function buildReport(args) {
   })
   const cloudInventory = compactCloudInventory(cloudInventoryResults)
   const cloudResources = compactCloudResources(resourceMatrix)
+  const credentialIntervention = compactCredentialIntervention(sensitiveBlockers)
 
   const report = {
     ok: true,
@@ -282,6 +291,11 @@ function buildReport(args) {
       rdsMigrationReady: rdsMigration.localReady === true || rdsMigration.local?.ready === true,
       rdsLocalExists: rdsMigration.localExists === true || rdsMigration.local?.exists === true,
       imagePublishReady: imagePublishPlan.ready === true || imagePublishPlan.local?.ready === true,
+      sensitiveActionBlockedIds: credentialIntervention.sensitiveActionBlockedIds,
+      actionTimeConfirmationRequiredIds: credentialIntervention.actionTimeConfirmationRequiredIds,
+      blockedCredentialNames: credentialIntervention.blockedCredentialNames,
+      readySecretEnvVariableCount: credentialIntervention.readySecretEnvVariableNames.length,
+      readySecretEnvVariableNames: credentialIntervention.readySecretEnvVariableNames,
       wechatDeferredBlocking: [...WECHAT_DEFERRED_BLOCKERS],
       appLaunchDeferredBlocking: [...APP_LAUNCH_DEFERRED_BLOCKERS],
     },
@@ -291,6 +305,7 @@ function buildReport(args) {
     rdsMigration: compactRdsMigration(rdsMigration),
     imagePublish: compactImagePublish(imagePublishPlan),
     cloudConfirmations: compactCloudConfirmations(cloudConfirmations),
+    credentialIntervention,
     deferredScope: {
       wechatOpenMobileApp: {
         status: "deferred_after_backend_online",
@@ -454,6 +469,57 @@ function evidenceForResourceRows(resourceMatrix, ids) {
   })
 }
 
+function compactCredentialIntervention(report) {
+  const summary = report.summary || {}
+  const userIntervention = summary.userIntervention || {}
+  const credentialBrief = report.credentialInterventionBrief || summary.credentialInterventionBrief || {}
+  const blockedCredentialNames = uniqueStrings(
+    credentialBrief.blockedCredentialNames ||
+      userIntervention.blockedVariableNames ||
+      [],
+  ).sort()
+  const readySecretEnvVariableNames = uniqueStrings(
+    credentialBrief.readySecretEnvVariableNames ||
+      userIntervention.readySecretEnvVariableNames ||
+      [],
+  ).sort()
+  const actionTimeConfirmationRequiredIds = uniqueStrings(
+    credentialBrief.actionTimeConfirmationRequiredIds ||
+      userIntervention.actionTimeConfirmationRequired ||
+      summary.actionTimeConfirmationRequired ||
+      [],
+  ).sort()
+  return {
+    canCodexProceedWithoutUser: credentialBrief.canCodexProceedWithoutUser === true,
+    sensitiveActionBlockedIds: summary.blockedIds || [],
+    actionTimeConfirmationRequiredIds,
+    blockedCredentialNames,
+    readySecretEnvVariableNames,
+    valueHandlingRules: credentialBrief.valueHandlingRules || userIntervention.valueHandlingRules || [],
+    forbiddenStorage: credentialBrief.forbiddenStorage || [],
+    groups: (credentialBrief.groups || []).map((group) => ({
+      category: group.category,
+      actionId: group.actionId,
+      status: group.status,
+      owner: group.owner,
+      type: group.type,
+      blockedCredentialNames: group.blockedCredentialNames || [],
+      readySecretEnvVariableNames: group.readySecretEnvVariableNames || [],
+      variableNames: group.variableNames || [],
+      obtainFrom: group.obtainFrom || "",
+      importTargets: group.importTargets || [],
+      writeTargets: group.writeTargets || [],
+      requiresActionTimeConfirmation: group.requiresActionTimeConfirmation === true,
+      verifyCommands: group.verifyCommands || [],
+      unblockCondition: group.unblockCondition || "",
+    })),
+  }
+}
+
+function uniqueStrings(values) {
+  return [...new Set((values || []).filter((value) => typeof value === "string" && value.trim()))]
+}
+
 function compactCloudInventory(report) {
   const observation = report.local?.observationSummary || {}
   return {
@@ -561,6 +627,15 @@ function renderMarkdown(report) {
     "## Next Backend Order",
     "",
     ...report.nextBackendOrder.map((item) => `- ${item}`),
+    "",
+    "## Credential Intervention",
+    "",
+    `- blockedCredentialNames: ${report.credentialIntervention.blockedCredentialNames.join(", ") || "none"}`,
+    `- readySecretEnvVariableCount: ${report.credentialIntervention.readySecretEnvVariableNames.length}`,
+    `- actionTimeConfirmationRequiredIds: ${report.credentialIntervention.actionTimeConfirmationRequiredIds.join(", ") || "none"}`,
+    ...report.credentialIntervention.groups.flatMap((group) => [
+      `- ${group.actionId}: ${group.category}; status=${group.status}; obtainFrom=${group.obtainFrom}; importTargets=${group.importTargets.join(", ") || "none"}`,
+    ]),
     "",
     "## Deferred App Launch Scope",
     "",
