@@ -8,6 +8,10 @@ import { fileURLToPath } from "node:url"
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const BACKEND_ROOT = resolve(__dirname, "..")
+const SOURCE_COMMANDS = {
+  credentialGate: "corepack pnpm aliyun:sensitive:blockers:backend",
+  deploymentGate: "corepack pnpm aliyun:backend-cn:status",
+}
 
 const SECRET_VALUE_PATTERNS = [
   /sk-[A-Za-z0-9_-]{20,}/,
@@ -109,7 +113,11 @@ function buildReport() {
     ok: true,
     generatedAt: new Date().toISOString(),
     currentScope: "backend_aliyun_only",
-    sourceCommand: "corepack pnpm aliyun:sensitive:blockers:backend",
+    sourceCommand: SOURCE_COMMANDS.credentialGate,
+    sourceCommands: [
+      SOURCE_COMMANDS.deploymentGate,
+      SOURCE_COMMANDS.credentialGate,
+    ],
     containsValues: false,
     readOnlyOnly: true,
     cloudApiCalled: false,
@@ -128,6 +136,23 @@ function buildReport() {
       "Supabase variables in legacy_database_migration_source are migration source / legacy compatibility only; formal production-cn database target is Aliyun RDS PostgreSQL.",
       "WeChat Open Platform mobile app, Apple Team ID, and Android release signing variables are deferred full App launch items, not current backend import blockers.",
     ],
+    statusConsistency: {
+      deploymentGate: SOURCE_COMMANDS.deploymentGate,
+      credentialGate: SOURCE_COMMANDS.credentialGate,
+      sharedCredentialFields: [
+        "blockedCredentialNames",
+        "readySecretEnvVariableCount",
+        "actionTimeConfirmationRequiredIds",
+        "deferredAppLaunchSensitiveActionIds",
+      ],
+      backendOnlyCredentialConclusion: [
+        `blockedCredentialNames=${(brief.blockedCredentialNames || []).join(", ") || "none"}`,
+        `readySecretEnvVariableCount=${brief.readySecretEnvVariableCount || 0}`,
+        `actionTimeConfirmationRequiredIds=${actionIds.join(", ") || "none"}`,
+      ].join("; "),
+      productionDatabaseDecision: "Aliyun RDS PostgreSQL is the production-cn database target; Supabase variables are migration source / legacy compatibility inputs only.",
+      appLaunchDecision: "WeChat Open Platform mobile app login, Apple Team ID, and Android release signing are deferred full App launch items, not current backend-only blockers.",
+    },
     importEvidenceTargets: [
       "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport.importedAt",
       "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport.evidence",
@@ -137,9 +162,9 @@ function buildReport() {
       "deploy/aliyun-production-cn.rds-migration.local.json -> migration.* non-secret validation handles",
     ],
     verificationCommands: [
-      "corepack pnpm aliyun:sensitive:blockers:backend",
+      SOURCE_COMMANDS.credentialGate,
       "corepack pnpm aliyun:env:checklist",
-      "corepack pnpm aliyun:backend-cn:status",
+      SOURCE_COMMANDS.deploymentGate,
       "corepack pnpm aliyun:rds:migration:evidence:strict",
       "corepack pnpm aliyun:cloud:confirmations:strict",
       "corepack pnpm aliyun:image:plan:strict",
@@ -217,6 +242,15 @@ function renderMarkdown(report) {
     "actionTimeConfirmationRequired=true",
     `actionTimeConfirmationRequiredIds=${report.actionTimeConfirmationRequiredIds.join(", ")}`,
     "```",
+    "",
+    "## Status Source Consistency",
+    "",
+    `- Deployment gate: \`${report.statusConsistency.deploymentGate}\``,
+    `- Credential gate: \`${report.statusConsistency.credentialGate}\``,
+    `- Shared credential fields: ${report.statusConsistency.sharedCredentialFields.map((field) => `\`${field}\``).join(", ")}`,
+    `- Backend-only credential conclusion: ${report.statusConsistency.backendOnlyCredentialConclusion}`,
+    `- Production database decision: ${report.statusConsistency.productionDatabaseDecision}`,
+    `- App launch decision: ${report.statusConsistency.appLaunchDecision}`,
     "",
     "Deferred full App launch sensitive actions:",
     "",

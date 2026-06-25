@@ -1,6 +1,6 @@
 # APP production-cn backend-only secret env import batches
 
-Generated: 2026-06-25T08:07:57.871Z
+Generated: 2026-06-25T10:33:24.566Z
 
 Source command: `corepack pnpm aliyun:sensitive:blockers:backend`
 
@@ -20,6 +20,15 @@ canCodexProceedWithoutUser=false
 actionTimeConfirmationRequired=true
 actionTimeConfirmationRequiredIds=S03_ACR_PAID_PURCHASE, S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT
 ```
+
+## Status Source Consistency
+
+- Deployment gate: `corepack pnpm aliyun:backend-cn:status`
+- Credential gate: `corepack pnpm aliyun:sensitive:blockers:backend`
+- Shared credential fields: `blockedCredentialNames`, `readySecretEnvVariableCount`, `actionTimeConfirmationRequiredIds`, `deferredAppLaunchSensitiveActionIds`
+- Backend-only credential conclusion: blockedCredentialNames=DATABASE_URL_CN; readySecretEnvVariableCount=17; actionTimeConfirmationRequiredIds=S03_ACR_PAID_PURCHASE, S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT
+- Production database decision: Aliyun RDS PostgreSQL is the production-cn database target; Supabase variables are migration source / legacy compatibility inputs only.
+- App launch decision: WeChat Open Platform mobile app login, Apple Team ID, and Android release signing are deferred full App launch items, not current backend-only blockers.
 
 Deferred full App launch sensitive actions:
 
