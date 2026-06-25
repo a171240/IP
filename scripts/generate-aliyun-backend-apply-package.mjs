@@ -220,6 +220,11 @@ function buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEv
   const cloudInventoryReadyLocalOperations = backendStatus.cloudInventory?.readyLocalOperations || "unknown"
   const cloudInventoryExecutedCommandResults = backendStatus.cloudInventory?.executedCommandResults || "unknown"
   const cliConfigFailureCategory = cloudActions.summary?.cliConfigProbeFailureCategory || "unknown"
+  const resourceEvidenceById = new Map(
+    (cloudActions.cloudActionClosureBrief?.blockedResourceEvidence || []).map((item) => [item.id, item]),
+  )
+  const ossResourceEvidence = resourceEvidenceById.get("R05_OSS_AUDIO_STORAGE")
+  const slsResourceEvidence = resourceEvidenceById.get("R07_SLS_ALERTS")
 
   return [
     {
@@ -341,6 +346,7 @@ function buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEv
       consolePath: "阿里云控制台 -> OSS / RAM / STS",
       currentEvidence: [
         `inventory.ossAudioBucket=${cloudInventory.ossAudioBucket || "unknown"}`,
+        ...formatResourceEvidence("ossResource", ossResourceEvidence),
         "bucket=meiye-huajing-service-records-production-cn",
         "serviceRecordPrefix=service-records/production-cn",
       ],
@@ -549,6 +555,7 @@ function buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEv
       consolePath: "阿里云控制台 -> 日志服务 SLS",
       currentEvidence: [
         `inventory.slsProject=${cloudInventory.slsProject || "unknown"}`,
+        ...formatResourceEvidence("slsResource", slsResourceEvidence),
         "alerts=0",
       ],
       currentBlockers: filterPresent(statusBlockers, ["SLS_ALERTS_NOT_READY"]),
@@ -648,6 +655,16 @@ function buildUserIntervention({ sensitiveBlockers, backendStatus, cloudActions 
 
 function filterPresent(blockerSet, names) {
   return names.filter((name) => blockerSet.has(name))
+}
+
+function formatResourceEvidence(prefix, evidence) {
+  if (!evidence) return []
+  return [
+    `${prefix}.observedStatus=${evidence.observedStatus || "unknown"}`,
+    `${prefix}.observedReadiness=${evidence.observedReadiness || "unknown"}`,
+    ...(evidence.currentEvidence || []).slice(0, 3).map((item, index) => `${prefix}.currentEvidence${index + 1}=${item}`),
+    ...(evidence.missingEvidence || []).slice(0, 4).map((item) => `${prefix}.missing=${item}`),
+  ]
 }
 
 function renderMarkdown(report) {

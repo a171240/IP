@@ -1,6 +1,6 @@
 # APP production-cn Aliyun backend apply package
 
-Generated at: 2026-06-25T09:42:40.204Z
+Generated at: 2026-06-25T10:07:45.833Z
 
 ## Scope
 
@@ -71,7 +71,7 @@ Generated at: 2026-06-25T09:42:40.204Z
 - mutationType: ram_policy_binding_or_secret_runtime_role
 - requiredAuthorizationPackets: P05_OSS_RAM_STS
 - consolePath: 阿里云控制台 -> OSS / RAM / STS
-- currentEvidence: inventory.ossAudioBucket=not_observed; bucket=meiye-huajing-service-records-production-cn; serviceRecordPrefix=service-records/production-cn
+- currentEvidence: inventory.ossAudioBucket=not_observed; ossResource.observedStatus=bucket_visible_unconfirmed; ossResource.observedReadiness=partial; ossResource.currentEvidence1=cloudshell_oss_cors_ram_2026-06-24T01:30_CST_bucket_exists_acl_private_cors_allowed_origins_api-cn_assets-cn_methods_GET_POST_PUT_HEAD_policy_MeiyeHuajingServiceRecordsOssPolicy_exists_attachmentCount_0_ram_least_privilege_not_bound; ossResource.currentEvidence2=observedResourceStatus=bucket_visible_unconfirmed; ossResource.currentEvidence3=observedResourceReadiness=partial; ossResource.missing=oss:confirmed; ossResource.missing=oss:ramLeastPrivilege; ossResource.missing=observed:bucket_visible_unconfirmed; bucket=meiye-huajing-service-records-production-cn; serviceRecordPrefix=service-records/production-cn
 - currentBlockers: OSS_RAM_STS_NOT_READY
 - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss; ALIYUN_OSS_ACCESS_KEY_SECRET / STS token -> KMS/Secrets Manager/SAE secret env only if runtime role is not used
 - userMustHandle: AccessKeySecret or STS token if runtime role is not selected; RAM policy attachment or runtime role authorization
@@ -161,7 +161,7 @@ Generated at: 2026-06-25T09:42:40.204Z
 - mutationType: observability_alert_create
 - requiredAuthorizationPackets: P08_SAE_RUNTIME_SLS
 - consolePath: 阿里云控制台 -> 日志服务 SLS
-- currentEvidence: inventory.slsProject=not_observed; alerts=0
+- currentEvidence: inventory.slsProject=not_observed; slsResource.observedStatus=project_logstore_visible_alerts_pending; slsResource.observedReadiness=partial; slsResource.currentEvidence1=cloudshell_sls_2026-06-24T01:30_CST_project_meiye-huajing-app-prod-cn_logstore_app-api_exists_alerts_0_dashboards_0_health_5xx_alerts_not_configured; slsResource.currentEvidence2=observedResourceStatus=project_logstore_visible_alerts_pending; slsResource.currentEvidence3=observedResourceReadiness=partial; slsResource.missing=slsAlerts:confirmed; slsResource.missing=slsAlerts:healthAlertConfigured; slsResource.missing=slsAlerts:serverErrorAlertConfigured; slsResource.missing=observed:project_logstore_visible_alerts_pending; alerts=0
 - currentBlockers: SLS_ALERTS_NOT_READY
 - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.slsAlerts
 - userMustHandle: alert recipient/channel confirmation if needed
