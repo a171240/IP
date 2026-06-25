@@ -99,6 +99,19 @@ test("Aliyun CloudShell handoff produces value-free local JSON and Markdown", ()
   assert.ok(operationIds.includes("I05_OSS_AUDIO_BUCKET"))
   assert.ok(operationIds.includes("I08_RDS_POSTGRES"))
   assert.ok(operationIds.includes("I09_TAIR_REDIS"))
+  assert.deepEqual(findOperation(report, "I03_DNS_API_DOMAIN").writeTargets, [
+    "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps",
+  ])
+  assert.deepEqual(findOperation(report, "I04_DNS_ASSET_DOMAIN").writeTargets, [
+    "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps",
+  ])
+  assert.deepEqual(findOperation(report, "I05_OSS_AUDIO_BUCKET").writeTargets, [
+    "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss",
+  ])
+  assert.deepEqual(findOperation(report, "I07_CERT_HTTPS").writeTargets, [
+    "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps",
+    "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps",
+  ])
   assert.ok(report.writebackTargets.includes("deploy/aliyun-production-cn.cloud-inventory-results.local.json"))
   assert.ok(report.strictVerificationOrder.includes("corepack pnpm aliyun:cloud:access"))
   assert.ok(report.strictVerificationOrder.includes("corepack pnpm aliyun:cloud:inventory-results:strict"))
@@ -110,10 +123,21 @@ test("Aliyun CloudShell handoff produces value-free local JSON and Markdown", ()
   assert.match(markdown, /currentBrowserCanUseCurrentConsole:/)
   assert.match(markdown, /已有 strict inventory 证据/)
   assert.match(markdown, /I01_SAE_RUNTIME/)
+  assert.match(markdown, /items\.apiDomainHttps/)
+  assert.match(markdown, /items\.assetDomainHttps/)
+  assert.match(markdown, /items\.oss/)
   assert.match(markdown, /Strict 验证顺序/)
+  assert.equal(report.operations.flatMap((item) => item.writeTargets).some((item) => /items\.(apiDomain|assetDomain|ossAudio)\b/.test(item)), false)
+  assert.doesNotMatch(markdown, /items\.(apiDomain|assetDomain|ossAudio)\b/)
   assert.doesNotMatch(output, secretLike)
   assert.doesNotMatch(markdown, secretLike)
 })
+
+function findOperation(report, id) {
+  const operation = report.operations.find((item) => item.id === id)
+  assert.ok(operation, `missing operation ${id}`)
+  return operation
+}
 
 function readJsonFromPath(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"))

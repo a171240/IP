@@ -55,6 +55,20 @@ test("Aliyun CLI inventory plan is read-only and does not call cloud APIs", () =
   assert.ok(report.summary.commandTemplates >= 23)
   assert.ok(report.operations.every((item) => item.readOnly === true))
   assert.ok(report.operations.every((item) => item.status === report.status))
+  assert.deepEqual(findOperation(report, "I03_DNS_API_DOMAIN").writeTargets, [
+    "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps",
+  ])
+  assert.deepEqual(findOperation(report, "I04_DNS_ASSET_DOMAIN").writeTargets, [
+    "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps",
+  ])
+  assert.deepEqual(findOperation(report, "I05_OSS_AUDIO_BUCKET").writeTargets, [
+    "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss",
+  ])
+  assert.deepEqual(findOperation(report, "I07_CERT_HTTPS").writeTargets, [
+    "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps",
+    "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps",
+  ])
+  assert.equal(report.operations.flatMap((item) => item.writeTargets).some((item) => /items\.(apiDomain|assetDomain|ossAudio)\b/.test(item)), false)
   assert.ok(commandTemplates.some((item) => item.includes("aliyun sae ListApplications")))
   assert.ok(commandTemplates.some((item) => item.includes("aliyun cr ListRepoTag")))
   assert.ok(commandTemplates.some((item) => item.includes("aliyun alidns DescribeSubDomainRecords --SubDomain api-cn.ipgongchang.xin")))
@@ -69,3 +83,9 @@ test("Aliyun CLI inventory plan is read-only and does not call cloud APIs", () =
   assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
 })
+
+function findOperation(report, id) {
+  const operation = report.operations.find((item) => item.id === id)
+  assert.ok(operation, `missing operation ${id}`)
+  return operation
+}

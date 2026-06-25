@@ -131,7 +131,7 @@ Generated: 2026-06-24T14:54:59.856Z
 - commands:
   - `aliyun alidns DescribeSubDomainRecords --SubDomain api-cn.ipgongchang.xin` - Verify api-cn record target, status, and TTL.
   - `aliyun alidns DescribeDomainRecords --DomainName ipgongchang.xin --RRKeyWord api-cn` - Cross-check api-cn record from the parent domain record list.
-- writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomain
+- writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps
 - forbiddenCommands: AddDomainRecord, UpdateDomainRecord, DeleteDomainRecord, SetDomainRecordStatus
 
 ### I04_DNS_ASSET_DOMAIN assets-cn DNS and HTTPS route inventory
@@ -143,7 +143,7 @@ Generated: 2026-06-24T14:54:59.856Z
 - commands:
   - `aliyun alidns DescribeSubDomainRecords --SubDomain assets-cn.ipgongchang.xin` - Verify assets-cn record target, status, and TTL.
   - `aliyun alidns DescribeDomainRecords --DomainName ipgongchang.xin --RRKeyWord assets-cn` - Cross-check assets-cn record from the parent domain record list.
-- writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomain
+- writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps
 - forbiddenCommands: AddDomainRecord, UpdateDomainRecord, DeleteDomainRecord, SetDomainRecordStatus
 
 ### I05_OSS_AUDIO_BUCKET OSS service-record audio bucket inventory
@@ -155,7 +155,7 @@ Generated: 2026-06-24T14:54:59.856Z
 - commands:
   - `aliyun oss stat oss://meiye-huajing-service-records-production-cn` - Verify bucket existence and region metadata only.
   - `aliyun oss cors get oss://meiye-huajing-service-records-production-cn` - Verify CORS policy needed by service-record uploads.
-- writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.ossAudio
+- writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss
 - forbiddenCommands: aliyun oss cp, aliyun oss cat, aliyun oss sign, aliyun oss rm, aliyun oss mb, aliyun oss set-acl
 
 ### I06_SLS_ALERTS SLS project, logstore, and alert inventory
@@ -181,7 +181,7 @@ Generated: 2026-06-24T14:54:59.856Z
 - commands:
   - `aliyun cas ListUserCertificateOrder --region cn-hangzhou` - Verify certificate order/list evidence for api-cn and assets-cn.
   - `aliyun cas ListDeploymentJob --region cn-hangzhou` - Verify deployment job evidence without downloading certificate material.
-- writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomain; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomain
+- writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps
 - forbiddenCommands: GetUserCertificateDetail, CreateCertificate, DeleteCertificate, CreateDeploymentJob
 
 ### I08_RDS_POSTGRES RDS PostgreSQL production-cn data-layer inventory

@@ -196,7 +196,7 @@ function buildInventoryPlan(cloudAccess) {
           helpCommand: "aliyun alidns DescribeDomainRecords --help",
         },
       ],
-      writeTargets: ["deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomain"],
+      writeTargets: ["deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps"],
       forbiddenCommands: ["AddDomainRecord", "UpdateDomainRecord", "DeleteDomainRecord", "SetDomainRecordStatus"],
     },
     {
@@ -219,7 +219,7 @@ function buildInventoryPlan(cloudAccess) {
           helpCommand: "aliyun alidns DescribeDomainRecords --help",
         },
       ],
-      writeTargets: ["deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomain"],
+      writeTargets: ["deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps"],
       forbiddenCommands: ["AddDomainRecord", "UpdateDomainRecord", "DeleteDomainRecord", "SetDomainRecordStatus"],
     },
     {
@@ -242,7 +242,7 @@ function buildInventoryPlan(cloudAccess) {
           helpCommand: "aliyun oss help",
         },
       ],
-      writeTargets: ["deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.ossAudio"],
+      writeTargets: ["deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss"],
       forbiddenCommands: ["aliyun oss cp", "aliyun oss cat", "aliyun oss sign", "aliyun oss rm", "aliyun oss mb", "aliyun oss set-acl"],
     },
     {
@@ -299,8 +299,8 @@ function buildInventoryPlan(cloudAccess) {
         },
       ],
       writeTargets: [
-        "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomain",
-        "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomain",
+        "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps",
+        "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps",
       ],
       forbiddenCommands: ["GetUserCertificateDetail", "CreateCertificate", "DeleteCertificate", "CreateDeploymentJob"],
     },
