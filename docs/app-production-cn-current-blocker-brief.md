@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 当前阻塞简报
 
-Generated: 2026-06-25T23:06:21.724Z
+Generated: 2026-06-25T23:31:31.426Z
 
 ## 结论
 
@@ -38,7 +38,7 @@ Generated: 2026-06-25T23:06:21.724Z
 - canStartNowConsoleTasks: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS
 - canStartNowWritebackTaskCount: 2
 - blockedByConsoleTaskDependencies: C01_SAE_RUNTIME, C03_API_DOMAIN_HTTPS_ICP, C04_ASSET_DOMAIN_HTTPS_ICP, C06_ENV_IMPORT, C07_SLS_ALERTS
-- canStartNowAuthorizationPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
+- canStartNowAuthorizationPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE
 - blockedByAuthorizationPacketDependencies: P04_ACR_IMAGE_AND_PULL, P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS, P09_PRODUCTION_DEPLOY
 - cloudConfirmationsReady: 0/7
 - operatorTasksReady: 0/8
@@ -237,15 +237,15 @@ Generated: 2026-06-25T23:06:21.724Z
 
 - canStartNowConsoleTasks: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS
 - blockedByConsoleTaskDependencies: C01_SAE_RUNTIME, C03_API_DOMAIN_HTTPS_ICP, C04_ASSET_DOMAIN_HTTPS_ICP, C06_ENV_IMPORT, C07_SLS_ALERTS
-- canStartNowAuthorizationPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
+- canStartNowAuthorizationPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE
 - blockedByAuthorizationPacketDependencies: P04_ACR_IMAGE_AND_PULL, P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS, P09_PRODUCTION_DEPLOY
 
 | 授权包 | 动作 | owner | 最小确认语 | 非密钥证据 |
 | --- | --- | --- | --- | --- |
 | `P00_ALIYUN_READONLY_INVENTORY_IDENTITY` | 恢复阿里云 CLI/CloudShell 只读盘点身份 | 用户/阿里云只读盘点操作员 | 授权开通/重新连接阿里云 CloudShell 或配置 Aliyun CLI；如 CloudShell 提示会创建性能型 NAS 并可能产生费用，确认后才可点击开通；只运行 allowlisted 只读盘点命令并写入非密钥 evidence。 | true |
-| `P03_ACR_PURCHASE` | 确认 ACR 企业版付费购买 | 用户/阿里云 ACR 操作员 | 授权购买 ACR Enterprise Economic，cn-hangzhou，1 个月，当前报价 CNY 117.00。 | true |
-| `P05_OSS_RAM_STS` | 绑定 OSS RAM 最小权限或 STS/运行时角色方案 | 阿里云 OSS/RAM 操作员 | 授权为服务记录音频 OSS 配置最小权限 RAM/STS 或运行时角色，并只通过密钥环境注入。 | false |
 | `P11_ALIYUN_RDS_DATA_MIGRATION` | 创建阿里云 RDS PostgreSQL 并完成正式数据层迁移 | 阿里云 RDS/后端数据迁移操作员 | 授权创建/确认阿里云 RDS PostgreSQL production-cn 数据库并完成数据迁移；DATABASE_URL_CN 只能进入阿里云 secret env。 | false |
+| `P05_OSS_RAM_STS` | 绑定 OSS RAM 最小权限或 STS/运行时角色方案 | 阿里云 OSS/RAM 操作员 | 授权为服务记录音频 OSS 配置最小权限 RAM/STS 或运行时角色，并只通过密钥环境注入。 | false |
+| `P03_ACR_PURCHASE` | 确认 ACR 企业版付费购买 | 用户/阿里云 ACR 操作员 | 授权购买 ACR Enterprise Economic，cn-hangzhou，1 个月，当前报价 CNY 117.00。 | true |
 
 ## 当前可做动作回填清单
 
@@ -356,14 +356,14 @@ Generated: 2026-06-25T23:06:21.724Z
 - verifyCommands: corepack pnpm aliyun:cloud:access; MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1 corepack pnpm aliyun:cloud:inventory-run -- --execute-readonly --write-local deploy/aliyun-production-cn.cloud-inventory-results.local.json; corepack pnpm aliyun:cloud:inventory-results:strict; corepack pnpm aliyun:evidence:writeback:backend
 - nonSecretEvidenceOnly: true
 
-### P03_ACR_PURCHASE
+### P11_ALIYUN_RDS_DATA_MIGRATION
 
-- title: 确认 ACR 企业版付费购买
-- owner: 用户/阿里云 ACR 操作员
-- minimumUserPhrase: 授权购买 ACR Enterprise Economic，cn-hangzhou，1 个月，当前报价 CNY 117.00。
-- writeTargets: deploy/aliyun-production-cn.image-publish.local.json -> acr.purchaseCandidate / acr confirmed evidence
-- verifyCommands: corepack pnpm aliyun:image:plan
-- nonSecretEvidenceOnly: true
+- title: 创建阿里云 RDS PostgreSQL 并完成正式数据层迁移
+- owner: 阿里云 RDS/后端数据迁移操作员
+- minimumUserPhrase: 授权创建/确认阿里云 RDS PostgreSQL production-cn 数据库并完成数据迁移；DATABASE_URL_CN 只能进入阿里云 secret env。
+- writeTargets: docs/app-production-cn-rds-migration-package.md -> non-secret schema/validation/rollback package digest handoff; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres / migration non-secret evidence; DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env only
+- verifyCommands: corepack pnpm aliyun:rds:migration:package; corepack pnpm aliyun:rds:migration:evidence:strict; corepack pnpm aliyun:sensitive:blockers:backend; corepack pnpm aliyun:backend-cn:status; corepack pnpm aliyun:completion:audit; corepack pnpm aliyun:predeploy
+- nonSecretEvidenceOnly: false
 
 ### P05_OSS_RAM_STS
 
@@ -374,14 +374,14 @@ Generated: 2026-06-25T23:06:21.724Z
 - verifyCommands: corepack pnpm aliyun:cloud:confirmations; corepack pnpm aliyun:health:smoke
 - nonSecretEvidenceOnly: false
 
-### P11_ALIYUN_RDS_DATA_MIGRATION
+### P03_ACR_PURCHASE
 
-- title: 创建阿里云 RDS PostgreSQL 并完成正式数据层迁移
-- owner: 阿里云 RDS/后端数据迁移操作员
-- minimumUserPhrase: 授权创建/确认阿里云 RDS PostgreSQL production-cn 数据库并完成数据迁移；DATABASE_URL_CN 只能进入阿里云 secret env。
-- writeTargets: docs/app-production-cn-rds-migration-package.md -> non-secret schema/validation/rollback package digest handoff; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres / migration non-secret evidence; DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env only
-- verifyCommands: corepack pnpm aliyun:rds:migration:package; corepack pnpm aliyun:rds:migration:evidence:strict; corepack pnpm aliyun:sensitive:blockers:backend; corepack pnpm aliyun:backend-cn:status; corepack pnpm aliyun:completion:audit; corepack pnpm aliyun:predeploy
-- nonSecretEvidenceOnly: false
+- title: 确认 ACR 企业版付费购买
+- owner: 用户/阿里云 ACR 操作员
+- minimumUserPhrase: 授权购买 ACR Enterprise Economic，cn-hangzhou，1 个月，当前报价 CNY 117.00。
+- writeTargets: deploy/aliyun-production-cn.image-publish.local.json -> acr.purchaseCandidate / acr confirmed evidence
+- verifyCommands: corepack pnpm aliyun:image:plan
+- nonSecretEvidenceOnly: true
 
 ## 密钥/密码/token/付款/受控标识符阻塞项
 

@@ -135,9 +135,9 @@ test("Aliyun evidence writeback backend-only mode excludes deferred APP launch g
   assert.equal(report.summary.totalGaps, 50)
   assert.deepEqual(report.summary.actionableCanStartNowPacketIds, [
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
-    "P03_ACR_PURCHASE",
-    "P05_OSS_RAM_STS",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
+    "P05_OSS_RAM_STS",
+    "P03_ACR_PURCHASE",
   ])
   assert.deepEqual(report.summary.actionableBlockedByDependencyPacketIds, [
     "P04_ACR_IMAGE_AND_PULL",
@@ -146,8 +146,8 @@ test("Aliyun evidence writeback backend-only mode excludes deferred APP launch g
     "P08_SAE_RUNTIME_SLS",
   ])
   assert.deepEqual(report.summary.actionableSecretOrCredentialPacketIds, [
-    "P05_OSS_RAM_STS",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
+    "P05_OSS_RAM_STS",
     "P06_ENV_IMPORT",
   ])
   assert.equal(report.actionableWritebackSequence.currentScope, "backend_aliyun_only")
@@ -441,7 +441,7 @@ test("Aliyun evidence writeback markdown renders the same writeback boundaries",
   assert.match(markdownOutput, /证据闭环摘要/)
   assert.match(markdownOutput, /按动作包排序的证据回填/)
   assert.match(markdownOutput, /canStartNowPacketIds: none/)
-  assert.match(markdownOutput, /secretOrCredentialPacketIds: P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION, P06_ENV_IMPORT, P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING/)
+  assert.match(markdownOutput, /secretOrCredentialPacketIds: P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P06_ENV_IMPORT, P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING/)
   assert.match(markdownOutput, /blockedCredentialCount: 8/)
   assert.match(markdownOutput, /readySecretEnvVariableCount: 17/)
   assert.match(markdownOutput, /resourceEvidenceReady: 0\/7/)
@@ -485,9 +485,9 @@ test("tracked APP production-cn evidence gap doc pins the current non-deployable
   assert.match(doc, /blockedCredentialNames: DATABASE_URL_CN/)
   assert.match(doc, /resourceEvidenceReady: 0\/7/)
   assert.match(doc, /按动作包排序的证据回填/)
-  assert.match(doc, /canStartNowPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(doc, /canStartNowPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE/)
   assert.match(doc, /blockedByDependencyPacketIds: P04_ACR_IMAGE_AND_PULL, P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS/)
-  assert.match(doc, /secretOrCredentialPacketIds: P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION, P06_ENV_IMPORT/)
+  assert.match(doc, /secretOrCredentialPacketIds: P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P06_ENV_IMPORT/)
   assert.match(doc, /### P11_ALIYUN_RDS_DATA_MIGRATION/)
   assert.match(doc, /gapCount: 19/)
   assert.match(doc, /### P04_ACR_IMAGE_AND_PULL/)
@@ -590,13 +590,13 @@ test("tracked backend-only evidence writeback gap doc pins Aliyun backend scope"
   assert.match(doc, /blockedCredentialCount: 1/)
   assert.match(doc, /blockedCredentialNames: DATABASE_URL_CN/)
   assert.match(doc, /resourceEvidenceReady: 0\/7/)
-  assert.match(doc, /canStartNowPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(doc, /canStartNowPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE/)
   assert.match(doc, /blockedByDependencyPacketIds: P04_ACR_IMAGE_AND_PULL, P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS/)
-  assert.match(doc, /secretOrCredentialPacketIds: P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION, P06_ENV_IMPORT/)
+  assert.match(doc, /secretOrCredentialPacketIds: P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P06_ENV_IMPORT/)
   assert.match(doc, /### P00_ALIYUN_READONLY_INVENTORY_IDENTITY/)
-  assert.match(doc, /### P03_ACR_PURCHASE/)
-  assert.match(doc, /### P05_OSS_RAM_STS/)
   assert.match(doc, /### P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(doc, /### P05_OSS_RAM_STS/)
+  assert.match(doc, /### P03_ACR_PURCHASE/)
   assert.match(doc, /### P04_ACR_IMAGE_AND_PULL/)
   assert.match(doc, /### P06_ENV_IMPORT/)
   assert.match(doc, /### P07_DOMAIN_DNS_HTTPS/)

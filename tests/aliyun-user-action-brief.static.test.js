@@ -40,7 +40,7 @@ test("APP production-cn user action brief documents credential and operator hand
   assert.match(doc, /fullAppLaunchScope: deferred_after_backend_online/)
   assert.match(doc, /ready: 0 \/ 12/)
   assert.match(doc, /blocked: 12/)
-  assert.match(doc, /nextActionTimeConfirmations: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(doc, /nextActionTimeConfirmations: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE/)
   assert.match(doc, /deferredAppLaunchConfirmations: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID/)
   assert.match(doc, /blockedCredentialCount: 8/)
   assert.match(doc, /blockedCredentialNames: .*DATABASE_URL_CN/)
@@ -154,9 +154,9 @@ test("Aliyun user action brief is value-free and includes the expected blockers"
   assert.ok(report.summary.actionTimeConfirmationRequired.includes("U11_ALIYUN_RDS_DATA_MIGRATION"))
   assert.deepEqual(report.summary.nextActionTimeConfirmations, [
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
-    "P03_ACR_PURCHASE",
-    "P05_OSS_RAM_STS",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
+    "P05_OSS_RAM_STS",
+    "P03_ACR_PURCHASE",
   ])
   assert.deepEqual(report.summary.deferredAppLaunchConfirmations, [
     "P01_WECHAT_OPEN_MOBILE_APP",
@@ -335,9 +335,9 @@ test("Aliyun user action brief backend-only mode excludes deferred APP launch bl
   ])
   assert.deepEqual(report.summary.nextActionTimeConfirmations, [
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
-    "P03_ACR_PURCHASE",
-    "P05_OSS_RAM_STS",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
+    "P05_OSS_RAM_STS",
+    "P03_ACR_PURCHASE",
   ])
   assert.equal(report.actionTimeAuthorizationRequest.required, true)
   assert.equal(report.actionTimeAuthorizationRequest.currentScope, "backend_aliyun_only")
@@ -364,7 +364,7 @@ test("Aliyun user action brief backend-only mode excludes deferred APP launch bl
   assert.match(markdown, /DATABASE_URL_CN 从哪里获得并导入到哪里/)
   assert.match(markdown, /## 动作时授权请求/)
   assert.match(markdown, /recommendedUserReply: 授权本轮只做阿里云后端第一批动作/)
-  assert.match(markdown, /packetIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(markdown, /packetIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE/)
   assert.match(markdown, /compatibilityReviewChecklist 6 类/)
   assert.match(markdown, /corepack pnpm aliyun:rds:migration:package/)
   assert.doesNotMatch(output + markdown, /WECHAT_OPEN_APP_ID|WECHAT_OPEN_APP_SECRET/)

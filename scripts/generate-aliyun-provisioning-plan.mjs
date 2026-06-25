@@ -81,13 +81,13 @@ const PHASES = Object.freeze([
   }),
   Object.freeze({
     id: "PH02_BASE_CLOUD_RESOURCES",
-    title: "确认 ACR、RDS PostgreSQL 和 OSS/RAM/STS 基础资源",
-    authorizationPackets: ["P03_ACR_PURCHASE", "P05_OSS_RAM_STS", "P11_ALIYUN_RDS_DATA_MIGRATION"],
+    title: "确认 RDS PostgreSQL、OSS/RAM/STS 和 ACR 基础资源",
+    authorizationPackets: ["P11_ALIYUN_RDS_DATA_MIGRATION", "P05_OSS_RAM_STS", "P03_ACR_PURCHASE"],
     consoleTasks: ["C02_ACR_IMAGE_AND_PULL", "C05_OSS_AUDIO_RAM_STS"],
     completionEvidence: [
-      "ACR 只记录 registry host、namespace、repository、remote tag 和购买证据。",
       "RDS PostgreSQL 必须完成实例、DATABASE_URL_CN secret env、schema/data 迁移、APP API smoke 和回滚验收；首版业务数据访问代码侧已切到 RDS repository。",
       "OSS 只记录 bucket、region、CORS、RAM/STS 最小权限布尔证据。",
+      "ACR 只记录 registry host、namespace、repository、remote tag 和购买证据。",
     ],
   }),
   Object.freeze({

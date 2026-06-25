@@ -84,9 +84,9 @@ test("Aliyun cloud actions package summarizes current cloud console action order
   assert.ok(report.summary.blockedByDependencies.includes("C06_ENV_IMPORT"))
   assert.deepEqual(report.summary.cloudConsolePackets, [
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
-    "P03_ACR_PURCHASE",
-    "P05_OSS_RAM_STS",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
+    "P05_OSS_RAM_STS",
+    "P03_ACR_PURCHASE",
   ])
   assert.deepEqual(report.summary.externalAppPackets, [])
   assert.ok(report.summary.deferredAppLaunchPackets.includes("P01_WECHAT_OPEN_MOBILE_APP"))
@@ -175,9 +175,9 @@ test("Aliyun cloud actions package summarizes current cloud console action order
   assert.deepEqual(report.cloudActionClosureBrief.canStartNowConsoleTasks, ["C02_ACR_IMAGE_AND_PULL", "C05_OSS_AUDIO_RAM_STS"])
   assert.deepEqual(report.cloudActionClosureBrief.cloudConsolePackets, [
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
-    "P03_ACR_PURCHASE",
-    "P05_OSS_RAM_STS",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
+    "P05_OSS_RAM_STS",
+    "P03_ACR_PURCHASE",
   ])
   assert.deepEqual(report.cloudActionClosureBrief.externalAppPackets, [])
   assert.ok(report.cloudActionClosureBrief.deferredAppLaunchPackets.includes("P01_WECHAT_OPEN_MOBILE_APP"))
@@ -408,7 +408,7 @@ test("APP production-cn action queue documents the current authorized next-step 
     "consoleCanStartNow: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS",
     "BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE: kind=backend_apply_step; packets=P11_ALIYUN_RDS_DATA_MIGRATION; userIntervention=USER_CONFIRM_RDS_PURCHASE_AND_DATABASE_PASSWORD",
     "canStartNow: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS",
-    "cloudConsolePackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION",
+    "cloudConsolePackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE",
     "externalAppPackets: none",
     "deferredAppLaunchPackets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID",
     "C02_ACR_IMAGE_AND_PULL",
@@ -455,9 +455,9 @@ test("release manifest supersedes historical cloud action queue inventory snapsh
     "cloudInventoryReadyLocalOperations=0/9",
     "cloudInventoryExecutedCommandResults=9/9",
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
-    "P03_ACR_PURCHASE",
-    "P05_OSS_RAM_STS",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
+    "P05_OSS_RAM_STS",
+    "P03_ACR_PURCHASE",
     "onlyMissingBackendCredentialValue=DATABASE_URL_CN",
     "仅为历史快照",
     "不能作为当前部署证据",

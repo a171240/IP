@@ -77,9 +77,9 @@ test("Aliyun operator tasks backend-only mode excludes deferred app launch work"
       currentScope: "backend_aliyun_only",
       canStartNowPacketIds: [
         "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
-        "P03_ACR_PURCHASE",
-        "P05_OSS_RAM_STS",
         "P11_ALIYUN_RDS_DATA_MIGRATION",
+        "P05_OSS_RAM_STS",
+        "P03_ACR_PURCHASE",
       ],
       blockedByPacketDependencies: [
         "P08_SAE_RUNTIME_SLS",
@@ -105,9 +105,9 @@ test("Aliyun operator tasks backend-only mode excludes deferred app launch work"
   assert.equal(report.summary.operatorActionPacketSummary.taskPacketBindings.length, 8)
   assert.deepEqual(report.actionAuthorization.nextActionTimeConfirmationPacketIds, [
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
-    "P03_ACR_PURCHASE",
-    "P05_OSS_RAM_STS",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
+    "P05_OSS_RAM_STS",
+    "P03_ACR_PURCHASE",
   ])
   assert.equal(report.actionAuthorization.verdict, "blocked")
   assert.deepEqual(taskById.get("T02B_ALIYUN_RDS_DATA_MIGRATION").actionPacketIds, [
@@ -204,7 +204,7 @@ test("Aliyun operator tasks backend-only markdown omits deferred app launch task
   assert.match(markdown, /currentScope: backend_aliyun_only/)
   assert.match(markdown, /canProceedWithoutWechat: true/)
   assert.match(markdown, /## 动作包总览/)
-  assert.match(markdown, /nextActionTimeConfirmationPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(markdown, /nextActionTimeConfirmationPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE/)
   assert.match(markdown, /blockedByPacketDependencies: P08_SAE_RUNTIME_SLS, P04_ACR_IMAGE_AND_PULL, P07_DOMAIN_DNS_HTTPS, P06_ENV_IMPORT, P09_PRODUCTION_DEPLOY/)
   assert.match(markdown, /## RDS PostgreSQL 数据层迁移证据/)
   assert.match(markdown, /totalBlockers: 19/)

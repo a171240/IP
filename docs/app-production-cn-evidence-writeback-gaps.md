@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 阿里云证据回填清单
 
-Generated: 2026-06-25T23:12:17.318Z
+Generated: 2026-06-25T23:37:43.673Z
 
 ## 当前结论
 
@@ -30,9 +30,9 @@ Generated: 2026-06-25T23:12:17.318Z
 
 ## 按动作包排序的证据回填
 
-- canStartNowPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
+- canStartNowPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE
 - blockedByDependencyPacketIds: P04_ACR_IMAGE_AND_PULL, P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS
-- secretOrCredentialPacketIds: P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION, P06_ENV_IMPORT
+- secretOrCredentialPacketIds: P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P06_ENV_IMPORT
 
 ### P00_ALIYUN_READONLY_INVENTORY_IDENTITY
 
@@ -45,16 +45,16 @@ Generated: 2026-06-25T23:12:17.318Z
 - forbiddenValueClasses: AccessKeySecret, AppSecret, RAM Secret, Supabase service role key, cookie, registry password, token, 证书私钥
 - strictVerifyCommands: corepack pnpm aliyun:cloud:inventory-results:strict
 
-### P03_ACR_PURCHASE
+### P11_ALIYUN_RDS_DATA_MIGRATION
 
 - status: can_start_after_action_time_confirmation
-- nonSecretEvidenceOnly: true
-- gapCount: 3
-- groupKeys: imagePublish
-- jsonPaths: acr.registryHost, acr.namespace, acr.confirmed
-- writeTargets: deploy/aliyun-production-cn.image-publish.local.json -> acr
-- forbiddenValueClasses: AccessKeySecret, AppSecret, RAM Secret, Supabase service role key, cookie, registry password, token
-- strictVerifyCommands: corepack pnpm aliyun:image:plan:strict
+- nonSecretEvidenceOnly: false
+- gapCount: 19
+- groupKeys: rdsMigration
+- jsonPaths: rdsPostgres.instanceId, rdsPostgres.engineVersion, rdsPostgres.networkAccess, rdsPostgres.databaseName, rdsPostgres.evidence, rdsPostgres.confirmed, rdsPostgres.databaseAccountReady, rdsPostgres.databaseUrlCnSecretImported, migration.schemaCompatibilityReviewed, migration.supabaseSpecificSqlResolved, migration.rdsExtensionSupportConfirmed, migration.schemaMigrated, migration.dataMigrated, migration.rowCountValidationPassed, migration.criticalRecordValidationPassed, migration.appApiSmokeOnRdsPassed, migration.supabaseNoLongerFormalTarget, migration.rollbackRunbookReviewed, migration.rollbackValidationPassed
+- writeTargets: deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.instanceId; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.engineVersion; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.networkAccess; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.databaseName; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.evidence; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.confirmed; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.databaseAccountReady; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.databaseUrlCnSecretImported; deploy/aliyun-production-cn.rds-migration.local.json -> migration.schemaCompatibilityReviewed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.supabaseSpecificSqlResolved; deploy/aliyun-production-cn.rds-migration.local.json -> migration.rdsExtensionSupportConfirmed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.schemaMigrated; deploy/aliyun-production-cn.rds-migration.local.json -> migration.dataMigrated; deploy/aliyun-production-cn.rds-migration.local.json -> migration.rowCountValidationPassed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.criticalRecordValidationPassed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.appApiSmokeOnRdsPassed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.supabaseNoLongerFormalTarget; deploy/aliyun-production-cn.rds-migration.local.json -> migration.rollbackRunbookReviewed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.rollbackValidationPassed
+- forbiddenValueClasses: AccessKeySecret, DATABASE_URL_CN value, Supabase service role key, customer data, database password, dump contents, token
+- strictVerifyCommands: corepack pnpm aliyun:rds:migration:evidence:strict
 
 ### P05_OSS_RAM_STS
 
@@ -67,16 +67,16 @@ Generated: 2026-06-25T23:12:17.318Z
 - forbiddenValueClasses: AccessKeySecret, AppSecret, RAM Secret, Supabase service role key, cookie, registry password, token
 - strictVerifyCommands: corepack pnpm aliyun:cloud:confirmations:strict
 
-### P11_ALIYUN_RDS_DATA_MIGRATION
+### P03_ACR_PURCHASE
 
 - status: can_start_after_action_time_confirmation
-- nonSecretEvidenceOnly: false
-- gapCount: 19
-- groupKeys: rdsMigration
-- jsonPaths: rdsPostgres.instanceId, rdsPostgres.engineVersion, rdsPostgres.networkAccess, rdsPostgres.databaseName, rdsPostgres.evidence, rdsPostgres.confirmed, rdsPostgres.databaseAccountReady, rdsPostgres.databaseUrlCnSecretImported, migration.schemaCompatibilityReviewed, migration.supabaseSpecificSqlResolved, migration.rdsExtensionSupportConfirmed, migration.schemaMigrated, migration.dataMigrated, migration.rowCountValidationPassed, migration.criticalRecordValidationPassed, migration.appApiSmokeOnRdsPassed, migration.supabaseNoLongerFormalTarget, migration.rollbackRunbookReviewed, migration.rollbackValidationPassed
-- writeTargets: deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.instanceId; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.engineVersion; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.networkAccess; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.databaseName; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.evidence; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.confirmed; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.databaseAccountReady; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.databaseUrlCnSecretImported; deploy/aliyun-production-cn.rds-migration.local.json -> migration.schemaCompatibilityReviewed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.supabaseSpecificSqlResolved; deploy/aliyun-production-cn.rds-migration.local.json -> migration.rdsExtensionSupportConfirmed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.schemaMigrated; deploy/aliyun-production-cn.rds-migration.local.json -> migration.dataMigrated; deploy/aliyun-production-cn.rds-migration.local.json -> migration.rowCountValidationPassed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.criticalRecordValidationPassed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.appApiSmokeOnRdsPassed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.supabaseNoLongerFormalTarget; deploy/aliyun-production-cn.rds-migration.local.json -> migration.rollbackRunbookReviewed; deploy/aliyun-production-cn.rds-migration.local.json -> migration.rollbackValidationPassed
-- forbiddenValueClasses: AccessKeySecret, DATABASE_URL_CN value, Supabase service role key, customer data, database password, dump contents, token
-- strictVerifyCommands: corepack pnpm aliyun:rds:migration:evidence:strict
+- nonSecretEvidenceOnly: true
+- gapCount: 3
+- groupKeys: imagePublish
+- jsonPaths: acr.registryHost, acr.namespace, acr.confirmed
+- writeTargets: deploy/aliyun-production-cn.image-publish.local.json -> acr
+- forbiddenValueClasses: AccessKeySecret, AppSecret, RAM Secret, Supabase service role key, cookie, registry password, token
+- strictVerifyCommands: corepack pnpm aliyun:image:plan:strict
 
 ### P04_ACR_IMAGE_AND_PULL
 

@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 阿里云 Provisioning Plan
 
-Generated: 2026-06-25T22:56:24.812Z
+Generated: 2026-06-25T23:33:57.310Z
 
 ## 结论
 
@@ -30,7 +30,7 @@ Generated: 2026-06-25T22:56:24.812Z
 - Deferred phases: PH01_EXTERNAL_APP_IDENTIFIERS
 - Required blocking env: DATABASE_URL_CN
 - Deferred APP launch packets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID
-- Ready authorization packets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
+- Ready authorization packets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE
 - Deferred APP launch authorization packets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID
 - Ready console action packets: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS
 - Blocked credential count: 1
@@ -53,10 +53,10 @@ Generated: 2026-06-25T22:56:24.812Z
 - Ready to start phases: PH00_READONLY_INVENTORY_IDENTITY, PH02_BASE_CLOUD_RESOURCES
 - Blocked phases: PH03_IMAGE_PUSH_AND_PULL, PH04_ENV_IMPORT, PH05_SAE_RUNTIME_AND_SLS, PH06_DOMAIN_HTTPS_ICP, PH07_PRODUCTION_DEPLOY
 - Deferred phases: PH01_EXTERNAL_APP_IDENTIFIERS
-- Can start now authorization packets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
+- Can start now authorization packets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE
 - Deferred APP launch packets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID
 - Can start now console tasks: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS
-- Next action-time confirmations: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
+- Next action-time confirmations: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE
 
 ## Ready Authorization Packets
 
@@ -83,51 +83,6 @@ Generated: 2026-06-25T22:56:24.812Z
   - 不执行 docker login/push。
   - 不读取、复制、粘贴或输出 AccessKeySecret、STS token、cookie、registry password、RAM Secret 或证书私钥。
   - 除用户明确确认 CloudShell 开通页的性能型 NAS 费用提示外，不做任何 production-cn deploy、env import、资源创建或计费动作。
-
-### P03_ACR_PURCHASE 确认 ACR 企业版付费购买
-
-- Action id: U03_ACR_PURCHASE_CONFIRMATION
-- Sequence group: cloud_foundation
-- Minimum user phrase: 授权购买 ACR Enterprise Economic，cn-hangzhou，1 个月，当前报价 CNY 117.00。
-- Non-secret evidence only: true
-- Allowed actions:
-  - 在阿里云 ACR 企业版购买页确认规格、地域、时长和金额。
-  - 完成购买后创建或确认实例、namespace 和 repository。
-  - 只记录 registry host、namespace、repository 和非密钥购买证据。
-- Completion evidence:
-  - acr.purchaseCandidate.confirmed=true
-  - acr.registryHost actual aliyuncs.com host
-  - acr.namespace created
-  - repository=meiye-huajing-app-api
-- Write targets:
-  - deploy/aliyun-production-cn.image-publish.local.json -> acr.purchaseCandidate / acr confirmed evidence
-- Explicitly excluded:
-  - 未明确确认金额前不点击付款。
-  - 不执行 docker login/push。
-  - 不记录 registry password、RAM Secret 或 token。
-
-### P05_OSS_RAM_STS 绑定 OSS RAM 最小权限或 STS/运行时角色方案
-
-- Action id: U05_OSS_RAM_OR_STS
-- Sequence group: cloud_foundation
-- Minimum user phrase: 授权为服务记录音频 OSS 配置最小权限 RAM/STS 或运行时角色，并只通过密钥环境注入。
-- Non-secret evidence only: false
-- Allowed actions:
-  - 确认 bucket、region、CORS 和 service-records/production-cn 前缀。
-  - 绑定最小权限 RAM 策略或配置 STS/运行时角色。
-  - 只把 AccessKeySecret 或 STS token 导入 KMS/Secrets Manager/SAE secret env。
-- Completion evidence:
-  - oss.confirmed=true
-  - oss.ramLeastPrivilege=true
-  - serviceRecordPrefix=service-records/production-cn
-  - secret imported through Aliyun controlled secret env only
-- Write targets:
-  - deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss
-  - ALIYUN_OSS_ACCESS_KEY_ID / ALIYUN_OSS_ACCESS_KEY_SECRET / ALIYUN_OSS_SECURITY_TOKEN -> KMS/Secrets Manager/SAE secret env
-- Explicitly excluded:
-  - 不创建可提交的长期明文 Secret。
-  - 不下载 OSS 对象内容。
-  - 不把 AccessKeySecret 或 STS token 写入 JSON、Markdown、镜像或 git。
 
 ### P11_ALIYUN_RDS_DATA_MIGRATION 创建阿里云 RDS PostgreSQL 并完成正式数据层迁移
 
@@ -159,6 +114,51 @@ Generated: 2026-06-25T22:56:24.812Z
   - 不把数据库密码、连接串 value 或 Supabase service role key 写入 JSON、Markdown、Docker 镜像或 git。
   - 不把 Supabase 当作正式 production-cn 数据库目标。
   - 不执行破坏性数据迁移，除非迁移计划和回滚验收已单独确认。
+
+### P05_OSS_RAM_STS 绑定 OSS RAM 最小权限或 STS/运行时角色方案
+
+- Action id: U05_OSS_RAM_OR_STS
+- Sequence group: cloud_foundation
+- Minimum user phrase: 授权为服务记录音频 OSS 配置最小权限 RAM/STS 或运行时角色，并只通过密钥环境注入。
+- Non-secret evidence only: false
+- Allowed actions:
+  - 确认 bucket、region、CORS 和 service-records/production-cn 前缀。
+  - 绑定最小权限 RAM 策略或配置 STS/运行时角色。
+  - 只把 AccessKeySecret 或 STS token 导入 KMS/Secrets Manager/SAE secret env。
+- Completion evidence:
+  - oss.confirmed=true
+  - oss.ramLeastPrivilege=true
+  - serviceRecordPrefix=service-records/production-cn
+  - secret imported through Aliyun controlled secret env only
+- Write targets:
+  - deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss
+  - ALIYUN_OSS_ACCESS_KEY_ID / ALIYUN_OSS_ACCESS_KEY_SECRET / ALIYUN_OSS_SECURITY_TOKEN -> KMS/Secrets Manager/SAE secret env
+- Explicitly excluded:
+  - 不创建可提交的长期明文 Secret。
+  - 不下载 OSS 对象内容。
+  - 不把 AccessKeySecret 或 STS token 写入 JSON、Markdown、镜像或 git。
+
+### P03_ACR_PURCHASE 确认 ACR 企业版付费购买
+
+- Action id: U03_ACR_PURCHASE_CONFIRMATION
+- Sequence group: cloud_foundation
+- Minimum user phrase: 授权购买 ACR Enterprise Economic，cn-hangzhou，1 个月，当前报价 CNY 117.00。
+- Non-secret evidence only: true
+- Allowed actions:
+  - 在阿里云 ACR 企业版购买页确认规格、地域、时长和金额。
+  - 完成购买后创建或确认实例、namespace 和 repository。
+  - 只记录 registry host、namespace、repository 和非密钥购买证据。
+- Completion evidence:
+  - acr.purchaseCandidate.confirmed=true
+  - acr.registryHost actual aliyuncs.com host
+  - acr.namespace created
+  - repository=meiye-huajing-app-api
+- Write targets:
+  - deploy/aliyun-production-cn.image-publish.local.json -> acr.purchaseCandidate / acr confirmed evidence
+- Explicitly excluded:
+  - 未明确确认金额前不点击付款。
+  - 不执行 docker login/push。
+  - 不记录 registry password、RAM Secret 或 token。
 
 
 ## Phases
@@ -215,19 +215,19 @@ Generated: 2026-06-25T22:56:24.812Z
   - 当前后端-only 目标不创建微信开放平台移动应用、不做 Android release signing、不读取 Apple Team ID。
   - 这些延期项只在阿里云后端上线后单独授权处理。
 
-### PH02_BASE_CLOUD_RESOURCES 确认 ACR、RDS PostgreSQL 和 OSS/RAM/STS 基础资源
+### PH02_BASE_CLOUD_RESOURCES 确认 RDS PostgreSQL、OSS/RAM/STS 和 ACR 基础资源
 
 - Status: ready_for_action_time_confirmation
 - Can start now: true
 - Deferred after backend online: false
 - Requires action-time confirmation: true
-- Authorization packets: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
+- Authorization packets: P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE
 - Console tasks: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS
 - Current action scopes: C02_ACR_IMAGE_AND_PULL=purchase_and_repository_only
 - Current action scope handles: currentActionScope=purchase_and_repository_only
 - Blocking dependencies: none
 - Current blockers: imagePublishLocal:todo:acr.registryHost; imagePublishLocal:todo:acr.namespace; imagePublishLocal:todo:acr.remoteImage; imagePublishLocal:todo:acr.remoteDigest; imagePublishLocal:todo:acr.evidence; imagePublishLocal:acr.confirmed; imagePublishLocal:acr.imagePushed; imagePublishLocal:acr.digestVerified; imagePublishLocal:acr.remoteDigest=sha256; imagePublishLocal:runtime.confirmed; imagePublishLocal:runtime.remoteImageConfigured; imagePublishLocal:runtime.imagePullConfigured; S03_ACR_PAID_PURCHASE:blocked; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.registryHost; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.namespace; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.remoteImage; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.remoteDigest; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.evidence; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.confirmed; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.imagePushed; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.digestVerified; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.remoteDigest=sha256; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:runtime.confirmed; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:runtime.remoteImageConfigured; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:runtime.imagePullConfigured; oss:confirmed; oss:ramLeastPrivilege; S05_OSS_RAM_SECRET_OR_STS:blocked; R05_OSS_AUDIO_STORAGE:oss:confirmed; R05_OSS_AUDIO_STORAGE:oss:ramLeastPrivilege
-- Verify commands: `corepack pnpm aliyun:image:plan`; `corepack pnpm aliyun:cloud:confirmations`; `corepack pnpm aliyun:health:smoke`; `corepack pnpm aliyun:rds:migration:package`; `corepack pnpm aliyun:rds:migration:evidence:strict`; `corepack pnpm aliyun:sensitive:blockers:backend`; `corepack pnpm aliyun:backend-cn:status`; `corepack pnpm aliyun:completion:audit`; `corepack pnpm aliyun:predeploy`; `corepack pnpm aliyun:image:plan:strict`; `corepack pnpm aliyun:docker:build`; `corepack pnpm aliyun:container:smoke`; `corepack pnpm aliyun:app-api:smoke`; `postdeploy service-records upload smoke after API deployment`
+- Verify commands: `corepack pnpm aliyun:rds:migration:package`; `corepack pnpm aliyun:rds:migration:evidence:strict`; `corepack pnpm aliyun:sensitive:blockers:backend`; `corepack pnpm aliyun:backend-cn:status`; `corepack pnpm aliyun:completion:audit`; `corepack pnpm aliyun:predeploy`; `corepack pnpm aliyun:cloud:confirmations`; `corepack pnpm aliyun:health:smoke`; `corepack pnpm aliyun:image:plan`; `corepack pnpm aliyun:image:plan:strict`; `corepack pnpm aliyun:docker:build`; `corepack pnpm aliyun:container:smoke`; `corepack pnpm aliyun:app-api:smoke`; `postdeploy service-records upload smoke after API deployment`
 - Current action acceptance evidence:
   - acr.purchaseCandidate.confirmed=true
   - acr.registryHost actual aliyuncs.com host
@@ -244,19 +244,19 @@ Generated: 2026-06-25T22:56:24.812Z
   - 当前确认包不配置 SAE runtime image pull credentials。
   - imagePushed=true、digestVerified=true、runtime.remoteImageConfigured=true、runtime.imagePullConfigured=true 都属于后置验收。
 - Completion evidence:
-  - ACR 只记录 registry host、namespace、repository、remote tag 和购买证据。
   - RDS PostgreSQL 必须完成实例、DATABASE_URL_CN secret env、schema/data 迁移、APP API smoke 和回滚验收；首版业务数据访问代码侧已切到 RDS repository。
   - OSS 只记录 bucket、region、CORS、RAM/STS 最小权限布尔证据。
+  - ACR 只记录 registry host、namespace、repository、remote tag 和购买证据。
 - Explicitly excluded:
-  - 未明确确认金额前不点击付款。
-  - 不执行 docker login/push。
-  - 不记录 registry password、RAM Secret 或 token。
-  - 不创建可提交的长期明文 Secret。
-  - 不下载 OSS 对象内容。
-  - 不把 AccessKeySecret 或 STS token 写入 JSON、Markdown、镜像或 git。
   - 不把数据库密码、连接串 value 或 Supabase service role key 写入 JSON、Markdown、Docker 镜像或 git。
   - 不把 Supabase 当作正式 production-cn 数据库目标。
   - 不执行破坏性数据迁移，除非迁移计划和回滚验收已单独确认。
+  - 不创建可提交的长期明文 Secret。
+  - 不下载 OSS 对象内容。
+  - 不把 AccessKeySecret 或 STS token 写入 JSON、Markdown、镜像或 git。
+  - 未明确确认金额前不点击付款。
+  - 不执行 docker login/push。
+  - 不记录 registry password、RAM Secret 或 token。
   - AccessKeySecret
   - AppSecret
   - registry password

@@ -171,9 +171,9 @@ test("Aliyun completion audit reports the current goal as blocked without secret
   assert.equal(report.summary.operatorTasks.operatorActionPacketSummary.currentScope, "backend_aliyun_only")
   assert.deepEqual(report.summary.operatorTasks.operatorActionPacketSummary.canStartNowPacketIds, [
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
-    "P03_ACR_PURCHASE",
-    "P05_OSS_RAM_STS",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
+    "P05_OSS_RAM_STS",
+    "P03_ACR_PURCHASE",
   ])
   assert.deepEqual(report.summary.operatorTasks.operatorActionPacketSummary.deferredAppLaunchPacketIds, [
     "P01_WECHAT_OPEN_MOBILE_APP",
@@ -248,9 +248,9 @@ test("Aliyun completion audit reports the current goal as blocked without secret
     report.summary.nextActionTimeConfirmations.map((item) => item.packetId),
     [
       "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
-      "P03_ACR_PURCHASE",
-      "P05_OSS_RAM_STS",
       "P11_ALIYUN_RDS_DATA_MIGRATION",
+      "P05_OSS_RAM_STS",
+      "P03_ACR_PURCHASE",
     ],
   )
   assert.equal(report.sourceCommands.cloudConfirmations, "corepack pnpm aliyun:cloud:confirmations:backend")

@@ -177,9 +177,9 @@ test("APP production-cn credential acquisition runbook pins backend-only passwor
     "migration.rdsExtensionSupportConfirmed=true",
     "migration.supabaseNoLongerFormalTarget=true",
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
-    "P03_ACR_PURCHASE",
-    "P05_OSS_RAM_STS",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
+    "P05_OSS_RAM_STS",
+    "P03_ACR_PURCHASE",
     "P01_WECHAT_OPEN_MOBILE_APP",
     "P10_ANDROID_RELEASE_SIGNING",
     "P02_APPLE_TEAM_ID",
@@ -628,7 +628,7 @@ test("APP production-cn backend-only sensitive docs reflect current Aliyun backe
     actionDoc,
     /deferredAppLaunchConfirmations: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID/,
   )
-  assert.match(actionDoc, /nextActionTimeConfirmations: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(actionDoc, /nextActionTimeConfirmations: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE/)
   assert.match(importBatches, /Current backend-only sensitive gate/)
   assert.match(importBatches, /blockedCredentialCount=1/)
   assert.match(importBatches, /readySecretEnvVariableCount=17/)

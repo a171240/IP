@@ -113,9 +113,9 @@ test("Aliyun operator handoff backend-only mode excludes deferred APP launch wor
   assert.equal(report.actionTimeAuthorizationRequest.required, true)
   assert.deepEqual(report.actionTimeAuthorizationRequest.packetIds, [
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
-    "P03_ACR_PURCHASE",
-    "P05_OSS_RAM_STS",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
+    "P05_OSS_RAM_STS",
+    "P03_ACR_PURCHASE",
   ])
   assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /阿里云后端第一批动作/)
   assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /RDS PostgreSQL/)
@@ -197,7 +197,7 @@ test("Aliyun operator handoff backend-only mode excludes deferred APP launch wor
   assert.match(markdownOutput, /## 后端下一步顺序/)
   assert.match(markdownOutput, /## 动作时授权请求/)
   assert.match(markdownOutput, /recommendedUserReply: 授权本轮只做阿里云后端第一批动作/)
-  assert.match(markdownOutput, /packetIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(markdownOutput, /packetIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE/)
   assert.match(markdownOutput, /0\. P00_ALIYUN_READONLY_INVENTORY_IDENTITY/)
   assert.match(markdownOutput, /1\. P11_ALIYUN_RDS_DATA_MIGRATION/)
   assert.match(markdownOutput, /6\. P07_DOMAIN_DNS_HTTPS/)

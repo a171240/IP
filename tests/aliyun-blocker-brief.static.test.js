@@ -80,9 +80,9 @@ test("Aliyun blocker brief backend-only markdown stays focused on backend resour
   assert.deepEqual(report.summary.blockedCredentialNames, ["DATABASE_URL_CN"])
   assert.deepEqual(report.summary.canStartNowAuthorizationPackets, [
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
-    "P03_ACR_PURCHASE",
-    "P05_OSS_RAM_STS",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
+    "P05_OSS_RAM_STS",
+    "P03_ACR_PURCHASE",
   ])
 
   assert.match(markdown, /阿里云后端-only 当前执行简报/)
@@ -101,7 +101,7 @@ test("Aliyun blocker brief backend-only markdown stays focused on backend resour
   assert.match(markdown, /target: Aliyun RDS PostgreSQL/)
   assert.match(markdown, /databaseUrlCnStatus: todo/)
   assert.match(markdown, /requiredBlocking:[\s\S]*DATABASE_URL_CN[\s\S]*RDS_MIGRATION_EVIDENCE_NOT_READY/)
-  assert.match(markdown, /canStartNowAuthorizationPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(markdown, /canStartNowAuthorizationPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE/)
   assert.match(markdown, /P00_ALIYUN_READONLY_INVENTORY_IDENTITY/)
   assert.match(markdown, /P03_ACR_PURCHASE/)
   assert.match(markdown, /P05_OSS_RAM_STS/)
@@ -147,7 +147,7 @@ test("APP production-cn backend-only current blocker brief is the active backend
   assert.match(doc, /只聚合本地 value-free 证据/)
   assert.match(doc, /requiredBlocking:[\s\S]*ACR_IMAGE_REGISTRY_NOT_READY[\s\S]*DATABASE_URL_CN[\s\S]*SAE_RUNTIME_NOT_READY/)
   assert.match(doc, /canStartNowConsoleTasks: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS/)
-  assert.match(doc, /canStartNowAuthorizationPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(doc, /canStartNowAuthorizationPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE/)
   assert.match(doc, /target: Aliyun RDS PostgreSQL/)
   assert.match(doc, /databaseUrlCnStatus: todo/)
   assert.match(doc, /`DATABASE_URL_CN` \| P11_ALIYUN_RDS_DATA_MIGRATION/)
@@ -339,9 +339,9 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   ])
   assert.deepEqual(report.summary.canStartNowAuthorizationPackets, [
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
-    "P03_ACR_PURCHASE",
-    "P05_OSS_RAM_STS",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
+    "P05_OSS_RAM_STS",
+    "P03_ACR_PURCHASE",
   ])
   assert.deepEqual(report.summary.blockedByAuthorizationPacketDependencies, [
     "P04_ACR_IMAGE_AND_PULL",
@@ -399,9 +399,9 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   ])
   assert.deepEqual(report.summary.immediateAuthorizationPackets, [
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
-    "P03_ACR_PURCHASE",
-    "P05_OSS_RAM_STS",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
+    "P05_OSS_RAM_STS",
+    "P03_ACR_PURCHASE",
   ])
   assert.equal(report.summary.operatorTasksReady, "0/8")
   assert.match(markdown, /operatorTasksReady: 0\/8/)
@@ -588,7 +588,7 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.match(markdown, /下一步动作排序/)
   assert.match(markdown, /canStartNowConsoleTasks: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS/)
   assert.match(markdown, /blockedByConsoleTaskDependencies: C01_SAE_RUNTIME/)
-  assert.match(markdown, /canStartNowAuthorizationPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(markdown, /canStartNowAuthorizationPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE/)
   assert.match(markdown, /P03_ACR_PURCHASE/)
   assert.match(markdown, /授权购买/)
   assert.match(markdown, /当前可做动作回填清单/)
