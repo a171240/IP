@@ -78,7 +78,7 @@ test("Aliyun RDS migration plan inventories APP API Supabase dependency without 
   assert.equal(report.summary.databaseUrlCnReferencedInSource, true)
   assert.equal(report.summary.postgresDataAccessAdapterDetected, true)
   assert.equal(report.summary.schemaMapReady, true)
-  assert.equal(report.summary.schemaMapRequiredTableCount, 9)
+  assert.equal(report.summary.schemaMapRequiredTableCount, 15)
   assert.ok(report.summary.requiredBlocking.includes("DATABASE_URL_CN"))
   assert.ok(report.summary.requiredBlocking.includes("first_version_supabase_data_access_still_present"))
   assert.ok(!report.summary.requiredBlocking.includes("postgres_data_access_adapter_missing"))
@@ -94,6 +94,11 @@ test("Aliyun RDS migration plan inventories APP API Supabase dependency without 
   assert.equal(report.inventory.bridgeMap.file, "deploy/app-api-production-cn.bridge-map.json")
   assert.equal(report.inventory.bridgeMap.ready, true)
   assert.ok(report.inventory.schemaMap.requiredTables.includes("profiles"))
+  assert.ok(report.inventory.schemaMap.requiredTables.includes("entitlements"))
+  assert.ok(report.inventory.schemaMap.requiredTables.includes("mp_ai_point_ledger"))
+  assert.ok(report.inventory.schemaMap.requiredTables.includes("store_profiles"))
+  assert.ok(report.inventory.schemaMap.requiredTables.includes("voice_coach_sessions"))
+  assert.ok(report.inventory.schemaMap.requiredTables.includes("voice_coach_turns"))
   assert.ok(report.inventory.schemaMap.requiredTables.includes("service_record_sessions"))
 
   assert.ok(report.inventory.tables.includes("profiles"))
@@ -102,6 +107,7 @@ test("Aliyun RDS migration plan inventories APP API Supabase dependency without 
   assert.ok(report.inventory.tables.includes("voice_coach_customer_profiles"))
   assert.ok(report.inventory.storageBuckets.includes("delivery-packs"))
   assert.ok(report.inventory.rpcs.includes("consume_credits"))
+  assert.ok(report.inventory.rpcs.includes("grant_trial_credits"))
 
   assert.equal(byRoute.get("/api/app/auth/wechat").directUsesSupabase, true)
   assert.equal(byRoute.get("/api/app/auth/wechat").firstVersionRdsRequired, false)

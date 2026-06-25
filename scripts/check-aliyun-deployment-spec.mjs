@@ -25,6 +25,7 @@ const REQUIRED_PREDEPLOY_CHECKS = [
   "corepack pnpm aliyun:action:authorization:backend",
   "corepack pnpm aliyun:completion:audit",
   "corepack pnpm aliyun:rds:migration:plan",
+  "corepack pnpm aliyun:rds:route-map",
   "corepack pnpm aliyun:rds:migration:package",
   "corepack pnpm aliyun:rds:migration:evidence",
   "corepack pnpm aliyun:backend-cn:status",

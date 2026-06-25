@@ -1,230 +1,531 @@
-# APP production-cn RDS/PostgreSQL 迁移清单
+# APP production-cn RDS/PostgreSQL migration inventory
 
-更新时间：2026-06-24 CST
+Generated at: 2026-06-25T02:58:51.922Z
 
-## 结论
+## Conclusion
 
-缺口不只是微信开放平台移动应用。微信移动应用会解除 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`，但正式国内 production-cn 全量迁到阿里云还必须完成阿里云 RDS PostgreSQL 数据层迁移。
+- Current data layer: Supabase migration source / legacy compatibility only
+- Formal target: Aliyun RDS PostgreSQL
+- Migration ready: false
+- APP API routes: 31
+- APP API routes using Supabase: 31
+- APP API routes using Supabase data access: 29
+- First-version RDS required APP API routes: 25
+- First-version RDS required routes using Supabase: 25
+- First-version RDS required routes using Supabase data access: 25
+- Deferred APP API routes: 6
+- Deferred APP API routes using Supabase data access: 4
+- Shared Supabase files: 93
+- Shared Supabase data access files: 92
+- Supabase usage files: 96
+- DATABASE_URL_CN referenced in source: true
+- PostgreSQL data access adapter detected: true
+- RDS schema map ready: true
+- RDS schema map required tables: 15
+- requiredBlockingCodes: DATABASE_URL_CN, data_migration_not_verified, first_version_supabase_data_access_still_present, rds_instance_missing_or_unverified, rollback_validation_not_verified, schema_migration_not_verified
+- APP API bridge map ready: true
+- Tables: activation_requests, analytics_events, content_rewrites, content_sources, conversations, credit_transactions, delivery_packs, distribution_jobs, distribution_tasks, entitlements, knowledge_docs, mp_account_invites, mp_account_memberships, mp_ai_point_ledger, mp_companies, mp_knowledge_space_access, mp_knowledge_spaces, mp_stores, platform_connections, poster_generations, private_copy_drafts, profiles, reports, service_record_markers, service_record_segments, service_record_sessions, store_profiles, video_render_jobs, voice_coach_customer_profiles, voice_coach_events, voice_coach_jobs, voice_coach_knowledge_spaces, voice_coach_opening_preparations, voice_coach_scene_cards, voice_coach_sessions, voice_coach_training_packs, voice_coach_training_progress, voice_coach_turns, voice_training_packs, voice_training_progress, voice_training_tasks, wechatpay_orders, workflow_progress, xhs_drafts
+- RPCs: consume_credits, grant_trial_credits, update_profile_public
+- Storage buckets: delivery-packs
+- RDS adapter files: lib/aliyun-rds/postgres.server.ts
+- RDS schema map file: deploy/aliyun-production-cn.rds-first-version-schema-map.json
 
-当前阿里云后端-only 口径下，微信移动应用、Android 签名和 Apple Team ID 都是完整 APP 发布延期项；RDS/PostgreSQL 是当前后端上线前置项。
+## Required Blockers
 
-## 当前只读扫描结果
+### DATABASE_URL_CN
 
-当前 `corepack pnpm aliyun:rds:migration:plan` 的只读源码扫描结果：
+- status: todo
+- obtainFrom: Aliyun console -> RDS PostgreSQL -> database connection endpoint and credential
+- importTarget: Aliyun KMS / Secrets Manager / SAE secret env only
+- note: A connection string alone is not enough; source code, schema, data, and rollback evidence must also be migrated.
 
-```text
-currentDataLayer: Supabase migration source / legacy compatibility only
-formalTarget: Aliyun RDS PostgreSQL
-migrationReady: false
-appApiRouteCount: 31
-appApiRoutesWithSupabase: 31
-appApiRoutesWithSupabaseDataAccess: 29
-firstVersionRdsRouteCount: 25
-firstVersionRdsRoutesWithSupabase: 25
-firstVersionRdsRoutesWithSupabaseDataAccess: 25/25
-deferredAppApiRouteCount: 6
-deferredAppApiRoutesWithSupabaseDataAccess: 4
-appApiRoutesWithDirectSupabase: 3
-sharedSupabaseFileCount: 93
-sharedSupabaseDataAccessFileCount: 92
-supabaseUsageFileCount: 96
-tableCount: 44
-rpcCount: 3
-storageBucketCount: 1
-databaseUrlCnReferencedInSource: true
-postgresDataAccessAdapterDetected: true
-schemaMapReady: true
-schemaMapRequiredTableCount: 9
-```
+### ALIYUN_RDS_POSTGRES
 
-Human-readable summary used by release checks:
+- status: not_verified
+- obtainFrom: Aliyun console -> RDS -> PostgreSQL instance in cn-hangzhou
+- importTarget: deploy/aliyun-production-cn.cloud-inventory-results.local.json and cloud confirmations
+- note: Current strict read-only inventory is incomplete, so RDS PostgreSQL presence or absence is unverified; confirm in Aliyun console or allowlisted read-only inventory before treating DATABASE_URL_CN as available.
 
-```text
-APP API routes using Supabase: 31
-First-version RDS required routes using Supabase data access: 25
-DATABASE_URL_CN referenced in source: true
-PostgreSQL data access adapter detected: true
-```
+### SUPABASE_TO_RDS_DATA_ACCESS_MIGRATION
 
-这表示 APP 的 31 条 `app/api/app` 路由虽然多数是复用 `app/api/mp` 和 `lib` 的既有链路，但正式 production-cn 数据层仍不能停留在 Supabase。只填写 `DATABASE_URL_CN`，或只创建微信移动应用，都不能算完成“全部迁到阿里云”。
+- status: adapter_scaffolded_first_version_routes_still_using_supabase
+- obtainFrom: Code migration from Supabase SDK calls to a PostgreSQL/RDS data access layer
+- importTarget: backend source plus migration manifest
+- note: A DATABASE_URL_CN/PostgreSQL server adapter exists, but first-version APP API routes still depend on Supabase business data access.
 
-已具备的本地代码落点：
+### SCHEMA_DATA_ROLLBACK_VALIDATION
 
-```text
-rdsAdapterFile: lib/aliyun-rds/postgres.server.ts
-rdsSchemaMap: deploy/aliyun-production-cn.rds-first-version-schema-map.json
-bridgeMap: deploy/app-api-production-cn.bridge-map.json
-```
+- status: not_started
+- obtainFrom: schema dump, data migration runbook, smoke validation, and rollback rehearsal
+- importTarget: release evidence package
+- note: No production-cn RDS schema/data migration evidence is included yet.
 
-这只表示后端代码里已经有 server-only PostgreSQL/RDS 连接入口和第一版 schema 迁移清单；它不等于已经完成阿里云 RDS 实例、`DATABASE_URL_CN` secret 导入、业务路由切库、数据迁移或回滚验收。
+## First-version RDS Supabase Data Access Routes
 
-## 一阶段范围
+- /api/app/customer-profiles/[profileId]
+  - file: app/api/app/customer-profiles/[profileId]/route.ts
+  - capability: service_record_long_recording
+  - scopeClass: context
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/customer-profiles
+  - file: app/api/app/customer-profiles/route.ts
+  - capability: service_record_long_recording
+  - scopeClass: context
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/entitlements
+  - file: app/api/app/entitlements/route.ts
+  - capability: profile_multi_tenant_permissions
+  - scopeClass: account
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/profile
+  - file: app/api/app/profile/route.ts
+  - capability: profile_multi_tenant_permissions
+  - scopeClass: account
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/service-records/device-files/check
+  - file: app/api/app/service-records/device-files/check/route.ts
+  - capability: service_record_long_recording
+  - scopeClass: service-records
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/service-records/sessions/[sessionId]/asr/poll
+  - file: app/api/app/service-records/sessions/[sessionId]/asr/poll/route.ts
+  - capability: service_record_long_recording
+  - scopeClass: service-records
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/service-records/sessions/[sessionId]/audio/[segmentId]
+  - file: app/api/app/service-records/sessions/[sessionId]/audio/[segmentId]/route.ts
+  - capability: service_record_long_recording
+  - scopeClass: service-records
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/service-records/sessions/[sessionId]/end
+  - file: app/api/app/service-records/sessions/[sessionId]/end/route.ts
+  - capability: service_record_long_recording
+  - scopeClass: service-records
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/service-records/sessions/[sessionId]/markers
+  - file: app/api/app/service-records/sessions/[sessionId]/markers/route.ts
+  - capability: service_record_long_recording
+  - scopeClass: service-records
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/service-records/sessions/[sessionId]/oss-upload
+  - file: app/api/app/service-records/sessions/[sessionId]/oss-upload/route.ts
+  - capability: service_record_long_recording
+  - scopeClass: service-records
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/service-records/sessions/[sessionId]/process
+  - file: app/api/app/service-records/sessions/[sessionId]/process/route.ts
+  - capability: service_record_long_recording
+  - scopeClass: service-records
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/service-records/sessions/[sessionId]/resume
+  - file: app/api/app/service-records/sessions/[sessionId]/resume/route.ts
+  - capability: service_record_long_recording
+  - scopeClass: service-records
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/service-records/sessions/[sessionId]
+  - file: app/api/app/service-records/sessions/[sessionId]/route.ts
+  - capability: service_record_long_recording
+  - scopeClass: service-records
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/service-records/sessions/[sessionId]/segments/oss
+  - file: app/api/app/service-records/sessions/[sessionId]/segments/oss/route.ts
+  - capability: service_record_long_recording
+  - scopeClass: service-records
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/service-records/sessions/[sessionId]/segments
+  - file: app/api/app/service-records/sessions/[sessionId]/segments/route.ts
+  - capability: service_record_long_recording
+  - scopeClass: service-records
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/service-records/sessions
+  - file: app/api/app/service-records/sessions/route.ts
+  - capability: service_record_long_recording
+  - scopeClass: service-records
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/store-admin/analytics
+  - file: app/api/app/store-admin/analytics/route.ts
+  - capability: store_manager_service_record_read
+  - scopeClass: store-admin
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/store-admin/invites/[token]/accept
+  - file: app/api/app/store-admin/invites/[token]/accept/route.ts
+  - capability: store_invite
+  - scopeClass: invites
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/store-admin/invites/[token]/preview
+  - file: app/api/app/store-admin/invites/[token]/preview/route.ts
+  - capability: store_invite
+  - scopeClass: invites
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/store-admin/invites/[token]/qrcode
+  - file: app/api/app/store-admin/invites/[token]/qrcode/route.ts
+  - capability: store_invite
+  - scopeClass: invites
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/store-admin/invites
+  - file: app/api/app/store-admin/invites/route.ts
+  - capability: store_invite
+  - scopeClass: invites
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/store-admin/members
+  - file: app/api/app/store-admin/members/route.ts
+  - capability: store_manager_service_record_read
+  - scopeClass: store-admin
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/store-admin/overview
+  - file: app/api/app/store-admin/overview/route.ts
+  - capability: store_manager_service_record_read
+  - scopeClass: store-admin
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/store-profiles/[profileId]
+  - file: app/api/app/store-profiles/[profileId]/route.ts
+  - capability: profile_multi_tenant_permissions
+  - scopeClass: context
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/store-profiles
+  - file: app/api/app/store-profiles/route.ts
+  - capability: profile_multi_tenant_permissions
+  - scopeClass: context
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
 
-当前必须迁 RDS 的是一阶段 25 条路由。
+## Deferred APP API Routes
 
-延期的 6 条路由：
+- /api/app/auth/logout
+  - file: app/api/app/auth/logout/route.ts
+  - reason: Logout is an Auth session boundary and does not own first-version RDS business data.
+  - usesSupabaseDataAccess: false
+- /api/app/auth/wechat
+  - file: app/api/app/auth/wechat/route.ts
+  - reason: WeChat Open Platform mobile app creation and its env are explicitly deferred from the current Aliyun backend-only target.
+  - usesSupabaseDataAccess: true
+- /api/app/health
+  - file: app/api/app/health/route.ts
+  - reason: Health is a deployment/env smoke route; it is handled by SAE env import and health smoke, not RDS data migration.
+  - usesSupabaseDataAccess: false
+- /api/app/scene-cards/[cardId]
+  - file: app/api/app/scene-cards/[cardId]/route.ts
+  - reason: Scene cards belong to A3 voice-coach/customer-project migration, not the current first-version backend closure.
+  - usesSupabaseDataAccess: true
+- /api/app/scene-cards
+  - file: app/api/app/scene-cards/route.ts
+  - reason: Scene cards belong to A3 voice-coach/customer-project migration, not the current first-version backend closure.
+  - usesSupabaseDataAccess: true
+- /api/app/wechat/login
+  - file: app/api/app/wechat/login/route.ts
+  - reason: WeChat Open Platform mobile app creation and its env are explicitly deferred from the current Aliyun backend-only target.
+  - usesSupabaseDataAccess: true
 
-```text
-/api/app/health
-/api/app/auth/logout
-/api/app/auth/wechat
-/api/app/wechat/login
-/api/app/scene-cards
-/api/app/scene-cards/[cardId]
-```
+## Full APP API Supabase Routes
 
-延期原因：
+- /api/app/auth/logout
+  - file: app/api/app/auth/logout/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/auth/wechat
+  - file: app/api/app/auth/wechat/route.ts
+  - tables: profiles
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: IPgongchang_SUPABASE_ANON_KEY, IPgongchang_SUPABASE_PUBLISHABLE_KEY, IPgongchang_SUPABASE_URL, NEXT_PUBLIC_IPgongchang_SUPABASE_ANON_KEY, NEXT_PUBLIC_IPgongchang_SUPABASE_PUBLISHABLE_KEY, NEXT_PUBLIC_IPgongchang_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_SUPABASE_URL
+- /api/app/customer-profiles/[profileId]
+  - file: app/api/app/customer-profiles/[profileId]/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/customer-profiles
+  - file: app/api/app/customer-profiles/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/entitlements
+  - file: app/api/app/entitlements/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/health
+  - file: app/api/app/health/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: IPgongchang_SUPABASE_ANON_KEY, IPgongchang_SUPABASE_PUBLISHABLE_KEY, IPgongchang_SUPABASE_SECRET_KEY, IPgongchang_SUPABASE_SERVICE_ROLE_KEY, IPgongchang_SUPABASE_URL, NEXT_PUBLIC_IPgongchang_SUPABASE_ANON_KEY, NEXT_PUBLIC_IPgongchang_SUPABASE_PUBLISHABLE_KEY, NEXT_PUBLIC_IPgongchang_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+- /api/app/profile
+  - file: app/api/app/profile/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/scene-cards/[cardId]
+  - file: app/api/app/scene-cards/[cardId]/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/scene-cards
+  - file: app/api/app/scene-cards/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/service-records/device-files/check
+  - file: app/api/app/service-records/device-files/check/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/service-records/sessions/[sessionId]/asr/poll
+  - file: app/api/app/service-records/sessions/[sessionId]/asr/poll/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/service-records/sessions/[sessionId]/audio/[segmentId]
+  - file: app/api/app/service-records/sessions/[sessionId]/audio/[segmentId]/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/service-records/sessions/[sessionId]/end
+  - file: app/api/app/service-records/sessions/[sessionId]/end/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/service-records/sessions/[sessionId]/markers
+  - file: app/api/app/service-records/sessions/[sessionId]/markers/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/service-records/sessions/[sessionId]/oss-upload
+  - file: app/api/app/service-records/sessions/[sessionId]/oss-upload/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/service-records/sessions/[sessionId]/process
+  - file: app/api/app/service-records/sessions/[sessionId]/process/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/service-records/sessions/[sessionId]/resume
+  - file: app/api/app/service-records/sessions/[sessionId]/resume/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/service-records/sessions/[sessionId]
+  - file: app/api/app/service-records/sessions/[sessionId]/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/service-records/sessions/[sessionId]/segments/oss
+  - file: app/api/app/service-records/sessions/[sessionId]/segments/oss/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/service-records/sessions/[sessionId]/segments
+  - file: app/api/app/service-records/sessions/[sessionId]/segments/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/service-records/sessions
+  - file: app/api/app/service-records/sessions/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/store-admin/analytics
+  - file: app/api/app/store-admin/analytics/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/store-admin/invites/[token]/accept
+  - file: app/api/app/store-admin/invites/[token]/accept/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/store-admin/invites/[token]/preview
+  - file: app/api/app/store-admin/invites/[token]/preview/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/store-admin/invites/[token]/qrcode
+  - file: app/api/app/store-admin/invites/[token]/qrcode/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/store-admin/invites
+  - file: app/api/app/store-admin/invites/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/store-admin/members
+  - file: app/api/app/store-admin/members/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/store-admin/overview
+  - file: app/api/app/store-admin/overview/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/store-profiles/[profileId]
+  - file: app/api/app/store-profiles/[profileId]/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/store-profiles
+  - file: app/api/app/store-profiles/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/wechat/login
+  - file: app/api/app/wechat/login/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
 
-- `/api/app/auth/logout` 是 APP Auth session 边界，只校验 Bearer token 并做 best-effort sign-out；它依赖 Supabase Auth，但不拥有第一版 RDS 业务数据。
-- 微信登录两条按当前目标等后端上线后再做微信开放平台移动应用。
-- `scene-cards` 属于 A3 话术训练/顾客项目资料迁移。
-- `/api/app/health` 是 SAE 环境和健康检查，不作为 RDS 数据访问迁移 blocker。
+## Migration Phases
 
-## 必填阻塞项
+### RDS01_FREEZE_SCHEMA_INVENTORY
 
-```text
-DATABASE_URL_CN
-rds_instance_missing_or_unverified
-first_version_supabase_data_access_still_present
-schema_migration_not_verified
-data_migration_not_verified
-rollback_validation_not_verified
-```
+- canStartNow: false
+- blockedBy: none
+- expectedEvidence: Supabase table/RPC/storage inventory reviewed; first-version APP scope confirmed; deploy/aliyun-production-cn.rds-first-version-schema-map.json contains non-secret table/function/storage scope
 
-已解除的本地代码阻塞：
+### RDS02_CREATE_ALIYUN_RDS_POSTGRES
 
-```text
-postgres_data_access_adapter_missing
-```
+- canStartNow: true
+- blockedBy: none
+- expectedEvidence: RDS PostgreSQL instance exists in cn-hangzhou; DATABASE_URL_CN imported only through secret env
 
-仍然阻塞的原因是 APP 第一版必须上线的 25 条 RDS 路由还在直接或间接使用 Supabase 数据访问，真实 RDS 实例与迁移验收也没有完成。
+### RDS03_BUILD_POSTGRES_DATA_ACCESS_ADAPTER
 
-## RDS 迁移包
+- canStartNow: false
+- blockedBy: RDS01_FREEZE_SCHEMA_INVENTORY
+- expectedEvidence: First-version APP API routes no longer depend on Supabase as formal production-cn data layer; adapter uses DATABASE_URL_CN in server runtime only
 
-当前 `corepack pnpm aliyun:rds:migration:package` 能生成 value-free 迁移包，用于动作时交给 RDS/后端迁移操作员复核。最近一次本地生成摘要：
+### RDS04_MIGRATE_SCHEMA_AND_DATA
 
-```text
-sourceFileCount: 6
-requiredTableCount: 9
-requiredFunctionCount: 1
-requiredStorageCount: 1
-schemaSqlSha256: 7da2a25fd73733939bb799b912f86484ba954cb027b2046c44903d96b8b5b9d4
-validationSqlSha256: 3975d5f2f7808bf51694b82ff8f817aa5fccff6d983a36c68de2c2a38d261d50
-rollbackChecklistSha256: f2dbdf60cf7d6700d1b93ed66d9123ce089fa462b55be2f6188d502b11aa27dd
-```
+- canStartNow: false
+- blockedBy: RDS02_CREATE_ALIYUN_RDS_POSTGRES, RDS03_BUILD_POSTGRES_DATA_ACCESS_ADAPTER
+- expectedEvidence: schema migration completed; data migration completed; row counts and critical records validated
 
-迁移包输出文件：
+### RDS05_VALIDATE_APP_API_ON_RDS
 
-```text
-rds-migration-package.json
-rds-migration-package.md
-rds-schema.sql
-rds-validation.sql
-rds-rollback-checklist.md
-```
+- canStartNow: false
+- blockedBy: RDS04_MIGRATE_SCHEMA_AND_DATA
+- expectedEvidence: profile / tenant / invite / service-record smoke passes against RDS; production-cn health strict passes database dependency checks
 
-迁移包只能作为 schema/validation/rollback 的无值执行材料。它不包含 `DATABASE_URL_CN`、数据库密码、dump 内容、Supabase service role key、AccessKeySecret、token 或 cookie。
+### RDS06_SWITCH_PRODUCTION_CN_AND_ROLLBACK
 
-## DATABASE_URL_CN
+- canStartNow: false
+- blockedBy: RDS05_VALIDATE_APP_API_ON_RDS
+- expectedEvidence: production-cn switch confirmed; rollback runbook rehearsed
 
-获得位置：
+## Safety Boundary
 
-```text
-阿里云控制台 -> RDS -> PostgreSQL -> cn-hangzhou 实例 -> 数据库连接信息
-```
+- This command does not connect to Supabase, Aliyun RDS, Vercel, or WeChat.
+- This command does not read .env files or output secret values.
+- This command does not create resources, import environment variables, push images, or deploy production-cn.
 
-导入位置：
+## Next Actions
 
-```text
-阿里云 KMS / Secrets Manager / SAE secret env
-```
-
-禁止位置：
-
-```text
-git
-Markdown / JSON 报告
-Docker image
-APP 包
-小程序包
-shell history
-```
-
-## 迁移阶段
-
-```text
-RDS01_FREEZE_SCHEMA_INVENTORY
-RDS02_CREATE_ALIYUN_RDS_POSTGRES
-RDS03_BUILD_POSTGRES_DATA_ACCESS_ADAPTER
-RDS04_MIGRATE_SCHEMA_AND_DATA
-RDS05_VALIDATE_APP_API_ON_RDS
-RDS06_SWITCH_PRODUCTION_CN_AND_ROLLBACK
-```
-
-当前可开始但不能自动越权完成的是：
-
-```text
-RDS02_CREATE_ALIYUN_RDS_POSTGRES
-```
-
-`RDS02` 涉及创建/确认阿里云 RDS PostgreSQL 实例和受控数据库账号；完成后只能把连接串作为 secret env 导入，不能写入文档或仓库。
-
-## 回填证据
-
-RDS 动作完成后，只能把非密钥证据写入 ignored 的本地文件：
-
-```text
-deploy/aliyun-production-cn.rds-migration.local.json
-```
-
-必须闭合的字段组：
-
-- `rdsPostgres.*`：RDS 实例、数据库账号、网络、database 名称、`DATABASE_URL_CN` secret env 导入状态。
-- `migration.*`：数据访问层迁移、schema/data 迁移、row count、关键记录、APP API smoke、Supabase 不再是正式目标、rollback runbook 和 rollback validation。
-
-禁止写入：
-
-```text
-DATABASE_URL_CN value
-database password
-dump contents
-customer data
-Supabase service role key
-AccessKeySecret
-STS token
-cookie
-```
-
-## 与微信移动应用的关系
-
-微信开放平台移动应用负责 APP 微信登录：
-
-```text
-WECHAT_OPEN_APP_ID
-WECHAT_OPEN_APP_SECRET
-WECHAT_OPEN_APP_REVIEW_STATUS
-```
-
-阿里云 RDS PostgreSQL 负责正式数据库：
-
-```text
-DATABASE_URL_CN
-PostgreSQL data access adapter
-schema/data migration evidence
-rollback validation evidence
-```
-
-这两条是并行前置项，不是互相替代关系。小程序的 `WECHAT_MINI_APPID`、`WECHAT_MINI_SECRET`、`WECHAT_LOGIN_SECRET` 也不能替代 APP 微信开放平台移动应用凭证。
-
-## 验证命令
-
-```bash
-corepack pnpm aliyun:rds:migration:plan
-corepack pnpm aliyun:rds:migration:package
-corepack pnpm aliyun:rds:migration:evidence
-corepack pnpm aliyun:rds:migration:evidence:strict
-corepack pnpm aliyun:backend-cn:status
-corepack pnpm aliyun:predeploy
-```
-
-这些命令只读本地源码和非密钥规格，不连接 Supabase、不连接阿里云 RDS、不读取 `.env` 值、不创建云资源、不导入环境变量、不部署 production-cn。
+- Create or confirm Aliyun RDS PostgreSQL in cn-hangzhou before importing DATABASE_URL_CN.
+- Keep Supabase variables only as migration-source or legacy-compatibility env, not as the final production-cn database target.
+- Plan code migration for the first-version APP API routes and shared Supabase data access files listed in this report.
+- Add schema/data migration and rollback evidence before marking Aliyun RDS PostgreSQL migration confirmed.

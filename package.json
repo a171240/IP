@@ -56,6 +56,8 @@
     "aliyun:completion:audit:test": "node --test tests/aliyun-completion-audit.static.test.js",
     "aliyun:rds:migration:plan": "node ./scripts/summarize-aliyun-rds-migration-plan.mjs",
     "aliyun:rds:migration:plan:test": "node --test tests/aliyun-rds-migration-plan.static.test.js",
+    "aliyun:rds:route-map": "node ./scripts/generate-aliyun-rds-route-migration-map.mjs",
+    "aliyun:rds:route-map:test": "node --test tests/aliyun-rds-route-migration-map.static.test.js",
     "aliyun:rds:migration:package": "node ./scripts/generate-aliyun-rds-migration-package.mjs",
     "aliyun:rds:migration:package:test": "node --test tests/aliyun-rds-migration-package.static.test.js",
     "aliyun:rds:migration:evidence": "node ./scripts/check-aliyun-rds-migration-evidence.mjs --allow-incomplete",

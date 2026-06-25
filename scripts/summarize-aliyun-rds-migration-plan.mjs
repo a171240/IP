@@ -753,6 +753,7 @@ function renderMarkdown(report) {
     `- PostgreSQL data access adapter detected: ${report.summary.postgresDataAccessAdapterDetected}`,
     `- RDS schema map ready: ${report.summary.schemaMapReady}`,
     `- RDS schema map required tables: ${report.summary.schemaMapRequiredTableCount}`,
+    `- requiredBlockingCodes: ${report.summary.requiredBlocking.join(", ") || "none"}`,
     `- APP API bridge map ready: ${report.inventory.bridgeMap.ready}`,
     `- Tables: ${report.inventory.tables.join(", ") || "none"}`,
     `- RPCs: ${report.inventory.rpcs.join(", ") || "none"}`,

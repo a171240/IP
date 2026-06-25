@@ -29,6 +29,9 @@
   ],
   "sourceMigrations": [
     "lib/supabase/schema.sql",
+    "supabase/migrations/20250213_add_activation_requests_and_entitlements.sql",
+    "supabase/migrations/20260209_xhs_v4_store_profiles_and_draft_fields.sql",
+    "supabase/migrations/20260210_add_voice_coach_sessions_and_turns.sql",
     "supabase/migrations/20260412_add_voice_coach_profiles_and_scene_cards.sql",
     "supabase/migrations/20260506_add_mp_ai_points_backend.sql",
     "supabase/migrations/20260511_add_mp_account_invites_and_org_snapshots.sql",
@@ -47,6 +50,29 @@
         "row_count_matches_source",
         "critical_test_user_profile_exists",
         "credits_columns_present"
+      ]
+    },
+    {
+      "name": "credit_transactions",
+      "source": "lib/supabase/schema.sql",
+      "capabilities": [
+        "profile_multi_tenant_permissions"
+      ],
+      "validation": [
+        "row_count_matches_source",
+        "user_credit_ledger_resolves_profile"
+      ]
+    },
+    {
+      "name": "entitlements",
+      "source": "supabase/migrations/20250213_add_activation_requests_and_entitlements.sql",
+      "capabilities": [
+        "login_test_token",
+        "profile_multi_tenant_permissions"
+      ],
+      "validation": [
+        "row_count_matches_source",
+        "entitlement_lookup_by_user_id_passes"
       ]
     },
     {
@@ -91,6 +117,19 @@
       ]
     },
     {
+      "name": "mp_ai_point_ledger",
+      "source": "supabase/migrations/20260506_add_mp_ai_points_backend.sql",
+      "capabilities": [
+        "profile_multi_tenant_permissions",
+        "store_manager_service_record_read"
+      ],
+      "validation": [
+        "row_count_matches_source",
+        "user_company_store_indexes_present",
+        "grant_and_consume_credit_ledger_writes_validate"
+      ]
+    },
+    {
       "name": "mp_account_invites",
       "source": "supabase/migrations/20260511_add_mp_account_invites_and_org_snapshots.sql",
       "capabilities": [
@@ -103,6 +142,17 @@
       ]
     },
     {
+      "name": "store_profiles",
+      "source": "supabase/migrations/20260209_xhs_v4_store_profiles_and_draft_fields.sql",
+      "capabilities": [
+        "profile_multi_tenant_permissions"
+      ],
+      "validation": [
+        "row_count_matches_source",
+        "store_profile_owner_crud_smoke_passes"
+      ]
+    },
+    {
       "name": "voice_coach_customer_profiles",
       "source": "supabase/migrations/20260412_add_voice_coach_profiles_and_scene_cards.sql",
       "capabilities": [
@@ -112,6 +162,30 @@
       "validation": [
         "row_count_matches_source",
         "service_record_customer_fk_resolves"
+      ]
+    },
+    {
+      "name": "voice_coach_sessions",
+      "source": "supabase/migrations/20260210_add_voice_coach_sessions_and_turns.sql",
+      "capabilities": [
+        "store_manager_service_record_read"
+      ],
+      "validation": [
+        "row_count_matches_source",
+        "company_store_started_indexes_present",
+        "store_manager_overview_smoke_passes"
+      ]
+    },
+    {
+      "name": "voice_coach_turns",
+      "source": "supabase/migrations/20260210_add_voice_coach_sessions_and_turns.sql",
+      "capabilities": [
+        "store_manager_service_record_read"
+      ],
+      "validation": [
+        "row_count_matches_source",
+        "session_turn_indexes_present",
+        "store_manager_member_stats_smoke_passes"
       ]
     },
     {
@@ -162,6 +236,17 @@
       "validation": [
         "function_exists",
         "credit_balance_transaction_smoke_passes"
+      ]
+    },
+    {
+      "name": "grant_trial_credits",
+      "source": "lib/supabase/schema.sql",
+      "capabilities": [
+        "profile_multi_tenant_permissions"
+      ],
+      "validation": [
+        "function_exists",
+        "trial_credit_grant_smoke_passes"
       ]
     }
   ],

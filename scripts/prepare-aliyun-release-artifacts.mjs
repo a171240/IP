@@ -343,6 +343,7 @@ function renderMarkdown(audit) {
   const actionAuthorization = audit.checks.actionAuthorization
   const completionAudit = audit.checks.completionAudit
   const rdsMigrationPlan = audit.checks.rdsMigrationPlan
+  const rdsRouteMigrationMap = audit.checks.rdsRouteMigrationMap
   const rdsMigrationPackage = audit.checks.rdsMigrationPackage
   const rdsMigrationEvidence = audit.checks.rdsMigrationEvidence
   const backendCnStatus = audit.checks.backendCnStatus
@@ -418,6 +419,7 @@ function renderMarkdown(audit) {
     `- provisioningPlan: ${provisioningPlan.summary.readyToStartPhases.length}/${provisioningPlan.summary.phases} phases ready to start, executionMode ${provisioningPlan.executionMode}`,
     `- completionAudit: ${completionAudit.verdict}, complete ${completionAudit.complete === true}, proved ${completionAudit.summary.proved}/${completionAudit.summary.requirements}`,
     `- rdsMigrationPlan: first-version RDS routes ${rdsMigrationPlan.summary.firstVersionRdsRoutesWithSupabaseDataAccess}/${rdsMigrationPlan.summary.firstVersionRdsRouteCount} still use Supabase data access; full app routes ${rdsMigrationPlan.summary.appApiRoutesWithSupabase}/${rdsMigrationPlan.summary.appApiRouteCount} touch Supabase, migrationReady ${rdsMigrationPlan.migrationReady}`,
+    `- rdsRouteMigrationMap: first-version routes ${rdsRouteMigrationMap.summary.routesStillUsingSupabaseDataAccess}/${rdsRouteMigrationMap.summary.firstVersionRouteCount} still use Supabase data access, observed tables ${rdsRouteMigrationMap.summary.observedTableCount}/${rdsRouteMigrationMap.summary.requiredTableCount}, schema gaps ${rdsRouteMigrationMap.summary.schemaMapMissingObservedTables.length}`,
     `- rdsMigrationPackage: ${rdsMigrationPackage.ok === true ? "ready" : "not ready"} (${rdsMigrationPackage.summary.sourceFileCount} source files, ${rdsMigrationPackage.summary.requiredTableCount} tables)`,
     `- rdsMigrationEvidence: localExists ${rdsMigrationEvidence.summary.localExists === true}, localReady ${rdsMigrationEvidence.summary.localReady === true}, required packets ${rdsMigrationEvidence.summary.requiredAuthorizationPackets.join(", ") || "none"}`,
     `- backendCnStatus: ${backendCnStatus.currentScope}, canDeployBackendNow ${backendCnStatus.canDeployBackendNow === true}, blockers ${backendCnStatus.summary.backendRequiredBlockingCount}`,
@@ -868,6 +870,25 @@ function renderMarkdown(audit) {
     ...(rdsMigrationPlan.migrationPhases?.length
       ? rdsMigrationPlan.migrationPhases.map((item) => `- ${item.id}: canStartNow=${item.canStartNow}`)
       : ["- phases: none"]),
+    "",
+    "## RDS/PostgreSQL 路由迁移图",
+    "",
+    `- json: ${audit.outputFiles.rdsRouteMigrationMapJson}`,
+    `- markdown: ${audit.outputFiles.rdsRouteMigrationMapMarkdown}`,
+    `- ok: ${rdsRouteMigrationMap.ok === true}`,
+    `- containsValues: ${rdsRouteMigrationMap.containsValues === true}`,
+    `- secretLeakCheck: ${rdsRouteMigrationMap.secretLeakCheck?.ok === true}`,
+    `- firstVersionRouteCount: ${rdsRouteMigrationMap.summary.firstVersionRouteCount}`,
+    `- routesStillUsingSupabaseDataAccess: ${rdsRouteMigrationMap.summary.routesStillUsingSupabaseDataAccess}`,
+    `- observedTables: ${rdsRouteMigrationMap.summary.observedTableCount}/${rdsRouteMigrationMap.summary.requiredTableCount}`,
+    `- observedRpcs: ${rdsRouteMigrationMap.summary.observedRpcCount}/${rdsRouteMigrationMap.summary.requiredFunctionCount}`,
+    `- schemaMapMissingObservedTables: ${rdsRouteMigrationMap.summary.schemaMapMissingObservedTables.join(", ") || "none"}`,
+    `- schemaMapMissingObservedRpcs: ${rdsRouteMigrationMap.summary.schemaMapMissingObservedRpcs.join(", ") || "none"}`,
+    `- sharedDataAccessFileCount: ${rdsRouteMigrationMap.summary.sharedDataAccessFileCount}`,
+    `- blockedCredentialNames: ${rdsRouteMigrationMap.summary.blockedCredentialNames.join(", ") || "none"}`,
+    ...(rdsRouteMigrationMap.routeGroups?.length
+      ? rdsRouteMigrationMap.routeGroups.map((item) => `- ${item.scope}: routes=${item.routeCount}; tables=${item.tableNames.join(", ") || "none"}`)
+      : ["- routeGroups: none"]),
     "",
     "## RDS/PostgreSQL 迁移包",
     "",
@@ -1528,6 +1549,8 @@ function main() {
   const completionAuditMarkdownPath = resolve(args.outDir, "completion-audit.md")
   const rdsMigrationPlanJsonPath = resolve(args.outDir, "rds-migration-plan.json")
   const rdsMigrationPlanMarkdownPath = resolve(args.outDir, "rds-migration-plan.md")
+  const rdsRouteMigrationMapJsonPath = resolve(args.outDir, "rds-route-migration-map.json")
+  const rdsRouteMigrationMapMarkdownPath = resolve(args.outDir, "rds-route-migration-map.md")
   const rdsMigrationPackageDir = resolve(args.outDir, "rds-migration-package")
   const rdsMigrationPackageJsonPath = resolve(rdsMigrationPackageDir, "rds-migration-package.json")
   const rdsMigrationPackageMarkdownPath = resolve(rdsMigrationPackageDir, "rds-migration-package.md")
@@ -1665,6 +1688,13 @@ function main() {
     rdsMigrationPlanJsonPath,
     "--markdown",
     rdsMigrationPlanMarkdownPath,
+  ])
+  const rdsRouteMigrationMap = runJson("rds_route_migration_map", [
+    "scripts/generate-aliyun-rds-route-migration-map.mjs",
+    "--out",
+    rdsRouteMigrationMapJsonPath,
+    "--markdown",
+    rdsRouteMigrationMapMarkdownPath,
   ])
   const rdsMigrationPackage = runJson("rds_migration_package", [
     "scripts/generate-aliyun-rds-migration-package.mjs",
@@ -1853,6 +1883,7 @@ function main() {
       actionAuthorization,
       completionAudit,
       rdsMigrationPlan,
+      rdsRouteMigrationMap,
       rdsMigrationPackage,
       rdsMigrationEvidence,
       backendCnStatus,
@@ -1918,6 +1949,8 @@ function main() {
       completionAuditMarkdown: completionAuditMarkdownPath,
       rdsMigrationPlanJson: rdsMigrationPlanJsonPath,
       rdsMigrationPlanMarkdown: rdsMigrationPlanMarkdownPath,
+      rdsRouteMigrationMapJson: rdsRouteMigrationMapJsonPath,
+      rdsRouteMigrationMapMarkdown: rdsRouteMigrationMapMarkdownPath,
       rdsMigrationPackageDir,
       rdsMigrationPackageJson: rdsMigrationPackageJsonPath,
       rdsMigrationPackageMarkdown: rdsMigrationPackageMarkdownPath,
@@ -2349,6 +2382,25 @@ function main() {
       requiredBlocking: rdsMigrationPlan.summary.requiredBlocking || [],
       migrationPhases: (rdsMigrationPlan.migrationPhases || []).map((item) => `${item.id}:canStartNow=${item.canStartNow}`),
     },
+    rdsRouteMigrationMap: {
+      report: audit.outputFiles.rdsRouteMigrationMapJson,
+      markdown: audit.outputFiles.rdsRouteMigrationMapMarkdown,
+      ok: rdsRouteMigrationMap.ok === true,
+      containsValues: rdsRouteMigrationMap.containsValues === true,
+      secretLeakCheck: rdsRouteMigrationMap.secretLeakCheck?.ok === true,
+      firstVersionRouteCount: rdsRouteMigrationMap.summary.firstVersionRouteCount,
+      routesStillUsingSupabaseDataAccess: rdsRouteMigrationMap.summary.routesStillUsingSupabaseDataAccess,
+      observedTableCount: rdsRouteMigrationMap.summary.observedTableCount,
+      requiredTableCount: rdsRouteMigrationMap.summary.requiredTableCount,
+      observedRpcCount: rdsRouteMigrationMap.summary.observedRpcCount,
+      requiredFunctionCount: rdsRouteMigrationMap.summary.requiredFunctionCount,
+      schemaMapMissingObservedTables: rdsRouteMigrationMap.summary.schemaMapMissingObservedTables || [],
+      schemaMapMissingObservedRpcs: rdsRouteMigrationMap.summary.schemaMapMissingObservedRpcs || [],
+      requiredTablesWithoutRouteObservation: rdsRouteMigrationMap.summary.requiredTablesWithoutRouteObservation || [],
+      sharedDataAccessFileCount: rdsRouteMigrationMap.summary.sharedDataAccessFileCount,
+      routeGroups: (rdsRouteMigrationMap.routeGroups || []).map((item) => `${item.scope}:${item.routeCount}`),
+      blockedCredentialNames: rdsRouteMigrationMap.summary.blockedCredentialNames || [],
+    },
     rdsMigrationPackage: {
       dir: audit.outputFiles.rdsMigrationPackageDir,
       report: audit.outputFiles.rdsMigrationPackageJson,
@@ -2759,6 +2811,8 @@ function main() {
     completionAuditMarkdown: audit.outputFiles.completionAuditMarkdown,
     rdsMigrationPlanJson: audit.outputFiles.rdsMigrationPlanJson,
     rdsMigrationPlanMarkdown: audit.outputFiles.rdsMigrationPlanMarkdown,
+    rdsRouteMigrationMapJson: audit.outputFiles.rdsRouteMigrationMapJson,
+    rdsRouteMigrationMapMarkdown: audit.outputFiles.rdsRouteMigrationMapMarkdown,
     rdsMigrationPackageDir: audit.outputFiles.rdsMigrationPackageDir,
     rdsMigrationPackageJson: audit.outputFiles.rdsMigrationPackageJson,
     rdsMigrationPackageMarkdown: audit.outputFiles.rdsMigrationPackageMarkdown,
