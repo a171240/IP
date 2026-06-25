@@ -94,7 +94,8 @@ test("Aliyun sensitive blockers backend-only mode excludes deferred APP launch c
   assert.ok(!ids.includes("S02_APPLE_TEAM_ID"))
   assert.ok(!ids.includes("S07_ANDROID_RELEASE_SIGNING"))
   assert.match(report.currentAnswer, /阿里云后端-only/)
-  assert.ok(report.nextActions.some((item) => item.includes("S03/S04/S05/S08/S06")))
+  assert.ok(report.nextActions.some((item) => item.includes("第一批先处理 S03/S05/S08")))
+  assert.ok(report.nextActions.some((item) => item.includes("S04 registry/SAE 拉取认证和 S06 ready secret env 导入仍被依赖阻塞")))
   assert.ok(report.nextActions.some((item) => item.includes("APP 发布阶段延期项")))
   assert.equal(report.credentialAcquisitionQueue.queueScope, "backend_aliyun_only")
   assert.deepEqual(report.credentialAcquisitionQueue.missingCredentialNames, ["DATABASE_URL_CN"])
@@ -102,6 +103,25 @@ test("Aliyun sensitive blockers backend-only mode excludes deferred APP launch c
   assert.equal(report.credentialAcquisitionQueue.readySecretEnvVariableCount, 17)
   assert.deepEqual(report.credentialAcquisitionQueue.items.map((item) => item.actionId), ids)
   assert.ok(report.credentialAcquisitionQueue.items.every((item) => item.requiresActionTimeConfirmation === true))
+  assert.equal(report.backendOnlyCredentialExecutionOrder.currentScope, "backend_aliyun_only")
+  assert.deepEqual(report.backendOnlyCredentialExecutionOrder.nonCredentialCanStartPacketIds, [
+    "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
+  ])
+  assert.deepEqual(report.backendOnlyCredentialExecutionOrder.credentialCanStartAfterActionTimeConfirmationIds, [
+    "S03_ACR_PAID_PURCHASE",
+    "S05_OSS_RAM_SECRET_OR_STS",
+    "S08_ALIYUN_RDS_DATABASE_URL",
+  ])
+  assert.deepEqual(report.backendOnlyCredentialExecutionOrder.credentialBlockedByDependencyIds, [
+    "S04_ACR_REGISTRY_AUTH",
+    "S06_READY_SENSITIVE_ENV_IMPORT",
+  ])
+  assert.ok(report.backendOnlyCredentialExecutionOrder.dependencyReasons.some((item) =>
+    item.includes("S04_ACR_REGISTRY_AUTH waits for ACR")))
+  assert.ok(report.backendOnlyCredentialExecutionOrder.dependencyReasons.some((item) =>
+    item.includes("S06_READY_SENSITIVE_ENV_IMPORT waits for RDS DATABASE_URL_CN")))
+  assert.ok(report.nextActions.some((item) => item.includes("第一批先处理 S03/S05/S08")))
+  assert.ok(report.nextActions.some((item) => item.includes("S04 registry/SAE 拉取认证和 S06 ready secret env 导入仍被依赖阻塞")))
   const rdsQueueItem = report.credentialAcquisitionQueue.items.find((item) => item.actionId === "S08_ALIYUN_RDS_DATABASE_URL")
   assert.ok(rdsQueueItem)
   assert.equal(rdsQueueItem.userQuestion, "DATABASE_URL_CN 从哪里获得并导入到哪里")
@@ -132,6 +152,10 @@ test("APP production-cn credential acquisition runbook pins backend-only passwor
     "S05_OSS_RAM_SECRET_OR_STS",
     "S08_ALIYUN_RDS_DATABASE_URL",
     "S06_READY_SENSITIVE_ENV_IMPORT",
+    "后端-only 动作顺序口径",
+    "credentialCanStartAfterActionTimeConfirmationIds: S03_ACR_PAID_PURCHASE, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL",
+    "credentialBlockedByDependencyIds: S04_ACR_REGISTRY_AUTH, S06_READY_SENSITIVE_ENV_IMPORT",
+    "nonCredentialCanStartPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "Import the DATABASE_URL_CN value directly into Aliyun KMS / Secrets Manager / SAE secret env.",
     "rdsPostgres.databaseUrlCnSecretImported=true",
     "migration.supabaseNoLongerFormalTarget=true",
@@ -560,6 +584,12 @@ test("APP production-cn backend-only sensitive docs reflect current Aliyun backe
   assert.match(sensitiveDoc, /readySecretsPendingCloudImport: 17/)
   assert.match(sensitiveDoc, /paidPurchaseConfirmationActionIds: S03_ACR_PAID_PURCHASE/)
   assert.match(sensitiveDoc, /controlledSecretChannelActionIds: S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT/)
+  assert.match(sensitiveDoc, /## 后端-only 动作顺序口径/)
+  assert.match(sensitiveDoc, /nonCredentialCanStartPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY/)
+  assert.match(sensitiveDoc, /credentialCanStartAfterActionTimeConfirmationIds: S03_ACR_PAID_PURCHASE, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL/)
+  assert.match(sensitiveDoc, /credentialBlockedByDependencyIds: S04_ACR_REGISTRY_AUTH, S06_READY_SENSITIVE_ENV_IMPORT/)
+  assert.match(sensitiveDoc, /S04_ACR_REGISTRY_AUTH waits for ACR/)
+  assert.match(sensitiveDoc, /S06_READY_SENSITIVE_ENV_IMPORT waits for RDS DATABASE_URL_CN/)
 
   assert.match(
     sensitiveDoc,

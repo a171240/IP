@@ -348,6 +348,37 @@ function buildCredentialAcquisitionQueue(credentialBrief, currentScope) {
   }
 }
 
+function buildBackendOnlyCredentialExecutionOrder(credentialBrief) {
+  const groupIds = new Set((credentialBrief.groups || []).map((group) => group.actionId))
+  const includeIfPresent = (ids) => ids.filter((id) => groupIds.has(id))
+
+  return {
+    currentScope: "backend_aliyun_only",
+    nonCredentialCanStartPacketIds: [
+      "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
+    ],
+    credentialCanStartAfterActionTimeConfirmationIds: includeIfPresent([
+      "S03_ACR_PAID_PURCHASE",
+      "S05_OSS_RAM_SECRET_OR_STS",
+      "S08_ALIYUN_RDS_DATABASE_URL",
+    ]),
+    credentialBlockedByDependencyIds: includeIfPresent([
+      "S04_ACR_REGISTRY_AUTH",
+      "S06_READY_SENSITIVE_ENV_IMPORT",
+    ]),
+    dependencyReasons: [
+      "S04_ACR_REGISTRY_AUTH waits for ACR instance/namespace/repository evidence before docker login/push or SAE image pull can be configured.",
+      "S06_READY_SENSITIVE_ENV_IMPORT waits for RDS DATABASE_URL_CN, OSS RAM/STS, image/runtime evidence, and the selected Aliyun secret-env target.",
+    ],
+    deferredAppLaunchSensitiveActionIds: APP_LAUNCH_DEFERRED_SENSITIVE_ACTION_IDS,
+    firstBatchVerificationCommands: [
+      "corepack pnpm aliyun:sensitive:blockers:backend",
+      "corepack pnpm aliyun:backend-cn:status",
+      "corepack pnpm aliyun:evidence:writeback:backend",
+    ],
+  }
+}
+
 function destinationSummaryForGroup(group) {
   const writeTargets = group.writeTargets || []
   if (writeTargets.length) return writeTargets
@@ -506,6 +537,9 @@ function buildReport(operatorTasks, args) {
   const summary = summarize(items)
   const credentialPasswordIntervention = buildCredentialPasswordIntervention(summary.credentialInterventionBrief)
   const credentialAcquisitionQueue = buildCredentialAcquisitionQueue(summary.credentialInterventionBrief, currentScope)
+  const backendOnlyCredentialExecutionOrder = args.backendOnly
+    ? buildBackendOnlyCredentialExecutionOrder(summary.credentialInterventionBrief)
+    : null
   const report = {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -526,11 +560,13 @@ function buildReport(operatorTasks, args) {
     credentialInterventionBrief: summary.credentialInterventionBrief,
     credentialPasswordIntervention,
     credentialAcquisitionQueue,
+    ...(backendOnlyCredentialExecutionOrder ? { backendOnlyCredentialExecutionOrder } : {}),
     items,
     nextActions: [
       ...(args.backendOnly
         ? [
-          "当前后端-only 先处理 S03/S04/S05/S08/S06：ACR 付款、registry/SAE 拉取认证、OSS RAM/STS、RDS DATABASE_URL_CN、ready secret env 导入。",
+          "当前后端-only 第一批先处理 S03/S05/S08，P00 只读盘点另行按 CloudShell/CLI 规则执行。",
+          "S04 registry/SAE 拉取认证和 S06 ready secret env 导入仍被依赖阻塞，等 ACR/RDS/OSS/runtime 证据闭合后再做。",
           "微信开放平台、Apple Team ID 和 Android release signing 保留为 APP 发布阶段延期项，不作为当前阿里云后端阻塞。",
         ]
         : [
@@ -587,6 +623,14 @@ function renderMarkdown(report) {
     "",
     ...renderCredentialPasswordIntervention(report.credentialPasswordIntervention),
     "",
+    ...(report.backendOnlyCredentialExecutionOrder
+      ? [
+        "## 后端-only 动作顺序口径",
+        "",
+        ...renderBackendOnlyCredentialExecutionOrder(report.backendOnlyCredentialExecutionOrder),
+        "",
+      ]
+      : []),
     report.backendOnly ? "## 后端-only 获取/导入队列" : "## 获取/导入队列",
     "",
     ...renderCredentialAcquisitionQueue(report.credentialAcquisitionQueue),
@@ -645,6 +689,19 @@ function renderMarkdown(report) {
     "",
   )
   return `${lines.join("\n").replace(/\n+$/u, "")}\n`
+}
+
+function renderBackendOnlyCredentialExecutionOrder(order) {
+  return [
+    `- currentScope: ${order.currentScope}`,
+    `- nonCredentialCanStartPacketIds: ${order.nonCredentialCanStartPacketIds.join(", ") || "none"}`,
+    `- credentialCanStartAfterActionTimeConfirmationIds: ${order.credentialCanStartAfterActionTimeConfirmationIds.join(", ") || "none"}`,
+    `- credentialBlockedByDependencyIds: ${order.credentialBlockedByDependencyIds.join(", ") || "none"}`,
+    `- deferredAppLaunchSensitiveActionIds: ${order.deferredAppLaunchSensitiveActionIds.join(", ") || "none"}`,
+    `- firstBatchVerificationCommands: ${order.firstBatchVerificationCommands.join("; ")}`,
+    "",
+    ...order.dependencyReasons.map((item) => `- ${item}`),
+  ]
 }
 
 function renderCredentialPasswordIntervention(intervention) {

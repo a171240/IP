@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 密钥/密码/token/付款/受控标识符阻塞项
 
-Generated: 2026-06-25T19:43:14.775Z
+Generated: 2026-06-25T22:03:40.190Z
 
 ## 结论
 
@@ -38,6 +38,18 @@ Generated: 2026-06-25T19:43:14.775Z
 - DATABASE_URL_CN must come from Aliyun RDS PostgreSQL after schema/data migration validation and must only enter KMS/Secrets Manager/SAE secret env.
 - Ready local secret variables still need controlled Aliyun secret-env import; names can be reported, values must not be copied into JSON, Markdown, Docker images, git, chat, or shell history.
 - ACR purchase and registry/runtime pull credentials require action-time confirmation; registry password or pull secret must stay in Docker credential helper, RAM/KMS/Secrets Manager, or Aliyun runtime secret settings.
+
+## 后端-only 动作顺序口径
+
+- currentScope: backend_aliyun_only
+- nonCredentialCanStartPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY
+- credentialCanStartAfterActionTimeConfirmationIds: S03_ACR_PAID_PURCHASE, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL
+- credentialBlockedByDependencyIds: S04_ACR_REGISTRY_AUTH, S06_READY_SENSITIVE_ENV_IMPORT
+- deferredAppLaunchSensitiveActionIds: S01_WECHAT_OPEN_APP_LOGIN, S02_APPLE_TEAM_ID, S07_ANDROID_RELEASE_SIGNING
+- firstBatchVerificationCommands: corepack pnpm aliyun:sensitive:blockers:backend; corepack pnpm aliyun:backend-cn:status; corepack pnpm aliyun:evidence:writeback:backend
+
+- S04_ACR_REGISTRY_AUTH waits for ACR instance/namespace/repository evidence before docker login/push or SAE image pull can be configured.
+- S06_READY_SENSITIVE_ENV_IMPORT waits for RDS DATABASE_URL_CN, OSS RAM/STS, image/runtime evidence, and the selected Aliyun secret-env target.
 
 ## 后端-only 获取/导入队列
 

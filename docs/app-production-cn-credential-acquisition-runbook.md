@@ -33,6 +33,16 @@ readySecretEnvVariableCount=17
 deferredAppLaunchSensitiveActionIds=S01_WECHAT_OPEN_APP_LOGIN, S02_APPLE_TEAM_ID, S07_ANDROID_RELEASE_SIGNING
 ```
 
+## 后端-only 动作顺序口径
+
+```text
+nonCredentialCanStartPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY
+credentialCanStartAfterActionTimeConfirmationIds: S03_ACR_PAID_PURCHASE, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL
+credentialBlockedByDependencyIds: S04_ACR_REGISTRY_AUTH, S06_READY_SENSITIVE_ENV_IMPORT
+```
+
+`S04_ACR_REGISTRY_AUTH` waits for ACR instance/namespace/repository evidence before docker login/push or SAE image pull can be configured. `S06_READY_SENSITIVE_ENV_IMPORT` waits for RDS `DATABASE_URL_CN`, OSS RAM/STS, image/runtime evidence, and the selected Aliyun secret-env target.
+
 Short answer for the current backend-only run:
 
 ```text
