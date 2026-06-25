@@ -659,6 +659,8 @@ function renderMarkdown(report) {
         `- Sequence group: ${packet.sequenceGroup || "none"}`,
         `- Minimum user phrase: ${packet.minimumUserPhrase}`,
         `- Non-secret evidence only: ${packet.nonSecretEvidenceOnly}`,
+        "- Allowed actions:",
+        ...(packet.allowedActions.length ? packet.allowedActions.map((item) => `  - ${item}`) : ["  - none"]),
         "- Completion evidence:",
         ...(packet.completionEvidence.length ? packet.completionEvidence.map((item) => `  - ${item}`) : ["  - none"]),
         "- Write targets:",

@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 阿里云后端-only 当前执行简报
 
-Generated: 2026-06-25T21:52:18.349Z
+Generated: 2026-06-25T22:47:39.372Z
 
 ## 结论
 
@@ -108,8 +108,8 @@ Generated: 2026-06-25T21:52:18.349Z
 - title: 创建阿里云 RDS PostgreSQL 并完成正式数据层迁移
 - owner: 阿里云 RDS/后端数据迁移操作员
 - minimumUserPhrase: 授权创建/确认阿里云 RDS PostgreSQL production-cn 数据库并完成数据迁移；DATABASE_URL_CN 只能进入阿里云 secret env。
-- writeTargets: DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env; RDS PostgreSQL 实例、schema/data migration、rollback validation -> 非密钥证据报告
-- verifyCommands: corepack pnpm aliyun:readiness; corepack pnpm aliyun:completion:audit; corepack pnpm aliyun:predeploy
+- writeTargets: docs/app-production-cn-rds-migration-package.md -> non-secret schema/validation/rollback package digest handoff; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres / migration non-secret evidence; DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env only
+- verifyCommands: corepack pnpm aliyun:rds:migration:package; corepack pnpm aliyun:rds:migration:evidence:strict; corepack pnpm aliyun:sensitive:blockers:backend; corepack pnpm aliyun:backend-cn:status; corepack pnpm aliyun:completion:audit; corepack pnpm aliyun:predeploy
 - nonSecretEvidenceOnly: false
 
 ## 当前可回填的后端证据

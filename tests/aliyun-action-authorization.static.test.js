@@ -149,6 +149,7 @@ test("Aliyun action authorization matrix separates local-safe work from external
 
   assert.equal(byId.get("U11_ALIYUN_RDS_DATA_MIGRATION").automationPolicy, "rds_creation_and_database_migration_requires_action_time_confirmation")
   assert.equal(byId.get("U11_ALIYUN_RDS_DATA_MIGRATION").blockerClass, "database_secret_and_migration")
+  assert.match(byId.get("U11_ALIYUN_RDS_DATA_MIGRATION").why, /兼容审查/)
   assert.ok(byId.get("U11_ALIYUN_RDS_DATA_MIGRATION").variableNames.includes("DATABASE_URL_CN"))
   assert.ok(byId.get("U11_ALIYUN_RDS_DATA_MIGRATION").currentBlockers.includes("rdsMigrationIncludedInThisRelease=false"))
 
@@ -202,6 +203,16 @@ test("Aliyun action authorization matrix separates local-safe work from external
   )
   assert.match(nextConfirmationsById.get("P11_ALIYUN_RDS_DATA_MIGRATION").minimumUserPhrase, /RDS PostgreSQL/)
   assert.ok(
+    nextConfirmationsById.get("P11_ALIYUN_RDS_DATA_MIGRATION").allowedActions.some((item) =>
+      item.includes("compatibilityReviewChecklist 6 类"),
+    ),
+  )
+  assert.ok(
+    nextConfirmationsById.get("P11_ALIYUN_RDS_DATA_MIGRATION").completionEvidence.some((item) =>
+      item.includes("compatibilityReviewChecklistItemCount=6"),
+    ),
+  )
+  assert.ok(
     nextConfirmationsById.get("P11_ALIYUN_RDS_DATA_MIGRATION").writeTargets.some((item) =>
       item.includes("DATABASE_URL_CN"),
     ),
@@ -229,6 +240,14 @@ test("Aliyun action authorization matrix separates local-safe work from external
     "P05_OSS_RAM_STS",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
   ])
+  assert.ok(
+    packetsById.get("P11_ALIYUN_RDS_DATA_MIGRATION").allowedActions.some((item) =>
+      item.includes("docs/app-production-cn-rds-migration-package.md"),
+    ),
+  )
+  assert.ok(
+    packetsById.get("P11_ALIYUN_RDS_DATA_MIGRATION").completionEvidence.includes("migration.schemaCompatibilityReviewed=true"),
+  )
   assert.ok(packetsById.get("P06_ENV_IMPORT").explicitlyExcluded.some((item) => item.includes("不把任何 value")))
   assert.deepEqual(packetsById.get("P07_DOMAIN_DNS_HTTPS").dependsOn, ["P08_SAE_RUNTIME_SLS"])
   assert.ok(packetsById.get("P07_DOMAIN_DNS_HTTPS").allowedActions.some((item) => item.includes("api-cn.ipgongchang.xin")))

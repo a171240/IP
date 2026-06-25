@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 阿里云 Provisioning Plan
 
-Generated: 2026-06-25T16:37:50.398Z
+Generated: 2026-06-25T22:56:24.812Z
 
 ## 结论
 
@@ -66,6 +66,11 @@ Generated: 2026-06-25T16:37:50.398Z
 - Sequence group: readonly_inventory
 - Minimum user phrase: 授权开通/重新连接阿里云 CloudShell 或配置 Aliyun CLI；如 CloudShell 提示会创建性能型 NAS 并可能产生费用，确认后才可点击开通；只运行 allowlisted 只读盘点命令并写入非密钥 evidence。
 - Non-secret evidence only: true
+- Allowed actions:
+  - 如 CloudShell 页面要求开通，先确认性能型 NAS 费用提示，再进入只读盘点。
+  - 使用阿里云官方 CLI 或 CloudShell 的只读身份。
+  - 只运行本仓库生成的 List/Describe/stat/get inventory 命令。
+  - 只记录资源名、布尔值、时间戳、命令状态、sha256 指纹和非密钥 evidence handle。
 - Completion evidence:
   - cloudInventoryResults.localReady=true
   - readyLocalOperations=9/9
@@ -85,6 +90,10 @@ Generated: 2026-06-25T16:37:50.398Z
 - Sequence group: cloud_foundation
 - Minimum user phrase: 授权购买 ACR Enterprise Economic，cn-hangzhou，1 个月，当前报价 CNY 117.00。
 - Non-secret evidence only: true
+- Allowed actions:
+  - 在阿里云 ACR 企业版购买页确认规格、地域、时长和金额。
+  - 完成购买后创建或确认实例、namespace 和 repository。
+  - 只记录 registry host、namespace、repository 和非密钥购买证据。
 - Completion evidence:
   - acr.purchaseCandidate.confirmed=true
   - acr.registryHost actual aliyuncs.com host
@@ -103,6 +112,10 @@ Generated: 2026-06-25T16:37:50.398Z
 - Sequence group: cloud_foundation
 - Minimum user phrase: 授权为服务记录音频 OSS 配置最小权限 RAM/STS 或运行时角色，并只通过密钥环境注入。
 - Non-secret evidence only: false
+- Allowed actions:
+  - 确认 bucket、region、CORS 和 service-records/production-cn 前缀。
+  - 绑定最小权限 RAM 策略或配置 STS/运行时角色。
+  - 只把 AccessKeySecret 或 STS token 导入 KMS/Secrets Manager/SAE secret env。
 - Completion evidence:
   - oss.confirmed=true
   - oss.ramLeastPrivilege=true
@@ -122,14 +135,26 @@ Generated: 2026-06-25T16:37:50.398Z
 - Sequence group: cloud_foundation
 - Minimum user phrase: 授权创建/确认阿里云 RDS PostgreSQL production-cn 数据库并完成数据迁移；DATABASE_URL_CN 只能进入阿里云 secret env。
 - Non-secret evidence only: false
+- Allowed actions:
+  - 创建或确认 cn-hangzhou RDS PostgreSQL 实例、数据库、账号和网络白名单/内网访问策略。
+  - 先生成并核对 docs/app-production-cn-rds-migration-package.md，关闭 compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查。
+  - 执行 Supabase 到 RDS/PostgreSQL 的 schema/data 迁移与回滚验收。
+  - 只把 DATABASE_URL_CN 导入 KMS/Secrets Manager/SAE secret env，并记录非密钥迁移证据。
 - Completion evidence:
   - Aliyun RDS PostgreSQL instance exists in cn-hangzhou
+  - database account and least-privilege access are ready
   - DATABASE_URL_CN imported through secret env only
-  - backend production-cn data access no longer depends on Supabase as formal database target
-  - migration and rollback validation pass
+  - compatibilityReviewChecklistItemCount=6 is reviewed and closed before schema apply
+  - supabase_auth_uid/supabase_storage_schema/supabase_service_role/row_level_security/policy_statement/extension_review dispositions are recorded without secrets
+  - migration.schemaCompatibilityReviewed=true
+  - migration.supabaseSpecificSqlResolved=true
+  - migration.rdsExtensionSupportConfirmed=true
+  - schema/data/APP API smoke/rollback validation passed
+  - backend production-cn no longer depends on Supabase as formal database target
 - Write targets:
-  - DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env
-  - RDS PostgreSQL 实例、schema/data migration、rollback validation -> 非密钥证据报告
+  - docs/app-production-cn-rds-migration-package.md -> non-secret schema/validation/rollback package digest handoff
+  - deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres / migration non-secret evidence
+  - DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env only
 - Explicitly excluded:
   - 不把数据库密码、连接串 value 或 Supabase service role key 写入 JSON、Markdown、Docker 镜像或 git。
   - 不把 Supabase 当作正式 production-cn 数据库目标。
@@ -202,7 +227,7 @@ Generated: 2026-06-25T16:37:50.398Z
 - Current action scope handles: currentActionScope=purchase_and_repository_only
 - Blocking dependencies: none
 - Current blockers: imagePublishLocal:todo:acr.registryHost; imagePublishLocal:todo:acr.namespace; imagePublishLocal:todo:acr.remoteImage; imagePublishLocal:todo:acr.remoteDigest; imagePublishLocal:todo:acr.evidence; imagePublishLocal:acr.confirmed; imagePublishLocal:acr.imagePushed; imagePublishLocal:acr.digestVerified; imagePublishLocal:acr.remoteDigest=sha256; imagePublishLocal:runtime.confirmed; imagePublishLocal:runtime.remoteImageConfigured; imagePublishLocal:runtime.imagePullConfigured; S03_ACR_PAID_PURCHASE:blocked; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.registryHost; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.namespace; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.remoteImage; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.remoteDigest; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.evidence; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.confirmed; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.imagePushed; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.digestVerified; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.remoteDigest=sha256; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:runtime.confirmed; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:runtime.remoteImageConfigured; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:runtime.imagePullConfigured; oss:confirmed; oss:ramLeastPrivilege; S05_OSS_RAM_SECRET_OR_STS:blocked; R05_OSS_AUDIO_STORAGE:oss:confirmed; R05_OSS_AUDIO_STORAGE:oss:ramLeastPrivilege
-- Verify commands: `corepack pnpm aliyun:image:plan`; `corepack pnpm aliyun:cloud:confirmations`; `corepack pnpm aliyun:health:smoke`; `corepack pnpm aliyun:readiness`; `corepack pnpm aliyun:completion:audit`; `corepack pnpm aliyun:predeploy`; `corepack pnpm aliyun:image:plan:strict`; `corepack pnpm aliyun:docker:build`; `corepack pnpm aliyun:container:smoke`; `corepack pnpm aliyun:app-api:smoke`; `postdeploy service-records upload smoke after API deployment`
+- Verify commands: `corepack pnpm aliyun:image:plan`; `corepack pnpm aliyun:cloud:confirmations`; `corepack pnpm aliyun:health:smoke`; `corepack pnpm aliyun:rds:migration:package`; `corepack pnpm aliyun:rds:migration:evidence:strict`; `corepack pnpm aliyun:sensitive:blockers:backend`; `corepack pnpm aliyun:backend-cn:status`; `corepack pnpm aliyun:completion:audit`; `corepack pnpm aliyun:predeploy`; `corepack pnpm aliyun:image:plan:strict`; `corepack pnpm aliyun:docker:build`; `corepack pnpm aliyun:container:smoke`; `corepack pnpm aliyun:app-api:smoke`; `postdeploy service-records upload smoke after API deployment`
 - Current action acceptance evidence:
   - acr.purchaseCandidate.confirmed=true
   - acr.registryHost actual aliyuncs.com host

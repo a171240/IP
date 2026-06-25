@@ -47,6 +47,9 @@ test("APP production-cn user action brief documents credential and operator hand
   assert.match(doc, /readySecretEnvVariableCount: 17/)
   assert.match(doc, /databaseUrlCnStatus=todo/)
   assert.match(doc, /RDS PostgreSQL 迁移和回滚验收通过/)
+  assert.match(doc, /aliyun:rds:migration:package/)
+  assert.match(doc, /compatibilityReviewChecklist 6 类/)
+  assert.match(doc, /migration\.schemaCompatibilityReviewed=true/)
   assert.match(doc, /P01_WECHAT_OPEN_MOBILE_APP/)
   assert.match(doc, /P10_ANDROID_RELEASE_SIGNING/)
   assert.match(doc, /P02_APPLE_TEAM_ID/)
@@ -239,6 +242,27 @@ test("Aliyun user action brief is value-free and includes the expected blockers"
       item.includes("DATABASE_URL_CN"),
     ),
   )
+  assert.ok(
+    nextConfirmationsById.get("P11_ALIYUN_RDS_DATA_MIGRATION").allowedActions.some((item) =>
+      item.includes("compatibilityReviewChecklist 6 类"),
+    ),
+  )
+  assert.ok(
+    nextConfirmationsById.get("P11_ALIYUN_RDS_DATA_MIGRATION").completionEvidence.some((item) =>
+      item.includes("compatibilityReviewChecklistItemCount=6"),
+    ),
+  )
+  assert.ok(
+    nextConfirmationsById.get("P11_ALIYUN_RDS_DATA_MIGRATION").verifyCommands.includes("corepack pnpm aliyun:rds:migration:package"),
+  )
+  assert.ok(
+    rdsAction.writeTargets.some((item) => item.includes("docs/app-production-cn-rds-migration-package.md")),
+  )
+  assert.ok(
+    rdsAction.verifyCommands.includes("corepack pnpm aliyun:rds:migration:evidence:strict"),
+  )
+  assert.match(rdsAction.requiredUserAction, /APP API smoke/)
+  assert.match(rdsAction.unblockCondition, /migration\.schemaCompatibilityReviewed=true/)
   assert.equal(report.actions.find((item) => item.id === "U08_SAE_RUNTIME_AND_SLS").requiresActionTimeConfirmation, true)
   assert.equal(report.actions.find((item) => item.id === "U08_SAE_RUNTIME_AND_SLS").requiresUserAction, true)
   assert.ok(acrRuntimeAction.currentEvidence.includes("R02_ACR_IMAGE_REGISTRY:localDockerImage.status=ready"))
@@ -264,6 +288,8 @@ test("Aliyun user action brief is value-free and includes the expected blockers"
   assert.match(markdown, /### 获取\/导入队列/)
   assert.match(markdown, /queueScope: full_app_launch/)
   assert.match(markdown, /DATABASE_URL_CN 从哪里获得并导入到哪里/)
+  assert.match(markdown, /compatibilityReviewChecklistItemCount=6/)
+  assert.match(markdown, /corepack pnpm aliyun:rds:migration:package/)
   assert.match(markdown, /blockedCredentialCount: 8/)
   assert.match(markdown, /readySecretEnvVariableCount: 17/)
   assert.match(markdown, /WECHAT_OPEN_APP_ID/)
@@ -339,6 +365,8 @@ test("Aliyun user action brief backend-only mode excludes deferred APP launch bl
   assert.match(markdown, /## 动作时授权请求/)
   assert.match(markdown, /recommendedUserReply: 授权本轮只做阿里云后端第一批动作/)
   assert.match(markdown, /packetIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(markdown, /compatibilityReviewChecklist 6 类/)
+  assert.match(markdown, /corepack pnpm aliyun:rds:migration:package/)
   assert.doesNotMatch(output + markdown, /WECHAT_OPEN_APP_ID|WECHAT_OPEN_APP_SECRET/)
   assert.doesNotMatch(output + markdown, /MEIYE_RELEASE_STORE_PASSWORD|MEIYE_RELEASE_KEY_PASSWORD/)
 })

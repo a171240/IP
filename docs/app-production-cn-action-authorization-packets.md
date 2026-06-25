@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 阿里云动作授权矩阵
 
-Generated: 2026-06-25T12:13:58.921Z
+Generated: 2026-06-25T22:53:42.699Z
 
 ## 结论
 
@@ -98,11 +98,11 @@ Generated: 2026-06-25T12:13:58.921Z
 - owner: 阿里云 RDS/后端数据迁移操作员
 - sequenceGroup: cloud_foundation
 - minimumUserPhrase: 授权创建/确认阿里云 RDS PostgreSQL production-cn 数据库并完成数据迁移；DATABASE_URL_CN 只能进入阿里云 secret env。
-- allowedActions: 创建或确认 cn-hangzhou RDS PostgreSQL 实例、数据库、账号和网络白名单/内网访问策略。; 执行 Supabase 到 RDS/PostgreSQL 的 schema/data 迁移与回滚验收。; 只把 DATABASE_URL_CN 导入 KMS/Secrets Manager/SAE secret env，并记录非密钥迁移证据。
+- allowedActions: 创建或确认 cn-hangzhou RDS PostgreSQL 实例、数据库、账号和网络白名单/内网访问策略。; 先生成并核对 docs/app-production-cn-rds-migration-package.md，关闭 compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查。; 执行 Supabase 到 RDS/PostgreSQL 的 schema/data 迁移与回滚验收。; 只把 DATABASE_URL_CN 导入 KMS/Secrets Manager/SAE secret env，并记录非密钥迁移证据。
 - explicitlyExcluded: 不把数据库密码、连接串 value 或 Supabase service role key 写入 JSON、Markdown、Docker 镜像或 git。; 不把 Supabase 当作正式 production-cn 数据库目标。; 不执行破坏性数据迁移，除非迁移计划和回滚验收已单独确认。
-- completionEvidence: Aliyun RDS PostgreSQL instance exists in cn-hangzhou; DATABASE_URL_CN imported through secret env only; backend production-cn data access no longer depends on Supabase as formal database target; migration and rollback validation pass
-- writeTargets: DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env; RDS PostgreSQL 实例、schema/data migration、rollback validation -> 非密钥证据报告
-- verifyCommands: corepack pnpm aliyun:readiness; corepack pnpm aliyun:completion:audit; corepack pnpm aliyun:predeploy
+- completionEvidence: Aliyun RDS PostgreSQL instance exists in cn-hangzhou; database account and least-privilege access are ready; DATABASE_URL_CN imported through secret env only; compatibilityReviewChecklistItemCount=6 is reviewed and closed before schema apply; supabase_auth_uid/supabase_storage_schema/supabase_service_role/row_level_security/policy_statement/extension_review dispositions are recorded without secrets; migration.schemaCompatibilityReviewed=true; migration.supabaseSpecificSqlResolved=true; migration.rdsExtensionSupportConfirmed=true; schema/data/APP API smoke/rollback validation passed; backend production-cn no longer depends on Supabase as formal database target
+- writeTargets: docs/app-production-cn-rds-migration-package.md -> non-secret schema/validation/rollback package digest handoff; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres / migration non-secret evidence; DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env only
+- verifyCommands: corepack pnpm aliyun:rds:migration:package; corepack pnpm aliyun:rds:migration:evidence:strict; corepack pnpm aliyun:sensitive:blockers:backend; corepack pnpm aliyun:backend-cn:status; corepack pnpm aliyun:completion:audit; corepack pnpm aliyun:predeploy
 - nonSecretEvidenceOnly: false
 
 ## 动作分类
@@ -178,14 +178,14 @@ Generated: 2026-06-25T12:13:58.921Z
 - canCodexProceedWithoutUser: false
 - requiresActionTimeConfirmation: true
 - blockerClass: database_secret_and_migration
-- why: 正式国内 production-cn 数据库目标必须是阿里云 RDS PostgreSQL；创建实例、导入 DATABASE_URL_CN 和迁移数据都需要动作时确认。
+- why: 正式国内 production-cn 数据库目标必须是阿里云 RDS PostgreSQL；创建实例、关闭 Supabase SQL 兼容审查、导入 DATABASE_URL_CN 和迁移数据都需要动作时确认。
 - owner: 阿里云 RDS/后端数据迁移操作员
 - obtainFrom: 阿里云控制台 -> RDS PostgreSQL -> cn-hangzhou 实例；后端 Supabase 到 RDS/PostgreSQL 迁移 runbook
-- writeTargets: DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env; RDS PostgreSQL 实例、schema/data migration、rollback validation -> 非密钥证据报告
+- writeTargets: docs/app-production-cn-rds-migration-package.md -> non-secret schema/validation/rollback package digest handoff; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres / migration non-secret evidence; DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env only
 - variableNames: DATABASE_URL_CN
 - currentBlockers: requiredEnv:DATABASE_URL_CN; DATABASE_URL_CN_status:todo; rdsMigrationIncludedInThisRelease=false
 - currentEvidence: bridgeDataLayer.current=Supabase migration source / legacy compatibility only; bridgeDataLayer.target=Aliyun RDS PostgreSQL; databaseUrlCnStatus=todo; rdsMigrationIncludedInThisRelease=false; rdsMigrationRequiredForFinalProductionCn=true
-- verifyCommands: corepack pnpm aliyun:readiness; corepack pnpm aliyun:completion:audit; corepack pnpm aliyun:predeploy
+- verifyCommands: corepack pnpm aliyun:rds:migration:package; corepack pnpm aliyun:rds:migration:evidence:strict; corepack pnpm aliyun:sensitive:blockers:backend; corepack pnpm aliyun:backend-cn:status; corepack pnpm aliyun:completion:audit; corepack pnpm aliyun:predeploy
 
 ### U06_ENV_IMPORT 把 ready 环境变量导入 SAE/KMS/Secrets Manager
 
@@ -336,12 +336,12 @@ Generated: 2026-06-25T12:13:58.921Z
 - canStartNow: true
 - requiresActionTimeConfirmation: true
 - minimumUserPhrase: 授权创建/确认阿里云 RDS PostgreSQL production-cn 数据库并完成数据迁移；DATABASE_URL_CN 只能进入阿里云 secret env。
-- allowedActions: 创建或确认 cn-hangzhou RDS PostgreSQL 实例、数据库、账号和网络白名单/内网访问策略。; 执行 Supabase 到 RDS/PostgreSQL 的 schema/data 迁移与回滚验收。; 只把 DATABASE_URL_CN 导入 KMS/Secrets Manager/SAE secret env，并记录非密钥迁移证据。
+- allowedActions: 创建或确认 cn-hangzhou RDS PostgreSQL 实例、数据库、账号和网络白名单/内网访问策略。; 先生成并核对 docs/app-production-cn-rds-migration-package.md，关闭 compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查。; 执行 Supabase 到 RDS/PostgreSQL 的 schema/data 迁移与回滚验收。; 只把 DATABASE_URL_CN 导入 KMS/Secrets Manager/SAE secret env，并记录非密钥迁移证据。
 - explicitlyExcluded: 不把数据库密码、连接串 value 或 Supabase service role key 写入 JSON、Markdown、Docker 镜像或 git。; 不把 Supabase 当作正式 production-cn 数据库目标。; 不执行破坏性数据迁移，除非迁移计划和回滚验收已单独确认。
-- completionEvidence: Aliyun RDS PostgreSQL instance exists in cn-hangzhou; DATABASE_URL_CN imported through secret env only; backend production-cn data access no longer depends on Supabase as formal database target; migration and rollback validation pass
-- writeTargets: DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env; RDS PostgreSQL 实例、schema/data migration、rollback validation -> 非密钥证据报告
+- completionEvidence: Aliyun RDS PostgreSQL instance exists in cn-hangzhou; database account and least-privilege access are ready; DATABASE_URL_CN imported through secret env only; compatibilityReviewChecklistItemCount=6 is reviewed and closed before schema apply; supabase_auth_uid/supabase_storage_schema/supabase_service_role/row_level_security/policy_statement/extension_review dispositions are recorded without secrets; migration.schemaCompatibilityReviewed=true; migration.supabaseSpecificSqlResolved=true; migration.rdsExtensionSupportConfirmed=true; schema/data/APP API smoke/rollback validation passed; backend production-cn no longer depends on Supabase as formal database target
+- writeTargets: docs/app-production-cn-rds-migration-package.md -> non-secret schema/validation/rollback package digest handoff; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres / migration non-secret evidence; DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env only
 - variableNames: DATABASE_URL_CN
-- verifyCommands: corepack pnpm aliyun:readiness; corepack pnpm aliyun:completion:audit; corepack pnpm aliyun:predeploy
+- verifyCommands: corepack pnpm aliyun:rds:migration:package; corepack pnpm aliyun:rds:migration:evidence:strict; corepack pnpm aliyun:sensitive:blockers:backend; corepack pnpm aliyun:backend-cn:status; corepack pnpm aliyun:completion:audit; corepack pnpm aliyun:predeploy
 
 ### P06_ENV_IMPORT 把 ready 环境变量导入 SAE/KMS/Secrets Manager
 
