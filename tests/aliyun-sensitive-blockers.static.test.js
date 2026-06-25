@@ -101,6 +101,50 @@ test("Aliyun sensitive blockers backend-only mode excludes deferred APP launch c
   assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
 })
 
+test("APP production-cn credential acquisition runbook pins backend-only password blockers", () => {
+  const runbook = read("docs", "app-production-cn-credential-acquisition-runbook.md")
+
+  for (const expected of [
+    "Current Backend-Only Scope",
+    "backend_aliyun_only",
+    "blockedCredentialCount=1",
+    "blockedCredentialNames=DATABASE_URL_CN",
+    "readySecretEnvVariableCount=17",
+    "Only missing backend credential/password item: DATABASE_URL_CN.",
+    "CloudShell is not a credential source.",
+    "docs/app-production-cn-backend-sensitive-blockers.md",
+    "docs/app-production-cn-backend-user-action-brief.md",
+    "docs/app-production-cn-backend-secret-env-import-batches.md",
+    "S03_ACR_PAID_PURCHASE",
+    "S04_ACR_REGISTRY_AUTH",
+    "S05_OSS_RAM_SECRET_OR_STS",
+    "S08_ALIYUN_RDS_DATABASE_URL",
+    "S06_READY_SENSITIVE_ENV_IMPORT",
+    "Import the DATABASE_URL_CN value directly into Aliyun KMS / Secrets Manager / SAE secret env.",
+    "rdsPostgres.databaseUrlCnSecretImported=true",
+    "migration.supabaseNoLongerFormalTarget=true",
+    "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
+    "P03_ACR_PURCHASE",
+    "P05_OSS_RAM_STS",
+    "P11_ALIYUN_RDS_DATA_MIGRATION",
+    "P01_WECHAT_OPEN_MOBILE_APP",
+    "P10_ANDROID_RELEASE_SIGNING",
+    "P02_APPLE_TEAM_ID",
+  ]) {
+    assert.match(runbook, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
+  }
+
+  assert.match(runbook, /WeChat Open Platform mobile app credentials, Android release signing, and Apple Team ID are deferred/)
+  assert.match(runbook, /Android release signing/)
+  assert.match(runbook, /Apple Team ID/)
+  assert.match(runbook, /不能用小程序 AppID\/Secret 替代/)
+  assert.doesNotMatch(runbook, /数据层暂时沿用现有 Supabase/)
+  assert.doesNotMatch(runbook, /DATABASE_URL_CN\s*=\s*\S/)
+  assert.doesNotMatch(runbook, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(runbook, /LTAI[A-Za-z0-9]{12,}/)
+  assert.doesNotMatch(runbook, /:\/\/[^\s:@]+:[^\s@]+@/)
+})
+
 test("Aliyun sensitive blockers output has current blocked action ids but no secret values", () => {
   const output = execFileSync(process.execPath, ["scripts/summarize-aliyun-sensitive-blockers.mjs"], {
     cwd: root,
