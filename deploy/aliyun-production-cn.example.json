@@ -67,6 +67,13 @@
     "writesLocalFileOnlyWhenExplicit": true,
     "secretsPolicy": "The runner never writes raw stdout/stderr. It records command names, exit status, line counts, SHA-256 evidence handles, timestamps, and booleans only."
   },
+  "cloudShellCollector": {
+    "checkCommand": "corepack pnpm aliyun:cloudshell:collector",
+    "script": "scripts/generate-aliyun-cloudshell-readonly-collector.mjs",
+    "scope": "generator only; writes a self-contained CloudShell Python collector to /tmp and never calls Aliyun cloud APIs by itself",
+    "requiresConnectedCloudShell": true,
+    "secretsPolicy": "The generated collector requires MEIYE_ALLOW_ALIYUN_CLOUDSHELL_READONLY=1, runs only allowlisted read-only commands, and prints/stores no raw stdout or stderr."
+  },
   "cloudInventoryResults": {
     "exampleFile": "deploy/aliyun-production-cn.cloud-inventory-results.example.json",
     "localFile": "deploy/aliyun-production-cn.cloud-inventory-results.local.json",
@@ -94,6 +101,7 @@
     "corepack pnpm run aliyun:cloud-access:test",
     "corepack pnpm run aliyun:cloud:inventory-plan:test",
     "corepack pnpm run aliyun:cloud:inventory-run:test",
+    "corepack pnpm run aliyun:cloudshell:collector:test",
     "corepack pnpm run aliyun:cloudshell:handoff:test",
     "corepack pnpm run aliyun:cloud:inventory-results:test",
     "corepack pnpm run aliyun:sensitive:blockers:test",
@@ -145,6 +153,7 @@
     "corepack pnpm run aliyun:cloud:access",
     "corepack pnpm run aliyun:cloud:inventory-plan",
     "corepack pnpm run aliyun:cloud:inventory-run",
+    "corepack pnpm run aliyun:cloudshell:collector",
     "corepack pnpm run aliyun:cloudshell:handoff",
     "corepack pnpm run aliyun:cloud:inventory-results",
     "corepack pnpm run aliyun:cloud:confirmations",
@@ -197,6 +206,7 @@
     "corepack pnpm aliyun:cloud:access",
     "corepack pnpm aliyun:cloud:inventory-plan",
     "corepack pnpm aliyun:cloud:inventory-run",
+    "corepack pnpm aliyun:cloudshell:collector",
     "corepack pnpm aliyun:cloudshell:handoff",
     "corepack pnpm aliyun:cloud:inventory-results",
     "corepack pnpm aliyun:cloud:confirmations",

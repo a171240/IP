@@ -38,6 +38,7 @@ const REQUIRED_PREDEPLOY_CHECKS = [
   "corepack pnpm aliyun:cloud:access",
   "corepack pnpm aliyun:cloud:inventory-plan",
   "corepack pnpm aliyun:cloud:inventory-run",
+  "corepack pnpm aliyun:cloudshell:collector",
   "corepack pnpm aliyun:cloud:inventory-results",
   "corepack pnpm aliyun:cloud:confirmations",
   "corepack pnpm aliyun:readiness",
@@ -270,6 +271,23 @@ function validateSpec(spec) {
   }
   if (!String(cloudInventoryRunner.secretsPolicy || "").includes("never writes raw stdout/stderr")) {
     blockers.push("cloudInventoryRunner.secretsPolicy")
+  }
+
+  const cloudShellCollector = spec.cloudShellCollector || {}
+  if (cloudShellCollector.checkCommand !== "corepack pnpm aliyun:cloudshell:collector") {
+    blockers.push("cloudShellCollector.checkCommand")
+  }
+  if (cloudShellCollector.script !== "scripts/generate-aliyun-cloudshell-readonly-collector.mjs") {
+    blockers.push("cloudShellCollector.script")
+  }
+  if (cloudShellCollector.requiresConnectedCloudShell !== true) {
+    blockers.push("cloudShellCollector.requiresConnectedCloudShell")
+  }
+  if (!String(cloudShellCollector.scope || "").includes("never calls Aliyun cloud APIs")) {
+    blockers.push("cloudShellCollector.scope")
+  }
+  if (!String(cloudShellCollector.secretsPolicy || "").includes("prints/stores no raw stdout or stderr")) {
+    blockers.push("cloudShellCollector.secretsPolicy")
   }
 
   const cloudInventoryResults = spec.cloudInventoryResults || {}

@@ -325,6 +325,7 @@ function renderMarkdown(audit) {
   const cloudAccess = audit.checks.cloudAccess
   const cloudInventoryPlan = audit.checks.cloudInventoryPlan
   const cloudInventoryRunner = audit.checks.cloudInventoryRunner
+  const cloudshellReadonlyCollector = audit.checks.cloudshellReadonlyCollector
   const cloudshellInventoryHandoff = audit.checks.cloudshellInventoryHandoff
   const cloudInventoryResults = audit.checks.cloudInventoryResults
   const deploymentSpec = audit.checks.deploymentSpec
@@ -415,6 +416,7 @@ function renderMarkdown(audit) {
     `- cloudInventoryPlan: ${cloudInventoryPlan.canRunReadOnlyInventoryNow ? "ready" : "blocked"} (${cloudInventoryPlan.summary?.totalOperations || 0} operations)`,
     `- cloudInventoryRunner: ${cloudInventoryRunner.executionMode}, executed ${cloudInventoryRunner.summary.executedCommands}/${cloudInventoryRunner.summary.commands}`,
     `- cloudInventoryRunnerFailureCategories: ${Object.keys(cloudInventoryRunner.summary.failureCategories || {}).length ? JSON.stringify(cloudInventoryRunner.summary.failureCategories) : "none"}`,
+    `- cloudshellReadonlyCollector: script ${basename(cloudshellReadonlyCollector.scriptFile || "")}, commands ${cloudshellReadonlyCollector.summary?.commands || 0}, cloudApiCalled ${cloudshellReadonlyCollector.cloudApiCalled === true}`,
     `- cloudshellInventoryHandoff: canReadCloudNow ${cloudshellInventoryHandoff.cliReadiness.canReadCloudNow}, strictInventoryAlreadyReady ${cloudshellInventoryHandoff.existingInventoryEvidence?.ready === true}, operations ${cloudshellInventoryHandoff.inventoryPlan.totalOperations}`,
     `- cloudInventoryResults: ${cloudInventoryResults.local?.ready ? "ready" : "not ready"} (${cloudInventoryResults.local?.checkedOperations || 0} local operations)`,
     `- cloudInventoryConsoleOnly: safe ${cloudInventoryObservation.safeConsoleOnly === true}, console observations ${cloudInventoryObservation.consoleObservationOperations || 0}/${cloudInventoryObservation.operations || 0}, executed commands ${cloudInventoryObservation.executedCommandResults || 0}/${cloudInventoryObservation.commandResults || 0}, cloud API calls ${cloudInventoryObservation.cloudApiCalledCommandResults || 0}`,
@@ -535,6 +537,24 @@ function renderMarkdown(audit) {
     ...(cloudInventoryRunner.executionDiagnostics?.nextActions?.length
       ? cloudInventoryRunner.executionDiagnostics.nextActions.map((item) => `- nextAction: ${item}`)
       : []),
+    "",
+    "## CloudShell 只读采集器",
+    "",
+    `- script: ${audit.outputFiles.cloudshellReadonlyCollectorScript}`,
+    `- json: ${audit.outputFiles.cloudshellReadonlyCollectorJson}`,
+    `- markdown: ${audit.outputFiles.cloudshellReadonlyCollectorMarkdown}`,
+    `- ok: ${cloudshellReadonlyCollector.ok === true}`,
+    `- executionMode: ${cloudshellReadonlyCollector.executionMode}`,
+    `- allowEnv: ${cloudshellReadonlyCollector.allowEnv}`,
+    `- containsValues: ${cloudshellReadonlyCollector.containsValues === true}`,
+    `- readOnlyOnly: ${cloudshellReadonlyCollector.readOnlyOnly === true}`,
+    `- cloudApiCalled: ${cloudshellReadonlyCollector.cloudApiCalled === true}`,
+    `- mutationPerformed: ${cloudshellReadonlyCollector.mutationPerformed === true}`,
+    `- commands: ${cloudshellReadonlyCollector.summary?.commands || 0}`,
+    `- secretLeakCheck: ${cloudshellReadonlyCollector.secretLeakCheck?.ok === true}`,
+    ...(cloudshellReadonlyCollector.blockers?.length
+      ? cloudshellReadonlyCollector.blockers.map((item) => `- ${item}`)
+      : ["- blockers: none"]),
     "",
     "## CloudShell / CLI 只读盘点交接包",
     "",
@@ -1520,6 +1540,18 @@ function main() {
     "--markdown",
     cloudInventoryRunnerMarkdownPath,
   ])
+  const cloudshellReadonlyCollectorJsonPath = resolve(args.outDir, "cloudshell-readonly-collector.json")
+  const cloudshellReadonlyCollectorMarkdownPath = resolve(args.outDir, "cloudshell-readonly-collector.md")
+  const cloudshellReadonlyCollectorScriptPath = resolve(args.outDir, "cloudshell-readonly-collector.py")
+  const cloudshellReadonlyCollector = runJson("cloudshell_readonly_collector", [
+    "scripts/generate-aliyun-cloudshell-readonly-collector.mjs",
+    "--out",
+    cloudshellReadonlyCollectorScriptPath,
+    "--report",
+    cloudshellReadonlyCollectorJsonPath,
+    "--markdown",
+    cloudshellReadonlyCollectorMarkdownPath,
+  ])
   const cloudshellInventoryHandoffJsonPath = resolve(args.outDir, "cloudshell-inventory-handoff.json")
   const cloudshellInventoryHandoffMarkdownPath = resolve(args.outDir, "cloudshell-inventory-handoff.md")
   const cloudshellInventoryHandoff = runJson("cloudshell_inventory_handoff", [
@@ -1895,6 +1927,7 @@ function main() {
       cloudAccess,
       cloudInventoryPlan,
       cloudInventoryRunner,
+      cloudshellReadonlyCollector,
       cloudshellInventoryHandoff,
       cloudInventoryResults,
       deploymentSpec,
@@ -1950,6 +1983,9 @@ function main() {
       cloudInventoryPlanMarkdown: cloudInventoryPlanMarkdownPath,
       cloudInventoryRunnerJson: cloudInventoryRunnerJsonPath,
       cloudInventoryRunnerMarkdown: cloudInventoryRunnerMarkdownPath,
+      cloudshellReadonlyCollectorJson: cloudshellReadonlyCollectorJsonPath,
+      cloudshellReadonlyCollectorMarkdown: cloudshellReadonlyCollectorMarkdownPath,
+      cloudshellReadonlyCollectorScript: cloudshellReadonlyCollectorScriptPath,
       cloudshellInventoryHandoffJson: cloudshellInventoryHandoffJsonPath,
       cloudshellInventoryHandoffMarkdown: cloudshellInventoryHandoffMarkdownPath,
       cloudInventoryResultsJson: cloudInventoryResultsJsonPath,
@@ -2090,6 +2126,21 @@ function main() {
       failureCategories: cloudInventoryRunner.summary.failureCategories || {},
       diagnosticsNextActions: cloudInventoryRunner.executionDiagnostics?.nextActions || [],
       blockers: cloudInventoryRunner.blockers || [],
+    },
+    cloudshellReadonlyCollector: {
+      report: audit.outputFiles.cloudshellReadonlyCollectorJson,
+      markdown: audit.outputFiles.cloudshellReadonlyCollectorMarkdown,
+      script: audit.outputFiles.cloudshellReadonlyCollectorScript,
+      ok: cloudshellReadonlyCollector.ok === true,
+      executionMode: cloudshellReadonlyCollector.executionMode,
+      allowEnv: cloudshellReadonlyCollector.allowEnv,
+      containsValues: cloudshellReadonlyCollector.containsValues === true,
+      readOnlyOnly: cloudshellReadonlyCollector.readOnlyOnly === true,
+      cloudApiCalled: cloudshellReadonlyCollector.cloudApiCalled === true,
+      mutationPerformed: cloudshellReadonlyCollector.mutationPerformed === true,
+      commands: cloudshellReadonlyCollector.summary?.commands || 0,
+      secretLeakCheck: cloudshellReadonlyCollector.secretLeakCheck?.ok === true,
+      blockers: cloudshellReadonlyCollector.blockers || [],
     },
     cloudshellInventoryHandoff: {
       report: audit.outputFiles.cloudshellInventoryHandoffJson,
@@ -2832,6 +2883,9 @@ function main() {
     cloudInventoryPlanMarkdown: audit.outputFiles.cloudInventoryPlanMarkdown,
     cloudInventoryRunnerJson: audit.outputFiles.cloudInventoryRunnerJson,
     cloudInventoryRunnerMarkdown: audit.outputFiles.cloudInventoryRunnerMarkdown,
+    cloudshellReadonlyCollectorJson: audit.outputFiles.cloudshellReadonlyCollectorJson,
+    cloudshellReadonlyCollectorMarkdown: audit.outputFiles.cloudshellReadonlyCollectorMarkdown,
+    cloudshellReadonlyCollectorScript: audit.outputFiles.cloudshellReadonlyCollectorScript,
     cloudInventoryResultsJson: audit.outputFiles.cloudInventoryResultsJson,
     cloudInventoryResultsMarkdown: audit.outputFiles.cloudInventoryResultsMarkdown,
     cloudConfirmationsCheckReport: audit.outputFiles.cloudConfirmationsCheck,
