@@ -209,6 +209,13 @@ function runInputs(args) {
     "--cloud-confirmations",
     args.cloudConfirmationsFile,
   ])
+  const backendCloudConfirmations = runJson("backend_cloud_confirmations", [
+    "scripts/check-aliyun-cloud-confirmations.mjs",
+    "--backend-only",
+    "--allow-incomplete",
+    "--local",
+    args.cloudConfirmationsFile,
+  ])
   const actionAuthorization = runJson("action_authorization", [
     "scripts/summarize-aliyun-action-authorization.mjs",
     "--backend-only",
@@ -233,6 +240,7 @@ function runInputs(args) {
   ])
   const operatorHandoff = buildOperatorHandoffFallback({
     productionStatus,
+    backendCloudConfirmations,
     resourcesMatrix,
     consoleRunbook,
     envHandoff: fullAppEnvHandoff,
@@ -248,6 +256,7 @@ function runInputs(args) {
     sensitiveBlockers,
     fullAppSensitiveBlockers,
     resourcesMatrix,
+    backendCloudConfirmations,
     actionAuthorization,
     consoleRunbook,
     wechatOpenMobileAppPackage,
@@ -256,13 +265,14 @@ function runInputs(args) {
 
 function buildOperatorHandoffFallback({
   productionStatus,
+  backendCloudConfirmations,
   resourcesMatrix,
   consoleRunbook,
   envHandoff,
   operatorHandoffError,
 }) {
   const local = productionStatus.localReadiness || {}
-  const cloudConfirmations = productionStatus.summary?.cloudConfirmations || {}
+  const cloudConfirmations = summarizeCloudConfirmationReport(backendCloudConfirmations)
   const inventory = productionStatus.summary?.cloudInventoryResults || {}
   const consoleTasks = (consoleRunbook.consoleTasks || []).map((task) => ({
     id: task.id,
@@ -290,7 +300,7 @@ function buildOperatorHandoffFallback({
     localEvidenceGaps: {
       cloudConfirmations: {
         ready: Number(cloudConfirmations.ready || 0) === Number(cloudConfirmations.total || 0) && Number(cloudConfirmations.total || 0) > 0,
-        totalBlockers: compactCloudPending(cloudConfirmations.pending).length,
+        totalBlockers: Number(cloudConfirmations.totalBlockers || 0),
       },
       cloudInventoryResults: {
         checkedOperations: inventory.localCheckedOperations || inventory.localOperations || 0,
@@ -333,6 +343,7 @@ function buildAudit(args, inputs) {
     sensitiveBlockers,
     fullAppSensitiveBlockers,
     resourcesMatrix,
+    backendCloudConfirmations,
     actionAuthorization,
     consoleRunbook,
     wechatOpenMobileAppPackage,
@@ -341,11 +352,12 @@ function buildAudit(args, inputs) {
   const fullAppCredentialIntervention = credentialInterventionFromSensitiveBlockers(fullAppSensitiveBlockers)
   const deferredAppLaunchBlockedCredentialNames = fullAppCredentialIntervention.blockedCredentialNames
     .filter((name) => APP_LAUNCH_CREDENTIAL_NAME_PATTERNS.some((pattern) => pattern.test(String(name))))
+  const backendCloudConfirmationSummary = summarizeCloudConfirmationReport(backendCloudConfirmations)
   const bridgeDataLayer = buildBridgeDataLayerBoundary(productionStatus, operatorHandoff)
   const localImplementation = buildLocalImplementationEvidence(productionStatus, operatorHandoff)
   const requirements = [
     buildLocalAppBackendRequirement(productionStatus, operatorHandoff, localImplementation),
-    buildAliyunCloudResourceRequirement(productionStatus, operatorHandoff, resourcesMatrix),
+    buildAliyunCloudResourceRequirement(productionStatus, operatorHandoff, resourcesMatrix, backendCloudConfirmationSummary),
     buildAliyunDataLayerRequirement(bridgeDataLayer),
     buildCloudInventoryRequirement(productionStatus, operatorHandoff),
     buildImagePublishRequirement(operatorHandoff),
@@ -392,9 +404,15 @@ function buildAudit(args, inputs) {
       localImplementationReadyFields: localImplementation.readyFields,
       localImplementationBlockingFields: localImplementation.blockingFields,
       localCodeMachineBlockers: localImplementation.machineBlockers,
-      requiredEnv: `${productionStatus.summary?.requiredReady || 0}/${productionStatus.summary?.requiredTotal || 0}`,
-      requiredBlocking: productionStatus.summary?.requiredBlocking || [],
-      cloudConfirmations: productionStatus.summary?.cloudConfirmations || {},
+      requiredEnv: `${envHandoff.summary?.requiredReady || 0}/${envHandoff.summary?.requiredTotal || 0}`,
+      requiredBlockingScope: CURRENT_SCOPE,
+      requiredBlocking: envHandoff.summary?.requiredBlocking || [],
+      fullAppRequiredEnv: `${fullAppEnvHandoff.summary?.requiredReady || 0}/${fullAppEnvHandoff.summary?.requiredTotal || 0}`,
+      fullAppRequiredBlocking: fullAppEnvHandoff.summary?.fullAppRequiredBlocking
+        || productionStatus.summary?.requiredBlocking
+        || [],
+      cloudConfirmations: backendCloudConfirmationSummary,
+      fullAppCloudConfirmations: productionStatus.summary?.cloudConfirmations || {},
       cloudInventoryResults: productionStatus.summary?.cloudInventoryResults || {},
       bridgeDataLayer,
       operatorTasks: productionStatus.summary?.operatorTasks || {},
@@ -440,6 +458,7 @@ function buildAudit(args, inputs) {
       fullAppSensitiveBlockers: "corepack pnpm aliyun:sensitive:blockers",
       resourcesMatrix: "corepack pnpm aliyun:resources:matrix",
       actionAuthorization: "corepack pnpm aliyun:action:authorization:backend",
+      cloudConfirmations: "corepack pnpm aliyun:cloud:confirmations:backend",
       consoleRunbook: "corepack pnpm aliyun:console:runbook",
       wechatOpenMobileAppPackage: "corepack pnpm aliyun:wechat-open:package",
     },
@@ -627,20 +646,61 @@ function credentialInterventionFromSensitiveBlockers(sensitiveBlockers) {
   }
 }
 
-function buildAliyunCloudResourceRequirement(status, operatorHandoff, resourcesMatrix) {
-  const cloud = status.summary?.cloudConfirmations || {}
+function summarizeCloudConfirmationReport(report) {
+  const local = report?.local || {}
+  const itemStatus = local.itemStatus || {}
+  const groups = report?.writebackPlan?.groups || []
+  const keys = Object.keys(itemStatus)
+  const total = Number(local.checkedItems || keys.length || 0)
+  const ready = keys.filter((key) => itemStatus[key]?.ready === true).length
+  const pending = groups.length
+    ? groups
+      .filter((group) => group.ready !== true)
+      .map((group) => ({
+        key: group.id,
+        label: group.title || group.id,
+        missing: (group.blockers || []).map((blocker) => stripCloudBlockerPrefix(group.id, blocker)),
+      }))
+    : keys
+      .filter((key) => itemStatus[key]?.ready !== true)
+      .map((key) => ({
+        key,
+        label: key,
+        missing: itemStatus[key]?.blockers || [],
+      }))
+  return {
+    scope: report?.currentScope || CURRENT_SCOPE,
+    backendOnly: report?.backendOnly === true,
+    ready,
+    total,
+    totalBlockers: Number(report?.summary?.totalBlockers || local.blockers?.length || compactCloudPending(pending).length || 0),
+    writebackBlockingGroups: report?.summary?.writebackBlockingGroups || pending.map((item) => item.key),
+    requiredAuthorizationPackets: report?.summary?.requiredAuthorizationPackets || [],
+    pending,
+  }
+}
+
+function stripCloudBlockerPrefix(key, blocker) {
+  const value = String(blocker || "")
+  const prefix = `${key}:`
+  return value.startsWith(prefix) ? value.slice(prefix.length) : value
+}
+
+function buildAliyunCloudResourceRequirement(status, operatorHandoff, resourcesMatrix, backendCloudConfirmationSummary) {
+  const cloud = backendCloudConfirmationSummary || {}
   const ready = Number(cloud.ready || 0)
   const total = Number(cloud.total || 0)
   const resourceEvidence = resourcesMatrix.resourceEvidenceBrief || {}
   const blockedResourceEvidence = resourceEvidence.blockedResourceEvidence || []
-  const backendCloudPending = (cloud.pending || [])
-    .filter((item) => item.key !== "wechatOpenPlatform")
+  const backendCloudPending = cloud.pending || []
   return requirement({
     id: "G02_ALIYUN_CLOUD_RESOURCES_READY",
     title: "阿里云 production-cn 云资源完成并有非密钥证据",
     status: total > 0 && ready === total ? "proved" : "blocked",
     evidence: [
+      `cloudConfirmationScope=${cloud.scope || CURRENT_SCOPE}`,
       `cloudConfirmations ${ready}/${total} ready`,
+      `cloudConfirmations.totalBlockers=${cloud.totalBlockers || 0}`,
       `resourceEvidenceReady=${resourceEvidence.ready || 0}/${resourceEvidence.total || 0}`,
       `resourceEvidenceBlocked=${resourceEvidence.blocked || 0}`,
       `operatorTasks ready ${status.summary?.operatorTasks?.ready || 0}/${status.summary?.operatorTasks?.total || 0}`,
@@ -936,10 +996,14 @@ function renderMarkdown(report) {
     `- Local implementation ready: ${report.summary.localImplementationReady}`,
     `- Local implementation blocking fields: ${report.summary.localImplementationBlockingFields.length ? report.summary.localImplementationBlockingFields.join(", ") : "none"}`,
     `- Local code machine blockers: ${report.summary.localCodeMachineBlockers.length ? report.summary.localCodeMachineBlockers.join(", ") : "none"}`,
-    `- Required env: ${report.summary.requiredEnv}`,
+    `- Required env (${report.summary.requiredBlockingScope}): ${report.summary.requiredEnv}`,
+    `- Required blockers (${report.summary.requiredBlockingScope}): ${report.summary.requiredBlocking.join(", ") || "none"}`,
+    `- Full app required env: ${report.summary.fullAppRequiredEnv}`,
+    `- Full app required blockers: ${report.summary.fullAppRequiredBlocking.join(", ") || "none"}`,
     `- Backend required blockers: ${report.summary.backendRequiredBlocking.join(", ") || "none"}`,
     `- Deferred app launch blockers: ${report.summary.deferredAppLaunchBlocking.join(", ") || "none"}`,
-    `- Cloud confirmations: ${report.summary.cloudConfirmations.ready || 0}/${report.summary.cloudConfirmations.total || 0} ready`,
+    `- Cloud confirmations (${report.summary.cloudConfirmations.scope || report.currentScope}): ${report.summary.cloudConfirmations.ready || 0}/${report.summary.cloudConfirmations.total || 0} ready, blockers ${report.summary.cloudConfirmations.totalBlockers || 0}`,
+    `- Full app cloud confirmations: ${report.summary.fullAppCloudConfirmations.ready || 0}/${report.summary.fullAppCloudConfirmations.total || 0} ready`,
     `- Cloud inventory results: localReady ${report.summary.cloudInventoryResults.localReady === true}, ready operations ${report.summary.cloudInventoryResults.readyLocalOperations || 0}/${report.summary.cloudInventoryResults.localOperations || 0}`,
     `- Cloud inventory console-only: safe ${report.summary.cloudInventoryResults.observationSummary?.safeConsoleOnly === true}, console observations ${report.summary.cloudInventoryResults.observationSummary?.consoleObservationOperations || 0}/${report.summary.cloudInventoryResults.observationSummary?.operations || 0}, executed commands ${report.summary.cloudInventoryResults.observationSummary?.executedCommandResults || 0}/${report.summary.cloudInventoryResults.observationSummary?.commandResults || 0}, cloud API calls ${report.summary.cloudInventoryResults.observationSummary?.cloudApiCalledCommandResults || 0}`,
     `- Bridge data layer: current ${report.bridgeDataLayer.current}, target ${report.bridgeDataLayer.target}, first bridge uses ${report.bridgeDataLayer.firstBridgeDeploymentUses}`,

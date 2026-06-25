@@ -107,6 +107,31 @@ test("Aliyun completion audit reports the current goal as blocked without secret
   assert.ok(report.summary.blocked >= 6)
   assert.ok(report.summary.proved >= 1)
   assert.ok(report.summary.partial >= 1)
+  assert.equal(report.summary.requiredBlockingScope, "backend_aliyun_only")
+  assert.equal(report.summary.requiredEnv, "24/25")
+  assert.deepEqual(report.summary.requiredBlocking, ["DATABASE_URL_CN"])
+  assert.ok(!report.summary.requiredBlocking.includes("WECHAT_OPEN_APP_ID"))
+  assert.ok(!report.summary.requiredBlocking.includes("WECHAT_OPEN_APP_SECRET"))
+  assert.equal(report.summary.fullAppRequiredEnv, "24/27")
+  assert.ok(report.summary.fullAppRequiredBlocking.includes("WECHAT_OPEN_APP_ID"))
+  assert.ok(report.summary.fullAppRequiredBlocking.includes("WECHAT_OPEN_APP_SECRET"))
+  assert.equal(report.summary.cloudConfirmations.scope, "backend_aliyun_only")
+  assert.equal(report.summary.cloudConfirmations.backendOnly, true)
+  assert.equal(report.summary.cloudConfirmations.ready, 0)
+  assert.equal(report.summary.cloudConfirmations.total, 6)
+  assert.equal(report.summary.cloudConfirmations.totalBlockers, 18)
+  assert.ok(!report.summary.cloudConfirmations.pending.some((item) => item.key === "wechatOpenPlatform"))
+  assert.deepEqual(report.summary.cloudConfirmations.writebackBlockingGroups, [
+    "runtime",
+    "apiDomainHttps",
+    "assetDomainHttps",
+    "oss",
+    "envImport",
+    "slsAlerts",
+  ])
+  assert.equal(report.summary.fullAppCloudConfirmations.ready, 0)
+  assert.equal(report.summary.fullAppCloudConfirmations.total, 7)
+  assert.ok(report.summary.fullAppCloudConfirmations.pending.some((item) => item.key === "wechatOpenPlatform"))
   assert.equal(report.summary.blockedCredentialCount, 1)
   assert.deepEqual(report.summary.blockedCredentialNames, ["DATABASE_URL_CN"])
   assert.equal(report.summary.fullAppBlockedCredentialCount, 8)
@@ -162,6 +187,11 @@ test("Aliyun completion audit reports the current goal as blocked without secret
   assert.ok(!byId.get("G01_LOCAL_APP_BACKEND_READY").blockers.includes("appApiBridgeMap"))
   assert.ok(!byId.get("G01_LOCAL_APP_BACKEND_READY").blockers.includes("appRuntimeConfig"))
   assert.equal(byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").status, "blocked")
+  assert.ok(byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").evidence.includes("cloudConfirmationScope=backend_aliyun_only"))
+  assert.ok(byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").evidence.includes("cloudConfirmations 0/6 ready"))
+  assert.ok(!byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").blockers.some((item) =>
+    item.startsWith("wechatOpenPlatform:")
+  ))
   assert.ok(byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").evidence.includes("resourceEvidenceReady=0/7"))
   assert.ok(byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").blockers.some((item) =>
     item.includes("R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.registryHost")
@@ -197,11 +227,13 @@ test("Aliyun completion audit reports the current goal as blocked without secret
   assert.deepEqual(
     report.summary.nextActionTimeConfirmations.map((item) => item.packetId),
     [
+      "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
       "P03_ACR_PURCHASE",
       "P05_OSS_RAM_STS",
       "P11_ALIYUN_RDS_DATA_MIGRATION",
     ],
   )
+  assert.equal(report.sourceCommands.cloudConfirmations, "corepack pnpm aliyun:cloud:confirmations:backend")
   assert.ok(
     report.summary.nextActionTimeConfirmations
       .find((item) => item.packetId === "P03_ACR_PURCHASE")
