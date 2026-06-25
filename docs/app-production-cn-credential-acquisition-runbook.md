@@ -100,20 +100,18 @@ WECHAT_MINI_SECRET
 
 `WECHAT_MINI_APPID`, `WECHAT_MINI_SECRET`, and `WECHAT_LOGIN_SECRET` are compatibility inputs for existing mini-program or legacy login paths. They do not unblock native APP WeChat login.
 
-## What Can Be Started Next
+## Backend-Only Actions That Can Start Next
 
-After fresh action-time confirmation, these can be started because they have no packet dependency:
+After fresh action-time confirmation, these backend-only packets can be started because they have no packet dependency:
 
 ```text
-P01_WECHAT_OPEN_MOBILE_APP
-P10_ANDROID_RELEASE_SIGNING
-P02_APPLE_TEAM_ID
+P00_ALIYUN_READONLY_INVENTORY_IDENTITY
 P03_ACR_PURCHASE
 P05_OSS_RAM_STS
 P11_ALIYUN_RDS_DATA_MIGRATION
 ```
 
-These are still dependency-blocked:
+These backend packets are still dependency-blocked:
 
 ```text
 P04_ACR_IMAGE_AND_PULL
@@ -123,16 +121,31 @@ P08_SAE_RUNTIME_SLS
 P09_PRODUCTION_DEPLOY
 ```
 
+Full App launch packets remain deferred until after the Aliyun backend is online:
+
+```text
+P01_WECHAT_OPEN_MOBILE_APP
+P10_ANDROID_RELEASE_SIGNING
+P02_APPLE_TEAM_ID
+```
+
 ## Evidence To Record After Authorized Actions
 
 Only non-secret evidence may be written:
 
 ```text
-deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.wechatOpenPlatform
 deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss
 deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport
+deploy/aliyun-production-cn.cloud-inventory-results.local.json -> non-secret read-only inventory summaries
+deploy/aliyun-production-cn.rds-migration.local.json -> RDS PostgreSQL migration non-secret evidence
 deploy/aliyun-production-cn.image-publish.local.json -> acr + runtime non-secret fields
 release manifest -> action name, evidence handle, verification command, result
+```
+
+Deferred full App launch evidence writes, not current backend-only writes:
+
+```text
+deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.wechatOpenPlatform
 ```
 
 Valid evidence handles include console path, screenshot ID, ticket ID, resource name, digest, boolean readiness field, or timestamp. Secret values, passwords, tokens, AppSecret, AccessKeySecret, registry password, RAM Secret, STS token, certificate private key, Android keystore password, and Supabase service role key values are forbidden.

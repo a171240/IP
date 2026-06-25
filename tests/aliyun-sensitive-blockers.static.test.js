@@ -361,7 +361,28 @@ test("Aliyun credential acquisition runbook stays aligned with sensitive blocker
   assert.match(runbook, /阿里云不是 APP 的创建平台/)
   assert.match(runbook, /不能用小程序 AppID\/Secret 替代/)
   assert.match(runbook, /P01_WECHAT_OPEN_MOBILE_APP/)
+  assert.match(runbook, /Backend-Only Actions That Can Start Next/)
+  assert.match(runbook, /P00_ALIYUN_READONLY_INVENTORY_IDENTITY/)
   assert.match(runbook, /P09_PRODUCTION_DEPLOY/)
+
+  const backendStartSection = runbook.match(
+    /## Backend-Only Actions That Can Start Next[\s\S]*?```text\n([\s\S]*?)```/,
+  )?.[1] || ""
+  assert.match(backendStartSection, /P00_ALIYUN_READONLY_INVENTORY_IDENTITY/)
+  assert.match(backendStartSection, /P03_ACR_PURCHASE/)
+  assert.match(backendStartSection, /P05_OSS_RAM_STS/)
+  assert.match(backendStartSection, /P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.doesNotMatch(backendStartSection, /P01_WECHAT_OPEN_MOBILE_APP/)
+  assert.doesNotMatch(backendStartSection, /P10_ANDROID_RELEASE_SIGNING/)
+  assert.doesNotMatch(backendStartSection, /P02_APPLE_TEAM_ID/)
+
+  const deferredLaunchSection = runbook.match(
+    /Full App launch packets remain deferred[\s\S]*?```text\n([\s\S]*?)```/,
+  )?.[1] || ""
+  assert.match(deferredLaunchSection, /P01_WECHAT_OPEN_MOBILE_APP/)
+  assert.match(deferredLaunchSection, /P10_ANDROID_RELEASE_SIGNING/)
+  assert.match(deferredLaunchSection, /P02_APPLE_TEAM_ID/)
+  assert.match(runbook, /Deferred full App launch evidence writes, not current backend-only writes/)
 
   for (const item of report.items) {
     assert.match(runbook, new RegExp(item.id))
