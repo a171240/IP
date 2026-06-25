@@ -355,13 +355,11 @@ function analyzeFile(filePath) {
   const localSupabaseImport = /["'`](?:@\/lib\/supabase|\.{1,2}\/[^"'`]*supabase|lib\/supabase)[^"'`]*["'`]/.test(text)
   const createClientUsage = /\bcreate(?:Server)?Client\s*\(/.test(text)
   const supabaseIdentifierUsage = /\bsupabase\b/i.test(text)
-  const supabaseDataAccessUsage = directSupabasePackageImport
-    || localSupabaseImport
-    || createClientUsage
-    || tables.length > 0
+  const supabaseDataAccessUsage = tables.length > 0
     || storageBuckets.length > 0
     || rpcs.length > 0
   const postgresPackageImport = /\b(?:from|require)\s*\(?["'`](?:pg|postgres|@vercel\/postgres|drizzle-orm|kysely)["'`]/.test(text)
+  const aliyunRdsImport = /["'`]@\/lib\/aliyun-rds[^"'`]*["'`]/.test(text)
   const databaseUrlCnUsage = envKeys.includes("DATABASE_URL_CN")
   const usesSupabase = directSupabasePackageImport
     || localSupabaseImport
@@ -381,6 +379,7 @@ function analyzeFile(filePath) {
     createClientUsage,
     supabaseIdentifierUsage,
     postgresPackageImport,
+    aliyunRdsImport,
     databaseUrlCnUsage,
     envKeys,
     tables,
@@ -496,7 +495,9 @@ function buildReport() {
   const sharedSupabaseFiles = sharedAnalyses.filter((file) => file.usesSupabase)
   const sharedSupabaseDataAccessFiles = sharedAnalyses.filter((file) => file.supabaseDataAccessUsage)
   const directSupabasePackageImportFiles = allAnalyses.filter((file) => file.directSupabasePackageImport)
-  const postgresAdapterFiles = allAnalyses.filter((file) => file.postgresPackageImport || file.databaseUrlCnUsage)
+  const postgresAdapterFiles = allAnalyses.filter((file) =>
+    file.postgresPackageImport || file.databaseUrlCnUsage || file.aliyunRdsImport
+  )
   const databaseUrlCnFiles = allAnalyses.filter((file) => file.databaseUrlCnUsage)
   const tables = uniqueSorted(allAnalyses.flatMap((file) => file.tables))
   const rpcs = uniqueSorted(allAnalyses.flatMap((file) => file.rpcs))

@@ -273,8 +273,10 @@ function analyzeSource(text) {
     importsSupabase: /@\/lib\/supabase|@supabase\/(?:supabase-js|ssr)/.test(text),
     createsSupabaseClient: /\bcreate(?:Admin|Server)?SupabaseClient(?:ForRequest)?\s*\(/.test(text),
     usesSupabaseIdentifier: /\bsupabase\b/.test(text),
+    usesAliyunRds: /@\/lib\/aliyun-rds|DATABASE_URL_CN|\bqueryAliyunRds\b|\bwithAliyunRds/.test(text),
     tables: unique(Array.from(text.matchAll(/\.from\(\s*["'`]([^"'`]+)["'`]\s*\)/g)).map((match) => match[1])),
     rpcs: unique(Array.from(text.matchAll(/\.rpc\(\s*["'`]([^"'`]+)["'`]\s*[,)]/g)).map((match) => match[1])),
+    rdsTables: unique(Array.from(text.matchAll(/\bpublic\.([a-zA-Z_][a-zA-Z0-9_]*)\b/g)).map((match) => match[1])),
   }
 }
 
@@ -299,20 +301,27 @@ function buildImplementationWorkPackages(routeGroups) {
       tableNames: [],
       rpcNames: [],
       dataAccessFiles: [],
+      rdsDataAccessFiles: [],
+      routesStillUsingSupabaseDataAccess: 0,
     }
+    const remainingSupabaseRoutes = group.routesStillUsingSupabaseDataAccess || 0
     return {
       id: template.id,
       order: index + 1,
       title: template.title,
       scope: template.scope,
-      status: group.routeCount
-        ? "blocked_until_repository_uses_database_url_cn"
-        : "no_first_version_routes_observed",
+      status: !group.routeCount
+        ? "no_first_version_routes_observed"
+        : remainingSupabaseRoutes > 0
+          ? "blocked_until_repository_uses_database_url_cn"
+          : "rds_repository_in_source_pending_runtime_evidence",
       routeCount: group.routeCount,
+      routesStillUsingSupabaseDataAccess: remainingSupabaseRoutes,
       routes: group.routes,
       tableNames: group.tableNames,
       rpcNames: group.rpcNames,
       currentSupabaseDataAccessFiles: group.dataAccessFiles,
+      rdsDataAccessFiles: group.rdsDataAccessFiles,
       proposedRepositoryFiles: template.proposedRepositoryFiles,
       blockedBy: unique(["DATABASE_URL_CN", "schema_data_rollback_validation", ...template.blockedBy]),
       acceptanceGates: template.acceptanceGates,
@@ -325,6 +334,9 @@ function buildReport(args) {
   const bridgeMap = readJson(args.bridgeMap)
   const rdsPlan = runJson("rds_migration_plan", ["scripts/summarize-aliyun-rds-migration-plan.mjs"])
   const firstVersionByFile = new Map(
+    (rdsPlan.firstVersionRdsRoutes || []).map((item) => [item.file, item]),
+  )
+  const firstVersionSupabaseDataAccessByFile = new Map(
     (rdsPlan.firstVersionRdsSupabaseDataAccessRoutes || []).map((item) => [item.file, item]),
   )
   const requiredTableNames = new Set((schemaMap.requiredTables || []).map((item) => item.name))
@@ -332,16 +344,17 @@ function buildReport(args) {
   const routes = (bridgeMap.routes || [])
     .filter((route) => firstVersionByFile.has(route.appFile))
     .map((route) => {
-      const seedPaths = unique([route.appFile, ...(route.sourceFiles || [])])
+      const seedPaths = unique([route.appFile])
       const dependencies = collectDependencyGraph(seedPaths)
       const dataAccessFiles = dependencies.filter((file) =>
         file.analysis.tables.length
-          || file.analysis.rpcs.length
-          || file.analysis.createsSupabaseClient
-          || file.analysis.importsSupabase,
+          || file.analysis.rpcs.length,
       )
+      const rdsDataAccessFiles = dependencies.filter((file) => file.analysis.usesAliyunRds || file.analysis.rdsTables.length)
       const tables = unique(dataAccessFiles.flatMap((file) => file.analysis.tables))
       const rpcs = unique(dataAccessFiles.flatMap((file) => file.analysis.rpcs))
+      const rdsTables = unique(rdsDataAccessFiles.flatMap((file) => file.analysis.rdsTables))
+      const stillUsesSupabaseDataAccess = firstVersionSupabaseDataAccessByFile.has(route.appFile)
       return {
         route: route.route,
         methods: route.methods || [],
@@ -353,10 +366,12 @@ function buildReport(args) {
         sourcePages: route.sourcePages || [],
         productionCnStatus: route.productionCnStatus || "",
         firstVersionCapabilities: capabilityForRoute(route),
-        stillUsesSupabaseDataAccess: true,
+        stillUsesSupabaseDataAccess,
+        usesAliyunRdsDataAccess: rdsDataAccessFiles.length > 0,
         directSupabaseDataAccess: firstVersionByFile.get(route.appFile)?.directSupabaseDataAccess === true,
         tableNames: tables,
         rpcNames: rpcs,
+        rdsTableNames: rdsTables,
         dataAccessFiles: dataAccessFiles.map((file) => ({
           file: file.file,
           importsSupabase: file.analysis.importsSupabase,
@@ -364,13 +379,20 @@ function buildReport(args) {
           tableNames: file.analysis.tables,
           rpcNames: file.analysis.rpcs,
         })),
-        rdsMigrationStatus: "blocked_until_route_repository_uses_database_url_cn",
+        rdsDataAccessFiles: rdsDataAccessFiles.map((file) => ({
+          file: file.file,
+          rdsTableNames: file.analysis.rdsTables,
+        })),
+        rdsMigrationStatus: stillUsesSupabaseDataAccess
+          ? "blocked_until_route_repository_uses_database_url_cn"
+          : "rds_repository_in_source_pending_runtime_evidence",
       }
     })
 
-  const observedTables = unique(routes.flatMap((route) => route.tableNames))
+  const observedTables = unique(routes.flatMap((route) => [...route.tableNames, ...route.rdsTableNames]))
   const observedRpcs = unique(routes.flatMap((route) => route.rpcNames))
   const sharedDataAccessFiles = unique(routes.flatMap((route) => route.dataAccessFiles.map((item) => item.file)))
+  const sharedRdsDataAccessFiles = unique(routes.flatMap((route) => route.rdsDataAccessFiles.map((item) => item.file)))
   const schemaMapMissingObservedTables = observedTables.filter((name) => !requiredTableNames.has(name))
   const schemaMapMissingObservedRpcs = observedRpcs.filter((name) => !requiredFunctionNames.has(name))
   const requiredTablesWithoutRouteObservation = unique(
@@ -386,10 +408,12 @@ function buildReport(args) {
     .map(([scope, group]) => ({
       scope,
       routeCount: group.length,
+      routesStillUsingSupabaseDataAccess: group.filter((route) => route.stillUsesSupabaseDataAccess).length,
       routes: group.map((route) => route.route),
-      tableNames: unique(group.flatMap((route) => route.tableNames)),
+      tableNames: unique(group.flatMap((route) => [...route.tableNames, ...route.rdsTableNames])),
       rpcNames: unique(group.flatMap((route) => route.rpcNames)),
       dataAccessFiles: unique(group.flatMap((route) => route.dataAccessFiles.map((item) => item.file))),
+      rdsDataAccessFiles: unique(group.flatMap((route) => route.rdsDataAccessFiles.map((item) => item.file))),
     }))
   const implementationWorkPackages = buildImplementationWorkPackages(routeGroups)
 
@@ -408,7 +432,9 @@ function buildReport(args) {
       bridgeRouteCount: (bridgeMap.routes || []).length,
       firstVersionRouteCount: routes.length,
       routesStillUsingSupabaseDataAccess: routes.filter((route) => route.stillUsesSupabaseDataAccess).length,
+      routesUsingAliyunRdsDataAccess: routes.filter((route) => route.usesAliyunRdsDataAccess).length,
       sharedDataAccessFileCount: sharedDataAccessFiles.length,
+      sharedRdsDataAccessFileCount: sharedRdsDataAccessFiles.length,
       observedTableCount: observedTables.length,
       observedRpcCount: observedRpcs.length,
       requiredTableCount: requiredTableNames.size,
@@ -429,6 +455,7 @@ function buildReport(args) {
     observedTables,
     observedRpcs,
     sharedDataAccessFiles,
+    sharedRdsDataAccessFiles,
     rdsAdapterFiles: rdsPlan.inventory?.postgresAdapterFiles || [],
     nextRequiredActions: [
       "Create or confirm Aliyun RDS PostgreSQL in cn-hangzhou before importing DATABASE_URL_CN.",
@@ -476,7 +503,9 @@ function renderMarkdown(report) {
     `- currentSource: ${report.currentSource}`,
     `- firstVersionRouteCount: ${report.summary.firstVersionRouteCount}`,
     `- routesStillUsingSupabaseDataAccess: ${report.summary.routesStillUsingSupabaseDataAccess}`,
+    `- routesUsingAliyunRdsDataAccess: ${report.summary.routesUsingAliyunRdsDataAccess}`,
     `- sharedDataAccessFileCount: ${report.summary.sharedDataAccessFileCount}`,
+    `- sharedRdsDataAccessFileCount: ${report.summary.sharedRdsDataAccessFileCount}`,
     `- implementationWorkPackageCount: ${report.summary.implementationWorkPackageCount}`,
     `- proposedRepositoryFileCount: ${report.summary.proposedRepositoryFileCount}`,
     `- observedTables: ${report.observedTables.join(", ") || "none"}`,
@@ -491,9 +520,11 @@ function renderMarkdown(report) {
       `### ${group.scope}`,
       "",
       `- routeCount: ${group.routeCount}`,
+      `- routesStillUsingSupabaseDataAccess: ${group.routesStillUsingSupabaseDataAccess}`,
       `- tableNames: ${group.tableNames.join(", ") || "none"}`,
       `- rpcNames: ${group.rpcNames.join(", ") || "none"}`,
       `- dataAccessFiles: ${group.dataAccessFiles.join(", ") || "none"}`,
+      `- rdsDataAccessFiles: ${group.rdsDataAccessFiles.join(", ") || "none"}`,
       ...group.routes.map((route) => `- ${route}`),
       "",
     ]),
@@ -507,10 +538,12 @@ function renderMarkdown(report) {
       `- status: ${item.status}`,
       `- scope: ${item.scope}`,
       `- routeCount: ${item.routeCount}`,
+      `- routesStillUsingSupabaseDataAccess: ${item.routesStillUsingSupabaseDataAccess}`,
       `- routes: ${item.routes.join(", ") || "none"}`,
       `- tableNames: ${item.tableNames.join(", ") || "none"}`,
       `- rpcNames: ${item.rpcNames.join(", ") || "none"}`,
       `- currentSupabaseDataAccessFiles: ${item.currentSupabaseDataAccessFiles.join(", ") || "none"}`,
+      `- rdsDataAccessFiles: ${item.rdsDataAccessFiles.join(", ") || "none"}`,
       `- proposedRepositoryFiles: ${item.proposedRepositoryFiles.join(", ") || "none"}`,
       `- blockedBy: ${item.blockedBy.join(", ") || "none"}`,
       ...item.acceptanceGates.map((gate) => `- acceptanceGate: ${gate}`),
@@ -528,7 +561,9 @@ function renderMarkdown(report) {
       `- sourceFiles: ${route.sourceFiles.join(", ") || "none"}`,
       `- tableNames: ${route.tableNames.join(", ") || "none"}`,
       `- rpcNames: ${route.rpcNames.join(", ") || "none"}`,
+      `- rdsTableNames: ${route.rdsTableNames.join(", ") || "none"}`,
       `- dataAccessFiles: ${route.dataAccessFiles.map((item) => item.file).join(", ") || "none"}`,
+      `- rdsDataAccessFiles: ${route.rdsDataAccessFiles.map((item) => item.file).join(", ") || "none"}`,
       `- rdsMigrationStatus: ${route.rdsMigrationStatus}`,
       "",
     ]),

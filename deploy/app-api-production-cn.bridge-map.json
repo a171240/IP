@@ -120,15 +120,17 @@
         "GET"
       ],
       "appFile": "app/api/app/profile/route.ts",
-      "sourceType": "mp_reexport",
-      "sourceRoute": "/api/mp/profile",
+      "sourceType": "app_native",
       "sourceFiles": [
-        "app/api/mp/profile/route.ts"
+        "app/api/app/profile/route.ts",
+        "lib/aliyun-rds/repositories/account-profile.server.ts",
+        "lib/aliyun-rds/postgres.server.ts"
       ],
       "sourcePages": [
         "../meiye-huajing-miniprogram/pages/mine/index.js"
       ],
-      "productionCnStatus": "bridge_ready"
+      "productionCnStatus": "bridge_ready",
+      "note": "APP account profile now keeps Supabase Auth token verification but reads profile, entitlements, company, store, and membership data through Aliyun RDS."
     },
     {
       "scope": "account",
@@ -137,15 +139,16 @@
         "GET"
       ],
       "appFile": "app/api/app/entitlements/route.ts",
-      "sourceType": "mp_reexport",
-      "sourceRoute": "/api/mp/profile",
+      "sourceType": "app_alias",
+      "sourceRoute": "/api/app/profile",
       "sourceFiles": [
-        "app/api/mp/profile/route.ts"
+        "app/api/app/profile/route.ts"
       ],
       "sourcePages": [
         "../meiye-huajing-miniprogram/pages/mine/index.js"
       ],
-      "productionCnStatus": "bridge_ready"
+      "productionCnStatus": "bridge_ready",
+      "note": "Alias to the APP-native profile route so entitlements use the same Aliyun RDS account repository."
     },
     {
       "scope": "store-admin",

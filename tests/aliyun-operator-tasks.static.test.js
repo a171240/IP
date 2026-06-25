@@ -61,6 +61,7 @@ test("Aliyun operator tasks backend-only mode excludes deferred app launch work"
     "S03_ACR_PAID_PURCHASE",
     "S04_ACR_REGISTRY_AUTH",
     "S05_OSS_RAM_SECRET_OR_STS",
+    "S08_ALIYUN_RDS_DATABASE_URL",
     "S06_READY_SENSITIVE_ENV_IMPORT",
   ])
   assert.deepEqual(report.summary, {

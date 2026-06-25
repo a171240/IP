@@ -82,11 +82,11 @@ APP_API_POSTGRES_ADAPTER_MISSING
 RDS 数据访问仍未闭环，但当前 blocker 口径已按 APP 第一版范围计算：
 
 ```text
-appApiRouteCount=30
-appApiRoutesWithSupabaseDataAccess=29
+appApiRouteCount=31
+appApiRoutesWithSupabaseDataAccess=27
 firstVersionRdsRouteCount=25
-firstVersionRdsRoutesWithSupabaseDataAccess=25/25
-deferredAppApiRouteCount=5
+firstVersionRdsRoutesWithSupabaseDataAccess=23/25
+deferredAppApiRouteCount=6
 ```
 
 不在当前后端阻塞项里：

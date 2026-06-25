@@ -1,6 +1,6 @@
 # APP production-cn RDS/PostgreSQL migration inventory
 
-Generated at: 2026-06-25T02:58:51.922Z
+Generated at: 2026-06-25T04:46:01.372Z
 
 ## Conclusion
 
@@ -9,15 +9,15 @@ Generated at: 2026-06-25T02:58:51.922Z
 - Migration ready: false
 - APP API routes: 31
 - APP API routes using Supabase: 31
-- APP API routes using Supabase data access: 29
+- APP API routes using Supabase data access: 27
 - First-version RDS required APP API routes: 25
 - First-version RDS required routes using Supabase: 25
-- First-version RDS required routes using Supabase data access: 25
+- First-version RDS required routes using Supabase data access: 23
 - Deferred APP API routes: 6
 - Deferred APP API routes using Supabase data access: 4
 - Shared Supabase files: 93
-- Shared Supabase data access files: 92
-- Supabase usage files: 96
+- Shared Supabase data access files: 75
+- Supabase usage files: 97
 - DATABASE_URL_CN referenced in source: true
 - PostgreSQL data access adapter detected: true
 - RDS schema map ready: true
@@ -27,7 +27,7 @@ Generated at: 2026-06-25T02:58:51.922Z
 - Tables: activation_requests, analytics_events, content_rewrites, content_sources, conversations, credit_transactions, delivery_packs, distribution_jobs, distribution_tasks, entitlements, knowledge_docs, mp_account_invites, mp_account_memberships, mp_ai_point_ledger, mp_companies, mp_knowledge_space_access, mp_knowledge_spaces, mp_stores, platform_connections, poster_generations, private_copy_drafts, profiles, reports, service_record_markers, service_record_segments, service_record_sessions, store_profiles, video_render_jobs, voice_coach_customer_profiles, voice_coach_events, voice_coach_jobs, voice_coach_knowledge_spaces, voice_coach_opening_preparations, voice_coach_scene_cards, voice_coach_sessions, voice_coach_training_packs, voice_coach_training_progress, voice_coach_turns, voice_training_packs, voice_training_progress, voice_training_tasks, wechatpay_orders, workflow_progress, xhs_drafts
 - RPCs: consume_credits, grant_trial_credits, update_profile_public
 - Storage buckets: delivery-packs
-- RDS adapter files: lib/aliyun-rds/postgres.server.ts
+- RDS adapter files: app/api/app/profile/route.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts
 - RDS schema map file: deploy/aliyun-production-cn.rds-first-version-schema-map.json
 
 ## Required Blockers
@@ -74,22 +74,6 @@ Generated at: 2026-06-25T02:58:51.922Z
   - file: app/api/app/customer-profiles/route.ts
   - capability: service_record_long_recording
   - scopeClass: context
-  - tables: none
-  - rpcs: none
-  - storageBuckets: none
-  - envKeys: none
-- /api/app/entitlements
-  - file: app/api/app/entitlements/route.ts
-  - capability: profile_multi_tenant_permissions
-  - scopeClass: account
-  - tables: none
-  - rpcs: none
-  - storageBuckets: none
-  - envKeys: none
-- /api/app/profile
-  - file: app/api/app/profile/route.ts
-  - capability: profile_multi_tenant_permissions
-  - scopeClass: account
   - tables: none
   - rpcs: none
   - storageBuckets: none
@@ -333,7 +317,7 @@ Generated at: 2026-06-25T02:58:51.922Z
   - tables: none
   - rpcs: none
   - storageBuckets: none
-  - envKeys: none
+  - envKeys: DATABASE_URL_CN
 - /api/app/scene-cards/[cardId]
   - file: app/api/app/scene-cards/[cardId]/route.ts
   - tables: none
