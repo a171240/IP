@@ -11,6 +11,17 @@ const BACKEND_ROOT = resolve(__dirname, "..")
 const WORKSPACE_ROOT = resolve(BACKEND_ROOT, "../..")
 const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
+const DEFAULT_DEFERRED_APP_LAUNCH_ENV_NAMES = Object.freeze([
+  "WECHAT_OPEN_APP_ID",
+  "WECHAT_OPEN_APP_SECRET",
+  "APPLE_TEAM_ID",
+  "MEIYE_RELEASE_STORE_FILE",
+  "MEIYE_RELEASE_STORE_PASSWORD",
+  "MEIYE_RELEASE_KEY_ALIAS",
+  "MEIYE_RELEASE_KEY_PASSWORD",
+  "ANDROID_RELEASE_WECHAT_SIGNATURE",
+  "IOS_UNIVERSAL_LINK_AASA",
+])
 const TARGET_RUNTIME = Object.freeze({
   provider: "Aliyun SAE",
   region: "cn-hangzhou",
@@ -172,6 +183,7 @@ function runJson(label, scriptArgs) {
 function buildPlan(args) {
   const actionAuthorization = runJson("action_authorization", [
     "scripts/summarize-aliyun-action-authorization.mjs",
+    "--backend-only",
     "--env-file",
     args.envFile,
     "--cloud-confirmations",
@@ -184,11 +196,17 @@ function buildPlan(args) {
     "--cloud-confirmations",
     args.cloudConfirmationsFile,
   ])
-  const packetsById = new Map((actionAuthorization.authorizationPackets || []).map((item) => [item.packetId, item]))
+  const packetsById = new Map([
+    ...(actionAuthorization.authorizationPackets || []),
+    ...(actionAuthorization.deferredAppLaunchPackets || []),
+  ].map((item) => [item.packetId, item]))
   const consoleTasksById = new Map((consoleRunbook.consoleTasks || []).map((item) => [item.id, item]))
   const currentStartPacketIds = new Set(actionAuthorization.summary?.canStartNowPackets || [])
   const deferredAppLaunchPacketIds = new Set(actionAuthorization.summary?.deferredAppLaunchPackets || [])
-  const deferredAppLaunchEnvNames = new Set(actionAuthorization.summary?.deferredAppLaunchBlocking || [])
+  const deferredAppLaunchEnvNames = new Set([
+    ...DEFAULT_DEFERRED_APP_LAUNCH_ENV_NAMES,
+    ...(actionAuthorization.summary?.deferredAppLaunchBlocking || []),
+  ])
   const phases = PHASES.map((phase) => buildPhase(phase, packetsById, consoleTasksById, {
     currentStartPacketIds,
     deferredAppLaunchPacketIds,
@@ -213,7 +231,7 @@ function buildPlan(args) {
     fullAppLaunchScope: actionAuthorization.fullAppLaunchScope || "deferred_after_backend_online",
     currentAnswer: "这是 provisioning 计划，不是执行结果；没有动作时确认前不能购买、创建、修改、推送镜像、导入密钥或部署 production-cn。",
     sourceCommands: {
-      actionAuthorization: "corepack pnpm aliyun:action:authorization",
+      actionAuthorization: "corepack pnpm aliyun:action:authorization:backend",
       consoleRunbook: "corepack pnpm aliyun:console:runbook",
     },
     targetRuntime: TARGET_RUNTIME,
@@ -240,7 +258,10 @@ function buildPlan(args) {
     readyAuthorizationPackets: (actionAuthorization.authorizationPackets || [])
       .filter((packet) => packet.canStartNow === true && currentStartPacketIds.has(packet.packetId))
       .map(compactReadyAuthorizationPacket),
-    deferredAppLaunchAuthorizationPackets: (actionAuthorization.authorizationPackets || [])
+    deferredAppLaunchAuthorizationPackets: [
+      ...(actionAuthorization.authorizationPackets || []),
+      ...(actionAuthorization.deferredAppLaunchPackets || []),
+    ]
       .filter((packet) => deferredAppLaunchPacketIds.has(packet.packetId))
       .map(compactReadyAuthorizationPacket),
     readyActionPackets: (consoleRunbook.readyActionPackets || []).map(compactReadyActionPacket),
@@ -277,8 +298,10 @@ function buildProvisioningClosureBrief({
   phases,
 }) {
   const runbookBrief = consoleRunbook.consoleClosureBrief || {}
-  const blockedCredentialNames = runbookBrief.blockedCredentialNames || []
-  const readySecretEnvVariableNames = runbookBrief.readySecretEnvVariableNames || []
+  const authorizationBrief = actionAuthorization.authorizationClosureBrief || {}
+  const closureBrief = Object.keys(authorizationBrief).length ? authorizationBrief : runbookBrief
+  const blockedCredentialNames = closureBrief.blockedCredentialNames || []
+  const readySecretEnvVariableNames = closureBrief.readySecretEnvVariableNames || []
   const readyToStartPhases = phases
     .filter((item) => item.canStartNow)
     .map((item) => item.id)
@@ -290,17 +313,17 @@ function buildProvisioningClosureBrief({
     conclusion: "现在不能部署；当前只推进阿里云后端，PH02 可进入动作时确认，微信移动 App、Android/iOS 发布凭证延期到后端上线后。",
     canDeployNow: consoleRunbook.summary?.canDeployNow === true,
     canCodexExecuteNow: false,
-    blockedCredentialCount: runbookBrief.blockedCredentialCount ?? blockedCredentialNames.length,
+    blockedCredentialCount: closureBrief.blockedCredentialCount ?? blockedCredentialNames.length,
     blockedCredentialNames,
-    readySecretEnvVariableCount: runbookBrief.readySecretEnvVariableCount ?? readySecretEnvVariableNames.length,
+    readySecretEnvVariableCount: closureBrief.readySecretEnvVariableCount ?? readySecretEnvVariableNames.length,
     readySecretEnvVariableNames,
-    resourceEvidenceReady: runbookBrief.resourceEvidenceReady || consoleRunbook.summary?.resourceEvidenceReady || "unknown",
-    blockedResourceEvidenceIds: runbookBrief.blockedResourceEvidenceIds || consoleRunbook.summary?.blockedResourceEvidenceIds || [],
+    resourceEvidenceReady: closureBrief.resourceEvidenceReady || consoleRunbook.summary?.resourceEvidenceReady || "unknown",
+    blockedResourceEvidenceIds: closureBrief.blockedResourceEvidenceIds || consoleRunbook.summary?.blockedResourceEvidenceIds || [],
     partiallyObservedResourceEvidenceIds:
-      runbookBrief.partiallyObservedResourceEvidenceIds ||
+      closureBrief.partiallyObservedResourceEvidenceIds ||
       consoleRunbook.summary?.partiallyObservedResourceEvidenceIds ||
       [],
-    blockedResourceEvidence: runbookBrief.blockedResourceEvidence || [],
+    blockedResourceEvidence: closureBrief.blockedResourceEvidence || [],
     readyToStartPhases,
     blockedPhases,
     canStartNowAuthorizationPackets: actionAuthorization.summary?.canStartNowPackets || [],
@@ -310,6 +333,7 @@ function buildProvisioningClosureBrief({
     requiredBlocking: actionAuthorization.summary?.requiredBlocking || [],
     actionTimeConfirmationRequired: uniqueStrings([
       ...(runbookBrief.actionTimeConfirmationRequiredIds || []),
+      ...(authorizationBrief.actionTimeConfirmationRequiredIds || []),
       ...(actionAuthorization.summary?.actionTimeConfirmationRequired || []),
     ]),
   }
@@ -378,6 +402,10 @@ function buildPhase(phase, packetsById, consoleTasksById, {
     explicitlyExcluded: uniqueStrings([
       ...packets.flatMap((item) => item.explicitlyExcluded || []),
       ...consoleTasks.flatMap((item) => item.forbidden || []),
+      ...(isDeferredAfterBackendOnline ? [
+        "当前后端-only 目标不创建微信开放平台移动应用、不做 Android release signing、不读取 Apple Team ID。",
+        "这些延期项只在阿里云后端上线后单独授权处理。",
+      ] : []),
     ]),
     verifyCommands: uniqueStrings(consoleTasks.flatMap((item) => item.verifyCommands || [])),
     completionEvidence: phase.completionEvidence,
@@ -388,6 +416,10 @@ function compactPacket(packet) {
   return {
     packetId: packet.packetId,
     actionId: packet.actionId,
+    title: packet.title || "",
+    owner: packet.owner || "",
+    deferredUntil: packet.deferredUntil || "",
+    deferReason: packet.deferReason || "",
     canStartNow: packet.canStartNow === true,
     dependsOn: packet.dependsOn || [],
     blockingDependencies: packet.blockingDependencies || [],
@@ -482,8 +514,16 @@ function filterDeferredAppLaunchEnvMentions(values, deferredAppLaunchEnvNames = 
   if (!deferredAppLaunchEnvNames || deferredAppLaunchEnvNames.size === 0) return values || []
   return (values || []).filter((value) => {
     const text = String(value)
-    return !Array.from(deferredAppLaunchEnvNames).some((name) => text.includes(name))
+    return !Array.from(deferredAppLaunchEnvNames).some((name) => isDeferredEnvBlocker(text, name))
   })
+}
+
+function isDeferredEnvBlocker(text, name) {
+  return text === name ||
+    text === `requiredEnv:${name}` ||
+    text === `missing_required_env:${name}` ||
+    text.includes(`:requiredEnv:${name}`) ||
+    text.includes(`:missing_required_env:${name}`)
 }
 
 function uniqueStrings(values) {

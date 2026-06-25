@@ -49,6 +49,7 @@ test("Aliyun provisioning plan renders phase order without executing cloud actio
   assert.equal(report.canCodexExecuteNow, false)
   assert.equal(report.currentScope, "backend_aliyun_only")
   assert.equal(report.fullAppLaunchScope, "deferred_after_backend_online")
+  assert.equal(report.sourceCommands.actionAuthorization, "corepack pnpm aliyun:action:authorization:backend")
   assert.equal(report.secretLeakCheck.ok, true)
   assert.equal(report.summary.phases, 7)
   assert.deepEqual(report.summary.readyToStartPhases, [
@@ -63,7 +64,8 @@ test("Aliyun provisioning plan renders phase order without executing cloud actio
     "P10_ANDROID_RELEASE_SIGNING",
     "P02_APPLE_TEAM_ID",
   ])
-  assert.equal(report.summary.blockedCredentialCount, 8)
+  assert.equal(report.summary.authorizationPackets, 8)
+  assert.equal(report.summary.blockedCredentialCount, 1)
   assert.equal(report.summary.readySecretEnvVariableCount, 17)
   assert.equal(report.summary.resourceEvidenceReady, "0/7")
   assert.ok(report.summary.blockedResourceEvidenceIds.includes("R01_SAE_RUNTIME"))
@@ -72,10 +74,10 @@ test("Aliyun provisioning plan renders phase order without executing cloud actio
   assert.ok(report.summary.partiallyObservedResourceEvidenceIds.includes("R07_SLS_ALERTS"))
   assert.equal(report.provisioningClosureBrief.canDeployNow, false)
   assert.equal(report.provisioningClosureBrief.canCodexExecuteNow, false)
-  assert.equal(report.provisioningClosureBrief.blockedCredentialCount, 8)
+  assert.equal(report.provisioningClosureBrief.blockedCredentialCount, 1)
   assert.ok(report.provisioningClosureBrief.blockedCredentialNames.includes("DATABASE_URL_CN"))
-  assert.ok(report.provisioningClosureBrief.blockedCredentialNames.includes("WECHAT_OPEN_APP_ID"))
-  assert.ok(report.provisioningClosureBrief.blockedCredentialNames.includes("WECHAT_OPEN_APP_SECRET"))
+  assert.ok(!report.provisioningClosureBrief.blockedCredentialNames.includes("WECHAT_OPEN_APP_ID"))
+  assert.ok(!report.provisioningClosureBrief.blockedCredentialNames.includes("WECHAT_OPEN_APP_SECRET"))
   assert.equal(report.provisioningClosureBrief.readySecretEnvVariableCount, 17)
   assert.equal(report.provisioningClosureBrief.resourceEvidenceReady, "0/7")
   assert.ok(report.provisioningClosureBrief.blockedResourceEvidenceIds.includes("R02_ACR_IMAGE_REGISTRY"))
@@ -119,8 +121,10 @@ test("Aliyun provisioning plan renders phase order without executing cloud actio
   ])
   assert.ok(report.deferredAppLaunchAuthorizationPackets.some((item) =>
     item.packetId === "P01_WECHAT_OPEN_MOBILE_APP" &&
-    item.minimumUserPhrase.includes("不读取或输出 AppSecret")
+    item.title.includes("微信开放平台移动应用")
   ))
+  assert.ok(report.phases.find((item) => item.id === "PH01_EXTERNAL_APP_IDENTIFIERS")
+    .authorizationPackets.every((item) => item.deferredUntil === "deferred_after_backend_online"))
   assert.ok(report.readyAuthorizationPackets.some((item) =>
     item.packetId === "P03_ACR_PURCHASE" &&
     item.nonSecretEvidenceOnly === true &&
@@ -136,13 +140,24 @@ test("Aliyun provisioning plan renders phase order without executing cloud actio
   assert.equal(identifiers.canStartNow, false)
   assert.equal(identifiers.deferredAfterBackendOnline, true)
   assert.ok(identifiers.blockingDependencies.includes("deferredAfterBackendOnline:P01_WECHAT_OPEN_MOBILE_APP"))
+  assert.ok(identifiers.blockingDependencies.includes("deferredAfterBackendOnline:P02_APPLE_TEAM_ID"))
+  assert.ok(identifiers.currentBlockers.includes("dependsOn:deferredAfterBackendOnline:P02_APPLE_TEAM_ID"))
   assert.deepEqual(identifiers.authorizationPackets.map((item) => item.packetId), [
     "P01_WECHAT_OPEN_MOBILE_APP",
     "P10_ANDROID_RELEASE_SIGNING",
     "P02_APPLE_TEAM_ID",
   ])
-  assert.ok(identifiers.explicitlyExcluded.some((item) => item.includes("不使用小程序 AppID")))
-  assert.ok(identifiers.explicitlyExcluded.some((item) => item.includes("debug.keystore")))
+  assert.ok(identifiers.authorizationPackets.some((item) =>
+    item.packetId === "P01_WECHAT_OPEN_MOBILE_APP" &&
+    item.deferReason.includes("不属于当前阿里云后端补齐目标")
+  ))
+  assert.ok(identifiers.authorizationPackets.some((item) =>
+    item.packetId === "P10_ANDROID_RELEASE_SIGNING" &&
+    item.title.includes("Android release signing")
+  ))
+  assert.ok(identifiers.explicitlyExcluded.some((item) =>
+    item.includes("当前后端-only 目标不创建微信开放平台移动应用")
+  ))
 
   const baseCloud = byId.get("PH02_BASE_CLOUD_RESOURCES")
   const baseAcr = baseCloud.consoleTasks.find((item) => item.id === "C02_ACR_IMAGE_AND_PULL")
@@ -180,6 +195,13 @@ test("Aliyun provisioning plan renders phase order without executing cloud actio
   assert.equal(env.canStartNow, false)
   assert.ok(env.blockingDependencies.includes("P05_OSS_RAM_STS"))
   assert.ok(env.blockingDependencies.includes("P11_ALIYUN_RDS_DATA_MIGRATION"))
+  assert.ok(env.currentBlockers.includes("requiredEnv:DATABASE_URL_CN"))
+  assert.ok(!env.currentBlockers.some((item) => /WECHAT_OPEN_APP_ID|WECHAT_OPEN_APP_SECRET|APPLE_TEAM_ID|MEIYE_RELEASE_/.test(item)))
+  assert.deepEqual(env.currentActionAcceptanceEvidence, [
+    "secretNotInImage=true",
+    "importedAt=实际导入时间",
+    "currentBackendRequiredBlocking=DATABASE_URL_CN",
+  ])
 
   const deploy = byId.get("PH07_PRODUCTION_DEPLOY")
   assert.equal(deploy.canStartNow, false)
@@ -212,7 +234,7 @@ test("Aliyun provisioning plan markdown preserves ACR current scope and deferred
   assert.match(markdown, /Full APP launch scope: deferred_after_backend_online/)
   assert.match(markdown, /Required blocking env: DATABASE_URL_CN/)
   assert.match(markdown, /Deferred APP launch packets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID/)
-  assert.match(markdown, /Blocked credential count: 8/)
+  assert.match(markdown, /Blocked credential count: 1/)
   assert.match(markdown, /Ready secret env variable count: 17/)
   assert.match(markdown, /Resource evidence ready: 0\/7/)
   assert.match(markdown, /Blocked resource evidence ids: .*R02_ACR_IMAGE_REGISTRY/)
@@ -220,6 +242,8 @@ test("Aliyun provisioning plan markdown preserves ACR current scope and deferred
   assert.match(markdown, /Can Codex execute now: false/)
   assert.match(markdown, /Ready authorization packets: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION/)
   assert.match(markdown, /Deferred APP launch authorization packets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID/)
+  assert.doesNotMatch(markdown, /Blocked credential names: .*WECHAT_OPEN_APP_ID/)
+  assert.doesNotMatch(markdown, /Blocked credential names: .*WECHAT_OPEN_APP_SECRET/)
   assert.match(markdown, /P11_ALIYUN_RDS_DATA_MIGRATION/)
   assert.match(markdown, /Ready console action packets: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS/)
   assert.match(markdown, /## Ready Authorization Packets/)

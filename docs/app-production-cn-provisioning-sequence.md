@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 阿里云 Provisioning Plan
 
-Generated: 2026-06-25T08:20:25.005Z
+Generated: 2026-06-25T09:09:38.668Z
 
 ## 结论
 
@@ -32,7 +32,7 @@ Generated: 2026-06-25T08:20:25.005Z
 - Ready authorization packets: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION
 - Deferred APP launch authorization packets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID
 - Ready console action packets: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS
-- Blocked credential count: 8
+- Blocked credential count: 1
 - Ready secret env variable count: 17
 - Resource evidence ready: 0/7
 - Blocked resource evidence ids: R01_SAE_RUNTIME, R02_ACR_IMAGE_REGISTRY, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R05_OSS_AUDIO_STORAGE, R06_ENV_IMPORT, R07_SLS_ALERTS
@@ -43,8 +43,8 @@ Generated: 2026-06-25T08:20:25.005Z
 - Conclusion: 现在不能部署；当前只推进阿里云后端，PH02 可进入动作时确认，微信移动 App、Android/iOS 发布凭证延期到后端上线后。
 - Can deploy now: false
 - Can Codex execute now: false
-- Blocked credential count: 8
-- Blocked credential names: APPLE_TEAM_ID, DATABASE_URL_CN, MEIYE_RELEASE_KEY_ALIAS, MEIYE_RELEASE_KEY_PASSWORD, MEIYE_RELEASE_STORE_FILE, MEIYE_RELEASE_STORE_PASSWORD, WECHAT_OPEN_APP_ID, WECHAT_OPEN_APP_SECRET
+- Blocked credential count: 1
+- Blocked credential names: DATABASE_URL_CN
 - Ready secret env variable count: 17
 - Resource evidence ready: 0/7
 - Blocked resource evidence ids: R01_SAE_RUNTIME, R02_ACR_IMAGE_REGISTRY, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R05_OSS_AUDIO_STORAGE, R06_ENV_IMPORT, R07_SLS_ALERTS
@@ -139,14 +139,8 @@ Generated: 2026-06-25T08:20:25.005Z
   - Android release 包必须用受控 release keystore 签名，并只记录微信 Android 签名非密钥证据。
   - APPLE_TEAM_ID 从 Apple Developer 读取并导入 plain env。
 - Explicitly excluded:
-  - 不使用小程序 AppID/Secret 替代移动应用凭证。
-  - 不把 AppSecret 写入 JSON、Markdown、Docker 镜像或 git。
-  - 不做小程序上传或 APP 商店提交。
-  - 不使用 debug.keystore、debug APK 或 debug 签名。
-  - 不把 keystore 文件、store password、key password、证书私钥或微信 AppSecret 写入 JSON、Markdown、Docker 镜像或 git。
-  - 不创建微信开放平台移动应用、不提交审核；这些必须由 P01 单独授权。
-  - 不猜测 Team ID。
-  - 不创建/修改证书、描述文件或 App Store Connect 记录。
+  - 当前后端-only 目标不创建微信开放平台移动应用、不做 Android release signing、不读取 Apple Team ID。
+  - 这些延期项只在阿里云后端上线后单独授权处理。
 
 ### PH02_BASE_CLOUD_RESOURCES 确认 ACR、RDS PostgreSQL 和 OSS/RAM/STS 基础资源
 
@@ -261,7 +255,6 @@ Generated: 2026-06-25T08:20:25.005Z
   - cloud-confirmations.local.json 只记录 importedAt、target、secretNotInImage=true 和 evidence handle。
 - Explicitly excluded:
   - 不把任何 value 粘贴到 Markdown、JSON、Dockerfile、镜像或 git。
-  - 不导入 WECHAT_OPEN_APP_ID/SECRET，除非移动应用审核已通过并单独授权。
   - 不部署 production-cn。
   - AccessKeySecret
   - AppSecret
