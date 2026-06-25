@@ -351,6 +351,7 @@ test("Aliyun credential acquisition runbook stays aligned with sensitive blocker
   assert.match(runbook, /blockedCredentialCount=2/)
   assert.match(runbook, /blockedCredentialNames=ALIYUN_OSS_SECURITY_TOKEN, DATABASE_URL_CN/)
   assert.match(runbook, /docs\/app-production-cn-backend-sensitive-blockers\.md/)
+  assert.match(runbook, /docs\/app-production-cn-backend-secret-env-import-batches\.md/)
   assert.match(runbook, /blockedCredentialCount=9/)
   assert.match(runbook, /readySecretEnvVariableCount=17/)
   assert.match(runbook, /canCodexProceedWithoutUser=false/)
@@ -396,6 +397,7 @@ test("Aliyun credential acquisition runbook stays aligned with sensitive blocker
 test("APP production-cn backend-only sensitive docs reflect current Aliyun backend scope", () => {
   const sensitiveDoc = read("docs", "app-production-cn-backend-sensitive-blockers.md")
   const actionDoc = read("docs", "app-production-cn-backend-user-action-brief.md")
+  const importBatches = read("docs", "app-production-cn-backend-secret-env-import-batches.md")
   const output = execFileSync(process.execPath, [
     "scripts/summarize-aliyun-sensitive-blockers.mjs",
     "--backend-only",
@@ -432,13 +434,45 @@ test("APP production-cn backend-only sensitive docs reflect current Aliyun backe
     /deferredAppLaunchConfirmations: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID/,
   )
   assert.match(actionDoc, /nextActionTimeConfirmations: P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(importBatches, /Current backend-only sensitive gate/)
+  assert.match(importBatches, /blockedCredentialCount=2/)
+  assert.match(importBatches, /readySecretEnvVariableCount=17/)
+  assert.match(importBatches, /readySecretEnvVariableGroupCount=9/)
+  assert.match(importBatches, /ALIYUN_OSS_SECURITY_TOKEN/)
+  assert.match(importBatches, /DATABASE_URL_CN/)
+  assert.match(importBatches, /S03_ACR_PAID_PURCHASE/)
+  assert.match(importBatches, /S04_ACR_REGISTRY_AUTH/)
+  assert.match(importBatches, /legacy_database_migration_source/)
+  assert.match(importBatches, /Aliyun RDS PostgreSQL/)
+  assert.match(importBatches, /WECHAT_OPEN_APP_ID/)
+  assert.match(importBatches, /S01_WECHAT_OPEN_APP_LOGIN/)
+  assert.match(importBatches, /APPLE_TEAM_ID/)
+  assert.match(importBatches, /S02_APPLE_TEAM_ID/)
+  assert.match(importBatches, /MEIYE_RELEASE_KEY_PASSWORD/)
+  assert.match(importBatches, /S07_ANDROID_RELEASE_SIGNING/)
+  assert.match(importBatches, /They do not unblock native APP WeChat login/)
+  assert.match(importBatches, /corepack pnpm aliyun:sensitive:blockers:backend/)
+  assert.match(importBatches, /Do not import env values without action-time authorization/)
+  assert.doesNotMatch(importBatches, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(importBatches, /LTAI[A-Za-z0-9]{12,}/)
+  assert.doesNotMatch(importBatches, /:\/\/[^\s:@]+:[^\s@]+@/)
+  assert.doesNotMatch(importBatches, /AccessKeySecret\s*[:=]\s*["'][^"']+["']/)
   assert.deepEqual(report.credentialInterventionBrief.blockedCredentialNames, [
     "ALIYUN_OSS_SECURITY_TOKEN",
     "DATABASE_URL_CN",
   ])
+  assert.equal(report.summary.readySensitiveEnvVariableGroups.length, 9)
+  for (const group of report.summary.readySensitiveEnvVariableGroups) {
+    assert.match(importBatches, new RegExp(group.category))
+    assert.match(importBatches, new RegExp(String(group.count)))
+    for (const name of group.variableNames) {
+      assert.match(importBatches, new RegExp(name))
+    }
+  }
   for (const name of report.credentialInterventionBrief.readySecretEnvVariableNames) {
     assert.match(sensitiveDoc, new RegExp(name))
     assert.match(actionDoc, new RegExp(name))
+    assert.match(importBatches, new RegExp(name))
   }
 })
 

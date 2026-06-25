@@ -38,6 +38,7 @@ Backend-only docs:
 ```text
 docs/app-production-cn-backend-sensitive-blockers.md
 docs/app-production-cn-backend-user-action-brief.md
+docs/app-production-cn-backend-secret-env-import-batches.md
 ```
 
 ## Current Verdict
