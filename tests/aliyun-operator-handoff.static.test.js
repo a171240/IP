@@ -74,6 +74,8 @@ test("Aliyun operator handoff command is wired into scripts and local predeploy"
   assert.match(releaseArtifacts, /readySecretEnvVariableCount/)
   assert.match(releaseArtifacts, /resourceEvidenceReady/)
   assert.match(releaseArtifacts, /blockedResourceEvidenceIds/)
+  assert.match(releaseArtifacts, /operatorHandoff\.actionTimeAuthorizationRequest/)
+  assert.match(releaseArtifacts, /actionTimeAuthorizationRequest\.recommendedUserReply/)
   assert.match(releaseArtifacts, /localEvidenceGaps:[\s\S]*rdsMigration/)
   assert.match(releaseArtifacts, /operatorHandoff\.localEvidenceGaps\?\.rdsMigration/)
 })
@@ -108,6 +110,17 @@ test("Aliyun operator handoff backend-only mode excludes deferred APP launch wor
 
   assert.equal(report.currentScope, "backend_aliyun_only")
   assert.equal(report.containsValues, false)
+  assert.equal(report.actionTimeAuthorizationRequest.required, true)
+  assert.deepEqual(report.actionTimeAuthorizationRequest.packetIds, [
+    "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
+    "P03_ACR_PURCHASE",
+    "P05_OSS_RAM_STS",
+    "P11_ALIYUN_RDS_DATA_MIGRATION",
+  ])
+  assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /阿里云后端第一批动作/)
+  assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /RDS PostgreSQL/)
+  assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /不做微信\/Android\/iOS/)
+  assert.ok(report.actionTimeAuthorizationRequest.explicitlyExcluded.some((item) => /不执行 production-cn 部署/.test(item)))
   assert.equal(report.operatorClosureBrief.blockedCredentialCount, 1)
   assert.deepEqual(report.operatorClosureBrief.blockedCredentialNames, ["DATABASE_URL_CN"])
   assert.ok(!report.operatorClosureBrief.blockedCredentialNames.includes("WECHAT_OPEN_APP_ID"))
@@ -179,6 +192,9 @@ test("Aliyun operator handoff backend-only mode excludes deferred APP launch wor
   assert.ok(priorityTaskIds.includes("T03B_ALIYUN_ACR_IMAGE_PUBLISH"))
   assert.ok(report.currentAnswer.includes("现在只处理阿里云后端"))
   assert.match(markdownOutput, /## 后端下一步顺序/)
+  assert.match(markdownOutput, /## 动作时授权请求/)
+  assert.match(markdownOutput, /recommendedUserReply: 授权本轮只做阿里云后端第一批动作/)
+  assert.match(markdownOutput, /packetIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P03_ACR_PURCHASE, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION/)
   assert.match(markdownOutput, /0\. P00_ALIYUN_READONLY_INVENTORY_IDENTITY/)
   assert.match(markdownOutput, /1\. P11_ALIYUN_RDS_DATA_MIGRATION/)
   assert.match(markdownOutput, /6\. P07_DOMAIN_DNS_HTTPS/)

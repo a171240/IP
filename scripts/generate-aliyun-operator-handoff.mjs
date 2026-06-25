@@ -487,6 +487,7 @@ function buildHandoff({
   consoleRunbook,
   sensitiveBlockers,
   resourcesMatrix,
+  userActionBrief,
   vercelEnvCoverage,
 }) {
   const tasks = operatorTasks.tasks || []
@@ -553,6 +554,7 @@ function buildHandoff({
       backendOnly: args.backendOnly,
     }),
     operatorClosureBrief,
+    actionTimeAuthorizationRequest: userActionBrief.actionTimeAuthorizationRequest || null,
     vercelEnvCoverage: compactVercelEnvCoverage(vercelEnvCoverage),
     bridgeDataLayer: status.summary?.bridgeDataLayer || status.localReadiness?.bridgeDataLayer || {
       current: "Supabase migration source / legacy compatibility only",
@@ -1277,6 +1279,15 @@ function renderMarkdown(handoff) {
     `- readySecretEnvVariableCount: ${handoff.operatorClosureBrief.readySecretEnvVariableCount}`,
     `- resourceEvidenceReady: ${handoff.operatorClosureBrief.resourceEvidenceReady}`,
     "",
+    "## 动作时授权请求",
+    "",
+    `- required: ${handoff.actionTimeAuthorizationRequest?.required === true}`,
+    `- packetIds: ${handoff.actionTimeAuthorizationRequest?.packetIds?.join(", ") || "none"}`,
+    `- recommendedUserReply: ${handoff.actionTimeAuthorizationRequest?.recommendedUserReply || "none"}`,
+    ...(handoff.actionTimeAuthorizationRequest?.explicitlyExcluded?.length
+      ? handoff.actionTimeAuthorizationRequest.explicitlyExcluded.map((item) => `- excluded: ${item}`)
+      : ["- excluded: none"]),
+    "",
     "## 目标闭环证据简表",
     "",
     `- blockedCredentialNames: ${handoff.operatorClosureBrief.blockedCredentialNames.length ? handoff.operatorClosureBrief.blockedCredentialNames.join(", ") : "none"}`,
@@ -1688,6 +1699,14 @@ function main() {
     "--cloud-confirmations",
     args.cloudConfirmationsFile,
   ])
+  const userActionBrief = runJson("user_action_brief", [
+    resolve(BACKEND_ROOT, "scripts/summarize-aliyun-user-action-brief.mjs"),
+    "--env-file",
+    args.envFile,
+    "--cloud-confirmations",
+    args.cloudConfirmationsFile,
+    ...backendOnlyArgs,
+  ])
   const resourcesMatrix = runJson("resources_matrix", [
     resolve(BACKEND_ROOT, "scripts/summarize-aliyun-resource-matrix.mjs"),
     "--env-file",
@@ -1708,6 +1727,7 @@ function main() {
     consoleRunbook,
     sensitiveBlockers,
     resourcesMatrix,
+    userActionBrief,
     vercelEnvCoverage,
   })
   const output = `${JSON.stringify(handoff, null, 2)}\n`
