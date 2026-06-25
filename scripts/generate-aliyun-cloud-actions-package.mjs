@@ -241,6 +241,11 @@ function buildPackage(args) {
     "scripts/check-aliyun-image-publish-plan.mjs",
     "--allow-incomplete",
   ])
+  const sensitiveBlockers = runJson("sensitive_blockers", [
+    "scripts/summarize-aliyun-sensitive-blockers.mjs",
+    "--backend-only",
+    ...envArgs(args),
+  ])
 
   const consoleTasks = (consoleRunbook.consoleTasks || []).map(scopeBackendOnlyConsoleTask)
   const immediateConsoleTasks = consoleTasks.filter((item) => item.canStartNow === true)
@@ -261,6 +266,7 @@ function buildPackage(args) {
     cloudInventorySummary,
   )
   const backendFirstOrder = buildBackendFirstOrder(backendStatus)
+  const credentialAcquisitionQueue = buildCredentialAcquisitionQueue(sensitiveBlockers)
   const cloudActionClosureBrief = buildCloudActionClosureBrief({
     consoleRunbook,
     backendFirstOrder,
@@ -271,6 +277,7 @@ function buildPackage(args) {
     deferredAppLaunchPackets,
     cloudInventorySummary,
     imagePublishWritebackPlan,
+    credentialAcquisitionQueue,
   })
   const currentBlockers = uniqueStrings([
     ...(backendStatus.summary?.backendRequiredBlocking || []).map((name) => `backendRequired:${name}`),
@@ -328,6 +335,7 @@ function buildPackage(args) {
       imagePublishWritebackBlockingGroups: imagePublishWritebackPlan.blockingGroups,
       cliConfigProbeFailureCategory,
       blockedCredentialCount: cloudActionClosureBrief.blockedCredentialCount,
+      onlyMissingBackendCredentialValue: credentialAcquisitionQueue.onlyMissingBackendCredentialValue,
       readySecretEnvVariableCount: cloudActionClosureBrief.readySecretEnvVariableCount,
       resourceEvidenceReady: cloudActionClosureBrief.resourceEvidenceReady,
       blockedResourceEvidenceIds: cloudActionClosureBrief.blockedResourceEvidenceIds,
@@ -337,6 +345,7 @@ function buildPackage(args) {
       backendFirstUserInterventionRequired: backendFirstOrder.userInterventionRequired,
     },
     cloudActionClosureBrief,
+    credentialAcquisitionQueue,
     firstCloudPhase,
     backendFirstOrder,
     executionQueue,
@@ -426,6 +435,7 @@ function buildCloudActionClosureBrief({
   deferredAppLaunchPackets,
   cloudInventorySummary,
   imagePublishWritebackPlan,
+  credentialAcquisitionQueue,
 }) {
   const runbookBrief = consoleRunbook.consoleClosureBrief || {}
   const blockedCredentialNames =
@@ -449,6 +459,8 @@ function buildCloudActionClosureBrief({
     canDeployNow: consoleRunbook.summary?.canDeployNow === true,
     blockedCredentialCount: backendBlockedCredentialNames.length,
     blockedCredentialNames: backendBlockedCredentialNames,
+    onlyMissingBackendCredentialValue: credentialAcquisitionQueue.onlyMissingBackendCredentialValue || "",
+    credentialAcquisitionQueueActionIds: (credentialAcquisitionQueue.items || []).map((item) => item.actionId),
     readySecretEnvVariableCount: runbookBrief.readySecretEnvVariableCount ?? readySecretEnvVariableNames.length,
     readySecretEnvVariableNames,
     resourceEvidenceReady: runbookBrief.resourceEvidenceReady || consoleRunbook.summary?.resourceEvidenceReady || "unknown",
@@ -474,6 +486,34 @@ function buildCloudActionClosureBrief({
       ...(runbookBrief.actionTimeConfirmationRequiredIds || []),
       ...cloudConsolePackets.map((item) => item.packetId),
     ]).filter((item) => !isDeferredAppLaunchBlocker(item)),
+  }
+}
+
+function buildCredentialAcquisitionQueue(sensitiveBlockers) {
+  const queue = sensitiveBlockers.credentialAcquisitionQueue || {}
+  return {
+    currentScope: queue.currentScope || CURRENT_SCOPE,
+    queueScope: queue.queueScope || queue.currentScope || CURRENT_SCOPE,
+    missingCredentialNames: queue.missingCredentialNames || [],
+    onlyMissingBackendCredentialValue: queue.onlyMissingBackendCredentialValue || "",
+    readySecretEnvVariableCount: queue.readySecretEnvVariableCount || 0,
+    readySecretEnvVariableNames: queue.readySecretEnvVariableNames || [],
+    requiresActionTimeConfirmationIds: queue.requiresActionTimeConfirmationIds || [],
+    items: (queue.items || []).map((item) => ({
+      order: item.order,
+      actionId: item.actionId,
+      category: item.category,
+      status: item.status,
+      owner: item.owner,
+      userQuestion: item.userQuestion || "",
+      obtainFrom: item.obtainFrom || "",
+      blockedCredentialNames: item.blockedCredentialNames || [],
+      readySecretEnvVariableNames: item.readySecretEnvVariableNames || [],
+      destinationSummary: item.destinationSummary || item.writeTargets || item.importTargets || [],
+      verifyCommands: item.verifyCommands || [],
+      requiresActionTimeConfirmation: item.requiresActionTimeConfirmation === true,
+      unblockCondition: item.unblockCondition || "",
+    })),
   }
 }
 
@@ -886,6 +926,7 @@ function renderMarkdown(report) {
     `- backendCanStartNowSteps: ${report.summary.backendCanStartNowSteps.length ? report.summary.backendCanStartNowSteps.join(", ") : "none"}`,
     `- immediateBackendSteps: ${report.summary.immediateBackendSteps.length ? report.summary.immediateBackendSteps.join(", ") : "none"}`,
     `- blockedBackendSteps: ${report.summary.blockedBackendSteps.length ? report.summary.blockedBackendSteps.join(", ") : "none"}`,
+    `- onlyMissingBackendCredentialValue: ${report.summary.onlyMissingBackendCredentialValue || "n/a"}`,
     "",
     "## 目标闭环证据简表",
     "",
@@ -893,6 +934,8 @@ function renderMarkdown(report) {
     `- canDeployNow: ${report.cloudActionClosureBrief.canDeployNow}`,
     `- blockedCredentialCount: ${report.cloudActionClosureBrief.blockedCredentialCount}`,
     `- blockedCredentialNames: ${report.cloudActionClosureBrief.blockedCredentialNames.length ? report.cloudActionClosureBrief.blockedCredentialNames.join(", ") : "none"}`,
+    `- onlyMissingBackendCredentialValue: ${report.cloudActionClosureBrief.onlyMissingBackendCredentialValue || "n/a"}`,
+    `- credentialAcquisitionQueueActionIds: ${report.cloudActionClosureBrief.credentialAcquisitionQueueActionIds.length ? report.cloudActionClosureBrief.credentialAcquisitionQueueActionIds.join(", ") : "none"}`,
     `- readySecretEnvVariableCount: ${report.cloudActionClosureBrief.readySecretEnvVariableCount}`,
     `- resourceEvidenceReady: ${report.cloudActionClosureBrief.resourceEvidenceReady}`,
     `- blockedResourceEvidenceIds: ${report.cloudActionClosureBrief.blockedResourceEvidenceIds.length ? report.cloudActionClosureBrief.blockedResourceEvidenceIds.join(", ") : "none"}`,
@@ -909,6 +952,10 @@ function renderMarkdown(report) {
     `- deferredAppLaunchPackets: ${report.cloudActionClosureBrief.deferredAppLaunchPackets.length ? report.cloudActionClosureBrief.deferredAppLaunchPackets.join(", ") : "none"}`,
     `- blockedByDependencies: ${report.cloudActionClosureBrief.blockedByDependencies.length ? report.cloudActionClosureBrief.blockedByDependencies.join(", ") : "none"}`,
     `- imagePublishWritebackBlockingGroups: ${report.cloudActionClosureBrief.imagePublishWritebackBlockingGroups.length ? report.cloudActionClosureBrief.imagePublishWritebackBlockingGroups.join(", ") : "none"}`,
+    "",
+    "## 后端 credential 获取/导入队列",
+    "",
+    ...renderCredentialAcquisitionQueue(report.credentialAcquisitionQueue),
     "",
     "## 后端优先执行顺序",
     "",
@@ -1007,6 +1054,39 @@ function renderMarkdown(report) {
 
 function uniqueStrings(items) {
   return [...new Set(items.filter(Boolean).map((item) => String(item)))]
+}
+
+function renderCredentialAcquisitionQueue(queue) {
+  if (!queue || !(queue.items || []).length) return ["- none"]
+  return [
+    `- queueScope: ${queue.queueScope}`,
+    `- missingCredentialNames: ${(queue.missingCredentialNames || []).join(", ") || "none"}`,
+    `- onlyMissingBackendCredentialValue: ${queue.onlyMissingBackendCredentialValue || "n/a"}`,
+    `- readySecretsPendingCloudImport: ${queue.readySecretEnvVariableCount || 0}`,
+    `- requiresActionTimeConfirmationIds: ${(queue.requiresActionTimeConfirmationIds || []).join(", ") || "none"}`,
+    "",
+    "| order | category | actionId | question | obtainFrom | destination | verify |",
+    "| --- | --- | --- | --- | --- | --- | --- |",
+    ...queue.items.map((item) => [
+      String(item.order || ""),
+      codeCell(item.category),
+      codeCell(item.actionId),
+      escapeTableCell(item.userQuestion || "none"),
+      escapeTableCell(item.obtainFrom || "none"),
+      escapeTableCell((item.destinationSummary || []).join("; ") || "none"),
+      escapeTableCell((item.verifyCommands || []).join("; ") || "none"),
+    ].join(" | ").replace(/^/, "| ").replace(/$/, " |")),
+  ]
+}
+
+function codeCell(value) {
+  return `\`${escapeTableCell(value)}\``
+}
+
+function escapeTableCell(value) {
+  return String(value || "")
+    .replace(/\|/g, "\\|")
+    .replace(/\r?\n/g, " ")
 }
 
 function findSecretLikeValues(value, path = "$", matches = []) {

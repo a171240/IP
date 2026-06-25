@@ -45,6 +45,7 @@ test("Aliyun cloud actions package command is wired into scripts, predeploy, dep
   assert.match(releaseArtifacts, /executionQueueExternalAppPrerequisites/)
   assert.match(releaseArtifacts, /executionQueueBlockedByDependencies/)
   assert.match(releaseArtifacts, /cloud-actions-package\.json/)
+  assert.match(packageScript, /buildCredentialAcquisitionQueue/)
 })
 
 test("Aliyun cloud actions package summarizes current cloud console action order without secret values", () => {
@@ -95,6 +96,7 @@ test("Aliyun cloud actions package summarizes current cloud console action order
   assert.equal(report.summary.sensitiveActionBlocked, "5/5")
   assert.equal(Object.hasOwn(report.summary, "sensitiveBlocked"), false)
   assert.equal(report.summary.blockedCredentialCount, 1)
+  assert.equal(report.summary.onlyMissingBackendCredentialValue, "DATABASE_URL_CN")
   assert.equal(report.summary.readySecretEnvVariableCount, 17)
   assert.equal(report.summary.resourceEvidenceReady, "0/7")
   assert.ok(report.summary.blockedResourceEvidenceIds.includes("R01_SAE_RUNTIME"))
@@ -132,6 +134,14 @@ test("Aliyun cloud actions package summarizes current cloud console action order
   assert.equal(report.cloudActionClosureBrief.canDeployNow, false)
   assert.equal(report.cloudActionClosureBrief.blockedCredentialCount, 1)
   assert.deepEqual(report.cloudActionClosureBrief.blockedCredentialNames, ["DATABASE_URL_CN"])
+  assert.equal(report.cloudActionClosureBrief.onlyMissingBackendCredentialValue, "DATABASE_URL_CN")
+  assert.deepEqual(report.cloudActionClosureBrief.credentialAcquisitionQueueActionIds, [
+    "S03_ACR_PAID_PURCHASE",
+    "S04_ACR_REGISTRY_AUTH",
+    "S05_OSS_RAM_SECRET_OR_STS",
+    "S08_ALIYUN_RDS_DATABASE_URL",
+    "S06_READY_SENSITIVE_ENV_IMPORT",
+  ])
   assert.equal(report.cloudActionClosureBrief.readySecretEnvVariableCount, 17)
   assert.equal(report.cloudActionClosureBrief.resourceEvidenceReady, "0/7")
   assert.ok(report.cloudActionClosureBrief.blockedResourceEvidenceIds.includes("R02_ACR_IMAGE_REGISTRY"))
@@ -166,6 +176,21 @@ test("Aliyun cloud actions package summarizes current cloud console action order
   assert.ok(report.cloudActionClosureBrief.deferredAppLaunchPackets.includes("P01_WECHAT_OPEN_MOBILE_APP"))
   assert.ok(report.cloudActionClosureBrief.blockedByDependencies.includes("C01_SAE_RUNTIME"))
   assert.ok(report.cloudActionClosureBrief.imagePublishWritebackBlockingGroups.includes("imagePushAndDigest"))
+  assert.equal(report.credentialAcquisitionQueue.queueScope, "backend_aliyun_only")
+  assert.equal(report.credentialAcquisitionQueue.onlyMissingBackendCredentialValue, "DATABASE_URL_CN")
+  assert.deepEqual(report.credentialAcquisitionQueue.items.map((item) => item.actionId), [
+    "S03_ACR_PAID_PURCHASE",
+    "S04_ACR_REGISTRY_AUTH",
+    "S05_OSS_RAM_SECRET_OR_STS",
+    "S08_ALIYUN_RDS_DATABASE_URL",
+    "S06_READY_SENSITIVE_ENV_IMPORT",
+  ])
+  const rdsQueueItem = report.credentialAcquisitionQueue.items.find((item) => item.actionId === "S08_ALIYUN_RDS_DATABASE_URL")
+  assert.ok(rdsQueueItem)
+  assert.equal(rdsQueueItem.userQuestion, "DATABASE_URL_CN 从哪里获得并导入到哪里")
+  assert.ok(rdsQueueItem.obtainFrom.includes("阿里云控制台 -> RDS PostgreSQL"))
+  assert.ok(rdsQueueItem.destinationSummary.some((item) => item.includes("DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env only")))
+  assert.ok(rdsQueueItem.verifyCommands.includes("corepack pnpm aliyun:rds:migration:evidence:strict"))
   assert.deepEqual(report.summary.imagePublishWritebackBlockingGroups, [
     "acrPurchaseAndRepository",
     "imagePushAndDigest",
@@ -276,6 +301,8 @@ test("Aliyun cloud actions package markdown renders compact action order without
   assert.match(markdown, /sensitiveActionBlocked: 5\/5/)
   assert.doesNotMatch(markdown, /sensitiveBlocked:/)
   assert.match(markdown, /blockedCredentialNames: DATABASE_URL_CN/)
+  assert.match(markdown, /onlyMissingBackendCredentialValue: DATABASE_URL_CN/)
+  assert.match(markdown, /credentialAcquisitionQueueActionIds: S03_ACR_PAID_PURCHASE, S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT/)
   assert.match(markdown, /readySecretEnvVariableCount: 17/)
   assert.match(markdown, /resourceEvidenceReady: 0\/7/)
   assert.match(markdown, /blockedResourceEvidenceIds: .*R02_ACR_IMAGE_REGISTRY/)
@@ -292,6 +319,12 @@ test("Aliyun cloud actions package markdown renders compact action order without
   assert.match(markdown, /P03_ACR_PURCHASE/)
   assert.match(markdown, /P05_OSS_RAM_STS/)
   assert.match(markdown, /P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(markdown, /## 后端 credential 获取\/导入队列/)
+  assert.match(markdown, /queueScope: backend_aliyun_only/)
+  assert.match(markdown, /DATABASE_URL_CN 从哪里获得并导入到哪里/)
+  assert.match(markdown, /阿里云控制台 -> RDS PostgreSQL/)
+  assert.match(markdown, /DATABASE_URL_CN -> 阿里云 KMS\/Secrets Manager\/SAE secret env only/)
+  assert.match(markdown, /corepack pnpm aliyun:rds:migration:evidence:strict/)
   assert.match(markdown, /只读盘点解锁/)
   assert.match(markdown, /blocked_until_cli_or_cloudshell_identity_ready/)
   assert.match(markdown, /cloudInventoryReadyLocalOperations: 0\/9/)
@@ -342,6 +375,8 @@ test("APP production-cn action queue documents the current authorized next-step 
     "cloudInventoryExecutedCommandResults: 9/9",
     "mutationPerformedCommandResults: 0",
     "blockedCredentialNames: DATABASE_URL_CN",
+    "onlyMissingBackendCredentialValue: DATABASE_URL_CN",
+    "credentialAcquisitionQueueActionIds: S03_ACR_PAID_PURCHASE, S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT",
     "backendCanStartNowSteps: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP03_ACR_PURCHASE_AND_REPOSITORY",
     "immediateBackendSteps: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP03_ACR_PURCHASE_AND_REPOSITORY",
     "blockedBackendSteps: BAP04_ACR_IMAGE_PUSH_AND_PULL, BAP05_BACKEND_ENV_IMPORT",
@@ -354,6 +389,12 @@ test("APP production-cn action queue documents the current authorized next-step 
     "BAP04_ACR_IMAGE_PUSH_AND_PULL: status=blocked_by_dependencies; packets=P04_ACR_IMAGE_AND_PULL; dependsOn=BAP03_ACR_PURCHASE_AND_REPOSITORY; order=4. Push backend image to ACR",
     "BAP05_BACKEND_ENV_IMPORT: status=blocked_by_dependencies",
     "order=5. Import backend env through SAE/KMS/Secrets Manager",
+    "## 后端 credential 获取/导入队列",
+    "queueScope: backend_aliyun_only",
+    "DATABASE_URL_CN 从哪里获得并导入到哪里",
+    "阿里云控制台 -> RDS PostgreSQL",
+    "DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env only",
+    "corepack pnpm aliyun:rds:migration:evidence:strict",
     "backendCanStartNow: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP03_ACR_PURCHASE_AND_REPOSITORY",
     "consoleCanStartNow: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS",
     "BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE: kind=backend_apply_step; packets=P11_ALIYUN_RDS_DATA_MIGRATION; userIntervention=USER_CONFIRM_RDS_PURCHASE_AND_DATABASE_PASSWORD",
