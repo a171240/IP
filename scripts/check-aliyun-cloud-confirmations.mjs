@@ -272,7 +272,7 @@ const CLOUD_CONFIRMATION_GROUP_METADATA = Object.freeze({
     actionScope: "runtime_env_import",
     canStartNow: false,
     requiredAuthorizationPackets: Object.freeze(["P06_ENV_IMPORT"]),
-    blockedUntil: "微信移动应用、OSS/RAM 和运行时目标明确后导入变量",
+    blockedUntil: "RDS/DATABASE_URL_CN、OSS/RAM、ACR 镜像和 SAE runtime 目标明确后导入变量",
     expectedEvidence: Object.freeze([
       "confirmed=true",
       "importedAt 为实际导入时间或证据编号",

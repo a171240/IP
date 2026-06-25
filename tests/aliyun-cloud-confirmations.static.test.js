@@ -97,6 +97,13 @@ test("Aliyun cloud confirmations backend-only mode excludes deferred APP launch 
   assert.ok(report.writebackPlan.strictVerificationOrder.includes("corepack pnpm aliyun:cloud:confirmations:backend:strict"))
   assert.ok(report.writebackPlan.groups.every((group) =>
     group.verifyCommands.includes("corepack pnpm aliyun:cloud:confirmations:backend")))
+  const envImportGroup = report.writebackPlan.groups.find((group) => group.id === "envImport")
+  assert.ok(envImportGroup)
+  assert.equal(
+    envImportGroup.blockedUntil,
+    "RDS/DATABASE_URL_CN、OSS/RAM、ACR 镜像和 SAE runtime 目标明确后导入变量",
+  )
+  assert.doesNotMatch(envImportGroup.blockedUntil, /微信移动应用/)
   assert.ok(report.nextActions.some((item) => item.includes("backend-only 口径下微信开放平台移动应用")))
   assertNoSecretLikeValues(output)
 })
