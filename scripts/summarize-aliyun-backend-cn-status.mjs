@@ -396,7 +396,7 @@ function buildReport(args) {
       ]),
       "1. Create or confirm Aliyun RDS PostgreSQL in cn-hangzhou and close Supabase-to-RDS migration evidence.",
       "2. Confirm OSS RAM/STS least-privilege runtime access.",
-      "3. Purchase/confirm ACR, build/push the backend image, and record non-secret digest evidence.",
+      "3. Purchase/confirm ACR Enterprise instance, namespace, and repository; defer docker login/push and remote digest evidence to P04.",
       "4. Import backend env through SAE/KMS/Secrets Manager, including DATABASE_URL_CN only as a secret env.",
       "5. Create SAE runtime with container port 3000 and /api/healthz.",
       "6. Bind api-cn/assets-cn DNS, HTTPS certificate, and ICP-compliant public access.",

@@ -60,7 +60,7 @@ const BACKEND_FIRST_STEPS = [
     orderLine: "4. Push backend image to ACR, verify digest, and configure SAE image pull authorization.",
     requiredAuthorizationPackets: ["P04_ACR_IMAGE_AND_PULL"],
     blockingDependencies: ["BAP03_ACR_PURCHASE_AND_REPOSITORY"],
-    userIntervention: "USER_CONFIRM_ACR_PAID_PURCHASE",
+    userIntervention: "USER_CONFIRM_ACR_IMAGE_PUSH_AND_RUNTIME_PULL",
   },
   {
     id: "BAP05_BACKEND_ENV_IMPORT",
