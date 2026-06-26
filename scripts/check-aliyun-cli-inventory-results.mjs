@@ -246,9 +246,9 @@ function validateCommandResult(rawResult, mode, index) {
       evidenceReady: !isPlaceholder(rawResult.evidence),
     }
   }
-  if (rawResult.executed !== true) blockers.push("executed=true")
-  if (rawResult.exitStatus !== 0) blockers.push("exitStatus=0")
-  if (rawResult.cloudApiCalled !== true) blockers.push("cloudApiCalled=true")
+  if (rawResult.executed !== true) blockers.push(expectedValueBlocker("executed", true, rawResult.executed))
+  if (rawResult.exitStatus !== 0) blockers.push(expectedValueBlocker("exitStatus", 0, rawResult.exitStatus))
+  if (rawResult.cloudApiCalled !== true) blockers.push(expectedValueBlocker("cloudApiCalled", true, rawResult.cloudApiCalled))
   if (isPlaceholder(rawResult.observedAt)) blockers.push("observedAt")
   if (isPlaceholder(rawResult.outputSummary)) blockers.push("outputSummary")
   if (isPlaceholder(rawResult.evidence)) blockers.push("evidence")
@@ -265,6 +265,17 @@ function validateCommandResult(rawResult, mode, index) {
     outputSummaryReady: !isPlaceholder(rawResult.outputSummary),
     evidenceReady: !isPlaceholder(rawResult.evidence),
   }
+}
+
+function expectedValueBlocker(field, expected, actual) {
+  return `expected:${field}=${formatScalar(expected)} actual:${formatScalar(actual)}`
+}
+
+function formatScalar(value) {
+  if (value === undefined) return "undefined"
+  if (value === null) return "null"
+  if (typeof value === "string") return value ? JSON.stringify(value) : '""'
+  return String(value)
 }
 
 function isPlaceholder(value) {

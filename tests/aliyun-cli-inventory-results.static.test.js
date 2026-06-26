@@ -202,7 +202,9 @@ test("Aliyun CLI inventory results separates console observations from strict CL
   assert.ok(report.local.blockers.includes("readonly_inventory_commands_executed=0/9"))
   assert.ok(report.local.blockers.includes("readonly_inventory_cloud_api_called=0/9"))
   assert.ok(report.local.blockers.includes("console_only_observation_not_strict_inventory"))
-  assert.ok(report.local.technicalBlockers.some((item) => item.includes("commandResults[0]:executed=true")))
+  assert.ok(report.local.technicalBlockers.some((item) =>
+    item.includes("commandResults[0]:expected:executed=true actual:false")
+  ))
   assert.deepEqual(summary.statusCounts, {
     not_found: 5,
     blocked: 2,
@@ -220,6 +222,24 @@ test("Aliyun CLI inventory results separates console observations from strict CL
   assert.equal(sls.status, "observed")
   assert.equal(sae.status, "not_found")
   assert.match(output, /safeConsoleOnly/)
+  assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
+  assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
+  assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
+})
+
+test("Aliyun CLI inventory results technical blockers show expected and actual values", () => {
+  const { output, report } = run(["--allow-incomplete"])
+
+  assert.equal(report.ok, false)
+  assert.equal(report.local.ready, false)
+  assert.ok(report.local.technicalBlockers.some((item) =>
+    item === "I01_SAE_RUNTIME:commandResults[0]:expected:exitStatus=0 actual:3"
+  ))
+  assert.ok(report.local.technicalBlockers.some((item) =>
+    item === "I05_OSS_AUDIO_BUCKET:commandResults[0]:expected:exitStatus=0 actual:1"
+  ))
+  assert.ok(!report.local.technicalBlockers.some((item) => /commandResults\[0\]:exitStatus=0$/.test(item)))
+  assert.match(output, /expected:exitStatus=0 actual:3/)
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
