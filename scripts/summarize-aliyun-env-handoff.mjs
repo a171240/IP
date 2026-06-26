@@ -156,6 +156,7 @@ function buildReport(args) {
     ],
   }
   if (args.backendOnly) applyBackendOnlyScope(report)
+  report.credentialAcquisitionQueue = buildCredentialAcquisitionQueue(report, args)
   const secretLikePaths = findSecretLikeValues(report)
   report.secretLeakCheck = {
     ok: secretLikePaths.length === 0,
@@ -201,6 +202,162 @@ function applyBackendOnlyScope(report) {
     envNames: Array.from(excluded).sort(),
     reason: "微信开放平台移动应用、Apple/Android 发布和 APP 协议页变量不参与当前阿里云后端补齐。",
   }
+}
+
+function buildCredentialAcquisitionQueue(report, args) {
+  const blockedRequired = report.groups.blockedRequired || []
+  const readySecretEnv = report.groups.readySecretEnv || []
+  const appLaunchBlocking = report.groups.appLaunchBlocking || []
+  const missingCredentialNames = blockedRequired.map((item) => item.name)
+  const readySecretEnvVariableNames = readySecretEnv.map((item) => item.name)
+  const items = []
+
+  for (const variable of blockedRequired) {
+    items.push({
+      order: items.length + 1,
+      actionId: actionIdForMissingVariable(variable.name),
+      category: categoryForMissingVariable(variable.name),
+      status: variable.status,
+      owner: variable.owner,
+      userQuestion: userQuestionForMissingVariable(variable.name),
+      variableNames: [variable.name],
+      blockedCredentialNames: [variable.name],
+      readySecretEnvVariableNames: [],
+      obtainFrom: variable.consolePath || variable.obtain,
+      obtain: variable.obtain,
+      destinationSummary: [
+        `${variable.name} -> ${variable.importTarget}`,
+        `${variable.cloudConfirmationKey || "cloud confirmation"} -> non-secret confirmation evidence`,
+      ],
+      importTarget: variable.importTarget,
+      valuePolicy: variable.valuePolicy,
+      forbidden: variable.forbidden,
+      verifyCommands: verifyCommandsForMissingVariable(variable.name),
+      requiresActionTimeConfirmation: true,
+      unblockCondition: unblockConditionForMissingVariable(variable.name),
+    })
+  }
+
+  if (readySecretEnvVariableNames.length) {
+    items.push({
+      order: items.length + 1,
+      actionId: "S06_READY_SENSITIVE_ENV_IMPORT",
+      relatedActionIds: readySecretEnvVariableNames.some((name) => name.startsWith("ALIYUN_OSS_"))
+        ? ["S05_OSS_RAM_SECRET_OR_STS", "S06_READY_SENSITIVE_ENV_IMPORT"]
+        : ["S06_READY_SENSITIVE_ENV_IMPORT"],
+      category: "ready_secret_env_import",
+      status: "blocked_until_cloud_import_confirmed",
+      owner: "阿里云运行环境/密钥操作员",
+      userQuestion: "本机已有 ready secret env 如何迁到阿里云运行环境",
+      variableNames: readySecretEnvVariableNames,
+      blockedCredentialNames: [],
+      readySecretEnvVariableNames,
+      obtainFrom: "按变量 owner/sourceCategory 从 Vercel production、Supabase、阿里云、DeepSeek、火山引擎、微信公众平台等控制台核对来源。",
+      obtain: "本地仅证明变量名和 ready 状态；动作时仍需从受控来源核对并导入阿里云。",
+      destinationSummary: [
+        "KMS/Secrets Manager/SAE secret env for secret or connection values",
+        "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport non-secret confirmation",
+      ],
+      importTarget: "阿里云 KMS/Secrets Manager/SAE secret env",
+      valuePolicy: "只在动作时导入 KMS/Secrets Manager/SAE secret env；报告中只保留变量名和非密钥证据。",
+      forbidden: "不能把真实 value 写入 JSON、Markdown、Docker 镜像、APP 包、小程序包、shell history 或 git。",
+      verifyCommands: [
+        args.backendOnly ? "corepack pnpm aliyun:env:handoff:backend" : "corepack pnpm aliyun:env:handoff",
+        args.backendOnly ? "corepack pnpm aliyun:sensitive:blockers:backend" : "corepack pnpm aliyun:sensitive:blockers",
+        "corepack pnpm aliyun:env:checklist",
+        "corepack pnpm aliyun:readiness:cloud-ready",
+      ],
+      requiresActionTimeConfirmation: true,
+      unblockCondition: "envImport.confirmed=true 且 envImport.secretNotInImage=true。",
+    })
+  }
+
+  if (!args.backendOnly && appLaunchBlocking.length) {
+    items.push({
+      order: items.length + 1,
+      actionId: "P01_WECHAT_OPEN_MOBILE_APP_OR_APP_LAUNCH_DEFERRED",
+      category: "deferred_app_launch_env",
+      status: "deferred_after_backend_online",
+      owner: "APP 发布操作员",
+      userQuestion: "完整 APP 发布还缺哪些移动应用/Apple/Android 变量",
+      variableNames: appLaunchBlocking.map((item) => item.name),
+      blockedCredentialNames: appLaunchBlocking
+        .filter((item) => item.importTarget !== "阿里云 SAE plain env")
+        .map((item) => item.name),
+      readySecretEnvVariableNames: [],
+      obtainFrom: "微信开放平台、Apple Developer、Android release signing secret store。",
+      obtain: "当前阿里云后端补齐阶段后置；完整 APP 上线前再处理。",
+      destinationSummary: appLaunchBlocking.map((item) => `${item.name} -> ${item.importTarget}`),
+      importTarget: "deferred full App launch env targets",
+      valuePolicy: "只在完整 APP 发布动作时处理，不参与当前 backend-only 阻塞。",
+      forbidden: "不能用小程序 AppID/Secret 替代移动应用 AppID/AppSecret；不能把 AppSecret 或签名密码写入文档、镜像、APP 包或 git。",
+      verifyCommands: [
+        "corepack pnpm aliyun:wechat-open:package",
+        "corepack pnpm aliyun:app-native:strict",
+      ],
+      requiresActionTimeConfirmation: true,
+      unblockCondition: "微信移动应用审核、Android release signing、Apple Team/AASA 均完成。",
+    })
+  }
+
+  return {
+    currentScope: report.currentScope,
+    queueScope: args.backendOnly ? CURRENT_SCOPE : "full_app_env_handoff",
+    missingCredentialNames,
+    onlyMissingBackendCredentialValue: args.backendOnly && missingCredentialNames.length === 1
+      ? missingCredentialNames[0]
+      : "",
+    readySecretEnvVariableCount: readySecretEnvVariableNames.length,
+    readySecretEnvVariableNames,
+    requiresActionTimeConfirmationIds: items
+      .flatMap((item) => [item.actionId, ...(item.relatedActionIds || [])])
+      .filter(Boolean)
+      .filter((value, index, list) => list.indexOf(value) === index),
+    items,
+    valueHandlingRules: [
+      "missingCredentialNames 只列变量名，不包含 value。",
+      "readySecretEnvVariableNames 表示本机 ready，但仍只能动作时导入阿里云 secret env。",
+      "DATABASE_URL_CN、数据库密码、AccessKeySecret、STS token、AppSecret、registry password、Supabase service role key、cookie 和证书私钥不能写入 JSON、Markdown、Docker 镜像、APP 包、小程序包、shell history 或 git。",
+    ],
+  }
+}
+
+function actionIdForMissingVariable(name) {
+  if (name === "DATABASE_URL_CN") return "S08_ALIYUN_RDS_DATABASE_URL"
+  return `MISSING_ENV_${name}`
+}
+
+function categoryForMissingVariable(name) {
+  if (name === "DATABASE_URL_CN") return "rds_database_secret_and_migration"
+  return "missing_required_env"
+}
+
+function userQuestionForMissingVariable(name) {
+  if (name === "DATABASE_URL_CN") return "DATABASE_URL_CN 从哪里获得并导入到哪里"
+  return `${name} 从哪里获得并导入到哪里`
+}
+
+function verifyCommandsForMissingVariable(name) {
+  if (name === "DATABASE_URL_CN") {
+    return [
+      "corepack pnpm aliyun:rds:migration:package",
+      "corepack pnpm aliyun:rds:migration:evidence:strict",
+      "corepack pnpm aliyun:sensitive:blockers:backend",
+      "corepack pnpm aliyun:backend-cn:status",
+      "corepack pnpm aliyun:completion:audit",
+    ]
+  }
+  return [
+    "corepack pnpm aliyun:env:handoff",
+    "corepack pnpm aliyun:env:checklist",
+  ]
+}
+
+function unblockConditionForMissingVariable(name) {
+  if (name === "DATABASE_URL_CN") {
+    return "rdsPostgres.databaseUrlCnSecretImported=true，compatibilityReviewChecklist 6 类已处理，migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true，schema/data/APP API smoke/rollback validation passed。"
+  }
+  return `${name} ready 且按目标导入阿里云运行环境。`
 }
 
 function groupVariables(plan) {
@@ -346,6 +503,15 @@ function renderMarkdown(report) {
     "",
     ...report.acquisitionOrder.map((item) => `- ${item.name}: ${item.reason}；获取：${item.obtain}；导入：${item.importTarget}`),
     "",
+    "## 密钥/密码获取与导入队列",
+    "",
+    `- queueScope: ${report.credentialAcquisitionQueue.queueScope}`,
+    `- missingCredentialNames: ${report.credentialAcquisitionQueue.missingCredentialNames.join(", ") || "none"}`,
+    `- onlyMissingBackendCredentialValue: ${report.credentialAcquisitionQueue.onlyMissingBackendCredentialValue || "none"}`,
+    `- readySecretEnvVariableCount: ${report.credentialAcquisitionQueue.readySecretEnvVariableCount}`,
+    `- requiresActionTimeConfirmationIds: ${report.credentialAcquisitionQueue.requiresActionTimeConfirmationIds.join(", ") || "none"}`,
+    "",
+    ...renderCredentialAcquisitionQueue(report.credentialAcquisitionQueue),
     ...GROUPS.flatMap(([key, title]) => renderGroup(title, report.groups[key])),
     "## 完成后验证",
     "",
@@ -356,6 +522,28 @@ function renderMarkdown(report) {
     ...report.safetyBoundary.map((item) => `- ${item}`),
   ]
   return `${lines.join("\n")}\n`
+}
+
+function renderCredentialAcquisitionQueue(queue) {
+  const items = queue.items || []
+  if (!items.length) return ["- none", ""]
+  return [
+    "| 顺序 | actionId | 变量 | 获取位置 | 导入目标 | 验证命令 |",
+    "| --- | --- | --- | --- | --- | --- |",
+    ...items.map((item) => [
+      item.order,
+      codeCell(item.actionId),
+      escapeTableCell((item.variableNames || []).join(", ") || "none"),
+      escapeTableCell(item.obtainFrom || item.obtain || ""),
+      escapeTableCell(item.importTarget || (item.destinationSummary || []).join("; ")),
+      escapeTableCell((item.verifyCommands || []).join("; ")),
+    ].join(" | ").replace(/^/, "| ").replace(/$/, " |")),
+    "",
+    "### 队列安全规则",
+    "",
+    ...queue.valueHandlingRules.map((item) => `- ${item}`),
+    "",
+  ]
 }
 
 function renderGroup(title, items) {

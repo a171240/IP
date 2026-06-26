@@ -13,6 +13,7 @@ test("Aliyun env handoff command is wired into scripts and deployment spec", () 
   const predeploy = read("scripts", "aliyun-predeploy-commands.mjs")
   const deploySpec = readJson("deploy", "aliyun-production-cn.example.json")
   const deploymentSpecChecker = read("scripts", "check-aliyun-deployment-spec.mjs")
+  const releaseArtifacts = read("scripts", "prepare-aliyun-release-artifacts.mjs")
 
   assert.equal(pkg.scripts["aliyun:env:handoff"], "node ./scripts/summarize-aliyun-env-handoff.mjs")
   assert.equal(pkg.scripts["aliyun:env:handoff:backend"], "node ./scripts/summarize-aliyun-env-handoff.mjs --backend-only")
@@ -27,6 +28,9 @@ test("Aliyun env handoff command is wired into scripts and deployment spec", () 
   assert.ok(deploySpec.predeployChecks.includes("corepack pnpm aliyun:env:handoff:backend"))
   assert.match(deploymentSpecChecker, /corepack pnpm aliyun:env:handoff/)
   assert.match(deploymentSpecChecker, /corepack pnpm aliyun:env:handoff:backend/)
+  assert.match(releaseArtifacts, /credentialAcquisitionQueueScope/)
+  assert.match(releaseArtifacts, /credentialAcquisitionQueueMissingNames/)
+  assert.match(releaseArtifacts, /credentialAcquisitionQueueActionIds/)
 })
 
 test("Aliyun env handoff groups current variables without printing values", () => {
@@ -67,6 +71,24 @@ test("Aliyun env handoff groups current variables without printing values", () =
   assert.match(wechatSecret.forbidden, /不能用小程序 Secret 替代/)
   assert.match(appleTeamId.forbidden, /不要猜测 Team ID/)
   assert.ok(report.acquisitionOrder.some((item) => item.name === "readySecretEnv"))
+  assert.equal(report.credentialAcquisitionQueue.queueScope, "full_app_env_handoff")
+  assert.ok(report.credentialAcquisitionQueue.missingCredentialNames.includes("DATABASE_URL_CN"))
+  assert.equal(report.credentialAcquisitionQueue.readySecretEnvVariableCount, readySecretNames.length)
+  assert.ok(report.credentialAcquisitionQueue.items.some((item) =>
+    item.actionId === "S08_ALIYUN_RDS_DATABASE_URL" &&
+    item.blockedCredentialNames.includes("DATABASE_URL_CN") &&
+    /RDS PostgreSQL/.test(item.obtainFrom) &&
+    /secret env/.test(item.importTarget)
+  ))
+  assert.ok(report.credentialAcquisitionQueue.items.some((item) =>
+    item.actionId === "S06_READY_SENSITIVE_ENV_IMPORT" &&
+    item.readySecretEnvVariableNames.includes("SUPABASE_SERVICE_ROLE_KEY")
+  ))
+  assert.ok(report.credentialAcquisitionQueue.items.some((item) =>
+    item.actionId === "P01_WECHAT_OPEN_MOBILE_APP_OR_APP_LAUNCH_DEFERRED" &&
+    item.variableNames.includes("WECHAT_OPEN_APP_ID") &&
+    item.variableNames.includes("APPLE_TEAM_ID")
+  ))
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
@@ -110,6 +132,26 @@ test("Aliyun env handoff backend-only mode excludes deferred app launch variable
     "readySecretEnv",
     "readyPlainEnv",
   ])
+  assert.equal(report.credentialAcquisitionQueue.queueScope, "backend_aliyun_only")
+  assert.deepEqual(report.credentialAcquisitionQueue.missingCredentialNames, ["DATABASE_URL_CN"])
+  assert.equal(report.credentialAcquisitionQueue.onlyMissingBackendCredentialValue, "DATABASE_URL_CN")
+  assert.equal(report.credentialAcquisitionQueue.readySecretEnvVariableCount, groupNames.readySecretEnv.length)
+  assert.deepEqual(report.credentialAcquisitionQueue.items.map((item) => item.actionId), [
+    "S08_ALIYUN_RDS_DATABASE_URL",
+    "S06_READY_SENSITIVE_ENV_IMPORT",
+  ])
+  const rdsQueueItem = report.credentialAcquisitionQueue.items.find((item) => item.actionId === "S08_ALIYUN_RDS_DATABASE_URL")
+  assert.ok(rdsQueueItem)
+  assert.equal(rdsQueueItem.userQuestion, "DATABASE_URL_CN 从哪里获得并导入到哪里")
+  assert.deepEqual(rdsQueueItem.blockedCredentialNames, ["DATABASE_URL_CN"])
+  assert.match(rdsQueueItem.obtainFrom, /RDS PostgreSQL/)
+  assert.match(rdsQueueItem.importTarget, /secret env/)
+  assert.ok(rdsQueueItem.verifyCommands.includes("corepack pnpm aliyun:rds:migration:package"))
+  const readyImportQueueItem = report.credentialAcquisitionQueue.items.find((item) => item.actionId === "S06_READY_SENSITIVE_ENV_IMPORT")
+  assert.ok(readyImportQueueItem.readySecretEnvVariableNames.includes("SUPABASE_SERVICE_ROLE_KEY"))
+  assert.ok(readyImportQueueItem.relatedActionIds.includes("S05_OSS_RAM_SECRET_OR_STS"))
+  assert.ok(report.credentialAcquisitionQueue.requiresActionTimeConfirmationIds.includes("S08_ALIYUN_RDS_DATABASE_URL"))
+  assert.ok(report.credentialAcquisitionQueue.valueHandlingRules.some((item) => /DATABASE_URL_CN/.test(item)))
   assert.ok(report.verificationCommands.includes("corepack pnpm aliyun:sensitive:blockers:backend"))
   assert.ok(report.verificationCommands.includes("corepack pnpm aliyun:operator:tasks:backend"))
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
@@ -144,6 +186,11 @@ test("Aliyun env handoff markdown keeps operator instructions value-free", () =>
   assert.match(markdown, /WECHAT_OPEN_APP_ID/)
   assert.match(markdown, /WECHAT_OPEN_APP_SECRET/)
   assert.match(markdown, /DATABASE_URL_CN/)
+  assert.match(markdown, /密钥\/密码获取与导入队列/)
+  assert.match(markdown, /queueScope: full_app_env_handoff/)
+  assert.match(markdown, /S08_ALIYUN_RDS_DATABASE_URL/)
+  assert.match(markdown, /S06_READY_SENSITIVE_ENV_IMPORT/)
+  assert.match(markdown, /P01_WECHAT_OPEN_MOBILE_APP_OR_APP_LAUNCH_DEFERRED/)
   assert.match(markdown, /APPLE_TEAM_ID/)
   assert.match(markdown, /可导入 KMS\/Secrets Manager\/SAE secret env/)
   assert.doesNotMatch(markdown, /sk-[A-Za-z0-9_-]{20,}/)
@@ -170,6 +217,12 @@ test("Aliyun env handoff backend-only markdown omits deferred app launch variabl
   assert.match(markdown, /requiredBlocking: DATABASE_URL_CN/)
   assert.match(markdown, /fullAppRequiredBlocking: DATABASE_URL_CN/)
   assert.match(markdown, /appLaunchBlocking: none/)
+  assert.match(markdown, /密钥\/密码获取与导入队列/)
+  assert.match(markdown, /queueScope: backend_aliyun_only/)
+  assert.match(markdown, /missingCredentialNames: DATABASE_URL_CN/)
+  assert.match(markdown, /onlyMissingBackendCredentialValue: DATABASE_URL_CN/)
+  assert.match(markdown, /S08_ALIYUN_RDS_DATABASE_URL/)
+  assert.match(markdown, /S06_READY_SENSITIVE_ENV_IMPORT/)
   assert.match(markdown, /corepack pnpm aliyun:sensitive:blockers:backend/)
   assert.match(markdown, /corepack pnpm aliyun:operator:tasks:backend/)
   assert.doesNotMatch(markdown, /WECHAT_OPEN_APP_ID/)
