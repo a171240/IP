@@ -124,12 +124,17 @@ function summarizeCloudShellGate(cloudShell = {}) {
     /performance_nas_may_generate_small_usage_fees|NAS|费用|开通/.test(evidence)
   const requiresRestartConfirmation = blockers.includes("cloudshell_disconnected_restart_instance_confirmation_required") ||
     /Disconnected|restart instance|restart_instance|重启实例|terminate all sessions|中止.*会话|终止.*会话|create a new session|创建.*新.*会话/i.test(combinedEvidence)
+  const connectingTerminalVisible = cloudShell.connecting === true ||
+    blockers.includes("cloudshell_connecting_terminal_input_visible_inventory_not_executed") ||
+    /cloudshell_connecting_terminal_input_visible_inventory_not_executed|正在连接\s*Cloud\s*Shell|connecting\s+Cloud\s*Shell|terminal_input_visible|Terminal input/i.test(combinedEvidence)
   const confirmationKinds = [
     ...(requiresOpenConfirmation ? ["open_service_nas_fee"] : []),
     ...(requiresRestartConfirmation ? ["restart_instance"] : []),
   ]
   return {
     connected: cloudShell.connected === true,
+    connecting: connectingTerminalVisible,
+    terminalInputVisible: cloudShell.terminalInputVisible === true || /terminal_input_visible|Terminal input/i.test(combinedEvidence),
     cliAvailable: cloudShell.cliAvailable === true,
     cliConfigFileExists: cloudShell.cliConfigFileExists === true,
     canRunReadOnlyInventory: cloudShell.canRunReadOnlyInventory === true,
@@ -151,7 +156,9 @@ function summarizeCloudShellGate(cloudShell = {}) {
         ? "disconnected_restart_instance_confirmation_required"
         : requiresOpenConfirmation
           ? "not_opened_nas_fee_confirmation_required"
-          : "cloudshell_cli_config_missing_or_unread",
+          : connectingTerminalVisible
+            ? "connecting_terminal_input_visible_inventory_not_executed"
+            : "cloudshell_cli_config_missing_or_unread",
   }
 }
 
@@ -207,6 +214,9 @@ function buildCurrentAnswer(cloudAccess, existingInventoryEvidence) {
   }
   if (cloudShell.requiresActionTimeOpenConfirmation) {
     return "Aliyun CloudShell read-only inventory is blocked because the current CloudShell page requires 开通 and warns about possible performance NAS usage fees; do not click it without action-time confirmation."
+  }
+  if (cloudShell.currentStatus === "connecting_terminal_input_visible_inventory_not_executed") {
+    return "Aliyun CloudShell is visible and still connecting; terminal input is present but no allowlisted read-only inventory has been run yet."
   }
   if (existingInventoryEvidence.ready === true) {
     return "Existing strict inventory evidence is ready, but current Aliyun CLI/CloudShell identity is not ready for refresh; do not treat later cloud changes as verified until inventory is rerun."
@@ -299,6 +309,8 @@ function buildReport(options = {}) {
         title: "阿里云 CloudShell",
         currentStatus: cloudShellGate.currentStatus,
         cloudShellConnected: cloudShellGate.connected,
+        cloudShellConnecting: cloudShellGate.connecting,
+        cloudShellTerminalInputVisible: cloudShellGate.terminalInputVisible,
         cloudShellCliAvailable: cloudShellGate.cliAvailable,
         cloudShellCliConfigFileExists: cloudShellGate.cliConfigFileExists,
         cloudShellCanRunReadOnlyInventory: cloudShellGate.canRunReadOnlyInventory,
@@ -415,6 +427,8 @@ function renderMarkdown(report) {
     `- currentBrowserCloudApiCalled: ${report.currentBrowser.cloudApiCalled === true}`,
     `- currentBrowserCloudMutationPerformed: ${report.currentBrowser.cloudMutationPerformed === true}`,
     `- cloudShellCurrentStatus: ${report.cloudShellGate.currentStatus}`,
+    `- cloudShellConnecting: ${report.cloudShellGate.connecting === true}`,
+    `- cloudShellTerminalInputVisible: ${report.cloudShellGate.terminalInputVisible === true}`,
     `- cloudShellRequiresActionTimeConfirmation: ${report.cloudShellGate.requiresActionTimeConfirmation === true}`,
     `- cloudShellRequiresActionTimeOpenConfirmation: ${report.cloudShellGate.requiresActionTimeOpenConfirmation === true}`,
     `- cloudShellRequiresActionTimeRestartConfirmation: ${report.cloudShellGate.requiresActionTimeRestartConfirmation === true}`,
@@ -469,6 +483,8 @@ function renderOperatorPath(item) {
     ...(item.consolePath ? [`- consolePath: ${item.consolePath}`] : []),
     ...(typeof item.currentBrowserCanUseCurrentConsole === "boolean" ? [`- currentBrowserCanUseCurrentConsole: ${item.currentBrowserCanUseCurrentConsole}`] : []),
     ...(typeof item.cloudShellConnected === "boolean" ? [`- cloudShellConnected: ${item.cloudShellConnected}`] : []),
+    ...(typeof item.cloudShellConnecting === "boolean" ? [`- cloudShellConnecting: ${item.cloudShellConnecting}`] : []),
+    ...(typeof item.cloudShellTerminalInputVisible === "boolean" ? [`- cloudShellTerminalInputVisible: ${item.cloudShellTerminalInputVisible}`] : []),
     ...(typeof item.cloudShellCanRunReadOnlyInventory === "boolean" ? [`- cloudShellCanRunReadOnlyInventory: ${item.cloudShellCanRunReadOnlyInventory}`] : []),
     ...(typeof item.requiresActionTimeConfirmation === "boolean" ? [`- requiresActionTimeConfirmation: ${item.requiresActionTimeConfirmation}`] : []),
     ...(typeof item.requiresActionTimeOpenConfirmation === "boolean" ? [`- requiresActionTimeOpenConfirmation: ${item.requiresActionTimeOpenConfirmation}`] : []),

@@ -340,6 +340,8 @@ function normalizeCloudAccessObservation(observation) {
       },
       cloudShell: {
         connected: false,
+        connecting: false,
+        terminalInputVisible: false,
         regionLabel: "",
         cliAvailable: false,
         cliVersion: "",
@@ -382,11 +384,23 @@ function normalizeCloudAccessObservation(observation) {
   const requiresRestartConfirmation = cloudShell.requiresActionTimeRestartConfirmation === true ||
     cloudShellBlockers.includes("cloudshell_disconnected_restart_instance_confirmation_required") ||
     /Disconnected|restart instance|restart_instance|重启实例|terminate all sessions|中止.*会话|终止.*会话|create a new session|创建.*新.*会话/i.test(cloudShellText)
+  const connectingTerminalVisible = cloudShell.connecting === true ||
+    cloudShellBlockers.includes("cloudshell_connecting_terminal_input_visible_inventory_not_executed") ||
+    /cloudshell_connecting_terminal_input_visible_inventory_not_executed|正在连接\s*Cloud\s*Shell|connecting\s+Cloud\s*Shell/i.test(cloudShellText) ||
+    (cloudShell.terminalInputVisible === true && /Terminal input|terminal_input_visible|终端输入框/i.test(cloudShellText))
   if (requiresOpenConfirmation && !cloudShellBlockers.includes("cloudshell_not_opened_action_time_confirmation_required_for_nas_fee_warning")) {
     cloudShellBlockers.push("cloudshell_not_opened_action_time_confirmation_required_for_nas_fee_warning")
   }
   if (requiresRestartConfirmation && !cloudShellBlockers.includes("cloudshell_disconnected_restart_instance_confirmation_required")) {
     cloudShellBlockers.push("cloudshell_disconnected_restart_instance_confirmation_required")
+  }
+  if (
+    connectingTerminalVisible &&
+    !requiresOpenConfirmation &&
+    !requiresRestartConfirmation &&
+    !cloudShellBlockers.includes("cloudshell_connecting_terminal_input_visible_inventory_not_executed")
+  ) {
+    cloudShellBlockers.push("cloudshell_connecting_terminal_input_visible_inventory_not_executed")
   }
   if (cloudShell.cloudMutationPerformed === true) blockers.push("cloudshell_mutation_observed")
   if (cloudShell.cloudApiCalled === true && cloudShell.canRunReadOnlyInventory !== true) {
@@ -439,6 +453,8 @@ function normalizeCloudAccessObservation(observation) {
     },
     cloudShell: {
       connected: cloudShell.connected === true,
+      connecting: connectingTerminalVisible,
+      terminalInputVisible: cloudShell.terminalInputVisible === true || /Terminal input|terminal_input_visible|终端输入框/i.test(cloudShellText),
       regionLabel: String(cloudShell.regionLabel || ""),
       cliAvailable: cloudShell.cliAvailable === true,
       cliVersion: String(cloudShell.cliVersion || ""),
@@ -592,6 +608,9 @@ function classifyCloudShellInventoryStatus(cloudShell = {}, observedLine = "") {
   }
   if (/cloudshell_not_opened_action_time_confirmation_required_for_nas_fee_warning|performance_nas_may_generate_small_usage_fees|performance NAS|性能型 NAS|usage fees|费用提示|点击开通|requires 开通/i.test(text)) {
     return "cloudshell_not_opened_nas_fee_confirmation_required"
+  }
+  if (/cloudshell_connecting_terminal_input_visible_inventory_not_executed|正在连接\s*Cloud\s*Shell|connecting\s+Cloud\s*Shell|terminal_input_visible|Terminal input/i.test(text)) {
+    return "cloudshell_connecting_inventory_not_executed"
   }
   const hasAnyObservation = Boolean(observedLine) ||
     cloudShell?.connected === true ||

@@ -254,6 +254,65 @@ test("Aliyun CloudShell handoff preserves disconnected restart confirmation", ()
   assert.doesNotMatch(output, secretLike)
 })
 
+test("Aliyun CloudShell handoff preserves connecting terminal state without confirmation", () => {
+  const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-cloudshell-handoff-connecting-"))
+  const observationPath = path.join(tmpdir, "cloud-access.local.json")
+  const markdownPath = path.join(tmpdir, "cloudshell-handoff.md")
+  writeCloudAccessObservationFixture(observationPath, {
+    resourcesObserved: [
+      "CloudShell tab shows 正在连接 Cloud Shell.; Terminal input visible; no command prompt observed; no allowlisted inventory command executed.",
+    ],
+    cloudShell: {
+      connecting: true,
+      terminalInputVisible: true,
+      blockers: ["cloudshell_connecting_terminal_input_visible_inventory_not_executed"],
+      evidence: "cloudshell_connecting_terminal_input_visible_no_inventory_no_confirm_no_mutation",
+    },
+  })
+  const output = execFileSync(process.execPath, [
+    "scripts/generate-aliyun-cloudshell-inventory-handoff.mjs",
+    "--cloud-access-observation",
+    observationPath,
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 30,
+  })
+  const report = JSON.parse(output)
+  execFileSync(process.execPath, [
+    "scripts/generate-aliyun-cloudshell-inventory-handoff.mjs",
+    "--cloud-access-observation",
+    observationPath,
+    "--markdown",
+    markdownPath,
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 30,
+  })
+  const markdown = fs.readFileSync(markdownPath, "utf8")
+  const cloudShellPath = report.operatorPaths.find((item) => item.id === "aliyun_cloudshell")
+
+  assert.ok(cloudShellPath, "missing aliyun_cloudshell operator path")
+  assert.equal(report.cloudShellGate.requiresActionTimeConfirmation, false)
+  assert.equal(report.cloudShellGate.requiresActionTimeOpenConfirmation, false)
+  assert.equal(report.cloudShellGate.requiresActionTimeRestartConfirmation, false)
+  assert.equal(report.cloudShellGate.connecting, true)
+  assert.equal(report.cloudShellGate.terminalInputVisible, true)
+  assert.equal(report.cloudShellGate.currentStatus, "connecting_terminal_input_visible_inventory_not_executed")
+  assert.deepEqual(report.cloudShellGate.confirmationKinds, [])
+  assert.ok(report.cloudShellGate.blockers.includes("cloudshell_connecting_terminal_input_visible_inventory_not_executed"))
+  assert.equal(cloudShellPath.cloudShellConnecting, true)
+  assert.equal(cloudShellPath.cloudShellTerminalInputVisible, true)
+  assert.equal(cloudShellPath.requiresActionTimeConfirmation, false)
+  assert.match(report.currentAnswer, /still connecting/)
+  assert.match(markdown, /cloudShellCurrentStatus: connecting_terminal_input_visible_inventory_not_executed/)
+  assert.match(markdown, /cloudShellConnecting: true/)
+  assert.match(markdown, /cloudShellTerminalInputVisible: true/)
+  assert.doesNotMatch(output, secretLike)
+  assert.doesNotMatch(markdown, secretLike)
+})
+
 function findOperation(report, id) {
   const operation = report.operations.find((item) => item.id === id)
   assert.ok(operation, `missing operation ${id}`)
