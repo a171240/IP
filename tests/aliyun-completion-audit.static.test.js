@@ -76,6 +76,7 @@ test("Aliyun completion audit command is wired into scripts, predeploy, deploy s
   assert.match(releaseArtifacts, /cloudInventoryConsoleOnly/)
   assert.match(releaseArtifacts, /observationSummary/)
   assert.match(releaseArtifacts, /nextActionTimeConfirmations/)
+  assert.match(releaseArtifacts, /actionTimeAuthorizationNow/)
   assert.match(releaseArtifacts, /blockedCredentialCount/)
   assert.match(releaseArtifacts, /readySecretEnvVariableCount/)
   assert.match(releaseArtifacts, /resourceEvidenceReady/)
@@ -253,6 +254,38 @@ test("Aliyun completion audit reports the current goal as blocked without secret
       "P03_ACR_PURCHASE",
     ],
   )
+  assert.equal(report.summary.actionTimeAuthorizationRequired, true)
+  assert.deepEqual(report.summary.actionTimeAuthorizationPacketIds, [
+    "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
+    "P11_ALIYUN_RDS_DATA_MIGRATION",
+    "P05_OSS_RAM_STS",
+    "P03_ACR_PURCHASE",
+  ])
+  assert.deepEqual(report.summary.actionTimeAuthorizationBlockedCredentialNames, ["DATABASE_URL_CN"])
+  assert.equal(report.summary.actionTimeAuthorizationReadySecretEnvVariableCount, 17)
+  assert.equal(report.actionTimeAuthorizationNow.required, true)
+  assert.equal(report.actionTimeAuthorizationNow.currentScope, "backend_aliyun_only")
+  assert.deepEqual(report.actionTimeAuthorizationNow.packetIds, report.summary.actionTimeAuthorizationPacketIds)
+  assert.deepEqual(report.actionTimeAuthorizationNow.nonSecretEvidenceOnlyPacketIds, [
+    "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
+    "P03_ACR_PURCHASE",
+  ])
+  assert.deepEqual(report.actionTimeAuthorizationNow.secretOrCredentialPacketIds, [
+    "P11_ALIYUN_RDS_DATA_MIGRATION",
+    "P05_OSS_RAM_STS",
+  ])
+  assert.deepEqual(report.actionTimeAuthorizationNow.blockedCredentialNames, ["DATABASE_URL_CN"])
+  assert.equal(report.actionTimeAuthorizationNow.readySecretEnvVariableCount, 17)
+  assert.ok(report.actionTimeAuthorizationNow.reason.includes("不授权任何阿里云变更"))
+  assert.ok(report.actionTimeAuthorizationNow.minimumUserPhrases.some((item) =>
+    item.packetId === "P00_ALIYUN_READONLY_INVENTORY_IDENTITY" &&
+    item.minimumUserPhrase.includes("只读盘点")
+  ))
+  assert.ok(report.actionTimeAuthorizationNow.explicitlyExcluded.some((item) => item.includes("不执行 docker login/push")))
+  assert.ok(report.actionTimeAuthorizationNow.writeTargets.some((item) => item.includes("DATABASE_URL_CN")))
+  assert.ok(report.actionTimeAuthorizationNow.verifyCommands.includes("corepack pnpm aliyun:rds:migration:package"))
+  assert.ok(report.actionTimeAuthorizationNow.valueHandlingRules.some((item) => item.includes("DATABASE_URL_CN")))
+  assert.deepEqual(report.nextActions.actionTimeAuthorizationNow.packetIds, report.actionTimeAuthorizationNow.packetIds)
   assert.equal(report.sourceCommands.cloudConfirmations, "corepack pnpm aliyun:cloud:confirmations:backend")
   assert.equal(report.sourceCommands.operatorTasks, "corepack pnpm aliyun:operator:tasks:backend")
   assert.ok(
@@ -318,6 +351,12 @@ test("Aliyun completion audit carries console-only inventory evidence into G03 a
   assert.match(markdownOutput, /## 数据层边界/)
   assert.match(markdownOutput, /rdsMigrationIncludedInThisRelease: false/)
   assert.match(markdownOutput, /rdsMigrationRequiredForFinalProductionCn: true/)
+  assert.match(markdownOutput, /Action-time authorization required: true/)
+  assert.match(markdownOutput, /Action-time authorization packet ids: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE/)
+  assert.match(markdownOutput, /Action-time authorization blocked credentials: DATABASE_URL_CN/)
+  assert.match(markdownOutput, /## 动作时授权摘要/)
+  assert.match(markdownOutput, /secretOrCredentialPacketIds: P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS/)
+  assert.match(markdownOutput, /readySecretEnvVariableCount: 17/)
   assert.match(markdownOutput, /目标闭环证据简表/)
   assert.match(markdownOutput, /blockedCredentialNames: DATABASE_URL_CN/)
   assert.match(markdownOutput, /fullAppBlockedCredentialNames: .*WECHAT_OPEN_APP_SECRET/)

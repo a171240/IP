@@ -360,6 +360,10 @@ function buildAudit(args, inputs) {
   } = inputs
   const goalClosureEvidenceBrief = buildGoalClosureEvidenceBrief(sensitiveBlockers, resourcesMatrix)
   const fullAppCredentialIntervention = credentialInterventionFromSensitiveBlockers(fullAppSensitiveBlockers)
+  const actionTimeAuthorizationNow = buildActionTimeAuthorizationNow(
+    actionAuthorization,
+    goalClosureEvidenceBrief.credentialIntervention,
+  )
   const deferredAppLaunchBlockedCredentialNames = fullAppCredentialIntervention.blockedCredentialNames
     .filter((name) => APP_LAUNCH_CREDENTIAL_NAME_PATTERNS.some((pattern) => pattern.test(String(name))))
   const backendCloudConfirmationSummary = summarizeCloudConfirmationReport(backendCloudConfirmations)
@@ -430,6 +434,10 @@ function buildAudit(args, inputs) {
       blockedByConsoleTaskDependencies: operatorHandoff.aliyunConsoleTaskOrder?.blockedByDependencies || [],
       canStartNowAuthorizationPackets: actionAuthorization.summary?.canStartNowPackets || [],
       nextActionTimeConfirmations: actionAuthorization.nextActionTimeConfirmations || [],
+      actionTimeAuthorizationRequired: actionTimeAuthorizationNow.required,
+      actionTimeAuthorizationPacketIds: actionTimeAuthorizationNow.packetIds,
+      actionTimeAuthorizationBlockedCredentialNames: actionTimeAuthorizationNow.blockedCredentialNames,
+      actionTimeAuthorizationReadySecretEnvVariableCount: actionTimeAuthorizationNow.readySecretEnvVariableCount,
       blockedByAuthorizationPacketDependencies: actionAuthorization.summary?.blockedByPacketDependencies || [],
       sensitiveBlockedIds: sensitiveBlockers.summary?.blockedIds || [],
       deferredAppLaunchSensitiveBlockedIds: (fullAppSensitiveBlockers.summary?.blockedIds || [])
@@ -445,10 +453,12 @@ function buildAudit(args, inputs) {
       blockedResourceEvidenceIds: goalClosureEvidenceBrief.resourceEvidence.blockedIds,
     },
     goalClosureEvidenceBrief,
+    actionTimeAuthorizationNow,
     requirements,
     nextActions: {
       userActionNow: operatorHandoff.userActionNow || [],
       aliyunConsoleActionNow: operatorHandoff.aliyunConsoleActionNow || [],
+      actionTimeAuthorizationNow,
       canStartNowConsoleTasks: operatorHandoff.aliyunConsoleTaskOrder?.canStartNow || [],
       blockedByConsoleTaskDependencies: operatorHandoff.aliyunConsoleTaskOrder?.blockedByDependencies || [],
       canStartNowAuthorizationPackets: actionAuthorization.summary?.canStartNowPackets || [],
@@ -654,6 +664,44 @@ function credentialInterventionFromSensitiveBlockers(sensitiveBlockers) {
     blockedCredentialNames: credentialIntervention.blockedCredentialNames || [],
     readySecretEnvVariableCount: credentialIntervention.readySecretEnvVariableCount || 0,
     readySecretEnvVariableNames: credentialIntervention.readySecretEnvVariableNames || [],
+  }
+}
+
+function buildActionTimeAuthorizationNow(actionAuthorization, credentialIntervention = {}) {
+  const packets = actionAuthorization.nextActionTimeConfirmations || []
+  const packetIds = packets.map((packet) => packet.packetId).filter(Boolean)
+  const nonSecretEvidenceOnlyPacketIds = packets
+    .filter((packet) => packet.nonSecretEvidenceOnly === true)
+    .map((packet) => packet.packetId)
+    .filter(Boolean)
+  const secretOrCredentialPacketIds = packets
+    .filter((packet) => packet.nonSecretEvidenceOnly !== true)
+    .map((packet) => packet.packetId)
+    .filter(Boolean)
+  return {
+    required: packetIds.length > 0,
+    currentScope: CURRENT_SCOPE,
+    reason: packetIds.length
+      ? "这些 packet 已可进入动作时确认，但本只读审计本身不授权任何阿里云变更、密钥导入、镜像推送或部署。"
+      : "当前没有可开始的动作时确认包。",
+    packetIds,
+    nonSecretEvidenceOnlyPacketIds,
+    secretOrCredentialPacketIds,
+    blockedCredentialNames: credentialIntervention.blockedCredentialNames || [],
+    readySecretEnvVariableCount: credentialIntervention.readySecretEnvVariableCount || 0,
+    actionTimeConfirmationRequiredIds: credentialIntervention.actionTimeConfirmationRequiredIds || [],
+    minimumUserPhrases: packets.map((packet) => ({
+      packetId: packet.packetId,
+      minimumUserPhrase: packet.minimumUserPhrase || "",
+    })),
+    allowedActions: uniqueStrings(packets.flatMap((packet) => packet.allowedActions || [])),
+    explicitlyExcluded: uniqueStrings(packets.flatMap((packet) => packet.explicitlyExcluded || [])),
+    writeTargets: uniqueStrings(packets.flatMap((packet) => packet.writeTargets || [])),
+    verifyCommands: uniqueStrings(packets.flatMap((packet) => packet.verifyCommands || [])),
+    valueHandlingRules: [
+      "只记录变量名、资源名、布尔值、时间戳、digest、控制台路径和非密钥 evidence handle。",
+      "DATABASE_URL_CN、数据库密码、AccessKeySecret、STS token、registry password、Supabase service role key、cookie 或证书私钥不能写入 JSON、Markdown、Docker 镜像、APP 包、小程序包、shell history 或 git。",
+    ],
   }
 }
 
@@ -1024,6 +1072,10 @@ function renderMarkdown(report) {
     `- Can start now console tasks: ${report.summary.canStartNowConsoleTasks.length ? report.summary.canStartNowConsoleTasks.join(", ") : "none"}`,
     `- Can start now authorization packets: ${report.summary.canStartNowAuthorizationPackets.length ? report.summary.canStartNowAuthorizationPackets.join(", ") : "none"}`,
     `- Next action-time confirmations: ${report.summary.nextActionTimeConfirmations.length ? report.summary.nextActionTimeConfirmations.map((item) => item.packetId).join(", ") : "none"}`,
+    `- Action-time authorization required: ${report.actionTimeAuthorizationNow.required}`,
+    `- Action-time authorization packet ids: ${report.actionTimeAuthorizationNow.packetIds.length ? report.actionTimeAuthorizationNow.packetIds.join(", ") : "none"}`,
+    `- Action-time authorization blocked credentials: ${report.actionTimeAuthorizationNow.blockedCredentialNames.length ? report.actionTimeAuthorizationNow.blockedCredentialNames.join(", ") : "none"}`,
+    `- Action-time authorization ready secret env variable count: ${report.actionTimeAuthorizationNow.readySecretEnvVariableCount}`,
     `- Blocked credential count: ${report.summary.blockedCredentialCount}`,
     `- Full app blocked credential count: ${report.summary.fullAppBlockedCredentialCount}`,
     `- Deferred app launch blocked credentials: ${report.summary.deferredAppLaunchBlockedCredentialNames.length ? report.summary.deferredAppLaunchBlockedCredentialNames.join(", ") : "none"}`,
@@ -1057,6 +1109,20 @@ function renderMarkdown(report) {
     `- rdsMigrationIncludedInThisRelease: ${report.bridgeDataLayer.rdsMigrationIncludedInThisRelease}`,
     `- rdsMigrationRequiredForFinalProductionCn: ${report.bridgeDataLayer.rdsMigrationRequiredForFinalProductionCn}`,
     ...(report.bridgeDataLayer.notes || []).map((item) => `- ${item}`),
+    "",
+    "## 动作时授权摘要",
+    "",
+    `- required: ${report.actionTimeAuthorizationNow.required}`,
+    `- currentScope: ${report.actionTimeAuthorizationNow.currentScope}`,
+    `- reason: ${report.actionTimeAuthorizationNow.reason}`,
+    `- packetIds: ${report.actionTimeAuthorizationNow.packetIds.length ? report.actionTimeAuthorizationNow.packetIds.join(", ") : "none"}`,
+    `- nonSecretEvidenceOnlyPacketIds: ${report.actionTimeAuthorizationNow.nonSecretEvidenceOnlyPacketIds.length ? report.actionTimeAuthorizationNow.nonSecretEvidenceOnlyPacketIds.join(", ") : "none"}`,
+    `- secretOrCredentialPacketIds: ${report.actionTimeAuthorizationNow.secretOrCredentialPacketIds.length ? report.actionTimeAuthorizationNow.secretOrCredentialPacketIds.join(", ") : "none"}`,
+    `- blockedCredentialNames: ${report.actionTimeAuthorizationNow.blockedCredentialNames.length ? report.actionTimeAuthorizationNow.blockedCredentialNames.join(", ") : "none"}`,
+    `- readySecretEnvVariableCount: ${report.actionTimeAuthorizationNow.readySecretEnvVariableCount}`,
+    `- explicitlyExcluded: ${report.actionTimeAuthorizationNow.explicitlyExcluded.length ? report.actionTimeAuthorizationNow.explicitlyExcluded.join("; ") : "none"}`,
+    "- valueHandlingRules:",
+    ...report.actionTimeAuthorizationNow.valueHandlingRules.map((item) => `  - ${item}`),
     "",
     "## 当前可开始的动作时确认",
     "",

@@ -885,6 +885,9 @@ function renderMarkdown(audit) {
     `- canStartNowConsoleTasks: ${completionAudit.summary.canStartNowConsoleTasks.length ? completionAudit.summary.canStartNowConsoleTasks.join(", ") : "none"}`,
     `- canStartNowAuthorizationPackets: ${completionAudit.summary.canStartNowAuthorizationPackets.length ? completionAudit.summary.canStartNowAuthorizationPackets.join(", ") : "none"}`,
     `- nextActionTimeConfirmations: ${completionAudit.summary.nextActionTimeConfirmations.length ? completionAudit.summary.nextActionTimeConfirmations.map((item) => item.packetId).join(", ") : "none"}`,
+    `- actionTimeAuthorizationNow.required: ${completionAudit.actionTimeAuthorizationNow?.required === true}`,
+    `- actionTimeAuthorizationNow.packetIds: ${completionAudit.actionTimeAuthorizationNow?.packetIds?.join(", ") || "none"}`,
+    `- actionTimeAuthorizationNow.blockedCredentialNames: ${completionAudit.actionTimeAuthorizationNow?.blockedCredentialNames?.join(", ") || "none"}`,
     ...(completionAudit.summary.nextActionTimeConfirmations?.length
       ? completionAudit.summary.nextActionTimeConfirmations.map((item) => `- ${item.packetId}: ${item.minimumUserPhrase}`)
       : ["- nextActionTimeConfirmations: none"]),
@@ -2569,6 +2572,7 @@ function main() {
       canStartNowConsoleTasks: completionAudit.summary.canStartNowConsoleTasks,
       canStartNowAuthorizationPackets: completionAudit.summary.canStartNowAuthorizationPackets,
       nextActionTimeConfirmations: completionAudit.summary.nextActionTimeConfirmations || [],
+      actionTimeAuthorizationNow: completionAudit.actionTimeAuthorizationNow || null,
       requirementStatuses: (completionAudit.requirements || []).map((item) => `${item.id}:${item.status}`),
     },
     rdsMigrationPlan: {
