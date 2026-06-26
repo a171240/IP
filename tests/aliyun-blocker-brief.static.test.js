@@ -78,6 +78,20 @@ test("Aliyun blocker brief backend-only markdown stays focused on backend resour
   assert.equal(report.summary.cloudConfirmationsReady, "0/6")
   assert.equal(report.summary.operatorTasksReady, "0/8")
   assert.deepEqual(report.summary.blockedCredentialNames, ["DATABASE_URL_CN"])
+  assert.deepEqual(report.summary.envSourceBlockedExternalRequired, ["DATABASE_URL_CN"])
+  assert.deepEqual(report.summary.envSourceCurrentBackendBlockedExternalRequired, ["DATABASE_URL_CN"])
+  assert.deepEqual(report.summary.envSourceDeferredAppLaunchBlockedExternalRequired, [
+    "WECHAT_OPEN_APP_ID",
+    "WECHAT_OPEN_APP_SECRET",
+    "APPLE_TEAM_ID",
+  ])
+  assert.match(report.summary.envSourceBlockedExternalScopeNote, /backend-only summary/)
+  assert.deepEqual(report.envSourceMap.blockedExternalScope.currentBackend, ["DATABASE_URL_CN"])
+  assert.deepEqual(report.envSourceMap.blockedExternalScope.deferredAppLaunch, [
+    "WECHAT_OPEN_APP_ID",
+    "WECHAT_OPEN_APP_SECRET",
+    "APPLE_TEAM_ID",
+  ])
   assert.deepEqual(report.summary.canStartNowAuthorizationPackets, [
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
@@ -112,6 +126,8 @@ test("Aliyun blocker brief backend-only markdown stays focused on backend resour
   assert.match(markdown, /R07_SLS_ALERTS/)
   assert.match(markdown, /`DATABASE_URL_CN`/)
   assert.match(markdown, /vercelRequiredCovered: 17\/27/)
+  assert.match(markdown, /currentBackendBlockedExternalRequired: DATABASE_URL_CN/)
+  assert.match(markdown, /deferredAppLaunchBlockedExternalRequiredCount: 3/)
   assert.match(markdown, /notACloudResourceReadyProof: true/)
   assert.match(markdown, /Strict 验证顺序/)
   assert.doesNotMatch(markdown, /微信开放平台移动应用链路/)
@@ -152,6 +168,8 @@ test("APP production-cn backend-only current blocker brief is the active backend
   assert.match(doc, /databaseUrlCnStatus: todo/)
   assert.match(doc, /`DATABASE_URL_CN` \| P11_ALIYUN_RDS_DATA_MIGRATION/)
   assert.match(doc, /vercelRequiredCovered: 17\/27/)
+  assert.match(doc, /currentBackendBlockedExternalRequired: DATABASE_URL_CN/)
+  assert.match(doc, /deferredAppLaunchBlockedExternalRequiredCount: 3/)
   assert.match(doc, /notACloudResourceReadyProof: true/)
   assert.match(doc, /未获动作时确认前禁止/)
   assert.doesNotMatch(doc, /微信开放平台移动应用链路/)
@@ -523,6 +541,20 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
     "WECHAT_OPEN_APP_SECRET",
     "APPLE_TEAM_ID",
   ])
+  assert.deepEqual(report.summary.envSourceCurrentBackendBlockedExternalRequired, ["DATABASE_URL_CN"])
+  assert.deepEqual(report.summary.envSourceDeferredAppLaunchBlockedExternalRequired, [
+    "WECHAT_OPEN_APP_ID",
+    "WECHAT_OPEN_APP_SECRET",
+    "APPLE_TEAM_ID",
+  ])
+  assert.match(report.summary.envSourceBlockedExternalScopeNote, /full App summary/)
+  assert.deepEqual(report.envSourceMap.blockedExternalScope.currentBackend, ["DATABASE_URL_CN"])
+  assert.deepEqual(report.envSourceMap.blockedExternalScope.deferredAppLaunch, [
+    "WECHAT_OPEN_APP_ID",
+    "WECHAT_OPEN_APP_SECRET",
+    "APPLE_TEAM_ID",
+  ])
+  assert.deepEqual(report.envSourceMap.blockedExternalScope.all, report.summary.envSourceBlockedExternalRequired)
   assert.ok(report.summary.envSourceReadyLocalButMissingFromVercel.includes("SERVICE_RECORD_DEEPSEEK_API_KEY"))
   assert.equal(report.envSourceMap.vercelCoverage.requiredCovered, "17/27")
   assert.ok(report.envSourceMap.vercelCoverage.bridgeKeysPresentInVercelProduction.includes("SUPABASE_SERVICE_ROLE_KEY"))

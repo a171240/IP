@@ -269,6 +269,7 @@ function buildReport(args) {
   const canStartNowWritebackPlan = compactCanStartNowWritebackPlan(consoleRunbook, imagePublishPlan)
   const cloudInventoryReadinessInterpretation = buildCloudInventoryReadinessInterpretation(status, cloudAccess)
   const envSourceMapSummary = compactEnvSourceMap(envSourceMap)
+  const envSourceBlockedExternalScope = splitEnvSourceBlockedExternalRequired(envSourceMapSummary)
   const backendRequiredBlocking = backendStatus.summary?.backendRequiredBlocking || []
   const deferredAppLaunchBlocking = backendStatus.summary?.appLaunchDeferredBlocking || []
   const currentOperatorTasks = completionAudit.summary?.operatorTasks || status.summary?.operatorTasks || {}
@@ -363,7 +364,14 @@ function buildReport(args) {
       envSourceVercelRequiredCovered: envSourceMapSummary.vercelCoverage.requiredCovered,
       envSourceCanMigrateFromVercelProduction: envSourceMapSummary.canMigrateFromVercelProduction,
       envSourceAppAliyunOwnedNotInVercel: envSourceMapSummary.appAliyunOwnedNotInVercel,
-      envSourceBlockedExternalRequired: envSourceMapSummary.blockedExternalRequired,
+      envSourceBlockedExternalRequired: args.backendOnly
+        ? envSourceBlockedExternalScope.currentBackend
+        : envSourceMapSummary.blockedExternalRequired,
+      envSourceCurrentBackendBlockedExternalRequired: envSourceBlockedExternalScope.currentBackend,
+      envSourceDeferredAppLaunchBlockedExternalRequired: envSourceBlockedExternalScope.deferredAppLaunch,
+      envSourceBlockedExternalScopeNote: args.backendOnly
+        ? "backend-only summary treats only currentBackend as current blockers; deferredAppLaunch remains full App launch context."
+        : "full App summary includes current backend and deferred App launch external blockers.",
       envSourceReadyLocalButMissingFromVercel: envSourceMapSummary.readyLocalButMissingFromVercel,
       envSourceSecretOrSensitiveToImport: envSourceMapSummary.secretOrSensitiveToImport,
     },
@@ -375,7 +383,10 @@ function buildReport(args) {
     credentialInterventionBrief,
     wechatOpenMobileApp,
     wechatCredentialBoundary,
-    envSourceMap: envSourceMapSummary,
+    envSourceMap: {
+      ...envSourceMapSummary,
+      blockedExternalScope: envSourceBlockedExternalScope,
+    },
     bridgeDataLayer,
     cloudResourceObservations,
     nextActionSequencing,
@@ -725,6 +736,29 @@ function compactEnvSourceMap(report = {}) {
   }
 }
 
+function splitEnvSourceBlockedExternalRequired(envSourceMapSummary = {}) {
+  const names = envSourceMapSummary.blockedExternalRequired || []
+  const currentBackend = []
+  const deferredAppLaunch = []
+  for (const name of names) {
+    if (isDeferredAppLaunchEnvSourceName(name)) {
+      deferredAppLaunch.push(name)
+    } else {
+      currentBackend.push(name)
+    }
+  }
+  return {
+    currentBackend,
+    deferredAppLaunch,
+    all: names,
+  }
+}
+
+function isDeferredAppLaunchEnvSourceName(name) {
+  return APP_LAUNCH_REQUIRED_NAMES.has(name)
+    || APP_LAUNCH_VARIABLE_PATTERNS.some((pattern) => pattern.test(String(name || "")))
+}
+
 function compactEnvSourceNameGroup(items = []) {
   return {
     count: items.length,
@@ -962,6 +996,9 @@ function renderBackendOnlyMarkdown(report) {
     `- vercelRequiredCovered: ${report.summary.envSourceVercelRequiredCovered}`,
     `- canMigrateFromVercelProduction: ${report.summary.envSourceCanMigrateFromVercelProduction}`,
     `- appAliyunOwnedNotInVercel: ${report.summary.envSourceAppAliyunOwnedNotInVercel}`,
+    `- currentBackendBlockedExternalRequired: ${report.summary.envSourceCurrentBackendBlockedExternalRequired.join(", ") || "none"}`,
+    `- deferredAppLaunchBlockedExternalRequiredCount: ${report.summary.envSourceDeferredAppLaunchBlockedExternalRequired.length}`,
+    `- scopeNote: ${report.summary.envSourceBlockedExternalScopeNote}`,
     `- secretOrSensitiveToImport: ${report.summary.envSourceSecretOrSensitiveToImport}`,
     "",
     "## CloudShell / CLI 只读盘点",

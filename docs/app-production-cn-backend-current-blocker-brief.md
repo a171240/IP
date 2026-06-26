@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 阿里云后端-only 当前执行简报
 
-Generated: 2026-06-25T23:31:26.805Z
+Generated: 2026-06-26T00:44:10.727Z
 
 ## 结论
 
@@ -229,6 +229,9 @@ Generated: 2026-06-25T23:31:26.805Z
 - vercelRequiredCovered: 17/27
 - canMigrateFromVercelProduction: 46
 - appAliyunOwnedNotInVercel: 10
+- currentBackendBlockedExternalRequired: DATABASE_URL_CN
+- deferredAppLaunchBlockedExternalRequiredCount: 3
+- scopeNote: backend-only summary treats only currentBackend as current blockers; deferredAppLaunch remains full App launch context.
 - secretOrSensitiveToImport: 17
 
 ## CloudShell / CLI 只读盘点
