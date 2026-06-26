@@ -17,6 +17,7 @@ test("Aliyun CloudShell handoff is wired into scripts, predeploy, deploy spec, a
   const releaseArtifacts = read("scripts", "prepare-aliyun-release-artifacts.mjs")
   const deploySpec = readJson("deploy", "aliyun-production-cn.example.json")
   const readonlyInventoryDoc = read("docs", "aliyun-cloudshell-readonly-inventory-2026-06-24.md")
+  const deployGuide = read("docs", "DEPLOY_ALIYUN_PRODUCTION_CN.md")
 
   assert.equal(pkg.scripts["aliyun:cloudshell:handoff"], "node ./scripts/generate-aliyun-cloudshell-inventory-handoff.mjs")
   assert.equal(pkg.scripts["aliyun:cloudshell:handoff:test"], "node --test tests/aliyun-cloudshell-inventory-handoff.static.test.js")
@@ -52,6 +53,12 @@ test("Aliyun CloudShell handoff is wired into scripts, predeploy, deploy spec, a
   assert.match(readonlyInventoryDoc, /APP 国内正式版全部迁到阿里云/)
   assert.match(readonlyInventoryDoc, /DATABASE_URL_CN/)
   assert.doesNotMatch(readonlyInventoryDoc, /数据层暂时沿用现有 Supabase/)
+  assert.match(deployGuide, /2026-06-26 CST 复核/)
+  assert.match(deployGuide, /readyLocalOperations=9\/9` 只能作为历史盘点记录/)
+  assert.match(deployGuide, /cloudInventoryStrictReady=false/)
+  assert.match(deployGuide, /DRY_RUN_NOT_EXECUTED/)
+  assert.match(deployGuide, /readyLocalOperations=0\/9/)
+  assert.match(deployGuide, /不能把历史只读盘点结果当成 P00 已闭环/)
 })
 
 test("Aliyun CloudShell handoff produces value-free local JSON and Markdown", () => {

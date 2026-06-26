@@ -1149,6 +1149,8 @@ appApiSmokeCoverage: 29 / 29 business routes
 
 2026-06-24 CST 更新：`cloud-inventory-results` 的盘点项已扩展为 9 项，新增 `I08_RDS_POSTGRES` 与 `I09_TAIR_REDIS`，用于把 RDS PostgreSQL 和 Redis/Tair 的只读存在性结果纳入机器校验。当前本机 ignored 的 `cloud-inventory-results.local.json` 已由 CloudShell 只读命令补齐，strict 结果为 `readyLocalOperations=9/9`、`executedCommandResults=12/12`、`cloudApiCalledCommandResults=12/12`、`mutationPerformedCommandResults=0`；结论是 RDS PostgreSQL、RDS 全量和 Redis/Tair 在 `cn-hangzhou` 均为 0 实例。这仍不表示可以部署，只表示数据层后置缺口已经有非密钥只读证据。
 
+2026-06-26 CST 复核：上一段 2026-06-24 的 `readyLocalOperations=9/9` 只能作为历史盘点记录，不能作为当前可部署证据。当前权威门禁重新回到 `cloudInventoryStrictReady=false`，`deploy/aliyun-production-cn.cloud-inventory-results.local.json` 为 `DRY_RUN_NOT_EXECUTED`，`readyLocalOperations=0/9`，`corepack pnpm aliyun:backend-cn:status` 仍显示后端 `canDeployBackendNow=false`。原因是当前 CloudShell 标签页处于 `Disconnected`，重连会触发“重启实例”确认；未获动作时确认前不能点击重启，也不能把历史只读盘点结果当成 P00 已闭环。下一步必须在用户动作时确认后恢复 CloudShell 或配置安全 Aliyun CLI profile，再运行 `corepack pnpm aliyun:cloudshell:collector:bootstrap | pbcopy` 生成新的非密钥 inventory JSON，并重新通过 `corepack pnpm aliyun:cloud:inventory-results:strict`。
+
 本轮为 `--skip-bundle` 审计，未重新生成 context tar；Docker context 和镜像已由 `aliyun:docker:check`、`aliyun:docker:build`、`aliyun:container:smoke` 覆盖。
 
 2026-06-22 08:24 CST 更新：云确认模板从 6 项扩展为 7 项，新增 `assetDomainHttps`，用于单独确认 `assets-cn.ipgongchang.xin` 的 DNS、HTTPS 和 ICP 证据。`corepack pnpm aliyun:cloud:confirmations` 当前显示 example checkedItems=7 且模板通过，local checkedItems=7、totalBlockers=25；新增的 4 个 local blocker 是 `assetDomainHttps:confirmed`、`assetDomainHttps:dnsResolvedToAliyun`、`assetDomainHttps:httpsEnabled`、`assetDomainHttps:icpReady`。
