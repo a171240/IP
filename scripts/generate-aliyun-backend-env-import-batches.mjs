@@ -101,6 +101,101 @@ function normalizeReadySecretGroup(group) {
   }
 }
 
+function buildBlockedSecretImportBatches(groups) {
+  return groups
+    .filter((group) =>
+      (group.blockedCredentialNames || []).length > 0 ||
+      group.category === "oss_ram_sts",
+    )
+    .map((group, index) => {
+      const blockedCredentialNames = group.blockedCredentialNames || []
+      const isRds = group.category === "rds_database_secret_and_migration"
+      const isOss = group.category === "oss_ram_sts"
+      return {
+        id: `BLOCKED_SECRET_BATCH_${String(index + 1).padStart(2, "0")}_${group.category.toUpperCase()}`,
+        category: group.category,
+        actionId: group.actionId,
+        phase: isRds
+          ? "blocked_until_rds_postgres_and_migration_evidence_ready"
+          : "blocked_until_oss_ram_sts_and_runtime_role_confirmed",
+        status: "blocked",
+        canImportNow: false,
+        owner: group.owner,
+        userQuestion: group.userQuestion,
+        variableNames: group.variableNames || [],
+        blockedCredentialNames,
+        readySecretEnvVariableNames: group.readySecretEnvVariableNames || [],
+        optionalVariableNames: isOss ? ["ALIYUN_OSS_SECURITY_TOKEN"] : [],
+        importTarget: (group.importTargets || []).join("; ") || "阿里云 KMS/Secrets Manager/SAE secret env",
+        writeTargets: group.writeTargets || [],
+        verifyCommands: group.verifyCommands || [],
+        requiresActionTimeConfirmation: group.requiresActionTimeConfirmation === true,
+        unblockCondition: group.unblockCondition || "",
+        valuePolicy: group.valueHandling || "只在动作时导入阿里云 secret env；报告中只保留变量名和非密钥证据。",
+        forbiddenStorage: group.forbiddenStorage || [],
+        dependencyEvidence: isRds
+          ? [
+            "rdsPostgres.confirmed=true",
+            "rdsPostgres.databaseAccountReady=true",
+            "rdsPostgres.databaseUrlCnSecretImported=true",
+            "migration.schemaCompatibilityReviewed=true",
+            "migration.supabaseSpecificSqlResolved=true",
+            "migration.rdsExtensionSupportConfirmed=true",
+            "migration.appApiSmokeOnRdsPassed=true",
+            "migration.rollbackValidationPassed=true",
+          ]
+          : [
+            "oss.confirmed=true",
+            "oss.ramLeastPrivilege=true",
+            "serviceRecordPrefix=service-records/production-cn",
+            "runtime role or least-privilege RAM/STS path selected",
+          ],
+      }
+    })
+}
+
+function buildReadySecretImportBatches(readyGroups) {
+  return readyGroups.map((group, index) => ({
+    id: `READY_SECRET_BATCH_${String(index + 1).padStart(2, "0")}_${String(group.category || "unknown").toUpperCase()}`,
+    category: group.category,
+    actionId: "S06_READY_SENSITIVE_ENV_IMPORT",
+    phase: "ready_by_name_blocked_until_authorized_aliyun_secret_env_import",
+    status: "ready_by_name_not_imported_to_aliyun",
+    canImportNow: false,
+    owner: group.owner,
+    userQuestion: "本机已有 ready secret env 如何迁到阿里云运行环境",
+    variableNames: group.variableNames || [],
+    blockedCredentialNames: [],
+    readySecretEnvVariableNames: group.variableNames || [],
+    optionalVariableNames: [],
+    importTarget: group.importTarget || "阿里云 KMS/Secrets Manager/SAE secret env",
+    writeTargets: [
+      "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport",
+    ],
+    verifyCommands: [
+      "corepack pnpm aliyun:env:handoff:backend",
+      "corepack pnpm aliyun:sensitive:blockers:backend",
+      "corepack pnpm aliyun:env:checklist",
+      "corepack pnpm aliyun:readiness:cloud-ready",
+    ],
+    requiresActionTimeConfirmation: true,
+    unblockCondition: "envImport.confirmed=true 且 envImport.secretNotInImage=true。",
+    valuePolicy: "本机只证明变量名和 ready 状态；动作时仍需从受控来源核对并导入阿里云 secret env。",
+    forbiddenStorage: [
+      "git",
+      "JSON/Markdown reports",
+      "Docker image",
+      "App bundle",
+      "shell history",
+    ],
+    dependencyEvidence: [
+      "RDS/DATABASE_URL_CN, OSS RAM/STS, ACR image, and SAE runtime targets closed before full env import",
+      "secretNotInImage=true",
+      "importedAt recorded without value",
+    ],
+  }))
+}
+
 function buildReport() {
   const sensitive = runSensitiveBlockersBackend()
   const brief = sensitive.credentialInterventionBrief || {}
@@ -108,6 +203,12 @@ function buildReport() {
   const readyGroups = (sensitive.summary?.readySensitiveEnvVariableGroups || []).map(normalizeReadySecretGroup)
   const notYetImportable = flattenBlockedRows(groups)
   const actionIds = brief.actionTimeConfirmationRequiredIds || sensitive.summary?.actionTimeConfirmationRequired || []
+  const blockedSecretImportBatches = buildBlockedSecretImportBatches(groups)
+  const readySecretImportBatches = buildReadySecretImportBatches(readyGroups)
+  const importBatches = [
+    ...blockedSecretImportBatches,
+    ...readySecretImportBatches,
+  ]
 
   const report = {
     ok: true,
@@ -131,6 +232,9 @@ function buildReport() {
     actionTimeConfirmationRequiredIds: actionIds,
     deferredAppLaunchSensitiveActionIds: sensitive.deferredAppLaunchSensitiveActionIds || [],
     notYetImportable,
+    blockedSecretImportBatches,
+    readySecretImportBatches,
+    importBatches,
     backendBlockerNotes: [
       "S03_ACR_PAID_PURCHASE and S04_ACR_REGISTRY_AUTH remain backend blockers, but registry secret material stays in ACR/Docker credential helper, RAM/KMS/Secrets Manager, or SAE runtime pull settings.",
       "Supabase variables in legacy_database_migration_source are migration source / legacy compatibility only; formal production-cn database target is Aliyun RDS PostgreSQL.",
@@ -206,6 +310,10 @@ function buildReport() {
     actionTimeConfirmationRequiredIds: actionIds,
     deferredAppLaunchSensitiveActionIds: report.deferredAppLaunchSensitiveActionIds,
     notYetImportableVariableNames: unique(notYetImportable.map((row) => row.variable)),
+    importBatchCount: importBatches.length,
+    blockedSecretImportBatchCount: blockedSecretImportBatches.length,
+    readySecretImportBatchCount: readySecretImportBatches.length,
+    importBatchIds: importBatches.map((batch) => batch.id),
   }
 
   return report
@@ -269,6 +377,16 @@ function renderMarkdown(report) {
     ),
     "",
     ...report.backendBlockerNotes.map((note) => `- ${note}`),
+    "",
+    "## Machine-Readable Import Batches",
+    "",
+    "The JSON output includes `importBatches`, `blockedSecretImportBatches`, and `readySecretImportBatches`. Every batch has `canImportNow=false` until the named action-time confirmation and dependency evidence are complete.",
+    "",
+    "| Batch | Phase | Can import now | Variables | Blocked credentials | Import target | Verification |",
+    "| --- | --- | --- | --- | --- | --- | --- |",
+    ...report.importBatches.map((batch) =>
+      `| \`${batch.id}\` | \`${batch.phase}\` | ${batch.canImportNow} | ${(batch.variableNames || []).map((name) => `\`${name}\``).join(", ") || "none"} | ${(batch.blockedCredentialNames || []).map((name) => `\`${name}\``).join(", ") || "none"} | ${batch.importTarget} | ${(batch.verifyCommands || []).map((command) => `\`${command}\``).join("<br>")} |`,
+    ),
     "",
     "## Conditional OSS STS Token",
     "",
