@@ -117,10 +117,23 @@ test("Aliyun cloud actions package summarizes current cloud console action order
     "BAP03_ACR_PURCHASE_AND_REPOSITORY",
   ])
   assert.ok(report.summary.blockedBackendSteps.includes("BAP05_BACKEND_ENV_IMPORT"))
-  assert.ok(report.summary.backendFirstUserInterventionRequired.includes("USER_CONFIRM_RDS_PURCHASE_AND_DATABASE_PASSWORD"))
+  assert.deepEqual(report.summary.backendFirstUserInterventionRequired, [
+    "USER_CONFIRM_ALIYUN_READONLY_INVENTORY_IDENTITY",
+    "USER_CONFIRM_RDS_PURCHASE_AND_DATABASE_PASSWORD",
+    "USER_CONFIRM_OSS_RAM_STS_SECRET_OR_RUNTIME_ROLE",
+    "USER_CONFIRM_ACR_PAID_PURCHASE",
+  ])
+  assert.ok(report.summary.backendDeferredUserInterventionRequired.includes("USER_CONFIRM_SECRET_ENV_IMPORT"))
+  assert.ok(report.summary.backendDeferredUserInterventionRequired.includes("USER_CONFIRM_DNS_HTTPS_ICP_CHANGE"))
+  assert.ok(report.summary.backendDeferredUserInterventionRequired.includes("USER_CONFIRM_PRODUCTION_DEPLOY"))
+  assert.ok(!report.summary.backendFirstUserInterventionRequired.includes("USER_CONFIRM_SECRET_ENV_IMPORT"))
+  assert.ok(!report.summary.backendFirstUserInterventionRequired.includes("USER_CONFIRM_DNS_HTTPS_ICP_CHANGE"))
+  assert.ok(!report.summary.backendFirstUserInterventionRequired.includes("USER_CONFIRM_PRODUCTION_DEPLOY"))
   assert.equal(report.backendFirstOrder.sourceCommand, "corepack pnpm aliyun:backend-cn:status")
   assert.match(report.backendFirstOrder.note, /backend-first apply order/)
   assert.deepEqual(report.backendFirstOrder.immediateBackendSteps, report.summary.immediateBackendSteps)
+  assert.deepEqual(report.backendFirstOrder.immediateUserInterventionRequired, report.summary.backendFirstUserInterventionRequired)
+  assert.deepEqual(report.backendFirstOrder.blockedUserInterventionRequired, report.summary.backendDeferredUserInterventionRequired)
   assert.ok(report.backendFirstOrder.steps.find((item) =>
     item.id === "BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE" &&
     item.status === "ready_for_action_time_confirmation" &&
@@ -318,6 +331,8 @@ test("Aliyun cloud actions package markdown renders compact action order without
   assert.match(markdown, /backendCanStartNowSteps: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP03_ACR_PURCHASE_AND_REPOSITORY/)
   assert.match(markdown, /immediateBackendSteps: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP03_ACR_PURCHASE_AND_REPOSITORY/)
   assert.match(markdown, /blockedBackendSteps: BAP04_ACR_IMAGE_PUSH_AND_PULL, BAP05_BACKEND_ENV_IMPORT/)
+  assert.match(markdown, /backendFirstUserInterventionRequired: USER_CONFIRM_ALIYUN_READONLY_INVENTORY_IDENTITY, USER_CONFIRM_RDS_PURCHASE_AND_DATABASE_PASSWORD, USER_CONFIRM_OSS_RAM_STS_SECRET_OR_RUNTIME_ROLE, USER_CONFIRM_ACR_PAID_PURCHASE/)
+  assert.match(markdown, /backendDeferredUserInterventionRequired: USER_CONFIRM_ACR_PAID_PURCHASE, USER_CONFIRM_SECRET_ENV_IMPORT, USER_CONFIRM_PRODUCTION_DEPLOY, USER_CONFIRM_DNS_HTTPS_ICP_CHANGE/)
   assert.match(markdown, /strictReadonlyInventoryReady: false/)
   assert.match(markdown, /cloudInventoryReadyLocalOperations: 0\/9/)
   assert.match(markdown, /cloudInventoryExecutedCommandResults: 9\/9/)
@@ -340,6 +355,8 @@ test("Aliyun cloud actions package markdown renders compact action order without
   assert.match(markdown, /下一步执行队列/)
   assert.match(markdown, /后端优先执行顺序/)
   assert.match(markdown, /sourceCommand: corepack pnpm aliyun:backend-cn:status/)
+  assert.match(markdown, /immediateUserInterventionRequired: USER_CONFIRM_ALIYUN_READONLY_INVENTORY_IDENTITY, USER_CONFIRM_RDS_PURCHASE_AND_DATABASE_PASSWORD, USER_CONFIRM_OSS_RAM_STS_SECRET_OR_RUNTIME_ROLE, USER_CONFIRM_ACR_PAID_PURCHASE/)
+  assert.match(markdown, /blockedUserInterventionRequired: USER_CONFIRM_ACR_PAID_PURCHASE, USER_CONFIRM_SECRET_ENV_IMPORT, USER_CONFIRM_PRODUCTION_DEPLOY, USER_CONFIRM_DNS_HTTPS_ICP_CHANGE/)
   assert.match(markdown, /BAP00_READONLY_INVENTORY_IDENTITY: status=ready_for_action_time_confirmation/)
   assert.match(markdown, /BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE: status=ready_for_action_time_confirmation; packets=P11_ALIYUN_RDS_DATA_MIGRATION/)
   assert.match(markdown, /BAP04_ACR_IMAGE_PUSH_AND_PULL: status=blocked_by_dependencies; packets=P04_ACR_IMAGE_AND_PULL; dependsOn=BAP03_ACR_PURCHASE_AND_REPOSITORY; order=4\. Push backend image to ACR/)
@@ -388,8 +405,12 @@ test("APP production-cn action queue documents the current authorized next-step 
     "backendCanStartNowSteps: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP03_ACR_PURCHASE_AND_REPOSITORY",
     "immediateBackendSteps: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP03_ACR_PURCHASE_AND_REPOSITORY",
     "blockedBackendSteps: BAP04_ACR_IMAGE_PUSH_AND_PULL, BAP05_BACKEND_ENV_IMPORT",
+    "backendFirstUserInterventionRequired: USER_CONFIRM_ALIYUN_READONLY_INVENTORY_IDENTITY, USER_CONFIRM_RDS_PURCHASE_AND_DATABASE_PASSWORD, USER_CONFIRM_OSS_RAM_STS_SECRET_OR_RUNTIME_ROLE, USER_CONFIRM_ACR_PAID_PURCHASE",
+    "backendDeferredUserInterventionRequired: USER_CONFIRM_ACR_PAID_PURCHASE, USER_CONFIRM_SECRET_ENV_IMPORT, USER_CONFIRM_PRODUCTION_DEPLOY, USER_CONFIRM_DNS_HTTPS_ICP_CHANGE",
     "## 后端优先执行顺序",
     "sourceCommand: corepack pnpm aliyun:backend-cn:status",
+    "immediateUserInterventionRequired: USER_CONFIRM_ALIYUN_READONLY_INVENTORY_IDENTITY, USER_CONFIRM_RDS_PURCHASE_AND_DATABASE_PASSWORD, USER_CONFIRM_OSS_RAM_STS_SECRET_OR_RUNTIME_ROLE, USER_CONFIRM_ACR_PAID_PURCHASE",
+    "blockedUserInterventionRequired: USER_CONFIRM_ACR_PAID_PURCHASE, USER_CONFIRM_SECRET_ENV_IMPORT, USER_CONFIRM_PRODUCTION_DEPLOY, USER_CONFIRM_DNS_HTTPS_ICP_CHANGE",
     "BAP00_READONLY_INVENTORY_IDENTITY: status=ready_for_action_time_confirmation",
     "BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE: status=ready_for_action_time_confirmation; packets=P11_ALIYUN_RDS_DATA_MIGRATION",
     "BAP02_OSS_RAM_STS_CLOSE: status=ready_for_action_time_confirmation; packets=P05_OSS_RAM_STS",

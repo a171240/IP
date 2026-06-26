@@ -342,7 +342,8 @@ function buildPackage(args) {
       partiallyObservedResourceEvidenceIds: cloudActionClosureBrief.partiallyObservedResourceEvidenceIds,
       immediateBackendSteps: backendFirstOrder.immediateBackendSteps,
       blockedBackendSteps: backendFirstOrder.blockedBackendSteps,
-      backendFirstUserInterventionRequired: backendFirstOrder.userInterventionRequired,
+      backendFirstUserInterventionRequired: backendFirstOrder.immediateUserInterventionRequired,
+      backendDeferredUserInterventionRequired: backendFirstOrder.blockedUserInterventionRequired,
     },
     cloudActionClosureBrief,
     credentialAcquisitionQueue,
@@ -634,6 +635,12 @@ function buildBackendFirstOrder(backendStatus) {
     immediateBackendSteps,
     blockedBackendSteps,
     actionTimeConfirmationRequired: BACKEND_FIRST_STEPS.map((step) => step.id),
+    immediateUserInterventionRequired: uniqueStrings(BACKEND_FIRST_STEPS
+      .filter((step) => step.blockingDependencies.length === 0)
+      .map((step) => step.userIntervention)),
+    blockedUserInterventionRequired: uniqueStrings(BACKEND_FIRST_STEPS
+      .filter((step) => step.blockingDependencies.length > 0)
+      .map((step) => step.userIntervention)),
     userInterventionRequired: uniqueStrings(BACKEND_FIRST_STEPS.map((step) => step.userIntervention)),
     steps: BACKEND_FIRST_STEPS.map((step) => ({
       id: step.id,
@@ -926,6 +933,8 @@ function renderMarkdown(report) {
     `- backendCanStartNowSteps: ${report.summary.backendCanStartNowSteps.length ? report.summary.backendCanStartNowSteps.join(", ") : "none"}`,
     `- immediateBackendSteps: ${report.summary.immediateBackendSteps.length ? report.summary.immediateBackendSteps.join(", ") : "none"}`,
     `- blockedBackendSteps: ${report.summary.blockedBackendSteps.length ? report.summary.blockedBackendSteps.join(", ") : "none"}`,
+    `- backendFirstUserInterventionRequired: ${report.summary.backendFirstUserInterventionRequired.length ? report.summary.backendFirstUserInterventionRequired.join(", ") : "none"}`,
+    `- backendDeferredUserInterventionRequired: ${report.summary.backendDeferredUserInterventionRequired.length ? report.summary.backendDeferredUserInterventionRequired.join(", ") : "none"}`,
     `- onlyMissingBackendCredentialValue: ${report.summary.onlyMissingBackendCredentialValue || "n/a"}`,
     "",
     "## 目标闭环证据简表",
@@ -965,6 +974,8 @@ function renderMarkdown(report) {
     `- immediateBackendSteps: ${report.backendFirstOrder.immediateBackendSteps.join(", ") || "none"}`,
     `- blockedBackendSteps: ${report.backendFirstOrder.blockedBackendSteps.join(", ") || "none"}`,
     `- actionTimeConfirmationRequired: ${report.backendFirstOrder.actionTimeConfirmationRequired.join(", ") || "none"}`,
+    `- immediateUserInterventionRequired: ${report.backendFirstOrder.immediateUserInterventionRequired.join(", ") || "none"}`,
+    `- blockedUserInterventionRequired: ${report.backendFirstOrder.blockedUserInterventionRequired.join(", ") || "none"}`,
     `- userInterventionRequired: ${report.backendFirstOrder.userInterventionRequired.join(", ") || "none"}`,
     ...(report.backendFirstOrder.steps.map((step) =>
       `- ${step.id}: status=${step.status}; packets=${step.requiredAuthorizationPackets.join(", ") || "none"}; dependsOn=${step.blockingDependencies.join(", ") || "none"}; order=${step.orderLine}`
