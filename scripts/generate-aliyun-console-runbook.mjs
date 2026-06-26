@@ -11,6 +11,16 @@ const BACKEND_ROOT = resolve(__dirname, "..")
 const WORKSPACE_ROOT = resolve(BACKEND_ROOT, "../..")
 const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
+const DEFERRED_APP_LAUNCH_BLOCKING = Object.freeze([
+  "WECHAT_OPEN_APP_ID",
+  "WECHAT_OPEN_APP_SECRET",
+  "WECHAT_OPEN_PLATFORM_MOBILE_APP",
+  "ANDROID_RELEASE_SIGNING",
+  "ANDROID_RELEASE_WECHAT_SIGNATURE",
+  "APPLE_TEAM_ID",
+  "IOS_UNIVERSAL_LINK_AASA",
+])
+const DEFERRED_APP_LAUNCH_BLOCKING_SET = new Set(DEFERRED_APP_LAUNCH_BLOCKING)
 
 const TASK_SEQUENCE_BY_ID = Object.freeze({
   C01_SAE_RUNTIME: Object.freeze({
@@ -151,11 +161,11 @@ function buildTask({
     currentActionScope,
     writeTargets: unique([...(resource?.writeTargets || []), ...(userAction?.writeTargets || [])]),
     nonSecretFieldsToRecord: resource?.nonSecretFieldsToRecord || [],
-    currentBlockers: unique([...(resource?.blockers || []), ...(userAction?.currentBlockers || [])]),
+    currentBlockers: sanitizeBackendOnlyStrings(unique([...(resource?.blockers || []), ...(userAction?.currentBlockers || [])])),
     currentEvidence: unique([...(resource?.currentEvidence || []), ...(userAction?.currentEvidence || [])]),
     nextActions: unique([...(resource?.nextActions || []), userAction?.requiredUserAction].filter(Boolean)),
     verifyCommands: unique([...(resource?.verifyCommands || []), ...(userAction?.verifyCommands || [])]),
-    completionEvidence: resource?.evidenceExpected || [],
+    completionEvidence: sanitizeBackendOnlyStrings(resource?.evidenceExpected || []),
     currentActionAcceptanceEvidence,
     deferredActions,
     forbidden: unique([...(resource?.forbidden || []), ...(userAction?.forbidden || [])]),
@@ -171,10 +181,12 @@ function buildRunbook(args) {
   ])
   const userActions = runJson("user_actions", [
     "scripts/summarize-aliyun-user-action-brief.mjs",
+    "--backend-only",
     ...envArgs(args),
   ])
   const sensitiveBlockers = runJson("sensitive_blockers", [
     "scripts/summarize-aliyun-sensitive-blockers.mjs",
+    "--backend-only",
     ...envArgs(args),
   ])
   const cloudAccess = runJson("cloud_access", [
@@ -298,7 +310,7 @@ function buildRunbook(args) {
         field("planCommand", "corepack pnpm aliyun:env:checklist", "local generated checklist"),
         field("plainEnvTarget", "SAE plain env for non-secret identifiers only", "env plan"),
         field("secretEnvTarget", "KMS/Secrets Manager/SAE secret env for secret or connection values", "env plan"),
-        field("requiredBlocking", status.summary?.requiredBlocking?.join(", ") || "none", "current status"),
+        field("requiredBlocking", backendOnlyRequiredBlocking(status.summary?.requiredBlocking || []).join(", ") || "none", "current status"),
         field("secretNotInImage", true, "completion evidence"),
       ],
     }),
@@ -333,15 +345,18 @@ function buildRunbook(args) {
     containsValues: false,
     readOnlyOnly: true,
     mutationPerformed: false,
-    currentAnswer: status.canDeployNow === true
-      ? "机器门禁接近可部署，但生产部署仍需单独授权；本 runbook 只负责控制台字段核对。"
-      : "现在不能部署；本 runbook 列出阿里云控制台需要创建、确认或补证据的字段，不执行任何云侧写操作。",
+    currentScope: "backend_aliyun_only",
+    canProceedWithoutWechat: true,
+    currentAnswer: "现在不能部署阿里云后端；微信开放平台移动应用、Android 签名和 Apple Team ID 已延期，本 runbook 只列出阿里云后端需要创建、确认或补证据的字段。",
     summary: {
-      productionReady: status.summary?.productionReady === true,
-      canDeployNow: status.canDeployNow === true,
+      productionReady: false,
+      canDeployNow: false,
+      currentScope: "backend_aliyun_only",
+      canProceedWithoutWechat: true,
       resourceReady: `${resourcesMatrix.summary.ready}/${resourcesMatrix.summary.total}`,
       userActionReady: `${userActions.summary.ready}/${userActions.summary.total}`,
-      requiredBlocking: status.summary?.requiredBlocking || [],
+      requiredBlocking: backendOnlyRequiredBlocking(status.summary?.requiredBlocking || []),
+      deferredAppLaunchBlocking: deferredAppLaunchBlocking(status.summary?.requiredBlocking || []),
       blockedResourceIds: resourcesMatrix.summary.blockedIds || [],
       blockedUserActionIds: userActions.summary.blockedIds || [],
       canStartNowConsoleTasks: tasks
@@ -443,7 +458,10 @@ function buildConsoleClosureBrief({
     .map((item) => item.id)
 
   return {
-    conclusion: "现在不能部署；必须先补齐微信开放平台移动 App 凭证、Android/iOS 发布凭证、阿里云资源证据和 secret env 导入证据。",
+    conclusion: "现在不能部署阿里云后端；微信开放平台移动应用、Android 签名和 Apple Team ID 已延期，当前必须先补齐 RDS/ACR/SAE/DNS/OSS/env/SLS/smoke 证据。",
+    currentScope: "backend_aliyun_only",
+    canProceedWithoutWechat: true,
+    deferredAppLaunchBlocking: DEFERRED_APP_LAUNCH_BLOCKING.filter((item) => item !== "ANDROID_RELEASE_WECHAT_SIGNATURE"),
     canCodexProceedWithoutUser: credentialBrief.canCodexProceedWithoutUser === true,
     blockedCredentialCount: credentialBrief.blockedCredentialCount ?? blockedCredentialNames.length,
     blockedCredentialNames,
@@ -534,6 +552,33 @@ function unique(values) {
   return Array.from(new Set(values.filter(Boolean)))
 }
 
+function backendOnlyRequiredBlocking(values) {
+  return unique(values).filter((item) => !DEFERRED_APP_LAUNCH_BLOCKING_SET.has(item))
+}
+
+function deferredAppLaunchBlocking(values) {
+  return unique([...values, ...DEFERRED_APP_LAUNCH_BLOCKING]).filter((item) => DEFERRED_APP_LAUNCH_BLOCKING_SET.has(item))
+}
+
+function sanitizeBackendOnlyStrings(values) {
+  return values
+    .map((value) => sanitizeBackendOnlyString(value))
+    .filter(Boolean)
+}
+
+function sanitizeBackendOnlyString(value) {
+  if (typeof value !== "string") return value
+  if (DEFERRED_APP_LAUNCH_BLOCKING.some((name) => value === name || value === `missing_required_env:${name}` || value === `requiredEnv:${name}`)) {
+    return ""
+  }
+  if (value.startsWith("requiredBlocking=")) {
+    const [, raw = ""] = value.split("=", 2)
+    const backendOnly = backendOnlyRequiredBlocking(raw.split(",").map((item) => item.trim()))
+    return `requiredBlocking=${backendOnly.join(",") || "none"}`
+  }
+  return value
+}
+
 function findSecretLikeValues(value, path = "$", matches = []) {
   if (typeof value === "string") {
     if (SECRET_VALUE_PATTERNS.some((pattern) => pattern.test(value))) matches.push(path)
@@ -562,6 +607,8 @@ function renderMarkdown(runbook) {
     `- ok: ${runbook.ok}`,
     `- containsValues: ${runbook.containsValues}`,
     `- mutationPerformed: ${runbook.mutationPerformed}`,
+    `- currentScope: ${runbook.currentScope}`,
+    `- canProceedWithoutWechat: ${runbook.canProceedWithoutWechat}`,
     `- productionReady: ${runbook.summary.productionReady}`,
     `- canDeployNow: ${runbook.summary.canDeployNow}`,
     `- resourceReady: ${runbook.summary.resourceReady}`,
@@ -580,6 +627,8 @@ function renderMarkdown(runbook) {
     "## 目标闭环证据简表",
     "",
     `- conclusion: ${runbook.consoleClosureBrief.conclusion}`,
+    `- currentScope: ${runbook.consoleClosureBrief.currentScope}`,
+    `- canProceedWithoutWechat: ${runbook.consoleClosureBrief.canProceedWithoutWechat}`,
     `- canCodexProceedWithoutUser: ${runbook.consoleClosureBrief.canCodexProceedWithoutUser}`,
     `- blockedCredentialCount: ${runbook.consoleClosureBrief.blockedCredentialCount}`,
     `- blockedCredentialNames: ${runbook.consoleClosureBrief.blockedCredentialNames.length ? runbook.consoleClosureBrief.blockedCredentialNames.join(", ") : "none"}`,
