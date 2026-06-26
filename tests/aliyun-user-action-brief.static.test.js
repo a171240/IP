@@ -186,13 +186,15 @@ test("Aliyun user action brief is value-free and includes the expected blockers"
   assert.ok(readonlyInventoryAction.currentBlockers.includes("readonly_inventory_strict_ready=0/9"))
   assert.ok(readonlyInventoryAction.currentBlockers.includes("cloudInventory:I08_RDS_POSTGRES"))
   assert.ok(readonlyInventoryAction.currentEvidence.includes("mutationPerformedCommandResults=0"))
+  assert.ok(readonlyInventoryAction.currentEvidence.includes("cloudShellCurrentStatus=connecting_terminal_input_visible_inventory_not_executed"))
   assert.match(nextConfirmationsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").minimumUserPhrase, /只读盘点命令/)
-  assert.match(nextConfirmationsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").minimumUserPhrase, /性能型 NAS/)
+  assert.match(nextConfirmationsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").minimumUserPhrase, /等待当前阿里云 CloudShell 连接完成/)
+  assert.equal(nextConfirmationsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").cloudShellCurrentStatus, "connecting_terminal_input_visible_inventory_not_executed")
   assert.ok(nextConfirmationsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").allowedActions.some((item) =>
-    item.includes("性能型 NAS 费用提示")
+    item.includes("正在连接 Cloud Shell")
   ))
   assert.ok(nextConfirmationsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").explicitlyExcluded.some((item) =>
-    item.includes("Create/Update/Delete/Deploy")
+    item.includes("当前 connecting 状态不授权")
   ))
   assert.ok(wechatAction.variableNames.includes("WECHAT_OPEN_APP_SECRET"))
   assert.equal(wechatAction.requiresActionTimeConfirmation, true)

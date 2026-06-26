@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 阿里云动作授权矩阵
 
-Generated: 2026-06-25T23:28:58.814Z
+Generated: 2026-06-26T01:41:10.832Z
 
 ## 结论
 
@@ -58,13 +58,17 @@ Generated: 2026-06-25T23:28:58.814Z
 - actionId: U00_ALIYUN_READONLY_INVENTORY_IDENTITY
 - owner: 用户/阿里云只读盘点操作员
 - sequenceGroup: readonly_inventory
-- minimumUserPhrase: 授权开通/重新连接阿里云 CloudShell 或配置 Aliyun CLI；如 CloudShell 提示会创建性能型 NAS 并可能产生费用，确认后才可点击开通；只运行 allowlisted 只读盘点命令并写入非密钥 evidence。
-- allowedActions: 如 CloudShell 页面要求开通，先确认性能型 NAS 费用提示，再进入只读盘点。; 使用阿里云官方 CLI 或 CloudShell 的只读身份。; 只运行本仓库生成的 List/Describe/stat/get inventory 命令。; 只记录资源名、布尔值、时间戳、命令状态、sha256 指纹和非密钥 evidence handle。
-- explicitlyExcluded: 不运行 Create/Update/Delete/Deploy/Start/Stop/Purchase/DNS mutation 命令。; 不执行 docker login/push。; 不读取、复制、粘贴或输出 AccessKeySecret、STS token、cookie、registry password、RAM Secret 或证书私钥。; 除用户明确确认 CloudShell 开通页的性能型 NAS 费用提示外，不做任何 production-cn deploy、env import、资源创建或计费动作。
+- minimumUserPhrase: 授权等待当前阿里云 CloudShell 连接完成后，只运行 allowlisted 只读盘点命令并写入非密钥 evidence；如后续出现开通、重启实例或费用提示，必须先停下另行确认。
+- allowedActions: 等待当前 CloudShell 从“正在连接 Cloud Shell.”变为可输入命令提示符。; 连接完成后只运行本仓库生成的 List/Describe/stat/get inventory 命令。; 也可改用已安全配置的 Aliyun CLI profile 执行同一套只读命令。; 只记录资源名、布尔值、时间戳、命令状态、sha256 指纹和非密钥 evidence handle。
+- explicitlyExcluded: 不运行 Create/Update/Delete/Deploy/Start/Stop/Purchase/DNS mutation 命令。; 不执行 docker login/push。; 不读取、复制、粘贴或输出 AccessKeySecret、STS token、cookie、registry password、RAM Secret 或证书私钥。; 当前 connecting 状态不授权点击开通、重启实例、购买、创建资源、导入环境变量或部署。
 - completionEvidence: cloudInventoryResults.localReady=true; readyLocalOperations=9/9; executedCommandResults=9/9; mutationPerformedCommandResults=0
 - writeTargets: deploy/aliyun-production-cn.cloud-inventory-results.local.json -> non-secret read-only inventory summaries
 - verifyCommands: corepack pnpm aliyun:cloud:access; MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1 corepack pnpm aliyun:cloud:inventory-run -- --execute-readonly --write-local deploy/aliyun-production-cn.cloud-inventory-results.local.json; corepack pnpm aliyun:cloud:inventory-results:strict; corepack pnpm aliyun:evidence:writeback:backend
 - nonSecretEvidenceOnly: true
+- cloudShellCurrentStatus: connecting_terminal_input_visible_inventory_not_executed
+- cloudShellConnecting: true
+- cloudShellTerminalInputVisible: true
+- cloudShellCanRunReadOnlyInventory: false
 
 ### P11_ALIYUN_RDS_DATA_MIGRATION 创建阿里云 RDS PostgreSQL 并完成正式数据层迁移
 
@@ -120,7 +124,7 @@ Generated: 2026-06-25T23:28:58.814Z
 - writeTargets: deploy/aliyun-production-cn.cloud-inventory-results.local.json -> non-secret read-only inventory summaries
 - variableNames: none
 - currentBlockers: readonly_inventory_strict_ready=0/9; cloudInventory:I01_SAE_RUNTIME; cloudInventory:I02_ACR_IMAGE; cloudInventory:I03_DNS_API_DOMAIN; cloudInventory:I04_DNS_ASSET_DOMAIN; cloudInventory:I05_OSS_AUDIO_BUCKET; cloudInventory:I06_SLS_ALERTS; cloudInventory:I07_CERT_HTTPS; cloudInventory:I08_RDS_POSTGRES; cloudInventory:I09_TAIR_REDIS
-- currentEvidence: cloudInventoryResults.templateReady=true; cloudInventoryResults.localExists=true; cloudInventoryResults.localReady=false; readyLocalOperations=0/9; executedCommandResults=9/9; cloudApiCalledCommandResults=9; mutationPerformedCommandResults=0
+- currentEvidence: cloudInventoryResults.templateReady=true; cloudInventoryResults.localExists=true; cloudInventoryResults.localReady=false; readyLocalOperations=0/9; executedCommandResults=9/9; cloudApiCalledCommandResults=9; mutationPerformedCommandResults=0; cloudShellCurrentStatus=connecting_terminal_input_visible_inventory_not_executed; cloudShellConnecting=true; cloudShellTerminalInputVisible=true; cloudShellCanRunReadOnlyInventory=false; cloudShellRequiresOpenConfirmation=false; cloudShellRequiresRestartConfirmation=false; cloudShellBlockers=cloudshell_connecting_terminal_input_visible_inventory_not_executed
 - verifyCommands: corepack pnpm aliyun:cloud:access; MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1 corepack pnpm aliyun:cloud:inventory-run -- --execute-readonly --write-local deploy/aliyun-production-cn.cloud-inventory-results.local.json; corepack pnpm aliyun:cloud:inventory-results:strict; corepack pnpm aliyun:evidence:writeback:backend
 
 ### U11_ALIYUN_RDS_DATA_MIGRATION 创建阿里云 RDS PostgreSQL 并完成正式数据层迁移
@@ -263,13 +267,17 @@ Generated: 2026-06-25T23:28:58.814Z
 - blockingDependencies: none
 - canStartNow: true
 - requiresActionTimeConfirmation: true
-- minimumUserPhrase: 授权开通/重新连接阿里云 CloudShell 或配置 Aliyun CLI；如 CloudShell 提示会创建性能型 NAS 并可能产生费用，确认后才可点击开通；只运行 allowlisted 只读盘点命令并写入非密钥 evidence。
-- allowedActions: 如 CloudShell 页面要求开通，先确认性能型 NAS 费用提示，再进入只读盘点。; 使用阿里云官方 CLI 或 CloudShell 的只读身份。; 只运行本仓库生成的 List/Describe/stat/get inventory 命令。; 只记录资源名、布尔值、时间戳、命令状态、sha256 指纹和非密钥 evidence handle。
-- explicitlyExcluded: 不运行 Create/Update/Delete/Deploy/Start/Stop/Purchase/DNS mutation 命令。; 不执行 docker login/push。; 不读取、复制、粘贴或输出 AccessKeySecret、STS token、cookie、registry password、RAM Secret 或证书私钥。; 除用户明确确认 CloudShell 开通页的性能型 NAS 费用提示外，不做任何 production-cn deploy、env import、资源创建或计费动作。
+- minimumUserPhrase: 授权等待当前阿里云 CloudShell 连接完成后，只运行 allowlisted 只读盘点命令并写入非密钥 evidence；如后续出现开通、重启实例或费用提示，必须先停下另行确认。
+- allowedActions: 等待当前 CloudShell 从“正在连接 Cloud Shell.”变为可输入命令提示符。; 连接完成后只运行本仓库生成的 List/Describe/stat/get inventory 命令。; 也可改用已安全配置的 Aliyun CLI profile 执行同一套只读命令。; 只记录资源名、布尔值、时间戳、命令状态、sha256 指纹和非密钥 evidence handle。
+- explicitlyExcluded: 不运行 Create/Update/Delete/Deploy/Start/Stop/Purchase/DNS mutation 命令。; 不执行 docker login/push。; 不读取、复制、粘贴或输出 AccessKeySecret、STS token、cookie、registry password、RAM Secret 或证书私钥。; 当前 connecting 状态不授权点击开通、重启实例、购买、创建资源、导入环境变量或部署。
 - completionEvidence: cloudInventoryResults.localReady=true; readyLocalOperations=9/9; executedCommandResults=9/9; mutationPerformedCommandResults=0
 - writeTargets: deploy/aliyun-production-cn.cloud-inventory-results.local.json -> non-secret read-only inventory summaries
 - variableNames: none
 - verifyCommands: corepack pnpm aliyun:cloud:access; MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1 corepack pnpm aliyun:cloud:inventory-run -- --execute-readonly --write-local deploy/aliyun-production-cn.cloud-inventory-results.local.json; corepack pnpm aliyun:cloud:inventory-results:strict; corepack pnpm aliyun:evidence:writeback:backend
+- cloudShellCurrentStatus: connecting_terminal_input_visible_inventory_not_executed
+- cloudShellConnecting: true
+- cloudShellTerminalInputVisible: true
+- cloudShellCanRunReadOnlyInventory: false
 
 ### P11_ALIYUN_RDS_DATA_MIGRATION 创建阿里云 RDS PostgreSQL 并完成正式数据层迁移
 

@@ -144,7 +144,9 @@ test("Aliyun provisioning plan renders phase order without executing cloud actio
   assert.ok(report.currentInventoryGate.currentEvidence.includes("cloudInventoryStrictReady=false"))
   assert.ok(report.currentInventoryGate.currentEvidence.includes("readyLocalOperations=0/9"))
   assert.ok(report.currentInventoryGate.currentEvidence.includes("dryRunEvidence=9/9"))
-  assert.ok(report.currentInventoryGate.nextRequiredAction.includes("动作时确认后恢复 CloudShell"))
+  assert.equal(report.currentInventoryGate.cloudShellCurrentStatus, "connecting_terminal_input_visible_inventory_not_executed")
+  assert.ok(report.currentInventoryGate.currentEvidence.includes("cloudShellCurrentStatus=connecting_terminal_input_visible_inventory_not_executed"))
+  assert.ok(report.currentInventoryGate.nextRequiredAction.includes("等待当前阿里云 CloudShell 连接完成"))
   assert.deepEqual(report.readyAuthorizationPackets.map((item) => item.packetId), [
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
@@ -308,7 +310,7 @@ test("Aliyun provisioning plan markdown preserves ACR current scope and deferred
   assert.match(markdown, /cloudInventoryResultGaps=1/)
   assert.match(markdown, /localInventoryFile: deploy\/aliyun-production-cn\.cloud-inventory-results\.local\.json/)
   assert.match(markdown, /failureCategories: aliyun_cli_profile_not_configured, aliyun_cli_config_incomplete/)
-  assert.match(markdown, /Next required action: 动作时确认后恢复 CloudShell/)
+  assert.match(markdown, /Next required action: 授权等待当前阿里云 CloudShell 连接完成后/)
   assert.match(markdown, /## Ready Authorization Packets/)
   assert.match(markdown, /### P00_ALIYUN_READONLY_INVENTORY_IDENTITY/)
   assert.match(markdown, /### P03_ACR_PURCHASE/)
@@ -363,7 +365,7 @@ test("APP production-cn provisioning sequence handoff matches the current plan",
   assert.match(handoff, /dryRunEvidence=9\/9/)
   assert.match(handoff, /## 当前 P00 只读盘点门禁/)
   assert.match(handoff, /cloudInventoryResultGaps=1/)
-  assert.match(handoff, /Next required action: 动作时确认后恢复 CloudShell/)
+  assert.match(handoff, /Next required action: 授权等待当前阿里云 CloudShell 连接完成后/)
 
   for (const phase of report.phases) {
     assert.match(handoff, new RegExp(phase.id))

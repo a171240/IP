@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process"
 import { writeFileSync } from "node:fs"
 import { dirname, isAbsolute, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
+import { buildReadonlyInventoryAuthorizationContext } from "./lib/aliyun-readonly-inventory-authorization.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -145,7 +146,7 @@ const AUTHORIZATION_PACKET_BY_ACTION_ID = Object.freeze({
     packetId: "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     sequenceGroup: "readonly_inventory",
     dependsOn: [],
-    minimumUserPhrase: "授权开通/重新连接阿里云 CloudShell 或配置 Aliyun CLI；如 CloudShell 提示会创建性能型 NAS 并可能产生费用，确认后才可点击开通；只运行 allowlisted 只读盘点命令并写入非密钥 evidence。",
+    minimumUserPhrase: "授权恢复阿里云 CloudShell/CLI 只读盘点身份；如页面后续出现开通、重启实例或费用提示，必须先停下另行确认；只运行 allowlisted 只读盘点命令并写入非密钥 evidence。",
     allowedActions: [
       "如 CloudShell 页面要求开通，先确认性能型 NAS 费用提示，再进入只读盘点。",
       "使用阿里云官方 CLI 或 CloudShell 的只读身份。",
@@ -435,6 +436,7 @@ function parseArgs(argv) {
     outPath: "",
     markdownPath: "",
     backendOnly: false,
+    cloudAccessObservationFile: "",
   }
 
   for (let index = 2; index < argv.length; index += 1) {
@@ -450,6 +452,10 @@ function parseArgs(argv) {
     }
     if (arg === "--cloud-confirmations") {
       args.cloudConfirmationsFile = resolveValue(argv[++index], "--cloud-confirmations")
+      continue
+    }
+    if (arg === "--cloud-access-observation") {
+      args.cloudAccessObservationFile = resolveValue(argv[++index], "--cloud-access-observation")
       continue
     }
     if (arg === "--out") {
@@ -484,6 +490,12 @@ function envArgs(args) {
   ]
 }
 
+function cloudAccessArgs(args) {
+  return args.cloudAccessObservationFile
+    ? ["--cloud-access-observation", args.cloudAccessObservationFile]
+    : []
+}
+
 function runJson(label, scriptArgs) {
   const result = spawnSync(process.execPath, scriptArgs, {
     cwd: BACKEND_ROOT,
@@ -503,10 +515,14 @@ function runJson(label, scriptArgs) {
 
 function buildReport(args) {
   const backendOnlyArg = args.backendOnly ? ["--backend-only"] : []
+  const readonlyInventoryAuthorization = buildReadonlyInventoryAuthorizationContext({
+    cloudAccessObservationFile: args.cloudAccessObservationFile,
+  })
   const userActions = runJson("user_actions", [
     "scripts/summarize-aliyun-user-action-brief.mjs",
     ...backendOnlyArg,
     ...envArgs(args),
+    ...cloudAccessArgs(args),
   ])
   const consoleRunbook = runJson("console_runbook", [
     "scripts/generate-aliyun-console-runbook.mjs",
@@ -518,7 +534,7 @@ function buildReport(args) {
   ])
 
   const actions = (userActions.actions || []).map((action) => classifyAction(action))
-  const authorizationPackets = buildAuthorizationPackets(actions)
+  const authorizationPackets = buildAuthorizationPackets(actions, readonlyInventoryAuthorization)
     .map((packet) => args.backendOnly ? filterBackendOnlyPacket(packet) : packet)
   const backendAuthorizationPackets = authorizationPackets.filter((packet) => !APP_LAUNCH_PACKET_IDS.has(packet.packetId))
   const deferredAppLaunchPackets = authorizationPackets.filter((packet) => APP_LAUNCH_PACKET_IDS.has(packet.packetId))
@@ -785,6 +801,17 @@ function isDeferredAppLaunchText(value) {
 }
 
 function compactActionTimeConfirmation(packet) {
+  const cloudShellFields = "cloudShellCurrentStatus" in packet
+    ? {
+      cloudShellCurrentStatus: packet.cloudShellCurrentStatus,
+      cloudShellConnecting: packet.cloudShellConnecting,
+      cloudShellTerminalInputVisible: packet.cloudShellTerminalInputVisible,
+      cloudShellCanRunReadOnlyInventory: packet.cloudShellCanRunReadOnlyInventory,
+      cloudShellRequiresOpenConfirmation: packet.cloudShellRequiresOpenConfirmation,
+      cloudShellRequiresRestartConfirmation: packet.cloudShellRequiresRestartConfirmation,
+      cloudShellBlockers: packet.cloudShellBlockers,
+    }
+    : {}
   return {
     packetId: packet.packetId,
     actionId: packet.actionId,
@@ -798,6 +825,7 @@ function compactActionTimeConfirmation(packet) {
     writeTargets: packet.writeTargets,
     verifyCommands: packet.verifyCommands,
     nonSecretEvidenceOnly: packet.nonSecretEvidenceOnly === true,
+    ...cloudShellFields,
   }
 }
 
@@ -829,7 +857,7 @@ function classifyAction(action) {
   }
 }
 
-function buildAuthorizationPackets(actions) {
+function buildAuthorizationPackets(actions, readonlyInventoryAuthorization) {
   const packetByActionId = new Map(
     actions.map((action) => {
       const packet = AUTHORIZATION_PACKET_BY_ACTION_ID[action.id]
@@ -839,11 +867,11 @@ function buildAuthorizationPackets(actions) {
   const statusByPacketId = new Map(
     actions.map((action) => [packetByActionId.get(action.id), action.status || "unknown"]),
   )
-  return actions.map((action) => buildAuthorizationPacket(action, statusByPacketId))
+  return actions.map((action) => buildAuthorizationPacket(action, statusByPacketId, readonlyInventoryAuthorization))
 }
 
-function buildAuthorizationPacket(action, statusByPacketId) {
-  const packet = AUTHORIZATION_PACKET_BY_ACTION_ID[action.id] || {
+function buildAuthorizationPacket(action, statusByPacketId, readonlyInventoryAuthorization) {
+  const basePacket = AUTHORIZATION_PACKET_BY_ACTION_ID[action.id] || {
     packetId: `P_UNKNOWN_${action.id || "ACTION"}`,
     sequenceGroup: "unknown",
     dependsOn: [],
@@ -852,6 +880,16 @@ function buildAuthorizationPacket(action, statusByPacketId) {
     explicitlyExcluded: ["未配置的动作包不能自动执行。"],
     completionEvidence: [],
   }
+  const packet = action.id === "U00_ALIYUN_READONLY_INVENTORY_IDENTITY"
+    ? {
+      ...basePacket,
+      minimumUserPhrase: readonlyInventoryAuthorization.minimumUserPhrase,
+      allowedActions: readonlyInventoryAuthorization.allowedActions,
+      explicitlyExcluded: readonlyInventoryAuthorization.explicitlyExcluded,
+      completionEvidence: readonlyInventoryAuthorization.completionEvidence,
+      actionTimeConfirmationExtra: readonlyInventoryAuthorization.actionTimeConfirmationExtra,
+    }
+    : basePacket
   const dependsOn = packet.dependsOn || []
   const blockingDependencies = dependsOn.filter((packetId) => statusByPacketId.get(packetId) !== "ready")
   return {
@@ -874,6 +912,7 @@ function buildAuthorizationPacket(action, statusByPacketId) {
     variableNames: action.variableNames,
     verifyCommands: action.verifyCommands,
     nonSecretEvidenceOnly: action.nonSecretEvidenceOnly,
+    ...(packet.actionTimeConfirmationExtra || {}),
   }
 }
 
@@ -963,6 +1002,12 @@ function renderMarkdown(report) {
       `- writeTargets: ${item.writeTargets.join("; ") || "none"}`,
       `- verifyCommands: ${item.verifyCommands.join("; ") || "none"}`,
       `- nonSecretEvidenceOnly: ${item.nonSecretEvidenceOnly}`,
+      ...("cloudShellCurrentStatus" in item ? [
+        `- cloudShellCurrentStatus: ${item.cloudShellCurrentStatus}`,
+        `- cloudShellConnecting: ${item.cloudShellConnecting}`,
+        `- cloudShellTerminalInputVisible: ${item.cloudShellTerminalInputVisible}`,
+        `- cloudShellCanRunReadOnlyInventory: ${item.cloudShellCanRunReadOnlyInventory}`,
+      ] : []),
       "",
     )
   }
@@ -1017,6 +1062,12 @@ function renderMarkdown(report) {
       `- writeTargets: ${packet.writeTargets.join("; ") || "none"}`,
       `- variableNames: ${packet.variableNames.join(", ") || "none"}`,
       `- verifyCommands: ${packet.verifyCommands.join("; ") || "none"}`,
+      ...("cloudShellCurrentStatus" in packet ? [
+        `- cloudShellCurrentStatus: ${packet.cloudShellCurrentStatus}`,
+        `- cloudShellConnecting: ${packet.cloudShellConnecting}`,
+        `- cloudShellTerminalInputVisible: ${packet.cloudShellTerminalInputVisible}`,
+        `- cloudShellCanRunReadOnlyInventory: ${packet.cloudShellCanRunReadOnlyInventory}`,
+      ] : []),
       "",
     )
   }

@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process"
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, isAbsolute, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
+import { buildReadonlyInventoryAuthorizationContext } from "./lib/aliyun-readonly-inventory-authorization.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -67,7 +68,7 @@ const NEXT_ACTION_TIME_CONFIRMATION_BY_ACTION_ID = Object.freeze({
   U00_ALIYUN_READONLY_INVENTORY_IDENTITY: Object.freeze({
     packetId: "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     sequenceGroup: "readonly_inventory",
-    minimumUserPhrase: "授权开通/重新连接阿里云 CloudShell 或配置 Aliyun CLI；如 CloudShell 提示会创建性能型 NAS 并可能产生费用，确认后才可点击开通；只运行 allowlisted 只读盘点命令并写入非密钥 evidence。",
+    minimumUserPhrase: "授权恢复阿里云 CloudShell/CLI 只读盘点身份；如页面后续出现开通、重启实例或费用提示，必须先停下另行确认；只运行 allowlisted 只读盘点命令并写入非密钥 evidence。",
     allowedActions: [
       "如 CloudShell 页面要求开通，先确认性能型 NAS 费用提示，再进入只读盘点。",
       "使用阿里云官方 CLI 或 CloudShell 的只读身份。",
@@ -226,6 +227,7 @@ function parseArgs(argv) {
     outPath: "",
     markdownPath: "",
     backendOnly: false,
+    cloudAccessObservationFile: "",
   }
 
   for (let index = 2; index < argv.length; index += 1) {
@@ -241,6 +243,10 @@ function parseArgs(argv) {
     }
     if (arg === "--cloud-confirmations") {
       args.cloudConfirmationsFile = resolveValue(argv[++index], "--cloud-confirmations")
+      continue
+    }
+    if (arg === "--cloud-access-observation") {
+      args.cloudAccessObservationFile = resolveValue(argv[++index], "--cloud-access-observation")
       continue
     }
     if (arg === "--out") {
@@ -285,6 +291,9 @@ function runJson(label, scriptArgs) {
 
 function buildReport(args) {
   const backendOnlyArg = args.backendOnly ? ["--backend-only"] : []
+  const readonlyInventoryAuthorization = buildReadonlyInventoryAuthorizationContext({
+    cloudAccessObservationFile: args.cloudAccessObservationFile,
+  })
   const sensitive = runJson("sensitive_blockers", [
     "scripts/summarize-aliyun-sensitive-blockers.mjs",
     ...backendOnlyArg,
@@ -316,11 +325,12 @@ function buildReport(args) {
     resourcesById,
     status,
     cloudItems: cloudConfirmations?.items || {},
+    readonlyInventoryAuthorization,
   })
   const backendActions = actions.filter((action) => !APP_LAUNCH_ACTION_IDS.has(action.id))
   const deferredAppLaunchActions = actions.filter((action) => APP_LAUNCH_ACTION_IDS.has(action.id))
-  const nextActionTimeConfirmations = buildNextActionTimeConfirmations(backendActions)
-  const deferredAppLaunchConfirmations = buildNextActionTimeConfirmations(deferredAppLaunchActions)
+  const nextActionTimeConfirmations = buildNextActionTimeConfirmations(backendActions, readonlyInventoryAuthorization)
+  const deferredAppLaunchConfirmations = buildNextActionTimeConfirmations(deferredAppLaunchActions, readonlyInventoryAuthorization)
   const credentialAcquisitionSummary = buildCredentialAcquisitionSummary(sensitive)
   const currentActions = args.backendOnly ? backendActions.map(filterBackendOnlyAction) : actions
   const reportBackendActions = args.backendOnly ? currentActions : backendActions
@@ -465,7 +475,7 @@ function buildActionTimeAuthorizationRequest({ backendOnly, nextActionTimeConfir
   }
 }
 
-function buildActions({ sensitiveById, resourcesById, status, cloudItems }) {
+function buildActions({ sensitiveById, resourcesById, status, cloudItems, readonlyInventoryAuthorization }) {
   const actionMap = new Map()
   const cloudInventoryResults = status.summary?.cloudInventoryResults || {}
   const cloudInventoryObservation = cloudInventoryResults.observationSummary || {}
@@ -479,7 +489,7 @@ function buildActions({ sensitiveById, resourcesById, status, cloudItems }) {
     writeTargets: [
       "deploy/aliyun-production-cn.cloud-inventory-results.local.json -> non-secret read-only inventory summaries",
     ],
-    requiredUserAction: "授权开通/重新连接阿里云 CloudShell 或配置 Aliyun CLI；如 CloudShell 提示会创建性能型 NAS 并可能产生费用，确认后才可点击开通；只运行 allowlisted 只读盘点命令并写入非密钥 evidence。",
+    requiredUserAction: readonlyInventoryAuthorization.requiredUserAction,
     unblockCondition: "cloudInventoryResults.localReady=true，readyLocalOperations=9/9，executedCommandResults=9/9，mutationPerformedCommandResults=0。",
     variableNames: [],
     requiresUserAction: true,
@@ -498,6 +508,7 @@ function buildActions({ sensitiveById, resourcesById, status, cloudItems }) {
       `executedCommandResults=${cloudInventoryObservation.executedCommandResults || 0}/${cloudInventoryObservation.commandResults || 0}`,
       `cloudApiCalledCommandResults=${cloudInventoryObservation.cloudApiCalledCommandResults || 0}`,
       `mutationPerformedCommandResults=${cloudInventoryObservation.mutationPerformedCommandResults || 0}`,
+      ...readonlyInventoryAuthorization.currentEvidence,
     ],
     verifyCommands: [
       "corepack pnpm aliyun:cloud:access",
@@ -867,11 +878,21 @@ function buildActions({ sensitiveById, resourcesById, status, cloudItems }) {
   return ACTION_ORDER.map((id) => actionMap.get(id)).filter(Boolean)
 }
 
-function buildNextActionTimeConfirmations(actions) {
+function buildNextActionTimeConfirmations(actions, readonlyInventoryAuthorization) {
   return actions
     .filter((action) => action.status !== "ready" && action.requiresActionTimeConfirmation)
     .map((action) => {
-      const packet = NEXT_ACTION_TIME_CONFIRMATION_BY_ACTION_ID[action.id]
+      const basePacket = NEXT_ACTION_TIME_CONFIRMATION_BY_ACTION_ID[action.id]
+      const packet = action.id === "U00_ALIYUN_READONLY_INVENTORY_IDENTITY"
+        ? {
+          ...basePacket,
+          minimumUserPhrase: readonlyInventoryAuthorization.minimumUserPhrase,
+          allowedActions: readonlyInventoryAuthorization.allowedActions,
+          explicitlyExcluded: readonlyInventoryAuthorization.explicitlyExcluded,
+          completionEvidence: readonlyInventoryAuthorization.completionEvidence,
+          actionTimeConfirmationExtra: readonlyInventoryAuthorization.actionTimeConfirmationExtra,
+        }
+        : basePacket
       if (!packet) return null
       return {
         packetId: packet.packetId,
@@ -886,6 +907,7 @@ function buildNextActionTimeConfirmations(actions) {
         writeTargets: action.writeTargets,
         verifyCommands: action.verifyCommands,
         nonSecretEvidenceOnly: action.nonSecretEvidenceOnly === true,
+        ...(packet.actionTimeConfirmationExtra || {}),
       }
     })
     .filter(Boolean)
@@ -1193,6 +1215,12 @@ function renderMarkdown(report) {
       `- writeTargets: ${item.writeTargets.join("; ") || "none"}`,
       `- verifyCommands: ${item.verifyCommands.join("; ") || "none"}`,
       `- nonSecretEvidenceOnly: ${item.nonSecretEvidenceOnly}`,
+      ...("cloudShellCurrentStatus" in item ? [
+        `- cloudShellCurrentStatus: ${item.cloudShellCurrentStatus}`,
+        `- cloudShellConnecting: ${item.cloudShellConnecting}`,
+        `- cloudShellTerminalInputVisible: ${item.cloudShellTerminalInputVisible}`,
+        `- cloudShellCanRunReadOnlyInventory: ${item.cloudShellCanRunReadOnlyInventory}`,
+      ] : []),
       "",
     )
   }

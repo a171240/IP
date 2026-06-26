@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 阿里云 Provisioning Plan
 
-Generated: 2026-06-26T00:07:19.406Z
+Generated: 2026-06-26T01:41:31.729Z
 
 ## 结论
 
@@ -82,8 +82,15 @@ Generated: 2026-06-26T00:07:19.406Z
   - mutationPerformedCommandResults=0
   - cloudInventoryResultGaps=1
   - dryRunEvidence=9/9
+  - cloudShellCurrentStatus=connecting_terminal_input_visible_inventory_not_executed
+  - cloudShellConnecting=true
+  - cloudShellTerminalInputVisible=true
+  - cloudShellCanRunReadOnlyInventory=false
+  - cloudShellRequiresOpenConfirmation=false
+  - cloudShellRequiresRestartConfirmation=false
+  - cloudShellBlockers=cloudshell_connecting_terminal_input_visible_inventory_not_executed
   - failureCategories=aliyun_cli_profile_not_configured,aliyun_cli_config_incomplete
-- Next required action: 动作时确认后恢复 CloudShell 或配置安全 Aliyun CLI profile，再重新运行 allowlisted 只读 inventory 并写回非密钥 evidence。
+- Next required action: 授权等待当前阿里云 CloudShell 连接完成后，只运行 allowlisted 只读盘点命令并写入非密钥 evidence；如后续出现开通、重启实例或费用提示，必须先停下另行确认。
 
 ## Ready Authorization Packets
 
@@ -91,12 +98,12 @@ Generated: 2026-06-26T00:07:19.406Z
 
 - Action id: U00_ALIYUN_READONLY_INVENTORY_IDENTITY
 - Sequence group: readonly_inventory
-- Minimum user phrase: 授权开通/重新连接阿里云 CloudShell 或配置 Aliyun CLI；如 CloudShell 提示会创建性能型 NAS 并可能产生费用，确认后才可点击开通；只运行 allowlisted 只读盘点命令并写入非密钥 evidence。
+- Minimum user phrase: 授权等待当前阿里云 CloudShell 连接完成后，只运行 allowlisted 只读盘点命令并写入非密钥 evidence；如后续出现开通、重启实例或费用提示，必须先停下另行确认。
 - Non-secret evidence only: true
 - Allowed actions:
-  - 如 CloudShell 页面要求开通，先确认性能型 NAS 费用提示，再进入只读盘点。
-  - 使用阿里云官方 CLI 或 CloudShell 的只读身份。
-  - 只运行本仓库生成的 List/Describe/stat/get inventory 命令。
+  - 等待当前 CloudShell 从“正在连接 Cloud Shell.”变为可输入命令提示符。
+  - 连接完成后只运行本仓库生成的 List/Describe/stat/get inventory 命令。
+  - 也可改用已安全配置的 Aliyun CLI profile 执行同一套只读命令。
   - 只记录资源名、布尔值、时间戳、命令状态、sha256 指纹和非密钥 evidence handle。
 - Completion evidence:
   - cloudInventoryResults.localReady=true
@@ -109,7 +116,7 @@ Generated: 2026-06-26T00:07:19.406Z
   - 不运行 Create/Update/Delete/Deploy/Start/Stop/Purchase/DNS mutation 命令。
   - 不执行 docker login/push。
   - 不读取、复制、粘贴或输出 AccessKeySecret、STS token、cookie、registry password、RAM Secret 或证书私钥。
-  - 除用户明确确认 CloudShell 开通页的性能型 NAS 费用提示外，不做任何 production-cn deploy、env import、资源创建或计费动作。
+  - 当前 connecting 状态不授权点击开通、重启实例、购买、创建资源、导入环境变量或部署。
 
 ### P11_ALIYUN_RDS_DATA_MIGRATION 创建阿里云 RDS PostgreSQL 并完成正式数据层迁移
 
@@ -215,7 +222,7 @@ Generated: 2026-06-26T00:07:19.406Z
   - 不运行 Create/Update/Delete/Deploy/Start/Stop/Purchase/DNS mutation 命令。
   - 不执行 docker login/push。
   - 不读取、复制、粘贴或输出 AccessKeySecret、STS token、cookie、registry password、RAM Secret 或证书私钥。
-  - 除用户明确确认 CloudShell 开通页的性能型 NAS 费用提示外，不做任何 production-cn deploy、env import、资源创建或计费动作。
+  - 当前 connecting 状态不授权点击开通、重启实例、购买、创建资源、导入环境变量或部署。
 
 ### PH01_EXTERNAL_APP_IDENTIFIERS 补齐微信移动应用、Android release 签名和 Apple Team ID
 

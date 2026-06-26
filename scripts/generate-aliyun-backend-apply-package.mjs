@@ -4,6 +4,7 @@ import { mkdirSync, writeFileSync } from "node:fs"
 import { dirname, isAbsolute, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { spawnSync } from "node:child_process"
+import { buildReadonlyInventoryAuthorizationContext } from "./lib/aliyun-readonly-inventory-authorization.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -49,6 +50,7 @@ function parseArgs(argv) {
     rdsMigrationFile: DEFAULT_RDS_MIGRATION_FILE,
     outPath: "",
     markdownPath: "",
+    cloudAccessObservationFile: "",
   }
 
   for (let index = 2; index < argv.length; index += 1) {
@@ -68,6 +70,10 @@ function parseArgs(argv) {
     }
     if (arg === "--rds-migration") {
       args.rdsMigrationFile = resolveValue(argv[++index], "--rds-migration")
+      continue
+    }
+    if (arg === "--cloud-access-observation") {
+      args.cloudAccessObservationFile = resolveValue(argv[++index], "--cloud-access-observation")
       continue
     }
     if (arg === "--out") {
@@ -110,6 +116,9 @@ function runJson(label, scriptArgs) {
 }
 
 function buildReport(args) {
+  const readonlyInventoryAuthorization = buildReadonlyInventoryAuthorizationContext({
+    cloudAccessObservationFile: args.cloudAccessObservationFile,
+  })
   const backendStatus = runJson("backend_status", [
     "scripts/summarize-aliyun-backend-cn-status.mjs",
     "--env-file",
@@ -143,7 +152,7 @@ function buildReport(args) {
     "--allow-incomplete",
   ])
 
-  const steps = buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEvidence })
+  const steps = buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEvidence, readonlyInventoryAuthorization })
   const immediateBackendSteps = steps.filter((step) => step.canStartAfterActionTimeConfirmation).map((step) => step.id)
   const blockedBackendSteps = steps.filter((step) => !step.canStartAfterActionTimeConfirmation).map((step) => step.id)
   const userIntervention = buildUserIntervention({ sensitiveBlockers, backendStatus, cloudActions })
@@ -416,7 +425,7 @@ function buildCredentialAcquisitionQueue(sensitiveBlockers) {
   }
 }
 
-function buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEvidence }) {
+function buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEvidence, readonlyInventoryAuthorization }) {
   const statusBlockers = new Set(backendStatus.summary.backendRequiredBlocking || [])
   const immediateConsoleTasks = new Set(cloudActions.summary?.canStartNowConsoleTasks || [])
   const blockedConsoleTasks = new Set(cloudActions.summary?.blockedByDependencies || [])
@@ -447,6 +456,7 @@ function buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEv
         `readyLocalOperations=${cloudInventoryReadyLocalOperations}`,
         `executedCommandResults=${cloudInventoryExecutedCommandResults}`,
         `cliConfigProbeFailureCategory=${cliConfigFailureCategory}`,
+        ...readonlyInventoryAuthorization.currentEvidence,
       ],
       currentBlockers: cloudInventoryReady ? [] : [
         `cloudInventory:readonly_inventory_strict_ready=${cloudInventoryReadyLocalOperations}`,
@@ -456,24 +466,13 @@ function buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEv
         "deploy/aliyun-production-cn.cloud-inventory-results.local.json -> non-secret read-only inventory summaries",
       ],
       userMustHandle: [
-        "Aliyun CLI default profile or CloudShell logged-in read-only identity",
-        "If CloudShell shows an 开通 page with a performance NAS usage-fee warning, confirm that warning before clicking 开通.",
-        "If the current CloudShell tab is disconnected, reconnecting it still requires action-time confirmation.",
-        "AccessKeySecret or STS token must never be copied into JSON, Markdown, chat, git, or shell history",
+        ...readonlyInventoryAuthorization.userMustHandle,
       ],
       actionTimeConfirmation: {
-        minimumUserPhrase: "授权开通/重新连接阿里云 CloudShell 或配置 Aliyun CLI；如 CloudShell 提示会创建性能型 NAS 并可能产生费用，确认后才可点击开通；只运行 allowlisted 只读盘点命令并写入非密钥 evidence。",
-        allowedActions: [
-          "If CloudShell requires service activation, confirm the performance NAS usage-fee warning before clicking 开通.",
-          "Reconnect the existing Aliyun CloudShell session or configure the official Aliyun CLI profile.",
-          "Run only the generated List/Describe/stat/get inventory commands.",
-          "Write only resource names, booleans, timestamps, command status, digest handles, and non-secret evidence handles.",
-        ],
-        explicitlyExcluded: [
-          "No Create/Update/Delete/Deploy/Start/Stop/Purchase/DNS mutation commands.",
-          "No docker login/push, registry password, AccessKeySecret, STS token, cookie, or certificate private key capture.",
-          "No production-cn deploy, env import, business resource creation, or billing action beyond the explicitly confirmed CloudShell activation warning.",
-        ],
+        minimumUserPhrase: readonlyInventoryAuthorization.minimumUserPhrase,
+        allowedActions: readonlyInventoryAuthorization.allowedActions,
+        explicitlyExcluded: readonlyInventoryAuthorization.explicitlyExcluded,
+        ...readonlyInventoryAuthorization.actionTimeConfirmationExtra,
       },
       nonSecretEvidenceToRecord: [
         "readyLocalOperations count",

@@ -4,6 +4,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, isAbsolute, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { spawnSync } from "node:child_process"
+import { buildReadonlyInventoryAuthorizationContext } from "./lib/aliyun-readonly-inventory-authorization.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -149,6 +150,7 @@ function parseArgs(argv) {
     cloudConfirmationsFile: DEFAULT_CLOUD_CONFIRMATIONS_FILE,
     outPath: "",
     markdownPath: "",
+    cloudAccessObservationFile: "",
   }
   for (let index = 2; index < argv.length; index += 1) {
     const arg = argv[index]
@@ -159,6 +161,10 @@ function parseArgs(argv) {
     }
     if (arg === "--cloud-confirmations") {
       args.cloudConfirmationsFile = resolveValue(argv[++index], "--cloud-confirmations")
+      continue
+    }
+    if (arg === "--cloud-access-observation") {
+      args.cloudAccessObservationFile = resolveValue(argv[++index], "--cloud-access-observation")
       continue
     }
     if (arg === "--out") {
@@ -201,6 +207,9 @@ function runJson(label, scriptArgs) {
 }
 
 function buildPlan(args) {
+  const readonlyInventoryAuthorization = buildReadonlyInventoryAuthorizationContext({
+    cloudAccessObservationFile: args.cloudAccessObservationFile,
+  })
   const actionAuthorization = runJson("action_authorization", [
     "scripts/summarize-aliyun-action-authorization.mjs",
     "--backend-only",
@@ -208,6 +217,7 @@ function buildPlan(args) {
     args.envFile,
     "--cloud-confirmations",
     args.cloudConfirmationsFile,
+    ...(args.cloudAccessObservationFile ? ["--cloud-access-observation", args.cloudAccessObservationFile] : []),
   ])
   const consoleRunbook = runJson("console_runbook", [
     "scripts/generate-aliyun-console-runbook.mjs",
@@ -235,7 +245,7 @@ function buildPlan(args) {
     deferredAppLaunchPacketIds,
     deferredAppLaunchEnvNames,
   }))
-  const currentInventoryGate = buildCurrentInventoryGate(backendStatus)
+  const currentInventoryGate = buildCurrentInventoryGate(backendStatus, readonlyInventoryAuthorization)
   const provisioningClosureBrief = buildProvisioningClosureBrief({
     consoleRunbook,
     actionAuthorization,
@@ -383,7 +393,7 @@ function buildProvisioningClosureBrief({
   }
 }
 
-function buildCurrentInventoryGate(backendStatus) {
+function buildCurrentInventoryGate(backendStatus, readonlyInventoryAuthorization) {
   const cloudInventory = backendStatus.cloudInventory || {}
   const gapSummary = backendStatus.summary?.evidenceWritebackGapSummary || {}
   const fileSummary = readCloudInventoryFileSummary(backendStatus.files?.cloudInventoryResultsFile)
@@ -403,6 +413,7 @@ function buildCurrentInventoryGate(backendStatus) {
     `mutationPerformedCommandResults=${mutationPerformedCommandResults}`,
     `cloudInventoryResultGaps=${cloudInventoryResultGaps}`,
     `dryRunEvidence=${dryRunEvidence}`,
+    ...readonlyInventoryAuthorization.currentEvidence,
     ...(failureCategories.length ? [`failureCategories=${failureCategories.join(",")}`] : []),
   ]
   return {
@@ -419,9 +430,10 @@ function buildCurrentInventoryGate(backendStatus) {
     operationCount: fileSummary.operationCount,
     failureCategories,
     currentEvidence,
+    cloudShellCurrentStatus: readonlyInventoryAuthorization.cloudShellCurrentStatus,
     nextRequiredAction: strictReady
       ? "P00 strict inventory is current; continue with the next backend cloud evidence gate."
-      : "动作时确认后恢复 CloudShell 或配置安全 Aliyun CLI profile，再重新运行 allowlisted 只读 inventory 并写回非密钥 evidence。",
+      : readonlyInventoryAuthorization.requiredUserAction,
   }
 }
 

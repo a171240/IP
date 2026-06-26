@@ -1,6 +1,6 @@
 # APP production-cn Aliyun backend apply package
 
-Generated at: 2026-06-25T23:20:39.884Z
+Generated at: 2026-06-26T01:42:54.574Z
 
 ## Scope
 
@@ -128,13 +128,13 @@ Generated at: 2026-06-25T23:20:39.884Z
 - mutationType: readonly_inventory_identity_and_non_secret_writeback
 - requiredAuthorizationPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY
 - consolePath: 本机 Aliyun CLI default profile 或阿里云控制台 -> CloudShell
-- currentEvidence: cloudInventoryStrictReady=false; readyLocalOperations=0/9; executedCommandResults=9/9; cliConfigProbeFailureCategory=aliyun_cli_profile_not_configured
+- currentEvidence: cloudInventoryStrictReady=false; readyLocalOperations=0/9; executedCommandResults=9/9; cliConfigProbeFailureCategory=aliyun_cli_profile_not_configured; cloudShellCurrentStatus=connecting_terminal_input_visible_inventory_not_executed; cloudShellConnecting=true; cloudShellTerminalInputVisible=true; cloudShellCanRunReadOnlyInventory=false; cloudShellRequiresOpenConfirmation=false; cloudShellRequiresRestartConfirmation=false; cloudShellBlockers=cloudshell_connecting_terminal_input_visible_inventory_not_executed
 - currentBlockers: cloudInventory:readonly_inventory_strict_ready=0/9, aliyun_cli_profile_not_configured
 - writeTargets: deploy/aliyun-production-cn.cloud-inventory-results.local.json -> non-secret read-only inventory summaries
-- userMustHandle: Aliyun CLI default profile or CloudShell logged-in read-only identity; If CloudShell shows an 开通 page with a performance NAS usage-fee warning, confirm that warning before clicking 开通.; If the current CloudShell tab is disconnected, reconnecting it still requires action-time confirmation.; AccessKeySecret or STS token must never be copied into JSON, Markdown, chat, git, or shell history
-- actionTimeConfirmation.minimumUserPhrase: 授权开通/重新连接阿里云 CloudShell 或配置 Aliyun CLI；如 CloudShell 提示会创建性能型 NAS 并可能产生费用，确认后才可点击开通；只运行 allowlisted 只读盘点命令并写入非密钥 evidence。
-- actionTimeConfirmation.allowedActions: If CloudShell requires service activation, confirm the performance NAS usage-fee warning before clicking 开通.; Reconnect the existing Aliyun CloudShell session or configure the official Aliyun CLI profile.; Run only the generated List/Describe/stat/get inventory commands.; Write only resource names, booleans, timestamps, command status, digest handles, and non-secret evidence handles.
-- actionTimeConfirmation.explicitlyExcluded: No Create/Update/Delete/Deploy/Start/Stop/Purchase/DNS mutation commands.; No docker login/push, registry password, AccessKeySecret, STS token, cookie, or certificate private key capture.; No production-cn deploy, env import, business resource creation, or billing action beyond the explicitly confirmed CloudShell activation warning.
+- userMustHandle: 当前 CloudShell 已打开但仍在连接；等出现命令提示符后才能跑 allowlisted 只读盘点。; 如后续出现开通、重启实例或费用提示，必须先停下另行确认。; AccessKeySecret or STS token must never be copied into JSON, Markdown, chat, git, or shell history
+- actionTimeConfirmation.minimumUserPhrase: 授权等待当前阿里云 CloudShell 连接完成后，只运行 allowlisted 只读盘点命令并写入非密钥 evidence；如后续出现开通、重启实例或费用提示，必须先停下另行确认。
+- actionTimeConfirmation.allowedActions: 等待当前 CloudShell 从“正在连接 Cloud Shell.”变为可输入命令提示符。; 连接完成后只运行本仓库生成的 List/Describe/stat/get inventory 命令。; 也可改用已安全配置的 Aliyun CLI profile 执行同一套只读命令。; 只记录资源名、布尔值、时间戳、命令状态、sha256 指纹和非密钥 evidence handle。
+- actionTimeConfirmation.explicitlyExcluded: 不运行 Create/Update/Delete/Deploy/Start/Stop/Purchase/DNS mutation 命令。; 不执行 docker login/push。; 不读取、复制、粘贴或输出 AccessKeySecret、STS token、cookie、registry password、RAM Secret 或证书私钥。; 当前 connecting 状态不授权点击开通、重启实例、购买、创建资源、导入环境变量或部署。
 - nonSecretEvidenceToRecord: readyLocalOperations count; executedCommandResults count; cloudApiCalledCommandResults count; mutationPerformedCommandResults=0; observed/not_found/blocked operation ids; timestamp and evidence handles only
 - verifyCommands: corepack pnpm aliyun:cloudshell:handoff; corepack pnpm aliyun:cloud:access; MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1 corepack pnpm aliyun:cloud:inventory-run -- --execute-readonly --write-local deploy/aliyun-production-cn.cloud-inventory-results.local.json; corepack pnpm aliyun:cloud:inventory-results:strict; corepack pnpm aliyun:evidence:writeback:backend
 
