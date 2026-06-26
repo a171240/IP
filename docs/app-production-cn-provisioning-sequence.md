@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 阿里云 Provisioning Plan
 
-Generated: 2026-06-25T23:33:57.310Z
+Generated: 2026-06-26T00:07:19.406Z
 
 ## 结论
 
@@ -38,6 +38,10 @@ Generated: 2026-06-25T23:33:57.310Z
 - Resource evidence ready: 0/7
 - Blocked resource evidence ids: R01_SAE_RUNTIME, R02_ACR_IMAGE_REGISTRY, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R05_OSS_AUDIO_STORAGE, R06_ENV_IMPORT, R07_SLS_ALERTS
 - Partially observed resource evidence ids: R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS
+- Current P00 inventory gate: not_ready
+- cloudInventoryStrictReady=false
+- readyLocalOperations=0/9
+- dryRunEvidence=9/9
 
 ## 目标闭环证据简表
 
@@ -57,6 +61,29 @@ Generated: 2026-06-25T23:33:57.310Z
 - Deferred APP launch packets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID
 - Can start now console tasks: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS
 - Next action-time confirmations: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE
+- Current P00 inventory gate: not_ready
+
+## 当前 P00 只读盘点门禁
+
+- Status: not_ready
+- cloudInventoryStrictReady=false
+- readyLocalOperations=0/9
+- executedCommandResults=9/9
+- mutationPerformedCommandResults=0
+- cloudInventoryResultGaps=1
+- localInventoryFile: deploy/aliyun-production-cn.cloud-inventory-results.local.json
+- localFileExists: true
+- dryRunEvidence=9/9
+- failureCategories: aliyun_cli_profile_not_configured, aliyun_cli_config_incomplete
+- Current evidence:
+  - cloudInventoryStrictReady=false
+  - readyLocalOperations=0/9
+  - executedCommandResults=9/9
+  - mutationPerformedCommandResults=0
+  - cloudInventoryResultGaps=1
+  - dryRunEvidence=9/9
+  - failureCategories=aliyun_cli_profile_not_configured,aliyun_cli_config_incomplete
+- Next required action: 动作时确认后恢复 CloudShell 或配置安全 Aliyun CLI profile，再重新运行 allowlisted 只读 inventory 并写回非密钥 evidence。
 
 ## Ready Authorization Packets
 

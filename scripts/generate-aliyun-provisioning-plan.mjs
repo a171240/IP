@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { writeFileSync } from "node:fs"
+import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, isAbsolute, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { spawnSync } from "node:child_process"
@@ -216,6 +216,9 @@ function buildPlan(args) {
     "--cloud-confirmations",
     args.cloudConfirmationsFile,
   ])
+  const backendStatus = runJson("backend_status", [
+    "scripts/summarize-aliyun-backend-cn-status.mjs",
+  ])
   const packetsById = new Map([
     ...(actionAuthorization.authorizationPackets || []),
     ...(actionAuthorization.deferredAppLaunchPackets || []),
@@ -232,10 +235,12 @@ function buildPlan(args) {
     deferredAppLaunchPacketIds,
     deferredAppLaunchEnvNames,
   }))
+  const currentInventoryGate = buildCurrentInventoryGate(backendStatus)
   const provisioningClosureBrief = buildProvisioningClosureBrief({
     consoleRunbook,
     actionAuthorization,
     phases,
+    currentInventoryGate,
   })
   const currentReadyPhases = phases.filter((item) => item.canStartNow).map((item) => item.id)
   const currentBlockedPhases = phases
@@ -260,6 +265,7 @@ function buildPlan(args) {
     sourceCommands: {
       actionAuthorization: "corepack pnpm aliyun:action:authorization:backend",
       consoleRunbook: "corepack pnpm aliyun:console:runbook",
+      backendStatus: "corepack pnpm aliyun:backend-cn:status",
     },
     targetRuntime: TARGET_RUNTIME,
     summary: {
@@ -280,8 +286,12 @@ function buildPlan(args) {
       resourceEvidenceReady: provisioningClosureBrief.resourceEvidenceReady,
       blockedResourceEvidenceIds: provisioningClosureBrief.blockedResourceEvidenceIds,
       partiallyObservedResourceEvidenceIds: provisioningClosureBrief.partiallyObservedResourceEvidenceIds,
+      cloudInventoryStrictReady: currentInventoryGate.strictReady,
+      cloudInventoryReadyLocalOperations: currentInventoryGate.readyLocalOperations,
+      cloudInventoryDryRunEvidence: currentInventoryGate.dryRunEvidence,
     },
     provisioningClosureBrief,
+    currentInventoryGate,
     phases,
     readyAuthorizationPackets: (actionAuthorization.authorizationPackets || [])
       .filter((packet) => packet.canStartNow === true && currentStartPacketIds.has(packet.packetId))
@@ -324,6 +334,7 @@ function buildProvisioningClosureBrief({
   consoleRunbook,
   actionAuthorization,
   phases,
+  currentInventoryGate,
 }) {
   const runbookBrief = consoleRunbook.consoleClosureBrief || {}
   const authorizationBrief = actionAuthorization.authorizationClosureBrief || {}
@@ -362,6 +373,7 @@ function buildProvisioningClosureBrief({
     deferredAppLaunchPackets: actionAuthorization.summary?.deferredAppLaunchPackets || [],
     canStartNowConsoleTasks: consoleRunbook.summary?.canStartNowConsoleTasks || [],
     nextActionTimeConfirmations: actionAuthorization.summary?.nextActionTimeConfirmations || [],
+    currentInventoryGate,
     requiredBlocking: actionAuthorization.summary?.requiredBlocking || [],
     actionTimeConfirmationRequired: filterDeferredAppLaunchActionIds(uniqueStrings([
       ...(runbookBrief.actionTimeConfirmationRequiredIds || []),
@@ -369,6 +381,82 @@ function buildProvisioningClosureBrief({
       ...(actionAuthorization.summary?.actionTimeConfirmationRequired || []),
     ])),
   }
+}
+
+function buildCurrentInventoryGate(backendStatus) {
+  const cloudInventory = backendStatus.cloudInventory || {}
+  const gapSummary = backendStatus.summary?.evidenceWritebackGapSummary || {}
+  const fileSummary = readCloudInventoryFileSummary(backendStatus.files?.cloudInventoryResultsFile)
+  const strictReady = cloudInventory.strictReady === true
+  const readyLocalOperations = cloudInventory.readyLocalOperations || "unknown"
+  const executedCommandResults = cloudInventory.executedCommandResults || "unknown"
+  const mutationPerformedCommandResults = cloudInventory.mutationPerformedCommandResults ?? "unknown"
+  const cloudInventoryResultGaps = gapSummary.cloudInventoryResultGaps ?? "unknown"
+  const dryRunEvidence = fileSummary.operationCount > 0
+    ? `${fileSummary.dryRunEvidenceCount}/${fileSummary.operationCount}`
+    : "unknown"
+  const failureCategories = fileSummary.failureCategories || []
+  const currentEvidence = [
+    `cloudInventoryStrictReady=${strictReady}`,
+    `readyLocalOperations=${readyLocalOperations}`,
+    `executedCommandResults=${executedCommandResults}`,
+    `mutationPerformedCommandResults=${mutationPerformedCommandResults}`,
+    `cloudInventoryResultGaps=${cloudInventoryResultGaps}`,
+    `dryRunEvidence=${dryRunEvidence}`,
+    ...(failureCategories.length ? [`failureCategories=${failureCategories.join(",")}`] : []),
+  ]
+  return {
+    status: strictReady ? "strict_ready" : "not_ready",
+    strictReady,
+    readyLocalOperations,
+    executedCommandResults,
+    mutationPerformedCommandResults,
+    cloudInventoryResultGaps,
+    localInventoryFile: toBackendRelativePath(backendStatus.files?.cloudInventoryResultsFile),
+    localFileExists: fileSummary.localFileExists,
+    dryRunEvidence,
+    dryRunEvidenceCount: fileSummary.dryRunEvidenceCount,
+    operationCount: fileSummary.operationCount,
+    failureCategories,
+    currentEvidence,
+    nextRequiredAction: strictReady
+      ? "P00 strict inventory is current; continue with the next backend cloud evidence gate."
+      : "动作时确认后恢复 CloudShell 或配置安全 Aliyun CLI profile，再重新运行 allowlisted 只读 inventory 并写回非密钥 evidence。",
+  }
+}
+
+function readCloudInventoryFileSummary(filePath) {
+  if (!filePath || !existsSync(filePath)) {
+    return {
+      localFileExists: false,
+      operationCount: 0,
+      dryRunEvidenceCount: 0,
+      failureCategories: [],
+    }
+  }
+  const parsed = JSON.parse(readFileSync(filePath, "utf8"))
+  const operations = Array.isArray(parsed.operations) ? parsed.operations : []
+  const failureCategories = uniqueStrings(operations.flatMap((operation) => (
+    Array.isArray(operation.commandResults) ? operation.commandResults : []
+  ).map((result) => extractFailureCategory(result.outputSummary))))
+  return {
+    localFileExists: true,
+    operationCount: operations.length,
+    dryRunEvidenceCount: operations.filter((operation) => operation.evidence === "DRY_RUN_NOT_EXECUTED").length,
+    failureCategories,
+  }
+}
+
+function extractFailureCategory(outputSummary) {
+  const match = String(outputSummary || "").match(/failureCategory=([^;\s]+)/)
+  return match ? match[1] : ""
+}
+
+function toBackendRelativePath(filePath) {
+  if (!filePath) return ""
+  const resolvedPath = resolve(filePath)
+  const prefix = `${BACKEND_ROOT}/`
+  return resolvedPath.startsWith(prefix) ? resolvedPath.slice(prefix.length) : resolvedPath
 }
 
 function filterDeferredAppLaunchActionIds(ids) {
@@ -629,6 +717,10 @@ function renderMarkdown(report) {
     `- Resource evidence ready: ${report.summary.resourceEvidenceReady}`,
     `- Blocked resource evidence ids: ${report.summary.blockedResourceEvidenceIds.length ? report.summary.blockedResourceEvidenceIds.join(", ") : "none"}`,
     `- Partially observed resource evidence ids: ${report.summary.partiallyObservedResourceEvidenceIds.length ? report.summary.partiallyObservedResourceEvidenceIds.join(", ") : "none"}`,
+    `- Current P00 inventory gate: ${report.currentInventoryGate.status}`,
+    `- cloudInventoryStrictReady=${report.currentInventoryGate.strictReady}`,
+    `- readyLocalOperations=${report.currentInventoryGate.readyLocalOperations}`,
+    `- dryRunEvidence=${report.currentInventoryGate.dryRunEvidence}`,
     "",
     "## 目标闭环证据简表",
     "",
@@ -648,6 +740,23 @@ function renderMarkdown(report) {
     `- Deferred APP launch packets: ${report.provisioningClosureBrief.deferredAppLaunchPackets.length ? report.provisioningClosureBrief.deferredAppLaunchPackets.join(", ") : "none"}`,
     `- Can start now console tasks: ${report.provisioningClosureBrief.canStartNowConsoleTasks.length ? report.provisioningClosureBrief.canStartNowConsoleTasks.join(", ") : "none"}`,
     `- Next action-time confirmations: ${report.provisioningClosureBrief.nextActionTimeConfirmations.length ? report.provisioningClosureBrief.nextActionTimeConfirmations.join(", ") : "none"}`,
+    `- Current P00 inventory gate: ${report.provisioningClosureBrief.currentInventoryGate.status}`,
+    "",
+    "## 当前 P00 只读盘点门禁",
+    "",
+    `- Status: ${report.currentInventoryGate.status}`,
+    `- cloudInventoryStrictReady=${report.currentInventoryGate.strictReady}`,
+    `- readyLocalOperations=${report.currentInventoryGate.readyLocalOperations}`,
+    `- executedCommandResults=${report.currentInventoryGate.executedCommandResults}`,
+    `- mutationPerformedCommandResults=${report.currentInventoryGate.mutationPerformedCommandResults}`,
+    `- cloudInventoryResultGaps=${report.currentInventoryGate.cloudInventoryResultGaps}`,
+    `- localInventoryFile: ${report.currentInventoryGate.localInventoryFile || "unknown"}`,
+    `- localFileExists: ${report.currentInventoryGate.localFileExists}`,
+    `- dryRunEvidence=${report.currentInventoryGate.dryRunEvidence}`,
+    `- failureCategories: ${report.currentInventoryGate.failureCategories.length ? report.currentInventoryGate.failureCategories.join(", ") : "none"}`,
+    "- Current evidence:",
+    ...report.currentInventoryGate.currentEvidence.map((item) => `  - ${item}`),
+    `- Next required action: ${report.currentInventoryGate.nextRequiredAction}`,
     "",
     "## Ready Authorization Packets",
     "",
