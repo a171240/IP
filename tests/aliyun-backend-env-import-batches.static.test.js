@@ -71,7 +71,7 @@ test("Aliyun backend env import batches report is value-free and backend-only", 
   assert.match(report.statusConsistency.backendOnlyCredentialConclusion, /blockedCredentialNames=DATABASE_URL_CN/)
   assert.match(report.statusConsistency.productionDatabaseDecision, /Aliyun RDS PostgreSQL/)
   assert.match(report.statusConsistency.appLaunchDecision, /not current backend-only blockers/)
-  assert.ok(report.actionTimeConfirmationRequiredIds.includes("S03_ACR_PAID_PURCHASE"))
+  assert.ok(!report.actionTimeConfirmationRequiredIds.includes("S03_ACR_PAID_PURCHASE"))
   assert.ok(report.actionTimeConfirmationRequiredIds.includes("S08_ALIYUN_RDS_DATABASE_URL"))
   assert.ok(report.deferredAppLaunchSensitiveActionIds.includes("S01_WECHAT_OPEN_APP_LOGIN"))
   assert.ok(report.deferredAppLaunchSensitiveActionIds.includes("S07_ANDROID_RELEASE_SIGNING"))

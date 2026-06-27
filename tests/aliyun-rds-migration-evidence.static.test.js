@@ -96,6 +96,94 @@ test("Aliyun RDS migration evidence check reports missing local closure without 
   assert.equal(report.summary.postgresDataAccessAdapterDetected, true)
   assert.deepEqual(report.summary.requiredAuthorizationPackets, ["P11_ALIYUN_RDS_DATA_MIGRATION"])
   assert.deepEqual(report.summary.writebackBlockingGroups, ["rdsInstanceAndSecret"])
+  assert.equal(report.summary.rdsMigrationPlanReady, false)
+  assert.equal(report.summary.rdsMigrationPhaseReady, "0/5")
+  assert.deepEqual(report.summary.rdsMigrationNextPhaseIds, [
+    "source_inventory_preflight",
+    "compatibility_review",
+    "rds_instance_and_secret",
+  ])
+  assert.equal(report.summary.rdsLocalReviewCanStartNow, true)
+  assert.equal(report.summary.rdsCanStartP11AfterActionTimeConfirmation, true)
+  assert.equal(report.summary.rdsCompatibilityReviewCanStartNow, false)
+  assert.equal(report.summary.rdsSchemaApplyBlockedByCompatibilityReview, true)
+  assert.equal(report.rdsMigrationPlan.onlyMissingBackendCredentialValue, "DATABASE_URL_CN")
+  assert.equal(report.rdsMigrationPlan.cloudOrSecretActionRequired, true)
+  assert.equal(report.rdsMigrationPlan.executionReadiness.canStartP11AfterActionTimeConfirmation, true)
+  assert.equal(report.rdsMigrationPlan.executionReadiness.compatibilityReviewCanStartNow, false)
+  assert.equal(report.rdsMigrationPlan.executionReadiness.schemaApplyBlockedByCompatibilityReview, true)
+  assert.equal(report.rdsMigrationPlan.executionReadiness.rdsInstanceAndSecretReady, false)
+  assert.equal(report.rdsMigrationPlan.executionReadiness.onlyMissingBackendCredentialValue, "DATABASE_URL_CN")
+  assert.equal(
+    report.rdsMigrationPlan.executionReadiness.databaseUrlCnSecretTarget,
+    "Aliyun KMS / Secrets Manager / SAE secret env",
+  )
+  assert.ok(report.rdsMigrationPlan.executionReadiness.localReviewCloseFields.includes("migration.schemaCompatibilityReviewed"))
+  assert.ok(report.rdsMigrationPlan.executionReadiness.cloudSecretWritebackFields.includes("rdsPostgres.databaseUrlCnSecretImported=true"))
+  assert.equal(
+    report.rdsMigrationPlan.executionReadiness.nextOperatorDecision,
+    "create_rds_import_database_url_secret_then_validate_schema_data_and_smoke",
+  )
+  assert.ok(report.rdsMigrationPlan.executionReadiness.verificationCommands.includes("corepack pnpm aliyun:sensitive:blockers:backend"))
+  assert.ok(report.rdsMigrationPlan.executionReadiness.safetyBoundary.some((item) => item.includes("Do not apply schema SQL")))
+  assert.equal(report.rdsMigrationPlan.compatibilityReview.packageOk, true)
+  assert.equal(report.rdsMigrationPlan.compatibilityReview.reviewRequired, true)
+  assert.equal(report.rdsMigrationPlan.compatibilityReview.findingCount, 181)
+  assert.equal(report.rdsMigrationPlan.compatibilityReview.affectedSourceFileCount, 9)
+  assert.equal(report.rdsMigrationPlan.compatibilityReview.checklistItemCount, 7)
+  assert.equal(report.rdsMigrationPlan.compatibilityReview.dispositionPlan.status, "open")
+  assert.equal(report.rdsMigrationPlan.compatibilityReview.dispositionPlan.itemCount, 7)
+  assert.equal(report.rdsMigrationPlan.compatibilityReview.dispositionPlan.readyToApplySchema, false)
+  assert.equal(report.rdsMigrationPlan.compatibilityReview.schemaApplyCandidateAudit.status, "blocked_supabase_specific_sql_present")
+  assert.equal(report.rdsMigrationPlan.compatibilityReview.schemaApplyCandidateAudit.readyToApplySchema, false)
+  assert.equal(report.rdsMigrationPlan.compatibilityReview.schemaApplyCandidateAudit.findingCount, 181)
+  assert.ok(report.rdsMigrationPlan.compatibilityReview.schemaApplyCandidateAudit.categories.includes("supabase_auth_schema"))
+  assert.ok(report.rdsMigrationPlan.compatibilityReview.schemaApplyCandidateAudit.categories.includes("supabase_auth_uid"))
+  assert.equal(report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateAudit.status, "blocked_extension_support_unconfirmed")
+  assert.equal(report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateAudit.readyToApplySchema, false)
+  assert.equal(report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateAudit.findingCount, 22)
+  assert.deepEqual(report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateAudit.categories, ["extension_review"])
+  assert.equal(report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateRemoval.removedStatementCount, 97)
+  assert.equal(report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateRemoval.rewrittenStatementCount, 12)
+  assert.equal(report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateReviewPlan.status, "open")
+  assert.equal(report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateReviewPlan.readyToApplySchema, false)
+  assert.equal(report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateReviewPlan.itemCount, 1)
+  assert.equal(report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateReviewPlan.findingCount, 22)
+  assert.deepEqual(report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateReviewPlan.categories, ["extension_review"])
+  assert.ok(report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateReviewPlan.requiredWriteBackFields.includes("migration.rdsExtensionSupportConfirmed"))
+  assert.ok(report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateRemoval.removedCategories.some((item) => item.code === "policy_statement"))
+  assert.ok(report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateRemoval.rewrittenCategories.some((item) => item.code === "supabase_auth_schema"))
+  assert.ok(report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateRemoval.rewrittenCategories.some((item) => item.code === "supabase_auth_uid"))
+  assert.ok(report.rdsMigrationPlan.compatibilityReview.dispositionPlan.requiredWriteBackFields.includes("migration.schemaCompatibilityReviewed"))
+  assert.ok(report.rdsMigrationPlan.compatibilityReview.dispositionPlan.items.some((item) =>
+    item.code === "supabase_auth_schema" &&
+    item.defaultProposedDisposition === "replace_supabase_auth_schema_with_app_identity_model"))
+  assert.ok(report.rdsMigrationPlan.compatibilityReview.dispositionPlan.items.some((item) =>
+    item.code === "supabase_auth_uid" &&
+    item.defaultProposedDisposition === "rewrite_to_backend_enforced_identity_and_tenant_scope"))
+  assert.deepEqual(report.rdsMigrationPlan.compatibilityReview.blockingFields, ["file_missing"])
+  assert.deepEqual(report.rdsMigrationPlan.compatibilityReview.categories.map((item) => item.code), [
+    "extension_review",
+    "policy_statement",
+    "row_level_security",
+    "supabase_auth_schema",
+    "supabase_auth_uid",
+    "supabase_service_role",
+    "supabase_storage_schema",
+  ])
+  assert.equal(
+    report.rdsMigrationPlan.compatibilityReview.packageDigests.schemaSqlSha256,
+    "5b9f4a99254d682ac0d68cc7b5e2dfaab4ff5445585373af2fd0a2e8b8244f41",
+  )
+  assert.equal(report.rdsMigrationPlan.phases.length, 5)
+  assert.deepEqual(report.rdsMigrationPlan.phases.map((item) => item.id), [
+    "source_inventory_preflight",
+    "compatibility_review",
+    "rds_instance_and_secret",
+    "schema_data_validation",
+    "app_api_smoke_and_rollback",
+  ])
+  assert.ok(report.rdsMigrationPlan.phases.every((item) => item.blockerFields.includes("file_missing")))
   assert.equal(report.sourceInventory.currentDataLayer, "Supabase migration source / legacy compatibility only")
   assert.equal(report.sourceInventory.formalTarget, "Aliyun RDS PostgreSQL")
   assert.equal(report.writebackPlan.groups[0].id, "rdsInstanceAndSecret")
@@ -127,6 +215,55 @@ test("Aliyun RDS migration evidence init creates a non-secret local evidence sca
   assert.equal(report.localInit.skipped, false)
   assert.equal(report.local.exists, true)
   assert.equal(report.local.ready, false)
+  assert.equal(report.summary.rdsMigrationPhaseReady, "1/5")
+  assert.deepEqual(report.summary.rdsMigrationNextPhaseIds, ["compatibility_review", "rds_instance_and_secret"])
+  assert.equal(report.summary.rdsCanStartP11AfterActionTimeConfirmation, true)
+  assert.equal(report.summary.rdsCompatibilityReviewCanStartNow, true)
+  assert.equal(report.summary.rdsSchemaApplyBlockedByCompatibilityReview, true)
+  assert.equal(report.rdsMigrationPlan.phases.find((item) => item.id === "source_inventory_preflight").ready, true)
+  assert.equal(report.rdsMigrationPlan.executionReadiness.canStartP11AfterActionTimeConfirmation, true)
+  assert.equal(report.rdsMigrationPlan.executionReadiness.compatibilityReviewCanStartNow, true)
+  assert.equal(report.rdsMigrationPlan.executionReadiness.schemaApplyBlockedByCompatibilityReview, true)
+  assert.equal(report.rdsMigrationPlan.executionReadiness.appApiSmokeBlockedUntilSchemaData, true)
+  assert.equal(report.rdsMigrationPlan.compatibilityReview.findingCount, 181)
+  assert.equal(report.rdsMigrationPlan.compatibilityReview.checklistItemCount, 7)
+  assert.equal(report.rdsMigrationPlan.compatibilityReview.dispositionPlan.itemCount, 7)
+  assert.ok(report.rdsMigrationPlan.compatibilityReview.dispositionPlan.closeConditions.some((item) =>
+    item.includes("migration.supabaseSpecificSqlResolved=true")))
+  assert.equal(report.rdsMigrationPlan.compatibilityReview.schemaApplyCandidateAudit.status, "blocked_supabase_specific_sql_present")
+  assert.equal(report.rdsMigrationPlan.compatibilityReview.schemaApplyCandidateAudit.readyToApplySchema, false)
+  assert.equal(report.rdsMigrationPlan.compatibilityReview.schemaApplyCandidateAudit.findingCount, 181)
+  assert.equal(report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateAudit.findingCount, 22)
+  assert.equal(report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateRemoval.removedStatementCount, 97)
+  assert.equal(report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateRemoval.rewrittenStatementCount, 12)
+  assert.equal(report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateReviewPlan.itemCount, 1)
+  assert.equal(report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateReviewPlan.findingCount, 22)
+  assert.ok(report.rdsMigrationPlan.compatibilityReview.schemaApplyCandidateAudit.byCode.some((item) =>
+    item.code === "supabase_storage_schema" &&
+    item.sourcePaths.includes("rds-schema.sql")))
+  assert.deepEqual(report.rdsMigrationPlan.compatibilityReview.blockingFields, [
+    "migration.schemaCompatibilityReviewed",
+    "migration.supabaseSpecificSqlResolved",
+    "migration.rdsExtensionSupportConfirmed",
+  ])
+  assert.ok(report.rdsMigrationPlan.compatibilityReview.categories.find((item) =>
+    item.code === "supabase_storage_schema" &&
+    item.defaultProposedDisposition === "exclude_from_rds_apply_and_replace_with_oss_boundary" &&
+    item.evidenceWriteBackFields.includes("cloudConfirmations.items.oss")))
+  assert.deepEqual(
+    report.rdsMigrationPlan.phases.find((item) => item.id === "compatibility_review").blockerFields,
+    [
+      "migration.schemaCompatibilityReviewed",
+      "migration.supabaseSpecificSqlResolved",
+      "migration.rdsExtensionSupportConfirmed",
+    ],
+  )
+  assert.ok(
+    report.rdsMigrationPlan.phases
+      .find((item) => item.id === "rds_instance_and_secret")
+      .writeTargets
+      .some((item) => item.includes("DATABASE_URL_CN value only")),
+  )
   assert.ok(!report.local.blockers.includes("file_missing"))
   assert.ok(report.local.blockers.includes("rdsPostgres.confirmed"))
   assert.ok(report.local.blockers.includes("rdsPostgres.databaseUrlCnSecretImported"))
@@ -266,6 +403,48 @@ test("Aliyun RDS migration evidence markdown is value-free", () => {
   assert.match(markdown, /RDS migration evidence check/)
   assert.match(markdown, /localExists: false/)
   assert.match(markdown, /writebackBlockingGroups: rdsInstanceAndSecret/)
+  assert.match(markdown, /rdsMigrationPhaseReady: 0\/5/)
+  assert.match(markdown, /rdsMigrationNextPhaseIds: source_inventory_preflight, compatibility_review, rds_instance_and_secret/)
+  assert.match(markdown, /rdsCanStartP11AfterActionTimeConfirmation: true/)
+  assert.match(markdown, /rdsCompatibilityReviewCanStartNow: false/)
+  assert.match(markdown, /rdsSchemaApplyBlockedByCompatibilityReview: true/)
+  assert.match(markdown, /RDS Migration Plan/)
+  assert.match(markdown, /execution_readiness/)
+  assert.match(markdown, /canStartP11AfterActionTimeConfirmation: true/)
+  assert.match(markdown, /compatibilityReviewCanStartNow: false/)
+  assert.match(markdown, /schemaApplyBlockedByCompatibilityReview: true/)
+  assert.match(markdown, /databaseUrlCnSecretTarget: Aliyun KMS \/ Secrets Manager \/ SAE secret env/)
+  assert.match(markdown, /nextOperatorDecision: create_rds_import_database_url_secret_then_validate_schema_data_and_smoke/)
+  assert.match(markdown, /compatibility_review_package/)
+  assert.match(markdown, /compatibility_disposition_plan/)
+  assert.match(markdown, /rds_apply_candidate/)
+  assert.match(markdown, /rds_apply_candidate_review_plan/)
+  assert.match(markdown, /findingCount: 181/)
+  assert.match(markdown, /findingCount: 22/)
+  assert.match(markdown, /itemCount: 1/)
+  assert.match(markdown, /review:extension_review: findings=22/)
+  assert.doesNotMatch(markdown, /review:supabase_auth_schema/)
+  assert.doesNotMatch(markdown, /review:supabase_auth_uid/)
+  assert.match(markdown, /removedStatementCount: 97/)
+  assert.match(markdown, /rewrittenStatementCount: 12/)
+  assert.match(markdown, /checklistItemCount: 7/)
+  assert.match(markdown, /defaultProposedDisposition: replace_supabase_auth_schema_with_app_identity_model/)
+  assert.match(markdown, /defaultProposedDisposition: rewrite_to_backend_enforced_identity_and_tenant_scope/)
+  assert.match(markdown, /defaultProposedDisposition: exclude_from_rds_apply_and_replace_with_oss_boundary/)
+  assert.match(markdown, /schemaSqlSha256: 5b9f4a99254d682ac0d68cc7b5e2dfaab4ff5445585373af2fd0a2e8b8244f41/)
+  assert.match(markdown, /rdsApplyCandidateSqlSha256: b6cca44687e039ec60837af55caeca861c3403131cb7cd2b511ffb25ad91aeef/)
+  assert.match(markdown, /source_inventory_preflight/)
+  assert.match(markdown, /compatibility_review/)
+  assert.match(markdown, /rds_instance_and_secret/)
+  assert.match(markdown, /schema_data_validation/)
+  assert.match(markdown, /app_api_smoke_and_rollback/)
+  assert.match(markdown, /extension_review/)
+  assert.match(markdown, /policy_statement/)
+  assert.match(markdown, /row_level_security/)
+  assert.match(markdown, /supabase_auth_schema/)
+  assert.match(markdown, /supabase_auth_uid/)
+  assert.match(markdown, /supabase_service_role/)
+  assert.match(markdown, /supabase_storage_schema/)
   assert.match(markdown, /firstVersionRdsRoutesWithSupabaseDataAccess: 0\/25/)
   assert.match(markdown, /deferredAppApiRoutesWithSupabaseDataAccess: 4\/6/)
   assert.match(markdown, /P11_ALIYUN_RDS_DATA_MIGRATION/)
@@ -275,4 +454,26 @@ test("Aliyun RDS migration evidence markdown is value-free", () => {
   assert.match(markdown, /Aliyun RDS PostgreSQL extension support confirmed/)
   assert.match(markdown, /Do not store DATABASE_URL_CN/)
   assert.doesNotMatch(output + markdown, secretLike)
+})
+
+test("tracked Aliyun RDS migration evidence doc pins the current P11 execution readiness", () => {
+  const doc = read("docs", "app-production-cn-rds-migration-evidence.md")
+
+  assert.match(doc, /APP production-cn RDS migration evidence check/)
+  assert.match(doc, /rdsMigrationPhaseReady: 1\/5/)
+  assert.match(doc, /rdsMigrationNextPhaseIds: compatibility_review, rds_instance_and_secret/)
+  assert.match(doc, /rdsCanStartP11AfterActionTimeConfirmation: true/)
+  assert.match(doc, /rdsCompatibilityReviewCanStartNow: true/)
+  assert.match(doc, /rdsSchemaApplyBlockedByCompatibilityReview: true/)
+  assert.match(doc, /execution_readiness/)
+  assert.match(doc, /canStartP11AfterActionTimeConfirmation: true/)
+  assert.match(doc, /compatibilityReviewCanStartNow: true/)
+  assert.match(doc, /schemaApplyBlockedByCompatibilityReview: true/)
+  assert.match(doc, /onlyMissingBackendCredentialValue: DATABASE_URL_CN/)
+  assert.match(doc, /databaseUrlCnSecretTarget: Aliyun KMS \/ Secrets Manager \/ SAE secret env/)
+  assert.match(doc, /localReviewCloseFields: migration\.schemaCompatibilityReviewed, migration\.supabaseSpecificSqlResolved, migration\.rdsExtensionSupportConfirmed/)
+  assert.match(doc, /nextOperatorDecision: close_compatibility_review_and_prepare_rds_action_time_confirmation/)
+  assert.match(doc, /compatibility_disposition_plan/)
+  assert.match(doc, /Do not apply schema to RDS before this review closes/)
+  assert.doesNotMatch(doc, secretLike)
 })

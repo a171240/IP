@@ -3,7 +3,7 @@
 import { mkdirSync, writeFileSync } from "node:fs"
 import { dirname, isAbsolute, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
-import { spawnSync } from "node:child_process"
+import { runJsonWithCache } from "./lib/run-json-cache.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -221,20 +221,10 @@ function resolveValue(value, name) {
 }
 
 function runJson(label, scriptArgs) {
-  const result = spawnSync(process.execPath, scriptArgs, {
+  return runJsonWithCache(label, scriptArgs, {
     cwd: BACKEND_ROOT,
-    encoding: "utf8",
     maxBuffer: 1024 * 1024 * 80,
   })
-  if (result.error) throw result.error
-  if (result.status !== 0) {
-    throw new Error(`${label}_failed:${result.status}\n${result.stderr || result.stdout}`)
-  }
-  try {
-    return JSON.parse(result.stdout)
-  } catch (error) {
-    throw new Error(`invalid_json_from_${label}:${error instanceof Error ? error.message : String(error)}`)
-  }
 }
 
 function buildReport(args) {
@@ -347,6 +337,8 @@ function buildReport(args) {
       backendTargetReady: `${backendTargets.filter((item) => item.ready).length}/${backendTargets.length}`,
       cloudResourceEvidenceReady: resourceMatrix.summary?.resourceEvidenceReady || "unknown",
       cloudInventoryStrictReady: cloudInventory.strictReady,
+      cloudInventoryFailureCategories: cloudInventory.failureCategories,
+      cloudInventoryFailedOperationIds: cloudInventory.failedOperationIds,
       rdsMigrationReady: rdsMigration.localReady === true || rdsMigration.local?.ready === true,
       rdsLocalExists: rdsMigration.localExists === true || rdsMigration.local?.exists === true,
       imagePublishReady: imagePublishPlan.ready === true || imagePublishPlan.local?.ready === true,
@@ -491,6 +483,25 @@ function currentEvidenceForTarget(id, { cloudConfirmations, imagePublishPlan, cl
       `appApiRoutesWithSupabase=${rdsMigration.summary?.appApiRoutesWithSupabase || 0}/${rdsMigration.summary?.appApiRouteCount || 0}`,
       `firstVersionRdsRoutesWithSupabaseDataAccess=${rdsMigration.summary?.firstVersionRdsRoutesWithSupabaseDataAccess || 0}/${rdsMigration.summary?.firstVersionRdsRouteCount || 0}`,
       `postgresDataAccessAdapterDetected=${rdsMigration.summary?.postgresDataAccessAdapterDetected === true}`,
+      rdsMigration.summary?.rdsMigrationPhaseReady ? `rdsMigrationPhaseReady=${rdsMigration.summary.rdsMigrationPhaseReady}` : "",
+      Array.isArray(rdsMigration.summary?.rdsMigrationNextPhaseIds) && rdsMigration.summary.rdsMigrationNextPhaseIds.length
+        ? `rdsMigrationNextPhaseIds=${rdsMigration.summary.rdsMigrationNextPhaseIds.join(",")}`
+        : "",
+      rdsMigration.summary?.rdsLocalReviewCanStartNow !== undefined
+        ? `rdsLocalReviewCanStartNow=${rdsMigration.summary.rdsLocalReviewCanStartNow === true}`
+        : "",
+      rdsMigration.summary?.rdsCanStartP11AfterActionTimeConfirmation !== undefined
+        ? `rdsCanStartP11AfterActionTimeConfirmation=${rdsMigration.summary.rdsCanStartP11AfterActionTimeConfirmation === true}`
+        : "",
+      rdsMigration.summary?.rdsCompatibilityReviewCanStartNow !== undefined
+        ? `rdsCompatibilityReviewCanStartNow=${rdsMigration.summary.rdsCompatibilityReviewCanStartNow === true}`
+        : "",
+      rdsMigration.summary?.rdsSchemaApplyBlockedByCompatibilityReview !== undefined
+        ? `rdsSchemaApplyBlockedByCompatibilityReview=${rdsMigration.summary.rdsSchemaApplyBlockedByCompatibilityReview === true}`
+        : "",
+      rdsMigration.rdsMigrationPlan?.executionReadiness?.nextOperatorDecision
+        ? `rdsNextOperatorDecision=${rdsMigration.rdsMigrationPlan.executionReadiness.nextOperatorDecision}`
+        : "",
       `inventoryNotFound=${(observation.notFoundOperationIds || []).includes("I08_RDS_POSTGRES")}`,
     ]
   }
@@ -535,7 +546,9 @@ function evidenceForResourceRows(resourceMatrix, ids) {
     return [
       `${id}.observedStatus=${row.observedStatus || "unknown"}`,
       `${id}.observedReadiness=${row.observedReadiness || "unknown"}`,
-      ...(row.currentEvidence || []).slice(0, 2).map((item, index) => `${id}.currentEvidence${index + 1}=${item}`),
+      ...(row.currentEvidence || [])
+        .slice(0, id === "R02_ACR_IMAGE_REGISTRY" ? 8 : 2)
+        .map((item, index) => `${id}.currentEvidence${index + 1}=${item}`),
       ...(row.missingEvidence || []).slice(0, 3).map((item) => `${id}.missing=${item}`),
     ]
   })
@@ -758,13 +771,21 @@ function uniqueStrings(values) {
 
 function compactCloudInventory(report) {
   const observation = report.local?.observationSummary || {}
+  const failureCategories = observation.failureCategories || {}
   return {
     strictReady: report.local?.ready === true,
     readyLocalOperations: `${report.summary?.readyLocalOperations || 0}/${report.summary?.localOperations || 0}`,
     executedCommandResults: `${observation.executedCommandResults || 0}/${observation.commandResults || 0}`,
     mutationPerformedCommandResults: observation.mutationPerformedCommandResults || 0,
+    failureCategories,
+    failedOperationIds: observation.failedOperationIds || [],
     observedOperationIds: observation.observedOperationIds || [],
     notFoundOperationIds: observation.notFoundOperationIds || [],
+    nextEvidenceAction: Object.keys(failureCategories).length
+      ? "configure_aliyun_cli_profile_or_run_cloudshell_readonly_collector"
+      : report.local?.ready === true
+        ? "none"
+        : "rerun_allowlisted_readonly_inventory",
     backendMeaning: {
       rdsPostgres: (observation.notFoundOperationIds || []).includes("I08_RDS_POSTGRES") ? "not_found" : "observed_or_unknown",
       saeRuntime: (observation.notFoundOperationIds || []).includes("I01_SAE_RUNTIME") ? "not_found" : "observed_or_unknown",
@@ -809,6 +830,10 @@ function compactRdsMigration(report) {
     deferredAppApiRoutesWithSupabaseDataAccess: report.summary?.deferredAppApiRoutesWithSupabaseDataAccess || 0,
     databaseUrlCnReferencedInSource: report.summary?.databaseUrlCnReferencedInSource === true,
     postgresDataAccessAdapterDetected: report.summary?.postgresDataAccessAdapterDetected === true,
+    rdsMigrationPlanReady: report.summary?.rdsMigrationPlanReady === true,
+    rdsMigrationPhaseReady: report.summary?.rdsMigrationPhaseReady || "0/5",
+    rdsMigrationNextPhaseIds: report.summary?.rdsMigrationNextPhaseIds || [],
+    rdsLocalReviewCanStartNow: report.summary?.rdsLocalReviewCanStartNow === true,
     blockers: report.local?.blockers || [],
     requiredAuthorizationPackets: report.summary?.requiredAuthorizationPackets || [],
   }
@@ -990,6 +1015,16 @@ function renderMarkdown(report) {
     `- backendMissingItems: ${report.cloudConfirmations.backendMissingItems.join(", ") || "none"}`,
     `- backendBlockers: ${report.cloudConfirmations.backendBlockers.join(", ") || "none"}`,
     `- wechatExcludedBlockers: ${report.cloudConfirmations.wechatExcludedBlockers.join(", ") || "none"}`,
+    "",
+    "## Cloud Inventory",
+    "",
+    `- strictReady: ${report.cloudInventory.strictReady}`,
+    `- readyLocalOperations: ${report.cloudInventory.readyLocalOperations}`,
+    `- executedCommandResults: ${report.cloudInventory.executedCommandResults}`,
+    `- mutationPerformedCommandResults: ${report.cloudInventory.mutationPerformedCommandResults}`,
+    `- failureCategories: ${Object.keys(report.cloudInventory.failureCategories).length ? JSON.stringify(report.cloudInventory.failureCategories) : "none"}`,
+    `- failedOperationIds: ${report.cloudInventory.failedOperationIds.join(", ") || "none"}`,
+    `- nextEvidenceAction: ${report.cloudInventory.nextEvidenceAction}`,
     "",
     "## Evidence Writeback",
     "",

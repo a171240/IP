@@ -1,6 +1,6 @@
 # APP production-cn backend-only secret env import batches
 
-Generated: 2026-06-25T08:07:57.911Z
+Generated: 2026-06-26T05:21:14.950Z
 
 Source command: `corepack pnpm aliyun:sensitive:blockers:backend`
 
@@ -18,8 +18,17 @@ readySecretEnvVariableCount=17
 readySecretEnvVariableGroupCount=9
 canCodexProceedWithoutUser=false
 actionTimeConfirmationRequired=true
-actionTimeConfirmationRequiredIds=S03_ACR_PAID_PURCHASE, S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT
+actionTimeConfirmationRequiredIds=S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT
 ```
+
+## Status Source Consistency
+
+- Deployment gate: `corepack pnpm aliyun:backend-cn:status`
+- Credential gate: `corepack pnpm aliyun:sensitive:blockers:backend`
+- Shared credential fields: `blockedCredentialNames`, `readySecretEnvVariableCount`, `actionTimeConfirmationRequiredIds`, `deferredAppLaunchSensitiveActionIds`
+- Backend-only credential conclusion: blockedCredentialNames=DATABASE_URL_CN; readySecretEnvVariableCount=17; actionTimeConfirmationRequiredIds=S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT
+- Production database decision: Aliyun RDS PostgreSQL is the production-cn database target; Supabase variables are migration source / legacy compatibility inputs only.
+- App launch decision: WeChat Open Platform mobile app login, Apple Team ID, and Android release signing are deferred full App launch items, not current backend-only blockers.
 
 Deferred full App launch sensitive actions:
 
@@ -37,9 +46,27 @@ These names are still blocked by Aliyun backend resource or credential decisions
 | --- | --- | --- | --- |
 | `DATABASE_URL_CN` | `S08_ALIYUN_RDS_DATABASE_URL` | 阿里云 RDS/后端数据迁移操作员 | 阿里云 KMS/Secrets Manager/SAE secret env |
 
-- S03_ACR_PAID_PURCHASE and S04_ACR_REGISTRY_AUTH remain backend blockers, but registry secret material stays in ACR/Docker credential helper, RAM/KMS/Secrets Manager, or SAE runtime pull settings.
+- ACR purchase evidence is confirmed locally; S04_ACR_REGISTRY_AUTH remains blocked until docker push, digest verification, and SAE runtime image pull configuration are closed without storing registry secret material in docs, JSON, images, or git.
 - Supabase variables in legacy_database_migration_source are migration source / legacy compatibility only; formal production-cn database target is Aliyun RDS PostgreSQL.
 - WeChat Open Platform mobile app, Apple Team ID, and Android release signing variables are deferred full App launch items, not current backend import blockers.
+
+## Machine-Readable Import Batches
+
+The JSON output includes `importBatches`, `blockedSecretImportBatches`, and `readySecretImportBatches`. Every batch has `canImportNow=false` until the named action-time confirmation and dependency evidence are complete.
+
+| Batch | Phase | Can import now | Variables | Blocked credentials | Import target | Verification |
+| --- | --- | --- | --- | --- | --- | --- |
+| `BLOCKED_SECRET_BATCH_01_OSS_RAM_STS` | `blocked_until_oss_ram_sts_and_runtime_role_confirmed` | false | `ALIYUN_OSS_ACCESS_KEY_ID`, `ALIYUN_OSS_ACCESS_KEY_SECRET`, `ALIYUN_OSS_SECURITY_TOKEN` | none | 阿里云 KMS/Secrets Manager/SAE secret env | `corepack pnpm aliyun:cloud:confirmations`<br>`corepack pnpm aliyun:health:smoke` |
+| `BLOCKED_SECRET_BATCH_02_RDS_DATABASE_SECRET_AND_MIGRATION` | `blocked_until_rds_postgres_and_migration_evidence_ready` | false | `DATABASE_URL_CN` | `DATABASE_URL_CN` | 阿里云 KMS/Secrets Manager/SAE secret env | `corepack pnpm aliyun:rds:migration:package`<br>`corepack pnpm aliyun:rds:migration:evidence:strict`<br>`corepack pnpm aliyun:sensitive:blockers:backend`<br>`corepack pnpm aliyun:backend-cn:status`<br>`corepack pnpm aliyun:completion:audit` |
+| `READY_SECRET_BATCH_01_LEGACY_DATABASE_MIGRATION_SOURCE` | `ready_by_name_blocked_until_authorized_aliyun_secret_env_import` | false | `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | none | migration source / legacy compatibility only; formal database target is Aliyun RDS PostgreSQL | `corepack pnpm aliyun:env:handoff:backend`<br>`corepack pnpm aliyun:sensitive:blockers:backend`<br>`corepack pnpm aliyun:env:checklist`<br>`corepack pnpm aliyun:readiness:cloud-ready` |
+| `READY_SECRET_BATCH_02_APP_AUTH` | `ready_by_name_blocked_until_authorized_aliyun_secret_env_import` | false | `WECHAT_LOGIN_SECRET` | none | 阿里云 KMS/Secrets Manager/SAE secret env | `corepack pnpm aliyun:env:handoff:backend`<br>`corepack pnpm aliyun:sensitive:blockers:backend`<br>`corepack pnpm aliyun:env:checklist`<br>`corepack pnpm aliyun:readiness:cloud-ready` |
+| `READY_SECRET_BATCH_03_ALIYUN_OSS` | `ready_by_name_blocked_until_authorized_aliyun_secret_env_import` | false | `ALIYUN_OSS_ACCESS_KEY_ID`, `ALIYUN_OSS_ACCESS_KEY_SECRET` | none | 阿里云 KMS/Secrets Manager/SAE secret env | `corepack pnpm aliyun:env:handoff:backend`<br>`corepack pnpm aliyun:sensitive:blockers:backend`<br>`corepack pnpm aliyun:env:checklist`<br>`corepack pnpm aliyun:readiness:cloud-ready` |
+| `READY_SECRET_BATCH_04_BAILIAN_ASR` | `ready_by_name_blocked_until_authorized_aliyun_secret_env_import` | false | `DASHSCOPE_API_KEY` | none | 阿里云 KMS/Secrets Manager/SAE secret env | `corepack pnpm aliyun:env:handoff:backend`<br>`corepack pnpm aliyun:sensitive:blockers:backend`<br>`corepack pnpm aliyun:env:checklist`<br>`corepack pnpm aliyun:readiness:cloud-ready` |
+| `READY_SECRET_BATCH_05_DEEPSEEK_SUMMARY` | `ready_by_name_blocked_until_authorized_aliyun_secret_env_import` | false | `DEEPSEEK_API_KEY`, `SERVICE_RECORD_DEEPSEEK_API_KEY` | none | 阿里云 KMS/Secrets Manager/SAE secret env | `corepack pnpm aliyun:env:handoff:backend`<br>`corepack pnpm aliyun:sensitive:blockers:backend`<br>`corepack pnpm aliyun:env:checklist`<br>`corepack pnpm aliyun:readiness:cloud-ready` |
+| `READY_SECRET_BATCH_06_VOLC_SPEECH` | `ready_by_name_blocked_until_authorized_aliyun_secret_env_import` | false | `VOLC_SPEECH_ACCESS_TOKEN`, `VOLC_SPEECH_APP_ID`, `VOLC_SPEECH_SECRET_KEY` | none | 阿里云 KMS/Secrets Manager/SAE secret env | `corepack pnpm aliyun:env:handoff:backend`<br>`corepack pnpm aliyun:sensitive:blockers:backend`<br>`corepack pnpm aliyun:env:checklist`<br>`corepack pnpm aliyun:readiness:cloud-ready` |
+| `READY_SECRET_BATCH_07_BACKEND_OPS` | `ready_by_name_blocked_until_authorized_aliyun_secret_env_import` | false | `ADMIN_USER_IDS`, `CREDITS_IP_SALT` | none | 阿里云 KMS/Secrets Manager/SAE secret env | `corepack pnpm aliyun:env:handoff:backend`<br>`corepack pnpm aliyun:sensitive:blockers:backend`<br>`corepack pnpm aliyun:env:checklist`<br>`corepack pnpm aliyun:readiness:cloud-ready` |
+| `READY_SECRET_BATCH_08_LEGACY_CONTENT_PROVIDER` | `ready_by_name_blocked_until_authorized_aliyun_secret_env_import` | false | `APIMART_API_KEY` | none | 阿里云 KMS/Secrets Manager/SAE secret env | `corepack pnpm aliyun:env:handoff:backend`<br>`corepack pnpm aliyun:sensitive:blockers:backend`<br>`corepack pnpm aliyun:env:checklist`<br>`corepack pnpm aliyun:readiness:cloud-ready` |
+| `READY_SECRET_BATCH_09_MINI_PROGRAM_COMPAT` | `ready_by_name_blocked_until_authorized_aliyun_secret_env_import` | false | `WECHAT_MINI_APPID`, `WECHAT_MINI_SECRET` | none | 阿里云 KMS/Secrets Manager/SAE secret env | `corepack pnpm aliyun:env:handoff:backend`<br>`corepack pnpm aliyun:sensitive:blockers:backend`<br>`corepack pnpm aliyun:env:checklist`<br>`corepack pnpm aliyun:readiness:cloud-ready` |
 
 ## Conditional OSS STS Token
 

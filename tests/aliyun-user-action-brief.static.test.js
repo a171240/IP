@@ -38,24 +38,24 @@ test("APP production-cn user action brief documents credential and operator hand
   assert.match(doc, /现在不能部署；当前只推进阿里云后端/)
   assert.match(doc, /currentScope: backend_aliyun_only/)
   assert.match(doc, /fullAppLaunchScope: deferred_after_backend_online/)
-  assert.match(doc, /ready: 0 \/ 12/)
-  assert.match(doc, /blocked: 12/)
-  assert.match(doc, /nextActionTimeConfirmations: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE/)
+  assert.match(doc, /ready: 1 \/ 9/)
+  assert.match(doc, /blocked: 8/)
+  assert.match(doc, /nextActionTimeConfirmations: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P04_ACR_IMAGE_AND_PULL/)
   assert.match(doc, /deferredAppLaunchConfirmations: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID/)
-  assert.match(doc, /blockedCredentialCount: 8/)
+  assert.match(doc, /blockedCredentialCount: 1/)
   assert.match(doc, /blockedCredentialNames: .*DATABASE_URL_CN/)
   assert.match(doc, /readySecretEnvVariableCount: 17/)
   assert.match(doc, /databaseUrlCnStatus=todo/)
   assert.match(doc, /RDS PostgreSQL 迁移和回滚验收通过/)
   assert.match(doc, /aliyun:rds:migration:package/)
-  assert.match(doc, /compatibilityReviewChecklist 6 类/)
+  assert.match(doc, /compatibilityReviewChecklist 7 类/)
   assert.match(doc, /migration\.schemaCompatibilityReviewed=true/)
   assert.match(doc, /P01_WECHAT_OPEN_MOBILE_APP/)
   assert.match(doc, /P10_ANDROID_RELEASE_SIGNING/)
   assert.match(doc, /P02_APPLE_TEAM_ID/)
   assert.match(doc, /P00_ALIYUN_READONLY_INVENTORY_IDENTITY/)
   assert.match(doc, /allowlisted 只读盘点命令/)
-  assert.match(doc, /P03_ACR_PURCHASE/)
+  assert.match(doc, /P04_ACR_IMAGE_AND_PULL/)
   assert.match(doc, /P05_OSS_RAM_STS/)
   assert.match(doc, /P11_ALIYUN_RDS_DATA_MIGRATION/)
   assert.match(doc, /ALIYUN_OSS_SECURITY_TOKEN/)
@@ -67,19 +67,19 @@ test("APP production-cn user action brief documents credential and operator hand
   assert.match(doc, /mini_program_compat/)
   assert.match(doc, /U09_DEPLOY_AUTHORIZATION/)
   assert.match(doc, /U11_ALIYUN_RDS_DATA_MIGRATION/)
-  assert.match(doc, /授权购买 ACR Enterprise Economic，cn-hangzhou，1 个月，当前报价 CNY 117\.00/)
+  assert.match(doc, /配置 ACR 镜像推送和 SAE 镜像拉取权限/)
   assert.match(doc, /授权为服务记录音频 OSS 配置最小权限 RAM\/STS/)
   assert.match(doc, /不执行 docker login\/push/)
   assert.match(doc, /不把 AccessKeySecret 或 STS token 写入 JSON、Markdown、镜像或 git/)
   assert.match(doc, /明确授权生产部署/)
   assert.match(doc, /git push/)
-  assert.match(doc, /WECHAT_OPEN_APP_ID/)
-  assert.match(doc, /WECHAT_OPEN_APP_SECRET/)
-  assert.match(doc, /MEIYE_RELEASE_STORE_PASSWORD/)
-  assert.match(doc, /MEIYE_RELEASE_KEY_PASSWORD/)
-  assert.match(doc, /U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE/)
-  assert.match(doc, /U10_ANDROID_RELEASE_SIGNING/)
-  assert.match(doc, /U02_APPLE_TEAM_ID/)
+  assert.doesNotMatch(doc, /WECHAT_OPEN_APP_ID/)
+  assert.doesNotMatch(doc, /WECHAT_OPEN_APP_SECRET/)
+  assert.doesNotMatch(doc, /MEIYE_RELEASE_STORE_PASSWORD/)
+  assert.doesNotMatch(doc, /MEIYE_RELEASE_KEY_PASSWORD/)
+  assert.doesNotMatch(doc, /U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE/)
+  assert.doesNotMatch(doc, /U10_ANDROID_RELEASE_SIGNING/)
+  assert.doesNotMatch(doc, /U02_APPLE_TEAM_ID/)
 })
 
 test("Aliyun user action brief is value-free and includes the expected blockers", () => {
@@ -148,7 +148,7 @@ test("Aliyun user action brief is value-free and includes the expected blockers"
   assert.ok(report.summary.actionTimeConfirmationRequired.includes("U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE"))
   assert.ok(report.summary.actionTimeConfirmationRequired.includes("U10_ANDROID_RELEASE_SIGNING"))
   assert.ok(report.summary.actionTimeConfirmationRequired.includes("U02_APPLE_TEAM_ID"))
-  assert.ok(report.summary.actionTimeConfirmationRequired.includes("U03_ACR_PURCHASE_CONFIRMATION"))
+  assert.ok(!report.summary.actionTimeConfirmationRequired.includes("U03_ACR_PURCHASE_CONFIRMATION"))
   assert.ok(report.summary.actionTimeConfirmationRequired.includes("U04_ACR_RUNTIME_AUTH"))
   assert.ok(report.summary.actionTimeConfirmationRequired.includes("U05_OSS_RAM_OR_STS"))
   assert.ok(report.summary.actionTimeConfirmationRequired.includes("U11_ALIYUN_RDS_DATA_MIGRATION"))
@@ -156,7 +156,7 @@ test("Aliyun user action brief is value-free and includes the expected blockers"
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
     "P05_OSS_RAM_STS",
-    "P03_ACR_PURCHASE",
+    "P04_ACR_IMAGE_AND_PULL",
   ])
   assert.deepEqual(report.summary.deferredAppLaunchConfirmations, [
     "P01_WECHAT_OPEN_MOBILE_APP",
@@ -186,15 +186,15 @@ test("Aliyun user action brief is value-free and includes the expected blockers"
   assert.ok(readonlyInventoryAction.currentBlockers.includes("readonly_inventory_strict_ready=0/9"))
   assert.ok(readonlyInventoryAction.currentBlockers.includes("cloudInventory:I08_RDS_POSTGRES"))
   assert.ok(readonlyInventoryAction.currentEvidence.includes("mutationPerformedCommandResults=0"))
-  assert.ok(readonlyInventoryAction.currentEvidence.includes("cloudShellCurrentStatus=connecting_terminal_input_visible_inventory_not_executed"))
+  assert.ok(readonlyInventoryAction.currentEvidence.includes("cloudShellCurrentStatus=disconnected_restart_instance_confirmation_required"))
   assert.match(nextConfirmationsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").minimumUserPhrase, /只读盘点命令/)
-  assert.match(nextConfirmationsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").minimumUserPhrase, /等待当前阿里云 CloudShell 连接完成/)
-  assert.equal(nextConfirmationsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").cloudShellCurrentStatus, "connecting_terminal_input_visible_inventory_not_executed")
+  assert.match(nextConfirmationsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").minimumUserPhrase, /重启实例提示/)
+  assert.equal(nextConfirmationsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").cloudShellCurrentStatus, "disconnected_restart_instance_confirmation_required")
   assert.ok(nextConfirmationsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").allowedActions.some((item) =>
-    item.includes("正在连接 Cloud Shell")
+    item.includes("重启实例提示")
   ))
   assert.ok(nextConfirmationsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").explicitlyExcluded.some((item) =>
-    item.includes("当前 connecting 状态不授权")
+    item.includes("CloudShell 重启实例提示")
   ))
   assert.ok(wechatAction.variableNames.includes("WECHAT_OPEN_APP_SECRET"))
   assert.equal(wechatAction.requiresActionTimeConfirmation, true)
@@ -225,9 +225,13 @@ test("Aliyun user action brief is value-free and includes the expected blockers"
   assert.ok(!acrPurchaseAction.currentEvidence.some((item) => item.includes("TODO_")))
   assert.ok(!acrRuntimeAction.currentEvidence.some((item) => item.includes("TODO_")))
   assert.ok(acrPurchaseAction.currentEvidence.includes("R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.quotedAmount=CNY 117.00"))
-  assert.ok(acrPurchaseAction.currentEvidence.includes("R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.requiresActionTimePurchaseConfirmation=true"))
-  assert.match(nextConfirmationsById.get("P03_ACR_PURCHASE").minimumUserPhrase, /CNY 117\.00/)
-  assert.equal(nextConfirmationsById.get("P03_ACR_PURCHASE").nonSecretEvidenceOnly, true)
+  assert.ok(acrPurchaseAction.currentEvidence.some((item) =>
+    item.includes("acr.purchaseCandidate.requiresActionTimePurchaseConfirmation=false")
+  ))
+  assert.equal(acrPurchaseAction.requiresUserAction, false)
+  assert.equal(acrPurchaseAction.requiresActionTimeConfirmation, false)
+  assert.match(nextConfirmationsById.get("P04_ACR_IMAGE_AND_PULL").minimumUserPhrase, /后端镜像/)
+  assert.equal(nextConfirmationsById.get("P04_ACR_IMAGE_AND_PULL").nonSecretEvidenceOnly, true)
   assert.equal(acrRuntimeAction.requiresActionTimeConfirmation, true)
   assert.equal(report.actions.find((item) => item.id === "U05_OSS_RAM_OR_STS").requiresActionTimeConfirmation, true)
   assert.ok(
@@ -246,12 +250,12 @@ test("Aliyun user action brief is value-free and includes the expected blockers"
   )
   assert.ok(
     nextConfirmationsById.get("P11_ALIYUN_RDS_DATA_MIGRATION").allowedActions.some((item) =>
-      item.includes("compatibilityReviewChecklist 6 类"),
+      item.includes("compatibilityReviewChecklist 7 类"),
     ),
   )
   assert.ok(
     nextConfirmationsById.get("P11_ALIYUN_RDS_DATA_MIGRATION").completionEvidence.some((item) =>
-      item.includes("compatibilityReviewChecklistItemCount=6"),
+      item.includes("compatibilityReviewChecklistItemCount=7"),
     ),
   )
   assert.ok(
@@ -267,7 +271,8 @@ test("Aliyun user action brief is value-free and includes the expected blockers"
   assert.match(rdsAction.unblockCondition, /migration\.schemaCompatibilityReviewed=true/)
   assert.equal(report.actions.find((item) => item.id === "U08_SAE_RUNTIME_AND_SLS").requiresActionTimeConfirmation, true)
   assert.equal(report.actions.find((item) => item.id === "U08_SAE_RUNTIME_AND_SLS").requiresUserAction, true)
-  assert.ok(acrRuntimeAction.currentEvidence.includes("R02_ACR_IMAGE_REGISTRY:localDockerImage.status=ready"))
+  assert.ok(acrRuntimeAction.currentEvidence.includes("R02_ACR_IMAGE_REGISTRY:localDockerImage.status=docker_daemon_unavailable_or_timeout"))
+  assert.ok(acrRuntimeAction.currentEvidence.includes("R02_ACR_IMAGE_REGISTRY:localDockerImage.dockerServerAvailable=false"))
   assert.ok(acrRuntimeAction.currentEvidence.includes("R02_ACR_IMAGE_REGISTRY:runtime.appName=meiye-huajing-app-api-production-cn"))
   assert.ok(domainAction.currentBlockers.includes("apiDomainHttps:dnsResolvedToAliyun"))
   assert.ok(deployAction.currentBlockers.includes("canDeployNow=false"))
@@ -290,7 +295,7 @@ test("Aliyun user action brief is value-free and includes the expected blockers"
   assert.match(markdown, /### 获取\/导入队列/)
   assert.match(markdown, /queueScope: full_app_launch/)
   assert.match(markdown, /DATABASE_URL_CN 从哪里获得并导入到哪里/)
-  assert.match(markdown, /compatibilityReviewChecklistItemCount=6/)
+  assert.match(markdown, /compatibilityReviewChecklistItemCount=7/)
   assert.match(markdown, /corepack pnpm aliyun:rds:migration:package/)
   assert.match(markdown, /blockedCredentialCount: 8/)
   assert.match(markdown, /readySecretEnvVariableCount: 17/)
@@ -322,14 +327,13 @@ test("Aliyun user action brief backend-only mode excludes deferred APP launch bl
 
   assert.equal(report.backendOnly, true)
   assert.equal(report.summary.total, 9)
-  assert.equal(report.summary.blocked, 9)
+  assert.equal(report.summary.blocked, 8)
   assert.deepEqual(report.summary.blockedCredentialNames, ["DATABASE_URL_CN"])
   assert.equal(report.credentialAcquisitionSummary.blockedCredentialCount, 1)
   assert.deepEqual(report.credentialAcquisitionSummary.blockedCredentialNames, ["DATABASE_URL_CN"])
   assert.equal(report.credentialAcquisitionSummary.credentialAcquisitionQueue.queueScope, "backend_aliyun_only")
   assert.equal(report.credentialAcquisitionSummary.credentialAcquisitionQueue.onlyMissingBackendCredentialValue, "DATABASE_URL_CN")
   assert.deepEqual(report.credentialAcquisitionSummary.credentialAcquisitionQueue.items.map((item) => item.actionId), [
-    "S03_ACR_PAID_PURCHASE",
     "S04_ACR_REGISTRY_AUTH",
     "S05_OSS_RAM_SECRET_OR_STS",
     "S08_ALIYUN_RDS_DATABASE_URL",
@@ -339,14 +343,14 @@ test("Aliyun user action brief backend-only mode excludes deferred APP launch bl
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
     "P05_OSS_RAM_STS",
-    "P03_ACR_PURCHASE",
+    "P04_ACR_IMAGE_AND_PULL",
   ])
   assert.equal(report.actionTimeAuthorizationRequest.required, true)
   assert.equal(report.actionTimeAuthorizationRequest.currentScope, "backend_aliyun_only")
   assert.deepEqual(report.actionTimeAuthorizationRequest.packetIds, report.summary.nextActionTimeConfirmations)
   assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /阿里云后端第一批动作/)
   assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /RDS PostgreSQL/)
-  assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /CNY117/)
+  assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /ACR 购买证据已确认/)
   assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /不做微信\/Android\/iOS/)
   assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /不部署上线、不改 DNS/)
   assert.ok(report.actionTimeAuthorizationRequest.explicitlyExcluded.some((item) => /不创建微信开放平台移动应用/.test(item)))
@@ -360,15 +364,16 @@ test("Aliyun user action brief backend-only mode excludes deferred APP launch bl
   assert.ok(!envImportAction.currentBlockers.some((item) => /WECHAT_OPEN_APP_ID|WECHAT_OPEN_APP_SECRET/.test(item)))
   assert.ok(deployAction.currentBlockers.includes("missing_required_env:DATABASE_URL_CN"))
   assert.ok(!deployAction.currentBlockers.some((item) => /WECHAT_OPEN_APP_ID|WECHAT_OPEN_APP_SECRET|微信开放平台移动应用/.test(item)))
+  assert.deepEqual(report.summary.requiredBlocking, ["DATABASE_URL_CN"])
+  assert.deepEqual(report.summary.blockedCredentialNames, ["DATABASE_URL_CN"])
   assert.match(markdown, /blockedCredentialNames: DATABASE_URL_CN/)
   assert.match(markdown, /### 后端-only 获取\/导入队列/)
   assert.match(markdown, /onlyMissingBackendCredentialValue: DATABASE_URL_CN/)
   assert.match(markdown, /DATABASE_URL_CN 从哪里获得并导入到哪里/)
   assert.match(markdown, /## 动作时授权请求/)
   assert.match(markdown, /recommendedUserReply: 授权本轮只做阿里云后端第一批动作/)
-  assert.match(markdown, /packetIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE/)
-  assert.match(markdown, /compatibilityReviewChecklist 6 类/)
+  assert.match(markdown, /packetIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P04_ACR_IMAGE_AND_PULL/)
+  assert.match(markdown, /compatibilityReviewChecklist 7 类/)
   assert.match(markdown, /corepack pnpm aliyun:rds:migration:package/)
-  assert.doesNotMatch(output + markdown, /WECHAT_OPEN_APP_ID|WECHAT_OPEN_APP_SECRET/)
   assert.doesNotMatch(output + markdown, /MEIYE_RELEASE_STORE_PASSWORD|MEIYE_RELEASE_KEY_PASSWORD/)
 })

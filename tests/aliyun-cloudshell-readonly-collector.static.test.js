@@ -124,6 +124,8 @@ test("Aliyun CloudShell readonly collector generator produces a value-free scrip
   assert.match(script, /subprocess\.run/)
   assert.match(script, /stdout=subprocess\.PIPE/)
   assert.match(script, /stderr=subprocess\.PIPE/)
+  assert.match(script, /def summarize_resource/)
+  assert.match(script, /resourceSummary=/)
   assert.match(script, /MEIYE_CLOUDSHELL_READONLY_INVENTORY_JSON_BEGIN/)
   assert.match(script, /Raw stdout\/stderr are not stored or printed/)
   assert.doesNotMatch(script, /print\(stdout|print\(stderr/)
@@ -142,6 +144,86 @@ test("Aliyun CloudShell readonly collector generator produces a value-free scrip
   assert.doesNotMatch(bootstrap, secretLike)
   assert.doesNotMatch(printedBootstrap, secretLike)
   assert.doesNotMatch(markdown, secretLike)
+})
+
+test("Aliyun CloudShell readonly collector summarizes resource evidence without raw output", () => {
+  const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-cloudshell-collector-run-"))
+  const scriptPath = path.join(tmpdir, "collector.py")
+  const outputPath = path.join(tmpdir, "inventory.json")
+  const fakeBin = path.join(tmpdir, "bin")
+  const fakeAliyun = path.join(fakeBin, "aliyun")
+  fs.mkdirSync(fakeBin)
+  fs.writeFileSync(fakeAliyun, `#!/usr/bin/env node
+const args = process.argv.slice(2);
+const text = args.join(" ");
+if (text.startsWith("sae ListApplications")) {
+  console.log(JSON.stringify({ Applications: [{ AppName: "other-app" }] }));
+} else if (text.startsWith("cr ListInstance")) {
+  console.log(JSON.stringify({ Instances: [{ InstanceName: "meiye-huajing-app-api" }] }));
+} else if (text.startsWith("alidns DescribeSubDomainRecords") && text.includes("api-cn.ipgongchang.xin")) {
+  console.log(JSON.stringify({ DomainRecords: { Record: [{ Type: "CNAME" }], TotalCount: 1 } }));
+} else if (text.startsWith("alidns DescribeSubDomainRecords") && text.includes("assets-cn.ipgongchang.xin")) {
+  console.log(JSON.stringify({ DomainRecords: { Record: [] }, TotalCount: 0 }));
+} else if (text.startsWith("oss stat")) {
+  console.log("Location: oss-cn-hangzhou\\nACL: private\\nStorageClass: Standard");
+} else if (text.startsWith("sls ListProject")) {
+  console.log(JSON.stringify({ projects: [{ projectName: "meiye-huajing-app-prod-cn" }] }));
+} else if (text.startsWith("cas ListUserCertificateOrder")) {
+  console.log(JSON.stringify({ CertificateOrderList: [] }));
+} else if (text.startsWith("rds DescribeDBInstances")) {
+  console.log(JSON.stringify({ Items: { DBInstance: [{ DBInstanceDescription: "meiye-huajing-app-api-production-cn", Engine: "PostgreSQL" }] }, TotalRecordCount: 1 }));
+} else if (text.startsWith("r-kvstore DescribeInstances")) {
+  console.log(JSON.stringify({ Instances: [], TotalCount: 0 }));
+} else {
+  console.error("unexpected command", text);
+  process.exit(12);
+}
+`, { mode: 0o700 })
+  execFileSync(process.execPath, [
+    "scripts/generate-aliyun-cloudshell-readonly-collector.mjs",
+    "--out",
+    scriptPath,
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 20,
+  })
+  const run = spawnSync("python3", [scriptPath, outputPath], {
+    cwd: root,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      PATH: `${fakeBin}${path.delimiter}${process.env.PATH || ""}`,
+      MEIYE_ALLOW_ALIYUN_CLOUDSHELL_READONLY: "1",
+    },
+    maxBuffer: 1024 * 1024 * 20,
+  })
+  assert.equal(run.status, 0, run.stderr || run.stdout)
+  const payload = JSON.parse(fs.readFileSync(outputPath, "utf8"))
+  const byId = new Map(payload.operations.map((item) => [item.id, item]))
+  const summary = (id) => byId.get(id).commandResults[0].outputSummary
+
+  assert.equal(byId.get("I01_SAE_RUNTIME").status, "not_found")
+  assert.match(summary("I01_SAE_RUNTIME"), /resourceSummary=.*targetAppPresent=false/)
+  assert.equal(byId.get("I02_ACR_IMAGE").status, "observed")
+  assert.match(summary("I02_ACR_IMAGE"), /targetInstanceOrNamespacePresent=true/)
+  assert.equal(byId.get("I03_DNS_API_DOMAIN").status, "observed")
+  assert.match(summary("I03_DNS_API_DOMAIN"), /recordCount=1/)
+  assert.equal(byId.get("I04_DNS_ASSET_DOMAIN").status, "not_found")
+  assert.match(summary("I04_DNS_ASSET_DOMAIN"), /recordCount=0/)
+  assert.equal(byId.get("I05_OSS_AUDIO_BUCKET").status, "observed")
+  assert.match(summary("I05_OSS_AUDIO_BUCKET"), /bucketExists=true/)
+  assert.match(summary("I05_OSS_AUDIO_BUCKET"), /acl=private/)
+  assert.equal(byId.get("I06_SLS_ALERTS").status, "observed")
+  assert.match(summary("I06_SLS_ALERTS"), /targetProjectPresent=true/)
+  assert.equal(byId.get("I07_CERT_HTTPS").status, "not_found")
+  assert.match(summary("I07_CERT_HTTPS"), /certificateOrderCount=0/)
+  assert.equal(byId.get("I08_RDS_POSTGRES").status, "observed")
+  assert.match(summary("I08_RDS_POSTGRES"), /targetInstancePresent=true/)
+  assert.match(summary("I08_RDS_POSTGRES"), /engines=PostgreSQL/)
+  assert.equal(byId.get("I09_TAIR_REDIS").status, "not_found")
+  assert.match(summary("I09_TAIR_REDIS"), /redisOrTairInstanceCount=0/)
+  assert.doesNotMatch(JSON.stringify(payload), secretLike)
 })
 
 test("Aliyun CloudShell readonly collector refuses unsafe template commands", () => {

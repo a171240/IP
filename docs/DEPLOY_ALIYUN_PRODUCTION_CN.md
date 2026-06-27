@@ -103,10 +103,10 @@ corepack pnpm aliyun:image:plan:strict
 ```text
 ACR 个人版：可进入创建页，但页面提示个人版无 SLA 且有使用限制，请勿在生产业务中使用。
 ACR 企业版：入口存在，属于生产级实例选择/购买路径。
-ACR 企业版经济版：2026-06-22 控制台核到 cn-hangzhou / 1 个月候选报价 CNY 117.00，尚未购买。
+ACR 企业版经济版：2026-06-26 已确认 cn-hangzhou / 1 个月实例 `meiye-huajing-app-api`，实例 id `cri-imlf4amccfw6m6sa`，namespace/repository `meiye-huajing-app-api` 已存在；当前未闭环的是镜像 push/import、远端 digest 核对和 SAE 镜像拉取配置。
 ```
 
-因此正式 production-cn 不应把个人版 ACR 当作最终生产证据。若只是桥接调试，可以单独标记为 diagnostic；正式发布需要选择企业版 ACR，或改用阿里云镜像构建/SAE 支持的其它生产级镜像来源，并把 remote image、digest 和运行时拉取证据写入 `deploy/aliyun-production-cn.image-publish.local.json`。ACR 企业版购买是明确付费动作，未取得用户对规格和金额的动作前确认时，只能在 local 文件里记录 `purchaseCandidate`，不能把 `acr.confirmed` 改成 true。
+因此正式 production-cn 不应把个人版 ACR 当作最终生产证据。若只是桥接调试，可以单独标记为 diagnostic；正式发布当前使用已确认的企业版 ACR，并必须把 remote image、digest 和运行时拉取证据写入 `deploy/aliyun-production-cn.image-publish.local.json`。P03 购买/仓库证据已 ready；P04 镜像推送/导入、digest 核对和 SAE 拉取配置仍必须单独动作时确认，且不能把 registry password、RAM Secret 或 token 写入文档、JSON、镜像或 git。
 
 ### 2.2 健康检查
 
@@ -240,7 +240,7 @@ corepack pnpm aliyun:user:actions
 corepack pnpm aliyun:operator:handoff
 ```
 
-这些命令不输出任何密钥值，也不会创建资源、导入变量或推送镜像。`aliyun:legal:check` 只确认后端包内 `/privacy` 和 `/terms` 页面存在、核心字段完整，并允许正式 URL 仍未填入 env；`aliyun:deploy:spec` 校验 `deploy/aliyun-production-cn.example.json` 的镜像、端口、ACR 发布计划、SAE runtime plan、域名、健康检查、前后置门禁顺序和 9 项外部确认；`aliyun:runtime:plan` 校验 `deploy/aliyun-production-cn.runtime-plan.json` 是否仍指向 `cn-hangzhou` 的 SAE 自定义容器、端口 3000 和 `api-cn.ipgongchang.xin`；`aliyun:cloud:access` 只检查本机是否具备阿里云 CLI 只读 inventory 条件，并输出 SAE/ACR/DNS/OSS/SLS 控制台要记录的非密钥证据字段，不调用阿里云 API；`aliyun:cloud:inventory-results` 校验 CLI/Cloud Shell 只读盘点后的本地非密钥摘要是否已经落到 `cloud-inventory-results.local.json`；`aliyun:status` 是给当前发布负责人看的只读总览，会把本地门禁、微信审核、Apple Universal Link、阿里云云资源确认、CLI 只读盘点结果、域名和 ACR 镜像证据压缩成一个 JSON 摘要；`aliyun:operator:tasks` 会把当前 `readiness`、`domain`、`.env.production-cn.local`、`image-publish.local.json` 和 `cloud-confirmations.local.json` 汇总为 9 个任务；`aliyun:sensitive:blockers` 会把 operator tasks 里的密钥、密码、token、付款和受控标识符类人工介入项单独压缩成无密钥清单；`aliyun:resources:matrix` 会把 SAE、ACR、api-cn、assets-cn、OSS、env import 和 SLS 这 7 个阿里云资源项压缩成资源矩阵，RDS/PostgreSQL 数据迁移由 `U11/P11_ALIYUN_RDS_DATA_MIGRATION` 单独管控，列出控制台路径、写入的 `.local.json` 字段、当前 blocker、验收命令和是否需要动作时确认；`aliyun:rds:migration:plan` 会只读扫描 `app/api/app`、其复用的 `app/api/mp` 和 `lib` 数据访问依赖，输出 APP 路由、Supabase 表/RPC/bucket、`DATABASE_URL_CN` 和 PostgreSQL adapter 缺口，不连接数据库、不读取 `.env` 值；`aliyun:user:actions` 会把微信移动应用、Apple Team ID、ACR 付费、OSS/RAM、RDS/PostgreSQL 迁移、环境变量导入、DNS/HTTPS/ICP、SAE/SLS 和最终部署授权整理成给用户看的单页动作简报；`aliyun:operator:handoff` 是给用户、阿里云操作员、微信开放平台操作员和发布负责人共用的非密钥操作包，适合直接判断“现在缺什么、去哪里拿、导入哪里”。它还会读取 Vercel production 的变量名元数据，列出哪些旧后端桥接变量已在 Vercel 中存在、哪些 production-cn 必填变量仍缺，并把 `cloud-confirmations.local.json` 与 `image-publish.local.json` 仍待填写的 JSON path、控制台来源、期望证据和禁止写入的敏感值逐项列出；这一步不读取值、不导出密钥，也不等于已导入阿里云。
+这些命令不输出任何密钥值，也不会创建资源、导入变量或推送镜像。`aliyun:legal:check` 只确认后端包内 `/privacy` 和 `/terms` 页面存在、核心字段完整，并允许正式 URL 仍未填入 env；`aliyun:deploy:spec` 校验 `deploy/aliyun-production-cn.example.json` 的镜像、端口、ACR 发布计划、SAE runtime plan、域名、健康检查、前后置门禁顺序和 9 项外部确认；`aliyun:runtime:plan` 校验 `deploy/aliyun-production-cn.runtime-plan.json` 是否仍指向 `cn-hangzhou` 的 SAE 自定义容器、端口 3000、`api-cn.ipgongchang.xin`，并确认 RDS PostgreSQL / `DATABASE_URL_CN` / ACR image digest / OSS runtime access / backend env import 都是 runtime ready 前置依赖；`aliyun:cloud:access` 只检查本机是否具备阿里云 CLI 只读 inventory 条件，并输出 SAE/ACR/DNS/OSS/SLS 控制台要记录的非密钥证据字段，不调用阿里云 API；`aliyun:cloud:inventory-results` 校验 CLI/Cloud Shell 只读盘点后的本地非密钥摘要是否已经落到 `cloud-inventory-results.local.json`；`aliyun:status` 是给当前发布负责人看的只读总览，会把本地门禁、微信审核、Apple Universal Link、阿里云云资源确认、CLI 只读盘点结果、域名和 ACR 镜像证据压缩成一个 JSON 摘要；`aliyun:operator:tasks` 会把当前 `readiness`、`domain`、`.env.production-cn.local`、`image-publish.local.json` 和 `cloud-confirmations.local.json` 汇总为 9 个任务；`aliyun:sensitive:blockers` 会把 operator tasks 里的密钥、密码、token、付款和受控标识符类人工介入项单独压缩成无密钥清单；`aliyun:resources:matrix` 会把 SAE、ACR、api-cn、assets-cn、OSS、env import 和 SLS 这 7 个阿里云资源项压缩成资源矩阵，RDS/PostgreSQL 数据迁移由 `U11/P11_ALIYUN_RDS_DATA_MIGRATION` 单独管控，列出控制台路径、写入的 `.local.json` 字段、当前 blocker、验收命令和是否需要动作时确认；`aliyun:rds:migration:plan` 会只读扫描 `app/api/app`、其复用的 `app/api/mp` 和 `lib` 数据访问依赖，输出 APP 路由、Supabase 表/RPC/bucket、`DATABASE_URL_CN` 和 PostgreSQL adapter 缺口，不连接数据库、不读取 `.env` 值；`aliyun:user:actions` 会把微信移动应用、Apple Team ID、ACR 付费、OSS/RAM、RDS/PostgreSQL 迁移、环境变量导入、DNS/HTTPS/ICP、SAE/SLS 和最终部署授权整理成给用户看的单页动作简报；`aliyun:operator:handoff` 是给用户、阿里云操作员、微信开放平台操作员和发布负责人共用的非密钥操作包，适合直接判断“现在缺什么、去哪里拿、导入哪里”。它还会读取 Vercel production 的变量名元数据，列出哪些旧后端桥接变量已在 Vercel 中存在、哪些 production-cn 必填变量仍缺，并把 `cloud-confirmations.local.json` 与 `image-publish.local.json` 仍待填写的 JSON path、控制台来源、期望证据和禁止写入的敏感值逐项列出；这一步不读取值、不导出密钥，也不等于已导入阿里云。
 
 ```text
 T01 微信开放平台移动应用审核和 APP 登录凭证
@@ -562,6 +562,8 @@ rm -f /tmp/meiye-sae-env.json
 健康检查：/api/healthz
 环境变量：从 .env.production-cn.local 导入非 TODO 值
 ```
+
+SAE runtime 不能绕过这些前置证据直接标记 ready：RDS PostgreSQL 迁移与 `DATABASE_URL_CN` secret env、ACR remote image digest 与 SAE image pull、OSS runtime role/STS/RAM 最小权限、backend env import。当前缺 `DATABASE_URL_CN` 时，只能准备 runtime 规格和非密钥回填字段，不能宣称后端已经可部署。
 
 ECS 只作为 SAE 不能满足运行约束时的备选：
 
@@ -1149,7 +1151,7 @@ appApiSmokeCoverage: 29 / 29 business routes
 
 2026-06-24 CST 更新：`cloud-inventory-results` 的盘点项已扩展为 9 项，新增 `I08_RDS_POSTGRES` 与 `I09_TAIR_REDIS`，用于把 RDS PostgreSQL 和 Redis/Tair 的只读存在性结果纳入机器校验。当前本机 ignored 的 `cloud-inventory-results.local.json` 已由 CloudShell 只读命令补齐，strict 结果为 `readyLocalOperations=9/9`、`executedCommandResults=12/12`、`cloudApiCalledCommandResults=12/12`、`mutationPerformedCommandResults=0`；结论是 RDS PostgreSQL、RDS 全量和 Redis/Tair 在 `cn-hangzhou` 均为 0 实例。这仍不表示可以部署，只表示数据层后置缺口已经有非密钥只读证据。
 
-2026-06-26 CST 复核：上一段 2026-06-24 的 `readyLocalOperations=9/9` 只能作为历史盘点记录，不能作为当前可部署证据。当前权威门禁重新回到 `cloudInventoryStrictReady=false`，`deploy/aliyun-production-cn.cloud-inventory-results.local.json` 为 `DRY_RUN_NOT_EXECUTED`，`readyLocalOperations=0/9`，`corepack pnpm aliyun:backend-cn:status` 仍显示后端 `canDeployBackendNow=false`。当前 CloudShell 标签页已经打开并显示“正在连接 Cloud Shell.”，Terminal input 可见，但尚未出现可确认的命令提示符，且未运行 allowlisted 只读 inventory；本轮未点击开通/重启、未调用阿里云 API、未做 mutation。下一步必须等待当前 CloudShell 连接完成后，只运行 allowlisted 只读盘点命令并写回非密钥 evidence；如后续出现开通、重启实例或费用提示，必须先停下另行确认。
+2026-06-26 CST 复核：上一段 2026-06-24 的 `readyLocalOperations=9/9` 只能作为历史盘点记录，不能作为当前可部署证据；不能把历史只读盘点结果当成 P00 已闭环。当前权威门禁重新回到 `cloudInventoryStrictReady=false`，`deploy/aliyun-production-cn.cloud-inventory-results.local.json` 为 `DRY_RUN_NOT_EXECUTED`，`readyLocalOperations=0/9`，`corepack pnpm aliyun:backend-cn:status` 仍显示后端 `canDeployBackendNow=false`。当前 CloudShell 标签页已经打开并显示“正在连接 Cloud Shell.”，Terminal input 可见，但尚未出现可确认的命令提示符，且未运行 allowlisted 只读 inventory；本轮未点击开通/重启、未调用阿里云 API、未做 mutation。下一步必须等待当前 CloudShell 连接完成后，只运行 allowlisted 只读盘点命令并写回非密钥 evidence；如后续出现开通、重启实例或费用提示，必须先停下另行确认。
 
 本轮为 `--skip-bundle` 审计，未重新生成 context tar；Docker context 和镜像已由 `aliyun:docker:check`、`aliyun:docker:build`、`aliyun:container:smoke` 覆盖。
 

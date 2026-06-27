@@ -134,6 +134,43 @@ function validatePlan(plan) {
     blockers.push("environmentImport.strictCheckCommand")
   }
 
+  const dataLayer = plan.dataLayer || {}
+  if (dataLayer.formalTarget !== "Aliyun RDS PostgreSQL") blockers.push("dataLayer.formalTarget")
+  if (dataLayer.connectionEnvName !== "DATABASE_URL_CN") blockers.push("dataLayer.connectionEnvName=DATABASE_URL_CN")
+  if (!String(dataLayer.connectionSecretTarget || "").includes("Aliyun KMS")) {
+    blockers.push("dataLayer.connectionSecretTarget")
+  }
+  if (dataLayer.migrationEvidenceCommand !== "corepack pnpm aliyun:rds:migration:evidence:strict") {
+    blockers.push("dataLayer.migrationEvidenceCommand")
+  }
+  if (dataLayer.requiredBeforeRuntimeReady !== true) blockers.push("dataLayer.requiredBeforeRuntimeReady=true")
+
+  const dependencies = Array.isArray(plan.predeployDependencies) ? plan.predeployDependencies : []
+  const dependencyById = new Map(dependencies.map((item) => [item.id, item]))
+  const requiredDependencyChecks = [
+    ["RDS_POSTGRES_MIGRATION", "P11_ALIYUN_RDS_DATA_MIGRATION", "corepack pnpm aliyun:rds:migration:evidence:strict"],
+    ["ACR_IMAGE_DIGEST_AND_PULL", "P04_ACR_IMAGE_AND_PULL", "corepack pnpm aliyun:image:plan:strict"],
+    ["OSS_RUNTIME_ACCESS", "P05_OSS_RAM_STS", "corepack pnpm aliyun:cloud:confirmations:backend:strict"],
+    ["BACKEND_ENV_IMPORT", "P06_ENV_IMPORT", "corepack pnpm aliyun:sensitive:blockers:backend"],
+  ]
+  for (const [id, authorizationPacket, evidenceCommand] of requiredDependencyChecks) {
+    const item = dependencyById.get(id)
+    if (!item) {
+      blockers.push(`predeployDependencies:${id}`)
+      continue
+    }
+    if (item.requiredBeforeRuntimeReady !== true) blockers.push(`predeployDependencies:${id}:requiredBeforeRuntimeReady=true`)
+    if (item.authorizationPacket !== authorizationPacket) {
+      blockers.push(`predeployDependencies:${id}:authorizationPacket=${authorizationPacket}`)
+    }
+    if (item.evidenceCommand !== evidenceCommand) blockers.push(`predeployDependencies:${id}:evidenceCommand`)
+  }
+  const rdsDependency = dependencyById.get("RDS_POSTGRES_MIGRATION") || {}
+  if (!Array.isArray(rdsDependency.blockingCredentialNames) ||
+    !rdsDependency.blockingCredentialNames.includes("DATABASE_URL_CN")) {
+    blockers.push("predeployDependencies:RDS_POSTGRES_MIGRATION:blockingCredentialNames=DATABASE_URL_CN")
+  }
+
   const observability = plan.observability || {}
   if (observability.slsRequired !== true) blockers.push("observability.slsRequired")
   if (observability.healthAlertRequired !== true) blockers.push("observability.healthAlertRequired")
@@ -149,7 +186,10 @@ function validatePlan(plan) {
   }
 
   const notIncluded = Array.isArray(plan.notIncludedInFirstBridge) ? plan.notIncludedInFirstBridge : []
-  for (const requiredText of ["RDS", "Mini-program", "Payment"]) {
+  if (notIncluded.some((item) => /RDS|DATABASE_URL_CN|PostgreSQL/i.test(String(item)))) {
+    blockers.push("notIncludedInFirstBridge:must_not_exclude_rds")
+  }
+  for (const requiredText of ["Redis/Tair", "Mini-program", "Payment"]) {
     if (!notIncluded.some((item) => String(item).includes(requiredText))) {
       blockers.push(`notIncludedInFirstBridge:${requiredText}`)
     }
@@ -194,6 +234,11 @@ function main() {
     imageProvider: plan.image?.provider || "",
     imageRepository: plan.image?.repository || "",
     imageTag: plan.image?.tag || "",
+    dataLayerTarget: plan.dataLayer?.formalTarget || "",
+    dataLayerConnectionEnvName: plan.dataLayer?.connectionEnvName || "",
+    predeployDependencyIds: Array.isArray(plan.predeployDependencies)
+      ? plan.predeployDependencies.map((item) => item.id)
+      : [],
     blockers: validation.blockers,
     warnings: validation.warnings,
     nextActions: [

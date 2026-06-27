@@ -56,7 +56,7 @@
 | 项目 | 获取/创建位置 | 写入文件或导入位置 | 密钥 | 当前状态 |
 | --- | --- | --- | --- | --- |
 | SAE 应用 | 阿里云控制台 -> SAE -> `cn-hangzhou` -> 创建应用，自定义容器，端口 `3000` | `deploy/aliyun-production-cn.cloud-confirmations.local.json` 非密钥证据；SAE 控制台运行时配置 | 否 | 只读核验应用列表显示暂无实例，目标应用 `meiye-huajing-app-api-production-cn` 未创建，`runtime.confirmed=false` |
-| ACR 镜像仓库 | 阿里云控制台 -> 容器镜像服务 ACR -> 命名空间/仓库 | `deploy/aliyun-production-cn.image-publish.local.json` 非密钥证据；Docker credential helper 或 RAM | 认证信息是密钥 | 未确认 ready；企业版经济版 `cn-hangzhou` 1 个月候选报价已核到 `CNY 117.00` / `¥117.00`，购买前需用户对金额和规格动作确认 |
+| ACR 镜像仓库 | 阿里云控制台 -> 容器镜像服务 ACR -> 命名空间/仓库 | `deploy/aliyun-production-cn.image-publish.local.json` 非密钥证据；Docker credential helper 或 RAM | 认证信息是密钥 | P03 购买/仓库证据已 ready：企业版经济版 `cn-hangzhou` 1 个月实例 `meiye-huajing-app-api`、namespace/repository `meiye-huajing-app-api` 已确认；当前缺 P04 镜像 push/import、远端 digest 核对和 SAE 拉取配置 |
 | OSS Bucket | 阿里云控制台 -> OSS -> Bucket、地域、CORS、RAM 最小权限 | `ALIYUN_OSS_BUCKET`、`ALIYUN_OSS_REGION`、`SERVICE_RECORD_OSS_PREFIX`；密钥走 KMS/Secrets Manager | Bucket/Region 否，AccessKey Secret 是 | Bucket/CORS 已建；RAM 策略模板见 `deploy/aliyun-production-cn.oss-ram-policy.json`，AccessKey/Secret 仍未创建导入 |
 | SLS 日志 | 阿里云控制台 -> SLS -> Project/Logstore/告警 | `deploy/aliyun-production-cn.cloud-confirmations.local.json` 非密钥证据 | 否 | 已记录 project/logstore 非密钥证据，但 health/5xx 告警未配置，`slsAlerts.confirmed=false` |
 | RDS PostgreSQL | 阿里云控制台 -> RDS -> PostgreSQL 实例 | `DATABASE_URL_CN` 或等价连接串走 KMS/Secrets Manager | 是 | 当前 strict inventory 未就绪，实例存在性未验证；正式 production-cn 必填；首版业务数据访问代码侧已切到 RDS repository，但仍必须完成迁移 package、6 类兼容审查、RDS 实例、schema/data 迁移、APP API smoke 和回滚验收 |
@@ -97,8 +97,8 @@
 1. `U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE`：微信开放平台账号已认证，但移动 App 未创建；先创建“美业话镜”移动应用并提交审核，审核通过后再取得 `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`。
 2. `U10_ANDROID_RELEASE_SIGNING`：配置 Android release signing，用 release APK/AAB 读取微信开放平台 Android 应用签名；keystore 和密码不能写入 JSON、Markdown、镜像或 git。
 3. `U02_APPLE_TEAM_ID`：从 Apple Developer 读取 10 位 Team ID，导入 SAE plain env，用于 AASA。
-4. `U03_ACR_PURCHASE_CONFIRMATION`：ACR Enterprise Economic / `cn-hangzhou` / 1 month / `CNY 117.00` 需要动作时付款确认。
-5. `U04_ACR_RUNTIME_AUTH`：ACR 实例 ready 后配置镜像仓库、push digest 和 SAE 拉取权限；registry password/token 不能写入文件。
+4. `U03_ACR_PURCHASE_CONFIRMATION`：ACR Enterprise Economic / `cn-hangzhou` / 1 month 购买/仓库证据已 ready，本地只保留非密钥证据。
+5. `U04_ACR_RUNTIME_AUTH`：配置镜像 push/import、远端 digest 和 SAE 拉取权限；registry password/token 不能写入文件。
 6. `U05_OSS_RAM_OR_STS`：OSS 最小权限策略已创建，仍需绑定运行身份并选择受限 AccessKey 或 STS/运行时角色注入。
 7. `U11_ALIYUN_RDS_DATA_MIGRATION`：先生成并核对 RDS migration package，创建/确认阿里云 RDS PostgreSQL，关闭 6 类 Supabase SQL 兼容审查，完成 Supabase 到 RDS/PostgreSQL 的 schema/data 迁移、`DATABASE_URL_CN` secret env 导入、APP API smoke 和回滚验收。
 8. `U06_ENV_IMPORT`：把本地/Vercel/Supabase/阿里云/DeepSeek/火山等 ready 变量导入 SAE/KMS/Secrets Manager，并确认 `secretNotInImage=true`。

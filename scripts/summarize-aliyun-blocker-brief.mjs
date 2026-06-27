@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-import { spawnSync } from "node:child_process"
 import { mkdirSync, writeFileSync } from "node:fs"
 import { dirname, isAbsolute, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
+import { runJsonWithCache } from "./lib/run-json-cache.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -124,20 +124,10 @@ function envArgs(args) {
 }
 
 function runJson(label, scriptArgs) {
-  const result = spawnSync(process.execPath, scriptArgs, {
+  return runJsonWithCache(label, scriptArgs, {
     cwd: BACKEND_ROOT,
-    encoding: "utf8",
     maxBuffer: 1024 * 1024 * 40,
   })
-  if (result.error) throw result.error
-  if (result.status !== 0) {
-    throw new Error(`${label}_failed:${result.status}\n${result.stderr || result.stdout}`)
-  }
-  try {
-    return JSON.parse(result.stdout)
-  } catch (error) {
-    throw new Error(`invalid_json_from_${label}:${error instanceof Error ? error.message : String(error)}`)
-  }
 }
 
 function buildCloudInventoryReadinessInterpretation(status, cloudAccess) {
@@ -485,12 +475,12 @@ function compactCanStartNowWritebackPlan(consoleRunbook, imagePublishPlan) {
     .filter((task) => task.canStartNow === true)
     .map((task) => {
       const imageGroup = task.id === "C02_ACR_IMAGE_AND_PULL"
-        ? imageGroups.get("acrPurchaseAndRepository")
+        ? findCurrentImageWritebackGroup(imageGroups)
         : null
       const deferredGroups = task.id === "C02_ACR_IMAGE_AND_PULL"
-        ? ["imagePushAndDigest", "saeRuntimeImagePull"]
+        ? ["acrPurchaseAndRepository", "imagePushAndDigest", "saeRuntimeImagePull"]
           .map((id) => imageGroups.get(id))
-          .filter(Boolean)
+          .filter((group) => group && group.id !== imageGroup?.id)
         : []
       const writeTargets = imageGroup?.writeTargets?.length
         ? imageGroup.writeTargets
@@ -540,9 +530,16 @@ function compactCanStartNowWritebackPlan(consoleRunbook, imagePublishPlan) {
     })
 }
 
+function findCurrentImageWritebackGroup(imageGroups) {
+  for (const id of ["acrPurchaseAndRepository", "imagePushAndDigest", "saeRuntimeImagePull"]) {
+    const group = imageGroups.get(id)
+    if (group && group.ready !== true && group.canStartNow === true) return group
+  }
+  return imageGroups.get("acrPurchaseAndRepository") || null
+}
+
 function compactCloudResourceObservations(resourcesMatrix) {
   const summary = resourcesMatrix.summary || {}
-  const observedStatuses = summary.observedResourceStatuses || {}
   const items = (resourcesMatrix.resources || []).map((item) => {
     const observed = item.observedResourceStatus || {}
     return {
@@ -561,6 +558,19 @@ function compactCloudResourceObservations(resourcesMatrix) {
       blockers: (item.blockers || []).slice(0, 8),
     }
   })
+  const observedReadyIds = items
+    .filter((item) => item.observedReadiness === "ready")
+    .map((item) => item.id)
+  const observedPartialIds = items
+    .filter((item) => item.observedReadiness === "partial")
+    .map((item) => item.id)
+  const observedBlockedIds = items
+    .filter((item) => item.observedReadiness === "blocked")
+    .map((item) => item.id)
+  const observedNotReadyIds = items
+    .filter((item) => item.observedReadiness !== "ready")
+    .map((item) => item.id)
+  const observedCount = items.filter((item) => item.observed).length
   return {
     evidenceReady: summary.resourceEvidenceReady || `${summary.ready || 0}/${summary.total || 0}`,
     total: summary.total || 0,
@@ -572,26 +582,18 @@ function compactCloudResourceObservations(resourcesMatrix) {
     imagePublishTotalBlockers: summary.imagePublishTotalBlockers || 0,
     cloudAccessCanReadNow: summary.cloudAccessCanReadNow === true,
     observedStatuses: {
-      total: observedStatuses.total || 0,
-      ready: observedStatuses.ready || 0,
-      partial: observedStatuses.partial || 0,
-      blocked: observedStatuses.blocked || 0,
-      observed: observedStatuses.observed || 0,
-      notObserved: observedStatuses.notObserved || 0,
-      blockedIds: observedStatuses.blockedIds || [],
+      total: items.length,
+      ready: observedReadyIds.length,
+      partial: observedPartialIds.length,
+      blocked: observedBlockedIds.length,
+      observed: observedCount,
+      notObserved: items.length - observedCount,
+      blockedIds: observedBlockedIds,
     },
-    observedReadyIds: items
-      .filter((item) => item.observedReadiness === "ready")
-      .map((item) => item.id),
-    observedPartialIds: items
-      .filter((item) => item.observedReadiness === "partial")
-      .map((item) => item.id),
-    observedBlockedIds: items
-      .filter((item) => item.observedReadiness === "blocked")
-      .map((item) => item.id),
-    observedNotReadyIds: items
-      .filter((item) => item.observedReadiness !== "ready")
-      .map((item) => item.id),
+    observedReadyIds,
+    observedPartialIds,
+    observedBlockedIds,
+    observedNotReadyIds,
     items,
   }
 }

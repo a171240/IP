@@ -17,6 +17,8 @@ const OLD_VERCEL_HOSTS = new Set([
   "ipnrgc.com",
   "www.ipnrgc.com",
 ])
+const EXPECTED_API_HOST = "api-cn.ipgongchang.xin"
+const EXPECTED_ASSET_HOST = "assets-cn.ipgongchang.xin"
 
 const ENV_TARGETS = [
   {
@@ -486,6 +488,100 @@ function nextActions(blocking) {
   return [...new Set(actions)]
 }
 
+function buildDomainCutoverPlan(checkedTargets, blocking) {
+  const targetsByHost = new Map()
+  for (const target of checkedTargets) {
+    if (!target.host) continue
+    const existing = targetsByHost.get(target.host) || []
+    existing.push(target)
+    targetsByHost.set(target.host, existing)
+  }
+  const apiTargets = targetsByHost.get(EXPECTED_API_HOST) || []
+  const assetTargets = targetsByHost.get(EXPECTED_ASSET_HOST) || []
+  const wildcardPlaceholderDetected = checkedTargets.some((target) =>
+    (target.dns?.wildcardProbe?.specialUseRecords || []).length > 0)
+
+  return {
+    ready: blocking.length === 0,
+    wildcardPlaceholderDetected,
+    targetHosts: [
+      {
+        id: "apiDomainHttps",
+        host: EXPECTED_API_HOST,
+        envKeys: ["APP_API_BASE_URL", "NEXT_PUBLIC_SITE_URL"],
+        observedTargetCount: apiTargets.length,
+        selectedIngressMode: "api_sae_custom_domain",
+        recordName: "api-cn",
+        recordType: "CNAME_OR_A",
+        recordValue: "<SAE/SLB/API gateway public endpoint>",
+        httpsProbeUrl: `https://${EXPECTED_API_HOST}/api/healthz`,
+        writeTarget: "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps",
+        prerequisites: [
+          "SAE production-cn backend runtime has a public ingress or bound custom domain target",
+          "Wildcard/special-use placeholder DNS no longer catches api-cn",
+          "Aliyun SSL certificate is bound to the API ingress",
+          "ICP readiness evidence is available",
+        ],
+      },
+      {
+        id: "assetDomainHttps",
+        host: EXPECTED_ASSET_HOST,
+        envKeys: ["APP_ASSET_BASE_URL"],
+        observedTargetCount: assetTargets.length,
+        selectedIngressMode: "asset_cdn_custom_domain",
+        fallbackIngressMode: "asset_oss_custom_domain",
+        recordName: "assets-cn",
+        recordType: "CNAME",
+        recordValue: "<CDN CNAME endpoint or OSS custom-domain CNAME endpoint>",
+        httpsProbeUrl: `https://${EXPECTED_ASSET_HOST}/`,
+        writeTarget: "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps",
+        prerequisites: [
+          "OSS/CDN asset origin is confirmed for production-cn",
+          "Wildcard/special-use placeholder DNS no longer catches assets-cn",
+          "Aliyun SSL certificate is bound to the asset endpoint",
+          "ICP readiness evidence is available",
+        ],
+      },
+    ],
+    writebackTemplate: {
+      jsonPaths: [
+        "items.apiDomainHttps",
+        "items.assetDomainHttps",
+      ],
+      optionalNonSecretFields: [
+        "dnsProvider",
+        "recordType",
+        "recordName",
+        "recordValue",
+        "ingressType",
+        "certificateId",
+        "certificateEvidence",
+        "icpEntity",
+        "icpEvidence",
+        "httpsProbeUrl",
+      ],
+      requiredCompletionFields: [
+        "confirmed=true",
+        "dnsResolvedToAliyun=true",
+        "httpsEnabled=true",
+        "icpReady=true",
+        "evidence=<non-secret DNS/cert/ICP evidence handle>",
+      ],
+    },
+    verificationOrder: [
+      "corepack pnpm aliyun:domain:check",
+      "corepack pnpm aliyun:cloud:confirmations:backend",
+      "corepack pnpm aliyun:domain:strict",
+      "corepack pnpm aliyun:postdeploy:smoke -- --base-url https://api-cn.ipgongchang.xin",
+    ],
+    safetyBoundary: [
+      "This script does not mutate DNS, bind certificates, create ICP filings, deploy, or call Aliyun write APIs.",
+      "Record only host names, DNS record metadata, endpoint names, certificate ids/evidence handles, ICP evidence handles, and booleans.",
+      "Never write certificate private keys, AccessKeySecret, registry password, RAM Secret, STS token, cookies, AppSecret, or Supabase service role key.",
+    ],
+  }
+}
+
 async function main() {
   const args = parseArgs(process.argv)
   const targets = collectTargets(args)
@@ -503,6 +599,7 @@ async function main() {
     targetTotal: checkedTargets.length,
     machineBlocking: blocking,
     targets: checkedTargets,
+    domainCutoverPlan: buildDomainCutoverPlan(checkedTargets, blocking),
     nextActions: nextActions(blocking),
   }
 

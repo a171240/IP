@@ -355,7 +355,7 @@ function verifyCommandsForMissingVariable(name) {
 
 function unblockConditionForMissingVariable(name) {
   if (name === "DATABASE_URL_CN") {
-    return "rdsPostgres.databaseUrlCnSecretImported=true，compatibilityReviewChecklist 6 类已处理，migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true，schema/data/APP API smoke/rollback validation passed。"
+    return "rdsPostgres.databaseUrlCnSecretImported=true，compatibilityReviewChecklist 7 类已处理，migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true，schema/data/APP API smoke/rollback validation passed。"
   }
   return `${name} ready 且按目标导入阿里云运行环境。`
 }

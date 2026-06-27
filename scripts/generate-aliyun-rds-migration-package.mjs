@@ -26,6 +26,12 @@ const SECRET_VALUE_PATTERNS = [
 
 const RDS_SQL_COMPATIBILITY_RULES = Object.freeze([
   {
+    code: "supabase_auth_schema",
+    pattern: /\bauth\.(?!uid\s*\()[A-Za-z_][A-Za-z0-9_]*\b/i,
+    severity: "replace_supabase_auth_schema",
+    action: "Replace Supabase auth schema references such as auth.users/auth.jwt with APP-owned identity tables or backend auth context before applying to Aliyun RDS.",
+  },
+  {
     code: "supabase_auth_uid",
     pattern: /\bauth\.uid\s*\(/i,
     severity: "rewrite_or_replace_before_apply",
@@ -64,8 +70,28 @@ const RDS_SQL_COMPATIBILITY_RULES = Object.freeze([
 ])
 
 const RDS_SQL_COMPATIBILITY_DISPOSITIONS = Object.freeze({
+  supabase_auth_schema: {
+    defaultProposedDisposition: "replace_supabase_auth_schema_with_app_identity_model",
+    requiredOperatorDecision: "Replace Supabase auth schema references such as auth.users and auth.jwt() with APP-owned identity tables, controlled user ids, or backend-provided auth context before applying schema SQL.",
+    operatorChecklist: [
+      "Map auth.users foreign keys or triggers to public.profiles, controlled UUID user ids, or another APP-owned identity boundary.",
+      "Remove Supabase auth triggers from the final RDS apply candidate unless an APP-owned replacement trigger is explicitly reviewed.",
+      "Replace auth.jwt() claim reads with backend-provided request claims or repository parameters.",
+    ],
+    writeBackFields: [
+      "migration.schemaCompatibilityReviewed",
+      "migration.supabaseSpecificSqlResolved",
+    ],
+    acceptanceEvidence: "No unresolved Supabase auth schema references such as auth.users or auth.jwt() remain in the reviewed RDS apply candidate.",
+  },
   supabase_auth_uid: {
+    defaultProposedDisposition: "rewrite_to_backend_enforced_identity_and_tenant_scope",
     requiredOperatorDecision: "Replace auth.uid() dependent SQL with backend-enforced user, company, store, and role checks before applying schema SQL.",
+    operatorChecklist: [
+      "Map each auth.uid() predicate to request user identity provided by the APP API auth layer.",
+      "Confirm company_id, store_id, and role checks are enforced in the Aliyun RDS repository layer.",
+      "Remove or rewrite the Supabase policy statement from the final RDS apply candidate.",
+    ],
     writeBackFields: [
       "migration.schemaCompatibilityReviewed",
       "migration.supabaseSpecificSqlResolved",
@@ -73,7 +99,13 @@ const RDS_SQL_COMPATIBILITY_DISPOSITIONS = Object.freeze({
     acceptanceEvidence: "All auth.uid() findings have a reviewed rewrite, removal, or backend-owned authorization note.",
   },
   supabase_storage_schema: {
+    defaultProposedDisposition: "exclude_from_rds_apply_and_replace_with_oss_boundary",
     requiredOperatorDecision: "Replace Supabase storage schema usage with Aliyun OSS bucket/prefix/CORS/RAM/STS evidence and application-level access checks.",
+    operatorChecklist: [
+      "Exclude storage.* statements from the RDS apply candidate.",
+      "Confirm OSS bucket, prefix, CORS, and RAM/STS least-privilege evidence for service-record audio.",
+      "Record upload/download smoke evidence handles without payloads or credentials.",
+    ],
     writeBackFields: [
       "migration.supabaseSpecificSqlResolved",
       "cloudConfirmations.items.oss",
@@ -81,7 +113,13 @@ const RDS_SQL_COMPATIBILITY_DISPOSITIONS = Object.freeze({
     acceptanceEvidence: "No storage.* SQL is applied to RDS; OSS/RAM/STS evidence covers the equivalent storage boundary.",
   },
   supabase_service_role: {
+    defaultProposedDisposition: "replace_with_backend_service_account_and_rds_roles",
     requiredOperatorDecision: "Replace Supabase service_role grants or policy references with Aliyun RDS roles plus backend service credentials.",
+    operatorChecklist: [
+      "Remove Supabase service_role references from the RDS apply candidate.",
+      "Confirm the backend service account can perform required server-side operations through Aliyun RDS.",
+      "Keep service credentials only in Aliyun secret env or runtime credential stores.",
+    ],
     writeBackFields: [
       "migration.schemaCompatibilityReviewed",
       "migration.supabaseSpecificSqlResolved",
@@ -89,7 +127,13 @@ const RDS_SQL_COMPATIBILITY_DISPOSITIONS = Object.freeze({
     acceptanceEvidence: "No Supabase service_role grant or policy remains in the reviewed RDS apply candidate.",
   },
   row_level_security: {
+    defaultProposedDisposition: "choose_rds_rls_or_backend_authorization_owner_before_apply",
     requiredOperatorDecision: "Decide and document whether RLS stays in Aliyun RDS or whether tenant authorization is fully enforced in lib/aliyun-rds repositories.",
+    operatorChecklist: [
+      "Pick one authorization owner for each table: Aliyun RDS RLS or backend repository checks.",
+      "Ensure store manager and company-scope reads still match first-version APP permissions.",
+      "Do not leave Supabase-only policies as the assumed enforcement layer.",
+    ],
     writeBackFields: [
       "migration.schemaCompatibilityReviewed",
       "migration.supabaseSpecificSqlResolved",
@@ -97,7 +141,13 @@ const RDS_SQL_COMPATIBILITY_DISPOSITIONS = Object.freeze({
     acceptanceEvidence: "Every RLS statement has an RDS-compatible authorization model before schema apply.",
   },
   policy_statement: {
+    defaultProposedDisposition: "rewrite_remove_or_replace_each_supabase_policy",
     requiredOperatorDecision: "Review every Supabase create policy statement and rewrite, remove, or replace it with backend-enforced tenant authorization.",
+    operatorChecklist: [
+      "Classify each create policy statement as rewrite, remove, or replace with backend enforcement.",
+      "Confirm login/profile/invite/service-record routes still enforce tenant scope after the change.",
+      "Record disposition by category and source file without copying customer data.",
+    ],
     writeBackFields: [
       "migration.schemaCompatibilityReviewed",
       "migration.supabaseSpecificSqlResolved",
@@ -105,13 +155,29 @@ const RDS_SQL_COMPATIBILITY_DISPOSITIONS = Object.freeze({
     acceptanceEvidence: "Every policy statement has a recorded disposition before schema apply.",
   },
   extension_review: {
+    defaultProposedDisposition: "confirm_rds_extension_support_or_replace_function_usage",
     requiredOperatorDecision: "Confirm Aliyun RDS PostgreSQL engine/version supports required extensions before applying schema SQL.",
+    operatorChecklist: [
+      "Confirm the target RDS PostgreSQL engine version.",
+      "Confirm pgcrypto or equivalent function support for gen_random_uuid().",
+      "Record whether each extension statement is kept, replaced, or removed before schema apply.",
+    ],
     writeBackFields: [
       "migration.rdsExtensionSupportConfirmed",
     ],
     acceptanceEvidence: "Target RDS engine/version and extension support evidence are recorded without secrets.",
   },
 })
+
+const COMPATIBILITY_FORBIDDEN_VALUES = Object.freeze([
+  "DATABASE_URL_CN value",
+  "database password",
+  "customer row payloads",
+  "dump contents",
+  "Supabase service role key",
+  "AccessKeySecret",
+  "STS token",
+])
 
 function parseArgs(argv) {
   const args = {
@@ -300,20 +366,430 @@ function buildCompatibilityReviewChecklist(compatibilityReview) {
       findingCount: item.findingCount,
       affectedSourceCount: item.affectedSourceCount,
       sourcePaths: item.sourcePaths || [],
+      defaultProposedDisposition: disposition.defaultProposedDisposition || "record_non_secret_disposition_before_apply",
       requiredOperatorDecision: disposition.requiredOperatorDecision || item.action,
+      operatorChecklist: disposition.operatorChecklist || [
+        "Review the finding category before applying schema SQL to Aliyun RDS.",
+        "Record a non-secret disposition and acceptance evidence handle.",
+      ],
       evidenceWriteBackFields: disposition.writeBackFields || ["migration.schemaCompatibilityReviewed"],
       acceptanceEvidence: disposition.acceptanceEvidence || "Record a non-secret compatibility disposition before applying schema SQL.",
-      forbiddenValues: [
-        "DATABASE_URL_CN value",
-        "database password",
-        "customer row payloads",
-        "dump contents",
-        "Supabase service role key",
-        "AccessKeySecret",
-        "STS token",
-      ],
+      forbiddenValues: [...COMPATIBILITY_FORBIDDEN_VALUES],
     }
   })
+}
+
+function uniqueStrings(values) {
+  const seen = new Set()
+  const result = []
+  for (const value of values) {
+    const item = String(value || "").trim()
+    if (!item || seen.has(item)) continue
+    seen.add(item)
+    result.push(item)
+  }
+  return result
+}
+
+function buildCompatibilityDispositionPlan(compatibilityReview, compatibilityReviewChecklist) {
+  const requiredWriteBackFields = uniqueStrings(
+    compatibilityReviewChecklist.flatMap((item) => item.evidenceWriteBackFields || []),
+  )
+  return {
+    status: compatibilityReview.required ? "open" : "not_required",
+    appliesTo: compatibilityReview.appliesTo,
+    readyToApplySchema: compatibilityReview.required === false,
+    defaultDispositionPolicy: "Do not apply unreviewed Supabase-specific SQL to Aliyun RDS.",
+    itemCount: compatibilityReviewChecklist.length,
+    findingCount: compatibilityReview.findingCount,
+    affectedSourceFileCount: compatibilityReview.affectedSourceCount,
+    requiredWriteBackFields,
+    closeConditions: [
+      "Every category has a reviewed non-secret disposition.",
+      "schemaApplyCandidateAudit.readyToApplySchema=true after Supabase-specific SQL is removed or rewritten from rds-schema.sql.",
+      "migration.schemaCompatibilityReviewed=true is recorded only after the reviewed RDS apply candidate is prepared.",
+      "migration.supabaseSpecificSqlResolved=true is recorded only after Supabase auth schema/auth.uid/storage/service_role/RLS/policy findings are resolved.",
+      "migration.rdsExtensionSupportConfirmed=true is recorded only after target RDS engine and extension support are confirmed.",
+    ],
+    forbiddenValues: [...COMPATIBILITY_FORBIDDEN_VALUES],
+    items: compatibilityReviewChecklist.map((item) => ({
+      code: item.code,
+      statusBeforeP11Apply: item.statusBeforeP11Apply,
+      defaultProposedDisposition: item.defaultProposedDisposition,
+      findingCount: item.findingCount,
+      affectedSourceCount: item.affectedSourceCount,
+      sourcePaths: item.sourcePaths,
+      requiredOperatorDecision: item.requiredOperatorDecision,
+      operatorChecklist: item.operatorChecklist,
+      evidenceWriteBackFields: item.evidenceWriteBackFields,
+      acceptanceEvidence: item.acceptanceEvidence,
+      forbiddenValues: item.forbiddenValues,
+    })),
+  }
+}
+
+function buildSchemaApplyCandidateAudit(schemaSql) {
+  const findings = auditRdsSqlCompatibility("rds-schema.sql", schemaSql)
+  const review = summarizeCompatibilityReview(findings)
+  const hasSupabaseSpecificFindings = review.categories.some((code) => code !== "extension_review")
+  return {
+    readyToApplySchema: review.required === false,
+    status: review.required
+      ? hasSupabaseSpecificFindings
+        ? "blocked_supabase_specific_sql_present"
+        : "blocked_extension_support_unconfirmed"
+      : "ready_after_target_rds_engine_confirmation",
+    appliesTo: "generated_rds_schema_sql",
+    policy: "Do not apply rds-schema.sql to Aliyun RDS while Supabase-specific auth/storage/RLS/policy/service_role SQL remains in the generated candidate.",
+    findingCount: review.findingCount,
+    affectedGeneratedFileCount: review.affectedSourceCount,
+    categories: review.categories,
+    byCode: review.byCode,
+    findings: review.findings.map((finding) => ({
+      code: finding.code,
+      severity: finding.severity,
+      lineCount: finding.lineCount,
+      sampleLineNumbers: finding.sampleLineNumbers,
+      action: finding.action,
+    })),
+    requiredBeforeApply: [
+      "Replace Supabase auth schema references such as auth.users and auth.jwt() with APP-owned identity tables or backend auth context.",
+      "Remove or rewrite auth.uid() predicates for backend-enforced identity and tenant checks.",
+      "Exclude storage.* SQL and replace it with OSS bucket/prefix/RAM/STS evidence.",
+      "Replace Supabase service_role grants/policies with Aliyun RDS roles and backend service credentials.",
+      "Choose RDS RLS or backend repository authorization for each table before schema apply.",
+      "Rewrite/remove Supabase create policy statements before schema apply.",
+      "Confirm target RDS PostgreSQL extension support for pgcrypto/gen_random_uuid() before keeping extension-dependent SQL.",
+    ],
+    forbiddenValues: [...COMPATIBILITY_FORBIDDEN_VALUES],
+  }
+}
+
+function buildGeneratedSqlLineSourceIndex(sql) {
+  const result = []
+  let currentSource = "generated_header"
+  const lines = sql.split(/\r?\n/)
+  for (let index = 0; index < lines.length; index += 1) {
+    const sourceMatch = lines[index].match(/^-- Source: (.+)$/)
+    if (sourceMatch) currentSource = sourceMatch[1].trim()
+    result.push({
+      lineNumber: index + 1,
+      sourcePath: currentSource,
+    })
+  }
+  return result
+}
+
+function summarizeReviewLinesBySource(lineNumbers, lineSourceIndex) {
+  const bySource = new Map()
+  for (const lineNumber of lineNumbers) {
+    const sourcePath = lineSourceIndex[lineNumber - 1]?.sourcePath || "unknown"
+    if (!bySource.has(sourcePath)) {
+      bySource.set(sourcePath, {
+        sourcePath,
+        lineCount: 0,
+        sampleLineNumbers: [],
+      })
+    }
+    const summary = bySource.get(sourcePath)
+    summary.lineCount += 1
+    if (summary.sampleLineNumbers.length < 8) summary.sampleLineNumbers.push(lineNumber)
+  }
+  return [...bySource.values()].sort((a, b) => a.sourcePath.localeCompare(b.sourcePath))
+}
+
+function buildRdsApplyCandidateReviewPlan(rdsApplyCandidateSql) {
+  const lineSourceIndex = buildGeneratedSqlLineSourceIndex(rdsApplyCandidateSql)
+  const items = []
+
+  for (const rule of RDS_SQL_COMPATIBILITY_RULES) {
+    const lineNumbers = lineNumbersForPattern(rdsApplyCandidateSql, rule.pattern)
+    if (!lineNumbers.length) continue
+    const disposition = RDS_SQL_COMPATIBILITY_DISPOSITIONS[rule.code] || {}
+    const sourceSummaries = summarizeReviewLinesBySource(lineNumbers, lineSourceIndex)
+    items.push({
+      code: rule.code,
+      statusBeforeApply: "must_resolve_before_schema_apply",
+      severity: rule.severity,
+      findingCount: lineNumbers.length,
+      affectedSourceCount: sourceSummaries.length,
+      sourceSummaries,
+      sampleLineNumbers: lineNumbers.slice(0, 12),
+      locationPolicy: "Line numbers refer to generated rds-apply-candidate.sql; source line text is intentionally omitted.",
+      defaultProposedDisposition: disposition.defaultProposedDisposition || "record_non_secret_disposition_before_apply",
+      requiredOperatorDecision: disposition.requiredOperatorDecision || rule.action,
+      operatorChecklist: disposition.operatorChecklist || [
+        "Review the generated RDS apply candidate finding before applying schema SQL.",
+        "Record a non-secret disposition and acceptance evidence handle.",
+      ],
+      evidenceWriteBackFields: disposition.writeBackFields || ["migration.schemaCompatibilityReviewed"],
+      acceptanceEvidence: disposition.acceptanceEvidence || "Record a non-secret compatibility disposition before applying schema SQL.",
+      forbiddenValues: [...COMPATIBILITY_FORBIDDEN_VALUES],
+    })
+  }
+
+  const sortedItems = items.sort((a, b) => a.code.localeCompare(b.code))
+  const requiredWriteBackFields = uniqueStrings(sortedItems.flatMap((item) => item.evidenceWriteBackFields || []))
+  return {
+    status: sortedItems.length ? "open" : "ready_after_target_rds_engine_confirmation",
+    appliesTo: "generated_rds_apply_candidate_sql",
+    readyToApplySchema: sortedItems.length === 0,
+    itemCount: sortedItems.length,
+    findingCount: sortedItems.reduce((sum, item) => sum + item.findingCount, 0),
+    categories: sortedItems.map((item) => item.code),
+    requiredWriteBackFields,
+    policy: "Close every remaining rds-apply-candidate.sql review item before applying schema SQL to Aliyun RDS.",
+    closeConditions: [
+      "No unresolved Supabase auth schema references remain in rds-apply-candidate.sql.",
+      "No unresolved auth.uid() calls remain in rds-apply-candidate.sql.",
+      "Target Aliyun RDS PostgreSQL extension support or replacement SQL is confirmed.",
+      "migration.schemaCompatibilityReviewed=true, migration.supabaseSpecificSqlResolved=true, and migration.rdsExtensionSupportConfirmed=true are recorded only after review closure.",
+    ],
+    items: sortedItems,
+    forbiddenValues: [...COMPATIBILITY_FORBIDDEN_VALUES],
+  }
+}
+
+function matchSqlDollarTag(text, index) {
+  const match = text.slice(index).match(/^\$[A-Za-z_][A-Za-z0-9_]*\$|^\$\$/)
+  return match ? match[0] : ""
+}
+
+function splitSqlStatements(sql) {
+  const statements = []
+  let current = ""
+  let inSingleQuote = false
+  let inLineComment = false
+  let inBlockComment = false
+  let dollarTag = ""
+
+  for (let index = 0; index < sql.length; index += 1) {
+    const char = sql[index]
+    const next = sql[index + 1] || ""
+
+    if (inLineComment) {
+      current += char
+      if (char === "\n") inLineComment = false
+      continue
+    }
+
+    if (inBlockComment) {
+      current += char
+      if (char === "*" && next === "/") {
+        current += next
+        index += 1
+        inBlockComment = false
+      }
+      continue
+    }
+
+    if (inSingleQuote) {
+      current += char
+      if (char === "'" && next === "'") {
+        current += next
+        index += 1
+        continue
+      }
+      if (char === "'") inSingleQuote = false
+      continue
+    }
+
+    if (dollarTag) {
+      if (sql.startsWith(dollarTag, index)) {
+        current += dollarTag
+        index += dollarTag.length - 1
+        dollarTag = ""
+        continue
+      }
+      current += char
+      continue
+    }
+
+    if (char === "-" && next === "-") {
+      current += char + next
+      index += 1
+      inLineComment = true
+      continue
+    }
+
+    if (char === "/" && next === "*") {
+      current += char + next
+      index += 1
+      inBlockComment = true
+      continue
+    }
+
+    if (char === "'") {
+      current += char
+      inSingleQuote = true
+      continue
+    }
+
+    const matchedDollarTag = matchSqlDollarTag(sql, index)
+    if (matchedDollarTag) {
+      current += matchedDollarTag
+      index += matchedDollarTag.length - 1
+      dollarTag = matchedDollarTag
+      continue
+    }
+
+    current += char
+    if (char === ";") {
+      const statement = current.trim()
+      if (statement) statements.push(statement)
+      current = ""
+    }
+  }
+
+  const trailing = current.trim()
+  if (trailing) statements.push(trailing)
+  return statements
+}
+
+function classifyStatementForRdsApplyCandidate(statement) {
+  const categories = []
+  if (/\b(create|drop)\s+policy\b/i.test(statement)) categories.push("policy_statement")
+  if (/\benable\s+row\s+level\s+security\b/i.test(statement)) categories.push("row_level_security")
+  if (/\bstorage\./i.test(statement)) categories.push("supabase_storage_schema")
+  if (/\bservice_role\b/i.test(statement)) categories.push("supabase_service_role")
+  if (/\bcreate\s+(?:or\s+replace\s+)?function\s+public\.handle_new_user\b/i.test(statement)) {
+    categories.push("supabase_auth_schema")
+  }
+  if (/\b(?:drop|create)\s+trigger\b[\s\S]*\bon\s+auth\.users\b/i.test(statement)) {
+    categories.push("supabase_auth_schema")
+  }
+  return categories
+}
+
+function rewriteStatementForRdsApplyCandidate(statement) {
+  const rewrittenCategories = []
+  let next = statement
+
+  const profileIdAuthUserReference =
+    /\bid\s+uuid\s+references\s+auth\.users\s*\(\s*id\s*\)\s+on\s+delete\s+cascade\s+primary\s+key\b/i
+  if (profileIdAuthUserReference.test(next)) {
+    next = next.replace(profileIdAuthUserReference, "id UUID PRIMARY KEY")
+    rewrittenCategories.push("supabase_auth_schema")
+  }
+
+  const authUsersReference = /\breferences\s+auth\.users\s*\(\s*id\s*\)/i
+  if (authUsersReference.test(next)) {
+    next = next.replace(/\breferences\s+auth\.users\s*\(\s*id\s*\)/gi, "references public.profiles(id)")
+    rewrittenCategories.push("supabase_auth_schema")
+  }
+
+  const authUidCall = /\bauth\.uid\s*\(\s*\)/i
+  if (authUidCall.test(next)) {
+    next = next.replace(/\bauth\.uid\s*\(\s*\)/gi, "nullif(current_setting('app.current_user_id', true), '')::uuid")
+    rewrittenCategories.push("supabase_auth_uid")
+  }
+
+  return {
+    statement: next,
+    rewrittenCategories: uniqueStrings(rewrittenCategories),
+  }
+}
+
+function buildRdsApplyCandidateSql(schemaMap, sourceFiles) {
+  const lines = [
+    "-- Meiye Huajing APP production-cn Aliyun RDS PostgreSQL apply candidate.",
+    "-- Generated from rds-schema.sql sources after removing Supabase-only policy, RLS, OSS-equivalent, service role, and auth trigger statements.",
+    "-- Supabase Auth foreign keys are rewritten to the APP-owned public.profiles identity boundary where possible.",
+    "-- Supabase request-user calls are rewritten to read app.current_user_id, which must be set by backend-owned request context before such functions are used.",
+    "-- This candidate is still not authorization to apply: run the attached audit and close remaining auth, extension, data migration, and rollback blockers first.",
+    "-- Do not paste DATABASE_URL_CN, database passwords, dump contents, Supabase service role keys, AccessKeySecret, tokens, or cookies into this file.",
+    "",
+    `-- Environment: ${schemaMap.environment}`,
+    `-- Formal target: ${schemaMap.formalTarget}`,
+    `-- Source file count: ${sourceFiles.length}`,
+    "",
+  ]
+  const removedByCode = new Map()
+  const rewrittenByCode = new Map()
+  const sourceSummaries = []
+  let keptStatementCount = 0
+  let removedStatementCount = 0
+  let rewrittenStatementCount = 0
+
+  for (const source of sourceFiles) {
+    const statements = splitSqlStatements(source.content)
+    const keptStatements = []
+    const removedForSource = []
+    const rewrittenForSource = []
+
+    for (const statement of statements) {
+      const categories = classifyStatementForRdsApplyCandidate(statement)
+      if (categories.length) {
+        removedStatementCount += 1
+        removedForSource.push(...categories)
+        for (const category of categories) {
+          removedByCode.set(category, (removedByCode.get(category) || 0) + 1)
+        }
+        continue
+      }
+      const rewritten = rewriteStatementForRdsApplyCandidate(statement)
+      if (rewritten.rewrittenCategories.length) {
+        rewrittenStatementCount += 1
+        rewrittenForSource.push(...rewritten.rewrittenCategories)
+        for (const category of rewritten.rewrittenCategories) {
+          rewrittenByCode.set(category, (rewrittenByCode.get(category) || 0) + 1)
+        }
+      }
+      keptStatementCount += 1
+      keptStatements.push(rewritten.statement)
+    }
+
+    sourceSummaries.push({
+      sourcePath: source.path,
+      sourceStatementCount: statements.length,
+      keptStatementCount: keptStatements.length,
+      removedStatementCount: statements.length - keptStatements.length,
+      removedCategories: [...new Set(removedForSource)].sort(),
+      rewrittenStatementCount: rewrittenForSource.length,
+      rewrittenCategories: [...new Set(rewrittenForSource)].sort(),
+    })
+
+    lines.push(
+      "",
+      "-- -----------------------------------------------------------------------------",
+      `-- Source: ${source.path}`,
+      `-- sha256: ${source.sha256}`,
+      `-- keptStatements: ${keptStatements.length}`,
+      `-- removedSupabaseOnlyStatements: ${statements.length - keptStatements.length}`,
+      `-- rewrittenRdsCompatibilityStatements: ${rewrittenForSource.length}`,
+      "-- -----------------------------------------------------------------------------",
+      "",
+      keptStatements.join("\n\n").trimEnd(),
+      "",
+    )
+  }
+
+  const removedCategories = [...removedByCode.entries()]
+    .map(([code, statementCount]) => ({ code, statementCount }))
+    .sort((a, b) => a.code.localeCompare(b.code))
+  const rewrittenCategories = [...rewrittenByCode.entries()]
+    .map(([code, statementCount]) => ({ code, statementCount }))
+    .sort((a, b) => a.code.localeCompare(b.code))
+
+  return {
+    sql: lines.join("\n"),
+    removalSummary: {
+      status: removedStatementCount > 0 ? "supabase_only_statements_removed" : "no_supabase_only_statements_detected",
+      keptStatementCount,
+      removedStatementCount,
+      removedCategories,
+      rewrittenStatementCount,
+      rewrittenCategories,
+      sourceSummaries,
+      policy: "Removed statements are not applied to Aliyun RDS; rewritten statements move Supabase auth references to APP-owned identity context. Equivalent authorization and object storage boundaries must be enforced by APP API repositories, Aliyun OSS, RAM/STS, and runtime secret env.",
+      remainingReviewRequired: true,
+      remainingReviewReasons: [
+        "Target Aliyun RDS PostgreSQL engine/version and extension support are not confirmed.",
+        "Backend-owned request context must set app.current_user_id before any rewritten auth.uid-compatible function is used.",
+        "Schema/data migration, APP API smoke, and rollback validation are not complete.",
+      ],
+    },
+  }
 }
 
 function renderSchemaSql(schemaMap, sourceFiles) {
@@ -429,18 +905,29 @@ function renderMarkdown(report) {
     `- requiredFunctionCount: ${report.summary.requiredFunctionCount}`,
     `- requiredStorageCount: ${report.summary.requiredStorageCount}`,
     `- schemaSqlSha256: ${report.summary.schemaSqlSha256}`,
+    `- rdsApplyCandidateSqlSha256: ${report.summary.rdsApplyCandidateSqlSha256}`,
     `- validationSqlSha256: ${report.summary.validationSqlSha256}`,
     `- blockers: ${report.blockers.length ? report.blockers.join(", ") : "none"}`,
     `- warnings: ${report.warnings.length ? report.warnings.join(", ") : "none"}`,
     `- rdsCompatibilityReviewRequired: ${report.compatibilityReview.required}`,
     `- rdsCompatibilityFindingCount: ${report.compatibilityReview.findingCount}`,
     `- rdsCompatibilityAffectedSourceCount: ${report.compatibilityReview.affectedSourceCount}`,
+    `- schemaApplyCandidateReady: ${report.schemaApplyCandidateAudit.readyToApplySchema}`,
+    `- schemaApplyCandidateStatus: ${report.schemaApplyCandidateAudit.status}`,
+    `- schemaApplyCandidateFindingCount: ${report.schemaApplyCandidateAudit.findingCount}`,
+    `- schemaApplyCandidateCategories: ${report.schemaApplyCandidateAudit.categories.join(", ") || "none"}`,
+    `- rdsApplyCandidateReady: ${report.rdsApplyCandidateAudit.readyToApplySchema}`,
+    `- rdsApplyCandidateStatus: ${report.rdsApplyCandidateAudit.status}`,
+    `- rdsApplyCandidateFindingCount: ${report.rdsApplyCandidateAudit.findingCount}`,
+    `- rdsApplyCandidateCategories: ${report.rdsApplyCandidateAudit.categories.join(", ") || "none"}`,
+    `- rdsApplyCandidateRemovedStatements: ${report.rdsApplyCandidate.removalSummary.removedStatementCount}`,
     "",
     "## Files",
     "",
     `- manifest: ${report.files.manifest}`,
     `- markdown: ${report.files.markdown}`,
     `- schemaSql: ${report.files.schemaSql}`,
+    `- rdsApplyCandidateSql: ${report.files.rdsApplyCandidateSql}`,
     `- validationSql: ${report.files.validationSql}`,
     `- rollbackChecklist: ${report.files.rollbackChecklist}`,
     "",
@@ -459,6 +946,75 @@ function renderMarkdown(report) {
       `- ${item.code}: findings=${item.findingCount}, sources=${item.affectedSourceCount}, action=${item.action}`,
     ),
     "",
+    "## RDS Schema Apply Candidate Audit",
+    "",
+    `- readyToApplySchema: ${report.schemaApplyCandidateAudit.readyToApplySchema}`,
+    `- status: ${report.schemaApplyCandidateAudit.status}`,
+    `- findingCount: ${report.schemaApplyCandidateAudit.findingCount}`,
+    `- categories: ${report.schemaApplyCandidateAudit.categories.join(", ") || "none"}`,
+    `- policy: ${report.schemaApplyCandidateAudit.policy}`,
+    "",
+    ...report.schemaApplyCandidateAudit.byCode.map((item) =>
+      `- ${item.code}: findings=${item.findingCount}, generatedFiles=${item.affectedSourceCount}, action=${item.action}`,
+    ),
+    "",
+    "## RDS Apply Candidate",
+    "",
+    `- readyToApplySchema: ${report.rdsApplyCandidateAudit.readyToApplySchema}`,
+    `- status: ${report.rdsApplyCandidateAudit.status}`,
+    `- findingCount: ${report.rdsApplyCandidateAudit.findingCount}`,
+    `- categories: ${report.rdsApplyCandidateAudit.categories.join(", ") || "none"}`,
+    `- removedStatementCount: ${report.rdsApplyCandidate.removalSummary.removedStatementCount}`,
+    `- keptStatementCount: ${report.rdsApplyCandidate.removalSummary.keptStatementCount}`,
+    `- removalPolicy: ${report.rdsApplyCandidate.removalSummary.policy}`,
+    "",
+    ...report.rdsApplyCandidate.removalSummary.removedCategories.map((item) =>
+      `- removed:${item.code}: statements=${item.statementCount}`,
+    ),
+    "",
+    "## RDS Apply Candidate Review Plan",
+    "",
+    `- status: ${report.rdsApplyCandidateReviewPlan.status}`,
+    `- readyToApplySchema: ${report.rdsApplyCandidateReviewPlan.readyToApplySchema}`,
+    `- itemCount: ${report.rdsApplyCandidateReviewPlan.itemCount}`,
+    `- findingCount: ${report.rdsApplyCandidateReviewPlan.findingCount}`,
+    `- categories: ${report.rdsApplyCandidateReviewPlan.categories.join(", ") || "none"}`,
+    `- requiredWriteBackFields: ${report.rdsApplyCandidateReviewPlan.requiredWriteBackFields.join(", ") || "none"}`,
+    `- policy: ${report.rdsApplyCandidateReviewPlan.policy}`,
+    `- closeConditions: ${report.rdsApplyCandidateReviewPlan.closeConditions.join("; ") || "none"}`,
+    "",
+    ...report.rdsApplyCandidateReviewPlan.items.flatMap((item) => [
+      `### apply-review:${item.code}`,
+      "",
+      `- statusBeforeApply: ${item.statusBeforeApply}`,
+      `- findingCount: ${item.findingCount}`,
+      `- affectedSourceCount: ${item.affectedSourceCount}`,
+      `- sampleLineNumbers: ${item.sampleLineNumbers.join(", ") || "none"}`,
+      `- sourceSummaries: ${item.sourceSummaries.map((source) => `${source.sourcePath}:${source.lineCount}`).join("; ") || "none"}`,
+      `- defaultProposedDisposition: ${item.defaultProposedDisposition}`,
+      `- requiredOperatorDecision: ${item.requiredOperatorDecision}`,
+      `- evidenceWriteBackFields: ${item.evidenceWriteBackFields.join(", ") || "none"}`,
+      `- acceptanceEvidence: ${item.acceptanceEvidence}`,
+      "",
+    ]),
+    "## RDS Compatibility Disposition Plan",
+    "",
+    `- status: ${report.compatibilityDispositionPlan.status}`,
+    `- readyToApplySchema: ${report.compatibilityDispositionPlan.readyToApplySchema}`,
+    `- defaultDispositionPolicy: ${report.compatibilityDispositionPlan.defaultDispositionPolicy}`,
+    `- itemCount: ${report.compatibilityDispositionPlan.itemCount}`,
+    `- requiredWriteBackFields: ${report.compatibilityDispositionPlan.requiredWriteBackFields.join(", ")}`,
+    `- closeConditions: ${report.compatibilityDispositionPlan.closeConditions.join("; ")}`,
+    `- forbiddenValues: ${report.compatibilityDispositionPlan.forbiddenValues.join(", ")}`,
+    "",
+    ...report.compatibilityDispositionPlan.items.flatMap((item) => [
+      `### disposition:${item.code}`,
+      "",
+      `- defaultProposedDisposition: ${item.defaultProposedDisposition}`,
+      `- operatorChecklist: ${item.operatorChecklist.join("; ")}`,
+      `- acceptanceEvidence: ${item.acceptanceEvidence}`,
+      "",
+    ]),
     "## RDS Compatibility Review Checklist",
     "",
     ...report.compatibilityReviewChecklist.flatMap((item) => [
@@ -468,7 +1024,9 @@ function renderMarkdown(report) {
       `- findingCount: ${item.findingCount}`,
       `- affectedSourceCount: ${item.affectedSourceCount}`,
       `- sourcePaths: ${item.sourcePaths.join(", ") || "none"}`,
+      `- defaultProposedDisposition: ${item.defaultProposedDisposition}`,
       `- requiredOperatorDecision: ${item.requiredOperatorDecision}`,
+      `- operatorChecklist: ${item.operatorChecklist.join("; ")}`,
       `- evidenceWriteBackFields: ${item.evidenceWriteBackFields.join(", ")}`,
       `- acceptanceEvidence: ${item.acceptanceEvidence}`,
       `- forbiddenValues: ${item.forbiddenValues.join(", ")}`,
@@ -524,17 +1082,31 @@ function buildReport(args) {
   }
 
   const schemaSql = renderSchemaSql(schemaMap, sourceFiles)
+  const rdsApplyCandidate = buildRdsApplyCandidateSql(schemaMap, sourceFiles)
+  const rdsApplyCandidateSql = rdsApplyCandidate.sql
   const validationSql = renderValidationSql(schemaMap)
   const rollbackChecklist = renderRollbackChecklist(schemaMap)
-  const combinedGenerated = `${schemaSql}\n${validationSql}\n${rollbackChecklist}`
+  const combinedGenerated = `${schemaSql}\n${rdsApplyCandidateSql}\n${validationSql}\n${rollbackChecklist}`
   const generatedSecretMatches = findSecretLikeValues(combinedGenerated)
   if (generatedSecretMatches.length) blockers.push("generated_package_contains_secret_like_values")
   const compatibilityReview = summarizeCompatibilityReview(compatibilityFindings)
   const compatibilityReviewChecklist = buildCompatibilityReviewChecklist(compatibilityReview)
+  const schemaApplyCandidateAudit = buildSchemaApplyCandidateAudit(schemaSql)
+  const rdsApplyCandidateAudit = {
+    ...buildSchemaApplyCandidateAudit(rdsApplyCandidateSql),
+    appliesTo: "generated_rds_apply_candidate_sql",
+    policy: "Do not apply rds-apply-candidate.sql until remaining auth-dependent function/reference rewrites, extension support, data migration, APP API smoke, and rollback validation are closed.",
+  }
+  const rdsApplyCandidateReviewPlan = buildRdsApplyCandidateReviewPlan(rdsApplyCandidateSql)
+  const compatibilityDispositionPlan = buildCompatibilityDispositionPlan(
+    compatibilityReview,
+    compatibilityReviewChecklist,
+  )
 
   const manifestPath = resolve(args.outDir, "rds-migration-package.json")
   const markdownPath = resolve(args.outDir, "rds-migration-package.md")
   const schemaSqlPath = resolve(args.outDir, "rds-schema.sql")
+  const rdsApplyCandidateSqlPath = resolve(args.outDir, "rds-apply-candidate.sql")
   const validationSqlPath = resolve(args.outDir, "rds-validation.sql")
   const rollbackChecklistPath = resolve(args.outDir, "rds-rollback-checklist.md")
 
@@ -557,21 +1129,42 @@ function buildReport(args) {
       requiredFunctionCount: (schemaMap.requiredFunctions || []).length,
       requiredStorageCount: (schemaMap.requiredStorage || []).length,
       schemaSqlBytes: Buffer.byteLength(schemaSql),
+      rdsApplyCandidateSqlBytes: Buffer.byteLength(rdsApplyCandidateSql),
       validationSqlBytes: Buffer.byteLength(validationSql),
       schemaSqlSha256: sha256(schemaSql),
+      rdsApplyCandidateSqlSha256: sha256(rdsApplyCandidateSql),
       validationSqlSha256: sha256(validationSql),
       rollbackChecklistSha256: sha256(rollbackChecklist),
       compatibilityReviewRequired: compatibilityReview.required,
       compatibilityFindingCount: compatibilityReview.findingCount,
       compatibilityAffectedSourceFileCount: compatibilityReview.affectedSourceCount,
       compatibilityReviewChecklistItemCount: compatibilityReviewChecklist.length,
+      compatibilityDispositionPlanItemCount: compatibilityDispositionPlan.itemCount,
+      schemaApplyCandidateReady: schemaApplyCandidateAudit.readyToApplySchema,
+      schemaApplyCandidateStatus: schemaApplyCandidateAudit.status,
+      schemaApplyCandidateFindingCount: schemaApplyCandidateAudit.findingCount,
+      schemaApplyCandidateCategories: schemaApplyCandidateAudit.categories,
+      rdsApplyCandidateReady: rdsApplyCandidateAudit.readyToApplySchema,
+      rdsApplyCandidateStatus: rdsApplyCandidateAudit.status,
+      rdsApplyCandidateFindingCount: rdsApplyCandidateAudit.findingCount,
+      rdsApplyCandidateCategories: rdsApplyCandidateAudit.categories,
+      rdsApplyCandidateRemovedStatementCount: rdsApplyCandidate.removalSummary.removedStatementCount,
+      rdsApplyCandidateReviewPlanReady: rdsApplyCandidateReviewPlan.readyToApplySchema,
+      rdsApplyCandidateReviewPlanItemCount: rdsApplyCandidateReviewPlan.itemCount,
+      rdsApplyCandidateReviewPlanFindingCount: rdsApplyCandidateReviewPlan.findingCount,
     },
     compatibilityReview,
     compatibilityReviewChecklist,
+    schemaApplyCandidateAudit,
+    rdsApplyCandidate,
+    rdsApplyCandidateAudit,
+    rdsApplyCandidateReviewPlan,
+    compatibilityDispositionPlan,
     files: {
       manifest: manifestPath,
       markdown: markdownPath,
       schemaSql: schemaSqlPath,
+      rdsApplyCandidateSql: rdsApplyCandidateSqlPath,
       validationSql: validationSqlPath,
       rollbackChecklist: rollbackChecklistPath,
     },
@@ -593,6 +1186,7 @@ function buildReport(args) {
   }
 
   writeText(schemaSqlPath, schemaSql)
+  writeText(rdsApplyCandidateSqlPath, rdsApplyCandidateSql)
   writeText(validationSqlPath, validationSql)
   writeText(rollbackChecklistPath, rollbackChecklist)
   writeText(markdownPath, renderMarkdown(report))

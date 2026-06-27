@@ -482,7 +482,7 @@ function normalizeCloudAccessObservation(observation) {
   }
 }
 
-function buildObservedResourceStatuses(cloudAccessObservation) {
+function buildObservedResourceStatuses(cloudAccessObservation, imagePublish = {}) {
   const lines = cloudAccessObservation.browserConsole?.resourcesObserved || []
   const saeLine = findObservedLine(lines, [
     /SAE console accessible/i,
@@ -500,6 +500,30 @@ function buildObservedResourceStatuses(cloudAccessObservation) {
   const cloudShellLine = findObservedLine(lines, /Cloud Shell tab|CloudShell tab|CloudShell|shell\.aliyun\.com/i)
   const localCliLine = findObservedLine(lines, /Local macOS aliyun CLI installed/i)
   const cloudShellInventoryStatus = classifyCloudShellInventoryStatus(cloudAccessObservation.cloudShell, cloudShellLine)
+  const acr = imagePublish?.acr || {}
+  const runtime = imagePublish?.runtime || {}
+  const acrRepositoryConfirmed = acr.purchaseCandidate?.confirmed === true &&
+    Boolean(acr.registryHost) &&
+    Boolean(acr.namespace) &&
+    Boolean(acr.repository)
+  const acrImageReady = acrRepositoryConfirmed &&
+    acr.imagePushed === true &&
+    acr.digestVerified === true &&
+    /^sha256:[a-f0-9]{64}$/i.test(String(acr.remoteDigest || "")) &&
+    runtime.remoteImageConfigured === true &&
+    runtime.imagePullConfigured === true
+  const acrStatus = acrRepositoryConfirmed
+    ? acrImageReady ? "acr_image_and_runtime_pull_confirmed" : "acr_repository_confirmed_image_push_pending"
+    : acrLine
+      ? /not purchased|purchase\/repository still action-time confirmation|no .*target instance|no .*repository/i.test(acrLine)
+        ? "purchase_candidate_visible_not_purchased"
+        : "purchase_or_instance_visible_unconfirmed"
+      : "not_observed"
+  const acrReadiness = acrImageReady ? "ready" : acrRepositoryConfirmed ? "partial" : "blocked"
+  const acrObservation = Array.from(new Set([
+    acrLine,
+    acrRepositoryConfirmed ? `local image-publish evidence confirms ACR registryHost=${acr.registryHost}; namespace=${acr.namespace}; repository=${acr.repository}; image push/digest/runtime pull pending` : "",
+  ].filter(Boolean))).join(" | ")
 
   return [
     {
@@ -529,15 +553,13 @@ function buildObservedResourceStatuses(cloudAccessObservation) {
     {
       id: "acrPurchase",
       title: "ACR 企业版实例和镜像仓库",
-      status: acrLine
-        ? /not purchased|purchase\/repository still action-time confirmation|no .*target instance|no .*repository/i.test(acrLine)
-          ? "purchase_candidate_visible_not_purchased"
-          : "purchase_or_instance_visible_unconfirmed"
-        : "not_observed",
-      readiness: "blocked",
-      observed: Boolean(acrLine),
-      currentObservation: acrLine,
-      nextAction: "动作时确认 ACR Enterprise Economic / cn-hangzhou / 1 month / CNY 117.00 后，购买实例并创建 namespace/repository。",
+      status: acrStatus,
+      readiness: acrReadiness,
+      observed: Boolean(acrLine || acrRepositoryConfirmed),
+      currentObservation: acrObservation,
+      nextAction: acrRepositoryConfirmed
+        ? "进入 P04：推送/导入后端镜像到 ACR，核对 sha256 digest，并配置 SAE 镜像拉取权限。"
+        : "动作时确认 ACR Enterprise Economic / cn-hangzhou / 1 month 后，购买实例并创建 namespace/repository。",
       writeTarget: "deploy/aliyun-production-cn.image-publish.local.json -> acr.purchaseCandidate / acr non-secret evidence",
     },
     {
@@ -766,7 +788,7 @@ function main() {
   const configFiles = candidateAliyunConfigFiles()
   const cliConfigExists = configFiles.some((item) => item.exists)
   const cliAvailable = Boolean(aliyunPath || aliyuncliPath)
-  const observedResourceStatuses = buildObservedResourceStatuses(cloudAccessObservation)
+  const observedResourceStatuses = buildObservedResourceStatuses(cloudAccessObservation, imagePublish)
   const report = {
     ok: true,
     generatedAt: new Date().toISOString(),

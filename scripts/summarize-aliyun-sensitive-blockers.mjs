@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
-import { spawnSync } from "node:child_process"
 import { writeFileSync } from "node:fs"
 import { dirname, isAbsolute, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { SENSITIVE_ACTION_METADATA } from "./aliyun-sensitive-action-metadata.mjs"
+import { runJsonWithCache } from "./lib/run-json-cache.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -82,7 +82,7 @@ function resolveValue(value, name) {
 }
 
 function runOperatorTasks(args) {
-  const result = spawnSync(process.execPath, [
+  return runJsonWithCache("operator_tasks", [
     "scripts/generate-aliyun-operator-tasks.mjs",
     "--env-file",
     args.envFile,
@@ -90,18 +90,8 @@ function runOperatorTasks(args) {
     args.cloudConfirmationsFile,
   ], {
     cwd: BACKEND_ROOT,
-    encoding: "utf8",
     maxBuffer: 1024 * 1024 * 20,
   })
-  if (result.error) throw result.error
-  if (result.status !== 0) {
-    throw new Error(`operator_tasks_failed:${result.status}\n${result.stderr || result.stdout}`)
-  }
-  try {
-    return JSON.parse(result.stdout)
-  } catch (error) {
-    throw new Error(`invalid_operator_tasks_json:${error instanceof Error ? error.message : String(error)}`)
-  }
 }
 
 function summarize(items) {
@@ -358,16 +348,14 @@ function buildBackendOnlyCredentialExecutionOrder(credentialBrief) {
       "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     ],
     credentialCanStartAfterActionTimeConfirmationIds: includeIfPresent([
-      "S03_ACR_PAID_PURCHASE",
+      "S04_ACR_REGISTRY_AUTH",
       "S05_OSS_RAM_SECRET_OR_STS",
       "S08_ALIYUN_RDS_DATABASE_URL",
     ]),
     credentialBlockedByDependencyIds: includeIfPresent([
-      "S04_ACR_REGISTRY_AUTH",
       "S06_READY_SENSITIVE_ENV_IMPORT",
     ]),
     dependencyReasons: [
-      "S04_ACR_REGISTRY_AUTH waits for ACR instance/namespace/repository evidence before docker login/push or SAE image pull can be configured.",
       "S06_READY_SENSITIVE_ENV_IMPORT waits for RDS DATABASE_URL_CN, OSS RAM/STS, image/runtime evidence, and the selected Aliyun secret-env target.",
     ],
     deferredAppLaunchSensitiveActionIds: APP_LAUNCH_DEFERRED_SENSITIVE_ACTION_IDS,
@@ -565,8 +553,8 @@ function buildReport(operatorTasks, args) {
     nextActions: [
       ...(args.backendOnly
         ? [
-          "当前后端-only 第一批先处理 S03/S05/S08，P00 只读盘点另行按 CloudShell/CLI 规则执行。",
-          "S04 registry/SAE 拉取认证和 S06 ready secret env 导入仍被依赖阻塞，等 ACR/RDS/OSS/runtime 证据闭合后再做。",
+          "当前后端-only 第一批先处理 S04/S05/S08，P00 只读盘点另行按 CloudShell/CLI 规则执行。",
+          "S06 ready secret env 导入仍被依赖阻塞，等 RDS/OSS/image/runtime 证据闭合后再做。",
           "微信开放平台、Apple Team ID 和 Android release signing 保留为 APP 发布阶段延期项，不作为当前阿里云后端阻塞。",
         ]
         : [

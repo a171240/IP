@@ -1,6 +1,6 @@
 # 阿里云控制台动作包
 
-生成时间：2026-06-26T02:55:50.190Z
+生成时间：2026-06-26T18:46:48.818Z
 
 ## 结论
 
@@ -13,8 +13,8 @@
 - verdict: blocked
 - cloudConfirmationsReady: 0/6
 - operatorTasksReady: 0/8
-- sensitiveActionReady: 0/5
-- sensitiveActionBlocked: 5/5
+- sensitiveActionReady: 0/4
+- sensitiveActionBlocked: 4/4
 - canReadCloudNow: false
 - cloudInventoryResultsReady: false
 - cloudInventoryReadyLocalOperations: 0/9
@@ -27,12 +27,12 @@
 - readySecretEnvVariableCount: 17
 - resourceEvidenceReady: 0/7
 - blockedResourceEvidenceIds: R01_SAE_RUNTIME, R02_ACR_IMAGE_REGISTRY, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R05_OSS_AUDIO_STORAGE, R06_ENV_IMPORT, R07_SLS_ALERTS
-- partiallyObservedResourceEvidenceIds: R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS
-- backendCanStartNowSteps: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP03_ACR_PURCHASE_AND_REPOSITORY
-- immediateBackendSteps: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP03_ACR_PURCHASE_AND_REPOSITORY
-- blockedBackendSteps: BAP04_ACR_IMAGE_PUSH_AND_PULL, BAP05_BACKEND_ENV_IMPORT, BAP06_SAE_RUNTIME_CREATE, BAP07_DOMAINS_HTTPS_ICP, BAP08_SLS_ALERTS, BAP09_POSTDEPLOY_SMOKE
-- backendFirstUserInterventionRequired: USER_CONFIRM_ALIYUN_READONLY_INVENTORY_IDENTITY, USER_CONFIRM_RDS_PURCHASE_AND_DATABASE_PASSWORD, USER_CONFIRM_OSS_RAM_STS_SECRET_OR_RUNTIME_ROLE, USER_CONFIRM_ACR_PAID_PURCHASE
-- backendDeferredUserInterventionRequired: USER_CONFIRM_ACR_IMAGE_PUSH_AND_RUNTIME_PULL, USER_CONFIRM_SECRET_ENV_IMPORT, USER_CONFIRM_PRODUCTION_DEPLOY, USER_CONFIRM_DNS_HTTPS_ICP_CHANGE
+- partiallyObservedResourceEvidenceIds: R02_ACR_IMAGE_REGISTRY, R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS
+- backendCanStartNowSteps: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP04_ACR_IMAGE_PUSH_AND_PULL
+- immediateBackendSteps: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP04_ACR_IMAGE_PUSH_AND_PULL
+- blockedBackendSteps: BAP05_BACKEND_ENV_IMPORT, BAP06_SAE_RUNTIME_CREATE, BAP07_DOMAINS_HTTPS_ICP, BAP08_SLS_ALERTS, BAP09_POSTDEPLOY_SMOKE
+- backendFirstUserInterventionRequired: USER_CONFIRM_ALIYUN_READONLY_INVENTORY_IDENTITY, USER_CONFIRM_RDS_PURCHASE_AND_DATABASE_PASSWORD, USER_CONFIRM_OSS_RAM_STS_SECRET_OR_RUNTIME_ROLE, USER_CONFIRM_ACR_IMAGE_PUSH_AND_RUNTIME_PULL
+- backendDeferredUserInterventionRequired: USER_CONFIRM_SECRET_ENV_IMPORT, USER_CONFIRM_PRODUCTION_DEPLOY, USER_CONFIRM_DNS_HTTPS_ICP_CHANGE
 - onlyMissingBackendCredentialValue: DATABASE_URL_CN
 
 ## 目标闭环证据简表
@@ -42,23 +42,23 @@
 - blockedCredentialCount: 1
 - blockedCredentialNames: DATABASE_URL_CN
 - onlyMissingBackendCredentialValue: DATABASE_URL_CN
-- credentialAcquisitionQueueActionIds: S03_ACR_PAID_PURCHASE, S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT
+- credentialAcquisitionQueueActionIds: S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT
 - readySecretEnvVariableCount: 17
 - resourceEvidenceReady: 0/7
 - blockedResourceEvidenceIds: R01_SAE_RUNTIME, R02_ACR_IMAGE_REGISTRY, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R05_OSS_AUDIO_STORAGE, R06_ENV_IMPORT, R07_SLS_ALERTS
-- partiallyObservedResourceEvidenceIds: R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS
+- partiallyObservedResourceEvidenceIds: R02_ACR_IMAGE_REGISTRY, R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS
 - strictReadonlyInventoryReady: false
 - cloudInventoryReadyLocalOperations: 0/9
 - cloudInventoryExecutedCommandResults: 9/9
 - mutationPerformedCommandResults: 0
-- backendCanStartNowSteps: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP03_ACR_PURCHASE_AND_REPOSITORY
-- backendBlockedByDependencies: BAP04_ACR_IMAGE_PUSH_AND_PULL, BAP05_BACKEND_ENV_IMPORT, BAP06_SAE_RUNTIME_CREATE, BAP07_DOMAINS_HTTPS_ICP, BAP08_SLS_ALERTS, BAP09_POSTDEPLOY_SMOKE
+- backendCanStartNowSteps: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP04_ACR_IMAGE_PUSH_AND_PULL
+- backendBlockedByDependencies: BAP05_BACKEND_ENV_IMPORT, BAP06_SAE_RUNTIME_CREATE, BAP07_DOMAINS_HTTPS_ICP, BAP08_SLS_ALERTS, BAP09_POSTDEPLOY_SMOKE
 - canStartNowConsoleTasks: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS
-- cloudConsolePackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE
+- cloudConsolePackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P04_ACR_IMAGE_AND_PULL
 - externalAppPackets: none
 - deferredAppLaunchPackets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID
 - blockedByDependencies: C01_SAE_RUNTIME, C03_API_DOMAIN_HTTPS_ICP, C04_ASSET_DOMAIN_HTTPS_ICP, C06_ENV_IMPORT, C07_SLS_ALERTS
-- imagePublishWritebackBlockingGroups: acrPurchaseAndRepository, imagePushAndDigest, saeRuntimeImagePull
+- imagePublishWritebackBlockingGroups: imagePushAndDigest, saeRuntimeImagePull
 
 ## 后端 credential 获取/导入队列
 
@@ -66,32 +66,31 @@
 - missingCredentialNames: DATABASE_URL_CN
 - onlyMissingBackendCredentialValue: DATABASE_URL_CN
 - readySecretsPendingCloudImport: 17
-- requiresActionTimeConfirmationIds: S03_ACR_PAID_PURCHASE, S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT
+- requiresActionTimeConfirmationIds: S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT
 
 | order | category | actionId | question | obtainFrom | destination | verify |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | `acr_paid_purchase` | `S03_ACR_PAID_PURCHASE` | 阿里云 ACR 是否需要购买和确认规格 | 阿里云控制台 -> 容器镜像服务 ACR -> 企业版购买页 | deploy/aliyun-production-cn.image-publish.local.json -> acr.purchaseCandidate / acr non-secret evidence | corepack pnpm aliyun:image:plan; corepack pnpm aliyun:resources:matrix; corepack pnpm aliyun:user:actions |
-| 2 | `acr_registry_auth` | `S04_ACR_REGISTRY_AUTH` | 镜像推送和 SAE 拉取凭证放在哪里 | 阿里云控制台 -> ACR 命名空间/镜像仓库；SAE 应用 -> 镜像拉取配置 | deploy/aliyun-production-cn.image-publish.local.json -> acr + runtime non-secret fields; SAE runtime image pull credentials -> Aliyun runtime secret settings only | corepack pnpm aliyun:image:plan:strict; corepack pnpm aliyun:container:smoke |
-| 3 | `oss_ram_sts` | `S05_OSS_RAM_SECRET_OR_STS` | OSS/RAM/STS 密钥如何导入阿里云运行环境 | 阿里云控制台 -> RAM 访问控制 / OSS Bucket / SAE 环境变量或 Secrets Manager | ALIYUN_OSS_ACCESS_KEY_ID / ALIYUN_OSS_ACCESS_KEY_SECRET / ALIYUN_OSS_SECURITY_TOKEN -> KMS/Secrets Manager/SAE secret env; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss | corepack pnpm aliyun:cloud:confirmations; corepack pnpm aliyun:health:smoke |
-| 4 | `rds_database_secret_and_migration` | `S08_ALIYUN_RDS_DATABASE_URL` | DATABASE_URL_CN 从哪里获得并导入到哪里 | 阿里云控制台 -> RDS PostgreSQL -> 实例/数据库/账号/连接信息；SAE/KMS/Secrets Manager -> secret env | DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env only; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres / migration non-secret evidence; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport non-secret confirmation | corepack pnpm aliyun:rds:migration:package; corepack pnpm aliyun:rds:migration:evidence:strict; corepack pnpm aliyun:sensitive:blockers:backend; corepack pnpm aliyun:backend-cn:status; corepack pnpm aliyun:completion:audit |
-| 5 | `ready_secret_env_import` | `S06_READY_SENSITIVE_ENV_IMPORT` | 本机已有 API key 如何迁到阿里云 secret env | 现有 Vercel production / Supabase / 阿里云百炼 / DeepSeek / 火山引擎 / 微信公众平台等控制台 | SAE plain env for non-secret identifiers only; KMS/Secrets Manager/SAE secret env for secret or connection values; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport | corepack pnpm aliyun:env:checklist; corepack pnpm aliyun:sensitive:blockers; corepack pnpm aliyun:readiness:cloud-ready |
+| 1 | `acr_registry_auth` | `S04_ACR_REGISTRY_AUTH` | 镜像推送和 SAE 拉取凭证放在哪里 | 阿里云控制台 -> ACR 命名空间/镜像仓库；SAE 应用 -> 镜像拉取配置 | Docker credential helper or short-lived docker login session -> local operator machine only; do not persist in repo; deploy/aliyun-production-cn.image-publish.local.json -> acr + runtime non-secret fields; SAE runtime image pull credentials -> Aliyun runtime secret settings only | corepack pnpm aliyun:image:plan:strict; corepack pnpm aliyun:container:smoke |
+| 2 | `oss_ram_sts` | `S05_OSS_RAM_SECRET_OR_STS` | OSS/RAM/STS 密钥如何导入阿里云运行环境 | 阿里云控制台 -> RAM 访问控制 / OSS Bucket / SAE 环境变量或 Secrets Manager | ALIYUN_OSS_ACCESS_KEY_ID / ALIYUN_OSS_ACCESS_KEY_SECRET / ALIYUN_OSS_SECURITY_TOKEN -> KMS/Secrets Manager/SAE secret env; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss | corepack pnpm aliyun:cloud:confirmations; corepack pnpm aliyun:health:smoke |
+| 3 | `rds_database_secret_and_migration` | `S08_ALIYUN_RDS_DATABASE_URL` | DATABASE_URL_CN 从哪里获得并导入到哪里 | 阿里云控制台 -> RDS PostgreSQL -> 实例/数据库/账号/连接信息；SAE/KMS/Secrets Manager -> secret env | DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env only; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres / migration non-secret evidence; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport non-secret confirmation | corepack pnpm aliyun:rds:migration:package; corepack pnpm aliyun:rds:migration:evidence:strict; corepack pnpm aliyun:sensitive:blockers:backend; corepack pnpm aliyun:backend-cn:status; corepack pnpm aliyun:completion:audit |
+| 4 | `ready_secret_env_import` | `S06_READY_SENSITIVE_ENV_IMPORT` | 本机已有 API key 如何迁到阿里云 secret env | 现有 Vercel production / Supabase / 阿里云百炼 / DeepSeek / 火山引擎 / 微信公众平台等控制台 | SAE plain env for non-secret identifiers only; KMS/Secrets Manager/SAE secret env for secret or connection values; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport | corepack pnpm aliyun:env:checklist; corepack pnpm aliyun:sensitive:blockers; corepack pnpm aliyun:readiness:cloud-ready |
 
 ## 后端优先执行顺序
 
 - sourceCommand: corepack pnpm aliyun:backend-cn:status
 - purpose: backend_first_apply_order_over_console_task_canStartNow
 - note: Console canStartNow only means a console task can begin after action-time confirmation; backend-first apply order still starts with BAP00/BAP01 so RDS and read-only inventory are not skipped.
-- immediateBackendSteps: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP03_ACR_PURCHASE_AND_REPOSITORY
-- blockedBackendSteps: BAP04_ACR_IMAGE_PUSH_AND_PULL, BAP05_BACKEND_ENV_IMPORT, BAP06_SAE_RUNTIME_CREATE, BAP07_DOMAINS_HTTPS_ICP, BAP08_SLS_ALERTS, BAP09_POSTDEPLOY_SMOKE
-- actionTimeConfirmationRequired: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP03_ACR_PURCHASE_AND_REPOSITORY, BAP04_ACR_IMAGE_PUSH_AND_PULL, BAP05_BACKEND_ENV_IMPORT, BAP06_SAE_RUNTIME_CREATE, BAP07_DOMAINS_HTTPS_ICP, BAP08_SLS_ALERTS, BAP09_POSTDEPLOY_SMOKE
-- immediateUserInterventionRequired: USER_CONFIRM_ALIYUN_READONLY_INVENTORY_IDENTITY, USER_CONFIRM_RDS_PURCHASE_AND_DATABASE_PASSWORD, USER_CONFIRM_OSS_RAM_STS_SECRET_OR_RUNTIME_ROLE, USER_CONFIRM_ACR_PAID_PURCHASE
-- blockedUserInterventionRequired: USER_CONFIRM_ACR_IMAGE_PUSH_AND_RUNTIME_PULL, USER_CONFIRM_SECRET_ENV_IMPORT, USER_CONFIRM_PRODUCTION_DEPLOY, USER_CONFIRM_DNS_HTTPS_ICP_CHANGE
-- userInterventionRequired: USER_CONFIRM_ALIYUN_READONLY_INVENTORY_IDENTITY, USER_CONFIRM_RDS_PURCHASE_AND_DATABASE_PASSWORD, USER_CONFIRM_OSS_RAM_STS_SECRET_OR_RUNTIME_ROLE, USER_CONFIRM_ACR_PAID_PURCHASE, USER_CONFIRM_ACR_IMAGE_PUSH_AND_RUNTIME_PULL, USER_CONFIRM_SECRET_ENV_IMPORT, USER_CONFIRM_PRODUCTION_DEPLOY, USER_CONFIRM_DNS_HTTPS_ICP_CHANGE
+- immediateBackendSteps: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP04_ACR_IMAGE_PUSH_AND_PULL
+- blockedBackendSteps: BAP05_BACKEND_ENV_IMPORT, BAP06_SAE_RUNTIME_CREATE, BAP07_DOMAINS_HTTPS_ICP, BAP08_SLS_ALERTS, BAP09_POSTDEPLOY_SMOKE
+- actionTimeConfirmationRequired: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP04_ACR_IMAGE_PUSH_AND_PULL, BAP05_BACKEND_ENV_IMPORT, BAP06_SAE_RUNTIME_CREATE, BAP07_DOMAINS_HTTPS_ICP, BAP08_SLS_ALERTS, BAP09_POSTDEPLOY_SMOKE
+- immediateUserInterventionRequired: USER_CONFIRM_ALIYUN_READONLY_INVENTORY_IDENTITY, USER_CONFIRM_RDS_PURCHASE_AND_DATABASE_PASSWORD, USER_CONFIRM_OSS_RAM_STS_SECRET_OR_RUNTIME_ROLE, USER_CONFIRM_ACR_IMAGE_PUSH_AND_RUNTIME_PULL
+- blockedUserInterventionRequired: USER_CONFIRM_SECRET_ENV_IMPORT, USER_CONFIRM_PRODUCTION_DEPLOY, USER_CONFIRM_DNS_HTTPS_ICP_CHANGE
+- userInterventionRequired: USER_CONFIRM_ALIYUN_READONLY_INVENTORY_IDENTITY, USER_CONFIRM_RDS_PURCHASE_AND_DATABASE_PASSWORD, USER_CONFIRM_OSS_RAM_STS_SECRET_OR_RUNTIME_ROLE, USER_CONFIRM_ACR_IMAGE_PUSH_AND_RUNTIME_PULL, USER_CONFIRM_SECRET_ENV_IMPORT, USER_CONFIRM_PRODUCTION_DEPLOY, USER_CONFIRM_DNS_HTTPS_ICP_CHANGE
 - BAP00_READONLY_INVENTORY_IDENTITY: status=ready_for_action_time_confirmation; packets=P00_ALIYUN_READONLY_INVENTORY_IDENTITY; dependsOn=none; order=0. Restore Aliyun CLI/CloudShell read-only inventory evidence and write non-secret summaries only.
 - BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE: status=ready_for_action_time_confirmation; packets=P11_ALIYUN_RDS_DATA_MIGRATION; dependsOn=none; order=1. Create or confirm Aliyun RDS PostgreSQL in cn-hangzhou and close Supabase-to-RDS migration evidence.
 - BAP02_OSS_RAM_STS_CLOSE: status=ready_for_action_time_confirmation; packets=P05_OSS_RAM_STS; dependsOn=none; order=2. Confirm OSS RAM/STS least-privilege runtime access.
-- BAP03_ACR_PURCHASE_AND_REPOSITORY: status=ready_for_action_time_confirmation; packets=P03_ACR_PURCHASE; dependsOn=none; order=3. Purchase/confirm ACR Enterprise instance, namespace, and repository.
-- BAP04_ACR_IMAGE_PUSH_AND_PULL: status=blocked_by_dependencies; packets=P04_ACR_IMAGE_AND_PULL; dependsOn=BAP03_ACR_PURCHASE_AND_REPOSITORY; order=4. Push backend image to ACR, verify digest, and configure SAE image pull authorization.
+- BAP03_ACR_PURCHASE_AND_REPOSITORY: status=completed; packets=P03_ACR_PURCHASE; dependsOn=none; order=3. Purchase/confirm ACR Enterprise instance, namespace, and repository.
+- BAP04_ACR_IMAGE_PUSH_AND_PULL: status=ready_for_action_time_confirmation; packets=P04_ACR_IMAGE_AND_PULL; dependsOn=none; order=4. Push backend image to ACR, verify digest, and configure SAE image pull authorization.
 - BAP05_BACKEND_ENV_IMPORT: status=blocked_by_dependencies; packets=P06_ENV_IMPORT; dependsOn=BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP04_ACR_IMAGE_PUSH_AND_PULL; order=5. Import backend env through SAE/KMS/Secrets Manager, including DATABASE_URL_CN only as a secret env.
 - BAP06_SAE_RUNTIME_CREATE: status=blocked_by_dependencies; packets=P08_SAE_RUNTIME_SLS; dependsOn=BAP02_OSS_RAM_STS_CLOSE, BAP04_ACR_IMAGE_PUSH_AND_PULL, BAP05_BACKEND_ENV_IMPORT; order=6. Create SAE runtime with container port 3000 and /api/healthz.
 - BAP07_DOMAINS_HTTPS_ICP: status=blocked_by_dependencies; packets=P07_DOMAIN_DNS_HTTPS; dependsOn=BAP06_SAE_RUNTIME_CREATE; order=7. Bind api-cn/assets-cn DNS, HTTPS certificate, and ICP-compliant public access.
@@ -100,18 +99,18 @@
 
 ## 下一步执行队列
 
-- backendCanStartNow: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP03_ACR_PURCHASE_AND_REPOSITORY
+- backendCanStartNow: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP04_ACR_IMAGE_PUSH_AND_PULL
 - consoleCanStartNow: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS
 - canStartNow: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS
 - externalAppPrerequisites: none
 - deferredAppLaunchPrerequisites: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID
-- backendBlockedByDependencies: BAP04_ACR_IMAGE_PUSH_AND_PULL, BAP05_BACKEND_ENV_IMPORT, BAP06_SAE_RUNTIME_CREATE, BAP07_DOMAINS_HTTPS_ICP, BAP08_SLS_ALERTS, BAP09_POSTDEPLOY_SMOKE
+- backendBlockedByDependencies: BAP05_BACKEND_ENV_IMPORT, BAP06_SAE_RUNTIME_CREATE, BAP07_DOMAINS_HTTPS_ICP, BAP08_SLS_ALERTS, BAP09_POSTDEPLOY_SMOKE
 - blockedByDependencies: C01_SAE_RUNTIME, C03_API_DOMAIN_HTTPS_ICP, C04_ASSET_DOMAIN_HTTPS_ICP, C06_ENV_IMPORT, C07_SLS_ALERTS
 - BAP00_READONLY_INVENTORY_IDENTITY: kind=backend_apply_step; packets=P00_ALIYUN_READONLY_INVENTORY_IDENTITY; userIntervention=USER_CONFIRM_ALIYUN_READONLY_INVENTORY_IDENTITY; order=0. Restore Aliyun CLI/CloudShell read-only inventory evidence and write non-secret summaries only.
 - BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE: kind=backend_apply_step; packets=P11_ALIYUN_RDS_DATA_MIGRATION; userIntervention=USER_CONFIRM_RDS_PURCHASE_AND_DATABASE_PASSWORD; order=1. Create or confirm Aliyun RDS PostgreSQL in cn-hangzhou and close Supabase-to-RDS migration evidence.
 - BAP02_OSS_RAM_STS_CLOSE: kind=backend_apply_step; packets=P05_OSS_RAM_STS; userIntervention=USER_CONFIRM_OSS_RAM_STS_SECRET_OR_RUNTIME_ROLE; order=2. Confirm OSS RAM/STS least-privilege runtime access.
-- BAP03_ACR_PURCHASE_AND_REPOSITORY: kind=backend_apply_step; packets=P03_ACR_PURCHASE; userIntervention=USER_CONFIRM_ACR_PAID_PURCHASE; order=3. Purchase/confirm ACR Enterprise instance, namespace, and repository.
-- C02_ACR_IMAGE_AND_PULL: kind=aliyun_console_task; scope=purchase_and_repository_only; phrase=授权购买/确认 ACR 企业版实例和镜像仓库基础信息；不执行 docker login/push，不记录 registry password。
+- BAP04_ACR_IMAGE_PUSH_AND_PULL: kind=backend_apply_step; packets=P04_ACR_IMAGE_AND_PULL; userIntervention=USER_CONFIRM_ACR_IMAGE_PUSH_AND_RUNTIME_PULL; order=4. Push backend image to ACR, verify digest, and configure SAE image pull authorization.
+- C02_ACR_IMAGE_AND_PULL: kind=aliyun_console_task; scope=image_push_or_import_and_digest_verification; phrase=授权把后端镜像推送或导入已创建的 ACR，核对 sha256 digest，并配置 SAE 拉取该镜像；不输出 registry 密码，不部署 production-cn。
 - C05_OSS_AUDIO_RAM_STS: kind=aliyun_console_task; scope=full_task; phrase=授权确认 OSS 音频 bucket、CORS、RAM 最小权限或 STS/运行时角色；Secret 只进阿里云受控密钥环境。
 - externalAppPrerequisiteItems: none
 
@@ -135,15 +134,15 @@
 
 ## 当前可先做
 
-### C02_ACR_IMAGE_AND_PULL 购买/确认 ACR 企业版实例和镜像仓库基础信息
+### C02_ACR_IMAGE_AND_PULL 推送/导入后端镜像到 ACR 并配置 SAE 拉取
 
-- consolePath: 阿里云控制台 -> 容器镜像服务 ACR -> 企业版购买页
-- minimumAuthorizationPhrase: 授权购买/确认 ACR 企业版实例和镜像仓库基础信息；不执行 docker login/push，不记录 registry password。
-- currentActionScope: purchase_and_repository_only
-- currentActionAcceptanceEvidence: acr.purchaseCandidate.confirmed=true；acr.registryHost actual aliyuncs.com host；acr.namespace created；repository=meiye-huajing-app-api
-- writeTargets: deploy/aliyun-production-cn.image-publish.local.json: acr.confirmed=true；deploy/aliyun-production-cn.image-publish.local.json: acr.registryHost=<cn-hangzhou aliyuncs.com host>；deploy/aliyun-production-cn.image-publish.local.json: acr.namespace=<actual namespace>
-- verifyCommands: corepack pnpm aliyun:image:plan
-- deferredActions: P04_ACR_IMAGE_AND_PULL 依赖 P03_ACR_PURCHASE 完成后再执行。；当前确认包不执行 docker login/push。；当前确认包不配置 SAE runtime image pull credentials。；imagePushed=true、digestVerified=true、runtime.remoteImageConfigured=true、runtime.imagePullConfigured=true 都属于后置验收。；imagePushAndDigest 需等待 P04_ACR_IMAGE_AND_PULL；当前 blockers: todo:acr.remoteImage, todo:acr.remoteDigest, todo:acr.evidence, acr.imagePushed, acr.digestVerified, acr.remoteDigest=sha256；saeRuntimeImagePull 需等待 P08_SAE_RUNTIME_SLS, P04_ACR_IMAGE_AND_PULL；当前 blockers: runtime.confirmed, runtime.remoteImageConfigured, runtime.imagePullConfigured
+- consolePath: 阿里云控制台 -> ACR 命名空间/镜像仓库；SAE 应用 -> 镜像拉取配置
+- minimumAuthorizationPhrase: 授权把后端镜像推送或导入已创建的 ACR，核对 sha256 digest，并配置 SAE 拉取该镜像；不输出 registry 密码，不部署 production-cn。
+- currentActionScope: image_push_or_import_and_digest_verification
+- currentActionAcceptanceEvidence: acr.imagePushed=true；acr.digestVerified=true；acr.remoteDigest=sha256:<64 hex>；runtime.remoteImageConfigured=true；runtime.imagePullConfigured=true
+- writeTargets: deploy/aliyun-production-cn.image-publish.local.json: acr.remoteImage=<registryHost>/<namespace>/meiye-huajing-app-api:production-cn；deploy/aliyun-production-cn.image-publish.local.json: acr.remoteDigest=sha256:<64 hex>；deploy/aliyun-production-cn.image-publish.local.json: acr.imagePushed=true；deploy/aliyun-production-cn.image-publish.local.json: acr.digestVerified=true；deploy/aliyun-production-cn.image-publish.local.json: acr.pushNetworkPath=public_registry|vpc_registry_from_aliyun_network|acr_import_task；deploy/aliyun-production-cn.image-publish.local.json: acr.publicNetworkEntranceEnabled=true if pushing from local/public network；deploy/aliyun-production-cn.image-publish.local.json: acr.evidence=<non-secret evidence handle>
+- verifyCommands: corepack pnpm aliyun:container:smoke；corepack pnpm aliyun:image:plan:strict
+- deferredActions: 不购买 ACR。；不把 docker login、registry password、RAM Secret 或 token 写入 JSON/Markdown/git。；不部署 production-cn，除非 P09_PRODUCTION_DEPLOY 单独授权。；acrPurchaseAndRepository 已完成；不再等待 P03_ACR_PURCHASE；当前 blockers: none；saeRuntimeImagePull 需等待 P08_SAE_RUNTIME_SLS, P04_ACR_IMAGE_AND_PULL；当前 blockers: runtime.confirmed, runtime.remoteImageConfigured, runtime.imagePullConfigured
 
 ### C05_OSS_AUDIO_RAM_STS 确认 OSS 音频 bucket、CORS、RAM 最小权限或 STS/运行时角色
 
@@ -165,10 +164,10 @@
 
 ## 云侧动作授权包
 
-- P00_ALIYUN_READONLY_INVENTORY_IDENTITY: 授权等待当前阿里云 CloudShell 连接完成后，只运行 allowlisted 只读盘点命令并写入非密钥 evidence；如后续出现开通、重启实例或费用提示，必须先停下另行确认。
+- P00_ALIYUN_READONLY_INVENTORY_IDENTITY: 授权在确认当前阿里云 CloudShell 重启实例提示后恢复只读盘点会话，或配置 Aliyun CLI；该提示会终止当前会话并创建新会话；只运行 allowlisted 只读盘点命令并写入非密钥 evidence。
 - P11_ALIYUN_RDS_DATA_MIGRATION: 授权创建/确认阿里云 RDS PostgreSQL production-cn 数据库并完成数据迁移；DATABASE_URL_CN 只能进入阿里云 secret env。
 - P05_OSS_RAM_STS: 授权为服务记录音频 OSS 配置最小权限 RAM/STS 或运行时角色，并只通过密钥环境注入。
-- P03_ACR_PURCHASE: 授权购买 ACR Enterprise Economic，cn-hangzhou，1 个月，当前报价 CNY 117.00。
+- P04_ACR_IMAGE_AND_PULL: 授权把后端镜像推送到已创建的 ACR，并配置 SAE 拉取该镜像；不输出 registry 密码。
 
 ## 延期的外部 App 前置项
 

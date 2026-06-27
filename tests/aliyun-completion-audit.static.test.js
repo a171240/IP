@@ -145,8 +145,8 @@ test("Aliyun completion audit reports the current goal as blocked without secret
   assert.ok(report.summary.deferredAppLaunchBlockedCredentialNames.includes("WECHAT_OPEN_APP_SECRET"))
   assert.ok(report.summary.deferredAppLaunchSensitiveBlockedIds.includes("S01_WECHAT_OPEN_APP_LOGIN"))
   assert.equal(report.summary.readySecretEnvVariableCount, 17)
-  assert.equal(report.summary.localImplementationReady, true)
-  assert.deepEqual(report.summary.localImplementationBlockingFields, [])
+  assert.equal(report.summary.localImplementationReady, false)
+  assert.deepEqual(report.summary.localImplementationBlockingFields, ["docker"])
   assert.ok(report.summary.localImplementationReadyFields.includes("appApiBridgeMap"))
   assert.ok(report.summary.localImplementationReadyFields.includes("appRuntimeConfig"))
   assert.ok(report.summary.localCodeMachineBlockers.includes("missing_required_env:DATABASE_URL_CN"))
@@ -174,7 +174,7 @@ test("Aliyun completion audit reports the current goal as blocked without secret
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
     "P05_OSS_RAM_STS",
-    "P03_ACR_PURCHASE",
+    "P04_ACR_IMAGE_AND_PULL",
   ])
   assert.deepEqual(report.summary.operatorTasks.operatorActionPacketSummary.deferredAppLaunchPacketIds, [
     "P01_WECHAT_OPEN_MOBILE_APP",
@@ -190,13 +190,13 @@ test("Aliyun completion audit reports the current goal as blocked without secret
   ))
   assert.ok(report.goalClosureEvidenceBrief.resourceEvidence.blockedResourceEvidence.some((item) =>
     item.id === "R02_ACR_IMAGE_REGISTRY" &&
-    item.requiredAuthorizationPackets.includes("P03_ACR_PURCHASE")
+    item.requiredAuthorizationPackets.includes("P04_ACR_IMAGE_AND_PULL")
   ))
 
   assert.equal(byId.get("G01_LOCAL_APP_BACKEND_READY").status, "partial")
   assert.ok(byId.get("G01_LOCAL_APP_BACKEND_READY").evidence.includes("localCodeReady=false"))
-  assert.ok(byId.get("G01_LOCAL_APP_BACKEND_READY").evidence.includes("localImplementationReady=true"))
-  assert.ok(byId.get("G01_LOCAL_APP_BACKEND_READY").evidence.includes("localImplementationBlockingFields=none"))
+  assert.ok(byId.get("G01_LOCAL_APP_BACKEND_READY").evidence.includes("localImplementationReady=false"))
+  assert.ok(byId.get("G01_LOCAL_APP_BACKEND_READY").evidence.includes("localImplementationBlockingFields=docker"))
   assert.ok(byId.get("G01_LOCAL_APP_BACKEND_READY").evidence.some((item) =>
     item.includes("localCodeMachineBlockers=") &&
     item.includes("missing_required_env:DATABASE_URL_CN") &&
@@ -215,7 +215,7 @@ test("Aliyun completion audit reports the current goal as blocked without secret
   ))
   assert.ok(byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").evidence.includes("resourceEvidenceReady=0/7"))
   assert.ok(byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").blockers.some((item) =>
-    item.includes("R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.registryHost")
+    item.includes("R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.remoteDigest")
   ))
   assert.equal(byId.get("G02B_ALIYUN_RDS_DATA_LAYER_READY").status, "blocked")
   assert.ok(byId.get("G02B_ALIYUN_RDS_DATA_LAYER_READY").blockers.includes("DATABASE_URL_CN"))
@@ -244,14 +244,14 @@ test("Aliyun completion audit reports the current goal as blocked without secret
   assert.ok(report.nextActions.canStartNowConsoleTasks.includes("C05_OSS_AUDIO_RAM_STS"))
   assert.ok(!report.nextActions.canStartNowAuthorizationPackets.includes("P01_WECHAT_OPEN_MOBILE_APP"))
   assert.ok(!report.nextActions.canStartNowAuthorizationPackets.includes("P10_ANDROID_RELEASE_SIGNING"))
-  assert.ok(report.nextActions.canStartNowAuthorizationPackets.includes("P03_ACR_PURCHASE"))
+  assert.ok(report.nextActions.canStartNowAuthorizationPackets.includes("P04_ACR_IMAGE_AND_PULL"))
   assert.deepEqual(
     report.summary.nextActionTimeConfirmations.map((item) => item.packetId),
     [
       "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
       "P11_ALIYUN_RDS_DATA_MIGRATION",
       "P05_OSS_RAM_STS",
-      "P03_ACR_PURCHASE",
+      "P04_ACR_IMAGE_AND_PULL",
     ],
   )
   assert.equal(report.summary.actionTimeAuthorizationRequired, true)
@@ -259,7 +259,7 @@ test("Aliyun completion audit reports the current goal as blocked without secret
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
     "P05_OSS_RAM_STS",
-    "P03_ACR_PURCHASE",
+    "P04_ACR_IMAGE_AND_PULL",
   ])
   assert.deepEqual(report.summary.actionTimeAuthorizationBlockedCredentialNames, ["DATABASE_URL_CN"])
   assert.equal(report.summary.actionTimeAuthorizationReadySecretEnvVariableCount, 17)
@@ -268,7 +268,7 @@ test("Aliyun completion audit reports the current goal as blocked without secret
   assert.deepEqual(report.actionTimeAuthorizationNow.packetIds, report.summary.actionTimeAuthorizationPacketIds)
   assert.deepEqual(report.actionTimeAuthorizationNow.nonSecretEvidenceOnlyPacketIds, [
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
-    "P03_ACR_PURCHASE",
+    "P04_ACR_IMAGE_AND_PULL",
   ])
   assert.deepEqual(report.actionTimeAuthorizationNow.secretOrCredentialPacketIds, [
     "P11_ALIYUN_RDS_DATA_MIGRATION",
@@ -290,8 +290,8 @@ test("Aliyun completion audit reports the current goal as blocked without secret
   assert.equal(report.sourceCommands.operatorTasks, "corepack pnpm aliyun:operator:tasks:backend")
   assert.ok(
     report.summary.nextActionTimeConfirmations
-      .find((item) => item.packetId === "P03_ACR_PURCHASE")
-      .explicitlyExcluded.some((item) => item.includes("未明确确认金额前不点击付款")),
+      .find((item) => item.packetId === "P04_ACR_IMAGE_AND_PULL")
+      .explicitlyExcluded.some((item) => item.includes("不购买 ACR")),
   )
   assert.ok(
     report.nextActions.nextActionTimeConfirmations
@@ -352,7 +352,7 @@ test("Aliyun completion audit carries console-only inventory evidence into G03 a
   assert.match(markdownOutput, /rdsMigrationIncludedInThisRelease: false/)
   assert.match(markdownOutput, /rdsMigrationRequiredForFinalProductionCn: true/)
   assert.match(markdownOutput, /Action-time authorization required: true/)
-  assert.match(markdownOutput, /Action-time authorization packet ids: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE/)
+  assert.match(markdownOutput, /Action-time authorization packet ids: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P04_ACR_IMAGE_AND_PULL/)
   assert.match(markdownOutput, /Action-time authorization blocked credentials: DATABASE_URL_CN/)
   assert.match(markdownOutput, /## 动作时授权摘要/)
   assert.match(markdownOutput, /secretOrCredentialPacketIds: P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS/)
@@ -362,7 +362,7 @@ test("Aliyun completion audit carries console-only inventory evidence into G03 a
   assert.match(markdownOutput, /fullAppBlockedCredentialNames: .*WECHAT_OPEN_APP_SECRET/)
   assert.match(markdownOutput, /deferredAppLaunchBlockedCredentialNames: .*WECHAT_OPEN_APP_SECRET/)
   assert.match(markdownOutput, /resourceEvidenceReady: 0\/7/)
-  assert.match(markdownOutput, /R02_ACR_IMAGE_REGISTRY: observed=purchase_candidate_visible_not_purchased\/blocked/)
+  assert.match(markdownOutput, /R02_ACR_IMAGE_REGISTRY: observed=acr_repository_confirmed_image_push_pending\/partial/)
   assert.match(markdownOutput, /safeConsoleOnly=true/)
   assert.doesNotMatch(output + markdownOutput, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output + markdownOutput, /LTAI[A-Za-z0-9]{12,}/)

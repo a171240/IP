@@ -58,6 +58,7 @@ export const SENSITIVE_ACTION_METADATA = {
   S04_ACR_REGISTRY_AUTH: {
     obtainFrom: "阿里云控制台 -> ACR 命名空间/镜像仓库；SAE 应用 -> 镜像拉取配置",
     writeTargets: [
+      "Docker credential helper or short-lived docker login session -> local operator machine only; do not persist in repo",
       "deploy/aliyun-production-cn.image-publish.local.json -> acr + runtime non-secret fields",
       "SAE runtime image pull credentials -> Aliyun runtime secret settings only",
     ],
@@ -110,8 +111,8 @@ export const SENSITIVE_ACTION_METADATA = {
       "Aliyun RDS PostgreSQL instance exists in cn-hangzhou",
       "database account and least-privilege access are ready",
       "DATABASE_URL_CN imported through secret env only",
-      "compatibilityReviewChecklistItemCount=6 is reviewed and closed before schema apply",
-      "supabase_auth_uid/supabase_storage_schema/supabase_service_role/row_level_security/policy_statement/extension_review dispositions are recorded without secrets",
+      "compatibilityReviewChecklistItemCount=7 is reviewed and closed before schema apply",
+      "supabase_auth_schema/supabase_auth_uid/supabase_storage_schema/supabase_service_role/row_level_security/policy_statement/extension_review dispositions are recorded without secrets",
       "migration.schemaCompatibilityReviewed=true",
       "migration.supabaseSpecificSqlResolved=true",
       "migration.rdsExtensionSupportConfirmed=true",

@@ -96,7 +96,7 @@ test("Aliyun blocker brief backend-only markdown stays focused on backend resour
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
     "P05_OSS_RAM_STS",
-    "P03_ACR_PURCHASE",
+    "P04_ACR_IMAGE_AND_PULL",
   ])
 
   assert.match(markdown, /阿里云后端-only 当前执行简报/)
@@ -115,9 +115,9 @@ test("Aliyun blocker brief backend-only markdown stays focused on backend resour
   assert.match(markdown, /target: Aliyun RDS PostgreSQL/)
   assert.match(markdown, /databaseUrlCnStatus: todo/)
   assert.match(markdown, /requiredBlocking:[\s\S]*DATABASE_URL_CN[\s\S]*RDS_MIGRATION_EVIDENCE_NOT_READY/)
-  assert.match(markdown, /canStartNowAuthorizationPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE/)
+  assert.match(markdown, /canStartNowAuthorizationPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P04_ACR_IMAGE_AND_PULL/)
   assert.match(markdown, /P00_ALIYUN_READONLY_INVENTORY_IDENTITY/)
-  assert.match(markdown, /P03_ACR_PURCHASE/)
+  assert.match(markdown, /P04_ACR_IMAGE_AND_PULL/)
   assert.match(markdown, /P05_OSS_RAM_STS/)
   assert.match(markdown, /P11_ALIYUN_RDS_DATA_MIGRATION/)
   assert.match(markdown, /R01_SAE_RUNTIME/)
@@ -163,7 +163,7 @@ test("APP production-cn backend-only current blocker brief is the active backend
   assert.match(doc, /只聚合本地 value-free 证据/)
   assert.match(doc, /requiredBlocking:[\s\S]*ACR_IMAGE_REGISTRY_NOT_READY[\s\S]*DATABASE_URL_CN[\s\S]*SAE_RUNTIME_NOT_READY/)
   assert.match(doc, /canStartNowConsoleTasks: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS/)
-  assert.match(doc, /canStartNowAuthorizationPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE/)
+  assert.match(doc, /canStartNowAuthorizationPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P04_ACR_IMAGE_AND_PULL/)
   assert.match(doc, /target: Aliyun RDS PostgreSQL/)
   assert.match(doc, /databaseUrlCnStatus: todo/)
   assert.match(doc, /`DATABASE_URL_CN` \| P11_ALIYUN_RDS_DATA_MIGRATION/)
@@ -196,7 +196,7 @@ test("APP production-cn current blocker brief records the go-no-go boundary", ()
   assert.match(doc, /localCodeReady: false/)
   assert.match(doc, /releaseEvidenceUsable: true/)
   assert.match(doc, /cloudResourceEvidenceReady: 0\/7/)
-  assert.match(doc, /sensitiveBlocked: 5\/5/)
+  assert.match(doc, /sensitiveBlocked: 4\/4/)
   assert.match(doc, /blockedCredentialCount: 1/)
   assert.match(doc, /blockedCredentialNames: DATABASE_URL_CN/)
   assert.match(doc, /readySecretEnvVariableCount: 17/)
@@ -230,14 +230,15 @@ test("APP production-cn current blocker brief records the go-no-go boundary", ()
   assert.match(doc, /cloudResourceObservedPartialIds:[\s\S]*R05_OSS_AUDIO_STORAGE[\s\S]*R07_SLS_ALERTS/)
   assert.match(doc, /cloudResourceObservedBlockedIds:[\s\S]*R01_SAE_RUNTIME[\s\S]*R06_ENV_IMPORT/)
   assert.match(doc, /canStartNowConsoleTasks:[\s\S]*C02_ACR_IMAGE_AND_PULL[\s\S]*C05_OSS_AUDIO_RAM_STS/)
-  assert.match(doc, /canStartNowAuthorizationPackets:[\s\S]*P03_ACR_PURCHASE[\s\S]*P05_OSS_RAM_STS[\s\S]*P11_ALIYUN_RDS_DATA_MIGRATION/)
-  assert.match(doc, /blockedByAuthorizationPacketDependencies:[\s\S]*P04_ACR_IMAGE_AND_PULL[\s\S]*P09_PRODUCTION_DEPLOY/)
-  assert.match(doc, /deploy\/aliyun-production-cn\.image-publish\.local\.json: acr\.confirmed=true/)
+  assert.match(doc, /canStartNowAuthorizationPackets:[\s\S]*P04_ACR_IMAGE_AND_PULL[\s\S]*P05_OSS_RAM_STS[\s\S]*P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(doc, /blockedByAuthorizationPacketDependencies:[\s\S]*P09_PRODUCTION_DEPLOY/)
+  assert.match(doc, /deploy\/aliyun-production-cn\.image-publish\.local\.json: acr\.imagePushed=true/)
+  assert.match(doc, /deploy\/aliyun-production-cn\.image-publish\.local\.json: acr\.digestVerified=true/)
   assert.match(doc, /deploy\/aliyun-production-cn\.cloud-confirmations\.local\.json -> items\.oss/)
   assert.match(doc, /bucket: meiye-huajing-service-records-production-cn/)
   assert.match(doc, /serviceRecordPrefix: service-records\/production-cn/)
   assert.match(doc, /docker login/)
-  assert.match(doc, /docker push/)
+  assert.match(doc, /推送镜像到 ACR/)
   assert.match(doc, /部署 production-cn/)
   assert.match(doc, /创建微信开放平台移动应用/)
   assert.doesNotMatch(doc, secretLike)
@@ -300,18 +301,18 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.ok(report.bridgeDataLayer.notes.some((item) => /正式国内 production-cn 目标必须使用阿里云 RDS PostgreSQL/.test(item)))
   assert.equal(report.summary.cloudResourceEvidenceReady, "0/7")
   assert.equal(report.summary.cloudResourceObservedReady, 0)
-  assert.equal(report.summary.cloudResourceObservedPartial, 2)
-  assert.equal(report.summary.cloudResourceObservedBlocked, 5)
+  assert.equal(report.summary.cloudResourceObservedPartial, 3)
+  assert.equal(report.summary.cloudResourceObservedBlocked, 4)
   assert.equal(report.summary.cloudResourceObservedTotal, 7)
   assert.ok(report.summary.cloudResourceBlockedIds.includes("R01_SAE_RUNTIME"))
   assert.ok(report.summary.cloudResourceBlockedIds.includes("R07_SLS_ALERTS"))
   assert.deepEqual(report.summary.cloudResourceObservedPartialIds, [
+    "R02_ACR_IMAGE_REGISTRY",
     "R05_OSS_AUDIO_STORAGE",
     "R07_SLS_ALERTS",
   ])
   assert.deepEqual(report.summary.cloudResourceObservedBlockedIds, [
     "R01_SAE_RUNTIME",
-    "R02_ACR_IMAGE_REGISTRY",
     "R03_API_DOMAIN_HTTPS",
     "R04_ASSET_DOMAIN_HTTPS",
     "R06_ENV_IMPORT",
@@ -319,8 +320,8 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.ok(report.summary.cloudResourceActionTimeConfirmations.includes("R02_ACR_IMAGE_REGISTRY"))
   assert.equal(report.cloudResourceObservations.evidenceReady, "0/7")
   assert.equal(report.cloudResourceObservations.observedStatuses.ready, 0)
-  assert.equal(report.cloudResourceObservations.observedStatuses.partial, 2)
-  assert.equal(report.cloudResourceObservations.observedStatuses.blocked, 5)
+  assert.equal(report.cloudResourceObservations.observedStatuses.partial, 3)
+  assert.equal(report.cloudResourceObservations.observedStatuses.blocked, 4)
   assert.equal(report.cloudResourceObservations.observedStatuses.total, 7)
   assert.deepEqual(report.cloudResourceObservations.observedPartialIds, report.summary.cloudResourceObservedPartialIds)
   assert.deepEqual(report.cloudResourceObservations.observedBlockedIds, report.summary.cloudResourceObservedBlockedIds)
@@ -334,7 +335,8 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.ok(report.cloudResourceObservations.items.some((item) =>
     item.id === "R02_ACR_IMAGE_REGISTRY" &&
     item.requiresActionTimeConfirmation === true &&
-    item.observedStatus === "purchase_candidate_visible_not_purchased"
+    item.observedStatus === "acr_repository_confirmed_image_push_pending" &&
+    item.observedReadiness === "partial"
   ))
   assert.ok(report.cloudResourceObservations.items.some((item) =>
     item.id === "R05_OSS_AUDIO_STORAGE" &&
@@ -359,10 +361,9 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
     "P05_OSS_RAM_STS",
-    "P03_ACR_PURCHASE",
+    "P04_ACR_IMAGE_AND_PULL",
   ])
   assert.deepEqual(report.summary.blockedByAuthorizationPacketDependencies, [
-    "P04_ACR_IMAGE_AND_PULL",
     "P06_ENV_IMPORT",
     "P07_DOMAIN_DNS_HTTPS",
     "P08_SAE_RUNTIME_SLS",
@@ -372,7 +373,7 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.deepEqual(report.nextActionSequencing.blockedByConsoleTaskDependencies, report.summary.blockedByConsoleTaskDependencies)
   assert.deepEqual(report.nextActionSequencing.canStartNowAuthorizationPackets, report.summary.canStartNowAuthorizationPackets)
   assert.ok(report.nextActionSequencing.nextActionTimeConfirmations.some((item) =>
-    item.packetId === "P03_ACR_PURCHASE" &&
+    item.packetId === "P04_ACR_IMAGE_AND_PULL" &&
     item.nonSecretEvidenceOnly === true &&
     /ACR/.test(item.minimumUserPhrase)
   ))
@@ -385,15 +386,15 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.equal(report.canStartNowWritebackPlan.length, 2)
   const acrWriteback = report.canStartNowWritebackPlan.find((item) => item.id === "C02_ACR_IMAGE_AND_PULL")
   assert.ok(acrWriteback)
-  assert.equal(acrWriteback.currentActionScope, "purchase_and_repository_only")
+  assert.equal(acrWriteback.currentActionScope, "image_push_or_import_and_digest_verification")
   assert.equal(acrWriteback.nonSecretEvidenceOnly, true)
-  assert.ok(acrWriteback.writeTargets.includes("deploy/aliyun-production-cn.image-publish.local.json: acr.confirmed=true"))
-  assert.ok(acrWriteback.writeTargets.some((item) => /acr.registryHost/.test(item)))
-  assert.ok(acrWriteback.acceptanceEvidence.some((item) => /ACR Enterprise Economic/.test(item)))
-  assert.ok(acrWriteback.deferredWritebackGroups.some((group) => group.id === "imagePushAndDigest"))
+  assert.ok(acrWriteback.writeTargets.some((item) => /acr\.remoteDigest/.test(item)))
+  assert.ok(acrWriteback.writeTargets.some((item) => /acr\.imagePushed=true/.test(item)))
+  assert.ok(acrWriteback.acceptanceEvidence.some((item) => /远端 ACR 镜像/.test(item)))
+  assert.ok(acrWriteback.deferredWritebackGroups.some((group) => group.id === "acrPurchaseAndRepository"))
   assert.ok(acrWriteback.deferredWritebackGroups.some((group) => group.id === "saeRuntimeImagePull"))
   assert.ok(acrWriteback.forbidden.some((item) => /registry/.test(item)))
-  assert.deepEqual(acrWriteback.verifyCommands, ["corepack pnpm aliyun:image:plan"])
+  assert.ok(acrWriteback.verifyCommands.includes("corepack pnpm aliyun:image:plan:strict"))
   const ossWriteback = report.canStartNowWritebackPlan.find((item) => item.id === "C05_OSS_AUDIO_RAM_STS")
   assert.ok(ossWriteback)
   assert.equal(ossWriteback.requiresActionTimeConfirmation, true)
@@ -404,7 +405,6 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.ok(ossWriteback.targetFields.some((item) => item.name === "serviceRecordPrefix" && item.value === "service-records/production-cn"))
   assert.ok(ossWriteback.forbidden.some((item) => /AccessKeySecret/.test(item)))
   assert.deepEqual(report.summary.sensitiveBlockedIds, [
-    "S03_ACR_PAID_PURCHASE",
     "S04_ACR_REGISTRY_AUTH",
     "S05_OSS_RAM_SECRET_OR_STS",
     "S08_ALIYUN_RDS_DATABASE_URL",
@@ -419,13 +419,13 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
     "P05_OSS_RAM_STS",
-    "P03_ACR_PURCHASE",
+    "P04_ACR_IMAGE_AND_PULL",
   ])
   assert.equal(report.summary.operatorTasksReady, "0/8")
   assert.match(markdown, /operatorTasksReady: 0\/8/)
   assert.equal(report.summary.blockedVariableAcquisitionCount, 1)
   assert.equal(report.summary.deferredAppLaunchVariableAcquisitionCount, 7)
-  assert.equal(report.summary.sensitiveBlocked, "5/5")
+  assert.equal(report.summary.sensitiveBlocked, "4/4")
   assert.equal(report.summary.blockedCredentialCount, 1)
   assert.equal(report.summary.readySecretEnvVariableCount, 17)
   assert.deepEqual(report.summary.blockedCredentialNames, ["DATABASE_URL_CN"])
@@ -608,11 +608,11 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.match(markdown, /阿里云资源观察结果/)
   assert.match(markdown, /evidenceReady: 0\/7/)
   assert.match(markdown, /observedReady: 0\/7/)
-  assert.match(markdown, /observedPartial: 2/)
-  assert.match(markdown, /observedBlocked: 5/)
-  assert.match(markdown, /cloudResourceObservedPartialIds: R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS/)
-  assert.match(markdown, /cloudResourceObservedBlockedIds: R01_SAE_RUNTIME, R02_ACR_IMAGE_REGISTRY, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R06_ENV_IMPORT/)
-  assert.match(markdown, /observedPartialIds: R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS/)
+  assert.match(markdown, /observedPartial: 3/)
+  assert.match(markdown, /observedBlocked: 4/)
+  assert.match(markdown, /cloudResourceObservedPartialIds: R02_ACR_IMAGE_REGISTRY, R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS/)
+  assert.match(markdown, /cloudResourceObservedBlockedIds: R01_SAE_RUNTIME, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R06_ENV_IMPORT/)
+  assert.match(markdown, /observedPartialIds: R02_ACR_IMAGE_REGISTRY, R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS/)
   assert.match(markdown, /R01_SAE_RUNTIME/)
   assert.match(markdown, /not_created_or_not_confirmed/)
   assert.match(markdown, /R05_OSS_AUDIO_STORAGE/)
@@ -620,14 +620,14 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.match(markdown, /下一步动作排序/)
   assert.match(markdown, /canStartNowConsoleTasks: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS/)
   assert.match(markdown, /blockedByConsoleTaskDependencies: C01_SAE_RUNTIME/)
-  assert.match(markdown, /canStartNowAuthorizationPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE/)
-  assert.match(markdown, /P03_ACR_PURCHASE/)
-  assert.match(markdown, /授权购买/)
+  assert.match(markdown, /canStartNowAuthorizationPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P04_ACR_IMAGE_AND_PULL/)
+  assert.match(markdown, /P04_ACR_IMAGE_AND_PULL/)
+  assert.match(markdown, /镜像推送|SAE 拉取/)
   assert.match(markdown, /当前可做动作回填清单/)
   assert.match(markdown, /C02_ACR_IMAGE_AND_PULL/)
-  assert.match(markdown, /purchase_and_repository_only/)
-  assert.match(markdown, /acr\.confirmed=true/)
-  assert.match(markdown, /imagePushAndDigest/)
+  assert.match(markdown, /image_push_or_import_and_digest_verification/)
+  assert.match(markdown, /acr\.remoteDigest/)
+  assert.match(markdown, /acr\.digestVerified/)
   assert.match(markdown, /C05_OSS_AUDIO_RAM_STS/)
   assert.match(markdown, /ramLeastPrivilege=true/)
   assert.match(markdown, /service-records\/production-cn/)
@@ -653,7 +653,7 @@ test("Aliyun blocker brief is concise, value-free, and names current hard blocke
   assert.match(markdown, /SUPABASE_SERVICE_ROLE_KEY/)
   assert.match(markdown, /WECHAT_OPEN_APP_SECRET/)
   assert.match(markdown, /用户介入密钥\/密码简表/)
-  assert.match(markdown, /sensitiveBlocked: 5\/5/)
+  assert.match(markdown, /sensitiveBlocked: 4\/4/)
   assert.match(markdown, /blockedCredentialCount: 1/)
   assert.match(markdown, /blockedCredentialNames: DATABASE_URL_CN/)
   assert.match(markdown, /readySecretEnvVariableCount: 17/)

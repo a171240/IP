@@ -232,6 +232,21 @@ test("Aliyun CLI inventory results technical blockers show expected and actual v
 
   assert.equal(report.ok, false)
   assert.equal(report.local.ready, false)
+  assert.deepEqual(report.local.observationSummary.failureCategories, {
+    aliyun_cli_profile_not_configured: 4,
+    aliyun_cli_config_incomplete: 5,
+  })
+  assert.deepEqual(report.local.observationSummary.failedOperationIds, [
+    "I01_SAE_RUNTIME",
+    "I02_ACR_IMAGE",
+    "I03_DNS_API_DOMAIN",
+    "I04_DNS_ASSET_DOMAIN",
+    "I05_OSS_AUDIO_BUCKET",
+    "I06_SLS_ALERTS",
+    "I07_CERT_HTTPS",
+    "I08_RDS_POSTGRES",
+    "I09_TAIR_REDIS",
+  ])
   assert.ok(report.local.technicalBlockers.some((item) =>
     item === "I01_SAE_RUNTIME:commandResults[0]:expected:exitStatus=0 actual:3"
   ))
@@ -240,6 +255,8 @@ test("Aliyun CLI inventory results technical blockers show expected and actual v
   ))
   assert.ok(!report.local.technicalBlockers.some((item) => /commandResults\[0\]:exitStatus=0$/.test(item)))
   assert.match(output, /expected:exitStatus=0 actual:3/)
+  assert.match(output, /aliyun_cli_profile_not_configured/)
+  assert.match(output, /aliyun_cli_config_incomplete/)
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)

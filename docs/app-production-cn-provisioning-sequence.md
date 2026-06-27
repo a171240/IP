@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 阿里云 Provisioning Plan
 
-Generated: 2026-06-26T01:41:31.729Z
+Generated: 2026-06-26T16:42:42.554Z
 
 ## 结论
 
@@ -24,24 +24,24 @@ Generated: 2026-06-26T01:41:31.729Z
 - ECS is a fallback only
 - Aliyun RDS PostgreSQL as the formal data layer
 - Cloud resource ready: 0/7
-- User action ready: 0/9
-- Ready phases: PH00_READONLY_INVENTORY_IDENTITY, PH02_BASE_CLOUD_RESOURCES
-- Blocked phases: PH03_IMAGE_PUSH_AND_PULL, PH04_ENV_IMPORT, PH05_SAE_RUNTIME_AND_SLS, PH06_DOMAIN_HTTPS_ICP, PH07_PRODUCTION_DEPLOY
+- User action ready: 1/9
+- Ready phases: PH00_READONLY_INVENTORY_IDENTITY, PH02_BASE_CLOUD_RESOURCES, PH03_IMAGE_PUSH_AND_PULL
+- Blocked phases: PH04_ENV_IMPORT, PH05_SAE_RUNTIME_AND_SLS, PH06_DOMAIN_HTTPS_ICP, PH07_PRODUCTION_DEPLOY
 - Deferred phases: PH01_EXTERNAL_APP_IDENTIFIERS
 - Required blocking env: DATABASE_URL_CN
 - Deferred APP launch packets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID
-- Ready authorization packets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE
+- Ready authorization packets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P04_ACR_IMAGE_AND_PULL
 - Deferred APP launch authorization packets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID
 - Ready console action packets: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS
 - Blocked credential count: 1
 - Ready secret env variable count: 17
 - Resource evidence ready: 0/7
 - Blocked resource evidence ids: R01_SAE_RUNTIME, R02_ACR_IMAGE_REGISTRY, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R05_OSS_AUDIO_STORAGE, R06_ENV_IMPORT, R07_SLS_ALERTS
-- Partially observed resource evidence ids: R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS
+- Partially observed resource evidence ids: R02_ACR_IMAGE_REGISTRY, R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS
 - Current P00 inventory gate: not_ready
 - cloudInventoryStrictReady=false
 - readyLocalOperations=0/9
-- dryRunEvidence=9/9
+- dryRunEvidence=0/9
 
 ## 目标闭环证据简表
 
@@ -53,14 +53,14 @@ Generated: 2026-06-26T01:41:31.729Z
 - Ready secret env variable count: 17
 - Resource evidence ready: 0/7
 - Blocked resource evidence ids: R01_SAE_RUNTIME, R02_ACR_IMAGE_REGISTRY, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R05_OSS_AUDIO_STORAGE, R06_ENV_IMPORT, R07_SLS_ALERTS
-- Partially observed resource evidence ids: R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS
-- Ready to start phases: PH00_READONLY_INVENTORY_IDENTITY, PH02_BASE_CLOUD_RESOURCES
-- Blocked phases: PH03_IMAGE_PUSH_AND_PULL, PH04_ENV_IMPORT, PH05_SAE_RUNTIME_AND_SLS, PH06_DOMAIN_HTTPS_ICP, PH07_PRODUCTION_DEPLOY
+- Partially observed resource evidence ids: R02_ACR_IMAGE_REGISTRY, R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS
+- Ready to start phases: PH00_READONLY_INVENTORY_IDENTITY, PH02_BASE_CLOUD_RESOURCES, PH03_IMAGE_PUSH_AND_PULL
+- Blocked phases: PH04_ENV_IMPORT, PH05_SAE_RUNTIME_AND_SLS, PH06_DOMAIN_HTTPS_ICP, PH07_PRODUCTION_DEPLOY
 - Deferred phases: PH01_EXTERNAL_APP_IDENTIFIERS
-- Can start now authorization packets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE
+- Can start now authorization packets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P04_ACR_IMAGE_AND_PULL
 - Deferred APP launch packets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID
 - Can start now console tasks: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS
-- Next action-time confirmations: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE
+- Next action-time confirmations: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P04_ACR_IMAGE_AND_PULL
 - Current P00 inventory gate: not_ready
 
 ## 当前 P00 只读盘点门禁
@@ -73,7 +73,7 @@ Generated: 2026-06-26T01:41:31.729Z
 - cloudInventoryResultGaps=1
 - localInventoryFile: deploy/aliyun-production-cn.cloud-inventory-results.local.json
 - localFileExists: true
-- dryRunEvidence=9/9
+- dryRunEvidence=0/9
 - failureCategories: aliyun_cli_profile_not_configured, aliyun_cli_config_incomplete
 - Current evidence:
   - cloudInventoryStrictReady=false
@@ -81,16 +81,16 @@ Generated: 2026-06-26T01:41:31.729Z
   - executedCommandResults=9/9
   - mutationPerformedCommandResults=0
   - cloudInventoryResultGaps=1
-  - dryRunEvidence=9/9
-  - cloudShellCurrentStatus=connecting_terminal_input_visible_inventory_not_executed
-  - cloudShellConnecting=true
+  - dryRunEvidence=0/9
+  - cloudShellCurrentStatus=disconnected_restart_instance_confirmation_required
+  - cloudShellConnecting=false
   - cloudShellTerminalInputVisible=true
   - cloudShellCanRunReadOnlyInventory=false
   - cloudShellRequiresOpenConfirmation=false
-  - cloudShellRequiresRestartConfirmation=false
-  - cloudShellBlockers=cloudshell_connecting_terminal_input_visible_inventory_not_executed
+  - cloudShellRequiresRestartConfirmation=true
+  - cloudShellBlockers=cloudshell_disconnected_restart_instance_confirmation_required
   - failureCategories=aliyun_cli_profile_not_configured,aliyun_cli_config_incomplete
-- Next required action: 授权等待当前阿里云 CloudShell 连接完成后，只运行 allowlisted 只读盘点命令并写入非密钥 evidence；如后续出现开通、重启实例或费用提示，必须先停下另行确认。
+- Next required action: 授权在确认当前阿里云 CloudShell 重启实例提示后恢复只读盘点会话，或配置 Aliyun CLI；该提示会终止当前会话并创建新会话；只运行 allowlisted 只读盘点命令并写入非密钥 evidence。
 
 ## Ready Authorization Packets
 
@@ -98,12 +98,11 @@ Generated: 2026-06-26T01:41:31.729Z
 
 - Action id: U00_ALIYUN_READONLY_INVENTORY_IDENTITY
 - Sequence group: readonly_inventory
-- Minimum user phrase: 授权等待当前阿里云 CloudShell 连接完成后，只运行 allowlisted 只读盘点命令并写入非密钥 evidence；如后续出现开通、重启实例或费用提示，必须先停下另行确认。
+- Minimum user phrase: 授权在确认当前阿里云 CloudShell 重启实例提示后恢复只读盘点会话，或配置 Aliyun CLI；该提示会终止当前会话并创建新会话；只运行 allowlisted 只读盘点命令并写入非密钥 evidence。
 - Non-secret evidence only: true
 - Allowed actions:
-  - 等待当前 CloudShell 从“正在连接 Cloud Shell.”变为可输入命令提示符。
-  - 连接完成后只运行本仓库生成的 List/Describe/stat/get inventory 命令。
-  - 也可改用已安全配置的 Aliyun CLI profile 执行同一套只读命令。
+  - 动作时确认 CloudShell 重启实例提示后恢复会话；若不确认，则改用已安全配置的 Aliyun CLI profile。
+  - 只运行本仓库生成的 List/Describe/stat/get inventory 命令。
   - 只记录资源名、布尔值、时间戳、命令状态、sha256 指纹和非密钥 evidence handle。
 - Completion evidence:
   - cloudInventoryResults.localReady=true
@@ -116,7 +115,7 @@ Generated: 2026-06-26T01:41:31.729Z
   - 不运行 Create/Update/Delete/Deploy/Start/Stop/Purchase/DNS mutation 命令。
   - 不执行 docker login/push。
   - 不读取、复制、粘贴或输出 AccessKeySecret、STS token、cookie、registry password、RAM Secret 或证书私钥。
-  - 当前 connecting 状态不授权点击开通、重启实例、购买、创建资源、导入环境变量或部署。
+  - 除用户明确确认 CloudShell 重启实例提示外，不做任何 production-cn deploy、env import、资源创建、购买或 DNS 变更。
 
 ### P11_ALIYUN_RDS_DATA_MIGRATION 创建阿里云 RDS PostgreSQL 并完成正式数据层迁移
 
@@ -126,15 +125,15 @@ Generated: 2026-06-26T01:41:31.729Z
 - Non-secret evidence only: false
 - Allowed actions:
   - 创建或确认 cn-hangzhou RDS PostgreSQL 实例、数据库、账号和网络白名单/内网访问策略。
-  - 先生成并核对 docs/app-production-cn-rds-migration-package.md，关闭 compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查。
+  - 先生成并核对 docs/app-production-cn-rds-migration-package.md，关闭 compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查。
   - 执行 Supabase 到 RDS/PostgreSQL 的 schema/data 迁移与回滚验收。
   - 只把 DATABASE_URL_CN 导入 KMS/Secrets Manager/SAE secret env，并记录非密钥迁移证据。
 - Completion evidence:
   - Aliyun RDS PostgreSQL instance exists in cn-hangzhou
   - database account and least-privilege access are ready
   - DATABASE_URL_CN imported through secret env only
-  - compatibilityReviewChecklistItemCount=6 is reviewed and closed before schema apply
-  - supabase_auth_uid/supabase_storage_schema/supabase_service_role/row_level_security/policy_statement/extension_review dispositions are recorded without secrets
+  - compatibilityReviewChecklistItemCount=7 is reviewed and closed before schema apply
+  - supabase_auth_schema/supabase_auth_uid/supabase_storage_schema/supabase_service_role/row_level_security/policy_statement/extension_review dispositions are recorded without secrets
   - migration.schemaCompatibilityReviewed=true
   - migration.supabaseSpecificSqlResolved=true
   - migration.rdsExtensionSupportConfirmed=true
@@ -172,27 +171,28 @@ Generated: 2026-06-26T01:41:31.729Z
   - 不下载 OSS 对象内容。
   - 不把 AccessKeySecret 或 STS token 写入 JSON、Markdown、镜像或 git。
 
-### P03_ACR_PURCHASE 确认 ACR 企业版付费购买
+### P04_ACR_IMAGE_AND_PULL 配置 ACR 镜像推送和 SAE 镜像拉取权限
 
-- Action id: U03_ACR_PURCHASE_CONFIRMATION
-- Sequence group: cloud_foundation
-- Minimum user phrase: 授权购买 ACR Enterprise Economic，cn-hangzhou，1 个月，当前报价 CNY 117.00。
+- Action id: U04_ACR_RUNTIME_AUTH
+- Sequence group: image_runtime
+- Minimum user phrase: 授权把后端镜像推送到已创建的 ACR，并配置 SAE 拉取该镜像；不输出 registry 密码。
 - Non-secret evidence only: true
 - Allowed actions:
-  - 在阿里云 ACR 企业版购买页确认规格、地域、时长和金额。
-  - 完成购买后创建或确认实例、namespace 和 repository。
-  - 只记录 registry host、namespace、repository 和非密钥购买证据。
+  - 构建并 smoke 本地 Docker 镜像。
+  - 通过受控 docker credential helper、RAM 或阿里云运行时配置完成镜像推送/拉取。
+  - 在 image-publish.local.json 记录 remote image、sha256 digest 和布尔证据。
 - Completion evidence:
-  - acr.purchaseCandidate.confirmed=true
-  - acr.registryHost actual aliyuncs.com host
-  - acr.namespace created
-  - repository=meiye-huajing-app-api
+  - acr.imagePushed=true
+  - acr.digestVerified=true
+  - runtime.remoteImageConfigured=true
+  - runtime.imagePullConfigured=true
+  - remoteDigest sha256 verified
 - Write targets:
-  - deploy/aliyun-production-cn.image-publish.local.json -> acr.purchaseCandidate / acr confirmed evidence
+  - deploy/aliyun-production-cn.image-publish.local.json -> acr + runtime
 - Explicitly excluded:
-  - 未明确确认金额前不点击付款。
-  - 不执行 docker login/push。
-  - 不记录 registry password、RAM Secret 或 token。
+  - 不购买 ACR。
+  - 不把 registry username/password、RAM Secret 或 token 写入文件、镜像或 git。
+  - 不部署 production-cn，除非 U09 单独授权。
 
 
 ## Phases
@@ -222,7 +222,7 @@ Generated: 2026-06-26T01:41:31.729Z
   - 不运行 Create/Update/Delete/Deploy/Start/Stop/Purchase/DNS mutation 命令。
   - 不执行 docker login/push。
   - 不读取、复制、粘贴或输出 AccessKeySecret、STS token、cookie、registry password、RAM Secret 或证书私钥。
-  - 当前 connecting 状态不授权点击开通、重启实例、购买、创建资源、导入环境变量或部署。
+  - 除用户明确确认 CloudShell 重启实例提示外，不做任何 production-cn deploy、env import、资源创建、购买或 DNS 变更。
 
 ### PH01_EXTERNAL_APP_IDENTIFIERS 补齐微信移动应用、Android release 签名和 Apple Team ID
 
@@ -249,38 +249,31 @@ Generated: 2026-06-26T01:41:31.729Z
   - 当前后端-only 目标不创建微信开放平台移动应用、不做 Android release signing、不读取 Apple Team ID。
   - 这些延期项只在阿里云后端上线后单独授权处理。
 
-### PH02_BASE_CLOUD_RESOURCES 确认 RDS PostgreSQL、OSS/RAM/STS 和 ACR 基础资源
+### PH02_BASE_CLOUD_RESOURCES 确认 RDS PostgreSQL 和 OSS/RAM/STS 基础资源
 
 - Status: ready_for_action_time_confirmation
 - Can start now: true
 - Deferred after backend online: false
 - Requires action-time confirmation: true
-- Authorization packets: P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE
-- Console tasks: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS
-- Current action scopes: C02_ACR_IMAGE_AND_PULL=purchase_and_repository_only
-- Current action scope handles: currentActionScope=purchase_and_repository_only
+- Authorization packets: P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS
+- Console tasks: C05_OSS_AUDIO_RAM_STS
+- Current action scopes: none
+- Current action scope handles: none
 - Blocking dependencies: none
-- Current blockers: imagePublishLocal:todo:acr.registryHost; imagePublishLocal:todo:acr.namespace; imagePublishLocal:todo:acr.remoteImage; imagePublishLocal:todo:acr.remoteDigest; imagePublishLocal:todo:acr.evidence; imagePublishLocal:acr.confirmed; imagePublishLocal:acr.imagePushed; imagePublishLocal:acr.digestVerified; imagePublishLocal:acr.remoteDigest=sha256; imagePublishLocal:runtime.confirmed; imagePublishLocal:runtime.remoteImageConfigured; imagePublishLocal:runtime.imagePullConfigured; S03_ACR_PAID_PURCHASE:blocked; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.registryHost; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.namespace; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.remoteImage; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.remoteDigest; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.evidence; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.confirmed; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.imagePushed; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.digestVerified; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.remoteDigest=sha256; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:runtime.confirmed; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:runtime.remoteImageConfigured; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:runtime.imagePullConfigured; oss:confirmed; oss:ramLeastPrivilege; S05_OSS_RAM_SECRET_OR_STS:blocked; R05_OSS_AUDIO_STORAGE:oss:confirmed; R05_OSS_AUDIO_STORAGE:oss:ramLeastPrivilege
-- Verify commands: `corepack pnpm aliyun:rds:migration:package`; `corepack pnpm aliyun:rds:migration:evidence:strict`; `corepack pnpm aliyun:sensitive:blockers:backend`; `corepack pnpm aliyun:backend-cn:status`; `corepack pnpm aliyun:completion:audit`; `corepack pnpm aliyun:predeploy`; `corepack pnpm aliyun:cloud:confirmations`; `corepack pnpm aliyun:health:smoke`; `corepack pnpm aliyun:image:plan`; `corepack pnpm aliyun:image:plan:strict`; `corepack pnpm aliyun:docker:build`; `corepack pnpm aliyun:container:smoke`; `corepack pnpm aliyun:app-api:smoke`; `postdeploy service-records upload smoke after API deployment`
+- Current blockers: oss:confirmed; oss:ramLeastPrivilege; S05_OSS_RAM_SECRET_OR_STS:blocked; R05_OSS_AUDIO_STORAGE:oss:confirmed; R05_OSS_AUDIO_STORAGE:oss:ramLeastPrivilege
+- Verify commands: `corepack pnpm aliyun:rds:migration:package`; `corepack pnpm aliyun:rds:migration:evidence:strict`; `corepack pnpm aliyun:sensitive:blockers:backend`; `corepack pnpm aliyun:backend-cn:status`; `corepack pnpm aliyun:completion:audit`; `corepack pnpm aliyun:predeploy`; `corepack pnpm aliyun:cloud:confirmations`; `corepack pnpm aliyun:health:smoke`; `corepack pnpm aliyun:app-api:smoke`; `postdeploy service-records upload smoke after API deployment`
 - Current action acceptance evidence:
-  - acr.purchaseCandidate.confirmed=true
-  - acr.registryHost actual aliyuncs.com host
-  - acr.namespace created
-  - repository=meiye-huajing-app-api
   - region=cn-hangzhou
   - corsConfigured=true
   - ramLeastPrivilege=true
   - serviceRecordPrefix=service-records/production-cn
   - confirmed=true
 - Deferred actions:
-  - P04_ACR_IMAGE_AND_PULL 依赖 P03_ACR_PURCHASE 完成后再执行。
-  - 当前确认包不执行 docker login/push。
-  - 当前确认包不配置 SAE runtime image pull credentials。
-  - imagePushed=true、digestVerified=true、runtime.remoteImageConfigured=true、runtime.imagePullConfigured=true 都属于后置验收。
+  - none
 - Completion evidence:
   - RDS PostgreSQL 必须完成实例、DATABASE_URL_CN secret env、schema/data 迁移、APP API smoke 和回滚验收；首版业务数据访问代码侧已切到 RDS repository。
   - OSS 只记录 bucket、region、CORS、RAM/STS 最小权限布尔证据。
-  - ACR 只记录 registry host、namespace、repository、remote tag 和购买证据。
+  - ACR P03 购买/仓库证据已 ready；当前阶段不再把 ACR 购买作为待执行基础动作。
 - Explicitly excluded:
   - 不把数据库密码、连接串 value 或 Supabase service role key 写入 JSON、Markdown、Docker 镜像或 git。
   - 不把 Supabase 当作正式 production-cn 数据库目标。
@@ -288,9 +281,6 @@ Generated: 2026-06-26T01:41:31.729Z
   - 不创建可提交的长期明文 Secret。
   - 不下载 OSS 对象内容。
   - 不把 AccessKeySecret 或 STS token 写入 JSON、Markdown、镜像或 git。
-  - 未明确确认金额前不点击付款。
-  - 不执行 docker login/push。
-  - 不记录 registry password、RAM Secret 或 token。
   - AccessKeySecret
   - AppSecret
   - registry password
@@ -301,27 +291,27 @@ Generated: 2026-06-26T01:41:31.729Z
 
 ### PH03_IMAGE_PUSH_AND_PULL 推送后端镜像并配置 SAE 镜像拉取
 
-- Status: blocked_by_dependencies
-- Can start now: false
+- Status: ready_for_action_time_confirmation
+- Can start now: true
 - Deferred after backend online: false
 - Requires action-time confirmation: true
 - Authorization packets: P04_ACR_IMAGE_AND_PULL
 - Console tasks: C02_ACR_IMAGE_AND_PULL
-- Current action scopes: C02_ACR_IMAGE_AND_PULL=purchase_and_repository_only
-- Current action scope handles: currentActionScope=purchase_and_repository_only
-- Blocking dependencies: P03_ACR_PURCHASE, notReadyForCurrentScope:P04_ACR_IMAGE_AND_PULL
-- Current blockers: imagePublishLocal:todo:acr.registryHost; imagePublishLocal:todo:acr.namespace; imagePublishLocal:todo:acr.remoteImage; imagePublishLocal:todo:acr.remoteDigest; imagePublishLocal:todo:acr.evidence; imagePublishLocal:acr.confirmed; imagePublishLocal:acr.imagePushed; imagePublishLocal:acr.digestVerified; imagePublishLocal:acr.remoteDigest=sha256; imagePublishLocal:runtime.confirmed; imagePublishLocal:runtime.remoteImageConfigured; imagePublishLocal:runtime.imagePullConfigured; S03_ACR_PAID_PURCHASE:blocked; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.registryHost; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.namespace; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.remoteImage; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.remoteDigest; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.evidence; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.confirmed; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.imagePushed; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.digestVerified; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.remoteDigest=sha256; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:runtime.confirmed; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:runtime.remoteImageConfigured; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:runtime.imagePullConfigured; dependsOn:P03_ACR_PURCHASE; dependsOn:notReadyForCurrentScope:P04_ACR_IMAGE_AND_PULL
+- Current action scopes: C02_ACR_IMAGE_AND_PULL=image_push_or_import_and_digest_verification
+- Current action scope handles: currentActionScope=image_push_or_import_and_digest_verification
+- Blocking dependencies: none
+- Current blockers: imagePublishLocal:todo:acr.remoteDigest; imagePublishLocal:acr.imagePushed; imagePublishLocal:acr.digestVerified; imagePublishLocal:acr.remoteDigest=sha256; imagePublishLocal:acr.pushNetworkPath; imagePublishLocal:runtime.confirmed; imagePublishLocal:runtime.remoteImageConfigured; imagePublishLocal:runtime.imagePullConfigured; S04_ACR_REGISTRY_AUTH:blocked; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.remoteDigest; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.imagePushed; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.digestVerified; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.remoteDigest=sha256; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.pushNetworkPath; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:runtime.confirmed; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:runtime.remoteImageConfigured; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:runtime.imagePullConfigured
 - Verify commands: `corepack pnpm aliyun:image:plan:strict`; `corepack pnpm aliyun:container:smoke`; `corepack pnpm aliyun:image:plan`; `corepack pnpm aliyun:docker:build`
 - Current action acceptance evidence:
-  - acr.purchaseCandidate.confirmed=true
-  - acr.registryHost actual aliyuncs.com host
-  - acr.namespace created
-  - repository=meiye-huajing-app-api
+  - acr.imagePushed=true
+  - acr.digestVerified=true
+  - acr.remoteDigest=sha256:<64 hex>
+  - runtime.remoteImageConfigured=true
+  - runtime.imagePullConfigured=true
 - Deferred actions:
-  - P04_ACR_IMAGE_AND_PULL 依赖 P03_ACR_PURCHASE 完成后再执行。
-  - 当前确认包不执行 docker login/push。
-  - 当前确认包不配置 SAE runtime image pull credentials。
-  - imagePushed=true、digestVerified=true、runtime.remoteImageConfigured=true、runtime.imagePullConfigured=true 都属于后置验收。
+  - 不购买 ACR。
+  - 不把 docker login、registry password、RAM Secret 或 token 写入 JSON/Markdown/git。
+  - 不部署 production-cn，除非 P09_PRODUCTION_DEPLOY 单独授权。
 - Completion evidence:
   - image-publish.local.json 只记录 remote image、sha256 digest 和布尔状态。
   - registry password、RAM Secret 或 token 不进入 JSON、Markdown、镜像或 git。
@@ -381,8 +371,8 @@ Generated: 2026-06-26T01:41:31.729Z
 - Console tasks: C01_SAE_RUNTIME, C07_SLS_ALERTS
 - Current action scopes: none
 - Current action scope handles: none
-- Blocking dependencies: P03_ACR_PURCHASE, P04_ACR_IMAGE_AND_PULL, P05_OSS_RAM_STS, P06_ENV_IMPORT, C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS, C06_ENV_IMPORT, C01_SAE_RUNTIME, notReadyForCurrentScope:P08_SAE_RUNTIME_SLS
-- Current blockers: runtime:confirmed; R01_SAE_RUNTIME:runtime:confirmed; R07_SLS_ALERTS:slsAlerts:confirmed; R07_SLS_ALERTS:slsAlerts:healthAlertConfigured; R07_SLS_ALERTS:slsAlerts:serverErrorAlertConfigured; slsAlerts:confirmed; slsAlerts:healthAlertConfigured; slsAlerts:serverErrorAlertConfigured; dependsOn:P03_ACR_PURCHASE; dependsOn:P04_ACR_IMAGE_AND_PULL; dependsOn:P05_OSS_RAM_STS; dependsOn:P06_ENV_IMPORT; dependsOn:C02_ACR_IMAGE_AND_PULL; dependsOn:C05_OSS_AUDIO_RAM_STS; dependsOn:C06_ENV_IMPORT; dependsOn:C01_SAE_RUNTIME; dependsOn:notReadyForCurrentScope:P08_SAE_RUNTIME_SLS
+- Blocking dependencies: P04_ACR_IMAGE_AND_PULL, P05_OSS_RAM_STS, P06_ENV_IMPORT, C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS, C06_ENV_IMPORT, C01_SAE_RUNTIME, notReadyForCurrentScope:P08_SAE_RUNTIME_SLS
+- Current blockers: runtime:confirmed; R01_SAE_RUNTIME:runtime:confirmed; R07_SLS_ALERTS:slsAlerts:confirmed; R07_SLS_ALERTS:slsAlerts:healthAlertConfigured; R07_SLS_ALERTS:slsAlerts:serverErrorAlertConfigured; slsAlerts:confirmed; slsAlerts:healthAlertConfigured; slsAlerts:serverErrorAlertConfigured; dependsOn:P04_ACR_IMAGE_AND_PULL; dependsOn:P05_OSS_RAM_STS; dependsOn:P06_ENV_IMPORT; dependsOn:C02_ACR_IMAGE_AND_PULL; dependsOn:C05_OSS_AUDIO_RAM_STS; dependsOn:C06_ENV_IMPORT; dependsOn:C01_SAE_RUNTIME; dependsOn:notReadyForCurrentScope:P08_SAE_RUNTIME_SLS
 - Verify commands: `corepack pnpm aliyun:runtime:plan`; `corepack pnpm aliyun:cloud:confirmations:backend:strict`; `corepack pnpm aliyun:cloud:confirmations`; `corepack pnpm aliyun:docker:check`; `corepack pnpm aliyun:health:smoke`; `corepack pnpm aliyun:cloud:confirmations:strict`; `corepack pnpm aliyun:postdeploy:smoke -- --base-url https://api-cn.ipgongchang.xin`; `corepack pnpm aliyun:cloud:check`
 - Current action acceptance evidence:
   - provider=SAE
@@ -453,8 +443,8 @@ Generated: 2026-06-26T01:41:31.729Z
 - Console tasks: none
 - Current action scopes: none
 - Current action scope handles: none
-- Blocking dependencies: P03_ACR_PURCHASE, P04_ACR_IMAGE_AND_PULL, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION, P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS, notReadyForCurrentScope:P09_PRODUCTION_DEPLOY
-- Current blockers: dependsOn:P03_ACR_PURCHASE; dependsOn:P04_ACR_IMAGE_AND_PULL; dependsOn:P05_OSS_RAM_STS; dependsOn:P11_ALIYUN_RDS_DATA_MIGRATION; dependsOn:P06_ENV_IMPORT; dependsOn:P07_DOMAIN_DNS_HTTPS; dependsOn:P08_SAE_RUNTIME_SLS; dependsOn:notReadyForCurrentScope:P09_PRODUCTION_DEPLOY
+- Blocking dependencies: P04_ACR_IMAGE_AND_PULL, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION, P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS, notReadyForCurrentScope:P09_PRODUCTION_DEPLOY
+- Current blockers: dependsOn:P04_ACR_IMAGE_AND_PULL; dependsOn:P05_OSS_RAM_STS; dependsOn:P11_ALIYUN_RDS_DATA_MIGRATION; dependsOn:P06_ENV_IMPORT; dependsOn:P07_DOMAIN_DNS_HTTPS; dependsOn:P08_SAE_RUNTIME_SLS; dependsOn:notReadyForCurrentScope:P09_PRODUCTION_DEPLOY
 - Verify commands: `corepack pnpm aliyun:predeploy`; `corepack pnpm aliyun:cloud:confirmations:backend:strict`
 - Current action acceptance evidence:
   - none

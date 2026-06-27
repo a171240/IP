@@ -36,6 +36,8 @@ const REQUIRED_FIELDS = {
     "provider",
     "region",
     "registryHost",
+    "vpcRegistryHost",
+    "publicNetworkEntranceEnabled",
     "namespace",
     "repository",
     "remoteTag",
@@ -43,6 +45,7 @@ const REQUIRED_FIELDS = {
     "remoteDigest",
     "imagePushed",
     "digestVerified",
+    "pushNetworkPath",
     "evidence",
   ],
   runtime: [
@@ -190,6 +193,9 @@ function validateFile(filePath, mode) {
     },
     acr: {
       registryHost: data.acr?.registryHost || "",
+      vpcRegistryHost: data.acr?.vpcRegistryHost || "",
+      publicNetworkEntranceEnabled: data.acr?.publicNetworkEntranceEnabled === true,
+      pushNetworkPath: data.acr?.pushNetworkPath || "",
       namespace: data.acr?.namespace || "",
       repository: data.acr?.repository || "",
       remoteImage: data.acr?.remoteImage || "",
@@ -247,9 +253,12 @@ function validateLocalValues(data, blockers) {
   const requiredLocalPaths = [
     "image.localDigest",
     "acr.registryHost",
+    "acr.vpcRegistryHost",
+    "acr.publicNetworkEntranceEnabled",
     "acr.namespace",
     "acr.remoteImage",
     "acr.remoteDigest",
+    "acr.pushNetworkPath",
     "acr.evidence",
     "runtime.target",
     "runtime.appName",
@@ -265,6 +274,7 @@ function validateLocalValues(data, blockers) {
   if (acr.imagePushed !== true) blockers.push("acr.imagePushed")
   if (acr.digestVerified !== true) blockers.push("acr.digestVerified")
   if (!isSha256(acr.remoteDigest)) blockers.push("acr.remoteDigest=sha256")
+  if (!isPushNetworkPathReady(acr)) blockers.push("acr.pushNetworkPath")
   if (runtime.confirmed !== true) blockers.push("runtime.confirmed")
   if (runtime.remoteImageConfigured !== true) blockers.push("runtime.remoteImageConfigured")
   if (runtime.imagePullConfigured !== true) blockers.push("runtime.imagePullConfigured")
@@ -278,6 +288,13 @@ function validateLocalValues(data, blockers) {
   if (registryHost && !isTodo(registryHost) && !registryHost.includes(EXPECTED_REGION)) {
     blockers.push(`acr.registryHost_region=${EXPECTED_REGION}`)
   }
+  const vpcRegistryHost = text(acr.vpcRegistryHost)
+  if (vpcRegistryHost && !isTodo(vpcRegistryHost) && !vpcRegistryHost.includes("-vpc.")) {
+    blockers.push("acr.vpcRegistryHost_vpc")
+  }
+  if (acr.pushNetworkPath === "public_registry" && acr.publicNetworkEntranceEnabled !== true) {
+    blockers.push("acr.publicNetworkEntranceEnabled")
+  }
   if (
     isNonTodoText(registryHost) &&
     isNonTodoText(namespace) &&
@@ -285,6 +302,18 @@ function validateLocalValues(data, blockers) {
   ) {
     blockers.push("acr.remoteImage_mismatch")
   }
+}
+
+function isPushNetworkPathReady(acr) {
+  const pushNetworkPath = text(acr.pushNetworkPath)
+  if (!pushNetworkPath || isTodo(pushNetworkPath) || pushNetworkPath.startsWith("pending")) return false
+  const publicNetworkReady = acr.publicNetworkEntranceEnabled === true
+  const vpcRegistryReady = isNonTodoText(acr.vpcRegistryHost)
+  return (
+    (pushNetworkPath === "public_registry" && publicNetworkReady) ||
+    (pushNetworkPath === "vpc_registry_from_aliyun_network" && vpcRegistryReady) ||
+    pushNetworkPath === "acr_import_task"
+  )
 }
 
 function findSecretLikeValues(value, path = "$") {
@@ -314,6 +343,58 @@ function inspectDockerImageReference(reference) {
   return result
 }
 
+function compactDockerOutput(result) {
+  return (result.stderr || result.stdout || "")
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .slice(0, 3)
+    .join(" | ")
+}
+
+function classifyDockerUnavailable(result, tag) {
+  if (result.error?.code === "ENOENT") {
+    return {
+      status: "docker_cli_missing",
+      tag,
+      dockerClientInstalled: false,
+      dockerServerAvailable: false,
+      nextEvidenceAction: "Install Docker CLI or use an Aliyun-side ACR import/VPC runner path.",
+    }
+  }
+  if (result.error?.code === "ETIMEDOUT") {
+    return {
+      status: "docker_daemon_unavailable_or_timeout",
+      tag,
+      dockerClientInstalled: true,
+      dockerServerAvailable: false,
+      error: result.error.message,
+      nextEvidenceAction: "Start Docker Desktop/daemon for local smoke, or use ACR import/VPC runner without relying on this machine's Docker daemon.",
+    }
+  }
+  if (result.error) {
+    return {
+      status: "docker_error",
+      tag,
+      dockerClientInstalled: true,
+      dockerServerAvailable: false,
+      error: result.error.message,
+      nextEvidenceAction: "Resolve the Docker command error before local smoke, or use ACR import/VPC runner.",
+    }
+  }
+  const detail = compactDockerOutput(result)
+  if (/error during connect|Cannot connect to the Docker daemon|docker\.sock/i.test(detail)) {
+    return {
+      status: "docker_daemon_unavailable",
+      tag,
+      dockerClientInstalled: true,
+      dockerServerAvailable: false,
+      detail,
+      nextEvidenceAction: "Start Docker Desktop/daemon for local smoke, or use ACR import/VPC runner without relying on this machine's Docker daemon.",
+    }
+  }
+  return null
+}
+
 function findLocalDockerImageListing(tag) {
   const result = spawnSync("docker", ["image", "ls", "--no-trunc", "--digests", "--format", "{{json .}}", tag], {
     cwd: BACKEND_ROOT,
@@ -321,16 +402,12 @@ function findLocalDockerImageListing(tag) {
     timeout: 5000,
     maxBuffer: 1024 * 1024,
   })
-  if (result.error?.code === "ENOENT") {
-    return { status: "docker_cli_missing" }
-  }
-  if (result.error) {
-    return { status: "docker_error", error: result.error.message }
-  }
+  const dockerUnavailable = classifyDockerUnavailable(result, tag)
+  if (dockerUnavailable) return dockerUnavailable
   if (result.status !== 0) {
     return {
       status: "image_not_found_or_docker_unavailable",
-      detail: (result.stderr || result.stdout || "").split(/\r?\n/).filter(Boolean).slice(0, 3).join(" | "),
+      detail: compactDockerOutput(result),
     }
   }
   const lines = result.stdout.trim().split(/\r?\n/).filter(Boolean)
@@ -349,37 +426,34 @@ function inspectLocalDockerImage(tag) {
   let result = inspectDockerImageReference(tag)
   let inspectedReference = tag
   let fallbackFromTagInspect = false
-  if (result.error?.code === "ENOENT") {
-    return { status: "docker_cli_missing", tag }
-  }
-  if (result.error) {
-    return { status: "docker_error", tag, error: result.error.message }
-  }
+  const dockerUnavailable = classifyDockerUnavailable(result, tag)
+  if (dockerUnavailable) return dockerUnavailable
   if (result.status !== 0) {
+    const directUnavailable = classifyDockerUnavailable(result, tag)
+    if (directUnavailable) return directUnavailable
     const listing = findLocalDockerImageListing(tag)
     const fallbackId = listing.listing?.ID
     if (!fallbackId || fallbackId === "<none>") {
       return {
         status: listing.status,
         tag,
-        detail: listing.detail || listing.error || (result.stderr || result.stdout || "").split(/\r?\n/).filter(Boolean).slice(0, 3).join(" | "),
+        dockerClientInstalled: listing.dockerClientInstalled,
+        dockerServerAvailable: listing.dockerServerAvailable,
+        detail: listing.detail || listing.error || compactDockerOutput(result),
+        nextEvidenceAction: listing.nextEvidenceAction || "Rebuild/smoke the local image or use ACR import/VPC runner.",
       }
     }
     result = inspectDockerImageReference(fallbackId)
     inspectedReference = fallbackId
     fallbackFromTagInspect = true
   }
-  if (result.error?.code === "ENOENT") {
-    return { status: "docker_cli_missing", tag }
-  }
-  if (result.error) {
-    return { status: "docker_error", tag, error: result.error.message }
-  }
+  const fallbackUnavailable = classifyDockerUnavailable(result, tag)
+  if (fallbackUnavailable) return fallbackUnavailable
   if (result.status !== 0) {
     return {
       status: "image_not_found_or_docker_unavailable",
       tag,
-      detail: (result.stderr || result.stdout || "").split(/\r?\n/).filter(Boolean).slice(0, 3).join(" | "),
+      detail: compactDockerOutput(result),
     }
   }
   try {
@@ -393,6 +467,8 @@ function inspectLocalDockerImage(tag) {
       repoTags: metadata.RepoTags || [],
       repoDigests: metadata.RepoDigests || [],
       size: metadata.Size || 0,
+      dockerClientInstalled: true,
+      dockerServerAvailable: true,
     }
   } catch (error) {
     return {
@@ -403,8 +479,46 @@ function inspectLocalDockerImage(tag) {
   }
 }
 
+function checkDockerContext() {
+  const result = spawnSync(process.execPath, ["scripts/check-aliyun-docker-context.mjs"], {
+    cwd: BACKEND_ROOT,
+    encoding: "utf8",
+    timeout: 10_000,
+    maxBuffer: 1024 * 1024,
+  })
+  if (result.error?.code === "ENOENT") return { ok: false, status: "node_missing" }
+  if (result.error?.code === "ETIMEDOUT") return { ok: false, status: "timeout" }
+  if (result.error) return { ok: false, status: "error", error: result.error.message }
+  if (result.status !== 0) {
+    return {
+      ok: false,
+      status: "failed",
+      detail: (result.stderr || result.stdout || "").split(/\r?\n/).filter(Boolean).slice(0, 3).join(" | "),
+    }
+  }
+  try {
+    const parsed = JSON.parse(result.stdout)
+    return {
+      ok: parsed.ok === true,
+      status: parsed.ok === true ? "ready" : "failed",
+      checkedFiles: parsed.checkedFiles || 0,
+      dockerignorePatterns: parsed.dockerignorePatterns || 0,
+      dockerfileSnippets: parsed.dockerfileSnippets || 0,
+      sensitiveEnvExcluded: parsed.sensitiveEnvExcluded === true,
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      status: "parse_failed",
+      error: error instanceof Error ? error.message : String(error),
+    }
+  }
+}
+
 function summarize(template, local) {
-  const writebackPlan = buildImageWritebackPlan(local)
+  const pushNetworkPlan = buildAcrPushNetworkPlan(local)
+  const writebackPlan = buildImageWritebackPlan(local, pushNetworkPlan)
+  const executionReadiness = buildAcrExecutionReadiness(local, {}, {}, pushNetworkPlan, writebackPlan)
   return {
     templateReady: template.ready,
     localExists: local.exists,
@@ -413,6 +527,10 @@ function summarize(template, local) {
     totalWarnings: template.warnings.length + local.warnings.length,
     writebackBlockingGroups: writebackPlan.blockingGroups,
     requiredAuthorizationPackets: writebackPlan.requiredAuthorizationPackets,
+    pushNetworkPathReady: pushNetworkPlan.selectedReady,
+    recommendedPushNetworkPaths: pushNetworkPlan.recommendedPathIds,
+    canStartP04AfterActionTimeConfirmation: executionReadiness.canStartP04AfterActionTimeConfirmation,
+    p04StrictReady: executionReadiness.p04StrictReady,
   }
 }
 
@@ -480,22 +598,27 @@ const WRITEBACK_GROUP_DEFINITIONS = Object.freeze([
       "acr.evidence",
       "acr.imagePushed",
       "acr.digestVerified",
+      "acr.pushNetworkPath",
+      "acr.publicNetworkEntranceEnabled",
     ]),
     writeTargets: Object.freeze([
       "deploy/aliyun-production-cn.image-publish.local.json: acr.remoteImage=<registryHost>/<namespace>/meiye-huajing-app-api:production-cn",
       "deploy/aliyun-production-cn.image-publish.local.json: acr.remoteDigest=sha256:<64 hex>",
       "deploy/aliyun-production-cn.image-publish.local.json: acr.imagePushed=true",
       "deploy/aliyun-production-cn.image-publish.local.json: acr.digestVerified=true",
+      "deploy/aliyun-production-cn.image-publish.local.json: acr.pushNetworkPath=public_registry|vpc_registry_from_aliyun_network|acr_import_task",
+      "deploy/aliyun-production-cn.image-publish.local.json: acr.publicNetworkEntranceEnabled=true if pushing from local/public network",
       "deploy/aliyun-production-cn.image-publish.local.json: acr.evidence=<non-secret evidence handle>",
     ]),
     expectedEvidence: Object.freeze([
       "远端 ACR 镜像已推送或导入",
       "远端 digest 与推送后的 sha256 digest 已核对",
+      "已选择 ACR 推送网络路径；当前公网入口未开启时不能直接从本机走公网 registry push",
       "本地镜像仍可通过 corepack pnpm aliyun:container:smoke",
     ]),
     forbidden: Object.freeze([
       "不要把 docker login 命令、registry 密码或临时 token 写入 JSON/Markdown/git",
-      "P03_ACR_PURCHASE 未完成前不要执行镜像推送动作",
+      "acrPurchaseAndRepository 未 ready 前不要执行镜像推送动作",
     ]),
     verifyCommands: Object.freeze([
       "corepack pnpm aliyun:container:smoke",
@@ -540,20 +663,113 @@ const WRITEBACK_GROUP_DEFINITIONS = Object.freeze([
   }),
 ])
 
-function buildImageWritebackPlan(local) {
+function buildAcrPushNetworkPlan(local) {
+  const acr = local.acr || {}
+  const selectedPath = text(acr.pushNetworkPath) || "pending_choose_vpc_registry_or_enable_public_network_entrance"
+  const registryHost = text(acr.registryHost)
+  const vpcRegistryHost = text(acr.vpcRegistryHost)
+  const namespace = text(acr.namespace)
+  const publicRemoteImage = isNonTodoText(registryHost) && isNonTodoText(namespace)
+    ? `${registryHost}/${namespace}/${EXPECTED_REPOSITORY}:${EXPECTED_REMOTE_TAG}`
+    : ""
+  const vpcRemoteImage = isNonTodoText(vpcRegistryHost) && isNonTodoText(namespace)
+    ? `${vpcRegistryHost}/${namespace}/${EXPECTED_REPOSITORY}:${EXPECTED_REMOTE_TAG}`
+    : ""
+  const publicBlockers = uniqueStrings([
+    acr.publicNetworkEntranceEnabled === true ? "" : "acr.publicNetworkEntranceEnabled=false",
+    isNonTodoText(registryHost) ? "" : "acr.registryHost",
+    isNonTodoText(namespace) ? "" : "acr.namespace",
+  ])
+  const vpcBlockers = uniqueStrings([
+    isNonTodoText(vpcRegistryHost) ? "" : "acr.vpcRegistryHost",
+    isNonTodoText(namespace) ? "" : "acr.namespace",
+  ])
+  const candidates = [
+    {
+      id: "public_registry",
+      title: "Local/public-network docker push to ACR public registry",
+      canUseNow: publicBlockers.length === 0,
+      blockers: publicBlockers,
+      remoteImage: publicRemoteImage,
+      commandMode: "local_docker_push_after_controlled_registry_auth",
+      commandPreview: publicBlockers.length === 0
+        ? `docker push ${publicRemoteImage}`
+        : "blocked_until_public_registry_entrance_enabled_and_registry_host_ready",
+      requiredEvidence: [
+        "acr.publicNetworkEntranceEnabled=true",
+        "remote digest sha256 verified after push",
+        "registry credential stays in Docker credential helper or short-lived operator session only",
+      ],
+    },
+    {
+      id: "vpc_registry_from_aliyun_network",
+      title: "Push through ACR VPC registry from an Aliyun-network runner",
+      canUseNow: vpcBlockers.length === 0,
+      blockers: vpcBlockers,
+      remoteImage: vpcRemoteImage,
+      commandMode: "docker_push_from_vpc_reachable_aliyun_runner",
+      commandPreview: vpcBlockers.length === 0
+        ? `docker push ${vpcRemoteImage}`
+        : "blocked_until_vpc_registry_host_and_namespace_ready",
+      requiredEvidence: [
+        "runner is in Aliyun network/VPC path that can reach the VPC registry host",
+        "remote digest sha256 verified after push",
+        "no registry credential written to JSON, Markdown, image, shell history, or git",
+      ],
+    },
+    {
+      id: "acr_import_task",
+      title: "Use ACR import task or controlled upload/import path",
+      canUseNow: isNonTodoText(namespace),
+      blockers: isNonTodoText(namespace) ? [] : ["acr.namespace"],
+      remoteImage: publicRemoteImage || vpcRemoteImage,
+      commandMode: "acr_import_or_controlled_upload_without_persisted_registry_secret",
+      commandPreview: "use ACR import/upload flow, then record remoteDigest and non-secret evidence handle",
+      requiredEvidence: [
+        "ACR import/upload task succeeded",
+        "remote digest sha256 verified in ACR",
+        "task id or console evidence handle recorded without credentials",
+      ],
+    },
+  ]
+  const candidateById = new Map(candidates.map((candidate) => [candidate.id, candidate]))
+  const selected = candidateById.get(selectedPath) || null
+  const recommendedPathIds = candidates
+    .filter((candidate) => candidate.canUseNow)
+    .map((candidate) => candidate.id)
+  return {
+    selectedPath,
+    selectedReady: selected?.canUseNow === true,
+    selectedBlockers: selected ? selected.blockers : ["acr.pushNetworkPath"],
+    publicNetworkEntranceEnabled: acr.publicNetworkEntranceEnabled === true,
+    registryHost,
+    vpcRegistryHost,
+    recommendedPathIds,
+    candidates,
+    safetyBoundary: [
+      "Do not run local/public docker push while acr.publicNetworkEntranceEnabled=false.",
+      "Do not store docker login commands, registry passwords, RAM Secret, STS token, or cookies in files or reports.",
+      "Record only push path, remote image, sha256 digest, booleans, and non-secret evidence handles.",
+    ],
+  }
+}
+
+function buildImageWritebackPlan(local, pushNetworkPlan = buildAcrPushNetworkPlan(local)) {
   const blockers = Array.isArray(local.blockers) ? local.blockers : []
-  const groups = WRITEBACK_GROUP_DEFINITIONS.map((definition) => {
+  const baseGroups = WRITEBACK_GROUP_DEFINITIONS.map((definition) => {
     const fields = new Set(definition.blockerFields)
     const groupBlockers = blockers.filter((blocker) => fields.has(fieldFromBlocker(blocker)))
-    return {
+    const ready = groupBlockers.length === 0
+    const completedPurchaseGroup = definition.id === "acrPurchaseAndRepository" && ready
+    const group = {
       id: definition.id,
       title: definition.title,
       source: definition.source,
       actionScope: definition.actionScope,
-      ready: groupBlockers.length === 0,
-      canStartNow: Boolean(definition.canStartNow),
+      ready,
+      canStartNow: completedPurchaseGroup ? false : Boolean(definition.canStartNow),
       dependsOnGroups: definition.dependsOnGroups || [],
-      requiresActionTimeConfirmation: definition.requiresActionTimeConfirmation,
+      requiresActionTimeConfirmation: completedPurchaseGroup ? false : definition.requiresActionTimeConfirmation,
       requiredAuthorizationPackets: definition.requiredAuthorizationPackets,
       consoleTaskIds: definition.consoleTaskIds,
       blockers: groupBlockers,
@@ -562,6 +778,28 @@ function buildImageWritebackPlan(local) {
       forbidden: definition.forbidden,
       verifyCommands: definition.verifyCommands,
       nonSecretEvidenceOnly: true,
+    }
+    if (definition.id === "imagePushAndDigest") {
+      return {
+        ...group,
+        pushNetworkPlan: {
+          selectedPath: pushNetworkPlan.selectedPath,
+          selectedReady: pushNetworkPlan.selectedReady,
+          selectedBlockers: pushNetworkPlan.selectedBlockers,
+          recommendedPathIds: pushNetworkPlan.recommendedPathIds,
+          candidates: pushNetworkPlan.candidates,
+        },
+      }
+    }
+    return group
+  })
+  const readyById = new Map(baseGroups.map((group) => [group.id, group.ready]))
+  const groups = baseGroups.map((group) => {
+    const dependsOnGroups = group.dependsOnGroups || []
+    const dependenciesReady = dependsOnGroups.length > 0 && dependsOnGroups.every((id) => readyById.get(id) === true)
+    return {
+      ...group,
+      canStartNow: group.canStartNow || (group.ready !== true && dependenciesReady),
     }
   })
   const blockingGroups = groups.filter((group) => !group.ready).map((group) => group.id)
@@ -589,13 +827,89 @@ function buildImageWritebackPlan(local) {
   }
 }
 
+function buildAcrExecutionReadiness(
+  local,
+  dockerContext,
+  localDockerImage,
+  pushNetworkPlan,
+  writebackPlan,
+) {
+  const groupsById = new Map((writebackPlan.groups || []).map((group) => [group.id, group]))
+  const purchaseReady = groupsById.get("acrPurchaseAndRepository")?.ready === true
+  const imagePushGroup = groupsById.get("imagePushAndDigest") || {}
+  const runtimePullGroup = groupsById.get("saeRuntimeImagePull") || {}
+  const publicRegistry = (pushNetworkPlan.candidates || []).find((candidate) => candidate.id === "public_registry")
+  const forbiddenTransferPathIds = (pushNetworkPlan.candidates || [])
+    .filter((candidate) => candidate.canUseNow !== true && candidate.id === "public_registry")
+    .map((candidate) => candidate.id)
+  const recommendedTransferPathIds = pushNetworkPlan.recommendedPathIds || []
+  const dockerDaemonReady = localDockerImage.dockerServerAvailable === true
+  const localPublicPushReady = dockerDaemonReady && publicRegistry?.canUseNow === true
+  const selectedTransferPathReady = pushNetworkPlan.selectedReady === true
+  const p04StrictReady = imagePushGroup.ready === true && runtimePullGroup.ready === true
+
+  let nextOperatorDecision = "choose_vpc_registry_from_aliyun_network_or_acr_import_task"
+  if (!purchaseReady) nextOperatorDecision = "confirm_acr_purchase_and_repository_first"
+  if (selectedTransferPathReady) nextOperatorDecision = "execute_selected_transfer_path_then_record_digest"
+  if (p04StrictReady) nextOperatorDecision = "preserve_ready_state_with_strict_verification"
+
+  return {
+    ready: p04StrictReady,
+    canStartP04AfterActionTimeConfirmation: purchaseReady && p04StrictReady !== true,
+    p04StrictReady,
+    purchaseAndRepositoryReady: purchaseReady,
+    selectedTransferPathReady,
+    selectedTransferPath: pushNetworkPlan.selectedPath || "",
+    recommendedTransferPathIds,
+    forbiddenTransferPathIds,
+    localPublicPushReady,
+    dockerContextReady: dockerContext.ok === true,
+    dockerDaemonReady,
+    dockerClientInstalled: localDockerImage.dockerClientInstalled === true,
+    canProceedWithoutLocalDockerDaemon: recommendedTransferPathIds.some((id) =>
+      id === "vpc_registry_from_aliyun_network" || id === "acr_import_task"),
+    nextOperatorDecision,
+    postActionWritebackFields: [
+      "acr.pushNetworkPath",
+      "acr.remoteImage",
+      "acr.remoteDigest=sha256:<64 hex>",
+      "acr.imagePushed=true",
+      "acr.digestVerified=true",
+      "acr.evidence=<non-secret evidence handle>",
+      "runtime.remoteImageConfigured=true",
+      "runtime.imagePullConfigured=true",
+      "runtime.evidence=<non-secret SAE evidence handle>",
+    ],
+    verificationCommands: [
+      "corepack pnpm aliyun:image:plan:strict",
+      "corepack pnpm aliyun:cloud:confirmations:backend:strict",
+      "corepack pnpm aliyun:backend-cn:status",
+    ],
+    safetyBoundary: [
+      "Do not use public_registry until acr.publicNetworkEntranceEnabled=true.",
+      "Do not continue local/public docker push when Docker daemon is unavailable.",
+      "Use only Docker credential helper, short-lived operator session, RAM/KMS/Secrets Manager, or Aliyun runtime settings for registry credentials.",
+      "Record only selected path, remote image, sha256 digest, booleans, and non-secret evidence handles.",
+    ],
+  }
+}
+
 function main() {
   const args = parseArgs(process.argv)
   const template = validateFile(args.templateFile, "template")
   const local = validateFile(args.localFile, "local")
+  const dockerContext = checkDockerContext()
   const localDockerImage = inspectLocalDockerImage(EXPECTED_LOCAL_TAG)
   const ready = template.ready && local.ready
-  const writebackPlan = buildImageWritebackPlan(local)
+  const pushNetworkPlan = buildAcrPushNetworkPlan(local)
+  const writebackPlan = buildImageWritebackPlan(local, pushNetworkPlan)
+  const executionReadiness = buildAcrExecutionReadiness(
+    local,
+    dockerContext,
+    localDockerImage,
+    pushNetworkPlan,
+    writebackPlan,
+  )
   const report = {
     ok: ready,
     ready,
@@ -604,19 +918,47 @@ function main() {
     summary: summarize(template, local),
     template,
     local,
+    dockerContext,
     localDockerImage,
+    pushNetworkPlan,
+    executionReadiness,
     writebackPlan,
-    nextActions: [
-      "Copy deploy/aliyun-production-cn.image-publish.example.json to deploy/aliyun-production-cn.image-publish.local.json after ACR is chosen.",
-      "If the ACR buy page is still waiting for payment, record only the non-secret purchase candidate quote and do not mark ACR as confirmed.",
-      "Fill only registry host, namespace, repository, image digest, booleans, and evidence handles. Do not store registry credentials.",
-      "Run corepack pnpm aliyun:docker:build and corepack pnpm aliyun:container:smoke before pushing the image.",
-      "Push or import the image into Aliyun ACR, configure SAE to use the remote image, then run corepack pnpm aliyun:image:plan:strict.",
-    ],
+    nextActions: buildNextActions(local, writebackPlan, pushNetworkPlan),
   }
 
   console.log(JSON.stringify(report, null, 2))
   if (!ready && !args.allowIncomplete) process.exit(1)
+}
+
+function buildNextActions(local, writebackPlan, pushNetworkPlan = buildAcrPushNetworkPlan(local)) {
+  const acrPurchaseReady = (writebackPlan.groups || [])
+    .some((group) => group.id === "acrPurchaseAndRepository" && group.ready === true)
+  const base = [
+    "Fill only registry host, namespace, repository, image digest, booleans, and evidence handles. Do not store registry credentials.",
+    "Run corepack pnpm aliyun:docker:build and corepack pnpm aliyun:container:smoke before pushing the image.",
+  ]
+  if (!local.exists) {
+    return [
+      "Copy deploy/aliyun-production-cn.image-publish.example.json to deploy/aliyun-production-cn.image-publish.local.json after ACR is chosen.",
+      "If the ACR buy page is still waiting for payment, record only the non-secret purchase candidate quote and do not mark ACR as confirmed.",
+      ...base,
+    ]
+  }
+  if (!acrPurchaseReady) {
+    return [
+      "Record only the non-secret ACR purchase/repository evidence after action-time confirmation; do not mark ACR as confirmed before the console shows the instance and repository.",
+      ...base,
+    ]
+  }
+  return [
+    "ACR purchase/repository evidence is confirmed; next close P04_ACR_IMAGE_AND_PULL by pushing/importing the image and recording remote digest evidence.",
+    ...base,
+    pushNetworkPlan.publicNetworkEntranceEnabled
+      ? "Current ACR public registry entrance is enabled; local/public docker push can be used only with controlled registry auth and no persisted credentials."
+      : "Current ACR console evidence shows the public registry entrance is not enabled; choose VPC registry push from Aliyun network, ACR import task, or explicitly enable public network entrance before local/public docker push.",
+    `Recommended push network paths now: ${pushNetworkPlan.recommendedPathIds.length ? pushNetworkPlan.recommendedPathIds.join(", ") : "none"}.`,
+    "Push or import the image into Aliyun ACR, configure SAE to use the remote image, then run corepack pnpm aliyun:image:plan:strict.",
+  ]
 }
 
 function printHelp() {

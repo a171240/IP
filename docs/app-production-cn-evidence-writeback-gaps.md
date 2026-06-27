@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 阿里云证据回填清单
 
-Generated: 2026-06-25T23:37:43.673Z
+Generated: 2026-06-26T15:38:17.545Z
 
 ## 当前结论
 
@@ -17,7 +17,7 @@ Generated: 2026-06-25T23:37:43.673Z
 
 - conclusion: 本地证据尚未闭环；部署前必须补齐本地 .local.json 证据并通过 strict 验证。
 - evidenceWritebackReady: 0/4
-- totalGaps: 50
+- totalGaps: 47
 - rdsMigrationGaps: 19
 - blockedCredentialCount: 1
 - blockedCredentialNames: DATABASE_URL_CN
@@ -25,13 +25,13 @@ Generated: 2026-06-25T23:37:43.673Z
 - readySecretEnvVariableNames: ADMIN_USER_IDS, ALIYUN_OSS_ACCESS_KEY_ID, ALIYUN_OSS_ACCESS_KEY_SECRET, APIMART_API_KEY, CREDITS_IP_SALT, DASHSCOPE_API_KEY, DEEPSEEK_API_KEY, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_SUPABASE_URL, SERVICE_RECORD_DEEPSEEK_API_KEY, SUPABASE_SERVICE_ROLE_KEY, VOLC_SPEECH_ACCESS_TOKEN, VOLC_SPEECH_APP_ID, VOLC_SPEECH_SECRET_KEY, WECHAT_LOGIN_SECRET, WECHAT_MINI_APPID, WECHAT_MINI_SECRET
 - resourceEvidenceReady: 0/7
 - blockedResourceEvidenceIds: R01_SAE_RUNTIME, R02_ACR_IMAGE_REGISTRY, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R05_OSS_AUDIO_STORAGE, R06_ENV_IMPORT, R07_SLS_ALERTS
-- partiallyObservedResourceEvidenceIds: R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS
+- partiallyObservedResourceEvidenceIds: R02_ACR_IMAGE_REGISTRY, R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS
 - writeTargets: /Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.rds-migration.local.json, /Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.cloud-inventory-results.local.json, /Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.cloud-confirmations.local.json, /Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.image-publish.local.json
 
 ## 按动作包排序的证据回填
 
-- canStartNowPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE
-- blockedByDependencyPacketIds: P04_ACR_IMAGE_AND_PULL, P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS
+- canStartNowPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P04_ACR_IMAGE_AND_PULL
+- blockedByDependencyPacketIds: P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS
 - secretOrCredentialPacketIds: P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P06_ENV_IMPORT
 
 ### P00_ALIYUN_READONLY_INVENTORY_IDENTITY
@@ -67,24 +67,13 @@ Generated: 2026-06-25T23:37:43.673Z
 - forbiddenValueClasses: AccessKeySecret, AppSecret, RAM Secret, Supabase service role key, cookie, registry password, token
 - strictVerifyCommands: corepack pnpm aliyun:cloud:confirmations:strict
 
-### P03_ACR_PURCHASE
+### P04_ACR_IMAGE_AND_PULL
 
 - status: can_start_after_action_time_confirmation
 - nonSecretEvidenceOnly: true
-- gapCount: 3
-- groupKeys: imagePublish
-- jsonPaths: acr.registryHost, acr.namespace, acr.confirmed
-- writeTargets: deploy/aliyun-production-cn.image-publish.local.json -> acr
-- forbiddenValueClasses: AccessKeySecret, AppSecret, RAM Secret, Supabase service role key, cookie, registry password, token
-- strictVerifyCommands: corepack pnpm aliyun:image:plan:strict
-
-### P04_ACR_IMAGE_AND_PULL
-
-- status: blocked_by_dependency
-- nonSecretEvidenceOnly: true
 - gapCount: 8
 - groupKeys: imagePublish
-- jsonPaths: acr.remoteImage, acr.remoteDigest, acr.evidence, acr.imagePushed, acr.digestVerified, runtime.remoteImageConfigured, runtime.imagePullConfigured
+- jsonPaths: acr.remoteDigest, acr.evidence, acr.imagePushed, acr.digestVerified, acr.pushNetworkPath, runtime.remoteImageConfigured, runtime.imagePullConfigured
 - writeTargets: deploy/aliyun-production-cn.image-publish.local.json -> acr; deploy/aliyun-production-cn.image-publish.local.json -> runtime
 - forbiddenValueClasses: AccessKeySecret, AppSecret, RAM Secret, Supabase service role key, cookie, registry password, token
 - strictVerifyCommands: corepack pnpm aliyun:image:plan:strict
@@ -126,52 +115,52 @@ Generated: 2026-06-25T23:37:43.673Z
 ## 已观测但未闭环的资源证据
 
 - R01_SAE_RUNTIME: observed=not_created_or_not_confirmed, readiness=blocked
-  - currentEvidence: chrome_sae_app_list_2026-06-25T19:47_CST_cn-hangzhou_huadong1_hangzhou_no_instances_target_app_meiye-huajing-app-api-production-cn_not_present_runtime_not_confirmed; observedResourceStatus=not_created_or_not_confirmed; observedResourceReadiness=blocked
+  - currentEvidence: chrome_sae_app_list_2026-06-25T19:47_CST_cn-hangzhou_huadong1_hangzhou_no_instances_target_app_meiye-huajing-app-api-production-cn_not_present_runtime_not_confirmed; runtimePlan.dataLayerTarget=Aliyun RDS PostgreSQL; runtimePlan.dataLayerConnectionEnvName=DATABASE_URL_CN; runtimePlan.predeployDependencyIds=RDS_POSTGRES_MIGRATION,ACR_IMAGE_DIGEST_AND_PULL,OSS_RUNTIME_ACCESS,BACKEND_ENV_IMPORT; runtimeSlsPlan.ready=false; runtimeSlsPlan.runtime.selectedMode=pending_create_sae_custom_container_runtime; runtimeSlsPlan.runtime.targetAppName=meiye-huajing-app-api-production-cn; runtimeSlsPlan.runtime.ready=false; runtimeSlsPlan.runtime.blockers=runtime.confirmed; runtimeSlsPlan.runtime.recommendedModeIds=sae_custom_container_runtime; runtimeSlsPlan.runtime.writebackTemplate=deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.runtime; runtimeSlsPlan.runtime.candidateIds=sae_custom_container_runtime; observedResourceStatus=not_created_or_not_confirmed; observedResourceReadiness=blocked
   - missingEvidence: runtime:confirmed; observed:not_created_or_not_confirmed
   - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.runtime
-  - nextEvidenceAction: confirm resource in Aliyun console or allowlisted readonly inventory, then write non-secret evidence to the configured .local.json target
-- R02_ACR_IMAGE_REGISTRY: observed=purchase_candidate_visible_not_purchased, readiness=blocked
-  - currentEvidence: imagePublish.localExists=true; imagePublish.localReady=false; image.localDigestReady=true; localDockerImage.status=ready; localDockerImage.repoDigest=meiye-huajing-app-api@sha256:494907a4f9e7342064dda55fe30e0e48dd245b6d6ae753bdbb3945f77c0f518d; acr.purchaseCandidate.edition=ACR Enterprise Economic; acr.purchaseCandidate.region=cn-hangzhou; acr.purchaseCandidate.duration=1 month; acr.purchaseCandidate.quotedAmount=CNY 117.00; acr.purchaseCandidate.confirmed=false; acr.purchaseCandidate.requiresActionTimePurchaseConfirmation=true; acr.purchaseCandidate.evidence=chrome_acr_instances_2026-06-25T19:47_CST_enterprise_instance_list_visible_create_enterprise_instance_entry_visible_no_meiye_target_instance_or_repository_confirmed_not_purchased_action_time_confirmation_required; runtime.target=SAE; runtime.appName=meiye-huajing-app-api-production-cn; runtime.remoteImageConfigured=false; runtime.imagePullConfigured=false; observedResourceStatus=purchase_candidate_visible_not_purchased; observedResourceReadiness=blocked
-  - missingEvidence: imagePublishLocal:todo:acr.registryHost; imagePublishLocal:todo:acr.namespace; imagePublishLocal:todo:acr.remoteImage; imagePublishLocal:todo:acr.remoteDigest; imagePublishLocal:todo:acr.evidence; imagePublishLocal:acr.confirmed; imagePublishLocal:acr.imagePushed; imagePublishLocal:acr.digestVerified; imagePublishLocal:acr.remoteDigest=sha256; imagePublishLocal:runtime.confirmed; imagePublishLocal:runtime.remoteImageConfigured; imagePublishLocal:runtime.imagePullConfigured; observed:purchase_candidate_visible_not_purchased
+  - nextEvidenceAction: after ACR image digest, RDS secret env, and OSS access path are ready, create or confirm SAE custom container runtime and write non-secret runtime evidence
+- R02_ACR_IMAGE_REGISTRY: observed=acr_repository_confirmed_image_push_pending, readiness=partial
+  - currentEvidence: imagePublish.localExists=true; imagePublish.localReady=false; image.localDigestReady=true; dockerContext.status=ready; dockerContext.ok=true; dockerContext.checkedFiles=7; dockerContext.sensitiveEnvExcluded=true; localDockerImage.status=docker_daemon_unavailable_or_timeout; localDockerImage.dockerClientInstalled=true; localDockerImage.dockerServerAvailable=false; localDockerImage.nextEvidenceAction=Start Docker Desktop/daemon for local smoke, or use ACR import/VPC runner without relying on this machine's Docker daemon.; acr.purchaseCandidate.edition=ACR Enterprise Economic; acr.purchaseCandidate.region=cn-hangzhou; acr.purchaseCandidate.duration=1 month; acr.purchaseCandidate.quotedAmount=CNY 117.00; acr.purchaseCandidate.confirmed=true; acr.purchaseCandidate.requiresActionTimePurchaseConfirmation=false; acr.purchaseCandidate.evidence=chrome_acr_2026-06-26T11:33_CST_instance_meiye-huajing-app-api_cri-imlf4amccfw6m6sa_running_economic_cn-hangzhou_expires_2026-07-27_namespace_meiye-huajing-app-api_normal_repo_meiye-huajing-app-api_private_local_repo_created; chrome_acr_repo_detail_2026-06-26T12:40_CST_public_address_requires_access_control_network_entrance_vpc_registry_host_visible; user_confirmed_acr_paid_success_2026-06-26T21:18_CST; acr.publicNetworkEntranceEnabled=false; acr.pushNetworkPlan.selectedPath=pending_choose_vpc_registry_or_enable_public_network_entrance; acr.pushNetworkPlan.selectedReady=false; acr.pushNetworkPlan.recommendedPathIds=vpc_registry_from_aliyun_network,acr_import_task; acr.execution.canStartP04AfterActionTimeConfirmation=true; acr.execution.p04StrictReady=false; acr.execution.selectedTransferPathReady=false; acr.execution.localPublicPushReady=false; acr.execution.dockerDaemonReady=false; acr.execution.recommendedTransferPathIds=vpc_registry_from_aliyun_network,acr_import_task; acr.execution.forbiddenTransferPathIds=public_registry; acr.execution.nextOperatorDecision=choose_vpc_registry_from_aliyun_network_or_acr_import_task; runtime.target=SAE; runtime.appName=meiye-huajing-app-api-production-cn; runtime.remoteImageConfigured=false; runtime.imagePullConfigured=false; observedResourceStatus=acr_repository_confirmed_image_push_pending; observedResourceReadiness=partial
+  - missingEvidence: imagePublishLocal:todo:acr.remoteDigest; imagePublishLocal:todo:acr.evidence; imagePublishLocal:acr.imagePushed; imagePublishLocal:acr.digestVerified; imagePublishLocal:acr.remoteDigest=sha256; imagePublishLocal:acr.pushNetworkPath; imagePublishLocal:runtime.confirmed; imagePublishLocal:runtime.remoteImageConfigured; imagePublishLocal:runtime.imagePullConfigured; observed:acr_repository_confirmed_image_push_pending
   - writeTargets: deploy/aliyun-production-cn.image-publish.local.json -> acr + runtime
-  - nextEvidenceAction: complete ACR purchase/repository evidence first, then image push/digest and SAE pull evidence after action-time confirmation
+  - nextEvidenceAction: ACR purchase/repository evidence is confirmed when acr.purchaseCandidate.confirmed=true; next close image push/digest and SAE pull evidence after P04/P08 action-time confirmation
 - R03_API_DOMAIN_HTTPS: observed=domain_visible_records_missing, readiness=blocked
-  - currentEvidence: chrome_dns_console_2026-06-25T19:47_CST_ipgongchang_xin_exact_search_api-cn_no_data_total_0_existing_api_A_106.14.241.129_no_sae_endpoint_no_https_icp_ready; observedResourceStatus=domain_visible_records_missing; observedResourceReadiness=blocked
+  - currentEvidence: chrome_dns_console_2026-06-25T19:47_CST_ipgongchang_xin_exact_search_api-cn_no_data_total_0_existing_api_A_106.14.241.129_no_sae_endpoint_no_https_icp_ready; domainHttpsPlan.ready=false; domainHttpsPlan.apiDomainHttps.selectedMode=pending_sae_runtime_public_endpoint; domainHttpsPlan.apiDomainHttps.targetHost=api-cn.ipgongchang.xin; domainHttpsPlan.apiDomainHttps.ready=false; domainHttpsPlan.apiDomainHttps.blockers=apiDomainHttps.confirmed,apiDomainHttps.dnsResolvedToAliyun,apiDomainHttps.httpsEnabled,apiDomainHttps.icpReady; domainHttpsPlan.apiDomainHttps.recommendedModeIds=api_sae_custom_domain; domainHttpsPlan.apiDomainHttps.writebackTemplate=deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps; domainHttpsPlan.apiDomainHttps.candidateIds=api_sae_custom_domain; observedResourceStatus=domain_visible_records_missing; observedResourceReadiness=blocked
   - missingEvidence: APP_API_BASE_URL:dns_special_use_wildcard_ip; APP_API_BASE_URL:https_not_ready:ECONNRESET; NEXT_PUBLIC_SITE_URL:dns_special_use_wildcard_ip; NEXT_PUBLIC_SITE_URL:https_not_ready:ECONNRESET; APP_ASSET_BASE_URL:dns_special_use_wildcard_ip; APP_ASSET_BASE_URL:https_not_ready:ECONNRESET; apiDomainHttps:confirmed; apiDomainHttps:dnsResolvedToAliyun; apiDomainHttps:httpsEnabled; apiDomainHttps:icpReady; assetDomainHttps:confirmed; assetDomainHttps:dnsResolvedToAliyun; assetDomainHttps:httpsEnabled; assetDomainHttps:icpReady; observed:domain_visible_records_missing
   - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps
-  - nextEvidenceAction: obtain action-time confirmation, perform only the named console action, then write non-secret evidence to the configured .local.json target
+  - nextEvidenceAction: after SAE runtime public endpoint exists, clear wildcard/special-use DNS, bind api-cn as a SAE custom domain, attach HTTPS certificate, confirm ICP, then write non-secret evidence
 - R04_ASSET_DOMAIN_HTTPS: observed=domain_visible_records_missing, readiness=blocked
-  - currentEvidence: chrome_dns_console_2026-06-25T19:47_CST_ipgongchang_xin_exact_search_assets-cn_no_data_total_0_no_cdn_or_oss_custom_domain_no_https_icp_ready; observedResourceStatus=domain_visible_records_missing; observedResourceReadiness=blocked
+  - currentEvidence: chrome_dns_console_2026-06-25T19:47_CST_ipgongchang_xin_exact_search_assets-cn_no_data_total_0_no_cdn_or_oss_custom_domain_no_https_icp_ready; domainHttpsPlan.ready=false; domainHttpsPlan.assetDomainHttps.selectedMode=pending_choose_cdn_or_oss_custom_domain; domainHttpsPlan.assetDomainHttps.targetHost=assets-cn.ipgongchang.xin; domainHttpsPlan.assetDomainHttps.ready=false; domainHttpsPlan.assetDomainHttps.blockers=assetDomainHttps.confirmed,assetDomainHttps.dnsResolvedToAliyun,assetDomainHttps.httpsEnabled,assetDomainHttps.icpReady; domainHttpsPlan.assetDomainHttps.recommendedModeIds=asset_cdn_custom_domain; domainHttpsPlan.assetDomainHttps.writebackTemplate=deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps; domainHttpsPlan.assetDomainHttps.candidateIds=asset_cdn_custom_domain,asset_oss_custom_domain; observedResourceStatus=domain_visible_records_missing; observedResourceReadiness=blocked
   - missingEvidence: APP_API_BASE_URL:dns_special_use_wildcard_ip; APP_API_BASE_URL:https_not_ready:ECONNRESET; NEXT_PUBLIC_SITE_URL:dns_special_use_wildcard_ip; NEXT_PUBLIC_SITE_URL:https_not_ready:ECONNRESET; APP_ASSET_BASE_URL:dns_special_use_wildcard_ip; APP_ASSET_BASE_URL:https_not_ready:ECONNRESET; apiDomainHttps:confirmed; apiDomainHttps:dnsResolvedToAliyun; apiDomainHttps:httpsEnabled; apiDomainHttps:icpReady; assetDomainHttps:confirmed; assetDomainHttps:dnsResolvedToAliyun; assetDomainHttps:httpsEnabled; assetDomainHttps:icpReady; observed:domain_visible_records_missing
   - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps
-  - nextEvidenceAction: obtain action-time confirmation, perform only the named console action, then write non-secret evidence to the configured .local.json target
+  - nextEvidenceAction: after OSS/CDN asset origin exists, clear wildcard/special-use DNS, bind assets-cn through CDN or OSS custom domain, attach HTTPS certificate, confirm ICP, then write non-secret evidence
 - R05_OSS_AUDIO_STORAGE: observed=bucket_visible_unconfirmed, readiness=partial
-  - currentEvidence: chrome_oss_bucket_2026-06-25T19:47_CST_bucket_exists_meiye-huajing-service-records-production-cn_visible_oss-cn-hangzhou_overview_object_page_prefix_service-records-production-cn_ram_sts_not_confirmed; observedResourceStatus=bucket_visible_unconfirmed; observedResourceReadiness=partial
+  - currentEvidence: chrome_oss_bucket_2026-06-26T12:40_CST_bucket_exists_cn-hangzhou_private_acl_standard_storage_zero_files_external_endpoint_oss-cn-hangzhou_internal_endpoint_oss-cn-hangzhou-internal_ram_sts_not_confirmed_cors_not_visible_on_overview; oss.accessPlan.selectedMode=pending_choose_sae_runtime_role_or_sts; oss.accessPlan.selectedReady=false; oss.accessPlan.selectedBlockers=oss.confirmed,oss.ramLeastPrivilege; oss.accessPlan.recommendedModeIds=sae_runtime_role,sts_assume_role; oss.accessPlan.policyFile=deploy/aliyun-production-cn.oss-ram-policy.json; oss.accessPlan.policyName=MeiyeHuajingServiceRecordsOssPolicy; oss.accessPlan.allowedActions=oss:GetObject,oss:PutObject,oss:PostObject; oss.accessPlan.resourceScope=acs:oss:*:*:meiye-huajing-service-records-production-cn/service-records/production-cn/*; oss.runtimePrefixContract.requiredEnvName=SERVICE_RECORD_OSS_PREFIX; oss.runtimePrefixContract.expectedValue=service-records/production-cn; oss.runtimePrefixContract.policyScopeCoversExpectedPrefix=true; oss.runtimePrefixContract.currentConfirmationPrefixReady=true; oss.accessPlan.writebackTemplate=deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss; oss.execution.canStartP05AfterActionTimeConfirmation=true; oss.execution.resourceReadyForP05=true; oss.execution.accessGrantReady=false; oss.execution.preferredModeId=sae_runtime_role; oss.execution.preferredModeAvoidsLongLivedSecret=true; oss.execution.fallbackSecretModeIds=sts_assume_role,least_privilege_ram_user_secret_env; oss.execution.fallbackSecretEnvNames=ALIYUN_OSS_ACCESS_KEY_ID,ALIYUN_OSS_ACCESS_KEY_SECRET,ALIYUN_OSS_SECURITY_TOKEN; oss.execution.nextOperatorDecision=choose_sae_runtime_role_or_sts_then_bind_least_privilege_policy; observedResourceStatus=bucket_visible_unconfirmed; observedResourceReadiness=partial
   - missingEvidence: oss:confirmed; oss:ramLeastPrivilege; observed:bucket_visible_unconfirmed
   - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss
   - nextEvidenceAction: confirm resource in Aliyun console or allowlisted readonly inventory, then write non-secret evidence to the configured .local.json target
 - R06_ENV_IMPORT: observed=cloudshell_disconnected_restart_confirmation_required, readiness=blocked
-  - currentEvidence: pending_aliyun_env_import_confirmation; observedResourceStatus=cloudshell_disconnected_restart_confirmation_required; observedResourceReadiness=blocked
+  - currentEvidence: pending_aliyun_env_import_confirmation; envImportPlan.ready=false; envImportPlan.selectedMode=pending_secret_env_import_after_resource_dependencies; envImportPlan.importTarget=SAE; envImportPlan.secretEnvStore=KMS/SecretsManager/SAE secret env; envImportPlan.blockedCredentialNames=DATABASE_URL_CN; envImportPlan.readySecretEnvVariableCount=17; envImportPlan.readySecretEnvVariableGroupCount=9; envImportPlan.blockedSecretBatchIds=BLOCKED_SECRET_BATCH_01_OSS_RAM_STS,BLOCKED_SECRET_BATCH_02_RDS_DATABASE_SECRET_AND_MIGRATION; envImportPlan.readySecretBatchIds=READY_SECRET_BATCH_01_LEGACY_DATABASE_MIGRATION_SOURCE,READY_SECRET_BATCH_02_APP_AUTH,READY_SECRET_BATCH_03_ALIYUN_OSS,READY_SECRET_BATCH_04_BAILIAN_ASR,READY_SECRET_BATCH_05_DEEPSEEK_SUMMARY,READY_SECRET_BATCH_06_VOLC_SPEECH,READY_SECRET_BATCH_07_BACKEND_OPS,READY_SECRET_BATCH_08_LEGACY_CONTENT_PROVIDER,READY_SECRET_BATCH_09_MINI_PROGRAM_COMPAT; envImportPlan.importBatchCount=11; envImportPlan.recommendedModeIds=blocked_rds_database_url_secret,blocked_oss_ram_sts_secret_env,ready_backend_secret_env_batches; envImportPlan.writebackTemplate=deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport; envImportPlan.candidateIds=blocked_rds_database_url_secret,blocked_oss_ram_sts_secret_env,ready_backend_secret_env_batches; observedResourceStatus=cloudshell_disconnected_restart_confirmation_required; observedResourceReadiness=blocked
   - missingEvidence: missing_required_env:DATABASE_URL_CN; envImport:confirmed; envImport:secretNotInImage; envImport:placeholder:importedAt; envImport:placeholder:evidence; observed:cloudshell_disconnected_restart_confirmation_required
   - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport; 阿里云 SAE 环境变量 / KMS / Secrets Manager
-  - nextEvidenceAction: import ready variables through SAE/KMS/Secrets Manager secret env after action-time confirmation, then run env/checklist and sensitive/blockers
+  - nextEvidenceAction: after RDS, OSS/RAM/STS, ACR image, and SAE runtime dependencies close, import backend secret-env batches through KMS/Secrets Manager/SAE secret env and write only non-secret batch evidence
 - R07_SLS_ALERTS: observed=project_logstore_visible_alerts_pending, readiness=partial
-  - currentEvidence: chrome_sls_2026-06-25T19:47_CST_project_meiye-huajing-app-prod-cn_logstore_app-api_visible_logstore_empty_index_not_enabled_health_5xx_alerts_not_configured; observedResourceStatus=project_logstore_visible_alerts_pending; observedResourceReadiness=partial
+  - currentEvidence: chrome_sls_2026-06-25T19:47_CST_project_meiye-huajing-app-prod-cn_logstore_app-api_visible_logstore_empty_index_not_enabled_health_5xx_alerts_not_configured; runtimeSlsPlan.ready=false; runtimeSlsPlan.slsAlerts.selectedMode=pending_bind_sae_logs_and_alerts; runtimeSlsPlan.slsAlerts.targetProject=meiye-huajing-app-prod-cn; runtimeSlsPlan.slsAlerts.targetLogstore=app-api; runtimeSlsPlan.slsAlerts.ready=false; runtimeSlsPlan.slsAlerts.blockers=slsAlerts.confirmed,slsAlerts.healthAlertConfigured,slsAlerts.serverErrorAlertConfigured; runtimeSlsPlan.slsAlerts.recommendedModeIds=sls_health_5xx_alerts; runtimeSlsPlan.slsAlerts.writebackTemplate=deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.slsAlerts; runtimeSlsPlan.slsAlerts.candidateIds=sls_health_5xx_alerts; observedResourceStatus=project_logstore_visible_alerts_pending; observedResourceReadiness=partial
   - missingEvidence: slsAlerts:confirmed; slsAlerts:healthAlertConfigured; slsAlerts:serverErrorAlertConfigured; observed:project_logstore_visible_alerts_pending
   - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.slsAlerts
-  - nextEvidenceAction: confirm resource in Aliyun console or allowlisted readonly inventory, then write non-secret evidence to the configured .local.json target
+  - nextEvidenceAction: after SAE runtime emits logs to SLS, configure logstore index plus health and 5xx alerts, then write non-secret alert evidence
 
 ## 汇总
 
 - files: 4
 - readyFiles: 0/4
-- totalGaps: 50
+- totalGaps: 47
 - rdsMigrationGaps: 19
 - cloudInventoryResultGaps: 1
 - cloudConfirmationGaps: 18
-- imagePublishGaps: 12
+- imagePublishGaps: 9
 - forbiddenValueClasses: AccessKeySecret, AppSecret, DATABASE_URL_CN value, RAM Secret, Supabase service role key, cookie, customer data, database password, dump contents, registry password, token, 证书私钥
-- requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION, P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P08_SAE_RUNTIME_SLS, P07_DOMAIN_DNS_HTTPS, P05_OSS_RAM_STS, P06_ENV_IMPORT, P03_ACR_PURCHASE, P04_ACR_IMAGE_AND_PULL
+- requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION, P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P08_SAE_RUNTIME_SLS, P07_DOMAIN_DNS_HTTPS, P05_OSS_RAM_STS, P06_ENV_IMPORT, P04_ACR_IMAGE_AND_PULL
 
 ## rdsMigration
 
@@ -180,7 +169,7 @@ Generated: 2026-06-25T23:37:43.673Z
 - ready: false
 - totalBlockers: 19
 - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-- blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env; compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+- blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env; compatibilityReviewChecklist 7 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
 - strictVerifyCommands: corepack pnpm aliyun:rds:migration:evidence:strict
 
 - `rdsPostgres.instanceId`
@@ -190,8 +179,8 @@ Generated: 2026-06-25T23:37:43.673Z
   - expected: 填入 RDS 控制台可见的非密钥实例 ID。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查已关闭
-  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env; compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据; compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查已关闭
+  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env; compatibilityReviewChecklist 7 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true
 - `rdsPostgres.engineVersion`
   - blocker: todo:rdsPostgres.engineVersion
   - source: 阿里云控制台 -> RDS PostgreSQL / SAE secret env
@@ -199,8 +188,8 @@ Generated: 2026-06-25T23:37:43.673Z
   - expected: 填入 RDS PostgreSQL 版本号。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查已关闭
-  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env; compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据; compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查已关闭
+  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env; compatibilityReviewChecklist 7 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true
 - `rdsPostgres.networkAccess`
   - blocker: todo:rdsPostgres.networkAccess
   - source: 阿里云控制台 -> RDS PostgreSQL / SAE secret env
@@ -208,8 +197,8 @@ Generated: 2026-06-25T23:37:43.673Z
   - expected: 填入 SAE 到 RDS 的 VPC/内网访问方式说明。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查已关闭
-  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env; compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据; compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查已关闭
+  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env; compatibilityReviewChecklist 7 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true
 - `rdsPostgres.databaseName`
   - blocker: todo:rdsPostgres.databaseName
   - source: 阿里云控制台 -> RDS PostgreSQL / SAE secret env
@@ -217,8 +206,8 @@ Generated: 2026-06-25T23:37:43.673Z
   - expected: 填入生产数据库名，不包含账号密码或连接串。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查已关闭
-  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env; compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据; compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查已关闭
+  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env; compatibilityReviewChecklist 7 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true
 - `rdsPostgres.evidence`
   - blocker: todo:rdsPostgres.evidence
   - source: 阿里云控制台 -> RDS PostgreSQL / SAE secret env
@@ -226,8 +215,8 @@ Generated: 2026-06-25T23:37:43.673Z
   - expected: 填控制台路径、截图编号、工单号或其它非密钥证据编号。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查已关闭
-  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env; compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据; compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查已关闭
+  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env; compatibilityReviewChecklist 7 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true
 - `rdsPostgres.confirmed`
   - blocker: rdsPostgres.confirmed
   - source: 阿里云控制台 -> RDS PostgreSQL / SAE secret env
@@ -235,8 +224,8 @@ Generated: 2026-06-25T23:37:43.673Z
   - expected: RDS PostgreSQL 实例确认存在后填 true。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查已关闭
-  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env; compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据; compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查已关闭
+  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env; compatibilityReviewChecklist 7 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true
 - `rdsPostgres.databaseAccountReady`
   - blocker: rdsPostgres.databaseAccountReady
   - source: 阿里云控制台 -> RDS PostgreSQL / SAE secret env
@@ -244,8 +233,8 @@ Generated: 2026-06-25T23:37:43.673Z
   - expected: 数据库账号和权限就绪后填 true，不记录密码。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查已关闭
-  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env; compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据; compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查已关闭
+  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env; compatibilityReviewChecklist 7 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true
 - `rdsPostgres.databaseUrlCnSecretImported`
   - blocker: rdsPostgres.databaseUrlCnSecretImported
   - source: 阿里云控制台 -> RDS PostgreSQL / SAE secret env
@@ -253,17 +242,17 @@ Generated: 2026-06-25T23:37:43.673Z
   - expected: DATABASE_URL_CN 已只导入阿里云 KMS/Secrets Manager/SAE secret env 后填 true。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查已关闭
-  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env; compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据; compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查已关闭
+  - blockedUntil: RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env; compatibilityReviewChecklist 7 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true
 - `migration.schemaCompatibilityReviewed`
   - blocker: migration.schemaCompatibilityReviewed
   - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
   - writeTo: deploy/aliyun-production-cn.rds-migration.local.json -> migration.schemaCompatibilityReviewed
-  - expected: compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查完成并记录非密钥处置结果后填 true。
+  - expected: compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查完成并记录非密钥处置结果后填 true。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
-  - blockedUntil: compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: compatibilityReviewChecklist 7 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
 - `migration.supabaseSpecificSqlResolved`
   - blocker: migration.supabaseSpecificSqlResolved
   - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
@@ -271,8 +260,8 @@ Generated: 2026-06-25T23:37:43.673Z
   - expected: supabase_auth_uid / storage / service_role / RLS / policy 等 Supabase-specific SQL 已改写或明确处置后填 true。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
-  - blockedUntil: compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: compatibilityReviewChecklist 7 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
 - `migration.rdsExtensionSupportConfirmed`
   - blocker: migration.rdsExtensionSupportConfirmed
   - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
@@ -280,8 +269,8 @@ Generated: 2026-06-25T23:37:43.673Z
   - expected: Aliyun RDS PostgreSQL extension 支持和替代方案已确认后填 true。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
-  - blockedUntil: compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: compatibilityReviewChecklist 7 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
 - `migration.schemaMigrated`
   - blocker: migration.schemaMigrated
   - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
@@ -289,8 +278,8 @@ Generated: 2026-06-25T23:37:43.673Z
   - expected: schema 已迁到 RDS/PostgreSQL 并通过非密钥验收后填 true。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
-  - blockedUntil: compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: compatibilityReviewChecklist 7 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
 - `migration.dataMigrated`
   - blocker: migration.dataMigrated
   - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
@@ -298,8 +287,8 @@ Generated: 2026-06-25T23:37:43.673Z
   - expected: 数据已按迁移计划进入 RDS/PostgreSQL 并通过非密钥验收后填 true。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
-  - blockedUntil: compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: compatibilityReviewChecklist 7 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
 - `migration.rowCountValidationPassed`
   - blocker: migration.rowCountValidationPassed
   - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
@@ -307,8 +296,8 @@ Generated: 2026-06-25T23:37:43.673Z
   - expected: 关键表 row count 校验通过后填 true。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
-  - blockedUntil: compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: compatibilityReviewChecklist 7 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
 - `migration.criticalRecordValidationPassed`
   - blocker: migration.criticalRecordValidationPassed
   - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
@@ -316,8 +305,8 @@ Generated: 2026-06-25T23:37:43.673Z
   - expected: 关键记录、租户/门店/服务记录关系校验通过后填 true。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
-  - blockedUntil: compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: compatibilityReviewChecklist 7 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
 - `migration.appApiSmokeOnRdsPassed`
   - blocker: migration.appApiSmokeOnRdsPassed
   - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
@@ -325,8 +314,8 @@ Generated: 2026-06-25T23:37:43.673Z
   - expected: profile / tenant / invite / service-record APP API 在 RDS 上冒烟通过后填 true。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
-  - blockedUntil: compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: compatibilityReviewChecklist 7 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
 - `migration.supabaseNoLongerFormalTarget`
   - blocker: migration.supabaseNoLongerFormalTarget
   - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
@@ -334,8 +323,8 @@ Generated: 2026-06-25T23:37:43.673Z
   - expected: Supabase 已仅作为迁移来源或旧兼容，不再作为 production-cn 正式数据库目标后填 true。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
-  - blockedUntil: compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: compatibilityReviewChecklist 7 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
 - `migration.rollbackRunbookReviewed`
   - blocker: migration.rollbackRunbookReviewed
   - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
@@ -343,8 +332,8 @@ Generated: 2026-06-25T23:37:43.673Z
   - expected: 回滚 runbook 已评审后填 true。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
-  - blockedUntil: compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: compatibilityReviewChecklist 7 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
 - `migration.rollbackValidationPassed`
   - blocker: migration.rollbackValidationPassed
   - source: Supabase 到 Aliyun RDS/PostgreSQL 迁移报告、APP API smoke 和 rollback 验收
@@ -352,8 +341,8 @@ Generated: 2026-06-25T23:37:43.673Z
   - expected: 回滚演练或可恢复性验证通过后填 true。
   - forbidden: database password, DATABASE_URL_CN value, Supabase service role key, dump contents, customer data, AccessKeySecret, token
   - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
-  - blockedUntil: compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
+  - requiredEvidence: docs/app-production-cn-rds-migration-package.md 已生成并核对; compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查处置结果; Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据
+  - blockedUntil: compatibilityReviewChecklist 7 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true; schema/data 迁移、RDS API smoke 和 rollback 验收已完成
 
 ## cloudInventoryResults
 
@@ -554,39 +543,12 @@ Generated: 2026-06-25T23:37:43.673Z
 - file: /Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.image-publish.local.json
 - exists: true
 - ready: false
-- totalBlockers: 12
-- localDockerImage: ready
-- requiredAuthorizationPackets: P03_ACR_PURCHASE, P04_ACR_IMAGE_AND_PULL, P08_SAE_RUNTIME_SLS
-- blockedUntil: ACR 已开通并确认仓库位置; 镜像已进入 ACR 且远端 digest 已核对; SAE runtime 已确认; SAE 镜像地址和拉取权限已配置
+- totalBlockers: 9
+- localDockerImage: docker_daemon_unavailable_or_timeout
+- requiredAuthorizationPackets: P04_ACR_IMAGE_AND_PULL, P08_SAE_RUNTIME_SLS
+- blockedUntil: 镜像已进入 ACR 且远端 digest 已核对; SAE runtime 已确认; SAE 镜像地址和拉取权限已配置
 - strictVerifyCommands: corepack pnpm aliyun:image:plan:strict
 
-- `acr.registryHost`
-  - blocker: todo:acr.registryHost
-  - source: 阿里云控制台 -> 容器镜像服务 ACR -> cn-hangzhou -> 命名空间/仓库
-  - writeTo: deploy/aliyun-production-cn.image-publish.local.json -> acr
-  - expected: 填阿里云 ACR registry host。
-  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
-  - requiredAuthorizationPackets: P03_ACR_PURCHASE
-  - requiredEvidence: ACR 实例、命名空间、仓库和非密钥控制台证据
-  - blockedUntil: ACR 已开通并确认仓库位置
-- `acr.namespace`
-  - blocker: todo:acr.namespace
-  - source: 阿里云控制台 -> 容器镜像服务 ACR -> cn-hangzhou -> 命名空间/仓库
-  - writeTo: deploy/aliyun-production-cn.image-publish.local.json -> acr
-  - expected: 填阿里云 ACR namespace。
-  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
-  - requiredAuthorizationPackets: P03_ACR_PURCHASE
-  - requiredEvidence: ACR 实例、命名空间、仓库和非密钥控制台证据
-  - blockedUntil: ACR 已开通并确认仓库位置
-- `acr.remoteImage`
-  - blocker: todo:acr.remoteImage
-  - source: 阿里云控制台 -> 容器镜像服务 ACR -> cn-hangzhou -> 命名空间/仓库
-  - writeTo: deploy/aliyun-production-cn.image-publish.local.json -> acr
-  - expected: 填 production-cn 远端镜像完整地址。
-  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
-  - requiredAuthorizationPackets: P04_ACR_IMAGE_AND_PULL
-  - requiredEvidence: ACR 远端镜像地址、sha256 digest、push/import 证据和 digest 核对证据
-  - blockedUntil: 镜像已进入 ACR 且远端 digest 已核对
 - `acr.remoteDigest`
   - blocker: todo:acr.remoteDigest
   - source: 阿里云控制台 -> 容器镜像服务 ACR -> cn-hangzhou -> 命名空间/仓库
@@ -605,15 +567,6 @@ Generated: 2026-06-25T23:37:43.673Z
   - requiredAuthorizationPackets: P04_ACR_IMAGE_AND_PULL
   - requiredEvidence: ACR 远端镜像地址、sha256 digest、push/import 证据和 digest 核对证据
   - blockedUntil: 镜像已进入 ACR 且远端 digest 已核对
-- `acr.confirmed`
-  - blocker: acr.confirmed
-  - source: 阿里云控制台 -> 容器镜像服务 ACR -> cn-hangzhou -> 命名空间/仓库
-  - writeTo: deploy/aliyun-production-cn.image-publish.local.json -> acr
-  - expected: ACR 仓库确认后填 true。
-  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
-  - requiredAuthorizationPackets: P03_ACR_PURCHASE
-  - requiredEvidence: ACR 实例、命名空间、仓库和非密钥控制台证据
-  - blockedUntil: ACR 已开通并确认仓库位置
 - `acr.imagePushed`
   - blocker: acr.imagePushed
   - source: 阿里云控制台 -> 容器镜像服务 ACR -> cn-hangzhou -> 命名空间/仓库
@@ -637,6 +590,15 @@ Generated: 2026-06-25T23:37:43.673Z
   - source: 阿里云控制台 -> 容器镜像服务 ACR -> cn-hangzhou -> 命名空间/仓库
   - writeTo: deploy/aliyun-production-cn.image-publish.local.json -> acr
   - expected: 填 sha256:<64 hex> 镜像 digest。
+  - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
+  - requiredAuthorizationPackets: P04_ACR_IMAGE_AND_PULL
+  - requiredEvidence: ACR 远端镜像地址、sha256 digest、push/import 证据和 digest 核对证据
+  - blockedUntil: 镜像已进入 ACR 且远端 digest 已核对
+- `acr.pushNetworkPath`
+  - blocker: acr.pushNetworkPath
+  - source: 阿里云控制台 -> 容器镜像服务 ACR -> cn-hangzhou -> 命名空间/仓库
+  - writeTo: deploy/aliyun-production-cn.image-publish.local.json -> acr
+  - expected: 填真实非密钥 ACR/SAE 证据，不能写 registry 密码、RAM Secret 或 token。
   - forbidden: AccessKeySecret, AppSecret, registry password, RAM Secret, token, cookie, Supabase service role key
   - requiredAuthorizationPackets: P04_ACR_IMAGE_AND_PULL
   - requiredEvidence: ACR 远端镜像地址、sha256 digest、push/import 证据和 digest 核对证据

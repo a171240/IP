@@ -60,7 +60,6 @@ test("Aliyun operator tasks backend-only mode excludes deferred app launch work"
     "T08_POSTDEPLOY_REMOTE_SMOKE",
   ])
   assert.deepEqual(sensitiveActionIds, [
-    "S03_ACR_PAID_PURCHASE",
     "S04_ACR_REGISTRY_AUTH",
     "S05_OSS_RAM_SECRET_OR_STS",
     "S08_ALIYUN_RDS_DATABASE_URL",
@@ -79,11 +78,10 @@ test("Aliyun operator tasks backend-only mode excludes deferred app launch work"
         "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
         "P11_ALIYUN_RDS_DATA_MIGRATION",
         "P05_OSS_RAM_STS",
-        "P03_ACR_PURCHASE",
+        "P04_ACR_IMAGE_AND_PULL",
       ],
       blockedByPacketDependencies: [
         "P08_SAE_RUNTIME_SLS",
-        "P04_ACR_IMAGE_AND_PULL",
         "P07_DOMAIN_DNS_HTTPS",
         "P06_ENV_IMPORT",
         "P09_PRODUCTION_DEPLOY",
@@ -107,7 +105,7 @@ test("Aliyun operator tasks backend-only mode excludes deferred app launch work"
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
     "P05_OSS_RAM_STS",
-    "P03_ACR_PURCHASE",
+    "P04_ACR_IMAGE_AND_PULL",
   ])
   assert.equal(report.actionAuthorization.verdict, "blocked")
   assert.deepEqual(taskById.get("T02B_ALIYUN_RDS_DATA_MIGRATION").actionPacketIds, [
@@ -134,11 +132,9 @@ test("Aliyun operator tasks backend-only mode excludes deferred app launch work"
     "P04_ACR_IMAGE_AND_PULL",
   ])
   assert.deepEqual(taskById.get("T03B_ALIYUN_ACR_IMAGE_PUBLISH").canStartNowAuthorizationPacketIds, [
-    "P03_ACR_PURCHASE",
-  ])
-  assert.deepEqual(taskById.get("T03B_ALIYUN_ACR_IMAGE_PUBLISH").blockedByAuthorizationPacketIds, [
     "P04_ACR_IMAGE_AND_PULL",
   ])
+  assert.deepEqual(taskById.get("T03B_ALIYUN_ACR_IMAGE_PUBLISH").blockedByAuthorizationPacketIds, [])
   assert.equal(taskById.get("T03B_ALIYUN_ACR_IMAGE_PUBLISH").nonSecretEvidenceOnly, true)
   assert.ok(taskById.get("T03B_ALIYUN_ACR_IMAGE_PUBLISH").writeTargets.some((item) => /image-publish\.local\.json/.test(item)))
   assert.deepEqual(taskById.get("T05_ALIYUN_OSS_AUDIO_STORAGE").canStartNowAuthorizationPacketIds, ["P05_OSS_RAM_STS"])
@@ -204,8 +200,8 @@ test("Aliyun operator tasks backend-only markdown omits deferred app launch task
   assert.match(markdown, /currentScope: backend_aliyun_only/)
   assert.match(markdown, /canProceedWithoutWechat: true/)
   assert.match(markdown, /## 动作包总览/)
-  assert.match(markdown, /nextActionTimeConfirmationPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE/)
-  assert.match(markdown, /blockedByPacketDependencies: P08_SAE_RUNTIME_SLS, P04_ACR_IMAGE_AND_PULL, P07_DOMAIN_DNS_HTTPS, P06_ENV_IMPORT, P09_PRODUCTION_DEPLOY/)
+  assert.match(markdown, /nextActionTimeConfirmationPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P04_ACR_IMAGE_AND_PULL/)
+  assert.match(markdown, /blockedByPacketDependencies: P08_SAE_RUNTIME_SLS, P07_DOMAIN_DNS_HTTPS, P06_ENV_IMPORT, P09_PRODUCTION_DEPLOY/)
   assert.match(markdown, /## RDS PostgreSQL 数据层迁移证据/)
   assert.match(markdown, /totalBlockers: 19/)
   assert.match(markdown, /blocker: migration\.schemaCompatibilityReviewed/)

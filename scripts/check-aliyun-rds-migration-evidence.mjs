@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { dirname, isAbsolute, resolve } from "node:path"
+import { tmpdir } from "node:os"
 import { fileURLToPath } from "node:url"
 import { spawnSync } from "node:child_process"
 
@@ -388,6 +389,44 @@ function runRdsMigrationPlan() {
   return JSON.parse(result.stdout)
 }
 
+function runRdsMigrationPackageSummary() {
+  const tempParent = mkdtempSync(resolve(tmpdir(), "meiye-rds-migration-package-review-"))
+  const outDir = resolve(tempParent, "package")
+  try {
+    const result = spawnSync(process.execPath, [
+      "scripts/generate-aliyun-rds-migration-package.mjs",
+      "--out-dir",
+      outDir,
+    ], {
+      cwd: BACKEND_ROOT,
+      encoding: "utf8",
+      maxBuffer: 1024 * 1024 * 80,
+    })
+    if (result.error) throw result.error
+    if (result.status !== 0) {
+      throw new Error(`rds_migration_package_failed:${result.status}\n${result.stderr || result.stdout}`)
+    }
+    const report = JSON.parse(result.stdout)
+    return {
+      ok: report.ok === true,
+      generatedAt: report.generatedAt,
+      summary: report.summary || {},
+      compatibilityReview: report.compatibilityReview || {},
+      compatibilityReviewChecklist: report.compatibilityReviewChecklist || [],
+      schemaApplyCandidateAudit: report.schemaApplyCandidateAudit || {},
+      rdsApplyCandidate: report.rdsApplyCandidate || {},
+      rdsApplyCandidateAudit: report.rdsApplyCandidateAudit || {},
+      rdsApplyCandidateReviewPlan: report.rdsApplyCandidateReviewPlan || {},
+      compatibilityDispositionPlan: report.compatibilityDispositionPlan || {},
+      sourceFiles: report.sourceFiles || [],
+      nextVerifyCommands: report.nextVerifyCommands || [],
+      valueHandlingRules: report.valueHandlingRules || [],
+    }
+  } finally {
+    rmSync(tempParent, { recursive: true, force: true })
+  }
+}
+
 function buildInitialLocalEvidence(sourceInventory) {
   const summary = sourceInventory.summary || {}
   const schemaMapReady = summary.schemaMapReady === true
@@ -573,8 +612,446 @@ function buildWritebackPlan(localValidation) {
   }
 }
 
-function summarize(template, local, sourceInventory) {
-  const writebackPlan = buildWritebackPlan(local)
+function buildRdsMigrationPlan(localValidation, sourceInventory, migrationPackage) {
+  const blockerFields = uniqueStrings((localValidation.blockers || []).map(fieldFromBlocker))
+  const hasBlocker = (field) => blockerFields.includes(field)
+  const phase = (config) => {
+    const fields = uniqueStrings(["file_missing", ...config.fields])
+    const blockers = uniqueStrings(fields.filter((field) => hasBlocker(field)))
+    return {
+      id: config.id,
+      title: config.title,
+      ready: blockers.length === 0,
+      canStartNow: config.canStartNow === true,
+      canStartAfterActionTimeConfirmation: config.canStartAfterActionTimeConfirmation === true,
+      requiresActionTimeConfirmation: config.requiresActionTimeConfirmation === true,
+      dependsOnPhaseIds: config.dependsOnPhaseIds || [],
+      requiredAuthorizationPackets: config.requiredAuthorizationPackets || [],
+      blockerFields: blockers,
+      writeTargets: config.writeTargets,
+      expectedEvidence: config.expectedEvidence,
+      forbidden: config.forbidden,
+      verifyCommands: config.verifyCommands,
+    }
+  }
+  const phases = [
+    phase({
+      id: "source_inventory_preflight",
+      title: "Local APP API and schema inventory preflight",
+      canStartNow: true,
+      requiresActionTimeConfirmation: false,
+      fields: [
+        "sourceInventory.generatedBy",
+        "sourceInventory.appApiRouteCount",
+        "sourceInventory.appApiRoutesWithSupabase",
+        "sourceInventory.appApiRoutesWithSupabaseDataAccess",
+        "sourceInventory.firstVersionRdsRouteCount",
+        "sourceInventory.firstVersionRdsRoutesWithSupabase",
+        "sourceInventory.firstVersionRdsRoutesWithSupabaseDataAccess",
+        "sourceInventory.deferredAppApiRouteCount",
+        "sourceInventory.deferredAppApiRoutesWithSupabaseDataAccess",
+        "sourceInventory.evidence",
+        "migration.schemaInventoryReviewed",
+        "migration.dataAccessAdapterReady",
+      ],
+      writeTargets: [
+        "deploy/aliyun-production-cn.rds-migration.local.json -> sourceInventory.* non-secret evidence",
+        "deploy/aliyun-production-cn.rds-first-version-schema-map.json",
+        "deploy/app-api-production-cn.bridge-map.json",
+      ],
+      expectedEvidence: [
+        "firstVersionRdsRouteCount=25",
+        "firstVersionRdsRoutesWithSupabaseDataAccess=0",
+        "postgresDataAccessAdapterDetected=true",
+        "schemaInventoryReviewed=true",
+        "dataAccessAdapterReady=true",
+      ],
+      forbidden: [
+        "Do not include row contents, customer data, Supabase service role key, or DATABASE_URL_CN value.",
+      ],
+      verifyCommands: [
+        "corepack pnpm aliyun:rds:migration:plan",
+        "corepack pnpm aliyun:rds:migration:evidence",
+      ],
+    }),
+    phase({
+      id: "compatibility_review",
+      title: "Supabase SQL compatibility and Aliyun RDS extension review",
+      canStartNow: true,
+      requiresActionTimeConfirmation: false,
+      dependsOnPhaseIds: ["source_inventory_preflight"],
+      fields: [
+        "migration.schemaCompatibilityReviewed",
+        "migration.supabaseSpecificSqlResolved",
+        "migration.rdsExtensionSupportConfirmed",
+      ],
+      writeTargets: [
+        "docs/app-production-cn-rds-migration-package.md -> compatibilityReviewChecklist non-secret dispositions",
+        "deploy/aliyun-production-cn.rds-migration.local.json -> migration schemaCompatibilityReviewed / supabaseSpecificSqlResolved / rdsExtensionSupportConfirmed",
+      ],
+      expectedEvidence: [
+        "compatibilityReviewChecklistItemCount=7 reviewed and closed",
+        "Supabase auth schema/auth.uid/storage/service_role/RLS/policy dispositions recorded without secrets",
+        "target Aliyun RDS PostgreSQL extension support or replacement plan confirmed",
+      ],
+      forbidden: [
+        "Do not apply schema to RDS before this review closes.",
+        "Do not store dump contents, customer data, database password, or Supabase service role key.",
+      ],
+      verifyCommands: [
+        "corepack pnpm aliyun:rds:migration:package",
+        "corepack pnpm aliyun:rds:migration:evidence",
+      ],
+    }),
+    phase({
+      id: "rds_instance_and_secret",
+      title: "Aliyun RDS PostgreSQL instance, database account, and DATABASE_URL_CN secret env",
+      canStartNow: false,
+      canStartAfterActionTimeConfirmation: true,
+      requiresActionTimeConfirmation: true,
+      requiredAuthorizationPackets: ["P11_ALIYUN_RDS_DATA_MIGRATION"],
+      fields: [
+        "rdsPostgres.instanceId",
+        "rdsPostgres.instanceName",
+        "rdsPostgres.engineVersion",
+        "rdsPostgres.networkAccess",
+        "rdsPostgres.databaseName",
+        "rdsPostgres.evidence",
+        "rdsPostgres.confirmed",
+        "rdsPostgres.databaseAccountReady",
+        "rdsPostgres.databaseUrlCnSecretImported",
+      ],
+      writeTargets: [
+        "deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.* non-secret evidence",
+        "Aliyun KMS / Secrets Manager / SAE secret env -> DATABASE_URL_CN value only",
+      ],
+      expectedEvidence: [
+        "RDS PostgreSQL instance exists in cn-hangzhou",
+        "database account and network access for SAE are ready",
+        "DATABASE_URL_CN imported only through Aliyun controlled secret env",
+      ],
+      forbidden: [
+        "Do not write DATABASE_URL_CN value, database password, or connection string to JSON, Markdown, Docker image, shell history, or git.",
+      ],
+      verifyCommands: [
+        "corepack pnpm aliyun:rds:migration:evidence",
+        "corepack pnpm aliyun:sensitive:blockers:backend",
+      ],
+    }),
+    phase({
+      id: "schema_data_validation",
+      title: "Schema/data migration and tenant critical record validation",
+      canStartNow: false,
+      canStartAfterActionTimeConfirmation: true,
+      requiresActionTimeConfirmation: true,
+      dependsOnPhaseIds: ["compatibility_review", "rds_instance_and_secret"],
+      requiredAuthorizationPackets: ["P11_ALIYUN_RDS_DATA_MIGRATION"],
+      fields: [
+        "migration.schemaMigrated",
+        "migration.dataMigrated",
+        "migration.rowCountValidationPassed",
+        "migration.criticalRecordValidationPassed",
+        "migration.supabaseNoLongerFormalTarget",
+      ],
+      writeTargets: [
+        "deploy/aliyun-production-cn.rds-migration.local.json -> migration schema/data validation booleans and non-secret evidence handle",
+        "release manifest / migration report -> non-secret migration evidence handle",
+      ],
+      expectedEvidence: [
+        "schemaMigrated=true",
+        "dataMigrated=true",
+        "rowCountValidationPassed=true",
+        "criticalRecordValidationPassed=true",
+        "supabaseNoLongerFormalTarget=true",
+      ],
+      forbidden: [
+        "Do not store migration dump contents or customer records in reports.",
+        "Do not run destructive migration without reviewed rollback path.",
+      ],
+      verifyCommands: [
+        "corepack pnpm aliyun:rds:migration:evidence:strict",
+        "corepack pnpm aliyun:backend-cn:status",
+      ],
+    }),
+    phase({
+      id: "app_api_smoke_and_rollback",
+      title: "APP API smoke on RDS and rollback validation",
+      canStartNow: false,
+      canStartAfterActionTimeConfirmation: true,
+      requiresActionTimeConfirmation: true,
+      dependsOnPhaseIds: ["schema_data_validation"],
+      requiredAuthorizationPackets: ["P11_ALIYUN_RDS_DATA_MIGRATION"],
+      fields: [
+        "migration.appApiSmokeOnRdsPassed",
+        "migration.rollbackRunbookReviewed",
+        "migration.rollbackValidationPassed",
+      ],
+      writeTargets: [
+        "deploy/aliyun-production-cn.rds-migration.local.json -> migration smoke/rollback booleans and non-secret evidence handle",
+      ],
+      expectedEvidence: [
+        "profile / tenant / invite / service-record APP API smoke passed against RDS",
+        "rollbackRunbookReviewed=true",
+        "rollbackValidationPassed=true",
+      ],
+      forbidden: [
+        "Do not include auth tokens, customer payloads, database password, or connection string value in smoke evidence.",
+      ],
+      verifyCommands: [
+        "corepack pnpm aliyun:rds:migration:evidence:strict",
+        "corepack pnpm aliyun:completion:audit",
+        "corepack pnpm aliyun:predeploy",
+      ],
+    }),
+  ]
+  const readyCount = phases.filter((item) => item.ready).length
+  const nextPhaseIds = phases
+    .filter((item) => {
+      if (item.ready) return false
+      const dependsOnPhaseIds = item.dependsOnPhaseIds || []
+      const dependenciesReady = dependsOnPhaseIds.every((phaseId) =>
+        phases.find((phaseItem) => phaseItem.id === phaseId)?.ready === true)
+      return item.canStartNow === true || (item.canStartAfterActionTimeConfirmation === true && dependenciesReady)
+    })
+    .map((item) => item.id)
+  const compatibilityReview = buildCompatibilityReviewPlan(localValidation, migrationPackage)
+  const executionReadiness = buildRdsExecutionReadiness(phases, compatibilityReview)
+  return {
+    ready: readyCount === phases.length,
+    phaseReady: `${readyCount}/${phases.length}`,
+    nextPhaseIds,
+    localReviewCanStartNow: phases.some((item) => item.id === "compatibility_review" && item.ready !== true && item.canStartNow),
+    cloudOrSecretActionRequired: phases.some((item) => item.ready !== true && item.requiresActionTimeConfirmation),
+    onlyMissingBackendCredentialValue: "DATABASE_URL_CN",
+    executionReadiness,
+    compatibilityReview,
+    sourceInventorySummary: {
+      appApiRouteCount: sourceInventory.summary?.appApiRouteCount || 0,
+      firstVersionRdsRouteCount: sourceInventory.summary?.firstVersionRdsRouteCount || 0,
+      firstVersionRdsRoutesWithSupabaseDataAccess: sourceInventory.summary?.firstVersionRdsRoutesWithSupabaseDataAccess || 0,
+      deferredAppApiRoutesWithSupabaseDataAccess: sourceInventory.summary?.deferredAppApiRoutesWithSupabaseDataAccess || 0,
+      postgresDataAccessAdapterDetected: sourceInventory.summary?.postgresDataAccessAdapterDetected === true,
+    },
+    phases,
+    safetyBoundary: [
+      "DATABASE_URL_CN and database password may only enter Aliyun KMS / Secrets Manager / SAE secret env.",
+      "Store only booleans, counts, resource identifiers, package digests, and non-secret evidence handles.",
+      "Supabase is a migration source or legacy compatibility source only, not the formal production-cn database target.",
+    ],
+  }
+}
+
+function buildRdsExecutionReadiness(phases, compatibilityReview) {
+  const phaseById = new Map(phases.map((phase) => [phase.id, phase]))
+  const sourceInventory = phaseById.get("source_inventory_preflight") || {}
+  const compatibility = phaseById.get("compatibility_review") || {}
+  const rdsInstance = phaseById.get("rds_instance_and_secret") || {}
+  const schemaData = phaseById.get("schema_data_validation") || {}
+  const appApiSmoke = phaseById.get("app_api_smoke_and_rollback") || {}
+  const canStartP11AfterActionTimeConfirmation = rdsInstance.ready !== true &&
+    rdsInstance.canStartAfterActionTimeConfirmation === true
+  const compatibilityReviewCanStartNow = compatibility.ready !== true &&
+    sourceInventory.ready === true &&
+    compatibility.canStartNow === true
+  const schemaApplyBlockedByCompatibilityReview = compatibility.ready !== true ||
+    compatibilityReview.dispositionPlan?.readyToApplySchema !== true
+  const rdsInstanceAndSecretReady = rdsInstance.ready === true
+  const schemaDataCanStartAfterActionTimeConfirmation = schemaData.ready !== true &&
+    compatibility.ready === true &&
+    rdsInstanceAndSecretReady &&
+    schemaData.canStartAfterActionTimeConfirmation === true
+  return {
+    ready: phases.every((phase) => phase.ready === true),
+    canStartP11AfterActionTimeConfirmation,
+    compatibilityReviewCanStartNow,
+    schemaApplyBlockedByCompatibilityReview,
+    rdsInstanceAndSecretReady,
+    schemaDataCanStartAfterActionTimeConfirmation,
+    appApiSmokeBlockedUntilSchemaData: appApiSmoke.ready !== true && schemaData.ready !== true,
+    onlyMissingBackendCredentialValue: "DATABASE_URL_CN",
+    databaseUrlCnSecretTarget: "Aliyun KMS / Secrets Manager / SAE secret env",
+    localReviewCloseFields: [
+      "migration.schemaCompatibilityReviewed",
+      "migration.supabaseSpecificSqlResolved",
+      "migration.rdsExtensionSupportConfirmed",
+    ],
+    cloudSecretWritebackFields: [
+      "rdsPostgres.instanceId",
+      "rdsPostgres.engineVersion",
+      "rdsPostgres.networkAccess",
+      "rdsPostgres.databaseName",
+      "rdsPostgres.databaseAccountReady=true",
+      "rdsPostgres.databaseUrlCnSecretImported=true",
+      "rdsPostgres.evidence=<non-secret RDS console/secret-env evidence handle>",
+    ],
+    migrationValidationWritebackFields: [
+      "migration.schemaMigrated=true",
+      "migration.dataMigrated=true",
+      "migration.rowCountValidationPassed=true",
+      "migration.criticalRecordValidationPassed=true",
+      "migration.appApiSmokeOnRdsPassed=true",
+      "migration.supabaseNoLongerFormalTarget=true",
+      "migration.rollbackValidationPassed=true",
+    ],
+    nextOperatorDecision: compatibilityReviewCanStartNow
+      ? "close_compatibility_review_and_prepare_rds_action_time_confirmation"
+      : "create_rds_import_database_url_secret_then_validate_schema_data_and_smoke",
+    verificationCommands: [
+      "corepack pnpm aliyun:rds:migration:package",
+      "corepack pnpm aliyun:rds:migration:evidence:strict",
+      "corepack pnpm aliyun:sensitive:blockers:backend",
+      "corepack pnpm aliyun:backend-cn:status",
+    ],
+    safetyBoundary: [
+      "Do not apply schema SQL until the 7 compatibility disposition categories are closed.",
+      "DATABASE_URL_CN and database password may only enter Aliyun KMS / Secrets Manager / SAE secret env.",
+      "Record only RDS instance ids, engine version, database name, booleans, digests, counts, and non-secret evidence handles.",
+      "Do not write dump contents, customer row payloads, Supabase service role key, AccessKeySecret, STS token, or connection string value.",
+    ],
+  }
+}
+
+function buildCompatibilityReviewPlan(localValidation, migrationPackage) {
+  const blockerFields = uniqueStrings((localValidation.blockers || []).map(fieldFromBlocker))
+  const blockingFields = [
+    "file_missing",
+    "migration.schemaCompatibilityReviewed",
+    "migration.supabaseSpecificSqlResolved",
+    "migration.rdsExtensionSupportConfirmed",
+  ].filter((field) => blockerFields.includes(field))
+  return {
+    ready: blockingFields.length === 0,
+    blockingFields,
+    packageOk: migrationPackage.ok === true,
+    reviewRequired: migrationPackage.summary?.compatibilityReviewRequired === true,
+    findingCount: migrationPackage.summary?.compatibilityFindingCount || 0,
+    affectedSourceFileCount: migrationPackage.summary?.compatibilityAffectedSourceFileCount || 0,
+    checklistItemCount: migrationPackage.summary?.compatibilityReviewChecklistItemCount || 0,
+    schemaApplyCandidateAudit: buildSchemaApplyCandidateAuditSummary(migrationPackage.schemaApplyCandidateAudit),
+    rdsApplyCandidateAudit: buildSchemaApplyCandidateAuditSummary(migrationPackage.rdsApplyCandidateAudit),
+    rdsApplyCandidateRemoval: {
+      status: migrationPackage.rdsApplyCandidate?.removalSummary?.status || "missing",
+      removedStatementCount: migrationPackage.rdsApplyCandidate?.removalSummary?.removedStatementCount || 0,
+      keptStatementCount: migrationPackage.rdsApplyCandidate?.removalSummary?.keptStatementCount || 0,
+      rewrittenStatementCount: migrationPackage.rdsApplyCandidate?.removalSummary?.rewrittenStatementCount || 0,
+      removedCategories: migrationPackage.rdsApplyCandidate?.removalSummary?.removedCategories || [],
+      rewrittenCategories: migrationPackage.rdsApplyCandidate?.removalSummary?.rewrittenCategories || [],
+      remainingReviewRequired: migrationPackage.rdsApplyCandidate?.removalSummary?.remainingReviewRequired === true,
+      remainingReviewReasons: migrationPackage.rdsApplyCandidate?.removalSummary?.remainingReviewReasons || [],
+    },
+    rdsApplyCandidateReviewPlan: {
+      status: migrationPackage.rdsApplyCandidateReviewPlan?.status || "missing",
+      readyToApplySchema: migrationPackage.rdsApplyCandidateReviewPlan?.readyToApplySchema === true,
+      itemCount: migrationPackage.rdsApplyCandidateReviewPlan?.itemCount || 0,
+      findingCount: migrationPackage.rdsApplyCandidateReviewPlan?.findingCount || 0,
+      categories: migrationPackage.rdsApplyCandidateReviewPlan?.categories || [],
+      requiredWriteBackFields: migrationPackage.rdsApplyCandidateReviewPlan?.requiredWriteBackFields || [],
+      closeConditions: migrationPackage.rdsApplyCandidateReviewPlan?.closeConditions || [],
+      items: migrationPackage.rdsApplyCandidateReviewPlan?.items || [],
+    },
+    categories: (migrationPackage.compatibilityReviewChecklist || []).map((item) => ({
+      code: item.code,
+      statusBeforeP11Apply: item.statusBeforeP11Apply,
+      findingCount: item.findingCount,
+      affectedSourceCount: item.affectedSourceCount,
+      evidenceWriteBackFields: item.evidenceWriteBackFields || [],
+      defaultProposedDisposition: item.defaultProposedDisposition || "",
+      requiredOperatorDecision: item.requiredOperatorDecision,
+      operatorChecklist: item.operatorChecklist || [],
+      acceptanceEvidence: item.acceptanceEvidence,
+    })),
+    dispositionPlan: buildCompatibilityDispositionPlanSummary(migrationPackage.compatibilityDispositionPlan),
+    packageDigests: {
+      schemaSqlSha256: migrationPackage.summary?.schemaSqlSha256 || "",
+      rdsApplyCandidateSqlSha256: migrationPackage.summary?.rdsApplyCandidateSqlSha256 || "",
+      validationSqlSha256: migrationPackage.summary?.validationSqlSha256 || "",
+      rollbackChecklistSha256: migrationPackage.summary?.rollbackChecklistSha256 || "",
+    },
+    writeTargets: [
+      "docs/app-production-cn-rds-migration-package.md -> compatibility review handoff summary",
+      "deploy/aliyun-production-cn.rds-migration.local.json -> migration.schemaCompatibilityReviewed / migration.supabaseSpecificSqlResolved / migration.rdsExtensionSupportConfirmed",
+    ],
+    forbidden: [
+      "DATABASE_URL_CN value",
+      "database password",
+      "customer row payloads",
+      "dump contents",
+      "Supabase service role key",
+      "AccessKeySecret",
+      "STS token",
+    ],
+  }
+}
+
+function buildSchemaApplyCandidateAuditSummary(audit) {
+  if (!audit || typeof audit !== "object") {
+    return {
+      readyToApplySchema: false,
+      status: "missing",
+      findingCount: 0,
+      categories: [],
+      byCode: [],
+      requiredBeforeApply: [],
+      forbiddenValues: [],
+    }
+  }
+  return {
+    readyToApplySchema: audit.readyToApplySchema === true,
+    status: audit.status || "unknown",
+    appliesTo: audit.appliesTo || "",
+    findingCount: audit.findingCount || 0,
+    affectedGeneratedFileCount: audit.affectedGeneratedFileCount || 0,
+    categories: audit.categories || [],
+    byCode: (audit.byCode || []).map((item) => ({
+      code: item.code,
+      severity: item.severity,
+      findingCount: item.findingCount || 0,
+      affectedSourceCount: item.affectedSourceCount || 0,
+      sourcePaths: item.sourcePaths || [],
+      action: item.action || "",
+    })),
+    requiredBeforeApply: audit.requiredBeforeApply || [],
+    forbiddenValues: audit.forbiddenValues || [],
+  }
+}
+
+function buildCompatibilityDispositionPlanSummary(dispositionPlan) {
+  if (!dispositionPlan || typeof dispositionPlan !== "object") {
+    return {
+      status: "missing",
+      readyToApplySchema: false,
+      itemCount: 0,
+      requiredWriteBackFields: [],
+      closeConditions: [],
+      forbiddenValues: [],
+      items: [],
+    }
+  }
+  return {
+    status: dispositionPlan.status || "unknown",
+    readyToApplySchema: dispositionPlan.readyToApplySchema === true,
+    defaultDispositionPolicy: dispositionPlan.defaultDispositionPolicy || "",
+    itemCount: dispositionPlan.itemCount || 0,
+    findingCount: dispositionPlan.findingCount || 0,
+    affectedSourceFileCount: dispositionPlan.affectedSourceFileCount || 0,
+    requiredWriteBackFields: dispositionPlan.requiredWriteBackFields || [],
+    closeConditions: dispositionPlan.closeConditions || [],
+    forbiddenValues: dispositionPlan.forbiddenValues || [],
+    items: (dispositionPlan.items || []).map((item) => ({
+      code: item.code,
+      defaultProposedDisposition: item.defaultProposedDisposition || "",
+      statusBeforeP11Apply: item.statusBeforeP11Apply || "",
+      findingCount: item.findingCount || 0,
+      affectedSourceCount: item.affectedSourceCount || 0,
+      evidenceWriteBackFields: item.evidenceWriteBackFields || [],
+      requiredOperatorDecision: item.requiredOperatorDecision || "",
+      operatorChecklist: item.operatorChecklist || [],
+      acceptanceEvidence: item.acceptanceEvidence || "",
+    })),
+  }
+}
+
+function summarizeWithPlan(template, local, sourceInventory, writebackPlan, rdsMigrationPlan) {
   return {
     templateReady: template.ready,
     localExists: local.exists,
@@ -594,6 +1071,13 @@ function summarize(template, local, sourceInventory) {
     postgresDataAccessAdapterDetected: sourceInventory.summary?.postgresDataAccessAdapterDetected === true,
     writebackBlockingGroups: writebackPlan.blockingGroups,
     requiredAuthorizationPackets: writebackPlan.requiredAuthorizationPackets,
+    rdsMigrationPlanReady: rdsMigrationPlan.ready,
+    rdsMigrationPhaseReady: rdsMigrationPlan.phaseReady,
+    rdsMigrationNextPhaseIds: rdsMigrationPlan.nextPhaseIds,
+    rdsLocalReviewCanStartNow: rdsMigrationPlan.localReviewCanStartNow,
+    rdsCanStartP11AfterActionTimeConfirmation: rdsMigrationPlan.executionReadiness.canStartP11AfterActionTimeConfirmation,
+    rdsCompatibilityReviewCanStartNow: rdsMigrationPlan.executionReadiness.compatibilityReviewCanStartNow,
+    rdsSchemaApplyBlockedByCompatibilityReview: rdsMigrationPlan.executionReadiness.schemaApplyBlockedByCompatibilityReview,
   }
 }
 
@@ -609,10 +1093,12 @@ function buildReport(args) {
   }
 
   const sourceInventory = runRdsMigrationPlan()
+  const migrationPackage = runRdsMigrationPackageSummary()
   const template = validateFile(args.templateFile, "template", sourceInventory)
   const local = validateFile(args.localFile, "local", sourceInventory)
   const writebackPlan = buildWritebackPlan(local)
-  const summary = summarize(template, local, sourceInventory)
+  const rdsMigrationPlan = buildRdsMigrationPlan(local, sourceInventory, migrationPackage)
+  const summary = summarizeWithPlan(template, local, sourceInventory, writebackPlan, rdsMigrationPlan)
   const ready = template.ready && local.ready
   const report = {
     ok: ready,
@@ -639,7 +1125,19 @@ function buildReport(args) {
       summary: sourceInventory.summary,
       inventory: sourceInventory.inventory,
     },
+    migrationPackage: {
+      ok: migrationPackage.ok === true,
+      summary: migrationPackage.summary,
+      compatibilityReview: {
+        required: migrationPackage.compatibilityReview?.required === true,
+        findingCount: migrationPackage.compatibilityReview?.findingCount || 0,
+        affectedSourceCount: migrationPackage.compatibilityReview?.affectedSourceCount || 0,
+      },
+      compatibilityReviewChecklist: rdsMigrationPlan.compatibilityReview.categories,
+      compatibilityDispositionPlan: rdsMigrationPlan.compatibilityReview.dispositionPlan,
+    },
     summary,
+    rdsMigrationPlan,
     writebackPlan,
     strictVerificationOrder: [
       "corepack pnpm aliyun:rds:migration:plan",
@@ -687,6 +1185,13 @@ function renderMarkdown(report) {
     `- postgresDataAccessAdapterDetected: ${report.summary.postgresDataAccessAdapterDetected}`,
     `- writebackBlockingGroups: ${report.summary.writebackBlockingGroups.join(", ") || "none"}`,
     `- requiredAuthorizationPackets: ${report.summary.requiredAuthorizationPackets.join(", ") || "none"}`,
+    `- rdsMigrationPlanReady: ${report.summary.rdsMigrationPlanReady}`,
+    `- rdsMigrationPhaseReady: ${report.summary.rdsMigrationPhaseReady}`,
+    `- rdsMigrationNextPhaseIds: ${report.summary.rdsMigrationNextPhaseIds.join(", ") || "none"}`,
+    `- rdsLocalReviewCanStartNow: ${report.summary.rdsLocalReviewCanStartNow}`,
+    `- rdsCanStartP11AfterActionTimeConfirmation: ${report.summary.rdsCanStartP11AfterActionTimeConfirmation}`,
+    `- rdsCompatibilityReviewCanStartNow: ${report.summary.rdsCompatibilityReviewCanStartNow}`,
+    `- rdsSchemaApplyBlockedByCompatibilityReview: ${report.summary.rdsSchemaApplyBlockedByCompatibilityReview}`,
     "",
     "## Files",
     "",
@@ -710,6 +1215,119 @@ function renderMarkdown(report) {
       `- expectedEvidence: ${group.expectedEvidence.join("; ")}`,
       `- forbidden: ${group.forbidden.join("; ")}`,
       `- verifyCommands: ${group.verifyCommands.join("; ")}`,
+      "",
+    ]),
+    "## RDS Migration Plan",
+    "",
+    `- ready: ${report.rdsMigrationPlan.ready}`,
+    `- phaseReady: ${report.rdsMigrationPlan.phaseReady}`,
+    `- nextPhaseIds: ${report.rdsMigrationPlan.nextPhaseIds.join(", ") || "none"}`,
+    `- localReviewCanStartNow: ${report.rdsMigrationPlan.localReviewCanStartNow}`,
+    `- cloudOrSecretActionRequired: ${report.rdsMigrationPlan.cloudOrSecretActionRequired}`,
+    `- onlyMissingBackendCredentialValue: ${report.rdsMigrationPlan.onlyMissingBackendCredentialValue}`,
+    "",
+    "### execution_readiness",
+    "",
+    `- canStartP11AfterActionTimeConfirmation: ${report.rdsMigrationPlan.executionReadiness.canStartP11AfterActionTimeConfirmation}`,
+    `- compatibilityReviewCanStartNow: ${report.rdsMigrationPlan.executionReadiness.compatibilityReviewCanStartNow}`,
+    `- schemaApplyBlockedByCompatibilityReview: ${report.rdsMigrationPlan.executionReadiness.schemaApplyBlockedByCompatibilityReview}`,
+    `- rdsInstanceAndSecretReady: ${report.rdsMigrationPlan.executionReadiness.rdsInstanceAndSecretReady}`,
+    `- onlyMissingBackendCredentialValue: ${report.rdsMigrationPlan.executionReadiness.onlyMissingBackendCredentialValue}`,
+    `- databaseUrlCnSecretTarget: ${report.rdsMigrationPlan.executionReadiness.databaseUrlCnSecretTarget}`,
+    `- localReviewCloseFields: ${report.rdsMigrationPlan.executionReadiness.localReviewCloseFields.join(", ") || "none"}`,
+    `- cloudSecretWritebackFields: ${report.rdsMigrationPlan.executionReadiness.cloudSecretWritebackFields.join(", ") || "none"}`,
+    `- nextOperatorDecision: ${report.rdsMigrationPlan.executionReadiness.nextOperatorDecision}`,
+    `- verificationCommands: ${report.rdsMigrationPlan.executionReadiness.verificationCommands.join("; ") || "none"}`,
+    "",
+    "### compatibility_review_package",
+    "",
+    `- ready: ${report.rdsMigrationPlan.compatibilityReview.ready}`,
+    `- packageOk: ${report.rdsMigrationPlan.compatibilityReview.packageOk}`,
+    `- reviewRequired: ${report.rdsMigrationPlan.compatibilityReview.reviewRequired}`,
+    `- findingCount: ${report.rdsMigrationPlan.compatibilityReview.findingCount}`,
+    `- affectedSourceFileCount: ${report.rdsMigrationPlan.compatibilityReview.affectedSourceFileCount}`,
+    `- checklistItemCount: ${report.rdsMigrationPlan.compatibilityReview.checklistItemCount}`,
+    `- blockingFields: ${report.rdsMigrationPlan.compatibilityReview.blockingFields.join(", ") || "none"}`,
+    `- schemaSqlSha256: ${report.rdsMigrationPlan.compatibilityReview.packageDigests.schemaSqlSha256}`,
+    `- rdsApplyCandidateSqlSha256: ${report.rdsMigrationPlan.compatibilityReview.packageDigests.rdsApplyCandidateSqlSha256}`,
+    `- validationSqlSha256: ${report.rdsMigrationPlan.compatibilityReview.packageDigests.validationSqlSha256}`,
+    `- rollbackChecklistSha256: ${report.rdsMigrationPlan.compatibilityReview.packageDigests.rollbackChecklistSha256}`,
+    "",
+    "### rds_apply_candidate",
+    "",
+    `- readyToApplySchema: ${report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateAudit.readyToApplySchema}`,
+    `- status: ${report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateAudit.status}`,
+    `- findingCount: ${report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateAudit.findingCount}`,
+    `- categories: ${report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateAudit.categories.join(", ") || "none"}`,
+    `- removedStatementCount: ${report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateRemoval.removedStatementCount}`,
+    `- keptStatementCount: ${report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateRemoval.keptStatementCount}`,
+    `- rewrittenStatementCount: ${report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateRemoval.rewrittenStatementCount}`,
+    `- remainingReviewRequired: ${report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateRemoval.remainingReviewRequired}`,
+    "",
+    ...report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateRemoval.removedCategories.map((item) =>
+      `- removed:${item.code}: statements=${item.statementCount}`,
+    ),
+    ...report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateRemoval.rewrittenCategories.map((item) =>
+      `- rewritten:${item.code}: statements=${item.statementCount}`,
+    ),
+    "",
+    "### rds_apply_candidate_review_plan",
+    "",
+    `- status: ${report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateReviewPlan.status}`,
+    `- readyToApplySchema: ${report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateReviewPlan.readyToApplySchema}`,
+    `- itemCount: ${report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateReviewPlan.itemCount}`,
+    `- findingCount: ${report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateReviewPlan.findingCount}`,
+    `- categories: ${report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateReviewPlan.categories.join(", ") || "none"}`,
+    `- requiredWriteBackFields: ${report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateReviewPlan.requiredWriteBackFields.join(", ") || "none"}`,
+    `- closeConditions: ${report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateReviewPlan.closeConditions.join("; ") || "none"}`,
+    "",
+    ...report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateReviewPlan.items.map((item) =>
+      `- review:${item.code}: findings=${item.findingCount}, sources=${item.affectedSourceCount}, fields=${(item.evidenceWriteBackFields || []).join(",") || "none"}`,
+    ),
+    "",
+    "### compatibility_disposition_plan",
+    "",
+    `- status: ${report.rdsMigrationPlan.compatibilityReview.dispositionPlan.status}`,
+    `- readyToApplySchema: ${report.rdsMigrationPlan.compatibilityReview.dispositionPlan.readyToApplySchema}`,
+    `- itemCount: ${report.rdsMigrationPlan.compatibilityReview.dispositionPlan.itemCount}`,
+    `- requiredWriteBackFields: ${report.rdsMigrationPlan.compatibilityReview.dispositionPlan.requiredWriteBackFields.join(", ") || "none"}`,
+    `- closeConditions: ${report.rdsMigrationPlan.compatibilityReview.dispositionPlan.closeConditions.join("; ") || "none"}`,
+    "",
+    ...report.rdsMigrationPlan.compatibilityReview.dispositionPlan.items.flatMap((item) => [
+      `#### disposition:${item.code}`,
+      "",
+      `- defaultProposedDisposition: ${item.defaultProposedDisposition}`,
+      `- operatorChecklist: ${item.operatorChecklist.join("; ") || "none"}`,
+      `- evidenceWriteBackFields: ${item.evidenceWriteBackFields.join(", ") || "none"}`,
+      `- acceptanceEvidence: ${item.acceptanceEvidence}`,
+      "",
+    ]),
+    ...report.rdsMigrationPlan.compatibilityReview.categories.flatMap((item) => [
+      `#### ${item.code}`,
+      "",
+      `- statusBeforeP11Apply: ${item.statusBeforeP11Apply}`,
+      `- findingCount: ${item.findingCount}`,
+      `- affectedSourceCount: ${item.affectedSourceCount}`,
+      `- defaultProposedDisposition: ${item.defaultProposedDisposition}`,
+      `- operatorChecklist: ${item.operatorChecklist.join("; ") || "none"}`,
+      `- evidenceWriteBackFields: ${item.evidenceWriteBackFields.join(", ") || "none"}`,
+      `- requiredOperatorDecision: ${item.requiredOperatorDecision}`,
+      `- acceptanceEvidence: ${item.acceptanceEvidence}`,
+      "",
+    ]),
+    ...report.rdsMigrationPlan.phases.flatMap((phase) => [
+      `### ${phase.id}`,
+      "",
+      `- ready: ${phase.ready}`,
+      `- canStartNow: ${phase.canStartNow}`,
+      `- canStartAfterActionTimeConfirmation: ${phase.canStartAfterActionTimeConfirmation}`,
+      `- dependsOnPhaseIds: ${phase.dependsOnPhaseIds.join(", ") || "none"}`,
+      `- requiredAuthorizationPackets: ${phase.requiredAuthorizationPackets.join(", ") || "none"}`,
+      `- blockerFields: ${phase.blockerFields.join(", ") || "none"}`,
+      `- writeTargets: ${phase.writeTargets.join("; ")}`,
+      `- expectedEvidence: ${phase.expectedEvidence.join("; ")}`,
+      `- forbidden: ${phase.forbidden.join("; ")}`,
+      `- verifyCommands: ${phase.verifyCommands.join("; ")}`,
       "",
     ]),
     "## Strict Verification Order",

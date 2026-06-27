@@ -3,7 +3,7 @@
 import { existsSync, writeFileSync } from "node:fs"
 import { dirname, isAbsolute, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
-import { spawnSync } from "node:child_process"
+import { runJsonWithCache } from "./lib/run-json-cache.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -84,20 +84,10 @@ function resolveValue(value, name) {
 }
 
 function runJson(label, scriptArgs) {
-  const result = spawnSync(process.execPath, scriptArgs, {
+  return runJsonWithCache(label, scriptArgs, {
     cwd: BACKEND_ROOT,
-    encoding: "utf8",
     maxBuffer: 1024 * 1024 * 30,
   })
-  if (result.error) throw result.error
-  if (result.status !== 0) {
-    throw new Error(`${label}_failed:${result.status}\n${result.stderr || result.stdout}`)
-  }
-  try {
-    return JSON.parse(result.stdout)
-  } catch (error) {
-    throw new Error(`invalid_json_from_${label}:${error instanceof Error ? error.message : String(error)}`)
-  }
 }
 
 function taskById(tasks, id) {

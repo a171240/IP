@@ -236,7 +236,7 @@ function buildReport() {
     readySecretImportBatches,
     importBatches,
     backendBlockerNotes: [
-      "S03_ACR_PAID_PURCHASE and S04_ACR_REGISTRY_AUTH remain backend blockers, but registry secret material stays in ACR/Docker credential helper, RAM/KMS/Secrets Manager, or SAE runtime pull settings.",
+      "ACR purchase evidence is confirmed locally; S04_ACR_REGISTRY_AUTH remains blocked until docker push, digest verification, and SAE runtime image pull configuration are closed without storing registry secret material in docs, JSON, images, or git.",
       "Supabase variables in legacy_database_migration_source are migration source / legacy compatibility only; formal production-cn database target is Aliyun RDS PostgreSQL.",
       "WeChat Open Platform mobile app, Apple Team ID, and Android release signing variables are deferred full App launch items, not current backend import blockers.",
     ],

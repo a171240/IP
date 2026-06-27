@@ -37,11 +37,11 @@ deferredAppLaunchSensitiveActionIds=S01_WECHAT_OPEN_APP_LOGIN, S02_APPLE_TEAM_ID
 
 ```text
 nonCredentialCanStartPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY
-credentialCanStartAfterActionTimeConfirmationIds: S03_ACR_PAID_PURCHASE, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL
-credentialBlockedByDependencyIds: S04_ACR_REGISTRY_AUTH, S06_READY_SENSITIVE_ENV_IMPORT
+credentialCanStartAfterActionTimeConfirmationIds: S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL
+credentialBlockedByDependencyIds: S06_READY_SENSITIVE_ENV_IMPORT
 ```
 
-`S04_ACR_REGISTRY_AUTH` waits for ACR instance/namespace/repository evidence before docker login/push or SAE image pull can be configured. `S06_READY_SENSITIVE_ENV_IMPORT` waits for RDS `DATABASE_URL_CN`, OSS RAM/STS, image/runtime evidence, and the selected Aliyun secret-env target.
+`S04_ACR_REGISTRY_AUTH` can start only after fresh action-time confirmation and must keep registry credentials out of reports, JSON, Docker images, shell history, and git. `S06_READY_SENSITIVE_ENV_IMPORT` waits for RDS `DATABASE_URL_CN`, OSS RAM/STS, image/runtime evidence, and the selected Aliyun secret-env target.
 
 Short answer for the current backend-only run:
 
@@ -49,11 +49,11 @@ Short answer for the current backend-only run:
 Only missing backend credential/password item: DATABASE_URL_CN.
 Where to get it: Aliyun Console -> RDS PostgreSQL -> cn-hangzhou instance -> database/account/connection information, after the RDS instance and database account are created or confirmed.
 Where to put it: Aliyun KMS / Secrets Manager / SAE secret env only.
-Required before treating it as complete: close the 6-item RDS compatibilityReviewChecklist (`supabase_auth_uid`, `supabase_storage_schema`, `supabase_service_role`, `row_level_security`, `policy_statement`, `extension_review`) and record only non-secret dispositions.
+Required before treating it as complete: close the 7-item RDS compatibilityReviewChecklist (`supabase_auth_schema`, `supabase_auth_uid`, `supabase_storage_schema`, `supabase_service_role`, `row_level_security`, `policy_statement`, `extension_review`) and record only non-secret dispositions.
 What not to do: do not write DATABASE_URL_CN value, database password, dump contents, Supabase service role key, AccessKeySecret, token, screenshots with values, shell history, JSON, Markdown, Docker image, App bundle, mini-program package, or git.
 ```
 
-CloudShell is not a credential source. It is only an inventory surface. The current CloudShell page requires clicking `开通` and warns it may create a performance NAS instance with possible usage fees. Do not click `开通` unless the user gives action-time authorization for that exact warning, and then run only allowlisted read-only inventory commands.
+CloudShell is not a credential source. It is only an inventory surface. The current CloudShell page requires clicking `开通` and warns it may create a performance NAS / 性能型 NAS instance with possible usage fees. Do not click `开通` unless the user gives action-time authorization for that exact warning, and then run only allowlisted read-only inventory commands.
 
 Backend-only docs:
 
@@ -86,7 +86,7 @@ If a console is already logged in, the operator may navigate and inspect non-sec
 CloudShell action-time phrase for the current state:
 
 ```text
-授权等待当前阿里云 CloudShell 连接完成后，只运行 allowlisted 只读盘点命令并写入非密钥 evidence；如后续出现开通、重启实例或费用提示，必须先停下另行确认；不创建业务资源、不购买 ACR、不导入密钥、不部署。
+授权在确认当前阿里云 CloudShell 重启实例提示后恢复只读盘点会话，或配置 Aliyun CLI；该提示会终止当前会话并创建新会话；只运行 allowlisted 只读盘点命令并写入非密钥 evidence；不创建业务资源、不购买 ACR、不导入密钥、不部署。
 ```
 
 ## Credentials And Controlled Actions
@@ -96,7 +96,6 @@ CloudShell action-time phrase for the current state:
 | `S01_WECHAT_OPEN_APP_LOGIN` | `WECHAT_OPEN_APP_ID`, `WECHAT_OPEN_APP_SECRET`, `WECHAT_OPEN_APP_REVIEW_STATUS` | 微信开放平台 -> 管理中心 -> 移动应用 -> 美业话镜 App -> 开发信息 | AppID -> Aliyun SAE plain env; AppSecret -> KMS/Secrets Manager/SAE secret env; non-secret evidence -> `items.wechatOpenPlatform` | `corepack pnpm aliyun:wechat-state:test`; `corepack pnpm aliyun:health:smoke`; `corepack pnpm aliyun:app-api:smoke`; `corepack pnpm aliyun:readiness` | Do not use mini-program credentials. Do not output or store AppSecret in Markdown, JSON, Docker images, app bundles, or git. |
 | `S07_ANDROID_RELEASE_SIGNING` | `MEIYE_RELEASE_STORE_FILE`, `MEIYE_RELEASE_STORE_PASSWORD`, `MEIYE_RELEASE_KEY_ALIAS`, `MEIYE_RELEASE_KEY_PASSWORD`, WeChat Android release signature evidence | Local or CI Android release signing secret store; WeChat Open Platform -> mobile app -> Android signature | Signing material -> local/CI signing secret store only; signature evidence -> WeChat Open Platform and non-secret `.local.json` fields | `cd /Users/Admin/Documents/美业话镜APP/meiye-huajing-app/android && ANDROID_HOME="$HOME/Library/Android/sdk" ANDROID_SDK_ROOT="$HOME/Library/Android/sdk" ./gradlew assembleRelease`; `ANDROID_HOME="$HOME/Library/Android/sdk" ANDROID_SDK_ROOT="$HOME/Library/Android/sdk" $ANDROID_HOME/build-tools/<version>/apksigner verify --print-certs app/build/outputs/apk/release/*.apk`; `corepack pnpm aliyun:wechat-open:package`; `corepack pnpm aliyun:app-native:check` | Do not use `debug.keystore`. Do not commit keystore files or passwords. |
 | `S02_APPLE_TEAM_ID` | `APPLE_TEAM_ID` | Apple Developer -> Membership or Certificates, Identifiers & Profiles -> Identifiers -> 美业话镜 App ID | Aliyun SAE plain env; AASA / iOS evidence handles | `corepack pnpm aliyun:aasa:check`; `corepack pnpm aliyun:app-native:check` | Do not guess the Team ID. Do not create certificates or provisioning profiles in this step. |
-| `S03_ACR_PAID_PURCHASE` | ACR Enterprise Economic purchase confirmation, registry host, namespace, repository | 阿里云控制台 -> 容器镜像服务 ACR -> 企业版购买页 | Non-secret purchase and repository evidence -> `deploy/aliyun-production-cn.image-publish.local.json` | `corepack pnpm aliyun:image:plan`; `corepack pnpm aliyun:resources:matrix`; `corepack pnpm aliyun:user:actions` | Do not click purchase until amount, region, edition, and term are confirmed at action time. Current candidate is cn-hangzhou, 1 month, CNY 117.00. |
 | `S04_ACR_REGISTRY_AUTH` | Registry push and SAE pull credential path | 阿里云控制台 -> ACR namespace/repository; SAE app -> image pull configuration | Docker credential helper, RAM/KMS/Secrets Manager, or Aliyun runtime secret settings only; non-secret digest evidence -> image-publish local file | `corepack pnpm aliyun:image:plan:strict`; `corepack pnpm aliyun:container:smoke` | Do not store registry username/password, RAM Secret, or token in files, images, reports, shell history, or git. |
 | `S05_OSS_RAM_SECRET_OR_STS` | `ALIYUN_OSS_SECURITY_TOKEN` if STS is selected; OSS bucket/CORS/prefix/RAM least privilege closure | 阿里云控制台 -> OSS Bucket / RAM 访问控制 / SAE runtime identity / Secrets Manager | OSS AccessKey/STS material -> KMS/Secrets Manager/SAE secret env only; non-secret evidence -> `items.oss` | `corepack pnpm aliyun:cloud:confirmations`; `corepack pnpm aliyun:health:smoke` | Do not create commit-ready long-lived plaintext secrets. Do not download OSS object contents. |
 | `S08_ALIYUN_RDS_DATABASE_URL` | `DATABASE_URL_CN` plus RDS PostgreSQL schema/data/API smoke/rollback migration evidence | 阿里云控制台 -> RDS PostgreSQL -> 实例/数据库/账号/连接信息；SAE/KMS/Secrets Manager -> secret env | `DATABASE_URL_CN` -> KMS/Secrets Manager/SAE secret env only; non-secret migration evidence -> `rds-migration.local.json` and `items.envImport` | `corepack pnpm aliyun:rds:migration:package`; `corepack pnpm aliyun:rds:migration:evidence:strict`; `corepack pnpm aliyun:sensitive:blockers:backend`; `corepack pnpm aliyun:backend-cn:status`; `corepack pnpm aliyun:completion:audit` | Do not store DATABASE_URL_CN, database password, dump contents, customer data, Supabase service role key, AccessKeySecret, token, reports, images, shell history, or git. |
@@ -182,17 +181,16 @@ After fresh action-time confirmation, these backend-only packets can be started 
 
 ```text
 P00_ALIYUN_READONLY_INVENTORY_IDENTITY
-P03_ACR_PURCHASE
+P04_ACR_IMAGE_AND_PULL
 P05_OSS_RAM_STS
 P11_ALIYUN_RDS_DATA_MIGRATION
 ```
 
-`P00_ALIYUN_READONLY_INVENTORY_IDENTITY` is allowed to start only under the CloudShell/NAS warning rule above. It does not authorize RDS creation, ACR purchase, OSS/RAM changes, env import, image push, DNS mutation, deployment, or git push.
+`P03_ACR_PURCHASE` is already confirmed as paid/opened for ACR Enterprise Economic in cn-hangzhou, 1 month, CNY 117.00. `P00_ALIYUN_READONLY_INVENTORY_IDENTITY` is allowed to start only under the CloudShell/NAS warning rule above. It does not authorize RDS creation, OSS/RAM changes, env import, image push, DNS mutation, deployment, or git push.
 
 These backend packets are still dependency-blocked:
 
 ```text
-P04_ACR_IMAGE_AND_PULL
 P06_ENV_IMPORT
 P07_DOMAIN_DNS_HTTPS
 P08_SAE_RUNTIME_SLS

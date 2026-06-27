@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 阿里云后端-only 当前执行简报
 
-Generated: 2026-06-26T01:45:16.056Z
+Generated: 2026-06-26T17:44:01.864Z
 
 ## 结论
 
@@ -13,7 +13,7 @@ Generated: 2026-06-26T01:45:16.056Z
 - cloudResourceEvidenceReady: 0/7
 - cloudConfirmationsReady: 0/6
 - operatorTasksReady: 0/8
-- sensitiveBlocked: 5/5
+- sensitiveBlocked: 4/4
 - blockedCredentialCount: 1
 - blockedCredentialNames: DATABASE_URL_CN
 - readySecretEnvVariableCount: 17
@@ -42,12 +42,12 @@ Generated: 2026-06-26T01:45:16.056Z
 
 - requiredBlocking: ACR_IMAGE_REGISTRY_NOT_READY, API_DOMAIN_HTTPS_ICP_NOT_READY, ASSET_DOMAIN_HTTPS_ICP_NOT_READY, DATABASE_URL_CN, ENV_IMPORT_NOT_READY, OSS_RAM_STS_NOT_READY, POSTDEPLOY_SMOKE_NOT_RUN, RDS_MIGRATION_EVIDENCE_NOT_READY, SAE_RUNTIME_NOT_READY, SLS_ALERTS_NOT_READY
 - machineBlocking: missing_required_env:DATABASE_URL_CN
-- cloudResourceObservedPartialIds: R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS
-- cloudResourceObservedBlockedIds: R01_SAE_RUNTIME, R02_ACR_IMAGE_REGISTRY, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R06_ENV_IMPORT
-- sensitiveBlockedIds: S03_ACR_PAID_PURCHASE, S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT
+- cloudResourceObservedPartialIds: R02_ACR_IMAGE_REGISTRY, R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS
+- cloudResourceObservedBlockedIds: R01_SAE_RUNTIME, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R06_ENV_IMPORT
+- sensitiveBlockedIds: S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT
 - canStartNowConsoleTasks: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS
-- canStartNowAuthorizationPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE
-- blockedByAuthorizationPacketDependencies: P04_ACR_IMAGE_AND_PULL, P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS, P09_PRODUCTION_DEPLOY
+- canStartNowAuthorizationPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P04_ACR_IMAGE_AND_PULL
+- blockedByAuthorizationPacketDependencies: P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS, P09_PRODUCTION_DEPLOY
 
 ## 数据层边界
 
@@ -67,11 +67,11 @@ Generated: 2026-06-26T01:45:16.056Z
 | 资源 | ready | 观察状态 | 观察成熟度 | 下一步 | 写入目标 |
 | --- | --- | --- | --- | --- | --- |
 | `R01_SAE_RUNTIME` | false | not_created_or_not_confirmed | blocked | 创建或确认 cn-hangzhou SAE 应用 meiye-huajing-app-api-production-cn，容器端口 3000，健康检查 /api/healthz。 | deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.runtime |
-| `R02_ACR_IMAGE_REGISTRY` | false | purchase_candidate_visible_not_purchased | blocked | 动作时确认 ACR Enterprise Economic / cn-hangzhou / 1 month / CNY 117.00 后，购买实例并创建 namespace/repository。 | deploy/aliyun-production-cn.image-publish.local.json -> acr.purchaseCandidate / acr non-secret evidence |
+| `R02_ACR_IMAGE_REGISTRY` | false | acr_repository_confirmed_image_push_pending | partial | Push/import the backend image to ACR, verify sha256 digest, then configure SAE image pull authorization. | deploy/aliyun-production-cn.image-publish.local.json -> acr.purchaseCandidate / acr non-secret evidence |
 | `R03_API_DOMAIN_HTTPS` | false | domain_visible_records_missing | blocked | 补齐 api-cn.ipgongchang.xin 与 assets-cn.ipgongchang.xin 解析到阿里云入口，并确认 HTTPS/ICP。 | deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps / items.assetDomainHttps |
 | `R04_ASSET_DOMAIN_HTTPS` | false | domain_visible_records_missing | blocked | 补齐 api-cn.ipgongchang.xin 与 assets-cn.ipgongchang.xin 解析到阿里云入口，并确认 HTTPS/ICP。 | deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps / items.assetDomainHttps |
 | `R05_OSS_AUDIO_STORAGE` | false | bucket_visible_unconfirmed | partial | 继续确认 CORS、RAM 最小权限和 service-records/production-cn 前缀；只记录 bucket/region/布尔证据。 | deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss |
-| `R06_ENV_IMPORT` | false | cloudshell_connecting_inventory_not_executed | blocked | 只有 Cloud Shell/CLI 配置 ready 后，才运行受控只读 inventory runner；否则继续用控制台人工证据。 | deploy/aliyun-production-cn.cloud-inventory-results.local.json |
+| `R06_ENV_IMPORT` | false | cloudshell_disconnected_restart_confirmation_required | blocked | 只有 Cloud Shell/CLI 配置 ready 后，才运行受控只读 inventory runner；否则继续用控制台人工证据。 | deploy/aliyun-production-cn.cloud-inventory-results.local.json |
 | `R07_SLS_ALERTS` | false | project_logstore_visible_alerts_pending | partial | SAE runtime ready 后配置日志采集、/api/healthz 健康告警和 5xx 告警。 | deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.slsAlerts |
 
 ## 现在需要动作时确认的后端授权包
@@ -80,7 +80,7 @@ Generated: 2026-06-26T01:45:16.056Z
 
 - title: 恢复阿里云 CLI/CloudShell 只读盘点身份
 - owner: 用户/阿里云只读盘点操作员
-- minimumUserPhrase: 授权等待当前阿里云 CloudShell 连接完成后，只运行 allowlisted 只读盘点命令并写入非密钥 evidence；如后续出现开通、重启实例或费用提示，必须先停下另行确认。
+- minimumUserPhrase: 授权在确认当前阿里云 CloudShell 重启实例提示后恢复只读盘点会话，或配置 Aliyun CLI；该提示会终止当前会话并创建新会话；只运行 allowlisted 只读盘点命令并写入非密钥 evidence。
 - writeTargets: deploy/aliyun-production-cn.cloud-inventory-results.local.json -> non-secret read-only inventory summaries
 - verifyCommands: corepack pnpm aliyun:cloud:access; MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1 corepack pnpm aliyun:cloud:inventory-run -- --execute-readonly --write-local deploy/aliyun-production-cn.cloud-inventory-results.local.json; corepack pnpm aliyun:cloud:inventory-results:strict; corepack pnpm aliyun:evidence:writeback:backend
 - nonSecretEvidenceOnly: true
@@ -103,57 +103,62 @@ Generated: 2026-06-26T01:45:16.056Z
 - verifyCommands: corepack pnpm aliyun:cloud:confirmations; corepack pnpm aliyun:health:smoke
 - nonSecretEvidenceOnly: false
 
-### P03_ACR_PURCHASE
+### P04_ACR_IMAGE_AND_PULL
 
-- title: 确认 ACR 企业版付费购买
-- owner: 用户/阿里云 ACR 操作员
-- minimumUserPhrase: 授权购买 ACR Enterprise Economic，cn-hangzhou，1 个月，当前报价 CNY 117.00。
-- writeTargets: deploy/aliyun-production-cn.image-publish.local.json -> acr.purchaseCandidate / acr confirmed evidence
-- verifyCommands: corepack pnpm aliyun:image:plan
+- title: 配置 ACR 镜像推送和 SAE 镜像拉取权限
+- owner: 阿里云 ACR/SAE 操作员
+- minimumUserPhrase: 授权把后端镜像推送到已创建的 ACR，并配置 SAE 拉取该镜像；不输出 registry 密码。
+- writeTargets: deploy/aliyun-production-cn.image-publish.local.json -> acr + runtime
+- verifyCommands: corepack pnpm aliyun:image:plan:strict; corepack pnpm aliyun:container:smoke
 - nonSecretEvidenceOnly: true
 
 ## 当前可回填的后端证据
 
 ### C02_ACR_IMAGE_AND_PULL
 
-- title: 购买/确认 ACR 企业版实例和镜像仓库基础信息
-- currentActionScope: purchase_and_repository_only
+- title: 推送/导入后端镜像到 ACR 并配置 SAE 拉取
+- currentActionScope: image_push_or_import_and_digest_verification
 - requiresActionTimeConfirmation: true
 - nonSecretEvidenceOnly: true
-- consolePath: 阿里云控制台 -> 容器镜像服务 ACR -> 企业版购买页
+- consolePath: 阿里云控制台 -> ACR 命名空间/镜像仓库；SAE 应用 -> 镜像拉取配置
 - targetFields:
-  - edition: ACR Enterprise Economic (image publish plan)
-  - region: cn-hangzhou (image publish plan)
-  - duration: 1 month (image publish plan)
-  - quotedAmount: CNY 117.00 (read-only console evidence)
+  - registryHost: meiye-huajing-app-api-registry.cn-hangzhou.cr.aliyuncs.com (image publish plan)
+  - namespace: meiye-huajing-app-api (image publish plan)
   - repository: meiye-huajing-app-api (image publish plan)
-  - remoteTag: production-cn (image publish plan)
+  - remoteImage: meiye-huajing-app-api-registry.cn-hangzhou.cr.aliyuncs.com/meiye-huajing-app-api/meiye-huajing-app-api:production-cn (image publish plan)
+  - remoteDigest: sha256:<64 hex> (P04 completion evidence)
   - localImage: meiye-huajing-app-api:production-cn (image publish plan)
-  - localDigest: meiye-huajing-app-api@sha256:494907a4f9e7342064dda55fe30e0e48dd245b6d6ae753bdbb3945f77c0f518d (local docker evidence)
+  - localDigest: ready (local docker evidence)
   - runtimeAppName: meiye-huajing-app-api-production-cn (image publish plan)
 - writeTargets:
-  - deploy/aliyun-production-cn.image-publish.local.json: acr.confirmed=true
-  - deploy/aliyun-production-cn.image-publish.local.json: acr.registryHost=<cn-hangzhou aliyuncs.com host>
-  - deploy/aliyun-production-cn.image-publish.local.json: acr.namespace=<actual namespace>
+  - deploy/aliyun-production-cn.image-publish.local.json: acr.remoteImage=<registryHost>/<namespace>/meiye-huajing-app-api:production-cn
+  - deploy/aliyun-production-cn.image-publish.local.json: acr.remoteDigest=sha256:<64 hex>
+  - deploy/aliyun-production-cn.image-publish.local.json: acr.imagePushed=true
+  - deploy/aliyun-production-cn.image-publish.local.json: acr.digestVerified=true
+  - deploy/aliyun-production-cn.image-publish.local.json: acr.pushNetworkPath=public_registry|vpc_registry_from_aliyun_network|acr_import_task
+  - deploy/aliyun-production-cn.image-publish.local.json: acr.publicNetworkEntranceEnabled=true if pushing from local/public network
+  - deploy/aliyun-production-cn.image-publish.local.json: acr.evidence=<non-secret evidence handle>
 - acceptanceEvidence:
-  - ACR Enterprise Economic / cn-hangzhou / 1 month 购买或已开通确认
-  - registryHost 必须是真实 aliyuncs.com host，不能保留 TODO
-  - namespace 和 repository=meiye-huajing-app-api 已确认
+  - 远端 ACR 镜像已推送或导入
+  - 远端 digest 与推送后的 sha256 digest 已核对
+  - 已选择 ACR 推送网络路径；当前公网入口未开启时不能直接从本机走公网 registry push
+  - 本地镜像仍可通过 corepack pnpm aliyun:container:smoke
 - currentBlockers:
-  - todo:acr.registryHost
-  - todo:acr.namespace
-  - acr.confirmed
+  - todo:acr.remoteDigest
+  - acr.imagePushed
+  - acr.digestVerified
+  - acr.remoteDigest=sha256
+  - acr.pushNetworkPath
 - deferredWritebackGroups:
-  - imagePushAndDigest: waits=P04_ACR_IMAGE_AND_PULL; blockers=todo:acr.remoteImage, todo:acr.remoteDigest, todo:acr.evidence, acr.imagePushed, acr.digestVerified, acr.remoteDigest=sha256
+  - acrPurchaseAndRepository: waits=P03_ACR_PURCHASE; blockers=none
   - saeRuntimeImagePull: waits=P08_SAE_RUNTIME_SLS, P04_ACR_IMAGE_AND_PULL; blockers=runtime.confirmed, runtime.remoteImageConfigured, runtime.imagePullConfigured
 - deferredActions:
-  - P04_ACR_IMAGE_AND_PULL 依赖 P03_ACR_PURCHASE 完成后再执行。
-  - 当前确认包不执行 docker login/push。
-  - 当前确认包不配置 SAE runtime image pull credentials。
-  - imagePushed=true、digestVerified=true、runtime.remoteImageConfigured=true、runtime.imagePullConfigured=true 都属于后置验收。
+  - 不购买 ACR。
+  - 不把 docker login、registry password、RAM Secret 或 token 写入 JSON/Markdown/git。
+  - 不部署 production-cn，除非 P09_PRODUCTION_DEPLOY 单独授权。
 - forbidden:
-  - 不要写入 ACR 用户名、密码、临时 token 或 RAM Secret
-  - 当前动作不执行 docker login、docker push 或 SAE 镜像拉取配置
+  - 不要把 docker login 命令、registry 密码或临时 token 写入 JSON/Markdown/git
+  - acrPurchaseAndRepository 未 ready 前不要执行镜像推送动作
   - AccessKeySecret
   - AppSecret
   - registry password
@@ -162,7 +167,8 @@ Generated: 2026-06-26T01:45:16.056Z
   - cookie
   - Supabase service role key
 - verifyCommands:
-  - corepack pnpm aliyun:image:plan
+  - corepack pnpm aliyun:container:smoke
+  - corepack pnpm aliyun:image:plan:strict
 
 ### C05_OSS_AUDIO_RAM_STS
 
@@ -216,7 +222,7 @@ Generated: 2026-06-26T01:45:16.056Z
 
 | 变量 | 授权包 | 获取位置 | 获取方式 | 导入目标 | 禁止写入 |
 | --- | --- | --- | --- | --- | --- |
-| `DATABASE_URL_CN` | P11_ALIYUN_RDS_DATA_MIGRATION | 阿里云控制台 -> RDS PostgreSQL -> 数据库连接 | 先生成并核对 docs/app-production-cn-rds-migration-package.md，创建或确认 production-cn RDS PostgreSQL，关闭 compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查，完成 schema/data、APP API smoke 和 rollback 验收后，只把连接串导入 secret env。 | 阿里云 KMS/Secrets Manager/SAE secret env | 只在动作时导入 KMS/Secrets Manager/SAE secret env；不要写入 JSON、Markdown、Docker 镜像或 git。 |
+| `DATABASE_URL_CN` | P11_ALIYUN_RDS_DATA_MIGRATION | 阿里云控制台 -> RDS PostgreSQL -> 数据库连接 | 先生成并核对 docs/app-production-cn-rds-migration-package.md，创建或确认 production-cn RDS PostgreSQL，关闭 compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查，完成 schema/data、APP API smoke 和 rollback 验收后，只把连接串导入 secret env。 | 阿里云 KMS/Secrets Manager/SAE secret env | 只在动作时导入 KMS/Secrets Manager/SAE secret env；不要写入 JSON、Markdown、Docker 镜像或 git。 |
 
 ## 已 ready 但仍需导入阿里云 secret env
 

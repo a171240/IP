@@ -1,6 +1,6 @@
 # 美业话镜 APP production-cn 阿里云动作授权矩阵
 
-Generated: 2026-06-26T01:41:10.832Z
+Generated: 2026-06-26T16:47:09.502Z
 
 ## 结论
 
@@ -12,13 +12,13 @@ Generated: 2026-06-26T01:41:10.832Z
 - mutationPerformed: false
 - containsValues: false
 - secretLeakCheck: true
-- actionTimeConfirmationRequired: U00_ALIYUN_READONLY_INVENTORY_IDENTITY, U11_ALIYUN_RDS_DATA_MIGRATION, U05_OSS_RAM_OR_STS, U03_ACR_PURCHASE_CONFIRMATION, U04_ACR_RUNTIME_AUTH, U06_ENV_IMPORT, U07_DOMAIN_DNS_HTTPS_ICP, U08_SAE_RUNTIME_AND_SLS, U09_DEPLOY_AUTHORIZATION
-- nextActionTimeConfirmations: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE
+- actionTimeConfirmationRequired: U00_ALIYUN_READONLY_INVENTORY_IDENTITY, U11_ALIYUN_RDS_DATA_MIGRATION, U05_OSS_RAM_OR_STS, U04_ACR_RUNTIME_AUTH, U06_ENV_IMPORT, U07_DOMAIN_DNS_HTTPS_ICP, U08_SAE_RUNTIME_AND_SLS, U09_DEPLOY_AUTHORIZATION
+- nextActionTimeConfirmations: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P04_ACR_IMAGE_AND_PULL
 - blockedCredentialCount: 1
 - readySecretEnvVariableCount: 17
 - resourceEvidenceReady: 0/7
 - blockedResourceEvidenceIds: R01_SAE_RUNTIME, R02_ACR_IMAGE_REGISTRY, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R05_OSS_AUDIO_STORAGE, R06_ENV_IMPORT, R07_SLS_ALERTS
-- partiallyObservedResourceEvidenceIds: R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS
+- partiallyObservedResourceEvidenceIds: R02_ACR_IMAGE_REGISTRY, R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS
 
 ## 目标闭环证据简表
 
@@ -30,11 +30,11 @@ Generated: 2026-06-26T01:41:10.832Z
 - readySecretEnvVariableCount: 17
 - resourceEvidenceReady: 0/7
 - blockedResourceEvidenceIds: R01_SAE_RUNTIME, R02_ACR_IMAGE_REGISTRY, R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS, R05_OSS_AUDIO_STORAGE, R06_ENV_IMPORT, R07_SLS_ALERTS
-- partiallyObservedResourceEvidenceIds: R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS
-- canStartNowPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE
+- partiallyObservedResourceEvidenceIds: R02_ACR_IMAGE_REGISTRY, R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS
+- canStartNowPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P04_ACR_IMAGE_AND_PULL
 - deferredAppLaunchPackets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID
 - canStartNowConsoleTasks: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS
-- blockedByPacketDependencies: P04_ACR_IMAGE_AND_PULL, P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS, P09_PRODUCTION_DEPLOY
+- blockedByPacketDependencies: P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS, P09_PRODUCTION_DEPLOY
 
 ## 允许的本地工作
 
@@ -58,15 +58,15 @@ Generated: 2026-06-26T01:41:10.832Z
 - actionId: U00_ALIYUN_READONLY_INVENTORY_IDENTITY
 - owner: 用户/阿里云只读盘点操作员
 - sequenceGroup: readonly_inventory
-- minimumUserPhrase: 授权等待当前阿里云 CloudShell 连接完成后，只运行 allowlisted 只读盘点命令并写入非密钥 evidence；如后续出现开通、重启实例或费用提示，必须先停下另行确认。
-- allowedActions: 等待当前 CloudShell 从“正在连接 Cloud Shell.”变为可输入命令提示符。; 连接完成后只运行本仓库生成的 List/Describe/stat/get inventory 命令。; 也可改用已安全配置的 Aliyun CLI profile 执行同一套只读命令。; 只记录资源名、布尔值、时间戳、命令状态、sha256 指纹和非密钥 evidence handle。
-- explicitlyExcluded: 不运行 Create/Update/Delete/Deploy/Start/Stop/Purchase/DNS mutation 命令。; 不执行 docker login/push。; 不读取、复制、粘贴或输出 AccessKeySecret、STS token、cookie、registry password、RAM Secret 或证书私钥。; 当前 connecting 状态不授权点击开通、重启实例、购买、创建资源、导入环境变量或部署。
+- minimumUserPhrase: 授权在确认当前阿里云 CloudShell 重启实例提示后恢复只读盘点会话，或配置 Aliyun CLI；该提示会终止当前会话并创建新会话；只运行 allowlisted 只读盘点命令并写入非密钥 evidence。
+- allowedActions: 动作时确认 CloudShell 重启实例提示后恢复会话；若不确认，则改用已安全配置的 Aliyun CLI profile。; 只运行本仓库生成的 List/Describe/stat/get inventory 命令。; 只记录资源名、布尔值、时间戳、命令状态、sha256 指纹和非密钥 evidence handle。
+- explicitlyExcluded: 不运行 Create/Update/Delete/Deploy/Start/Stop/Purchase/DNS mutation 命令。; 不执行 docker login/push。; 不读取、复制、粘贴或输出 AccessKeySecret、STS token、cookie、registry password、RAM Secret 或证书私钥。; 除用户明确确认 CloudShell 重启实例提示外，不做任何 production-cn deploy、env import、资源创建、购买或 DNS 变更。
 - completionEvidence: cloudInventoryResults.localReady=true; readyLocalOperations=9/9; executedCommandResults=9/9; mutationPerformedCommandResults=0
 - writeTargets: deploy/aliyun-production-cn.cloud-inventory-results.local.json -> non-secret read-only inventory summaries
 - verifyCommands: corepack pnpm aliyun:cloud:access; MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1 corepack pnpm aliyun:cloud:inventory-run -- --execute-readonly --write-local deploy/aliyun-production-cn.cloud-inventory-results.local.json; corepack pnpm aliyun:cloud:inventory-results:strict; corepack pnpm aliyun:evidence:writeback:backend
 - nonSecretEvidenceOnly: true
-- cloudShellCurrentStatus: connecting_terminal_input_visible_inventory_not_executed
-- cloudShellConnecting: true
+- cloudShellCurrentStatus: disconnected_restart_instance_confirmation_required
+- cloudShellConnecting: false
 - cloudShellTerminalInputVisible: true
 - cloudShellCanRunReadOnlyInventory: false
 
@@ -76,9 +76,9 @@ Generated: 2026-06-26T01:41:10.832Z
 - owner: 阿里云 RDS/后端数据迁移操作员
 - sequenceGroup: cloud_foundation
 - minimumUserPhrase: 授权创建/确认阿里云 RDS PostgreSQL production-cn 数据库并完成数据迁移；DATABASE_URL_CN 只能进入阿里云 secret env。
-- allowedActions: 创建或确认 cn-hangzhou RDS PostgreSQL 实例、数据库、账号和网络白名单/内网访问策略。; 先生成并核对 docs/app-production-cn-rds-migration-package.md，关闭 compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查。; 执行 Supabase 到 RDS/PostgreSQL 的 schema/data 迁移与回滚验收。; 只把 DATABASE_URL_CN 导入 KMS/Secrets Manager/SAE secret env，并记录非密钥迁移证据。
+- allowedActions: 创建或确认 cn-hangzhou RDS PostgreSQL 实例、数据库、账号和网络白名单/内网访问策略。; 先生成并核对 docs/app-production-cn-rds-migration-package.md，关闭 compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查。; 执行 Supabase 到 RDS/PostgreSQL 的 schema/data 迁移与回滚验收。; 只把 DATABASE_URL_CN 导入 KMS/Secrets Manager/SAE secret env，并记录非密钥迁移证据。
 - explicitlyExcluded: 不把数据库密码、连接串 value 或 Supabase service role key 写入 JSON、Markdown、Docker 镜像或 git。; 不把 Supabase 当作正式 production-cn 数据库目标。; 不执行破坏性数据迁移，除非迁移计划和回滚验收已单独确认。
-- completionEvidence: Aliyun RDS PostgreSQL instance exists in cn-hangzhou; database account and least-privilege access are ready; DATABASE_URL_CN imported through secret env only; compatibilityReviewChecklistItemCount=6 is reviewed and closed before schema apply; supabase_auth_uid/supabase_storage_schema/supabase_service_role/row_level_security/policy_statement/extension_review dispositions are recorded without secrets; migration.schemaCompatibilityReviewed=true; migration.supabaseSpecificSqlResolved=true; migration.rdsExtensionSupportConfirmed=true; schema/data/APP API smoke/rollback validation passed; backend production-cn no longer depends on Supabase as formal database target
+- completionEvidence: Aliyun RDS PostgreSQL instance exists in cn-hangzhou; database account and least-privilege access are ready; DATABASE_URL_CN imported through secret env only; compatibilityReviewChecklistItemCount=7 is reviewed and closed before schema apply; supabase_auth_schema/supabase_auth_uid/supabase_storage_schema/supabase_service_role/row_level_security/policy_statement/extension_review dispositions are recorded without secrets; migration.schemaCompatibilityReviewed=true; migration.supabaseSpecificSqlResolved=true; migration.rdsExtensionSupportConfirmed=true; schema/data/APP API smoke/rollback validation passed; backend production-cn no longer depends on Supabase as formal database target
 - writeTargets: docs/app-production-cn-rds-migration-package.md -> non-secret schema/validation/rollback package digest handoff; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres / migration non-secret evidence; DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env only
 - verifyCommands: corepack pnpm aliyun:rds:migration:package; corepack pnpm aliyun:rds:migration:evidence:strict; corepack pnpm aliyun:sensitive:blockers:backend; corepack pnpm aliyun:backend-cn:status; corepack pnpm aliyun:completion:audit; corepack pnpm aliyun:predeploy
 - nonSecretEvidenceOnly: false
@@ -96,17 +96,17 @@ Generated: 2026-06-26T01:41:10.832Z
 - verifyCommands: corepack pnpm aliyun:cloud:confirmations; corepack pnpm aliyun:health:smoke
 - nonSecretEvidenceOnly: false
 
-### P03_ACR_PURCHASE 确认 ACR 企业版付费购买
+### P04_ACR_IMAGE_AND_PULL 配置 ACR 镜像推送和 SAE 镜像拉取权限
 
-- actionId: U03_ACR_PURCHASE_CONFIRMATION
-- owner: 用户/阿里云 ACR 操作员
-- sequenceGroup: cloud_foundation
-- minimumUserPhrase: 授权购买 ACR Enterprise Economic，cn-hangzhou，1 个月，当前报价 CNY 117.00。
-- allowedActions: 在阿里云 ACR 企业版购买页确认规格、地域、时长和金额。; 完成购买后创建或确认实例、namespace 和 repository。; 只记录 registry host、namespace、repository 和非密钥购买证据。
-- explicitlyExcluded: 未明确确认金额前不点击付款。; 不执行 docker login/push。; 不记录 registry password、RAM Secret 或 token。
-- completionEvidence: acr.purchaseCandidate.confirmed=true; acr.registryHost actual aliyuncs.com host; acr.namespace created; repository=meiye-huajing-app-api
-- writeTargets: deploy/aliyun-production-cn.image-publish.local.json -> acr.purchaseCandidate / acr confirmed evidence
-- verifyCommands: corepack pnpm aliyun:image:plan
+- actionId: U04_ACR_RUNTIME_AUTH
+- owner: 阿里云 ACR/SAE 操作员
+- sequenceGroup: image_runtime
+- minimumUserPhrase: 授权把后端镜像推送到已创建的 ACR，并配置 SAE 拉取该镜像；不输出 registry 密码。
+- allowedActions: 构建并 smoke 本地 Docker 镜像。; 通过受控 docker credential helper、RAM 或阿里云运行时配置完成镜像推送/拉取。; 在 image-publish.local.json 记录 remote image、sha256 digest 和布尔证据。
+- explicitlyExcluded: 不购买 ACR。; 不把 registry username/password、RAM Secret 或 token 写入文件、镜像或 git。; 不部署 production-cn，除非 U09 单独授权。
+- completionEvidence: acr.imagePushed=true; acr.digestVerified=true; runtime.remoteImageConfigured=true; runtime.imagePullConfigured=true; remoteDigest sha256 verified
+- writeTargets: deploy/aliyun-production-cn.image-publish.local.json -> acr + runtime
+- verifyCommands: corepack pnpm aliyun:image:plan:strict; corepack pnpm aliyun:container:smoke
 - nonSecretEvidenceOnly: true
 
 ## 动作分类
@@ -124,7 +124,7 @@ Generated: 2026-06-26T01:41:10.832Z
 - writeTargets: deploy/aliyun-production-cn.cloud-inventory-results.local.json -> non-secret read-only inventory summaries
 - variableNames: none
 - currentBlockers: readonly_inventory_strict_ready=0/9; cloudInventory:I01_SAE_RUNTIME; cloudInventory:I02_ACR_IMAGE; cloudInventory:I03_DNS_API_DOMAIN; cloudInventory:I04_DNS_ASSET_DOMAIN; cloudInventory:I05_OSS_AUDIO_BUCKET; cloudInventory:I06_SLS_ALERTS; cloudInventory:I07_CERT_HTTPS; cloudInventory:I08_RDS_POSTGRES; cloudInventory:I09_TAIR_REDIS
-- currentEvidence: cloudInventoryResults.templateReady=true; cloudInventoryResults.localExists=true; cloudInventoryResults.localReady=false; readyLocalOperations=0/9; executedCommandResults=9/9; cloudApiCalledCommandResults=9; mutationPerformedCommandResults=0; cloudShellCurrentStatus=connecting_terminal_input_visible_inventory_not_executed; cloudShellConnecting=true; cloudShellTerminalInputVisible=true; cloudShellCanRunReadOnlyInventory=false; cloudShellRequiresOpenConfirmation=false; cloudShellRequiresRestartConfirmation=false; cloudShellBlockers=cloudshell_connecting_terminal_input_visible_inventory_not_executed
+- currentEvidence: cloudInventoryResults.templateReady=true; cloudInventoryResults.localExists=true; cloudInventoryResults.localReady=false; readyLocalOperations=0/9; executedCommandResults=9/9; cloudApiCalledCommandResults=9; mutationPerformedCommandResults=0; cloudShellCurrentStatus=disconnected_restart_instance_confirmation_required; cloudShellConnecting=false; cloudShellTerminalInputVisible=true; cloudShellCanRunReadOnlyInventory=false; cloudShellRequiresOpenConfirmation=false; cloudShellRequiresRestartConfirmation=true; cloudShellBlockers=cloudshell_disconnected_restart_instance_confirmation_required
 - verifyCommands: corepack pnpm aliyun:cloud:access; MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1 corepack pnpm aliyun:cloud:inventory-run -- --execute-readonly --write-local deploy/aliyun-production-cn.cloud-inventory-results.local.json; corepack pnpm aliyun:cloud:inventory-results:strict; corepack pnpm aliyun:evidence:writeback:backend
 
 ### U11_ALIYUN_RDS_DATA_MIGRATION 创建阿里云 RDS PostgreSQL 并完成正式数据层迁移
@@ -156,23 +156,23 @@ Generated: 2026-06-26T01:41:10.832Z
 - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss; ALIYUN_OSS_ACCESS_KEY_ID / ALIYUN_OSS_ACCESS_KEY_SECRET / ALIYUN_OSS_SECURITY_TOKEN -> KMS/Secrets Manager/SAE secret env
 - variableNames: ALIYUN_OSS_ACCESS_KEY_ID, ALIYUN_OSS_ACCESS_KEY_SECRET, ALIYUN_OSS_SECURITY_TOKEN
 - currentBlockers: S05_OSS_RAM_SECRET_OR_STS:blocked; R05_OSS_AUDIO_STORAGE:oss:confirmed; R05_OSS_AUDIO_STORAGE:oss:ramLeastPrivilege; oss:confirmed; oss:ramLeastPrivilege
-- currentEvidence: oss.confirmed=false; oss.bucket=meiye-huajing-service-records-production-cn; oss.region=cn-hangzhou; oss.corsConfigured=true; oss.ramLeastPrivilege=false; oss.serviceRecordPrefix=service-records/production-cn; R05_OSS_AUDIO_STORAGE:chrome_oss_bucket_2026-06-25T19:47_CST_bucket_exists_meiye-huajing-service-records-production-cn_visible_oss-cn-hangzhou_overview_object_page_prefix_service-records-production-cn_ram_sts_not_confirmed; R05_OSS_AUDIO_STORAGE:observedResourceStatus=bucket_visible_unconfirmed; R05_OSS_AUDIO_STORAGE:observedResourceReadiness=partial
+- currentEvidence: oss.confirmed=false; oss.bucket=meiye-huajing-service-records-production-cn; oss.region=cn-hangzhou; oss.corsConfigured=true; oss.ramLeastPrivilege=false; oss.serviceRecordPrefix=service-records/production-cn; R05_OSS_AUDIO_STORAGE:chrome_oss_bucket_2026-06-27T00:17_CST_bucket_exists_cn-hangzhou_private_acl_standard_storage_zero_files_external_endpoint_oss-cn-hangzhou_internal_endpoint_oss-cn-hangzhou-internal_zero_files_ram_sts_not_confirmed_cors_not_reverified_on_overview; R05_OSS_AUDIO_STORAGE:oss.accessPlan.selectedMode=pending_choose_sae_runtime_role_or_sts; R05_OSS_AUDIO_STORAGE:oss.accessPlan.selectedReady=false; R05_OSS_AUDIO_STORAGE:oss.accessPlan.selectedBlockers=oss.confirmed,oss.ramLeastPrivilege; R05_OSS_AUDIO_STORAGE:oss.accessPlan.recommendedModeIds=sae_runtime_role,sts_assume_role; R05_OSS_AUDIO_STORAGE:oss.accessPlan.policyFile=deploy/aliyun-production-cn.oss-ram-policy.json; R05_OSS_AUDIO_STORAGE:oss.accessPlan.policyName=MeiyeHuajingServiceRecordsOssPolicy; R05_OSS_AUDIO_STORAGE:oss.accessPlan.allowedActions=oss:GetObject,oss:PutObject,oss:PostObject; R05_OSS_AUDIO_STORAGE:oss.accessPlan.resourceScope=acs:oss:*:*:meiye-huajing-service-records-production-cn/service-records/production-cn/*; R05_OSS_AUDIO_STORAGE:oss.runtimePrefixContract.requiredEnvName=SERVICE_RECORD_OSS_PREFIX; R05_OSS_AUDIO_STORAGE:oss.runtimePrefixContract.expectedValue=service-records/production-cn; R05_OSS_AUDIO_STORAGE:oss.runtimePrefixContract.policyScopeCoversExpectedPrefix=true; R05_OSS_AUDIO_STORAGE:oss.runtimePrefixContract.currentConfirmationPrefixReady=true; R05_OSS_AUDIO_STORAGE:oss.accessPlan.writebackTemplate=deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss; R05_OSS_AUDIO_STORAGE:oss.execution.canStartP05AfterActionTimeConfirmation=true; R05_OSS_AUDIO_STORAGE:oss.execution.resourceReadyForP05=true; R05_OSS_AUDIO_STORAGE:oss.execution.accessGrantReady=false; R05_OSS_AUDIO_STORAGE:oss.execution.preferredModeId=sae_runtime_role; R05_OSS_AUDIO_STORAGE:oss.execution.preferredModeAvoidsLongLivedSecret=true; R05_OSS_AUDIO_STORAGE:oss.execution.fallbackSecretModeIds=sts_assume_role,least_privilege_ram_user_secret_env; R05_OSS_AUDIO_STORAGE:oss.execution.fallbackSecretEnvNames=ALIYUN_OSS_ACCESS_KEY_ID,ALIYUN_OSS_ACCESS_KEY_SECRET,ALIYUN_OSS_SECURITY_TOKEN; R05_OSS_AUDIO_STORAGE:oss.execution.nextOperatorDecision=choose_sae_runtime_role_or_sts_then_bind_least_privilege_policy; R05_OSS_AUDIO_STORAGE:observedResourceStatus=bucket_visible_unconfirmed; R05_OSS_AUDIO_STORAGE:observedResourceReadiness=partial
 - verifyCommands: corepack pnpm aliyun:cloud:confirmations; corepack pnpm aliyun:health:smoke
 
-### U03_ACR_PURCHASE_CONFIRMATION 确认 ACR 企业版付费购买
+### U03_ACR_PURCHASE_CONFIRMATION 确认 ACR 企业版购买/仓库证据
 
-- status: blocked
+- status: ready
 - automationPolicy: paid_purchase_requires_action_time_confirmation
 - canCodexProceedWithoutUser: false
-- requiresActionTimeConfirmation: true
+- requiresActionTimeConfirmation: false
 - blockerClass: paid_purchase
-- why: ACR 企业版购买是付费动作；当前只可记录报价候选，付款前必须确认金额和规格。
+- why: ACR 企业版购买/仓库证据已确认；当前不再执行付款动作，后续镜像 push/import 和 SAE 拉取配置必须走 P04。
 - owner: 用户/阿里云 ACR 操作员
-- obtainFrom: 阿里云控制台 -> 容器镜像服务 ACR -> 企业版购买页
+- obtainFrom: 阿里云控制台 -> 容器镜像服务 ACR -> 企业版实例/命名空间/镜像仓库
 - writeTargets: deploy/aliyun-production-cn.image-publish.local.json -> acr.purchaseCandidate / acr confirmed evidence
 - variableNames: none
-- currentBlockers: S03_ACR_PAID_PURCHASE:blocked; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.registryHost; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.namespace; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.remoteImage; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.remoteDigest; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.evidence; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.confirmed; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.imagePushed; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.digestVerified; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.remoteDigest=sha256; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:runtime.confirmed; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:runtime.remoteImageConfigured; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:runtime.imagePullConfigured
-- currentEvidence: R02_ACR_IMAGE_REGISTRY:imagePublish.localExists=true; R02_ACR_IMAGE_REGISTRY:imagePublish.localReady=false; R02_ACR_IMAGE_REGISTRY:image.localDigestReady=true; R02_ACR_IMAGE_REGISTRY:localDockerImage.status=ready; R02_ACR_IMAGE_REGISTRY:localDockerImage.repoDigest=meiye-huajing-app-api@sha256:494907a4f9e7342064dda55fe30e0e48dd245b6d6ae753bdbb3945f77c0f518d; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.edition=ACR Enterprise Economic; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.region=cn-hangzhou; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.duration=1 month; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.quotedAmount=CNY 117.00; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.confirmed=false; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.requiresActionTimePurchaseConfirmation=true; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.evidence=chrome_acr_instances_2026-06-25T19:47_CST_enterprise_instance_list_visible_create_enterprise_instance_entry_visible_no_meiye_target_instance_or_repository_confirmed_not_purchased_action_time_confirmation_required; R02_ACR_IMAGE_REGISTRY:runtime.target=SAE; R02_ACR_IMAGE_REGISTRY:runtime.appName=meiye-huajing-app-api-production-cn; R02_ACR_IMAGE_REGISTRY:runtime.remoteImageConfigured=false; R02_ACR_IMAGE_REGISTRY:runtime.imagePullConfigured=false; R02_ACR_IMAGE_REGISTRY:observedResourceStatus=purchase_candidate_visible_not_purchased; R02_ACR_IMAGE_REGISTRY:observedResourceReadiness=blocked
+- currentBlockers: none
+- currentEvidence: R02_ACR_IMAGE_REGISTRY:chrome_acr_repository_2026-06-27T00:11_CST_repo_meiye-huajing-app-api_private_local_normal_cn-hangzhou_repo_id_crr-k3xw5jyl3glkm1vs; chrome_acr_images_2026-06-27T00:13_CST_no_production_cn_tag_or_sha256_digest_visible_on_images_page; R02_ACR_IMAGE_REGISTRY:imagePublish.localExists=true; R02_ACR_IMAGE_REGISTRY:imagePublish.localReady=false; R02_ACR_IMAGE_REGISTRY:image.localDigestReady=true; R02_ACR_IMAGE_REGISTRY:dockerContext.status=ready; R02_ACR_IMAGE_REGISTRY:dockerContext.ok=true; R02_ACR_IMAGE_REGISTRY:dockerContext.checkedFiles=7; R02_ACR_IMAGE_REGISTRY:dockerContext.sensitiveEnvExcluded=true; R02_ACR_IMAGE_REGISTRY:localDockerImage.status=docker_daemon_unavailable_or_timeout; R02_ACR_IMAGE_REGISTRY:localDockerImage.dockerClientInstalled=true; R02_ACR_IMAGE_REGISTRY:localDockerImage.dockerServerAvailable=false; R02_ACR_IMAGE_REGISTRY:localDockerImage.nextEvidenceAction=Start Docker Desktop/daemon for local smoke, or use ACR import/VPC runner without relying on this machine's Docker daemon.; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.edition=ACR Enterprise Economic; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.region=cn-hangzhou; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.duration=1 month; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.quotedAmount=CNY 117.00; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.confirmed=true; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.requiresActionTimePurchaseConfirmation=false; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.evidence=chrome_acr_2026-06-26T11:33_CST_instance_meiye-huajing-app-api_cri-imlf4amccfw6m6sa_running_economic_cn-hangzhou_expires_2026-07-27_namespace_meiye-huajing-app-api_normal_repo_meiye-huajing-app-api_private_local_repo_created; chrome_acr_repo_detail_2026-06-26T12:40_CST_public_address_requires_access_control_network_entrance_vpc_registry_host_visible; user_confirmed_acr_paid_success_2026-06-26T21:18_CST; user_confirmed_acr_paid_success_2026-06-27T00:36_CST; R02_ACR_IMAGE_REGISTRY:acr.publicNetworkEntranceEnabled=false; R02_ACR_IMAGE_REGISTRY:acr.pushNetworkPlan.selectedPath=pending_choose_vpc_registry_or_enable_public_network_entrance; R02_ACR_IMAGE_REGISTRY:acr.pushNetworkPlan.selectedReady=false; R02_ACR_IMAGE_REGISTRY:acr.pushNetworkPlan.recommendedPathIds=vpc_registry_from_aliyun_network,acr_import_task; R02_ACR_IMAGE_REGISTRY:acr.execution.canStartP04AfterActionTimeConfirmation=true; R02_ACR_IMAGE_REGISTRY:acr.execution.p04StrictReady=false; R02_ACR_IMAGE_REGISTRY:acr.execution.selectedTransferPathReady=false; R02_ACR_IMAGE_REGISTRY:acr.execution.localPublicPushReady=false; R02_ACR_IMAGE_REGISTRY:acr.execution.dockerDaemonReady=false; R02_ACR_IMAGE_REGISTRY:acr.execution.recommendedTransferPathIds=vpc_registry_from_aliyun_network,acr_import_task; R02_ACR_IMAGE_REGISTRY:acr.execution.forbiddenTransferPathIds=public_registry; R02_ACR_IMAGE_REGISTRY:acr.execution.nextOperatorDecision=choose_vpc_registry_from_aliyun_network_or_acr_import_task; R02_ACR_IMAGE_REGISTRY:runtime.target=SAE; R02_ACR_IMAGE_REGISTRY:runtime.appName=meiye-huajing-app-api-production-cn; R02_ACR_IMAGE_REGISTRY:runtime.remoteImageConfigured=false; R02_ACR_IMAGE_REGISTRY:runtime.imagePullConfigured=false; R02_ACR_IMAGE_REGISTRY:observedResourceStatus=acr_repository_confirmed_image_push_pending; R02_ACR_IMAGE_REGISTRY:observedResourceReadiness=partial
 - verifyCommands: corepack pnpm aliyun:image:plan
 
 ### U04_ACR_RUNTIME_AUTH 配置 ACR 镜像推送和 SAE 镜像拉取权限
@@ -187,8 +187,8 @@ Generated: 2026-06-26T01:41:10.832Z
 - obtainFrom: 阿里云控制台 -> ACR 命名空间/镜像仓库；SAE 应用 -> 镜像拉取配置
 - writeTargets: deploy/aliyun-production-cn.image-publish.local.json -> acr + runtime
 - variableNames: none
-- currentBlockers: S04_ACR_REGISTRY_AUTH:blocked; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.registryHost; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.namespace; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.remoteImage; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.remoteDigest; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.evidence; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.confirmed; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.imagePushed; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.digestVerified; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.remoteDigest=sha256; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:runtime.confirmed; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:runtime.remoteImageConfigured; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:runtime.imagePullConfigured
-- currentEvidence: R02_ACR_IMAGE_REGISTRY:imagePublish.localExists=true; R02_ACR_IMAGE_REGISTRY:imagePublish.localReady=false; R02_ACR_IMAGE_REGISTRY:image.localDigestReady=true; R02_ACR_IMAGE_REGISTRY:localDockerImage.status=ready; R02_ACR_IMAGE_REGISTRY:localDockerImage.repoDigest=meiye-huajing-app-api@sha256:494907a4f9e7342064dda55fe30e0e48dd245b6d6ae753bdbb3945f77c0f518d; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.edition=ACR Enterprise Economic; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.region=cn-hangzhou; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.duration=1 month; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.quotedAmount=CNY 117.00; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.confirmed=false; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.requiresActionTimePurchaseConfirmation=true; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.evidence=chrome_acr_instances_2026-06-25T19:47_CST_enterprise_instance_list_visible_create_enterprise_instance_entry_visible_no_meiye_target_instance_or_repository_confirmed_not_purchased_action_time_confirmation_required; R02_ACR_IMAGE_REGISTRY:runtime.target=SAE; R02_ACR_IMAGE_REGISTRY:runtime.appName=meiye-huajing-app-api-production-cn; R02_ACR_IMAGE_REGISTRY:runtime.remoteImageConfigured=false; R02_ACR_IMAGE_REGISTRY:runtime.imagePullConfigured=false; R02_ACR_IMAGE_REGISTRY:observedResourceStatus=purchase_candidate_visible_not_purchased; R02_ACR_IMAGE_REGISTRY:observedResourceReadiness=blocked
+- currentBlockers: S04_ACR_REGISTRY_AUTH:blocked; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:todo:acr.remoteDigest; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.imagePushed; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.digestVerified; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.remoteDigest=sha256; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:acr.pushNetworkPath; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:runtime.confirmed; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:runtime.remoteImageConfigured; R02_ACR_IMAGE_REGISTRY:imagePublishLocal:runtime.imagePullConfigured
+- currentEvidence: R02_ACR_IMAGE_REGISTRY:chrome_acr_repository_2026-06-27T00:11_CST_repo_meiye-huajing-app-api_private_local_normal_cn-hangzhou_repo_id_crr-k3xw5jyl3glkm1vs; chrome_acr_images_2026-06-27T00:13_CST_no_production_cn_tag_or_sha256_digest_visible_on_images_page; R02_ACR_IMAGE_REGISTRY:imagePublish.localExists=true; R02_ACR_IMAGE_REGISTRY:imagePublish.localReady=false; R02_ACR_IMAGE_REGISTRY:image.localDigestReady=true; R02_ACR_IMAGE_REGISTRY:dockerContext.status=ready; R02_ACR_IMAGE_REGISTRY:dockerContext.ok=true; R02_ACR_IMAGE_REGISTRY:dockerContext.checkedFiles=7; R02_ACR_IMAGE_REGISTRY:dockerContext.sensitiveEnvExcluded=true; R02_ACR_IMAGE_REGISTRY:localDockerImage.status=docker_daemon_unavailable_or_timeout; R02_ACR_IMAGE_REGISTRY:localDockerImage.dockerClientInstalled=true; R02_ACR_IMAGE_REGISTRY:localDockerImage.dockerServerAvailable=false; R02_ACR_IMAGE_REGISTRY:localDockerImage.nextEvidenceAction=Start Docker Desktop/daemon for local smoke, or use ACR import/VPC runner without relying on this machine's Docker daemon.; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.edition=ACR Enterprise Economic; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.region=cn-hangzhou; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.duration=1 month; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.quotedAmount=CNY 117.00; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.confirmed=true; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.requiresActionTimePurchaseConfirmation=false; R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.evidence=chrome_acr_2026-06-26T11:33_CST_instance_meiye-huajing-app-api_cri-imlf4amccfw6m6sa_running_economic_cn-hangzhou_expires_2026-07-27_namespace_meiye-huajing-app-api_normal_repo_meiye-huajing-app-api_private_local_repo_created; chrome_acr_repo_detail_2026-06-26T12:40_CST_public_address_requires_access_control_network_entrance_vpc_registry_host_visible; user_confirmed_acr_paid_success_2026-06-26T21:18_CST; user_confirmed_acr_paid_success_2026-06-27T00:36_CST; R02_ACR_IMAGE_REGISTRY:acr.publicNetworkEntranceEnabled=false; R02_ACR_IMAGE_REGISTRY:acr.pushNetworkPlan.selectedPath=pending_choose_vpc_registry_or_enable_public_network_entrance; R02_ACR_IMAGE_REGISTRY:acr.pushNetworkPlan.selectedReady=false; R02_ACR_IMAGE_REGISTRY:acr.pushNetworkPlan.recommendedPathIds=vpc_registry_from_aliyun_network,acr_import_task; R02_ACR_IMAGE_REGISTRY:acr.execution.canStartP04AfterActionTimeConfirmation=true; R02_ACR_IMAGE_REGISTRY:acr.execution.p04StrictReady=false; R02_ACR_IMAGE_REGISTRY:acr.execution.selectedTransferPathReady=false; R02_ACR_IMAGE_REGISTRY:acr.execution.localPublicPushReady=false; R02_ACR_IMAGE_REGISTRY:acr.execution.dockerDaemonReady=false; R02_ACR_IMAGE_REGISTRY:acr.execution.recommendedTransferPathIds=vpc_registry_from_aliyun_network,acr_import_task; R02_ACR_IMAGE_REGISTRY:acr.execution.forbiddenTransferPathIds=public_registry; R02_ACR_IMAGE_REGISTRY:acr.execution.nextOperatorDecision=choose_vpc_registry_from_aliyun_network_or_acr_import_task; R02_ACR_IMAGE_REGISTRY:runtime.target=SAE; R02_ACR_IMAGE_REGISTRY:runtime.appName=meiye-huajing-app-api-production-cn; R02_ACR_IMAGE_REGISTRY:runtime.remoteImageConfigured=false; R02_ACR_IMAGE_REGISTRY:runtime.imagePullConfigured=false; R02_ACR_IMAGE_REGISTRY:observedResourceStatus=acr_repository_confirmed_image_push_pending; R02_ACR_IMAGE_REGISTRY:observedResourceReadiness=partial
 - verifyCommands: corepack pnpm aliyun:image:plan:strict; corepack pnpm aliyun:container:smoke
 
 ### U06_ENV_IMPORT 把 ready 环境变量导入 SAE/KMS/Secrets Manager
@@ -220,7 +220,7 @@ Generated: 2026-06-26T01:41:10.832Z
 - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps
 - variableNames: none
 - currentBlockers: R03_API_DOMAIN_HTTPS:APP_API_BASE_URL:dns_special_use_wildcard_ip; R03_API_DOMAIN_HTTPS:APP_API_BASE_URL:https_not_ready:ECONNRESET; R03_API_DOMAIN_HTTPS:NEXT_PUBLIC_SITE_URL:dns_special_use_wildcard_ip; R03_API_DOMAIN_HTTPS:NEXT_PUBLIC_SITE_URL:https_not_ready:ECONNRESET; R03_API_DOMAIN_HTTPS:APP_ASSET_BASE_URL:dns_special_use_wildcard_ip; R03_API_DOMAIN_HTTPS:APP_ASSET_BASE_URL:https_not_ready:ECONNRESET; R03_API_DOMAIN_HTTPS:apiDomainHttps:confirmed; R03_API_DOMAIN_HTTPS:apiDomainHttps:dnsResolvedToAliyun; R03_API_DOMAIN_HTTPS:apiDomainHttps:httpsEnabled; R03_API_DOMAIN_HTTPS:apiDomainHttps:icpReady; R03_API_DOMAIN_HTTPS:assetDomainHttps:confirmed; R03_API_DOMAIN_HTTPS:assetDomainHttps:dnsResolvedToAliyun; R03_API_DOMAIN_HTTPS:assetDomainHttps:httpsEnabled; R03_API_DOMAIN_HTTPS:assetDomainHttps:icpReady; R04_ASSET_DOMAIN_HTTPS:APP_API_BASE_URL:dns_special_use_wildcard_ip; R04_ASSET_DOMAIN_HTTPS:APP_API_BASE_URL:https_not_ready:ECONNRESET; R04_ASSET_DOMAIN_HTTPS:NEXT_PUBLIC_SITE_URL:dns_special_use_wildcard_ip; R04_ASSET_DOMAIN_HTTPS:NEXT_PUBLIC_SITE_URL:https_not_ready:ECONNRESET; R04_ASSET_DOMAIN_HTTPS:APP_ASSET_BASE_URL:dns_special_use_wildcard_ip; R04_ASSET_DOMAIN_HTTPS:APP_ASSET_BASE_URL:https_not_ready:ECONNRESET; R04_ASSET_DOMAIN_HTTPS:apiDomainHttps:confirmed; R04_ASSET_DOMAIN_HTTPS:apiDomainHttps:dnsResolvedToAliyun; R04_ASSET_DOMAIN_HTTPS:apiDomainHttps:httpsEnabled; R04_ASSET_DOMAIN_HTTPS:apiDomainHttps:icpReady; R04_ASSET_DOMAIN_HTTPS:assetDomainHttps:confirmed; R04_ASSET_DOMAIN_HTTPS:assetDomainHttps:dnsResolvedToAliyun; R04_ASSET_DOMAIN_HTTPS:assetDomainHttps:httpsEnabled; R04_ASSET_DOMAIN_HTTPS:assetDomainHttps:icpReady; apiDomainHttps:confirmed; apiDomainHttps:dnsResolvedToAliyun; apiDomainHttps:httpsEnabled; apiDomainHttps:icpReady; assetDomainHttps:confirmed; assetDomainHttps:dnsResolvedToAliyun; assetDomainHttps:httpsEnabled; assetDomainHttps:icpReady
-- currentEvidence: apiDomainHttps.confirmed=false; apiDomainHttps.host=api-cn.ipgongchang.xin; apiDomainHttps.dnsResolvedToAliyun=false; apiDomainHttps.httpsEnabled=false; apiDomainHttps.icpReady=false; assetDomainHttps.confirmed=false; assetDomainHttps.host=assets-cn.ipgongchang.xin; assetDomainHttps.dnsResolvedToAliyun=false; assetDomainHttps.httpsEnabled=false; assetDomainHttps.icpReady=false; R03_API_DOMAIN_HTTPS:chrome_dns_console_2026-06-25T19:47_CST_ipgongchang_xin_exact_search_api-cn_no_data_total_0_existing_api_A_106.14.241.129_no_sae_endpoint_no_https_icp_ready; R03_API_DOMAIN_HTTPS:observedResourceStatus=domain_visible_records_missing; R03_API_DOMAIN_HTTPS:observedResourceReadiness=blocked; R04_ASSET_DOMAIN_HTTPS:chrome_dns_console_2026-06-25T19:47_CST_ipgongchang_xin_exact_search_assets-cn_no_data_total_0_no_cdn_or_oss_custom_domain_no_https_icp_ready; R04_ASSET_DOMAIN_HTTPS:observedResourceStatus=domain_visible_records_missing; R04_ASSET_DOMAIN_HTTPS:observedResourceReadiness=blocked
+- currentEvidence: apiDomainHttps.confirmed=false; apiDomainHttps.host=api-cn.ipgongchang.xin; apiDomainHttps.dnsResolvedToAliyun=false; apiDomainHttps.httpsEnabled=false; apiDomainHttps.icpReady=false; assetDomainHttps.confirmed=false; assetDomainHttps.host=assets-cn.ipgongchang.xin; assetDomainHttps.dnsResolvedToAliyun=false; assetDomainHttps.httpsEnabled=false; assetDomainHttps.icpReady=false; R03_API_DOMAIN_HTTPS:chrome_dns_console_2026-06-25T19:47_CST_ipgongchang_xin_exact_search_api-cn_no_data_total_0_existing_api_A_106.14.241.129_no_sae_endpoint_no_https_icp_ready; R03_API_DOMAIN_HTTPS:domainHttpsPlan.ready=false; R03_API_DOMAIN_HTTPS:domainHttpsPlan.apiDomainHttps.selectedMode=pending_sae_runtime_public_endpoint; R03_API_DOMAIN_HTTPS:domainHttpsPlan.apiDomainHttps.targetHost=api-cn.ipgongchang.xin; R03_API_DOMAIN_HTTPS:domainHttpsPlan.apiDomainHttps.ready=false; R03_API_DOMAIN_HTTPS:domainHttpsPlan.apiDomainHttps.blockers=apiDomainHttps.confirmed,apiDomainHttps.dnsResolvedToAliyun,apiDomainHttps.httpsEnabled,apiDomainHttps.icpReady; R03_API_DOMAIN_HTTPS:domainHttpsPlan.apiDomainHttps.recommendedModeIds=api_sae_custom_domain; R03_API_DOMAIN_HTTPS:domainHttpsPlan.apiDomainHttps.writebackTemplate=deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps; R03_API_DOMAIN_HTTPS:domainHttpsPlan.apiDomainHttps.candidateIds=api_sae_custom_domain; R03_API_DOMAIN_HTTPS:observedResourceStatus=domain_visible_records_missing; R03_API_DOMAIN_HTTPS:observedResourceReadiness=blocked; R04_ASSET_DOMAIN_HTTPS:chrome_dns_console_2026-06-25T19:47_CST_ipgongchang_xin_exact_search_assets-cn_no_data_total_0_no_cdn_or_oss_custom_domain_no_https_icp_ready; R04_ASSET_DOMAIN_HTTPS:domainHttpsPlan.ready=false; R04_ASSET_DOMAIN_HTTPS:domainHttpsPlan.assetDomainHttps.selectedMode=pending_choose_cdn_or_oss_custom_domain; R04_ASSET_DOMAIN_HTTPS:domainHttpsPlan.assetDomainHttps.targetHost=assets-cn.ipgongchang.xin; R04_ASSET_DOMAIN_HTTPS:domainHttpsPlan.assetDomainHttps.ready=false; R04_ASSET_DOMAIN_HTTPS:domainHttpsPlan.assetDomainHttps.blockers=assetDomainHttps.confirmed,assetDomainHttps.dnsResolvedToAliyun,assetDomainHttps.httpsEnabled,assetDomainHttps.icpReady; R04_ASSET_DOMAIN_HTTPS:domainHttpsPlan.assetDomainHttps.recommendedModeIds=asset_cdn_custom_domain; R04_ASSET_DOMAIN_HTTPS:domainHttpsPlan.assetDomainHttps.writebackTemplate=deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps; R04_ASSET_DOMAIN_HTTPS:domainHttpsPlan.assetDomainHttps.candidateIds=asset_cdn_custom_domain,asset_oss_custom_domain; R04_ASSET_DOMAIN_HTTPS:observedResourceStatus=domain_visible_records_missing; R04_ASSET_DOMAIN_HTTPS:observedResourceReadiness=blocked
 - verifyCommands: corepack pnpm aliyun:domain:strict; corepack pnpm aliyun:remote:smoke -- --base-url https://api-cn.ipgongchang.xin
 
 ### U08_SAE_RUNTIME_AND_SLS 确认 SAE runtime 和 SLS health/5xx 告警
@@ -236,7 +236,7 @@ Generated: 2026-06-26T01:41:10.832Z
 - writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.runtime; deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.slsAlerts
 - variableNames: none
 - currentBlockers: R01_SAE_RUNTIME:runtime:confirmed; R07_SLS_ALERTS:slsAlerts:confirmed; R07_SLS_ALERTS:slsAlerts:healthAlertConfigured; R07_SLS_ALERTS:slsAlerts:serverErrorAlertConfigured; runtime:confirmed; slsAlerts:confirmed; slsAlerts:healthAlertConfigured; slsAlerts:serverErrorAlertConfigured
-- currentEvidence: runtime.confirmed=false; runtime.provider=SAE; runtime.region=cn-hangzhou; runtime.appName=meiye-huajing-app-api-production-cn; runtime.containerPort=3000; runtime.healthPath=/api/healthz; slsAlerts.confirmed=false; slsAlerts.slsProject=meiye-huajing-app-prod-cn; slsAlerts.healthAlertConfigured=false; slsAlerts.serverErrorAlertConfigured=false; R01_SAE_RUNTIME:chrome_sae_app_list_2026-06-25T19:47_CST_cn-hangzhou_huadong1_hangzhou_no_instances_target_app_meiye-huajing-app-api-production-cn_not_present_runtime_not_confirmed; R01_SAE_RUNTIME:observedResourceStatus=not_created_or_not_confirmed; R01_SAE_RUNTIME:observedResourceReadiness=blocked; R07_SLS_ALERTS:chrome_sls_2026-06-25T19:47_CST_project_meiye-huajing-app-prod-cn_logstore_app-api_visible_logstore_empty_index_not_enabled_health_5xx_alerts_not_configured; R07_SLS_ALERTS:observedResourceStatus=project_logstore_visible_alerts_pending; R07_SLS_ALERTS:observedResourceReadiness=partial
+- currentEvidence: runtime.confirmed=false; runtime.provider=SAE; runtime.region=cn-hangzhou; runtime.appName=meiye-huajing-app-api-production-cn; runtime.containerPort=3000; runtime.healthPath=/api/healthz; slsAlerts.confirmed=false; slsAlerts.slsProject=meiye-huajing-app-prod-cn; slsAlerts.healthAlertConfigured=false; slsAlerts.serverErrorAlertConfigured=false; R01_SAE_RUNTIME:chrome_sae_overview_2026-06-27T00:41_CST_cn-hangzhou_huadong1_hangzhou_app_list_empty_no_target_app_meiye-huajing-app-api-production-cn_runtime_not_created; R01_SAE_RUNTIME:runtimePlan.dataLayerTarget=Aliyun RDS PostgreSQL; R01_SAE_RUNTIME:runtimePlan.dataLayerConnectionEnvName=DATABASE_URL_CN; R01_SAE_RUNTIME:runtimePlan.predeployDependencyIds=RDS_POSTGRES_MIGRATION,ACR_IMAGE_DIGEST_AND_PULL,OSS_RUNTIME_ACCESS,BACKEND_ENV_IMPORT; R01_SAE_RUNTIME:runtimeSlsPlan.ready=false; R01_SAE_RUNTIME:runtimeSlsPlan.runtime.selectedMode=pending_create_sae_custom_container_runtime; R01_SAE_RUNTIME:runtimeSlsPlan.runtime.targetAppName=meiye-huajing-app-api-production-cn; R01_SAE_RUNTIME:runtimeSlsPlan.runtime.ready=false; R01_SAE_RUNTIME:runtimeSlsPlan.runtime.blockers=runtime.confirmed; R01_SAE_RUNTIME:runtimeSlsPlan.runtime.recommendedModeIds=sae_custom_container_runtime; R01_SAE_RUNTIME:runtimeSlsPlan.runtime.writebackTemplate=deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.runtime; R01_SAE_RUNTIME:runtimeSlsPlan.runtime.candidateIds=sae_custom_container_runtime; R01_SAE_RUNTIME:observedResourceStatus=not_created_or_not_confirmed; R01_SAE_RUNTIME:observedResourceReadiness=blocked; R07_SLS_ALERTS:chrome_sls_2026-06-25T19:47_CST_project_meiye-huajing-app-prod-cn_logstore_app-api_visible_logstore_empty_index_not_enabled_health_5xx_alerts_not_configured; R07_SLS_ALERTS:runtimeSlsPlan.ready=false; R07_SLS_ALERTS:runtimeSlsPlan.slsAlerts.selectedMode=pending_bind_sae_logs_and_alerts; R07_SLS_ALERTS:runtimeSlsPlan.slsAlerts.targetProject=meiye-huajing-app-prod-cn; R07_SLS_ALERTS:runtimeSlsPlan.slsAlerts.targetLogstore=app-api; R07_SLS_ALERTS:runtimeSlsPlan.slsAlerts.ready=false; R07_SLS_ALERTS:runtimeSlsPlan.slsAlerts.blockers=slsAlerts.confirmed,slsAlerts.healthAlertConfigured,slsAlerts.serverErrorAlertConfigured; R07_SLS_ALERTS:runtimeSlsPlan.slsAlerts.recommendedModeIds=sls_health_5xx_alerts; R07_SLS_ALERTS:runtimeSlsPlan.slsAlerts.writebackTemplate=deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.slsAlerts; R07_SLS_ALERTS:runtimeSlsPlan.slsAlerts.candidateIds=sls_health_5xx_alerts; R07_SLS_ALERTS:observedResourceStatus=project_logstore_visible_alerts_pending; R07_SLS_ALERTS:observedResourceReadiness=partial
 - verifyCommands: corepack pnpm aliyun:runtime:plan; corepack pnpm aliyun:cloud:confirmations:strict
 
 ### U09_DEPLOY_AUTHORIZATION 生产部署、镜像推送、DNS 变更、git push 的动作时授权
@@ -267,15 +267,15 @@ Generated: 2026-06-26T01:41:10.832Z
 - blockingDependencies: none
 - canStartNow: true
 - requiresActionTimeConfirmation: true
-- minimumUserPhrase: 授权等待当前阿里云 CloudShell 连接完成后，只运行 allowlisted 只读盘点命令并写入非密钥 evidence；如后续出现开通、重启实例或费用提示，必须先停下另行确认。
-- allowedActions: 等待当前 CloudShell 从“正在连接 Cloud Shell.”变为可输入命令提示符。; 连接完成后只运行本仓库生成的 List/Describe/stat/get inventory 命令。; 也可改用已安全配置的 Aliyun CLI profile 执行同一套只读命令。; 只记录资源名、布尔值、时间戳、命令状态、sha256 指纹和非密钥 evidence handle。
-- explicitlyExcluded: 不运行 Create/Update/Delete/Deploy/Start/Stop/Purchase/DNS mutation 命令。; 不执行 docker login/push。; 不读取、复制、粘贴或输出 AccessKeySecret、STS token、cookie、registry password、RAM Secret 或证书私钥。; 当前 connecting 状态不授权点击开通、重启实例、购买、创建资源、导入环境变量或部署。
+- minimumUserPhrase: 授权在确认当前阿里云 CloudShell 重启实例提示后恢复只读盘点会话，或配置 Aliyun CLI；该提示会终止当前会话并创建新会话；只运行 allowlisted 只读盘点命令并写入非密钥 evidence。
+- allowedActions: 动作时确认 CloudShell 重启实例提示后恢复会话；若不确认，则改用已安全配置的 Aliyun CLI profile。; 只运行本仓库生成的 List/Describe/stat/get inventory 命令。; 只记录资源名、布尔值、时间戳、命令状态、sha256 指纹和非密钥 evidence handle。
+- explicitlyExcluded: 不运行 Create/Update/Delete/Deploy/Start/Stop/Purchase/DNS mutation 命令。; 不执行 docker login/push。; 不读取、复制、粘贴或输出 AccessKeySecret、STS token、cookie、registry password、RAM Secret 或证书私钥。; 除用户明确确认 CloudShell 重启实例提示外，不做任何 production-cn deploy、env import、资源创建、购买或 DNS 变更。
 - completionEvidence: cloudInventoryResults.localReady=true; readyLocalOperations=9/9; executedCommandResults=9/9; mutationPerformedCommandResults=0
 - writeTargets: deploy/aliyun-production-cn.cloud-inventory-results.local.json -> non-secret read-only inventory summaries
 - variableNames: none
 - verifyCommands: corepack pnpm aliyun:cloud:access; MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1 corepack pnpm aliyun:cloud:inventory-run -- --execute-readonly --write-local deploy/aliyun-production-cn.cloud-inventory-results.local.json; corepack pnpm aliyun:cloud:inventory-results:strict; corepack pnpm aliyun:evidence:writeback:backend
-- cloudShellCurrentStatus: connecting_terminal_input_visible_inventory_not_executed
-- cloudShellConnecting: true
+- cloudShellCurrentStatus: disconnected_restart_instance_confirmation_required
+- cloudShellConnecting: false
 - cloudShellTerminalInputVisible: true
 - cloudShellCanRunReadOnlyInventory: false
 
@@ -290,9 +290,9 @@ Generated: 2026-06-26T01:41:10.832Z
 - canStartNow: true
 - requiresActionTimeConfirmation: true
 - minimumUserPhrase: 授权创建/确认阿里云 RDS PostgreSQL production-cn 数据库并完成数据迁移；DATABASE_URL_CN 只能进入阿里云 secret env。
-- allowedActions: 创建或确认 cn-hangzhou RDS PostgreSQL 实例、数据库、账号和网络白名单/内网访问策略。; 先生成并核对 docs/app-production-cn-rds-migration-package.md，关闭 compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查。; 执行 Supabase 到 RDS/PostgreSQL 的 schema/data 迁移与回滚验收。; 只把 DATABASE_URL_CN 导入 KMS/Secrets Manager/SAE secret env，并记录非密钥迁移证据。
+- allowedActions: 创建或确认 cn-hangzhou RDS PostgreSQL 实例、数据库、账号和网络白名单/内网访问策略。; 先生成并核对 docs/app-production-cn-rds-migration-package.md，关闭 compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查。; 执行 Supabase 到 RDS/PostgreSQL 的 schema/data 迁移与回滚验收。; 只把 DATABASE_URL_CN 导入 KMS/Secrets Manager/SAE secret env，并记录非密钥迁移证据。
 - explicitlyExcluded: 不把数据库密码、连接串 value 或 Supabase service role key 写入 JSON、Markdown、Docker 镜像或 git。; 不把 Supabase 当作正式 production-cn 数据库目标。; 不执行破坏性数据迁移，除非迁移计划和回滚验收已单独确认。
-- completionEvidence: Aliyun RDS PostgreSQL instance exists in cn-hangzhou; database account and least-privilege access are ready; DATABASE_URL_CN imported through secret env only; compatibilityReviewChecklistItemCount=6 is reviewed and closed before schema apply; supabase_auth_uid/supabase_storage_schema/supabase_service_role/row_level_security/policy_statement/extension_review dispositions are recorded without secrets; migration.schemaCompatibilityReviewed=true; migration.supabaseSpecificSqlResolved=true; migration.rdsExtensionSupportConfirmed=true; schema/data/APP API smoke/rollback validation passed; backend production-cn no longer depends on Supabase as formal database target
+- completionEvidence: Aliyun RDS PostgreSQL instance exists in cn-hangzhou; database account and least-privilege access are ready; DATABASE_URL_CN imported through secret env only; compatibilityReviewChecklistItemCount=7 is reviewed and closed before schema apply; supabase_auth_schema/supabase_auth_uid/supabase_storage_schema/supabase_service_role/row_level_security/policy_statement/extension_review dispositions are recorded without secrets; migration.schemaCompatibilityReviewed=true; migration.supabaseSpecificSqlResolved=true; migration.rdsExtensionSupportConfirmed=true; schema/data/APP API smoke/rollback validation passed; backend production-cn no longer depends on Supabase as formal database target
 - writeTargets: docs/app-production-cn-rds-migration-package.md -> non-secret schema/validation/rollback package digest handoff; deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres / migration non-secret evidence; DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env only
 - variableNames: DATABASE_URL_CN
 - verifyCommands: corepack pnpm aliyun:rds:migration:package; corepack pnpm aliyun:rds:migration:evidence:strict; corepack pnpm aliyun:sensitive:blockers:backend; corepack pnpm aliyun:backend-cn:status; corepack pnpm aliyun:completion:audit; corepack pnpm aliyun:predeploy
@@ -315,19 +315,19 @@ Generated: 2026-06-26T01:41:10.832Z
 - variableNames: ALIYUN_OSS_ACCESS_KEY_ID, ALIYUN_OSS_ACCESS_KEY_SECRET, ALIYUN_OSS_SECURITY_TOKEN
 - verifyCommands: corepack pnpm aliyun:cloud:confirmations; corepack pnpm aliyun:health:smoke
 
-### P03_ACR_PURCHASE 确认 ACR 企业版付费购买
+### P03_ACR_PURCHASE 确认 ACR 企业版购买/仓库证据
 
 - actionId: U03_ACR_PURCHASE_CONFIRMATION
-- status: blocked
+- status: ready
 - owner: 用户/阿里云 ACR 操作员
 - sequenceGroup: cloud_foundation
 - dependsOn: none
 - blockingDependencies: none
-- canStartNow: true
-- requiresActionTimeConfirmation: true
-- minimumUserPhrase: 授权购买 ACR Enterprise Economic，cn-hangzhou，1 个月，当前报价 CNY 117.00。
-- allowedActions: 在阿里云 ACR 企业版购买页确认规格、地域、时长和金额。; 完成购买后创建或确认实例、namespace 和 repository。; 只记录 registry host、namespace、repository 和非密钥购买证据。
-- explicitlyExcluded: 未明确确认金额前不点击付款。; 不执行 docker login/push。; 不记录 registry password、RAM Secret 或 token。
+- canStartNow: false
+- requiresActionTimeConfirmation: false
+- minimumUserPhrase: 已确认 ACR Enterprise Economic，cn-hangzhou，1 个月，CNY 117.00 购买/仓库证据；P03 不再作为当前待付款动作。
+- allowedActions: 复核已创建的 ACR 企业版实例、namespace 和 repository。; 只记录 registry host、namespace、repository、实例 id 和非密钥购买/仓库证据。; 把后续镜像 push/import、digest 核对和 SAE 拉取配置交给 P04_ACR_IMAGE_AND_PULL。
+- explicitlyExcluded: 不执行 docker login/push。; 不记录 registry password、RAM Secret 或 token。; 不把 P03 当作当前生产部署或镜像发布授权。
 - completionEvidence: acr.purchaseCandidate.confirmed=true; acr.registryHost actual aliyuncs.com host; acr.namespace created; repository=meiye-huajing-app-api
 - writeTargets: deploy/aliyun-production-cn.image-publish.local.json -> acr.purchaseCandidate / acr confirmed evidence
 - variableNames: none
@@ -340,8 +340,8 @@ Generated: 2026-06-26T01:41:10.832Z
 - owner: 阿里云 ACR/SAE 操作员
 - sequenceGroup: image_runtime
 - dependsOn: P03_ACR_PURCHASE
-- blockingDependencies: P03_ACR_PURCHASE
-- canStartNow: false
+- blockingDependencies: none
+- canStartNow: true
 - requiresActionTimeConfirmation: true
 - minimumUserPhrase: 授权把后端镜像推送到已创建的 ACR，并配置 SAE 拉取该镜像；不输出 registry 密码。
 - allowedActions: 构建并 smoke 本地 Docker 镜像。; 通过受控 docker credential helper、RAM 或阿里云运行时配置完成镜像推送/拉取。; 在 image-publish.local.json 记录 remote image、sha256 digest 和布尔证据。
@@ -394,7 +394,7 @@ Generated: 2026-06-26T01:41:10.832Z
 - owner: 阿里云操作员/运维操作员
 - sequenceGroup: runtime_observability
 - dependsOn: P03_ACR_PURCHASE, P04_ACR_IMAGE_AND_PULL, P05_OSS_RAM_STS, P06_ENV_IMPORT
-- blockingDependencies: P03_ACR_PURCHASE, P04_ACR_IMAGE_AND_PULL, P05_OSS_RAM_STS, P06_ENV_IMPORT
+- blockingDependencies: P04_ACR_IMAGE_AND_PULL, P05_OSS_RAM_STS, P06_ENV_IMPORT
 - canStartNow: false
 - requiresActionTimeConfirmation: true
 - minimumUserPhrase: 授权创建/确认 SAE production-cn 应用和 SLS health/5xx 告警；不导入密钥、不部署镜像。
@@ -412,7 +412,7 @@ Generated: 2026-06-26T01:41:10.832Z
 - owner: 用户/发布负责人
 - sequenceGroup: production_release
 - dependsOn: P03_ACR_PURCHASE, P04_ACR_IMAGE_AND_PULL, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION, P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS
-- blockingDependencies: P03_ACR_PURCHASE, P04_ACR_IMAGE_AND_PULL, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION, P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS
+- blockingDependencies: P04_ACR_IMAGE_AND_PULL, P05_OSS_RAM_STS, P11_ALIYUN_RDS_DATA_MIGRATION, P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS
 - canStartNow: false
 - requiresActionTimeConfirmation: true
 - minimumUserPhrase: 授权在所有 strict 门禁通过后执行 production-cn 部署；不包含 git push 或小程序上传。

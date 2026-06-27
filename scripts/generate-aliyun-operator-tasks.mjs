@@ -235,6 +235,9 @@ const BACKEND_CURRENT_CAN_START_PACKET_IDS = Object.freeze([
   "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
   "P11_ALIYUN_RDS_DATA_MIGRATION",
   "P05_OSS_RAM_STS",
+  "P04_ACR_IMAGE_AND_PULL",
+])
+const BACKEND_COMPLETED_PACKET_IDS = Object.freeze([
   "P03_ACR_PURCHASE",
 ])
 const BACKEND_DEFERRED_APP_LAUNCH_PACKET_IDS = Object.freeze([
@@ -509,7 +512,7 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan, rdsMigration
       "创建或确认 production-cn RDS PostgreSQL 实例、数据库、账号和网络访问策略。",
       "把 DATABASE_URL_CN 只导入阿里云 KMS/Secrets Manager/SAE secret env，不写入 JSON、Markdown、Docker 镜像、APP 包、小程序包或 git。",
       "迁移前完成 Supabase schema 兼容性复核、Supabase-specific SQL 改写和阿里云 RDS PostgreSQL extension 支持确认。",
-      "先关闭 RDS migration package 的 6 类 compatibilityReviewChecklist：supabase_auth_uid、supabase_storage_schema、supabase_service_role、row_level_security、policy_statement、extension_review。",
+      "先关闭 RDS migration package 的 7 类 compatibilityReviewChecklist：supabase_auth_schema、supabase_auth_uid、supabase_storage_schema、supabase_service_role、row_level_security、policy_statement、extension_review。",
       "按 RDS migration package 执行 schema/data 迁移、行数校验、关键记录校验、APP API smoke 和 rollback 验收。",
       "只把实例 id/name/region、迁移报告句柄、校验结果布尔值等非密钥证据写入 deploy/aliyun-production-cn.rds-migration.local.json。",
     ],
@@ -580,9 +583,9 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan, rdsMigration
     owner: "阿里云 ACR/后端发布操作员",
     consolePath: "阿里云控制台 -> 容器镜像服务 ACR / SAE 容器运行时",
     actions: [
-      "复制 deploy/aliyun-production-cn.image-publish.example.json 到 deploy/aliyun-production-cn.image-publish.local.json。",
-      "确认 ACR region 为 cn-hangzhou，repository 为 meiye-huajing-app-api，tag 为 production-cn。",
-      "当前已核到 ACR 企业版经济版 cn-hangzhou 1 个月候选报价 CNY 117.00；该步骤是付费购买，必须在付款动作前取得用户对金额和规格的明确确认。",
+      "确认 deploy/aliyun-production-cn.image-publish.local.json 已记录 ACR 企业版经济版 cn-hangzhou 购买/仓库非密钥证据。",
+      "确认 ACR registry host、namespace、repository 为 meiye-huajing-app-api，tag 为 production-cn。",
+      "ACR 企业版经济版 cn-hangzhou 1 个月已完成付款/确认；当前步骤进入 P04 后端镜像推送/导入和 SAE 拉取配置。",
       "先运行 corepack pnpm aliyun:docker:build 和 corepack pnpm aliyun:container:smoke。",
       "通过 docker login 或阿里云镜像构建服务把镜像推送/导入 ACR；不要把 registry 密码、RAM Secret 或 token 写入 JSON、文档或 git。",
       "配置 SAE 使用 ACR remoteImage，并确认运行时有镜像拉取权限。",
@@ -590,7 +593,10 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan, rdsMigration
     ],
     evidence: [
       "acr.confirmed=true",
-      "purchaseCandidate=ACR Enterprise Economic cn-hangzhou 1 month CNY 117.00 not purchased",
+      "purchaseCandidate=ACR Enterprise Economic cn-hangzhou 1 month CNY 117.00 confirmed",
+      "registryHost=meiye-huajing-app-api-registry.cn-hangzhou.cr.aliyuncs.com",
+      "namespace=meiye-huajing-app-api",
+      "repository=meiye-huajing-app-api",
       "imagePushed=true",
       "digestVerified=true",
       "runtime.remoteImageConfigured=true",
@@ -605,7 +611,7 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan, rdsMigration
     ],
     notes: [
       "image-publish.local.json 只记录非密钥镜像发布证据。",
-      "未付款前只能记录 purchaseCandidate，不能把 ACR 视为 confirmed。",
+      "P03 购买/仓库证据已经 ready；P04 仍必须单独完成镜像 push/digest 和 SAE 拉取证据。",
       "ACR 登录凭证只能放在 docker credential helper、RAM/KMS/Secrets Manager 或阿里云运行时配置里。",
     ],
   })
@@ -831,9 +837,13 @@ function attachOperatorAuthorization(report) {
     ? [...BACKEND_DEFERRED_APP_LAUNCH_PACKET_IDS]
     : []
   const deferredAppLaunchPacketIdSet = new Set(deferredAppLaunchPacketIds)
+  const completedPacketIdSet = new Set(report.currentScope === "backend_aliyun_only"
+    ? [...BACKEND_COMPLETED_PACKET_IDS]
+    : [])
   const blockedByPacketDependencies = allTaskPacketIds
     .filter((packetId) => !canStartNowPacketIdSet.has(packetId))
     .filter((packetId) => !deferredAppLaunchPacketIdSet.has(packetId))
+    .filter((packetId) => !completedPacketIdSet.has(packetId))
   const blockedByPacketDependencySet = new Set(blockedByPacketDependencies)
   const tasks = report.tasks.map((task) => withOperatorAuthorizationPackets({
     task,
@@ -1029,8 +1039,8 @@ function buildSensitiveActionItems({ envPlan, readiness, imagePublishPlan, nativ
       consolePath: "阿里云控制台 -> RDS PostgreSQL -> 实例/数据库/账号/连接信息；SAE/KMS/Secrets Manager",
       variableNames: ["DATABASE_URL_CN"],
       variableDetails: variableDetailsFor(variables, ["DATABASE_URL_CN"]),
-      requiredUserAction: "创建或确认 production-cn RDS PostgreSQL、数据库账号和网络访问策略；先关闭 RDS compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查；完成 Supabase 到 RDS/PostgreSQL 的迁移验收；只把 DATABASE_URL_CN 导入阿里云 secret env。",
-      unblockCondition: "rdsPostgres.databaseUrlCnSecretImported=true，compatibilityReviewChecklist 6 类已处理，migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true，且 APP 首版后端数据访问不再把 Supabase 作为正式 production-cn 数据库目标。",
+      requiredUserAction: "创建或确认 production-cn RDS PostgreSQL、数据库账号和网络访问策略；先关闭 RDS compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查；完成 Supabase 到 RDS/PostgreSQL 的迁移验收；只把 DATABASE_URL_CN 导入阿里云 secret env。",
+      unblockCondition: "rdsPostgres.databaseUrlCnSecretImported=true，compatibilityReviewChecklist 7 类已处理，migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true，且 APP 首版后端数据访问不再把 Supabase 作为正式 production-cn 数据库目标。",
       forbidden: "不能把 DATABASE_URL_CN、数据库密码、dump 内容、Supabase service role key、AccessKeySecret 或 token 写入 JSON、Markdown、Docker 镜像、APP 包、小程序包或 git。",
     })
   }

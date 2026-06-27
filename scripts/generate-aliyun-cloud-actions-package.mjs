@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-import { spawnSync } from "node:child_process"
 import { writeFileSync } from "node:fs"
 import { dirname, isAbsolute, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
+import { runJsonWithCache } from "./lib/run-json-cache.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -17,6 +17,7 @@ const CLOUD_CONSOLE_PACKET_IDS = new Set([
   "P11_ALIYUN_RDS_DATA_MIGRATION",
   "P05_OSS_RAM_STS",
   "P03_ACR_PURCHASE",
+  "P04_ACR_IMAGE_AND_PULL",
 ])
 const EXTERNAL_APP_PACKET_IDS = new Set(["P01_WECHAT_OPEN_MOBILE_APP", "P10_ANDROID_RELEASE_SIGNING", "P02_APPLE_TEAM_ID"])
 const CURRENT_SCOPE = "backend_aliyun_only"
@@ -191,20 +192,10 @@ function resolveValue(value, name) {
 }
 
 function runJson(label, scriptArgs) {
-  const result = spawnSync(process.execPath, scriptArgs, {
+  return runJsonWithCache(label, scriptArgs, {
     cwd: BACKEND_ROOT,
-    encoding: "utf8",
     maxBuffer: 1024 * 1024 * 50,
   })
-  if (result.error) throw result.error
-  if (result.status !== 0) {
-    throw new Error(`${label}_failed:${result.status}\n${result.stderr || result.stdout}`)
-  }
-  try {
-    return JSON.parse(result.stdout)
-  } catch (error) {
-    throw new Error(`invalid_json_from_${label}:${error instanceof Error ? error.message : String(error)}`)
-  }
 }
 
 function envArgs(args) {
@@ -250,7 +241,9 @@ function buildPackage(args) {
   const consoleTasks = (consoleRunbook.consoleTasks || []).map(scopeBackendOnlyConsoleTask)
   const immediateConsoleTasks = consoleTasks.filter((item) => item.canStartNow === true)
   const blockedConsoleTasks = consoleTasks.filter((item) => item.canStartNow !== true)
-  const immediatePackets = provisioningPlan.readyAuthorizationPackets || []
+  const immediatePackets = backendStatus.actionAuthorization?.nextActionTimeConfirmations?.length
+    ? backendStatus.actionAuthorization.nextActionTimeConfirmations
+    : provisioningPlan.readyAuthorizationPackets || []
   const cloudConsolePackets = immediatePackets.filter((item) => CLOUD_CONSOLE_PACKET_IDS.has(item.packetId))
   const deferredAppLaunchPackets = (provisioningPlan.deferredAppLaunchAuthorizationPackets || [])
     .filter((item) => EXTERNAL_APP_PACKET_IDS.has(item.packetId))
@@ -621,11 +614,30 @@ function buildExecutionQueue(backendFirstOrder, immediateConsoleTasks, blockedCo
 }
 
 function buildBackendFirstOrder(backendStatus) {
-  const immediateBackendSteps = BACKEND_FIRST_STEPS
-    .filter((step) => step.blockingDependencies.length === 0)
+  const canStartNowPackets = new Set(backendStatus.actionAuthorization?.canStartNowPackets || [])
+  const acrPurchaseConfirmed = canStartNowPackets.has("P04_ACR_IMAGE_AND_PULL")
+  const steps = BACKEND_FIRST_STEPS.map((step) => {
+    if (step.id === "BAP03_ACR_PURCHASE_AND_REPOSITORY" && acrPurchaseConfirmed) {
+      return {
+        ...step,
+        status: "completed",
+        completed: true,
+        blockingDependencies: [],
+      }
+    }
+    if (step.id === "BAP04_ACR_IMAGE_PUSH_AND_PULL" && canStartNowPackets.has("P04_ACR_IMAGE_AND_PULL")) {
+      return {
+        ...step,
+        blockingDependencies: [],
+      }
+    }
+    return step
+  })
+  const immediateBackendSteps = steps
+    .filter((step) => !step.completed && step.blockingDependencies.length === 0)
     .map((step) => step.id)
-  const blockedBackendSteps = BACKEND_FIRST_STEPS
-    .filter((step) => step.blockingDependencies.length > 0)
+  const blockedBackendSteps = steps
+    .filter((step) => !step.completed && step.blockingDependencies.length > 0)
     .map((step) => step.id)
   return {
     sourceCommand: "corepack pnpm aliyun:backend-cn:status",
@@ -634,21 +646,22 @@ function buildBackendFirstOrder(backendStatus) {
     sourceOrderLines: backendStatus.nextBackendOrder || [],
     immediateBackendSteps,
     blockedBackendSteps,
-    actionTimeConfirmationRequired: BACKEND_FIRST_STEPS.map((step) => step.id),
-    immediateUserInterventionRequired: uniqueStrings(BACKEND_FIRST_STEPS
-      .filter((step) => step.blockingDependencies.length === 0)
+    completedBackendSteps: steps.filter((step) => step.completed).map((step) => step.id),
+    actionTimeConfirmationRequired: steps.filter((step) => !step.completed).map((step) => step.id),
+    immediateUserInterventionRequired: uniqueStrings(steps
+      .filter((step) => !step.completed && step.blockingDependencies.length === 0)
       .map((step) => step.userIntervention)),
-    blockedUserInterventionRequired: uniqueStrings(BACKEND_FIRST_STEPS
-      .filter((step) => step.blockingDependencies.length > 0)
+    blockedUserInterventionRequired: uniqueStrings(steps
+      .filter((step) => !step.completed && step.blockingDependencies.length > 0)
       .map((step) => step.userIntervention)),
-    userInterventionRequired: uniqueStrings(BACKEND_FIRST_STEPS.map((step) => step.userIntervention)),
-    steps: BACKEND_FIRST_STEPS.map((step) => ({
+    userInterventionRequired: uniqueStrings(steps.filter((step) => !step.completed).map((step) => step.userIntervention)),
+    steps: steps.map((step) => ({
       id: step.id,
       title: step.title,
       orderLine: step.orderLine,
-      status: step.blockingDependencies.length === 0
+      status: step.status || (step.blockingDependencies.length === 0
         ? "ready_for_action_time_confirmation"
-        : "blocked_by_dependencies",
+        : "blocked_by_dependencies"),
       requiresActionTimeConfirmation: true,
       requiredAuthorizationPackets: step.requiredAuthorizationPackets,
       blockingDependencies: step.blockingDependencies,
@@ -820,22 +833,23 @@ function compactConsoleTask(task, imagePublishWritebackPlan = {}) {
   }
   if (task.id !== "C02_ACR_IMAGE_AND_PULL") return base
 
-  const currentGroup = imageWritebackGroup(imagePublishWritebackPlan, "acrPurchaseAndRepository")
-  const deferredGroups = ["imagePushAndDigest", "saeRuntimeImagePull"]
+  const currentGroup = currentImageWritebackGroup(imagePublishWritebackPlan)
+  const deferredGroups = ["acrPurchaseAndRepository", "imagePushAndDigest", "saeRuntimeImagePull"]
     .map((id) => imageWritebackGroup(imagePublishWritebackPlan, id))
-    .filter(Boolean)
+    .filter((group) => group && group.id !== currentGroup?.id)
   const currentActionAcceptanceEvidence = base.currentActionAcceptanceEvidence.length
     ? base.currentActionAcceptanceEvidence
     : currentGroup?.expectedEvidence || []
   const deferredGroupLines = deferredGroups.map((group) => {
     const packets = group.requiredAuthorizationPackets.join(", ") || "none"
     const blockers = group.blockers.join(", ") || "none"
+    if (group.ready === true) return `${group.id} 已完成；不再等待 ${packets}；当前 blockers: ${blockers}`
     return `${group.id} 需等待 ${packets}；当前 blockers: ${blockers}`
   })
 
   return {
     ...base,
-    currentActionScope: currentGroup?.actionScope || base.currentActionScope || "purchase_and_repository_only",
+    currentActionScope: currentGroup?.actionScope || base.currentActionScope || "image_push_or_import_and_digest_verification",
     currentActionAcceptanceEvidence,
     currentActionBlockers: currentGroup?.blockers || [],
     writeTargets: currentGroup?.writeTargets?.length ? currentGroup.writeTargets : base.writeTargets,
@@ -858,12 +872,20 @@ function compactConsoleTask(task, imagePublishWritebackPlan = {}) {
 
 function matchingAuthorizationPhrase(task) {
   if (task.id === "C02_ACR_IMAGE_AND_PULL") {
-    return "授权购买/确认 ACR 企业版实例和镜像仓库基础信息；不执行 docker login/push，不记录 registry password。"
+    return "授权把后端镜像推送或导入已创建的 ACR，核对 sha256 digest，并配置 SAE 拉取该镜像；不输出 registry 密码，不部署 production-cn。"
   }
   if (task.id === "C05_OSS_AUDIO_RAM_STS") {
     return "授权确认 OSS 音频 bucket、CORS、RAM 最小权限或 STS/运行时角色；Secret 只进阿里云受控密钥环境。"
   }
   return task.actionTimeConfirmationReason || ""
+}
+
+function currentImageWritebackGroup(imagePublishWritebackPlan) {
+  for (const id of ["acrPurchaseAndRepository", "imagePushAndDigest", "saeRuntimeImagePull"]) {
+    const group = imageWritebackGroup(imagePublishWritebackPlan, id)
+    if (group && group.ready !== true && group.canStartNow === true) return group
+  }
+  return imageWritebackGroup(imagePublishWritebackPlan, "acrPurchaseAndRepository")
 }
 
 function compactPacket(packet) {

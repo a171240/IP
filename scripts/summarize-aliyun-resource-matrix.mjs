@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-import { spawnSync } from "node:child_process"
 import { writeFileSync } from "node:fs"
 import { dirname, isAbsolute, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
+import { runJsonWithCache } from "./lib/run-json-cache.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -188,25 +188,11 @@ function resolveValue(value, name) {
 }
 
 function runJson(label, scriptArgs, allowFailure = false) {
-  const result = spawnSync(process.execPath, scriptArgs, {
+  return runJsonWithCache(label, scriptArgs, {
     cwd: BACKEND_ROOT,
-    encoding: "utf8",
     maxBuffer: 1024 * 1024 * 30,
+    allowFailure,
   })
-  if (result.error) throw result.error
-  if (result.status !== 0 && !allowFailure) {
-    throw new Error(`${label}_failed:${result.status}\n${result.stderr || result.stdout}`)
-  }
-  const stdout = (result.stdout || "").trim()
-  if (!stdout) {
-    if (allowFailure) return { ok: false, error: result.stderr || `exit ${result.status}` }
-    throw new Error(`${label}_empty_stdout`)
-  }
-  try {
-    return JSON.parse(stdout)
-  } catch (error) {
-    throw new Error(`invalid_json_from_${label}:${error instanceof Error ? error.message : String(error)}`)
-  }
 }
 
 function buildReport(args) {
@@ -226,6 +212,9 @@ function buildReport(args) {
   const imagePublishPlan = runJson("image_publish_plan", [
     "scripts/check-aliyun-image-publish-plan.mjs",
     "--allow-incomplete",
+  ])
+  const runtimePlan = runJson("runtime_plan", [
+    "scripts/check-aliyun-runtime-plan.mjs",
   ])
   const cloudAccess = runJson("cloud_access", [
     "scripts/check-aliyun-cloud-access.mjs",
@@ -252,10 +241,18 @@ function buildReport(args) {
     const task = taskById.get(definition.operatorTaskId) || null
     const confirmation = definition.cloudConfirmationKey ? confirmationByKey.get(definition.cloudConfirmationKey) || null : null
     const checklist = cloudChecklistById.get(definition.cloudAccessChecklistId) || null
-    const observedResourceStatus = observedStatusFor(definition, observedStatusById)
+    const observedResourceStatus = observedStatusFor(definition, observedStatusById, imagePublishPlan)
     const currentEvidence = unique([
       isUsableEvidence(checklist?.currentLocalEvidence) ? checklist.currentLocalEvidence : "",
       ...(definition.imagePublish ? imagePublishEvidence(imagePublishPlan) : []),
+      ...(definition.cloudConfirmationKey === "oss" ? ossAccessEvidence(cloudConfirmations) : []),
+      ...(definition.cloudConfirmationKey === "apiDomainHttps" || definition.cloudConfirmationKey === "assetDomainHttps"
+        ? domainHttpsEvidence(cloudConfirmations, definition.cloudConfirmationKey)
+        : []),
+      ...(definition.cloudConfirmationKey === "runtime" || definition.cloudConfirmationKey === "slsAlerts"
+        ? runtimeSlsEvidence(cloudConfirmations, definition.cloudConfirmationKey, runtimePlan)
+        : []),
+      ...(definition.cloudConfirmationKey === "envImport" ? envImportEvidence(cloudConfirmations) : []),
       observedResourceStatus?.status ? `observedResourceStatus=${observedResourceStatus.status}` : "",
       observedResourceStatus?.readiness ? `observedResourceReadiness=${observedResourceStatus.readiness}` : "",
     ])
@@ -312,6 +309,7 @@ function buildReport(args) {
       "corepack pnpm aliyun:operator:tasks",
       "corepack pnpm aliyun:cloud:confirmations",
       "corepack pnpm aliyun:image:plan",
+      "corepack pnpm aliyun:runtime:plan",
       "corepack pnpm aliyun:cloud:access",
       "corepack pnpm aliyun:env:handoff:backend",
     ],
@@ -330,6 +328,15 @@ function buildReport(args) {
         .filter((item) => item.requiresActionTimeConfirmation)
         .map((item) => item.id),
       cloudConfirmationsTotalBlockers: cloudConfirmations.summary?.totalBlockers ?? 0,
+      ossAccessPlanReady: cloudConfirmations.ossAccessPlan?.selectedReady === true,
+      recommendedOssAccessModes: cloudConfirmations.ossAccessPlan?.recommendedModeIds || [],
+      runtimeSlsPlanReady: cloudConfirmations.runtimeSlsPlan?.ready === true,
+      runtimePlanDataLayerTarget: runtimePlan.dataLayerTarget || "",
+      runtimePlanPredeployDependencyIds: runtimePlan.predeployDependencyIds || [],
+      recommendedRuntimeSlsModes: cloudConfirmations.runtimeSlsPlan?.recommendedModeIds || [],
+      envImportPlanReady: cloudConfirmations.envImportPlan?.ready === true,
+      envImportBlockedCredentialNames: cloudConfirmations.envImportPlan?.blockedCredentialNames || [],
+      envImportReadySecretEnvVariableCount: cloudConfirmations.envImportPlan?.readySecretEnvVariableCount ?? 0,
       imagePublishTotalBlockers: imagePublishPlan.summary?.totalBlockers ?? 0,
       cloudAccessCanReadNow: cloudAccess.canReadCloudNow === true,
       observedResourceStatuses: cloudAccess.observedResourceStatusSummary || {
@@ -357,7 +364,7 @@ function buildReport(args) {
     resources,
     nextActions: [
       "先用本矩阵确认哪些阿里云资源只差非密钥证据，哪些需要动作时授权。",
-      "ACR 购买、DNS 修改、环境变量导入、生产部署和任何密钥操作都需要动作时确认。",
+      "ACR 镜像推送/拉取、DNS 修改、环境变量导入、生产部署和任何密钥操作都需要动作时确认。",
       "每个资源完成后只把资源名、布尔状态、控制台路径或截图编号写入 .local.json；不要写任何 secret value。",
       "所有资源 ready 后运行 corepack pnpm aliyun:cloud:confirmations:strict 和 corepack pnpm aliyun:readiness:cloud-ready。",
     ],
@@ -385,7 +392,7 @@ function buildResourceEvidenceBrief(resources) {
     ready: item.ready === true,
     observedStatus: item.observedResourceStatus?.status || "none",
     observedReadiness: item.observedResourceStatus?.readiness || "none",
-    requiredAuthorizationPackets: RESOURCE_AUTHORIZATION_PACKETS[item.id] || [],
+    requiredAuthorizationPackets: requiredAuthorizationPacketsForResource(item),
     consoleTaskIds: RESOURCE_CONSOLE_TASKS[item.id] || [],
     requiresActionTimeConfirmation: item.requiresActionTimeConfirmation === true,
     currentEvidence: item.currentEvidence || [],
@@ -423,6 +430,15 @@ function buildResourceEvidenceBrief(resources) {
   }
 }
 
+function requiredAuthorizationPacketsForResource(item) {
+  if (item.id !== "R02_ACR_IMAGE_REGISTRY") return RESOURCE_AUTHORIZATION_PACKETS[item.id] || []
+  const purchaseConfirmed = (item.currentEvidence || [])
+    .some((value) => /acr\.purchaseCandidate\.confirmed=true/.test(String(value)))
+  return purchaseConfirmed
+    ? ["P04_ACR_IMAGE_AND_PULL"]
+    : RESOURCE_AUTHORIZATION_PACKETS[item.id] || []
+}
+
 function buildResourceBlockers(definition, task, confirmation, backendEnvHandoff) {
   const blockers = unique([
     ...(task?.blockerCodes || []),
@@ -450,8 +466,12 @@ function buildMissingEvidence(item) {
 
 function nextEvidenceActionForResource(item) {
   if (item.ready) return "run_strict_verification_to_preserve_ready_state"
-  if (item.id === "R02_ACR_IMAGE_REGISTRY") return "complete ACR purchase/repository evidence first, then image push/digest and SAE pull evidence after action-time confirmation"
-  if (item.id === "R06_ENV_IMPORT") return "import ready variables through SAE/KMS/Secrets Manager secret env after action-time confirmation, then run env/checklist and sensitive/blockers"
+  if (item.id === "R01_SAE_RUNTIME") return "after ACR image digest, RDS secret env, and OSS access path are ready, create or confirm SAE custom container runtime and write non-secret runtime evidence"
+  if (item.id === "R02_ACR_IMAGE_REGISTRY") return "ACR purchase/repository evidence is confirmed when acr.purchaseCandidate.confirmed=true; next close image push/digest and SAE pull evidence after P04/P08 action-time confirmation"
+  if (item.id === "R03_API_DOMAIN_HTTPS") return "after SAE runtime public endpoint exists, clear wildcard/special-use DNS, bind api-cn as a SAE custom domain, attach HTTPS certificate, confirm ICP, then write non-secret evidence"
+  if (item.id === "R04_ASSET_DOMAIN_HTTPS") return "after OSS/CDN asset origin exists, clear wildcard/special-use DNS, bind assets-cn through CDN or OSS custom domain, attach HTTPS certificate, confirm ICP, then write non-secret evidence"
+  if (item.id === "R06_ENV_IMPORT") return "after RDS, OSS/RAM/STS, ACR image, and SAE runtime dependencies close, import backend secret-env batches through KMS/Secrets Manager/SAE secret env and write only non-secret batch evidence"
+  if (item.id === "R07_SLS_ALERTS") return "after SAE runtime emits logs to SLS, configure logstore index plus health and 5xx alerts, then write non-secret alert evidence"
   if (item.requiresActionTimeConfirmation) return "obtain action-time confirmation, perform only the named console action, then write non-secret evidence to the configured .local.json target"
   return "confirm resource in Aliyun console or allowlisted readonly inventory, then write non-secret evidence to the configured .local.json target"
 }
@@ -465,7 +485,7 @@ function isUsableEvidence(value) {
   return Boolean(text) && !/^TODO_/i.test(text)
 }
 
-function observedStatusFor(definition, observedStatusById) {
+function observedStatusFor(definition, observedStatusById, imagePublishPlan) {
   const aliases = {
     saeRuntime: "saeRuntime",
     acrImage: "acrPurchase",
@@ -476,7 +496,53 @@ function observedStatusFor(definition, observedStatusById) {
     slsAlerts: "slsAlerts",
   }
   const id = aliases[definition.cloudAccessChecklistId]
-  return id ? observedStatusById.get(id) || null : null
+  const rawStatus = id ? observedStatusById.get(id) || null : null
+  if (definition.id !== "R02_ACR_IMAGE_REGISTRY") return rawStatus
+  return normalizeAcrObservedStatus(rawStatus, imagePublishPlan)
+}
+
+function normalizeAcrObservedStatus(rawStatus, imagePublishPlan) {
+  const local = imagePublishPlan.local || {}
+  const acr = local.acr || {}
+  const purchaseConfirmed = acr.purchaseCandidate?.confirmed === true || Boolean(acr.registryHost && acr.namespace)
+  if (!purchaseConfirmed) return rawStatus
+
+  const imagePushed = acr.imagePushed === true && acr.digestVerified === true && /^sha256:[a-f0-9]{64}$/i.test(String(acr.remoteDigest || ""))
+  const runtime = local.runtime || {}
+  const runtimePullReady = runtime.confirmed === true &&
+    runtime.remoteImageConfigured === true &&
+    runtime.imagePullConfigured === true
+
+  let status = "acr_repository_confirmed_image_push_pending"
+  let readiness = "partial"
+  let nextAction = "Push/import the backend image to ACR, verify sha256 digest, then configure SAE image pull authorization."
+  if (imagePushed && !runtimePullReady) {
+    status = "acr_image_pushed_runtime_pull_pending"
+    nextAction = "Configure SAE to use the ACR image and verify image pull authorization."
+  }
+  if (imagePushed && runtimePullReady) {
+    status = "acr_image_and_runtime_pull_confirmed"
+    readiness = "ready"
+    nextAction = "Preserve ACR digest and SAE pull evidence through strict verification."
+  }
+
+  return {
+    ...(rawStatus || {}),
+    id: rawStatus?.id || "acrPurchase",
+    title: rawStatus?.title || "ACR 企业版实例和镜像仓库",
+    status,
+    readiness,
+    observed: true,
+    currentObservation: [
+      rawStatus?.currentObservation,
+      `acr.purchaseCandidate.confirmed=${acr.purchaseCandidate?.confirmed === true}`,
+      acr.registryHost ? `acr.registryHost=${acr.registryHost}` : "",
+      acr.namespace ? `acr.namespace=${acr.namespace}` : "",
+      acr.repository ? `acr.repository=${acr.repository}` : "",
+    ].filter(Boolean).join("; "),
+    nextAction,
+    writeTarget: rawStatus?.writeTarget || "deploy/aliyun-production-cn.image-publish.local.json -> acr + runtime",
+  }
 }
 
 function imagePublishEvidence(imagePublishPlan) {
@@ -484,13 +550,31 @@ function imagePublishEvidence(imagePublishPlan) {
   const purchaseCandidate = local.acr?.purchaseCandidate || {}
   const runtime = local.runtime || {}
   const image = local.image || {}
+  const dockerContext = imagePublishPlan.dockerContext || {}
   const localDockerImage = imagePublishPlan.localDockerImage || {}
+  const pushNetworkPlan = imagePublishPlan.pushNetworkPlan || {}
+  const executionReadiness = imagePublishPlan.executionReadiness || {}
   const evidence = []
 
   if (local.exists !== undefined) evidence.push(`imagePublish.localExists=${local.exists === true}`)
   if (local.ready !== undefined) evidence.push(`imagePublish.localReady=${local.ready === true}`)
   if (image.localDigestReady !== undefined) evidence.push(`image.localDigestReady=${image.localDigestReady === true}`)
+  if (dockerContext.status) evidence.push(`dockerContext.status=${dockerContext.status}`)
+  if (dockerContext.ok !== undefined) evidence.push(`dockerContext.ok=${dockerContext.ok === true}`)
+  if (dockerContext.checkedFiles !== undefined) evidence.push(`dockerContext.checkedFiles=${dockerContext.checkedFiles}`)
+  if (dockerContext.sensitiveEnvExcluded !== undefined) {
+    evidence.push(`dockerContext.sensitiveEnvExcluded=${dockerContext.sensitiveEnvExcluded === true}`)
+  }
   if (localDockerImage.status) evidence.push(`localDockerImage.status=${localDockerImage.status}`)
+  if (localDockerImage.dockerClientInstalled !== undefined) {
+    evidence.push(`localDockerImage.dockerClientInstalled=${localDockerImage.dockerClientInstalled === true}`)
+  }
+  if (localDockerImage.dockerServerAvailable !== undefined) {
+    evidence.push(`localDockerImage.dockerServerAvailable=${localDockerImage.dockerServerAvailable === true}`)
+  }
+  if (localDockerImage.nextEvidenceAction) {
+    evidence.push(`localDockerImage.nextEvidenceAction=${localDockerImage.nextEvidenceAction}`)
+  }
   if (localDockerImage.repoDigests?.[0]) evidence.push(`localDockerImage.repoDigest=${localDockerImage.repoDigests[0]}`)
   if (purchaseCandidate.edition) evidence.push(`acr.purchaseCandidate.edition=${purchaseCandidate.edition}`)
   if (purchaseCandidate.region) evidence.push(`acr.purchaseCandidate.region=${purchaseCandidate.region}`)
@@ -505,6 +589,42 @@ function imagePublishEvidence(imagePublishPlan) {
     )
   }
   if (purchaseCandidate.evidence) evidence.push(`acr.purchaseCandidate.evidence=${purchaseCandidate.evidence}`)
+  if (pushNetworkPlan.publicNetworkEntranceEnabled !== undefined) {
+    evidence.push(`acr.publicNetworkEntranceEnabled=${pushNetworkPlan.publicNetworkEntranceEnabled === true}`)
+  }
+  if (pushNetworkPlan.selectedPath) evidence.push(`acr.pushNetworkPlan.selectedPath=${pushNetworkPlan.selectedPath}`)
+  if (pushNetworkPlan.selectedReady !== undefined) {
+    evidence.push(`acr.pushNetworkPlan.selectedReady=${pushNetworkPlan.selectedReady === true}`)
+  }
+  if (Array.isArray(pushNetworkPlan.recommendedPathIds) && pushNetworkPlan.recommendedPathIds.length) {
+    evidence.push(`acr.pushNetworkPlan.recommendedPathIds=${pushNetworkPlan.recommendedPathIds.join(",")}`)
+  }
+  if (executionReadiness.canStartP04AfterActionTimeConfirmation !== undefined) {
+    evidence.push(
+      `acr.execution.canStartP04AfterActionTimeConfirmation=${executionReadiness.canStartP04AfterActionTimeConfirmation === true}`,
+    )
+  }
+  if (executionReadiness.p04StrictReady !== undefined) {
+    evidence.push(`acr.execution.p04StrictReady=${executionReadiness.p04StrictReady === true}`)
+  }
+  if (executionReadiness.selectedTransferPathReady !== undefined) {
+    evidence.push(`acr.execution.selectedTransferPathReady=${executionReadiness.selectedTransferPathReady === true}`)
+  }
+  if (executionReadiness.localPublicPushReady !== undefined) {
+    evidence.push(`acr.execution.localPublicPushReady=${executionReadiness.localPublicPushReady === true}`)
+  }
+  if (executionReadiness.dockerDaemonReady !== undefined) {
+    evidence.push(`acr.execution.dockerDaemonReady=${executionReadiness.dockerDaemonReady === true}`)
+  }
+  if (Array.isArray(executionReadiness.recommendedTransferPathIds) && executionReadiness.recommendedTransferPathIds.length) {
+    evidence.push(`acr.execution.recommendedTransferPathIds=${executionReadiness.recommendedTransferPathIds.join(",")}`)
+  }
+  if (Array.isArray(executionReadiness.forbiddenTransferPathIds) && executionReadiness.forbiddenTransferPathIds.length) {
+    evidence.push(`acr.execution.forbiddenTransferPathIds=${executionReadiness.forbiddenTransferPathIds.join(",")}`)
+  }
+  if (executionReadiness.nextOperatorDecision) {
+    evidence.push(`acr.execution.nextOperatorDecision=${executionReadiness.nextOperatorDecision}`)
+  }
   if (runtime.target) evidence.push(`runtime.target=${runtime.target}`)
   if (runtime.appName) evidence.push(`runtime.appName=${runtime.appName}`)
   if (runtime.remoteImageConfigured !== undefined) {
@@ -514,6 +634,161 @@ function imagePublishEvidence(imagePublishPlan) {
     evidence.push(`runtime.imagePullConfigured=${runtime.imagePullConfigured === true}`)
   }
 
+  return evidence
+}
+
+function ossAccessEvidence(cloudConfirmations) {
+  const plan = cloudConfirmations.ossAccessPlan || {}
+  const execution = plan.executionReadiness || {}
+  const prefixContract = plan.runtimePrefixContract || {}
+  const evidence = []
+  if (plan.selectedMode) evidence.push(`oss.accessPlan.selectedMode=${plan.selectedMode}`)
+  if (plan.selectedReady !== undefined) evidence.push(`oss.accessPlan.selectedReady=${plan.selectedReady === true}`)
+  if (Array.isArray(plan.selectedBlockers) && plan.selectedBlockers.length) {
+    evidence.push(`oss.accessPlan.selectedBlockers=${plan.selectedBlockers.join(",")}`)
+  }
+  if (Array.isArray(plan.recommendedModeIds) && plan.recommendedModeIds.length) {
+    evidence.push(`oss.accessPlan.recommendedModeIds=${plan.recommendedModeIds.join(",")}`)
+  }
+  if (plan.policyFile) evidence.push(`oss.accessPlan.policyFile=${plan.policyFile}`)
+  if (plan.policyName) evidence.push(`oss.accessPlan.policyName=${plan.policyName}`)
+  if (plan.roleOrUserName) evidence.push(`oss.accessPlan.roleOrUserName=${plan.roleOrUserName}`)
+  if (Array.isArray(plan.selectedSecretEnvNames) && plan.selectedSecretEnvNames.length) {
+    evidence.push(`oss.accessPlan.selectedSecretEnvNames=${plan.selectedSecretEnvNames.join(",")}`)
+  }
+  if (plan.credentialBoundary) evidence.push(`oss.accessPlan.credentialBoundary=${plan.credentialBoundary}`)
+  if (Array.isArray(plan.allowedActions) && plan.allowedActions.length) {
+    evidence.push(`oss.accessPlan.allowedActions=${plan.allowedActions.join(",")}`)
+  }
+  if (plan.resourceScope) evidence.push(`oss.accessPlan.resourceScope=${plan.resourceScope}`)
+  if (prefixContract.requiredEnvName) {
+    evidence.push(`oss.runtimePrefixContract.requiredEnvName=${prefixContract.requiredEnvName}`)
+  }
+  if (prefixContract.expectedValue) {
+    evidence.push(`oss.runtimePrefixContract.expectedValue=${prefixContract.expectedValue}`)
+  }
+  if (prefixContract.policyScopeCoversExpectedPrefix !== undefined) {
+    evidence.push(
+      `oss.runtimePrefixContract.policyScopeCoversExpectedPrefix=${prefixContract.policyScopeCoversExpectedPrefix === true}`,
+    )
+  }
+  if (prefixContract.currentConfirmationPrefixReady !== undefined) {
+    evidence.push(
+      `oss.runtimePrefixContract.currentConfirmationPrefixReady=${prefixContract.currentConfirmationPrefixReady === true}`,
+    )
+  }
+  if (plan.writebackTemplate?.jsonPath) evidence.push(`oss.accessPlan.writebackTemplate=${plan.writebackTemplate.jsonPath}`)
+  if (execution.canStartP05AfterActionTimeConfirmation !== undefined) {
+    evidence.push(
+      `oss.execution.canStartP05AfterActionTimeConfirmation=${execution.canStartP05AfterActionTimeConfirmation === true}`,
+    )
+  }
+  if (execution.resourceReadyForP05 !== undefined) {
+    evidence.push(`oss.execution.resourceReadyForP05=${execution.resourceReadyForP05 === true}`)
+  }
+  if (execution.accessGrantReady !== undefined) {
+    evidence.push(`oss.execution.accessGrantReady=${execution.accessGrantReady === true}`)
+  }
+  if (execution.preferredModeId) evidence.push(`oss.execution.preferredModeId=${execution.preferredModeId}`)
+  if (execution.preferredModeAvoidsLongLivedSecret !== undefined) {
+    evidence.push(`oss.execution.preferredModeAvoidsLongLivedSecret=${execution.preferredModeAvoidsLongLivedSecret === true}`)
+  }
+  if (Array.isArray(execution.fallbackSecretModeIds) && execution.fallbackSecretModeIds.length) {
+    evidence.push(`oss.execution.fallbackSecretModeIds=${execution.fallbackSecretModeIds.join(",")}`)
+  }
+  if (Array.isArray(execution.fallbackSecretEnvNames) && execution.fallbackSecretEnvNames.length) {
+    evidence.push(`oss.execution.fallbackSecretEnvNames=${execution.fallbackSecretEnvNames.join(",")}`)
+  }
+  if (execution.nextOperatorDecision) evidence.push(`oss.execution.nextOperatorDecision=${execution.nextOperatorDecision}`)
+  return evidence
+}
+
+function domainHttpsEvidence(cloudConfirmations, key) {
+  const plan = cloudConfirmations.domainHttpsPlan || {}
+  const group = plan.groups?.[key] || {}
+  const evidence = []
+  if (plan.ready !== undefined) evidence.push(`domainHttpsPlan.ready=${plan.ready === true}`)
+  if (group.selectedMode) evidence.push(`domainHttpsPlan.${key}.selectedMode=${group.selectedMode}`)
+  if (group.targetHost) evidence.push(`domainHttpsPlan.${key}.targetHost=${group.targetHost}`)
+  if (group.ready !== undefined) evidence.push(`domainHttpsPlan.${key}.ready=${group.ready === true}`)
+  if (Array.isArray(group.blockers) && group.blockers.length) {
+    evidence.push(`domainHttpsPlan.${key}.blockers=${group.blockers.join(",")}`)
+  }
+  if (Array.isArray(group.recommendedModeIds) && group.recommendedModeIds.length) {
+    evidence.push(`domainHttpsPlan.${key}.recommendedModeIds=${group.recommendedModeIds.join(",")}`)
+  }
+  if (group.writebackTemplate?.jsonPath) {
+    evidence.push(`domainHttpsPlan.${key}.writebackTemplate=${group.writebackTemplate.jsonPath}`)
+  }
+  const candidateIds = Array.isArray(group.candidates) ? group.candidates.map((candidate) => candidate.id).filter(Boolean) : []
+  if (candidateIds.length) evidence.push(`domainHttpsPlan.${key}.candidateIds=${candidateIds.join(",")}`)
+  return evidence
+}
+
+function runtimeSlsEvidence(cloudConfirmations, key, runtimePlan = {}) {
+  const plan = cloudConfirmations.runtimeSlsPlan || {}
+  const group = plan.groups?.[key] || {}
+  const evidence = []
+  if (key === "runtime") {
+    if (runtimePlan.dataLayerTarget) evidence.push(`runtimePlan.dataLayerTarget=${runtimePlan.dataLayerTarget}`)
+    if (runtimePlan.dataLayerConnectionEnvName) {
+      evidence.push(`runtimePlan.dataLayerConnectionEnvName=${runtimePlan.dataLayerConnectionEnvName}`)
+    }
+    if (Array.isArray(runtimePlan.predeployDependencyIds) && runtimePlan.predeployDependencyIds.length) {
+      evidence.push(`runtimePlan.predeployDependencyIds=${runtimePlan.predeployDependencyIds.join(",")}`)
+    }
+  }
+  if (plan.ready !== undefined) evidence.push(`runtimeSlsPlan.ready=${plan.ready === true}`)
+  if (group.selectedMode) evidence.push(`runtimeSlsPlan.${key}.selectedMode=${group.selectedMode}`)
+  if (group.targetAppName) evidence.push(`runtimeSlsPlan.${key}.targetAppName=${group.targetAppName}`)
+  if (group.targetProject) evidence.push(`runtimeSlsPlan.${key}.targetProject=${group.targetProject}`)
+  if (group.targetLogstore) evidence.push(`runtimeSlsPlan.${key}.targetLogstore=${group.targetLogstore}`)
+  if (group.ready !== undefined) evidence.push(`runtimeSlsPlan.${key}.ready=${group.ready === true}`)
+  if (Array.isArray(group.blockers) && group.blockers.length) {
+    evidence.push(`runtimeSlsPlan.${key}.blockers=${group.blockers.join(",")}`)
+  }
+  if (Array.isArray(group.recommendedModeIds) && group.recommendedModeIds.length) {
+    evidence.push(`runtimeSlsPlan.${key}.recommendedModeIds=${group.recommendedModeIds.join(",")}`)
+  }
+  if (group.writebackTemplate?.jsonPath) {
+    evidence.push(`runtimeSlsPlan.${key}.writebackTemplate=${group.writebackTemplate.jsonPath}`)
+  }
+  const candidateIds = Array.isArray(group.candidates) ? group.candidates.map((candidate) => candidate.id).filter(Boolean) : []
+  if (candidateIds.length) evidence.push(`runtimeSlsPlan.${key}.candidateIds=${candidateIds.join(",")}`)
+  return evidence
+}
+
+function envImportEvidence(cloudConfirmations) {
+  const plan = cloudConfirmations.envImportPlan || {}
+  const evidence = []
+  if (plan.ready !== undefined) evidence.push(`envImportPlan.ready=${plan.ready === true}`)
+  if (plan.selectedMode) evidence.push(`envImportPlan.selectedMode=${plan.selectedMode}`)
+  if (plan.importTarget) evidence.push(`envImportPlan.importTarget=${plan.importTarget}`)
+  if (plan.secretEnvStore) evidence.push(`envImportPlan.secretEnvStore=${plan.secretEnvStore}`)
+  if (Array.isArray(plan.blockedCredentialNames) && plan.blockedCredentialNames.length) {
+    evidence.push(`envImportPlan.blockedCredentialNames=${plan.blockedCredentialNames.join(",")}`)
+  }
+  if (plan.readySecretEnvVariableCount !== undefined) {
+    evidence.push(`envImportPlan.readySecretEnvVariableCount=${plan.readySecretEnvVariableCount}`)
+  }
+  if (plan.readySecretEnvVariableGroupCount !== undefined) {
+    evidence.push(`envImportPlan.readySecretEnvVariableGroupCount=${plan.readySecretEnvVariableGroupCount}`)
+  }
+  if (Array.isArray(plan.blockedSecretBatchIds) && plan.blockedSecretBatchIds.length) {
+    evidence.push(`envImportPlan.blockedSecretBatchIds=${plan.blockedSecretBatchIds.join(",")}`)
+  }
+  if (Array.isArray(plan.readySecretBatchIds) && plan.readySecretBatchIds.length) {
+    evidence.push(`envImportPlan.readySecretBatchIds=${plan.readySecretBatchIds.join(",")}`)
+  }
+  if (plan.importBatchCount !== undefined) evidence.push(`envImportPlan.importBatchCount=${plan.importBatchCount}`)
+  if (Array.isArray(plan.recommendedModeIds) && plan.recommendedModeIds.length) {
+    evidence.push(`envImportPlan.recommendedModeIds=${plan.recommendedModeIds.join(",")}`)
+  }
+  if (plan.writebackTemplate?.jsonPath) {
+    evidence.push(`envImportPlan.writebackTemplate=${plan.writebackTemplate.jsonPath}`)
+  }
+  const candidateIds = Array.isArray(plan.candidates) ? plan.candidates.map((candidate) => candidate.id).filter(Boolean) : []
+  if (candidateIds.length) evidence.push(`envImportPlan.candidateIds=${candidateIds.join(",")}`)
   return evidence
 }
 
@@ -583,7 +858,7 @@ function renderMarkdown(report) {
     ...report.safetyBoundary.map((item) => `- ${item}`),
     "",
   )
-  return `${lines.join("\n")}\n`
+  return `${lines.join("\n").replace(/\n+$/, "")}\n`
 }
 
 function renderResourceEvidenceBrief(brief) {

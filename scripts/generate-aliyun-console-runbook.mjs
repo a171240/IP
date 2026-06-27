@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-import { spawnSync } from "node:child_process"
 import { writeFileSync } from "node:fs"
 import { dirname, isAbsolute, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
+import { runJsonWithCache } from "./lib/run-json-cache.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -107,20 +107,10 @@ function resolveValue(value, name) {
 }
 
 function runJson(label, scriptArgs) {
-  const result = spawnSync(process.execPath, scriptArgs, {
+  return runJsonWithCache(label, scriptArgs, {
     cwd: BACKEND_ROOT,
-    encoding: "utf8",
     maxBuffer: 1024 * 1024 * 30,
   })
-  if (result.error) throw result.error
-  if (result.status !== 0) {
-    throw new Error(`${label}_failed:${result.status}\n${result.stderr || result.stdout}`)
-  }
-  try {
-    return JSON.parse(result.stdout)
-  } catch (error) {
-    throw new Error(`invalid_json_from_${label}:${error instanceof Error ? error.message : String(error)}`)
-  }
 }
 
 function mapById(items = []) {
@@ -196,16 +186,16 @@ function buildRunbook(args) {
     "--cloud-confirmations",
     args.cloudConfirmationsFile,
   ])
-  const status = runJson("production_status", [
-    "scripts/summarize-aliyun-production-cn-status.mjs",
-    ...envArgs(args),
-  ])
+  const requiredBlocking = userActions.summary?.fullAppRequiredBlocking || userActions.summary?.requiredBlocking || []
 
   const resources = mapById(resourcesMatrix.resources || [])
   const actions = mapById(userActions.actions || [])
   const acr = imagePlan.local?.acr || {}
   const purchaseCandidate = acr.purchaseCandidate || {}
   const runtime = imagePlan.local?.runtime || {}
+  const acrPurchaseGroup = findWritebackGroup(imagePlan, "acrPurchaseAndRepository")
+  const imagePushGroup = findWritebackGroup(imagePlan, "imagePushAndDigest")
+  const acrPurchaseReady = acrPurchaseGroup?.ready === true
   const localDockerDigest =
     imagePlan.localDockerImage?.repoDigests?.[0] ||
     imagePlan.localDockerImage?.id ||
@@ -230,34 +220,65 @@ function buildRunbook(args) {
     }),
     buildTask({
       id: "C02_ACR_IMAGE_AND_PULL",
-      title: "购买/确认 ACR 企业版实例和镜像仓库基础信息",
+      title: acrPurchaseReady
+        ? "推送/导入后端镜像到 ACR 并配置 SAE 拉取"
+        : "购买/确认 ACR 企业版实例和镜像仓库基础信息",
       resource: resources.get("R02_ACR_IMAGE_REGISTRY"),
-      userAction: actions.get("U03_ACR_PURCHASE_CONFIRMATION"),
-      actionTimeConfirmationReason: "ACR 购买页当前候选为付费动作；付款前必须由用户确认规格和金额。",
-      currentActionScope: "purchase_and_repository_only",
-      currentActionAcceptanceEvidence: [
-        "acr.purchaseCandidate.confirmed=true",
-        "acr.registryHost actual aliyuncs.com host",
-        "acr.namespace created",
-        "repository=meiye-huajing-app-api",
-      ],
-      deferredActions: [
-        "P04_ACR_IMAGE_AND_PULL 依赖 P03_ACR_PURCHASE 完成后再执行。",
-        "当前确认包不执行 docker login/push。",
-        "当前确认包不配置 SAE runtime image pull credentials。",
-        "imagePushed=true、digestVerified=true、runtime.remoteImageConfigured=true、runtime.imagePullConfigured=true 都属于后置验收。",
-      ],
-      targetFields: [
-        field("edition", purchaseCandidate.edition || "ACR Enterprise Economic", "image publish plan"),
-        field("region", purchaseCandidate.region || "cn-hangzhou", "image publish plan"),
-        field("duration", purchaseCandidate.duration || "1 month", "image publish plan"),
-        field("quotedAmount", purchaseCandidate.quotedAmount || "CNY 117.00", "read-only console evidence"),
-        field("repository", acr.repository || "meiye-huajing-app-api", "image publish plan"),
-        field("remoteTag", acr.remoteTag || "production-cn", "image publish plan"),
-        field("localImage", imagePlan.local?.image?.localTag || "meiye-huajing-app-api:production-cn", "image publish plan"),
-        field("localDigest", localDockerDigest, "local docker evidence"),
-        field("runtimeAppName", runtime.appName || runtimePlan.appName, "image publish plan"),
-      ],
+      userAction: acrPurchaseReady ? actions.get("U04_ACR_RUNTIME_AUTH") : actions.get("U03_ACR_PURCHASE_CONFIRMATION"),
+      actionTimeConfirmationReason: acrPurchaseReady
+        ? "ACR 购买/仓库证据已经 ready；当前动作只覆盖 P04 镜像 push/import、digest 核对和 SAE 镜像拉取配置，不输出 registry 密码。"
+        : "ACR 购买页当前候选为付费动作；付款前必须由用户确认规格和金额。",
+      currentActionScope: acrPurchaseReady
+        ? imagePushGroup?.actionScope || "image_push_or_import_and_digest_verification"
+        : "purchase_and_repository_only",
+      currentActionAcceptanceEvidence: acrPurchaseReady
+        ? [
+            "acr.imagePushed=true",
+            "acr.digestVerified=true",
+            "acr.remoteDigest=sha256:<64 hex>",
+            "runtime.remoteImageConfigured=true",
+            "runtime.imagePullConfigured=true",
+          ]
+        : [
+            "acr.purchaseCandidate.confirmed=true",
+            "acr.registryHost actual aliyuncs.com host",
+            "acr.namespace created",
+            "repository=meiye-huajing-app-api",
+          ],
+      deferredActions: acrPurchaseReady
+        ? [
+            "不购买 ACR。",
+            "不把 docker login、registry password、RAM Secret 或 token 写入 JSON/Markdown/git。",
+            "不部署 production-cn，除非 P09_PRODUCTION_DEPLOY 单独授权。",
+          ]
+        : [
+            "P04_ACR_IMAGE_AND_PULL 依赖 P03_ACR_PURCHASE 完成后再执行。",
+            "当前确认包不执行 docker login/push。",
+            "当前确认包不配置 SAE runtime image pull credentials。",
+            "imagePushed=true、digestVerified=true、runtime.remoteImageConfigured=true、runtime.imagePullConfigured=true 都属于后置验收。",
+          ],
+      targetFields: acrPurchaseReady
+        ? [
+            field("registryHost", acr.registryHost || "TODO_ACR_REGISTRY_HOST", "image publish plan"),
+            field("namespace", acr.namespace || "TODO_ACR_NAMESPACE", "image publish plan"),
+            field("repository", acr.repository || "meiye-huajing-app-api", "image publish plan"),
+            field("remoteImage", acr.remoteImage || "TODO_ACR_REMOTE_IMAGE", "image publish plan"),
+            field("remoteDigest", acr.remoteDigest || "sha256:<64 hex>", "P04 completion evidence"),
+            field("localImage", imagePlan.local?.image?.localTag || "meiye-huajing-app-api:production-cn", "image publish plan"),
+            field("localDigest", localDockerDigest, "local docker evidence"),
+            field("runtimeAppName", runtime.appName || runtimePlan.appName, "image publish plan"),
+          ]
+        : [
+            field("edition", purchaseCandidate.edition || "ACR Enterprise Economic", "image publish plan"),
+            field("region", purchaseCandidate.region || "cn-hangzhou", "image publish plan"),
+            field("duration", purchaseCandidate.duration || "1 month", "image publish plan"),
+            field("quotedAmount", purchaseCandidate.quotedAmount || "CNY 117.00", "read-only console evidence"),
+            field("repository", acr.repository || "meiye-huajing-app-api", "image publish plan"),
+            field("remoteTag", acr.remoteTag || "production-cn", "image publish plan"),
+            field("localImage", imagePlan.local?.image?.localTag || "meiye-huajing-app-api:production-cn", "image publish plan"),
+            field("localDigest", localDockerDigest, "local docker evidence"),
+            field("runtimeAppName", runtime.appName || runtimePlan.appName, "image publish plan"),
+          ],
     }),
     buildTask({
       id: "C03_API_DOMAIN_HTTPS_ICP",
@@ -310,7 +331,7 @@ function buildRunbook(args) {
         field("planCommand", "corepack pnpm aliyun:env:checklist", "local generated checklist"),
         field("plainEnvTarget", "SAE plain env for non-secret identifiers only", "env plan"),
         field("secretEnvTarget", "KMS/Secrets Manager/SAE secret env for secret or connection values", "env plan"),
-        field("requiredBlocking", backendOnlyRequiredBlocking(status.summary?.requiredBlocking || []).join(", ") || "none", "current status"),
+        field("requiredBlocking", backendOnlyRequiredBlocking(requiredBlocking).join(", ") || "none", "user action summary"),
         field("secretNotInImage", true, "completion evidence"),
       ],
     }),
@@ -355,8 +376,8 @@ function buildRunbook(args) {
       canProceedWithoutWechat: true,
       resourceReady: `${resourcesMatrix.summary.ready}/${resourcesMatrix.summary.total}`,
       userActionReady: `${userActions.summary.ready}/${userActions.summary.total}`,
-      requiredBlocking: backendOnlyRequiredBlocking(status.summary?.requiredBlocking || []),
-      deferredAppLaunchBlocking: deferredAppLaunchBlocking(status.summary?.requiredBlocking || []),
+      requiredBlocking: backendOnlyRequiredBlocking(requiredBlocking),
+      deferredAppLaunchBlocking: deferredAppLaunchBlocking(requiredBlocking),
       blockedResourceIds: resourcesMatrix.summary.blockedIds || [],
       blockedUserActionIds: userActions.summary.blockedIds || [],
       canStartNowConsoleTasks: tasks
@@ -405,7 +426,7 @@ function buildRunbook(args) {
     safetyBoundary: [
       "本 runbook 不创建资源、不付款、不修改 DNS、不导入环境变量、不推送镜像、不部署。",
       "只在 .local.json 中记录资源名、布尔值、控制台路径或截图编号；不要写入 secret value。",
-      "ACR 付款、DNS 修改、环境变量导入、生产部署和 git push 都需要动作时确认。",
+      "ACR 镜像推送/拉取配置、DNS 修改、环境变量导入、生产部署和 git push 都需要动作时确认。",
       "不要把 AppSecret、AccessKeySecret、registry password、RAM Secret、STS token、cookie 或 Supabase service role key 写入仓库、文档、镜像或 JSON。",
     ],
   }
@@ -515,6 +536,9 @@ function buildReadyActionPacket(task) {
 
 function minimumAuthorizationPhrase(task) {
   if (task.id === "C02_ACR_IMAGE_AND_PULL") {
+    if (task.currentActionScope === "image_push_or_import_and_digest_verification") {
+      return "授权把后端镜像推送或导入已创建的 ACR，核对 sha256 digest，并配置 SAE 拉取该镜像；不输出 registry 密码，不部署 production-cn。"
+    }
     const amount = task.targetFields.find((item) => item.name === "quotedAmount")?.value || "当前报价"
     return `授权购买或确认 ACR Enterprise Economic，cn-hangzhou，1 个月，${amount}；本次只记录 ACR 实例、namespace、repository 和 registry host 非密钥证据，不执行 docker login/push。`
   }
@@ -546,6 +570,10 @@ function field(name, value, source) {
     value,
     source,
   }
+}
+
+function findWritebackGroup(imagePlan, id) {
+  return (imagePlan.writebackPlan?.groups || []).find((group) => group.id === id)
 }
 
 function unique(values) {

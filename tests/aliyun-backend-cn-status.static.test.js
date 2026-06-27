@@ -67,21 +67,20 @@ test("Aliyun backend-cn status excludes WeChat mobile app from current backend b
   assert.equal(report.summary.backendEvidenceScope.acrTrackedOutsideCloudConfirmations, true)
   assert.equal(report.summary.backendEvidenceScope.deferredAppLaunchExcluded, true)
   assert.equal(report.summary.evidenceWritebackReady, "0/4")
-  assert.equal(report.summary.evidenceWritebackTotalGaps, 50)
+  assert.equal(report.summary.evidenceWritebackTotalGaps, 46)
   assert.deepEqual(report.summary.evidenceWritebackGapSummary, {
     rdsMigrationGaps: 19,
     cloudInventoryResultGaps: 1,
     cloudConfirmationGaps: 18,
-    imagePublishGaps: 12,
+    imagePublishGaps: 8,
   })
   assert.deepEqual(report.summary.evidenceWritebackCanStartNowPacketIds, [
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
     "P05_OSS_RAM_STS",
-    "P03_ACR_PURCHASE",
+    "P04_ACR_IMAGE_AND_PULL",
   ])
   assert.deepEqual(report.summary.evidenceWritebackBlockedByDependencyPacketIds, [
-    "P04_ACR_IMAGE_AND_PULL",
     "P06_ENV_IMPORT",
     "P07_DOMAIN_DNS_HTTPS",
     "P08_SAE_RUNTIME_SLS",
@@ -92,31 +91,30 @@ test("Aliyun backend-cn status excludes WeChat mobile app from current backend b
     "S05_OSS_RAM_SECRET_OR_STS",
     "S06_READY_SENSITIVE_ENV_IMPORT",
     "S04_ACR_REGISTRY_AUTH",
-    "S03_ACR_PAID_PURCHASE",
   ])
   assert.deepEqual(report.summary.blockedCredentialNames, ["DATABASE_URL_CN"])
   assert.equal(report.summary.readySecretEnvVariableCount, 17)
   assert.ok(report.summary.readySecretEnvVariableNames.includes("ALIYUN_OSS_ACCESS_KEY_SECRET"))
   assert.ok(report.summary.readySecretEnvVariableNames.includes("WECHAT_MINI_SECRET"))
   assert.ok(report.summary.sensitiveActionBlockedIds.includes("S08_ALIYUN_RDS_DATABASE_URL"))
-  assert.ok(report.summary.actionTimeConfirmationRequiredIds.includes("S03_ACR_PAID_PURCHASE"))
+  assert.ok(!report.summary.actionTimeConfirmationRequiredIds.includes("S03_ACR_PAID_PURCHASE"))
   assert.ok(report.summary.actionTimeConfirmationRequiredIds.includes("S05_OSS_RAM_SECRET_OR_STS"))
   assert.ok(report.summary.actionTimeConfirmationRequiredIds.includes("S08_ALIYUN_RDS_DATABASE_URL"))
   assert.deepEqual(report.summary.nextActionTimeConfirmationPacketIds, [
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
     "P05_OSS_RAM_STS",
-    "P03_ACR_PURCHASE",
+    "P04_ACR_IMAGE_AND_PULL",
   ])
   assert.deepEqual(report.actionAuthorization.canStartNowPackets, report.summary.nextActionTimeConfirmationPacketIds)
-  assert.ok(report.actionAuthorization.blockedByPacketDependencies.includes("P04_ACR_IMAGE_AND_PULL"))
+  assert.ok(!report.actionAuthorization.blockedByPacketDependencies.includes("P04_ACR_IMAGE_AND_PULL"))
   assert.ok(report.actionAuthorization.blockedByPacketDependencies.includes("P09_PRODUCTION_DEPLOY"))
   const packetById = new Map(report.actionAuthorization.nextActionTimeConfirmations.map((item) => [item.packetId, item]))
   assert.match(packetById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").minimumUserPhrase, /CloudShell/)
   assert.match(packetById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").minimumUserPhrase, /只读盘点/)
   assert.ok(packetById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").explicitlyExcluded.some((item) => /Create\/Update\/Delete/.test(item)))
-  assert.match(packetById.get("P03_ACR_PURCHASE").minimumUserPhrase, /CNY 117\.00/)
-  assert.equal(packetById.get("P03_ACR_PURCHASE").nonSecretEvidenceOnly, true)
+  assert.match(packetById.get("P04_ACR_IMAGE_AND_PULL").minimumUserPhrase, /后端镜像/)
+  assert.equal(packetById.get("P04_ACR_IMAGE_AND_PULL").nonSecretEvidenceOnly, true)
   assert.match(packetById.get("P11_ALIYUN_RDS_DATA_MIGRATION").minimumUserPhrase, /DATABASE_URL_CN/)
   assert.equal(packetById.get("P11_ALIYUN_RDS_DATA_MIGRATION").nonSecretEvidenceOnly, false)
   assert.deepEqual(report.credentialIntervention.blockedCredentialNames, ["DATABASE_URL_CN"])
@@ -134,7 +132,7 @@ test("Aliyun backend-cn status excludes WeChat mobile app from current backend b
   assert.ok(report.credentialIntervention.interventionBreakdown.readySecretsPendingCloudImport.names.includes("SUPABASE_SERVICE_ROLE_KEY"))
   assert.ok(report.credentialIntervention.interventionBreakdown.readySecretsPendingCloudImport.actionIds.includes("S05_OSS_RAM_SECRET_OR_STS"))
   assert.ok(report.credentialIntervention.interventionBreakdown.readySecretsPendingCloudImport.actionIds.includes("S06_READY_SENSITIVE_ENV_IMPORT"))
-  assert.deepEqual(report.credentialIntervention.interventionBreakdown.paidPurchaseConfirmationActionIds, ["S03_ACR_PAID_PURCHASE"])
+  assert.deepEqual(report.credentialIntervention.interventionBreakdown.paidPurchaseConfirmationActionIds, [])
   assert.deepEqual(report.credentialIntervention.interventionBreakdown.controlledSecretChannelActionIds, [
     "S04_ACR_REGISTRY_AUTH",
     "S05_OSS_RAM_SECRET_OR_STS",
@@ -163,7 +161,7 @@ test("Aliyun backend-cn status excludes WeChat mobile app from current backend b
   assert.equal(report.credentialPasswordIntervention.readySecretsPendingCloudImport.count, 17)
   assert.ok(report.credentialPasswordIntervention.readySecretsPendingCloudImport.names.includes("ALIYUN_OSS_ACCESS_KEY_SECRET"))
   assert.ok(report.credentialPasswordIntervention.controlledSecretChannelActionIds.includes("S08_ALIYUN_RDS_DATABASE_URL"))
-  assert.ok(report.credentialPasswordIntervention.paidPurchaseConfirmationActionIds.includes("S03_ACR_PAID_PURCHASE"))
+  assert.deepEqual(report.credentialPasswordIntervention.paidPurchaseConfirmationActionIds, [])
   assert.ok(report.credentialPasswordIntervention.userMustProvideOrConfirm.some((item) => /DATABASE_URL_CN/.test(item)))
   assert.ok(report.credentialPasswordIntervention.forbiddenStorage.includes("Docker image"))
 
@@ -193,6 +191,24 @@ test("Aliyun backend-cn status excludes WeChat mobile app from current backend b
   assert.equal(report.cloudInventory.strictReady, false)
   assert.equal(report.cloudInventory.readyLocalOperations, "0/9")
   assert.equal(report.cloudInventory.executedCommandResults, "9/9")
+  assert.deepEqual(report.cloudInventory.failureCategories, {
+    aliyun_cli_profile_not_configured: 4,
+    aliyun_cli_config_incomplete: 5,
+  })
+  assert.deepEqual(report.cloudInventory.failedOperationIds, [
+    "I01_SAE_RUNTIME",
+    "I02_ACR_IMAGE",
+    "I03_DNS_API_DOMAIN",
+    "I04_DNS_ASSET_DOMAIN",
+    "I05_OSS_AUDIO_BUCKET",
+    "I06_SLS_ALERTS",
+    "I07_CERT_HTTPS",
+    "I08_RDS_POSTGRES",
+    "I09_TAIR_REDIS",
+  ])
+  assert.equal(report.cloudInventory.nextEvidenceAction, "configure_aliyun_cli_profile_or_run_cloudshell_readonly_collector")
+  assert.deepEqual(report.summary.cloudInventoryFailureCategories, report.cloudInventory.failureCategories)
+  assert.deepEqual(report.summary.cloudInventoryFailedOperationIds, report.cloudInventory.failedOperationIds)
   assert.deepEqual(report.cloudInventory.notFoundOperationIds, [])
   assert.deepEqual(report.cloudInventory.observedOperationIds, [])
   assert.equal(report.cloudInventory.backendMeaning.rdsPostgres, "observed_or_unknown")
@@ -242,11 +258,11 @@ test("Aliyun backend-cn status excludes WeChat mobile app from current backend b
   assert.ok(report.cloudResources.observedPartial.includes("R05_OSS_AUDIO_STORAGE"))
   assert.ok(report.cloudResources.observedPartial.includes("R07_SLS_ALERTS"))
   assert.equal(report.evidenceWriteback.evidenceWritebackReady, "0/4")
-  assert.equal(report.evidenceWriteback.totalGaps, 50)
+  assert.equal(report.evidenceWriteback.totalGaps, 46)
   assert.equal(report.evidenceWriteback.gapSummary.rdsMigrationGaps, 19)
   assert.equal(report.evidenceWriteback.gapSummary.cloudInventoryResultGaps, 1)
   assert.equal(report.evidenceWriteback.gapSummary.cloudConfirmationGaps, 18)
-  assert.equal(report.evidenceWriteback.gapSummary.imagePublishGaps, 12)
+  assert.equal(report.evidenceWriteback.gapSummary.imagePublishGaps, 8)
   assert.ok(report.evidenceWriteback.writeTargets.some((item) => item.endsWith("deploy/aliyun-production-cn.rds-migration.local.json")))
   assert.ok(report.evidenceWriteback.writeTargets.some((item) => item.endsWith("deploy/aliyun-production-cn.cloud-confirmations.local.json")))
   assert.ok(report.evidenceWriteback.writeTargets.some((item) => item.endsWith("deploy/aliyun-production-cn.image-publish.local.json")))
@@ -256,13 +272,22 @@ test("Aliyun backend-cn status excludes WeChat mobile app from current backend b
   assert.equal(evidenceGroupByKey.get("cloudInventoryResults").gaps, 1)
   assert.ok(evidenceGroupByKey.get("cloudInventoryResults").requiredAuthorizationPackets.includes("P00_ALIYUN_READONLY_INVENTORY_IDENTITY"))
   assert.equal(evidenceGroupByKey.get("cloudConfirmations").gaps, 18)
-  assert.equal(evidenceGroupByKey.get("imagePublish").gaps, 12)
+  assert.equal(evidenceGroupByKey.get("imagePublish").gaps, 8)
 
   assert.ok(targetById.get("B01_RDS_POSTGRES_DATA_LAYER").blockers.includes("DATABASE_URL_CN"))
   assert.ok(!targetById.get("B01_RDS_POSTGRES_DATA_LAYER").blockers.includes("RDS_POSTGRES_NOT_READY"))
   assert.ok(!targetById.get("B01_RDS_POSTGRES_DATA_LAYER").blockers.includes("APP_API_POSTGRES_ADAPTER_MISSING"))
+  assert.ok(targetById.get("B01_RDS_POSTGRES_DATA_LAYER").currentEvidence.includes("rdsMigrationPhaseReady=1/5"))
+  assert.ok(targetById.get("B01_RDS_POSTGRES_DATA_LAYER").currentEvidence.includes("rdsMigrationNextPhaseIds=compatibility_review,rds_instance_and_secret"))
+  assert.ok(targetById.get("B01_RDS_POSTGRES_DATA_LAYER").currentEvidence.includes("rdsLocalReviewCanStartNow=true"))
+  assert.ok(targetById.get("B01_RDS_POSTGRES_DATA_LAYER").currentEvidence.includes("rdsCanStartP11AfterActionTimeConfirmation=true"))
+  assert.ok(targetById.get("B01_RDS_POSTGRES_DATA_LAYER").currentEvidence.includes("rdsCompatibilityReviewCanStartNow=true"))
+  assert.ok(targetById.get("B01_RDS_POSTGRES_DATA_LAYER").currentEvidence.includes("rdsSchemaApplyBlockedByCompatibilityReview=true"))
+  assert.ok(targetById.get("B01_RDS_POSTGRES_DATA_LAYER").currentEvidence.includes("rdsNextOperatorDecision=close_compatibility_review_and_prepare_rds_action_time_confirmation"))
   assert.ok(targetById.get("B02_ACR_IMAGE_REGISTRY").blockers.includes("ACR_IMAGE_REGISTRY_NOT_READY"))
-  assert.ok(targetById.get("B02_ACR_IMAGE_REGISTRY").currentEvidence.includes("R02_ACR_IMAGE_REGISTRY.observedStatus=purchase_candidate_visible_not_purchased"))
+  assert.ok(targetById.get("B02_ACR_IMAGE_REGISTRY").currentEvidence.includes("R02_ACR_IMAGE_REGISTRY.observedStatus=acr_repository_confirmed_image_push_pending"))
+  assert.ok(targetById.get("B02_ACR_IMAGE_REGISTRY").currentEvidence.some((item) => item.includes("dockerContext.status=ready")))
+  assert.ok(targetById.get("B02_ACR_IMAGE_REGISTRY").currentEvidence.some((item) => item.includes("imagePublishLocal:todo:acr.remoteDigest")))
   assert.ok(targetById.get("B03_SAE_RUNTIME").blockers.includes("SAE_RUNTIME_NOT_READY"))
   assert.ok(targetById.get("B03_SAE_RUNTIME").currentEvidence.includes("R01_SAE_RUNTIME.observedReadiness=blocked"))
   assert.ok(targetById.get("B04_DOMAINS_HTTPS_ICP").blockers.includes("API_DOMAIN_HTTPS_ICP_NOT_READY"))
@@ -302,15 +327,22 @@ test("Aliyun backend-cn status markdown states the backend-only target", () => {
   assert.match(markdown, /backendMissingItems: runtime, apiDomainHttps, assetDomainHttps, oss, envImport, slsAlerts/)
   assert.match(markdown, /runtime:missing_cloud_confirmation_item/)
   assert.match(markdown, /envImport:missing_cloud_confirmation_item/)
+  assert.match(markdown, /## Cloud Inventory/)
+  assert.match(markdown, /strictReady: false/)
+  assert.match(markdown, /readyLocalOperations: 0\/9/)
+  assert.match(markdown, /executedCommandResults: 9\/9/)
+  assert.match(markdown, /failureCategories: \{"aliyun_cli_profile_not_configured":4,"aliyun_cli_config_incomplete":5\}/)
+  assert.match(markdown, /failedOperationIds: I01_SAE_RUNTIME, I02_ACR_IMAGE, I03_DNS_API_DOMAIN, I04_DNS_ASSET_DOMAIN, I05_OSS_AUDIO_BUCKET, I06_SLS_ALERTS, I07_CERT_HTTPS, I08_RDS_POSTGRES, I09_TAIR_REDIS/)
+  assert.match(markdown, /nextEvidenceAction: configure_aliyun_cli_profile_or_run_cloudshell_readonly_collector/)
   assert.match(markdown, /## Evidence Writeback/)
   assert.match(markdown, /evidenceWritebackReady: 0\/4/)
-  assert.match(markdown, /totalGaps: 50/)
+  assert.match(markdown, /totalGaps: 46/)
   assert.match(markdown, /rdsMigrationGaps: 19/)
   assert.match(markdown, /cloudInventoryResultGaps: 1/)
   assert.match(markdown, /cloudConfirmationGaps: 18/)
-  assert.match(markdown, /imagePublishGaps: 12/)
-  assert.match(markdown, /canStartNowPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE/)
-  assert.match(markdown, /blockedByDependencyPacketIds: P04_ACR_IMAGE_AND_PULL, P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS/)
+  assert.match(markdown, /imagePublishGaps: 8/)
+  assert.match(markdown, /canStartNowPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P04_ACR_IMAGE_AND_PULL/)
+  assert.match(markdown, /blockedByDependencyPacketIds: P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS/)
   assert.match(markdown, /rdsMigration: ready=false; gaps=19; packets=P11_ALIYUN_RDS_DATA_MIGRATION/)
   assert.match(markdown, /cloudInventoryResults: ready=false; gaps=1; packets=P00_ALIYUN_READONLY_INVENTORY_IDENTITY/)
   assert.match(markdown, /## Evidence Scope Breakdown/)
@@ -327,7 +359,7 @@ test("Aliyun backend-cn status markdown states the backend-only target", () => {
   assert.match(markdown, /readySecretEnvVariableCount: 17/)
   assert.match(markdown, /missingCredentialValues: DATABASE_URL_CN/)
   assert.match(markdown, /readySecretsPendingCloudImport: 17/)
-  assert.match(markdown, /paidPurchaseConfirmationActionIds: S03_ACR_PAID_PURCHASE/)
+  assert.match(markdown, /paidPurchaseConfirmationActionIds: none/)
   assert.match(markdown, /controlledSecretChannelActionIds: S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT/)
   assert.match(markdown, /S08_ALIYUN_RDS_DATABASE_URL/)
   assert.match(markdown, /阿里云 KMS\/Secrets Manager\/SAE secret env/)
@@ -342,8 +374,8 @@ test("Aliyun backend-cn status markdown states the backend-only target", () => {
   assert.match(markdown, /3\. Purchase\/confirm ACR Enterprise instance, namespace, and repository; defer docker login\/push and remote digest evidence to P04\./)
   assert.doesNotMatch(markdown, /build\/push the backend image/)
   assert.match(markdown, /## Action-Time Authorization Packets/)
-  assert.match(markdown, /nextActionTimeConfirmationPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE/)
-  assert.match(markdown, /blockedByPacketDependencies: P04_ACR_IMAGE_AND_PULL, P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS, P09_PRODUCTION_DEPLOY/)
+  assert.match(markdown, /nextActionTimeConfirmationPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P04_ACR_IMAGE_AND_PULL/)
+  assert.match(markdown, /blockedByPacketDependencies: P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS, P09_PRODUCTION_DEPLOY/)
   assert.match(markdown, /P00_ALIYUN_READONLY_INVENTORY_IDENTITY: 恢复阿里云 CLI\/CloudShell 只读盘点身份/)
   assert.match(markdown, /P11_ALIYUN_RDS_DATA_MIGRATION: 创建阿里云 RDS PostgreSQL 并完成正式数据层迁移/)
   assert.match(markdown, /corepack pnpm aliyun:cloudshell:handoff/)

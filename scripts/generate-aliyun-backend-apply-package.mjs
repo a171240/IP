@@ -3,8 +3,8 @@
 import { mkdirSync, writeFileSync } from "node:fs"
 import { dirname, isAbsolute, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
-import { spawnSync } from "node:child_process"
 import { buildReadonlyInventoryAuthorizationContext } from "./lib/aliyun-readonly-inventory-authorization.mjs"
+import { runJsonWithCache } from "./lib/run-json-cache.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -19,16 +19,16 @@ const FIRST_BACKEND_ACTION_PACKET_IDS = [
   READONLY_INVENTORY_AUTH_PACKET,
   "P11_ALIYUN_RDS_DATA_MIGRATION",
   "P05_OSS_RAM_STS",
-  "P03_ACR_PURCHASE",
+  "P04_ACR_IMAGE_AND_PULL",
 ]
 const FIRST_BACKEND_ACTION_STEP_IDS = [
   "BAP00_READONLY_INVENTORY_IDENTITY",
   "BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE",
   "BAP02_OSS_RAM_STS_CLOSE",
-  "BAP03_ACR_PURCHASE_AND_REPOSITORY",
+  "BAP04_ACR_IMAGE_PUSH_AND_PULL",
 ]
 const FIRST_BACKEND_ACTION_RECOMMENDED_REPLY =
-  "授权本轮只做阿里云后端第一批动作：只读盘点、创建/确认 RDS PostgreSQL 并处理数据库密码、确认 OSS RAM/STS，购买/确认 ACR Enterprise Economic cn-hangzhou 1个月 CNY117；密钥只进入阿里云 KMS/Secrets Manager/SAE secret env，不写文档/代码/git；仅处理 RDS/OSS 所需的受控 secret env，暂不执行全量 SAE env import；不做微信/Android/iOS、不部署上线、不改 DNS。"
+  "授权本轮只做阿里云后端第一批动作：只读盘点、创建/确认 RDS PostgreSQL 并处理数据库密码、确认 OSS RAM/STS；ACR 购买证据已确认，可另按 P04 推送后端镜像并配置 SAE 拉取，但 registry 密码只能走受控凭证通道；密钥只进入阿里云 KMS/Secrets Manager/SAE secret env，不写文档/代码/git；仅处理本批所需受控 secret env，暂不执行全量 SAE env import；不做微信/Android/iOS、不部署上线、不改 DNS。"
 
 const SECRET_VALUE_PATTERNS = [
   /sk-[A-Za-z0-9_-]{20,}/,
@@ -99,20 +99,11 @@ function resolveValue(value, name) {
 }
 
 function runJson(label, scriptArgs) {
-  const result = spawnSync(process.execPath, scriptArgs, {
+  return runJsonWithCache(label, scriptArgs, {
     cwd: BACKEND_ROOT,
-    encoding: "utf8",
     maxBuffer: 1024 * 1024 * 80,
+    timeoutMs: 120_000,
   })
-  if (result.error) throw result.error
-  if (result.status !== 0) {
-    throw new Error(`${label}_failed:${result.status}\n${result.stderr || result.stdout}`)
-  }
-  try {
-    return JSON.parse(result.stdout)
-  } catch (error) {
-    throw new Error(`invalid_json_from_${label}:${error instanceof Error ? error.message : String(error)}`)
-  }
 }
 
 function buildReport(args) {
@@ -154,8 +145,10 @@ function buildReport(args) {
 
   const steps = buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEvidence, readonlyInventoryAuthorization })
   const immediateBackendSteps = steps.filter((step) => step.canStartAfterActionTimeConfirmation).map((step) => step.id)
-  const blockedBackendSteps = steps.filter((step) => !step.canStartAfterActionTimeConfirmation).map((step) => step.id)
-  const userIntervention = buildUserIntervention({ sensitiveBlockers, backendStatus, cloudActions })
+  const blockedBackendSteps = steps
+    .filter((step) => !step.completed && !step.canStartAfterActionTimeConfirmation)
+    .map((step) => step.id)
+  const userIntervention = buildUserIntervention({ sensitiveBlockers, backendStatus, cloudActions, steps })
   const credentialPasswordIntervention = buildCredentialPasswordIntervention(sensitiveBlockers)
   const credentialAcquisitionQueue = buildCredentialAcquisitionQueue(sensitiveBlockers)
   const actionTimeAuthorizationRequest = buildActionTimeAuthorizationRequest(steps)
@@ -195,7 +188,9 @@ function buildReport(args) {
       onlyMissingBackendCredentialValue: credentialAcquisitionQueue.onlyMissingBackendCredentialValue,
       backendResourceEvidenceMatrixRows: backendResourceEvidenceMatrix.length,
       backendResourceEvidenceMatrixImmediateRows: backendResourceEvidenceMatrix.filter((item) => item.canStartAfterActionTimeConfirmation).length,
-      backendResourceEvidenceMatrixBlockedRows: backendResourceEvidenceMatrix.filter((item) => !item.canStartAfterActionTimeConfirmation).length,
+      backendResourceEvidenceMatrixBlockedRows: backendResourceEvidenceMatrix.filter((item) =>
+        !item.completed && !item.canStartAfterActionTimeConfirmation
+      ).length,
       backendResourceEvidenceMatrixCredentialOrPasswordRows: backendResourceEvidenceMatrix.filter((item) => item.requiresCredentialOrPasswordHandling).length,
     },
     actionTimeAuthorizationRequest,
@@ -265,12 +260,12 @@ function buildActionTimeAuthorizationRequest(steps) {
       "恢复阿里云 CLI/CloudShell 只读盘点身份，只运行 allowlisted List/Describe/stat/get inventory 命令。",
       "创建或确认 cn-hangzhou RDS PostgreSQL、数据库、账号和网络访问策略，并只把 DATABASE_URL_CN 写入阿里云受控 secret env。",
       "确认 OSS bucket/CORS/service-records 前缀，绑定最小权限 RAM/STS 或运行时角色。",
-      "购买或确认 ACR Enterprise Economic cn-hangzhou 1个月 CNY117，并记录 registry host、namespace、repository 等非密钥证据。",
+      "把后端镜像推送到已确认的 ACR 仓库，校验 remote sha256 digest，并配置 SAE 运行时镜像拉取。",
     ],
     explicitlyExcluded: [
       "不创建微信开放平台移动应用，不处理 Android release signing，不读取 Apple Team ID/AASA。",
       "不执行 production-cn 部署、postdeploy smoke、DNS/HTTPS/ICP 变更或 git push。",
-      "不执行 docker login/push，不配置 SAE 镜像拉取。",
+      "不购买 ACR，不把 registry username/password、RAM Secret 或 token 写入文件、镜像或 git。",
       "不执行全量 SAE 环境变量导入；只允许本批 RDS/OSS 动作要求的受控 secret env 写入。",
       "不把 DATABASE_URL_CN、数据库密码、AccessKeySecret、STS token、registry password、Supabase service role key、cookie 或证书私钥写入 JSON、Markdown、Docker 镜像、App 包、小程序包、shell history 或 git。",
     ],
@@ -290,7 +285,10 @@ function buildBackendResourceEvidenceMatrix(steps) {
       order: index + 1,
       stepId: step.id,
       title: step.title,
-      phase: step.canStartAfterActionTimeConfirmation
+      completed: step.completed === true,
+      phase: step.completed === true
+        ? "completed_evidence_recorded"
+        : step.canStartAfterActionTimeConfirmation
         ? "first_batch_after_action_time_confirmation"
         : "blocked_until_dependencies_close",
       canStartAfterActionTimeConfirmation: step.canStartAfterActionTimeConfirmation === true,
@@ -439,8 +437,17 @@ function buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEv
   const resourceEvidenceById = new Map(
     (cloudActions.cloudActionClosureBrief?.blockedResourceEvidence || []).map((item) => [item.id, item]),
   )
+  const acrResourceEvidence = resourceEvidenceById.get("R02_ACR_IMAGE_REGISTRY")
   const ossResourceEvidence = resourceEvidenceById.get("R05_OSS_AUDIO_STORAGE")
   const slsResourceEvidence = resourceEvidenceById.get("R07_SLS_ALERTS")
+  const canStartNowPackets = new Set(backendStatus.actionAuthorization?.canStartNowPackets || [])
+  const acrPurchaseConfirmed = canStartNowPackets.has("P04_ACR_IMAGE_AND_PULL") ||
+    (backendStatus.evidenceWriteback?.groupStatus || [])
+      .some((group) => group.key === "imagePublish" && !(group.requiredAuthorizationPackets || []).includes("P03_ACR_PURCHASE"))
+  const acrImagePushEvidence = (acrResourceEvidence?.currentEvidence || [])
+    .filter((item) =>
+      /^(localDockerImage\.status|image\.localDigestReady|acr\.purchaseCandidate\.confirmed|runtime\.appName|observedResourceStatus)=/.test(String(item)),
+    )
 
   return [
     {
@@ -507,6 +514,18 @@ function buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEv
         `firstVersionRdsRoutesTouchingSupabaseCompatibility=${rdsEvidence.summary?.firstVersionRdsRoutesWithSupabase || 0}/${rdsEvidence.summary?.firstVersionRdsRouteCount || 0}`,
         `firstVersionRdsRoutesWithSupabaseDataAccess=${rdsEvidence.summary?.firstVersionRdsRoutesWithSupabaseDataAccess || 0}/${rdsEvidence.summary?.firstVersionRdsRouteCount || 0}`,
         `postgresDataAccessAdapterDetected=${rdsEvidence.summary?.postgresDataAccessAdapterDetected === true}`,
+        `schemaApplyCandidate.status=${rdsEvidence.rdsMigrationPlan?.compatibilityReview?.schemaApplyCandidateAudit?.status || "unknown"}`,
+        `schemaApplyCandidate.readyToApplySchema=${rdsEvidence.rdsMigrationPlan?.compatibilityReview?.schemaApplyCandidateAudit?.readyToApplySchema === true}`,
+        `schemaApplyCandidate.findingCount=${rdsEvidence.rdsMigrationPlan?.compatibilityReview?.schemaApplyCandidateAudit?.findingCount || 0}`,
+        `schemaApplyCandidate.categories=${(rdsEvidence.rdsMigrationPlan?.compatibilityReview?.schemaApplyCandidateAudit?.categories || []).join(",")}`,
+        `rdsApplyCandidate.readyToApplySchema=${rdsEvidence.rdsMigrationPlan?.compatibilityReview?.rdsApplyCandidateAudit?.readyToApplySchema === true}`,
+        `rdsApplyCandidate.findingCount=${rdsEvidence.rdsMigrationPlan?.compatibilityReview?.rdsApplyCandidateAudit?.findingCount || 0}`,
+        `rdsApplyCandidate.categories=${(rdsEvidence.rdsMigrationPlan?.compatibilityReview?.rdsApplyCandidateAudit?.categories || []).join(",")}`,
+        `rdsApplyCandidate.removedStatementCount=${rdsEvidence.rdsMigrationPlan?.compatibilityReview?.rdsApplyCandidateRemoval?.removedStatementCount || 0}`,
+        `rdsApplyCandidate.rewrittenStatementCount=${rdsEvidence.rdsMigrationPlan?.compatibilityReview?.rdsApplyCandidateRemoval?.rewrittenStatementCount || 0}`,
+        `rdsApplyCandidate.reviewPlanItemCount=${rdsEvidence.rdsMigrationPlan?.compatibilityReview?.rdsApplyCandidateReviewPlan?.itemCount || 0}`,
+        `rdsApplyCandidate.reviewPlanFindingCount=${rdsEvidence.rdsMigrationPlan?.compatibilityReview?.rdsApplyCandidateReviewPlan?.findingCount || 0}`,
+        `rdsApplyCandidate.reviewPlanCategories=${(rdsEvidence.rdsMigrationPlan?.compatibilityReview?.rdsApplyCandidateReviewPlan?.categories || []).join(",")}`,
         "rdsMigrationPackageHandoff=docs/app-production-cn-rds-migration-package.md",
       ],
       currentBlockers: [
@@ -587,8 +606,9 @@ function buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEv
     {
       id: "BAP03_ACR_PURCHASE_AND_REPOSITORY",
       title: "Confirm ACR Enterprise instance, namespace, and repository",
-      canStartAfterActionTimeConfirmation: immediateConsoleTasks.has("C02_ACR_IMAGE_AND_PULL"),
-      requiresActionTimeConfirmation: true,
+      completed: acrPurchaseConfirmed,
+      canStartAfterActionTimeConfirmation: !acrPurchaseConfirmed && immediateConsoleTasks.has("C02_ACR_IMAGE_AND_PULL"),
+      requiresActionTimeConfirmation: !acrPurchaseConfirmed,
       mutationType: "paid_resource_purchase_or_confirmation",
       requiredAuthorizationPackets: ["P03_ACR_PURCHASE"],
       consolePath: "阿里云控制台 -> 容器镜像服务 ACR -> 企业版实例/命名空间/镜像仓库",
@@ -598,14 +618,15 @@ function buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEv
         "region=cn-hangzhou",
         "term=1 month",
         "quotedAmount=CNY 117.00",
+        `acr.purchaseCandidate.confirmed=${acrPurchaseConfirmed}`,
         "repository=meiye-huajing-app-api",
       ],
-      currentBlockers: filterPresent(statusBlockers, ["ACR_IMAGE_REGISTRY_NOT_READY"]),
+      currentBlockers: acrPurchaseConfirmed ? [] : filterPresent(statusBlockers, ["ACR_IMAGE_REGISTRY_NOT_READY"]),
       writeTargets: [
         "deploy/aliyun-production-cn.image-publish.local.json -> acr.confirmed/registryHost/namespace/repository",
       ],
       userMustHandle: [
-        "ACR paid purchase confirmation",
+        acrPurchaseConfirmed ? "ACR paid purchase confirmation already recorded as non-secret evidence" : "ACR paid purchase confirmation",
         "registry password only later through docker login or controlled credential helper",
       ],
       nonSecretEvidenceToRecord: [
@@ -622,13 +643,13 @@ function buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEv
     {
       id: "BAP04_ACR_IMAGE_PUSH_AND_PULL",
       title: "Push backend image to ACR and configure SAE pull evidence",
-      canStartAfterActionTimeConfirmation: false,
-      blockedUntil: ["BAP03_ACR_PURCHASE_AND_REPOSITORY"],
+      canStartAfterActionTimeConfirmation: canStartNowPackets.has("P04_ACR_IMAGE_AND_PULL"),
+      blockedUntil: canStartNowPackets.has("P04_ACR_IMAGE_AND_PULL") ? [] : ["BAP03_ACR_PURCHASE_AND_REPOSITORY"],
       requiresActionTimeConfirmation: true,
       mutationType: "docker_login_push_and_runtime_pull_secret",
       requiredAuthorizationPackets: ["P04_ACR_IMAGE_AND_PULL"],
       consolePath: "本机 Docker + 阿里云 ACR + SAE runtime image pull",
-      currentEvidence: ["localDockerImage.status=ready"],
+      currentEvidence: acrImagePushEvidence.length ? acrImagePushEvidence : ["localDockerImage.status=unknown"],
       currentBlockers: filterPresent(statusBlockers, ["ACR_IMAGE_REGISTRY_NOT_READY", "SAE_RUNTIME_NOT_READY"]),
       writeTargets: [
         "deploy/aliyun-production-cn.image-publish.local.json -> image/runtime",
@@ -824,26 +845,30 @@ function buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEv
   }))
 }
 
-function buildUserIntervention({ sensitiveBlockers, backendStatus, cloudActions }) {
+function buildUserIntervention({ sensitiveBlockers, backendStatus, cloudActions, steps = [] }) {
   const credentialBrief = sensitiveBlockers.credentialInterventionBrief || {}
   const blockedCredentialNames = credentialBrief.blockedCredentialNames || []
   const readySecretEnvVariableNames = credentialBrief.readySecretEnvVariableNames || []
   const appLaunchDeferred = backendStatus.summary.appLaunchDeferredBlocking || []
+  const completedStepIds = new Set(steps.filter((step) => step.completed).map((step) => step.id))
+  const acrPurchaseCompleted = completedStepIds.has("BAP03_ACR_PURCHASE_AND_REPOSITORY")
   const requiredIds = [
     "USER_CONFIRM_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "USER_CONFIRM_RDS_PURCHASE_AND_DATABASE_PASSWORD",
-    "USER_CONFIRM_ACR_PAID_PURCHASE",
+    acrPurchaseCompleted ? "" : "USER_CONFIRM_ACR_PAID_PURCHASE",
     "USER_CONFIRM_OSS_RAM_STS_SECRET_OR_RUNTIME_ROLE",
     "USER_CONFIRM_SECRET_ENV_IMPORT",
     "USER_CONFIRM_DNS_HTTPS_ICP_CHANGE",
     "USER_CONFIRM_PRODUCTION_DEPLOY",
-  ]
+  ].filter(Boolean)
   return {
     requiredIds,
     paymentOrBillingConfirmations: [
       "RDS PostgreSQL instance/spec purchase or existing instance confirmation",
-      "ACR Enterprise Economic cn-hangzhou 1 month quoted CNY 117.00",
       "SAE runtime/public ingress/SLS/certificate costs if prompted by Aliyun",
+    ],
+    completedPurchaseConfirmations: [
+      ...(acrPurchaseCompleted ? ["ACR Enterprise Economic cn-hangzhou 1 month CNY 117.00 paid and repository evidence recorded"] : []),
     ],
     secretOrPasswordHandling: [
       "Aliyun CLI profile, CloudShell session, AccessKeySecret or STS token if needed for read-only inventory",
@@ -935,6 +960,7 @@ function renderMarkdown(report) {
     "",
     `- requiredIds: ${report.userIntervention.requiredIds.join(", ")}`,
     `- paymentOrBillingConfirmations: ${report.userIntervention.paymentOrBillingConfirmations.join("; ")}`,
+    `- completedPurchaseConfirmations: ${report.userIntervention.completedPurchaseConfirmations.join("; ") || "none"}`,
     `- secretOrPasswordHandling: ${report.userIntervention.secretOrPasswordHandling.join("; ")}`,
     `- blockedCredentialCount: ${report.userIntervention.blockedCredentialNames.length}`,
     `- blockedCredentialNames: ${report.userIntervention.blockedCredentialNames.join(", ") || "none"}`,
@@ -1024,15 +1050,15 @@ function renderOperatorQuickStart(report) {
     "- P00: 恢复 Aliyun CLI/CloudShell 只读盘点，只运行 allowlisted List/Describe/stat/get inventory 命令，并只写非密钥 evidence。",
     "- P11: 创建或确认 cn-hangzhou RDS PostgreSQL、数据库、账号和网络访问策略；先记录 Supabase SQL 兼容审查、Supabase-specific SQL 处理和 RDS extension 支持，再迁移 schema/data；DATABASE_URL_CN 只进入 KMS/Secrets Manager/SAE secret env。",
     "- P05: 确认 OSS bucket/CORS/service-records 前缀，并绑定最小权限 RAM/STS 或运行时角色。",
-    "- P03: 购买或确认 ACR Enterprise Economic cn-hangzhou 1个月 CNY117，并创建/确认 namespace 和 repository。",
+    "- P04: 在已确认的 ACR 仓库中推送或导入后端镜像，校验 remote sha256 digest，并配置 SAE 镜像拉取权限；registry 密码只走受控凭证通道。",
     "",
-    "本批明确不做：微信开放平台移动应用、Android release signing、Apple Team ID/AASA、docker login/push、SAE runtime 创建、全量 env import、DNS/HTTPS/ICP 变更、production deploy、postdeploy smoke、git push。",
+    "本批明确不做：微信开放平台移动应用、Android release signing、Apple Team ID/AASA、再次购买 ACR、SAE runtime 创建、全量 env import、DNS/HTTPS/ICP 变更、production deploy、postdeploy smoke、git push。",
     "",
     "必须停手等用户确认的点：",
     "",
-    "- CloudShell 如出现性能型 NAS 费用提示，确认后才可点击开通。",
+    "- CloudShell 如出现重启实例、性能型 NAS 费用或开通提示，确认后才可继续。",
     "- RDS 如涉及规格购买、实例费用、数据库账号密码或迁移执行，动作前确认。",
-    "- ACR 付款页必须再次确认规格、地域、1个月和 CNY117 金额。",
+    "- ACR 购买证据已确认；P04 只处理镜像 push/import、digest 核对和 SAE 拉取配置，不再次付款。",
     "- AccessKeySecret、STS token、registry password、DATABASE_URL_CN、数据库密码、Supabase service role key 只能进入受控 secret 通道，不能写文档、JSON、镜像、shell history 或 git。",
     "",
     `授权口径：${report.actionTimeAuthorizationRequest.recommendedUserReply}`,

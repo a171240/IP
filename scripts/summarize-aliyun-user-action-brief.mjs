@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
-import { spawnSync } from "node:child_process"
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, isAbsolute, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { buildReadonlyInventoryAuthorizationContext } from "./lib/aliyun-readonly-inventory-authorization.mjs"
+import { runJsonWithCache } from "./lib/run-json-cache.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -51,6 +51,11 @@ const APP_LAUNCH_PACKET_IDS = new Set([
   "P01_WECHAT_OPEN_MOBILE_APP",
   "P10_ANDROID_RELEASE_SIGNING",
   "P02_APPLE_TEAM_ID",
+])
+const APP_LAUNCH_REQUIRED_NAMES = new Set([
+  "WECHAT_OPEN_APP_ID",
+  "WECHAT_OPEN_APP_SECRET",
+  "APPLE_TEAM_ID",
 ])
 const APP_LAUNCH_BLOCKER_PATTERNS = [
   /WECHAT_OPEN_APP_ID/,
@@ -151,22 +156,44 @@ const NEXT_ACTION_TIME_CONFIRMATION_BY_ACTION_ID = Object.freeze({
   U03_ACR_PURCHASE_CONFIRMATION: Object.freeze({
     packetId: "P03_ACR_PURCHASE",
     sequenceGroup: "cloud_foundation",
-    minimumUserPhrase: "授权购买 ACR Enterprise Economic，cn-hangzhou，1 个月，当前报价 CNY 117.00。",
+    minimumUserPhrase: "已确认 ACR Enterprise Economic，cn-hangzhou，1 个月购买/仓库证据；P03 不再作为当前待付款动作。",
     allowedActions: [
-      "在阿里云 ACR 企业版购买页确认规格、地域、时长和金额。",
-      "完成购买后创建或确认实例、namespace 和 repository。",
-      "只记录 registry host、namespace、repository 和非密钥购买证据。",
+      "复核已创建的 ACR 企业版实例、namespace 和 repository。",
+      "只记录 registry host、namespace、repository、实例 id 和非密钥购买/仓库证据。",
+      "把后续镜像 push/import、digest 核对和 SAE 拉取配置交给 P04_ACR_IMAGE_AND_PULL。",
     ],
     explicitlyExcluded: [
-      "未明确确认金额前不点击付款。",
       "不执行 docker login/push。",
       "不记录 registry password、RAM Secret 或 token。",
+      "不把 P03 当作当前生产部署或镜像发布授权。",
     ],
     completionEvidence: [
       "acr.purchaseCandidate.confirmed=true",
       "acr.registryHost actual aliyuncs.com host",
       "acr.namespace created",
       "repository=meiye-huajing-app-api",
+    ],
+  }),
+  U04_ACR_RUNTIME_AUTH: Object.freeze({
+    packetId: "P04_ACR_IMAGE_AND_PULL",
+    sequenceGroup: "image_runtime",
+    minimumUserPhrase: "授权把后端镜像推送到已创建的 ACR，并配置 SAE 拉取该镜像；不输出 registry 密码。",
+    allowedActions: [
+      "构建并 smoke 本地 Docker 镜像。",
+      "通过受控 docker credential helper、RAM 或阿里云运行时配置完成镜像推送/拉取。",
+      "在 image-publish.local.json 记录 remote image、sha256 digest 和布尔证据。",
+    ],
+    explicitlyExcluded: [
+      "不购买 ACR。",
+      "不把 registry username/password、RAM Secret 或 token 写入文件、镜像或 git。",
+      "不部署 production-cn，除非 U09 单独授权。",
+    ],
+    completionEvidence: [
+      "acr.imagePushed=true",
+      "acr.digestVerified=true",
+      "runtime.remoteImageConfigured=true",
+      "runtime.imagePullConfigured=true",
+      "remoteDigest sha256 verified",
     ],
   }),
   U05_OSS_RAM_OR_STS: Object.freeze({
@@ -196,7 +223,7 @@ const NEXT_ACTION_TIME_CONFIRMATION_BY_ACTION_ID = Object.freeze({
     minimumUserPhrase: "授权创建/确认阿里云 RDS PostgreSQL production-cn 数据库并完成数据迁移；DATABASE_URL_CN 只能进入阿里云 secret env。",
     allowedActions: [
       "创建或确认 cn-hangzhou RDS PostgreSQL 实例、数据库、账号和网络白名单/内网访问策略。",
-      "先生成并核对 docs/app-production-cn-rds-migration-package.md，关闭 compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查。",
+      "先生成并核对 docs/app-production-cn-rds-migration-package.md，关闭 compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查。",
       "执行 Supabase 到 RDS/PostgreSQL 的 schema/data 迁移与回滚验收。",
       "只把 DATABASE_URL_CN 导入 KMS/Secrets Manager/SAE secret env，并记录非密钥迁移证据。",
     ],
@@ -209,8 +236,8 @@ const NEXT_ACTION_TIME_CONFIRMATION_BY_ACTION_ID = Object.freeze({
       "Aliyun RDS PostgreSQL instance exists in cn-hangzhou",
       "database account and least-privilege access are ready",
       "DATABASE_URL_CN imported through secret env only",
-      "compatibilityReviewChecklistItemCount=6 is reviewed and closed before schema apply",
-      "supabase_auth_uid/supabase_storage_schema/supabase_service_role/row_level_security/policy_statement/extension_review dispositions are recorded without secrets",
+      "compatibilityReviewChecklistItemCount=7 is reviewed and closed before schema apply",
+      "supabase_auth_schema/supabase_auth_uid/supabase_storage_schema/supabase_service_role/row_level_security/policy_statement/extension_review dispositions are recorded without secrets",
       "migration.schemaCompatibilityReviewed=true",
       "migration.supabaseSpecificSqlResolved=true",
       "migration.rdsExtensionSupportConfirmed=true",
@@ -273,20 +300,10 @@ function resolveValue(value, name) {
 }
 
 function runJson(label, scriptArgs) {
-  const result = spawnSync(process.execPath, scriptArgs, {
+  return runJsonWithCache(label, scriptArgs, {
     cwd: BACKEND_ROOT,
-    encoding: "utf8",
     maxBuffer: 1024 * 1024 * 30,
   })
-  if (result.error) throw result.error
-  if (result.status !== 0) {
-    throw new Error(`${label}_failed:${result.status}\n${result.stderr || result.stdout}`)
-  }
-  try {
-    return JSON.parse(result.stdout)
-  } catch (error) {
-    throw new Error(`invalid_json_from_${label}:${error instanceof Error ? error.message : String(error)}`)
-  }
 }
 
 function buildReport(args) {
@@ -344,6 +361,9 @@ function buildReport(args) {
     backendOnly: args.backendOnly,
     nextActionTimeConfirmations,
   })
+  const requiredBlockingNames = status.summary?.requiredBlocking || []
+  const backendRequiredBlocking = requiredBlockingNames.filter((name) => !APP_LAUNCH_REQUIRED_NAMES.has(name))
+  const deferredRequiredBlocking = requiredBlockingNames.filter((name) => APP_LAUNCH_REQUIRED_NAMES.has(name))
   const blocked = currentActions.filter((item) => item.status !== "ready")
   const report = {
     ok: true,
@@ -379,6 +399,10 @@ function buildReport(args) {
       actionTimeConfirmationRequired: currentActions
         .filter((item) => item.requiresActionTimeConfirmation)
         .map((item) => item.id),
+      requiredBlocking: args.backendOnly ? backendRequiredBlocking : requiredBlockingNames,
+      fullAppRequiredBlocking: requiredBlockingNames,
+      deferredAppLaunchBlocking: args.backendOnly ? [] : deferredRequiredBlocking,
+      deferredAppLaunchBlockingCount: deferredRequiredBlocking.length,
       nextActionTimeConfirmations: nextActionTimeConfirmations.map((item) => item.packetId),
       deferredAppLaunchConfirmations: deferredAppLaunchConfirmations.map((item) => item.packetId),
       canBeRecordedAsNonSecretEvidence: currentActions
@@ -454,7 +478,7 @@ function buildActionTimeAuthorizationRequest({ backendOnly, nextActionTimeConfir
     backendOnly,
     packetIds,
     recommendedUserReply: backendOnly
-      ? "授权本轮只做阿里云后端第一批动作：只读盘点、创建/确认 RDS PostgreSQL 并处理数据库密码、确认 OSS RAM/STS，购买/确认 ACR Enterprise Economic cn-hangzhou 1个月 CNY117；密钥只进入阿里云 KMS/Secrets Manager/SAE secret env，不写文档/代码/git；仅处理 RDS/OSS 所需的受控 secret env，暂不执行全量 SAE env import；不做微信/Android/iOS、不部署上线、不改 DNS。"
+      ? "授权本轮只做阿里云后端第一批动作：只读盘点、创建/确认 RDS PostgreSQL 并处理数据库密码、确认 OSS RAM/STS；ACR 购买证据已确认，镜像推送/SAE 拉取配置需另按 P04 动作时确认；密钥只进入阿里云 KMS/Secrets Manager/SAE secret env，不写文档/代码/git；仅处理 RDS/OSS 所需的受控 secret env，暂不执行全量 SAE env import；不做微信/Android/iOS、不部署上线、不改 DNS。"
       : "请逐项明确授权 nextActionTimeConfirmations 中的动作；未明确授权前不做云端变更、购买、密钥导入、部署、DNS 或 git push。",
     minimumUserPhrases,
     allowedActions,
@@ -610,25 +634,28 @@ function buildActions({ sensitiveById, resourcesById, status, cloudItems, readon
     verifyCommands: ["corepack pnpm aliyun:aasa:check", "corepack pnpm aliyun:app-native:check"],
   })
 
+  const acrPurchaseConfirmed = isAcrPurchaseConfirmed(resourcesById)
+  const acrPurchaseEvidence = resourceEvidence(resourcesById, ["R02_ACR_IMAGE_REGISTRY"])
   addAction(actionMap, {
     id: "U03_ACR_PURCHASE_CONFIRMATION",
-    title: "确认 ACR 企业版付费购买",
-    status: sensitiveById.get("S03_ACR_PAID_PURCHASE")?.status || resourcesById.get("R02_ACR_IMAGE_REGISTRY")?.status || "blocked",
+    title: "确认 ACR 企业版购买/仓库证据",
+    status: acrPurchaseConfirmed ? "ready" : sensitiveById.get("S03_ACR_PAID_PURCHASE")?.status || "blocked",
     owner: "用户/阿里云 ACR 操作员",
-    obtainFrom: "阿里云控制台 -> 容器镜像服务 ACR -> 企业版购买页",
+    obtainFrom: "阿里云控制台 -> 容器镜像服务 ACR -> 企业版实例/命名空间/镜像仓库",
     writeTargets: ["deploy/aliyun-production-cn.image-publish.local.json -> acr.purchaseCandidate / acr confirmed evidence"],
-    requiredUserAction: sensitiveById.get("S03_ACR_PAID_PURCHASE")?.requiredUserAction,
-    unblockCondition: sensitiveById.get("S03_ACR_PAID_PURCHASE")?.unblockCondition,
+    requiredUserAction: acrPurchaseConfirmed
+      ? "P03 已确认；下一步不要再次付款，转到 P04 镜像 push/import、digest 核对和 SAE 拉取配置。"
+      : sensitiveById.get("S03_ACR_PAID_PURCHASE")?.requiredUserAction,
+    unblockCondition: acrPurchaseConfirmed
+      ? "acr.purchaseCandidate.confirmed=true、registryHost/namespace/repository 已记录非密钥证据。"
+      : sensitiveById.get("S03_ACR_PAID_PURCHASE")?.unblockCondition,
     variableNames: [],
-    requiresUserAction: true,
-    requiresActionTimeConfirmation: true,
+    requiresUserAction: !acrPurchaseConfirmed,
+    requiresActionTimeConfirmation: !acrPurchaseConfirmed,
     nonSecretEvidenceOnly: true,
     sourceIds: ["S03_ACR_PAID_PURCHASE", "R02_ACR_IMAGE_REGISTRY"],
-    currentBlockers: [
-      ...sensitiveStatusBlockers(sensitiveById, ["S03_ACR_PAID_PURCHASE"]),
-      ...resourceBlockers(resourcesById, ["R02_ACR_IMAGE_REGISTRY"]),
-    ],
-    currentEvidence: resourceEvidence(resourcesById, ["R02_ACR_IMAGE_REGISTRY"]),
+    currentBlockers: acrPurchaseConfirmed ? [] : sensitiveStatusBlockers(sensitiveById, ["S03_ACR_PAID_PURCHASE"]),
+    currentEvidence: acrPurchaseEvidence,
     verifyCommands: ["corepack pnpm aliyun:image:plan"],
   })
 
@@ -703,8 +730,8 @@ function buildActions({ sensitiveById, resourcesById, status, cloudItems, readon
       "deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres / migration non-secret evidence",
       "DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env only",
     ],
-    requiredUserAction: "创建或确认阿里云 RDS PostgreSQL；先生成 RDS 迁移包并关闭 compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查，再生成受控连接串，完成 Supabase 到 RDS/PostgreSQL 的代码、schema、数据、APP API smoke 和回滚迁移验收。",
-    unblockCondition: "DATABASE_URL_CN ready，compatibilityReviewChecklist 6 类已关闭，migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true，RDS PostgreSQL 迁移和回滚验收通过，production-cn 后端正式数据库目标不再是 Supabase。",
+    requiredUserAction: "创建或确认阿里云 RDS PostgreSQL；先生成 RDS 迁移包并关闭 compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查，再生成受控连接串，完成 Supabase 到 RDS/PostgreSQL 的代码、schema、数据、APP API smoke 和回滚迁移验收。",
+    unblockCondition: "DATABASE_URL_CN ready，compatibilityReviewChecklist 7 类已关闭，migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true，RDS PostgreSQL 迁移和回滚验收通过，production-cn 后端正式数据库目标不再是 Supabase。",
     variableNames: ["DATABASE_URL_CN"],
     requiresUserAction: true,
     requiresActionTimeConfirmation: true,
@@ -1109,6 +1136,11 @@ function resourceEvidence(resourcesById, ids) {
       .filter(Boolean)
       .map((item) => `${id}:${item}`)
   })
+}
+
+function isAcrPurchaseConfirmed(resourcesById) {
+  return resourceEvidence(resourcesById, ["R02_ACR_IMAGE_REGISTRY"])
+    .some((item) => /acr\.purchaseCandidate\.confirmed=true/.test(item))
 }
 
 function sensitiveVariableNotes(item) {

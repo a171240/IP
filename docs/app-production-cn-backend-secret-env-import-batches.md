@@ -1,6 +1,6 @@
 # APP production-cn backend-only secret env import batches
 
-Generated: 2026-06-26T02:03:41.338Z
+Generated: 2026-06-26T16:43:23.244Z
 
 Source command: `corepack pnpm aliyun:sensitive:blockers:backend`
 
@@ -18,7 +18,7 @@ readySecretEnvVariableCount=17
 readySecretEnvVariableGroupCount=9
 canCodexProceedWithoutUser=false
 actionTimeConfirmationRequired=true
-actionTimeConfirmationRequiredIds=S03_ACR_PAID_PURCHASE, S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT
+actionTimeConfirmationRequiredIds=S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT
 ```
 
 ## Status Source Consistency
@@ -26,7 +26,7 @@ actionTimeConfirmationRequiredIds=S03_ACR_PAID_PURCHASE, S04_ACR_REGISTRY_AUTH, 
 - Deployment gate: `corepack pnpm aliyun:backend-cn:status`
 - Credential gate: `corepack pnpm aliyun:sensitive:blockers:backend`
 - Shared credential fields: `blockedCredentialNames`, `readySecretEnvVariableCount`, `actionTimeConfirmationRequiredIds`, `deferredAppLaunchSensitiveActionIds`
-- Backend-only credential conclusion: blockedCredentialNames=DATABASE_URL_CN; readySecretEnvVariableCount=17; actionTimeConfirmationRequiredIds=S03_ACR_PAID_PURCHASE, S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT
+- Backend-only credential conclusion: blockedCredentialNames=DATABASE_URL_CN; readySecretEnvVariableCount=17; actionTimeConfirmationRequiredIds=S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT
 - Production database decision: Aliyun RDS PostgreSQL is the production-cn database target; Supabase variables are migration source / legacy compatibility inputs only.
 - App launch decision: WeChat Open Platform mobile app login, Apple Team ID, and Android release signing are deferred full App launch items, not current backend-only blockers.
 
@@ -46,7 +46,7 @@ These names are still blocked by Aliyun backend resource or credential decisions
 | --- | --- | --- | --- |
 | `DATABASE_URL_CN` | `S08_ALIYUN_RDS_DATABASE_URL` | 阿里云 RDS/后端数据迁移操作员 | 阿里云 KMS/Secrets Manager/SAE secret env |
 
-- S03_ACR_PAID_PURCHASE and S04_ACR_REGISTRY_AUTH remain backend blockers, but registry secret material stays in ACR/Docker credential helper, RAM/KMS/Secrets Manager, or SAE runtime pull settings.
+- ACR purchase evidence is confirmed locally; S04_ACR_REGISTRY_AUTH remains blocked until docker push, digest verification, and SAE runtime image pull configuration are closed without storing registry secret material in docs, JSON, images, or git.
 - Supabase variables in legacy_database_migration_source are migration source / legacy compatibility only; formal production-cn database target is Aliyun RDS PostgreSQL.
 - WeChat Open Platform mobile app, Apple Team ID, and Android release signing variables are deferred full App launch items, not current backend import blockers.
 

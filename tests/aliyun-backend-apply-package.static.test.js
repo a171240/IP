@@ -6,9 +6,24 @@ const os = require("node:os")
 const path = require("node:path")
 
 const root = process.cwd()
+const runJsonCacheDir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-backend-apply-package-cache-"))
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), "utf8")
 const readJson = (...parts) => JSON.parse(read(...parts))
 const secretLike = /(sk-[A-Za-z0-9_-]{20,}|LTAI[A-Za-z0-9]{12,}|:\/\/[^\s:@]+:[^\s@]+@|AccessKeySecret\s*[:=]\s*\S{8,}|DATABASE_URL_CN\s*=\s*\S{8,})/i
+
+function execNode(args, options = {}) {
+  return execFileSync(process.execPath, args, {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 100,
+    ...options,
+    env: {
+      ...process.env,
+      MEIYE_ALIYUN_RUN_JSON_CACHE_DIR: runJsonCacheDir,
+      ...(options.env || {}),
+    },
+  })
+}
 
 test("Aliyun backend apply package command is wired into scripts and deploy spec", () => {
   const pkg = readJson("package.json")
@@ -58,11 +73,7 @@ test("Aliyun backend apply package command is wired into scripts and deploy spec
 })
 
 test("Aliyun backend apply package separates immediate backend work from deferred app launch", () => {
-  const output = execFileSync(process.execPath, ["scripts/generate-aliyun-backend-apply-package.mjs"], {
-    cwd: root,
-    encoding: "utf8",
-    maxBuffer: 1024 * 1024 * 100,
-  })
+  const output = execNode(["scripts/generate-aliyun-backend-apply-package.mjs"])
   const report = JSON.parse(output)
   const steps = new Map(report.applySteps.map((item) => [item.id, item]))
 
@@ -82,10 +93,9 @@ test("Aliyun backend apply package separates immediate backend work from deferre
     "BAP00_READONLY_INVENTORY_IDENTITY",
     "BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE",
     "BAP02_OSS_RAM_STS_CLOSE",
-    "BAP03_ACR_PURCHASE_AND_REPOSITORY",
+    "BAP04_ACR_IMAGE_PUSH_AND_PULL",
   ])
   assert.deepEqual(report.summary.blockedBackendSteps, [
-    "BAP04_ACR_IMAGE_PUSH_AND_PULL",
     "BAP05_BACKEND_ENV_IMPORT",
     "BAP06_SAE_RUNTIME_CREATE",
     "BAP07_DOMAINS_HTTPS_ICP",
@@ -97,7 +107,7 @@ test("Aliyun backend apply package separates immediate backend work from deferre
   assert.deepEqual(report.summary.missingCredentialValues, ["DATABASE_URL_CN"])
   assert.equal(report.summary.readySecretsPendingCloudImport, 17)
   assert.equal(report.summary.onlyMissingBackendCredentialValue, "DATABASE_URL_CN")
-  assert.deepEqual(report.summary.paidPurchaseConfirmationActionIds, ["S03_ACR_PAID_PURCHASE"])
+  assert.deepEqual(report.summary.paidPurchaseConfirmationActionIds, [])
   assert.deepEqual(report.summary.controlledSecretChannelActionIds, [
     "S04_ACR_REGISTRY_AUTH",
     "S05_OSS_RAM_SECRET_OR_STS",
@@ -106,7 +116,7 @@ test("Aliyun backend apply package separates immediate backend work from deferre
   ])
   assert.equal(report.summary.backendResourceEvidenceMatrixRows, 10)
   assert.equal(report.summary.backendResourceEvidenceMatrixImmediateRows, 4)
-  assert.equal(report.summary.backendResourceEvidenceMatrixBlockedRows, 6)
+  assert.equal(report.summary.backendResourceEvidenceMatrixBlockedRows, 5)
   assert.equal(report.summary.backendResourceEvidenceMatrixCredentialOrPasswordRows, 6)
   assert.equal(report.backendResourceEvidenceMatrix.length, 10)
   const matrixByStepId = new Map(report.backendResourceEvidenceMatrix.map((item) => [item.stepId, item]))
@@ -131,13 +141,12 @@ test("Aliyun backend apply package separates immediate backend work from deferre
   assert.deepEqual(report.credentialPasswordIntervention.missingCredentialValues.actionIds, ["S08_ALIYUN_RDS_DATABASE_URL"])
   assert.equal(report.credentialPasswordIntervention.readySecretsPendingCloudImport.count, 17)
   assert.ok(report.credentialPasswordIntervention.readySecretsPendingCloudImport.names.includes("SUPABASE_SERVICE_ROLE_KEY"))
-  assert.deepEqual(report.credentialPasswordIntervention.paidPurchaseConfirmationActionIds, ["S03_ACR_PAID_PURCHASE"])
+  assert.deepEqual(report.credentialPasswordIntervention.paidPurchaseConfirmationActionIds, [])
   assert.ok(report.credentialPasswordIntervention.controlledSecretChannelActionIds.includes("S08_ALIYUN_RDS_DATABASE_URL"))
   assert.ok(report.credentialPasswordIntervention.userMustProvideOrConfirm.some((item) => /DATABASE_URL_CN/.test(item)))
   assert.equal(report.credentialAcquisitionQueue.queueScope, "backend_aliyun_only")
   assert.equal(report.credentialAcquisitionQueue.onlyMissingBackendCredentialValue, "DATABASE_URL_CN")
   assert.deepEqual(report.credentialAcquisitionQueue.items.map((item) => item.actionId), [
-    "S03_ACR_PAID_PURCHASE",
     "S04_ACR_REGISTRY_AUTH",
     "S05_OSS_RAM_SECRET_OR_STS",
     "S08_ALIYUN_RDS_DATABASE_URL",
@@ -161,25 +170,25 @@ test("Aliyun backend apply package separates immediate backend work from deferre
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
     "P05_OSS_RAM_STS",
-    "P03_ACR_PURCHASE",
+    "P04_ACR_IMAGE_AND_PULL",
   ])
   assert.deepEqual(report.actionTimeAuthorizationRequest.stepIds, [
     "BAP00_READONLY_INVENTORY_IDENTITY",
     "BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE",
     "BAP02_OSS_RAM_STS_CLOSE",
-    "BAP03_ACR_PURCHASE_AND_REPOSITORY",
+    "BAP04_ACR_IMAGE_PUSH_AND_PULL",
   ])
   assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /阿里云后端第一批动作/)
   assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /RDS PostgreSQL/)
-  assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /CNY117/)
+  assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /ACR 购买证据已确认/)
   assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /不做微信\/Android\/iOS/)
   assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /不部署上线、不改 DNS/)
   assert.ok(report.actionTimeAuthorizationRequest.allowedActions.some((item) => /RDS PostgreSQL/.test(item)))
   assert.ok(report.actionTimeAuthorizationRequest.allowedActions.some((item) => /OSS/.test(item)))
-  assert.ok(report.actionTimeAuthorizationRequest.allowedActions.some((item) => /ACR Enterprise/.test(item)))
+  assert.ok(report.actionTimeAuthorizationRequest.allowedActions.some((item) => /后端镜像/.test(item)))
   assert.ok(report.actionTimeAuthorizationRequest.explicitlyExcluded.some((item) => /不创建微信开放平台移动应用/.test(item)))
   assert.ok(report.actionTimeAuthorizationRequest.explicitlyExcluded.some((item) => /git push/.test(item)))
-  assert.ok(report.actionTimeAuthorizationRequest.explicitlyExcluded.some((item) => /不执行 docker login\/push/.test(item)))
+  assert.ok(report.actionTimeAuthorizationRequest.explicitlyExcluded.some((item) => /不购买 ACR/.test(item)))
   assert.ok(report.actionTimeAuthorizationRequest.valueHandling.some((item) => /非密钥 evidence handle/.test(item)))
   assert.ok(report.actionTimeAuthorizationRequest.writeTargets.some((item) => /DATABASE_URL_CN/.test(item)))
   assert.ok(report.actionTimeAuthorizationRequest.verifyCommands.includes("corepack pnpm aliyun:rds:migration:package"))
@@ -190,16 +199,18 @@ test("Aliyun backend apply package separates immediate backend work from deferre
   assert.ok(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").requiredAuthorizationPackets.includes("P00_ALIYUN_READONLY_INVENTORY_IDENTITY"))
   assert.ok(!steps.get("BAP00_READONLY_INVENTORY_IDENTITY").requiredAuthorizationPackets.includes("P11_ALIYUN_READONLY_INVENTORY_IDENTITY"))
   assert.ok(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").writeTargets.some((item) => item.includes("cloud-inventory-results.local.json")))
-  assert.ok(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").currentEvidence.includes("cloudShellCurrentStatus=connecting_terminal_input_visible_inventory_not_executed"))
-  assert.ok(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").userMustHandle.some((item) => item.includes("当前 CloudShell 已打开但仍在连接")))
-  assert.ok(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").userMustHandle.some((item) => item.includes("如后续出现开通、重启实例或费用提示")))
+  assert.ok(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").currentEvidence.includes("cloudShellCurrentStatus=disconnected_restart_instance_confirmation_required"))
+  assert.ok(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").userMustHandle.some((item) => item.includes("CloudShell tab is disconnected")))
+  assert.ok(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").userMustHandle.some((item) => item.includes("restart-instance prompt")))
   assert.match(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").actionTimeConfirmation.minimumUserPhrase, /CloudShell/)
-  assert.match(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").actionTimeConfirmation.minimumUserPhrase, /等待当前阿里云 CloudShell 连接完成/)
+  assert.match(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").actionTimeConfirmation.minimumUserPhrase, /重启实例提示/)
   assert.match(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").actionTimeConfirmation.minimumUserPhrase, /只读盘点/)
-  assert.equal(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").actionTimeConfirmation.cloudShellCurrentStatus, "connecting_terminal_input_visible_inventory_not_executed")
-  assert.ok(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").actionTimeConfirmation.allowedActions.some((item) => item.includes("正在连接 Cloud Shell")))
-  assert.ok(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").actionTimeConfirmation.explicitlyExcluded.some((item) => item.includes("当前 connecting 状态不授权")))
-  assert.ok(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").actionTimeConfirmation.explicitlyExcluded.some((item) => item.includes("导入环境变量")))
+  assert.equal(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").actionTimeConfirmation.cloudShellCurrentStatus, "disconnected_restart_instance_confirmation_required")
+  assert.ok(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").actionTimeConfirmation.allowedActions.some((item) => item.includes("重启实例提示")))
+  assert.ok(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").actionTimeConfirmation.explicitlyExcluded.some((item) => item.includes("CloudShell 重启实例提示")))
+  assert.ok(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").actionTimeConfirmation.explicitlyExcluded.some((item) => (
+    item.includes("env import") || item.includes("导入环境变量")
+  )))
   assert.ok(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").verifyCommands.includes("corepack pnpm aliyun:cloudshell:handoff"))
   assert.ok(steps.get("BAP00_READONLY_INVENTORY_IDENTITY").verifyCommands.some((item) => item.includes("MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1")))
   assert.equal(steps.get("BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE").canStartAfterActionTimeConfirmation, true)
@@ -214,6 +225,17 @@ test("Aliyun backend apply package separates immediate backend work from deferre
   assert.ok(steps.get("BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE").nonSecretEvidenceToRecord.includes("schemaCompatibilityReviewed=true"))
   assert.ok(steps.get("BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE").nonSecretEvidenceToRecord.includes("supabaseSpecificSqlResolved=true"))
   assert.ok(steps.get("BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE").nonSecretEvidenceToRecord.includes("rdsExtensionSupportConfirmed=true"))
+  assert.ok(steps.get("BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE").currentEvidence.includes("schemaApplyCandidate.status=blocked_supabase_specific_sql_present"))
+  assert.ok(steps.get("BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE").currentEvidence.includes("schemaApplyCandidate.readyToApplySchema=false"))
+  assert.ok(steps.get("BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE").currentEvidence.includes("schemaApplyCandidate.findingCount=181"))
+  assert.ok(steps.get("BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE").currentEvidence.includes("schemaApplyCandidate.categories=extension_review,policy_statement,row_level_security,supabase_auth_schema,supabase_auth_uid,supabase_service_role,supabase_storage_schema"))
+  assert.ok(steps.get("BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE").currentEvidence.includes("rdsApplyCandidate.findingCount=22"))
+  assert.ok(steps.get("BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE").currentEvidence.includes("rdsApplyCandidate.categories=extension_review"))
+  assert.ok(steps.get("BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE").currentEvidence.includes("rdsApplyCandidate.removedStatementCount=97"))
+  assert.ok(steps.get("BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE").currentEvidence.includes("rdsApplyCandidate.rewrittenStatementCount=12"))
+  assert.ok(steps.get("BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE").currentEvidence.includes("rdsApplyCandidate.reviewPlanItemCount=1"))
+  assert.ok(steps.get("BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE").currentEvidence.includes("rdsApplyCandidate.reviewPlanFindingCount=22"))
+  assert.ok(steps.get("BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE").currentEvidence.includes("rdsApplyCandidate.reviewPlanCategories=extension_review"))
   assert.ok(steps.get("BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE").currentEvidence.includes("rdsMigrationPackageHandoff=docs/app-production-cn-rds-migration-package.md"))
   assert.ok(steps.get("BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE").writeTargets.includes("docs/app-production-cn-rds-migration-package.md -> non-secret schema/validation/rollback package digest handoff"))
   assert.ok(steps.get("BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE").verifyCommands.includes("corepack pnpm aliyun:rds:migration:package"))
@@ -222,9 +244,12 @@ test("Aliyun backend apply package separates immediate backend work from deferre
   assert.ok(steps.get("BAP02_OSS_RAM_STS_CLOSE").currentEvidence.includes("ossResource.observedReadiness=partial"))
   assert.ok(steps.get("BAP02_OSS_RAM_STS_CLOSE").currentEvidence.some((item) => item.includes("bucket_exists")))
   assert.ok(steps.get("BAP02_OSS_RAM_STS_CLOSE").currentBlockers.includes("OSS_RAM_STS_NOT_READY"))
-  assert.equal(steps.get("BAP03_ACR_PURCHASE_AND_REPOSITORY").canStartAfterActionTimeConfirmation, true)
+  assert.equal(steps.get("BAP03_ACR_PURCHASE_AND_REPOSITORY").completed, true)
+  assert.equal(steps.get("BAP03_ACR_PURCHASE_AND_REPOSITORY").canStartAfterActionTimeConfirmation, false)
   assert.ok(steps.get("BAP03_ACR_PURCHASE_AND_REPOSITORY").currentEvidence.includes("quotedAmount=CNY 117.00"))
-  assert.deepEqual(steps.get("BAP04_ACR_IMAGE_PUSH_AND_PULL").blockedUntil, ["BAP03_ACR_PURCHASE_AND_REPOSITORY"])
+  assert.ok(steps.get("BAP03_ACR_PURCHASE_AND_REPOSITORY").currentEvidence.includes("acr.purchaseCandidate.confirmed=true"))
+  assert.deepEqual(steps.get("BAP04_ACR_IMAGE_PUSH_AND_PULL").blockedUntil, [])
+  assert.equal(steps.get("BAP04_ACR_IMAGE_PUSH_AND_PULL").canStartAfterActionTimeConfirmation, true)
   assert.ok(steps.get("BAP05_BACKEND_ENV_IMPORT").backendEnvExcludesForNow.includes("WECHAT_OPEN_APP_ID"))
   assert.deepEqual(steps.get("BAP06_SAE_RUNTIME_CREATE").blockedUntil, [
     "BAP04_ACR_IMAGE_PUSH_AND_PULL",
@@ -237,7 +262,9 @@ test("Aliyun backend apply package separates immediate backend work from deferre
   assert.ok(steps.get("BAP08_SLS_ALERTS").currentBlockers.includes("SLS_ALERTS_NOT_READY"))
   assert.ok(steps.get("BAP09_POSTDEPLOY_SMOKE").requiredAuthorizationPackets.includes("P09_PRODUCTION_DEPLOY"))
 
-  assert.ok(report.userIntervention.paymentOrBillingConfirmations.some((item) => /ACR Enterprise/.test(item)))
+  assert.ok(!report.userIntervention.requiredIds.includes("USER_CONFIRM_ACR_PAID_PURCHASE"))
+  assert.ok(!report.userIntervention.paymentOrBillingConfirmations.some((item) => /ACR Enterprise/.test(item)))
+  assert.ok(report.userIntervention.completedPurchaseConfirmations.some((item) => /ACR Enterprise/.test(item)))
   assert.ok(report.userIntervention.paymentOrBillingConfirmations.some((item) => /RDS PostgreSQL/.test(item)))
   assert.ok(report.userIntervention.requiredIds.includes("USER_CONFIRM_ALIYUN_READONLY_INVENTORY_IDENTITY"))
   assert.ok(report.userIntervention.secretOrPasswordHandling.some((item) => /read-only inventory/.test(item)))
@@ -263,27 +290,19 @@ test("Aliyun backend apply package separates immediate backend work from deferre
 test("Aliyun backend apply package reports field-level RDS blockers after local scaffold exists", () => {
   const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-backend-apply-package-rds-"))
   const localPath = path.join(tmpdir, "rds-migration.local.json")
-  execFileSync(process.execPath, [
+  execNode([
     "scripts/check-aliyun-rds-migration-evidence.mjs",
     "--allow-incomplete",
     "--init-local",
     "--local",
     localPath,
-  ], {
-    cwd: root,
-    encoding: "utf8",
-    maxBuffer: 1024 * 1024 * 100,
-  })
+  ])
 
-  const output = execFileSync(process.execPath, [
+  const output = execNode([
     "scripts/generate-aliyun-backend-apply-package.mjs",
     "--rds-migration",
     localPath,
-  ], {
-    cwd: root,
-    encoding: "utf8",
-    maxBuffer: 1024 * 1024 * 100,
-  })
+  ])
   const report = JSON.parse(output)
   const rdsStep = report.applySteps.find((item) => item.id === "BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE")
 
@@ -301,6 +320,17 @@ test("Aliyun backend apply package reports field-level RDS blockers after local 
   assert.ok(rdsStep.currentEvidence.includes("appApiRoutesWithSupabaseDataAccess=4/31"))
   assert.ok(rdsStep.currentEvidence.includes("firstVersionRdsRoutesTouchingSupabaseCompatibility=23/25"))
   assert.ok(rdsStep.currentEvidence.includes("firstVersionRdsRoutesWithSupabaseDataAccess=0/25"))
+  assert.ok(rdsStep.currentEvidence.includes("schemaApplyCandidate.status=blocked_supabase_specific_sql_present"))
+  assert.ok(rdsStep.currentEvidence.includes("schemaApplyCandidate.readyToApplySchema=false"))
+  assert.ok(rdsStep.currentEvidence.includes("schemaApplyCandidate.findingCount=181"))
+  assert.ok(rdsStep.currentEvidence.includes("schemaApplyCandidate.categories=extension_review,policy_statement,row_level_security,supabase_auth_schema,supabase_auth_uid,supabase_service_role,supabase_storage_schema"))
+  assert.ok(rdsStep.currentEvidence.includes("rdsApplyCandidate.findingCount=22"))
+  assert.ok(rdsStep.currentEvidence.includes("rdsApplyCandidate.categories=extension_review"))
+  assert.ok(rdsStep.currentEvidence.includes("rdsApplyCandidate.removedStatementCount=97"))
+  assert.ok(rdsStep.currentEvidence.includes("rdsApplyCandidate.rewrittenStatementCount=12"))
+  assert.ok(rdsStep.currentEvidence.includes("rdsApplyCandidate.reviewPlanItemCount=1"))
+  assert.ok(rdsStep.currentEvidence.includes("rdsApplyCandidate.reviewPlanFindingCount=22"))
+  assert.ok(rdsStep.currentEvidence.includes("rdsApplyCandidate.reviewPlanCategories=extension_review"))
 
   assert.doesNotMatch(output, secretLike)
 })
@@ -308,15 +338,11 @@ test("Aliyun backend apply package reports field-level RDS blockers after local 
 test("Aliyun backend apply package markdown is value-free and actionable", () => {
   const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-backend-apply-package-"))
   const markdownPath = path.join(tmpdir, "backend-apply-package.md")
-  const output = execFileSync(process.execPath, [
+  const output = execNode([
     "scripts/generate-aliyun-backend-apply-package.mjs",
     "--markdown",
     markdownPath,
-  ], {
-    cwd: root,
-    encoding: "utf8",
-    maxBuffer: 1024 * 1024 * 100,
-  })
+  ])
   const markdown = fs.readFileSync(markdownPath, "utf8")
 
   assert.match(markdown, /currentScope: backend_aliyun_only/)
@@ -334,14 +360,14 @@ test("Aliyun backend apply package markdown is value-free and actionable", () =>
   assert.match(markdown, /RDS extension 支持/)
   assert.match(markdown, /DATABASE_URL_CN 只进入 KMS\/Secrets Manager\/SAE secret env/)
   assert.match(markdown, /P05: 确认 OSS bucket\/CORS\/service-records 前缀/)
-  assert.match(markdown, /P03: 购买或确认 ACR Enterprise Economic cn-hangzhou 1个月 CNY117/)
+  assert.match(markdown, /P04.*推送后端镜像/)
   assert.match(markdown, /本批明确不做：微信开放平台移动应用、Android release signing、Apple Team ID\/AASA/)
-  assert.match(markdown, /docker login\/push/)
+  assert.match(markdown, /再次购买 ACR/)
   assert.match(markdown, /DNS\/HTTPS\/ICP 变更/)
   assert.match(markdown, /必须停手等用户确认的点/)
-  assert.match(markdown, /CloudShell 如出现性能型 NAS 费用提示/)
+  assert.match(markdown, /CloudShell 如出现重启实例、性能型 NAS 费用或开通提示/)
   assert.match(markdown, /RDS 如涉及规格购买、实例费用、数据库账号密码或迁移执行/)
-  assert.match(markdown, /ACR 付款页必须再次确认规格、地域、1个月和 CNY117 金额/)
+  assert.match(markdown, /ACR 购买证据已确认/)
   assert.match(markdown, /AccessKeySecret、STS token、registry password、DATABASE_URL_CN/)
   assert.match(markdown, /授权口径：授权本轮只做阿里云后端第一批动作/)
   assert.match(markdown, /BAP00_READONLY_INVENTORY_IDENTITY/)
@@ -359,14 +385,14 @@ test("Aliyun backend apply package markdown is value-free and actionable", () =>
   assert.match(markdown, /USER_CONFIRM_ALIYUN_READONLY_INVENTORY_IDENTITY/)
   assert.match(markdown, /## Action-Time Authorization Request/)
   assert.match(markdown, /recommendedUserReply: 授权本轮只做阿里云后端第一批动作/)
-  assert.match(markdown, /packetIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE/)
+  assert.match(markdown, /packetIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P04_ACR_IMAGE_AND_PULL/)
   assert.match(markdown, /不做微信\/Android\/iOS、不部署上线、不改 DNS/)
-  assert.match(markdown, /不执行 docker login\/push/)
+  assert.match(markdown, /不购买 ACR/)
   assert.match(markdown, /actionTimeConfirmation\.minimumUserPhrase: .*CloudShell/)
-  assert.match(markdown, /actionTimeConfirmation\.minimumUserPhrase: .*等待当前阿里云 CloudShell 连接完成/)
-  assert.match(markdown, /cloudShellCurrentStatus=connecting_terminal_input_visible_inventory_not_executed/)
-  assert.match(markdown, /actionTimeConfirmation\.allowedActions: .*正在连接 Cloud Shell/)
-  assert.match(markdown, /actionTimeConfirmation\.explicitlyExcluded: .*当前 connecting 状态不授权/)
+  assert.match(markdown, /actionTimeConfirmation\.minimumUserPhrase: .*重启实例提示/)
+  assert.match(markdown, /cloudShellCurrentStatus=disconnected_restart_instance_confirmation_required/)
+  assert.match(markdown, /actionTimeConfirmation\.allowedActions: .*重启实例提示/)
+  assert.match(markdown, /actionTimeConfirmation\.explicitlyExcluded: .*CloudShell 重启实例提示/)
   assert.match(markdown, /cloudInventory:readonly_inventory_strict_ready=0\/9/)
   assert.match(markdown, /MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1/)
   assert.match(markdown, /corepack pnpm aliyun:env:handoff:backend/)
@@ -381,7 +407,7 @@ test("Aliyun backend apply package markdown is value-free and actionable", () =>
   assert.match(markdown, /missingCredentialValues: DATABASE_URL_CN/)
   assert.match(markdown, /missingCredentialValueActionIds: S08_ALIYUN_RDS_DATABASE_URL/)
   assert.match(markdown, /readySecretsPendingCloudImport: 17/)
-  assert.match(markdown, /paidPurchaseConfirmationActionIds: S03_ACR_PAID_PURCHASE/)
+  assert.match(markdown, /paidPurchaseConfirmationActionIds: none/)
   assert.match(markdown, /controlledSecretChannelActionIds: S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT/)
   assert.match(markdown, /## Backend Credential Acquisition Queue/)
   assert.match(markdown, /queueScope: backend_aliyun_only/)

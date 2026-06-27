@@ -3,8 +3,8 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, isAbsolute, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
-import { spawnSync } from "node:child_process"
 import { buildReadonlyInventoryAuthorizationContext } from "./lib/aliyun-readonly-inventory-authorization.mjs"
+import { runJsonWithCache } from "./lib/run-json-cache.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -82,13 +82,13 @@ const PHASES = Object.freeze([
   }),
   Object.freeze({
     id: "PH02_BASE_CLOUD_RESOURCES",
-    title: "确认 RDS PostgreSQL、OSS/RAM/STS 和 ACR 基础资源",
-    authorizationPackets: ["P11_ALIYUN_RDS_DATA_MIGRATION", "P05_OSS_RAM_STS", "P03_ACR_PURCHASE"],
-    consoleTasks: ["C02_ACR_IMAGE_AND_PULL", "C05_OSS_AUDIO_RAM_STS"],
+    title: "确认 RDS PostgreSQL 和 OSS/RAM/STS 基础资源",
+    authorizationPackets: ["P11_ALIYUN_RDS_DATA_MIGRATION", "P05_OSS_RAM_STS"],
+    consoleTasks: ["C05_OSS_AUDIO_RAM_STS"],
     completionEvidence: [
       "RDS PostgreSQL 必须完成实例、DATABASE_URL_CN secret env、schema/data 迁移、APP API smoke 和回滚验收；首版业务数据访问代码侧已切到 RDS repository。",
       "OSS 只记录 bucket、region、CORS、RAM/STS 最小权限布尔证据。",
-      "ACR 只记录 registry host、namespace、repository、remote tag 和购买证据。",
+      "ACR P03 购买/仓库证据已 ready；当前阶段不再把 ACR 购买作为待执行基础动作。",
     ],
   }),
   Object.freeze({
@@ -190,20 +190,10 @@ function resolveValue(value, name) {
 }
 
 function runJson(label, scriptArgs) {
-  const result = spawnSync(process.execPath, scriptArgs, {
+  return runJsonWithCache(label, scriptArgs, {
     cwd: BACKEND_ROOT,
-    encoding: "utf8",
     maxBuffer: 1024 * 1024 * 40,
   })
-  if (result.error) throw result.error
-  if (result.status !== 0) {
-    throw new Error(`${label}_failed:${result.status}\n${result.stderr || result.stdout}`)
-  }
-  try {
-    return JSON.parse(result.stdout)
-  } catch (error) {
-    throw new Error(`invalid_json_from_${label}:${error instanceof Error ? error.message : String(error)}`)
-  }
 }
 
 function buildPlan(args) {

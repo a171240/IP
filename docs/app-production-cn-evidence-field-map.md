@@ -15,11 +15,11 @@ It tells the operator which local evidence field to update after an authorized e
 ```text
 Production-cn cannot be deployed now.
 evidenceWritebackReady=0/4
-totalGaps=50
+totalGaps=47
 rdsMigrationGaps=19
 cloudInventoryResultGaps=1
 cloudConfirmationGaps=18
-imagePublishGaps=12
+imagePublishGaps=9
 ```
 
 Current scope is `backend_aliyun_only`. WeChat Open Platform mobile app, Apple, and Android release-signing evidence fields are deferred and are not current Aliyun backend blockers.
@@ -99,19 +99,16 @@ Target file:
 deploy/aliyun-production-cn.image-publish.local.json
 ```
 
-Current field blockers: `12`.
+Current field blockers: `9`.
 
 | JSON path | Authorization packet | Expected non-secret evidence |
 | --- | --- | --- |
-| `acr.registryHost` | `P03_ACR_PURCHASE` | Record the actual Aliyun ACR registry host after purchase or confirmed instance selection. |
-| `acr.namespace` | `P03_ACR_PURCHASE` | Record the actual Aliyun ACR namespace after purchase or confirmed instance selection. |
-| `acr.remoteImage` | `P04_ACR_IMAGE_AND_PULL` | Record the full production-cn remote image address after image push or import. |
 | `acr.remoteDigest` | `P04_ACR_IMAGE_AND_PULL` | Record the remote `sha256:<64 hex>` image digest after verification. |
 | `acr.evidence` | `P04_ACR_IMAGE_AND_PULL` | Record a non-secret ACR push, import, or digest-verification evidence handle. |
-| `acr.confirmed` | `P03_ACR_PURCHASE` | Set `true` only after the ACR repository is confirmed. |
 | `acr.imagePushed` | `P04_ACR_IMAGE_AND_PULL` | Set `true` only after the image is pushed or imported into ACR. |
 | `acr.digestVerified` | `P04_ACR_IMAGE_AND_PULL` | Set `true` only after the remote digest is verified. |
 | `acr.remoteDigest` | `P04_ACR_IMAGE_AND_PULL` | The digest must use the `sha256:<64 hex>` format; this is a second blocker on the same field. |
+| `acr.pushNetworkPath` | `P04_ACR_IMAGE_AND_PULL` | Record the chosen non-secret push path: `public_registry`, `vpc_registry_from_aliyun_network`, or `acr_import_task`; never record registry credentials. |
 | `runtime.confirmed` | `P08_SAE_RUNTIME_SLS` | Set `true` only after the SAE runtime is confirmed. |
 | `runtime.remoteImageConfigured` | `P04_ACR_IMAGE_AND_PULL` | Set `true` only after SAE points to the ACR remote image. |
 | `runtime.imagePullConfigured` | `P04_ACR_IMAGE_AND_PULL` | Set `true` only after SAE image-pull permission is configured. |

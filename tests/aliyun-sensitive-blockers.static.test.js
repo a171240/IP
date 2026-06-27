@@ -46,14 +46,13 @@ test("Aliyun sensitive blockers backend-only mode excludes deferred APP launch c
     "S07_ANDROID_RELEASE_SIGNING",
   ])
   assert.deepEqual(ids, [
-    "S03_ACR_PAID_PURCHASE",
     "S04_ACR_REGISTRY_AUTH",
     "S05_OSS_RAM_SECRET_OR_STS",
     "S08_ALIYUN_RDS_DATABASE_URL",
     "S06_READY_SENSITIVE_ENV_IMPORT",
   ])
-  assert.equal(report.summary.total, 5)
-  assert.equal(report.summary.blocked, 5)
+  assert.equal(report.summary.total, 4)
+  assert.equal(report.summary.blocked, 4)
   assert.deepEqual(report.summary.blockedIds, ids)
   assert.deepEqual(report.summary.actionTimeConfirmationRequired, ids)
   assert.deepEqual(report.credentialInterventionBrief.actionTimeConfirmationRequiredIds, ids)
@@ -62,7 +61,7 @@ test("Aliyun sensitive blockers backend-only mode excludes deferred APP launch c
   assert.deepEqual(report.credentialInterventionBrief.interventionBreakdown.missingCredentialValues.names, ["DATABASE_URL_CN"])
   assert.deepEqual(report.credentialInterventionBrief.interventionBreakdown.missingCredentialValues.actionIds, ["S08_ALIYUN_RDS_DATABASE_URL"])
   assert.equal(report.credentialInterventionBrief.interventionBreakdown.readySecretsPendingCloudImport.count, 17)
-  assert.deepEqual(report.credentialInterventionBrief.interventionBreakdown.paidPurchaseConfirmationActionIds, ["S03_ACR_PAID_PURCHASE"])
+  assert.deepEqual(report.credentialInterventionBrief.interventionBreakdown.paidPurchaseConfirmationActionIds, [])
   assert.deepEqual(report.credentialInterventionBrief.interventionBreakdown.controlledSecretChannelActionIds, [
     "S04_ACR_REGISTRY_AUTH",
     "S05_OSS_RAM_SECRET_OR_STS",
@@ -74,13 +73,13 @@ test("Aliyun sensitive blockers backend-only mode excludes deferred APP launch c
   assert.deepEqual(report.credentialPasswordIntervention.missingCredentialValues.actionIds, ["S08_ALIYUN_RDS_DATABASE_URL"])
   assert.equal(report.credentialPasswordIntervention.readySecretsPendingCloudImport.count, 17)
   assert.ok(report.credentialPasswordIntervention.readySecretsPendingCloudImport.names.includes("SUPABASE_SERVICE_ROLE_KEY"))
-  assert.deepEqual(report.credentialPasswordIntervention.paidPurchaseConfirmationActionIds, ["S03_ACR_PAID_PURCHASE"])
+  assert.deepEqual(report.credentialPasswordIntervention.paidPurchaseConfirmationActionIds, [])
   assert.ok(report.credentialPasswordIntervention.controlledSecretChannelActionIds.includes("S08_ALIYUN_RDS_DATABASE_URL"))
   assert.ok(report.credentialPasswordIntervention.userMustProvideOrConfirm.some((item) => /DATABASE_URL_CN/.test(item)))
   assert.ok(!report.summary.userIntervention.blockedVariableNames.includes("ALIYUN_OSS_SECURITY_TOKEN"))
   assert.equal(report.credentialInterventionBrief.readySecretEnvVariableCount, 17)
   assert.ok(report.credentialInterventionBrief.readySecretEnvVariableNames.includes("SUPABASE_SERVICE_ROLE_KEY"))
-  assert.ok(report.summary.userIntervention.groups.paid_purchase_confirmation.includes("S03_ACR_PAID_PURCHASE"))
+  assert.equal(report.summary.userIntervention.groups.paid_purchase_confirmation, undefined)
   assert.ok(report.summary.userIntervention.groups.controlled_secret_channel.includes("S04_ACR_REGISTRY_AUTH"))
   assert.ok(report.summary.userIntervention.groups.controlled_secret_channel.includes("S05_OSS_RAM_SECRET_OR_STS"))
   assert.ok(report.summary.userIntervention.groups.controlled_secret_channel.includes("S08_ALIYUN_RDS_DATABASE_URL"))
@@ -94,8 +93,8 @@ test("Aliyun sensitive blockers backend-only mode excludes deferred APP launch c
   assert.ok(!ids.includes("S02_APPLE_TEAM_ID"))
   assert.ok(!ids.includes("S07_ANDROID_RELEASE_SIGNING"))
   assert.match(report.currentAnswer, /阿里云后端-only/)
-  assert.ok(report.nextActions.some((item) => item.includes("第一批先处理 S03/S05/S08")))
-  assert.ok(report.nextActions.some((item) => item.includes("S04 registry/SAE 拉取认证和 S06 ready secret env 导入仍被依赖阻塞")))
+  assert.ok(report.nextActions.some((item) => item.includes("第一批先处理 S04/S05/S08")))
+  assert.ok(report.nextActions.some((item) => item.includes("S06 ready secret env 导入仍被依赖阻塞")))
   assert.ok(report.nextActions.some((item) => item.includes("APP 发布阶段延期项")))
   assert.equal(report.credentialAcquisitionQueue.queueScope, "backend_aliyun_only")
   assert.deepEqual(report.credentialAcquisitionQueue.missingCredentialNames, ["DATABASE_URL_CN"])
@@ -108,20 +107,17 @@ test("Aliyun sensitive blockers backend-only mode excludes deferred APP launch c
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
   ])
   assert.deepEqual(report.backendOnlyCredentialExecutionOrder.credentialCanStartAfterActionTimeConfirmationIds, [
-    "S03_ACR_PAID_PURCHASE",
+    "S04_ACR_REGISTRY_AUTH",
     "S05_OSS_RAM_SECRET_OR_STS",
     "S08_ALIYUN_RDS_DATABASE_URL",
   ])
   assert.deepEqual(report.backendOnlyCredentialExecutionOrder.credentialBlockedByDependencyIds, [
-    "S04_ACR_REGISTRY_AUTH",
     "S06_READY_SENSITIVE_ENV_IMPORT",
   ])
   assert.ok(report.backendOnlyCredentialExecutionOrder.dependencyReasons.some((item) =>
-    item.includes("S04_ACR_REGISTRY_AUTH waits for ACR")))
-  assert.ok(report.backendOnlyCredentialExecutionOrder.dependencyReasons.some((item) =>
     item.includes("S06_READY_SENSITIVE_ENV_IMPORT waits for RDS DATABASE_URL_CN")))
-  assert.ok(report.nextActions.some((item) => item.includes("第一批先处理 S03/S05/S08")))
-  assert.ok(report.nextActions.some((item) => item.includes("S04 registry/SAE 拉取认证和 S06 ready secret env 导入仍被依赖阻塞")))
+  assert.ok(report.nextActions.some((item) => item.includes("第一批先处理 S04/S05/S08")))
+  assert.ok(report.nextActions.some((item) => item.includes("S06 ready secret env 导入仍被依赖阻塞")))
   const rdsQueueItem = report.credentialAcquisitionQueue.items.find((item) => item.actionId === "S08_ALIYUN_RDS_DATABASE_URL")
   assert.ok(rdsQueueItem)
   assert.equal(rdsQueueItem.userQuestion, "DATABASE_URL_CN 从哪里获得并导入到哪里")
@@ -130,9 +126,9 @@ test("Aliyun sensitive blockers backend-only mode excludes deferred APP launch c
   assert.ok(rdsQueueItem.verifyCommands.includes("corepack pnpm aliyun:rds:migration:package"))
   assert.ok(rdsQueueItem.verifyCommands.includes("corepack pnpm aliyun:rds:migration:evidence:strict"))
   const rdsSensitiveItem = report.items.find((item) => item.id === "S08_ALIYUN_RDS_DATABASE_URL")
-  assert.match(rdsSensitiveItem.requiredUserAction, /compatibilityReviewChecklist 6 类/)
+  assert.match(rdsSensitiveItem.requiredUserAction, /compatibilityReviewChecklist 7 类/)
   assert.match(rdsSensitiveItem.unblockCondition, /migration\.schemaCompatibilityReviewed=true/)
-  assert.ok(rdsSensitiveItem.completionEvidence.includes("compatibilityReviewChecklistItemCount=6 is reviewed and closed before schema apply"))
+  assert.ok(rdsSensitiveItem.completionEvidence.includes("compatibilityReviewChecklistItemCount=7 is reviewed and closed before schema apply"))
   assert.ok(rdsSensitiveItem.completionEvidence.includes("migration.supabaseSpecificSqlResolved=true"))
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
@@ -153,18 +149,18 @@ test("APP production-cn credential acquisition runbook pins backend-only passwor
     "docs/app-production-cn-backend-sensitive-blockers.md",
     "docs/app-production-cn-backend-user-action-brief.md",
     "docs/app-production-cn-backend-secret-env-import-batches.md",
-    "S03_ACR_PAID_PURCHASE",
     "S04_ACR_REGISTRY_AUTH",
     "S05_OSS_RAM_SECRET_OR_STS",
     "S08_ALIYUN_RDS_DATABASE_URL",
     "S06_READY_SENSITIVE_ENV_IMPORT",
     "后端-only 动作顺序口径",
-    "credentialCanStartAfterActionTimeConfirmationIds: S03_ACR_PAID_PURCHASE, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL",
-    "credentialBlockedByDependencyIds: S04_ACR_REGISTRY_AUTH, S06_READY_SENSITIVE_ENV_IMPORT",
+    "credentialCanStartAfterActionTimeConfirmationIds: S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL",
+    "credentialBlockedByDependencyIds: S06_READY_SENSITIVE_ENV_IMPORT",
     "nonCredentialCanStartPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "Import the DATABASE_URL_CN value directly into Aliyun KMS / Secrets Manager / SAE secret env.",
-    "Required before treating it as complete: close the 6-item RDS compatibilityReviewChecklist",
+    "Required before treating it as complete: close the 7-item RDS compatibilityReviewChecklist",
     "corepack pnpm aliyun:rds:migration:package",
+    "supabase_auth_schema",
     "supabase_auth_uid",
     "supabase_storage_schema",
     "supabase_service_role",
@@ -179,7 +175,7 @@ test("APP production-cn credential acquisition runbook pins backend-only passwor
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
     "P05_OSS_RAM_STS",
-    "P03_ACR_PURCHASE",
+    "P04_ACR_IMAGE_AND_PULL",
     "P01_WECHAT_OPEN_MOBILE_APP",
     "P10_ANDROID_RELEASE_SIGNING",
     "P02_APPLE_TEAM_ID",
@@ -208,7 +204,6 @@ test("Aliyun sensitive blockers output has current blocked action ids but no sec
   const ids = report.items.map((item) => item.id)
   const wechatItem = report.items.find((item) => item.id === "S01_WECHAT_OPEN_APP_LOGIN")
   const appleItem = report.items.find((item) => item.id === "S02_APPLE_TEAM_ID")
-  const acrPurchaseItem = report.items.find((item) => item.id === "S03_ACR_PAID_PURCHASE")
   const envImportItem = report.items.find((item) => item.id === "S06_READY_SENSITIVE_ENV_IMPORT")
   const androidSigningItem = report.items.find((item) => item.id === "S07_ANDROID_RELEASE_SIGNING")
 
@@ -222,7 +217,6 @@ test("Aliyun sensitive blockers output has current blocked action ids but no sec
     [
       "S01_WECHAT_OPEN_APP_LOGIN",
       "S02_APPLE_TEAM_ID",
-      "S03_ACR_PAID_PURCHASE",
       "S04_ACR_REGISTRY_AUTH",
       "S05_OSS_RAM_SECRET_OR_STS",
       "S08_ALIYUN_RDS_DATABASE_URL",
@@ -243,7 +237,7 @@ test("Aliyun sensitive blockers output has current blocked action ids but no sec
   assert.ok(report.credentialPasswordIntervention.missingCredentialValues.names.includes("DATABASE_URL_CN"))
   assert.ok(report.credentialPasswordIntervention.missingCredentialValues.names.includes("WECHAT_OPEN_APP_SECRET"))
   assert.ok(report.credentialPasswordIntervention.readySecretsPendingCloudImport.names.includes("SUPABASE_SERVICE_ROLE_KEY"))
-  assert.ok(report.credentialPasswordIntervention.paidPurchaseConfirmationActionIds.includes("S03_ACR_PAID_PURCHASE"))
+  assert.deepEqual(report.credentialPasswordIntervention.paidPurchaseConfirmationActionIds, [])
   assert.ok(report.credentialPasswordIntervention.controlledSecretChannelActionIds.includes("S08_ALIYUN_RDS_DATABASE_URL"))
   assert.ok(!report.credentialInterventionBrief.blockedCredentialNames.includes("ALIYUN_OSS_SECURITY_TOKEN"))
   assert.ok(report.credentialInterventionBrief.blockedCredentialNames.includes("DATABASE_URL_CN"))
@@ -275,7 +269,7 @@ test("Aliyun sensitive blockers output has current blocked action ids but no sec
   ))
   const fullRdsItem = report.items.find((item) => item.id === "S08_ALIYUN_RDS_DATABASE_URL")
   assert.ok(fullRdsItem.verifyCommands.includes("corepack pnpm aliyun:rds:migration:package"))
-  assert.match(fullRdsItem.requiredUserAction, /compatibilityReviewChecklist 6 类/)
+  assert.match(fullRdsItem.requiredUserAction, /compatibilityReviewChecklist 7 类/)
   assert.match(fullRdsItem.unblockCondition, /migration\.supabaseSpecificSqlResolved=true/)
   assert.match(fullRdsItem.completionEvidence.join("\n"), /extension_review dispositions are recorded without secrets/)
   assert.ok(report.credentialInterventionBrief.groups.some((group) =>
@@ -286,7 +280,7 @@ test("Aliyun sensitive blockers output has current blocked action ids but no sec
   ))
   assert.deepEqual(report.summary.userIntervention.groups.external_review_then_app_credentials, ["S01_WECHAT_OPEN_APP_LOGIN"])
   assert.deepEqual(report.summary.userIntervention.groups.external_identifier_lookup, ["S02_APPLE_TEAM_ID"])
-  assert.deepEqual(report.summary.userIntervention.groups.paid_purchase_confirmation, ["S03_ACR_PAID_PURCHASE"])
+  assert.equal(report.summary.userIntervention.groups.paid_purchase_confirmation, undefined)
   assert.ok(report.summary.userIntervention.groups.controlled_secret_channel.includes("S04_ACR_REGISTRY_AUTH"))
   assert.ok(report.summary.userIntervention.groups.controlled_secret_channel.includes("S05_OSS_RAM_SECRET_OR_STS"))
   assert.ok(report.summary.userIntervention.groups.controlled_secret_channel.includes("S08_ALIYUN_RDS_DATABASE_URL"))
@@ -325,13 +319,9 @@ test("Aliyun sensitive blockers output has current blocked action ids but no sec
     item.status === "empty" &&
     item.importTarget === "阿里云 SAE plain env"
   ))
-  assert.ok(ids.includes("S03_ACR_PAID_PURCHASE"))
   assert.ok(ids.includes("S08_ALIYUN_RDS_DATABASE_URL"))
   assert.ok(ids.includes("S06_READY_SENSITIVE_ENV_IMPORT"))
   assert.ok(ids.includes("S07_ANDROID_RELEASE_SIGNING"))
-  assert.equal(acrPurchaseItem.requiresActionTimeConfirmation, true)
-  assert.ok(acrPurchaseItem.writeTargets.some((target) => target.includes("image-publish.local.json")))
-  assert.match(acrPurchaseItem.completionEvidence.join("\n"), /acr\.purchaseCandidate\.confirmed=true/)
   assert.equal(envImportItem.requiresActionTimeConfirmation, true)
   assert.ok(envImportItem.writeTargets.some((target) => target.includes("items.envImport")))
   assert.ok(envImportItem.verifyCommands.includes("corepack pnpm aliyun:env:checklist"))
@@ -345,7 +335,6 @@ test("Aliyun sensitive blockers output has current blocked action ids but no sec
     [
       "S01_WECHAT_OPEN_APP_LOGIN",
       "S02_APPLE_TEAM_ID",
-      "S03_ACR_PAID_PURCHASE",
       "S04_ACR_REGISTRY_AUTH",
       "S05_OSS_RAM_SECRET_OR_STS",
       "S08_ALIYUN_RDS_DATABASE_URL",
@@ -398,7 +387,7 @@ test("Aliyun operator status and handoff inherit sensitive action metadata", () 
   const handoff = JSON.parse(handoffOutput)
   const operatorWechat = operatorTasks.sensitiveActionItems.find((item) => item.id === "S01_WECHAT_OPEN_APP_LOGIN")
   const operatorApple = operatorTasks.sensitiveActionItems.find((item) => item.id === "S02_APPLE_TEAM_ID")
-  const statusAcrPurchase = status.tasks.sensitiveActionItems.find((item) => item.id === "S03_ACR_PAID_PURCHASE")
+  const statusAcrRuntimeAuth = status.tasks.sensitiveActionItems.find((item) => item.id === "S04_ACR_REGISTRY_AUTH")
   const handoffEnvImport = handoff.sensitiveActionItems.find((item) => item.id === "S06_READY_SENSITIVE_ENV_IMPORT")
   const handoffAndroidSigning = handoff.sensitiveActionItems.find((item) => item.id === "S07_ANDROID_RELEASE_SIGNING")
 
@@ -411,9 +400,9 @@ test("Aliyun operator status and handoff inherit sensitive action metadata", () 
   assert.equal(operatorApple.type, "external_identifier")
   assert.ok(operatorApple.variableDetails.some((item) => item.name === "APPLE_TEAM_ID"))
   assert.ok(status.humanSummary.some((line) => /密钥\/密码\/token\/付款\/受控标识符类人工介入项/.test(line)))
-  assert.equal(statusAcrPurchase.requiresActionTimeConfirmation, true)
-  assert.match(statusAcrPurchase.obtainFrom, /容器镜像服务 ACR/)
-  assert.ok(statusAcrPurchase.writeTargets.some((target) => target.includes("image-publish.local.json")))
+  assert.equal(statusAcrRuntimeAuth.requiresActionTimeConfirmation, true)
+  assert.match(statusAcrRuntimeAuth.obtainFrom, /ACR/)
+  assert.ok(statusAcrRuntimeAuth.writeTargets.some((target) => target.includes("Docker credential helper")))
   assert.equal(handoffEnvImport.requiresActionTimeConfirmation, true)
   assert.ok(handoffEnvImport.variableDetails.some((item) => item.name === "SUPABASE_SERVICE_ROLE_KEY"))
   assert.ok(handoffEnvImport.verifyCommands.includes("corepack pnpm aliyun:readiness:cloud-ready"))
@@ -451,7 +440,7 @@ test("Aliyun sensitive blockers markdown renders value-free variable acquisition
   assert.match(markdown, /readySecretEnvVariableCount: 17/)
   assert.match(markdown, /missingCredentialValues: .*DATABASE_URL_CN/)
   assert.match(markdown, /readySecretsPendingCloudImport: 17/)
-  assert.match(markdown, /paidPurchaseConfirmationActionIds: S03_ACR_PAID_PURCHASE/)
+  assert.match(markdown, /paidPurchaseConfirmationActionIds: none/)
   assert.match(markdown, /controlledSecretChannelActionIds: .*S08_ALIYUN_RDS_DATABASE_URL/)
   assert.match(markdown, /wechat_open_mobile_app/)
   assert.match(markdown, /rds_database_secret_and_migration/)
@@ -515,7 +504,7 @@ test("Aliyun credential acquisition runbook stays aligned with sensitive blocker
     /## Backend-Only Actions That Can Start Next[\s\S]*?```text\n([\s\S]*?)```/,
   )?.[1] || ""
   assert.match(backendStartSection, /P00_ALIYUN_READONLY_INVENTORY_IDENTITY/)
-  assert.match(backendStartSection, /P03_ACR_PURCHASE/)
+  assert.match(backendStartSection, /P04_ACR_IMAGE_AND_PULL/)
   assert.match(backendStartSection, /P05_OSS_RAM_STS/)
   assert.match(backendStartSection, /P11_ALIYUN_RDS_DATA_MIGRATION/)
   assert.doesNotMatch(backendStartSection, /P01_WECHAT_OPEN_MOBILE_APP/)
@@ -583,7 +572,6 @@ test("APP production-cn backend-only sensitive docs reflect current Aliyun backe
     assert.match(doc, /readySecretEnvVariableCount: 17|readySecretEnvVariableCount=17/)
     assert.match(doc, /ALIYUN_OSS_SECURITY_TOKEN/)
     assert.match(doc, /DATABASE_URL_CN/)
-    assert.match(doc, /S03_ACR_PAID_PURCHASE/)
     assert.match(doc, /S05_OSS_RAM_SECRET_OR_STS/)
     assert.match(doc, /S08_ALIYUN_RDS_DATABASE_URL/)
     assert.match(doc, /S06_READY_SENSITIVE_ENV_IMPORT/)
@@ -604,20 +592,19 @@ test("APP production-cn backend-only sensitive docs reflect current Aliyun backe
   assert.match(sensitiveDoc, /missingCredentialValues: DATABASE_URL_CN/)
   assert.match(sensitiveDoc, /missingCredentialValueActionIds: S08_ALIYUN_RDS_DATABASE_URL/)
   assert.match(sensitiveDoc, /readySecretsPendingCloudImport: 17/)
-  assert.match(sensitiveDoc, /paidPurchaseConfirmationActionIds: S03_ACR_PAID_PURCHASE/)
+  assert.match(sensitiveDoc, /paidPurchaseConfirmationActionIds: none/)
   assert.match(sensitiveDoc, /controlledSecretChannelActionIds: S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT/)
   assert.match(sensitiveDoc, /corepack pnpm aliyun:rds:migration:package/)
-  assert.match(sensitiveDoc, /compatibilityReviewChecklist 6 类/)
-  assert.match(sensitiveDoc, /compatibilityReviewChecklistItemCount=6 is reviewed and closed before schema apply/)
-  assert.match(sensitiveDoc, /supabase_auth_uid\/supabase_storage_schema\/supabase_service_role\/row_level_security\/policy_statement\/extension_review/)
+  assert.match(sensitiveDoc, /compatibilityReviewChecklist 7 类/)
+  assert.match(sensitiveDoc, /compatibilityReviewChecklistItemCount=7 is reviewed and closed before schema apply/)
+  assert.match(sensitiveDoc, /supabase_auth_schema\/supabase_auth_uid\/supabase_storage_schema\/supabase_service_role\/row_level_security\/policy_statement\/extension_review/)
   assert.match(sensitiveDoc, /migration\.schemaCompatibilityReviewed=true/)
   assert.match(sensitiveDoc, /migration\.supabaseSpecificSqlResolved=true/)
   assert.match(sensitiveDoc, /migration\.rdsExtensionSupportConfirmed=true/)
   assert.match(sensitiveDoc, /## 后端-only 动作顺序口径/)
   assert.match(sensitiveDoc, /nonCredentialCanStartPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY/)
-  assert.match(sensitiveDoc, /credentialCanStartAfterActionTimeConfirmationIds: S03_ACR_PAID_PURCHASE, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL/)
-  assert.match(sensitiveDoc, /credentialBlockedByDependencyIds: S04_ACR_REGISTRY_AUTH, S06_READY_SENSITIVE_ENV_IMPORT/)
-  assert.match(sensitiveDoc, /S04_ACR_REGISTRY_AUTH waits for ACR/)
+  assert.match(sensitiveDoc, /credentialCanStartAfterActionTimeConfirmationIds: S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL/)
+  assert.match(sensitiveDoc, /credentialBlockedByDependencyIds: S06_READY_SENSITIVE_ENV_IMPORT/)
   assert.match(sensitiveDoc, /S06_READY_SENSITIVE_ENV_IMPORT waits for RDS DATABASE_URL_CN/)
 
   assert.match(
@@ -628,14 +615,14 @@ test("APP production-cn backend-only sensitive docs reflect current Aliyun backe
     actionDoc,
     /deferredAppLaunchConfirmations: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID/,
   )
-  assert.match(actionDoc, /nextActionTimeConfirmations: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE/)
+  assert.match(actionDoc, /nextActionTimeConfirmations: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P04_ACR_IMAGE_AND_PULL/)
   assert.match(importBatches, /Current backend-only sensitive gate/)
   assert.match(importBatches, /blockedCredentialCount=1/)
   assert.match(importBatches, /readySecretEnvVariableCount=17/)
   assert.match(importBatches, /readySecretEnvVariableGroupCount=9/)
   assert.match(importBatches, /ALIYUN_OSS_SECURITY_TOKEN/)
   assert.match(importBatches, /DATABASE_URL_CN/)
-  assert.match(importBatches, /S03_ACR_PAID_PURCHASE/)
+  assert.match(importBatches, /ACR purchase evidence is confirmed locally/)
   assert.match(importBatches, /S04_ACR_REGISTRY_AUTH/)
   assert.match(importBatches, /legacy_database_migration_source/)
   assert.match(importBatches, /Aliyun RDS PostgreSQL/)
@@ -700,7 +687,7 @@ test("APP production-cn sensitive blockers handoff documents user-intervention c
   for (const expected of [
     "# 美业话镜 APP production-cn 密钥/密码/token/付款/受控标识符阻塞项",
     "currentScope: full_app_launch",
-    "blocked: 8 / 8",
+    "blocked: 7 / 7",
     "blockedCredentialCount: 8",
     "blockedCredentialNames: APPLE_TEAM_ID, DATABASE_URL_CN",
     "readySecretEnvVariableCount: 17",
@@ -708,7 +695,7 @@ test("APP production-cn sensitive blockers handoff documents user-intervention c
     "## 密钥/密码介入拆解",
     "missingCredentialValues: APPLE_TEAM_ID, DATABASE_URL_CN",
     "readySecretsPendingCloudImport: 17",
-    "paidPurchaseConfirmationActionIds: S03_ACR_PAID_PURCHASE",
+    "paidPurchaseConfirmationActionIds: none",
     "controlledSecretChannelActionIds: S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT",
     "ALIYUN_OSS_SECURITY_TOKEN",
     "DATABASE_URL_CN",
@@ -724,8 +711,6 @@ test("APP production-cn sensitive blockers handoff documents user-intervention c
     "WECHAT_OPEN_APP_SECRET -> 阿里云 KMS/Secrets Manager/SAE secret env",
     "S02_APPLE_TEAM_ID",
     "com.ipgongchang.meiyehuajing",
-    "S03_ACR_PAID_PURCHASE",
-    "CNY 117.00",
     "S04_ACR_REGISTRY_AUTH",
     "runtime.imagePullConfigured=true",
     "S05_OSS_RAM_SECRET_OR_STS",

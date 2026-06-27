@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
-import { spawnSync } from "node:child_process"
 import { writeFileSync } from "node:fs"
 import { dirname, isAbsolute, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { buildReadonlyInventoryAuthorizationContext } from "./lib/aliyun-readonly-inventory-authorization.mjs"
+import { runJsonWithCache } from "./lib/run-json-cache.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -88,7 +88,7 @@ const POLICY_BY_ACTION_ID = Object.freeze({
     canCodexProceedWithoutUser: false,
     requiresActionTimeConfirmation: true,
     blockerClass: "paid_purchase",
-    why: "ACR 企业版购买是付费动作；当前只可记录报价候选，付款前必须确认金额和规格。",
+    why: "ACR 企业版购买/仓库证据已确认；当前不再执行付款动作，后续镜像 push/import 和 SAE 拉取配置必须走 P04。",
   }),
   U04_ACR_RUNTIME_AUTH: Object.freeze({
     automationPolicy: "registry_auth_requires_runtime_secret_channel",
@@ -233,16 +233,16 @@ const AUTHORIZATION_PACKET_BY_ACTION_ID = Object.freeze({
     packetId: "P03_ACR_PURCHASE",
     sequenceGroup: "cloud_foundation",
     dependsOn: [],
-    minimumUserPhrase: "授权购买 ACR Enterprise Economic，cn-hangzhou，1 个月，当前报价 CNY 117.00。",
+    minimumUserPhrase: "已确认 ACR Enterprise Economic，cn-hangzhou，1 个月，CNY 117.00 购买/仓库证据；P03 不再作为当前待付款动作。",
     allowedActions: [
-      "在阿里云 ACR 企业版购买页确认规格、地域、时长和金额。",
-      "完成购买后创建或确认实例、namespace 和 repository。",
-      "只记录 registry host、namespace、repository 和非密钥购买证据。",
+      "复核已创建的 ACR 企业版实例、namespace 和 repository。",
+      "只记录 registry host、namespace、repository、实例 id 和非密钥购买/仓库证据。",
+      "把后续镜像 push/import、digest 核对和 SAE 拉取配置交给 P04_ACR_IMAGE_AND_PULL。",
     ],
     explicitlyExcluded: [
-      "未明确确认金额前不点击付款。",
       "不执行 docker login/push。",
       "不记录 registry password、RAM Secret 或 token。",
+      "不把 P03 当作当前生产部署或镜像发布授权。",
     ],
     completionEvidence: [
       "acr.purchaseCandidate.confirmed=true",
@@ -303,7 +303,7 @@ const AUTHORIZATION_PACKET_BY_ACTION_ID = Object.freeze({
     minimumUserPhrase: "授权创建/确认阿里云 RDS PostgreSQL production-cn 数据库并完成数据迁移；DATABASE_URL_CN 只能进入阿里云 secret env。",
     allowedActions: [
       "创建或确认 cn-hangzhou RDS PostgreSQL 实例、数据库、账号和网络白名单/内网访问策略。",
-      "先生成并核对 docs/app-production-cn-rds-migration-package.md，关闭 compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查。",
+      "先生成并核对 docs/app-production-cn-rds-migration-package.md，关闭 compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查。",
       "执行 Supabase 到 RDS/PostgreSQL 的 schema/data 迁移与回滚验收。",
       "只把 DATABASE_URL_CN 导入 KMS/Secrets Manager/SAE secret env，并记录非密钥迁移证据。",
     ],
@@ -316,8 +316,8 @@ const AUTHORIZATION_PACKET_BY_ACTION_ID = Object.freeze({
       "Aliyun RDS PostgreSQL instance exists in cn-hangzhou",
       "database account and least-privilege access are ready",
       "DATABASE_URL_CN imported through secret env only",
-      "compatibilityReviewChecklistItemCount=6 is reviewed and closed before schema apply",
-      "supabase_auth_uid/supabase_storage_schema/supabase_service_role/row_level_security/policy_statement/extension_review dispositions are recorded without secrets",
+      "compatibilityReviewChecklistItemCount=7 is reviewed and closed before schema apply",
+      "supabase_auth_schema/supabase_auth_uid/supabase_storage_schema/supabase_service_role/row_level_security/policy_statement/extension_review dispositions are recorded without secrets",
       "migration.schemaCompatibilityReviewed=true",
       "migration.supabaseSpecificSqlResolved=true",
       "migration.rdsExtensionSupportConfirmed=true",
@@ -497,20 +497,10 @@ function cloudAccessArgs(args) {
 }
 
 function runJson(label, scriptArgs) {
-  const result = spawnSync(process.execPath, scriptArgs, {
+  return runJsonWithCache(label, scriptArgs, {
     cwd: BACKEND_ROOT,
-    encoding: "utf8",
     maxBuffer: 1024 * 1024 * 40,
   })
-  if (result.error) throw result.error
-  if (result.status !== 0) {
-    throw new Error(`${label}_failed:${result.status}\n${result.stderr || result.stdout}`)
-  }
-  try {
-    return JSON.parse(result.stdout)
-  } catch (error) {
-    throw new Error(`invalid_json_from_${label}:${error instanceof Error ? error.message : String(error)}`)
-  }
 }
 
 function buildReport(args) {
@@ -837,6 +827,9 @@ function classifyAction(action) {
     blockerClass: "unknown",
     why: "未配置的动作必须先人工复核。",
   }
+  const requiresActionTimeConfirmation = typeof action.requiresActionTimeConfirmation === "boolean"
+    ? action.requiresActionTimeConfirmation
+    : policy.requiresActionTimeConfirmation
   return {
     id: action.id,
     title: action.title,
@@ -850,7 +843,7 @@ function classifyAction(action) {
     verifyCommands: action.verifyCommands || [],
     automationPolicy: policy.automationPolicy,
     canCodexProceedWithoutUser: policy.canCodexProceedWithoutUser,
-    requiresActionTimeConfirmation: policy.requiresActionTimeConfirmation,
+    requiresActionTimeConfirmation,
     blockerClass: policy.blockerClass,
     why: policy.why,
     nonSecretEvidenceOnly: action.nonSecretEvidenceOnly === true,

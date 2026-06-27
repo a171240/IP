@@ -115,7 +115,7 @@ test("Aliyun operator handoff backend-only mode excludes deferred APP launch wor
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
     "P05_OSS_RAM_STS",
-    "P03_ACR_PURCHASE",
+    "P04_ACR_IMAGE_AND_PULL",
   ])
   assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /阿里云后端第一批动作/)
   assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /RDS PostgreSQL/)
@@ -197,7 +197,7 @@ test("Aliyun operator handoff backend-only mode excludes deferred APP launch wor
   assert.match(markdownOutput, /## 后端下一步顺序/)
   assert.match(markdownOutput, /## 动作时授权请求/)
   assert.match(markdownOutput, /recommendedUserReply: 授权本轮只做阿里云后端第一批动作/)
-  assert.match(markdownOutput, /packetIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P03_ACR_PURCHASE/)
+  assert.match(markdownOutput, /packetIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P04_ACR_IMAGE_AND_PULL/)
   assert.match(markdownOutput, /0\. P00_ALIYUN_READONLY_INVENTORY_IDENTITY/)
   assert.match(markdownOutput, /1\. P11_ALIYUN_RDS_DATA_MIGRATION/)
   assert.match(markdownOutput, /6\. P07_DOMAIN_DNS_HTTPS/)
@@ -223,7 +223,7 @@ test("Aliyun operator handoff maps ACR and SAE evidence gaps to the correct cons
   const gaps = report.localEvidenceGaps.imagePublish.gaps
   const inventoryResults = report.localEvidenceGaps.cloudInventoryResults
   const byPath = new Map(gaps.map((item) => [item.jsonPath, item]))
-  const registryHost = byPath.get("acr.registryHost")
+  const acrPushNetworkPath = byPath.get("acr.pushNetworkPath")
   const remoteDigest = byPath.get("acr.remoteDigest")
   const runtimeConfirmed = byPath.get("runtime.confirmed")
   const remoteImageConfigured = byPath.get("runtime.remoteImageConfigured")
@@ -244,7 +244,7 @@ test("Aliyun operator handoff maps ACR and SAE evidence gaps to the correct cons
   ))
   assert.ok(report.operatorClosureBrief.blockedResourceEvidence.some((item) =>
     item.id === "R02_ACR_IMAGE_REGISTRY" &&
-    item.requiredAuthorizationPackets.includes("P03_ACR_PURCHASE")
+    item.requiredAuthorizationPackets.includes("P04_ACR_IMAGE_AND_PULL")
   ))
   const ossResourceEvidence = report.operatorClosureBrief.blockedResourceEvidence.find((item) =>
     item.id === "R05_OSS_AUDIO_STORAGE")
@@ -295,9 +295,10 @@ test("Aliyun operator handoff maps ACR and SAE evidence gaps to the correct cons
   assert.match(inventoryResults.gaps[0].writeTo, /cloud-inventory-results\.local\.json/)
   assert.match(inventoryResults.gaps[0].expected, /复制/)
   assert.match(report.safetyBoundary.join("\n"), /cloud-inventory-results\.local\.json/)
-  assert.equal(report.localEvidenceGaps.imagePublish.totalBlockers, 12)
-  assert.match(registryHost.source, /容器镜像服务 ACR/)
-  assert.match(registryHost.writeTo, /-> acr$/)
+  assert.equal(report.localEvidenceGaps.imagePublish.totalBlockers, 8)
+  assert.ok(!byPath.has("acr.registryHost"))
+  assert.match(acrPushNetworkPath.source, /容器镜像服务 ACR/)
+  assert.match(acrPushNetworkPath.writeTo, /-> acr$/)
   assert.match(remoteDigest.source, /容器镜像服务 ACR/)
   assert.match(runtimeConfirmed.source, /SAE/)
   assert.doesNotMatch(runtimeConfirmed.source, /命名空间\/仓库/)
@@ -398,7 +399,7 @@ test("Aliyun operator handoff exposes console-only inventory observation summary
   assert.match(markdownOutput, /readySecretEnvVariableCount: 17/)
   assert.match(markdownOutput, /resourceEvidenceReady: 0\/7/)
   assert.match(markdownOutput, /WECHAT_OPEN_APP_SECRET/)
-  assert.match(markdownOutput, /R02_ACR_IMAGE_REGISTRY: observed=purchase_candidate_visible_not_purchased\/blocked/)
+  assert.match(markdownOutput, /R02_ACR_IMAGE_REGISTRY: observed=acr_repository_confirmed_image_push_pending\/partial/)
   assert.doesNotMatch(output + markdownOutput, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output + markdownOutput, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(output + markdownOutput, /:\/\/[^\s:@]+:[^\s@]+@/)

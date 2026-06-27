@@ -3,7 +3,7 @@
 import { writeFileSync } from "node:fs"
 import { dirname, isAbsolute, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
-import { spawnSync } from "node:child_process"
+import { runJsonWithCache } from "./lib/run-json-cache.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -102,57 +102,29 @@ function resolveValue(value, name) {
 }
 
 function runJson(label, scriptArgs, options = {}) {
-  const result = spawnSync(process.execPath, scriptArgs, {
+  return runJsonWithCache(label, scriptArgs, {
     cwd: BACKEND_ROOT,
-    encoding: "utf8",
     maxBuffer: 1024 * 1024 * 40,
-    timeout: options.timeoutMs || 0,
+    timeoutMs: options.timeoutMs || 0,
   })
-  if (result.error) throw result.error
-  if (result.status !== 0) {
-    throw new Error(`${label}_failed:${result.status}\n${result.stderr || result.stdout}`)
-  }
-  try {
-    return JSON.parse(result.stdout)
-  } catch (error) {
-    throw new Error(`invalid_json_from_${label}:${error instanceof Error ? error.message : String(error)}`)
-  }
 }
 
 function runJsonOptional(label, scriptArgs, options = {}) {
-  const result = spawnSync(process.execPath, scriptArgs, {
-    cwd: BACKEND_ROOT,
-    encoding: "utf8",
-    maxBuffer: 1024 * 1024 * 40,
-    timeout: options.timeoutMs || 0,
-  })
-  if (result.error) {
-    return {
-      ok: false,
-      report: null,
-      error: result.error.code === "ETIMEDOUT"
-        ? `${label}_timeout:${options.timeoutMs || 0}ms`
-        : result.error.message,
-    }
-  }
-  if (result.status !== 0) {
-    return {
-      ok: false,
-      report: null,
-      error: `${label}_failed:${result.status}`,
-    }
-  }
   try {
     return {
       ok: true,
-      report: JSON.parse(result.stdout),
+      report: runJsonWithCache(label, scriptArgs, {
+        cwd: BACKEND_ROOT,
+        maxBuffer: 1024 * 1024 * 40,
+        timeoutMs: options.timeoutMs || 0,
+      }),
       error: null,
     }
   } catch (error) {
     return {
       ok: false,
       report: null,
-      error: `invalid_json_from_${label}:${error instanceof Error ? error.message : String(error)}`,
+      error: error instanceof Error ? error.message : String(error),
     }
   }
 }

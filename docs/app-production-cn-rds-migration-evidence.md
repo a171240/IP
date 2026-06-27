@@ -1,0 +1,357 @@
+# APP production-cn RDS migration evidence check
+
+Generated at: 2026-06-26T16:28:41.035Z
+
+## Conclusion
+
+- ok: false
+- templateReady: true
+- localExists: true
+- localReady: false
+- migrationReady: false
+- appApiRoutesWithSupabase: 29/31
+- appApiRoutesWithSupabaseDataAccess: 4/31
+- firstVersionRdsRoutesWithSupabaseDataAccess: 0/25
+- deferredAppApiRoutesWithSupabaseDataAccess: 4/6
+- databaseUrlCnReferencedInSource: true
+- postgresDataAccessAdapterDetected: true
+- writebackBlockingGroups: rdsInstanceAndSecret, schemaDataAndRollback
+- requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
+- rdsMigrationPlanReady: false
+- rdsMigrationPhaseReady: 1/5
+- rdsMigrationNextPhaseIds: compatibility_review, rds_instance_and_secret
+- rdsLocalReviewCanStartNow: true
+- rdsCanStartP11AfterActionTimeConfirmation: true
+- rdsCompatibilityReviewCanStartNow: true
+- rdsSchemaApplyBlockedByCompatibilityReview: true
+
+## Files
+
+- template: /Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.rds-migration.example.json
+- local: /Users/Admin/Documents/美业话镜APP/handoff/IP/deploy/aliyun-production-cn.rds-migration.local.json
+
+## Local Blockers
+
+- todo:rdsPostgres.instanceId
+- todo:rdsPostgres.engineVersion
+- todo:rdsPostgres.networkAccess
+- todo:rdsPostgres.databaseName
+- todo:rdsPostgres.evidence
+- rdsPostgres.confirmed
+- rdsPostgres.databaseAccountReady
+- rdsPostgres.databaseUrlCnSecretImported
+- migration.schemaCompatibilityReviewed
+- migration.supabaseSpecificSqlResolved
+- migration.rdsExtensionSupportConfirmed
+- migration.schemaMigrated
+- migration.dataMigrated
+- migration.rowCountValidationPassed
+- migration.criticalRecordValidationPassed
+- migration.appApiSmokeOnRdsPassed
+- migration.supabaseNoLongerFormalTarget
+- migration.rollbackRunbookReviewed
+- migration.rollbackValidationPassed
+
+## Writeback Plan
+
+### rdsInstanceAndSecret
+
+- canStartNow: true
+- dependsOnGroups: none
+- requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
+- blockerFields: rdsPostgres.instanceId, rdsPostgres.engineVersion, rdsPostgres.networkAccess, rdsPostgres.databaseName, rdsPostgres.evidence, rdsPostgres.confirmed, rdsPostgres.databaseAccountReady, rdsPostgres.databaseUrlCnSecretImported
+- writeTargets: deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.* non-secret evidence; /Users/Admin/Documents/美业话镜APP/.env.production-cn.local -> DATABASE_URL_CN status only, never committed; Aliyun KMS / Secrets Manager / SAE secret env -> DATABASE_URL_CN value
+- expectedEvidence: RDS PostgreSQL instance exists in cn-hangzhou; database account and database are ready; DATABASE_URL_CN imported only through secret env
+- forbidden: Do not record database password or connection string value; Do not store DATABASE_URL_CN in git, JSON, Markdown, Docker image, APP bundle, or mini-program package
+- verifyCommands: corepack pnpm aliyun:rds:migration:evidence; corepack pnpm aliyun:env:check
+
+### schemaDataAndRollback
+
+- canStartNow: false
+- dependsOnGroups: rdsInstanceAndSecret
+- requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
+- blockerFields: migration.schemaCompatibilityReviewed, migration.supabaseSpecificSqlResolved, migration.rdsExtensionSupportConfirmed, migration.schemaMigrated, migration.dataMigrated, migration.rowCountValidationPassed, migration.criticalRecordValidationPassed, migration.appApiSmokeOnRdsPassed, migration.supabaseNoLongerFormalTarget, migration.rollbackRunbookReviewed, migration.rollbackValidationPassed
+- writeTargets: deploy/aliyun-production-cn.rds-migration.local.json -> sourceInventory / migration non-secret evidence; release manifest / migration report -> non-secret migration evidence handle
+- expectedEvidence: APP API data access adapter uses RDS/PostgreSQL as formal production-cn data layer; Supabase SQL compatibility review completed before applying schema to Aliyun RDS; Supabase-specific auth/storage/RLS/service_role SQL resolved or rewritten for Aliyun RDS; Aliyun RDS PostgreSQL extension support confirmed for required functions; schema and data migration validated; row counts, critical records, APP API smoke, and rollback validation passed
+- forbidden: Do not run destructive migration without reviewed migration and rollback plan; Do not store dump contents, customer data, Supabase service role key, or database password in reports
+- verifyCommands: corepack pnpm aliyun:rds:migration:plan; corepack pnpm aliyun:rds:migration:evidence:strict; corepack pnpm aliyun:completion:audit
+
+## RDS Migration Plan
+
+- ready: false
+- phaseReady: 1/5
+- nextPhaseIds: compatibility_review, rds_instance_and_secret
+- localReviewCanStartNow: true
+- cloudOrSecretActionRequired: true
+- onlyMissingBackendCredentialValue: DATABASE_URL_CN
+
+### execution_readiness
+
+- canStartP11AfterActionTimeConfirmation: true
+- compatibilityReviewCanStartNow: true
+- schemaApplyBlockedByCompatibilityReview: true
+- rdsInstanceAndSecretReady: false
+- onlyMissingBackendCredentialValue: DATABASE_URL_CN
+- databaseUrlCnSecretTarget: Aliyun KMS / Secrets Manager / SAE secret env
+- localReviewCloseFields: migration.schemaCompatibilityReviewed, migration.supabaseSpecificSqlResolved, migration.rdsExtensionSupportConfirmed
+- cloudSecretWritebackFields: rdsPostgres.instanceId, rdsPostgres.engineVersion, rdsPostgres.networkAccess, rdsPostgres.databaseName, rdsPostgres.databaseAccountReady=true, rdsPostgres.databaseUrlCnSecretImported=true, rdsPostgres.evidence=<non-secret RDS console/secret-env evidence handle>
+- nextOperatorDecision: close_compatibility_review_and_prepare_rds_action_time_confirmation
+- verificationCommands: corepack pnpm aliyun:rds:migration:package; corepack pnpm aliyun:rds:migration:evidence:strict; corepack pnpm aliyun:sensitive:blockers:backend; corepack pnpm aliyun:backend-cn:status
+
+### compatibility_review_package
+
+- ready: false
+- packageOk: true
+- reviewRequired: true
+- findingCount: 181
+- affectedSourceFileCount: 9
+- checklistItemCount: 7
+- blockingFields: migration.schemaCompatibilityReviewed, migration.supabaseSpecificSqlResolved, migration.rdsExtensionSupportConfirmed
+- schemaSqlSha256: 5b9f4a99254d682ac0d68cc7b5e2dfaab4ff5445585373af2fd0a2e8b8244f41
+- rdsApplyCandidateSqlSha256: b6cca44687e039ec60837af55caeca861c3403131cb7cd2b511ffb25ad91aeef
+- validationSqlSha256: 02d43c412731687ba06aa3f8827052564d4ae64ba29036cf255c88561935d55c
+- rollbackChecklistSha256: c8a973fdaa5aef67266623b9137e291a82356addd32fb6553db4cffe103793ad
+
+### rds_apply_candidate
+
+- readyToApplySchema: false
+- status: blocked_extension_support_unconfirmed
+- findingCount: 22
+- categories: extension_review
+- removedStatementCount: 97
+- keptStatementCount: 138
+- rewrittenStatementCount: 12
+- remainingReviewRequired: true
+
+- removed:policy_statement: statements=69
+- removed:row_level_security: statements=23
+- removed:supabase_auth_schema: statements=3
+- removed:supabase_service_role: statements=10
+- removed:supabase_storage_schema: statements=2
+- rewritten:supabase_auth_schema: statements=9
+- rewritten:supabase_auth_uid: statements=3
+
+### rds_apply_candidate_review_plan
+
+- status: open
+- readyToApplySchema: false
+- itemCount: 1
+- findingCount: 22
+- categories: extension_review
+- requiredWriteBackFields: migration.rdsExtensionSupportConfirmed
+- closeConditions: No unresolved Supabase auth schema references remain in rds-apply-candidate.sql.; No unresolved auth.uid() calls remain in rds-apply-candidate.sql.; Target Aliyun RDS PostgreSQL extension support or replacement SQL is confirmed.; migration.schemaCompatibilityReviewed=true, migration.supabaseSpecificSqlResolved=true, and migration.rdsExtensionSupportConfirmed=true are recorded only after review closure.
+
+- review:extension_review: findings=22, sources=8, fields=migration.rdsExtensionSupportConfirmed
+
+### compatibility_disposition_plan
+
+- status: open
+- readyToApplySchema: false
+- itemCount: 7
+- requiredWriteBackFields: migration.rdsExtensionSupportConfirmed, migration.schemaCompatibilityReviewed, migration.supabaseSpecificSqlResolved, cloudConfirmations.items.oss
+- closeConditions: Every category has a reviewed non-secret disposition.; schemaApplyCandidateAudit.readyToApplySchema=true after Supabase-specific SQL is removed or rewritten from rds-schema.sql.; migration.schemaCompatibilityReviewed=true is recorded only after the reviewed RDS apply candidate is prepared.; migration.supabaseSpecificSqlResolved=true is recorded only after Supabase auth schema/auth.uid/storage/service_role/RLS/policy findings are resolved.; migration.rdsExtensionSupportConfirmed=true is recorded only after target RDS engine and extension support are confirmed.
+
+#### disposition:extension_review
+
+- defaultProposedDisposition: confirm_rds_extension_support_or_replace_function_usage
+- operatorChecklist: Confirm the target RDS PostgreSQL engine version.; Confirm pgcrypto or equivalent function support for gen_random_uuid().; Record whether each extension statement is kept, replaced, or removed before schema apply.
+- evidenceWriteBackFields: migration.rdsExtensionSupportConfirmed
+- acceptanceEvidence: Target RDS engine/version and extension support evidence are recorded without secrets.
+
+#### disposition:policy_statement
+
+- defaultProposedDisposition: rewrite_remove_or_replace_each_supabase_policy
+- operatorChecklist: Classify each create policy statement as rewrite, remove, or replace with backend enforcement.; Confirm login/profile/invite/service-record routes still enforce tenant scope after the change.; Record disposition by category and source file without copying customer data.
+- evidenceWriteBackFields: migration.schemaCompatibilityReviewed, migration.supabaseSpecificSqlResolved
+- acceptanceEvidence: Every policy statement has a recorded disposition before schema apply.
+
+#### disposition:row_level_security
+
+- defaultProposedDisposition: choose_rds_rls_or_backend_authorization_owner_before_apply
+- operatorChecklist: Pick one authorization owner for each table: Aliyun RDS RLS or backend repository checks.; Ensure store manager and company-scope reads still match first-version APP permissions.; Do not leave Supabase-only policies as the assumed enforcement layer.
+- evidenceWriteBackFields: migration.schemaCompatibilityReviewed, migration.supabaseSpecificSqlResolved
+- acceptanceEvidence: Every RLS statement has an RDS-compatible authorization model before schema apply.
+
+#### disposition:supabase_auth_schema
+
+- defaultProposedDisposition: replace_supabase_auth_schema_with_app_identity_model
+- operatorChecklist: Map auth.users foreign keys or triggers to public.profiles, controlled UUID user ids, or another APP-owned identity boundary.; Remove Supabase auth triggers from the final RDS apply candidate unless an APP-owned replacement trigger is explicitly reviewed.; Replace auth.jwt() claim reads with backend-provided request claims or repository parameters.
+- evidenceWriteBackFields: migration.schemaCompatibilityReviewed, migration.supabaseSpecificSqlResolved
+- acceptanceEvidence: No unresolved Supabase auth schema references such as auth.users or auth.jwt() remain in the reviewed RDS apply candidate.
+
+#### disposition:supabase_auth_uid
+
+- defaultProposedDisposition: rewrite_to_backend_enforced_identity_and_tenant_scope
+- operatorChecklist: Map each auth.uid() predicate to request user identity provided by the APP API auth layer.; Confirm company_id, store_id, and role checks are enforced in the Aliyun RDS repository layer.; Remove or rewrite the Supabase policy statement from the final RDS apply candidate.
+- evidenceWriteBackFields: migration.schemaCompatibilityReviewed, migration.supabaseSpecificSqlResolved
+- acceptanceEvidence: All auth.uid() findings have a reviewed rewrite, removal, or backend-owned authorization note.
+
+#### disposition:supabase_service_role
+
+- defaultProposedDisposition: replace_with_backend_service_account_and_rds_roles
+- operatorChecklist: Remove Supabase service_role references from the RDS apply candidate.; Confirm the backend service account can perform required server-side operations through Aliyun RDS.; Keep service credentials only in Aliyun secret env or runtime credential stores.
+- evidenceWriteBackFields: migration.schemaCompatibilityReviewed, migration.supabaseSpecificSqlResolved
+- acceptanceEvidence: No Supabase service_role grant or policy remains in the reviewed RDS apply candidate.
+
+#### disposition:supabase_storage_schema
+
+- defaultProposedDisposition: exclude_from_rds_apply_and_replace_with_oss_boundary
+- operatorChecklist: Exclude storage.* statements from the RDS apply candidate.; Confirm OSS bucket, prefix, CORS, and RAM/STS least-privilege evidence for service-record audio.; Record upload/download smoke evidence handles without payloads or credentials.
+- evidenceWriteBackFields: migration.supabaseSpecificSqlResolved, cloudConfirmations.items.oss
+- acceptanceEvidence: No storage.* SQL is applied to RDS; OSS/RAM/STS evidence covers the equivalent storage boundary.
+
+#### extension_review
+
+- statusBeforeP11Apply: must_resolve_before_schema_apply
+- findingCount: 22
+- affectedSourceCount: 8
+- defaultProposedDisposition: confirm_rds_extension_support_or_replace_function_usage
+- operatorChecklist: Confirm the target RDS PostgreSQL engine version.; Confirm pgcrypto or equivalent function support for gen_random_uuid().; Record whether each extension statement is kept, replaced, or removed before schema apply.
+- evidenceWriteBackFields: migration.rdsExtensionSupportConfirmed
+- requiredOperatorDecision: Confirm Aliyun RDS PostgreSQL engine/version supports required extensions before applying schema SQL.
+- acceptanceEvidence: Target RDS engine/version and extension support evidence are recorded without secrets.
+
+#### policy_statement
+
+- statusBeforeP11Apply: must_resolve_before_schema_apply
+- findingCount: 56
+- affectedSourceCount: 8
+- defaultProposedDisposition: rewrite_remove_or_replace_each_supabase_policy
+- operatorChecklist: Classify each create policy statement as rewrite, remove, or replace with backend enforcement.; Confirm login/profile/invite/service-record routes still enforce tenant scope after the change.; Record disposition by category and source file without copying customer data.
+- evidenceWriteBackFields: migration.schemaCompatibilityReviewed, migration.supabaseSpecificSqlResolved
+- requiredOperatorDecision: Review every Supabase create policy statement and rewrite, remove, or replace it with backend-enforced tenant authorization.
+- acceptanceEvidence: Every policy statement has a recorded disposition before schema apply.
+
+#### row_level_security
+
+- statusBeforeP11Apply: must_resolve_before_schema_apply
+- findingCount: 23
+- affectedSourceCount: 8
+- defaultProposedDisposition: choose_rds_rls_or_backend_authorization_owner_before_apply
+- operatorChecklist: Pick one authorization owner for each table: Aliyun RDS RLS or backend repository checks.; Ensure store manager and company-scope reads still match first-version APP permissions.; Do not leave Supabase-only policies as the assumed enforcement layer.
+- evidenceWriteBackFields: migration.schemaCompatibilityReviewed, migration.supabaseSpecificSqlResolved
+- requiredOperatorDecision: Decide and document whether RLS stays in Aliyun RDS or whether tenant authorization is fully enforced in lib/aliyun-rds repositories.
+- acceptanceEvidence: Every RLS statement has an RDS-compatible authorization model before schema apply.
+
+#### supabase_auth_schema
+
+- statusBeforeP11Apply: must_resolve_before_schema_apply
+- findingCount: 12
+- affectedSourceCount: 5
+- defaultProposedDisposition: replace_supabase_auth_schema_with_app_identity_model
+- operatorChecklist: Map auth.users foreign keys or triggers to public.profiles, controlled UUID user ids, or another APP-owned identity boundary.; Remove Supabase auth triggers from the final RDS apply candidate unless an APP-owned replacement trigger is explicitly reviewed.; Replace auth.jwt() claim reads with backend-provided request claims or repository parameters.
+- evidenceWriteBackFields: migration.schemaCompatibilityReviewed, migration.supabaseSpecificSqlResolved
+- requiredOperatorDecision: Replace Supabase auth schema references such as auth.users and auth.jwt() with APP-owned identity tables, controlled user ids, or backend-provided auth context before applying schema SQL.
+- acceptanceEvidence: No unresolved Supabase auth schema references such as auth.users or auth.jwt() remain in the reviewed RDS apply candidate.
+
+#### supabase_auth_uid
+
+- statusBeforeP11Apply: must_resolve_before_schema_apply
+- findingCount: 56
+- affectedSourceCount: 7
+- defaultProposedDisposition: rewrite_to_backend_enforced_identity_and_tenant_scope
+- operatorChecklist: Map each auth.uid() predicate to request user identity provided by the APP API auth layer.; Confirm company_id, store_id, and role checks are enforced in the Aliyun RDS repository layer.; Remove or rewrite the Supabase policy statement from the final RDS apply candidate.
+- evidenceWriteBackFields: migration.schemaCompatibilityReviewed, migration.supabaseSpecificSqlResolved
+- requiredOperatorDecision: Replace auth.uid() dependent SQL with backend-enforced user, company, store, and role checks before applying schema SQL.
+- acceptanceEvidence: All auth.uid() findings have a reviewed rewrite, removal, or backend-owned authorization note.
+
+#### supabase_service_role
+
+- statusBeforeP11Apply: must_resolve_before_schema_apply
+- findingCount: 10
+- affectedSourceCount: 5
+- defaultProposedDisposition: replace_with_backend_service_account_and_rds_roles
+- operatorChecklist: Remove Supabase service_role references from the RDS apply candidate.; Confirm the backend service account can perform required server-side operations through Aliyun RDS.; Keep service credentials only in Aliyun secret env or runtime credential stores.
+- evidenceWriteBackFields: migration.schemaCompatibilityReviewed, migration.supabaseSpecificSqlResolved
+- requiredOperatorDecision: Replace Supabase service_role grants or policy references with Aliyun RDS roles plus backend service credentials.
+- acceptanceEvidence: No Supabase service_role grant or policy remains in the reviewed RDS apply candidate.
+
+#### supabase_storage_schema
+
+- statusBeforeP11Apply: must_resolve_before_schema_apply
+- findingCount: 2
+- affectedSourceCount: 2
+- defaultProposedDisposition: exclude_from_rds_apply_and_replace_with_oss_boundary
+- operatorChecklist: Exclude storage.* statements from the RDS apply candidate.; Confirm OSS bucket, prefix, CORS, and RAM/STS least-privilege evidence for service-record audio.; Record upload/download smoke evidence handles without payloads or credentials.
+- evidenceWriteBackFields: migration.supabaseSpecificSqlResolved, cloudConfirmations.items.oss
+- requiredOperatorDecision: Replace Supabase storage schema usage with Aliyun OSS bucket/prefix/CORS/RAM/STS evidence and application-level access checks.
+- acceptanceEvidence: No storage.* SQL is applied to RDS; OSS/RAM/STS evidence covers the equivalent storage boundary.
+
+### source_inventory_preflight
+
+- ready: true
+- canStartNow: true
+- canStartAfterActionTimeConfirmation: false
+- dependsOnPhaseIds: none
+- requiredAuthorizationPackets: none
+- blockerFields: none
+- writeTargets: deploy/aliyun-production-cn.rds-migration.local.json -> sourceInventory.* non-secret evidence; deploy/aliyun-production-cn.rds-first-version-schema-map.json; deploy/app-api-production-cn.bridge-map.json
+- expectedEvidence: firstVersionRdsRouteCount=25; firstVersionRdsRoutesWithSupabaseDataAccess=0; postgresDataAccessAdapterDetected=true; schemaInventoryReviewed=true; dataAccessAdapterReady=true
+- forbidden: Do not include row contents, customer data, Supabase service role key, or DATABASE_URL_CN value.
+- verifyCommands: corepack pnpm aliyun:rds:migration:plan; corepack pnpm aliyun:rds:migration:evidence
+
+### compatibility_review
+
+- ready: false
+- canStartNow: true
+- canStartAfterActionTimeConfirmation: false
+- dependsOnPhaseIds: source_inventory_preflight
+- requiredAuthorizationPackets: none
+- blockerFields: migration.schemaCompatibilityReviewed, migration.supabaseSpecificSqlResolved, migration.rdsExtensionSupportConfirmed
+- writeTargets: docs/app-production-cn-rds-migration-package.md -> compatibilityReviewChecklist non-secret dispositions; deploy/aliyun-production-cn.rds-migration.local.json -> migration schemaCompatibilityReviewed / supabaseSpecificSqlResolved / rdsExtensionSupportConfirmed
+- expectedEvidence: compatibilityReviewChecklistItemCount=7 reviewed and closed; Supabase auth schema/auth.uid/storage/service_role/RLS/policy dispositions recorded without secrets; target Aliyun RDS PostgreSQL extension support or replacement plan confirmed
+- forbidden: Do not apply schema to RDS before this review closes.; Do not store dump contents, customer data, database password, or Supabase service role key.
+- verifyCommands: corepack pnpm aliyun:rds:migration:package; corepack pnpm aliyun:rds:migration:evidence
+
+### rds_instance_and_secret
+
+- ready: false
+- canStartNow: false
+- canStartAfterActionTimeConfirmation: true
+- dependsOnPhaseIds: none
+- requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
+- blockerFields: rdsPostgres.instanceId, rdsPostgres.engineVersion, rdsPostgres.networkAccess, rdsPostgres.databaseName, rdsPostgres.evidence, rdsPostgres.confirmed, rdsPostgres.databaseAccountReady, rdsPostgres.databaseUrlCnSecretImported
+- writeTargets: deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.* non-secret evidence; Aliyun KMS / Secrets Manager / SAE secret env -> DATABASE_URL_CN value only
+- expectedEvidence: RDS PostgreSQL instance exists in cn-hangzhou; database account and network access for SAE are ready; DATABASE_URL_CN imported only through Aliyun controlled secret env
+- forbidden: Do not write DATABASE_URL_CN value, database password, or connection string to JSON, Markdown, Docker image, shell history, or git.
+- verifyCommands: corepack pnpm aliyun:rds:migration:evidence; corepack pnpm aliyun:sensitive:blockers:backend
+
+### schema_data_validation
+
+- ready: false
+- canStartNow: false
+- canStartAfterActionTimeConfirmation: true
+- dependsOnPhaseIds: compatibility_review, rds_instance_and_secret
+- requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
+- blockerFields: migration.schemaMigrated, migration.dataMigrated, migration.rowCountValidationPassed, migration.criticalRecordValidationPassed, migration.supabaseNoLongerFormalTarget
+- writeTargets: deploy/aliyun-production-cn.rds-migration.local.json -> migration schema/data validation booleans and non-secret evidence handle; release manifest / migration report -> non-secret migration evidence handle
+- expectedEvidence: schemaMigrated=true; dataMigrated=true; rowCountValidationPassed=true; criticalRecordValidationPassed=true; supabaseNoLongerFormalTarget=true
+- forbidden: Do not store migration dump contents or customer records in reports.; Do not run destructive migration without reviewed rollback path.
+- verifyCommands: corepack pnpm aliyun:rds:migration:evidence:strict; corepack pnpm aliyun:backend-cn:status
+
+### app_api_smoke_and_rollback
+
+- ready: false
+- canStartNow: false
+- canStartAfterActionTimeConfirmation: true
+- dependsOnPhaseIds: schema_data_validation
+- requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
+- blockerFields: migration.appApiSmokeOnRdsPassed, migration.rollbackRunbookReviewed, migration.rollbackValidationPassed
+- writeTargets: deploy/aliyun-production-cn.rds-migration.local.json -> migration smoke/rollback booleans and non-secret evidence handle
+- expectedEvidence: profile / tenant / invite / service-record APP API smoke passed against RDS; rollbackRunbookReviewed=true; rollbackValidationPassed=true
+- forbidden: Do not include auth tokens, customer payloads, database password, or connection string value in smoke evidence.
+- verifyCommands: corepack pnpm aliyun:rds:migration:evidence:strict; corepack pnpm aliyun:completion:audit; corepack pnpm aliyun:predeploy
+
+## Strict Verification Order
+
+- corepack pnpm aliyun:rds:migration:plan
+- corepack pnpm aliyun:rds:migration:evidence:strict
+- corepack pnpm aliyun:env:check
+- corepack pnpm aliyun:completion:audit
+- corepack pnpm aliyun:predeploy
+
+## Safety Boundary
+
+- This checker never connects to Supabase, Aliyun RDS, Vercel, or WeChat.
+- Only non-secret evidence handles, booleans, resource names, and counts may be stored in the .local.json evidence file.
+- DATABASE_URL_CN, database password, dump contents, Supabase service role key, AccessKeySecret, AppSecret, STS token, and cookies must never be written to JSON, Markdown, Docker image, APP bundle, mini-program package, or git.

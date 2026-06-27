@@ -14,11 +14,10 @@ const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-pr
 const DEFAULT_CLOUD_INVENTORY_RESULTS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-inventory-results.local.json")
 const DEFAULT_RDS_MIGRATION_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.rds-migration.local.json")
 const READONLY_INVENTORY_AUTH_PACKET = "P00_ALIYUN_READONLY_INVENTORY_IDENTITY"
-const BACKEND_CURRENT_CAN_START_PACKET_IDS = Object.freeze([
+const BACKEND_BASE_CAN_START_PACKET_IDS = Object.freeze([
   "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
   "P11_ALIYUN_RDS_DATA_MIGRATION",
   "P05_OSS_RAM_STS",
-  "P03_ACR_PURCHASE",
 ])
 const BACKEND_DEFERRED_APP_LAUNCH_PACKET_IDS = Object.freeze([
   "P01_WECHAT_OPEN_MOBILE_APP",
@@ -208,11 +207,11 @@ function writebackPrerequisites(groupKey, item) {
         [
           "docs/app-production-cn-rds-migration-package.md 已生成并核对",
           "RDS PostgreSQL 实例、数据库账号和 DATABASE_URL_CN secret env 的非密钥证据",
-          "compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查已关闭",
+          "compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查已关闭",
         ],
         [
           "RDS PostgreSQL 已创建，数据库账号 ready，DATABASE_URL_CN 已只导入 secret env",
-          "compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true",
+          "compatibilityReviewChecklist 7 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true",
         ],
       )
     }
@@ -221,11 +220,11 @@ function writebackPrerequisites(groupKey, item) {
         ["P11_ALIYUN_RDS_DATA_MIGRATION"],
         [
           "docs/app-production-cn-rds-migration-package.md 已生成并核对",
-          "compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查处置结果",
+          "compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查处置结果",
           "Supabase 到 RDS/PostgreSQL schema、data、row count、critical record、APP API smoke 和 rollback 验收证据",
         ],
         [
-          "compatibilityReviewChecklist 6 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true",
+          "compatibilityReviewChecklist 7 类已关闭，且 migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true",
           "schema/data 迁移、RDS API smoke 和 rollback 验收已完成",
         ],
       )
@@ -400,7 +399,7 @@ function expectedForRdsField(field) {
   if (field === "rdsPostgres.databaseAccountReady") return "数据库账号和权限就绪后填 true，不记录密码。"
   if (field === "rdsPostgres.databaseUrlCnSecretImported") return "DATABASE_URL_CN 已只导入阿里云 KMS/Secrets Manager/SAE secret env 后填 true。"
   if (field === "migration.dataAccessAdapterReady") return "第一版 APP API 正式 production-cn 数据访问不再依赖 Supabase 后填 true。"
-  if (field === "migration.schemaCompatibilityReviewed") return "compatibilityReviewChecklist 6 类 Supabase SQL 兼容审查完成并记录非密钥处置结果后填 true。"
+  if (field === "migration.schemaCompatibilityReviewed") return "compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查完成并记录非密钥处置结果后填 true。"
   if (field === "migration.supabaseSpecificSqlResolved") return "supabase_auth_uid / storage / service_role / RLS / policy 等 Supabase-specific SQL 已改写或明确处置后填 true。"
   if (field === "migration.rdsExtensionSupportConfirmed") return "Aliyun RDS PostgreSQL extension 支持和替代方案已确认后填 true。"
   if (field === "migration.schemaMigrated") return "schema 已迁到 RDS/PostgreSQL 并通过非密钥验收后填 true。"
@@ -506,8 +505,18 @@ function buildEvidenceClosureBrief(handoff, writebackGroups, allGaps, requiredAu
 }
 
 function buildActionableWritebackSequence(writebackGroups, currentScope) {
+  const requiredPacketIds = new Set(
+    Object.values(writebackGroups)
+      .flatMap((group) => group.gaps || [])
+      .flatMap((gap) => gap.requiredAuthorizationPackets || []),
+  )
+  const acrActionPacketId = requiredPacketIds.has("P03_ACR_PURCHASE")
+    ? "P03_ACR_PURCHASE"
+    : requiredPacketIds.has("P04_ACR_IMAGE_AND_PULL")
+      ? "P04_ACR_IMAGE_AND_PULL"
+      : ""
   const canStartNowPacketIds = currentScope === "backend_aliyun_only"
-    ? [...BACKEND_CURRENT_CAN_START_PACKET_IDS]
+    ? uniqueStrings([...BACKEND_BASE_CAN_START_PACKET_IDS, acrActionPacketId])
     : []
   const deferredAppLaunchPacketIds = currentScope === "backend_aliyun_only"
     ? [...BACKEND_DEFERRED_APP_LAUNCH_PACKET_IDS]

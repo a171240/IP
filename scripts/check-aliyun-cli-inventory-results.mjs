@@ -264,7 +264,13 @@ function validateCommandResult(rawResult, mode, index) {
     observedAtReady: !isPlaceholder(rawResult.observedAt),
     outputSummaryReady: !isPlaceholder(rawResult.outputSummary),
     evidenceReady: !isPlaceholder(rawResult.evidence),
+    failureCategory: parseFailureCategory(rawResult.outputSummary),
   }
+}
+
+function parseFailureCategory(outputSummary) {
+  const match = String(outputSummary || "").match(/failureCategory=([^;\s]+)/)
+  return match?.[1] || ""
 }
 
 function expectedValueBlocker(field, expected, actual) {
@@ -322,9 +328,14 @@ function summarizeLocalObservation(localFile) {
   const operations = localFile.operations || []
   const commandResults = operations.flatMap((operation) => operation.commandResults || [])
   const statusCounts = {}
+  const failureCategories = {}
   for (const operation of operations) {
     const status = operation.status || "unknown"
     statusCounts[status] = (statusCounts[status] || 0) + 1
+  }
+  for (const result of commandResults) {
+    if (result.ready || !result.failureCategory) continue
+    failureCategories[result.failureCategory] = (failureCategories[result.failureCategory] || 0) + 1
   }
   const evidenceReadyOperations = operations.filter((operation) => operation.evidenceReady === true).length
   const consoleObservationOperations = operations.filter((operation) =>
@@ -350,6 +361,10 @@ function summarizeLocalObservation(localFile) {
     executedCommandResults: commandResults.filter((result) => result.executed === true).length,
     cloudApiCalledCommandResults: commandResults.filter((result) => result.cloudApiCalled === true).length,
     mutationPerformedCommandResults: commandResults.filter((result) => result.mutationPerformed === true).length,
+    failureCategories,
+    failedOperationIds: operations
+      .filter((operation) => (operation.commandResults || []).some((result) => result.ready !== true))
+      .map((operation) => operation.id),
     observedOperationIds: operations.filter((operation) => operation.status === "observed").map((operation) => operation.id),
     notFoundOperationIds: operations.filter((operation) => operation.status === "not_found").map((operation) => operation.id),
     blockedOperationIds: operations.filter((operation) => operation.status === "blocked").map((operation) => operation.id),
@@ -392,6 +407,8 @@ function renderMarkdown(report) {
     `- localConsoleObservationOperations: ${report.local.observationSummary.consoleObservationOperations} / ${report.local.observationSummary.operations}`,
     `- executedCommandResults: ${report.local.observationSummary.executedCommandResults} / ${report.local.observationSummary.commandResults}`,
     `- cloudApiCalledCommandResults: ${report.local.observationSummary.cloudApiCalledCommandResults}`,
+    `- failureCategories: ${Object.keys(report.local.observationSummary.failureCategories).length ? JSON.stringify(report.local.observationSummary.failureCategories) : "none"}`,
+    `- failedOperationIds: ${report.local.observationSummary.failedOperationIds.join(", ") || "none"}`,
     "",
     "## Local Blockers",
     "",

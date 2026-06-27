@@ -5,6 +5,7 @@ const path = require("node:path")
 
 const root = process.cwd()
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), "utf8")
+const readJson = (...parts) => JSON.parse(read(...parts))
 
 test("Aliyun domain readiness detects special-use wildcard placeholders", () => {
   const source = read("scripts", "check-aliyun-domain-readiness.mjs")
@@ -15,6 +16,30 @@ test("Aliyun domain readiness detects special-use wildcard placeholders", () => 
   assert.match(source, /wildcardProbe/)
   assert.match(source, /dns_special_use_wildcard_ip/)
   assert.match(source, /198\.18\.0\.0\/15/)
+  assert.match(source, /function buildDomainCutoverPlan/)
+  assert.match(source, /api_sae_custom_domain/)
+  assert.match(source, /asset_cdn_custom_domain/)
+  assert.match(source, /asset_oss_custom_domain/)
+  assert.match(source, /certificateId/)
+  assert.match(source, /icpEvidence/)
+  assert.match(source, /domainCutoverPlan/)
+})
+
+test("Aliyun domain readiness exposes P07 non-secret cutover writeback fields", () => {
+  const source = read("scripts", "check-aliyun-domain-readiness.mjs")
+  const template = readJson("deploy", "aliyun-production-cn.cloud-confirmations.example.json")
+
+  assert.match(source, /items\.apiDomainHttps/)
+  assert.match(source, /items\.assetDomainHttps/)
+  assert.match(source, /recordValue/)
+  assert.match(source, /httpsProbeUrl: `https:\/\/\$\{EXPECTED_API_HOST\}\/api\/healthz`/)
+  assert.match(source, /httpsProbeUrl: `https:\/\/\$\{EXPECTED_ASSET_HOST\}\/`/)
+  assert.equal(template.items.apiDomainHttps.ingressType, "sae_custom_domain")
+  assert.equal(template.items.apiDomainHttps.recordName, "api-cn")
+  assert.equal(template.items.apiDomainHttps.httpsProbeUrl, "https://api-cn.ipgongchang.xin/api/healthz")
+  assert.equal(template.items.assetDomainHttps.ingressType, "cdn_custom_domain")
+  assert.equal(template.items.assetDomainHttps.recordName, "assets-cn")
+  assert.equal(template.items.assetDomainHttps.httpsProbeUrl, "https://assets-cn.ipgongchang.xin/")
 })
 
 test("Aliyun deployment docs record current api-cn and assets-cn wildcard blocker", () => {

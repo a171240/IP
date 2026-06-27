@@ -190,6 +190,142 @@ def classify_failure(status, combined_output):
         return "aliyun_cli_command_or_api_not_supported"
     return "aliyun_cli_readonly_command_failed"
 
+def first_json_payload(text):
+    text = (text or "").strip()
+    if not text:
+        return None
+    try:
+        return json.loads(text)
+    except Exception:
+        pass
+    start = text.find("{")
+    end = text.rfind("}")
+    if start >= 0 and end > start:
+        try:
+            return json.loads(text[start:end + 1])
+        except Exception:
+            return None
+    return None
+
+def walk_values(value, keys):
+    wanted = {key.lower() for key in keys}
+    found = []
+    def walk(item):
+        if isinstance(item, dict):
+            for key, nested in item.items():
+                if str(key).lower() in wanted and nested not in (None, ""):
+                    found.append(str(nested))
+                walk(nested)
+        elif isinstance(item, list):
+            for nested in item:
+                walk(nested)
+    walk(value)
+    return found
+
+def first_list(value, keys):
+    wanted = {key.lower() for key in keys}
+    queue = [value]
+    while queue:
+        item = queue.pop(0)
+        if isinstance(item, dict):
+            for key, nested in item.items():
+                if str(key).lower() in wanted and isinstance(nested, list):
+                    return nested
+                queue.append(nested)
+        elif isinstance(item, list):
+            return item
+    return []
+
+def count_items(data, list_keys):
+    if isinstance(data, list):
+        return len(data)
+    if isinstance(data, dict):
+        for key in ("TotalCount", "Total", "TotalRecordCount", "Count"):
+            if key in data:
+                try:
+                    return int(data[key])
+                except Exception:
+                    pass
+    items = first_list(data, list_keys)
+    return len(items) if isinstance(items, list) else 0
+
+def compact_text(value, limit=80):
+    text = re.sub(r"[^A-Za-z0-9_.:/@+=,-]+", "_", str(value or "").strip())
+    return text[:limit]
+
+def bool_text(value):
+    return "true" if value else "false"
+
+def summarize_resource(operation_id, status, stdout, stderr):
+    if status != 0:
+        return {
+            "status": "blocked",
+            "parts": [],
+        }
+    data = first_json_payload(stdout)
+    combined = (stdout or "") + "\\n" + (stderr or "")
+    if operation_id == "I01_SAE_RUNTIME":
+        target = "meiye-huajing-app-api-production-cn"
+        names = walk_values(data, ["AppName", "ApplicationName", "Name"]) if data is not None else []
+        count = count_items(data, ["Applications", "ApplicationList", "Data"]) if data is not None else 0
+        present = target in names
+        return {"status": "observed" if present else "not_found", "parts": [f"applicationCount={count}", f"targetAppPresent={bool_text(present)}", f"targetAppName={target}"]}
+    if operation_id == "I02_ACR_IMAGE":
+        target = "meiye-huajing-app-api"
+        names = walk_values(data, ["InstanceName", "Name", "NamespaceName"]) if data is not None else []
+        count = count_items(data, ["Instances", "InstanceList", "data"]) if data is not None else 0
+        present = target in names
+        return {"status": "observed" if present or count > 0 else "not_found", "parts": [f"instanceCount={count}", f"targetInstanceOrNamespacePresent={bool_text(present)}", f"targetName={target}"]}
+    if operation_id in ("I03_DNS_API_DOMAIN", "I04_DNS_ASSET_DOMAIN"):
+        target = "api-cn.ipgongchang.xin" if operation_id == "I03_DNS_API_DOMAIN" else "assets-cn.ipgongchang.xin"
+        records = first_list(data, ["Record", "DomainRecords", "Records"]) if data is not None else []
+        count = count_items(data, ["Record", "DomainRecords", "Records"]) if data is not None else 0
+        record_types = []
+        if isinstance(records, list):
+            record_types = sorted(set(compact_text(item.get("Type", "")) for item in records if isinstance(item, dict) and item.get("Type")))
+        return {"status": "observed" if count > 0 else "not_found", "parts": [f"subDomain={target}", f"recordCount={count}", f"recordTypes={','.join(record_types) if record_types else 'none'}"]}
+    if operation_id == "I05_OSS_AUDIO_BUCKET":
+        bucket = "meiye-huajing-service-records-production-cn"
+        location = ""
+        acl = ""
+        storage_class = ""
+        for line in combined.splitlines():
+            lower = line.lower()
+            if "location" in lower and not location:
+                location = compact_text(line.split(":", 1)[-1])
+            if "acl" in lower and not acl:
+                acl = compact_text(line.split(":", 1)[-1])
+            if "storage" in lower and "class" in lower and not storage_class:
+                storage_class = compact_text(line.split(":", 1)[-1])
+        parts = [f"bucket={bucket}", "bucketExists=true"]
+        if location:
+            parts.append(f"location={location}")
+        if acl:
+            parts.append(f"acl={acl}")
+        if storage_class:
+            parts.append(f"storageClass={storage_class}")
+        return {"status": "observed", "parts": parts}
+    if operation_id == "I06_SLS_ALERTS":
+        target = "meiye-huajing-app-prod-cn"
+        names = walk_values(data, ["projectName", "ProjectName", "name"]) if data is not None else []
+        count = count_items(data, ["projects", "Project", "data"]) if data is not None else 0
+        present = target in names
+        return {"status": "observed" if present else "not_found", "parts": [f"projectCount={count}", f"targetProjectPresent={bool_text(present)}", f"targetProject={target}"]}
+    if operation_id == "I07_CERT_HTTPS":
+        count = count_items(data, ["CertificateOrderList", "Certificates", "data"]) if data is not None else 0
+        return {"status": "observed" if count > 0 else "not_found", "parts": [f"certificateOrderCount={count}"]}
+    if operation_id == "I08_RDS_POSTGRES":
+        target = "meiye-huajing-app-api-production-cn"
+        names = walk_values(data, ["DBInstanceDescription", "DBInstanceId", "DBInstanceName"]) if data is not None else []
+        count = count_items(data, ["DBInstance", "Items", "DBInstances"]) if data is not None else 0
+        present = target in names
+        engines = sorted(set(walk_values(data, ["Engine"]))) if data is not None else []
+        return {"status": "observed" if present or count > 0 else "not_found", "parts": [f"postgresInstanceCount={count}", f"targetInstancePresent={bool_text(present)}", f"targetInstanceName={target}", f"engines={','.join(compact_text(engine) for engine in engines[:5]) if engines else 'none'}"]}
+    if operation_id == "I09_TAIR_REDIS":
+        count = count_items(data, ["KVStoreInstance", "Instances", "data"]) if data is not None else 0
+        return {"status": "observed" if count > 0 else "not_found", "parts": [f"redisOrTairInstanceCount={count}"]}
+    return {"status": "observed", "parts": []}
+
 def validate_command(command):
     if not command.startswith("aliyun "):
         raise RuntimeError("unsupported_command:" + command)
@@ -227,9 +363,11 @@ def run_operation(operation):
     stdout_lines = len([line for line in stdout.splitlines() if line.strip()])
     stderr_lines = len([line for line in stderr.splitlines() if line.strip()])
     failure_category = classify_failure(status, combined)
+    resource_summary = summarize_resource(operation["id"], status, stdout, stderr)
     if contains_secret_like_value(combined):
         failure_category = "output_contains_secret_like_value_redacted"
         status = status if status != 0 else 1
+        resource_summary = {"status": "blocked", "parts": []}
     summary_parts = [
         f"exit={status}",
         f"stdoutLines={stdout_lines}",
@@ -238,7 +376,9 @@ def run_operation(operation):
     ]
     if failure_category:
         summary_parts.append(f"failureCategory={failure_category}")
-    status_label = "observed" if status == 0 else "blocked"
+    if resource_summary.get("parts"):
+        summary_parts.append("resourceSummary=" + ",".join(resource_summary["parts"]))
+    status_label = resource_summary.get("status") or ("observed" if status == 0 else "blocked")
     evidence = f"cloudshell_readonly_{operation['id']}_{started_at.replace(':', '-').replace('.', '-')}_{fingerprint[:16]}"
     return {
         "id": operation["id"],
