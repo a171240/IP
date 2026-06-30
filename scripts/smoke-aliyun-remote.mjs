@@ -10,6 +10,8 @@ const DEFAULT_ENV_FILE = resolve(__dirname, "../../../.env.production-cn.local")
 const DEFAULT_TIMEOUT_MS = 15_000
 const HEALTH_PATHS = ["/api/healthz", "/api/app/health", "/api/app/health?strict=1"]
 const KNOWN_CHECK_GROUPS = new Set([
+  "aliyunRds",
+  "aliyunOssRuntime",
   "supabase",
   "appWechatLogin",
   "legalLinks",
