@@ -14,21 +14,20 @@ const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
 const DEFAULT_CLOUD_INVENTORY_RESULTS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-inventory-results.local.json")
 const DEFAULT_RDS_MIGRATION_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.rds-migration.local.json")
+const DEFAULT_IMAGE_PUBLISH_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.image-publish.local.json")
 const READONLY_INVENTORY_AUTH_PACKET = "P00_ALIYUN_READONLY_INVENTORY_IDENTITY"
 const FIRST_BACKEND_ACTION_PACKET_IDS = [
-  READONLY_INVENTORY_AUTH_PACKET,
   "P11_ALIYUN_RDS_DATA_MIGRATION",
   "P05_OSS_RAM_STS",
   "P04_ACR_IMAGE_AND_PULL",
 ]
 const FIRST_BACKEND_ACTION_STEP_IDS = [
-  "BAP00_READONLY_INVENTORY_IDENTITY",
   "BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE",
   "BAP02_OSS_RAM_STS_CLOSE",
   "BAP04_ACR_IMAGE_PUSH_AND_PULL",
 ]
 const FIRST_BACKEND_ACTION_RECOMMENDED_REPLY =
-  "授权本轮只做阿里云后端第一批动作：只读盘点、创建/确认 RDS PostgreSQL 并处理数据库密码、确认 OSS RAM/STS；ACR 购买证据已确认，可另按 P04 推送后端镜像并配置 SAE 拉取，但 registry 密码只能走受控凭证通道；密钥只进入阿里云 KMS/Secrets Manager/SAE secret env，不写文档/代码/git；仅处理本批所需受控 secret env，暂不执行全量 SAE env import；不做微信/Android/iOS、不部署上线、不改 DNS。"
+  "授权本轮只做阿里云后端第一批剩余动作：创建/确认 RDS PostgreSQL 并处理数据库密码、确认 OSS RAM/STS/SAE RRSA OIDC、推送或导入 ACR 后端镜像并配置 SAE 拉取；P00 只读盘点已完成；registry 密码只能走受控凭证通道；密钥只进入阿里云 KMS/Secrets Manager/SAE secret env，不写文档/代码/git；仅处理本批所需受控 secret env，暂不执行全量 SAE env import；不做微信/Android/iOS、不部署上线、不改 DNS。"
 
 const SECRET_VALUE_PATTERNS = [
   /sk-[A-Za-z0-9_-]{20,}/,
@@ -48,6 +47,7 @@ function parseArgs(argv) {
     cloudConfirmationsFile: DEFAULT_CLOUD_CONFIRMATIONS_FILE,
     cloudInventoryResultsFile: DEFAULT_CLOUD_INVENTORY_RESULTS_FILE,
     rdsMigrationFile: DEFAULT_RDS_MIGRATION_FILE,
+    imagePublishFile: DEFAULT_IMAGE_PUBLISH_FILE,
     outPath: "",
     markdownPath: "",
     cloudAccessObservationFile: "",
@@ -70,6 +70,10 @@ function parseArgs(argv) {
     }
     if (arg === "--rds-migration") {
       args.rdsMigrationFile = resolveValue(argv[++index], "--rds-migration")
+      continue
+    }
+    if (arg === "--image-publish") {
+      args.imagePublishFile = resolveValue(argv[++index], "--image-publish")
       continue
     }
     if (arg === "--cloud-access-observation") {
@@ -120,13 +124,8 @@ function buildReport(args) {
     args.cloudInventoryResultsFile,
     "--rds-migration",
     args.rdsMigrationFile,
-  ])
-  const cloudActions = runJson("cloud_actions", [
-    "scripts/generate-aliyun-cloud-actions-package.mjs",
-    "--env-file",
-    args.envFile,
-    "--cloud-confirmations",
-    args.cloudConfirmationsFile,
+    "--image-publish",
+    args.imagePublishFile,
   ])
   const sensitiveBlockers = runJson("sensitive_blockers", [
     "scripts/summarize-aliyun-sensitive-blockers.mjs",
@@ -143,12 +142,12 @@ function buildReport(args) {
     "--allow-incomplete",
   ])
 
-  const steps = buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEvidence, readonlyInventoryAuthorization })
+  const steps = buildApplySteps({ backendStatus, sensitiveBlockers, rdsEvidence, readonlyInventoryAuthorization })
   const immediateBackendSteps = steps.filter((step) => step.canStartAfterActionTimeConfirmation).map((step) => step.id)
   const blockedBackendSteps = steps
     .filter((step) => !step.completed && !step.canStartAfterActionTimeConfirmation)
     .map((step) => step.id)
-  const userIntervention = buildUserIntervention({ sensitiveBlockers, backendStatus, cloudActions, steps })
+  const userIntervention = buildUserIntervention({ sensitiveBlockers, backendStatus, steps })
   const credentialPasswordIntervention = buildCredentialPasswordIntervention(sensitiveBlockers)
   const credentialAcquisitionQueue = buildCredentialAcquisitionQueue(sensitiveBlockers)
   const actionTimeAuthorizationRequest = buildActionTimeAuthorizationRequest(steps)
@@ -257,9 +256,8 @@ function buildActionTimeAuthorizationRequest(steps) {
     packetIds: FIRST_BACKEND_ACTION_PACKET_IDS,
     recommendedUserReply: FIRST_BACKEND_ACTION_RECOMMENDED_REPLY,
     allowedActions: [
-      "恢复阿里云 CLI/CloudShell 只读盘点身份，只运行 allowlisted List/Describe/stat/get inventory 命令。",
       "创建或确认 cn-hangzhou RDS PostgreSQL、数据库、账号和网络访问策略，并只把 DATABASE_URL_CN 写入阿里云受控 secret env。",
-      "确认 OSS bucket/CORS/service-records 前缀，绑定最小权限 RAM/STS 或运行时角色。",
+      "确认 OSS bucket/CORS/service-records 前缀，绑定最小权限 RAM/STS 或 SAE RRSA/OIDC 运行时角色。",
       "把后端镜像推送到已确认的 ACR 仓库，校验 remote sha256 digest，并配置 SAE 运行时镜像拉取。",
     ],
     explicitlyExcluded: [
@@ -423,20 +421,16 @@ function buildCredentialAcquisitionQueue(sensitiveBlockers) {
   }
 }
 
-function buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEvidence, readonlyInventoryAuthorization }) {
+function buildApplySteps({ backendStatus, sensitiveBlockers, rdsEvidence, readonlyInventoryAuthorization }) {
   const statusBlockers = new Set(backendStatus.summary.backendRequiredBlocking || [])
-  const immediateConsoleTasks = new Set(cloudActions.summary?.canStartNowConsoleTasks || [])
-  const blockedConsoleTasks = new Set(cloudActions.summary?.blockedByDependencies || [])
   const blockedCredentialNames = new Set(sensitiveBlockers.credentialInterventionBrief?.blockedCredentialNames || [])
   const readySecretEnvVariableNames = sensitiveBlockers.credentialInterventionBrief?.readySecretEnvVariableNames || []
   const cloudInventory = backendStatus.cloudInventory?.backendMeaning || {}
   const cloudInventoryReady = backendStatus.cloudInventory?.strictReady === true
   const cloudInventoryReadyLocalOperations = backendStatus.cloudInventory?.readyLocalOperations || "unknown"
   const cloudInventoryExecutedCommandResults = backendStatus.cloudInventory?.executedCommandResults || "unknown"
-  const cliConfigFailureCategory = cloudActions.summary?.cliConfigProbeFailureCategory || "unknown"
-  const resourceEvidenceById = new Map(
-    (cloudActions.cloudActionClosureBrief?.blockedResourceEvidence || []).map((item) => [item.id, item]),
-  )
+  const cliConfigFailureCategory = firstFailureCategory(backendStatus.cloudInventory?.failureCategories)
+  const resourceEvidenceById = buildResourceEvidenceById(backendStatus)
   const acrResourceEvidence = resourceEvidenceById.get("R02_ACR_IMAGE_REGISTRY")
   const ossResourceEvidence = resourceEvidenceById.get("R05_OSS_AUDIO_STORAGE")
   const slsResourceEvidence = resourceEvidenceById.get("R07_SLS_ALERTS")
@@ -448,15 +442,35 @@ function buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEv
     .filter((item) =>
       /^(localDockerImage\.status|image\.localDigestReady|acr\.purchaseCandidate\.confirmed|runtime\.appName|observedResourceStatus)=/.test(String(item)),
     )
+  const rdsMigrationLocal = rdsEvidence.local?.migration || {}
+  const rdsApplyCandidateReviewPlan = rdsEvidence.rdsMigrationPlan?.compatibilityReview?.rdsApplyCandidateReviewPlan || {}
+  const rdsCompatibilityLocalReviewClosed = rdsMigrationLocal.schemaCompatibilityReviewed === true &&
+    rdsMigrationLocal.supabaseSpecificSqlResolved === true &&
+    rdsMigrationLocal.rdsExtensionSupportConfirmed === true
+  const rdsCompatibilityUserMustHandle = rdsCompatibilityLocalReviewClosed ? [] : [
+    "Supabase SQL compatibility review before applying schema to Aliyun RDS",
+    "Supabase-specific auth/storage/RLS/service_role SQL rewrite or explicit resolution",
+    "Aliyun RDS PostgreSQL extension support confirmation",
+  ]
+  const rdsCompatibilityEvidenceToRecord = rdsCompatibilityLocalReviewClosed ? [
+    "schemaCompatibilityReviewed=true already recorded in local evidence",
+    "supabaseSpecificSqlResolved=true already recorded in local evidence",
+    "rdsExtensionSupportConfirmed=true already recorded in local evidence",
+  ] : [
+    "schemaCompatibilityReviewed=true",
+    "supabaseSpecificSqlResolved=true",
+    "rdsExtensionSupportConfirmed=true",
+  ]
 
   return [
     {
       id: "BAP00_READONLY_INVENTORY_IDENTITY",
       title: "Restore Aliyun CLI or CloudShell read-only inventory evidence",
+      completed: cloudInventoryReady,
       canStartAfterActionTimeConfirmation: !cloudInventoryReady,
-      requiresActionTimeConfirmation: true,
+      requiresActionTimeConfirmation: !cloudInventoryReady,
       mutationType: "readonly_inventory_identity_and_non_secret_writeback",
-      requiredAuthorizationPackets: [READONLY_INVENTORY_AUTH_PACKET],
+      requiredAuthorizationPackets: cloudInventoryReady ? [] : [READONLY_INVENTORY_AUTH_PACKET],
       consolePath: "本机 Aliyun CLI default profile 或阿里云控制台 -> CloudShell",
       currentEvidence: [
         `cloudInventoryStrictReady=${cloudInventoryReady}`,
@@ -526,6 +540,10 @@ function buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEv
         `rdsApplyCandidate.reviewPlanItemCount=${rdsEvidence.rdsMigrationPlan?.compatibilityReview?.rdsApplyCandidateReviewPlan?.itemCount || 0}`,
         `rdsApplyCandidate.reviewPlanFindingCount=${rdsEvidence.rdsMigrationPlan?.compatibilityReview?.rdsApplyCandidateReviewPlan?.findingCount || 0}`,
         `rdsApplyCandidate.reviewPlanCategories=${(rdsEvidence.rdsMigrationPlan?.compatibilityReview?.rdsApplyCandidateReviewPlan?.categories || []).join(",")}`,
+        `rdsApplyCandidate.reviewPlanResolvedItemCount=${rdsApplyCandidateReviewPlan.resolvedItemCount || 0}`,
+        `rdsApplyCandidate.reviewPlanResolvedFindingCount=${rdsApplyCandidateReviewPlan.resolvedFindingCount || 0}`,
+        `rdsApplyCandidate.reviewPlanResolvedCategories=${(rdsApplyCandidateReviewPlan.resolvedCategories || []).join(",")}`,
+        `rdsCompatibilityLocalReviewClosed=${rdsCompatibilityLocalReviewClosed}`,
         "rdsMigrationPackageHandoff=docs/app-production-cn-rds-migration-package.md",
       ],
       currentBlockers: [
@@ -546,9 +564,7 @@ function buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEv
         "RDS purchase/spec confirmation if billed",
         "database account password",
         "DATABASE_URL_CN secret value",
-        "Supabase SQL compatibility review before applying schema to Aliyun RDS",
-        "Supabase-specific auth/storage/RLS/service_role SQL rewrite or explicit resolution",
-        "Aliyun RDS PostgreSQL extension support confirmation",
+        ...rdsCompatibilityUserMustHandle,
         "Supabase export/import credentials during migration",
         "migration rollback confirmation",
       ],
@@ -557,22 +573,21 @@ function buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEv
         "database name",
         "database account ready=true",
         "DATABASE_URL_CN secret imported=true without value",
-        "schemaCompatibilityReviewed=true",
-        "supabaseSpecificSqlResolved=true",
-        "rdsExtensionSupportConfirmed=true",
+        ...rdsCompatibilityEvidenceToRecord,
         "schema/data/row-count/critical-record/rollback validation handles",
       ],
       verifyCommands: [
         "corepack pnpm aliyun:rds:migration:package",
         "corepack pnpm aliyun:rds:migration:plan",
         "corepack pnpm aliyun:rds:migration:evidence:strict",
+        "MEIYE_ALLOW_ALIYUN_RDS_RUNTIME_SMOKE=1 corepack pnpm aliyun:rds:runtime-smoke:strict",
         "corepack pnpm aliyun:backend-cn:status",
       ],
     },
     {
       id: "BAP02_OSS_RAM_STS_CLOSE",
       title: "Close OSS audio bucket RAM least privilege or STS/runtime role",
-      canStartAfterActionTimeConfirmation: immediateConsoleTasks.has("C05_OSS_AUDIO_RAM_STS"),
+      canStartAfterActionTimeConfirmation: canStartNowPackets.has("P05_OSS_RAM_STS"),
       requiresActionTimeConfirmation: true,
       mutationType: "ram_policy_binding_or_secret_runtime_role",
       requiredAuthorizationPackets: ["P05_OSS_RAM_STS"],
@@ -586,6 +601,7 @@ function buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEv
       currentBlockers: filterPresent(statusBlockers, ["OSS_RAM_STS_NOT_READY"]),
       writeTargets: [
         "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss",
+        "SAE RRSA/OIDC env ALIBABA_CLOUD_ROLE_ARN / ALIBABA_CLOUD_OIDC_PROVIDER_ARN / ALIBABA_CLOUD_OIDC_TOKEN_FILE when runtime role is used",
         "ALIYUN_OSS_ACCESS_KEY_SECRET / STS token -> KMS/Secrets Manager/SAE secret env only if runtime role is not used",
       ],
       userMustHandle: [
@@ -595,10 +611,12 @@ function buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEv
       nonSecretEvidenceToRecord: [
         "confirmed=true",
         "ramLeastPrivilege=true",
-        "runtime role or STS path selected",
+        "SAE RRSA/OIDC runtime role or STS path selected",
+        "ALIBABA_CLOUD_ROLE_ARN / ALIBABA_CLOUD_OIDC_PROVIDER_ARN / ALIBABA_CLOUD_OIDC_TOKEN_FILE runtime env set if accessMode=sae_runtime_role",
         "serviceRecordPrefix=service-records/production-cn",
       ],
       verifyCommands: [
+        "corepack pnpm aliyun:oss:runtime-access:strict",
         "corepack pnpm aliyun:cloud:confirmations",
         "corepack pnpm aliyun:backend-cn:status",
       ],
@@ -845,15 +863,16 @@ function buildApplySteps({ backendStatus, cloudActions, sensitiveBlockers, rdsEv
   }))
 }
 
-function buildUserIntervention({ sensitiveBlockers, backendStatus, cloudActions, steps = [] }) {
+function buildUserIntervention({ sensitiveBlockers, backendStatus, steps = [] }) {
   const credentialBrief = sensitiveBlockers.credentialInterventionBrief || {}
   const blockedCredentialNames = credentialBrief.blockedCredentialNames || []
   const readySecretEnvVariableNames = credentialBrief.readySecretEnvVariableNames || []
   const appLaunchDeferred = backendStatus.summary.appLaunchDeferredBlocking || []
   const completedStepIds = new Set(steps.filter((step) => step.completed).map((step) => step.id))
   const acrPurchaseCompleted = completedStepIds.has("BAP03_ACR_PURCHASE_AND_REPOSITORY")
+  const readonlyInventoryCompleted = completedStepIds.has("BAP00_READONLY_INVENTORY_IDENTITY")
   const requiredIds = [
-    "USER_CONFIRM_ALIYUN_READONLY_INVENTORY_IDENTITY",
+    readonlyInventoryCompleted ? "" : "USER_CONFIRM_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "USER_CONFIRM_RDS_PURCHASE_AND_DATABASE_PASSWORD",
     acrPurchaseCompleted ? "" : "USER_CONFIRM_ACR_PAID_PURCHASE",
     "USER_CONFIRM_OSS_RAM_STS_SECRET_OR_RUNTIME_ROLE",
@@ -871,7 +890,7 @@ function buildUserIntervention({ sensitiveBlockers, backendStatus, cloudActions,
       ...(acrPurchaseCompleted ? ["ACR Enterprise Economic cn-hangzhou 1 month CNY 117.00 paid and repository evidence recorded"] : []),
     ],
     secretOrPasswordHandling: [
-      "Aliyun CLI profile, CloudShell session, AccessKeySecret or STS token if needed for read-only inventory",
+      ...(readonlyInventoryCompleted ? [] : ["Aliyun CLI profile, CloudShell session, AccessKeySecret or STS token if needed for read-only inventory"]),
       "DATABASE_URL_CN",
       "database account password",
       "ALIYUN_OSS_ACCESS_KEY_SECRET or STS token if runtime role is not used",
@@ -888,8 +907,34 @@ function buildUserIntervention({ sensitiveBlockers, backendStatus, cloudActions,
       "WECHAT_OPEN_PLATFORM_MOBILE_APP",
       "ANDROID_RELEASE_WECHAT_SIGNATURE",
     ],
-    actionTimeCloudConsolePackets: cloudActions.summary?.cloudConsolePackets || [],
+    actionTimeCloudConsolePackets: backendStatus.actionAuthorization?.nextActionTimeConfirmationPacketIds || [],
   }
+}
+
+function firstFailureCategory(categories) {
+  const entries = Object.entries(categories || {}).filter(([, count]) => Number(count) > 0)
+  return entries[0]?.[0] || "none"
+}
+
+function buildResourceEvidenceById(backendStatus) {
+  const imagePublish = backendStatus.imagePublish || {}
+  return new Map((backendStatus.cloudResources?.rows || []).map((row) => {
+    const currentEvidence = [
+      `observedResourceStatus=${row.ready === true ? "ready" : "blocked"}`,
+      ...(row.id === "R02_ACR_IMAGE_REGISTRY" ? [
+        `image.localDigestReady=${imagePublish.localReady === true}`,
+        `image.imagePushAndDigestReady=${imagePublish.imagePushAndDigestReady === true}`,
+        `runtime.saeRuntimeImagePullReady=${imagePublish.saeRuntimeImagePullReady === true}`,
+      ] : []),
+    ]
+    const missingEvidence = row.ready === true ? [] : (row.requiredAuthorizationPackets || [])
+    return [row.id, {
+      observedStatus: row.ready === true ? "ready" : "blocked",
+      observedReadiness: row.observedReadiness || "unknown",
+      currentEvidence,
+      missingEvidence,
+    }]
+  }))
 }
 
 function filterPresent(blockerSet, names) {
@@ -987,7 +1032,7 @@ function renderMarkdown(report) {
       `- canStartAfterActionTimeConfirmation: ${step.canStartAfterActionTimeConfirmation}`,
       `- blockedUntil: ${(step.blockedUntil || []).join(", ") || "none"}`,
       `- mutationType: ${step.mutationType}`,
-      `- requiredAuthorizationPackets: ${step.requiredAuthorizationPackets.join(", ")}`,
+      `- requiredAuthorizationPackets: ${step.requiredAuthorizationPackets.join(", ") || "none"}`,
       `- consolePath: ${step.consolePath}`,
       `- currentEvidence: ${step.currentEvidence.join("; ") || "none"}`,
       `- currentBlockers: ${step.currentBlockers.join(", ") || "none"}`,
@@ -1018,7 +1063,7 @@ function renderBackendResourceEvidenceMatrix(matrix) {
   return [
     `- rows: ${matrix.length}`,
     `- immediateRows: ${matrix.filter((item) => item.canStartAfterActionTimeConfirmation).length}`,
-    `- blockedRows: ${matrix.filter((item) => !item.canStartAfterActionTimeConfirmation).length}`,
+    `- blockedRows: ${matrix.filter((item) => !item.completed && !item.canStartAfterActionTimeConfirmation).length}`,
     `- credentialOrPasswordRows: ${matrix.filter((item) => item.requiresCredentialOrPasswordHandling).length}`,
     "",
     "| order | step | phase | packets | local evidence targets | secret/password handling | verify |",
@@ -1036,8 +1081,11 @@ function renderBackendResourceEvidenceMatrix(matrix) {
 }
 
 function renderOperatorQuickStart(report) {
+  const conclusion = report.canDeployBackendNow
+    ? "当前结论：阿里云后端资源、证据和 postdeploy smoke 已闭合；正式生产发布仍需要 P09 动作时授权。"
+    : "当前结论：不能部署；这不是微信移动应用阻塞，而是阿里云后端资源和证据还没有闭环。"
   return [
-    "当前结论：不能部署；这不是微信移动应用阻塞，而是阿里云后端资源和证据还没有闭环。",
+    conclusion,
     "",
     `- current backend scope: ${report.currentScope}`,
     `- resource evidence: ${report.summary.resourceEvidenceReady}`,
@@ -1045,18 +1093,24 @@ function renderOperatorQuickStart(report) {
     `- missing backend credential/password: ${report.credentialPasswordIntervention.missingCredentialValues.names.join(", ") || "none"}`,
     `- deferred app launch items: ${report.userIntervention.deferredAppLaunchBlocking.join(", ") || "none"}`,
     "",
-    "拿到动作时授权后，本批只做这四件事：",
+    report.summary.cloudInventoryStrictReady
+      ? "P00 只读盘点已完成。拿到动作时授权后，本批继续做这三件事："
+      : "拿到动作时授权后，本批只做这四件事：",
     "",
-    "- P00: 恢复 Aliyun CLI/CloudShell 只读盘点，只运行 allowlisted List/Describe/stat/get inventory 命令，并只写非密钥 evidence。",
+    ...(report.summary.cloudInventoryStrictReady
+      ? []
+      : ["- P00: 恢复 Aliyun CLI/CloudShell 只读盘点，只运行 allowlisted List/Describe/stat/get inventory 命令，并只写非密钥 evidence。"]),
     "- P11: 创建或确认 cn-hangzhou RDS PostgreSQL、数据库、账号和网络访问策略；先记录 Supabase SQL 兼容审查、Supabase-specific SQL 处理和 RDS extension 支持，再迁移 schema/data；DATABASE_URL_CN 只进入 KMS/Secrets Manager/SAE secret env。",
-    "- P05: 确认 OSS bucket/CORS/service-records 前缀，并绑定最小权限 RAM/STS 或运行时角色。",
+    "- P05: 确认 OSS bucket/CORS/service-records 前缀，并绑定最小权限 RAM/STS 或 SAE RRSA/OIDC 运行时角色。",
     "- P04: 在已确认的 ACR 仓库中推送或导入后端镜像，校验 remote sha256 digest，并配置 SAE 镜像拉取权限；registry 密码只走受控凭证通道。",
     "",
     "本批明确不做：微信开放平台移动应用、Android release signing、Apple Team ID/AASA、再次购买 ACR、SAE runtime 创建、全量 env import、DNS/HTTPS/ICP 变更、production deploy、postdeploy smoke、git push。",
     "",
     "必须停手等用户确认的点：",
     "",
-    "- CloudShell 如出现重启实例、性能型 NAS 费用或开通提示，确认后才可继续。",
+    ...(report.summary.cloudInventoryStrictReady
+      ? ["- 如后续要刷新 CloudShell/P00 盘点，出现重启实例、性能型 NAS 费用或开通提示时必须重新确认。"]
+      : ["- CloudShell 如出现重启实例、性能型 NAS 费用或开通提示，确认后才可继续。"]),
     "- RDS 如涉及规格购买、实例费用、数据库账号密码或迁移执行，动作前确认。",
     "- ACR 购买证据已确认；P04 只处理镜像 push/import、digest 核对和 SAE 拉取配置，不再次付款。",
     "- AccessKeySecret、STS token、registry password、DATABASE_URL_CN、数据库密码、Supabase service role key 只能进入受控 secret 通道，不能写文档、JSON、镜像、shell history 或 git。",
@@ -1147,7 +1201,7 @@ function main() {
 function printHelp() {
   console.log([
     "Usage:",
-    "  node scripts/generate-aliyun-backend-apply-package.mjs [--out path] [--markdown path]",
+    "  node scripts/generate-aliyun-backend-apply-package.mjs [--env-file path] [--cloud-confirmations path] [--cloud-inventory-results path] [--rds-migration path] [--image-publish path] [--out path] [--markdown path]",
     "",
     "Builds a value-free backend-only Aliyun apply package. It does not mutate cloud resources.",
   ].join("\n"))
