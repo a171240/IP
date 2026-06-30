@@ -19,7 +19,7 @@ const REQUIRED_DOCKERFILE_SNIPPETS = [
   "RUN pnpm install --frozen-lockfile",
   "RUN pnpm build",
   "EXPOSE 3000",
-  'CMD ["pnpm", "start"]',
+  'CMD ["node", "node_modules/next/dist/bin/next", "start"]',
 ]
 
 const REQUIRED_DOCKERIGNORE_PATTERNS = [
@@ -99,6 +99,9 @@ function main() {
   const dockerfile = readText("Dockerfile")
   for (const snippet of REQUIRED_DOCKERFILE_SNIPPETS) {
     assertIncludes("dockerfile_snippet", dockerfile, snippet)
+  }
+  if (dockerfile.includes('CMD ["pnpm", "start"]')) {
+    throw new Error("unsafe_runtime_package_manager_start:pnpm")
   }
 
   const dockerignore = assertDockerignore()

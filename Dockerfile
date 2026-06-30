@@ -22,7 +22,6 @@ ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 ENV PORT=3000
-RUN corepack enable
 COPY --from=builder /app ./
 EXPOSE 3000
-CMD ["pnpm", "start"]
+CMD ["node", "node_modules/next/dist/bin/next", "start"]
