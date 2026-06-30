@@ -12,6 +12,22 @@
       "appName": "TODO_ALIYUN_APP_NAME",
       "containerPort": 3000,
       "healthPath": "/api/healthz",
+      "acrImage": "TODO_ACR_REMOTE_IMAGE_REFERENCE",
+      "imageDigest": "TODO_SHA256_DIGEST_EVIDENCE_HANDLE",
+      "imagePullConfigured": false,
+      "publicEndpoint": "TODO_SAE_PUBLIC_ENDPOINT_OR_INGRESS_EVIDENCE",
+      "runtimeRoleName": "TODO_NON_SECRET_SAE_RUNTIME_ROLE_OR_IDENTITY_NAME",
+      "envSecretSource": "TODO_SAE_OR_KMS_OR_SECRETS_MANAGER_SECRET_ENV",
+      "logProject": "meiye-huajing-app-prod-cn",
+      "logstore": "app-api",
+      "vpcId": "TODO_VPC_ID_OR_EVIDENCE_HANDLE",
+      "vswitchId": "TODO_VSWITCH_ID_OR_EVIDENCE_HANDLE",
+      "securityGroupId": "TODO_SECURITY_GROUP_ID_OR_EVIDENCE_HANDLE",
+      "cpu": "TODO_CPU_SPEC",
+      "memory": "TODO_MEMORY_SPEC",
+      "replicas": "TODO_REPLICA_COUNT",
+      "autoScaling": "TODO_AUTOSCALING_EVIDENCE",
+      "releaseStrategy": "TODO_RELEASE_STRATEGY_EVIDENCE",
       "evidence": "TODO_ALIYUN_CONSOLE_URL_OR_SCREENSHOT_ID"
     },
     "apiDomainHttps": {
@@ -20,6 +36,16 @@
       "dnsResolvedToAliyun": false,
       "httpsEnabled": false,
       "icpReady": false,
+      "dnsProvider": "Alibaba Cloud DNS",
+      "recordType": "TODO_CNAME_OR_A",
+      "recordName": "api-cn",
+      "recordValue": "TODO_SAE_OR_SLB_OR_API_GATEWAY_PUBLIC_ENDPOINT",
+      "ingressType": "sae_custom_domain",
+      "certificateId": "TODO_ALIYUN_CERTIFICATE_ID_OR_EVIDENCE_ID",
+      "certificateEvidence": "TODO_CERT_BINDING_EVIDENCE",
+      "icpEntity": "TODO_ICP_ENTITY_OR_RECORD_ID",
+      "icpEvidence": "TODO_ICP_READY_EVIDENCE",
+      "httpsProbeUrl": "https://api-cn.ipgongchang.xin/api/healthz",
       "evidence": "TODO_DNS_CERT_ICP_EVIDENCE"
     },
     "assetDomainHttps": {
@@ -28,6 +54,16 @@
       "dnsResolvedToAliyun": false,
       "httpsEnabled": false,
       "icpReady": false,
+      "dnsProvider": "Alibaba Cloud DNS",
+      "recordType": "CNAME",
+      "recordName": "assets-cn",
+      "recordValue": "TODO_CDN_OR_OSS_CUSTOM_DOMAIN_CNAME_ENDPOINT",
+      "ingressType": "cdn_custom_domain",
+      "certificateId": "TODO_ALIYUN_CERTIFICATE_ID_OR_EVIDENCE_ID",
+      "certificateEvidence": "TODO_CERT_BINDING_EVIDENCE",
+      "icpEntity": "TODO_ICP_ENTITY_OR_RECORD_ID",
+      "icpEvidence": "TODO_ICP_READY_EVIDENCE",
+      "httpsProbeUrl": "https://assets-cn.ipgongchang.xin/",
       "evidence": "TODO_ASSET_DNS_CERT_ICP_EVIDENCE"
     },
     "oss": {
@@ -37,6 +73,11 @@
       "corsConfigured": false,
       "ramLeastPrivilege": false,
       "serviceRecordPrefix": "service-records/production-cn",
+      "accessMode": "TODO_sae_runtime_role_OR_sts_assume_role_OR_least_privilege_ram_user_secret_env",
+      "roleOrUserName": "TODO_NON_SECRET_ROLE_OR_RAM_USER_NAME",
+      "policyName": "MeiyeHuajingServiceRecordsOssPolicy",
+      "secretEnvNames": [],
+      "credentialBoundary": "TODO_runtime_role_no_long_lived_secret_OR_sts_token_secret_env_only_OR_access_key_secret_env_only",
       "evidence": "TODO_OSS_CORS_RAM_EVIDENCE"
     },
     "wechatOpenPlatform": {
@@ -61,13 +102,51 @@
       "target": "TODO_SAE_OR_KMS_OR_SECRETS_MANAGER",
       "importedAt": "TODO_YYYY-MM-DDTHH:mm:ss+08:00",
       "secretNotInImage": false,
+      "importMode": "backend_aliyun_only_secret_env_batches",
+      "secretEnvStore": "TODO_KMS_OR_SECRETS_MANAGER_OR_SAE_SECRET_ENV",
+      "secretEnvScope": "backend_aliyun_only",
+      "readySecretEnvVariableCount": 17,
+      "readySecretEnvVariableGroupCount": 9,
+      "blockedCredentialNames": [
+        "DATABASE_URL_CN"
+      ],
+      "blockedSecretBatchIds": [
+        "BLOCKED_SECRET_BATCH_01_OSS_RAM_STS",
+        "BLOCKED_SECRET_BATCH_02_RDS_DATABASE_SECRET_AND_MIGRATION"
+      ],
+      "readySecretBatchIds": [
+        "READY_SECRET_BATCH_01_LEGACY_DATABASE_MIGRATION_SOURCE",
+        "READY_SECRET_BATCH_02_APP_AUTH",
+        "READY_SECRET_BATCH_03_ALIYUN_OSS",
+        "READY_SECRET_BATCH_04_BAILIAN_ASR",
+        "READY_SECRET_BATCH_05_DEEPSEEK_SUMMARY",
+        "READY_SECRET_BATCH_06_VOLC_SPEECH",
+        "READY_SECRET_BATCH_07_BACKEND_OPS",
+        "READY_SECRET_BATCH_08_LEGACY_CONTENT_PROVIDER",
+        "READY_SECRET_BATCH_09_MINI_PROGRAM_COMPAT"
+      ],
+      "importBatchCount": 11,
+      "rdsSecretImported": false,
+      "ossSecretsImported": false,
+      "readySecretsImported": false,
+      "imageContainsSecrets": false,
+      "deferredAppLaunchExcluded": true,
+      "importBatchEvidence": "TODO_BACKEND_ENV_IMPORT_BATCH_EVIDENCE",
       "evidence": "TODO_ENV_IMPORT_EVIDENCE"
     },
     "slsAlerts": {
       "confirmed": false,
       "slsProject": "TODO_SLS_PROJECT",
+      "region": "TODO_SLS_REGION",
+      "logstore": "TODO_SLS_LOGSTORE",
       "healthAlertConfigured": false,
       "serverErrorAlertConfigured": false,
+      "healthAlertName": "TODO_HEALTH_ALERT_RULE_NAME",
+      "serverErrorAlertName": "TODO_5XX_ALERT_RULE_NAME",
+      "requestLogQuery": "TODO_SAVED_QUERY_OR_QUERY_EVIDENCE",
+      "dashboardName": "TODO_DASHBOARD_NAME_OR_EVIDENCE",
+      "notificationChannel": "TODO_NON_SECRET_CONTACT_GROUP_OR_CHANNEL_EVIDENCE",
+      "retentionDays": "TODO_LOG_RETENTION_DAYS",
       "evidence": "TODO_SLS_ALERT_EVIDENCE"
     }
   }

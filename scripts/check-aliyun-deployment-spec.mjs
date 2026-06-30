@@ -14,6 +14,8 @@ const DEFAULT_SPEC_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.exa
 const REQUIRED_PREDEPLOY_CHECKS = [
   "corepack pnpm aliyun:deploy:spec",
   "corepack pnpm aliyun:image:plan",
+  "corepack pnpm aliyun:acr:transfer-handoff",
+  "corepack pnpm aliyun:sae:runtime-handoff",
   "corepack pnpm aliyun:legal:check",
   "corepack pnpm aliyun:operator:tasks",
   "corepack pnpm aliyun:sensitive:blockers",
@@ -28,6 +30,8 @@ const REQUIRED_PREDEPLOY_CHECKS = [
   "corepack pnpm aliyun:rds:route-map",
   "corepack pnpm aliyun:rds:migration:package",
   "corepack pnpm aliyun:rds:migration:evidence",
+  "corepack pnpm aliyun:rds:runtime-smoke",
+  "corepack pnpm aliyun:oss:runtime-access",
   "corepack pnpm aliyun:backend-cn:status",
   "corepack pnpm aliyun:backend-cn:apply-package",
   "corepack pnpm aliyun:operator:tasks:backend",
