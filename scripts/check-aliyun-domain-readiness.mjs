@@ -19,6 +19,20 @@ const OLD_VERCEL_HOSTS = new Set([
 ])
 const EXPECTED_API_HOST = "api-cn.ipgongchang.xin"
 const EXPECTED_ASSET_HOST = "assets-cn.ipgongchang.xin"
+const PUBLIC_DOH_RESOLVERS = [
+  {
+    id: "alidns",
+    url: "https://dns.alidns.com/resolve",
+    headers: {},
+  },
+  {
+    id: "cloudflare",
+    url: "https://cloudflare-dns.com/dns-query",
+    headers: {
+      accept: "application/dns-json",
+    },
+  },
+]
 
 const ENV_TARGETS = [
   {
@@ -233,33 +247,48 @@ function validateUrl(target) {
 }
 
 async function resolveDns(hostname) {
-  const [a, aaaa, cname, wildcardProbe] = await Promise.all([
+  const [a, aaaa, cname, wildcardProbe, publicDoh] = await Promise.all([
     safeDns(() => resolve4(hostname)),
     safeDns(() => resolve6(hostname)),
     safeDns(() => resolveCname(hostname)),
     resolveWildcardDns(hostname),
+    resolvePublicDoh(hostname),
   ])
-  const records = {
+  const localRecords = {
     A: a.records,
     AAAA: aaaa.records,
     CNAME: cname.records,
   }
-  const errors = {
+  const localErrors = {
     A: a.error,
     AAAA: aaaa.error,
     CNAME: cname.error,
   }
+  const usePublicDoh = publicDoh.checked
+  const records = usePublicDoh ? publicDoh.records : localRecords
+  const errors = usePublicDoh ? publicDoh.errors : localErrors
   const allRecords = [...records.A, ...records.AAAA, ...records.CNAME]
+  const localAllRecords = [...localRecords.A, ...localRecords.AAAA, ...localRecords.CNAME]
   const specialUseRecords = [...records.A, ...records.AAAA].filter((record) => isSpecialUseIp(record))
+  const localSpecialUseRecords = [...localRecords.A, ...localRecords.AAAA].filter((record) => isSpecialUseIp(record))
   const pointsToVercel = allRecords.some((record) => String(record).toLowerCase().includes("vercel"))
   return {
     ready: allRecords.length > 0 && !pointsToVercel && specialUseRecords.length === 0,
+    evidenceSource: usePublicDoh ? "public_doh" : "local_resolver",
     recordCount: allRecords.length,
     records,
     errors,
     specialUseRecords,
     pointsToVercel,
     wildcardProbe,
+    publicDoh,
+    localResolver: {
+      recordCount: localAllRecords.length,
+      records: localRecords,
+      errors: localErrors,
+      specialUseRecords: localSpecialUseRecords,
+      pollutedBySpecialUse: localSpecialUseRecords.length > 0 && publicDoh.checked,
+    },
   }
 }
 
@@ -279,31 +308,47 @@ async function resolveWildcardDns(hostname) {
 
   const nonce = new Date().toISOString().slice(0, 10).replace(/-/g, "")
   const host = `wildcard-proof-${nonce}.${baseDomain}`
-  const [a, aaaa, cname] = await Promise.all([
+  const [a, aaaa, cname, publicDoh] = await Promise.all([
     safeDns(() => resolve4(host)),
     safeDns(() => resolve6(host)),
     safeDns(() => resolveCname(host)),
+    resolvePublicDoh(host),
   ])
-  const records = {
+  const localRecords = {
     A: a.records,
     AAAA: aaaa.records,
     CNAME: cname.records,
   }
-  const errors = {
+  const localErrors = {
     A: a.error,
     AAAA: aaaa.error,
     CNAME: cname.error,
   }
+  const usePublicDoh = publicDoh.checked
+  const records = usePublicDoh ? publicDoh.records : localRecords
+  const errors = usePublicDoh ? publicDoh.errors : localErrors
   const allRecords = [...records.A, ...records.AAAA, ...records.CNAME]
+  const localAllRecords = [...localRecords.A, ...localRecords.AAAA, ...localRecords.CNAME]
   const specialUseRecords = [...records.A, ...records.AAAA].filter((record) => isSpecialUseIp(record))
+  const localSpecialUseRecords = [...localRecords.A, ...localRecords.AAAA].filter((record) => isSpecialUseIp(record))
   return {
     checked: true,
     host,
+    evidenceSource: usePublicDoh ? "public_doh" : "local_resolver",
     recordCount: allRecords.length,
     records,
     errors,
     specialUseRecords,
     detected: allRecords.length > 0,
+    publicDoh,
+    localResolver: {
+      recordCount: localAllRecords.length,
+      records: localRecords,
+      errors: localErrors,
+      specialUseRecords: localSpecialUseRecords,
+      pollutedBySpecialUse: localSpecialUseRecords.length > 0 && publicDoh.checked,
+      detected: localAllRecords.length > 0,
+    },
   }
 }
 
@@ -361,12 +406,108 @@ async function safeDns(fn) {
   }
 }
 
-function httpsProbe(parsed, probePath, timeoutMs) {
+async function resolvePublicDoh(hostname) {
+  const results = await Promise.all(PUBLIC_DOH_RESOLVERS.map((resolver) => queryDohResolver(resolver, hostname)))
+  const answered = results.find((result) => result.ok && result.recordCount > 0)
+  const resolved = answered || results.find((result) => result.ok) || results[0]
+  if (!resolved || !resolved.ok) {
+    return {
+      checked: false,
+      source: "",
+      statusCode: 0,
+      records: { A: [], AAAA: [], CNAME: [] },
+      errors: { A: "doh_unavailable", AAAA: "doh_unavailable", CNAME: "doh_unavailable" },
+      resolvers: results,
+    }
+  }
+  return {
+    checked: true,
+    source: resolved.source,
+    statusCode: resolved.statusCode,
+    records: resolved.records,
+    errors: resolved.errors,
+    resolvers: results,
+  }
+}
+
+async function queryDohResolver(resolver, hostname) {
+  try {
+    const url = new URL(resolver.url)
+    url.searchParams.set("name", hostname)
+    url.searchParams.set("type", "A")
+    const response = await fetch(url, {
+      headers: resolver.headers,
+      signal: AbortSignal.timeout(5000),
+    })
+    if (!response.ok) throw new Error(`http_${response.status}`)
+    const payload = await response.json()
+    return normalizeDohPayload(resolver.id, payload)
+  } catch (error) {
+    return {
+      ok: false,
+      source: resolver.id,
+      statusCode: 0,
+      recordCount: 0,
+      records: { A: [], AAAA: [], CNAME: [] },
+      errors: {
+        A: error?.code || error?.message || "doh_query_error",
+        AAAA: error?.code || error?.message || "doh_query_error",
+        CNAME: error?.code || error?.message || "doh_query_error",
+      },
+    }
+  }
+}
+
+function normalizeDohPayload(source, payload) {
+  const records = { A: [], AAAA: [], CNAME: [] }
+  for (const answer of payload?.Answer || []) {
+    if (answer?.type === 1) records.A.push(String(answer.data || "").trim())
+    if (answer?.type === 28) records.AAAA.push(String(answer.data || "").trim())
+    if (answer?.type === 5) records.CNAME.push(String(answer.data || "").trim().replace(/\.$/, ""))
+  }
+  records.A = records.A.filter(Boolean)
+  records.AAAA = records.AAAA.filter(Boolean)
+  records.CNAME = records.CNAME.filter(Boolean)
+  const recordCount = records.A.length + records.AAAA.length + records.CNAME.length
+  const statusCode = Number(payload?.Status ?? 0)
+  const error = recordCount > 0 ? "" : dohStatusText(statusCode)
+  return {
+    ok: true,
+    source,
+    statusCode,
+    recordCount,
+    records,
+    errors: {
+      A: records.A.length ? "" : error,
+      AAAA: records.AAAA.length ? "" : error,
+      CNAME: records.CNAME.length ? "" : error,
+    },
+  }
+}
+
+function dohStatusText(statusCode) {
+  if (statusCode === 0) return "NOERROR_EMPTY"
+  if (statusCode === 3) return "NXDOMAIN"
+  return `DNS_STATUS_${statusCode}`
+}
+
+function httpsProbe(parsed, probePath, timeoutMs, dns = null) {
   const probeUrl = new URL(probePath, parsed.origin)
+  const forcedARecord = (dns?.records?.A || []).find((record) => !isSpecialUseIp(record))
   return new Promise((resolveProbe) => {
     const req = request(probeUrl, {
       method: "GET",
       timeout: timeoutMs,
+      servername: parsed.hostname,
+      ...(forcedARecord ? {
+        lookup: (_hostname, options, callback) => {
+          if (options?.all) {
+            callback(null, [{ address: forcedARecord, family: 4 }])
+            return
+          }
+          callback(null, forcedARecord, 4)
+        },
+      } : {}),
       headers: {
         accept: "application/json,text/plain,*/*",
         "user-agent": "meiye-aliyun-domain-readiness/1.0",
@@ -418,10 +559,8 @@ async function checkTarget(target, args) {
     }
   }
 
-  const [dns, https] = await Promise.all([
-    resolveDns(url.parsed.hostname),
-    httpsProbe(url.parsed, target.probePath, args.timeoutMs),
-  ])
+  const dns = await resolveDns(url.parsed.hostname)
+  const https = await httpsProbe(url.parsed, target.probePath, args.timeoutMs, dns)
 
   const blocking = [...url.blocking]
   if (!dns.ready) {
@@ -470,7 +609,14 @@ function nextActions(blocking) {
     actions.push("把 APP production-cn 正式入口切到 api-cn/assets-cn HTTPS 域名，不使用旧 Vercel 域名。")
   }
   if (blocking.some((item) => item.includes("dns_not_ready"))) {
-    actions.push("在阿里云 DNS 为 api-cn/assets-cn 添加解析，指向 SAE/SLB 或 OSS/CDN 入口。")
+    const apiDnsNotReady = blocking.some((item) =>
+      item.includes("APP_API_BASE_URL:dns_not_ready") || item.includes("NEXT_PUBLIC_SITE_URL:dns_not_ready"))
+    const assetDnsNotReady = blocking.some((item) => item.includes("APP_ASSET_BASE_URL:dns_not_ready"))
+    if (assetDnsNotReady && !apiDnsNotReady) {
+      actions.push("api-cn 公网 DNS 已指向阿里云入口；继续在阿里云 DNS 为 assets-cn 添加解析，指向 OSS/CDN 静态资源入口。")
+    } else {
+      actions.push("在阿里云 DNS 为 api-cn/assets-cn 添加解析，指向 SAE/SLB 或 OSS/CDN 入口。")
+    }
   }
   if (blocking.some((item) => item.includes("dns_special_use_wildcard_ip"))) {
     actions.push("api-cn/assets-cn 当前命中 198.18.0.0/15 这类特殊用途占位解析，且随机子域也返回特殊用途地址；先清理泛解析/占位解析，再指向 SAE/SLB 或 OSS/CDN 公网入口。")
@@ -500,10 +646,14 @@ function buildDomainCutoverPlan(checkedTargets, blocking) {
   const assetTargets = targetsByHost.get(EXPECTED_ASSET_HOST) || []
   const wildcardPlaceholderDetected = checkedTargets.some((target) =>
     (target.dns?.wildcardProbe?.specialUseRecords || []).length > 0)
+  const localResolverPollutionDetected = checkedTargets.some((target) =>
+    target.dns?.localResolver?.pollutedBySpecialUse ||
+    target.dns?.wildcardProbe?.localResolver?.pollutedBySpecialUse)
 
   return {
     ready: blocking.length === 0,
     wildcardPlaceholderDetected,
+    localResolverPollutionDetected,
     targetHosts: [
       {
         id: "apiDomainHttps",
@@ -518,7 +668,7 @@ function buildDomainCutoverPlan(checkedTargets, blocking) {
         writeTarget: "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps",
         prerequisites: [
           "SAE production-cn backend runtime has a public ingress or bound custom domain target",
-          "Wildcard/special-use placeholder DNS no longer catches api-cn",
+          "Public DoH resolves api-cn to the Aliyun public ingress",
           "Aliyun SSL certificate is bound to the API ingress",
           "ICP readiness evidence is available",
         ],
@@ -537,7 +687,7 @@ function buildDomainCutoverPlan(checkedTargets, blocking) {
         writeTarget: "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps",
         prerequisites: [
           "OSS/CDN asset origin is confirmed for production-cn",
-          "Wildcard/special-use placeholder DNS no longer catches assets-cn",
+          "Public DoH resolves assets-cn to the selected OSS/CDN asset endpoint",
           "Aliyun SSL certificate is bound to the asset endpoint",
           "ICP readiness evidence is available",
         ],

@@ -5,11 +5,17 @@ const path = require("node:path")
 
 const root = process.cwd()
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), "utf8")
-const readJson = (...parts) => JSON.parse(read(...parts))
 
-test("Aliyun domain readiness detects special-use wildcard placeholders", () => {
+test("Aliyun domain readiness uses public DoH while retaining local DNS pollution diagnostics", () => {
   const source = read("scripts", "check-aliyun-domain-readiness.mjs")
 
+  assert.match(source, /PUBLIC_DOH_RESOLVERS/)
+  assert.match(source, /async function resolvePublicDoh/)
+  assert.match(source, /function normalizeDohPayload/)
+  assert.match(source, /evidenceSource: usePublicDoh \? "public_doh" : "local_resolver"/)
+  assert.match(source, /localResolver/)
+  assert.match(source, /pollutedBySpecialUse/)
+  assert.match(source, /httpsProbe\(url\.parsed, target\.probePath, args\.timeoutMs, dns\)/)
   assert.match(source, /async function resolveWildcardDns/)
   assert.match(source, /function baseDomainFromHostname/)
   assert.match(source, /wildcard-proof-\$\{nonce\}\.\$\{baseDomain\}/)
@@ -27,29 +33,31 @@ test("Aliyun domain readiness detects special-use wildcard placeholders", () => 
 
 test("Aliyun domain readiness exposes P07 non-secret cutover writeback fields", () => {
   const source = read("scripts", "check-aliyun-domain-readiness.mjs")
-  const template = readJson("deploy", "aliyun-production-cn.cloud-confirmations.example.json")
 
   assert.match(source, /items\.apiDomainHttps/)
   assert.match(source, /items\.assetDomainHttps/)
   assert.match(source, /recordValue/)
+  assert.match(source, /api_sae_custom_domain/)
+  assert.match(source, /asset_cdn_custom_domain/)
+  assert.match(source, /asset_oss_custom_domain/)
   assert.match(source, /httpsProbeUrl: `https:\/\/\$\{EXPECTED_API_HOST\}\/api\/healthz`/)
   assert.match(source, /httpsProbeUrl: `https:\/\/\$\{EXPECTED_ASSET_HOST\}\/`/)
-  assert.equal(template.items.apiDomainHttps.ingressType, "sae_custom_domain")
-  assert.equal(template.items.apiDomainHttps.recordName, "api-cn")
-  assert.equal(template.items.apiDomainHttps.httpsProbeUrl, "https://api-cn.ipgongchang.xin/api/healthz")
-  assert.equal(template.items.assetDomainHttps.ingressType, "cdn_custom_domain")
-  assert.equal(template.items.assetDomainHttps.recordName, "assets-cn")
-  assert.equal(template.items.assetDomainHttps.httpsProbeUrl, "https://assets-cn.ipgongchang.xin/")
+  assert.match(source, /Public DoH resolves api-cn to the Aliyun public ingress/)
+  assert.match(source, /Public DoH resolves assets-cn to the selected OSS\/CDN asset endpoint/)
 })
 
-test("Aliyun deployment docs record current api-cn and assets-cn wildcard blocker", () => {
+test("Aliyun deployment docs record current DoH-based P07 state", () => {
   const deployDoc = read("docs", "DEPLOY_ALIYUN_PRODUCTION_CN.md")
   const releaseManifest = read("docs", "release-manifest-2026-06-21-app-aliyun-production-cn-bridge.md")
 
-  assert.match(deployDoc, /`?api-cn\/assets-cn`? 当前命中 `?198\.18\.0\.0\/15`?/)
-  assert.match(deployDoc, /随机子域也返回特殊用途地址/)
-  assert.match(releaseManifest, /`?api-cn\/assets-cn`? 当前命中 `?198\.18\.0\.0\/15`?/)
-  assert.match(releaseManifest, /阿里云 DNS 控制台[\s\S]{0,80}未显示显式 api-cn\/assets-cn 记录/)
+  assert.match(deployDoc, /DoH 显示 `api-cn\.ipgongchang\.xin -> 47\.111\.169\.95`/)
+  assert.match(deployDoc, /`assets-cn\.ipgongchang\.xin -> 47\.111\.169\.95`/)
+  assert.match(deployDoc, /`icpReady` 和域名组 `confirmed` 仍保持 false/)
+  assert.match(deployDoc, /本机 `dig` 返回的 `198\.18\.\*` 是当前本机网络\/代理解析污染提示/)
+  assert.match(releaseManifest, /当前 DoH 结果为 `api-cn\.ipgongchang\.xin -> 47\.111\.169\.95`/)
+  assert.match(releaseManifest, /`assets-cn\.ipgongchang\.xin -> 47\.111\.169\.95`/)
+  assert.match(releaseManifest, /targetReady=2\/2/)
+  assert.match(releaseManifest, /localResolver\.pollutedBySpecialUse/)
 })
 
 test("Aliyun domain docs reject legacy api/ip records as APP production-cn evidence", () => {

@@ -590,6 +590,8 @@ api-cn.ipgongchang.xin
 
 2026-06-22 19:17 CST 只读复核：阿里云 DNS 详情页显示存在旧 `api` / `ip` A 记录，均指向 `106.14.241.129`。这两个记录不是 `api-cn` 或 `assets-cn` 主机记录，不能作为 APP production-cn 的 API 域名或资产域名 ready 证据；后续必须分别创建/确认 `api-cn.ipgongchang.xin` 和 `assets-cn.ipgongchang.xin`，并补 DNS、HTTPS 和 ICP 证据。
 
+2026-06-29 CST P07 复核：`aliyun:domain:check` 已改用公网 DoH 作为 DNS 证据源，并保留本机 resolver 诊断。DoH 显示 `api-cn.ipgongchang.xin -> 47.111.169.95`、`assets-cn.ipgongchang.xin -> 47.111.169.95`，均指向 SAE/CLB 公网 IP；本机 `dig` 返回的 `198.18.*` 是当前本机网络/代理解析污染提示，不再作为公网 DNS blocker。HTTPS 已通过 Let's Encrypt RSA 通配证书绑定到 SLB 443，`api-cn` 和 `assets-cn` 均返回 HTTP 200；但没有查到官方 ICP 备案号，因此 `icpReady` 和域名组 `confirmed` 仍保持 false。`assets-cn` 当前是 SAE/CLB 共享静态兜底入口，不是 CDN 或 OSS 自定义域证据。
+
 机器检查：
 
 ```bash
@@ -1094,6 +1096,8 @@ APP_ASSET_BASE_URL: assets-cn.ipgongchang.xin -> A 198.18.0.6, dns_special_use_i
 
 因此当前域名不是 production ready。下一步需要把 `api-cn` / `assets-cn` 解析到公网可访问的阿里云 SAE/SLB 或 OSS/CDN 入口，并配置 HTTPS 证书；之后再跑 `corepack pnpm aliyun:domain:strict`。
 
+2026-06-29 CST 更新：当前公网 DoH 已证明 `api-cn.ipgongchang.xin` 和 `assets-cn.ipgongchang.xin` 均解析到 `47.111.169.95`，HTTPS 探测均返回 200。当前不是“DNS/HTTPS 未接通”阻塞，而是官方 ICP 备案证据尚未写回；`assets-cn` 仍只是 SAE/CLB 静态兜底入口，后续如要正式改为 CDN/OSS 自定义域，需要单独开通并替换证据。
+
 `aliyun:cloud:check` 当前云确认状态：
 
 ```text
@@ -1109,7 +1113,7 @@ envImport missing: confirmed, secretNotInImage
 slsAlerts missing: confirmed, healthAlertConfigured, serverErrorAlertConfigured
 ```
 
-`APP_ASSET_BASE_URL` 已按 `https://assets-cn.ipgongchang.xin` 写入本地配置，但资产域名、HTTPS/ICP 和 OSS/CDN 仍未人工确认为 production ready；`assetDomainHttps` 必须单独确认，不能复用 `apiDomainHttps` 的证据。`corepack pnpm aliyun:cloud:confirmations:strict` 现在也会校验 OSS region 必须为 `cn-hangzhou`，北京 Bucket 只能作为“已发现资源但未满足目标地域”的证据。
+`APP_ASSET_BASE_URL` 已按 `https://assets-cn.ipgongchang.xin` 写入本地配置，当前 DNS/HTTPS 已接到阿里云 CLB 并通过探测；ICP 仍未官方确认，且当前不是 CDN/OSS 自定义域。`assetDomainHttps` 必须单独确认，不能复用 `apiDomainHttps` 的证据。`corepack pnpm aliyun:cloud:confirmations:strict` 现在也会校验 OSS region 必须为 `cn-hangzhou`，北京 Bucket 只能作为“已发现资源但未满足目标地域”的证据。
 
 最新发布审计产物：
 
