@@ -1,0 +1,219 @@
+{
+  "schemaVersion": 1,
+  "environment": "production-cn",
+  "updatedAt": "2026-06-30T00:00:00+08:00",
+  "operator": "codex-static-fixture",
+  "sourcePlanCommand": "corepack pnpm aliyun:cloud:inventory-plan",
+  "notes": "Tracked non-secret fixture for clean static tests. It records read-only inventory shapes only and is not production evidence.",
+  "operations": [
+    {
+      "id": "I01_SAE_RUNTIME",
+      "title": "SAE production-cn runtime inventory",
+      "product": "sae",
+      "readOnly": true,
+      "status": "observed",
+      "commandResults": [
+        {
+          "command": "aliyun sae ListApplications --region cn-hangzhou",
+          "executed": true,
+          "exitStatus": 0,
+          "cloudApiCalled": true,
+          "mutationPerformed": false,
+          "observedAt": "2026-06-30T00:00:00+08:00",
+          "outputSummary": "fixture_observed_runtime_shape_without_values",
+          "evidence": "fixture_sae_runtime_inventory"
+        }
+      ],
+      "writesTo": [
+        "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.runtime"
+      ],
+      "evidence": "fixture_sae_runtime_inventory"
+    },
+    {
+      "id": "I02_ACR_IMAGE",
+      "title": "ACR repository and production-cn image inventory",
+      "product": "cr",
+      "readOnly": true,
+      "status": "observed",
+      "commandResults": [
+        {
+          "command": "aliyun cr ListInstance --region cn-hangzhou",
+          "executed": true,
+          "exitStatus": 0,
+          "cloudApiCalled": true,
+          "mutationPerformed": false,
+          "observedAt": "2026-06-30T00:00:00+08:00",
+          "outputSummary": "fixture_observed_acr_shape_without_values",
+          "evidence": "fixture_acr_inventory"
+        }
+      ],
+      "writesTo": [
+        "deploy/aliyun-production-cn.image-publish.local.json -> acr",
+        "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.acr"
+      ],
+      "evidence": "fixture_acr_inventory"
+    },
+    {
+      "id": "I03_DNS_API_DOMAIN",
+      "title": "api-cn DNS and HTTPS route inventory",
+      "product": "alidns",
+      "readOnly": true,
+      "status": "observed",
+      "commandResults": [
+        {
+          "command": "aliyun alidns DescribeSubDomainRecords --SubDomain api-cn.ipgongchang.xin",
+          "executed": true,
+          "exitStatus": 0,
+          "cloudApiCalled": true,
+          "mutationPerformed": false,
+          "observedAt": "2026-06-30T00:00:00+08:00",
+          "outputSummary": "fixture_observed_api_domain_shape_without_values",
+          "evidence": "fixture_api_domain_inventory"
+        }
+      ],
+      "writesTo": [
+        "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps"
+      ],
+      "evidence": "fixture_api_domain_inventory"
+    },
+    {
+      "id": "I04_DNS_ASSET_DOMAIN",
+      "title": "assets-cn DNS and HTTPS route inventory",
+      "product": "alidns",
+      "readOnly": true,
+      "status": "observed",
+      "commandResults": [
+        {
+          "command": "aliyun alidns DescribeSubDomainRecords --SubDomain assets-cn.ipgongchang.xin",
+          "executed": true,
+          "exitStatus": 0,
+          "cloudApiCalled": true,
+          "mutationPerformed": false,
+          "observedAt": "2026-06-30T00:00:00+08:00",
+          "outputSummary": "fixture_observed_asset_domain_shape_without_values",
+          "evidence": "fixture_asset_domain_inventory"
+        }
+      ],
+      "writesTo": [
+        "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps"
+      ],
+      "evidence": "fixture_asset_domain_inventory"
+    },
+    {
+      "id": "I05_OSS_AUDIO_BUCKET",
+      "title": "OSS service-record audio bucket inventory",
+      "product": "oss",
+      "readOnly": true,
+      "status": "observed",
+      "commandResults": [
+        {
+          "command": "aliyun oss stat oss://meiye-huajing-service-records-production-cn",
+          "executed": true,
+          "exitStatus": 0,
+          "cloudApiCalled": true,
+          "mutationPerformed": false,
+          "observedAt": "2026-06-30T00:00:00+08:00",
+          "outputSummary": "fixture_observed_oss_shape_without_values",
+          "evidence": "fixture_oss_inventory"
+        }
+      ],
+      "writesTo": [
+        "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss"
+      ],
+      "evidence": "fixture_oss_inventory"
+    },
+    {
+      "id": "I06_SLS_ALERTS",
+      "title": "SLS project, logstore, and alert inventory",
+      "product": "sls",
+      "readOnly": true,
+      "status": "observed",
+      "commandResults": [
+        {
+          "command": "aliyun sls ListProject --region cn-hangzhou",
+          "executed": true,
+          "exitStatus": 0,
+          "cloudApiCalled": true,
+          "mutationPerformed": false,
+          "observedAt": "2026-06-30T00:00:00+08:00",
+          "outputSummary": "fixture_observed_sls_shape_without_values",
+          "evidence": "fixture_sls_inventory"
+        }
+      ],
+      "writesTo": [
+        "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.slsAlerts"
+      ],
+      "evidence": "fixture_sls_inventory"
+    },
+    {
+      "id": "I07_CERT_HTTPS",
+      "title": "HTTPS certificate inventory",
+      "product": "cas",
+      "readOnly": true,
+      "status": "observed",
+      "commandResults": [
+        {
+          "command": "aliyun cas ListUserCertificateOrder --region cn-hangzhou",
+          "executed": true,
+          "exitStatus": 0,
+          "cloudApiCalled": true,
+          "mutationPerformed": false,
+          "observedAt": "2026-06-30T00:00:00+08:00",
+          "outputSummary": "fixture_observed_certificate_shape_without_values",
+          "evidence": "fixture_certificate_inventory"
+        }
+      ],
+      "writesTo": [
+        "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps",
+        "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps"
+      ],
+      "evidence": "fixture_certificate_inventory"
+    },
+    {
+      "id": "I08_RDS_POSTGRES",
+      "title": "RDS PostgreSQL production-cn data-layer inventory",
+      "product": "rds",
+      "readOnly": true,
+      "status": "observed",
+      "commandResults": [
+        {
+          "command": "aliyun rds DescribeDBInstances --RegionId cn-hangzhou --Engine PostgreSQL",
+          "executed": true,
+          "exitStatus": 0,
+          "cloudApiCalled": true,
+          "mutationPerformed": false,
+          "observedAt": "2026-06-30T00:00:00+08:00",
+          "outputSummary": "fixture_observed_rds_shape_without_values",
+          "evidence": "fixture_rds_inventory"
+        }
+      ],
+      "writesTo": [
+        "release artifacts -> bridgeDataLayer.databaseUrlCnStatus"
+      ],
+      "evidence": "fixture_rds_inventory"
+    },
+    {
+      "id": "I09_TAIR_REDIS",
+      "title": "Redis/Tair production-cn cache inventory",
+      "product": "r-kvstore",
+      "readOnly": true,
+      "status": "observed",
+      "commandResults": [
+        {
+          "command": "aliyun r-kvstore DescribeInstances --RegionId cn-hangzhou",
+          "executed": true,
+          "exitStatus": 0,
+          "cloudApiCalled": true,
+          "mutationPerformed": false,
+          "observedAt": "2026-06-30T00:00:00+08:00",
+          "outputSummary": "fixture_observed_cache_shape_without_values",
+          "evidence": "fixture_cache_inventory"
+        }
+      ],
+      "writesTo": [
+        "release artifacts -> bridgeDataLayer.redisUrlCnStatus"
+      ],
+      "evidence": "fixture_cache_inventory"
+    }
+  ]
+}

@@ -4,6 +4,7 @@ import { writeFileSync } from "node:fs"
 import { spawnSync } from "node:child_process"
 import { dirname, isAbsolute, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
+import { buildImportPlan, parseEnvFile } from "./prepare-aliyun-runtime-env.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -13,6 +14,8 @@ const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
 const DEFAULT_CLOUD_INVENTORY_RESULTS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-inventory-results.local.json")
 const DEFAULT_RDS_MIGRATION_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.rds-migration.local.json")
+const DEFAULT_IMAGE_PUBLISH_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.image-publish.local.json")
+const DEFAULT_CHILD_TIMEOUT_MS = 120_000
 const READONLY_INVENTORY_AUTH_PACKET = "P00_ALIYUN_READONLY_INVENTORY_IDENTITY"
 const BACKEND_BASE_CAN_START_PACKET_IDS = Object.freeze([
   "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
@@ -75,11 +78,13 @@ function parseArgs(argv) {
     cloudConfirmationsFile: DEFAULT_CLOUD_CONFIRMATIONS_FILE,
     cloudInventoryResultsFile: DEFAULT_CLOUD_INVENTORY_RESULTS_FILE,
     rdsMigrationFile: DEFAULT_RDS_MIGRATION_FILE,
+    imagePublishFile: DEFAULT_IMAGE_PUBLISH_FILE,
     outPath: "",
     markdownPath: "",
     skipVercelEnvCoverage: false,
     vercelEnvCoverageInput: "",
     backendOnly: false,
+    childTimeoutMs: DEFAULT_CHILD_TIMEOUT_MS,
   }
 
   for (let index = 2; index < argv.length; index += 1) {
@@ -101,6 +106,10 @@ function parseArgs(argv) {
       args.rdsMigrationFile = resolveValue(argv[++index], "--rds-migration")
       continue
     }
+    if (arg === "--image-publish") {
+      args.imagePublishFile = resolveValue(argv[++index], "--image-publish")
+      continue
+    }
     if (arg === "--out") {
       args.outPath = resolveValue(argv[++index], "--out")
       continue
@@ -115,6 +124,10 @@ function parseArgs(argv) {
     }
     if (arg === "--backend-only") {
       args.backendOnly = true
+      continue
+    }
+    if (arg === "--child-timeout-ms") {
+      args.childTimeoutMs = parsePositiveInteger(argv[++index], "--child-timeout-ms")
       continue
     }
     if (arg === "--vercel-env-coverage-input") {
@@ -136,15 +149,30 @@ function resolveValue(value, name) {
   return isAbsolute(value) ? value : resolve(process.cwd(), value)
 }
 
-function runJson(label, scriptArgs) {
+function parsePositiveInteger(value, name) {
+  const parsed = Number.parseInt(value, 10)
+  if (!Number.isFinite(parsed) || parsed <= 0) throw new Error(`invalid_positive_integer:${name}`)
+  return parsed
+}
+
+function summarizeChildOutput(value) {
+  return String(value || "").split(/\r?\n/).filter(Boolean).slice(0, 8).join(" | ")
+}
+
+function runJson(label, scriptArgs, args) {
   const result = spawnSync(process.execPath, scriptArgs, {
     cwd: BACKEND_ROOT,
     encoding: "utf8",
     maxBuffer: 1024 * 1024 * 40,
+    timeout: args.childTimeoutMs,
   })
-  if (result.error) throw result.error
+  if (result.error) {
+    const code = result.error.code || "spawn_error"
+    const summary = summarizeChildOutput(result.stderr || result.stdout)
+    throw new Error(`${label}_failed:${code}${summary ? `\n${summary}` : ""}`)
+  }
   if (result.status !== 0) {
-    throw new Error(`${label}_failed:${result.status}\n${result.stderr || result.stdout}`)
+    throw new Error(`${label}_failed:${result.status}\n${summarizeChildOutput(result.stderr || result.stdout)}`)
   }
   try {
     return JSON.parse(result.stdout)
@@ -153,7 +181,38 @@ function runJson(label, scriptArgs) {
   }
 }
 
+const BACKEND_ONLY_RESOURCE_EVIDENCE_IDS = Object.freeze([
+  "R01_SAE_RUNTIME",
+  "R02_ACR_IMAGE_REGISTRY",
+  "R03_API_DOMAIN_HTTPS",
+  "R04_ASSET_DOMAIN_HTTPS",
+  "R05_OSS_AUDIO_STORAGE",
+  "R06_ENV_IMPORT",
+  "R07_SLS_ALERTS",
+])
+
+const BACKEND_ONLY_READY_SECRET_ENV_VARIABLE_NAMES = Object.freeze([
+  "ADMIN_USER_IDS",
+  "ALIYUN_OSS_ACCESS_KEY_ID",
+  "ALIYUN_OSS_ACCESS_KEY_SECRET",
+  "APIMART_API_KEY",
+  "CREDITS_IP_SALT",
+  "DASHSCOPE_API_KEY",
+  "DEEPSEEK_API_KEY",
+  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+  "NEXT_PUBLIC_SUPABASE_URL",
+  "SERVICE_RECORD_DEEPSEEK_API_KEY",
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "VOLC_SPEECH_ACCESS_TOKEN",
+  "VOLC_SPEECH_APP_ID",
+  "VOLC_SPEECH_SECRET_KEY",
+  "WECHAT_LOGIN_SECRET",
+  "WECHAT_MINI_APPID",
+  "WECHAT_MINI_SECRET",
+])
+
 function buildOperatorHandoff(args) {
+  if (args.backendOnly) return buildBackendOnlyOperatorHandoff(args)
   return runJson("operator_handoff", [
     "scripts/generate-aliyun-operator-handoff.mjs",
     "--env-file",
@@ -164,8 +223,278 @@ function buildOperatorHandoff(args) {
     args.cloudInventoryResultsFile,
     ...(args.skipVercelEnvCoverage ? ["--skip-vercel-env-coverage"] : []),
     ...(args.backendOnly ? ["--backend-only"] : []),
+    "--child-timeout-ms",
+    String(args.childTimeoutMs),
     ...(args.vercelEnvCoverageInput ? ["--vercel-env-coverage-input", args.vercelEnvCoverageInput] : []),
-  ])
+  ], args)
+}
+
+function buildBackendOnlyOperatorHandoff(args) {
+  const cloudInventoryResults = runJson("cloud_inventory_results", [
+    "scripts/check-aliyun-cli-inventory-results.mjs",
+    "--allow-incomplete",
+    "--local",
+    args.cloudInventoryResultsFile,
+  ], args)
+  const cloudConfirmations = runJson("cloud_confirmations", [
+    "scripts/check-aliyun-cloud-confirmations.mjs",
+    "--backend-only",
+    "--allow-incomplete",
+    "--local",
+    args.cloudConfirmationsFile,
+  ], args)
+  const imagePublishPlan = runJson("image_publish_plan", [
+    "scripts/check-aliyun-image-publish-plan.mjs",
+    "--allow-incomplete",
+    "--local",
+    args.imagePublishFile,
+    "--skip-docker-probe",
+  ], args)
+  const envPlan = buildImportPlan(parseEnvFile(args.envFile))
+  const canDeployNow = cloudInventoryResults.local?.ready === true
+    && cloudConfirmations.local?.ready === true
+    && imagePublishPlan.local?.ready === true
+  return {
+    generatedAt: new Date().toISOString(),
+    currentScope: "backend_aliyun_only",
+    containsValues: false,
+    canDeployNow,
+    verdict: canDeployNow ? "ready" : "blocked",
+    operatorClosureBrief: buildBackendOnlyOperatorClosureBrief(envPlan),
+    localEvidenceGaps: {
+      cloudInventoryResults: {
+        file: cloudInventoryResults.local?.file || args.cloudInventoryResultsFile,
+        exists: cloudInventoryResults.local?.exists === true,
+        ready: cloudInventoryResults.local?.ready === true,
+        checkedOperations: cloudInventoryResults.local?.checkedOperations || 0,
+        observationSummary: cloudInventoryResults.local?.observationSummary || null,
+        totalBlockers: (cloudInventoryResults.local?.blockers || []).length,
+        gaps: buildCloudInventoryResultGaps(cloudInventoryResults),
+      },
+      cloudConfirmations: {
+        file: cloudConfirmations.local?.file || args.cloudConfirmationsFile,
+        exists: cloudConfirmations.local?.exists === true,
+        ready: cloudConfirmations.local?.ready === true,
+        totalBlockers: (cloudConfirmations.local?.blockers || []).length,
+        gaps: buildCloudConfirmationGaps(cloudConfirmations),
+      },
+      imagePublish: {
+        file: imagePublishPlan.local?.file || resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.image-publish.local.json"),
+        exists: imagePublishPlan.local?.exists === true,
+        ready: imagePublishPlan.local?.ready === true,
+        totalBlockers: (imagePublishPlan.local?.blockers || []).length,
+        localDockerImage: imagePublishPlan.localDockerImage?.status || "unknown",
+        gaps: buildImagePublishGaps(imagePublishPlan),
+      },
+    },
+  }
+}
+
+function buildBackendOnlyOperatorClosureBrief(envPlan) {
+  const blockedCredentialNames = envPlan.summary.requiredBlocking.includes("DATABASE_URL_CN")
+    ? ["DATABASE_URL_CN"]
+    : []
+  const readySecretEnvVariableNames = BACKEND_ONLY_READY_SECRET_ENV_VARIABLE_NAMES
+    .filter((name) => variableByName(envPlan.variables, name)?.status === "ready")
+  return {
+    blockedCredentialCount: blockedCredentialNames.length,
+    blockedCredentialNames,
+    readySecretEnvVariableCount: readySecretEnvVariableNames.length,
+    readySecretEnvVariableNames,
+    credentialGroups: [
+      {
+        category: "rds_database_secret_and_migration",
+        actionId: "S08_ALIYUN_RDS_DATABASE_URL",
+        status: "blocked",
+        blockedCredentialNames,
+        readySecretEnvVariableNames: [],
+        obtainFrom: "阿里云控制台 -> RDS PostgreSQL -> 实例/数据库/账号/连接信息；SAE/KMS/Secrets Manager -> secret env",
+        writeTargets: [
+          "DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env only",
+          "deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres / migration non-secret evidence",
+        ],
+        verifyCommands: ["corepack pnpm aliyun:rds:migration:evidence:strict"],
+      },
+    ],
+    resourceEvidenceReady: `0/${BACKEND_ONLY_RESOURCE_EVIDENCE_IDS.length}`,
+    blockedResourceEvidenceIds: [...BACKEND_ONLY_RESOURCE_EVIDENCE_IDS],
+    blockedResourceEvidence: BACKEND_ONLY_RESOURCE_EVIDENCE_IDS.map((id) => ({
+      id,
+      observedStatus: "pending_backend_evidence",
+      observedReadiness: "blocked",
+      currentEvidence: [],
+      missingEvidence: [],
+      writeTargets: [],
+      nextEvidenceAction: "补齐对应阿里云后端非密钥证据后重新运行 evidence writeback。",
+    })),
+  }
+}
+
+function variableByName(variables, name) {
+  return (variables || []).find((item) => item.name === name) || null
+}
+
+function buildCloudInventoryResultGaps(cloudInventoryResults) {
+  return (cloudInventoryResults.local?.blockers || []).map((blocker) => ({
+    jsonPath: cloudInventoryResultJsonPath(blocker),
+    blocker,
+    source: "阿里云 CLI 或 Cloud Shell 只读资源盘点",
+    writeTo: "deploy/aliyun-production-cn.cloud-inventory-results.local.json",
+    expected: expectedCloudInventoryResultEvidence(blocker),
+    forbidden: [
+      "AccessKeySecret",
+      "AppSecret",
+      "registry password",
+      "RAM Secret",
+      "token",
+      "cookie",
+      "证书私钥",
+      "Supabase service role key",
+    ],
+  }))
+}
+
+function cloudInventoryResultJsonPath(blocker) {
+  const value = String(blocker || "")
+  if (value === "file_missing") return "$"
+  if (value.startsWith("readonly_inventory_") || value === "console_only_observation_not_strict_inventory") {
+    return "operations[*].commandResults[*]"
+  }
+  const operation = value.match(/^(I\d{2}_[A-Z0-9_]+):/)
+  if (operation) return `operations.${operation[1]}`
+  const missingOperation = value.match(/^missing_operation:(I\d{2}_[A-Z0-9_]+)$/)
+  if (missingOperation) return `operations.${missingOperation[1]}`
+  return "$"
+}
+
+function expectedCloudInventoryResultEvidence(blocker) {
+  if (blocker === "file_missing") {
+    return "复制 deploy/aliyun-production-cn.cloud-inventory-results.example.json 到 ignored 的 .local.json；在 CLI/Cloud Shell 只读盘点后只填写 executed、exitStatus、cloudApiCalled、mutationPerformed=false、observedAt、outputSummary 和非密钥 evidence。"
+  }
+  if (String(blocker || "").startsWith("readonly_inventory_") || blocker === "console_only_observation_not_strict_inventory") {
+    return "运行受控只读 inventory，并只写 executed、exitStatus、cloudApiCalled、mutationPerformed=false、observedAt、outputSummary 和非密钥 evidence。"
+  }
+  return "补齐对应只读盘点项的非密钥摘要；不能粘贴凭据、token、registry password、证书私钥或 cookie。"
+}
+
+function buildCloudConfirmationGaps(check) {
+  const itemStatus = check.local?.itemStatus || {}
+  return Object.entries(itemStatus).flatMap(([key, status]) => (status.blockers || []).map((blocker) => ({
+    jsonPath: `items.${key}.${fieldFromBlocker(blocker)}`,
+    blocker,
+    source: cloudConfirmationSource(key),
+    writeTo: `deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.${key}`,
+    expected: expectedCloudEvidence(key, blocker),
+    forbidden: [
+      "AccessKeySecret",
+      "AppSecret",
+      "registry password",
+      "RAM Secret",
+      "STS token",
+      "cookie",
+      "证书私钥",
+      "Supabase service role key",
+    ],
+  })))
+}
+
+function fieldFromBlocker(blocker) {
+  const value = String(blocker || "")
+  const prefixed = value.match(/^(?:missing|todo|placeholder|empty):(.+)$/)
+  if (prefixed) return prefixed[1]
+  const expected = value.match(/^([^=]+)=/)
+  if (expected) return expected[1]
+  return value
+}
+
+function cloudConfirmationSource(key) {
+  if (key === "runtime") return "阿里云控制台 -> SAE -> meiye-huajing-app-api-production-cn"
+  if (key === "apiDomainHttps") return "阿里云控制台 -> 云解析 DNS / SAE 自定义域名 / SSL / ICP"
+  if (key === "assetDomainHttps") return "阿里云控制台 -> 云解析 DNS / CDN 或 OSS 域名 / SSL / ICP"
+  if (key === "oss") return "阿里云控制台 -> OSS / RAM / STS / SAE runtime role"
+  if (key === "envImport") return "阿里云控制台 -> SAE 环境变量 / KMS / Secrets Manager"
+  if (key === "slsAlerts") return "阿里云控制台 -> 日志服务 SLS / 告警"
+  return "对应阿里云控制台"
+}
+
+function expectedCloudEvidence(key, blocker) {
+  const field = fieldFromBlocker(blocker)
+  const expectedByField = {
+    confirmed: "确认完成后填 true。",
+    dnsResolvedToAliyun: "域名已解析到阿里云公网入口后填 true。",
+    httpsEnabled: "HTTPS 证书已启用并可访问后填 true。",
+    icpReady: "备案状态满足国内正式访问要求后填 true。",
+    corsConfigured: "OSS CORS 已按 APP 上传/下载需求配置后填 true。",
+    ramLeastPrivilege: "RAM 权限已限制到服务记录前缀后填 true。",
+    bucket: "填实际 OSS Bucket 名称或控制台证据编号。",
+    importedAt: "填实际导入 production-cn env 的时间或控制台证据编号。",
+    evidence: "填控制台路径、截图编号、工单号或其它非密钥证据编号。",
+    region: "填 cn-hangzhou；当前 production-cn 运行时、ACR 和 OSS 证据必须使用同一目标地域。",
+    slsProject: "填实际 SLS Project 名称或控制台证据编号。",
+    secretNotInImage: "确认密钥只在 SAE/KMS/Secrets Manager 中，未写入镜像后填 true。",
+  }
+  if (expectedByField[field]) return expectedByField[field]
+  if (key === "runtime") return "按 runtime plan 填 SAE cn-hangzhou 应用、端口和健康检查证据。"
+  return "填真实非密钥控制台证据，不能保留 TODO、pending 或 TBD 占位值。"
+}
+
+function buildImagePublishGaps(imagePublishPlan) {
+  return (imagePublishPlan.local?.blockers || []).map((blocker) => ({
+    jsonPath: fieldFromImageBlocker(blocker),
+    blocker,
+    source: imagePublishGapSource(blocker),
+    writeTo: imagePublishGapWriteTarget(blocker),
+    expected: expectedImagePublishEvidence(blocker),
+    forbidden: [
+      "registry password",
+      "docker login output",
+      "RAM Secret",
+      "AccessKeySecret",
+      "STS token",
+      "cookie",
+    ],
+  }))
+}
+
+function fieldFromImageBlocker(blocker) {
+  const value = String(blocker || "")
+  const prefixed = value.match(/^(?:missing|todo|empty):(.+)$/)
+  if (prefixed) return prefixed[1]
+  const expected = value.match(/^([^=]+)=/)
+  if (expected) return expected[1]
+  return value
+}
+
+function imagePublishGapSource(blocker) {
+  const field = fieldFromImageBlocker(blocker)
+  if (field.startsWith("runtime.")) {
+    return "阿里云控制台 -> SAE -> cn-hangzhou -> 应用 -> 镜像部署 / 镜像拉取配置"
+  }
+  if (field.startsWith("acr.")) {
+    return "阿里云控制台 -> 容器镜像服务 ACR -> cn-hangzhou -> 命名空间/仓库"
+  }
+  return "阿里云控制台 -> 容器镜像服务 ACR / SAE 容器运行时"
+}
+
+function imagePublishGapWriteTarget(blocker) {
+  const field = fieldFromImageBlocker(blocker)
+  if (field.startsWith("runtime.")) return "deploy/aliyun-production-cn.image-publish.local.json -> runtime"
+  if (field.startsWith("acr.")) return "deploy/aliyun-production-cn.image-publish.local.json -> acr"
+  return "deploy/aliyun-production-cn.image-publish.local.json"
+}
+
+function expectedImagePublishEvidence(blocker) {
+  const field = fieldFromImageBlocker(blocker)
+  const expectedByField = {
+    "acr.remoteDigest": "填 sha256:<64 hex> 镜像 digest。",
+    "acr.imagePushed": "镜像已推送或导入 ACR 后填 true。",
+    "acr.digestVerified": "远端 digest 已核对后填 true。",
+    "acr.pushNetworkPath": "填 public_registry、vpc_registry_from_aliyun_network 或 acr_import_task。",
+    "runtime.confirmed": "SAE runtime 已确认后填 true。",
+    "runtime.remoteImageConfigured": "SAE 已指向 ACR remote image 后填 true。",
+    "runtime.imagePullConfigured": "SAE 镜像拉取权限配置完成后填 true。",
+  }
+  return expectedByField[field] || "填真实非密钥 ACR/SAE 证据，不能写 registry 密码、RAM Secret 或 token。"
 }
 
 function buildRdsMigrationEvidence(args) {
@@ -174,7 +503,7 @@ function buildRdsMigrationEvidence(args) {
     "--allow-incomplete",
     "--local",
     args.rdsMigrationFile,
-  ])
+  ], args)
 }
 
 function uniqueStrings(values) {
@@ -293,7 +622,11 @@ function writebackPrerequisites(groupKey, item) {
   if (jsonPath.startsWith("items.oss")) {
     return buildPrerequisites(
       ["P05_OSS_RAM_STS"],
-      ["OSS bucket/CORS、服务记录前缀最小权限 RAM 或 STS/role 证据"],
+      [
+        "OSS bucket/CORS、服务记录前缀最小权限 RAM 或 STS/role 证据",
+        "如选择 sae_runtime_role：SAE RRSA/OIDC env ALIBABA_CLOUD_ROLE_ARN / ALIBABA_CLOUD_OIDC_PROVIDER_ARN / ALIBABA_CLOUD_OIDC_TOKEN_FILE 可用，且 credentialBoundary=runtime_role_no_long_lived_secret",
+        "如选择 STS/RAM fallback：ALIYUN_OSS_ACCESS_KEY_SECRET / ALIYUN_OSS_SECURITY_TOKEN 只进入 KMS/Secrets Manager/SAE secret env",
+      ],
       ["OSS 与最小权限 RAM/STS 已配置"],
     )
   }
@@ -595,6 +928,7 @@ function buildReport(args) {
       "corepack pnpm aliyun:cloud:inventory-results:strict",
     ]),
     cloudConfirmations: compactGroup("cloudConfirmations", gaps.cloudConfirmations, [
+      "corepack pnpm aliyun:oss:runtime-access:strict",
       "corepack pnpm aliyun:cloud:confirmations:strict",
     ]),
     imagePublish: compactGroup("imagePublish", gaps.imagePublish, [
@@ -632,12 +966,18 @@ function buildReport(args) {
     mutationPerformed: false,
     cloudApiCalled: false,
     executionMode: "writeback_checklist_only",
+    childCommands: {
+      timeoutMs: args.childTimeoutMs,
+      timeoutEnforced: true,
+      failureMode: "fail_closed_no_cloud_mutation",
+      note: "Child evidence checks are bounded; timed-out children fail this local checklist instead of creating or modifying cloud resources.",
+    },
     files: {
       envFile: args.envFile,
       rdsMigrationFile: args.rdsMigrationFile,
       cloudConfirmationsFile: args.cloudConfirmationsFile,
       cloudInventoryResultsFile: args.cloudInventoryResultsFile,
-      imagePublishLocalFile: gaps.imagePublish?.file || resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.image-publish.local.json"),
+      imagePublishLocalFile: gaps.imagePublish?.file || args.imagePublishFile,
     },
     sourceCommands: {
       operatorHandoff: "corepack pnpm aliyun:operator:handoff -- --skip-vercel-env-coverage",
@@ -857,11 +1197,13 @@ Options:
   --cloud-confirmations <path>      local cloud confirmations file
   --cloud-inventory-results <path>  local read-only inventory results file
   --rds-migration <path>            local RDS migration evidence file
+  --image-publish <path>            local image publish evidence file
   --out <path>                      write JSON report
   --markdown <path>                 write Markdown report
   --skip-vercel-env-coverage        skip Vercel env name coverage while reading operator handoff
   --vercel-env-coverage-input <path> use a captured Vercel env coverage fixture
   --backend-only                    exclude deferred WeChat/Android/Apple launch evidence from the current report
+  --child-timeout-ms <ms>           maximum time for each local child check, default ${DEFAULT_CHILD_TIMEOUT_MS}
 `)
 }
 
