@@ -278,6 +278,10 @@ function buildReport(args) {
     args.envFile,
     "--cloud-confirmations",
     args.cloudConfirmationsFile,
+    "--rds-migration",
+    args.rdsMigrationFile,
+    "--image-publish",
+    args.imagePublishFile,
   ])
   const rdsMigration = run("rds_migration", [
     "scripts/check-aliyun-rds-migration-evidence.mjs",
@@ -300,6 +304,10 @@ function buildReport(args) {
     args.envFile,
     "--cloud-confirmations",
     args.cloudConfirmationsFile,
+    "--rds-migration",
+    args.rdsMigrationFile,
+    "--image-publish",
+    args.imagePublishFile,
   ])
   const backendRequiredBlocking = buildBackendRequiredBlocking({
     cloudConfirmations,

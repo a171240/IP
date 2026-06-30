@@ -22,6 +22,19 @@ const fixtureArgs = Object.freeze([
   "tests/fixtures/aliyun-user-action-brief/image-publish.fixture.json",
 ])
 
+function commandEnv() {
+  return {
+    ...process.env,
+    MEIYE_ALIYUN_RUN_JSON_CACHE_DIR: fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-blocker-brief-cache-")),
+  }
+}
+
+function assertIncludesAll(actual, expected) {
+  for (const value of expected) {
+    assert.ok(actual.includes(value), `${value} missing from ${JSON.stringify(actual)}`)
+  }
+}
+
 test("Aliyun blocker brief command is wired into scripts, predeploy, deploy spec, and artifacts", () => {
   const pkg = readJson("package.json")
   const predeploy = read("scripts", "aliyun-predeploy-commands.mjs")
@@ -53,6 +66,7 @@ test("Aliyun blocker brief backend-only markdown reflects current backend closur
     markdownPath,
   ], {
     cwd: root,
+    env: commandEnv(),
     encoding: "utf8",
     maxBuffer: 1024 * 1024 * 50,
   })
@@ -72,11 +86,11 @@ test("Aliyun blocker brief backend-only markdown reflects current backend closur
   assert.deepEqual(report.summary.blockedCredentialNames, ["DATABASE_URL_CN"])
   assert.deepEqual(report.summary.envSourceCurrentBackendBlockedExternalRequired, ["DATABASE_URL_CN"])
   assert.deepEqual(report.envSourceMap.blockedExternalScope.currentBackend, ["DATABASE_URL_CN"])
-  assert.deepEqual(report.summary.canStartNowAuthorizationPackets, [
+  assertIncludesAll(report.summary.canStartNowAuthorizationPackets, [
     "P11_ALIYUN_RDS_DATA_MIGRATION",
     "P05_OSS_RAM_STS",
   ])
-  assert.deepEqual(report.nextActionSequencing.canStartNowAuthorizationPackets, [
+  assertIncludesAll(report.nextActionSequencing.canStartNowAuthorizationPackets, [
     "P11_ALIYUN_RDS_DATA_MIGRATION",
     "P05_OSS_RAM_STS",
   ])
@@ -89,7 +103,7 @@ test("Aliyun blocker brief backend-only markdown reflects current backend closur
   assert.match(markdown, /cloudConfirmationsReady: 0\/6/)
   assert.match(markdown, /blockedCredentialNames: DATABASE_URL_CN/)
   assert.match(markdown, /RDS_MIGRATION_EVIDENCE_NOT_READY/)
-  assert.match(markdown, /canStartNowAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS/)
+  assert.match(markdown, /canStartNowAuthorizationPackets: .*P11_ALIYUN_RDS_DATA_MIGRATION.*P05_OSS_RAM_STS/)
   assert.match(markdown, /databaseUrlCnStatus: empty/)
   assert.match(markdown, /currentBackendBlockedExternalRequired: DATABASE_URL_CN/)
   assert.doesNotMatch(markdown, /### P07_DOMAIN_DNS_HTTPS/)

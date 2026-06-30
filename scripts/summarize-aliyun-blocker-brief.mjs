@@ -214,6 +214,8 @@ function buildReport(args) {
   const completionAudit = runJson("completion_audit", [
     "scripts/summarize-aliyun-completion-audit.mjs",
     ...envArgs(args),
+    "--cloud-inventory-results",
+    args.cloudInventoryResultsFile,
   ])
   const sensitiveBlockers = runJson("sensitive_blockers", [
     "scripts/summarize-aliyun-sensitive-blockers.mjs",
@@ -228,10 +230,18 @@ function buildReport(args) {
     "scripts/summarize-aliyun-action-authorization.mjs",
     "--backend-only",
     ...envArgs(args),
+    "--rds-migration",
+    args.rdsMigrationFile,
+    "--image-publish",
+    args.imagePublishFile,
   ])
   const resourcesMatrix = runJson("resources_matrix", [
     "scripts/summarize-aliyun-resource-matrix.mjs",
     ...envArgs(args),
+    "--rds-migration",
+    args.rdsMigrationFile,
+    "--image-publish",
+    args.imagePublishFile,
   ])
   const consoleRunbook = runJson("console_runbook", [
     "scripts/generate-aliyun-console-runbook.mjs",
