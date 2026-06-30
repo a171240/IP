@@ -72,6 +72,11 @@ type TrainingPackSeed = {
   validation?: Record<string, unknown>
 }
 
+type KnowledgeSpaceAccessRow = {
+  knowledge_space_id?: unknown
+  expires_at?: string | null
+}
+
 const COMMON_TRAINING_PACK_SEED = commonBeautyTrainingPack as TrainingPackSeed
 const BAIBAITU_TRAINING_PACK_SEED = baibaituSpeakingTrainingPack as TrainingPackSeed
 
@@ -589,11 +594,11 @@ async function getExplicitKnowledgeSpaceAccessIds(supabase: QuerySupabaseClient,
   if (error) throw error
 
   const now = Date.now()
-  return new Set(
-    (data || [])
-      .filter((row: any) => !row.expires_at || new Date(row.expires_at).getTime() > now)
-      .map((row: any) => cleanText(row.knowledge_space_id, 120))
-      .filter(Boolean),
+  return new Set<string>(
+    ((data || []) as KnowledgeSpaceAccessRow[])
+      .filter((row) => !row.expires_at || new Date(row.expires_at).getTime() > now)
+      .map((row) => cleanText(row.knowledge_space_id, 120))
+      .filter((id): id is string => Boolean(id)),
   )
 }
 
@@ -612,9 +617,11 @@ async function listMpKnowledgeSpaces(args: {
   if (error) throw error
 
   const explicitAccessIds = await getExplicitKnowledgeSpaceAccessIds(args.supabase, args.ctx)
-  return (data || [])
-    .map(normalizeSpaceRow)
-    .filter((space): space is TrainingKnowledgeSpace => Boolean(space && canAccessKnowledgeSpace(space, args.ctx, explicitAccessIds)))
+  return ((data || []) as unknown[])
+    .map((row) => normalizeSpaceRow(row))
+    .filter((space: TrainingKnowledgeSpace | null): space is TrainingKnowledgeSpace =>
+      Boolean(space && canAccessKnowledgeSpace(space, args.ctx, explicitAccessIds)),
+    )
 }
 
 async function listLegacyKnowledgeSpaces(args: {
@@ -631,9 +638,11 @@ async function listLegacyKnowledgeSpaces(args: {
   if (error && isDatabaseFeatureUnavailableError(error)) return []
   if (error) throw error
 
-  return (data || [])
-    .map(normalizeSpaceRow)
-    .filter((space): space is TrainingKnowledgeSpace => Boolean(space && canAccessKnowledgeSpace(space, args.ctx, new Set())))
+  return ((data || []) as unknown[])
+    .map((row) => normalizeSpaceRow(row))
+    .filter((space: TrainingKnowledgeSpace | null): space is TrainingKnowledgeSpace =>
+      Boolean(space && canAccessKnowledgeSpace(space, args.ctx, new Set<string>())),
+    )
 }
 
 export async function listKnowledgeSpaces(args: {
@@ -697,9 +706,9 @@ export async function resolveTrainingPack(args: {
       .order("day_index", { ascending: true })
 
     if (!taskError && taskData) {
-      const tasks = (taskData || [])
-        .map((task: any) => normalizeVoiceTrainingTaskRow(task, normalizedPack))
-        .filter((task): task is TrainingTask => Boolean(task))
+      const tasks = ((taskData || []) as unknown[])
+        .map((task) => normalizeVoiceTrainingTaskRow(task, normalizedPack))
+        .filter((task: TrainingTask | null): task is TrainingTask => Boolean(task))
       return {
         ...normalizedPack,
         metadata: {

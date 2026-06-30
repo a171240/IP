@@ -138,10 +138,14 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
       .eq("session_id", sessionId)
       .order("turn_index", { ascending: false })
       .limit(6)
-    const history = (historyRows || [])
+    const history: Array<{
+      role: "customer" | "beautician"
+      text: string
+      emotion?: VoiceCoachEmotion
+    }> = ((historyRows || []) as Array<{ role?: unknown; text?: unknown; emotion?: unknown }>)
       .slice()
       .reverse()
-      .map((t: any) => ({
+      .map((t) => ({
         role: t.role as "customer" | "beautician",
         text: String(t.text || ""),
         emotion: (t.emotion ? String(t.emotion) : undefined) as VoiceCoachEmotion | undefined,
