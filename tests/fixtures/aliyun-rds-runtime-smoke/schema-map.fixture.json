@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "environment": "production-cn",
+  "scope": "first-version-app-backend-runtime-smoke-fixture",
+  "containsValues": false,
+  "readOnlyOnly": true,
+  "notes": [
+    "Tracked non-secret fixture for static runtime-smoke tests.",
+    "It contains only object names needed by the dry-run report and no DATABASE_URL_CN, passwords, row payloads, dumps, tokens, cookies, or customer data."
+  ],
+  "requiredTables": [
+    {
+      "name": "credit_transactions"
+    },
+    {
+      "name": "entitlements"
+    },
+    {
+      "name": "mp_account_invites"
+    },
+    {
+      "name": "mp_account_memberships"
+    },
+    {
+      "name": "mp_ai_point_ledger"
+    },
+    {
+      "name": "mp_companies"
+    },
+    {
+      "name": "mp_stores"
+    },
+    {
+      "name": "profiles"
+    },
+    {
+      "name": "service_record_markers"
+    },
+    {
+      "name": "service_record_segments"
+    },
+    {
+      "name": "service_record_sessions"
+    },
+    {
+      "name": "store_profiles"
+    },
+    {
+      "name": "voice_coach_customer_profiles"
+    },
+    {
+      "name": "voice_coach_sessions"
+    },
+    {
+      "name": "voice_coach_turns"
+    }
+  ],
+  "requiredFunctions": []
+}
