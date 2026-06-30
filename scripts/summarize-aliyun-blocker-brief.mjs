@@ -11,6 +11,9 @@ const BACKEND_ROOT = resolve(__dirname, "..")
 const WORKSPACE_ROOT = resolve(BACKEND_ROOT, "../..")
 const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
+const DEFAULT_CLOUD_INVENTORY_RESULTS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-inventory-results.local.json")
+const DEFAULT_RDS_MIGRATION_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.rds-migration.local.json")
+const DEFAULT_IMAGE_PUBLISH_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.image-publish.local.json")
 
 const SECRET_VALUE_PATTERNS = [
   /sk-[A-Za-z0-9_-]{20,}/,
@@ -58,6 +61,9 @@ function parseArgs(argv) {
   const args = {
     envFile: DEFAULT_ENV_FILE,
     cloudConfirmationsFile: DEFAULT_CLOUD_CONFIRMATIONS_FILE,
+    cloudInventoryResultsFile: DEFAULT_CLOUD_INVENTORY_RESULTS_FILE,
+    rdsMigrationFile: DEFAULT_RDS_MIGRATION_FILE,
+    imagePublishFile: DEFAULT_IMAGE_PUBLISH_FILE,
     outPath: "",
     markdownPath: "",
     skipVercelEnvCoverage: false,
@@ -78,6 +84,18 @@ function parseArgs(argv) {
     }
     if (arg === "--cloud-confirmations") {
       args.cloudConfirmationsFile = resolveValue(argv[++index], "--cloud-confirmations")
+      continue
+    }
+    if (arg === "--cloud-inventory-results") {
+      args.cloudInventoryResultsFile = resolveValue(argv[++index], "--cloud-inventory-results")
+      continue
+    }
+    if (arg === "--rds-migration") {
+      args.rdsMigrationFile = resolveValue(argv[++index], "--rds-migration")
+      continue
+    }
+    if (arg === "--image-publish") {
+      args.imagePublishFile = resolveValue(argv[++index], "--image-publish")
       continue
     }
     if (arg === "--out") {
@@ -120,6 +138,24 @@ function envArgs(args) {
     args.envFile,
     "--cloud-confirmations",
     args.cloudConfirmationsFile,
+  ]
+}
+
+function evidenceArgs(args) {
+  return [
+    ...envArgs(args),
+    "--cloud-inventory-results",
+    args.cloudInventoryResultsFile,
+    "--image-publish",
+    args.imagePublishFile,
+  ]
+}
+
+function backendStatusArgs(args) {
+  return [
+    ...evidenceArgs(args),
+    "--rds-migration",
+    args.rdsMigrationFile,
   ]
 }
 
@@ -169,11 +205,11 @@ function buildReport(args) {
   const status = runJson("production_status", [
     "scripts/summarize-aliyun-production-cn-status.mjs",
     ...(args.backendOnly ? ["--backend-only"] : []),
-    ...envArgs(args),
+    ...evidenceArgs(args),
   ])
   const backendStatus = runJson("backend_status", [
     "scripts/summarize-aliyun-backend-cn-status.mjs",
-    ...envArgs(args),
+    ...backendStatusArgs(args),
   ])
   const completionAudit = runJson("completion_audit", [
     "scripts/summarize-aliyun-completion-audit.mjs",
@@ -203,6 +239,8 @@ function buildReport(args) {
   ])
   const imagePublishPlan = runJson("image_publish_plan", [
     "scripts/check-aliyun-image-publish-plan.mjs",
+    "--local",
+    args.imagePublishFile,
     "--allow-incomplete",
   ])
   const cloudAccess = runJson("cloud_access", [
@@ -253,13 +291,28 @@ function buildReport(args) {
     || {}
   const wechatOpenMobileApp = compactWechatOpenMobileApp(wechatOpenMobileAppPackage)
   const wechatCredentialBoundary = wechatOpenMobileApp.credentialBoundary
-  const bridgeDataLayer = compactBridgeDataLayer(status.summary?.bridgeDataLayer || {})
+  let bridgeDataLayer = compactBridgeDataLayer(status.summary?.bridgeDataLayer || {})
+  if (backendStatus.summary?.rdsMigrationReady === true) {
+    bridgeDataLayer = {
+      ...bridgeDataLayer,
+      status: "ready",
+      databaseUrlCnStatus: "ready",
+      rdsMigrationIncludedInThisRelease: true,
+      notes: uniqueStrings([
+        "RDS migration evidence is ready in backend-cn status; DATABASE_URL_CN is no longer a current backend credential blocker.",
+        ...bridgeDataLayer.notes.filter((note) => !/DATABASE_URL_CN 是正式全阿里云数据层的必填阻塞项/.test(note)),
+      ]),
+    }
+  }
   const cloudResourceObservations = compactCloudResourceObservations(resourcesMatrix)
-  const nextActionSequencing = compactNextActionSequencing(completionAudit)
+  const nextActionSequencing = compactNextActionSequencing(completionAudit, backendStatus.actionAuthorization)
   const canStartNowWritebackPlan = compactCanStartNowWritebackPlan(consoleRunbook, imagePublishPlan)
   const cloudInventoryReadinessInterpretation = buildCloudInventoryReadinessInterpretation(status, cloudAccess)
   const envSourceMapSummary = compactEnvSourceMap(envSourceMap)
-  const envSourceBlockedExternalScope = splitEnvSourceBlockedExternalRequired(envSourceMapSummary)
+  const envSourceBlockedExternalScope = filterEnvSourceBlockedExternalScope(
+    splitEnvSourceBlockedExternalRequired(envSourceMapSummary),
+    backendStatus.summary?.rdsMigrationReady === true ? ["DATABASE_URL_CN"] : [],
+  )
   const backendRequiredBlocking = backendStatus.summary?.backendRequiredBlocking || []
   const deferredAppLaunchBlocking = backendStatus.summary?.appLaunchDeferredBlocking || []
   const currentOperatorTasks = completionAudit.summary?.operatorTasks || status.summary?.operatorTasks || {}
@@ -278,7 +331,7 @@ function buildReport(args) {
     verdict: status.verdict || completionAudit.verdict || "blocked",
     currentAnswer: backendStatus.canDeployBackendNow === true
       ? "阿里云后端门禁接近可部署，但生产动作仍需动作时确认。"
-      : "现在不能部署；当前只推进阿里云后端，微信/Android/Apple 发布项已延期，先补 RDS、ACR、OSS、SAE、DNS/HTTPS/ICP、env、SLS 和 smoke 证据。",
+      : `现在不能部署；当前只推进阿里云后端，微信/Android/Apple 发布项已延期，剩余阻塞：${backendRequiredBlocking.join(", ") || "none"}。`,
     summary: {
       currentScope: CURRENT_SCOPE,
       fullAppLaunchScope: FULL_APP_LAUNCH_SCOPE,
@@ -337,7 +390,7 @@ function buildReport(args) {
       blockedVariableAcquisitionCount: blockedVariableAcquisitionPlan.length,
       deferredAppLaunchVariableAcquisitionCount: deferredAppLaunchVariableAcquisitionPlan.length,
       readySecretEnvImportGroupCount: readySecretEnvImportGroups.length,
-      immediateAuthorizationPackets: actionAuthorization.summary?.nextActionTimeConfirmations || [],
+      immediateAuthorizationPackets: backendStatus.summary?.nextActionTimeConfirmationPacketIds || [],
       cloudInventoryStrictReady: `${status.summary?.cloudInventoryResults?.readyLocalOperations || 0}/${status.summary?.cloudInventoryResults?.localOperations || 0}`,
       cloudInventoryInterpretation: cloudInventoryReadinessInterpretation.interpretation,
       canReadCloudNow: cloudAccess.canReadCloudNow === true,
@@ -365,7 +418,7 @@ function buildReport(args) {
       envSourceReadyLocalButMissingFromVercel: envSourceMapSummary.readyLocalButMissingFromVercel,
       envSourceSecretOrSensitiveToImport: envSourceMapSummary.secretOrSensitiveToImport,
     },
-    immediateAuthorizationPackets: actionAuthorization.nextActionTimeConfirmations || [],
+    immediateAuthorizationPackets: backendStatus.actionAuthorization?.nextActionTimeConfirmations || [],
     requiredEnvBlockers,
     blockedVariableAcquisitionPlan,
     deferredAppLaunchVariableAcquisitionPlan,
@@ -447,14 +500,27 @@ function buildReport(args) {
   return report
 }
 
-function compactNextActionSequencing(completionAudit) {
+function compactNextActionSequencing(completionAudit, backendActionAuthorization = {}) {
   const summary = completionAudit.summary || {}
+  const backendPacketIds = Array.isArray(backendActionAuthorization.nextActionTimeConfirmationPacketIds)
+    ? backendActionAuthorization.nextActionTimeConfirmationPacketIds
+    : null
+  const backendCanStartNowPackets = Array.isArray(backendActionAuthorization.canStartNowPackets)
+    ? backendActionAuthorization.canStartNowPackets
+    : null
+  const backendBlockedByPacketDependencies = Array.isArray(backendActionAuthorization.blockedByPacketDependencies)
+    ? backendActionAuthorization.blockedByPacketDependencies
+    : null
+  const backendPackets = Array.isArray(backendActionAuthorization.nextActionTimeConfirmations)
+    ? backendActionAuthorization.nextActionTimeConfirmations
+    : null
   return {
     canStartNowConsoleTasks: summary.canStartNowConsoleTasks || [],
     blockedByConsoleTaskDependencies: summary.blockedByConsoleTaskDependencies || [],
-    canStartNowAuthorizationPackets: summary.canStartNowAuthorizationPackets || [],
-    blockedByAuthorizationPacketDependencies: summary.blockedByAuthorizationPacketDependencies || [],
-    nextActionTimeConfirmations: (summary.nextActionTimeConfirmations || []).map((item) => ({
+    canStartNowAuthorizationPackets: backendCanStartNowPackets || summary.canStartNowAuthorizationPackets || [],
+    blockedByAuthorizationPacketDependencies: backendBlockedByPacketDependencies || summary.blockedByAuthorizationPacketDependencies || [],
+    nextActionTimeConfirmationPacketIds: backendPacketIds || (summary.nextActionTimeConfirmations || []).map((item) => item.packetId),
+    nextActionTimeConfirmations: (backendPackets || summary.nextActionTimeConfirmations || []).map((item) => ({
       packetId: item.packetId,
       actionId: item.actionId,
       title: item.title,
@@ -753,6 +819,17 @@ function splitEnvSourceBlockedExternalRequired(envSourceMapSummary = {}) {
     currentBackend,
     deferredAppLaunch,
     all: names,
+  }
+}
+
+function filterEnvSourceBlockedExternalScope(scope, resolvedNames = []) {
+  const resolved = new Set(resolvedNames)
+  const removeResolved = (items) => (items || []).filter((item) => !resolved.has(item))
+  return {
+    currentBackend: removeResolved(scope.currentBackend),
+    deferredAppLaunch: removeResolved(scope.deferredAppLaunch),
+    all: removeResolved(scope.all),
+    resolvedBackendNames: [...resolved],
   }
 }
 
@@ -1531,6 +1608,10 @@ function printHelp() {
 Options:
   --env-file <path>             production-cn env file
   --cloud-confirmations <path>  local cloud confirmations file
+  --cloud-inventory-results <path>
+                                local read-only cloud inventory result fixture
+  --rds-migration <path>        local RDS migration evidence fixture
+  --image-publish <path>        local ACR/image publish evidence fixture
   --out <path>                  write JSON brief
   --markdown <path>             write Markdown brief
 `)

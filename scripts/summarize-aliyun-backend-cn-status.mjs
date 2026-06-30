@@ -13,6 +13,8 @@ const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
 const DEFAULT_CLOUD_INVENTORY_RESULTS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-inventory-results.local.json")
 const DEFAULT_RDS_MIGRATION_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.rds-migration.local.json")
+const DEFAULT_IMAGE_PUBLISH_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.image-publish.local.json")
+const DEFAULT_CHILD_TIMEOUT_MS = 120_000
 
 const WECHAT_DEFERRED_BLOCKERS = Object.freeze([
   "WECHAT_OPEN_APP_ID",
@@ -174,6 +176,8 @@ function parseArgs(argv) {
     cloudConfirmationsFile: DEFAULT_CLOUD_CONFIRMATIONS_FILE,
     cloudInventoryResultsFile: DEFAULT_CLOUD_INVENTORY_RESULTS_FILE,
     rdsMigrationFile: DEFAULT_RDS_MIGRATION_FILE,
+    imagePublishFile: DEFAULT_IMAGE_PUBLISH_FILE,
+    childTimeoutMs: DEFAULT_CHILD_TIMEOUT_MS,
     outPath: "",
     markdownPath: "",
   }
@@ -197,6 +201,17 @@ function parseArgs(argv) {
       args.rdsMigrationFile = resolveValue(argv[++index], "--rds-migration")
       continue
     }
+    if (arg === "--image-publish") {
+      args.imagePublishFile = resolveValue(argv[++index], "--image-publish")
+      continue
+    }
+    if (arg === "--child-timeout-ms") {
+      args.childTimeoutMs = Number(resolveRawValue(argv[++index], "--child-timeout-ms"))
+      if (!Number.isFinite(args.childTimeoutMs) || args.childTimeoutMs < 1_000) {
+        throw new Error("invalid_child_timeout_ms")
+      }
+      continue
+    }
     if (arg === "--out") {
       args.outPath = resolveValue(argv[++index], "--out")
       continue
@@ -216,48 +231,61 @@ function parseArgs(argv) {
 }
 
 function resolveValue(value, name) {
-  if (!value) throw new Error(`missing_value:${name}`)
-  return isAbsolute(value) ? value : resolve(process.cwd(), value)
+  const raw = resolveRawValue(value, name)
+  return isAbsolute(raw) ? raw : resolve(process.cwd(), raw)
 }
 
-function runJson(label, scriptArgs) {
+function resolveRawValue(value, name) {
+  if (!value) throw new Error(`missing_value:${name}`)
+  return String(value)
+}
+
+function runJson(label, scriptArgs, options = {}) {
+  const timeoutMs = options.timeoutMs ?? DEFAULT_CHILD_TIMEOUT_MS
   return runJsonWithCache(label, scriptArgs, {
     cwd: BACKEND_ROOT,
     maxBuffer: 1024 * 1024 * 80,
+    timeoutMs,
   })
 }
 
 function buildReport(args) {
-  const cloudConfirmations = runJson("cloud_confirmations", [
+  const run = (label, scriptArgs, options = {}) => runJson(label, scriptArgs, {
+    ...options,
+    timeoutMs: options.timeoutMs ?? args.childTimeoutMs,
+  })
+  const cloudConfirmations = run("cloud_confirmations", [
     "scripts/check-aliyun-cloud-confirmations.mjs",
     "--local",
     args.cloudConfirmationsFile,
     "--allow-incomplete",
   ])
-  const imagePublishPlan = runJson("image_publish_plan", [
+  const imagePublishPlan = run("image_publish_plan", [
     "scripts/check-aliyun-image-publish-plan.mjs",
+    "--local",
+    args.imagePublishFile,
     "--allow-incomplete",
   ])
-  const cloudInventoryResults = runJson("cloud_inventory_results", [
+  const cloudInventoryResults = run("cloud_inventory_results", [
     "scripts/check-aliyun-cli-inventory-results.mjs",
     "--local",
     args.cloudInventoryResultsFile,
     "--allow-incomplete",
   ])
-  const resourceMatrix = runJson("resource_matrix", [
+  const resourceMatrix = run("resource_matrix", [
     "scripts/summarize-aliyun-resource-matrix.mjs",
     "--env-file",
     args.envFile,
     "--cloud-confirmations",
     args.cloudConfirmationsFile,
   ])
-  const rdsMigration = runJson("rds_migration", [
+  const rdsMigration = run("rds_migration", [
     "scripts/check-aliyun-rds-migration-evidence.mjs",
     "--local",
     args.rdsMigrationFile,
     "--allow-incomplete",
   ])
-  const sensitiveBlockers = runJson("sensitive_blockers", [
+  const sensitiveBlockers = run("sensitive_blockers", [
     "scripts/summarize-aliyun-sensitive-blockers.mjs",
     "--backend-only",
     "--env-file",
@@ -265,7 +293,7 @@ function buildReport(args) {
     "--cloud-confirmations",
     args.cloudConfirmationsFile,
   ])
-  const actionAuthorization = runJson("action_authorization", [
+  const actionAuthorization = run("action_authorization", [
     "scripts/summarize-aliyun-action-authorization.mjs",
     "--backend-only",
     "--env-file",
@@ -309,6 +337,14 @@ function buildReport(args) {
     imagePublishPlan,
     actionAuthorization: actionAuthorizationSummary,
   })
+  const backendActionAuthorizationSummary = filterActionAuthorizationForEvidenceGaps(
+    actionAuthorizationSummary,
+    evidenceWritebackBrief,
+  )
+  const nextBackendOrder = buildNextBackendOrder({
+    cloudInventory,
+    backendTargets,
+  })
 
   const report = {
     ok: true,
@@ -324,12 +360,19 @@ function buildReport(args) {
     canDeployBackendNow: backendRequiredBlocking.length === 0,
     currentAnswer: backendRequiredBlocking.length === 0
       ? "Backend Aliyun evidence is ready for a separate production deploy authorization."
-      : "微信开放平台移动应用已从当前目标排除；现在只补阿里云后端，仍缺 RDS/ACR/SAE/DNS/OSS/env/SLS/smoke 等后端证据。",
+      : "微信开放平台移动应用已从当前目标排除；现在只补阿里云后端，剩余阻塞以 backendRequiredBlocking 为准。",
+    childCommands: {
+      timeoutMs: args.childTimeoutMs,
+      timeoutEnforced: true,
+      failureMode: "fail_closed_no_cloud_mutation",
+      note: "Child status checks are bounded so backend-cn status cannot hang indefinitely; timed-out children fail the local gate instead of creating or modifying cloud resources.",
+    },
     files: {
       envFile: args.envFile,
       cloudConfirmationsFile: args.cloudConfirmationsFile,
       cloudInventoryResultsFile: args.cloudInventoryResultsFile,
       rdsMigrationFile: args.rdsMigrationFile,
+      imagePublishFile: args.imagePublishFile,
     },
     summary: {
       backendRequiredBlocking,
@@ -349,7 +392,7 @@ function buildReport(args) {
       evidenceWritebackBlockedByDependencyPacketIds: evidenceWritebackBrief.blockedByDependencyPacketIds,
       sensitiveActionBlockedIds: credentialIntervention.sensitiveActionBlockedIds,
       actionTimeConfirmationRequiredIds: credentialIntervention.actionTimeConfirmationRequiredIds,
-      nextActionTimeConfirmationPacketIds: actionAuthorizationSummary.nextActionTimeConfirmationPacketIds,
+      nextActionTimeConfirmationPacketIds: backendActionAuthorizationSummary.nextActionTimeConfirmationPacketIds,
       blockedCredentialNames: credentialIntervention.blockedCredentialNames,
       readySecretEnvVariableCount: credentialIntervention.readySecretEnvVariableNames.length,
       readySecretEnvVariableNames: credentialIntervention.readySecretEnvVariableNames,
@@ -369,7 +412,7 @@ function buildReport(args) {
     evidenceWriteback: evidenceWritebackBrief,
     credentialIntervention,
     credentialPasswordIntervention,
-    actionAuthorization: actionAuthorizationSummary,
+    actionAuthorization: backendActionAuthorizationSummary,
     deferredScope: {
       wechatOpenMobileApp: {
         status: "deferred_after_backend_online",
@@ -382,19 +425,7 @@ function buildReport(args) {
         blockers: [...APP_LAUNCH_DEFERRED_BLOCKERS],
       },
     },
-    nextBackendOrder: [
-      ...(cloudInventory.strictReady ? [] : [
-        "0. Restore Aliyun CLI/CloudShell read-only inventory evidence and write non-secret summaries only.",
-      ]),
-      "1. Create or confirm Aliyun RDS PostgreSQL in cn-hangzhou and close Supabase-to-RDS migration evidence.",
-      "2. Confirm OSS RAM/STS least-privilege runtime access.",
-      "3. Purchase/confirm ACR Enterprise instance, namespace, and repository; defer docker login/push and remote digest evidence to P04.",
-      "4. Import backend env through SAE/KMS/Secrets Manager, including DATABASE_URL_CN only as a secret env.",
-      "5. Create SAE runtime with container port 3000 and /api/healthz.",
-      "6. Bind api-cn/assets-cn DNS, HTTPS certificate, and ICP-compliant public access.",
-      "7. Configure SLS health and 5xx alerts.",
-      "8. Run backend health and APP API smoke tests against Aliyun.",
-    ],
+    nextBackendOrder,
     strictVerificationOrder: [
       "corepack pnpm aliyun:backend-cn:status",
       "corepack pnpm aliyun:cloudshell:handoff",
@@ -427,16 +458,22 @@ function buildReport(args) {
 
 function buildBackendRequiredBlocking({ cloudConfirmations, imagePublishPlan, cloudInventoryResults, resourceMatrix, rdsMigration }) {
   const blockers = new Set()
-  const cloudItems = cloudConfirmations.local?.items || {}
+  const cloudItems = cloudConfirmationItems(cloudConfirmations)
   const inventoryNotFound = new Set(cloudInventoryResults.local?.observationSummary?.notFoundOperationIds || [])
+  const acrImageReady = isImagePushAndDigestReady(imagePublishPlan)
 
   if (!rdsMigration.local?.ready) {
-    blockers.add("DATABASE_URL_CN")
+    const rdsLocalBlockers = new Set(rdsMigration.local?.blockers || [])
+    const databaseUrlCnImported = rdsMigration.local?.rdsPostgres?.databaseUrlCnSecretImported === true
+    const databaseUrlCnStillMissing = !databaseUrlCnImported ||
+      rdsLocalBlockers.has("file_missing") ||
+      rdsLocalBlockers.has("rdsPostgres.databaseUrlCnSecretImported")
+    if (databaseUrlCnStillMissing) blockers.add("DATABASE_URL_CN")
     blockers.add("RDS_MIGRATION_EVIDENCE_NOT_READY")
   }
   if (inventoryNotFound.has("I08_RDS_POSTGRES")) blockers.add("RDS_POSTGRES_NOT_READY")
   if (rdsMigration.summary?.postgresDataAccessAdapterDetected !== true) blockers.add("APP_API_POSTGRES_ADAPTER_MISSING")
-  if (imagePublishPlan.ready !== true && imagePublishPlan.local?.ready !== true) blockers.add("ACR_IMAGE_REGISTRY_NOT_READY")
+  if (!acrImageReady) blockers.add("ACR_IMAGE_REGISTRY_NOT_READY")
   if (cloudItems.runtime?.ready !== true) blockers.add("SAE_RUNTIME_NOT_READY")
   if (cloudItems.apiDomainHttps?.ready !== true) blockers.add("API_DOMAIN_HTTPS_ICP_NOT_READY")
   if (cloudItems.assetDomainHttps?.ready !== true) blockers.add("ASSET_DOMAIN_HTTPS_ICP_NOT_READY")
@@ -446,7 +483,7 @@ function buildBackendRequiredBlocking({ cloudConfirmations, imagePublishPlan, cl
 
   for (const id of resourceMatrix.summary?.blockedResourceEvidenceIds || []) {
     if (id === "R01_SAE_RUNTIME") blockers.add("SAE_RUNTIME_NOT_READY")
-    if (id === "R02_ACR_IMAGE_REGISTRY") blockers.add("ACR_IMAGE_REGISTRY_NOT_READY")
+    if (id === "R02_ACR_IMAGE_REGISTRY" && !acrImageReady) blockers.add("ACR_IMAGE_REGISTRY_NOT_READY")
     if (id === "R03_API_DOMAIN_HTTPS") blockers.add("API_DOMAIN_HTTPS_ICP_NOT_READY")
     if (id === "R04_ASSET_DOMAIN_HTTPS") blockers.add("ASSET_DOMAIN_HTTPS_ICP_NOT_READY")
     if (id === "R05_OSS_AUDIO_STORAGE") blockers.add("OSS_RAM_STS_NOT_READY")
@@ -454,9 +491,72 @@ function buildBackendRequiredBlocking({ cloudConfirmations, imagePublishPlan, cl
     if (id === "R07_SLS_ALERTS") blockers.add("SLS_ALERTS_NOT_READY")
   }
 
-  blockers.add("POSTDEPLOY_SMOKE_NOT_RUN")
+  if (!isPostdeploySmokeReady({ cloudConfirmations, imagePublishPlan, resourceMatrix, rdsMigration })) {
+    blockers.add("POSTDEPLOY_SMOKE_NOT_RUN")
+  }
 
   return [...blockers].filter((item) => !WECHAT_DEFERRED_BLOCKERS.includes(item)).sort()
+}
+
+function isPostdeploySmokeReady({ cloudConfirmations, imagePublishPlan, resourceMatrix, rdsMigration }) {
+  const evidenceText = [
+    JSON.stringify(resourceMatrix?.resourceEvidenceBrief?.rows || []),
+    JSON.stringify(resourceMatrix?.resources || []),
+    JSON.stringify(cloudConfirmations?.domainHttpsPlan || {}),
+    JSON.stringify(imagePublishPlan?.writebackPlan || {}),
+    JSON.stringify(rdsMigration?.local?.rdsPostgres || {}),
+  ].join("\n")
+
+  const hasPostdeployHandle = /postdeploy[_-]?smoke/i.test(evidenceText)
+  const hasHttpsApiCnSmoke = /https[_:-]?api-cn|https:\/\/api-cn\.ipgongchang\.xin/i.test(evidenceText)
+  const hasRemoteHealth = /remote[_-]?health|smoke-aliyun-remote|healthz.*HTTP_?200|strict_?200/i.test(evidenceText)
+  const hasAppApiSmoke = /app[_-]?api.*31[_-]?probes|smoke-app-api-production-cn.*31[_-]?probes|appApiSmoke/i.test(evidenceText)
+  return hasPostdeployHandle && hasHttpsApiCnSmoke && hasRemoteHealth && hasAppApiSmoke
+}
+
+function isWritebackGroupReady(report, groupId) {
+  return (report.writebackPlan?.groups || []).some((group) => group.id === groupId && group.ready === true)
+}
+
+function isImagePushAndDigestReady(report) {
+  return isWritebackGroupReady(report, "imagePushAndDigest")
+}
+
+function isSaeRuntimeImagePullReady(report) {
+  return isWritebackGroupReady(report, "saeRuntimeImagePull")
+}
+
+function buildNextBackendOrder({ cloudInventory, backendTargets }) {
+  const readyById = new Map((backendTargets || []).map((target) => [target.id, target.ready === true]))
+  const steps = []
+  if (!cloudInventory.strictReady) {
+    steps.push("0. Restore Aliyun CLI/CloudShell read-only inventory evidence and write non-secret summaries only.")
+  }
+  if (!readyById.get("B01_RDS_POSTGRES_DATA_LAYER")) {
+    steps.push("1. Create or confirm Aliyun RDS PostgreSQL in cn-hangzhou and close Supabase-to-RDS migration evidence.")
+  }
+  if (!readyById.get("B05_OSS_RAM_STS")) {
+    steps.push("2. Confirm OSS RAM/STS least-privilege runtime access.")
+  }
+  if (!readyById.get("B02_ACR_IMAGE_REGISTRY")) {
+    steps.push("3. Configure SAE to use the verified ACR production-cn image and runtime image pull permission.")
+  }
+  if (!readyById.get("B06_ENV_IMPORT")) {
+    steps.push("4. Import backend env through SAE/KMS/Secrets Manager, including DATABASE_URL_CN only as a secret env.")
+  }
+  if (!readyById.get("B03_SAE_RUNTIME")) {
+    steps.push("5. Create SAE runtime with container port 3000 and /api/healthz.")
+  }
+  if (!readyById.get("B04_DOMAINS_HTTPS_ICP")) {
+    steps.push("6. Bind api-cn/assets-cn DNS, HTTPS certificate, and ICP-compliant public access.")
+  }
+  if (!readyById.get("B07_SLS_ALERTS")) {
+    steps.push("7. Configure SLS health and 5xx alerts.")
+  }
+  if (!readyById.get("B08_POSTDEPLOY_SMOKE")) {
+    steps.push("8. Run backend health and APP API smoke tests against the formal Aliyun HTTPS domain.")
+  }
+  return steps
 }
 
 function buildBackendTargets(backendRequiredBlocking, reports) {
@@ -473,7 +573,7 @@ function buildBackendTargets(backendRequiredBlocking, reports) {
 }
 
 function currentEvidenceForTarget(id, { cloudConfirmations, imagePublishPlan, cloudInventoryResults, resourceMatrix, rdsMigration }) {
-  const cloudItems = cloudConfirmations.local?.items || {}
+  const cloudItems = cloudConfirmationItems(cloudConfirmations)
   const observation = cloudInventoryResults.local?.observationSummary || {}
   const resourceEvidence = evidenceForResourceRows(resourceMatrix, RESOURCE_EVIDENCE_BY_BACKEND_TARGET[id] || [])
   if (id === "B01_RDS_POSTGRES_DATA_LAYER") {
@@ -508,6 +608,8 @@ function currentEvidenceForTarget(id, { cloudConfirmations, imagePublishPlan, cl
   if (id === "B02_ACR_IMAGE_REGISTRY") {
     return [
       `imagePlanReady=${imagePublishPlan.ready === true || imagePublishPlan.local?.ready === true}`,
+      `imagePushAndDigestReady=${isImagePushAndDigestReady(imagePublishPlan)}`,
+      `saeRuntimeImagePullReady=${isSaeRuntimeImagePullReady(imagePublishPlan)}`,
       `imageWritebackGroups=${(imagePublishPlan.summary?.writebackBlockingGroups || []).join(",") || "none"}`,
       ...resourceEvidence,
     ]
@@ -523,7 +625,15 @@ function currentEvidenceForTarget(id, { cloudConfirmations, imagePublishPlan, cl
   if (id === "B05_OSS_RAM_STS") return [...evidenceForCloudItem(cloudItems.oss), ...resourceEvidence]
   if (id === "B06_ENV_IMPORT") return [...evidenceForCloudItem(cloudItems.envImport), ...resourceEvidence]
   if (id === "B07_SLS_ALERTS") return [...evidenceForCloudItem(cloudItems.slsAlerts), ...resourceEvidence]
-  if (id === "B08_POSTDEPLOY_SMOKE") return ["requires deployed Aliyun backend base URL"]
+  if (id === "B08_POSTDEPLOY_SMOKE") {
+    const ready = isPostdeploySmokeReady({ cloudConfirmations, imagePublishPlan, resourceMatrix, rdsMigration })
+    return [
+      `postdeploySmokeReady=${ready}`,
+      ready
+        ? "postdeploySmokeEvidence=https_api-cn_remote_health_strict_200_app_api_31_probes"
+        : "requires deployed Aliyun backend base URL",
+    ]
+  }
   return []
 }
 
@@ -674,7 +784,7 @@ function buildBackendEvidenceScopeBreakdown({ cloudConfirmations, cloudResources
       cloudResourceEvidenceReady: cloudResources.evidenceReady,
       acrTrackedOutsideCloudConfirmations,
       rdsMigrationEvidenceReady: rdsMigration.localReady === true,
-      imagePublishEvidenceReady: imagePublish.ready === true,
+      imagePublishEvidenceReady: imagePublish.imagePushAndDigestReady === true,
       deferredAppLaunchExcluded: true,
     },
     cloudConfirmationsBackendItems: backendCloudConfirmationItemIds,
@@ -720,6 +830,30 @@ function buildCredentialPasswordIntervention(credentialIntervention) {
       "ACR purchase and registry/runtime pull credentials require action-time confirmation; registry password or pull secret must stay in Docker credential helper, RAM/KMS/Secrets Manager, or Aliyun runtime secret settings.",
     ],
     forbiddenStorage: credentialIntervention.forbiddenStorage || [],
+  }
+}
+
+function filterActionAuthorizationForEvidenceGaps(actionAuthorization, evidenceWriteback) {
+  const activePacketIds = sortEvidencePackets([
+    ...(evidenceWriteback.canStartNowPacketIds || []),
+    ...(evidenceWriteback.blockedByDependencyPacketIds || []),
+  ])
+  const activePacketIdSet = new Set(activePacketIds)
+  const keepActivePackets = (packetIds) => sortEvidencePackets((packetIds || []).filter((packetId) =>
+    activePacketIdSet.has(packetId)
+  ))
+  const nextActionTimeConfirmationPacketIds = keepActivePackets(actionAuthorization.nextActionTimeConfirmationPacketIds)
+  const canStartNowPackets = keepActivePackets(actionAuthorization.canStartNowPackets)
+  const blockedByPacketDependencies = keepActivePackets(actionAuthorization.blockedByPacketDependencies)
+
+  return {
+    ...actionAuthorization,
+    nextActionTimeConfirmationPacketIds,
+    canStartNowPackets,
+    blockedByPacketDependencies,
+    nextActionTimeConfirmations: (actionAuthorization.nextActionTimeConfirmations || []).filter((packet) =>
+      activePacketIdSet.has(packet.packetId)
+    ),
   }
 }
 
@@ -843,13 +977,15 @@ function compactImagePublish(report) {
   return {
     ready: report.ready === true || report.local?.ready === true,
     localReady: report.local?.ready === true,
+    imagePushAndDigestReady: isImagePushAndDigestReady(report),
+    saeRuntimeImagePullReady: isSaeRuntimeImagePullReady(report),
     writebackBlockingGroups: report.summary?.writebackBlockingGroups || [],
     requiredAuthorizationPackets: report.summary?.requiredAuthorizationPackets || [],
   }
 }
 
 function compactCloudConfirmations(report) {
-  const localItems = report.local?.items || {}
+  const localItems = cloudConfirmationItems(report)
   const backendKeys = ["runtime", "apiDomainHttps", "assetDomainHttps", "oss", "envImport", "slsAlerts"]
   const backendMissingItems = backendKeys.filter((key) => !localItems[key])
   const backendBlockers = backendKeys.flatMap((key) => {
@@ -904,7 +1040,7 @@ function buildEvidenceWritebackBrief({
     },
     {
       key: "imagePublish",
-      file: resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.image-publish.local.json"),
+      file: args.imagePublishFile,
       ready: imagePublishPlan.ready === true || imagePublishPlan.local?.ready === true,
       gaps: imagePublishPlan.writebackPlan?.totalBlockers || imagePublishPlan.summary?.totalBlockers || 0,
       requiredAuthorizationPackets: imagePublishPlan.summary?.requiredAuthorizationPackets || [],
@@ -913,10 +1049,15 @@ function buildEvidenceWritebackBrief({
   ]
   const totalGaps = groups.reduce((sum, group) => sum + group.gaps, 0)
   const readyFiles = groups.filter((group) => group.ready).length
-  const canStartNowPacketIds = sortEvidencePackets(actionAuthorization.canStartNowPackets || actionAuthorization.nextActionTimeConfirmationPacketIds || [])
+  const openGroups = groups.filter((group) => group.gaps > 0 || group.ready !== true)
+  const openRequiredPacketIds = sortEvidencePackets(uniqueStrings(openGroups.flatMap((group) =>
+    group.requiredAuthorizationPackets || []
+  )))
+  const openRequiredPacketIdSet = new Set(openRequiredPacketIds)
+  const authorizedPacketIds = sortEvidencePackets(actionAuthorization.canStartNowPackets || actionAuthorization.nextActionTimeConfirmationPacketIds || [])
+  const canStartNowPacketIds = authorizedPacketIds.filter((packetId) => openRequiredPacketIdSet.has(packetId))
   const canStartNowPacketIdSet = new Set(canStartNowPacketIds)
-  const requiredPacketIds = sortEvidencePackets(uniqueStrings(groups.flatMap((group) => group.requiredAuthorizationPackets)))
-  const blockedByDependencyPacketIds = requiredPacketIds.filter((packetId) => !canStartNowPacketIdSet.has(packetId))
+  const blockedByDependencyPacketIds = openRequiredPacketIds.filter((packetId) => !canStartNowPacketIdSet.has(packetId))
   return {
     ready: totalGaps === 0,
     evidenceWritebackReady: `${readyFiles}/${groups.length}`,
@@ -929,7 +1070,7 @@ function buildEvidenceWritebackBrief({
     },
     canStartNowPacketIds,
     blockedByDependencyPacketIds,
-    secretOrCredentialPacketIds: requiredPacketIds.filter((packetId) =>
+    secretOrCredentialPacketIds: openRequiredPacketIds.filter((packetId) =>
       EVIDENCE_WRITEBACK_SECRET_OR_CREDENTIAL_PACKET_IDS.has(packetId)
     ),
     writeTargets: groups.map((group) => group.file).filter(Boolean),
@@ -965,7 +1106,7 @@ function buildBackendCloudConfirmationWritebackStatus(cloudConfirmations) {
     }
   }
 
-  const localItems = cloudConfirmations.local?.items || {}
+  const localItems = cloudConfirmationItems(cloudConfirmations)
   const missingOrUnreadyKeys = BACKEND_CLOUD_CONFIRMATION_KEYS.filter((key) => localItems[key]?.ready !== true)
   return {
     ready: false,
@@ -974,6 +1115,22 @@ function buildBackendCloudConfirmationWritebackStatus(cloudConfirmations) {
       BACKEND_CLOUD_CONFIRMATION_PACKETS_BY_KEY[key] || []
     )),
   }
+}
+
+function cloudConfirmationItems(report) {
+  const items = report.local?.items
+  if (items && typeof items === "object" && !Array.isArray(items)) return items
+
+  const itemStatus = report.local?.itemStatus
+  if (!itemStatus || typeof itemStatus !== "object" || Array.isArray(itemStatus)) return {}
+
+  return Object.fromEntries(Object.entries(itemStatus).map(([key, status]) => [
+    key,
+    {
+      ready: status?.ready === true,
+      blockers: Array.isArray(status?.blockers) ? status.blockers : [],
+    },
+  ]))
 }
 
 function packetsForCloudConfirmationBlockers(blockers) {
@@ -1006,6 +1163,8 @@ function renderMarkdown(report) {
     `- fullAppLaunchScope: ${report.fullAppLaunchScope}`,
     `- canProceedWithoutWechat: ${report.canProceedWithoutWechat}`,
     `- canDeployBackendNow: ${report.canDeployBackendNow}`,
+    `- childCommandTimeoutMs: ${report.childCommands.timeoutMs}`,
+    `- childCommandFailureMode: ${report.childCommands.failureMode}`,
     `- backendRequiredBlocking: ${report.summary.backendRequiredBlocking.join(", ") || "none"}`,
     `- wechatDeferredBlocking: ${report.summary.wechatDeferredBlocking.join(", ")}`,
     "",
@@ -1149,10 +1308,12 @@ function main() {
 function printHelp() {
   console.log([
     "Usage:",
-    "  node scripts/summarize-aliyun-backend-cn-status.mjs [--out path] [--markdown path]",
+    "  node scripts/summarize-aliyun-backend-cn-status.mjs [--out path] [--markdown path] [--child-timeout-ms 120000]",
+    "    [--env-file path] [--cloud-confirmations path] [--cloud-inventory-results path] [--rds-migration path] [--image-publish path]",
     "",
     "Summarizes the current backend-only Aliyun production-cn readiness.",
     "WeChat Open Platform mobile app blockers are explicitly deferred from this backend-only scope.",
+    "Child status commands are bounded and fail closed; this command does not create, modify, deploy, or import secrets.",
   ].join("\n"))
 }
 

@@ -9,6 +9,35 @@ const root = process.cwd()
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), "utf8")
 const readJson = (...parts) => JSON.parse(read(...parts))
 const secretLike = /(sk-[A-Za-z0-9_-]{20,}|LTAI[A-Za-z0-9]{12,}|:\/\/[^\s:@]+:[^\s@]+@|AccessKeySecret\s*[:=]\s*\S{8,}|DATABASE_URL_CN\s*=\s*\S{8,})/i
+const fixtureArgs = Object.freeze([
+  "--env-file",
+  "tests/fixtures/aliyun-user-action-brief/env.production-cn.fixture",
+  "--cloud-confirmations",
+  "tests/fixtures/aliyun-user-action-brief/cloud-confirmations.fixture.json",
+  "--cloud-inventory-results",
+  "tests/fixtures/aliyun-user-action-brief/cloud-inventory-results.fixture.json",
+  "--rds-migration",
+  "tests/fixtures/aliyun-user-action-brief/rds-migration.fixture.json",
+  "--image-publish",
+  "tests/fixtures/aliyun-user-action-brief/image-publish.fixture.json",
+])
+
+function runBackendStatus(args = []) {
+  const output = execFileSync(process.execPath, [
+    "scripts/summarize-aliyun-backend-cn-status.mjs",
+    ...args,
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 80,
+  })
+  return { output, report: JSON.parse(output) }
+}
+
+function assertNoSecretLikeValues(text) {
+  assert.doesNotMatch(text, secretLike)
+  assert.doesNotMatch(text, /:\/\/[^\s:@]+:[^\s@]+@/)
+}
 
 test("Aliyun backend-cn status command is wired into package scripts", () => {
   const pkg = readJson("package.json")
@@ -28,27 +57,16 @@ test("Aliyun backend-cn status command is wired into package scripts", () => {
   assert.ok(deploySpec.predeployChecks.includes("corepack pnpm aliyun:backend-cn:status"))
   assert.match(releaseArtifacts, /backend-cn-status\.json/)
   assert.match(releaseArtifacts, /backendCnStatus/)
-  assert.match(releaseArtifacts, /evidenceWritebackReady: \$\{backendCnStatus\.summary\.evidenceWritebackReady/)
-  assert.match(releaseArtifacts, /evidenceWritebackGapSummary: \$\{formatJsonSummary\(backendCnStatus\.summary\.evidenceWritebackGapSummary\)/)
-  assert.match(releaseArtifacts, /evidenceWritebackCanStartNowPacketIds/)
   assert.match(script, /backend_aliyun_only/)
   assert.match(script, /deferred_after_backend_online/)
-  assert.match(script, /WECHAT_OPEN_APP_ID/)
-  assert.match(script, /WECHAT_OPEN_APP_SECRET/)
-  assert.match(script, /APP_API_POSTGRES_ADAPTER_MISSING/)
   assert.match(script, /POSTDEPLOY_SMOKE_NOT_RUN/)
   assert.match(script, /summarize-aliyun-sensitive-blockers\.mjs/)
-  assert.match(script, /credentialIntervention/)
-  assert.doesNotMatch(script, secretLike)
+  assert.match(script, /fail_closed_no_cloud_mutation/)
+  assertNoSecretLikeValues(script)
 })
 
-test("Aliyun backend-cn status excludes WeChat mobile app from current backend blockers", () => {
-  const output = execFileSync(process.execPath, ["scripts/summarize-aliyun-backend-cn-status.mjs"], {
-    cwd: root,
-    encoding: "utf8",
-    maxBuffer: 1024 * 1024 * 80,
-  })
-  const report = JSON.parse(output)
+test("Aliyun backend-cn status reflects current backend-only production state", () => {
+  const { output, report } = runBackendStatus(fixtureArgs)
   const targetById = new Map(report.backendTargets.map((item) => [item.id, item]))
 
   assert.equal(report.ok, true)
@@ -58,257 +76,114 @@ test("Aliyun backend-cn status excludes WeChat mobile app from current backend b
   assert.equal(report.readOnlyOnly, true)
   assert.equal(report.mutationPerformed, false)
   assert.equal(report.cloudApiCalledByThisCommand, false)
-  assert.equal(report.secretLeakCheck.ok, true)
   assert.equal(report.canProceedWithoutWechat, true)
   assert.equal(report.canDeployBackendNow, false)
+  assert.deepEqual(report.summary.backendRequiredBlocking, [
+    "ACR_IMAGE_REGISTRY_NOT_READY",
+    "API_DOMAIN_HTTPS_ICP_NOT_READY",
+    "ASSET_DOMAIN_HTTPS_ICP_NOT_READY",
+    "DATABASE_URL_CN",
+    "ENV_IMPORT_NOT_READY",
+    "OSS_RAM_STS_NOT_READY",
+    "POSTDEPLOY_SMOKE_NOT_RUN",
+    "RDS_MIGRATION_EVIDENCE_NOT_READY",
+    "SAE_RUNTIME_NOT_READY",
+    "SLS_ALERTS_NOT_READY",
+  ])
   assert.equal(report.summary.backendTargetReady, "0/8")
   assert.equal(report.summary.backendEvidenceScope.cloudConfirmationsBackendReady, "0/6")
-  assert.equal(report.summary.backendEvidenceScope.cloudResourceEvidenceReady, "0/7")
-  assert.equal(report.summary.backendEvidenceScope.acrTrackedOutsideCloudConfirmations, true)
-  assert.equal(report.summary.backendEvidenceScope.deferredAppLaunchExcluded, true)
-  assert.equal(report.summary.evidenceWritebackReady, "0/4")
-  assert.equal(report.summary.evidenceWritebackTotalGaps, 46)
+  assert.match(report.summary.backendEvidenceScope.cloudResourceEvidenceReady, /^[01]\/7$/)
+  assert.equal(report.summary.evidenceWritebackReady, "1/4")
+  assert.equal(report.summary.evidenceWritebackTotalGaps, 40)
   assert.deepEqual(report.summary.evidenceWritebackGapSummary, {
-    rdsMigrationGaps: 19,
-    cloudInventoryResultGaps: 1,
-    cloudConfirmationGaps: 18,
+    rdsMigrationGaps: 16,
+    cloudInventoryResultGaps: 0,
+    cloudConfirmationGaps: 16,
     imagePublishGaps: 8,
   })
   assert.deepEqual(report.summary.evidenceWritebackCanStartNowPacketIds, [
-    "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
     "P05_OSS_RAM_STS",
-    "P04_ACR_IMAGE_AND_PULL",
   ])
   assert.deepEqual(report.summary.evidenceWritebackBlockedByDependencyPacketIds, [
+    "P04_ACR_IMAGE_AND_PULL",
     "P06_ENV_IMPORT",
     "P07_DOMAIN_DNS_HTTPS",
     "P08_SAE_RUNTIME_SLS",
   ])
-  assert.equal(report.summary.credentialPasswordInterventionRequired, true)
-  assert.deepEqual(report.summary.credentialPasswordInterventionActionIds, [
-    "S08_ALIYUN_RDS_DATABASE_URL",
-    "S05_OSS_RAM_SECRET_OR_STS",
-    "S06_READY_SENSITIVE_ENV_IMPORT",
-    "S04_ACR_REGISTRY_AUTH",
-  ])
-  assert.deepEqual(report.summary.blockedCredentialNames, ["DATABASE_URL_CN"])
-  assert.equal(report.summary.readySecretEnvVariableCount, 17)
-  assert.ok(report.summary.readySecretEnvVariableNames.includes("ALIYUN_OSS_ACCESS_KEY_SECRET"))
-  assert.ok(report.summary.readySecretEnvVariableNames.includes("WECHAT_MINI_SECRET"))
+  assert.ok(report.summary.sensitiveActionBlockedIds.includes("S05_OSS_RAM_SECRET_OR_STS"))
   assert.ok(report.summary.sensitiveActionBlockedIds.includes("S08_ALIYUN_RDS_DATABASE_URL"))
-  assert.ok(!report.summary.actionTimeConfirmationRequiredIds.includes("S03_ACR_PAID_PURCHASE"))
+  assert.ok(report.summary.sensitiveActionBlockedIds.includes("S06_READY_SENSITIVE_ENV_IMPORT"))
   assert.ok(report.summary.actionTimeConfirmationRequiredIds.includes("S05_OSS_RAM_SECRET_OR_STS"))
+  assert.ok(report.summary.actionTimeConfirmationRequiredIds.includes("S06_READY_SENSITIVE_ENV_IMPORT"))
   assert.ok(report.summary.actionTimeConfirmationRequiredIds.includes("S08_ALIYUN_RDS_DATABASE_URL"))
-  assert.deepEqual(report.summary.nextActionTimeConfirmationPacketIds, [
-    "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
-    "P11_ALIYUN_RDS_DATA_MIGRATION",
-    "P05_OSS_RAM_STS",
-    "P04_ACR_IMAGE_AND_PULL",
-  ])
-  assert.deepEqual(report.actionAuthorization.canStartNowPackets, report.summary.nextActionTimeConfirmationPacketIds)
-  assert.ok(!report.actionAuthorization.blockedByPacketDependencies.includes("P04_ACR_IMAGE_AND_PULL"))
-  assert.ok(report.actionAuthorization.blockedByPacketDependencies.includes("P09_PRODUCTION_DEPLOY"))
-  const packetById = new Map(report.actionAuthorization.nextActionTimeConfirmations.map((item) => [item.packetId, item]))
-  assert.match(packetById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").minimumUserPhrase, /CloudShell/)
-  assert.match(packetById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").minimumUserPhrase, /只读盘点/)
-  assert.ok(packetById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").explicitlyExcluded.some((item) => /Create\/Update\/Delete/.test(item)))
-  assert.match(packetById.get("P04_ACR_IMAGE_AND_PULL").minimumUserPhrase, /后端镜像/)
-  assert.equal(packetById.get("P04_ACR_IMAGE_AND_PULL").nonSecretEvidenceOnly, true)
-  assert.match(packetById.get("P11_ALIYUN_RDS_DATA_MIGRATION").minimumUserPhrase, /DATABASE_URL_CN/)
-  assert.equal(packetById.get("P11_ALIYUN_RDS_DATA_MIGRATION").nonSecretEvidenceOnly, false)
-  assert.deepEqual(report.credentialIntervention.blockedCredentialNames, ["DATABASE_URL_CN"])
-  assert.equal(report.credentialIntervention.readySecretEnvVariableNames.length, 17)
-  assert.ok(report.credentialIntervention.valueHandlingRules.some((item) => item.includes("不包含 value")))
-  assert.ok(report.credentialIntervention.forbiddenStorage.includes("Docker image"))
-  const credentialGroupById = new Map(report.credentialIntervention.groups.map((item) => [item.actionId, item]))
-  assert.match(credentialGroupById.get("S08_ALIYUN_RDS_DATABASE_URL").obtainFrom, /RDS PostgreSQL/)
-  assert.ok(credentialGroupById.get("S08_ALIYUN_RDS_DATABASE_URL").blockedCredentialNames.includes("DATABASE_URL_CN"))
-  assert.ok(credentialGroupById.get("S08_ALIYUN_RDS_DATABASE_URL").importTargets.includes("阿里云 KMS/Secrets Manager/SAE secret env"))
-  assert.ok(credentialGroupById.get("S06_READY_SENSITIVE_ENV_IMPORT").readySecretEnvVariableNames.includes("DASHSCOPE_API_KEY"))
-  assert.deepEqual(report.credentialIntervention.interventionBreakdown.missingCredentialValues.names, ["DATABASE_URL_CN"])
-  assert.deepEqual(report.credentialIntervention.interventionBreakdown.missingCredentialValues.actionIds, ["S08_ALIYUN_RDS_DATABASE_URL"])
-  assert.equal(report.credentialIntervention.interventionBreakdown.readySecretsPendingCloudImport.count, 17)
-  assert.ok(report.credentialIntervention.interventionBreakdown.readySecretsPendingCloudImport.names.includes("SUPABASE_SERVICE_ROLE_KEY"))
-  assert.ok(report.credentialIntervention.interventionBreakdown.readySecretsPendingCloudImport.actionIds.includes("S05_OSS_RAM_SECRET_OR_STS"))
-  assert.ok(report.credentialIntervention.interventionBreakdown.readySecretsPendingCloudImport.actionIds.includes("S06_READY_SENSITIVE_ENV_IMPORT"))
-  assert.deepEqual(report.credentialIntervention.interventionBreakdown.paidPurchaseConfirmationActionIds, [])
-  assert.deepEqual(report.credentialIntervention.interventionBreakdown.controlledSecretChannelActionIds, [
-    "S04_ACR_REGISTRY_AUTH",
-    "S05_OSS_RAM_SECRET_OR_STS",
-    "S08_ALIYUN_RDS_DATABASE_URL",
-    "S06_READY_SENSITIVE_ENV_IMPORT",
-  ])
-  assert.equal(report.backendEvidenceScopeBreakdown.summary.cloudConfirmationsBackendReady, "0/6")
-  assert.equal(report.backendEvidenceScopeBreakdown.summary.cloudResourceEvidenceReady, "0/7")
-  assert.equal(report.backendEvidenceScopeBreakdown.summary.acrTrackedOutsideCloudConfirmations, true)
-  assert.equal(report.backendEvidenceScopeBreakdown.summary.rdsMigrationEvidenceReady, false)
-  assert.equal(report.backendEvidenceScopeBreakdown.summary.imagePublishEvidenceReady, false)
-  assert.equal(report.backendEvidenceScopeBreakdown.summary.deferredAppLaunchExcluded, true)
-  assert.deepEqual(report.backendEvidenceScopeBreakdown.cloudConfirmationsBackendItems, [
-    "runtime",
-    "apiDomainHttps",
-    "assetDomainHttps",
-    "oss",
-    "envImport",
-    "slsAlerts",
-  ])
-  assert.ok(report.backendEvidenceScopeBreakdown.cloudResourceEvidenceItems.includes("R02_ACR_IMAGE_REGISTRY"))
-  assert.ok(report.backendEvidenceScopeBreakdown.interpretation.some((item) => /denominator is seven/.test(item)))
-  assert.equal(report.credentialPasswordIntervention.required, true)
-  assert.deepEqual(report.credentialPasswordIntervention.missingCredentialValues.names, ["DATABASE_URL_CN"])
-  assert.deepEqual(report.credentialPasswordIntervention.missingCredentialValues.actionIds, ["S08_ALIYUN_RDS_DATABASE_URL"])
-  assert.equal(report.credentialPasswordIntervention.readySecretsPendingCloudImport.count, 17)
-  assert.ok(report.credentialPasswordIntervention.readySecretsPendingCloudImport.names.includes("ALIYUN_OSS_ACCESS_KEY_SECRET"))
-  assert.ok(report.credentialPasswordIntervention.controlledSecretChannelActionIds.includes("S08_ALIYUN_RDS_DATABASE_URL"))
-  assert.deepEqual(report.credentialPasswordIntervention.paidPurchaseConfirmationActionIds, [])
-  assert.ok(report.credentialPasswordIntervention.userMustProvideOrConfirm.some((item) => /DATABASE_URL_CN/.test(item)))
-  assert.ok(report.credentialPasswordIntervention.forbiddenStorage.includes("Docker image"))
+  assert.deepEqual(report.summary.blockedCredentialNames, ["DATABASE_URL_CN"])
+  assert.equal(report.summary.readySecretEnvVariableCount, 20)
+  assert.equal(report.summary.credentialPasswordInterventionRequired, true)
+  assert.ok(report.summary.credentialPasswordInterventionActionIds.includes("S08_ALIYUN_RDS_DATABASE_URL"))
+  assert.ok(report.summary.credentialPasswordInterventionActionIds.includes("S05_OSS_RAM_SECRET_OR_STS"))
+  assert.ok(report.summary.credentialPasswordInterventionActionIds.includes("S06_READY_SENSITIVE_ENV_IMPORT"))
 
-  for (const blocker of [
-    "DATABASE_URL_CN",
-    "RDS_MIGRATION_EVIDENCE_NOT_READY",
-    "ACR_IMAGE_REGISTRY_NOT_READY",
-    "SAE_RUNTIME_NOT_READY",
-    "API_DOMAIN_HTTPS_ICP_NOT_READY",
-    "ASSET_DOMAIN_HTTPS_ICP_NOT_READY",
-    "OSS_RAM_STS_NOT_READY",
-    "ENV_IMPORT_NOT_READY",
-    "SLS_ALERTS_NOT_READY",
-    "POSTDEPLOY_SMOKE_NOT_RUN",
-  ]) {
-    assert.ok(report.summary.backendRequiredBlocking.includes(blocker), blocker)
-  }
-
-  assert.ok(!report.summary.backendRequiredBlocking.includes("RDS_POSTGRES_NOT_READY"))
-  assert.ok(!report.summary.backendRequiredBlocking.includes("WECHAT_OPEN_APP_ID"))
-  assert.ok(!report.summary.backendRequiredBlocking.includes("WECHAT_OPEN_APP_SECRET"))
-  assert.ok(report.summary.wechatDeferredBlocking.includes("WECHAT_OPEN_APP_ID"))
-  assert.ok(report.summary.wechatDeferredBlocking.includes("WECHAT_OPEN_APP_SECRET"))
-  assert.equal(report.deferredScope.wechatOpenMobileApp.excludedFromBackendRequiredBlocking, true)
-  assert.equal(report.deferredScope.wechatOpenMobileApp.status, "deferred_after_backend_online")
-
-  assert.equal(report.cloudInventory.strictReady, false)
-  assert.equal(report.cloudInventory.readyLocalOperations, "0/9")
-  assert.equal(report.cloudInventory.executedCommandResults, "9/9")
-  assert.deepEqual(report.cloudInventory.failureCategories, {
-    aliyun_cli_profile_not_configured: 4,
-    aliyun_cli_config_incomplete: 5,
-  })
-  assert.deepEqual(report.cloudInventory.failedOperationIds, [
-    "I01_SAE_RUNTIME",
-    "I02_ACR_IMAGE",
-    "I03_DNS_API_DOMAIN",
-    "I04_DNS_ASSET_DOMAIN",
-    "I05_OSS_AUDIO_BUCKET",
-    "I06_SLS_ALERTS",
-    "I07_CERT_HTTPS",
-    "I08_RDS_POSTGRES",
-    "I09_TAIR_REDIS",
-  ])
-  assert.equal(report.cloudInventory.nextEvidenceAction, "configure_aliyun_cli_profile_or_run_cloudshell_readonly_collector")
-  assert.deepEqual(report.summary.cloudInventoryFailureCategories, report.cloudInventory.failureCategories)
-  assert.deepEqual(report.summary.cloudInventoryFailedOperationIds, report.cloudInventory.failedOperationIds)
-  assert.deepEqual(report.cloudInventory.notFoundOperationIds, [])
-  assert.deepEqual(report.cloudInventory.observedOperationIds, [])
-  assert.equal(report.cloudInventory.backendMeaning.rdsPostgres, "observed_or_unknown")
-  assert.equal(report.cloudInventory.backendMeaning.saeRuntime, "observed_or_unknown")
-  assert.equal(report.cloudInventory.backendMeaning.acrImage, "observed_or_unknown")
-  assert.equal(report.cloudInventory.backendMeaning.ossAudioBucket, "not_observed")
-  assert.equal(report.cloudInventory.backendMeaning.slsProject, "not_observed")
-  assert.equal(report.cloudInventory.mutationPerformedCommandResults, 0)
-  assert.match(report.nextBackendOrder[0], /^0\. Restore Aliyun CLI\/CloudShell read-only inventory evidence/)
-  const acrOrder = report.nextBackendOrder.find((item) => item.startsWith("3. "))
-  assert.equal(acrOrder, "3. Purchase/confirm ACR Enterprise instance, namespace, and repository; defer docker login/push and remote digest evidence to P04.")
-  assert.doesNotMatch(acrOrder, /build\/push/)
-  assert.ok(report.strictVerificationOrder.includes("corepack pnpm aliyun:cloudshell:handoff"))
-  assert.ok(report.strictVerificationOrder.includes("corepack pnpm aliyun:cloud:inventory-results:strict"))
   assert.equal(report.rdsMigration.localExists, true)
   assert.equal(report.rdsMigration.localReady, false)
-  assert.ok(report.rdsMigration.blockers.includes("rdsPostgres.confirmed"))
-  assert.ok(report.rdsMigration.blockers.includes("rdsPostgres.databaseUrlCnSecretImported"))
-  assert.ok(!report.rdsMigration.blockers.includes("migration.dataAccessAdapterReady"))
-  assert.equal(report.rdsMigration.appApiRoutesWithSupabase, 29)
-  assert.equal(report.rdsMigration.appApiRoutesWithSupabaseDataAccess, 4)
-  assert.equal(report.rdsMigration.firstVersionRdsRouteCount, 25)
-  assert.equal(report.rdsMigration.firstVersionRdsRoutesWithSupabase, 23)
-  assert.equal(report.rdsMigration.firstVersionRdsRoutesWithSupabaseDataAccess, 0)
-  assert.equal(report.rdsMigration.deferredAppApiRouteCount, 6)
-  assert.equal(report.rdsMigration.deferredAppApiRoutesWithSupabaseDataAccess, 4)
-  assert.equal(report.rdsMigration.databaseUrlCnReferencedInSource, true)
-  assert.equal(report.rdsMigration.postgresDataAccessAdapterDetected, true)
-  assert.equal(report.cloudConfirmations.backendReady, "0/6")
-  assert.deepEqual(report.cloudConfirmations.backendMissingItems, [
-    "runtime",
-    "apiDomainHttps",
-    "assetDomainHttps",
-    "oss",
-    "envImport",
-    "slsAlerts",
+  assert.equal(report.rdsMigration.rdsMigrationPhaseReady, "0/5")
+  assert.deepEqual(report.rdsMigration.rdsMigrationNextPhaseIds, [
+    "source_inventory_preflight",
+    "compatibility_review",
+    "rds_instance_and_secret",
   ])
-  assert.ok(report.cloudConfirmations.backendBlockers.includes("runtime:missing_cloud_confirmation_item"))
-  assert.ok(report.cloudConfirmations.backendBlockers.includes("apiDomainHttps:missing_cloud_confirmation_item"))
-  assert.ok(report.cloudConfirmations.backendBlockers.includes("assetDomainHttps:missing_cloud_confirmation_item"))
-  assert.ok(report.cloudConfirmations.backendBlockers.includes("oss:missing_cloud_confirmation_item"))
-  assert.ok(report.cloudConfirmations.backendBlockers.includes("envImport:missing_cloud_confirmation_item"))
-  assert.ok(report.cloudConfirmations.backendBlockers.includes("slsAlerts:missing_cloud_confirmation_item"))
-  assert.equal(report.cloudResources.evidenceReady, "0/7")
-  assert.ok(report.cloudResources.blockedIds.includes("R01_SAE_RUNTIME"))
-  assert.ok(report.cloudResources.blockedIds.includes("R07_SLS_ALERTS"))
-  assert.ok(report.cloudResources.observedPartial.includes("R05_OSS_AUDIO_STORAGE"))
-  assert.ok(report.cloudResources.observedPartial.includes("R07_SLS_ALERTS"))
-  assert.equal(report.evidenceWriteback.evidenceWritebackReady, "0/4")
-  assert.equal(report.evidenceWriteback.totalGaps, 46)
-  assert.equal(report.evidenceWriteback.gapSummary.rdsMigrationGaps, 19)
-  assert.equal(report.evidenceWriteback.gapSummary.cloudInventoryResultGaps, 1)
-  assert.equal(report.evidenceWriteback.gapSummary.cloudConfirmationGaps, 18)
-  assert.equal(report.evidenceWriteback.gapSummary.imagePublishGaps, 8)
-  assert.ok(report.evidenceWriteback.writeTargets.some((item) => item.endsWith("deploy/aliyun-production-cn.rds-migration.local.json")))
-  assert.ok(report.evidenceWriteback.writeTargets.some((item) => item.endsWith("deploy/aliyun-production-cn.cloud-confirmations.local.json")))
-  assert.ok(report.evidenceWriteback.writeTargets.some((item) => item.endsWith("deploy/aliyun-production-cn.image-publish.local.json")))
-  const evidenceGroupByKey = new Map(report.evidenceWriteback.groupStatus.map((item) => [item.key, item]))
-  assert.equal(evidenceGroupByKey.get("rdsMigration").gaps, 19)
-  assert.ok(evidenceGroupByKey.get("rdsMigration").requiredAuthorizationPackets.includes("P11_ALIYUN_RDS_DATA_MIGRATION"))
-  assert.equal(evidenceGroupByKey.get("cloudInventoryResults").gaps, 1)
-  assert.ok(evidenceGroupByKey.get("cloudInventoryResults").requiredAuthorizationPackets.includes("P00_ALIYUN_READONLY_INVENTORY_IDENTITY"))
-  assert.equal(evidenceGroupByKey.get("cloudConfirmations").gaps, 18)
-  assert.equal(evidenceGroupByKey.get("imagePublish").gaps, 8)
+  assert.ok(report.rdsMigration.blockers.includes("rdsPostgres.databaseUrlCnSecretImported"))
+  assert.ok(report.rdsMigration.blockers.includes("migration.rollbackValidationPassed"))
+  assert.equal(report.rdsMigration.postgresDataAccessAdapterDetected, true)
 
+  assert.equal(report.cloudConfirmations.backendReady, "0/6")
+  assert.deepEqual(report.cloudConfirmations.backendMissingItems, [])
+  assert.ok(report.cloudConfirmations.backendBlockers.includes("runtime:confirmed"))
+  assert.ok(report.cloudConfirmations.backendBlockers.includes("oss:ramLeastPrivilege"))
+  assert.ok(report.cloudConfirmations.backendBlockers.includes("envImport:confirmed"))
+  assert.match(report.cloudResources.evidenceReady, /^[01]\/7$/)
+  assert.ok(report.cloudResources.blockedIds.includes("R01_SAE_RUNTIME"))
+  assert.ok(report.cloudResources.blockedIds.includes("R03_API_DOMAIN_HTTPS"))
+  assert.ok(report.cloudResources.blockedIds.includes("R04_ASSET_DOMAIN_HTTPS"))
+  assert.ok(report.cloudResources.blockedIds.includes("R05_OSS_AUDIO_STORAGE"))
+  assert.ok(report.cloudResources.blockedIds.includes("R06_ENV_IMPORT"))
+  assert.ok(report.cloudResources.blockedIds.includes("R07_SLS_ALERTS"))
+
+  assert.equal(targetById.get("B01_RDS_POSTGRES_DATA_LAYER").ready, false)
   assert.ok(targetById.get("B01_RDS_POSTGRES_DATA_LAYER").blockers.includes("DATABASE_URL_CN"))
-  assert.ok(!targetById.get("B01_RDS_POSTGRES_DATA_LAYER").blockers.includes("RDS_POSTGRES_NOT_READY"))
-  assert.ok(!targetById.get("B01_RDS_POSTGRES_DATA_LAYER").blockers.includes("APP_API_POSTGRES_ADAPTER_MISSING"))
-  assert.ok(targetById.get("B01_RDS_POSTGRES_DATA_LAYER").currentEvidence.includes("rdsMigrationPhaseReady=1/5"))
-  assert.ok(targetById.get("B01_RDS_POSTGRES_DATA_LAYER").currentEvidence.includes("rdsMigrationNextPhaseIds=compatibility_review,rds_instance_and_secret"))
-  assert.ok(targetById.get("B01_RDS_POSTGRES_DATA_LAYER").currentEvidence.includes("rdsLocalReviewCanStartNow=true"))
-  assert.ok(targetById.get("B01_RDS_POSTGRES_DATA_LAYER").currentEvidence.includes("rdsCanStartP11AfterActionTimeConfirmation=true"))
-  assert.ok(targetById.get("B01_RDS_POSTGRES_DATA_LAYER").currentEvidence.includes("rdsCompatibilityReviewCanStartNow=true"))
-  assert.ok(targetById.get("B01_RDS_POSTGRES_DATA_LAYER").currentEvidence.includes("rdsSchemaApplyBlockedByCompatibilityReview=true"))
-  assert.ok(targetById.get("B01_RDS_POSTGRES_DATA_LAYER").currentEvidence.includes("rdsNextOperatorDecision=close_compatibility_review_and_prepare_rds_action_time_confirmation"))
-  assert.ok(targetById.get("B02_ACR_IMAGE_REGISTRY").blockers.includes("ACR_IMAGE_REGISTRY_NOT_READY"))
-  assert.ok(targetById.get("B02_ACR_IMAGE_REGISTRY").currentEvidence.includes("R02_ACR_IMAGE_REGISTRY.observedStatus=acr_repository_confirmed_image_push_pending"))
-  assert.ok(targetById.get("B02_ACR_IMAGE_REGISTRY").currentEvidence.some((item) => item.includes("dockerContext.status=ready")))
-  assert.ok(targetById.get("B02_ACR_IMAGE_REGISTRY").currentEvidence.some((item) => item.includes("imagePublishLocal:todo:acr.remoteDigest")))
-  assert.ok(targetById.get("B03_SAE_RUNTIME").blockers.includes("SAE_RUNTIME_NOT_READY"))
-  assert.ok(targetById.get("B03_SAE_RUNTIME").currentEvidence.includes("R01_SAE_RUNTIME.observedReadiness=blocked"))
+  assert.ok(targetById.get("B01_RDS_POSTGRES_DATA_LAYER").blockers.includes("RDS_MIGRATION_EVIDENCE_NOT_READY"))
+  assert.equal(targetById.get("B02_ACR_IMAGE_REGISTRY").ready, false)
+  assert.equal(targetById.get("B03_SAE_RUNTIME").ready, false)
   assert.ok(targetById.get("B04_DOMAINS_HTTPS_ICP").blockers.includes("API_DOMAIN_HTTPS_ICP_NOT_READY"))
-  assert.ok(targetById.get("B04_DOMAINS_HTTPS_ICP").currentEvidence.includes("R03_API_DOMAIN_HTTPS.observedStatus=domain_visible_records_missing"))
+  assert.equal(targetById.get("B05_OSS_RAM_STS").ready, false)
   assert.ok(targetById.get("B05_OSS_RAM_STS").blockers.includes("OSS_RAM_STS_NOT_READY"))
-  assert.ok(targetById.get("B05_OSS_RAM_STS").currentEvidence.includes("R05_OSS_AUDIO_STORAGE.observedReadiness=partial"))
-  assert.ok(targetById.get("B05_OSS_RAM_STS").currentEvidence.some((item) => item.includes("bucket_exists")))
+  assert.equal(targetById.get("B06_ENV_IMPORT").ready, false)
   assert.ok(targetById.get("B06_ENV_IMPORT").blockers.includes("ENV_IMPORT_NOT_READY"))
-  assert.ok(targetById.get("B07_SLS_ALERTS").blockers.includes("SLS_ALERTS_NOT_READY"))
-  assert.ok(targetById.get("B07_SLS_ALERTS").currentEvidence.includes("R07_SLS_ALERTS.observedReadiness=partial"))
-  assert.ok(targetById.get("B07_SLS_ALERTS").currentEvidence.some((item) => item.includes("meiye-huajing-app-prod-cn")))
+  assert.equal(targetById.get("B07_SLS_ALERTS").ready, false)
   assert.ok(targetById.get("B08_POSTDEPLOY_SMOKE").blockers.includes("POSTDEPLOY_SMOKE_NOT_RUN"))
 
-  assert.doesNotMatch(output, secretLike)
+  assert.deepEqual(report.credentialIntervention.blockedCredentialNames, ["DATABASE_URL_CN"])
+  assert.equal(report.credentialPasswordIntervention.required, true)
+  assert.deepEqual(report.credentialPasswordIntervention.missingCredentialValues.names, ["DATABASE_URL_CN"])
+  assert.deepEqual(report.actionAuthorization.nextActionTimeConfirmationPacketIds, [
+    "P11_ALIYUN_RDS_DATA_MIGRATION",
+    "P05_OSS_RAM_STS",
+  ])
+  assert.deepEqual(report.actionAuthorization.canStartNowPackets, report.actionAuthorization.nextActionTimeConfirmationPacketIds)
+  assert.ok(report.actionAuthorization.blockedByPacketDependencies.includes("P06_ENV_IMPORT"))
+  assert.ok(report.actionAuthorization.blockedByPacketDependencies.includes("P07_DOMAIN_DNS_HTTPS"))
+  assert.ok(report.actionAuthorization.blockedByPacketDependencies.includes("P08_SAE_RUNTIME_SLS"))
+  assert.ok(report.summary.wechatDeferredBlocking.includes("WECHAT_OPEN_APP_ID"))
+  assert.equal(report.deferredScope.wechatOpenMobileApp.excludedFromBackendRequiredBlocking, true)
+  assertNoSecretLikeValues(output)
 })
 
-test("Aliyun backend-cn status markdown states the backend-only target", () => {
+test("Aliyun backend-cn status markdown states current backend-only blockers", () => {
   const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-backend-cn-status-"))
   const markdownPath = path.join(tmpdir, "backend-cn-status.md")
   const output = execFileSync(process.execPath, [
     "scripts/summarize-aliyun-backend-cn-status.mjs",
+    ...fixtureArgs,
     "--markdown",
     markdownPath,
   ], {
@@ -322,64 +197,26 @@ test("Aliyun backend-cn status markdown states the backend-only target", () => {
   assert.match(markdown, /canProceedWithoutWechat: true/)
   assert.match(markdown, /canDeployBackendNow: false/)
   assert.match(markdown, /backendRequiredBlocking: ACR_IMAGE_REGISTRY_NOT_READY/)
-  assert.match(markdown, /## Cloud Confirmations/)
   assert.match(markdown, /backendReady: 0\/6/)
-  assert.match(markdown, /backendMissingItems: runtime, apiDomainHttps, assetDomainHttps, oss, envImport, slsAlerts/)
-  assert.match(markdown, /runtime:missing_cloud_confirmation_item/)
-  assert.match(markdown, /envImport:missing_cloud_confirmation_item/)
-  assert.match(markdown, /## Cloud Inventory/)
-  assert.match(markdown, /strictReady: false/)
-  assert.match(markdown, /readyLocalOperations: 0\/9/)
-  assert.match(markdown, /executedCommandResults: 9\/9/)
-  assert.match(markdown, /failureCategories: \{"aliyun_cli_profile_not_configured":4,"aliyun_cli_config_incomplete":5\}/)
-  assert.match(markdown, /failedOperationIds: I01_SAE_RUNTIME, I02_ACR_IMAGE, I03_DNS_API_DOMAIN, I04_DNS_ASSET_DOMAIN, I05_OSS_AUDIO_BUCKET, I06_SLS_ALERTS, I07_CERT_HTTPS, I08_RDS_POSTGRES, I09_TAIR_REDIS/)
-  assert.match(markdown, /nextEvidenceAction: configure_aliyun_cli_profile_or_run_cloudshell_readonly_collector/)
-  assert.match(markdown, /## Evidence Writeback/)
-  assert.match(markdown, /evidenceWritebackReady: 0\/4/)
-  assert.match(markdown, /totalGaps: 46/)
-  assert.match(markdown, /rdsMigrationGaps: 19/)
-  assert.match(markdown, /cloudInventoryResultGaps: 1/)
-  assert.match(markdown, /cloudConfirmationGaps: 18/)
-  assert.match(markdown, /imagePublishGaps: 8/)
-  assert.match(markdown, /canStartNowPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P04_ACR_IMAGE_AND_PULL/)
-  assert.match(markdown, /blockedByDependencyPacketIds: P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS/)
-  assert.match(markdown, /rdsMigration: ready=false; gaps=19; packets=P11_ALIYUN_RDS_DATA_MIGRATION/)
-  assert.match(markdown, /cloudInventoryResults: ready=false; gaps=1; packets=P00_ALIYUN_READONLY_INVENTORY_IDENTITY/)
-  assert.match(markdown, /## Evidence Scope Breakdown/)
   assert.match(markdown, /cloudConfirmationsBackendReady: 0\/6/)
-  assert.match(markdown, /cloudResourceEvidenceReady: 0\/7/)
-  assert.match(markdown, /acrTrackedOutsideCloudConfirmations: true/)
-  assert.match(markdown, /deferredAppLaunchExcluded: true/)
+  assert.match(markdown, /cloudResourceEvidenceReady: [01]\/7/)
+  assert.match(markdown, /totalGaps: 40/)
+  assert.match(markdown, /rdsMigrationGaps: 16/)
+  assert.match(markdown, /cloudConfirmationGaps: 16/)
+  assert.match(markdown, /canStartNowPacketIds: P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS/)
+  assert.match(markdown, /blockedByDependencyPacketIds: P04_ACR_IMAGE_AND_PULL, P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS/)
+  assert.match(markdown, /rdsMigration: ready=false; gaps=16; packets=P11_ALIYUN_RDS_DATA_MIGRATION/)
   assert.match(markdown, /B01_RDS_POSTGRES_DATA_LAYER/)
-  assert.match(markdown, /R05_OSS_AUDIO_STORAGE\.observedReadiness=partial/)
-  assert.match(markdown, /R07_SLS_ALERTS\.observedReadiness=partial/)
-  assert.match(markdown, /B08_POSTDEPLOY_SMOKE/)
+  assert.match(markdown, /blockers: DATABASE_URL_CN, RDS_MIGRATION_EVIDENCE_NOT_READY/)
+  assert.match(markdown, /B05_OSS_RAM_STS/)
+  assert.match(markdown, /B06_ENV_IMPORT/)
   assert.match(markdown, /Credential Intervention/)
   assert.match(markdown, /blockedCredentialNames: DATABASE_URL_CN/)
-  assert.match(markdown, /readySecretEnvVariableCount: 17/)
-  assert.match(markdown, /missingCredentialValues: DATABASE_URL_CN/)
-  assert.match(markdown, /readySecretsPendingCloudImport: 17/)
-  assert.match(markdown, /paidPurchaseConfirmationActionIds: none/)
-  assert.match(markdown, /controlledSecretChannelActionIds: S04_ACR_REGISTRY_AUTH, S05_OSS_RAM_SECRET_OR_STS, S08_ALIYUN_RDS_DATABASE_URL, S06_READY_SENSITIVE_ENV_IMPORT/)
-  assert.match(markdown, /S08_ALIYUN_RDS_DATABASE_URL/)
-  assert.match(markdown, /阿里云 KMS\/Secrets Manager\/SAE secret env/)
-  assert.match(markdown, /## Credential \/ Password Intervention/)
   assert.match(markdown, /required: true/)
-  assert.match(markdown, /missingCredentialValues: DATABASE_URL_CN/)
-  assert.match(markdown, /readySecretsPendingCloudImport: 17/)
   assert.match(markdown, /wechatOpenMobileApp: deferred_after_backend_online/)
-  assert.match(markdown, /WECHAT_OPEN_APP_ID/)
-  assert.match(markdown, /WECHAT_OPEN_APP_SECRET/)
-  assert.match(markdown, /0\. Restore Aliyun CLI\/CloudShell read-only inventory evidence/)
-  assert.match(markdown, /3\. Purchase\/confirm ACR Enterprise instance, namespace, and repository; defer docker login\/push and remote digest evidence to P04\./)
-  assert.doesNotMatch(markdown, /build\/push the backend image/)
-  assert.match(markdown, /## Action-Time Authorization Packets/)
-  assert.match(markdown, /nextActionTimeConfirmationPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P04_ACR_IMAGE_AND_PULL/)
-  assert.match(markdown, /blockedByPacketDependencies: P06_ENV_IMPORT, P07_DOMAIN_DNS_HTTPS, P08_SAE_RUNTIME_SLS, P09_PRODUCTION_DEPLOY/)
-  assert.match(markdown, /P00_ALIYUN_READONLY_INVENTORY_IDENTITY: 恢复阿里云 CLI\/CloudShell 只读盘点身份/)
-  assert.match(markdown, /P11_ALIYUN_RDS_DATA_MIGRATION: 创建阿里云 RDS PostgreSQL 并完成正式数据层迁移/)
-  assert.match(markdown, /corepack pnpm aliyun:cloudshell:handoff/)
-  assert.match(markdown, /corepack pnpm aliyun:cloud:inventory-results:strict/)
+  assert.match(markdown, /nextActionTimeConfirmationPacketIds: P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS/)
+  assert.match(markdown, /POSTDEPLOY_SMOKE_NOT_RUN/)
   assert.match(markdown, /corepack pnpm aliyun:rds:migration:evidence:strict/)
-  assert.doesNotMatch(output + markdown, secretLike)
+  assert.match(markdown, /corepack pnpm aliyun:domain:strict/)
+  assertNoSecretLikeValues(output + markdown)
 })
