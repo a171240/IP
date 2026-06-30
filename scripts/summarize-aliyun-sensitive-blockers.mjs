@@ -19,6 +19,11 @@ const APP_LAUNCH_DEFERRED_SENSITIVE_ACTION_IDS = Object.freeze([
 ])
 const APP_LAUNCH_DEFERRED_SENSITIVE_ACTION_ID_SET = new Set(APP_LAUNCH_DEFERRED_SENSITIVE_ACTION_IDS)
 const CONDITIONAL_OPTIONAL_CREDENTIAL_NAMES = new Set([
+  "ALIBABA_CLOUD_ROLE_ARN",
+  "ALIBABA_CLOUD_OIDC_PROVIDER_ARN",
+  "ALIBABA_CLOUD_OIDC_TOKEN_FILE",
+  "ALIYUN_OSS_ACCESS_KEY_ID",
+  "ALIYUN_OSS_ACCESS_KEY_SECRET",
   "ALIYUN_OSS_SECURITY_TOKEN",
 ])
 
@@ -293,6 +298,7 @@ function buildCredentialPasswordIntervention(credentialBrief) {
     actionIds,
     userMustProvideOrConfirm: [
       "DATABASE_URL_CN must come from Aliyun RDS PostgreSQL after schema/data migration validation and must only enter KMS/Secrets Manager/SAE secret env.",
+      "OSS should use SAE RRSA/OIDC runtime role first: ALIBABA_CLOUD_ROLE_ARN, ALIBABA_CLOUD_OIDC_PROVIDER_ARN, and ALIBABA_CLOUD_OIDC_TOKEN_FILE are runtime env/file-path inputs, while AccessKey/STS values are fallback-only secret env material.",
       "Ready local secret variables still need controlled Aliyun secret-env import; names can be reported, values must not be copied into JSON, Markdown, Docker images, git, chat, or shell history.",
       "ACR purchase and registry/runtime pull credentials require action-time confirmation; registry password or pull secret must stay in Docker credential helper, RAM/KMS/Secrets Manager, or Aliyun runtime secret settings.",
     ],
@@ -341,23 +347,32 @@ function buildCredentialAcquisitionQueue(credentialBrief, currentScope) {
 function buildBackendOnlyCredentialExecutionOrder(credentialBrief) {
   const groupIds = new Set((credentialBrief.groups || []).map((group) => group.actionId))
   const includeIfPresent = (ids) => ids.filter((id) => groupIds.has(id))
+  const credentialCanStartAfterActionTimeConfirmationIds = includeIfPresent([
+    "S04_ACR_REGISTRY_AUTH",
+    "S05_OSS_RAM_SECRET_OR_STS",
+    "S08_ALIYUN_RDS_DATABASE_URL",
+  ])
+  const credentialBlockedByDependencyIds = includeIfPresent([
+    "S06_READY_SENSITIVE_ENV_IMPORT",
+  ])
 
   return {
     currentScope: "backend_aliyun_only",
-    nonCredentialCanStartPacketIds: [
+    completedPacketIds: [
       "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     ],
-    credentialCanStartAfterActionTimeConfirmationIds: includeIfPresent([
-      "S04_ACR_REGISTRY_AUTH",
-      "S05_OSS_RAM_SECRET_OR_STS",
-      "S08_ALIYUN_RDS_DATABASE_URL",
-    ]),
-    credentialBlockedByDependencyIds: includeIfPresent([
-      "S06_READY_SENSITIVE_ENV_IMPORT",
-    ]),
-    dependencyReasons: [
-      "S06_READY_SENSITIVE_ENV_IMPORT waits for RDS DATABASE_URL_CN, OSS RAM/STS, image/runtime evidence, and the selected Aliyun secret-env target.",
-    ],
+    nonCredentialCanStartPacketIds: [],
+    credentialCanStartAfterActionTimeConfirmationIds,
+    credentialBlockedByDependencyIds,
+    dependencyReasons: credentialCanStartAfterActionTimeConfirmationIds.length || credentialBlockedByDependencyIds.length
+      ? [
+        "P00_ALIYUN_READONLY_INVENTORY_IDENTITY is complete; current backend action packets start at P11/P05/P04.",
+        "S06_READY_SENSITIVE_ENV_IMPORT waits for RDS DATABASE_URL_CN, OSS access mode/runtime role or fallback STS evidence, image/runtime evidence, and the selected Aliyun secret-env target.",
+      ]
+      : [
+        "P00_ALIYUN_READONLY_INVENTORY_IDENTITY is complete for the current backend pass.",
+        "No backend-only credential action remains open; remaining backend closure is tracked by backend-cn status.",
+      ],
     deferredAppLaunchSensitiveActionIds: APP_LAUNCH_DEFERRED_SENSITIVE_ACTION_IDS,
     firstBatchVerificationCommands: [
       "corepack pnpm aliyun:sensitive:blockers:backend",
@@ -413,6 +428,7 @@ function isBlockedCredentialVariable(variable) {
 function valueHandlingForItem(item, variableDetails) {
   if (item.id === "S03_ACR_PAID_PURCHASE") return "只记录 ACR 规格、地域、命名空间、仓库名和付款确认状态；不记录付款凭据。"
   if (item.id === "S04_ACR_REGISTRY_AUTH") return "镜像仓库登录和 SAE 拉取凭证只能进入 Docker credential helper、RAM/KMS/Secrets Manager 或阿里云运行时 secret 配置。"
+  if (item.id === "S05_OSS_RAM_SECRET_OR_STS") return "首选 SAE RRSA/OIDC runtime role：ALIBABA_CLOUD_ROLE_ARN、ALIBABA_CLOUD_OIDC_PROVIDER_ARN、ALIBABA_CLOUD_OIDC_TOKEN_FILE 由运行环境提供；ALIYUN_OSS_ACCESS_KEY_ID/SECRET/SECURITY_TOKEN 仅在 fallback 模式走 KMS/Secrets Manager/SAE secret env。"
   if (item.id === "S08_ALIYUN_RDS_DATABASE_URL") return "DATABASE_URL_CN 和数据库密码只能进入 KMS/Secrets Manager/SAE secret env；报告只记录 RDS 实例、数据库名、布尔状态和迁移验收证据。"
   if (item.id === "S07_ANDROID_RELEASE_SIGNING") return "release keystore 和密码只进入本机/CI signing secret store；微信开放平台只填写签名摘要。"
   if (variableDetails.some((variable) => String(variable.importTarget || "").includes("plain env"))) {
@@ -552,11 +568,17 @@ function buildReport(operatorTasks, args) {
     items,
     nextActions: [
       ...(args.backendOnly
-        ? [
-          "当前后端-only 第一批先处理 S04/S05/S08，P00 只读盘点另行按 CloudShell/CLI 规则执行。",
-          "S06 ready secret env 导入仍被依赖阻塞，等 RDS/OSS/image/runtime 证据闭合后再做。",
-          "微信开放平台、Apple Team ID 和 Android release signing 保留为 APP 发布阶段延期项，不作为当前阿里云后端阻塞。",
-        ]
+        ? (summary.blocked
+          ? [
+            "P00 只读盘点已完成；当前后端-only 第一批继续处理仍阻塞的 credential action，并按 backend-cn status 闭环。",
+            "S06 ready secret env 导入仍被依赖阻塞，等 RDS/OSS/image/runtime 证据闭合后再做。",
+            "微信开放平台、Apple Team ID 和 Android release signing 保留为 APP 发布阶段延期项，不作为当前阿里云后端阻塞。",
+          ]
+          : [
+            "P00 只读盘点已完成；当前后端-only 没有未完成的密钥、密码、token、付款或受控标识符类人工介入项。",
+            "继续按 backend-cn status 处理 api-cn/assets-cn DNS/HTTPS/ICP 和正式域名 smoke。",
+            "微信开放平台、Apple Team ID 和 Android release signing 保留为 APP 发布阶段延期项，不作为当前阿里云后端阻塞。",
+          ])
         : [
           "先处理 S01 微信开放平台移动应用创建/审核；审核通过后再获取 WECHAT_OPEN_APP_ID / WECHAT_OPEN_APP_SECRET。",
           "确认 APPLE_TEAM_ID 后只导入 plain env，用于 AASA；不要猜测。",
@@ -682,6 +704,7 @@ function renderMarkdown(report) {
 function renderBackendOnlyCredentialExecutionOrder(order) {
   return [
     `- currentScope: ${order.currentScope}`,
+    `- completedPacketIds: ${order.completedPacketIds.join(", ") || "none"}`,
     `- nonCredentialCanStartPacketIds: ${order.nonCredentialCanStartPacketIds.join(", ") || "none"}`,
     `- credentialCanStartAfterActionTimeConfirmationIds: ${order.credentialCanStartAfterActionTimeConfirmationIds.join(", ") || "none"}`,
     `- credentialBlockedByDependencyIds: ${order.credentialBlockedByDependencyIds.join(", ") || "none"}`,
