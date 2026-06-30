@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import { isAliyunRdsConfigured } from "@/lib/aliyun-rds/postgres.server"
+import { isAliyunRdsServiceRecordOssConfigured } from "@/lib/aliyun-rds/service-record-oss.server"
+
 export const runtime = "nodejs"
 
-const REQUIRED_RUNTIME_GROUPS = {
+const LEGACY_REQUIRED_RUNTIME_GROUPS = {
   supabase: [
     ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_IPgongchang_SUPABASE_URL", "IPgongchang_SUPABASE_URL"],
     [
@@ -26,6 +29,12 @@ const REQUIRED_RUNTIME_GROUPS = {
     ["ALIYUN_OSS_ACCESS_KEY_SECRET", "ALIBABA_CLOUD_ACCESS_KEY_SECRET"],
     ["ALIYUN_OSS_BUCKET", "SERVICE_RECORD_OSS_BUCKET"],
   ],
+  bailianAsr: [["DASHSCOPE_API_KEY", "BAILIAN_API_KEY", "ALIBABA_CLOUD_BAILIAN_API_KEY"]],
+  serviceRecordSummary: [["SERVICE_RECORD_DEEPSEEK_API_KEY", "DEEPSEEK_API_KEY"]],
+  volcSpeech: [["VOLC_SPEECH_APP_ID"], ["VOLC_SPEECH_ACCESS_TOKEN"]],
+} as const
+
+const ALIYUN_REQUIRED_RUNTIME_GROUPS = {
   bailianAsr: [["DASHSCOPE_API_KEY", "BAILIAN_API_KEY", "ALIBABA_CLOUD_BAILIAN_API_KEY"]],
   serviceRecordSummary: [["SERVICE_RECORD_DEEPSEEK_API_KEY", "DEEPSEEK_API_KEY"]],
   volcSpeech: [["VOLC_SPEECH_APP_ID"], ["VOLC_SPEECH_ACCESS_TOKEN"]],
@@ -75,14 +84,41 @@ function runtimeGroupReady(key: string, groups: readonly (readonly string[])[]) 
   return groupReady(groups)
 }
 
-export async function GET(request: NextRequest) {
-  const strict = request.nextUrl.searchParams.get("strict") === "1"
-  const checks = Object.fromEntries(
-    Object.entries(REQUIRED_RUNTIME_GROUPS).map(([key, groups]) => [
+function isAliyunProductionCnRuntime() {
+  return process.env.APP_ENV === "production-cn" || process.env.APP_REGION === "cn-hangzhou"
+}
+
+function getWechatOpenAppReviewStatus() {
+  return String(process.env.WECHAT_OPEN_APP_REVIEW_STATUS || "deferred").trim() || "deferred"
+}
+
+function getAliyunRuntimeChecks() {
+  return {
+    aliyunRds: isAliyunRdsConfigured(),
+    legalLinks: LEGAL_LINK_KEYS.every((name) => isReadyLegalUrl(process.env[name])),
+    aliyunOssRuntime: isAliyunRdsServiceRecordOssConfigured(),
+    ...Object.fromEntries(
+      Object.entries(ALIYUN_REQUIRED_RUNTIME_GROUPS).map(([key, groups]) => [
+        key,
+        groupReady(groups),
+      ]),
+    ),
+  }
+}
+
+function getLegacyRuntimeChecks() {
+  return Object.fromEntries(
+    Object.entries(LEGACY_REQUIRED_RUNTIME_GROUPS).map(([key, groups]) => [
       key,
       runtimeGroupReady(key, groups),
     ]),
   )
+}
+
+export async function GET(request: NextRequest) {
+  const strict = request.nextUrl.searchParams.get("strict") === "1"
+  const productionCn = isAliyunProductionCnRuntime()
+  const checks = productionCn ? getAliyunRuntimeChecks() : getLegacyRuntimeChecks()
   const missing = Object.entries(checks)
     .filter(([, ready]) => !ready)
     .map(([key]) => key)
@@ -94,8 +130,15 @@ export async function GET(request: NextRequest) {
       service: "meiye-huajing-app-api",
       env: process.env.APP_ENV || process.env.NODE_ENV || "unknown",
       region: process.env.APP_REGION || process.env.ALIYUN_REGION || "",
+      mode: productionCn ? "aliyun-production-cn" : "legacy",
       checks,
       missing,
+      deferred: productionCn
+        ? {
+            supabase: "not_required_for_aliyun_production_cn",
+            appWechatLogin: getWechatOpenAppReviewStatus(),
+          }
+        : {},
     },
     { status: strict && !ok ? 503 : 200 },
   )

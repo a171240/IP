@@ -2,6 +2,11 @@ import "server-only"
 
 import { NextRequest, NextResponse } from "next/server"
 
+import {
+  appAuthConfigurationErrorResponse,
+  appAuthRequiredResponse,
+  resolveAliyunRdsAppAuthUser,
+} from "@/lib/aliyun-rds/app-auth.server"
 import { AliyunRdsConfigurationError, queryAliyunRds, withAliyunRdsTransaction } from "@/lib/aliyun-rds/postgres.server"
 import {
   accountContextPayload,
@@ -9,7 +14,6 @@ import {
   type AppAccountContext,
   type AppAuthUser,
 } from "@/lib/aliyun-rds/repositories/account-profile.server"
-import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 
 export const SERVICE_RECORD_RESUME_WINDOW_MS = 5 * 60 * 1000
 export const SERVICE_RECORD_MAX_SEGMENT_BYTES = 12 * 1024 * 1024
@@ -96,6 +100,9 @@ export function jsonError(status: number, error: string, code = error, extra?: R
 }
 
 export function rdsServiceRecordErrorResponse(error: unknown, fallbackCode: string) {
+  const appAuthError = appAuthConfigurationErrorResponse(error)
+  if (appAuthError) return appAuthError
+
   if (error instanceof AliyunRdsConfigurationError) {
     return NextResponse.json(
       { ok: false, error: "DATABASE_URL_CN is required", code: "rds_not_configured" },
@@ -219,24 +226,16 @@ export async function resolveAliyunRdsServiceRecordAuth(request: NextRequest): P
   | { ok: true; value: AliyunRdsServiceRecordAuth }
   | { ok: false; error: Response }
 > {
-  const supabase = await createServerSupabaseClientForRequest(request)
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
+  const auth = await resolveAliyunRdsAppAuthUser(request)
+  if (!auth) {
     return {
       ok: false,
-      error: NextResponse.json({ ok: false, error: "请先登录", code: "auth_required" }, { status: 401 }),
+      error: appAuthRequiredResponse(),
     }
   }
 
   try {
-    const authUser = {
-      id: user.id,
-      email: user.email ?? null,
-      user_metadata: user.user_metadata || {},
-    }
+    const authUser = auth.user
     const ctx = await getAliyunRdsAppAccountContext(authUser)
     return { ok: true, value: { ctx, user: authUser } }
   } catch (error) {

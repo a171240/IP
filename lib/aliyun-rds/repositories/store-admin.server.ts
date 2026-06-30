@@ -3,6 +3,11 @@ import "server-only"
 import { NextRequest, NextResponse } from "next/server"
 
 import {
+  appAuthConfigurationErrorResponse,
+  appAuthRequiredResponse,
+  resolveAliyunRdsAppAuthUser,
+} from "@/lib/aliyun-rds/app-auth.server"
+import {
   AliyunRdsConfigurationError,
   isAliyunRdsRuntimeUnavailableError,
   queryAliyunRds,
@@ -14,7 +19,6 @@ import {
   type AppAccountContext,
   type AppAuthUser,
 } from "@/lib/aliyun-rds/repositories/account-profile.server"
-import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 import { getVoiceCoachSessionClientContext } from "@/lib/voice-coach/session-context"
 import { getScenario } from "@/lib/voice-coach/scenarios"
 
@@ -109,6 +113,9 @@ export function jsonError(status: number, error: string, code = error, extra?: R
 }
 
 export function rdsStoreAdminErrorResponse(error: unknown, fallbackCode: string) {
+  const appAuthError = appAuthConfigurationErrorResponse(error)
+  if (appAuthError) return appAuthError
+
   if (error instanceof AliyunRdsConfigurationError) {
     return jsonError(503, "DATABASE_URL_CN is required", "rds_not_configured")
   }
@@ -122,20 +129,10 @@ export async function resolveAliyunRdsStoreManagerAuth(request: NextRequest): Pr
   | { ok: true; user: AppAuthUser; ctx: AppAccountContext }
   | { ok: false; error: Response }
 > {
-  const supabase = await createServerSupabaseClientForRequest(request)
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const auth = await resolveAliyunRdsAppAuthUser(request)
+  if (!auth) return { ok: false, error: appAuthRequiredResponse() }
 
-  if (!user) {
-    return { ok: false, error: jsonError(401, "请先登录", "auth_required") }
-  }
-
-  const authUser: AppAuthUser = {
-    id: user.id,
-    email: user.email ?? null,
-    user_metadata: user.user_metadata || {},
-  }
+  const authUser: AppAuthUser = auth.user
   const ctx = await getAliyunRdsAppAccountContext(authUser)
   if (!ctx.isManager || (!ctx.companyId && !ctx.isPlatformAdmin)) {
     return { ok: false, error: jsonError(403, "当前账号没有门店管理权限", "store_admin_required") }
