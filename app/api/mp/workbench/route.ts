@@ -5,6 +5,27 @@ import { xhsCoverUrl } from "@/lib/xhs/cover-url"
 
 export const runtime = "nodejs"
 
+type WorkbenchXhsDraftRow = {
+  id: string
+  updated_at?: string | null
+  cover_storage_path?: string | null
+  publish_qr_url?: string | null
+  publish_qr_storage_path?: string | null
+  [key: string]: unknown
+}
+
+type WorkbenchDeliveryPackRow = {
+  id: string
+  status?: string | null
+  pdf_path?: string | null
+  [key: string]: unknown
+}
+
+type WorkbenchOrderRow = {
+  status?: string | null
+  [key: string]: unknown
+}
+
 export async function GET(request: NextRequest) {
   const billing = await resolveMpAiBillingContext(request)
   if (!billing.ok) return billing.error
@@ -44,16 +65,16 @@ export async function GET(request: NextRequest) {
   ])
 
   const recent = {
-    xhs_drafts: (xhsDrafts || []).map((d) => ({
+    xhs_drafts: ((xhsDrafts || []) as WorkbenchXhsDraftRow[]).map((d) => ({
       ...d,
       cover_url: d.cover_storage_path ? xhsCoverUrl(d.id, d.cover_storage_path, d.updated_at) : null,
       qr_url: d.publish_qr_url || d.publish_qr_storage_path ? `/api/mp/xhs/qrs/${d.id}` : null,
     })),
-    delivery_packs: (packs || []).map((p) => ({
+    delivery_packs: ((packs || []) as WorkbenchDeliveryPackRow[]).map((p) => ({
       ...p,
       download_url: p.pdf_path ? `/api/mp/delivery-pack/${p.id}/download` : null,
     })),
-    orders: orders || [],
+    orders: (orders || []) as WorkbenchOrderRow[],
   }
 
   const hasXhs = recent.xhs_drafts.length > 0

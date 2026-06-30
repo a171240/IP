@@ -7,6 +7,15 @@ import { xhsCoverUrl } from "@/lib/xhs/cover-url"
 
 export const runtime = "nodejs"
 
+type DraftListRow = {
+  id: string
+  updated_at?: string | null
+  cover_storage_path?: string | null
+  publish_qr_url?: string | null
+  publish_qr_storage_path?: string | null
+  [key: string]: unknown
+}
+
 const createDraftSchema = z.object({
   contentType: z.string().max(40).optional(),
   topic: z.string().max(200).optional(),
@@ -72,7 +81,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: false, error: error.message || "query_failed" }, { status: 500 })
   }
 
-  const drafts = (data || []).map((row) => {
+  const drafts = ((data || []) as DraftListRow[]).map((row) => {
     const coverUrl = row.cover_storage_path ? xhsCoverUrl(row.id, row.cover_storage_path, row.updated_at) : null
     const qrUrl = row.publish_qr_url || row.publish_qr_storage_path ? `/api/mp/xhs/qrs/${row.id}` : null
     return { ...row, cover_url: coverUrl, qr_url: qrUrl }

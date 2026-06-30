@@ -5,6 +5,17 @@ import { downloadAsset, getXhsAssetsBucket } from "@/lib/xhs/assets.server"
 
 export const runtime = "nodejs"
 
+type PosterGenerationRow = {
+  id: string
+  created_at?: string | null
+  mode?: string | null
+  template_id?: string | null
+  image_bucket?: string | null
+  size?: string | null
+  resolution?: string | null
+  content_type?: string | null
+}
+
 function imageUrlForPoster(posterId: string) {
   return `/api/mp/posters/images/${posterId}`
 }
@@ -48,7 +59,7 @@ export async function GET(request: NextRequest) {
   }
 
   const posters = await Promise.all(
-    (data || []).map(async (item) => {
+    ((data || []) as PosterGenerationRow[]).map(async (item) => {
       const meta = await loadPosterMetadata({
         bucket: item.image_bucket || getXhsAssetsBucket(),
         posterId: item.id,

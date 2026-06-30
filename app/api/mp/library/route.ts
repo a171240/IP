@@ -8,6 +8,27 @@ export const runtime = "nodejs"
 
 type JsonObject = Record<string, unknown>
 
+type LibraryReportBackfillRow = {
+  id: string
+  content?: unknown
+  metadata?: unknown
+}
+
+type LibraryXhsDraftRow = {
+  id: string
+  updated_at?: string | null
+  cover_storage_path?: string | null
+  publish_qr_url?: string | null
+  publish_qr_storage_path?: string | null
+  [key: string]: unknown
+}
+
+type LibraryDeliveryPackRow = {
+  id: string
+  pdf_path?: string | null
+  [key: string]: unknown
+}
+
 function isRecord(value: unknown): value is JsonObject {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value)
 }
@@ -85,12 +106,12 @@ export async function GET(request: NextRequest) {
 
       const now = new Date().toISOString()
       await Promise.all(
-        (rows || []).map(async (row) => {
-          const content = String((row as { content?: unknown }).content || "")
+        ((rows || []) as LibraryReportBackfillRow[]).map(async (row) => {
+          const content = String(row.content || "")
           const topics = extractTopicsFromText(content, 220)
           if (!topics.length) return
 
-          const meta = isRecord((row as { metadata?: unknown }).metadata) ? { ...(row as { metadata: JsonObject }).metadata } : {}
+          const meta = isRecord(row.metadata) ? { ...row.metadata } : {}
           meta.p7_topics = topics
           meta.p7_topics_parsed_at = now
           meta.p7_topics_parser = "v1"
@@ -110,13 +131,13 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const xhs_drafts = (draftsRes.data || []).map((d) => ({
+  const xhs_drafts = ((draftsRes.data || []) as LibraryXhsDraftRow[]).map((d) => ({
     ...d,
     cover_url: d.cover_storage_path ? xhsCoverUrl(d.id, d.cover_storage_path, d.updated_at) : null,
     qr_url: d.publish_qr_url || d.publish_qr_storage_path ? `/api/mp/xhs/qrs/${d.id}` : null,
   }))
 
-  const delivery_packs = (packsRes.data || []).map((p) => ({
+  const delivery_packs = ((packsRes.data || []) as LibraryDeliveryPackRow[]).map((p) => ({
     ...p,
     download_url: p.pdf_path ? `/api/mp/delivery-pack/${p.id}/download` : null,
   }))

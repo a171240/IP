@@ -275,7 +275,7 @@ async function loadDraftCoverAsset(opts: {
       typeof data?.keywords === "string"
         ? data.keywords.trim()
         : Array.isArray(data?.keywords)
-          ? data.keywords.map((item) => String(item || "").trim()).filter(Boolean).join("、")
+          ? (data.keywords as unknown[]).map((item: unknown) => String(item || "").trim()).filter(Boolean).join("、")
           : "",
     coverPoints: Array.isArray(data?.cover_points)
       ? data.cover_points.map((item: unknown) => String(item || "").trim()).filter(Boolean).slice(0, 4)
