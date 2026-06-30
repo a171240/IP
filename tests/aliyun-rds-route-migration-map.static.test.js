@@ -52,11 +52,11 @@ test("Aliyun RDS route migration map covers first-version APP route data access 
   assert.equal(report.summary.routesStillUsingSupabaseDataAccess, 0)
   assert.equal(report.summary.routesUsingAliyunRdsDataAccess, 25)
   assert.equal(report.summary.sharedDataAccessFileCount, 0)
-  assert.equal(report.summary.sharedRdsDataAccessFileCount, 34)
+  assert.equal(report.summary.sharedRdsDataAccessFileCount, 36)
   assert.equal(report.summary.observedTableCount, 14)
   assert.equal(report.summary.requiredTableCount, 15)
   assert.equal(report.summary.observedRpcCount, 0)
-  assert.equal(report.summary.requiredFunctionCount, 2)
+  assert.equal(report.summary.requiredFunctionCount, 0)
   assert.equal(report.summary.implementationWorkPackageCount, 5)
   assert.equal(report.summary.proposedRepositoryFileCount, 11)
   assert.deepEqual(report.summary.schemaMapMissingObservedTables, [])
@@ -74,8 +74,12 @@ test("Aliyun RDS route migration map covers first-version APP route data access 
   assert.ok(report.observedTables.includes("service_record_sessions"))
   assert.deepEqual(report.observedRpcs, [])
   assert.deepEqual(report.rdsAdapterFiles, [
+    "app/api/app/assets/sign-read/route.ts",
+    "app/api/app/auth/logout/route.ts",
+    "app/api/app/content-drafts/route.ts",
     "app/api/app/customer-profiles/[profileId]/route.ts",
     "app/api/app/customer-profiles/route.ts",
+    "app/api/app/health/route.ts",
     "app/api/app/profile/route.ts",
     "app/api/app/service-records/device-files/check/route.ts",
     "app/api/app/service-records/sessions/[sessionId]/asr/poll/route.ts",
@@ -96,8 +100,10 @@ test("Aliyun RDS route migration map covers first-version APP route data access 
     "app/api/app/store-admin/invites/route.ts",
     "app/api/app/store-admin/members/route.ts",
     "app/api/app/store-admin/overview/route.ts",
+    "app/api/app/store-admin/service-records/route.ts",
     "app/api/app/store-profiles/[profileId]/route.ts",
     "app/api/app/store-profiles/route.ts",
+    "lib/aliyun-rds/app-auth.server.ts",
     "lib/aliyun-rds/postgres.server.ts",
     "lib/aliyun-rds/repositories/account-profile.server.ts",
     "lib/aliyun-rds/repositories/customer-profiles.server.ts",
@@ -363,7 +369,8 @@ test("Aliyun APP context profile routes use RDS repositories instead of mini-pro
   ]) {
     assert.doesNotMatch(route, /@\/app\/api\/mp\//)
     assert.match(route, /AliyunRdsConfigurationError/)
-    assert.match(route, /createServerSupabaseClientForRequest/)
+    assert.match(route, /resolveAliyunRdsAppAuthUser/)
+    assert.doesNotMatch(route, /createServerSupabaseClientForRequest|@\/lib\/supabase|@supabase\/supabase-js/)
   }
 
   assert.match(storeProfilesRoute, /listAliyunRdsStoreProfiles/)
