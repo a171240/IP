@@ -236,6 +236,14 @@ function metadataText(meta: unknown, key: string) {
   return typeof value === "string" ? value.trim() : ""
 }
 
+function metadataUuid(meta: unknown, key: string) {
+  const value = metadataText(meta, key)
+  if (!value) return null
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+    ? value
+    : null
+}
+
 function parseEnvList(...keys: string[]) {
   const values = keys.flatMap((key) => String(process.env[key] || "").split(/[,\s]+/))
   return new Set(values.map((value) => value.trim().toLowerCase()).filter(Boolean))
@@ -366,23 +374,79 @@ async function getOrCreateProfileRow(user: AppAuthUser): Promise<ProfileRow> {
     `select ${PROFILE_COLUMNS} from public.profiles where id = $1 limit 1`,
     [user.id],
   )
-  if (selected.rows[0]) return selected.rows[0]
 
   const nickname = metadataText(user.user_metadata, "nickname") || user.email?.split("@")[0] || "User"
   const avatarUrl = metadataText(user.user_metadata, "avatar_url") || null
+  const metadataRole = metadataText(user.user_metadata, "account_role")
+  const accountRole = metadataRole ? normalizeRole(metadataRole) : null
+  const companyId = metadataUuid(user.user_metadata, "company_id")
+  const storeId = metadataUuid(user.user_metadata, "store_id")
+  const companyName = metadataText(user.user_metadata, "company_name") || null
+  const storeName = metadataText(user.user_metadata, "store_name") || null
+  const servicePlanLabel = metadataText(user.user_metadata, "service_plan_label") || null
+
+  if (selected.rows[0]) {
+    const row = selected.rows[0]
+    if (
+      (!row.account_role && accountRole) ||
+      (!row.company_id && companyId) ||
+      (!row.store_id && storeId) ||
+      (!row.company_name && companyName) ||
+      (!row.store_name && storeName) ||
+      (!row.service_plan_label && servicePlanLabel)
+    ) {
+      const updated = await queryAliyunRds<ProfileRow>(
+        `
+          update public.profiles
+          set account_role = coalesce(account_role, $2),
+              company_id = coalesce(company_id, $3),
+              company_name = coalesce(company_name, $4),
+              store_id = coalesce(store_id, $5),
+              store_name = coalesce(store_name, $6),
+              service_plan_label = coalesce(service_plan_label, $7),
+              updated_at = now()
+          where id = $1
+          returning ${PROFILE_COLUMNS}
+        `,
+        [user.id, accountRole, companyId, companyName, storeId, storeName, servicePlanLabel],
+      )
+      return updated.rows[0] || row
+    }
+    return row
+  }
 
   const created = await queryAliyunRds<ProfileRow>(
     `
-      insert into public.profiles (id, email, nickname, avatar_url, plan, credits_balance, credits_unlimited)
-      values ($1, $2, $3, $4, 'free', 30, false)
+      insert into public.profiles (
+        id, email, nickname, avatar_url, plan, credits_balance, credits_unlimited,
+        account_role, company_id, company_name, store_id, store_name, service_plan_label
+      )
+      values ($1, $2, $3, $4, 'free', 30, false, $5, $6, $7, $8, $9, $10)
       on conflict (id) do update
         set email = coalesce(excluded.email, public.profiles.email),
             nickname = coalesce(public.profiles.nickname, excluded.nickname),
             avatar_url = coalesce(public.profiles.avatar_url, excluded.avatar_url),
+            account_role = coalesce(public.profiles.account_role, excluded.account_role),
+            company_id = coalesce(public.profiles.company_id, excluded.company_id),
+            company_name = coalesce(public.profiles.company_name, excluded.company_name),
+            store_id = coalesce(public.profiles.store_id, excluded.store_id),
+            store_name = coalesce(public.profiles.store_name, excluded.store_name),
+            service_plan_label = coalesce(public.profiles.service_plan_label, excluded.service_plan_label),
             updated_at = now()
       returning ${PROFILE_COLUMNS}
     `,
-    [user.id, user.email ?? null, nickname, avatarUrl],
+    [
+      user.id,
+      user.email ?? null,
+      nickname,
+      avatarUrl,
+      accountRole,
+      companyId,
+      companyName,
+      storeId,
+      storeName,
+      servicePlanLabel,
+    ],
   )
 
   if (!created.rows[0]) throw new Error("profile_create_failed")

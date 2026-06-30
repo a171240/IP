@@ -2,12 +2,16 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { z } from "zod"
 
+import {
+  appAuthConfigurationErrorResponse,
+  appAuthRequiredResponse,
+  resolveAliyunRdsAppAuthUser,
+} from "@/lib/aliyun-rds/app-auth.server"
 import { AliyunRdsConfigurationError } from "@/lib/aliyun-rds/postgres.server"
 import {
   createAliyunRdsStoreProfile,
   listAliyunRdsStoreProfiles,
 } from "@/lib/aliyun-rds/repositories/store-profiles.server"
-import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
 
@@ -24,6 +28,9 @@ const createSchema = z.object({
 })
 
 function rdsErrorResponse(error: unknown, fallbackCode: string) {
+  const appAuthError = appAuthConfigurationErrorResponse(error)
+  if (appAuthError) return appAuthError
+
   if (error instanceof AliyunRdsConfigurationError) {
     return NextResponse.json(
       { ok: false, error: "DATABASE_URL_CN is required", code: "rds_not_configured" },
@@ -37,21 +44,15 @@ function rdsErrorResponse(error: unknown, fallbackCode: string) {
 }
 
 export async function GET(request: NextRequest) {
-  const supabase = await createServerSupabaseClientForRequest(request)
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return NextResponse.json({ ok: false, error: "请先登录" }, { status: 401 })
-  }
-
-  const url = new URL(request.url)
-  const limitRaw = url.searchParams.get("limit")
-  const limit = Math.min(50, Math.max(1, Number(limitRaw || 20) || 20))
-
   try {
-    const profiles = await listAliyunRdsStoreProfiles(user.id, limit)
+    const auth = await resolveAliyunRdsAppAuthUser(request)
+    if (!auth) return appAuthRequiredResponse()
+
+    const url = new URL(request.url)
+    const limitRaw = url.searchParams.get("limit")
+    const limit = Math.min(50, Math.max(1, Number(limitRaw || 20) || 20))
+
+    const profiles = await listAliyunRdsStoreProfiles(auth.user.id, limit)
     return NextResponse.json({ ok: true, profiles })
   } catch (error) {
     return rdsErrorResponse(error, "query_failed")
@@ -59,27 +60,21 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await createServerSupabaseClientForRequest(request)
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return NextResponse.json({ ok: false, error: "请先登录" }, { status: 401 })
-  }
-
-  const body = await request.json().catch(() => null)
-  const parsed = createSchema.safeParse(body)
-  if (!parsed.success) {
-    return NextResponse.json({ ok: false, error: "invalid_payload", details: parsed.error.issues }, { status: 400 })
-  }
-
   try {
+    const auth = await resolveAliyunRdsAppAuthUser(request)
+    if (!auth) return appAuthRequiredResponse()
+
+    const body = await request.json().catch(() => null)
+    const parsed = createSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ ok: false, error: "invalid_payload", details: parsed.error.issues }, { status: 400 })
+    }
+
     const profile = await createAliyunRdsStoreProfile(
       {
-        id: user.id,
-        email: user.email ?? null,
-        user_metadata: user.user_metadata || {},
+        id: auth.user.id,
+        email: auth.user.email ?? null,
+        user_metadata: auth.user.user_metadata || {},
       },
       parsed.data,
     )

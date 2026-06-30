@@ -1,15 +1,22 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import {
+  appAuthConfigurationErrorResponse,
+  appAuthRequiredResponse,
+  resolveAliyunRdsAppAuthUser,
+} from "@/lib/aliyun-rds/app-auth.server"
 import { AliyunRdsConfigurationError, isAliyunRdsRuntimeUnavailableError } from "@/lib/aliyun-rds/postgres.server"
 import {
   acceptAliyunRdsStoreInvite,
   StoreInviteHttpError,
 } from "@/lib/aliyun-rds/repositories/store-invites.server"
-import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
 
 function inviteErrorResponse(error: unknown) {
+  const appAuthError = appAuthConfigurationErrorResponse(error)
+  if (appAuthError) return appAuthError
+
   if (error instanceof StoreInviteHttpError) {
     return NextResponse.json({ ok: false, error: error.message, code: error.code }, { status: error.status })
   }
@@ -31,17 +38,10 @@ export async function POST(
 ) {
   try {
     const { token } = await params
-    const supabase = await createServerSupabaseClientForRequest(request)
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ ok: false, error: "请先登录", code: "auth_required" }, { status: 401 })
+    const auth = await resolveAliyunRdsAppAuthUser(request)
+    if (!auth) return appAuthRequiredResponse()
 
-    const payload = await acceptAliyunRdsStoreInvite(token, {
-      id: user.id,
-      email: user.email ?? null,
-      user_metadata: user.user_metadata || {},
-    })
+    const payload = await acceptAliyunRdsStoreInvite(token, auth.user)
     return NextResponse.json(payload)
   } catch (error) {
     return inviteErrorResponse(error)

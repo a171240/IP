@@ -2,13 +2,17 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { z } from "zod"
 
+import {
+  appAuthConfigurationErrorResponse,
+  appAuthRequiredResponse,
+  resolveAliyunRdsAppAuthUser,
+} from "@/lib/aliyun-rds/app-auth.server"
 import { AliyunRdsConfigurationError } from "@/lib/aliyun-rds/postgres.server"
 import {
   deleteAliyunRdsStoreProfile,
   getAliyunRdsStoreProfile,
   updateAliyunRdsStoreProfile,
 } from "@/lib/aliyun-rds/repositories/store-profiles.server"
-import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
 
@@ -25,6 +29,9 @@ const updateSchema = z.object({
 })
 
 function rdsErrorResponse(error: unknown, fallbackCode: string) {
+  const appAuthError = appAuthConfigurationErrorResponse(error)
+  if (appAuthError) return appAuthError
+
   if (error instanceof AliyunRdsConfigurationError) {
     return NextResponse.json(
       { ok: false, error: "DATABASE_URL_CN is required", code: "rds_not_configured" },
@@ -38,11 +45,8 @@ function rdsErrorResponse(error: unknown, fallbackCode: string) {
 }
 
 async function requireUser(request: NextRequest) {
-  const supabase = await createServerSupabaseClientForRequest(request)
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  return user
+  const auth = await resolveAliyunRdsAppAuthUser(request)
+  return auth?.user || null
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ profileId: string }> }) {
@@ -50,10 +54,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const id = (profileId || "").trim()
   if (!id) return NextResponse.json({ ok: false, error: "missing_profile_id" }, { status: 400 })
 
-  const user = await requireUser(request)
-  if (!user) return NextResponse.json({ ok: false, error: "请先登录" }, { status: 401 })
-
   try {
+    const user = await requireUser(request)
+    if (!user) return appAuthRequiredResponse()
+
     const profile = await getAliyunRdsStoreProfile(user.id, id)
     if (!profile) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 })
     return NextResponse.json({ ok: true, profile })
@@ -67,16 +71,16 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   const id = (profileId || "").trim()
   if (!id) return NextResponse.json({ ok: false, error: "missing_profile_id" }, { status: 400 })
 
-  const user = await requireUser(request)
-  if (!user) return NextResponse.json({ ok: false, error: "请先登录" }, { status: 401 })
-
-  const body = await request.json().catch(() => null)
-  const parsed = updateSchema.safeParse(body)
-  if (!parsed.success) {
-    return NextResponse.json({ ok: false, error: "invalid_payload", details: parsed.error.issues }, { status: 400 })
-  }
-
   try {
+    const user = await requireUser(request)
+    if (!user) return appAuthRequiredResponse()
+
+    const body = await request.json().catch(() => null)
+    const parsed = updateSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ ok: false, error: "invalid_payload", details: parsed.error.issues }, { status: 400 })
+    }
+
     const profile = await updateAliyunRdsStoreProfile(user.id, id, parsed.data)
     if (!profile) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 })
     return NextResponse.json({ ok: true, profile })
@@ -90,10 +94,10 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   const id = (profileId || "").trim()
   if (!id) return NextResponse.json({ ok: false, error: "missing_profile_id" }, { status: 400 })
 
-  const user = await requireUser(request)
-  if (!user) return NextResponse.json({ ok: false, error: "请先登录" }, { status: 401 })
-
   try {
+    const user = await requireUser(request)
+    if (!user) return appAuthRequiredResponse()
+
     await deleteAliyunRdsStoreProfile(user.id, id)
     return NextResponse.json({ ok: true })
   } catch (error) {
