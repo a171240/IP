@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "environment": "production-cn",
+  "updatedAt": "2026-06-30T00:00:00+08:00",
+  "operator": "codex-static-fixture",
+  "notes": "Tracked non-secret fixture for clean static tests. It intentionally keeps RDS creation, DATABASE_URL_CN import, migration, smoke, and rollback blocked.",
+  "rdsPostgres": {
+    "confirmed": false,
+    "provider": "Aliyun RDS PostgreSQL",
+    "region": "cn-hangzhou",
+    "instanceId": "fixture_rds_instance_pending",
+    "instanceName": "meiye-huajing-app-api-production-cn",
+    "engine": "PostgreSQL",
+    "engineVersion": "16",
+    "networkAccess": "vpc_or_sae_internal_access_pending",
+    "databaseName": "meiye_huajing_app",
+    "databaseAccountReady": false,
+    "databaseUrlCnSecretImported": false,
+    "databaseUrlCnSecretTarget": "Aliyun KMS / Secrets Manager / SAE secret env",
+    "evidence": "fixture_rds_not_created"
+  },
+  "sourceInventory": {
+    "generatedBy": "corepack pnpm aliyun:rds:migration:plan",
+    "appApiRouteCount": 34,
+    "appApiRoutesWithSupabase": 32,
+    "appApiRoutesWithSupabaseDataAccess": 4,
+    "firstVersionRdsRouteCount": 25,
+    "firstVersionRdsRoutesWithSupabase": 23,
+    "firstVersionRdsRoutesWithSupabaseDataAccess": 0,
+    "deferredAppApiRouteCount": 9,
+    "deferredAppApiRoutesWithSupabaseDataAccess": 4,
+    "tableCount": 44,
+    "rpcCount": 3,
+    "storageBucketCount": 1,
+    "databaseUrlCnReferencedInSource": true,
+    "postgresDataAccessAdapterDetected": true,
+    "evidence": "fixture_current_rds_plan_counts_match_head"
+  },
+  "migration": {
+    "schemaInventoryReviewed": false,
+    "schemaCompatibilityReviewed": false,
+    "supabaseSpecificSqlResolved": false,
+    "rdsExtensionSupportConfirmed": false,
+    "dataAccessAdapterReady": false,
+    "schemaMigrated": false,
+    "dataMigrated": false,
+    "rowCountValidationPassed": false,
+    "criticalRecordValidationPassed": false,
+    "appApiSmokeOnRdsPassed": false,
+    "supabaseNoLongerFormalTarget": false,
+    "rollbackRunbookReviewed": false,
+    "rollbackValidationPassed": false,
+    "evidence": "fixture_migration_not_authorized"
+  },
+  "security": {
+    "containsDatabasePassword": false,
+    "containsConnectionString": false,
+    "containsSupabaseServiceRoleKey": false,
+    "secretPolicy": "Do not store DATABASE_URL_CN, database password, dump contents, Supabase service role key, AccessKeySecret, AppSecret, STS token, or cookie in git, JSON, Markdown, Docker image, APP bundle, or mini-program package."
+  },
+  "verifyCommands": [
+    "corepack pnpm aliyun:rds:migration:plan",
+    "corepack pnpm aliyun:rds:migration:evidence:strict",
+    "corepack pnpm aliyun:env:check",
+    "corepack pnpm aliyun:completion:audit",
+    "corepack pnpm aliyun:predeploy"
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "environment": "production-cn",
+  "updatedAt": "2026-06-30T00:00:00+08:00",
+  "operator": "codex-static-fixture",
+  "notes": "Tracked non-secret fixture for clean static tests. It records blocker states only and is not production evidence.",
+  "items": {
+    "runtime": {
+      "confirmed": false,
+      "provider": "SAE",
+      "region": "cn-hangzhou",
+      "appName": "meiye-huajing-app-api-production-cn",
+      "containerPort": 3000,
+      "healthPath": "/api/healthz",
+      "evidence": "fixture_runtime_not_created"
+    },
+    "apiDomainHttps": {
+      "confirmed": false,
+      "host": "api-cn.ipgongchang.xin",
+      "dnsResolvedToAliyun": false,
+      "httpsEnabled": false,
+      "icpReady": false,
+      "evidence": "fixture_api_domain_pending"
+    },
+    "assetDomainHttps": {
+      "confirmed": false,
+      "host": "assets-cn.ipgongchang.xin",
+      "dnsResolvedToAliyun": false,
+      "httpsEnabled": false,
+      "icpReady": false,
+      "evidence": "fixture_asset_domain_pending"
+    },
+    "oss": {
+      "confirmed": false,
+      "bucket": "meiye-huajing-service-records-production-cn",
+      "region": "cn-hangzhou",
+      "corsConfigured": false,
+      "ramLeastPrivilege": false,
+      "serviceRecordPrefix": "service-records/production-cn",
+      "evidence": "fixture_oss_bucket_name_only"
+    },
+    "wechatOpenPlatform": {
+      "confirmed": false,
+      "accountVerified": false,
+      "mobileAppCreated": false,
+      "mobileAppSubmitted": false,
+      "reviewStatus": "not_started",
+      "mobileAppName": "美业话镜",
+      "mobileAppIdReady": false,
+      "mobileAppSecretReady": false,
+      "androidPackageName": "com.ipgongchang.meiyehuajing",
+      "androidSignature": "fixture_android_release_signature_pending",
+      "androidConfigured": false,
+      "iosBundleId": "com.ipgongchang.meiyehuajing",
+      "iosUniversalLink": "https://api-cn.ipgongchang.xin/.well-known/apple-app-site-association",
+      "iosConfigured": false,
+      "evidence": "fixture_wechat_open_mobile_app_pending"
+    },
+    "envImport": {
+      "confirmed": false,
+      "target": "SAE",
+      "importedAt": "2026-06-30T00:00:00+08:00",
+      "secretNotInImage": true,
+      "evidence": "fixture_env_import_pending"
+    },
+    "slsAlerts": {
+      "confirmed": false,
+      "slsProject": "meiye-huajing-app-prod-cn",
+      "healthAlertConfigured": false,
+      "serverErrorAlertConfigured": false,
+      "evidence": "fixture_sls_alerts_pending"
+    }
+  }
+}

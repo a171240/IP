@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "environment": "production-cn",
+  "updatedAt": "2026-06-30T00:00:00+08:00",
+  "operator": "codex-static-fixture",
+  "notes": "Tracked non-secret fixture for clean static tests. It intentionally keeps image push and runtime pull blocked.",
+  "image": {
+    "localTag": "meiye-huajing-app-api:production-cn",
+    "localDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "dockerBuildCommand": "corepack pnpm aliyun:docker:build",
+    "containerSmokeCommand": "corepack pnpm aliyun:container:smoke"
+  },
+  "acr": {
+    "confirmed": true,
+    "provider": "Aliyun ACR",
+    "region": "cn-hangzhou",
+    "registryHost": "meiye-huajing-app-api-registry.cn-hangzhou.cr.aliyuncs.com",
+    "vpcRegistryHost": "meiye-huajing-app-api-registry-vpc.cn-hangzhou.cr.aliyuncs.com",
+    "publicNetworkEntranceEnabled": false,
+    "namespace": "meiye",
+    "repository": "meiye-huajing-app-api",
+    "remoteTag": "production-cn",
+    "remoteImage": "meiye-huajing-app-api-registry.cn-hangzhou.cr.aliyuncs.com/meiye/meiye-huajing-app-api:production-cn",
+    "remoteDigest": "",
+    "imagePushed": false,
+    "digestVerified": false,
+    "pushNetworkPath": "pending_choose_vpc_registry_or_acr_import_task",
+    "evidence": "fixture_acr_repository_observed",
+    "purchaseCandidate": {
+      "confirmed": true,
+      "edition": "ACR Enterprise Economic",
+      "region": "cn-hangzhou",
+      "duration": "1 month",
+      "quotedAmount": "fixture_non_secret_quote",
+      "quotedAt": "2026-06-30T00:00:00+08:00",
+      "requiresActionTimePurchaseConfirmation": false,
+      "evidence": "fixture_purchase_candidate_observed"
+    }
+  },
+  "runtime": {
+    "confirmed": false,
+    "target": "SAE",
+    "appName": "meiye-huajing-app-api-production-cn",
+    "remoteImageConfigured": false,
+    "imagePullConfigured": false,
+    "imagePullCredentialMode": "runtime_role_or_secret_env_pending",
+    "evidence": "fixture_runtime_pull_pending"
+  },
+  "commands": {
+    "tag": "docker tag meiye-huajing-app-api:production-cn meiye-huajing-app-api-registry.cn-hangzhou.cr.aliyuncs.com/meiye/meiye-huajing-app-api:production-cn",
+    "push": "docker push meiye-huajing-app-api-registry.cn-hangzhou.cr.aliyuncs.com/meiye/meiye-huajing-app-api:production-cn",
+    "inspect": "docker image inspect meiye-huajing-app-api-registry.cn-hangzhou.cr.aliyuncs.com/meiye/meiye-huajing-app-api:production-cn"
+  },
+  "security": {
+    "containsRegistryCredentials": false,
+    "secretPolicy": "Do not store ACR username, password, access token, RAM secret, or image pull secret in this file. Use docker login, credential helper, RAM, or Aliyun runtime secret settings outside git."
+  }
+}
