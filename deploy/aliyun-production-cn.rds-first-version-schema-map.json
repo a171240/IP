@@ -226,28 +226,22 @@
       ]
     }
   ],
-  "requiredFunctions": [
+  "requiredFunctions": [],
+  "deferredFunctions": [
+    {
+      "name": "update_profile_public",
+      "source": "lib/supabase/schema.sql",
+      "deferReason": "legacy Supabase profile RPC uses auth.uid(); first-version APP profile reads and inserts through lib/aliyun-rds/repositories/account-profile.server.ts instead"
+    },
     {
       "name": "consume_credits",
       "source": "lib/supabase/schema.sql",
-      "capabilities": [
-        "profile_multi_tenant_permissions"
-      ],
-      "validation": [
-        "function_exists",
-        "credit_balance_transaction_smoke_passes"
-      ]
+      "deferReason": "legacy Supabase credit RPC uses auth.uid(); first-version APP billing reads profile and ledger tables through RDS repositories and does not execute this RPC"
     },
     {
       "name": "grant_trial_credits",
       "source": "lib/supabase/schema.sql",
-      "capabilities": [
-        "profile_multi_tenant_permissions"
-      ],
-      "validation": [
-        "function_exists",
-        "trial_credit_grant_smoke_passes"
-      ]
+      "deferReason": "legacy Supabase trial-credit RPC uses auth.uid(); first-version APP release scope excludes chat/trial-credit mutation flows"
     }
   ],
   "requiredStorage": [
