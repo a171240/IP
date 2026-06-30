@@ -13,13 +13,13 @@ const DEFAULT_TEMPLATE_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn
 const DEFAULT_LOCAL_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.rds-migration.local.json")
 const EXPECTED_REGION = "cn-hangzhou"
 const EXPECTED_PROVIDER = "Aliyun RDS PostgreSQL"
-const EXPECTED_APP_API_ROUTE_COUNT = 31
-const EXPECTED_APP_API_ROUTES_WITH_SUPABASE = 29
+const EXPECTED_APP_API_ROUTE_COUNT = 34
+const EXPECTED_APP_API_ROUTES_WITH_SUPABASE = 32
 const EXPECTED_APP_API_ROUTES_WITH_SUPABASE_DATA_ACCESS = 4
 const EXPECTED_FIRST_VERSION_RDS_ROUTE_COUNT = 25
 const EXPECTED_FIRST_VERSION_RDS_ROUTES_WITH_SUPABASE = 23
 const EXPECTED_FIRST_VERSION_RDS_ROUTES_WITH_SUPABASE_DATA_ACCESS = 0
-const EXPECTED_DEFERRED_APP_API_ROUTE_COUNT = 6
+const EXPECTED_DEFERRED_APP_API_ROUTE_COUNT = 9
 const EXPECTED_DEFERRED_APP_API_ROUTES_WITH_SUPABASE_DATA_ACCESS = 4
 
 const TOP_LEVEL_FIELDS = new Set([
@@ -854,7 +854,7 @@ function buildRdsExecutionReadiness(phases, compatibilityReview) {
     sourceInventory.ready === true &&
     compatibility.canStartNow === true
   const schemaApplyBlockedByCompatibilityReview = compatibility.ready !== true ||
-    compatibilityReview.dispositionPlan?.readyToApplySchema !== true
+    compatibilityReview.rdsApplyCandidateReviewPlan?.readyToApplySchema !== true
   const rdsInstanceAndSecretReady = rdsInstance.ready === true
   const schemaDataCanStartAfterActionTimeConfirmation = schemaData.ready !== true &&
     compatibility.ready === true &&
@@ -945,9 +945,14 @@ function buildCompatibilityReviewPlan(localValidation, migrationPackage) {
       itemCount: migrationPackage.rdsApplyCandidateReviewPlan?.itemCount || 0,
       findingCount: migrationPackage.rdsApplyCandidateReviewPlan?.findingCount || 0,
       categories: migrationPackage.rdsApplyCandidateReviewPlan?.categories || [],
+      resolvedItemCount: migrationPackage.rdsApplyCandidateReviewPlan?.resolvedItemCount || 0,
+      resolvedFindingCount: migrationPackage.rdsApplyCandidateReviewPlan?.resolvedFindingCount || 0,
+      resolvedCategories: migrationPackage.rdsApplyCandidateReviewPlan?.resolvedCategories || [],
       requiredWriteBackFields: migrationPackage.rdsApplyCandidateReviewPlan?.requiredWriteBackFields || [],
       closeConditions: migrationPackage.rdsApplyCandidateReviewPlan?.closeConditions || [],
       items: migrationPackage.rdsApplyCandidateReviewPlan?.items || [],
+      resolvedItems: migrationPackage.rdsApplyCandidateReviewPlan?.resolvedItems || [],
+      targetRdsReviewResolution: migrationPackage.rdsApplyCandidateReviewPlan?.targetRdsReviewResolution || null,
     },
     categories: (migrationPackage.compatibilityReviewChecklist || []).map((item) => ({
       code: item.code,
@@ -1278,6 +1283,9 @@ function renderMarkdown(report) {
     `- itemCount: ${report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateReviewPlan.itemCount}`,
     `- findingCount: ${report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateReviewPlan.findingCount}`,
     `- categories: ${report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateReviewPlan.categories.join(", ") || "none"}`,
+    `- resolvedItemCount: ${report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateReviewPlan.resolvedItemCount}`,
+    `- resolvedFindingCount: ${report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateReviewPlan.resolvedFindingCount}`,
+    `- resolvedCategories: ${report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateReviewPlan.resolvedCategories.join(", ") || "none"}`,
     `- requiredWriteBackFields: ${report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateReviewPlan.requiredWriteBackFields.join(", ") || "none"}`,
     `- closeConditions: ${report.rdsMigrationPlan.compatibilityReview.rdsApplyCandidateReviewPlan.closeConditions.join("; ") || "none"}`,
     "",

@@ -1,6 +1,6 @@
 # APP production-cn RDS migration evidence check
 
-Generated at: 2026-06-26T16:28:41.035Z
+Generated at: 2026-06-30T18:45:04.362Z
 
 ## Conclusion
 
@@ -9,21 +9,21 @@ Generated at: 2026-06-26T16:28:41.035Z
 - localExists: true
 - localReady: false
 - migrationReady: false
-- appApiRoutesWithSupabase: 29/31
-- appApiRoutesWithSupabaseDataAccess: 4/31
+- appApiRoutesWithSupabase: 32/34
+- appApiRoutesWithSupabaseDataAccess: 4/34
 - firstVersionRdsRoutesWithSupabaseDataAccess: 0/25
-- deferredAppApiRoutesWithSupabaseDataAccess: 4/6
+- deferredAppApiRoutesWithSupabaseDataAccess: 4/9
 - databaseUrlCnReferencedInSource: true
 - postgresDataAccessAdapterDetected: true
-- writebackBlockingGroups: rdsInstanceAndSecret, schemaDataAndRollback
+- writebackBlockingGroups: schemaDataAndRollback
 - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
 - rdsMigrationPlanReady: false
-- rdsMigrationPhaseReady: 1/5
-- rdsMigrationNextPhaseIds: compatibility_review, rds_instance_and_secret
-- rdsLocalReviewCanStartNow: true
-- rdsCanStartP11AfterActionTimeConfirmation: true
-- rdsCompatibilityReviewCanStartNow: true
-- rdsSchemaApplyBlockedByCompatibilityReview: true
+- rdsMigrationPhaseReady: 4/5
+- rdsMigrationNextPhaseIds: source_inventory_preflight
+- rdsLocalReviewCanStartNow: false
+- rdsCanStartP11AfterActionTimeConfirmation: false
+- rdsCompatibilityReviewCanStartNow: false
+- rdsSchemaApplyBlockedByCompatibilityReview: false
 
 ## Files
 
@@ -32,25 +32,12 @@ Generated at: 2026-06-26T16:28:41.035Z
 
 ## Local Blockers
 
-- todo:rdsPostgres.instanceId
-- todo:rdsPostgres.engineVersion
-- todo:rdsPostgres.networkAccess
-- todo:rdsPostgres.databaseName
-- todo:rdsPostgres.evidence
-- rdsPostgres.confirmed
-- rdsPostgres.databaseAccountReady
-- rdsPostgres.databaseUrlCnSecretImported
-- migration.schemaCompatibilityReviewed
-- migration.supabaseSpecificSqlResolved
-- migration.rdsExtensionSupportConfirmed
-- migration.schemaMigrated
-- migration.dataMigrated
-- migration.rowCountValidationPassed
-- migration.criticalRecordValidationPassed
-- migration.appApiSmokeOnRdsPassed
-- migration.supabaseNoLongerFormalTarget
-- migration.rollbackRunbookReviewed
-- migration.rollbackValidationPassed
+- sourceInventory.appApiRouteCount=34
+- sourceInventory.appApiRoutesWithSupabase=32
+- sourceInventory.deferredAppApiRouteCount=9
+- sourceInventory.appApiRouteCount_mismatch_current_plan
+- sourceInventory.appApiRoutesWithSupabase_mismatch_current_plan
+- sourceInventory.deferredAppApiRouteCount_mismatch_current_plan
 
 ## Writeback Plan
 
@@ -59,7 +46,7 @@ Generated at: 2026-06-26T16:28:41.035Z
 - canStartNow: true
 - dependsOnGroups: none
 - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-- blockerFields: rdsPostgres.instanceId, rdsPostgres.engineVersion, rdsPostgres.networkAccess, rdsPostgres.databaseName, rdsPostgres.evidence, rdsPostgres.confirmed, rdsPostgres.databaseAccountReady, rdsPostgres.databaseUrlCnSecretImported
+- blockerFields: none
 - writeTargets: deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.* non-secret evidence; /Users/Admin/Documents/美业话镜APP/.env.production-cn.local -> DATABASE_URL_CN status only, never committed; Aliyun KMS / Secrets Manager / SAE secret env -> DATABASE_URL_CN value
 - expectedEvidence: RDS PostgreSQL instance exists in cn-hangzhou; database account and database are ready; DATABASE_URL_CN imported only through secret env
 - forbidden: Do not record database password or connection string value; Do not store DATABASE_URL_CN in git, JSON, Markdown, Docker image, APP bundle, or mini-program package
@@ -70,7 +57,7 @@ Generated at: 2026-06-26T16:28:41.035Z
 - canStartNow: false
 - dependsOnGroups: rdsInstanceAndSecret
 - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-- blockerFields: migration.schemaCompatibilityReviewed, migration.supabaseSpecificSqlResolved, migration.rdsExtensionSupportConfirmed, migration.schemaMigrated, migration.dataMigrated, migration.rowCountValidationPassed, migration.criticalRecordValidationPassed, migration.appApiSmokeOnRdsPassed, migration.supabaseNoLongerFormalTarget, migration.rollbackRunbookReviewed, migration.rollbackValidationPassed
+- blockerFields: sourceInventory.appApiRouteCount, sourceInventory.appApiRoutesWithSupabase, sourceInventory.deferredAppApiRouteCount, sourceInventory.appApiRouteCount_mismatch_current_plan, sourceInventory.appApiRoutesWithSupabase_mismatch_current_plan, sourceInventory.deferredAppApiRouteCount_mismatch_current_plan
 - writeTargets: deploy/aliyun-production-cn.rds-migration.local.json -> sourceInventory / migration non-secret evidence; release manifest / migration report -> non-secret migration evidence handle
 - expectedEvidence: APP API data access adapter uses RDS/PostgreSQL as formal production-cn data layer; Supabase SQL compatibility review completed before applying schema to Aliyun RDS; Supabase-specific auth/storage/RLS/service_role SQL resolved or rewritten for Aliyun RDS; Aliyun RDS PostgreSQL extension support confirmed for required functions; schema and data migration validated; row counts, critical records, APP API smoke, and rollback validation passed
 - forbidden: Do not run destructive migration without reviewed migration and rollback plan; Do not store dump contents, customer data, Supabase service role key, or database password in reports
@@ -79,69 +66,74 @@ Generated at: 2026-06-26T16:28:41.035Z
 ## RDS Migration Plan
 
 - ready: false
-- phaseReady: 1/5
-- nextPhaseIds: compatibility_review, rds_instance_and_secret
-- localReviewCanStartNow: true
-- cloudOrSecretActionRequired: true
+- phaseReady: 4/5
+- nextPhaseIds: source_inventory_preflight
+- localReviewCanStartNow: false
+- cloudOrSecretActionRequired: false
 - onlyMissingBackendCredentialValue: DATABASE_URL_CN
 
 ### execution_readiness
 
-- canStartP11AfterActionTimeConfirmation: true
-- compatibilityReviewCanStartNow: true
-- schemaApplyBlockedByCompatibilityReview: true
-- rdsInstanceAndSecretReady: false
+- canStartP11AfterActionTimeConfirmation: false
+- compatibilityReviewCanStartNow: false
+- schemaApplyBlockedByCompatibilityReview: false
+- rdsInstanceAndSecretReady: true
 - onlyMissingBackendCredentialValue: DATABASE_URL_CN
 - databaseUrlCnSecretTarget: Aliyun KMS / Secrets Manager / SAE secret env
 - localReviewCloseFields: migration.schemaCompatibilityReviewed, migration.supabaseSpecificSqlResolved, migration.rdsExtensionSupportConfirmed
 - cloudSecretWritebackFields: rdsPostgres.instanceId, rdsPostgres.engineVersion, rdsPostgres.networkAccess, rdsPostgres.databaseName, rdsPostgres.databaseAccountReady=true, rdsPostgres.databaseUrlCnSecretImported=true, rdsPostgres.evidence=<non-secret RDS console/secret-env evidence handle>
-- nextOperatorDecision: close_compatibility_review_and_prepare_rds_action_time_confirmation
+- nextOperatorDecision: create_rds_import_database_url_secret_then_validate_schema_data_and_smoke
 - verificationCommands: corepack pnpm aliyun:rds:migration:package; corepack pnpm aliyun:rds:migration:evidence:strict; corepack pnpm aliyun:sensitive:blockers:backend; corepack pnpm aliyun:backend-cn:status
 
 ### compatibility_review_package
 
-- ready: false
+- ready: true
 - packageOk: true
 - reviewRequired: true
 - findingCount: 181
 - affectedSourceFileCount: 9
 - checklistItemCount: 7
-- blockingFields: migration.schemaCompatibilityReviewed, migration.supabaseSpecificSqlResolved, migration.rdsExtensionSupportConfirmed
+- blockingFields: none
 - schemaSqlSha256: 5b9f4a99254d682ac0d68cc7b5e2dfaab4ff5445585373af2fd0a2e8b8244f41
-- rdsApplyCandidateSqlSha256: b6cca44687e039ec60837af55caeca861c3403131cb7cd2b511ffb25ad91aeef
-- validationSqlSha256: 02d43c412731687ba06aa3f8827052564d4ae64ba29036cf255c88561935d55c
-- rollbackChecklistSha256: c8a973fdaa5aef67266623b9137e291a82356addd32fb6553db4cffe103793ad
+- rdsApplyCandidateSqlSha256: 2091ef7975246cfd770883d2ac5b7b3da6b45ee76a82178f7a8e9db18f91a8ab
+- validationSqlSha256: 5642494c32ffaf4e9eb8297678c460b79dbd3de1f467f2851949a903961f838d
+- rollbackChecklistSha256: f875b86c32714158fdd35121c56ac54b9000fe3689206a9c946dc630c7e0ad20
 
 ### rds_apply_candidate
 
-- readyToApplySchema: false
-- status: blocked_extension_support_unconfirmed
-- findingCount: 22
-- categories: extension_review
-- removedStatementCount: 97
-- keptStatementCount: 138
-- rewrittenStatementCount: 12
-- remainingReviewRequired: true
+- readyToApplySchema: true
+- status: ready_after_target_rds_engine_confirmation
+- findingCount: 0
+- categories: none
+- removedStatementCount: 113
+- keptStatementCount: 148
+- rewrittenStatementCount: 9
+- remainingReviewRequired: false
 
-- removed:policy_statement: statements=69
+- removed:deferred_auth_uid_function:consume_credits: statements=1
+- removed:deferred_auth_uid_function:grant_trial_credits: statements=1
+- removed:deferred_auth_uid_function:update_profile_public: statements=1
+- removed:deferred_out_of_scope_xhs_drafts: statements=12
+- removed:policy_statement: statements=70
 - removed:row_level_security: statements=23
 - removed:supabase_auth_schema: statements=3
 - removed:supabase_service_role: statements=10
 - removed:supabase_storage_schema: statements=2
 - rewritten:supabase_auth_schema: statements=9
-- rewritten:supabase_auth_uid: statements=3
 
 ### rds_apply_candidate_review_plan
 
-- status: open
-- readyToApplySchema: false
-- itemCount: 1
-- findingCount: 22
-- categories: extension_review
-- requiredWriteBackFields: migration.rdsExtensionSupportConfirmed
-- closeConditions: No unresolved Supabase auth schema references remain in rds-apply-candidate.sql.; No unresolved auth.uid() calls remain in rds-apply-candidate.sql.; Target Aliyun RDS PostgreSQL extension support or replacement SQL is confirmed.; migration.schemaCompatibilityReviewed=true, migration.supabaseSpecificSqlResolved=true, and migration.rdsExtensionSupportConfirmed=true are recorded only after review closure.
+- status: ready_after_target_rds_engine_confirmation
+- readyToApplySchema: true
+- itemCount: 0
+- findingCount: 0
+- categories: none
+- resolvedItemCount: 1
+- resolvedFindingCount: 22
+- resolvedCategories: extension_review
+- requiredWriteBackFields: none
+- closeConditions: Resolved target-engine review items are backed by non-secret Aliyun RDS official extension evidence.; migration.schemaCompatibilityReviewed=true, migration.supabaseSpecificSqlResolved=true, and migration.rdsExtensionSupportConfirmed=true are recorded only after review closure.
 
-- review:extension_review: findings=22, sources=8, fields=migration.rdsExtensionSupportConfirmed
 
 ### compatibility_disposition_plan
 
@@ -279,12 +271,12 @@ Generated at: 2026-06-26T16:28:41.035Z
 
 ### source_inventory_preflight
 
-- ready: true
+- ready: false
 - canStartNow: true
 - canStartAfterActionTimeConfirmation: false
 - dependsOnPhaseIds: none
 - requiredAuthorizationPackets: none
-- blockerFields: none
+- blockerFields: sourceInventory.appApiRouteCount, sourceInventory.appApiRoutesWithSupabase, sourceInventory.deferredAppApiRouteCount
 - writeTargets: deploy/aliyun-production-cn.rds-migration.local.json -> sourceInventory.* non-secret evidence; deploy/aliyun-production-cn.rds-first-version-schema-map.json; deploy/app-api-production-cn.bridge-map.json
 - expectedEvidence: firstVersionRdsRouteCount=25; firstVersionRdsRoutesWithSupabaseDataAccess=0; postgresDataAccessAdapterDetected=true; schemaInventoryReviewed=true; dataAccessAdapterReady=true
 - forbidden: Do not include row contents, customer data, Supabase service role key, or DATABASE_URL_CN value.
@@ -292,12 +284,12 @@ Generated at: 2026-06-26T16:28:41.035Z
 
 ### compatibility_review
 
-- ready: false
+- ready: true
 - canStartNow: true
 - canStartAfterActionTimeConfirmation: false
 - dependsOnPhaseIds: source_inventory_preflight
 - requiredAuthorizationPackets: none
-- blockerFields: migration.schemaCompatibilityReviewed, migration.supabaseSpecificSqlResolved, migration.rdsExtensionSupportConfirmed
+- blockerFields: none
 - writeTargets: docs/app-production-cn-rds-migration-package.md -> compatibilityReviewChecklist non-secret dispositions; deploy/aliyun-production-cn.rds-migration.local.json -> migration schemaCompatibilityReviewed / supabaseSpecificSqlResolved / rdsExtensionSupportConfirmed
 - expectedEvidence: compatibilityReviewChecklistItemCount=7 reviewed and closed; Supabase auth schema/auth.uid/storage/service_role/RLS/policy dispositions recorded without secrets; target Aliyun RDS PostgreSQL extension support or replacement plan confirmed
 - forbidden: Do not apply schema to RDS before this review closes.; Do not store dump contents, customer data, database password, or Supabase service role key.
@@ -305,12 +297,12 @@ Generated at: 2026-06-26T16:28:41.035Z
 
 ### rds_instance_and_secret
 
-- ready: false
+- ready: true
 - canStartNow: false
 - canStartAfterActionTimeConfirmation: true
 - dependsOnPhaseIds: none
 - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-- blockerFields: rdsPostgres.instanceId, rdsPostgres.engineVersion, rdsPostgres.networkAccess, rdsPostgres.databaseName, rdsPostgres.evidence, rdsPostgres.confirmed, rdsPostgres.databaseAccountReady, rdsPostgres.databaseUrlCnSecretImported
+- blockerFields: none
 - writeTargets: deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres.* non-secret evidence; Aliyun KMS / Secrets Manager / SAE secret env -> DATABASE_URL_CN value only
 - expectedEvidence: RDS PostgreSQL instance exists in cn-hangzhou; database account and network access for SAE are ready; DATABASE_URL_CN imported only through Aliyun controlled secret env
 - forbidden: Do not write DATABASE_URL_CN value, database password, or connection string to JSON, Markdown, Docker image, shell history, or git.
@@ -318,12 +310,12 @@ Generated at: 2026-06-26T16:28:41.035Z
 
 ### schema_data_validation
 
-- ready: false
+- ready: true
 - canStartNow: false
 - canStartAfterActionTimeConfirmation: true
 - dependsOnPhaseIds: compatibility_review, rds_instance_and_secret
 - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-- blockerFields: migration.schemaMigrated, migration.dataMigrated, migration.rowCountValidationPassed, migration.criticalRecordValidationPassed, migration.supabaseNoLongerFormalTarget
+- blockerFields: none
 - writeTargets: deploy/aliyun-production-cn.rds-migration.local.json -> migration schema/data validation booleans and non-secret evidence handle; release manifest / migration report -> non-secret migration evidence handle
 - expectedEvidence: schemaMigrated=true; dataMigrated=true; rowCountValidationPassed=true; criticalRecordValidationPassed=true; supabaseNoLongerFormalTarget=true
 - forbidden: Do not store migration dump contents or customer records in reports.; Do not run destructive migration without reviewed rollback path.
@@ -331,12 +323,12 @@ Generated at: 2026-06-26T16:28:41.035Z
 
 ### app_api_smoke_and_rollback
 
-- ready: false
+- ready: true
 - canStartNow: false
 - canStartAfterActionTimeConfirmation: true
 - dependsOnPhaseIds: schema_data_validation
 - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-- blockerFields: migration.appApiSmokeOnRdsPassed, migration.rollbackRunbookReviewed, migration.rollbackValidationPassed
+- blockerFields: none
 - writeTargets: deploy/aliyun-production-cn.rds-migration.local.json -> migration smoke/rollback booleans and non-secret evidence handle
 - expectedEvidence: profile / tenant / invite / service-record APP API smoke passed against RDS; rollbackRunbookReviewed=true; rollbackValidationPassed=true
 - forbidden: Do not include auth tokens, customer payloads, database password, or connection string value in smoke evidence.
