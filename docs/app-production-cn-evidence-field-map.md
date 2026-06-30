@@ -1,34 +1,36 @@
 # APP production-cn evidence field map
 
-Date: 2026-06-26
+Date: 2026-06-30
 
-This is the field-level, value-free map for the current production-cn evidence gaps. It is derived from:
+This is the value-free field map for the current `backend_aliyun_only` production-cn evidence state. It is derived from:
 
 ```bash
-corepack pnpm aliyun:evidence:writeback:backend
+node scripts/generate-aliyun-evidence-writeback-checklist.mjs --backend-only --skip-vercel-env-coverage --env-file tests/fixtures/aliyun-user-action-brief/env.production-cn.fixture --cloud-confirmations tests/fixtures/aliyun-user-action-brief/cloud-confirmations.fixture.json --cloud-inventory-results tests/fixtures/aliyun-user-action-brief/cloud-inventory-results.fixture.json --rds-migration tests/fixtures/aliyun-user-action-brief/rds-migration.fixture.json --image-publish tests/fixtures/aliyun-user-action-brief/image-publish.fixture.json
 ```
 
-It tells the operator which local evidence field to update after an authorized external action. It does not contain secret values and does not authorize cloud mutation.
+It tells the operator which local evidence fields remain after authorized external actions. It does not contain secret values and does not authorize cloud mutation.
 
 ## Current Gate
 
 ```text
-Production-cn cannot be deployed now.
-evidenceWritebackReady=0/4
-totalGaps=47
-rdsMigrationGaps=19
-cloudInventoryResultGaps=1
-cloudConfirmationGaps=18
-imagePublishGaps=9
+Production-cn backend cannot be deployed now.
+evidenceWritebackReady=1/4
+totalGaps=40
+rdsMigrationGaps=16
+cloudInventoryResultGaps=0
+cloudConfirmationGaps=16
+imagePublishGaps=8
 ```
 
 Current scope is `backend_aliyun_only`. WeChat Open Platform mobile app, Apple, and Android release-signing evidence fields are deferred and are not current Aliyun backend blockers.
 
-## No Ready Evidence File
+## Ready Evidence Files
 
-All four evidence files still have current backend blockers. The read-only inventory file exists, but strict-ready inventory is still blocked by `readonly_inventory_strict_ready=0/9`.
+Fixture-backed strict-ready evidence groups: `cloudInventoryResults`.
 
-## rds-migration.local.json
+Production local evidence still needs authorized writeback before deployment; this document only maps non-secret target fields.
+
+## rdsMigration
 
 Target file:
 
@@ -36,31 +38,40 @@ Target file:
 deploy/aliyun-production-cn.rds-migration.local.json
 ```
 
-Current field blockers: `19`.
+Current field blockers: `16`.
 
 | JSON path | Authorization packet | Expected non-secret evidence |
 | --- | --- | --- |
-| `rdsPostgres.instanceId` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Record the non-secret RDS instance ID after the cn-hangzhou PostgreSQL instance exists. |
-| `rdsPostgres.engineVersion` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Record the PostgreSQL version shown by RDS. |
-| `rdsPostgres.networkAccess` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Record the VPC or SAE internal access evidence without connection strings. |
-| `rdsPostgres.databaseName` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Record the database name only; never record account password or connection string. |
-| `rdsPostgres.evidence` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Record a console path, screenshot ID, ticket ID, or other non-secret RDS evidence handle. |
-| `rdsPostgres.confirmed` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after RDS PostgreSQL exists and matches the production-cn target. |
-| `rdsPostgres.databaseAccountReady` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after the database account and privileges are ready; never record the password. |
-| `rdsPostgres.databaseUrlCnSecretImported` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after `DATABASE_URL_CN` is imported through Aliyun KMS, Secrets Manager, or SAE secret env. |
-| `migration.schemaCompatibilityReviewed` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after the Supabase SQL compatibility review is recorded before applying schema SQL to Aliyun RDS. |
-| `migration.supabaseSpecificSqlResolved` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after Supabase-specific auth, storage, RLS, and service_role SQL has been rewritten or explicitly resolved for Aliyun RDS. |
-| `migration.rdsExtensionSupportConfirmed` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after required PostgreSQL extensions and functions are confirmed on the target Aliyun RDS engine. |
-| `migration.schemaMigrated` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after schema migration is applied to RDS and validated without secret values. |
-| `migration.dataMigrated` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after required data is migrated to RDS and validated without customer data in reports. |
-| `migration.rowCountValidationPassed` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after required table row counts have been validated. |
-| `migration.criticalRecordValidationPassed` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after profile, tenant, store, invite, customer, and service-record critical records validate. |
-| `migration.appApiSmokeOnRdsPassed` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after profile, tenant, invite, and service-record APP API smoke passes against RDS. |
-| `migration.supabaseNoLongerFormalTarget` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after Supabase is migration source or legacy compatibility only, not the formal production-cn database target. |
-| `migration.rollbackRunbookReviewed` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after the rollback runbook is reviewed. |
-| `migration.rollbackValidationPassed` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Set `true` only after rollback validation or recovery rehearsal passes. |
+| `rdsPostgres.confirmed` | `P11_ALIYUN_RDS_DATA_MIGRATION` | RDS PostgreSQL 实例确认存在后填 true。 |
+| `rdsPostgres.databaseAccountReady` | `P11_ALIYUN_RDS_DATA_MIGRATION` | 数据库账号和权限就绪后填 true，不记录密码。 |
+| `rdsPostgres.databaseUrlCnSecretImported` | `P11_ALIYUN_RDS_DATA_MIGRATION` | DATABASE_URL_CN 已只导入阿里云 KMS/Secrets Manager/SAE secret env 后填 true。 |
+| `migration.schemaInventoryReviewed` | `P11_ALIYUN_RDS_DATA_MIGRATION` | 填真实非密钥证据，不能保留 TODO、pending 或 TBD 占位值。 |
+| `migration.schemaCompatibilityReviewed` | `P11_ALIYUN_RDS_DATA_MIGRATION` | compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查完成并记录非密钥处置结果后填 true。 |
+| `migration.supabaseSpecificSqlResolved` | `P11_ALIYUN_RDS_DATA_MIGRATION` | supabase_auth_uid / storage / service_role / RLS / policy 等 Supabase-specific SQL 已改写或明确处置后填 true。 |
+| `migration.rdsExtensionSupportConfirmed` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Aliyun RDS PostgreSQL extension 支持和替代方案已确认后填 true。 |
+| `migration.dataAccessAdapterReady` | `P11_ALIYUN_RDS_DATA_MIGRATION` | 第一版 APP API 正式 production-cn 数据访问不再依赖 Supabase 后填 true。 |
+| `migration.schemaMigrated` | `P11_ALIYUN_RDS_DATA_MIGRATION` | schema 已迁到 RDS/PostgreSQL 并通过非密钥验收后填 true。 |
+| `migration.dataMigrated` | `P11_ALIYUN_RDS_DATA_MIGRATION` | 数据已按迁移计划进入 RDS/PostgreSQL 并通过非密钥验收后填 true。 |
+| `migration.rowCountValidationPassed` | `P11_ALIYUN_RDS_DATA_MIGRATION` | 关键表 row count 校验通过后填 true。 |
+| `migration.criticalRecordValidationPassed` | `P11_ALIYUN_RDS_DATA_MIGRATION` | 关键记录、租户/门店/服务记录关系校验通过后填 true。 |
+| `migration.appApiSmokeOnRdsPassed` | `P11_ALIYUN_RDS_DATA_MIGRATION` | profile / tenant / invite / service-record APP API 在 RDS 上冒烟通过后填 true。 |
+| `migration.supabaseNoLongerFormalTarget` | `P11_ALIYUN_RDS_DATA_MIGRATION` | Supabase 已仅作为迁移来源或旧兼容，不再作为 production-cn 正式数据库目标后填 true。 |
+| `migration.rollbackRunbookReviewed` | `P11_ALIYUN_RDS_DATA_MIGRATION` | 回滚 runbook 已评审后填 true。 |
+| `migration.rollbackValidationPassed` | `P11_ALIYUN_RDS_DATA_MIGRATION` | 回滚演练或可恢复性验证通过后填 true。 |
 
-## cloud-confirmations.local.json
+## cloudInventoryResults
+
+Target file:
+
+```text
+deploy/aliyun-production-cn.cloud-inventory-results.local.json
+```
+
+Current field blockers: `0`.
+
+- none
+
+## cloudConfirmations
 
 Target file:
 
@@ -68,30 +79,28 @@ Target file:
 deploy/aliyun-production-cn.cloud-confirmations.local.json
 ```
 
-Current field blockers: `18`.
+Current field blockers: `16`.
 
 | JSON path | Authorization packet | Expected non-secret evidence |
 | --- | --- | --- |
-| `items.runtime.confirmed` | `P08_SAE_RUNTIME_SLS` | Set `true` only after SAE runtime is confirmed. |
-| `items.apiDomainHttps.confirmed` | `P07_DOMAIN_DNS_HTTPS` | Set `true` only after the API domain evidence is complete. |
-| `items.apiDomainHttps.dnsResolvedToAliyun` | `P07_DOMAIN_DNS_HTTPS` | Set `true` only after DNS resolves to the Aliyun public entry. |
-| `items.apiDomainHttps.httpsEnabled` | `P07_DOMAIN_DNS_HTTPS` | Set `true` only after HTTPS is enabled and reachable. |
-| `items.apiDomainHttps.icpReady` | `P07_DOMAIN_DNS_HTTPS` | Set `true` only after ICP is ready for domestic production access. |
-| `items.assetDomainHttps.confirmed` | `P07_DOMAIN_DNS_HTTPS` | Set `true` only after the asset domain evidence is complete. |
-| `items.assetDomainHttps.dnsResolvedToAliyun` | `P07_DOMAIN_DNS_HTTPS` | Set `true` only after DNS resolves to the Aliyun public entry. |
-| `items.assetDomainHttps.httpsEnabled` | `P07_DOMAIN_DNS_HTTPS` | Set `true` only after HTTPS is enabled and reachable. |
-| `items.assetDomainHttps.icpReady` | `P07_DOMAIN_DNS_HTTPS` | Set `true` only after ICP is ready for domestic production access. |
-| `items.oss.confirmed` | `P05_OSS_RAM_STS` | Set `true` only after OSS bucket, CORS, and runtime access are confirmed. |
-| `items.oss.ramLeastPrivilege` | `P05_OSS_RAM_STS` | Set `true` only after RAM, STS, or runtime role access is limited to the service-record prefix. |
-| `items.envImport.importedAt` | `P06_ENV_IMPORT` | Record the import time or a non-secret console evidence ID. |
-| `items.envImport.evidence` | `P06_ENV_IMPORT` | Record a console path, screenshot ID, ticket ID, or other non-secret evidence handle. |
-| `items.envImport.confirmed` | `P06_ENV_IMPORT` | Set `true` only after production-cn env values are imported into Aliyun runtime env. |
-| `items.envImport.secretNotInImage` | `P06_ENV_IMPORT` | Set `true` only after secrets are confirmed to live in SAE, KMS, or Secrets Manager, not in the image. |
-| `items.slsAlerts.confirmed` | `P08_SAE_RUNTIME_SLS` | Set `true` only after SLS alert evidence is complete. |
-| `items.slsAlerts.healthAlertConfigured` | `P08_SAE_RUNTIME_SLS` | Set `true` or record a non-secret alert evidence ID only after the health alert is configured. |
-| `items.slsAlerts.serverErrorAlertConfigured` | `P08_SAE_RUNTIME_SLS` | Set `true` or record a non-secret alert evidence ID only after the 5xx alert is configured. |
+| `items.runtime.confirmed` | `P08_SAE_RUNTIME_SLS` | 确认完成后填 true。 |
+| `items.apiDomainHttps.confirmed` | `P07_DOMAIN_DNS_HTTPS` | 确认完成后填 true。 |
+| `items.apiDomainHttps.dnsResolvedToAliyun` | `P07_DOMAIN_DNS_HTTPS` | 域名已解析到阿里云公网入口后填 true。 |
+| `items.apiDomainHttps.httpsEnabled` | `P07_DOMAIN_DNS_HTTPS` | HTTPS 证书已启用并可访问后填 true。 |
+| `items.apiDomainHttps.icpReady` | `P07_DOMAIN_DNS_HTTPS` | 备案状态满足国内正式访问要求后填 true。 |
+| `items.assetDomainHttps.confirmed` | `P07_DOMAIN_DNS_HTTPS` | 确认完成后填 true。 |
+| `items.assetDomainHttps.dnsResolvedToAliyun` | `P07_DOMAIN_DNS_HTTPS` | 域名已解析到阿里云公网入口后填 true。 |
+| `items.assetDomainHttps.httpsEnabled` | `P07_DOMAIN_DNS_HTTPS` | HTTPS 证书已启用并可访问后填 true。 |
+| `items.assetDomainHttps.icpReady` | `P07_DOMAIN_DNS_HTTPS` | 备案状态满足国内正式访问要求后填 true。 |
+| `items.oss.confirmed` | `P05_OSS_RAM_STS` | 确认完成后填 true。 |
+| `items.oss.corsConfigured` | `P05_OSS_RAM_STS` | OSS CORS 已按 APP 上传/下载需求配置后填 true。 |
+| `items.oss.ramLeastPrivilege` | `P05_OSS_RAM_STS` | RAM 权限已限制到服务记录前缀后填 true。 |
+| `items.envImport.confirmed` | `P06_ENV_IMPORT` | 确认完成后填 true。 |
+| `items.slsAlerts.confirmed` | `P08_SAE_RUNTIME_SLS` | 确认完成后填 true。 |
+| `items.slsAlerts.healthAlertConfigured` | `P08_SAE_RUNTIME_SLS` | 填真实非密钥控制台证据，不能保留 TODO、pending 或 TBD 占位值。 |
+| `items.slsAlerts.serverErrorAlertConfigured` | `P08_SAE_RUNTIME_SLS` | 填真实非密钥控制台证据，不能保留 TODO、pending 或 TBD 占位值。 |
 
-## image-publish.local.json
+## imagePublish
 
 Target file:
 
@@ -99,52 +108,51 @@ Target file:
 deploy/aliyun-production-cn.image-publish.local.json
 ```
 
-Current field blockers: `9`.
+Current field blockers: `8`.
 
 | JSON path | Authorization packet | Expected non-secret evidence |
 | --- | --- | --- |
-| `acr.remoteDigest` | `P04_ACR_IMAGE_AND_PULL` | Record the remote `sha256:<64 hex>` image digest after verification. |
-| `acr.evidence` | `P04_ACR_IMAGE_AND_PULL` | Record a non-secret ACR push, import, or digest-verification evidence handle. |
-| `acr.imagePushed` | `P04_ACR_IMAGE_AND_PULL` | Set `true` only after the image is pushed or imported into ACR. |
-| `acr.digestVerified` | `P04_ACR_IMAGE_AND_PULL` | Set `true` only after the remote digest is verified. |
-| `acr.remoteDigest` | `P04_ACR_IMAGE_AND_PULL` | The digest must use the `sha256:<64 hex>` format; this is a second blocker on the same field. |
-| `acr.pushNetworkPath` | `P04_ACR_IMAGE_AND_PULL` | Record the chosen non-secret push path: `public_registry`, `vpc_registry_from_aliyun_network`, or `acr_import_task`; never record registry credentials. |
-| `runtime.confirmed` | `P08_SAE_RUNTIME_SLS` | Set `true` only after the SAE runtime is confirmed. |
-| `runtime.remoteImageConfigured` | `P04_ACR_IMAGE_AND_PULL` | Set `true` only after SAE points to the ACR remote image. |
-| `runtime.imagePullConfigured` | `P04_ACR_IMAGE_AND_PULL` | Set `true` only after SAE image-pull permission is configured. |
+| `acr.remoteDigest` | `P04_ACR_IMAGE_AND_PULL` | 填 sha256:<64 hex> 镜像 digest。 |
+| `acr.imagePushed` | `P04_ACR_IMAGE_AND_PULL` | 镜像已推送或导入 ACR 后填 true。 |
+| `acr.digestVerified` | `P04_ACR_IMAGE_AND_PULL` | 远端 digest 已核对后填 true。 |
+| `acr.remoteDigest` | `P04_ACR_IMAGE_AND_PULL` | 填 sha256:<64 hex> 镜像 digest。 |
+| `acr.pushNetworkPath` | `P04_ACR_IMAGE_AND_PULL` | 填 public_registry、vpc_registry_from_aliyun_network 或 acr_import_task。 |
+| `runtime.confirmed` | `P08_SAE_RUNTIME_SLS` | SAE runtime 已确认后填 true。 |
+| `runtime.remoteImageConfigured` | `P04_ACR_IMAGE_AND_PULL` | SAE 已指向 ACR remote image 后填 true。 |
+| `runtime.imagePullConfigured` | `P04_ACR_IMAGE_AND_PULL` | SAE 镜像拉取权限配置完成后填 true。 |
 
 ## Forbidden Values
 
 Never write these values into JSON, Markdown, Docker images, app bundles, shell history, or git:
 
 ```text
-AppSecret
 AccessKeySecret
+AppSecret
 DATABASE_URL_CN value
-database password
-dump contents
-customer data
-registry password
 RAM Secret
 STS token
-cookie
 Supabase service role key
-Android keystore password
-certificate private key
+cookie
+customer data
+database password
+docker login output
+dump contents
+registry password
+token
+证书私钥
 ```
 
-## Verification After Any Field Update
+## Verification
 
-Run the strict command for the touched file first, then the completion gates:
+Use these commands to preserve the backend evidence state:
 
 ```bash
-corepack pnpm aliyun:cloud:confirmations:strict
-corepack pnpm aliyun:cloud:inventory-results:strict
 corepack pnpm aliyun:rds:migration:evidence:strict
+corepack pnpm aliyun:cloud:inventory-results:strict
+corepack pnpm aliyun:cloud:confirmations:strict
 corepack pnpm aliyun:image:plan:strict
+corepack pnpm aliyun:backend-cn:status
 corepack pnpm aliyun:evidence:writeback:backend
-corepack pnpm aliyun:completion:audit
-corepack pnpm aliyun:predeploy
 ```
 
-Do not deploy production-cn until all four evidence files are ready and the strict gates pass.
+Do not run production deployment without P09 action-time authorization.
