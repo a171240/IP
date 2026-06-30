@@ -42,10 +42,23 @@ export function runJsonWithCache(label, scriptArgs, options = {}) {
         [CACHE_ENV]: cacheDir,
       },
     })
-    if (result.error) throw result.error
     stdout = result.stdout || ""
     stderr = result.stderr || ""
     status = result.status || 0
+    if (result.error) {
+      const code = result.error.code || "spawn_error"
+      const message = result.error.message || String(result.error)
+      if (options.allowFailure) {
+        return {
+          ok: false,
+          error: `${code}:${message}`,
+          timedOut: code === "ETIMEDOUT",
+          stdoutLines: lineCount(stdout),
+          stderrLines: lineCount(stderr),
+        }
+      }
+      throw new Error(`${label}_failed:${code}\n${message}\n${stderr || stdout}`)
+    }
     if (status === 0 && stdout.trim()) {
       writeFileSync(cachePath, stdout, { mode: 0o600 })
     }
@@ -66,4 +79,9 @@ export function runJsonWithCache(label, scriptArgs, options = {}) {
   } catch (error) {
     throw new Error(`invalid_json_from_${label}:${error instanceof Error ? error.message : String(error)}`)
   }
+}
+
+function lineCount(value) {
+  const text = String(value || "").trim()
+  return text ? text.split(/\r?\n/).filter(Boolean).length : 0
 }
