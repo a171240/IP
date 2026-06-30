@@ -12,6 +12,8 @@ const WORKSPACE_ROOT = resolve(BACKEND_ROOT, "../..")
 const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
 const DEFAULT_CLOUD_INVENTORY_RESULTS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-inventory-results.local.json")
+const DEFAULT_IMAGE_PUBLISH_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.image-publish.local.json")
+const DEFAULT_CHILD_TIMEOUT_MS = 120_000
 const BACKEND_ONLY_ENV_BLOCKERS = new Set(["DATABASE_URL_CN"])
 const BACKEND_ONLY_DEFERRED_APP_LAUNCH_BLOCKING = [
   "WECHAT_OPEN_PLATFORM_MOBILE_APP",
@@ -36,9 +38,11 @@ function parseArgs(argv) {
     envFile: DEFAULT_ENV_FILE,
     cloudConfirmationsFile: DEFAULT_CLOUD_CONFIRMATIONS_FILE,
     cloudInventoryResultsFile: DEFAULT_CLOUD_INVENTORY_RESULTS_FILE,
+    imagePublishFile: DEFAULT_IMAGE_PUBLISH_FILE,
     outPath: "",
     markdownPath: "",
     backendOnly: false,
+    childTimeoutMs: DEFAULT_CHILD_TIMEOUT_MS,
   }
 
   for (let index = 2; index < argv.length; index += 1) {
@@ -56,6 +60,10 @@ function parseArgs(argv) {
       args.cloudConfirmationsFile = resolveValue(argv[++index], "--cloud-confirmations")
       continue
     }
+    if (arg === "--image-publish") {
+      args.imagePublishFile = resolveValue(argv[++index], "--image-publish")
+      continue
+    }
     if (arg === "--cloud-inventory-results") {
       args.cloudInventoryResultsFile = resolveValue(argv[++index], "--cloud-inventory-results")
       continue
@@ -66,6 +74,10 @@ function parseArgs(argv) {
     }
     if (arg === "--markdown") {
       args.markdownPath = resolveValue(argv[++index], "--markdown")
+      continue
+    }
+    if (arg === "--child-timeout-ms") {
+      args.childTimeoutMs = parsePositiveInteger(argv[++index], "--child-timeout-ms")
       continue
     }
     if (arg === "--help" || arg === "-h") {
@@ -83,10 +95,17 @@ function resolveValue(value, name) {
   return isAbsolute(value) ? value : resolve(process.cwd(), value)
 }
 
-function runJson(label, scriptArgs) {
+function parsePositiveInteger(value, name) {
+  const parsed = Number.parseInt(value, 10)
+  if (!Number.isFinite(parsed) || parsed <= 0) throw new Error(`invalid_positive_integer:${name}`)
+  return parsed
+}
+
+function runJson(label, scriptArgs, args) {
   return runJsonWithCache(label, scriptArgs, {
     cwd: BACKEND_ROOT,
     maxBuffer: 1024 * 1024 * 30,
+    timeoutMs: args.childTimeoutMs,
   })
 }
 
@@ -143,7 +162,7 @@ function compactTask(task) {
   }
 }
 
-function buildStatus({ readiness, operatorTasks, cloudInventoryResults, cloudConfirmationsCheck, args }) {
+function buildStatus({ readiness, operatorTasks, cloudInventoryResults, cloudConfirmationsCheck, imagePublishPlan, args }) {
   const tasks = operatorTasks.tasks || []
   const notReadyTasks = tasks.filter((task) => !task.ready)
   const readyTasks = tasks.filter((task) => task.ready)
@@ -186,7 +205,7 @@ function buildStatus({ readiness, operatorTasks, cloudInventoryResults, cloudCon
   const appRuntimeConfig = readiness.checks?.appProductionConfig?.runtimeConfig || null
   const nativeRelease = readiness.checks?.appProductionConfig?.nativeRelease || null
   const universalLink = readiness.checks?.appProductionConfig?.universalLink || null
-  const imagePlan = readiness.checks?.imagePublishPlan || null
+  const imagePlan = imagePublishPlan || readiness.checks?.imagePublishPlan || null
   const docker = readiness.checks?.docker || null
   const bridgeDataLayer = readiness.checks?.bridgeDataLayer || null
   const wechatReviewStatus = readiness.checks?.wechatOpenPlatform?.reviewStatus || "unknown"
@@ -255,6 +274,8 @@ function buildStatus({ readiness, operatorTasks, cloudInventoryResults, cloudCon
       envFileExists: existsSync(args.envFile),
       cloudConfirmationsFile: args.cloudConfirmationsFile,
       cloudConfirmationsFileExists: existsSync(args.cloudConfirmationsFile),
+      imagePublishFile: args.imagePublishFile,
+      imagePublishFileExists: existsSync(args.imagePublishFile),
       cloudInventoryResultsFile: args.cloudInventoryResultsFile,
       cloudInventoryResultsFileExists: existsSync(args.cloudInventoryResultsFile),
     },
@@ -491,10 +512,12 @@ Options:
   --backend-only                Scope the current blockers to Aliyun backend completion only.
   --env-file <path>              Env file to check. Defaults to workspace .env.production-cn.local.
   --cloud-confirmations <path>   Non-secret cloud confirmation file.
+  --image-publish <path>          Non-secret ACR/image publish evidence file.
   --cloud-inventory-results <path>
                                   Non-secret Aliyun CLI inventory result summary file.
   --out <path>                   Write JSON summary to a file.
   --markdown <path>              Write Markdown summary to a file.
+  --child-timeout-ms <ms>         Maximum time for each local child check, default ${DEFAULT_CHILD_TIMEOUT_MS}.
   -h, --help                     Show this help.
 `)
 }
@@ -509,7 +532,7 @@ function main() {
     args.envFile,
     "--cloud-confirmations",
     args.cloudConfirmationsFile,
-  ])
+  ], args)
   const operatorTasks = runJson("operator_tasks", [
     resolve(BACKEND_ROOT, "scripts/generate-aliyun-operator-tasks.mjs"),
     ...backendOnlyArg,
@@ -517,13 +540,19 @@ function main() {
     args.envFile,
     "--cloud-confirmations",
     args.cloudConfirmationsFile,
-  ])
+  ], args)
+  const imagePublishPlan = runJson("image_publish_plan", [
+    resolve(BACKEND_ROOT, "scripts/check-aliyun-image-publish-plan.mjs"),
+    "--allow-incomplete",
+    "--local",
+    args.imagePublishFile,
+  ], args)
   const cloudInventoryResults = runJson("cloud_inventory_results", [
     resolve(BACKEND_ROOT, "scripts/check-aliyun-cli-inventory-results.mjs"),
     "--allow-incomplete",
     "--local",
     args.cloudInventoryResultsFile,
-  ])
+  ], args)
   const cloudConfirmationsCheck = args.backendOnly
     ? runJson("cloud_confirmations", [
       resolve(BACKEND_ROOT, "scripts/check-aliyun-cloud-confirmations.mjs"),
@@ -531,10 +560,10 @@ function main() {
       "--allow-incomplete",
       "--local",
       args.cloudConfirmationsFile,
-    ])
+    ], args)
     : null
 
-  const status = buildStatus({ readiness, operatorTasks, cloudInventoryResults, cloudConfirmationsCheck, args })
+  const status = buildStatus({ readiness, operatorTasks, cloudInventoryResults, cloudConfirmationsCheck, imagePublishPlan, args })
   const output = `${JSON.stringify(status, null, 2)}\n`
   if (args.outPath) writeFileSync(args.outPath, output)
   if (args.markdownPath) writeFileSync(args.markdownPath, renderMarkdown(status))

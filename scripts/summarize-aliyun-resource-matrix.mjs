@@ -11,6 +11,8 @@ const BACKEND_ROOT = resolve(__dirname, "..")
 const WORKSPACE_ROOT = resolve(BACKEND_ROOT, "../..")
 const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
+const DEFAULT_RDS_MIGRATION_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.rds-migration.local.json")
+const DEFAULT_IMAGE_PUBLISH_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.image-publish.local.json")
 const CURRENT_SCOPE = "backend_aliyun_only"
 const FULL_APP_LAUNCH_SCOPE = "deferred_after_backend_online"
 
@@ -149,6 +151,8 @@ function parseArgs(argv) {
   const args = {
     envFile: DEFAULT_ENV_FILE,
     cloudConfirmationsFile: DEFAULT_CLOUD_CONFIRMATIONS_FILE,
+    rdsMigrationFile: DEFAULT_RDS_MIGRATION_FILE,
+    imagePublishFile: DEFAULT_IMAGE_PUBLISH_FILE,
     outPath: "",
     markdownPath: "",
   }
@@ -162,6 +166,14 @@ function parseArgs(argv) {
     }
     if (arg === "--cloud-confirmations") {
       args.cloudConfirmationsFile = resolveValue(argv[++index], "--cloud-confirmations")
+      continue
+    }
+    if (arg === "--rds-migration") {
+      args.rdsMigrationFile = resolveValue(argv[++index], "--rds-migration")
+      continue
+    }
+    if (arg === "--image-publish") {
+      args.imagePublishFile = resolveValue(argv[++index], "--image-publish")
       continue
     }
     if (arg === "--out") {
@@ -212,6 +224,8 @@ function buildReport(args) {
   const imagePublishPlan = runJson("image_publish_plan", [
     "scripts/check-aliyun-image-publish-plan.mjs",
     "--allow-incomplete",
+    "--local",
+    args.imagePublishFile,
   ])
   const runtimePlan = runJson("runtime_plan", [
     "scripts/check-aliyun-runtime-plan.mjs",
@@ -222,12 +236,20 @@ function buildReport(args) {
     args.envFile,
     "--cloud-confirmations",
     args.cloudConfirmationsFile,
+    "--image-publish",
+    args.imagePublishFile,
   ])
   const backendEnvHandoff = runJson("backend_env_handoff", [
     "scripts/summarize-aliyun-env-handoff.mjs",
     "--backend-only",
     "--env-file",
     args.envFile,
+  ])
+  const rdsMigration = runJson("rds_migration", [
+    "scripts/check-aliyun-rds-migration-evidence.mjs",
+    "--local",
+    args.rdsMigrationFile,
+    "--allow-incomplete",
   ])
 
   const taskById = new Map((operatorTasks.tasks || []).map((task) => [task.id, task]))
@@ -297,6 +319,10 @@ function buildReport(args) {
 
   const blocked = resources.filter((item) => !item.ready)
   const resourceEvidenceBrief = buildResourceEvidenceBrief(resources)
+  const backendRequiredBlocking = filterBackendRequiredBlocking(
+    backendEnvHandoff.summary?.requiredBlocking || [],
+    { cloudConfirmations, rdsMigration },
+  )
   const report = {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -312,10 +338,13 @@ function buildReport(args) {
       "corepack pnpm aliyun:runtime:plan",
       "corepack pnpm aliyun:cloud:access",
       "corepack pnpm aliyun:env:handoff:backend",
+      "corepack pnpm aliyun:rds:migration:evidence",
     ],
     files: {
       envFile: args.envFile,
       cloudConfirmationsFile: args.cloudConfirmationsFile,
+      rdsMigrationFile: args.rdsMigrationFile,
+      imagePublishFile: args.imagePublishFile,
     },
     summary: {
       total: resources.length,
@@ -350,7 +379,7 @@ function buildReport(args) {
       },
       resourceEvidenceReady: `${resourceEvidenceBrief.ready}/${resourceEvidenceBrief.total}`,
       blockedResourceEvidenceIds: resourceEvidenceBrief.blockedIds,
-      backendRequiredBlocking: backendEnvHandoff.summary?.requiredBlocking || [],
+      backendRequiredBlocking,
       deferredAppLaunchBlocking: backendEnvHandoff.summary?.appLaunchBlocking || [],
       backendOnlyExclusions: backendEnvHandoff.backendOnlyExclusions?.envNames || [],
     },
@@ -381,6 +410,22 @@ function buildReport(args) {
   }
   report.ok = report.secretLeakCheck.ok
   return report
+}
+
+function filterBackendRequiredBlocking(blockers, { cloudConfirmations, rdsMigration }) {
+  const rdsReady = rdsMigration.local?.ready === true ||
+    rdsMigration.localReady === true ||
+    rdsMigration.local?.rdsPostgres?.databaseUrlCnSecretImported === true
+  const envImportReady = cloudConfirmations.local?.itemStatus?.envImport?.ready === true ||
+    cloudConfirmations.envImportPlan?.ready === true
+  const databaseUrlCnReady = rdsReady && envImportReady
+  return unique(blockers).filter((blocker) => {
+    if (blocker === "DATABASE_URL_CN" || blocker === "missing_required_env:DATABASE_URL_CN") {
+      return !databaseUrlCnReady
+    }
+    if (blocker === "RDS_MIGRATION_EVIDENCE_NOT_READY") return !rdsReady
+    return true
+  })
 }
 
 function buildResourceEvidenceBrief(resources) {
@@ -700,6 +745,12 @@ function ossAccessEvidence(cloudConfirmations) {
     evidence.push(`oss.execution.fallbackSecretEnvNames=${execution.fallbackSecretEnvNames.join(",")}`)
   }
   if (execution.nextOperatorDecision) evidence.push(`oss.execution.nextOperatorDecision=${execution.nextOperatorDecision}`)
+  if (Array.isArray(execution.postActionWritebackFields) && execution.postActionWritebackFields.length) {
+    evidence.push(`oss.execution.postActionWritebackFields=${execution.postActionWritebackFields.join("|")}`)
+  }
+  if (Array.isArray(execution.verificationCommands) && execution.verificationCommands.length) {
+    evidence.push(`oss.execution.verificationCommands=${execution.verificationCommands.join("|")}`)
+  }
   return evidence
 }
 
@@ -908,7 +959,7 @@ function main() {
 function printHelp() {
   console.log([
     "Usage:",
-    "  node scripts/summarize-aliyun-resource-matrix.mjs [--env-file path] [--cloud-confirmations path] [--out /tmp/resources.json] [--markdown /tmp/resources.md]",
+    "  node scripts/summarize-aliyun-resource-matrix.mjs [--env-file path] [--cloud-confirmations path] [--rds-migration path] [--image-publish path] [--out /tmp/resources.json] [--markdown /tmp/resources.md]",
     "",
     "Builds a non-secret Aliyun resource matrix from existing operator, cloud-confirmation, image, and cloud-access checks.",
     "It does not create resources, import secrets, mutate DNS, push images, deploy, or pay for ACR.",

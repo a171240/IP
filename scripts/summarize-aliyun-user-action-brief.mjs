@@ -12,6 +12,8 @@ const BACKEND_ROOT = resolve(__dirname, "..")
 const WORKSPACE_ROOT = resolve(BACKEND_ROOT, "../..")
 const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
+const DEFAULT_RDS_MIGRATION_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.rds-migration.local.json")
+const DEFAULT_IMAGE_PUBLISH_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.image-publish.local.json")
 
 const SECRET_VALUE_PATTERNS = [
   /sk-[A-Za-z0-9_-]{20,}/,
@@ -245,12 +247,37 @@ const NEXT_ACTION_TIME_CONFIRMATION_BY_ACTION_ID = Object.freeze({
       "backend production-cn no longer depends on Supabase as formal database target",
     ],
   }),
+  U07_DOMAIN_DNS_HTTPS_ICP: Object.freeze({
+    packetId: "P07_DOMAIN_DNS_HTTPS",
+    sequenceGroup: "public_entry",
+    minimumUserPhrase: "授权配置 api-cn/assets-cn 的 DNS、HTTPS 和 ICP 证据，目标必须是阿里云公网入口。",
+    allowedActions: [
+      "把 api-cn.ipgongchang.xin 指向 SAE/SLB/API 公网入口。",
+      "把 assets-cn.ipgongchang.xin 指向 OSS/CDN 静态资源入口。",
+      "绑定 HTTPS 证书并记录 ICP ready 证据。",
+    ],
+    explicitlyExcluded: [
+      "不指向 Vercel、localhost、example 或 198.18.0.x 特殊用途地址。",
+      "不下载证书私钥。",
+      "不部署 production-cn。",
+    ],
+    completionEvidence: [
+      "apiDomainHttps.dnsResolvedToAliyun=true",
+      "apiDomainHttps.httpsEnabled=true",
+      "apiDomainHttps.icpReady=true",
+      "assetDomainHttps.dnsResolvedToAliyun=true",
+      "assetDomainHttps.httpsEnabled=true",
+      "assetDomainHttps.icpReady=true",
+    ],
+  }),
 })
 
 function parseArgs(argv) {
   const args = {
     envFile: DEFAULT_ENV_FILE,
     cloudConfirmationsFile: DEFAULT_CLOUD_CONFIRMATIONS_FILE,
+    rdsMigrationFile: DEFAULT_RDS_MIGRATION_FILE,
+    imagePublishFile: DEFAULT_IMAGE_PUBLISH_FILE,
     outPath: "",
     markdownPath: "",
     backendOnly: false,
@@ -270,6 +297,14 @@ function parseArgs(argv) {
     }
     if (arg === "--cloud-confirmations") {
       args.cloudConfirmationsFile = resolveValue(argv[++index], "--cloud-confirmations")
+      continue
+    }
+    if (arg === "--rds-migration") {
+      args.rdsMigrationFile = resolveValue(argv[++index], "--rds-migration")
+      continue
+    }
+    if (arg === "--image-publish") {
+      args.imagePublishFile = resolveValue(argv[++index], "--image-publish")
       continue
     }
     if (arg === "--cloud-access-observation") {
@@ -325,6 +360,10 @@ function buildReport(args) {
     args.envFile,
     "--cloud-confirmations",
     args.cloudConfirmationsFile,
+    "--rds-migration",
+    args.rdsMigrationFile,
+    "--image-publish",
+    args.imagePublishFile,
   ])
   const status = runJson("production_status", [
     "scripts/summarize-aliyun-production-cn-status.mjs",
@@ -332,6 +371,14 @@ function buildReport(args) {
     args.envFile,
     "--cloud-confirmations",
     args.cloudConfirmationsFile,
+    "--image-publish",
+    args.imagePublishFile,
+  ])
+  const rdsMigration = runJson("rds_migration", [
+    "scripts/check-aliyun-rds-migration-evidence.mjs",
+    "--local",
+    args.rdsMigrationFile,
+    "--allow-incomplete",
   ])
 
   const sensitiveById = new Map((sensitive.items || []).map((item) => [item.id, item]))
@@ -341,6 +388,7 @@ function buildReport(args) {
     sensitiveById,
     resourcesById,
     status,
+    rdsMigration,
     cloudItems: cloudConfirmations?.items || {},
     readonlyInventoryAuthorization,
   })
@@ -362,8 +410,9 @@ function buildReport(args) {
     nextActionTimeConfirmations,
   })
   const requiredBlockingNames = status.summary?.requiredBlocking || []
-  const backendRequiredBlocking = requiredBlockingNames.filter((name) => !APP_LAUNCH_REQUIRED_NAMES.has(name))
+  const backendRequiredBlocking = filterCurrentBackendRequiredBlocking(requiredBlockingNames, rdsMigration)
   const deferredRequiredBlocking = requiredBlockingNames.filter((name) => APP_LAUNCH_REQUIRED_NAMES.has(name))
+  const filteredRequiredBlocking = uniqueStrings([...backendRequiredBlocking, ...deferredRequiredBlocking])
   const blocked = currentActions.filter((item) => item.status !== "ready")
   const report = {
     ok: true,
@@ -379,11 +428,13 @@ function buildReport(args) {
     sourceCommands: [
       args.backendOnly ? "corepack pnpm aliyun:sensitive:blockers:backend" : "corepack pnpm aliyun:sensitive:blockers",
       "corepack pnpm aliyun:resources:matrix",
-      "corepack pnpm aliyun:status",
+      args.backendOnly ? "corepack pnpm aliyun:rds:migration:evidence:strict" : "corepack pnpm aliyun:status",
     ],
     files: {
       envFile: args.envFile,
       cloudConfirmationsFile: args.cloudConfirmationsFile,
+      rdsMigrationFile: args.rdsMigrationFile,
+      imagePublishFile: args.imagePublishFile,
     },
     summary: {
       currentScope: CURRENT_SCOPE,
@@ -399,8 +450,8 @@ function buildReport(args) {
       actionTimeConfirmationRequired: currentActions
         .filter((item) => item.requiresActionTimeConfirmation)
         .map((item) => item.id),
-      requiredBlocking: args.backendOnly ? backendRequiredBlocking : requiredBlockingNames,
-      fullAppRequiredBlocking: requiredBlockingNames,
+      requiredBlocking: args.backendOnly ? backendRequiredBlocking : filteredRequiredBlocking,
+      fullAppRequiredBlocking: filteredRequiredBlocking,
       deferredAppLaunchBlocking: args.backendOnly ? [] : deferredRequiredBlocking,
       deferredAppLaunchBlockingCount: deferredRequiredBlocking.length,
       nextActionTimeConfirmations: nextActionTimeConfirmations.map((item) => item.packetId),
@@ -478,7 +529,7 @@ function buildActionTimeAuthorizationRequest({ backendOnly, nextActionTimeConfir
     backendOnly,
     packetIds,
     recommendedUserReply: backendOnly
-      ? "授权本轮只做阿里云后端第一批动作：只读盘点、创建/确认 RDS PostgreSQL 并处理数据库密码、确认 OSS RAM/STS；ACR 购买证据已确认，镜像推送/SAE 拉取配置需另按 P04 动作时确认；密钥只进入阿里云 KMS/Secrets Manager/SAE secret env，不写文档/代码/git；仅处理 RDS/OSS 所需的受控 secret env，暂不执行全量 SAE env import；不做微信/Android/iOS、不部署上线、不改 DNS。"
+      ? recommendedBackendOnlyAuthorizationReply(packetIds)
       : "请逐项明确授权 nextActionTimeConfirmations 中的动作；未明确授权前不做云端变更、购买、密钥导入、部署、DNS 或 git push。",
     minimumUserPhrases,
     allowedActions,
@@ -499,10 +550,23 @@ function buildActionTimeAuthorizationRequest({ backendOnly, nextActionTimeConfir
   }
 }
 
-function buildActions({ sensitiveById, resourcesById, status, cloudItems, readonlyInventoryAuthorization }) {
+function recommendedBackendOnlyAuthorizationReply(packetIds) {
+  if (!packetIds.length) {
+    return "当前 backend-only 没有需要动作时确认的云端变更；继续只读校验和文档同步。"
+  }
+  if (packetIds.length === 1 && packetIds[0] === "P07_DOMAIN_DNS_HTTPS") {
+    return "授权本轮只处理阿里云后端 P07：配置 api-cn/assets-cn 的 DNS、HTTPS 和 ICP 证据，目标必须是阿里云公网入口；不下载证书私钥、不部署 production-cn、不做微信/Android/iOS、不 git push。"
+  }
+  return "授权本轮只处理 nextActionTimeConfirmations 中列出的阿里云后端动作；密钥只进入阿里云 KMS/Secrets Manager/SAE secret env，不写文档/代码/git；不做微信/Android/iOS、不部署上线、不 git push。"
+}
+
+function buildActions({ sensitiveById, resourcesById, status, rdsMigration, cloudItems, readonlyInventoryAuthorization }) {
   const actionMap = new Map()
   const cloudInventoryResults = status.summary?.cloudInventoryResults || {}
   const cloudInventoryObservation = cloudInventoryResults.observationSummary || {}
+  const backendRequiredBlocking = filterCurrentBackendRequiredBlocking(status.summary?.requiredBlocking || [], rdsMigration)
+    .map((item) => `requiredEnv:${item}`)
+  const rdsMigrationReady = rdsMigration?.localReady === true || rdsMigration?.local?.ready === true
 
   addAction(actionMap, {
     id: "U00_ALIYUN_READONLY_INVENTORY_IDENTITY",
@@ -686,10 +750,11 @@ function buildActions({ sensitiveById, resourcesById, status, cloudItems, readon
     title: "绑定 OSS RAM 最小权限或 STS/运行时角色方案",
     status: sensitiveById.get("S05_OSS_RAM_SECRET_OR_STS")?.status || resourcesById.get("R05_OSS_AUDIO_STORAGE")?.status || "blocked",
     owner: "阿里云 OSS/RAM 操作员",
-    obtainFrom: "阿里云控制台 -> OSS Bucket / RAM 访问控制 / SAE 运行身份",
+    obtainFrom: "阿里云控制台 -> OSS Bucket / RAM 访问控制 / SAE RRSA/OIDC 运行身份",
     writeTargets: [
       "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss",
-      "ALIYUN_OSS_ACCESS_KEY_ID / ALIYUN_OSS_ACCESS_KEY_SECRET / ALIYUN_OSS_SECURITY_TOKEN -> KMS/Secrets Manager/SAE secret env",
+      "SAE RRSA/OIDC env ALIBABA_CLOUD_ROLE_ARN / ALIBABA_CLOUD_OIDC_PROVIDER_ARN / ALIBABA_CLOUD_OIDC_TOKEN_FILE when accessMode=sae_runtime_role",
+      "fallback only: ALIYUN_OSS_ACCESS_KEY_ID / ALIYUN_OSS_ACCESS_KEY_SECRET / ALIYUN_OSS_SECURITY_TOKEN -> KMS/Secrets Manager/SAE secret env",
     ],
     requiredUserAction: sensitiveById.get("S05_OSS_RAM_SECRET_OR_STS")?.requiredUserAction,
     unblockCondition: sensitiveById.get("S05_OSS_RAM_SECRET_OR_STS")?.unblockCondition,
@@ -718,11 +783,11 @@ function buildActions({ sensitiveById, resourcesById, status, cloudItems, readon
   })
 
   const bridgeDataLayer = status.summary?.bridgeDataLayer || {}
-  const rdsMigrationIncluded = bridgeDataLayer.rdsMigrationIncludedInThisRelease === true
+  const rdsMigrationIncluded = rdsMigrationReady || bridgeDataLayer.rdsMigrationIncludedInThisRelease === true
   addAction(actionMap, {
     id: "U11_ALIYUN_RDS_DATA_MIGRATION",
     title: "创建阿里云 RDS PostgreSQL 并完成正式数据层迁移",
-    status: rdsMigrationIncluded && bridgeDataLayer.databaseUrlCnStatus === "ready" ? "ready" : "blocked",
+    status: rdsMigrationReady || (rdsMigrationIncluded && bridgeDataLayer.databaseUrlCnStatus === "ready") ? "ready" : "blocked",
     owner: "阿里云 RDS/后端数据迁移操作员",
     obtainFrom: "阿里云控制台 -> RDS PostgreSQL -> cn-hangzhou 实例；后端 Supabase 到 RDS/PostgreSQL 迁移 runbook",
     writeTargets: [
@@ -733,20 +798,21 @@ function buildActions({ sensitiveById, resourcesById, status, cloudItems, readon
     requiredUserAction: "创建或确认阿里云 RDS PostgreSQL；先生成 RDS 迁移包并关闭 compatibilityReviewChecklist 7 类 Supabase SQL 兼容审查，再生成受控连接串，完成 Supabase 到 RDS/PostgreSQL 的代码、schema、数据、APP API smoke 和回滚迁移验收。",
     unblockCondition: "DATABASE_URL_CN ready，compatibilityReviewChecklist 7 类已关闭，migration.schemaCompatibilityReviewed=true、migration.supabaseSpecificSqlResolved=true、migration.rdsExtensionSupportConfirmed=true，RDS PostgreSQL 迁移和回滚验收通过，production-cn 后端正式数据库目标不再是 Supabase。",
     variableNames: ["DATABASE_URL_CN"],
-    requiresUserAction: true,
-    requiresActionTimeConfirmation: true,
+    requiresUserAction: !rdsMigrationReady,
+    requiresActionTimeConfirmation: !rdsMigrationReady,
     nonSecretEvidenceOnly: false,
     sourceIds: ["G02B_ALIYUN_RDS_DATA_LAYER_READY", "DATABASE_URL_CN"],
     currentBlockers: uniqueStrings([
-      ...requiredBlocking(status).filter((item) => item.includes("DATABASE_URL_CN")),
-      ...(bridgeDataLayer.databaseUrlCnStatus === "ready" ? [] : [`DATABASE_URL_CN_status:${bridgeDataLayer.databaseUrlCnStatus || "unknown"}`]),
-      ...(rdsMigrationIncluded ? [] : ["rdsMigrationIncludedInThisRelease=false"]),
+      ...(rdsMigrationReady ? [] : backendRequiredBlocking.filter((item) => item.includes("DATABASE_URL_CN"))),
+      ...(rdsMigrationReady || bridgeDataLayer.databaseUrlCnStatus === "ready" ? [] : [`DATABASE_URL_CN_status:${bridgeDataLayer.databaseUrlCnStatus || "unknown"}`]),
+      ...(rdsMigrationReady || rdsMigrationIncluded ? [] : ["rdsMigrationIncludedInThisRelease=false"]),
     ]),
     currentEvidence: [
       `bridgeDataLayer.current=${bridgeDataLayer.current || "unknown"}`,
       `bridgeDataLayer.target=${bridgeDataLayer.target || "unknown"}`,
-      `databaseUrlCnStatus=${bridgeDataLayer.databaseUrlCnStatus || "unknown"}`,
+      `databaseUrlCnStatus=${rdsMigrationReady ? "ready" : bridgeDataLayer.databaseUrlCnStatus || "unknown"}`,
       `rdsMigrationIncludedInThisRelease=${rdsMigrationIncluded}`,
+      `rdsMigrationEvidenceReady=${rdsMigrationReady}`,
       `rdsMigrationRequiredForFinalProductionCn=${bridgeDataLayer.rdsMigrationRequiredForFinalProductionCn === true}`,
     ],
     verifyCommands: [
@@ -780,7 +846,7 @@ function buildActions({ sensitiveById, resourcesById, status, cloudItems, readon
       ...sensitiveStatusBlockers(sensitiveById, ["S06_READY_SENSITIVE_ENV_IMPORT"]),
       ...resourceBlockers(resourcesById, ["R06_ENV_IMPORT"]),
       ...cloudMissing(status, "envImport"),
-      ...requiredBlocking(status),
+      ...backendRequiredBlocking,
     ],
     currentEvidence: cloudEvidence(cloudItems, "envImport", [
       "confirmed",
@@ -892,7 +958,7 @@ function buildActions({ sensitiveById, resourcesById, status, cloudItems, readon
     requiresActionTimeConfirmation: true,
     nonSecretEvidenceOnly: true,
     sourceIds: ["release_gate"],
-    currentBlockers: deployAuthorizationBlockers(status),
+    currentBlockers: deployAuthorizationBlockers(status, rdsMigration),
     currentEvidence: [
       `verdict=${status.verdict || "unknown"}`,
       `canDeployNow=${status.canDeployNow === true}`,
@@ -1107,6 +1173,21 @@ function requiredBlocking(status) {
   return (status.summary?.requiredBlocking || []).map((item) => `requiredEnv:${item}`)
 }
 
+function filterCurrentBackendRequiredBlocking(requiredBlockingNames, rdsMigration) {
+  const rdsReady = rdsMigration?.localReady === true || rdsMigration?.local?.ready === true
+  const rdsBlockers = new Set([
+    "DATABASE_URL_CN",
+    "RDS_POSTGRES_NOT_READY",
+    "RDS_MIGRATION_EVIDENCE_NOT_READY",
+    "APP_API_POSTGRES_ADAPTER_MISSING",
+  ])
+  return (requiredBlockingNames || []).filter((name) => {
+    if (APP_LAUNCH_REQUIRED_NAMES.has(name)) return false
+    if (rdsReady && rdsBlockers.has(name)) return false
+    return true
+  })
+}
+
 function cloudMissing(status, key) {
   const pending = status.summary?.cloudConfirmations?.pending || []
   const item = pending.find((entry) => entry.key === key)
@@ -1166,14 +1247,23 @@ function formatEvidenceValue(value) {
   return `${text.slice(0, 137)}...`
 }
 
-function deployAuthorizationBlockers(status) {
+function deployAuthorizationBlockers(status, rdsMigration = null) {
+  const rdsReady = rdsMigration?.localReady === true || rdsMigration?.local?.ready === true
   const blockers = []
   if (status.canDeployNow !== true) blockers.push("canDeployNow=false")
   if (status.summary?.productionReady !== true) blockers.push("productionReady=false")
-  blockers.push(...requiredBlocking(status))
+  blockers.push(...filterCurrentBackendRequiredBlocking(status.summary?.requiredBlocking || [], rdsMigration)
+    .map((item) => `requiredEnv:${item}`))
   blockers.push(...(status.summary?.machineBlocking || []))
   blockers.push(...(status.summary?.manualBlocking || []).map((item) => `manual:${item}`))
-  return blockers
+  return rdsReady
+    ? blockers.filter((item) => !isResolvedRdsBlockerText(item))
+    : blockers
+}
+
+function isResolvedRdsBlockerText(value) {
+  return /DATABASE_URL_CN|RDS_POSTGRES|RDS_MIGRATION|APP_API_POSTGRES|missing_required_env:DATABASE_URL_CN/i
+    .test(String(value || ""))
 }
 
 function uniqueStrings(values) {
@@ -1301,8 +1391,8 @@ function renderMarkdown(report) {
       `- currentBlockers: ${item.currentBlockers.length ? item.currentBlockers.join("; ") : "none"}`,
       `- currentEvidence: ${item.currentEvidence.length ? item.currentEvidence.join("; ") : "none"}`,
       `- requiresActionTimeConfirmation: ${item.requiresActionTimeConfirmation}`,
-      `- requiredUserAction: ${item.requiredUserAction}`,
-      `- unblockCondition: ${item.unblockCondition}`,
+      `- requiredUserAction: ${item.requiredUserAction || "none"}`,
+      `- unblockCondition: ${item.unblockCondition || "none"}`,
       `- verifyCommands: ${item.verifyCommands.join("; ")}`,
       "",
     )
@@ -1420,7 +1510,7 @@ function main() {
 function printHelp() {
   console.log([
     "Usage:",
-    "  node scripts/summarize-aliyun-user-action-brief.mjs [--backend-only] [--env-file path] [--cloud-confirmations path] [--out /tmp/user-actions.json] [--markdown /tmp/user-actions.md]",
+    "  node scripts/summarize-aliyun-user-action-brief.mjs [--backend-only] [--env-file path] [--cloud-confirmations path] [--rds-migration path] [--image-publish path] [--out /tmp/user-actions.json] [--markdown /tmp/user-actions.md]",
     "",
     "Builds a non-secret user action brief for Aliyun production-cn release blockers.",
     "--backend-only excludes deferred WeChat Open Platform mobile app, Android signing, and Apple Team ID launch work from the current output.",
