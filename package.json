@@ -128,6 +128,7 @@
     "aliyun:release:artifacts:backend": "node ./scripts/prepare-aliyun-release-artifacts.mjs --backend-only --skip-vercel-env-coverage",
     "aliyun:health:smoke": "node ./scripts/smoke-aliyun-health.mjs",
     "aliyun:remote:smoke": "node ./scripts/smoke-aliyun-remote.mjs",
+    "aliyun:app-api:live-env": "node ./scripts/check-app-api-live-smoke-env.mjs",
     "aliyun:app-api:smoke": "node ./scripts/smoke-app-api-production-cn.mjs",
     "aliyun:postdeploy:smoke": "node ./scripts/run-aliyun-postdeploy-smoke.mjs",
     "aliyun:routes:check": "node ./scripts/check-app-api-production-cn-routes.mjs",
