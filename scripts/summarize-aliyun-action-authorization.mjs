@@ -12,6 +12,8 @@ const BACKEND_ROOT = resolve(__dirname, "..")
 const WORKSPACE_ROOT = resolve(BACKEND_ROOT, "../..")
 const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
+const DEFAULT_RDS_MIGRATION_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.rds-migration.local.json")
+const DEFAULT_IMAGE_PUBLISH_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.image-publish.local.json")
 
 const SECRET_VALUE_PATTERNS = [
   /sk-[A-Za-z0-9_-]{20,}/,
@@ -433,6 +435,8 @@ function parseArgs(argv) {
   const args = {
     envFile: DEFAULT_ENV_FILE,
     cloudConfirmationsFile: DEFAULT_CLOUD_CONFIRMATIONS_FILE,
+    rdsMigrationFile: DEFAULT_RDS_MIGRATION_FILE,
+    imagePublishFile: DEFAULT_IMAGE_PUBLISH_FILE,
     outPath: "",
     markdownPath: "",
     backendOnly: false,
@@ -452,6 +456,14 @@ function parseArgs(argv) {
     }
     if (arg === "--cloud-confirmations") {
       args.cloudConfirmationsFile = resolveValue(argv[++index], "--cloud-confirmations")
+      continue
+    }
+    if (arg === "--rds-migration") {
+      args.rdsMigrationFile = resolveValue(argv[++index], "--rds-migration")
+      continue
+    }
+    if (arg === "--image-publish") {
+      args.imagePublishFile = resolveValue(argv[++index], "--image-publish")
       continue
     }
     if (arg === "--cloud-access-observation") {
@@ -490,6 +502,15 @@ function envArgs(args) {
   ]
 }
 
+function userActionEvidenceArgs(args) {
+  return [
+    "--rds-migration",
+    args.rdsMigrationFile,
+    "--image-publish",
+    args.imagePublishFile,
+  ]
+}
+
 function cloudAccessArgs(args) {
   return args.cloudAccessObservationFile
     ? ["--cloud-access-observation", args.cloudAccessObservationFile]
@@ -512,6 +533,7 @@ function buildReport(args) {
     "scripts/summarize-aliyun-user-action-brief.mjs",
     ...backendOnlyArg,
     ...envArgs(args),
+    ...userActionEvidenceArgs(args),
     ...cloudAccessArgs(args),
   ])
   const consoleRunbook = runJson("console_runbook", [
@@ -521,6 +543,8 @@ function buildReport(args) {
   const status = runJson("production_status", [
     "scripts/summarize-aliyun-production-cn-status.mjs",
     ...envArgs(args),
+    "--image-publish",
+    args.imagePublishFile,
   ])
 
   const actions = (userActions.actions || []).map((action) => classifyAction(action))
@@ -598,6 +622,8 @@ function buildReport(args) {
     files: {
       envFile: args.envFile,
       cloudConfirmationsFile: args.cloudConfirmationsFile,
+      rdsMigrationFile: args.rdsMigrationFile,
+      imagePublishFile: args.imagePublishFile,
     },
     summary: {
       currentScope: CURRENT_SCOPE,
@@ -1138,7 +1164,7 @@ function main() {
 function printHelp() {
   console.log([
     "Usage:",
-    "  node scripts/summarize-aliyun-action-authorization.mjs [--backend-only] [--env-file path] [--cloud-confirmations path] [--out /tmp/report.json] [--markdown /tmp/report.md]",
+    "  node scripts/summarize-aliyun-action-authorization.mjs [--backend-only] [--env-file path] [--cloud-confirmations path] [--rds-migration path] [--image-publish path] [--out /tmp/report.json] [--markdown /tmp/report.md]",
     "",
     "Builds a non-secret action-time authorization matrix for APP production-cn Aliyun work.",
     "--backend-only excludes deferred WeChat Open Platform mobile app, Android signing, and Apple Team ID launch work from the current authorization matrix.",

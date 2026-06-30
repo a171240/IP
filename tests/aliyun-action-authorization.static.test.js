@@ -9,6 +9,17 @@ const root = process.cwd()
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), "utf8")
 const readJson = (...parts) => JSON.parse(read(...parts))
 const secretLike = /(sk-[A-Za-z0-9_-]{20,}|LTAI[A-Za-z0-9]{12,}|:\/\/[^\s:@]+:[^\s@]+@|AccessKeySecret\s*[:=]\s*\S{8,}|DATABASE_URL_CN\s*=\s*\S{8,})/i
+const fixtureDir = path.join(root, "tests", "fixtures", "aliyun-user-action-brief")
+const fixtureArgs = [
+  "--env-file",
+  path.join(fixtureDir, "env.production-cn.fixture"),
+  "--cloud-confirmations",
+  path.join(fixtureDir, "cloud-confirmations.fixture.json"),
+  "--rds-migration",
+  path.join(fixtureDir, "rds-migration.fixture.json"),
+  "--image-publish",
+  path.join(fixtureDir, "image-publish.fixture.json"),
+]
 
 test("Aliyun action authorization command is wired into scripts and predeploy", () => {
   const pkg = readJson("package.json")
@@ -31,13 +42,14 @@ test("Aliyun action authorization command is wired into scripts and predeploy", 
   assert.match(releaseArtifacts, /authorizationClosureBrief/)
 })
 
-test("backend-only action authorization reflects current P11 RDS migration gate", () => {
+test("backend-only action authorization reflects fixture P11 and P05 gates", () => {
   const markdownPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "meiye-action-auth-")), "authorization.md")
   const output = execFileSync(process.execPath, [
     "scripts/summarize-aliyun-action-authorization.mjs",
     "--backend-only",
     "--markdown",
     markdownPath,
+    ...fixtureArgs,
   ], {
     cwd: root,
     encoding: "utf8",
@@ -60,19 +72,37 @@ test("backend-only action authorization reflects current P11 RDS migration gate"
   assert.deepEqual(report.summary.deferredAppLaunchBlocking, [])
   assert.deepEqual(report.summary.currentExternalBlockers, [
     "U11_ALIYUN_RDS_DATA_MIGRATION",
+    "U05_OSS_RAM_OR_STS",
+    "U06_ENV_IMPORT",
+    "U07_DOMAIN_DNS_HTTPS_ICP",
+    "U08_SAE_RUNTIME_AND_SLS",
     "U09_DEPLOY_AUTHORIZATION",
   ])
   assert.deepEqual(report.summary.actionTimeConfirmationRequired, [
     "U11_ALIYUN_RDS_DATA_MIGRATION",
+    "U05_OSS_RAM_OR_STS",
+    "U06_ENV_IMPORT",
+    "U07_DOMAIN_DNS_HTTPS_ICP",
+    "U08_SAE_RUNTIME_AND_SLS",
     "U09_DEPLOY_AUTHORIZATION",
   ])
   assert.deepEqual(report.summary.deferredExternalBlockers, [])
-  assert.deepEqual(report.summary.nextActionTimeConfirmations, ["P11_ALIYUN_RDS_DATA_MIGRATION"])
-  assert.deepEqual(report.summary.canStartNowPackets, ["P11_ALIYUN_RDS_DATA_MIGRATION"])
-  assert.equal(report.summary.blockedCredentialCount, 0)
-  assert.deepEqual(report.authorizationClosureBrief.blockedCredentialNames, [])
+  assert.deepEqual(report.summary.nextActionTimeConfirmations, [
+    "P11_ALIYUN_RDS_DATA_MIGRATION",
+    "P05_OSS_RAM_STS",
+  ])
+  assert.deepEqual(report.summary.canStartNowPackets, [
+    "P11_ALIYUN_RDS_DATA_MIGRATION",
+    "P05_OSS_RAM_STS",
+  ])
+  assert.equal(report.summary.blockedCredentialCount, 1)
+  assert.deepEqual(report.authorizationClosureBrief.blockedCredentialNames, ["DATABASE_URL_CN"])
   assert.deepEqual(report.authorizationClosureBrief.actionTimeConfirmationRequired, [
     "P11_ALIYUN_RDS_DATA_MIGRATION",
+    "P05_OSS_RAM_STS",
+    "P06_ENV_IMPORT",
+    "P07_DOMAIN_DNS_HTTPS",
+    "P08_SAE_RUNTIME_SLS",
     "P09_PRODUCTION_DEPLOY",
   ])
   assert.match(report.currentAnswer, /后端仍有必填阻塞：DATABASE_URL_CN/)
@@ -80,32 +110,42 @@ test("backend-only action authorization reflects current P11 RDS migration gate"
 
   assert.equal(actionsById.get("U11_ALIYUN_RDS_DATA_MIGRATION").status, "blocked")
   assert.ok(actionsById.get("U11_ALIYUN_RDS_DATA_MIGRATION").currentBlockers.includes("requiredEnv:DATABASE_URL_CN"))
-  assert.ok(actionsById.get("U11_ALIYUN_RDS_DATA_MIGRATION").currentBlockers.includes("DATABASE_URL_CN_status:todo"))
-  assert.equal(actionsById.get("U06_ENV_IMPORT").status, "ready")
+  assert.ok(actionsById.get("U11_ALIYUN_RDS_DATA_MIGRATION").currentBlockers.includes("DATABASE_URL_CN_status:empty"))
+  assert.equal(actionsById.get("U05_OSS_RAM_OR_STS").status, "blocked")
+  assert.equal(actionsById.get("U06_ENV_IMPORT").status, "blocked")
   assert.ok(actionsById.get("U06_ENV_IMPORT").currentBlockers.includes("requiredEnv:DATABASE_URL_CN"))
-  assert.equal(actionsById.get("U07_DOMAIN_DNS_HTTPS_ICP").status, "ready")
+  assert.equal(actionsById.get("U07_DOMAIN_DNS_HTTPS_ICP").status, "blocked")
   assert.equal(actionsById.get("U09_DEPLOY_AUTHORIZATION").status, "blocked")
   assert.ok(actionsById.get("U09_DEPLOY_AUTHORIZATION").currentBlockers.includes("missing_required_env:DATABASE_URL_CN"))
   assert.ok(!actionsById.has("U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE"))
   assert.ok(!packetsById.has("P01_WECHAT_OPEN_MOBILE_APP"))
   assert.equal(packetsById.get("P07_DOMAIN_DNS_HTTPS").canStartNow, false)
-  assert.deepEqual(packetsById.get("P07_DOMAIN_DNS_HTTPS").blockingDependencies, [])
+  assert.deepEqual(packetsById.get("P07_DOMAIN_DNS_HTTPS").blockingDependencies, ["P08_SAE_RUNTIME_SLS"])
   assert.equal(packetsById.get("P11_ALIYUN_RDS_DATA_MIGRATION").canStartNow, true)
   assert.deepEqual(packetsById.get("P11_ALIYUN_RDS_DATA_MIGRATION").blockingDependencies, [])
+  assert.equal(packetsById.get("P05_OSS_RAM_STS").canStartNow, true)
   assert.equal(packetsById.get("P09_PRODUCTION_DEPLOY").canStartNow, false)
-  assert.deepEqual(packetsById.get("P09_PRODUCTION_DEPLOY").blockingDependencies, ["P11_ALIYUN_RDS_DATA_MIGRATION"])
+  assert.deepEqual(packetsById.get("P09_PRODUCTION_DEPLOY").blockingDependencies, [
+    "P05_OSS_RAM_STS",
+    "P11_ALIYUN_RDS_DATA_MIGRATION",
+    "P06_ENV_IMPORT",
+    "P07_DOMAIN_DNS_HTTPS",
+    "P08_SAE_RUNTIME_SLS",
+  ])
 
   assert.match(markdown, /后端仍有必填阻塞：DATABASE_URL_CN/)
-  assert.match(markdown, /nextActionTimeConfirmations: P11_ALIYUN_RDS_DATA_MIGRATION/)
-  assert.match(markdown, /blockedCredentialNames: none/)
-  assert.doesNotMatch(markdown, /blockedCredentialNames: DATABASE_URL_CN/)
+  assert.match(markdown, /nextActionTimeConfirmations: P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS/)
+  assert.match(markdown, /blockedCredentialNames: DATABASE_URL_CN/)
   assert.doesNotMatch(output + markdown, /WECHAT_OPEN_APP_ID|WECHAT_OPEN_APP_SECRET/)
   assert.doesNotMatch(output + markdown, /MEIYE_RELEASE_STORE_PASSWORD|MEIYE_RELEASE_KEY_PASSWORD/)
   assert.doesNotMatch(output + markdown, secretLike)
 })
 
 test("full action authorization keeps deferred APP launch blockers separate from backend closure", () => {
-  const output = execFileSync(process.execPath, ["scripts/summarize-aliyun-action-authorization.mjs"], {
+  const output = execFileSync(process.execPath, [
+    "scripts/summarize-aliyun-action-authorization.mjs",
+    ...fixtureArgs,
+  ], {
     cwd: root,
     encoding: "utf8",
     maxBuffer: 1024 * 1024 * 80,
@@ -117,17 +157,14 @@ test("full action authorization keeps deferred APP launch blockers separate from
   assert.equal(report.summary.actions, 12)
   assert.equal(report.summary.authorizationPackets, 12)
   assert.deepEqual(report.summary.requiredBlocking, ["DATABASE_URL_CN"])
-  assert.deepEqual(report.summary.fullAppRequiredBlocking, [
-    "DATABASE_URL_CN",
-    "WECHAT_OPEN_APP_ID",
-    "WECHAT_OPEN_APP_SECRET",
-  ])
-  assert.deepEqual(report.summary.deferredAppLaunchBlocking, [
-    "WECHAT_OPEN_APP_ID",
-    "WECHAT_OPEN_APP_SECRET",
-  ])
+  assert.deepEqual(report.summary.fullAppRequiredBlocking, ["DATABASE_URL_CN"])
+  assert.deepEqual(report.summary.deferredAppLaunchBlocking, [])
   assert.deepEqual(report.summary.currentExternalBlockers, [
     "U11_ALIYUN_RDS_DATA_MIGRATION",
+    "U05_OSS_RAM_OR_STS",
+    "U06_ENV_IMPORT",
+    "U07_DOMAIN_DNS_HTTPS_ICP",
+    "U08_SAE_RUNTIME_AND_SLS",
     "U09_DEPLOY_AUTHORIZATION",
   ])
   assert.deepEqual(report.summary.deferredExternalBlockers, [
@@ -135,25 +172,32 @@ test("full action authorization keeps deferred APP launch blockers separate from
     "U10_ANDROID_RELEASE_SIGNING",
     "U02_APPLE_TEAM_ID",
   ])
-  assert.deepEqual(report.summary.nextActionTimeConfirmations, ["P11_ALIYUN_RDS_DATA_MIGRATION"])
-  assert.deepEqual(report.summary.canStartNowPackets, ["P11_ALIYUN_RDS_DATA_MIGRATION"])
+  assert.deepEqual(report.summary.nextActionTimeConfirmations, [
+    "P11_ALIYUN_RDS_DATA_MIGRATION",
+    "P05_OSS_RAM_STS",
+  ])
+  assert.deepEqual(report.summary.canStartNowPackets, [
+    "P11_ALIYUN_RDS_DATA_MIGRATION",
+    "P05_OSS_RAM_STS",
+  ])
   assert.deepEqual(report.authorizationClosureBrief.blockedCredentialNames, [
-    "APPLE_TEAM_ID",
+    "DATABASE_URL_CN",
     "MEIYE_RELEASE_KEY_ALIAS",
     "MEIYE_RELEASE_KEY_PASSWORD",
     "MEIYE_RELEASE_STORE_FILE",
     "MEIYE_RELEASE_STORE_PASSWORD",
-    "WECHAT_OPEN_APP_ID",
-    "WECHAT_OPEN_APP_SECRET",
   ])
   assert.match(report.currentAnswer, /后端仍有必填阻塞：DATABASE_URL_CN/)
-  assert.doesNotMatch(JSON.stringify(report.authorizationClosureBrief.blockedCredentialNames), /DATABASE_URL_CN/)
   assert.doesNotMatch(output, secretLike)
 })
 
 test("Aliyun action authorization packet handoff documents the current backend packet gate", () => {
   const handoff = read("docs", "app-production-cn-action-authorization-packets.md")
-  const output = execFileSync(process.execPath, ["scripts/summarize-aliyun-action-authorization.mjs", "--backend-only"], {
+  const output = execFileSync(process.execPath, [
+    "scripts/summarize-aliyun-action-authorization.mjs",
+    "--backend-only",
+    ...fixtureArgs,
+  ], {
     cwd: root,
     encoding: "utf8",
     maxBuffer: 1024 * 1024 * 80,
