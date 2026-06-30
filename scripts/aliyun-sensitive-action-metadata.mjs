@@ -76,12 +76,14 @@ export const SENSITIVE_ACTION_METADATA = {
     ],
   },
   S05_OSS_RAM_SECRET_OR_STS: {
-    obtainFrom: "阿里云控制台 -> RAM 访问控制 / OSS Bucket / SAE 环境变量或 Secrets Manager",
+    obtainFrom: "阿里云控制台 -> RAM 访问控制 / OSS Bucket / SAE RRSA/OIDC 运行时角色或环境变量",
     writeTargets: [
-      "ALIYUN_OSS_ACCESS_KEY_ID / ALIYUN_OSS_ACCESS_KEY_SECRET / ALIYUN_OSS_SECURITY_TOKEN -> KMS/Secrets Manager/SAE secret env",
+      "SAE RRSA/OIDC env ALIBABA_CLOUD_ROLE_ARN / ALIBABA_CLOUD_OIDC_PROVIDER_ARN / ALIBABA_CLOUD_OIDC_TOKEN_FILE when accessMode=sae_runtime_role",
+      "fallback only: ALIYUN_OSS_ACCESS_KEY_ID / ALIYUN_OSS_ACCESS_KEY_SECRET / ALIYUN_OSS_SECURITY_TOKEN -> KMS/Secrets Manager/SAE secret env",
       "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss",
     ],
     verifyCommands: [
+      "corepack pnpm aliyun:oss:runtime-access:strict",
       "corepack pnpm aliyun:cloud:confirmations",
       "corepack pnpm aliyun:health:smoke",
     ],
@@ -89,7 +91,8 @@ export const SENSITIVE_ACTION_METADATA = {
     completionEvidence: [
       "oss.confirmed=true",
       "oss.ramLeastPrivilege=true",
-      "secret/token imported only through Aliyun controlled secret env",
+      "preferred accessMode=sae_runtime_role uses SAE RRSA/OIDC AssumeRoleWithOIDC temporary credentials",
+      "fallback secret/token imported only through Aliyun controlled secret env",
     ],
   },
   S08_ALIYUN_RDS_DATABASE_URL: {
