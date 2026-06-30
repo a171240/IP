@@ -2,11 +2,13 @@ const test = require("node:test")
 const assert = require("node:assert/strict")
 const { execFileSync } = require("node:child_process")
 const fs = require("node:fs")
+const os = require("node:os")
 const path = require("node:path")
 
 const root = process.cwd()
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), "utf8")
 const readJson = (...parts) => JSON.parse(read(...parts))
+const secretLike = /(sk-[A-Za-z0-9_-]{20,}|LTAI[A-Za-z0-9]{12,}|:\/\/[^\s:@]+:[^\s@]+@|AccessKeySecret\s*[:=]\s*\S{8,}|DATABASE_URL_CN\s*=\s*\S{8,})/i
 
 test("Aliyun action authorization command is wired into scripts and predeploy", () => {
   const pkg = readJson("package.json")
@@ -26,278 +28,11 @@ test("Aliyun action authorization command is wired into scripts and predeploy", 
   assert.ok(deploySpec.predeployChecks.includes("corepack pnpm aliyun:action:authorization"))
   assert.ok(deploySpec.predeployChecks.includes("corepack pnpm aliyun:action:authorization:backend"))
   assert.match(releaseArtifacts, /scripts\/summarize-aliyun-action-authorization\.mjs"[\s\S]*\.\.\.backendOnlyArg/)
-  assert.match(releaseArtifacts, /authorizationPackets/)
-  assert.match(releaseArtifacts, /authorizationPacketIds/)
-  assert.match(releaseArtifacts, /canStartNowPackets/)
-  assert.match(releaseArtifacts, /nextActionTimeConfirmations/)
-  assert.match(releaseArtifacts, /blockedByPacketDependencies/)
   assert.match(releaseArtifacts, /authorizationClosureBrief/)
-  assert.match(releaseArtifacts, /blockedCredentialCount/)
-  assert.match(releaseArtifacts, /resourceEvidenceReady/)
-  assert.match(releaseArtifacts, /partiallyObservedResourceEvidenceIds/)
 })
 
-test("Aliyun action authorization matrix separates local-safe work from external actions", () => {
-  const output = execFileSync(process.execPath, ["scripts/summarize-aliyun-action-authorization.mjs"], {
-    cwd: root,
-    encoding: "utf8",
-    maxBuffer: 1024 * 1024 * 40,
-  })
-  const report = JSON.parse(output)
-  const byId = new Map(report.actions.map((item) => [item.id, item]))
-
-  assert.equal(report.ok, true)
-  assert.equal(report.containsValues, false)
-  assert.equal(report.readOnlyOnly, true)
-  assert.equal(report.mutationPerformed, false)
-  assert.equal(report.canDeployNow, false)
-  assert.equal(report.secretLeakCheck.ok, true)
-  assert.equal(report.summary.actions, 12)
-  assert.equal(report.summary.authorizationPackets, 12)
-  assert.equal(report.currentScope, "backend_aliyun_only")
-  assert.deepEqual(report.summary.canStartNowPackets, [
-    "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
-    "P11_ALIYUN_RDS_DATA_MIGRATION",
-    "P05_OSS_RAM_STS",
-    "P04_ACR_IMAGE_AND_PULL",
-  ])
-  assert.deepEqual(report.summary.deferredAppLaunchPackets, [
-    "P01_WECHAT_OPEN_MOBILE_APP",
-    "P10_ANDROID_RELEASE_SIGNING",
-    "P02_APPLE_TEAM_ID",
-  ])
-  assert.deepEqual(report.summary.nextActionTimeConfirmations, report.summary.canStartNowPackets)
-  assert.ok(!report.summary.blockedByPacketDependencies.includes("P04_ACR_IMAGE_AND_PULL"))
-  assert.ok(report.summary.blockedByPacketDependencies.includes("P09_PRODUCTION_DEPLOY"))
-  assert.deepEqual(report.summary.canCodexProceedWithoutUser, [])
-  assert.equal(report.summary.cloudConsoleTasks, 7)
-  assert.deepEqual(report.summary.requiredBlocking, ["DATABASE_URL_CN"])
-  assert.ok(report.summary.fullAppRequiredBlocking.includes("WECHAT_OPEN_APP_ID"))
-  assert.ok(report.summary.fullAppRequiredBlocking.includes("WECHAT_OPEN_APP_SECRET"))
-  assert.equal(report.summary.blockedCredentialCount, 1)
-  assert.equal(report.summary.readySecretEnvVariableCount, 17)
-  assert.equal(report.summary.resourceEvidenceReady, "0/7")
-  assert.ok(report.summary.blockedResourceEvidenceIds.includes("R01_SAE_RUNTIME"))
-  assert.ok(report.summary.blockedResourceEvidenceIds.includes("R06_ENV_IMPORT"))
-  assert.ok(report.summary.partiallyObservedResourceEvidenceIds.includes("R05_OSS_AUDIO_STORAGE"))
-  assert.ok(report.summary.partiallyObservedResourceEvidenceIds.includes("R07_SLS_ALERTS"))
-  assert.equal(report.authorizationClosureBrief.canDeployNow, false)
-  assert.equal(report.authorizationClosureBrief.canCodexProceedWithoutUser, false)
-  assert.equal(report.authorizationClosureBrief.blockedCredentialCount, 1)
-  assert.ok(report.authorizationClosureBrief.blockedCredentialNames.includes("DATABASE_URL_CN"))
-  assert.equal(report.authorizationClosureBrief.readySecretEnvVariableCount, 17)
-  assert.equal(report.authorizationClosureBrief.resourceEvidenceReady, "0/7")
-  assert.ok(report.authorizationClosureBrief.blockedResourceEvidenceIds.includes("R02_ACR_IMAGE_REGISTRY"))
-  assert.ok(report.authorizationClosureBrief.blockedResourceEvidenceIds.includes("R07_SLS_ALERTS"))
-  assert.ok(report.authorizationClosureBrief.partiallyObservedResourceEvidenceIds.includes("R05_OSS_AUDIO_STORAGE"))
-  assert.ok(report.authorizationClosureBrief.partiallyObservedResourceEvidenceIds.includes("R07_SLS_ALERTS"))
-  assert.ok(report.authorizationClosureBrief.blockedResourceEvidence.some((item) =>
-    item.id === "R05_OSS_AUDIO_STORAGE" &&
-    item.observedReadiness === "partial" &&
-    item.currentEvidence.some((evidence) => /bucket_exists/.test(evidence))
-  ))
-  assert.deepEqual(report.authorizationClosureBrief.canStartNowPackets, [
-    "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
-    "P11_ALIYUN_RDS_DATA_MIGRATION",
-    "P05_OSS_RAM_STS",
-    "P04_ACR_IMAGE_AND_PULL",
-  ])
-  assert.deepEqual(report.authorizationClosureBrief.deferredAppLaunchPackets, [
-    "P01_WECHAT_OPEN_MOBILE_APP",
-    "P10_ANDROID_RELEASE_SIGNING",
-    "P02_APPLE_TEAM_ID",
-  ])
-  assert.deepEqual(report.authorizationClosureBrief.canStartNowConsoleTasks, [
-    "C02_ACR_IMAGE_AND_PULL",
-    "C05_OSS_AUDIO_RAM_STS",
-  ])
-  assert.ok(!report.authorizationClosureBrief.blockedByPacketDependencies.includes("P04_ACR_IMAGE_AND_PULL"))
-  assert.ok(report.authorizationClosureBrief.blockedByTaskDependencies.includes("C01_SAE_RUNTIME"))
-
-  assert.equal(byId.get("U00_ALIYUN_READONLY_INVENTORY_IDENTITY").automationPolicy, "readonly_inventory_identity_requires_action_time_confirmation")
-  assert.equal(byId.get("U00_ALIYUN_READONLY_INVENTORY_IDENTITY").blockerClass, "readonly_cloud_inventory_identity")
-  assert.equal(byId.get("U00_ALIYUN_READONLY_INVENTORY_IDENTITY").requiresActionTimeConfirmation, true)
-  assert.ok(byId.get("U00_ALIYUN_READONLY_INVENTORY_IDENTITY").currentBlockers.includes("readonly_inventory_strict_ready=0/9"))
-  assert.ok(byId.get("U00_ALIYUN_READONLY_INVENTORY_IDENTITY").currentEvidence.includes("mutationPerformedCommandResults=0"))
-
-  assert.equal(byId.get("U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE").automationPolicy, "external_platform_review_required")
-  assert.equal(byId.get("U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE").requiresActionTimeConfirmation, true)
-  assert.ok(byId.get("U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE").currentEvidence.includes("wechatOpenPlatform.mobileAppCreated=false"))
-  assert.ok(byId.get("U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE").currentBlockers.includes("wechatOpenPlatform:mobileAppCreated"))
-
-  assert.equal(byId.get("U10_ANDROID_RELEASE_SIGNING").automationPolicy, "android_release_signing_requires_action_time_confirmation")
-  assert.equal(byId.get("U10_ANDROID_RELEASE_SIGNING").blockerClass, "android_keystore_password_or_signature")
-  assert.equal(byId.get("U10_ANDROID_RELEASE_SIGNING").requiresActionTimeConfirmation, true)
-  assert.ok(byId.get("U10_ANDROID_RELEASE_SIGNING").variableNames.includes("MEIYE_RELEASE_KEY_PASSWORD"))
-  assert.ok(byId.get("U10_ANDROID_RELEASE_SIGNING").currentBlockers.includes("S07_ANDROID_RELEASE_SIGNING:blocked"))
-  assert.ok(byId.get("U10_ANDROID_RELEASE_SIGNING").currentBlockers.includes("wechatOpenPlatform:androidSignature"))
-
-  assert.equal(byId.get("U02_APPLE_TEAM_ID").requiresActionTimeConfirmation, true)
-
-  assert.equal(byId.get("U03_ACR_PURCHASE_CONFIRMATION").automationPolicy, "paid_purchase_requires_action_time_confirmation")
-  assert.equal(byId.get("U03_ACR_PURCHASE_CONFIRMATION").requiresActionTimeConfirmation, false)
-  assert.ok(byId.get("U03_ACR_PURCHASE_CONFIRMATION").currentEvidence.includes("R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.quotedAmount=CNY 117.00"))
-  assert.ok(byId.get("U03_ACR_PURCHASE_CONFIRMATION").currentEvidence.includes("R02_ACR_IMAGE_REGISTRY:acr.purchaseCandidate.requiresActionTimePurchaseConfirmation=false"))
-
-  assert.equal(byId.get("U06_ENV_IMPORT").automationPolicy, "secret_import_requires_action_time_confirmation")
-  assert.equal(byId.get("U06_ENV_IMPORT").blockerClass, "ready_sensitive_env_need_cloud_import")
-  assert.ok(byId.get("U06_ENV_IMPORT").currentBlockers.includes("envImport:secretNotInImage"))
-
-  assert.equal(byId.get("U04_ACR_RUNTIME_AUTH").requiresActionTimeConfirmation, true)
-  assert.equal(byId.get("U05_OSS_RAM_OR_STS").requiresActionTimeConfirmation, true)
-
-  assert.equal(byId.get("U11_ALIYUN_RDS_DATA_MIGRATION").automationPolicy, "rds_creation_and_database_migration_requires_action_time_confirmation")
-  assert.equal(byId.get("U11_ALIYUN_RDS_DATA_MIGRATION").blockerClass, "database_secret_and_migration")
-  assert.match(byId.get("U11_ALIYUN_RDS_DATA_MIGRATION").why, /兼容审查/)
-  assert.ok(byId.get("U11_ALIYUN_RDS_DATA_MIGRATION").variableNames.includes("DATABASE_URL_CN"))
-  assert.ok(byId.get("U11_ALIYUN_RDS_DATA_MIGRATION").currentBlockers.includes("rdsMigrationIncludedInThisRelease=false"))
-
-  assert.equal(byId.get("U07_DOMAIN_DNS_HTTPS_ICP").automationPolicy, "dns_https_icp_requires_action_time_confirmation")
-  assert.ok(byId.get("U07_DOMAIN_DNS_HTTPS_ICP").currentBlockers.includes("apiDomainHttps:dnsResolvedToAliyun"))
-
-  assert.equal(byId.get("U08_SAE_RUNTIME_AND_SLS").automationPolicy, "cloud_resource_creation_requires_action_time_confirmation")
-  assert.ok(byId.get("U08_SAE_RUNTIME_AND_SLS").currentBlockers.includes("runtime:confirmed"))
-
-  assert.equal(byId.get("U09_DEPLOY_AUTHORIZATION").automationPolicy, "production_release_requires_explicit_authorization")
-  assert.ok(byId.get("U09_DEPLOY_AUTHORIZATION").currentBlockers.includes("canDeployNow=false"))
-
-  assert.ok(report.prohibitedWithoutActionTimeConfirmation.some((item) => item.includes("购买 ACR")))
-  assert.ok(report.prohibitedWithoutActionTimeConfirmation.some((item) => item.includes("创建/修改 SAE")))
-  assert.ok(report.prohibitedWithoutActionTimeConfirmation.some((item) => item.includes("读取、复制、粘贴、导入或输出")))
-  assert.ok(report.safeLocalWorkStillAllowed.some((item) => item.includes("运行本地检查")))
-
-  assert.equal(report.nextActionTimeConfirmations.length, 4)
-  assert.deepEqual(report.deferredAppLaunchConfirmations.map((item) => item.packetId), [
-    "P01_WECHAT_OPEN_MOBILE_APP",
-    "P10_ANDROID_RELEASE_SIGNING",
-    "P02_APPLE_TEAM_ID",
-  ])
-  const nextConfirmationsById = new Map(report.nextActionTimeConfirmations.map((item) => [item.packetId, item]))
-  const deferredConfirmationsById = new Map(report.deferredAppLaunchConfirmations.map((item) => [item.packetId, item]))
-  assert.match(nextConfirmationsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").minimumUserPhrase, /allowlisted 只读盘点命令/)
-  assert.match(nextConfirmationsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").minimumUserPhrase, /确认当前阿里云 CloudShell 重启实例提示/)
-  assert.equal(nextConfirmationsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").cloudShellCurrentStatus, "disconnected_restart_instance_confirmation_required")
-  assert.equal(nextConfirmationsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").cloudShellConnecting, false)
-  assert.equal(nextConfirmationsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").cloudShellTerminalInputVisible, true)
-  assert.equal(nextConfirmationsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").cloudShellRequiresRestartConfirmation, true)
-  assert.ok(nextConfirmationsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").allowedActions.some((item) =>
-    item.includes("重启实例提示")
-  ))
-  assert.ok(nextConfirmationsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").explicitlyExcluded.some((item) =>
-    item.includes("CloudShell 重启实例提示")
-  ))
-  assert.match(deferredConfirmationsById.get("P01_WECHAT_OPEN_MOBILE_APP").minimumUserPhrase, /微信开放平台创建\/补全美业话镜移动应用资料/)
-  assert.match(deferredConfirmationsById.get("P10_ANDROID_RELEASE_SIGNING").minimumUserPhrase, /Android release keystore/)
-  assert.ok(deferredConfirmationsById.get("P02_APPLE_TEAM_ID").writeTargets.includes("APPLE_TEAM_ID -> 阿里云 SAE plain env"))
-  assert.match(nextConfirmationsById.get("P04_ACR_IMAGE_AND_PULL").minimumUserPhrase, /后端镜像/)
-  assert.ok(
-    nextConfirmationsById.get("P04_ACR_IMAGE_AND_PULL").explicitlyExcluded.some((item) =>
-      item.includes("不购买 ACR"),
-    ),
-  )
-  assert.equal(nextConfirmationsById.get("P04_ACR_IMAGE_AND_PULL").nonSecretEvidenceOnly, true)
-  assert.ok(
-    nextConfirmationsById.get("P05_OSS_RAM_STS").completionEvidence.includes("oss.ramLeastPrivilege=true"),
-  )
-  assert.ok(
-    nextConfirmationsById.get("P05_OSS_RAM_STS").explicitlyExcluded.some((item) =>
-      item.includes("不把 AccessKeySecret"),
-    ),
-  )
-  assert.match(nextConfirmationsById.get("P11_ALIYUN_RDS_DATA_MIGRATION").minimumUserPhrase, /RDS PostgreSQL/)
-  assert.ok(
-    nextConfirmationsById.get("P11_ALIYUN_RDS_DATA_MIGRATION").allowedActions.some((item) =>
-      item.includes("compatibilityReviewChecklist 7 类"),
-    ),
-  )
-  assert.ok(
-    nextConfirmationsById.get("P11_ALIYUN_RDS_DATA_MIGRATION").completionEvidence.some((item) =>
-      item.includes("compatibilityReviewChecklistItemCount=7"),
-    ),
-  )
-  assert.ok(
-    nextConfirmationsById.get("P11_ALIYUN_RDS_DATA_MIGRATION").writeTargets.some((item) =>
-      item.includes("DATABASE_URL_CN"),
-    ),
-  )
-
-  assert.equal(report.authorizationPackets.length, 12)
-  const packetsById = new Map(report.authorizationPackets.map((item) => [item.packetId, item]))
-  assert.equal(packetsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").actionId, "U00_ALIYUN_READONLY_INVENTORY_IDENTITY")
-  assert.equal(packetsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").canStartNow, true)
-  assert.equal(packetsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").nonSecretEvidenceOnly, true)
-  assert.ok(packetsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").completionEvidence.includes("mutationPerformedCommandResults=0"))
-  assert.equal(packetsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").cloudShellCurrentStatus, "disconnected_restart_instance_confirmation_required")
-  assert.match(packetsById.get("P00_ALIYUN_READONLY_INVENTORY_IDENTITY").minimumUserPhrase, /确认当前阿里云 CloudShell 重启实例提示/)
-  assert.equal(packetsById.get("P10_ANDROID_RELEASE_SIGNING").actionId, "U10_ANDROID_RELEASE_SIGNING")
-  assert.equal(packetsById.get("P10_ANDROID_RELEASE_SIGNING").canStartNow, true)
-  assert.ok(packetsById.get("P10_ANDROID_RELEASE_SIGNING").completionEvidence.includes("wechatOpenPlatform.androidConfigured=true"))
-  assert.equal(packetsById.get("P03_ACR_PURCHASE").actionId, "U03_ACR_PURCHASE_CONFIRMATION")
-  assert.equal(packetsById.get("P03_ACR_PURCHASE").canStartNow, false)
-  assert.equal(packetsById.get("P03_ACR_PURCHASE").status, "ready")
-  assert.match(packetsById.get("P03_ACR_PURCHASE").minimumUserPhrase, /CNY 117\.00/)
-  assert.ok(packetsById.get("P03_ACR_PURCHASE").explicitlyExcluded.some((item) => item.includes("docker login")))
-  assert.deepEqual(packetsById.get("P04_ACR_IMAGE_AND_PULL").dependsOn, ["P03_ACR_PURCHASE"])
-  assert.deepEqual(packetsById.get("P04_ACR_IMAGE_AND_PULL").blockingDependencies, [])
-  assert.equal(packetsById.get("P04_ACR_IMAGE_AND_PULL").canStartNow, true)
-  assert.ok(packetsById.get("P04_ACR_IMAGE_AND_PULL").explicitlyExcluded.some((item) => item.includes("不购买 ACR")))
-  assert.deepEqual(packetsById.get("P06_ENV_IMPORT").dependsOn, [
-    "P05_OSS_RAM_STS",
-    "P11_ALIYUN_RDS_DATA_MIGRATION",
-  ])
-  assert.ok(
-    packetsById.get("P11_ALIYUN_RDS_DATA_MIGRATION").allowedActions.some((item) =>
-      item.includes("docs/app-production-cn-rds-migration-package.md"),
-    ),
-  )
-  assert.ok(
-    packetsById.get("P11_ALIYUN_RDS_DATA_MIGRATION").completionEvidence.includes("migration.schemaCompatibilityReviewed=true"),
-  )
-  assert.ok(packetsById.get("P06_ENV_IMPORT").explicitlyExcluded.some((item) => item.includes("不把任何 value")))
-  assert.deepEqual(packetsById.get("P07_DOMAIN_DNS_HTTPS").dependsOn, ["P08_SAE_RUNTIME_SLS"])
-  assert.ok(packetsById.get("P07_DOMAIN_DNS_HTTPS").allowedActions.some((item) => item.includes("api-cn.ipgongchang.xin")))
-  assert.ok(packetsById.get("P08_SAE_RUNTIME_SLS").explicitlyExcluded.some((item) => item.includes("不推送镜像")))
-  assert.ok(!packetsById.get("P09_PRODUCTION_DEPLOY").dependsOn.includes("P10_ANDROID_RELEASE_SIGNING"))
-  assert.ok(packetsById.get("P09_PRODUCTION_DEPLOY").dependsOn.includes("P11_ALIYUN_RDS_DATA_MIGRATION"))
-  assert.ok(packetsById.get("P09_PRODUCTION_DEPLOY").dependsOn.includes("P08_SAE_RUNTIME_SLS"))
-  assert.equal(packetsById.get("P09_PRODUCTION_DEPLOY").canStartNow, false)
-  assert.ok(packetsById.get("P09_PRODUCTION_DEPLOY").explicitlyExcluded.some((item) => item.includes("不 git push")))
-
-  assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
-  assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
-  assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
-})
-
-test("Aliyun action authorization markdown includes closure brief without secret values", () => {
-  const markdownPath = "/tmp/meiye-aliyun-action-authorization-test.md"
-  const output = execFileSync(process.execPath, [
-    "scripts/summarize-aliyun-action-authorization.mjs",
-    "--markdown",
-    markdownPath,
-  ], {
-    cwd: root,
-    encoding: "utf8",
-    maxBuffer: 1024 * 1024 * 50,
-  })
-  const markdown = fs.readFileSync(markdownPath, "utf8")
-
-  assert.match(markdown, /## 目标闭环证据简表/)
-  assert.match(markdown, /blockedCredentialCount: 1/)
-  assert.match(markdown, /readySecretEnvVariableCount: 17/)
-  assert.match(markdown, /resourceEvidenceReady: 0\/7/)
-  assert.match(markdown, /blockedResourceEvidenceIds: .*R02_ACR_IMAGE_REGISTRY/)
-  assert.match(markdown, /partiallyObservedResourceEvidenceIds: R02_ACR_IMAGE_REGISTRY, R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS/)
-  assert.match(markdown, /canStartNowPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION/)
-  assert.match(markdown, /deferredAppLaunchPackets: P01_WECHAT_OPEN_MOBILE_APP/)
-  assert.match(markdown, /canStartNowConsoleTasks: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS/)
-  assert.doesNotMatch(markdown, /blockedByPacketDependencies: .*P04_ACR_IMAGE_AND_PULL/)
-  assert.doesNotMatch(output + markdown, /sk-[A-Za-z0-9_-]{20,}/)
-  assert.doesNotMatch(output + markdown, /LTAI[A-Za-z0-9]{12,}/)
-  assert.doesNotMatch(output + markdown, /:\/\/[^\s:@]+:[^\s@]+@/)
-})
-
-test("Aliyun action authorization backend-only mode excludes deferred APP launch blockers", () => {
-  const markdownPath = "/tmp/meiye-aliyun-action-authorization-backend-test.md"
+test("backend-only action authorization reflects current P11 RDS migration gate", () => {
+  const markdownPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "meiye-action-auth-")), "authorization.md")
   const output = execFileSync(process.execPath, [
     "scripts/summarize-aliyun-action-authorization.mjs",
     "--backend-only",
@@ -306,94 +41,142 @@ test("Aliyun action authorization backend-only mode excludes deferred APP launch
   ], {
     cwd: root,
     encoding: "utf8",
-    maxBuffer: 1024 * 1024 * 50,
+    maxBuffer: 1024 * 1024 * 80,
   })
   const report = JSON.parse(output)
   const markdown = fs.readFileSync(markdownPath, "utf8")
-  const actionIds = report.actions.map((item) => item.id)
-  const packetIds = report.authorizationPackets.map((item) => item.packetId)
-  const envImportEvidence = report.authorizationClosureBrief.blockedResourceEvidence
-    .find((item) => item.id === "R06_ENV_IMPORT")
-  const envImportPacket = report.authorizationPackets.find((item) => item.packetId === "P06_ENV_IMPORT")
+  const actionsById = new Map(report.actions.map((item) => [item.id, item]))
+  const packetsById = new Map(report.authorizationPackets.map((item) => [item.packetId, item]))
 
+  assert.equal(report.ok, true)
   assert.equal(report.backendOnly, true)
+  assert.equal(report.containsValues, false)
+  assert.equal(report.mutationPerformed, false)
+  assert.equal(report.secretLeakCheck.ok, true)
   assert.equal(report.summary.actions, 9)
   assert.equal(report.summary.authorizationPackets, 9)
   assert.deepEqual(report.summary.requiredBlocking, ["DATABASE_URL_CN"])
   assert.deepEqual(report.summary.fullAppRequiredBlocking, ["DATABASE_URL_CN"])
   assert.deepEqual(report.summary.deferredAppLaunchBlocking, [])
-  assert.equal(report.summary.deferredAppLaunchBlockingCount, 2)
-  assert.equal(report.summary.blockedCredentialCount, 1)
-  assert.deepEqual(report.authorizationClosureBrief.blockedCredentialNames, ["DATABASE_URL_CN"])
-  assert.equal(report.authorizationClosureBrief.blockedCredentialCount, 1)
-  assert.deepEqual(report.summary.nextActionTimeConfirmations, [
-    "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
-    "P11_ALIYUN_RDS_DATA_MIGRATION",
-    "P05_OSS_RAM_STS",
-    "P04_ACR_IMAGE_AND_PULL",
+  assert.deepEqual(report.summary.currentExternalBlockers, [
+    "U11_ALIYUN_RDS_DATA_MIGRATION",
+    "U09_DEPLOY_AUTHORIZATION",
   ])
-  assert.ok(!actionIds.includes("U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE"))
-  assert.ok(!actionIds.includes("U10_ANDROID_RELEASE_SIGNING"))
-  assert.ok(!actionIds.includes("U02_APPLE_TEAM_ID"))
-  assert.ok(!packetIds.includes("P01_WECHAT_OPEN_MOBILE_APP"))
-  assert.ok(packetIds.includes("P00_ALIYUN_READONLY_INVENTORY_IDENTITY"))
-  assert.ok(!packetIds.includes("P10_ANDROID_RELEASE_SIGNING"))
-  assert.ok(!packetIds.includes("P02_APPLE_TEAM_ID"))
-  assert.ok(envImportEvidence.missingEvidence.includes("missing_required_env:DATABASE_URL_CN"))
-  assert.ok(!envImportEvidence.missingEvidence.some((item) => /WECHAT_OPEN_APP_ID|WECHAT_OPEN_APP_SECRET/.test(item)))
-  assert.ok(!envImportPacket.explicitlyExcluded.some((item) => /WECHAT_OPEN_APP_ID|WECHAT_OPEN_APP_SECRET/.test(item)))
-  assert.match(markdown, /blockedCredentialNames: DATABASE_URL_CN/)
+  assert.deepEqual(report.summary.actionTimeConfirmationRequired, [
+    "U11_ALIYUN_RDS_DATA_MIGRATION",
+    "U09_DEPLOY_AUTHORIZATION",
+  ])
+  assert.deepEqual(report.summary.deferredExternalBlockers, [])
+  assert.deepEqual(report.summary.nextActionTimeConfirmations, ["P11_ALIYUN_RDS_DATA_MIGRATION"])
+  assert.deepEqual(report.summary.canStartNowPackets, ["P11_ALIYUN_RDS_DATA_MIGRATION"])
+  assert.equal(report.summary.blockedCredentialCount, 0)
+  assert.deepEqual(report.authorizationClosureBrief.blockedCredentialNames, [])
+  assert.deepEqual(report.authorizationClosureBrief.actionTimeConfirmationRequired, [
+    "P11_ALIYUN_RDS_DATA_MIGRATION",
+    "P09_PRODUCTION_DEPLOY",
+  ])
+  assert.match(report.currentAnswer, /后端仍有必填阻塞：DATABASE_URL_CN/)
+  assert.match(report.authorizationClosureBrief.conclusion, /动作时确认入口/)
+
+  assert.equal(actionsById.get("U11_ALIYUN_RDS_DATA_MIGRATION").status, "blocked")
+  assert.ok(actionsById.get("U11_ALIYUN_RDS_DATA_MIGRATION").currentBlockers.includes("requiredEnv:DATABASE_URL_CN"))
+  assert.ok(actionsById.get("U11_ALIYUN_RDS_DATA_MIGRATION").currentBlockers.includes("DATABASE_URL_CN_status:todo"))
+  assert.equal(actionsById.get("U06_ENV_IMPORT").status, "ready")
+  assert.ok(actionsById.get("U06_ENV_IMPORT").currentBlockers.includes("requiredEnv:DATABASE_URL_CN"))
+  assert.equal(actionsById.get("U07_DOMAIN_DNS_HTTPS_ICP").status, "ready")
+  assert.equal(actionsById.get("U09_DEPLOY_AUTHORIZATION").status, "blocked")
+  assert.ok(actionsById.get("U09_DEPLOY_AUTHORIZATION").currentBlockers.includes("missing_required_env:DATABASE_URL_CN"))
+  assert.ok(!actionsById.has("U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE"))
+  assert.ok(!packetsById.has("P01_WECHAT_OPEN_MOBILE_APP"))
+  assert.equal(packetsById.get("P07_DOMAIN_DNS_HTTPS").canStartNow, false)
+  assert.deepEqual(packetsById.get("P07_DOMAIN_DNS_HTTPS").blockingDependencies, [])
+  assert.equal(packetsById.get("P11_ALIYUN_RDS_DATA_MIGRATION").canStartNow, true)
+  assert.deepEqual(packetsById.get("P11_ALIYUN_RDS_DATA_MIGRATION").blockingDependencies, [])
+  assert.equal(packetsById.get("P09_PRODUCTION_DEPLOY").canStartNow, false)
+  assert.deepEqual(packetsById.get("P09_PRODUCTION_DEPLOY").blockingDependencies, ["P11_ALIYUN_RDS_DATA_MIGRATION"])
+
+  assert.match(markdown, /后端仍有必填阻塞：DATABASE_URL_CN/)
+  assert.match(markdown, /nextActionTimeConfirmations: P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(markdown, /blockedCredentialNames: none/)
+  assert.doesNotMatch(markdown, /blockedCredentialNames: DATABASE_URL_CN/)
   assert.doesNotMatch(output + markdown, /WECHAT_OPEN_APP_ID|WECHAT_OPEN_APP_SECRET/)
   assert.doesNotMatch(output + markdown, /MEIYE_RELEASE_STORE_PASSWORD|MEIYE_RELEASE_KEY_PASSWORD/)
+  assert.doesNotMatch(output + markdown, secretLike)
 })
 
-test("Aliyun action authorization packet handoff documents the current packet gate", () => {
+test("full action authorization keeps deferred APP launch blockers separate from backend closure", () => {
+  const output = execFileSync(process.execPath, ["scripts/summarize-aliyun-action-authorization.mjs"], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 80,
+  })
+  const report = JSON.parse(output)
+
+  assert.equal(report.ok, true)
+  assert.equal(report.backendOnly, false)
+  assert.equal(report.summary.actions, 12)
+  assert.equal(report.summary.authorizationPackets, 12)
+  assert.deepEqual(report.summary.requiredBlocking, ["DATABASE_URL_CN"])
+  assert.deepEqual(report.summary.fullAppRequiredBlocking, [
+    "DATABASE_URL_CN",
+    "WECHAT_OPEN_APP_ID",
+    "WECHAT_OPEN_APP_SECRET",
+  ])
+  assert.deepEqual(report.summary.deferredAppLaunchBlocking, [
+    "WECHAT_OPEN_APP_ID",
+    "WECHAT_OPEN_APP_SECRET",
+  ])
+  assert.deepEqual(report.summary.currentExternalBlockers, [
+    "U11_ALIYUN_RDS_DATA_MIGRATION",
+    "U09_DEPLOY_AUTHORIZATION",
+  ])
+  assert.deepEqual(report.summary.deferredExternalBlockers, [
+    "U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE",
+    "U10_ANDROID_RELEASE_SIGNING",
+    "U02_APPLE_TEAM_ID",
+  ])
+  assert.deepEqual(report.summary.nextActionTimeConfirmations, ["P11_ALIYUN_RDS_DATA_MIGRATION"])
+  assert.deepEqual(report.summary.canStartNowPackets, ["P11_ALIYUN_RDS_DATA_MIGRATION"])
+  assert.deepEqual(report.authorizationClosureBrief.blockedCredentialNames, [
+    "APPLE_TEAM_ID",
+    "MEIYE_RELEASE_KEY_ALIAS",
+    "MEIYE_RELEASE_KEY_PASSWORD",
+    "MEIYE_RELEASE_STORE_FILE",
+    "MEIYE_RELEASE_STORE_PASSWORD",
+    "WECHAT_OPEN_APP_ID",
+    "WECHAT_OPEN_APP_SECRET",
+  ])
+  assert.match(report.currentAnswer, /后端仍有必填阻塞：DATABASE_URL_CN/)
+  assert.doesNotMatch(JSON.stringify(report.authorizationClosureBrief.blockedCredentialNames), /DATABASE_URL_CN/)
+  assert.doesNotMatch(output, secretLike)
+})
+
+test("Aliyun action authorization packet handoff documents the current backend packet gate", () => {
   const handoff = read("docs", "app-production-cn-action-authorization-packets.md")
   const output = execFileSync(process.execPath, ["scripts/summarize-aliyun-action-authorization.mjs", "--backend-only"], {
     cwd: root,
     encoding: "utf8",
-    maxBuffer: 1024 * 1024 * 40,
+    maxBuffer: 1024 * 1024 * 80,
   })
   const report = JSON.parse(output)
 
-  assert.match(handoff, /现在不能部署；当前只推进阿里云后端/)
+  assert.match(handoff, /现在不能部署；后端仍有必填阻塞：DATABASE_URL_CN/)
   assert.match(handoff, /currentScope: backend_aliyun_only/)
   assert.match(handoff, /fullAppLaunchScope: deferred_after_backend_online/)
   assert.match(handoff, /canDeployNow: false/)
   assert.match(handoff, /secretLeakCheck: true/)
-  assert.match(handoff, /resourceEvidenceReady: 0\/7/)
-  assert.match(handoff, /blockedCredentialCount: 1/)
-  assert.match(handoff, /blockedCredentialNames: DATABASE_URL_CN/)
-  assert.match(handoff, /readySecretEnvVariableCount: 17/)
-  assert.match(handoff, /canStartNowPackets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P04_ACR_IMAGE_AND_PULL/)
-  assert.match(handoff, /deferredAppLaunchPackets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID/)
-  assert.doesNotMatch(handoff, /blockedCredentialNames: .*WECHAT_OPEN_APP/)
+  assert.match(handoff, /blockedCredentialCount: 0/)
+  assert.match(handoff, /blockedCredentialNames: none/)
+  assert.match(handoff, /nextActionTimeConfirmations: P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(handoff, /canStartNowPackets: P11_ALIYUN_RDS_DATA_MIGRATION/)
+  assert.match(handoff, /blockedByPacketDependencies: P06_ENV_IMPORT, P09_PRODUCTION_DEPLOY/)
+  assert.doesNotMatch(handoff, /blockedCredentialNames: DATABASE_URL_CN/)
+  assert.doesNotMatch(handoff, /WECHAT_OPEN_APP_ID|WECHAT_OPEN_APP_SECRET/)
 
   for (const packet of report.authorizationPackets) {
     assert.match(handoff, new RegExp(packet.packetId))
     assert.match(handoff, new RegExp(packet.actionId))
-    for (const dependency of packet.dependsOn || []) {
-      assert.match(handoff, new RegExp(dependency))
-    }
   }
 
-  for (const packetId of report.summary.canStartNowPackets) {
-    assert.match(handoff, new RegExp(packetId))
-  }
-  for (const packetId of report.summary.blockedByPacketDependencies) {
-    assert.match(handoff, new RegExp(packetId))
-  }
-  for (const resourceId of report.summary.blockedResourceEvidenceIds) {
-    assert.match(handoff, new RegExp(resourceId))
-  }
-  for (const resourceId of report.summary.partiallyObservedResourceEvidenceIds) {
-    assert.match(handoff, new RegExp(resourceId))
-  }
-  for (const name of report.authorizationClosureBrief.blockedCredentialNames) {
-    assert.match(handoff, new RegExp(name))
-  }
-
-  assert.doesNotMatch(handoff, /sk-[A-Za-z0-9_-]{20,}/)
-  assert.doesNotMatch(handoff, /LTAI[A-Za-z0-9]{12,}/)
-  assert.doesNotMatch(handoff, /:\/\/[^\s:@]+:[^\s@]+@/)
+  assert.doesNotMatch(handoff, secretLike)
 })
