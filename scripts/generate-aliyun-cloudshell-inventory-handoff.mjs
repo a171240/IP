@@ -205,9 +205,6 @@ function summarizeCloudInventoryResults(cloudInventoryResults = {}) {
 }
 
 function buildCurrentAnswer(cloudAccess, existingInventoryEvidence) {
-  if (cloudAccess.canReadCloudNow === true) {
-    return "Aliyun CLI/CloudShell read-only inventory can be attempted after action-time confirmation."
-  }
   const cloudShell = summarizeCloudShellGate(cloudAccess.cloudShellObservation?.cloudShell || {})
   if (cloudShell.requiresActionTimeRestartConfirmation) {
     return "Aliyun CloudShell read-only inventory is blocked because the current CloudShell tab is disconnected and the page shows a restart-instance confirmation; do not confirm it without action-time approval."
@@ -217,6 +214,9 @@ function buildCurrentAnswer(cloudAccess, existingInventoryEvidence) {
   }
   if (cloudShell.currentStatus === "connecting_terminal_input_visible_inventory_not_executed") {
     return "Aliyun CloudShell is visible and still connecting; terminal input is present but no allowlisted read-only inventory has been run yet."
+  }
+  if (cloudAccess.canReadCloudNow === true) {
+    return "Aliyun CLI/CloudShell read-only inventory can be attempted after action-time confirmation."
   }
   if (existingInventoryEvidence.ready === true) {
     return "Existing strict inventory evidence is ready, but current Aliyun CLI/CloudShell identity is not ready for refresh; do not treat later cloud changes as verified until inventory is rerun."
@@ -264,6 +264,15 @@ function buildReport(options = {}) {
     cloudApiCalled: false,
     mutationPerformed: false,
     executionMode: "handoff_only",
+    foregroundBrowserInteraction: {
+      defaultMode: "background_only_no_page_switch",
+      pageSwitchAllowedByThisCommand: false,
+      browserTabFocusAllowedByThisCommand: false,
+      browserClickAllowedByThisCommand: false,
+      browserProbeIsBackgroundOnly: true,
+      browserProbeScope: "sanitized_chrome_tab_title_and_host_path_only",
+      operatorInstruction: "Do not switch browser pages, focus tabs, click reconnect/open buttons, or interact with Aliyun console from this command. Use local CLI handoff first; any CloudShell foreground action requires separate action-time confirmation.",
+    },
     currentAnswer: buildCurrentAnswer(cloudAccess, existingInventoryEvidence),
     cliReadiness: {
       canReadCloudNow: cloudAccess.canReadCloudNow === true,
@@ -389,6 +398,7 @@ function buildReport(options = {}) {
     ],
     safetyBoundary: [
       "This command only generates a local handoff package.",
+      "It runs in background-only mode and does not switch browser pages, focus tabs, click CloudShell reconnect/open buttons, or interact with Aliyun console.",
       "It does not call Aliyun cloud APIs, configure CLI credentials, create resources, change DNS, import env vars, push images, or deploy production-cn.",
       "All reports are value-free; raw CLI stdout/stderr and credential files are never read or written.",
     ],
@@ -421,6 +431,11 @@ function renderMarkdown(report) {
     `- strictInventoryExecutedCommandResults: ${report.existingInventoryEvidence.executedCommandResults}/${report.existingInventoryEvidence.commandResults}`,
     `- strictInventoryCloudApiCalledCommandResults: ${report.existingInventoryEvidence.cloudApiCalledCommandResults}`,
     `- strictInventoryMutationPerformedCommandResults: ${report.existingInventoryEvidence.mutationPerformedCommandResults}`,
+    `- foregroundDefaultMode: ${report.foregroundBrowserInteraction.defaultMode}`,
+    `- foregroundPageSwitchAllowed: ${report.foregroundBrowserInteraction.pageSwitchAllowedByThisCommand === true}`,
+    `- foregroundBrowserClickAllowed: ${report.foregroundBrowserInteraction.browserClickAllowedByThisCommand === true}`,
+    `- browserProbeIsBackgroundOnly: ${report.foregroundBrowserInteraction.browserProbeIsBackgroundOnly === true}`,
+    `- browserProbeScope: ${report.foregroundBrowserInteraction.browserProbeScope}`,
     `- currentBrowserCanUseCurrentConsole: ${report.currentBrowser.canUseCurrentConsole === true}`,
     `- currentBrowserAliyunConsoleTabCount: ${report.currentBrowser.aliyunConsoleTabCount}`,
     `- currentBrowserAliyunConsoleHostPaths: ${formatList(report.currentBrowser.aliyunConsoleHostPaths)}`,

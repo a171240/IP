@@ -24,6 +24,9 @@ test("Aliyun CloudShell handoff is wired into scripts, predeploy, deploy spec, a
   assert.match(source, /--cloud-access-observation/)
   assert.match(source, /requiresActionTimeRestartConfirmation/)
   assert.match(source, /disconnected_restart_instance_confirmation_required/)
+  assert.match(source, /background_only_no_page_switch/)
+  assert.match(source, /pageSwitchAllowedByThisCommand: false/)
+  assert.match(source, /browserClickAllowedByThisCommand: false/)
   assert.match(predeploy, /aliyun:cloudshell:handoff:test/)
   assert.match(predeploy, /aliyun:cloudshell:handoff/)
   assert.ok(deploySpec.localPredeployChecks.includes("corepack pnpm run aliyun:cloudshell:handoff:test"))
@@ -94,6 +97,13 @@ test("Aliyun CloudShell handoff produces value-free local JSON and Markdown", ()
   assert.equal(report.cloudApiCalled, false)
   assert.equal(report.mutationPerformed, false)
   assert.equal(report.secretLeakCheck.ok, true)
+  assert.equal(report.foregroundBrowserInteraction.defaultMode, "background_only_no_page_switch")
+  assert.equal(report.foregroundBrowserInteraction.pageSwitchAllowedByThisCommand, false)
+  assert.equal(report.foregroundBrowserInteraction.browserTabFocusAllowedByThisCommand, false)
+  assert.equal(report.foregroundBrowserInteraction.browserClickAllowedByThisCommand, false)
+  assert.equal(report.foregroundBrowserInteraction.browserProbeIsBackgroundOnly, true)
+  assert.equal(report.foregroundBrowserInteraction.browserProbeScope, "sanitized_chrome_tab_title_and_host_path_only")
+  assert.match(report.foregroundBrowserInteraction.operatorInstruction, /Do not switch browser pages/)
   assert.equal(report.currentBrowser.checked, true)
   assert.equal(typeof report.currentBrowser.canUseCurrentConsole, "boolean")
   assert.ok(Array.isArray(report.currentBrowser.aliyunConsoleHostPaths))
@@ -152,6 +162,11 @@ test("Aliyun CloudShell handoff produces value-free local JSON and Markdown", ()
   assert.match(markdown, /strictInventoryAlreadyReady: true/)
   assert.match(markdown, /strictInventoryReadyLocalOperations: 9\/9/)
   assert.match(markdown, /strictInventoryMutationPerformedCommandResults: 0/)
+  assert.match(markdown, /foregroundDefaultMode: background_only_no_page_switch/)
+  assert.match(markdown, /foregroundPageSwitchAllowed: false/)
+  assert.match(markdown, /foregroundBrowserClickAllowed: false/)
+  assert.match(markdown, /browserProbeIsBackgroundOnly: true/)
+  assert.match(markdown, /browserProbeScope: sanitized_chrome_tab_title_and_host_path_only/)
   assert.match(markdown, /currentBrowserCanUseCurrentConsole:/)
   assert.match(markdown, /cloudShellRequiresActionTimeConfirmation:/)
   assert.match(markdown, /cloudShellRequiresActionTimeOpenConfirmation:/)
@@ -369,6 +384,8 @@ function writeCloudAccessObservationFixture(filePath, options = {}) {
         },
         cloudShell: {
           connected: false,
+          connecting: cloudShell.connecting === true,
+          terminalInputVisible: cloudShell.terminalInputVisible === true,
           regionLabel: "",
           cliAvailable: false,
           cliVersion: "",
