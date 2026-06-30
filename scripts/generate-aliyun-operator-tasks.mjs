@@ -14,12 +14,14 @@ const WORKSPACE_ROOT = resolve(BACKEND_ROOT, "../..")
 const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
 const DEFAULT_RDS_MIGRATION_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.rds-migration.local.json")
+const DEFAULT_IMAGE_PUBLISH_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.image-publish.local.json")
 
 function parseArgs(argv) {
   const args = {
     envFile: DEFAULT_ENV_FILE,
     cloudConfirmationsFile: DEFAULT_CLOUD_CONFIRMATIONS_FILE,
     rdsMigrationFile: DEFAULT_RDS_MIGRATION_FILE,
+    imagePublishFile: DEFAULT_IMAGE_PUBLISH_FILE,
     outPath: "",
     markdownPath: "",
     backendOnly: false,
@@ -38,6 +40,10 @@ function parseArgs(argv) {
     }
     if (arg === "--rds-migration") {
       args.rdsMigrationFile = resolveValue(argv[++index], "--rds-migration")
+      continue
+    }
+    if (arg === "--image-publish") {
+      args.imagePublishFile = resolveValue(argv[++index], "--image-publish")
       continue
     }
     if (arg === "--out") {
@@ -141,9 +147,11 @@ const OPERATOR_AUTHORIZATION_PACKET_METADATA = Object.freeze({
     nonSecretEvidenceOnly: false,
     writeTargets: [
       "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss",
-      "ALIYUN_OSS_ACCESS_KEY_ID / ALIYUN_OSS_ACCESS_KEY_SECRET / ALIYUN_OSS_SECURITY_TOKEN -> KMS/Secrets Manager/SAE secret env",
+      "SAE RRSA/OIDC env ALIBABA_CLOUD_ROLE_ARN / ALIBABA_CLOUD_OIDC_PROVIDER_ARN / ALIBABA_CLOUD_OIDC_TOKEN_FILE when accessMode=sae_runtime_role",
+      "fallback only: ALIYUN_OSS_ACCESS_KEY_ID / ALIYUN_OSS_ACCESS_KEY_SECRET / ALIYUN_OSS_SECURITY_TOKEN -> KMS/Secrets Manager/SAE secret env",
     ],
     verifyCommands: [
+      "corepack pnpm aliyun:oss:runtime-access:strict",
       "corepack pnpm aliyun:cloud:confirmations",
       "corepack pnpm aliyun:health:smoke",
     ],
@@ -257,6 +265,9 @@ function backendOnlyTask(task, scopedEnvSummary) {
       ? "requires_runtime_domain_env_cloud_confirmations"
       : item)
     .filter((item) => !isAppLaunchBlocker(item))
+  const status = task.id === "T06_ALIYUN_ENV_IMPORT" && blockerCodes.length === 0
+    ? "ready"
+    : task.status
   const actions = task.actions.map((item) => {
     if (task.id === "T06_ALIYUN_ENV_IMPORT") {
       return item.replace("、微信开放平台", "")
@@ -282,14 +293,16 @@ function backendOnlyTask(task, scopedEnvSummary) {
   })
   return {
     ...task,
+    status,
     actions,
     evidence,
     blockerCodes,
-    ready: task.status === "ready",
+    ready: status === "ready",
   }
 }
 
 function applyBackendOnlyScope(report) {
+  const cloudImportedEnvNames = new Set(report.cloudImportedRequiredEnvNames || [])
   const excludedTaskIds = report.tasks
     .filter((task) => APP_LAUNCH_TASK_IDS.has(task.id))
     .map((task) => task.id)
@@ -299,11 +312,17 @@ function applyBackendOnlyScope(report) {
   const excludedRequiredBlocking = report.env.summary.requiredBlocking
     .filter((name) => APP_LAUNCH_ENV_NAMES.has(name))
   const backendRequiredBlocking = report.env.summary.requiredBlocking
-    .filter((name) => !APP_LAUNCH_ENV_NAMES.has(name))
+    .filter((name) => !APP_LAUNCH_ENV_NAMES.has(name) && !cloudImportedEnvNames.has(name))
+  const cloudImportedRequiredBlocking = report.env.summary.requiredBlocking
+    .filter((name) => cloudImportedEnvNames.has(name))
 
   const scopedEnvSummary = {
     ...report.env.summary,
     requiredTotal: Math.max(0, report.env.summary.requiredTotal - excludedRequiredBlocking.length),
+    requiredReady: Math.min(
+      Math.max(0, report.env.summary.requiredTotal - excludedRequiredBlocking.length),
+      (report.env.summary.requiredReady || 0) + cloudImportedRequiredBlocking.length,
+    ),
     requiredBlocking: backendRequiredBlocking,
     appLaunchBlocking: Array.from(new Set([
       ...(report.env.summary.appLaunchBlocking || []),
@@ -328,11 +347,12 @@ function applyBackendOnlyScope(report) {
       summary: scopedEnvSummary,
       requiredBlocking: backendRequiredBlocking,
       requiredBlockingDetails: report.env.requiredBlockingDetails
-        .filter((item) => !APP_LAUNCH_ENV_NAMES.has(item.name)),
+        .filter((item) => !APP_LAUNCH_ENV_NAMES.has(item.name) && !cloudImportedEnvNames.has(item.name)),
     },
     readiness: {
       ...report.readiness,
-      machineBlocking: report.readiness.machineBlocking.filter((item) => !isAppLaunchBlocker(item)),
+      machineBlocking: report.readiness.machineBlocking.filter((item) =>
+        !isAppLaunchBlocker(item) && !cloudImportedEnvNames.has(String(item).replace(/^missing_required_env:/u, ""))),
       manualBlocking: report.readiness.manualBlocking.filter((item) => !isAppLaunchBlocker(item)),
     },
     tasks,
@@ -395,7 +415,7 @@ function buildCloudConfirmationIndex(readiness) {
   return new Map(items.map((item) => [item.key, item]))
 }
 
-function buildTasks({ envPlan, readiness, domain, imagePublishPlan, rdsMigrationEvidence }) {
+function buildTasks({ envPlan, readiness, domain, cloudConfirmations, imagePublishPlan, rdsMigrationEvidence }) {
   const cloud = buildCloudConfirmationIndex(readiness)
   const tasks = []
   const wechatOpenPlatform = readiness.checks?.wechatOpenPlatform || {}
@@ -501,6 +521,9 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan, rdsMigration
   const rdsSourceInventory = rdsLocal.sourceInventory || {}
   const rdsMigration = rdsLocal.migration || {}
   const rdsSummary = rdsMigrationEvidence.summary || {}
+  const rdsCompatibilityClosed = rdsMigration.schemaCompatibilityReviewed === true &&
+    rdsMigration.supabaseSpecificSqlResolved === true &&
+    rdsMigration.rdsExtensionSupportConfirmed === true
   addTask(tasks, {
     id: "T02B_ALIYUN_RDS_DATA_MIGRATION",
     title: "创建阿里云 RDS PostgreSQL 并完成正式数据层迁移",
@@ -511,8 +534,12 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan, rdsMigration
     actions: [
       "创建或确认 production-cn RDS PostgreSQL 实例、数据库、账号和网络访问策略。",
       "把 DATABASE_URL_CN 只导入阿里云 KMS/Secrets Manager/SAE secret env，不写入 JSON、Markdown、Docker 镜像、APP 包、小程序包或 git。",
-      "迁移前完成 Supabase schema 兼容性复核、Supabase-specific SQL 改写和阿里云 RDS PostgreSQL extension 支持确认。",
-      "先关闭 RDS migration package 的 7 类 compatibilityReviewChecklist：supabase_auth_schema、supabase_auth_uid、supabase_storage_schema、supabase_service_role、row_level_security、policy_statement、extension_review。",
+      ...(rdsCompatibilityClosed ? [
+        "Supabase schema 兼容性复核、Supabase-specific SQL 改写和阿里云 RDS PostgreSQL extension 支持已在 local evidence 中记录为 true。",
+      ] : [
+        "迁移前完成 Supabase schema 兼容性复核、Supabase-specific SQL 改写和阿里云 RDS PostgreSQL extension 支持确认。",
+        "先关闭 RDS migration package 的 7 类 compatibilityReviewChecklist：supabase_auth_schema、supabase_auth_uid、supabase_storage_schema、supabase_service_role、row_level_security、policy_statement、extension_review。",
+      ]),
       "按 RDS migration package 执行 schema/data 迁移、行数校验、关键记录校验、APP API smoke 和 rollback 验收。",
       "只把实例 id/name/region、迁移报告句柄、校验结果布尔值等非密钥证据写入 deploy/aliyun-production-cn.rds-migration.local.json。",
     ],
@@ -665,7 +692,7 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan, rdsMigration
       "确认服务记录音频使用的 OSS Bucket 名称和 region。",
       "确认 CORS 允许 APP 所需上传/下载方法和 Header。",
       "确认 RAM 权限限制到服务记录音频前缀 service-records/production-cn。",
-      "确认 ALIYUN_OSS_ACCESS_KEY_ID、ALIYUN_OSS_ACCESS_KEY_SECRET、ALIYUN_OSS_BUCKET、ALIYUN_OSS_REGION 已通过密钥环境变量导入；使用临时 STS 凭证时额外导入 ALIYUN_OSS_SECURITY_TOKEN。",
+      "首选确认 SAE RRSA/OIDC runtime role 已绑定 OSS 最小权限，并由运行环境提供 ALIBABA_CLOUD_ROLE_ARN / ALIBABA_CLOUD_OIDC_PROVIDER_ARN / ALIBABA_CLOUD_OIDC_TOKEN_FILE；如选择 fallback，再把 ALIYUN_OSS_ACCESS_KEY_ID/SECRET 或 STS token 导入受控 secret env。",
       "在 cloud-confirmations.local.json 的 oss 项记录 Bucket、region 和非密钥证据。",
     ],
     evidence: [
@@ -682,12 +709,18 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan, rdsMigration
   })
 
   const envImport = cloud.get("envImport")
+  const envImportReady = envImport?.ready === true || cloudConfirmations?.items?.envImport?.confirmed === true
+  const cloudImportedEnvNames = new Set(
+    isDatabaseUrlCnImported({ cloudConfirmations, rdsMigrationEvidence, envImport }) ? ["DATABASE_URL_CN"] : [],
+  )
+  const effectiveRequiredBlocking = envPlan.summary.requiredBlocking
+    .filter((key) => !cloudImportedEnvNames.has(key))
   addTask(tasks, {
     id: "T06_ALIYUN_ENV_IMPORT",
     title: "导入 production-cn 运行环境变量",
-    status: envImport?.ready && envPlan.summary.requiredBlocking.length === 0 ? "ready" : "blocked",
+    status: envImportReady && effectiveRequiredBlocking.length === 0 ? "ready" : "blocked",
     blockerCodes: [
-      ...envPlan.summary.requiredBlocking.map((key) => `missing_required_env:${key}`),
+      ...effectiveRequiredBlocking.map((key) => `missing_required_env:${key}`),
       ...missingList(envImport),
     ],
     owner: "阿里云运行环境/密钥操作员",
@@ -701,8 +734,8 @@ function buildTasks({ envPlan, readiness, domain, imagePublishPlan, rdsMigration
     evidence: [
       "secretNotInImage=true",
       "importedAt=实际导入时间",
-      `requiredReady=${envPlan.summary.requiredReady}/${envPlan.summary.requiredTotal}`,
-      `requiredBlocking=${envPlan.summary.requiredBlocking.length ? envPlan.summary.requiredBlocking.join(",") : "none"}`,
+      `requiredReady=${Math.min(envPlan.summary.requiredTotal, envPlan.summary.requiredReady + cloudImportedEnvNames.size)}/${envPlan.summary.requiredTotal}`,
+      `requiredBlocking=${effectiveRequiredBlocking.length ? effectiveRequiredBlocking.join(",") : "none"}`,
     ],
     verifyCommands: [
       "corepack pnpm aliyun:env:check",
@@ -932,7 +965,7 @@ function uniqueStrings(values) {
   return [...new Set((values || []).filter((value) => typeof value === "string" && value.trim()))]
 }
 
-function buildSensitiveActionItems({ envPlan, readiness, imagePublishPlan, nativeRelease }) {
+function buildSensitiveActionItems({ envPlan, readiness, imagePublishPlan, nativeRelease, cloudConfirmations, rdsMigrationEvidence }) {
   const variables = envPlan.variables || []
   const envImport = readiness.checks?.cloudConfirmations?.items?.find((item) => item.key === "envImport")
   const oss = readiness.checks?.cloudConfirmations?.items?.find((item) => item.key === "oss")
@@ -1016,21 +1049,32 @@ function buildSensitiveActionItems({ envPlan, readiness, imagePublishPlan, nativ
       type: "ram_secret_or_sts_import",
       status: "blocked",
       owner: "阿里云 OSS/RAM 操作员",
-      consolePath: "阿里云控制台 -> RAM 访问控制 / OSS Bucket / SAE 环境变量或 Secrets Manager",
-      variableNames: ["ALIYUN_OSS_ACCESS_KEY_ID", "ALIYUN_OSS_ACCESS_KEY_SECRET", "ALIYUN_OSS_SECURITY_TOKEN"],
+      consolePath: "阿里云控制台 -> RAM 访问控制 / OSS Bucket / SAE RRSA/OIDC 运行时角色或环境变量",
+      variableNames: [
+        "ALIBABA_CLOUD_ROLE_ARN",
+        "ALIBABA_CLOUD_OIDC_PROVIDER_ARN",
+        "ALIBABA_CLOUD_OIDC_TOKEN_FILE",
+        "ALIYUN_OSS_ACCESS_KEY_ID",
+        "ALIYUN_OSS_ACCESS_KEY_SECRET",
+        "ALIYUN_OSS_SECURITY_TOKEN",
+      ],
       variableDetails: variableDetailsFor(variables, [
+        "ALIBABA_CLOUD_ROLE_ARN",
+        "ALIBABA_CLOUD_OIDC_PROVIDER_ARN",
+        "ALIBABA_CLOUD_OIDC_TOKEN_FILE",
         "ALIYUN_OSS_ACCESS_KEY_ID",
         "ALIYUN_OSS_ACCESS_KEY_SECRET",
         "ALIYUN_OSS_SECURITY_TOKEN",
       ]),
-      requiredUserAction: "把已创建的 OSS 最小权限策略绑定到实际运行身份，并选择受限 AccessKey 或 STS/运行时角色注入方案。",
-      unblockCondition: "oss.ramLeastPrivilege=true，且对应 secret/token 只通过阿里云密钥环境注入。",
+      requiredUserAction: "把已创建的 OSS 最小权限策略绑定到实际运行身份；首选 SAE RRSA/OIDC runtime role，并由运行环境提供 role ARN、OIDC provider ARN 和 token file path，AccessKey/STS 仅作 fallback。",
+      unblockCondition: "oss.accessMode=sae_runtime_role 时 ALIBABA_CLOUD_ROLE_ARN / ALIBABA_CLOUD_OIDC_PROVIDER_ARN / ALIBABA_CLOUD_OIDC_TOKEN_FILE 可用；或 fallback secret/token 只通过阿里云密钥环境注入；oss.ramLeastPrivilege=true。",
       forbidden: "不创建可提交的长期明文 Secret；不把 AccessKeySecret 或 STS token 写入仓库、文档或镜像。",
     })
   }
 
   const databaseUrlCn = variables.find((item) => item.name === "DATABASE_URL_CN")
-  if (!databaseUrlCn || databaseUrlCn.status !== "ready") {
+  const databaseUrlCnImported = isDatabaseUrlCnImported({ cloudConfirmations, rdsMigrationEvidence, envImport })
+  if ((!databaseUrlCn || databaseUrlCn.status !== "ready") && !databaseUrlCnImported) {
     items.push({
       id: "S08_ALIYUN_RDS_DATABASE_URL",
       type: "database_secret_and_migration",
@@ -1065,6 +1109,24 @@ function buildSensitiveActionItems({ envPlan, readiness, imagePublishPlan, nativ
   if (androidSigningItem) items.push(androidSigningItem)
 
   return items.map(withSensitiveActionMetadata)
+}
+
+function isDatabaseUrlCnImported({ cloudConfirmations, rdsMigrationEvidence, envImport }) {
+  const cloudEnvImport = cloudConfirmations?.items?.envImport || {}
+  const rdsLocal = rdsMigrationEvidence?.local || {}
+  const rdsPostgres = rdsLocal.rdsPostgres || {}
+  const migration = rdsLocal.migration || {}
+  return (
+    rdsPostgres.databaseUrlCnSecretImported === true &&
+    migration.schemaMigrated === true &&
+    migration.dataMigrated === true &&
+    migration.appApiSmokeOnRdsPassed === true &&
+    (
+      envImport?.ready === true ||
+      cloudEnvImport.confirmed === true ||
+      cloudEnvImport.rdsSecretImported === true
+    )
+  )
 }
 
 function buildAndroidReleaseSigningSensitiveItem({ nativeRelease, wechatOpenPlatform }) {
@@ -1419,6 +1481,8 @@ function main() {
   const cloudConfirmations = readJsonIfExists(args.cloudConfirmationsFile)
   const imagePublishPlan = runJson("image_publish_plan", [
     "scripts/check-aliyun-image-publish-plan.mjs",
+    "--local",
+    args.imagePublishFile,
     "--allow-incomplete",
   ])
   const rdsMigrationEvidence = runJson("rds_migration_evidence", [
@@ -1431,13 +1495,27 @@ function main() {
     "scripts/check-app-native-release-config.mjs",
     "--allow-blocking",
   ])
+  const cloudEnvImport = readiness.checks?.cloudConfirmations?.items?.find((item) => item.key === "envImport")
+  const cloudImportedRequiredEnvNames = isDatabaseUrlCnImported({
+    cloudConfirmations,
+    rdsMigrationEvidence,
+    envImport: cloudEnvImport,
+  }) ? ["DATABASE_URL_CN"] : []
   const tasks = buildTasks({ envPlan, readiness, domain, cloudConfirmations, imagePublishPlan, rdsMigrationEvidence })
-  const sensitiveActionItems = buildSensitiveActionItems({ envPlan, readiness, imagePublishPlan, nativeRelease })
+  const sensitiveActionItems = buildSensitiveActionItems({
+    envPlan,
+    readiness,
+    imagePublishPlan,
+    nativeRelease,
+    cloudConfirmations,
+    rdsMigrationEvidence,
+  })
   let report = {
     generatedAt: new Date().toISOString(),
     containsValues: false,
     envFile: args.envFile,
     cloudConfirmationsFile: existsSync(args.cloudConfirmationsFile) ? args.cloudConfirmationsFile : null,
+    cloudImportedRequiredEnvNames,
     summary: summarizeTasks(tasks),
     sensitiveActionItems,
     readiness: {
@@ -1521,7 +1599,7 @@ function main() {
 function printHelp() {
   console.log([
     "Usage:",
-    "  node scripts/generate-aliyun-operator-tasks.mjs [--backend-only] [--env-file path] [--cloud-confirmations path] [--rds-migration path] [--out /tmp/tasks.json] [--markdown /tmp/tasks.md]",
+    "  node scripts/generate-aliyun-operator-tasks.mjs [--backend-only] [--env-file path] [--cloud-confirmations path] [--rds-migration path] [--image-publish path] [--out /tmp/tasks.json] [--markdown /tmp/tasks.md]",
     "",
     "Generates a non-secret Aliyun/WeChat operator task list from env plan, readiness, cloud confirmations, and domain probes.",
     "--backend-only excludes deferred WeChat Open Platform, Apple Team ID, Android signing, and APP legal-page publishing tasks.",

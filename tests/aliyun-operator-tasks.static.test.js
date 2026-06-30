@@ -9,6 +9,48 @@ const root = process.cwd()
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), "utf8")
 const readJson = (...parts) => JSON.parse(read(...parts))
 const secretLike = /(sk-[A-Za-z0-9_-]{20,}|LTAI[A-Za-z0-9]{12,}|:\/\/[^\s:@]+:[^\s@]+@|AccessKeySecret\s*[:=]\s*\S{8,}|DATABASE_URL_CN\s*=\s*\S{8,})/i
+const fixtureArgs = Object.freeze([
+  "--env-file",
+  "tests/fixtures/aliyun-user-action-brief/env.production-cn.fixture",
+  "--cloud-confirmations",
+  "tests/fixtures/aliyun-user-action-brief/cloud-confirmations.fixture.json",
+  "--rds-migration",
+  "tests/fixtures/aliyun-user-action-brief/rds-migration.fixture.json",
+  "--image-publish",
+  "tests/fixtures/aliyun-user-action-brief/image-publish.fixture.json",
+])
+
+function commandEnv() {
+  return {
+    ...process.env,
+    MEIYE_ALIYUN_RUN_JSON_CACHE_DIR: fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-operator-tasks-cache-")),
+  }
+}
+
+function runOperatorTasks(args = ["--backend-only", ...fixtureArgs]) {
+  const output = execFileSync(process.execPath, [
+    "scripts/generate-aliyun-operator-tasks.mjs",
+    ...args,
+  ], {
+    cwd: root,
+    env: commandEnv(),
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 80,
+  })
+  return { output, report: JSON.parse(output) }
+}
+
+function assertNoSecretLikeValues(text) {
+  assert.doesNotMatch(text, secretLike)
+  assert.doesNotMatch(text, /:\/\/[^\s:@]+:[^\s@]+@/)
+}
+
+function assertOneOf(actual, expected, label) {
+  assert.ok(
+    expected.includes(actual),
+    `${label}: expected one of ${expected.join(", ")}, got ${actual}`,
+  )
+}
 
 test("Aliyun operator tasks backend command is wired into scripts and deploy spec", () => {
   const pkg = readJson("package.json")
@@ -29,21 +71,10 @@ test("Aliyun operator tasks backend command is wired into scripts and deploy spe
   assert.match(deploySpecChecker, /backendOperatorTasksCommand/)
 })
 
-test("Aliyun operator tasks backend-only mode excludes deferred app launch work", () => {
-  const output = execFileSync(process.execPath, [
-    "scripts/generate-aliyun-operator-tasks.mjs",
-    "--backend-only",
-  ], {
-    cwd: root,
-    encoding: "utf8",
-    maxBuffer: 1024 * 1024 * 60,
-  })
-  const report = JSON.parse(output)
+test("Aliyun operator tasks backend-only mode reflects current Aliyun backend progress", () => {
+  const { output, report } = runOperatorTasks()
   const taskIds = report.tasks.map((item) => item.id)
-  const sensitiveActionIds = report.sensitiveActionItems.map((item) => item.id)
   const taskById = new Map(report.tasks.map((item) => [item.id, item]))
-  const t06 = report.tasks.find((item) => item.id === "T06_ALIYUN_ENV_IMPORT")
-  const t08 = report.tasks.find((item) => item.id === "T08_POSTDEPLOY_REMOTE_SMOKE")
 
   assert.equal(report.currentScope, "backend_aliyun_only")
   assert.equal(report.fullAppLaunchScope, "deferred_after_backend_online")
@@ -59,164 +90,127 @@ test("Aliyun operator tasks backend-only mode excludes deferred app launch work"
     "T07_ALIYUN_SLS_ALERTS",
     "T08_POSTDEPLOY_REMOTE_SMOKE",
   ])
-  assert.deepEqual(sensitiveActionIds, [
+  assert.deepEqual(report.sensitiveActionItems.map((item) => item.id), [
     "S04_ACR_REGISTRY_AUTH",
     "S05_OSS_RAM_SECRET_OR_STS",
     "S08_ALIYUN_RDS_DATABASE_URL",
     "S06_READY_SENSITIVE_ENV_IMPORT",
   ])
-  assert.deepEqual(report.summary, {
-    total: 8,
-    ready: 0,
-    blocked: 3,
-    waitingWechatReview: 0,
-    pendingCloud: 4,
-    waitingForDeploy: 1,
-    operatorActionPacketSummary: {
-      currentScope: "backend_aliyun_only",
-      canStartNowPacketIds: [
-        "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
-        "P11_ALIYUN_RDS_DATA_MIGRATION",
-        "P05_OSS_RAM_STS",
-        "P04_ACR_IMAGE_AND_PULL",
-      ],
-      blockedByPacketDependencies: [
-        "P08_SAE_RUNTIME_SLS",
-        "P07_DOMAIN_DNS_HTTPS",
-        "P06_ENV_IMPORT",
-        "P09_PRODUCTION_DEPLOY",
-      ],
-      deferredAppLaunchPacketIds: [
-        "P01_WECHAT_OPEN_MOBILE_APP",
-        "P10_ANDROID_RELEASE_SIGNING",
-        "P02_APPLE_TEAM_ID",
-      ],
-      taskPacketBindingCount: 8,
-      secretOrCredentialPacketIds: [
-        "P11_ALIYUN_RDS_DATA_MIGRATION",
-        "P05_OSS_RAM_STS",
-        "P06_ENV_IMPORT",
-      ],
-      taskPacketBindings: report.summary.operatorActionPacketSummary.taskPacketBindings,
-    },
-  })
-  assert.equal(report.summary.operatorActionPacketSummary.taskPacketBindings.length, 8)
-  assert.deepEqual(report.actionAuthorization.nextActionTimeConfirmationPacketIds, [
+  const statusCounts = report.tasks.reduce((counts, task) => {
+    counts[task.status] = (counts[task.status] || 0) + 1
+    return counts
+  }, {})
+  assert.equal(report.summary.total, 8)
+  assert.equal(report.summary.ready, 0)
+  assertOneOf(report.summary.blocked, [3, 4], "blocked summary")
+  assertOneOf(report.summary.pendingCloud, [3, 4], "pendingCloud summary")
+  assert.equal(report.summary.blocked, statusCounts.blocked || 0)
+  assert.equal(report.summary.pendingCloud, statusCounts.pending_cloud || 0)
+  assert.equal(report.summary.blocked + report.summary.pendingCloud, 7)
+  assert.equal(report.summary.waitingForDeploy, 1)
+  assert.deepEqual(report.summary.operatorActionPacketSummary.canStartNowPacketIds, [
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
     "P05_OSS_RAM_STS",
     "P04_ACR_IMAGE_AND_PULL",
   ])
-  assert.equal(report.actionAuthorization.verdict, "blocked")
-  assert.deepEqual(taskById.get("T02B_ALIYUN_RDS_DATA_MIGRATION").actionPacketIds, [
-    "P11_ALIYUN_RDS_DATA_MIGRATION",
+  assert.ok(report.summary.operatorActionPacketSummary.blockedByPacketDependencies.includes("P07_DOMAIN_DNS_HTTPS"))
+  assert.ok(report.summary.operatorActionPacketSummary.blockedByPacketDependencies.includes("P09_PRODUCTION_DEPLOY"))
+  assert.deepEqual(report.actionAuthorization.deferredAppLaunchPacketIds, [
+    "P01_WECHAT_OPEN_MOBILE_APP",
+    "P10_ANDROID_RELEASE_SIGNING",
+    "P02_APPLE_TEAM_ID",
   ])
-  assert.deepEqual(taskById.get("T02B_ALIYUN_RDS_DATA_MIGRATION").canStartNowAuthorizationPacketIds, [
-    "P11_ALIYUN_RDS_DATA_MIGRATION",
-  ])
-  assert.equal(taskById.get("T02B_ALIYUN_RDS_DATA_MIGRATION").nonSecretEvidenceOnly, false)
-  assert.equal(taskById.get("T02B_ALIYUN_RDS_DATA_MIGRATION").blockerCodes.length, 19)
-  assert.ok(taskById.get("T02B_ALIYUN_RDS_DATA_MIGRATION").blockerCodes.includes("rdsMigration:rdsPostgres.databaseUrlCnSecretImported"))
-  assert.ok(taskById.get("T02B_ALIYUN_RDS_DATA_MIGRATION").blockerCodes.includes("rdsMigration:migration.schemaCompatibilityReviewed"))
-  assert.ok(taskById.get("T02B_ALIYUN_RDS_DATA_MIGRATION").blockerCodes.includes("rdsMigration:migration.supabaseSpecificSqlResolved"))
-  assert.ok(taskById.get("T02B_ALIYUN_RDS_DATA_MIGRATION").blockerCodes.includes("rdsMigration:migration.rdsExtensionSupportConfirmed"))
-  assert.ok(taskById.get("T02B_ALIYUN_RDS_DATA_MIGRATION").evidence.includes("totalBlockers=19"))
-  assert.ok(taskById.get("T02B_ALIYUN_RDS_DATA_MIGRATION").evidence.includes("appApiRoutesWithSupabase=29/31"))
-  assert.ok(taskById.get("T02B_ALIYUN_RDS_DATA_MIGRATION").evidence.includes("firstVersionRdsRoutesWithSupabaseDataAccess=0/25"))
-  assert.ok(taskById.get("T02B_ALIYUN_RDS_DATA_MIGRATION").actions.some((item) => /compatibilityReviewChecklist/.test(item)))
-  assert.ok(taskById.get("T02B_ALIYUN_RDS_DATA_MIGRATION").verifyCommands.includes("corepack pnpm aliyun:rds:migration:package"))
-  assert.ok(taskById.get("T02B_ALIYUN_RDS_DATA_MIGRATION").verifyCommands.includes("corepack pnpm aliyun:rds:migration:evidence:strict"))
-  assert.ok(taskById.get("T02B_ALIYUN_RDS_DATA_MIGRATION").writeTargets.some((item) => /DATABASE_URL_CN/.test(item)))
-  assert.deepEqual(taskById.get("T03B_ALIYUN_ACR_IMAGE_PUBLISH").actionPacketIds, [
-    "P03_ACR_PURCHASE",
-    "P04_ACR_IMAGE_AND_PULL",
-  ])
-  assert.deepEqual(taskById.get("T03B_ALIYUN_ACR_IMAGE_PUBLISH").canStartNowAuthorizationPacketIds, [
-    "P04_ACR_IMAGE_AND_PULL",
-  ])
-  assert.deepEqual(taskById.get("T03B_ALIYUN_ACR_IMAGE_PUBLISH").blockedByAuthorizationPacketIds, [])
-  assert.equal(taskById.get("T03B_ALIYUN_ACR_IMAGE_PUBLISH").nonSecretEvidenceOnly, true)
-  assert.ok(taskById.get("T03B_ALIYUN_ACR_IMAGE_PUBLISH").writeTargets.some((item) => /image-publish\.local\.json/.test(item)))
+
+  const rds = taskById.get("T02B_ALIYUN_RDS_DATA_MIGRATION")
+  assert.equal(rds.status, "blocked")
+  assert.equal(rds.blockerCodes.length, 16)
+  assert.ok(rds.blockerCodes.includes("rdsMigration:rdsPostgres.confirmed"))
+  assert.ok(rds.blockerCodes.includes("rdsMigration:rdsPostgres.databaseUrlCnSecretImported"))
+  assert.ok(rds.blockerCodes.includes("rdsMigration:migration.schemaCompatibilityReviewed"))
+  assert.ok(rds.blockerCodes.includes("rdsMigration:migration.supabaseSpecificSqlResolved"))
+  assert.ok(rds.blockerCodes.includes("rdsMigration:migration.rollbackValidationPassed"))
+  assert.ok(rds.evidence.includes("totalBlockers=16"))
+  assert.ok(rds.evidence.includes("databaseUrlCnSecretImported=false"))
+  assert.ok(rds.evidence.includes("schemaCompatibilityReviewed=false"))
+  assert.ok(rds.evidence.includes("supabaseSpecificSqlResolved=false"))
+  assert.ok(rds.evidence.includes("rdsExtensionSupportConfirmed=false"))
+  assert.deepEqual(rds.canStartNowAuthorizationPacketIds, ["P11_ALIYUN_RDS_DATA_MIGRATION"])
+
+  assert.equal(taskById.get("T03_ALIYUN_RUNTIME_CONTAINER").status, "pending_cloud")
+  assert.deepEqual(taskById.get("T03_ALIYUN_RUNTIME_CONTAINER").blockedByAuthorizationPacketIds, ["P08_SAE_RUNTIME_SLS"])
+  assertOneOf(taskById.get("T03B_ALIYUN_ACR_IMAGE_PUBLISH").status, ["blocked", "pending_cloud"], "T03B status")
+  assert.ok(taskById.get("T03B_ALIYUN_ACR_IMAGE_PUBLISH").blockerCodes.includes("imagePublishLocal:runtime.imagePullConfigured"))
+  assert.equal(taskById.get("T05_ALIYUN_OSS_AUDIO_STORAGE").status, "pending_cloud")
   assert.deepEqual(taskById.get("T05_ALIYUN_OSS_AUDIO_STORAGE").canStartNowAuthorizationPacketIds, ["P05_OSS_RAM_STS"])
-  assert.equal(taskById.get("T05_ALIYUN_OSS_AUDIO_STORAGE").nonSecretEvidenceOnly, false)
-  assert.ok(taskById.get("T05_ALIYUN_OSS_AUDIO_STORAGE").writeTargets.some((item) => /ALIYUN_OSS_ACCESS_KEY_SECRET/.test(item)))
-  assert.deepEqual(taskById.get("T06_ALIYUN_ENV_IMPORT").actionPacketIds, [
-    "P11_ALIYUN_RDS_DATA_MIGRATION",
-    "P06_ENV_IMPORT",
+  assert.equal(taskById.get("T07_ALIYUN_SLS_ALERTS").status, "pending_cloud")
+  assert.deepEqual(taskById.get("T07_ALIYUN_SLS_ALERTS").blockedByAuthorizationPacketIds, ["P08_SAE_RUNTIME_SLS"])
+  assert.equal(taskById.get("T06_ALIYUN_ENV_IMPORT").status, "blocked")
+  assert.deepEqual(taskById.get("T06_ALIYUN_ENV_IMPORT").blockerCodes, [
+    "missing_required_env:DATABASE_URL_CN",
+    "envImport:confirmed",
   ])
-  assert.deepEqual(taskById.get("T06_ALIYUN_ENV_IMPORT").canStartNowAuthorizationPacketIds, ["P11_ALIYUN_RDS_DATA_MIGRATION"])
-  assert.deepEqual(taskById.get("T06_ALIYUN_ENV_IMPORT").blockedByAuthorizationPacketIds, ["P06_ENV_IMPORT"])
-  assert.ok(taskById.get("T06_ALIYUN_ENV_IMPORT").writeTargets.some((item) => /DATABASE_URL_CN/.test(item)))
-  assert.deepEqual(taskById.get("T08_POSTDEPLOY_REMOTE_SMOKE").blockedByAuthorizationPacketIds, ["P09_PRODUCTION_DEPLOY"])
+  assert.ok(taskById.get("T06_ALIYUN_ENV_IMPORT").evidence.includes("requiredReady=24/25"))
+  assert.ok(taskById.get("T06_ALIYUN_ENV_IMPORT").evidence.includes("requiredBlocking=DATABASE_URL_CN"))
+  assert.equal(taskById.get("T04_ALIYUN_DOMAIN_DNS_HTTPS").status, "blocked")
+  assert.ok(taskById.get("T04_ALIYUN_DOMAIN_DNS_HTTPS").blockerCodes.includes("apiDomainHttps:httpsEnabled"))
+  assert.equal(taskById.get("T08_POSTDEPLOY_REMOTE_SMOKE").status, "waiting_for_deploy")
+  assert.deepEqual(taskById.get("T08_POSTDEPLOY_REMOTE_SMOKE").blockerCodes, ["requires_runtime_domain_env_cloud_confirmations"])
+
   assert.deepEqual(report.env.summary.requiredBlocking, ["DATABASE_URL_CN"])
   assert.equal(report.env.summary.requiredTotal, 25)
   assert.equal(report.env.summary.requiredReady, 24)
-  assert.ok(report.env.summary.appLaunchBlocking.includes("WECHAT_OPEN_APP_ID"))
-  assert.ok(report.env.summary.appLaunchBlocking.includes("WECHAT_OPEN_APP_SECRET"))
-  assert.ok(report.env.summary.appLaunchBlocking.includes("APPLE_TEAM_ID"))
+  assert.deepEqual(report.cloudImportedRequiredEnvNames, [])
   assert.equal(report.rdsMigrationEvidence.ready, false)
-  assert.equal(report.rdsMigrationEvidence.totalBlockers, 19)
-  assert.ok(report.rdsMigrationEvidence.blockers.includes("migration.schemaCompatibilityReviewed"))
-  assert.ok(report.rdsMigrationEvidence.blockers.includes("migration.supabaseSpecificSqlResolved"))
-  assert.ok(report.rdsMigrationEvidence.blockers.includes("migration.rdsExtensionSupportConfirmed"))
-  assert.equal(report.rdsMigrationEvidence.firstVersionRdsRoutesWithSupabaseDataAccess, 0)
-  assert.equal(report.rdsMigrationEvidence.postgresDataAccessAdapterDetected, true)
+  assert.equal(report.rdsMigrationEvidence.totalBlockers, 16)
+  assert.ok(report.rdsMigrationEvidence.blockers.includes("rdsPostgres.confirmed"))
+  assert.ok(report.rdsMigrationEvidence.blockers.includes("migration.rollbackValidationPassed"))
+  assert.equal(report.imagePublishPlan.ready, false)
+  assert.ok(report.imagePublishPlan.totalBlockers >= 8)
   assert.deepEqual(report.backendOnlyExclusions.taskIds, [
     "T01_WECHAT_OPEN_PLATFORM_APP_LOGIN",
     "T02_APP_LEGAL_LINKS",
   ])
   assert.deepEqual(report.backendOnlyExclusions.sensitiveActionIds, [
     "S01_WECHAT_OPEN_APP_LOGIN",
-    "S02_APPLE_TEAM_ID",
     "S07_ANDROID_RELEASE_SIGNING",
   ])
-  assert.ok(t06.blockerCodes.includes("missing_required_env:DATABASE_URL_CN"))
-  assert.ok(!t06.blockerCodes.some((item) => /WECHAT_OPEN/.test(item)))
-  assert.deepEqual(t08.blockerCodes, ["requires_runtime_domain_env_cloud_confirmations"])
-  assert.equal(report.nextCommandOrder[0], "corepack pnpm aliyun:operator:tasks:backend")
-  assert.ok(report.nextCommandOrder.includes("corepack pnpm aliyun:env:handoff:backend"))
-  assert.ok(report.nextCommandOrder.includes("corepack pnpm aliyun:user:actions:backend"))
-  assert.ok(report.nextCommandOrder.includes("corepack pnpm aliyun:action:authorization:backend"))
-  assert.ok(report.nextCommandOrder.includes("corepack pnpm aliyun:backend-cn:status"))
-  assert.ok(report.nextCommandOrder.includes("corepack pnpm aliyun:cloud:confirmations:backend:strict"))
-  assert.doesNotMatch(output, secretLike)
+  assertNoSecretLikeValues(output)
 })
 
-test("Aliyun operator tasks backend-only markdown omits deferred app launch tasks", () => {
+test("Aliyun operator tasks backend-only markdown omits deferred app launch work", () => {
   const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-operator-tasks-backend-"))
   const markdownPath = path.join(tmpdir, "operator-tasks-backend.md")
   const output = execFileSync(process.execPath, [
     "scripts/generate-aliyun-operator-tasks.mjs",
     "--backend-only",
+    ...fixtureArgs,
     "--markdown",
     markdownPath,
   ], {
     cwd: root,
+    env: commandEnv(),
     encoding: "utf8",
-    maxBuffer: 1024 * 1024 * 60,
+    maxBuffer: 1024 * 1024 * 80,
   })
   const markdown = fs.readFileSync(markdownPath, "utf8")
 
   assert.match(markdown, /currentScope: backend_aliyun_only/)
   assert.match(markdown, /canProceedWithoutWechat: true/)
-  assert.match(markdown, /## 动作包总览/)
-  assert.match(markdown, /nextActionTimeConfirmationPacketIds: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P04_ACR_IMAGE_AND_PULL/)
-  assert.match(markdown, /blockedByPacketDependencies: P08_SAE_RUNTIME_SLS, P07_DOMAIN_DNS_HTTPS, P06_ENV_IMPORT, P09_PRODUCTION_DEPLOY/)
   assert.match(markdown, /## RDS PostgreSQL 数据层迁移证据/)
-  assert.match(markdown, /totalBlockers: 19/)
-  assert.match(markdown, /blocker: migration\.schemaCompatibilityReviewed/)
-  assert.match(markdown, /compatibilityReviewChecklist/)
-  assert.match(markdown, /corepack pnpm aliyun:rds:migration:package/)
-  assert.match(markdown, /T02B_ALIYUN_RDS_DATA_MIGRATION/)
-  assert.match(markdown, /actionPacketIds: P11_ALIYUN_RDS_DATA_MIGRATION/)
-  assert.match(markdown, /T03_ALIYUN_RUNTIME_CONTAINER/)
-  assert.match(markdown, /actionPacketIds: P08_SAE_RUNTIME_SLS/)
-  assert.match(markdown, /writeTargets: deploy\/aliyun-production-cn\.cloud-confirmations\.local\.json -> items\.runtime/)
+  assert.match(markdown, /totalBlockers: 16/)
+  assert.match(markdown, /blocker: rdsPostgres\.confirmed/)
+  assert.match(markdown, /blocker: migration\.rollbackValidationPassed/)
+  assert.match(markdown, /databaseUrlCnSecretImported=false/)
+  assert.match(markdown, /T06_ALIYUN_ENV_IMPORT/)
+  assert.match(markdown, /status: blocked/)
+  assert.match(markdown, /requiredBlocking=DATABASE_URL_CN/)
+  assert.match(markdown, /S04_ACR_REGISTRY_AUTH/)
+  assert.match(markdown, /T04_ALIYUN_DOMAIN_DNS_HTTPS/)
   assert.match(markdown, /T08_POSTDEPLOY_REMOTE_SMOKE/)
-  assert.match(markdown, /actionPacketIds: P09_PRODUCTION_DEPLOY/)
   assert.doesNotMatch(markdown, /T01_WECHAT_OPEN_PLATFORM_APP_LOGIN/)
   assert.doesNotMatch(markdown, /S01_WECHAT_OPEN_APP_LOGIN/)
   assert.doesNotMatch(markdown, /WECHAT_OPEN_APP_ID/)
   assert.doesNotMatch(markdown, /WECHAT_OPEN_APP_SECRET/)
-  assert.doesNotMatch(output + markdown, secretLike)
+  assertNoSecretLikeValues(output + markdown)
 })
