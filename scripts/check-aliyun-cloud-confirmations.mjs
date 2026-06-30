@@ -56,13 +56,33 @@ const DEFINITIONS = [
       "confirmed",
       "provider",
       "region",
+      "appId",
       "appName",
       "containerPort",
       "healthPath",
       "acrImage",
       "imageDigest",
       "imagePullConfigured",
+      "imagePullSecretId",
+      "imagePullSecretName",
+      "imagePullCredentialMode",
+      "startCommand",
       "publicEndpoint",
+      "publicIngress",
+      "publicIngressProtocol",
+      "internetSlbId",
+      "internetIp",
+      "httpHealthUrl",
+      "dnsHttpHealthProbe",
+      "runningInstances",
+      "lastDeployChangeOrderId",
+      "lastDeployPipelineId",
+      "lastBindSlbChangeOrderId",
+      "lastBindSlbPipelineId",
+      "slsConfigured",
+      "slsLogConfigName",
+      "lastSlsDeployChangeOrderId",
+      "lastSlsDeployPipelineId",
       "runtimeRoleName",
       "envSecretSource",
       "logProject",
@@ -104,11 +124,14 @@ const DEFINITIONS = [
       "recordType",
       "recordName",
       "recordValue",
+      "recordId",
       "ingressType",
       "certificateId",
       "certificateEvidence",
       "icpEntity",
       "icpEvidence",
+      "httpProbeUrl",
+      "httpProbeWithResolve",
       "httpsProbeUrl",
       "evidence",
     ],
@@ -137,6 +160,7 @@ const DEFINITIONS = [
       "recordType",
       "recordName",
       "recordValue",
+      "recordId",
       "ingressType",
       "certificateId",
       "certificateEvidence",
@@ -314,6 +338,11 @@ const DEFINITIONS = [
       "dashboardName",
       "notificationChannel",
       "retentionDays",
+      "indexEnabled",
+      "logConfigName",
+      "logType",
+      "logDir",
+      "importedAt",
       "evidence",
     ],
     validate: (item, mode) => {
@@ -1026,12 +1055,16 @@ function buildEnvImportPlan(local) {
   const readySecretBatchIds = values.readySecretBatchIds.length
     ? values.readySecretBatchIds
     : [...EXPECTED_READY_SECRET_BATCH_IDS]
+  const rdsSecretImported = values.rdsSecretImported === true
+  const defaultBlockedSecretBatchIds = rdsSecretImported
+    ? ["BLOCKED_SECRET_BATCH_01_OSS_RAM_STS"]
+    : [...EXPECTED_BLOCKED_SECRET_BATCH_IDS]
   const blockedSecretBatchIds = values.blockedSecretBatchIds.length
     ? values.blockedSecretBatchIds
-    : [...EXPECTED_BLOCKED_SECRET_BATCH_IDS]
+    : (envItem?.ready === true ? [] : defaultBlockedSecretBatchIds)
   const blockedCredentialNames = values.blockedCredentialNames.length
     ? values.blockedCredentialNames
-    : [...EXPECTED_BLOCKED_CREDENTIAL_NAMES]
+    : (rdsSecretImported ? [] : [...EXPECTED_BLOCKED_CREDENTIAL_NAMES])
   const readySecretEnvVariableCount = Number.isFinite(values.readySecretEnvVariableCount) && values.readySecretEnvVariableCount > 0
     ? values.readySecretEnvVariableCount
     : EXPECTED_READY_SECRET_ENV_VARIABLE_COUNT
@@ -1075,30 +1108,47 @@ function buildEnvImportPlan(local) {
       ],
     },
     {
-      id: "blocked_oss_ram_sts_secret_env",
-      title: "Import OSS RAM/STS credentials only after least-privilege access path is confirmed",
+      id: "blocked_oss_runtime_role_or_fallback_secret_env",
+      title: "Confirm SAE RRSA/OIDC runtime role first, or import fallback RAM/STS credentials after least-privilege access is confirmed",
       actionPacketId: "P05_OSS_RAM_STS",
       sensitiveActionId: "S05_OSS_RAM_SECRET_OR_STS",
       recommended: true,
       canUseNow: false,
-      variableNames: ["ALIYUN_OSS_ACCESS_KEY_ID", "ALIYUN_OSS_ACCESS_KEY_SECRET", "ALIYUN_OSS_SECURITY_TOKEN"],
+      variableNames: [
+        "ALIBABA_CLOUD_ROLE_ARN",
+        "ALIBABA_CLOUD_OIDC_PROVIDER_ARN",
+        "ALIBABA_CLOUD_OIDC_TOKEN_FILE",
+        "ALIYUN_OSS_ACCESS_KEY_ID",
+        "ALIYUN_OSS_ACCESS_KEY_SECRET",
+        "ALIYUN_OSS_SECURITY_TOKEN",
+      ],
       blockedCredentialNames: [],
-      optionalVariableNames: ["ALIYUN_OSS_SECURITY_TOKEN"],
-      importTarget: "阿里云 KMS/Secrets Manager/SAE secret env",
+      optionalVariableNames: ["ALIYUN_OSS_ACCESS_KEY_ID", "ALIYUN_OSS_ACCESS_KEY_SECRET", "ALIYUN_OSS_SECURITY_TOKEN"],
+      plainEnvVariableNames: [
+        "ALIBABA_CLOUD_ROLE_ARN",
+        "ALIBABA_CLOUD_OIDC_PROVIDER_ARN",
+        "ALIBABA_CLOUD_OIDC_TOKEN_FILE",
+      ],
+      fallbackSecretEnvVariableNames: ["ALIYUN_OSS_ACCESS_KEY_ID", "ALIYUN_OSS_ACCESS_KEY_SECRET", "ALIYUN_OSS_SECURITY_TOKEN"],
+      preferredCredentialMode: "sae_runtime_role",
+      importTarget: "preferred: SAE RRSA/OIDC runtime env; fallback only: KMS/Secrets Manager/SAE secret env",
       blockers: [
         "oss.confirmed",
         "oss.ramLeastPrivilege",
         "oss.accessMode",
-        "runtime role or STS/RAM path selected",
+        "SAE RRSA/OIDC runtime role or fallback STS/RAM path selected",
       ],
       writeBackFields: [
+        "items.oss.accessMode=sae_runtime_role|sts_assume_role|least_privilege_ram_user_secret_env",
+        "SAE RRSA/OIDC env ALIBABA_CLOUD_ROLE_ARN, ALIBABA_CLOUD_OIDC_PROVIDER_ARN, and ALIBABA_CLOUD_OIDC_TOKEN_FILE when accessMode=sae_runtime_role",
         "items.oss.ramLeastPrivilege=true",
         "items.envImport.ossSecretsImported=true",
         "items.envImport.secretNotInImage=true",
       ],
       requiredEvidence: [
         "OSS bucket and service-record prefix are confirmed",
-        "RAM policy or runtime role is limited to required OSS actions and resource scope",
+        "RAM policy is bound to the SAE RRSA/OIDC runtime role and limited to required OSS actions and resource scope",
+        "sae_runtime_role path uses AssumeRoleWithOIDC and does not require long-lived OSS AccessKeySecret",
         "AccessKeySecret/RAM Secret/STS token values are not written to reports, images, shell history, or git",
       ],
     },
@@ -1149,7 +1199,7 @@ function buildEnvImportPlan(local) {
     importBatchCount,
     recommendedModeIds: [
       "blocked_rds_database_url_secret",
-      "blocked_oss_ram_sts_secret_env",
+      "blocked_oss_runtime_role_or_fallback_secret_env",
       "ready_backend_secret_env_batches",
     ],
     candidates,
@@ -1221,24 +1271,26 @@ function buildOssAccessPlan(local) {
   const candidates = [
     {
       id: "sae_runtime_role",
-      title: "Use an Aliyun runtime role or equivalent SAE identity for OSS signing",
+      title: "Use SAE RRSA/OIDC runtime role for OSS signing",
       preferredOrder: 1,
       recommended: true,
       canUseNow: selectedReady,
       blockers: candidateBlockers,
-      credentialHandling: "no long-lived OSS AccessKeySecret in repository or image; runtime identity evidence only",
+      credentialHandling: "no long-lived OSS AccessKeySecret in repository or image; SAE RRSA/OIDC runtime identity evidence only",
       secretEnvNames: [],
       writeBackFields: [
         "items.oss.accessMode=sae_runtime_role",
-        "items.oss.roleOrUserName=<SAE runtime role or service-linked runtime identity name>",
+        "items.oss.roleOrUserName=<SAE RRSA/OIDC runtime role name>",
         "items.oss.policyName=MeiyeHuajingServiceRecordsOssPolicy",
         "items.oss.secretEnvNames=[]",
         "items.oss.credentialBoundary=runtime_role_no_long_lived_secret",
         "items.oss.ramLeastPrivilege=true",
         "items.oss.confirmed=true",
+        "SAE RRSA/OIDC env ALIBABA_CLOUD_ROLE_ARN, ALIBABA_CLOUD_OIDC_PROVIDER_ARN, and ALIBABA_CLOUD_OIDC_TOKEN_FILE",
       ],
       requiredEvidence: [
-        "RAM policy is bound to the SAE runtime identity or equivalent runtime role",
+        "RAM policy is bound to the SAE RRSA/OIDC runtime role",
+        "SAE runtime exposes ALIBABA_CLOUD_ROLE_ARN, ALIBABA_CLOUD_OIDC_PROVIDER_ARN, and ALIBABA_CLOUD_OIDC_TOKEN_FILE",
         "oss.ramLeastPrivilege=true",
         "non-secret role/policy evidence handle recorded in items.oss.evidence",
       ],
@@ -1411,21 +1463,23 @@ function buildOssExecutionReadiness({
       : "choose_sae_runtime_role_or_sts_then_bind_least_privilege_policy",
     postActionWritebackFields: [
       "items.oss.accessMode=sae_runtime_role|sts_assume_role|least_privilege_ram_user_secret_env",
-      "items.oss.roleOrUserName=<runtime role, RAM role, or dedicated RAM user name>",
+      "items.oss.roleOrUserName=<SAE RRSA/OIDC runtime role, RAM role, or dedicated RAM user name>",
       "items.oss.policyName=MeiyeHuajingServiceRecordsOssPolicy",
       "items.oss.secretEnvNames=[] for sae_runtime_role, or controlled secret env names for STS/RAM fallback",
       "items.oss.credentialBoundary=runtime_role_no_long_lived_secret|sts_token_secret_env_only|access_key_secret_env_only",
+      "SAE RRSA/OIDC env ALIBABA_CLOUD_ROLE_ARN, ALIBABA_CLOUD_OIDC_PROVIDER_ARN, and ALIBABA_CLOUD_OIDC_TOKEN_FILE when accessMode=sae_runtime_role",
       "items.oss.ramLeastPrivilege=true",
       "items.oss.confirmed=true",
       "items.oss.evidence=<non-secret role/policy/binding evidence handle>",
     ],
     verificationCommands: [
+      "corepack pnpm aliyun:oss:runtime-access:strict",
       "corepack pnpm aliyun:cloud:confirmations:backend:strict",
       "corepack pnpm aliyun:sensitive:blockers:backend",
       "corepack pnpm aliyun:backend-cn:status",
     ],
     safetyBoundary: [
-      "Prefer sae_runtime_role so no long-lived OSS AccessKeySecret is needed.",
+      "Prefer SAE RRSA/OIDC runtime role so no long-lived OSS AccessKeySecret is needed.",
       "Use STS or dedicated RAM user only as fallback, and put secret values only into KMS/Secrets Manager/SAE secret env.",
       "Record only role/user names, policy name, allowed actions, resource scope, booleans, and non-secret evidence handles.",
       "Never write AccessKeySecret, RAM Secret, STS token, cookies, AppSecret, registry password, or Supabase service role key.",
