@@ -25,8 +25,8 @@ test("APP production-cn checklist records current blockers without secret values
     "ready 0/11",
     "ready 0/7",
     "Android release signing",
-    "required `17/27`",
-    "本机 full APP required env 现在是 `24/27` ready",
+    "required `15/25`",
+    "本机 full APP required env 现在是 `22/25` ready",
     "当前阿里云后端-only 口径只把 `DATABASE_URL_CN` 作为后端必填阻塞",
     "后端必填阻塞是",
     "APP 发布阻塞但非后端必填",
@@ -35,8 +35,9 @@ test("APP production-cn checklist records current blockers without secret values
     "移动 App 未创建",
     "meiye-huajing-app-api-production-cn",
     "runtime.confirmed=false",
-    "CNY 117.00",
-    "¥117.00",
+    "OSS AccessKey 不再是硬必填",
+    "ALIYUN_OSS_RAM_ROLE_NAME",
+    "AccessKey/STS 仅作为 fallback secret env",
     "secretNotInImage=true",
     "受控标识符",
     "Apple Team ID 是 Apple Developer 受控标识符，不是密钥",
@@ -79,15 +80,16 @@ test("APP production-cn checklist records current blockers without secret values
   assert.doesNotMatch(doc, /AccessKeySecret\s*[:=]\s*["'][^"']+["']/)
 })
 
-test("APP production-cn release manifest keeps Vercel coverage aligned with required env count", () => {
-  const manifest = read("docs", "release-manifest-2026-06-21-app-aliyun-production-cn-bridge.md")
+test("APP production-cn checklist keeps Vercel coverage aligned with required env count", () => {
+  const doc = read("docs", "app-production-cn-env-checklist.md")
 
-  assert.match(manifest, /required APP production-cn variables covered by Vercel production: 17 \/ 27/)
-  assert.match(manifest, /缺失的 10 个必填项/)
-  assert.match(manifest, /`api-cn`\/`assets-cn` 域名变量/)
-  assert.match(manifest, /required missing in Vercel production:[\s\S]*APP_ASSET_BASE_URL/)
-  assert.doesNotMatch(manifest, /required APP production-cn variables covered by Vercel production: 17 \/ 25/)
-  assert.doesNotMatch(manifest, /缺失的 8 个必填项/)
+  assert.match(doc, /required `15\/25` 已存在/)
+  assert.match(doc, /本机 full APP required env 现在是 `22\/25` ready/)
+  assert.match(doc, /OSS AccessKey 不再是硬必填/)
+  assert.match(doc, /ALIYUN_OSS_RAM_ROLE_NAME/)
+  assert.match(doc, /AccessKey\/STS 仅作为 fallback secret env/)
+  assert.doesNotMatch(doc, /required `17\/25` 已存在/)
+  assert.doesNotMatch(doc, /required `17\/27` 已存在/)
 })
 
 test("APP production-cn release manifest separates historical snapshots from current gate counts", () => {

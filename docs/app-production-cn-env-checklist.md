@@ -8,7 +8,7 @@
 
 2026-06-22 17:31 CST 复核：现在仍不能部署。`corepack pnpm aliyun:user:actions` 当前为 `ready 0/9`，`corepack pnpm aliyun:resources:matrix` 当前为阿里云资源 `ready 0/7`。本机和 Vercel 可确认的是：本地后端容器镜像存在，APP API 桥接路由和本地 smoke 通过，Vercel production 只能提供旧后端变量名来源；阿里云 production-cn 仍缺云侧资源确认、密钥导入和移动 App 登录凭证。
 
-2026-06-24 CST 复核：现在仍不能部署。`corepack pnpm aliyun:user:actions` 当前为 `ready 0/11`，新增阻塞项是正式阿里云 RDS PostgreSQL 数据层迁移、Android release signing 与微信开放平台 Android 应用签名；`corepack pnpm aliyun:resources:matrix` 当前仍为阿里云资源 `ready 0/7`。本机 full APP required env 现在是 `24/27` ready，缺 `DATABASE_URL_CN` / `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；当前阿里云后端-only 口径只把 `DATABASE_URL_CN` 作为后端必填阻塞，`WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET` 已延期到后端上线后的 APP 发布/微信移动应用阶段。当前严格只读盘点未就绪，`cloudInventoryResultsReady=false`、`readyLocalOperations=0/9`，云资源侧仍缺 SAE、ACR、api-cn/assets-cn DNS/HTTPS/ICP、OSS RAM/STS、环境变量导入和 SLS 告警的最终确认。
+2026-06-24 CST 复核：现在仍不能部署。`corepack pnpm aliyun:user:actions` 当前为 `ready 0/11`，新增阻塞项是正式阿里云 RDS PostgreSQL 数据层迁移、Android release signing 与微信开放平台 Android 应用签名；`corepack pnpm aliyun:resources:matrix` 当前仍为阿里云资源 `ready 0/7`。本机 full APP required env 现在是 `22/25` ready，缺 `DATABASE_URL_CN` / `WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET`；当前阿里云后端-only 口径只把 `DATABASE_URL_CN` 作为后端必填阻塞，`WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET` 已延期到后端上线后的 APP 发布/微信移动应用阶段。OSS AccessKey 不再是硬必填：首选 SAE runtime role，并把非密钥 `ALIYUN_OSS_RAM_ROLE_NAME` 写入 SAE plain env；AccessKey/STS 仅作为 fallback secret env。当前严格只读盘点未就绪，`cloudInventoryResultsReady=false`、`readyLocalOperations=0/9`，云资源侧仍缺 SAE、ACR、api-cn/assets-cn DNS/HTTPS/ICP、OSS RAM/STS、环境变量导入和 SLS 告警的最终确认。
 
 2026-06-22 20:37 CST 复核：本机已通过 Homebrew 安装阿里云 CLI，`aliyun version` 为 `3.3.23`，路径为 `/opt/homebrew/bin/aliyun`。`corepack pnpm aliyun:cloud:access` 当前不再报 `aliyun_cli_missing`，但仍报 `aliyun_cli_config_missing_or_unread` 与 `cloudshell_cli_config_missing_or_unread`；脚本未读取任何配置文件内容、未调用云 API、未创建或修改阿里云资源。该状态只表示本机具备后续只读 inventory 的 CLI 前置工具，不表示阿里云资源 ready。
 
@@ -20,9 +20,9 @@
 
 2026-06-25 数据层补充：当前 strict inventory 不完整，不能再把旧快照中的 RDS PostgreSQL / Redis/Tair 数量当作当前事实。按正式全阿里云 production-cn 口径，`DATABASE_URL_CN` 仍是必填阻塞项；首版 APP 业务数据访问代码侧已经切到 APP-native RDS repository，但还必须先生成并核对 `docs/app-production-cn-rds-migration-package.md`，配套 RDS PostgreSQL 实例、数据库账号、secret env 导入、`compatibilityReviewChecklist` 6 类 Supabase SQL 兼容审查、schema/data 迁移、APP API smoke 和回滚验收。Supabase 只能作为迁移来源或旧链路兼容。`REDIS_URL_CN` 仍可按实际队列/缓存依赖后置。
 
-当前 Vercel production 只读覆盖检查 `corepack pnpm aliyun:vercel-env:coverage` 显示 required `17/27` 已存在，缺 `APP_ENV`、`APP_REGION`、`APP_API_BASE_URL`、`APP_ASSET_BASE_URL`、`NEXT_PUBLIC_SITE_URL`、`PRIVACY_POLICY_URL`、`TERMS_URL`、`DATABASE_URL_CN`、`WECHAT_OPEN_APP_ID`、`WECHAT_OPEN_APP_SECRET`。前 7 个是国内 APP/阿里云运行配置；`DATABASE_URL_CN` 必须来自阿里云 RDS PostgreSQL 和迁移验收；后 2 个必须等微信开放平台移动应用创建并审核通过后获得。
+当前 Vercel production 只读覆盖检查 `corepack pnpm aliyun:vercel-env:coverage` 显示 required `15/25` 已存在，缺 `APP_ENV`、`APP_REGION`、`APP_API_BASE_URL`、`APP_ASSET_BASE_URL`、`NEXT_PUBLIC_SITE_URL`、`PRIVACY_POLICY_URL`、`TERMS_URL`、`DATABASE_URL_CN`、`WECHAT_OPEN_APP_ID`、`WECHAT_OPEN_APP_SECRET`。前 7 个是国内 APP/阿里云运行配置；`DATABASE_URL_CN` 必须来自阿里云 RDS PostgreSQL 和迁移验收；后 2 个必须等微信开放平台移动应用创建并审核通过后获得。
 
-当前 `/tmp/meiye-aliyun-env-import-checklist.md` 由 `corepack pnpm aliyun:env:checklist` 生成，包含 63 个变量的导入目标和来源说明，不包含真实 value。当前本机 full APP required env 是 `24/27` ready；当前阿里云后端-only 的后端必填阻塞是 `DATABASE_URL_CN`，`WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET` / `APPLE_TEAM_ID` 会出现在“APP 发布阻塞但非后端必填”分组，用于微信移动应用登录与 iOS Universal Link / AASA 验收。上述状态不等于云侧环境变量已经导入阿里云。
+当前 `/tmp/meiye-aliyun-env-import-checklist.md` 由 `corepack pnpm aliyun:env:checklist` 生成，包含 64 个变量的导入目标和来源说明，不包含真实 value。当前本机 full APP required env 是 `22/25` ready；当前阿里云后端-only 的后端必填阻塞是 `DATABASE_URL_CN`，`WECHAT_OPEN_APP_ID` / `WECHAT_OPEN_APP_SECRET` / `APPLE_TEAM_ID` 会出现在“APP 发布阻塞但非后端必填”分组，用于微信移动应用登录与 iOS Universal Link / AASA 验收。上述状态不等于云侧环境变量已经导入阿里云。
 
 ## 微信登录
 
@@ -75,9 +75,10 @@
 
 | 变量 | 获取位置 | 导入位置 | 密钥 | 备注 |
 | --- | --- | --- | --- | --- |
-| `ALIYUN_OSS_ACCESS_KEY_ID` | 阿里云 RAM 最小权限用户或角色 | 阿里云 SAE secret/KMS/Secrets Manager | 是 | 不写入镜像或 git |
-| `ALIYUN_OSS_ACCESS_KEY_SECRET` | 阿里云 RAM 最小权限用户或角色 | 阿里云 SAE secret/KMS/Secrets Manager | 是 | 不写入镜像或 git |
-| `ALIYUN_OSS_SECURITY_TOKEN` | 阿里云 RAM/STS 临时凭证或 SAE 运行时角色链路 | 阿里云 SAE secret/KMS/Secrets Manager | 是 | 可选；后端已支持 STS token 表单上传和签名下载，长期 AccessKey 模式可留空 |
+| `ALIYUN_OSS_RAM_ROLE_NAME` | SAE runtime role / instance metadata | 阿里云 SAE plain env | 否 | 首选 OSS 访问路径；非密钥运行时角色名，不写入 secret store |
+| `ALIYUN_OSS_ACCESS_KEY_ID` | 阿里云 RAM 最小权限用户或 STS fallback | 阿里云 SAE secret/KMS/Secrets Manager | 是 | fallback secret env；SAE runtime role 可用时留空，不写入镜像或 git |
+| `ALIYUN_OSS_ACCESS_KEY_SECRET` | 阿里云 RAM 最小权限用户 fallback | 阿里云 SAE secret/KMS/Secrets Manager | 是 | fallback secret env；SAE runtime role 可用时留空，不写入镜像或 git |
+| `ALIYUN_OSS_SECURITY_TOKEN` | 阿里云 RAM/STS 临时凭证 fallback | 阿里云 SAE secret/KMS/Secrets Manager | 是 | fallback secret env；后端已支持 STS token 表单上传和签名下载，长期 AccessKey 模式可留空 |
 | `DASHSCOPE_API_KEY` | 阿里云百炼/Model Studio 控制台 | 阿里云 SAE secret/KMS/Secrets Manager | 是 | 服务记录 ASR/LLM 相关 |
 | `VOLC_SPEECH_APP_ID` | 火山引擎 OpenSpeech 控制台 | 阿里云 SAE secret/KMS/Secrets Manager | 是 | 语音能力保留字节链路时需要 |
 | `VOLC_SPEECH_ACCESS_TOKEN` | 火山引擎 OpenSpeech 控制台 | 阿里云 SAE secret/KMS/Secrets Manager | 是 | 不写入 App 包 |
