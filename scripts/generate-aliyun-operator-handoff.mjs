@@ -14,6 +14,8 @@ const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
 const DEFAULT_CLOUD_INVENTORY_RESULTS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-inventory-results.local.json")
 const DEFAULT_RDS_MIGRATION_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.rds-migration.local.json")
+const DEFAULT_IMAGE_PUBLISH_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.image-publish.local.json")
+const DEFAULT_CHILD_TIMEOUT_MS = 120_000
 const APP_LAUNCH_BLOCKING_VARIABLE_NAMES = new Set(["APPLE_TEAM_ID"])
 const APP_LAUNCH_DEFERRED_VARIABLE_NAMES = new Set([
   "APPLE_TEAM_ID",
@@ -51,11 +53,13 @@ function parseArgs(argv) {
     cloudConfirmationsFile: DEFAULT_CLOUD_CONFIRMATIONS_FILE,
     cloudInventoryResultsFile: DEFAULT_CLOUD_INVENTORY_RESULTS_FILE,
     rdsMigrationFile: DEFAULT_RDS_MIGRATION_FILE,
+    imagePublishFile: DEFAULT_IMAGE_PUBLISH_FILE,
     outPath: "",
     markdownPath: "",
     skipVercelEnvCoverage: false,
     vercelEnvCoverageInput: "",
     backendOnly: false,
+    childTimeoutMs: DEFAULT_CHILD_TIMEOUT_MS,
   }
 
   for (let index = 2; index < argv.length; index += 1) {
@@ -77,6 +81,10 @@ function parseArgs(argv) {
       args.rdsMigrationFile = resolveValue(argv[++index], "--rds-migration")
       continue
     }
+    if (arg === "--image-publish") {
+      args.imagePublishFile = resolveValue(argv[++index], "--image-publish")
+      continue
+    }
     if (arg === "--out") {
       args.outPath = resolveValue(argv[++index], "--out")
       continue
@@ -91,6 +99,10 @@ function parseArgs(argv) {
     }
     if (arg === "--backend-only") {
       args.backendOnly = true
+      continue
+    }
+    if (arg === "--child-timeout-ms") {
+      args.childTimeoutMs = parsePositiveInteger(argv[++index], "--child-timeout-ms")
       continue
     }
     if (arg === "--vercel-env-coverage-input") {
@@ -112,15 +124,30 @@ function resolveValue(value, name) {
   return isAbsolute(value) ? value : resolve(process.cwd(), value)
 }
 
-function runJson(label, scriptArgs) {
+function parsePositiveInteger(value, name) {
+  const parsed = Number.parseInt(value, 10)
+  if (!Number.isFinite(parsed) || parsed <= 0) throw new Error(`invalid_positive_integer:${name}`)
+  return parsed
+}
+
+function summarizeChildOutput(value) {
+  return String(value || "").split(/\r?\n/).filter(Boolean).slice(0, 8).join(" | ")
+}
+
+function runJson(label, scriptArgs, args) {
   const result = spawnSync(process.execPath, scriptArgs, {
     cwd: BACKEND_ROOT,
     encoding: "utf8",
     maxBuffer: 1024 * 1024 * 30,
+    timeout: args.childTimeoutMs,
   })
-  if (result.error) throw result.error
+  if (result.error) {
+    const code = result.error.code || "spawn_error"
+    const summary = summarizeChildOutput(result.stderr || result.stdout)
+    throw new Error(`${label}_failed:${code}${summary ? `\n${summary}` : ""}`)
+  }
   if (result.status !== 0) {
-    throw new Error(`${label}_failed:${result.status}\n${result.stderr || result.stdout}`)
+    throw new Error(`${label}_failed:${result.status}\n${summarizeChildOutput(result.stderr || result.stdout)}`)
   }
   try {
     return JSON.parse(result.stdout)
@@ -129,24 +156,25 @@ function runJson(label, scriptArgs) {
   }
 }
 
-function runJsonAllowFailure(label, scriptArgs) {
+function runJsonAllowFailure(label, scriptArgs, args) {
   const result = spawnSync(process.execPath, scriptArgs, {
     cwd: BACKEND_ROOT,
     encoding: "utf8",
     maxBuffer: 1024 * 1024 * 30,
+    timeout: args.childTimeoutMs,
   })
   if (result.error) {
     return {
       ok: false,
       report: null,
-      error: result.error.message,
+      error: `${result.error.code || "spawn_error"}:${result.error.message}`,
     }
   }
   if (result.status !== 0) {
     return {
       ok: false,
       report: null,
-      error: (result.stderr || result.stdout || `exit ${result.status}`).split(/\r?\n/).slice(0, 8).join(" | "),
+      error: summarizeChildOutput(result.stderr || result.stdout || `exit ${result.status}`),
     }
   }
   try {
@@ -179,7 +207,7 @@ function runVercelEnvCoverage(args) {
   }
   return {
     skipped: false,
-    ...runJsonAllowFailure("vercel_env_coverage", scriptArgs),
+    ...runJsonAllowFailure("vercel_env_coverage", scriptArgs, args),
   }
 }
 
@@ -489,6 +517,7 @@ function buildHandoff({
   resourcesMatrix,
   userActionBrief,
   vercelEnvCoverage,
+  childCommandFailures = [],
 }) {
   const tasks = operatorTasks.tasks || []
   const aliyunConsoleTaskOrder = buildAliyunConsoleTaskOrder(consoleRunbook, {
@@ -514,6 +543,13 @@ function buildHandoff({
     generatedAt: new Date().toISOString(),
     currentScope: args.backendOnly ? "backend_aliyun_only" : "full_app_launch",
     containsValues: false,
+    childCommands: {
+      timeoutMs: args.childTimeoutMs,
+      timeoutEnforced: true,
+      failureMode: "fail_closed_no_cloud_mutation",
+      failures: childCommandFailures,
+      note: "Child handoff checks are bounded; timed-out children fail this local handoff instead of creating or modifying cloud resources.",
+    },
     canDeployNow: status.canDeployNow === true,
     verdict: status.verdict,
     currentAnswer: status.canDeployNow === true
@@ -532,7 +568,8 @@ function buildHandoff({
       cloudInventoryResultsFileExists: existsSync(args.cloudInventoryResultsFile),
       rdsMigrationFile: args.rdsMigrationFile,
       rdsMigrationFileExists: existsSync(args.rdsMigrationFile),
-      imagePublishLocalFile: resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.image-publish.local.json"),
+      imagePublishLocalFile: args.imagePublishFile,
+      imagePublishLocalFileExists: existsSync(args.imagePublishFile),
     },
     localReady: {
       appApiBridgeMap: status.localReadiness?.backendBridgeMap?.ok === true,
@@ -1641,79 +1678,669 @@ function writeOutput(filePath, content) {
   writeFileSync(filePath, content, { mode: 0o600 })
 }
 
-function main() {
-  const args = parseArgs(process.argv)
-  const envPlan = buildImportPlan(parseEnvFile(args.envFile))
-  const backendOnlyArgs = args.backendOnly ? ["--backend-only"] : []
-  const status = runJson("status", [
-    resolve(BACKEND_ROOT, "scripts/summarize-aliyun-production-cn-status.mjs"),
-    "--env-file",
-    args.envFile,
-    "--cloud-confirmations",
-    args.cloudConfirmationsFile,
-    "--cloud-inventory-results",
+const BACKEND_ONLY_CAN_START_PACKET_IDS = Object.freeze([
+  "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
+  "P11_ALIYUN_RDS_DATA_MIGRATION",
+  "P05_OSS_RAM_STS",
+  "P04_ACR_IMAGE_AND_PULL",
+])
+
+const BACKEND_ONLY_RESOURCE_EVIDENCE_IDS = Object.freeze([
+  "R01_SAE_RUNTIME",
+  "R02_ACR_IMAGE_REGISTRY",
+  "R03_API_DOMAIN_HTTPS",
+  "R04_ASSET_DOMAIN_HTTPS",
+  "R05_OSS_AUDIO_STORAGE",
+  "R06_ENV_IMPORT",
+  "R07_SLS_ALERTS",
+])
+
+const BACKEND_ONLY_READY_SECRET_ENV_VARIABLE_NAMES = Object.freeze([
+  "ADMIN_USER_IDS",
+  "ALIYUN_OSS_ACCESS_KEY_ID",
+  "ALIYUN_OSS_ACCESS_KEY_SECRET",
+  "APIMART_API_KEY",
+  "CREDITS_IP_SALT",
+  "DASHSCOPE_API_KEY",
+  "DEEPSEEK_API_KEY",
+  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+  "NEXT_PUBLIC_SUPABASE_URL",
+  "SERVICE_RECORD_DEEPSEEK_API_KEY",
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "VOLC_SPEECH_ACCESS_TOKEN",
+  "VOLC_SPEECH_APP_ID",
+  "VOLC_SPEECH_SECRET_KEY",
+  "WECHAT_LOGIN_SECRET",
+  "WECHAT_MINI_APPID",
+  "WECHAT_MINI_SECRET",
+])
+
+function buildBackendOnlyActionTimeAuthorizationRequest() {
+  return {
+    required: true,
+    currentScope: "backend_aliyun_only",
+    packetIds: [...BACKEND_ONLY_CAN_START_PACKET_IDS],
+    recommendedUserReply: "授权本轮只做阿里云后端第一批动作：只读盘点、创建/确认 RDS PostgreSQL 并处理数据库密码、确认 OSS RAM/STS/SAE RRSA/OIDC runtime role；ACR 购买证据已确认，镜像推送/SAE 拉取配置需另按 P04 动作时确认；DATABASE_URL_CN 和 fallback AccessKey/STS 只进入阿里云 KMS/Secrets Manager/SAE secret env，RRSA/OIDC 角色 ARN、Provider ARN 和 token 文件路径只作为运行时非密钥配置；不写文档/代码/git；不做微信/Android/iOS、不部署上线、不改 DNS。",
+    valueHandling: [
+      "只输出变量名、资源名、布尔状态和非密钥 evidence handle。",
+      "DATABASE_URL_CN、数据库密码、fallback AccessKeySecret、registry password、STS token 和 Supabase service role key 只能进入阿里云 secret env 或受控运行时。",
+    ],
+    explicitlyExcluded: [
+      "不做微信/Android/iOS。",
+      "不执行 production-cn 部署。",
+      "不修改 DNS/HTTPS/ICP。",
+      "不执行 git push、微信上传或应用市场发布。",
+    ],
+  }
+}
+
+function buildBackendOnlySensitiveBlockersFromEnvPlan(envPlan) {
+  const blockedCredentialNames = envPlan.summary.requiredBlocking.includes("DATABASE_URL_CN")
+    ? ["DATABASE_URL_CN"]
+    : []
+  const readySecretEnvVariableNames = BACKEND_ONLY_READY_SECRET_ENV_VARIABLE_NAMES
+    .filter((name) => variableByName(envPlan.variables, name)?.status === "ready")
+  const credentialInterventionBrief = {
+    canCodexProceedWithoutUser: blockedCredentialNames.length === 0,
+    blockedCredentialCount: blockedCredentialNames.length,
+    blockedCredentialNames,
+    readySecretEnvVariableCount: readySecretEnvVariableNames.length,
+    readySecretEnvVariableNames,
+    actionTimeConfirmationRequiredIds: [
+      "S04_ACR_REGISTRY_AUTH",
+      "S05_OSS_RAM_SECRET_OR_STS",
+      "S08_ALIYUN_RDS_DATABASE_URL",
+      "S06_READY_SENSITIVE_ENV_IMPORT",
+    ],
+    groups: [
+      {
+        category: "rds_database_secret_and_migration",
+        actionId: "S08_ALIYUN_RDS_DATABASE_URL",
+        status: "blocked",
+        blockedCredentialNames,
+        readySecretEnvVariableNames: [],
+        obtainFrom: "阿里云控制台 -> RDS PostgreSQL -> 实例/数据库/账号/连接信息；SAE/KMS/Secrets Manager -> secret env",
+        writeTargets: [
+          "DATABASE_URL_CN -> 阿里云 KMS/Secrets Manager/SAE secret env only",
+          "deploy/aliyun-production-cn.rds-migration.local.json -> rdsPostgres / migration non-secret evidence",
+        ],
+        verifyCommands: [
+          "corepack pnpm aliyun:rds:migration:evidence:strict",
+          "corepack pnpm aliyun:backend-cn:status",
+        ],
+      },
+      {
+        category: "oss_ram_sts",
+        actionId: "S05_OSS_RAM_SECRET_OR_STS",
+        status: "blocked",
+        blockedCredentialNames: [],
+        readySecretEnvVariableNames: readySecretEnvVariableNames.filter((name) =>
+          name === "ALIYUN_OSS_ACCESS_KEY_ID" || name === "ALIYUN_OSS_ACCESS_KEY_SECRET"
+        ),
+        obtainFrom: "阿里云控制台 -> RAM 访问控制 / OSS Bucket / SAE 运行时角色或环境变量",
+        writeTargets: [
+          "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss",
+          "SAE RRSA/OIDC env ALIBABA_CLOUD_ROLE_ARN / ALIBABA_CLOUD_OIDC_PROVIDER_ARN / ALIBABA_CLOUD_OIDC_TOKEN_FILE when accessMode=sae_runtime_role",
+          "fallback only: ALIYUN_OSS_ACCESS_KEY_ID / ALIYUN_OSS_ACCESS_KEY_SECRET / ALIYUN_OSS_SECURITY_TOKEN -> KMS/Secrets Manager/SAE secret env",
+        ],
+        verifyCommands: [
+          "corepack pnpm aliyun:oss:runtime-access:strict",
+          "corepack pnpm aliyun:cloud:confirmations:backend:strict",
+        ],
+      },
+      {
+        category: "ready_secret_env_import",
+        actionId: "S06_READY_SENSITIVE_ENV_IMPORT",
+        status: "blocked",
+        blockedCredentialNames: [],
+        readySecretEnvVariableNames,
+        obtainFrom: "现有 Vercel production / Supabase / 阿里云百炼 / DeepSeek / 火山引擎 / 微信公众平台等控制台",
+        writeTargets: ["deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport"],
+        verifyCommands: ["corepack pnpm aliyun:env:handoff:backend"],
+      },
+    ],
+    valueHandlingRules: [
+      "blockedVariableNames 只说明还缺哪些变量名，不包含 value。",
+      "readySecretEnvVariableNames 表示本机已有 ready 状态但仍只能通过 KMS/Secrets Manager/SAE secret env 导入。",
+      "AppSecret、AccessKeySecret、registry password、RAM Secret、STS token、keystore password 和 Supabase service role key 不能写入 JSON、Markdown、Docker 镜像或 git。",
+    ],
+  }
+  return {
+    ok: true,
+    currentScope: "backend_aliyun_only",
+    backendOnly: true,
+    containsValues: false,
+    readOnlyOnly: true,
+    summary: {
+      credentialInterventionBrief,
+      blockedIds: credentialInterventionBrief.actionTimeConfirmationRequiredIds,
+    },
+    credentialInterventionBrief,
+  }
+}
+
+function buildBackendOnlyCloudAccessStub() {
+  const forbidden = [
+    "AccessKeySecret",
+    "AppSecret",
+    "registry password",
+    "RAM Secret",
+    "STS token",
+    "cookie",
+    "证书私钥",
+    "Supabase service role key",
+  ]
+  return {
+    readOnlyOnly: true,
+    cloudApiCalled: false,
+    cloudMutationPerformed: false,
+    canReadCloudNow: false,
+    cli: {},
+    blockers: ["backend_only_handoff_uses_local_evidence_reports"],
+    consoleEvidenceChecklist: [
+      {
+        id: "runtime",
+        title: "SAE runtime",
+        consolePath: "阿里云控制台 -> SAE -> meiye-huajing-app-api-production-cn",
+        writeTo: "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.runtime",
+        forbidden,
+      },
+      {
+        id: "apiDomainHttps",
+        title: "api-cn DNS/HTTPS/ICP",
+        consolePath: "阿里云控制台 -> 云解析 DNS / SAE 自定义域名 / SSL / ICP",
+        writeTo: "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps",
+        forbidden,
+      },
+      {
+        id: "assetDomainHttps",
+        title: "assets-cn DNS/HTTPS/ICP",
+        consolePath: "阿里云控制台 -> 云解析 DNS / CDN 或 OSS 域名 / SSL / ICP",
+        writeTo: "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps",
+        forbidden,
+      },
+      {
+        id: "oss",
+        title: "OSS/RAM/STS",
+        consolePath: "阿里云控制台 -> OSS / RAM / STS / SAE runtime role",
+        writeTo: "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss",
+        forbidden,
+      },
+      {
+        id: "envImport",
+        title: "SAE/KMS/Secrets Manager env import",
+        consolePath: "阿里云控制台 -> SAE 环境变量 / KMS / Secrets Manager",
+        writeTo: "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport",
+        forbidden,
+      },
+      {
+        id: "slsAlerts",
+        title: "SLS alerts",
+        consolePath: "阿里云控制台 -> 日志服务 SLS / 告警",
+        writeTo: "deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.slsAlerts",
+        forbidden,
+      },
+      {
+        id: "imagePublish",
+        title: "ACR image publish",
+        consolePath: "阿里云控制台 -> 容器镜像服务 ACR / SAE 镜像部署",
+        writeTo: "deploy/aliyun-production-cn.image-publish.local.json -> acr + runtime",
+        forbidden,
+      },
+    ],
+    localBrowserProbe: {
+      checked: false,
+      cloudApiCalled: false,
+      cloudMutationPerformed: false,
+      blockers: ["not_used_in_backend_only_background_handoff"],
+    },
+  }
+}
+
+function buildBackendOnlyResourceMatrixStub({ cloudConfirmationsCheck, imagePublishPlan }) {
+  const itemStatus = cloudConfirmationsCheck.local?.itemStatus || {}
+  const imageBlockers = imagePublishPlan.local?.blockers || []
+  const rows = [
+    resourceEvidenceRow({
+      id: "R01_SAE_RUNTIME",
+      observedStatus: "not_confirmed",
+      observedReadiness: "blocked",
+      packets: ["P08_SAE_RUNTIME_SLS"],
+      consoleTaskIds: ["C01_SAE_RUNTIME"],
+      currentEvidence: ["runtime.confirmed=false"],
+      missingEvidence: (itemStatus.runtime?.blockers || ["confirmed"]).map((item) => `runtime:${item}`),
+      writeTargets: ["deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.runtime"],
+    }),
+    resourceEvidenceRow({
+      id: "R02_ACR_IMAGE_REGISTRY",
+      observedStatus: imagePublishPlan.local?.acr?.purchaseCandidate?.confirmed === true
+        ? "acr_repository_confirmed_image_push_pending"
+        : "acr_registry_not_confirmed",
+      observedReadiness: "partial",
+      packets: ["P04_ACR_IMAGE_AND_PULL"],
+      consoleTaskIds: ["C02_ACR_IMAGE_AND_PULL"],
+      currentEvidence: [
+        imagePublishPlan.local?.acr?.purchaseCandidate?.confirmed === true
+          ? "acr.purchaseCandidate.confirmed=true"
+          : "acr.purchaseCandidate.confirmed=false",
+        `image.localDigestReady=${imagePublishPlan.local?.image?.localDigestReady === true}`,
+      ],
+      missingEvidence: imageBlockers.map((item) => `imagePublishLocal:${item}`),
+      writeTargets: ["deploy/aliyun-production-cn.image-publish.local.json -> acr + runtime"],
+    }),
+    resourceEvidenceRow({
+      id: "R03_API_DOMAIN_HTTPS",
+      observedStatus: "not_confirmed",
+      observedReadiness: "blocked",
+      packets: ["P07_DOMAIN_DNS_HTTPS"],
+      consoleTaskIds: ["C03_API_DOMAIN_HTTPS_ICP"],
+      currentEvidence: ["apiDomainHttps.confirmed=false"],
+      missingEvidence: (itemStatus.apiDomainHttps?.blockers || ["confirmed"]).map((item) => `apiDomainHttps:${item}`),
+      writeTargets: ["deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps"],
+    }),
+    resourceEvidenceRow({
+      id: "R04_ASSET_DOMAIN_HTTPS",
+      observedStatus: "not_confirmed",
+      observedReadiness: "blocked",
+      packets: ["P07_DOMAIN_DNS_HTTPS"],
+      consoleTaskIds: ["C04_ASSET_DOMAIN_HTTPS_ICP"],
+      currentEvidence: ["assetDomainHttps.confirmed=false"],
+      missingEvidence: (itemStatus.assetDomainHttps?.blockers || ["confirmed"]).map((item) => `assetDomainHttps:${item}`),
+      writeTargets: ["deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps"],
+    }),
+    resourceEvidenceRow({
+      id: "R05_OSS_AUDIO_STORAGE",
+      observedStatus: "bucket_visible_unconfirmed",
+      observedReadiness: "partial",
+      packets: ["P05_OSS_RAM_STS"],
+      consoleTaskIds: ["C05_OSS_AUDIO_RAM_STS"],
+      currentEvidence: ["bucket_exists_or_local_evidence_present", "serviceRecordPrefix=service-records/production-cn"],
+      missingEvidence: (itemStatus.oss?.blockers || ["confirmed", "ramLeastPrivilege"]).map((item) => `oss:${item}`),
+      writeTargets: ["deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.oss"],
+    }),
+    resourceEvidenceRow({
+      id: "R06_ENV_IMPORT",
+      observedStatus: "pending_env_import_confirmation",
+      observedReadiness: "blocked",
+      packets: ["P06_ENV_IMPORT"],
+      consoleTaskIds: ["C06_ENV_IMPORT"],
+      currentEvidence: ["envImport.blockedCredentialNames=DATABASE_URL_CN"],
+      missingEvidence: [
+        "missing_required_env:DATABASE_URL_CN",
+        ...(itemStatus.envImport?.blockers || ["confirmed", "secretNotInImage"]).map((item) => `envImport:${item}`),
+      ],
+      writeTargets: ["deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.envImport"],
+    }),
+    resourceEvidenceRow({
+      id: "R07_SLS_ALERTS",
+      observedStatus: "project_logstore_visible_alerts_pending",
+      observedReadiness: "partial",
+      packets: ["P08_SAE_RUNTIME_SLS"],
+      consoleTaskIds: ["C07_SLS_ALERTS"],
+      currentEvidence: ["project_meiye-huajing-app-prod-cn_logstore_app-api"],
+      missingEvidence: (itemStatus.slsAlerts?.blockers || ["confirmed"]).map((item) => `slsAlerts:${item}`),
+      writeTargets: ["deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.slsAlerts"],
+    }),
+  ]
+  return {
+    summary: {
+      resourceEvidenceReady: `0/${BACKEND_ONLY_RESOURCE_EVIDENCE_IDS.length}`,
+      blockedResourceEvidenceIds: [...BACKEND_ONLY_RESOURCE_EVIDENCE_IDS],
+    },
+    resourceEvidenceBrief: {
+      ready: 0,
+      total: BACKEND_ONLY_RESOURCE_EVIDENCE_IDS.length,
+      blockedIds: [...BACKEND_ONLY_RESOURCE_EVIDENCE_IDS],
+      blockedResourceEvidence: rows,
+      valueHandlingRules: [
+        "只记录资源名、布尔值、时间戳、控制台路径和非密钥 evidence handle。",
+      ],
+    },
+  }
+}
+
+function resourceEvidenceRow({
+  id,
+  observedStatus,
+  observedReadiness,
+  packets,
+  consoleTaskIds,
+  currentEvidence,
+  missingEvidence,
+  writeTargets,
+}) {
+  return {
+    id,
+    status: "blocked",
+    observedStatus,
+    observedReadiness,
+    requiredAuthorizationPackets: packets,
+    consoleTaskIds,
+    currentEvidence,
+    missingEvidence,
+    writeTargets,
+    verifyCommands: [],
+    nextEvidenceAction: "补齐对应阿里云后端非密钥证据后重新运行 backend-only handoff。",
+  }
+}
+
+function buildBackendOnlyStatusForHandoff({
+  cloudInventoryResults,
+  cloudConfirmationsCheck,
+  imagePublishPlan,
+  rdsMigrationEvidence,
+}) {
+  const itemStatus = cloudConfirmationsCheck.local?.itemStatus || {}
+  const blockers = new Set()
+  if (rdsMigrationEvidence.local?.ready !== true) {
+    blockers.add("DATABASE_URL_CN")
+    blockers.add("RDS_MIGRATION_EVIDENCE_NOT_READY")
+  }
+  if (imagePublishPlan.ready !== true && imagePublishPlan.local?.ready !== true) blockers.add("ACR_IMAGE_REGISTRY_NOT_READY")
+  if (itemStatus.runtime?.ready !== true) blockers.add("SAE_RUNTIME_NOT_READY")
+  if (itemStatus.apiDomainHttps?.ready !== true) blockers.add("API_DOMAIN_HTTPS_ICP_NOT_READY")
+  if (itemStatus.assetDomainHttps?.ready !== true) blockers.add("ASSET_DOMAIN_HTTPS_ICP_NOT_READY")
+  if (itemStatus.oss?.ready !== true) blockers.add("OSS_RAM_STS_NOT_READY")
+  if (itemStatus.envImport?.ready !== true) blockers.add("ENV_IMPORT_NOT_READY")
+  if (itemStatus.slsAlerts?.ready !== true) blockers.add("SLS_ALERTS_NOT_READY")
+  blockers.add("POSTDEPLOY_SMOKE_NOT_RUN")
+
+  const backendRequiredBlocking = [...blockers].sort()
+  return {
+    canDeployNow: backendRequiredBlocking.length === 0,
+    verdict: backendRequiredBlocking.length === 0 ? "ready" : "blocked",
+    summary: {
+      backendRequiredBlocking,
+      machineBlocking: rdsMigrationEvidence.local?.ready === true ? [] : ["missing_required_env:DATABASE_URL_CN"],
+      operatorTasks: { waitingWechatReview: 0 },
+    },
+    localReadiness: {
+      cloudInventoryResults: {
+        localFile: cloudInventoryResults.local?.file,
+        localExists: cloudInventoryResults.local?.exists === true,
+        localReady: cloudInventoryResults.local?.ready === true,
+        localCheckedOperations: cloudInventoryResults.local?.checkedOperations || 0,
+        localBlockers: cloudInventoryResults.local?.blockers || [],
+        readyLocalOperations: cloudInventoryResults.summary?.readyLocalOperations || 0,
+        localOperations: cloudInventoryResults.summary?.localOperations || 9,
+        observationSummary: cloudInventoryResults.local?.observationSummary || {},
+      },
+    },
+    nextCommandOrder: [
+      "corepack pnpm aliyun:cloud:inventory-results:strict",
+      "corepack pnpm aliyun:rds:migration:evidence:strict",
+      "corepack pnpm aliyun:cloud:confirmations:backend:strict",
+      "corepack pnpm aliyun:image:plan:strict",
+      "corepack pnpm aliyun:evidence:writeback:backend",
+    ],
+  }
+}
+
+function buildBackendOnlyOperatorTasks({ rdsMigrationEvidence }) {
+  const rdsBlockers = rdsMigrationEvidence.local?.blockers || []
+  const task = ({ id, title, status = "blocked", blockerCodes = [], owner, consolePath, actions = [], evidence = [], verifyCommands = [], notes = [] }) => ({
+    id,
+    title,
+    status,
+    ready: status === "ready",
+    owner,
+    consolePath,
+    blockerCodes,
+    actions,
+    evidence,
+    verifyCommands,
+    notes,
+  })
+  const tasks = [
+    task({
+      id: "T03_ALIYUN_RUNTIME_CONTAINER",
+      title: "创建或确认 SAE production-cn 容器运行时",
+      blockerCodes: ["runtime:confirmed"],
+      owner: "阿里云 SAE 操作员",
+      consolePath: "阿里云控制台 -> SAE -> meiye-huajing-app-api-production-cn",
+      actions: ["等 RDS、ACR 镜像、OSS 和 env 依赖闭合后创建或确认 SAE runtime。"],
+      evidence: ["runtimeTarget=SAE", "healthPath=/api/healthz"],
+      verifyCommands: ["corepack pnpm aliyun:runtime:plan"],
+    }),
+    task({
+      id: "T03B_ALIYUN_ACR_IMAGE_PUBLISH",
+      title: "推送或导入后端镜像到 ACR 并配置 SAE 拉取",
+      blockerCodes: ["acr.remoteDigest", "acr.imagePushed", "runtime.imagePullConfigured"],
+      owner: "阿里云 ACR/后端发布操作员",
+      consolePath: "阿里云控制台 -> 容器镜像服务 ACR / SAE 镜像部署",
+      actions: ["选择 VPC registry 或 ACR import task，推送/导入镜像并核对 sha256 digest。"],
+      evidence: ["acrPurchaseConfirmed=true"],
+      verifyCommands: ["corepack pnpm aliyun:image:plan:strict"],
+    }),
+    task({
+      id: "T04_ALIYUN_DOMAIN_DNS_HTTPS",
+      title: "配置 api-cn/assets-cn DNS、HTTPS 和 ICP",
+      blockerCodes: [
+        "apiDomainHttps:confirmed",
+        "apiDomainHttps:dnsResolvedToAliyun",
+        "assetDomainHttps:confirmed",
+        "assetDomainHttps:dnsResolvedToAliyun",
+      ],
+      owner: "阿里云域名/证书操作员",
+      consolePath: "阿里云控制台 -> 云解析 DNS / SSL / ICP",
+      actions: ["SAE/OSS/CDN 入口确定后再配置 api-cn 和 assets-cn。"],
+      evidence: ["apiHost=api-cn.ipgongchang.xin", "assetHost=assets-cn.ipgongchang.xin"],
+      verifyCommands: ["corepack pnpm aliyun:domain:strict"],
+    }),
+    task({
+      id: "T05_ALIYUN_OSS_AUDIO_STORAGE",
+      title: "确认 OSS 音频 bucket、CORS、RAM 最小权限或 STS/运行时角色",
+      blockerCodes: ["oss:confirmed", "oss:ramLeastPrivilege"],
+      owner: "阿里云 OSS/RAM 操作员",
+      consolePath: "阿里云控制台 -> OSS / RAM / STS / SAE runtime role",
+      actions: ["确认 service-records/production-cn 前缀最小权限，并优先使用 SAE runtime role 或 STS。"],
+      evidence: ["bucket=meiye-huajing-service-records-production-cn", "serviceRecordPrefix=service-records/production-cn"],
+      verifyCommands: ["corepack pnpm aliyun:cloud:confirmations:backend:strict"],
+    }),
+    task({
+      id: "T06_ALIYUN_ENV_IMPORT",
+      title: "把 production-cn 变量导入 SAE/KMS/Secrets Manager",
+      blockerCodes: [
+        "missing_required_env:DATABASE_URL_CN",
+        "envImport:confirmed",
+        "envImport:secretNotInImage",
+      ],
+      owner: "阿里云运行环境/密钥操作员",
+      consolePath: "阿里云 SAE 应用 -> 环境变量 / KMS / Secrets Manager",
+      actions: [
+        "只把后端当前范围需要的变量导入阿里云运行环境。",
+        "DATABASE_URL_CN 只能进入 secret env，不能写入 JSON、Markdown、Docker 镜像或 git。",
+      ],
+      evidence: ["requiredBlocking=DATABASE_URL_CN", "readySecretEnvVariableCount=17"],
+      verifyCommands: ["corepack pnpm aliyun:env:handoff:backend", "corepack pnpm aliyun:sensitive:blockers:backend"],
+    }),
+    task({
+      id: "T07_ALIYUN_SLS_ALERTS",
+      title: "配置 SLS 日志采集、/api/healthz 健康告警和 5xx 告警",
+      blockerCodes: ["slsAlerts:confirmed", "slsAlerts:healthAlertConfigured", "slsAlerts:serverErrorAlertConfigured"],
+      owner: "阿里云 SLS/运维操作员",
+      consolePath: "阿里云控制台 -> 日志服务 SLS / 告警",
+      actions: ["SAE runtime 接入日志后配置 health 和 5xx 告警。"],
+      evidence: ["slsProject=meiye-huajing-app-prod-cn", "logstore=app-api"],
+      verifyCommands: ["corepack pnpm aliyun:cloud:check"],
+    }),
+    task({
+      id: "T08_POSTDEPLOY_REMOTE_SMOKE",
+      title: "阿里云后端部署后 smoke",
+      status: "waiting_for_deploy",
+      blockerCodes: ["BACKEND_ALIYUN_DEPLOY_NOT_READY", "POSTDEPLOY_SMOKE_NOT_RUN"],
+      owner: "后端发布操作员",
+      consolePath: "https://api-cn.ipgongchang.xin",
+      actions: ["部署授权后运行 health、profile、tenant、invite 和 service-record smoke。"],
+      evidence: ["postdeploySmoke=not_run"],
+      verifyCommands: [
+        "corepack pnpm aliyun:postdeploy:smoke -- --base-url https://api-cn.ipgongchang.xin",
+      ],
+    }),
+  ]
+  return {
+    generatedAt: new Date().toISOString(),
+    currentScope: "backend_aliyun_only",
+    containsValues: false,
+    summary: {
+      total: tasks.length,
+      ready: tasks.filter((item) => item.ready).length,
+      blocked: tasks.filter((item) => item.status === "blocked").length,
+      waitingForDeploy: tasks.filter((item) => item.status === "waiting_for_deploy").length,
+    },
+    tasks,
+    sensitiveActionItems: [],
+    rdsMigrationEvidence: {
+      ready: rdsMigrationEvidence.local?.ready === true,
+      totalBlockers: rdsBlockers.length,
+      blockers: rdsBlockers,
+    },
+  }
+}
+
+function buildBackendOnlyConsoleRunbook({ cloudConfirmationsCheck, imagePublishPlan }) {
+  const itemStatus = cloudConfirmationsCheck.local?.itemStatus || {}
+  const imageBlockers = imagePublishPlan.local?.blockers || []
+  const task = ({ id, title, status = "blocked", dependsOn = [], blockingDependencies = [], canStartNow = false, requiresActionTimeConfirmation = false, consolePath, currentBlockers = [], verifyCommands = [] }) => ({
+    id,
+    title,
+    status,
+    ready: status === "ready",
+    sequencePhase: "backend_only",
+    dependsOn,
+    blockingDependencies,
+    canStartNow,
+    requiresActionTimeConfirmation,
+    consolePath,
+    currentBlockers,
+    verifyCommands,
+  })
+  const tasks = [
+    task({
+      id: "C01_SAE_RUNTIME",
+      title: "创建 SAE runtime",
+      dependsOn: ["C02_ACR_IMAGE_AND_PULL", "C05_OSS_AUDIO_RAM_STS", "C06_ENV_IMPORT"],
+      blockingDependencies: ["C02_ACR_IMAGE_AND_PULL", "C05_OSS_AUDIO_RAM_STS", "C06_ENV_IMPORT"],
+      consolePath: "阿里云控制台 -> SAE",
+      currentBlockers: (itemStatus.runtime?.blockers || ["confirmed"]).map((item) => `runtime:${item}`),
+      verifyCommands: ["corepack pnpm aliyun:runtime:plan"],
+    }),
+    task({
+      id: "C02_ACR_IMAGE_AND_PULL",
+      title: "推送/导入 ACR 镜像并配置拉取",
+      canStartNow: true,
+      requiresActionTimeConfirmation: true,
+      consolePath: "阿里云控制台 -> ACR / SAE",
+      currentBlockers: imageBlockers,
+      verifyCommands: ["corepack pnpm aliyun:image:plan:strict"],
+    }),
+    task({
+      id: "C03_API_DOMAIN_HTTPS_ICP",
+      title: "配置 api-cn DNS/HTTPS/ICP",
+      dependsOn: ["C01_SAE_RUNTIME"],
+      blockingDependencies: ["C01_SAE_RUNTIME"],
+      requiresActionTimeConfirmation: true,
+      consolePath: "阿里云控制台 -> 云解析 DNS / SSL / ICP",
+      currentBlockers: (itemStatus.apiDomainHttps?.blockers || ["confirmed"]).map((item) => `apiDomainHttps:${item}`),
+      verifyCommands: ["corepack pnpm aliyun:domain:strict"],
+    }),
+    task({
+      id: "C04_ASSET_DOMAIN_HTTPS_ICP",
+      title: "配置 assets-cn DNS/HTTPS/ICP",
+      dependsOn: ["C05_OSS_AUDIO_RAM_STS"],
+      blockingDependencies: ["C05_OSS_AUDIO_RAM_STS"],
+      requiresActionTimeConfirmation: true,
+      consolePath: "阿里云控制台 -> CDN/OSS 域名 / SSL / ICP",
+      currentBlockers: (itemStatus.assetDomainHttps?.blockers || ["confirmed"]).map((item) => `assetDomainHttps:${item}`),
+      verifyCommands: ["corepack pnpm aliyun:domain:strict"],
+    }),
+    task({
+      id: "C05_OSS_AUDIO_RAM_STS",
+      title: "确认 OSS RAM/STS 最小权限",
+      canStartNow: true,
+      requiresActionTimeConfirmation: true,
+      consolePath: "阿里云控制台 -> OSS / RAM / STS",
+      currentBlockers: (itemStatus.oss?.blockers || ["confirmed", "ramLeastPrivilege"]).map((item) => `oss:${item}`),
+      verifyCommands: ["corepack pnpm aliyun:cloud:confirmations:backend:strict"],
+    }),
+    task({
+      id: "C06_ENV_IMPORT",
+      title: "导入后端 env",
+      dependsOn: ["C01_SAE_RUNTIME", "C02_ACR_IMAGE_AND_PULL", "C05_OSS_AUDIO_RAM_STS"],
+      blockingDependencies: ["C01_SAE_RUNTIME", "C02_ACR_IMAGE_AND_PULL", "C05_OSS_AUDIO_RAM_STS"],
+      requiresActionTimeConfirmation: true,
+      consolePath: "阿里云 SAE 应用 -> 环境变量 / KMS / Secrets Manager",
+      currentBlockers: [
+        "requiredEnv:DATABASE_URL_CN",
+        "envImport:confirmed",
+        "envImport:secretNotInImage",
+      ],
+      verifyCommands: ["corepack pnpm aliyun:env:handoff:backend"],
+    }),
+    task({
+      id: "C07_SLS_ALERTS",
+      title: "配置 SLS 告警",
+      dependsOn: ["C01_SAE_RUNTIME"],
+      blockingDependencies: ["C01_SAE_RUNTIME"],
+      consolePath: "阿里云控制台 -> SLS / 告警",
+      currentBlockers: (itemStatus.slsAlerts?.blockers || ["confirmed"]).map((item) => `slsAlerts:${item}`),
+      verifyCommands: ["corepack pnpm aliyun:cloud:check"],
+    }),
+  ]
+  return {
+    summary: {
+      resourceReady: `0/${BACKEND_ONLY_RESOURCE_EVIDENCE_IDS.length}`,
+      userActionReady: "0/0",
+      canStartNowConsoleTasks: tasks.filter((item) => item.canStartNow).map((item) => item.id),
+      blockedByTaskDependencies: tasks.filter((item) => item.blockingDependencies.length > 0).map((item) => item.id),
+    },
+    consoleTasks: tasks,
+  }
+}
+
+function mainBackendOnly(args, envPlan) {
+  const cloudInventoryResults = runJson("cloud_inventory_results", [
+    resolve(BACKEND_ROOT, "scripts/check-aliyun-cli-inventory-results.mjs"),
+    "--allow-incomplete",
+    "--local",
     args.cloudInventoryResultsFile,
-  ])
-  const operatorTasks = runJson("operator_tasks", [
-    resolve(BACKEND_ROOT, "scripts/generate-aliyun-operator-tasks.mjs"),
-    "--env-file",
-    args.envFile,
-    "--cloud-confirmations",
-    args.cloudConfirmationsFile,
-    ...backendOnlyArgs,
-  ])
-  const cloudAccess = runJson("cloud_access", [
-    resolve(BACKEND_ROOT, "scripts/check-aliyun-cloud-access.mjs"),
-    "--env-file",
-    args.envFile,
-    "--cloud-confirmations",
-    args.cloudConfirmationsFile,
-  ])
+  ], args)
   const cloudConfirmationsCheck = runJson("cloud_confirmations", [
     resolve(BACKEND_ROOT, "scripts/check-aliyun-cloud-confirmations.mjs"),
+    "--backend-only",
     "--allow-incomplete",
     "--local",
     args.cloudConfirmationsFile,
-  ])
+  ], args)
   const imagePublishPlan = runJson("image_publish_plan", [
     resolve(BACKEND_ROOT, "scripts/check-aliyun-image-publish-plan.mjs"),
     "--allow-incomplete",
-  ])
+    "--local",
+    args.imagePublishFile,
+  ], args)
   const rdsMigrationEvidence = runJson("rds_migration_evidence", [
     resolve(BACKEND_ROOT, "scripts/check-aliyun-rds-migration-evidence.mjs"),
     "--allow-incomplete",
     "--local",
     args.rdsMigrationFile,
-  ])
-  const consoleRunbook = runJson("console_runbook", [
-    resolve(BACKEND_ROOT, "scripts/generate-aliyun-console-runbook.mjs"),
-    "--env-file",
-    args.envFile,
-    "--cloud-confirmations",
-    args.cloudConfirmationsFile,
-  ])
-  const sensitiveBlockers = runJson("sensitive_blockers", [
-    resolve(BACKEND_ROOT, "scripts/summarize-aliyun-sensitive-blockers.mjs"),
-    "--env-file",
-    args.envFile,
-    "--cloud-confirmations",
-    args.cloudConfirmationsFile,
-  ])
-  const userActionBrief = runJson("user_action_brief", [
-    resolve(BACKEND_ROOT, "scripts/summarize-aliyun-user-action-brief.mjs"),
-    "--env-file",
-    args.envFile,
-    "--cloud-confirmations",
-    args.cloudConfirmationsFile,
-    ...backendOnlyArgs,
-  ])
-  const resourcesMatrix = runJson("resources_matrix", [
-    resolve(BACKEND_ROOT, "scripts/summarize-aliyun-resource-matrix.mjs"),
-    "--env-file",
-    args.envFile,
-    "--cloud-confirmations",
-    args.cloudConfirmationsFile,
-  ])
+  ], args)
+  const sensitiveBlockers = buildBackendOnlySensitiveBlockersFromEnvPlan(envPlan)
+  const cloudAccess = buildBackendOnlyCloudAccessStub()
+  const resourcesMatrix = buildBackendOnlyResourceMatrixStub({
+    cloudConfirmationsCheck,
+    imagePublishPlan,
+  })
+  const status = buildBackendOnlyStatusForHandoff({
+    cloudInventoryResults,
+    cloudConfirmationsCheck,
+    imagePublishPlan,
+    rdsMigrationEvidence,
+  })
+  const operatorTasks = buildBackendOnlyOperatorTasks({ rdsMigrationEvidence })
+  const consoleRunbook = buildBackendOnlyConsoleRunbook({ cloudConfirmationsCheck, imagePublishPlan })
+  const userActionBrief = {
+    actionTimeAuthorizationRequest: buildBackendOnlyActionTimeAuthorizationRequest(),
+  }
   const vercelEnvCoverage = runVercelEnvCoverage(args)
   const handoff = buildHandoff({
     args,
@@ -1729,6 +2356,143 @@ function main() {
     resourcesMatrix,
     userActionBrief,
     vercelEnvCoverage,
+    childCommandFailures: [],
+  })
+  const output = `${JSON.stringify(handoff, null, 2)}\n`
+  process.stdout.write(output)
+  writeOutput(args.outPath, output)
+  writeOutput(args.markdownPath, renderMarkdown(handoff))
+}
+
+function main() {
+  const args = parseArgs(process.argv)
+  const envPlan = buildImportPlan(parseEnvFile(args.envFile))
+  if (args.backendOnly) {
+    mainBackendOnly(args, envPlan)
+    return
+  }
+  const backendOnlyArgs = args.backendOnly ? ["--backend-only"] : []
+  const status = runJson("status", [
+    resolve(BACKEND_ROOT, "scripts/summarize-aliyun-production-cn-status.mjs"),
+    "--env-file",
+    args.envFile,
+    "--cloud-confirmations",
+    args.cloudConfirmationsFile,
+    "--cloud-inventory-results",
+    args.cloudInventoryResultsFile,
+    "--image-publish",
+    args.imagePublishFile,
+    "--child-timeout-ms",
+    String(args.childTimeoutMs),
+  ], args)
+  const operatorTasks = runJson("operator_tasks", [
+    resolve(BACKEND_ROOT, "scripts/generate-aliyun-operator-tasks.mjs"),
+    "--env-file",
+    args.envFile,
+    "--cloud-confirmations",
+    args.cloudConfirmationsFile,
+    "--image-publish",
+    args.imagePublishFile,
+    ...backendOnlyArgs,
+  ], args)
+  const cloudAccess = runJson("cloud_access", [
+    resolve(BACKEND_ROOT, "scripts/check-aliyun-cloud-access.mjs"),
+    "--env-file",
+    args.envFile,
+    "--cloud-confirmations",
+    args.cloudConfirmationsFile,
+  ], args)
+  const cloudConfirmationsCheck = runJson("cloud_confirmations", [
+    resolve(BACKEND_ROOT, "scripts/check-aliyun-cloud-confirmations.mjs"),
+    "--allow-incomplete",
+    "--local",
+    args.cloudConfirmationsFile,
+  ], args)
+  const imagePublishPlan = runJson("image_publish_plan", [
+    resolve(BACKEND_ROOT, "scripts/check-aliyun-image-publish-plan.mjs"),
+    "--allow-incomplete",
+    "--local",
+    args.imagePublishFile,
+  ], args)
+  const rdsMigrationEvidence = runJson("rds_migration_evidence", [
+    resolve(BACKEND_ROOT, "scripts/check-aliyun-rds-migration-evidence.mjs"),
+    "--allow-incomplete",
+    "--local",
+    args.rdsMigrationFile,
+  ], args)
+  const consoleRunbookResult = args.backendOnly
+    ? {
+        ok: false,
+        skipped: true,
+        report: null,
+        error: "skipped_for_backend_only_handoff",
+      }
+    : runJsonAllowFailure("console_runbook", [
+      resolve(BACKEND_ROOT, "scripts/generate-aliyun-console-runbook.mjs"),
+      "--env-file",
+      args.envFile,
+      "--cloud-confirmations",
+      args.cloudConfirmationsFile,
+    ], args)
+  const childCommandFailures = []
+  if (!consoleRunbookResult.ok && !consoleRunbookResult.skipped) {
+    childCommandFailures.push({
+      label: "console_runbook",
+      error: consoleRunbookResult.error || "unknown_error",
+      fallback: "empty_console_runbook",
+    })
+  }
+  const consoleRunbook = consoleRunbookResult.report || {
+    summary: {
+      resourceReady: "unknown",
+      userActionReady: "unknown",
+      canStartNowConsoleTasks: [],
+      blockedByTaskDependencies: [],
+    },
+    consoleTasks: [],
+  }
+  const sensitiveBlockers = runJson("sensitive_blockers", [
+    resolve(BACKEND_ROOT, "scripts/summarize-aliyun-sensitive-blockers.mjs"),
+    "--env-file",
+    args.envFile,
+    "--cloud-confirmations",
+    args.cloudConfirmationsFile,
+  ], args)
+  const userActionBrief = runJson("user_action_brief", [
+    resolve(BACKEND_ROOT, "scripts/summarize-aliyun-user-action-brief.mjs"),
+    "--env-file",
+    args.envFile,
+    "--cloud-confirmations",
+    args.cloudConfirmationsFile,
+    "--image-publish",
+    args.imagePublishFile,
+    ...backendOnlyArgs,
+  ], args)
+  const resourcesMatrix = runJson("resources_matrix", [
+    resolve(BACKEND_ROOT, "scripts/summarize-aliyun-resource-matrix.mjs"),
+    "--env-file",
+    args.envFile,
+    "--cloud-confirmations",
+    args.cloudConfirmationsFile,
+    "--image-publish",
+    args.imagePublishFile,
+  ], args)
+  const vercelEnvCoverage = runVercelEnvCoverage(args)
+  const handoff = buildHandoff({
+    args,
+    envPlan,
+    status,
+    operatorTasks,
+    cloudAccess,
+    cloudConfirmationsCheck,
+    imagePublishPlan,
+    rdsMigrationEvidence,
+    consoleRunbook,
+    sensitiveBlockers,
+    resourcesMatrix,
+    userActionBrief,
+    vercelEnvCoverage,
+    childCommandFailures,
   })
   const output = `${JSON.stringify(handoff, null, 2)}\n`
   process.stdout.write(output)
@@ -1739,7 +2503,7 @@ function main() {
 function printHelp() {
   console.log([
     "Usage:",
-    "  node scripts/generate-aliyun-operator-handoff.mjs [--env-file path] [--cloud-confirmations path] [--cloud-inventory-results path] [--rds-migration path] [--out /tmp/handoff.json] [--markdown /tmp/handoff.md] [--skip-vercel-env-coverage] [--vercel-env-coverage-input /tmp/vercel-env.json] [--backend-only]",
+    "  node scripts/generate-aliyun-operator-handoff.mjs [--env-file path] [--cloud-confirmations path] [--cloud-inventory-results path] [--rds-migration path] [--image-publish path] [--out /tmp/handoff.json] [--markdown /tmp/handoff.md] [--skip-vercel-env-coverage] [--vercel-env-coverage-input /tmp/vercel-env.json] [--backend-only] [--child-timeout-ms 120000]",
     "",
     "Generates a concise non-secret handoff for the user, Aliyun operator, WeChat Open Platform operator, and release owner.",
     "--backend-only excludes deferred WeChat/Android/Apple launch work from the current Aliyun backend handoff.",

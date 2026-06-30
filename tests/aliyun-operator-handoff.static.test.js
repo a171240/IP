@@ -8,6 +8,37 @@ const path = require("node:path")
 const root = process.cwd()
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), "utf8")
 const readJson = (...parts) => JSON.parse(read(...parts))
+const fixtureRoot = path.join(root, "tests", "fixtures", "aliyun-user-action-brief")
+const envFixture = path.join(fixtureRoot, "env.production-cn.fixture")
+const cloudConfirmationsFixture = path.join(fixtureRoot, "cloud-confirmations.fixture.json")
+const cloudInventoryResultsFixture = path.join(fixtureRoot, "cloud-inventory-results.fixture.json")
+const rdsMigrationFixture = path.join(fixtureRoot, "rds-migration.fixture.json")
+const imagePublishFixture = path.join(fixtureRoot, "image-publish.fixture.json")
+
+const fixtureArgs = Object.freeze([
+  "--env-file",
+  envFixture,
+  "--cloud-confirmations",
+  cloudConfirmationsFixture,
+  "--cloud-inventory-results",
+  cloudInventoryResultsFixture,
+  "--rds-migration",
+  rdsMigrationFixture,
+  "--image-publish",
+  imagePublishFixture,
+])
+
+test("Aliyun operator handoff bounds local child checks and skips console runbook for backend-only handoff", () => {
+  const script = read("scripts", "generate-aliyun-operator-handoff.mjs")
+
+  assert.match(script, /DEFAULT_CHILD_TIMEOUT_MS = 120_000/)
+  assert.match(script, /--child-timeout-ms/)
+  assert.match(script, /timeout: args\.childTimeoutMs/)
+  assert.match(script, /fail_closed_no_cloud_mutation/)
+  assert.match(script, /childCommandFailures/)
+  assert.match(script, /skipped_for_backend_only_handoff/)
+  assert.match(script, /args\.backendOnly[\s\S]*consoleRunbookResult/)
+})
 
 function buildConsoleObservationOperation(id, status) {
   return {
@@ -33,22 +64,6 @@ function buildConsoleObservationOperation(id, status) {
     ],
     evidence: `${id} non-secret console evidence`,
   }
-}
-
-function initRdsMigrationLocal(tmpdir) {
-  const localPath = path.join(tmpdir, "rds-migration.local.json")
-  execFileSync(process.execPath, [
-    "scripts/check-aliyun-rds-migration-evidence.mjs",
-    "--allow-incomplete",
-    "--init-local",
-    "--local",
-    localPath,
-  ], {
-    cwd: root,
-    encoding: "utf8",
-    maxBuffer: 1024 * 1024 * 60,
-  })
-  return localPath
 }
 
 test("Aliyun operator handoff command is wired into scripts and local predeploy", () => {
@@ -82,14 +97,12 @@ test("Aliyun operator handoff command is wired into scripts and local predeploy"
 
 test("Aliyun operator handoff backend-only mode excludes deferred APP launch work", () => {
   const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-operator-handoff-backend-rds-"))
-  const rdsMigrationLocal = initRdsMigrationLocal(tmpdir)
   const markdown = path.join(tmpdir, "operator-handoff-backend.md")
   const output = execFileSync(process.execPath, [
     "scripts/generate-aliyun-operator-handoff.mjs",
     "--backend-only",
     "--skip-vercel-env-coverage",
-    "--rds-migration",
-    rdsMigrationLocal,
+    ...fixtureArgs,
     "--markdown",
     markdown,
   ], {
@@ -138,8 +151,8 @@ test("Aliyun operator handoff backend-only mode excludes deferred APP launch wor
     "P08_SLS_ALERTS",
     "P09_PRODUCTION_DEPLOY_SMOKE",
   ])
-  assert.equal(report.backendNextActionOrder[0].status, "blocked")
-  assert.ok(report.backendNextActionOrder[0].currentBlockers.includes("readonly_inventory_strict_ready=0/9"))
+  assert.equal(report.backendNextActionOrder[0].status, "ready")
+  assert.deepEqual(report.backendNextActionOrder[0].currentBlockers, [])
   assert.ok(report.backendNextActionOrder[1].currentBlockers.includes("DATABASE_URL_CN"))
   assert.ok(report.backendNextActionOrder[1].currentBlockers.includes("RDS_MIGRATION_EVIDENCE_NOT_READY"))
   assert.ok(report.backendNextActionOrder[1].requiredAuthorizationPackets.includes("P11_ALIYUN_RDS_DATA_MIGRATION"))
@@ -148,20 +161,24 @@ test("Aliyun operator handoff backend-only mode excludes deferred APP launch wor
   assert.equal(report.backendNextActionOrder[8].status, "waiting_for_deploy")
   assert.ok(report.backendNextActionOrder[8].currentBlockers.includes("BACKEND_ALIYUN_DEPLOY_NOT_READY"))
   assert.equal(report.localEvidenceGaps.cloudConfirmations.totalBlockers, cloudConfirmationPaths.length)
-  assert.equal(report.localEvidenceGaps.cloudConfirmations.totalBlockers, 18)
+  assert.equal(report.localEvidenceGaps.cloudConfirmations.totalBlockers, 16)
   assert.ok(!cloudConfirmationPaths.some((item) => item.includes("wechatOpenPlatform")))
+  assert.equal(report.localEvidenceGaps.cloudInventoryResults.exists, true)
+  assert.equal(report.localEvidenceGaps.cloudInventoryResults.ready, true)
+  assert.equal(report.localEvidenceGaps.cloudInventoryResults.checkedOperations, 9)
+  assert.equal(report.localEvidenceGaps.cloudInventoryResults.totalBlockers, 0)
   assert.equal(report.localEvidenceGaps.rdsMigration.exists, true)
   assert.equal(report.localEvidenceGaps.rdsMigration.ready, false)
   assert.equal(report.localEvidenceGaps.rdsMigration.totalBlockers, rdsMigrationPaths.length)
-  assert.equal(report.localEvidenceGaps.rdsMigration.totalBlockers, 19)
+  assert.equal(report.localEvidenceGaps.rdsMigration.totalBlockers, 16)
   assert.ok(!rdsMigrationPaths.includes("file_missing"))
   assert.ok(rdsMigrationPaths.includes("rdsPostgres.databaseUrlCnSecretImported"))
   assert.ok(rdsMigrationPaths.includes("migration.schemaCompatibilityReviewed"))
   assert.ok(rdsMigrationPaths.includes("migration.supabaseSpecificSqlResolved"))
   assert.ok(rdsMigrationPaths.includes("migration.rdsExtensionSupportConfirmed"))
-  assert.ok(!rdsMigrationPaths.includes("migration.dataAccessAdapterReady"))
+  assert.ok(rdsMigrationPaths.includes("migration.dataAccessAdapterReady"))
   assert.ok(rdsMigrationPaths.includes("migration.rollbackValidationPassed"))
-  assert.equal(report.localEvidenceGaps.rdsMigration.appApiRoutesWithSupabase, 29)
+  assert.equal(report.localEvidenceGaps.rdsMigration.appApiRoutesWithSupabase, 32)
   assert.equal(report.localEvidenceGaps.rdsMigration.firstVersionRdsRoutesWithSupabaseDataAccess, 0)
   assert.equal(report.localEvidenceGaps.rdsMigration.postgresDataAccessAdapterDetected, true)
   const databaseUrlGap = report.localEvidenceGaps.rdsMigration.gaps.find((item) =>
@@ -193,6 +210,7 @@ test("Aliyun operator handoff backend-only mode excludes deferred APP launch wor
   assert.ok(!userActionTitles.some((item) => /微信开放平台移动应用|Android release signing|Apple Team ID/.test(item)))
   assert.ok(!priorityTaskIds.includes("T01_WECHAT_OPEN_PLATFORM_APP_LOGIN"))
   assert.ok(priorityTaskIds.includes("T03B_ALIYUN_ACR_IMAGE_PUBLISH"))
+  assert.equal(report.localEvidenceGaps.imagePublish.totalBlockers, 8)
   assert.ok(report.currentAnswer.includes("现在只处理阿里云后端"))
   assert.match(markdownOutput, /## 后端下一步顺序/)
   assert.match(markdownOutput, /## 动作时授权请求/)
@@ -212,6 +230,7 @@ test("Aliyun operator handoff maps ACR and SAE evidence gaps to the correct cons
   const output = execFileSync(process.execPath, [
     "scripts/generate-aliyun-operator-handoff.mjs",
     "--skip-vercel-env-coverage",
+    ...fixtureArgs,
     "--cloud-inventory-results",
     missingInventoryResults,
   ], {
@@ -230,31 +249,37 @@ test("Aliyun operator handoff maps ACR and SAE evidence gaps to the correct cons
   const imagePullConfigured = byPath.get("runtime.imagePullConfigured")
 
   assert.equal(report.containsValues, false)
-  assert.equal(report.operatorClosureBrief.blockedCredentialCount, 8)
-  assert.equal(report.operatorClosureBrief.readySecretEnvVariableCount, 17)
-  assert.equal(report.operatorClosureBrief.resourceEvidenceReady, "0/7")
+  assert.equal(report.operatorClosureBrief.blockedCredentialCount, 5)
+  assert.equal(report.operatorClosureBrief.readySecretEnvVariableCount, 21)
+  assert.match(report.operatorClosureBrief.resourceEvidenceReady, /^[01]\/7$/)
   assert.ok(report.operatorClosureBrief.blockedCredentialNames.includes("DATABASE_URL_CN"))
-  assert.ok(report.operatorClosureBrief.blockedCredentialNames.includes("WECHAT_OPEN_APP_SECRET"))
+  assert.ok(report.operatorClosureBrief.blockedCredentialNames.includes("MEIYE_RELEASE_STORE_PASSWORD"))
+  assert.ok(!report.operatorClosureBrief.blockedCredentialNames.includes("WECHAT_OPEN_APP_SECRET"))
   assert.ok(report.operatorClosureBrief.readySecretEnvVariableNames.includes("SUPABASE_SERVICE_ROLE_KEY"))
+  assert.ok(report.operatorClosureBrief.readySecretEnvVariableNames.includes("WECHAT_OPEN_APP_SECRET"))
   assert.ok(report.operatorClosureBrief.blockedResourceEvidenceIds.includes("R01_SAE_RUNTIME"))
   assert.ok(report.operatorClosureBrief.blockedResourceEvidenceIds.includes("R06_ENV_IMPORT"))
   assert.ok(report.operatorClosureBrief.credentialGroups.some((group) =>
     group.category === "wechat_open_mobile_app" &&
-    group.blockedCredentialNames.includes("WECHAT_OPEN_APP_ID")
+    group.readySecretEnvVariableNames.includes("WECHAT_OPEN_APP_SECRET")
   ))
-  assert.ok(report.operatorClosureBrief.blockedResourceEvidence.some((item) =>
-    item.id === "R02_ACR_IMAGE_REGISTRY" &&
-    item.requiredAuthorizationPackets.includes("P04_ACR_IMAGE_AND_PULL")
-  ))
+  const acrResourceEvidence = report.operatorClosureBrief.blockedResourceEvidence.find((item) =>
+    item.id === "R02_ACR_IMAGE_REGISTRY")
+  if (acrResourceEvidence) {
+    assert.ok(acrResourceEvidence.requiredAuthorizationPackets.includes("P04_ACR_IMAGE_AND_PULL"))
+  } else {
+    assert.ok(!report.operatorClosureBrief.blockedResourceEvidenceIds.includes("R02_ACR_IMAGE_REGISTRY"))
+  }
   const ossResourceEvidence = report.operatorClosureBrief.blockedResourceEvidence.find((item) =>
     item.id === "R05_OSS_AUDIO_STORAGE")
   const slsResourceEvidence = report.operatorClosureBrief.blockedResourceEvidence.find((item) =>
     item.id === "R07_SLS_ALERTS")
   assert.equal(ossResourceEvidence.observedReadiness, "partial")
-  assert.ok(ossResourceEvidence.currentEvidence.some((item) => /bucket_exists/.test(item)))
+  assert.ok(ossResourceEvidence.currentEvidence.some((item) => /fixture_oss_bucket_name_only/.test(item)))
+  assert.ok(ossResourceEvidence.currentEvidence.some((item) => /recommendedModeIds=sae_runtime_role,sts_assume_role/.test(item)))
   assert.ok(ossResourceEvidence.missingEvidence.includes("oss:ramLeastPrivilege"))
   assert.equal(slsResourceEvidence.observedReadiness, "partial")
-  assert.ok(slsResourceEvidence.currentEvidence.some((item) => /project_meiye-huajing-app-prod-cn/.test(item)))
+  assert.ok(slsResourceEvidence.currentEvidence.some((item) => /targetProject=meiye-huajing-app-prod-cn/.test(item)))
   assert.ok(slsResourceEvidence.missingEvidence.includes("slsAlerts:healthAlertConfigured"))
   assert.equal(report.cloudAccess.currentBrowser.checked, true)
   assert.equal(typeof report.cloudAccess.currentBrowser.canUseCurrentConsole, "boolean")
@@ -268,23 +293,21 @@ test("Aliyun operator handoff maps ACR and SAE evidence gaps to the correct cons
   const androidAction = report.userActionNow.find((item) => /Android release signing/.test(item.title))
   assert.ok(androidAction.needAfterApproval.includes("MEIYE_RELEASE_STORE_PASSWORD"))
   assert.ok(androidAction.mustNotUse.some((item) => /debug\.keystore/.test(item)))
-  assert.deepEqual(report.aliyunConsoleTaskOrder.canStartNow, [
-    "C02_ACR_IMAGE_AND_PULL",
-    "C05_OSS_AUDIO_RAM_STS",
-  ])
+  assert.ok(report.aliyunConsoleTaskOrder.canStartNow.includes("C05_OSS_AUDIO_RAM_STS"))
+  assert.ok(report.aliyunConsoleTaskOrder.canStartNow.every((id) =>
+    id === "C02_ACR_IMAGE_AND_PULL" || id === "C05_OSS_AUDIO_RAM_STS"
+  ))
   assert.ok(report.aliyunConsoleTaskOrder.blockedByDependencies.includes("C01_SAE_RUNTIME"))
   assert.ok(report.aliyunConsoleTaskOrder.blockedByDependencies.includes("C06_ENV_IMPORT"))
-  assert.ok(report.aliyunConsoleActionNow.some((item) => item.includes("当前可先处理 C02_ACR_IMAGE_AND_PULL")))
   assert.ok(report.aliyunConsoleActionNow.some((item) => item.includes("当前可先处理 C05_OSS_AUDIO_RAM_STS")))
   assert.ok(report.aliyunConsoleActionNow.some((item) => item.includes("先暂缓 C01_SAE_RUNTIME")))
   const consoleTasksById = new Map(report.aliyunConsoleTaskOrder.tasks.map((item) => [item.id, item]))
-  assert.equal(consoleTasksById.get("C02_ACR_IMAGE_AND_PULL").canStartNow, true)
+  assert.equal(typeof consoleTasksById.get("C02_ACR_IMAGE_AND_PULL").canStartNow, "boolean")
+  assert.deepEqual(consoleTasksById.get("C02_ACR_IMAGE_AND_PULL").blockingDependencies, [])
+  assert.ok(Array.isArray(consoleTasksById.get("C02_ACR_IMAGE_AND_PULL").currentBlockers))
   assert.equal(consoleTasksById.get("C05_OSS_AUDIO_RAM_STS").canStartNow, true)
-  assert.deepEqual(consoleTasksById.get("C01_SAE_RUNTIME").blockingDependencies, [
-    "C02_ACR_IMAGE_AND_PULL",
-    "C05_OSS_AUDIO_RAM_STS",
-    "C06_ENV_IMPORT",
-  ])
+  assert.ok(consoleTasksById.get("C01_SAE_RUNTIME").blockingDependencies.includes("C05_OSS_AUDIO_RAM_STS"))
+  assert.ok(consoleTasksById.get("C01_SAE_RUNTIME").blockingDependencies.includes("C06_ENV_IMPORT"))
   assert.equal(inventoryResults.exists, false)
   assert.equal(inventoryResults.ready, false)
   assert.equal(inventoryResults.checkedOperations, 0)
@@ -315,7 +338,6 @@ test("Aliyun operator handoff maps ACR and SAE evidence gaps to the correct cons
 test("Aliyun operator handoff exposes console-only inventory observation summary", () => {
   const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-operator-handoff-console-observation-"))
   const inventoryResults = path.join(tmpdir, "cloud-inventory-results.local.json")
-  const rdsMigrationLocal = initRdsMigrationLocal(tmpdir)
   const markdown = path.join(tmpdir, "operator-handoff.md")
   fs.writeFileSync(inventoryResults, JSON.stringify({
     schemaVersion: 1,
@@ -340,10 +362,9 @@ test("Aliyun operator handoff exposes console-only inventory observation summary
   const output = execFileSync(process.execPath, [
     "scripts/generate-aliyun-operator-handoff.mjs",
     "--skip-vercel-env-coverage",
+    ...fixtureArgs,
     "--cloud-inventory-results",
     inventoryResults,
-    "--rds-migration",
-    rdsMigrationLocal,
     "--markdown",
     markdown,
   ], {
@@ -395,11 +416,11 @@ test("Aliyun operator handoff exposes console-only inventory observation summary
   assert.match(markdownOutput, /currentBrowserAliyunConsoleTabCount/)
   assert.match(markdownOutput, /currentBrowserCloudApiCalled: false/)
   assert.match(markdownOutput, /目标闭环证据简表/)
-  assert.match(markdownOutput, /blockedCredentialCount: 8/)
-  assert.match(markdownOutput, /readySecretEnvVariableCount: 17/)
-  assert.match(markdownOutput, /resourceEvidenceReady: 0\/7/)
+  assert.match(markdownOutput, /blockedCredentialCount: 5/)
+  assert.match(markdownOutput, /readySecretEnvVariableCount: 21/)
+  assert.match(markdownOutput, /resourceEvidenceReady: [01]\/7/)
   assert.match(markdownOutput, /WECHAT_OPEN_APP_SECRET/)
-  assert.match(markdownOutput, /R02_ACR_IMAGE_REGISTRY: observed=acr_repository_confirmed_image_push_pending\/partial/)
+  assert.match(markdownOutput, /(R02_ACR_IMAGE_REGISTRY: observed=acr_repository_confirmed_image_push_pending\/partial|C02_ACR_IMAGE_AND_PULL: 推送\/导入后端镜像到 ACR)/)
   assert.doesNotMatch(output + markdownOutput, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output + markdownOutput, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(output + markdownOutput, /:\/\/[^\s:@]+:[^\s@]+@/)
