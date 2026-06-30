@@ -547,7 +547,7 @@ function buildReport(args) {
     ? (userActions.deferredAppLaunchConfirmations || []).map(compactDeferredConfirmation)
     : deferredAppLaunchConfirmations
   const actionTimeConfirmationRequired = actions
-    .filter((action) => action.requiresActionTimeConfirmation)
+    .filter((action) => action.status !== "ready" && action.requiresActionTimeConfirmation)
     .map((action) => action.id)
   const backendActions = actions.filter((action) => !APP_LAUNCH_ACTION_IDS.has(action.id))
   const deferredAppLaunchActions = actions.filter((action) => APP_LAUNCH_ACTION_IDS.has(action.id))
@@ -565,9 +565,12 @@ function buildReport(args) {
     deferredAppLaunchConfirmations: reportedDeferredAppLaunchConfirmations,
     backendOnly: args.backendOnly,
   })
-  const requiredBlocking = status.summary?.requiredBlocking || []
+  const requiredBlocking = userActions.summary?.requiredBlocking || status.summary?.requiredBlocking || []
+  const fullAppRequiredBlocking = userActions.summary?.fullAppRequiredBlocking || requiredBlocking
   const backendRequiredBlocking = requiredBlocking.filter((name) => !APP_LAUNCH_REQUIRED_NAMES.has(name))
-  const deferredAppLaunchBlocking = requiredBlocking.filter((name) => APP_LAUNCH_REQUIRED_NAMES.has(name))
+  const deferredAppLaunchBlocking = args.backendOnly
+    ? []
+    : userActions.summary?.deferredAppLaunchBlocking || fullAppRequiredBlocking.filter((name) => APP_LAUNCH_REQUIRED_NAMES.has(name))
   const report = {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -579,9 +582,14 @@ function buildReport(args) {
     mutationPerformed: false,
     canDeployNow: status.canDeployNow === true,
     verdict: status.verdict || "blocked",
-    currentAnswer: status.canDeployNow === true
-      ? "阿里云后端门禁接近可部署，但生产动作仍需逐项授权。"
-      : "现在不能部署；当前只推进阿里云后端，微信/Apple/Android 发布项已延期，后端仍缺 RDS、ACR、OSS、SAE、DNS、env、SLS 和 smoke 证据。",
+    currentAnswer: buildCurrentAnswer({
+      canDeployNow: status.canDeployNow === true,
+      backendOnly: args.backendOnly,
+      backendRequiredBlocking,
+      currentExternalBlockers,
+      nextActionTimeConfirmations,
+      deferredAppLaunchBlocking,
+    }),
     sourceCommands: [
       args.backendOnly ? "corepack pnpm aliyun:user:actions:backend" : "corepack pnpm aliyun:user:actions",
       "corepack pnpm aliyun:console:runbook",
@@ -605,7 +613,7 @@ function buildReport(args) {
       cloudResourceReady: consoleRunbook.summary?.resourceReady || "unknown",
       userActionReady: userActions.summary ? `${userActions.summary.ready}/${userActions.summary.total}` : "unknown",
       requiredBlocking: backendRequiredBlocking,
-      fullAppRequiredBlocking: args.backendOnly ? backendRequiredBlocking : requiredBlocking,
+      fullAppRequiredBlocking: args.backendOnly ? backendRequiredBlocking : fullAppRequiredBlocking,
       deferredAppLaunchBlocking: args.backendOnly ? [] : deferredAppLaunchBlocking,
       deferredAppLaunchBlockingCount: deferredAppLaunchBlocking.length,
       sensitiveActionItems: args.backendOnly
@@ -678,6 +686,48 @@ function buildReport(args) {
   return report
 }
 
+function buildCurrentAnswer({
+  canDeployNow,
+  backendOnly,
+  backendRequiredBlocking,
+  currentExternalBlockers,
+  nextActionTimeConfirmations,
+  deferredAppLaunchBlocking,
+}) {
+  if (canDeployNow) return "阿里云后端门禁接近可部署，但生产动作仍需逐项授权。"
+  const nextPackets = nextActionTimeConfirmations.map((item) => item.packetId)
+  const onlyP07Left = backendRequiredBlocking.length === 0 &&
+    currentExternalBlockers.every((id) => id === "U07_DOMAIN_DNS_HTTPS_ICP" || id === "U09_DEPLOY_AUTHORIZATION") &&
+    nextPackets.includes("P07_DOMAIN_DNS_HTTPS")
+  if (onlyP07Left) {
+    return backendOnly
+      ? "现在还不能部署；阿里云后端 RDS、ACR、OSS、SAE、env、SLS 已闭环，当前只剩 P07 api-cn/assets-cn DNS、HTTPS、ICP 证据和正式 HTTPS smoke。"
+      : "现在还不能做完整 APP 发布；阿里云后端当前只剩 P07 api-cn/assets-cn DNS、HTTPS、ICP 证据和正式 HTTPS smoke，微信/Android/Apple 发布项仍延期处理。"
+  }
+  const backendText = backendRequiredBlocking.length
+    ? `后端仍有必填阻塞：${backendRequiredBlocking.join(", ")}。`
+    : "后端必填环境阻塞已清空。"
+  const deferredText = deferredAppLaunchBlocking.length
+    ? `微信/Android/Apple 发布项延期阻塞：${deferredAppLaunchBlocking.join(", ")}。`
+    : "微信/Android/Apple 发布项已延期到后端上线后处理。"
+  return `现在不能部署；${backendText}${backendOnly ? "" : deferredText}`
+}
+
+function buildAuthorizationClosureConclusion({
+  backendOnly,
+  canDeployNow,
+  canStartNowPackets,
+  blockedCredentialNames,
+}) {
+  if (canDeployNow) return "后端 strict 门禁接近完成；生产部署仍需单独动作时授权。"
+  if (blockedCredentialNames.length === 0 && canStartNowPackets.length === 1 && canStartNowPackets[0] === "P07_DOMAIN_DNS_HTTPS") {
+    return backendOnly
+      ? "现在不能部署；RDS/ACR/OSS/SAE/env/SLS 已闭环，当前动作授权入口只剩 P07 DNS/HTTPS/ICP，随后跑正式 HTTPS smoke。"
+      : "现在不能完整发布 APP；阿里云后端动作授权入口只剩 P07 DNS/HTTPS/ICP，微信/Android/Apple 发布项延期。"
+  }
+  return "现在不能部署；这些 packet 是动作时确认入口，不能替代云资源、密钥导入、DNS/HTTPS/ICP 和 smoke 证据闭环。"
+}
+
 function buildAuthorizationClosureBrief({
   consoleRunbook,
   userActions,
@@ -688,12 +738,8 @@ function buildAuthorizationClosureBrief({
 }) {
   const runbookBrief = consoleRunbook.consoleClosureBrief || {}
   const credentialSummary = userActions.credentialAcquisitionSummary || {}
-  const blockedCredentialNames = backendOnly
-    ? credentialSummary.blockedCredentialNames || []
-    : runbookBrief.blockedCredentialNames || []
-  const readySecretEnvVariableNames = backendOnly
-    ? credentialSummary.readySecretEnvVariableNames || []
-    : runbookBrief.readySecretEnvVariableNames || []
+  const blockedCredentialNames = credentialSummary.blockedCredentialNames || []
+  const readySecretEnvVariableNames = credentialSummary.readySecretEnvVariableNames || []
   const blockedResourceEvidence = runbookBrief.blockedResourceEvidence || []
   const canStartNowPackets = nextActionTimeConfirmations.map((item) => item.packetId)
   const blockedByPacketDependencies = authorizationPackets
@@ -701,18 +747,19 @@ function buildAuthorizationClosureBrief({
     .map((packet) => packet.packetId)
 
   return {
-    conclusion: "现在不能部署；这些 packet 只是阿里云后端动作时确认入口，不能替代 RDS/ACR/OSS/SAE/DNS/env/SLS/smoke 证据闭环。",
+    conclusion: buildAuthorizationClosureConclusion({
+      backendOnly,
+      canDeployNow: consoleRunbook.summary?.canDeployNow === true,
+      canStartNowPackets,
+      blockedCredentialNames,
+    }),
     currentScope: CURRENT_SCOPE,
     fullAppLaunchScope: FULL_APP_LAUNCH_SCOPE,
     canDeployNow: consoleRunbook.summary?.canDeployNow === true,
     canCodexProceedWithoutUser: false,
-    blockedCredentialCount: backendOnly
-      ? blockedCredentialNames.length
-      : runbookBrief.blockedCredentialCount ?? blockedCredentialNames.length,
+    blockedCredentialCount: blockedCredentialNames.length,
     blockedCredentialNames,
-    readySecretEnvVariableCount: backendOnly
-      ? readySecretEnvVariableNames.length
-      : runbookBrief.readySecretEnvVariableCount ?? readySecretEnvVariableNames.length,
+    readySecretEnvVariableCount: readySecretEnvVariableNames.length,
     readySecretEnvVariableNames,
     resourceEvidenceReady: runbookBrief.resourceEvidenceReady || consoleRunbook.summary?.resourceEvidenceReady || "unknown",
     blockedResourceEvidenceIds: runbookBrief.blockedResourceEvidenceIds || consoleRunbook.summary?.blockedResourceEvidenceIds || [],
@@ -731,7 +778,7 @@ function buildAuthorizationClosureBrief({
     actionTimeConfirmationRequired: unique([
       ...(backendOnly ? [] : runbookBrief.actionTimeConfirmationRequiredIds || []),
       ...authorizationPackets
-        .filter((packet) => packet.requiresActionTimeConfirmation && !APP_LAUNCH_PACKET_IDS.has(packet.packetId))
+        .filter((packet) => packet.status !== "ready" && packet.requiresActionTimeConfirmation && !APP_LAUNCH_PACKET_IDS.has(packet.packetId))
         .map((packet) => packet.packetId),
     ]),
   }
