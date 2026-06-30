@@ -294,7 +294,7 @@ async function submitPendingSegmentAsr(segment: ServiceRecordSegmentRow) {
   if (taskIdOf(segment)) return segment
 
   try {
-    const audioUrl = createAliyunRdsSignedAudioUrlForBailian(segment)
+    const audioUrl = await createAliyunRdsSignedAudioUrlForBailian(segment)
     const asr = await submitAliyunRdsBailianAsrTask(audioUrl)
     const nextSegment = await updateAliyunRdsServiceRecordSegmentAsr({
       segmentId: segment.id,
@@ -432,6 +432,6 @@ export async function createAliyunRdsServiceRecordSegmentAudioUrl(sessionId: str
   if (!segment?.storage_path) return null
   return {
     segment,
-    playbackUrl: createAliyunRdsServiceRecordOssSignedGetUrl(segment.storage_path),
+    playbackUrl: await createAliyunRdsServiceRecordOssSignedGetUrl(segment.storage_path),
   }
 }

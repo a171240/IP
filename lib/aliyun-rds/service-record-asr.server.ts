@@ -132,7 +132,7 @@ function transcriptionParameters() {
   return params
 }
 
-export function createAliyunRdsSignedAudioUrlForBailian(segment: ServiceRecordSegmentRow) {
+export async function createAliyunRdsSignedAudioUrlForBailian(segment: ServiceRecordSegmentRow) {
   const storagePath = cleanText(segment.storage_path, 2000)
   if (!storagePath) throw new Error("missing_storage_path")
   const metadata = isRecord(segment.metadata) ? segment.metadata : {}

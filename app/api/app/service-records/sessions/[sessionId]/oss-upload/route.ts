@@ -120,7 +120,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       clientSegmentId,
       ext: detected.ext,
     })
-    const policy = createAliyunRdsServiceRecordOssPostPolicy({
+    const policy = await createAliyunRdsServiceRecordOssPostPolicy({
       objectKey,
       contentType: detected.contentType,
       maxBytes: uploadPolicyMaxBytes(payload, detected, audioBytes, maxDirectBytes),

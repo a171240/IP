@@ -50,7 +50,7 @@ function detectAudio(file: File, formFormat?: unknown) {
 async function submitSegmentAsr(segment: Awaited<ReturnType<typeof upsertAliyunRdsServiceRecordSegment>>) {
   if (!isAliyunRdsBailianAsrConfigured()) return segment
   try {
-    const audioUrl = createAliyunRdsSignedAudioUrlForBailian(segment)
+    const audioUrl = await createAliyunRdsSignedAudioUrlForBailian(segment)
     const asr = await submitAliyunRdsBailianAsrTask(audioUrl)
     return await updateAliyunRdsServiceRecordSegmentAsr({
       segmentId: segment.id,
