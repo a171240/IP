@@ -7,6 +7,7 @@ const path = require("node:path")
 const root = process.cwd()
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), "utf8")
 const readJson = (...parts) => JSON.parse(read(...parts))
+const envFixturePath = createEnvFixture()
 
 const REQUIRED_MISSING = [
   "APP_ENV",
@@ -49,6 +50,8 @@ test("Aliyun env source map classifies Vercel migration names without printing v
 
   const output = execFileSync(process.execPath, [
     "scripts/summarize-aliyun-env-source-map.mjs",
+    "--env-file",
+    envFixturePath,
     "--vercel-env-coverage-report",
     coveragePath,
     "--out",
@@ -72,7 +75,7 @@ test("Aliyun env source map classifies Vercel migration names without printing v
   assert.equal(report.mutationPerformed, false)
   assert.equal(report.secretLeakCheck.ok, true)
   assert.equal(report.vercelCoverage.ok, true)
-  assert.equal(report.summary.vercelRequiredCovered, "17/27")
+  assert.equal(report.summary.vercelRequiredCovered, "15/25")
   assert.deepEqual(report.summary.requiredMissingInVercelProduction, REQUIRED_MISSING)
   assert.ok(migrateNames.includes("SUPABASE_SERVICE_ROLE_KEY"))
   assert.ok(migrateNames.includes("DEEPSEEK_API_KEY"))
@@ -95,6 +98,8 @@ test("Aliyun env source map classifies Vercel migration names without printing v
 test("Aliyun env source map skip mode remains value-free and deterministic", () => {
   const output = execFileSync(process.execPath, [
     "scripts/summarize-aliyun-env-source-map.mjs",
+    "--env-file",
+    envFixturePath,
     "--skip-vercel-env-coverage",
   ], {
     cwd: root,
@@ -160,4 +165,35 @@ function fakeVercelCoverage() {
     appSpecificKeysMissingInVercelProduction: REQUIRED_MISSING,
     extraProductionKeys: [],
   }
+}
+
+function createEnvFixture() {
+  const outDir = fs.mkdtempSync("/tmp/meiye-env-source-map-fixture-")
+  const filePath = path.join(outDir, ".env.production-cn.local")
+  fs.writeFileSync(filePath, [
+    "APP_ENV=production-cn",
+    "APP_REGION=cn-hangzhou",
+    "APP_API_BASE_URL=https://api.example.test",
+    "APP_ASSET_BASE_URL=https://assets.example.test",
+    "NEXT_PUBLIC_SITE_URL=https://site.example.test",
+    "PRIVACY_POLICY_URL=https://site.example.test/privacy",
+    "TERMS_URL=https://site.example.test/terms",
+    "NEXT_PUBLIC_SUPABASE_URL=https://supabase.example.test",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY=test",
+    "SUPABASE_SERVICE_ROLE_KEY=test",
+    "WECHAT_LOGIN_SECRET=test",
+    "ALIYUN_OSS_BUCKET=meiye-service-records-test",
+    "ALIYUN_OSS_REGION=oss-cn-hangzhou",
+    "SERVICE_RECORD_OSS_PREFIX=service-records/",
+    "DASHSCOPE_API_KEY=test",
+    "BAILIAN_ASR_MODEL=paraformer-realtime-v2",
+    "SERVICE_RECORD_ASR_PROVIDER=bailian",
+    "DEEPSEEK_API_KEY=test",
+    "DEEPSEEK_BASE_URL=https://deepseek.example.test",
+    "DEEPSEEK_MODEL=deepseek-chat",
+    "VOLC_SPEECH_APP_ID=app1",
+    "VOLC_SPEECH_ACCESS_TOKEN=test",
+    "",
+  ].join("\n"))
+  return filePath
 }

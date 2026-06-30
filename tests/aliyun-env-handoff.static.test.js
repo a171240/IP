@@ -7,6 +7,7 @@ const path = require("node:path")
 const root = process.cwd()
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), "utf8")
 const readJson = (...parts) => JSON.parse(read(...parts))
+const envFixturePath = createEnvFixture()
 
 test("Aliyun env handoff command is wired into scripts and deployment spec", () => {
   const pkg = readJson("package.json")
@@ -34,7 +35,11 @@ test("Aliyun env handoff command is wired into scripts and deployment spec", () 
 })
 
 test("Aliyun env handoff groups current variables without printing values", () => {
-  const output = execFileSync(process.execPath, ["scripts/summarize-aliyun-env-handoff.mjs"], {
+  const output = execFileSync(process.execPath, [
+    "scripts/summarize-aliyun-env-handoff.mjs",
+    "--env-file",
+    envFixturePath,
+  ], {
     cwd: root,
     encoding: "utf8",
     maxBuffer: 1024 * 1024 * 20,
@@ -97,6 +102,8 @@ test("Aliyun env handoff groups current variables without printing values", () =
 test("Aliyun env handoff backend-only mode excludes deferred app launch variables", () => {
   const output = execFileSync(process.execPath, [
     "scripts/summarize-aliyun-env-handoff.mjs",
+    "--env-file",
+    envFixturePath,
     "--backend-only",
   ], {
     cwd: root,
@@ -116,8 +123,8 @@ test("Aliyun env handoff backend-only mode excludes deferred app launch variable
   assert.deepEqual(report.summary.requiredBlocking, ["DATABASE_URL_CN"])
   assert.deepEqual(report.summary.fullAppRequiredBlocking, ["DATABASE_URL_CN"])
   assert.deepEqual(report.summary.appLaunchBlocking, [])
-  assert.equal(report.summary.requiredTotal, 25)
-  assert.equal(report.summary.requiredReady, 24)
+  assert.equal(report.summary.requiredTotal, 23)
+  assert.equal(report.summary.requiredReady, 22)
   assert.deepEqual(groupNames.blockedRequired, ["DATABASE_URL_CN"])
   assert.deepEqual(groupNames.appLaunchBlocking, [])
   assert.ok(!groupNames.readyPlainEnv.includes("WECHAT_OPEN_APP_REVIEW_STATUS"))
@@ -149,7 +156,9 @@ test("Aliyun env handoff backend-only mode excludes deferred app launch variable
   assert.ok(rdsQueueItem.verifyCommands.includes("corepack pnpm aliyun:rds:migration:package"))
   const readyImportQueueItem = report.credentialAcquisitionQueue.items.find((item) => item.actionId === "S06_READY_SENSITIVE_ENV_IMPORT")
   assert.ok(readyImportQueueItem.readySecretEnvVariableNames.includes("SUPABASE_SERVICE_ROLE_KEY"))
-  assert.ok(readyImportQueueItem.relatedActionIds.includes("S05_OSS_RAM_SECRET_OR_STS"))
+  assert.ok(groupNames.deferred.includes("ALIYUN_OSS_ACCESS_KEY_ID"))
+  assert.ok(groupNames.deferred.includes("ALIYUN_OSS_ACCESS_KEY_SECRET"))
+  assert.ok(!readyImportQueueItem.relatedActionIds.includes("S05_OSS_RAM_SECRET_OR_STS"))
   assert.ok(report.credentialAcquisitionQueue.requiresActionTimeConfirmationIds.includes("S08_ALIYUN_RDS_DATABASE_URL"))
   assert.ok(report.credentialAcquisitionQueue.valueHandlingRules.some((item) => /DATABASE_URL_CN/.test(item)))
   assert.ok(report.verificationCommands.includes("corepack pnpm aliyun:sensitive:blockers:backend"))
@@ -165,6 +174,8 @@ test("Aliyun env handoff markdown keeps operator instructions value-free", () =>
   const markdownPath = path.join(outDir, "env-handoff.md")
   execFileSync(process.execPath, [
     "scripts/summarize-aliyun-env-handoff.mjs",
+    "--env-file",
+    envFixturePath,
     "--out",
     jsonPath,
     "--markdown",
@@ -203,6 +214,8 @@ test("Aliyun env handoff backend-only markdown omits deferred app launch variabl
   const markdownPath = path.join(outDir, "env-handoff-backend.md")
   execFileSync(process.execPath, [
     "scripts/summarize-aliyun-env-handoff.mjs",
+    "--env-file",
+    envFixturePath,
     "--backend-only",
     "--markdown",
     markdownPath,
@@ -236,4 +249,35 @@ test("Aliyun env handoff backend-only markdown omits deferred app launch variabl
 
 function readJsonFromPath(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"))
+}
+
+function createEnvFixture() {
+  const outDir = fs.mkdtempSync("/tmp/meiye-env-runtime-fixture-")
+  const filePath = path.join(outDir, ".env.production-cn.local")
+  fs.writeFileSync(filePath, [
+    "APP_ENV=production-cn",
+    "APP_REGION=cn-hangzhou",
+    "APP_API_BASE_URL=https://api.example.test",
+    "APP_ASSET_BASE_URL=https://assets.example.test",
+    "NEXT_PUBLIC_SITE_URL=https://site.example.test",
+    "PRIVACY_POLICY_URL=https://site.example.test/privacy",
+    "TERMS_URL=https://site.example.test/terms",
+    "NEXT_PUBLIC_SUPABASE_URL=https://supabase.example.test",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY=test",
+    "SUPABASE_SERVICE_ROLE_KEY=test",
+    "WECHAT_LOGIN_SECRET=test",
+    "ALIYUN_OSS_BUCKET=meiye-service-records-test",
+    "ALIYUN_OSS_REGION=oss-cn-hangzhou",
+    "SERVICE_RECORD_OSS_PREFIX=service-records/",
+    "DASHSCOPE_API_KEY=test",
+    "BAILIAN_ASR_MODEL=paraformer-realtime-v2",
+    "SERVICE_RECORD_ASR_PROVIDER=bailian",
+    "DEEPSEEK_API_KEY=test",
+    "DEEPSEEK_BASE_URL=https://deepseek.example.test",
+    "DEEPSEEK_MODEL=deepseek-chat",
+    "VOLC_SPEECH_APP_ID=app1",
+    "VOLC_SPEECH_ACCESS_TOKEN=test",
+    "",
+  ].join("\n"))
+  return filePath
 }

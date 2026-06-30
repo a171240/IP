@@ -23,8 +23,6 @@ export const REQUIRED_KEYS = [
   "WECHAT_LOGIN_SECRET",
   "WECHAT_OPEN_APP_ID",
   "WECHAT_OPEN_APP_SECRET",
-  "ALIYUN_OSS_ACCESS_KEY_ID",
-  "ALIYUN_OSS_ACCESS_KEY_SECRET",
   "ALIYUN_OSS_BUCKET",
   "ALIYUN_OSS_REGION",
   "SERVICE_RECORD_OSS_PREFIX",
@@ -40,6 +38,12 @@ export const REQUIRED_KEYS = [
 
 export const OPTIONAL_KEYS = [
   "REDIS_URL_CN",
+  "ALIBABA_CLOUD_ROLE_ARN",
+  "ALIBABA_CLOUD_OIDC_PROVIDER_ARN",
+  "ALIBABA_CLOUD_OIDC_TOKEN_FILE",
+  "ALIYUN_OSS_RAM_ROLE_NAME",
+  "ALIYUN_OSS_ACCESS_KEY_ID",
+  "ALIYUN_OSS_ACCESS_KEY_SECRET",
   "ALIYUN_OSS_SECURITY_TOKEN",
   "BAILIAN_ASR_LANGUAGE_HINTS",
   "BAILIAN_ASR_DIARIZATION_ENABLED",
@@ -357,7 +361,7 @@ function rawStatusOf(value) {
 }
 
 function sensitivityOf(key) {
-  if (/^(APP_ENV|APP_REGION|APP_API_BASE_URL|APP_ASSET_BASE_URL|NEXT_PUBLIC_SITE_URL|PRIVACY_POLICY_URL|TERMS_URL|ALIYUN_OSS_BUCKET|ALIYUN_OSS_REGION|SERVICE_RECORD_OSS_PREFIX|BAILIAN_ASR_MODEL|BAILIAN_ASR_LANGUAGE_HINTS|BAILIAN_ASR_DIARIZATION_ENABLED|BAILIAN_ASR_SPEAKER_COUNT|BAILIAN_ASR_AUDIO_URL_EXPIRES_SECONDS|SERVICE_RECORD_ASR_PROVIDER|DEEPSEEK_BASE_URL|DEEPSEEK_MODEL|SERVICE_RECORD_DEEPSEEK_BASE_URL|SERVICE_RECORD_DEEPSEEK_MODEL|VOLC_ASR_RESOURCE_ID|VOLC_ASR_FLASH_RESOURCE_ID|VOLC_TTS_CLUSTER|VOLC_TTS_VOICE_TYPE|VOLC_TTS_LANGUAGE|VOICE_COACH_ENABLED|VOICE_COACH_MAX_TURNS|VOICE_COACH_REPLY_PROVIDER|VOICE_COACH_ANALYSIS_PROVIDER|VOICE_COACH_FIRST_TURN_MODE|VOICE_COACH_FIRST_TTS_MODE|WECHAT_OPEN_APP_REVIEW_STATUS|APPLE_TEAM_ID|APIMART_BASE_URL|APIMART_MODEL|APIMART_IMAGE_BASE_URL|APIMART_IMAGE_MODEL)$/.test(key)) {
+  if (/^(APP_ENV|APP_REGION|APP_API_BASE_URL|APP_ASSET_BASE_URL|NEXT_PUBLIC_SITE_URL|PRIVACY_POLICY_URL|TERMS_URL|ALIYUN_OSS_BUCKET|ALIYUN_OSS_REGION|ALIBABA_CLOUD_ROLE_ARN|ALIBABA_CLOUD_OIDC_PROVIDER_ARN|ALIBABA_CLOUD_OIDC_TOKEN_FILE|ALIYUN_OSS_RAM_ROLE_NAME|SERVICE_RECORD_OSS_PREFIX|BAILIAN_ASR_MODEL|BAILIAN_ASR_LANGUAGE_HINTS|BAILIAN_ASR_DIARIZATION_ENABLED|BAILIAN_ASR_SPEAKER_COUNT|BAILIAN_ASR_AUDIO_URL_EXPIRES_SECONDS|SERVICE_RECORD_ASR_PROVIDER|DEEPSEEK_BASE_URL|DEEPSEEK_MODEL|SERVICE_RECORD_DEEPSEEK_BASE_URL|SERVICE_RECORD_DEEPSEEK_MODEL|VOLC_ASR_RESOURCE_ID|VOLC_ASR_FLASH_RESOURCE_ID|VOLC_TTS_CLUSTER|VOLC_TTS_VOICE_TYPE|VOLC_TTS_LANGUAGE|VOICE_COACH_ENABLED|VOICE_COACH_MAX_TURNS|VOICE_COACH_REPLY_PROVIDER|VOICE_COACH_ANALYSIS_PROVIDER|VOICE_COACH_FIRST_TURN_MODE|VOICE_COACH_FIRST_TTS_MODE|WECHAT_OPEN_APP_REVIEW_STATUS|APPLE_TEAM_ID|APIMART_BASE_URL|APIMART_MODEL|APIMART_IMAGE_BASE_URL|APIMART_IMAGE_MODEL)$/.test(key)) {
     return "public"
   }
   if (/(_ID|_USER_IDS|_EMAILS|_BUCKET|_REGION|DATABASE_URL_CN|REDIS_URL_CN|NEXT_PUBLIC_SUPABASE_URL|NEXT_PUBLIC_SUPABASE_ANON_KEY|WECHAT_MINI_APPID|WECHAT_OPEN_APP_ID)$/.test(key)) {
@@ -504,12 +508,23 @@ function sourceMetadataOf(key) {
     })
   }
   if (/^ALIYUN_OSS|SERVICE_RECORD_OSS_PREFIX/.test(key)) {
+    if (key === "ALIYUN_OSS_RAM_ROLE_NAME") {
+      return metadata({
+        category: "aliyun_oss",
+        owner: "阿里云 OSS/RAM/SAE 操作员",
+        consolePath: "阿里云 SAE 应用 -> 运行时角色 / 环境变量；RAM 访问控制 -> 角色",
+        obtain: "兼容 ECS metadata fallback：仅在不使用 SAE RRSA/OIDC 时填写非密钥 RAM role name。",
+        importTarget: "阿里云 SAE plain env",
+        cloudConfirmationKey: "oss",
+        notes: "当前 SAE 首选 ALIBABA_CLOUD_ROLE_ARN / ALIBABA_CLOUD_OIDC_PROVIDER_ARN / ALIBABA_CLOUD_OIDC_TOKEN_FILE；本变量仅作 metadata fallback。",
+      })
+    }
     if (key === "ALIYUN_OSS_SECURITY_TOKEN") {
       return metadata({
         category: "aliyun_oss",
         owner: "阿里云 OSS/RAM 操作员",
-        consolePath: "阿里云 RAM / STS / SAE 运行时角色",
-        obtain: "使用临时 STS 凭证或运行时角色链路时注入；长期 AccessKey 模式可以留空。",
+        consolePath: "阿里云 RAM / STS / SAE RRSA/OIDC 运行时角色",
+        obtain: "仅 fallback 模式使用临时 STS 凭证时注入；SAE RRSA/OIDC 首选链路可留空。",
         importTarget: "阿里云 KMS/Secrets Manager/SAE secret env",
         cloudConfirmationKey: "oss",
         notes: "可选临时凭证 token；不能写入镜像、文档或 git。",
@@ -519,10 +534,21 @@ function sourceMetadataOf(key) {
       category: "aliyun_oss",
       owner: "阿里云 OSS/RAM 操作员",
       consolePath: "阿里云控制台 -> OSS Bucket / RAM 访问控制",
-      obtain: "确认服务记录音频 Bucket、region、CORS 和 RAM 最小权限，生成受限 AccessKey。",
+      obtain: "仅在不使用 SAE RRSA/OIDC runtime role 时作为 fallback：确认服务记录音频 Bucket、region、CORS 和 RAM 最小权限，生成受限 AccessKey。",
       importTarget: sensitivityOf(key) === "public" ? "阿里云 SAE plain env" : "阿里云 KMS/Secrets Manager/SAE secret env",
       cloudConfirmationKey: "oss",
-      notes: "RAM 权限应限制到服务记录音频前缀。",
+      notes: "首选 SAE RRSA/OIDC runtime role；AccessKey/Secret 只作为 fallback，RAM 权限应限制到服务记录音频前缀。",
+    })
+  }
+  if (/^ALIBABA_CLOUD_(ROLE_ARN|OIDC_PROVIDER_ARN|OIDC_TOKEN_FILE)$/.test(key)) {
+    return metadata({
+      category: "aliyun_oss",
+      owner: "阿里云 OSS/RAM/SAE 操作员",
+      consolePath: "阿里云 SAE 应用 -> RRSA/OIDC 运行时角色；RAM 访问控制 -> OIDC provider / role",
+      obtain: "首选 SAE RRSA/OIDC：由 SAE 运行环境提供 role ARN、OIDC provider ARN 和 token file path。",
+      importTarget: "阿里云 SAE runtime env",
+      cloudConfirmationKey: "oss",
+      notes: "变量值本身是运行时配置/文件路径，不是 AccessKeySecret；OIDC token 文件内容不能写入文档、镜像或 git。",
     })
   }
   if (/DASHSCOPE|BAILIAN/.test(key)) {
