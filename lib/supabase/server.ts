@@ -70,9 +70,27 @@ function getBearerToken(request: NextRequest): string | null {
   return match ? match[1].trim() : null
 }
 
+type RequestSupabaseClient = ReturnType<typeof createSupabaseClient>
+
+function createUnauthenticatedSupabaseClient(): RequestSupabaseClient {
+  return {
+    auth: {
+      async getUser() {
+        return { data: { user: null }, error: null }
+      },
+      async signOut() {
+        return { error: null }
+      },
+    },
+  } as unknown as RequestSupabaseClient
+}
+
 export async function createServerSupabaseClientForRequest(request: NextRequest) {
   const token = getBearerToken(request)
   if (!token) {
+    if (!getSupabaseUrl() || !getSupabaseAnonKey()) {
+      return createUnauthenticatedSupabaseClient()
+    }
     return createServerSupabaseClient()
   }
 
@@ -98,8 +116,6 @@ export async function createServerSupabaseClientForRequest(request: NextRequest)
 export async function createClient() {
   return createServerSupabaseClient()
 }
-
-
 
 
 
