@@ -28,12 +28,22 @@ const SECRET_VALUE_PATTERNS = [
 
 function parseArgs(argv) {
   const args = {
+    envFile: "",
+    cloudConfirmationsFile: "",
     out: "",
     markdown: "",
   }
   for (let index = 2; index < argv.length; index += 1) {
     const arg = argv[index]
     if (arg === "--") continue
+    if (arg === "--env-file") {
+      args.envFile = resolveValue(argv[++index], "--env-file")
+      continue
+    }
+    if (arg === "--cloud-confirmations") {
+      args.cloudConfirmationsFile = resolveValue(argv[++index], "--cloud-confirmations")
+      continue
+    }
     if (arg === "--out") {
       args.out = resolveValue(argv[++index], "--out")
       continue
@@ -62,11 +72,14 @@ function writeText(filePath, content) {
   writeFileSync(filePath, content.endsWith("\n") ? content : `${content}\n`, { mode: 0o600 })
 }
 
-function runSensitiveBlockersBackend() {
-  const result = spawnSync(process.execPath, [
+function runSensitiveBlockersBackend(args = {}) {
+  const scriptArgs = [
     "scripts/summarize-aliyun-sensitive-blockers.mjs",
     "--backend-only",
-  ], {
+    ...(args.envFile ? ["--env-file", args.envFile] : []),
+    ...(args.cloudConfirmationsFile ? ["--cloud-confirmations", args.cloudConfirmationsFile] : []),
+  ]
+  const result = spawnSync(process.execPath, scriptArgs, {
     cwd: BACKEND_ROOT,
     encoding: "utf8",
     maxBuffer: 1024 * 1024 * 30,
@@ -111,27 +124,49 @@ function buildBlockedSecretImportBatches(groups) {
       const blockedCredentialNames = group.blockedCredentialNames || []
       const isRds = group.category === "rds_database_secret_and_migration"
       const isOss = group.category === "oss_ram_sts"
+      const ossFallbackSecretNames = [
+        "ALIYUN_OSS_ACCESS_KEY_ID",
+        "ALIYUN_OSS_ACCESS_KEY_SECRET",
+        "ALIYUN_OSS_SECURITY_TOKEN",
+      ]
       return {
         id: `BLOCKED_SECRET_BATCH_${String(index + 1).padStart(2, "0")}_${group.category.toUpperCase()}`,
         category: group.category,
         actionId: group.actionId,
         phase: isRds
           ? "blocked_until_rds_postgres_and_migration_evidence_ready"
-          : "blocked_until_oss_ram_sts_and_runtime_role_confirmed",
+          : "blocked_until_oss_access_mode_and_runtime_role_confirmed",
         status: "blocked",
         canImportNow: false,
         owner: group.owner,
         userQuestion: group.userQuestion,
-        variableNames: group.variableNames || [],
+        variableNames: isOss
+          ? ["ALIBABA_CLOUD_ROLE_ARN", "ALIBABA_CLOUD_OIDC_PROVIDER_ARN", "ALIBABA_CLOUD_OIDC_TOKEN_FILE", ...ossFallbackSecretNames]
+          : group.variableNames || [],
         blockedCredentialNames,
         readySecretEnvVariableNames: group.readySecretEnvVariableNames || [],
-        optionalVariableNames: isOss ? ["ALIYUN_OSS_SECURITY_TOKEN"] : [],
-        importTarget: (group.importTargets || []).join("; ") || "阿里云 KMS/Secrets Manager/SAE secret env",
+        optionalVariableNames: isOss ? ossFallbackSecretNames : [],
+        plainEnvVariableNames: isOss
+          ? ["ALIBABA_CLOUD_ROLE_ARN", "ALIBABA_CLOUD_OIDC_PROVIDER_ARN", "ALIBABA_CLOUD_OIDC_TOKEN_FILE"]
+          : [],
+        fallbackSecretEnvVariableNames: isOss ? ossFallbackSecretNames : [],
+        preferredCredentialMode: isOss ? "sae_runtime_role" : "",
+        credentialModes: isOss ? [
+          "sae_runtime_role_rrsa_oidc",
+          "sts_assume_role_secret_env",
+          "least_privilege_ram_user_secret_env",
+        ] : [],
+        preferredModeAvoidsLongLivedSecret: isOss ? true : undefined,
+        importTarget: isOss
+          ? "preferred: SAE RRSA/OIDC runtime env + runtime role binding; fallback only: 阿里云 KMS/Secrets Manager/SAE secret env"
+          : (group.importTargets || []).join("; ") || "阿里云 KMS/Secrets Manager/SAE secret env",
         writeTargets: group.writeTargets || [],
         verifyCommands: group.verifyCommands || [],
         requiresActionTimeConfirmation: group.requiresActionTimeConfirmation === true,
         unblockCondition: group.unblockCondition || "",
-        valuePolicy: group.valueHandling || "只在动作时导入阿里云 secret env；报告中只保留变量名和非密钥证据。",
+        valuePolicy: isOss
+          ? "首选 SAE RRSA/OIDC runtime role：只记录非密钥 role ARN、OIDC provider ARN 和 token file path；AccessKey/Secret/STS token 仅在 fallback 模式动作时导入阿里云 secret env。"
+          : group.valueHandling || "只在动作时导入阿里云 secret env；报告中只保留变量名和非密钥证据。",
         forbiddenStorage: group.forbiddenStorage || [],
         dependencyEvidence: isRds
           ? [
@@ -147,8 +182,10 @@ function buildBlockedSecretImportBatches(groups) {
           : [
             "oss.confirmed=true",
             "oss.ramLeastPrivilege=true",
+            "oss.accessMode=sae_runtime_role|sts_assume_role|least_privilege_ram_user_secret_env",
+            "ALIBABA_CLOUD_ROLE_ARN / ALIBABA_CLOUD_OIDC_PROVIDER_ARN / ALIBABA_CLOUD_OIDC_TOKEN_FILE runtime env set when accessMode=sae_runtime_role",
             "serviceRecordPrefix=service-records/production-cn",
-            "runtime role or least-privilege RAM/STS path selected",
+            "runtime role or fallback least-privilege RAM/STS path selected",
           ],
       }
     })
@@ -196,8 +233,8 @@ function buildReadySecretImportBatches(readyGroups) {
   }))
 }
 
-function buildReport() {
-  const sensitive = runSensitiveBlockersBackend()
+function buildReport(args = {}) {
+  const sensitive = runSensitiveBlockersBackend(args)
   const brief = sensitive.credentialInterventionBrief || {}
   const groups = brief.groups || []
   const readyGroups = (sensitive.summary?.readySensitiveEnvVariableGroups || []).map(normalizeReadySecretGroup)
@@ -219,6 +256,10 @@ function buildReport() {
       SOURCE_COMMANDS.deploymentGate,
       SOURCE_COMMANDS.credentialGate,
     ],
+    sourceFiles: {
+      envFile: args.envFile || "",
+      cloudConfirmationsFile: args.cloudConfirmationsFile || "",
+    },
     containsValues: false,
     readOnlyOnly: true,
     cloudApiCalled: false,
@@ -237,6 +278,7 @@ function buildReport() {
     importBatches,
     backendBlockerNotes: [
       "ACR purchase evidence is confirmed locally; S04_ACR_REGISTRY_AUTH remains blocked until docker push, digest verification, and SAE runtime image pull configuration are closed without storing registry secret material in docs, JSON, images, or git.",
+      "OSS P05 now prefers SAE RRSA/OIDC runtime role. ALIBABA_CLOUD_ROLE_ARN, ALIBABA_CLOUD_OIDC_PROVIDER_ARN, and ALIBABA_CLOUD_OIDC_TOKEN_FILE are runtime env/file-path inputs when accessMode=sae_runtime_role; ALIYUN_OSS_ACCESS_KEY_ID/SECRET/SECURITY_TOKEN are fallback-only secret env names.",
       "Supabase variables in legacy_database_migration_source are migration source / legacy compatibility only; formal production-cn database target is Aliyun RDS PostgreSQL.",
       "WeChat Open Platform mobile app, Apple Team ID, and Android release signing variables are deferred full App launch items, not current backend import blockers.",
     ],
@@ -388,9 +430,9 @@ function renderMarkdown(report) {
       `| \`${batch.id}\` | \`${batch.phase}\` | ${batch.canImportNow} | ${(batch.variableNames || []).map((name) => `\`${name}\``).join(", ") || "none"} | ${(batch.blockedCredentialNames || []).map((name) => `\`${name}\``).join(", ") || "none"} | ${batch.importTarget} | ${(batch.verifyCommands || []).map((command) => `\`${command}\``).join("<br>")} |`,
     ),
     "",
-    "## Conditional OSS STS Token",
+    "## Conditional OSS Credential Path",
     "",
-    "`ALIYUN_OSS_SECURITY_TOKEN` is optional. Import it only when the OSS runtime path uses temporary STS credentials. If the backend uses a least-privilege RAM AccessKey or an SAE runtime role path that does not issue an STS session token to the app, leave this variable empty and do not count it as a backend-only blocked credential.",
+    "Preferred path is SAE RRSA/OIDC runtime role: configure `ALIBABA_CLOUD_ROLE_ARN`, `ALIBABA_CLOUD_OIDC_PROVIDER_ARN`, and `ALIBABA_CLOUD_OIDC_TOKEN_FILE` through SAE RRSA/OIDC, bind the least-privilege OSS policy to that role, and let the backend exchange the runtime OIDC token for temporary STS credentials. `ALIYUN_OSS_ACCESS_KEY_ID`, `ALIYUN_OSS_ACCESS_KEY_SECRET`, and `ALIYUN_OSS_SECURITY_TOKEN` are fallback-only secret env names; import them only when the selected access mode is STS or a dedicated least-privilege RAM user.",
     "",
     "## Ready Secret Env Import Batches",
     "",
@@ -444,7 +486,7 @@ function renderMarkdown(report) {
 function printHelp() {
   console.log([
     "Usage:",
-    "  node scripts/generate-aliyun-backend-env-import-batches.mjs [--out path] [--markdown path]",
+    "  node scripts/generate-aliyun-backend-env-import-batches.mjs [--env-file path] [--cloud-confirmations path] [--out path] [--markdown path]",
     "",
     "Builds a value-free backend-only Aliyun secret-env import batch report from aliyun:sensitive:blockers:backend.",
   ].join("\n"))
@@ -452,7 +494,7 @@ function printHelp() {
 
 try {
   const args = parseArgs(process.argv)
-  const report = buildReport()
+  const report = buildReport(args)
   const json = JSON.stringify(report, null, 2)
   console.log(json)
   if (args.out) writeText(args.out, json)
