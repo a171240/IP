@@ -56,6 +56,13 @@ export const ServerSessionReadySchema = z.object({
   type: z.literal("session.ready"),
   session_id: z.string(),
   scenario: VoiceCoachScenarioSchema,
+  capabilities: z
+    .object({
+      protocol_version: z.number().int().nonnegative(),
+      streaming_tts: z.boolean(),
+      audio_persistence: z.boolean(),
+    })
+    .optional(),
 })
 
 export const ServerAsrPartialSchema = z.object({

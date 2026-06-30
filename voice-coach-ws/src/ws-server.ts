@@ -218,6 +218,11 @@ export async function handleVoiceCoachConnection(
     type: "session.ready",
     session_id: sessionId,
     scenario: snapshot.scenario,
+    capabilities: {
+      protocol_version: 2,
+      streaming_tts: true,
+      audio_persistence: true,
+    },
   })
 }
 

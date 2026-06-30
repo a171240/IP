@@ -19,8 +19,19 @@ describe("protocol", () => {
       type: "session.ready",
       session_id: "session-1",
       scenario: getScenario("objection_safety"),
+      capabilities: {
+        protocol_version: 2,
+        streaming_tts: true,
+        audio_persistence: true,
+      },
     })
     expect(msg.type).toBe("session.ready")
+    if (msg.type !== "session.ready") {
+      throw new Error("expected session.ready")
+    }
+    expect(msg.capabilities?.audio_persistence).toBe(true)
+    expect(msg.capabilities?.streaming_tts).toBe(true)
+    expect(msg.capabilities?.protocol_version).toBe(2)
     expect(() => ServerMsgSchema.parse({ type: "error", code: "x", message: "y" })).toThrow()
   })
 
