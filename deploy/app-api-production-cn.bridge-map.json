@@ -211,6 +211,28 @@
       "productionCnStatus": "bridge_ready"
     },
     {
+      "scope": "service-records",
+      "route": "/api/app/store-admin/service-records",
+      "methods": [
+        "GET"
+      ],
+      "appFile": "app/api/app/store-admin/service-records/route.ts",
+      "sourceType": "app_native",
+      "sourceRoute": "",
+      "sourceFiles": [
+        "app/api/app/store-admin/service-records/route.ts",
+        "lib/aliyun-rds/repositories/service-records.server.ts",
+        "lib/aliyun-rds/repositories/store-admin.server.ts",
+        "lib/aliyun-rds/repositories/account-profile.server.ts",
+        "lib/aliyun-rds/postgres.server.ts"
+      ],
+      "sourcePages": [
+        "../meiye-huajing-miniprogram/pages/store-admin/service-records/index.js"
+      ],
+      "productionCnStatus": "bridge_ready",
+      "note": "APP store-admin service records facade is manager-only and reads service sessions through Aliyun RDS with store scope."
+    },
+    {
       "scope": "invites",
       "route": "/api/app/store-admin/invites",
       "methods": [

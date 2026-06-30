@@ -66,6 +66,12 @@ export const REQUIRED_ROUTES = [
     methods: ["GET"],
   },
   {
+    scope: "service-records",
+    route: "/api/app/store-admin/service-records",
+    file: "app/api/app/store-admin/service-records/route.ts",
+    methods: ["GET"],
+  },
+  {
     scope: "invites",
     route: "/api/app/store-admin/invites",
     file: "app/api/app/store-admin/invites/route.ts",

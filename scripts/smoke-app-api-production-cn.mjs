@@ -64,6 +64,12 @@ export const PROBES = [
     expected: [{ status: 401 }],
   },
   {
+    scope: "service-records",
+    method: "GET",
+    path: "/api/app/store-admin/service-records",
+    expected: [{ status: 401 }],
+  },
+  {
     scope: "invites",
     method: "POST",
     path: "/api/app/store-admin/invites",
