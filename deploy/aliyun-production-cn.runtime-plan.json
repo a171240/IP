@@ -35,6 +35,49 @@
     "secretPolicy": "Import secrets through Aliyun runtime env, KMS, or Secrets Manager. Do not bake secrets into the Docker image, JSON, docs, or git.",
     "strictCheckCommand": "corepack pnpm aliyun:readiness:cloud-ready"
   },
+  "dataLayer": {
+    "formalTarget": "Aliyun RDS PostgreSQL",
+    "connectionEnvName": "DATABASE_URL_CN",
+    "connectionSecretTarget": "Aliyun KMS / Secrets Manager / SAE secret env",
+    "migrationEvidenceCommand": "corepack pnpm aliyun:rds:migration:evidence:strict",
+    "runtimeSmokeCommand": "corepack pnpm aliyun:rds:runtime-smoke:strict",
+    "requiredBeforeRuntimeReady": true
+  },
+  "predeployDependencies": [
+    {
+      "id": "RDS_POSTGRES_MIGRATION",
+      "requiredBeforeRuntimeReady": true,
+      "authorizationPacket": "P11_ALIYUN_RDS_DATA_MIGRATION",
+      "evidenceCommand": "corepack pnpm aliyun:rds:migration:evidence:strict",
+      "supportingEvidenceCommands": [
+        "corepack pnpm aliyun:rds:runtime-smoke:strict"
+      ],
+      "blockingCredentialNames": [
+        "DATABASE_URL_CN"
+      ]
+    },
+    {
+      "id": "ACR_IMAGE_DIGEST_AND_PULL",
+      "requiredBeforeRuntimeReady": true,
+      "authorizationPacket": "P04_ACR_IMAGE_AND_PULL",
+      "evidenceCommand": "corepack pnpm aliyun:image:plan:strict"
+    },
+    {
+      "id": "OSS_RUNTIME_ACCESS",
+      "requiredBeforeRuntimeReady": true,
+      "authorizationPacket": "P05_OSS_RAM_STS",
+      "evidenceCommand": "corepack pnpm aliyun:cloud:confirmations:backend:strict",
+      "supportingEvidenceCommands": [
+        "corepack pnpm aliyun:oss:runtime-access:strict"
+      ]
+    },
+    {
+      "id": "BACKEND_ENV_IMPORT",
+      "requiredBeforeRuntimeReady": true,
+      "authorizationPacket": "P06_ENV_IMPORT",
+      "evidenceCommand": "corepack pnpm aliyun:sensitive:blockers:backend"
+    }
+  ],
   "observability": {
     "slsRequired": true,
     "healthAlertRequired": true,
@@ -46,7 +89,6 @@
     "strictCheckCommand": "corepack pnpm aliyun:cloud:confirmations:strict"
   },
   "notIncludedInFirstBridge": [
-    "RDS production data migration",
     "Redis/Tair hard dependency",
     "Mini-program upload",
     "App store submission",

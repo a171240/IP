@@ -45,6 +45,7 @@ test("Aliyun runtime plan treats RDS PostgreSQL as a runtime readiness dependenc
   assert.equal(plan.dataLayer.connectionEnvName, "DATABASE_URL_CN")
   assert.equal(plan.dataLayer.requiredBeforeRuntimeReady, true)
   assert.equal(plan.dataLayer.migrationEvidenceCommand, "corepack pnpm aliyun:rds:migration:evidence:strict")
+  assert.equal(plan.dataLayer.runtimeSmokeCommand, "corepack pnpm aliyun:rds:runtime-smoke:strict")
   assert.ok(plan.dataLayer.connectionSecretTarget.includes("Aliyun KMS"))
   assert.ok(plan.notIncludedInFirstBridge.every((item) => !/RDS|DATABASE_URL_CN|PostgreSQL/i.test(item)))
   assert.deepEqual(
@@ -57,6 +58,12 @@ test("Aliyun runtime plan treats RDS PostgreSQL as a runtime readiness dependenc
     ],
   )
   assert.deepEqual(plan.predeployDependencies[0].blockingCredentialNames, ["DATABASE_URL_CN"])
+  assert.deepEqual(plan.predeployDependencies[0].supportingEvidenceCommands, [
+    "corepack pnpm aliyun:rds:runtime-smoke:strict",
+  ])
+  assert.deepEqual(plan.predeployDependencies[2].supportingEvidenceCommands, [
+    "corepack pnpm aliyun:oss:runtime-access:strict",
+  ])
   assert.doesNotMatch(JSON.stringify(plan) + output, secretLike)
 })
 
@@ -67,4 +74,5 @@ test("Aliyun runtime plan checker rejects putting RDS back into the excluded fir
   assert.match(checker, /dataLayer\.formalTarget/)
   assert.match(checker, /predeployDependencies:RDS_POSTGRES_MIGRATION/)
   assert.match(checker, /blockingCredentialNames=DATABASE_URL_CN/)
+  assert.match(checker, /corepack pnpm aliyun:rds:runtime-smoke:strict/)
 })

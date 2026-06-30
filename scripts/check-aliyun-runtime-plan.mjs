@@ -143,6 +143,9 @@ function validatePlan(plan) {
   if (dataLayer.migrationEvidenceCommand !== "corepack pnpm aliyun:rds:migration:evidence:strict") {
     blockers.push("dataLayer.migrationEvidenceCommand")
   }
+  if (dataLayer.runtimeSmokeCommand !== "corepack pnpm aliyun:rds:runtime-smoke:strict") {
+    blockers.push("dataLayer.runtimeSmokeCommand")
+  }
   if (dataLayer.requiredBeforeRuntimeReady !== true) blockers.push("dataLayer.requiredBeforeRuntimeReady=true")
 
   const dependencies = Array.isArray(plan.predeployDependencies) ? plan.predeployDependencies : []
@@ -169,6 +172,10 @@ function validatePlan(plan) {
   if (!Array.isArray(rdsDependency.blockingCredentialNames) ||
     !rdsDependency.blockingCredentialNames.includes("DATABASE_URL_CN")) {
     blockers.push("predeployDependencies:RDS_POSTGRES_MIGRATION:blockingCredentialNames=DATABASE_URL_CN")
+  }
+  if (!Array.isArray(rdsDependency.supportingEvidenceCommands) ||
+    !rdsDependency.supportingEvidenceCommands.includes("corepack pnpm aliyun:rds:runtime-smoke:strict")) {
+    blockers.push("predeployDependencies:RDS_POSTGRES_MIGRATION:supportingEvidenceCommands")
   }
 
   const observability = plan.observability || {}
