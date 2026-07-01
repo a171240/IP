@@ -414,7 +414,7 @@ const AUTHORIZATION_PACKET_BY_ACTION_ID = Object.freeze({
     allowedActions: [
       "确认 cloud confirmations、image plan、domain、readiness 和 predeploy strict 全部通过。",
       "执行 production-cn 后端部署。",
-      "运行 postdeploy smoke 并记录部署证据。",
+      "运行 postdeploy smoke、APP API smoke 和 all-pages online boundary，并记录部署证据。",
     ],
     explicitlyExcluded: [
       "不 git push，除非单独授权。",
@@ -427,6 +427,7 @@ const AUTHORIZATION_PACKET_BY_ACTION_ID = Object.freeze({
       "corepack pnpm aliyun:domain:strict pass",
       "corepack pnpm aliyun:readiness:cloud-ready pass",
       "corepack pnpm aliyun:postdeploy:smoke pass",
+      "corepack pnpm aliyun:app-api:online-readonly-boundary pass with 404=0",
     ],
   }),
 })

@@ -1457,6 +1457,7 @@ function renderMarkdown(audit) {
     "corepack pnpm aliyun:docker:build",
     "corepack pnpm aliyun:remote:smoke -- --base-url https://api-cn.ipgongchang.xin",
     "corepack pnpm aliyun:app-api:smoke -- --base-url https://api-cn.ipgongchang.xin",
+    "corepack pnpm aliyun:app-api:online-readonly-boundary -- --base-url https://api-cn.ipgongchang.xin --timeout-ms 15000",
     "```",
   ].join("\n")
 }

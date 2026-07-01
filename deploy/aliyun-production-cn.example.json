@@ -251,7 +251,8 @@
     "corepack pnpm aliyun:cloud:confirmations:strict",
     "corepack pnpm aliyun:postdeploy:smoke -- --base-url https://api-cn.ipgongchang.xin",
     "corepack pnpm aliyun:remote:smoke -- --base-url https://api-cn.ipgongchang.xin",
-    "corepack pnpm aliyun:app-api:smoke -- --base-url https://api-cn.ipgongchang.xin"
+    "corepack pnpm aliyun:app-api:smoke -- --base-url https://api-cn.ipgongchang.xin",
+    "corepack pnpm aliyun:app-api:online-readonly-boundary -- --base-url https://api-cn.ipgongchang.xin --timeout-ms 15000"
   ],
   "requiredExternalConfirmations": [
     "SAE application created",

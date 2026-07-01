@@ -3,11 +3,21 @@
 const test = require("node:test")
 const assert = require("node:assert/strict")
 const { spawn } = require("node:child_process")
+const fs = require("node:fs")
 const http = require("node:http")
 const path = require("node:path")
 
 const root = process.cwd()
 const script = path.join(root, "scripts", "check-app-api-online-readonly-boundary.mjs")
+const postdeployCommand = "corepack pnpm aliyun:app-api:online-readonly-boundary -- --base-url https://api-cn.ipgongchang.xin --timeout-ms 15000"
+
+function read(...parts) {
+  return fs.readFileSync(path.join(root, ...parts), "utf8")
+}
+
+function readJson(...parts) {
+  return JSON.parse(read(...parts))
+}
 
 function runAsync(baseUrl) {
   return new Promise((resolve, reject) => {
@@ -128,4 +138,24 @@ test("online readonly boundary checker fails closed on deployed route 404", asyn
   } finally {
     await closeServer(stub.server)
   }
+})
+
+test("online readonly boundary is wired into production postdeploy release gates", () => {
+  const pkg = readJson("package.json")
+  const deploySpec = readJson("deploy", "aliyun-production-cn.example.json")
+  const deploymentSpecChecker = read("scripts", "check-aliyun-deployment-spec.mjs")
+  const operatorHandoff = read("scripts", "generate-aliyun-operator-handoff.mjs")
+  const releaseArtifacts = read("scripts", "prepare-aliyun-release-artifacts.mjs")
+  const actionAuthorization = read("scripts", "summarize-aliyun-action-authorization.mjs")
+
+  assert.equal(
+    pkg.scripts["aliyun:app-api:online-readonly-boundary"],
+    "node ./scripts/check-app-api-online-readonly-boundary.mjs",
+  )
+  assert.ok(deploySpec.postdeployChecks.includes(postdeployCommand))
+  assert.match(deploymentSpecChecker, /aliyun:app-api:online-readonly-boundary -- --base-url https:\/\/api-cn\.ipgongchang\.xin --timeout-ms 15000/)
+  assert.match(operatorHandoff, /ONLINE_READONLY_BOUNDARY_NOT_RUN/)
+  assert.match(operatorHandoff, /online-readonly-boundary ok=true and 404=0/)
+  assert.match(releaseArtifacts, /aliyun:app-api:online-readonly-boundary -- --base-url https:\/\/api-cn\.ipgongchang\.xin --timeout-ms 15000/)
+  assert.match(actionAuthorization, /online-readonly-boundary pass with 404=0/)
 })

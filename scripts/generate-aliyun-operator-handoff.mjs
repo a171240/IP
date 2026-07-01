@@ -817,15 +817,16 @@ function buildBackendNextActionOrder({ backendOnly, status, rdsMigrationEvidence
     {
       order: 8,
       id: "P09_PRODUCTION_DEPLOY_SMOKE",
-      title: "Run backend health and APP API smoke against Aliyun",
+      title: "Run backend health, APP API smoke, and all-pages online boundary against Aliyun",
       status: postdeploySmokeReady ? "ready" : "waiting_for_deploy",
       owner: "后端发布操作员",
-      evidenceTarget: "postdeploy smoke evidence",
+      evidenceTarget: "postdeploy smoke evidence; online-readonly-boundary ok=true and 404=0",
       requiredAuthorizationPackets: ["P09_PRODUCTION_DEPLOY"],
-      currentBlockers: postdeploySmokeReady ? [] : ["BACKEND_ALIYUN_DEPLOY_NOT_READY", "POSTDEPLOY_SMOKE_NOT_RUN"],
+      currentBlockers: postdeploySmokeReady ? [] : ["BACKEND_ALIYUN_DEPLOY_NOT_READY", "POSTDEPLOY_SMOKE_NOT_RUN", "ONLINE_READONLY_BOUNDARY_NOT_RUN"],
       verifyCommands: [
         "corepack pnpm aliyun:postdeploy:smoke -- --base-url https://api-cn.ipgongchang.xin",
         "corepack pnpm aliyun:app-api:smoke -- --base-url https://api-cn.ipgongchang.xin",
+        "corepack pnpm aliyun:app-api:online-readonly-boundary -- --base-url https://api-cn.ipgongchang.xin --timeout-ms 15000",
       ],
     },
   ]
