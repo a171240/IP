@@ -1,25 +1,25 @@
 # APP production-cn RDS migration evidence check
 
-Generated at: 2026-06-30T18:45:04.362Z
+Generated at: 2026-07-01T08:20:55.311Z
 
 ## Conclusion
 
-- ok: false
+- ok: true
 - templateReady: true
 - localExists: true
-- localReady: false
-- migrationReady: false
-- appApiRoutesWithSupabase: 32/34
-- appApiRoutesWithSupabaseDataAccess: 4/34
+- localReady: true
+- migrationReady: true
+- appApiRoutesWithSupabase: 54/56
+- appApiRoutesWithSupabaseDataAccess: 4/56
 - firstVersionRdsRoutesWithSupabaseDataAccess: 0/25
-- deferredAppApiRoutesWithSupabaseDataAccess: 4/9
+- deferredAppApiRoutesWithSupabaseDataAccess: 4/31
 - databaseUrlCnReferencedInSource: true
 - postgresDataAccessAdapterDetected: true
-- writebackBlockingGroups: schemaDataAndRollback
+- writebackBlockingGroups: none
 - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-- rdsMigrationPlanReady: false
-- rdsMigrationPhaseReady: 4/5
-- rdsMigrationNextPhaseIds: source_inventory_preflight
+- rdsMigrationPlanReady: true
+- rdsMigrationPhaseReady: 5/5
+- rdsMigrationNextPhaseIds: none
 - rdsLocalReviewCanStartNow: false
 - rdsCanStartP11AfterActionTimeConfirmation: false
 - rdsCompatibilityReviewCanStartNow: false
@@ -32,12 +32,7 @@ Generated at: 2026-06-30T18:45:04.362Z
 
 ## Local Blockers
 
-- sourceInventory.appApiRouteCount=34
-- sourceInventory.appApiRoutesWithSupabase=32
-- sourceInventory.deferredAppApiRouteCount=9
-- sourceInventory.appApiRouteCount_mismatch_current_plan
-- sourceInventory.appApiRoutesWithSupabase_mismatch_current_plan
-- sourceInventory.deferredAppApiRouteCount_mismatch_current_plan
+- none
 
 ## Writeback Plan
 
@@ -57,7 +52,7 @@ Generated at: 2026-06-30T18:45:04.362Z
 - canStartNow: false
 - dependsOnGroups: rdsInstanceAndSecret
 - requiredAuthorizationPackets: P11_ALIYUN_RDS_DATA_MIGRATION
-- blockerFields: sourceInventory.appApiRouteCount, sourceInventory.appApiRoutesWithSupabase, sourceInventory.deferredAppApiRouteCount, sourceInventory.appApiRouteCount_mismatch_current_plan, sourceInventory.appApiRoutesWithSupabase_mismatch_current_plan, sourceInventory.deferredAppApiRouteCount_mismatch_current_plan
+- blockerFields: none
 - writeTargets: deploy/aliyun-production-cn.rds-migration.local.json -> sourceInventory / migration non-secret evidence; release manifest / migration report -> non-secret migration evidence handle
 - expectedEvidence: APP API data access adapter uses RDS/PostgreSQL as formal production-cn data layer; Supabase SQL compatibility review completed before applying schema to Aliyun RDS; Supabase-specific auth/storage/RLS/service_role SQL resolved or rewritten for Aliyun RDS; Aliyun RDS PostgreSQL extension support confirmed for required functions; schema and data migration validated; row counts, critical records, APP API smoke, and rollback validation passed
 - forbidden: Do not run destructive migration without reviewed migration and rollback plan; Do not store dump contents, customer data, Supabase service role key, or database password in reports
@@ -65,9 +60,9 @@ Generated at: 2026-06-30T18:45:04.362Z
 
 ## RDS Migration Plan
 
-- ready: false
-- phaseReady: 4/5
-- nextPhaseIds: source_inventory_preflight
+- ready: true
+- phaseReady: 5/5
+- nextPhaseIds: none
 - localReviewCanStartNow: false
 - cloudOrSecretActionRequired: false
 - onlyMissingBackendCredentialValue: DATABASE_URL_CN
@@ -271,12 +266,12 @@ Generated at: 2026-06-30T18:45:04.362Z
 
 ### source_inventory_preflight
 
-- ready: false
+- ready: true
 - canStartNow: true
 - canStartAfterActionTimeConfirmation: false
 - dependsOnPhaseIds: none
 - requiredAuthorizationPackets: none
-- blockerFields: sourceInventory.appApiRouteCount, sourceInventory.appApiRoutesWithSupabase, sourceInventory.deferredAppApiRouteCount
+- blockerFields: none
 - writeTargets: deploy/aliyun-production-cn.rds-migration.local.json -> sourceInventory.* non-secret evidence; deploy/aliyun-production-cn.rds-first-version-schema-map.json; deploy/app-api-production-cn.bridge-map.json
 - expectedEvidence: firstVersionRdsRouteCount=25; firstVersionRdsRoutesWithSupabaseDataAccess=0; postgresDataAccessAdapterDetected=true; schemaInventoryReviewed=true; dataAccessAdapterReady=true
 - forbidden: Do not include row contents, customer data, Supabase service role key, or DATABASE_URL_CN value.

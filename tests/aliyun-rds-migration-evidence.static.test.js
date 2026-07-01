@@ -36,13 +36,13 @@ test("Aliyun RDS migration evidence command is wired into package scripts", () =
   assert.equal(template.rdsPostgres.provider, "Aliyun RDS PostgreSQL")
   assert.equal(template.rdsPostgres.region, "cn-hangzhou")
   assert.equal(template.rdsPostgres.databaseUrlCnSecretTarget, "Aliyun KMS / Secrets Manager / SAE secret env")
-  assert.equal(template.sourceInventory.appApiRouteCount, 34)
-  assert.equal(template.sourceInventory.appApiRoutesWithSupabase, 32)
+  assert.equal(template.sourceInventory.appApiRouteCount, 56)
+  assert.equal(template.sourceInventory.appApiRoutesWithSupabase, 54)
   assert.equal(template.sourceInventory.appApiRoutesWithSupabaseDataAccess, 4)
   assert.equal(template.sourceInventory.firstVersionRdsRouteCount, 25)
   assert.equal(template.sourceInventory.firstVersionRdsRoutesWithSupabase, 23)
   assert.equal(template.sourceInventory.firstVersionRdsRoutesWithSupabaseDataAccess, 0)
-  assert.equal(template.sourceInventory.deferredAppApiRouteCount, 9)
+  assert.equal(template.sourceInventory.deferredAppApiRouteCount, 31)
   assert.equal(template.sourceInventory.deferredAppApiRoutesWithSupabaseDataAccess, 4)
   assert.equal(template.sourceInventory.databaseUrlCnReferencedInSource, true)
   assert.equal(template.sourceInventory.postgresDataAccessAdapterDetected, true)
@@ -84,13 +84,13 @@ test("Aliyun RDS migration evidence check reports missing local closure without 
   assert.equal(report.template.ready, true)
   assert.equal(report.local.exists, false)
   assert.deepEqual(report.local.blockers, ["file_missing"])
-  assert.equal(report.summary.appApiRouteCount, 34)
-  assert.equal(report.summary.appApiRoutesWithSupabase, 32)
+  assert.equal(report.summary.appApiRouteCount, 56)
+  assert.equal(report.summary.appApiRoutesWithSupabase, 54)
   assert.equal(report.summary.appApiRoutesWithSupabaseDataAccess, 4)
   assert.equal(report.summary.firstVersionRdsRouteCount, 25)
   assert.equal(report.summary.firstVersionRdsRoutesWithSupabase, 23)
   assert.equal(report.summary.firstVersionRdsRoutesWithSupabaseDataAccess, 0)
-  assert.equal(report.summary.deferredAppApiRouteCount, 9)
+  assert.equal(report.summary.deferredAppApiRouteCount, 31)
   assert.equal(report.summary.deferredAppApiRoutesWithSupabaseDataAccess, 4)
   assert.equal(report.summary.databaseUrlCnReferencedInSource, true)
   assert.equal(report.summary.postgresDataAccessAdapterDetected, true)
@@ -295,7 +295,7 @@ test("Aliyun RDS migration evidence init creates a non-secret local evidence sca
   assert.equal(local.rdsPostgres.region, "cn-hangzhou")
   assert.equal(local.rdsPostgres.databaseUrlCnSecretImported, false)
   assert.equal(local.sourceInventory.generatedBy, "corepack pnpm aliyun:rds:migration:plan")
-  assert.equal(local.sourceInventory.appApiRouteCount, 34)
+  assert.equal(local.sourceInventory.appApiRouteCount, 56)
   assert.equal(local.sourceInventory.firstVersionRdsRoutesWithSupabaseDataAccess, 0)
   assert.equal(local.sourceInventory.databaseUrlCnReferencedInSource, true)
   assert.equal(local.sourceInventory.postgresDataAccessAdapterDetected, true)
@@ -337,13 +337,13 @@ test("Aliyun RDS migration evidence init does not overwrite an existing local ev
     },
     sourceInventory: {
       generatedBy: "corepack pnpm aliyun:rds:migration:plan",
-      appApiRouteCount: 31,
-      appApiRoutesWithSupabase: 29,
+      appApiRouteCount: 56,
+      appApiRoutesWithSupabase: 54,
       appApiRoutesWithSupabaseDataAccess: 4,
       firstVersionRdsRouteCount: 25,
       firstVersionRdsRoutesWithSupabase: 23,
       firstVersionRdsRoutesWithSupabaseDataAccess: 0,
-      deferredAppApiRouteCount: 6,
+      deferredAppApiRouteCount: 31,
       deferredAppApiRoutesWithSupabaseDataAccess: 4,
       tableCount: 44,
       rpcCount: 3,
@@ -466,7 +466,7 @@ test("Aliyun RDS migration evidence markdown is value-free", () => {
   assert.match(markdown, /supabase_service_role/)
   assert.match(markdown, /supabase_storage_schema/)
   assert.match(markdown, /firstVersionRdsRoutesWithSupabaseDataAccess: 0\/25/)
-  assert.match(markdown, /deferredAppApiRoutesWithSupabaseDataAccess: 4\/9/)
+  assert.match(markdown, /deferredAppApiRoutesWithSupabaseDataAccess: 4\/31/)
   assert.match(markdown, /P11_ALIYUN_RDS_DATA_MIGRATION/)
   assert.match(markdown, /DATABASE_URL_CN/)
   assert.match(markdown, /Supabase SQL compatibility review completed/)
@@ -480,19 +480,20 @@ test("tracked Aliyun RDS migration evidence doc pins the current P11 execution r
   const doc = read("docs", "app-production-cn-rds-migration-evidence.md")
 
   assert.match(doc, /APP production-cn RDS migration evidence check/)
-  assert.match(doc, /ok: false/)
+  assert.match(doc, /ok: true/)
   assert.match(doc, /templateReady: true/)
-  assert.match(doc, /localReady: false/)
-  assert.match(doc, /migrationReady: false/)
-  assert.match(doc, /writebackBlockingGroups: schemaDataAndRollback/)
-  assert.match(doc, /rdsMigrationPhaseReady: 4\/5/)
-  assert.match(doc, /rdsMigrationNextPhaseIds: source_inventory_preflight/)
-  assert.match(doc, /appApiRoutesWithSupabase: 32\/34/)
-  assert.match(doc, /deferredAppApiRoutesWithSupabaseDataAccess: 4\/9/)
-  assert.match(doc, /sourceInventory\.appApiRouteCount=34/)
-  assert.match(doc, /sourceInventory\.appApiRoutesWithSupabase=32/)
-  assert.match(doc, /sourceInventory\.deferredAppApiRouteCount=9/)
-  assert.match(doc, /sourceInventory\.appApiRouteCount_mismatch_current_plan/)
+  assert.match(doc, /localReady: true/)
+  assert.match(doc, /migrationReady: true/)
+  assert.match(doc, /writebackBlockingGroups: none/)
+  assert.match(doc, /rdsMigrationPhaseReady: 5\/5/)
+  assert.match(doc, /rdsMigrationNextPhaseIds: none/)
+  assert.match(doc, /appApiRoutesWithSupabase: 54\/56/)
+  assert.match(doc, /deferredAppApiRoutesWithSupabaseDataAccess: 4\/31/)
+  assert.match(doc, /## Local Blockers\n\n- none/)
+  assert.doesNotMatch(doc, /sourceInventory\.appApiRouteCount=56/)
+  assert.doesNotMatch(doc, /sourceInventory\.appApiRoutesWithSupabase=54/)
+  assert.doesNotMatch(doc, /sourceInventory\.deferredAppApiRouteCount=31/)
+  assert.doesNotMatch(doc, /sourceInventory\.appApiRouteCount_mismatch_current_plan/)
   assert.match(doc, /rdsCanStartP11AfterActionTimeConfirmation: false/)
   assert.match(doc, /rdsCompatibilityReviewCanStartNow: false/)
   assert.match(doc, /rdsSchemaApplyBlockedByCompatibilityReview: false/)
@@ -510,7 +511,7 @@ test("tracked Aliyun RDS migration evidence doc pins the current P11 execution r
   assert.match(doc, /resolvedFindingCount: 22/)
   assert.match(doc, /compatibility_disposition_plan/)
   assert.match(doc, /rdsInstanceAndSecret/)
-  assert.match(doc, /blockerFields: sourceInventory\.appApiRouteCount, sourceInventory\.appApiRoutesWithSupabase, sourceInventory\.deferredAppApiRouteCount/)
+  assert.match(doc, /blockerFields: none/)
   assert.match(doc, /app_api_smoke_and_rollback/)
   assert.match(doc, /rollbackValidationPassed=true/)
   assert.doesNotMatch(doc, secretLike)
