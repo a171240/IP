@@ -152,6 +152,42 @@ test("APP API live smoke env checker does not request anything until read-only s
   assert.doesNotMatch(result.stdout + result.stderr, new RegExp(SECRET_MANAGER_TOKEN))
 })
 
+test("APP API live smoke plan covers cross-tab GET probes only", () => {
+  const result = run(validEnv())
+  const probes = result.report.readOnlySmoke.probes
+  const paths = new Set(probes.map((item) => item.path))
+  const ids = new Set(probes.map((item) => item.id))
+  const scopes = new Set(probes.map((item) => item.scope))
+
+  assert.equal(ids.size, probes.length)
+  assert.ok(probes.every((item) => item.method === "GET"))
+  assert.ok(ids.has("employee_profile"))
+  assert.ok(ids.has("manager_profile"))
+  assert.ok(paths.has("/api/app/profile"))
+  assert.ok(paths.has("/api/app/entitlements"))
+  assert.ok(paths.has("/api/app/posters/templates"))
+  assert.ok(paths.has("/api/app/posters/history"))
+  assert.ok(paths.has("/api/app/xhs/drafts"))
+  assert.ok(paths.has("/api/app/private-copy/drafts"))
+  assert.ok(paths.has("/api/app/learning/progress?modules=professional,speech&include_entities=true"))
+  assert.ok(paths.has("/api/app/voice-coach/sessions?limit=5"))
+  assert.ok(paths.has("/api/app/customer-profiles?limit=5"))
+  assert.ok(paths.has("/api/app/scene-cards?limit=5"))
+  assert.ok(paths.has("/api/app/service-records/sessions?limit=5"))
+  assert.ok(paths.has("/api/app/store-admin/overview"))
+  assert.ok(paths.has("/api/app/store-admin/members?limit=5"))
+  assert.ok(paths.has("/api/app/store-admin/service-records?limit=5"))
+  assert.ok(paths.has("/api/app/store-profiles?limit=5"))
+  assert.ok(paths.has("/api/app/knowledge-spaces"))
+  assert.ok(scopes.has("content-poster"))
+  assert.ok(scopes.has("content-xhs"))
+  assert.ok(scopes.has("content-private-copy"))
+  assert.ok(scopes.has("learning-progress"))
+  assert.ok(scopes.has("voice-coach"))
+  assert.ok(scopes.has("knowledge-spaces"))
+  assert.equal(probes.some((item) => /generate|pay|publish|submit/.test(item.path)), false)
+})
+
 test("APP API live smoke execution uses GET-only probes and redacts token values", async () => {
   const stub = await createStubServer()
   try {
