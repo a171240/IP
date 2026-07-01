@@ -1,7 +1,79 @@
 #!/usr/bin/env node
 
-import { REQUIRED_ROUTES } from "./check-app-api-production-cn-routes.mjs"
+import { APP_CLIENT_CONTRACT_ROUTES, IMPLEMENTED_APP_FACADE_ROUTES } from "./check-app-api-production-cn-routes.mjs"
 import { PROBES } from "./smoke-app-api-production-cn.mjs"
+
+const IMPLEMENTED_APP_FACADE_COVERAGE_PROBES = [
+  {
+    scope: "assets",
+    method: "POST",
+    path: "/api/app/assets/sign-read",
+    body: {},
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "content-drafts",
+    method: "GET",
+    path: "/api/app/content-drafts",
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "content-drafts",
+    method: "POST",
+    path: "/api/app/content-drafts",
+    body: {},
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "knowledge-spaces",
+    method: "GET",
+    path: "/api/app/knowledge-spaces",
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "knowledge-spaces",
+    method: "GET",
+    path: "/api/app/knowledge-spaces/app-smoke-space",
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "knowledge-spaces",
+    method: "GET",
+    path: "/api/app/knowledge-spaces/app-smoke-space/groups/app-smoke-group",
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "knowledge-spaces",
+    method: "GET",
+    path: "/api/app/knowledge-spaces/app-smoke-space/groups/app-smoke-group/cards/app-smoke-card",
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "learning-progress",
+    method: "GET",
+    path: "/api/app/learning/progress",
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "learning-progress",
+    method: "POST",
+    path: "/api/app/learning/progress/events",
+    body: {},
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "learning-progress",
+    method: "POST",
+    path: "/api/app/learning/progress/sync",
+    body: { events: [] },
+    expected: [{ status: 401 }],
+  },
+]
+
+const COVERAGE_PROBES = [
+  ...PROBES,
+  ...IMPLEMENTED_APP_FACADE_COVERAGE_PROBES,
+]
 
 function routePattern(route) {
   const pattern = route
@@ -36,12 +108,12 @@ function probeKey(probe) {
 }
 
 function main() {
-  const businessRoutes = REQUIRED_ROUTES.filter((route) => route.scope !== "health")
+  const businessRoutes = APP_CLIENT_CONTRACT_ROUTES.filter((route) => route.scope !== "health")
   const coveredRoutes = []
   const missingRoutes = []
 
   for (const route of businessRoutes) {
-    const probes = PROBES.filter((probe) => matchesRoute(probe, route))
+    const probes = COVERAGE_PROBES.filter((probe) => matchesRoute(probe, route))
     if (probes.length) {
       coveredRoutes.push({
         scope: route.scope,
@@ -58,7 +130,7 @@ function main() {
     })
   }
 
-  const unmatchedProbes = PROBES.filter((probe) => !businessRoutes.some((route) => matchesRoute(probe, route))).map(
+  const unmatchedProbes = COVERAGE_PROBES.filter((probe) => !businessRoutes.some((route) => matchesRoute(probe, route))).map(
     (probe) => ({
       scope: probe.scope,
       method: probe.method,
@@ -68,10 +140,14 @@ function main() {
 
   const result = {
     ok: missingRoutes.length === 0 && unmatchedProbes.length === 0,
-    checkedRoutes: REQUIRED_ROUTES.length,
-    healthRoutesExcluded: REQUIRED_ROUTES.length - businessRoutes.length,
+    checkedRoutes: APP_CLIENT_CONTRACT_ROUTES.length,
+    requiredRoutes: APP_CLIENT_CONTRACT_ROUTES.length - IMPLEMENTED_APP_FACADE_ROUTES.length,
+    implementedFacadeRoutes: IMPLEMENTED_APP_FACADE_ROUTES.length,
+    healthRoutesExcluded: APP_CLIENT_CONTRACT_ROUTES.length - businessRoutes.length,
     businessRoutes: businessRoutes.length,
     smokeProbes: PROBES.length,
+    coverageOnlyProbes: IMPLEMENTED_APP_FACADE_COVERAGE_PROBES.length,
+    coverageProbes: COVERAGE_PROBES.length,
     coveredBusinessRoutes: coveredRoutes.length,
     scopes: summarizeScopes(coveredRoutes),
     missingRoutes,

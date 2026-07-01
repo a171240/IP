@@ -20,6 +20,8 @@ export const runtime = "nodejs"
 
 const allowedContentDraftKinds = new Set(["poster", "xhs", "private_copy"])
 const MAX_LIMIT = 50
+const MAX_TITLE_LENGTH = 160
+const MAX_BODY_LENGTH = 20_000
 
 type ContentDraftRow = {
   id: string
@@ -35,6 +37,14 @@ type ContentDraftRow = {
   updated_at: string | null
 }
 
+type ContentDraftPayload = {
+  kind?: unknown
+  title?: unknown
+  body?: unknown
+  status?: unknown
+  source_context?: unknown
+}
+
 function jsonError(status: number, error: string, code = error, extra?: Record<string, unknown>) {
   return NextResponse.json({ ok: false, error, code, ...(extra || {}) }, { status })
 }
@@ -48,6 +58,14 @@ function parseLimit(value: unknown) {
   const parsed = Number(value || 20)
   if (!Number.isFinite(parsed)) return 20
   return Math.min(MAX_LIMIT, Math.max(1, Math.round(parsed)))
+}
+
+async function readJsonBody(request: NextRequest) {
+  try {
+    return await request.json()
+  } catch {
+    return null
+  }
 }
 
 function resolveContentDraftScope(ctx: AppAccountContext, request: NextRequest) {
@@ -159,6 +177,27 @@ function toPublicContentDraft(row: ContentDraftRow) {
   }
 }
 
+function validateContentDraftPayload(payload: ContentDraftPayload) {
+  const kind = cleanText(payload.kind, 40)
+  if (!allowedContentDraftKinds.has(kind)) {
+    return { error: jsonError(400, "invalid_content_draft_kind", "invalid_content_draft_kind") }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, "status")) {
+    const status = cleanText(payload.status, 40)
+    if (status && status !== "draft") {
+      return { error: jsonError(400, "content_draft_status_must_be_draft", "content_draft_status_must_be_draft") }
+    }
+  }
+
+  return {
+    body: cleanText(payload.body, MAX_BODY_LENGTH),
+    kind,
+    sourceContext: safeSourceContext(payload.source_context),
+    title: cleanText(payload.title, MAX_TITLE_LENGTH),
+  }
+}
+
 function contentDraftErrorResponse(error: unknown, fallbackCode: string) {
   const appAuthError = appAuthConfigurationErrorResponse(error)
   if (appAuthError) return appAuthError
@@ -228,5 +267,61 @@ export async function GET(request: NextRequest) {
       })
     }
     return contentDraftErrorResponse(error, "content_drafts_query_failed")
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const auth = await resolveAliyunRdsAppAuthUser(request)
+    if (!auth) return appAuthRequiredResponse()
+
+    const payload = await readJsonBody(request)
+    if (!isRecord(payload)) {
+      return jsonError(400, "invalid_payload", "invalid_payload")
+    }
+
+    const ctx = await getAliyunRdsAppAccountContext(auth.user)
+    const scope = resolveContentDraftScope(ctx, request)
+    if ("error" in scope) return scope.error
+
+    const validated = validateContentDraftPayload(payload)
+    if ("error" in validated) return validated.error
+
+    const now = new Date().toISOString()
+    const result = await queryAliyunRds<ContentDraftRow>(
+      `
+        insert into public.content_drafts (
+          company_id, store_id, kind, title, body, source_context, status,
+          created_by_membership_id, created_at, updated_at
+        )
+        values ($1, $2, $3, $4, $5, $6::jsonb, 'draft', $7, $8, $8)
+        returning id, company_id, store_id, kind, title, body, source_context, status,
+                  created_by_membership_id, created_at, updated_at
+      `,
+      [
+        scope.companyId,
+        scope.storeId,
+        validated.kind,
+        validated.title || null,
+        validated.body || null,
+        JSON.stringify(validated.sourceContext),
+        ctx.membershipId,
+        now,
+      ],
+    )
+
+    const draft = result.rows[0]
+    if (!draft) return jsonError(500, "content_draft_create_failed", "content_draft_create_failed")
+
+    return NextResponse.json({
+      ok: true,
+      context: accountContextPayload(ctx),
+      draft: toPublicContentDraft(draft),
+    })
+  } catch (error) {
+    if (isContentDraftSchemaMissing(error)) {
+      return jsonError(503, "content_drafts_schema_not_ready", "content_drafts_schema_not_ready")
+    }
+    return contentDraftErrorResponse(error, "content_draft_create_failed")
   }
 }

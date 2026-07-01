@@ -20,7 +20,7 @@ test("APP auth helper supports device-gated test login without storing real secr
   assert.match(source, /APP_ENV === "production-cn"/)
 })
 
-test("APP content drafts GET route is an auth-protected read-only RDS facade", () => {
+test("APP content drafts GET route keeps the auth-protected RDS list facade", () => {
   const source = read("app", "api", "app", "content-drafts", "route.ts")
 
   assert.match(source, /export const runtime = "nodejs"/)
@@ -37,14 +37,52 @@ test("APP content drafts GET route is an auth-protected read-only RDS facade", (
   assert.match(source, /invalid_content_draft_kind/)
   assert.match(source, /tenant_scope_denied/)
   assert.match(source, /content_drafts_schema_not_ready/)
-  assert.doesNotMatch(source, /export async function POST/)
-  assert.doesNotMatch(source, /\.insert\(/)
   assert.doesNotMatch(source, /\.update\(/)
   assert.doesNotMatch(source, /\.delete\(/)
   assert.doesNotMatch(source, /withAliyunRdsTransaction/)
   assert.doesNotMatch(source, /createServerSupabaseClientForRequest/)
   assert.doesNotMatch(source, /uploadBufferAsset/)
   assert.doesNotMatch(source, /signed_url/)
+})
+
+test("APP content drafts POST route creates only tenant-scoped draft rows", () => {
+  const source = read("app", "api", "app", "content-drafts", "route.ts")
+
+  assert.match(source, /export async function POST\(request: NextRequest\)/)
+  assert.match(source, /resolveAliyunRdsAppAuthUser\(request\)/)
+  assert.match(source, /appAuthRequiredResponse\(\)/)
+  assert.match(source, /getAliyunRdsAppAccountContext\(auth\.user\)/)
+  assert.match(source, /resolveContentDraftScope\(ctx, request\)/)
+  assert.match(source, /validateContentDraftPayload\(payload\)/)
+  assert.match(source, /insert into public\.content_drafts/)
+  assert.match(source, /company_id, store_id, kind, title, body, source_context, status/)
+  assert.match(source, /created_by_membership_id/)
+  assert.match(source, /values \(\$1, \$2, \$3, \$4, \$5, \$6::jsonb, 'draft'/)
+  assert.match(source, /JSON\.stringify\(validated\.sourceContext\)/)
+  assert.match(source, /ctx\.membershipId/)
+  assert.match(source, /returning id, company_id, store_id, kind, title, body, source_context, status/)
+  assert.match(source, /draft: toPublicContentDraft\(draft\)/)
+  assert.match(source, /content_draft_create_failed/)
+  assert.match(source, /content_drafts_schema_not_ready/)
+  assert.doesNotMatch(source, /poster_generate/)
+  assert.doesNotMatch(source, /generateXhsV4/)
+  assert.doesNotMatch(source, /generatePrivateCopyContent/)
+  assert.doesNotMatch(source, /chargeMpAiPoints/)
+  assert.doesNotMatch(source, /wechatpay/i)
+})
+
+test("APP content drafts POST validates kind and refuses non-draft status", () => {
+  const source = read("app", "api", "app", "content-drafts", "route.ts")
+
+  assert.match(source, /function validateContentDraftPayload/)
+  assert.match(source, /allowedContentDraftKinds\.has\(kind\)/)
+  assert.match(source, /invalid_content_draft_kind/)
+  assert.match(source, /Object\.prototype\.hasOwnProperty\.call\(payload, "status"\)/)
+  assert.match(source, /status !== "draft"/)
+  assert.match(source, /content_draft_status_must_be_draft/)
+  assert.match(source, /safeSourceContext\(payload\.source_context\)/)
+  assert.match(source, /MAX_TITLE_LENGTH/)
+  assert.match(source, /MAX_BODY_LENGTH/)
 })
 
 test("APP content drafts route redacts unsafe source_context fields before returning drafts", () => {

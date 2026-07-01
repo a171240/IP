@@ -205,6 +205,68 @@ export const REQUIRED_ROUTES = [
   },
 ]
 
+export const IMPLEMENTED_APP_FACADE_ROUTES = [
+  {
+    scope: "assets",
+    route: "/api/app/assets/sign-read",
+    file: "app/api/app/assets/sign-read/route.ts",
+    methods: ["POST"],
+  },
+  {
+    scope: "content-drafts",
+    route: "/api/app/content-drafts",
+    file: "app/api/app/content-drafts/route.ts",
+    methods: ["GET", "POST"],
+  },
+  {
+    scope: "knowledge-spaces",
+    route: "/api/app/knowledge-spaces",
+    file: "app/api/app/knowledge-spaces/route.ts",
+    methods: ["GET"],
+  },
+  {
+    scope: "knowledge-spaces",
+    route: "/api/app/knowledge-spaces/[spaceId]",
+    file: "app/api/app/knowledge-spaces/[...path]/route.ts",
+    methods: ["GET"],
+  },
+  {
+    scope: "knowledge-spaces",
+    route: "/api/app/knowledge-spaces/[spaceId]/groups/[groupId]",
+    file: "app/api/app/knowledge-spaces/[...path]/route.ts",
+    methods: ["GET"],
+  },
+  {
+    scope: "knowledge-spaces",
+    route: "/api/app/knowledge-spaces/[spaceId]/groups/[groupId]/cards/[cardId]",
+    file: "app/api/app/knowledge-spaces/[...path]/route.ts",
+    methods: ["GET"],
+  },
+  {
+    scope: "learning-progress",
+    route: "/api/app/learning/progress",
+    file: "app/api/app/learning/progress/route.ts",
+    methods: ["GET"],
+  },
+  {
+    scope: "learning-progress",
+    route: "/api/app/learning/progress/events",
+    file: "app/api/app/learning/progress/events/route.ts",
+    methods: ["POST"],
+  },
+  {
+    scope: "learning-progress",
+    route: "/api/app/learning/progress/sync",
+    file: "app/api/app/learning/progress/sync/route.ts",
+    methods: ["POST"],
+  },
+]
+
+export const APP_CLIENT_CONTRACT_ROUTES = [
+  ...REQUIRED_ROUTES,
+  ...IMPLEMENTED_APP_FACADE_ROUTES,
+]
+
 function exportedMethods(source) {
   const methods = new Set()
   for (const method of ["GET", "POST", "PUT", "PATCH", "DELETE"]) {
@@ -224,7 +286,7 @@ function main() {
   const failures = []
   const scopes = new Map()
 
-  for (const item of REQUIRED_ROUTES) {
+  for (const item of APP_CLIENT_CONTRACT_ROUTES) {
     const absolute = resolve(process.cwd(), item.file)
     if (!existsSync(absolute)) {
       failures.push({ route: item.route, file: item.file, error: "missing_file" })
@@ -246,7 +308,9 @@ function main() {
   }
 
   const result = {
-    checkedRoutes: REQUIRED_ROUTES.length,
+    checkedRoutes: APP_CLIENT_CONTRACT_ROUTES.length,
+    requiredRoutes: REQUIRED_ROUTES.length,
+    implementedFacadeRoutes: IMPLEMENTED_APP_FACADE_ROUTES.length,
     scopes: Object.fromEntries([...scopes.entries()].sort(([a], [b]) => a.localeCompare(b))),
     failures,
   }

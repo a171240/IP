@@ -72,3 +72,19 @@ test("APP assets sign-read route has no OSS writes, DB writes, or private bucket
   assert.doesNotMatch(source, /createServerSupabaseClientForRequest/)
   assert.doesNotMatch(source, /public-read/)
 })
+
+test("APP assets sign-read is included in App client contract routes and coverage", () => {
+  const contract = read("scripts", "check-app-client-api-contract.mjs")
+  const routes = read("scripts", "check-app-api-production-cn-routes.mjs")
+  const coverage = read("scripts", "check-app-api-smoke-coverage.mjs")
+
+  assert.match(contract, /"\/api\/app\/assets\/sign-read"/)
+  assert.match(contract, /const DEFERRED_PREFIXES = \[\]/)
+  assert.match(routes, /scope:\s*"assets"/)
+  assert.match(routes, /route:\s*"\/api\/app\/assets\/sign-read"/)
+  assert.match(routes, /file:\s*"app\/api\/app\/assets\/sign-read\/route\.ts"/)
+  assert.match(routes, /methods:\s*\["POST"\]/)
+  assert.match(coverage, /scope:\s*"assets"/)
+  assert.match(coverage, /path:\s*"\/api\/app\/assets\/sign-read"/)
+  assert.match(coverage, /expected:\s*\[\{\s*status:\s*401\s*\}\]/)
+})

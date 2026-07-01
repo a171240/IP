@@ -10,7 +10,11 @@ const root = process.cwd()
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), "utf8")
 
 function runContractCheck() {
-  const output = execFileSync(process.execPath, ["scripts/check-app-client-api-contract.mjs"], {
+  return runJsonScript("scripts/check-app-client-api-contract.mjs")
+}
+
+function runJsonScript(script) {
+  const output = execFileSync(process.execPath, [script], {
     cwd: root,
     encoding: "utf8",
     maxBuffer: 1024 * 1024 * 20,
@@ -21,31 +25,72 @@ function runContractCheck() {
   }
 }
 
-test("APP client API contract defers package-2 content and media APIs outside first backend scope", () => {
+test("APP client API contract audits implemented package-2 facades", () => {
   const { output, report } = runContractCheck()
   const deferredRoutes = report.deferredRoutes.map((item) => `${item.method} ${item.route}`)
 
   assert.equal(report.ok, true)
-  assert.equal(report.auditedClientApiCalls, 42)
-  assert.equal(report.uniqueAuditedClientRoutes, 36)
-  assert.equal(report.deferredClientApiCalls, 7)
+  assert.equal(report.auditedClientApiCalls, 52)
+  assert.equal(report.uniqueAuditedClientRoutes, 46)
+  assert.equal(report.deferredClientApiCalls, 0)
+  assert.equal(report.matchedBackendRoutes, 37)
+  assert.equal(report.scopes.assets, 1)
+  assert.equal(report.scopes["content-drafts"], 1)
+  assert.equal(report.scopes["knowledge-spaces"], 4)
+  assert.equal(report.scopes["learning-progress"], 3)
+  assert.deepEqual(report.failures.missingBackendRoutes, [])
+  assert.deepEqual(report.failures.methodMismatches, [])
   assert.deepEqual(report.failures.unclassifiedRoutes, [])
-  assert.ok(deferredRoutes.includes("POST /api/app/assets/sign-read"))
-  assert.ok(deferredRoutes.includes("GET /api/app/content-drafts"))
-  assert.ok(deferredRoutes.includes("POST /api/app/content-drafts"))
-  assert.ok(report.deferredRoutes.some((item) =>
-    item.route === "/api/app/assets/sign-read" &&
-    item.reason.includes("signed media asset read")))
-  assert.ok(report.deferredRoutes.some((item) =>
-    item.route === "/api/app/content-drafts" &&
-    item.reason.includes("content drafts")))
+  assert.deepEqual(deferredRoutes, [])
+  assert.equal(deferredRoutes.includes("POST /api/app/assets/sign-read"), false)
+  assert.equal(deferredRoutes.includes("GET /api/app/content-drafts"), false)
+  assert.equal(deferredRoutes.includes("POST /api/app/content-drafts"), false)
+  assert.equal(deferredRoutes.includes("GET /api/app/knowledge-spaces"), false)
+  assert.equal(deferredRoutes.includes("GET /api/app/knowledge-spaces/[spaceId]"), false)
+  assert.equal(deferredRoutes.includes("GET /api/app/knowledge-spaces/[spaceId]/groups/[groupId]"), false)
+  assert.equal(
+    deferredRoutes.includes("GET /api/app/knowledge-spaces/[spaceId]/groups/[groupId]/cards/[cardId]"),
+    false,
+  )
+  assert.equal(deferredRoutes.includes("GET /api/app/learning/progress"), false)
+  assert.equal(deferredRoutes.includes("POST /api/app/learning/progress/events"), false)
+  assert.equal(deferredRoutes.includes("POST /api/app/learning/progress/sync"), false)
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
 })
 
-test("APP production-cn deploy guide documents deferred package-2 APP client APIs", () => {
-  const doc = read("docs", "DEPLOY_ALIYUN_PRODUCTION_CN.md")
+test("APP route and coverage gates include implemented package-2 facades", () => {
+  const routes = runJsonScript("scripts/check-app-api-production-cn-routes.mjs").report
+  const coverage = runJsonScript("scripts/check-app-api-smoke-coverage.mjs").report
+  const contract = read("scripts", "check-app-client-api-contract.mjs")
 
-  assert.match(doc, /Package 2 的 `knowledge-spaces`、`assets\/sign-read`、`content-drafts` 调用只报告为 deferred/)
+  assert.equal(routes.checkedRoutes, 42)
+  assert.equal(routes.requiredRoutes, 33)
+  assert.equal(routes.implementedFacadeRoutes, 9)
+  assert.equal(routes.scopes.assets, 1)
+  assert.equal(routes.scopes["content-drafts"], 1)
+  assert.equal(routes.scopes["knowledge-spaces"], 4)
+  assert.equal(routes.scopes["learning-progress"], 3)
+  assert.deepEqual(routes.failures, [])
+
+  assert.equal(coverage.ok, true)
+  assert.equal(coverage.checkedRoutes, 42)
+  assert.equal(coverage.businessRoutes, 40)
+  assert.equal(coverage.coverageOnlyProbes, 10)
+  assert.equal(coverage.coverageProbes, 42)
+  assert.equal(coverage.coveredBusinessRoutes, 40)
+  assert.equal(coverage.scopes.assets, 1)
+  assert.equal(coverage.scopes["content-drafts"], 1)
+  assert.equal(coverage.scopes["knowledge-spaces"], 4)
+  assert.equal(coverage.scopes["learning-progress"], 3)
+  assert.deepEqual(coverage.missingRoutes, [])
+  assert.deepEqual(coverage.unmatchedProbes, [])
+
+  assert.match(contract, /"\/api\/app\/assets\/sign-read"/)
+  assert.match(contract, /"\/api\/app\/learning\/progress"/)
+  assert.match(contract, /const DEFERRED_PREFIXES = \[\]/)
+  assert.doesNotMatch(contract, /prefix:\s*"\/api\/app\/content-drafts"/)
+  assert.doesNotMatch(contract, /prefix:\s*"\/api\/app\/knowledge-spaces"/)
+  assert.doesNotMatch(contract, /prefix:\s*"\/api\/app\/learning\/progress"/)
 })

@@ -4,7 +4,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs"
 import { dirname, extname, relative, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
-import { REQUIRED_ROUTES } from "./check-app-api-production-cn-routes.mjs"
+import { APP_CLIENT_CONTRACT_ROUTES } from "./check-app-api-production-cn-routes.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -20,23 +20,14 @@ const AUDITED_PREFIXES = [
   "/api/app/store-profiles",
   "/api/app/customer-profiles",
   "/api/app/scene-cards",
+  "/api/app/assets/sign-read",
+  "/api/app/content-drafts",
+  "/api/app/knowledge-spaces",
+  "/api/app/learning/progress",
   "/api/app/service-records/",
 ]
 
-const DEFERRED_PREFIXES = [
-  {
-    prefix: "/api/app/knowledge-spaces",
-    reason: "package-2 knowledge space template is outside production-cn first-version backend scope",
-  },
-  {
-    prefix: "/api/app/assets/sign-read",
-    reason: "package-2 signed media asset read is outside production-cn first-version backend scope",
-  },
-  {
-    prefix: "/api/app/content-drafts",
-    reason: "package-2 content drafts for poster/xhs/private copy are outside production-cn first-version backend scope",
-  },
-]
+const DEFERRED_PREFIXES = []
 
 function parseArgs(argv) {
   const args = {
@@ -252,7 +243,7 @@ function uniqueBy(items, keyFn) {
 function main() {
   const args = parseArgs(process.argv)
   const appSrcApi = resolve(args.appRoot, "src/api")
-  const backendRoutes = REQUIRED_ROUTES.filter((route) => route.scope !== "health")
+  const backendRoutes = APP_CLIENT_CONTRACT_ROUTES.filter((route) => route.scope !== "health")
   const backendBySignature = new Map(backendRoutes.map((route) => [routeSignature(route.route), route]))
   const failures = {
     missingBackendRoutes: [],
