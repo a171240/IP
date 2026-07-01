@@ -68,6 +68,65 @@ const IMPLEMENTED_APP_FACADE_COVERAGE_PROBES = [
     body: { events: [] },
     expected: [{ status: 401 }],
   },
+  {
+    scope: "content-poster",
+    method: "GET",
+    path: "/api/app/posters/templates",
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "content-poster",
+    method: "GET",
+    path: "/api/app/posters/history",
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "content-poster",
+    method: "POST",
+    path: "/api/app/posters/generate",
+    body: {},
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "content-xhs",
+    method: "POST",
+    path: "/api/app/xhs/generate-v4",
+    body: {},
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "content-xhs",
+    method: "POST",
+    path: "/api/app/xhs/content/danger-check",
+    body: {},
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "content-xhs",
+    method: "GET",
+    path: "/api/app/xhs/drafts",
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "content-xhs",
+    method: "POST",
+    path: "/api/app/xhs/generate-cover-image",
+    body: {},
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "content-private-copy",
+    method: "POST",
+    path: "/api/app/private-copy/generate",
+    body: {},
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "content-private-copy",
+    method: "GET",
+    path: "/api/app/private-copy/drafts",
+    expected: [{ status: 401 }],
+  },
 ]
 
 const COVERAGE_PROBES = [

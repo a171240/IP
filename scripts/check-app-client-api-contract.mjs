@@ -22,6 +22,9 @@ const AUDITED_PREFIXES = [
   "/api/app/scene-cards",
   "/api/app/assets/sign-read",
   "/api/app/content-drafts",
+  "/api/app/posters/",
+  "/api/app/xhs/",
+  "/api/app/private-copy/",
   "/api/app/knowledge-spaces",
   "/api/app/learning/progress",
   "/api/app/service-records/",
@@ -163,6 +166,65 @@ function inferMethod(callText) {
   return /\bbody\s*:/.test(callText) ? "POST" : "GET"
 }
 
+function findContentWorkflowRoutePlans(source) {
+  const calls = []
+  const marker = /CONTENT_WORKFLOW_ROUTE_PLANS\s*=\s*\{/g
+  let match
+  while ((match = marker.exec(source))) {
+    const openIndex = source.indexOf("{", match.index)
+    const closeIndex = findMatchingBrace(source, openIndex)
+    if (closeIndex < 0) continue
+
+    const objectText = source.slice(openIndex + 1, closeIndex)
+    const planPattern =
+      /([A-Za-z_$][\w$]*)\s*:\s*\{[\s\S]*?\baction\s*:\s*["']([^"']+)["'][\s\S]*?\bappEndpoint\s*:\s*["'](\/api\/app\/[^"']+)["'][\s\S]*?\bmethod\s*:\s*["']([A-Z]+)["'][\s\S]*?\}/g
+    let planMatch
+    while ((planMatch = planPattern.exec(objectText))) {
+      const route = normalizeClientPath(planMatch[3])
+      calls.push({
+        action: planMatch[2],
+        index: openIndex + planMatch.index,
+        method: planMatch[4],
+        route,
+        text: planMatch[0],
+      })
+    }
+    marker.lastIndex = closeIndex + 1
+  }
+  return calls
+}
+
+function findMatchingBrace(source, openIndex) {
+  let depth = 0
+  let quote = ""
+  let escaped = false
+  for (let index = openIndex; index < source.length; index += 1) {
+    const char = source[index]
+    if (quote) {
+      if (escaped) {
+        escaped = false
+        continue
+      }
+      if (char === "\\") {
+        escaped = true
+        continue
+      }
+      if (char === quote) quote = ""
+      continue
+    }
+    if (char === "\"" || char === "'" || char === "`") {
+      quote = char
+      continue
+    }
+    if (char === "{") depth += 1
+    if (char === "}") {
+      depth -= 1
+      if (depth === 0) return index
+    }
+  }
+  return -1
+}
+
 function normalizeClientPath(value) {
   const text = String(value || "").replace(/\s+/g, " ").trim()
   const route = text.replace(/\$\{([^}]+)\}/g, (_, expression) => {
@@ -214,6 +276,22 @@ function extractClientCalls(appRoot) {
         signature: routeSignature(route),
         status: classification.status,
         reason: classification.reason || null,
+        source: "apiRequest",
+      })
+    }
+    for (const plan of findContentWorkflowRoutePlans(source)) {
+      if (!plan.route.startsWith("/api/app/")) continue
+      const classification = classifyRoute(plan.route)
+      calls.push({
+        action: plan.action,
+        file: relative(appRoot, file),
+        line: lineNumberAt(source, plan.index),
+        method: plan.method,
+        route: plan.route,
+        signature: routeSignature(plan.route),
+        status: classification.status,
+        reason: classification.reason || null,
+        source: "contentWorkflowRoutePlan",
       })
     }
   }

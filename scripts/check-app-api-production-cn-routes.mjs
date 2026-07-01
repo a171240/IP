@@ -260,6 +260,60 @@ export const IMPLEMENTED_APP_FACADE_ROUTES = [
     file: "app/api/app/learning/progress/sync/route.ts",
     methods: ["POST"],
   },
+  {
+    scope: "content-poster",
+    route: "/api/app/posters/templates",
+    file: "app/api/app/posters/templates/route.ts",
+    methods: ["GET"],
+  },
+  {
+    scope: "content-poster",
+    route: "/api/app/posters/history",
+    file: "app/api/app/posters/history/route.ts",
+    methods: ["GET"],
+  },
+  {
+    scope: "content-poster",
+    route: "/api/app/posters/generate",
+    file: "app/api/app/posters/generate/route.ts",
+    methods: ["POST"],
+  },
+  {
+    scope: "content-xhs",
+    route: "/api/app/xhs/generate-v4",
+    file: "app/api/app/xhs/generate-v4/route.ts",
+    methods: ["POST"],
+  },
+  {
+    scope: "content-xhs",
+    route: "/api/app/xhs/content/danger-check",
+    file: "app/api/app/xhs/content/danger-check/route.ts",
+    methods: ["POST"],
+  },
+  {
+    scope: "content-xhs",
+    route: "/api/app/xhs/drafts",
+    file: "app/api/app/xhs/drafts/route.ts",
+    methods: ["GET"],
+  },
+  {
+    scope: "content-xhs",
+    route: "/api/app/xhs/generate-cover-image",
+    file: "app/api/app/xhs/generate-cover-image/route.ts",
+    methods: ["POST"],
+  },
+  {
+    scope: "content-private-copy",
+    route: "/api/app/private-copy/generate",
+    file: "app/api/app/private-copy/generate/route.ts",
+    methods: ["POST"],
+  },
+  {
+    scope: "content-private-copy",
+    route: "/api/app/private-copy/drafts",
+    file: "app/api/app/private-copy/drafts/route.ts",
+    methods: ["GET"],
+  },
 ]
 
 export const APP_CLIENT_CONTRACT_ROUTES = [
