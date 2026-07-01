@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 
 import { pathToFileURL } from "node:url"
+import { existsSync } from "node:fs"
+import { resolve } from "node:path"
+import { APP_CLIENT_CONTRACT_ROUTES } from "./check-app-api-production-cn-routes.mjs"
 import { READ_ONLY_PROBES } from "./check-app-api-live-smoke-env.mjs"
 
 const DEFAULT_BASE_URL = "https://api-cn.ipgongchang.xin"
@@ -84,21 +87,26 @@ async function runOnlineReadonlyBoundary(args) {
     results.push(await requestProbe(args.baseUrl, probe, args.timeoutMs))
   }
 
+  const enrichedResults = results.map((result) => ({
+    ...result,
+    localRoute: findLocalRoute(result),
+  }))
   const grouped = summarizeByStatus(results)
-  const routeBlockers = results.filter((result) => {
+  const routeBlockers = enrichedResults.filter((result) => {
     if (result.scope === "health") return result.status == null || result.status >= 500
     return result.status == null || result.status === 404 || result.status >= 500
   })
+  const sourceRouteAudit = summarizeSourceRouteAudit(enrichedResults)
 
   return {
-    ok: routeBlockers.length === 0,
+    ok: routeBlockers.length === 0 && sourceRouteAudit.missingSourceRoutes.length === 0,
     baseUrl: args.baseUrl,
     getOnly: true,
     tokenSent: false,
     requestBodySent: false,
     networkRequestsAttempted: true,
     checked: results.length,
-    routeBlockers: routeBlockers.map(({ id, scope, path, status, code, contentType, error }) => ({
+    routeBlockers: routeBlockers.map(({ id, scope, path, status, code, contentType, error, localRoute }) => ({
       id,
       scope,
       path,
@@ -106,10 +114,90 @@ async function runOnlineReadonlyBoundary(args) {
       code,
       contentType,
       error,
+      localRoute,
     })),
+    sourceRouteAudit,
     grouped,
-    results,
+    results: enrichedResults,
   }
+}
+
+function findLocalRoute(probe) {
+  const pathname = pathnameOf(probe.path)
+  const route = APP_CLIENT_CONTRACT_ROUTES.find((item) => {
+    return item.methods.includes(probe.method) && routePattern(item.route).test(pathname)
+  })
+  if (!route) {
+    return {
+      status: "SOURCE_ROUTE_MISSING",
+      route: "",
+      file: "",
+      sourcePresent: false,
+    }
+  }
+
+  const sourcePresent = existsSync(resolve(process.cwd(), route.file))
+  return {
+    status: sourcePresent ? "SOURCE_ROUTE_PRESENT" : "SOURCE_ROUTE_FILE_MISSING",
+    route: route.route,
+    file: route.file,
+    sourcePresent,
+  }
+}
+
+function summarizeSourceRouteAudit(results) {
+  const missingSourceRoutes = []
+  const deployed404WithSourcePresent = []
+
+  for (const result of results) {
+    if (!result.localRoute.sourcePresent) {
+      missingSourceRoutes.push({
+        id: result.id,
+        method: result.method,
+        path: result.path,
+        status: result.localRoute.status,
+        route: result.localRoute.route,
+        file: result.localRoute.file,
+      })
+      continue
+    }
+    if (result.status === 404) {
+      deployed404WithSourcePresent.push({
+        id: result.id,
+        method: result.method,
+        path: result.path,
+        file: result.localRoute.file,
+      })
+    }
+  }
+
+  return {
+    checked: results.length,
+    missingSourceRoutes,
+    deployed404WithSourcePresent,
+    localSourceReadyForBlocked404: missingSourceRoutes.length === 0 && deployed404WithSourcePresent.length > 0,
+    note: "SOURCE_ROUTE_PRESENT plus deployed 404 means the local source contains the route, but the current online artifact does not serve it.",
+  }
+}
+
+function pathnameOf(path) {
+  return new URL(path, "https://local.invalid").pathname
+}
+
+function routePattern(route) {
+  const pattern = route
+    .split("/")
+    .map((part) => {
+      if (!part) return ""
+      if (/^\[[^\]]+\]$/.test(part)) return "[^/]+"
+      return escapeRegex(part)
+    })
+    .join("/")
+  return new RegExp(`^${pattern}$`)
+}
+
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }
 
 async function requestProbe(baseUrl, probe, timeoutMs) {
@@ -206,8 +294,10 @@ async function main() {
 
 export {
   HEALTH_PROBES,
+  findLocalRoute,
   parseArgs,
   runOnlineReadonlyBoundary,
+  summarizeSourceRouteAudit,
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

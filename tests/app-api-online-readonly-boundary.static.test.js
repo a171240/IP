@@ -109,7 +109,10 @@ test("online readonly boundary checker sends GET-only unauthenticated probes", a
     assert.equal(result.report.tokenSent, false)
     assert.equal(result.report.requestBodySent, false)
     assert.equal(result.report.routeBlockers.length, 0)
+    assert.equal(result.report.sourceRouteAudit.missingSourceRoutes.length, 0)
+    assert.equal(result.report.sourceRouteAudit.deployed404WithSourcePresent.length, 0)
     assert.ok(result.report.checked >= 18)
+    assert.ok(result.report.results.every((item) => item.localRoute.sourcePresent === true))
     assert.ok(stub.requests.every((item) => item.method === "GET"))
     assert.ok(stub.requests.every((item) => item.authorization === ""))
     assert.ok(stub.requests.every((item) => item.bodyLength === 0))
@@ -131,7 +134,20 @@ test("online readonly boundary checker fails closed on deployed route 404", asyn
 
     assert.equal(result.status, 1)
     assert.equal(result.report.ok, false)
-    assert.ok(result.report.routeBlockers.some((item) => item.path === "/api/app/knowledge-spaces"))
+    const blocker = result.report.routeBlockers.find((item) => item.path === "/api/app/knowledge-spaces")
+    assert.ok(blocker)
+    assert.equal(blocker.localRoute.status, "SOURCE_ROUTE_PRESENT")
+    assert.equal(blocker.localRoute.file, "app/api/app/knowledge-spaces/route.ts")
+    assert.equal(result.report.sourceRouteAudit.missingSourceRoutes.length, 0)
+    assert.deepEqual(result.report.sourceRouteAudit.deployed404WithSourcePresent, [
+      {
+        id: "employee_knowledge_spaces",
+        method: "GET",
+        path: "/api/app/knowledge-spaces",
+        file: "app/api/app/knowledge-spaces/route.ts",
+      },
+    ])
+    assert.equal(result.report.sourceRouteAudit.localSourceReadyForBlocked404, true)
     assert.equal(result.report.grouped["404"], 1)
     assert.ok(stub.requests.every((item) => item.method === "GET"))
     assert.ok(stub.requests.every((item) => item.authorization === ""))

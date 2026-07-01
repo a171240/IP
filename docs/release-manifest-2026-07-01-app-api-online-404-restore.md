@@ -79,6 +79,9 @@ checked=20
 ok=false
 tokenSent=false
 requestBodySent=false
+sourceRouteAudit.missingSourceRoutes=0
+sourceRouteAudit.deployed404WithSourcePresent=7
+sourceRouteAudit.localSourceReadyForBlocked404=true
 ```
 
 The 7 current blockers:
@@ -92,6 +95,10 @@ GET /api/app/learning/progress?modules=professional,speech&include_entities=true
 GET /api/app/voice-coach/sessions?limit=5
 GET /api/app/knowledge-spaces
 ```
+
+The current boundary script also audits local source parity for each probed
+route. All 7 `404 text/html` blockers map to existing local route files, so the
+current blocker is a deployed-artifact gap, not a missing local source route.
 
 ## Included Changes For Candidate Release
 
