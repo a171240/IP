@@ -127,6 +127,65 @@ const IMPLEMENTED_APP_FACADE_COVERAGE_PROBES = [
     path: "/api/app/private-copy/drafts",
     expected: [{ status: 401 }],
   },
+  {
+    scope: "voice-coach",
+    method: "GET",
+    path: "/api/app/voice-coach/sessions",
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "voice-coach",
+    method: "POST",
+    path: "/api/app/voice-coach/sessions",
+    body: {},
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "voice-coach",
+    method: "GET",
+    path: "/api/app/voice-coach/sessions/app-smoke-session",
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "voice-coach",
+    method: "GET",
+    path: "/api/app/voice-coach/sessions/app-smoke-session/events",
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "voice-coach",
+    method: "POST",
+    path: "/api/app/voice-coach/sessions/app-smoke-session/turns/app-smoke-turn/tts",
+    body: {},
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "voice-coach",
+    method: "POST",
+    path: "/api/app/voice-coach/sessions/app-smoke-session/asr-preview",
+    body: {},
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "voice-coach",
+    method: "POST",
+    path: "/api/app/voice-coach/sessions/app-smoke-session/beautician-turn/submit",
+    body: {},
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "voice-coach",
+    method: "POST",
+    path: "/api/app/voice-coach/sessions/app-smoke-session/end",
+    body: {},
+    expected: [{ status: 401 }],
+  },
+  {
+    scope: "voice-coach",
+    method: "GET",
+    path: "/api/app/voice-coach/sessions/app-smoke-session/report",
+    expected: [{ status: 401 }],
+  },
 ]
 
 const COVERAGE_PROBES = [

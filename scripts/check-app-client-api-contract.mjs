@@ -28,6 +28,7 @@ const AUDITED_PREFIXES = [
   "/api/app/knowledge-spaces",
   "/api/app/learning/progress",
   "/api/app/service-records/",
+  "/api/app/voice-coach/",
 ]
 
 const DEFERRED_PREFIXES = []
@@ -194,6 +195,75 @@ function findContentWorkflowRoutePlans(source) {
   return calls
 }
 
+function findVoiceCoachRoutePlans(source) {
+  const baseMatch = source.match(/const\s+VOICE_COACH_SESSIONS_PATH\s*=\s*["']([^"']+)["']/)
+  if (!baseMatch || !source.includes("VOICE_COACH_API_ROUTES")) return []
+
+  const baseRoute = normalizeClientPath(baseMatch[1])
+  const normalized = normalizeAppContractRoute(baseRoute)
+  if (!normalized || !normalized.route.endsWith("/voice-coach/sessions")) return []
+
+  const index = source.indexOf("VOICE_COACH_API_ROUTES")
+  const base = normalized.route
+  const clientBase = normalized.clientRoute || baseRoute
+  return [
+    {
+      action: "voiceCoach.sessions.list",
+      method: "GET",
+      route: base,
+      clientRoute: clientBase,
+    },
+    {
+      action: "voiceCoach.sessions.create",
+      method: "POST",
+      route: base,
+      clientRoute: clientBase,
+    },
+    {
+      action: "voiceCoach.sessions.detail",
+      method: "GET",
+      route: `${base}/[sessionId]`,
+      clientRoute: `${clientBase}/[sessionId]`,
+    },
+    {
+      action: "voiceCoach.sessions.events",
+      method: "GET",
+      route: `${base}/[sessionId]/events`,
+      clientRoute: `${clientBase}/[sessionId]/events`,
+    },
+    {
+      action: "voiceCoach.turns.tts",
+      method: "POST",
+      route: `${base}/[sessionId]/turns/[turnId]/tts`,
+      clientRoute: `${clientBase}/[sessionId]/turns/[turnId]/tts`,
+    },
+    {
+      action: "voiceCoach.asrPreview",
+      method: "POST",
+      route: `${base}/[sessionId]/asr-preview`,
+      clientRoute: `${clientBase}/[sessionId]/asr-preview`,
+    },
+    {
+      action: "voiceCoach.beauticianTurn.submit",
+      method: "POST",
+      route: `${base}/[sessionId]/beautician-turn/submit`,
+      clientRoute: `${clientBase}/[sessionId]/beautician-turn/submit`,
+    },
+    {
+      action: "voiceCoach.sessions.end",
+      method: "POST",
+      route: `${base}/[sessionId]/end`,
+      clientRoute: `${clientBase}/[sessionId]/end`,
+    },
+    {
+      action: "voiceCoach.report",
+      method: "GET",
+      route: `${base}/[sessionId]/report`,
+      clientRoute: `${clientBase}/[sessionId]/report`,
+    },
+  ].map((item) => ({ ...item, index }))
+}
+
 function findMatchingBrace(source, openIndex) {
   let depth = 0
   let quote = ""
@@ -237,6 +307,17 @@ function normalizeClientPath(value) {
   return route.replace(/\/+/g, "/")
 }
 
+function normalizeAppContractRoute(route) {
+  if (route.startsWith("/api/app/")) return { route, clientRoute: null }
+  if (route === "/api/voice-coach" || route.startsWith("/api/voice-coach/")) {
+    return {
+      route: route.replace(/^\/api\/voice-coach\b/, "/api/app/voice-coach"),
+      clientRoute: route,
+    }
+  }
+  return null
+}
+
 function routeSignature(route) {
   return String(route)
     .split("/")
@@ -265,25 +346,43 @@ function extractClientCalls(appRoot) {
     for (const call of findApiRequestCalls(source)) {
       const pathExpression = extractPathExpression(call.text)
       if (!pathExpression) continue
-      const route = normalizeClientPath(pathExpression.literal)
-      if (!route.startsWith("/api/app/")) continue
-      const classification = classifyRoute(route)
+      const normalized = normalizeAppContractRoute(normalizeClientPath(pathExpression.literal))
+      if (!normalized) continue
+      const classification = classifyRoute(normalized.route)
       calls.push({
+        clientRoute: normalized.clientRoute,
         file: relative(appRoot, file),
         line: lineNumberAt(source, call.index),
         method: inferMethod(call.text),
-        route,
-        signature: routeSignature(route),
+        route: normalized.route,
+        signature: routeSignature(normalized.route),
         status: classification.status,
         reason: classification.reason || null,
-        source: "apiRequest",
+        source: normalized.clientRoute ? "legacyApiRequest" : "apiRequest",
       })
     }
     for (const plan of findContentWorkflowRoutePlans(source)) {
-      if (!plan.route.startsWith("/api/app/")) continue
+      const normalized = normalizeAppContractRoute(plan.route)
+      if (!normalized) continue
+      const classification = classifyRoute(normalized.route)
+      calls.push({
+        action: plan.action,
+        clientRoute: normalized.clientRoute,
+        file: relative(appRoot, file),
+        line: lineNumberAt(source, plan.index),
+        method: plan.method,
+        route: normalized.route,
+        signature: routeSignature(normalized.route),
+        status: classification.status,
+        reason: classification.reason || null,
+        source: "contentWorkflowRoutePlan",
+      })
+    }
+    for (const plan of findVoiceCoachRoutePlans(source)) {
       const classification = classifyRoute(plan.route)
       calls.push({
         action: plan.action,
+        clientRoute: plan.clientRoute,
         file: relative(appRoot, file),
         line: lineNumberAt(source, plan.index),
         method: plan.method,
@@ -291,7 +390,7 @@ function extractClientCalls(appRoot) {
         signature: routeSignature(plan.route),
         status: classification.status,
         reason: classification.reason || null,
-        source: "contentWorkflowRoutePlan",
+        source: "voiceCoachRoutePlan",
       })
     }
   }

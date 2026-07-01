@@ -314,6 +314,54 @@ export const IMPLEMENTED_APP_FACADE_ROUTES = [
     file: "app/api/app/private-copy/drafts/route.ts",
     methods: ["GET"],
   },
+  {
+    scope: "voice-coach",
+    route: "/api/app/voice-coach/sessions",
+    file: "app/api/app/voice-coach/sessions/route.ts",
+    methods: ["GET", "POST"],
+  },
+  {
+    scope: "voice-coach",
+    route: "/api/app/voice-coach/sessions/[sessionId]",
+    file: "app/api/app/voice-coach/sessions/[sessionId]/route.ts",
+    methods: ["GET"],
+  },
+  {
+    scope: "voice-coach",
+    route: "/api/app/voice-coach/sessions/[sessionId]/events",
+    file: "app/api/app/voice-coach/sessions/[sessionId]/events/route.ts",
+    methods: ["GET"],
+  },
+  {
+    scope: "voice-coach",
+    route: "/api/app/voice-coach/sessions/[sessionId]/turns/[turnId]/tts",
+    file: "app/api/app/voice-coach/sessions/[sessionId]/turns/[turnId]/tts/route.ts",
+    methods: ["POST"],
+  },
+  {
+    scope: "voice-coach",
+    route: "/api/app/voice-coach/sessions/[sessionId]/asr-preview",
+    file: "app/api/app/voice-coach/sessions/[sessionId]/asr-preview/route.ts",
+    methods: ["POST"],
+  },
+  {
+    scope: "voice-coach",
+    route: "/api/app/voice-coach/sessions/[sessionId]/beautician-turn/submit",
+    file: "app/api/app/voice-coach/sessions/[sessionId]/beautician-turn/submit/route.ts",
+    methods: ["POST"],
+  },
+  {
+    scope: "voice-coach",
+    route: "/api/app/voice-coach/sessions/[sessionId]/end",
+    file: "app/api/app/voice-coach/sessions/[sessionId]/end/route.ts",
+    methods: ["POST"],
+  },
+  {
+    scope: "voice-coach",
+    route: "/api/app/voice-coach/sessions/[sessionId]/report",
+    file: "app/api/app/voice-coach/sessions/[sessionId]/report/route.ts",
+    methods: ["GET"],
+  },
 ]
 
 export const APP_CLIENT_CONTRACT_ROUTES = [
