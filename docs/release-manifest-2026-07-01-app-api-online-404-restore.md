@@ -8,10 +8,10 @@
 - Version: `app-api-online-404-restore-2026-07-01`
 - Backend repository: `/Users/Admin/Documents/美业话镜APP/handoff/IP`
 - Backend branch: `codex/app-api-handoff-20260521`
-- Backend current HEAD: `e1a6d77`
+- Backend candidate HEAD before this manifest refresh commit: `6fb91a0`
 - App planning repository: `/Users/Admin/Documents/美业话镜APP`
 - App branch: `main`
-- App current HEAD: `2e0163a`
+- App evidence HEAD before this manifest refresh commit: `9ced9975`
 - Production host: `https://api-cn.ipgongchang.xin`
 - Data/schema scope: no production data or schema write in this manifest
 
@@ -25,32 +25,14 @@
 
 ## Workspace State Snapshot
 
-This snapshot was recorded before committing this manifest. The release execution
-must still use a clean release worktree or an exact staged subset.
+This snapshot was refreshed after the local App evidence and backend
+release-gate commits. Release execution must still use a clean release worktree
+or an exact staged subset.
 
 Backend status:
 
 ```text
-## codex/app-api-handoff-20260521...origin/codex/app-api-handoff-20260521 [ahead 417]
- M docs/app-production-cn-action-queue.md
- M docs/app-production-cn-provisioning-sequence.md
- M docs/app-production-cn-rds-migration-plan.md
- M scripts/generate-aliyun-cloud-actions-package.mjs
- M scripts/generate-aliyun-console-runbook.mjs
- M tests/aliyun-action-authorization.static.test.js
- M tests/aliyun-backend-apply-package.static.test.js
- M tests/aliyun-blocker-brief.static.test.js
- M tests/aliyun-cli-inventory-results.static.test.js
- M tests/aliyun-cloud-access.static.test.js
- M tests/aliyun-cloud-actions-package.static.test.js
- M tests/aliyun-completion-audit.static.test.js
- M tests/aliyun-console-runbook.static.test.js
- M tests/aliyun-operator-handoff.static.test.js
- M tests/aliyun-provisioning-plan.static.test.js
- M tests/aliyun-rds-migration-plan.static.test.js
- M tests/aliyun-rds-route-migration-map.static.test.js
- M tests/aliyun-user-action-brief.static.test.js
-?? docs/release-manifest-2026-07-01-app-api-online-404-restore.md
+## codex/app-api-handoff-20260521...origin/codex/app-api-handoff-20260521 [ahead 419]
 ?? scripts/deploy-aliyun-backend-image-hotfix.mjs
 ```
 
@@ -58,20 +40,20 @@ App planning status:
 
 ```text
 ## main
- M AGENTS.md
 ```
 
 Untracked files that must be included:
 
 ```text
-docs/release-manifest-2026-07-01-app-api-online-404-restore.md
+None.
 ```
 
 Dirty files intentionally excluded:
 
 ```text
 Backend: scripts/deploy-aliyun-backend-image-hotfix.mjs
-Release execution must use an audited clean release worktree or an exact staged subset; the current main worktree is not release-clean.
+App: none at snapshot time
+Release execution must use an audited clean release worktree or an exact staged subset; the untracked backend hotfix script is excluded from this manifest.
 ```
 
 ## Current Online Baseline
@@ -79,7 +61,7 @@ Release execution must use an audited clean release worktree or an exact staged 
 Current online image evidence from `deploy/aliyun-production-cn.image-publish.local.json`:
 
 - Online source commit recorded in current image evidence: `6a9faa5a3c7d949b5ffec8aa7ae81dcbce41a064`
-- Current backend repository HEAD: `e1a6d77`
+- Current backend candidate HEAD before this manifest refresh commit: `6fb91a0`
 - Current ACR remote digest: `sha256:ebc50349625891b26aa74f0f76bd6726c3f86f34aeff9f20b7741b1954bc0937`
 - Current SAE app: `meiye-huajing-app-api-production-cn`
 - Current SAE app id: `41b347a0-ae54-4215-9ee6-8dc82c427dd2`
@@ -130,6 +112,8 @@ Related local release-gate commits after the route closure:
 ```text
 f61815b release: require app api online boundary gate
 e1a6d77 app-api: harden aliyun health smoke gates
+273aa22 docs: add app api online restore manifest
+6fb91a0 docs: refresh aliyun production evidence gates
 ```
 
 Relevant route files added after the currently recorded online source commit include:
@@ -170,7 +154,7 @@ app/api/app/xhs/content/danger-check/route.ts
 - Production write smoke or test-data creation.
 - Real token smoke until `APP_DEVICE_ID`, employee token, and manager token are supplied through shell env.
 - The untracked backend script `scripts/deploy-aliyun-backend-image-hotfix.mjs`.
-- The App root dirty `AGENTS.md`.
+- Any App Store, Android market, WeChat mini-program, native signing, install, or launch action.
 
 ## Database Changes
 
@@ -219,6 +203,8 @@ aliyun:app-api:coverage PASS, businessRoutes=57, coveredBusinessRoutes=57
 aliyun:health:smoke PASS with expectedMissing=[aliyunRds]
 aliyun:app-api:smoke PASS, checkedProbes=32, localRdsUnavailableExpected=2
 online-readonly-boundary FAIL as expected, checked=20, 200=2, 401=11, 404=7
+App status:all-pages:check PASS at HEAD 9ced9975
+Native gap runbook PASS, status=LOCAL_PREFLIGHT_ONLY, nativeGapRoutes=8
 ```
 
 Post-deploy smoke acceptance:
@@ -240,7 +226,7 @@ no 5xx
 
 ## Risk Checklist
 
-- Unknown dirty changes: App root `AGENTS.md` is dirty and excluded; backend untracked hotfix script is excluded.
+- Unknown dirty changes: backend untracked hotfix script is excluded; App main was clean at snapshot time.
 - Deleted files: none observed in this manifest round.
 - Route conflicts: current online source commit predates the App-facing facade route commits listed above.
 - Product/point display conflicts: not included.
