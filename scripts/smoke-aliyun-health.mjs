@@ -40,6 +40,12 @@ const REQUIRED_RUNTIME_GROUPS = {
   volcSpeech: [["VOLC_SPEECH_APP_ID"], ["VOLC_SPEECH_ACCESS_TOKEN"]],
 }
 
+const ALIYUN_REQUIRED_RUNTIME_GROUPS = {
+  bailianAsr: [["DASHSCOPE_API_KEY", "BAILIAN_API_KEY", "ALIBABA_CLOUD_BAILIAN_API_KEY"]],
+  serviceRecordSummary: [["SERVICE_RECORD_DEEPSEEK_API_KEY", "DEEPSEEK_API_KEY"]],
+  volcSpeech: [["VOLC_SPEECH_APP_ID"], ["VOLC_SPEECH_ACCESS_TOKEN"]],
+}
+
 const LEGAL_LINK_KEYS = ["PRIVACY_POLICY_URL", "TERMS_URL"]
 const DISALLOWED_LEGAL_HOSTS = new Set([
   "ip.ipgongchang.xin",
@@ -134,6 +140,14 @@ function hasAnyEnv(env, names) {
   return names.some((name) => isReadyEnvValue(env.get(name)))
 }
 
+function getEnvText(env, ...names) {
+  for (const name of names) {
+    const value = String(env.get(name) || "").trim()
+    if (isReadyEnvValue(value)) return value
+  }
+  return ""
+}
+
 function groupReady(env, name, groups) {
   if (name === "legalLinks") {
     return LEGAL_LINK_KEYS.every((key) => isReadyLegalUrl(env.get(key)))
@@ -141,7 +155,57 @@ function groupReady(env, name, groups) {
   return groups.every((group) => hasAnyEnv(env, group))
 }
 
+function isAliyunProductionCnRuntime(env) {
+  return env.get("APP_ENV") === "production-cn" || env.get("APP_REGION") === "cn-hangzhou"
+}
+
+function isAliyunKmsSecretDatabaseUrlConfigured(env) {
+  const secretName = getEnvText(
+    env,
+    "DATABASE_URL_CN_SECRET_NAME",
+    "ALIYUN_RDS_DATABASE_URL_CN_SECRET_NAME",
+    "ALIYUN_KMS_DATABASE_URL_CN_SECRET_NAME",
+  )
+  const envCredential = getEnvText(env, "ALIBABA_CLOUD_ACCESS_KEY_ID", "ALIYUN_KMS_ACCESS_KEY_ID") &&
+    getEnvText(env, "ALIBABA_CLOUD_ACCESS_KEY_SECRET", "ALIYUN_KMS_ACCESS_KEY_SECRET")
+  const oidcCredential = getEnvText(env, "ALIBABA_CLOUD_ROLE_ARN", "ALIYUN_KMS_ROLE_ARN") &&
+    getEnvText(env, "ALIBABA_CLOUD_OIDC_PROVIDER_ARN", "ALIYUN_KMS_OIDC_PROVIDER_ARN") &&
+    getEnvText(env, "ALIBABA_CLOUD_OIDC_TOKEN_FILE", "ALIYUN_KMS_OIDC_TOKEN_FILE")
+  return Boolean(secretName && (envCredential || oidcCredential))
+}
+
+function isAliyunRdsConfigured(env) {
+  return Boolean(getEnvText(env, "DATABASE_URL_CN") || isAliyunKmsSecretDatabaseUrlConfigured(env))
+}
+
+function isAliyunOssRuntimeConfigured(env) {
+  const bucket = getEnvText(env, "ALIYUN_OSS_BUCKET", "SERVICE_RECORD_OSS_BUCKET")
+  const envCredentialsReady = getEnvText(env, "ALIYUN_OSS_ACCESS_KEY_ID", "ALIBABA_CLOUD_ACCESS_KEY_ID") &&
+    getEnvText(env, "ALIYUN_OSS_ACCESS_KEY_SECRET", "ALIBABA_CLOUD_ACCESS_KEY_SECRET")
+  const oidcReady = getEnvText(env, "ALIYUN_OSS_ROLE_ARN", "SERVICE_RECORD_OSS_ROLE_ARN", "ALIBABA_CLOUD_ROLE_ARN") &&
+    getEnvText(env, "ALIYUN_OSS_OIDC_PROVIDER_ARN", "SERVICE_RECORD_OSS_OIDC_PROVIDER_ARN", "ALIBABA_CLOUD_OIDC_PROVIDER_ARN") &&
+    getEnvText(env, "ALIYUN_OSS_OIDC_TOKEN_FILE", "SERVICE_RECORD_OSS_OIDC_TOKEN_FILE", "ALIBABA_CLOUD_OIDC_TOKEN_FILE")
+  const runtimeRoleName = getEnvText(env, "ALIYUN_OSS_RAM_ROLE_NAME", "SERVICE_RECORD_OSS_RAM_ROLE_NAME", "ALIBABA_CLOUD_ECS_METADATA")
+  return Boolean(bucket && (envCredentialsReady || oidcReady || runtimeRoleName))
+}
+
 function expectedMissingGroups(env) {
+  if (isAliyunProductionCnRuntime(env)) {
+    const checks = {
+      aliyunRds: isAliyunRdsConfigured(env),
+      legalLinks: LEGAL_LINK_KEYS.every((key) => isReadyLegalUrl(env.get(key))),
+      aliyunOssRuntime: isAliyunOssRuntimeConfigured(env),
+      ...Object.fromEntries(
+        Object.entries(ALIYUN_REQUIRED_RUNTIME_GROUPS).map(([name, groups]) => [
+          name,
+          groupReady(env, name, groups),
+        ]),
+      ),
+    }
+    return Object.entries(checks)
+      .filter(([, ready]) => !ready)
+      .map(([name]) => name)
+  }
   return Object.entries(REQUIRED_RUNTIME_GROUPS)
     .filter(([name, groups]) => !groupReady(env, name, groups))
     .map(([name]) => name)

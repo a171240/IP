@@ -134,7 +134,7 @@ async function createAliyunRdsPool(): Promise<Pool> {
 }
 
 function readDatabaseUrl(options: { allowMissing: boolean }): string {
-  const value = readTextEnv("DATABASE_URL_CN")
+  const value = readConfiguredTextEnv("DATABASE_URL_CN")
   if (!value && !options.allowMissing) {
     throw new AliyunRdsConfigurationError("DATABASE_URL_CN is required for Aliyun RDS PostgreSQL access")
   }
@@ -150,6 +150,11 @@ async function resolveDatabaseUrl(): Promise<string> {
 
 function readTextEnv(key: string): string {
   return String(process.env[key] || "").trim()
+}
+
+function readConfiguredTextEnv(key: string): string {
+  const value = readTextEnv(key)
+  return value && !value.startsWith("TODO_") ? value : ""
 }
 
 function readPositiveIntEnv(key: string): number | undefined {

@@ -30,7 +30,7 @@ let aliyunOssMetadataCredentialCache: {
 function envText(...names: string[]) {
   for (const name of names) {
     const value = cleanText(process.env[name], 5000)
-    if (value) return value
+    if (value && !value.startsWith("TODO_")) return value
   }
   return ""
 }

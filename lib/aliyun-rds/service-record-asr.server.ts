@@ -38,7 +38,7 @@ export type AliyunRdsBailianPollResult = {
 function envText(...names: string[]) {
   for (const name of names) {
     const value = cleanText(process.env[name], 500)
-    if (value) return value
+    if (value && !value.startsWith("TODO_")) return value
   }
   return ""
 }

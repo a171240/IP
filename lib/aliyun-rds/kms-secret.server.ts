@@ -251,7 +251,7 @@ function getAliyunKmsTimeoutMs() {
 function envText(...names: string[]) {
   for (const name of names) {
     const value = text(process.env[name], 5000)
-    if (value) return value
+    if (value && !value.startsWith("TODO_")) return value
   }
   return ""
 }

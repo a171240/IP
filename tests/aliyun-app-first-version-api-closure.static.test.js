@@ -154,7 +154,7 @@ test("first-version APP API routes are present in the production-cn route regist
 })
 
 test("first-version APP API smoke plan proves routes with auth or payload guards only", async () => {
-  const { PROBES } = await importScript("scripts", "smoke-app-api-production-cn.mjs")
+  const { PROBES, buildProbePlanForRuntime } = await importScript("scripts", "smoke-app-api-production-cn.mjs")
   const probes = new Map(PROBES.map((item) => [probeKey(item), item]))
 
   for (const expected of FIRST_VERSION_ROUTES) {
@@ -173,6 +173,26 @@ test("first-version APP API smoke plan proves routes with auth or payload guards
     false,
     "A5 generation routes should not enter first-version production smoke",
   )
+
+  const localPlan = buildProbePlanForRuntime(PROBES, {
+    env: new Map([["DATABASE_URL_CN", "TODO_REPLACE_WITH_ALIYUN_RDS_URL"]]),
+    allowLocalRdsUnavailable: true,
+  })
+  const localPreviewProbe = localPlan.find(
+    (item) => item.path === "/api/app/store-admin/invites/app-smoke-invalid-token/preview",
+  )
+  const localQrProbe = localPlan.find(
+    (item) => item.path === "/api/app/store-admin/invites/app-smoke-invalid-token/qrcode",
+  )
+  assert.deepEqual(localPreviewProbe.expected, [
+    { status: 503, code: "rds_not_configured" },
+    { status: 503, code: "rds_unavailable" },
+  ])
+  assert.deepEqual(localQrProbe.expected, [
+    { status: 503, code: "rds_not_configured" },
+    { status: 503, code: "rds_unavailable" },
+  ])
+  assert.equal(localPreviewProbe.runtimeExpectation, "local_rds_unavailable")
 })
 
 test("first-version bridge map keeps scope narrow and records the committed facade status", () => {

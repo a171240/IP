@@ -10,6 +10,10 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const DEFAULT_ENV_FILE = resolve(__dirname, "../../../.env.production-cn.local")
 const DEFAULT_TIMEOUT_MS = 20_000
+const LOCAL_RDS_UNAVAILABLE_EXPECTED = Object.freeze([
+  { status: 503, code: "rds_not_configured" },
+  { status: 503, code: "rds_unavailable" },
+])
 
 export const PROBES = [
   {
@@ -81,12 +85,14 @@ export const PROBES = [
     method: "GET",
     path: "/api/app/store-admin/invites/app-smoke-invalid-token/preview",
     expected: [{ status: 404, code: "invite_not_found" }],
+    allowLocalRdsUnavailable: true,
   },
   {
     scope: "invites",
     method: "GET",
     path: "/api/app/store-admin/invites/app-smoke-invalid-token/qrcode",
     expected: [{ status: 404, code: "invite_not_found" }],
+    allowLocalRdsUnavailable: true,
   },
   {
     scope: "invites",
@@ -298,6 +304,60 @@ function mapToObject(map) {
   return Object.fromEntries(map.entries())
 }
 
+function isReadyEnvValue(value) {
+  const text = String(value || "").trim()
+  return Boolean(text && text !== "\"\"" && text !== "''" && !text.startsWith("TODO_"))
+}
+
+function getEnvText(env, ...names) {
+  for (const name of names) {
+    const value = String(env.get(name) || "").trim()
+    if (isReadyEnvValue(value)) return value
+  }
+  return ""
+}
+
+function isAliyunKmsSecretDatabaseUrlConfigured(env) {
+  const secretName = getEnvText(
+    env,
+    "DATABASE_URL_CN_SECRET_NAME",
+    "ALIYUN_RDS_DATABASE_URL_CN_SECRET_NAME",
+    "ALIYUN_KMS_DATABASE_URL_CN_SECRET_NAME",
+  )
+  const envCredential = getEnvText(env, "ALIBABA_CLOUD_ACCESS_KEY_ID", "ALIYUN_KMS_ACCESS_KEY_ID") &&
+    getEnvText(env, "ALIBABA_CLOUD_ACCESS_KEY_SECRET", "ALIYUN_KMS_ACCESS_KEY_SECRET")
+  const oidcCredential = getEnvText(env, "ALIBABA_CLOUD_ROLE_ARN", "ALIYUN_KMS_ROLE_ARN") &&
+    getEnvText(env, "ALIBABA_CLOUD_OIDC_PROVIDER_ARN", "ALIYUN_KMS_OIDC_PROVIDER_ARN") &&
+    getEnvText(env, "ALIBABA_CLOUD_OIDC_TOKEN_FILE", "ALIYUN_KMS_OIDC_TOKEN_FILE")
+  return Boolean(secretName && (envCredential || oidcCredential))
+}
+
+function isAliyunRdsConfigured(env) {
+  return Boolean(getEnvText(env, "DATABASE_URL_CN") || isAliyunKmsSecretDatabaseUrlConfigured(env))
+}
+
+export function buildProbePlanForRuntime(probes, options = {}) {
+  const env = options.env instanceof Map ? options.env : new Map()
+  const allowLocalRdsUnavailable = Boolean(options.allowLocalRdsUnavailable && !isAliyunRdsConfigured(env))
+  return probes.map((probe) => {
+    if (!allowLocalRdsUnavailable || !probe.allowLocalRdsUnavailable) return probe
+    return {
+      ...probe,
+      expected: LOCAL_RDS_UNAVAILABLE_EXPECTED.map((item) => ({ ...item })),
+      runtimeExpectation: "local_rds_unavailable",
+    }
+  })
+}
+
+function summarizeRuntimePlan(probes, options) {
+  const localRdsUnavailableProbes = probes.filter((probe) => probe.runtimeExpectation === "local_rds_unavailable")
+  return {
+    localMode: Boolean(options.localMode),
+    aliyunRdsReady: options.localMode ? isAliyunRdsConfigured(options.env) : "not_checked_for_remote_base_url",
+    localRdsUnavailableExpected: localRdsUnavailableProbes.length,
+  }
+}
+
 async function getFreePort() {
   return new Promise((resolvePort, reject) => {
     const server = net.createServer()
@@ -402,6 +462,7 @@ async function requestProbe(baseUrl, probe, timeoutMs) {
       path: probe.path,
       status: response.status,
       code,
+      ...(probe.runtimeExpectation ? { runtimeExpectation: probe.runtimeExpectation } : {}),
     }
   } finally {
     clearTimeout(timeout)
@@ -437,9 +498,9 @@ function printHelp() {
   ].join("\n"))
 }
 
-async function runWithBaseUrl(baseUrl, timeoutMs) {
+async function runWithBaseUrl(baseUrl, timeoutMs, probes = PROBES) {
   const results = []
-  for (const probe of PROBES) {
+  for (const probe of probes) {
     results.push(await requestProbe(baseUrl, probe, timeoutMs))
   }
   return results
@@ -449,21 +510,25 @@ async function main() {
   const args = parseArgs(process.argv)
   let server = null
   let baseUrl = args.baseUrl
+  let env = new Map()
+  const localMode = !baseUrl
   try {
     if (!baseUrl) {
       if (!existsSync(resolve(process.cwd(), ".next"))) {
         throw new Error("next_build_not_found:run_corepack_pnpm_build_first")
       }
-      const env = parseEnvFile(args.envFile)
+      env = parseEnvFile(args.envFile)
       const port = await getFreePort()
       baseUrl = `http://127.0.0.1:${port}`
       server = await startServer(env, port)
       await waitForReady(baseUrl, server.child, args.timeoutMs)
     }
 
-    const probes = await runWithBaseUrl(baseUrl, args.timeoutMs)
+    const probePlan = buildProbePlanForRuntime(PROBES, { env, allowLocalRdsUnavailable: localMode })
+    const probes = await runWithBaseUrl(baseUrl, args.timeoutMs, probePlan)
     console.log(JSON.stringify({
       baseUrl,
+      runtimePlan: summarizeRuntimePlan(probePlan, { env, localMode }),
       checkedProbes: probes.length,
       scopes: summarizeScopes(probes),
       probes,

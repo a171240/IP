@@ -5,6 +5,11 @@ const path = require("node:path")
 
 const root = process.cwd()
 const source = fs.readFileSync(path.join(root, "app", "api", "app", "health", "route.ts"), "utf8")
+const postgresSource = fs.readFileSync(path.join(root, "lib", "aliyun-rds", "postgres.server.ts"), "utf8")
+const kmsSource = fs.readFileSync(path.join(root, "lib", "aliyun-rds", "kms-secret.server.ts"), "utf8")
+const ossSource = fs.readFileSync(path.join(root, "lib", "aliyun-rds", "service-record-oss.server.ts"), "utf8")
+const asrSource = fs.readFileSync(path.join(root, "lib", "aliyun-rds", "service-record-asr.server.ts"), "utf8")
+const healthSmokeSource = fs.readFileSync(path.join(root, "scripts", "smoke-aliyun-health.mjs"), "utf8")
 
 test("APP health route uses Aliyun production-cn readiness instead of legacy Supabase blockers", () => {
   assert.match(source, /isAliyunRdsConfigured/)
@@ -17,4 +22,14 @@ test("APP health route uses Aliyun production-cn readiness instead of legacy Sup
   assert.ok(aliyunGroups)
   assert.doesNotMatch(aliyunGroups[1], /supabase/)
   assert.doesNotMatch(aliyunGroups[1], /appWechatLogin/)
+})
+
+test("APP health readiness treats TODO placeholders as missing runtime configuration", () => {
+  assert.match(postgresSource, /readConfiguredTextEnv\("DATABASE_URL_CN"\)/)
+  assert.match(postgresSource, /!value\.startsWith\("TODO_"\)/)
+  assert.match(kmsSource, /!value\.startsWith\("TODO_"\)/)
+  assert.match(ossSource, /!value\.startsWith\("TODO_"\)/)
+  assert.match(asrSource, /!value\.startsWith\("TODO_"\)/)
+  assert.match(healthSmokeSource, /getEnvText\(env, "DATABASE_URL_CN"\)/)
+  assert.doesNotMatch(healthSmokeSource, /return Boolean\(getRawEnvText\(env, "DATABASE_URL_CN"\)/)
 })
