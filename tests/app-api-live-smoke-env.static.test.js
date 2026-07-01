@@ -3,6 +3,7 @@
 const test = require("node:test")
 const assert = require("node:assert/strict")
 const { spawn, spawnSync } = require("node:child_process")
+const { writeFileSync } = require("node:fs")
 const http = require("node:http")
 const path = require("node:path")
 
@@ -71,6 +72,40 @@ function validEnv(extra = {}) {
     APP_EMPLOYEE_TOKEN: SECRET_EMPLOYEE_TOKEN,
     APP_MANAGER_TOKEN: SECRET_MANAGER_TOKEN,
     ...extra,
+  }
+}
+
+function writeBoundaryReport(report) {
+  const filePath = path.join(
+    process.env.TMPDIR || "/tmp",
+    `app-api-online-boundary-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.json`,
+  )
+  writeFileSync(filePath, JSON.stringify(report, null, 2))
+  return filePath
+}
+
+function cleanBoundaryReport() {
+  return {
+    ok: true,
+    checked: 20,
+    grouped: { "200": 2, "401": 18, "404": 0 },
+    routeBlockers: [],
+  }
+}
+
+function dirtyBoundaryReport() {
+  return {
+    ok: false,
+    checked: 20,
+    grouped: { "200": 2, "401": 11, "404": 7 },
+    routeBlockers: [
+      {
+        id: "employee_knowledge_spaces",
+        path: "/api/app/knowledge-spaces",
+        status: 404,
+        contentType: "text/html",
+      },
+    ],
   }
 }
 
@@ -143,6 +178,7 @@ test("APP API live smoke env checker does not request anything until read-only s
   assert.equal(result.report.readOnlyExecutionReady, false)
   assert.equal(result.report.networkRequestsAttempted, false)
   assert.ok(result.report.executionBlockers.includes("APP_READ_ONLY_LIVE_SMOKE:missing_or_false"))
+  assert.ok(result.report.executionBlockers.includes("APP_ONLINE_BOUNDARY_REPORT:missing"))
   assert.ok(result.report.readOnlySmoke.probes.every((item) => item.method === "GET"))
   assert.ok(result.report.skippedMutatingEndpoints.some((item) => item.path.includes("generate")))
   assert.ok(result.report.skippedMutatingEndpoints.some((item) => item.path.includes("pay")))
@@ -150,6 +186,34 @@ test("APP API live smoke env checker does not request anything until read-only s
   assert.ok(result.report.skippedMutatingEndpoints.some((item) => item.path.includes("submit")))
   assert.doesNotMatch(result.stdout + result.stderr, new RegExp(SECRET_EMPLOYEE_TOKEN))
   assert.doesNotMatch(result.stdout + result.stderr, new RegExp(SECRET_MANAGER_TOKEN))
+})
+
+test("APP API live smoke execution requires a clean online boundary report", () => {
+  const reportPath = writeBoundaryReport(dirtyBoundaryReport())
+  const result = run(
+    validEnv({
+      APP_READ_ONLY_LIVE_SMOKE: "true",
+    }),
+    ["--execute-read-only", "--online-boundary-report", reportPath],
+  )
+
+  assert.equal(result.status, 1)
+  assert.equal(result.report.ok, false)
+  assert.equal(result.report.mode, "plan_only")
+  assert.equal(result.report.liveSmokeEnvReady, true)
+  assert.equal(result.report.readOnlySwitchEnabled, true)
+  assert.equal(result.report.readOnlyExecutionReady, false)
+  assert.equal(result.report.networkRequestsAttempted, false)
+  assert.equal(result.report.onlineBoundary.ready, false)
+  assert.equal(result.report.onlineBoundary.grouped404, 7)
+  assert.ok(
+    result.report.executionBlockers.includes(
+      "APP_ONLINE_BOUNDARY_REPORT:route_blockers_not_empty",
+    ),
+  )
+  assert.ok(
+    result.report.executionBlockers.includes("APP_ONLINE_BOUNDARY_REPORT:http_404_not_zero"),
+  )
 })
 
 test("APP API live smoke plan covers cross-tab GET probes only", () => {
@@ -190,19 +254,22 @@ test("APP API live smoke plan covers cross-tab GET probes only", () => {
 
 test("APP API live smoke execution uses GET-only probes and redacts token values", async () => {
   const stub = await createStubServer()
+  const reportPath = writeBoundaryReport(cleanBoundaryReport())
   try {
     const result = await runAsync(
       validEnv({
         APP_BASE_URL: stub.baseUrl,
         APP_READ_ONLY_LIVE_SMOKE: "true",
       }),
-      ["--allow-local", "--timeout-ms", "3000"],
+      ["--allow-local", "--timeout-ms", "3000", "--online-boundary-report", reportPath],
     )
 
     assert.equal(result.status, 0)
     assert.equal(result.report.ok, true)
     assert.equal(result.report.mode, "read_only_executed")
     assert.equal(result.report.networkRequestsAttempted, true)
+    assert.equal(result.report.onlineBoundary.ready, true)
+    assert.equal(result.report.onlineBoundary.grouped404, 0)
     assert.equal(result.report.readOnlySmoke.result.checkedProbes, result.report.readOnlySmoke.probes.length)
     assert.ok(stub.requests.length > 0)
     assert.ok(stub.requests.every((item) => item.method === "GET"))

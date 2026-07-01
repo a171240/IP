@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { readFileSync } from "node:fs"
 import { pathToFileURL } from "node:url"
 
 const READ_ONLY_SWITCH_ENV = "APP_READ_ONLY_LIVE_SMOKE"
@@ -213,6 +214,7 @@ function parseArgs(argv) {
   const args = {
     allowLocal: false,
     executeReadOnly: false,
+    onlineBoundaryReport: null,
     timeoutMs: DEFAULT_TIMEOUT_MS,
   }
 
@@ -224,6 +226,10 @@ function parseArgs(argv) {
     }
     if (arg === "--execute-read-only") {
       args.executeReadOnly = true
+      continue
+    }
+    if (arg === "--online-boundary-report") {
+      args.onlineBoundaryReport = resolveRawValue(argv[++index], "--online-boundary-report")
       continue
     }
     if (arg === "--timeout-ms") {
@@ -308,6 +314,7 @@ function isReadOnlySwitchEnabled(env, args) {
 
 function buildReport(env, args) {
   let baseUrl = null
+  const onlineBoundary = validateOnlineBoundaryReport(args.onlineBoundaryReport)
   const required = REQUIRED_VARIABLES.map((item) => {
     const validation = validateValue(item, env[item.name], args)
     if (item.name === "APP_BASE_URL" && validation.status === "ready") baseUrl = validation.baseUrl
@@ -329,8 +336,9 @@ function buildReport(env, args) {
   const executionBlockers = [
     ...envBlockers,
     ...(readOnlySwitchEnabled ? [] : [`${READ_ONLY_SWITCH_ENV}:missing_or_false`]),
+    ...onlineBoundary.executionBlockers,
   ]
-  const canExecuteReadOnly = liveSmokeEnvReady && readOnlySwitchEnabled
+  const canExecuteReadOnly = liveSmokeEnvReady && readOnlySwitchEnabled && onlineBoundary.ready
 
   return {
     ok: false,
@@ -342,6 +350,7 @@ function buildReport(env, args) {
     required,
     blockers: envBlockers,
     executionBlockers,
+    onlineBoundary,
     policy: {
       noSecretValuesPrinted: true,
       envFileRead: false,
@@ -349,16 +358,67 @@ function buildReport(env, args) {
       baseUrlMustUseHttps: !args.allowLocal,
       localHostsRejectedByDefault: !args.allowLocal,
       readOnlySmokeRequires: `${READ_ONLY_SWITCH_ENV}=true or --execute-read-only`,
+      onlineBoundaryRequires: "--online-boundary-report with ok=true, routeBlockers=[], and 404=0",
       mutatingSmokeAuthorizedHere: false,
     },
     readOnlySmoke: {
       baseUrl: baseUrl ? publicBaseUrl(baseUrl) : null,
       ready: canExecuteReadOnly,
       probes: READ_ONLY_PROBES.map(publicProbe),
-      command: "APP_READ_ONLY_LIVE_SMOKE=true node scripts/check-app-api-live-smoke-env.mjs",
-      alternativeCommand: "node scripts/check-app-api-live-smoke-env.mjs --execute-read-only",
+      command: "APP_READ_ONLY_LIVE_SMOKE=true node scripts/check-app-api-live-smoke-env.mjs --online-boundary-report <online-readonly-boundary.json>",
+      alternativeCommand: "node scripts/check-app-api-live-smoke-env.mjs --execute-read-only --online-boundary-report <online-readonly-boundary.json>",
     },
     skippedMutatingEndpoints: SKIPPED_MUTATING_ENDPOINTS,
+  }
+}
+
+function validateOnlineBoundaryReport(filePath) {
+  if (!filePath) {
+    return {
+      ready: false,
+      status: "missing",
+      path: null,
+      executionBlockers: ["APP_ONLINE_BOUNDARY_REPORT:missing"],
+      requiredForExecution: true,
+    }
+  }
+
+  let report
+  try {
+    report = JSON.parse(readFileSync(filePath, "utf8"))
+  } catch (error) {
+    return {
+      ready: false,
+      status: "invalid",
+      path: filePath,
+      reason: error instanceof Error ? error.message : String(error),
+      executionBlockers: ["APP_ONLINE_BOUNDARY_REPORT:invalid"],
+      requiredForExecution: true,
+    }
+  }
+
+  const grouped404 = Number(report?.grouped?.["404"] || 0)
+  const routeBlockers = Array.isArray(report?.routeBlockers) ? report.routeBlockers : []
+  const blockers = []
+  if (report?.ok !== true) blockers.push("ok_not_true")
+  if (routeBlockers.length > 0) blockers.push("route_blockers_not_empty")
+  if (grouped404 !== 0) blockers.push("http_404_not_zero")
+
+  return {
+    ready: blockers.length === 0,
+    status: blockers.length === 0 ? "ready" : "blocked",
+    path: filePath,
+    ok: report?.ok === true,
+    checked: Number(report?.checked || 0),
+    grouped404,
+    routeBlockers: routeBlockers.map((item) => ({
+      id: item.id || "",
+      path: item.path || "",
+      status: item.status || null,
+      contentType: item.contentType || "",
+    })),
+    executionBlockers: blockers.map((item) => `APP_ONLINE_BOUNDARY_REPORT:${item}`),
+    requiredForExecution: true,
   }
 }
 
@@ -505,6 +565,7 @@ function printHelp() {
     "  node scripts/check-app-api-live-smoke-env.mjs",
     "  APP_READ_ONLY_LIVE_SMOKE=true node scripts/check-app-api-live-smoke-env.mjs",
     "  node scripts/check-app-api-live-smoke-env.mjs --execute-read-only",
+    "  node scripts/check-app-api-live-smoke-env.mjs --execute-read-only --online-boundary-report /tmp/app-api-online-readonly-boundary.json",
     "",
     "Required environment variables:",
     "  APP_BASE_URL",
@@ -514,7 +575,7 @@ function printHelp() {
     "",
     "Safety:",
     "  The default mode prints missing prerequisites and a read-only plan only.",
-    "  Network requests run only when the env is complete and APP_READ_ONLY_LIVE_SMOKE=true or --execute-read-only is set.",
+    "  Network requests run only when the env is complete, APP_READ_ONLY_LIVE_SMOKE=true or --execute-read-only is set, and online boundary report is 404-free.",
     "  The live smoke uses GET probes only and never prints token values or response bodies.",
   ].join("\n"))
 }

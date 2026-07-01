@@ -251,4 +251,5 @@ no 5xx
   - User must explicitly authorize a backend-only production-cn release thread before any image build/push/SAE deploy.
   - Release thread must rerun the pre-release checks above.
   - After deploy, `online-readonly-boundary` must show `404=0` before App all-pages online availability can advance.
+  - After 404 clears, save the boundary result as a JSON report and pass it to `check-app-api-live-smoke-env.mjs --online-boundary-report <json>`.
   - After 404 clears, collect `APP_DEVICE_ID`, employee token, and manager token through shell env for login-state read-only smoke.
