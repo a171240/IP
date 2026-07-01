@@ -63,30 +63,24 @@ test("backend-only user action brief reflects fixture backend authorization gate
   assert.equal(report.mutationPerformed, false)
   assert.equal(report.secretLeakCheck.ok, true)
   assert.equal(report.summary.total, 9)
-  assert.equal(report.summary.ready, 1)
-  assert.equal(report.summary.blocked, 8)
+  assert.equal(report.summary.ready, 3)
+  assert.equal(report.summary.blocked, 6)
   assert.deepEqual(report.summary.blockedIds, [
-    "U00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "U11_ALIYUN_RDS_DATA_MIGRATION",
     "U05_OSS_RAM_OR_STS",
-    "U04_ACR_RUNTIME_AUTH",
     "U06_ENV_IMPORT",
     "U07_DOMAIN_DNS_HTTPS_ICP",
     "U08_SAE_RUNTIME_AND_SLS",
     "U09_DEPLOY_AUTHORIZATION",
   ])
   assert.deepEqual(report.summary.nextActionTimeConfirmations, [
-    "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
     "P05_OSS_RAM_STS",
-    "P04_ACR_IMAGE_AND_PULL",
     "P07_DOMAIN_DNS_HTTPS",
   ])
   assert.deepEqual(report.actionTimeAuthorizationRequest.packetIds, [
-    "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
     "P05_OSS_RAM_STS",
-    "P04_ACR_IMAGE_AND_PULL",
     "P07_DOMAIN_DNS_HTTPS",
   ])
   assert.match(report.actionTimeAuthorizationRequest.recommendedUserReply, /nextActionTimeConfirmations/)
@@ -95,23 +89,26 @@ test("backend-only user action brief reflects fixture backend authorization gate
   assert.equal(report.credentialAcquisitionSummary.blockedCredentialCount, 1)
   assert.equal(report.credentialAcquisitionSummary.credentialAcquisitionQueue.onlyMissingBackendCredentialValue, "DATABASE_URL_CN")
 
+  assert.equal(actionsById.get("U00_ALIYUN_READONLY_INVENTORY_IDENTITY").status, "ready")
   assert.equal(actionsById.get("U11_ALIYUN_RDS_DATA_MIGRATION").status, "blocked")
   assert.equal(actionsById.get("U11_ALIYUN_RDS_DATA_MIGRATION").requiresActionTimeConfirmation, true)
   assert.ok(actionsById.get("U11_ALIYUN_RDS_DATA_MIGRATION").currentBlockers.includes("requiredEnv:DATABASE_URL_CN"))
   assert.ok(actionsById.get("U11_ALIYUN_RDS_DATA_MIGRATION").currentBlockers.includes("DATABASE_URL_CN_status:empty"))
   assert.equal(actionsById.get("U05_OSS_RAM_OR_STS").status, "blocked")
-  assert.equal(actionsById.get("U04_ACR_RUNTIME_AUTH").status, "blocked")
+  assert.equal(actionsById.get("U03_ACR_PURCHASE_CONFIRMATION").status, "ready")
+  assert.equal(actionsById.get("U04_ACR_RUNTIME_AUTH").status, "ready")
   assert.equal(actionsById.get("U06_ENV_IMPORT").status, "blocked")
   assert.ok(actionsById.get("U06_ENV_IMPORT").currentBlockers.includes("requiredEnv:DATABASE_URL_CN"))
   assert.equal(actionsById.get("U07_DOMAIN_DNS_HTTPS_ICP").status, "blocked")
   assert.ok(actionsById.get("U07_DOMAIN_DNS_HTTPS_ICP").currentBlockers.length > 0)
+  assert.equal(actionsById.get("U08_SAE_RUNTIME_AND_SLS").status, "pending_cloud")
   assert.ok(actionsById.get("U09_DEPLOY_AUTHORIZATION").currentBlockers.includes("canDeployNow=false"))
   assert.ok(actionsById.get("U09_DEPLOY_AUTHORIZATION").currentBlockers.includes("missing_required_env:DATABASE_URL_CN"))
   assert.ok(!actionsById.get("U09_DEPLOY_AUTHORIZATION").currentBlockers.some((item) =>
     /WECHAT_OPEN_APP_ID|WECHAT_OPEN_APP_SECRET/.test(item)
   ))
 
-  assert.match(markdown, /nextActionTimeConfirmations: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P04_ACR_IMAGE_AND_PULL, P07_DOMAIN_DNS_HTTPS/)
+  assert.match(markdown, /nextActionTimeConfirmations: P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P07_DOMAIN_DNS_HTTPS/)
   assert.match(markdown, /blockedCredentialNames: DATABASE_URL_CN/)
   assert.match(markdown, /DATABASE_URL_CN_status:empty/)
   assert.match(markdown, /rdsMigrationEvidenceReady=false/)
@@ -147,27 +144,21 @@ test("full user action brief keeps deferred APP launch blockers separate from ba
   assert.equal(report.containsValues, false)
   assert.equal(report.secretLeakCheck.ok, true)
   assert.equal(report.summary.total, 12)
-  assert.equal(report.summary.ready, 1)
-  assert.equal(report.summary.blocked, 11)
+  assert.equal(report.summary.ready, 3)
+  assert.equal(report.summary.blocked, 9)
   assert.deepEqual(report.summary.nextActionTimeConfirmations, [
-    "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
     "P05_OSS_RAM_STS",
-    "P04_ACR_IMAGE_AND_PULL",
     "P07_DOMAIN_DNS_HTTPS",
   ])
   assert.deepEqual(report.nextActionTimeConfirmations.map((item) => item.packetId), [
-    "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
     "P05_OSS_RAM_STS",
-    "P04_ACR_IMAGE_AND_PULL",
     "P07_DOMAIN_DNS_HTTPS",
   ])
   assert.deepEqual(authorization.nextActionTimeConfirmations.map((item) => item.packetId), [
-    "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
     "P05_OSS_RAM_STS",
-    "P04_ACR_IMAGE_AND_PULL",
   ])
   assert.deepEqual(report.summary.requiredBlocking, ["DATABASE_URL_CN"])
   assert.equal(report.summary.blockedCredentialCount, 5)
@@ -183,8 +174,11 @@ test("full user action brief keeps deferred APP launch blockers separate from ba
   assert.ok(report.summary.deferredAppLaunchConfirmations.includes("P01_WECHAT_OPEN_MOBILE_APP"))
   assert.ok(report.summary.deferredAppLaunchConfirmations.includes("P10_ANDROID_RELEASE_SIGNING"))
   assert.ok(report.summary.deferredAppLaunchConfirmations.includes("P02_APPLE_TEAM_ID"))
+  assert.equal(actionsById.get("U00_ALIYUN_READONLY_INVENTORY_IDENTITY").status, "ready")
   assert.equal(actionsById.get("U11_ALIYUN_RDS_DATA_MIGRATION").status, "blocked")
   assert.ok(actionsById.get("U11_ALIYUN_RDS_DATA_MIGRATION").currentBlockers.includes("requiredEnv:DATABASE_URL_CN"))
+  assert.equal(actionsById.get("U03_ACR_PURCHASE_CONFIRMATION").status, "ready")
+  assert.equal(actionsById.get("U04_ACR_RUNTIME_AUTH").status, "ready")
   assert.equal(actionsById.get("U07_DOMAIN_DNS_HTTPS_ICP").status, "blocked")
   assert.equal(actionsById.get("U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE").status, "blocked")
   assert.equal(actionsById.get("U10_ANDROID_RELEASE_SIGNING").status, "blocked")

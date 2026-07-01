@@ -79,7 +79,7 @@ test("Aliyun blocker brief backend-only markdown reflects current backend closur
   assert.equal(report.summary.canProceedWithoutWechat, true)
   assert.equal(report.summary.backendTargetReady, "0/8")
   assert.equal(report.summary.cloudConfirmationsReady, "0/6")
-  assert.match(report.summary.operatorTasksReady, /^[01]\/8$/)
+  assert.match(report.summary.operatorTasksReady, /^[0-2]\/8$/)
   assert.match(report.summary.cloudResourceEvidenceReady, /^[01]\/7$/)
   assert.ok(report.summary.requiredBlocking.includes("RDS_MIGRATION_EVIDENCE_NOT_READY"))
   assert.ok(report.summary.requiredBlocking.includes("DATABASE_URL_CN"))

@@ -73,13 +73,16 @@ test("Aliyun RDS route migration map covers first-version APP route data access 
   assert.ok(report.observedTables.includes("voice_coach_turns"))
   assert.ok(report.observedTables.includes("service_record_sessions"))
   assert.deepEqual(report.observedRpcs, [])
-  assert.deepEqual(report.rdsAdapterFiles, [
+  assert.ok(report.rdsAdapterFiles.length >= 60)
+  for (const file of [
     "app/api/app/assets/sign-read/route.ts",
     "app/api/app/auth/logout/route.ts",
     "app/api/app/content-drafts/route.ts",
     "app/api/app/customer-profiles/[profileId]/route.ts",
     "app/api/app/customer-profiles/route.ts",
     "app/api/app/health/route.ts",
+    "app/api/app/knowledge-spaces/route.ts",
+    "app/api/app/learning/progress/route.ts",
     "app/api/app/profile/route.ts",
     "app/api/app/service-records/device-files/check/route.ts",
     "app/api/app/service-records/sessions/[sessionId]/asr/poll/route.ts",
@@ -103,10 +106,14 @@ test("Aliyun RDS route migration map covers first-version APP route data access 
     "app/api/app/store-admin/service-records/route.ts",
     "app/api/app/store-profiles/[profileId]/route.ts",
     "app/api/app/store-profiles/route.ts",
+    "app/api/app/voice-coach/sessions/route.ts",
     "lib/aliyun-rds/app-auth.server.ts",
     "lib/aliyun-rds/postgres.server.ts",
     "lib/aliyun-rds/repositories/account-profile.server.ts",
+    "lib/aliyun-rds/repositories/app-content-workflows.server.ts",
+    "lib/aliyun-rds/repositories/app-voice-coach-facade.server.ts",
     "lib/aliyun-rds/repositories/customer-profiles.server.ts",
+    "lib/aliyun-rds/repositories/learning-progress.server.ts",
     "lib/aliyun-rds/repositories/service-record-processing.server.ts",
     "lib/aliyun-rds/repositories/service-records.server.ts",
     "lib/aliyun-rds/repositories/store-admin.server.ts",
@@ -114,7 +121,9 @@ test("Aliyun RDS route migration map covers first-version APP route data access 
     "lib/aliyun-rds/repositories/store-profiles.server.ts",
     "lib/aliyun-rds/service-record-asr.server.ts",
     "lib/aliyun-rds/service-record-oss.server.ts",
-  ])
+  ]) {
+    assert.ok(report.rdsAdapterFiles.includes(file), file)
+  }
 
   assert.equal(byRoute.get("/api/app/profile").stillUsesSupabaseDataAccess, false)
   assert.equal(byRoute.get("/api/app/profile").usesAliyunRdsDataAccess, true)

@@ -257,11 +257,15 @@ test("Aliyun cloud access report preserves current non-secret console evidence",
   assert.equal(typeof report.localBrowserProbe.aliyunConsoleTabCount, "number")
   assert.ok(Array.isArray(report.localBrowserProbe.aliyunConsoleTabs))
   assert.ok(report.localBrowserProbe.note.includes("does not read cookies"))
-  assert.ok([
-    "aliyun_cli_profile_not_configured",
-    "aliyun_cli_config_incomplete",
-    "aliyun_cli_config_probe_failed",
-  ].includes(report.cli.configProbe.failureCategory))
+  if (report.cli.configProbe.ready === true) {
+    assert.equal(report.cli.configProbe.failureCategory, "")
+  } else {
+    assert.ok([
+      "aliyun_cli_profile_not_configured",
+      "aliyun_cli_config_incomplete",
+      "aliyun_cli_config_probe_failed",
+    ].includes(report.cli.configProbe.failureCategory))
+  }
   assert.equal(report.cloudShellObservation.exists, true)
   assert.equal(report.cloudShellObservation.browserConsole.chromeLoggedIn, true)
   assert.equal(typeof report.cloudShellObservation.workbenchTerminal.connected, "boolean")
@@ -274,14 +278,14 @@ test("Aliyun cloud access report preserves current non-secret console evidence",
   assert.match(resourcesObserved, /DNS ipgongchang\.xin visible; no explicit api-cn\/assets-cn records shown|DNS ipgongchang\.xin authoritative records visible; .*built-in host record search for api-cn and assets-cn returns 没有数据/)
   assert.match(resourcesObserved, /SLS logsearch URL visible for project meiye-huajing-app-prod-cn and logstore app-api/)
   assert.equal(report.observedResourceStatusSummary.total, 7)
-  assert.equal(report.observedResourceStatusSummary.ready, 0)
-  assert.equal(report.observedResourceStatusSummary.partial, 3)
+  assert.equal(report.observedResourceStatusSummary.ready, 1)
+  assert.equal(report.observedResourceStatusSummary.partial, 2)
   assert.equal(report.observedResourceStatusSummary.blocked, 4)
   assert.equal(report.observedResourceStatusSummary.observed, 7)
   assert.equal(statusById.get("saeRuntime").status, "not_created_or_not_confirmed")
   assert.equal(statusById.get("saeRuntime").readiness, "blocked")
-  assert.equal(statusById.get("acrPurchase").status, "acr_repository_confirmed_image_push_pending")
-  assert.equal(statusById.get("acrPurchase").readiness, "partial")
+  assert.equal(statusById.get("acrPurchase").status, "acr_image_and_runtime_pull_confirmed")
+  assert.equal(statusById.get("acrPurchase").readiness, "ready")
   assert.match(statusById.get("acrPurchase").nextAction, /进入 P04/)
   assert.equal(statusById.get("domainDns").status, "domain_visible_records_missing")
   assert.equal(statusById.get("ossAudio").status, "bucket_visible_unconfirmed")
@@ -303,7 +307,11 @@ test("Aliyun cloud access report preserves current non-secret console evidence",
     "envImport",
     "slsAlerts",
   ])
-  assert.ok(report.blockers.includes("aliyun_cli_config_missing_or_unread"))
+  if (report.cli.configProbe.ready === true) {
+    assert.ok(!report.blockers.includes("aliyun_cli_config_missing_or_unread"))
+  } else {
+    assert.ok(report.blockers.includes("aliyun_cli_config_missing_or_unread"))
+  }
   const cloudShellBlockers = report.cloudShellObservation.cloudShell.blockers
   const hasNasOpenConfirmation = cloudShellBlockers.includes("cloudshell_not_opened_action_time_confirmation_required_for_nas_fee_warning")
   const hasRestartConfirmation = cloudShellBlockers.includes("cloudshell_disconnected_restart_instance_confirmation_required")
@@ -323,7 +331,9 @@ test("Aliyun cloud access report preserves current non-secret console evidence",
     assert.equal(report.cloudShellObservation.cloudShell.requiresActionTimeRestartConfirmation, false)
     assert.match(report.cloudShellObservation.cloudShell.evidence, /connecting|正在连接|terminal_input_visible/)
   }
-  assert.ok(report.blockers.includes(report.cli.configProbe.failureCategory))
+  if (report.cli.configProbe.failureCategory) {
+    assert.ok(report.blockers.includes(report.cli.configProbe.failureCategory))
+  }
   assert.doesNotMatch(output, /sk-[A-Za-z0-9_-]{20,}/)
   assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)

@@ -368,7 +368,7 @@ function buildRunbook(args) {
     mutationPerformed: false,
     currentScope: "backend_aliyun_only",
     canProceedWithoutWechat: true,
-    currentAnswer: "现在不能部署阿里云后端；微信开放平台移动应用、Android 签名和 Apple Team ID 已延期，本 runbook 只列出阿里云后端需要创建、确认或补证据的字段。",
+    currentAnswer: consoleClosureBrief.conclusion,
     summary: {
       productionReady: false,
       canDeployNow: false,
@@ -477,9 +477,26 @@ function buildConsoleClosureBrief({
   const partiallyObservedResourceEvidenceIds = compactedBlockedResourceEvidence
     .filter((item) => item.observedReadiness === "partial")
     .map((item) => item.id)
+  const resourceEvidenceReady =
+    resourcesMatrix.summary?.resourceEvidenceReady ||
+    `${resourceEvidenceBrief.ready ?? resourcesMatrix.summary?.ready ?? 0}/${resourceEvidenceBrief.total ?? resourcesMatrix.summary?.total ?? 0}`
+  const blockedResourceEvidenceIds =
+    resourcesMatrix.summary?.blockedResourceEvidenceIds ||
+    resourceEvidenceBrief.blockedIds ||
+    resourcesMatrix.summary?.blockedIds ||
+    []
+  const canStartNowConsoleTasks = tasks
+    .filter((task) => task.canStartNow)
+    .map((task) => task.id)
+  const resourceEvidenceClosed = blockedResourceEvidenceIds.length === 0 &&
+    partiallyObservedResourceEvidenceIds.length === 0 &&
+    String(resourceEvidenceReady).replace(/\s/g, "") === `${resourcesMatrix.summary?.total || 0}/${resourcesMatrix.summary?.total || 0}`
+  const conclusion = resourceEvidenceClosed
+    ? "现在不能部署阿里云后端；阿里云资源证据已齐，本地还差 U09_DEPLOY_AUTHORIZATION 动作时部署授权，以及部署后的线上 smoke 和 404 清零验收；微信开放平台移动应用、Android 签名和 Apple Team ID 已延期。"
+    : "现在不能部署阿里云后端；微信开放平台移动应用、Android 签名和 Apple Team ID 已延期，当前必须先补齐 RDS/ACR/SAE/DNS/OSS/env/SLS/smoke 证据。"
 
   return {
-    conclusion: "现在不能部署阿里云后端；微信开放平台移动应用、Android 签名和 Apple Team ID 已延期，当前必须先补齐 RDS/ACR/SAE/DNS/OSS/env/SLS/smoke 证据。",
+    conclusion,
     currentScope: "backend_aliyun_only",
     canProceedWithoutWechat: true,
     deferredAppLaunchBlocking: DEFERRED_APP_LAUNCH_BLOCKING.filter((item) => item !== "ANDROID_RELEASE_WECHAT_SIGNATURE"),
@@ -488,19 +505,11 @@ function buildConsoleClosureBrief({
     blockedCredentialNames,
     readySecretEnvVariableCount: credentialBrief.readySecretEnvVariableCount ?? readySecretEnvVariableNames.length,
     readySecretEnvVariableNames,
-    resourceEvidenceReady:
-      resourcesMatrix.summary?.resourceEvidenceReady ||
-      `${resourceEvidenceBrief.ready ?? resourcesMatrix.summary?.ready ?? 0}/${resourceEvidenceBrief.total ?? resourcesMatrix.summary?.total ?? 0}`,
-    blockedResourceEvidenceIds:
-      resourcesMatrix.summary?.blockedResourceEvidenceIds ||
-      resourceEvidenceBrief.blockedIds ||
-      resourcesMatrix.summary?.blockedIds ||
-      [],
+    resourceEvidenceReady,
+    blockedResourceEvidenceIds,
     partiallyObservedResourceEvidenceIds,
     blockedResourceEvidence: compactedBlockedResourceEvidence,
-    canStartNowConsoleTasks: tasks
-      .filter((task) => task.canStartNow)
-      .map((task) => task.id),
+    canStartNowConsoleTasks,
     readyActionPacketIds: readyActionPackets.map((packet) => packet.taskId),
     nextActionTimeConfirmations: userActions.summary?.nextActionTimeConfirmations || [],
     actionTimeConfirmationRequiredIds: unique([

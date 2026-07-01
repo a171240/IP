@@ -1,6 +1,6 @@
 # 阿里云控制台动作包
 
-生成时间：2026-06-29T14:37:04.734Z
+生成时间：2026-07-01T08:58:32.626Z
 
 ## 结论
 
@@ -9,10 +9,10 @@
 - fullAppLaunchScope: deferred_after_backend_online
 - canDeployNow: false
 - canProceedWithoutWechat: true
-- backendTargetReady: 6/8
+- backendTargetReady: 8/8
 - verdict: blocked
-- cloudConfirmationsReady: 4/6
-- operatorTasksReady: 6/8
+- cloudConfirmationsReady: 6/6
+- operatorTasksReady: 7/8
 - sensitiveActionReady: 0/0
 - sensitiveActionBlocked: 0/0
 - canReadCloudNow: true
@@ -25,8 +25,8 @@
 - cloudApiCalled: false
 - blockedCredentialCount: 0
 - readySecretEnvVariableCount: 0
-- resourceEvidenceReady: 5/7
-- blockedResourceEvidenceIds: R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS
+- resourceEvidenceReady: 7/7
+- blockedResourceEvidenceIds: none
 - partiallyObservedResourceEvidenceIds: none
 - backendCanStartNowSteps: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP03_ACR_PURCHASE_AND_REPOSITORY
 - immediateBackendSteps: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP03_ACR_PURCHASE_AND_REPOSITORY
@@ -37,15 +37,15 @@
 
 ## 目标闭环证据简表
 
-- conclusion: 现在不能部署；本动作包当前只覆盖阿里云后端，能进入 C02/C05/P11 的动作时确认，其余 ACR push/SAE/DNS/env/SLS/smoke 仍未闭环。
+- conclusion: 现在不能部署阿里云后端；阿里云资源证据已齐，本地还差 U09_DEPLOY_AUTHORIZATION 动作时部署授权，以及部署后的线上 smoke 和 404 清零验收；微信开放平台移动应用、Android 签名和 Apple Team ID 已延期。
 - canDeployNow: false
 - blockedCredentialCount: 0
 - blockedCredentialNames: none
 - onlyMissingBackendCredentialValue: n/a
 - credentialAcquisitionQueueActionIds: none
 - readySecretEnvVariableCount: 0
-- resourceEvidenceReady: 5/7
-- blockedResourceEvidenceIds: R03_API_DOMAIN_HTTPS, R04_ASSET_DOMAIN_HTTPS
+- resourceEvidenceReady: 7/7
+- blockedResourceEvidenceIds: none
 - partiallyObservedResourceEvidenceIds: none
 - strictReadonlyInventoryReady: true
 - cloudInventoryReadyLocalOperations: 9/9
@@ -53,11 +53,11 @@
 - mutationPerformedCommandResults: 0
 - backendCanStartNowSteps: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP03_ACR_PURCHASE_AND_REPOSITORY
 - backendBlockedByDependencies: BAP04_ACR_IMAGE_PUSH_AND_PULL, BAP05_BACKEND_ENV_IMPORT, BAP06_SAE_RUNTIME_CREATE, BAP07_DOMAINS_HTTPS_ICP, BAP08_SLS_ALERTS, BAP09_POSTDEPLOY_SMOKE
-- canStartNowConsoleTasks: C03_API_DOMAIN_HTTPS_ICP, C04_ASSET_DOMAIN_HTTPS_ICP
+- canStartNowConsoleTasks: none
 - cloudConsolePackets: none
 - externalAppPackets: none
 - deferredAppLaunchPackets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID
-- blockedByDependencies: C01_SAE_RUNTIME, C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS, C06_ENV_IMPORT, C07_SLS_ALERTS
+- blockedByDependencies: C01_SAE_RUNTIME, C02_ACR_IMAGE_AND_PULL, C03_API_DOMAIN_HTTPS_ICP, C04_ASSET_DOMAIN_HTTPS_ICP, C05_OSS_AUDIO_RAM_STS, C06_ENV_IMPORT, C07_SLS_ALERTS
 - imagePublishWritebackBlockingGroups: none
 
 ## 后端 credential 获取/导入队列
@@ -89,18 +89,17 @@
 ## 下一步执行队列
 
 - backendCanStartNow: BAP00_READONLY_INVENTORY_IDENTITY, BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE, BAP02_OSS_RAM_STS_CLOSE, BAP03_ACR_PURCHASE_AND_REPOSITORY
-- consoleCanStartNow: C03_API_DOMAIN_HTTPS_ICP, C04_ASSET_DOMAIN_HTTPS_ICP
-- canStartNow: C03_API_DOMAIN_HTTPS_ICP, C04_ASSET_DOMAIN_HTTPS_ICP
+- consoleCanStartNow: none
+- canStartNow: none
 - externalAppPrerequisites: none
 - deferredAppLaunchPrerequisites: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID
 - backendBlockedByDependencies: BAP04_ACR_IMAGE_PUSH_AND_PULL, BAP05_BACKEND_ENV_IMPORT, BAP06_SAE_RUNTIME_CREATE, BAP07_DOMAINS_HTTPS_ICP, BAP08_SLS_ALERTS, BAP09_POSTDEPLOY_SMOKE
-- blockedByDependencies: C01_SAE_RUNTIME, C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS, C06_ENV_IMPORT, C07_SLS_ALERTS
+- blockedByDependencies: C01_SAE_RUNTIME, C02_ACR_IMAGE_AND_PULL, C03_API_DOMAIN_HTTPS_ICP, C04_ASSET_DOMAIN_HTTPS_ICP, C05_OSS_AUDIO_RAM_STS, C06_ENV_IMPORT, C07_SLS_ALERTS
 - BAP00_READONLY_INVENTORY_IDENTITY: kind=backend_apply_step; packets=P00_ALIYUN_READONLY_INVENTORY_IDENTITY; userIntervention=USER_CONFIRM_ALIYUN_READONLY_INVENTORY_IDENTITY; order=0. Restore Aliyun CLI/CloudShell read-only inventory evidence and write non-secret summaries only.
 - BAP01_RDS_POSTGRES_CREATE_AND_MIGRATE: kind=backend_apply_step; packets=P11_ALIYUN_RDS_DATA_MIGRATION; userIntervention=USER_CONFIRM_RDS_PURCHASE_AND_DATABASE_PASSWORD; order=1. Create or confirm Aliyun RDS PostgreSQL in cn-hangzhou and close Supabase-to-RDS migration evidence.
 - BAP02_OSS_RAM_STS_CLOSE: kind=backend_apply_step; packets=P05_OSS_RAM_STS; userIntervention=USER_CONFIRM_OSS_RAM_STS_SECRET_OR_RUNTIME_ROLE; order=2. Confirm OSS RAM/STS least-privilege runtime access.
 - BAP03_ACR_PURCHASE_AND_REPOSITORY: kind=backend_apply_step; packets=P03_ACR_PURCHASE; userIntervention=USER_CONFIRM_ACR_PAID_PURCHASE; order=3. Purchase/confirm ACR Enterprise instance, namespace, and repository.
-- C03_API_DOMAIN_HTTPS_ICP: kind=aliyun_console_task; scope=full_task; phrase=DNS/HTTPS 会改变公网访问入口，动作前需要确认目标入口。
-- C04_ASSET_DOMAIN_HTTPS_ICP: kind=aliyun_console_task; scope=full_task; phrase=DNS/HTTPS 会改变静态资源公网访问入口，动作前需要确认目标入口。
+- canStartNowItems: none
 - externalAppPrerequisiteItems: none
 
 ## 只读盘点解锁
@@ -123,30 +122,14 @@
 
 ## 当前可先做
 
-### C03_API_DOMAIN_HTTPS_ICP 配置 api-cn DNS、HTTPS、ICP 和后端公网入口
-
-- consolePath: 阿里云控制台 -> 云解析 DNS / 数字证书管理服务 / SAE 或 OSS/CDN 入口
-- minimumAuthorizationPhrase: DNS/HTTPS 会改变公网访问入口，动作前需要确认目标入口。
-- currentActionScope: full_task
-- currentActionAcceptanceEvidence: none
-- writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps；deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps
-- verifyCommands: corepack pnpm aliyun:domain:check；corepack pnpm aliyun:domain:strict；corepack pnpm aliyun:postdeploy:smoke -- --base-url https://api-cn.ipgongchang.xin；corepack pnpm aliyun:remote:smoke -- --base-url https://api-cn.ipgongchang.xin
-- deferredActions: none
-
-### C04_ASSET_DOMAIN_HTTPS_ICP 配置 assets-cn DNS、HTTPS、ICP 和 OSS/CDN 资源入口
-
-- consolePath: 阿里云控制台 -> 云解析 DNS / 数字证书管理服务 / SAE 或 OSS/CDN 入口
-- minimumAuthorizationPhrase: DNS/HTTPS 会改变静态资源公网访问入口，动作前需要确认目标入口。
-- currentActionScope: full_task
-- currentActionAcceptanceEvidence: none
-- writeTargets: deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.assetDomainHttps；deploy/aliyun-production-cn.cloud-confirmations.local.json -> items.apiDomainHttps
-- verifyCommands: corepack pnpm aliyun:domain:check；corepack pnpm aliyun:domain:strict；corepack pnpm aliyun:postdeploy:smoke -- --base-url https://api-cn.ipgongchang.xin；corepack pnpm aliyun:remote:smoke -- --base-url https://api-cn.ipgongchang.xin
-- deferredActions: none
+- none
 
 ## 必须暂缓
 
 - C01_SAE_RUNTIME: dependsOn=none; blockers=none
 - C02_ACR_IMAGE_AND_PULL: dependsOn=none; blockers=none
+- C03_API_DOMAIN_HTTPS_ICP: dependsOn=none; blockers=none
+- C04_ASSET_DOMAIN_HTTPS_ICP: dependsOn=none; blockers=none
 - C05_OSS_AUDIO_RAM_STS: dependsOn=none; blockers=none
 - C06_ENV_IMPORT: dependsOn=none; blockers=none
 - C07_SLS_ALERTS: dependsOn=none; blockers=none
@@ -185,11 +168,10 @@
 
 ## 当前阻塞
 
-- backendRequired:API_DOMAIN_HTTPS_ICP_NOT_READY
-- backendRequired:ASSET_DOMAIN_HTTPS_ICP_NOT_READY
-- backendRequired:POSTDEPLOY_SMOKE_NOT_RUN
 - blockedConsoleTask:C01_SAE_RUNTIME
 - blockedConsoleTask:C02_ACR_IMAGE_AND_PULL
+- blockedConsoleTask:C03_API_DOMAIN_HTTPS_ICP
+- blockedConsoleTask:C04_ASSET_DOMAIN_HTTPS_ICP
 - blockedConsoleTask:C05_OSS_AUDIO_RAM_STS
 - blockedConsoleTask:C06_ENV_IMPORT
 - blockedConsoleTask:C07_SLS_ALERTS

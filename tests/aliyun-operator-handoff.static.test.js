@@ -178,7 +178,7 @@ test("Aliyun operator handoff backend-only mode excludes deferred APP launch wor
   assert.ok(rdsMigrationPaths.includes("migration.rdsExtensionSupportConfirmed"))
   assert.ok(rdsMigrationPaths.includes("migration.dataAccessAdapterReady"))
   assert.ok(rdsMigrationPaths.includes("migration.rollbackValidationPassed"))
-  assert.equal(report.localEvidenceGaps.rdsMigration.appApiRoutesWithSupabase, 32)
+  assert.equal(report.localEvidenceGaps.rdsMigration.appApiRoutesWithSupabase, 54)
   assert.equal(report.localEvidenceGaps.rdsMigration.firstVersionRdsRoutesWithSupabaseDataAccess, 0)
   assert.equal(report.localEvidenceGaps.rdsMigration.postgresDataAccessAdapterDetected, true)
   const databaseUrlGap = report.localEvidenceGaps.rdsMigration.gaps.find((item) =>

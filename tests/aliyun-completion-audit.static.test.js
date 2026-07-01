@@ -181,7 +181,7 @@ test("Aliyun completion audit reports the current goal as blocked without secret
   assert.ok(report.summary.blockedResourceEvidenceIds.includes("R01_SAE_RUNTIME"))
   assert.ok(report.summary.blockedResourceEvidenceIds.includes("R06_ENV_IMPORT"))
   assert.equal(report.summary.operatorTasks.total, 8)
-  assert.equal(report.summary.operatorTasks.ready, 1)
+  assert.equal(report.summary.operatorTasks.ready, 2)
   assert.equal(report.summary.operatorTasks.operatorActionPacketSummary.currentScope, "backend_aliyun_only")
   assert.deepEqual(report.summary.operatorTasks.operatorActionPacketSummary.canStartNowPacketIds, [
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
@@ -221,7 +221,7 @@ test("Aliyun completion audit reports the current goal as blocked without secret
   assert.equal(byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").status, "blocked")
   assert.ok(byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").evidence.includes("cloudConfirmationScope=backend_aliyun_only"))
   assert.ok(byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").evidence.includes("cloudConfirmations 0/6 ready"))
-  assert.ok(byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").evidence.includes("operatorTasks ready 1/8"))
+  assert.ok(byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").evidence.includes("operatorTasks ready 2/8"))
   assert.ok(!byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").evidence.includes("operatorTasks ready 1/9"))
   assert.ok(!byId.get("G02_ALIYUN_CLOUD_RESOURCES_READY").blockers.some((item) =>
     item.startsWith("wechatOpenPlatform:")
@@ -257,18 +257,15 @@ test("Aliyun completion audit reports the current goal as blocked without secret
   assert.ok(!report.nextActions.canStartNowAuthorizationPackets.includes("P01_WECHAT_OPEN_MOBILE_APP"))
   assert.ok(!report.nextActions.canStartNowAuthorizationPackets.includes("P10_ANDROID_RELEASE_SIGNING"))
   assert.ok(!report.nextActions.canStartNowAuthorizationPackets.includes("P03_ACR_PURCHASE"))
-  assert.ok(report.summary.canStartNowAuthorizationPackets.includes("P11_ALIYUN_RDS_DATA_MIGRATION"))
   assert.ok(report.summary.canStartNowAuthorizationPackets.includes("P05_OSS_RAM_STS"))
   assert.deepEqual(
     report.summary.nextActionTimeConfirmations.map((item) => item.packetId),
     [
-      "P11_ALIYUN_RDS_DATA_MIGRATION",
       "P05_OSS_RAM_STS",
     ],
   )
   assert.equal(report.summary.actionTimeAuthorizationRequired, true)
   assert.deepEqual(report.summary.actionTimeAuthorizationPacketIds, [
-    "P11_ALIYUN_RDS_DATA_MIGRATION",
     "P05_OSS_RAM_STS",
   ])
   assert.deepEqual(report.summary.actionTimeAuthorizationBlockedCredentialNames, ["DATABASE_URL_CN"])
@@ -278,27 +275,26 @@ test("Aliyun completion audit reports the current goal as blocked without secret
   assert.deepEqual(report.actionTimeAuthorizationNow.packetIds, report.summary.actionTimeAuthorizationPacketIds)
   assert.deepEqual(report.actionTimeAuthorizationNow.nonSecretEvidenceOnlyPacketIds, [])
   assert.deepEqual(report.actionTimeAuthorizationNow.secretOrCredentialPacketIds, [
-    "P11_ALIYUN_RDS_DATA_MIGRATION",
     "P05_OSS_RAM_STS",
   ])
   assert.deepEqual(report.actionTimeAuthorizationNow.blockedCredentialNames, ["DATABASE_URL_CN"])
   assert.equal(report.actionTimeAuthorizationNow.readySecretEnvVariableCount, 20)
   assert.ok(report.actionTimeAuthorizationNow.reason.includes("不授权任何阿里云变更"))
   assert.ok(report.actionTimeAuthorizationNow.minimumUserPhrases.some((item) =>
-    item.packetId === "P11_ALIYUN_RDS_DATA_MIGRATION" &&
-    item.minimumUserPhrase.includes("DATABASE_URL_CN")
+    item.packetId === "P05_OSS_RAM_STS" &&
+    item.minimumUserPhrase.includes("OSS")
   ))
-  assert.ok(report.actionTimeAuthorizationNow.explicitlyExcluded.some((item) => item.includes("不把数据库密码")))
-  assert.ok(report.actionTimeAuthorizationNow.writeTargets.some((item) => item.includes("DATABASE_URL_CN")))
-  assert.ok(report.actionTimeAuthorizationNow.verifyCommands.includes("corepack pnpm aliyun:rds:migration:package"))
-  assert.ok(report.actionTimeAuthorizationNow.valueHandlingRules.some((item) => item.includes("DATABASE_URL_CN")))
+  assert.ok(report.actionTimeAuthorizationNow.explicitlyExcluded.some((item) => item.includes("不创建可提交的长期明文 Secret")))
+  assert.ok(report.actionTimeAuthorizationNow.writeTargets.some((item) => item.includes("items.oss")))
+  assert.ok(report.actionTimeAuthorizationNow.verifyCommands.includes("corepack pnpm aliyun:cloud:confirmations"))
+  assert.ok(report.actionTimeAuthorizationNow.valueHandlingRules.some((item) => item.includes("AccessKeySecret")))
   assert.deepEqual(report.nextActions.actionTimeAuthorizationNow.packetIds, report.actionTimeAuthorizationNow.packetIds)
   assert.equal(report.sourceCommands.cloudConfirmations, "corepack pnpm aliyun:cloud:confirmations:backend")
   assert.equal(report.sourceCommands.operatorTasks, "corepack pnpm aliyun:operator:tasks:backend")
   assert.ok(
     report.summary.nextActionTimeConfirmations
-      .find((item) => item.packetId === "P11_ALIYUN_RDS_DATA_MIGRATION")
-      .explicitlyExcluded.some((item) => item.includes("不把数据库密码")),
+      .find((item) => item.packetId === "P05_OSS_RAM_STS")
+      .explicitlyExcluded.some((item) => item.includes("不创建可提交的长期明文 Secret")),
   )
   assert.ok(
     report.nextActions.nextActionTimeConfirmations
@@ -358,10 +354,10 @@ test("Aliyun completion audit carries console-only inventory evidence into G03 a
   assert.match(markdownOutput, /rdsMigrationIncludedInThisRelease: false/)
   assert.match(markdownOutput, /rdsMigrationRequiredForFinalProductionCn: true/)
   assert.match(markdownOutput, /Action-time authorization required: true/)
-  assert.match(markdownOutput, /Action-time authorization packet ids: P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS/)
+  assert.match(markdownOutput, /Action-time authorization packet ids: P05_OSS_RAM_STS/)
   assert.match(markdownOutput, /Action-time authorization blocked credentials: DATABASE_URL_CN/)
   assert.match(markdownOutput, /## 动作时授权摘要/)
-  assert.match(markdownOutput, /secretOrCredentialPacketIds: P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS/)
+  assert.match(markdownOutput, /secretOrCredentialPacketIds: P05_OSS_RAM_STS/)
   assert.match(markdownOutput, /readySecretEnvVariableCount: 20/)
   assert.match(markdownOutput, /目标闭环证据简表/)
   assert.match(markdownOutput, /blockedCredentialNames: DATABASE_URL_CN/)

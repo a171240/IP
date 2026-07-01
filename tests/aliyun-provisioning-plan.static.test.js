@@ -53,64 +53,46 @@ test("Aliyun provisioning plan renders phase order without executing cloud actio
   assert.equal(report.sourceCommands.backendStatus, "corepack pnpm aliyun:backend-cn:status")
   assert.equal(report.secretLeakCheck.ok, true)
   assert.equal(report.summary.phases, 8)
-  assert.deepEqual(report.summary.readyToStartPhases, [
-    "PH00_READONLY_INVENTORY_IDENTITY",
-    "PH02_BASE_CLOUD_RESOURCES",
-    "PH03_IMAGE_PUSH_AND_PULL",
-  ])
+  assert.deepEqual(report.summary.readyToStartPhases, ["PH07_PRODUCTION_DEPLOY"])
   assert.ok(!report.summary.blockedPhases.includes("PH01_EXTERNAL_APP_IDENTIFIERS"))
-  assert.ok(!report.summary.blockedPhases.includes("PH03_IMAGE_PUSH_AND_PULL"))
-  assert.ok(report.summary.blockedPhases.includes("PH07_PRODUCTION_DEPLOY"))
+  assert.ok(report.summary.blockedPhases.includes("PH00_READONLY_INVENTORY_IDENTITY"))
+  assert.ok(report.summary.blockedPhases.includes("PH03_IMAGE_PUSH_AND_PULL"))
+  assert.ok(!report.summary.blockedPhases.includes("PH07_PRODUCTION_DEPLOY"))
   assert.deepEqual(report.summary.deferredPhases, ["PH01_EXTERNAL_APP_IDENTIFIERS"])
-  assert.equal(report.summary.userActionReady, "1/9")
-  assert.deepEqual(report.summary.requiredBlocking, ["DATABASE_URL_CN"])
+  assert.equal(report.summary.userActionReady, "8/9")
+  assert.deepEqual(report.summary.requiredBlocking, [])
   assert.deepEqual(report.summary.deferredAppLaunchPackets, [
     "P01_WECHAT_OPEN_MOBILE_APP",
     "P10_ANDROID_RELEASE_SIGNING",
     "P02_APPLE_TEAM_ID",
   ])
   assert.equal(report.summary.authorizationPackets, 9)
-  assert.equal(report.summary.blockedCredentialCount, 1)
-  assert.equal(report.summary.readySecretEnvVariableCount, 17)
-  assert.equal(report.summary.resourceEvidenceReady, "0/7")
-  assert.ok(report.summary.blockedResourceEvidenceIds.includes("R01_SAE_RUNTIME"))
-  assert.ok(report.summary.blockedResourceEvidenceIds.includes("R06_ENV_IMPORT"))
-  assert.ok(report.summary.partiallyObservedResourceEvidenceIds.includes("R05_OSS_AUDIO_STORAGE"))
-  assert.ok(report.summary.partiallyObservedResourceEvidenceIds.includes("R07_SLS_ALERTS"))
-  assert.equal(report.summary.cloudInventoryStrictReady, false)
-  assert.equal(report.summary.cloudInventoryReadyLocalOperations, "0/9")
+  assert.equal(report.summary.blockedCredentialCount, 0)
+  assert.equal(report.summary.readySecretEnvVariableCount, 0)
+  assert.equal(report.summary.resourceEvidenceReady, "7/7")
+  assert.deepEqual(report.summary.blockedResourceEvidenceIds, [])
+  assert.deepEqual(report.summary.partiallyObservedResourceEvidenceIds, [])
+  assert.equal(report.summary.cloudInventoryStrictReady, true)
+  assert.equal(report.summary.cloudInventoryReadyLocalOperations, "9/9")
   assert.equal(report.summary.cloudInventoryDryRunEvidence, "0/9")
   assert.equal(report.provisioningClosureBrief.canDeployNow, false)
   assert.equal(report.provisioningClosureBrief.canCodexExecuteNow, false)
-  assert.equal(report.provisioningClosureBrief.blockedCredentialCount, 1)
-  assert.ok(report.provisioningClosureBrief.blockedCredentialNames.includes("DATABASE_URL_CN"))
+  assert.match(report.provisioningClosureBrief.conclusion, /PH00\/PH02/)
+  assert.equal(report.provisioningClosureBrief.blockedCredentialCount, 0)
+  assert.deepEqual(report.provisioningClosureBrief.blockedCredentialNames, [])
   assert.ok(!report.provisioningClosureBrief.blockedCredentialNames.includes("WECHAT_OPEN_APP_ID"))
   assert.ok(!report.provisioningClosureBrief.blockedCredentialNames.includes("WECHAT_OPEN_APP_SECRET"))
-  assert.equal(report.provisioningClosureBrief.readySecretEnvVariableCount, 17)
-  assert.equal(report.provisioningClosureBrief.resourceEvidenceReady, "0/7")
-  assert.ok(report.provisioningClosureBrief.blockedResourceEvidenceIds.includes("R02_ACR_IMAGE_REGISTRY"))
-  assert.ok(report.provisioningClosureBrief.blockedResourceEvidenceIds.includes("R07_SLS_ALERTS"))
-  assert.ok(report.provisioningClosureBrief.partiallyObservedResourceEvidenceIds.includes("R05_OSS_AUDIO_STORAGE"))
-  assert.ok(report.provisioningClosureBrief.partiallyObservedResourceEvidenceIds.includes("R07_SLS_ALERTS"))
-  assert.ok(report.provisioningClosureBrief.blockedResourceEvidence.some((item) =>
-    item.id === "R05_OSS_AUDIO_STORAGE" &&
-    item.observedReadiness === "partial" &&
-    item.currentEvidence.some((evidence) => /bucket_exists/.test(evidence))
-  ))
-  assert.deepEqual(report.provisioningClosureBrief.readyToStartPhases, [
-    "PH00_READONLY_INVENTORY_IDENTITY",
-    "PH02_BASE_CLOUD_RESOURCES",
-    "PH03_IMAGE_PUSH_AND_PULL",
-  ])
+  assert.equal(report.provisioningClosureBrief.readySecretEnvVariableCount, 0)
+  assert.equal(report.provisioningClosureBrief.resourceEvidenceReady, "7/7")
+  assert.deepEqual(report.provisioningClosureBrief.blockedResourceEvidenceIds, [])
+  assert.deepEqual(report.provisioningClosureBrief.partiallyObservedResourceEvidenceIds, [])
+  assert.deepEqual(report.provisioningClosureBrief.blockedResourceEvidence, [])
+  assert.deepEqual(report.provisioningClosureBrief.readyToStartPhases, ["PH07_PRODUCTION_DEPLOY"])
   assert.ok(!report.provisioningClosureBrief.blockedPhases.includes("PH01_EXTERNAL_APP_IDENTIFIERS"))
-  assert.ok(report.provisioningClosureBrief.blockedPhases.includes("PH07_PRODUCTION_DEPLOY"))
+  assert.ok(report.provisioningClosureBrief.blockedPhases.includes("PH00_READONLY_INVENTORY_IDENTITY"))
+  assert.ok(!report.provisioningClosureBrief.blockedPhases.includes("PH07_PRODUCTION_DEPLOY"))
   assert.deepEqual(report.provisioningClosureBrief.deferredPhases, ["PH01_EXTERNAL_APP_IDENTIFIERS"])
-  assert.deepEqual(report.provisioningClosureBrief.canStartNowAuthorizationPackets, [
-    "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
-    "P11_ALIYUN_RDS_DATA_MIGRATION",
-    "P05_OSS_RAM_STS",
-    "P04_ACR_IMAGE_AND_PULL",
-  ])
+  assert.deepEqual(report.provisioningClosureBrief.canStartNowAuthorizationPackets, ["P09_PRODUCTION_DEPLOY"])
   assert.deepEqual(report.provisioningClosureBrief.deferredAppLaunchPackets, [
     "P01_WECHAT_OPEN_MOBILE_APP",
     "P10_ANDROID_RELEASE_SIGNING",
@@ -122,38 +104,28 @@ test("Aliyun provisioning plan renders phase order without executing cloud actio
   assert.ok(!report.provisioningClosureBrief.actionTimeConfirmationRequired.includes("U01_WECHAT_OPEN_APP_CREATE_AND_APPROVE"))
   assert.ok(!report.provisioningClosureBrief.actionTimeConfirmationRequired.includes("U02_APPLE_TEAM_ID"))
   assert.ok(!report.provisioningClosureBrief.actionTimeConfirmationRequired.includes("U10_ANDROID_RELEASE_SIGNING"))
-  assert.ok(report.provisioningClosureBrief.actionTimeConfirmationRequired.includes("S08_ALIYUN_RDS_DATABASE_URL"))
   assert.ok(report.provisioningClosureBrief.actionTimeConfirmationRequired.includes("U00_ALIYUN_READONLY_INVENTORY_IDENTITY"))
-  assert.ok(report.provisioningClosureBrief.actionTimeConfirmationRequired.includes("U11_ALIYUN_RDS_DATA_MIGRATION"))
-  assert.deepEqual(report.provisioningClosureBrief.canStartNowConsoleTasks, [
-    "C02_ACR_IMAGE_AND_PULL",
-    "C05_OSS_AUDIO_RAM_STS",
-  ])
-  assert.ok(report.provisioningClosureBrief.nextActionTimeConfirmations.includes("P04_ACR_IMAGE_AND_PULL"))
-  assert.equal(report.provisioningClosureBrief.currentInventoryGate.status, "not_ready")
-  assert.equal(report.currentInventoryGate.status, "not_ready")
-  assert.equal(report.currentInventoryGate.strictReady, false)
-  assert.equal(report.currentInventoryGate.readyLocalOperations, "0/9")
+  assert.ok(report.provisioningClosureBrief.actionTimeConfirmationRequired.includes("U09_DEPLOY_AUTHORIZATION"))
+  assert.deepEqual(report.provisioningClosureBrief.canStartNowConsoleTasks, [])
+  assert.deepEqual(report.provisioningClosureBrief.nextActionTimeConfirmations, ["P09_PRODUCTION_DEPLOY"])
+  assert.equal(report.provisioningClosureBrief.currentInventoryGate.status, "strict_ready")
+  assert.equal(report.currentInventoryGate.status, "strict_ready")
+  assert.equal(report.currentInventoryGate.strictReady, true)
+  assert.equal(report.currentInventoryGate.readyLocalOperations, "9/9")
   assert.equal(report.currentInventoryGate.executedCommandResults, "9/9")
   assert.equal(report.currentInventoryGate.mutationPerformedCommandResults, 0)
-  assert.equal(report.currentInventoryGate.cloudInventoryResultGaps, 1)
+  assert.equal(report.currentInventoryGate.cloudInventoryResultGaps, 0)
   assert.equal(report.currentInventoryGate.localInventoryFile, "deploy/aliyun-production-cn.cloud-inventory-results.local.json")
   assert.equal(report.currentInventoryGate.localFileExists, true)
   assert.equal(report.currentInventoryGate.dryRunEvidence, "0/9")
-  assert.ok(report.currentInventoryGate.failureCategories.includes("aliyun_cli_profile_not_configured"))
-  assert.ok(report.currentInventoryGate.failureCategories.includes("aliyun_cli_config_incomplete"))
-  assert.ok(report.currentInventoryGate.currentEvidence.includes("cloudInventoryStrictReady=false"))
-  assert.ok(report.currentInventoryGate.currentEvidence.includes("readyLocalOperations=0/9"))
+  assert.deepEqual(report.currentInventoryGate.failureCategories, [])
+  assert.ok(report.currentInventoryGate.currentEvidence.includes("cloudInventoryStrictReady=true"))
+  assert.ok(report.currentInventoryGate.currentEvidence.includes("readyLocalOperations=9/9"))
   assert.ok(report.currentInventoryGate.currentEvidence.includes("dryRunEvidence=0/9"))
   assert.equal(report.currentInventoryGate.cloudShellCurrentStatus, "disconnected_restart_instance_confirmation_required")
   assert.ok(report.currentInventoryGate.currentEvidence.includes("cloudShellCurrentStatus=disconnected_restart_instance_confirmation_required"))
-  assert.ok(report.currentInventoryGate.nextRequiredAction.includes("确认当前阿里云 CloudShell 重启实例提示"))
-  assert.deepEqual(report.readyAuthorizationPackets.map((item) => item.packetId), [
-    "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
-    "P11_ALIYUN_RDS_DATA_MIGRATION",
-    "P05_OSS_RAM_STS",
-    "P04_ACR_IMAGE_AND_PULL",
-  ])
+  assert.ok(report.currentInventoryGate.nextRequiredAction.includes("P00 strict inventory is current"))
+  assert.deepEqual(report.readyAuthorizationPackets.map((item) => item.packetId), ["P09_PRODUCTION_DEPLOY"])
   assert.deepEqual(report.deferredAppLaunchAuthorizationPackets.map((item) => item.packetId), [
     "P01_WECHAT_OPEN_MOBILE_APP",
     "P10_ANDROID_RELEASE_SIGNING",
@@ -166,8 +138,8 @@ test("Aliyun provisioning plan renders phase order without executing cloud actio
   assert.ok(report.phases.find((item) => item.id === "PH01_EXTERNAL_APP_IDENTIFIERS")
     .authorizationPackets.every((item) => item.deferredUntil === "deferred_after_backend_online"))
   const readonly = byId.get("PH00_READONLY_INVENTORY_IDENTITY")
-  assert.equal(readonly.status, "ready_for_action_time_confirmation")
-  assert.equal(readonly.canStartNow, true)
+  assert.equal(readonly.status, "blocked_by_dependencies")
+  assert.equal(readonly.canStartNow, false)
   assert.equal(readonly.deferredAfterBackendOnline, false)
   assert.deepEqual(readonly.authorizationPackets.map((item) => item.packetId), [
     "P00_ALIYUN_READONLY_INVENTORY_IDENTITY",
@@ -175,15 +147,7 @@ test("Aliyun provisioning plan renders phase order without executing cloud actio
   assert.ok(readonly.verifyCommands.includes("corepack pnpm aliyun:cloud:access"))
   assert.ok(readonly.verifyCommands.some((item) => item.includes("MEIYE_ALLOW_ALIYUN_READONLY_INVENTORY=1")))
   assert.ok(readonly.completionEvidence.some((item) => item.includes("List/Describe/stat/get")))
-  assert.ok(report.readyAuthorizationPackets.some((item) =>
-    item.packetId === "P04_ACR_IMAGE_AND_PULL" &&
-    item.nonSecretEvidenceOnly === true &&
-    item.completionEvidence.includes("acr.imagePushed=true")
-  ))
-  assert.deepEqual(report.readyActionPackets.map((item) => item.taskId), [
-    "C02_ACR_IMAGE_AND_PULL",
-    "C05_OSS_AUDIO_RAM_STS",
-  ])
+  assert.deepEqual(report.readyActionPackets.map((item) => item.taskId), [])
 
   const identifiers = byId.get("PH01_EXTERNAL_APP_IDENTIFIERS")
   assert.equal(identifiers.status, "deferred_after_backend_online")
@@ -210,7 +174,8 @@ test("Aliyun provisioning plan renders phase order without executing cloud actio
   ))
 
   const baseCloud = byId.get("PH02_BASE_CLOUD_RESOURCES")
-  assert.equal(baseCloud.canStartNow, true)
+  assert.equal(baseCloud.status, "blocked_by_dependencies")
+  assert.equal(baseCloud.canStartNow, false)
   assert.deepEqual(baseCloud.consoleTasks.map((item) => item.id), [
     "C05_OSS_AUDIO_RAM_STS",
   ])
@@ -221,8 +186,9 @@ test("Aliyun provisioning plan renders phase order without executing cloud actio
   const image = byId.get("PH03_IMAGE_PUSH_AND_PULL")
   const baseAcr = image.consoleTasks.find((item) => item.id === "C02_ACR_IMAGE_AND_PULL")
   const imagePacket = image.authorizationPackets.find((item) => item.packetId === "P04_ACR_IMAGE_AND_PULL")
-  assert.equal(image.canStartNow, true)
-  assert.ok(!image.blockingDependencies.includes("P03_ACR_PURCHASE"))
+  assert.equal(image.status, "blocked_by_dependencies")
+  assert.equal(image.canStartNow, false)
+  assert.ok(image.blockingDependencies.includes("notReadyForCurrentScope:P04_ACR_IMAGE_AND_PULL"))
   assert.equal(baseAcr.currentActionScope, "image_push_or_import_and_digest_verification")
   assert.ok(image.currentActionScopes.some((item) => (
     item.taskId === "C02_ACR_IMAGE_AND_PULL" && item.scope === "image_push_or_import_and_digest_verification"
@@ -237,19 +203,19 @@ test("Aliyun provisioning plan renders phase order without executing cloud actio
 
   const env = byId.get("PH04_ENV_IMPORT")
   assert.equal(env.canStartNow, false)
-  assert.ok(env.blockingDependencies.includes("P05_OSS_RAM_STS"))
-  assert.ok(env.blockingDependencies.includes("P11_ALIYUN_RDS_DATA_MIGRATION"))
-  assert.ok(env.currentBlockers.includes("requiredEnv:DATABASE_URL_CN"))
+  assert.deepEqual(env.blockingDependencies, ["notReadyForCurrentScope:P06_ENV_IMPORT"])
+  assert.ok(env.currentBlockers.includes("dependsOn:notReadyForCurrentScope:P06_ENV_IMPORT"))
   assert.ok(!env.currentBlockers.some((item) => /WECHAT_OPEN_APP_ID|WECHAT_OPEN_APP_SECRET|APPLE_TEAM_ID|MEIYE_RELEASE_/.test(item)))
   assert.deepEqual(env.currentActionAcceptanceEvidence, [
     "secretNotInImage=true",
     "importedAt=实际导入时间",
-    "currentBackendRequiredBlocking=DATABASE_URL_CN",
+    "currentBackendRequiredBlocking=none",
   ])
 
   const deploy = byId.get("PH07_PRODUCTION_DEPLOY")
-  assert.equal(deploy.canStartNow, false)
-  assert.ok(deploy.blockingDependencies.includes("P08_SAE_RUNTIME_SLS"))
+  assert.equal(deploy.status, "ready_for_action_time_confirmation")
+  assert.equal(deploy.canStartNow, true)
+  assert.deepEqual(deploy.blockingDependencies, [])
   assert.ok(deploy.explicitlyExcluded.some((item) => item.includes("不 git push")))
 
   assert.ok(report.safetyBoundary.some((item) => item.includes("不执行任何阿里云")))
@@ -276,39 +242,36 @@ test("Aliyun provisioning plan markdown preserves ACR current scope and deferred
   assert.match(markdown, /## 目标闭环证据简表/)
   assert.match(markdown, /Current scope: backend_aliyun_only/)
   assert.match(markdown, /Full APP launch scope: deferred_after_backend_online/)
-  assert.match(markdown, /Required blocking env: DATABASE_URL_CN/)
+  assert.match(markdown, /Required blocking env: none/)
   assert.match(markdown, /Deferred APP launch packets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID/)
-  assert.match(markdown, /Blocked credential count: 1/)
-  assert.match(markdown, /Ready secret env variable count: 17/)
-  assert.match(markdown, /Resource evidence ready: 0\/7/)
-  assert.match(markdown, /Current P00 inventory gate: not_ready/)
-  assert.match(markdown, /cloudInventoryStrictReady=false/)
-  assert.match(markdown, /readyLocalOperations=0\/9/)
+  assert.match(markdown, /Blocked credential count: 0/)
+  assert.match(markdown, /Ready secret env variable count: 0/)
+  assert.match(markdown, /Resource evidence ready: 7\/7/)
+  assert.match(markdown, /Current P00 inventory gate: strict_ready/)
+  assert.match(markdown, /cloudInventoryStrictReady=true/)
+  assert.match(markdown, /readyLocalOperations=9\/9/)
   assert.match(markdown, /dryRunEvidence=0\/9/)
-  assert.match(markdown, /Blocked resource evidence ids: .*R02_ACR_IMAGE_REGISTRY/)
-  assert.match(markdown, /Partially observed resource evidence ids: R02_ACR_IMAGE_REGISTRY, R05_OSS_AUDIO_STORAGE, R07_SLS_ALERTS/)
+  assert.match(markdown, /Blocked resource evidence ids: none/)
+  assert.match(markdown, /Partially observed resource evidence ids: none/)
   assert.match(markdown, /Can Codex execute now: false/)
-  assert.match(markdown, /Ready authorization packets: P00_ALIYUN_READONLY_INVENTORY_IDENTITY, P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P04_ACR_IMAGE_AND_PULL/)
+  assert.match(markdown, /Ready authorization packets: P09_PRODUCTION_DEPLOY/)
   assert.match(markdown, /Deferred APP launch authorization packets: P01_WECHAT_OPEN_MOBILE_APP, P10_ANDROID_RELEASE_SIGNING, P02_APPLE_TEAM_ID/)
-  assert.match(markdown, /Ready phases: PH00_READONLY_INVENTORY_IDENTITY, PH02_BASE_CLOUD_RESOURCES, PH03_IMAGE_PUSH_AND_PULL/)
+  assert.match(markdown, /Ready phases: PH07_PRODUCTION_DEPLOY/)
   assert.match(markdown, /Deferred phases: PH01_EXTERNAL_APP_IDENTIFIERS/)
   assert.doesNotMatch(markdown, /Blocked phases: .*PH01_EXTERNAL_APP_IDENTIFIERS/)
   assert.doesNotMatch(markdown, /Blocked credential names: .*WECHAT_OPEN_APP_ID/)
   assert.doesNotMatch(markdown, /Blocked credential names: .*WECHAT_OPEN_APP_SECRET/)
   assert.match(markdown, /P11_ALIYUN_RDS_DATA_MIGRATION/)
-  assert.match(markdown, /compatibilityReviewChecklist 7 类/)
-  assert.match(markdown, /compatibilityReviewChecklistItemCount=7/)
   assert.match(markdown, /corepack pnpm aliyun:rds:migration:package/)
-  assert.match(markdown, /Ready console action packets: C02_ACR_IMAGE_AND_PULL, C05_OSS_AUDIO_RAM_STS/)
+  assert.match(markdown, /Ready console action packets: none/)
   assert.match(markdown, /## 当前 P00 只读盘点门禁/)
-  assert.match(markdown, /Status: not_ready/)
-  assert.match(markdown, /cloudInventoryResultGaps=1/)
+  assert.match(markdown, /Status: strict_ready/)
+  assert.match(markdown, /cloudInventoryResultGaps=0/)
   assert.match(markdown, /localInventoryFile: deploy\/aliyun-production-cn\.cloud-inventory-results\.local\.json/)
-  assert.match(markdown, /failureCategories: aliyun_cli_profile_not_configured, aliyun_cli_config_incomplete/)
-  assert.match(markdown, /Next required action: 授权在确认当前阿里云 CloudShell 重启实例提示后/)
+  assert.match(markdown, /failureCategories: none/)
+  assert.match(markdown, /Next required action: P00 strict inventory is current/)
   assert.match(markdown, /## Ready Authorization Packets/)
-  assert.match(markdown, /### P00_ALIYUN_READONLY_INVENTORY_IDENTITY/)
-  assert.match(markdown, /### P04_ACR_IMAGE_AND_PULL/)
+  assert.match(markdown, /### P09_PRODUCTION_DEPLOY/)
   assert.match(markdown, /### PH00_READONLY_INVENTORY_IDENTITY/)
   assert.match(markdown, /### PH01_EXTERNAL_APP_IDENTIFIERS/)
   assert.match(markdown, /Deferred after backend online: true/)
@@ -354,13 +317,13 @@ test("APP production-cn provisioning sequence handoff matches the current plan",
   assert.match(handoff, /assetHost=assets-cn\.ipgongchang\.xin/)
   assert.match(handoff, /ECS is a fallback only/)
   assert.match(handoff, /Aliyun RDS PostgreSQL as the formal data layer/)
-  assert.match(handoff, /Current P00 inventory gate: not_ready/)
-  assert.match(handoff, /cloudInventoryStrictReady=false/)
-  assert.match(handoff, /readyLocalOperations=0\/9/)
+  assert.match(handoff, /Current P00 inventory gate: strict_ready/)
+  assert.match(handoff, /cloudInventoryStrictReady=true/)
+  assert.match(handoff, /readyLocalOperations=9\/9/)
   assert.match(handoff, /dryRunEvidence=0\/9/)
   assert.match(handoff, /## 当前 P00 只读盘点门禁/)
-  assert.match(handoff, /cloudInventoryResultGaps=1/)
-  assert.match(handoff, /Next required action: 授权在确认当前阿里云 CloudShell 重启实例提示后/)
+  assert.match(handoff, /cloudInventoryResultGaps=0/)
+  assert.match(handoff, /Next required action: P00 strict inventory is current/)
 
   for (const phase of report.phases) {
     assert.match(handoff, new RegExp(phase.id))

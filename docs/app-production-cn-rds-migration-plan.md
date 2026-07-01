@@ -1,23 +1,23 @@
 # APP production-cn RDS/PostgreSQL migration inventory
 
-Generated at: 2026-06-25T06:38:27.428Z
+Generated at: 2026-07-01T09:22:15.593Z
 
 ## Conclusion
 
 - Current data layer: Supabase migration source / legacy compatibility only
 - Formal target: Aliyun RDS PostgreSQL
 - Migration ready: false
-- APP API routes: 31
-- APP API routes using Supabase: 29
+- APP API routes: 56
+- APP API routes using Supabase: 54
 - APP API routes using Supabase data access: 4
 - First-version RDS required APP API routes: 25
 - First-version RDS required routes using Supabase: 23
 - First-version RDS required routes using Supabase data access: 0
-- Deferred APP API routes: 6
+- Deferred APP API routes: 31
 - Deferred APP API routes using Supabase data access: 4
-- Shared Supabase files: 95
+- Shared Supabase files: 94
 - Shared Supabase data access files: 75
-- Supabase usage files: 104
+- Supabase usage files: 96
 - DATABASE_URL_CN referenced in source: true
 - PostgreSQL data access adapter detected: true
 - RDS schema map ready: true
@@ -27,7 +27,7 @@ Generated at: 2026-06-25T06:38:27.428Z
 - Tables: activation_requests, analytics_events, content_rewrites, content_sources, conversations, credit_transactions, delivery_packs, distribution_jobs, distribution_tasks, entitlements, knowledge_docs, mp_account_invites, mp_account_memberships, mp_ai_point_ledger, mp_companies, mp_knowledge_space_access, mp_knowledge_spaces, mp_stores, platform_connections, poster_generations, private_copy_drafts, profiles, reports, service_record_markers, service_record_segments, service_record_sessions, store_profiles, video_render_jobs, voice_coach_customer_profiles, voice_coach_events, voice_coach_jobs, voice_coach_knowledge_spaces, voice_coach_opening_preparations, voice_coach_scene_cards, voice_coach_sessions, voice_coach_training_packs, voice_coach_training_progress, voice_coach_turns, voice_training_packs, voice_training_progress, voice_training_tasks, wechatpay_orders, workflow_progress, xhs_drafts
 - RPCs: consume_credits, grant_trial_credits, update_profile_public
 - Storage buckets: delivery-packs
-- RDS adapter files: app/api/app/customer-profiles/[profileId]/route.ts, app/api/app/customer-profiles/route.ts, app/api/app/profile/route.ts, app/api/app/service-records/device-files/check/route.ts, app/api/app/service-records/sessions/[sessionId]/asr/poll/route.ts, app/api/app/service-records/sessions/[sessionId]/audio/[segmentId]/route.ts, app/api/app/service-records/sessions/[sessionId]/end/route.ts, app/api/app/service-records/sessions/[sessionId]/markers/route.ts, app/api/app/service-records/sessions/[sessionId]/oss-upload/route.ts, app/api/app/service-records/sessions/[sessionId]/process/route.ts, app/api/app/service-records/sessions/[sessionId]/resume/route.ts, app/api/app/service-records/sessions/[sessionId]/route.ts, app/api/app/service-records/sessions/[sessionId]/segments/oss/route.ts, app/api/app/service-records/sessions/[sessionId]/segments/route.ts, app/api/app/service-records/sessions/route.ts, app/api/app/store-admin/analytics/route.ts, app/api/app/store-admin/invites/[token]/accept/route.ts, app/api/app/store-admin/invites/[token]/preview/route.ts, app/api/app/store-admin/invites/[token]/qrcode/route.ts, app/api/app/store-admin/invites/route.ts, app/api/app/store-admin/members/route.ts, app/api/app/store-admin/overview/route.ts, app/api/app/store-profiles/[profileId]/route.ts, app/api/app/store-profiles/route.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts, lib/aliyun-rds/repositories/customer-profiles.server.ts, lib/aliyun-rds/repositories/service-record-processing.server.ts, lib/aliyun-rds/repositories/service-records.server.ts, lib/aliyun-rds/repositories/store-admin.server.ts, lib/aliyun-rds/repositories/store-invites.server.ts, lib/aliyun-rds/repositories/store-profiles.server.ts, lib/aliyun-rds/service-record-asr.server.ts, lib/aliyun-rds/service-record-oss.server.ts
+- RDS adapter files: app/api/app/assets/sign-read/route.ts, app/api/app/auth/logout/route.ts, app/api/app/content-drafts/route.ts, app/api/app/customer-profiles/[profileId]/route.ts, app/api/app/customer-profiles/route.ts, app/api/app/health/route.ts, app/api/app/knowledge-spaces/[...path]/route.ts, app/api/app/knowledge-spaces/route.ts, app/api/app/learning/progress/events/route.ts, app/api/app/learning/progress/route.ts, app/api/app/learning/progress/sync/route.ts, app/api/app/posters/generate/route.ts, app/api/app/posters/history/route.ts, app/api/app/posters/templates/route.ts, app/api/app/private-copy/drafts/route.ts, app/api/app/private-copy/generate/route.ts, app/api/app/profile/route.ts, app/api/app/service-records/device-files/check/route.ts, app/api/app/service-records/sessions/[sessionId]/asr/poll/route.ts, app/api/app/service-records/sessions/[sessionId]/audio/[segmentId]/route.ts, app/api/app/service-records/sessions/[sessionId]/end/route.ts, app/api/app/service-records/sessions/[sessionId]/markers/route.ts, app/api/app/service-records/sessions/[sessionId]/oss-upload/route.ts, app/api/app/service-records/sessions/[sessionId]/process/route.ts, app/api/app/service-records/sessions/[sessionId]/resume/route.ts, app/api/app/service-records/sessions/[sessionId]/route.ts, app/api/app/service-records/sessions/[sessionId]/segments/oss/route.ts, app/api/app/service-records/sessions/[sessionId]/segments/route.ts, app/api/app/service-records/sessions/route.ts, app/api/app/store-admin/analytics/route.ts, app/api/app/store-admin/invites/[token]/accept/route.ts, app/api/app/store-admin/invites/[token]/preview/route.ts, app/api/app/store-admin/invites/[token]/qrcode/route.ts, app/api/app/store-admin/invites/route.ts, app/api/app/store-admin/members/route.ts, app/api/app/store-admin/overview/route.ts, app/api/app/store-admin/service-records/route.ts, app/api/app/store-profiles/[profileId]/route.ts, app/api/app/store-profiles/route.ts, app/api/app/voice-coach/sessions/[sessionId]/asr-preview/route.ts, app/api/app/voice-coach/sessions/[sessionId]/beautician-turn/submit/route.ts, app/api/app/voice-coach/sessions/[sessionId]/end/route.ts, app/api/app/voice-coach/sessions/[sessionId]/events/route.ts, app/api/app/voice-coach/sessions/[sessionId]/report/route.ts, app/api/app/voice-coach/sessions/[sessionId]/route.ts, app/api/app/voice-coach/sessions/[sessionId]/turns/[turnId]/tts/route.ts, app/api/app/voice-coach/sessions/route.ts, app/api/app/xhs/content/danger-check/route.ts, app/api/app/xhs/drafts/route.ts, app/api/app/xhs/generate-cover-image/route.ts, app/api/app/xhs/generate-v4/route.ts, lib/aliyun-rds/app-auth.server.ts, lib/aliyun-rds/postgres.server.ts, lib/aliyun-rds/repositories/account-profile.server.ts, lib/aliyun-rds/repositories/app-content-workflows.server.ts, lib/aliyun-rds/repositories/app-voice-coach-facade.server.ts, lib/aliyun-rds/repositories/customer-profiles.server.ts, lib/aliyun-rds/repositories/learning-progress.server.ts, lib/aliyun-rds/repositories/service-record-processing.server.ts, lib/aliyun-rds/repositories/service-records.server.ts, lib/aliyun-rds/repositories/store-admin.server.ts, lib/aliyun-rds/repositories/store-invites.server.ts, lib/aliyun-rds/repositories/store-profiles.server.ts, lib/aliyun-rds/service-record-asr.server.ts, lib/aliyun-rds/service-record-oss.server.ts
 - RDS schema map file: deploy/aliyun-production-cn.rds-first-version-schema-map.json
 
 ## Required Blockers
@@ -65,6 +65,10 @@ Generated at: 2026-06-25T06:38:27.428Z
 
 ## Deferred APP API Routes
 
+- /api/app/assets/sign-read
+  - file: app/api/app/assets/sign-read/route.ts
+  - reason: Route is present in the APP API inventory but is not part of the first-version RDS migration rule set.
+  - usesSupabaseDataAccess: false
 - /api/app/auth/logout
   - file: app/api/app/auth/logout/route.ts
   - reason: Logout is an Auth session boundary and does not own first-version RDS business data.
@@ -73,9 +77,53 @@ Generated at: 2026-06-25T06:38:27.428Z
   - file: app/api/app/auth/wechat/route.ts
   - reason: WeChat Open Platform mobile app creation and its env are explicitly deferred from the current Aliyun backend-only target.
   - usesSupabaseDataAccess: true
+- /api/app/content-drafts
+  - file: app/api/app/content-drafts/route.ts
+  - reason: Route is present in the APP API inventory but is not part of the first-version RDS migration rule set.
+  - usesSupabaseDataAccess: false
 - /api/app/health
   - file: app/api/app/health/route.ts
   - reason: Health is a deployment/env smoke route; it is handled by SAE env import and health smoke, not RDS data migration.
+  - usesSupabaseDataAccess: false
+- /api/app/knowledge-spaces/[...path]
+  - file: app/api/app/knowledge-spaces/[...path]/route.ts
+  - reason: Route is present in the APP API inventory but is not part of the first-version RDS migration rule set.
+  - usesSupabaseDataAccess: false
+- /api/app/knowledge-spaces
+  - file: app/api/app/knowledge-spaces/route.ts
+  - reason: Route is present in the APP API inventory but is not part of the first-version RDS migration rule set.
+  - usesSupabaseDataAccess: false
+- /api/app/learning/progress/events
+  - file: app/api/app/learning/progress/events/route.ts
+  - reason: Route is present in the APP API inventory but is not part of the first-version RDS migration rule set.
+  - usesSupabaseDataAccess: false
+- /api/app/learning/progress
+  - file: app/api/app/learning/progress/route.ts
+  - reason: Route is present in the APP API inventory but is not part of the first-version RDS migration rule set.
+  - usesSupabaseDataAccess: false
+- /api/app/learning/progress/sync
+  - file: app/api/app/learning/progress/sync/route.ts
+  - reason: Route is present in the APP API inventory but is not part of the first-version RDS migration rule set.
+  - usesSupabaseDataAccess: false
+- /api/app/posters/generate
+  - file: app/api/app/posters/generate/route.ts
+  - reason: Route is present in the APP API inventory but is not part of the first-version RDS migration rule set.
+  - usesSupabaseDataAccess: false
+- /api/app/posters/history
+  - file: app/api/app/posters/history/route.ts
+  - reason: Route is present in the APP API inventory but is not part of the first-version RDS migration rule set.
+  - usesSupabaseDataAccess: false
+- /api/app/posters/templates
+  - file: app/api/app/posters/templates/route.ts
+  - reason: Route is present in the APP API inventory but is not part of the first-version RDS migration rule set.
+  - usesSupabaseDataAccess: false
+- /api/app/private-copy/drafts
+  - file: app/api/app/private-copy/drafts/route.ts
+  - reason: Route is present in the APP API inventory but is not part of the first-version RDS migration rule set.
+  - usesSupabaseDataAccess: false
+- /api/app/private-copy/generate
+  - file: app/api/app/private-copy/generate/route.ts
+  - reason: Route is present in the APP API inventory but is not part of the first-version RDS migration rule set.
   - usesSupabaseDataAccess: false
 - /api/app/scene-cards/[cardId]
   - file: app/api/app/scene-cards/[cardId]/route.ts
@@ -85,13 +133,71 @@ Generated at: 2026-06-25T06:38:27.428Z
   - file: app/api/app/scene-cards/route.ts
   - reason: Scene cards belong to A3 voice-coach/customer-project migration, not the current first-version backend closure.
   - usesSupabaseDataAccess: true
+- /api/app/store-admin/service-records
+  - file: app/api/app/store-admin/service-records/route.ts
+  - reason: Route is present in the APP API inventory but is not part of the first-version RDS migration rule set.
+  - usesSupabaseDataAccess: false
+- /api/app/voice-coach/sessions/[sessionId]/asr-preview
+  - file: app/api/app/voice-coach/sessions/[sessionId]/asr-preview/route.ts
+  - reason: Route is present in the APP API inventory but is not part of the first-version RDS migration rule set.
+  - usesSupabaseDataAccess: false
+- /api/app/voice-coach/sessions/[sessionId]/beautician-turn/submit
+  - file: app/api/app/voice-coach/sessions/[sessionId]/beautician-turn/submit/route.ts
+  - reason: Route is present in the APP API inventory but is not part of the first-version RDS migration rule set.
+  - usesSupabaseDataAccess: false
+- /api/app/voice-coach/sessions/[sessionId]/end
+  - file: app/api/app/voice-coach/sessions/[sessionId]/end/route.ts
+  - reason: Route is present in the APP API inventory but is not part of the first-version RDS migration rule set.
+  - usesSupabaseDataAccess: false
+- /api/app/voice-coach/sessions/[sessionId]/events
+  - file: app/api/app/voice-coach/sessions/[sessionId]/events/route.ts
+  - reason: Route is present in the APP API inventory but is not part of the first-version RDS migration rule set.
+  - usesSupabaseDataAccess: false
+- /api/app/voice-coach/sessions/[sessionId]/report
+  - file: app/api/app/voice-coach/sessions/[sessionId]/report/route.ts
+  - reason: Route is present in the APP API inventory but is not part of the first-version RDS migration rule set.
+  - usesSupabaseDataAccess: false
+- /api/app/voice-coach/sessions/[sessionId]
+  - file: app/api/app/voice-coach/sessions/[sessionId]/route.ts
+  - reason: Route is present in the APP API inventory but is not part of the first-version RDS migration rule set.
+  - usesSupabaseDataAccess: false
+- /api/app/voice-coach/sessions/[sessionId]/turns/[turnId]/tts
+  - file: app/api/app/voice-coach/sessions/[sessionId]/turns/[turnId]/tts/route.ts
+  - reason: Route is present in the APP API inventory but is not part of the first-version RDS migration rule set.
+  - usesSupabaseDataAccess: false
+- /api/app/voice-coach/sessions
+  - file: app/api/app/voice-coach/sessions/route.ts
+  - reason: Route is present in the APP API inventory but is not part of the first-version RDS migration rule set.
+  - usesSupabaseDataAccess: false
 - /api/app/wechat/login
   - file: app/api/app/wechat/login/route.ts
   - reason: WeChat Open Platform mobile app creation and its env are explicitly deferred from the current Aliyun backend-only target.
   - usesSupabaseDataAccess: true
+- /api/app/xhs/content/danger-check
+  - file: app/api/app/xhs/content/danger-check/route.ts
+  - reason: Route is present in the APP API inventory but is not part of the first-version RDS migration rule set.
+  - usesSupabaseDataAccess: false
+- /api/app/xhs/drafts
+  - file: app/api/app/xhs/drafts/route.ts
+  - reason: Route is present in the APP API inventory but is not part of the first-version RDS migration rule set.
+  - usesSupabaseDataAccess: false
+- /api/app/xhs/generate-cover-image
+  - file: app/api/app/xhs/generate-cover-image/route.ts
+  - reason: Route is present in the APP API inventory but is not part of the first-version RDS migration rule set.
+  - usesSupabaseDataAccess: false
+- /api/app/xhs/generate-v4
+  - file: app/api/app/xhs/generate-v4/route.ts
+  - reason: Route is present in the APP API inventory but is not part of the first-version RDS migration rule set.
+  - usesSupabaseDataAccess: false
 
 ## Full APP API Supabase Routes
 
+- /api/app/assets/sign-read
+  - file: app/api/app/assets/sign-read/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: DATABASE_URL_CN
 - /api/app/auth/logout
   - file: app/api/app/auth/logout/route.ts
   - tables: none
@@ -104,6 +210,12 @@ Generated at: 2026-06-25T06:38:27.428Z
   - rpcs: none
   - storageBuckets: none
   - envKeys: IPgongchang_SUPABASE_ANON_KEY, IPgongchang_SUPABASE_PUBLISHABLE_KEY, IPgongchang_SUPABASE_URL, NEXT_PUBLIC_IPgongchang_SUPABASE_ANON_KEY, NEXT_PUBLIC_IPgongchang_SUPABASE_PUBLISHABLE_KEY, NEXT_PUBLIC_IPgongchang_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_SUPABASE_URL
+- /api/app/content-drafts
+  - file: app/api/app/content-drafts/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: DATABASE_URL_CN
 - /api/app/customer-profiles/[profileId]
   - file: app/api/app/customer-profiles/[profileId]/route.ts
   - tables: none
@@ -128,6 +240,66 @@ Generated at: 2026-06-25T06:38:27.428Z
   - rpcs: none
   - storageBuckets: none
   - envKeys: IPgongchang_SUPABASE_ANON_KEY, IPgongchang_SUPABASE_PUBLISHABLE_KEY, IPgongchang_SUPABASE_SECRET_KEY, IPgongchang_SUPABASE_SERVICE_ROLE_KEY, IPgongchang_SUPABASE_URL, NEXT_PUBLIC_IPgongchang_SUPABASE_ANON_KEY, NEXT_PUBLIC_IPgongchang_SUPABASE_PUBLISHABLE_KEY, NEXT_PUBLIC_IPgongchang_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+- /api/app/knowledge-spaces/[...path]
+  - file: app/api/app/knowledge-spaces/[...path]/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: DATABASE_URL_CN
+- /api/app/knowledge-spaces
+  - file: app/api/app/knowledge-spaces/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: DATABASE_URL_CN
+- /api/app/learning/progress/events
+  - file: app/api/app/learning/progress/events/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: DATABASE_URL_CN
+- /api/app/learning/progress
+  - file: app/api/app/learning/progress/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: DATABASE_URL_CN
+- /api/app/learning/progress/sync
+  - file: app/api/app/learning/progress/sync/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: DATABASE_URL_CN
+- /api/app/posters/generate
+  - file: app/api/app/posters/generate/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/posters/history
+  - file: app/api/app/posters/history/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/posters/templates
+  - file: app/api/app/posters/templates/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/private-copy/drafts
+  - file: app/api/app/private-copy/drafts/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/private-copy/generate
+  - file: app/api/app/private-copy/generate/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
 - /api/app/profile
   - file: app/api/app/profile/route.ts
   - tables: none
@@ -248,6 +420,12 @@ Generated at: 2026-06-25T06:38:27.428Z
   - rpcs: none
   - storageBuckets: none
   - envKeys: none
+- /api/app/store-admin/service-records
+  - file: app/api/app/store-admin/service-records/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
 - /api/app/store-profiles/[profileId]
   - file: app/api/app/store-profiles/[profileId]/route.ts
   - tables: none
@@ -260,8 +438,80 @@ Generated at: 2026-06-25T06:38:27.428Z
   - rpcs: none
   - storageBuckets: none
   - envKeys: DATABASE_URL_CN
+- /api/app/voice-coach/sessions/[sessionId]/asr-preview
+  - file: app/api/app/voice-coach/sessions/[sessionId]/asr-preview/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/voice-coach/sessions/[sessionId]/beautician-turn/submit
+  - file: app/api/app/voice-coach/sessions/[sessionId]/beautician-turn/submit/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/voice-coach/sessions/[sessionId]/end
+  - file: app/api/app/voice-coach/sessions/[sessionId]/end/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/voice-coach/sessions/[sessionId]/events
+  - file: app/api/app/voice-coach/sessions/[sessionId]/events/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/voice-coach/sessions/[sessionId]/report
+  - file: app/api/app/voice-coach/sessions/[sessionId]/report/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/voice-coach/sessions/[sessionId]
+  - file: app/api/app/voice-coach/sessions/[sessionId]/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/voice-coach/sessions/[sessionId]/turns/[turnId]/tts
+  - file: app/api/app/voice-coach/sessions/[sessionId]/turns/[turnId]/tts/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/voice-coach/sessions
+  - file: app/api/app/voice-coach/sessions/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
 - /api/app/wechat/login
   - file: app/api/app/wechat/login/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/xhs/content/danger-check
+  - file: app/api/app/xhs/content/danger-check/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/xhs/drafts
+  - file: app/api/app/xhs/drafts/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/xhs/generate-cover-image
+  - file: app/api/app/xhs/generate-cover-image/route.ts
+  - tables: none
+  - rpcs: none
+  - storageBuckets: none
+  - envKeys: none
+- /api/app/xhs/generate-v4
+  - file: app/api/app/xhs/generate-v4/route.ts
   - tables: none
   - rpcs: none
   - storageBuckets: none

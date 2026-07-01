@@ -61,6 +61,44 @@ function writeConsoleOnlyLocalFixture() {
   return localFile
 }
 
+function writeTechnicalBlockerLocalFixture() {
+  const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-inventory-results-technical-blockers-"))
+  const localFile = path.join(tmpdir, "inventory.local.json")
+  const template = readJson("deploy", "aliyun-production-cn.cloud-inventory-results.example.json")
+  const profileMissingIds = new Set([
+    "I01_SAE_RUNTIME",
+    "I02_ACR_IMAGE",
+    "I03_DNS_API_DOMAIN",
+    "I04_DNS_ASSET_DOMAIN",
+  ])
+  const local = {
+    ...template,
+    updatedAt: "2026-06-24T02:00:00+08:00",
+    operator: "codex-test-technical-blockers",
+    notes: "synthetic non-secret technical blocker fixture",
+    operations: template.operations.map((operation) => {
+      const profileMissing = profileMissingIds.has(operation.id)
+      return {
+        ...operation,
+        status: "blocked",
+        evidence: `${operation.id}_technical_blocker_non_secret_evidence`,
+        commandResults: operation.commandResults.map((result) => ({
+          ...result,
+          executed: true,
+          exitStatus: profileMissing ? 3 : 1,
+          cloudApiCalled: false,
+          mutationPerformed: false,
+          observedAt: "2026-06-24T02:00:00+08:00",
+          outputSummary: `failureCategory=${profileMissing ? "aliyun_cli_profile_not_configured" : "aliyun_cli_config_incomplete"}; non-secret synthetic failure`,
+          evidence: `${operation.id}_technical_blocker_command_evidence`,
+        })),
+      }
+    }),
+  }
+  fs.writeFileSync(localFile, JSON.stringify(local, null, 2))
+  return localFile
+}
+
 test("Aliyun CLI inventory results command is wired into scripts, predeploy, and deploy spec", () => {
   const pkg = readJson("package.json")
   const predeploy = read("scripts", "aliyun-predeploy-commands.mjs")
@@ -228,7 +266,8 @@ test("Aliyun CLI inventory results separates console observations from strict CL
 })
 
 test("Aliyun CLI inventory results technical blockers show expected and actual values", () => {
-  const { output, report } = run(["--allow-incomplete"])
+  const localFile = writeTechnicalBlockerLocalFixture()
+  const { output, report } = run(["--allow-incomplete", "--local", localFile])
 
   assert.equal(report.ok, false)
   assert.equal(report.local.ready, false)

@@ -300,11 +300,11 @@ function buildPackage(args) {
     readOnlyOnly: true,
     mutationPerformed: false,
     cloudApiCalled: false,
-    currentAnswer: "现在不能部署；本包只把阿里云控制台可先做/需暂缓的动作拆成短清单，不创建资源、不付款、不导入密钥、不部署。",
+    currentAnswer: cloudActionClosureBrief.conclusion,
     summary: {
       currentScope: CURRENT_SCOPE,
       fullAppLaunchScope: FULL_APP_LAUNCH_SCOPE,
-      canDeployNow: backendStatus.canDeployBackendNow === true,
+      canDeployNow: cloudActionClosureBrief.canDeployNow === true && backendStatus.canDeployBackendNow === true,
       canProceedWithoutWechat: backendStatus.canProceedWithoutWechat === true,
       verdict: productionStatus.verdict || "blocked",
       backendTargetReady: backendStatus.summary?.backendTargetReady || "unknown",
@@ -447,7 +447,8 @@ function buildCloudActionClosureBrief({
     []
 
   return {
-    conclusion: "现在不能部署；本动作包当前只覆盖阿里云后端，能进入 C02/C05/P11 的动作时确认，其余 ACR push/SAE/DNS/env/SLS/smoke 仍未闭环。",
+    conclusion: runbookBrief.conclusion ||
+      "现在不能部署；本动作包当前只覆盖阿里云后端，仍需动作时部署授权和线上 smoke / 404 清零验收。",
     currentScope: CURRENT_SCOPE,
     fullAppLaunchScope: FULL_APP_LAUNCH_SCOPE,
     canDeployNow: consoleRunbook.summary?.canDeployNow === true,
