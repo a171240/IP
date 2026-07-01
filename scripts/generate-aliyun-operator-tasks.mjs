@@ -15,6 +15,7 @@ const DEFAULT_ENV_FILE = resolve(WORKSPACE_ROOT, ".env.production-cn.local")
 const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-confirmations.local.json")
 const DEFAULT_RDS_MIGRATION_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.rds-migration.local.json")
 const DEFAULT_IMAGE_PUBLISH_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.image-publish.local.json")
+const APP_API_ONLINE_READONLY_BOUNDARY_COMMAND = "corepack pnpm aliyun:app-api:online-readonly-boundary -- --base-url https://api-cn.ipgongchang.xin --timeout-ms 15000"
 
 function parseArgs(argv) {
   const args = {
@@ -235,6 +236,7 @@ const OPERATOR_AUTHORIZATION_PACKET_METADATA = Object.freeze({
     verifyCommands: [
       "corepack pnpm aliyun:predeploy",
       "corepack pnpm aliyun:postdeploy:smoke -- --base-url https://api-cn.ipgongchang.xin",
+      APP_API_ONLINE_READONLY_BOUNDARY_COMMAND,
       "corepack pnpm aliyun:completion:audit",
     ],
   }),
@@ -779,16 +781,19 @@ function buildTasks({ envPlan, readiness, domain, cloudConfirmations, imagePubli
       "完成前置微信、协议、运行时、ACR 镜像、域名、OSS、环境变量和 SLS 任务后部署 production-cn 后端。",
       "先运行 domain strict，确认 api-cn/assets-cn DNS 和 HTTPS 可用。",
       "再运行统一 postdeploy smoke，验证 health 和 APP API guard。",
+      "最后运行 APP API online-readonly-boundary，验收 404=0。",
       "微信开放平台或正式协议 URL 未补齐时只能使用 --allow-missing appWechatLogin,legalLinks 做桥接调试，不能作为正式上线结论。",
     ],
     evidence: [
       "corepack pnpm aliyun:domain:strict pass",
       "corepack pnpm aliyun:postdeploy:smoke pass",
+      "online-readonly-boundary ok=true and 404=0",
       "strict health 不再缺 appWechatLogin 或 legalLinks",
     ],
     verifyCommands: [
       "corepack pnpm aliyun:domain:strict",
       "corepack pnpm aliyun:postdeploy:smoke -- --base-url https://api-cn.ipgongchang.xin",
+      APP_API_ONLINE_READONLY_BOUNDARY_COMMAND,
     ],
   })
 

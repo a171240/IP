@@ -2,6 +2,7 @@ const test = require("node:test")
 const assert = require("node:assert/strict")
 const { execFileSync, spawnSync } = require("node:child_process")
 const fs = require("node:fs")
+const os = require("node:os")
 const path = require("node:path")
 
 const root = process.cwd()
@@ -42,6 +43,10 @@ test("Aliyun image publish plan test path is fixture-first and skips Docker prob
   assert.match(checker, /function skippedLocalDockerImage/)
   assert.match(checker, /vpc_registry_from_aliyun_network/)
   assert.match(checker, /acr_repo_sync_existing_source_tag/)
+  assert.match(checker, /SOURCE_FRESHNESS_BLOCKER/)
+  assert.match(checker, /cloudBuildRunner\?\.lastSuccessfulBuild\?\.sourceCommit/)
+  assert.match(checker, /runGit\(\["diff", "--name-only"/)
+  assert.match(checker, /image\.sourceCommitMatchesHead/)
 })
 
 test("Aliyun image publish plan reports fixture blockers without secret values", () => {
@@ -132,4 +137,45 @@ test("Aliyun image publish plan strict mode fails closed on fixture blockers", (
   assert.ok(report.writebackPlan.blockingGroups.includes("imagePushAndDigest"))
   assert.ok(report.writebackPlan.blockingGroups.includes("saeRuntimeImagePull"))
   assert.doesNotMatch(result.stdout + result.stderr, secretLike)
+})
+
+test("Aliyun image publish plan fails closed when current-source claim lacks source commit proof", () => {
+  const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-image-source-freshness-"))
+  const localPath = path.join(tmpdir, "image-publish.local.json")
+  const fixture = JSON.parse(fs.readFileSync(fixturePath, "utf8"))
+  fixture.image.remoteDigestCoversCurrentSource = true
+  fixture.acr.cloudBuildRunner = {
+    ready: true,
+    status: "completed",
+    lastSuccessfulBuild: {
+      sourceCommit: "",
+      sourceTarSha256: "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      remoteDigest: "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    },
+  }
+  fs.writeFileSync(localPath, JSON.stringify(fixture, null, 2))
+
+  try {
+    const output = execFileSync(process.execPath, [
+      "scripts/check-aliyun-image-publish-plan.mjs",
+      "--template",
+      fixturePath,
+      "--local",
+      localPath,
+      "--skip-docker-probe",
+      "--allow-incomplete",
+    ], {
+      cwd: root,
+      encoding: "utf8",
+      maxBuffer: 1024 * 1024 * 20,
+    })
+    const report = JSON.parse(output)
+
+    assert.equal(report.local.image.sourceFreshness.status, "missing_source_commit")
+    assert.ok(report.local.blockers.includes("image.sourceCommitMatchesHead"))
+    assert.ok(report.writebackPlan.blockingGroups.includes("imagePushAndDigest"))
+    assert.doesNotMatch(output, secretLike)
+  } finally {
+    fs.rmSync(tmpdir, { recursive: true, force: true })
+  }
 })

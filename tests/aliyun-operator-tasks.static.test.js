@@ -19,6 +19,7 @@ const fixtureArgs = Object.freeze([
   "--image-publish",
   "tests/fixtures/aliyun-user-action-brief/image-publish.fixture.json",
 ])
+const onlineBoundaryCommand = "corepack pnpm aliyun:app-api:online-readonly-boundary -- --base-url https://api-cn.ipgongchang.xin --timeout-ms 15000"
 
 function commandEnv() {
   return {
@@ -156,6 +157,12 @@ test("Aliyun operator tasks backend-only mode reflects current Aliyun backend pr
   assert.ok(taskById.get("T04_ALIYUN_DOMAIN_DNS_HTTPS").blockerCodes.includes("apiDomainHttps:httpsEnabled"))
   assert.equal(taskById.get("T08_POSTDEPLOY_REMOTE_SMOKE").status, "waiting_for_deploy")
   assert.deepEqual(taskById.get("T08_POSTDEPLOY_REMOTE_SMOKE").blockerCodes, ["requires_runtime_domain_env_cloud_confirmations"])
+  assert.ok(taskById.get("T08_POSTDEPLOY_REMOTE_SMOKE").verifyCommands.includes(onlineBoundaryCommand))
+  assert.ok(taskById.get("T08_POSTDEPLOY_REMOTE_SMOKE").evidence.includes("online-readonly-boundary ok=true and 404=0"))
+  assert.ok(taskById.get("T08_POSTDEPLOY_REMOTE_SMOKE").actionPackets.some((packet) => (
+    packet.packetId === "P09_PRODUCTION_DEPLOY" &&
+    packet.verifyCommands.includes(onlineBoundaryCommand)
+  )))
 
   assert.deepEqual(report.env.summary.requiredBlocking, ["DATABASE_URL_CN"])
   assert.equal(report.env.summary.requiredTotal, 25)
@@ -208,6 +215,8 @@ test("Aliyun operator tasks backend-only markdown omits deferred app launch work
   assert.match(markdown, /S04_ACR_REGISTRY_AUTH/)
   assert.match(markdown, /T04_ALIYUN_DOMAIN_DNS_HTTPS/)
   assert.match(markdown, /T08_POSTDEPLOY_REMOTE_SMOKE/)
+  assert.match(markdown, /aliyun:app-api:online-readonly-boundary -- --base-url https:\/\/api-cn\.ipgongchang\.xin --timeout-ms 15000/)
+  assert.match(markdown, /online-readonly-boundary ok=true and 404=0/)
   assert.doesNotMatch(markdown, /T01_WECHAT_OPEN_PLATFORM_APP_LOGIN/)
   assert.doesNotMatch(markdown, /S01_WECHAT_OPEN_APP_LOGIN/)
   assert.doesNotMatch(markdown, /WECHAT_OPEN_APP_ID/)

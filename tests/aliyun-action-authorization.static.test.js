@@ -73,6 +73,7 @@ test("backend-only action authorization reflects fixture P11 and P05 gates", () 
   assert.deepEqual(report.summary.currentExternalBlockers, [
     "U11_ALIYUN_RDS_DATA_MIGRATION",
     "U05_OSS_RAM_OR_STS",
+    "U04_ACR_RUNTIME_AUTH",
     "U06_ENV_IMPORT",
     "U07_DOMAIN_DNS_HTTPS_ICP",
     "U08_SAE_RUNTIME_AND_SLS",
@@ -81,6 +82,7 @@ test("backend-only action authorization reflects fixture P11 and P05 gates", () 
   assert.deepEqual(report.summary.actionTimeConfirmationRequired, [
     "U11_ALIYUN_RDS_DATA_MIGRATION",
     "U05_OSS_RAM_OR_STS",
+    "U04_ACR_RUNTIME_AUTH",
     "U06_ENV_IMPORT",
     "U07_DOMAIN_DNS_HTTPS_ICP",
     "U08_SAE_RUNTIME_AND_SLS",
@@ -90,16 +92,19 @@ test("backend-only action authorization reflects fixture P11 and P05 gates", () 
   assert.deepEqual(report.summary.nextActionTimeConfirmations, [
     "P11_ALIYUN_RDS_DATA_MIGRATION",
     "P05_OSS_RAM_STS",
+    "P04_ACR_IMAGE_AND_PULL",
   ])
   assert.deepEqual(report.summary.canStartNowPackets, [
     "P11_ALIYUN_RDS_DATA_MIGRATION",
     "P05_OSS_RAM_STS",
+    "P04_ACR_IMAGE_AND_PULL",
   ])
   assert.equal(report.summary.blockedCredentialCount, 1)
   assert.deepEqual(report.authorizationClosureBrief.blockedCredentialNames, ["DATABASE_URL_CN"])
   assert.deepEqual(report.authorizationClosureBrief.actionTimeConfirmationRequired, [
     "P11_ALIYUN_RDS_DATA_MIGRATION",
     "P05_OSS_RAM_STS",
+    "P04_ACR_IMAGE_AND_PULL",
     "P06_ENV_IMPORT",
     "P07_DOMAIN_DNS_HTTPS",
     "P08_SAE_RUNTIME_SLS",
@@ -112,7 +117,9 @@ test("backend-only action authorization reflects fixture P11 and P05 gates", () 
   assert.ok(actionsById.get("U11_ALIYUN_RDS_DATA_MIGRATION").currentBlockers.includes("requiredEnv:DATABASE_URL_CN"))
   assert.ok(actionsById.get("U11_ALIYUN_RDS_DATA_MIGRATION").currentBlockers.includes("DATABASE_URL_CN_status:empty"))
   assert.equal(actionsById.get("U05_OSS_RAM_OR_STS").status, "blocked")
-  assert.equal(actionsById.get("U04_ACR_RUNTIME_AUTH").status, "ready")
+  assert.equal(actionsById.get("U04_ACR_RUNTIME_AUTH").status, "blocked")
+  assert.ok(actionsById.get("U04_ACR_RUNTIME_AUTH").currentBlockers.includes("S04_ACR_REGISTRY_AUTH:blocked"))
+  assert.ok(actionsById.get("U04_ACR_RUNTIME_AUTH").currentBlockers.includes("R02_ACR_IMAGE_REGISTRY:imagePublishLocal:image.sourceCommitMatchesHead"))
   assert.equal(actionsById.get("U06_ENV_IMPORT").status, "blocked")
   assert.ok(actionsById.get("U06_ENV_IMPORT").currentBlockers.includes("requiredEnv:DATABASE_URL_CN"))
   assert.equal(actionsById.get("U07_DOMAIN_DNS_HTTPS_ICP").status, "blocked")
@@ -125,8 +132,11 @@ test("backend-only action authorization reflects fixture P11 and P05 gates", () 
   assert.equal(packetsById.get("P11_ALIYUN_RDS_DATA_MIGRATION").canStartNow, true)
   assert.deepEqual(packetsById.get("P11_ALIYUN_RDS_DATA_MIGRATION").blockingDependencies, [])
   assert.equal(packetsById.get("P05_OSS_RAM_STS").canStartNow, true)
+  assert.equal(packetsById.get("P04_ACR_IMAGE_AND_PULL").canStartNow, true)
+  assert.deepEqual(packetsById.get("P04_ACR_IMAGE_AND_PULL").blockingDependencies, [])
   assert.equal(packetsById.get("P09_PRODUCTION_DEPLOY").canStartNow, false)
   assert.deepEqual(packetsById.get("P09_PRODUCTION_DEPLOY").blockingDependencies, [
+    "P04_ACR_IMAGE_AND_PULL",
     "P05_OSS_RAM_STS",
     "P11_ALIYUN_RDS_DATA_MIGRATION",
     "P06_ENV_IMPORT",
@@ -135,7 +145,7 @@ test("backend-only action authorization reflects fixture P11 and P05 gates", () 
   ])
 
   assert.match(markdown, /后端仍有必填阻塞：DATABASE_URL_CN/)
-  assert.match(markdown, /nextActionTimeConfirmations: P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS/)
+  assert.match(markdown, /nextActionTimeConfirmations: P11_ALIYUN_RDS_DATA_MIGRATION, P05_OSS_RAM_STS, P04_ACR_IMAGE_AND_PULL/)
   assert.match(markdown, /blockedCredentialNames: DATABASE_URL_CN/)
   assert.doesNotMatch(output + markdown, /WECHAT_OPEN_APP_ID|WECHAT_OPEN_APP_SECRET/)
   assert.doesNotMatch(output + markdown, /MEIYE_RELEASE_STORE_PASSWORD|MEIYE_RELEASE_KEY_PASSWORD/)
@@ -163,6 +173,7 @@ test("full action authorization keeps deferred APP launch blockers separate from
   assert.deepEqual(report.summary.currentExternalBlockers, [
     "U11_ALIYUN_RDS_DATA_MIGRATION",
     "U05_OSS_RAM_OR_STS",
+    "U04_ACR_RUNTIME_AUTH",
     "U06_ENV_IMPORT",
     "U07_DOMAIN_DNS_HTTPS_ICP",
     "U08_SAE_RUNTIME_AND_SLS",
@@ -176,10 +187,12 @@ test("full action authorization keeps deferred APP launch blockers separate from
   assert.deepEqual(report.summary.nextActionTimeConfirmations, [
     "P11_ALIYUN_RDS_DATA_MIGRATION",
     "P05_OSS_RAM_STS",
+    "P04_ACR_IMAGE_AND_PULL",
   ])
   assert.deepEqual(report.summary.canStartNowPackets, [
     "P11_ALIYUN_RDS_DATA_MIGRATION",
     "P05_OSS_RAM_STS",
+    "P04_ACR_IMAGE_AND_PULL",
   ])
   assert.deepEqual(report.authorizationClosureBrief.blockedCredentialNames, [
     "DATABASE_URL_CN",

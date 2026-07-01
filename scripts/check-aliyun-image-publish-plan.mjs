@@ -15,6 +15,20 @@ const EXPECTED_PROVIDER = "Aliyun ACR"
 const EXPECTED_REGION = "cn-hangzhou"
 const EXPECTED_REPOSITORY = "meiye-huajing-app-api"
 const EXPECTED_REMOTE_TAG = "production-cn"
+const SOURCE_FRESHNESS_BLOCKER = "image.sourceCommitMatchesHead"
+const RUNTIME_SOURCE_PATH_PATTERNS = Object.freeze([
+  /^app\//,
+  /^lib\//,
+  /^scripts\//,
+  /^deploy\//,
+  /^public\//,
+  /^middleware\.(?:js|ts)$/,
+  /^instrumentation\.(?:js|ts)$/,
+  /^next\.config\./,
+  /^package(?:-lock)?\.json$/,
+  /^pnpm-lock\.yaml$/,
+  /^tsconfig\.json$/,
+])
 
 const TOP_LEVEL_FIELDS = new Set([
   "schemaVersion",
@@ -183,7 +197,19 @@ function validateFile(filePath, mode) {
   if (secretMatches.length) blockers.push(`contains_secret_like_values:${secretMatches.join(",")}`)
 
   validateCommonValues(data, blockers)
-  if (mode === "local") validateLocalValues(data, blockers)
+  const sourceFreshness = mode === "local"
+    ? validateLocalSourceFreshness(data)
+    : {
+        checked: false,
+        status: "not_applicable",
+        blockers: [],
+        warnings: [],
+      }
+  if (mode === "local") {
+    validateLocalValues(data, blockers)
+    blockers.push(...sourceFreshness.blockers)
+    warnings.push(...sourceFreshness.warnings)
+  }
 
   return {
     file: filePath,
@@ -196,6 +222,7 @@ function validateFile(filePath, mode) {
       localTag: data.image?.localTag || "",
       localDigestReady: isSha256(data.image?.localDigest),
       remoteDigestCoversCurrentSource: data.image?.remoteDigestCoversCurrentSource,
+      sourceFreshness,
     },
     acr: {
       registryHost: data.acr?.registryHost || "",
@@ -220,6 +247,148 @@ function validateFile(filePath, mode) {
       imagePullConfigured: data.runtime?.imagePullConfigured === true,
     },
   }
+}
+
+function validateLocalSourceFreshness(data) {
+  const claimedCurrentSource = data.image?.remoteDigestCoversCurrentSource === true
+  const sourceCommit = text(data.acr?.cloudBuildRunner?.lastSuccessfulBuild?.sourceCommit)
+  const currentSourceTarSha256 = text(data.image?.currentSourceTarSha256)
+  const lastSuccessfulBuild = data.acr?.cloudBuildRunner?.lastSuccessfulBuild || null
+  const base = {
+    checked: true,
+    claimedCurrentSource,
+    blockerId: SOURCE_FRESHNESS_BLOCKER,
+    currentHead: "",
+    imageSourceCommit: sourceCommit,
+    currentSourceTarSha256,
+    lastSuccessfulBuild,
+    changedFiles: [],
+    runtimeChangedFiles: [],
+    runtimeChangedFileCount: 0,
+    changedFileSample: [],
+    runtimeChangedFileSample: [],
+    blockers: [],
+    warnings: [],
+  }
+
+  if (!claimedCurrentSource) {
+    return {
+      ...base,
+      status: "not_claimed",
+    }
+  }
+
+  const head = runGit(["rev-parse", "HEAD"])
+  if (!head.ok) {
+    return {
+      ...base,
+      status: "git_head_unavailable",
+      blockers: [SOURCE_FRESHNESS_BLOCKER],
+      error: head.error,
+    }
+  }
+
+  const currentHead = head.stdout.trim()
+  if (!sourceCommit) {
+    return {
+      ...base,
+      currentHead,
+      status: "missing_source_commit",
+      blockers: [SOURCE_FRESHNESS_BLOCKER],
+    }
+  }
+
+  const sourceObject = runGit(["rev-parse", "--verify", `${sourceCommit}^{commit}`])
+  if (!sourceObject.ok) {
+    return {
+      ...base,
+      currentHead,
+      status: "source_commit_not_found",
+      blockers: [SOURCE_FRESHNESS_BLOCKER],
+      error: sourceObject.error,
+    }
+  }
+
+  const normalizedSourceCommit = sourceObject.stdout.trim()
+  if (normalizedSourceCommit === currentHead) {
+    return {
+      ...base,
+      currentHead,
+      imageSourceCommit: normalizedSourceCommit,
+      status: "current",
+    }
+  }
+
+  const diff = runGit(["diff", "--name-only", `${normalizedSourceCommit}..${currentHead}`, "--"])
+  if (!diff.ok) {
+    return {
+      ...base,
+      currentHead,
+      imageSourceCommit: normalizedSourceCommit,
+      status: "diff_unavailable",
+      blockers: [SOURCE_FRESHNESS_BLOCKER],
+      error: diff.error,
+    }
+  }
+
+  const changedFiles = diff.stdout
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+  const runtimeChangedFiles = changedFiles.filter(isRuntimeSourcePath)
+  const staleStatus = runtimeChangedFiles.length > 0
+    ? "stale_runtime_source"
+    : "stale_non_runtime_source"
+  return {
+    ...base,
+    currentHead,
+    imageSourceCommit: normalizedSourceCommit,
+    status: staleStatus,
+    changedFiles,
+    runtimeChangedFiles,
+    runtimeChangedFileCount: runtimeChangedFiles.length,
+    changedFileSample: changedFiles.slice(0, 20),
+    runtimeChangedFileSample: runtimeChangedFiles.slice(0, 20),
+    blockers: runtimeChangedFiles.length > 0 ? [SOURCE_FRESHNESS_BLOCKER] : [],
+    warnings: runtimeChangedFiles.length > 0 ? [] : ["image.sourceCommitDiffHasNoRuntimeFiles"],
+  }
+}
+
+function runGit(args) {
+  const result = spawnSync("git", args, {
+    cwd: BACKEND_ROOT,
+    encoding: "utf8",
+    timeout: 10_000,
+    maxBuffer: 1024 * 1024 * 5,
+  })
+  if (result.error) {
+    return {
+      ok: false,
+      stdout: result.stdout || "",
+      error: `${result.error.code || "git_error"}:${result.error.message}`,
+    }
+  }
+  if (result.status !== 0) {
+    return {
+      ok: false,
+      stdout: result.stdout || "",
+      error: (result.stderr || result.stdout || `git_exit_${result.status}`)
+        .split(/\r?\n/)
+        .filter(Boolean)
+        .slice(0, 3)
+        .join(" | "),
+    }
+  }
+  return {
+    ok: true,
+    stdout: result.stdout || "",
+    error: "",
+  }
+}
+
+function isRuntimeSourcePath(filePath) {
+  const normalized = String(filePath || "").replace(/\\/g, "/")
+  return RUNTIME_SOURCE_PATH_PATTERNS.some((pattern) => pattern.test(normalized))
 }
 
 function validateCommonValues(data, blockers) {
@@ -711,6 +880,7 @@ const WRITEBACK_GROUP_DEFINITIONS = Object.freeze([
       "acr.pushNetworkPath",
       "acr.publicNetworkEntranceEnabled",
       "image.remoteDigestCoversCurrentSource",
+      SOURCE_FRESHNESS_BLOCKER,
     ]),
     writeTargets: Object.freeze([
       "deploy/aliyun-production-cn.image-publish.local.json: acr.remoteImage=<registryHost>/<namespace>/meiye-huajing-app-api:production-cn",
@@ -720,10 +890,12 @@ const WRITEBACK_GROUP_DEFINITIONS = Object.freeze([
       "deploy/aliyun-production-cn.image-publish.local.json: acr.pushNetworkPath=public_registry|vpc_registry_from_aliyun_network|acr_repo_sync_existing_source_tag",
       "deploy/aliyun-production-cn.image-publish.local.json: acr.publicNetworkEntranceEnabled=true if pushing from local/public network",
       "deploy/aliyun-production-cn.image-publish.local.json: acr.evidence=<non-secret evidence handle>",
+      "deploy/aliyun-production-cn.image-publish.local.json: acr.cloudBuildRunner.lastSuccessfulBuild.sourceCommit=<git HEAD used for the image>",
     ]),
     expectedEvidence: Object.freeze([
       "远端 ACR 镜像已推送或导入",
       "远端 digest 与推送后的 sha256 digest 已核对",
+      "lastSuccessfulBuild.sourceCommit 必须等于当前 HEAD，或当前 HEAD 相对该 commit 没有运行相关文件变化",
       "已选择 ACR 推送网络路径；当前公网入口未开启时不能直接从本机走公网 registry push",
       "本地镜像仍可通过 corepack pnpm aliyun:container:smoke",
     ]),
@@ -1002,6 +1174,7 @@ function buildAcrExecutionReadiness(
       "acr.imagePushed=true",
       "acr.digestVerified=true",
       "acr.evidence=<non-secret evidence handle>",
+      "acr.cloudBuildRunner.lastSuccessfulBuild.sourceCommit=<git HEAD used for the image>",
       "runtime.remoteImageConfigured=true",
       "runtime.imagePullConfigured=true",
       "runtime.evidence=<non-secret SAE evidence handle>",
