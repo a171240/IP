@@ -19,6 +19,8 @@ type SupabaseAuthUser = {
   user_metadata?: unknown
 }
 
+type ConfiguredTestLoginUser = Record<string, unknown>
+
 export class AliyunRdsAppAuthConfigurationError extends Error {
   constructor(message: string) {
     super(message)
@@ -67,6 +69,10 @@ export async function resolveAliyunRdsAppAuthUser(
 
 function resolveConfiguredTestLoginUser(request: NextRequest, token: string): AppAuthUser | null {
   if (!isTruthy(readTextEnv("APP_TEST_LOGIN_ENABLED"))) return null
+
+  const multiUser = resolveConfiguredTestLoginUsersJsonUser(request, token)
+  if (multiUser) return multiUser
+
   if (!requestDeviceAllowed(request)) return null
   if (!testTokenMatches(token)) return null
 
@@ -91,6 +97,19 @@ function resolveConfiguredTestLoginUser(request: NextRequest, token: string): Ap
   return { id: userId, email, user_metadata: metadata }
 }
 
+function resolveConfiguredTestLoginUsersJsonUser(request: NextRequest, token: string): AppAuthUser | null {
+  const users = parseConfiguredTestLoginUsersJson()
+  if (!users.length) return null
+
+  for (const user of users) {
+    if (!configuredTestLoginUserTokenMatches(user, token)) continue
+    if (!configuredTestLoginUserDeviceAllowed(request, user)) return null
+    return buildConfiguredTestLoginJsonUser(user)
+  }
+
+  return null
+}
+
 async function resolveSupabaseUser(request: NextRequest): Promise<SupabaseAuthUser | null> {
   try {
     const supabase = await createServerSupabaseClientForRequest(request)
@@ -112,6 +131,10 @@ function getBearerToken(request: NextRequest): string {
 
 function requestDeviceAllowed(request: NextRequest) {
   const allowList = parseEnvSet("APP_TEST_LOGIN_DEVICE_IDS")
+  return requestDeviceAllowedBySet(request, allowList)
+}
+
+function requestDeviceAllowedBySet(request: NextRequest, allowList: Set<string>) {
   if (!allowList.size) return false
   if (allowList.has("*")) return true
   const deviceId = String(request.headers.get("x-device-id") || "").trim()
@@ -127,13 +150,87 @@ function testTokenMatches(token: string) {
   return safeEqual(sha256(token), configuredHash.toLowerCase())
 }
 
+function parseConfiguredTestLoginUsersJson(): ConfiguredTestLoginUser[] {
+  const raw = readTextEnv("APP_TEST_LOGIN_USERS_JSON")
+  if (!raw) return []
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    throw new AliyunRdsAppAuthConfigurationError("APP_TEST_LOGIN_USERS_JSON must be valid JSON")
+  }
+
+  if (!Array.isArray(parsed)) {
+    throw new AliyunRdsAppAuthConfigurationError("APP_TEST_LOGIN_USERS_JSON must be a JSON array")
+  }
+
+  return parsed.map((item, index) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      throw new AliyunRdsAppAuthConfigurationError(`APP_TEST_LOGIN_USERS_JSON[${index}] must be an object`)
+    }
+    return item as ConfiguredTestLoginUser
+  })
+}
+
+function configuredTestLoginUserTokenMatches(user: ConfiguredTestLoginUser, token: string) {
+  const configuredHash = recordText(user, "token_sha256", "tokenSha256").replace(/^sha256:/i, "").toLowerCase()
+  if (!configuredHash) {
+    throw new AliyunRdsAppAuthConfigurationError("APP_TEST_LOGIN_USERS_JSON entries require token_sha256")
+  }
+  if (!/^[a-f0-9]{64}$/.test(configuredHash)) {
+    throw new AliyunRdsAppAuthConfigurationError("APP_TEST_LOGIN_USERS_JSON token_sha256 must be a sha256 hex digest")
+  }
+  return safeEqual(sha256(token), configuredHash)
+}
+
+function configuredTestLoginUserDeviceAllowed(request: NextRequest, user: ConfiguredTestLoginUser) {
+  const userDeviceIds = recordText(user, "device_ids", "deviceIds")
+  if (userDeviceIds) return requestDeviceAllowedBySet(request, parseTextSet(userDeviceIds))
+  return requestDeviceAllowed(request)
+}
+
+function buildConfiguredTestLoginJsonUser(user: ConfiguredTestLoginUser): AppAuthUser {
+  const userId = recordText(user, "user_id", "userId")
+  if (!UUID_PATTERN.test(userId)) {
+    throw new AliyunRdsAppAuthConfigurationError("APP_TEST_LOGIN_USERS_JSON user_id must be a UUID")
+  }
+
+  const email = recordText(user, "email") || `app-test-${userId}@ipgongchang.xin`
+  const nickname = recordText(user, "nickname", "name") || "美业话镜测试账号"
+  const metadata = compactRecord({
+    nickname,
+    auth_source: "aliyun_test_login",
+    account_role: recordText(user, "account_role", "accountRole"),
+    company_id: recordText(user, "company_id", "companyId"),
+    company_name: recordText(user, "company_name", "companyName"),
+    store_id: recordText(user, "store_id", "storeId"),
+    store_name: recordText(user, "store_name", "storeName"),
+    service_plan_label: recordText(user, "service_plan_label", "servicePlanLabel"),
+  })
+
+  return { id: userId, email, user_metadata: metadata }
+}
+
 function parseEnvSet(key: string) {
+  return parseTextSet(readTextEnv(key))
+}
+
+function parseTextSet(value: string) {
   return new Set(
-    readTextEnv(key)
+    value
       .split(/[,\s]+/)
       .map(value => value.trim())
       .filter(Boolean),
   )
+}
+
+function recordText(record: ConfiguredTestLoginUser, ...keys: string[]) {
+  for (const key of keys) {
+    const value = record[key]
+    if (typeof value === "string") return value.trim()
+  }
+  return ""
 }
 
 function isAliyunProductionCnRuntime() {

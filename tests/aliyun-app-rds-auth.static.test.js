@@ -12,11 +12,32 @@ test("Aliyun APP auth helper gates test login by env token and device id", () =>
   assert.match(source, /APP_TEST_LOGIN_ENABLED/)
   assert.match(source, /APP_TEST_LOGIN_TOKEN/)
   assert.match(source, /APP_TEST_LOGIN_TOKEN_SHA256/)
+  assert.match(source, /APP_TEST_LOGIN_USERS_JSON/)
   assert.match(source, /APP_TEST_LOGIN_DEVICE_IDS/)
   assert.match(source, /timingSafeEqual/)
   assert.match(source, /APP_TEST_LOGIN_USER_ID must be a UUID/)
   assert.match(source, /auth_source:\s*"aliyun_test_login"/)
   assert.match(source, /createServerSupabaseClientForRequest\(request\)/)
+})
+
+test("Aliyun APP auth helper supports multiple hash-only test login users", () => {
+  const source = read("lib", "aliyun-rds", "app-auth.server.ts")
+
+  assert.match(source, /parseConfiguredTestLoginUsersJson/)
+  assert.match(source, /APP_TEST_LOGIN_USERS_JSON must be valid JSON/)
+  assert.match(source, /APP_TEST_LOGIN_USERS_JSON must be a JSON array/)
+  assert.match(source, /APP_TEST_LOGIN_USERS_JSON entries require token_sha256/)
+  assert.match(source, /tokenSha256/)
+  assert.match(source, /sha256\(token\)/)
+  assert.match(source, /token_sha256 must be a sha256 hex digest/)
+  assert.match(source, /configuredTestLoginUserDeviceAllowed/)
+  assert.match(source, /device_ids/)
+  assert.match(source, /deviceIds/)
+  assert.match(source, /account_role:\s*recordText\(user,\s*"account_role",\s*"accountRole"\)/)
+  assert.match(source, /company_id:\s*recordText\(user,\s*"company_id",\s*"companyId"\)/)
+  assert.match(source, /store_id:\s*recordText\(user,\s*"store_id",\s*"storeId"\)/)
+  assert.doesNotMatch(source, /token:\s*recordText/)
+  assert.doesNotMatch(source, /raw_token|plain_token|APP_TEST_LOGIN_USERS_JSON_TOKEN/)
 })
 
 test("first-version APP RDS auth routes use Aliyun helper instead of direct Supabase user lookup", () => {
