@@ -10,6 +10,7 @@ const script = path.join(root, "scripts", "plan-app-api-readonly-live-smoke.mjs"
 
 const SECRET_EMPLOYEE_TOKEN = "employee-plan-token-value-1234567890"
 const SECRET_MANAGER_TOKEN = "manager-plan-token-value-1234567890"
+const SECRET_CROSS_MANAGER_TOKEN = "cross-manager-plan-token-value-1234567890"
 
 function run(args = []) {
   const result = spawnSync(process.execPath, [script, ...args], {
@@ -22,6 +23,7 @@ function run(args = []) {
       APP_DEVICE_ID: "plan-device-id-20260702",
       APP_EMPLOYEE_TOKEN: SECRET_EMPLOYEE_TOKEN,
       APP_MANAGER_TOKEN: SECRET_MANAGER_TOKEN,
+      APP_CROSS_STORE_MANAGER_TOKEN: SECRET_CROSS_MANAGER_TOKEN,
       APP_READ_ONLY_LIVE_SMOKE: "true",
     },
     encoding: "utf8",
@@ -49,7 +51,9 @@ test("APP API read-only live-smoke plan is dry-run only and does not print secre
   assert.equal(result.report.writesAuthorizedHere, false)
   assert.doesNotMatch(result.stdout + result.stderr, new RegExp(SECRET_EMPLOYEE_TOKEN))
   assert.doesNotMatch(result.stdout + result.stderr, new RegExp(SECRET_MANAGER_TOKEN))
+  assert.doesNotMatch(result.stdout + result.stderr, new RegExp(SECRET_CROSS_MANAGER_TOKEN))
   assert.ok(result.report.requiredInputs.every((item) => item.value !== "present"))
+  assert.ok(result.report.requiredL3PermissionInputs.every((item) => item.value !== "present"))
 })
 
 test("APP API read-only live-smoke plan sequences env, boundary, preflight, and explicit execution", () => {
@@ -63,6 +67,7 @@ test("APP API read-only live-smoke plan sequences env, boundary, preflight, and 
       "online_readonly_boundary",
       "execution_preflight",
       "read_only_smoke_execute",
+      "l3_permission_smoke_execute",
     ],
   )
   assert.match(steps[0].command, /aliyun:app-api:live-env/)
@@ -73,17 +78,25 @@ test("APP API read-only live-smoke plan sequences env, boundary, preflight, and 
   assert.match(steps[3].command, /aliyun:app-api:readonly-smoke/)
   assert.equal(steps[3].requiresExplicitAuthorization, true)
   assert.equal(steps[3].networkRequestsAttemptedByThisPlan, false)
+  assert.match(steps[4].command, /aliyun:app-api:l3-permission-smoke/)
+  assert.equal(steps[4].authorizationId, "L3_PERMISSION_READONLY_EXECUTION_AUTHORIZATION")
+  assert.equal(steps[4].requiresExplicitAuthorization, true)
+  assert.deepEqual(steps[4].methodsAllowed, ["GET"])
+  assert.equal(steps[4].networkRequestsAttemptedByThisPlan, false)
 })
 
 test("APP API read-only live-smoke plan is GET-only and excludes mutating work", () => {
   const result = run()
   const onlineMethods = new Set(result.report.onlineBoundary.probes.map((item) => item.method))
   const smokeMethods = new Set(result.report.readOnlySmoke.probes.map((item) => item.method))
+  const l3Methods = new Set(result.report.l3PermissionSmoke.probes.map((item) => item.method))
   const smokePaths = new Set(result.report.readOnlySmoke.probes.map((item) => item.path))
+  const l3Ids = new Set(result.report.l3PermissionSmoke.probes.map((item) => item.id))
   const skippedPaths = result.report.skippedMutatingEndpoints.map((item) => item.path)
 
   assert.deepEqual([...onlineMethods], ["GET"])
   assert.deepEqual([...smokeMethods], ["GET"])
+  assert.deepEqual([...l3Methods], ["GET"])
   assert.ok(smokePaths.has("/api/app/profile"))
   assert.ok(smokePaths.has("/api/app/entitlements"))
   assert.ok(smokePaths.has("/api/app/service-records/sessions?limit=5"))
@@ -94,6 +107,39 @@ test("APP API read-only live-smoke plan is GET-only and excludes mutating work",
   assert.ok(skippedPaths.some((item) => item.includes("generate")))
   assert.ok(skippedPaths.some((item) => item.includes("pay")))
   assert.ok(result.report.forbiddenActions.includes("no production deploy, promote, alias, database write, or git push"))
+  assert.ok(result.report.forbiddenActions.includes("no L3 permission execution without L3_PERMISSION_READONLY_EXECUTION_AUTHORIZATION"))
+  assert.equal(result.report.l3PermissionSmoke.authorizationId, "L3_PERMISSION_READONLY_EXECUTION_AUTHORIZATION")
+  assert.equal(result.report.l3PermissionSmoke.tokenBacked, true)
+  assert.equal(result.report.l3PermissionSmoke.status, "PLAN_READY_NOT_EXECUTED")
+  assert.ok(l3Ids.has("manager_service_records_list_positive"))
+  assert.ok(l3Ids.has("manager_service_record_detail_positive"))
+  assert.ok(l3Ids.has("employee_store_admin_records_negative"))
+  assert.ok(l3Ids.has("employee_manager_record_detail_negative"))
+  assert.ok(l3Ids.has("cross_store_record_isolation_negative"))
+  assert.ok(
+    result.report.l3PermissionSmoke.probes.some(
+      (item) => item.id === "manager_service_records_list_positive"
+        && item.containsSessionEnvName === "APP_MANAGER_SERVICE_RECORD_SESSION_ID_READONLY",
+    ),
+  )
+  assert.ok(
+    result.report.requiredL3PermissionInputs.some(
+      (item) => item.name === "APP_MANAGER_SERVICE_RECORD_SESSION_ID_READONLY"
+        && item.required === true
+        && item.value === "redacted_not_read",
+    ),
+  )
+  assert.ok(
+    result.report.requiredL3PermissionInputs.some(
+      (item) => item.name === "APP_CROSS_STORE_SESSION_ID_READONLY"
+        && item.required === true
+        && item.value === "redacted_not_read",
+    ),
+  )
+  assert.deepEqual(
+    result.report.redaction.tokenEnvNames,
+    ["APP_EMPLOYEE_TOKEN", "APP_MANAGER_TOKEN", "APP_CROSS_STORE_MANAGER_TOKEN"],
+  )
 })
 
 test("APP API read-only live-smoke plan is exposed through package scripts", () => {
@@ -102,5 +148,9 @@ test("APP API read-only live-smoke plan is exposed through package scripts", () 
   assert.equal(
     pkg.scripts["aliyun:app-api:readonly-plan"],
     "node ./scripts/plan-app-api-readonly-live-smoke.mjs",
+  )
+  assert.equal(
+    pkg.scripts["aliyun:app-api:l3-permission-smoke"],
+    "node ./scripts/check-app-api-live-smoke-env.mjs --execute-l3-permission",
   )
 })

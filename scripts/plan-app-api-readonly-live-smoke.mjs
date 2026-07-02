@@ -3,6 +3,8 @@
 import { pathToFileURL } from "node:url"
 import { HEALTH_PROBES } from "./check-app-api-online-readonly-boundary.mjs"
 import {
+  L3_PERMISSION_PROBES,
+  L3_PERMISSION_VARIABLES,
   READ_ONLY_PROBES,
   REQUIRED_VARIABLES,
   SKIPPED_MUTATING_ENDPOINTS,
@@ -47,6 +49,7 @@ function requireValue(value, name) {
 function buildPlan(args) {
   const onlineBoundaryProbes = [...HEALTH_PROBES, ...READ_ONLY_PROBES].map(publicProbe)
   const readOnlySmokeProbes = READ_ONLY_PROBES.map(publicProbe)
+  const l3PermissionProbes = L3_PERMISSION_PROBES.map(publicProbe)
 
   return {
     ok: true,
@@ -65,12 +68,22 @@ function buildPlan(args) {
       value: item.kind === "secret_token" ? "redacted_not_read" : "not_read",
       source: "shell_env_at_execution_time",
     })),
+    requiredL3PermissionInputs: L3_PERMISSION_VARIABLES.map((item) => ({
+      name: item.name,
+      required: item.required === true,
+      description: item.description,
+      value: item.kind === "secret_token" || item.kind === "opaque_id"
+        ? "redacted_not_read"
+        : "not_read",
+      source: "shell_env_at_execution_time",
+    })),
     requiredExternalGates: [
       "APP_BASE_URL must be a non-local HTTPS production-cn URL unless a local stub is explicitly allowed for tests",
       "APP_DEVICE_ID must be allowlisted for the smoke operator/device",
       "APP_EMPLOYEE_TOKEN and APP_MANAGER_TOKEN must be supplied only in the shell that executes live smoke",
       "online-readonly-boundary must return ok=true, routeBlockers=[], and grouped[404]=0",
       "read-only execution still requires APP_READ_ONLY_LIVE_SMOKE=true or --execute-read-only",
+      "L3 permission execution additionally requires APP_L3_PERMISSION_SMOKE=true or --execute-l3-permission, APP_MANAGER_SERVICE_RECORD_SESSION_ID_READONLY, and APP_CROSS_STORE_SESSION_ID_READONLY",
     ],
     sequence: [
       {
@@ -110,10 +123,22 @@ function buildPlan(args) {
         tokenValuesPrinted: false,
         responseBodiesPrinted: false,
       },
+      {
+        id: "l3_permission_smoke_execute",
+        command: `corepack pnpm run aliyun:app-api:l3-permission-smoke -- --online-boundary-report ${args.boundaryReport}`,
+        purpose: "execute GET-only L3 permission probes after explicit L3 authorization: manager detail positive, employee negative, and cross-store negative",
+        requiresExplicitAuthorization: true,
+        authorizationId: "L3_PERMISSION_READONLY_EXECUTION_AUTHORIZATION",
+        networkRequestsAttemptedByThisPlan: false,
+        networkRequestsAttemptedAtExecutionTime: true,
+        methodsAllowed: ["GET"],
+        tokenValuesPrinted: false,
+        responseBodiesPrinted: false,
+      },
     ],
     redaction: {
       noSecretValuesPrintedByThisPlan: true,
-      tokenEnvNames: ["APP_EMPLOYEE_TOKEN", "APP_MANAGER_TOKEN"],
+      tokenEnvNames: ["APP_EMPLOYEE_TOKEN", "APP_MANAGER_TOKEN", "APP_CROSS_STORE_MANAGER_TOKEN"],
       publicTokenValue: "redacted",
       responseSecretEchoPolicy: "fail_probe_if_response_contains_input_token",
     },
@@ -135,6 +160,16 @@ function buildPlan(args) {
       successPolicy: "each probe must return a 2xx JSON response and must not echo input token values",
       probes: readOnlySmokeProbes,
     },
+    l3PermissionSmoke: {
+      getOnly: true,
+      tokenBacked: true,
+      status: "PLAN_READY_NOT_EXECUTED",
+      authorizationId: "L3_PERMISSION_READONLY_EXECUTION_AUTHORIZATION",
+      successPolicy: "manager same-store list/detail must pass, employee/cross-store negative probes must deny or hide session data",
+      blockedOutcomes: ["BLOCKED_NO_MANAGER_RECORD_ID", "BLOCKED_CROSS_STORE_INPUT"],
+      outputEvidencePath: "docs/app-production-cn-l3-permission-smoke-current.json",
+      probes: l3PermissionProbes,
+    },
     skippedMutatingEndpoints: SKIPPED_MUTATING_ENDPOINTS,
     forbiddenActions: [
       "no write smoke",
@@ -143,6 +178,7 @@ function buildPlan(args) {
       "no OSS upload or signed action execution",
       "no ASR/process/publish/payment POST",
       "no production deploy, promote, alias, database write, or git push",
+      "no L3 permission execution without L3_PERMISSION_READONLY_EXECUTION_AUTHORIZATION",
     ],
   }
 }
@@ -154,6 +190,9 @@ function publicProbe(probe) {
     role: probe.role || null,
     method: probe.method,
     path: probe.path,
+    expectedStatuses: probe.expectedStatuses || null,
+    negativePermissionProbe: probe.negativePermissionProbe === true,
+    containsSessionEnvName: probe.containsSessionEnvName || null,
     description: probe.description,
   }
 }

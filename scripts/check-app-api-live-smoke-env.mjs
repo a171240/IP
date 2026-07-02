@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs"
 import { pathToFileURL } from "node:url"
 
 const READ_ONLY_SWITCH_ENV = "APP_READ_ONLY_LIVE_SMOKE"
+const L3_PERMISSION_SWITCH_ENV = "APP_L3_PERMISSION_SMOKE"
 const DEFAULT_TIMEOUT_MS = 15_000
 
 const REQUIRED_VARIABLES = [
@@ -176,6 +177,83 @@ const READ_ONLY_PROBES = [
   },
 ]
 
+const L3_PERMISSION_VARIABLES = [
+  {
+    name: "APP_MANAGER_SERVICE_RECORD_SESSION_ID_READONLY",
+    kind: "opaque_id",
+    required: true,
+    description: "same-store service-record session id selected from the manager list probe for L3 detail positive/negative checks",
+  },
+  {
+    name: "APP_CROSS_STORE_SESSION_ID_READONLY",
+    kind: "opaque_id",
+    required: true,
+    description: "cross-store service-record session id required for tenant isolation negative check",
+  },
+  {
+    name: "APP_CROSS_STORE_MANAGER_TOKEN",
+    kind: "secret_token",
+    required: false,
+    description: "optional manager token from another store; omitted runs the cross-store id against APP_MANAGER_TOKEN",
+  },
+]
+
+const L3_PERMISSION_PROBES = [
+  {
+    id: "manager_service_records_list_positive",
+    scope: "l3-permission",
+    role: "manager",
+    method: "GET",
+    path: "/api/app/store-admin/service-records?limit=5",
+    containsSessionEnvName: "APP_MANAGER_SERVICE_RECORD_SESSION_ID_READONLY",
+    expectedStatuses: [200],
+    description: "manager can read same-store service-record list containing the selected detail id",
+  },
+  {
+    id: "manager_service_record_detail_positive",
+    scope: "l3-permission",
+    role: "manager",
+    method: "GET",
+    path: "/api/app/service-records/sessions/$APP_MANAGER_SERVICE_RECORD_SESSION_ID_READONLY",
+    pathEnvName: "APP_MANAGER_SERVICE_RECORD_SESSION_ID_READONLY",
+    expectedStatuses: [200],
+    description: "manager can read same-store service-record detail selected from the list",
+  },
+  {
+    id: "employee_store_admin_records_negative",
+    scope: "l3-permission",
+    role: "employee",
+    method: "GET",
+    path: "/api/app/store-admin/service-records?limit=5",
+    expectedStatuses: [403],
+    negativePermissionProbe: true,
+    description: "employee must not read manager store-admin service-record list",
+  },
+  {
+    id: "employee_manager_record_detail_negative",
+    scope: "l3-permission",
+    role: "employee",
+    method: "GET",
+    path: "/api/app/service-records/sessions/$APP_MANAGER_SERVICE_RECORD_SESSION_ID_READONLY",
+    pathEnvName: "APP_MANAGER_SERVICE_RECORD_SESSION_ID_READONLY",
+    expectedStatuses: [403, 404],
+    negativePermissionProbe: true,
+    description: "employee must not read the manager-selected service-record detail",
+  },
+  {
+    id: "cross_store_record_isolation_negative",
+    scope: "l3-permission",
+    role: "cross_store_manager",
+    method: "GET",
+    path: "/api/app/service-records/sessions/$APP_CROSS_STORE_SESSION_ID_READONLY",
+    pathEnvName: "APP_CROSS_STORE_SESSION_ID_READONLY",
+    expectedStatuses: [403, 404],
+    negativePermissionProbe: true,
+    optionalInputBlocker: "BLOCKED_CROSS_STORE_INPUT",
+    description: "cross-store record must be denied or hidden and must not return session data",
+  },
+]
+
 const SKIPPED_MUTATING_ENDPOINTS = [
   { method: "POST", path: "/api/app/auth/wechat", reason: "login/auth exchange is not part of read-only smoke" },
   { method: "POST", path: "/api/app/auth/logout", reason: "state-changing auth operation" },
@@ -213,6 +291,7 @@ const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1"])
 function parseArgs(argv) {
   const args = {
     allowLocal: false,
+    executeL3Permission: false,
     executeReadOnly: false,
     onlineBoundaryReport: null,
     timeoutMs: DEFAULT_TIMEOUT_MS,
@@ -226,6 +305,10 @@ function parseArgs(argv) {
     }
     if (arg === "--execute-read-only") {
       args.executeReadOnly = true
+      continue
+    }
+    if (arg === "--execute-l3-permission") {
+      args.executeL3Permission = true
       continue
     }
     if (arg === "--online-boundary-report") {
@@ -263,6 +346,7 @@ function validateValue(item, rawValue, args) {
   if (item.kind === "https_url") return validateBaseUrl(value, args)
   if (item.kind === "device_id") return validateDeviceId(value)
   if (item.kind === "secret_token") return validateToken(value)
+  if (item.kind === "opaque_id") return validateOpaqueId(value)
   return { status: "ready" }
 }
 
@@ -308,8 +392,18 @@ function validateToken(value) {
   return { status: "ready" }
 }
 
+function validateOpaqueId(value) {
+  if (value.length < 3) return { status: "invalid", reason: "id_too_short" }
+  if (/\s/.test(value)) return { status: "invalid", reason: "id_contains_space" }
+  return { status: "ready" }
+}
+
 function isReadOnlySwitchEnabled(env, args) {
   return args.executeReadOnly || String(env[READ_ONLY_SWITCH_ENV] || "").trim().toLowerCase() === "true"
+}
+
+function isL3PermissionSwitchEnabled(env, args) {
+  return args.executeL3Permission || String(env[L3_PERMISSION_SWITCH_ENV] || "").trim().toLowerCase() === "true"
 }
 
 function buildReport(env, args) {
@@ -333,20 +427,43 @@ function buildReport(env, args) {
     .map((item) => `${item.name}:${item.status}${item.reason ? `:${item.reason}` : ""}`)
   const liveSmokeEnvReady = envBlockers.length === 0
   const readOnlySwitchEnabled = isReadOnlySwitchEnabled(env, args)
-  const executionBlockers = [
+  const l3PermissionSwitchEnabled = isL3PermissionSwitchEnabled(env, args)
+  const l3PermissionInputs = validateL3PermissionInputs(env, args)
+  const baseExecutionBlockers = [
     ...envBlockers,
-    ...(readOnlySwitchEnabled ? [] : [`${READ_ONLY_SWITCH_ENV}:missing_or_false`]),
     ...onlineBoundary.executionBlockers,
   ]
+  const executionBlockers = [
+    ...baseExecutionBlockers,
+    ...(readOnlySwitchEnabled ? [] : [`${READ_ONLY_SWITCH_ENV}:missing_or_false`]),
+  ]
   const canExecuteReadOnly = liveSmokeEnvReady && readOnlySwitchEnabled && onlineBoundary.ready
+  const l3ExecutionBlockers = [
+    ...baseExecutionBlockers,
+    ...(l3PermissionSwitchEnabled ? [] : [`${L3_PERMISSION_SWITCH_ENV}:missing_or_false`]),
+    ...l3PermissionInputs.blockers,
+  ]
+  const canExecuteL3Permission = liveSmokeEnvReady
+    && onlineBoundary.ready
+    && l3PermissionSwitchEnabled
+    && l3PermissionInputs.ready
+  const mode = canExecuteReadOnly && canExecuteL3Permission
+    ? "read_only_and_l3_permission_execute_pending"
+    : canExecuteL3Permission
+      ? "l3_permission_execute_pending"
+      : canExecuteReadOnly
+        ? "read_only_execute_pending"
+        : "plan_only"
 
   return {
     ok: false,
-    mode: canExecuteReadOnly ? "read_only_execute_pending" : "plan_only",
+    mode,
     networkRequestsAttempted: false,
     liveSmokeEnvReady,
     readOnlySwitchEnabled,
+    l3PermissionSwitchEnabled,
     readOnlyExecutionReady: canExecuteReadOnly,
+    l3PermissionExecutionReady: canExecuteL3Permission,
     required,
     blockers: envBlockers,
     executionBlockers,
@@ -368,7 +485,49 @@ function buildReport(env, args) {
       command: "APP_READ_ONLY_LIVE_SMOKE=true node scripts/check-app-api-live-smoke-env.mjs --online-boundary-report <online-readonly-boundary.json>",
       alternativeCommand: "node scripts/check-app-api-live-smoke-env.mjs --execute-read-only --online-boundary-report <online-readonly-boundary.json>",
     },
+    l3PermissionSmoke: {
+      status: canExecuteL3Permission ? "ready_to_execute" : "plan_only",
+      ready: canExecuteL3Permission,
+      executed: false,
+      l3PermissionPass: false,
+      requires: `${L3_PERMISSION_SWITCH_ENV}=true or --execute-l3-permission`,
+      expectedEvidenceStatus: "L3_PERMISSION_SMOKE_EXECUTED",
+      planReference: "docs/app-l3-permission-smoke-plan-2026-07-02.md",
+      requiredInputs: l3PermissionInputs.publicInputs,
+      executionBlockers: l3ExecutionBlockers,
+      blockedOutcomes: [
+        "BLOCKED_NO_MANAGER_RECORD_ID",
+        "BLOCKED_CROSS_STORE_INPUT",
+      ],
+      probes: L3_PERMISSION_PROBES.map(publicProbe),
+      command: "APP_L3_PERMISSION_SMOKE=true node scripts/check-app-api-live-smoke-env.mjs --online-boundary-report <online-readonly-boundary.json>",
+      alternativeCommand: "node scripts/check-app-api-live-smoke-env.mjs --execute-l3-permission --online-boundary-report <online-readonly-boundary.json>",
+    },
     skippedMutatingEndpoints: SKIPPED_MUTATING_ENDPOINTS,
+  }
+}
+
+function validateL3PermissionInputs(env, args) {
+  const publicInputs = L3_PERMISSION_VARIABLES.map((item) => {
+    const validation = validateValue(item, env[item.name], args)
+    return {
+      name: item.name,
+      required: item.required === true,
+      description: item.description,
+      status: validation.status,
+      reason: validation.reason || null,
+      value: item.kind === "secret_token" || item.kind === "opaque_id"
+        ? "redacted"
+        : validation.status === "ready" ? "present" : "redacted",
+    }
+  })
+  const blockers = publicInputs
+    .filter((item) => item.required && item.status !== "ready")
+    .map((item) => `${item.name}:${item.status}${item.reason ? `:${item.reason}` : ""}`)
+  return {
+    ready: blockers.length === 0,
+    blockers,
+    publicInputs,
   }
 }
 
@@ -434,6 +593,9 @@ function publicProbe(probe) {
     role: probe.role,
     method: probe.method,
     path: probe.path,
+    expectedStatuses: probe.expectedStatuses || null,
+    negativePermissionProbe: probe.negativePermissionProbe === true,
+    containsSessionEnvName: probe.containsSessionEnvName || null,
     description: probe.description,
   }
 }
@@ -456,6 +618,59 @@ async function runReadOnlySmoke(baseUrl, env, args) {
   }
 }
 
+async function runL3PermissionSmoke(baseUrl, env, args) {
+  const startedAt = new Date().toISOString()
+  const probes = []
+  for (const probe of L3_PERMISSION_PROBES) {
+    const resolved = resolveProbeForEnv(probe, env)
+    if (resolved.blocked) {
+      probes.push({
+        ...publicProbe(probe),
+        ok: false,
+        status: null,
+        code: resolved.blocked,
+        json: false,
+        bodyType: null,
+        bodyHasSession: false,
+        durationMs: 0,
+        blocked: true,
+      })
+      continue
+    }
+    probes.push(await requestProbe(baseUrl, resolved.probe, env, args.timeoutMs))
+  }
+  const bodyHasSessionForNegativeProbes = probes
+    .filter((probe) => probe.negativePermissionProbe === true)
+    .some((probe) => probe.bodyHasSession === true)
+  const ok = probes.every((probe) => probe.ok) && !bodyHasSessionForNegativeProbes
+  return {
+    ok,
+    status: ok ? "L3_PERMISSION_SMOKE_EXECUTED" : "L3_PERMISSION_SMOKE_INCOMPLETE",
+    startedAt,
+    finishedAt: new Date().toISOString(),
+    baseUrl: publicBaseUrl(baseUrl),
+    checkedProbes: probes.length,
+    probes,
+    bodyHasSessionForNegativeProbes,
+  }
+}
+
+function resolveProbeForEnv(probe, env) {
+  if (!probe.pathEnvName) return { probe }
+  const rawValue = String(env[probe.pathEnvName] || "").trim()
+  if (!rawValue) {
+    return {
+      blocked: probe.optionalInputBlocker || "BLOCKED_NO_MANAGER_RECORD_ID",
+    }
+  }
+  return {
+    probe: {
+      ...probe,
+      actualPath: probe.path.replace(`$${probe.pathEnvName}`, encodeURIComponent(rawValue)),
+    },
+  }
+}
+
 async function requestProbe(baseUrl, probe, env, timeoutMs) {
   const started = Date.now()
   const token = tokenForRole(probe.role, env)
@@ -463,7 +678,7 @@ async function requestProbe(baseUrl, probe, env, timeoutMs) {
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
 
   try {
-    const response = await fetch(new URL(probe.path, `${baseUrl}/`).toString(), {
+    const response = await fetch(new URL(probe.actualPath || probe.path, `${baseUrl}/`).toString(), {
       method: "GET",
       signal: controller.signal,
       headers: {
@@ -476,7 +691,15 @@ async function requestProbe(baseUrl, probe, env, timeoutMs) {
     const text = await response.text()
     assertResponseDoesNotContainInputSecrets(text, env, probe)
     const bodyInfo = parseJsonBodyInfo(text, probe)
-    const ok = response.status >= 200 && response.status < 300
+    const bodyContainsExpectedSession = probe.containsSessionEnvName
+      ? bodyInfo.sessionIds.includes(String(env[probe.containsSessionEnvName] || "").trim())
+      : null
+    const statusOk = Array.isArray(probe.expectedStatuses)
+      ? probe.expectedStatuses.includes(response.status)
+      : response.status >= 200 && response.status < 300
+    const ok = statusOk
+      && !(probe.negativePermissionProbe === true && bodyInfo.bodyHasSession)
+      && !(probe.containsSessionEnvName && bodyContainsExpectedSession !== true)
 
     return {
       ...publicProbe(probe),
@@ -485,6 +708,9 @@ async function requestProbe(baseUrl, probe, env, timeoutMs) {
       code: bodyInfo.code,
       json: bodyInfo.json,
       bodyType: bodyInfo.bodyType,
+      bodyHasSession: bodyInfo.bodyHasSession,
+      bodyContainsExpectedSession,
+      negativePermissionProbe: probe.negativePermissionProbe === true,
       durationMs: Date.now() - started,
     }
   } catch (error) {
@@ -495,6 +721,9 @@ async function requestProbe(baseUrl, probe, env, timeoutMs) {
       code: "",
       json: false,
       bodyType: null,
+      bodyHasSession: false,
+      bodyContainsExpectedSession: null,
+      negativePermissionProbe: probe.negativePermissionProbe === true,
       durationMs: Date.now() - started,
       error: redactSensitiveText(error instanceof Error ? error.message : String(error), env),
     }
@@ -506,12 +735,15 @@ async function requestProbe(baseUrl, probe, env, timeoutMs) {
 function tokenForRole(role, env) {
   if (role === "employee") return String(env.APP_EMPLOYEE_TOKEN || "")
   if (role === "manager") return String(env.APP_MANAGER_TOKEN || "")
+  if (role === "cross_store_manager") {
+    return String(env.APP_CROSS_STORE_MANAGER_TOKEN || env.APP_MANAGER_TOKEN || "")
+  }
   throw new Error(`unknown_probe_role:${role}`)
 }
 
 function parseJsonBodyInfo(text, probe) {
   if (!text.trim()) {
-    return { json: false, bodyType: "empty", code: "" }
+    return { json: false, bodyType: "empty", code: "", bodyHasSession: false, sessionIds: [] }
   }
 
   let body
@@ -528,11 +760,42 @@ function parseJsonBodyInfo(text, probe) {
     json: true,
     bodyType: Array.isArray(body) ? "array" : typeof body,
     code,
+    bodyHasSession: hasSessionPayload(body),
+    sessionIds: extractSessionIds(body),
   }
 }
 
+function hasSessionPayload(body) {
+  if (!body || typeof body !== "object") return false
+  if (Array.isArray(body)) return body.some((item) => hasSessionPayload(item))
+  if (Object.prototype.hasOwnProperty.call(body, "session")) return body.session != null
+  if (Array.isArray(body.sessions) && body.sessions.length > 0) return true
+  for (const key of ["session_id", "sessionId", "client_session_id", "clientSessionId"]) {
+    if (typeof body[key] === "string" && body[key].length > 0) return true
+  }
+  return Object.values(body).some((value) => hasSessionPayload(value))
+}
+
+function extractSessionIds(body) {
+  const ids = new Set()
+  collectSessionIds(body, ids)
+  return [...ids]
+}
+
+function collectSessionIds(value, ids) {
+  if (!value || typeof value !== "object") return
+  if (Array.isArray(value)) {
+    for (const item of value) collectSessionIds(item, ids)
+    return
+  }
+  for (const key of ["id", "session_id", "sessionId", "client_session_id", "clientSessionId"]) {
+    if (typeof value[key] === "string" && value[key].trim()) ids.add(value[key].trim())
+  }
+  for (const child of Object.values(value)) collectSessionIds(child, ids)
+}
+
 function assertResponseDoesNotContainInputSecrets(text, env, probe) {
-  for (const name of ["APP_EMPLOYEE_TOKEN", "APP_MANAGER_TOKEN"]) {
+  for (const name of ["APP_EMPLOYEE_TOKEN", "APP_MANAGER_TOKEN", "APP_CROSS_STORE_MANAGER_TOKEN"]) {
     const secret = String(env[name] || "")
     if (secret.length >= 8 && text.includes(secret)) {
       throw new Error(`probe_response_echoed_input_secret:${probe.method}:${probe.path}:${name}`)
@@ -542,7 +805,7 @@ function assertResponseDoesNotContainInputSecrets(text, env, probe) {
 
 function redactSensitiveText(text, env) {
   let redacted = String(text || "")
-  for (const name of ["APP_EMPLOYEE_TOKEN", "APP_MANAGER_TOKEN"]) {
+  for (const name of ["APP_EMPLOYEE_TOKEN", "APP_MANAGER_TOKEN", "APP_CROSS_STORE_MANAGER_TOKEN"]) {
     const secret = String(env[name] || "")
     if (secret.length >= 8) redacted = redacted.split(secret).join(`[REDACTED:${name}]`)
   }
@@ -565,6 +828,7 @@ function printHelp() {
     "  node scripts/check-app-api-live-smoke-env.mjs",
     "  APP_READ_ONLY_LIVE_SMOKE=true node scripts/check-app-api-live-smoke-env.mjs",
     "  node scripts/check-app-api-live-smoke-env.mjs --execute-read-only",
+    "  node scripts/check-app-api-live-smoke-env.mjs --execute-l3-permission",
     "  node scripts/check-app-api-live-smoke-env.mjs --execute-read-only --online-boundary-report /tmp/app-api-online-readonly-boundary.json",
     "",
     "Required environment variables:",
@@ -572,10 +836,14 @@ function printHelp() {
     "  APP_DEVICE_ID",
     "  APP_EMPLOYEE_TOKEN",
     "  APP_MANAGER_TOKEN",
+    "  APP_MANAGER_SERVICE_RECORD_SESSION_ID_READONLY (L3 only)",
+    "  APP_CROSS_STORE_SESSION_ID_READONLY (L3 cross-store negative)",
+    "  APP_CROSS_STORE_MANAGER_TOKEN (optional L3 cross-store role)",
     "",
     "Safety:",
     "  The default mode prints missing prerequisites and a read-only plan only.",
-    "  Network requests run only when the env is complete, APP_READ_ONLY_LIVE_SMOKE=true or --execute-read-only is set, and online boundary report is 404-free.",
+    "  Read-only network requests run only when the env is complete, APP_READ_ONLY_LIVE_SMOKE=true or --execute-read-only is set, and online boundary report is 404-free.",
+    "  L3 permission probes additionally require APP_L3_PERMISSION_SMOKE=true or --execute-l3-permission plus manager-selected and cross-store session ids.",
     "  The live smoke uses GET probes only and never prints token values or response bodies.",
   ].join("\n"))
 }
@@ -584,17 +852,33 @@ async function main() {
   try {
     const args = parseArgs(process.argv)
     const report = buildReport(process.env, args)
-    if (report.readOnlyExecutionReady) {
+    if (report.readOnlyExecutionReady || report.l3PermissionExecutionReady) {
       const baseUrl = validateBaseUrl(String(process.env.APP_BASE_URL || ""), args).baseUrl
-      const smoke = await runReadOnlySmoke(baseUrl, process.env, args)
+      const smoke = report.readOnlyExecutionReady
+        ? await runReadOnlySmoke(baseUrl, process.env, args)
+        : null
+      const l3Smoke = report.l3PermissionExecutionReady
+        ? await runL3PermissionSmoke(baseUrl, process.env, args)
+        : null
+      const mode = smoke && l3Smoke
+        ? "read_only_and_l3_permission_executed"
+        : l3Smoke
+          ? "l3_permission_executed"
+          : "read_only_executed"
       const result = {
         ...report,
-        ok: smoke.ok,
-        mode: "read_only_executed",
+        ok: (smoke ? smoke.ok : true) && (l3Smoke ? l3Smoke.ok : true),
+        mode,
         networkRequestsAttempted: true,
         readOnlySmoke: {
           ...report.readOnlySmoke,
           result: smoke,
+        },
+        l3PermissionSmoke: {
+          ...report.l3PermissionSmoke,
+          executed: Boolean(l3Smoke),
+          l3PermissionPass: Boolean(l3Smoke?.ok),
+          result: l3Smoke,
         },
       }
       console.log(JSON.stringify(result, null, 2))
@@ -616,6 +900,8 @@ async function main() {
 
 export {
   READ_ONLY_PROBES,
+  L3_PERMISSION_PROBES,
+  L3_PERMISSION_VARIABLES,
   REQUIRED_VARIABLES,
   SKIPPED_MUTATING_ENDPOINTS,
   buildReport,

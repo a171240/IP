@@ -12,6 +12,7 @@ const script = path.join(root, "scripts", "check-app-api-live-smoke-env.mjs")
 
 const SECRET_EMPLOYEE_TOKEN = "employee-live-smoke-token-value-1234567890"
 const SECRET_MANAGER_TOKEN = "manager-live-smoke-token-value-1234567890"
+const SECRET_CROSS_MANAGER_TOKEN = "cross-manager-live-smoke-token-value-1234567890"
 
 function run(extraEnv = {}, args = []) {
   const result = spawnSync(process.execPath, [script, ...args], {
@@ -109,7 +110,7 @@ function dirtyBoundaryReport() {
   }
 }
 
-function createStubServer() {
+function createStubServer(resolveResponse = null) {
   const requests = []
   const server = http.createServer((request, response) => {
     requests.push({
@@ -119,8 +120,11 @@ function createStubServer() {
       deviceId: request.headers["x-device-id"],
       liveSmoke: request.headers["x-app-live-smoke"],
     })
-    response.writeHead(200, { "content-type": "application/json" })
-    response.end(JSON.stringify({ ok: true, route: request.url }))
+    const resolved = resolveResponse
+      ? resolveResponse(request)
+      : { status: 200, body: { ok: true, route: request.url } }
+    response.writeHead(resolved.status, { "content-type": "application/json" })
+    response.end(JSON.stringify(resolved.body))
   })
 
   return new Promise((resolve, reject) => {
@@ -179,11 +183,49 @@ test("APP API live smoke env checker does not request anything until read-only s
   assert.equal(result.report.networkRequestsAttempted, false)
   assert.ok(result.report.executionBlockers.includes("APP_READ_ONLY_LIVE_SMOKE:missing_or_false"))
   assert.ok(result.report.executionBlockers.includes("APP_ONLINE_BOUNDARY_REPORT:missing"))
+  assert.equal(result.report.l3PermissionSwitchEnabled, false)
+  assert.equal(result.report.l3PermissionSmoke.ready, false)
+  assert.equal(result.report.l3PermissionSmoke.executed, false)
+  assert.ok(result.report.l3PermissionSmoke.executionBlockers.includes("APP_L3_PERMISSION_SMOKE:missing_or_false"))
+  assert.ok(
+    result.report.l3PermissionSmoke.requiredInputs.some(
+      (item) => item.name === "APP_MANAGER_SERVICE_RECORD_SESSION_ID_READONLY"
+        && item.status === "missing",
+    ),
+  )
   assert.ok(result.report.readOnlySmoke.probes.every((item) => item.method === "GET"))
   assert.ok(result.report.skippedMutatingEndpoints.some((item) => item.path.includes("generate")))
   assert.ok(result.report.skippedMutatingEndpoints.some((item) => item.path.includes("pay")))
   assert.ok(result.report.skippedMutatingEndpoints.some((item) => item.path.includes("publish")))
   assert.ok(result.report.skippedMutatingEndpoints.some((item) => item.path.includes("submit")))
+  assert.doesNotMatch(result.stdout + result.stderr, new RegExp(SECRET_EMPLOYEE_TOKEN))
+  assert.doesNotMatch(result.stdout + result.stderr, new RegExp(SECRET_MANAGER_TOKEN))
+})
+
+test("APP API L3 permission smoke remains plan-only without the manager-selected session id", () => {
+  const result = run(validEnv({
+    APP_L3_PERMISSION_SMOKE: "true",
+  }))
+
+  assert.equal(result.status, 1)
+  assert.equal(result.report.ok, false)
+  assert.equal(result.report.mode, "plan_only")
+  assert.equal(result.report.networkRequestsAttempted, false)
+  assert.equal(result.report.l3PermissionSwitchEnabled, true)
+  assert.equal(result.report.l3PermissionSmoke.ready, false)
+  assert.equal(result.report.l3PermissionSmoke.executed, false)
+  assert.ok(
+    result.report.l3PermissionSmoke.executionBlockers.includes(
+      "APP_MANAGER_SERVICE_RECORD_SESSION_ID_READONLY:missing:not_set",
+    ),
+  )
+  assert.ok(result.report.l3PermissionSmoke.probes.every((item) => item.method === "GET"))
+  assert.ok(
+    result.report.l3PermissionSmoke.probes.some(
+      (item) => item.id === "employee_manager_record_detail_negative"
+        && item.negativePermissionProbe === true,
+    ),
+  )
   assert.doesNotMatch(result.stdout + result.stderr, new RegExp(SECRET_EMPLOYEE_TOKEN))
   assert.doesNotMatch(result.stdout + result.stderr, new RegExp(SECRET_MANAGER_TOKEN))
 })
@@ -280,6 +322,117 @@ test("APP API live smoke execution uses GET-only probes and redacts token values
     assert.equal(stub.requests.some((item) => /generate|pay|publish|submit/.test(item.url)), false)
     assert.doesNotMatch(result.stdout + result.stderr, new RegExp(SECRET_EMPLOYEE_TOKEN))
     assert.doesNotMatch(result.stdout + result.stderr, new RegExp(SECRET_MANAGER_TOKEN))
+  } finally {
+    await closeServer(stub.server)
+  }
+})
+
+test("APP API L3 permission smoke executes manager positive and employee/cross-store negative GET probes", async () => {
+  const stub = await createStubServer((request) => {
+    const auth = request.headers.authorization
+    if (
+      request.url === "/api/app/store-admin/service-records?limit=5"
+      && auth === `Bearer ${SECRET_EMPLOYEE_TOKEN}`
+    ) {
+      return {
+        status: 403,
+        body: { ok: false, code: "store_admin_required" },
+      }
+    }
+    if (
+      request.url === "/api/app/store-admin/service-records?limit=5"
+      && auth === `Bearer ${SECRET_MANAGER_TOKEN}`
+    ) {
+      return {
+        status: 200,
+        body: { ok: true, sessions: [{ id: "manager-session-001" }] },
+      }
+    }
+    if (
+      request.url === "/api/app/service-records/sessions/manager-session-001"
+      && auth === `Bearer ${SECRET_MANAGER_TOKEN}`
+    ) {
+      return {
+        status: 200,
+        body: { ok: true, session: { id: "manager-session-001" } },
+      }
+    }
+    if (
+      request.url === "/api/app/service-records/sessions/manager-session-001"
+      && auth === `Bearer ${SECRET_EMPLOYEE_TOKEN}`
+    ) {
+      return {
+        status: 403,
+        body: { ok: false, code: "tenant_scope_denied" },
+      }
+    }
+    if (
+      request.url === "/api/app/service-records/sessions/cross-store-session-001"
+      && auth === `Bearer ${SECRET_CROSS_MANAGER_TOKEN}`
+    ) {
+      return {
+        status: 404,
+        body: { ok: false, code: "service_record_not_found" },
+      }
+    }
+    return {
+      status: 200,
+      body: { ok: true, route: request.url },
+    }
+  })
+  const reportPath = writeBoundaryReport(cleanBoundaryReport())
+  try {
+    const result = await runAsync(
+      validEnv({
+        APP_BASE_URL: stub.baseUrl,
+        APP_L3_PERMISSION_SMOKE: "true",
+        APP_MANAGER_SERVICE_RECORD_SESSION_ID_READONLY: "manager-session-001",
+        APP_CROSS_STORE_SESSION_ID_READONLY: "cross-store-session-001",
+        APP_CROSS_STORE_MANAGER_TOKEN: SECRET_CROSS_MANAGER_TOKEN,
+      }),
+      ["--allow-local", "--execute-l3-permission", "--timeout-ms", "3000", "--online-boundary-report", reportPath],
+    )
+
+    assert.equal(result.status, 0)
+    assert.equal(result.report.ok, true)
+    assert.equal(result.report.mode, "l3_permission_executed")
+    assert.equal(result.report.networkRequestsAttempted, true)
+    assert.equal(result.report.readOnlySmoke.result, null)
+    assert.equal(result.report.l3PermissionSmoke.executed, true)
+    assert.equal(result.report.l3PermissionSmoke.l3PermissionPass, true)
+    assert.equal(result.report.l3PermissionSmoke.result.status, "L3_PERMISSION_SMOKE_EXECUTED")
+    assert.equal(result.report.l3PermissionSmoke.result.checkedProbes, 5)
+    assert.equal(result.report.l3PermissionSmoke.result.bodyHasSessionForNegativeProbes, false)
+    assert.ok(result.report.l3PermissionSmoke.result.probes.every((item) => item.method === "GET"))
+    assert.ok(result.report.l3PermissionSmoke.result.probes.every((item) => item.ok === true))
+    assert.ok(
+      result.report.l3PermissionSmoke.result.probes.some(
+        (item) => item.id === "manager_service_records_list_positive"
+          && item.status === 200
+          && item.bodyContainsExpectedSession === true,
+      ),
+    )
+    assert.ok(
+      result.report.l3PermissionSmoke.result.probes.some(
+        (item) => item.id === "employee_store_admin_records_negative"
+          && item.status === 403
+          && item.bodyHasSession === false,
+      ),
+    )
+    assert.ok(
+      result.report.l3PermissionSmoke.result.probes.some(
+        (item) => item.id === "cross_store_record_isolation_negative"
+          && item.status === 404
+          && item.bodyHasSession === false,
+      ),
+    )
+    assert.equal(stub.requests.length, 5)
+    assert.ok(stub.requests.every((item) => item.method === "GET"))
+    assert.ok(stub.requests.some((item) => item.authorization === `Bearer ${SECRET_CROSS_MANAGER_TOKEN}`))
+    assert.equal(stub.requests.some((item) => /generate|pay|publish|submit/.test(item.url)), false)
+    assert.doesNotMatch(result.stdout + result.stderr, new RegExp(SECRET_EMPLOYEE_TOKEN))
+    assert.doesNotMatch(result.stdout + result.stderr, new RegExp(SECRET_MANAGER_TOKEN))
+    assert.doesNotMatch(result.stdout + result.stderr, new RegExp(SECRET_CROSS_MANAGER_TOKEN))
   } finally {
     await closeServer(stub.server)
   }
