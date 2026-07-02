@@ -132,6 +132,8 @@
     "aliyun:app-api:live-env": "node ./scripts/check-app-api-live-smoke-env.mjs",
     "aliyun:app-api:readonly-smoke": "node ./scripts/check-app-api-live-smoke-env.mjs --execute-read-only",
     "aliyun:app-api:online-readonly-boundary": "node ./scripts/check-app-api-online-readonly-boundary.mjs",
+    "aliyun:app-api:test-accounts": "node ./scripts/register-app-live-smoke-test-accounts.mjs",
+    "aliyun:app-api:test-accounts:test": "node --test tests/app-api-test-accounts.static.test.js",
     "aliyun:app-api:smoke": "node ./scripts/smoke-app-api-production-cn.mjs",
     "aliyun:postdeploy:smoke": "node ./scripts/run-aliyun-postdeploy-smoke.mjs",
     "aliyun:routes:check": "node ./scripts/check-app-api-production-cn-routes.mjs",
