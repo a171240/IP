@@ -67,3 +67,17 @@ test("APP live-smoke test account script is exposed through package scripts", ()
     "node --test tests/app-api-test-accounts.static.test.js",
   )
 })
+
+test("production-cn knowledge membership patch uses declared test-account scope only", () => {
+  const source = read("scripts", "apply-production-cn-rds-knowledge-membership.mjs")
+
+  assert.match(source, /create temp table _codex_declared_scope as/)
+  assert.match(source, /select distinct company_id, store_id\s+from _codex_accounts/)
+  assert.match(source, /declared_scope/)
+  assert.match(source, /test_accounts_scope_mismatch/)
+  assert.match(source, /declared_scope_not_active/)
+  assert.match(source, /account\.company_id/)
+  assert.match(source, /account\.store_id/)
+  assert.doesNotMatch(source, /latest_active_store/)
+  assert.doesNotMatch(source, /order by store\.created_at desc/)
+})

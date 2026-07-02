@@ -566,26 +566,31 @@ from jsonb_to_recordset((select doc->'accounts' from _codex_payload)) as x(
   role text,
   user_id uuid,
   company_id uuid,
-  company_name text,
-  store_id uuid,
-  store_name text,
-  service_plan_label text
+  store_id uuid
 );
+
+create temp table _codex_declared_scope as
+select distinct company_id, store_id
+from _codex_accounts;
 
 create temp table _codex_scope as
 select
   company.id as company_id,
   store.id as store_id,
-  'latest_active_store'::text as scope_source
-from public.mp_stores store
-join public.mp_companies company on company.id = store.company_id
-where store.status = 'active' and company.status = 'active'
-order by store.created_at desc
-limit 1;
+  'declared_scope'::text as scope_source
+from _codex_declared_scope declared
+join public.mp_companies company
+  on company.id = declared.company_id
+ and company.status = 'active'
+join public.mp_stores store
+  on store.id = declared.store_id
+ and store.company_id = company.id
+ and store.status = 'active';
 
 do $$
 declare
   account_count integer;
+  declared_scope_count integer;
   scope_count integer;
 begin
   select count(*) into account_count from _codex_accounts;
@@ -593,9 +598,14 @@ begin
     raise exception 'expected_two_test_accounts';
   end if;
 
+  select count(*) into declared_scope_count from _codex_declared_scope;
+  if declared_scope_count <> 1 then
+    raise exception 'test_accounts_scope_mismatch';
+  end if;
+
   select count(*) into scope_count from _codex_scope;
   if scope_count <> 1 then
-    raise exception 'no_active_company_store';
+    raise exception 'declared_scope_not_active';
   end if;
 end $$;
 
@@ -771,15 +781,17 @@ insert into public.mp_account_memberships
   (user_id, company_id, store_id, role, status, display_name, accepted_at, last_seen_at)
 select
   account.user_id,
-  scope.company_id,
-  scope.store_id,
+  account.company_id,
+  account.store_id,
   account.role,
   'active',
   coalesce(nullif(account.nickname, ''), account.email, account.key),
   now(),
   now()
 from _codex_accounts account
-cross join _codex_scope scope
+join _codex_scope scope
+  on scope.company_id = account.company_id
+ and scope.store_id = account.store_id
 on conflict (user_id, company_id, store_id, role) do update
 set status = 'active',
     display_name = excluded.display_name,
