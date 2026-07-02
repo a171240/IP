@@ -46,6 +46,7 @@ test("first-version APP RDS auth routes use Aliyun helper instead of direct Supa
     ["lib", "aliyun-rds", "repositories", "service-records.server.ts"],
     ["lib", "aliyun-rds", "repositories", "store-admin.server.ts"],
     ["app", "api", "app", "customer-profiles", "route.ts"],
+    ["app", "api", "app", "scene-cards", "route.ts"],
     ["app", "api", "app", "store-profiles", "route.ts"],
     ["app", "api", "app", "store-admin", "invites", "[token]", "accept", "route.ts"],
   ]

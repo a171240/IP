@@ -209,7 +209,6 @@ test("Aliyun RDS route migration map covers first-version APP route data access 
   assert.ok(byRoute.get("/api/app/customer-profiles").rdsDataAccessFiles.some((item) =>
     item.file === "lib/aliyun-rds/repositories/customer-profiles.server.ts"
   ))
-
   const workPackages = new Map(report.implementationWorkPackages.map((item) => [item.id, item]))
   assert.deepEqual(Array.from(workPackages.keys()), [
     "RDS_WP01_ACCOUNT_PROFILE_ENTITLEMENTS",
@@ -392,10 +391,27 @@ test("Aliyun APP context profile routes use RDS repositories instead of mini-pro
   assert.match(customerProfileDetailRoute, /getAliyunRdsCustomerProfile/)
   assert.match(customerProfileDetailRoute, /updateAliyunRdsCustomerProfile/)
   assert.match(customerProfileDetailRoute, /deleteAliyunRdsCustomerProfile/)
+  const sceneCardsRoute = read("app", "api", "app", "scene-cards", "route.ts")
+  const sceneCardDetailRoute = read("app", "api", "app", "scene-cards", "[cardId]", "route.ts")
+  const sceneCardRepository = read("lib", "aliyun-rds", "repositories", "scene-cards.server.ts")
+
+  for (const route of [sceneCardsRoute, sceneCardDetailRoute]) {
+    assert.doesNotMatch(route, /@\/app\/api\/mp\//)
+    assert.match(route, /AliyunRdsConfigurationError/)
+    assert.match(route, /resolveAliyunRdsAppAuthUser/)
+    assert.doesNotMatch(route, /createServerSupabaseClientForRequest|@\/lib\/supabase|@supabase\/supabase-js/)
+  }
+
+  assert.match(sceneCardsRoute, /listAliyunRdsSceneCards/)
+  assert.match(sceneCardsRoute, /createAliyunRdsSceneCard/)
+  assert.match(sceneCardDetailRoute, /getAliyunRdsSceneCard/)
+  assert.match(sceneCardDetailRoute, /updateAliyunRdsSceneCard/)
+  assert.match(sceneCardDetailRoute, /deleteAliyunRdsSceneCard/)
   assert.match(storeRepository, /public\.store_profiles/)
   assert.match(storeRepository, /public\.profiles/)
   assert.match(customerRepository, /public\.voice_coach_customer_profiles/)
-  assert.doesNotMatch(storeRepository + customerRepository, /@\/lib\/supabase|@supabase\/supabase-js/)
+  assert.match(sceneCardRepository, /public\.voice_coach_scene_cards/)
+  assert.doesNotMatch(storeRepository + customerRepository + sceneCardRepository, /@\/lib\/supabase|@supabase\/supabase-js/)
 })
 
 test("Aliyun APP service record routes use RDS, OSS, and ASR helpers for WP03", () => {

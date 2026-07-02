@@ -403,15 +403,17 @@
         "POST"
       ],
       "appFile": "app/api/app/scene-cards/route.ts",
-      "sourceType": "mp_reexport",
-      "sourceRoute": "/api/mp/voice-coach/scene-cards",
+      "sourceType": "app_native",
       "sourceFiles": [
-        "app/api/mp/voice-coach/scene-cards/route.ts"
+        "app/api/app/scene-cards/route.ts",
+        "lib/aliyun-rds/repositories/scene-cards.server.ts",
+        "lib/aliyun-rds/postgres.server.ts"
       ],
       "sourcePages": [
         "../meiye-huajing-miniprogram/pages/voice-coach/scene-cards/index.js"
       ],
-      "productionCnStatus": "bridge_ready"
+      "productionCnStatus": "bridge_ready",
+      "note": "APP scene card list/create now uses the Aliyun RDS scene card repository; this remains A3/deferred for first-version RDS migration scope but no longer proxies the mini-program Supabase route."
     },
     {
       "scope": "context",
@@ -422,15 +424,17 @@
         "DELETE"
       ],
       "appFile": "app/api/app/scene-cards/[cardId]/route.ts",
-      "sourceType": "mp_reexport",
-      "sourceRoute": "/api/mp/voice-coach/scene-cards/[cardId]",
+      "sourceType": "app_native",
       "sourceFiles": [
-        "app/api/mp/voice-coach/scene-cards/[cardId]/route.ts"
+        "app/api/app/scene-cards/[cardId]/route.ts",
+        "lib/aliyun-rds/repositories/scene-cards.server.ts",
+        "lib/aliyun-rds/postgres.server.ts"
       ],
       "sourcePages": [
         "../meiye-huajing-miniprogram/pages/voice-coach/scene-card-editor/index.js"
       ],
-      "productionCnStatus": "bridge_ready"
+      "productionCnStatus": "bridge_ready",
+      "note": "APP scene card detail/update/delete now uses the Aliyun RDS scene card repository; this remains A3/deferred for first-version RDS migration scope but no longer proxies the mini-program Supabase route."
     },
     {
       "scope": "service-records",
