@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server"
 
 import {
-  appContentAcceptedResponse,
   appContentWorkflowErrorResponse,
+  createAppContentWorkflowDraft,
   readOptionalAppContentJsonBody,
   resolveAppContentWorkflowContext,
 } from "@/lib/aliyun-rds/repositories/app-content-workflows.server"
@@ -17,11 +17,12 @@ export async function POST(request: NextRequest) {
     const body = await readOptionalAppContentJsonBody(request)
     if ("error" in body) return body.error
 
-    return appContentAcceptedResponse({
+    return createAppContentWorkflowDraft({
       action: "xhs.generate",
       ctx: resolved.ctx,
       kind: "xhs",
-      message: "App XHS text facade is auth-closed. AI generation, billing, and draft persistence are disabled in this App-facing closure route.",
+      message: "App XHS text request was saved as a non-AI draft bridge. AI generation, cover generation, billing, and external posting remain disabled for this route.",
+      payload: body.body,
       scope: resolved.scope,
     })
   } catch (error) {
