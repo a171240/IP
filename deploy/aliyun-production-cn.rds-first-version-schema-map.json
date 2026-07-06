@@ -30,6 +30,7 @@
   ],
   "sourceMigrations": [
     "deploy/aliyun-production-cn.app-auth-revocations-schema.sql",
+    "deploy/aliyun-production-cn.app-compliance-requests-schema.sql",
     "lib/supabase/schema.sql",
     "supabase/migrations/20250213_add_activation_requests_and_entitlements.sql",
     "supabase/migrations/20260209_xhs_v4_store_profiles_and_draft_fields.sql",
@@ -90,6 +91,19 @@
         "auth_source_check_present",
         "expires_at_lookup_index_present",
         "logout_revoke_smoke_pending"
+      ]
+    },
+    {
+      "name": "app_compliance_requests",
+      "source": "deploy/aliyun-production-cn.app-compliance-requests-schema.sql",
+      "capabilities": [
+        "profile_multi_tenant_permissions"
+      ],
+      "validation": [
+        "account_deletion_receipt_schema_present",
+        "personal_data_deletion_receipt_schema_present",
+        "user_scope_requested_at_index_present",
+        "scope_kind_status_requested_at_index_present"
       ]
     },
     {
