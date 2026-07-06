@@ -55,5 +55,7 @@ test("APP logout route records a hashed server-side revocation contract", () => 
   assert.match(revocations, /revoked_at/)
   assert.match(revocations, /expires_at/)
   assert.match(revocations, /sha256/)
+  assert.match(revocations, /\[89ab\]\[0-9a-f\]\{3\}-\[0-9a-f\]\{12\}/)
+  assert.doesNotMatch(revocations, /\[89ab\]\[0-9a-f\]\{12\}/)
   assert.doesNotMatch(revocations, /raw_token|plain_token|authorization|Bearer|console\.(log|error|warn)/i)
 })
