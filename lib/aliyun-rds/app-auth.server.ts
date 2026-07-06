@@ -3,6 +3,7 @@ import "server-only"
 import { createHash, timingSafeEqual } from "crypto"
 import { NextRequest, NextResponse } from "next/server"
 
+import { isAliyunRdsAppAuthTokenRevoked } from "@/lib/aliyun-rds/app-auth-revocations.server"
 import type { AppAuthUser } from "@/lib/aliyun-rds/repositories/account-profile.server"
 import { createServerSupabaseClientForRequest } from "@/lib/supabase/server"
 
@@ -49,22 +50,49 @@ export async function resolveAliyunRdsAppAuthUser(
   request: NextRequest,
 ): Promise<AliyunRdsAppAuth | null> {
   const bearerToken = getBearerToken(request)
+  const bearerTokenHash = getAliyunRdsAppAuthBearerTokenHash(request)
   if (bearerToken) {
     const testLoginUser = resolveConfiguredTestLoginUser(request, bearerToken)
-    if (testLoginUser) return { source: "aliyun_test_login", user: testLoginUser }
+    if (testLoginUser) {
+      const revoked = await isAliyunRdsAppAuthTokenRevoked({
+        source: "aliyun_test_login",
+        tokenHash: bearerTokenHash,
+        userId: testLoginUser.id,
+      })
+      if (revoked) return null
+      return { source: "aliyun_test_login", user: testLoginUser }
+    }
   }
 
   const supabaseUser = await resolveSupabaseUser(request)
   if (!supabaseUser) return null
+  const userId = String(supabaseUser.id || "")
+  if (bearerTokenHash) {
+    const revoked = await isAliyunRdsAppAuthTokenRevoked({
+      source: "supabase",
+      tokenHash: bearerTokenHash,
+      userId,
+    })
+    if (revoked) return null
+  }
 
   return {
     source: "supabase",
     user: {
-      id: String(supabaseUser.id || ""),
+      id: userId,
       email: supabaseUser.email ?? null,
       user_metadata: supabaseUser.user_metadata || {},
     },
   }
+}
+
+export function getAliyunRdsAppAuthBearerTokenHash(request: NextRequest) {
+  const token = getBearerToken(request)
+  return token ? sha256(token) : ""
+}
+
+export function getAliyunRdsAppAuthDeviceId(request: NextRequest) {
+  return requestDeviceId(request)
 }
 
 function resolveConfiguredTestLoginUser(request: NextRequest, token: string): AppAuthUser | null {
@@ -137,8 +165,12 @@ function requestDeviceAllowed(request: NextRequest) {
 function requestDeviceAllowedBySet(request: NextRequest, allowList: Set<string>) {
   if (!allowList.size) return false
   if (allowList.has("*")) return true
-  const deviceId = String(request.headers.get("x-device-id") || "").trim()
+  const deviceId = requestDeviceId(request)
   return Boolean(deviceId && allowList.has(deviceId))
+}
+
+function requestDeviceId(request: NextRequest) {
+  return String(request.headers.get("x-device-id") || "").trim()
 }
 
 function testTokenMatches(token: string) {

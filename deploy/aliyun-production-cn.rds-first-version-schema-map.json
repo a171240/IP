@@ -13,6 +13,7 @@
   ],
   "firstVersionCapabilities": [
     "login_test_token",
+    "logout_session_revoke",
     "profile_multi_tenant_permissions",
     "store_invite",
     "service_record_long_recording",
@@ -28,6 +29,7 @@
     "wechat_open_platform_mobile_app_creation"
   ],
   "sourceMigrations": [
+    "deploy/aliyun-production-cn.app-auth-revocations-schema.sql",
     "lib/supabase/schema.sql",
     "supabase/migrations/20250213_add_activation_requests_and_entitlements.sql",
     "supabase/migrations/20260209_xhs_v4_store_profiles_and_draft_fields.sql",
@@ -73,6 +75,21 @@
       "validation": [
         "row_count_matches_source",
         "entitlement_lookup_by_user_id_passes"
+      ]
+    },
+    {
+      "name": "app_auth_token_revocations",
+      "source": "deploy/aliyun-production-cn.app-auth-revocations-schema.sql",
+      "capabilities": [
+        "login_test_token",
+        "logout_session_revoke",
+        "profile_multi_tenant_permissions"
+      ],
+      "validation": [
+        "token_hash_primary_key_present",
+        "auth_source_check_present",
+        "expires_at_lookup_index_present",
+        "logout_revoke_smoke_pending"
       ]
     },
     {
