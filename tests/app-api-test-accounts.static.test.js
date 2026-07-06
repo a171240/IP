@@ -68,6 +68,16 @@ test("APP live-smoke test account script is exposed through package scripts", ()
   )
 })
 
+test("APP live-smoke test account UUID validation accepts standard UUID segments", () => {
+  const source = read("scripts", "register-app-live-smoke-test-accounts.mjs")
+
+  assert.match(
+    source,
+    /\[89ab\]\[0-9a-f\]\{3\}-\[0-9a-f\]\{12\}/,
+  )
+  assert.doesNotMatch(source, /\[89ab\]\[0-9a-f\]\{12\}/)
+})
+
 test("production-cn knowledge membership patch uses declared test-account scope only", () => {
   const source = read("scripts", "apply-production-cn-rds-knowledge-membership.mjs")
 
