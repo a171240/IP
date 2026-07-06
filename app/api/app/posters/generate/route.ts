@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server"
 
 import {
-  appContentAcceptedResponse,
   appContentWorkflowErrorResponse,
+  createAppContentWorkflowDraft,
   readOptionalAppContentJsonBody,
   resolveAppContentWorkflowContext,
 } from "@/lib/aliyun-rds/repositories/app-content-workflows.server"
@@ -17,11 +17,12 @@ export async function POST(request: NextRequest) {
     const body = await readOptionalAppContentJsonBody(request)
     if ("error" in body) return body.error
 
-    return appContentAcceptedResponse({
+    return createAppContentWorkflowDraft({
       action: "poster.generate",
       ctx: resolved.ctx,
       kind: "poster",
-      message: "App poster facade is auth-closed. Image generation remains disabled until production provider and billing closure are explicitly enabled.",
+      message: "App poster request was saved as a non-AI draft bridge. Image generation, billing, OSS upload, saving, and sharing remain disabled for this route.",
+      payload: body.body,
       scope: resolved.scope,
     })
   } catch (error) {
