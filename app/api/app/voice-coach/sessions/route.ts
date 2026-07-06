@@ -2,8 +2,8 @@ import { NextRequest } from "next/server"
 
 import {
   appVoiceCoachFacadeErrorResponse,
-  appVoiceCoachSessionAcceptedResponse,
-  appVoiceCoachSessionListResponse,
+  createAppVoiceCoachTextSessionResponse,
+  listAppVoiceCoachTextSessionsResponse,
   readOptionalAppVoiceCoachJsonBody,
   resolveAppVoiceCoachFacadeContext,
 } from "@/lib/aliyun-rds/repositories/app-voice-coach-facade.server"
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     const resolved = await resolveAppVoiceCoachFacadeContext(request)
     if ("error" in resolved) return resolved.error
 
-    return appVoiceCoachSessionListResponse({
+    return await listAppVoiceCoachTextSessionsResponse({
       ctx: resolved.ctx,
       request,
       scope: resolved.scope,
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     const body = await readOptionalAppVoiceCoachJsonBody(request)
     if ("error" in body) return body.error
 
-    return appVoiceCoachSessionAcceptedResponse({
+    return await createAppVoiceCoachTextSessionResponse({
       body: body.body,
       ctx: resolved.ctx,
       scope: resolved.scope,

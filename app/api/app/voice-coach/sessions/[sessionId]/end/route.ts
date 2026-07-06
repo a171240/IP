@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import {
-  appVoiceCoachEndAcceptedResponse,
   appVoiceCoachFacadeErrorResponse,
+  endAppVoiceCoachTextSessionResponse,
   readOptionalAppVoiceCoachJsonBody,
   resolveAppVoiceCoachFacadeContext,
 } from "@/lib/aliyun-rds/repositories/app-voice-coach-facade.server"
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ se
     const body = await readOptionalAppVoiceCoachJsonBody(request)
     if ("error" in body) return body.error
 
-    return appVoiceCoachEndAcceptedResponse({
+    return await endAppVoiceCoachTextSessionResponse({
       ctx: resolved.ctx,
       scope: resolved.scope,
       sessionId: id,

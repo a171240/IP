@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 import {
   appVoiceCoachFacadeErrorResponse,
-  appVoiceCoachReportResponse,
+  getAppVoiceCoachTextReportResponse,
   resolveAppVoiceCoachFacadeContext,
 } from "@/lib/aliyun-rds/repositories/app-voice-coach-facade.server"
 
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ ses
     const resolved = await resolveAppVoiceCoachFacadeContext(request)
     if ("error" in resolved) return resolved.error
 
-    return appVoiceCoachReportResponse({
+    return await getAppVoiceCoachTextReportResponse({
       ctx: resolved.ctx,
       scope: resolved.scope,
       sessionId: id,
