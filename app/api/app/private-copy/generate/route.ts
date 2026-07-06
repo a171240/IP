@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server"
 
 import {
-  appContentAcceptedResponse,
   appContentWorkflowErrorResponse,
+  createAppContentWorkflowDraft,
   readOptionalAppContentJsonBody,
   resolveAppContentWorkflowContext,
 } from "@/lib/aliyun-rds/repositories/app-content-workflows.server"
@@ -17,11 +17,12 @@ export async function POST(request: NextRequest) {
     const body = await readOptionalAppContentJsonBody(request)
     if ("error" in body) return body.error
 
-    return appContentAcceptedResponse({
+    return createAppContentWorkflowDraft({
       action: "private_copy.generate",
       ctx: resolved.ctx,
       kind: "private_copy",
-      message: "App private-copy facade is auth-closed. Private copy AI generation, billing, and production draft writes are disabled in this route.",
+      message: "App private-copy request was saved as a non-AI draft bridge. AI generation and billing remain disabled for this route.",
+      payload: body.body,
       scope: resolved.scope,
     })
   } catch (error) {

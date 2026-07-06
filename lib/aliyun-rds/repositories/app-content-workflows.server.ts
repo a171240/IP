@@ -48,7 +48,19 @@ export const APP_CONTENT_FORBIDDEN_SIDE_EFFECTS = [
   "production_write",
 ] as const
 
+export const APP_CONTENT_DRAFT_BRIDGE_FORBIDDEN_SIDE_EFFECTS = [
+  "ai_generation",
+  "ai_point_charge",
+  "wechat_pay",
+  "external_publish",
+  "external_xhs_or_wechat_call",
+] as const
+
 export const APP_CONTENT_GENERATION_NOT_CONFIGURED_CODE = "app_content_generation_not_configured"
+export const APP_CONTENT_DRAFT_BRIDGE_CODE = "app_content_draft_persisted_bridge"
+
+const MAX_DRAFT_TITLE_LENGTH = 160
+const MAX_DRAFT_BODY_LENGTH = 20_000
 
 function jsonError(status: number, error: string, code = error, extra?: Record<string, unknown>) {
   return NextResponse.json({ ok: false, error, code, ...(extra || {}) }, { status })
@@ -198,6 +210,54 @@ export async function safeListAppContentDrafts(opts: {
   }
 }
 
+export async function createAppContentWorkflowDraft(opts: {
+  action: string
+  ctx: AppAccountContext
+  kind: AppContentWorkflowKind
+  message: string
+  payload: Record<string, unknown>
+  scope: AppContentWorkflowScope
+}) {
+  const draft = buildAppContentWorkflowDraft(opts.kind, opts.payload)
+  const now = new Date().toISOString()
+  const result = await queryAliyunRds<ContentDraftRow>(
+    `
+      insert into public.content_drafts (
+        company_id, store_id, kind, title, body, source_context, status,
+        created_by_membership_id, created_at, updated_at
+      )
+      values ($1, $2, $3, $4, $5, $6::jsonb, 'draft', $7, $8, $8)
+      returning id, company_id, store_id, kind, title, body, source_context, status,
+                created_by_membership_id, created_at, updated_at
+    `,
+    [
+      opts.scope.companyId,
+      opts.scope.storeId,
+      opts.kind,
+      draft.title || null,
+      draft.body || null,
+      JSON.stringify(draft.sourceContext),
+      opts.ctx.membershipId,
+      now,
+    ],
+  )
+
+  const created = result.rows[0]
+  if (!created) throw new Error("content_workflow_draft_create_failed")
+
+  return NextResponse.json({
+    ok: true,
+    action: opts.action,
+    status: "accepted",
+    generation_status: "persisted_bridge",
+    code: APP_CONTENT_DRAFT_BRIDGE_CODE,
+    message: opts.message,
+    context: appContentContextPayload(opts.ctx, opts.scope),
+    draft: toPublicContentDraft(created),
+    forbidden_side_effects: APP_CONTENT_DRAFT_BRIDGE_FORBIDDEN_SIDE_EFFECTS,
+  })
+}
+
 export function appContentAcceptedResponse(opts: {
   action: string
   ctx: AppAccountContext
@@ -223,4 +283,52 @@ export function appContentAcceptedResponse(opts: {
     },
     { status: 202 },
   )
+}
+
+function buildAppContentWorkflowDraft(kind: AppContentWorkflowKind, payload: Record<string, unknown>) {
+  const prompt = cleanText(payload.prompt, MAX_DRAFT_BODY_LENGTH)
+  const body = firstText(
+    [payload.body, payload.content, payload.text],
+    MAX_DRAFT_BODY_LENGTH,
+  ) || nonAiBridgeBody(kind, prompt)
+  const title = firstText(
+    [payload.title, payload.topic, prompt],
+    MAX_DRAFT_TITLE_LENGTH,
+  ) || defaultDraftTitle(kind)
+  const sourceContext = isRecord(payload.source_context) ? payload.source_context : {}
+
+  return {
+    body,
+    sourceContext: {
+      ...sourceContext,
+      app_content_bridge: {
+        ai_generation: false,
+        ai_points_charged: false,
+        kind,
+        storage: "public.content_drafts",
+      },
+    },
+    title,
+  }
+}
+
+function firstText(values: unknown[], max: number) {
+  for (const value of values) {
+    const text = cleanText(value, max)
+    if (text) return text
+  }
+  return ""
+}
+
+function defaultDraftTitle(kind: AppContentWorkflowKind) {
+  if (kind === "private_copy") return "私域文案草稿"
+  if (kind === "xhs") return "小红书草稿"
+  return "海报草稿"
+}
+
+function nonAiBridgeBody(kind: AppContentWorkflowKind, prompt: string) {
+  const label = kind === "private_copy" ? "私域文案" : defaultDraftTitle(kind)
+  return prompt
+    ? `非 AI 持久化桥接${label}：${prompt}`
+    : `非 AI 持久化桥接${label}：已保存请求，待接入真实生成服务后补全文案。`
 }
