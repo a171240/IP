@@ -29,6 +29,13 @@ export type AppVoiceCoachFacadeScope = {
 
 type AppVoiceCoachRdsRepository = typeof import("@/lib/aliyun-rds/repositories/app-voice-coach-rds.server")
 
+export type AppVoiceCoachCreateTimingLog = {
+  recordStage(stageName: string, startedAtMs: number): void
+  setRepositoryMode(repositoryMode: string): void
+  setSessionId(sessionId: string): void
+  write(status: number, error?: unknown): void
+}
+
 const DEFAULT_SCENARIO_ID = "objection_safety"
 const LOCAL_DURABLE_STORE_ENV = "APP_VOICE_COACH_LOCAL_DURABLE_STORE_PATH"
 const REPOSITORY_MODE_ENV = "APP_VOICE_COACH_TEXT_REPOSITORY_MODE"
@@ -189,6 +196,68 @@ function textContractPayload() {
     provider_mode: TEXT_SESSION_PROVIDER_MODE,
     local_side_effects: APP_VOICE_COACH_TEXT_SIDE_EFFECTS,
   }
+}
+
+export function createAppVoiceCoachCreateTimingLog(): AppVoiceCoachCreateTimingLog {
+  const requestId = randomUUID().replace(/-/g, "").slice(0, 12)
+  const requestStartedAt = Date.now()
+  const stages: Array<{ name: string; duration_ms: number }> = []
+  let repositoryMode = "unknown"
+  let sessionIdFragment = ""
+  let didWrite = false
+
+  return {
+    recordStage(stageName: string, startedAtMs: number) {
+      stages.push({
+        duration_ms: elapsedMs(startedAtMs),
+        name: cleanTimingStageName(stageName),
+      })
+    },
+    setRepositoryMode(nextRepositoryMode: string) {
+      repositoryMode = cleanText(nextRepositoryMode, 100) || "unknown"
+    },
+    setSessionId(sessionId: string) {
+      sessionIdFragment = safeIdFragment(sessionId)
+    },
+    write(status: number, error?: unknown) {
+      if (didWrite) return
+      didWrite = true
+      const payload: Record<string, unknown> = {
+        event: "app_voice_coach_create_timing",
+        repository_mode: repositoryMode,
+        request_id: requestId,
+        stages,
+        status,
+        total_ms: elapsedMs(requestStartedAt),
+      }
+      if (sessionIdFragment) payload.session_id_fragment = sessionIdFragment
+      if (error) payload.error_class = timingErrorClass(error)
+      console.info(JSON.stringify(payload))
+    },
+  }
+}
+
+function elapsedMs(startedAtMs: number) {
+  const elapsed = Date.now() - startedAtMs
+  return Number.isFinite(elapsed) && elapsed >= 0 ? Math.round(elapsed) : 0
+}
+
+function cleanTimingStageName(stageName: string) {
+  return cleanText(stageName, 80).replace(/[^a-z0-9_]/gi, "_") || "unknown"
+}
+
+function safeIdFragment(value: unknown) {
+  const text = cleanText(value, 120)
+  if (!text) return ""
+  if (text.length <= 12) return text
+  return `${text.slice(0, 8)}...${text.slice(-5)}`
+}
+
+function timingErrorClass(error: unknown) {
+  if (error instanceof AliyunRdsConfigurationError) return "AliyunRdsConfigurationError"
+  if (isAliyunRdsRuntimeUnavailableError(error)) return "AliyunRdsRuntimeUnavailable"
+  if (error instanceof Error) return cleanTimingStageName(error.name || "Error")
+  return "NonErrorThrow"
 }
 
 function selectedTextRepositoryMode() {
@@ -578,21 +647,32 @@ export async function createAppVoiceCoachTextSessionResponse(opts: {
   body: Record<string, unknown>
   ctx: AppAccountContext
   scope: AppVoiceCoachFacadeScope
+  timing?: AppVoiceCoachCreateTimingLog
 }) {
   if (shouldUseRdsRepository()) {
+    const importStartedAt = Date.now()
     const rdsRepository = await loadRdsRepository()
+    opts.timing?.recordStage("rds_repository_import", importStartedAt)
+    opts.timing?.setRepositoryMode(rdsRepository.APP_VOICE_COACH_RDS_REPOSITORY_MODE)
+
+    const payloadStartedAt = Date.now()
     const scenario = scenarioPayload(opts.body.scenario_id)
+    const firstCustomerTurnText = firstCustomerText(opts.body.scenario_id)
+    opts.timing?.recordStage("rds_prepare_payload", payloadStartedAt)
+
     const created = await rdsRepository.createAliyunRdsVoiceCoachTextSession({
       customerProfileId: cleanText(opts.body.customer_profile_id, 80) || null,
-      firstCustomerText: firstCustomerText(opts.body.scenario_id),
+      firstCustomerText: firstCustomerTurnText,
       scenario,
       sceneCardId: cleanText(opts.body.scene_card_id, 80) || null,
       sessionContext: {
         company_id: opts.scope.companyId,
         store_id: opts.scope.storeId,
       },
+      timing: opts.timing,
       userId: opts.ctx.userId,
     })
+    opts.timing?.setSessionId(created.session.id)
     return NextResponse.json(
       {
         ok: true,
@@ -611,6 +691,7 @@ export async function createAppVoiceCoachTextSessionResponse(opts: {
     )
   }
 
+  opts.timing?.setRepositoryMode(TEXT_SESSION_REPOSITORY_MODE)
   const sessions = readTextSessions()
   const scenario = scenarioPayload(opts.body.scenario_id)
   const sessionId = `app-vc-${randomUUID()}`
@@ -638,6 +719,7 @@ export async function createAppVoiceCoachTextSessionResponse(opts: {
   appendEvent(session, "session.created", { session_id: sessionId, first_turn_id: firstTurn.turn_id })
   sessions.set(sessionId, session)
   writeTextSessions(sessions)
+  opts.timing?.setSessionId(sessionId)
 
   return NextResponse.json(
     {

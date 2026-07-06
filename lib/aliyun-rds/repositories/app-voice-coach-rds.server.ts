@@ -1,11 +1,15 @@
 import "server-only"
 
-import { withAliyunRdsTransaction } from "@/lib/aliyun-rds/postgres.server"
+import { getAliyunRdsPool, withAliyunRdsTransaction } from "@/lib/aliyun-rds/postgres.server"
 
 export const APP_VOICE_COACH_RDS_REPOSITORY_MODE = "rds_voice_coach_text_session_contract"
 
 export type AppVoiceCoachRdsQueryClient = {
   query<T>(text: string, values?: readonly unknown[]): Promise<{ rows: T[] }>
+}
+
+export type AppVoiceCoachCreateTimingRecorder = {
+  recordStage(stageName: string, startedAtMs: number): void
 }
 
 export type AppVoiceCoachRdsScenarioSnapshot = {
@@ -61,8 +65,14 @@ export async function createAliyunRdsVoiceCoachTextSession(args: {
   scenario: AppVoiceCoachRdsScenarioSnapshot
   sceneCardId?: string | null
   sessionContext?: Record<string, unknown>
+  timing?: AppVoiceCoachCreateTimingRecorder
   userId: string
 }) {
+  if (args.timing) {
+    return withAliyunRdsCreateTimingTransaction(args.timing, (client) =>
+      createAliyunRdsVoiceCoachTextSessionWithClient(client, args),
+    )
+  }
   return withAliyunRdsTransaction((client) => createAliyunRdsVoiceCoachTextSessionWithClient(client, args))
 }
 
@@ -107,6 +117,7 @@ export async function createAliyunRdsVoiceCoachTextSessionWithClient(
     scenario: AppVoiceCoachRdsScenarioSnapshot
     sceneCardId?: string | null
     sessionContext?: Record<string, unknown>
+    timing?: AppVoiceCoachCreateTimingRecorder
     userId: string
   },
 ) {
@@ -117,6 +128,7 @@ export async function createAliyunRdsVoiceCoachTextSessionWithClient(
     ...(args.sessionContext || {}),
     repository_mode: APP_VOICE_COACH_RDS_REPOSITORY_MODE,
   }
+  const sessionInsertStartedAt = Date.now()
   const sessionResult = await client.query<AppVoiceCoachRdsSessionRow>(
     `
       insert into public.voice_coach_sessions (
@@ -140,9 +152,11 @@ export async function createAliyunRdsVoiceCoachTextSessionWithClient(
       jsonbParam(args.scenario),
     ],
   )
+  args.timing?.recordStage("rds_insert_session", sessionInsertStartedAt)
   const session = sessionResult.rows[0]
   if (!session) throw new Error("voice_coach_rds_session_insert_failed")
 
+  const firstTurnInsertStartedAt = Date.now()
   const firstCustomerTurn = await insertAliyunRdsVoiceCoachTextTurnWithClient(client, {
     analysis: { source: "text_first_rds_contract" },
     features: { provider_mode: "text_only_no_audio_provider" },
@@ -151,8 +165,43 @@ export async function createAliyunRdsVoiceCoachTextSessionWithClient(
     text: firstText,
     turnIndex: 0,
   })
+  args.timing?.recordStage("rds_insert_first_customer_turn", firstTurnInsertStartedAt)
 
   return { firstCustomerTurn, session }
+}
+
+async function withAliyunRdsCreateTimingTransaction<T>(
+  timing: AppVoiceCoachCreateTimingRecorder,
+  fn: (client: AppVoiceCoachRdsQueryClient) => Promise<T>,
+): Promise<T> {
+  const poolStartedAt = Date.now()
+  const pool = await getAliyunRdsPool()
+  timing.recordStage("rds_pool_ready", poolStartedAt)
+
+  const clientStartedAt = Date.now()
+  const client = await pool.connect()
+  timing.recordStage("rds_client_acquired", clientStartedAt)
+
+  try {
+    const beginStartedAt = Date.now()
+    await client.query("BEGIN")
+    timing.recordStage("rds_begin", beginStartedAt)
+
+    try {
+      const result = await fn(client)
+      const commitStartedAt = Date.now()
+      await client.query("COMMIT")
+      timing.recordStage("rds_commit", commitStartedAt)
+      return result
+    } catch (error) {
+      const rollbackStartedAt = Date.now()
+      await client.query("ROLLBACK")
+      timing.recordStage("rds_rollback", rollbackStartedAt)
+      throw error
+    }
+  } finally {
+    client.release()
+  }
 }
 
 export async function getAliyunRdsVoiceCoachTextSessionWithClient(
