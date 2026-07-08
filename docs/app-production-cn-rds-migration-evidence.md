@@ -9,10 +9,10 @@ Generated at: 2026-07-01T08:20:55.311Z
 - localExists: true
 - localReady: true
 - migrationReady: true
-- appApiRoutesWithSupabase: 54/56
-- appApiRoutesWithSupabaseDataAccess: 4/56
+- appApiRoutesWithSupabase: 56/58
+- appApiRoutesWithSupabaseDataAccess: 2/58
 - firstVersionRdsRoutesWithSupabaseDataAccess: 0/25
-- deferredAppApiRoutesWithSupabaseDataAccess: 4/31
+- deferredAppApiRoutesWithSupabaseDataAccess: 2/33
 - databaseUrlCnReferencedInSource: true
 - postgresDataAccessAdapterDetected: true
 - writebackBlockingGroups: none
@@ -89,10 +89,10 @@ Generated at: 2026-07-01T08:20:55.311Z
 - affectedSourceFileCount: 9
 - checklistItemCount: 7
 - blockingFields: none
-- schemaSqlSha256: 5b9f4a99254d682ac0d68cc7b5e2dfaab4ff5445585373af2fd0a2e8b8244f41
-- rdsApplyCandidateSqlSha256: 2091ef7975246cfd770883d2ac5b7b3da6b45ee76a82178f7a8e9db18f91a8ab
-- validationSqlSha256: 5642494c32ffaf4e9eb8297678c460b79dbd3de1f467f2851949a903961f838d
-- rollbackChecklistSha256: f875b86c32714158fdd35121c56ac54b9000fe3689206a9c946dc630c7e0ad20
+- schemaSqlSha256: 3658701c742308f9084248ae5c73d59fa770ce0499e5ba96f225731650ce9a37
+- rdsApplyCandidateSqlSha256: 84d86d895c3c26beb0dc3ec78951db577bfb782ac9d6d1a6f8c1d1716f355b38
+- validationSqlSha256: dc86e9d57099f78146577510bdc3f1a52949e0af327c12c15defaef28d12c3d5
+- rollbackChecklistSha256: 14556863a433cb4b1eed435e938700733d3b195693973b79fc984cfe2ff6f207
 
 ### rds_apply_candidate
 
@@ -101,7 +101,7 @@ Generated at: 2026-07-01T08:20:55.311Z
 - findingCount: 0
 - categories: none
 - removedStatementCount: 113
-- keptStatementCount: 148
+- keptStatementCount: 155
 - rewrittenStatementCount: 9
 - remainingReviewRequired: false
 
