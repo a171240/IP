@@ -3,6 +3,8 @@
 import { pathToFileURL } from "node:url"
 import { HEALTH_PROBES } from "./check-app-api-online-readonly-boundary.mjs"
 import {
+  CONTENT_XHS_L3_PERMISSION_PROBES,
+  CONTENT_XHS_L3_PERMISSION_VARIABLES,
   L3_PERMISSION_PROBES,
   L3_PERMISSION_VARIABLES,
   READ_ONLY_PROBES,
@@ -49,6 +51,7 @@ function requireValue(value, name) {
 function buildPlan(args) {
   const onlineBoundaryProbes = [...HEALTH_PROBES, ...READ_ONLY_PROBES].map(publicProbe)
   const readOnlySmokeProbes = READ_ONLY_PROBES.map(publicProbe)
+  const contentXhsL3PermissionProbes = CONTENT_XHS_L3_PERMISSION_PROBES.map(publicProbe)
   const l3PermissionProbes = L3_PERMISSION_PROBES.map(publicProbe)
 
   return {
@@ -77,13 +80,22 @@ function buildPlan(args) {
         : "not_read",
       source: "shell_env_at_execution_time",
     })),
+    requiredContentXhsL3PermissionInputs: CONTENT_XHS_L3_PERMISSION_VARIABLES.map((item) => ({
+      name: item.name,
+      required: item.required === true,
+      description: item.description,
+      value: item.kind === "secret_token" || item.kind === "opaque_id"
+        ? "redacted_not_read"
+        : "not_read",
+      source: "shell_env_at_execution_time",
+    })),
     requiredExternalGates: [
       "APP_BASE_URL must be a non-local HTTPS production-cn URL unless a local stub is explicitly allowed for tests",
       "APP_DEVICE_ID must be allowlisted for the smoke operator/device",
       "APP_EMPLOYEE_TOKEN and APP_MANAGER_TOKEN must be supplied only in the shell that executes live smoke",
       "online-readonly-boundary must return ok=true, routeBlockers=[], and grouped[404]=0",
       "read-only execution still requires APP_READ_ONLY_LIVE_SMOKE=true or --execute-read-only",
-      "L3 permission execution additionally requires APP_L3_PERMISSION_SMOKE=true or --execute-l3-permission, APP_MANAGER_SERVICE_RECORD_SESSION_ID_READONLY, and APP_CROSS_STORE_SESSION_ID_READONLY",
+      "L3 permission execution additionally requires APP_L3_PERMISSION_SMOKE=true or --execute-l3-permission, APP_MANAGER_SERVICE_RECORD_SESSION_ID_READONLY, APP_CROSS_STORE_SESSION_ID_READONLY, and APP_UNBOUND_TOKEN for content-xhs negative checks",
     ],
     sequence: [
       {
@@ -124,9 +136,21 @@ function buildPlan(args) {
         responseBodiesPrinted: false,
       },
       {
+        id: "content_xhs_l3_permission_smoke_execute",
+        command: `corepack pnpm run aliyun:app-api:content-xhs-l3-smoke -- --online-boundary-report ${args.boundaryReport}`,
+        purpose: "execute GET-only content-xhs L3 probes after explicit L3 authorization: employee drafts 200, manager drafts 200, and unbound drafts 403",
+        requiresExplicitAuthorization: true,
+        authorizationId: "CONTENT_XHS_L3_PERMISSION_READONLY_EXECUTION_AUTHORIZATION",
+        networkRequestsAttemptedByThisPlan: false,
+        networkRequestsAttemptedAtExecutionTime: true,
+        methodsAllowed: ["GET"],
+        tokenValuesPrinted: false,
+        responseBodiesPrinted: false,
+      },
+      {
         id: "l3_permission_smoke_execute",
         command: `corepack pnpm run aliyun:app-api:l3-permission-smoke -- --online-boundary-report ${args.boundaryReport}`,
-        purpose: "execute GET-only L3 permission probes after explicit L3 authorization: manager detail positive, employee negative, and cross-store negative",
+        purpose: "execute GET-only L3 permission probes after explicit L3 authorization: content-xhs employee/manager/unbound checks plus service-record manager/employee/cross-store checks",
         requiresExplicitAuthorization: true,
         authorizationId: "L3_PERMISSION_READONLY_EXECUTION_AUTHORIZATION",
         networkRequestsAttemptedByThisPlan: false,
@@ -138,7 +162,12 @@ function buildPlan(args) {
     ],
     redaction: {
       noSecretValuesPrintedByThisPlan: true,
-      tokenEnvNames: ["APP_EMPLOYEE_TOKEN", "APP_MANAGER_TOKEN", "APP_CROSS_STORE_MANAGER_TOKEN"],
+      tokenEnvNames: [
+        "APP_EMPLOYEE_TOKEN",
+        "APP_MANAGER_TOKEN",
+        "APP_CROSS_STORE_MANAGER_TOKEN",
+        "APP_UNBOUND_TOKEN",
+      ],
       publicTokenValue: "redacted",
       responseSecretEchoPolicy: "fail_probe_if_response_contains_input_token",
     },
@@ -165,10 +194,27 @@ function buildPlan(args) {
       tokenBacked: true,
       status: "PLAN_READY_NOT_EXECUTED",
       authorizationId: "L3_PERMISSION_READONLY_EXECUTION_AUTHORIZATION",
-      successPolicy: "manager same-store list/detail must pass, employee/cross-store negative probes must deny or hide session data",
-      blockedOutcomes: ["BLOCKED_NO_MANAGER_RECORD_ID", "BLOCKED_CROSS_STORE_INPUT"],
+      successPolicy: "content-xhs employee and manager drafts must pass, unbound drafts must deny, service-record same-store list/detail must pass, and employee/cross-store negative probes must deny or hide session data",
+      blockedOutcomes: [
+        "BLOCKED_NO_MANAGER_RECORD_ID",
+        "BLOCKED_CROSS_STORE_INPUT",
+        "BLOCKED_UNBOUND_TOKEN_INPUT",
+      ],
       outputEvidencePath: "docs/app-production-cn-l3-permission-smoke-current.json",
       probes: l3PermissionProbes,
+    },
+    contentXhsL3PermissionSmoke: {
+      getOnly: true,
+      tokenBacked: true,
+      status: "PLAN_READY_NOT_EXECUTED",
+      authorizationId: "CONTENT_XHS_L3_PERMISSION_READONLY_EXECUTION_AUTHORIZATION",
+      successPolicy: "content-xhs employee and manager drafts must pass and unbound drafts must deny without service-record session inputs",
+      blockedOutcomes: [
+        "BLOCKED_CONTENT_XHS_TOKEN_INPUTS_MISSING",
+        "BLOCKED_ONLINE_BOUNDARY_REPORT_MISSING",
+      ],
+      outputEvidencePath: "docs/app-production-cn-content-xhs-l3-permission-smoke-current.json",
+      probes: contentXhsL3PermissionProbes,
     },
     skippedMutatingEndpoints: SKIPPED_MUTATING_ENDPOINTS,
     forbiddenActions: [
@@ -178,6 +224,7 @@ function buildPlan(args) {
       "no OSS upload or signed action execution",
       "no ASR/process/publish/payment POST",
       "no production deploy, promote, alias, database write, or git push",
+      "no content-xhs L3 permission execution without CONTENT_XHS_L3_PERMISSION_READONLY_EXECUTION_AUTHORIZATION",
       "no L3 permission execution without L3_PERMISSION_READONLY_EXECUTION_AUTHORIZATION",
     ],
   }

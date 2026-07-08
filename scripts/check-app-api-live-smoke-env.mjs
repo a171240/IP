@@ -5,6 +5,7 @@ import { pathToFileURL } from "node:url"
 
 const READ_ONLY_SWITCH_ENV = "APP_READ_ONLY_LIVE_SMOKE"
 const L3_PERMISSION_SWITCH_ENV = "APP_L3_PERMISSION_SMOKE"
+const CONTENT_XHS_L3_PERMISSION_SWITCH_ENV = "APP_CONTENT_XHS_L3_SMOKE"
 const DEFAULT_TIMEOUT_MS = 15_000
 
 const REQUIRED_VARIABLES = [
@@ -196,9 +197,45 @@ const L3_PERMISSION_VARIABLES = [
     required: false,
     description: "optional manager token from another store; omitted runs the cross-store id against APP_MANAGER_TOKEN",
   },
+  {
+    name: "APP_UNBOUND_TOKEN",
+    kind: "secret_token",
+    required: false,
+    description: "optional unbound account token for tenant binding negative checks such as XHS drafts",
+  },
 ]
 
 const L3_PERMISSION_PROBES = [
+  {
+    id: "employee_xhs_drafts_positive",
+    scope: "l3-permission",
+    role: "employee",
+    method: "GET",
+    path: "/api/app/xhs/drafts",
+    expectedStatuses: [200],
+    description: "employee can read tenant-scoped XHS drafts list",
+  },
+  {
+    id: "manager_xhs_drafts_positive",
+    scope: "l3-permission",
+    role: "manager",
+    method: "GET",
+    path: "/api/app/xhs/drafts",
+    expectedStatuses: [200],
+    description: "manager can read tenant-scoped XHS drafts list",
+  },
+  {
+    id: "unbound_xhs_drafts_negative",
+    scope: "l3-permission",
+    role: "unbound",
+    method: "GET",
+    path: "/api/app/xhs/drafts",
+    expectedStatuses: [403],
+    negativePermissionProbe: true,
+    optionalInputBlocker: "BLOCKED_UNBOUND_TOKEN_INPUT",
+    tokenEnvName: "APP_UNBOUND_TOKEN",
+    description: "unbound account must not read tenant-scoped XHS drafts list",
+  },
   {
     id: "manager_service_records_list_positive",
     scope: "l3-permission",
@@ -254,6 +291,25 @@ const L3_PERMISSION_PROBES = [
   },
 ]
 
+const CONTENT_XHS_L3_PERMISSION_VARIABLES = [
+  {
+    name: "APP_UNBOUND_TOKEN",
+    kind: "secret_token",
+    required: true,
+    description: "unbound account token for the content-xhs tenant binding negative check",
+  },
+]
+
+const CONTENT_XHS_L3_PERMISSION_PROBE_IDS = [
+  "employee_xhs_drafts_positive",
+  "manager_xhs_drafts_positive",
+  "unbound_xhs_drafts_negative",
+]
+
+const CONTENT_XHS_L3_PERMISSION_PROBES = L3_PERMISSION_PROBES.filter((probe) => (
+  CONTENT_XHS_L3_PERMISSION_PROBE_IDS.includes(probe.id)
+))
+
 const SKIPPED_MUTATING_ENDPOINTS = [
   { method: "POST", path: "/api/app/auth/wechat", reason: "login/auth exchange is not part of read-only smoke" },
   { method: "POST", path: "/api/app/auth/logout", reason: "state-changing auth operation" },
@@ -291,6 +347,7 @@ const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1"])
 function parseArgs(argv) {
   const args = {
     allowLocal: false,
+    executeContentXhsL3Permission: false,
     executeL3Permission: false,
     executeReadOnly: false,
     onlineBoundaryReport: null,
@@ -309,6 +366,10 @@ function parseArgs(argv) {
     }
     if (arg === "--execute-l3-permission") {
       args.executeL3Permission = true
+      continue
+    }
+    if (arg === "--execute-content-xhs-l3") {
+      args.executeContentXhsL3Permission = true
       continue
     }
     if (arg === "--online-boundary-report") {
@@ -406,6 +467,11 @@ function isL3PermissionSwitchEnabled(env, args) {
   return args.executeL3Permission || String(env[L3_PERMISSION_SWITCH_ENV] || "").trim().toLowerCase() === "true"
 }
 
+function isContentXhsL3PermissionSwitchEnabled(env, args) {
+  return args.executeContentXhsL3Permission
+    || String(env[CONTENT_XHS_L3_PERMISSION_SWITCH_ENV] || "").trim().toLowerCase() === "true"
+}
+
 function buildReport(env, args) {
   let baseUrl = null
   const onlineBoundary = validateOnlineBoundaryReport(args.onlineBoundaryReport)
@@ -428,7 +494,9 @@ function buildReport(env, args) {
   const liveSmokeEnvReady = envBlockers.length === 0
   const readOnlySwitchEnabled = isReadOnlySwitchEnabled(env, args)
   const l3PermissionSwitchEnabled = isL3PermissionSwitchEnabled(env, args)
+  const contentXhsL3PermissionSwitchEnabled = isContentXhsL3PermissionSwitchEnabled(env, args)
   const l3PermissionInputs = validateL3PermissionInputs(env, args)
+  const contentXhsL3PermissionInputs = validateContentXhsL3PermissionInputs(env, args)
   const baseExecutionBlockers = [
     ...envBlockers,
     ...onlineBoundary.executionBlockers,
@@ -443,17 +511,25 @@ function buildReport(env, args) {
     ...(l3PermissionSwitchEnabled ? [] : [`${L3_PERMISSION_SWITCH_ENV}:missing_or_false`]),
     ...l3PermissionInputs.blockers,
   ]
+  const contentXhsL3ExecutionBlockers = [
+    ...baseExecutionBlockers,
+    ...(contentXhsL3PermissionSwitchEnabled ? [] : [`${CONTENT_XHS_L3_PERMISSION_SWITCH_ENV}:missing_or_false`]),
+    ...contentXhsL3PermissionInputs.blockers,
+  ]
   const canExecuteL3Permission = liveSmokeEnvReady
     && onlineBoundary.ready
     && l3PermissionSwitchEnabled
     && l3PermissionInputs.ready
-  const mode = canExecuteReadOnly && canExecuteL3Permission
-    ? "read_only_and_l3_permission_execute_pending"
-    : canExecuteL3Permission
-      ? "l3_permission_execute_pending"
-      : canExecuteReadOnly
-        ? "read_only_execute_pending"
-        : "plan_only"
+  const canExecuteContentXhsL3Permission = liveSmokeEnvReady
+    && onlineBoundary.ready
+    && contentXhsL3PermissionSwitchEnabled
+    && contentXhsL3PermissionInputs.ready
+  const pendingModes = [
+    canExecuteReadOnly ? "read_only" : null,
+    canExecuteContentXhsL3Permission ? "content_xhs_l3_permission" : null,
+    canExecuteL3Permission ? "l3_permission" : null,
+  ].filter(Boolean)
+  const mode = pendingModes.length > 0 ? `${pendingModes.join("_and_")}_execute_pending` : "plan_only"
 
   return {
     ok: false,
@@ -462,8 +538,10 @@ function buildReport(env, args) {
     liveSmokeEnvReady,
     readOnlySwitchEnabled,
     l3PermissionSwitchEnabled,
+    contentXhsL3PermissionSwitchEnabled,
     readOnlyExecutionReady: canExecuteReadOnly,
     l3PermissionExecutionReady: canExecuteL3Permission,
+    contentXhsL3PermissionExecutionReady: canExecuteContentXhsL3Permission,
     required,
     blockers: envBlockers,
     executionBlockers,
@@ -498,10 +576,28 @@ function buildReport(env, args) {
       blockedOutcomes: [
         "BLOCKED_NO_MANAGER_RECORD_ID",
         "BLOCKED_CROSS_STORE_INPUT",
+        "BLOCKED_UNBOUND_TOKEN_INPUT",
       ],
       probes: L3_PERMISSION_PROBES.map(publicProbe),
       command: "APP_L3_PERMISSION_SMOKE=true node scripts/check-app-api-live-smoke-env.mjs --online-boundary-report <online-readonly-boundary.json>",
       alternativeCommand: "node scripts/check-app-api-live-smoke-env.mjs --execute-l3-permission --online-boundary-report <online-readonly-boundary.json>",
+    },
+    contentXhsL3PermissionSmoke: {
+      status: canExecuteContentXhsL3Permission ? "ready_to_execute" : "plan_only",
+      ready: canExecuteContentXhsL3Permission,
+      executed: false,
+      l3PermissionPass: false,
+      requires: `${CONTENT_XHS_L3_PERMISSION_SWITCH_ENV}=true or --execute-content-xhs-l3`,
+      expectedEvidenceStatus: "CONTENT_XHS_L3_PERMISSION_SMOKE_EXECUTED",
+      requiredInputs: contentXhsL3PermissionInputs.publicInputs,
+      executionBlockers: contentXhsL3ExecutionBlockers,
+      blockedOutcomes: [
+        "BLOCKED_CONTENT_XHS_TOKEN_INPUTS_MISSING",
+        "BLOCKED_ONLINE_BOUNDARY_REPORT_MISSING",
+      ],
+      probes: CONTENT_XHS_L3_PERMISSION_PROBES.map(publicProbe),
+      command: "APP_CONTENT_XHS_L3_SMOKE=true node scripts/check-app-api-live-smoke-env.mjs --online-boundary-report <online-readonly-boundary.json>",
+      alternativeCommand: "node scripts/check-app-api-live-smoke-env.mjs --execute-content-xhs-l3 --online-boundary-report <online-readonly-boundary.json>",
     },
     skippedMutatingEndpoints: SKIPPED_MUTATING_ENDPOINTS,
   }
@@ -509,6 +605,30 @@ function buildReport(env, args) {
 
 function validateL3PermissionInputs(env, args) {
   const publicInputs = L3_PERMISSION_VARIABLES.map((item) => {
+    const validation = validateValue(item, env[item.name], args)
+    return {
+      name: item.name,
+      required: item.required === true,
+      description: item.description,
+      status: validation.status,
+      reason: validation.reason || null,
+      value: item.kind === "secret_token" || item.kind === "opaque_id"
+        ? "redacted"
+        : validation.status === "ready" ? "present" : "redacted",
+    }
+  })
+  const blockers = publicInputs
+    .filter((item) => item.required && item.status !== "ready")
+    .map((item) => `${item.name}:${item.status}${item.reason ? `:${item.reason}` : ""}`)
+  return {
+    ready: blockers.length === 0,
+    blockers,
+    publicInputs,
+  }
+}
+
+function validateContentXhsL3PermissionInputs(env, args) {
+  const publicInputs = CONTENT_XHS_L3_PERMISSION_VARIABLES.map((item) => {
     const validation = validateValue(item, env[item.name], args)
     return {
       name: item.name,
@@ -655,7 +775,54 @@ async function runL3PermissionSmoke(baseUrl, env, args) {
   }
 }
 
+async function runContentXhsL3PermissionSmoke(baseUrl, env, args) {
+  const startedAt = new Date().toISOString()
+  const probes = []
+  for (const probe of CONTENT_XHS_L3_PERMISSION_PROBES) {
+    const resolved = resolveProbeForEnv(probe, env)
+    if (resolved.blocked) {
+      probes.push({
+        ...publicProbe(probe),
+        ok: false,
+        status: null,
+        code: resolved.blocked,
+        json: false,
+        bodyType: null,
+        bodyHasSession: false,
+        durationMs: 0,
+        blocked: true,
+      })
+      continue
+    }
+    probes.push(await requestProbe(baseUrl, resolved.probe, env, args.timeoutMs))
+  }
+  const bodyHasSessionForNegativeProbes = probes
+    .filter((probe) => probe.negativePermissionProbe === true)
+    .some((probe) => probe.bodyHasSession === true)
+  const ok = probes.every((probe) => probe.ok) && !bodyHasSessionForNegativeProbes
+  return {
+    ok,
+    status: ok
+      ? "CONTENT_XHS_L3_PERMISSION_SMOKE_EXECUTED"
+      : "CONTENT_XHS_L3_PERMISSION_SMOKE_INCOMPLETE",
+    startedAt,
+    finishedAt: new Date().toISOString(),
+    baseUrl: publicBaseUrl(baseUrl),
+    checkedProbes: probes.length,
+    probes,
+    bodyHasSessionForNegativeProbes,
+  }
+}
+
 function resolveProbeForEnv(probe, env) {
+  if (probe.tokenEnvName) {
+    const token = String(env[probe.tokenEnvName] || "").trim()
+    if (!token) {
+      return {
+        blocked: probe.optionalInputBlocker || `${probe.tokenEnvName}:missing`,
+      }
+    }
+  }
   if (!probe.pathEnvName) return { probe }
   const rawValue = String(env[probe.pathEnvName] || "").trim()
   if (!rawValue) {
@@ -735,6 +902,7 @@ async function requestProbe(baseUrl, probe, env, timeoutMs) {
 function tokenForRole(role, env) {
   if (role === "employee") return String(env.APP_EMPLOYEE_TOKEN || "")
   if (role === "manager") return String(env.APP_MANAGER_TOKEN || "")
+  if (role === "unbound") return String(env.APP_UNBOUND_TOKEN || "")
   if (role === "cross_store_manager") {
     return String(env.APP_CROSS_STORE_MANAGER_TOKEN || env.APP_MANAGER_TOKEN || "")
   }
@@ -795,7 +963,7 @@ function collectSessionIds(value, ids) {
 }
 
 function assertResponseDoesNotContainInputSecrets(text, env, probe) {
-  for (const name of ["APP_EMPLOYEE_TOKEN", "APP_MANAGER_TOKEN", "APP_CROSS_STORE_MANAGER_TOKEN"]) {
+  for (const name of ["APP_EMPLOYEE_TOKEN", "APP_MANAGER_TOKEN", "APP_CROSS_STORE_MANAGER_TOKEN", "APP_UNBOUND_TOKEN"]) {
     const secret = String(env[name] || "")
     if (secret.length >= 8 && text.includes(secret)) {
       throw new Error(`probe_response_echoed_input_secret:${probe.method}:${probe.path}:${name}`)
@@ -805,7 +973,7 @@ function assertResponseDoesNotContainInputSecrets(text, env, probe) {
 
 function redactSensitiveText(text, env) {
   let redacted = String(text || "")
-  for (const name of ["APP_EMPLOYEE_TOKEN", "APP_MANAGER_TOKEN", "APP_CROSS_STORE_MANAGER_TOKEN"]) {
+  for (const name of ["APP_EMPLOYEE_TOKEN", "APP_MANAGER_TOKEN", "APP_CROSS_STORE_MANAGER_TOKEN", "APP_UNBOUND_TOKEN"]) {
     const secret = String(env[name] || "")
     if (secret.length >= 8) redacted = redacted.split(secret).join(`[REDACTED:${name}]`)
   }
@@ -829,6 +997,7 @@ function printHelp() {
     "  APP_READ_ONLY_LIVE_SMOKE=true node scripts/check-app-api-live-smoke-env.mjs",
     "  node scripts/check-app-api-live-smoke-env.mjs --execute-read-only",
     "  node scripts/check-app-api-live-smoke-env.mjs --execute-l3-permission",
+    "  node scripts/check-app-api-live-smoke-env.mjs --execute-content-xhs-l3",
     "  node scripts/check-app-api-live-smoke-env.mjs --execute-read-only --online-boundary-report /tmp/app-api-online-readonly-boundary.json",
     "",
     "Required environment variables:",
@@ -839,11 +1008,13 @@ function printHelp() {
     "  APP_MANAGER_SERVICE_RECORD_SESSION_ID_READONLY (L3 only)",
     "  APP_CROSS_STORE_SESSION_ID_READONLY (L3 cross-store negative)",
     "  APP_CROSS_STORE_MANAGER_TOKEN (optional L3 cross-store role)",
+    "  APP_UNBOUND_TOKEN (required content-xhs L3 unbound tenant negative; optional combined L3 unbound tenant negative)",
     "",
     "Safety:",
     "  The default mode prints missing prerequisites and a read-only plan only.",
     "  Read-only network requests run only when the env is complete, APP_READ_ONLY_LIVE_SMOKE=true or --execute-read-only is set, and online boundary report is 404-free.",
     "  L3 permission probes additionally require APP_L3_PERMISSION_SMOKE=true or --execute-l3-permission plus manager-selected and cross-store session ids.",
+    "  Content-XHS L3 permission probes require APP_CONTENT_XHS_L3_SMOKE=true or --execute-content-xhs-l3 plus APP_UNBOUND_TOKEN, without service-record session ids.",
     "  The live smoke uses GET probes only and never prints token values or response bodies.",
   ].join("\n"))
 }
@@ -852,22 +1023,32 @@ async function main() {
   try {
     const args = parseArgs(process.argv)
     const report = buildReport(process.env, args)
-    if (report.readOnlyExecutionReady || report.l3PermissionExecutionReady) {
+    if (
+      report.readOnlyExecutionReady
+      || report.contentXhsL3PermissionExecutionReady
+      || report.l3PermissionExecutionReady
+    ) {
       const baseUrl = validateBaseUrl(String(process.env.APP_BASE_URL || ""), args).baseUrl
       const smoke = report.readOnlyExecutionReady
         ? await runReadOnlySmoke(baseUrl, process.env, args)
         : null
+      const contentXhsL3Smoke = report.contentXhsL3PermissionExecutionReady
+        ? await runContentXhsL3PermissionSmoke(baseUrl, process.env, args)
+        : null
       const l3Smoke = report.l3PermissionExecutionReady
         ? await runL3PermissionSmoke(baseUrl, process.env, args)
         : null
-      const mode = smoke && l3Smoke
-        ? "read_only_and_l3_permission_executed"
-        : l3Smoke
-          ? "l3_permission_executed"
-          : "read_only_executed"
+      const executedModes = [
+        smoke ? "read_only" : null,
+        contentXhsL3Smoke ? "content_xhs_l3_permission" : null,
+        l3Smoke ? "l3_permission" : null,
+      ].filter(Boolean)
+      const mode = `${executedModes.join("_and_")}_executed`
       const result = {
         ...report,
-        ok: (smoke ? smoke.ok : true) && (l3Smoke ? l3Smoke.ok : true),
+        ok: (smoke ? smoke.ok : true)
+          && (contentXhsL3Smoke ? contentXhsL3Smoke.ok : true)
+          && (l3Smoke ? l3Smoke.ok : true),
         mode,
         networkRequestsAttempted: true,
         readOnlySmoke: {
@@ -879,6 +1060,12 @@ async function main() {
           executed: Boolean(l3Smoke),
           l3PermissionPass: Boolean(l3Smoke?.ok),
           result: l3Smoke,
+        },
+        contentXhsL3PermissionSmoke: {
+          ...report.contentXhsL3PermissionSmoke,
+          executed: Boolean(contentXhsL3Smoke),
+          l3PermissionPass: Boolean(contentXhsL3Smoke?.ok),
+          result: contentXhsL3Smoke,
         },
       }
       console.log(JSON.stringify(result, null, 2))
@@ -899,6 +1086,8 @@ async function main() {
 }
 
 export {
+  CONTENT_XHS_L3_PERMISSION_PROBES,
+  CONTENT_XHS_L3_PERMISSION_VARIABLES,
   READ_ONLY_PROBES,
   L3_PERMISSION_PROBES,
   L3_PERMISSION_VARIABLES,

@@ -13,6 +13,7 @@ const script = path.join(root, "scripts", "check-app-api-live-smoke-env.mjs")
 const SECRET_EMPLOYEE_TOKEN = "employee-live-smoke-token-value-1234567890"
 const SECRET_MANAGER_TOKEN = "manager-live-smoke-token-value-1234567890"
 const SECRET_CROSS_MANAGER_TOKEN = "cross-manager-live-smoke-token-value-1234567890"
+const SECRET_UNBOUND_TOKEN = "unbound-live-smoke-token-value-1234567890"
 
 function run(extraEnv = {}, args = []) {
   const result = spawnSync(process.execPath, [script, ...args], {
@@ -226,8 +227,82 @@ test("APP API L3 permission smoke remains plan-only without the manager-selected
         && item.negativePermissionProbe === true,
     ),
   )
+  assert.ok(
+    result.report.l3PermissionSmoke.requiredInputs.some(
+      (item) => item.name === "APP_UNBOUND_TOKEN"
+        && item.required === false,
+    ),
+  )
+  assert.ok(
+    result.report.l3PermissionSmoke.probes.some(
+      (item) => item.id === "employee_xhs_drafts_positive"
+        && item.path === "/api/app/xhs/drafts"
+        && item.method === "GET",
+    ),
+  )
+  assert.ok(
+    result.report.l3PermissionSmoke.probes.some(
+      (item) => item.id === "manager_xhs_drafts_positive"
+        && item.path === "/api/app/xhs/drafts"
+        && item.method === "GET",
+    ),
+  )
+  assert.ok(
+    result.report.l3PermissionSmoke.probes.some(
+      (item) => item.id === "unbound_xhs_drafts_negative"
+        && item.path === "/api/app/xhs/drafts"
+        && item.expectedStatuses.includes(403),
+    ),
+  )
   assert.doesNotMatch(result.stdout + result.stderr, new RegExp(SECRET_EMPLOYEE_TOKEN))
   assert.doesNotMatch(result.stdout + result.stderr, new RegExp(SECRET_MANAGER_TOKEN))
+})
+
+test("APP API content-xhs L3 smoke is independent from service-record session inputs", () => {
+  const result = run(validEnv({
+    APP_CONTENT_XHS_L3_SMOKE: "true",
+    APP_UNBOUND_TOKEN: SECRET_UNBOUND_TOKEN,
+  }))
+
+  assert.equal(result.status, 1)
+  assert.equal(result.report.ok, false)
+  assert.equal(result.report.mode, "plan_only")
+  assert.equal(result.report.networkRequestsAttempted, false)
+  assert.equal(result.report.contentXhsL3PermissionSwitchEnabled, true)
+  assert.equal(result.report.contentXhsL3PermissionExecutionReady, false)
+  assert.equal(result.report.contentXhsL3PermissionSmoke.ready, false)
+  assert.ok(
+    result.report.contentXhsL3PermissionSmoke.executionBlockers.includes(
+      "APP_ONLINE_BOUNDARY_REPORT:missing",
+    ),
+  )
+  assert.equal(
+    result.report.contentXhsL3PermissionSmoke.executionBlockers.some(
+      (item) => item.includes("APP_MANAGER_SERVICE_RECORD_SESSION_ID_READONLY"),
+    ),
+    false,
+  )
+  assert.equal(
+    result.report.contentXhsL3PermissionSmoke.executionBlockers.some(
+      (item) => item.includes("APP_CROSS_STORE_SESSION_ID_READONLY"),
+    ),
+    false,
+  )
+  assert.deepEqual(
+    result.report.contentXhsL3PermissionSmoke.probes.map((item) => item.id),
+    [
+      "employee_xhs_drafts_positive",
+      "manager_xhs_drafts_positive",
+      "unbound_xhs_drafts_negative",
+    ],
+  )
+  assert.equal(
+    result.report.contentXhsL3PermissionSmoke.probes.every(
+      (item) => item.method === "GET" && item.path === "/api/app/xhs/drafts",
+    ),
+    true,
+  )
+  assert.doesNotMatch(result.stdout + result.stderr, new RegExp(SECRET_UNBOUND_TOKEN))
 })
 
 test("APP API live smoke execution requires a clean online boundary report", () => {
@@ -375,6 +450,15 @@ test("APP API L3 permission smoke executes manager positive and employee/cross-s
         body: { ok: false, code: "service_record_not_found" },
       }
     }
+    if (
+      request.url === "/api/app/xhs/drafts"
+      && auth === `Bearer ${SECRET_UNBOUND_TOKEN}`
+    ) {
+      return {
+        status: 403,
+        body: { ok: false, code: "tenant_scope_denied" },
+      }
+    }
     return {
       status: 200,
       body: { ok: true, route: request.url },
@@ -389,6 +473,7 @@ test("APP API L3 permission smoke executes manager positive and employee/cross-s
         APP_MANAGER_SERVICE_RECORD_SESSION_ID_READONLY: "manager-session-001",
         APP_CROSS_STORE_SESSION_ID_READONLY: "cross-store-session-001",
         APP_CROSS_STORE_MANAGER_TOKEN: SECRET_CROSS_MANAGER_TOKEN,
+        APP_UNBOUND_TOKEN: SECRET_UNBOUND_TOKEN,
       }),
       ["--allow-local", "--execute-l3-permission", "--timeout-ms", "3000", "--online-boundary-report", reportPath],
     )
@@ -401,7 +486,7 @@ test("APP API L3 permission smoke executes manager positive and employee/cross-s
     assert.equal(result.report.l3PermissionSmoke.executed, true)
     assert.equal(result.report.l3PermissionSmoke.l3PermissionPass, true)
     assert.equal(result.report.l3PermissionSmoke.result.status, "L3_PERMISSION_SMOKE_EXECUTED")
-    assert.equal(result.report.l3PermissionSmoke.result.checkedProbes, 5)
+    assert.equal(result.report.l3PermissionSmoke.result.checkedProbes, 8)
     assert.equal(result.report.l3PermissionSmoke.result.bodyHasSessionForNegativeProbes, false)
     assert.ok(result.report.l3PermissionSmoke.result.probes.every((item) => item.method === "GET"))
     assert.ok(result.report.l3PermissionSmoke.result.probes.every((item) => item.ok === true))
@@ -426,13 +511,99 @@ test("APP API L3 permission smoke executes manager positive and employee/cross-s
           && item.bodyHasSession === false,
       ),
     )
-    assert.equal(stub.requests.length, 5)
+    assert.ok(
+      result.report.l3PermissionSmoke.result.probes.some(
+        (item) => item.id === "employee_xhs_drafts_positive"
+          && item.status === 200
+          && item.bodyHasSession === false,
+      ),
+    )
+    assert.ok(
+      result.report.l3PermissionSmoke.result.probes.some(
+        (item) => item.id === "manager_xhs_drafts_positive"
+          && item.status === 200
+          && item.bodyHasSession === false,
+      ),
+    )
+    assert.ok(
+      result.report.l3PermissionSmoke.result.probes.some(
+        (item) => item.id === "unbound_xhs_drafts_negative"
+          && item.status === 403
+          && item.bodyHasSession === false,
+      ),
+    )
+    assert.equal(stub.requests.length, 8)
     assert.ok(stub.requests.every((item) => item.method === "GET"))
     assert.ok(stub.requests.some((item) => item.authorization === `Bearer ${SECRET_CROSS_MANAGER_TOKEN}`))
+    assert.ok(stub.requests.some((item) => item.authorization === `Bearer ${SECRET_UNBOUND_TOKEN}`))
     assert.equal(stub.requests.some((item) => /generate|pay|publish|submit/.test(item.url)), false)
     assert.doesNotMatch(result.stdout + result.stderr, new RegExp(SECRET_EMPLOYEE_TOKEN))
     assert.doesNotMatch(result.stdout + result.stderr, new RegExp(SECRET_MANAGER_TOKEN))
     assert.doesNotMatch(result.stdout + result.stderr, new RegExp(SECRET_CROSS_MANAGER_TOKEN))
+    assert.doesNotMatch(result.stdout + result.stderr, new RegExp(SECRET_UNBOUND_TOKEN))
+  } finally {
+    await closeServer(stub.server)
+  }
+})
+
+test("APP API content-xhs L3 smoke executes only XHS GET probes", async () => {
+  const stub = await createStubServer((request) => {
+    const auth = request.headers.authorization
+    if (
+      request.url === "/api/app/xhs/drafts"
+      && auth === `Bearer ${SECRET_UNBOUND_TOKEN}`
+    ) {
+      return {
+        status: 403,
+        body: { ok: false, code: "tenant_scope_denied" },
+      }
+    }
+    return {
+      status: 200,
+      body: { ok: true, drafts: [] },
+    }
+  })
+  const reportPath = writeBoundaryReport(cleanBoundaryReport())
+  try {
+    const result = await runAsync(
+      validEnv({
+        APP_BASE_URL: stub.baseUrl,
+        APP_CONTENT_XHS_L3_SMOKE: "true",
+        APP_UNBOUND_TOKEN: SECRET_UNBOUND_TOKEN,
+      }),
+      ["--allow-local", "--execute-content-xhs-l3", "--timeout-ms", "3000", "--online-boundary-report", reportPath],
+    )
+
+    assert.equal(result.status, 0)
+    assert.equal(result.report.ok, true)
+    assert.equal(result.report.mode, "content_xhs_l3_permission_executed")
+    assert.equal(result.report.networkRequestsAttempted, true)
+    assert.equal(result.report.l3PermissionSmoke.result, null)
+    assert.equal(result.report.contentXhsL3PermissionSmoke.executed, true)
+    assert.equal(result.report.contentXhsL3PermissionSmoke.l3PermissionPass, true)
+    assert.equal(
+      result.report.contentXhsL3PermissionSmoke.result.status,
+      "CONTENT_XHS_L3_PERMISSION_SMOKE_EXECUTED",
+    )
+    assert.equal(result.report.contentXhsL3PermissionSmoke.result.checkedProbes, 3)
+    assert.deepEqual(
+      result.report.contentXhsL3PermissionSmoke.result.probes.map((item) => item.id),
+      [
+        "employee_xhs_drafts_positive",
+        "manager_xhs_drafts_positive",
+        "unbound_xhs_drafts_negative",
+      ],
+    )
+    assert.equal(stub.requests.length, 3)
+    assert.ok(stub.requests.every((item) => item.method === "GET"))
+    assert.ok(stub.requests.every((item) => item.url === "/api/app/xhs/drafts"))
+    assert.ok(stub.requests.some((item) => item.authorization === `Bearer ${SECRET_EMPLOYEE_TOKEN}`))
+    assert.ok(stub.requests.some((item) => item.authorization === `Bearer ${SECRET_MANAGER_TOKEN}`))
+    assert.ok(stub.requests.some((item) => item.authorization === `Bearer ${SECRET_UNBOUND_TOKEN}`))
+    assert.equal(stub.requests.some((item) => /service-records|generate|pay|publish|submit/.test(item.url)), false)
+    assert.doesNotMatch(result.stdout + result.stderr, new RegExp(SECRET_EMPLOYEE_TOKEN))
+    assert.doesNotMatch(result.stdout + result.stderr, new RegExp(SECRET_MANAGER_TOKEN))
+    assert.doesNotMatch(result.stdout + result.stderr, new RegExp(SECRET_UNBOUND_TOKEN))
   } finally {
     await closeServer(stub.server)
   }

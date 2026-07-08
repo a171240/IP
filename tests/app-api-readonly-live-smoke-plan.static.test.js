@@ -67,6 +67,7 @@ test("APP API read-only live-smoke plan sequences env, boundary, preflight, and 
       "online_readonly_boundary",
       "execution_preflight",
       "read_only_smoke_execute",
+      "content_xhs_l3_permission_smoke_execute",
       "l3_permission_smoke_execute",
     ],
   )
@@ -78,11 +79,13 @@ test("APP API read-only live-smoke plan sequences env, boundary, preflight, and 
   assert.match(steps[3].command, /aliyun:app-api:readonly-smoke/)
   assert.equal(steps[3].requiresExplicitAuthorization, true)
   assert.equal(steps[3].networkRequestsAttemptedByThisPlan, false)
-  assert.match(steps[4].command, /aliyun:app-api:l3-permission-smoke/)
-  assert.equal(steps[4].authorizationId, "L3_PERMISSION_READONLY_EXECUTION_AUTHORIZATION")
+  assert.match(steps[4].command, /aliyun:app-api:content-xhs-l3-smoke/)
+  assert.equal(steps[4].authorizationId, "CONTENT_XHS_L3_PERMISSION_READONLY_EXECUTION_AUTHORIZATION")
   assert.equal(steps[4].requiresExplicitAuthorization, true)
   assert.deepEqual(steps[4].methodsAllowed, ["GET"])
   assert.equal(steps[4].networkRequestsAttemptedByThisPlan, false)
+  assert.match(steps[5].command, /aliyun:app-api:l3-permission-smoke/)
+  assert.equal(steps[5].authorizationId, "L3_PERMISSION_READONLY_EXECUTION_AUTHORIZATION")
 })
 
 test("APP API read-only live-smoke plan is GET-only and excludes mutating work", () => {
@@ -92,6 +95,7 @@ test("APP API read-only live-smoke plan is GET-only and excludes mutating work",
   const l3Methods = new Set(result.report.l3PermissionSmoke.probes.map((item) => item.method))
   const smokePaths = new Set(result.report.readOnlySmoke.probes.map((item) => item.path))
   const l3Ids = new Set(result.report.l3PermissionSmoke.probes.map((item) => item.id))
+  const contentXhsIds = new Set(result.report.contentXhsL3PermissionSmoke.probes.map((item) => item.id))
   const skippedPaths = result.report.skippedMutatingEndpoints.map((item) => item.path)
 
   assert.deepEqual([...onlineMethods], ["GET"])
@@ -107,7 +111,25 @@ test("APP API read-only live-smoke plan is GET-only and excludes mutating work",
   assert.ok(skippedPaths.some((item) => item.includes("generate")))
   assert.ok(skippedPaths.some((item) => item.includes("pay")))
   assert.ok(result.report.forbiddenActions.includes("no production deploy, promote, alias, database write, or git push"))
+  assert.ok(result.report.forbiddenActions.includes("no content-xhs L3 permission execution without CONTENT_XHS_L3_PERMISSION_READONLY_EXECUTION_AUTHORIZATION"))
   assert.ok(result.report.forbiddenActions.includes("no L3 permission execution without L3_PERMISSION_READONLY_EXECUTION_AUTHORIZATION"))
+  assert.equal(result.report.contentXhsL3PermissionSmoke.authorizationId, "CONTENT_XHS_L3_PERMISSION_READONLY_EXECUTION_AUTHORIZATION")
+  assert.equal(result.report.contentXhsL3PermissionSmoke.status, "PLAN_READY_NOT_EXECUTED")
+  assert.equal(result.report.contentXhsL3PermissionSmoke.outputEvidencePath, "docs/app-production-cn-content-xhs-l3-permission-smoke-current.json")
+  assert.deepEqual(
+    [...contentXhsIds],
+    [
+      "employee_xhs_drafts_positive",
+      "manager_xhs_drafts_positive",
+      "unbound_xhs_drafts_negative",
+    ],
+  )
+  assert.equal(
+    result.report.contentXhsL3PermissionSmoke.probes.every(
+      (item) => item.path === "/api/app/xhs/drafts" && item.method === "GET",
+    ),
+    true,
+  )
   assert.equal(result.report.l3PermissionSmoke.authorizationId, "L3_PERMISSION_READONLY_EXECUTION_AUTHORIZATION")
   assert.equal(result.report.l3PermissionSmoke.tokenBacked, true)
   assert.equal(result.report.l3PermissionSmoke.status, "PLAN_READY_NOT_EXECUTED")
@@ -138,7 +160,22 @@ test("APP API read-only live-smoke plan is GET-only and excludes mutating work",
   )
   assert.deepEqual(
     result.report.redaction.tokenEnvNames,
-    ["APP_EMPLOYEE_TOKEN", "APP_MANAGER_TOKEN", "APP_CROSS_STORE_MANAGER_TOKEN"],
+    [
+      "APP_EMPLOYEE_TOKEN",
+      "APP_MANAGER_TOKEN",
+      "APP_CROSS_STORE_MANAGER_TOKEN",
+      "APP_UNBOUND_TOKEN",
+    ],
+  )
+  assert.ok(l3Ids.has("employee_xhs_drafts_positive"))
+  assert.ok(l3Ids.has("manager_xhs_drafts_positive"))
+  assert.ok(l3Ids.has("unbound_xhs_drafts_negative"))
+  assert.ok(
+    result.report.requiredL3PermissionInputs.some(
+      (item) => item.name === "APP_UNBOUND_TOKEN"
+        && item.required === false
+        && item.value === "redacted_not_read",
+    ),
   )
 })
 
