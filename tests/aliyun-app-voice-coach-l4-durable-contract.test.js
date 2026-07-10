@@ -11,12 +11,56 @@ const ts = require("typescript")
 const root = process.cwd()
 const helperPath = path.join(root, "lib", "aliyun-rds", "repositories", "app-voice-coach-facade.server.ts")
 
+const voiceCoachFeatureDecision = { enabled: true, reason: "ok", source: "ai_points" }
+const authorizationChecks = []
 const testAccountContext = {
+  accountStatus: "bound",
   userId: "app-user-employee-durable",
+  userEmail: null,
+  membershipId: "membership-employee-durable",
   companyId: "company-chunshe",
+  companyName: "春舍公司",
   storeId: "store-chunshe",
+  storeName: "春舍门店",
   role: "employee",
+  roleLabel: "员工",
+  scopeLabel: "春舍门店",
+  memberships: [],
+  isManager: false,
+  isCompanyManager: false,
+  isStoreManager: false,
   isPlatformAdmin: false,
+  features: { voice_coach: voiceCoachFeatureDecision },
+}
+
+function requireAuthorizedVoiceCoachAccess(ctx, features, feature, requestedScope) {
+  assert.equal(ctx, testAccountContext)
+  assert.equal(features, testAccountContext.features)
+  assert.equal(feature, "voice_coach")
+  assert.deepEqual(features.voice_coach, voiceCoachFeatureDecision)
+  if (requestedScope) {
+    assert.deepEqual(requestedScope, {
+      companyId: testAccountContext.companyId,
+      storeId: testAccountContext.storeId,
+    })
+  }
+  authorizationChecks.push(requestedScope || null)
+  return { ok: true, account: ctx }
+}
+
+function resetAuthorizationChecks() {
+  authorizationChecks.length = 0
+}
+
+function assertAuthorizationChecks(requestCount) {
+  assert.equal(authorizationChecks.length, requestCount * 2)
+  for (let index = 0; index < authorizationChecks.length; index += 2) {
+    assert.equal(authorizationChecks[index], null)
+    assert.deepEqual(authorizationChecks[index + 1], {
+      companyId: testAccountContext.companyId,
+      storeId: testAccountContext.storeId,
+    })
+  }
 }
 
 function jsonResponse(body, init = {}) {
@@ -43,6 +87,9 @@ const helperStubs = {
     appAuthConfigurationErrorResponse: () => null,
     appAuthRequiredResponse: () => jsonResponse({ ok: false, code: "unauthorized" }, { status: 401 }),
     resolveAliyunRdsAppAuthUser: async () => ({ user: { id: testAccountContext.userId } }),
+  },
+  "@/lib/aliyun-rds/app-authorization.server": {
+    requireAppFeatureAccess: requireAuthorizedVoiceCoachAccess,
   },
   "@/lib/aliyun-rds/postgres.server": {
     AliyunRdsConfigurationError: class AliyunRdsConfigurationError extends Error {},
@@ -141,6 +188,7 @@ function durableRoute(...parts) {
 }
 
 test("VC-L4-03 local durable voiceCoach contract survives helper reloads", async (t) => {
+  resetAuthorizationChecks()
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "app-vc-durable-"))
   process.env.APP_VOICE_COACH_LOCAL_DURABLE_STORE_PATH = path.join(tempDir, "sessions.json")
   t.after(() => {
@@ -228,4 +276,5 @@ test("VC-L4-03 local durable voiceCoach contract survives helper reloads", async
     [created.session_id],
   )
   assert.equal(list.sessions[0].can_view_report, true)
+  assertAuthorizationChecks(7)
 })

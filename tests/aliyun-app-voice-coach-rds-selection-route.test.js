@@ -11,12 +11,56 @@ const ts = require("typescript")
 const root = process.cwd()
 const helperPath = path.join(root, "lib", "aliyun-rds", "repositories", "app-voice-coach-facade.server.ts")
 
+const voiceCoachFeatureDecision = { enabled: true, reason: "ok", source: "ai_points" }
+const authorizationChecks = []
 const testAccountContext = {
+  accountStatus: "bound",
   userId: "app-user-route-rds-1",
+  userEmail: null,
+  membershipId: "membership-route-rds-1",
   companyId: "company-chunshe",
+  companyName: "春舍公司",
   storeId: "store-chunshe",
+  storeName: "春舍门店",
   role: "employee",
+  roleLabel: "员工",
+  scopeLabel: "春舍门店",
+  memberships: [],
+  isManager: false,
+  isCompanyManager: false,
+  isStoreManager: false,
   isPlatformAdmin: false,
+  features: { voice_coach: voiceCoachFeatureDecision },
+}
+
+function requireAuthorizedVoiceCoachAccess(ctx, features, feature, requestedScope) {
+  assert.equal(ctx, testAccountContext)
+  assert.equal(features, testAccountContext.features)
+  assert.equal(feature, "voice_coach")
+  assert.deepEqual(features.voice_coach, voiceCoachFeatureDecision)
+  if (requestedScope) {
+    assert.deepEqual(requestedScope, {
+      companyId: testAccountContext.companyId,
+      storeId: testAccountContext.storeId,
+    })
+  }
+  authorizationChecks.push(requestedScope || null)
+  return { ok: true, account: ctx }
+}
+
+function resetAuthorizationChecks() {
+  authorizationChecks.length = 0
+}
+
+function assertAuthorizationChecks(requestCount) {
+  assert.equal(authorizationChecks.length, requestCount * 2)
+  for (let index = 0; index < authorizationChecks.length; index += 2) {
+    assert.equal(authorizationChecks[index], null)
+    assert.deepEqual(authorizationChecks[index + 1], {
+      companyId: testAccountContext.companyId,
+      storeId: testAccountContext.storeId,
+    })
+  }
 }
 
 function jsonResponse(body, init = {}) {
@@ -253,6 +297,9 @@ function helperStubs(rdsMock) {
       appAuthRequiredResponse: () => jsonResponse({ ok: false, code: "unauthorized" }, { status: 401 }),
       resolveAliyunRdsAppAuthUser: async () => ({ user: { id: testAccountContext.userId } }),
     },
+    "@/lib/aliyun-rds/app-authorization.server": {
+      requireAppFeatureAccess: requireAuthorizedVoiceCoachAccess,
+    },
     "@/lib/aliyun-rds/postgres.server": {
       AliyunRdsConfigurationError: class AliyunRdsConfigurationError extends Error {},
       isAliyunRdsRuntimeUnavailableError: () => false,
@@ -340,6 +387,7 @@ function compileHelperWithRdsMock(t) {
 }
 
 test("VC-L4-05 route handlers use explicit RDS repository selection when configured", async (t) => {
+  resetAuthorizationChecks()
   const { helperExports, rdsMock } = compileHelperWithRdsMock(t)
   const sessionsRoute = routeModule(helperExports, "app", "api", "app", "voice-coach", "sessions", "route.ts")
   const detailRoute = routeModule(helperExports, "app", "api", "app", "voice-coach", "sessions", "[sessionId]", "route.ts")
@@ -428,9 +476,11 @@ test("VC-L4-05 route handlers use explicit RDS repository selection when configu
   assert.equal(list.repository_mode, "rds_voice_coach_text_session_contract")
   assert.equal(list.sessions[0].id, created.session_id)
   assert(rdsMock.calls.includes("listAliyunRdsVoiceCoachTextSessionHistory"))
+  assertAuthorizationChecks(7)
 })
 
 test("VC-L4-05 route repository selection fails fast on unknown mode", async (t) => {
+  resetAuthorizationChecks()
   const rdsMock = createRdsMock()
   const previousMode = process.env.APP_VOICE_COACH_TEXT_REPOSITORY_MODE
   process.env.APP_VOICE_COACH_TEXT_REPOSITORY_MODE = "mystery"
@@ -449,9 +499,11 @@ test("VC-L4-05 route repository selection fails fast on unknown mode", async (t)
   assert.equal(created.code, "app_voice_coach_session_create_failed")
   assert.match(created.error, /app_voice_coach_repository_mode_unsupported:mystery/)
   assert.deepEqual(rdsMock.calls, [])
+  assertAuthorizationChecks(1)
 })
 
 test("VC-L4-10B route create emits sanitized timing evidence for RDS mode", async (t) => {
+  resetAuthorizationChecks()
   const { helperExports } = compileHelperWithRdsMock(t)
   const sessionsRoute = routeModule(helperExports, "app", "api", "app", "voice-coach", "sessions", "route.ts")
   const originalConsoleInfo = console.info
@@ -496,4 +548,5 @@ test("VC-L4-10B route create emits sanitized timing evidence for RDS mode", asyn
   assert.doesNotMatch(serialized, /我担心皮肤敏感|我会先确认敏感风险/)
   assert.doesNotMatch(serialized, /11111111-1111-4111-8111-111111111111/)
   assert.doesNotMatch(serialized, /22222222-2222-4222-8222-222222222222/)
+  assertAuthorizationChecks(1)
 })

@@ -14,6 +14,7 @@ import {
   type AppAccountContext,
   type AppAuthUser,
 } from "@/lib/aliyun-rds/repositories/account-profile.server"
+import { requireAppFeatureAccess, type AppRequestedTenantScope } from "@/lib/aliyun-rds/app-authorization.server"
 
 export const SERVICE_RECORD_RESUME_WINDOW_MS = 5 * 60 * 1000
 export const SERVICE_RECORD_MAX_SEGMENT_BYTES = 12 * 1024 * 1024
@@ -222,6 +223,28 @@ export function accountPayload(ctx: AppAccountContext) {
   return accountContextPayload(ctx)
 }
 
+function requestedServiceRecordScope(ctx: AppAccountContext, request: NextRequest): AppRequestedTenantScope {
+  const params = new URL(request.url).searchParams
+  const hasRequestedCompanyId = params.has("company_id")
+  const hasRequestedStoreId = params.has("store_id")
+  const requestedCompanyId = cleanText(params.get("company_id"), 80)
+  const requestedStoreId = cleanText(params.get("store_id"), 80)
+  if (hasRequestedCompanyId || hasRequestedStoreId) {
+    return {
+      ...(hasRequestedCompanyId ? { companyId: requestedCompanyId || null } : {}),
+      ...(hasRequestedStoreId ? { storeId: requestedStoreId || null } : {}),
+    }
+  }
+  return {
+    ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
+    ...(ctx.storeId ? { storeId: ctx.storeId } : {}),
+  }
+}
+
+function serviceRecordAuthorizationError(access: { status: number; body: unknown }) {
+  return NextResponse.json(access.body, { status: access.status })
+}
+
 export async function resolveAliyunRdsServiceRecordAuth(request: NextRequest): Promise<
   | { ok: true; value: AliyunRdsServiceRecordAuth }
   | { ok: false; error: Response }
@@ -237,6 +260,15 @@ export async function resolveAliyunRdsServiceRecordAuth(request: NextRequest): P
   try {
     const authUser = auth.user
     const ctx = await getAliyunRdsAppAccountContext(authUser)
+    const access = requireAppFeatureAccess(
+      ctx,
+      ctx.features,
+      "service_record",
+      requestedServiceRecordScope(ctx, request),
+    )
+    if (!access.ok) {
+      return { ok: false, error: serviceRecordAuthorizationError(access) }
+    }
     return { ok: true, value: { ctx, user: authUser } }
   } catch (error) {
     return { ok: false, error: rdsServiceRecordErrorResponse(error, "account_context_failed") }
@@ -245,11 +277,17 @@ export async function resolveAliyunRdsServiceRecordAuth(request: NextRequest): P
 
 export function canReadServiceRecordSession(ctx: AppAccountContext, session: ServiceRecordSessionRow | null) {
   if (!session) return false
-  if (String(session.user_id || "") === ctx.userId) return true
-  if (ctx.isPlatformAdmin) return true
-  if (ctx.isStoreManager && ctx.storeId && String(session.store_id || "") === ctx.storeId) return true
-  if (ctx.isCompanyManager && ctx.companyId && String(session.company_id || "") === ctx.companyId) return true
-  return false
+  const isSessionOwner = String(session.user_id || "") === ctx.userId
+  if (!ctx.isManager && !isSessionOwner) return false
+
+  const companyScope = session.company_id ? { companyId: String(session.company_id) } : {}
+  const resourceScope: AppRequestedTenantScope = ctx.isCompanyManager && !ctx.isPlatformAdmin
+    ? companyScope
+    : {
+        ...companyScope,
+        ...(session.store_id ? { storeId: String(session.store_id) } : {}),
+      }
+  return requireAppFeatureAccess(ctx, ctx.features, "service_record", resourceScope).ok
 }
 
 export function toPublicSession(row: ServiceRecordSessionRow | null) {

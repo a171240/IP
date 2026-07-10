@@ -437,8 +437,8 @@ test("APP API L3 permission smoke executes manager positive and employee/cross-s
       && auth === `Bearer ${SECRET_EMPLOYEE_TOKEN}`
     ) {
       return {
-        status: 403,
-        body: { ok: false, code: "tenant_scope_denied" },
+        status: 404,
+        body: { ok: false, code: "not_found" },
       }
     }
     if (
@@ -447,7 +447,7 @@ test("APP API L3 permission smoke executes manager positive and employee/cross-s
     ) {
       return {
         status: 404,
-        body: { ok: false, code: "service_record_not_found" },
+        body: { ok: false, code: "not_found" },
       }
     }
     if (
@@ -506,8 +506,17 @@ test("APP API L3 permission smoke executes manager positive and employee/cross-s
     )
     assert.ok(
       result.report.l3PermissionSmoke.result.probes.some(
+        (item) => item.id === "employee_manager_record_detail_negative"
+          && item.status === 404
+          && item.code === "not_found"
+          && item.bodyHasSession === false,
+      ),
+    )
+    assert.ok(
+      result.report.l3PermissionSmoke.result.probes.some(
         (item) => item.id === "cross_store_record_isolation_negative"
           && item.status === 404
+          && item.code === "not_found"
           && item.bodyHasSession === false,
       ),
     )

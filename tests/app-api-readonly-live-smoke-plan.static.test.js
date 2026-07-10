@@ -95,6 +95,7 @@ test("APP API read-only live-smoke plan is GET-only and excludes mutating work",
   const l3Methods = new Set(result.report.l3PermissionSmoke.probes.map((item) => item.method))
   const smokePaths = new Set(result.report.readOnlySmoke.probes.map((item) => item.path))
   const l3Ids = new Set(result.report.l3PermissionSmoke.probes.map((item) => item.id))
+  const l3ById = new Map(result.report.l3PermissionSmoke.probes.map((item) => [item.id, item]))
   const contentXhsIds = new Set(result.report.contentXhsL3PermissionSmoke.probes.map((item) => item.id))
   const skippedPaths = result.report.skippedMutatingEndpoints.map((item) => item.path)
 
@@ -138,6 +139,9 @@ test("APP API read-only live-smoke plan is GET-only and excludes mutating work",
   assert.ok(l3Ids.has("employee_store_admin_records_negative"))
   assert.ok(l3Ids.has("employee_manager_record_detail_negative"))
   assert.ok(l3Ids.has("cross_store_record_isolation_negative"))
+  assert.deepEqual(l3ById.get("employee_store_admin_records_negative").expectedStatuses, [403])
+  assert.deepEqual(l3ById.get("employee_manager_record_detail_negative").expectedStatuses, [404])
+  assert.deepEqual(l3ById.get("cross_store_record_isolation_negative").expectedStatuses, [404])
   assert.ok(
     result.report.l3PermissionSmoke.probes.some(
       (item) => item.id === "manager_service_records_list_positive"

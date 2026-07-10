@@ -20,6 +20,7 @@ import {
   getAliyunRdsAppAccountContext,
   type AppAccountContext,
 } from "@/lib/aliyun-rds/repositories/account-profile.server"
+import { requireAppFeatureAccess } from "@/lib/aliyun-rds/app-authorization.server"
 import { getScenario } from "@/lib/voice-coach/scenarios"
 
 export type AppVoiceCoachFacadeScope = {
@@ -161,8 +162,19 @@ export async function resolveAppVoiceCoachFacadeContext(request: NextRequest) {
   if (!auth) return { error: appAuthRequiredResponse() }
 
   const ctx = await getAliyunRdsAppAccountContext(auth.user)
+  const access = requireAppFeatureAccess(ctx, ctx.features, "voice_coach")
+  if (!access.ok) {
+    return { error: NextResponse.json(access.body, { status: access.status }) }
+  }
   const scope = resolveAppVoiceCoachScope(ctx, request)
   if ("error" in scope) return { error: scope.error }
+  const scopeAccess = requireAppFeatureAccess(ctx, ctx.features, "voice_coach", {
+    companyId: scope.companyId,
+    storeId: scope.storeId,
+  })
+  if (!scopeAccess.ok) {
+    return { error: NextResponse.json(scopeAccess.body, { status: scopeAccess.status }) }
+  }
 
   return { auth, ctx, scope }
 }

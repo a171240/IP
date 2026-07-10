@@ -28,7 +28,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   try {
     const session = await getAliyunRdsReadableServiceRecordSession(ctx, id)
-    if (!session) return jsonError(404, "service_record_not_found", "service_record_not_found")
+    if (!session) return NextResponse.json({ ok: false, code: "not_found" }, { status: 404 })
 
     const [segments, markers] = await Promise.all([
       listAliyunRdsServiceRecordSegments(session.id),

@@ -19,6 +19,11 @@ import {
   type AppAccountContext,
   type AppAuthUser,
 } from "@/lib/aliyun-rds/repositories/account-profile.server"
+import {
+  appAuthorizationErrorResponse,
+  requireAppFeatureAccess,
+  type AppRequestedTenantScope,
+} from "@/lib/aliyun-rds/app-authorization.server"
 import { getVoiceCoachSessionClientContext } from "@/lib/voice-coach/session-context"
 import { getScenario } from "@/lib/voice-coach/scenarios"
 
@@ -125,6 +130,24 @@ export function rdsStoreAdminErrorResponse(error: unknown, fallbackCode: string)
   return jsonError(500, error instanceof Error ? error.message : fallbackCode, fallbackCode)
 }
 
+function requestedStoreAdminScope(ctx: AppAccountContext, request: NextRequest): AppRequestedTenantScope {
+  const params = new URL(request.url).searchParams
+  const hasRequestedCompanyId = params.has("company_id")
+  const hasRequestedStoreId = params.has("store_id")
+  const requestedCompanyId = cleanText(params.get("company_id"), 80)
+  const requestedStoreId = cleanText(params.get("store_id"), 80)
+  if (hasRequestedCompanyId || hasRequestedStoreId) {
+    return {
+      ...(hasRequestedCompanyId ? { companyId: requestedCompanyId || null } : {}),
+      ...(hasRequestedStoreId ? { storeId: requestedStoreId || null } : {}),
+    }
+  }
+  return {
+    ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
+    ...(ctx.storeId ? { storeId: ctx.storeId } : {}),
+  }
+}
+
 export async function resolveAliyunRdsStoreManagerAuth(request: NextRequest): Promise<
   | { ok: true; user: AppAuthUser; ctx: AppAccountContext }
   | { ok: false; error: Response }
@@ -134,8 +157,18 @@ export async function resolveAliyunRdsStoreManagerAuth(request: NextRequest): Pr
 
   const authUser: AppAuthUser = auth.user
   const ctx = await getAliyunRdsAppAccountContext(authUser)
+  const access = requireAppFeatureAccess(
+    ctx,
+    ctx.features,
+    "store_admin",
+    requestedStoreAdminScope(ctx, request),
+  )
+  if (!access.ok) {
+    return { ok: false, error: NextResponse.json(access.body, { status: access.status }) }
+  }
   if (!ctx.isManager || (!ctx.companyId && !ctx.isPlatformAdmin)) {
-    return { ok: false, error: jsonError(403, "当前账号没有门店管理权限", "store_admin_required") }
+    const denial = appAuthorizationErrorResponse("role_denied", "store_admin")
+    return { ok: false, error: NextResponse.json(denial.body, { status: denial.status }) }
   }
 
   return { ok: true, user: authUser, ctx }
