@@ -3,7 +3,7 @@ import "server-only"
 import { queryAliyunRds } from "@/lib/aliyun-rds/postgres.server"
 import { normalizePlan, type PlanId } from "@/lib/pricing/rules"
 
-const MP_ACCOUNT_ROLES = [
+const TENANT_MEMBERSHIP_ROLES = [
   "company_owner",
   "company_admin",
   "merchant_owner",
@@ -12,10 +12,13 @@ const MP_ACCOUNT_ROLES = [
   "store_admin",
   "staff",
   "employee",
-  "service_operator",
 ] as const
 
-type MpAccountRole = (typeof MP_ACCOUNT_ROLES)[number]
+type TenantMembershipRole = (typeof TENANT_MEMBERSHIP_ROLES)[number]
+type RecognizedMembershipRole = TenantMembershipRole | "customer"
+type AppAccountRole = RecognizedMembershipRole | "platform_admin" | null
+type AppAccountStatus = "bound" | "not_bound" | "role_denied" | "suspended" | "inactive"
+type AppAccountScope = "company" | "store" | "customer"
 
 type ProfileRow = {
   id: string
@@ -44,14 +47,17 @@ type MembershipRow = {
   user_id: string
   company_id: string | null
   company_name: string | null
+  company_status: string | null
   store_id: string | null
   store_name: string | null
+  store_status: string | null
+  store_company_id: string | null
   role: string | null
   status: string | null
   display_name: string | null
-  accepted_at: string | null
-  last_seen_at: string | null
-  created_at: string | null
+  accepted_at: string | Date | null
+  last_seen_at: string | Date | null
+  created_at: string | Date | null
 }
 
 type BillingOwnerRow = {
@@ -83,20 +89,24 @@ export type AppAccountMembership = {
   companyName: string | null
   storeId: string | null
   storeName: string | null
-  role: MpAccountRole
+  role: RecognizedMembershipRole
   roleLabel: string
-  status: string
+  scope: AppAccountScope
+  status: "active"
+  isActive: true
   displayName: string | null
   acceptedAt: string | null
   lastSeenAt: string | null
   createdAt: string | null
+  joinedAt: string | null
 }
 
 export type AppAccountContext = {
+  accountStatus: AppAccountStatus
   userId: string
   userEmail: string | null
   membershipId: string | null
-  role: MpAccountRole
+  role: AppAccountRole
   roleLabel: string
   companyId: string | null
   companyName: string | null
@@ -117,7 +127,7 @@ type AppBillingProfile = {
   trial_granted_at: string | null
   ai_points_balance: number
   ai_points_unlimited: boolean
-  account_role: string
+  account_role: AppAccountRole
   account_role_label: string
   company_id: string | null
   company_name: string | null
@@ -129,7 +139,7 @@ type AppBillingProfile = {
   billing_scope?: string | null
 }
 
-const ROLE_LABELS: Record<MpAccountRole, string> = {
+const ROLE_LABELS: Record<Exclude<AppAccountRole, null>, string> = {
   company_owner: "公司主账号",
   company_admin: "总管理员",
   merchant_owner: "商家主账号",
@@ -138,11 +148,11 @@ const ROLE_LABELS: Record<MpAccountRole, string> = {
   store_admin: "门店管理员",
   staff: "员工",
   employee: "员工",
-  service_operator: "服务顾问",
+  customer: "顾客",
+  platform_admin: "平台管理员",
 }
 
-const ROLE_PRIORITY: Record<MpAccountRole, number> = {
-  service_operator: 100,
+const ROLE_PRIORITY: Record<TenantMembershipRole, number> = {
   company_owner: 90,
   merchant_owner: 88,
   company_admin: 80,
@@ -160,16 +170,15 @@ const MP_SERVICE_PLAN_LABELS: Record<PlanId, string> = {
   vip: "服务交付包",
 }
 
-const COMPANY_MANAGER_ROLES = new Set<MpAccountRole>([
+const COMPANY_MANAGER_ROLES = new Set<TenantMembershipRole>([
   "company_owner",
   "company_admin",
   "merchant_owner",
   "merchant_admin",
-  "service_operator",
 ])
-const STORE_MANAGER_ROLES = new Set<MpAccountRole>(["store_owner", "store_admin"])
-const MANAGER_ROLES = new Set<MpAccountRole>([...COMPANY_MANAGER_ROLES, ...STORE_MANAGER_ROLES])
-const STORE_SCOPED_ROLES = new Set<MpAccountRole>(["store_owner", "store_admin", "staff", "employee"])
+const STORE_MANAGER_ROLES = new Set<TenantMembershipRole>(["store_owner", "store_admin"])
+const MANAGER_ROLES = new Set<TenantMembershipRole>([...COMPANY_MANAGER_ROLES, ...STORE_MANAGER_ROLES])
+const STORE_SCOPED_ROLES = new Set<TenantMembershipRole>(["store_owner", "store_admin", "staff", "employee"])
 const STORE_BILLING_OWNER_ROLES = new Set(["store_owner", "store_admin"])
 const COMPANY_BILLING_OWNER_ROLES = new Set(["company_owner", "company_admin", "merchant_owner", "merchant_admin"])
 const BILLING_OWNER_ROLE_PRIORITY: Record<string, number> = {
@@ -198,50 +207,41 @@ const PROFILE_COLUMNS = [
   "service_plan_label",
 ].join(", ")
 
-function normalizeRole(role: unknown): MpAccountRole {
+function parseTenantMembershipRole(role: unknown): TenantMembershipRole | null {
   const text = String(role || "").trim()
-  return (MP_ACCOUNT_ROLES as readonly string[]).includes(text) ? (text as MpAccountRole) : "staff"
+  return (TENANT_MEMBERSHIP_ROLES as readonly string[]).includes(text) ? (text as TenantMembershipRole) : null
+}
+
+function parseRecognizedMembershipRole(role: unknown): RecognizedMembershipRole | null {
+  const tenantRole = parseTenantMembershipRole(role)
+  if (tenantRole) return tenantRole
+  return String(role || "").trim() === "customer" ? "customer" : null
+}
+
+function accountRoleLabel(role: AppAccountRole) {
+  return role ? ROLE_LABELS[role] : "当前账号"
 }
 
 export function getAliyunRdsAppAccountRoleLabel(role: unknown) {
-  return ROLE_LABELS[normalizeRole(role)] || "当前账号"
+  return accountRoleLabel(parseRecognizedMembershipRole(role))
 }
 
 export function isAliyunRdsStoreScopedRole(role: unknown) {
-  return STORE_SCOPED_ROLES.has(normalizeRole(role))
+  const tenantRole = parseTenantMembershipRole(role)
+  return tenantRole ? STORE_SCOPED_ROLES.has(tenantRole) : false
 }
 
-export function canAliyunRdsInviteRole(ctx: AppAccountContext, role: MpAccountRole) {
+export function canAliyunRdsInviteRole(ctx: AppAccountContext, role: unknown) {
+  const tenantRole = parseTenantMembershipRole(role)
+  if (!tenantRole) return false
   if (ctx.isPlatformAdmin) return true
   if (ctx.isCompanyManager) {
-    return role !== "service_operator" && role !== "company_owner" && role !== "merchant_owner"
+    return tenantRole !== "company_owner" && tenantRole !== "merchant_owner"
   }
   if (ctx.isStoreManager) {
-    return role === "staff" || role === "employee"
+    return tenantRole === "staff" || tenantRole === "employee"
   }
   return false
-}
-
-function firstText(...values: unknown[]) {
-  for (const value of values) {
-    const text = String(value || "").trim()
-    if (text) return text
-  }
-  return ""
-}
-
-function metadataText(meta: unknown, key: string) {
-  if (!meta || typeof meta !== "object") return ""
-  const value = (meta as Record<string, unknown>)[key]
-  return typeof value === "string" ? value.trim() : ""
-}
-
-function metadataUuid(meta: unknown, key: string) {
-  const value = metadataText(meta, key)
-  if (!value) return null
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
-    ? value
-    : null
 }
 
 function parseEnvList(...keys: string[]) {
@@ -261,11 +261,41 @@ function profileDisplayName(row: Partial<ProfileRow | BillingOwnerRow> | null | 
   return row?.nickname?.trim() || row?.store_name?.trim() || row?.company_name?.trim() || row?.email?.trim() || "门店负责人"
 }
 
+function nullableText(value: unknown) {
+  const text = String(value || "").trim()
+  return text || null
+}
+
+function membershipTimestampText(value: string | Date | null) {
+  if (value === null || value === "") return null
+  const timestamp = value instanceof Date ? value.getTime() : Date.parse(value)
+  if (!Number.isFinite(timestamp)) throw new Error(`invalid membership timestamp: ${String(value)}`)
+  return new Date(timestamp).toISOString()
+}
+
+function emptyProfileRow(user: AppAuthUser): ProfileRow {
+  return {
+    id: user.id,
+    email: user.email ?? null,
+    nickname: null,
+    avatar_url: null,
+    plan: "free",
+    credits_balance: 0,
+    credits_unlimited: false,
+    trial_granted_at: null,
+    account_role: null,
+    company_id: null,
+    company_name: null,
+    store_id: null,
+    store_name: null,
+    service_plan_label: null,
+  }
+}
+
 function normalizeProfile(row: ProfileRow): AppBillingProfile {
   const plan = normalizePlan(row.plan)
   const creditsBalance = Number(row.credits_balance || 0)
-  const creditsUnlimited = Boolean(row.credits_unlimited) || plan === "vip"
-  const role = normalizeRole(row.account_role || "merchant_owner")
+  const creditsUnlimited = Boolean(row.credits_unlimited)
   const servicePlanLabel = row.service_plan_label?.trim() || MP_SERVICE_PLAN_LABELS[plan]
 
   return {
@@ -275,33 +305,72 @@ function normalizeProfile(row: ProfileRow): AppBillingProfile {
     trial_granted_at: row.trial_granted_at ?? null,
     ai_points_balance: creditsBalance,
     ai_points_unlimited: creditsUnlimited,
-    account_role: role,
-    account_role_label: ROLE_LABELS[role],
-    company_id: row.company_id || null,
-    company_name: row.company_name || null,
-    store_id: row.store_id || null,
-    store_name: row.store_name || null,
+    account_role: null,
+    account_role_label: "当前账号",
+    company_id: null,
+    company_name: null,
+    store_id: null,
+    store_name: null,
     service_plan_label: servicePlanLabel,
   }
 }
 
-function mapMembership(row: MembershipRow): AppAccountMembership {
-  const role = normalizeRole(row.role)
+function mapMembership(row: MembershipRow, role: RecognizedMembershipRole): AppAccountMembership {
+  const isCustomer = role === "customer"
+  const isStoreScoped = role !== "customer" && STORE_SCOPED_ROLES.has(role)
+  const companyId = isCustomer ? null : row.company_id || null
+  const storeId = isStoreScoped ? row.store_id || null : null
+  const acceptedAt = membershipTimestampText(row.accepted_at)
+  const lastSeenAt = membershipTimestampText(row.last_seen_at)
+  const createdAt = membershipTimestampText(row.created_at)
   return {
     id: String(row.id),
     userId: String(row.user_id),
-    companyId: row.company_id || null,
-    companyName: firstText(row.company_name),
-    storeId: row.store_id || null,
-    storeName: firstText(row.store_name),
+    companyId,
+    companyName: isCustomer ? null : nullableText(row.company_name),
+    storeId,
+    storeName: isStoreScoped ? nullableText(row.store_name) : null,
     role,
     roleLabel: ROLE_LABELS[role],
-    status: firstText(row.status, "active"),
+    scope: isCustomer ? "customer" : storeId ? "store" : "company",
+    status: "active",
+    isActive: true,
     displayName: row.display_name || null,
-    acceptedAt: row.accepted_at || null,
-    lastSeenAt: row.last_seen_at || null,
-    createdAt: row.created_at || null,
+    acceptedAt,
+    lastSeenAt,
+    createdAt,
+    joinedAt: acceptedAt || createdAt,
   }
+}
+
+function isActiveStatus(value: unknown) {
+  return String(value || "").trim().toLowerCase() === "active"
+}
+
+function hasValidTenantParents(row: MembershipRow) {
+  const role = parseTenantMembershipRole(row.role)
+  if (!role) return false
+  if (!row.company_id || !isActiveStatus(row.company_status)) return false
+  if (row.store_id && (!isActiveStatus(row.store_status) || row.store_company_id !== row.company_id)) return false
+  return STORE_SCOPED_ROLES.has(role) ? Boolean(row.store_id) : true
+}
+
+function validTenantMembership(row: MembershipRow) {
+  return Boolean(parseTenantMembershipRole(row.role) && isActiveStatus(row.status) && hasValidTenantParents(row))
+}
+
+function validCustomerMembership(row: MembershipRow) {
+  return parseRecognizedMembershipRole(row.role) === "customer" && isActiveStatus(row.status)
+}
+
+function compareMembershipPriority(left: AppAccountMembership, right: AppAccountMembership) {
+  const leftRole = left.role === "customer" ? null : left.role
+  const rightRole = right.role === "customer" ? null : right.role
+  const priorityDelta = (rightRole ? ROLE_PRIORITY[rightRole] : 0) - (leftRole ? ROLE_PRIORITY[leftRole] : 0)
+  if (priorityDelta) return priorityDelta
+  const createdDelta = (right.createdAt ? Date.parse(right.createdAt) : 0) - (left.createdAt ? Date.parse(left.createdAt) : 0)
+  if (createdDelta) return createdDelta
+  return left.id.localeCompare(right.id)
 }
 
 function choosePrimaryMembership(memberships: AppAccountMembership[], fallback?: ProfileRow | null) {
@@ -311,48 +380,98 @@ function choosePrimaryMembership(memberships: AppAccountMembership[], fallback?:
   const fallbackStoreId = fallback?.store_id || null
   if (fallbackCompanyId || fallbackStoreId) {
     const exact = memberships.find(
-      (item) =>
-        (!fallbackCompanyId || item.companyId === fallbackCompanyId) &&
-        (!fallbackStoreId || item.storeId === fallbackStoreId),
+      (item) => item.companyId === fallbackCompanyId && item.storeId === fallbackStoreId,
     )
     if (exact) return exact
   }
 
-  return memberships
-    .slice()
-    .sort((left, right) => (ROLE_PRIORITY[right.role] || 0) - (ROLE_PRIORITY[left.role] || 0))[0]
+  return memberships.slice().sort(compareMembershipPriority)[0]
 }
 
-function buildFallbackContext(args: {
-  userId: string
-  userEmail?: string | null
-  profile?: ProfileRow | null
-  isPlatformAdmin?: boolean
+function unavailableAccountStatus(rows: MembershipRow[], profile: ProfileRow | null): AppAccountStatus {
+  if (rows.some((row) => String(row.status || "").trim().toLowerCase() === "suspended")) return "suspended"
+  if (
+    rows.some(
+      (row) =>
+        !isActiveStatus(row.status) ||
+        Boolean(parseTenantMembershipRole(row.role) && !hasValidTenantParents(row)),
+    )
+  ) {
+    return "inactive"
+  }
+  if (rows.some((row) => isActiveStatus(row.status))) return "role_denied"
+  if (String(profile?.account_role || "").trim() === "service_operator") return "role_denied"
+  return "not_bound"
+}
+
+function buildUnavailableContext(args: {
+  user: AppAuthUser
+  accountStatus: AppAccountStatus
+  customerMemberships?: AppAccountMembership[]
 }): AppAccountContext {
-  const role = normalizeRole(args.profile?.account_role || (args.isPlatformAdmin ? "service_operator" : "staff"))
-  const companyName = args.profile?.company_name || null
-  const storeName = args.profile?.store_name || null
+  const customerMembership = args.customerMemberships?.[0] || null
   return {
-    userId: args.userId,
-    userEmail: args.userEmail ?? null,
+    accountStatus: args.accountStatus,
+    userId: args.user.id,
+    userEmail: args.user.email ?? null,
     membershipId: null,
-    role,
-    roleLabel: ROLE_LABELS[role],
-    companyId: args.profile?.company_id || null,
-    companyName,
-    storeId: args.profile?.store_id || null,
-    storeName,
-    scopeLabel: storeName || companyName || "当前账号",
+    role: customerMembership ? "customer" : null,
+    roleLabel: customerMembership ? customerMembership.roleLabel : "当前账号",
+    companyId: null,
+    companyName: null,
+    storeId: null,
+    storeName: null,
+    scopeLabel: "当前账号",
+    memberships: args.accountStatus === "role_denied" ? args.customerMemberships || [] : [],
+    isManager: false,
+    isCompanyManager: false,
+    isStoreManager: false,
+    isPlatformAdmin: false,
+  }
+}
+
+function platformAccountContext(user: AppAuthUser): AppAccountContext {
+  return {
+    accountStatus: "bound",
+    userId: user.id,
+    userEmail: user.email ?? null,
+    membershipId: null,
+    role: "platform_admin",
+    roleLabel: ROLE_LABELS.platform_admin,
+    companyId: null,
+    companyName: null,
+    storeId: null,
+    storeName: null,
+    scopeLabel: "平台账号",
     memberships: [],
-    isManager: MANAGER_ROLES.has(role),
-    isCompanyManager: COMPANY_MANAGER_ROLES.has(role),
-    isStoreManager: STORE_MANAGER_ROLES.has(role),
-    isPlatformAdmin: Boolean(args.isPlatformAdmin || role === "service_operator"),
+    isManager: true,
+    isCompanyManager: true,
+    isStoreManager: false,
+    isPlatformAdmin: true,
+  }
+}
+
+function membershipSnapshot(membership: AppAccountMembership) {
+  return {
+    id: membership.id,
+    user_id: membership.userId,
+    role: membership.role,
+    role_label: membership.roleLabel,
+    scope: membership.scope,
+    status: membership.status,
+    is_active: membership.isActive,
+    company_id: membership.companyId,
+    company_name: membership.companyName,
+    store_id: membership.storeId,
+    store_name: membership.storeName,
+    joined_at: membership.joinedAt,
   }
 }
 
 export function accountContextPayload(ctx: AppAccountContext) {
   return {
+    account_status: ctx.accountStatus,
+    active_membership_id: ctx.membershipId,
     membership_id: ctx.membershipId,
     account_role: ctx.role,
     account_role_label: ctx.roleLabel,
@@ -365,92 +484,16 @@ export function accountContextPayload(ctx: AppAccountContext) {
     is_company_manager: ctx.isCompanyManager,
     is_store_manager: ctx.isStoreManager,
     is_platform_admin: ctx.isPlatformAdmin,
-    memberships: ctx.memberships,
+    memberships: ctx.memberships.map(membershipSnapshot),
   }
 }
 
-async function getOrCreateProfileRow(user: AppAuthUser): Promise<ProfileRow> {
-  const selected = await queryAliyunRds<ProfileRow>(
+async function findProfileRow(userId: string): Promise<ProfileRow | null> {
+  const result = await queryAliyunRds<ProfileRow>(
     `select ${PROFILE_COLUMNS} from public.profiles where id = $1 limit 1`,
-    [user.id],
+    [userId],
   )
-
-  const nickname = metadataText(user.user_metadata, "nickname") || user.email?.split("@")[0] || "User"
-  const avatarUrl = metadataText(user.user_metadata, "avatar_url") || null
-  const metadataRole = metadataText(user.user_metadata, "account_role")
-  const accountRole = metadataRole ? normalizeRole(metadataRole) : null
-  const companyId = metadataUuid(user.user_metadata, "company_id")
-  const storeId = metadataUuid(user.user_metadata, "store_id")
-  const companyName = metadataText(user.user_metadata, "company_name") || null
-  const storeName = metadataText(user.user_metadata, "store_name") || null
-  const servicePlanLabel = metadataText(user.user_metadata, "service_plan_label") || null
-
-  if (selected.rows[0]) {
-    const row = selected.rows[0]
-    if (
-      (!row.account_role && accountRole) ||
-      (!row.company_id && companyId) ||
-      (!row.store_id && storeId) ||
-      (!row.company_name && companyName) ||
-      (!row.store_name && storeName) ||
-      (!row.service_plan_label && servicePlanLabel)
-    ) {
-      const updated = await queryAliyunRds<ProfileRow>(
-        `
-          update public.profiles
-          set account_role = coalesce(account_role, $2),
-              company_id = coalesce(company_id, $3),
-              company_name = coalesce(company_name, $4),
-              store_id = coalesce(store_id, $5),
-              store_name = coalesce(store_name, $6),
-              service_plan_label = coalesce(service_plan_label, $7),
-              updated_at = now()
-          where id = $1
-          returning ${PROFILE_COLUMNS}
-        `,
-        [user.id, accountRole, companyId, companyName, storeId, storeName, servicePlanLabel],
-      )
-      return updated.rows[0] || row
-    }
-    return row
-  }
-
-  const created = await queryAliyunRds<ProfileRow>(
-    `
-      insert into public.profiles (
-        id, email, nickname, avatar_url, plan, credits_balance, credits_unlimited,
-        account_role, company_id, company_name, store_id, store_name, service_plan_label
-      )
-      values ($1, $2, $3, $4, 'free', 30, false, $5, $6, $7, $8, $9, $10)
-      on conflict (id) do update
-        set email = coalesce(excluded.email, public.profiles.email),
-            nickname = coalesce(public.profiles.nickname, excluded.nickname),
-            avatar_url = coalesce(public.profiles.avatar_url, excluded.avatar_url),
-            account_role = coalesce(public.profiles.account_role, excluded.account_role),
-            company_id = coalesce(public.profiles.company_id, excluded.company_id),
-            company_name = coalesce(public.profiles.company_name, excluded.company_name),
-            store_id = coalesce(public.profiles.store_id, excluded.store_id),
-            store_name = coalesce(public.profiles.store_name, excluded.store_name),
-            service_plan_label = coalesce(public.profiles.service_plan_label, excluded.service_plan_label),
-            updated_at = now()
-      returning ${PROFILE_COLUMNS}
-    `,
-    [
-      user.id,
-      user.email ?? null,
-      nickname,
-      avatarUrl,
-      accountRole,
-      companyId,
-      companyName,
-      storeId,
-      storeName,
-      servicePlanLabel,
-    ],
-  )
-
-  if (!created.rows[0]) throw new Error("profile_create_failed")
-  return created.rows[0]
+  return result.rows[0] || null
 }
 
 async function getEntitlementRow(userId: string): Promise<EntitlementRow | null> {
@@ -469,8 +512,11 @@ async function getMembershipRows(userId: string): Promise<MembershipRow[]> {
         membership.user_id,
         membership.company_id,
         company.name as company_name,
+        company.status as company_status,
         membership.store_id,
         store.name as store_name,
+        store.status as store_status,
+        store.company_id as store_company_id,
         membership.role,
         membership.status,
         membership.display_name,
@@ -480,8 +526,8 @@ async function getMembershipRows(userId: string): Promise<MembershipRow[]> {
       from public.mp_account_memberships membership
       left join public.mp_companies company on company.id = membership.company_id
       left join public.mp_stores store on store.id = membership.store_id
-      where membership.user_id = $1 and membership.status = 'active'
-      order by membership.created_at desc
+      where membership.user_id = $1
+      order by membership.created_at desc, membership.id asc
     `,
     [userId],
   )
@@ -490,51 +536,60 @@ async function getMembershipRows(userId: string): Promise<MembershipRow[]> {
 
 function buildAccountContext(args: {
   user: AppAuthUser
-  profile: ProfileRow
+  profile: ProfileRow | null
   membershipRows: MembershipRow[]
 }): AppAccountContext {
   const email = String(args.user.email || "").trim().toLowerCase()
   const envAdmin =
     platformAdminUserIds().has(args.user.id.toLowerCase()) || (email ? platformAdminEmails().has(email) : false)
-  const profileRole = normalizeRole(args.profile.account_role || (envAdmin ? "service_operator" : "staff"))
-  const isPlatformAdmin = envAdmin || profileRole === "service_operator"
-  const memberships = args.membershipRows.map(mapMembership)
+  if (envAdmin) return platformAccountContext(args.user)
+
+  const memberships = args.membershipRows
+    .filter(validTenantMembership)
+    .map((row) => mapMembership(row, parseTenantMembershipRole(row.role)!))
+  const customerMemberships = args.membershipRows
+    .filter(validCustomerMembership)
+    .map((row) => mapMembership(row, "customer"))
   const primary = choosePrimaryMembership(memberships, args.profile)
 
   if (!primary) {
-    return buildFallbackContext({
-      userId: args.user.id,
-      userEmail: args.user.email ?? null,
-      profile: args.profile,
-      isPlatformAdmin,
+    return buildUnavailableContext({
+      user: args.user,
+      accountStatus: unavailableAccountStatus(args.membershipRows, args.profile),
+      customerMemberships,
     })
   }
 
   return {
+    accountStatus: "bound",
     userId: args.user.id,
     userEmail: args.user.email ?? null,
     membershipId: primary.id,
     role: primary.role,
     roleLabel: primary.roleLabel,
     companyId: primary.companyId,
-    companyName: primary.companyName || args.profile.company_name || null,
+    companyName: primary.companyName,
     storeId: primary.storeId,
-    storeName: primary.storeName || args.profile.store_name || null,
+    storeName: primary.storeName,
     scopeLabel: primary.storeName || primary.companyName || "当前账号",
-    memberships,
-    isManager: MANAGER_ROLES.has(primary.role) || isPlatformAdmin,
-    isCompanyManager: COMPANY_MANAGER_ROLES.has(primary.role) || isPlatformAdmin,
-    isStoreManager: STORE_MANAGER_ROLES.has(primary.role),
-    isPlatformAdmin,
+    memberships: [...memberships, ...customerMemberships],
+    isManager: primary.role !== "customer" && MANAGER_ROLES.has(primary.role),
+    isCompanyManager: primary.role !== "customer" && COMPANY_MANAGER_ROLES.has(primary.role),
+    isStoreManager: primary.role !== "customer" && STORE_MANAGER_ROLES.has(primary.role),
+    isPlatformAdmin: false,
   }
 }
 
-function shouldUseMembershipBilling(role: string) {
-  return role === "staff" || role === "employee"
+function shouldUseMembershipBilling(account: AppAccountContext) {
+  return (
+    account.accountStatus === "bound" &&
+    Boolean(account.membershipId) &&
+    (account.role === "staff" || account.role === "employee")
+  )
 }
 
 async function resolveMembershipBillingProfile(account: AppAccountContext): Promise<Partial<AppBillingProfile> | null> {
-  if (!shouldUseMembershipBilling(account.role)) return null
+  if (!shouldUseMembershipBilling(account)) return null
   if (!account.companyId) return null
 
   const roles = Array.from(new Set([...STORE_BILLING_OWNER_ROLES, ...COMPANY_BILLING_OWNER_ROLES]))
@@ -571,7 +626,7 @@ async function resolveMembershipBillingProfile(account: AppAccountContext): Prom
     })
     .map((row) => {
       const plan = normalizePlan(row.plan)
-      const unlimited = Boolean(row.credits_unlimited) || plan === "vip"
+      const unlimited = Boolean(row.credits_unlimited)
       const balance = Number(row.credits_balance || 0)
       return { row, plan, unlimited, balance }
     })
@@ -630,16 +685,17 @@ function buildProfilePayload(ctx: AppBillingProfile, profile: ProfileRow) {
 }
 
 export async function getAliyunRdsAppProfileResponse(user: AppAuthUser) {
-  const profileRow = await getOrCreateProfileRow(user)
-  const [entitlement, membershipRows] = await Promise.all([
+  const [storedProfile, entitlement, membershipRows] = await Promise.all([
+    findProfileRow(user.id),
     getEntitlementRow(user.id),
     getMembershipRows(user.id),
   ])
-  const account = buildAccountContext({ user, profile: profileRow, membershipRows })
+  const profileRow = storedProfile || emptyProfileRow(user)
+  const account = buildAccountContext({ user, profile: storedProfile, membershipRows })
   let billingProfile: AppBillingProfile = {
     ...normalizeProfile(profileRow),
     account_role: account.role,
-    account_role_label: account.roleLabel,
+    account_role_label: accountRoleLabel(account.role),
     company_id: account.companyId,
     company_name: account.companyName,
     store_id: account.storeId,
@@ -666,7 +722,6 @@ export async function getAliyunRdsAppProfileResponse(user: AppAuthUser) {
 }
 
 export async function getAliyunRdsAppAccountContext(user: AppAuthUser) {
-  const profileRow = await getOrCreateProfileRow(user)
-  const membershipRows = await getMembershipRows(user.id)
+  const [profileRow, membershipRows] = await Promise.all([findProfileRow(user.id), getMembershipRows(user.id)])
   return buildAccountContext({ user, profile: profileRow, membershipRows })
 }

@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
+
 const test = require("node:test")
 const assert = require("node:assert/strict")
 const fs = require("node:fs")
@@ -5,6 +7,20 @@ const path = require("node:path")
 
 const root = process.cwd()
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), "utf8")
+
+function readFunctionSource(source, functionName) {
+  const signature = `export async function ${functionName}`
+  const start = source.indexOf(signature)
+  assert.notEqual(start, -1, signature)
+  const openingBrace = source.indexOf("{", start)
+  let depth = 0
+  for (let index = openingBrace; index < source.length; index += 1) {
+    if (source[index] === "{") depth += 1
+    if (source[index] === "}") depth -= 1
+    if (depth === 0) return source.slice(start, index + 1)
+  }
+  assert.fail(`unterminated function: ${functionName}`)
+}
 
 test("Aliyun APP auth helper gates test login by env token and device id", () => {
   const source = read("lib", "aliyun-rds", "app-auth.server.ts")
@@ -58,12 +74,19 @@ test("first-version APP RDS auth routes use Aliyun helper instead of direct Supa
   }
 })
 
-test("RDS profile creation can hydrate test-login tenant scope from server metadata", () => {
+test("RDS profile GET reads never hydrate tenant scope or mutate profiles", () => {
   const source = read("lib", "aliyun-rds", "repositories", "account-profile.server.ts")
+  const profileRead = readFunctionSource(source, "getAliyunRdsAppProfileResponse")
+  const accountRead = readFunctionSource(source, "getAliyunRdsAppAccountContext")
 
-  assert.match(source, /metadataUuid\(user\.user_metadata,\s*"company_id"\)/)
-  assert.match(source, /metadataUuid\(user\.user_metadata,\s*"store_id"\)/)
-  assert.match(source, /account_role = coalesce\(account_role, \$2\)/)
-  assert.match(source, /service_plan_label = coalesce\(service_plan_label, \$7\)/)
-  assert.match(source, /account_role, company_id, company_name, store_id, store_name, service_plan_label/)
+  assert.match(source, /findProfileRow/)
+  assert.match(source, /company\.status as company_status/)
+  assert.match(source, /store\.status as store_status/)
+  assert.match(source, /store\.company_id as store_company_id/)
+  assert.doesNotMatch(source, /getOrCreateProfileRow/)
+  assert.doesNotMatch(source, /metadataUuid/)
+  for (const readPath of [profileRead, accountRead]) {
+    assert.match(readPath, /findProfileRow/)
+    assert.doesNotMatch(readPath, /bootstrap|initialize|queryAliyunRds/i)
+  }
 })

@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "api_contract_id": "APP_G1_ACCOUNT_ACCESS_V1",
+  "routes": {
+    "profile": { "method": "GET", "path": "/api/app/profile" },
+    "entitlements": { "method": "GET", "path": "/api/app/entitlements" },
+    "bootstrap": { "method": "POST", "path": "/api/app/account/bootstrap" },
+    "invite_preview": { "method": "GET", "path": "/api/app/store-admin/invites/:token/preview" },
+    "invite_accept": { "method": "POST", "path": "/api/app/store-admin/invites/:token/accept" }
+  },
+  "account_statuses": [
+    "bound",
+    "not_bound",
+    "role_denied",
+    "suspended",
+    "inactive"
+  ],
+  "access_reasons": [
+    "ok",
+    "not_authenticated",
+    "not_bound",
+    "role_denied",
+    "entitlement_denied",
+    "suspended",
+    "inactive",
+    "tenant_scope_denied"
+  ],
+  "profile_envelope": {
+    "top_level_keys": ["ok", "user", "account_status", "active_membership_id", "memberships", "entitlements", "features", "profile"],
+    "user_keys": ["id"],
+    "membership_keys": ["id", "user_id", "role", "role_label", "scope", "status", "is_active", "company_id", "company_name", "store_id", "store_name", "joined_at"],
+    "entitlement_keys": ["plan", "pro_expires_at"],
+    "feature_decision_keys": ["enabled", "reason", "source"],
+    "profile_keys": ["account_status", "membership_id", "account_role", "account_role_label", "company_id", "company_name", "store_id", "store_name", "plan", "plan_label", "service_plan_label", "ai_points_balance", "ai_points_unlimited", "nickname", "avatar_url"]
+  },
+  "entitlements_envelope": {
+    "top_level_keys": ["ok", "plan", "pro_expires_at", "features"],
+    "feature_decision_keys": ["enabled", "reason", "source"]
+  },
+  "bootstrap_envelope": {
+    "top_level_keys": ["ok", "profile_initialized"]
+  },
+  "feature_policy": {
+    "all_keys": ["auth", "account", "home", "entitlements", "orders", "service_record", "service_record_review", "store_admin", "member_invite", "company_admin", "platform_admin", "professional_learning", "speech_library", "voice_coach", "knowledge_context", "store_profiles", "customer_knowledge_base", "content", "poster", "xiaohongshu", "private_copy", "content_studio", "content_library"],
+    "recovery_keys": ["auth", "account"],
+    "tenant_base_keys": ["home", "entitlements", "orders", "service_record", "professional_learning", "speech_library", "knowledge_context", "store_profiles", "customer_knowledge_base", "content_library"],
+    "ai_point_keys": ["voice_coach", "content", "poster", "xiaohongshu", "private_copy", "content_studio"],
+    "manager_keys": ["service_record_review", "store_admin", "member_invite"],
+    "company_keys": ["company_admin"],
+    "platform_keys": ["platform_admin"],
+    "tenant_decision_precedence": ["suspended", "inactive", "role_denied", "not_bound", "entitlement_denied", "ok"],
+    "missing_feature_decision": "entitlement_denied"
+  },
+  "role_policy": {
+    "tenant_membership_roles": ["company_owner", "company_admin", "merchant_owner", "merchant_admin", "store_owner", "store_admin", "staff", "employee"],
+    "normalized_role_map": {
+      "company_owner": "company_admin",
+      "company_admin": "company_admin",
+      "merchant_owner": "company_admin",
+      "merchant_admin": "company_admin",
+      "store_owner": "store_manager",
+      "store_admin": "store_manager",
+      "staff": "employee",
+      "employee": "employee",
+      "customer": "customer"
+    },
+    "customer_role": "customer",
+    "platform_authority": "server_allowlist_only",
+    "platform_allowlist_override": "platform_admin",
+    "untrusted_membership_aliases": ["store_manager", "platform_admin", "service_operator"],
+    "untrusted_service_operator": { "normalized_role": "guest", "account_status": "role_denied" },
+    "unknown_or_null_role": { "normalized_role": "guest", "account_status": "role_denied" }
+  },
+  "authorization_errors": {
+    "status": 403,
+    "body_keys": ["ok", "code", "feature"],
+    "collection_cross_scope": { "status": 403, "code": "tenant_scope_denied" },
+    "object_cross_scope": { "status": 404, "code": "not_found" }
+  },
+  "invite_contract": {
+    "states": ["invalid", "unusable", "usable"],
+    "preview_keys": ["ok", "state", "usable", "unusable_reason", "invite"],
+    "invite_keys": ["id", "role", "role_label", "max_uses", "used_count", "expires_at", "status", "note", "company_id", "company_name", "store_id", "store_name"],
+    "unusable_reasons": ["inactive", "expired", "exhausted", "company_inactive", "store_inactive", "role_denied"],
+    "unknown_token": { "status": 404, "code": "invite_not_found" },
+    "role_denied": { "status": 403, "code": "role_denied" },
+    "found_unusable": { "status": 410, "code": "invite_unusable" }
+  }
+}
