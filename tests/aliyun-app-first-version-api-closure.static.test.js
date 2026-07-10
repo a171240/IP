@@ -23,6 +23,12 @@ const FIRST_VERSION_ROUTES = [
     smokeStatus: 404,
   },
   {
+    method: "GET",
+    route: "/api/app/store-admin/invites/[token]/qrcode",
+    smokePath: "/api/app/store-admin/invites/app-smoke-invalid-token/qrcode",
+    smokeStatus: 404,
+  },
+  {
     method: "POST",
     route: "/api/app/store-admin/invites/[token]/accept",
     smokePath: "/api/app/store-admin/invites/app-smoke-invalid-token/accept",
