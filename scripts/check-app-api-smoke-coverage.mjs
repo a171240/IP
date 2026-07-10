@@ -188,9 +188,19 @@ const IMPLEMENTED_APP_FACADE_COVERAGE_PROBES = [
   },
 ]
 
+const NON_EXECUTED_MUTATION_COVERAGE_PROBES = [
+  {
+    scope: "account",
+    method: "POST",
+    path: "/api/app/account/bootstrap",
+    expected: [{ status: 401 }],
+  },
+]
+
 const COVERAGE_PROBES = [
   ...PROBES,
   ...IMPLEMENTED_APP_FACADE_COVERAGE_PROBES,
+  ...NON_EXECUTED_MUTATION_COVERAGE_PROBES,
 ]
 
 function routePattern(route) {
@@ -264,7 +274,8 @@ function main() {
     healthRoutesExcluded: APP_CLIENT_CONTRACT_ROUTES.length - businessRoutes.length,
     businessRoutes: businessRoutes.length,
     smokeProbes: PROBES.length,
-    coverageOnlyProbes: IMPLEMENTED_APP_FACADE_COVERAGE_PROBES.length,
+    coverageOnlyProbes:
+      IMPLEMENTED_APP_FACADE_COVERAGE_PROBES.length + NON_EXECUTED_MUTATION_COVERAGE_PROBES.length,
     coverageProbes: COVERAGE_PROBES.length,
     coveredBusinessRoutes: coveredRoutes.length,
     scopes: summarizeScopes(coveredRoutes),

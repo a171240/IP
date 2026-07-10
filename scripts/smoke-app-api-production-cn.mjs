@@ -15,6 +15,15 @@ const LOCAL_RDS_UNAVAILABLE_EXPECTED = Object.freeze([
   { status: 503, code: "rds_unavailable" },
 ])
 
+export const MUTATION_EXCLUDED_ROUTES = [
+  {
+    scope: "account",
+    method: "POST",
+    path: "/api/app/account/bootstrap",
+    reason: "authenticated_profile_mutation",
+  },
+]
+
 export const PROBES = [
   {
     scope: "auth",

@@ -139,16 +139,36 @@
         "GET"
       ],
       "appFile": "app/api/app/entitlements/route.ts",
-      "sourceType": "app_alias",
-      "sourceRoute": "/api/app/profile",
+      "sourceType": "app_native",
       "sourceFiles": [
-        "app/api/app/profile/route.ts"
+        "app/api/app/entitlements/route.ts",
+        "lib/aliyun-rds/repositories/account-profile.server.ts",
+        "lib/aliyun-rds/postgres.server.ts"
       ],
       "sourcePages": [
         "../meiye-huajing-miniprogram/pages/mine/index.js"
       ],
       "productionCnStatus": "bridge_ready",
-      "note": "Alias to the APP-native profile route so entitlements use the same Aliyun RDS account repository."
+      "note": "APP entitlements uses its independent narrow route and the shared Aliyun RDS account repository."
+    },
+    {
+      "scope": "account",
+      "route": "/api/app/account/bootstrap",
+      "methods": [
+        "POST"
+      ],
+      "appFile": "app/api/app/account/bootstrap/route.ts",
+      "sourceType": "app_native",
+      "sourceFiles": [
+        "app/api/app/account/bootstrap/route.ts",
+        "lib/aliyun-rds/repositories/account-profile.server.ts",
+        "lib/aliyun-rds/postgres.server.ts"
+      ],
+      "sourcePages": [
+        "../meiye-huajing-miniprogram/pages/mine/index.js"
+      ],
+      "productionCnStatus": "bridge_ready",
+      "note": "Authenticated APP account bootstrap inserts only an idempotent non-grant display shell in Aliyun RDS."
     },
     {
       "scope": "store-admin",

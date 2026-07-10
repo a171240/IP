@@ -223,6 +223,17 @@ const PROFILE_COLUMNS = [
   "store_name",
   "service_plan_label",
 ].join(", ")
+const APP_BOOTSTRAP_NICKNAME_MAX_LENGTH = 120
+const APP_BOOTSTRAP_AVATAR_URL_MAX_LENGTH = 2_048
+
+function boundedAuthMetadataText(metadata: unknown, key: "nickname" | "avatar_url", maxLength: number) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null
+  if (!Object.prototype.hasOwnProperty.call(metadata, key)) return null
+  const value = (metadata as Record<string, unknown>)[key]
+  if (typeof value !== "string") return null
+  const text = value.trim()
+  return text ? text.slice(0, maxLength) : null
+}
 
 function parseTenantMembershipRole(role: unknown): TenantMembershipRole | null {
   const text = String(role || "").trim()
@@ -813,6 +824,28 @@ export async function getAliyunRdsAppEntitlementsResponse(user: AppAuthUser) {
     pro_expires_at: entitlement.pro_expires_at,
     features: snapshot.account.features,
   }
+}
+
+export async function bootstrapAliyunRdsAppProfile(user: AppAuthUser) {
+  const nickname = boundedAuthMetadataText(
+    user.user_metadata,
+    "nickname",
+    APP_BOOTSTRAP_NICKNAME_MAX_LENGTH,
+  )
+  const avatarUrl = boundedAuthMetadataText(
+    user.user_metadata,
+    "avatar_url",
+    APP_BOOTSTRAP_AVATAR_URL_MAX_LENGTH,
+  )
+
+  await queryAliyunRds(
+    `
+      insert into public.profiles (id, email, nickname, avatar_url, account_role, plan, credits_balance, credits_unlimited)
+      values ($1, $2, $3, $4, 'guest', 'free', 0, false)
+      on conflict (id) do nothing
+    `,
+    [user.id, user.email ?? null, nickname, avatarUrl],
+  )
 }
 
 export async function getAliyunRdsAppAccountContext(user: AppAuthUser) {

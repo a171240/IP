@@ -48,6 +48,12 @@ export const REQUIRED_ROUTES = [
     methods: ["GET"],
   },
   {
+    scope: "account",
+    route: "/api/app/account/bootstrap",
+    file: "app/api/app/account/bootstrap/route.ts",
+    methods: ["POST"],
+  },
+  {
     scope: "store-admin",
     route: "/api/app/store-admin/overview",
     file: "app/api/app/store-admin/overview/route.ts",
