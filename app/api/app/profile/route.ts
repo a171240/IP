@@ -6,7 +6,7 @@ import {
   resolveAliyunRdsAppAuthUser,
 } from "@/lib/aliyun-rds/app-auth.server"
 import { AliyunRdsConfigurationError } from "@/lib/aliyun-rds/postgres.server"
-import { getAliyunRdsAppProfileResponse } from "@/lib/aliyun-rds/repositories/account-profile.server"
+import { getAliyunRdsAppProfileContractResponse } from "@/lib/aliyun-rds/repositories/account-profile.server"
 
 export const runtime = "nodejs"
 
@@ -15,19 +15,8 @@ export async function GET(request: NextRequest) {
     const auth = await resolveAliyunRdsAppAuthUser(request)
     if (!auth) return appAuthRequiredResponse()
 
-    const account = await getAliyunRdsAppProfileResponse(auth.user)
-
-    return NextResponse.json({
-      ok: true,
-      user: {
-        id: auth.user.id,
-        email: auth.user.email ?? null,
-        user_metadata: auth.user.user_metadata || {},
-      },
-      profile: account.profile,
-      entitlements: account.entitlements,
-      account: account.account,
-    })
+    const profile = await getAliyunRdsAppProfileContractResponse(auth.user)
+    return NextResponse.json(profile)
   } catch (error) {
     const appAuthError = appAuthConfigurationErrorResponse(error)
     if (appAuthError) return appAuthError
@@ -42,7 +31,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         ok: false,
-        error: error instanceof Error ? error.message : "profile_query_failed",
+        error: "profile_query_failed",
         code: "profile_query_failed",
       },
       { status: 500 },

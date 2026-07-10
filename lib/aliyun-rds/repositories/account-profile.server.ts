@@ -1,5 +1,11 @@
 import "server-only"
 
+import {
+  buildAppFeatureDecisions,
+  normalizeAppAccountRole,
+  type AppFeatureDecisions,
+  type AppNormalizedRole,
+} from "@/lib/aliyun-rds/app-authorization.server"
 import { queryAliyunRds } from "@/lib/aliyun-rds/postgres.server"
 import { normalizePlan, type PlanId } from "@/lib/pricing/rules"
 
@@ -118,7 +124,10 @@ export type AppAccountContext = {
   isCompanyManager: boolean
   isStoreManager: boolean
   isPlatformAdmin: boolean
+  features: AppFeatureDecisions
 }
+
+type AppAccountIdentity = Omit<AppAccountContext, "features">
 
 type AppBillingProfile = {
   plan: PlanId
@@ -148,6 +157,14 @@ const ROLE_LABELS: Record<Exclude<AppAccountRole, null>, string> = {
   store_admin: "门店管理员",
   staff: "员工",
   employee: "员工",
+  customer: "顾客",
+  platform_admin: "平台管理员",
+}
+
+const NORMALIZED_ROLE_LABELS: Record<Exclude<AppNormalizedRole, "guest">, string> = {
+  employee: "员工",
+  store_manager: "店长",
+  company_admin: "公司管理员",
   customer: "顾客",
   platform_admin: "平台管理员",
 }
@@ -408,7 +425,7 @@ function buildUnavailableContext(args: {
   user: AppAuthUser
   accountStatus: AppAccountStatus
   customerMemberships?: AppAccountMembership[]
-}): AppAccountContext {
+}): AppAccountIdentity {
   const customerMembership = args.customerMemberships?.[0] || null
   return {
     accountStatus: args.accountStatus,
@@ -430,7 +447,7 @@ function buildUnavailableContext(args: {
   }
 }
 
-function platformAccountContext(user: AppAuthUser): AppAccountContext {
+function platformAccountContext(user: AppAuthUser): AppAccountIdentity {
   return {
     accountStatus: "bound",
     userId: user.id,
@@ -538,7 +555,7 @@ function buildAccountContext(args: {
   user: AppAuthUser
   profile: ProfileRow | null
   membershipRows: MembershipRow[]
-}): AppAccountContext {
+}): AppAccountIdentity {
   const email = String(args.user.email || "").trim().toLowerCase()
   const envAdmin =
     platformAdminUserIds().has(args.user.id.toLowerCase()) || (email ? platformAdminEmails().has(email) : false)
@@ -580,7 +597,7 @@ function buildAccountContext(args: {
   }
 }
 
-function shouldUseMembershipBilling(account: AppAccountContext) {
+function shouldUseMembershipBilling(account: AppAccountIdentity) {
   return (
     account.accountStatus === "bound" &&
     Boolean(account.membershipId) &&
@@ -588,7 +605,7 @@ function shouldUseMembershipBilling(account: AppAccountContext) {
   )
 }
 
-async function resolveMembershipBillingProfile(account: AppAccountContext): Promise<Partial<AppBillingProfile> | null> {
+async function resolveMembershipBillingProfile(account: AppAccountIdentity): Promise<Partial<AppBillingProfile> | null> {
   if (!shouldUseMembershipBilling(account)) return null
   if (!account.companyId) return null
 
@@ -684,7 +701,30 @@ function buildProfilePayload(ctx: AppBillingProfile, profile: ProfileRow) {
   }
 }
 
-export async function getAliyunRdsAppProfileResponse(user: AppAuthUser) {
+function entitlementPayload(entitlement: EntitlementRow | null) {
+  return {
+    plan: entitlement?.plan ?? null,
+    pro_expires_at: entitlement?.pro_expires_at ?? null,
+  }
+}
+
+function normalizedProfileRole(account: AppAccountIdentity) {
+  const normalizedRole = normalizeAppAccountRole(account.role, account.isPlatformAdmin)
+  return normalizedRole === "guest" ? null : normalizedRole
+}
+
+function normalizedProfileRoleLabel(role: Exclude<AppNormalizedRole, "guest"> | null) {
+  return role ? NORMALIZED_ROLE_LABELS[role] : "当前账号"
+}
+
+type AppAccountReadSnapshot = {
+  profileRow: ProfileRow
+  entitlement: EntitlementRow | null
+  account: AppAccountContext
+  billingProfile: AppBillingProfile
+}
+
+async function loadAppAccountReadSnapshot(user: AppAuthUser): Promise<AppAccountReadSnapshot> {
   const [storedProfile, entitlement, membershipRows] = await Promise.all([
     findProfileRow(user.id),
     getEntitlementRow(user.id),
@@ -709,19 +749,72 @@ export async function getAliyunRdsAppProfileResponse(user: AppAuthUser) {
     }
   }
 
+  const features = buildAppFeatureDecisions(account, {
+    aiPointsBalance: billingProfile.ai_points_balance,
+    aiPointsUnlimited: billingProfile.ai_points_unlimited,
+  })
+
   return {
-    profile: buildProfilePayload(billingProfile, profileRow),
-    entitlements: entitlement
-      ? {
-          plan: entitlement.plan ?? null,
-          pro_expires_at: entitlement.pro_expires_at ?? null,
-        }
-      : null,
-    account: accountContextPayload(account),
+    profileRow,
+    entitlement,
+    account: { ...account, features },
+    billingProfile,
+  }
+}
+
+export async function getAliyunRdsAppProfileResponse(user: AppAuthUser) {
+  const snapshot = await loadAppAccountReadSnapshot(user)
+
+  return {
+    profile: buildProfilePayload(snapshot.billingProfile, snapshot.profileRow),
+    entitlements: snapshot.entitlement ? entitlementPayload(snapshot.entitlement) : null,
+    account: accountContextPayload(snapshot.account),
+  }
+}
+
+export async function getAliyunRdsAppProfileContractResponse(user: AppAuthUser) {
+  const snapshot = await loadAppAccountReadSnapshot(user)
+  const accountRole = normalizedProfileRole(snapshot.account)
+
+  return {
+    ok: true as const,
+    user: { id: user.id },
+    account_status: snapshot.account.accountStatus,
+    active_membership_id: snapshot.account.membershipId,
+    memberships: snapshot.account.memberships.map(membershipSnapshot),
+    entitlements: entitlementPayload(snapshot.entitlement),
+    features: snapshot.account.features,
+    profile: {
+      account_status: snapshot.account.accountStatus,
+      membership_id: snapshot.account.membershipId,
+      account_role: accountRole,
+      account_role_label: normalizedProfileRoleLabel(accountRole),
+      company_id: snapshot.account.companyId,
+      company_name: snapshot.account.companyName,
+      store_id: snapshot.account.storeId,
+      store_name: snapshot.account.storeName,
+      plan: snapshot.billingProfile.plan,
+      plan_label: snapshot.billingProfile.service_plan_label,
+      service_plan_label: snapshot.billingProfile.service_plan_label,
+      ai_points_balance: snapshot.billingProfile.ai_points_balance,
+      ai_points_unlimited: snapshot.billingProfile.ai_points_unlimited,
+      nickname: snapshot.profileRow.nickname ?? null,
+      avatar_url: snapshot.profileRow.avatar_url ?? null,
+    },
+  }
+}
+
+export async function getAliyunRdsAppEntitlementsResponse(user: AppAuthUser) {
+  const snapshot = await loadAppAccountReadSnapshot(user)
+  const entitlement = entitlementPayload(snapshot.entitlement)
+  return {
+    ok: true as const,
+    plan: entitlement.plan,
+    pro_expires_at: entitlement.pro_expires_at,
+    features: snapshot.account.features,
   }
 }
 
 export async function getAliyunRdsAppAccountContext(user: AppAuthUser) {
-  const [profileRow, membershipRows] = await Promise.all([findProfileRow(user.id), getMembershipRows(user.id)])
-  return buildAccountContext({ user, profile: profileRow, membershipRows })
+  return (await loadAppAccountReadSnapshot(user)).account
 }

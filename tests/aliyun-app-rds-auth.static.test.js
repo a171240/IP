@@ -9,7 +9,9 @@ const root = process.cwd()
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), "utf8")
 
 function readFunctionSource(source, functionName) {
-  const signature = `export async function ${functionName}`
+  const exportedSignature = `export async function ${functionName}`
+  const internalSignature = `async function ${functionName}`
+  const signature = source.includes(exportedSignature) ? exportedSignature : internalSignature
   const start = source.indexOf(signature)
   assert.notEqual(start, -1, signature)
   const openingBrace = source.indexOf("{", start)
@@ -78,6 +80,7 @@ test("RDS profile GET reads never hydrate tenant scope or mutate profiles", () =
   const source = read("lib", "aliyun-rds", "repositories", "account-profile.server.ts")
   const profileRead = readFunctionSource(source, "getAliyunRdsAppProfileResponse")
   const accountRead = readFunctionSource(source, "getAliyunRdsAppAccountContext")
+  const sharedRead = readFunctionSource(source, "loadAppAccountReadSnapshot")
 
   assert.match(source, /findProfileRow/)
   assert.match(source, /company\.status as company_status/)
@@ -86,7 +89,11 @@ test("RDS profile GET reads never hydrate tenant scope or mutate profiles", () =
   assert.doesNotMatch(source, /getOrCreateProfileRow/)
   assert.doesNotMatch(source, /metadataUuid/)
   for (const readPath of [profileRead, accountRead]) {
-    assert.match(readPath, /findProfileRow/)
+    assert.match(readPath, /loadAppAccountReadSnapshot/)
     assert.doesNotMatch(readPath, /bootstrap|initialize|queryAliyunRds/i)
   }
+  assert.match(sharedRead, /findProfileRow/)
+  assert.match(sharedRead, /getEntitlementRow/)
+  assert.match(sharedRead, /getMembershipRows/)
+  assert.doesNotMatch(sharedRead, /bootstrap|initialize|insert|update|delete|merge|truncate/i)
 })

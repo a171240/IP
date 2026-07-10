@@ -9,6 +9,7 @@ const ts = require("typescript")
 
 const root = process.cwd()
 const repositoryPath = path.join(root, "lib", "aliyun-rds", "repositories", "account-profile.server.ts")
+const authorizationPath = path.join(root, "lib", "aliyun-rds", "app-authorization.server.ts")
 const contractPath = path.join(root, "contracts", "app-account-access-v1.json")
 
 const exactMembershipKeys = [
@@ -71,34 +72,40 @@ function membershipRow(overrides = {}) {
   }
 }
 
-function compileRepository(queryAliyunRds) {
-  const source = fs.readFileSync(repositoryPath, "utf8")
+function compileTsModule(filePath, stubs) {
+  const source = fs.readFileSync(filePath, "utf8")
   const compiled = ts.transpileModule(source, {
     compilerOptions: {
       esModuleInterop: true,
       module: ts.ModuleKind.CommonJS,
       target: ts.ScriptTarget.ES2022,
     },
-    fileName: repositoryPath,
+    fileName: filePath,
   }).outputText
 
-  const compiledModule = new Module(repositoryPath, module)
-  compiledModule.filename = repositoryPath
-  compiledModule.paths = Module._nodeModulePaths(path.dirname(repositoryPath))
+  const compiledModule = new Module(filePath, module)
+  compiledModule.filename = filePath
+  compiledModule.paths = Module._nodeModulePaths(path.dirname(filePath))
   compiledModule.require = (moduleId) => {
-    if (moduleId === "server-only") return {}
-    if (moduleId === "@/lib/aliyun-rds/postgres.server") return { queryAliyunRds }
-    if (moduleId === "@/lib/pricing/rules") {
-      return {
-        normalizePlan(value) {
-          return ["free", "basic", "pro", "vip"].includes(value) ? value : "free"
-        },
-      }
-    }
+    if (moduleId in stubs) return stubs[moduleId]
     return require(moduleId)
   }
-  compiledModule._compile(compiled, repositoryPath)
+  compiledModule._compile(compiled, filePath)
   return compiledModule.exports
+}
+
+function compileRepository(queryAliyunRds) {
+  const authorization = compileTsModule(authorizationPath, { "server-only": {} })
+  return compileTsModule(repositoryPath, {
+    "server-only": {},
+    "@/lib/aliyun-rds/app-authorization.server": authorization,
+    "@/lib/aliyun-rds/postgres.server": { queryAliyunRds },
+    "@/lib/pricing/rules": {
+      normalizePlan(value) {
+        return ["free", "basic", "pro", "vip"].includes(value) ? value : "free"
+      },
+    },
+  })
 }
 
 function repositoryHarness({ profile = profileRow(), memberships = [], entitlement = null, billingOwners = [] } = {}) {
