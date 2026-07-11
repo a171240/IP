@@ -127,7 +127,7 @@ export function rdsStoreAdminErrorResponse(error: unknown, fallbackCode: string)
   if (isAliyunRdsRuntimeUnavailableError(error)) {
     return jsonError(503, "Aliyun RDS is not reachable", "rds_unavailable")
   }
-  return jsonError(500, error instanceof Error ? error.message : fallbackCode, fallbackCode)
+  return jsonError(500, fallbackCode, fallbackCode)
 }
 
 function requestedStoreAdminScope(ctx: AppAccountContext, request: NextRequest): AppRequestedTenantScope {
@@ -275,15 +275,10 @@ function buildSessionTitle(row: VoiceSessionRow) {
 function storeWhereClause(ctx: AppAccountContext, opts: { companyId: string; storeId?: string }) {
   const clauses = ["company_id = $1", "status = 'active'"]
   const values: unknown[] = [opts.companyId]
-  let next = 2
-  if (ctx.isStoreManager && ctx.storeId) {
-    clauses.push(`id = $${next}`)
-    values.push(ctx.storeId)
-    next += 1
-  }
-  if (opts.storeId) {
-    clauses.push(`id = $${next}`)
-    values.push(opts.storeId)
+  const storeId = ctx.isStoreManager && ctx.storeId ? ctx.storeId : opts.storeId
+  if (storeId) {
+    clauses.push("id = $2")
+    values.push(storeId)
   }
   return { where: clauses.join(" and "), values }
 }
@@ -311,36 +306,28 @@ async function resolveStores(ctx: AppAccountContext, request: NextRequest): Prom
 }
 
 async function listMemberships(args: {
+  activeOnly: boolean
   companyId: string
-  ctx: AppAccountContext
-  requestedStoreId?: string
-  activeOnly?: boolean
+  storeIds: string[]
+  strictStoreScope: boolean
   limit?: number
 }) {
-  const clauses = ["company_id = $1"]
-  const values: unknown[] = [args.companyId]
-  let next = 2
-  if (args.activeOnly) clauses.push("status = 'active'")
-  if (args.ctx.isStoreManager && args.ctx.storeId) {
-    clauses.push(`store_id = $${next}`)
-    values.push(args.ctx.storeId)
-    next += 1
-  }
-  if (args.requestedStoreId) {
-    clauses.push(`store_id = $${next}`)
-    values.push(args.requestedStoreId)
-    next += 1
-  }
+  if (args.strictStoreScope && !args.storeIds.length) return []
+  const storeScopeClause = args.strictStoreScope
+    ? "store_id = any($2::uuid[])"
+    : "(store_id is null or store_id = any($2::uuid[]))"
+  const activeClause = args.activeOnly ? " and status = 'active'" : ""
 
   const result = await queryAliyunRds<MembershipRow>(
     `
       select id, user_id, company_id, store_id, role, status, display_name, accepted_at, last_seen_at, created_at
       from public.mp_account_memberships
-      where ${clauses.join(" and ")}
+      where company_id = $1${activeClause}
+        and ${storeScopeClause}
       order by created_at desc
       limit ${Math.max(1, Math.min(5000, args.limit || 2000))}
     `,
-    values,
+    [args.companyId, args.storeIds],
   )
   return result.rows
 }
@@ -357,19 +344,32 @@ async function listProfiles(userIds: string[], includeBilling = false) {
   return result.rows
 }
 
-async function listSessionsByUsers(userIds: string[], startAt: string, limit = 5000) {
-  if (!userIds.length) return []
+async function listStoreAdminSessions(args: {
+  companyId: string
+  storeIds: string[]
+  strictStoreScope: boolean
+  userIds: string[]
+  startAt: string
+  limit?: number
+}) {
+  if (!args.userIds.length || (args.strictStoreScope && !args.storeIds.length)) return []
+  const storeScopeClause = args.strictStoreScope
+    ? "store_id = any($4::uuid[])"
+    : "(store_id is null or store_id = any($4::uuid[]))"
   const result = await queryAliyunRds<VoiceSessionRow>(
     `
       select
         id, user_id, company_id, store_id, membership_id, scenario_id, status, started_at, ended_at, created_at,
         total_score, report_json, customer_profile_id, scene_card_id, session_context_json, scenario_snapshot_json
       from public.voice_coach_sessions
-      where user_id = any($1::uuid[]) and started_at >= $2
+      where user_id = any($1::uuid[])
+        and company_id = $2
+        and started_at >= $3
+        and ${storeScopeClause}
       order by started_at desc
-      limit ${Math.max(1, Math.min(5000, limit))}
+      limit ${Math.max(1, Math.min(5000, args.limit || 5000))}
     `,
-    [userIds, startAt],
+    [args.userIds, args.companyId, args.startAt, args.storeIds],
   )
   return result.rows
 }
@@ -389,34 +389,50 @@ async function listTurns(sessionIds: string[], onlyBeautician = false, limit = 1
   return result.rows
 }
 
-function scopedMemberships(rows: MembershipRow[], opts: { ctx: AppAccountContext; storeIds: string[] }) {
+function scopedMemberships(
+  rows: MembershipRow[],
+  opts: { ctx: AppAccountContext; storeIds: string[]; strictStoreScope: boolean },
+) {
   const storeIdSet = new Set(opts.storeIds)
   return rows.filter((row) => {
     if (row.role === "service_operator") return false
-    if (!row.store_id) return opts.ctx.isCompanyManager || opts.ctx.isPlatformAdmin
+    if (!row.store_id) return !opts.strictStoreScope && (opts.ctx.isCompanyManager || opts.ctx.isPlatformAdmin)
     if (!storeIdSet.size) return false
     return storeIdSet.has(row.store_id)
   })
 }
 
-function scopedSession(row: VoiceSessionRow, args: { companyIdSet: Set<string>; storeIdSet: Set<string>; userIdSet: Set<string> }) {
-  const companyId = cleanText(row.company_id, 80)
-  const storeId = cleanText(row.store_id, 80)
-  if (args.storeIdSet.size) return args.storeIdSet.has(storeId)
-  if (args.companyIdSet.size) return args.companyIdSet.has(companyId)
-  return args.userIdSet.has(String(row.user_id))
+function scopedStoreAdminSessions(
+  rows: VoiceSessionRow[],
+  args: {
+    companyId: string
+    storeIds: string[]
+    userIds: string[]
+    strictStoreScope: boolean
+  },
+) {
+  const storeIdSet = new Set(args.storeIds)
+  const userIdSet = new Set(args.userIds)
+  return rows.filter((row) => {
+    if (!userIdSet.has(cleanText(row.user_id, 80))) return false
+    if (cleanText(row.company_id, 80) !== args.companyId) return false
+    const storeId = cleanText(row.store_id, 80)
+    if (!storeId) return !args.strictStoreScope
+    return storeIdSet.has(storeId)
+  })
 }
 
 function scopedLedger(row: LedgerRow, args: { companyIdSet: Set<string>; storeIdSet: Set<string>; strictStoreScope: boolean }) {
   const companyId = cleanText(row.company_id, 80)
   const storeId = cleanText(row.store_id, 80)
-  if (args.strictStoreScope && args.storeIdSet.size) return args.storeIdSet.has(storeId)
-  if (args.companyIdSet.size) return args.companyIdSet.has(companyId)
-  if (args.storeIdSet.size) return args.storeIdSet.has(storeId)
-  return true
+  if (!args.companyIdSet.has(companyId)) return false
+  if (args.strictStoreScope) return args.storeIdSet.has(storeId)
+  if (!storeId) return true
+  return args.storeIdSet.has(storeId)
 }
 
 export async function getAliyunRdsStoreAdminOverview(ctx: AppAccountContext, request: NextRequest) {
+  const requestedStoreId = cleanText(new URL(request.url).searchParams.get("store_id"), 80)
   const scope = await resolveStores(ctx, request).catch((error) => {
     if (error instanceof Error && error.message === "company_id_required") return null
     throw error
@@ -424,13 +440,32 @@ export async function getAliyunRdsStoreAdminOverview(ctx: AppAccountContext, req
   if (!scope) return { error: jsonError(400, "请先选择公司", "company_id_required") }
 
   const storeIds = scope.stores.map((store) => store.id).filter(Boolean)
-  const membershipRows = await listMemberships({ companyId: scope.companyId, ctx, activeOnly: true })
-  const memberships = scopedMemberships(membershipRows, { ctx, storeIds })
+  const strictStoreScope = ctx.isStoreManager || Boolean(requestedStoreId)
+  const membershipRows = await listMemberships({
+    activeOnly: true,
+    companyId: scope.companyId,
+    storeIds,
+    strictStoreScope,
+  })
+  const memberships = scopedMemberships(membershipRows, { ctx, storeIds, strictStoreScope })
   const userIds = Array.from(new Set(memberships.map((item) => item.user_id).filter(Boolean)))
   const profiles = await listProfiles(userIds)
   const profileMap = mapById(profiles)
 
-  const sessions = await listSessionsByUsers(userIds, dayStartIso(), 1000)
+  const sessionRows = await listStoreAdminSessions({
+    companyId: scope.companyId,
+    storeIds,
+    strictStoreScope,
+    userIds,
+    startAt: dayStartIso(),
+    limit: 1000,
+  })
+  const sessions = scopedStoreAdminSessions(sessionRows, {
+    companyId: scope.companyId,
+    storeIds,
+    userIds,
+    strictStoreScope,
+  })
   const sessionIds = sessions.map((item) => item.id).filter(Boolean)
   const turns = await listTurns(sessionIds, true, 3000)
   const secondsBySession = new Map<string, number>()
@@ -485,21 +520,41 @@ export async function getAliyunRdsStoreAdminOverview(ctx: AppAccountContext, req
 
 export async function getAliyunRdsStoreAdminMembers(ctx: AppAccountContext, request: NextRequest) {
   const params = new URL(request.url).searchParams
+  const requestedCompanyId = cleanText(params.get("company_id"), 80)
   const requestedStoreId = cleanText(params.get("store_id"), 80)
-  const companyId = ctx.companyId
-  if (!companyId && !ctx.isPlatformAdmin) return { error: jsonError(400, "当前账号缺少公司归属", "company_id_required") }
+  const companyId = ctx.isPlatformAdmin ? requestedCompanyId : ctx.companyId
   if (!companyId) return { error: jsonError(400, "当前账号缺少公司归属", "company_id_required") }
 
   const scope = await resolveStores(ctx, request)
   const storeIds = scope.stores.map((store) => store.id).filter(Boolean)
   const storeMap = mapById(scope.stores)
-  const membershipRows = await listMemberships({ companyId, ctx, requestedStoreId, limit: 2000 })
-  const scopedRows = scopedMemberships(membershipRows, { ctx, storeIds })
+  const strictStoreScope = ctx.isStoreManager || Boolean(requestedStoreId)
+  const membershipRows = await listMemberships({
+    activeOnly: false,
+    companyId,
+    storeIds,
+    strictStoreScope,
+    limit: 2000,
+  })
+  const scopedRows = scopedMemberships(membershipRows, { ctx, storeIds, strictStoreScope })
 
   const userIds = Array.from(new Set(scopedRows.map((row) => row.user_id).filter(Boolean)))
   const profiles = await listProfiles(userIds)
   const profileMap = mapById(profiles)
-  const sessions = await listSessionsByUsers(userIds, dayStartIso(), 1000)
+  const sessionRows = await listStoreAdminSessions({
+    companyId,
+    storeIds,
+    strictStoreScope,
+    userIds,
+    startAt: dayStartIso(),
+    limit: 1000,
+  })
+  const sessions = scopedStoreAdminSessions(sessionRows, {
+    companyId,
+    storeIds,
+    userIds,
+    strictStoreScope,
+  })
   const sessionIds = sessions.map((item) => item.id).filter(Boolean)
   const turns = await listTurns(sessionIds, true, 3000)
 
@@ -569,17 +624,27 @@ export async function getAliyunRdsStoreAdminMembers(ctx: AppAccountContext, requ
   }
 }
 
-async function listLedger(companyIds: string[], startAt: string) {
-  if (!companyIds.length) return []
+async function listStoreAdminLedger(args: {
+  companyId: string
+  storeIds: string[]
+  strictStoreScope: boolean
+  startAt: string
+}) {
+  if (args.strictStoreScope && !args.storeIds.length) return []
+  const storeScopeClause = args.strictStoreScope
+    ? "store_id = any($3::uuid[])"
+    : "(store_id is null or store_id = any($3::uuid[]))"
   const result = await queryAliyunRds<LedgerRow>(
     `
       select id, user_id, company_id, store_id, action_code, action_title, page_path, delta, balance_after, status, reason, created_at
       from public.mp_ai_point_ledger
-      where company_id = any($1::uuid[]) and created_at >= $2
+      where company_id = $1
+        and created_at >= $2
+        and ${storeScopeClause}
       order by created_at desc
       limit 2000
     `,
-    [companyIds, startAt],
+    [args.companyId, args.startAt, args.storeIds],
   )
   return result.rows
 }
@@ -595,40 +660,44 @@ export async function getAliyunRdsStoreAdminAnalytics(ctx: AppAccountContext, re
   const scope = await resolveStores(ctx, request)
   const startAt = rangeStartIso(days)
   const companyIdSet = new Set([companyId])
-  const requestedStoreIdSet = new Set([requestedStoreId].filter(Boolean))
-  const storeIdSet = new Set(
-    (requestedStoreIdSet.size ? Array.from(requestedStoreIdSet) : scope.stores.map((store) => store.id))
-      .map((id: unknown) => cleanText(id, 80))
-      .filter(Boolean),
-  )
-  for (const store of scope.stores || []) {
-    const itemCompanyId = cleanText(store.company_id, 80)
-    if (itemCompanyId) companyIdSet.add(itemCompanyId)
-  }
+  const storeIds = scope.stores.map((store) => cleanText(store.id, 80)).filter(Boolean)
+  const storeIdSet = new Set(storeIds)
+  const strictStoreScope = Boolean(requestedStoreId || ctx.isStoreManager)
 
-  const membershipRows = await listMemberships({ companyId, ctx, activeOnly: true, limit: 2000 })
-  const memberships = membershipRows.filter((row) => {
-    if (row.role === "service_operator") return false
-    const storeId = cleanText(row.store_id, 80)
-    if (!storeId) return !Boolean(requestedStoreId || ctx.isStoreManager)
-    if (!storeIdSet.size) return true
-    return storeIdSet.has(storeId)
+  const membershipRows = await listMemberships({
+    activeOnly: true,
+    companyId,
+    storeIds,
+    strictStoreScope,
+    limit: 2000,
   })
+  const memberships = scopedMemberships(membershipRows, { ctx, storeIds, strictStoreScope })
   const userIds = Array.from(new Set(memberships.map((row) => cleanText(row.user_id, 80)).filter(Boolean)))
-  const userIdSet = new Set(userIds)
   const profiles = await listProfiles(userIds, true)
   const profileMap = mapById(profiles)
   const storeMap = mapById(scope.stores)
-  const allSessions = await listSessionsByUsers(userIds, startAt, 5000)
-  const sessions = allSessions.filter((row) => scopedSession(row, { companyIdSet, storeIdSet, userIdSet }))
+  const allSessions = await listStoreAdminSessions({
+    companyId,
+    storeIds,
+    strictStoreScope,
+    userIds,
+    startAt,
+    limit: 5000,
+  })
+  const sessions = scopedStoreAdminSessions(allSessions, {
+    companyId,
+    storeIds,
+    strictStoreScope,
+    userIds,
+  })
   const sessionIds = sessions.map((session) => session.id).filter(Boolean)
   const turns = await listTurns(sessionIds, false, 15000)
-  const ledgerRows = await listLedger(Array.from(companyIdSet), startAt)
+  const ledgerRows = await listStoreAdminLedger({ companyId, storeIds, strictStoreScope, startAt })
   const ledger = ledgerRows.filter((row) =>
     scopedLedger(row, {
       companyIdSet,
       storeIdSet,
-      strictStoreScope: Boolean(requestedStoreId || ctx.isStoreManager),
+      strictStoreScope,
     }),
   )
 
