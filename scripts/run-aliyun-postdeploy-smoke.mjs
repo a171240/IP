@@ -2,8 +2,19 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, isAbsolute, resolve } from "node:path"
-import { fileURLToPath } from "node:url"
+import { fileURLToPath, pathToFileURL } from "node:url"
 import { spawnSync } from "node:child_process"
+
+import {
+  canonicalizeDeploymentIdentity,
+  canonicalIsoTimestampMs,
+  observeDeploymentIdentities,
+  publicProvenanceErrorCode,
+} from "./lib/aliyun-deployment-identity.mjs"
+import {
+  APP_API_SMOKE_PROBE_SET_ID,
+  PROBES,
+} from "./smoke-app-api-production-cn.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -17,6 +28,63 @@ const FORBIDDEN_HOSTS = new Set([
   "www.ipnrgc.com",
   "ipnrgc.com",
 ])
+const PRODUCTION_HEALTH_CHECK_GROUPS = Object.freeze([
+  "aliyunRds",
+  "legalLinks",
+  "aliyunOssRuntime",
+  "bailianAsr",
+  "serviceRecordSummary",
+  "volcSpeech",
+])
+const PRODUCTION_HEALTH_METADATA = Object.freeze({
+  service: "meiye-huajing-app-api",
+  env: "production-cn",
+  region: "cn-hangzhou",
+  mode: "aliyun-production-cn",
+})
+const REMOTE_LOCAL_RDS_UNAVAILABLE_EXPECTED_COUNT = PROBES.filter(
+  (probe) => probe.runtimeExpectation === "local_rds_unavailable",
+).length
+
+function canonicalizeAllowedMissing(value) {
+  if (!Array.isArray(value)) throw new Error("invalid_allowed_missing")
+  const groups = new Set()
+  for (const group of value) {
+    if (
+      typeof group !== "string" ||
+      !PRODUCTION_HEALTH_CHECK_GROUPS.includes(group) ||
+      groups.has(group)
+    ) {
+      throw new Error("invalid_allowed_missing")
+    }
+    groups.add(group)
+  }
+  return PRODUCTION_HEALTH_CHECK_GROUPS.filter((group) => groups.has(group))
+}
+
+function parseAllowedMissing(value) {
+  if (!value) return []
+  const groups = value.split(",").map((group) => group.trim())
+  if (groups.some((group) => group.length === 0)) throw new Error("invalid_allowed_missing")
+  return canonicalizeAllowedMissing(groups)
+}
+
+function closeAllowedMissing(value) {
+  try {
+    return { ok: true, groups: canonicalizeAllowedMissing(value) }
+  } catch {
+    return { ok: false, groups: [] }
+  }
+}
+
+function closeBaseUrl(value) {
+  try {
+    const normalized = normalizeBaseUrl(value)
+    return typeof value === "string" && value === normalized ? normalized : null
+  } catch {
+    return null
+  }
+}
 
 function parseArgs(argv) {
   const args = {
@@ -24,9 +92,10 @@ function parseArgs(argv) {
     baseUrl: "",
     outDir: "",
     timeoutMs: DEFAULT_TIMEOUT_MS,
-    allowMissing: "",
+    allowedMissing: [],
     allowCustomHost: false,
   }
+  let allowedMissingProvided = false
   for (let index = 2; index < argv.length; index += 1) {
     const arg = argv[index]
     if (arg === "--") continue
@@ -48,7 +117,9 @@ function parseArgs(argv) {
       continue
     }
     if (arg === "--allow-missing") {
-      args.allowMissing = requireValue(argv[++index], "--allow-missing")
+      if (allowedMissingProvided) throw new Error("invalid_allowed_missing")
+      args.allowedMissing = parseAllowedMissing(requireValue(argv[++index], "--allow-missing"))
+      allowedMissingProvided = true
       continue
     }
     if (arg === "--allow-custom-host") {
@@ -70,6 +141,325 @@ function parseArgs(argv) {
     args.outDir = resolve(DEFAULT_OUT_PARENT, `meiye-huajing-aliyun-postdeploy-smoke-${stamp}`)
   }
   return args
+}
+
+export function buildPostdeploySmokeReport({
+  generatedAt,
+  baseUrl,
+  allowedMissing,
+  steps,
+  outputFiles,
+}) {
+  const generatedAtMs = canonicalIsoTimestampMs(generatedAt)
+  if (generatedAtMs === null) throw new Error("invalid_smoke_generated_at")
+  const closedBaseUrl = closeBaseUrl(baseUrl)
+  const closedAllowedMissing = closeAllowedMissing(allowedMissing)
+  const closedSteps = {
+    remoteHealth: closeSmokeStep("remote_health", steps?.remoteHealth, {
+      now: generatedAtMs,
+      expectedBaseUrl: closedBaseUrl,
+      expectedAllowedMissing: closedAllowedMissing.ok ? closedAllowedMissing.groups : null,
+    }),
+    appApiSmoke: closeSmokeStep("app_api_smoke", steps?.appApiSmoke, {
+      now: generatedAtMs,
+      expectedBaseUrl: closedBaseUrl,
+    }),
+  }
+  const remoteResult = closedSteps.remoteHealth.result
+  const observed = observeDeploymentIdentities([
+    remoteResult?.healthz?.observedDeploymentIdentity,
+    remoteResult?.health?.observedDeploymentIdentity,
+    remoteResult?.strictHealth?.observedDeploymentIdentity,
+  ], { now: generatedAtMs })
+  let provenanceErrorCode = remoteResult
+    ? publicProvenanceErrorCode(observed.errorCode)
+    : "REMOTE_DEPLOYMENT_IDENTITY_INVALID"
+  if (remoteResult && remoteResult.provenanceErrorCode !== provenanceErrorCode) {
+    provenanceErrorCode = "REMOTE_DEPLOYMENT_IDENTITY_INVALID"
+  }
+  if (!observed.ready && remoteResult) {
+    for (const healthKey of ["healthz", "health", "strictHealth"]) {
+      remoteResult[healthKey].observedDeploymentIdentity = null
+    }
+  }
+  const observedBaseUrls = [
+    steps?.remoteHealth?.result?.baseUrl,
+    steps?.appApiSmoke?.result?.baseUrl,
+  ]
+  const hasBaseUrlMismatch = observedBaseUrls.some((observedBaseUrl) => (
+    typeof observedBaseUrl === "string" && observedBaseUrl !== closedBaseUrl
+  ))
+  return {
+    generatedAt,
+    baseUrl: closedBaseUrl !== null && !hasBaseUrlMismatch ? closedBaseUrl : "",
+    deploymentIdentity: observed.ready ? observed.identity : null,
+    provenanceErrorCode,
+    allowedMissing: closedAllowedMissing.groups,
+    ok: provenanceErrorCode === null && observed.ready && closedSteps.remoteHealth.ok && closedSteps.appApiSmoke.ok,
+    steps: closedSteps,
+    outputFiles: closeOutputFiles(outputFiles),
+  }
+}
+
+const STEP_FIELDS = Object.freeze(["ok", "status", "errorCode", "result"])
+const OUTPUT_FILE_FIELDS = Object.freeze([
+  "remoteHealth",
+  "appApiSmoke",
+  "reportJson",
+  "reportMarkdown",
+])
+const REMOTE_RESULT_FIELDS = Object.freeze([
+  "baseUrl",
+  "allowedMissing",
+  "provenanceErrorCode",
+  "healthz",
+  "health",
+  "strictHealth",
+])
+const HEALTH_SUMMARY_FIELDS = Object.freeze([
+  "status",
+  "service",
+  "env",
+  "region",
+  "mode",
+  "checks",
+  "ok",
+  "missing",
+  "observedDeploymentIdentity",
+])
+const APP_RESULT_FIELDS = Object.freeze([
+  "baseUrl",
+  "probeSetId",
+  "runtimePlan",
+  "checkedProbes",
+  "scopes",
+  "probes",
+])
+const RUNTIME_PLAN_FIELDS = Object.freeze([
+  "localMode",
+  "aliyunRdsReady",
+  "localRdsUnavailableExpected",
+])
+const ALLOWED_STEP_ERROR_CODES = Object.freeze({
+  remote_health: new Set([
+    "REMOTE_HEALTH_CHILD_FAILED",
+    "REMOTE_HEALTH_OUTPUT_INVALID",
+    "REMOTE_HEALTH_STEP_INVALID",
+    "REMOTE_HEALTH_RESULT_INVALID",
+  ]),
+  app_api_smoke: new Set([
+    "APP_API_SMOKE_CHILD_FAILED",
+    "APP_API_SMOKE_OUTPUT_INVALID",
+    "APP_API_SMOKE_STEP_INVALID",
+    "APP_API_SMOKE_RESULT_INVALID",
+  ]),
+})
+
+function isPlainObject(value) {
+  return Boolean(
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    Object.getPrototypeOf(value) === Object.prototype
+  )
+}
+
+function hasExactFields(value, requiredFields) {
+  if (!isPlainObject(value)) return false
+  const actual = Object.keys(value).sort()
+  const expected = [...requiredFields].sort()
+  return actual.length === expected.length && actual.every((field, index) => field === expected[index])
+}
+
+function sanitizeRemoteHealthSummary(value, healthKey, now, allowedMissing) {
+  if (!hasExactFields(value, HEALTH_SUMMARY_FIELDS)) throw new Error("REMOTE_HEALTH_RESULT_INVALID")
+  if (
+    !Number.isInteger(value.status) ||
+    typeof value.ok !== "boolean" ||
+    !Array.isArray(value.missing) ||
+    !hasExactFields(value.checks, PRODUCTION_HEALTH_CHECK_GROUPS)
+  ) {
+    throw new Error("REMOTE_HEALTH_RESULT_INVALID")
+  }
+  for (const [field, expected] of Object.entries(PRODUCTION_HEALTH_METADATA)) {
+    if (value[field] !== expected) throw new Error("REMOTE_HEALTH_RESULT_INVALID")
+  }
+  if (PRODUCTION_HEALTH_CHECK_GROUPS.some((group) => typeof value.checks[group] !== "boolean")) {
+    throw new Error("REMOTE_HEALTH_RESULT_INVALID")
+  }
+  const checks = Object.fromEntries(
+    PRODUCTION_HEALTH_CHECK_GROUPS.map((group) => [group, value.checks[group]]),
+  )
+  const expectedMissing = PRODUCTION_HEALTH_CHECK_GROUPS.filter((group) => checks[group] === false)
+  const expectedStatus = healthKey === "strictHealth" && expectedMissing.length > 0 ? 503 : 200
+  if (
+    value.missing.length !== expectedMissing.length ||
+    value.missing.some((item, index) => item !== expectedMissing[index]) ||
+    expectedMissing.some((group) => !allowedMissing.has(group)) ||
+    value.ok !== (expectedMissing.length === 0) ||
+    value.status !== expectedStatus
+  ) {
+    throw new Error("REMOTE_HEALTH_RESULT_INVALID")
+  }
+  let observedDeploymentIdentity = null
+  if (value.observedDeploymentIdentity !== null) {
+    const canonical = canonicalizeDeploymentIdentity(value.observedDeploymentIdentity, { now })
+    if (canonical.ok) observedDeploymentIdentity = canonical.identity
+  }
+  return {
+    status: value.status,
+    ...PRODUCTION_HEALTH_METADATA,
+    checks,
+    ok: value.ok,
+    missing: expectedMissing,
+    observedDeploymentIdentity,
+  }
+}
+
+function sanitizeRemoteHealthResult(value, options) {
+  if (!hasExactFields(value, REMOTE_RESULT_FIELDS)) throw new Error("REMOTE_HEALTH_RESULT_INVALID")
+  if (options.expectedBaseUrl === null || value.baseUrl !== options.expectedBaseUrl) {
+    throw new Error("REMOTE_HEALTH_RESULT_INVALID")
+  }
+  const remoteAllowedMissing = closeAllowedMissing(value.allowedMissing)
+  if (
+    !remoteAllowedMissing.ok ||
+    !Array.isArray(options.expectedAllowedMissing) ||
+    remoteAllowedMissing.groups.length !== options.expectedAllowedMissing.length ||
+    remoteAllowedMissing.groups.some((group, index) => group !== options.expectedAllowedMissing[index])
+  ) {
+    throw new Error("REMOTE_HEALTH_RESULT_INVALID")
+  }
+  const allowedMissing = new Set(remoteAllowedMissing.groups)
+  const allowedProvenanceCodes = new Set([
+    null,
+    "REMOTE_DEPLOYMENT_IDENTITY_UNAVAILABLE",
+    "REMOTE_DEPLOYMENT_IDENTITY_INVALID",
+    "REMOTE_DEPLOYMENT_IDENTITY_MIXED",
+  ])
+  if (!allowedProvenanceCodes.has(value.provenanceErrorCode)) throw new Error("REMOTE_HEALTH_RESULT_INVALID")
+  return {
+    baseUrl: options.expectedBaseUrl,
+    allowedMissing: remoteAllowedMissing.groups,
+    provenanceErrorCode: value.provenanceErrorCode,
+    healthz: sanitizeRemoteHealthSummary(value.healthz, "healthz", options.now, allowedMissing),
+    health: sanitizeRemoteHealthSummary(value.health, "health", options.now, allowedMissing),
+    strictHealth: sanitizeRemoteHealthSummary(value.strictHealth, "strictHealth", options.now, allowedMissing),
+  }
+}
+
+function expectedScopeCounts() {
+  const counts = new Map()
+  for (const probe of PROBES) counts.set(probe.scope, (counts.get(probe.scope) || 0) + 1)
+  return Object.fromEntries([...counts.entries()].sort(([left], [right]) => left.localeCompare(right)))
+}
+
+function sanitizeAppApiResult(value, expectedBaseUrl) {
+  if (!hasExactFields(value, APP_RESULT_FIELDS)) throw new Error("APP_API_SMOKE_RESULT_INVALID")
+  if (
+    expectedBaseUrl === null ||
+    value.baseUrl !== expectedBaseUrl ||
+    value.probeSetId !== APP_API_SMOKE_PROBE_SET_ID ||
+    value.checkedProbes !== PROBES.length ||
+    !hasExactFields(value.runtimePlan, RUNTIME_PLAN_FIELDS) ||
+    value.runtimePlan.localMode !== false ||
+    value.runtimePlan.aliyunRdsReady !== "not_checked_for_remote_base_url" ||
+    value.runtimePlan.localRdsUnavailableExpected !== REMOTE_LOCAL_RDS_UNAVAILABLE_EXPECTED_COUNT ||
+    !hasExactFields(value.scopes, Object.keys(expectedScopeCounts())) ||
+    !Array.isArray(value.probes) ||
+    value.probes.length !== PROBES.length
+  ) {
+    throw new Error("APP_API_SMOKE_RESULT_INVALID")
+  }
+  const scopes = expectedScopeCounts()
+  if (Object.keys(scopes).some((scope) => value.scopes[scope] !== scopes[scope])) {
+    throw new Error("APP_API_SMOKE_RESULT_INVALID")
+  }
+  const probes = value.probes.map((observed, index) => {
+    const expectedProbe = PROBES[index]
+    const expectedFields = ["scope", "method", "path", "status", "code"]
+    if (expectedProbe.runtimeExpectation) expectedFields.push("runtimeExpectation")
+    if (!hasExactFields(observed, expectedFields)) throw new Error("APP_API_SMOKE_RESULT_INVALID")
+    const matched = expectedProbe.expected.some((expected) => (
+      observed.status === expected.status && observed.code === expected.code
+    ))
+    if (
+      !matched ||
+      observed.scope !== expectedProbe.scope ||
+      observed.method !== expectedProbe.method ||
+      observed.path !== expectedProbe.path ||
+      observed.runtimeExpectation !== expectedProbe.runtimeExpectation
+    ) {
+      throw new Error("APP_API_SMOKE_RESULT_INVALID")
+    }
+    return {
+      scope: expectedProbe.scope,
+      method: expectedProbe.method,
+      path: expectedProbe.path,
+      status: observed.status,
+      code: observed.code,
+      ...(expectedProbe.runtimeExpectation ? { runtimeExpectation: expectedProbe.runtimeExpectation } : {}),
+    }
+  })
+  return {
+    baseUrl: expectedBaseUrl,
+    probeSetId: APP_API_SMOKE_PROBE_SET_ID,
+    runtimePlan: {
+      localMode: false,
+      aliyunRdsReady: "not_checked_for_remote_base_url",
+      localRdsUnavailableExpected: REMOTE_LOCAL_RDS_UNAVAILABLE_EXPECTED_COUNT,
+    },
+    checkedProbes: PROBES.length,
+    scopes,
+    probes,
+  }
+}
+
+function closeSmokeStep(label, step, options = {}) {
+  if (!hasExactFields(step, STEP_FIELDS)) {
+    return {
+      ok: false,
+      status: Number.isInteger(step?.status) ? step.status : -1,
+      errorCode: label === "remote_health" ? "REMOTE_HEALTH_STEP_INVALID" : "APP_API_SMOKE_STEP_INVALID",
+      result: null,
+    }
+  }
+  const status = Number.isInteger(step.status) ? step.status : -1
+  if (step.ok !== true || status !== 0 || step.errorCode !== null) {
+    return {
+      ok: false,
+      status,
+      errorCode: ALLOWED_STEP_ERROR_CODES[label].has(step.errorCode)
+        ? step.errorCode
+        : label === "remote_health" ? "REMOTE_HEALTH_CHILD_FAILED" : "APP_API_SMOKE_CHILD_FAILED",
+      result: null,
+    }
+  }
+  try {
+    return {
+      ok: true,
+      status: 0,
+      errorCode: null,
+      result: label === "remote_health"
+        ? sanitizeRemoteHealthResult(step.result, options)
+        : sanitizeAppApiResult(step.result, options.expectedBaseUrl),
+    }
+  } catch {
+    return {
+      ok: false,
+      status: 0,
+      errorCode: label === "remote_health" ? "REMOTE_HEALTH_RESULT_INVALID" : "APP_API_SMOKE_RESULT_INVALID",
+      result: null,
+    }
+  }
+}
+
+function closeOutputFiles(outputFiles) {
+  if (!hasExactFields(outputFiles, OUTPUT_FILE_FIELDS)) throw new Error("invalid_output_files")
+  if (OUTPUT_FILE_FIELDS.some((field) => typeof outputFiles[field] !== "string" || outputFiles[field].trim().length === 0)) {
+    throw new Error("invalid_output_files")
+  }
+  return Object.fromEntries(OUTPUT_FILE_FIELDS.map((field) => [field, outputFiles[field]]))
 }
 
 function requireValue(value, name) {
@@ -130,7 +520,9 @@ function runNode(script, args) {
     encoding: "utf8",
     maxBuffer: 1024 * 1024 * 20,
   })
-  if (result.error) throw result.error
+  if (result.error) {
+    return { status: -1, stdout: "", stderr: "" }
+  }
   return {
     status: result.status,
     stdout: (result.stdout || "").trim(),
@@ -138,12 +530,13 @@ function runNode(script, args) {
   }
 }
 
-function parseJsonStep(label, output) {
+export function buildSmokeChildStep(label, output) {
+  const errorCodePrefix = label === "remote_health" ? "REMOTE_HEALTH" : "APP_API_SMOKE"
   if (output.status !== 0) {
     return {
       ok: false,
-      status: output.status,
-      error: compactError(output),
+      status: Number.isInteger(output.status) ? output.status : -1,
+      errorCode: `${errorCodePrefix}_CHILD_FAILED`,
       result: null,
     }
   }
@@ -151,25 +544,17 @@ function parseJsonStep(label, output) {
     return {
       ok: true,
       status: 0,
-      error: null,
+      errorCode: null,
       result: JSON.parse(output.stdout),
     }
-  } catch (error) {
+  } catch {
     return {
       ok: false,
       status: 0,
-      error: `invalid_json_from_${label}:${error instanceof Error ? error.message : String(error)}`,
+      errorCode: `${errorCodePrefix}_OUTPUT_INVALID`,
       result: null,
     }
   }
-}
-
-function compactError(output) {
-  return (output.stderr || output.stdout || `exit ${output.status}`)
-    .split(/\r?\n/)
-    .filter(Boolean)
-    .slice(0, 10)
-    .join(" | ")
 }
 
 function assertNoSecretValues(report) {
@@ -191,7 +576,7 @@ function writeJson(filePath, payload) {
   writeFileSync(filePath, JSON.stringify(payload, null, 2), { mode: 0o600 })
 }
 
-function writeMarkdown(filePath, report) {
+export function renderPostdeploySmokeMarkdown(report) {
   const lines = [
     "# 美业话镜 APP production-cn 阿里云 postdeploy smoke",
     "",
@@ -217,16 +602,44 @@ function writeMarkdown(filePath, report) {
   ]
   if (!report.ok) {
     lines.push("", "## 错误", "")
-    if (report.steps.remoteHealth.error) lines.push(`- remoteHealth: ${report.steps.remoteHealth.error}`)
-    if (report.steps.appApiSmoke.error) lines.push(`- appApiSmoke: ${report.steps.appApiSmoke.error}`)
+    if (report.provenanceErrorCode) lines.push(`- provenance: ${report.provenanceErrorCode}`)
+    if (report.steps.remoteHealth.errorCode) lines.push(`- remoteHealth: ${report.steps.remoteHealth.errorCode}`)
+    if (report.steps.appApiSmoke.errorCode) lines.push(`- appApiSmoke: ${report.steps.appApiSmoke.errorCode}`)
   }
-  writeFileSync(filePath, `${lines.join("\n")}\n`, { mode: 0o600 })
+  return `${lines.join("\n")}\n`
+}
+
+function writeMarkdown(filePath, report) {
+  writeFileSync(filePath, renderPostdeploySmokeMarkdown(report), { mode: 0o600 })
+}
+
+export function buildPostdeployConsoleSummary(report, outDir) {
+  return {
+    ok: report.ok,
+    baseUrl: report.baseUrl,
+    outDir,
+    allowedMissing: report.allowedMissing,
+    provenanceErrorCode: report.provenanceErrorCode,
+    remoteHealth: {
+      ok: report.steps.remoteHealth.ok,
+      status: report.steps.remoteHealth.status,
+      errorCode: report.steps.remoteHealth.errorCode,
+    },
+    appApiSmoke: {
+      ok: report.steps.appApiSmoke.ok,
+      status: report.steps.appApiSmoke.status,
+      checkedProbes: report.steps.appApiSmoke.result?.checkedProbes || 0,
+      errorCode: report.steps.appApiSmoke.errorCode,
+    },
+    reportJson: report.outputFiles.reportJson,
+    reportMarkdown: report.outputFiles.reportMarkdown,
+  }
 }
 
 function printHelp() {
   console.log([
     "Usage:",
-    "  node scripts/run-aliyun-postdeploy-smoke.mjs --base-url https://api-cn.ipgongchang.xin [--allow-missing appWechatLogin,legalLinks] [--out-dir /tmp/path]",
+    "  node scripts/run-aliyun-postdeploy-smoke.mjs --base-url https://api-cn.ipgongchang.xin [--out-dir /tmp/path]",
     "",
     "Runs deployed Aliyun health smoke and APP API smoke, then writes non-secret JSON/Markdown reports outside the repo.",
     "If --base-url is omitted, APP_API_BASE_URL is read from .env.production-cn.local.",
@@ -245,7 +658,9 @@ function main() {
     "--timeout-ms",
     String(args.timeoutMs),
   ]
-  if (args.allowMissing) healthArgs.push("--allow-missing", args.allowMissing)
+  if (args.allowedMissing.length > 0) {
+    healthArgs.push("--allow-missing", args.allowedMissing.join(","))
+  }
   const appApiArgs = [
     "--base-url",
     args.baseUrl,
@@ -253,8 +668,8 @@ function main() {
     String(args.timeoutMs),
   ]
 
-  const remoteHealth = parseJsonStep("remote_health", runNode("scripts/smoke-aliyun-remote.mjs", healthArgs))
-  const appApiSmoke = parseJsonStep("app_api_smoke", runNode("scripts/smoke-app-api-production-cn.mjs", appApiArgs))
+  const remoteHealth = buildSmokeChildStep("remote_health", runNode("scripts/smoke-aliyun-remote.mjs", healthArgs))
+  const appApiSmoke = buildSmokeChildStep("app_api_smoke", runNode("scripts/smoke-app-api-production-cn.mjs", appApiArgs))
 
   const outputFiles = {
     remoteHealth: resolve(args.outDir, "remote-health-smoke.json"),
@@ -262,56 +677,31 @@ function main() {
     reportJson: resolve(args.outDir, "postdeploy-smoke.json"),
     reportMarkdown: resolve(args.outDir, "postdeploy-smoke.md"),
   }
-  const report = {
+  const report = buildPostdeploySmokeReport({
     generatedAt: new Date().toISOString(),
     baseUrl: args.baseUrl,
-    allowedMissing: args.allowMissing ? args.allowMissing.split(",").map((item) => item.trim()).filter(Boolean) : [],
-    ok: remoteHealth.ok && appApiSmoke.ok,
+    allowedMissing: args.allowedMissing,
     steps: {
       remoteHealth,
       appApiSmoke,
     },
     outputFiles,
-  }
+  })
 
   assertNoSecretValues(report)
-  writeJson(outputFiles.remoteHealth, remoteHealth)
-  writeJson(outputFiles.appApiSmoke, appApiSmoke)
+  writeJson(outputFiles.remoteHealth, report.steps.remoteHealth)
+  writeJson(outputFiles.appApiSmoke, report.steps.appApiSmoke)
   writeJson(outputFiles.reportJson, report)
   writeMarkdown(outputFiles.reportMarkdown, report)
-  console.log(JSON.stringify({
-    ok: report.ok,
-    baseUrl: report.baseUrl,
-    outDir: args.outDir,
-    allowedMissing: report.allowedMissing,
-    remoteHealth: {
-      ok: remoteHealth.ok,
-      status: remoteHealth.status,
-      summary: remoteHealth.result
-        ? {
-            healthz: remoteHealth.result.healthz,
-            health: remoteHealth.result.health,
-            strictHealth: remoteHealth.result.strictHealth,
-          }
-        : null,
-      error: remoteHealth.error,
-    },
-    appApiSmoke: {
-      ok: appApiSmoke.ok,
-      status: appApiSmoke.status,
-      checkedProbes: appApiSmoke.result?.checkedProbes || 0,
-      scopes: appApiSmoke.result?.scopes || null,
-      error: appApiSmoke.error,
-    },
-    reportJson: outputFiles.reportJson,
-    reportMarkdown: outputFiles.reportMarkdown,
-  }, null, 2))
+  console.log(JSON.stringify(buildPostdeployConsoleSummary(report, args.outDir), null, 2))
   if (!report.ok) process.exit(1)
 }
 
-try {
-  main()
-} catch (error) {
-  console.error(error instanceof Error ? error.message : String(error))
-  process.exit(1)
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  try {
+    main()
+  } catch {
+    console.error("POSTDEPLOY_SMOKE_FAILED")
+    process.exit(1)
+  }
 }

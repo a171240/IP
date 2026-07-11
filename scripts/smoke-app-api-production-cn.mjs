@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn } from "node:child_process"
+import { createHash } from "node:crypto"
 import { existsSync, readFileSync } from "node:fs"
 import net from "node:net"
 import { dirname, isAbsolute, resolve } from "node:path"
@@ -14,6 +15,8 @@ const LOCAL_RDS_UNAVAILABLE_EXPECTED = Object.freeze([
   { status: 503, code: "rds_not_configured" },
   { status: 503, code: "rds_unavailable" },
 ])
+const ALLOWED_HTTP_METHODS = new Set(["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"])
+const PUBLIC_ERROR_CODE_PATTERN = /^[a-z][a-z0-9_]*$/
 
 export const MUTATION_EXCLUDED_ROUTES = [
   {
@@ -50,44 +53,44 @@ export const PROBES = [
     scope: "account",
     method: "GET",
     path: "/api/app/profile",
-    expected: [{ status: 401 }],
+    expected: [{ status: 401, code: "auth_required" }],
   },
   {
     scope: "account",
     method: "GET",
     path: "/api/app/entitlements",
-    expected: [{ status: 401 }],
+    expected: [{ status: 401, code: "auth_required" }],
   },
   {
     scope: "store-admin",
     method: "GET",
     path: "/api/app/store-admin/overview",
-    expected: [{ status: 401 }],
+    expected: [{ status: 401, code: "auth_required" }],
   },
   {
     scope: "store-admin",
     method: "GET",
     path: "/api/app/store-admin/members",
-    expected: [{ status: 401 }],
+    expected: [{ status: 401, code: "auth_required" }],
   },
   {
     scope: "store-admin",
     method: "GET",
     path: "/api/app/store-admin/analytics",
-    expected: [{ status: 401 }],
+    expected: [{ status: 401, code: "auth_required" }],
   },
   {
     scope: "service-records",
     method: "GET",
     path: "/api/app/store-admin/service-records",
-    expected: [{ status: 401 }],
+    expected: [{ status: 401, code: "auth_required" }],
   },
   {
     scope: "invites",
     method: "POST",
     path: "/api/app/store-admin/invites",
     body: {},
-    expected: [{ status: 401 }],
+    expected: [{ status: 401, code: "auth_required" }],
   },
   {
     scope: "invites",
@@ -108,133 +111,239 @@ export const PROBES = [
     method: "POST",
     path: "/api/app/store-admin/invites/app-smoke-invalid-token/accept",
     body: {},
-    expected: [{ status: 401 }],
+    expected: [{ status: 401, code: "auth_required" }],
   },
   {
     scope: "context",
     method: "GET",
     path: "/api/app/store-profiles",
-    expected: [{ status: 401 }],
+    expected: [{ status: 401, code: "auth_required" }],
   },
   {
     scope: "context",
     method: "GET",
     path: "/api/app/store-profiles/app-smoke-profile",
-    expected: [{ status: 401 }],
+    expected: [{ status: 401, code: "auth_required" }],
   },
   {
     scope: "context",
     method: "GET",
     path: "/api/app/customer-profiles",
-    expected: [{ status: 401 }],
+    expected: [{ status: 401, code: "auth_required" }],
   },
   {
     scope: "context",
     method: "GET",
     path: "/api/app/customer-profiles/app-smoke-profile",
-    expected: [{ status: 401 }],
+    expected: [{ status: 401, code: "auth_required" }],
   },
   {
     scope: "context",
     method: "GET",
     path: "/api/app/scene-cards",
-    expected: [{ status: 401 }],
+    expected: [{ status: 401, code: "auth_required" }],
   },
   {
     scope: "context",
     method: "GET",
     path: "/api/app/scene-cards/app-smoke-card",
-    expected: [{ status: 401 }],
+    expected: [{ status: 401, code: "auth_required" }],
+  },
+  {
+    scope: "learning-progress",
+    method: "GET",
+    path: "/api/app/learning/progress",
+    expected: [{ status: 401, code: "auth_required" }],
+  },
+  {
+    scope: "learning-progress",
+    method: "POST",
+    path: "/api/app/learning/progress/events",
+    body: {},
+    expected: [{ status: 401, code: "auth_required" }],
+  },
+  {
+    scope: "learning-progress",
+    method: "POST",
+    path: "/api/app/learning/progress/sync",
+    body: {},
+    expected: [{ status: 401, code: "auth_required" }],
   },
   {
     scope: "service-records",
     method: "GET",
     path: "/api/app/service-records/sessions",
-    expected: [{ status: 401 }],
+    expected: [{ status: 401, code: "auth_required" }],
   },
   {
     scope: "service-records",
     method: "POST",
     path: "/api/app/service-records/sessions",
     body: {},
-    expected: [{ status: 401 }],
+    expected: [{ status: 401, code: "auth_required" }],
   },
   {
     scope: "service-records",
     method: "POST",
     path: "/api/app/service-records/device-files/check",
     body: { files: [] },
-    expected: [{ status: 401 }],
+    expected: [{ status: 401, code: "auth_required" }],
   },
   {
     scope: "service-records",
     method: "GET",
     path: "/api/app/service-records/sessions/app-smoke-session",
-    expected: [{ status: 401 }],
+    expected: [{ status: 401, code: "auth_required" }],
   },
   {
     scope: "service-records",
     method: "POST",
     path: "/api/app/service-records/sessions/app-smoke-session/segments",
     body: {},
-    expected: [{ status: 401 }],
+    expected: [{ status: 401, code: "auth_required" }],
   },
   {
     scope: "service-records",
     method: "POST",
     path: "/api/app/service-records/sessions/app-smoke-session/oss-upload",
     body: {},
-    expected: [{ status: 401 }],
+    expected: [{ status: 401, code: "auth_required" }],
   },
   {
     scope: "service-records",
     method: "POST",
     path: "/api/app/service-records/sessions/app-smoke-session/segments/oss",
     body: {},
-    expected: [{ status: 401 }],
+    expected: [{ status: 401, code: "auth_required" }],
   },
   {
     scope: "service-records",
     method: "POST",
     path: "/api/app/service-records/sessions/app-smoke-session/markers",
     body: {},
-    expected: [{ status: 401 }],
+    expected: [{ status: 401, code: "auth_required" }],
   },
   {
     scope: "service-records",
     method: "POST",
     path: "/api/app/service-records/sessions/app-smoke-session/resume",
     body: {},
-    expected: [{ status: 401 }],
+    expected: [{ status: 401, code: "auth_required" }],
   },
   {
     scope: "service-records",
     method: "POST",
     path: "/api/app/service-records/sessions/app-smoke-session/end",
     body: {},
-    expected: [{ status: 401 }],
+    expected: [{ status: 401, code: "auth_required" }],
   },
   {
     scope: "service-records",
     method: "POST",
     path: "/api/app/service-records/sessions/app-smoke-session/process",
     body: {},
-    expected: [{ status: 401 }],
+    expected: [{ status: 401, code: "auth_required" }],
   },
   {
     scope: "service-records",
     method: "POST",
     path: "/api/app/service-records/sessions/app-smoke-session/asr/poll",
     body: {},
-    expected: [{ status: 401 }],
+    expected: [{ status: 401, code: "auth_required" }],
   },
   {
     scope: "service-records",
     method: "GET",
     path: "/api/app/service-records/sessions/app-smoke-session/audio/app-smoke-segment",
-    expected: [{ status: 401 }],
+    expected: [{ status: 401, code: "auth_required" }],
   },
 ]
+
+function normalizeProbeContractValue(value, path = "$probes") {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw new Error(`non_finite_probe_contract_number:${path}`)
+    return value
+  }
+  if (Array.isArray(value)) {
+    return value.map((item, index) => normalizeProbeContractValue(item, `${path}[${index}]`))
+  }
+  if (value && typeof value === "object") {
+    const prototype = Object.getPrototypeOf(value)
+    if (prototype !== Object.prototype) {
+      throw new Error(`unsupported_probe_contract_object:${path}`)
+    }
+    return Object.fromEntries(Object.keys(value).sort().map((key, index) => [
+      key,
+      normalizeProbeContractValue(value[key], `${path}.key[${index}]`),
+    ]))
+  }
+  throw new Error(`unsupported_probe_contract_value:${path}:${typeof value}`)
+}
+
+function validateProbeContract(probes) {
+  if (!Array.isArray(probes) || probes.length === 0) {
+    throw new Error("invalid_probe_contract:probes:not_nonempty_array")
+  }
+
+  const routeKeys = new Set()
+  probes.forEach((probe, probeIndex) => {
+    if (!probe || typeof probe !== "object" || Array.isArray(probe) || Object.getPrototypeOf(probe) !== Object.prototype) {
+      throw new Error(`invalid_probe_contract:item:${probeIndex}:not_plain_object`)
+    }
+    if (typeof probe.scope !== "string" || probe.scope.trim().length === 0) {
+      throw new Error(`invalid_probe_contract:item:${probeIndex}:scope`)
+    }
+    if (typeof probe.method !== "string" || !ALLOWED_HTTP_METHODS.has(probe.method)) {
+      throw new Error(`invalid_probe_contract:item:${probeIndex}:method`)
+    }
+    if (typeof probe.path !== "string" || !probe.path.startsWith("/")) {
+      throw new Error(`invalid_probe_contract:item:${probeIndex}:path`)
+    }
+    if (!Array.isArray(probe.expected) || probe.expected.length === 0) {
+      throw new Error(`invalid_probe_contract:item:${probeIndex}:expected`)
+    }
+    probe.expected.forEach((expected, expectedIndex) => {
+      if (!expected || typeof expected !== "object" || Array.isArray(expected) || Object.getPrototypeOf(expected) !== Object.prototype) {
+        throw new Error(`invalid_probe_contract:item:${probeIndex}:expected:${expectedIndex}:not_plain_object`)
+      }
+      if (!Number.isInteger(expected.status) || expected.status < 100 || expected.status > 599) {
+        throw new Error(`invalid_probe_contract:item:${probeIndex}:expected:${expectedIndex}:status`)
+      }
+      if (
+        !Object.hasOwn(expected, "code") ||
+        typeof expected.code !== "string" ||
+        expected.code.length === 0 ||
+        expected.code !== expected.code.trim() ||
+        !PUBLIC_ERROR_CODE_PATTERN.test(expected.code)
+      ) {
+        throw new Error(`invalid_probe_contract:item:${probeIndex}:expected:${expectedIndex}:code`)
+      }
+    })
+
+    const routeKey = `${probe.method} ${probe.path}`
+    if (routeKeys.has(routeKey)) {
+      throw new Error(`invalid_probe_contract:item:${probeIndex}:duplicate_method_path`)
+    }
+    routeKeys.add(routeKey)
+  })
+}
+
+export function buildAppApiSmokeProbeSetId(probes) {
+  validateProbeContract(probes)
+  let safeProbeContract
+  try {
+    safeProbeContract = normalizeProbeContractValue(probes)
+  } catch {
+    throw new Error("invalid_probe_contract:value")
+  }
+  const digest = createHash("sha256")
+    .update(JSON.stringify(safeProbeContract))
+    .digest("hex")
+  return `app_api_smoke_probe_set_v1:${safeProbeContract.length}:${digest}`
+}
+
+export const APP_API_SMOKE_PROBE_SET_ID = buildAppApiSmokeProbeSetId(PROBES)
 
 function parseArgs(argv) {
   const args = {
@@ -435,7 +544,7 @@ async function stopServer(child) {
   ])
 }
 
-async function requestProbe(baseUrl, probe, timeoutMs) {
+async function requestProbe(baseUrl, probe, timeoutMs, probeOrdinal) {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
   try {
@@ -453,17 +562,16 @@ async function requestProbe(baseUrl, probe, timeoutMs) {
     try {
       body = JSON.parse(text)
     } catch {
-      throw new Error(`invalid_json:${probe.method}:${probe.path}:${response.status}`)
+      throw new Error(`APP_API_PROBE_INVALID_JSON:${probeOrdinal}:${safeNumericStatus(response.status)}`)
     }
-    assertNoSensitiveFields(text, probe)
+    assertNoSensitiveFields(text, probeOrdinal, response.status)
     const code = body && typeof body === "object" ? String(body.code || body.error || "") : ""
     const matched = probe.expected.some((item) => {
       if (item.status !== response.status) return false
-      return !item.code || item.code === code
+      return item.code === code
     })
     if (!matched) {
-      const expected = probe.expected.map((item) => `${item.status}${item.code ? `/${item.code}` : ""}`).join("|")
-      throw new Error(`unexpected_probe_result:${probe.method}:${probe.path}:got_${response.status}/${code}:expected_${expected}`)
+      throw new Error(`APP_API_PROBE_RESULT_MISMATCH:${probeOrdinal}:${safeNumericStatus(response.status)}`)
     }
     return {
       scope: probe.scope,
@@ -473,14 +581,21 @@ async function requestProbe(baseUrl, probe, timeoutMs) {
       code,
       ...(probe.runtimeExpectation ? { runtimeExpectation: probe.runtimeExpectation } : {}),
     }
+  } catch (error) {
+    if (error instanceof Error && /^APP_API_PROBE_[A-Z_]+:\d+:\d+$/.test(error.message)) throw error
+    throw new Error(`APP_API_PROBE_REQUEST_FAILED:${probeOrdinal}:0`)
   } finally {
     clearTimeout(timeout)
   }
 }
 
-function assertNoSensitiveFields(text, probe) {
+function safeNumericStatus(value) {
+  return Number.isInteger(value) && value >= 100 && value <= 599 ? value : 0
+}
+
+function assertNoSensitiveFields(text, probeOrdinal, status) {
   if (/(SECRET|TOKEN|PASSWORD|PRIVATE_KEY|SERVICE_ROLE|ACCESS_KEY|DASHSCOPE_API_KEY|DEEPSEEK_API_KEY)/i.test(text)) {
-    throw new Error(`probe_response_contains_sensitive_field_name:${probe.method}:${probe.path}`)
+    throw new Error(`APP_API_PROBE_SENSITIVE_RESPONSE:${probeOrdinal}:${safeNumericStatus(status)}`)
   }
 }
 
@@ -509,8 +624,8 @@ function printHelp() {
 
 async function runWithBaseUrl(baseUrl, timeoutMs, probes = PROBES) {
   const results = []
-  for (const probe of probes) {
-    results.push(await requestProbe(baseUrl, probe, timeoutMs))
+  for (const [probeOrdinal, probe] of probes.entries()) {
+    results.push(await requestProbe(baseUrl, probe, timeoutMs, probeOrdinal))
   }
   return results
 }
@@ -537,16 +652,18 @@ async function main() {
     const probes = await runWithBaseUrl(baseUrl, args.timeoutMs, probePlan)
     console.log(JSON.stringify({
       baseUrl,
+      probeSetId: APP_API_SMOKE_PROBE_SET_ID,
       runtimePlan: summarizeRuntimePlan(probePlan, { env, localMode }),
       checkedProbes: probes.length,
       scopes: summarizeScopes(probes),
       probes,
     }, null, 2))
   } catch (error) {
-    const recentServerLines = server?.logs?.join("").split(/\r?\n/).filter(Boolean).slice(-6) || []
+    const errorCode = error instanceof Error && /^APP_API_PROBE_[A-Z_]+:\d+:\d+$/.test(error.message)
+      ? error.message
+      : "APP_API_SMOKE_FAILED"
     console.error(JSON.stringify({
-      error: error instanceof Error ? error.message : String(error),
-      recentServerLines,
+      errorCode,
     }, null, 2))
     process.exitCode = 1
   } finally {

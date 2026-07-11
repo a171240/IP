@@ -1,5 +1,12 @@
 # APP production-cn RDS migration evidence check
 
+> Status: `HISTORICAL_EXTERNAL_EVIDENCE_NOT_CURRENT`
+>
+> This is a 2026-07-01 external snapshot from `/Users/Admin/Documents/美业话镜APP/handoff/IP`.
+> It does not satisfy the current controller evidence gate, and the historical
+> `migrationReady: true` below must not be interpreted as current evidence.
+> Current verification requires a fresh local evidence file and a fresh checker run.
+
 Generated at: 2026-07-01T08:20:55.311Z
 
 ## Conclusion

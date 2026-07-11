@@ -118,6 +118,23 @@ const IMPLEMENTATION_WORK_PACKAGE_TEMPLATES = [
       "Generated invite links point to the production-cn backend/app base URL without exposing token hashes.",
     ],
   },
+  {
+    id: "RDS_WP06_PROFESSIONAL_LEARNING_PROGRESS",
+    scope: "learning-progress",
+    title: "Professional and speech learning progress event repository",
+    proposedRepositoryFiles: [
+      "lib/aliyun-rds/repositories/learning-progress.server.ts",
+    ],
+    blockedBy: [
+      "account_context_repository_ready",
+      "app_learning_progress_events_table_migrated",
+    ],
+    acceptanceGates: [
+      "Learning progress query, event, and sync routes use the DATABASE_URL_CN-backed event store.",
+      "Company, store, membership, and user scope remain enforced before progress is returned or written.",
+      "Client event idempotency and viewed/practiced aggregation are validated against migrated RDS data.",
+    ],
+  },
 ]
 
 function parseArgs(argv) {
@@ -288,6 +305,7 @@ function capabilityForRoute(route) {
   if (scope === "store-admin") return ["profile_multi_tenant_permissions", "store_manager_service_record_read"]
   if (path.includes("/store-profiles")) return ["profile_multi_tenant_permissions"]
   if (path.includes("/customer-profiles")) return ["service_record_long_recording", "store_manager_service_record_read"]
+  if (scope === "learning-progress") return ["professional_learning_progress"]
   if (scope === "service-records") return ["service_record_long_recording", "store_manager_service_record_read"]
   return []
 }
@@ -460,7 +478,7 @@ function buildReport(args) {
     nextRequiredActions: routes.filter((route) => route.stillUsesSupabaseDataAccess).length === 0
       ? [
           "Create or confirm Aliyun RDS PostgreSQL in cn-hangzhou before importing DATABASE_URL_CN.",
-          "Keep the APP-native RDS work packages in place and validate account, context, service-records, store-admin, and invites against migrated RDS data.",
+          "Keep the APP-native RDS work packages in place and validate account, context, service-records, store-admin, invites, and professional learning progress against migrated RDS data.",
           "Run schema/data migration, row-count validation, critical-record validation, APP API smoke, and rollback rehearsal.",
         ]
       : [

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 const test = require("node:test")
 const assert = require("node:assert/strict")
 const { execFileSync } = require("node:child_process")
@@ -16,12 +17,13 @@ const fixtureCloudConfirmations = path.join(
 )
 const secretLike = /(sk-[A-Za-z0-9_-]{20,}|LTAI[A-Za-z0-9]{12,}|:\/\/[^\s:@]+:[^\s@]+@|AccessKeySecret\s*[:=]\s*\S{8,}|DATABASE_URL_CN\s*=\s*\S{8,})/i
 
-function writeSanitizedCloudConfirmationsFixture() {
+function writeSanitizedCloudConfirmationsFixture(mutate) {
   const source = readJson(fixtureCloudConfirmations)
   const sanitized = {
     ...source,
     notes: `${source.notes} Copied by static test into temporary template/local files.`,
   }
+  if (mutate) mutate(sanitized)
   const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-cloud-confirmations-fixture-"))
   const templatePath = path.join(tmpdir, "cloud-confirmations.template.json")
   const localPath = path.join(tmpdir, "cloud-confirmations.local.json")
@@ -30,8 +32,8 @@ function writeSanitizedCloudConfirmationsFixture() {
   return { templatePath, localPath }
 }
 
-function runCloudConfirmations(args = []) {
-  const { templatePath, localPath } = writeSanitizedCloudConfirmationsFixture()
+function runCloudConfirmations(args = [], mutate) {
+  const { templatePath, localPath } = writeSanitizedCloudConfirmationsFixture(mutate)
   const output = execFileSync(process.execPath, [
     "scripts/check-aliyun-cloud-confirmations.mjs",
     "--template",
@@ -163,4 +165,93 @@ test("Aliyun cloud confirmations backend-only mode uses fixture blockers without
   assert.ok(groupById.get("assetDomainHttps").blockers.includes("assetDomainHttps:confirmed"))
   assert.ok(report.nextActions.some((item) => item.includes("backend-only 口径下微信开放平台移动应用")))
   assertNoSecretLikeValues(output)
+})
+
+test("allow-incomplete reports one missing local evidence file without crashing", () => {
+  const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-cloud-confirmations-missing-local-"))
+  const missingLocalPath = path.join(tmpdir, "cloud-confirmations.local.json")
+  const output = execFileSync(process.execPath, [
+    "scripts/check-aliyun-cloud-confirmations.mjs",
+    "--backend-only",
+    "--allow-incomplete",
+    "--local",
+    missingLocalPath,
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 80,
+  })
+  const report = JSON.parse(output)
+
+  assert.equal(report.ok, false)
+  assert.equal(report.local.exists, false)
+  assert.deepEqual(report.local.blockers, ["file_missing"])
+  assert.deepEqual(report.local.itemStatus, {})
+  assert.equal(report.envImportPlan.ready, false)
+  assert.ok(Array.isArray(report.envImportPlan.readySecretBatchIds))
+  assert.ok(Array.isArray(report.envImportPlan.blockedSecretBatchIds))
+  assert.ok(Array.isArray(report.envImportPlan.blockedCredentialNames))
+  assertNoSecretLikeValues(output)
+})
+
+test("ready SAE runtime exposes only one validated five-field deployment identity", () => {
+  const example = readJson("deploy", "aliyun-production-cn.cloud-confirmations.example.json")
+  const checker = read("scripts", "check-aliyun-cloud-confirmations.mjs")
+  const expectedIdentity = {
+    imageDigest: `sha256:${"a".repeat(64)}`,
+    saeAppId: "sae-app-20260711",
+    saeDeploymentId: "sae-change-order-20260711",
+    saeVersionId: "sae-version-20260711",
+    deploymentCompletedAt: "2026-07-11T11:00:00.000Z",
+  }
+  const expectedAcrImage = "meiye-huajing-app-api-registry.cn-hangzhou.cr.aliyuncs.com/meiye/meiye-huajing-app-api:production-cn"
+  for (const field of ["imageDigest", "appId", "lastDeployChangeOrderId", "saeVersionId", "deploymentCompletedAt"]) {
+    assert.ok(Object.hasOwn(example.items.runtime, field), `${field} should be documented in the example`)
+  }
+  assert.match(checker, /deploymentIdentity/)
+
+  const mutateReadyRuntime = (data) => {
+    Object.assign(data.items.runtime, {
+      confirmed: true,
+      imageDigest: expectedIdentity.imageDigest,
+      appId: expectedIdentity.saeAppId,
+      lastDeployChangeOrderId: expectedIdentity.saeDeploymentId,
+      saeVersionId: expectedIdentity.saeVersionId,
+      deploymentCompletedAt: expectedIdentity.deploymentCompletedAt,
+      acrImage: expectedAcrImage,
+      imagePullConfigured: true,
+    })
+  }
+  const { output, report } = runCloudConfirmations(["--backend-only", "--allow-incomplete"], mutateReadyRuntime)
+  assert.equal(report.local.itemStatus.runtime.ready, true)
+  assert.deepEqual(report.local.itemStatus.runtime.deploymentIdentity, expectedIdentity)
+  assert.deepEqual(Object.keys(report.local.itemStatus.runtime).sort(), ["blockers", "deploymentIdentity", "ready"])
+  assertNoSecretLikeValues(output)
+
+  const invalidCases = [
+    ["imageDigest", "sha256:invalid", "deployment_identity_image_digest"],
+    ["appId", "TODO_APP", "deployment_identity_sae_app_id"],
+    ["appId", "todo-app", "deployment_identity_sae_app_id"],
+    ["appId", "pending_app", "deployment_identity_sae_app_id"],
+    ["appId", "TBD-app", "deployment_identity_sae_app_id"],
+    ["lastDeployChangeOrderId", "contains whitespace", "deployment_identity_sae_deployment_id"],
+    ["saeVersionId", "", "deployment_identity_sae_version_id"],
+    ["deploymentCompletedAt", "2026-07-11 11:00:00", "deployment_identity_completed_at"],
+    ["deploymentCompletedAt", "2099-01-01T00:00:00.000Z", "deployment_identity_completed_in_future"],
+    ["provider", "ECS", "provider=SAE"],
+    ["region", "cn-shanghai", "region=cn-hangzhou"],
+    ["appName", "wrong-app", "appName=meiye-huajing-app-api-production-cn"],
+    ["imagePullConfigured", false, "imagePullConfigured=true"],
+    ["acrImage", "TODO_ACR_IMAGE", "acrImage=production-cn"],
+    ["acrImage", "docker.io/example/backend:latest", "acrImage=production-cn"],
+  ]
+  for (const [field, value, blocker] of invalidCases) {
+    const invalid = runCloudConfirmations(["--backend-only", "--allow-incomplete"], (data) => {
+      mutateReadyRuntime(data)
+      data.items.runtime[field] = value
+    })
+    assert.equal(invalid.report.local.itemStatus.runtime.ready, false, field)
+    assert.ok(invalid.report.local.itemStatus.runtime.blockers.includes(blocker), field)
+    assert.equal(invalid.report.local.itemStatus.runtime.deploymentIdentity, null)
+  }
 })

@@ -5,6 +5,7 @@ const assert = require("node:assert/strict")
 const { execFileSync } = require("node:child_process")
 const fs = require("node:fs")
 const path = require("node:path")
+const { pathToFileURL } = require("node:url")
 
 const root = process.cwd()
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), "utf8")
@@ -69,14 +70,16 @@ test("APP client API contract audits implemented package-2 and content workflow 
   assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
 })
 
-test("APP route and coverage gates include implemented package-2 facades", () => {
+test("APP route and coverage gates include implemented package-2 facades", async () => {
   const routes = runJsonScript("scripts/check-app-api-production-cn-routes.mjs").report
   const coverage = runJsonScript("scripts/check-app-api-smoke-coverage.mjs").report
   const contract = read("scripts", "check-app-client-api-contract.mjs")
+  const { REQUIRED_ROUTES } = await import(pathToFileURL(path.join(root, "scripts", "check-app-api-production-cn-routes.mjs")).href)
+  const requiredByRoute = new Map(REQUIRED_ROUTES.map((item) => [item.route, item]))
 
   assert.equal(routes.checkedRoutes, 60)
-  assert.equal(routes.requiredRoutes, 34)
-  assert.equal(routes.implementedFacadeRoutes, 26)
+  assert.equal(routes.requiredRoutes, 37)
+  assert.equal(routes.implementedFacadeRoutes, 23)
   assert.equal(routes.scopes.account, 3)
   assert.equal(routes.scopes.assets, 1)
   assert.equal(routes.scopes["content-drafts"], 1)
@@ -87,14 +90,24 @@ test("APP route and coverage gates include implemented package-2 facades", () =>
   assert.equal(routes.scopes["learning-progress"], 3)
   assert.equal(routes.scopes["voice-coach"], 8)
   assert.deepEqual(routes.failures, [])
+  for (const expected of [
+    { route: "/api/app/learning/progress", methods: ["GET"] },
+    { route: "/api/app/learning/progress/events", methods: ["POST"] },
+    { route: "/api/app/learning/progress/sync", methods: ["POST"] },
+  ]) {
+    const route = requiredByRoute.get(expected.route)
+    assert.ok(route, `${expected.route} should be required`)
+    assert.equal(route.scope, "learning-progress")
+    assert.deepEqual(route.methods, expected.methods)
+  }
 
   assert.equal(coverage.ok, true)
   assert.equal(coverage.checkedRoutes, 60)
-  assert.equal(coverage.requiredRoutes, 34)
+  assert.equal(coverage.requiredRoutes, 37)
   assert.equal(coverage.businessRoutes, 58)
-  assert.equal(coverage.smokeProbes, 32)
+  assert.equal(coverage.smokeProbes, 35)
   assert.equal(coverage.coverageOnlyProbes, 29)
-  assert.equal(coverage.coverageProbes, 61)
+  assert.equal(coverage.coverageProbes, 64)
   assert.equal(coverage.coveredBusinessRoutes, 58)
   assert.equal(coverage.scopes.account, 3)
   assert.equal(coverage.scopes.assets, 1)

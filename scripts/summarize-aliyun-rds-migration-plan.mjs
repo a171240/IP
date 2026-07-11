@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from "node:fs"
 import { dirname, extname, isAbsolute, relative, resolve } from "node:path"
-import { fileURLToPath } from "node:url"
+import { fileURLToPath, pathToFileURL } from "node:url"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -73,6 +73,11 @@ const FIRST_VERSION_RDS_REQUIRED_MATCHERS = Object.freeze([
     pattern: /^\/api\/app\/customer-profiles(?:\/.*)?$/,
     capability: "service_record_long_recording",
     reason: "Customer profile context needed by first-version service records.",
+  },
+  {
+    pattern: /^\/api\/app\/learning\/progress(?:\/(?:events|sync))?$/,
+    capability: "professional_learning_progress",
+    reason: "S2 professional and speech learning progress required by the first Tab.",
   },
   {
     pattern: /^\/api\/app\/service-records(?:\/.*)?$/,
@@ -256,7 +261,7 @@ function buildBridgeMapSummary() {
   }
 }
 
-function classifyFirstVersionRdsScope(routePath, bridgeRoute) {
+export function classifyFirstVersionRdsScope(routePath, bridgeRoute) {
   if (routePath === "/api/app/health") {
     return {
       firstVersionRdsRequired: false,
@@ -866,9 +871,11 @@ function printHelp() {
   ].join("\n"))
 }
 
-try {
-  main()
-} catch (error) {
-  console.error(error instanceof Error ? error.message : String(error))
-  process.exit(1)
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  try {
+    main()
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error))
+    process.exit(1)
+  }
 }

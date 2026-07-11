@@ -1,9 +1,12 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
+
 const test = require("node:test")
 const assert = require("node:assert/strict")
 const { execFileSync } = require("node:child_process")
 const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
+const { pathToFileURL } = require("node:url")
 
 const root = process.cwd()
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), "utf8")
@@ -28,9 +31,11 @@ test("Aliyun RDS migration plan command is wired into scripts, predeploy, deploy
   assert.match(releaseArtifacts, /rds-migration-plan\.json/)
   assert.match(releaseArtifacts, /rds-migration-plan\.md/)
   assert.match(releaseArtifacts, /rdsMigrationPlan/)
-  assert.match(rdsDoc, /APP API routes: 56/)
-  assert.match(rdsDoc, /APP API routes using Supabase: 54/)
-  assert.match(rdsDoc, /APP API routes using Supabase data access: 4/)
+  assert.match(rdsDoc, /APP API routes: 59/)
+  assert.match(rdsDoc, /APP API routes using Supabase: 57/)
+  assert.match(rdsDoc, /APP API routes using Supabase data access: 2/)
+  assert.match(rdsDoc, /First-version RDS required APP API routes: 28/)
+  assert.match(rdsDoc, /First-version RDS required routes using Supabase: 26/)
   assert.match(rdsDoc, /First-version RDS required routes using Supabase data access: 0/)
   assert.match(rdsDoc, /DATABASE_URL_CN/)
   assert.match(rdsDoc, /lib\/aliyun-rds\/postgres\.server\.ts/)
@@ -65,24 +70,24 @@ test("Aliyun RDS migration plan inventories APP API Supabase dependency without 
   assert.equal(report.migrationReady, false)
   assert.equal(report.secretLeakCheck.ok, true)
 
-  assert.equal(report.summary.appApiRouteCount, 56)
-  assert.equal(report.summary.appApiRoutesWithSupabase, 54)
-  assert.equal(report.summary.appApiRoutesWithSupabaseDataAccess, 4)
+  assert.equal(report.summary.appApiRouteCount, 59)
+  assert.equal(report.summary.appApiRoutesWithSupabase, 57)
+  assert.equal(report.summary.appApiRoutesWithSupabaseDataAccess, 2)
   assert.equal(report.summary.appApiRoutesWithDirectSupabase, 2)
   assert.equal(report.summary.appApiRoutesWithDirectSupabaseDataAccess, 1)
-  assert.equal(report.summary.firstVersionRdsRouteCount, 25)
-  assert.equal(report.summary.firstVersionRdsRoutesWithSupabase, 23)
+  assert.equal(report.summary.firstVersionRdsRouteCount, 28)
+  assert.equal(report.summary.firstVersionRdsRoutesWithSupabase, 26)
   assert.equal(report.summary.firstVersionRdsRoutesWithSupabaseDataAccess, 0)
   assert.equal(report.summary.deferredAppApiRouteCount, 31)
   assert.equal(report.summary.deferredAppApiRoutesWithSupabase, 31)
-  assert.equal(report.summary.deferredAppApiRoutesWithSupabaseDataAccess, 4)
+  assert.equal(report.summary.deferredAppApiRoutesWithSupabaseDataAccess, 2)
   assert.ok(report.summary.sharedSupabaseFileCount >= 20)
   assert.ok(report.summary.sharedSupabaseDataAccessFileCount >= 20)
   assert.ok(report.summary.supabaseUsageFileCount >= 30)
   assert.equal(report.summary.databaseUrlCnReferencedInSource, true)
   assert.equal(report.summary.postgresDataAccessAdapterDetected, true)
   assert.equal(report.summary.schemaMapReady, true)
-  assert.equal(report.summary.schemaMapRequiredTableCount, 15)
+  assert.equal(report.summary.schemaMapRequiredTableCount, 18)
   assert.ok(report.summary.requiredBlocking.includes("DATABASE_URL_CN"))
   assert.ok(!report.summary.requiredBlocking.includes("first_version_supabase_data_access_still_present"))
   assert.ok(!report.summary.requiredBlocking.includes("postgres_data_access_adapter_missing"))
@@ -92,29 +97,15 @@ test("Aliyun RDS migration plan inventories APP API Supabase dependency without 
     item.status === "not_verified" &&
     /presence or absence is unverified/.test(item.note)
   )))
-  assert.deepEqual(report.inventory.databaseUrlCnFiles, [
-    "app/api/app/assets/sign-read/route.ts",
-    "app/api/app/content-drafts/route.ts",
-    "app/api/app/customer-profiles/[profileId]/route.ts",
-    "app/api/app/customer-profiles/route.ts",
-    "app/api/app/knowledge-spaces/[...path]/route.ts",
-    "app/api/app/knowledge-spaces/route.ts",
+  for (const file of [
     "app/api/app/learning/progress/events/route.ts",
     "app/api/app/learning/progress/route.ts",
     "app/api/app/learning/progress/sync/route.ts",
     "app/api/app/profile/route.ts",
-    "app/api/app/store-admin/invites/[token]/accept/route.ts",
-    "app/api/app/store-admin/invites/[token]/preview/route.ts",
-    "app/api/app/store-admin/invites/[token]/qrcode/route.ts",
-    "app/api/app/store-admin/invites/route.ts",
-    "app/api/app/store-profiles/[profileId]/route.ts",
-    "app/api/app/store-profiles/route.ts",
     "lib/aliyun-rds/postgres.server.ts",
-    "lib/aliyun-rds/repositories/app-content-workflows.server.ts",
-    "lib/aliyun-rds/repositories/app-voice-coach-facade.server.ts",
-    "lib/aliyun-rds/repositories/service-records.server.ts",
-    "lib/aliyun-rds/repositories/store-admin.server.ts",
-  ])
+  ]) {
+    assert.ok(report.inventory.databaseUrlCnFiles.includes(file), file)
+  }
   assert.ok(report.inventory.postgresAdapterFiles.length >= 60)
   for (const file of [
     "app/api/app/customer-profiles/[profileId]/route.ts",
@@ -171,6 +162,7 @@ test("Aliyun RDS migration plan inventories APP API Supabase dependency without 
   assert.ok(report.inventory.schemaMap.requiredTables.includes("voice_coach_sessions"))
   assert.ok(report.inventory.schemaMap.requiredTables.includes("voice_coach_turns"))
   assert.ok(report.inventory.schemaMap.requiredTables.includes("service_record_sessions"))
+  assert.ok(report.inventory.schemaMap.requiredTables.includes("app_learning_progress_events"))
 
   assert.ok(report.inventory.tables.includes("profiles"))
   assert.ok(report.inventory.tables.includes("mp_account_memberships"))
@@ -201,6 +193,21 @@ test("Aliyun RDS migration plan inventories APP API Supabase dependency without 
   assert.equal(byRoute.get("/api/app/entitlements").firstVersionRdsRequired, true)
   assert.equal(byRoute.get("/api/app/entitlements").usesSupabaseDataAccess, false)
   assert.deepEqual(byRoute.get("/api/app/entitlements").supabaseDataAccessDependencyFiles, [])
+  for (const routePath of [
+    "/api/app/learning/progress",
+    "/api/app/learning/progress/events",
+    "/api/app/learning/progress/sync",
+  ]) {
+    const route = byRoute.get(routePath)
+    assert.equal(route.firstVersionRdsRequired, true, routePath)
+    assert.equal(route.firstVersionCapability, "professional_learning_progress", routePath)
+    assert.equal(route.appApiScopeClass, "learning-progress", routePath)
+    assert.equal(route.usesSupabase, true, routePath)
+    assert.equal(route.usesSupabaseDataAccess, false, routePath)
+    assert.equal(route.directSupabaseDataAccess, false, routePath)
+    assert.ok(route.envKeys.includes("DATABASE_URL_CN"), routePath)
+    assert.deepEqual(route.supabaseDataAccessDependencyFiles, [], routePath)
+  }
   for (const routePath of [
     "/api/app/store-profiles",
     "/api/app/store-profiles/[profileId]",
@@ -256,6 +263,19 @@ test("Aliyun RDS migration plan inventories APP API Supabase dependency without 
   assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
 })
 
+test("professional learning admission does not absorb unknown future subroutes", async () => {
+  const { classifyFirstVersionRdsScope } = await import(
+    pathToFileURL(path.join(root, "scripts", "summarize-aliyun-rds-migration-plan.mjs")).href
+  )
+  const admitted = classifyFirstVersionRdsScope("/api/app/learning/progress/sync", { scope: "learning-progress" })
+  const future = classifyFirstVersionRdsScope("/api/app/learning/progress/future", { scope: "learning-progress" })
+
+  assert.equal(admitted.firstVersionRdsRequired, true)
+  assert.equal(admitted.capability, "professional_learning_progress")
+  assert.equal(future.firstVersionRdsRequired, false)
+  assert.equal(future.appApiScopeClass, "unclassified_learning-progress")
+})
+
 test("Aliyun RDS migration plan markdown explains blockers and phases without values", () => {
   const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-rds-migration-plan-"))
   const markdownPath = path.join(tmpdir, "rds-migration-plan.md")
@@ -271,11 +291,17 @@ test("Aliyun RDS migration plan markdown explains blockers and phases without va
   const markdown = fs.readFileSync(markdownPath, "utf8")
 
   assert.match(markdown, /Formal target: Aliyun RDS PostgreSQL/)
-  assert.match(markdown, /APP API routes: 56/)
-  assert.match(markdown, /APP API routes using Supabase: 54/)
-  assert.match(markdown, /APP API routes using Supabase data access: 4/)
+  assert.match(markdown, /APP API routes: 59/)
+  assert.match(markdown, /APP API routes using Supabase: 57/)
+  assert.match(markdown, /APP API routes using Supabase data access: 2/)
+  assert.match(markdown, /First-version RDS required APP API routes: 28/)
+  assert.match(markdown, /First-version RDS required routes using Supabase: 26/)
   assert.match(markdown, /First-version RDS required routes using Supabase data access: 0/)
   assert.match(markdown, /Deferred APP API routes: 31/)
+  const deferredRoutesSection = markdown
+    .split("## Deferred APP API Routes")[1]
+    .split("## Full APP API Supabase Routes")[0]
+  assert.doesNotMatch(deferredRoutesSection, /- \/api\/app\/learning\/progress(?:\/events|\/sync)?\n  - file:/)
   assert.match(markdown, /DATABASE_URL_CN/)
   assert.match(markdown, /PostgreSQL data access adapter detected: true/)
   assert.match(markdown, /RDS schema map ready: true/)

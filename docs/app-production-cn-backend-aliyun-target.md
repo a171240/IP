@@ -1,5 +1,9 @@
 # 美业话镜 APP production-cn 阿里云后端补齐目标
 
+> Historical snapshot only — this 2026-06-24 target note is not current readiness evidence.
+> Historical `25`-route counts below do not satisfy the current RDS or B08 gates.
+> Current facts require fresh validators and a structured `postdeploy-smoke.json` from the standard producer.
+
 Date: 2026-06-24
 
 当前目标已经收窄为：先把 APP 后端补到阿里云，微信开放平台移动应用先不做，等项目后端上线后再推进。

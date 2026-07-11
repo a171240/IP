@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
+
 const test = require("node:test")
 const assert = require("node:assert/strict")
 const { execFileSync } = require("node:child_process")
@@ -48,20 +50,24 @@ test("Aliyun RDS route migration map covers first-version APP route data access 
   assert.equal(report.currentSource, "Supabase migration source / legacy compatibility only")
   assert.equal(report.secretLeakCheck.ok, true)
 
-  assert.equal(report.summary.firstVersionRouteCount, 25)
+  assert.equal(report.summary.bridgeRouteCount, 37)
+  assert.equal(report.summary.firstVersionRouteCount, 28)
   assert.equal(report.summary.routesStillUsingSupabaseDataAccess, 0)
-  assert.equal(report.summary.routesUsingAliyunRdsDataAccess, 25)
+  assert.equal(report.summary.routesUsingAliyunRdsDataAccess, 28)
   assert.equal(report.summary.sharedDataAccessFileCount, 0)
-  assert.equal(report.summary.sharedRdsDataAccessFileCount, 38)
-  assert.equal(report.summary.observedTableCount, 15)
-  assert.equal(report.summary.requiredTableCount, 17)
+  assert.equal(report.summary.sharedRdsDataAccessFileCount, 42)
+  assert.equal(report.summary.observedTableCount, 16)
+  assert.equal(report.summary.requiredTableCount, 18)
   assert.equal(report.summary.observedRpcCount, 0)
   assert.equal(report.summary.requiredFunctionCount, 0)
-  assert.equal(report.summary.implementationWorkPackageCount, 5)
-  assert.equal(report.summary.proposedRepositoryFileCount, 11)
+  assert.equal(report.summary.implementationWorkPackageCount, 6)
+  assert.equal(report.summary.proposedRepositoryFileCount, 12)
   assert.deepEqual(report.summary.schemaMapMissingObservedTables, [])
   assert.deepEqual(report.summary.schemaMapMissingObservedRpcs, [])
-  assert.deepEqual(report.summary.requiredTablesWithoutRouteObservation, ["credit_transactions"])
+  assert.deepEqual(report.summary.requiredTablesWithoutRouteObservation, [
+    "app_compliance_requests",
+    "credit_transactions",
+  ])
   assert.deepEqual(report.summary.blockedCredentialNames, ["DATABASE_URL_CN"])
   assert.ok(!report.summary.rdsPlanRequiredBlocking.includes("first_version_supabase_data_access_still_present"))
 
@@ -209,6 +215,21 @@ test("Aliyun RDS route migration map covers first-version APP route data access 
   assert.ok(byRoute.get("/api/app/customer-profiles").rdsDataAccessFiles.some((item) =>
     item.file === "lib/aliyun-rds/repositories/customer-profiles.server.ts"
   ))
+  for (const routePath of [
+    "/api/app/learning/progress",
+    "/api/app/learning/progress/events",
+    "/api/app/learning/progress/sync",
+  ]) {
+    const route = byRoute.get(routePath)
+    assert.equal(route.scope, "learning-progress", routePath)
+    assert.deepEqual(route.firstVersionCapabilities, ["professional_learning_progress"], routePath)
+    assert.equal(route.stillUsesSupabaseDataAccess, false, routePath)
+    assert.equal(route.usesAliyunRdsDataAccess, true, routePath)
+    assert.ok(route.rdsTableNames.includes("app_learning_progress_events"), routePath)
+    assert.ok(route.rdsDataAccessFiles.some((item) =>
+      item.file === "lib/aliyun-rds/repositories/learning-progress.server.ts"
+    ), routePath)
+  }
   const workPackages = new Map(report.implementationWorkPackages.map((item) => [item.id, item]))
   assert.deepEqual(Array.from(workPackages.keys()), [
     "RDS_WP01_ACCOUNT_PROFILE_ENTITLEMENTS",
@@ -216,6 +237,7 @@ test("Aliyun RDS route migration map covers first-version APP route data access 
     "RDS_WP03_SERVICE_RECORDS_CORE",
     "RDS_WP04_STORE_ADMIN_READ_MODELS",
     "RDS_WP05_STORE_INVITES",
+    "RDS_WP06_PROFESSIONAL_LEARNING_PROGRESS",
   ])
   assert.equal(workPackages.get("RDS_WP01_ACCOUNT_PROFILE_ENTITLEMENTS").routeCount, 2)
   assert.ok(
@@ -296,6 +318,20 @@ test("Aliyun RDS route migration map covers first-version APP route data access 
       .get("RDS_WP05_STORE_INVITES")
       .rdsDataAccessFiles.includes("lib/aliyun-rds/repositories/store-invites.server.ts"),
   )
+  assert.equal(workPackages.get("RDS_WP06_PROFESSIONAL_LEARNING_PROGRESS").routeCount, 3)
+  assert.equal(
+    workPackages.get("RDS_WP06_PROFESSIONAL_LEARNING_PROGRESS").status,
+    "rds_repository_in_source_pending_runtime_evidence",
+  )
+  assert.equal(
+    workPackages.get("RDS_WP06_PROFESSIONAL_LEARNING_PROGRESS").routesStillUsingSupabaseDataAccess,
+    0,
+  )
+  assert.ok(
+    workPackages
+      .get("RDS_WP06_PROFESSIONAL_LEARNING_PROGRESS")
+      .rdsDataAccessFiles.includes("lib/aliyun-rds/repositories/learning-progress.server.ts"),
+  )
   assert.equal(
     report.implementationWorkPackages.filter((item) => item.status === "blocked_until_repository_uses_database_url_cn").length,
     0,
@@ -322,12 +358,12 @@ test("Aliyun RDS route migration map markdown is actionable and value-free", () 
   const report = JSON.parse(fs.readFileSync(jsonPath, "utf8"))
   const markdown = fs.readFileSync(markdownPath, "utf8")
 
-  assert.equal(report.summary.firstVersionRouteCount, 25)
+  assert.equal(report.summary.firstVersionRouteCount, 28)
   assert.match(markdown, /Aliyun RDS Route Migration Map/)
   assert.match(markdown, /routesStillUsingSupabaseDataAccess: 0/)
-  assert.match(markdown, /routesUsingAliyunRdsDataAccess: 25/)
-  assert.match(markdown, /implementationWorkPackageCount: 5/)
-  assert.match(markdown, /requiredTablesWithoutRouteObservation: credit_transactions/)
+  assert.match(markdown, /routesUsingAliyunRdsDataAccess: 28/)
+  assert.match(markdown, /implementationWorkPackageCount: 6/)
+  assert.match(markdown, /requiredTablesWithoutRouteObservation: app_compliance_requests, credit_transactions/)
   assert.match(markdown, /RDS_WP01_ACCOUNT_PROFILE_ENTITLEMENTS/)
   assert.match(markdown, /rds_repository_in_source_pending_runtime_evidence/)
   assert.match(markdown, /lib\/aliyun-rds\/repositories\/account-profile\.server\.ts/)
@@ -342,8 +378,42 @@ test("Aliyun RDS route migration map markdown is actionable and value-free", () 
   assert.match(markdown, /lib\/aliyun-rds\/repositories\/store-admin\.server\.ts/)
   assert.match(markdown, /RDS_WP05_STORE_INVITES/)
   assert.match(markdown, /lib\/aliyun-rds\/repositories\/store-invites\.server\.ts/)
+  assert.match(markdown, /RDS_WP06_PROFESSIONAL_LEARNING_PROGRESS/)
+  assert.match(markdown, /\/api\/app\/learning\/progress/)
+  assert.match(markdown, /lib\/aliyun-rds\/repositories\/learning-progress\.server\.ts/)
   assert.match(markdown, /Create or confirm Aliyun RDS PostgreSQL/)
   assert.doesNotMatch(output + markdown, secretLike)
+})
+
+test("tracked Aliyun RDS route migration map exactly matches fresh generated Markdown", () => {
+  const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-rds-route-map-drift-"))
+  const markdownPath = path.join(tmpdir, "rds-route-map.md")
+  try {
+    execFileSync(process.execPath, [
+      "scripts/generate-aliyun-rds-route-migration-map.mjs",
+      "--markdown",
+      markdownPath,
+    ], {
+      cwd: root,
+      encoding: "utf8",
+      maxBuffer: 1024 * 1024 * 50,
+    })
+    const tracked = read("docs", "app-production-cn-rds-route-migration-map.md")
+    const fresh = fs.readFileSync(markdownPath, "utf8")
+    assert.equal(tracked, fresh)
+    assert.match(tracked, /firstVersionRouteCount: 28/)
+    assert.match(tracked, /implementationWorkPackageCount: 6/)
+    assert.match(tracked, /RDS_WP06_PROFESSIONAL_LEARNING_PROGRESS/)
+    for (const route of [
+      "/api/app/learning/progress",
+      "/api/app/learning/progress/events",
+      "/api/app/learning/progress/sync",
+    ]) {
+      assert.ok(tracked.includes(route), route)
+    }
+  } finally {
+    fs.rmSync(tmpdir, { recursive: true, force: true })
+  }
 })
 
 test("Aliyun APP account profile routes use RDS repository instead of mini-program profile re-export", () => {

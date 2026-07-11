@@ -1,9 +1,21 @@
 #!/usr/bin/env node
 
-import { mkdirSync, writeFileSync } from "node:fs"
+import { spawnSync } from "node:child_process"
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, isAbsolute, resolve } from "node:path"
-import { fileURLToPath } from "node:url"
-import { runJsonWithCache } from "./lib/run-json-cache.mjs"
+import { fileURLToPath, pathToFileURL } from "node:url"
+import { APP_API_SMOKE_PROBE_SET_ID, PROBES } from "./smoke-app-api-production-cn.mjs"
+import {
+  DEPLOYMENT_IDENTITY_FIELDS,
+  canonicalizeDeploymentIdentity,
+  canonicalIsoTimestampMs,
+  isCanonicalImageDigest,
+  observeDeploymentIdentities,
+  sameDeploymentIdentity,
+  validationClockMs,
+} from "./lib/aliyun-deployment-identity.mjs"
+
+export { APP_API_SMOKE_PROBE_SET_ID }
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -14,7 +26,9 @@ const DEFAULT_CLOUD_CONFIRMATIONS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-pr
 const DEFAULT_CLOUD_INVENTORY_RESULTS_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.cloud-inventory-results.local.json")
 const DEFAULT_RDS_MIGRATION_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.rds-migration.local.json")
 const DEFAULT_IMAGE_PUBLISH_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.image-publish.local.json")
+const DEFAULT_POSTDEPLOY_SMOKE_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.postdeploy-smoke.local.json")
 const DEFAULT_CHILD_TIMEOUT_MS = 120_000
+const PRODUCTION_CN_APP_API_BASE_URL = "https://api-cn.ipgongchang.xin"
 
 const WECHAT_DEFERRED_BLOCKERS = Object.freeze([
   "WECHAT_OPEN_APP_ID",
@@ -145,6 +159,7 @@ const BACKEND_TARGETS = Object.freeze([
       "corepack pnpm aliyun:health:smoke",
       "corepack pnpm aliyun:app-api:smoke",
       "corepack pnpm aliyun:postdeploy:smoke",
+      "corepack pnpm aliyun:backend-cn:status -- --postdeploy-smoke deploy/aliyun-production-cn.postdeploy-smoke.local.json",
     ]),
   },
 ])
@@ -177,6 +192,7 @@ function parseArgs(argv) {
     cloudInventoryResultsFile: DEFAULT_CLOUD_INVENTORY_RESULTS_FILE,
     rdsMigrationFile: DEFAULT_RDS_MIGRATION_FILE,
     imagePublishFile: DEFAULT_IMAGE_PUBLISH_FILE,
+    postdeploySmokeFile: DEFAULT_POSTDEPLOY_SMOKE_FILE,
     childTimeoutMs: DEFAULT_CHILD_TIMEOUT_MS,
     outPath: "",
     markdownPath: "",
@@ -203,6 +219,10 @@ function parseArgs(argv) {
     }
     if (arg === "--image-publish") {
       args.imagePublishFile = resolveValue(argv[++index], "--image-publish")
+      continue
+    }
+    if (arg === "--postdeploy-smoke") {
+      args.postdeploySmokeFile = resolveValue(argv[++index], "--postdeploy-smoke")
       continue
     }
     if (arg === "--child-timeout-ms") {
@@ -240,17 +260,41 @@ function resolveRawValue(value, name) {
   return String(value)
 }
 
-function runJson(label, scriptArgs, options = {}) {
+function runJsonForInvocation(invocationCache, label, scriptArgs, options = {}) {
+  const cacheKey = JSON.stringify(scriptArgs)
+  if (invocationCache.has(cacheKey)) return invocationCache.get(cacheKey)
+
   const timeoutMs = options.timeoutMs ?? DEFAULT_CHILD_TIMEOUT_MS
-  return runJsonWithCache(label, scriptArgs, {
+  const childEnv = { ...process.env }
+  delete childEnv.MEIYE_ALIYUN_RUN_JSON_CACHE_DIR
+  const result = spawnSync(process.execPath, scriptArgs, {
     cwd: BACKEND_ROOT,
+    encoding: "utf8",
     maxBuffer: 1024 * 1024 * 80,
-    timeoutMs,
+    timeout: timeoutMs,
+    env: childEnv,
   })
+  if (result.error) {
+    const code = String(result.error.code || "spawn_error")
+    throw new Error(`${label}_failed:${code}`)
+  }
+  if (result.status !== 0) throw new Error(`${label}_failed:nonzero_exit`)
+
+  const stdout = String(result.stdout || "").trim()
+  if (!stdout) throw new Error(`${label}_failed:empty_stdout`)
+  let parsed
+  try {
+    parsed = JSON.parse(stdout)
+  } catch {
+    throw new Error(`${label}_failed:invalid_json`)
+  }
+  invocationCache.set(cacheKey, parsed)
+  return parsed
 }
 
 function buildReport(args) {
-  const run = (label, scriptArgs, options = {}) => runJson(label, scriptArgs, {
+  const invocationCache = new Map()
+  const run = (label, scriptArgs, options = {}) => runJsonForInvocation(invocationCache, label, scriptArgs, {
     ...options,
     timeoutMs: options.timeoutMs ?? args.childTimeoutMs,
   })
@@ -309,12 +353,15 @@ function buildReport(args) {
     "--image-publish",
     args.imagePublishFile,
   ])
+  const deploymentGate = deriveExpectedDeploymentIdentity(imagePublishPlan, cloudConfirmations)
+  const postdeploySmoke = readPostdeploySmokeReport(args.postdeploySmokeFile, { deploymentGate })
   const backendRequiredBlocking = buildBackendRequiredBlocking({
     cloudConfirmations,
     imagePublishPlan,
     cloudInventoryResults,
     resourceMatrix,
     rdsMigration,
+    postdeploySmoke,
   })
   const backendTargets = buildBackendTargets(backendRequiredBlocking, {
     cloudConfirmations,
@@ -322,6 +369,7 @@ function buildReport(args) {
     cloudInventoryResults,
     resourceMatrix,
     rdsMigration,
+    postdeploySmoke,
   })
   const cloudInventory = compactCloudInventory(cloudInventoryResults)
   const cloudResources = compactCloudResources(resourceMatrix)
@@ -393,6 +441,7 @@ function buildReport(args) {
       rdsMigrationReady: rdsMigration.localReady === true || rdsMigration.local?.ready === true,
       rdsLocalExists: rdsMigration.localExists === true || rdsMigration.local?.exists === true,
       imagePublishReady: imagePublishPlan.ready === true || imagePublishPlan.local?.ready === true,
+      postdeploySmokeReady: postdeploySmoke.ready,
       evidenceWritebackReady: evidenceWritebackBrief.evidenceWritebackReady,
       evidenceWritebackTotalGaps: evidenceWritebackBrief.totalGaps,
       evidenceWritebackGapSummary: evidenceWritebackBrief.gapSummary,
@@ -417,6 +466,7 @@ function buildReport(args) {
     rdsMigration: rdsMigrationBrief,
     imagePublish: imagePublishBrief,
     cloudConfirmations: cloudConfirmationsBrief,
+    postdeploySmoke,
     evidenceWriteback: evidenceWritebackBrief,
     credentialIntervention,
     credentialPasswordIntervention,
@@ -436,6 +486,7 @@ function buildReport(args) {
     nextBackendOrder,
     strictVerificationOrder: [
       "corepack pnpm aliyun:backend-cn:status",
+      "corepack pnpm aliyun:backend-cn:status -- --postdeploy-smoke deploy/aliyun-production-cn.postdeploy-smoke.local.json",
       "corepack pnpm aliyun:cloudshell:handoff",
       "corepack pnpm aliyun:cloud:inventory-results:strict",
       "corepack pnpm aliyun:rds:migration:evidence:strict",
@@ -464,7 +515,7 @@ function buildReport(args) {
   return report
 }
 
-function buildBackendRequiredBlocking({ cloudConfirmations, imagePublishPlan, cloudInventoryResults, resourceMatrix, rdsMigration }) {
+function buildBackendRequiredBlocking({ cloudConfirmations, imagePublishPlan, cloudInventoryResults, resourceMatrix, rdsMigration, postdeploySmoke }) {
   const blockers = new Set()
   const cloudItems = cloudConfirmationItems(cloudConfirmations)
   const inventoryNotFound = new Set(cloudInventoryResults.local?.observationSummary?.notFoundOperationIds || [])
@@ -499,27 +550,450 @@ function buildBackendRequiredBlocking({ cloudConfirmations, imagePublishPlan, cl
     if (id === "R07_SLS_ALERTS") blockers.add("SLS_ALERTS_NOT_READY")
   }
 
-  if (!isPostdeploySmokeReady({ cloudConfirmations, imagePublishPlan, resourceMatrix, rdsMigration })) {
+  if (postdeploySmoke.ready !== true) {
     blockers.add("POSTDEPLOY_SMOKE_NOT_RUN")
   }
 
   return [...blockers].filter((item) => !WECHAT_DEFERRED_BLOCKERS.includes(item)).sort()
 }
 
-function isPostdeploySmokeReady({ cloudConfirmations, imagePublishPlan, resourceMatrix, rdsMigration }) {
-  const evidenceText = [
-    JSON.stringify(resourceMatrix?.resourceEvidenceBrief?.rows || []),
-    JSON.stringify(resourceMatrix?.resources || []),
-    JSON.stringify(cloudConfirmations?.domainHttpsPlan || {}),
-    JSON.stringify(imagePublishPlan?.writebackPlan || {}),
-    JSON.stringify(rdsMigration?.local?.rdsPostgres || {}),
-  ].join("\n")
+function isPlainObject(value) {
+  return Boolean(
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    Object.getPrototypeOf(value) === Object.prototype
+  )
+}
 
-  const hasPostdeployHandle = /postdeploy[_-]?smoke/i.test(evidenceText)
-  const hasHttpsApiCnSmoke = /https[_:-]?api-cn|https:\/\/api-cn\.ipgongchang\.xin/i.test(evidenceText)
-  const hasRemoteHealth = /remote[_-]?health|smoke-aliyun-remote|healthz.*HTTP_?200|strict_?200/i.test(evidenceText)
-  const hasAppApiSmoke = /app[_-]?api.*31[_-]?probes|smoke-app-api-production-cn.*31[_-]?probes|appApiSmoke/i.test(evidenceText)
-  return hasPostdeployHandle && hasHttpsApiCnSmoke && hasRemoteHealth && hasAppApiSmoke
+function isEmptyArray(value) {
+  return Array.isArray(value) && value.length === 0
+}
+
+function appApiProbeKey(probe) {
+  return `${String(probe?.method || "").toUpperCase()} ${String(probe?.path || "")}`
+}
+
+export function deriveExpectedDeploymentIdentity(imagePublishPlan, cloudConfirmations, options = {}) {
+  const now = validationClockMs(options.now ?? Date.now())
+  if (now === null) return { ready: false, blockers: ["validation_clock_invalid"], identity: null }
+  const blockers = []
+  const b02Ready = isImagePushAndDigestReady(imagePublishPlan)
+  const runtime = cloudConfirmations?.local?.itemStatus?.runtime
+  const b03Ready = runtime?.ready === true
+  if (!b02Ready) blockers.push("deployment_identity_b02_unready")
+  if (!b03Ready) blockers.push("deployment_identity_b03_unready")
+  if (blockers.length > 0) return { ready: false, blockers: blockers.sort(), identity: null }
+
+  const imageDigest = imagePublishPlan?.local?.acr?.remoteDigest
+  if (!isCanonicalImageDigest(imageDigest)) {
+    return { ready: false, blockers: ["deployment_identity_b02_digest_invalid"], identity: null }
+  }
+  const runtimeIdentity = runtime.deploymentIdentity
+  const canonicalRuntimeIdentity = canonicalizeDeploymentIdentity(runtimeIdentity, { now })
+  if (!canonicalRuntimeIdentity.ok) {
+    if (canonicalRuntimeIdentity.errorCode === "deployment_identity_completed_in_future") {
+      return { ready: false, blockers: [canonicalRuntimeIdentity.errorCode], identity: null }
+    }
+    return { ready: false, blockers: ["deployment_identity_b03_invalid"], identity: null }
+  }
+  if (imageDigest !== canonicalRuntimeIdentity.identity.imageDigest) {
+    return { ready: false, blockers: ["deployment_identity_digest_mismatch"], identity: null }
+  }
+  return {
+    ready: true,
+    blockers: [],
+    identity: Object.fromEntries(DEPLOYMENT_IDENTITY_FIELDS.map((field) => [field, canonicalRuntimeIdentity.identity[field]])),
+  }
+}
+
+function expectedAppApiProbeScopes() {
+  const scopes = new Map()
+  for (const probe of PROBES) scopes.set(probe.scope, (scopes.get(probe.scope) || 0) + 1)
+  return Object.fromEntries([...scopes.entries()].sort(([left], [right]) => left.localeCompare(right)))
+}
+
+function hasExactRecordValues(value, expected) {
+  if (!isPlainObject(value)) return false
+  const valueKeys = Object.keys(value).sort()
+  const expectedKeys = Object.keys(expected).sort()
+  return valueKeys.length === expectedKeys.length &&
+    valueKeys.every((key, index) => key === expectedKeys[index] && value[key] === expected[key])
+}
+
+function safePostdeployMatches(report, deploymentGate, remoteIdentityGate) {
+  const remoteResult = report?.steps?.remoteHealth?.result
+  const appApiResult = report?.steps?.appApiSmoke?.result
+  return {
+    baseUrlMatchesExpected: report?.baseUrl === PRODUCTION_CN_APP_API_BASE_URL &&
+      remoteResult?.baseUrl === PRODUCTION_CN_APP_API_BASE_URL &&
+      appApiResult?.baseUrl === PRODUCTION_CN_APP_API_BASE_URL,
+    probeSetIdMatchesExpected: appApiResult?.probeSetId === APP_API_SMOKE_PROBE_SET_ID,
+    probeCountMatchesExpected: appApiResult?.checkedProbes === PROBES.length &&
+      Array.isArray(appApiResult?.probes) &&
+      appApiResult.probes.length === PROBES.length,
+    deploymentIdentityMatchesExpected: deploymentGate?.ready === true &&
+      remoteIdentityGate?.ready === true &&
+      sameDeploymentIdentity(remoteIdentityGate.identity, deploymentGate.identity) &&
+      sameDeploymentIdentity(report?.deploymentIdentity, remoteIdentityGate.identity),
+  }
+}
+
+const POSTDEPLOY_REPORT_FIELDS = Object.freeze([
+  "generatedAt",
+  "baseUrl",
+  "deploymentIdentity",
+  "provenanceErrorCode",
+  "allowedMissing",
+  "ok",
+  "steps",
+  "outputFiles",
+])
+const POSTDEPLOY_STEP_FIELDS = Object.freeze(["ok", "status", "errorCode", "result"])
+const REMOTE_HEALTH_RESULT_FIELDS = Object.freeze([
+  "baseUrl",
+  "allowedMissing",
+  "provenanceErrorCode",
+  "healthz",
+  "health",
+  "strictHealth",
+])
+const REMOTE_HEALTH_SUMMARY_FIELDS = Object.freeze([
+  "status",
+  "service",
+  "env",
+  "region",
+  "mode",
+  "checks",
+  "ok",
+  "missing",
+  "observedDeploymentIdentity",
+])
+const PRODUCTION_HEALTH_CHECK_GROUPS = Object.freeze([
+  "aliyunRds",
+  "legalLinks",
+  "aliyunOssRuntime",
+  "bailianAsr",
+  "serviceRecordSummary",
+  "volcSpeech",
+])
+const PRODUCTION_HEALTH_METADATA = Object.freeze({
+  service: "meiye-huajing-app-api",
+  env: "production-cn",
+  region: "cn-hangzhou",
+  mode: "aliyun-production-cn",
+})
+const APP_API_RESULT_FIELDS = Object.freeze([
+  "baseUrl",
+  "probeSetId",
+  "runtimePlan",
+  "checkedProbes",
+  "scopes",
+  "probes",
+])
+const OUTPUT_FILE_FIELDS = Object.freeze([
+  "remoteHealth",
+  "appApiSmoke",
+  "reportJson",
+  "reportMarkdown",
+])
+
+function hasExactFields(value, fields) {
+  if (!isPlainObject(value)) return false
+  const actual = Object.keys(value).sort()
+  const expected = [...fields].sort()
+  return actual.length === expected.length && actual.every((field, index) => field === expected[index])
+}
+
+function remoteIdentityGate(report, now) {
+  const remoteResult = report?.steps?.remoteHealth?.result
+  return observeDeploymentIdentities([
+    remoteResult?.healthz?.observedDeploymentIdentity,
+    remoteResult?.health?.observedDeploymentIdentity,
+    remoteResult?.strictHealth?.observedDeploymentIdentity,
+  ], { now })
+}
+
+function validateProductionHealthSummary(health, healthKey, healthPath) {
+  const blockers = []
+  for (const [field, expected] of Object.entries(PRODUCTION_HEALTH_METADATA)) {
+    if (health[field] !== expected) blockers.push(`${healthPath}.${field}`)
+  }
+  const checksValid = hasExactFields(health.checks, PRODUCTION_HEALTH_CHECK_GROUPS) &&
+    PRODUCTION_HEALTH_CHECK_GROUPS.every((group) => typeof health.checks[group] === "boolean")
+  if (!checksValid) {
+    blockers.push(`${healthPath}.checks`)
+    return blockers
+  }
+  const expectedMissing = PRODUCTION_HEALTH_CHECK_GROUPS.filter((group) => health.checks[group] === false)
+  const missingMatches = Array.isArray(health.missing) &&
+    health.missing.length === expectedMissing.length &&
+    health.missing.every((group, index) => group === expectedMissing[index])
+  if (!missingMatches) blockers.push(`${healthPath}.missing_consistency`)
+  if (health.ok !== (expectedMissing.length === 0)) blockers.push(`${healthPath}.ok_consistency`)
+  const expectedStatus = healthKey === "strictHealth" && expectedMissing.length > 0 ? 503 : 200
+  if (health.status !== expectedStatus) blockers.push(`${healthPath}.status_consistency`)
+  return blockers
+}
+
+export function validatePostdeploySmokeReport(report, options = {}) {
+  const blockers = []
+  const deploymentGate = options.deploymentGate
+  let matches = safePostdeployMatches(report, deploymentGate, { ready: false, identity: null })
+  const result = () => ({
+    ready: blockers.length === 0,
+    blockers: [...new Set(blockers)].sort(),
+    expectedBaseUrl: PRODUCTION_CN_APP_API_BASE_URL,
+    expectedProbeSetId: APP_API_SMOKE_PROBE_SET_ID,
+    expectedProbeCount: PROBES.length,
+    ...matches,
+  })
+
+  if (!isPlainObject(report)) {
+    blockers.push("report_not_object")
+    return result()
+  }
+  if (findSecretLikeValues(report).length > 0) {
+    blockers.push("report_sensitive_value")
+    return result()
+  }
+
+  const now = validationClockMs(options.now ?? Date.now())
+  if (now === null) {
+    blockers.push("validation_clock_invalid")
+    return result()
+  }
+  const observedIdentityGate = remoteIdentityGate(report, now)
+  matches = safePostdeployMatches(report, deploymentGate, observedIdentityGate)
+  if (!hasExactFields(report, POSTDEPLOY_REPORT_FIELDS)) blockers.push("report.schema")
+  if (deploymentGate?.ready !== true) {
+    blockers.push(...(
+      Array.isArray(deploymentGate?.blockers) && deploymentGate.blockers.length > 0
+        ? deploymentGate.blockers
+        : ["deployment_identity_expected_unavailable"]
+    ))
+  } else {
+    const expectedIdentity = canonicalizeDeploymentIdentity(deploymentGate.identity, { now })
+    if (!expectedIdentity.ok) {
+      blockers.push(expectedIdentity.errorCode === "deployment_identity_completed_in_future"
+        ? expectedIdentity.errorCode
+        : "deployment_identity_expected_invalid")
+    }
+  }
+  if (!observedIdentityGate.ready) blockers.push(observedIdentityGate.errorCode)
+  const reportIdentity = canonicalizeDeploymentIdentity(report.deploymentIdentity, { now })
+  if (!reportIdentity.ok) {
+    blockers.push(reportIdentity.errorCode === "deployment_identity_completed_in_future"
+      ? reportIdentity.errorCode
+      : "deployment_identity_report_invalid")
+  }
+  if (
+    observedIdentityGate.ready &&
+    reportIdentity.ok &&
+    !sameDeploymentIdentity(reportIdentity.identity, observedIdentityGate.identity)
+  ) {
+    blockers.push("deployment_identity_report_not_observed")
+  }
+  if (
+    deploymentGate?.ready === true &&
+    observedIdentityGate.ready &&
+    !sameDeploymentIdentity(observedIdentityGate.identity, deploymentGate.identity)
+  ) {
+    blockers.push("deployment_identity_mismatch")
+  }
+
+  if (report.ok !== true) blockers.push("report.ok")
+  if (report.provenanceErrorCode !== null) blockers.push("report.provenanceErrorCode")
+  if (report.baseUrl !== PRODUCTION_CN_APP_API_BASE_URL) blockers.push("report.baseUrl")
+  if (!isEmptyArray(report.allowedMissing)) blockers.push("report.allowedMissing")
+  const generatedAt = canonicalIsoTimestampMs(report.generatedAt)
+  if (generatedAt === null) {
+    blockers.push("report.generatedAt.invalid")
+  } else if (generatedAt > now + 5 * 60_000) {
+    blockers.push("report.generatedAt.future")
+  } else if (now - generatedAt > 24 * 60 * 60_000) {
+    blockers.push("report.generatedAt.stale")
+  }
+  if (
+    generatedAt !== null &&
+    observedIdentityGate.ready &&
+    generatedAt < canonicalIsoTimestampMs(observedIdentityGate.identity.deploymentCompletedAt)
+  ) {
+    blockers.push("smoke_precedes_deployment")
+  }
+
+  if (!hasExactFields(report.steps, ["remoteHealth", "appApiSmoke"])) blockers.push("report.steps")
+  if (
+    !hasExactFields(report.outputFiles, OUTPUT_FILE_FIELDS) ||
+    OUTPUT_FILE_FIELDS.some((field) => (
+      typeof report.outputFiles?.[field] !== "string" || report.outputFiles[field].trim().length === 0
+    ))
+  ) {
+    blockers.push("report.outputFiles")
+  }
+
+  const remoteHealth = report.steps?.remoteHealth
+  if (!isPlainObject(remoteHealth)) {
+    blockers.push("steps.remoteHealth")
+  } else {
+    if (!hasExactFields(remoteHealth, POSTDEPLOY_STEP_FIELDS)) blockers.push("steps.remoteHealth.schema")
+    if (remoteHealth.ok !== true) blockers.push("steps.remoteHealth.ok")
+    if (remoteHealth.status !== 0) blockers.push("steps.remoteHealth.status")
+    if (remoteHealth.errorCode !== null) blockers.push("steps.remoteHealth.errorCode")
+    const remoteResult = remoteHealth.result
+    if (!isPlainObject(remoteResult)) {
+      blockers.push("steps.remoteHealth.result")
+    } else {
+      if (!hasExactFields(remoteResult, REMOTE_HEALTH_RESULT_FIELDS)) {
+        blockers.push("steps.remoteHealth.result.schema")
+      }
+      if (remoteResult.baseUrl !== PRODUCTION_CN_APP_API_BASE_URL) blockers.push("steps.remoteHealth.result.baseUrl")
+      if (!isEmptyArray(remoteResult.allowedMissing)) blockers.push("steps.remoteHealth.result.allowedMissing")
+      if (remoteResult.provenanceErrorCode !== null) blockers.push("steps.remoteHealth.result.provenanceErrorCode")
+      for (const healthKey of ["healthz", "health", "strictHealth"]) {
+        const health = remoteResult[healthKey]
+        const healthPath = `steps.remoteHealth.result.${healthKey}`
+        if (!isPlainObject(health)) {
+          blockers.push(healthPath)
+          continue
+        }
+        if (!hasExactFields(health, REMOTE_HEALTH_SUMMARY_FIELDS)) blockers.push(`${healthPath}.schema`)
+        blockers.push(...validateProductionHealthSummary(health, healthKey, healthPath))
+        if (health.status !== 200) blockers.push(`${healthPath}.status`)
+        if (health.ok !== true) blockers.push(`${healthPath}.ok`)
+        if (!isEmptyArray(health.missing)) blockers.push(`${healthPath}.missing`)
+      }
+    }
+  }
+
+  const appApiSmoke = report.steps?.appApiSmoke
+  if (!isPlainObject(appApiSmoke)) {
+    blockers.push("steps.appApiSmoke")
+  } else {
+    if (!hasExactFields(appApiSmoke, POSTDEPLOY_STEP_FIELDS)) blockers.push("steps.appApiSmoke.schema")
+    if (appApiSmoke.ok !== true) blockers.push("steps.appApiSmoke.ok")
+    if (appApiSmoke.status !== 0) blockers.push("steps.appApiSmoke.status")
+    if (appApiSmoke.errorCode !== null) blockers.push("steps.appApiSmoke.errorCode")
+    const appApiResult = appApiSmoke.result
+    if (!isPlainObject(appApiResult)) {
+      blockers.push("steps.appApiSmoke.result")
+    } else {
+      if (!hasExactFields(appApiResult, APP_API_RESULT_FIELDS)) blockers.push("steps.appApiSmoke.result.schema")
+      if (appApiResult.baseUrl !== PRODUCTION_CN_APP_API_BASE_URL) blockers.push("steps.appApiSmoke.result.baseUrl")
+      if (appApiResult.probeSetId !== APP_API_SMOKE_PROBE_SET_ID) blockers.push("steps.appApiSmoke.result.probeSetId")
+      if (appApiResult.checkedProbes !== PROBES.length) blockers.push("steps.appApiSmoke.result.checkedProbes")
+      const expectedRuntimePlan = {
+        localMode: false,
+        aliyunRdsReady: "not_checked_for_remote_base_url",
+        localRdsUnavailableExpected: PROBES.filter((probe) => probe.runtimeExpectation === "local_rds_unavailable").length,
+      }
+      if (!hasExactRecordValues(appApiResult.runtimePlan, expectedRuntimePlan)) {
+        blockers.push("steps.appApiSmoke.result.runtimePlan")
+      }
+      if (!hasExactRecordValues(appApiResult.scopes, expectedAppApiProbeScopes())) {
+        blockers.push("steps.appApiSmoke.result.scopes")
+      }
+      if (!Array.isArray(appApiResult.probes)) {
+        blockers.push("steps.appApiSmoke.result.probes")
+      } else {
+        if (appApiResult.probes.length !== PROBES.length) blockers.push("steps.appApiSmoke.result.probes.length")
+        const expectedByKey = new Map(PROBES.map((probe) => [appApiProbeKey(probe), probe]))
+        const expectedIndexByKey = new Map(PROBES.map((probe, index) => [appApiProbeKey(probe), index]))
+        const observedKeys = new Set()
+        for (const [probeIndex, probe] of appApiResult.probes.entries()) {
+          if (!isPlainObject(probe)) {
+            blockers.push(`steps.appApiSmoke.result.probes.item_shape:${probeIndex}`)
+            continue
+          }
+          const key = appApiProbeKey(probe)
+          const expectedProbe = expectedByKey.get(key)
+          const expectedProbeFields = ["scope", "method", "path", "status", "code"]
+          if (expectedProbe?.runtimeExpectation) expectedProbeFields.push("runtimeExpectation")
+          if (!hasExactFields(probe, expectedProbeFields)) {
+            blockers.push(`steps.appApiSmoke.result.probes.item_shape:${probeIndex}`)
+          }
+          if (
+            typeof probe.scope !== "string" ||
+            typeof probe.method !== "string" ||
+            typeof probe.path !== "string" ||
+            !Number.isInteger(probe.status) ||
+            typeof probe.code !== "string"
+          ) {
+            blockers.push(`steps.appApiSmoke.result.probes.item_shape:${probeIndex}`)
+          }
+          if (observedKeys.has(key)) blockers.push(`steps.appApiSmoke.result.probes.duplicate:${probeIndex}`)
+          observedKeys.add(key)
+          if (!expectedProbe) {
+            blockers.push(`steps.appApiSmoke.result.probes.unexpected:${probeIndex}`)
+            continue
+          }
+          if (probe.scope !== expectedProbe.scope) blockers.push(`steps.appApiSmoke.result.probes.scope:${probeIndex}`)
+          if (probe.method !== expectedProbe.method) blockers.push(`steps.appApiSmoke.result.probes.method:${probeIndex}`)
+          if (probe.runtimeExpectation !== expectedProbe.runtimeExpectation) {
+            blockers.push(`steps.appApiSmoke.result.probes.runtimeExpectation:${probeIndex}`)
+          }
+          const matchesExpected = expectedProbe.expected.some((expected) => (
+            probe.status === expected.status && probe.code === expected.code
+          ))
+          if (!matchesExpected) blockers.push(`steps.appApiSmoke.result.probes.result:${probeIndex}`)
+        }
+        for (const key of expectedByKey.keys()) {
+          if (!observedKeys.has(key)) {
+            blockers.push(`steps.appApiSmoke.result.probes.missing:${expectedIndexByKey.get(key)}`)
+          }
+        }
+      }
+    }
+  }
+
+  return result()
+}
+
+function deploymentGateBlockers(deploymentGate) {
+  if (deploymentGate?.ready === true) return []
+  return Array.isArray(deploymentGate?.blockers) && deploymentGate.blockers.length > 0
+    ? deploymentGate.blockers
+    : ["deployment_identity_expected_unavailable"]
+}
+
+function readPostdeploySmokeReport(filePath, options = {}) {
+  const identityBlockers = deploymentGateBlockers(options.deploymentGate)
+  if (!existsSync(filePath)) {
+    return {
+      exists: false,
+      ready: false,
+      blockers: [...new Set(["file_missing", ...identityBlockers])].sort(),
+      expectedBaseUrl: PRODUCTION_CN_APP_API_BASE_URL,
+      expectedProbeSetId: APP_API_SMOKE_PROBE_SET_ID,
+      expectedProbeCount: PROBES.length,
+      baseUrlMatchesExpected: false,
+      probeSetIdMatchesExpected: false,
+      probeCountMatchesExpected: false,
+      deploymentIdentityMatchesExpected: false,
+    }
+  }
+
+  try {
+    const report = JSON.parse(readFileSync(filePath, "utf8"))
+    const validation = validatePostdeploySmokeReport(report, { deploymentGate: options.deploymentGate })
+    return {
+      exists: true,
+      ...validation,
+    }
+  } catch {
+    return {
+      exists: true,
+      ready: false,
+      blockers: [...new Set(["invalid_json", ...identityBlockers])].sort(),
+      expectedBaseUrl: PRODUCTION_CN_APP_API_BASE_URL,
+      expectedProbeSetId: APP_API_SMOKE_PROBE_SET_ID,
+      expectedProbeCount: PROBES.length,
+      baseUrlMatchesExpected: false,
+      probeSetIdMatchesExpected: false,
+      probeCountMatchesExpected: false,
+      deploymentIdentityMatchesExpected: false,
+    }
+  }
 }
 
 function isWritebackGroupReady(report, groupId) {
@@ -527,7 +1001,18 @@ function isWritebackGroupReady(report, groupId) {
 }
 
 function isImagePushAndDigestReady(report) {
-  return isWritebackGroupReady(report, "imagePushAndDigest")
+  const sourceFreshness = report.local?.image?.sourceFreshness
+  const acceptedFreshnessStatuses = new Set([
+    "current",
+    "current_non_runtime_dirty",
+    "stale_non_runtime_source",
+  ])
+  return report.local?.ready === true &&
+    isWritebackGroupReady(report, "imagePushAndDigest") &&
+    sourceFreshness?.checked === true &&
+    Array.isArray(sourceFreshness.blockers) &&
+    sourceFreshness.blockers.length === 0 &&
+    acceptedFreshnessStatuses.has(sourceFreshness.status)
 }
 
 function isSaeRuntimeImagePullReady(report) {
@@ -580,7 +1065,7 @@ function buildBackendTargets(backendRequiredBlocking, reports) {
   })
 }
 
-function currentEvidenceForTarget(id, { cloudConfirmations, imagePublishPlan, cloudInventoryResults, resourceMatrix, rdsMigration }) {
+function currentEvidenceForTarget(id, { cloudConfirmations, imagePublishPlan, cloudInventoryResults, resourceMatrix, rdsMigration, postdeploySmoke }) {
   const cloudItems = cloudConfirmationItems(cloudConfirmations)
   const observation = cloudInventoryResults.local?.observationSummary || {}
   const resourceEvidence = evidenceForResourceRows(resourceMatrix, RESOURCE_EVIDENCE_BY_BACKEND_TARGET[id] || [])
@@ -634,12 +1119,17 @@ function currentEvidenceForTarget(id, { cloudConfirmations, imagePublishPlan, cl
   if (id === "B06_ENV_IMPORT") return [...evidenceForCloudItem(cloudItems.envImport), ...resourceEvidence]
   if (id === "B07_SLS_ALERTS") return [...evidenceForCloudItem(cloudItems.slsAlerts), ...resourceEvidence]
   if (id === "B08_POSTDEPLOY_SMOKE") {
-    const ready = isPostdeploySmokeReady({ cloudConfirmations, imagePublishPlan, resourceMatrix, rdsMigration })
     return [
-      `postdeploySmokeReady=${ready}`,
-      ready
-        ? "postdeploySmokeEvidence=https_api-cn_remote_health_strict_200_app_api_31_probes"
-        : "requires deployed Aliyun backend base URL",
+      `postdeploySmokeExists=${postdeploySmoke.exists}`,
+      `postdeploySmokeReady=${postdeploySmoke.ready}`,
+      `postdeploySmokeBlockers=${postdeploySmoke.blockers.join(",") || "none"}`,
+      `expectedBaseUrl=${postdeploySmoke.expectedBaseUrl}`,
+      `expectedAppApiSmokeProbeSetId=${postdeploySmoke.expectedProbeSetId}`,
+      `expectedAppApiSmokeProbeCount=${postdeploySmoke.expectedProbeCount}`,
+      `baseUrlMatchesExpected=${postdeploySmoke.baseUrlMatchesExpected}`,
+      `probeSetIdMatchesExpected=${postdeploySmoke.probeSetIdMatchesExpected}`,
+      `probeCountMatchesExpected=${postdeploySmoke.probeCountMatchesExpected}`,
+      `deploymentIdentityMatchesExpected=${postdeploySmoke.deploymentIdentityMatchesExpected}`,
     ]
   }
   return []
@@ -1217,6 +1707,19 @@ function renderMarkdown(report) {
     `- deferredAppLaunchExcluded: ${report.backendEvidenceScopeBreakdown.summary.deferredAppLaunchExcluded}`,
     `- interpretation: ${report.backendEvidenceScopeBreakdown.interpretation.join(" ")}`,
     "",
+    "## Structured Postdeploy Smoke",
+    "",
+    `- exists: ${report.postdeploySmoke.exists}`,
+    `- ready: ${report.postdeploySmoke.ready}`,
+    `- blockers: ${report.postdeploySmoke.blockers.join(", ") || "none"}`,
+    `- expectedBaseUrl: ${report.postdeploySmoke.expectedBaseUrl}`,
+    `- expectedProbeSetId: ${report.postdeploySmoke.expectedProbeSetId}`,
+    `- expectedProbeCount: ${report.postdeploySmoke.expectedProbeCount}`,
+    `- baseUrlMatchesExpected: ${report.postdeploySmoke.baseUrlMatchesExpected}`,
+    `- probeSetIdMatchesExpected: ${report.postdeploySmoke.probeSetIdMatchesExpected}`,
+    `- probeCountMatchesExpected: ${report.postdeploySmoke.probeCountMatchesExpected}`,
+    `- deploymentIdentityMatchesExpected: ${report.postdeploySmoke.deploymentIdentityMatchesExpected}`,
+    "",
     "## Backend Targets",
     "",
     ...report.backendTargets.flatMap((target) => [
@@ -1293,8 +1796,10 @@ function findSecretLikeValues(value, path = "$") {
     value.forEach((item, index) => matches.push(...findSecretLikeValues(item, `${path}[${index}]`)))
     return matches
   }
-  for (const [key, nested] of Object.entries(value)) {
-    matches.push(...findSecretLikeValues(nested, `${path}.${key}`))
+  for (const [index, [key, nested]] of Object.entries(value).entries()) {
+    const safePath = `${path}.*[${index}]`
+    if (SECRET_VALUE_PATTERNS.some((pattern) => pattern.test(key))) matches.push(safePath)
+    matches.push(...findSecretLikeValues(nested, safePath))
   }
   return matches
 }
@@ -1318,16 +1823,20 @@ function printHelp() {
     "Usage:",
     "  node scripts/summarize-aliyun-backend-cn-status.mjs [--out path] [--markdown path] [--child-timeout-ms 120000]",
     "    [--env-file path] [--cloud-confirmations path] [--cloud-inventory-results path] [--rds-migration path] [--image-publish path]",
+    "    [--postdeploy-smoke deploy/aliyun-production-cn.postdeploy-smoke.local.json]",
     "",
     "Summarizes the current backend-only Aliyun production-cn readiness.",
     "WeChat Open Platform mobile app blockers are explicitly deferred from this backend-only scope.",
+    "B08 reads only the standard postdeploy-smoke.json written by run-aliyun-postdeploy-smoke.mjs; a missing or invalid report stays blocked.",
     "Child status commands are bounded and fail closed; this command does not create, modify, deploy, or import secrets.",
   ].join("\n"))
 }
 
-try {
-  main()
-} catch (error) {
-  console.error(error instanceof Error ? error.message : String(error))
-  process.exit(1)
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  try {
+    main()
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error))
+    process.exit(1)
+  }
 }

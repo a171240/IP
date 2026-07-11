@@ -4,21 +4,51 @@ import { existsSync, readFileSync } from "node:fs"
 import { dirname, isAbsolute, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
+import {
+  observeDeploymentIdentities,
+  publicProvenanceErrorCode,
+} from "./lib/aliyun-deployment-identity.mjs"
+
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const DEFAULT_ENV_FILE = resolve(__dirname, "../../../.env.production-cn.local")
 const DEFAULT_TIMEOUT_MS = 15_000
 const HEALTH_PATHS = ["/api/healthz", "/api/app/health", "/api/app/health?strict=1"]
-const KNOWN_CHECK_GROUPS = new Set([
+const PRODUCTION_HEALTH_CHECK_GROUPS = Object.freeze([
   "aliyunRds",
-  "aliyunOssRuntime",
-  "supabase",
-  "appWechatLogin",
   "legalLinks",
-  "aliyunOss",
+  "aliyunOssRuntime",
   "bailianAsr",
   "serviceRecordSummary",
   "volcSpeech",
+])
+const PRODUCTION_HEALTH_CHECK_GROUP_SET = new Set(PRODUCTION_HEALTH_CHECK_GROUPS)
+const PRODUCTION_HEALTH_METADATA = Object.freeze({
+  service: "meiye-huajing-app-api",
+  env: "production-cn",
+  region: "cn-hangzhou",
+  mode: "aliyun-production-cn",
+})
+const KNOWN_HEALTH_FIELDS = new Set([
+  "ok",
+  "service",
+  "env",
+  "region",
+  "mode",
+  "checks",
+  "missing",
+  "deferred",
+  "deploymentIdentity",
+])
+const KNOWN_DEFERRED_FIELDS = new Set(["supabase", "appWechatLogin"])
+const FIXED_REMOTE_ERRORS = new Set([
+  "REMOTE_HEALTH_ARGUMENT_INVALID",
+  "REMOTE_HEALTH_REQUEST_FAILED",
+  "REMOTE_HEALTH_RESPONSE_INVALID",
+  "REMOTE_HEALTH_SCHEMA_INVALID",
+  "REMOTE_HEALTH_SENSITIVE_FIELD",
+  "REMOTE_HEALTH_UNEXPECTED_MISSING",
+  "REMOTE_HEALTH_STATUS_INVALID",
 ])
 
 function parseArgs(argv) {
@@ -136,7 +166,7 @@ async function readJson(baseUrl, path, timeoutMs) {
     try {
       body = JSON.parse(text)
     } catch {
-      throw new Error(`invalid_json:${path}:${response.status}`)
+      throw new Error("REMOTE_HEALTH_RESPONSE_INVALID")
     }
     return {
       path,
@@ -144,6 +174,9 @@ async function readJson(baseUrl, path, timeoutMs) {
       text,
       body,
     }
+  } catch (error) {
+    if (error instanceof Error && FIXED_REMOTE_ERRORS.has(error.message)) throw error
+    throw new Error("REMOTE_HEALTH_REQUEST_FAILED")
   } finally {
     clearTimeout(timeout)
   }
@@ -152,21 +185,54 @@ async function readJson(baseUrl, path, timeoutMs) {
 function assertNoSensitiveFieldNames(result) {
   const text = result.text
   if (/(SECRET|TOKEN|PASSWORD|PRIVATE_KEY|SERVICE_ROLE|ACCESS_KEY|DASHSCOPE_API_KEY|DEEPSEEK_API_KEY)/i.test(text)) {
-    throw new Error(`health_response_contains_sensitive_field_name:${result.path}`)
+    throw new Error("REMOTE_HEALTH_SENSITIVE_FIELD")
   }
+}
+
+function isPlainObject(value) {
+  return Boolean(
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    Object.getPrototypeOf(value) === Object.prototype
+  )
 }
 
 function assertHealthShape(result) {
   const body = result.body
-  if (!body || typeof body !== "object") throw new Error(`invalid_body:${result.path}`)
-  if (typeof body.ok !== "boolean") throw new Error(`ok_not_boolean:${result.path}`)
-  if (!Array.isArray(body.missing)) throw new Error(`missing_not_array:${result.path}`)
-  if (!body.checks || typeof body.checks !== "object") throw new Error(`checks_not_object:${result.path}`)
-  for (const group of Object.keys(body.checks)) {
-    if (!KNOWN_CHECK_GROUPS.has(group)) throw new Error(`unknown_check_group:${group}`)
+  if (!isPlainObject(body)) throw new Error("REMOTE_HEALTH_SCHEMA_INVALID")
+  if (Object.keys(body).some((field) => !KNOWN_HEALTH_FIELDS.has(field))) {
+    throw new Error("REMOTE_HEALTH_SCHEMA_INVALID")
   }
-  for (const group of body.missing) {
-    if (!KNOWN_CHECK_GROUPS.has(group)) throw new Error(`unknown_missing_group:${group}`)
+  if (typeof body.ok !== "boolean") throw new Error("REMOTE_HEALTH_SCHEMA_INVALID")
+  if (!Array.isArray(body.missing)) throw new Error("REMOTE_HEALTH_SCHEMA_INVALID")
+  if (!isPlainObject(body.checks)) throw new Error("REMOTE_HEALTH_SCHEMA_INVALID")
+  for (const [field, expected] of Object.entries(PRODUCTION_HEALTH_METADATA)) {
+    if (body[field] !== expected) throw new Error("REMOTE_HEALTH_SCHEMA_INVALID")
+  }
+  if (body.deferred !== undefined) {
+    if (
+      !isPlainObject(body.deferred) ||
+      Object.keys(body.deferred).some((field) => !KNOWN_DEFERRED_FIELDS.has(field)) ||
+      Object.values(body.deferred).some((value) => typeof value !== "string")
+    ) {
+      throw new Error("REMOTE_HEALTH_SCHEMA_INVALID")
+    }
+  }
+  const checkGroups = Object.keys(body.checks)
+  if (
+    checkGroups.length !== PRODUCTION_HEALTH_CHECK_GROUPS.length ||
+    PRODUCTION_HEALTH_CHECK_GROUPS.some((group) => typeof body.checks[group] !== "boolean")
+  ) {
+    throw new Error("REMOTE_HEALTH_SCHEMA_INVALID")
+  }
+  const expectedMissing = PRODUCTION_HEALTH_CHECK_GROUPS.filter((group) => body.checks[group] === false)
+  if (
+    body.missing.length !== expectedMissing.length ||
+    body.missing.some((group, index) => group !== expectedMissing[index]) ||
+    body.ok !== (expectedMissing.length === 0)
+  ) {
+    throw new Error("REMOTE_HEALTH_SCHEMA_INVALID")
   }
 }
 
@@ -176,31 +242,39 @@ function assertResult(result, allowMissing) {
   const missing = new Set(result.body.missing)
   const unexpectedMissing = [...missing].filter((group) => !allowMissing.has(group))
   if (unexpectedMissing.length) {
-    throw new Error(`unexpected_missing:${result.path}:${unexpectedMissing.join(",")}`)
+    throw new Error("REMOTE_HEALTH_UNEXPECTED_MISSING")
   }
   const expectedReady = missing.size === 0
   if (result.path.includes("strict=1")) {
     const expectedStatus = expectedReady ? 200 : 503
     if (result.status !== expectedStatus) {
-      throw new Error(`unexpected_strict_status:${result.status}`)
+      throw new Error("REMOTE_HEALTH_STATUS_INVALID")
     }
   } else if (result.status !== 200) {
-    throw new Error(`unexpected_status:${result.path}:${result.status}`)
+    throw new Error("REMOTE_HEALTH_STATUS_INVALID")
   }
 }
 
-function summarize(result) {
+function summarize(result, observedDeploymentIdentity) {
   return {
     status: result.status,
+    service: result.body.service,
+    env: result.body.env,
+    region: result.body.region,
+    mode: result.body.mode,
+    checks: Object.fromEntries(
+      PRODUCTION_HEALTH_CHECK_GROUPS.map((group) => [group, result.body.checks[group]]),
+    ),
     ok: result.body.ok,
-    missing: result.body.missing,
+    missing: [...result.body.missing],
+    observedDeploymentIdentity,
   }
 }
 
 function printHelp() {
   console.log([
     "Usage:",
-    "  node scripts/smoke-aliyun-remote.mjs [--base-url https://api-cn.example.com] [--allow-missing appWechatLogin,legalLinks]",
+    "  node scripts/smoke-aliyun-remote.mjs [--base-url https://api-cn.example.com] [--allow-missing legalLinks,bailianAsr]",
     "",
     "Validates deployed health endpoints without reading or printing secrets.",
     "If --base-url is omitted, APP_API_BASE_URL is read from .env.production-cn.local.",
@@ -212,7 +286,7 @@ async function main() {
   const args = parseArgs(process.argv)
   const baseUrl = resolveBaseUrl(args)
   for (const group of args.allowMissing) {
-    if (!KNOWN_CHECK_GROUPS.has(group)) throw new Error(`unknown_allowed_missing_group:${group}`)
+    if (!PRODUCTION_HEALTH_CHECK_GROUP_SET.has(group)) throw new Error(`unknown_allowed_missing_group:${group}`)
   }
   const results = []
   for (const path of HEALTH_PATHS) {
@@ -220,18 +294,28 @@ async function main() {
     assertResult(result, args.allowMissing)
     results.push(result)
   }
+  const observed = observeDeploymentIdentities(
+    results.map((result) => result.body.deploymentIdentity ?? null),
+    { now: Date.now() },
+  )
+  const provenanceErrorCode = publicProvenanceErrorCode(observed.errorCode)
+  const observedDeploymentIdentity = observed.ready ? observed.identity : null
   console.log(JSON.stringify({
     baseUrl,
     allowedMissing: [...args.allowMissing],
-    healthz: summarize(results[0]),
-    health: summarize(results[1]),
-    strictHealth: summarize(results[2]),
+    provenanceErrorCode,
+    healthz: summarize(results[0], observedDeploymentIdentity),
+    health: summarize(results[1], observedDeploymentIdentity),
+    strictHealth: summarize(results[2], observedDeploymentIdentity),
   }, null, 2))
 }
 
 try {
   await main()
 } catch (error) {
-  console.error(error instanceof Error ? error.message : String(error))
+  const errorCode = error instanceof Error && FIXED_REMOTE_ERRORS.has(error.message)
+    ? error.message
+    : "REMOTE_HEALTH_FAILED"
+  console.error(errorCode)
   process.exit(1)
 }

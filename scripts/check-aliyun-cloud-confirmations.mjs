@@ -4,6 +4,13 @@ import { existsSync, readFileSync } from "node:fs"
 import { dirname, isAbsolute, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
+import {
+  canonicalIsoTimestampMs,
+  canonicalizeDeploymentIdentity,
+  isCanonicalImageDigest,
+  isDeploymentIdentityPlaceholder,
+} from "./lib/aliyun-deployment-identity.mjs"
+
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const BACKEND_ROOT = resolve(__dirname, "..")
@@ -24,6 +31,8 @@ const EXPECTED_SLS_PROJECT = "meiye-huajing-app-prod-cn"
 const EXPECTED_SLS_LOGSTORE = "app-api"
 const EXPECTED_READY_SECRET_ENV_VARIABLE_COUNT = 17
 const EXPECTED_READY_SECRET_ENV_GROUP_COUNT = 9
+const SAE_DEPLOYMENT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/
+const ACR_PRODUCTION_IMAGE_PATTERN = /^meiye-huajing-app-api-registry(?:-vpc)?\.cn-hangzhou\.cr\.aliyuncs\.com\/[a-z0-9][a-z0-9._-]*\/meiye-huajing-app-api:production-cn$/
 const EXPECTED_BLOCKED_CREDENTIAL_NAMES = Object.freeze(["DATABASE_URL_CN"])
 const EXPECTED_BLOCKED_SECRET_BATCH_IDS = Object.freeze([
   "BLOCKED_SECRET_BATCH_01_OSS_RAM_STS",
@@ -76,6 +85,8 @@ const DEFINITIONS = [
       "dnsHttpHealthProbe",
       "runningInstances",
       "lastDeployChangeOrderId",
+      "saeVersionId",
+      "deploymentCompletedAt",
       "lastDeployPipelineId",
       "lastBindSlbChangeOrderId",
       "lastBindSlbPipelineId",
@@ -106,6 +117,19 @@ const DEFINITIONS = [
       }
       if (String(item.healthPath || "").trim() !== EXPECTED_RUNTIME_HEALTH_PATH) {
         blockers.push(`healthPath=${EXPECTED_RUNTIME_HEALTH_PATH}`)
+      }
+      if (mode === "local" && item.confirmed === true) {
+        if (String(item.region || "") !== EXPECTED_ALIYUN_REGION) {
+          blockers.push(`region=${EXPECTED_ALIYUN_REGION}`)
+        }
+        if (String(item.appName || "") !== EXPECTED_SAE_APP_NAME) {
+          blockers.push(`appName=${EXPECTED_SAE_APP_NAME}`)
+        }
+        if (!ACR_PRODUCTION_IMAGE_PATTERN.test(String(item.acrImage || ""))) {
+          blockers.push("acrImage=production-cn")
+        }
+        if (item.imagePullConfigured !== true) blockers.push("imagePullConfigured=true")
+        blockers.push(...runtimeDeploymentIdentityBlockers(item))
       }
       return blockers
     },
@@ -628,6 +652,54 @@ function text(value) {
   return String(value || "").trim()
 }
 
+function rawString(value) {
+  return typeof value === "string" ? value : ""
+}
+
+function runtimeDeploymentIdentityBlockers(item) {
+  const blockers = []
+  if (!isCanonicalImageDigest(rawString(item.imageDigest))) blockers.push("deployment_identity_image_digest")
+  if (
+    !SAE_DEPLOYMENT_ID_PATTERN.test(rawString(item.appId)) ||
+    rawString(item.appId) !== rawString(item.appId).trim() ||
+    isDeploymentIdentityPlaceholder(item.appId)
+  ) {
+    blockers.push("deployment_identity_sae_app_id")
+  }
+  if (
+    !SAE_DEPLOYMENT_ID_PATTERN.test(rawString(item.lastDeployChangeOrderId)) ||
+    rawString(item.lastDeployChangeOrderId) !== rawString(item.lastDeployChangeOrderId).trim() ||
+    isDeploymentIdentityPlaceholder(item.lastDeployChangeOrderId)
+  ) {
+    blockers.push("deployment_identity_sae_deployment_id")
+  }
+  if (
+    !SAE_DEPLOYMENT_ID_PATTERN.test(rawString(item.saeVersionId)) ||
+    rawString(item.saeVersionId) !== rawString(item.saeVersionId).trim() ||
+    isDeploymentIdentityPlaceholder(item.saeVersionId)
+  ) {
+    blockers.push("deployment_identity_sae_version_id")
+  }
+  const deploymentCompletedAtMs = canonicalIsoTimestampMs(rawString(item.deploymentCompletedAt))
+  if (deploymentCompletedAtMs === null) {
+    blockers.push("deployment_identity_completed_at")
+  } else if (deploymentCompletedAtMs > Date.now()) {
+    blockers.push("deployment_identity_completed_in_future")
+  }
+  return blockers
+}
+
+function runtimeDeploymentIdentity(rawItem) {
+  const validation = canonicalizeDeploymentIdentity({
+    imageDigest: rawString(rawItem.imageDigest),
+    saeAppId: rawString(rawItem.appId),
+    saeDeploymentId: rawString(rawItem.lastDeployChangeOrderId),
+    saeVersionId: rawString(rawItem.saeVersionId),
+    deploymentCompletedAt: rawString(rawItem.deploymentCompletedAt),
+  }, { now: Date.now() })
+  return validation.ok ? validation.identity : null
+}
+
 function nonSecretConfirmationValues(key, rawItem) {
   if (key === "runtime" && rawItem && typeof rawItem === "object" && !Array.isArray(rawItem)) {
     return {
@@ -637,6 +709,7 @@ function nonSecretConfirmationValues(key, rawItem) {
       appName: text(rawItem.appName),
       containerPort: Number(rawItem.containerPort),
       healthPath: text(rawItem.healthPath),
+      deploymentIdentity: runtimeDeploymentIdentity(rawItem),
       acrImage: text(rawItem.acrImage),
       imageDigest: text(rawItem.imageDigest),
       imagePullConfigured: rawItem.imagePullConfigured === true,
@@ -1052,18 +1125,21 @@ function buildEnvImportPlan(local) {
   const envItem = (local.items || []).find((item) => item.key === "envImport") || null
   const values = envItem?.nonSecretValues || {}
   const blockers = cloudItemBlockers("envImport", envItem)
-  const readySecretBatchIds = values.readySecretBatchIds.length
-    ? values.readySecretBatchIds
+  const reportedReadySecretBatchIds = Array.isArray(values.readySecretBatchIds) ? values.readySecretBatchIds : []
+  const reportedBlockedSecretBatchIds = Array.isArray(values.blockedSecretBatchIds) ? values.blockedSecretBatchIds : []
+  const reportedBlockedCredentialNames = Array.isArray(values.blockedCredentialNames) ? values.blockedCredentialNames : []
+  const readySecretBatchIds = reportedReadySecretBatchIds.length
+    ? reportedReadySecretBatchIds
     : [...EXPECTED_READY_SECRET_BATCH_IDS]
   const rdsSecretImported = values.rdsSecretImported === true
   const defaultBlockedSecretBatchIds = rdsSecretImported
     ? ["BLOCKED_SECRET_BATCH_01_OSS_RAM_STS"]
     : [...EXPECTED_BLOCKED_SECRET_BATCH_IDS]
-  const blockedSecretBatchIds = values.blockedSecretBatchIds.length
-    ? values.blockedSecretBatchIds
+  const blockedSecretBatchIds = reportedBlockedSecretBatchIds.length
+    ? reportedBlockedSecretBatchIds
     : (envItem?.ready === true ? [] : defaultBlockedSecretBatchIds)
-  const blockedCredentialNames = values.blockedCredentialNames.length
-    ? values.blockedCredentialNames
+  const blockedCredentialNames = reportedBlockedCredentialNames.length
+    ? reportedBlockedCredentialNames
     : (rdsSecretImported ? [] : [...EXPECTED_BLOCKED_CREDENTIAL_NAMES])
   const readySecretEnvVariableCount = Number.isFinite(values.readySecretEnvVariableCount) && values.readySecretEnvVariableCount > 0
     ? values.readySecretEnvVariableCount
@@ -1908,6 +1984,9 @@ function main() {
       itemStatus: Object.fromEntries(local.items.map((item) => [item.key, {
         ready: item.ready,
         blockers: item.blockers,
+        ...(item.key === "runtime"
+          ? { deploymentIdentity: item.ready ? item.nonSecretValues.deploymentIdentity : null }
+          : {}),
       }])),
     },
     ossAccessPlan,

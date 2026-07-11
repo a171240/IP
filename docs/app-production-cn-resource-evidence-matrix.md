@@ -1,5 +1,9 @@
 # 美业话镜 APP production-cn 阿里云资源矩阵
 
+> Historical snapshot only — this 2026-06-29 matrix is not current readiness evidence.
+> Historical `7/7` and `31`-probe observations below do not satisfy the current B08 gate.
+> Current facts require fresh validators and a structured `postdeploy-smoke.json` from the standard producer.
+
 Generated: 2026-06-29T15:43:12.413Z
 
 ## 结论

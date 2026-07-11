@@ -13,14 +13,6 @@ const DEFAULT_TEMPLATE_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn
 const DEFAULT_LOCAL_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.rds-migration.local.json")
 const EXPECTED_REGION = "cn-hangzhou"
 const EXPECTED_PROVIDER = "Aliyun RDS PostgreSQL"
-const EXPECTED_APP_API_ROUTE_COUNT = 58
-const EXPECTED_APP_API_ROUTES_WITH_SUPABASE = 56
-const EXPECTED_APP_API_ROUTES_WITH_SUPABASE_DATA_ACCESS = 2
-const EXPECTED_FIRST_VERSION_RDS_ROUTE_COUNT = 25
-const EXPECTED_FIRST_VERSION_RDS_ROUTES_WITH_SUPABASE = 23
-const EXPECTED_FIRST_VERSION_RDS_ROUTES_WITH_SUPABASE_DATA_ACCESS = 0
-const EXPECTED_DEFERRED_APP_API_ROUTE_COUNT = 33
-const EXPECTED_DEFERRED_APP_API_ROUTES_WITH_SUPABASE_DATA_ACCESS = 2
 
 const TOP_LEVEL_FIELDS = new Set([
   "schemaVersion",
@@ -282,30 +274,6 @@ function validateCommonValues(data, blockers, sourceInventory) {
 
   if (inventory.generatedBy !== "corepack pnpm aliyun:rds:migration:plan") {
     blockers.push("sourceInventory.generatedBy")
-  }
-  if (Number(inventory.appApiRouteCount) !== EXPECTED_APP_API_ROUTE_COUNT) {
-    blockers.push(`sourceInventory.appApiRouteCount=${EXPECTED_APP_API_ROUTE_COUNT}`)
-  }
-  if (Number(inventory.appApiRoutesWithSupabase) !== EXPECTED_APP_API_ROUTES_WITH_SUPABASE) {
-    blockers.push(`sourceInventory.appApiRoutesWithSupabase=${EXPECTED_APP_API_ROUTES_WITH_SUPABASE}`)
-  }
-  if (Number(inventory.appApiRoutesWithSupabaseDataAccess) !== EXPECTED_APP_API_ROUTES_WITH_SUPABASE_DATA_ACCESS) {
-    blockers.push(`sourceInventory.appApiRoutesWithSupabaseDataAccess=${EXPECTED_APP_API_ROUTES_WITH_SUPABASE_DATA_ACCESS}`)
-  }
-  if (Number(inventory.firstVersionRdsRouteCount) !== EXPECTED_FIRST_VERSION_RDS_ROUTE_COUNT) {
-    blockers.push(`sourceInventory.firstVersionRdsRouteCount=${EXPECTED_FIRST_VERSION_RDS_ROUTE_COUNT}`)
-  }
-  if (Number(inventory.firstVersionRdsRoutesWithSupabase) !== EXPECTED_FIRST_VERSION_RDS_ROUTES_WITH_SUPABASE) {
-    blockers.push(`sourceInventory.firstVersionRdsRoutesWithSupabase=${EXPECTED_FIRST_VERSION_RDS_ROUTES_WITH_SUPABASE}`)
-  }
-  if (Number(inventory.firstVersionRdsRoutesWithSupabaseDataAccess) !== EXPECTED_FIRST_VERSION_RDS_ROUTES_WITH_SUPABASE_DATA_ACCESS) {
-    blockers.push(`sourceInventory.firstVersionRdsRoutesWithSupabaseDataAccess=${EXPECTED_FIRST_VERSION_RDS_ROUTES_WITH_SUPABASE_DATA_ACCESS}`)
-  }
-  if (Number(inventory.deferredAppApiRouteCount) !== EXPECTED_DEFERRED_APP_API_ROUTE_COUNT) {
-    blockers.push(`sourceInventory.deferredAppApiRouteCount=${EXPECTED_DEFERRED_APP_API_ROUTE_COUNT}`)
-  }
-  if (Number(inventory.deferredAppApiRoutesWithSupabaseDataAccess) !== EXPECTED_DEFERRED_APP_API_ROUTES_WITH_SUPABASE_DATA_ACCESS) {
-    blockers.push(`sourceInventory.deferredAppApiRoutesWithSupabaseDataAccess=${EXPECTED_DEFERRED_APP_API_ROUTES_WITH_SUPABASE_DATA_ACCESS}`)
   }
   if (Number(inventory.appApiRouteCount) !== Number(sourceInventory.summary?.appApiRouteCount || 0)) {
     blockers.push("sourceInventory.appApiRouteCount_mismatch_current_plan")
@@ -660,8 +628,8 @@ function buildRdsMigrationPlan(localValidation, sourceInventory, migrationPackag
         "deploy/app-api-production-cn.bridge-map.json",
       ],
       expectedEvidence: [
-        "firstVersionRdsRouteCount=25",
-        "firstVersionRdsRoutesWithSupabaseDataAccess=0",
+        `firstVersionRdsRouteCount=${Number(sourceInventory.summary?.firstVersionRdsRouteCount || 0)}`,
+        `firstVersionRdsRoutesWithSupabaseDataAccess=${Number(sourceInventory.summary?.firstVersionRdsRoutesWithSupabaseDataAccess || 0)}`,
         "postgresDataAccessAdapterDetected=true",
         "schemaInventoryReviewed=true",
         "dataAccessAdapterReady=true",

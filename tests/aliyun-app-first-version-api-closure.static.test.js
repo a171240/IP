@@ -2,6 +2,7 @@
 
 const test = require("node:test")
 const assert = require("node:assert/strict")
+const { spawnSync } = require("node:child_process")
 const fs = require("node:fs")
 const path = require("node:path")
 const { pathToFileURL } = require("node:url")
@@ -32,6 +33,24 @@ const FIRST_VERSION_ROUTES = [
     method: "POST",
     route: "/api/app/store-admin/invites/[token]/accept",
     smokePath: "/api/app/store-admin/invites/app-smoke-invalid-token/accept",
+    smokeStatus: 401,
+  },
+  {
+    method: "GET",
+    route: "/api/app/learning/progress",
+    smokePath: "/api/app/learning/progress",
+    smokeStatus: 401,
+  },
+  {
+    method: "POST",
+    route: "/api/app/learning/progress/events",
+    smokePath: "/api/app/learning/progress/events",
+    smokeStatus: 401,
+  },
+  {
+    method: "POST",
+    route: "/api/app/learning/progress/sync",
+    smokePath: "/api/app/learning/progress/sync",
     smokeStatus: 401,
   },
   {
@@ -140,6 +159,9 @@ const EXPECTED_LIVE_PROBE_KEYS = [
   "GET /api/app/customer-profiles/app-smoke-profile",
   "GET /api/app/scene-cards",
   "GET /api/app/scene-cards/app-smoke-card",
+  "GET /api/app/learning/progress",
+  "POST /api/app/learning/progress/events",
+  "POST /api/app/learning/progress/sync",
   "GET /api/app/service-records/sessions",
   "POST /api/app/service-records/sessions",
   "POST /api/app/service-records/device-files/check",
@@ -160,6 +182,12 @@ const OUT_OF_FIRST_VERSION_ROUTES = [
   "/api/app/xhs/generate-v4",
   "/api/app/private-copy/generate",
   "/api/app/xhs/generate-cover-image",
+]
+
+const LEARNING_PROGRESS_ROUTE_PATHS = [
+  "/api/app/learning/progress",
+  "/api/app/learning/progress/events",
+  "/api/app/learning/progress/sync",
 ]
 
 async function importScript(...parts) {
@@ -196,7 +224,13 @@ test("first-version APP API routes are present in the production-cn route regist
 })
 
 test("first-version APP API smoke plan proves routes with auth or payload guards only", async () => {
-  const { MUTATION_EXCLUDED_ROUTES, PROBES, buildProbePlanForRuntime } = await importScript(
+  const {
+    APP_API_SMOKE_PROBE_SET_ID,
+    MUTATION_EXCLUDED_ROUTES,
+    PROBES,
+    buildAppApiSmokeProbeSetId,
+    buildProbePlanForRuntime,
+  } = await importScript(
     "scripts",
     "smoke-app-api-production-cn.mjs",
   )
@@ -215,7 +249,41 @@ test("first-version APP API smoke plan proves routes with auth or payload guards
   const wechatLoginProbe = probes.get("POST /api/app/auth/wechat")
   assert.ok(wechatLoginProbe.expected.some((item) => item.status === 400 && item.code === "missing_code"))
   assert.deepEqual(PROBES.map(probeKey), EXPECTED_LIVE_PROBE_KEYS)
-  assert.equal(PROBES.length, 32)
+  assert.equal(PROBES.length, 35)
+  assert.match(APP_API_SMOKE_PROBE_SET_ID, /^app_api_smoke_probe_set_v1:35:[a-f0-9]{64}$/)
+  assert.equal(buildAppApiSmokeProbeSetId(PROBES), APP_API_SMOKE_PROBE_SET_ID)
+  assert.notEqual(
+    buildAppApiSmokeProbeSetId(PROBES.map((probe, index) => (
+      index === 0 ? { ...probe, path: `${probe.path}/changed` } : probe
+    ))),
+    APP_API_SMOKE_PROBE_SET_ID,
+  )
+  const deviceFilesProbeIndex = PROBES.findIndex((probe) => probe.path === "/api/app/service-records/device-files/check")
+  const withDeviceFilesBody = (body) => PROBES.map((probe, index) => (
+    index === deviceFilesProbeIndex ? { ...probe, body } : probe
+  ))
+  const populatedBodyId = buildAppApiSmokeProbeSetId(withDeviceFilesBody({
+    files: [{ name: "fixture-file-a", metadata: { retries: 1, ready: true } }],
+  }))
+  assert.notEqual(populatedBodyId, APP_API_SMOKE_PROBE_SET_ID)
+  assert.notEqual(buildAppApiSmokeProbeSetId(withDeviceFilesBody({ files: null })), APP_API_SMOKE_PROBE_SET_ID)
+  assert.notEqual(buildAppApiSmokeProbeSetId(withDeviceFilesBody({ files: "[]" })), APP_API_SMOKE_PROBE_SET_ID)
+  assert.notEqual(
+    populatedBodyId,
+    buildAppApiSmokeProbeSetId(withDeviceFilesBody({
+      files: [{ name: "fixture-file-a", metadata: { retries: 1, ready: false } }],
+    })),
+  )
+  assert.equal(
+    buildAppApiSmokeProbeSetId(withDeviceFilesBody({ files: [], metadata: { count: 1, ready: false } })),
+    buildAppApiSmokeProbeSetId(withDeviceFilesBody({ metadata: { ready: false, count: 1 }, files: [] })),
+  )
+  assert.notEqual(
+    buildAppApiSmokeProbeSetId(withDeviceFilesBody({ files: ["first", "second"] })),
+    buildAppApiSmokeProbeSetId(withDeviceFilesBody({ files: ["second", "first"] })),
+  )
+  assert.equal(populatedBodyId.includes("fixture-file-a"), false)
+  assert.match(read("scripts", "smoke-app-api-production-cn.mjs"), /probeSetId:\s*APP_API_SMOKE_PROBE_SET_ID/)
   assert.equal(probes.has("POST /api/app/account/bootstrap"), false)
   assert.deepEqual(MUTATION_EXCLUDED_ROUTES, [
     {
@@ -252,11 +320,32 @@ test("first-version APP API smoke plan proves routes with auth or payload guards
   assert.equal(localPreviewProbe.runtimeExpectation, "local_rds_unavailable")
 })
 
+test("APP API smoke mismatch console exposes only fixed error ID, probe ordinal, and numeric status", () => {
+  const scriptPath = path.join(root, "scripts", "smoke-app-api-production-cn.mjs")
+  const sentinel = ["ZhangSan", "_<b>markdown</b>_", "\u001b[31m", "_opaqueCredential987654"].join("")
+  const source = [
+    `const sentinel = ${JSON.stringify(sentinel)}`,
+    "globalThis.fetch = async () => ({ status: 418, text: async () => JSON.stringify({ code: sentinel, error: sentinel, message: sentinel, key: sentinel }) })",
+    `process.argv = [process.execPath, ${JSON.stringify(scriptPath)}, "--base-url", "https://api-cn.ipgongchang.xin"]`,
+    `await import(${JSON.stringify(pathToFileURL(scriptPath).href)})`,
+  ].join("\n")
+  const result = spawnSync(process.execPath, ["--input-type=module", "--eval", source], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 20,
+  })
+  const output = `${result.stdout}\n${result.stderr}`
+  assert.equal(result.status, 1)
+  assert.match(output, /APP_API_PROBE_RESULT_MISMATCH:0:418/)
+  assert.equal(output.includes(sentinel), false)
+  assert.doesNotMatch(output, /\/api\/app\/|expected_|got_|recentServerLines|"code"|"message"|"key"/)
+})
+
 test("first-version bridge map keeps scope narrow and records the committed facade status", () => {
   const bridgeMap = JSON.parse(read("deploy", "app-api-production-cn.bridge-map.json"))
   const bridgeRoutes = new Map(bridgeMap.routes.map((item) => [item.route, item]))
 
-  assert.equal(bridgeMap.routes.length, 34)
+  assert.equal(bridgeMap.routes.length, 37)
   assert.deepEqual(bridgeMap.firstVersionScope, [
     "login",
     "test-token",
@@ -265,6 +354,7 @@ test("first-version bridge map keeps scope narrow and records the committed faca
     "store-invites",
     "long-service-recording",
     "store-admin-service-records",
+    "professional-learning-progress",
   ])
   assert.equal(bridgeRoutes.get("/api/app/profile").productionCnStatus, "bridge_ready")
   const bootstrapRoute = bridgeRoutes.get("/api/app/account/bootstrap")
@@ -283,6 +373,18 @@ test("first-version bridge map keeps scope narrow and records the committed faca
   ])
   assert.equal(bridgeRoutes.get("/api/app/store-admin/service-records").productionCnStatus, "bridge_ready")
   assert.equal(bridgeRoutes.get("/api/app/auth/wechat").productionCnStatus, "external_env_blocked")
+
+  for (const routePath of LEARNING_PROGRESS_ROUTE_PATHS) {
+    const route = bridgeRoutes.get(routePath)
+    assert.ok(route, `${routePath} should be in the first-version bridge map`)
+    assert.equal(route.scope, "learning-progress")
+    assert.equal(route.sourceType, "app_native")
+    assert.equal(route.productionCnStatus, "bridge_ready")
+    assert.ok(route.sourceFiles.includes("lib/aliyun-rds/repositories/learning-progress.server.ts"))
+    assert.ok(route.sourceFiles.includes("lib/aliyun-rds/postgres.server.ts"))
+    assert.match(route.note, /schema, data, and runtime evidence/i)
+    assert.doesNotMatch(route.note, /migration[_ -]?ready/i)
+  }
 
   for (const route of OUT_OF_FIRST_VERSION_ROUTES) {
     assert.equal(bridgeRoutes.has(route), false, `${route} should stay out of first-version bridge map`)

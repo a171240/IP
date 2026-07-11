@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "environment": "production-cn",
-  "updatedAt": "2026-06-22",
+  "updatedAt": "2026-07-11",
   "containsValues": false,
   "firstVersionScope": [
     "login",
@@ -10,7 +10,8 @@
     "multi-tenant-permissions",
     "store-invites",
     "long-service-recording",
-    "store-admin-service-records"
+    "store-admin-service-records",
+    "professional-learning-progress"
   ],
   "sourceDocs": [
     "../meiye-huajing-miniprogram/docs/app-api-contract-map.md",
@@ -455,6 +456,57 @@
       ],
       "productionCnStatus": "bridge_ready",
       "note": "APP scene card detail/update/delete now uses the Aliyun RDS scene card repository; this remains A3/deferred for first-version RDS migration scope but no longer proxies the mini-program Supabase route."
+    },
+    {
+      "scope": "learning-progress",
+      "route": "/api/app/learning/progress",
+      "methods": [
+        "GET"
+      ],
+      "appFile": "app/api/app/learning/progress/route.ts",
+      "sourceType": "app_native",
+      "sourceFiles": [
+        "app/api/app/learning/progress/route.ts",
+        "lib/aliyun-rds/repositories/learning-progress.server.ts",
+        "lib/aliyun-rds/repositories/account-profile.server.ts",
+        "lib/aliyun-rds/postgres.server.ts"
+      ],
+      "productionCnStatus": "bridge_ready",
+      "note": "APP learning progress reads use the Aliyun RDS event store; production-cn still requires schema, data, and runtime evidence. Mini-program semantic migration evidence is managed by the pinned cross-repo audit/map; this entry proves only the native backend contract."
+    },
+    {
+      "scope": "learning-progress",
+      "route": "/api/app/learning/progress/events",
+      "methods": [
+        "POST"
+      ],
+      "appFile": "app/api/app/learning/progress/events/route.ts",
+      "sourceType": "app_native",
+      "sourceFiles": [
+        "app/api/app/learning/progress/events/route.ts",
+        "lib/aliyun-rds/repositories/learning-progress.server.ts",
+        "lib/aliyun-rds/repositories/account-profile.server.ts",
+        "lib/aliyun-rds/postgres.server.ts"
+      ],
+      "productionCnStatus": "bridge_ready",
+      "note": "APP learning progress event writes use the Aliyun RDS event store; production-cn still requires schema, data, and runtime evidence. Mini-program semantic migration evidence is managed by the pinned cross-repo audit/map; this entry proves only the native backend contract."
+    },
+    {
+      "scope": "learning-progress",
+      "route": "/api/app/learning/progress/sync",
+      "methods": [
+        "POST"
+      ],
+      "appFile": "app/api/app/learning/progress/sync/route.ts",
+      "sourceType": "app_native",
+      "sourceFiles": [
+        "app/api/app/learning/progress/sync/route.ts",
+        "lib/aliyun-rds/repositories/learning-progress.server.ts",
+        "lib/aliyun-rds/repositories/account-profile.server.ts",
+        "lib/aliyun-rds/postgres.server.ts"
+      ],
+      "productionCnStatus": "bridge_ready",
+      "note": "APP learning progress sync uses the Aliyun RDS event store; production-cn still requires schema, data, and runtime evidence. Mini-program semantic migration evidence is managed by the pinned cross-repo audit/map; this entry proves only the native backend contract."
     },
     {
       "scope": "service-records",

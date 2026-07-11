@@ -18,16 +18,28 @@ const EXPECTED_REMOTE_TAG = "production-cn"
 const SOURCE_FRESHNESS_BLOCKER = "image.sourceCommitMatchesHead"
 const RUNTIME_SOURCE_PATH_PATTERNS = Object.freeze([
   /^app\//,
+  /^components\//,
+  /^contexts\//,
+  /^hooks\//,
   /^lib\//,
-  /^scripts\//,
-  /^deploy\//,
   /^public\//,
-  /^middleware\.(?:js|ts)$/,
-  /^instrumentation\.(?:js|ts)$/,
-  /^next\.config\./,
-  /^package(?:-lock)?\.json$/,
+  /^提示词\//,
+  /^playbooks\//,
+  /^styles\//,
+  /^types\//,
+  /^(?:middleware|proxy|instrumentation)\.(?:js|cjs|mjs|ts)$/,
+  /^(?:next|postcss|eslint)\.config\.(?:js|cjs|mjs|ts)$/,
+  /^package\.json$/,
+  /^package-lock\.json$/,
   /^pnpm-lock\.yaml$/,
-  /^tsconfig\.json$/,
+  /^yarn\.lock$/,
+  /^bun\.lockb?$/,
+  /^tsconfig(?:\.[A-Za-z0-9_-]+)?\.json$/,
+  /^Dockerfile(?:\..+)?$/,
+  /^\.dockerignore$/,
+  /^scripts\/strict-build\.mjs$/,
+  /^scripts\/check-backend-release-package\.mjs$/,
+  /^scripts\/required-professional-learning-rendered-assets\.json$/,
 ])
 
 const TOP_LEVEL_FIELDS = new Set([
@@ -262,6 +274,9 @@ function validateLocalSourceFreshness(data) {
     imageSourceCommit: sourceCommit,
     currentSourceTarSha256,
     lastSuccessfulBuild,
+    committedChangedFiles: [],
+    trackedDirtyFiles: [],
+    untrackedFiles: [],
     changedFiles: [],
     runtimeChangedFiles: [],
     runtimeChangedFileCount: 0,
@@ -284,7 +299,6 @@ function validateLocalSourceFreshness(data) {
       ...base,
       status: "git_head_unavailable",
       blockers: [SOURCE_FRESHNESS_BLOCKER],
-      error: head.error,
     }
   }
 
@@ -305,52 +319,65 @@ function validateLocalSourceFreshness(data) {
       currentHead,
       status: "source_commit_not_found",
       blockers: [SOURCE_FRESHNESS_BLOCKER],
-      error: sourceObject.error,
     }
   }
 
   const normalizedSourceCommit = sourceObject.stdout.trim()
-  if (normalizedSourceCommit === currentHead) {
+  const committedDiff = normalizedSourceCommit === currentHead
+    ? { ok: true, stdout: "" }
+    : runGit(["diff", "--name-only", "--no-renames", "-z", `${normalizedSourceCommit}..${currentHead}`, "--"])
+  const trackedDirty = runGit(["diff", "--name-only", "--no-renames", "-z", "HEAD", "--"])
+  const untracked = runGit(["ls-files", "--others", "--exclude-standard", "-z"])
+  if (!committedDiff.ok || !trackedDirty.ok || !untracked.ok) {
     return {
       ...base,
       currentHead,
       imageSourceCommit: normalizedSourceCommit,
-      status: "current",
-    }
-  }
-
-  const diff = runGit(["diff", "--name-only", `${normalizedSourceCommit}..${currentHead}`, "--"])
-  if (!diff.ok) {
-    return {
-      ...base,
-      currentHead,
-      imageSourceCommit: normalizedSourceCommit,
-      status: "diff_unavailable",
+      status: "git_inventory_unavailable",
       blockers: [SOURCE_FRESHNESS_BLOCKER],
-      error: diff.error,
     }
   }
 
-  const changedFiles = diff.stdout
-    .split(/\r?\n/)
-    .map((item) => item.trim())
-    .filter(Boolean)
+  const parsePaths = (stdout) => stdout.split("\0").filter(Boolean)
+  const committedChangedFiles = parsePaths(committedDiff.stdout)
+  const trackedDirtyFiles = parsePaths(trackedDirty.stdout)
+  const untrackedFiles = parsePaths(untracked.stdout)
+  const changedFiles = [...new Set([
+    ...committedChangedFiles,
+    ...trackedDirtyFiles,
+    ...untrackedFiles,
+  ])].sort()
   const runtimeChangedFiles = changedFiles.filter(isRuntimeSourcePath)
-  const staleStatus = runtimeChangedFiles.length > 0
+  const dirtyFileCount = trackedDirtyFiles.length + untrackedFiles.length
+  const status = runtimeChangedFiles.length > 0
     ? "stale_runtime_source"
-    : "stale_non_runtime_source"
+    : changedFiles.length > 0
+      ? normalizedSourceCommit === currentHead
+        ? "current_non_runtime_dirty"
+        : "stale_non_runtime_source"
+      : "current"
+  const warnings = []
+  if (committedChangedFiles.length > 0 && committedChangedFiles.every((filePath) => !isRuntimeSourcePath(filePath))) {
+    warnings.push("image.sourceCommitDiffHasNoRuntimeFiles")
+  }
+  if (dirtyFileCount > 0 && [...trackedDirtyFiles, ...untrackedFiles].every((filePath) => !isRuntimeSourcePath(filePath))) {
+    warnings.push("image.sourceDirtyHasNoRuntimeFiles")
+  }
   return {
     ...base,
     currentHead,
     imageSourceCommit: normalizedSourceCommit,
-    status: staleStatus,
+    status,
+    committedChangedFiles,
+    trackedDirtyFiles,
+    untrackedFiles,
     changedFiles,
     runtimeChangedFiles,
     runtimeChangedFileCount: runtimeChangedFiles.length,
     changedFileSample: changedFiles.slice(0, 20),
     runtimeChangedFileSample: runtimeChangedFiles.slice(0, 20),
     blockers: runtimeChangedFiles.length > 0 ? [SOURCE_FRESHNESS_BLOCKER] : [],
-    warnings: runtimeChangedFiles.length > 0 ? [] : ["image.sourceCommitDiffHasNoRuntimeFiles"],
+    warnings,
   }
 }
 
@@ -364,25 +391,21 @@ function runGit(args) {
   if (result.error) {
     return {
       ok: false,
-      stdout: result.stdout || "",
-      error: `${result.error.code || "git_error"}:${result.error.message}`,
+      stdout: "",
+      errorCode: "git_inventory_failed",
     }
   }
   if (result.status !== 0) {
     return {
       ok: false,
-      stdout: result.stdout || "",
-      error: (result.stderr || result.stdout || `git_exit_${result.status}`)
-        .split(/\r?\n/)
-        .filter(Boolean)
-        .slice(0, 3)
-        .join(" | "),
+      stdout: "",
+      errorCode: "git_inventory_failed",
     }
   }
   return {
     ok: true,
     stdout: result.stdout || "",
-    error: "",
+    errorCode: null,
   }
 }
 

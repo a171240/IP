@@ -209,6 +209,24 @@ export const REQUIRED_ROUTES = [
     file: "app/api/app/service-records/sessions/[sessionId]/audio/[segmentId]/route.ts",
     methods: ["GET"],
   },
+  {
+    scope: "learning-progress",
+    route: "/api/app/learning/progress",
+    file: "app/api/app/learning/progress/route.ts",
+    methods: ["GET"],
+  },
+  {
+    scope: "learning-progress",
+    route: "/api/app/learning/progress/events",
+    file: "app/api/app/learning/progress/events/route.ts",
+    methods: ["POST"],
+  },
+  {
+    scope: "learning-progress",
+    route: "/api/app/learning/progress/sync",
+    file: "app/api/app/learning/progress/sync/route.ts",
+    methods: ["POST"],
+  },
 ]
 
 export const IMPLEMENTED_APP_FACADE_ROUTES = [
@@ -247,24 +265,6 @@ export const IMPLEMENTED_APP_FACADE_ROUTES = [
     route: "/api/app/knowledge-spaces/[spaceId]/groups/[groupId]/cards/[cardId]",
     file: "app/api/app/knowledge-spaces/[...path]/route.ts",
     methods: ["GET"],
-  },
-  {
-    scope: "learning-progress",
-    route: "/api/app/learning/progress",
-    file: "app/api/app/learning/progress/route.ts",
-    methods: ["GET"],
-  },
-  {
-    scope: "learning-progress",
-    route: "/api/app/learning/progress/events",
-    file: "app/api/app/learning/progress/events/route.ts",
-    methods: ["POST"],
-  },
-  {
-    scope: "learning-progress",
-    route: "/api/app/learning/progress/sync",
-    file: "app/api/app/learning/progress/sync/route.ts",
-    methods: ["POST"],
   },
   {
     scope: "content-poster",
