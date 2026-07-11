@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import { isAppVoiceCoachProductionRepositoryModeConfigured } from "@/lib/aliyun-rds/app-voice-coach-runtime-config.server"
 import { isAliyunRdsConfigured } from "@/lib/aliyun-rds/postgres.server"
 import { isAliyunRdsServiceRecordOssConfigured } from "@/lib/aliyun-rds/service-record-oss.server"
 
@@ -95,6 +96,7 @@ function getWechatOpenAppReviewStatus() {
 function getAliyunRuntimeChecks() {
   return {
     aliyunRds: isAliyunRdsConfigured(),
+    voiceCoachTextRepository: isAppVoiceCoachProductionRepositoryModeConfigured(),
     legalLinks: LEGAL_LINK_KEYS.every((name) => isReadyLegalUrl(process.env[name])),
     aliyunOssRuntime: isAliyunRdsServiceRecordOssConfigured(),
     ...Object.fromEntries(

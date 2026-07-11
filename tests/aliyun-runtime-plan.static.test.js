@@ -1,7 +1,8 @@
 const test = require("node:test")
 const assert = require("node:assert/strict")
-const { execFileSync } = require("node:child_process")
+const { execFileSync, spawnSync } = require("node:child_process")
 const fs = require("node:fs")
+const os = require("node:os")
 const path = require("node:path")
 
 const root = process.cwd()
@@ -9,6 +10,7 @@ const read = (...parts) => fs.readFileSync(path.join(root, ...parts), "utf8")
 const readJson = (...parts) => JSON.parse(read(...parts))
 
 const secretLike = /(sk-[A-Za-z0-9_-]{20,}|LTAI[A-Za-z0-9]{12,}|:\/\/[^\s:@]+:[^\s@]+@)/
+const productionVoiceCoachRepositoryMode = "rds_voice_coach_text_session_contract"
 
 test("Aliyun runtime plan command is wired into package scripts", () => {
   const pkg = readJson("package.json")
@@ -34,6 +36,15 @@ test("Aliyun runtime plan treats RDS PostgreSQL as a runtime readiness dependenc
   assert.equal(report.healthPath, "/api/healthz")
   assert.equal(report.dataLayerTarget, "Aliyun RDS PostgreSQL")
   assert.equal(report.dataLayerConnectionEnvName, "DATABASE_URL_CN")
+  assert.equal(
+    report.voiceCoachTextRepositoryModeEnvName,
+    "APP_VOICE_COACH_TEXT_REPOSITORY_MODE",
+  )
+  assert.equal(
+    report.voiceCoachTextRepositoryModeRequiredValue,
+    productionVoiceCoachRepositoryMode,
+  )
+  assert.equal(report.voiceCoachTextRepositoryFailClosed, true)
   assert.deepEqual(report.predeployDependencyIds, [
     "RDS_POSTGRES_MIGRATION",
     "ACR_IMAGE_DIGEST_AND_PULL",
@@ -43,6 +54,15 @@ test("Aliyun runtime plan treats RDS PostgreSQL as a runtime readiness dependenc
 
   assert.equal(plan.dataLayer.formalTarget, "Aliyun RDS PostgreSQL")
   assert.equal(plan.dataLayer.connectionEnvName, "DATABASE_URL_CN")
+  assert.equal(
+    plan.dataLayer.voiceCoachTextRepositoryModeEnvName,
+    "APP_VOICE_COACH_TEXT_REPOSITORY_MODE",
+  )
+  assert.equal(
+    plan.dataLayer.voiceCoachTextRepositoryModeRequiredValue,
+    productionVoiceCoachRepositoryMode,
+  )
+  assert.equal(plan.dataLayer.voiceCoachTextRepositoryFailClosed, true)
   assert.equal(plan.dataLayer.requiredBeforeRuntimeReady, true)
   assert.equal(plan.dataLayer.migrationEvidenceCommand, "corepack pnpm aliyun:rds:migration:evidence:strict")
   assert.equal(plan.dataLayer.runtimeSmokeCommand, "corepack pnpm aliyun:rds:runtime-smoke:strict")
@@ -65,6 +85,54 @@ test("Aliyun runtime plan treats RDS PostgreSQL as a runtime readiness dependenc
     "corepack pnpm aliyun:oss:runtime-access:strict",
   ])
   assert.doesNotMatch(JSON.stringify(plan) + output, secretLike)
+})
+
+test("Aliyun runtime plan checker rejects missing or relaxed voice-coach repository gates", () => {
+  const canonicalPlan = readJson("deploy", "aliyun-production-cn.runtime-plan.json")
+  const cases = [
+    {
+      blocker: "dataLayer.voiceCoachTextRepositoryModeEnvName=APP_VOICE_COACH_TEXT_REPOSITORY_MODE",
+      mutate(plan) {
+        delete plan.dataLayer.voiceCoachTextRepositoryModeEnvName
+      },
+    },
+    {
+      blocker: `dataLayer.voiceCoachTextRepositoryModeRequiredValue=${productionVoiceCoachRepositoryMode}`,
+      mutate(plan) {
+        plan.dataLayer.voiceCoachTextRepositoryModeRequiredValue = "rds"
+      },
+    },
+    {
+      blocker: "dataLayer.voiceCoachTextRepositoryFailClosed=true",
+      mutate(plan) {
+        plan.dataLayer.voiceCoachTextRepositoryFailClosed = false
+      },
+    },
+  ]
+
+  for (const testCase of cases) {
+    const plan = structuredClone(canonicalPlan)
+    testCase.mutate(plan)
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "aliyun-runtime-plan-voice-coach-"))
+    const planPath = path.join(tempDir, "runtime-plan.json")
+    try {
+      fs.writeFileSync(planPath, JSON.stringify(plan, null, 2))
+      const result = spawnSync(process.execPath, [
+        "scripts/check-aliyun-runtime-plan.mjs",
+        "--plan",
+        planPath,
+      ], {
+        cwd: root,
+        encoding: "utf8",
+      })
+
+      assert.equal(result.status, 1)
+      const report = JSON.parse(result.stdout)
+      assert.ok(report.blockers.includes(testCase.blocker))
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true })
+    }
+  }
 })
 
 test("Aliyun runtime plan checker rejects putting RDS back into the excluded first bridge list", () => {

@@ -1,12 +1,14 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { execFileSync } from "node:child_process"
-import { readFileSync } from "node:fs"
+import { execFileSync, spawnSync } from "node:child_process"
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 
 const root = process.cwd()
 const envPlanModuleUrl = pathToFileURL(join(root, "scripts", "prepare-aliyun-runtime-env.mjs")).href
+const productionRdsRepositoryMode = "rds_voice_coach_text_session_contract"
 
 async function buildPlan(overrides) {
   const { buildImportPlan } = await import(envPlanModuleUrl)
@@ -49,6 +51,66 @@ test("Aliyun env import plan has no ready public variables targeting secret env"
     .map((item) => item.name)
 
   assert.deepEqual(mismatches, [])
+})
+
+test("Aliyun env import plan requires only the production RDS voice-coach repository mode", async () => {
+  const readyPlan = await buildPlan({
+    APP_VOICE_COACH_TEXT_REPOSITORY_MODE: productionRdsRepositoryMode,
+  })
+  const readyMode = byName(readyPlan, "APP_VOICE_COACH_TEXT_REPOSITORY_MODE")
+
+  assert.equal(readyMode.required, true)
+  assert.equal(readyMode.status, "ready")
+  assert.equal(readyMode.sensitivity, "public")
+  assert.equal(readyMode.importTarget, "阿里云 SAE plain env")
+  assert.doesNotMatch(JSON.stringify(readyPlan), /local_durable|APP_VOICE_COACH_LOCAL_DURABLE_STORE_PATH/)
+
+  const invalidPlan = await buildPlan({
+    APP_VOICE_COACH_TEXT_REPOSITORY_MODE: "local_durable",
+  })
+  const invalidMode = byName(invalidPlan, "APP_VOICE_COACH_TEXT_REPOSITORY_MODE")
+
+  assert.equal(invalidMode.status, "invalid")
+  assert.ok(invalidPlan.summary.requiredBlocking.includes("APP_VOICE_COACH_TEXT_REPOSITORY_MODE"))
+  assert.doesNotMatch(JSON.stringify(invalidPlan), /local_durable/)
+})
+
+test("Aliyun env validator rejects an invalid voice-coach repository mode even with allow-todo", t => {
+  const fixtureDir = mkdtempSync(join(tmpdir(), "meiye-env-invalid-mode-"))
+  t.after(() => rmSync(fixtureDir, { recursive: true, force: true }))
+  const fixturePath = join(fixtureDir, ".env.production-cn.local")
+  writeFileSync(fixturePath, "APP_VOICE_COACH_TEXT_REPOSITORY_MODE=local_durable\n")
+
+  const result = spawnSync(process.execPath, [
+    "scripts/prepare-aliyun-runtime-env.mjs",
+    "--env-file",
+    fixturePath,
+    "--allow-todo",
+  ], {
+    cwd: root,
+    encoding: "utf8",
+  })
+
+  assert.equal(result.status, 1)
+  assert.match(result.stdout, /APP_VOICE_COACH_TEXT_REPOSITORY_MODE/)
+  assert.doesNotMatch(`${result.stdout}\n${result.stderr}`, /local_durable/)
+})
+
+test("Aliyun runtime plan pins the production voice-coach repository contract without secrets", () => {
+  const runtimePlan = JSON.parse(
+    readFileSync(join(root, "deploy", "aliyun-production-cn.runtime-plan.json"), "utf8"),
+  )
+
+  assert.equal(
+    runtimePlan.dataLayer.voiceCoachTextRepositoryModeEnvName,
+    "APP_VOICE_COACH_TEXT_REPOSITORY_MODE",
+  )
+  assert.equal(
+    runtimePlan.dataLayer.voiceCoachTextRepositoryModeRequiredValue,
+    productionRdsRepositoryMode,
+  )
+  assert.equal(runtimePlan.dataLayer.voiceCoachTextRepositoryFailClosed, true)
+  assert.equal(runtimePlan.containsValues, false)
 })
 
 test("Aliyun env import plan splits WeChat Open AppID and AppSecret import targets", async () => {

@@ -14,6 +14,11 @@ const healthSmokeSource = fs.readFileSync(path.join(root, "scripts", "smoke-aliy
 test("APP health route uses Aliyun production-cn readiness instead of legacy Supabase blockers", () => {
   assert.match(source, /isAliyunRdsConfigured/)
   assert.match(source, /isAliyunRdsServiceRecordOssConfigured/)
+  assert.match(source, /isAppVoiceCoachProductionRepositoryModeConfigured/)
+  assert.match(
+    source,
+    /voiceCoachTextRepository:\s*isAppVoiceCoachProductionRepositoryModeConfigured\(\)/,
+  )
   assert.match(source, /mode: productionCn \? "aliyun-production-cn" : "legacy"/)
   assert.match(source, /supabase: "not_required_for_aliyun_production_cn"/)
   assert.match(source, /appWechatLogin: getWechatOpenAppReviewStatus\(\)/)
@@ -31,5 +36,8 @@ test("APP health readiness treats TODO placeholders as missing runtime configura
   assert.match(ossSource, /!value\.startsWith\("TODO_"\)/)
   assert.match(asrSource, /!value\.startsWith\("TODO_"\)/)
   assert.match(healthSmokeSource, /getEnvText\(env, "DATABASE_URL_CN"\)/)
+  assert.match(healthSmokeSource, /APP_VOICE_COACH_TEXT_REPOSITORY_MODE/)
+  assert.match(healthSmokeSource, /voiceCoachTextRepository/)
+  assert.match(healthSmokeSource, /rds_voice_coach_text_session_contract/)
   assert.doesNotMatch(healthSmokeSource, /return Boolean\(getRawEnvText\(env, "DATABASE_URL_CN"\)/)
 })

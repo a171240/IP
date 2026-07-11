@@ -10,6 +10,7 @@ const ts = require("typescript")
 
 const root = process.cwd()
 const helperPath = path.join(root, "lib", "aliyun-rds", "repositories", "app-voice-coach-facade.server.ts")
+const runtimeConfigPath = path.join(root, "lib", "aliyun-rds", "app-voice-coach-runtime-config.server.ts")
 
 const voiceCoachFeatureDecision = { enabled: true, reason: "ok", source: "ai_points" }
 const authorizationChecks = []
@@ -83,6 +84,9 @@ const nextServerStub = {
 const helperStubs = {
   "server-only": {},
   "next/server": nextServerStub,
+  "@/lib/aliyun-rds/app-voice-coach-runtime-config.server": compileTsModule(runtimeConfigPath, {
+    "server-only": {},
+  }),
   "@/lib/aliyun-rds/app-auth.server": {
     appAuthConfigurationErrorResponse: () => null,
     appAuthRequiredResponse: () => jsonResponse({ ok: false, code: "unauthorized" }, { status: 401 }),
@@ -190,9 +194,21 @@ function durableRoute(...parts) {
 test("VC-L4-03 local durable voiceCoach contract survives helper reloads", async (t) => {
   resetAuthorizationChecks()
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "app-vc-durable-"))
+  const previous = {
+    appEnv: process.env.APP_ENV,
+    appRegion: process.env.APP_REGION,
+    repositoryMode: process.env.APP_VOICE_COACH_TEXT_REPOSITORY_MODE,
+    storePath: process.env.APP_VOICE_COACH_LOCAL_DURABLE_STORE_PATH,
+  }
+  process.env.APP_ENV = "test"
+  delete process.env.APP_REGION
+  delete process.env.APP_VOICE_COACH_TEXT_REPOSITORY_MODE
   process.env.APP_VOICE_COACH_LOCAL_DURABLE_STORE_PATH = path.join(tempDir, "sessions.json")
   t.after(() => {
-    delete process.env.APP_VOICE_COACH_LOCAL_DURABLE_STORE_PATH
+    restoreEnv("APP_ENV", previous.appEnv)
+    restoreEnv("APP_REGION", previous.appRegion)
+    restoreEnv("APP_VOICE_COACH_TEXT_REPOSITORY_MODE", previous.repositoryMode)
+    restoreEnv("APP_VOICE_COACH_LOCAL_DURABLE_STORE_PATH", previous.storePath)
     fs.rmSync(tempDir, { recursive: true, force: true })
   })
 
@@ -278,3 +294,8 @@ test("VC-L4-03 local durable voiceCoach contract survives helper reloads", async
   assert.equal(list.sessions[0].can_view_report, true)
   assertAuthorizationChecks(7)
 })
+
+function restoreEnv(key, value) {
+  if (value === undefined) delete process.env[key]
+  else process.env[key] = value
+}

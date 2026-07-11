@@ -12,6 +12,7 @@ const envFixturePath = createEnvFixture()
 const REQUIRED_MISSING = [
   "APP_ENV",
   "APP_REGION",
+  "APP_VOICE_COACH_TEXT_REPOSITORY_MODE",
   "APP_API_BASE_URL",
   "APP_ASSET_BASE_URL",
   "NEXT_PUBLIC_SITE_URL",
@@ -67,6 +68,7 @@ test("Aliyun env source map classifies Vercel migration names without printing v
   const markdown = fs.readFileSync(markdownPath, "utf8")
   const migrateNames = report.groups.migrateFromVercelProduction.map((item) => item.name)
   const appAliyunNames = report.groups.appAliyunOwnedNotInVercel.map((item) => item.name)
+  const readyLocalMissingNames = report.groups.readyLocalButMissingFromVercel.map((item) => item.name)
   const blockedNames = report.groups.blockedExternalRequired.map((item) => item.name)
   const miniCompatNames = report.groups.miniProgramCompatOnly.map((item) => item.name)
 
@@ -75,12 +77,13 @@ test("Aliyun env source map classifies Vercel migration names without printing v
   assert.equal(report.mutationPerformed, false)
   assert.equal(report.secretLeakCheck.ok, true)
   assert.equal(report.vercelCoverage.ok, true)
-  assert.equal(report.summary.vercelRequiredCovered, "15/25")
+  assert.equal(report.summary.vercelRequiredCovered, "15/26")
   assert.deepEqual(report.summary.requiredMissingInVercelProduction, REQUIRED_MISSING)
   assert.ok(migrateNames.includes("SUPABASE_SERVICE_ROLE_KEY"))
   assert.ok(migrateNames.includes("DEEPSEEK_API_KEY"))
   assert.ok(appAliyunNames.includes("APP_API_BASE_URL"))
   assert.ok(appAliyunNames.includes("APP_ASSET_BASE_URL"))
+  assert.ok(readyLocalMissingNames.includes("APP_VOICE_COACH_TEXT_REPOSITORY_MODE"))
   assert.ok(blockedNames.includes("WECHAT_OPEN_APP_ID"))
   assert.ok(blockedNames.includes("WECHAT_OPEN_APP_SECRET"))
   assert.ok(blockedNames.includes("DATABASE_URL_CN"))
@@ -127,7 +130,7 @@ function fakeVercelCoverage() {
       vercelEntries: 130,
       uniqueNames: 130,
       productionNames: 130,
-      requiredTotal: 27,
+      requiredTotal: 28,
       requiredPresentInVercelProduction: 17,
       optionalTotal: 37,
       optionalPresentInVercelProduction: 29,
@@ -173,6 +176,7 @@ function createEnvFixture() {
   fs.writeFileSync(filePath, [
     "APP_ENV=production-cn",
     "APP_REGION=cn-hangzhou",
+    "APP_VOICE_COACH_TEXT_REPOSITORY_MODE=rds_voice_coach_text_session_contract",
     "APP_API_BASE_URL=https://api.example.test",
     "APP_ASSET_BASE_URL=https://assets.example.test",
     "NEXT_PUBLIC_SITE_URL=https://site.example.test",

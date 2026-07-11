@@ -8,6 +8,8 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const BACKEND_ROOT = resolve(__dirname, "..")
 const DEFAULT_PLAN_FILE = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.runtime-plan.json")
+const VOICE_COACH_TEXT_REPOSITORY_MODE_ENV = "APP_VOICE_COACH_TEXT_REPOSITORY_MODE"
+const PRODUCTION_VOICE_COACH_TEXT_REPOSITORY_MODE = "rds_voice_coach_text_session_contract"
 
 const FORBIDDEN_HOSTS = new Set([
   "ip.ipgongchang.xin",
@@ -137,6 +139,15 @@ function validatePlan(plan) {
   const dataLayer = plan.dataLayer || {}
   if (dataLayer.formalTarget !== "Aliyun RDS PostgreSQL") blockers.push("dataLayer.formalTarget")
   if (dataLayer.connectionEnvName !== "DATABASE_URL_CN") blockers.push("dataLayer.connectionEnvName=DATABASE_URL_CN")
+  if (dataLayer.voiceCoachTextRepositoryModeEnvName !== VOICE_COACH_TEXT_REPOSITORY_MODE_ENV) {
+    blockers.push(`dataLayer.voiceCoachTextRepositoryModeEnvName=${VOICE_COACH_TEXT_REPOSITORY_MODE_ENV}`)
+  }
+  if (dataLayer.voiceCoachTextRepositoryModeRequiredValue !== PRODUCTION_VOICE_COACH_TEXT_REPOSITORY_MODE) {
+    blockers.push(`dataLayer.voiceCoachTextRepositoryModeRequiredValue=${PRODUCTION_VOICE_COACH_TEXT_REPOSITORY_MODE}`)
+  }
+  if (dataLayer.voiceCoachTextRepositoryFailClosed !== true) {
+    blockers.push("dataLayer.voiceCoachTextRepositoryFailClosed=true")
+  }
   if (!String(dataLayer.connectionSecretTarget || "").includes("Aliyun KMS")) {
     blockers.push("dataLayer.connectionSecretTarget")
   }
@@ -243,6 +254,12 @@ function main() {
     imageTag: plan.image?.tag || "",
     dataLayerTarget: plan.dataLayer?.formalTarget || "",
     dataLayerConnectionEnvName: plan.dataLayer?.connectionEnvName || "",
+    voiceCoachTextRepositoryModeEnvName:
+      plan.dataLayer?.voiceCoachTextRepositoryModeEnvName || "",
+    voiceCoachTextRepositoryModeRequiredValue:
+      plan.dataLayer?.voiceCoachTextRepositoryModeRequiredValue || "",
+    voiceCoachTextRepositoryFailClosed:
+      plan.dataLayer?.voiceCoachTextRepositoryFailClosed === true,
     predeployDependencyIds: Array.isArray(plan.predeployDependencies)
       ? plan.predeployDependencies.map((item) => item.id)
       : [],

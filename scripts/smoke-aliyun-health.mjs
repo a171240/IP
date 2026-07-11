@@ -10,6 +10,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const DEFAULT_ENV_FILE = resolve(__dirname, "../../../.env.production-cn.local")
 const DEFAULT_TIMEOUT_MS = 20_000
+const PRODUCTION_VOICE_COACH_TEXT_REPOSITORY_MODE = "rds_voice_coach_text_session_contract"
 
 const REQUIRED_RUNTIME_GROUPS = {
   supabase: [
@@ -159,6 +160,11 @@ function isAliyunProductionCnRuntime(env) {
   return env.get("APP_ENV") === "production-cn" || env.get("APP_REGION") === "cn-hangzhou"
 }
 
+function isAppVoiceCoachProductionRepositoryModeConfigured(env) {
+  return getEnvText(env, "APP_VOICE_COACH_TEXT_REPOSITORY_MODE") ===
+    PRODUCTION_VOICE_COACH_TEXT_REPOSITORY_MODE
+}
+
 function isAliyunKmsSecretDatabaseUrlConfigured(env) {
   const secretName = getEnvText(
     env,
@@ -193,6 +199,7 @@ function expectedMissingGroups(env) {
   if (isAliyunProductionCnRuntime(env)) {
     const checks = {
       aliyunRds: isAliyunRdsConfigured(env),
+      voiceCoachTextRepository: isAppVoiceCoachProductionRepositoryModeConfigured(env),
       legalLinks: LEGAL_LINK_KEYS.every((key) => isReadyLegalUrl(env.get(key))),
       aliyunOssRuntime: isAliyunOssRuntimeConfigured(env),
       ...Object.fromEntries(
@@ -289,10 +296,18 @@ async function readJson(baseUrl, path) {
   }
 }
 
-function assertHealthResult(result, expectedMissing) {
+function assertHealthResult(result, expectedMissing, expectedVoiceCoachRepositoryReady) {
   const body = result.body
   if (!body || typeof body !== "object") throw new Error(`invalid_body:${result.path}`)
   if (!Array.isArray(body.missing)) throw new Error(`missing_not_array:${result.path}`)
+  if (expectedVoiceCoachRepositoryReady !== null) {
+    if (!body.checks || typeof body.checks !== "object") {
+      throw new Error(`checks_not_object:${result.path}`)
+    }
+    if (body.checks.voiceCoachTextRepository !== expectedVoiceCoachRepositoryReady) {
+      throw new Error(`unexpected_voice_coach_repository_check:${result.path}`)
+    }
+  }
   const actualMissing = [...body.missing].sort()
   const expected = [...expectedMissing].sort()
   if (JSON.stringify(actualMissing) !== JSON.stringify(expected)) {
@@ -325,6 +340,7 @@ function summarizeResult(result) {
     status: result.status,
     ok: Boolean(result.body.ok),
     missing: result.body.missing,
+    voiceCoachTextRepository: Boolean(result.body.checks?.voiceCoachTextRepository),
   }
 }
 
@@ -362,6 +378,9 @@ async function main() {
   const port = await getFreePort()
   const baseUrl = `http://127.0.0.1:${port}`
   const expectedMissing = expectedMissingGroups(env)
+  const expectedVoiceCoachRepositoryReady = isAliyunProductionCnRuntime(env)
+    ? isAppVoiceCoachProductionRepositoryModeConfigured(env)
+    : null
   const { child, logs } = await startServer(env, port)
   try {
     await waitForReady(baseUrl, child, args.timeoutMs)
@@ -370,7 +389,9 @@ async function main() {
       await readJson(baseUrl, "/api/app/health"),
       await readJson(baseUrl, "/api/app/health?strict=1"),
     ]
-    for (const result of results) assertHealthResult(result, expectedMissing)
+    for (const result of results) {
+      assertHealthResult(result, expectedMissing, expectedVoiceCoachRepositoryReady)
+    }
     const sensitiveLeakCount = countSensitiveLeaks(env, results)
     if (sensitiveLeakCount > 0) throw new Error("health_response_leaked_sensitive_values")
     console.log(JSON.stringify({

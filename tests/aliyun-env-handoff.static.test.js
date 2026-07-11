@@ -67,6 +67,7 @@ test("Aliyun env handoff groups current variables without printing values", () =
   assert.ok(appLaunchNames.includes("WECHAT_OPEN_APP_SECRET"))
   assert.ok(appLaunchNames.includes("APPLE_TEAM_ID"))
   assert.ok(readyPlainNames.includes("APP_API_BASE_URL"))
+  assert.ok(readyPlainNames.includes("APP_VOICE_COACH_TEXT_REPOSITORY_MODE"))
   assert.ok(readySecretNames.includes("SUPABASE_SERVICE_ROLE_KEY"))
   assert.ok(!deferredNames.includes("DATABASE_URL_CN"))
   assert.ok(deferredNames.includes("REDIS_URL_CN"))
@@ -123,8 +124,8 @@ test("Aliyun env handoff backend-only mode excludes deferred app launch variable
   assert.deepEqual(report.summary.requiredBlocking, ["DATABASE_URL_CN"])
   assert.deepEqual(report.summary.fullAppRequiredBlocking, ["DATABASE_URL_CN"])
   assert.deepEqual(report.summary.appLaunchBlocking, [])
-  assert.equal(report.summary.requiredTotal, 23)
-  assert.equal(report.summary.requiredReady, 22)
+  assert.equal(report.summary.requiredTotal, 24)
+  assert.equal(report.summary.requiredReady, 23)
   assert.deepEqual(groupNames.blockedRequired, ["DATABASE_URL_CN"])
   assert.deepEqual(groupNames.appLaunchBlocking, [])
   assert.ok(!groupNames.readyPlainEnv.includes("WECHAT_OPEN_APP_REVIEW_STATUS"))
@@ -167,6 +168,54 @@ test("Aliyun env handoff backend-only mode excludes deferred app launch variable
   assert.doesNotMatch(output, /LTAI[A-Za-z0-9]{12,}/)
   assert.doesNotMatch(output, /:\/\/[^\s:@]+:[^\s@]+@/)
 })
+
+for (const repositoryModeCase of [
+  { label: "missing", mode: undefined, status: "empty" },
+  { label: "invalid", mode: "local_durable", status: "invalid" },
+]) {
+  test(`Aliyun env handoff keeps ${repositoryModeCase.label} voice-coach mode blockers aligned with the current answer`, t => {
+    const fixturePath = createRepositoryModeFixture(t, repositoryModeCase.mode)
+
+    for (const args of [[], ["--backend-only"]]) {
+      const output = execFileSync(process.execPath, [
+        "scripts/summarize-aliyun-env-handoff.mjs",
+        "--env-file",
+        fixturePath,
+        ...args,
+      ], {
+        cwd: root,
+        encoding: "utf8",
+        maxBuffer: 1024 * 1024 * 20,
+      })
+      const report = JSON.parse(output)
+      const expectedBlocking = [
+        "APP_VOICE_COACH_TEXT_REPOSITORY_MODE",
+        "DATABASE_URL_CN",
+      ]
+
+      assert.deepEqual(report.summary.requiredBlocking, expectedBlocking)
+      if (args.includes("--backend-only")) {
+        assert.deepEqual(report.summary.fullAppRequiredBlocking, expectedBlocking)
+      } else {
+        for (const name of expectedBlocking) {
+          assert.ok(report.summary.fullAppRequiredBlocking.includes(name))
+        }
+      }
+      for (const name of expectedBlocking) {
+        assert.match(report.currentAnswer, new RegExp(name))
+      }
+      assert.doesNotMatch(report.currentAnswer, /只剩 DATABASE_URL_CN/)
+      assert.equal(report.credentialAcquisitionQueue.onlyMissingBackendCredentialValue, "")
+      assert.equal(
+        report.groups.blockedRequired.find(
+          item => item.name === "APP_VOICE_COACH_TEXT_REPOSITORY_MODE",
+        )?.status,
+        repositoryModeCase.status,
+      )
+      assert.doesNotMatch(output, /local_durable/)
+    }
+  })
+}
 
 test("Aliyun env handoff markdown keeps operator instructions value-free", () => {
   const outDir = fs.mkdtempSync("/tmp/meiye-env-handoff-test-")
@@ -251,12 +300,27 @@ function readJsonFromPath(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"))
 }
 
+function createRepositoryModeFixture(t, mode) {
+  const outDir = fs.mkdtempSync("/tmp/meiye-env-handoff-mode-fixture-")
+  t.after(() => fs.rmSync(outDir, { recursive: true, force: true }))
+  const filePath = path.join(outDir, ".env.production-cn.local")
+  const lines = fs.readFileSync(envFixturePath, "utf8")
+    .split(/\r?\n/)
+    .filter(line => !line.startsWith("APP_VOICE_COACH_TEXT_REPOSITORY_MODE="))
+  if (mode !== undefined) {
+    lines.splice(2, 0, `APP_VOICE_COACH_TEXT_REPOSITORY_MODE=${mode}`)
+  }
+  fs.writeFileSync(filePath, lines.join("\n"))
+  return filePath
+}
+
 function createEnvFixture() {
   const outDir = fs.mkdtempSync("/tmp/meiye-env-runtime-fixture-")
   const filePath = path.join(outDir, ".env.production-cn.local")
   fs.writeFileSync(filePath, [
     "APP_ENV=production-cn",
     "APP_REGION=cn-hangzhou",
+    "APP_VOICE_COACH_TEXT_REPOSITORY_MODE=rds_voice_coach_text_session_contract",
     "APP_API_BASE_URL=https://api.example.test",
     "APP_ASSET_BASE_URL=https://assets.example.test",
     "NEXT_PUBLIC_SITE_URL=https://site.example.test",

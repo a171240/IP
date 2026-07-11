@@ -151,7 +151,7 @@ test("Aliyun operator tasks backend-only mode reflects current Aliyun backend pr
     "missing_required_env:DATABASE_URL_CN",
     "envImport:confirmed",
   ])
-  assert.ok(taskById.get("T06_ALIYUN_ENV_IMPORT").evidence.includes("requiredReady=24/25"))
+  assert.ok(taskById.get("T06_ALIYUN_ENV_IMPORT").evidence.includes("requiredReady=25/26"))
   assert.ok(taskById.get("T06_ALIYUN_ENV_IMPORT").evidence.includes("requiredBlocking=DATABASE_URL_CN"))
   assert.equal(taskById.get("T04_ALIYUN_DOMAIN_DNS_HTTPS").status, "blocked")
   assert.ok(taskById.get("T04_ALIYUN_DOMAIN_DNS_HTTPS").blockerCodes.includes("apiDomainHttps:httpsEnabled"))
@@ -165,8 +165,8 @@ test("Aliyun operator tasks backend-only mode reflects current Aliyun backend pr
   )))
 
   assert.deepEqual(report.env.summary.requiredBlocking, ["DATABASE_URL_CN"])
-  assert.equal(report.env.summary.requiredTotal, 25)
-  assert.equal(report.env.summary.requiredReady, 24)
+  assert.equal(report.env.summary.requiredTotal, 26)
+  assert.equal(report.env.summary.requiredReady, 25)
   assert.deepEqual(report.cloudImportedRequiredEnvNames, [])
   assert.equal(report.rdsMigrationEvidence.ready, false)
   assert.equal(report.rdsMigrationEvidence.totalBlockers, 16)

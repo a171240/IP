@@ -106,7 +106,10 @@ function buildReport(args) {
       envFile: args.envFile,
       envFileExists: existsSync(args.envFile),
     },
-    currentAnswer: "现在不能部署；当前只推进阿里云后端，后端必填阻塞只剩 DATABASE_URL_CN，微信移动应用/Android/Apple 发布变量延期到后端上线后。",
+    currentAnswer: buildCurrentAnswer(
+      groups.blockedRequired.map((item) => item.name),
+      false,
+    ),
     summary: {
       currentScope: CURRENT_SCOPE,
       fullAppLaunchScope: FULL_APP_LAUNCH_SCOPE,
@@ -178,10 +181,10 @@ function applyBackendOnlyScope(report) {
     report.groups[key] = report.groups[key].filter((item) => !APP_LAUNCH_DEFERRED_NAMES.has(item.name))
   }
 
-  report.currentAnswer = "现在只处理阿里云后端环境变量；后端必填阻塞只剩 DATABASE_URL_CN，微信移动应用、Apple/Android 发布和 APP 协议页变量全部后置。"
   report.summary.requiredTotal = Math.max(0, report.summary.requiredTotal - 2)
   report.summary.requiredBlocking = report.groups.blockedRequired.map((item) => item.name)
   report.summary.fullAppRequiredBlocking = report.summary.requiredBlocking
+  report.currentAnswer = buildCurrentAnswer(report.summary.requiredBlocking, true)
   report.summary.appLaunchBlocking = []
   report.summary.readyPlainEnv = report.groups.readyPlainEnv.length
   report.summary.readySecretEnv = report.groups.readySecretEnv.length
@@ -202,6 +205,15 @@ function applyBackendOnlyScope(report) {
     envNames: Array.from(excluded).sort(),
     reason: "微信开放平台移动应用、Apple/Android 发布和 APP 协议页变量不参与当前阿里云后端补齐。",
   }
+}
+
+function buildCurrentAnswer(requiredBlocking, backendOnly) {
+  const backendStatus = requiredBlocking.length
+    ? `后端必填阻塞：${requiredBlocking.join("、")}`
+    : "后端必填变量已全部 ready"
+  return backendOnly
+    ? `现在只处理阿里云后端环境变量；${backendStatus}；微信移动应用、Apple/Android 发布和 APP 协议页变量全部后置。`
+    : `现在不能部署；当前只推进阿里云后端，${backendStatus}；微信移动应用/Android/Apple 发布变量延期到后端上线后。`
 }
 
 function buildCredentialAcquisitionQueue(report, args) {

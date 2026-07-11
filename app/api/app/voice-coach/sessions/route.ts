@@ -58,7 +58,11 @@ export async function POST(request: NextRequest) {
     timing.write(response.status)
     return response
   } catch (error) {
-    timing.write(500, error)
-    return appVoiceCoachFacadeErrorResponse(error, "app_voice_coach_session_create_failed")
+    const response = appVoiceCoachFacadeErrorResponse(
+      error,
+      "app_voice_coach_session_create_failed",
+    )
+    timing.write(response.status, error)
+    return response
   }
 }

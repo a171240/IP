@@ -38,6 +38,9 @@
   "dataLayer": {
     "formalTarget": "Aliyun RDS PostgreSQL",
     "connectionEnvName": "DATABASE_URL_CN",
+    "voiceCoachTextRepositoryModeEnvName": "APP_VOICE_COACH_TEXT_REPOSITORY_MODE",
+    "voiceCoachTextRepositoryModeRequiredValue": "rds_voice_coach_text_session_contract",
+    "voiceCoachTextRepositoryFailClosed": true,
     "connectionSecretTarget": "Aliyun KMS / Secrets Manager / SAE secret env",
     "migrationEvidenceCommand": "corepack pnpm aliyun:rds:migration:evidence:strict",
     "runtimeSmokeCommand": "corepack pnpm aliyun:rds:runtime-smoke:strict",

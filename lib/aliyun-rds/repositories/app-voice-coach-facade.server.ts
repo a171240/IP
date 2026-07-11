@@ -16,6 +16,12 @@ import {
   isAliyunRdsRuntimeUnavailableError,
 } from "@/lib/aliyun-rds/postgres.server"
 import {
+  APP_VOICE_COACH_PRODUCTION_RDS_REPOSITORY_MODE,
+  APP_VOICE_COACH_REPOSITORY_NOT_CONFIGURED_CODE,
+  AppVoiceCoachRepositoryConfigurationError,
+  resolveAppVoiceCoachTextRepositorySelection,
+} from "@/lib/aliyun-rds/app-voice-coach-runtime-config.server"
+import {
   accountContextPayload,
   getAliyunRdsAppAccountContext,
   type AppAccountContext,
@@ -40,9 +46,6 @@ export type AppVoiceCoachCreateTimingLog = {
 
 const DEFAULT_SCENARIO_ID = "objection_safety"
 const LOCAL_DURABLE_STORE_ENV = "APP_VOICE_COACH_LOCAL_DURABLE_STORE_PATH"
-const REPOSITORY_MODE_ENV = "APP_VOICE_COACH_TEXT_REPOSITORY_MODE"
-const LOCAL_DURABLE_REPOSITORY_SELECTION = "local_durable"
-const RDS_REPOSITORY_SELECTION = "rds"
 const TEXT_SESSION_REPOSITORY_MODE = "text_first_local_durable_session_store"
 const TEXT_SESSION_PROVIDER_MODE = "text_only_no_audio_provider"
 const UUID_PATTERN = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i
@@ -191,6 +194,7 @@ export function resolveAppVoiceCoachScope(ctx: AppAccountContext, request: NextR
 }
 
 export async function resolveAppVoiceCoachFacadeContext(request: NextRequest) {
+  resolveAppVoiceCoachTextRepositorySelection()
   const auth = await resolveAliyunRdsAppAuthUser(request)
   if (!auth) return { error: appAuthRequiredResponse() }
 
@@ -216,6 +220,13 @@ export function appVoiceCoachFacadeErrorResponse(error: unknown, fallbackCode: s
   const appAuthError = appAuthConfigurationErrorResponse(error)
   if (appAuthError) return appAuthError
 
+  if (error instanceof AppVoiceCoachRepositoryConfigurationError) {
+    return jsonError(
+      503,
+      APP_VOICE_COACH_REPOSITORY_NOT_CONFIGURED_CODE,
+      APP_VOICE_COACH_REPOSITORY_NOT_CONFIGURED_CODE,
+    )
+  }
   if (error instanceof AliyunRdsConfigurationError) {
     return jsonError(503, "DATABASE_URL_CN is required", "rds_not_configured")
   }
@@ -300,20 +311,17 @@ function safeIdFragment(value: unknown) {
 }
 
 function timingErrorClass(error: unknown) {
+  if (error instanceof AppVoiceCoachRepositoryConfigurationError) {
+    return "AppVoiceCoachRepositoryConfigurationError"
+  }
   if (error instanceof AliyunRdsConfigurationError) return "AliyunRdsConfigurationError"
   if (isAliyunRdsRuntimeUnavailableError(error)) return "AliyunRdsRuntimeUnavailable"
   if (error instanceof Error) return cleanTimingStageName(error.name || "Error")
   return "NonErrorThrow"
 }
 
-function selectedTextRepositoryMode() {
-  const mode = cleanText(process.env[REPOSITORY_MODE_ENV], 80) || LOCAL_DURABLE_REPOSITORY_SELECTION
-  if (mode === LOCAL_DURABLE_REPOSITORY_SELECTION || mode === RDS_REPOSITORY_SELECTION) return mode
-  throw new Error(`app_voice_coach_repository_mode_unsupported:${mode}`)
-}
-
 function shouldUseRdsRepository() {
-  return selectedTextRepositoryMode() === RDS_REPOSITORY_SELECTION
+  return resolveAppVoiceCoachTextRepositorySelection() === "rds"
 }
 
 async function loadRdsRepository(): Promise<AppVoiceCoachRdsRepository> {
@@ -325,6 +333,12 @@ function rdsContractPayload(repositoryMode: string) {
     repository_mode: repositoryMode,
     provider_mode: TEXT_SESSION_PROVIDER_MODE,
   }
+}
+
+function selectedTextContractPayload() {
+  return shouldUseRdsRepository()
+    ? rdsContractPayload(APP_VOICE_COACH_PRODUCTION_RDS_REPOSITORY_MODE)
+    : textContractPayload()
 }
 
 function scenarioPayload(scenarioId: unknown) {
@@ -954,7 +968,7 @@ export function appVoiceCoachTtsProviderRequiredResponse(opts: {
       turn_id: opts.turnId,
       audio_url: null,
       audio_seconds: null,
-      ...textContractPayload(),
+      ...selectedTextContractPayload(),
     },
     { status: 501 },
   )
@@ -976,7 +990,7 @@ export function appVoiceCoachAsrProviderRequiredResponse(opts: {
       confidence: null,
       audio_seconds: null,
       request_id: null,
-      ...textContractPayload(),
+      ...selectedTextContractPayload(),
     },
     { status: 501 },
   )

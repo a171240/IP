@@ -7,10 +7,13 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const APP_ENV_FILE = resolve(__dirname, "../../../.env.production-cn.local")
+const VOICE_COACH_TEXT_REPOSITORY_MODE_KEY = "APP_VOICE_COACH_TEXT_REPOSITORY_MODE"
+const PRODUCTION_VOICE_COACH_TEXT_REPOSITORY_MODE = "rds_voice_coach_text_session_contract"
 
 export const REQUIRED_KEYS = [
   "APP_ENV",
   "APP_REGION",
+  VOICE_COACH_TEXT_REPOSITORY_MODE_KEY,
   "APP_API_BASE_URL",
   "APP_ASSET_BASE_URL",
   "NEXT_PUBLIC_SITE_URL",
@@ -170,11 +173,11 @@ function isTodo(value) {
 export function summarize(env, allowTodo) {
   const required = REQUIRED_KEYS.map((key) => ({
     key,
-    status: statusOf(env.get(key), allowTodo),
+    status: statusOf(key, env.get(key), allowTodo),
   }))
   const optional = OPTIONAL_KEYS.map((key) => ({
     key,
-    status: statusOf(env.get(key), true),
+    status: statusOf(key, env.get(key), true),
   }))
   const missingRequired = required.filter((item) => item.status !== "ready")
   const readyCount = [...required, ...optional].filter((item) => item.status === "ready").length
@@ -190,9 +193,15 @@ export function summarize(env, allowTodo) {
   }
 }
 
-function statusOf(value, allowTodo) {
+function statusOf(key, value, allowTodo) {
   if (!isFilled(value)) return "empty"
   if (isTodo(value)) return allowTodo ? "todo" : "todo_blocking"
+  if (
+    key === VOICE_COACH_TEXT_REPOSITORY_MODE_KEY &&
+    String(value).trim() !== PRODUCTION_VOICE_COACH_TEXT_REPOSITORY_MODE
+  ) {
+    return "invalid"
+  }
   return "ready"
 }
 
@@ -201,6 +210,11 @@ function writeImportFile(env, writePath, opts = {}) {
   const payload = allKeys
     .filter((key) => isFilled(env.get(key)))
     .filter((key) => opts.includeTodoInWrite || !isTodo(env.get(key)))
+    .filter(
+      (key) =>
+        key !== VOICE_COACH_TEXT_REPOSITORY_MODE_KEY ||
+        String(env.get(key)).trim() === PRODUCTION_VOICE_COACH_TEXT_REPOSITORY_MODE,
+    )
     .map((key) => ({
       name: key,
       value: env.get(key),
@@ -335,7 +349,7 @@ function escapeTableCell(value) {
 }
 
 function buildPlanItem(env, key, required) {
-  const status = rawStatusOf(env.get(key))
+  const status = rawStatusOf(key, env.get(key))
   const metadata = sourceMetadataOf(key)
   return {
     name: key,
@@ -354,14 +368,20 @@ function buildPlanItem(env, key, required) {
   }
 }
 
-function rawStatusOf(value) {
+function rawStatusOf(key, value) {
   if (!isFilled(value)) return "empty"
   if (isTodo(value)) return "todo"
+  if (
+    key === VOICE_COACH_TEXT_REPOSITORY_MODE_KEY &&
+    String(value).trim() !== PRODUCTION_VOICE_COACH_TEXT_REPOSITORY_MODE
+  ) {
+    return "invalid"
+  }
   return "ready"
 }
 
 function sensitivityOf(key) {
-  if (/^(APP_ENV|APP_REGION|APP_API_BASE_URL|APP_ASSET_BASE_URL|NEXT_PUBLIC_SITE_URL|PRIVACY_POLICY_URL|TERMS_URL|ALIYUN_OSS_BUCKET|ALIYUN_OSS_REGION|ALIBABA_CLOUD_ROLE_ARN|ALIBABA_CLOUD_OIDC_PROVIDER_ARN|ALIBABA_CLOUD_OIDC_TOKEN_FILE|ALIYUN_OSS_RAM_ROLE_NAME|SERVICE_RECORD_OSS_PREFIX|BAILIAN_ASR_MODEL|BAILIAN_ASR_LANGUAGE_HINTS|BAILIAN_ASR_DIARIZATION_ENABLED|BAILIAN_ASR_SPEAKER_COUNT|BAILIAN_ASR_AUDIO_URL_EXPIRES_SECONDS|SERVICE_RECORD_ASR_PROVIDER|DEEPSEEK_BASE_URL|DEEPSEEK_MODEL|SERVICE_RECORD_DEEPSEEK_BASE_URL|SERVICE_RECORD_DEEPSEEK_MODEL|VOLC_ASR_RESOURCE_ID|VOLC_ASR_FLASH_RESOURCE_ID|VOLC_TTS_CLUSTER|VOLC_TTS_VOICE_TYPE|VOLC_TTS_LANGUAGE|VOICE_COACH_ENABLED|VOICE_COACH_MAX_TURNS|VOICE_COACH_REPLY_PROVIDER|VOICE_COACH_ANALYSIS_PROVIDER|VOICE_COACH_FIRST_TURN_MODE|VOICE_COACH_FIRST_TTS_MODE|WECHAT_OPEN_APP_REVIEW_STATUS|APPLE_TEAM_ID|APIMART_BASE_URL|APIMART_MODEL|APIMART_IMAGE_BASE_URL|APIMART_IMAGE_MODEL)$/.test(key)) {
+  if (/^(APP_ENV|APP_REGION|APP_API_BASE_URL|APP_ASSET_BASE_URL|APP_VOICE_COACH_TEXT_REPOSITORY_MODE|NEXT_PUBLIC_SITE_URL|PRIVACY_POLICY_URL|TERMS_URL|ALIYUN_OSS_BUCKET|ALIYUN_OSS_REGION|ALIBABA_CLOUD_ROLE_ARN|ALIBABA_CLOUD_OIDC_PROVIDER_ARN|ALIBABA_CLOUD_OIDC_TOKEN_FILE|ALIYUN_OSS_RAM_ROLE_NAME|SERVICE_RECORD_OSS_PREFIX|BAILIAN_ASR_MODEL|BAILIAN_ASR_LANGUAGE_HINTS|BAILIAN_ASR_DIARIZATION_ENABLED|BAILIAN_ASR_SPEAKER_COUNT|BAILIAN_ASR_AUDIO_URL_EXPIRES_SECONDS|SERVICE_RECORD_ASR_PROVIDER|DEEPSEEK_BASE_URL|DEEPSEEK_MODEL|SERVICE_RECORD_DEEPSEEK_BASE_URL|SERVICE_RECORD_DEEPSEEK_MODEL|VOLC_ASR_RESOURCE_ID|VOLC_ASR_FLASH_RESOURCE_ID|VOLC_TTS_CLUSTER|VOLC_TTS_VOICE_TYPE|VOLC_TTS_LANGUAGE|VOICE_COACH_ENABLED|VOICE_COACH_MAX_TURNS|VOICE_COACH_REPLY_PROVIDER|VOICE_COACH_ANALYSIS_PROVIDER|VOICE_COACH_FIRST_TURN_MODE|VOICE_COACH_FIRST_TTS_MODE|WECHAT_OPEN_APP_REVIEW_STATUS|APPLE_TEAM_ID|APIMART_BASE_URL|APIMART_MODEL|APIMART_IMAGE_BASE_URL|APIMART_IMAGE_MODEL)$/.test(key)) {
     return "public"
   }
   if (/(_ID|_USER_IDS|_EMAILS|_BUCKET|_REGION|DATABASE_URL_CN|REDIS_URL_CN|NEXT_PUBLIC_SUPABASE_URL|NEXT_PUBLIC_SUPABASE_ANON_KEY|WECHAT_MINI_APPID|WECHAT_OPEN_APP_ID)$/.test(key)) {
@@ -371,6 +391,17 @@ function sensitivityOf(key) {
 }
 
 function sourceMetadataOf(key) {
+  if (key === VOICE_COACH_TEXT_REPOSITORY_MODE_KEY) {
+    return metadata({
+      category: "runtime_repository",
+      owner: "后端发布操作员",
+      consolePath: "本仓库 production-cn 运行合同 / 阿里云 SAE 环境变量",
+      obtain: `固定填写 ${PRODUCTION_VOICE_COACH_TEXT_REPOSITORY_MODE}；不允许本地仓库模式或旧 rds 别名。`,
+      importTarget: "阿里云 SAE plain env",
+      cloudConfirmationKey: "envImport",
+      notes: "production-cn 必填的非密钥 fail-closed 配置。",
+    })
+  }
   if (key === "APP_ENV") {
     return metadata({
       category: "runtime",
@@ -664,6 +695,9 @@ function actionFor(key, status, required, importTarget) {
   if (key === "APPLE_TEAM_ID") {
     return "APP 发布/AASA 阻塞：从 Apple Developer 获取 10 位 Team ID 后导入阿里云 SAE plain env"
   }
+  if (key === VOICE_COACH_TEXT_REPOSITORY_MODE_KEY && status === "invalid") {
+    return `改为唯一允许的 production-cn 值 ${PRODUCTION_VOICE_COACH_TEXT_REPOSITORY_MODE}`
+  }
   if (required) return "补齐后才能进入 production-cn 发布门禁"
   return "可后置；功能启用或正式迁移时再补齐"
 }
@@ -740,7 +774,8 @@ function main() {
   }
 
   console.log(JSON.stringify(result, null, 2))
-  if (summary.missingRequired.length && !args.allowTodo) process.exit(1)
+  const hasInvalidRequired = summary.required.some((item) => item.status === "invalid")
+  if (hasInvalidRequired || (summary.missingRequired.length && !args.allowTodo)) process.exit(1)
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

@@ -10,9 +10,11 @@ const ts = require("typescript")
 
 const root = process.cwd()
 const helperPath = path.join(root, "lib", "aliyun-rds", "repositories", "app-voice-coach-facade.server.ts")
+const runtimeConfigPath = path.join(root, "lib", "aliyun-rds", "app-voice-coach-runtime-config.server.ts")
 
 const voiceCoachFeatureDecision = { enabled: true, reason: "ok", source: "ai_points" }
 const authorizationChecks = []
+let accountContextReadCount = 0
 const SESSION_ID = "77777777-7777-4777-8777-777777777777"
 const CUSTOMER_PROFILE_ID = "11111111-1111-4111-8111-111111111111"
 const SCENE_CARD_ID = "22222222-2222-4222-8222-222222222222"
@@ -20,6 +22,7 @@ const FOREIGN_ID = "88888888-8888-4888-8888-888888888888"
 const FIRST_ATTEMPT_ID = "attempt-0001"
 const SECOND_ATTEMPT_ID = "attempt-0002"
 const THIRD_ATTEMPT_ID = "attempt-0003"
+const PRODUCTION_RDS_REPOSITORY_MODE = "rds_voice_coach_text_session_contract"
 const testAccountContext = {
   accountStatus: "bound",
   userId: "app-user-route-rds-1",
@@ -58,6 +61,7 @@ function requireAuthorizedVoiceCoachAccess(ctx, features, feature, requestedScop
 
 function resetAuthorizationChecks() {
   authorizationChecks.length = 0
+  accountContextReadCount = 0
   currentAccountContext = { ...testAccountContext }
 }
 
@@ -120,7 +124,7 @@ function createRdsMock() {
   const callArgs = []
   const sessions = new Map()
   const turns = new Map()
-  const mode = "rds_voice_coach_text_session_contract"
+  const mode = PRODUCTION_RDS_REPOSITORY_MODE
   const customerProfiles = new Map([
     [CUSTOMER_PROFILE_ID, { id: CUSTOMER_PROFILE_ID, user_id: testAccountContext.userId, name: "张女士" }],
   ])
@@ -412,6 +416,9 @@ function helperStubs(rdsMock) {
   return {
     "server-only": {},
     "next/server": nextServerStub,
+    "@/lib/aliyun-rds/app-voice-coach-runtime-config.server": compileTsModule(runtimeConfigPath, {
+      "server-only": {},
+    }),
     "@/lib/aliyun-rds/app-auth.server": {
       appAuthConfigurationErrorResponse: () => null,
       appAuthRequiredResponse: () => jsonResponse({ ok: false, code: "unauthorized" }, { status: 401 }),
@@ -435,7 +442,10 @@ function helperStubs(rdsMock) {
           store_id: ctx.storeId,
         },
       }),
-      getAliyunRdsAppAccountContext: async () => currentAccountContext,
+      getAliyunRdsAppAccountContext: async () => {
+        accountContextReadCount += 1
+        return currentAccountContext
+      },
     },
     "@/lib/aliyun-rds/repositories/app-voice-coach-rds.server": rdsMock.module,
     "@/lib/voice-coach/scenarios": {
@@ -510,6 +520,39 @@ function compileHelperWithMode(t, mode) {
 
 function compileHelperWithRdsMock(t) {
   return compileHelperWithMode(t, "rds")
+}
+
+async function withVoiceCoachRuntimeEnv(options, run) {
+  const keys = [
+    "APP_ENV",
+    "APP_REGION",
+    "APP_VOICE_COACH_LOCAL_DURABLE_STORE_PATH",
+    "APP_VOICE_COACH_TEXT_REPOSITORY_MODE",
+  ]
+  const previous = Object.fromEntries(keys.map((key) => [key, process.env[key]]))
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "app-vc-production-mode-"))
+  const storePath = path.join(tempDir, "sessions.json")
+  const next = {
+    APP_ENV: options.appEnv,
+    APP_REGION: options.appRegion,
+    APP_VOICE_COACH_LOCAL_DURABLE_STORE_PATH: storePath,
+    APP_VOICE_COACH_TEXT_REPOSITORY_MODE: options.mode,
+  }
+
+  for (const [key, value] of Object.entries(next)) {
+    if (value === undefined) delete process.env[key]
+    else process.env[key] = value
+  }
+
+  try {
+    return await run({ storePath })
+  } finally {
+    for (const key of keys) {
+      if (previous[key] === undefined) delete process.env[key]
+      else process.env[key] = previous[key]
+    }
+    fs.rmSync(tempDir, { recursive: true, force: true })
+  }
 }
 
 test("VC-L4-05 route handlers use explicit RDS repository selection when configured", async (t) => {
@@ -805,28 +848,178 @@ test("VC-L4-06 RDS submit and end retries are idempotent without transaction-ext
   assert.equal(rdsMock.turns.get(SESSION_ID).length, 4)
 })
 
-test("VC-L4-05 route repository selection fails fast on unknown mode", async (t) => {
-  resetAuthorizationChecks()
-  const rdsMock = createRdsMock()
-  const previousMode = process.env.APP_VOICE_COACH_TEXT_REPOSITORY_MODE
-  process.env.APP_VOICE_COACH_TEXT_REPOSITORY_MODE = "mystery"
-  t.after(() => {
-    if (previousMode === undefined) delete process.env.APP_VOICE_COACH_TEXT_REPOSITORY_MODE
-    else process.env.APP_VOICE_COACH_TEXT_REPOSITORY_MODE = previousMode
-  })
-  const helperExports = compileTsModule(helperPath, helperStubs(rdsMock))
-  const sessionsRoute = routeModule(helperExports, "app", "api", "app", "voice-coach", "sessions", "route.ts")
+test("VC-L4-05 route repository selection fails fast on unknown mode", async () => {
+  await withVoiceCoachRuntimeEnv({ appEnv: "test", mode: "mystery" }, async () => {
+    resetAuthorizationChecks()
+    const rdsMock = createRdsMock()
+    const helperExports = compileTsModule(helperPath, helperStubs(rdsMock))
+    const sessionsRoute = routeModule(helperExports, "app", "api", "app", "voice-coach", "sessions", "route.ts")
 
-  const createResponse = await sessionsRoute.POST(
-    request("https://local.test/api/app/voice-coach/sessions", { scenario_id: "objection_safety" }),
+    const createResponse = await sessionsRoute.POST(
+      request("https://local.test/api/app/voice-coach/sessions", { scenario_id: "objection_safety" }),
+    )
+    const created = await payload(createResponse)
+    assert.equal(createResponse.status, 503)
+    assert.equal(created.code, "voice_coach_repository_not_configured")
+    assert.equal(created.error, "voice_coach_repository_not_configured")
+    assert.doesNotMatch(JSON.stringify(created), /mystery|repository_mode_unsupported/)
+    assert.deepEqual(rdsMock.calls, [])
+    assert.equal(accountContextReadCount, 0)
+    assertAuthorizationChecks(0)
+  })
+})
+
+test("VC-L4-05 production-cn rejects every non-contract repository mode before local or RDS access", async (t) => {
+  const cases = [
+    { appEnv: "production-cn", mode: undefined },
+    { appEnv: "production-cn", mode: "local_durable" },
+    { appEnv: "test", appRegion: "cn-hangzhou", mode: "rds" },
+    { appEnv: "production-cn", mode: "mystery" },
+  ]
+  const originalConsoleInfo = console.info
+  const infoLogs = []
+  console.info = (message) => {
+    infoLogs.push(String(message))
+  }
+  t.after(() => {
+    console.info = originalConsoleInfo
+  })
+
+  for (const runtimeCase of cases) {
+    await withVoiceCoachRuntimeEnv(runtimeCase, async ({ storePath }) => {
+      resetAuthorizationChecks()
+      const rdsMock = createRdsMock()
+      const helperExports = compileTsModule(helperPath, helperStubs(rdsMock))
+      const sessionsRoute = routeModule(helperExports, "app", "api", "app", "voice-coach", "sessions", "route.ts")
+
+      const response = await sessionsRoute.POST(
+        request("https://local.test/api/app/voice-coach/sessions", { scenario_id: "objection_safety" }),
+      )
+      const body = await payload(response)
+
+      assert.equal(response.status, 503)
+      assert.deepEqual(body, {
+        ok: false,
+        error: "voice_coach_repository_not_configured",
+        code: "voice_coach_repository_not_configured",
+      })
+      assert.equal(fs.existsSync(storePath), false)
+      assert.deepEqual(rdsMock.calls, [])
+      assert.doesNotMatch(JSON.stringify(body), /local_durable|mystery|sessions\.json|repository_mode_unsupported/)
+      assert.equal(accountContextReadCount, 0)
+      assertAuthorizationChecks(0)
+    })
+  }
+
+  const timingEvents = infoLogs
+    .map((line) => JSON.parse(line))
+    .filter((entry) => entry.event === "app_voice_coach_create_timing")
+  assert.equal(timingEvents.length, cases.length)
+  for (const event of timingEvents) {
+    assert.equal(event.status, 503)
+    assert.equal(event.error_class, "AppVoiceCoachRepositoryConfigurationError")
+  }
+})
+
+test("VC-L4-05 production-cn accepts the explicit RDS contract mode without local filesystem access", async () => {
+  await withVoiceCoachRuntimeEnv(
+    { appEnv: "production-cn", mode: PRODUCTION_RDS_REPOSITORY_MODE },
+    async ({ storePath }) => {
+      resetAuthorizationChecks()
+      const rdsMock = createRdsMock()
+      const helperExports = compileTsModule(helperPath, helperStubs(rdsMock))
+      const sessionsRoute = routeModule(helperExports, "app", "api", "app", "voice-coach", "sessions", "route.ts")
+
+      const response = await sessionsRoute.POST(
+        request("https://local.test/api/app/voice-coach/sessions", { scenario_id: "objection_safety" }),
+      )
+      const body = await payload(response)
+
+      assert.equal(response.status, 201)
+      assert.equal(body.repository_mode, PRODUCTION_RDS_REPOSITORY_MODE)
+      assert.equal(fs.existsSync(storePath), false)
+      assert.deepEqual(rdsMock.calls, ["createAliyunRdsVoiceCoachTextSession"])
+      assert.equal(accountContextReadCount, 1)
+      assertAuthorizationChecks(1)
+    },
   )
-  const created = await payload(createResponse)
-  assert.equal(createResponse.status, 500)
-  assert.equal(created.code, "app_voice_coach_session_create_failed")
-  assert.equal(created.error, "app_voice_coach_session_create_failed")
-  assert.doesNotMatch(JSON.stringify(created), /mystery|repository_mode_unsupported/)
-  assert.deepEqual(rdsMock.calls, [])
-  assertAuthorizationChecks(1)
+})
+
+test("VC-L4-05 non-production runtime keeps missing mode compatible with the local repository", async () => {
+  await withVoiceCoachRuntimeEnv({ appEnv: "test", mode: undefined }, async ({ storePath }) => {
+    resetAuthorizationChecks()
+    const rdsMock = createRdsMock()
+    const helperExports = compileTsModule(helperPath, helperStubs(rdsMock))
+    const sessionsRoute = routeModule(helperExports, "app", "api", "app", "voice-coach", "sessions", "route.ts")
+
+    const response = await sessionsRoute.POST(
+      request("https://local.test/api/app/voice-coach/sessions", { scenario_id: "objection_safety" }),
+    )
+    const body = await payload(response)
+
+    assert.equal(response.status, 201)
+    assert.equal(body.repository_mode, "text_first_local_durable_session_store")
+    assert.equal(fs.existsSync(storePath), true)
+    assert.deepEqual(rdsMock.calls, [])
+    assert.equal(accountContextReadCount, 1)
+    assertAuthorizationChecks(1)
+  })
+})
+
+test("VC-L4-05 production-cn rejects invalid repository mode for TTS and ASR before account access", async () => {
+  await withVoiceCoachRuntimeEnv(
+    { appEnv: "production-cn", mode: "rds" },
+    async () => {
+      resetAuthorizationChecks()
+      const rdsMock = createRdsMock()
+      const helperExports = compileTsModule(helperPath, helperStubs(rdsMock))
+      const ttsRoute = routeModule(
+        helperExports,
+        "app",
+        "api",
+        "app",
+        "voice-coach",
+        "sessions",
+        "[sessionId]",
+        "turns",
+        "[turnId]",
+        "tts",
+        "route.ts",
+      )
+      const asrRoute = routeModule(
+        helperExports,
+        "app",
+        "api",
+        "app",
+        "voice-coach",
+        "sessions",
+        "[sessionId]",
+        "asr-preview",
+        "route.ts",
+      )
+
+      const ttsResponse = await ttsRoute.POST(
+        request("https://local.test/not-a-uuid/turns/turn-1/tts"),
+        { params: Promise.resolve({ sessionId: "not-a-uuid", turnId: "turn-1" }) },
+      )
+      const asrResponse = await asrRoute.POST(
+        request("https://local.test/not-a-uuid/asr-preview"),
+        sessionContext("not-a-uuid"),
+      )
+
+      for (const response of [ttsResponse, asrResponse]) {
+        assert.equal(response.status, 503)
+        assert.deepEqual(await payload(response), {
+          ok: false,
+          error: "voice_coach_repository_not_configured",
+          code: "voice_coach_repository_not_configured",
+        })
+      }
+      assert.equal(accountContextReadCount, 0)
+      assertAuthorizationChecks(0)
+      assert.deepEqual(rdsMock.calls, [])
+    },
+  )
 })
 
 test("VC-L4-05 route requires an active membership before any voice-coach repository access", async (t) => {
@@ -990,6 +1183,14 @@ test("VC-L4-05 unexpected RDS failures return only the stable route fallback cod
   resetAuthorizationChecks()
   const { helperExports } = compileHelperWithRdsMock(t)
   const sessionsRoute = routeModule(helperExports, "app", "api", "app", "voice-coach", "sessions", "route.ts")
+  const originalConsoleInfo = console.info
+  const infoLogs = []
+  console.info = (message) => {
+    infoLogs.push(String(message))
+  }
+  t.after(() => {
+    console.info = originalConsoleInfo
+  })
 
   const response = await sessionsRoute.POST(
     request("https://local.test/api/app/voice-coach/sessions", { scenario_id: "explode" }),
@@ -1000,6 +1201,12 @@ test("VC-L4-05 unexpected RDS failures return only the stable route fallback cod
   assert.equal(body.error, "app_voice_coach_session_create_failed")
   assert.equal(body.code, "app_voice_coach_session_create_failed")
   assert.doesNotMatch(JSON.stringify(body), /secret_table|private\/backend|select \*/i)
+  const timingEvent = infoLogs
+    .map((line) => JSON.parse(line))
+    .find((entry) => entry.event === "app_voice_coach_create_timing")
+  assert.ok(timingEvent)
+  assert.equal(timingEvent.status, 500)
+  assert.equal(timingEvent.error_class, "Error")
 })
 
 test("VC-L4-05 local durable sessions are isolated by membership as well as user and tenant", async (t) => {
@@ -1031,48 +1238,61 @@ test("VC-L4-05 local durable sessions are isolated by membership as well as user
   assert.equal(ownerDetailResponse.status, 200)
 })
 
-test("VC-L4-05 RDS mode keeps TTS and ASR at fixed 501 without session lookup", async (t) => {
-  resetAuthorizationChecks()
-  const { helperExports, rdsMock } = compileHelperWithRdsMock(t)
-  const ttsRoute = routeModule(
-    helperExports,
-    "app",
-    "api",
-    "app",
-    "voice-coach",
-    "sessions",
-    "[sessionId]",
-    "turns",
-    "[turnId]",
-    "tts",
-    "route.ts",
-  )
-  const asrRoute = routeModule(
-    helperExports,
-    "app",
-    "api",
-    "app",
-    "voice-coach",
-    "sessions",
-    "[sessionId]",
-    "asr-preview",
-    "route.ts",
-  )
+test("VC-L4-05 production RDS mode keeps TTS and ASR at fixed 501 with the RDS contract", async () => {
+  await withVoiceCoachRuntimeEnv(
+    { appEnv: "production-cn", mode: PRODUCTION_RDS_REPOSITORY_MODE },
+    async () => {
+      resetAuthorizationChecks()
+      const rdsMock = createRdsMock()
+      const helperExports = compileTsModule(helperPath, helperStubs(rdsMock))
+      const ttsRoute = routeModule(
+        helperExports,
+        "app",
+        "api",
+        "app",
+        "voice-coach",
+        "sessions",
+        "[sessionId]",
+        "turns",
+        "[turnId]",
+        "tts",
+        "route.ts",
+      )
+      const asrRoute = routeModule(
+        helperExports,
+        "app",
+        "api",
+        "app",
+        "voice-coach",
+        "sessions",
+        "[sessionId]",
+        "asr-preview",
+        "route.ts",
+      )
 
-  const ttsResponse = await ttsRoute.POST(
-    request("https://local.test/not-a-uuid/turns/turn-1/tts"),
-    { params: Promise.resolve({ sessionId: "not-a-uuid", turnId: "turn-1" }) },
-  )
-  const asrResponse = await asrRoute.POST(
-    request("https://local.test/not-a-uuid/asr-preview"),
-    sessionContext("not-a-uuid"),
-  )
+      const ttsResponse = await ttsRoute.POST(
+        request("https://local.test/not-a-uuid/turns/turn-1/tts"),
+        { params: Promise.resolve({ sessionId: "not-a-uuid", turnId: "turn-1" }) },
+      )
+      const asrResponse = await asrRoute.POST(
+        request("https://local.test/not-a-uuid/asr-preview"),
+        sessionContext("not-a-uuid"),
+      )
 
-  assert.equal(ttsResponse.status, 501)
-  assert.equal((await payload(ttsResponse)).code, "voice_coach_tts_provider_required")
-  assert.equal(asrResponse.status, 501)
-  assert.equal((await payload(asrResponse)).code, "voice_coach_asr_provider_required")
-  assert.deepEqual(rdsMock.calls, [])
+      for (const [response, code] of [
+        [ttsResponse, "voice_coach_tts_provider_required"],
+        [asrResponse, "voice_coach_asr_provider_required"],
+      ]) {
+        const body = await payload(response)
+        assert.equal(response.status, 501)
+        assert.equal(body.code, code)
+        assert.equal(body.repository_mode, PRODUCTION_RDS_REPOSITORY_MODE)
+        assert.equal("local_side_effects" in body, false)
+        assert.doesNotMatch(JSON.stringify(body), /local_durable/)
+      }
+      assert.deepEqual(rdsMock.calls, [])
+    },
+  )
 })
 
 test("VC-L4-10B route create emits sanitized timing evidence for RDS mode", async (t) => {
