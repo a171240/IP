@@ -12,6 +12,13 @@ export type AppVoiceCoachCreateTimingRecorder = {
   recordStage(stageName: string, startedAtMs: number): void
 }
 
+export type AppVoiceCoachRdsScope = {
+  userId: string
+  companyId: string
+  storeId: string
+  membershipId: string
+}
+
 export type AppVoiceCoachRdsScenarioSnapshot = {
   id: string
   name?: string
@@ -23,6 +30,9 @@ export type AppVoiceCoachRdsSessionRow = {
   id: string
   created_at: string
   user_id: string
+  company_id: string | null
+  store_id: string | null
+  membership_id: string | null
   scenario_id: string
   status: "active" | "ended" | string
   started_at: string
@@ -59,14 +69,35 @@ export type AppVoiceCoachRdsEvent = {
   payload: Record<string, unknown>
 }
 
-export async function createAliyunRdsVoiceCoachTextSession(args: {
+type AppVoiceCoachCustomerSelectionRow = {
+  id: string
+  user_id: string
+  name: string
+}
+
+type AppVoiceCoachSceneSelectionRow = {
+  id: string
+  user_id: string
+  name: string
+  service_name: string | null
+}
+
+const CUSTOMER_PROFILE_NOT_FOUND = "voice_coach_rds_customer_profile_not_found"
+const SCENE_CARD_NOT_FOUND = "voice_coach_rds_scene_card_not_found"
+
+export function getAliyunRdsVoiceCoachSelectionErrorCode(error: unknown) {
+  if (!(error instanceof Error)) return null
+  if (error.message === CUSTOMER_PROFILE_NOT_FOUND) return "customer_profile_not_found"
+  if (error.message === SCENE_CARD_NOT_FOUND) return "scene_card_not_found"
+  return null
+}
+
+export async function createAliyunRdsVoiceCoachTextSession(args: AppVoiceCoachRdsScope & {
   customerProfileId?: string | null
   firstCustomerText: string
   scenario: AppVoiceCoachRdsScenarioSnapshot
   sceneCardId?: string | null
-  sessionContext?: Record<string, unknown>
   timing?: AppVoiceCoachCreateTimingRecorder
-  userId: string
 }) {
   if (args.timing) {
     return withAliyunRdsCreateTimingTransaction(args.timing, (client) =>
@@ -76,63 +107,79 @@ export async function createAliyunRdsVoiceCoachTextSession(args: {
   return withAliyunRdsTransaction((client) => createAliyunRdsVoiceCoachTextSessionWithClient(client, args))
 }
 
-export async function getAliyunRdsVoiceCoachTextSession(args: {
+export async function getAliyunRdsVoiceCoachTextSession(args: AppVoiceCoachRdsScope & {
   sessionId: string
-  userId: string
 }) {
   return withAliyunRdsTransaction((client) => getAliyunRdsVoiceCoachTextSessionWithClient(client, args))
 }
 
-export async function appendAliyunRdsVoiceCoachTextReply(args: {
+export async function appendAliyunRdsVoiceCoachTextReply(args: AppVoiceCoachRdsScope & {
   nextCustomerText?: string | null
   replyText: string
   sessionId: string
-  userId: string
 }) {
   return withAliyunRdsTransaction((client) => appendAliyunRdsVoiceCoachTextReplyWithClient(client, args))
 }
 
-export async function endAliyunRdsVoiceCoachTextSession(args: {
+export async function endAliyunRdsVoiceCoachTextSession(args: AppVoiceCoachRdsScope & {
   dimensionScores: unknown
   report: Record<string, unknown>
   sessionId: string
   totalScore: number
-  userId: string
 }) {
   return withAliyunRdsTransaction((client) => endAliyunRdsVoiceCoachTextSessionWithClient(client, args))
 }
 
-export async function listAliyunRdsVoiceCoachTextSessionHistory(args: {
+export async function listAliyunRdsVoiceCoachTextSessionHistory(args: AppVoiceCoachRdsScope & {
   limit: number
-  userId: string
 }) {
   return withAliyunRdsTransaction((client) => listAliyunRdsVoiceCoachTextSessionHistoryWithClient(client, args))
 }
 
 export async function createAliyunRdsVoiceCoachTextSessionWithClient(
   client: AppVoiceCoachRdsQueryClient,
-  args: {
+  args: AppVoiceCoachRdsScope & {
     customerProfileId?: string | null
     firstCustomerText: string
     scenario: AppVoiceCoachRdsScenarioSnapshot
     sceneCardId?: string | null
-    sessionContext?: Record<string, unknown>
     timing?: AppVoiceCoachCreateTimingRecorder
-    userId: string
   },
 ) {
   const userId = requiredText(args.userId, "voice_coach_rds_user_id_required")
+  const companyId = requiredText(args.companyId, "voice_coach_rds_company_id_required")
+  const storeId = requiredText(args.storeId, "voice_coach_rds_store_id_required")
+  const membershipId = requiredText(args.membershipId, "voice_coach_rds_membership_id_required")
   const scenarioId = requiredText(args.scenario?.id, "voice_coach_rds_scenario_id_required")
   const firstText = requiredText(args.firstCustomerText, "voice_coach_rds_first_customer_text_required")
+  const customerProfileId = optionalText(args.customerProfileId)
+  const sceneCardId = optionalText(args.sceneCardId)
+  const customer = customerProfileId
+    ? await loadAliyunRdsVoiceCoachCustomerSelection(client, customerProfileId, userId)
+    : null
+  if (customerProfileId && !customer) throw new Error(CUSTOMER_PROFILE_NOT_FOUND)
+  const scene = sceneCardId
+    ? await loadAliyunRdsVoiceCoachSceneSelection(client, sceneCardId, userId)
+    : null
+  if (sceneCardId && !scene) throw new Error(SCENE_CARD_NOT_FOUND)
   const sessionContext = {
-    ...(args.sessionContext || {}),
-    repository_mode: APP_VOICE_COACH_RDS_REPOSITORY_MODE,
+    customer_profile_id: customerProfileId,
+    customer_name: customer?.name || null,
+    scene_card_id: sceneCardId,
+    scene_name: scene?.name || null,
+    service_name: scene?.service_name || null,
+    company_id: companyId,
+    store_id: storeId,
+    membership_id: membershipId,
   }
   const sessionInsertStartedAt = Date.now()
   const sessionResult = await client.query<AppVoiceCoachRdsSessionRow>(
     `
       insert into public.voice_coach_sessions (
         user_id,
+        company_id,
+        store_id,
+        membership_id,
         scenario_id,
         status,
         customer_profile_id,
@@ -140,14 +187,17 @@ export async function createAliyunRdsVoiceCoachTextSessionWithClient(
         session_context_json,
         scenario_snapshot_json
       )
-      values ($1, $2, 'active', $3, $4, $5::jsonb, $6::jsonb)
+      values ($1, $2, $3, $4, $5, 'active', $6, $7, $8::jsonb, $9::jsonb)
       returning *
     `,
     [
       userId,
+      companyId,
+      storeId,
+      membershipId,
       scenarioId,
-      optionalText(args.customerProfileId),
-      optionalText(args.sceneCardId),
+      customerProfileId,
+      sceneCardId,
       jsonbParam(sessionContext),
       jsonbParam(args.scenario),
     ],
@@ -168,6 +218,40 @@ export async function createAliyunRdsVoiceCoachTextSessionWithClient(
   args.timing?.recordStage("rds_insert_first_customer_turn", firstTurnInsertStartedAt)
 
   return { firstCustomerTurn, session }
+}
+
+async function loadAliyunRdsVoiceCoachCustomerSelection(
+  client: AppVoiceCoachRdsQueryClient,
+  customerProfileId: string,
+  userId: string,
+) {
+  const result = await client.query<AppVoiceCoachCustomerSelectionRow>(
+    `
+      select id, user_id, name
+      from public.voice_coach_customer_profiles
+      where id = $1 and user_id = $2
+      limit 1
+    `,
+    [customerProfileId, userId],
+  )
+  return result.rows[0] || null
+}
+
+async function loadAliyunRdsVoiceCoachSceneSelection(
+  client: AppVoiceCoachRdsQueryClient,
+  sceneCardId: string,
+  userId: string,
+) {
+  const result = await client.query<AppVoiceCoachSceneSelectionRow>(
+    `
+      select id, user_id, name, service_name
+      from public.voice_coach_scene_cards
+      where id = $1 and user_id = $2
+      limit 1
+    `,
+    [sceneCardId, userId],
+  )
+  return result.rows[0] || null
 }
 
 async function withAliyunRdsCreateTimingTransaction<T>(
@@ -206,21 +290,27 @@ async function withAliyunRdsCreateTimingTransaction<T>(
 
 export async function getAliyunRdsVoiceCoachTextSessionWithClient(
   client: AppVoiceCoachRdsQueryClient,
-  args: {
+  args: AppVoiceCoachRdsScope & {
     sessionId: string
-    userId: string
   },
 ) {
   const sessionResult = await client.query<AppVoiceCoachRdsSessionRow>(
     `
       select *
       from public.voice_coach_sessions
-      where id = $1 and user_id = $2
+      where id = $1
+        and user_id = $2
+        and company_id = $3
+        and store_id = $4
+        and membership_id = $5
       limit 1
     `,
     [
       requiredText(args.sessionId, "voice_coach_rds_session_id_required"),
       requiredText(args.userId, "voice_coach_rds_user_id_required"),
+      requiredText(args.companyId, "voice_coach_rds_company_id_required"),
+      requiredText(args.storeId, "voice_coach_rds_store_id_required"),
+      requiredText(args.membershipId, "voice_coach_rds_membership_id_required"),
     ],
   )
   const session = sessionResult.rows[0] || null
@@ -232,16 +322,18 @@ export async function getAliyunRdsVoiceCoachTextSessionWithClient(
 
 export async function appendAliyunRdsVoiceCoachTextReplyWithClient(
   client: AppVoiceCoachRdsQueryClient,
-  args: {
+  args: AppVoiceCoachRdsScope & {
     nextCustomerText?: string | null
     replyText: string
     sessionId: string
-    userId: string
   },
 ) {
   const current = await getAliyunRdsVoiceCoachTextSessionWithClient(client, {
     sessionId: args.sessionId,
     userId: args.userId,
+    companyId: args.companyId,
+    storeId: args.storeId,
+    membershipId: args.membershipId,
   })
   if (!current) throw new Error("voice_coach_rds_session_not_found")
   if (current.session.status === "ended") throw new Error("voice_coach_rds_session_ended")
@@ -280,12 +372,11 @@ export async function appendAliyunRdsVoiceCoachTextReplyWithClient(
 
 export async function endAliyunRdsVoiceCoachTextSessionWithClient(
   client: AppVoiceCoachRdsQueryClient,
-  args: {
+  args: AppVoiceCoachRdsScope & {
     dimensionScores: unknown
     report: Record<string, unknown>
     sessionId: string
     totalScore: number
-    userId: string
   },
 ) {
   const result = await client.query<AppVoiceCoachRdsSessionRow>(
@@ -294,15 +385,22 @@ export async function endAliyunRdsVoiceCoachTextSessionWithClient(
       set
         status = 'ended',
         ended_at = now(),
-        report_json = $3::jsonb,
-        total_score = $4,
-        dimension_scores = $5::jsonb
-      where id = $1 and user_id = $2
+        report_json = $6::jsonb,
+        total_score = $7,
+        dimension_scores = $8::jsonb
+      where id = $1
+        and user_id = $2
+        and company_id = $3
+        and store_id = $4
+        and membership_id = $5
       returning *
     `,
     [
       requiredText(args.sessionId, "voice_coach_rds_session_id_required"),
       requiredText(args.userId, "voice_coach_rds_user_id_required"),
+      requiredText(args.companyId, "voice_coach_rds_company_id_required"),
+      requiredText(args.storeId, "voice_coach_rds_store_id_required"),
+      requiredText(args.membershipId, "voice_coach_rds_membership_id_required"),
       jsonbParam(args.report),
       args.totalScore,
       jsonbParam(args.dimensionScores),
@@ -315,9 +413,8 @@ export async function endAliyunRdsVoiceCoachTextSessionWithClient(
 
 export async function listAliyunRdsVoiceCoachTextSessionHistoryWithClient(
   client: AppVoiceCoachRdsQueryClient,
-  args: {
+  args: AppVoiceCoachRdsScope & {
     limit: number
-    userId: string
   },
 ) {
   const result = await client.query<AppVoiceCoachRdsSessionRow>(
@@ -325,10 +422,19 @@ export async function listAliyunRdsVoiceCoachTextSessionHistoryWithClient(
       select *
       from public.voice_coach_sessions
       where user_id = $1
+        and company_id = $2
+        and store_id = $3
+        and membership_id = $4
       order by created_at desc
-      limit $2
+      limit $5
     `,
-    [requiredText(args.userId, "voice_coach_rds_user_id_required"), normalizeLimit(args.limit)],
+    [
+      requiredText(args.userId, "voice_coach_rds_user_id_required"),
+      requiredText(args.companyId, "voice_coach_rds_company_id_required"),
+      requiredText(args.storeId, "voice_coach_rds_store_id_required"),
+      requiredText(args.membershipId, "voice_coach_rds_membership_id_required"),
+      normalizeLimit(args.limit),
+    ],
   )
   return result.rows
 }

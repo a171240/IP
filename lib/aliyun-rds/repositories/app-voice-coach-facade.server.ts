@@ -26,6 +26,7 @@ import { getScenario } from "@/lib/voice-coach/scenarios"
 export type AppVoiceCoachFacadeScope = {
   companyId: string
   storeId: string
+  membershipId: string
 }
 
 type AppVoiceCoachRdsRepository = typeof import("@/lib/aliyun-rds/repositories/app-voice-coach-rds.server")
@@ -44,6 +45,7 @@ const LOCAL_DURABLE_REPOSITORY_SELECTION = "local_durable"
 const RDS_REPOSITORY_SELECTION = "rds"
 const TEXT_SESSION_REPOSITORY_MODE = "text_first_local_durable_session_store"
 const TEXT_SESSION_PROVIDER_MODE = "text_only_no_audio_provider"
+const UUID_PATTERN = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i
 
 type TextTurn = {
   turn_id: string
@@ -71,6 +73,7 @@ type TextSession = {
   userId: string
   companyId: string
   storeId: string
+  membershipId: string
   status: "active" | "ended"
   startedAt: string
   endedAt: string | null
@@ -114,6 +117,37 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value))
 }
 
+function isUuid(value: unknown) {
+  return UUID_PATTERN.test(cleanText(value, 80))
+}
+
+function rdsSessionNotFoundResponse(sessionId: unknown) {
+  return isUuid(sessionId) ? null : jsonError(404, "voice_coach_session_not_found", "voice_coach_session_not_found")
+}
+
+function rdsScopeArgs(ctx: AppAccountContext, scope: AppVoiceCoachFacadeScope) {
+  return {
+    userId: ctx.userId,
+    companyId: scope.companyId,
+    storeId: scope.storeId,
+    membershipId: scope.membershipId,
+  }
+}
+
+function safeRdsSessionContext(value: unknown) {
+  const context = isRecord(value) ? value : {}
+  return {
+    customer_profile_id: cleanText(context.customer_profile_id, 80) || null,
+    customer_name: cleanText(context.customer_name, 160) || null,
+    scene_card_id: cleanText(context.scene_card_id, 80) || null,
+    scene_name: cleanText(context.scene_name, 160) || null,
+    service_name: cleanText(context.service_name, 160) || null,
+    company_id: cleanText(context.company_id, 80) || null,
+    store_id: cleanText(context.store_id, 80) || null,
+    membership_id: cleanText(context.membership_id, 80) || null,
+  }
+}
+
 function parseLimit(value: unknown) {
   const parsed = Number(value || 20)
   if (!Number.isFinite(parsed)) return 20
@@ -140,21 +174,20 @@ export function resolveAppVoiceCoachScope(ctx: AppAccountContext, request: NextR
   const requestedCompanyId = cleanText(params.get("company_id"), 80)
   const requestedStoreId = cleanText(params.get("store_id"), 80)
 
-  if (!ctx.isPlatformAdmin && requestedCompanyId && requestedCompanyId !== ctx.companyId) {
+  if (requestedCompanyId && requestedCompanyId !== ctx.companyId) {
+    return { error: jsonError(403, "tenant_scope_denied", "tenant_scope_denied") }
+  }
+  if (requestedStoreId && requestedStoreId !== ctx.storeId) {
     return { error: jsonError(403, "tenant_scope_denied", "tenant_scope_denied") }
   }
 
-  const companyId = ctx.isPlatformAdmin && requestedCompanyId ? requestedCompanyId : ctx.companyId
-  const storeId = requestedStoreId || ctx.storeId
-
-  if (!companyId || !storeId) {
-    return { error: jsonError(403, "tenant_scope_denied", "tenant_scope_denied") }
-  }
-  if (!ctx.isPlatformAdmin && ctx.storeId && requestedStoreId && requestedStoreId !== ctx.storeId) {
+  const companyId = ctx.companyId
+  const storeId = ctx.storeId
+  if (!companyId || !storeId || !ctx.membershipId) {
     return { error: jsonError(403, "tenant_scope_denied", "tenant_scope_denied") }
   }
 
-  return { companyId, storeId }
+  return { companyId, storeId, membershipId: ctx.membershipId }
 }
 
 export async function resolveAppVoiceCoachFacadeContext(request: NextRequest) {
@@ -189,7 +222,7 @@ export function appVoiceCoachFacadeErrorResponse(error: unknown, fallbackCode: s
   if (isAliyunRdsRuntimeUnavailableError(error)) {
     return jsonError(503, "Aliyun RDS is not reachable", "rds_unavailable")
   }
-  return jsonError(500, error instanceof Error ? error.message : fallbackCode, fallbackCode)
+  return jsonError(500, fallbackCode, fallbackCode)
 }
 
 export function appVoiceCoachContextPayload(ctx: AppAccountContext, scope: AppVoiceCoachFacadeScope) {
@@ -198,6 +231,7 @@ export function appVoiceCoachContextPayload(ctx: AppAccountContext, scope: AppVo
     voice_coach_scope: {
       company_id: scope.companyId,
       store_id: scope.storeId,
+      membership_id: scope.membershipId,
     },
   }
 }
@@ -318,7 +352,12 @@ function formToRecord(form: FormData) {
 }
 
 function sessionBelongsToScope(session: TextSession, ctx: AppAccountContext, scope: AppVoiceCoachFacadeScope) {
-  return session.userId === ctx.userId && session.companyId === scope.companyId && session.storeId === scope.storeId
+  return (
+    session.userId === ctx.userId &&
+    session.companyId === scope.companyId &&
+    session.storeId === scope.storeId &&
+    session.membershipId === scope.membershipId
+  )
 }
 
 function textSessionStorePath() {
@@ -424,6 +463,7 @@ function sessionPayload(session: TextSession) {
     context: {
       repository_mode: TEXT_SESSION_REPOSITORY_MODE,
       provider_mode: TEXT_SESSION_PROVIDER_MODE,
+      membership_id: session.membershipId,
     },
   }
 }
@@ -519,11 +559,13 @@ function rdsSessionPayload(
     ended_at: string | null
     total_score: number | string | null
     scenario_id: string
+    session_context_json?: unknown
     scenario_snapshot_json?: unknown
   },
   repositoryMode: string,
 ) {
   const snapshot = isRecord(session.scenario_snapshot_json) ? session.scenario_snapshot_json : null
+  const sessionContext = safeRdsSessionContext(session.session_context_json)
   return {
     id: session.id,
     status: session.status,
@@ -532,6 +574,7 @@ function rdsSessionPayload(
     total_score: session.total_score === null || session.total_score === undefined ? null : Number(session.total_score),
     scenario: snapshot || scenarioPayload(session.scenario_id),
     context: {
+      ...sessionContext,
       repository_mode: repositoryMode,
       provider_mode: TEXT_SESSION_PROVIDER_MODE,
     },
@@ -547,6 +590,7 @@ function rdsHistoryPayload(
     total_score: number | string | null
     scenario_id: string
     report_json: unknown
+    session_context_json?: unknown
     scenario_snapshot_json?: unknown
   },
   repositoryMode: string,
@@ -554,6 +598,7 @@ function rdsHistoryPayload(
   const snapshot = isRecord(session.scenario_snapshot_json) ? session.scenario_snapshot_json : null
   const scenarioName = cleanText(snapshot?.name, 120) || scenarioPayload(session.scenario_id).name
   const score = session.total_score === null || session.total_score === undefined ? null : Number(session.total_score)
+  const sessionContext = safeRdsSessionContext(session.session_context_json)
   return {
     id: session.id,
     status: session.status,
@@ -561,9 +606,9 @@ function rdsHistoryPayload(
     ended_at: session.ended_at,
     title: scenarioName || "文字对练",
     subtitle: session.status === "ended" ? "已生成文字版报告" : "进行中文字对练",
-    customer_name: null,
-    scene_name: scenarioName || null,
-    service_name: null,
+    customer_name: sessionContext.customer_name,
+    scene_name: sessionContext.scene_name,
+    service_name: sessionContext.service_name,
     score,
     score_label: score === null ? null : `${score} 分`,
     can_view_report: Boolean(session.report_json),
@@ -582,6 +627,9 @@ function rdsSessionAsTextSession(args: {
     total_score: number | string | null
     scenario_id: string
     report_json: unknown
+    company_id?: string | null
+    store_id?: string | null
+    membership_id?: string | null
     scenario_snapshot_json?: unknown
   }
   turns: Array<{ id: string; turn_index: number; role: string; text: string; emotion?: string | null }>
@@ -591,8 +639,9 @@ function rdsSessionAsTextSession(args: {
   return {
     id: args.session.id,
     userId: args.session.user_id,
-    companyId: "",
-    storeId: "",
+    companyId: cleanText(args.session.company_id, 80),
+    storeId: cleanText(args.session.store_id, 80),
+    membershipId: cleanText(args.session.membership_id, 80),
     status: args.session.status === "ended" ? "ended" : "active",
     startedAt: args.session.started_at,
     endedAt: args.session.ended_at,
@@ -627,7 +676,7 @@ export async function listAppVoiceCoachTextSessionsResponse(opts: {
     const limit = parseLimit(params.get("limit"))
     const sessions = await rdsRepository.listAliyunRdsVoiceCoachTextSessionHistory({
       limit,
-      userId: opts.ctx.userId,
+      ...rdsScopeArgs(opts.ctx, opts.scope),
     })
     return NextResponse.json({
       ok: true,
@@ -662,6 +711,15 @@ export async function createAppVoiceCoachTextSessionResponse(opts: {
   timing?: AppVoiceCoachCreateTimingLog
 }) {
   if (shouldUseRdsRepository()) {
+    const customerProfileId = cleanText(opts.body.customer_profile_id, 80) || null
+    const sceneCardId = cleanText(opts.body.scene_card_id, 80) || null
+    if (customerProfileId && !isUuid(customerProfileId)) {
+      return jsonError(400, "customer_profile_not_found", "customer_profile_not_found")
+    }
+    if (sceneCardId && !isUuid(sceneCardId)) {
+      return jsonError(400, "scene_card_not_found", "scene_card_not_found")
+    }
+
     const importStartedAt = Date.now()
     const rdsRepository = await loadRdsRepository()
     opts.timing?.recordStage("rds_repository_import", importStartedAt)
@@ -672,19 +730,23 @@ export async function createAppVoiceCoachTextSessionResponse(opts: {
     const firstCustomerTurnText = firstCustomerText(opts.body.scenario_id)
     opts.timing?.recordStage("rds_prepare_payload", payloadStartedAt)
 
-    const created = await rdsRepository.createAliyunRdsVoiceCoachTextSession({
-      customerProfileId: cleanText(opts.body.customer_profile_id, 80) || null,
-      firstCustomerText: firstCustomerTurnText,
-      scenario,
-      sceneCardId: cleanText(opts.body.scene_card_id, 80) || null,
-      sessionContext: {
-        company_id: opts.scope.companyId,
-        store_id: opts.scope.storeId,
-      },
-      timing: opts.timing,
-      userId: opts.ctx.userId,
-    })
+    let created
+    try {
+      created = await rdsRepository.createAliyunRdsVoiceCoachTextSession({
+        customerProfileId,
+        firstCustomerText: firstCustomerTurnText,
+        scenario,
+        sceneCardId,
+        timing: opts.timing,
+        ...rdsScopeArgs(opts.ctx, opts.scope),
+      })
+    } catch (error) {
+      const selectionErrorCode = rdsRepository.getAliyunRdsVoiceCoachSelectionErrorCode(error)
+      if (selectionErrorCode) return jsonError(400, selectionErrorCode, selectionErrorCode)
+      throw error
+    }
     opts.timing?.setSessionId(created.session.id)
+    const sessionContext = safeRdsSessionContext(created.session.session_context_json)
     return NextResponse.json(
       {
         ok: true,
@@ -693,6 +755,7 @@ export async function createAppVoiceCoachTextSessionResponse(opts: {
         session_id: created.session.id,
         scenario,
         session_context: {
+          ...sessionContext,
           repository_mode: rdsRepository.APP_VOICE_COACH_RDS_REPOSITORY_MODE,
           provider_mode: TEXT_SESSION_PROVIDER_MODE,
         },
@@ -718,6 +781,7 @@ export async function createAppVoiceCoachTextSessionResponse(opts: {
     userId: opts.ctx.userId,
     companyId: opts.scope.companyId,
     storeId: opts.scope.storeId,
+    membershipId: opts.scope.membershipId,
     status: "active",
     startedAt: now,
     endedAt: null,
@@ -757,10 +821,12 @@ export async function getAppVoiceCoachTextSessionResponse(opts: {
   sessionId: string
 }) {
   if (shouldUseRdsRepository()) {
+    const invalidSessionResponse = rdsSessionNotFoundResponse(opts.sessionId)
+    if (invalidSessionResponse) return invalidSessionResponse
     const rdsRepository = await loadRdsRepository()
     const detail = await rdsRepository.getAliyunRdsVoiceCoachTextSession({
       sessionId: opts.sessionId,
-      userId: opts.ctx.userId,
+      ...rdsScopeArgs(opts.ctx, opts.scope),
     })
     if (!detail) return jsonError(404, "voice_coach_session_not_found", "voice_coach_session_not_found")
     return NextResponse.json({
@@ -793,10 +859,12 @@ export async function listAppVoiceCoachTextEventsResponse(opts: {
   sessionId: string
 }) {
   if (shouldUseRdsRepository()) {
+    const invalidSessionResponse = rdsSessionNotFoundResponse(opts.sessionId)
+    if (invalidSessionResponse) return invalidSessionResponse
     const rdsRepository = await loadRdsRepository()
     const detail = await rdsRepository.getAliyunRdsVoiceCoachTextSession({
       sessionId: opts.sessionId,
-      userId: opts.ctx.userId,
+      ...rdsScopeArgs(opts.ctx, opts.scope),
     })
     if (!detail) return jsonError(404, "voice_coach_session_not_found", "voice_coach_session_not_found")
     const params = new URL(opts.request.url).searchParams
@@ -839,10 +907,12 @@ export async function getAppVoiceCoachTextReportResponse(opts: {
   sessionId: string
 }) {
   if (shouldUseRdsRepository()) {
+    const invalidSessionResponse = rdsSessionNotFoundResponse(opts.sessionId)
+    if (invalidSessionResponse) return invalidSessionResponse
     const rdsRepository = await loadRdsRepository()
     const detail = await rdsRepository.getAliyunRdsVoiceCoachTextSession({
       sessionId: opts.sessionId,
-      userId: opts.ctx.userId,
+      ...rdsScopeArgs(opts.ctx, opts.scope),
     })
     if (!detail) return jsonError(404, "voice_coach_session_not_found", "voice_coach_session_not_found")
     if (!isRecord(detail.session.report_json)) {
@@ -919,10 +989,12 @@ export async function submitAppVoiceCoachTextBeauticianTurnResponse(opts: {
   sessionId: string
 }) {
   if (shouldUseRdsRepository()) {
+    const invalidSessionResponse = rdsSessionNotFoundResponse(opts.sessionId)
+    if (invalidSessionResponse) return invalidSessionResponse
     const rdsRepository = await loadRdsRepository()
     const detail = await rdsRepository.getAliyunRdsVoiceCoachTextSession({
       sessionId: opts.sessionId,
-      userId: opts.ctx.userId,
+      ...rdsScopeArgs(opts.ctx, opts.scope),
     })
     if (!detail) return jsonError(404, "voice_coach_session_not_found", "voice_coach_session_not_found")
     if (detail.session.status === "ended") return jsonError(409, "voice_coach_session_ended", "voice_coach_session_ended")
@@ -939,7 +1011,7 @@ export async function submitAppVoiceCoachTextBeauticianTurnResponse(opts: {
       nextCustomerText: nextCustomerText(replyText, reachedMaxTurns) || null,
       replyText,
       sessionId: opts.sessionId,
-      userId: opts.ctx.userId,
+      ...rdsScopeArgs(opts.ctx, opts.scope),
     })
     return NextResponse.json({
       ok: true,
@@ -1022,10 +1094,12 @@ export async function endAppVoiceCoachTextSessionResponse(opts: {
   sessionId: string
 }) {
   if (shouldUseRdsRepository()) {
+    const invalidSessionResponse = rdsSessionNotFoundResponse(opts.sessionId)
+    if (invalidSessionResponse) return invalidSessionResponse
     const rdsRepository = await loadRdsRepository()
     const detail = await rdsRepository.getAliyunRdsVoiceCoachTextSession({
       sessionId: opts.sessionId,
-      userId: opts.ctx.userId,
+      ...rdsScopeArgs(opts.ctx, opts.scope),
     })
     if (!detail) return jsonError(404, "voice_coach_session_not_found", "voice_coach_session_not_found")
 
@@ -1041,7 +1115,7 @@ export async function endAppVoiceCoachTextSessionResponse(opts: {
       report,
       sessionId: opts.sessionId,
       totalScore: report.total_score,
-      userId: opts.ctx.userId,
+      ...rdsScopeArgs(opts.ctx, opts.scope),
     })
     return NextResponse.json({
       ok: true,

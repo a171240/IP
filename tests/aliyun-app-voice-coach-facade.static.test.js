@@ -43,9 +43,36 @@ test("APP voiceCoach facade helper is App-auth gated and tenant scoped", () => {
   assert.match(helper, /requestedCompanyId !== ctx\.companyId/)
   assert.match(helper, /requestedStoreId !== ctx\.storeId/)
   assert.match(helper, /tenant_scope_denied/)
+  assert.match(helper, /membershipId: string/)
+  assert.match(helper, /!ctx\.membershipId/)
   assert.match(helper, /voice_coach_scope/)
   assert.match(helper, /company_id: scope\.companyId/)
   assert.match(helper, /store_id: scope\.storeId/)
+  assert.match(helper, /membership_id: scope\.membershipId/)
+  assert.match(helper, /session\.membershipId === scope\.membershipId/)
+  assert.doesNotMatch(helper, /error instanceof Error \? error\.message : fallbackCode/)
+  assert.match(helper, /return jsonError\(500, fallbackCode, fallbackCode\)/)
+})
+
+test("APP voiceCoach RDS facade returns only the frozen safe selection snapshot", () => {
+  const helper = read("lib", "aliyun-rds", "repositories", "app-voice-coach-facade.server.ts")
+
+  for (const field of [
+    "customer_profile_id",
+    "customer_name",
+    "scene_card_id",
+    "scene_name",
+    "service_name",
+    "company_id",
+    "store_id",
+    "membership_id",
+  ]) {
+    assert.match(helper, new RegExp(field))
+  }
+  assert.match(helper, /customer_name: sessionContext\.customer_name/)
+  assert.match(helper, /scene_name: sessionContext\.scene_name/)
+  assert.match(helper, /service_name: sessionContext\.service_name/)
+  assert.doesNotMatch(helper, /live_notes|training_context|followup_context/)
 })
 
 test("APP voiceCoach helper returns text-first local L4 shapes without provider or DB side effects", () => {

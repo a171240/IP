@@ -702,7 +702,7 @@ test("voice-coach entitlement denial precedes list or local-store work and valid
   assert.deepEqual(companyAdminResponse.body, {
     ok: false,
     code: "tenant_scope_denied",
-    feature: "voice_coach",
+    error: "tenant_scope_denied",
   })
   assert.equal(companyAdminHarness.counters.listCalls, 0)
   assert.equal(companyAdminHarness.counters.localStoreCalls, 0)
@@ -719,7 +719,39 @@ test("voice-coach entitlement denial precedes list or local-store work and valid
   const platformResponse = await platformHarness.route.GET(
     request("/api/app/voice-coach/sessions?company_id=company-2&store_id=store-2"),
   )
-  assert.equal(platformResponse.status, 200)
-  assert.equal(platformHarness.counters.listCalls, 1)
+  assert.equal(platformResponse.status, 403)
+  assert.deepEqual(platformResponse.body, {
+    ok: false,
+    code: "tenant_scope_denied",
+    error: "tenant_scope_denied",
+  })
+  assert.equal(platformHarness.counters.listCalls, 0)
   assert.equal(platformHarness.counters.localStoreCalls, 0)
+
+  const tenantPlatformHarness = voiceHarness(
+    appAccountContext({
+      membershipId: "membership-1",
+      role: "platform_admin",
+      companyId: "company-1",
+      storeId: "store-1",
+      isPlatformAdmin: true,
+    }),
+  )
+  const crossTenantPlatformResponse = await tenantPlatformHarness.route.GET(
+    request("/api/app/voice-coach/sessions?company_id=company-2&store_id=store-2"),
+  )
+  assert.equal(crossTenantPlatformResponse.status, 403)
+  assert.deepEqual(crossTenantPlatformResponse.body, {
+    ok: false,
+    code: "tenant_scope_denied",
+    error: "tenant_scope_denied",
+  })
+  assert.equal(tenantPlatformHarness.counters.listCalls, 0)
+
+  const matchingTenantPlatformResponse = await tenantPlatformHarness.route.GET(
+    request("/api/app/voice-coach/sessions?company_id=company-1&store_id=store-1"),
+  )
+  assert.equal(matchingTenantPlatformResponse.status, 200)
+  assert.equal(tenantPlatformHarness.counters.listCalls, 1)
+  assert.equal(tenantPlatformHarness.counters.localStoreCalls, 0)
 })
