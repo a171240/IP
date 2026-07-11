@@ -234,8 +234,11 @@ export async function createAliyunRdsStoreInvite(args: {
   body: unknown
 }) {
   const body = isRecord(args.body) ? args.body : {}
-  const requestedRole = cleanText(body.role || "staff", 40)
-  const role = requestedRole || "staff"
+  const hasRequestedRole = Object.prototype.hasOwnProperty.call(body, "role")
+  if (hasRequestedRole && (typeof body.role !== "string" || !body.role.trim())) {
+    throw new StoreInviteHttpError(403, "当前账号不能邀请该角色", "role_not_allowed")
+  }
+  const role = hasRequestedRole ? cleanText(body.role, 40) : "staff"
   if (!canAliyunRdsInviteRole(args.ctx, role)) {
     throw new StoreInviteHttpError(403, "当前账号不能邀请该角色", "role_not_allowed")
   }

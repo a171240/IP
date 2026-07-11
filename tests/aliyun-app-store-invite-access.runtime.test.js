@@ -1344,6 +1344,68 @@ test("create rejects company role with store before any query or insert", async 
   assert.equal(counters.topLevelQueries, 0)
 })
 
+test("create defaults a truly omitted role to staff", async () => {
+  let insertParams = null
+  const { counters, repository } = repositoryHarness({
+    queryAliyunRds: async (sql, params) => {
+      const text = compactSql(sql)
+      if (text.includes("from public.mp_companies")) return { rows: [companyRow()] }
+      if (text.includes("from public.mp_stores")) return { rows: [storeRow()] }
+      if (text.startsWith("insert into public.mp_account_invites")) {
+        insertParams = params
+        return { rows: [inviteRow({ role: params[2] })] }
+      }
+      throw new Error(`unexpected invite create query: ${text}`)
+    },
+  })
+
+  const result = await repository.createAliyunRdsStoreInvite({
+    ctx: appAccountContext(),
+    user: { id: "manager-user" },
+    body: { store_id: "store-1" },
+  })
+
+  assert.equal(result.ok, true)
+  assert.equal(result.invite.role, "staff")
+  assert.equal(insertParams[2], "staff")
+  assert.equal(counters.topLevelQueries, 3)
+  assert.equal(counters.transactionCalls, 0)
+})
+
+test("create rejects every explicitly malformed role before database access", async (t) => {
+  const malformedRoles = [
+    { name: "undefined", value: undefined },
+    { name: "number", value: 0 },
+    { name: "boolean", value: false },
+    { name: "null", value: null },
+    { name: "array", value: ["staff"] },
+    { name: "object", value: { role: "staff" } },
+    { name: "empty", value: "" },
+    { name: "whitespace", value: " \t\n " },
+  ]
+
+  for (const item of malformedRoles) {
+    await t.test(item.name, async () => {
+      const { counters, repository } = repositoryHarness({
+        queryAliyunRds: async () => {
+          throw new Error("database_query_forbidden")
+        },
+      })
+      const route = compileCreateRoute(repository)
+
+      const response = await route.POST(request("https://local.invalid/api/app/store-admin/invites", {
+        role: item.value,
+        store_id: "store-1",
+      }))
+
+      assert.equal(response.status, 403)
+      assert.deepEqual(response.body, { ok: false, code: "role_not_allowed" })
+      assert.equal(counters.topLevelQueries, 0)
+      assert.equal(counters.transactionCalls, 0)
+    })
+  }
+})
+
 test("create route projects the exact App success contract without repository context", async () => {
   const baseRepository = repositoryHarness().repository
   const invite = {
