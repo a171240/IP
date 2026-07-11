@@ -15,6 +15,7 @@
     "login_test_token",
     "logout_session_revoke",
     "profile_multi_tenant_permissions",
+    "professional_learning_progress",
     "store_invite",
     "service_record_long_recording",
     "store_manager_service_record_read"
@@ -39,7 +40,8 @@
     "supabase/migrations/20260506_add_mp_ai_points_backend.sql",
     "supabase/migrations/20260511_add_mp_account_invites_and_org_snapshots.sql",
     "supabase/migrations/20260511_harden_mp_account_invites_access.sql",
-    "supabase/migrations/20260513085315_add_service_record_sessions.sql"
+    "supabase/migrations/20260513085315_add_service_record_sessions.sql",
+    "deploy/aliyun-production-cn.app-learning-progress-schema.sql"
   ],
   "requiredTables": [
     {
@@ -104,6 +106,19 @@
         "personal_data_deletion_receipt_schema_present",
         "user_scope_requested_at_index_present",
         "scope_kind_status_requested_at_index_present"
+      ]
+    },
+    {
+      "name": "app_learning_progress_events",
+      "source": "deploy/aliyun-production-cn.app-learning-progress-schema.sql",
+      "capabilities": [
+        "professional_learning_progress"
+      ],
+      "validation": [
+        "event_id_primary_key_present",
+        "scope_client_event_unique_key_present",
+        "scope_module_occurred_index_present",
+        "viewed_practiced_event_contract_present"
       ]
     },
     {

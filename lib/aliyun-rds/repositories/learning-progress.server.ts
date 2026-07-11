@@ -1,10 +1,12 @@
 import "server-only"
 
 import { createHash } from "crypto"
+import type { PoolClient } from "pg"
 
+import { queryAliyunRds, withAliyunRdsTransaction } from "@/lib/aliyun-rds/postgres.server"
 import type { AppAccountContext } from "@/lib/aliyun-rds/repositories/account-profile.server"
 
-export const LEARNING_PROGRESS_REPOSITORY_MODE = "facade_in_memory"
+export const LEARNING_PROGRESS_REPOSITORY_MODE = "aliyun_rds_event_store"
 
 export type LearningProgressModule = "professional" | "speech"
 export type LearningProgressEntityType = "professional_lesson" | "professional_path" | "speech_card" | "speech_group"
@@ -77,7 +79,6 @@ type LearningProgressValidationError = {
 type LearningProgressEntityAggregate = {
   entityId: string
   entityType: LearningProgressEntityType
-  firstEventReceivedAt: string
   groupId?: string
   lastPracticedAt: string | null
   lastViewedAt: string | null
@@ -85,27 +86,44 @@ type LearningProgressEntityAggregate = {
   pathId?: string
   practiceCount: number
   practicedAt: string | null
-  tenantKey: string
   totalPageCount?: number
   viewCount: number
   viewedAt: string | null
   viewedPageCount?: number
 }
 
-type StoredLearningProgressEvent = LearningProgressEvent & {
-  entityKey: string
-  receivedAt: string
-  serverEventId: string
-  tenantKey: string
+type LearningProgressEventRow = {
+  id: string
+  company_id: string
+  store_id: string
+  membership_id: string
+  user_id: string
+  client_event_id: string
+  module: LearningProgressModule
+  entity_type: LearningProgressEntityType
+  entity_id: string
+  action: LearningProgressAction
+  occurred_at: string | Date
+  metadata: unknown
+  received_at: string | Date
 }
 
-type LearningProgressMemoryStore = {
-  entitiesByKey: Map<string, LearningProgressEntityAggregate>
-  eventsByClientKey: Map<string, StoredLearningProgressEvent>
+type LearningProgressApplySuccess = {
+  ok: true
+  entity: LearningProgressPublicEntity
+  event: {
+    client_event_id: string
+    deduped: boolean
+    received_at: string
+    server_event_id: string
+  }
+  summary_delta: Omit<LearningProgressSummary, "next" | "total_count">
 }
 
-declare global {
-  var __meiyeLearningProgressMemoryStore: LearningProgressMemoryStore | undefined
+type PersistedLearningProgressEvent = {
+  ok: true
+  deduped: boolean
+  event: LearningProgressEventRow
 }
 
 const LEARNING_PROGRESS_TOTALS: Record<LearningProgressModule, number> = {
@@ -242,15 +260,13 @@ export function parseLearningProgressModules(
   return { ok: true, modules: [...new Set(modules)] }
 }
 
-export function listLearningProgress(args: {
+export async function listLearningProgress(args: {
   includeEntities?: boolean
   modules: LearningProgressModule[]
   scope: LearningProgressTenantScope
 }) {
-  const tenantKey = tenantMemoryKey(args.scope)
-  const allEntities = [...getLearningProgressMemoryStore().entitiesByKey.values()]
-    .filter((entity) => entity.tenantKey === tenantKey && args.modules.includes(entity.module))
-    .sort(compareEntities)
+  const rows = await queryLearningProgressEvents(args.scope, args.modules)
+  const allEntities = aggregateLearningProgressRows(rows).sort(compareEntities)
 
   return {
     entities: args.includeEntities === false ? [] : allEntities.map(toPublicLearningProgressEntity),
@@ -261,83 +277,43 @@ export function listLearningProgress(args: {
   }
 }
 
-export function applyLearningProgressEvent(
+export async function applyLearningProgressEvent(
   scope: LearningProgressTenantScope,
   payload: unknown,
-): | {
-    ok: true
-    entity: LearningProgressPublicEntity
-    event: {
-      client_event_id: string
-      deduped: boolean
-      received_at: string
-      server_event_id: string
-    }
-    summary_delta: Omit<LearningProgressSummary, "next" | "total_count">
-  }
-  | LearningProgressValidationError {
+): Promise<LearningProgressApplySuccess | LearningProgressValidationError> {
   const validation = validateLearningProgressEventPayload(payload)
   if (!validation.ok) return validation
 
-  const store = getLearningProgressMemoryStore()
-  const tenantKey = tenantMemoryKey(scope)
-  const clientKey = `${tenantKey}:${validation.event.clientEventId}`
-  const existingEvent = store.eventsByClientKey.get(clientKey)
-  if (existingEvent) {
-    const aggregate = store.entitiesByKey.get(existingEvent.entityKey)
+  return withAliyunRdsTransaction(async (client) => {
+    const persisted = await persistLearningProgressEvent(client, scope, validation.event)
+    if (!persisted.ok) return persisted
+
+    const rows = await queryLearningProgressEvents(scope, [persisted.event.module], client)
+    const entities = aggregateLearningProgressRows(rows)
+    const aggregate = entities.find((entity) =>
+      entity.module === persisted.event.module &&
+      entity.entityType === persisted.event.entity_type &&
+      entity.entityId === persisted.event.entity_id)
     if (!aggregate) {
-      return learningProgressError(500, "learning_progress_facade_inconsistent", "Learning progress facade store is inconsistent")
+      throw new Error("learning_progress_event_aggregate_failed")
     }
-    const summary = buildLearningProgressSummary(existingEvent.module, entitiesForTenantModule(tenantKey, existingEvent.module))
+
+    const summary = buildLearningProgressSummary(persisted.event.module, entities)
     return {
       ok: true,
       entity: toPublicLearningProgressEntity(aggregate),
       event: {
-        client_event_id: existingEvent.clientEventId,
-        deduped: true,
-        received_at: existingEvent.receivedAt,
-        server_event_id: existingEvent.serverEventId,
+        client_event_id: persisted.event.client_event_id,
+        deduped: persisted.deduped,
+        received_at: toIsoString(persisted.event.received_at, "received_at"),
+        server_event_id: persisted.event.id,
       },
       summary_delta: summaryDelta(summary),
     }
-  }
-
-  const event = validation.event
-  const meta = lookupLearningProgressEntity(event.module, event.entityType, event.entityId)
-  if (!meta) {
-    return learningProgressError(404, "learning_entity_not_found", "Learning entity is not in the current App catalog")
-  }
-
-  const receivedAt = new Date().toISOString()
-  const entityKey = `${tenantKey}:${event.module}:${event.entityType}:${event.entityId}`
-  const storedEvent: StoredLearningProgressEvent = {
-    ...event,
-    entityKey,
-    receivedAt,
-    serverEventId: createLearningProgressServerEventId(tenantKey, event.clientEventId),
-    tenantKey,
-  }
-  store.eventsByClientKey.set(clientKey, storedEvent)
-
-  const aggregate = store.entitiesByKey.get(entityKey) || createEntityAggregate(tenantKey, meta, receivedAt)
-  applyEventToAggregate(aggregate, event, meta)
-  store.entitiesByKey.set(entityKey, aggregate)
-
-  const summary = buildLearningProgressSummary(event.module, entitiesForTenantModule(tenantKey, event.module))
-  return {
-    ok: true,
-    entity: toPublicLearningProgressEntity(aggregate),
-    event: {
-      client_event_id: storedEvent.clientEventId,
-      deduped: false,
-      received_at: storedEvent.receivedAt,
-      server_event_id: storedEvent.serverEventId,
-    },
-    summary_delta: summaryDelta(summary),
-  }
+  })
 }
 
-export function syncLearningProgressEvents(scope: LearningProgressTenantScope, payload: unknown) {
+export async function syncLearningProgressEvents(scope: LearningProgressTenantScope, payload: unknown) {
   if (!isLearningProgressRecord(payload)) {
     return learningProgressError(400, "invalid_payload", "Request body must be a JSON object")
   }
@@ -347,40 +323,43 @@ export function syncLearningProgressEvents(scope: LearningProgressTenantScope, p
     return learningProgressError(422, "invalid_learning_event", "events must be an array")
   }
 
-  const acceptedEventIds: string[] = []
-  const rejectedEvents: Array<{ client_event_id: string | null; code: string; message: string }> = []
+  return withAliyunRdsTransaction(async (client) => {
+    const acceptedEventIds: string[] = []
+    const rejectedEvents: Array<{ client_event_id: string | null; code: string; message: string }> = []
 
-  for (const item of events) {
-    const result = applyLearningProgressEvent(scope, item)
-    if (result.ok) {
-      acceptedEventIds.push(result.event.client_event_id)
-      continue
+    for (const item of events) {
+      const validation = validateLearningProgressEventPayload(item)
+      const result = validation.ok
+        ? await persistLearningProgressEvent(client, scope, validation.event)
+        : validation
+      if (result.ok) {
+        acceptedEventIds.push(result.event.client_event_id)
+        continue
+      }
+      rejectedEvents.push({
+        client_event_id: rejectedLearningProgressClientEventId(item),
+        code: result.code,
+        message: result.message,
+      })
     }
-    rejectedEvents.push({
-      client_event_id: isLearningProgressRecord(item) ? cleanLearningProgressText(item.client_event_id, 220) || null : null,
-      code: result.code,
-      message: result.message,
-    })
-  }
 
-  const progress = listLearningProgress({
-    includeEntities: false,
-    modules: ["professional", "speech"],
-    scope,
+    const rows = await queryLearningProgressEvents(scope, ["professional", "speech"], client)
+    const entities = aggregateLearningProgressRows(rows)
+    const serverTime = new Date().toISOString()
+    return {
+      ok: true as const,
+      accepted_event_ids: acceptedEventIds,
+      client_sync_id: cleanLearningProgressText(payload.client_sync_id, 220),
+      progress: {
+        entities: [],
+        server_time: serverTime,
+        summaries: (["professional", "speech"] as const).map((module) =>
+          buildLearningProgressSummary(module, entities)),
+      },
+      rejected_events: rejectedEvents,
+      repository_mode: LEARNING_PROGRESS_REPOSITORY_MODE,
+    }
   })
-
-  return {
-    ok: true as const,
-    accepted_event_ids: acceptedEventIds,
-    client_sync_id: cleanLearningProgressText(payload.client_sync_id, 220),
-    progress: {
-      entities: progress.entities,
-      server_time: progress.server_time,
-      summaries: progress.summaries,
-    },
-    rejected_events: rejectedEvents,
-    repository_mode: LEARNING_PROGRESS_REPOSITORY_MODE,
-  }
 }
 
 function validateLearningProgressEventPayload(
@@ -390,13 +369,16 @@ function validateLearningProgressEventPayload(
     return learningProgressError(400, "invalid_payload", "Request body must be a JSON object")
   }
 
-  const clientEventId = cleanLearningProgressText(payload.client_event_id, 220)
+  const clientEventId = rawLearningProgressClientEventId(payload.client_event_id)
   const moduleName = cleanLearningProgressText(payload.module, 40)
   const entityType = cleanLearningProgressText(payload.entity_type, 60)
   const entityId = cleanLearningProgressText(payload.entity_id, 160)
   const action = cleanLearningProgressText(payload.action, 40)
   const occurredAt = parseLearningProgressOccurredAt(payload.occurred_at)
 
+  if (clientEventId.length > 220) {
+    return learningProgressError(422, "invalid_learning_event", "client_event_id must be between 1 and 220 characters")
+  }
   if (!clientEventId || !entityId || !occurredAt) {
     return learningProgressError(422, "invalid_learning_event", "client_event_id, entity_id, and valid occurred_at are required")
   }
@@ -434,21 +416,21 @@ function validateLearningProgressEventPayload(
   }
 }
 
+function rawLearningProgressClientEventId(value: unknown) {
+  return String(value || "").trim()
+}
+
+function rejectedLearningProgressClientEventId(value: unknown) {
+  if (!isLearningProgressRecord(value)) return null
+  const clientEventId = rawLearningProgressClientEventId(value.client_event_id)
+  return clientEventId && clientEventId.length <= 220 ? clientEventId : null
+}
+
 function learningProgressError(status: number, code: string, message: string): LearningProgressValidationError {
   return { ok: false, code, message, status }
 }
 
-function getLearningProgressMemoryStore() {
-  if (!globalThis.__meiyeLearningProgressMemoryStore) {
-    globalThis.__meiyeLearningProgressMemoryStore = {
-      entitiesByKey: new Map(),
-      eventsByClientKey: new Map(),
-    }
-  }
-  return globalThis.__meiyeLearningProgressMemoryStore
-}
-
-function tenantMemoryKey(scope: LearningProgressTenantScope) {
+function tenantScopeKey(scope: LearningProgressTenantScope) {
   return [
     scope.companyId,
     scope.storeId,
@@ -457,20 +439,169 @@ function tenantMemoryKey(scope: LearningProgressTenantScope) {
   ].join(":")
 }
 
-function entitiesForTenantModule(tenantKey: string, module: LearningProgressModule) {
-  return [...getLearningProgressMemoryStore().entitiesByKey.values()]
-    .filter((entity) => entity.tenantKey === tenantKey && entity.module === module)
+async function persistLearningProgressEvent(
+  client: PoolClient,
+  scope: LearningProgressTenantScope,
+  event: LearningProgressEvent,
+): Promise<PersistedLearningProgressEvent | LearningProgressValidationError> {
+  const tenantKey = tenantScopeKey(scope)
+  const serverEventId = createLearningProgressServerEventId(tenantKey, event.clientEventId)
+  const inserted = await client.query<LearningProgressEventRow>(
+    `
+      insert into public.app_learning_progress_events (
+        id, company_id, store_id, membership_id, user_id, client_event_id,
+        module, entity_type, entity_id, action, occurred_at, metadata
+      )
+      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb)
+      on conflict (company_id, store_id, membership_id, user_id, client_event_id) do nothing
+      returning id, company_id, store_id, membership_id, user_id, client_event_id,
+        module, entity_type, entity_id, action, occurred_at, metadata, received_at
+    `,
+    [
+      serverEventId,
+      scope.companyId,
+      scope.storeId,
+      scope.membershipId,
+      scope.userId,
+      event.clientEventId,
+      event.module,
+      event.entityType,
+      event.entityId,
+      event.action,
+      event.occurredAt,
+      canonicalLearningProgressJson(event.metadata),
+    ],
+  )
+  const deduped = inserted.rows.length === 0
+  const storedEvent = inserted.rows[0] || await findLearningProgressEventByClientId(client, scope, event.clientEventId)
+  if (!storedEvent) throw new Error("learning_progress_idempotency_read_failed")
+  if (deduped && !sameLearningProgressEvent(storedEvent, event)) {
+    return learningProgressError(
+      409,
+      "learning_event_id_conflict",
+      "client_event_id is already bound to a different learning event",
+    )
+  }
+  return { ok: true, deduped, event: storedEvent }
+}
+
+function sameLearningProgressEvent(stored: LearningProgressEventRow, incoming: LearningProgressEvent) {
+  return stored.module === incoming.module &&
+    stored.entity_type === incoming.entityType &&
+    stored.entity_id === incoming.entityId &&
+    stored.action === incoming.action &&
+    toIsoString(stored.occurred_at, "occurred_at") === incoming.occurredAt &&
+    canonicalLearningProgressJson(stored.metadata) === canonicalLearningProgressJson(incoming.metadata)
+}
+
+function canonicalLearningProgressJson(value: unknown): string {
+  const json = JSON.stringify(value)
+  if (typeof json !== "string") return "null"
+  return stableLearningProgressJson(JSON.parse(json))
+}
+
+function stableLearningProgressJson(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableLearningProgressJson).join(",")}]`
+  }
+  if (isLearningProgressRecord(value)) {
+    return `{${Object.keys(value).sort().map((key) =>
+      `${JSON.stringify(key)}:${stableLearningProgressJson(value[key])}`).join(",")}}`
+  }
+  return JSON.stringify(value)
+}
+
+async function queryLearningProgressEvents(
+  scope: LearningProgressTenantScope,
+  modules: LearningProgressModule[],
+  client?: PoolClient,
+) {
+  const sql = `
+    select id, company_id, store_id, membership_id, user_id, client_event_id,
+      module, entity_type, entity_id, action, occurred_at, metadata, received_at
+    from public.app_learning_progress_events
+    where company_id = $1
+      and store_id = $2
+      and membership_id = $3
+      and user_id = $4
+      and module = any($5::text[])
+    order by occurred_at asc, received_at asc, id asc
+  `
+  const values = [scope.companyId, scope.storeId, scope.membershipId, scope.userId, modules]
+  const result = client
+    ? await client.query<LearningProgressEventRow>(sql, values)
+    : await queryAliyunRds<LearningProgressEventRow>(sql, values)
+  return result.rows
+}
+
+async function findLearningProgressEventByClientId(
+  client: PoolClient,
+  scope: LearningProgressTenantScope,
+  clientEventId: string,
+) {
+  const result = await client.query<LearningProgressEventRow>(
+    `
+      select id, company_id, store_id, membership_id, user_id, client_event_id,
+        module, entity_type, entity_id, action, occurred_at, metadata, received_at
+      from public.app_learning_progress_events
+      where company_id = $1
+        and store_id = $2
+        and membership_id = $3
+        and user_id = $4
+        and client_event_id = $5
+      limit 1
+    `,
+    [scope.companyId, scope.storeId, scope.membershipId, scope.userId, clientEventId],
+  )
+  return result.rows[0] || null
+}
+
+function aggregateLearningProgressRows(rows: LearningProgressEventRow[]) {
+  const entities = new Map<string, LearningProgressEntityAggregate>()
+
+  for (const row of rows) {
+    const meta = lookupLearningProgressEntity(row.module, row.entity_type, row.entity_id)
+    if (!meta) throw new Error("learning_progress_catalog_row_invalid")
+
+    const event: LearningProgressEvent = {
+      action: row.action,
+      clientEventId: row.client_event_id,
+      entityId: row.entity_id,
+      entityType: row.entity_type,
+      metadata: isLearningProgressRecord(row.metadata) ? row.metadata : {},
+      module: row.module,
+      occurredAt: toIsoString(row.occurred_at, "occurred_at"),
+    }
+    const entityKey = `${row.module}:${row.entity_type}:${row.entity_id}`
+    const aggregate = entities.get(entityKey) || createEntityAggregate(meta)
+    applyEventToAggregate(aggregate, event, meta)
+    entities.set(entityKey, aggregate)
+  }
+
+  return [...entities.values()]
+}
+
+function toIsoString(value: string | Date, field: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) throw new Error(`learning_progress_invalid_${field}`)
+  return date.toISOString()
+}
+
+export function learningProgressSchemaMissing(error: unknown) {
+  const code = String((error as { code?: unknown })?.code || "")
+  const message = String((error as { message?: unknown })?.message || "")
+  return (
+    (code === "42P01" || code === "42703" || /does not exist|column .* does not exist/i.test(message)) &&
+    /app_learning_progress_events/i.test(message)
+  )
 }
 
 function createEntityAggregate(
-  tenantKey: string,
   meta: LearningProgressEntityMeta,
-  receivedAt: string,
 ): LearningProgressEntityAggregate {
   return {
     entityId: meta.entityId,
     entityType: meta.entityType,
-    firstEventReceivedAt: receivedAt,
     groupId: meta.groupId,
     lastPracticedAt: null,
     lastViewedAt: null,
@@ -478,7 +609,6 @@ function createEntityAggregate(
     pathId: meta.pathId,
     practiceCount: 0,
     practicedAt: null,
-    tenantKey,
     totalPageCount: meta.totalPageCount,
     viewCount: 0,
     viewedAt: null,

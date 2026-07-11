@@ -9,6 +9,7 @@ import { AliyunRdsConfigurationError, isAliyunRdsRuntimeUnavailableError } from 
 import { getAliyunRdsAppAccountContext } from "@/lib/aliyun-rds/repositories/account-profile.server"
 import {
   cleanLearningProgressText,
+  learningProgressSchemaMissing,
   listLearningProgress,
   parseLearningProgressModules,
   resolveLearningProgressTenantScope,
@@ -30,7 +31,10 @@ function learningProgressErrorResponse(error: unknown, fallbackCode: string) {
   if (isAliyunRdsRuntimeUnavailableError(error)) {
     return jsonError(503, "Aliyun RDS is not reachable", "rds_unavailable")
   }
-  return jsonError(500, error instanceof Error ? error.message : fallbackCode, fallbackCode)
+  if (learningProgressSchemaMissing(error)) {
+    return jsonError(503, "learning_progress_schema_not_ready", "learning_progress_schema_not_ready")
+  }
+  return jsonError(500, fallbackCode, fallbackCode)
 }
 
 export async function GET(request: NextRequest) {
@@ -51,7 +55,7 @@ export async function GET(request: NextRequest) {
     }
 
     const includeEntities = cleanLearningProgressText(params.get("include_entities"), 20).toLowerCase() !== "false"
-    const progress = listLearningProgress({
+    const progress = await listLearningProgress({
       includeEntities,
       modules: modules.modules,
       scope: scope.scope,

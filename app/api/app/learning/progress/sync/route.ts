@@ -10,6 +10,7 @@ import { getAliyunRdsAppAccountContext } from "@/lib/aliyun-rds/repositories/acc
 import {
   cleanLearningProgressText,
   isLearningProgressRecord,
+  learningProgressSchemaMissing,
   resolveLearningProgressTenantScope,
   syncLearningProgressEvents,
 } from "@/lib/aliyun-rds/repositories/learning-progress.server"
@@ -30,7 +31,10 @@ function learningProgressErrorResponse(error: unknown, fallbackCode: string) {
   if (isAliyunRdsRuntimeUnavailableError(error)) {
     return jsonError(503, "Aliyun RDS is not reachable", "rds_unavailable")
   }
-  return jsonError(500, error instanceof Error ? error.message : fallbackCode, fallbackCode)
+  if (learningProgressSchemaMissing(error)) {
+    return jsonError(503, "learning_progress_schema_not_ready", "learning_progress_schema_not_ready")
+  }
+  return jsonError(500, fallbackCode, fallbackCode)
 }
 
 export async function POST(request: NextRequest) {
@@ -50,7 +54,7 @@ export async function POST(request: NextRequest) {
       return jsonError(scope.status, scope.code, scope.code, { message: scope.message })
     }
 
-    const result = syncLearningProgressEvents(scope.scope, payload)
+    const result = await syncLearningProgressEvents(scope.scope, payload)
     if (!result.ok) {
       return jsonError(result.status, result.code, result.code, { message: result.message })
     }

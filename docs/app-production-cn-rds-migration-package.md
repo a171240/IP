@@ -7,14 +7,14 @@
 - readOnlyOnly: true
 - cloudApiCalled: false
 - mutationPerformed: false
-- sourceFileCount: 11
-- requiredTableCount: 17
+- sourceFileCount: 12
+- requiredTableCount: 18
 - requiredFunctionCount: 0
 - requiredStorageCount: 1
-- schemaSqlSha256: 3658701c742308f9084248ae5c73d59fa770ce0499e5ba96f225731650ce9a37
-- rdsApplyCandidateSqlSha256: 84d86d895c3c26beb0dc3ec78951db577bfb782ac9d6d1a6f8c1d1716f355b38
-- validationSqlSha256: dc86e9d57099f78146577510bdc3f1a52949e0af327c12c15defaef28d12c3d5
-- rollbackChecklistSha256: 14556863a433cb4b1eed435e938700733d3b195693973b79fc984cfe2ff6f207
+- schemaSqlSha256: 9da94ef44b7a62127a02b40d6dd9cce8822dd19b1c531472af4fceaa4a71abb7
+- rdsApplyCandidateSqlSha256: ad3b6c19d853459a8eaba4f3cda171869d338c4478b4d3b00bfa5c518f38b855
+- validationSqlSha256: 79e9349d41191f1ea7359e512a7fea0c4c9881f359977af65e32942bd63f332c
+- rollbackChecklistSha256: ed105e65805a194e036f2efe3d43b0151d4ef95fe548ef5456fa5b2cc1a5bc9e
 - blockers: none
 - warnings: rds_sql_compatibility_review_required:deploy/aliyun-production-cn.app-compliance-requests-schema.sql:extension_review, rds_sql_compatibility_review_required:lib/supabase/schema.sql:extension_review+policy_statement+row_level_security+supabase_auth_schema+supabase_auth_uid, rds_sql_compatibility_review_required:supabase/migrations/20250213_add_activation_requests_and_entitlements.sql:extension_review+policy_statement+row_level_security+supabase_auth_schema+supabase_auth_uid+supabase_service_role, rds_sql_compatibility_review_required:supabase/migrations/20260209_xhs_v4_store_profiles_and_draft_fields.sql:extension_review+policy_statement+row_level_security+supabase_auth_uid+supabase_service_role, rds_sql_compatibility_review_required:supabase/migrations/20260210_add_voice_coach_sessions_and_turns.sql:extension_review+policy_statement+row_level_security+supabase_auth_uid+supabase_service_role+supabase_storage_schema, rds_sql_compatibility_review_required:supabase/migrations/20260412_add_voice_coach_profiles_and_scene_cards.sql:extension_review+policy_statement+row_level_security+supabase_auth_uid+supabase_service_role, rds_sql_compatibility_review_required:supabase/migrations/20260506_add_mp_ai_points_backend.sql:extension_review+policy_statement+row_level_security+supabase_auth_schema+supabase_auth_uid, rds_sql_compatibility_review_required:supabase/migrations/20260511_add_mp_account_invites_and_org_snapshots.sql:extension_review+row_level_security+supabase_auth_schema, rds_sql_compatibility_review_required:supabase/migrations/20260511_harden_mp_account_invites_access.sql:policy_statement, rds_sql_compatibility_review_required:supabase/migrations/20260513085315_add_service_record_sessions.sql:extension_review+policy_statement+row_level_security+supabase_auth_schema+supabase_auth_uid+supabase_service_role+supabase_storage_schema
 - rdsCompatibilityReviewRequired: true
@@ -37,12 +37,12 @@
 
 ## Files
 
-- manifest: /tmp/meiye-rds-package-doc-current/rds-migration-package.json
-- markdown: /tmp/meiye-rds-package-doc-current/rds-migration-package.md
-- schemaSql: /tmp/meiye-rds-package-doc-current/rds-schema.sql
-- rdsApplyCandidateSql: /tmp/meiye-rds-package-doc-current/rds-apply-candidate.sql
-- validationSql: /tmp/meiye-rds-package-doc-current/rds-validation.sql
-- rollbackChecklist: /tmp/meiye-rds-package-doc-current/rds-rollback-checklist.md
+- manifest: /tmp/meiye-g2a-learning-progress-rds-package/rds-migration-package.json
+- markdown: /tmp/meiye-g2a-learning-progress-rds-package/rds-migration-package.md
+- schemaSql: /tmp/meiye-g2a-learning-progress-rds-package/rds-schema.sql
+- rdsApplyCandidateSql: /tmp/meiye-g2a-learning-progress-rds-package/rds-apply-candidate.sql
+- validationSql: /tmp/meiye-g2a-learning-progress-rds-package/rds-validation.sql
+- rollbackChecklist: /tmp/meiye-g2a-learning-progress-rds-package/rds-rollback-checklist.md
 
 ## Source Files
 
@@ -57,6 +57,7 @@
 - supabase/migrations/20260511_add_mp_account_invites_and_org_snapshots.sql: 228b26e164a130edafa6ce544b088f02dab48a25af029e0c98681df49d9b47ed
 - supabase/migrations/20260511_harden_mp_account_invites_access.sql: 2efe570c4d98a98b8640c5d5ff7ba578fe5c418f6d362fa04f970c5ae5660cf2
 - supabase/migrations/20260513085315_add_service_record_sessions.sql: 6b3b929032010946d363eec0c5bb4130cf68891bd6a487d57c284293e6ecc4f3
+- deploy/aliyun-production-cn.app-learning-progress-schema.sql: b981d5f9f2ac14eccad694b974a2aaf7f3d8162e5db2997d844b3290e16dbbb0
 
 ## Required Tables
 
@@ -65,6 +66,7 @@
 - entitlements: source=supabase/migrations/20250213_add_activation_requests_and_entitlements.sql; capabilities=login_test_token, profile_multi_tenant_permissions; validation=row_count_matches_source, entitlement_lookup_by_user_id_passes
 - app_auth_token_revocations: source=deploy/aliyun-production-cn.app-auth-revocations-schema.sql; capabilities=login_test_token, logout_session_revoke, profile_multi_tenant_permissions; validation=token_hash_primary_key_present, auth_source_check_present, expires_at_lookup_index_present, logout_revoke_smoke_pending
 - app_compliance_requests: source=deploy/aliyun-production-cn.app-compliance-requests-schema.sql; capabilities=profile_multi_tenant_permissions; validation=account_deletion_receipt_schema_present, personal_data_deletion_receipt_schema_present, user_scope_requested_at_index_present, scope_kind_status_requested_at_index_present
+- app_learning_progress_events: source=deploy/aliyun-production-cn.app-learning-progress-schema.sql; capabilities=professional_learning_progress; validation=event_id_primary_key_present, scope_client_event_unique_key_present, scope_module_occurred_index_present, viewed_practiced_event_contract_present
 - mp_companies: source=supabase/migrations/20260506_add_mp_ai_points_backend.sql; capabilities=profile_multi_tenant_permissions, store_invite, store_manager_service_record_read; validation=row_count_matches_source, company_admin_membership_resolves
 - mp_stores: source=supabase/migrations/20260506_add_mp_ai_points_backend.sql; capabilities=profile_multi_tenant_permissions, store_invite, service_record_long_recording, store_manager_service_record_read; validation=row_count_matches_source, store_manager_membership_resolves_store
 - mp_account_memberships: source=supabase/migrations/20260506_add_mp_ai_points_backend.sql; capabilities=profile_multi_tenant_permissions, store_invite, store_manager_service_record_read; validation=row_count_matches_source, company_scope_and_store_scope_indexes_present, active_memberships_resolve_profile_company_store
@@ -126,7 +128,7 @@
 - removedStatementCount: 113
 - rewrittenStatementCount: 9
 - rewrittenCategories: supabase_auth_schema
-- keptStatementCount: 155
+- keptStatementCount: 158
 - removalPolicy: Removed statements are not applied to Aliyun RDS; deferred auth.uid() RPC functions and out-of-scope XHS draft statements are excluded from the first-version apply candidate, while rewritten statements move remaining Supabase auth references to APP-owned identity context. Equivalent authorization and object storage boundaries must be enforced by APP API repositories, Aliyun OSS, RAM/STS, and runtime secret env.
 
 - removed:deferred_auth_uid_function:consume_credits: statements=1
