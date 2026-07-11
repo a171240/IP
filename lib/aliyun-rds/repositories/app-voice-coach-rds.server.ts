@@ -69,6 +69,12 @@ export type AppVoiceCoachRdsEvent = {
   payload: Record<string, unknown>
 }
 
+export type AppVoiceCoachRdsEndState = {
+  dimensionScores: unknown
+  report: Record<string, unknown>
+  totalScore: number
+}
+
 type AppVoiceCoachCustomerSelectionRow = {
   id: string
   user_id: string
@@ -84,11 +90,30 @@ type AppVoiceCoachSceneSelectionRow = {
 
 const CUSTOMER_PROFILE_NOT_FOUND = "voice_coach_rds_customer_profile_not_found"
 const SCENE_CARD_NOT_FOUND = "voice_coach_rds_scene_card_not_found"
+const SESSION_NOT_FOUND = "voice_coach_rds_session_not_found"
+const SESSION_ENDED = "voice_coach_rds_session_ended"
+const IDEMPOTENCY_CONFLICT = "voice_coach_rds_idempotency_conflict"
+const REPLY_TARGET_STALE = "voice_coach_rds_reply_target_stale"
 
 export function getAliyunRdsVoiceCoachSelectionErrorCode(error: unknown) {
   if (!(error instanceof Error)) return null
   if (error.message === CUSTOMER_PROFILE_NOT_FOUND) return "customer_profile_not_found"
   if (error.message === SCENE_CARD_NOT_FOUND) return "scene_card_not_found"
+  return null
+}
+
+export function getAliyunRdsVoiceCoachMutationError(error: unknown) {
+  if (!(error instanceof Error)) return null
+  if (error.message === SESSION_NOT_FOUND || error.message === "voice_coach_rds_session_end_failed") {
+    return { status: 404, code: "voice_coach_session_not_found" }
+  }
+  if (error.message === IDEMPOTENCY_CONFLICT) {
+    return { status: 409, code: "voice_coach_idempotency_conflict" }
+  }
+  if (error.message === SESSION_ENDED) return { status: 409, code: "voice_coach_session_ended" }
+  if (error.message === REPLY_TARGET_STALE) {
+    return { status: 409, code: "voice_coach_reply_target_stale" }
+  }
   return null
 }
 
@@ -114,18 +139,21 @@ export async function getAliyunRdsVoiceCoachTextSession(args: AppVoiceCoachRdsSc
 }
 
 export async function appendAliyunRdsVoiceCoachTextReply(args: AppVoiceCoachRdsScope & {
+  clientAttemptId: string
   nextCustomerText?: string | null
   replyText: string
+  replyToTurnId: string
   sessionId: string
 }) {
   return withAliyunRdsTransaction((client) => appendAliyunRdsVoiceCoachTextReplyWithClient(client, args))
 }
 
 export async function endAliyunRdsVoiceCoachTextSession(args: AppVoiceCoachRdsScope & {
-  dimensionScores: unknown
-  report: Record<string, unknown>
+  buildEndState(args: {
+    session: AppVoiceCoachRdsSessionRow
+    turns: AppVoiceCoachRdsTurnRow[]
+  }): AppVoiceCoachRdsEndState
   sessionId: string
-  totalScore: number
 }) {
   return withAliyunRdsTransaction((client) => endAliyunRdsVoiceCoachTextSessionWithClient(client, args))
 }
@@ -320,65 +348,175 @@ export async function getAliyunRdsVoiceCoachTextSessionWithClient(
   return { session, turns }
 }
 
+async function lockAliyunRdsVoiceCoachTextSessionWithClient(
+  client: AppVoiceCoachRdsQueryClient,
+  args: AppVoiceCoachRdsScope & { sessionId: string },
+) {
+  const result = await client.query<AppVoiceCoachRdsSessionRow>(
+    `
+      select *
+      from public.voice_coach_sessions
+      where id = $1
+        and user_id = $2
+        and company_id = $3
+        and store_id = $4
+        and membership_id = $5
+      limit 1
+      for update
+    `,
+    [
+      requiredText(args.sessionId, "voice_coach_rds_session_id_required"),
+      requiredText(args.userId, "voice_coach_rds_user_id_required"),
+      requiredText(args.companyId, "voice_coach_rds_company_id_required"),
+      requiredText(args.storeId, "voice_coach_rds_store_id_required"),
+      requiredText(args.membershipId, "voice_coach_rds_membership_id_required"),
+    ],
+  )
+  return result.rows[0] || null
+}
+
+async function findAliyunRdsVoiceCoachAttemptWithClient(
+  client: AppVoiceCoachRdsQueryClient,
+  sessionId: string,
+  clientAttemptId: string,
+) {
+  const result = await client.query<AppVoiceCoachRdsTurnRow>(
+    `
+      select *
+      from public.voice_coach_turns
+      where session_id = $1
+        and role = 'beautician'
+        and features_json ->> 'client_attempt_id' = $2
+      order by turn_index asc
+      limit 1
+    `,
+    [sessionId, clientAttemptId],
+  )
+  return result.rows[0] || null
+}
+
 export async function appendAliyunRdsVoiceCoachTextReplyWithClient(
   client: AppVoiceCoachRdsQueryClient,
   args: AppVoiceCoachRdsScope & {
+    clientAttemptId: string
     nextCustomerText?: string | null
     replyText: string
+    replyToTurnId: string
     sessionId: string
   },
 ) {
-  const current = await getAliyunRdsVoiceCoachTextSessionWithClient(client, {
-    sessionId: args.sessionId,
+  const sessionId = requiredText(args.sessionId, "voice_coach_rds_session_id_required")
+  const clientAttemptId = requiredText(args.clientAttemptId, "voice_coach_rds_client_attempt_id_required")
+  const replyToTurnId = requiredText(args.replyToTurnId, "voice_coach_rds_reply_to_turn_id_required")
+  const replyText = requiredText(args.replyText, "voice_coach_rds_reply_text_required")
+  const session = await lockAliyunRdsVoiceCoachTextSessionWithClient(client, {
+    sessionId,
     userId: args.userId,
     companyId: args.companyId,
     storeId: args.storeId,
     membershipId: args.membershipId,
   })
-  if (!current) throw new Error("voice_coach_rds_session_not_found")
-  if (current.session.status === "ended") throw new Error("voice_coach_rds_session_ended")
+  if (!session) throw new Error(SESSION_NOT_FOUND)
 
-  const maxIndexResult = await client.query<{ max_turn_index: number }>(
-    `
-      select coalesce(max(turn_index), -1)::int as max_turn_index
-      from public.voice_coach_turns
-      where session_id = $1
-    `,
-    [requiredText(args.sessionId, "voice_coach_rds_session_id_required")],
+  const existingBeauticianTurn = await findAliyunRdsVoiceCoachAttemptWithClient(
+    client,
+    sessionId,
+    clientAttemptId,
   )
-  const maxTurnIndex = Number(maxIndexResult.rows[0]?.max_turn_index ?? -1)
+  if (existingBeauticianTurn) {
+    const existingFeatures = recordValue(existingBeauticianTurn.features_json)
+    if (
+      normalizedComparableText(existingBeauticianTurn.text) !== normalizedComparableText(replyText) ||
+      existingFeatures.reply_to_turn_id !== replyToTurnId
+    ) {
+      throw new Error(IDEMPOTENCY_CONFLICT)
+    }
+
+    const turns = await listAliyunRdsVoiceCoachTextTurnsWithClient(client, sessionId)
+    const nextCustomerTurn = turns.find(
+      (turn) => turn.role === "customer" && Number(turn.turn_index) === Number(existingBeauticianTurn.turn_index) + 1,
+    ) || null
+    const beauticianCountAtAttempt = turns.filter(
+      (turn) => turn.role === "beautician" && Number(turn.turn_index) <= Number(existingBeauticianTurn.turn_index),
+    ).length
+    return {
+      beauticianTurn: existingBeauticianTurn,
+      deduped: true,
+      nextCustomerTurn,
+      reachedMaxTurns: beauticianCountAtAttempt >= 2,
+      session,
+      turns,
+    }
+  }
+
+  if (session.status === "ended") throw new Error(SESSION_ENDED)
+
+  const turnsBeforeSubmit = await listAliyunRdsVoiceCoachTextTurnsWithClient(client, sessionId)
+  const latestTurn = turnsBeforeSubmit[turnsBeforeSubmit.length - 1]
+  if (!latestTurn || latestTurn.role !== "customer" || latestTurn.id !== replyToTurnId) {
+    throw new Error(REPLY_TARGET_STALE)
+  }
+
+  const maxTurnIndex = turnsBeforeSubmit.reduce(
+    (currentMax, turn) => Math.max(currentMax, Number(turn.turn_index)),
+    -1,
+  )
+  const reachedMaxTurns = turnsBeforeSubmit.filter((turn) => turn.role === "beautician").length + 1 >= 2
   const beauticianTurn = await insertAliyunRdsVoiceCoachTextTurnWithClient(client, {
     analysis: { source: "text_first_rds_contract" },
-    features: { provider_mode: "text_only_no_audio_provider" },
+    features: {
+      provider_mode: "text_only_no_audio_provider",
+      client_attempt_id: clientAttemptId,
+      reply_to_turn_id: replyToTurnId,
+    },
     role: "beautician",
-    sessionId: args.sessionId,
-    text: requiredText(args.replyText, "voice_coach_rds_reply_text_required"),
+    sessionId,
+    text: replyText,
     turnIndex: maxTurnIndex + 1,
   })
   const nextText = optionalText(args.nextCustomerText)
-  const nextCustomerTurn = nextText
+  const nextCustomerTurn = !reachedMaxTurns && nextText
     ? await insertAliyunRdsVoiceCoachTextTurnWithClient(client, {
         analysis: { source: "text_first_rds_contract" },
         features: { provider_mode: "text_only_no_audio_provider" },
         role: "customer",
-        sessionId: args.sessionId,
+        sessionId,
         text: nextText,
         turnIndex: maxTurnIndex + 2,
       })
     : null
+  const turns = nextCustomerTurn
+    ? [...turnsBeforeSubmit, beauticianTurn, nextCustomerTurn]
+    : [...turnsBeforeSubmit, beauticianTurn]
 
-  return { beauticianTurn, nextCustomerTurn }
+  return { beauticianTurn, deduped: false, nextCustomerTurn, reachedMaxTurns, session, turns }
 }
 
 export async function endAliyunRdsVoiceCoachTextSessionWithClient(
   client: AppVoiceCoachRdsQueryClient,
   args: AppVoiceCoachRdsScope & {
-    dimensionScores: unknown
-    report: Record<string, unknown>
+    buildEndState(args: {
+      session: AppVoiceCoachRdsSessionRow
+      turns: AppVoiceCoachRdsTurnRow[]
+    }): AppVoiceCoachRdsEndState
     sessionId: string
-    totalScore: number
   },
 ) {
+  const sessionId = requiredText(args.sessionId, "voice_coach_rds_session_id_required")
+  const session = await lockAliyunRdsVoiceCoachTextSessionWithClient(client, {
+    sessionId,
+    userId: args.userId,
+    companyId: args.companyId,
+    storeId: args.storeId,
+    membershipId: args.membershipId,
+  })
+  if (!session) throw new Error("voice_coach_rds_session_end_failed")
+  if (session.status === "ended") {
+    return { deduped: true, report: session.report_json, session }
+  }
+
+  const turns = await listAliyunRdsVoiceCoachTextTurnsWithClient(client, sessionId)
+  const endState = args.buildEndState({ session, turns })
   const result = await client.query<AppVoiceCoachRdsSessionRow>(
     `
       update public.voice_coach_sessions
@@ -396,19 +534,19 @@ export async function endAliyunRdsVoiceCoachTextSessionWithClient(
       returning *
     `,
     [
-      requiredText(args.sessionId, "voice_coach_rds_session_id_required"),
+      sessionId,
       requiredText(args.userId, "voice_coach_rds_user_id_required"),
       requiredText(args.companyId, "voice_coach_rds_company_id_required"),
       requiredText(args.storeId, "voice_coach_rds_store_id_required"),
       requiredText(args.membershipId, "voice_coach_rds_membership_id_required"),
-      jsonbParam(args.report),
-      args.totalScore,
-      jsonbParam(args.dimensionScores),
+      jsonbParam(endState.report),
+      endState.totalScore,
+      jsonbParam(endState.dimensionScores),
     ],
   )
-  const session = result.rows[0]
-  if (!session) throw new Error("voice_coach_rds_session_end_failed")
-  return session
+  const endedSession = result.rows[0]
+  if (!endedSession) throw new Error("voice_coach_rds_session_end_failed")
+  return { deduped: false, report: endedSession.report_json, session: endedSession }
 }
 
 export async function listAliyunRdsVoiceCoachTextSessionHistoryWithClient(
@@ -548,6 +686,16 @@ async function insertAliyunRdsVoiceCoachTextTurnWithClient(
 
 function jsonbParam(value: unknown) {
   return JSON.stringify(value ?? null)
+}
+
+function recordValue(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {}
+}
+
+function normalizedComparableText(value: unknown) {
+  return String(value || "").trim()
 }
 
 function optionalText(value: unknown) {

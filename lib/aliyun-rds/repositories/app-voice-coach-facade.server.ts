@@ -991,13 +991,15 @@ export async function submitAppVoiceCoachTextBeauticianTurnResponse(opts: {
   if (shouldUseRdsRepository()) {
     const invalidSessionResponse = rdsSessionNotFoundResponse(opts.sessionId)
     if (invalidSessionResponse) return invalidSessionResponse
-    const rdsRepository = await loadRdsRepository()
-    const detail = await rdsRepository.getAliyunRdsVoiceCoachTextSession({
-      sessionId: opts.sessionId,
-      ...rdsScopeArgs(opts.ctx, opts.scope),
-    })
-    if (!detail) return jsonError(404, "voice_coach_session_not_found", "voice_coach_session_not_found")
-    if (detail.session.status === "ended") return jsonError(409, "voice_coach_session_ended", "voice_coach_session_ended")
+
+    const rawClientAttemptId = opts.body.client_attempt_id
+    const clientAttemptId = typeof rawClientAttemptId === "string" ? rawClientAttemptId.trim() : ""
+    if (!clientAttemptId) return jsonError(400, "client_attempt_id_required", "client_attempt_id_required")
+    if (clientAttemptId.length < 8 || clientAttemptId.length > 120) {
+      return jsonError(400, "client_attempt_id_invalid", "client_attempt_id_invalid")
+    }
+    const replyToTurnId = cleanText(opts.body.reply_to_turn_id, 160)
+    if (!replyToTurnId) return jsonError(400, "reply_to_turn_id_required", "reply_to_turn_id_required")
 
     const replyText = cleanText(
       opts.body.transcript_text || opts.body.text || opts.body.asr_text || opts.body.reply_text,
@@ -1005,28 +1007,32 @@ export async function submitAppVoiceCoachTextBeauticianTurnResponse(opts: {
     )
     if (!replyText) return jsonError(400, "beautician_turn_text_required", "beautician_turn_text_required")
 
-    const beauticianCountAfterSubmit = detail.turns.filter((turn) => turn.role === "beautician").length + 1
-    const reachedMaxTurns = beauticianCountAfterSubmit >= 2
-    const submitted = await rdsRepository.appendAliyunRdsVoiceCoachTextReply({
-      nextCustomerText: nextCustomerText(replyText, reachedMaxTurns) || null,
-      replyText,
-      sessionId: opts.sessionId,
-      ...rdsScopeArgs(opts.ctx, opts.scope),
-    })
+    const rdsRepository = await loadRdsRepository()
+    let submitted
+    try {
+      submitted = await rdsRepository.appendAliyunRdsVoiceCoachTextReply({
+        clientAttemptId,
+        nextCustomerText: nextCustomerText(replyText, false) || null,
+        replyText,
+        replyToTurnId,
+        sessionId: opts.sessionId,
+        ...rdsScopeArgs(opts.ctx, opts.scope),
+      })
+    } catch (error) {
+      const mutationError = rdsRepository.getAliyunRdsVoiceCoachMutationError(error)
+      if (mutationError) return jsonError(mutationError.status, mutationError.code, mutationError.code)
+      throw error
+    }
     return NextResponse.json({
       ok: true,
       context: appVoiceCoachContextPayload(opts.ctx, opts.scope),
       session_id: opts.sessionId,
       turn_id: submitted.beauticianTurn.id,
       job_id: null,
-      client_attempt_id: cleanText(opts.body.client_attempt_id, 120) || null,
-      next_cursor: rdsRepository.deriveAliyunRdsVoiceCoachTextEvents(detail.session, [
-        ...detail.turns,
-        submitted.beauticianTurn,
-        ...(submitted.nextCustomerTurn ? [submitted.nextCustomerTurn] : []),
-      ]).length,
-      reached_max_turns: reachedMaxTurns,
-      deduped: false,
+      client_attempt_id: clientAttemptId,
+      next_cursor: rdsRepository.deriveAliyunRdsVoiceCoachTextEvents(submitted.session, submitted.turns).length,
+      reached_max_turns: submitted.reachedMaxTurns,
+      deduped: submitted.deduped,
       server_advanced: Boolean(submitted.nextCustomerTurn),
       server_advanced_stage: submitted.nextCustomerTurn ? "next_customer_turn_ready" : "ready_to_end",
       beautician_turn: rdsTurnPayload(submitted.beauticianTurn),
@@ -1097,32 +1103,38 @@ export async function endAppVoiceCoachTextSessionResponse(opts: {
     const invalidSessionResponse = rdsSessionNotFoundResponse(opts.sessionId)
     if (invalidSessionResponse) return invalidSessionResponse
     const rdsRepository = await loadRdsRepository()
-    const detail = await rdsRepository.getAliyunRdsVoiceCoachTextSession({
-      sessionId: opts.sessionId,
-      ...rdsScopeArgs(opts.ctx, opts.scope),
-    })
-    if (!detail) return jsonError(404, "voice_coach_session_not_found", "voice_coach_session_not_found")
-
-    const textSession = rdsSessionAsTextSession({
-      repositoryMode: rdsRepository.APP_VOICE_COACH_RDS_REPOSITORY_MODE,
-      session: detail.session,
-      turns: detail.turns,
-    })
-    const report = reportForSession(textSession)
-    report.meta.generated_from = rdsRepository.APP_VOICE_COACH_RDS_REPOSITORY_MODE
-    const ended = await rdsRepository.endAliyunRdsVoiceCoachTextSession({
-      dimensionScores: report.dimension,
-      report,
-      sessionId: opts.sessionId,
-      totalScore: report.total_score,
-      ...rdsScopeArgs(opts.ctx, opts.scope),
-    })
+    let ended
+    try {
+      ended = await rdsRepository.endAliyunRdsVoiceCoachTextSession({
+        buildEndState: ({ session, turns }) => {
+          const textSession = rdsSessionAsTextSession({
+            repositoryMode: rdsRepository.APP_VOICE_COACH_RDS_REPOSITORY_MODE,
+            session,
+            turns,
+          })
+          const report = reportForSession(textSession)
+          report.meta.generated_from = rdsRepository.APP_VOICE_COACH_RDS_REPOSITORY_MODE
+          return {
+            dimensionScores: report.dimension,
+            report,
+            totalScore: report.total_score,
+          }
+        },
+        sessionId: opts.sessionId,
+        ...rdsScopeArgs(opts.ctx, opts.scope),
+      })
+    } catch (error) {
+      const mutationError = rdsRepository.getAliyunRdsVoiceCoachMutationError(error)
+      if (mutationError) return jsonError(mutationError.status, mutationError.code, mutationError.code)
+      throw error
+    }
     return NextResponse.json({
       ok: true,
       context: appVoiceCoachContextPayload(opts.ctx, opts.scope),
       session_id: opts.sessionId,
-      session: rdsSessionPayload(ended, rdsRepository.APP_VOICE_COACH_RDS_REPOSITORY_MODE),
-      report,
+      session: rdsSessionPayload(ended.session, rdsRepository.APP_VOICE_COACH_RDS_REPOSITORY_MODE),
+      report: ended.report,
+      deduped: ended.deduped,
       ...rdsContractPayload(rdsRepository.APP_VOICE_COACH_RDS_REPOSITORY_MODE),
     })
   }

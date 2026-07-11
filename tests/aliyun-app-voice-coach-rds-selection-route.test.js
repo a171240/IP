@@ -17,6 +17,9 @@ const SESSION_ID = "77777777-7777-4777-8777-777777777777"
 const CUSTOMER_PROFILE_ID = "11111111-1111-4111-8111-111111111111"
 const SCENE_CARD_ID = "22222222-2222-4222-8222-222222222222"
 const FOREIGN_ID = "88888888-8888-4888-8888-888888888888"
+const FIRST_ATTEMPT_ID = "attempt-0001"
+const SECOND_ATTEMPT_ID = "attempt-0002"
+const THIRD_ATTEMPT_ID = "attempt-0003"
 const testAccountContext = {
   accountStatus: "bound",
   userId: "app-user-route-rds-1",
@@ -150,6 +153,21 @@ function createRdsMock() {
     return null
   }
 
+  function mutationError(error) {
+    const byMessage = {
+      voice_coach_rds_session_not_found: { status: 404, code: "voice_coach_session_not_found" },
+      voice_coach_rds_session_end_failed: { status: 404, code: "voice_coach_session_not_found" },
+      voice_coach_rds_idempotency_conflict: { status: 409, code: "voice_coach_idempotency_conflict" },
+      voice_coach_rds_session_ended: { status: 409, code: "voice_coach_session_ended" },
+      voice_coach_rds_reply_target_stale: { status: 409, code: "voice_coach_reply_target_stale" },
+    }
+    return error instanceof Error ? byMessage[error.message] || null : null
+  }
+
+  function normalizedText(value) {
+    return String(value || "").trim()
+  }
+
   function turn(args) {
     return {
       id: `rds-turn-${args.turnIndex + 1}`,
@@ -163,17 +181,102 @@ function createRdsMock() {
       audio_seconds: null,
       asr_confidence: null,
       analysis_json: {},
-      features_json: {},
+      features_json: args.features || {},
     }
+  }
+
+  async function appendTextReply(name, args) {
+    remember(name, args)
+    const session = sessions.get(args.sessionId)
+    if (!belongsToScope(session, args)) throw new Error("voice_coach_rds_session_not_found")
+    const currentTurns = turns.get(args.sessionId) || []
+    const existing = currentTurns.find(
+      (item) => item.role === "beautician" && item.features_json?.client_attempt_id === args.clientAttemptId,
+    )
+    if (existing) {
+      if (
+        normalizedText(existing.text) !== normalizedText(args.replyText) ||
+        existing.features_json?.reply_to_turn_id !== args.replyToTurnId
+      ) {
+        throw new Error("voice_coach_rds_idempotency_conflict")
+      }
+      const nextCustomerTurn = currentTurns.find(
+        (item) => item.role === "customer" && item.turn_index === existing.turn_index + 1,
+      ) || null
+      return {
+        beauticianTurn: existing,
+        deduped: true,
+        nextCustomerTurn,
+        reachedMaxTurns: !nextCustomerTurn,
+        session,
+        turns: currentTurns,
+      }
+    }
+    if (session.status === "ended") throw new Error("voice_coach_rds_session_ended")
+
+    const latestTurn = currentTurns[currentTurns.length - 1]
+    if (!latestTurn || latestTurn.role !== "customer" || latestTurn.id !== args.replyToTurnId) {
+      throw new Error("voice_coach_rds_reply_target_stale")
+    }
+    const reachedMaxTurns = currentTurns.filter((item) => item.role === "beautician").length + 1 >= 2
+    const beauticianTurn = turn({
+      features: {
+        provider_mode: "text_only_no_audio_provider",
+        client_attempt_id: args.clientAttemptId,
+        reply_to_turn_id: args.replyToTurnId,
+      },
+      role: "beautician",
+      sessionId: args.sessionId,
+      text: args.replyText,
+      turnIndex: Math.max(...currentTurns.map((item) => item.turn_index), -1) + 1,
+    })
+    const nextCustomerTurn = !reachedMaxTurns && args.nextCustomerText
+      ? turn({
+          role: "customer",
+          sessionId: args.sessionId,
+          text: args.nextCustomerText,
+          turnIndex: beauticianTurn.turn_index + 1,
+        })
+      : null
+    const updatedTurns = nextCustomerTurn
+      ? [...currentTurns, beauticianTurn, nextCustomerTurn]
+      : [...currentTurns, beauticianTurn]
+    turns.set(args.sessionId, updatedTurns)
+    return {
+      beauticianTurn,
+      deduped: false,
+      nextCustomerTurn,
+      reachedMaxTurns,
+      session,
+      turns: updatedTurns,
+    }
+  }
+
+  async function endTextSession(name, args) {
+    remember(name, args)
+    const session = sessions.get(args.sessionId)
+    if (!belongsToScope(session, args)) throw new Error("voice_coach_rds_session_end_failed")
+    if (session.status === "ended") {
+      return { deduped: true, report: session.report_json, session }
+    }
+    const endState = args.buildEndState({ session, turns: turns.get(args.sessionId) || [] })
+    session.status = "ended"
+    session.ended_at = "2026-07-06T10:06:00.000Z"
+    session.report_json = endState.report
+    session.total_score = endState.totalScore
+    session.dimension_scores = endState.dimensionScores
+    return { deduped: false, report: session.report_json, session }
   }
 
   return {
     calls,
     callArgs,
     sessions,
+    turns,
     module: {
       APP_VOICE_COACH_RDS_REPOSITORY_MODE: mode,
       getAliyunRdsVoiceCoachSelectionErrorCode: selectionErrorCode,
+      getAliyunRdsVoiceCoachMutationError: mutationError,
       async createAliyunRdsVoiceCoachTextSession(args) {
         remember("createAliyunRdsVoiceCoachTextSession", args)
         args.timing?.recordStage("rds_mock_create", Date.now())
@@ -240,70 +343,16 @@ function createRdsMock() {
         return { session, turns: turns.get(args.sessionId) || [] }
       },
       async appendAliyunRdsVoiceCoachTextReplyWithClient(_client, args) {
-        remember("appendAliyunRdsVoiceCoachTextReplyWithClient", args)
-        const session = sessions.get(args.sessionId)
-        if (!belongsToScope(session, args)) throw new Error("voice_coach_rds_session_not_found")
-        const currentTurns = turns.get(args.sessionId) || []
-        const beauticianTurn = turn({
-          role: "beautician",
-          sessionId: args.sessionId,
-          text: args.replyText,
-          turnIndex: currentTurns.length,
-        })
-        const nextCustomerTurn = args.nextCustomerText
-          ? turn({
-              role: "customer",
-              sessionId: args.sessionId,
-              text: args.nextCustomerText,
-              turnIndex: currentTurns.length + 1,
-            })
-          : null
-        turns.set(args.sessionId, nextCustomerTurn ? [...currentTurns, beauticianTurn, nextCustomerTurn] : [...currentTurns, beauticianTurn])
-        return { beauticianTurn, nextCustomerTurn }
+        return appendTextReply("appendAliyunRdsVoiceCoachTextReplyWithClient", args)
       },
       async appendAliyunRdsVoiceCoachTextReply(args) {
-        remember("appendAliyunRdsVoiceCoachTextReply", args)
-        const session = sessions.get(args.sessionId)
-        if (!belongsToScope(session, args)) throw new Error("voice_coach_rds_session_not_found")
-        const currentTurns = turns.get(args.sessionId) || []
-        const beauticianTurn = turn({
-          role: "beautician",
-          sessionId: args.sessionId,
-          text: args.replyText,
-          turnIndex: currentTurns.length,
-        })
-        const nextCustomerTurn = args.nextCustomerText
-          ? turn({
-              role: "customer",
-              sessionId: args.sessionId,
-              text: args.nextCustomerText,
-              turnIndex: currentTurns.length + 1,
-            })
-          : null
-        turns.set(args.sessionId, nextCustomerTurn ? [...currentTurns, beauticianTurn, nextCustomerTurn] : [...currentTurns, beauticianTurn])
-        return { beauticianTurn, nextCustomerTurn }
+        return appendTextReply("appendAliyunRdsVoiceCoachTextReply", args)
       },
       async endAliyunRdsVoiceCoachTextSessionWithClient(_client, args) {
-        remember("endAliyunRdsVoiceCoachTextSessionWithClient", args)
-        const session = sessions.get(args.sessionId)
-        if (!belongsToScope(session, args)) throw new Error("voice_coach_rds_session_end_failed")
-        session.status = "ended"
-        session.ended_at = "2026-07-06T10:06:00.000Z"
-        session.report_json = args.report
-        session.total_score = args.totalScore
-        session.dimension_scores = args.dimensionScores
-        return session
+        return endTextSession("endAliyunRdsVoiceCoachTextSessionWithClient", args)
       },
       async endAliyunRdsVoiceCoachTextSession(args) {
-        remember("endAliyunRdsVoiceCoachTextSession", args)
-        const session = sessions.get(args.sessionId)
-        if (!belongsToScope(session, args)) throw new Error("voice_coach_rds_session_end_failed")
-        session.status = "ended"
-        session.ended_at = "2026-07-06T10:06:00.000Z"
-        session.report_json = args.report
-        session.total_score = args.totalScore
-        session.dimension_scores = args.dimensionScores
-        return session
+        return endTextSession("endAliyunRdsVoiceCoachTextSession", args)
       },
       async listAliyunRdsVoiceCoachTextSessionHistoryWithClient(_client, args) {
         remember("listAliyunRdsVoiceCoachTextSessionHistoryWithClient", args)
@@ -527,8 +576,11 @@ test("VC-L4-05 route handlers use explicit RDS repository selection when configu
   assert.equal(detail.session.context.service_name, created.session_context.service_name)
   assert.equal(detail.turns[0].turn_id, "rds-turn-1")
 
+  const submitCallOffset = rdsMock.calls.length
   const submitResponse = await submitRoute.POST(
     request(`https://local.test/api/app/voice-coach/sessions/${created.session_id}/beautician-turn/submit`, {
+      client_attempt_id: FIRST_ATTEMPT_ID,
+      reply_to_turn_id: detail.turns[0].turn_id,
       transcript_text: "我会先确认敏感风险，再从低刺激护理开始。",
     }),
     sessionContext(created.session_id),
@@ -536,8 +588,14 @@ test("VC-L4-05 route handlers use explicit RDS repository selection when configu
   const submitted = await payload(submitResponse)
   assert.equal(submitResponse.status, 200)
   assert.equal(submitted.repository_mode, "rds_voice_coach_text_session_contract")
+  assert.equal(submitted.client_attempt_id, FIRST_ATTEMPT_ID)
+  assert.equal(submitted.deduped, false)
   assert.equal(submitted.beautician_turn.turn_id, "rds-turn-2")
   assert.equal(submitted.next_customer_turn.turn_id, "rds-turn-3")
+  assert.deepEqual(
+    rdsMock.calls.slice(submitCallOffset),
+    ["appendAliyunRdsVoiceCoachTextReply", "deriveAliyunRdsVoiceCoachTextEvents"],
+  )
 
   const eventsResponse = await eventsRoute.GET(
     request(`https://local.test/api/app/voice-coach/sessions/${created.session_id}/events?cursor=0`),
@@ -550,6 +608,7 @@ test("VC-L4-05 route handlers use explicit RDS repository selection when configu
     ["session.created", "beautician_turn.submitted", "customer_turn.ready"],
   )
 
+  const endCallOffset = rdsMock.calls.length
   const endResponse = await endRoute.POST(
     request(`https://local.test/api/app/voice-coach/sessions/${created.session_id}/end`, {}),
     sessionContext(created.session_id),
@@ -558,6 +617,8 @@ test("VC-L4-05 route handlers use explicit RDS repository selection when configu
   assert.equal(endResponse.status, 200)
   assert.equal(ended.repository_mode, "rds_voice_coach_text_session_contract")
   assert.equal(ended.session.status, "ended")
+  assert.equal(ended.deduped, false)
+  assert.deepEqual(rdsMock.calls.slice(endCallOffset), ["endAliyunRdsVoiceCoachTextSession"])
 
   const reportResponse = await reportRoute.GET(
     request(`https://local.test/api/app/voice-coach/sessions/${created.session_id}/report`),
@@ -578,6 +639,170 @@ test("VC-L4-05 route handlers use explicit RDS repository selection when configu
   assert.equal(list.sessions[0].service_name, created.session_context.service_name)
   assert(rdsMock.calls.includes("listAliyunRdsVoiceCoachTextSessionHistory"))
   assertAuthorizationChecks(7)
+})
+
+test("VC-L4-06 RDS submit requires bounded attempt and reply target without repository access", async (t) => {
+  resetAuthorizationChecks()
+  const { helperExports, rdsMock } = compileHelperWithRdsMock(t)
+  const submitRoute = routeModule(
+    helperExports,
+    "app",
+    "api",
+    "app",
+    "voice-coach",
+    "sessions",
+    "[sessionId]",
+    "beautician-turn",
+    "submit",
+    "route.ts",
+  )
+  const cases = [
+    [{ reply_to_turn_id: "rds-turn-1", transcript_text: "回答" }, "client_attempt_id_required"],
+    [{ client_attempt_id: "short", reply_to_turn_id: "rds-turn-1", transcript_text: "回答" }, "client_attempt_id_invalid"],
+    [
+      { client_attempt_id: "a".repeat(121), reply_to_turn_id: "rds-turn-1", transcript_text: "回答" },
+      "client_attempt_id_invalid",
+    ],
+    [{ client_attempt_id: FIRST_ATTEMPT_ID, transcript_text: "回答" }, "reply_to_turn_id_required"],
+  ]
+
+  for (const [body, code] of cases) {
+    rdsMock.calls.length = 0
+    rdsMock.callArgs.length = 0
+    const response = await submitRoute.POST(
+      request(`https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/beautician-turn/submit`, body),
+      sessionContext(SESSION_ID),
+    )
+    const responseBody = await payload(response)
+    assert.equal(response.status, 400)
+    assert.equal(responseBody.error, code)
+    assert.equal(responseBody.code, code)
+    assert.deepEqual(rdsMock.calls, [])
+  }
+})
+
+test("VC-L4-06 RDS submit and end retries are idempotent without transaction-external detail", async (t) => {
+  resetAuthorizationChecks()
+  const { helperExports, rdsMock } = compileHelperWithRdsMock(t)
+  const sessionsRoute = routeModule(helperExports, "app", "api", "app", "voice-coach", "sessions", "route.ts")
+  const submitRoute = routeModule(
+    helperExports,
+    "app",
+    "api",
+    "app",
+    "voice-coach",
+    "sessions",
+    "[sessionId]",
+    "beautician-turn",
+    "submit",
+    "route.ts",
+  )
+  const endRoute = routeModule(helperExports, "app", "api", "app", "voice-coach", "sessions", "[sessionId]", "end", "route.ts")
+
+  const createdResponse = await sessionsRoute.POST(
+    request("https://local.test/api/app/voice-coach/sessions", { scenario_id: "objection_safety" }),
+  )
+  assert.equal(createdResponse.status, 201)
+  rdsMock.calls.length = 0
+  rdsMock.callArgs.length = 0
+
+  async function submit(body) {
+    const response = await submitRoute.POST(
+      request(`https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/beautician-turn/submit`, body),
+      sessionContext(SESSION_ID),
+    )
+    return { response, body: await payload(response) }
+  }
+
+  const firstPayload = {
+    client_attempt_id: FIRST_ATTEMPT_ID,
+    reply_to_turn_id: "rds-turn-1",
+    transcript_text: "我会  先确认敏感风险，再从低刺激护理开始。",
+  }
+  const first = await submit(firstPayload)
+  assert.equal(first.response.status, 200)
+  assert.equal(first.body.deduped, false)
+  assert.equal(first.body.reached_max_turns, false)
+  assert.equal(rdsMock.turns.get(SESSION_ID).length, 3)
+
+  const retry = await submit({ ...firstPayload, transcript_text: `  ${firstPayload.transcript_text}  ` })
+  assert.equal(retry.response.status, 200)
+  assert.equal(retry.body.deduped, true)
+  assert.equal(retry.body.beautician_turn.turn_id, first.body.beautician_turn.turn_id)
+  assert.equal(retry.body.next_customer_turn.turn_id, first.body.next_customer_turn.turn_id)
+  assert.equal(rdsMock.turns.get(SESSION_ID).length, 3)
+
+  const internalWhitespaceConflict = await submit({
+    ...firstPayload,
+    transcript_text: "我会 先确认敏感风险，再从低刺激护理开始。",
+  })
+  assert.equal(internalWhitespaceConflict.response.status, 409)
+  assert.equal(internalWhitespaceConflict.body.code, "voice_coach_idempotency_conflict")
+  assert.equal(rdsMock.turns.get(SESSION_ID).length, 3)
+
+  const textConflict = await submit({ ...firstPayload, transcript_text: "同一 attempt 的不同回答" })
+  assert.equal(textConflict.response.status, 409)
+  assert.equal(textConflict.body.code, "voice_coach_idempotency_conflict")
+  const targetConflict = await submit({ ...firstPayload, reply_to_turn_id: first.body.next_customer_turn.turn_id })
+  assert.equal(targetConflict.response.status, 409)
+  assert.equal(targetConflict.body.code, "voice_coach_idempotency_conflict")
+
+  const stale = await submit({
+    client_attempt_id: SECOND_ATTEMPT_ID,
+    reply_to_turn_id: "rds-turn-1",
+    transcript_text: "新的回答",
+  })
+  assert.equal(stale.response.status, 409)
+  assert.equal(stale.body.code, "voice_coach_reply_target_stale")
+
+  const second = await submit({
+    client_attempt_id: SECOND_ATTEMPT_ID,
+    reply_to_turn_id: first.body.next_customer_turn.turn_id,
+    transcript_text: "这是针对最新顾客问题的回答",
+  })
+  assert.equal(second.response.status, 200)
+  assert.equal(second.body.reached_max_turns, true)
+  assert.equal(second.body.next_customer_turn, null)
+
+  const overLimit = await submit({
+    client_attempt_id: THIRD_ATTEMPT_ID,
+    reply_to_turn_id: first.body.next_customer_turn.turn_id,
+    transcript_text: "达到上限后的第三次回答",
+  })
+  assert.equal(overLimit.response.status, 409)
+  assert.equal(overLimit.body.code, "voice_coach_reply_target_stale")
+  assert.equal(rdsMock.turns.get(SESSION_ID).length, 4)
+
+  const firstEndResponse = await endRoute.POST(
+    request(`https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/end`),
+    sessionContext(SESSION_ID),
+  )
+  const firstEnd = await payload(firstEndResponse)
+  assert.equal(firstEndResponse.status, 200)
+  assert.equal(firstEnd.deduped, false)
+  const retryEndResponse = await endRoute.POST(
+    request(`https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/end`),
+    sessionContext(SESSION_ID),
+  )
+  const retryEnd = await payload(retryEndResponse)
+  assert.equal(retryEndResponse.status, 200)
+  assert.equal(retryEnd.deduped, true)
+  assert.equal(retryEnd.session.ended_at, firstEnd.session.ended_at)
+  assert.deepEqual(retryEnd.report, firstEnd.report)
+
+  const retryAfterEnd = await submit(firstPayload)
+  assert.equal(retryAfterEnd.response.status, 200)
+  assert.equal(retryAfterEnd.body.deduped, true)
+  const newAttemptAfterEnd = await submit({
+    client_attempt_id: THIRD_ATTEMPT_ID,
+    reply_to_turn_id: first.body.next_customer_turn.turn_id,
+    transcript_text: "结束后的新 attempt",
+  })
+  assert.equal(newAttemptAfterEnd.response.status, 409)
+  assert.equal(newAttemptAfterEnd.body.code, "voice_coach_session_ended")
+
+  assert(!rdsMock.calls.includes("getAliyunRdsVoiceCoachTextSession"))
+  assert.equal(rdsMock.turns.get(SESSION_ID).length, 4)
 })
 
 test("VC-L4-05 route repository selection fails fast on unknown mode", async (t) => {
@@ -664,6 +889,8 @@ test("VC-L4-05 route fails closed when company, store, or membership changes aft
       eventsRoute.GET(request(`https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/events`), sessionContext(SESSION_ID)),
       submitRoute.POST(
         request(`https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/beautician-turn/submit`, {
+          client_attempt_id: `${dimension}-attempt-0001`,
+          reply_to_turn_id: "rds-turn-1",
           transcript_text: "不应写入",
         }),
         sessionContext(SESSION_ID),
@@ -676,8 +903,8 @@ test("VC-L4-05 route fails closed when company, store, or membership changes aft
       assert.equal(response.status, 404, `${dimension} change must fail closed`)
       assert.equal(body.code, "voice_coach_session_not_found")
     }
-    assert(!rdsMock.calls.includes("appendAliyunRdsVoiceCoachTextReply"))
-    assert(!rdsMock.calls.includes("endAliyunRdsVoiceCoachTextSession"))
+    assert.equal(rdsMock.calls.filter((name) => name === "appendAliyunRdsVoiceCoachTextReply").length, 1)
+    assert.equal(rdsMock.calls.filter((name) => name === "endAliyunRdsVoiceCoachTextSession").length, 1)
     assert.equal(originalSession.status, "active", `${dimension} change must not end original session`)
     assert.equal(originalSession.report_json, null, `${dimension} change must not write original report`)
   }

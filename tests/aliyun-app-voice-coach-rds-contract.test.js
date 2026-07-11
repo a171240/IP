@@ -18,6 +18,9 @@ const STORE_ID = "55555555-5555-4555-8555-555555555555"
 const MEMBERSHIP_ID = "66666666-6666-4666-8666-666666666666"
 const SESSION_ID = "77777777-7777-4777-8777-777777777777"
 const FOREIGN_ID = "88888888-8888-4888-8888-888888888888"
+const FIRST_ATTEMPT_ID = "attempt-0001"
+const SECOND_ATTEMPT_ID = "attempt-0002"
+const THIRD_ATTEMPT_ID = "attempt-0003"
 
 const SESSION_SCOPE = {
   companyId: COMPANY_ID,
@@ -165,6 +168,23 @@ class FakeVoiceCoachRdsClient {
       }
     }
 
+    if (
+      sql.startsWith("select * from public.voice_coach_turns where session_id = $1") &&
+      sql.includes("features_json") &&
+      sql.includes("client_attempt_id")
+    ) {
+      return {
+        rows: this.turns
+          .filter((turn) =>
+            turn.session_id === values[0] &&
+            turn.role === "beautician" &&
+            turn.features_json?.client_attempt_id === values[1],
+          )
+          .sort((left, right) => left.turn_index - right.turn_index)
+          .slice(0, 1),
+      }
+    }
+
     if (sql.startsWith("select * from public.voice_coach_turns where session_id = $1")) {
       return {
         rows: this.turns
@@ -271,11 +291,15 @@ test("VC-L4-04 RDS repository persists four-dimensional scope and a user-owned s
   assert.equal(detailAfterCreate.turns.length, 1)
 
   const submitted = await repository.appendAliyunRdsVoiceCoachTextReplyWithClient(client, {
+    clientAttemptId: FIRST_ATTEMPT_ID,
     nextCustomerText: "那如果我中途觉得刺痛，你们会怎么处理？",
     replyText: "我会先确认敏感风险，再从低刺激护理开始。",
+    replyToTurnId: created.firstCustomerTurn.id,
     sessionId: created.session.id,
     ...SESSION_SCOPE,
   })
+  assert.equal(submitted.deduped, false)
+  assert.equal(submitted.reachedMaxTurns, false)
   assert.equal(submitted.beauticianTurn.role, "beautician")
   assert.equal(submitted.nextCustomerTurn.role, "customer")
   assert.equal(submitted.nextCustomerTurn.turn_index, 2)
@@ -290,13 +314,17 @@ test("VC-L4-04 RDS repository persists four-dimensional scope and a user-owned s
     ["session.created", "beautician_turn.submitted", "customer_turn.ready"],
   )
 
-  const ended = await repository.endAliyunRdsVoiceCoachTextSessionWithClient(client, {
-    dimensionScores: [{ key: "empathy", score: 82 }],
-    report: { status: "ready", total_score: 82, tabs: { transcript: [] } },
+  const endedResult = await repository.endAliyunRdsVoiceCoachTextSessionWithClient(client, {
+    buildEndState: () => ({
+      dimensionScores: [{ key: "empathy", score: 82 }],
+      report: { status: "ready", total_score: 82, tabs: { transcript: [] } },
+      totalScore: 82,
+    }),
     sessionId: created.session.id,
-    totalScore: 82,
     ...SESSION_SCOPE,
   })
+  const ended = endedResult.session
+  assert.equal(endedResult.deduped, false)
   assert.equal(ended.status, "ended")
   assert.equal(ended.report_json.status, "ready")
 
@@ -345,7 +373,9 @@ test("VC-L4-04 RDS repository fails closed across every tenant dimension and leg
     )
     await assert.rejects(
       repository.appendAliyunRdsVoiceCoachTextReplyWithClient(client, {
+        clientAttemptId: FIRST_ATTEMPT_ID,
         replyText: "不应写入",
+        replyToTurnId: created.firstCustomerTurn.id,
         sessionId: created.session.id,
         ...changedScope,
       }),
@@ -354,10 +384,12 @@ test("VC-L4-04 RDS repository fails closed across every tenant dimension and leg
     )
     await assert.rejects(
       repository.endAliyunRdsVoiceCoachTextSessionWithClient(client, {
-        dimensionScores: [],
-        report: { status: "must_not_persist" },
+        buildEndState: () => ({
+          dimensionScores: [],
+          report: { status: "must_not_persist" },
+          totalScore: 0,
+        }),
         sessionId: created.session.id,
-        totalScore: 0,
         ...changedScope,
       }),
       /voice_coach_rds_session_end_failed/,
@@ -367,11 +399,12 @@ test("VC-L4-04 RDS repository fails closed across every tenant dimension and leg
     assert.equal(created.session.report_json, null, `${dimension} change must not write the original report`)
   }
 
-  const endQueries = client.queries.filter((query) => query.text.startsWith("update public.voice_coach_sessions"))
-  assert.equal(endQueries.length, scopeChanges.length)
-  for (const query of endQueries) {
+  const mutationLocks = client.queries.filter((query) => /voice_coach_sessions.*for update$/.test(query.text))
+  assert.equal(mutationLocks.length, scopeChanges.length * 2)
+  for (const query of mutationLocks) {
     assert.match(query.text, /company_id = \$3 and store_id = \$4 and membership_id = \$5/)
   }
+  assert.equal(client.queries.filter((query) => query.text.startsWith("update public.voice_coach_sessions")).length, 0)
 
   client.sessions.push({
     ...created.session,
@@ -387,6 +420,188 @@ test("VC-L4-04 RDS repository fails closed across every tenant dimension and leg
     }),
     null,
   )
+})
+
+test("VC-L4-06 RDS submit is transaction-locked and idempotent across repository instances", async () => {
+  const firstRepositoryInstance = compileRepository()
+  const secondRepositoryInstance = compileRepository()
+  const client = new FakeVoiceCoachRdsClient()
+  const created = await firstRepositoryInstance.createAliyunRdsVoiceCoachTextSessionWithClient(client, createArgs())
+  const queryOffset = client.queries.length
+
+  const first = await firstRepositoryInstance.appendAliyunRdsVoiceCoachTextReplyWithClient(client, {
+    clientAttemptId: FIRST_ATTEMPT_ID,
+    nextCustomerText: "那如果我中途觉得刺痛，你们会怎么处理？",
+    replyText: "我会  先确认敏感风险，再从低刺激护理开始。",
+    replyToTurnId: created.firstCustomerTurn.id,
+    sessionId: created.session.id,
+    ...SESSION_SCOPE,
+  })
+  assert.equal(first.deduped, false)
+  assert.equal(first.reachedMaxTurns, false)
+  assert.equal(first.turns.length, 3)
+  assert.deepEqual(first.beauticianTurn.features_json, {
+    provider_mode: "text_only_no_audio_provider",
+    client_attempt_id: FIRST_ATTEMPT_ID,
+    reply_to_turn_id: created.firstCustomerTurn.id,
+  })
+
+  const firstMutationQueries = client.queries.slice(queryOffset)
+  assert.match(firstMutationQueries[0].text, /for update$/)
+  assert.match(firstMutationQueries[1].text, /features_json.*client_attempt_id/)
+  assert(!firstMutationQueries.some((query) => /max\(turn_index\)/.test(query.text)))
+
+  const turnCountAfterFirstSubmit = client.turns.length
+  const deduped = await secondRepositoryInstance.appendAliyunRdsVoiceCoachTextReplyWithClient(client, {
+    clientAttemptId: FIRST_ATTEMPT_ID,
+    nextCustomerText: "不应覆盖首次生成的下一句",
+    replyText: "  我会  先确认敏感风险，再从低刺激护理开始。  ",
+    replyToTurnId: created.firstCustomerTurn.id,
+    sessionId: created.session.id,
+    ...SESSION_SCOPE,
+  })
+  assert.equal(deduped.deduped, true)
+  assert.equal(deduped.beauticianTurn.id, first.beauticianTurn.id)
+  assert.equal(deduped.nextCustomerTurn.id, first.nextCustomerTurn.id)
+  assert.equal(client.turns.length, turnCountAfterFirstSubmit)
+
+  await assert.rejects(
+    secondRepositoryInstance.appendAliyunRdsVoiceCoachTextReplyWithClient(client, {
+      clientAttemptId: FIRST_ATTEMPT_ID,
+      nextCustomerText: "不会写入",
+      replyText: "我会 先确认敏感风险，再从低刺激护理开始。",
+      replyToTurnId: created.firstCustomerTurn.id,
+      sessionId: created.session.id,
+      ...SESSION_SCOPE,
+    }),
+    /voice_coach_rds_idempotency_conflict/,
+  )
+  assert.equal(client.turns.length, turnCountAfterFirstSubmit)
+
+  await assert.rejects(
+    secondRepositoryInstance.appendAliyunRdsVoiceCoachTextReplyWithClient(client, {
+      clientAttemptId: FIRST_ATTEMPT_ID,
+      nextCustomerText: "不会写入",
+      replyText: "同一 attempt 的不同文本",
+      replyToTurnId: created.firstCustomerTurn.id,
+      sessionId: created.session.id,
+      ...SESSION_SCOPE,
+    }),
+    /voice_coach_rds_idempotency_conflict/,
+  )
+  await assert.rejects(
+    secondRepositoryInstance.appendAliyunRdsVoiceCoachTextReplyWithClient(client, {
+      clientAttemptId: FIRST_ATTEMPT_ID,
+      nextCustomerText: "不会写入",
+      replyText: "我会  先确认敏感风险，再从低刺激护理开始。",
+      replyToTurnId: first.nextCustomerTurn.id,
+      sessionId: created.session.id,
+      ...SESSION_SCOPE,
+    }),
+    /voice_coach_rds_idempotency_conflict/,
+  )
+  await assert.rejects(
+    firstRepositoryInstance.appendAliyunRdsVoiceCoachTextReplyWithClient(client, {
+      clientAttemptId: SECOND_ATTEMPT_ID,
+      nextCustomerText: "不会写入",
+      replyText: "新的回答",
+      replyToTurnId: created.firstCustomerTurn.id,
+      sessionId: created.session.id,
+      ...SESSION_SCOPE,
+    }),
+    /voice_coach_rds_reply_target_stale/,
+  )
+
+  const second = await firstRepositoryInstance.appendAliyunRdsVoiceCoachTextReplyWithClient(client, {
+    clientAttemptId: SECOND_ATTEMPT_ID,
+    nextCustomerText: "达到上限后不应插入",
+    replyText: "这是针对最新顾客问题的回答",
+    replyToTurnId: first.nextCustomerTurn.id,
+    sessionId: created.session.id,
+    ...SESSION_SCOPE,
+  })
+  assert.equal(second.deduped, false)
+  assert.equal(second.reachedMaxTurns, true)
+  assert.equal(second.nextCustomerTurn, null)
+
+  await assert.rejects(
+    secondRepositoryInstance.appendAliyunRdsVoiceCoachTextReplyWithClient(client, {
+      clientAttemptId: THIRD_ATTEMPT_ID,
+      nextCustomerText: "不会写入",
+      replyText: "达到上限后的第三次回答",
+      replyToTurnId: first.nextCustomerTurn.id,
+      sessionId: created.session.id,
+      ...SESSION_SCOPE,
+    }),
+    /voice_coach_rds_reply_target_stale/,
+  )
+  assert.equal(client.turns.length, 4)
+
+  created.session.status = "ended"
+  const dedupedAfterEnd = await secondRepositoryInstance.appendAliyunRdsVoiceCoachTextReplyWithClient(client, {
+    clientAttemptId: FIRST_ATTEMPT_ID,
+    nextCustomerText: "不会覆盖",
+    replyText: "我会  先确认敏感风险，再从低刺激护理开始。",
+    replyToTurnId: created.firstCustomerTurn.id,
+    sessionId: created.session.id,
+    ...SESSION_SCOPE,
+  })
+  assert.equal(dedupedAfterEnd.deduped, true)
+  await assert.rejects(
+    secondRepositoryInstance.appendAliyunRdsVoiceCoachTextReplyWithClient(client, {
+      clientAttemptId: THIRD_ATTEMPT_ID,
+      nextCustomerText: "不会写入",
+      replyText: "结束后的新 attempt",
+      replyToTurnId: first.nextCustomerTurn.id,
+      sessionId: created.session.id,
+      ...SESSION_SCOPE,
+    }),
+    /voice_coach_rds_session_ended/,
+  )
+  assert.equal(client.turns.length, 4)
+})
+
+test("VC-L4-06 RDS end retries return the first persisted report without rewriting", async () => {
+  const firstRepositoryInstance = compileRepository()
+  const secondRepositoryInstance = compileRepository()
+  const client = new FakeVoiceCoachRdsClient()
+  const created = await firstRepositoryInstance.createAliyunRdsVoiceCoachTextSessionWithClient(client, createArgs())
+  let buildCount = 0
+
+  const first = await firstRepositoryInstance.endAliyunRdsVoiceCoachTextSessionWithClient(client, {
+    buildEndState: ({ turns }) => {
+      buildCount += 1
+      return {
+        dimensionScores: [{ key: "empathy", score: 82 }],
+        report: { status: "ready", total_score: 82, turn_count: turns.length },
+        totalScore: 82,
+      }
+    },
+    sessionId: created.session.id,
+    ...SESSION_SCOPE,
+  })
+  const firstEndedAt = first.session.ended_at
+  assert.equal(first.deduped, false)
+  assert.equal(first.report.total_score, 82)
+
+  const retried = await secondRepositoryInstance.endAliyunRdsVoiceCoachTextSessionWithClient(client, {
+    buildEndState: () => {
+      buildCount += 1
+      return {
+        dimensionScores: [{ key: "must_not_persist", score: 0 }],
+        report: { status: "must_not_persist", total_score: 0 },
+        totalScore: 0,
+      }
+    },
+    sessionId: created.session.id,
+    ...SESSION_SCOPE,
+  })
+  assert.equal(retried.deduped, true)
+  assert.equal(retried.session.ended_at, firstEndedAt)
+  assert.deepEqual(retried.report, first.report)
+  assert.equal(buildCount, 1)
+  assert.equal(client.queries.filter((query) => query.text.startsWith("update public.voice_coach_sessions")).length, 1)
+  assert.equal(client.queries.filter((query) => /voice_coach_sessions.*for update$/.test(query.text)).length, 2)
 })
 
 test("VC-L4-04 RDS repository rejects foreign customer and scene selections", async () => {
