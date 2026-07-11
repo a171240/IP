@@ -318,7 +318,7 @@ function compilePreviewRoute(repository) {
   })
 }
 
-function compileAcceptRoute(repository, authOverrides = {}) {
+function compileAcceptRoute(repository, authOverrides = {}, accountProfileOverrides = {}) {
   return compileTsModule(acceptRoutePath, {
     "next/server": nextServerStub,
     "@/lib/aliyun-rds/app-auth.server": {
@@ -328,6 +328,10 @@ function compileAcceptRoute(repository, authOverrides = {}) {
       ...authOverrides,
     },
     "@/lib/aliyun-rds/postgres.server": routePostgresStub,
+    "@/lib/aliyun-rds/repositories/account-profile.server": {
+      getAliyunRdsAppAccountContext: async () => appAccountContext({ userId: "invitee-user" }),
+      ...accountProfileOverrides,
+    },
     "@/lib/aliyun-rds/repositories/store-invites.server": repository,
   })
 }
@@ -341,10 +345,13 @@ function compileQrcodeRoute(repository, createMiniProgramCode) {
   })
 }
 
-function compileCreateRoute(repository) {
+function compileCreateRoute(repository, postgresOverrides = {}) {
   return compileTsModule(createRoutePath, {
     "next/server": nextServerStub,
-    "@/lib/aliyun-rds/postgres.server": routePostgresStub,
+    "@/lib/aliyun-rds/postgres.server": {
+      ...routePostgresStub,
+      ...postgresOverrides,
+    },
     "@/lib/aliyun-rds/repositories/store-admin.server": {
       resolveAliyunRdsStoreManagerAuth: async () => ({
         ok: true,
@@ -833,6 +840,98 @@ test("accept route authenticates before resolving token params", async () => {
   assert.equal(acceptCalls, 0)
 })
 
+test("accept route maps suspended and inactive accounts to role_denied before params or repository writes", async () => {
+  for (const accountStatus of ["suspended", "inactive"]) {
+    const events = []
+    const transaction = transactionClient({
+      invite: inviteRow(),
+      company: companyRow(),
+      store: storeRow(),
+      membership: membershipRow(),
+      upsertedMembership: membershipRow(),
+    })
+    const { counters, repository } = repositoryHarness({ client: transaction.client })
+    const route = compileAcceptRoute(repository, {
+      resolveAliyunRdsAppAuthUser: async () => {
+        events.push("auth")
+        return { user: { id: "invitee-user" } }
+      },
+    }, {
+      getAliyunRdsAppAccountContext: async () => {
+        events.push("account")
+        return appAccountContext({ accountStatus, userId: "invitee-user" })
+      },
+    })
+    const params = {
+      then(resolve) {
+        events.push("params")
+        resolve({ token: "sensitive-token" })
+      },
+    }
+
+    const response = await route.POST(
+      request("https://local.invalid/api/app/store-admin/invites/token/accept"),
+      { params },
+    )
+
+    assert.deepEqual({
+      status: response.status,
+      body: response.body,
+      events,
+      transactionCalls: counters.transactionCalls,
+      transactionWrites: transaction.writes,
+    }, {
+      status: 403,
+      body: { ok: false, code: "role_denied" },
+      events: ["auth", "account"],
+      transactionCalls: 0,
+      transactionWrites: [],
+    }, accountStatus)
+  }
+})
+
+test("accept route lets recovery account states reach a valid invite", async () => {
+  const cases = [
+    { name: "not_bound", accountStatus: "not_bound", role: null },
+    { name: "customer", accountStatus: "role_denied", role: "customer" },
+    { name: "unknown_role", accountStatus: "role_denied", role: "legacy_unknown_role" },
+  ]
+
+  for (const item of cases) {
+    const events = []
+    const baseRepository = repositoryHarness().repository
+    const route = compileAcceptRoute(routeRepositoryStub(baseRepository, {
+      acceptAliyunRdsStoreInvite: async () => {
+        events.push("accept")
+        return { ok: true, recovery: item.name }
+      },
+    }), {
+      resolveAliyunRdsAppAuthUser: async () => {
+        events.push("auth")
+        return { user: { id: "invitee-user" } }
+      },
+    }, {
+      getAliyunRdsAppAccountContext: async () => {
+        events.push("account")
+        return appAccountContext({
+          accountStatus: item.accountStatus,
+          role: item.role,
+          userId: "invitee-user",
+        })
+      },
+    })
+
+    const response = await route.POST(
+      request("https://local.invalid/api/app/store-admin/invites/token/accept"),
+      { params: Promise.resolve({ token: "valid-token" }) },
+    )
+
+    assert.equal(response.status, 200, item.name)
+    assert.deepEqual(response.body, { ok: true, recovery: item.name }, item.name)
+    assert.deepEqual(events, ["auth", "account", "accept"], item.name)
+  }
+})
+
 test("accept locks parents then rejects every unusable reason before membership work", async () => {
   const cases = [
     {
@@ -1241,6 +1340,93 @@ test("create rejects company role with store before any query or insert", async 
   }))
 
   assert.equal(response.status, 400)
-  assert.equal(response.body.code, "store_id_not_allowed")
+  assert.deepEqual(response.body, { ok: false, code: "store_id_not_allowed" })
   assert.equal(counters.topLevelQueries, 0)
+})
+
+test("create route projects the exact App success contract without repository context", async () => {
+  const baseRepository = repositoryHarness().repository
+  const invite = {
+    ...inviteRow(),
+    role_label: "员工",
+    company_name: "公司一",
+    store_name: "门店一",
+  }
+  const route = compileCreateRoute(routeRepositoryStub(baseRepository, {
+    createAliyunRdsStoreInvite: async () => ({
+      ok: true,
+      context: { unsafe_repository_context: RAW_MARKER },
+      invite,
+      token: "fixture-invite-token",
+      path: "/pages/store-admin/invite-accept/index?token=fixture-invite-token",
+    }),
+  }))
+
+  const response = await route.POST(request("https://local.invalid/api/app/store-admin/invites", {
+    role: "employee",
+    store_id: "store-1",
+  }))
+
+  assert.equal(response.status, 200)
+  assert.deepEqual(response.body, {
+    ok: true,
+    invite,
+    token: "fixture-invite-token",
+    path: "/pages/store-admin/invite-accept/index?token=fixture-invite-token",
+  })
+  assert.equal(JSON.stringify(response.body).includes(RAW_MARKER), false)
+})
+
+test("create route returns code-only errors without raw exception markers", async () => {
+  const baseRepository = repositoryHarness().repository
+  const runtimeError = new Error(RAW_MARKER)
+  const cases = [
+    {
+      name: "known_invite_error",
+      error: new baseRepository.StoreInviteHttpError(400, RAW_MARKER, "store_id_required"),
+      expectedStatus: 400,
+      expectedBody: { ok: false, code: "store_id_required" },
+      postgresOverrides: {},
+    },
+    {
+      name: "configuration_error",
+      error: new AliyunRdsConfigurationError(RAW_MARKER),
+      expectedStatus: 503,
+      expectedBody: { ok: false, code: "rds_not_configured" },
+      postgresOverrides: {},
+    },
+    {
+      name: "runtime_error",
+      error: runtimeError,
+      expectedStatus: 503,
+      expectedBody: { ok: false, code: "rds_unavailable" },
+      postgresOverrides: {
+        isAliyunRdsRuntimeUnavailableError: (error) => error === runtimeError,
+      },
+    },
+    {
+      name: "unknown_error",
+      error: new Error(RAW_MARKER),
+      expectedStatus: 500,
+      expectedBody: { ok: false, code: "invite_create_failed" },
+      postgresOverrides: {},
+    },
+  ]
+
+  for (const item of cases) {
+    const route = compileCreateRoute(routeRepositoryStub(baseRepository, {
+      createAliyunRdsStoreInvite: async () => {
+        throw item.error
+      },
+    }), item.postgresOverrides)
+
+    const response = await route.POST(request("https://local.invalid/api/app/store-admin/invites", {
+      role: "employee",
+      store_id: "store-1",
+    }))
+
+    assert.equal(response.status, item.expectedStatus, item.name)
+    assert.deepEqual(response.body, item.expectedBody, item.name)
+    assert.equal(JSON.stringify(response.body).includes(RAW_MARKER), false, item.name)
+  }
 })

@@ -6,6 +6,7 @@ import {
   resolveAliyunRdsAppAuthUser,
 } from "@/lib/aliyun-rds/app-auth.server"
 import { AliyunRdsConfigurationError, isAliyunRdsRuntimeUnavailableError } from "@/lib/aliyun-rds/postgres.server"
+import { getAliyunRdsAppAccountContext } from "@/lib/aliyun-rds/repositories/account-profile.server"
 import {
   acceptAliyunRdsStoreInvite,
   StoreInviteHttpError,
@@ -43,6 +44,12 @@ export async function POST(
   try {
     const auth = await resolveAliyunRdsAppAuthUser(request)
     if (!auth) return appAuthRequiredResponse()
+
+    const account = await getAliyunRdsAppAccountContext(auth.user)
+    if (account.accountStatus === "suspended" || account.accountStatus === "inactive") {
+      return NextResponse.json({ ok: false, code: "role_denied" }, { status: 403 })
+    }
+
     const { token } = await params
 
     const payload = await acceptAliyunRdsStoreInvite(token, auth.user)

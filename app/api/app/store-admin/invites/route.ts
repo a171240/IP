@@ -11,18 +11,15 @@ export const runtime = "nodejs"
 
 function inviteErrorResponse(error: unknown) {
   if (error instanceof StoreInviteHttpError) {
-    return NextResponse.json({ ok: false, error: error.message, code: error.code }, { status: error.status })
+    return NextResponse.json({ ok: false, code: error.code }, { status: error.status })
   }
   if (error instanceof AliyunRdsConfigurationError) {
-    return NextResponse.json({ ok: false, error: "DATABASE_URL_CN is required", code: "rds_not_configured" }, { status: 503 })
+    return NextResponse.json({ ok: false, code: "rds_not_configured" }, { status: 503 })
   }
   if (isAliyunRdsRuntimeUnavailableError(error)) {
-    return NextResponse.json({ ok: false, error: "Aliyun RDS is not reachable", code: "rds_unavailable" }, { status: 503 })
+    return NextResponse.json({ ok: false, code: "rds_unavailable" }, { status: 503 })
   }
-  return NextResponse.json(
-    { ok: false, error: error instanceof Error ? error.message : "invite_create_failed", code: "invite_create_failed" },
-    { status: 500 },
-  )
+  return NextResponse.json({ ok: false, code: "invite_create_failed" }, { status: 500 })
 }
 
 export async function POST(request: NextRequest) {
@@ -31,7 +28,12 @@ export async function POST(request: NextRequest) {
     if (!auth.ok) return auth.error
     const body = await request.json().catch(() => null)
     const payload = await createAliyunRdsStoreInvite({ ctx: auth.ctx, user: auth.user, body })
-    return NextResponse.json(payload)
+    return NextResponse.json({
+      ok: payload.ok,
+      invite: payload.invite,
+      token: payload.token,
+      path: payload.path,
+    })
   } catch (error) {
     return inviteErrorResponse(error)
   }
