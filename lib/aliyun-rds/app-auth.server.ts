@@ -33,7 +33,7 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3
 
 export function appAuthRequiredResponse() {
   return NextResponse.json(
-    { ok: false, error: "请先登录", code: "auth_required" },
+    { ok: false, code: "auth_required" },
     { status: 401 },
   )
 }
