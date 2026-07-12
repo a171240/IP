@@ -16,6 +16,7 @@
     "logout_session_revoke",
     "profile_multi_tenant_permissions",
     "professional_learning_progress",
+    "voice_coach_text_training",
     "store_invite",
     "service_record_long_recording",
     "store_manager_service_record_read"
@@ -202,36 +203,324 @@
       "name": "voice_coach_customer_profiles",
       "source": "supabase/migrations/20260412_add_voice_coach_profiles_and_scene_cards.sql",
       "capabilities": [
+        "voice_coach_text_training",
         "service_record_long_recording",
         "store_manager_service_record_read"
       ],
       "validation": [
-        "row_count_matches_source",
-        "service_record_customer_fk_resolves"
+        "app_voice_coach_selection_columns_present",
+        "primary_key_present",
+        "user_updated_index_present"
+      ],
+      "requiredColumns": [
+        { "name": "id", "dataType": "uuid", "udtName": "uuid", "nullable": false, "defaultExpression": "gen_random_uuid()" },
+        { "name": "created_at", "dataType": "timestamp with time zone", "udtName": "timestamptz", "nullable": false, "defaultExpression": "now()" },
+        { "name": "updated_at", "dataType": "timestamp with time zone", "udtName": "timestamptz", "nullable": false, "defaultExpression": "now()" },
+        { "name": "user_id", "dataType": "uuid", "udtName": "uuid", "nullable": false, "defaultExpression": null },
+        { "name": "name", "dataType": "text", "udtName": "text", "nullable": false, "defaultExpression": null },
+        { "name": "age_label", "dataType": "text", "udtName": "text", "nullable": true, "defaultExpression": null },
+        { "name": "occupation", "dataType": "text", "udtName": "text", "nullable": true, "defaultExpression": null },
+        { "name": "personality_tags", "dataType": "jsonb", "udtName": "jsonb", "nullable": false, "defaultExpression": "'[]'::jsonb" },
+        { "name": "communication_style", "dataType": "text", "udtName": "text", "nullable": true, "defaultExpression": null },
+        { "name": "core_concerns", "dataType": "jsonb", "udtName": "jsonb", "nullable": false, "defaultExpression": "'[]'::jsonb" },
+        { "name": "trust_triggers", "dataType": "jsonb", "udtName": "jsonb", "nullable": false, "defaultExpression": "'[]'::jsonb" },
+        { "name": "past_experience", "dataType": "text", "udtName": "text", "nullable": true, "defaultExpression": null },
+        { "name": "notes", "dataType": "text", "udtName": "text", "nullable": true, "defaultExpression": null }
+      ],
+      "requiredConstraints": [
+        {
+          "name": "voice_coach_customer_profiles_pkey",
+          "type": "primary_key",
+          "columns": ["id"],
+          "validated": true
+        }
+      ],
+      "requiredIndexes": [
+        {
+          "name": "voice_coach_customer_profiles_user_updated_idx",
+          "method": "btree",
+          "unique": false,
+          "columns": [
+            { "name": "user_id", "direction": "ASC" },
+            { "name": "updated_at", "direction": "DESC" }
+          ],
+          "predicate": null,
+          "expression": null,
+          "valid": true,
+          "ready": true
+        }
+      ]
+    },
+    {
+      "name": "voice_coach_scene_cards",
+      "source": "supabase/migrations/20260412_add_voice_coach_profiles_and_scene_cards.sql",
+      "capabilities": [
+        "voice_coach_text_training"
+      ],
+      "validation": [
+        "app_voice_coach_selection_columns_present",
+        "primary_key_present",
+        "user_updated_index_present"
+      ],
+      "requiredColumns": [
+        { "name": "id", "dataType": "uuid", "udtName": "uuid", "nullable": false, "defaultExpression": "gen_random_uuid()" },
+        { "name": "created_at", "dataType": "timestamp with time zone", "udtName": "timestamptz", "nullable": false, "defaultExpression": "now()" },
+        { "name": "updated_at", "dataType": "timestamp with time zone", "udtName": "timestamptz", "nullable": false, "defaultExpression": "now()" },
+        { "name": "user_id", "dataType": "uuid", "udtName": "uuid", "nullable": false, "defaultExpression": null },
+        { "name": "name", "dataType": "text", "udtName": "text", "nullable": false, "defaultExpression": null },
+        { "name": "scene_kind", "dataType": "text", "udtName": "text", "nullable": false, "defaultExpression": "'customer_visit'::text" },
+        { "name": "service_name", "dataType": "text", "udtName": "text", "nullable": true, "defaultExpression": null },
+        { "name": "customer_stage", "dataType": "text", "udtName": "text", "nullable": true, "defaultExpression": null },
+        { "name": "scene_goal", "dataType": "text", "udtName": "text", "nullable": true, "defaultExpression": null },
+        { "name": "focus_stages", "dataType": "jsonb", "udtName": "jsonb", "nullable": false, "defaultExpression": "'[]'::jsonb" },
+        { "name": "likely_questions", "dataType": "jsonb", "udtName": "jsonb", "nullable": false, "defaultExpression": "'[]'::jsonb" },
+        { "name": "target_objections", "dataType": "jsonb", "udtName": "jsonb", "nullable": false, "defaultExpression": "'[]'::jsonb" },
+        { "name": "communication_method_tags", "dataType": "jsonb", "udtName": "jsonb", "nullable": false, "defaultExpression": "'[]'::jsonb" },
+        { "name": "must_cover_points", "dataType": "jsonb", "udtName": "jsonb", "nullable": false, "defaultExpression": "'[]'::jsonb" },
+        { "name": "do_not_say", "dataType": "jsonb", "udtName": "jsonb", "nullable": false, "defaultExpression": "'[]'::jsonb" },
+        { "name": "notes", "dataType": "text", "udtName": "text", "nullable": true, "defaultExpression": null }
+      ],
+      "requiredConstraints": [
+        {
+          "name": "voice_coach_scene_cards_pkey",
+          "type": "primary_key",
+          "columns": ["id"],
+          "validated": true
+        },
+        {
+          "name": "voice_coach_scene_cards_scene_kind_check",
+          "type": "check",
+          "columns": ["scene_kind"],
+          "checkExpression": "scene_kind = ANY (ARRAY['customer_visit'::text, 'offer_promo'::text])",
+          "validated": true
+        }
+      ],
+      "requiredIndexes": [
+        {
+          "name": "voice_coach_scene_cards_user_updated_idx",
+          "method": "btree",
+          "unique": false,
+          "columns": [
+            { "name": "user_id", "direction": "ASC" },
+            { "name": "updated_at", "direction": "DESC" }
+          ],
+          "predicate": null,
+          "expression": null,
+          "valid": true,
+          "ready": true
+        }
       ]
     },
     {
       "name": "voice_coach_sessions",
       "source": "supabase/migrations/20260210_add_voice_coach_sessions_and_turns.sql",
       "capabilities": [
+        "voice_coach_text_training",
         "store_manager_service_record_read"
       ],
       "validation": [
-        "row_count_matches_source",
-        "company_store_started_indexes_present",
-        "store_manager_overview_smoke_passes"
+        "app_voice_coach_session_contract_columns_present",
+        "scope_and_selection_foreign_keys_present",
+        "status_check_present",
+        "scope_and_lookup_indexes_present"
+      ],
+      "requiredColumns": [
+        { "name": "id", "dataType": "uuid", "udtName": "uuid", "nullable": false, "defaultExpression": "gen_random_uuid()" },
+        { "name": "created_at", "dataType": "timestamp with time zone", "udtName": "timestamptz", "nullable": false, "defaultExpression": "now()" },
+        { "name": "user_id", "dataType": "uuid", "udtName": "uuid", "nullable": false, "defaultExpression": null },
+        { "name": "company_id", "dataType": "uuid", "udtName": "uuid", "nullable": true, "defaultExpression": null },
+        { "name": "store_id", "dataType": "uuid", "udtName": "uuid", "nullable": true, "defaultExpression": null },
+        { "name": "membership_id", "dataType": "uuid", "udtName": "uuid", "nullable": true, "defaultExpression": null },
+        { "name": "scenario_id", "dataType": "text", "udtName": "text", "nullable": false, "defaultExpression": "'objection_safety'::text" },
+        { "name": "status", "dataType": "text", "udtName": "text", "nullable": false, "defaultExpression": "'active'::text" },
+        { "name": "started_at", "dataType": "timestamp with time zone", "udtName": "timestamptz", "nullable": false, "defaultExpression": "now()" },
+        { "name": "ended_at", "dataType": "timestamp with time zone", "udtName": "timestamptz", "nullable": true, "defaultExpression": null },
+        { "name": "report_json", "dataType": "jsonb", "udtName": "jsonb", "nullable": true, "defaultExpression": null },
+        { "name": "total_score", "dataType": "numeric", "udtName": "numeric", "nullable": true, "defaultExpression": null },
+        { "name": "dimension_scores", "dataType": "jsonb", "udtName": "jsonb", "nullable": true, "defaultExpression": null },
+        { "name": "customer_profile_id", "dataType": "uuid", "udtName": "uuid", "nullable": true, "defaultExpression": null },
+        { "name": "scene_card_id", "dataType": "uuid", "udtName": "uuid", "nullable": true, "defaultExpression": null },
+        { "name": "session_context_json", "dataType": "jsonb", "udtName": "jsonb", "nullable": true, "defaultExpression": null },
+        { "name": "scenario_snapshot_json", "dataType": "jsonb", "udtName": "jsonb", "nullable": true, "defaultExpression": null }
+      ],
+      "requiredConstraints": [
+        {
+          "name": "voice_coach_sessions_pkey",
+          "type": "primary_key",
+          "columns": ["id"],
+          "validated": true
+        },
+        {
+          "name": "voice_coach_sessions_status_check",
+          "type": "check",
+          "columns": ["status"],
+          "checkExpression": "status = ANY (ARRAY['active'::text, 'ended'::text])",
+          "validated": true
+        },
+        {
+          "name": "voice_coach_sessions_company_id_fkey",
+          "type": "foreign_key",
+          "columns": ["company_id"],
+          "referencedTable": "mp_companies",
+          "referencedColumns": ["id"],
+          "onDelete": "set_null",
+          "validated": true
+        },
+        {
+          "name": "voice_coach_sessions_store_id_fkey",
+          "type": "foreign_key",
+          "columns": ["store_id"],
+          "referencedTable": "mp_stores",
+          "referencedColumns": ["id"],
+          "onDelete": "set_null",
+          "validated": true
+        },
+        {
+          "name": "voice_coach_sessions_membership_id_fkey",
+          "type": "foreign_key",
+          "columns": ["membership_id"],
+          "referencedTable": "mp_account_memberships",
+          "referencedColumns": ["id"],
+          "onDelete": "set_null",
+          "validated": true
+        },
+        {
+          "name": "voice_coach_sessions_customer_profile_id_fkey",
+          "type": "foreign_key",
+          "columns": ["customer_profile_id"],
+          "referencedTable": "voice_coach_customer_profiles",
+          "referencedColumns": ["id"],
+          "onDelete": "set_null",
+          "validated": true
+        },
+        {
+          "name": "voice_coach_sessions_scene_card_id_fkey",
+          "type": "foreign_key",
+          "columns": ["scene_card_id"],
+          "referencedTable": "voice_coach_scene_cards",
+          "referencedColumns": ["id"],
+          "onDelete": "set_null",
+          "validated": true
+        }
+      ],
+      "requiredIndexes": [
+        {
+          "name": "voice_coach_sessions_user_created_at_idx",
+          "method": "btree",
+          "unique": false,
+          "columns": [{ "name": "user_id", "direction": "ASC" }, { "name": "created_at", "direction": "DESC" }],
+          "predicate": null, "expression": null, "valid": true, "ready": true
+        },
+        {
+          "name": "voice_coach_sessions_status_idx",
+          "method": "btree",
+          "unique": false,
+          "columns": [{ "name": "status", "direction": "ASC" }],
+          "predicate": null, "expression": null, "valid": true, "ready": true
+        },
+        {
+          "name": "voice_coach_sessions_company_started_idx",
+          "method": "btree",
+          "unique": false,
+          "columns": [{ "name": "company_id", "direction": "ASC" }, { "name": "started_at", "direction": "DESC" }],
+          "predicate": null, "expression": null, "valid": true, "ready": true
+        },
+        {
+          "name": "voice_coach_sessions_store_started_idx",
+          "method": "btree",
+          "unique": false,
+          "columns": [{ "name": "store_id", "direction": "ASC" }, { "name": "started_at", "direction": "DESC" }],
+          "predicate": null, "expression": null, "valid": true, "ready": true
+        },
+        {
+          "name": "voice_coach_sessions_membership_started_idx",
+          "method": "btree",
+          "unique": false,
+          "columns": [{ "name": "membership_id", "direction": "ASC" }, { "name": "started_at", "direction": "DESC" }],
+          "predicate": null, "expression": null, "valid": true, "ready": true
+        },
+        {
+          "name": "voice_coach_sessions_customer_profile_idx",
+          "method": "btree",
+          "unique": false,
+          "columns": [{ "name": "customer_profile_id", "direction": "ASC" }],
+          "predicate": null, "expression": null, "valid": true, "ready": true
+        },
+        {
+          "name": "voice_coach_sessions_scene_card_idx",
+          "method": "btree",
+          "unique": false,
+          "columns": [{ "name": "scene_card_id", "direction": "ASC" }],
+          "predicate": null, "expression": null, "valid": true, "ready": true
+        }
       ]
     },
     {
       "name": "voice_coach_turns",
       "source": "supabase/migrations/20260210_add_voice_coach_sessions_and_turns.sql",
       "capabilities": [
+        "voice_coach_text_training",
         "store_manager_service_record_read"
       ],
       "validation": [
-        "row_count_matches_source",
-        "session_turn_indexes_present",
-        "store_manager_member_stats_smoke_passes"
+        "app_voice_coach_turn_contract_columns_present",
+        "session_fk_and_role_check_present",
+        "session_turn_unique_index_present",
+        "session_created_index_present"
+      ],
+      "requiredColumns": [
+        { "name": "id", "dataType": "uuid", "udtName": "uuid", "nullable": false, "defaultExpression": "gen_random_uuid()" },
+        { "name": "created_at", "dataType": "timestamp with time zone", "udtName": "timestamptz", "nullable": false, "defaultExpression": "now()" },
+        { "name": "session_id", "dataType": "uuid", "udtName": "uuid", "nullable": false, "defaultExpression": null },
+        { "name": "turn_index", "dataType": "integer", "udtName": "int4", "nullable": false, "defaultExpression": null },
+        { "name": "role", "dataType": "text", "udtName": "text", "nullable": false, "defaultExpression": null },
+        { "name": "text", "dataType": "text", "udtName": "text", "nullable": false, "defaultExpression": "''::text" },
+        { "name": "emotion", "dataType": "text", "udtName": "text", "nullable": true, "defaultExpression": null },
+        { "name": "audio_path", "dataType": "text", "udtName": "text", "nullable": true, "defaultExpression": null },
+        { "name": "audio_seconds", "dataType": "numeric", "udtName": "numeric", "nullable": true, "defaultExpression": null },
+        { "name": "asr_confidence", "dataType": "numeric", "udtName": "numeric", "nullable": true, "defaultExpression": null },
+        { "name": "analysis_json", "dataType": "jsonb", "udtName": "jsonb", "nullable": true, "defaultExpression": null },
+        { "name": "features_json", "dataType": "jsonb", "udtName": "jsonb", "nullable": true, "defaultExpression": null }
+      ],
+      "requiredConstraints": [
+        {
+          "name": "voice_coach_turns_pkey",
+          "type": "primary_key",
+          "columns": ["id"],
+          "validated": true
+        },
+        {
+          "name": "voice_coach_turns_session_id_fkey",
+          "type": "foreign_key",
+          "columns": ["session_id"],
+          "referencedTable": "voice_coach_sessions",
+          "referencedColumns": ["id"],
+          "onDelete": "cascade",
+          "validated": true
+        },
+        {
+          "name": "voice_coach_turns_role_check",
+          "type": "check",
+          "columns": ["role"],
+          "checkExpression": "role = ANY (ARRAY['customer'::text, 'beautician'::text])",
+          "validated": true
+        }
+      ],
+      "requiredIndexes": [
+        {
+          "name": "voice_coach_turns_session_turn_index_key",
+          "method": "btree",
+          "unique": true,
+          "columns": [{ "name": "session_id", "direction": "ASC" }, { "name": "turn_index", "direction": "ASC" }],
+          "predicate": null, "expression": null, "valid": true, "ready": true
+        },
+        {
+          "name": "voice_coach_turns_session_created_at_idx",
+          "method": "btree",
+          "unique": false,
+          "columns": [{ "name": "session_id", "direction": "ASC" }, { "name": "created_at", "direction": "ASC" }],
+          "predicate": null, "expression": null, "valid": true, "ready": true
+        }
       ]
     },
     {

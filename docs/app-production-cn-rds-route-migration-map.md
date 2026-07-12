@@ -18,7 +18,7 @@
 - observedTables: app_auth_token_revocations, app_learning_progress_events, entitlements, mp_account_invites, mp_account_memberships, mp_ai_point_ledger, mp_companies, mp_stores, profiles, service_record_markers, service_record_segments, service_record_sessions, store_profiles, voice_coach_customer_profiles, voice_coach_sessions, voice_coach_turns
 - observedRpcs: none
 - schemaMapMissingObservedTables: none
-- requiredTablesWithoutRouteObservation: app_compliance_requests, credit_transactions
+- requiredTablesWithoutRouteObservation: app_compliance_requests, credit_transactions, voice_coach_scene_cards
 - blockedCredentialNames: DATABASE_URL_CN
 
 ## Route Groups

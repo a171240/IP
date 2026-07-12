@@ -57,7 +57,7 @@ test("Aliyun RDS route migration map covers first-version APP route data access 
   assert.equal(report.summary.sharedDataAccessFileCount, 0)
   assert.equal(report.summary.sharedRdsDataAccessFileCount, 42)
   assert.equal(report.summary.observedTableCount, 16)
-  assert.equal(report.summary.requiredTableCount, 18)
+  assert.equal(report.summary.requiredTableCount, 19)
   assert.equal(report.summary.observedRpcCount, 0)
   assert.equal(report.summary.requiredFunctionCount, 0)
   assert.equal(report.summary.implementationWorkPackageCount, 6)
@@ -67,6 +67,7 @@ test("Aliyun RDS route migration map covers first-version APP route data access 
   assert.deepEqual(report.summary.requiredTablesWithoutRouteObservation, [
     "app_compliance_requests",
     "credit_transactions",
+    "voice_coach_scene_cards",
   ])
   assert.deepEqual(report.summary.blockedCredentialNames, ["DATABASE_URL_CN"])
   assert.ok(!report.summary.rdsPlanRequiredBlocking.includes("first_version_supabase_data_access_still_present"))
@@ -363,7 +364,7 @@ test("Aliyun RDS route migration map markdown is actionable and value-free", () 
   assert.match(markdown, /routesStillUsingSupabaseDataAccess: 0/)
   assert.match(markdown, /routesUsingAliyunRdsDataAccess: 28/)
   assert.match(markdown, /implementationWorkPackageCount: 6/)
-  assert.match(markdown, /requiredTablesWithoutRouteObservation: app_compliance_requests, credit_transactions/)
+  assert.match(markdown, /requiredTablesWithoutRouteObservation: app_compliance_requests, credit_transactions, voice_coach_scene_cards/)
   assert.match(markdown, /RDS_WP01_ACCOUNT_PROFILE_ENTITLEMENTS/)
   assert.match(markdown, /rds_repository_in_source_pending_runtime_evidence/)
   assert.match(markdown, /lib\/aliyun-rds\/repositories\/account-profile\.server\.ts/)

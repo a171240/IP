@@ -10,6 +10,12 @@ const __dirname = dirname(__filename)
 const BACKEND_ROOT = resolve(__dirname, "..")
 const DEFAULT_SCHEMA_MAP = resolve(BACKEND_ROOT, "deploy/aliyun-production-cn.rds-first-version-schema-map.json")
 const DEFAULT_OUT_PARENT = "/tmp"
+const POSTGRES_CONSTRAINT_TYPES = Object.freeze({
+  check: "c",
+  foreign_key: "f",
+  primary_key: "p",
+  unique: "u",
+})
 
 const SECRET_VALUE_PATTERNS = [
   /sk-[A-Za-z0-9_-]{20,}/,
@@ -1138,13 +1144,40 @@ function renderSchemaSql(schemaMap, sourceFiles) {
   return lines.join("\n")
 }
 
+function renderIdentifierTextArray(values, kind) {
+  if (!Array.isArray(values) || values.length === 0) throw new Error(`required_${kind}_list`)
+  return `ARRAY[${values.map((value) => `'${quoteLiteral(assertSafeIdentifier(value, kind))}'`).join(", ")}]::text[]`
+}
+
+function renderIndexStructurePredicates(indexAlias) {
+  return {
+    columns: [
+      "ARRAY(",
+      "  select attribute.attname::text",
+      `  from unnest(${indexAlias}.indkey::smallint[], ${indexAlias}.indoption::smallint[]) with ordinality as key_column(attnum, option_bits, ordinality)`,
+      `  join pg_attribute attribute on attribute.attrelid = ${indexAlias}.indrelid and attribute.attnum = key_column.attnum`,
+      `  where key_column.ordinality <= ${indexAlias}.indnkeyatts`,
+      "  order by key_column.ordinality",
+      ")",
+    ].join(" "),
+    directions: [
+      "ARRAY(",
+      "  select case when (key_column.option_bits & 1) = 1 then 'DESC' else 'ASC' end",
+      `  from unnest(${indexAlias}.indkey::smallint[], ${indexAlias}.indoption::smallint[]) with ordinality as key_column(attnum, option_bits, ordinality)`,
+      `  where key_column.ordinality <= ${indexAlias}.indnkeyatts`,
+      "  order by key_column.ordinality",
+      ")",
+    ].join(" "),
+  }
+}
+
 function renderValidationSql(schemaMap) {
   const lines = [
     "-- Meiye Huajing APP production-cn Aliyun RDS validation queries.",
     "-- These queries are non-destructive. They should be run on the Aliyun RDS PostgreSQL target after schema/data migration.",
     "-- They intentionally return counts and existence booleans only; do not export row contents into evidence files.",
     "",
-    "select current_database() as database_name, current_user as database_user, now() as checked_at;",
+    "BEGIN READ ONLY;",
     "",
     "-- Required table existence and row-count checks.",
   ]
@@ -1155,6 +1188,172 @@ function renderValidationSql(schemaMap) {
       `select '${quoteLiteral(name)}' as object_name, to_regclass('public.${name}') is not null as exists_in_public;`,
       `select '${quoteLiteral(name)}' as table_name, count(*)::bigint as row_count from public.${name};`,
     )
+  }
+
+  lines.push("", "-- Required column checks for runtime repository contracts.")
+  for (const table of schemaMap.requiredTables || []) {
+    const tableName = assertSafeIdentifier(table.name, "table")
+    for (const column of table.requiredColumns || []) {
+      const columnName = assertSafeIdentifier(column.name, "column")
+      const dataType = quoteLiteral(column.dataType)
+      const udtName = quoteLiteral(column.udtName)
+      if (typeof column.nullable !== "boolean") throw new Error(`required_column_nullable_boolean:${columnName}`)
+      if (column.defaultExpression !== null && typeof column.defaultExpression !== "string") {
+        throw new Error(`required_column_default_expression:${columnName}`)
+      }
+      const sharedColumnPredicate = [
+        "c.table_schema = 'public'",
+        `c.table_name = '${quoteLiteral(tableName)}'`,
+        `c.column_name = '${quoteLiteral(columnName)}'`,
+      ].join(" and ")
+      const defaultPredicate = column.defaultExpression === null
+        ? "c.column_default is null"
+        : `regexp_replace(coalesce(c.column_default, ''), '\\s+', ' ', 'g') = regexp_replace('${quoteLiteral(column.defaultExpression)}', '\\s+', ' ', 'g')`
+      lines.push([
+        "select",
+        `  '${quoteLiteral(`${tableName}.${columnName}`)}' as object_name,`,
+        `  exists (select 1 from information_schema.columns c where ${sharedColumnPredicate}) as exists_in_public,`,
+        `  exists (select 1 from information_schema.columns c where ${sharedColumnPredicate} and c.data_type = '${dataType}') as data_type_matches,`,
+        `  exists (select 1 from information_schema.columns c where ${sharedColumnPredicate} and c.udt_name = '${udtName}') as udt_name_matches,`,
+        `  exists (select 1 from information_schema.columns c where ${sharedColumnPredicate} and c.is_nullable = '${column.nullable ? "YES" : "NO"}') as nullable_matches,`,
+        `  exists (select 1 from information_schema.columns c where ${sharedColumnPredicate} and ${defaultPredicate}) as default_matches;`,
+      ].join("\n"))
+    }
+  }
+
+  lines.push("", "-- Required constraint checks, including expected PostgreSQL constraint type.")
+  for (const table of schemaMap.requiredTables || []) {
+    const tableName = assertSafeIdentifier(table.name, "table")
+    for (const constraint of table.requiredConstraints || []) {
+      const constraintName = assertSafeIdentifier(constraint.name, "constraint")
+      const postgresType = POSTGRES_CONSTRAINT_TYPES[String(constraint.type || "")]
+      if (!postgresType) throw new Error(`unsupported_constraint_type:${String(constraint.type || "")}`)
+      if (constraint.validated !== true) throw new Error(`required_constraint_validated_true:${constraintName}`)
+      const expectedColumns = renderIdentifierTextArray(constraint.columns, "constraint_column")
+      const sharedConstraintFrom = [
+        "from pg_constraint constraint_row",
+        "join pg_class table_class on table_class.oid = constraint_row.conrelid",
+        "join pg_namespace table_namespace on table_namespace.oid = table_class.relnamespace",
+      ].join(" ")
+      const sharedConstraintPredicate = [
+        "table_namespace.nspname = 'public'",
+        `table_class.relname = '${quoteLiteral(tableName)}'`,
+        `constraint_row.conname = '${quoteLiteral(constraintName)}'`,
+      ].join(" and ")
+      const actualConstraintColumns = [
+        "ARRAY(",
+        "  select attribute.attname::text",
+        "  from unnest(constraint_row.conkey) with ordinality as key_column(attnum, ordinality)",
+        "  join pg_attribute attribute on attribute.attrelid = constraint_row.conrelid and attribute.attnum = key_column.attnum",
+        "  order by key_column.ordinality",
+        ")",
+      ].join(" ")
+      let checkDefinitionExpression = "true"
+      let foreignKeyTargetExpression = "true"
+      let deleteActionExpression = "true"
+      if (postgresType === "c") {
+        if (typeof constraint.checkExpression !== "string" || !constraint.checkExpression) {
+          throw new Error(`required_constraint_check_expression:${constraintName}`)
+        }
+        checkDefinitionExpression = [
+          "exists (select 1",
+          sharedConstraintFrom,
+          `where ${sharedConstraintPredicate}`,
+          `and regexp_replace(coalesce(pg_get_expr(constraint_row.conbin, constraint_row.conrelid, true), ''), '\\s+', ' ', 'g') = regexp_replace('${quoteLiteral(constraint.checkExpression)}', '\\s+', ' ', 'g'))`,
+        ].join(" ")
+      }
+      if (postgresType === "f") {
+        const referencedTable = assertSafeIdentifier(constraint.referencedTable, "referenced_table")
+        const referencedColumns = renderIdentifierTextArray(constraint.referencedColumns, "referenced_column")
+        const deleteAction = ({ cascade: "c", restrict: "r", set_default: "d", set_null: "n", no_action: "a" })[constraint.onDelete]
+        if (!deleteAction) throw new Error(`unsupported_foreign_key_delete_action:${String(constraint.onDelete || "")}`)
+        const actualReferencedColumns = [
+          "ARRAY(",
+          "  select attribute.attname::text",
+          "  from unnest(constraint_row.confkey) with ordinality as key_column(attnum, ordinality)",
+          "  join pg_attribute attribute on attribute.attrelid = constraint_row.confrelid and attribute.attnum = key_column.attnum",
+          "  order by key_column.ordinality",
+          ")",
+        ].join(" ")
+        foreignKeyTargetExpression = [
+          "exists (select 1",
+          sharedConstraintFrom,
+          "join pg_class referenced_table on referenced_table.oid = constraint_row.confrelid",
+          "join pg_namespace referenced_namespace on referenced_namespace.oid = referenced_table.relnamespace",
+          `where ${sharedConstraintPredicate}`,
+          "and referenced_namespace.nspname = 'public'",
+          `and referenced_table.relname = '${quoteLiteral(referencedTable)}'`,
+          `and ${actualReferencedColumns} = ${referencedColumns})`,
+        ].join(" ")
+        deleteActionExpression = `exists (select 1 ${sharedConstraintFrom} where ${sharedConstraintPredicate} and constraint_row.confdeltype::text = '${deleteAction}')`
+      }
+      lines.push([
+        "select",
+        `  '${quoteLiteral(`${tableName}.${constraintName}`)}' as object_name,`,
+        `  exists (select 1 ${sharedConstraintFrom} where ${sharedConstraintPredicate}) as exists_in_public,`,
+        `  exists (select 1 ${sharedConstraintFrom} where ${sharedConstraintPredicate} and constraint_row.contype::text = '${postgresType}') as type_matches,`,
+        `  exists (select 1 ${sharedConstraintFrom} where ${sharedConstraintPredicate} and ${actualConstraintColumns} = ${expectedColumns}) as columns_match,`,
+        `  ${checkDefinitionExpression} as check_definition_matches,`,
+        `  ${foreignKeyTargetExpression} as foreign_key_target_matches,`,
+        `  ${deleteActionExpression} as delete_action_matches,`,
+        `  exists (select 1 ${sharedConstraintFrom} where ${sharedConstraintPredicate} and constraint_row.convalidated is true) as validated;`,
+      ].join("\n"))
+    }
+  }
+
+  lines.push("", "-- Required index checks, including expected uniqueness.")
+  for (const table of schemaMap.requiredTables || []) {
+    const tableName = assertSafeIdentifier(table.name, "table")
+    for (const index of table.requiredIndexes || []) {
+      const indexName = assertSafeIdentifier(index.name, "index")
+      const indexMethod = assertSafeIdentifier(index.method, "index_method")
+      if (indexMethod !== "btree") throw new Error(`unsupported_required_index_method:${indexMethod}`)
+      if (typeof index.unique !== "boolean") {
+        throw new Error(`required_index_unique_boolean:${indexName}`)
+      }
+      if (index.predicate !== null || index.expression !== null) {
+        throw new Error(`required_plain_index_only:${indexName}`)
+      }
+      if (index.valid !== true || index.ready !== true) {
+        throw new Error(`required_index_valid_and_ready:${indexName}`)
+      }
+      if (!Array.isArray(index.columns) || !index.columns.length) {
+        throw new Error(`required_index_columns:${indexName}`)
+      }
+      const expectedColumnNames = renderIdentifierTextArray(index.columns.map((column) => column.name), "index_column")
+      const expectedDirections = `ARRAY[${index.columns.map((column) => {
+        const direction = String(column.direction || "")
+        if (!new Set(["ASC", "DESC"]).has(direction)) throw new Error(`required_index_direction:${direction}`)
+        return `'${direction}'`
+      }).join(", ")}]::text[]`
+      const sharedIndexFrom = [
+        "from pg_index index_row",
+        "join pg_class index_class on index_class.oid = index_row.indexrelid",
+        "join pg_class table_class on table_class.oid = index_row.indrelid",
+        "join pg_namespace table_namespace on table_namespace.oid = table_class.relnamespace",
+        "join pg_am access_method on access_method.oid = index_class.relam",
+      ].join(" ")
+      const sharedIndexPredicate = [
+        "table_namespace.nspname = 'public'",
+        `table_class.relname = '${quoteLiteral(tableName)}'`,
+        `index_class.relname = '${quoteLiteral(indexName)}'`,
+      ].join(" and ")
+      const indexStructure = renderIndexStructurePredicates("index_row")
+      lines.push([
+        "select",
+        `  '${quoteLiteral(`${tableName}.${indexName}`)}' as object_name,`,
+        `  exists (select 1 ${sharedIndexFrom} where ${sharedIndexPredicate}) as exists_in_public,`,
+        `  exists (select 1 ${sharedIndexFrom} where ${sharedIndexPredicate} and access_method.amname = '${quoteLiteral(indexMethod)}') as method_matches,`,
+        `  exists (select 1 ${sharedIndexFrom} where ${sharedIndexPredicate} and ${indexStructure.columns} = ${expectedColumnNames}) as columns_match,`,
+        `  exists (select 1 ${sharedIndexFrom} where ${sharedIndexPredicate} and ${indexStructure.directions} = ${expectedDirections}) as directions_match,`,
+        `  exists (select 1 ${sharedIndexFrom} where ${sharedIndexPredicate} and index_row.indisunique is ${index.unique ? "true" : "false"}) as unique_matches,`,
+        `  exists (select 1 ${sharedIndexFrom} where ${sharedIndexPredicate} and index_row.indpred is null) as no_predicate,`,
+        `  exists (select 1 ${sharedIndexFrom} where ${sharedIndexPredicate} and index_row.indexprs is null) as no_expression,`,
+        `  exists (select 1 ${sharedIndexFrom} where ${sharedIndexPredicate} and index_row.indnatts = index_row.indnkeyatts) as no_extra_columns,`,
+        `  exists (select 1 ${sharedIndexFrom} where ${sharedIndexPredicate} and index_row.indisvalid is true) as valid,`,
+        `  exists (select 1 ${sharedIndexFrom} where ${sharedIndexPredicate} and index_row.indisready is true) as ready;`,
+      ].join("\n"))
+    }
   }
 
   lines.push("", "-- Required function checks.")
@@ -1177,6 +1376,8 @@ function renderValidationSql(schemaMap) {
     "-- APP smoke gates after DATABASE_URL_CN is imported as a secret env.",
     "-- Run: corepack pnpm aliyun:app-api:smoke -- --base-url https://api-cn.ipgongchang.xin",
     "-- Run: corepack pnpm aliyun:rds:migration:evidence:strict",
+    "",
+    "ROLLBACK;",
   )
 
   return lines.join("\n")
@@ -1221,6 +1422,9 @@ function renderMarkdown(report) {
     `- mutationPerformed: ${report.mutationPerformed}`,
     `- sourceFileCount: ${report.summary.sourceFileCount}`,
     `- requiredTableCount: ${report.summary.requiredTableCount}`,
+    `- requiredColumnCount: ${report.summary.requiredColumnCount}`,
+    `- requiredConstraintCount: ${report.summary.requiredConstraintCount}`,
+    `- requiredIndexCount: ${report.summary.requiredIndexCount}`,
     `- requiredFunctionCount: ${report.summary.requiredFunctionCount}`,
     `- requiredStorageCount: ${report.summary.requiredStorageCount}`,
     `- schemaSqlSha256: ${report.summary.schemaSqlSha256}`,
@@ -1528,6 +1732,9 @@ function buildReport(args) {
     summary: {
       sourceFileCount: sourceFiles.length,
       requiredTableCount: (schemaMap.requiredTables || []).length,
+      requiredColumnCount: (schemaMap.requiredTables || []).flatMap((table) => table.requiredColumns || []).length,
+      requiredConstraintCount: (schemaMap.requiredTables || []).flatMap((table) => table.requiredConstraints || []).length,
+      requiredIndexCount: (schemaMap.requiredTables || []).flatMap((table) => table.requiredIndexes || []).length,
       requiredFunctionCount: (schemaMap.requiredFunctions || []).length,
       requiredStorageCount: (schemaMap.requiredStorage || []).length,
       schemaSqlBytes: Buffer.byteLength(schemaSqlOutput),
@@ -1574,7 +1781,10 @@ function buildReport(args) {
       validationSql: validationSqlPath,
       rollbackChecklist: rollbackChecklistPath,
     },
-    sourceFiles: sourceFiles.map(({ content: _content, ...item }) => item),
+    sourceFiles: sourceFiles.map(({ content, ...item }) => {
+      void content
+      return item
+    }),
     requiredTables: schemaMap.requiredTables || [],
     requiredFunctions: schemaMap.requiredFunctions || [],
     requiredStorage: schemaMap.requiredStorage || [],

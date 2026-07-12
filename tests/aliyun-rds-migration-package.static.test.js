@@ -12,6 +12,180 @@ const read = (...parts) => fs.readFileSync(path.join(root, ...parts), "utf8")
 const readJson = (...parts) => JSON.parse(read(...parts))
 const secretLike = /(sk-[A-Za-z0-9_-]{20,}|LTAI[A-Za-z0-9]{12,}|:\/\/[^\s:@]+:[^\s@]+@|AccessKeySecret\s*[:=]\s*\S{8,}|DATABASE_URL_CN\s*=\s*\S{8,})/i
 
+function requiredColumn(name, dataType, udtName, nullable, defaultExpression = null) {
+  return { name, dataType, udtName, nullable, defaultExpression }
+}
+
+function requiredIndex(name, unique, columns) {
+  return {
+    name,
+    method: "btree",
+    unique,
+    columns: columns.map(([columnName, direction]) => ({ name: columnName, direction })),
+    predicate: null,
+    expression: null,
+    valid: true,
+    ready: true,
+  }
+}
+
+test("Aliyun RDS schema map admits the exact voice coach runtime contract", () => {
+  const schemaMap = readJson("deploy", "aliyun-production-cn.rds-first-version-schema-map.json")
+  const voiceTables = schemaMap.requiredTables
+    .filter((item) => item.name.startsWith("voice_coach_"))
+  const byName = new Map(voiceTables.map((item) => [item.name, item]))
+
+  assert.ok(schemaMap.firstVersionCapabilities.includes("voice_coach_text_training"))
+  assert.deepEqual([...byName.keys()].sort(), [
+    "voice_coach_customer_profiles",
+    "voice_coach_scene_cards",
+    "voice_coach_sessions",
+    "voice_coach_turns",
+  ])
+  assert.ok(voiceTables.every((item) => item.capabilities.includes("voice_coach_text_training")))
+  assert.deepEqual(byName.get("voice_coach_scene_cards").capabilities, ["voice_coach_text_training"])
+  assert.deepEqual(byName.get("voice_coach_customer_profiles").requiredColumns, [
+    requiredColumn("id", "uuid", "uuid", false, "gen_random_uuid()"),
+    requiredColumn("created_at", "timestamp with time zone", "timestamptz", false, "now()"),
+    requiredColumn("updated_at", "timestamp with time zone", "timestamptz", false, "now()"),
+    requiredColumn("user_id", "uuid", "uuid", false),
+    requiredColumn("name", "text", "text", false),
+    requiredColumn("age_label", "text", "text", true),
+    requiredColumn("occupation", "text", "text", true),
+    requiredColumn("personality_tags", "jsonb", "jsonb", false, "'[]'::jsonb"),
+    requiredColumn("communication_style", "text", "text", true),
+    requiredColumn("core_concerns", "jsonb", "jsonb", false, "'[]'::jsonb"),
+    requiredColumn("trust_triggers", "jsonb", "jsonb", false, "'[]'::jsonb"),
+    requiredColumn("past_experience", "text", "text", true),
+    requiredColumn("notes", "text", "text", true),
+  ])
+  assert.deepEqual(byName.get("voice_coach_scene_cards").requiredColumns, [
+    requiredColumn("id", "uuid", "uuid", false, "gen_random_uuid()"),
+    requiredColumn("created_at", "timestamp with time zone", "timestamptz", false, "now()"),
+    requiredColumn("updated_at", "timestamp with time zone", "timestamptz", false, "now()"),
+    requiredColumn("user_id", "uuid", "uuid", false),
+    requiredColumn("name", "text", "text", false),
+    requiredColumn("scene_kind", "text", "text", false, "'customer_visit'::text"),
+    requiredColumn("service_name", "text", "text", true),
+    requiredColumn("customer_stage", "text", "text", true),
+    requiredColumn("scene_goal", "text", "text", true),
+    requiredColumn("focus_stages", "jsonb", "jsonb", false, "'[]'::jsonb"),
+    requiredColumn("likely_questions", "jsonb", "jsonb", false, "'[]'::jsonb"),
+    requiredColumn("target_objections", "jsonb", "jsonb", false, "'[]'::jsonb"),
+    requiredColumn("communication_method_tags", "jsonb", "jsonb", false, "'[]'::jsonb"),
+    requiredColumn("must_cover_points", "jsonb", "jsonb", false, "'[]'::jsonb"),
+    requiredColumn("do_not_say", "jsonb", "jsonb", false, "'[]'::jsonb"),
+    requiredColumn("notes", "text", "text", true),
+  ])
+  assert.deepEqual(byName.get("voice_coach_sessions").requiredColumns, [
+    requiredColumn("id", "uuid", "uuid", false, "gen_random_uuid()"),
+    requiredColumn("created_at", "timestamp with time zone", "timestamptz", false, "now()"),
+    requiredColumn("user_id", "uuid", "uuid", false),
+    requiredColumn("company_id", "uuid", "uuid", true),
+    requiredColumn("store_id", "uuid", "uuid", true),
+    requiredColumn("membership_id", "uuid", "uuid", true),
+    requiredColumn("scenario_id", "text", "text", false, "'objection_safety'::text"),
+    requiredColumn("status", "text", "text", false, "'active'::text"),
+    requiredColumn("started_at", "timestamp with time zone", "timestamptz", false, "now()"),
+    requiredColumn("ended_at", "timestamp with time zone", "timestamptz", true),
+    requiredColumn("report_json", "jsonb", "jsonb", true),
+    requiredColumn("total_score", "numeric", "numeric", true),
+    requiredColumn("dimension_scores", "jsonb", "jsonb", true),
+    requiredColumn("customer_profile_id", "uuid", "uuid", true),
+    requiredColumn("scene_card_id", "uuid", "uuid", true),
+    requiredColumn("session_context_json", "jsonb", "jsonb", true),
+    requiredColumn("scenario_snapshot_json", "jsonb", "jsonb", true),
+  ])
+  assert.deepEqual(byName.get("voice_coach_turns").requiredColumns, [
+    requiredColumn("id", "uuid", "uuid", false, "gen_random_uuid()"),
+    requiredColumn("created_at", "timestamp with time zone", "timestamptz", false, "now()"),
+    requiredColumn("session_id", "uuid", "uuid", false),
+    requiredColumn("turn_index", "integer", "int4", false),
+    requiredColumn("role", "text", "text", false),
+    requiredColumn("text", "text", "text", false, "''::text"),
+    requiredColumn("emotion", "text", "text", true),
+    requiredColumn("audio_path", "text", "text", true),
+    requiredColumn("audio_seconds", "numeric", "numeric", true),
+    requiredColumn("asr_confidence", "numeric", "numeric", true),
+    requiredColumn("analysis_json", "jsonb", "jsonb", true),
+    requiredColumn("features_json", "jsonb", "jsonb", true),
+  ])
+
+  assert.equal(voiceTables.flatMap((item) => item.requiredColumns).length, 58)
+  assert.equal(voiceTables.flatMap((item) => item.requiredConstraints).length, 13)
+  assert.equal(voiceTables.flatMap((item) => item.requiredIndexes).length, 11)
+  assert.deepEqual(byName.get("voice_coach_customer_profiles").requiredConstraints, [
+    { name: "voice_coach_customer_profiles_pkey", type: "primary_key", columns: ["id"], validated: true },
+  ])
+  assert.deepEqual(byName.get("voice_coach_scene_cards").requiredConstraints, [
+    { name: "voice_coach_scene_cards_pkey", type: "primary_key", columns: ["id"], validated: true },
+    {
+      name: "voice_coach_scene_cards_scene_kind_check",
+      type: "check",
+      columns: ["scene_kind"],
+      checkExpression: "scene_kind = ANY (ARRAY['customer_visit'::text, 'offer_promo'::text])",
+      validated: true,
+    },
+  ])
+  assert.deepEqual(byName.get("voice_coach_sessions").requiredConstraints, [
+    { name: "voice_coach_sessions_pkey", type: "primary_key", columns: ["id"], validated: true },
+    {
+      name: "voice_coach_sessions_status_check",
+      type: "check",
+      columns: ["status"],
+      checkExpression: "status = ANY (ARRAY['active'::text, 'ended'::text])",
+      validated: true,
+    },
+    { name: "voice_coach_sessions_company_id_fkey", type: "foreign_key", columns: ["company_id"], referencedTable: "mp_companies", referencedColumns: ["id"], onDelete: "set_null", validated: true },
+    { name: "voice_coach_sessions_store_id_fkey", type: "foreign_key", columns: ["store_id"], referencedTable: "mp_stores", referencedColumns: ["id"], onDelete: "set_null", validated: true },
+    { name: "voice_coach_sessions_membership_id_fkey", type: "foreign_key", columns: ["membership_id"], referencedTable: "mp_account_memberships", referencedColumns: ["id"], onDelete: "set_null", validated: true },
+    { name: "voice_coach_sessions_customer_profile_id_fkey", type: "foreign_key", columns: ["customer_profile_id"], referencedTable: "voice_coach_customer_profiles", referencedColumns: ["id"], onDelete: "set_null", validated: true },
+    { name: "voice_coach_sessions_scene_card_id_fkey", type: "foreign_key", columns: ["scene_card_id"], referencedTable: "voice_coach_scene_cards", referencedColumns: ["id"], onDelete: "set_null", validated: true },
+  ])
+  assert.deepEqual(byName.get("voice_coach_turns").requiredConstraints, [
+    { name: "voice_coach_turns_pkey", type: "primary_key", columns: ["id"], validated: true },
+    { name: "voice_coach_turns_session_id_fkey", type: "foreign_key", columns: ["session_id"], referencedTable: "voice_coach_sessions", referencedColumns: ["id"], onDelete: "cascade", validated: true },
+    {
+      name: "voice_coach_turns_role_check",
+      type: "check",
+      columns: ["role"],
+      checkExpression: "role = ANY (ARRAY['customer'::text, 'beautician'::text])",
+      validated: true,
+    },
+  ])
+  assert.deepEqual(byName.get("voice_coach_customer_profiles").requiredIndexes, [
+    requiredIndex("voice_coach_customer_profiles_user_updated_idx", false, [["user_id", "ASC"], ["updated_at", "DESC"]]),
+  ])
+  assert.deepEqual(byName.get("voice_coach_scene_cards").requiredIndexes, [
+    requiredIndex("voice_coach_scene_cards_user_updated_idx", false, [["user_id", "ASC"], ["updated_at", "DESC"]]),
+  ])
+  assert.deepEqual(byName.get("voice_coach_sessions").requiredIndexes, [
+    requiredIndex("voice_coach_sessions_user_created_at_idx", false, [["user_id", "ASC"], ["created_at", "DESC"]]),
+    requiredIndex("voice_coach_sessions_status_idx", false, [["status", "ASC"]]),
+    requiredIndex("voice_coach_sessions_company_started_idx", false, [["company_id", "ASC"], ["started_at", "DESC"]]),
+    requiredIndex("voice_coach_sessions_store_started_idx", false, [["store_id", "ASC"], ["started_at", "DESC"]]),
+    requiredIndex("voice_coach_sessions_membership_started_idx", false, [["membership_id", "ASC"], ["started_at", "DESC"]]),
+    requiredIndex("voice_coach_sessions_customer_profile_idx", false, [["customer_profile_id", "ASC"]]),
+    requiredIndex("voice_coach_sessions_scene_card_idx", false, [["scene_card_id", "ASC"]]),
+  ])
+  assert.deepEqual(byName.get("voice_coach_turns").requiredIndexes, [
+    requiredIndex("voice_coach_turns_session_turn_index_key", true, [["session_id", "ASC"], ["turn_index", "ASC"]]),
+    requiredIndex("voice_coach_turns_session_created_at_idx", false, [["session_id", "ASC"], ["created_at", "ASC"]]),
+  ])
+
+  const repositoryByTable = new Map([
+    ["voice_coach_customer_profiles", read("lib", "aliyun-rds", "repositories", "customer-profiles.server.ts")],
+    ["voice_coach_scene_cards", read("lib", "aliyun-rds", "repositories", "scene-cards.server.ts")],
+    ["voice_coach_sessions", read("lib", "aliyun-rds", "repositories", "app-voice-coach-rds.server.ts")],
+    ["voice_coach_turns", read("lib", "aliyun-rds", "repositories", "app-voice-coach-rds.server.ts")],
+  ])
+  for (const [tableName, repositorySource] of repositoryByTable) {
+    for (const column of byName.get(tableName).requiredColumns) {
+      assert.match(repositorySource, new RegExp(`\\b${column.name}\\b`), `${tableName}.${column.name}`)
+    }
+  }
+})
+
 test("Aliyun RDS migration package command is wired into scripts, deploy spec, and artifacts", () => {
   const pkg = readJson("package.json")
   const predeploy = read("scripts", "aliyun-predeploy-commands.mjs")
@@ -60,7 +234,10 @@ test("Aliyun RDS migration package generates non-secret SQL and validation artif
   assert.equal(report.cloudApiCalled, false)
   assert.equal(report.mutationPerformed, false)
   assert.equal(report.summary.sourceFileCount, 12)
-  assert.equal(report.summary.requiredTableCount, 18)
+  assert.equal(report.summary.requiredTableCount, 19)
+  assert.equal(report.summary.requiredColumnCount, 58)
+  assert.equal(report.summary.requiredConstraintCount, 13)
+  assert.equal(report.summary.requiredIndexCount, 11)
   assert.equal(report.summary.requiredFunctionCount, 0)
   assert.equal(report.summary.requiredStorageCount, 1)
   assert.equal(report.summary.compatibilityReviewRequired, true)
@@ -262,6 +439,39 @@ test("Aliyun RDS migration package generates non-secret SQL and validation artif
   assert.match(validationSql, /to_regclass\('public\.app_compliance_requests'\)/)
   assert.match(validationSql, /to_regclass\('public\.app_learning_progress_events'\)/)
   assert.match(validationSql, /from public\.service_record_sessions/)
+  assert.match(validationSql, /^BEGIN READ ONLY;$/m)
+  assert.match(validationSql, /^ROLLBACK;$/m)
+  assert.match(validationSql, /to_regclass\('public\.voice_coach_scene_cards'\)/)
+  assert.match(validationSql, /information_schema\.columns/)
+  assert.match(validationSql, /data_type/)
+  assert.match(validationSql, /udt_name/)
+  assert.match(validationSql, /is_nullable/)
+  assert.match(validationSql, /column_default/)
+  assert.match(validationSql, /voice_coach_sessions.*company_id/s)
+  assert.match(validationSql, /voice_coach_sessions.*scenario_snapshot_json/s)
+  assert.match(validationSql, /voice_coach_turns.*features_json/s)
+  assert.match(validationSql, /pg_constraint/)
+  assert.match(validationSql, /pg_get_expr/)
+  assert.match(validationSql, /convalidated/)
+  assert.match(validationSql, /confdeltype/)
+  assert.match(validationSql, /voice_coach_sessions_company_id_fkey/)
+  assert.match(validationSql, /pg_index/)
+  assert.match(validationSql, /pg_am/)
+  assert.match(validationSql, /method_matches/)
+  assert.match(validationSql, /indkey/)
+  assert.match(validationSql, /indoption/)
+  assert.match(validationSql, /indpred is null/)
+  assert.match(validationSql, /indexprs is null/)
+  assert.match(validationSql, /indnatts/)
+  assert.match(validationSql, /indnkeyatts/)
+  assert.match(validationSql, /indisvalid/)
+  assert.match(validationSql, /indisready/)
+  assert.equal((validationSql.match(/attribute\.attname::text/g) || []).length, 30)
+  assert.doesNotMatch(validationSql, /attribute\.attname(?!::text)/)
+  assert.match(validationSql, /voice_coach_turns_session_turn_index_key/)
+  assert.doesNotMatch(validationSql, /select current_database\(\)|current_user|now\(\) as checked_at/i)
+  assert.doesNotMatch(validationSql, /\bANALYZE\b/i)
+  assert.doesNotMatch(validationSql, /select\s+\*/i)
   assert.doesNotMatch(validationSql, /p\.proname = 'consume_credits'/)
   assert.doesNotMatch(validationSql, /p\.proname = 'grant_trial_credits'/)
   assert.match(rollback, /Supabase as migration source/)
@@ -299,18 +509,31 @@ test("Aliyun RDS migration package generates non-secret SQL and validation artif
 
 test("tracked Aliyun RDS migration package handoff pins non-secret package digests", () => {
   const doc = read("docs", "app-production-cn-rds-migration-package.md")
+  const outDir = path.join(os.tmpdir(), `aliyun-rds-tracked-package-${Date.now()}-${Math.random().toString(16).slice(2)}`)
+  const report = JSON.parse(execFileSync(process.execPath, [
+    "scripts/generate-aliyun-rds-migration-package.mjs",
+    "--out-dir",
+    outDir,
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 20,
+  }))
 
   assert.match(doc, /APP production-cn RDS Migration Package Handoff/)
   assert.match(doc, /requiredAuthorizationPacket: P11_ALIYUN_RDS_DATA_MIGRATION/)
   assert.match(doc, /blockedCredentialNames: DATABASE_URL_CN/)
   assert.match(doc, /sourceFileCount: 12/)
-  assert.match(doc, /requiredTableCount: 18/)
+  assert.match(doc, new RegExp(`requiredTableCount: ${report.summary.requiredTableCount}`))
+  assert.match(doc, new RegExp(`requiredColumnCount: ${report.summary.requiredColumnCount}`))
+  assert.match(doc, new RegExp(`requiredConstraintCount: ${report.summary.requiredConstraintCount}`))
+  assert.match(doc, new RegExp(`requiredIndexCount: ${report.summary.requiredIndexCount}`))
   assert.match(doc, /requiredFunctionCount: 0/)
   assert.match(doc, /requiredStorageCount: 1/)
-  assert.match(doc, /schemaSqlSha256: 9da94ef44b7a62127a02b40d6dd9cce8822dd19b1c531472af4fceaa4a71abb7/)
-  assert.match(doc, /rdsApplyCandidateSqlSha256: ad3b6c19d853459a8eaba4f3cda171869d338c4478b4d3b00bfa5c518f38b855/)
-  assert.match(doc, /validationSqlSha256: 79e9349d41191f1ea7359e512a7fea0c4c9881f359977af65e32942bd63f332c/)
-  assert.match(doc, /rollbackChecklistSha256: ed105e65805a194e036f2efe3d43b0151d4ef95fe548ef5456fa5b2cc1a5bc9e/)
+  assert.match(doc, new RegExp(`schemaSqlSha256: ${report.summary.schemaSqlSha256}`))
+  assert.match(doc, new RegExp(`rdsApplyCandidateSqlSha256: ${report.summary.rdsApplyCandidateSqlSha256}`))
+  assert.match(doc, new RegExp(`validationSqlSha256: ${report.summary.validationSqlSha256}`))
+  assert.match(doc, new RegExp(`rollbackChecklistSha256: ${report.summary.rollbackChecklistSha256}`))
   assert.match(doc, /RDS Compatibility Review/)
   assert.match(doc, /rdsCompatibilityReviewRequired: true/)
   assert.match(doc, /rdsCompatibilityAffectedSourceCount: 10/)

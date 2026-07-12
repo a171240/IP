@@ -8,13 +8,16 @@
 - cloudApiCalled: false
 - mutationPerformed: false
 - sourceFileCount: 12
-- requiredTableCount: 18
+- requiredTableCount: 19
+- requiredColumnCount: 58
+- requiredConstraintCount: 13
+- requiredIndexCount: 11
 - requiredFunctionCount: 0
 - requiredStorageCount: 1
 - schemaSqlSha256: 9da94ef44b7a62127a02b40d6dd9cce8822dd19b1c531472af4fceaa4a71abb7
 - rdsApplyCandidateSqlSha256: ad3b6c19d853459a8eaba4f3cda171869d338c4478b4d3b00bfa5c518f38b855
-- validationSqlSha256: 79e9349d41191f1ea7359e512a7fea0c4c9881f359977af65e32942bd63f332c
-- rollbackChecklistSha256: ed105e65805a194e036f2efe3d43b0151d4ef95fe548ef5456fa5b2cc1a5bc9e
+- validationSqlSha256: f192b692eeb2ddd321f3415124b9c60309c6285ae004fbf88a4bfaf0cef6caeb
+- rollbackChecklistSha256: d2268ee047d102f0dd52a0b8b089dfe043ad2a6e300c1f3ae5a156d8d6d4d7b5
 - blockers: none
 - warnings: rds_sql_compatibility_review_required:deploy/aliyun-production-cn.app-compliance-requests-schema.sql:extension_review, rds_sql_compatibility_review_required:lib/supabase/schema.sql:extension_review+policy_statement+row_level_security+supabase_auth_schema+supabase_auth_uid, rds_sql_compatibility_review_required:supabase/migrations/20250213_add_activation_requests_and_entitlements.sql:extension_review+policy_statement+row_level_security+supabase_auth_schema+supabase_auth_uid+supabase_service_role, rds_sql_compatibility_review_required:supabase/migrations/20260209_xhs_v4_store_profiles_and_draft_fields.sql:extension_review+policy_statement+row_level_security+supabase_auth_uid+supabase_service_role, rds_sql_compatibility_review_required:supabase/migrations/20260210_add_voice_coach_sessions_and_turns.sql:extension_review+policy_statement+row_level_security+supabase_auth_uid+supabase_service_role+supabase_storage_schema, rds_sql_compatibility_review_required:supabase/migrations/20260412_add_voice_coach_profiles_and_scene_cards.sql:extension_review+policy_statement+row_level_security+supabase_auth_uid+supabase_service_role, rds_sql_compatibility_review_required:supabase/migrations/20260506_add_mp_ai_points_backend.sql:extension_review+policy_statement+row_level_security+supabase_auth_schema+supabase_auth_uid, rds_sql_compatibility_review_required:supabase/migrations/20260511_add_mp_account_invites_and_org_snapshots.sql:extension_review+row_level_security+supabase_auth_schema, rds_sql_compatibility_review_required:supabase/migrations/20260511_harden_mp_account_invites_access.sql:policy_statement, rds_sql_compatibility_review_required:supabase/migrations/20260513085315_add_service_record_sessions.sql:extension_review+policy_statement+row_level_security+supabase_auth_schema+supabase_auth_uid+supabase_service_role+supabase_storage_schema
 - rdsCompatibilityReviewRequired: true
@@ -37,12 +40,12 @@
 
 ## Files
 
-- manifest: /tmp/meiye-g2a-learning-progress-rds-package/rds-migration-package.json
-- markdown: /tmp/meiye-g2a-learning-progress-rds-package/rds-migration-package.md
-- schemaSql: /tmp/meiye-g2a-learning-progress-rds-package/rds-schema.sql
-- rdsApplyCandidateSql: /tmp/meiye-g2a-learning-progress-rds-package/rds-apply-candidate.sql
-- validationSql: /tmp/meiye-g2a-learning-progress-rds-package/rds-validation.sql
-- rollbackChecklist: /tmp/meiye-g2a-learning-progress-rds-package/rds-rollback-checklist.md
+- manifest: /tmp/meiye-g3d-b-schema-admission-rds-package-final2/rds-migration-package.json
+- markdown: /tmp/meiye-g3d-b-schema-admission-rds-package-final2/rds-migration-package.md
+- schemaSql: /tmp/meiye-g3d-b-schema-admission-rds-package-final2/rds-schema.sql
+- rdsApplyCandidateSql: /tmp/meiye-g3d-b-schema-admission-rds-package-final2/rds-apply-candidate.sql
+- validationSql: /tmp/meiye-g3d-b-schema-admission-rds-package-final2/rds-validation.sql
+- rollbackChecklist: /tmp/meiye-g3d-b-schema-admission-rds-package-final2/rds-rollback-checklist.md
 
 ## Source Files
 
@@ -73,9 +76,10 @@
 - mp_ai_point_ledger: source=supabase/migrations/20260506_add_mp_ai_points_backend.sql; capabilities=profile_multi_tenant_permissions, store_manager_service_record_read; validation=row_count_matches_source, user_company_store_indexes_present, grant_and_consume_credit_ledger_writes_validate
 - mp_account_invites: source=supabase/migrations/20260511_add_mp_account_invites_and_org_snapshots.sql; capabilities=store_invite; validation=row_count_matches_source, token_hash_index_present, expired_invite_rejected_by_api_smoke
 - store_profiles: source=supabase/migrations/20260209_xhs_v4_store_profiles_and_draft_fields.sql; capabilities=profile_multi_tenant_permissions; validation=row_count_matches_source, store_profile_owner_crud_smoke_passes
-- voice_coach_customer_profiles: source=supabase/migrations/20260412_add_voice_coach_profiles_and_scene_cards.sql; capabilities=service_record_long_recording, store_manager_service_record_read; validation=row_count_matches_source, service_record_customer_fk_resolves
-- voice_coach_sessions: source=supabase/migrations/20260210_add_voice_coach_sessions_and_turns.sql; capabilities=store_manager_service_record_read; validation=row_count_matches_source, company_store_started_indexes_present, store_manager_overview_smoke_passes
-- voice_coach_turns: source=supabase/migrations/20260210_add_voice_coach_sessions_and_turns.sql; capabilities=store_manager_service_record_read; validation=row_count_matches_source, session_turn_indexes_present, store_manager_member_stats_smoke_passes
+- voice_coach_customer_profiles: source=supabase/migrations/20260412_add_voice_coach_profiles_and_scene_cards.sql; capabilities=voice_coach_text_training, service_record_long_recording, store_manager_service_record_read; validation=app_voice_coach_selection_columns_present, primary_key_present, user_updated_index_present
+- voice_coach_scene_cards: source=supabase/migrations/20260412_add_voice_coach_profiles_and_scene_cards.sql; capabilities=voice_coach_text_training; validation=app_voice_coach_selection_columns_present, primary_key_present, user_updated_index_present
+- voice_coach_sessions: source=supabase/migrations/20260210_add_voice_coach_sessions_and_turns.sql; capabilities=voice_coach_text_training, store_manager_service_record_read; validation=app_voice_coach_session_contract_columns_present, scope_and_selection_foreign_keys_present, status_check_present, scope_and_lookup_indexes_present
+- voice_coach_turns: source=supabase/migrations/20260210_add_voice_coach_sessions_and_turns.sql; capabilities=voice_coach_text_training, store_manager_service_record_read; validation=app_voice_coach_turn_contract_columns_present, session_fk_and_role_check_present, session_turn_unique_index_present, session_created_index_present
 - service_record_sessions: source=supabase/migrations/20260513085315_add_service_record_sessions.sql; capabilities=service_record_long_recording, store_manager_service_record_read; validation=row_count_matches_source, unique_user_client_session_key_present, company_store_started_indexes_present
 - service_record_segments: source=supabase/migrations/20260513085315_add_service_record_sessions.sql; capabilities=service_record_long_recording, store_manager_service_record_read; validation=row_count_matches_source, unique_session_client_segment_key_present, asr_status_index_present
 - service_record_markers: source=supabase/migrations/20260513085315_add_service_record_sessions.sql; capabilities=service_record_long_recording; validation=row_count_matches_source, session_offset_index_present
