@@ -12,6 +12,12 @@ const authorizationPath = path.join(root, "lib", "aliyun-rds", "app-authorizatio
 const serviceRepositoryPath = path.join(root, "lib", "aliyun-rds", "repositories", "service-records.server.ts")
 const storeRepositoryPath = path.join(root, "lib", "aliyun-rds", "repositories", "store-admin.server.ts")
 const voiceFacadePath = path.join(root, "lib", "aliyun-rds", "repositories", "app-voice-coach-facade.server.ts")
+const voiceRuntimeConfigPath = path.join(
+  root,
+  "lib",
+  "aliyun-rds",
+  "app-voice-coach-runtime-config.server.ts",
+)
 const serviceListRoutePath = path.join(root, "app", "api", "app", "service-records", "sessions", "route.ts")
 const serviceDetailRoutePath = path.join(
   root,
@@ -299,6 +305,10 @@ function voiceHarness(ctx) {
     "server-only": {},
     "node:fs": fileSystemStub,
     "next/server": nextServer,
+    "@/lib/aliyun-rds/app-voice-coach-runtime-config.server": compileTsModule(
+      voiceRuntimeConfigPath,
+      { "server-only": {} },
+    ),
     "@/lib/aliyun-rds/app-auth.server": authStubs(ctx, counters),
     "@/lib/aliyun-rds/postgres.server": {
       AliyunRdsConfigurationError: class AliyunRdsConfigurationError extends Error {},

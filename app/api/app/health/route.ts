@@ -93,6 +93,25 @@ function getWechatOpenAppReviewStatus() {
   return String(process.env.WECHAT_OPEN_APP_REVIEW_STATUS || "deferred").trim() || "deferred"
 }
 
+function getAliyunDeploymentIdentity() {
+  const imageDigest = String(process.env.APP_DEPLOYMENT_IMAGE_DIGEST || "").trim()
+  const saeAppId = String(process.env.APP_DEPLOYMENT_SAE_APP_ID || "").trim()
+  const saeDeploymentId = String(process.env.APP_DEPLOYMENT_SAE_DEPLOYMENT_ID || "").trim()
+  const saeVersionId = String(process.env.APP_DEPLOYMENT_SAE_VERSION_ID || "").trim()
+  const deploymentCompletedAt = String(process.env.APP_DEPLOYMENT_COMPLETED_AT || "").trim()
+  const values = [imageDigest, saeAppId, saeDeploymentId, saeVersionId, deploymentCompletedAt]
+
+  if (!values.every(isReadyEnvValue)) return null
+
+  return {
+    imageDigest,
+    saeAppId,
+    saeDeploymentId,
+    saeVersionId,
+    deploymentCompletedAt,
+  }
+}
+
 function getAliyunRuntimeChecks() {
   return {
     aliyunRds: isAliyunRdsConfigured(),
@@ -133,6 +152,7 @@ export async function GET(request: NextRequest) {
       env: process.env.APP_ENV || process.env.NODE_ENV || "unknown",
       region: process.env.APP_REGION || process.env.ALIYUN_REGION || "",
       mode: productionCn ? "aliyun-production-cn" : "legacy",
+      deploymentIdentity: productionCn ? getAliyunDeploymentIdentity() : null,
       checks,
       missing,
       deferred: productionCn

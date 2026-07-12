@@ -41,3 +41,21 @@ test("APP health readiness treats TODO placeholders as missing runtime configura
   assert.match(healthSmokeSource, /rds_voice_coach_text_session_contract/)
   assert.doesNotMatch(healthSmokeSource, /return Boolean\(getRawEnvText\(env, "DATABASE_URL_CN"\)/)
 })
+
+test("APP health route exposes the exact non-secret SAE deployment identity", () => {
+  for (const envName of [
+    "APP_DEPLOYMENT_IMAGE_DIGEST",
+    "APP_DEPLOYMENT_SAE_APP_ID",
+    "APP_DEPLOYMENT_SAE_DEPLOYMENT_ID",
+    "APP_DEPLOYMENT_SAE_VERSION_ID",
+    "APP_DEPLOYMENT_COMPLETED_AT",
+  ]) {
+    assert.match(source, new RegExp(`process\\.env\\.${envName}`))
+  }
+
+  assert.match(source, /function getAliyunDeploymentIdentity\(\)/)
+  assert.match(
+    source,
+    /deploymentIdentity:\s*productionCn\s*\?\s*getAliyunDeploymentIdentity\(\)\s*:\s*null/,
+  )
+})
