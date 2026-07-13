@@ -31,17 +31,17 @@
     "wechat_open_platform_mobile_app_creation"
   ],
   "sourceMigrations": [
-    "deploy/aliyun-production-cn.app-auth-revocations-schema.sql",
-    "deploy/aliyun-production-cn.app-compliance-requests-schema.sql",
     "lib/supabase/schema.sql",
     "supabase/migrations/20250213_add_activation_requests_and_entitlements.sql",
+    "supabase/migrations/20260506_add_mp_ai_points_backend.sql",
     "supabase/migrations/20260209_xhs_v4_store_profiles_and_draft_fields.sql",
     "supabase/migrations/20260210_add_voice_coach_sessions_and_turns.sql",
     "supabase/migrations/20260412_add_voice_coach_profiles_and_scene_cards.sql",
-    "supabase/migrations/20260506_add_mp_ai_points_backend.sql",
     "supabase/migrations/20260511_add_mp_account_invites_and_org_snapshots.sql",
     "supabase/migrations/20260511_harden_mp_account_invites_access.sql",
     "supabase/migrations/20260513085315_add_service_record_sessions.sql",
+    "deploy/aliyun-production-cn.app-auth-revocations-schema.sql",
+    "deploy/aliyun-production-cn.app-compliance-requests-schema.sql",
     "deploy/aliyun-production-cn.app-learning-progress-schema.sql"
   ],
   "requiredTables": [

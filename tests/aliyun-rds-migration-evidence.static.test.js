@@ -188,7 +188,7 @@ test("Aliyun RDS migration evidence check reports missing local closure without 
   ])
   assert.equal(
     report.rdsMigrationPlan.compatibilityReview.packageDigests.schemaSqlSha256,
-    "9da94ef44b7a62127a02b40d6dd9cce8822dd19b1c531472af4fceaa4a71abb7",
+    "fa356d284c170cf7fa0c7ee0a3857341d041252df310c4d5dd904778a2680311",
   )
   assert.equal(report.rdsMigrationPlan.phases.length, 5)
   assert.deepEqual(report.rdsMigrationPlan.phases.map((item) => item.id), [
@@ -458,8 +458,8 @@ test("Aliyun RDS migration evidence markdown is value-free", () => {
   assert.match(markdown, /defaultProposedDisposition: replace_supabase_auth_schema_with_app_identity_model/)
   assert.match(markdown, /defaultProposedDisposition: rewrite_to_backend_enforced_identity_and_tenant_scope/)
   assert.match(markdown, /defaultProposedDisposition: exclude_from_rds_apply_and_replace_with_oss_boundary/)
-  assert.match(markdown, /schemaSqlSha256: 9da94ef44b7a62127a02b40d6dd9cce8822dd19b1c531472af4fceaa4a71abb7/)
-  assert.match(markdown, /rdsApplyCandidateSqlSha256: ad3b6c19d853459a8eaba4f3cda171869d338c4478b4d3b00bfa5c518f38b855/)
+  assert.match(markdown, /schemaSqlSha256: fa356d284c170cf7fa0c7ee0a3857341d041252df310c4d5dd904778a2680311/)
+  assert.match(markdown, /rdsApplyCandidateSqlSha256: a9feb5e139d52b2383fe58c45a2f68b0ed2c2b360dcd2092c4505d820a29e9c8/)
   assert.match(markdown, /validationSqlSha256: 79e9349d41191f1ea7359e512a7fea0c4c9881f359977af65e32942bd63f332c/)
   assert.match(markdown, /source_inventory_preflight/)
   assert.match(markdown, /compatibility_review/)

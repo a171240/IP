@@ -75,7 +75,7 @@ test("APP voiceCoach RDS facade returns only the frozen safe selection snapshot"
   assert.doesNotMatch(helper, /live_notes|training_context|followup_context/)
 })
 
-test("APP voiceCoach helper returns text-first local L4 shapes without provider or DB side effects", () => {
+test("VC-G4A-04 App voiceCoach audio routes bind the real Volc provider contract", () => {
   const helper = read("lib", "aliyun-rds", "repositories", "app-voice-coach-facade.server.ts")
   const combinedRoutes = ROUTES.map(routeSource).join("\n")
   const combined = `${helper}\n${combinedRoutes}`
@@ -94,8 +94,15 @@ test("APP voiceCoach helper returns text-first local L4 shapes without provider 
   assert.match(helper, /submitAppVoiceCoachTextBeauticianTurnResponse/)
   assert.match(helper, /endAppVoiceCoachTextSessionResponse/)
   assert.match(helper, /getAppVoiceCoachTextReportResponse/)
-  assert.match(helper, /appVoiceCoachTtsProviderRequiredResponse/)
-  assert.match(helper, /appVoiceCoachAsrProviderRequiredResponse/)
+  assert.match(helper, /synthesizeAppVoiceCoachTurnResponse/)
+  assert.match(helper, /transcribeAppVoiceCoachAudioResponse/)
+  assert.match(helper, /doubaoTts/)
+  assert.match(helper, /doubaoAsrFlash/)
+  assert.match(helper, /uploadVoiceCoachAudio/)
+  assert.match(helper, /signVoiceCoachAudio/)
+  assert.match(helper, /transcript_text_required/)
+  assert.match(helper, /voice_coach_audio_required/)
+  assert.match(helper, /saveAliyunRdsVoiceCoachTurnAudio/)
 
   assert.match(combinedRoutes, /resolveAppVoiceCoachFacadeContext\(request\)/)
   assert.match(combinedRoutes, /appVoiceCoachFacadeErrorResponse/)
@@ -106,8 +113,8 @@ test("APP voiceCoach helper returns text-first local L4 shapes without provider 
   assert.match(combinedRoutes, /submitAppVoiceCoachTextBeauticianTurnResponse/)
   assert.match(combinedRoutes, /endAppVoiceCoachTextSessionResponse/)
   assert.match(combinedRoutes, /getAppVoiceCoachTextReportResponse/)
-  assert.match(combinedRoutes, /appVoiceCoachTtsProviderRequiredResponse/)
-  assert.match(combinedRoutes, /appVoiceCoachAsrProviderRequiredResponse/)
+  assert.match(combinedRoutes, /synthesizeAppVoiceCoachTurnResponse/)
+  assert.match(combinedRoutes, /transcribeAppVoiceCoachAudioResponse/)
 
   assert.doesNotMatch(combined, /capability_pending/)
   assert.doesNotMatch(combined, /no_voice_coach_persistence/)
@@ -121,14 +128,13 @@ test("APP voiceCoach helper returns text-first local L4 shapes without provider 
   assert.doesNotMatch(combined, /appVoiceCoachReportResponse/)
   assert.doesNotMatch(combined, /appVoiceCoachTtsAcceptedResponse/)
   assert.doesNotMatch(combined, /appVoiceCoachAsrPreviewAcceptedResponse/)
+  assert.doesNotMatch(combined, /voice_coach_tts_provider_required/)
+  assert.doesNotMatch(combined, /voice_coach_asr_provider_required/)
   assert.doesNotMatch(combined, /\{\s*status:\s*202\s*\}/)
 
   assert.doesNotMatch(combined, /createServerSupabaseClientForRequest/)
   assert.doesNotMatch(combined, /createAdminSupabaseClient/)
-  assert.doesNotMatch(combined, /doubao(?:Tts|Asr|AsrFlash|AsrAuc)/i)
   assert.doesNotMatch(combined, /llm(?:Generate|Analyze)/i)
-  assert.doesNotMatch(combined, /uploadVoiceCoachAudio/)
-  assert.doesNotMatch(combined, /signVoiceCoachAudio/)
   assert.doesNotMatch(combined, /emitVoiceCoachEvent/)
   assert.doesNotMatch(combined, /pumpVoiceCoach/)
   assert.doesNotMatch(combined, /refreshVoiceCoachReport/)

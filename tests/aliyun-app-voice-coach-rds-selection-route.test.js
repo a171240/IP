@@ -352,6 +352,16 @@ function createRdsMock() {
       async appendAliyunRdsVoiceCoachTextReply(args) {
         return appendTextReply("appendAliyunRdsVoiceCoachTextReply", args)
       },
+      async saveAliyunRdsVoiceCoachTurnAudio(args) {
+        remember("saveAliyunRdsVoiceCoachTurnAudio", args)
+        const session = sessions.get(args.sessionId)
+        if (!belongsToScope(session, args)) return null
+        const row = (turns.get(args.sessionId) || []).find((turn) => turn.id === args.turnId && turn.role === "customer")
+        if (!row) return null
+        row.audio_path = args.audioPath
+        row.audio_seconds = args.audioSeconds
+        return row
+      },
       async endAliyunRdsVoiceCoachTextSessionWithClient(_client, args) {
         return endTextSession("endAliyunRdsVoiceCoachTextSessionWithClient", args)
       },
@@ -457,6 +467,14 @@ function helperStubs(rdsMock) {
         firstTurnPool: [{ text: "我担心皮肤敏感，做完会不会不舒服？" }],
       }),
     },
+    "@/lib/voice-coach/speech/doubao.server": {
+      doubaoAsrFlash: async () => ({ text: "转写", confidence: 0.9, durationSeconds: 1, requestId: "asr-test" }),
+      doubaoTts: async () => ({ audio: Buffer.from("audio"), durationSeconds: 1, requestId: "tts-test" }),
+    },
+    "@/lib/voice-coach/storage.server": {
+      signVoiceCoachAudio: async (path) => `https://audio.test/${path}`,
+      uploadVoiceCoachAudio: async () => {},
+    },
   }
 }
 
@@ -482,12 +500,26 @@ function request(url, body = {}, contentType = "application/json") {
       return {
         entries: function* entries() {
           for (const [key, value] of Object.entries(body)) {
-            yield [key, String(value)]
+            yield [key, typeof value === "string" ? value : value]
           }
         },
       }
     },
   }
+}
+
+function audioUpload() {
+  return {
+    name: "voice.mp3",
+    type: "audio/mpeg",
+    async arrayBuffer() {
+      return Uint8Array.from([1, 2, 3]).buffer
+    },
+  }
+}
+
+function audioSubmitRequest(url, body) {
+  return request(url, { ...body, audio: audioUpload() }, "multipart/form-data")
 }
 
 async function payload(response) {
@@ -621,7 +653,7 @@ test("VC-L4-05 route handlers use explicit RDS repository selection when configu
 
   const submitCallOffset = rdsMock.calls.length
   const submitResponse = await submitRoute.POST(
-    request(`https://local.test/api/app/voice-coach/sessions/${created.session_id}/beautician-turn/submit`, {
+    audioSubmitRequest(`https://local.test/api/app/voice-coach/sessions/${created.session_id}/beautician-turn/submit`, {
       client_attempt_id: FIRST_ATTEMPT_ID,
       reply_to_turn_id: detail.turns[0].turn_id,
       transcript_text: "我会先确认敏感风险，再从低刺激护理开始。",
@@ -713,11 +745,11 @@ test("VC-L4-06 RDS submit requires bounded attempt and reply target without repo
     rdsMock.calls.length = 0
     rdsMock.callArgs.length = 0
     const response = await submitRoute.POST(
-      request(`https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/beautician-turn/submit`, body),
+      audioSubmitRequest(`https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/beautician-turn/submit`, body),
       sessionContext(SESSION_ID),
     )
     const responseBody = await payload(response)
-    assert.equal(response.status, 400)
+    assert.equal(response.status, 422)
     assert.equal(responseBody.error, code)
     assert.equal(responseBody.code, code)
     assert.deepEqual(rdsMock.calls, [])
@@ -751,7 +783,7 @@ test("VC-L4-06 RDS submit and end retries are idempotent without transaction-ext
 
   async function submit(body) {
     const response = await submitRoute.POST(
-      request(`https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/beautician-turn/submit`, body),
+      audioSubmitRequest(`https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/beautician-turn/submit`, body),
       sessionContext(SESSION_ID),
     )
     return { response, body: await payload(response) }
@@ -1081,7 +1113,7 @@ test("VC-L4-05 route fails closed when company, store, or membership changes aft
       detailRoute.GET(request(`https://local.test/api/app/voice-coach/sessions/${SESSION_ID}`), sessionContext(SESSION_ID)),
       eventsRoute.GET(request(`https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/events`), sessionContext(SESSION_ID)),
       submitRoute.POST(
-        request(`https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/beautician-turn/submit`, {
+        audioSubmitRequest(`https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/beautician-turn/submit`, {
           client_attempt_id: `${dimension}-attempt-0001`,
           reply_to_turn_id: "rds-turn-1",
           transcript_text: "不应写入",
@@ -1128,7 +1160,7 @@ test("VC-L4-05 malformed RDS session ids skip repository while canonical UUIDv7 
     detailRoute.GET(request(`https://local.test/${malformedId}`), sessionContext(malformedId)),
     eventsRoute.GET(request(`https://local.test/${malformedId}/events`), sessionContext(malformedId)),
     submitRoute.POST(
-      request(`https://local.test/${malformedId}/submit`, { transcript_text: "不会写入" }),
+      audioSubmitRequest(`https://local.test/${malformedId}/submit`, { transcript_text: "不会写入" }),
       sessionContext(malformedId),
     ),
     reportRoute.GET(request(`https://local.test/${malformedId}/report`), sessionContext(malformedId)),
@@ -1238,13 +1270,14 @@ test("VC-L4-05 local durable sessions are isolated by membership as well as user
   assert.equal(ownerDetailResponse.status, 200)
 })
 
-test("VC-L4-05 production RDS mode keeps TTS and ASR at fixed 501 with the RDS contract", async () => {
+test("VC-G4A-03 production RDS mode returns scoped TTS and ASR audio contracts", async () => {
   await withVoiceCoachRuntimeEnv(
     { appEnv: "production-cn", mode: PRODUCTION_RDS_REPOSITORY_MODE },
     async () => {
       resetAuthorizationChecks()
       const rdsMock = createRdsMock()
       const helperExports = compileTsModule(helperPath, helperStubs(rdsMock))
+      const sessionsRoute = routeModule(helperExports, "app", "api", "app", "voice-coach", "sessions", "route.ts")
       const ttsRoute = routeModule(
         helperExports,
         "app",
@@ -1270,27 +1303,28 @@ test("VC-L4-05 production RDS mode keeps TTS and ASR at fixed 501 with the RDS c
         "route.ts",
       )
 
+      const created = await payload(
+        await sessionsRoute.POST(request("https://local.test/api/app/voice-coach/sessions", { scenario_id: "objection_safety" })),
+      )
       const ttsResponse = await ttsRoute.POST(
-        request("https://local.test/not-a-uuid/turns/turn-1/tts"),
-        { params: Promise.resolve({ sessionId: "not-a-uuid", turnId: "turn-1" }) },
+        request(`https://local.test/${created.session_id}/turns/${created.first_customer_turn.turn_id}/tts`),
+        { params: Promise.resolve({ sessionId: created.session_id, turnId: created.first_customer_turn.turn_id }) },
       )
       const asrResponse = await asrRoute.POST(
-        request("https://local.test/not-a-uuid/asr-preview"),
-        sessionContext("not-a-uuid"),
+        request(`https://local.test/${created.session_id}/asr-preview`, { audio_b64: "AQID", format: "mp3" }),
+        sessionContext(created.session_id),
       )
 
-      for (const [response, code] of [
-        [ttsResponse, "voice_coach_tts_provider_required"],
-        [asrResponse, "voice_coach_asr_provider_required"],
-      ]) {
+      for (const response of [ttsResponse, asrResponse]) {
         const body = await payload(response)
-        assert.equal(response.status, 501)
-        assert.equal(body.code, code)
+        assert.equal(response.status, 200)
+        assert.equal(body.ok, true)
         assert.equal(body.repository_mode, PRODUCTION_RDS_REPOSITORY_MODE)
         assert.equal("local_side_effects" in body, false)
         assert.doesNotMatch(JSON.stringify(body), /local_durable/)
       }
-      assert.deepEqual(rdsMock.calls, [])
+      assert.equal((await payload(ttsResponse)).audio_url.startsWith("https://audio.test/"), true)
+      assert.equal((await payload(asrResponse)).text, "转写")
     },
   )
 })

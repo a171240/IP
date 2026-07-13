@@ -14,8 +14,8 @@
 - requiredIndexCount: 11
 - requiredFunctionCount: 0
 - requiredStorageCount: 1
-- schemaSqlSha256: 9da94ef44b7a62127a02b40d6dd9cce8822dd19b1c531472af4fceaa4a71abb7
-- rdsApplyCandidateSqlSha256: ad3b6c19d853459a8eaba4f3cda171869d338c4478b4d3b00bfa5c518f38b855
+- schemaSqlSha256: fa356d284c170cf7fa0c7ee0a3857341d041252df310c4d5dd904778a2680311
+- rdsApplyCandidateSqlSha256: a9feb5e139d52b2383fe58c45a2f68b0ed2c2b360dcd2092c4505d820a29e9c8
 - validationSqlSha256: f192b692eeb2ddd321f3415124b9c60309c6285ae004fbf88a4bfaf0cef6caeb
 - rollbackChecklistSha256: d2268ee047d102f0dd52a0b8b089dfe043ad2a6e300c1f3ae5a156d8d6d4d7b5
 - blockers: none

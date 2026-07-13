@@ -381,6 +381,14 @@ test("Aliyun RDS migration package generates non-secret SQL and validation artif
   assert.ok(report.sourceFiles.some((item) => item.path === "deploy/aliyun-production-cn.app-learning-progress-schema.sql"))
   const sourcePaths = report.sourceFiles.map((item) => item.path)
   assert.ok(
+    sourcePaths.indexOf("lib/supabase/schema.sql") <
+    sourcePaths.indexOf("supabase/migrations/20260506_add_mp_ai_points_backend.sql"),
+  )
+  assert.ok(
+    sourcePaths.indexOf("supabase/migrations/20260506_add_mp_ai_points_backend.sql") <
+    sourcePaths.indexOf("deploy/aliyun-production-cn.app-compliance-requests-schema.sql"),
+  )
+  assert.ok(
     sourcePaths.indexOf("deploy/aliyun-production-cn.app-learning-progress-schema.sql") >
     sourcePaths.indexOf("supabase/migrations/20260513085315_add_service_record_sessions.sql"),
   )

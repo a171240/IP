@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest } from "next/server"
 
 import {
+  appVoiceCoachAudioErrorResponse,
   appVoiceCoachFacadeErrorResponse,
-  appVoiceCoachTtsProviderRequiredResponse,
-  readOptionalAppVoiceCoachJsonBody,
   resolveAppVoiceCoachFacadeContext,
+  synthesizeAppVoiceCoachTurnResponse,
 } from "@/lib/aliyun-rds/repositories/app-voice-coach-facade.server"
 
 export const runtime = "nodejs"
@@ -18,22 +18,19 @@ export async function POST(
     const id = String(sessionId || "").trim()
     const voiceTurnId = String(turnId || "").trim()
     if (!id || !voiceTurnId) {
-      return NextResponse.json({ ok: false, error: "missing_params", code: "missing_params" }, { status: 400 })
+      return appVoiceCoachAudioErrorResponse("turn_tts", "missing_params")
     }
 
-    const resolved = await resolveAppVoiceCoachFacadeContext(request)
+    const resolved = await resolveAppVoiceCoachFacadeContext(request, "turn_tts")
     if ("error" in resolved) return resolved.error
 
-    const body = await readOptionalAppVoiceCoachJsonBody(request)
-    if ("error" in body) return body.error
-
-    return appVoiceCoachTtsProviderRequiredResponse({
+    return await synthesizeAppVoiceCoachTurnResponse({
       ctx: resolved.ctx,
       scope: resolved.scope,
       sessionId: id,
       turnId: voiceTurnId,
     })
   } catch (error) {
-    return appVoiceCoachFacadeErrorResponse(error, "app_voice_coach_tts_failed")
+    return appVoiceCoachFacadeErrorResponse(error, "voice_coach_tts_provider_failed", "turn_tts")
   }
 }

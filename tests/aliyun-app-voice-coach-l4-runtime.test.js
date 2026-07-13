@@ -14,6 +14,8 @@ const runtimeConfigPath = path.join(root, "lib", "aliyun-rds", "app-voice-coach-
 
 const voiceCoachFeatureDecision = { enabled: true, reason: "ok", source: "ai_points" }
 const authorizationChecks = []
+const audioProviderCalls = { asr: 0, tts: 0, uploads: 0 }
+const audioBoundaryFailures = { asr: null, tts: null, upload: null, sign: null }
 const testAccountContext = {
   accountStatus: "bound",
   userId: "app-user-employee-1",
@@ -121,6 +123,28 @@ const helperStubs = {
       firstTurnPool: [{ text: "我担心皮肤敏感，做完会不会不舒服？" }],
     }),
   },
+  "@/lib/voice-coach/speech/doubao.server": {
+    doubaoAsrFlash: async () => {
+      audioProviderCalls.asr += 1
+      if (audioBoundaryFailures.asr) throw new Error(audioBoundaryFailures.asr)
+      return { text: "真实转写文本", confidence: 0.99, durationSeconds: 1.2, requestId: "asr-g4a-test" }
+    },
+    doubaoTts: async () => {
+      audioProviderCalls.tts += 1
+      if (audioBoundaryFailures.tts) throw new Error(audioBoundaryFailures.tts)
+      return { audio: Buffer.from("audio"), durationSeconds: 1.4, requestId: "tts-g4a-test" }
+    },
+  },
+  "@/lib/voice-coach/storage.server": {
+    signVoiceCoachAudio: async (path) => {
+      if (audioBoundaryFailures.sign) throw new Error(audioBoundaryFailures.sign)
+      return `https://audio.local/${path}`
+    },
+    uploadVoiceCoachAudio: async () => {
+      audioProviderCalls.uploads += 1
+      if (audioBoundaryFailures.upload) throw new Error(audioBoundaryFailures.upload)
+    },
+  },
 }
 
 function compileTsModule(filePath, stubs) {
@@ -169,10 +193,20 @@ function request(url, body = {}, contentType = "application/json") {
       return {
         entries: function* entries() {
           for (const [key, value] of Object.entries(body)) {
-            yield [key, String(value)]
+            yield [key, typeof value === "string" ? value : value]
           }
         },
       }
+    },
+  }
+}
+
+function audioUpload() {
+  return {
+    name: "voice.mp3",
+    type: "audio/mpeg",
+    async arrayBuffer() {
+      return Uint8Array.from([1, 2, 3]).buffer
     },
   }
 }
@@ -205,6 +239,10 @@ function setDurableStoreForTest(t) {
 function restoreEnv(key, value) {
   if (value === undefined) delete process.env[key]
   else process.env[key] = value
+}
+
+function resetAudioBoundaryFailures() {
+  for (const key of Object.keys(audioBoundaryFailures)) audioBoundaryFailures[key] = null
 }
 
 test("VC-L4-02 local route runtime closes a text-first voiceCoach session", async (t) => {
@@ -249,10 +287,16 @@ test("VC-L4-02 local route runtime closes a text-first voiceCoach session", asyn
   assert.equal(detail.turns[0].role, "customer")
 
   const submitResponse = await submitRoute.POST(
-    request(`https://local.test/api/app/voice-coach/sessions/${created.session_id}/beautician-turn/submit`, {
-      transcript_text: "我先确认你的敏感情况，再建议从低刺激护理开始。",
-      client_attempt_id: "runtime-proof-1",
-    }),
+    request(
+      `https://local.test/api/app/voice-coach/sessions/${created.session_id}/beautician-turn/submit`,
+      {
+        audio: audioUpload(),
+        reply_to_turn_id: created.first_customer_turn.turn_id,
+        transcript_text: "我先确认你的敏感情况，再建议从低刺激护理开始。",
+        client_attempt_id: "runtime-proof-1",
+      },
+      "multipart/form-data; boundary=g4a",
+    ),
     sessionContext,
   )
   const submitted = await payload(submitResponse)
@@ -307,7 +351,7 @@ test("VC-L4-02 local route runtime closes a text-first voiceCoach session", asyn
   assertAuthorizationChecks(8)
 })
 
-test("VC-L4-02 local route runtime keeps audio/provider routes outside L4", async (t) => {
+test("VC-G4A-01 local route runtime invokes the real App audio contract", async (t) => {
   resetAuthorizationChecks()
   setDurableStoreForTest(t)
   const sessionsRoute = routeModule("app", "api", "app", "voice-coach", "sessions", "route.ts")
@@ -335,19 +379,163 @@ test("VC-L4-02 local route runtime keeps audio/provider routes outside L4", asyn
     { params: Promise.resolve({ sessionId: created.session_id, turnId: created.first_customer_turn.turn_id }) },
   )
   const tts = await payload(ttsResponse)
-  assert.equal(ttsResponse.status, 501)
-  assert.equal(tts.code, "voice_coach_tts_provider_required")
+  assert.equal(ttsResponse.status, 200)
+  assert.equal(tts.ok, true)
+  assert.equal(typeof tts.audio_url, "string")
+  assert.equal(tts.turn_id, created.first_customer_turn.turn_id)
+  assert.equal(tts.provider_mode, "volc_speech_tts")
+  assert.equal(audioProviderCalls.tts, 1)
   assert.equal(tts.repository_mode, "text_first_local_durable_session_store")
   assert.ok(Array.isArray(tts.local_side_effects))
 
   const asrResponse = await asrRoute.POST(
-    request(`https://local.test/api/app/voice-coach/sessions/${created.session_id}/asr-preview`, {}),
+    request(`https://local.test/api/app/voice-coach/sessions/${created.session_id}/asr-preview`, {
+      audio_b64: "AQID",
+      format: "mp3",
+    }),
     { params: Promise.resolve({ sessionId: created.session_id }) },
   )
   const asr = await payload(asrResponse)
-  assert.equal(asrResponse.status, 501)
-  assert.equal(asr.code, "voice_coach_asr_provider_required")
+  assert.equal(asrResponse.status, 200)
+  assert.equal(asr.ok, true)
+  assert.equal(typeof asr.text, "string")
+  assert.equal(asr.provider_mode, "volc_speech_asr_flash")
+  assert.equal(audioProviderCalls.asr, 1)
   assert.equal(asr.repository_mode, "text_first_local_durable_session_store")
   assert.ok(Array.isArray(asr.local_side_effects))
   assertAuthorizationChecks(3)
+})
+
+test("VC-G4A-02 local submit rejects a turn without transcript_text", async (t) => {
+  resetAuthorizationChecks()
+  setDurableStoreForTest(t)
+  const sessionsRoute = routeModule("app", "api", "app", "voice-coach", "sessions", "route.ts")
+  const submitRoute = routeModule(
+    "app",
+    "api",
+    "app",
+    "voice-coach",
+    "sessions",
+    "[sessionId]",
+    "beautician-turn",
+    "submit",
+    "route.ts",
+  )
+  const created = await payload(
+    await sessionsRoute.POST(request("https://local.test/api/app/voice-coach/sessions", { scenario_id: "objection_safety" })),
+  )
+
+  const response = await submitRoute.POST(
+    request(
+      `https://local.test/api/app/voice-coach/sessions/${created.session_id}/beautician-turn/submit`,
+      {
+        client_attempt_id: "g4a-missing-transcript",
+        reply_to_turn_id: created.first_customer_turn.turn_id,
+      },
+      "multipart/form-data; boundary=g4a",
+    ),
+    { params: Promise.resolve({ sessionId: created.session_id }) },
+  )
+
+  assert.equal(response.status, 422)
+  assert.equal((await payload(response)).code, "transcript_text_required")
+})
+
+test("VC-G4A-B malformed JSON and non-multipart submit return matrix 422 invalid_payload", async (t) => {
+  resetAuthorizationChecks()
+  setDurableStoreForTest(t)
+  const sessionsRoute = routeModule("app", "api", "app", "voice-coach", "sessions", "route.ts")
+  const asrRoute = routeModule("app", "api", "app", "voice-coach", "sessions", "[sessionId]", "asr-preview", "route.ts")
+  const submitRoute = routeModule(
+    "app", "api", "app", "voice-coach", "sessions", "[sessionId]", "beautician-turn", "submit", "route.ts",
+  )
+  const created = await payload(
+    await sessionsRoute.POST(request("https://local.test/api/app/voice-coach/sessions", { scenario_id: "objection_safety" })),
+  )
+  const malformedJsonRequest = request(`https://local.test/${created.session_id}/asr-preview`)
+  malformedJsonRequest.json = async () => { throw new SyntaxError("malformed JSON fixture") }
+
+  const asrResponse = await asrRoute.POST(malformedJsonRequest, {
+    params: Promise.resolve({ sessionId: created.session_id }),
+  })
+  const submitResponse = await submitRoute.POST(
+    request(`https://local.test/${created.session_id}/submit`, {
+      audio: audioUpload(),
+      client_attempt_id: "g4a-invalid-content-type",
+      reply_to_turn_id: created.first_customer_turn.turn_id,
+      transcript_text: "请先说说您的顾虑。",
+    }),
+    { params: Promise.resolve({ sessionId: created.session_id }) },
+  )
+
+  for (const response of [asrResponse, submitResponse]) {
+    assert.equal(response.status, 422)
+    assert.equal((await payload(response)).code, "invalid_payload")
+  }
+})
+
+test("VC-G4A-B provider and persist failures retain stable 502 business codes", async (t) => {
+  resetAuthorizationChecks()
+  resetAudioBoundaryFailures()
+  t.after(resetAudioBoundaryFailures)
+  setDurableStoreForTest(t)
+  const sessionsRoute = routeModule("app", "api", "app", "voice-coach", "sessions", "route.ts")
+  const asrRoute = routeModule("app", "api", "app", "voice-coach", "sessions", "[sessionId]", "asr-preview", "route.ts")
+  const ttsRoute = routeModule(
+    "app", "api", "app", "voice-coach", "sessions", "[sessionId]", "turns", "[turnId]", "tts", "route.ts",
+  )
+  const submitRoute = routeModule(
+    "app", "api", "app", "voice-coach", "sessions", "[sessionId]", "beautician-turn", "submit", "route.ts",
+  )
+  const created = await payload(
+    await sessionsRoute.POST(request("https://local.test/api/app/voice-coach/sessions", { scenario_id: "objection_safety" })),
+  )
+  const sessionContext = { params: Promise.resolve({ sessionId: created.session_id }) }
+  const ttsContext = {
+    params: Promise.resolve({ sessionId: created.session_id, turnId: created.first_customer_turn.turn_id }),
+  }
+
+  audioBoundaryFailures.asr = "asr_flash_timeout"
+  let response = await asrRoute.POST(
+    request(`https://local.test/${created.session_id}/asr-preview`, { audio_b64: "AQID", format: "mp3" }),
+    sessionContext,
+  )
+  assert.equal(response.status, 502)
+  assert.equal((await payload(response)).code, "voice_coach_asr_provider_unavailable")
+
+  audioBoundaryFailures.asr = "asr_invalid_response"
+  response = await asrRoute.POST(
+    request(`https://local.test/${created.session_id}/asr-preview`, { audio_b64: "AQID", format: "mp3" }),
+    sessionContext,
+  )
+  assert.equal(response.status, 502)
+  assert.equal((await payload(response)).code, "voice_coach_asr_provider_failed")
+
+  audioBoundaryFailures.asr = null
+  audioBoundaryFailures.tts = "tts_provider_fixture"
+  response = await ttsRoute.POST(request(`https://local.test/${created.session_id}/tts`), ttsContext)
+  assert.equal(response.status, 502)
+  assert.equal((await payload(response)).code, "voice_coach_tts_provider_failed")
+
+  audioBoundaryFailures.tts = null
+  audioBoundaryFailures.upload = "storage_upload_fixture"
+  response = await ttsRoute.POST(request(`https://local.test/${created.session_id}/tts`), ttsContext)
+  assert.equal(response.status, 502)
+  assert.equal((await payload(response)).code, "voice_coach_tts_persist_failed")
+
+  response = await submitRoute.POST(
+    request(
+      `https://local.test/${created.session_id}/submit`,
+      {
+        audio: audioUpload(),
+        client_attempt_id: "g4a-persist-failure",
+        reply_to_turn_id: created.first_customer_turn.turn_id,
+        transcript_text: "请先说说您的顾虑。",
+      },
+      "multipart/form-data; boundary=g4a",
+    ),
+    sessionContext,
+  )
+  assert.equal(response.status, 502)
+  assert.equal((await payload(response)).code, "voice_coach_audio_persist_failed")
 })
