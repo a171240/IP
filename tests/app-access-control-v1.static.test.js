@@ -26,6 +26,13 @@ const repositoryPath = path.join(
   "repositories",
   "app-access-control.server.ts",
 )
+const voiceCoachFacadePath = path.join(
+  root,
+  "lib",
+  "aliyun-rds",
+  "repositories",
+  "app-voice-coach-facade.server.ts",
+)
 const accountProfileRepositoryPath = path.join(
   root,
   "lib",
@@ -64,6 +71,10 @@ test("V1 migration separates canonical identity, contacts, trials, memberships, 
   assert.match(sql, /data_domain text not null default 'personal_trial'/i)
   assert.match(sql, /client_session_id text/i)
   assert.match(sql, /canonical_user_id uuid/i)
+  assert.match(sql, /trial_reservation_status text/i)
+  assert.match(sql, /trial_reservation_expires_at timestamptz/i)
+  assert.match(sql, /trial_completion_event_id text/i)
+  assert.match(sql, /trial_round_1_evidence jsonb/i)
   assert.match(sql, /authorization_version bigint/i)
   assert.match(sql, /normalized_value_hash text not null/i)
   assert.match(sql, /encrypted_value text not null/i)
@@ -87,6 +98,10 @@ test("V1 migration separates canonical identity, contacts, trials, memberships, 
     sql,
     /create unique index voice_coach_trial_client_session_idx\s+on public\.voice_coach_sessions\(canonical_user_id, client_session_id\)/i,
   )
+  assert.match(
+    sql,
+    /create unique index voice_coach_trial_completion_event_idx\s+on public\.voice_coach_sessions\(trial_completion_event_id\)/i,
+  )
   assert.doesNotMatch(sql, /\b(phone|mobile).*(membership|entitlement)/i)
 })
 
@@ -99,6 +114,9 @@ test("V1 rollback is explicit and removes only V1-owned schema additions", () =>
   assert.match(sql, /drop table if exists public\.app_idempotency_records/i)
   assert.match(sql, /drop table if exists public\.app_auth_identities/i)
   assert.match(sql, /alter table public\.voice_coach_sessions[\s\S]*drop column if exists data_domain/i)
+  assert.match(sql, /drop column if exists trial_reservation_status/i)
+  assert.match(sql, /drop column if exists trial_completion_event_id/i)
+  assert.match(sql, /drop index if exists public\.voice_coach_trial_completion_event_idx/i)
   assert.doesNotMatch(sql, /drop table if exists public\.(profiles|entitlements|mp_account_memberships|voice_coach_sessions)\b/i)
 })
 
@@ -117,7 +135,11 @@ test("access-control repository exposes the canonical V1 operations", () => {
   for (const operation of [
     "ensureAppCanonicalIdentityAndTrial",
     "getAppAccessSnapshot",
-    "consumePersonalTrialVoiceSession",
+    "reservePersonalTrialVoiceSession",
+    "recordPersonalTrialVoiceEvidence",
+    "completePersonalTrialFirstRound",
+    "releasePersonalTrialVoiceSession",
+    "expirePersonalTrialVoiceReservations",
     "grantAppAccess",
   ]) {
     assert.match(source, new RegExp(`export async function ${operation}\\b`), operation)
@@ -136,6 +158,66 @@ test("access-control repository exposes the canonical V1 operations", () => {
   assert.doesNotMatch(
     source,
     /from public\.entitlements where canonical_user_id/i,
+  )
+})
+
+test("personal trial voice creation reserves without consuming sessions_used", () => {
+  const source = fs.readFileSync(repositoryPath, "utf8")
+
+  assert.match(
+    source,
+    /export async function reservePersonalTrialVoiceSession\b/,
+  )
+
+  const reserveSection = source.match(
+    /export async function reservePersonalTrialVoiceSession[\s\S]*?(?=export async function completePersonalTrialFirstRound)/,
+  )?.[0]
+  assert.ok(reserveSection, "reservePersonalTrialVoiceSession section")
+  assert.doesNotMatch(reserveSection, /sessions_used\s*=\s*sessions_used\s*\+\s*1/i)
+  assert.doesNotMatch(reserveSection, /personal_trial\.voice_session_consumed/)
+})
+
+test("round one completion consumes only previously persisted server evidence", () => {
+  const source = fs.readFileSync(repositoryPath, "utf8")
+  const completeSection = source.match(
+    /export async function completePersonalTrialFirstRound[\s\S]*?(?=export async function releasePersonalTrialVoiceSession)/,
+  )?.[0]
+
+  assert.ok(completeSection, "completePersonalTrialFirstRound section")
+  assert.match(
+    completeSection,
+    /from public\.app_personal_trial_voice_evidence/i,
+  )
+  assert.doesNotMatch(completeSection, /args\.evidence/)
+})
+
+test("round one completion enforces reservation TTL in the consuming SQL statement", () => {
+  const source = fs.readFileSync(repositoryPath, "utf8")
+  const completeSection = source.match(
+    /export async function completePersonalTrialFirstRound[\s\S]*?(?=export async function releasePersonalTrialVoiceSession)/,
+  )?.[0]
+
+  assert.ok(completeSection, "completePersonalTrialFirstRound section")
+  assert.match(
+    completeSection,
+    /update public\.voice_coach_sessions[\s\S]*trial_reservation_expires_at\s*>\s*clock_timestamp\(\)/i,
+  )
+  assert.doesNotMatch(completeSection, /Date\.now\(\)/)
+})
+
+test("personal trial AI coach is closed by default and enforced before reservation", () => {
+  const repository = fs.readFileSync(repositoryPath, "utf8")
+  const facade = fs.readFileSync(voiceCoachFacadePath, "utf8")
+
+  assert.match(
+    repository,
+    /export function personalTrialAiCoachPublicEnabled\b/,
+  )
+  assert.match(repository, /PERSONAL_TRIAL_AI_COACH_PUBLIC_ENABLED/)
+  assert.match(repository, /aiCoachPublicEnabled/)
+  assert.match(
+    facade,
+    /personalAccess\.trial\.aiCoachPublicEnabled[\s\S]*personal_trial_ai_coach_not_open/,
   )
 })
 

@@ -2,7 +2,7 @@ import "server-only"
 
 import { getAliyunRdsPool, withAliyunRdsTransaction } from "@/lib/aliyun-rds/postgres.server"
 import {
-  consumePersonalTrialVoiceSessionWithClient,
+  reservePersonalTrialVoiceSessionWithClient,
 } from "@/lib/aliyun-rds/repositories/app-access-control.server"
 
 export const APP_VOICE_COACH_RDS_REPOSITORY_MODE = "rds_voice_coach_text_session_contract"
@@ -173,7 +173,7 @@ export async function createAliyunRdsPersonalTrialVoiceCoachTextSessionWithClien
     args.firstCustomerText,
     "voice_coach_rds_first_customer_text_required",
   )
-  const consumed = await consumePersonalTrialVoiceSessionWithClient(client, {
+  const reservation = await reservePersonalTrialVoiceSessionWithClient(client, {
     canonicalUserId: args.canonicalUserId,
     clientSessionId: args.clientSessionId,
     requestPayload: { scenario_id: args.scenario.id },
@@ -189,7 +189,7 @@ export async function createAliyunRdsPersonalTrialVoiceCoachTextSessionWithClien
         and data_domain = 'personal_trial'
       limit 1
     `,
-    [consumed.sessionId, args.userId, args.canonicalUserId],
+    [reservation.sessionId, args.userId, args.canonicalUserId],
   )
   const session = sessionResult.rows[0]
   if (!session) throw new Error("voice_coach_rds_session_insert_failed")
@@ -200,7 +200,7 @@ export async function createAliyunRdsPersonalTrialVoiceCoachTextSessionWithClien
       deduped: true,
       firstCustomerTurn: existingTurns[0],
       session,
-      trial: consumed.trial,
+      trial: reservation.trial,
     }
   }
 
@@ -216,10 +216,10 @@ export async function createAliyunRdsPersonalTrialVoiceCoachTextSessionWithClien
     turnIndex: 0,
   })
   return {
-    deduped: consumed.deduped,
+    deduped: reservation.deduped,
     firstCustomerTurn,
     session,
-    trial: consumed.trial,
+    trial: reservation.trial,
   }
 }
 
@@ -443,6 +443,13 @@ export async function getAliyunRdsVoiceCoachTextSessionWithClient(
             $3 = 'personal_trial'
             and data_domain = 'personal_trial'
             and canonical_user_id = $4
+            and (
+              trial_reservation_status = 'consumed'
+              or (
+                trial_reservation_status = 'reserved'
+                and trial_reservation_expires_at > clock_timestamp()
+              )
+            )
           )
           or (
             $3 = 'store'
@@ -487,6 +494,13 @@ async function lockAliyunRdsVoiceCoachTextSessionWithClient(
             $3 = 'personal_trial'
             and data_domain = 'personal_trial'
             and canonical_user_id = $4
+            and (
+              trial_reservation_status = 'consumed'
+              or (
+                trial_reservation_status = 'reserved'
+                and trial_reservation_expires_at > clock_timestamp()
+              )
+            )
           )
           or (
             $3 = 'store'

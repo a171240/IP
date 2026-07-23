@@ -383,6 +383,16 @@ export async function resolveAppVoiceCoachFacadeContext(
     }
   }
 
+  if (!personalAccess.trial.aiCoachPublicEnabled) {
+    return {
+      error: jsonError(
+        403,
+        "personal_trial_ai_coach_not_open",
+        "personal_trial_ai_coach_not_open",
+      ),
+    }
+  }
+
   return {
     auth,
     ctx,
@@ -1055,6 +1065,12 @@ export async function createAppVoiceCoachTextSessionResponse(opts: {
       if (code === "app_idempotency_conflict") {
         return jsonError(409, code, code)
       }
+      if (
+        code === "personal_trial_session_terminal" ||
+        code === "personal_trial_reservation_expired"
+      ) {
+        return jsonError(409, code, code)
+      }
       if (code === "client_session_id_invalid") {
         return jsonError(422, code, code)
       }
@@ -1089,9 +1105,12 @@ export async function createAppVoiceCoachTextSessionResponse(opts: {
                 data_domain: created.trial.dataDomain,
                 status: created.trial.status,
                 ai_coach_session_limit: created.trial.sessionLimit,
+                ai_coach_sessions_reserved: created.trial.sessionsReserved,
                 ai_coach_sessions_used: created.trial.sessionsUsed,
                 ai_coach_sessions_remaining:
                   created.trial.sessionsRemaining,
+                ai_coach_public_enabled:
+                  created.trial.aiCoachPublicEnabled,
               },
             }
           : {}),

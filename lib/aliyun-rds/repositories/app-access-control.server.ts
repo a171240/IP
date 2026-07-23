@@ -22,6 +22,8 @@ export type AppPersonalTrialSnapshot = {
   dataDomain: "personal_trial"
   status: "active" | "exhausted" | "suspended" | "revoked"
   sessionLimit: 2
+  aiCoachPublicEnabled: boolean
+  sessionsReserved: number
   sessionsUsed: number
   sessionsRemaining: number
 }
@@ -47,6 +49,25 @@ export type AppAccessGrantResult = {
   membershipId: string
   deduped: boolean
 }
+
+type AppPersonalTrialFirstRoundEvidence = {
+  openingTtsAudioId: string
+  recordingReceiptId: string
+  asrResultId: string
+  nextTurnTtsAudioId: string
+}
+
+export type AppPersonalTrialVoiceEvidenceStage =
+  | "opening_tts_ready"
+  | "recording_received"
+  | "asr_succeeded"
+  | "next_turn_tts_ready"
+
+export type AppPersonalTrialTechnicalFailureReason =
+  | "opening_tts_failed"
+  | "recording_receive_failed"
+  | "asr_failed"
+  | "next_turn_tts_failed"
 
 type IdentityDescriptor = {
   provider: string
@@ -75,6 +96,7 @@ type IdentityReviewRow = {
 type TrialRow = {
   status: AppPersonalTrialSnapshot["status"]
   session_limit: number
+  sessions_reserved: number | string
   sessions_used: number
 }
 
@@ -98,6 +120,18 @@ class AppIdentityConflictError extends Error {
 type VoiceSessionRow = {
   id: string
   client_request_hash: string | null
+  trial_completion_event_hash: string | null
+  trial_completion_event_id: string | null
+  trial_round_1_evidence: unknown
+  trial_release_reason: AppPersonalTrialTechnicalFailureReason | "reservation_expired" | null
+  trial_reservation_active?: boolean
+  trial_reservation_expires_at: Date | string | null
+  trial_reservation_status: "reserved" | "consumed" | "released" | "expired" | null
+}
+
+type PersonalTrialVoiceEvidenceRow = {
+  evidence_id: string
+  evidence_stage: AppPersonalTrialVoiceEvidenceStage
 }
 
 type IdempotencyRow = {
@@ -107,6 +141,21 @@ type IdempotencyRow = {
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const SAFE_KEY_PATTERN = /^[a-z0-9][a-z0-9_.:-]*$/i
+const DEFAULT_PERSONAL_TRIAL_RESERVATION_TTL_SECONDS = 600
+const PERSONAL_TRIAL_TECHNICAL_FAILURE_REASONS =
+  new Set<AppPersonalTrialTechnicalFailureReason>([
+    "opening_tts_failed",
+    "recording_receive_failed",
+    "asr_failed",
+    "next_turn_tts_failed",
+  ])
+const PERSONAL_TRIAL_VOICE_EVIDENCE_STAGES =
+  new Set<AppPersonalTrialVoiceEvidenceStage>([
+    "opening_tts_ready",
+    "recording_received",
+    "asr_succeeded",
+    "next_turn_tts_ready",
+  ])
 const ACCESS_GRANT_ROLES = new Set([
   "company_owner",
   "company_admin",
@@ -449,6 +498,14 @@ export async function resolveAppCanonicalAuthorizationWithClient(
         trial.status,
         trial.session_limit,
         trial.sessions_used,
+        (
+          select count(*)::integer
+          from public.voice_coach_sessions session
+          where session.canonical_user_id = canonical.id
+            and session.data_domain = 'personal_trial'
+            and session.trial_reservation_status = 'reserved'
+            and session.trial_reservation_expires_at > now()
+        ) as sessions_reserved,
         coalesce(version.authorization_version, 0) as authorization_version
       from public.app_canonical_users canonical
       join public.app_personal_trials trial
@@ -579,18 +636,18 @@ export async function getAppAccessSnapshotWithClient(
   }
 }
 
-export async function consumePersonalTrialVoiceSession(args: {
+export async function reservePersonalTrialVoiceSession(args: {
   canonicalUserId: string
   clientSessionId: string
   requestPayload: Record<string, unknown>
   userId: string
 }) {
   return withAliyunRdsTransaction((client) =>
-    consumePersonalTrialVoiceSessionWithClient(client, args),
+    reservePersonalTrialVoiceSessionWithClient(client, args),
   )
 }
 
-export async function consumePersonalTrialVoiceSessionWithClient(
+export async function reservePersonalTrialVoiceSessionWithClient(
   client: AppAccessQueryClient,
   args: {
     canonicalUserId: string
@@ -603,10 +660,7 @@ export async function consumePersonalTrialVoiceSessionWithClient(
   const userId = requiredUuid(args.userId, "app_user_id_invalid")
   const clientSessionId = requiredIdempotencyKey(args.clientSessionId, "client_session_id_invalid")
   const requestHash = sha256(stableJson(args.requestPayload))
-  await acquireTransactionLock(
-    client,
-    `personal-trial:${canonicalUserId}:${clientSessionId}`,
-  )
+  await acquireTransactionLock(client, `personal-trial:${canonicalUserId}`)
 
   const identity = await client.query<{ present: boolean }>(
     `
@@ -621,7 +675,13 @@ export async function consumePersonalTrialVoiceSessionWithClient(
 
   const existing = await client.query<VoiceSessionRow>(
     `
-      select id, client_request_hash
+      select
+        id,
+        client_request_hash,
+        trial_reservation_status,
+        trial_reservation_expires_at,
+        trial_reservation_expires_at > clock_timestamp()
+          as trial_reservation_active
       from public.voice_coach_sessions
       where canonical_user_id = $1
         and client_session_id = $2
@@ -635,6 +695,18 @@ export async function consumePersonalTrialVoiceSessionWithClient(
     if (existing.rows[0].client_request_hash !== requestHash) {
       throw new Error("app_idempotency_conflict")
     }
+    if (
+      existing.rows[0].trial_reservation_status === "released" ||
+      existing.rows[0].trial_reservation_status === "expired"
+    ) {
+      throw new Error("personal_trial_session_terminal")
+    }
+    if (
+      existing.rows[0].trial_reservation_status === "reserved" &&
+      !existing.rows[0].trial_reservation_active
+    ) {
+      throw new Error("personal_trial_reservation_expired")
+    }
     return {
       deduped: true,
       sessionId: existing.rows[0].id,
@@ -644,20 +716,37 @@ export async function consumePersonalTrialVoiceSessionWithClient(
 
   const trialResult = await client.query<TrialRow>(
     `
-      select status, session_limit, sessions_used
-      from public.app_personal_trials
-      where canonical_user_id = $1
+      select
+        trial.status,
+        trial.session_limit,
+        trial.sessions_used,
+        (
+          select count(*)::integer
+          from public.voice_coach_sessions session
+          where session.canonical_user_id = trial.canonical_user_id
+            and session.data_domain = 'personal_trial'
+            and session.trial_reservation_status = 'reserved'
+            and session.trial_reservation_expires_at > now()
+        ) as sessions_reserved
+      from public.app_personal_trials trial
+      where trial.canonical_user_id = $1
       limit 1
       for update
     `,
     [canonicalUserId],
   )
   const trial = trialResult.rows[0]
-  if (!trial || trial.status !== "active" || trial.sessions_used >= trial.session_limit) {
+  if (
+    !trial ||
+    trial.status !== "active" ||
+    Number(trial.sessions_used) + Number(trial.sessions_reserved) >=
+      Number(trial.session_limit)
+  ) {
     throw new Error("personal_trial_exhausted")
   }
 
   const scenarioId = optionalText(args.requestPayload.scenario_id, 120) || "objection_safety"
+  const reservationTtlSeconds = personalTrialReservationTtlSeconds()
   const inserted = await client.query<{ id: string }>(
     `
       insert into public.voice_coach_sessions (
@@ -666,6 +755,9 @@ export async function consumePersonalTrialVoiceSessionWithClient(
         data_domain,
         client_session_id,
         client_request_hash,
+        trial_reservation_status,
+        trial_reserved_at,
+        trial_reservation_expires_at,
         company_id,
         store_id,
         membership_id,
@@ -680,6 +772,9 @@ export async function consumePersonalTrialVoiceSessionWithClient(
         'personal_trial',
         $3,
         $4,
+        'reserved',
+        now(),
+        now() + make_interval(secs => $8::integer),
         null,
         null,
         null,
@@ -701,25 +796,11 @@ export async function consumePersonalTrialVoiceSessionWithClient(
         canonical_user_id: canonicalUserId,
       }),
       jsonbParam(args.requestPayload),
+      reservationTtlSeconds,
     ],
   )
   const sessionId = inserted.rows[0]?.id
   if (!sessionId) throw new Error("personal_trial_session_create_failed")
-
-  const updatedTrial = await client.query<TrialRow>(
-    `
-      update public.app_personal_trials
-      set
-        sessions_used = sessions_used + 1,
-        status = case when sessions_used + 1 >= session_limit then 'exhausted' else 'active' end,
-        updated_at = now()
-      where canonical_user_id = $1
-      returning status, session_limit, sessions_used
-    `,
-    [canonicalUserId],
-  )
-  const afterTrial = updatedTrial.rows[0]
-  if (!afterTrial) throw new Error("personal_trial_update_failed")
 
   await client.query(
     `
@@ -732,21 +813,571 @@ export async function consumePersonalTrialVoiceSessionWithClient(
         request_id,
         after_json
       )
-      values ($1, $2, 'personal_trial.voice_session_consumed', 'voice_coach_session', $3, $4, $5::jsonb)
+      values ($1, $2, 'personal_trial.voice_session_reserved', 'voice_coach_session', $3, $4, $5::jsonb)
     `,
     [
       canonicalUserId,
       userId,
       sessionId,
       clientSessionId,
-      jsonbParam({ trial: trialSnapshot(afterTrial) }),
+      jsonbParam({
+        reservation_expires_in_seconds: reservationTtlSeconds,
+        reservation_status: "reserved",
+      }),
     ],
   )
 
   return {
     deduped: false,
     sessionId,
-    trial: trialSnapshot(afterTrial),
+    trial: await getPersonalTrialSnapshotWithClient(client, canonicalUserId),
+  }
+}
+
+export async function recordPersonalTrialVoiceEvidence(args: {
+  canonicalUserId: string
+  evidenceId: string
+  evidenceStage: AppPersonalTrialVoiceEvidenceStage
+  sessionId: string
+}) {
+  return withAliyunRdsTransaction((client) =>
+    recordPersonalTrialVoiceEvidenceWithClient(client, args),
+  )
+}
+
+export async function recordPersonalTrialVoiceEvidenceWithClient(
+  client: AppAccessQueryClient,
+  args: {
+    canonicalUserId: string
+    evidenceId: string
+    evidenceStage: AppPersonalTrialVoiceEvidenceStage
+    sessionId: string
+  },
+) {
+  const canonicalUserId = requiredUuid(
+    args.canonicalUserId,
+    "canonical_user_id_invalid",
+  )
+  const sessionId = requiredUuid(args.sessionId, "voice_coach_session_id_invalid")
+  const evidenceStage = requiredPersonalTrialVoiceEvidenceStage(
+    args.evidenceStage,
+  )
+  const evidenceId = requiredText(
+    args.evidenceId,
+    200,
+    "personal_trial_voice_evidence_id_invalid",
+  )
+  await acquireTransactionLock(client, `personal-trial:${canonicalUserId}`)
+
+  const sessionResult = await client.query<VoiceSessionRow>(
+    `
+      select
+        id,
+        trial_reservation_status,
+        trial_reservation_expires_at
+      from public.voice_coach_sessions
+      where id = $1
+        and canonical_user_id = $2
+        and data_domain = 'personal_trial'
+      limit 1
+      for update
+    `,
+    [sessionId, canonicalUserId],
+  )
+  const session = sessionResult.rows[0]
+  if (!session) throw new Error("personal_trial_session_not_found")
+
+  const existingEvidence = await client.query<PersonalTrialVoiceEvidenceRow>(
+    `
+      select evidence_stage, evidence_id
+      from public.app_personal_trial_voice_evidence
+      where session_id = $1
+        and evidence_stage = $2
+      limit 1
+      for update
+    `,
+    [sessionId, evidenceStage],
+  )
+  if (existingEvidence.rows[0]) {
+    if (existingEvidence.rows[0].evidence_id !== evidenceId) {
+      throw new Error("personal_trial_voice_evidence_conflict")
+    }
+    return {
+      deduped: true,
+      evidenceId,
+      evidenceStage,
+      sessionId,
+    }
+  }
+  if (session.trial_reservation_status !== "reserved") {
+    throw new Error("personal_trial_voice_evidence_conflict")
+  }
+
+  const insertedEvidence = await client.query<PersonalTrialVoiceEvidenceRow>(
+    `
+      insert into public.app_personal_trial_voice_evidence (
+        session_id,
+        evidence_stage,
+        evidence_id
+      )
+      select
+        session.id,
+        $3,
+        $4
+      from public.voice_coach_sessions session
+      where session.id = $1
+        and session.canonical_user_id = $2
+        and session.data_domain = 'personal_trial'
+        and session.trial_reservation_status = 'reserved'
+        and session.trial_reservation_expires_at > clock_timestamp()
+      returning evidence_stage, evidence_id
+    `,
+    [sessionId, canonicalUserId, evidenceStage, evidenceId],
+  )
+  if (!insertedEvidence.rows[0]) {
+    throw new Error("personal_trial_reservation_expired")
+  }
+
+  return {
+    deduped: false,
+    evidenceId,
+    evidenceStage,
+    sessionId,
+  }
+}
+
+export async function completePersonalTrialFirstRound(args: {
+  canonicalUserId: string
+  completionEventId: string
+  sessionId: string
+}) {
+  return withAliyunRdsTransaction((client) =>
+    completePersonalTrialFirstRoundWithClient(client, args),
+  )
+}
+
+export async function completePersonalTrialFirstRoundWithClient(
+  client: AppAccessQueryClient,
+  args: {
+    canonicalUserId: string
+    completionEventId: string
+    sessionId: string
+  },
+) {
+  const canonicalUserId = requiredUuid(
+    args.canonicalUserId,
+    "canonical_user_id_invalid",
+  )
+  const sessionId = requiredUuid(args.sessionId, "voice_coach_session_id_invalid")
+  const completionEventId = requiredIdempotencyKey(
+    args.completionEventId,
+    "trial_completion_event_id_invalid",
+  )
+  await acquireTransactionLock(client, `personal-trial:${canonicalUserId}`)
+  await acquireTransactionLock(
+    client,
+    `personal-trial-completion:${completionEventId}`,
+  )
+
+  const sessionResult = await client.query<VoiceSessionRow>(
+    `
+      select
+        id,
+        client_request_hash,
+        trial_reservation_status,
+        trial_reservation_expires_at,
+        trial_completion_event_id,
+        trial_completion_event_hash,
+        trial_round_1_evidence
+      from public.voice_coach_sessions
+      where id = $1
+        and canonical_user_id = $2
+        and data_domain = 'personal_trial'
+      limit 1
+      for update
+    `,
+    [sessionId, canonicalUserId],
+  )
+  const session = sessionResult.rows[0]
+  if (!session) throw new Error("personal_trial_session_not_found")
+
+  if (session.trial_completion_event_id) {
+    if (
+      session.trial_reservation_status === "consumed" &&
+      session.trial_completion_event_id === completionEventId &&
+      session.trial_completion_event_hash &&
+      session.trial_round_1_evidence
+    ) {
+      return {
+        deduped: true,
+        sessionId,
+        trial: await getPersonalTrialSnapshotWithClient(client, canonicalUserId),
+      }
+    }
+    throw new Error("personal_trial_completion_conflict")
+  }
+
+  const existingEvent = await client.query<{
+    id: string
+    trial_completion_event_hash: string | null
+  }>(
+    `
+      select id, trial_completion_event_hash
+      from public.voice_coach_sessions
+      where trial_completion_event_id = $1
+      limit 1
+      for update
+    `,
+    [completionEventId],
+  )
+  if (existingEvent.rows[0]) {
+    throw new Error("personal_trial_completion_conflict")
+  }
+  if (session.trial_reservation_status !== "reserved") {
+    throw new Error("personal_trial_completion_conflict")
+  }
+
+  const evidenceResult = await client.query<PersonalTrialVoiceEvidenceRow>(
+    `
+      select evidence_stage, evidence_id
+      from public.app_personal_trial_voice_evidence
+      where session_id = $1
+      order by evidence_stage
+    `,
+    [sessionId],
+  )
+  const evidence = requiredPersistedFirstRoundEvidence(evidenceResult.rows)
+  const completionEventHash = sha256(stableJson(evidence))
+
+  const consumedSession = await client.query<{ id: string }>(
+    `
+      update public.voice_coach_sessions
+      set
+        trial_reservation_status = 'consumed',
+        trial_consumed_at = now(),
+        trial_completion_event_id = $2,
+        trial_completion_event_hash = $3,
+        trial_round_1_evidence = $4::jsonb
+      where id = $1
+        and canonical_user_id = $5
+        and data_domain = 'personal_trial'
+        and trial_reservation_status = 'reserved'
+        and trial_reservation_expires_at > clock_timestamp()
+      returning id
+    `,
+    [
+      sessionId,
+      completionEventId,
+      completionEventHash,
+      jsonbParam(firstRoundEvidenceJson(evidence)),
+      canonicalUserId,
+    ],
+  )
+  if (!consumedSession.rows[0]) {
+    throw new Error("personal_trial_reservation_expired")
+  }
+
+  const updatedTrial = await client.query<TrialRow>(
+    `
+      update public.app_personal_trials
+      set
+        sessions_used = sessions_used + 1,
+        status = case
+          when sessions_used + 1 >= session_limit then 'exhausted'
+          else 'active'
+        end,
+        updated_at = now()
+      where canonical_user_id = $1
+        and status = 'active'
+        and sessions_used < session_limit
+      returning
+        status,
+        session_limit,
+        sessions_used,
+        0::integer as sessions_reserved
+    `,
+    [canonicalUserId],
+  )
+  if (!updatedTrial.rows[0]) throw new Error("personal_trial_completion_conflict")
+
+  await client.query(
+    `
+      insert into public.app_authorization_audit_events (
+        canonical_user_id,
+        action,
+        target_type,
+        target_id,
+        request_id,
+        after_json
+      )
+      values (
+        $1,
+        'personal_trial.round_1_completed',
+        'voice_coach_session',
+        $2,
+        $3,
+        $4::jsonb
+      )
+    `,
+    [
+      canonicalUserId,
+      sessionId,
+      completionEventId,
+      jsonbParam({
+        completion_event_hash: completionEventHash,
+        evidence: firstRoundEvidenceJson(evidence),
+      }),
+    ],
+  )
+
+  return {
+    deduped: false,
+    sessionId,
+    trial: await getPersonalTrialSnapshotWithClient(client, canonicalUserId),
+  }
+}
+
+export async function releasePersonalTrialVoiceSession(args: {
+  canonicalUserId: string
+  reason: AppPersonalTrialTechnicalFailureReason
+  sessionId: string
+}) {
+  return withAliyunRdsTransaction((client) =>
+    releasePersonalTrialVoiceSessionWithClient(client, args),
+  )
+}
+
+export async function releasePersonalTrialVoiceSessionWithClient(
+  client: AppAccessQueryClient,
+  args: {
+    canonicalUserId: string
+    reason: AppPersonalTrialTechnicalFailureReason
+    sessionId: string
+  },
+) {
+  const canonicalUserId = requiredUuid(
+    args.canonicalUserId,
+    "canonical_user_id_invalid",
+  )
+  const sessionId = requiredUuid(args.sessionId, "voice_coach_session_id_invalid")
+  const reason = requiredTechnicalFailureReason(args.reason)
+  await acquireTransactionLock(client, `personal-trial:${canonicalUserId}`)
+
+  const sessionResult = await client.query<VoiceSessionRow>(
+    `
+      select
+        id,
+        client_request_hash,
+        trial_reservation_status,
+        trial_reservation_expires_at,
+        trial_completion_event_id,
+        trial_completion_event_hash,
+        trial_release_reason
+      from public.voice_coach_sessions
+      where id = $1
+        and canonical_user_id = $2
+        and data_domain = 'personal_trial'
+      limit 1
+      for update
+    `,
+    [sessionId, canonicalUserId],
+  )
+  const session = sessionResult.rows[0]
+  if (!session) throw new Error("personal_trial_session_not_found")
+  if (session.trial_reservation_status === "consumed") {
+    await client.query(
+      `
+        insert into public.app_authorization_audit_events (
+          canonical_user_id,
+          action,
+          target_type,
+          target_id,
+          metadata
+        )
+        values (
+          $1,
+          'personal_trial.post_consumption_failure_recorded',
+          'voice_coach_session',
+          $2,
+          $3::jsonb
+        )
+      `,
+      [canonicalUserId, sessionId, jsonbParam({ reason })],
+    )
+    return {
+      deduped: false,
+      released: false,
+      reservationStatus: "consumed" as const,
+      sessionId,
+      trial: await getPersonalTrialSnapshotWithClient(client, canonicalUserId),
+    }
+  }
+  if (session.trial_reservation_status === "released") {
+    if (session.trial_release_reason !== reason) {
+      throw new Error("personal_trial_release_conflict")
+    }
+    return {
+      deduped: true,
+      released: true,
+      reservationStatus: "released" as const,
+      sessionId,
+      trial: await getPersonalTrialSnapshotWithClient(client, canonicalUserId),
+    }
+  }
+  if (session.trial_reservation_status === "expired") {
+    return {
+      deduped: true,
+      released: false,
+      reservationStatus: "expired" as const,
+      sessionId,
+      trial: await getPersonalTrialSnapshotWithClient(client, canonicalUserId),
+    }
+  }
+  if (session.trial_reservation_status !== "reserved") {
+    throw new Error("personal_trial_release_conflict")
+  }
+
+  const releasedSession = await client.query<{
+    id: string
+    trial_reservation_status: "released" | "expired"
+  }>(
+    `
+      with release_clock as (
+        select clock_timestamp() as observed_at
+      )
+      update public.voice_coach_sessions as session
+      set
+        trial_reservation_status = case
+          when session.trial_reservation_expires_at > release_clock.observed_at
+            then 'released'
+          else 'expired'
+        end,
+        trial_released_at = release_clock.observed_at,
+        trial_release_reason = case
+          when session.trial_reservation_expires_at > release_clock.observed_at
+            then $2
+          else 'reservation_expired'
+        end
+      from release_clock
+      where session.id = $1
+        and session.trial_reservation_status = 'reserved'
+      returning session.id, session.trial_reservation_status
+    `,
+    [sessionId, reason],
+  )
+  if (!releasedSession.rows[0]) throw new Error("personal_trial_release_conflict")
+  const reservationStatus =
+    releasedSession.rows[0].trial_reservation_status
+  const expired = reservationStatus === "expired"
+
+  await client.query(
+    `
+      insert into public.app_authorization_audit_events (
+        canonical_user_id,
+        action,
+        target_type,
+        target_id,
+        metadata
+      )
+      values (
+        $1,
+        $2,
+        'voice_coach_session',
+        $3,
+        $4::jsonb
+      )
+    `,
+    [
+      canonicalUserId,
+      expired
+        ? "personal_trial.voice_session_expired"
+        : "personal_trial.voice_session_released",
+      sessionId,
+      jsonbParam(
+        expired
+          ? {
+              late_technical_failure_reason: reason,
+              reason: "reservation_expired",
+            }
+          : { reason },
+      ),
+    ],
+  )
+
+  return {
+    deduped: false,
+    released: !expired,
+    reservationStatus,
+    sessionId,
+    trial: await getPersonalTrialSnapshotWithClient(client, canonicalUserId),
+  }
+}
+
+export async function expirePersonalTrialVoiceReservations(args: {
+  canonicalUserId: string
+}) {
+  return withAliyunRdsTransaction((client) =>
+    expirePersonalTrialVoiceReservationsWithClient(client, args),
+  )
+}
+
+export async function expirePersonalTrialVoiceReservationsWithClient(
+  client: AppAccessQueryClient,
+  args: {
+    canonicalUserId: string
+  },
+) {
+  const canonicalUserId = requiredUuid(
+    args.canonicalUserId,
+    "canonical_user_id_invalid",
+  )
+  await acquireTransactionLock(client, `personal-trial:${canonicalUserId}`)
+
+  const expiredSessions = await client.query<{ id: string }>(
+    `
+      update public.voice_coach_sessions
+      set
+        trial_reservation_status = 'expired',
+        trial_released_at = now(),
+        trial_release_reason = 'reservation_expired'
+      where canonical_user_id = $1
+        and data_domain = 'personal_trial'
+        and trial_reservation_status = 'reserved'
+        and trial_reservation_expires_at <= now()
+      returning id
+    `,
+    [canonicalUserId],
+  )
+  for (const session of expiredSessions.rows) {
+    await client.query(
+      `
+        insert into public.app_authorization_audit_events (
+          canonical_user_id,
+          action,
+          target_type,
+          target_id,
+          metadata
+        )
+        values (
+          $1,
+          'personal_trial.voice_session_expired',
+          'voice_coach_session',
+          $2,
+          $3::jsonb
+        )
+      `,
+      [
+        canonicalUserId,
+        session.id,
+        jsonbParam({ reason: "reservation_expired" }),
+      ],
+    )
+  }
+
+  return {
+    expiredCount: expiredSessions.rows.length,
+    sessionIds: expiredSessions.rows.map((session) => session.id),
+    trial: await getPersonalTrialSnapshotWithClient(client, canonicalUserId),
   }
 }
 
@@ -1244,7 +1875,23 @@ async function getPersonalTrialSnapshotWithClient(
   canonicalUserId: string,
 ) {
   const result = await client.query<TrialRow>(
-    "select status, session_limit, sessions_used from public.app_personal_trials where canonical_user_id = $1 limit 1",
+    `
+      select
+        trial.status,
+        trial.session_limit,
+        trial.sessions_used,
+        (
+          select count(*)::integer
+          from public.voice_coach_sessions session
+          where session.canonical_user_id = trial.canonical_user_id
+            and session.data_domain = 'personal_trial'
+            and session.trial_reservation_status = 'reserved'
+            and session.trial_reservation_expires_at > now()
+        ) as sessions_reserved
+      from public.app_personal_trials trial
+      where trial.canonical_user_id = $1
+      limit 1
+    `,
     [canonicalUserId],
   )
   if (!result.rows[0]) throw new Error("personal_trial_not_found")
@@ -1253,16 +1900,115 @@ async function getPersonalTrialSnapshotWithClient(
 
 function trialSnapshot(row: TrialRow): AppPersonalTrialSnapshot {
   const sessionLimit = Number(row.session_limit)
+  const sessionsReserved = Number(row.sessions_reserved)
   const sessionsUsed = Number(row.sessions_used)
-  if (sessionLimit !== 2) throw new Error("personal_trial_limit_invalid")
+  if (
+    sessionLimit !== 2 ||
+    !Number.isInteger(sessionsReserved) ||
+    sessionsReserved < 0 ||
+    !Number.isInteger(sessionsUsed) ||
+    sessionsUsed < 0 ||
+    sessionsUsed + sessionsReserved > sessionLimit
+  ) {
+    throw new Error("personal_trial_limit_invalid")
+  }
   return {
     kind: "personal_trial",
     dataDomain: "personal_trial",
     status: row.status,
     sessionLimit: 2,
+    aiCoachPublicEnabled: personalTrialAiCoachPublicEnabled(),
+    sessionsReserved,
     sessionsUsed,
-    sessionsRemaining: Math.max(0, sessionLimit - sessionsUsed),
+    sessionsRemaining: Math.max(
+      0,
+      sessionLimit - sessionsUsed - sessionsReserved,
+    ),
   }
+}
+
+export function personalTrialReservationTtlSeconds() {
+  const configured = String(
+    process.env.PERSONAL_TRIAL_VOICE_RESERVATION_TTL_SECONDS || "",
+  ).trim()
+  if (!configured) return DEFAULT_PERSONAL_TRIAL_RESERVATION_TTL_SECONDS
+  const seconds = Number(configured)
+  if (!Number.isInteger(seconds) || seconds < 1 || seconds > 86_400) {
+    throw new Error("personal_trial_reservation_ttl_invalid")
+  }
+  return seconds
+}
+
+export function personalTrialAiCoachPublicEnabled() {
+  const configured = String(
+    process.env.PERSONAL_TRIAL_AI_COACH_PUBLIC_ENABLED || "",
+  ).trim().toLowerCase()
+  return configured === "1" || configured === "true"
+}
+
+function requiredPersistedFirstRoundEvidence(
+  rows: PersonalTrialVoiceEvidenceRow[],
+): AppPersonalTrialFirstRoundEvidence {
+  const evidenceByStage = new Map(
+    rows.map((row) => [row.evidence_stage, row.evidence_id]),
+  )
+  if (
+    rows.length !== PERSONAL_TRIAL_VOICE_EVIDENCE_STAGES.size ||
+    evidenceByStage.size !== PERSONAL_TRIAL_VOICE_EVIDENCE_STAGES.size
+  ) {
+    throw new Error("personal_trial_first_round_evidence_incomplete")
+  }
+  return {
+    openingTtsAudioId: requiredText(
+      evidenceByStage.get("opening_tts_ready"),
+      200,
+      "personal_trial_first_round_evidence_incomplete",
+    ),
+    recordingReceiptId: requiredText(
+      evidenceByStage.get("recording_received"),
+      200,
+      "personal_trial_first_round_evidence_incomplete",
+    ),
+    asrResultId: requiredText(
+      evidenceByStage.get("asr_succeeded"),
+      200,
+      "personal_trial_first_round_evidence_incomplete",
+    ),
+    nextTurnTtsAudioId: requiredText(
+      evidenceByStage.get("next_turn_tts_ready"),
+      200,
+      "personal_trial_first_round_evidence_incomplete",
+    ),
+  }
+}
+
+function requiredPersonalTrialVoiceEvidenceStage(
+  value: unknown,
+): AppPersonalTrialVoiceEvidenceStage {
+  const evidenceStage = String(value || "") as AppPersonalTrialVoiceEvidenceStage
+  if (!PERSONAL_TRIAL_VOICE_EVIDENCE_STAGES.has(evidenceStage)) {
+    throw new Error("personal_trial_voice_evidence_stage_invalid")
+  }
+  return evidenceStage
+}
+
+function firstRoundEvidenceJson(evidence: AppPersonalTrialFirstRoundEvidence) {
+  return {
+    opening_tts_audio_id: evidence.openingTtsAudioId,
+    recording_receipt_id: evidence.recordingReceiptId,
+    asr_result_id: evidence.asrResultId,
+    next_turn_tts_audio_id: evidence.nextTurnTtsAudioId,
+  }
+}
+
+function requiredTechnicalFailureReason(
+  value: unknown,
+): AppPersonalTrialTechnicalFailureReason {
+  const reason = String(value || "") as AppPersonalTrialTechnicalFailureReason
+  if (!PERSONAL_TRIAL_TECHNICAL_FAILURE_REASONS.has(reason)) {
+    throw new Error("personal_trial_release_reason_invalid")
+  }
+  return reason
 }
 
 function requiredIdempotencyKey(value: unknown, errorCode: string) {

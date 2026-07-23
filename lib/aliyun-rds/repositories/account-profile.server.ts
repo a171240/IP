@@ -1096,8 +1096,10 @@ function appAccessContractPayload(snapshot: AppAccountReadSnapshot) {
       data_domain: trial.dataDomain,
       status: trial.status,
       ai_coach_session_limit: trial.sessionLimit,
+      ai_coach_sessions_reserved: trial.sessionsReserved,
       ai_coach_sessions_used: trial.sessionsUsed,
       ai_coach_sessions_remaining: trial.sessionsRemaining,
+      ai_coach_public_enabled: trial.aiCoachPublicEnabled,
     },
   }
 }

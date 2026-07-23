@@ -568,52 +568,233 @@ test(
         [mismatchedMembership.rows[0].id],
       )
 
-      const [sessionOne, sessionOneRetry] = await Promise.all([
-        repository.consumePersonalTrialVoiceSession({
-          canonicalUserId: first.canonicalUserId,
-          clientSessionId: "app-start-00000001",
-          requestPayload: { scenario_id: "objection_safety" },
-          userId: userA,
-        }),
-        repository.consumePersonalTrialVoiceSession({
-          canonicalUserId: first.canonicalUserId,
-          clientSessionId: "app-start-00000001",
-          requestPayload: { scenario_id: "objection_safety" },
-          userId: userA,
-        }),
-      ])
-      assert.deepEqual(
-        [sessionOne.deduped, sessionOneRetry.deduped].sort(),
-        [false, true],
+      const reservationInputs = [
+        "app-start-00000001",
+        "app-start-00000002",
+        "app-start-00000003",
+      ].map((clientSessionId) => ({
+        canonicalUserId: first.canonicalUserId,
+        clientSessionId,
+        requestPayload: { scenario_id: "objection_safety" },
+        userId: userA,
+      }))
+      const reservationResults = await Promise.allSettled(
+        reservationInputs.map((input) =>
+          repository.reservePersonalTrialVoiceSession(input),
+        ),
       )
-      assert.equal(sessionOne.sessionId, sessionOneRetry.sessionId)
-      assert.equal(sessionOneRetry.trial.sessionsUsed, 1)
+      const fulfilledReservations = reservationResults.filter(
+        (result) => result.status === "fulfilled",
+      )
+      const rejectedReservations = reservationResults.filter(
+        (result) => result.status === "rejected",
+      )
+      assert.equal(fulfilledReservations.length, 2)
+      assert.equal(rejectedReservations.length, 1)
+      assert.match(String(rejectedReservations[0].reason), /personal_trial_exhausted/)
+      const firstFulfilledIndex = reservationResults.findIndex(
+        (result) => result.status === "fulfilled",
+      )
+      const firstReservation = fulfilledReservations[0].value
+      const firstReservationRetry =
+        await repository.reservePersonalTrialVoiceSession(
+          reservationInputs[firstFulfilledIndex],
+        )
+      assert.equal(firstReservation.deduped, false)
+      assert.equal(firstReservationRetry.deduped, true)
+      assert.equal(firstReservation.sessionId, firstReservationRetry.sessionId)
+      assert.equal(firstReservationRetry.trial.sessionsUsed, 0)
+      assert.equal(firstReservationRetry.trial.sessionsReserved, 2)
+      assert.equal(firstReservationRetry.trial.sessionsRemaining, 0)
 
       await assert.rejects(
-        repository.consumePersonalTrialVoiceSession({
-          canonicalUserId: first.canonicalUserId,
-          clientSessionId: "app-start-00000001",
+        repository.reservePersonalTrialVoiceSession({
+          ...reservationInputs[firstFulfilledIndex],
           requestPayload: { scenario_id: "different" },
-          userId: userA,
         }),
         /app_idempotency_conflict/,
       )
 
-      await repository.consumePersonalTrialVoiceSession({
+      const completionEvidence = {
+        asrResultId: "asr-result-0001",
+        nextTurnTtsAudioId: "tts-next-0001",
+        openingTtsAudioId: "tts-opening-0001",
+        recordingReceiptId: "recording-receipt-0001",
+      }
+      const completionInput = {
         canonicalUserId: first.canonicalUserId,
-        clientSessionId: "app-start-00000002",
-        requestPayload: { scenario_id: "objection_safety" },
-        userId: userA,
-      })
+        completionEventId: "round-1-completed-event-0001",
+        sessionId: firstReservation.sessionId,
+      }
       await assert.rejects(
-        repository.consumePersonalTrialVoiceSession({
+        repository.completePersonalTrialFirstRound({
+          ...completionInput,
+          evidence: completionEvidence,
+        }),
+        /personal_trial_first_round_evidence_incomplete/,
+      )
+      const trialBeforeEvidence = await pool.query(
+        `
+          select sessions_used
+          from public.app_personal_trials
+          where canonical_user_id = $1
+        `,
+        [first.canonicalUserId],
+      )
+      assert.deepEqual(trialBeforeEvidence.rows, [{ sessions_used: 0 }])
+
+      for (const [evidenceStage, evidenceId] of [
+        ["opening_tts_ready", completionEvidence.openingTtsAudioId],
+        ["recording_received", completionEvidence.recordingReceiptId],
+        ["asr_succeeded", completionEvidence.asrResultId],
+      ]) {
+        await repository.recordPersonalTrialVoiceEvidence({
           canonicalUserId: first.canonicalUserId,
-          clientSessionId: "app-start-00000003",
+          evidenceId,
+          evidenceStage,
+          sessionId: firstReservation.sessionId,
+        })
+      }
+      await assert.rejects(
+        repository.completePersonalTrialFirstRound(completionInput),
+        /personal_trial_first_round_evidence_incomplete/,
+      )
+      const finalEvidence = await repository.recordPersonalTrialVoiceEvidence({
+        canonicalUserId: first.canonicalUserId,
+        evidenceId: completionEvidence.nextTurnTtsAudioId,
+        evidenceStage: "next_turn_tts_ready",
+        sessionId: firstReservation.sessionId,
+      })
+      const finalEvidenceReplay =
+        await repository.recordPersonalTrialVoiceEvidence({
+          canonicalUserId: first.canonicalUserId,
+          evidenceId: completionEvidence.nextTurnTtsAudioId,
+          evidenceStage: "next_turn_tts_ready",
+          sessionId: firstReservation.sessionId,
+        })
+      assert.equal(finalEvidence.deduped, false)
+      assert.equal(finalEvidenceReplay.deduped, true)
+      await assert.rejects(
+        repository.recordPersonalTrialVoiceEvidence({
+          canonicalUserId: first.canonicalUserId,
+          evidenceId: "tts-next-conflict",
+          evidenceStage: "next_turn_tts_ready",
+          sessionId: firstReservation.sessionId,
+        }),
+        /personal_trial_voice_evidence_conflict/,
+      )
+      const completed =
+        await repository.completePersonalTrialFirstRound(completionInput)
+      assert.equal(completed.deduped, false)
+      assert.equal(completed.trial.sessionsUsed, 1)
+      assert.equal(completed.trial.sessionsReserved, 1)
+      assert.equal(completed.trial.sessionsRemaining, 0)
+      const completionReplay =
+        await repository.completePersonalTrialFirstRound(completionInput)
+      assert.equal(completionReplay.deduped, true)
+      assert.equal(completionReplay.trial.sessionsUsed, 1)
+      const otherReservation = fulfilledReservations.find(
+        (reservation) => reservation.value.sessionId !== firstReservation.sessionId,
+      ).value
+      await assert.rejects(
+        repository.completePersonalTrialFirstRound({
+          ...completionInput,
+          completionEventId: "round-1-completed-event-conflict",
+        }),
+        /personal_trial_completion_conflict/,
+      )
+      await assert.rejects(
+        repository.completePersonalTrialFirstRound({
+          ...completionInput,
+          sessionId: otherReservation.sessionId,
+        }),
+        /personal_trial_completion_conflict/,
+      )
+
+      const consumedFailure =
+        await repository.releasePersonalTrialVoiceSession({
+          canonicalUserId: first.canonicalUserId,
+          reason: "opening_tts_failed",
+          sessionId: firstReservation.sessionId,
+        })
+      assert.equal(consumedFailure.released, false)
+      assert.equal(consumedFailure.reservationStatus, "consumed")
+      assert.equal(consumedFailure.trial.sessionsUsed, 1)
+
+      const releaseReasons = [
+        "opening_tts_failed",
+        "recording_receive_failed",
+        "asr_failed",
+        "next_turn_tts_failed",
+      ]
+      let firstReleasedReservation = null
+      for (const [index, reason] of releaseReasons.entries()) {
+        const reservation = index === 0
+          ? otherReservation
+          : await repository.reservePersonalTrialVoiceSession({
+              canonicalUserId: first.canonicalUserId,
+              clientSessionId: `release-case-${index + 1}-00000001`,
+              requestPayload: { scenario_id: "objection_safety" },
+              userId: userA,
+            })
+        if (!firstReleasedReservation) firstReleasedReservation = reservation
+        const released =
+          await repository.releasePersonalTrialVoiceSession({
+            canonicalUserId: first.canonicalUserId,
+            reason,
+            sessionId: reservation.sessionId,
+          })
+        assert.equal(released.released, true)
+        assert.equal(released.reservationStatus, "released")
+        assert.equal(released.trial.sessionsUsed, 1)
+      }
+      const releaseReplay =
+        await repository.releasePersonalTrialVoiceSession({
+          canonicalUserId: first.canonicalUserId,
+          reason: releaseReasons[0],
+          sessionId: firstReleasedReservation.sessionId,
+        })
+      assert.equal(releaseReplay.deduped, true)
+      assert.equal(releaseReplay.trial.sessionsUsed, 1)
+      assert.equal(releaseReplay.trial.sessionsReserved, 0)
+      assert.equal(releaseReplay.trial.sessionsRemaining, 1)
+      const releasedSession = await pool.query(
+        `
+          select client_session_id
+          from public.voice_coach_sessions
+          where id = $1
+        `,
+        [firstReleasedReservation.sessionId],
+      )
+      const releasedClientSessionId =
+        releasedSession.rows[0].client_session_id
+      await assert.rejects(
+        repository.reservePersonalTrialVoiceSession({
+          canonicalUserId: first.canonicalUserId,
+          clientSessionId: releasedClientSessionId,
           requestPayload: { scenario_id: "objection_safety" },
           userId: userA,
         }),
-        /personal_trial_exhausted/,
+        /personal_trial_session_terminal/,
       )
+      await assert.rejects(
+        voiceRepository.createAliyunRdsPersonalTrialVoiceCoachTextSession({
+          canonicalUserId: first.canonicalUserId,
+          clientSessionId: releasedClientSessionId,
+          firstCustomerText: "释放后的旧会话不能重新进入。",
+          scenario: { id: "objection_safety" },
+          userId: userA,
+        }),
+        /personal_trial_session_terminal/,
+      )
+      const releasedDetail =
+        await voiceRepository.getAliyunRdsVoiceCoachTextSession({
+          canonicalUserId: first.canonicalUserId,
+          dataDomain: "personal_trial",
+          sessionId: firstReleasedReservation.sessionId,
+          userId: userA,
+        })
+      assert.equal(releasedDetail, null)
 
       const legacyMembership = await pool.query(
         `
@@ -945,9 +1126,29 @@ test(
         },
       })
       assert.equal(snapshot.canonicalUserId, first.canonicalUserId)
-      assert.equal(snapshot.trial.sessionsUsed, 2)
-      assert.equal(snapshot.trial.sessionsRemaining, 0)
+      assert.equal(snapshot.trial.sessionsUsed, 1)
+      assert.equal(snapshot.trial.sessionsReserved, 0)
+      assert.equal(snapshot.trial.sessionsRemaining, 1)
       assert.equal(snapshot.authorizationVersion, grant.authorizationVersion)
+      const preservedTrialDomain = await pool.query(
+        `
+          select
+            count(*)::integer as session_count,
+            bool_and(
+              company_id is null
+              and store_id is null
+              and membership_id is null
+            ) as tenant_fields_are_null
+          from public.voice_coach_sessions
+          where canonical_user_id = $1
+            and data_domain = 'personal_trial'
+        `,
+        [first.canonicalUserId],
+      )
+      assert.deepEqual(preservedTrialDomain.rows, [{
+        session_count: 5,
+        tenant_fields_are_null: true,
+      }])
       const formalProfile = await profileRepository.getAliyunRdsAppProfileContractResponse({
         id: userB,
         email: "b@test.invalid",
@@ -1054,8 +1255,17 @@ test(
           "verified_phone.ambiguous",
           "verified_phone.ambiguous",
           "verified_phone.ambiguous",
-          "personal_trial.voice_session_consumed",
-          "personal_trial.voice_session_consumed",
+          "personal_trial.voice_session_reserved",
+          "personal_trial.voice_session_reserved",
+          "personal_trial.round_1_completed",
+          "personal_trial.post_consumption_failure_recorded",
+          "personal_trial.voice_session_released",
+          "personal_trial.voice_session_reserved",
+          "personal_trial.voice_session_released",
+          "personal_trial.voice_session_reserved",
+          "personal_trial.voice_session_released",
+          "personal_trial.voice_session_reserved",
+          "personal_trial.voice_session_released",
           "access_grant.rejected",
           "access_grant.upserted",
           "access_grant.rejected",
@@ -1070,6 +1280,174 @@ test(
         id: userC,
         user_metadata: {},
       })
+      const previousReservationTtl =
+        process.env.PERSONAL_TRIAL_VOICE_RESERVATION_TTL_SECONDS
+      process.env.PERSONAL_TRIAL_VOICE_RESERVATION_TTL_SECONDS = "30"
+      try {
+        const configuredTtlReservation =
+          await repository.reservePersonalTrialVoiceSession({
+            canonicalUserId: isolatedTrial.canonicalUserId,
+            clientSessionId: "configured-ttl-reservation-0001",
+            requestPayload: { scenario_id: "objection_safety" },
+            userId: userC,
+          })
+        const configuredTtl = await pool.query(
+          `
+            select extract(
+              epoch from trial_reservation_expires_at - trial_reserved_at
+            )::integer as ttl_seconds
+            from public.voice_coach_sessions
+            where id = $1
+          `,
+          [configuredTtlReservation.sessionId],
+        )
+        assert.deepEqual(configuredTtl.rows, [{ ttl_seconds: 30 }])
+        for (const [evidenceStage, evidenceId] of [
+          ["opening_tts_ready", "expired-opening-tts-0001"],
+          ["recording_received", "expired-recording-0001"],
+          ["asr_succeeded", "expired-asr-0001"],
+          ["next_turn_tts_ready", "expired-next-tts-0001"],
+        ]) {
+          await repository.recordPersonalTrialVoiceEvidence({
+            canonicalUserId: isolatedTrial.canonicalUserId,
+            evidenceId,
+            evidenceStage,
+            sessionId: configuredTtlReservation.sessionId,
+          })
+        }
+        await pool.query(
+          `
+            update public.voice_coach_sessions
+            set
+              trial_reserved_at = now() - interval '31 seconds',
+              trial_reservation_expires_at = now() - interval '1 second'
+            where id = $1
+          `,
+          [configuredTtlReservation.sessionId],
+        )
+        await assert.rejects(
+          repository.completePersonalTrialFirstRound({
+            canonicalUserId: isolatedTrial.canonicalUserId,
+            completionEventId: "expired-completion-event-0001",
+            sessionId: configuredTtlReservation.sessionId,
+          }),
+          /personal_trial_reservation_expired/,
+        )
+        const trialAfterExpiredCompletion = await pool.query(
+          `
+            select sessions_used
+            from public.app_personal_trials
+            where canonical_user_id = $1
+          `,
+          [isolatedTrial.canonicalUserId],
+        )
+        assert.deepEqual(
+          trialAfterExpiredCompletion.rows,
+          [{ sessions_used: 0 }],
+        )
+        await assert.rejects(
+          repository.reservePersonalTrialVoiceSession({
+            canonicalUserId: isolatedTrial.canonicalUserId,
+            clientSessionId: "configured-ttl-reservation-0001",
+            requestPayload: { scenario_id: "objection_safety" },
+            userId: userC,
+          }),
+          /personal_trial_reservation_expired/,
+        )
+        const elapsedReservationDetail =
+          await voiceRepository.getAliyunRdsVoiceCoachTextSession({
+            canonicalUserId: isolatedTrial.canonicalUserId,
+            dataDomain: "personal_trial",
+            sessionId: configuredTtlReservation.sessionId,
+            userId: userC,
+          })
+        assert.equal(elapsedReservationDetail, null)
+        const lateTechnicalFailure =
+          await repository.releasePersonalTrialVoiceSession({
+            canonicalUserId: isolatedTrial.canonicalUserId,
+            reason: "asr_failed",
+            sessionId: configuredTtlReservation.sessionId,
+          })
+        assert.equal(lateTechnicalFailure.released, false)
+        assert.equal(
+          lateTechnicalFailure.reservationStatus,
+          "expired",
+        )
+        assert.equal(lateTechnicalFailure.trial.sessionsUsed, 0)
+        assert.equal(lateTechnicalFailure.trial.sessionsReserved, 0)
+        assert.equal(lateTechnicalFailure.trial.sessionsRemaining, 2)
+        const lateTechnicalFailureReplay =
+          await repository.releasePersonalTrialVoiceSession({
+            canonicalUserId: isolatedTrial.canonicalUserId,
+            reason: "asr_failed",
+            sessionId: configuredTtlReservation.sessionId,
+          })
+        assert.equal(lateTechnicalFailureReplay.deduped, true)
+        assert.equal(
+          lateTechnicalFailureReplay.reservationStatus,
+          "expired",
+        )
+        const expiredReservationState = await pool.query(
+          `
+            select trial_reservation_status, trial_release_reason
+            from public.voice_coach_sessions
+            where id = $1
+          `,
+          [configuredTtlReservation.sessionId],
+        )
+        assert.deepEqual(expiredReservationState.rows, [
+          {
+            trial_release_reason: "reservation_expired",
+            trial_reservation_status: "expired",
+          },
+        ])
+        const expirySweepReservation =
+          await repository.reservePersonalTrialVoiceSession({
+            canonicalUserId: isolatedTrial.canonicalUserId,
+            clientSessionId: "expiry-sweep-reservation-0001",
+            requestPayload: { scenario_id: "objection_safety" },
+            userId: userC,
+          })
+        await pool.query(
+          `
+            update public.voice_coach_sessions
+            set
+              trial_reserved_at = now() - interval '31 seconds',
+              trial_reservation_expires_at = now() - interval '1 second'
+            where id = $1
+          `,
+          [expirySweepReservation.sessionId],
+        )
+        const expired =
+          await repository.expirePersonalTrialVoiceReservations({
+            canonicalUserId: isolatedTrial.canonicalUserId,
+          })
+        assert.equal(expired.expiredCount, 1)
+        assert.equal(expired.trial.sessionsUsed, 0)
+        assert.equal(expired.trial.sessionsReserved, 0)
+        assert.equal(expired.trial.sessionsRemaining, 2)
+        await assert.rejects(
+          repository.reservePersonalTrialVoiceSession({
+            canonicalUserId: isolatedTrial.canonicalUserId,
+            clientSessionId: "configured-ttl-reservation-0001",
+            requestPayload: { scenario_id: "objection_safety" },
+            userId: userC,
+          }),
+          /personal_trial_session_terminal/,
+        )
+        const expiryReplay =
+          await repository.expirePersonalTrialVoiceReservations({
+            canonicalUserId: isolatedTrial.canonicalUserId,
+          })
+        assert.equal(expiryReplay.expiredCount, 0)
+      } finally {
+        if (previousReservationTtl === undefined) {
+          delete process.env.PERSONAL_TRIAL_VOICE_RESERVATION_TTL_SECONDS
+        } else {
+          process.env.PERSONAL_TRIAL_VOICE_RESERVATION_TTL_SECONDS =
+            previousReservationTtl
+        }
+      }
       const voiceCreateInput = {
         canonicalUserId: isolatedTrial.canonicalUserId,
         clientSessionId: "voice-start-0001",
@@ -1091,6 +1469,17 @@ test(
       assert.equal(created.session.id, retried.session.id)
       assert.equal(created.deduped, false)
       assert.equal(retried.deduped, true)
+      const defaultTtl = await pool.query(
+        `
+          select extract(
+            epoch from trial_reservation_expires_at - trial_reserved_at
+          )::integer as ttl_seconds
+          from public.voice_coach_sessions
+          where id = $1
+        `,
+        [created.session.id],
+      )
+      assert.deepEqual(defaultTtl.rows, [{ ttl_seconds: 600 }])
       await pool.query("begin")
       try {
         await assert.rejects(
@@ -1146,13 +1535,17 @@ test(
         ...trialScope,
         limit: 10,
       })
-      assert.equal(history.length, 1)
-      assert.equal(history[0].data_domain, "personal_trial")
+      assert.equal(history.length, 3)
+      assert.equal(
+        history.every((session) => session.data_domain === "personal_trial"),
+        true,
+      )
       const isolatedSnapshot = await repository.getAppAccessSnapshot({
         id: userC,
         user_metadata: {},
       })
-      assert.equal(isolatedSnapshot.trial.sessionsUsed, 1)
+      assert.equal(isolatedSnapshot.trial.sessionsUsed, 0)
+      assert.equal(isolatedSnapshot.trial.sessionsReserved, 1)
     } finally {
       await pool.end()
     }

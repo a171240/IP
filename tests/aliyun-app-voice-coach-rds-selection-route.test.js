@@ -389,7 +389,9 @@ function createRdsMock() {
             dataDomain: "personal_trial",
             status: "active",
             sessionLimit: 2,
-            sessionsUsed: 1,
+            aiCoachPublicEnabled: true,
+            sessionsReserved: 1,
+            sessionsUsed: 0,
             sessionsRemaining: 1,
           },
         }
@@ -529,6 +531,8 @@ function helperStubs(rdsMock) {
           dataDomain: "personal_trial",
           status: "active",
           sessionLimit: 2,
+          aiCoachPublicEnabled: true,
+          sessionsReserved: 0,
           sessionsUsed: 0,
           sessionsRemaining: 2,
         },
@@ -658,8 +662,10 @@ test("V1 personal trial creates an RDS demo session without tenant scope and ret
   assert.equal(body.session_context.store_id, null)
   assert.equal(body.session_context.membership_id, null)
   assert.equal(body.trial.ai_coach_session_limit, 2)
-  assert.equal(body.trial.ai_coach_sessions_used, 1)
+  assert.equal(body.trial.ai_coach_sessions_reserved, 1)
+  assert.equal(body.trial.ai_coach_sessions_used, 0)
   assert.equal(body.trial.ai_coach_sessions_remaining, 1)
+  assert.equal(body.trial.ai_coach_public_enabled, true)
   assert.deepEqual(rdsMock.calls, [
     "createAliyunRdsPersonalTrialVoiceCoachTextSession",
   ])

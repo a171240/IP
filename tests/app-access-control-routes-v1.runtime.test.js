@@ -86,6 +86,8 @@ test("bootstrap initializes profile and canonical personal trial in one endpoint
               dataDomain: "personal_trial",
               status: "active",
               sessionLimit: 2,
+              aiCoachPublicEnabled: false,
+              sessionsReserved: 0,
               sessionsUsed: 0,
               sessionsRemaining: 2,
             },
@@ -110,8 +112,10 @@ test("bootstrap initializes profile and canonical personal trial in one endpoint
       data_domain: "personal_trial",
       status: "active",
       ai_coach_session_limit: 2,
+      ai_coach_sessions_reserved: 0,
       ai_coach_sessions_used: 0,
       ai_coach_sessions_remaining: 2,
+      ai_coach_public_enabled: false,
     },
   })
 })
@@ -375,8 +379,10 @@ test("APP access snapshot exposes refreshable trial and authorization version wi
             data_domain: "personal_trial",
             status: "active",
             ai_coach_session_limit: 2,
-            ai_coach_sessions_used: 1,
+            ai_coach_sessions_reserved: 1,
+            ai_coach_sessions_used: 0,
             ai_coach_sessions_remaining: 1,
+            ai_coach_public_enabled: false,
           },
         }),
       },
@@ -396,8 +402,10 @@ test("APP access snapshot exposes refreshable trial and authorization version wi
       data_domain: "personal_trial",
       status: "active",
       ai_coach_session_limit: 2,
-      ai_coach_sessions_used: 1,
+      ai_coach_sessions_reserved: 1,
+      ai_coach_sessions_used: 0,
       ai_coach_sessions_remaining: 1,
+      ai_coach_public_enabled: false,
     },
   })
 })

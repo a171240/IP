@@ -340,6 +340,8 @@ function repositoryHarness() {
           dataDomain: "personal_trial",
           status: "active",
           sessionLimit: 2,
+          aiCoachPublicEnabled: false,
+          sessionsReserved: 0,
           sessionsUsed: 1,
           sessionsRemaining: 1,
         },

@@ -13,6 +13,7 @@ begin
     or exists (select 1 from public.app_authorization_audit_events limit 1)
     or exists (select 1 from public.app_idempotency_records limit 1)
     or exists (select 1 from public.app_membership_entitlements limit 1)
+    or exists (select 1 from public.app_personal_trial_voice_evidence limit 1)
     or exists (
       select 1
       from public.mp_account_memberships
@@ -28,6 +29,15 @@ begin
         or data_domain <> 'store'
         or client_session_id is not null
         or client_request_hash is not null
+        or trial_reservation_status is not null
+        or trial_reserved_at is not null
+        or trial_reservation_expires_at is not null
+        or trial_consumed_at is not null
+        or trial_completion_event_id is not null
+        or trial_completion_event_hash is not null
+        or trial_round_1_evidence is not null
+        or trial_released_at is not null
+        or trial_release_reason is not null
       limit 1
     )
   then
@@ -38,10 +48,22 @@ end
 $$;
 
 drop index if exists public.voice_coach_canonical_domain_created_idx;
+drop index if exists public.voice_coach_trial_completion_event_idx;
 drop index if exists public.voice_coach_trial_client_session_idx;
+
+drop table if exists public.app_personal_trial_voice_evidence;
 
 alter table public.voice_coach_sessions
   drop constraint if exists voice_coach_sessions_domain_scope_check,
+  drop column if exists trial_release_reason,
+  drop column if exists trial_released_at,
+  drop column if exists trial_round_1_evidence,
+  drop column if exists trial_completion_event_hash,
+  drop column if exists trial_completion_event_id,
+  drop column if exists trial_consumed_at,
+  drop column if exists trial_reservation_expires_at,
+  drop column if exists trial_reserved_at,
+  drop column if exists trial_reservation_status,
   drop column if exists client_request_hash,
   drop column if exists client_session_id,
   drop column if exists data_domain,

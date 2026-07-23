@@ -15,6 +15,7 @@ begin
     or to_regclass('public.app_authorization_audit_events') is not null
     or to_regclass('public.app_idempotency_records') is not null
     or to_regclass('public.app_membership_entitlements') is not null
+    or to_regclass('public.app_personal_trial_voice_evidence') is not null
   then
     raise exception 'app_access_control_v1_schema_conflict: owned table already exists';
   end if;
@@ -38,7 +39,16 @@ begin
             'canonical_user_id',
             'data_domain',
             'client_session_id',
-            'client_request_hash'
+            'client_request_hash',
+            'trial_reservation_status',
+            'trial_reserved_at',
+            'trial_reservation_expires_at',
+            'trial_consumed_at',
+            'trial_completion_event_id',
+            'trial_completion_event_hash',
+            'trial_round_1_evidence',
+            'trial_released_at',
+            'trial_release_reason'
           )
         )
       )
@@ -306,7 +316,26 @@ alter table public.voice_coach_sessions
   add column data_domain text not null default 'store'
     check (data_domain in ('store', 'personal_trial')),
   add column client_session_id text,
-  add column client_request_hash text;
+  add column client_request_hash text,
+  add column trial_reservation_status text
+    check (trial_reservation_status in ('reserved', 'consumed', 'released', 'expired')),
+  add column trial_reserved_at timestamptz,
+  add column trial_reservation_expires_at timestamptz,
+  add column trial_consumed_at timestamptz,
+  add column trial_completion_event_id text,
+  add column trial_completion_event_hash text,
+  add column trial_round_1_evidence jsonb,
+  add column trial_released_at timestamptz,
+  add column trial_release_reason text
+    check (
+      trial_release_reason in (
+        'opening_tts_failed',
+        'recording_receive_failed',
+        'asr_failed',
+        'next_turn_tts_failed',
+        'reservation_expired'
+      )
+    );
 
 alter table public.voice_coach_sessions
   add constraint voice_coach_sessions_domain_scope_check
@@ -317,18 +346,96 @@ alter table public.voice_coach_sessions
       and company_id is null
       and store_id is null
       and membership_id is null
+      and trial_reservation_status is not null
+      and trial_reserved_at is not null
+      and trial_reservation_expires_at is not null
+      and trial_reservation_expires_at > trial_reserved_at
+      and (
+        (
+          trial_reservation_status = 'reserved'
+          and trial_consumed_at is null
+          and trial_completion_event_id is null
+          and trial_completion_event_hash is null
+          and trial_round_1_evidence is null
+          and trial_released_at is null
+          and trial_release_reason is null
+        )
+        or (
+          trial_reservation_status = 'consumed'
+          and trial_consumed_at is not null
+          and trial_completion_event_id is not null
+          and trial_completion_event_hash is not null
+          and trial_round_1_evidence is not null
+          and trial_released_at is null
+          and trial_release_reason is null
+        )
+        or (
+          trial_reservation_status = 'released'
+          and trial_consumed_at is null
+          and trial_completion_event_id is null
+          and trial_completion_event_hash is null
+          and trial_round_1_evidence is null
+          and trial_released_at is not null
+          and trial_release_reason in (
+            'opening_tts_failed',
+            'recording_receive_failed',
+            'asr_failed',
+            'next_turn_tts_failed'
+          )
+        )
+        or (
+          trial_reservation_status = 'expired'
+          and trial_consumed_at is null
+          and trial_completion_event_id is null
+          and trial_completion_event_hash is null
+          and trial_round_1_evidence is null
+          and trial_released_at is not null
+          and trial_release_reason = 'reservation_expired'
+        )
+      )
     )
     or (
       data_domain = 'store'
       and company_id is not null
       and store_id is not null
       and membership_id is not null
+      and trial_reservation_status is null
+      and trial_reserved_at is null
+      and trial_reservation_expires_at is null
+      and trial_consumed_at is null
+      and trial_completion_event_id is null
+      and trial_completion_event_hash is null
+      and trial_round_1_evidence is null
+      and trial_released_at is null
+      and trial_release_reason is null
     )
   ) not valid;
+
+create table public.app_personal_trial_voice_evidence (
+  session_id uuid not null
+    references public.voice_coach_sessions(id) on delete restrict,
+  evidence_stage text not null
+    check (
+      evidence_stage in (
+        'opening_tts_ready',
+        'recording_received',
+        'asr_succeeded',
+        'next_turn_tts_ready'
+      )
+    ),
+  evidence_id text not null
+    check (length(evidence_id) between 1 and 200),
+  recorded_at timestamptz not null default now(),
+  primary key (session_id, evidence_stage)
+);
 
 create unique index voice_coach_trial_client_session_idx
   on public.voice_coach_sessions(canonical_user_id, client_session_id)
   where data_domain = 'personal_trial' and client_session_id is not null;
+
+create unique index voice_coach_trial_completion_event_idx
+  on public.voice_coach_sessions(trial_completion_event_id)
+  where trial_completion_event_id is not null;
 
 create index voice_coach_canonical_domain_created_idx
   on public.voice_coach_sessions(canonical_user_id, data_domain, created_at desc);
@@ -339,5 +446,7 @@ comment on table public.app_verified_contacts is
   'Verified contacts store a lookup hash plus encrypted value; they are recovery evidence only and never implicitly create a membership or entitlement.';
 comment on column public.voice_coach_sessions.data_domain is
   'store is tenant data; personal_trial is isolated demo data with no company/store/membership scope.';
+comment on table public.app_personal_trial_voice_evidence is
+  'Server-only immutable evidence stages. A completion event may consume a trial only after all four rows exist for one session.';
 
 commit;

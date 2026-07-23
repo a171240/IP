@@ -346,7 +346,9 @@ test(
       assert.equal(bootstrap.status, 200)
       assert.equal(bootstrap.body.access_mode, "personal_trial")
       assert.equal(bootstrap.body.trial.ai_coach_session_limit, 2)
+      assert.equal(bootstrap.body.trial.ai_coach_sessions_reserved, 0)
       assert.equal(bootstrap.body.trial.ai_coach_sessions_remaining, 2)
+      assert.equal(bootstrap.body.trial.ai_coach_public_enabled, false)
       const canonicalUserId = bootstrap.body.canonical_user_id
       assert.match(canonicalUserId, /^[0-9a-f-]{36}$/)
 
@@ -372,6 +374,49 @@ test(
         client_session_id: "http-trial-session-0001",
         scenario_id: "objection_safety",
       }
+      const closedTrial = await requestJson(
+        baseUrl,
+        "/api/app/voice-coach/sessions",
+        userToken,
+        { method: "POST", body: JSON.stringify(firstPayload) },
+      )
+      assert.equal(closedTrial.status, 403)
+      assert.equal(closedTrial.body.code, "personal_trial_ai_coach_not_open")
+      const closedTrialEvidence = await pool.query(
+        `
+          select count(*)::integer as trial_session_count
+          from public.voice_coach_sessions
+          where canonical_user_id = $1
+            and data_domain = 'personal_trial'
+        `,
+        [canonicalUserId],
+      )
+      assert.deepEqual(closedTrialEvidence.rows, [{ trial_session_count: 0 }])
+
+      progress("restarting local Next HTTP server with the isolated trial gate enabled")
+      await stopProcess(nextProcess)
+      nextProcess = null
+      nextLogs.length = 0
+      nextProcess = spawn(process.execPath, [
+        nextBin,
+        "dev",
+        "--webpack",
+        "--hostname",
+        "127.0.0.1",
+        "--port",
+        String(httpPort),
+      ], {
+        cwd: root,
+        env: {
+          ...nextEnvironment,
+          PERSONAL_TRIAL_AI_COACH_PUBLIC_ENABLED: "1",
+        },
+        stdio: ["ignore", "pipe", "pipe"],
+      })
+      nextProcess.stdout.on("data", chunk => nextLogs.push(String(chunk)))
+      nextProcess.stderr.on("data", chunk => nextLogs.push(String(chunk)))
+      await waitForHttpServer(baseUrl, nextProcess, nextLogs, testTokens)
+
       const first = await requestJson(
         baseUrl,
         "/api/app/voice-coach/sessions",
@@ -384,8 +429,10 @@ test(
         first.body.context.voice_coach_scope.data_domain,
         "personal_trial",
       )
-      assert.equal(first.body.trial.ai_coach_sessions_used, 1)
+      assert.equal(first.body.trial.ai_coach_sessions_used, 0)
+      assert.equal(first.body.trial.ai_coach_sessions_reserved, 1)
       assert.equal(first.body.trial.ai_coach_sessions_remaining, 1)
+      assert.equal(first.body.trial.ai_coach_public_enabled, true)
 
       const firstRetry = await requestJson(
         baseUrl,
@@ -396,7 +443,8 @@ test(
       assert.equal(firstRetry.status, 200)
       assert.equal(firstRetry.body.deduped, true)
       assert.equal(firstRetry.body.session_id, first.body.session_id)
-      assert.equal(firstRetry.body.trial.ai_coach_sessions_used, 1)
+      assert.equal(firstRetry.body.trial.ai_coach_sessions_used, 0)
+      assert.equal(firstRetry.body.trial.ai_coach_sessions_reserved, 1)
 
       const normalizedRetry = await requestJson(
         baseUrl,
@@ -427,7 +475,8 @@ test(
         },
       )
       assert.equal(second.status, 201)
-      assert.equal(second.body.trial.ai_coach_sessions_used, 2)
+      assert.equal(second.body.trial.ai_coach_sessions_used, 0)
+      assert.equal(second.body.trial.ai_coach_sessions_reserved, 2)
       assert.equal(second.body.trial.ai_coach_sessions_remaining, 0)
 
       const exhausted = await requestJson(
