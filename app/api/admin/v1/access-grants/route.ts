@@ -55,6 +55,12 @@ function accessGrantErrorResponse(error: unknown) {
   if (code === "app_idempotency_conflict") {
     return jsonError(409, "idempotency_key_reused")
   }
+  if (code === "app_identity_review_required") {
+    return jsonError(409, "identity_review_required")
+  }
+  if (code === "membership_conflict") {
+    return jsonError(409, code)
+  }
   return null
 }
 

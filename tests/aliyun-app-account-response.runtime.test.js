@@ -287,6 +287,9 @@ function repositoryHarness() {
   const queryAliyunRds = async (sql) => {
     const normalizedSql = String(sql).replace(/\s+/g, " ").trim()
     sqlLog.push(normalizedSql)
+    if (normalizedSql === "set transaction isolation level repeatable read read only") {
+      return { rows: [] }
+    }
     if (normalizedSql.includes("join public.profiles profile")) return { rows: [] }
     if (normalizedSql.includes("from public.app_membership_entitlements entitlement")) {
       return {
@@ -316,7 +319,11 @@ function repositoryHarness() {
     : {}
   const repository = compileTsModule(repositoryPath, {
     "server-only": {},
-    "@/lib/aliyun-rds/postgres.server": { queryAliyunRds },
+    "@/lib/aliyun-rds/postgres.server": {
+      queryAliyunRds,
+      withAliyunRdsTransaction: async fn =>
+        fn({ query: queryAliyunRds }),
+    },
     "@/lib/pricing/rules": {
       normalizePlan(value) {
         return ["free", "basic", "pro", "vip"].includes(value) ? value : "free"
@@ -324,7 +331,7 @@ function repositoryHarness() {
     },
     "@/lib/aliyun-rds/app-authorization.server": authorization,
     "@/lib/aliyun-rds/repositories/app-access-control.server": {
-      resolveAppCanonicalAuthorization: async () => ({
+      resolveAppCanonicalAuthorizationWithClient: async () => ({
         canonicalUserId: "canonical-user-1",
         identityState: "resolved",
         authorizationVersion: 3,
@@ -369,7 +376,10 @@ function routeModules(repository, user) {
 function assertSelectOnly(sqlLog) {
   assert.ok(sqlLog.length > 0)
   for (const sql of sqlLog) {
-    assert.match(sql, /^select\b/i)
+    assert.match(
+      sql,
+      /^(select\b|set transaction isolation level repeatable read read only$)/i,
+    )
     assert.doesNotMatch(sql, /\b(insert|update|delete|merge|truncate)\b/i)
   }
 }
@@ -401,6 +411,10 @@ test("profile GET emits one exact profile and authorization snapshot without pri
   assert.equal(response.body.identity_state, "resolved")
   assert.equal(response.body.access_mode, "formal")
   assert.equal(response.body.authorization_version, 3)
+  assert.equal(
+    sqlLog[0],
+    "set transaction isolation level repeatable read read only",
+  )
   assert.deepEqual(Object.keys(response.body.memberships[0]), expectedContract.profile_envelope.membership_keys)
   assert.deepEqual(Object.keys(response.body.entitlements), expectedContract.profile_envelope.entitlement_keys)
   assert.deepEqual(Object.keys(response.body.features), expectedContract.feature_policy.all_keys)

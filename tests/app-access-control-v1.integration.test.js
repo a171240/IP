@@ -113,6 +113,20 @@ test(
         "@/lib/aliyun-rds/repositories/app-access-control.server": repository,
         "@/lib/aliyun-rds/postgres.server": {
           queryAliyunRds: (sql, values) => pool.query(sql, values),
+          withAliyunRdsTransaction: async (operation) => {
+            const client = await pool.connect()
+            try {
+              await client.query("begin")
+              const result = await operation(client)
+              await client.query("commit")
+              return result
+            } catch (error) {
+              await client.query("rollback")
+              throw error
+            } finally {
+              client.release()
+            }
+          },
         },
         "@/lib/pricing/rules": {
           normalizePlan(value) {
@@ -280,8 +294,8 @@ test(
         reason: "not_bound",
         source: "account",
       })
-      const reviewedAccount =
-        await profileRepository.getAliyunRdsAppAccountContext({
+      await assert.rejects(
+        profileRepository.getAliyunRdsAppAccountContext({
           id: userD,
           email: "d@test.invalid",
           app_metadata: {
@@ -291,9 +305,55 @@ test(
             wechat_unionid: "union-shared",
             wechat_union_issuer: "open-platform-test",
           },
+        }),
+        /app_identity_review_required/,
+      )
+      const previousPlatformAdminIds =
+        process.env.MP_PLATFORM_ADMIN_USER_IDS
+      process.env.MP_PLATFORM_ADMIN_USER_IDS = userD
+      try {
+        const reviewedPlatformProfile =
+          await profileRepository.getAliyunRdsAppProfileContractResponse({
+            id: userD,
+            email: "d@test.invalid",
+            app_metadata: {
+              auth_source: "wechat_open_app",
+              wechat_open_app_id: "wx-open-app-test",
+              wechat_app_openid: "openid-d",
+              wechat_unionid: "union-shared",
+              wechat_union_issuer: "open-platform-test",
+            },
+          })
+        assert.equal(reviewedPlatformProfile.identity_state, "review_required")
+        assert.equal(reviewedPlatformProfile.account_status, "not_bound")
+        assert.equal(reviewedPlatformProfile.profile.account_role, null)
+        assert.deepEqual(reviewedPlatformProfile.memberships, [])
+        assert.deepEqual(reviewedPlatformProfile.features.platform_admin, {
+          enabled: false,
+          reason: "not_bound",
+          source: "account",
         })
-      assert.equal(reviewedAccount.accountStatus, "not_bound")
-      assert.deepEqual(reviewedAccount.memberships, [])
+        await assert.rejects(
+          profileRepository.getAliyunRdsAppAccountContext({
+            id: userD,
+            email: "d@test.invalid",
+            app_metadata: {
+              auth_source: "wechat_open_app",
+              wechat_open_app_id: "wx-open-app-test",
+              wechat_app_openid: "openid-d",
+              wechat_unionid: "union-shared",
+              wechat_union_issuer: "open-platform-test",
+            },
+          }),
+          /app_identity_review_required/,
+        )
+      } finally {
+        if (previousPlatformAdminIds === undefined) {
+          delete process.env.MP_PLATFORM_ADMIN_USER_IDS
+        } else {
+          process.env.MP_PLATFORM_ADMIN_USER_IDS = previousPlatformAdminIds
+        }
+      }
       await assert.rejects(
         repository.getAppAccessSnapshot({
           id: userD,
@@ -370,6 +430,80 @@ test(
         `,
       )
       assert.equal(phoneConflictAudit.rows[0].count, 2)
+
+      const phoneClientA = await pool.connect()
+      const phoneClientB = await pool.connect()
+      try {
+        await phoneClientA.query("begin")
+        await phoneClientB.query("begin")
+        await phoneClientA.query(
+          `
+            insert into public.app_verified_contacts (
+              canonical_user_id,
+              contact_type,
+              normalized_value_hash,
+              encrypted_value,
+              verified_at,
+              verification_source
+            )
+            values ($1, 'phone', $2, 'fixture-concurrent-a', now(), 'test_fixture')
+          `,
+          [
+            first.canonicalUserId,
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          ],
+        )
+        const concurrentInsert = phoneClientB.query(
+          `
+            insert into public.app_verified_contacts (
+              canonical_user_id,
+              contact_type,
+              normalized_value_hash,
+              encrypted_value,
+              verified_at,
+              verification_source
+            )
+            values ($1, 'phone', $2, 'fixture-concurrent-b', now(), 'test_fixture')
+          `,
+          [
+            forgedUserMetadataIdentity.canonicalUserId,
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          ],
+        )
+        await phoneClientA.query("commit")
+        await concurrentInsert
+        await phoneClientB.query("commit")
+      } catch (error) {
+        await Promise.allSettled([
+          phoneClientA.query("rollback"),
+          phoneClientB.query("rollback"),
+        ])
+        throw error
+      } finally {
+        phoneClientA.release()
+        phoneClientB.release()
+      }
+      const concurrentPhoneConflict = await pool.query(
+        `
+          select status
+          from public.app_verified_contacts
+          where normalized_value_hash =
+            'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+          order by canonical_user_id
+        `,
+      )
+      assert.deepEqual(concurrentPhoneConflict.rows, [
+        { status: "conflict" },
+        { status: "conflict" },
+      ])
+      const allPhoneConflictAudits = await pool.query(
+        `
+          select count(*)::integer as count
+          from public.app_authorization_audit_events
+          where action = 'verified_phone.ambiguous'
+        `,
+      )
+      assert.equal(allPhoneConflictAudits.rows[0].count, 4)
 
       const mismatchedMembership = await pool.query(
         `
@@ -467,6 +601,23 @@ test(
         /personal_trial_exhausted/,
       )
 
+      const legacyMembership = await pool.query(
+        `
+          insert into public.mp_account_memberships (
+            user_id,
+            company_id,
+            store_id,
+            role,
+            status,
+            access_source,
+            authorization_version
+          )
+          values ($1, $2, $3, 'employee', 'active', null, 0)
+          returning id
+        `,
+        [userA, companyId, storeId],
+      )
+
       await pool.query(`
         create or replace function public.test_force_access_grant_failure()
         returns trigger
@@ -528,9 +679,14 @@ test(
               select authorization_version::integer
               from public.app_authorization_versions
               where canonical_user_id = $1
-            ) as authorization_version
+            ) as authorization_version,
+            (
+              select count(*)::integer
+              from public.mp_account_memberships
+              where id = $3 and canonical_user_id is null
+            ) as legacy_membership_preserved
         `,
-        [first.canonicalUserId, operator],
+        [first.canonicalUserId, operator, legacyMembership.rows[0].id],
       )
       assert.deepEqual(rollbackEvidence.rows, [{
         membership_count: 0,
@@ -538,6 +694,7 @@ test(
         access_grant_audit_count: 0,
         idempotency_count: 0,
         authorization_version: 0,
+        legacy_membership_preserved: 1,
       }])
 
       await assert.rejects(
@@ -555,6 +712,64 @@ test(
         }),
         /access_grant_feature_plan_denied/,
       )
+      await pool.query(
+        `
+          insert into public.mp_account_memberships (
+            user_id,
+            company_id,
+            store_id,
+            role,
+            status
+          )
+          values
+            ($1, $2, $3, 'employee', 'active'),
+            ($1, $2, $3, 'staff', 'active')
+        `,
+        [userC, companyId, storeBId],
+      )
+      await assert.rejects(
+        repository.grantAppAccess({
+          canonicalUserId: forgedUserMetadataIdentity.canonicalUserId,
+          companyId,
+          featureKeys: ["voice_coach"],
+          idempotencyKey: "grant-legacy-conflict",
+          operatorUserId: operator,
+          operatorRole: "platform_admin",
+          plan: "pro",
+          reason: "legacy membership conflict test",
+          role: "employee",
+          storeId: storeBId,
+        }),
+        /membership_conflict/,
+      )
+      const legacyConflictEvidence = await pool.query(
+        `
+          select
+            (
+              select count(*)::integer
+              from public.mp_account_memberships
+              where user_id = $1
+                and company_id = $2
+                and store_id = $3
+                and canonical_user_id is null
+            ) as legacy_count,
+            (
+              select authorization_version::integer
+              from public.app_authorization_versions
+              where canonical_user_id = $4
+            ) as authorization_version
+        `,
+        [
+          userC,
+          companyId,
+          storeBId,
+          forgedUserMetadataIdentity.canonicalUserId,
+        ],
+      )
+      assert.deepEqual(legacyConflictEvidence.rows, [{
+        authorization_version: 0,
+        legacy_count: 2,
+      }])
       const grant = await repository.grantAppAccess({
         canonicalUserId: first.canonicalUserId,
         companyId,
@@ -582,6 +797,7 @@ test(
       assert.equal(grant.deduped, false)
       assert.equal(grantRetry.deduped, true)
       assert.equal(grant.membershipId, grantRetry.membershipId)
+      assert.equal(grant.membershipId, legacyMembership.rows[0].id)
       assert.ok(grant.authorizationVersion >= 1)
       await assert.rejects(
         repository.grantAppAccess({
@@ -717,8 +933,11 @@ test(
           "identity.review_required",
           "verified_phone.ambiguous",
           "verified_phone.ambiguous",
+          "verified_phone.ambiguous",
+          "verified_phone.ambiguous",
           "personal_trial.voice_session_consumed",
           "personal_trial.voice_session_consumed",
+          "access_grant.rejected",
           "access_grant.rejected",
           "access_grant.upserted",
           "access_grant.rejected",

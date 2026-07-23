@@ -82,6 +82,35 @@ function publicUserMetadata(meta: unknown) {
   return publicMetadata
 }
 
+function isMissingSyntheticLogin(error: unknown) {
+  const record = metadataRecord(error)
+  const code = metadataText(record, "code")
+  const message = metadataText(record, "message")
+  return (
+    code === "invalid_credentials" ||
+    /invalid login credentials/i.test(message)
+  )
+}
+
+function isTrustedLegacyUnionUser(
+  user: {
+    app_metadata?: unknown
+  },
+  args: {
+    appId: string
+    issuer: string
+    unionid: string
+  },
+) {
+  const metadata = metadataRecord(user.app_metadata)
+  return (
+    metadataText(metadata, "auth_source") === "wechat_open_app" &&
+    metadataText(metadata, "wechat_open_app_id") === args.appId &&
+    metadataText(metadata, "wechat_unionid") === args.unionid &&
+    metadataText(metadata, "wechat_union_issuer") === args.issuer
+  )
+}
+
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null)
   if (!body || typeof body !== "object") {
@@ -123,12 +152,16 @@ export async function POST(request: NextRequest) {
 
   const openid = wechatData.openid
   const unionid = wechatData.unionid || ""
-  const identityKey =
+  const scopedIdentityKey =
     unionid && WECHAT_OPEN_PLATFORM_SCOPE_ID
       ? `union_${WECHAT_OPEN_PLATFORM_SCOPE_ID}_${unionid}`
       : `openid_${WECHAT_OPEN_APP_ID}_${openid}`
-  const email = buildWechatEmail(identityKey)
-  const password = buildWechatPassword(identityKey)
+  const email = buildWechatEmail(scopedIdentityKey)
+  const password = buildWechatPassword(scopedIdentityKey)
+  const legacyUnionIdentityKey =
+    unionid && WECHAT_OPEN_PLATFORM_SCOPE_ID
+      ? `union_${unionid}`
+      : null
   const trustedWechatIdentityMetadata = {
     auth_source: "wechat_open_app",
     wechat_open_app_id: WECHAT_OPEN_APP_ID,
@@ -146,26 +179,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "supabase_admin_env_missing" }, { status: 500 })
   }
 
-  let createErrorMessage = ""
-  await admin.auth.admin
-    .createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        nickname: nickname || DEFAULT_WECHAT_NICKNAME,
-        avatar_url: avatarUrl || null,
-      },
-      app_metadata: trustedWechatIdentityMetadata,
-    })
-    .then(({ error }) => {
-      if (error) {
-        const message =
-          typeof error === "object" && error && "message" in error ? String((error as { message?: string }).message || "") : ""
-        createErrorMessage = message || "create_failed"
-      }
-    })
-
   const supabaseUrl = getSupabaseUrl()
   const supabaseAnonKey = getSupabaseAnonKey()
   if (!supabaseUrl || !supabaseAnonKey) {
@@ -176,10 +189,73 @@ export async function POST(request: NextRequest) {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 
-  const { data: sessionData, error: signInError } = await supabase.auth.signInWithPassword({
+  let migratingLegacyUnionPrincipal = false
+
+  const scopedSignIn = await supabase.auth.signInWithPassword({
     email,
     password,
   })
+  let sessionData = scopedSignIn.data
+  let signInError = scopedSignIn.error
+
+  if (
+    !sessionData?.session &&
+    legacyUnionIdentityKey &&
+    isMissingSyntheticLogin(signInError)
+  ) {
+    const legacyEmail = buildWechatEmail(legacyUnionIdentityKey)
+    const legacyPassword = buildWechatPassword(legacyUnionIdentityKey)
+    const legacySignIn = await supabase.auth.signInWithPassword({
+      email: legacyEmail,
+      password: legacyPassword,
+    })
+    if (legacySignIn.data?.session) {
+      if (
+        !isTrustedLegacyUnionUser(legacySignIn.data.session.user, {
+          appId: WECHAT_OPEN_APP_ID,
+          issuer: WECHAT_OPEN_PLATFORM_SCOPE_ID,
+          unionid,
+        })
+      ) {
+        return NextResponse.json(
+          { error: "legacy_identity_review_required" },
+          { status: 409 },
+        )
+      }
+      sessionData = legacySignIn.data
+      signInError = null
+      migratingLegacyUnionPrincipal = true
+    } else if (!isMissingSyntheticLogin(legacySignIn.error)) {
+      return NextResponse.json(
+        { error: "legacy_identity_lookup_failed" },
+        { status: 500 },
+      )
+    }
+  }
+
+  let createErrorMessage = ""
+  if (!sessionData?.session) {
+    const created = await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        nickname: nickname || DEFAULT_WECHAT_NICKNAME,
+        avatar_url: avatarUrl || null,
+      },
+      app_metadata: trustedWechatIdentityMetadata,
+    })
+    if (created.error) {
+      createErrorMessage =
+        metadataText(created.error, "message") || "create_failed"
+    }
+    const createdSignIn = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+    sessionData = createdSignIn.data
+    signInError = createdSignIn.error
+  }
 
   if (signInError || !sessionData.session) {
     if (createErrorMessage) {
@@ -211,6 +287,7 @@ export async function POST(request: NextRequest) {
     data: updatedUserData,
     error: updatedUserError,
   } = await admin.auth.admin.updateUserById(user.id, {
+    ...(migratingLegacyUnionPrincipal ? { email, password } : {}),
     app_metadata: nextAppMetadata,
     user_metadata: nextUserMetadata,
   })

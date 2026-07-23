@@ -61,6 +61,8 @@ test("WeChat login stores canonical identity only in admin-controlled app_metada
   const signInCalls = []
   const updateCalls = []
   let profileUpsertError = null
+  let legacySignedInUser = null
+  let scopedUserExists = false
   let trustedMetadataUpdateError = null
 
   try {
@@ -104,6 +106,7 @@ test("WeChat login stores canonical identity only in admin-controlled app_metada
         admin: {
           async createUser(input) {
             createCalls.push(input)
+            scopedUserExists = true
             return { error: null }
           },
           async updateUserById(userId, input) {
@@ -114,10 +117,14 @@ test("WeChat login stores canonical identity only in admin-controlled app_metada
                 error: trustedMetadataUpdateError,
               }
             }
+            const sourceUser =
+              legacySignedInUser?.id === userId
+                ? legacySignedInUser
+                : signedInUser
             return {
               data: {
                 user: {
-                  ...signedInUser,
+                  ...sourceUser,
                   app_metadata: input.app_metadata,
                   user_metadata: input.user_metadata,
                 },
@@ -144,13 +151,35 @@ test("WeChat login stores canonical identity only in admin-controlled app_metada
           auth: {
             async signInWithPassword(input) {
               signInCalls.push(input)
+              const isScopedPrincipal = input.email.includes(
+                "union_open-platform-trusted_unionid-trusted",
+              )
+              const isLegacyPrincipal = input.email.includes(
+                "union_unionid-trusted",
+              )
+              const selectedUser =
+                isScopedPrincipal && scopedUserExists
+                  ? signedInUser
+                  : isLegacyPrincipal
+                    ? legacySignedInUser
+                    : null
+              if (!selectedUser) {
+                return {
+                  data: { session: null },
+                  error: {
+                    code: "invalid_credentials",
+                    message: "Invalid login credentials",
+                    status: 400,
+                  },
+                }
+              }
               return {
                 data: {
                   session: {
                     access_token: "app-access-token",
                     expires_in: 3600,
                     refresh_token: "app-refresh-token",
-                    user: signedInUser,
+                    user: selectedUser,
                   },
                 },
                 error: null,
@@ -180,7 +209,7 @@ test("WeChat login stores canonical identity only in admin-controlled app_metada
       createCalls[0].email,
       /union_open-platform-trusted_unionid-trusted/,
     )
-    assert.equal(signInCalls[0].email, createCalls[0].email)
+    assert.equal(signInCalls.at(-1).email, createCalls[0].email)
     assert.deepEqual(createCalls[0].user_metadata, {
       avatar_url: "https://images.test.invalid/avatar.png",
       nickname: "可信昵称",
@@ -231,6 +260,58 @@ test("WeChat login stores canonical identity only in admin-controlled app_metada
     assert.deepEqual(profileFailure.body, {
       error: "profile_upsert_failed",
     })
+
+    profileUpsertError = null
+    scopedUserExists = false
+    legacySignedInUser = {
+      id: "10000000-0000-4000-8000-000000000088",
+      app_metadata: {
+        auth_source: "wechat_open_app",
+        wechat_open_app_id: "wx-open-app-trusted",
+        wechat_unionid: "unionid-trusted",
+        wechat_union_issuer: "open-platform-trusted",
+      },
+      user_metadata: { nickname: "存量用户" },
+    }
+    const createCountBeforeLegacy = createCalls.length
+    const updateCountBeforeLegacy = updateCalls.length
+    const legacyMigration = await route.POST({
+      async json() {
+        return { code: "legacy-migration-code" }
+      },
+    })
+    assert.equal(legacyMigration.status, 200)
+    assert.equal(createCalls.length, createCountBeforeLegacy)
+    assert.equal(updateCalls.length, updateCountBeforeLegacy + 1)
+    assert.equal(
+      updateCalls.at(-1).userId,
+      legacySignedInUser.id,
+    )
+    assert.match(
+      updateCalls.at(-1).input.email,
+      /union_open-platform-trusted_unionid-trusted/,
+    )
+    assert.equal(typeof updateCalls.at(-1).input.password, "string")
+
+    legacySignedInUser = {
+      ...legacySignedInUser,
+      app_metadata: {
+        ...legacySignedInUser.app_metadata,
+        wechat_union_issuer: "different-open-platform",
+      },
+    }
+    const updateCountBeforeConflict = updateCalls.length
+    const legacyConflict = await route.POST({
+      async json() {
+        return { code: "legacy-conflict-code" }
+      },
+    })
+    assert.equal(legacyConflict.status, 409)
+    assert.deepEqual(legacyConflict.body, {
+      error: "legacy_identity_review_required",
+    })
+    assert.equal(createCalls.length, createCountBeforeLegacy)
+    assert.equal(updateCalls.length, updateCountBeforeConflict)
   } finally {
     global.fetch = originalFetch
     for (const [key, value] of Object.entries(originalEnvironment)) {

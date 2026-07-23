@@ -350,6 +350,15 @@ test(
       const canonicalUserId = bootstrap.body.canonical_user_id
       assert.match(canonicalUserId, /^[0-9a-f-]{36}$/)
 
+      const operatorBootstrap = await requestJson(
+        baseUrl,
+        "/api/app/account/bootstrap",
+        operatorToken,
+        { method: "POST", body: "{}" },
+      )
+      assert.equal(operatorBootstrap.status, 200)
+      assert.equal(operatorBootstrap.body.identity_state, "resolved")
+
       const beforeGrant = await requestJson(
         baseUrl,
         "/api/app/access?refresh=1",
@@ -572,8 +581,8 @@ test(
       const dryRunReport = JSON.parse(dryRun.stdout)
       assert.equal(dryRunReport.mode, "dry-run")
       assert.equal(dryRunReport.scanned_profiles, 3)
-      assert.equal(dryRunReport.already_linked, 1)
-      assert.equal(dryRunReport.candidates_without_canonical_identity, 2)
+      assert.equal(dryRunReport.already_linked, 2)
+      assert.equal(dryRunReport.candidates_without_canonical_identity, 1)
       assert.equal(dryRunReport.writes_performed, 0)
 
       progress("stopping HTTP server and validating rollback")

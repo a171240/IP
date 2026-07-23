@@ -6,9 +6,13 @@ import {
   type AppFeatureDecisions,
   type AppNormalizedRole,
 } from "@/lib/aliyun-rds/app-authorization.server"
-import { queryAliyunRds } from "@/lib/aliyun-rds/postgres.server"
 import {
-  resolveAppCanonicalAuthorization,
+  queryAliyunRds,
+  withAliyunRdsTransaction,
+} from "@/lib/aliyun-rds/postgres.server"
+import {
+  resolveAppCanonicalAuthorizationWithClient,
+  type AppAccessQueryClient,
   type AppCanonicalAuthorization,
 } from "@/lib/aliyun-rds/repositories/app-access-control.server"
 import { normalizePlan, type PlanId } from "@/lib/pricing/rules"
@@ -555,8 +559,11 @@ export function accountContextPayload(ctx: AppAccountContext) {
   }
 }
 
-async function findProfileRow(userId: string): Promise<ProfileRow | null> {
-  const result = await queryAliyunRds<ProfileRow>(
+async function findProfileRow(
+  client: AppAccessQueryClient,
+  userId: string,
+): Promise<ProfileRow | null> {
+  const result = await client.query<ProfileRow>(
     `select ${PROFILE_COLUMNS} from public.profiles where id = $1 limit 1`,
     [userId],
   )
@@ -564,9 +571,10 @@ async function findProfileRow(userId: string): Promise<ProfileRow | null> {
 }
 
 async function getLegacyEntitlementRow(
+  client: AppAccessQueryClient,
   userId: string,
 ): Promise<EntitlementRow | null> {
-  const result = await queryAliyunRds<EntitlementRow>(
+  const result = await client.query<EntitlementRow>(
     `
       select
         'legacy'::text as entitlement_source,
@@ -585,11 +593,14 @@ async function getLegacyEntitlementRow(
   return result.rows[0] || null
 }
 
-async function getMembershipEntitlementRow(args: {
-  canonicalUserId: string
-  membershipId: string
-}): Promise<EntitlementRow | null> {
-  const result = await queryAliyunRds<EntitlementRow>(
+async function getMembershipEntitlementRow(
+  client: AppAccessQueryClient,
+  args: {
+    canonicalUserId: string
+    membershipId: string
+  },
+): Promise<EntitlementRow | null> {
+  const result = await client.query<EntitlementRow>(
     `
       select
         'membership'::text as entitlement_source,
@@ -610,10 +621,11 @@ async function getMembershipEntitlementRow(args: {
 }
 
 async function getMembershipRows(
+  client: AppAccessQueryClient,
   userId: string,
   canonicalUserId: string,
 ): Promise<MembershipRow[]> {
-  const result = await queryAliyunRds<MembershipRow>(
+  const result = await client.query<MembershipRow>(
     `
       select
         membership.id,
@@ -650,8 +662,14 @@ function buildAccountContext(args: {
   user: AppAuthUser
   profile: ProfileRow | null
   membershipRows: MembershipRow[]
+  platformAdminAllowed?: boolean
 }): AppAccountIdentity {
-  if (isPlatformAdminUser(args.user)) return platformAccountContext(args.user)
+  if (
+    args.platformAdminAllowed !== false &&
+    isPlatformAdminUser(args.user)
+  ) {
+    return platformAccountContext(args.user)
+  }
 
   const memberships = args.membershipRows
     .filter(validTenantMembership)
@@ -697,12 +715,15 @@ function shouldUseMembershipBilling(account: AppAccountIdentity) {
   )
 }
 
-async function resolveMembershipBillingProfile(account: AppAccountIdentity): Promise<Partial<AppBillingProfile> | null> {
+async function resolveMembershipBillingProfile(
+  client: AppAccessQueryClient,
+  account: AppAccountIdentity,
+): Promise<Partial<AppBillingProfile> | null> {
   if (!shouldUseMembershipBilling(account)) return null
   if (!account.companyId) return null
 
   const roles = Array.from(new Set([...STORE_BILLING_OWNER_ROLES, ...COMPANY_BILLING_OWNER_ROLES]))
-  const result = await queryAliyunRds<BillingOwnerRow>(
+  const result = await client.query<BillingOwnerRow>(
     `
       select
         membership.user_id,
@@ -817,9 +838,24 @@ type AppAccountReadSnapshot = {
   billingProfile: AppBillingProfile
 }
 
-async function loadAppAccountReadSnapshot(user: AppAuthUser): Promise<AppAccountReadSnapshot> {
-  const authorization = await resolveAppCanonicalAuthorization(user)
-  const storedProfile = await findProfileRow(user.id)
+async function loadAppAccountReadSnapshot(
+  user: AppAuthUser,
+): Promise<AppAccountReadSnapshot> {
+  return withAliyunRdsTransaction(async (client) => {
+    await client.query("set transaction isolation level repeatable read read only")
+    return loadAppAccountReadSnapshotWithClient(client, user)
+  })
+}
+
+async function loadAppAccountReadSnapshotWithClient(
+  client: AppAccessQueryClient,
+  user: AppAuthUser,
+): Promise<AppAccountReadSnapshot> {
+  const authorization = await resolveAppCanonicalAuthorizationWithClient(
+    client,
+    user,
+  )
+  const storedProfile = await findProfileRow(client, user.id)
   const identityReviewRequired =
     authorization.identityState === "review_required"
   const profileRow = identityReviewRequired
@@ -827,18 +863,27 @@ async function loadAppAccountReadSnapshot(user: AppAuthUser): Promise<AppAccount
     : storedProfile || emptyProfileRow(user)
   const membershipRows = identityReviewRequired
     ? []
-    : await getMembershipRows(user.id, authorization.canonicalUserId)
-  const account = buildAccountContext({ user, profile: profileRow, membershipRows })
+    : await getMembershipRows(
+        client,
+        user.id,
+        authorization.canonicalUserId,
+      )
+  const account = buildAccountContext({
+    user,
+    profile: profileRow,
+    membershipRows,
+    platformAdminAllowed: !identityReviewRequired,
+  })
   const membershipEntitlement =
     authorization.identityState === "resolved" && account.membershipId
-      ? await getMembershipEntitlementRow({
+      ? await getMembershipEntitlementRow(client, {
           canonicalUserId: authorization.canonicalUserId,
           membershipId: account.membershipId,
         })
       : null
   const legacyEntitlement =
     authorization.identityState === "resolved" && !membershipEntitlement
-      ? await getLegacyEntitlementRow(user.id)
+      ? await getLegacyEntitlementRow(client, user.id)
       : null
   const entitlement = membershipEntitlement || legacyEntitlement
   let billingProfile: AppBillingProfile = {
@@ -850,7 +895,10 @@ async function loadAppAccountReadSnapshot(user: AppAuthUser): Promise<AppAccount
     store_id: account.storeId,
     store_name: account.storeName,
   }
-  const membershipBilling = await resolveMembershipBillingProfile(account)
+  const membershipBilling = await resolveMembershipBillingProfile(
+    client,
+    account,
+  )
   if (membershipBilling) {
     billingProfile = {
       ...billingProfile,
@@ -1011,17 +1059,11 @@ export async function bootstrapAliyunRdsAppProfile(user: AppAuthUser) {
 }
 
 export async function getAliyunRdsAppAccountContext(user: AppAuthUser) {
-  if (isPlatformAdminUser(user)) {
-    const account = platformAccountContext(user)
-    return {
-      ...account,
-      features: buildAppFeatureDecisions(account, {
-        aiPointsBalance: 0,
-        aiPointsUnlimited: true,
-      }),
-    }
+  const snapshot = await loadAppAccountReadSnapshot(user)
+  if (snapshot.authorization.identityState === "review_required") {
+    throw new Error("app_identity_review_required")
   }
-  return (await loadAppAccountReadSnapshot(user)).account
+  return snapshot.account
 }
 
 function appAccessContractPayload(snapshot: AppAccountReadSnapshot) {

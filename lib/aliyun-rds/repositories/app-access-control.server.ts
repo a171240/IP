@@ -914,22 +914,39 @@ export async function grantAppAccessWithClient(
   const existingMembership = await client.query<{
     access_source: string | null
     authorization_version: number | string
+    canonical_user_id: string | null
     id: string
     role: string
     status: string
     user_id: string
   }>(
     `
-      select id, user_id, role, status, access_source, authorization_version
+      select
+        id,
+        user_id,
+        canonical_user_id,
+        role,
+        status,
+        access_source,
+        authorization_version
       from public.mp_account_memberships
-      where canonical_user_id = $1
+      where (
+          canonical_user_id = $1
+          or (
+            canonical_user_id is null
+            and user_id = $4
+          )
+        )
         and company_id = $2
         and store_id is not distinct from $3::uuid
-      limit 1
+      order by canonical_user_id nulls last, id
       for update
     `,
-    [canonicalUserId, companyId, storeId],
+    [canonicalUserId, companyId, storeId, targetUserId],
   )
+  if (existingMembership.rows.length > 1) {
+    throw new Error("membership_conflict")
+  }
   let membershipId = existingMembership.rows[0]?.id || null
   const existingEntitlement = membershipId
     ? await client.query<{
@@ -957,16 +974,23 @@ export async function grantAppAccessWithClient(
       `
         update public.mp_account_memberships
         set
-          user_id = $2,
-          role = $3,
+          canonical_user_id = $2,
+          user_id = $3,
+          role = $4,
           status = 'active',
           access_source = 'admin_access_grant',
-          authorization_version = $4,
+          authorization_version = $5,
           accepted_at = coalesce(accepted_at, now()),
           updated_at = now()
         where id = $1
       `,
-      [membershipId, targetUserId, role, authorizationVersion],
+      [
+        membershipId,
+        canonicalUserId,
+        targetUserId,
+        role,
+        authorizationVersion,
+      ],
     )
   } else {
     const membership = await client.query<{ id: string }>(
@@ -1292,6 +1316,7 @@ async function recordRejectedAccessGrant(
       "access_grant_feature_role_denied",
       "access_grant_operator_role_denied",
       "app_idempotency_conflict",
+      "membership_conflict",
     ].includes(errorCode)
   ) {
     return

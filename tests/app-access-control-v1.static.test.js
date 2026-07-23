@@ -26,6 +26,13 @@ const repositoryPath = path.join(
   "repositories",
   "app-access-control.server.ts",
 )
+const accountProfileRepositoryPath = path.join(
+  root,
+  "lib",
+  "aliyun-rds",
+  "repositories",
+  "account-profile.server.ts",
+)
 const storeAdminRepositoryPath = path.join(
   root,
   "lib",
@@ -61,6 +68,11 @@ test("V1 migration separates canonical identity, contacts, trials, memberships, 
   assert.match(sql, /normalized_value_hash text not null/i)
   assert.match(sql, /encrypted_value text not null/i)
   assert.match(sql, /app_verified_contacts_mark_ambiguity/i)
+  assert.match(sql, /pg_advisory_xact_lock/i)
+  assert.match(
+    sql,
+    /create trigger app_verified_contacts_mark_ambiguity\s+before insert/i,
+  )
   assert.match(sql, /voice_coach_sessions_domain_scope_check/i)
   assert.match(
     sql,
@@ -114,6 +126,11 @@ test("access-control repository exposes the canonical V1 operations", () => {
   assert.match(source, /app_identity_review_required/)
   assert.match(source, /persistAppIdentityReview/)
   assert.match(source, /membership_id/)
+  assert.match(source, /membership_conflict/)
+  assert.match(
+    source,
+    /canonical_user_id is null[\s\S]*user_id = \$4/i,
+  )
   assert.doesNotMatch(
     source,
     /from public\.entitlements where canonical_user_id/i,
@@ -132,10 +149,25 @@ test("canonical WeChat identity uses only admin-controlled app_metadata", () => 
   assert.match(wechatAuthRoute, /app_metadata:\s*nextAppMetadata/)
   assert.match(
     wechatAuthRoute,
-    /WECHAT_OPEN_PLATFORM_SCOPE_ID[\s\S]*unionid[\s\S]*identityKey/,
+    /WECHAT_OPEN_PLATFORM_SCOPE_ID[\s\S]*unionid[\s\S]*scopedIdentityKey/,
   )
+  assert.match(wechatAuthRoute, /legacyUnionIdentityKey/)
+  assert.match(wechatAuthRoute, /isTrustedLegacyUnionUser/)
+  assert.match(wechatAuthRoute, /legacy_identity_review_required/)
   assert.match(wechatAuthRoute, /updateUserById[\s\S]*updatedUserError/)
   assert.match(wechatAuthRoute, /profileUpsertError/)
+})
+
+test("profile authorization is read from one repeatable-read database snapshot", () => {
+  const source = fs.readFileSync(accountProfileRepositoryPath, "utf8")
+
+  assert.match(source, /withAliyunRdsTransaction/)
+  assert.match(
+    source,
+    /set transaction isolation level repeatable read read only/i,
+  )
+  assert.match(source, /loadAppAccountReadSnapshotWithClient/)
+  assert.match(source, /resolveAppCanonicalAuthorizationWithClient/)
 })
 
 test("formal store reporting explicitly excludes personal trial sessions", () => {

@@ -247,6 +247,81 @@ test("admin access grant exposes a stable conflict code for a reused idempotency
   assert.equal(response.body.code, "idempotency_key_reused")
 })
 
+test("admin access grant fails closed for identity review and legacy membership conflicts", async () => {
+  const routePath = path.join(
+    root,
+    "app",
+    "api",
+    "admin",
+    "v1",
+    "access-grants",
+    "route.ts",
+  )
+  const authStub = {
+    appAuthConfigurationErrorResponse: () => null,
+    appAuthRequiredResponse: () =>
+      jsonResponse({ code: "auth_required" }, { status: 401 }),
+    resolveAliyunRdsAppAuthUser: async () => ({
+      user: { id: "10000000-0000-4000-8000-000000000003" },
+    }),
+  }
+  const postgresStub = {
+    AliyunRdsConfigurationError:
+      class AliyunRdsConfigurationError extends Error {},
+  }
+  const identityReviewRoute = compileTsModule(routePath, {
+    "next/server": nextServerStub,
+    "@/lib/aliyun-rds/app-auth.server": authStub,
+    "@/lib/aliyun-rds/postgres.server": postgresStub,
+    "@/lib/aliyun-rds/repositories/account-profile.server": {
+      getAliyunRdsAppAccountContext: async () => {
+        throw new Error("app_identity_review_required")
+      },
+    },
+    "@/lib/aliyun-rds/repositories/app-access-control.server": {
+      grantAppAccess: async () => {
+        throw new Error("must_not_be_called")
+      },
+    },
+  })
+  const identityReviewResponse = await identityReviewRoute.POST(request({}))
+  assert.equal(identityReviewResponse.status, 409)
+  assert.equal(
+    identityReviewResponse.body.code,
+    "identity_review_required",
+  )
+
+  const membershipConflictRoute = compileTsModule(routePath, {
+    "next/server": nextServerStub,
+    "@/lib/aliyun-rds/app-auth.server": authStub,
+    "@/lib/aliyun-rds/postgres.server": postgresStub,
+    "@/lib/aliyun-rds/repositories/account-profile.server": {
+      getAliyunRdsAppAccountContext: async () => ({
+        isPlatformAdmin: true,
+        role: "platform_admin",
+      }),
+    },
+    "@/lib/aliyun-rds/repositories/app-access-control.server": {
+      grantAppAccess: async () => {
+        throw new Error("membership_conflict")
+      },
+    },
+  })
+  const membershipConflictResponse = await membershipConflictRoute.POST(
+    request({
+      canonical_user_id: "10000000-0000-4000-8000-000000000001",
+      company_id: "20000000-0000-4000-8000-000000000001",
+      store_id: "30000000-0000-4000-8000-000000000001",
+      role: "employee",
+      plan: "pro",
+      reason: "legacy conflict",
+      feature_keys: ["voice_coach"],
+    }),
+  )
+  assert.equal(membershipConflictResponse.status, 409)
+  assert.equal(membershipConflictResponse.body.code, "membership_conflict")
+})
+
 test("admin access grant rejects a signed-in non-platform account", async () => {
   const route = compileTsModule(
     path.join(root, "app", "api", "admin", "v1", "access-grants", "route.ts"),

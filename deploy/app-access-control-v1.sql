@@ -180,12 +180,25 @@ declare
   affected_canonical_user_id uuid;
   affected_count integer;
 begin
-  select count(distinct canonical_user_id)::integer
+  perform pg_advisory_xact_lock(
+    hashtextextended(
+      new.contact_type || ':' || new.normalized_value_hash,
+      0
+    )
+  );
+
+  select count(distinct candidate.canonical_user_id)::integer
   into affected_count
-  from public.app_verified_contacts
-  where contact_type = new.contact_type
-    and normalized_value_hash = new.normalized_value_hash
-    and status in ('verified', 'conflict');
+  from (
+    select contact.canonical_user_id
+    from public.app_verified_contacts contact
+    where contact.contact_type = new.contact_type
+      and contact.normalized_value_hash = new.normalized_value_hash
+      and contact.status in ('verified', 'conflict')
+      and contact.id <> new.id
+    union
+    select new.canonical_user_id
+  ) candidate;
 
   if affected_count <= 1 then
     return new;
@@ -195,14 +208,21 @@ begin
   set status = 'conflict', updated_at = now()
   where contact_type = new.contact_type
     and normalized_value_hash = new.normalized_value_hash
-    and status = 'verified';
+    and status = 'verified'
+    and id <> new.id;
+
+  new.status := 'conflict';
+  new.updated_at := now();
 
   for affected_canonical_user_id in
-    select distinct canonical_user_id
-    from public.app_verified_contacts
-    where contact_type = new.contact_type
-      and normalized_value_hash = new.normalized_value_hash
-      and status = 'conflict'
+    select contact.canonical_user_id
+    from public.app_verified_contacts contact
+    where contact.contact_type = new.contact_type
+      and contact.normalized_value_hash = new.normalized_value_hash
+      and contact.status = 'conflict'
+      and contact.id <> new.id
+    union
+    select new.canonical_user_id
   loop
     insert into public.app_authorization_audit_events (
       canonical_user_id,
@@ -228,7 +248,7 @@ end
 $$;
 
 create trigger app_verified_contacts_mark_ambiguity
-after insert or update of contact_type, normalized_value_hash, status
+before insert or update of contact_type, normalized_value_hash, status
 on public.app_verified_contacts
 for each row
 when (new.status = 'verified')
