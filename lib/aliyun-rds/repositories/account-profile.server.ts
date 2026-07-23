@@ -88,6 +88,7 @@ type BillingOwnerRow = {
 export type AppAuthUser = {
   id: string
   email?: string | null
+  app_metadata?: unknown
   user_metadata?: unknown
 }
 

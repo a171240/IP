@@ -17,6 +17,7 @@ export type AliyunRdsAppAuth = {
 type SupabaseAuthUser = {
   id?: unknown
   email?: string | null
+  app_metadata?: unknown
   user_metadata?: unknown
 }
 
@@ -81,6 +82,7 @@ export async function resolveAliyunRdsAppAuthUser(
     user: {
       id: userId,
       email: supabaseUser.email ?? null,
+      app_metadata: supabaseUser.app_metadata || {},
       user_metadata: supabaseUser.user_metadata || {},
     },
   }

@@ -151,7 +151,7 @@ test(
       const [first, second] = await Promise.all([
         repository.ensureAppCanonicalIdentityAndTrial({
           id: userA,
-          user_metadata: {
+          app_metadata: {
             auth_source: "wechat_open_app",
             wechat_open_app_id: "wx-open-app-test",
             wechat_app_openid: "openid-a",
@@ -161,7 +161,7 @@ test(
         }),
         repository.ensureAppCanonicalIdentityAndTrial({
           id: userB,
-          user_metadata: {
+          app_metadata: {
             auth_source: "wechat_open_app",
             wechat_open_app_id: "wx-open-app-test",
             wechat_app_openid: "openid-b",
@@ -176,6 +176,22 @@ test(
       assert.equal(first.trial.sessionsUsed, 0)
       assert.equal(first.trial.sessionsRemaining, 2)
 
+      const forgedUserMetadataIdentity =
+        await repository.ensureAppCanonicalIdentityAndTrial({
+          id: userC,
+          user_metadata: {
+            auth_source: "wechat_open_app",
+            wechat_open_app_id: "wx-open-app-test",
+            wechat_app_openid: "openid-forged",
+            wechat_unionid: "union-shared",
+            wechat_union_issuer: "open-platform-test",
+          },
+        })
+      assert.notEqual(
+        forgedUserMetadataIdentity.canonicalUserId,
+        first.canonicalUserId,
+      )
+
       const conflictingIdentity = await repository.ensureAppCanonicalIdentityAndTrial({
         id: userD,
         user_metadata: {},
@@ -183,7 +199,7 @@ test(
       await assert.rejects(
         repository.ensureAppCanonicalIdentityAndTrial({
           id: userD,
-          user_metadata: {
+          app_metadata: {
             auth_source: "wechat_open_app",
             wechat_open_app_id: "wx-open-app-test",
             wechat_app_openid: "openid-d",

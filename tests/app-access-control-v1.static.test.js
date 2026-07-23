@@ -9,6 +9,16 @@ const root = process.cwd()
 const migrationPath = path.join(root, "deploy", "app-access-control-v1.sql")
 const rollbackPath = path.join(root, "deploy", "app-access-control-v1.rollback.sql")
 const backfillPath = path.join(root, "scripts", "dry-run-app-identity-backfill.mjs")
+const appAuthPath = path.join(root, "lib", "aliyun-rds", "app-auth.server.ts")
+const wechatAuthRoutePath = path.join(
+  root,
+  "app",
+  "api",
+  "app",
+  "auth",
+  "wechat",
+  "route.ts",
+)
 const repositoryPath = path.join(
   root,
   "lib",
@@ -77,4 +87,16 @@ test("access-control repository exposes the canonical V1 operations", () => {
   ]) {
     assert.match(source, new RegExp(`export async function ${operation}\\b`), operation)
   }
+})
+
+test("canonical WeChat identity uses only admin-controlled app_metadata", () => {
+  const repository = fs.readFileSync(repositoryPath, "utf8")
+  const appAuth = fs.readFileSync(appAuthPath, "utf8")
+  const wechatAuthRoute = fs.readFileSync(wechatAuthRoutePath, "utf8")
+
+  assert.match(repository, /recordValue\(user\.app_metadata\)/)
+  assert.doesNotMatch(repository, /recordValue\(user\.user_metadata\)/)
+  assert.match(appAuth, /app_metadata:\s*supabaseUser\.app_metadata/)
+  assert.match(wechatAuthRoute, /app_metadata:\s*trustedWechatIdentityMetadata/)
+  assert.match(wechatAuthRoute, /app_metadata:\s*nextAppMetadata/)
 })

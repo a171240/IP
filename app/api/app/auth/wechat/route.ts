@@ -66,6 +66,22 @@ function metadataText(meta: unknown, key: string) {
   return typeof value === "string" ? value.trim() : ""
 }
 
+function metadataRecord(meta: unknown) {
+  return meta && typeof meta === "object" && !Array.isArray(meta)
+    ? { ...(meta as Record<string, unknown>) }
+    : {}
+}
+
+function publicUserMetadata(meta: unknown) {
+  const publicMetadata = metadataRecord(meta)
+  delete publicMetadata.auth_source
+  delete publicMetadata.wechat_open_app_id
+  delete publicMetadata.wechat_app_openid
+  delete publicMetadata.wechat_unionid
+  delete publicMetadata.wechat_union_issuer
+  return publicMetadata
+}
+
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null)
   if (!body || typeof body !== "object") {
@@ -110,6 +126,15 @@ export async function POST(request: NextRequest) {
   const identityKey = unionid ? `union_${unionid}` : `openid_${openid}`
   const email = buildWechatEmail(identityKey)
   const password = buildWechatPassword(identityKey)
+  const trustedWechatIdentityMetadata = {
+    auth_source: "wechat_open_app",
+    wechat_open_app_id: WECHAT_OPEN_APP_ID,
+    wechat_app_openid: openid,
+    wechat_unionid: unionid || null,
+    ...(unionid && WECHAT_OPEN_PLATFORM_SCOPE_ID
+      ? { wechat_union_issuer: WECHAT_OPEN_PLATFORM_SCOPE_ID }
+      : {}),
+  }
 
   let admin
   try {
@@ -127,14 +152,8 @@ export async function POST(request: NextRequest) {
       user_metadata: {
         nickname: nickname || DEFAULT_WECHAT_NICKNAME,
         avatar_url: avatarUrl || null,
-        auth_source: "wechat_open_app",
-        wechat_open_app_id: WECHAT_OPEN_APP_ID,
-        wechat_app_openid: openid,
-        wechat_unionid: unionid || null,
-        ...(unionid && WECHAT_OPEN_PLATFORM_SCOPE_ID
-          ? { wechat_union_issuer: WECHAT_OPEN_PLATFORM_SCOPE_ID }
-          : {}),
       },
+      app_metadata: trustedWechatIdentityMetadata,
     })
     .then(({ error }) => {
       if (error) {
@@ -176,19 +195,17 @@ export async function POST(request: NextRequest) {
   const existingNickname = metadataText(user.user_metadata, "nickname")
   const nextNickname = nickname || existingNickname || DEFAULT_WECHAT_NICKNAME
   const nextUserMetadata = {
-    ...(user.user_metadata || {}),
+    ...publicUserMetadata(user.user_metadata),
     nickname: nextNickname,
-    auth_source: "wechat_open_app",
-    wechat_open_app_id: WECHAT_OPEN_APP_ID,
-    wechat_app_openid: openid,
     ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
-    ...(unionid ? { wechat_unionid: unionid } : {}),
-    ...(unionid && WECHAT_OPEN_PLATFORM_SCOPE_ID
-      ? { wechat_union_issuer: WECHAT_OPEN_PLATFORM_SCOPE_ID }
-      : {}),
+  }
+  const nextAppMetadata = {
+    ...metadataRecord(user.app_metadata),
+    ...trustedWechatIdentityMetadata,
   }
 
   const { data: updatedUserData } = await admin.auth.admin.updateUserById(user.id, {
+    app_metadata: nextAppMetadata,
     user_metadata: nextUserMetadata,
   })
   const responseUser = updatedUserData?.user || { ...user, user_metadata: nextUserMetadata }

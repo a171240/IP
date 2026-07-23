@@ -13,6 +13,7 @@ export type AppAccessQueryClient = {
 
 export type AppAccessAuthUser = {
   id: string
+  app_metadata?: unknown
   user_metadata?: unknown
 }
 
@@ -135,7 +136,7 @@ const MANAGER_FEATURES = new Set([
 
 export function deriveAppAuthIdentity(user: AppAccessAuthUser): IdentityDescriptor {
   const userId = requiredUuid(user.id, "app_user_id_invalid")
-  const metadata = recordValue(user.user_metadata)
+  const metadata = recordValue(user.app_metadata)
   const source = optionalText(metadata.auth_source, 80)
   const openId = optionalText(metadata.wechat_app_openid, 200)
   const appId = optionalText(metadata.wechat_open_app_id, 200)

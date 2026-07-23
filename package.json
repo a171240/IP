@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "test:app-access-control:http": "APP_ACCESS_CONTROL_HTTP_INTEGRATION=1 node --test tests/app-access-control-v1.http.integration.test.js",
     "build": "node ./scripts/check-backend-release-package.mjs && node ./scripts/strict-build.mjs",
     "release:preflight": "node ./scripts/check-backend-release-package.mjs",
     "release:verify:professional-images": "node ./scripts/check-professional-learning-remote-images.mjs --concurrency 4 --timeout-ms 30000",
