@@ -140,6 +140,7 @@ type IdempotencyRow = {
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const AUDIO_SHA256_PATTERN = /^[0-9a-f]{64}$/
 const SAFE_KEY_PATTERN = /^[a-z0-9][a-z0-9_.:-]*$/i
 const DEFAULT_PERSONAL_TRIAL_RESERVATION_TTL_SECONDS = 600
 const PERSONAL_TRIAL_TECHNICAL_FAILURE_REASONS =
@@ -1047,6 +1048,52 @@ export async function completePersonalTrialFirstRoundWithClient(
     [sessionId],
   )
   const evidence = requiredPersistedFirstRoundEvidence(evidenceResult.rows)
+  const verifiedEvidence = await client.query<{ verified: boolean }>(
+    `
+      select true as verified
+      from public.voice_coach_turns as opening_turn
+      join public.voice_coach_turns as recording_turn
+        on recording_turn.session_id = opening_turn.session_id
+      join public.app_personal_trial_asr_receipts as asr_receipt
+        on asr_receipt.session_id = recording_turn.session_id
+      join public.voice_coach_turns as next_turn
+        on next_turn.session_id = recording_turn.session_id
+      where opening_turn.session_id = $1
+        and opening_turn.id::text = $3
+        and opening_turn.role = 'customer'
+        and opening_turn.turn_index = 0
+        and nullif(btrim(opening_turn.audio_path), '') is not null
+        and recording_turn.id::text = $4
+        and recording_turn.role = 'beautician'
+        and recording_turn.turn_index = 1
+        and nullif(btrim(recording_turn.audio_path), '') is not null
+        and asr_receipt.id::text = $5
+        and asr_receipt.canonical_user_id = $2
+        and asr_receipt.claimed_turn_id = recording_turn.id
+        and asr_receipt.claimed_at is not null
+        and recording_turn.features_json ->> 'asr_receipt_id' =
+          asr_receipt.id::text
+        and recording_turn.features_json ->> 'submitted_audio_sha256' =
+          asr_receipt.audio_sha256
+        and btrim(recording_turn.text) = btrim(asr_receipt.transcript_text)
+        and next_turn.id::text = $6
+        and next_turn.role = 'customer'
+        and next_turn.turn_index = 2
+        and nullif(btrim(next_turn.audio_path), '') is not null
+      limit 1
+    `,
+    [
+      sessionId,
+      canonicalUserId,
+      evidence.openingTtsAudioId,
+      evidence.recordingReceiptId,
+      evidence.asrResultId,
+      evidence.nextTurnTtsAudioId,
+    ],
+  )
+  if (!verifiedEvidence.rows[0]) {
+    throw new Error("personal_trial_first_round_evidence_invalid")
+  }
   const completionEventHash = sha256(stableJson(evidence))
 
   const consumedSession = await client.query<{ id: string }>(
@@ -1076,6 +1123,7 @@ export async function completePersonalTrialFirstRoundWithClient(
   if (!consumedSession.rows[0]) {
     throw new Error("personal_trial_reservation_expired")
   }
+  await deletePersonalTrialAsrProcessingLeasesWithClient(client, [sessionId])
 
   const updatedTrial = await client.query<TrialRow>(
     `
@@ -1137,6 +1185,151 @@ export async function completePersonalTrialFirstRoundWithClient(
   }
 }
 
+export async function settlePersonalTrialAsrProcessingFailure(args: {
+  audioSha256: string
+  canonicalUserId: string
+  processingOwnerToken: string
+  sessionId: string
+}) {
+  return withAliyunRdsTransaction((client) =>
+    settlePersonalTrialAsrProcessingFailureWithClient(client, args),
+  )
+}
+
+export async function settlePersonalTrialAsrProcessingFailureWithClient(
+  client: AppAccessQueryClient,
+  args: {
+    audioSha256: string
+    canonicalUserId: string
+    processingOwnerToken: string
+    sessionId: string
+  },
+) {
+  const canonicalUserId = requiredUuid(
+    args.canonicalUserId,
+    "canonical_user_id_invalid",
+  )
+  const sessionId = requiredUuid(args.sessionId, "voice_coach_session_id_invalid")
+  const processingOwnerToken = requiredUuid(
+    args.processingOwnerToken,
+    "personal_trial_asr_processing_owner_invalid",
+  )
+  const audioSha256 = requiredText(
+    args.audioSha256,
+    64,
+    "personal_trial_asr_audio_sha256_invalid",
+  )
+  if (!AUDIO_SHA256_PATTERN.test(audioSha256)) {
+    throw new Error("personal_trial_asr_audio_sha256_invalid")
+  }
+  await acquireTransactionLock(client, `personal-trial:${canonicalUserId}`)
+  const session = await client.query<{ id: string }>(
+    `
+      select id
+      from public.voice_coach_sessions
+      where id = $1
+        and canonical_user_id = $2
+        and data_domain = 'personal_trial'
+      limit 1
+      for update
+    `,
+    [sessionId, canonicalUserId],
+  )
+  if (!session.rows[0]) throw new Error("personal_trial_session_not_found")
+
+  const receipt = await client.query<{ id: string }>(
+    `
+      select id
+      from public.app_personal_trial_asr_receipts
+      where session_id = $1
+        and canonical_user_id = $2
+        and audio_sha256 = $3
+      limit 1
+    `,
+    [sessionId, canonicalUserId, audioSha256],
+  )
+  if (receipt.rows[0]) {
+    await client.query(
+      `
+        delete from public.app_personal_trial_asr_processing_leases
+        where session_id = $1
+          and canonical_user_id = $2
+          and audio_sha256 = $3
+          and owner_token = $4
+      `,
+      [sessionId, canonicalUserId, audioSha256, processingOwnerToken],
+    )
+    return {
+      inProgress: false,
+      receiptAvailable: true,
+      released: false,
+      reservationStatus: null,
+      sessionId,
+    }
+  }
+
+  const lease = await client.query<{
+    active: boolean
+    owner_token: string
+  }>(
+    `
+      select
+        owner_token,
+        expires_at > clock_timestamp() as active
+      from public.app_personal_trial_asr_processing_leases
+      where session_id = $1
+        and canonical_user_id = $2
+        and audio_sha256 = $3
+      limit 1
+      for update
+    `,
+    [sessionId, canonicalUserId, audioSha256],
+  )
+  const currentLease = lease.rows[0]
+  if (!currentLease || currentLease.owner_token !== processingOwnerToken) {
+    return {
+      inProgress: Boolean(currentLease?.active),
+      receiptAvailable: false,
+      released: false,
+      reservationStatus: null,
+      sessionId,
+    }
+  }
+
+  const deletedLease = await client.query<{ session_id: string }>(
+    `
+      delete from public.app_personal_trial_asr_processing_leases
+      where session_id = $1
+        and canonical_user_id = $2
+        and audio_sha256 = $3
+        and owner_token = $4
+      returning session_id
+    `,
+    [sessionId, canonicalUserId, audioSha256, processingOwnerToken],
+  )
+  if (!deletedLease.rows[0]) {
+    return {
+      inProgress: false,
+      receiptAvailable: false,
+      released: false,
+      reservationStatus: null,
+      sessionId,
+    }
+  }
+  const released = await releasePersonalTrialVoiceSessionWithClient(client, {
+    canonicalUserId,
+    reason: "asr_failed",
+    sessionId,
+  })
+  return {
+    inProgress: false,
+    receiptAvailable: false,
+    released: released.released,
+    reservationStatus: released.reservationStatus,
+    sessionId,
+  }
+}
+
 export async function releasePersonalTrialVoiceSession(args: {
   canonicalUserId: string
   reason: AppPersonalTrialTechnicalFailureReason
@@ -1185,6 +1378,7 @@ export async function releasePersonalTrialVoiceSessionWithClient(
   const session = sessionResult.rows[0]
   if (!session) throw new Error("personal_trial_session_not_found")
   if (session.trial_reservation_status === "consumed") {
+    await deletePersonalTrialAsrProcessingLeasesWithClient(client, [sessionId])
     await client.query(
       `
         insert into public.app_authorization_audit_events (
@@ -1213,6 +1407,7 @@ export async function releasePersonalTrialVoiceSessionWithClient(
     }
   }
   if (session.trial_reservation_status === "released") {
+    await deletePersonalTrialAsrProcessingLeasesWithClient(client, [sessionId])
     if (session.trial_release_reason !== reason) {
       throw new Error("personal_trial_release_conflict")
     }
@@ -1225,6 +1420,7 @@ export async function releasePersonalTrialVoiceSessionWithClient(
     }
   }
   if (session.trial_reservation_status === "expired") {
+    await deletePersonalTrialAsrProcessingLeasesWithClient(client, [sessionId])
     return {
       deduped: true,
       released: false,
@@ -1266,6 +1462,7 @@ export async function releasePersonalTrialVoiceSessionWithClient(
     [sessionId, reason],
   )
   if (!releasedSession.rows[0]) throw new Error("personal_trial_release_conflict")
+  await deletePersonalTrialAsrProcessingLeasesWithClient(client, [sessionId])
   const reservationStatus =
     releasedSession.rows[0].trial_reservation_status
   const expired = reservationStatus === "expired"
@@ -1348,6 +1545,10 @@ export async function expirePersonalTrialVoiceReservationsWithClient(
     `,
     [canonicalUserId],
   )
+  await deletePersonalTrialAsrProcessingLeasesWithClient(
+    client,
+    expiredSessions.rows.map((session) => session.id),
+  )
   for (const session of expiredSessions.rows) {
     await client.query(
       `
@@ -1379,6 +1580,71 @@ export async function expirePersonalTrialVoiceReservationsWithClient(
     sessionIds: expiredSessions.rows.map((session) => session.id),
     trial: await getPersonalTrialSnapshotWithClient(client, canonicalUserId),
   }
+}
+
+export async function expireAllPersonalTrialVoiceReservations(args: {
+  limit?: number
+} = {}) {
+  const limit = Math.max(1, Math.min(500, Math.round(Number(args.limit || 100))))
+  return withAliyunRdsTransaction(async (client) => {
+    const expiredSessions = await client.query<{
+      canonical_user_id: string
+      id: string
+    }>(
+      `
+        with candidates as (
+          select id
+          from public.voice_coach_sessions
+          where data_domain = 'personal_trial'
+            and trial_reservation_status = 'reserved'
+            and trial_reservation_expires_at <= clock_timestamp()
+          order by trial_reservation_expires_at asc, id asc
+          limit $1
+          for update skip locked
+        ),
+        expired_sessions as (
+          update public.voice_coach_sessions as session
+          set
+            trial_reservation_status = 'expired',
+            trial_released_at = clock_timestamp(),
+            trial_release_reason = 'reservation_expired'
+          from candidates
+          where session.id = candidates.id
+          returning session.id, session.canonical_user_id
+        ),
+        audit_events as (
+          insert into public.app_authorization_audit_events (
+            canonical_user_id,
+            action,
+            target_type,
+            target_id,
+            metadata
+          )
+          select
+            canonical_user_id,
+            'personal_trial.voice_session_expired',
+            'voice_coach_session',
+            id,
+            jsonb_build_object('reason', 'reservation_expired')
+          from expired_sessions
+          returning target_id
+        )
+        select expired_sessions.id, expired_sessions.canonical_user_id
+        from expired_sessions
+        join audit_events on audit_events.target_id = expired_sessions.id::text
+        order by expired_sessions.id
+      `,
+      [limit],
+    )
+    await deletePersonalTrialAsrProcessingLeasesWithClient(
+      client,
+      expiredSessions.rows.map((session) => session.id),
+    )
+    return {
+      expiredCount: expiredSessions.rows.length,
+      sessionIds: expiredSessions.rows.map((session) => session.id),
+    }
+  })
 }
 
 export async function grantAppAccess(args: {
@@ -1943,6 +2209,14 @@ export function personalTrialAiCoachPublicEnabled() {
   const configured = String(
     process.env.PERSONAL_TRIAL_AI_COACH_PUBLIC_ENABLED || "",
   ).trim().toLowerCase()
+  const publicEnabled = configured === "1" || configured === "true"
+  return publicEnabled && personalTrialVoiceEventsReady()
+}
+
+export function personalTrialVoiceEventsReady() {
+  const configured = String(
+    process.env.PERSONAL_TRIAL_VOICE_EVENTS_READY || "",
+  ).trim().toLowerCase()
   return configured === "1" || configured === "true"
 }
 
@@ -2173,6 +2447,20 @@ async function acquireTransactionLock(client: AppAccessQueryClient, value: strin
   await client.query(
     "select pg_advisory_xact_lock(hashtextextended($1, 0))",
     [value],
+  )
+}
+
+async function deletePersonalTrialAsrProcessingLeasesWithClient(
+  client: AppAccessQueryClient,
+  sessionIds: string[],
+) {
+  if (!sessionIds.length) return
+  await client.query(
+    `
+      delete from public.app_personal_trial_asr_processing_leases
+      where session_id = any($1::uuid[])
+    `,
+    [sessionIds],
   )
 }
 

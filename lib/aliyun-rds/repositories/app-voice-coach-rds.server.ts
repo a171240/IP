@@ -41,6 +41,8 @@ export type AppVoiceCoachRdsSessionRow = {
   canonical_user_id?: string | null
   data_domain?: "store" | "personal_trial" | string
   client_session_id?: string | null
+  trial_reservation_expires_at?: Date | string | null
+  trial_reservation_status?: "reserved" | "consumed" | "released" | "expired" | null
   scenario_id: string
   status: "active" | "ended" | string
   started_at: string
@@ -68,6 +70,22 @@ export type AppVoiceCoachRdsTurnRow = {
   analysis_json: unknown
   features_json: unknown
 }
+
+export type AppPersonalTrialAsrReceipt = {
+  id: string
+  audioSha256: string
+  audioSeconds: number | null
+  claimedTurnId: string | null
+  confidence: number | null
+  providerRequestId: string | null
+  transcriptText: string
+}
+
+export type AppPersonalTrialAsrProcessingClaim =
+  | { state: "claimed"; ownerToken: string }
+  | { state: "in_progress" }
+  | { state: "not_required" }
+  | { state: "receipt"; receipt: AppPersonalTrialAsrReceipt }
 
 export type AppVoiceCoachRdsEvent = {
   cursor: number
@@ -102,6 +120,19 @@ const SESSION_NOT_FOUND = "voice_coach_rds_session_not_found"
 const SESSION_ENDED = "voice_coach_rds_session_ended"
 const IDEMPOTENCY_CONFLICT = "voice_coach_rds_idempotency_conflict"
 const REPLY_TARGET_STALE = "voice_coach_rds_reply_target_stale"
+const ASR_RECEIPT_REQUIRED = "voice_coach_rds_asr_receipt_required"
+const ASR_PROCESSING_REQUIRED = "voice_coach_rds_asr_processing_required"
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+type AppPersonalTrialAsrReceiptRow = {
+  id: string
+  audio_sha256: string
+  audio_seconds: number | string | null
+  claimed_turn_id: string | null
+  confidence: number | string | null
+  provider_request_id: string | null
+  transcript_text: string
+}
 
 export function getAliyunRdsVoiceCoachSelectionErrorCode(error: unknown) {
   if (!(error instanceof Error)) return null
@@ -121,6 +152,9 @@ export function getAliyunRdsVoiceCoachMutationError(error: unknown) {
   if (error.message === SESSION_ENDED) return { status: 409, code: "voice_coach_session_ended" }
   if (error.message === REPLY_TARGET_STALE) {
     return { status: 409, code: "voice_coach_reply_target_stale" }
+  }
+  if (error.message === ASR_RECEIPT_REQUIRED) {
+    return { status: 409, code: "voice_coach_idempotency_conflict" }
   }
   return null
 }
@@ -234,12 +268,57 @@ export async function appendAliyunRdsVoiceCoachTextReply(args: AppVoiceCoachRdsS
   audioSeconds: number | null
   clientAttemptId: string
   nextCustomerText?: string | null
+  personalTrialAsrReceiptId?: string | null
   persistAudio?: () => Promise<void>
   replyText: string
   replyToTurnId: string
   sessionId: string
+  submittedAudioSha256?: string | null
 }) {
   return withAliyunRdsTransaction((client) => appendAliyunRdsVoiceCoachTextReplyWithClient(client, args))
+}
+
+export async function persistAliyunRdsPersonalTrialAsrReceipt(args: AppVoiceCoachRdsScope & {
+  audioSeconds: number | null
+  audioSha256: string
+  confidence: number | null
+  processingOwnerToken?: string | null
+  providerRequestId: string | null
+  sessionId: string
+  transcriptText: string
+}) {
+  return withAliyunRdsTransaction((client) =>
+    persistAliyunRdsPersonalTrialAsrReceiptWithClient(client, args),
+  )
+}
+
+export async function claimAliyunRdsPersonalTrialAsrProcessing(args: AppVoiceCoachRdsScope & {
+  audioSha256: string
+  ownerToken: string
+  sessionId: string
+}): Promise<AppPersonalTrialAsrProcessingClaim> {
+  return withAliyunRdsTransaction((client) =>
+    claimAliyunRdsPersonalTrialAsrProcessingWithClient(client, args),
+  )
+}
+
+export async function abandonAliyunRdsPersonalTrialAsrProcessing(args: AppVoiceCoachRdsScope & {
+  audioSha256: string
+  ownerToken: string
+  sessionId: string
+}) {
+  return withAliyunRdsTransaction((client) =>
+    abandonAliyunRdsPersonalTrialAsrProcessingWithClient(client, args),
+  )
+}
+
+export async function resolveAliyunRdsPersonalTrialAsrReceipt(args: AppVoiceCoachRdsScope & {
+  audioSha256: string
+  sessionId: string
+}) {
+  return withAliyunRdsTransaction((client) =>
+    resolveAliyunRdsPersonalTrialAsrReceiptWithClient(client, args),
+  )
 }
 
 export async function saveAliyunRdsVoiceCoachTurnAudio(args: AppVoiceCoachRdsScope & {
@@ -553,16 +632,19 @@ export async function appendAliyunRdsVoiceCoachTextReplyWithClient(
     audioSeconds: number | null
     clientAttemptId: string
     nextCustomerText?: string | null
+    personalTrialAsrReceiptId?: string | null
     persistAudio?: () => Promise<void>
     replyText: string
     replyToTurnId: string
     sessionId: string
+    submittedAudioSha256?: string | null
   },
 ) {
   const sessionId = requiredText(args.sessionId, "voice_coach_rds_session_id_required")
   const clientAttemptId = requiredText(args.clientAttemptId, "voice_coach_rds_client_attempt_id_required")
   const replyToTurnId = requiredText(args.replyToTurnId, "voice_coach_rds_reply_to_turn_id_required")
-  const replyText = requiredText(args.replyText, "voice_coach_rds_reply_text_required")
+  const scope = normalizedRdsScope(args)
+  let replyText = requiredText(args.replyText, "voice_coach_rds_reply_text_required")
   const session = await lockAliyunRdsVoiceCoachTextSessionWithClient(client, {
     sessionId,
     userId: args.userId,
@@ -574,6 +656,44 @@ export async function appendAliyunRdsVoiceCoachTextReplyWithClient(
   })
   if (!session) throw new Error(SESSION_NOT_FOUND)
 
+  let personalTrialAsrReceipt: AppPersonalTrialAsrReceiptRow | null = null
+  if (scope.dataDomain === "personal_trial") {
+    const receiptId = requiredText(
+      args.personalTrialAsrReceiptId,
+      ASR_RECEIPT_REQUIRED,
+    )
+    const submittedAudioSha256 = requiredAudioSha256(
+      args.submittedAudioSha256,
+      ASR_RECEIPT_REQUIRED,
+    )
+    const receiptResult = await client.query<AppPersonalTrialAsrReceiptRow>(
+      `
+        select
+          id,
+          audio_sha256,
+          audio_seconds,
+          claimed_turn_id,
+          confidence,
+          provider_request_id,
+          transcript_text
+        from public.app_personal_trial_asr_receipts
+        where id = $1
+          and session_id = $2
+          and canonical_user_id = $3
+          and audio_sha256 = $4
+        limit 1
+        for update
+      `,
+      [receiptId, sessionId, scope.canonicalUserId, submittedAudioSha256],
+    )
+    personalTrialAsrReceipt = receiptResult.rows[0] || null
+    if (!personalTrialAsrReceipt) throw new Error(ASR_RECEIPT_REQUIRED)
+    replyText = requiredText(
+      personalTrialAsrReceipt.transcript_text,
+      ASR_RECEIPT_REQUIRED,
+    )
+  }
+
   const existingBeauticianTurn = await findAliyunRdsVoiceCoachAttemptWithClient(
     client,
     sessionId,
@@ -583,7 +703,14 @@ export async function appendAliyunRdsVoiceCoachTextReplyWithClient(
     const existingFeatures = recordValue(existingBeauticianTurn.features_json)
     if (
       normalizedComparableText(existingBeauticianTurn.text) !== normalizedComparableText(replyText) ||
-      existingFeatures.reply_to_turn_id !== replyToTurnId
+      existingFeatures.reply_to_turn_id !== replyToTurnId ||
+      (
+        personalTrialAsrReceipt &&
+        (
+          personalTrialAsrReceipt.claimed_turn_id !== existingBeauticianTurn.id ||
+          existingFeatures.asr_receipt_id !== personalTrialAsrReceipt.id
+        )
+      )
     ) {
       throw new Error(IDEMPOTENCY_CONFLICT)
     }
@@ -605,6 +732,9 @@ export async function appendAliyunRdsVoiceCoachTextReplyWithClient(
     }
   }
 
+  if (personalTrialAsrReceipt?.claimed_turn_id) {
+    throw new Error(ASR_RECEIPT_REQUIRED)
+  }
   if (session.status === "ended") throw new Error(SESSION_ENDED)
 
   const turnsBeforeSubmit = await listAliyunRdsVoiceCoachTextTurnsWithClient(client, sessionId)
@@ -626,6 +756,12 @@ export async function appendAliyunRdsVoiceCoachTextReplyWithClient(
       provider_mode: "text_only_no_audio_provider",
       client_attempt_id: clientAttemptId,
       reply_to_turn_id: replyToTurnId,
+      ...(personalTrialAsrReceipt
+        ? {
+            asr_receipt_id: personalTrialAsrReceipt.id,
+            submitted_audio_sha256: personalTrialAsrReceipt.audio_sha256,
+          }
+        : {}),
     },
     role: "beautician",
     sessionId,
@@ -641,6 +777,19 @@ export async function appendAliyunRdsVoiceCoachTextReplyWithClient(
       sessionId,
       turnId: beauticianTurn.id,
     })
+  }
+  if (personalTrialAsrReceipt) {
+    const claimedReceipt = await client.query<{ id: string }>(
+      `
+        update public.app_personal_trial_asr_receipts
+        set claimed_turn_id = $2, claimed_at = now()
+        where id = $1
+          and claimed_turn_id is null
+        returning id
+      `,
+      [personalTrialAsrReceipt.id, beauticianTurn.id],
+    )
+    if (!claimedReceipt.rows[0]) throw new Error(ASR_RECEIPT_REQUIRED)
   }
   const nextText = optionalText(args.nextCustomerText)
   const nextCustomerTurn = !reachedMaxTurns && nextText
@@ -658,6 +807,298 @@ export async function appendAliyunRdsVoiceCoachTextReplyWithClient(
     : [...turnsBeforeSubmit, beauticianTurn]
 
   return { beauticianTurn, deduped: false, nextCustomerTurn, reachedMaxTurns, session, turns }
+}
+
+export async function claimAliyunRdsPersonalTrialAsrProcessingWithClient(
+  client: AppVoiceCoachRdsQueryClient,
+  args: AppVoiceCoachRdsScope & {
+    audioSha256: string
+    ownerToken: string
+    sessionId: string
+  },
+): Promise<AppPersonalTrialAsrProcessingClaim> {
+  const scope = normalizedRdsScope(args)
+  if (scope.dataDomain !== "personal_trial") throw new Error(ASR_PROCESSING_REQUIRED)
+  const sessionId = requiredText(args.sessionId, "voice_coach_rds_session_id_required")
+  const audioSha256 = requiredAudioSha256(args.audioSha256, ASR_PROCESSING_REQUIRED)
+  const ownerToken = requiredUuid(args.ownerToken, ASR_PROCESSING_REQUIRED)
+  await acquirePersonalTrialTransactionLock(client, scope.canonicalUserId)
+  const session = await lockAliyunRdsVoiceCoachTextSessionWithClient(client, {
+    ...args,
+    sessionId,
+  })
+  if (!session) throw new Error(SESSION_NOT_FOUND)
+
+  const existingReceipt = await loadPersonalTrialAsrReceiptWithClient(
+    client,
+    sessionId,
+    scope.canonicalUserId,
+    audioSha256,
+  )
+  if (existingReceipt) {
+    return { receipt: personalTrialAsrReceipt(existingReceipt), state: "receipt" }
+  }
+  if (session.trial_reservation_status !== "reserved") {
+    return { state: "not_required" }
+  }
+  if (!session.trial_reservation_expires_at) throw new Error(ASR_PROCESSING_REQUIRED)
+
+  const claimed = await client.query<{ owner_token: string }>(
+    `
+      insert into public.app_personal_trial_asr_processing_leases as lease (
+        session_id,
+        canonical_user_id,
+        audio_sha256,
+        owner_token,
+        expires_at
+      )
+      values (
+        $1,
+        $2,
+        $3,
+        $4,
+        (
+          select trial_reservation_expires_at
+          from public.voice_coach_sessions
+          where id = $1
+        )
+      )
+      on conflict (session_id, audio_sha256) do update
+      set
+        canonical_user_id = excluded.canonical_user_id,
+        owner_token = excluded.owner_token,
+        expires_at = excluded.expires_at,
+        updated_at = clock_timestamp()
+      where lease.expires_at <= clock_timestamp()
+      returning owner_token
+    `,
+    [
+      sessionId,
+      scope.canonicalUserId,
+      audioSha256,
+      ownerToken,
+    ],
+  )
+  return claimed.rows[0]?.owner_token === ownerToken
+    ? { ownerToken, state: "claimed" }
+    : { state: "in_progress" }
+}
+
+export async function abandonAliyunRdsPersonalTrialAsrProcessingWithClient(
+  client: AppVoiceCoachRdsQueryClient,
+  args: AppVoiceCoachRdsScope & {
+    audioSha256: string
+    ownerToken: string
+    sessionId: string
+  },
+) {
+  const scope = normalizedRdsScope(args)
+  if (scope.dataDomain !== "personal_trial") throw new Error(ASR_PROCESSING_REQUIRED)
+  const sessionId = requiredText(args.sessionId, "voice_coach_rds_session_id_required")
+  const audioSha256 = requiredAudioSha256(args.audioSha256, ASR_PROCESSING_REQUIRED)
+  const ownerToken = requiredUuid(args.ownerToken, ASR_PROCESSING_REQUIRED)
+  await acquirePersonalTrialTransactionLock(client, scope.canonicalUserId)
+  const session = await lockAliyunRdsVoiceCoachTextSessionWithClient(client, {
+    ...args,
+    sessionId,
+  })
+  if (!session) return { abandoned: false }
+  const deleted = await client.query<{ session_id: string }>(
+    `
+      delete from public.app_personal_trial_asr_processing_leases
+      where session_id = $1
+        and canonical_user_id = $2
+        and audio_sha256 = $3
+        and owner_token = $4
+      returning session_id
+    `,
+    [
+      sessionId,
+      scope.canonicalUserId,
+      audioSha256,
+      ownerToken,
+    ],
+  )
+  return { abandoned: Boolean(deleted.rows[0]) }
+}
+
+export async function persistAliyunRdsPersonalTrialAsrReceiptWithClient(
+  client: AppVoiceCoachRdsQueryClient,
+  args: AppVoiceCoachRdsScope & {
+    audioSeconds: number | null
+    audioSha256: string
+    confidence: number | null
+    processingOwnerToken?: string | null
+    providerRequestId: string | null
+    sessionId: string
+    transcriptText: string
+  },
+) {
+  const scope = normalizedRdsScope(args)
+  if (scope.dataDomain !== "personal_trial") throw new Error(ASR_RECEIPT_REQUIRED)
+  const sessionId = requiredText(args.sessionId, "voice_coach_rds_session_id_required")
+  const audioSha256 = requiredAudioSha256(args.audioSha256, ASR_RECEIPT_REQUIRED)
+  const transcriptText = requiredText(args.transcriptText, ASR_RECEIPT_REQUIRED)
+  await acquirePersonalTrialTransactionLock(client, scope.canonicalUserId)
+  const session = await lockAliyunRdsVoiceCoachTextSessionWithClient(client, {
+    ...args,
+    sessionId,
+  })
+  if (!session) throw new Error(SESSION_NOT_FOUND)
+  const existingReceipt = await loadPersonalTrialAsrReceiptWithClient(
+    client,
+    sessionId,
+    scope.canonicalUserId,
+    audioSha256,
+  )
+  if (existingReceipt) return personalTrialAsrReceipt(existingReceipt)
+
+  const processingOwnerToken = args.processingOwnerToken
+    ? requiredUuid(args.processingOwnerToken, ASR_PROCESSING_REQUIRED)
+    : null
+  if (session.trial_reservation_status === "reserved") {
+    if (!processingOwnerToken) throw new Error(ASR_PROCESSING_REQUIRED)
+    const lease = await client.query<{ owner_token: string }>(
+      `
+        select owner_token
+        from public.app_personal_trial_asr_processing_leases
+        where session_id = $1
+          and canonical_user_id = $2
+          and audio_sha256 = $3
+          and owner_token = $4
+          and expires_at > clock_timestamp()
+        limit 1
+        for update
+      `,
+      [sessionId, scope.canonicalUserId, audioSha256, processingOwnerToken],
+    )
+    if (!lease.rows[0]) throw new Error(ASR_PROCESSING_REQUIRED)
+  }
+
+  const result = await client.query<AppPersonalTrialAsrReceiptRow>(
+    `
+      insert into public.app_personal_trial_asr_receipts (
+        session_id,
+        canonical_user_id,
+        audio_sha256,
+        transcript_text,
+        provider_request_id,
+        confidence,
+        audio_seconds
+      )
+      values ($1, $2, $3, $4, $5, $6, $7)
+      on conflict (session_id, audio_sha256) do nothing
+      returning
+        id,
+        audio_sha256,
+        audio_seconds,
+        claimed_turn_id,
+        confidence,
+        provider_request_id,
+        transcript_text
+    `,
+    [
+      sessionId,
+      scope.canonicalUserId,
+      audioSha256,
+      transcriptText,
+      optionalText(args.providerRequestId),
+      args.confidence,
+      args.audioSeconds,
+    ],
+  )
+  const row = result.rows[0] || await loadPersonalTrialAsrReceiptWithClient(
+    client,
+    sessionId,
+    scope.canonicalUserId,
+    audioSha256,
+  )
+  if (!row) throw new Error(ASR_RECEIPT_REQUIRED)
+  if (processingOwnerToken) {
+    const deletedLease = await client.query<{ session_id: string }>(
+      `
+        delete from public.app_personal_trial_asr_processing_leases
+        where session_id = $1
+          and canonical_user_id = $2
+          and audio_sha256 = $3
+          and owner_token = $4
+        returning session_id
+      `,
+      [sessionId, scope.canonicalUserId, audioSha256, processingOwnerToken],
+    )
+    if (
+      session.trial_reservation_status === "reserved" &&
+      !deletedLease.rows[0]
+    ) {
+      throw new Error(ASR_PROCESSING_REQUIRED)
+    }
+  }
+  return personalTrialAsrReceipt(row)
+}
+
+export async function resolveAliyunRdsPersonalTrialAsrReceiptWithClient(
+  client: AppVoiceCoachRdsQueryClient,
+  args: AppVoiceCoachRdsScope & {
+    audioSha256: string
+    sessionId: string
+  },
+) {
+  const scope = normalizedRdsScope(args)
+  if (scope.dataDomain !== "personal_trial") throw new Error(ASR_RECEIPT_REQUIRED)
+  const sessionId = requiredText(args.sessionId, "voice_coach_rds_session_id_required")
+  const session = await lockAliyunRdsVoiceCoachTextSessionWithClient(client, {
+    ...args,
+    sessionId,
+  })
+  if (!session) throw new Error(SESSION_NOT_FOUND)
+  const row = await loadPersonalTrialAsrReceiptWithClient(
+    client,
+    sessionId,
+    scope.canonicalUserId,
+    requiredAudioSha256(args.audioSha256, ASR_RECEIPT_REQUIRED),
+  )
+  return row ? personalTrialAsrReceipt(row) : null
+}
+
+async function loadPersonalTrialAsrReceiptWithClient(
+  client: AppVoiceCoachRdsQueryClient,
+  sessionId: string,
+  canonicalUserId: string,
+  audioSha256: string,
+) {
+  const result = await client.query<AppPersonalTrialAsrReceiptRow>(
+    `
+      select
+        id,
+        audio_sha256,
+        audio_seconds,
+        claimed_turn_id,
+        confidence,
+        provider_request_id,
+        transcript_text
+      from public.app_personal_trial_asr_receipts
+      where session_id = $1
+        and canonical_user_id = $2
+        and audio_sha256 = $3
+      limit 1
+    `,
+    [sessionId, canonicalUserId, audioSha256],
+  )
+  return result.rows[0] || null
+}
+
+function personalTrialAsrReceipt(
+  row: AppPersonalTrialAsrReceiptRow,
+): AppPersonalTrialAsrReceipt {
+  return {
+    id: row.id,
+    audioSha256: row.audio_sha256,
+    audioSeconds: row.audio_seconds === null ? null : Number(row.audio_seconds),
+    claimedTurnId: row.claimed_turn_id,
+    confidence: row.confidence === null ? null : Number(row.confidence),
+    providerRequestId: row.provider_request_id,
+    transcriptText: row.transcript_text,
+  }
 }
 
 export async function saveAliyunRdsVoiceCoachTurnAudioWithClient(
@@ -964,6 +1405,28 @@ function optionalText(value: unknown) {
 function requiredText(value: unknown, errorCode: string) {
   const text = optionalText(value)
   if (!text) throw new Error(errorCode)
+  return text
+}
+
+function requiredUuid(value: unknown, errorCode: string) {
+  const text = String(value || "").trim()
+  if (!UUID_PATTERN.test(text)) throw new Error(errorCode)
+  return text
+}
+
+async function acquirePersonalTrialTransactionLock(
+  client: AppVoiceCoachRdsQueryClient,
+  canonicalUserId: string,
+) {
+  await client.query(
+    "select pg_advisory_xact_lock(hashtextextended($1, 0))",
+    [`personal-trial:${canonicalUserId}`],
+  )
+}
+
+function requiredAudioSha256(value: unknown, errorCode: string) {
+  const text = requiredText(value, errorCode)
+  if (!/^[0-9a-f]{64}$/.test(text)) throw new Error(errorCode)
   return text
 }
 

@@ -410,6 +410,7 @@ test(
         env: {
           ...nextEnvironment,
           PERSONAL_TRIAL_AI_COACH_PUBLIC_ENABLED: "1",
+          PERSONAL_TRIAL_VOICE_EVENTS_READY: "1",
         },
         stdio: ["ignore", "pipe", "pipe"],
       })

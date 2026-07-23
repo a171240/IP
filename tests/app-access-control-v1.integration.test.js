@@ -40,6 +40,99 @@ function compileTsModule(filePath, stubs) {
   return compiledModule.exports
 }
 
+async function seedVerifiedPersonalTrialEvidence(pool, args) {
+  const audioSha256 = "b".repeat(64)
+  const openingTurn = await pool.query(
+    `
+      insert into public.voice_coach_turns (
+        session_id,
+        turn_index,
+        role,
+        text,
+        audio_path,
+        features_json
+      )
+      values ($1, 0, 'customer', 'opening', $2, '{}'::jsonb)
+      returning id
+    `,
+    [args.sessionId, `${args.pathPrefix}/opening.mp3`],
+  )
+  const recordingTurn = await pool.query(
+    `
+      insert into public.voice_coach_turns (
+        session_id,
+        turn_index,
+        role,
+        text,
+        audio_path,
+        features_json
+      )
+      values (
+        $1,
+        1,
+        'beautician',
+        'server transcript',
+        $2,
+        jsonb_build_object('submitted_audio_sha256', $3::text)
+      )
+      returning id
+    `,
+    [args.sessionId, `${args.pathPrefix}/recording.mp3`, audioSha256],
+  )
+  const nextTurn = await pool.query(
+    `
+      insert into public.voice_coach_turns (
+        session_id,
+        turn_index,
+        role,
+        text,
+        audio_path,
+        features_json
+      )
+      values ($1, 2, 'customer', 'next', $2, '{}'::jsonb)
+      returning id
+    `,
+    [args.sessionId, `${args.pathPrefix}/next.mp3`],
+  )
+  const asrReceipt = await pool.query(
+    `
+      insert into public.app_personal_trial_asr_receipts (
+        session_id,
+        canonical_user_id,
+        audio_sha256,
+        transcript_text,
+        claimed_turn_id,
+        claimed_at
+      )
+      values ($1, $2, $3, 'server transcript', $4, now())
+      returning id
+    `,
+    [
+      args.sessionId,
+      args.canonicalUserId,
+      audioSha256,
+      recordingTurn.rows[0].id,
+    ],
+  )
+  await pool.query(
+    `
+      update public.voice_coach_turns
+      set features_json = features_json || jsonb_build_object(
+        'asr_receipt_id',
+        $2::text
+      )
+      where id = $1
+    `,
+    [recordingTurn.rows[0].id, asrReceipt.rows[0].id],
+  )
+  return {
+    openingTtsAudioId: openingTurn.rows[0].id,
+    recordingReceiptId: recordingTurn.rows[0].id,
+    asrResultId: asrReceipt.rows[0].id,
+    nextTurnTtsAudioId: nextTurn.rows[0].id,
+  }
+}
+
 test(
   "canonical identity, two-use trial, access grant and idempotency hold in isolated PostgreSQL",
   { skip: !databaseUrl },
@@ -683,19 +776,258 @@ test(
         }),
         /personal_trial_voice_evidence_conflict/,
       )
+      await assert.rejects(
+        repository.completePersonalTrialFirstRound(completionInput),
+        /personal_trial_first_round_evidence_invalid/,
+      )
+      await pool.query(
+        `
+          delete from public.app_personal_trial_voice_evidence
+          where session_id = $1
+        `,
+        [firstReservation.sessionId],
+      )
+      const openingTurn = await pool.query(
+        `
+          insert into public.voice_coach_turns (
+            session_id,
+            turn_index,
+            role,
+            text,
+            audio_path,
+            features_json
+          )
+          values ($1, 0, 'customer', 'opening', 'trial/opening.mp3', '{}'::jsonb)
+          returning id
+        `,
+        [firstReservation.sessionId],
+      )
+      const recordingTurn = await pool.query(
+        `
+          insert into public.voice_coach_turns (
+            session_id,
+            turn_index,
+            role,
+            text,
+            audio_path,
+            features_json
+          )
+          values (
+            $1,
+            1,
+            'beautician',
+            'server transcript',
+            'trial/recording.mp3',
+            jsonb_build_object('submitted_audio_sha256', $2::text)
+          )
+          returning id
+        `,
+        [firstReservation.sessionId, "a".repeat(64)],
+      )
+      const nextTurn = await pool.query(
+        `
+          insert into public.voice_coach_turns (
+            session_id,
+            turn_index,
+            role,
+            text,
+            audio_path,
+            features_json
+          )
+          values ($1, 2, 'customer', 'next', 'trial/next.mp3', '{}'::jsonb)
+          returning id
+        `,
+        [firstReservation.sessionId],
+      )
+      const asrReceipt = await pool.query(
+        `
+          insert into public.app_personal_trial_asr_receipts (
+            session_id,
+            canonical_user_id,
+            audio_sha256,
+            transcript_text,
+            claimed_turn_id,
+            claimed_at
+          )
+          values ($1, $2, $3, 'server transcript', $4, now())
+          returning id
+        `,
+        [
+          firstReservation.sessionId,
+          first.canonicalUserId,
+          "a".repeat(64),
+          recordingTurn.rows[0].id,
+        ],
+      )
+      await pool.query(
+        `
+          update public.voice_coach_turns
+          set features_json = features_json || jsonb_build_object(
+            'asr_receipt_id',
+            $2::text
+          )
+          where id = $1
+        `,
+        [recordingTurn.rows[0].id, asrReceipt.rows[0].id],
+      )
+      const verifiedCompletionEvidence = {
+        openingTtsAudioId: openingTurn.rows[0].id,
+        recordingReceiptId: recordingTurn.rows[0].id,
+        asrResultId: asrReceipt.rows[0].id,
+        nextTurnTtsAudioId: nextTurn.rows[0].id,
+      }
+      for (const [evidenceStage, evidenceId] of [
+        ["opening_tts_ready", verifiedCompletionEvidence.openingTtsAudioId],
+        ["recording_received", verifiedCompletionEvidence.recordingReceiptId],
+        ["asr_succeeded", verifiedCompletionEvidence.asrResultId],
+        ["next_turn_tts_ready", verifiedCompletionEvidence.nextTurnTtsAudioId],
+      ]) {
+        await repository.recordPersonalTrialVoiceEvidence({
+          canonicalUserId: first.canonicalUserId,
+          evidenceId,
+          evidenceStage,
+          sessionId: firstReservation.sessionId,
+        })
+      }
+      await pool.query(
+        `
+          update public.app_personal_trial_asr_receipts
+          set claimed_turn_id = null, claimed_at = null
+          where id = $1
+        `,
+        [asrReceipt.rows[0].id],
+      )
+      await assert.rejects(
+        repository.completePersonalTrialFirstRound(completionInput),
+        /personal_trial_first_round_evidence_invalid/,
+      )
+      await pool.query(
+        `
+          update public.app_personal_trial_asr_receipts
+          set claimed_turn_id = $2, claimed_at = now()
+          where id = $1
+        `,
+        [asrReceipt.rows[0].id, recordingTurn.rows[0].id],
+      )
+      await pool.query(
+        `
+          update public.voice_coach_turns
+          set features_json = jsonb_set(
+            features_json,
+            '{submitted_audio_sha256}',
+            to_jsonb($2::text)
+          )
+          where id = $1
+        `,
+        [recordingTurn.rows[0].id, "d".repeat(64)],
+      )
+      await assert.rejects(
+        repository.completePersonalTrialFirstRound(completionInput),
+        /personal_trial_first_round_evidence_invalid/,
+      )
+      await pool.query(
+        `
+          update public.voice_coach_turns
+          set features_json = jsonb_set(
+            features_json,
+            '{submitted_audio_sha256}',
+            to_jsonb($2::text)
+          )
+          where id = $1
+        `,
+        [recordingTurn.rows[0].id, "a".repeat(64)],
+      )
+      await pool.query(
+        `
+          update public.voice_coach_turns
+          set turn_index = 3
+          where id = $1
+        `,
+        [recordingTurn.rows[0].id],
+      )
+      await assert.rejects(
+        repository.completePersonalTrialFirstRound(completionInput),
+        /personal_trial_first_round_evidence_invalid/,
+      )
+      await pool.query(
+        `
+          update public.voice_coach_turns
+          set turn_index = 1
+          where id = $1
+        `,
+        [recordingTurn.rows[0].id],
+      )
+      const otherReservation = fulfilledReservations.find(
+        (reservation) => reservation.value.sessionId !== firstReservation.sessionId,
+      ).value
+      const foreignAsrReceipt = await pool.query(
+        `
+          insert into public.app_personal_trial_asr_receipts (
+            session_id,
+            canonical_user_id,
+            audio_sha256,
+            transcript_text
+          )
+          values ($1, $2, $3, 'foreign transcript')
+          returning id
+        `,
+        [
+          otherReservation.sessionId,
+          first.canonicalUserId,
+          "e".repeat(64),
+        ],
+      )
+      await pool.query(
+        `
+          update public.app_personal_trial_voice_evidence
+          set evidence_id = $2
+          where session_id = $1
+            and evidence_stage = 'asr_succeeded'
+        `,
+        [firstReservation.sessionId, foreignAsrReceipt.rows[0].id],
+      )
+      await assert.rejects(
+        repository.completePersonalTrialFirstRound(completionInput),
+        /personal_trial_first_round_evidence_invalid/,
+      )
+      await pool.query(
+        `
+          update public.app_personal_trial_voice_evidence
+          set evidence_id = $2
+          where session_id = $1
+            and evidence_stage = 'asr_succeeded'
+        `,
+        [firstReservation.sessionId, asrReceipt.rows[0].id],
+      )
+      const completionLease =
+        await voiceRepository.claimAliyunRdsPersonalTrialAsrProcessing({
+          audioSha256: "f".repeat(64),
+          canonicalUserId: first.canonicalUserId,
+          dataDomain: "personal_trial",
+          ownerToken: "30000000-0000-4000-8000-000000000001",
+          sessionId: firstReservation.sessionId,
+          userId: userA,
+        })
+      assert.equal(completionLease.state, "claimed")
       const completed =
         await repository.completePersonalTrialFirstRound(completionInput)
       assert.equal(completed.deduped, false)
       assert.equal(completed.trial.sessionsUsed, 1)
       assert.equal(completed.trial.sessionsReserved, 1)
       assert.equal(completed.trial.sessionsRemaining, 0)
+      const completedSessionLeases = await pool.query(
+        `
+          select count(*)::integer as lease_count
+          from public.app_personal_trial_asr_processing_leases
+          where session_id = $1
+        `,
+        [firstReservation.sessionId],
+      )
+      assert.deepEqual(completedSessionLeases.rows, [{ lease_count: 0 }])
       const completionReplay =
         await repository.completePersonalTrialFirstRound(completionInput)
       assert.equal(completionReplay.deduped, true)
       assert.equal(completionReplay.trial.sessionsUsed, 1)
-      const otherReservation = fulfilledReservations.find(
-        (reservation) => reservation.value.sessionId !== firstReservation.sessionId,
-      ).value
       await assert.rejects(
         repository.completePersonalTrialFirstRound({
           ...completionInput,
@@ -1302,11 +1634,16 @@ test(
           [configuredTtlReservation.sessionId],
         )
         assert.deepEqual(configuredTtl.rows, [{ ttl_seconds: 30 }])
+        const expiringEvidence = await seedVerifiedPersonalTrialEvidence(pool, {
+          canonicalUserId: isolatedTrial.canonicalUserId,
+          pathPrefix: "trial/expiring",
+          sessionId: configuredTtlReservation.sessionId,
+        })
         for (const [evidenceStage, evidenceId] of [
-          ["opening_tts_ready", "expired-opening-tts-0001"],
-          ["recording_received", "expired-recording-0001"],
-          ["asr_succeeded", "expired-asr-0001"],
-          ["next_turn_tts_ready", "expired-next-tts-0001"],
+          ["opening_tts_ready", expiringEvidence.openingTtsAudioId],
+          ["recording_received", expiringEvidence.recordingReceiptId],
+          ["asr_succeeded", expiringEvidence.asrResultId],
+          ["next_turn_tts_ready", expiringEvidence.nextTurnTtsAudioId],
         ]) {
           await repository.recordPersonalTrialVoiceEvidence({
             canonicalUserId: isolatedTrial.canonicalUserId,
@@ -1408,6 +1745,16 @@ test(
             requestPayload: { scenario_id: "objection_safety" },
             userId: userC,
           })
+        const expirySweepLease =
+          await voiceRepository.claimAliyunRdsPersonalTrialAsrProcessing({
+            audioSha256: "8".repeat(64),
+            canonicalUserId: isolatedTrial.canonicalUserId,
+            dataDomain: "personal_trial",
+            ownerToken: "40000000-0000-4000-8000-000000000001",
+            sessionId: expirySweepReservation.sessionId,
+            userId: userC,
+          })
+        assert.equal(expirySweepLease.state, "claimed")
         await pool.query(
           `
             update public.voice_coach_sessions
@@ -1426,6 +1773,15 @@ test(
         assert.equal(expired.trial.sessionsUsed, 0)
         assert.equal(expired.trial.sessionsReserved, 0)
         assert.equal(expired.trial.sessionsRemaining, 2)
+        const expirySweepLeases = await pool.query(
+          `
+            select count(*)::integer as lease_count
+            from public.app_personal_trial_asr_processing_leases
+            where session_id = $1
+          `,
+          [expirySweepReservation.sessionId],
+        )
+        assert.deepEqual(expirySweepLeases.rows, [{ lease_count: 0 }])
         await assert.rejects(
           repository.reservePersonalTrialVoiceSession({
             canonicalUserId: isolatedTrial.canonicalUserId,
@@ -1440,6 +1796,48 @@ test(
             canonicalUserId: isolatedTrial.canonicalUserId,
           })
         assert.equal(expiryReplay.expiredCount, 0)
+
+        const globalExpiryReservation =
+          await repository.reservePersonalTrialVoiceSession({
+            canonicalUserId: isolatedTrial.canonicalUserId,
+            clientSessionId: "global-expiry-reservation-0001",
+            requestPayload: { scenario_id: "objection_safety" },
+            userId: userC,
+          })
+        const globalExpiryLease =
+          await voiceRepository.claimAliyunRdsPersonalTrialAsrProcessing({
+            audioSha256: "9".repeat(64),
+            canonicalUserId: isolatedTrial.canonicalUserId,
+            dataDomain: "personal_trial",
+            ownerToken: "40000000-0000-4000-8000-000000000002",
+            sessionId: globalExpiryReservation.sessionId,
+            userId: userC,
+          })
+        assert.equal(globalExpiryLease.state, "claimed")
+        await pool.query(
+          `
+            update public.voice_coach_sessions
+            set
+              trial_reserved_at = now() - interval '31 seconds',
+              trial_reservation_expires_at = now() - interval '1 second'
+            where id = $1
+          `,
+          [globalExpiryReservation.sessionId],
+        )
+        const globallyExpired =
+          await repository.expireAllPersonalTrialVoiceReservations({ limit: 1 })
+        assert.deepEqual(globallyExpired.sessionIds, [
+          globalExpiryReservation.sessionId,
+        ])
+        const globalExpiryLeases = await pool.query(
+          `
+            select count(*)::integer as lease_count
+            from public.app_personal_trial_asr_processing_leases
+            where session_id = $1
+          `,
+          [globalExpiryReservation.sessionId],
+        )
+        assert.deepEqual(globalExpiryLeases.rows, [{ lease_count: 0 }])
       } finally {
         if (previousReservationTtl === undefined) {
           delete process.env.PERSONAL_TRIAL_VOICE_RESERVATION_TTL_SECONDS
@@ -1448,6 +1846,177 @@ test(
             previousReservationTtl
         }
       }
+      const failureReservation =
+        await repository.reservePersonalTrialVoiceSession({
+          canonicalUserId: isolatedTrial.canonicalUserId,
+          clientSessionId: "asr-processing-failure-0001",
+          requestPayload: { scenario_id: "objection_safety" },
+          userId: userC,
+        })
+      const failureAudioSha256 = "d".repeat(64)
+      const failureOwnerToken = "10000000-0000-4000-8000-000000000001"
+      const failureClaim =
+        await voiceRepository.claimAliyunRdsPersonalTrialAsrProcessing({
+          audioSha256: failureAudioSha256,
+          canonicalUserId: isolatedTrial.canonicalUserId,
+          dataDomain: "personal_trial",
+          ownerToken: failureOwnerToken,
+          sessionId: failureReservation.sessionId,
+          userId: userC,
+        })
+      assert.equal(failureClaim.state, "claimed")
+      const foreignFailure =
+        await repository.settlePersonalTrialAsrProcessingFailure({
+          audioSha256: failureAudioSha256,
+          canonicalUserId: isolatedTrial.canonicalUserId,
+          processingOwnerToken: "10000000-0000-4000-8000-000000000002",
+          sessionId: failureReservation.sessionId,
+        })
+      assert.equal(foreignFailure.inProgress, true)
+      assert.equal(foreignFailure.released, false)
+      const failureReservationStillActive = await pool.query(
+        `
+          select trial_reservation_status
+          from public.voice_coach_sessions
+          where id = $1
+        `,
+        [failureReservation.sessionId],
+      )
+      assert.deepEqual(failureReservationStillActive.rows, [
+        { trial_reservation_status: "reserved" },
+      ])
+      const ownedFailure =
+        await repository.settlePersonalTrialAsrProcessingFailure({
+          audioSha256: failureAudioSha256,
+          canonicalUserId: isolatedTrial.canonicalUserId,
+          processingOwnerToken: failureOwnerToken,
+          sessionId: failureReservation.sessionId,
+        })
+      assert.equal(ownedFailure.inProgress, false)
+      assert.equal(ownedFailure.released, true)
+      assert.equal(ownedFailure.reservationStatus, "released")
+      const releasedFailureLease = await pool.query(
+        `
+          select count(*)::integer as lease_count
+          from public.app_personal_trial_asr_processing_leases
+          where session_id = $1
+        `,
+        [failureReservation.sessionId],
+      )
+      assert.deepEqual(releasedFailureLease.rows, [{ lease_count: 0 }])
+
+      const expirySettlementRaceReservation =
+        await repository.reservePersonalTrialVoiceSession({
+          canonicalUserId: isolatedTrial.canonicalUserId,
+          clientSessionId: "expiry-settlement-race-0001",
+          requestPayload: { scenario_id: "objection_safety" },
+          userId: userC,
+        })
+      const expirySettlementRaceAudioSha256 = "6".repeat(64)
+      const expirySettlementRaceOwnerToken =
+        "10000000-0000-4000-8000-000000000003"
+      const expirySettlementRaceClaim =
+        await voiceRepository.claimAliyunRdsPersonalTrialAsrProcessing({
+          audioSha256: expirySettlementRaceAudioSha256,
+          canonicalUserId: isolatedTrial.canonicalUserId,
+          dataDomain: "personal_trial",
+          ownerToken: expirySettlementRaceOwnerToken,
+          sessionId: expirySettlementRaceReservation.sessionId,
+          userId: userC,
+        })
+      assert.equal(expirySettlementRaceClaim.state, "claimed")
+      const expiryClient = await pool.connect()
+      const settlementClient = await pool.connect()
+      try {
+        await expiryClient.query("begin")
+        await settlementClient.query("begin")
+        await expiryClient.query(
+          `
+            select id
+            from public.voice_coach_sessions
+            where id = $1
+            for update
+          `,
+          [expirySettlementRaceReservation.sessionId],
+        )
+        const settlementResultPromise =
+          repository.settlePersonalTrialAsrProcessingFailureWithClient(
+            settlementClient,
+            {
+              audioSha256: expirySettlementRaceAudioSha256,
+              canonicalUserId: isolatedTrial.canonicalUserId,
+              processingOwnerToken: expirySettlementRaceOwnerToken,
+              sessionId: expirySettlementRaceReservation.sessionId,
+            },
+          ).then(
+            (value) => ({ error: null, value }),
+            (error) => ({ error, value: null }),
+          )
+        let settlementWaitingForSession = false
+        for (let attempt = 0; attempt < 50; attempt += 1) {
+          const activity = await pool.query(
+            `
+              select wait_event_type
+              from pg_stat_activity
+              where pid = $1
+            `,
+            [settlementClient.processID],
+          )
+          if (activity.rows[0]?.wait_event_type === "Lock") {
+            settlementWaitingForSession = true
+            break
+          }
+          await new Promise((resolve) => setTimeout(resolve, 20))
+        }
+        assert.equal(settlementWaitingForSession, true)
+        const expiryDeleteResult = await expiryClient
+          .query(
+            `
+              delete from public.app_personal_trial_asr_processing_leases
+              where session_id = $1
+            `,
+            [expirySettlementRaceReservation.sessionId],
+          )
+          .then(
+            (value) => ({ error: null, value }),
+            (error) => ({ error, value: null }),
+          )
+        if (expiryDeleteResult.error) {
+          await expiryClient.query("rollback")
+        } else {
+          await expiryClient.query("commit")
+        }
+        const settlementResult = await settlementResultPromise
+        if (settlementResult.error) {
+          await settlementClient.query("rollback")
+        } else {
+          await settlementClient.query("commit")
+        }
+        assert.equal(
+          expiryDeleteResult.error?.code || null,
+          null,
+          "expiry lease cleanup must not deadlock with ASR failure settlement",
+        )
+        assert.equal(
+          settlementResult.error?.code || null,
+          null,
+          "ASR failure settlement must not deadlock with expiry lease cleanup",
+        )
+        assert.equal(settlementResult.value.released, false)
+      } finally {
+        await Promise.allSettled([
+          expiryClient.query("rollback"),
+          settlementClient.query("rollback"),
+        ])
+        expiryClient.release()
+        settlementClient.release()
+      }
+      await repository.releasePersonalTrialVoiceSession({
+        canonicalUserId: isolatedTrial.canonicalUserId,
+        reason: "asr_failed",
+        sessionId: expirySettlementRaceReservation.sessionId,
+      })
+
       const voiceCreateInput = {
         canonicalUserId: isolatedTrial.canonicalUserId,
         clientSessionId: "voice-start-0001",
@@ -1510,15 +2079,99 @@ test(
         ...trialScope,
         sessionId: created.session.id,
       })
+      const submittedAudioSha256 = "c".repeat(64)
+      const firstAsrOwnerToken = "20000000-0000-4000-8000-000000000001"
+      const secondAsrOwnerToken = "20000000-0000-4000-8000-000000000002"
+      const firstAsrClaim =
+        await voiceRepository.claimAliyunRdsPersonalTrialAsrProcessing({
+          ...trialScope,
+          audioSha256: submittedAudioSha256,
+          ownerToken: firstAsrOwnerToken,
+          sessionId: created.session.id,
+        })
+      assert.equal(firstAsrClaim.state, "claimed")
+      const activeLeaseConflict =
+        await voiceRepository.claimAliyunRdsPersonalTrialAsrProcessing({
+          ...trialScope,
+          audioSha256: submittedAudioSha256,
+          ownerToken: secondAsrOwnerToken,
+          sessionId: created.session.id,
+        })
+      assert.equal(activeLeaseConflict.state, "in_progress")
+      const leaseDeadline = await pool.query(
+        `
+          select
+            lease.expires_at = session.trial_reservation_expires_at
+              as reuses_reservation_deadline
+          from public.app_personal_trial_asr_processing_leases lease
+          join public.voice_coach_sessions session
+            on session.id = lease.session_id
+          where lease.session_id = $1
+            and lease.audio_sha256 = $2
+        `,
+        [created.session.id, submittedAudioSha256],
+      )
+      assert.deepEqual(leaseDeadline.rows, [
+        { reuses_reservation_deadline: true },
+      ])
+      await pool.query(
+        `
+          update public.app_personal_trial_asr_processing_leases
+          set expires_at = clock_timestamp() - interval '1 second'
+          where session_id = $1
+            and audio_sha256 = $2
+        `,
+        [created.session.id, submittedAudioSha256],
+      )
+      const staleLeaseTakeover =
+        await voiceRepository.claimAliyunRdsPersonalTrialAsrProcessing({
+          ...trialScope,
+          audioSha256: submittedAudioSha256,
+          ownerToken: secondAsrOwnerToken,
+          sessionId: created.session.id,
+        })
+      assert.equal(staleLeaseTakeover.state, "claimed")
+      const staleOwnerFailure =
+        await repository.settlePersonalTrialAsrProcessingFailure({
+          audioSha256: submittedAudioSha256,
+          canonicalUserId: isolatedTrial.canonicalUserId,
+          processingOwnerToken: firstAsrOwnerToken,
+          sessionId: created.session.id,
+        })
+      assert.equal(staleOwnerFailure.inProgress, true)
+      assert.equal(staleOwnerFailure.released, false)
+      const personalTrialAsrReceipt =
+        await voiceRepository.persistAliyunRdsPersonalTrialAsrReceipt({
+          ...trialScope,
+          audioSeconds: 1,
+          audioSha256: submittedAudioSha256,
+          confidence: 0.9,
+          processingOwnerToken: secondAsrOwnerToken,
+          providerRequestId: "voice-asr-request-0001",
+          sessionId: created.session.id,
+          transcriptText: "我会先确认您的顾虑，再说明体验边界。",
+        })
+      const receiptReplay =
+        await voiceRepository.claimAliyunRdsPersonalTrialAsrProcessing({
+          ...trialScope,
+          audioSha256: submittedAudioSha256,
+          ownerToken: firstAsrOwnerToken,
+          sessionId: created.session.id,
+        })
+      assert.equal(receiptReplay.state, "receipt")
+      assert.equal(receiptReplay.receipt.id, personalTrialAsrReceipt.id)
       const submitted = await voiceRepository.appendAliyunRdsVoiceCoachTextReply({
         ...trialScope,
-        audioPath: "",
-        audioSeconds: null,
+        audioPath: "trial/voice-attempt-0001.mp3",
+        audioSeconds: 1,
         clientAttemptId: "voice-attempt-0001",
         nextCustomerText: "那我再问一个问题。",
+        personalTrialAsrReceiptId: personalTrialAsrReceipt.id,
+        persistAudio: async () => {},
         replyText: "我会先确认您的顾虑，再说明体验边界。",
         replyToTurnId: detail.turns[0].id,
         sessionId: created.session.id,
+        submittedAudioSha256,
       })
       assert.equal(submitted.beauticianTurn.role, "beautician")
       const ended = await voiceRepository.endAliyunRdsVoiceCoachTextSession({
@@ -1535,7 +2188,11 @@ test(
         ...trialScope,
         limit: 10,
       })
-      assert.equal(history.length, 3)
+      assert.equal(history.length, 6)
+      assert.equal(
+        history.some((session) => session.id === created.session.id),
+        true,
+      )
       assert.equal(
         history.every((session) => session.data_domain === "personal_trial"),
         true,

@@ -14,6 +14,8 @@ begin
     or exists (select 1 from public.app_idempotency_records limit 1)
     or exists (select 1 from public.app_membership_entitlements limit 1)
     or exists (select 1 from public.app_personal_trial_voice_evidence limit 1)
+    or exists (select 1 from public.app_personal_trial_asr_receipts limit 1)
+    or exists (select 1 from public.app_personal_trial_asr_processing_leases limit 1)
     or exists (
       select 1
       from public.mp_account_memberships
@@ -51,6 +53,9 @@ drop index if exists public.voice_coach_canonical_domain_created_idx;
 drop index if exists public.voice_coach_trial_completion_event_idx;
 drop index if exists public.voice_coach_trial_client_session_idx;
 
+drop table if exists public.app_personal_trial_asr_processing_leases;
+drop index if exists public.app_personal_trial_asr_receipts_canonical_created_idx;
+drop table if exists public.app_personal_trial_asr_receipts;
 drop table if exists public.app_personal_trial_voice_evidence;
 
 alter table public.voice_coach_sessions

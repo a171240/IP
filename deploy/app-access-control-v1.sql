@@ -16,6 +16,8 @@ begin
     or to_regclass('public.app_idempotency_records') is not null
     or to_regclass('public.app_membership_entitlements') is not null
     or to_regclass('public.app_personal_trial_voice_evidence') is not null
+    or to_regclass('public.app_personal_trial_asr_receipts') is not null
+    or to_regclass('public.app_personal_trial_asr_processing_leases') is not null
   then
     raise exception 'app_access_control_v1_schema_conflict: owned table already exists';
   end if;
@@ -429,6 +431,50 @@ create table public.app_personal_trial_voice_evidence (
   primary key (session_id, evidence_stage)
 );
 
+create table public.app_personal_trial_asr_receipts (
+  id uuid primary key default gen_random_uuid(),
+  session_id uuid not null
+    references public.voice_coach_sessions(id) on delete restrict,
+  canonical_user_id uuid not null
+    references public.app_canonical_users(id) on delete restrict,
+  audio_sha256 text not null
+    check (audio_sha256 ~ '^[0-9a-f]{64}$'),
+  transcript_text text not null
+    check (length(btrim(transcript_text)) between 1 and 1000),
+  provider_request_id text,
+  confidence double precision,
+  audio_seconds double precision,
+  claimed_turn_id uuid
+    references public.voice_coach_turns(id) on delete restrict,
+  created_at timestamptz not null default now(),
+  claimed_at timestamptz,
+  unique (session_id, audio_sha256),
+  check (
+    (claimed_turn_id is null and claimed_at is null)
+    or (claimed_turn_id is not null and claimed_at is not null)
+  )
+);
+
+create index app_personal_trial_asr_receipts_canonical_created_idx
+  on public.app_personal_trial_asr_receipts(
+    canonical_user_id,
+    created_at desc
+  );
+
+create table public.app_personal_trial_asr_processing_leases (
+  session_id uuid not null
+    references public.voice_coach_sessions(id) on delete restrict,
+  canonical_user_id uuid not null
+    references public.app_canonical_users(id) on delete restrict,
+  audio_sha256 text not null
+    check (audio_sha256 ~ '^[0-9a-f]{64}$'),
+  owner_token uuid not null,
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (session_id, audio_sha256)
+);
+
 create unique index voice_coach_trial_client_session_idx
   on public.voice_coach_sessions(canonical_user_id, client_session_id)
   where data_domain = 'personal_trial' and client_session_id is not null;
@@ -448,5 +494,9 @@ comment on column public.voice_coach_sessions.data_domain is
   'store is tenant data; personal_trial is isolated demo data with no company/store/membership scope.';
 comment on table public.app_personal_trial_voice_evidence is
   'Server-only immutable evidence stages. A completion event may consume a trial only after all four rows exist for one session.';
+comment on table public.app_personal_trial_asr_receipts is
+  'Server-owned ASR results bound to one personal-trial session and the SHA-256 of the exact submitted audio. Clients cannot supply or replace the authoritative transcript.';
+comment on table public.app_personal_trial_asr_processing_leases is
+  'Server-owned single-flight claim for personal-trial ASR. Its deadline is the voice-session reservation deadline, so it cannot extend or replace the authoritative trial TTL.';
 
 commit;

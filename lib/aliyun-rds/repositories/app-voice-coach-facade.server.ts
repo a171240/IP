@@ -46,6 +46,7 @@ export type AppVoiceCoachFacadeScope =
   | AppVoiceCoachPersonalTrialScope
 
 type AppVoiceCoachRdsRepository = typeof import("@/lib/aliyun-rds/repositories/app-voice-coach-rds.server")
+type AppAccessControlRepository = typeof import("@/lib/aliyun-rds/repositories/app-access-control.server")
 
 export type AppVoiceCoachCreateTimingLog = {
   recordStage(stageName: string, startedAtMs: number): void
@@ -215,13 +216,21 @@ function isVoiceCoachProviderUnavailableError(error: unknown) {
     /timeout|network|fetch failed|temporarily unavailable|(?:http|status)_(?:429|5\d\d)/i.test(message)
 }
 
+function isVoiceCoachClientAudioRejectedError(error: unknown) {
+  if (!error || typeof error !== "object") return false
+  const message = String((error as { message?: unknown }).message || "")
+  return /asr_http_(?:400|413|415|422)(?:\D|$)/i.test(message)
+}
+
 async function callAppVoiceCoachAsrProvider<T>(operation: () => Promise<T>) {
   try {
     return await operation()
   } catch (error) {
     throw new AppVoiceCoachAudioContractError(
       "asr_preview",
-      isVoiceCoachProviderUnavailableError(error)
+      isVoiceCoachClientAudioRejectedError(error)
+        ? "invalid_payload"
+        : isVoiceCoachProviderUnavailableError(error)
         ? "voice_coach_asr_provider_unavailable"
         : "voice_coach_asr_provider_failed",
     )
@@ -231,6 +240,10 @@ async function callAppVoiceCoachAsrProvider<T>(operation: () => Promise<T>) {
 function cleanText(value: unknown, max = 160) {
   const text = String(value || "").trim()
   return text.length > max ? text.slice(0, max) : text
+}
+
+function voiceCoachAudioSha256(audio: Buffer) {
+  return createHash("sha256").update(audio).digest("hex")
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -462,6 +475,128 @@ export function appVoiceCoachContextPayload(ctx: AppAccountContext, scope: AppVo
 
 function shouldUseRdsForScope(scope: AppVoiceCoachFacadeScope) {
   return "dataDomain" in scope || shouldUseRdsRepository()
+}
+
+function personalTrialScope(
+  scope: AppVoiceCoachFacadeScope,
+): AppVoiceCoachPersonalTrialScope | null {
+  return "dataDomain" in scope ? scope : null
+}
+
+async function loadAccessControlRepository(): Promise<AppAccessControlRepository> {
+  return import("@/lib/aliyun-rds/repositories/app-access-control.server")
+}
+
+type PersonalTrialTechnicalFailureReason =
+  | "opening_tts_failed"
+  | "recording_receive_failed"
+  | "asr_failed"
+  | "next_turn_tts_failed"
+
+async function releasePersonalTrialTechnicalFailure(args: {
+  reason: PersonalTrialTechnicalFailureReason
+  scope: AppVoiceCoachFacadeScope
+  sessionId: string
+}) {
+  const scope = personalTrialScope(args.scope)
+  if (!scope) return
+  const accessRepository = await loadAccessControlRepository()
+  await accessRepository.releasePersonalTrialVoiceSession({
+    canonicalUserId: scope.canonicalUserId,
+    reason: args.reason,
+    sessionId: args.sessionId,
+  })
+}
+
+async function withPersonalTrialTechnicalFailure<T>(args: {
+  operation: () => Promise<T>
+  reason: PersonalTrialTechnicalFailureReason | null
+  scope: AppVoiceCoachFacadeScope
+  sessionId: string
+}) {
+  try {
+    return await args.operation()
+  } catch (error) {
+    if (args.reason) {
+      await releasePersonalTrialTechnicalFailure({
+        reason: args.reason,
+        scope: args.scope,
+        sessionId: args.sessionId,
+      })
+    }
+    throw error
+  }
+}
+
+function personalTrialTtsFailureReason(
+  scope: AppVoiceCoachFacadeScope,
+  turnIndex: number,
+): PersonalTrialTechnicalFailureReason | null {
+  if (!personalTrialScope(scope)) return null
+  if (turnIndex === 0) return "opening_tts_failed"
+  if (turnIndex === 2) return "next_turn_tts_failed"
+  return null
+}
+
+async function recordPersonalTrialTtsEvidence(args: {
+  scope: AppVoiceCoachFacadeScope
+  sessionId: string
+  turnId: string
+  turnIndex: number
+}) {
+  const scope = personalTrialScope(args.scope)
+  if (!scope || (args.turnIndex !== 0 && args.turnIndex !== 2)) return
+  const accessRepository = await loadAccessControlRepository()
+  const evidenceStage = args.turnIndex === 0
+    ? "opening_tts_ready" as const
+    : "next_turn_tts_ready" as const
+  await withPersonalTrialTechnicalFailure({
+    operation: () =>
+      accessRepository.recordPersonalTrialVoiceEvidence({
+        canonicalUserId: scope.canonicalUserId,
+        evidenceId: args.turnId,
+        evidenceStage,
+        sessionId: args.sessionId,
+      }),
+    reason: evidenceStage === "opening_tts_ready"
+      ? "opening_tts_failed"
+      : "next_turn_tts_failed",
+    scope: args.scope,
+    sessionId: args.sessionId,
+  })
+  if (evidenceStage === "next_turn_tts_ready") {
+    await accessRepository.completePersonalTrialFirstRound({
+      canonicalUserId: scope.canonicalUserId,
+      completionEventId: `round_1_completed:${args.sessionId}`,
+      sessionId: args.sessionId,
+    })
+  }
+}
+
+async function recordPersonalTrialSubmittedTurnEvidence(args: {
+  asrReceiptId: string | null
+  beauticianTurnId: string
+  scope: AppVoiceCoachFacadeScope
+  sessionId: string
+}) {
+  const scope = personalTrialScope(args.scope)
+  if (!scope) return
+  if (!args.asrReceiptId) {
+    throw new Error("voice_coach_rds_asr_receipt_required")
+  }
+  const accessRepository = await loadAccessControlRepository()
+  await accessRepository.recordPersonalTrialVoiceEvidence({
+    canonicalUserId: scope.canonicalUserId,
+    evidenceId: args.beauticianTurnId,
+    evidenceStage: "recording_received",
+    sessionId: args.sessionId,
+  })
+  await accessRepository.recordPersonalTrialVoiceEvidence({
+    canonicalUserId: scope.canonicalUserId,
+    evidenceId: args.asrReceiptId,
+    evidenceStage: "asr_succeeded",
+    sessionId: args.sessionId,
+  })
 }
 
 function textContractPayload() {
@@ -1320,14 +1455,30 @@ export async function synthesizeAppVoiceCoachTurnResponse(opts: {
       return appVoiceCoachAudioErrorResponse("turn_tts", "voice_coach_tts_turn_not_customer")
     }
     if (!turn.text.trim()) return appVoiceCoachAudioErrorResponse("turn_tts", "voice_coach_tts_text_required")
+    const ttsFailureReason = personalTrialTtsFailureReason(
+      opts.scope,
+      Number(turn.turn_index),
+    )
 
     const existingPath = cleanText(turn.audio_path, 1200)
     if (existingPath) {
-      const audioUrl = await withAppVoiceCoachAudioBoundary(
-        "turn_tts",
-        "voice_coach_tts_persist_failed",
-        () => signVoiceCoachAudio(existingPath),
-      )
+      const audioUrl = await withPersonalTrialTechnicalFailure({
+        operation: () =>
+          withAppVoiceCoachAudioBoundary(
+            "turn_tts",
+            "voice_coach_tts_persist_failed",
+            () => signVoiceCoachAudio(existingPath),
+          ),
+        reason: ttsFailureReason,
+        scope: opts.scope,
+        sessionId: opts.sessionId,
+      })
+      await recordPersonalTrialTtsEvidence({
+        scope: opts.scope,
+        sessionId: opts.sessionId,
+        turnId: turn.id,
+        turnIndex: Number(turn.turn_index),
+      })
       return NextResponse.json({
         ok: true,
         context: appVoiceCoachContextPayload(opts.ctx, opts.scope),
@@ -1341,35 +1492,77 @@ export async function synthesizeAppVoiceCoachTurnResponse(opts: {
       })
     }
 
-    const tts = await withAppVoiceCoachAudioBoundary(
-      "turn_tts",
-      "voice_coach_tts_provider_failed",
-      () => doubaoTts({ text: turn.text, uid: opts.ctx.userId }),
-    )
-    if (!tts.audio?.length) return appVoiceCoachAudioErrorResponse("turn_tts", "voice_coach_tts_empty_audio")
+    const tts = await withPersonalTrialTechnicalFailure({
+      operation: () =>
+        withAppVoiceCoachAudioBoundary(
+          "turn_tts",
+          "voice_coach_tts_provider_failed",
+          () => doubaoTts({ text: turn.text, uid: opts.ctx.userId }),
+        ),
+      reason: ttsFailureReason,
+      scope: opts.scope,
+      sessionId: opts.sessionId,
+    })
+    if (!tts.audio?.length) {
+      if (ttsFailureReason) {
+        await releasePersonalTrialTechnicalFailure({
+          reason: ttsFailureReason,
+          scope: opts.scope,
+          sessionId: opts.sessionId,
+        })
+      }
+      return appVoiceCoachAudioErrorResponse("turn_tts", "voice_coach_tts_empty_audio")
+    }
     const ttsAudio = tts.audio
     const audioPath = appVoiceCoachTtsAudioPath({ sessionId: opts.sessionId, turnId: turn.id, userId: opts.ctx.userId })
-    const saved = await withAppVoiceCoachAudioBoundary(
-      "turn_tts",
-      "voice_coach_tts_persist_failed",
-      async () => {
-        await uploadVoiceCoachAudio({ path: audioPath, data: ttsAudio, contentType: "audio/mpeg" })
-        return rdsRepository.saveAliyunRdsVoiceCoachTurnAudio({
+    const saved = await withPersonalTrialTechnicalFailure({
+      operation: () =>
+        withAppVoiceCoachAudioBoundary(
+          "turn_tts",
+          "voice_coach_tts_persist_failed",
+          async () => {
+            await uploadVoiceCoachAudio({ path: audioPath, data: ttsAudio, contentType: "audio/mpeg" })
+            return rdsRepository.saveAliyunRdsVoiceCoachTurnAudio({
+              sessionId: opts.sessionId,
+              turnId: turn.id,
+              expectedRole: "customer",
+              audioPath,
+              audioSeconds: tts.durationSeconds,
+              ...rdsScopeArgs(opts.ctx, opts.scope),
+            })
+          },
+        ),
+      reason: ttsFailureReason,
+      scope: opts.scope,
+      sessionId: opts.sessionId,
+    })
+    if (!saved) {
+      if (ttsFailureReason) {
+        await releasePersonalTrialTechnicalFailure({
+          reason: ttsFailureReason,
+          scope: opts.scope,
           sessionId: opts.sessionId,
-          turnId: turn.id,
-          expectedRole: "customer",
-          audioPath,
-          audioSeconds: tts.durationSeconds,
-          ...rdsScopeArgs(opts.ctx, opts.scope),
         })
-      },
-    )
-    if (!saved) return appVoiceCoachAudioErrorResponse("turn_tts", "voice_coach_turn_not_found")
-    const audioUrl = await withAppVoiceCoachAudioBoundary(
-      "turn_tts",
-      "voice_coach_tts_persist_failed",
-      () => signVoiceCoachAudio(audioPath),
-    )
+      }
+      return appVoiceCoachAudioErrorResponse("turn_tts", "voice_coach_turn_not_found")
+    }
+    const audioUrl = await withPersonalTrialTechnicalFailure({
+      operation: () =>
+        withAppVoiceCoachAudioBoundary(
+          "turn_tts",
+          "voice_coach_tts_persist_failed",
+          () => signVoiceCoachAudio(audioPath),
+        ),
+      reason: ttsFailureReason,
+      scope: opts.scope,
+      sessionId: opts.sessionId,
+    })
+    await recordPersonalTrialTtsEvidence({
+      scope: opts.scope,
+      sessionId: opts.sessionId,
+      turnId: saved.id,
+      turnIndex: Number(saved.turn_index),
+    })
     return NextResponse.json({
       ok: true,
       context: appVoiceCoachContextPayload(opts.ctx, opts.scope),
@@ -1463,17 +1656,167 @@ export async function transcribeAppVoiceCoachAudioResponse(opts: {
       ...rdsScopeArgs(opts.ctx, opts.scope),
     })
     if (!detail) return appVoiceCoachAudioErrorResponse("asr_preview", "voice_coach_session_not_found")
-    const asr = await callAppVoiceCoachAsrProvider(() => doubaoAsrFlash({ audio, format, uid: opts.ctx.userId }))
-    return NextResponse.json({
-      ok: true,
-      context: appVoiceCoachContextPayload(opts.ctx, opts.scope),
-      session_id: opts.sessionId,
-      text: asr.text,
-      confidence: asr.confidence,
-      audio_seconds: asr.durationSeconds,
-      request_id: asr.requestId,
-      ...rdsContractPayload(rdsRepository.APP_VOICE_COACH_RDS_REPOSITORY_MODE),
-      provider_mode: "volc_speech_asr_flash",
+    const personalTrial = personalTrialScope(opts.scope)
+    const audioSha256 = voiceCoachAudioSha256(audio)
+    const rdsAsrResponse = (result: {
+      audioSeconds: number | null
+      confidence: number | null
+      receiptId?: string
+      requestId: string | null
+      text: string
+    }) =>
+      NextResponse.json({
+        ok: true,
+        context: appVoiceCoachContextPayload(opts.ctx, opts.scope),
+        session_id: opts.sessionId,
+        text: result.text,
+        confidence: result.confidence,
+        audio_seconds: result.audioSeconds,
+        request_id: result.requestId,
+        ...(result.receiptId ? { asr_receipt_id: result.receiptId } : {}),
+        ...rdsContractPayload(rdsRepository.APP_VOICE_COACH_RDS_REPOSITORY_MODE),
+        provider_mode: "volc_speech_asr_flash",
+      })
+    const resolveExistingReceipt = () =>
+      rdsRepository.resolveAliyunRdsPersonalTrialAsrReceipt({
+        audioSha256,
+        sessionId: opts.sessionId,
+        ...rdsScopeArgs(opts.ctx, opts.scope),
+      })
+    let asrProcessingOwnerToken: string | null = null
+    if (personalTrial) {
+      const claim = await rdsRepository.claimAliyunRdsPersonalTrialAsrProcessing({
+        audioSha256,
+        ownerToken: randomUUID(),
+        sessionId: opts.sessionId,
+        ...rdsScopeArgs(opts.ctx, opts.scope),
+      })
+      if (claim.state === "receipt") {
+        return rdsAsrResponse({
+          audioSeconds: claim.receipt.audioSeconds,
+          confidence: claim.receipt.confidence,
+          receiptId: claim.receipt.id,
+          requestId: claim.receipt.providerRequestId,
+          text: claim.receipt.transcriptText,
+        })
+      }
+      if (claim.state === "in_progress") {
+        return appVoiceCoachAudioErrorResponse(
+          "asr_preview",
+          "voice_coach_asr_provider_unavailable",
+        )
+      }
+      if (claim.state === "claimed") {
+        asrProcessingOwnerToken = claim.ownerToken
+      }
+    }
+    const abandonAsrProcessing = async () => {
+      if (!personalTrial || !asrProcessingOwnerToken) return
+      await rdsRepository.abandonAliyunRdsPersonalTrialAsrProcessing({
+        audioSha256,
+        ownerToken: asrProcessingOwnerToken,
+        sessionId: opts.sessionId,
+        ...rdsScopeArgs(opts.ctx, opts.scope),
+      })
+    }
+    const settleAsrTechnicalFailure = async () => {
+      if (!personalTrial) {
+        return { inProgress: false, receipt: null }
+      }
+      if (!asrProcessingOwnerToken) {
+        await releasePersonalTrialTechnicalFailure({
+          reason: "asr_failed",
+          scope: opts.scope,
+          sessionId: opts.sessionId,
+        })
+        return { inProgress: false, receipt: null }
+      }
+      const accessRepository = await loadAccessControlRepository()
+      const settlement =
+        await accessRepository.settlePersonalTrialAsrProcessingFailure({
+          audioSha256,
+          canonicalUserId: personalTrial.canonicalUserId,
+          processingOwnerToken: asrProcessingOwnerToken,
+          sessionId: opts.sessionId,
+        })
+      if (!settlement.receiptAvailable) {
+        return { inProgress: settlement.inProgress, receipt: null }
+      }
+      return {
+        inProgress: false,
+        receipt: await resolveExistingReceipt(),
+      }
+    }
+    let asr
+    try {
+      asr = await callAppVoiceCoachAsrProvider(
+        () => doubaoAsrFlash({ audio, format, uid: opts.ctx.userId }),
+      )
+    } catch (error) {
+      const clientInvalid = error instanceof AppVoiceCoachAudioContractError &&
+        error.code === "invalid_payload"
+      if (clientInvalid) {
+        await abandonAsrProcessing()
+      } else {
+        const settlement = await settleAsrTechnicalFailure()
+        if (settlement.receipt) {
+          return rdsAsrResponse({
+            audioSeconds: settlement.receipt.audioSeconds,
+            confidence: settlement.receipt.confidence,
+            receiptId: settlement.receipt.id,
+            requestId: settlement.receipt.providerRequestId,
+            text: settlement.receipt.transcriptText,
+          })
+        }
+        if (settlement.inProgress) {
+          return appVoiceCoachAudioErrorResponse(
+            "asr_preview",
+            "voice_coach_asr_provider_unavailable",
+          )
+        }
+      }
+      throw error
+    }
+    if (personalTrial && !String(asr.text || "").trim()) {
+      await abandonAsrProcessing()
+      return appVoiceCoachAudioErrorResponse("asr_preview", "invalid_payload")
+    }
+    let personalTrialAsrReceipt = null
+    if (personalTrial) {
+      try {
+        personalTrialAsrReceipt =
+          await rdsRepository.persistAliyunRdsPersonalTrialAsrReceipt({
+              audioSeconds: asr.durationSeconds,
+              audioSha256,
+              confidence: asr.confidence,
+              processingOwnerToken: asrProcessingOwnerToken,
+              providerRequestId: asr.requestId,
+              sessionId: opts.sessionId,
+              transcriptText: asr.text,
+              ...rdsScopeArgs(opts.ctx, opts.scope),
+            })
+      } catch (error) {
+        const settlement = await settleAsrTechnicalFailure()
+        if (settlement.receipt) {
+          personalTrialAsrReceipt = settlement.receipt
+        } else if (settlement.inProgress) {
+          return appVoiceCoachAudioErrorResponse(
+            "asr_preview",
+            "voice_coach_asr_provider_unavailable",
+          )
+        } else {
+          throw error
+        }
+      }
+    }
+    return rdsAsrResponse({
+      audioSeconds: personalTrialAsrReceipt?.audioSeconds ?? asr.durationSeconds,
+      confidence: personalTrialAsrReceipt?.confidence ?? asr.confidence,
+      ...(personalTrialAsrReceipt
+        ? { receiptId: personalTrialAsrReceipt.id }
+        : {}),
+      requestId: personalTrialAsrReceipt?.providerRequestId ?? asr.requestId,
+      text: personalTrialAsrReceipt?.transcriptText ?? asr.text,
     })
   }
 
@@ -1511,8 +1854,10 @@ export async function submitAppVoiceCoachTextBeauticianTurnResponse(opts: {
   }
   const replyToTurnId = cleanText(opts.body.reply_to_turn_id, 160)
   if (!replyToTurnId) return appVoiceCoachAudioErrorResponse("audio_submit", "reply_to_turn_id_required")
-  const replyText = cleanText(opts.body.transcript_text, 1000)
-  if (!replyText) return appVoiceCoachAudioErrorResponse("audio_submit", "transcript_text_required")
+  const clientReplyText = cleanText(opts.body.transcript_text, 1000)
+  if (!("dataDomain" in opts.scope) && !clientReplyText) {
+    return appVoiceCoachAudioErrorResponse("audio_submit", "transcript_text_required")
+  }
   let submittedAudio: Awaited<ReturnType<typeof appVoiceCoachSubmitAudio>>
   try {
     submittedAudio = await appVoiceCoachSubmitAudio(opts.body)
@@ -1524,6 +1869,7 @@ export async function submitAppVoiceCoachTextBeauticianTurnResponse(opts: {
     return appVoiceCoachAudioErrorResponse("audio_submit", code)
   }
   const audioSeconds = safeAudioSeconds(opts.body.client_audio_seconds)
+  const submittedAudioSha256 = voiceCoachAudioSha256(submittedAudio.audio)
   const audioPath = appVoiceCoachAttemptAudioPath({
     clientAttemptId,
     format: submittedAudio.format,
@@ -1533,6 +1879,22 @@ export async function submitAppVoiceCoachTextBeauticianTurnResponse(opts: {
 
   if (shouldUseRdsForScope(opts.scope)) {
     const rdsRepository = await loadRdsRepository()
+    const personalTrialAsrReceipt = "dataDomain" in opts.scope
+      ? await rdsRepository.resolveAliyunRdsPersonalTrialAsrReceipt({
+          audioSha256: submittedAudioSha256,
+          sessionId: opts.sessionId,
+          ...rdsScopeArgs(opts.ctx, opts.scope),
+        })
+      : null
+    if ("dataDomain" in opts.scope && !personalTrialAsrReceipt) {
+      return appVoiceCoachAudioErrorResponse(
+        "audio_submit",
+        "voice_coach_idempotency_conflict",
+      )
+    }
+    const replyText = personalTrialAsrReceipt
+      ? personalTrialAsrReceipt.transcriptText
+      : clientReplyText
     let submitted
     try {
       submitted = await rdsRepository.appendAliyunRdsVoiceCoachTextReply({
@@ -1540,9 +1902,13 @@ export async function submitAppVoiceCoachTextBeauticianTurnResponse(opts: {
         audioSeconds,
         clientAttemptId,
         nextCustomerText: nextCustomerText(replyText, false) || null,
-        replyText,
+        personalTrialAsrReceiptId: personalTrialAsrReceipt?.id || null,
+        replyText: personalTrialAsrReceipt
+          ? personalTrialAsrReceipt.transcriptText
+          : clientReplyText,
         replyToTurnId,
         sessionId: opts.sessionId,
+        submittedAudioSha256,
         persistAudio: () =>
           withAppVoiceCoachAudioBoundary(
             "audio_submit",
@@ -1559,14 +1925,41 @@ export async function submitAppVoiceCoachTextBeauticianTurnResponse(opts: {
     } catch (error) {
       const mutationError = rdsRepository.getAliyunRdsVoiceCoachMutationError(error)
       if (mutationError) return appVoiceCoachAudioErrorResponse("audio_submit", mutationError.code)
+      await releasePersonalTrialTechnicalFailure({
+        reason: "recording_receive_failed",
+        scope: opts.scope,
+        sessionId: opts.sessionId,
+      })
       throw error
     }
+    await withPersonalTrialTechnicalFailure({
+      operation: () =>
+        recordPersonalTrialSubmittedTurnEvidence({
+          asrReceiptId: personalTrialAsrReceipt?.id || null,
+          beauticianTurnId: submitted.beauticianTurn.id,
+          scope: opts.scope,
+          sessionId: opts.sessionId,
+        }),
+      reason: personalTrialScope(opts.scope)
+        ? "recording_receive_failed"
+        : null,
+      scope: opts.scope,
+      sessionId: opts.sessionId,
+    })
     const beauticianAudioUrl = submitted.beauticianTurn.audio_path
-      ? await withAppVoiceCoachAudioBoundary(
-          "audio_submit",
-          "voice_coach_audio_persist_failed",
-          () => signVoiceCoachAudio(submitted.beauticianTurn.audio_path || ""),
-        )
+      ? await withPersonalTrialTechnicalFailure({
+          operation: () =>
+            withAppVoiceCoachAudioBoundary(
+              "audio_submit",
+              "voice_coach_audio_persist_failed",
+              () => signVoiceCoachAudio(submitted.beauticianTurn.audio_path || ""),
+            ),
+          reason: personalTrialScope(opts.scope)
+            ? "recording_receive_failed"
+            : null,
+          scope: opts.scope,
+          sessionId: opts.sessionId,
+        })
       : null
     return NextResponse.json({
       ok: true,
@@ -1589,6 +1982,7 @@ export async function submitAppVoiceCoachTextBeauticianTurnResponse(opts: {
     })
   }
 
+  const replyText = clientReplyText
   const writableSession = readWritableTextSession(opts.sessionId, opts.ctx, opts.scope)
   if (!writableSession) return appVoiceCoachAudioErrorResponse("audio_submit", "voice_coach_session_not_found")
   const { session, sessions } = writableSession
