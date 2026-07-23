@@ -15,6 +15,7 @@ const enabled = process.env.APP_ACCESS_CONTROL_HTTP_INTEGRATION === "1"
 const deviceId = "app-access-http-integration"
 const userId = "10000000-0000-4000-8000-000000000011"
 const operatorUserId = "10000000-0000-4000-8000-000000000012"
+const legacyUserId = "10000000-0000-4000-8000-000000000013"
 const companyId = "20000000-0000-4000-8000-000000000011"
 const storeId = "30000000-0000-4000-8000-000000000011"
 
@@ -186,6 +187,25 @@ test(
         path.join(root, "tests", "fixtures", "app-access-control-v1-base.sql"),
         "-f",
         path.join(root, "deploy", "aliyun-production-cn.app-auth-revocations-schema.sql"),
+      ])
+      run(psql, [
+        databaseUrl,
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-c",
+        `
+          insert into auth.users (id, email)
+          values ('${legacyUserId}', 'legacy-entitlement@test.invalid');
+          insert into public.profiles (id, email, plan)
+          values ('${legacyUserId}', 'legacy-entitlement@test.invalid', 'pro');
+          insert into public.entitlements (user_id, plan)
+          values ('${legacyUserId}', 'pro');
+        `,
+      ])
+      run(psql, [
+        databaseUrl,
+        "-v",
+        "ON_ERROR_STOP=1",
         "-f",
         path.join(root, "deploy", "app-access-control-v1.sql"),
       ])
@@ -219,6 +239,27 @@ test(
       )
 
       pool = new Pool({ connectionString: databaseUrl })
+      const legacyCompatibility = await pool.query(
+        `
+          select
+            (
+              select string_agg(column_name::text, ',' order by ordinal_position)
+              from information_schema.columns
+              where table_schema = 'public'
+                and table_name = 'entitlements'
+            ) as entitlement_columns,
+            (
+              select plan
+              from public.entitlements
+              where user_id = $1
+            ) as legacy_plan
+        `,
+        [legacyUserId],
+      )
+      assert.deepEqual(legacyCompatibility.rows, [{
+        entitlement_columns: "user_id,plan,pro_expires_at,updated_at",
+        legacy_plan: "pro",
+      }])
       progress("seeding non-production identities and tenant")
       await pool.query(
         `
@@ -400,6 +441,7 @@ test(
         company_id: companyId,
         feature_keys: ["voice_coach", "speech_library"],
         plan: "pro",
+        reason: "HTTP integration access grant",
         role: "employee",
         store_id: storeId,
       }
@@ -413,7 +455,7 @@ test(
           body: JSON.stringify(grantBody),
         },
       )
-      assert.equal(grant.status, 201)
+      assert.equal(grant.status, 201, JSON.stringify(grant.body))
       assert.equal(grant.body.deduped, false)
       assert.ok(grant.body.authorization_version > 0)
 
@@ -491,10 +533,10 @@ test(
             ) as active_membership_count,
             (
               select count(*)::integer
-              from public.entitlements
+              from public.app_membership_entitlements
               where canonical_user_id = $1
                 and status = 'active'
-            ) as active_entitlement_count,
+            ) as active_membership_entitlement_count,
             (
               select count(*)::integer
               from public.app_authorization_audit_events
@@ -504,9 +546,9 @@ test(
         [canonicalUserId],
       )
       assert.deepEqual(evidence.rows, [{
-        active_entitlement_count: 1,
         active_membership_count: 1,
-        audit_event_count: 3,
+        active_membership_entitlement_count: 1,
+        audit_event_count: 4,
         trial_session_count: 2,
       }])
       progress("running read-only identity backfill dry-run")
@@ -529,14 +571,50 @@ test(
       )
       const dryRunReport = JSON.parse(dryRun.stdout)
       assert.equal(dryRunReport.mode, "dry-run")
-      assert.equal(dryRunReport.scanned_profiles, 2)
+      assert.equal(dryRunReport.scanned_profiles, 3)
       assert.equal(dryRunReport.already_linked, 1)
-      assert.equal(dryRunReport.candidates_without_canonical_identity, 1)
+      assert.equal(dryRunReport.candidates_without_canonical_identity, 2)
       assert.equal(dryRunReport.writes_performed, 0)
 
       progress("stopping HTTP server and validating rollback")
       await stopProcess(nextProcess)
       nextProcess = null
+      const blockedRollback = spawnSync(psql, [
+        databaseUrl,
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-f",
+        path.join(root, "deploy", "app-access-control-v1.rollback.sql"),
+      ], {
+        cwd: root,
+        encoding: "utf8",
+      })
+      assert.notEqual(blockedRollback.status, 0)
+      assert.match(
+        `${blockedRollback.stdout}\n${blockedRollback.stderr}`,
+        /app_access_control_v1_rollback_blocked_business_data/,
+      )
+      await pool.query(`
+        delete from public.voice_coach_sessions
+        where canonical_user_id is not null
+          or data_domain <> 'store'
+          or client_session_id is not null
+          or client_request_hash is not null;
+        delete from public.app_membership_entitlements;
+        delete from public.mp_account_memberships
+        where canonical_user_id is not null
+          or access_source is not null
+          or authorization_version <> 0;
+        delete from public.app_identity_reviews;
+        delete from public.app_verified_contacts;
+        delete from public.app_idempotency_records;
+        delete from public.app_authorization_audit_events;
+        delete from public.app_personal_trials;
+        delete from public.app_authorization_versions;
+        delete from public.app_identity_links;
+        delete from public.app_auth_identities;
+        delete from public.app_canonical_users;
+      `)
       run(psql, [
         databaseUrl,
         "-v",
@@ -552,6 +630,11 @@ test(
             as legacy_voice_table_preserved,
           to_regclass('public.app_auth_token_revocations') is not null
             as prerequisite_auth_table_preserved,
+          (
+            select plan
+            from public.entitlements
+            where user_id = '${legacyUserId}'
+          ) as legacy_entitlement_plan,
           exists (
             select 1
             from information_schema.columns
@@ -562,6 +645,7 @@ test(
       `)
       assert.deepEqual(rollbackEvidence.rows, [{
         canonical_tables_removed: true,
+        legacy_entitlement_plan: "pro",
         legacy_voice_table_preserved: true,
         prerequisite_auth_table_preserved: true,
         trial_scope_column_present: false,

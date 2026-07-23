@@ -18,22 +18,25 @@ export async function POST(request: NextRequest) {
 
     await bootstrapAliyunRdsAppProfile(auth.user)
     const access = await ensureAppCanonicalIdentityAndTrial(auth.user)
-    return NextResponse.json({
-      ok: true,
-      profile_initialized: true,
-      canonical_user_id: access.canonicalUserId,
-      access_mode: access.accessMode,
-      identity_state: access.identityState,
-      authorization_version: access.authorizationVersion,
-      trial: {
-        kind: access.trial.kind,
-        data_domain: access.trial.dataDomain,
-        status: access.trial.status,
-        ai_coach_session_limit: access.trial.sessionLimit,
-        ai_coach_sessions_used: access.trial.sessionsUsed,
-        ai_coach_sessions_remaining: access.trial.sessionsRemaining,
+    return NextResponse.json(
+      {
+        ok: true,
+        profile_initialized: true,
+        canonical_user_id: access.canonicalUserId,
+        access_mode: access.accessMode,
+        identity_state: access.identityState,
+        authorization_version: access.authorizationVersion,
+        trial: {
+          kind: access.trial.kind,
+          data_domain: access.trial.dataDomain,
+          status: access.trial.status,
+          ai_coach_session_limit: access.trial.sessionLimit,
+          ai_coach_sessions_used: access.trial.sessionsUsed,
+          ai_coach_sessions_remaining: access.trial.sessionsRemaining,
+        },
       },
-    })
+      { headers: { "Cache-Control": "private, no-store" } },
+    )
   } catch (error) {
     const appAuthError = appAuthConfigurationErrorResponse(error)
     if (appAuthError) return appAuthError
@@ -44,14 +47,23 @@ export async function POST(request: NextRequest) {
         { status: 503 },
       )
     }
-    if (error instanceof Error && error.message === "app_identity_conflict") {
+    if (
+      error instanceof Error &&
+      (
+        error.message === "app_identity_conflict" ||
+        error.message === "app_identity_review_required"
+      )
+    ) {
       return NextResponse.json(
         {
           ok: false,
           error: "identity_review_required",
           code: "identity_review_required",
         },
-        { status: 409 },
+        {
+          headers: { "Cache-Control": "private, no-store" },
+          status: 409,
+        },
       )
     }
 

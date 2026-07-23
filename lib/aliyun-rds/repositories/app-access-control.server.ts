@@ -34,6 +34,13 @@ export type AppAccessSnapshot = {
   trial: AppPersonalTrialSnapshot
 }
 
+export type AppCanonicalAuthorization = {
+  canonicalUserId: string
+  identityState: "resolved" | "review_required"
+  authorizationVersion: number
+  trial: AppPersonalTrialSnapshot
+}
+
 export type AppAccessGrantResult = {
   authorizationVersion: number
   canonicalUserId: string
@@ -61,16 +68,31 @@ type LinkRow = {
   canonical_user_id: string
 }
 
+type IdentityReviewRow = {
+  status: "pending" | "resolved" | "dismissed"
+}
+
 type TrialRow = {
   status: AppPersonalTrialSnapshot["status"]
   session_limit: number
   sessions_used: number
 }
 
-type AccessSnapshotRow = TrialRow & {
-  canonical_user_id: string
-  authorization_version: number | string
-  has_formal_membership: boolean
+type IdentityConflictDetails = {
+  appUserId: string
+  candidateCanonicalUserId: string
+  existingCanonicalUserId: string
+  identityFingerprint: string
+}
+
+class AppIdentityConflictError extends Error {
+  readonly details: IdentityConflictDetails
+
+  constructor(details: IdentityConflictDetails) {
+    super("app_identity_conflict")
+    this.name = "AppIdentityConflictError"
+    this.details = details
+  }
 }
 
 type VoiceSessionRow = {
@@ -163,9 +185,15 @@ export function deriveAppAuthIdentity(user: AppAccessAuthUser): IdentityDescript
 }
 
 export async function ensureAppCanonicalIdentityAndTrial(user: AppAccessAuthUser) {
-  return withAliyunRdsTransaction((client) =>
-    ensureAppCanonicalIdentityAndTrialWithClient(client, user),
-  )
+  try {
+    return await withAliyunRdsTransaction((client) =>
+      ensureAppCanonicalIdentityAndTrialWithClient(client, user),
+    )
+  } catch (error) {
+    if (!(error instanceof AppIdentityConflictError)) throw error
+    await persistAppIdentityReview(error.details)
+    throw new Error("app_identity_review_required")
+  }
 }
 
 export async function ensureAppCanonicalIdentityAndTrialWithClient(
@@ -202,7 +230,14 @@ export async function ensureAppCanonicalIdentityAndTrialWithClient(
       unionLinkResult.rows[0]?.canonical_user_id,
     ].filter(Boolean),
   )
-  if (canonicalCandidates.size > 1) throw new Error("app_identity_conflict")
+  if (canonicalCandidates.size > 1) {
+    throw identityConflictError({
+      candidates: canonicalCandidates,
+      identity,
+      userId,
+      existingCanonicalUserId: byUserResult.rows[0]?.canonical_user_id,
+    })
+  }
 
   let canonicalUserId = Array.from(canonicalCandidates)[0] || null
   if (!canonicalUserId) {
@@ -251,7 +286,15 @@ export async function ensureAppCanonicalIdentityAndTrialWithClient(
     stored.provider_app_id !== identity.providerAppId ||
     stored.subject !== identity.subject
   ) {
-    throw new Error("app_identity_conflict")
+    throw identityConflictError({
+      candidates: new Set([
+        stored?.canonical_user_id,
+        canonicalUserId,
+      ].filter(Boolean)),
+      identity,
+      userId,
+      existingCanonicalUserId: stored?.canonical_user_id || canonicalUserId,
+    })
   }
 
   if (identity.unionIssuer && identity.unionSubject) {
@@ -273,7 +316,15 @@ export async function ensureAppCanonicalIdentityAndTrialWithClient(
       [identity.unionIssuer, identity.unionSubject],
     )
     if (storedLink.rows[0]?.canonical_user_id !== canonicalUserId) {
-      throw new Error("app_identity_conflict")
+      throw identityConflictError({
+        candidates: new Set([
+          canonicalUserId,
+          storedLink.rows[0]?.canonical_user_id,
+        ].filter(Boolean)),
+        identity,
+        userId,
+        existingCanonicalUserId: canonicalUserId,
+      })
     }
   }
 
@@ -304,10 +355,123 @@ export async function ensureAppCanonicalIdentityAndTrialWithClient(
     [canonicalUserId],
   )
 
-  return getAppAccessSnapshotWithClient(client, userId)
+  return getAppAccessSnapshotWithClient(client, user)
 }
 
-export async function getAppAccessSnapshot(userId: string) {
+export async function resolveAppCanonicalAuthorization(
+  user: AppAccessAuthUser,
+): Promise<AppCanonicalAuthorization> {
+  return resolveAppCanonicalAuthorizationWithClient(
+    {
+      query: async <T>(text: string, values?: readonly unknown[]) => {
+        const result = await queryAliyunRds(text, values)
+        return { rows: result.rows as T[] }
+      },
+    },
+    user,
+  )
+}
+
+export async function resolveAppCanonicalAuthorizationWithClient(
+  client: AppAccessQueryClient,
+  user: AppAccessAuthUser,
+): Promise<AppCanonicalAuthorization> {
+  const userId = requiredUuid(user.id, "app_user_id_invalid")
+  const identity = deriveAppAuthIdentity(user)
+  const byUserResult = await client.query<IdentityRow>(
+    `
+      select canonical_user_id, app_user_id, provider, provider_app_id, subject
+      from public.app_auth_identities
+      where app_user_id = $1
+      limit 1
+    `,
+    [userId],
+  )
+  const bySubjectResult = await client.query<IdentityRow>(
+    `
+      select canonical_user_id, app_user_id, provider, provider_app_id, subject
+      from public.app_auth_identities
+      where provider = $1 and provider_app_id = $2 and subject = $3
+      limit 1
+    `,
+    [identity.provider, identity.providerAppId, identity.subject],
+  )
+  const unionLinkResult =
+    identity.unionIssuer && identity.unionSubject
+      ? await client.query<LinkRow>(
+          `
+            select canonical_user_id
+            from public.app_identity_links
+            where link_type = 'wechat_unionid' and issuer = $1 and subject = $2
+            limit 1
+          `,
+          [identity.unionIssuer, identity.unionSubject],
+        )
+      : { rows: [] as LinkRow[] }
+  const reviewResult = await client.query<IdentityReviewRow>(
+    `
+      select status
+      from public.app_identity_reviews
+      where app_user_id = $1 and status = 'pending'
+      limit 1
+    `,
+    [userId],
+  )
+
+  const stored = byUserResult.rows[0]
+  if (!stored) throw new Error("app_canonical_identity_not_found")
+  const canonicalCandidates = new Set(
+    [
+      stored.canonical_user_id,
+      bySubjectResult.rows[0]?.canonical_user_id,
+      unionLinkResult.rows[0]?.canonical_user_id,
+    ].filter((value): value is string => Boolean(value)),
+  )
+  const storedIdentityMatches =
+    stored.provider === identity.provider &&
+    stored.provider_app_id === identity.providerAppId &&
+    stored.subject === identity.subject
+  const identityState =
+    reviewResult.rows[0]?.status === "pending" ||
+    canonicalCandidates.size > 1 ||
+    !storedIdentityMatches
+      ? "review_required"
+      : "resolved"
+  const accessResult = await client.query<
+    TrialRow & {
+      authorization_version: number | string
+      canonical_user_id: string
+    }
+  >(
+    `
+      select
+        canonical.id as canonical_user_id,
+        trial.status,
+        trial.session_limit,
+        trial.sessions_used,
+        coalesce(version.authorization_version, 0) as authorization_version
+      from public.app_canonical_users canonical
+      join public.app_personal_trials trial
+        on trial.canonical_user_id = canonical.id
+      left join public.app_authorization_versions version
+        on version.canonical_user_id = canonical.id
+      where canonical.id = $1 and canonical.status = 'active'
+      limit 1
+    `,
+    [stored.canonical_user_id],
+  )
+  const access = accessResult.rows[0]
+  if (!access) throw new Error("app_canonical_identity_not_found")
+
+  return {
+    canonicalUserId: access.canonical_user_id,
+    identityState,
+    authorizationVersion: Number(access.authorization_version || 0),
+    trial: trialSnapshot(access),
+  }
+}
+
+export async function getAppAccessSnapshot(user: AppAccessAuthUser) {
   return getAppAccessSnapshotWithClient(
     {
       query: async <T>(text: string, values?: readonly unknown[]) => {
@@ -315,50 +479,103 @@ export async function getAppAccessSnapshot(userId: string) {
         return { rows: result.rows as T[] }
       },
     },
-    userId,
+    user,
   )
 }
 
 export async function getAppAccessSnapshotWithClient(
   client: AppAccessQueryClient,
-  userId: string,
+  user: AppAccessAuthUser,
 ): Promise<AppAccessSnapshot> {
-  const result = await client.query<AccessSnapshotRow>(
+  const userId = requiredUuid(user.id, "app_user_id_invalid")
+  const authorization = await resolveAppCanonicalAuthorizationWithClient(
+    client,
+    user,
+  )
+  if (authorization.identityState === "review_required") {
+    throw new Error("app_identity_review_required")
+  }
+  const result = await client.query<{ has_formal_membership: boolean }>(
     `
       select
-        identity.canonical_user_id,
-        trial.status,
-        trial.session_limit,
-        trial.sessions_used,
-        coalesce(version.authorization_version, 0) as authorization_version,
         exists (
           select 1
           from public.mp_account_memberships membership
-          where membership.canonical_user_id = identity.canonical_user_id
+          join public.mp_companies company
+            on company.id = membership.company_id
+           and company.status = 'active'
+          left join public.mp_stores store
+            on store.id = membership.store_id
+           and store.company_id = membership.company_id
+           and store.status = 'active'
+          join public.app_membership_entitlements entitlement
+            on entitlement.membership_id = membership.id
+           and entitlement.canonical_user_id = membership.canonical_user_id
+           and entitlement.status = 'active'
+          where membership.canonical_user_id = $1
             and membership.status = 'active'
+            and (
+              (
+                select profile.company_id
+                from public.profiles profile
+                where profile.id = $2
+                limit 1
+              ) is null
+              or membership.company_id = (
+                select profile.company_id
+                from public.profiles profile
+                where profile.id = $2
+                limit 1
+              )
+            )
+            and (
+              (
+                select profile.store_id
+                from public.profiles profile
+                where profile.id = $2
+                limit 1
+              ) is null
+              or membership.store_id = (
+                select profile.store_id
+                from public.profiles profile
+                where profile.id = $2
+                limit 1
+              )
+            )
+            and (
+              (
+                membership.role in (
+                  'company_owner',
+                  'company_admin',
+                  'merchant_owner',
+                  'merchant_admin'
+                )
+                and membership.store_id is null
+              )
+              or (
+                membership.role in (
+                  'store_owner',
+                  'store_admin',
+                  'staff',
+                  'employee'
+                )
+                and membership.store_id is not null
+                and store.id is not null
+              )
+            )
         ) as has_formal_membership
-      from public.app_auth_identities identity
-      join public.app_canonical_users canonical
-        on canonical.id = identity.canonical_user_id
-       and canonical.status = 'active'
-      join public.app_personal_trials trial
-        on trial.canonical_user_id = identity.canonical_user_id
-      left join public.app_authorization_versions version
-        on version.canonical_user_id = identity.canonical_user_id
-      where identity.app_user_id = $1
-      limit 1
     `,
-    [requiredUuid(userId, "app_user_id_invalid")],
+    [authorization.canonicalUserId, userId],
   )
   const row = result.rows[0]
-  if (!row) throw new Error("app_canonical_identity_not_found")
+  if (!row) throw new Error("app_access_snapshot_failed")
 
   return {
-    canonicalUserId: row.canonical_user_id,
+    canonicalUserId: authorization.canonicalUserId,
     identityState: "resolved",
     accessMode: row.has_formal_membership ? "formal" : "personal_trial",
-    authorizationVersion: Number(row.authorization_version || 0),
-    trial: trialSnapshot(row),
+    authorizationVersion: authorization.authorizationVersion,
+    trial: authorization.trial,
   }
 }
 
@@ -539,11 +756,20 @@ export async function grantAppAccess(args: {
   featureKeys: string[]
   idempotencyKey: string
   operatorUserId: string
+  operatorRole: string
   plan: string
+  reason: string
   role: string
   storeId?: string | null
 }) {
-  return withAliyunRdsTransaction((client) => grantAppAccessWithClient(client, args))
+  try {
+    return await withAliyunRdsTransaction((client) =>
+      grantAppAccessWithClient(client, args),
+    )
+  } catch (error) {
+    await recordRejectedAccessGrant(args, error)
+    throw error
+  }
 }
 
 export async function grantAppAccessWithClient(
@@ -554,7 +780,9 @@ export async function grantAppAccessWithClient(
     featureKeys: string[]
     idempotencyKey: string
     operatorUserId: string
+    operatorRole: string
     plan: string
+    reason: string
     role: string
     storeId?: string | null
   },
@@ -564,6 +792,11 @@ export async function grantAppAccessWithClient(
   const storeId = args.storeId ? requiredUuid(args.storeId, "store_id_invalid") : null
   const operatorUserId = requiredUuid(args.operatorUserId, "operator_user_id_invalid")
   const idempotencyKey = requiredIdempotencyKey(args.idempotencyKey, "idempotency_key_invalid")
+  const operatorRole = String(args.operatorRole || "").trim()
+  if (operatorRole !== "platform_admin") {
+    throw new Error("access_grant_operator_role_denied")
+  }
+  const reason = requiredText(args.reason, 500, "access_grant_reason_invalid")
   const role = String(args.role || "").trim()
   const plan = String(args.plan || "").trim()
   if (!ACCESS_GRANT_ROLES.has(role)) throw new Error("access_grant_role_invalid")
@@ -583,9 +816,21 @@ export async function grantAppAccessWithClient(
   if (featureKeys.some((key) => !featureAllowedForRole(key, role))) {
     throw new Error("access_grant_feature_role_denied")
   }
+  if (featureKeys.some((key) => !featureAllowedForPlan(key, plan))) {
+    throw new Error("access_grant_feature_plan_denied")
+  }
 
   const requestHash = sha256(
-    stableJson({ canonicalUserId, companyId, featureKeys, plan, role, storeId }),
+    stableJson({
+      canonicalUserId,
+      companyId,
+      featureKeys,
+      operatorRole,
+      plan,
+      reason,
+      role,
+      storeId,
+    }),
   )
   await acquireTransactionLock(client, `access-grant:${operatorUserId}:${idempotencyKey}`)
   const existingIdempotency = await client.query<IdempotencyRow>(
@@ -666,9 +911,16 @@ export async function grantAppAccessWithClient(
   )
   const authorizationVersion = Number(versionResult.rows[0]?.authorization_version || 0)
 
-  const existingMembership = await client.query<{ id: string }>(
+  const existingMembership = await client.query<{
+    access_source: string | null
+    authorization_version: number | string
+    id: string
+    role: string
+    status: string
+    user_id: string
+  }>(
     `
-      select id
+      select id, user_id, role, status, access_source, authorization_version
       from public.mp_account_memberships
       where canonical_user_id = $1
         and company_id = $2
@@ -679,6 +931,27 @@ export async function grantAppAccessWithClient(
     [canonicalUserId, companyId, storeId],
   )
   let membershipId = existingMembership.rows[0]?.id || null
+  const existingEntitlement = membershipId
+    ? await client.query<{
+        authorization_version: number | string
+        feature_keys: string[]
+        plan: string
+        status: string
+      }>(
+        `
+          select plan, status, feature_keys, authorization_version
+          from public.app_membership_entitlements
+          where membership_id = $1
+          limit 1
+          for update
+        `,
+        [membershipId],
+      )
+    : { rows: [] }
+  const beforeState = {
+    entitlement: existingEntitlement.rows[0] || null,
+    membership: existingMembership.rows[0] || null,
+  }
   if (membershipId) {
     await client.query(
       `
@@ -727,52 +1000,40 @@ export async function grantAppAccessWithClient(
   }
   if (!membershipId) throw new Error("access_grant_membership_failed")
 
-  const existingEntitlement = await client.query<{ user_id: string }>(
-    "select user_id from public.entitlements where canonical_user_id = $1 limit 1 for update",
-    [canonicalUserId],
-  )
-  if (existingEntitlement.rows[0]) {
-    await client.query(
-      `
-        update public.entitlements
-        set
-          plan = $2,
-          status = 'active',
-          feature_keys = $3::text[],
-          authorization_version = $4,
-          granted_by_user_id = $5,
-          grant_source = 'admin_access_grant',
-          updated_at = now()
-        where canonical_user_id = $1
-      `,
-      [canonicalUserId, plan, featureKeys, authorizationVersion, operatorUserId],
-    )
-  } else {
-    await client.query(
-      `
-        insert into public.entitlements (
-          user_id,
-          canonical_user_id,
-          plan,
-          status,
-          feature_keys,
-          authorization_version,
-          granted_by_user_id,
-          grant_source,
-          updated_at
-        )
-        values ($1, $2, $3, 'active', $4::text[], $5, $6, 'admin_access_grant', now())
-      `,
-      [
-        targetUserId,
-        canonicalUserId,
+  await client.query(
+    `
+      insert into public.app_membership_entitlements (
+        membership_id,
+        canonical_user_id,
         plan,
-        featureKeys,
-        authorizationVersion,
-        operatorUserId,
-      ],
-    )
-  }
+        status,
+        feature_keys,
+        authorization_version,
+        granted_by_user_id,
+        grant_source,
+        updated_at
+      )
+      values ($1, $2, $3, 'active', $4::text[], $5, $6, 'admin_access_grant', now())
+      on conflict (membership_id) do update
+      set
+        canonical_user_id = excluded.canonical_user_id,
+        plan = excluded.plan,
+        status = 'active',
+        feature_keys = excluded.feature_keys,
+        authorization_version = excluded.authorization_version,
+        granted_by_user_id = excluded.granted_by_user_id,
+        grant_source = excluded.grant_source,
+        updated_at = now()
+    `,
+    [
+      membershipId,
+      canonicalUserId,
+      plan,
+      featureKeys,
+      authorizationVersion,
+      operatorUserId,
+    ],
+  )
 
   const response = {
     authorizationVersion,
@@ -788,11 +1049,48 @@ export async function grantAppAccessWithClient(
         target_type,
         target_id,
         request_id,
-        after_json
+        before_json,
+        after_json,
+        metadata
       )
-      values ($1, $2, 'access_grant.upserted', 'membership', $3, $4, $5::jsonb)
+      values (
+        $1,
+        $2,
+        'access_grant.upserted',
+        'membership',
+        $3,
+        $4,
+        $5::jsonb,
+        $6::jsonb,
+        $7::jsonb
+      )
     `,
-    [canonicalUserId, operatorUserId, membershipId, idempotencyKey, jsonbParam(response)],
+    [
+      canonicalUserId,
+      operatorUserId,
+      membershipId,
+      idempotencyKey,
+      jsonbParam(beforeState),
+      jsonbParam({
+        ...response,
+        entitlement: {
+          feature_keys: featureKeys,
+          plan,
+          status: "active",
+        },
+        membership: {
+          company_id: companyId,
+          role,
+          status: "active",
+          store_id: storeId,
+        },
+      }),
+      jsonbParam({
+        operator_role: operatorRole,
+        reason,
+        request_hash: requestHash,
+      }),
+    ],
   )
   await client.query(
     `
@@ -809,6 +1107,102 @@ export async function grantAppAccessWithClient(
   )
 
   return { ...response, deduped: false }
+}
+
+function identityConflictError(args: {
+  candidates: Set<string>
+  existingCanonicalUserId?: string
+  identity: IdentityDescriptor
+  userId: string
+}) {
+  const candidates = Array.from(args.candidates)
+  const existingCanonicalUserId =
+    args.existingCanonicalUserId || candidates[0]
+  const candidateCanonicalUserId =
+    candidates.find((candidate) => candidate !== existingCanonicalUserId) ||
+    candidates[0]
+  if (!existingCanonicalUserId || !candidateCanonicalUserId) {
+    throw new Error("app_identity_conflict_details_missing")
+  }
+  return new AppIdentityConflictError({
+    appUserId: args.userId,
+    candidateCanonicalUserId,
+    existingCanonicalUserId,
+    identityFingerprint: sha256(stableJson({
+      provider: args.identity.provider,
+      providerAppId: args.identity.providerAppId,
+      subjectHash: sha256(args.identity.subject),
+      unionIssuer: args.identity.unionIssuer,
+      unionSubjectHash: args.identity.unionSubject
+        ? sha256(args.identity.unionSubject)
+        : null,
+    })),
+  })
+}
+
+async function persistAppIdentityReview(details: IdentityConflictDetails) {
+  await withAliyunRdsTransaction(async (client) => {
+    await acquireTransactionLock(client, `identity-review:${details.appUserId}`)
+    await client.query(
+      `
+        insert into public.app_identity_reviews (
+          app_user_id,
+          existing_canonical_user_id,
+          candidate_canonical_user_id,
+          reason,
+          status,
+          trusted_identity_fingerprint,
+          updated_at
+        )
+        values ($1, $2, $3, 'trusted_identity_conflict', 'pending', $4, now())
+        on conflict (app_user_id) do update
+        set
+          existing_canonical_user_id = excluded.existing_canonical_user_id,
+          candidate_canonical_user_id = excluded.candidate_canonical_user_id,
+          reason = excluded.reason,
+          status = 'pending',
+          trusted_identity_fingerprint = excluded.trusted_identity_fingerprint,
+          resolution_metadata = '{}'::jsonb,
+          resolved_at = null,
+          updated_at = now()
+      `,
+      [
+        details.appUserId,
+        details.existingCanonicalUserId,
+        details.candidateCanonicalUserId,
+        details.identityFingerprint,
+      ],
+    )
+    await client.query(
+      `
+        insert into public.app_authorization_audit_events (
+          canonical_user_id,
+          actor_user_id,
+          action,
+          target_type,
+          target_id,
+          metadata
+        )
+        values (
+          $1::uuid,
+          $2::uuid,
+          'identity.review_required',
+          'app_auth_identity',
+          $2::uuid::text,
+          $3::jsonb
+        )
+      `,
+      [
+        details.existingCanonicalUserId,
+        details.appUserId,
+        jsonbParam({
+          candidate_canonical_user_id: details.candidateCanonicalUserId,
+          reason: "trusted_identity_conflict",
+          trusted_identity_fingerprint: details.identityFingerprint,
+        }),
+      ],
+    )
+  })
 }
 
 async function getPersonalTrialSnapshotWithClient(
@@ -838,9 +1232,23 @@ function trialSnapshot(row: TrialRow): AppPersonalTrialSnapshot {
 }
 
 function requiredIdempotencyKey(value: unknown, errorCode: string) {
-  const key = optionalText(value, 120)
-  if (!key || key.length < 8 || !SAFE_KEY_PATTERN.test(key)) throw new Error(errorCode)
+  if (typeof value !== "string") throw new Error(errorCode)
+  const key = value.trim()
+  if (
+    key.length < 8 ||
+    key.length > 120 ||
+    !SAFE_KEY_PATTERN.test(key)
+  ) {
+    throw new Error(errorCode)
+  }
   return key
+}
+
+function requiredText(value: unknown, maxLength: number, errorCode: string) {
+  if (typeof value !== "string") throw new Error(errorCode)
+  const text = value.trim()
+  if (!text || text.length > maxLength) throw new Error(errorCode)
+  return text
 }
 
 function featureAllowedForRole(featureKey: string, role: string) {
@@ -854,6 +1262,95 @@ function featureAllowedForRole(featureKey: string, role: string) {
   }
   if (featureKey === "company_admin") return COMPANY_SCOPED_ROLES.has(role)
   return false
+}
+
+function featureAllowedForPlan(featureKey: string, plan: string) {
+  if (plan === "pro" || plan === "vip") return true
+  if (plan === "basic") {
+    return TENANT_BASE_FEATURES.has(featureKey) || featureKey === "voice_coach"
+  }
+  return plan === "free" && TENANT_BASE_FEATURES.has(featureKey)
+}
+
+async function recordRejectedAccessGrant(
+  args: {
+    canonicalUserId: string
+    featureKeys: string[]
+    idempotencyKey: string
+    operatorRole: string
+    operatorUserId: string
+    plan: string
+    reason: string
+    role: string
+  },
+  error: unknown,
+) {
+  const errorCode = error instanceof Error ? error.message : ""
+  if (
+    ![
+      "access_grant_feature_plan_denied",
+      "access_grant_feature_role_denied",
+      "access_grant_operator_role_denied",
+      "app_idempotency_conflict",
+    ].includes(errorCode)
+  ) {
+    return
+  }
+  const canonicalUserId = String(args.canonicalUserId || "").trim()
+  const operatorUserId = String(args.operatorUserId || "").trim()
+  if (!UUID_PATTERN.test(canonicalUserId) || !UUID_PATTERN.test(operatorUserId)) {
+    return
+  }
+  const requestHash = sha256(stableJson({
+    canonicalUserId,
+    featureKeys: Array.isArray(args.featureKeys)
+      ? args.featureKeys.map((value) => String(value || "").trim()).sort()
+      : [],
+    operatorRole: String(args.operatorRole || "").trim(),
+    plan: String(args.plan || "").trim(),
+    reason: String(args.reason || "").trim().slice(0, 500),
+    role: String(args.role || "").trim(),
+  }))
+  await withAliyunRdsTransaction(async (client) => {
+    await client.query(
+      `
+        insert into public.app_authorization_audit_events (
+          canonical_user_id,
+          actor_user_id,
+          action,
+          target_type,
+          target_id,
+          request_id,
+          metadata
+        )
+        values (
+          (
+            select id
+            from public.app_canonical_users
+            where id = $1
+            limit 1
+          ),
+          $2,
+          'access_grant.rejected',
+          'canonical_user',
+          $1::text,
+          $3,
+          $4::jsonb
+        )
+      `,
+      [
+        canonicalUserId,
+        operatorUserId,
+        String(args.idempotencyKey || "").trim().slice(0, 120) || null,
+        jsonbParam({
+          code: errorCode,
+          operator_role: String(args.operatorRole || "").trim(),
+          reason: String(args.reason || "").trim().slice(0, 500),
+          request_hash: requestHash,
+        }),
+      ],
+    )
+  })
 }
 
 function requiredUuid(value: unknown, errorCode: string) {

@@ -364,6 +364,7 @@ async function listStoreAdminSessions(args: {
       from public.voice_coach_sessions
       where user_id = any($1::uuid[])
         and company_id = $2
+        and data_domain = 'store'
         and started_at >= $3
         and ${storeScopeClause}
       order by started_at desc

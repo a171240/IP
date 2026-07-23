@@ -58,7 +58,10 @@ test("WeChat login stores canonical identity only in admin-controlled app_metada
   }
   const originalFetch = global.fetch
   const createCalls = []
+  const signInCalls = []
   const updateCalls = []
+  let profileUpsertError = null
+  let trustedMetadataUpdateError = null
 
   try {
     Object.assign(process.env, {
@@ -105,6 +108,12 @@ test("WeChat login stores canonical identity only in admin-controlled app_metada
           },
           async updateUserById(userId, input) {
             updateCalls.push({ input, userId })
+            if (trustedMetadataUpdateError) {
+              return {
+                data: { user: null },
+                error: trustedMetadataUpdateError,
+              }
+            }
             return {
               data: {
                 user: {
@@ -120,7 +129,7 @@ test("WeChat login stores canonical identity only in admin-controlled app_metada
       from() {
         return {
           async upsert() {
-            return { error: null }
+            return { error: profileUpsertError }
           },
         }
       },
@@ -133,7 +142,8 @@ test("WeChat login stores canonical identity only in admin-controlled app_metada
       "@supabase/supabase-js": {
         createClient: () => ({
           auth: {
-            async signInWithPassword() {
+            async signInWithPassword(input) {
+              signInCalls.push(input)
               return {
                 data: {
                   session: {
@@ -166,6 +176,11 @@ test("WeChat login stores canonical identity only in admin-controlled app_metada
 
     assert.equal(response.status, 200)
     assert.equal(createCalls.length, 1)
+    assert.match(
+      createCalls[0].email,
+      /union_open-platform-trusted_unionid-trusted/,
+    )
+    assert.equal(signInCalls[0].email, createCalls[0].email)
     assert.deepEqual(createCalls[0].user_metadata, {
       avatar_url: "https://images.test.invalid/avatar.png",
       nickname: "可信昵称",
@@ -192,6 +207,29 @@ test("WeChat login stores canonical identity only in admin-controlled app_metada
       wechat_open_app_id: "wx-open-app-trusted",
       wechat_union_issuer: "open-platform-trusted",
       wechat_unionid: "unionid-trusted",
+    })
+
+    trustedMetadataUpdateError = { message: "fixture update failure" }
+    const metadataFailure = await route.POST({
+      async json() {
+        return { code: "metadata-failure-code" }
+      },
+    })
+    assert.equal(metadataFailure.status, 500)
+    assert.deepEqual(metadataFailure.body, {
+      error: "trusted_identity_metadata_update_failed",
+    })
+
+    trustedMetadataUpdateError = null
+    profileUpsertError = { message: "fixture profile failure" }
+    const profileFailure = await route.POST({
+      async json() {
+        return { code: "profile-failure-code" }
+      },
+    })
+    assert.equal(profileFailure.status, 500)
+    assert.deepEqual(profileFailure.body, {
+      error: "profile_upsert_failed",
     })
   } finally {
     global.fetch = originalFetch

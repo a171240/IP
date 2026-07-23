@@ -123,7 +123,10 @@ export async function POST(request: NextRequest) {
 
   const openid = wechatData.openid
   const unionid = wechatData.unionid || ""
-  const identityKey = unionid ? `union_${unionid}` : `openid_${openid}`
+  const identityKey =
+    unionid && WECHAT_OPEN_PLATFORM_SCOPE_ID
+      ? `union_${WECHAT_OPEN_PLATFORM_SCOPE_ID}_${unionid}`
+      : `openid_${WECHAT_OPEN_APP_ID}_${openid}`
   const email = buildWechatEmail(identityKey)
   const password = buildWechatPassword(identityKey)
   const trustedWechatIdentityMetadata = {
@@ -204,13 +207,22 @@ export async function POST(request: NextRequest) {
     ...trustedWechatIdentityMetadata,
   }
 
-  const { data: updatedUserData } = await admin.auth.admin.updateUserById(user.id, {
+  const {
+    data: updatedUserData,
+    error: updatedUserError,
+  } = await admin.auth.admin.updateUserById(user.id, {
     app_metadata: nextAppMetadata,
     user_metadata: nextUserMetadata,
   })
-  const responseUser = updatedUserData?.user || { ...user, user_metadata: nextUserMetadata }
+  if (updatedUserError || !updatedUserData?.user) {
+    return NextResponse.json(
+      { error: "trusted_identity_metadata_update_failed" },
+      { status: 500 },
+    )
+  }
+  const responseUser = updatedUserData.user
 
-  await admin
+  const { error: profileUpsertError } = await admin
     .from("profiles")
     .upsert(
       {
@@ -221,6 +233,12 @@ export async function POST(request: NextRequest) {
       },
       { onConflict: "id" }
     )
+  if (profileUpsertError) {
+    return NextResponse.json(
+      { error: "profile_upsert_failed" },
+      { status: 500 },
+    )
+  }
 
   return NextResponse.json({
     access_token: sessionData.session.access_token,

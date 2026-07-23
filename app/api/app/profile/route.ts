@@ -16,7 +16,9 @@ export async function GET(request: NextRequest) {
     if (!auth) return appAuthRequiredResponse()
 
     const profile = await getAliyunRdsAppProfileContractResponse(auth.user)
-    return NextResponse.json(profile)
+    return NextResponse.json(profile, {
+      headers: { "Cache-Control": "private, no-store" },
+    })
   } catch (error) {
     const appAuthError = appAuthConfigurationErrorResponse(error)
     if (appAuthError) return appAuthError

@@ -8,11 +8,13 @@ begin
     to_regclass('public.app_canonical_users') is not null
     or to_regclass('public.app_auth_identities') is not null
     or to_regclass('public.app_identity_links') is not null
+    or to_regclass('public.app_identity_reviews') is not null
     or to_regclass('public.app_verified_contacts') is not null
     or to_regclass('public.app_personal_trials') is not null
     or to_regclass('public.app_authorization_versions') is not null
     or to_regclass('public.app_authorization_audit_events') is not null
     or to_regclass('public.app_idempotency_records') is not null
+    or to_regclass('public.app_membership_entitlements') is not null
   then
     raise exception 'app_access_control_v1_schema_conflict: owned table already exists';
   end if;
@@ -28,17 +30,6 @@ begin
             'canonical_user_id',
             'access_source',
             'authorization_version'
-          )
-        )
-        or (
-          table_name = 'entitlements'
-          and column_name in (
-            'canonical_user_id',
-            'status',
-            'feature_keys',
-            'authorization_version',
-            'granted_by_user_id',
-            'grant_source'
           )
         )
         or (
@@ -97,6 +88,29 @@ create table public.app_identity_links (
   unique (link_type, issuer, subject)
 );
 
+create table public.app_identity_reviews (
+  id uuid primary key default gen_random_uuid(),
+  app_user_id uuid not null unique,
+  existing_canonical_user_id uuid not null
+    references public.app_canonical_users(id) on delete restrict,
+  candidate_canonical_user_id uuid not null
+    references public.app_canonical_users(id) on delete restrict,
+  reason text not null check (
+    reason in ('trusted_identity_conflict', 'verified_phone_ambiguous')
+  ),
+  status text not null default 'pending'
+    check (status in ('pending', 'resolved', 'dismissed')),
+  trusted_identity_fingerprint text not null,
+  resolution_metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  resolved_at timestamptz,
+  check (
+    (status = 'pending' and resolved_at is null)
+    or (status <> 'pending' and resolved_at is not null)
+  )
+);
+
 create table public.app_verified_contacts (
   id uuid primary key default gen_random_uuid(),
   canonical_user_id uuid not null
@@ -113,7 +127,7 @@ create table public.app_verified_contacts (
   unique (canonical_user_id, contact_type, normalized_value_hash)
 );
 
-create unique index app_verified_contacts_active_value_idx
+create index app_verified_contacts_active_value_idx
   on public.app_verified_contacts(contact_type, normalized_value_hash)
   where status = 'verified';
 
@@ -158,6 +172,68 @@ create table public.app_authorization_audit_events (
 create index app_authorization_audit_canonical_created_idx
   on public.app_authorization_audit_events(canonical_user_id, created_at desc);
 
+create function public.app_verified_contacts_mark_ambiguity()
+returns trigger
+language plpgsql
+as $$
+declare
+  affected_canonical_user_id uuid;
+  affected_count integer;
+begin
+  select count(distinct canonical_user_id)::integer
+  into affected_count
+  from public.app_verified_contacts
+  where contact_type = new.contact_type
+    and normalized_value_hash = new.normalized_value_hash
+    and status in ('verified', 'conflict');
+
+  if affected_count <= 1 then
+    return new;
+  end if;
+
+  update public.app_verified_contacts
+  set status = 'conflict', updated_at = now()
+  where contact_type = new.contact_type
+    and normalized_value_hash = new.normalized_value_hash
+    and status = 'verified';
+
+  for affected_canonical_user_id in
+    select distinct canonical_user_id
+    from public.app_verified_contacts
+    where contact_type = new.contact_type
+      and normalized_value_hash = new.normalized_value_hash
+      and status = 'conflict'
+  loop
+    insert into public.app_authorization_audit_events (
+      canonical_user_id,
+      action,
+      target_type,
+      target_id,
+      metadata
+    )
+    values (
+      affected_canonical_user_id,
+      'verified_phone.ambiguous',
+      'verified_contact',
+      null,
+      jsonb_build_object(
+        'contact_type', new.contact_type,
+        'candidate_count', affected_count
+      )
+    );
+  end loop;
+
+  return new;
+end
+$$;
+
+create trigger app_verified_contacts_mark_ambiguity
+after insert or update of contact_type, normalized_value_hash, status
+on public.app_verified_contacts
+for each row
+when (new.status = 'verified')
+execute function public.app_verified_contacts_mark_ambiguity();
+
 create table public.app_idempotency_records (
   id uuid primary key default gen_random_uuid(),
   operation_scope text not null,
@@ -184,18 +260,25 @@ create unique index mp_memberships_canonical_store_scope_idx
   on public.mp_account_memberships(canonical_user_id, company_id, store_id)
   where canonical_user_id is not null and store_id is not null;
 
-alter table public.entitlements
-  add column canonical_user_id uuid
+create table public.app_membership_entitlements (
+  membership_id uuid primary key
+    references public.mp_account_memberships(id) on delete restrict,
+  canonical_user_id uuid not null
     references public.app_canonical_users(id) on delete restrict,
-  add column status text not null default 'active',
-  add column feature_keys text[] not null default '{}'::text[],
-  add column authorization_version bigint not null default 0,
-  add column granted_by_user_id uuid,
-  add column grant_source text;
+  plan text not null check (plan in ('free', 'basic', 'pro', 'vip')),
+  status text not null default 'active'
+    check (status in ('active', 'suspended', 'revoked', 'expired')),
+  feature_keys text[] not null default '{}'::text[],
+  authorization_version bigint not null default 0
+    check (authorization_version >= 0),
+  granted_by_user_id uuid,
+  grant_source text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
 
-create unique index entitlements_canonical_user_idx
-  on public.entitlements(canonical_user_id)
-  where canonical_user_id is not null;
+create index app_membership_entitlements_canonical_idx
+  on public.app_membership_entitlements(canonical_user_id, updated_at desc);
 
 alter table public.voice_coach_sessions
   add column canonical_user_id uuid
@@ -204,6 +287,24 @@ alter table public.voice_coach_sessions
     check (data_domain in ('store', 'personal_trial')),
   add column client_session_id text,
   add column client_request_hash text;
+
+alter table public.voice_coach_sessions
+  add constraint voice_coach_sessions_domain_scope_check
+  check (
+    (
+      data_domain = 'personal_trial'
+      and canonical_user_id is not null
+      and company_id is null
+      and store_id is null
+      and membership_id is null
+    )
+    or (
+      data_domain = 'store'
+      and company_id is not null
+      and store_id is not null
+      and membership_id is not null
+    )
+  ) not valid;
 
 create unique index voice_coach_trial_client_session_idx
   on public.voice_coach_sessions(canonical_user_id, client_session_id)

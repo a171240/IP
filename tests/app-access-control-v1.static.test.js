@@ -26,6 +26,13 @@ const repositoryPath = path.join(
   "repositories",
   "app-access-control.server.ts",
 )
+const storeAdminRepositoryPath = path.join(
+  root,
+  "lib",
+  "aliyun-rds",
+  "repositories",
+  "store-admin.server.ts",
+)
 
 test("V1 migration separates canonical identity, contacts, trials, memberships, entitlements and audit", () => {
   const sql = fs.readFileSync(migrationPath, "utf8")
@@ -33,11 +40,14 @@ test("V1 migration separates canonical identity, contacts, trials, memberships, 
   for (const table of [
     "app_canonical_users",
     "app_auth_identities",
+    "app_identity_links",
+    "app_identity_reviews",
     "app_verified_contacts",
     "app_personal_trials",
     "app_authorization_versions",
     "app_authorization_audit_events",
     "app_idempotency_records",
+    "app_membership_entitlements",
   ]) {
     assert.match(sql, new RegExp(`create table public\\.${table}`, "i"), table)
   }
@@ -50,7 +60,17 @@ test("V1 migration separates canonical identity, contacts, trials, memberships, 
   assert.match(sql, /authorization_version bigint/i)
   assert.match(sql, /normalized_value_hash text not null/i)
   assert.match(sql, /encrypted_value text not null/i)
+  assert.match(sql, /app_verified_contacts_mark_ambiguity/i)
+  assert.match(sql, /voice_coach_sessions_domain_scope_check/i)
+  assert.match(
+    sql,
+    /data_domain = 'personal_trial'[\s\S]*company_id is null[\s\S]*store_id is null[\s\S]*membership_id is null/i,
+  )
   assert.doesNotMatch(sql, /\bnormalized_value text\b/i)
+  assert.doesNotMatch(
+    sql,
+    /alter table public\.entitlements[\s\S]*add column feature_keys/i,
+  )
   assert.match(
     sql,
     /create unique index voice_coach_trial_client_session_idx\s+on public\.voice_coach_sessions\(canonical_user_id, client_session_id\)/i,
@@ -61,6 +81,9 @@ test("V1 migration separates canonical identity, contacts, trials, memberships, 
 test("V1 rollback is explicit and removes only V1-owned schema additions", () => {
   const sql = fs.readFileSync(rollbackPath, "utf8")
 
+  assert.match(sql, /app_access_control_v1_rollback_blocked_business_data/i)
+  assert.match(sql, /app_membership_entitlements/i)
+  assert.match(sql, /app_identity_reviews/i)
   assert.match(sql, /drop table if exists public\.app_idempotency_records/i)
   assert.match(sql, /drop table if exists public\.app_auth_identities/i)
   assert.match(sql, /alter table public\.voice_coach_sessions[\s\S]*drop column if exists data_domain/i)
@@ -87,6 +110,14 @@ test("access-control repository exposes the canonical V1 operations", () => {
   ]) {
     assert.match(source, new RegExp(`export async function ${operation}\\b`), operation)
   }
+
+  assert.match(source, /app_identity_review_required/)
+  assert.match(source, /persistAppIdentityReview/)
+  assert.match(source, /membership_id/)
+  assert.doesNotMatch(
+    source,
+    /from public\.entitlements where canonical_user_id/i,
+  )
 })
 
 test("canonical WeChat identity uses only admin-controlled app_metadata", () => {
@@ -99,4 +130,19 @@ test("canonical WeChat identity uses only admin-controlled app_metadata", () => 
   assert.match(appAuth, /app_metadata:\s*supabaseUser\.app_metadata/)
   assert.match(wechatAuthRoute, /app_metadata:\s*trustedWechatIdentityMetadata/)
   assert.match(wechatAuthRoute, /app_metadata:\s*nextAppMetadata/)
+  assert.match(
+    wechatAuthRoute,
+    /WECHAT_OPEN_PLATFORM_SCOPE_ID[\s\S]*unionid[\s\S]*identityKey/,
+  )
+  assert.match(wechatAuthRoute, /updateUserById[\s\S]*updatedUserError/)
+  assert.match(wechatAuthRoute, /profileUpsertError/)
+})
+
+test("formal store reporting explicitly excludes personal trial sessions", () => {
+  const source = fs.readFileSync(storeAdminRepositoryPath, "utf8")
+
+  assert.match(
+    source,
+    /from public\.voice_coach_sessions[\s\S]*data_domain = 'store'/i,
+  )
 })

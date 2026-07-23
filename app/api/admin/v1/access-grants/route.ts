@@ -39,7 +39,10 @@ function accessGrantErrorResponse(error: unknown) {
       "access_grant_role_invalid",
       "access_grant_plan_invalid",
       "access_grant_feature_key_invalid",
+      "access_grant_feature_plan_denied",
       "access_grant_feature_role_denied",
+      "access_grant_operator_role_denied",
+      "access_grant_reason_invalid",
       "access_grant_store_required",
       "access_grant_company_scope_required",
     ].includes(code)
@@ -80,7 +83,9 @@ export async function POST(request: NextRequest) {
       featureKeys: featureKeys(body.feature_keys),
       idempotencyKey,
       operatorUserId: auth.user.id,
+      operatorRole: String(account.role || ""),
       plan: text(body.plan),
+      reason: text(body.reason),
       role: text(body.role),
       storeId: text(body.store_id) || null,
     })

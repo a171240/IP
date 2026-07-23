@@ -371,7 +371,7 @@ export async function resolveAppVoiceCoachFacadeContext(
   const accessRepository = await import(
     "@/lib/aliyun-rds/repositories/app-access-control.server"
   )
-  const personalAccess = await accessRepository.getAppAccessSnapshot(auth.user.id)
+  const personalAccess = await accessRepository.getAppAccessSnapshot(auth.user)
   if (
     personalAccess.accessMode !== "personal_trial" ||
     !["active", "exhausted"].includes(personalAccess.trial.status)
@@ -414,6 +414,9 @@ export function appVoiceCoachFacadeErrorResponse(
   }
   if (error instanceof AliyunRdsConfigurationError) {
     return jsonError(503, "DATABASE_URL_CN is required", "rds_not_configured")
+  }
+  if (error instanceof Error && error.message === "app_identity_review_required") {
+    return jsonError(409, "identity_review_required", "identity_review_required")
   }
   if (isAliyunRdsRuntimeUnavailableError(error)) {
     return jsonError(503, "Aliyun RDS is not reachable", "rds_unavailable")

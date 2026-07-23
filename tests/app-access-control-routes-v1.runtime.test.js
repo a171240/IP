@@ -163,7 +163,10 @@ test("admin access grant requires platform admin and forwards the idempotency co
       AliyunRdsConfigurationError: class AliyunRdsConfigurationError extends Error {},
     },
     "@/lib/aliyun-rds/repositories/account-profile.server": {
-      getAliyunRdsAppAccountContext: async () => ({ isPlatformAdmin: true }),
+      getAliyunRdsAppAccountContext: async () => ({
+        isPlatformAdmin: true,
+        role: "platform_admin",
+      }),
     },
     "@/lib/aliyun-rds/repositories/app-access-control.server": {
       grantAppAccess: async (input) => {
@@ -183,6 +186,7 @@ test("admin access grant requires platform admin and forwards the idempotency co
     store_id: "30000000-0000-4000-8000-000000000001",
     role: "employee",
     plan: "pro",
+    reason: "runtime route grant",
     feature_keys: ["voice_coach"],
   }
 
@@ -196,7 +200,9 @@ test("admin access grant requires platform admin and forwards the idempotency co
       featureKeys: body.feature_keys,
       idempotencyKey: "grant-key-0001",
       operatorUserId: "10000000-0000-4000-8000-000000000003",
+      operatorRole: "platform_admin",
       plan: "pro",
+      reason: "runtime route grant",
       role: "employee",
       storeId: body.store_id,
     },
@@ -283,19 +289,19 @@ test("APP access snapshot exposes refreshable trial and authorization version wi
       "@/lib/aliyun-rds/postgres.server": {
         AliyunRdsConfigurationError: class AliyunRdsConfigurationError extends Error {},
       },
-      "@/lib/aliyun-rds/repositories/app-access-control.server": {
-        getAppAccessSnapshot: async () => ({
-          canonicalUserId: "canonical-1",
-          identityState: "resolved",
-          accessMode: "personal_trial",
-          authorizationVersion: 3,
+      "@/lib/aliyun-rds/repositories/account-profile.server": {
+        getAliyunRdsAppAccessSnapshot: async () => ({
+          canonical_user_id: "canonical-1",
+          identity_state: "resolved",
+          access_mode: "personal_trial",
+          authorization_version: 3,
           trial: {
             kind: "personal_trial",
-            dataDomain: "personal_trial",
+            data_domain: "personal_trial",
             status: "active",
-            sessionLimit: 2,
-            sessionsUsed: 1,
-            sessionsRemaining: 1,
+            ai_coach_session_limit: 2,
+            ai_coach_sessions_used: 1,
+            ai_coach_sessions_remaining: 1,
           },
         }),
       },

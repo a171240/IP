@@ -110,6 +110,7 @@ test(
       {
         "server-only": {},
         "@/lib/aliyun-rds/app-authorization.server": authorization,
+        "@/lib/aliyun-rds/repositories/app-access-control.server": repository,
         "@/lib/aliyun-rds/postgres.server": {
           queryAliyunRds: (sql, values) => pool.query(sql, values),
         },
@@ -128,6 +129,7 @@ test(
     const userD = "10000000-0000-4000-8000-000000000005"
     const companyId = "20000000-0000-4000-8000-000000000001"
     const storeId = "30000000-0000-4000-8000-000000000001"
+    const storeBId = "30000000-0000-4000-8000-000000000002"
 
     try {
       await pool.query("truncate public.voice_coach_turns, public.voice_coach_sessions, public.app_authorization_audit_events, public.app_idempotency_records, public.mp_account_memberships, public.entitlements, public.app_personal_trials, public.app_verified_contacts, public.app_auth_identities, public.app_canonical_users, public.mp_stores, public.mp_companies, public.profiles, auth.users restart identity cascade")
@@ -144,8 +146,11 @@ test(
         [companyId],
       )
       await pool.query(
-        "insert into public.mp_stores (id, company_id, name) values ($1, $2, '测试门店')",
-        [storeId, companyId],
+        `
+          insert into public.mp_stores (id, company_id, name)
+          values ($1, $3, '测试门店 A'), ($2, $3, '测试门店 B')
+        `,
+        [storeId, storeBId, companyId],
       )
 
       const [first, second] = await Promise.all([
@@ -207,7 +212,100 @@ test(
             wechat_union_issuer: "open-platform-test",
           },
         }),
-        /app_identity_conflict/,
+        /app_identity_review_required/,
+      )
+      const identityReview = await pool.query(
+        `
+          select status, reason
+          from public.app_identity_reviews
+          where app_user_id = $1
+        `,
+        [userD],
+      )
+      assert.deepEqual(identityReview.rows, [{
+        reason: "trusted_identity_conflict",
+        status: "pending",
+      }])
+      const conflictMembership = await pool.query(
+        `
+          insert into public.mp_account_memberships (
+            user_id,
+            canonical_user_id,
+            company_id,
+            store_id,
+            role,
+            status,
+            access_source,
+            authorization_version
+          )
+          values ($1, $2, $3, $4, 'employee', 'active', 'test_fixture', 1)
+          returning id
+        `,
+        [userD, conflictingIdentity.canonicalUserId, companyId, storeId],
+      )
+      await pool.query(
+        `
+          insert into public.app_membership_entitlements (
+            membership_id,
+            canonical_user_id,
+            plan,
+            status,
+            feature_keys,
+            authorization_version,
+            grant_source
+          )
+          values ($1, $2, 'pro', 'active', array['voice_coach'], 1, 'test_fixture')
+        `,
+        [conflictMembership.rows[0].id, conflictingIdentity.canonicalUserId],
+      )
+      const reviewedProfile =
+        await profileRepository.getAliyunRdsAppProfileContractResponse({
+          id: userD,
+          email: "d@test.invalid",
+          app_metadata: {
+            auth_source: "wechat_open_app",
+            wechat_open_app_id: "wx-open-app-test",
+            wechat_app_openid: "openid-d",
+            wechat_unionid: "union-shared",
+            wechat_union_issuer: "open-platform-test",
+          },
+        })
+      assert.equal(reviewedProfile.identity_state, "review_required")
+      assert.equal(reviewedProfile.access_mode, "personal_trial")
+      assert.equal(reviewedProfile.account_status, "not_bound")
+      assert.equal(reviewedProfile.active_membership_id, null)
+      assert.deepEqual(reviewedProfile.memberships, [])
+      assert.deepEqual(reviewedProfile.features.voice_coach, {
+        enabled: false,
+        reason: "not_bound",
+        source: "account",
+      })
+      const reviewedAccount =
+        await profileRepository.getAliyunRdsAppAccountContext({
+          id: userD,
+          email: "d@test.invalid",
+          app_metadata: {
+            auth_source: "wechat_open_app",
+            wechat_open_app_id: "wx-open-app-test",
+            wechat_app_openid: "openid-d",
+            wechat_unionid: "union-shared",
+            wechat_union_issuer: "open-platform-test",
+          },
+        })
+      assert.equal(reviewedAccount.accountStatus, "not_bound")
+      assert.deepEqual(reviewedAccount.memberships, [])
+      await assert.rejects(
+        repository.getAppAccessSnapshot({
+          id: userD,
+          app_metadata: {
+            auth_source: "wechat_open_app",
+            wechat_open_app_id: "wx-open-app-test",
+            wechat_app_openid: "openid-d",
+            wechat_unionid: "union-shared",
+            wechat_union_issuer: "open-platform-test",
+          },
+        }),
+        /app_identity_review_required/,
       )
       await pool.query(
         `
@@ -230,35 +328,97 @@ test(
         `,
         [first.canonicalUserId],
       )
-      await assert.rejects(
-        pool.query(
-          `
-            insert into public.app_verified_contacts (
-              canonical_user_id,
-              contact_type,
-              normalized_value_hash,
-              encrypted_value,
-              verified_at,
-              verification_source
-            )
-            values (
-              $1,
-              'phone',
-              'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-              'fixture-encrypted-phone-b',
-              now(),
-              'test_fixture'
-            )
-          `,
-          [conflictingIdentity.canonicalUserId],
-        ),
-        /app_verified_contacts_active_value_idx/,
-      )
-      const conflictingMemberships = await pool.query(
-        "select count(*)::integer as count from public.mp_account_memberships where canonical_user_id = $1",
+      await pool.query(
+        `
+          insert into public.app_verified_contacts (
+            canonical_user_id,
+            contact_type,
+            normalized_value_hash,
+            encrypted_value,
+            verified_at,
+            verification_source
+          )
+          values (
+            $1,
+            'phone',
+            'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+            'fixture-encrypted-phone-b',
+            now(),
+            'test_fixture'
+          )
+        `,
         [conflictingIdentity.canonicalUserId],
       )
-      assert.equal(conflictingMemberships.rows[0].count, 0)
+      const phoneConflict = await pool.query(
+        `
+          select status
+          from public.app_verified_contacts
+          where normalized_value_hash =
+            'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+          order by canonical_user_id
+        `,
+      )
+      assert.deepEqual(phoneConflict.rows, [
+        { status: "conflict" },
+        { status: "conflict" },
+      ])
+      const phoneConflictAudit = await pool.query(
+        `
+          select count(*)::integer as count
+          from public.app_authorization_audit_events
+          where action = 'verified_phone.ambiguous'
+        `,
+      )
+      assert.equal(phoneConflictAudit.rows[0].count, 2)
+
+      const mismatchedMembership = await pool.query(
+        `
+          insert into public.mp_account_memberships (
+            user_id,
+            canonical_user_id,
+            company_id,
+            store_id,
+            role,
+            status,
+            access_source,
+            authorization_version
+          )
+          values ($1, $2, $3, $4, 'employee', 'active', 'test_fixture', 1)
+          returning id
+        `,
+        [userA, conflictingIdentity.canonicalUserId, companyId, storeBId],
+      )
+      await pool.query(
+        `
+          insert into public.app_membership_entitlements (
+            membership_id,
+            canonical_user_id,
+            plan,
+            status,
+            feature_keys,
+            authorization_version,
+            grant_source
+          )
+          values ($1, $2, 'pro', 'active', array['voice_coach'], 1, 'test_fixture')
+        `,
+        [mismatchedMembership.rows[0].id, conflictingIdentity.canonicalUserId],
+      )
+      const mismatchedProfile =
+        await profileRepository.getAliyunRdsAppProfileContractResponse({
+          id: userA,
+          email: "a@test.invalid",
+          app_metadata: {
+            auth_source: "wechat_open_app",
+            wechat_open_app_id: "wx-open-app-test",
+            wechat_app_openid: "openid-a",
+            wechat_unionid: "union-shared",
+            wechat_union_issuer: "open-platform-test",
+          },
+        })
+      assert.equal(mismatchedProfile.identity_state, "resolved")
+      assert.equal(mismatchedProfile.account_status, "not_bound")
+      assert.equal(mismatchedProfile.active_membership_id, null)
+      assert.deepEqual(mismatchedProfile.memberships, [])
 
       const [sessionOne, sessionOneRetry] = await Promise.all([
         repository.consumePersonalTrialVoiceSession({
@@ -322,7 +482,7 @@ test(
       `)
       await pool.query(`
         create trigger test_force_access_grant_failure
-        before insert or update on public.entitlements
+        before insert or update on public.app_membership_entitlements
         for each row execute function public.test_force_access_grant_failure()
       `)
       try {
@@ -333,7 +493,9 @@ test(
             featureKeys: ["voice_coach"],
             idempotencyKey: "grant-rollback-0001",
             operatorUserId: operator,
+            operatorRole: "platform_admin",
             plan: "pro",
+            reason: "integration rollback test",
             role: "employee",
             storeId,
           }),
@@ -341,7 +503,7 @@ test(
         )
       } finally {
         await pool.query(
-          "drop trigger if exists test_force_access_grant_failure on public.entitlements",
+          "drop trigger if exists test_force_access_grant_failure on public.app_membership_entitlements",
         )
         await pool.query(
           "drop function if exists public.test_force_access_grant_failure()",
@@ -351,7 +513,7 @@ test(
         `
           select
             (select count(*)::integer from public.mp_account_memberships where canonical_user_id = $1) as membership_count,
-            (select count(*)::integer from public.entitlements where canonical_user_id = $1) as entitlement_count,
+            (select count(*)::integer from public.app_membership_entitlements where canonical_user_id = $1) as entitlement_count,
             (
               select count(*)::integer
               from public.app_authorization_audit_events
@@ -378,13 +540,30 @@ test(
         authorization_version: 0,
       }])
 
+      await assert.rejects(
+        repository.grantAppAccess({
+          canonicalUserId: first.canonicalUserId,
+          companyId,
+          featureKeys: ["voice_coach"],
+          idempotencyKey: "grant-free-ai-denied",
+          operatorUserId: operator,
+          operatorRole: "platform_admin",
+          plan: "free",
+          reason: "plan feature matrix test",
+          role: "employee",
+          storeId,
+        }),
+        /access_grant_feature_plan_denied/,
+      )
       const grant = await repository.grantAppAccess({
         canonicalUserId: first.canonicalUserId,
         companyId,
         featureKeys: ["voice_coach", "speech_library"],
         idempotencyKey: "grant-00000001",
         operatorUserId: operator,
+        operatorRole: "platform_admin",
         plan: "pro",
+        reason: "open store A",
         role: "employee",
         storeId,
       })
@@ -394,7 +573,9 @@ test(
         featureKeys: ["voice_coach", "speech_library"],
         idempotencyKey: "grant-00000001",
         operatorUserId: operator,
+        operatorRole: "platform_admin",
         plan: "pro",
+        reason: "open store A",
         role: "employee",
         storeId,
       })
@@ -409,14 +590,25 @@ test(
           featureKeys: ["store_admin"],
           idempotencyKey: "grant-privilege-escalation",
           operatorUserId: operator,
+          operatorRole: "platform_admin",
           plan: "pro",
+          reason: "role feature matrix test",
           role: "employee",
           storeId,
         }),
         /access_grant_feature_role_denied/,
       )
 
-      const snapshot = await repository.getAppAccessSnapshot(userB)
+      const snapshot = await repository.getAppAccessSnapshot({
+        id: userB,
+        app_metadata: {
+          auth_source: "wechat_open_app",
+          wechat_open_app_id: "wx-open-app-test",
+          wechat_app_openid: "openid-b",
+          wechat_unionid: "union-shared",
+          wechat_union_issuer: "open-platform-test",
+        },
+      })
       assert.equal(snapshot.canonicalUserId, first.canonicalUserId)
       assert.equal(snapshot.trial.sessionsUsed, 2)
       assert.equal(snapshot.trial.sessionsRemaining, 0)
@@ -424,7 +616,13 @@ test(
       const formalProfile = await profileRepository.getAliyunRdsAppProfileContractResponse({
         id: userB,
         email: "b@test.invalid",
-        user_metadata: {},
+        app_metadata: {
+          auth_source: "wechat_open_app",
+          wechat_open_app_id: "wx-open-app-test",
+          wechat_app_openid: "openid-b",
+          wechat_unionid: "union-shared",
+          wechat_union_issuer: "open-platform-test",
+        },
       })
       assert.equal(formalProfile.account_status, "bound")
       assert.equal(formalProfile.active_membership_id, grant.membershipId)
@@ -440,13 +638,92 @@ test(
         reason: "entitlement_denied",
         source: "membership",
       })
+      const grantB = await repository.grantAppAccess({
+        canonicalUserId: first.canonicalUserId,
+        companyId,
+        featureKeys: ["content"],
+        idempotencyKey: "grant-00000002",
+        operatorUserId: operator,
+        operatorRole: "platform_admin",
+        plan: "pro",
+        reason: "open store B",
+        role: "employee",
+        storeId: storeBId,
+      })
+      await pool.query(
+        "update public.profiles set company_id = $2, store_id = $3 where id = $1",
+        [userB, companyId, storeBId],
+      )
+      const storeBProfile =
+        await profileRepository.getAliyunRdsAppProfileContractResponse({
+          id: userB,
+          email: "b@test.invalid",
+          app_metadata: {
+            auth_source: "wechat_open_app",
+            wechat_open_app_id: "wx-open-app-test",
+            wechat_app_openid: "openid-b",
+            wechat_unionid: "union-shared",
+            wechat_union_issuer: "open-platform-test",
+          },
+        })
+      assert.equal(storeBProfile.active_membership_id, grantB.membershipId)
+      assert.equal(storeBProfile.features.content.enabled, true)
+      assert.equal(storeBProfile.features.voice_coach.enabled, false)
+      await pool.query(
+        "update public.profiles set company_id = $2, store_id = $3 where id = $1",
+        [userB, companyId, storeId],
+      )
+      const storeAProfile =
+        await profileRepository.getAliyunRdsAppProfileContractResponse({
+          id: userB,
+          email: "b@test.invalid",
+          app_metadata: {
+            auth_source: "wechat_open_app",
+            wechat_open_app_id: "wx-open-app-test",
+            wechat_app_openid: "openid-b",
+            wechat_unionid: "union-shared",
+            wechat_union_issuer: "open-platform-test",
+          },
+        })
+      assert.equal(storeAProfile.active_membership_id, grant.membershipId)
+      assert.equal(storeAProfile.features.voice_coach.enabled, true)
+      assert.equal(storeAProfile.features.content.enabled, false)
+      await pool.query(
+        "update public.mp_stores set status = 'inactive' where id = $1",
+        [storeId],
+      )
+      const inactiveStoreAccess = await repository.getAppAccessSnapshot({
+        id: userB,
+        app_metadata: {
+          auth_source: "wechat_open_app",
+          wechat_open_app_id: "wx-open-app-test",
+          wechat_app_openid: "openid-b",
+          wechat_unionid: "union-shared",
+          wechat_union_issuer: "open-platform-test",
+        },
+      })
+      assert.equal(inactiveStoreAccess.accessMode, "personal_trial")
+      await pool.query(
+        "update public.mp_stores set status = 'active' where id = $1",
+        [storeId],
+      )
 
       const audit = await pool.query(
         "select action from public.app_authorization_audit_events order by created_at, id",
       )
       assert.deepEqual(
         audit.rows.map((row) => row.action),
-        ["personal_trial.voice_session_consumed", "personal_trial.voice_session_consumed", "access_grant.upserted"],
+        [
+          "identity.review_required",
+          "verified_phone.ambiguous",
+          "verified_phone.ambiguous",
+          "personal_trial.voice_session_consumed",
+          "personal_trial.voice_session_consumed",
+          "access_grant.rejected",
+          "access_grant.upserted",
+          "access_grant.rejected",
+          "access_grant.upserted",
+        ],
       )
 
       const isolatedTrial = await repository.ensureAppCanonicalIdentityAndTrial({
@@ -474,6 +751,22 @@ test(
       assert.equal(created.session.id, retried.session.id)
       assert.equal(created.deduped, false)
       assert.equal(retried.deduped, true)
+      await pool.query("begin")
+      try {
+        await assert.rejects(
+          pool.query(
+            `
+              update public.voice_coach_sessions
+              set company_id = $2, store_id = $3, membership_id = $4
+              where id = $1
+            `,
+            [created.session.id, companyId, storeId, grant.membershipId],
+          ),
+          /voice_coach_sessions_domain_scope_check/,
+        )
+      } finally {
+        await pool.query("rollback")
+      }
       const turns = await pool.query(
         "select role, turn_index from public.voice_coach_turns where session_id = $1 order by turn_index",
         [created.session.id],
@@ -515,7 +808,10 @@ test(
       })
       assert.equal(history.length, 1)
       assert.equal(history[0].data_domain, "personal_trial")
-      const isolatedSnapshot = await repository.getAppAccessSnapshot(userC)
+      const isolatedSnapshot = await repository.getAppAccessSnapshot({
+        id: userC,
+        user_metadata: {},
+      })
       assert.equal(isolatedSnapshot.trial.sessionsUsed, 1)
     } finally {
       await pool.end()
