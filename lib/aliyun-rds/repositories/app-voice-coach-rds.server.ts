@@ -1,6 +1,9 @@
 import "server-only"
 
 import { getAliyunRdsPool, withAliyunRdsTransaction } from "@/lib/aliyun-rds/postgres.server"
+import {
+  consumePersonalTrialVoiceSessionWithClient,
+} from "@/lib/aliyun-rds/repositories/app-access-control.server"
 
 export const APP_VOICE_COACH_RDS_REPOSITORY_MODE = "rds_voice_coach_text_session_contract"
 
@@ -14,9 +17,11 @@ export type AppVoiceCoachCreateTimingRecorder = {
 
 export type AppVoiceCoachRdsScope = {
   userId: string
-  companyId: string
-  storeId: string
-  membershipId: string
+  dataDomain?: "store" | "personal_trial"
+  canonicalUserId?: string | null
+  companyId?: string | null
+  storeId?: string | null
+  membershipId?: string | null
 }
 
 export type AppVoiceCoachRdsScenarioSnapshot = {
@@ -33,6 +38,9 @@ export type AppVoiceCoachRdsSessionRow = {
   company_id: string | null
   store_id: string | null
   membership_id: string | null
+  canonical_user_id?: string | null
+  data_domain?: "store" | "personal_trial" | string
+  client_session_id?: string | null
   scenario_id: string
   status: "active" | "ended" | string
   started_at: string
@@ -132,6 +140,89 @@ export async function createAliyunRdsVoiceCoachTextSession(args: AppVoiceCoachRd
   return withAliyunRdsTransaction((client) => createAliyunRdsVoiceCoachTextSessionWithClient(client, args))
 }
 
+export async function createAliyunRdsPersonalTrialVoiceCoachTextSession(args: {
+  canonicalUserId: string
+  clientSessionId: string
+  firstCustomerText: string
+  scenario: AppVoiceCoachRdsScenarioSnapshot
+  userId: string
+  timing?: AppVoiceCoachCreateTimingRecorder
+}) {
+  if (args.timing) {
+    return withAliyunRdsCreateTimingTransaction(args.timing, (client) =>
+      createAliyunRdsPersonalTrialVoiceCoachTextSessionWithClient(client, args),
+    )
+  }
+  return withAliyunRdsTransaction((client) =>
+    createAliyunRdsPersonalTrialVoiceCoachTextSessionWithClient(client, args),
+  )
+}
+
+export async function createAliyunRdsPersonalTrialVoiceCoachTextSessionWithClient(
+  client: AppVoiceCoachRdsQueryClient,
+  args: {
+    canonicalUserId: string
+    clientSessionId: string
+    firstCustomerText: string
+    scenario: AppVoiceCoachRdsScenarioSnapshot
+    userId: string
+    timing?: AppVoiceCoachCreateTimingRecorder
+  },
+) {
+  const firstText = requiredText(
+    args.firstCustomerText,
+    "voice_coach_rds_first_customer_text_required",
+  )
+  const consumed = await consumePersonalTrialVoiceSessionWithClient(client, {
+    canonicalUserId: args.canonicalUserId,
+    clientSessionId: args.clientSessionId,
+    requestPayload: { scenario_id: args.scenario.id },
+    userId: args.userId,
+  })
+  const sessionResult = await client.query<AppVoiceCoachRdsSessionRow>(
+    `
+      select *
+      from public.voice_coach_sessions
+      where id = $1
+        and user_id = $2
+        and canonical_user_id = $3
+        and data_domain = 'personal_trial'
+      limit 1
+    `,
+    [consumed.sessionId, args.userId, args.canonicalUserId],
+  )
+  const session = sessionResult.rows[0]
+  if (!session) throw new Error("voice_coach_rds_session_insert_failed")
+
+  const existingTurns = await listAliyunRdsVoiceCoachTextTurnsWithClient(client, session.id)
+  if (existingTurns[0]) {
+    return {
+      deduped: true,
+      firstCustomerTurn: existingTurns[0],
+      session,
+      trial: consumed.trial,
+    }
+  }
+
+  const firstCustomerTurn = await insertAliyunRdsVoiceCoachTextTurnWithClient(client, {
+    analysis: { source: "personal_trial_text_first_rds_contract" },
+    features: {
+      data_domain: "personal_trial",
+      provider_mode: "text_only_no_audio_provider",
+    },
+    role: "customer",
+    sessionId: session.id,
+    text: firstText,
+    turnIndex: 0,
+  })
+  return {
+    deduped: consumed.deduped,
+    firstCustomerTurn,
+    session,
+    trial: consumed.trial,
+  }
+}
+
 export async function getAliyunRdsVoiceCoachTextSession(args: AppVoiceCoachRdsScope & {
   sessionId: string
 }) {
@@ -188,9 +279,13 @@ export async function createAliyunRdsVoiceCoachTextSessionWithClient(
   },
 ) {
   const userId = requiredText(args.userId, "voice_coach_rds_user_id_required")
-  const companyId = requiredText(args.companyId, "voice_coach_rds_company_id_required")
-  const storeId = requiredText(args.storeId, "voice_coach_rds_store_id_required")
-  const membershipId = requiredText(args.membershipId, "voice_coach_rds_membership_id_required")
+  const scope = normalizedRdsScope(args)
+  if (scope.dataDomain !== "store") {
+    throw new Error("voice_coach_rds_store_scope_required")
+  }
+  const companyId = scope.companyId
+  const storeId = scope.storeId
+  const membershipId = scope.membershipId
   const scenarioId = requiredText(args.scenario?.id, "voice_coach_rds_scenario_id_required")
   const firstText = requiredText(args.firstCustomerText, "voice_coach_rds_first_customer_text_required")
   const customerProfileId = optionalText(args.customerProfileId)
@@ -218,6 +313,7 @@ export async function createAliyunRdsVoiceCoachTextSessionWithClient(
     `
       insert into public.voice_coach_sessions (
         user_id,
+        data_domain,
         company_id,
         store_id,
         membership_id,
@@ -228,7 +324,7 @@ export async function createAliyunRdsVoiceCoachTextSessionWithClient(
         session_context_json,
         scenario_snapshot_json
       )
-      values ($1, $2, $3, $4, $5, 'active', $6, $7, $8::jsonb, $9::jsonb)
+      values ($1, 'store', $2, $3, $4, $5, 'active', $6, $7, $8::jsonb, $9::jsonb)
       returning *
     `,
     [
@@ -335,23 +431,37 @@ export async function getAliyunRdsVoiceCoachTextSessionWithClient(
     sessionId: string
   },
 ) {
+  const scope = normalizedRdsScope(args)
   const sessionResult = await client.query<AppVoiceCoachRdsSessionRow>(
     `
       select *
       from public.voice_coach_sessions
       where id = $1
         and user_id = $2
-        and company_id = $3
-        and store_id = $4
-        and membership_id = $5
+        and (
+          (
+            $3 = 'personal_trial'
+            and data_domain = 'personal_trial'
+            and canonical_user_id = $4
+          )
+          or (
+            $3 = 'store'
+            and data_domain = 'store'
+            and company_id = $5
+            and store_id = $6
+            and membership_id = $7
+          )
+        )
       limit 1
     `,
     [
       requiredText(args.sessionId, "voice_coach_rds_session_id_required"),
       requiredText(args.userId, "voice_coach_rds_user_id_required"),
-      requiredText(args.companyId, "voice_coach_rds_company_id_required"),
-      requiredText(args.storeId, "voice_coach_rds_store_id_required"),
-      requiredText(args.membershipId, "voice_coach_rds_membership_id_required"),
+      scope.dataDomain,
+      scope.canonicalUserId,
+      scope.companyId,
+      scope.storeId,
+      scope.membershipId,
     ],
   )
   const session = sessionResult.rows[0] || null
@@ -365,24 +475,38 @@ async function lockAliyunRdsVoiceCoachTextSessionWithClient(
   client: AppVoiceCoachRdsQueryClient,
   args: AppVoiceCoachRdsScope & { sessionId: string },
 ) {
+  const scope = normalizedRdsScope(args)
   const result = await client.query<AppVoiceCoachRdsSessionRow>(
     `
       select *
       from public.voice_coach_sessions
       where id = $1
         and user_id = $2
-        and company_id = $3
-        and store_id = $4
-        and membership_id = $5
+        and (
+          (
+            $3 = 'personal_trial'
+            and data_domain = 'personal_trial'
+            and canonical_user_id = $4
+          )
+          or (
+            $3 = 'store'
+            and data_domain = 'store'
+            and company_id = $5
+            and store_id = $6
+            and membership_id = $7
+          )
+        )
       limit 1
       for update
     `,
     [
       requiredText(args.sessionId, "voice_coach_rds_session_id_required"),
       requiredText(args.userId, "voice_coach_rds_user_id_required"),
-      requiredText(args.companyId, "voice_coach_rds_company_id_required"),
-      requiredText(args.storeId, "voice_coach_rds_store_id_required"),
-      requiredText(args.membershipId, "voice_coach_rds_membership_id_required"),
+      scope.dataDomain,
+      scope.canonicalUserId,
+      scope.companyId,
+      scope.storeId,
+      scope.membershipId,
     ],
   )
   return result.rows[0] || null
@@ -428,6 +552,8 @@ export async function appendAliyunRdsVoiceCoachTextReplyWithClient(
   const session = await lockAliyunRdsVoiceCoachTextSessionWithClient(client, {
     sessionId,
     userId: args.userId,
+    dataDomain: args.dataDomain,
+    canonicalUserId: args.canonicalUserId,
     companyId: args.companyId,
     storeId: args.storeId,
     membershipId: args.membershipId,
@@ -535,6 +661,8 @@ export async function saveAliyunRdsVoiceCoachTurnAudioWithClient(
   const session = await lockAliyunRdsVoiceCoachTextSessionWithClient(client, {
     sessionId,
     userId: args.userId,
+    dataDomain: args.dataDomain,
+    canonicalUserId: args.canonicalUserId,
     companyId: args.companyId,
     storeId: args.storeId,
     membershipId: args.membershipId,
@@ -589,9 +717,12 @@ export async function endAliyunRdsVoiceCoachTextSessionWithClient(
   },
 ) {
   const sessionId = requiredText(args.sessionId, "voice_coach_rds_session_id_required")
+  const scope = normalizedRdsScope(args)
   const session = await lockAliyunRdsVoiceCoachTextSessionWithClient(client, {
     sessionId,
     userId: args.userId,
+    dataDomain: args.dataDomain,
+    canonicalUserId: args.canonicalUserId,
     companyId: args.companyId,
     storeId: args.storeId,
     membershipId: args.membershipId,
@@ -609,22 +740,35 @@ export async function endAliyunRdsVoiceCoachTextSessionWithClient(
       set
         status = 'ended',
         ended_at = now(),
-        report_json = $6::jsonb,
-        total_score = $7,
-        dimension_scores = $8::jsonb
+        report_json = $8::jsonb,
+        total_score = $9,
+        dimension_scores = $10::jsonb
       where id = $1
         and user_id = $2
-        and company_id = $3
-        and store_id = $4
-        and membership_id = $5
+        and (
+          (
+            $3 = 'personal_trial'
+            and data_domain = 'personal_trial'
+            and canonical_user_id = $4
+          )
+          or (
+            $3 = 'store'
+            and data_domain = 'store'
+            and company_id = $5
+            and store_id = $6
+            and membership_id = $7
+          )
+        )
       returning *
     `,
     [
       sessionId,
       requiredText(args.userId, "voice_coach_rds_user_id_required"),
-      requiredText(args.companyId, "voice_coach_rds_company_id_required"),
-      requiredText(args.storeId, "voice_coach_rds_store_id_required"),
-      requiredText(args.membershipId, "voice_coach_rds_membership_id_required"),
+      scope.dataDomain,
+      scope.canonicalUserId,
+      scope.companyId,
+      scope.storeId,
+      scope.membershipId,
       jsonbParam(endState.report),
       endState.totalScore,
       jsonbParam(endState.dimensionScores),
@@ -641,22 +785,36 @@ export async function listAliyunRdsVoiceCoachTextSessionHistoryWithClient(
     limit: number
   },
 ) {
+  const scope = normalizedRdsScope(args)
   const result = await client.query<AppVoiceCoachRdsSessionRow>(
     `
       select *
       from public.voice_coach_sessions
       where user_id = $1
-        and company_id = $2
-        and store_id = $3
-        and membership_id = $4
+        and (
+          (
+            $2 = 'personal_trial'
+            and data_domain = 'personal_trial'
+            and canonical_user_id = $3
+          )
+          or (
+            $2 = 'store'
+            and data_domain = 'store'
+            and company_id = $4
+            and store_id = $5
+            and membership_id = $6
+          )
+        )
       order by created_at desc
-      limit $5
+      limit $7
     `,
     [
       requiredText(args.userId, "voice_coach_rds_user_id_required"),
-      requiredText(args.companyId, "voice_coach_rds_company_id_required"),
-      requiredText(args.storeId, "voice_coach_rds_store_id_required"),
-      requiredText(args.membershipId, "voice_coach_rds_membership_id_required"),
+      scope.dataDomain,
+      scope.canonicalUserId,
+      scope.companyId,
+      scope.storeId,
+      scope.membershipId,
       normalizeLimit(args.limit),
     ],
   )
@@ -799,4 +957,29 @@ function normalizeLimit(value: unknown) {
   const numberValue = Number(value || 20)
   if (!Number.isFinite(numberValue)) return 20
   return Math.max(1, Math.min(50, Math.round(numberValue)))
+}
+
+function normalizedRdsScope(args: AppVoiceCoachRdsScope) {
+  if (args.dataDomain === "personal_trial") {
+    return {
+      dataDomain: "personal_trial" as const,
+      canonicalUserId: requiredText(
+        args.canonicalUserId,
+        "voice_coach_rds_canonical_user_id_required",
+      ),
+      companyId: null,
+      storeId: null,
+      membershipId: null,
+    }
+  }
+  return {
+    dataDomain: "store" as const,
+    canonicalUserId: null,
+    companyId: requiredText(args.companyId, "voice_coach_rds_company_id_required"),
+    storeId: requiredText(args.storeId, "voice_coach_rds_store_id_required"),
+    membershipId: requiredText(
+      args.membershipId,
+      "voice_coach_rds_membership_id_required",
+    ),
+  }
 }

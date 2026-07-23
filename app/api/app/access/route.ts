@@ -6,24 +6,21 @@ import {
   resolveAliyunRdsAppAuthUser,
 } from "@/lib/aliyun-rds/app-auth.server"
 import { AliyunRdsConfigurationError } from "@/lib/aliyun-rds/postgres.server"
-import { ensureAppCanonicalIdentityAndTrial } from "@/lib/aliyun-rds/repositories/app-access-control.server"
-import { bootstrapAliyunRdsAppProfile } from "@/lib/aliyun-rds/repositories/account-profile.server"
+import { getAppAccessSnapshot } from "@/lib/aliyun-rds/repositories/app-access-control.server"
 
 export const runtime = "nodejs"
 
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     const auth = await resolveAliyunRdsAppAuthUser(request)
     if (!auth) return appAuthRequiredResponse()
 
-    await bootstrapAliyunRdsAppProfile(auth.user)
-    const access = await ensureAppCanonicalIdentityAndTrial(auth.user)
+    const access = await getAppAccessSnapshot(auth.user.id)
     return NextResponse.json({
       ok: true,
-      profile_initialized: true,
       canonical_user_id: access.canonicalUserId,
-      access_mode: access.accessMode,
       identity_state: access.identityState,
+      access_mode: access.accessMode,
       authorization_version: access.authorizationVersion,
       trial: {
         kind: access.trial.kind,
@@ -37,30 +34,14 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     const appAuthError = appAuthConfigurationErrorResponse(error)
     if (appAuthError) return appAuthError
-
     if (error instanceof AliyunRdsConfigurationError) {
       return NextResponse.json(
-        { ok: false, error: "DATABASE_URL_CN is required", code: "rds_not_configured" },
+        { ok: false, error: "rds_not_configured", code: "rds_not_configured" },
         { status: 503 },
       )
     }
-    if (error instanceof Error && error.message === "app_identity_conflict") {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "identity_review_required",
-          code: "identity_review_required",
-        },
-        { status: 409 },
-      )
-    }
-
     return NextResponse.json(
-      {
-        ok: false,
-        error: "account_bootstrap_failed",
-        code: "account_bootstrap_failed",
-      },
+      { ok: false, error: "access_snapshot_failed", code: "access_snapshot_failed" },
       { status: 500 },
     )
   }

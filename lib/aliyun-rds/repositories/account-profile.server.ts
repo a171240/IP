@@ -46,6 +46,9 @@ type ProfileRow = {
 type EntitlementRow = {
   plan: string | null
   pro_expires_at: string | null
+  status?: string | null
+  feature_keys?: string[] | null
+  authorization_version?: number | string | null
 }
 
 type MembershipRow = {
@@ -479,10 +482,13 @@ function platformAccountContext(user: AppAuthUser): AppAccountIdentity {
   }
 }
 
-function membershipSnapshot(membership: AppAccountMembership) {
+function membershipSnapshot(
+  membership: AppAccountMembership,
+  authorizedUserId = membership.userId,
+) {
   return {
     id: membership.id,
-    user_id: membership.userId,
+    user_id: authorizedUserId,
     role: membership.role,
     role_label: membership.roleLabel,
     scope: membership.scope,
@@ -512,7 +518,9 @@ export function accountContextPayload(ctx: AppAccountContext) {
     is_company_manager: ctx.isCompanyManager,
     is_store_manager: ctx.isStoreManager,
     is_platform_admin: ctx.isPlatformAdmin,
-    memberships: ctx.memberships.map(membershipSnapshot),
+    memberships: ctx.memberships.map((membership) =>
+      membershipSnapshot(membership, ctx.userId),
+    ),
   }
 }
 
@@ -526,7 +534,24 @@ async function findProfileRow(userId: string): Promise<ProfileRow | null> {
 
 async function getEntitlementRow(userId: string): Promise<EntitlementRow | null> {
   const result = await queryAliyunRds<EntitlementRow>(
-    "select plan, pro_expires_at from public.entitlements where user_id = $1 limit 1",
+    `
+      select
+        entitlement.plan,
+        entitlement.pro_expires_at,
+        entitlement.status,
+        entitlement.feature_keys,
+        entitlement.authorization_version
+      from public.entitlements entitlement
+      where entitlement.user_id = $1
+         or entitlement.canonical_user_id = (
+           select identity.canonical_user_id
+           from public.app_auth_identities identity
+           where identity.app_user_id = $1
+           limit 1
+         )
+      order by (entitlement.canonical_user_id is not null) desc
+      limit 1
+    `,
     [userId],
   )
   return result.rows[0] || null
@@ -555,6 +580,12 @@ async function getMembershipRows(userId: string): Promise<MembershipRow[]> {
       left join public.mp_companies company on company.id = membership.company_id
       left join public.mp_stores store on store.id = membership.store_id
       where membership.user_id = $1
+         or membership.canonical_user_id = (
+           select identity.canonical_user_id
+           from public.app_auth_identities identity
+           where identity.app_user_id = $1
+           limit 1
+         )
       order by membership.created_at desc, membership.id asc
     `,
     [userId],
@@ -760,10 +791,14 @@ async function loadAppAccountReadSnapshot(user: AppAuthUser): Promise<AppAccount
     }
   }
 
-  const features = buildAppFeatureDecisions(account, {
+  const baseFeatures = buildAppFeatureDecisions(account, {
     aiPointsBalance: billingProfile.ai_points_balance,
     aiPointsUnlimited: billingProfile.ai_points_unlimited,
   })
+  const features = applyExplicitEntitlementFeatures(
+    baseFeatures,
+    entitlement,
+  )
 
   return {
     profileRow,
@@ -771,6 +806,49 @@ async function loadAppAccountReadSnapshot(user: AppAuthUser): Promise<AppAccount
     account: { ...account, features },
     billingProfile,
   }
+}
+
+function applyExplicitEntitlementFeatures(
+  baseFeatures: AppFeatureDecisions,
+  entitlement: EntitlementRow | null,
+): AppFeatureDecisions {
+  if (
+    entitlement?.status !== "active" ||
+    !Array.isArray(entitlement.feature_keys)
+  ) {
+    return baseFeatures
+  }
+
+  const grantedFeatures = new Set(entitlement.feature_keys)
+  return Object.fromEntries(
+    Object.entries(baseFeatures).map(([featureKey, decision]) => {
+      if (featureKey === "auth" || featureKey === "account") {
+        return [featureKey, decision]
+      }
+      if (
+        decision.reason === "role_denied" ||
+        decision.reason === "not_bound" ||
+        decision.reason === "suspended" ||
+        decision.reason === "inactive"
+      ) {
+        return [featureKey, decision]
+      }
+      if (grantedFeatures.has(featureKey)) {
+        return [
+          featureKey,
+          { enabled: true, reason: "ok", source: "membership" },
+        ]
+      }
+      return [
+        featureKey,
+        {
+          enabled: false,
+          reason: "entitlement_denied",
+          source: "membership",
+        },
+      ]
+    }),
+  ) as AppFeatureDecisions
 }
 
 export async function getAliyunRdsAppProfileResponse(user: AppAuthUser) {
@@ -792,7 +870,9 @@ export async function getAliyunRdsAppProfileContractResponse(user: AppAuthUser) 
     user: { id: user.id },
     account_status: snapshot.account.accountStatus,
     active_membership_id: snapshot.account.membershipId,
-    memberships: snapshot.account.memberships.map(membershipSnapshot),
+    memberships: snapshot.account.memberships.map((membership) =>
+      membershipSnapshot(membership, user.id),
+    ),
     entitlements: entitlementPayload(snapshot.entitlement),
     features: snapshot.account.features,
     profile: {

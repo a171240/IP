@@ -10,6 +10,8 @@ const WECHAT_OPEN_APP_ID =
   process.env.WECHAT_OPEN_APP_ID || process.env.WECHAT_APP_APPID || process.env.WECHAT_APP_ID || ""
 const WECHAT_OPEN_APP_SECRET =
   process.env.WECHAT_OPEN_APP_SECRET || process.env.WECHAT_APP_SECRET || process.env.WECHAT_OPEN_SECRET || ""
+const WECHAT_OPEN_PLATFORM_SCOPE_ID =
+  process.env.WECHAT_OPEN_PLATFORM_SCOPE_ID || ""
 const WECHAT_LOGIN_SECRET = process.env.WECHAT_LOGIN_SECRET || ""
 const DEFAULT_WECHAT_NICKNAME = "WeChat App User"
 
@@ -126,8 +128,12 @@ export async function POST(request: NextRequest) {
         nickname: nickname || DEFAULT_WECHAT_NICKNAME,
         avatar_url: avatarUrl || null,
         auth_source: "wechat_open_app",
+        wechat_open_app_id: WECHAT_OPEN_APP_ID,
         wechat_app_openid: openid,
         wechat_unionid: unionid || null,
+        ...(unionid && WECHAT_OPEN_PLATFORM_SCOPE_ID
+          ? { wechat_union_issuer: WECHAT_OPEN_PLATFORM_SCOPE_ID }
+          : {}),
       },
     })
     .then(({ error }) => {
@@ -173,9 +179,13 @@ export async function POST(request: NextRequest) {
     ...(user.user_metadata || {}),
     nickname: nextNickname,
     auth_source: "wechat_open_app",
+    wechat_open_app_id: WECHAT_OPEN_APP_ID,
     wechat_app_openid: openid,
     ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
     ...(unionid ? { wechat_unionid: unionid } : {}),
+    ...(unionid && WECHAT_OPEN_PLATFORM_SCOPE_ID
+      ? { wechat_union_issuer: WECHAT_OPEN_PLATFORM_SCOPE_ID }
+      : {}),
   }
 
   const { data: updatedUserData } = await admin.auth.admin.updateUserById(user.id, {

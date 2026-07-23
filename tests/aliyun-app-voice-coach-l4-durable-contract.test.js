@@ -121,6 +121,14 @@ const helperStubs = {
       firstTurnPool: [{ text: "我担心皮肤敏感，做完会不会不舒服？" }],
     }),
   },
+  "@/lib/voice-coach/speech/doubao.server": {
+    doubaoAsrFlash: async () => ({ text: "" }),
+    doubaoTts: async () => Buffer.from(""),
+  },
+  "@/lib/voice-coach/storage.server": {
+    signVoiceCoachAudio: async () => null,
+    uploadVoiceCoachAudio: async () => ({ key: "test-audio-key" }),
+  },
 }
 
 function compileTsModule(filePath, stubs) {
@@ -171,7 +179,7 @@ function request(url, body = {}, contentType = "application/json") {
       return {
         entries: function* entries() {
           for (const [key, value] of Object.entries(body)) {
-            yield [key, String(value)]
+            yield [key, key === "audio" ? value : String(value)]
           }
         },
       }
@@ -243,8 +251,16 @@ test("VC-L4-03 local durable voiceCoach contract survives helper reloads", async
   )
   const submitResponse = await submitRoute.POST(
     request(`https://local.test/api/app/voice-coach/sessions/${created.session_id}/beautician-turn/submit`, {
+      audio: {
+        name: "answer.wav",
+        type: "audio/wav",
+        arrayBuffer: async () => Uint8Array.from([1, 2, 3]).buffer,
+      },
+      client_audio_seconds: 1,
+      client_attempt_id: "11111111-1111-4111-8111-111111111111",
+      reply_to_turn_id: created.first_customer_turn.turn_id,
       transcript_text: "我先确认敏感风险，再从低刺激护理开始。",
-    }),
+    }, "multipart/form-data; boundary=test"),
     sessionContext(created.session_id),
   )
   const submitted = await payload(submitResponse)

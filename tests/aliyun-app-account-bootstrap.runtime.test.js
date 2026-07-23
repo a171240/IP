@@ -93,6 +93,20 @@ function jsonResponse(body, init = {}) {
 
 function bootstrapRoute(repository, user) {
   class AliyunRdsConfigurationError extends Error {}
+  const access = {
+    canonicalUserId: "canonical-bootstrap-1",
+    accessMode: "personal_trial",
+    identityState: "resolved",
+    authorizationVersion: 0,
+    trial: {
+      kind: "personal_trial",
+      dataDomain: "personal_trial",
+      status: "active",
+      sessionLimit: 2,
+      sessionsUsed: 0,
+      sessionsRemaining: 2,
+    },
+  }
   return compileTsModule(bootstrapRoutePath, {
     "next/server": {
       NextRequest: class NextRequest {},
@@ -105,7 +119,27 @@ function bootstrapRoute(repository, user) {
     },
     "@/lib/aliyun-rds/postgres.server": { AliyunRdsConfigurationError },
     "@/lib/aliyun-rds/repositories/account-profile.server": repository,
+    "@/lib/aliyun-rds/repositories/app-access-control.server": {
+      ensureAppCanonicalIdentityAndTrial: async () => access,
+    },
   })
+}
+
+const expectedBootstrapResponse = {
+  ok: true,
+  profile_initialized: true,
+  canonical_user_id: "canonical-bootstrap-1",
+  access_mode: "personal_trial",
+  identity_state: "resolved",
+  authorization_version: 0,
+  trial: {
+    kind: "personal_trial",
+    data_domain: "personal_trial",
+    status: "active",
+    ai_coach_session_limit: 2,
+    ai_coach_sessions_used: 0,
+    ai_coach_sessions_remaining: 2,
+  },
 }
 
 function requestWithForbiddenBody() {
@@ -169,8 +203,8 @@ test("authenticated bootstrap inserts bounded display fields once and ignores pr
   const secondResponse = await route.POST(requestProbe.request)
 
   assert.equal(requestProbe.readCount(), 0)
-  assert.deepEqual(firstResponse.body, { ok: true, profile_initialized: true })
-  assert.deepEqual(secondResponse.body, { ok: true, profile_initialized: true })
+  assert.deepEqual(firstResponse.body, expectedBootstrapResponse)
+  assert.deepEqual(secondResponse.body, expectedBootstrapResponse)
   assert.equal(firstResponse.status, 200)
   assert.equal(secondResponse.status, 200)
   assert.equal(queryLog.length, 2)

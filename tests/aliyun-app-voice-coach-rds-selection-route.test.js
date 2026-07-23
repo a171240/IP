@@ -15,6 +15,7 @@ const runtimeConfigPath = path.join(root, "lib", "aliyun-rds", "app-voice-coach-
 const voiceCoachFeatureDecision = { enabled: true, reason: "ok", source: "ai_points" }
 const authorizationChecks = []
 let accountContextReadCount = 0
+let forceVoiceCoachDenied = false
 const SESSION_ID = "77777777-7777-4777-8777-777777777777"
 const CUSTOMER_PROFILE_ID = "11111111-1111-4111-8111-111111111111"
 const SCENE_CARD_ID = "22222222-2222-4222-8222-222222222222"
@@ -56,12 +57,20 @@ function requireAuthorizedVoiceCoachAccess(ctx, features, feature, requestedScop
     })
   }
   authorizationChecks.push(requestedScope || null)
+  if (forceVoiceCoachDenied && !requestedScope) {
+    return {
+      ok: false,
+      status: 403,
+      body: { ok: false, code: "not_bound", feature: "voice_coach" },
+    }
+  }
   return { ok: true, account: ctx }
 }
 
 function resetAuthorizationChecks() {
   authorizationChecks.length = 0
   accountContextReadCount = 0
+  forceVoiceCoachDenied = false
   currentAccountContext = { ...testAccountContext }
 }
 
@@ -138,6 +147,14 @@ function createRdsMock() {
   }
 
   function belongsToScope(session, args) {
+    if (args.dataDomain === "personal_trial") {
+      return Boolean(
+        session &&
+          session.user_id === args.userId &&
+          session.data_domain === "personal_trial" &&
+          session.canonical_user_id === args.canonicalUserId,
+      )
+    }
     return Boolean(
       session &&
         session.user_id === args.userId &&
@@ -334,6 +351,49 @@ function createRdsMock() {
         turns.set(session.id, [firstCustomerTurn])
         return { firstCustomerTurn, session }
       },
+      async createAliyunRdsPersonalTrialVoiceCoachTextSession(args) {
+        remember("createAliyunRdsPersonalTrialVoiceCoachTextSession", args)
+        const session = {
+          id: SESSION_ID,
+          created_at: "2026-07-06T10:00:00.000Z",
+          user_id: args.userId,
+          canonical_user_id: args.canonicalUserId,
+          data_domain: "personal_trial",
+          company_id: null,
+          store_id: null,
+          membership_id: null,
+          scenario_id: args.scenario.id,
+          status: "active",
+          started_at: "2026-07-06T10:00:00.000Z",
+          ended_at: null,
+          report_json: null,
+          total_score: null,
+          dimension_scores: null,
+          session_context_json: { data_domain: "personal_trial" },
+          scenario_snapshot_json: args.scenario,
+        }
+        const firstCustomerTurn = turn({
+          role: "customer",
+          sessionId: session.id,
+          text: args.firstCustomerText,
+          turnIndex: 0,
+        })
+        sessions.set(session.id, session)
+        turns.set(session.id, [firstCustomerTurn])
+        return {
+          deduped: false,
+          firstCustomerTurn,
+          session,
+          trial: {
+            kind: "personal_trial",
+            dataDomain: "personal_trial",
+            status: "active",
+            sessionLimit: 2,
+            sessionsUsed: 1,
+            sessionsRemaining: 1,
+          },
+        }
+      },
       async getAliyunRdsVoiceCoachTextSessionWithClient(_client, args) {
         remember("getAliyunRdsVoiceCoachTextSessionWithClient", args)
         const session = sessions.get(args.sessionId)
@@ -458,6 +518,22 @@ function helperStubs(rdsMock) {
       },
     },
     "@/lib/aliyun-rds/repositories/app-voice-coach-rds.server": rdsMock.module,
+    "@/lib/aliyun-rds/repositories/app-access-control.server": {
+      getAppAccessSnapshot: async () => ({
+        canonicalUserId: "99999999-9999-4999-8999-999999999999",
+        identityState: "resolved",
+        accessMode: "personal_trial",
+        authorizationVersion: 0,
+        trial: {
+          kind: "personal_trial",
+          dataDomain: "personal_trial",
+          status: "active",
+          sessionLimit: 2,
+          sessionsUsed: 0,
+          sessionsRemaining: 2,
+        },
+      }),
+    },
     "@/lib/voice-coach/scenarios": {
       getScenario: (scenarioId) => ({
         id: scenarioId || "objection_safety",
@@ -553,6 +629,50 @@ function compileHelperWithMode(t, mode) {
 function compileHelperWithRdsMock(t) {
   return compileHelperWithMode(t, "rds")
 }
+
+test("V1 personal trial creates an RDS demo session without tenant scope and returns remaining uses", async (t) => {
+  resetAuthorizationChecks()
+  forceVoiceCoachDenied = true
+  const { helperExports, rdsMock } = compileHelperWithRdsMock(t)
+  const sessionsRoute = routeModule(
+    helperExports,
+    "app",
+    "api",
+    "app",
+    "voice-coach",
+    "sessions",
+    "route.ts",
+  )
+
+  const response = await sessionsRoute.POST(
+    request("https://local.test/api/app/voice-coach/sessions", {
+      client_session_id: "trial-session-0001",
+      scenario_id: "objection_safety",
+    }),
+  )
+  const body = await payload(response)
+
+  assert.equal(response.status, 201)
+  assert.equal(body.session_context.data_domain, "personal_trial")
+  assert.equal(body.session_context.company_id, null)
+  assert.equal(body.session_context.store_id, null)
+  assert.equal(body.session_context.membership_id, null)
+  assert.equal(body.trial.ai_coach_session_limit, 2)
+  assert.equal(body.trial.ai_coach_sessions_used, 1)
+  assert.equal(body.trial.ai_coach_sessions_remaining, 1)
+  assert.deepEqual(rdsMock.calls, [
+    "createAliyunRdsPersonalTrialVoiceCoachTextSession",
+  ])
+  assert.equal(rdsMock.callArgs[0].args.clientSessionId, "trial-session-0001")
+  assert.equal(
+    rdsMock.callArgs[0].args.canonicalUserId,
+    "99999999-9999-4999-8999-999999999999",
+  )
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(rdsMock.callArgs[0].args, "companyId"),
+    false,
+  )
+})
 
 async function withVoiceCoachRuntimeEnv(options, run) {
   const keys = [

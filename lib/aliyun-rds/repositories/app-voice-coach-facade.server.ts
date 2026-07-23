@@ -16,7 +16,6 @@ import {
   isAliyunRdsRuntimeUnavailableError,
 } from "@/lib/aliyun-rds/postgres.server"
 import {
-  APP_VOICE_COACH_PRODUCTION_RDS_REPOSITORY_MODE,
   APP_VOICE_COACH_REPOSITORY_NOT_CONFIGURED_CODE,
   AppVoiceCoachRepositoryConfigurationError,
   resolveAppVoiceCoachTextRepositorySelection,
@@ -31,11 +30,20 @@ import { doubaoAsrFlash, doubaoTts } from "@/lib/voice-coach/speech/doubao.serve
 import { signVoiceCoachAudio, uploadVoiceCoachAudio } from "@/lib/voice-coach/storage.server"
 import { getScenario } from "@/lib/voice-coach/scenarios"
 
-export type AppVoiceCoachFacadeScope = {
+type AppVoiceCoachStoreScope = {
   companyId: string
   storeId: string
   membershipId: string
 }
+
+type AppVoiceCoachPersonalTrialScope = {
+  dataDomain: "personal_trial"
+  canonicalUserId: string
+}
+
+export type AppVoiceCoachFacadeScope =
+  | AppVoiceCoachStoreScope
+  | AppVoiceCoachPersonalTrialScope
 
 type AppVoiceCoachRdsRepository = typeof import("@/lib/aliyun-rds/repositories/app-voice-coach-rds.server")
 
@@ -241,6 +249,13 @@ function rdsSessionNotFoundResponse(sessionId: unknown, endpoint?: AppVoiceCoach
 }
 
 function rdsScopeArgs(ctx: AppAccountContext, scope: AppVoiceCoachFacadeScope) {
+  if ("dataDomain" in scope) {
+    return {
+      userId: ctx.userId,
+      dataDomain: scope.dataDomain,
+      canonicalUserId: scope.canonicalUserId,
+    }
+  }
   return {
     userId: ctx.userId,
     companyId: scope.companyId,
@@ -336,28 +351,46 @@ export async function resolveAppVoiceCoachFacadeContext(
 
   const ctx = await getAliyunRdsAppAccountContext(auth.user)
   const access = requireAppFeatureAccess(ctx, ctx.features, "voice_coach")
-  if (!access.ok) {
+  if (access.ok) {
+    const scope = resolveAppVoiceCoachScope(ctx, request)
+    if ("error" in scope) return { error: scope.error }
+    const scopeAccess = requireAppFeatureAccess(ctx, ctx.features, "voice_coach", {
+      companyId: scope.companyId,
+      storeId: scope.storeId,
+    })
+    if (!scopeAccess.ok) {
+      return {
+        error: endpoint
+          ? appVoiceCoachAudioErrorResponse(endpoint, "voice_coach_feature_forbidden")
+          : NextResponse.json(scopeAccess.body, { status: scopeAccess.status }),
+      }
+    }
+    return { auth, ctx, scope }
+  }
+
+  const accessRepository = await import(
+    "@/lib/aliyun-rds/repositories/app-access-control.server"
+  )
+  const personalAccess = await accessRepository.getAppAccessSnapshot(auth.user.id)
+  if (
+    personalAccess.accessMode !== "personal_trial" ||
+    !["active", "exhausted"].includes(personalAccess.trial.status)
+  ) {
     return {
       error: endpoint
         ? appVoiceCoachAudioErrorResponse(endpoint, "voice_coach_feature_forbidden")
         : NextResponse.json(access.body, { status: access.status }),
     }
   }
-  const scope = resolveAppVoiceCoachScope(ctx, request)
-  if ("error" in scope) return { error: scope.error }
-  const scopeAccess = requireAppFeatureAccess(ctx, ctx.features, "voice_coach", {
-    companyId: scope.companyId,
-    storeId: scope.storeId,
-  })
-  if (!scopeAccess.ok) {
-    return {
-      error: endpoint
-        ? appVoiceCoachAudioErrorResponse(endpoint, "voice_coach_feature_forbidden")
-        : NextResponse.json(scopeAccess.body, { status: scopeAccess.status }),
-    }
-  }
 
-  return { auth, ctx, scope }
+  return {
+    auth,
+    ctx,
+    scope: {
+      dataDomain: "personal_trial" as const,
+      canonicalUserId: personalAccess.canonicalUserId,
+    },
+  }
 }
 
 export function appVoiceCoachFacadeErrorResponse(
@@ -392,6 +425,18 @@ export function appVoiceCoachFacadeErrorResponse(
 }
 
 export function appVoiceCoachContextPayload(ctx: AppAccountContext, scope: AppVoiceCoachFacadeScope) {
+  if ("dataDomain" in scope) {
+    return {
+      ...accountContextPayload(ctx),
+      voice_coach_scope: {
+        data_domain: scope.dataDomain,
+        canonical_user_id: scope.canonicalUserId,
+        company_id: null,
+        store_id: null,
+        membership_id: null,
+      },
+    }
+  }
   return {
     ...accountContextPayload(ctx),
     voice_coach_scope: {
@@ -400,6 +445,10 @@ export function appVoiceCoachContextPayload(ctx: AppAccountContext, scope: AppVo
       membership_id: scope.membershipId,
     },
   }
+}
+
+function shouldUseRdsForScope(scope: AppVoiceCoachFacadeScope) {
+  return "dataDomain" in scope || shouldUseRdsRepository()
 }
 
 function textContractPayload() {
@@ -490,12 +539,6 @@ function rdsContractPayload(repositoryMode: string) {
   }
 }
 
-function selectedTextContractPayload() {
-  return shouldUseRdsRepository()
-    ? rdsContractPayload(APP_VOICE_COACH_PRODUCTION_RDS_REPOSITORY_MODE)
-    : textContractPayload()
-}
-
 function scenarioPayload(scenarioId: unknown) {
   const scenario = getScenario(cleanText(scenarioId, 60) || DEFAULT_SCENARIO_ID)
   return {
@@ -570,6 +613,7 @@ function appVoiceCoachTtsAudioPath(args: { sessionId: string; turnId: string; us
 }
 
 function sessionBelongsToScope(session: TextSession, ctx: AppAccountContext, scope: AppVoiceCoachFacadeScope) {
+  if ("dataDomain" in scope) return false
   return (
     session.userId === ctx.userId &&
     session.companyId === scope.companyId &&
@@ -894,7 +938,7 @@ export async function listAppVoiceCoachTextSessionsResponse(opts: {
   request: NextRequest
   scope: AppVoiceCoachFacadeScope
 }) {
-    if (shouldUseRdsRepository()) {
+  if (shouldUseRdsForScope(opts.scope)) {
     const rdsRepository = await loadRdsRepository()
     const params = new URL(opts.request.url).searchParams
     const limit = parseLimit(params.get("limit"))
@@ -934,9 +978,17 @@ export async function createAppVoiceCoachTextSessionResponse(opts: {
   scope: AppVoiceCoachFacadeScope
   timing?: AppVoiceCoachCreateTimingLog
 }) {
-  if (shouldUseRdsRepository()) {
+  if (shouldUseRdsForScope(opts.scope)) {
     const customerProfileId = cleanText(opts.body.customer_profile_id, 80) || null
     const sceneCardId = cleanText(opts.body.scene_card_id, 80) || null
+    const personalTrialScope = "dataDomain" in opts.scope ? opts.scope : null
+    if (personalTrialScope && (customerProfileId || sceneCardId)) {
+      return jsonError(
+        422,
+        "personal_trial_demo_selection_forbidden",
+        "personal_trial_demo_selection_forbidden",
+      )
+    }
     if (customerProfileId && !isUuid(customerProfileId)) {
       return jsonError(400, "customer_profile_not_found", "customer_profile_not_found")
     }
@@ -954,19 +1006,55 @@ export async function createAppVoiceCoachTextSessionResponse(opts: {
     const firstCustomerTurnText = firstCustomerText(opts.body.scenario_id)
     opts.timing?.recordStage("rds_prepare_payload", payloadStartedAt)
 
-    let created
+    let created:
+      | Awaited<ReturnType<AppVoiceCoachRdsRepository["createAliyunRdsVoiceCoachTextSession"]>>
+      | Awaited<
+          ReturnType<
+            AppVoiceCoachRdsRepository["createAliyunRdsPersonalTrialVoiceCoachTextSession"]
+          >
+        >
     try {
-      created = await rdsRepository.createAliyunRdsVoiceCoachTextSession({
-        customerProfileId,
-        firstCustomerText: firstCustomerTurnText,
-        scenario,
-        sceneCardId,
-        timing: opts.timing,
-        ...rdsScopeArgs(opts.ctx, opts.scope),
-      })
+      if (personalTrialScope) {
+        const clientSessionId = cleanText(opts.body.client_session_id, 120)
+        if (clientSessionId.length < 8) {
+          return jsonError(
+            422,
+            "client_session_id_required",
+            "client_session_id_required",
+          )
+        }
+        created =
+          await rdsRepository.createAliyunRdsPersonalTrialVoiceCoachTextSession({
+            canonicalUserId: personalTrialScope.canonicalUserId,
+            clientSessionId,
+            firstCustomerText: firstCustomerTurnText,
+            scenario,
+            timing: opts.timing,
+            userId: opts.ctx.userId,
+          })
+      } else {
+        created = await rdsRepository.createAliyunRdsVoiceCoachTextSession({
+          customerProfileId,
+          firstCustomerText: firstCustomerTurnText,
+          scenario,
+          sceneCardId,
+          timing: opts.timing,
+          ...rdsScopeArgs(opts.ctx, opts.scope),
+        })
+      }
     } catch (error) {
       const selectionErrorCode = rdsRepository.getAliyunRdsVoiceCoachSelectionErrorCode(error)
       if (selectionErrorCode) return jsonError(400, selectionErrorCode, selectionErrorCode)
+      const code = error instanceof Error ? error.message : ""
+      if (code === "personal_trial_exhausted") {
+        return jsonError(403, code, code)
+      }
+      if (code === "app_idempotency_conflict") {
+        return jsonError(409, code, code)
+      }
+      if (code === "client_session_id_invalid") {
+        return jsonError(422, code, code)
+      }
       throw error
     }
     opts.timing?.setSessionId(created.session.id)
@@ -980,16 +1068,43 @@ export async function createAppVoiceCoachTextSessionResponse(opts: {
         scenario,
         session_context: {
           ...sessionContext,
+          ...("dataDomain" in opts.scope
+            ? {
+                canonical_user_id: opts.scope.canonicalUserId,
+                data_domain: opts.scope.dataDomain,
+              }
+            : {}),
           repository_mode: rdsRepository.APP_VOICE_COACH_RDS_REPOSITORY_MODE,
           provider_mode: TEXT_SESSION_PROVIDER_MODE,
         },
         first_customer_turn: rdsTurnPayload(created.firstCustomerTurn),
+        ...("trial" in created
+          ? {
+              deduped: created.deduped,
+              trial: {
+                kind: created.trial.kind,
+                data_domain: created.trial.dataDomain,
+                status: created.trial.status,
+                ai_coach_session_limit: created.trial.sessionLimit,
+                ai_coach_sessions_used: created.trial.sessionsUsed,
+                ai_coach_sessions_remaining:
+                  created.trial.sessionsRemaining,
+              },
+            }
+          : {}),
         ...rdsContractPayload(rdsRepository.APP_VOICE_COACH_RDS_REPOSITORY_MODE),
       },
-      { status: 201 },
+      { status: "deduped" in created && created.deduped ? 200 : 201 },
     )
   }
 
+  if ("dataDomain" in opts.scope) {
+    return jsonError(
+      503,
+      "personal_trial_rds_required",
+      "personal_trial_rds_required",
+    )
+  }
   opts.timing?.setRepositoryMode(TEXT_SESSION_REPOSITORY_MODE)
   const sessions = readTextSessions()
   const scenario = scenarioPayload(opts.body.scenario_id)
@@ -1044,7 +1159,7 @@ export async function getAppVoiceCoachTextSessionResponse(opts: {
   scope: AppVoiceCoachFacadeScope
   sessionId: string
 }) {
-  if (shouldUseRdsRepository()) {
+  if (shouldUseRdsForScope(opts.scope)) {
     const invalidSessionResponse = rdsSessionNotFoundResponse(opts.sessionId)
     if (invalidSessionResponse) return invalidSessionResponse
     const rdsRepository = await loadRdsRepository()
@@ -1082,7 +1197,7 @@ export async function listAppVoiceCoachTextEventsResponse(opts: {
   scope: AppVoiceCoachFacadeScope
   sessionId: string
 }) {
-  if (shouldUseRdsRepository()) {
+  if (shouldUseRdsForScope(opts.scope)) {
     const invalidSessionResponse = rdsSessionNotFoundResponse(opts.sessionId)
     if (invalidSessionResponse) return invalidSessionResponse
     const rdsRepository = await loadRdsRepository()
@@ -1130,7 +1245,7 @@ export async function getAppVoiceCoachTextReportResponse(opts: {
   scope: AppVoiceCoachFacadeScope
   sessionId: string
 }) {
-  if (shouldUseRdsRepository()) {
+  if (shouldUseRdsForScope(opts.scope)) {
     const invalidSessionResponse = rdsSessionNotFoundResponse(opts.sessionId)
     if (invalidSessionResponse) return invalidSessionResponse
     const rdsRepository = await loadRdsRepository()
@@ -1168,7 +1283,7 @@ export async function synthesizeAppVoiceCoachTurnResponse(opts: {
   sessionId: string
   turnId: string
 }) {
-  if (shouldUseRdsRepository()) {
+  if (shouldUseRdsForScope(opts.scope)) {
     const invalidSessionResponse = rdsSessionNotFoundResponse(opts.sessionId, "turn_tts")
     if (invalidSessionResponse) return invalidSessionResponse
     const rdsRepository = await loadRdsRepository()
@@ -1317,7 +1432,7 @@ export async function transcribeAppVoiceCoachAudioResponse(opts: {
     return appVoiceCoachAudioErrorResponse("asr_preview", "voice_coach_audio_too_large")
   }
 
-  if (shouldUseRdsRepository()) {
+  if (shouldUseRdsForScope(opts.scope)) {
     const invalidSessionResponse = rdsSessionNotFoundResponse(opts.sessionId, "asr_preview")
     if (invalidSessionResponse) return invalidSessionResponse
     const rdsRepository = await loadRdsRepository()
@@ -1363,7 +1478,7 @@ export async function submitAppVoiceCoachTextBeauticianTurnResponse(opts: {
   scope: AppVoiceCoachFacadeScope
   sessionId: string
 }) {
-  if (shouldUseRdsRepository()) {
+  if (shouldUseRdsForScope(opts.scope)) {
     const invalidSessionResponse = rdsSessionNotFoundResponse(opts.sessionId, "audio_submit")
     if (invalidSessionResponse) return invalidSessionResponse
   }
@@ -1394,7 +1509,7 @@ export async function submitAppVoiceCoachTextBeauticianTurnResponse(opts: {
     userId: opts.ctx.userId,
   })
 
-  if (shouldUseRdsRepository()) {
+  if (shouldUseRdsForScope(opts.scope)) {
     const rdsRepository = await loadRdsRepository()
     let submitted
     try {
@@ -1555,7 +1670,7 @@ export async function endAppVoiceCoachTextSessionResponse(opts: {
   scope: AppVoiceCoachFacadeScope
   sessionId: string
 }) {
-  if (shouldUseRdsRepository()) {
+  if (shouldUseRdsForScope(opts.scope)) {
     const invalidSessionResponse = rdsSessionNotFoundResponse(opts.sessionId)
     if (invalidSessionResponse) return invalidSessionResponse
     const rdsRepository = await loadRdsRepository()
