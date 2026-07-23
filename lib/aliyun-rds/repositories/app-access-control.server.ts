@@ -872,12 +872,14 @@ export async function grantAppAccessWithClient(
         on identity.canonical_user_id = canonical.id
       where canonical.id = $1 and canonical.status = 'active'
       order by identity.created_at asc, identity.id asc
-      limit 1
       for update of canonical
     `,
     [canonicalUserId],
   )
-  const targetUserId = target.rows[0]?.app_user_id
+  const targetUserIds = Array.from(
+    new Set(target.rows.map((row) => row.app_user_id).filter(Boolean)),
+  )
+  const targetUserId = targetUserIds[0]
   if (!targetUserId) throw new Error("canonical_user_not_found")
 
   const company = await client.query<{ id: string }>(
@@ -932,22 +934,30 @@ export async function grantAppAccessWithClient(
       from public.mp_account_memberships
       where (
           canonical_user_id = $1
-          or (
-            canonical_user_id is null
-            and user_id = $4
-          )
+          or user_id = any($4::uuid[])
         )
         and company_id = $2
         and store_id is not distinct from $3::uuid
       order by canonical_user_id nulls last, id
       for update
     `,
-    [canonicalUserId, companyId, storeId, targetUserId],
+    [canonicalUserId, companyId, storeId, targetUserIds],
   )
   if (existingMembership.rows.length > 1) {
     throw new Error("membership_conflict")
   }
-  let membershipId = existingMembership.rows[0]?.id || null
+  const existingMembershipRow = existingMembership.rows[0] || null
+  if (
+    existingMembershipRow?.canonical_user_id &&
+    existingMembershipRow.canonical_user_id !== canonicalUserId
+  ) {
+    throw new Error("membership_conflict")
+  }
+  let membershipId = existingMembershipRow?.id || null
+  const membershipUserId =
+    existingMembershipRow && targetUserIds.includes(existingMembershipRow.user_id)
+      ? existingMembershipRow.user_id
+      : targetUserId
   const existingEntitlement = membershipId
     ? await client.query<{
         authorization_version: number | string
@@ -987,7 +997,7 @@ export async function grantAppAccessWithClient(
       [
         membershipId,
         canonicalUserId,
-        targetUserId,
+        membershipUserId,
         role,
         authorizationVersion,
       ],

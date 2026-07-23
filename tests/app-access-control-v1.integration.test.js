@@ -144,6 +144,8 @@ test(
     const companyId = "20000000-0000-4000-8000-000000000001"
     const storeId = "30000000-0000-4000-8000-000000000001"
     const storeBId = "30000000-0000-4000-8000-000000000002"
+    const storeCId = "30000000-0000-4000-8000-000000000003"
+    const storeDId = "30000000-0000-4000-8000-000000000004"
 
     try {
       await pool.query("truncate public.voice_coach_turns, public.voice_coach_sessions, public.app_authorization_audit_events, public.app_idempotency_records, public.mp_account_memberships, public.entitlements, public.app_personal_trials, public.app_verified_contacts, public.app_auth_identities, public.app_canonical_users, public.mp_stores, public.mp_companies, public.profiles, auth.users restart identity cascade")
@@ -162,9 +164,13 @@ test(
       await pool.query(
         `
           insert into public.mp_stores (id, company_id, name)
-          values ($1, $3, '测试门店 A'), ($2, $3, '测试门店 B')
+          values
+            ($1, $5, '测试门店 A'),
+            ($2, $5, '测试门店 B'),
+            ($3, $5, '测试门店 C'),
+            ($4, $5, '测试门店 D')
         `,
-        [storeId, storeBId, companyId],
+        [storeId, storeBId, storeCId, storeDId, companyId],
       )
 
       const [first, second] = await Promise.all([
@@ -553,6 +559,14 @@ test(
       assert.equal(mismatchedProfile.account_status, "not_bound")
       assert.equal(mismatchedProfile.active_membership_id, null)
       assert.deepEqual(mismatchedProfile.memberships, [])
+      await pool.query(
+        "delete from public.app_membership_entitlements where membership_id = $1",
+        [mismatchedMembership.rows[0].id],
+      )
+      await pool.query(
+        "delete from public.mp_account_memberships where id = $1",
+        [mismatchedMembership.rows[0].id],
+      )
 
       const [sessionOne, sessionOneRetry] = await Promise.all([
         repository.consumePersonalTrialVoiceSession({
@@ -711,6 +725,111 @@ test(
           storeId,
         }),
         /access_grant_feature_plan_denied/,
+      )
+      const secondaryIdentityLegacyMembership = await pool.query(
+        `
+          insert into public.mp_account_memberships (
+            user_id,
+            company_id,
+            store_id,
+            role,
+            status
+          )
+          values ($1, $2, $3, 'employee', 'active')
+          returning id
+        `,
+        [userB, companyId, storeCId],
+      )
+      const secondaryIdentityGrant = await repository.grantAppAccess({
+        canonicalUserId: first.canonicalUserId,
+        companyId,
+        featureKeys: ["voice_coach"],
+        idempotencyKey: "grant-secondary-identity-legacy",
+        operatorUserId: operator,
+        operatorRole: "platform_admin",
+        plan: "pro",
+        reason: "adopt membership from another linked identity",
+        role: "employee",
+        storeId: storeCId,
+      })
+      assert.equal(
+        secondaryIdentityGrant.membershipId,
+        secondaryIdentityLegacyMembership.rows[0].id,
+      )
+      const secondaryIdentityMembership = await pool.query(
+        `
+          select canonical_user_id, user_id
+          from public.mp_account_memberships
+          where id = $1
+        `,
+        [secondaryIdentityGrant.membershipId],
+      )
+      assert.deepEqual(secondaryIdentityMembership.rows, [{
+        canonical_user_id: first.canonicalUserId,
+        user_id: userB,
+      }])
+      await pool.query(
+        "delete from public.app_membership_entitlements where membership_id = $1",
+        [secondaryIdentityGrant.membershipId],
+      )
+      await pool.query(
+        "delete from public.mp_account_memberships where id = $1",
+        [secondaryIdentityGrant.membershipId],
+      )
+
+      await pool.query(
+        `
+          insert into public.mp_account_memberships (
+            user_id,
+            canonical_user_id,
+            company_id,
+            store_id,
+            role,
+            status
+          )
+          values ($1, $2, $3, $4, 'employee', 'active')
+        `,
+        [
+          userA,
+          forgedUserMetadataIdentity.canonicalUserId,
+          companyId,
+          storeDId,
+        ],
+      )
+      const versionBeforeForeignMembershipConflict = await pool.query(
+        `
+          select authorization_version::integer
+          from public.app_authorization_versions
+          where canonical_user_id = $1
+        `,
+        [first.canonicalUserId],
+      )
+      await assert.rejects(
+        repository.grantAppAccess({
+          canonicalUserId: first.canonicalUserId,
+          companyId,
+          featureKeys: ["voice_coach"],
+          idempotencyKey: "grant-foreign-canonical-conflict",
+          operatorUserId: operator,
+          operatorRole: "platform_admin",
+          plan: "pro",
+          reason: "foreign canonical membership conflict",
+          role: "employee",
+          storeId: storeDId,
+        }),
+        /membership_conflict/,
+      )
+      const versionAfterForeignMembershipConflict = await pool.query(
+        `
+          select authorization_version::integer
+          from public.app_authorization_versions
+          where canonical_user_id = $1
+        `,
+        [first.canonicalUserId],
+      )
+      assert.deepEqual(
+        versionAfterForeignMembershipConflict.rows,
+        versionBeforeForeignMembershipConflict.rows,
       )
       await pool.query(
         `
@@ -937,6 +1056,8 @@ test(
           "verified_phone.ambiguous",
           "personal_trial.voice_session_consumed",
           "personal_trial.voice_session_consumed",
+          "access_grant.rejected",
+          "access_grant.upserted",
           "access_grant.rejected",
           "access_grant.rejected",
           "access_grant.upserted",

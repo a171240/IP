@@ -14,6 +14,8 @@ const WECHAT_OPEN_PLATFORM_SCOPE_ID =
   process.env.WECHAT_OPEN_PLATFORM_SCOPE_ID || ""
 const WECHAT_LOGIN_SECRET = process.env.WECHAT_LOGIN_SECRET || ""
 const DEFAULT_WECHAT_NICKNAME = "WeChat App User"
+const AUTH_USER_LOOKUP_PAGE_SIZE = 200
+const AUTH_USER_LOOKUP_MAX_PAGES = 500
 
 type WechatOpenTokenResponse = {
   errcode?: number
@@ -24,6 +26,13 @@ type WechatOpenTokenResponse = {
   openid?: string
   scope?: string
   unionid?: string
+}
+
+type AdminAuthUser = {
+  id: string
+  email?: string | null
+  app_metadata?: unknown
+  user_metadata?: unknown
 }
 
 function getSupabaseUrl(): string {
@@ -90,6 +99,38 @@ function isMissingSyntheticLogin(error: unknown) {
     code === "invalid_credentials" ||
     /invalid login credentials/i.test(message)
   )
+}
+
+async function findAdminUserByEmail(
+  admin: ReturnType<typeof createAdminSupabaseClient>,
+  email: string,
+): Promise<
+  | { status: "absent" }
+  | { status: "found"; user: AdminAuthUser }
+  | { status: "unavailable" }
+> {
+  const normalizedEmail = email.trim().toLowerCase()
+  let page = 1
+  for (let attempt = 0; attempt < AUTH_USER_LOOKUP_MAX_PAGES; attempt += 1) {
+    const { data, error } = await admin.auth.admin.listUsers({
+      page,
+      perPage: AUTH_USER_LOOKUP_PAGE_SIZE,
+    })
+    if (error) return { status: "unavailable" }
+    const match = data.users.find(
+      (user) => user.email?.trim().toLowerCase() === normalizedEmail,
+    )
+    if (match) return { status: "found", user: match }
+    if (data.nextPage === null) return { status: "absent" }
+    if (
+      !Number.isInteger(data.nextPage) ||
+      Number(data.nextPage) <= page
+    ) {
+      return { status: "unavailable" }
+    }
+    page = Number(data.nextPage)
+  }
+  return { status: "unavailable" }
 }
 
 function isTrustedLegacyUnionUser(
@@ -190,6 +231,7 @@ export async function POST(request: NextRequest) {
   })
 
   let migratingLegacyUnionPrincipal = false
+  let adminMigratedUser: AdminAuthUser | null = null
 
   const scopedSignIn = await supabase.auth.signInWithPassword({
     email,
@@ -197,6 +239,13 @@ export async function POST(request: NextRequest) {
   })
   let sessionData = scopedSignIn.data
   let signInError = scopedSignIn.error
+
+  if (!sessionData?.session && !isMissingSyntheticLogin(signInError)) {
+    return NextResponse.json(
+      { error: "scoped_identity_lookup_failed" },
+      { status: 500 },
+    )
+  }
 
   if (
     !sessionData?.session &&
@@ -230,6 +279,67 @@ export async function POST(request: NextRequest) {
         { error: "legacy_identity_lookup_failed" },
         { status: 500 },
       )
+    } else {
+      const legacyLookup = await findAdminUserByEmail(admin, legacyEmail)
+      if (legacyLookup.status === "unavailable") {
+        return NextResponse.json(
+          { error: "legacy_identity_lookup_failed" },
+          { status: 500 },
+        )
+      }
+      if (legacyLookup.status === "found") {
+        if (
+          !isTrustedLegacyUnionUser(legacyLookup.user, {
+            appId: WECHAT_OPEN_APP_ID,
+            issuer: WECHAT_OPEN_PLATFORM_SCOPE_ID,
+            unionid,
+          })
+        ) {
+          return NextResponse.json(
+            { error: "legacy_identity_review_required" },
+            { status: 409 },
+          )
+        }
+        const legacyNickname =
+          metadataText(legacyLookup.user.user_metadata, "nickname")
+        const nextLegacyNickname =
+          nickname || legacyNickname || DEFAULT_WECHAT_NICKNAME
+        const migratedLegacyUser = await admin.auth.admin.updateUserById(
+          legacyLookup.user.id,
+          {
+            email,
+            password,
+            app_metadata: {
+              ...metadataRecord(legacyLookup.user.app_metadata),
+              ...trustedWechatIdentityMetadata,
+            },
+            user_metadata: {
+              ...publicUserMetadata(legacyLookup.user.user_metadata),
+              nickname: nextLegacyNickname,
+              ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
+            },
+          },
+        )
+        if (migratedLegacyUser.error || !migratedLegacyUser.data?.user) {
+          return NextResponse.json(
+            { error: "trusted_identity_metadata_update_failed" },
+            { status: 500 },
+          )
+        }
+        const migratedSignIn = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        })
+        if (migratedSignIn.error || !migratedSignIn.data?.session) {
+          return NextResponse.json(
+            { error: "legacy_identity_migration_sign_in_failed" },
+            { status: 500 },
+          )
+        }
+        sessionData = migratedSignIn.data
+        signInError = null
+        adminMigratedUser = migratedLegacyUser.data.user
+      }
     }
   }
 
@@ -283,21 +393,24 @@ export async function POST(request: NextRequest) {
     ...trustedWechatIdentityMetadata,
   }
 
-  const {
-    data: updatedUserData,
-    error: updatedUserError,
-  } = await admin.auth.admin.updateUserById(user.id, {
-    ...(migratingLegacyUnionPrincipal ? { email, password } : {}),
-    app_metadata: nextAppMetadata,
-    user_metadata: nextUserMetadata,
-  })
-  if (updatedUserError || !updatedUserData?.user) {
-    return NextResponse.json(
-      { error: "trusted_identity_metadata_update_failed" },
-      { status: 500 },
-    )
+  let responseUser = adminMigratedUser
+  if (!responseUser) {
+    const {
+      data: updatedUserData,
+      error: updatedUserError,
+    } = await admin.auth.admin.updateUserById(user.id, {
+      ...(migratingLegacyUnionPrincipal ? { email, password } : {}),
+      app_metadata: nextAppMetadata,
+      user_metadata: nextUserMetadata,
+    })
+    if (updatedUserError || !updatedUserData?.user) {
+      return NextResponse.json(
+        { error: "trusted_identity_metadata_update_failed" },
+        { status: 500 },
+      )
+    }
+    responseUser = updatedUserData.user
   }
-  const responseUser = updatedUserData.user
 
   const { error: profileUpsertError } = await admin
     .from("profiles")

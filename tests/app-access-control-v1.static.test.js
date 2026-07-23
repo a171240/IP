@@ -127,9 +127,11 @@ test("access-control repository exposes the canonical V1 operations", () => {
   assert.match(source, /persistAppIdentityReview/)
   assert.match(source, /membership_id/)
   assert.match(source, /membership_conflict/)
+  assert.match(source, /const targetUserIds = Array\.from/)
+  assert.match(source, /user_id = any\(\$4::uuid\[\]\)/i)
   assert.match(
     source,
-    /canonical_user_id is null[\s\S]*user_id = \$4/i,
+    /existingMembershipRow\.canonical_user_id !== canonicalUserId/,
   )
   assert.doesNotMatch(
     source,

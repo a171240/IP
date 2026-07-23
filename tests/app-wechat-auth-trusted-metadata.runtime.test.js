@@ -58,11 +58,14 @@ test("WeChat login stores canonical identity only in admin-controlled app_metada
   }
   const originalFetch = global.fetch
   const createCalls = []
+  const listUsersCalls = []
   const signInCalls = []
   const updateCalls = []
+  let adminUsers = []
+  let listUsersError = null
   let profileUpsertError = null
   let legacySignedInUser = null
-  let scopedUserExists = false
+  let scopedSignedInUser = null
   let trustedMetadataUpdateError = null
 
   try {
@@ -106,8 +109,18 @@ test("WeChat login stores canonical identity only in admin-controlled app_metada
         admin: {
           async createUser(input) {
             createCalls.push(input)
-            scopedUserExists = true
+            scopedSignedInUser = signedInUser
             return { error: null }
+          },
+          async listUsers(input) {
+            listUsersCalls.push(input)
+            return {
+              data: {
+                nextPage: null,
+                users: adminUsers,
+              },
+              error: listUsersError,
+            }
           },
           async updateUserById(userId, input) {
             updateCalls.push({ input, userId })
@@ -120,14 +133,24 @@ test("WeChat login stores canonical identity only in admin-controlled app_metada
             const sourceUser =
               legacySignedInUser?.id === userId
                 ? legacySignedInUser
-                : signedInUser
+                : adminUsers.find(user => user.id === userId) || signedInUser
+            const updatedUser = {
+              ...sourceUser,
+              email: input.email || sourceUser.email,
+              app_metadata: input.app_metadata,
+              user_metadata: input.user_metadata,
+            }
+            if (
+              typeof input.email === "string" &&
+              input.email.includes(
+                "union_open-platform-trusted_unionid-trusted",
+              )
+            ) {
+              scopedSignedInUser = updatedUser
+            }
             return {
               data: {
-                user: {
-                  ...sourceUser,
-                  app_metadata: input.app_metadata,
-                  user_metadata: input.user_metadata,
-                },
+                user: updatedUser,
               },
             }
           },
@@ -158,8 +181,8 @@ test("WeChat login stores canonical identity only in admin-controlled app_metada
                 "union_unionid-trusted",
               )
               const selectedUser =
-                isScopedPrincipal && scopedUserExists
-                  ? signedInUser
+                isScopedPrincipal
+                  ? scopedSignedInUser
                   : isLegacyPrincipal
                     ? legacySignedInUser
                     : null
@@ -262,7 +285,7 @@ test("WeChat login stores canonical identity only in admin-controlled app_metada
     })
 
     profileUpsertError = null
-    scopedUserExists = false
+    scopedSignedInUser = null
     legacySignedInUser = {
       id: "10000000-0000-4000-8000-000000000088",
       app_metadata: {
@@ -293,6 +316,7 @@ test("WeChat login stores canonical identity only in admin-controlled app_metada
     )
     assert.equal(typeof updateCalls.at(-1).input.password, "string")
 
+    scopedSignedInUser = null
     legacySignedInUser = {
       ...legacySignedInUser,
       app_metadata: {
@@ -312,6 +336,68 @@ test("WeChat login stores canonical identity only in admin-controlled app_metada
     })
     assert.equal(createCalls.length, createCountBeforeLegacy)
     assert.equal(updateCalls.length, updateCountBeforeConflict)
+
+    legacySignedInUser = null
+    const passwordDriftLegacyUser = {
+      id: "10000000-0000-4000-8000-000000000077",
+      email: "wxapp_union_unionid-trusted@ipgongchang.xin",
+      app_metadata: {
+        auth_source: "wechat_open_app",
+        wechat_open_app_id: "wx-open-app-trusted",
+        wechat_unionid: "unionid-trusted",
+        wechat_union_issuer: "open-platform-trusted",
+      },
+      user_metadata: { nickname: "密码漂移存量用户" },
+    }
+    adminUsers = [passwordDriftLegacyUser]
+    const createCountBeforePasswordDrift = createCalls.length
+    const updateCountBeforePasswordDrift = updateCalls.length
+    const passwordDriftMigration = await route.POST({
+      async json() {
+        return { code: "legacy-password-drift-code" }
+      },
+    })
+    assert.equal(passwordDriftMigration.status, 200)
+    assert.equal(createCalls.length, createCountBeforePasswordDrift)
+    assert.equal(updateCalls.length, updateCountBeforePasswordDrift + 1)
+    assert.equal(updateCalls.at(-1).userId, passwordDriftLegacyUser.id)
+    assert.equal(listUsersCalls.length > 0, true)
+
+    scopedSignedInUser = null
+    adminUsers = [{
+      ...passwordDriftLegacyUser,
+      app_metadata: {
+        ...passwordDriftLegacyUser.app_metadata,
+        wechat_union_issuer: "different-open-platform",
+      },
+    }]
+    const createCountBeforeAdminConflict = createCalls.length
+    const updateCountBeforeAdminConflict = updateCalls.length
+    const adminConflict = await route.POST({
+      async json() {
+        return { code: "legacy-admin-conflict-code" }
+      },
+    })
+    assert.equal(adminConflict.status, 409)
+    assert.deepEqual(adminConflict.body, {
+      error: "legacy_identity_review_required",
+    })
+    assert.equal(createCalls.length, createCountBeforeAdminConflict)
+    assert.equal(updateCalls.length, updateCountBeforeAdminConflict)
+
+    adminUsers = []
+    listUsersError = { message: "fixture admin lookup failure" }
+    const createCountBeforeLookupFailure = createCalls.length
+    const lookupFailure = await route.POST({
+      async json() {
+        return { code: "legacy-lookup-failure-code" }
+      },
+    })
+    assert.equal(lookupFailure.status, 500)
+    assert.deepEqual(lookupFailure.body, {
+      error: "legacy_identity_lookup_failed",
+    })
+    assert.equal(createCalls.length, createCountBeforeLookupFailure)
   } finally {
     global.fetch = originalFetch
     for (const [key, value] of Object.entries(originalEnvironment)) {
