@@ -17,12 +17,20 @@
     {
       "id": "PERSONAL_TRIAL_RESERVATION_EXPIRY",
       "provider": "Aliyun EventBridge",
+      "apiVersion": "2020-04-01",
       "region": "cn-hangzhou",
       "sourceType": "time-triggered custom event source",
+      "topology": {
+        "eventBusName": "meiye-huajing-production-cn",
+        "eventSourceName": "personal-trial-reservation-expiry-5m",
+        "connectionName": "personal-trial-reservation-expiry-prod-cn",
+        "apiDestinationName": "personal-trial-reservation-expiry-prod-cn",
+        "ruleName": "personal-trial-reservation-expiry-5m"
+      },
       "schedule": {
         "type": "cron",
         "cronExpression": "0 */5 * * * *",
-        "timeZone": "Asia/Shanghai"
+        "timeZone": "GMT+8:00"
       },
       "target": {
         "type": "API destination",
@@ -32,15 +40,65 @@
         "authentication": {
           "type": "API key header",
           "headerName": "Authorization",
-          "secretName": "CRON_SECRET",
+          "secretName": "PERSONAL_TRIAL_EXPIRY_CRON_SECRET",
           "valueFormat": "Bearer <secret>",
           "secretStorage": "Aliyun EventBridge connection"
         }
       },
+      "rule": {
+        "initialStatus": "DISABLE",
+        "filterPattern": {
+          "source": [
+            "personal-trial-reservation-expiry-5m"
+          ]
+        }
+      },
+      "eventTarget": {
+        "id": "personal-trial-reservation-expiry-api-destination",
+        "type": "acs.api.destination",
+        "endpointPattern": "acs:api-destination:cn-hangzhou:<account-id>:name/personal-trial-reservation-expiry-prod-cn",
+        "paramList": [
+          {
+            "resourceKey": "Name",
+            "form": "CONSTANT",
+            "value": "personal-trial-reservation-expiry-prod-cn"
+          }
+        ],
+        "pushRetryStrategy": "BACKOFF_RETRY",
+        "errorsTolerance": "ALL",
+        "deadLetterQueue": {
+          "enabled": false,
+          "reason": "Do not create a new paid DLQ for P12; continue later schedule cycles and monitor failed deliveries."
+        }
+      },
+      "creationOrder": [
+        "eventBus",
+        "eventSource",
+        "connection",
+        "apiDestination",
+        "rule",
+        "eventTarget"
+      ],
+      "collisionPolicy": "stop_on_existing_name_with_nonmatching_configuration",
+      "monitoring": {
+        "eventTraceRequired": true,
+        "httpStatus200Required": true,
+        "failedDeliveryMonitoringRequired": true,
+        "noNewPaidDeadLetterQueue": true
+      },
+      "rollback": {
+        "disableRule": true,
+        "deleteExistingResourcesAutomatically": false
+      },
+      "cloudConfirmationKey": "personalTrialReservationExpiryScheduler",
+      "strictCheckCommand": "corepack pnpm aliyun:runtime:plan:strict",
+      "verificationGates": {
+        "beforeSaeDeploy": "corepack pnpm aliyun:runtime:plan:strict",
+        "afterSaeDeployBeforeRuleEnable": "corepack pnpm aliyun:runtime:plan:controlled:strict",
+        "afterRuleEnable": "corepack pnpm aliyun:runtime:plan:enabled:strict"
+      },
       "requiredBeforePersonalTrialPublicEnable": true,
       "requiresSeparateAuthorization": true,
-      "provisioned": false,
-      "verificationStatus": "not_run",
       "containsValues": false
     }
   ],

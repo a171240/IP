@@ -9,7 +9,7 @@ const DEFAULT_LIMIT = 100
 const MAX_LIMIT = 500
 
 function authorized(request: NextRequest) {
-  const secret = process.env.CRON_SECRET
+  const secret = process.env.PERSONAL_TRIAL_EXPIRY_CRON_SECRET
   if (!secret) return false
   return request.headers.get("authorization") === `Bearer ${secret}`
 }

@@ -78,12 +78,22 @@ function request(authorization, limit = null) {
   }
 }
 
-test("personal trial reservation cron is authenticated and bounds each sweep", async (t) => {
-  const previousSecret = process.env.CRON_SECRET
-  process.env.CRON_SECRET = "local-test-only"
+test("personal trial reservation cron accepts only its dedicated secret and bounds each sweep", async (t) => {
+  const previousDedicatedSecret =
+    process.env.PERSONAL_TRIAL_EXPIRY_CRON_SECRET
+  const previousSharedSecret = process.env.CRON_SECRET
+  process.env.PERSONAL_TRIAL_EXPIRY_CRON_SECRET =
+    "personal-trial-local-test-only"
+  process.env.CRON_SECRET = "shared-local-test-only"
   t.after(() => {
-    if (previousSecret === undefined) delete process.env.CRON_SECRET
-    else process.env.CRON_SECRET = previousSecret
+    if (previousDedicatedSecret === undefined) {
+      delete process.env.PERSONAL_TRIAL_EXPIRY_CRON_SECRET
+    } else {
+      process.env.PERSONAL_TRIAL_EXPIRY_CRON_SECRET =
+        previousDedicatedSecret
+    }
+    if (previousSharedSecret === undefined) delete process.env.CRON_SECRET
+    else process.env.CRON_SECRET = previousSharedSecret
   })
 
   const calls = []
@@ -96,7 +106,15 @@ test("personal trial reservation cron is authenticated and bounds each sweep", a
   assert.equal(denied.status, 401)
   assert.deepEqual(calls, [])
 
-  const accepted = await route.GET(request("Bearer local-test-only", "9999"))
+  const sharedSecretDenied = await route.GET(
+    request("Bearer shared-local-test-only"),
+  )
+  assert.equal(sharedSecretDenied.status, 401)
+  assert.deepEqual(calls, [])
+
+  const accepted = await route.GET(
+    request("Bearer personal-trial-local-test-only", "9999"),
+  )
   assert.equal(accepted.status, 200)
   assert.deepEqual(calls, [{ limit: 500 }])
   assert.deepEqual(await accepted.json(), {
@@ -107,17 +125,25 @@ test("personal trial reservation cron is authenticated and bounds each sweep", a
 })
 
 test("personal trial reservation cron does not expose database errors", async (t) => {
-  const previousSecret = process.env.CRON_SECRET
-  process.env.CRON_SECRET = "local-test-only"
+  const previousDedicatedSecret =
+    process.env.PERSONAL_TRIAL_EXPIRY_CRON_SECRET
+  process.env.PERSONAL_TRIAL_EXPIRY_CRON_SECRET =
+    "personal-trial-local-test-only"
   t.after(() => {
-    if (previousSecret === undefined) delete process.env.CRON_SECRET
-    else process.env.CRON_SECRET = previousSecret
+    if (previousDedicatedSecret === undefined) {
+      delete process.env.PERSONAL_TRIAL_EXPIRY_CRON_SECRET
+    } else {
+      process.env.PERSONAL_TRIAL_EXPIRY_CRON_SECRET =
+        previousDedicatedSecret
+    }
   })
 
   const route = compileRoute(async () => {
     throw new Error("select secret_value from private_table")
   })
-  const response = await route.GET(request("Bearer local-test-only"))
+  const response = await route.GET(
+    request("Bearer personal-trial-local-test-only"),
+  )
   assert.equal(response.status, 500)
   const body = await response.json()
   assert.equal(body.code, "personal_trial_reservation_expiry_failed")

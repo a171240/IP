@@ -17,6 +17,11 @@
     "appName": "meiye-huajing-app-api-production-cn",
     "note": "First production-cn bridge deploy targets Aliyun SAE custom container. ECS remains a fallback only if SAE cannot satisfy runtime constraints."
   },
+  "personalTrialExpirySchedulerGates": {
+    "beforeSaeDeploy": "corepack pnpm aliyun:runtime:plan:strict",
+    "afterSaeDeployBeforeRuleEnable": "corepack pnpm aliyun:runtime:plan:controlled:strict",
+    "afterRuleEnable": "corepack pnpm aliyun:runtime:plan:enabled:strict"
+  },
   "imagePublish": {
     "exampleFile": "deploy/aliyun-production-cn.image-publish.example.json",
     "localFile": "deploy/aliyun-production-cn.image-publish.local.json",
@@ -158,6 +163,7 @@
     "corepack pnpm run aliyun:android-signing:package",
     "corepack pnpm run aliyun:apple-team:package",
     "corepack pnpm run aliyun:runtime:plan",
+    "corepack pnpm run aliyun:runtime:plan:strict",
     "corepack pnpm run aliyun:image:plan",
     "corepack pnpm run aliyun:acr:transfer-handoff",
     "corepack pnpm run aliyun:sae:runtime-handoff",
@@ -234,6 +240,7 @@
     "corepack pnpm aliyun:env:source-map",
     "corepack pnpm aliyun:domain:check",
     "corepack pnpm aliyun:runtime:plan",
+    "corepack pnpm aliyun:runtime:plan:strict",
     "corepack pnpm aliyun:cloud:check",
     "corepack pnpm aliyun:readiness:cloud-ready",
     "corepack pnpm aliyun:release:artifacts",
@@ -249,6 +256,7 @@
   "postdeployChecks": [
     "corepack pnpm aliyun:domain:strict",
     "corepack pnpm aliyun:cloud:confirmations:strict",
+    "corepack pnpm aliyun:runtime:plan:enabled:strict",
     "corepack pnpm aliyun:postdeploy:smoke -- --base-url https://api-cn.ipgongchang.xin",
     "corepack pnpm aliyun:remote:smoke -- --base-url https://api-cn.ipgongchang.xin",
     "corepack pnpm aliyun:app-api:smoke -- --base-url https://api-cn.ipgongchang.xin",

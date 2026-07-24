@@ -55,6 +55,9 @@ const APP_LAUNCH_DEFERRED_AUTHORIZATION_PACKETS = Object.freeze([
   "P10_ANDROID_RELEASE_SIGNING",
   "P02_APPLE_TEAM_ID",
 ])
+const SPECIALIZED_CONFIRMATION_KEYS = Object.freeze([
+  "personalTrialReservationExpiryScheduler",
+])
 
 const DEFINITIONS = [
   {
@@ -379,7 +382,15 @@ const DEFINITIONS = [
   },
 ]
 
-const TOP_LEVEL_FIELDS = new Set(["schemaVersion", "environment", "updatedAt", "operator", "notes", "items"])
+const TOP_LEVEL_FIELDS = new Set([
+  "schemaVersion",
+  "environment",
+  "containsValues",
+  "updatedAt",
+  "operator",
+  "notes",
+  "items",
+])
 const CLOUD_CONFIRMATION_GROUP_METADATA = Object.freeze({
   runtime: Object.freeze({
     title: "SAE runtime 与健康检查",
@@ -580,13 +591,34 @@ function validateFile(filePath, mode, options = {}) {
   if (topLevelUnknown.length) warnings.push(`unknown_top_level_fields:${topLevelUnknown.join(",")}`)
   if (data.schemaVersion !== 1) blockers.push("schemaVersion=1")
   if (data.environment !== "production-cn") blockers.push("environment=production-cn")
+  if (
+    Object.hasOwn(data, "containsValues") &&
+    data.containsValues !== false
+  ) {
+    blockers.push("containsValues=false")
+  }
   if (!data.items || typeof data.items !== "object" || Array.isArray(data.items)) blockers.push("items_object_required")
 
   const secretMatches = findSecretLikeValues(data)
   if (secretMatches.length) blockers.push(`contains_secret_like_values:${secretMatches.join(",")}`)
 
   const rawItems = data.items && typeof data.items === "object" && !Array.isArray(data.items) ? data.items : {}
-  const knownKeys = new Set(DEFINITIONS.map((item) => item.key))
+  if (
+    options.requirePersonalTrialSchedulerEvidence === true &&
+    (
+      !rawItems.personalTrialReservationExpiryScheduler ||
+      typeof rawItems.personalTrialReservationExpiryScheduler !== "object" ||
+      Array.isArray(rawItems.personalTrialReservationExpiryScheduler)
+    )
+  ) {
+    blockers.push(
+      "personalTrialReservationExpiryScheduler:strict_evidence_required",
+    )
+  }
+  const knownKeys = new Set([
+    ...DEFINITIONS.map((item) => item.key),
+    ...SPECIALIZED_CONFIRMATION_KEYS,
+  ])
   const unknownItems = Object.keys(rawItems).filter((key) => !knownKeys.has(key))
   if (unknownItems.length) warnings.push(`unknown_items:${unknownItems.join(",")}`)
 
@@ -1944,8 +1976,15 @@ function main() {
   const args = parseArgs(process.argv)
   const currentScope = args.backendOnly ? "backend_aliyun_only" : "full_app_launch"
   const definitions = definitionsForScope(args)
-  const template = validateFile(args.templateFile, "template", { currentScope, definitions })
-  const local = validateFile(args.localFile, "local", { currentScope, definitions })
+  const template = validateFile(args.templateFile, "template", {
+    currentScope,
+    definitions,
+  })
+  const local = validateFile(args.localFile, "local", {
+    currentScope,
+    definitions,
+    requirePersonalTrialSchedulerEvidence: !args.allowIncomplete,
+  })
   const ok = template.ready && local.ready
   const ossAccessPlan = buildOssAccessPlan(local)
   const domainHttpsPlan = buildDomainHttpsPlan(local)

@@ -164,7 +164,11 @@ test("expired reservations expose an Aliyun-scheduled authenticated sweep", () =
   assert.match(repository, /expireAllPersonalTrialVoiceReservations/)
   assert.match(repository, /for update skip locked/i)
   assert.match(repository, /personal_trial\.voice_session_expired/)
-  assert.match(cronRoute, /process\.env\.CRON_SECRET/)
+  assert.match(
+    cronRoute,
+    /process\.env\.PERSONAL_TRIAL_EXPIRY_CRON_SECRET/,
+  )
+  assert.doesNotMatch(cronRoute, /process\.env\.CRON_SECRET/)
   assert.match(cronRoute, /Bearer \$\{secret\}/)
   assert.match(cronRoute, /expireAllPersonalTrialVoiceReservations/)
   assert.equal(aliyunRuntimePlan.target.provider, "SAE")
@@ -176,6 +180,14 @@ test("expired reservations expose an Aliyun-scheduled authenticated sweep", () =
   )
   assert.equal(expiryScheduler.provider, "Aliyun EventBridge")
   assert.equal(expiryScheduler.schedule.cronExpression, "0 */5 * * * *")
+  assert.equal(expiryScheduler.schedule.timeZone, "GMT+8:00")
+  assert.deepEqual(expiryScheduler.topology, {
+    eventBusName: "meiye-huajing-production-cn",
+    eventSourceName: "personal-trial-reservation-expiry-5m",
+    connectionName: "personal-trial-reservation-expiry-prod-cn",
+    apiDestinationName: "personal-trial-reservation-expiry-prod-cn",
+    ruleName: "personal-trial-reservation-expiry-5m",
+  })
   assert.equal(expiryScheduler.target.type, "API destination")
   assert.equal(expiryScheduler.target.method, "GET")
   assert.equal(
@@ -183,10 +195,17 @@ test("expired reservations expose an Aliyun-scheduled authenticated sweep", () =
     "https://api-cn.ipgongchang.xin/api/cron/personal-trial-reservations",
   )
   assert.equal(expiryScheduler.target.authentication.headerName, "Authorization")
-  assert.equal(expiryScheduler.target.authentication.secretName, "CRON_SECRET")
+  assert.equal(
+    expiryScheduler.target.authentication.secretName,
+    "PERSONAL_TRIAL_EXPIRY_CRON_SECRET",
+  )
+  assert.equal(expiryScheduler.rule.initialStatus, "DISABLE")
+  assert.equal(expiryScheduler.eventTarget.pushRetryStrategy, "BACKOFF_RETRY")
+  assert.equal(expiryScheduler.eventTarget.errorsTolerance, "ALL")
+  assert.equal(expiryScheduler.eventTarget.deadLetterQueue.enabled, false)
   assert.equal(expiryScheduler.requiredBeforePersonalTrialPublicEnable, true)
-  assert.equal(expiryScheduler.provisioned, false)
-  assert.equal(expiryScheduler.verificationStatus, "not_run")
+  assert.equal(Object.hasOwn(expiryScheduler, "provisioned"), false)
+  assert.equal(Object.hasOwn(expiryScheduler, "verificationStatus"), false)
   assert.equal(
     vercel.crons.some(
       (cron) => cron.path === "/api/cron/personal-trial-reservations",

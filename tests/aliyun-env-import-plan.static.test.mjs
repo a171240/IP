@@ -145,10 +145,16 @@ test("Aliyun env import plan separates Apple Team ID from deferred variables", a
   assert.match(appleTeamId.action, /APP 发布\/AASA 阻塞/)
 })
 
-test("Aliyun env checklist renders Apple Team ID outside deferred section", () => {
-  const markdownPath = "/tmp/meiye-aliyun-env-import-checklist-test.md"
+test("Aliyun env checklist renders Apple Team ID outside deferred section", (t) => {
+  const outputDir = mkdtempSync(join(tmpdir(), "meiye-aliyun-env-checklist-"))
+  const envPath = join(outputDir, ".env.production-cn.local")
+  const markdownPath = join(outputDir, "checklist.md")
+  writeFileSync(envPath, "")
+  t.after(() => rmSync(outputDir, { recursive: true, force: true }))
   execFileSync(process.execPath, [
     "scripts/prepare-aliyun-runtime-env.mjs",
+    "--env-file",
+    envPath,
     "--allow-todo",
     "--write-plan-markdown",
     markdownPath,

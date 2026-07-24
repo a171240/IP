@@ -53,6 +53,7 @@ const REQUIRED_PREDEPLOY_CHECKS = [
   "corepack pnpm aliyun:env:source-map",
   "corepack pnpm aliyun:domain:check",
   "corepack pnpm aliyun:runtime:plan",
+  "corepack pnpm aliyun:runtime:plan:strict",
   "corepack pnpm aliyun:cloud:check",
   "corepack pnpm aliyun:readiness:cloud-ready",
   "corepack pnpm aliyun:release:artifacts",
@@ -69,6 +70,7 @@ const REQUIRED_PREDEPLOY_CHECKS = [
 const REQUIRED_POSTDEPLOY_CHECKS = [
   "corepack pnpm aliyun:domain:strict",
   "corepack pnpm aliyun:cloud:confirmations:strict",
+  "corepack pnpm aliyun:runtime:plan:enabled:strict",
   "corepack pnpm aliyun:postdeploy:smoke -- --base-url https://api-cn.ipgongchang.xin",
   "corepack pnpm aliyun:remote:smoke -- --base-url https://api-cn.ipgongchang.xin",
   "corepack pnpm aliyun:app-api:smoke -- --base-url https://api-cn.ipgongchang.xin",
@@ -179,6 +181,27 @@ function validateSpec(spec) {
   if (runtimePlan.region !== "cn-hangzhou") blockers.push("runtimePlan.region=cn-hangzhou")
   if (runtimePlan.appName !== "meiye-huajing-app-api-production-cn") blockers.push("runtimePlan.appName")
   if (!String(runtimePlan.note || "").includes("SAE custom container")) blockers.push("runtimePlan.note")
+
+  const personalTrialExpirySchedulerGates =
+    spec.personalTrialExpirySchedulerGates || {}
+  for (const [field, expected] of [
+    [
+      "beforeSaeDeploy",
+      "corepack pnpm aliyun:runtime:plan:strict",
+    ],
+    [
+      "afterSaeDeployBeforeRuleEnable",
+      "corepack pnpm aliyun:runtime:plan:controlled:strict",
+    ],
+    [
+      "afterRuleEnable",
+      "corepack pnpm aliyun:runtime:plan:enabled:strict",
+    ],
+  ]) {
+    if (personalTrialExpirySchedulerGates[field] !== expected) {
+      blockers.push(`personalTrialExpirySchedulerGates.${field}`)
+    }
+  }
 
   const imagePublish = spec.imagePublish || {}
   if (imagePublish.exampleFile !== "deploy/aliyun-production-cn.image-publish.example.json") {
