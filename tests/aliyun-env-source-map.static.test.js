@@ -84,6 +84,11 @@ test("Aliyun env source map classifies Vercel migration names without printing v
   assert.ok(appAliyunNames.includes("APP_API_BASE_URL"))
   assert.ok(appAliyunNames.includes("APP_ASSET_BASE_URL"))
   assert.ok(readyLocalMissingNames.includes("APP_VOICE_COACH_TEXT_REPOSITORY_MODE"))
+  assert.ok(
+    readyLocalMissingNames.includes(
+      "PERSONAL_TRIAL_EXPIRY_CRON_SECRET",
+    ),
+  )
   assert.ok(blockedNames.includes("WECHAT_OPEN_APP_ID"))
   assert.ok(blockedNames.includes("WECHAT_OPEN_APP_SECRET"))
   assert.ok(blockedNames.includes("DATABASE_URL_CN"))
@@ -142,6 +147,7 @@ function fakeVercelCoverage() {
       "ALIYUN_OSS_SECURITY_TOKEN",
       "VOICE_COACH_ALLOW_USER_IDS",
       "CRON_SECRET",
+      "PERSONAL_TRIAL_EXPIRY_CRON_SECRET",
       "ADMIN_EMAILS",
       "APPLE_TEAM_ID",
       "APIMART_IMAGE_API_KEY",
@@ -197,6 +203,7 @@ function createEnvFixture() {
     "DEEPSEEK_MODEL=deepseek-chat",
     "VOLC_SPEECH_APP_ID=app1",
     "VOLC_SPEECH_ACCESS_TOKEN=test",
+    "PERSONAL_TRIAL_EXPIRY_CRON_SECRET=test",
     "",
   ].join("\n"))
   return filePath

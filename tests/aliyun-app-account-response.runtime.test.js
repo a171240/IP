@@ -45,6 +45,11 @@ const expectedContract = {
       "entitlements",
       "features",
       "profile",
+      "canonical_user_id",
+      "identity_state",
+      "access_mode",
+      "authorization_version",
+      "trial",
     ],
     user_keys: ["id"],
     membership_keys: [
@@ -282,7 +287,23 @@ function repositoryHarness() {
   const queryAliyunRds = async (sql) => {
     const normalizedSql = String(sql).replace(/\s+/g, " ").trim()
     sqlLog.push(normalizedSql)
+    if (normalizedSql === "set transaction isolation level repeatable read read only") {
+      return { rows: [] }
+    }
     if (normalizedSql.includes("join public.profiles profile")) return { rows: [] }
+    if (normalizedSql.includes("from public.app_membership_entitlements entitlement")) {
+      return {
+        rows: [{
+          entitlement_source: "membership",
+          membership_id: "membership-1",
+          plan: "pro",
+          pro_expires_at: null,
+          status: "active",
+          feature_keys: ["home"],
+          authorization_version: 3,
+        }],
+      }
+    }
     if (normalizedSql.includes("from public.mp_account_memberships membership")) {
       return { rows: [membershipRow()] }
     }
@@ -298,13 +319,34 @@ function repositoryHarness() {
     : {}
   const repository = compileTsModule(repositoryPath, {
     "server-only": {},
-    "@/lib/aliyun-rds/postgres.server": { queryAliyunRds },
+    "@/lib/aliyun-rds/postgres.server": {
+      queryAliyunRds,
+      withAliyunRdsTransaction: async fn =>
+        fn({ query: queryAliyunRds }),
+    },
     "@/lib/pricing/rules": {
       normalizePlan(value) {
         return ["free", "basic", "pro", "vip"].includes(value) ? value : "free"
       },
     },
     "@/lib/aliyun-rds/app-authorization.server": authorization,
+    "@/lib/aliyun-rds/repositories/app-access-control.server": {
+      resolveAppCanonicalAuthorizationWithClient: async () => ({
+        canonicalUserId: "canonical-user-1",
+        identityState: "resolved",
+        authorizationVersion: 3,
+        trial: {
+          kind: "personal_trial",
+          dataDomain: "personal_trial",
+          status: "active",
+          sessionLimit: 2,
+          aiCoachPublicEnabled: false,
+          sessionsReserved: 0,
+          sessionsUsed: 1,
+          sessionsRemaining: 1,
+        },
+      }),
+    },
   })
   return { repository, sqlLog }
 }
@@ -336,7 +378,10 @@ function routeModules(repository, user) {
 function assertSelectOnly(sqlLog) {
   assert.ok(sqlLog.length > 0)
   for (const sql of sqlLog) {
-    assert.match(sql, /^select\b/i)
+    assert.match(
+      sql,
+      /^(select\b|set transaction isolation level repeatable read read only$)/i,
+    )
     assert.doesNotMatch(sql, /\b(insert|update|delete|merge|truncate)\b/i)
   }
 }
@@ -345,7 +390,7 @@ test("tracked APP G1 contract equals the complete frozen JSON contract", () => {
   assert.deepEqual(JSON.parse(fs.readFileSync(contractPath, "utf8")), expectedContract)
 })
 
-test("profile GET emits the exact top-level snake-case contract without identity metadata", async () => {
+test("profile GET emits one exact profile and authorization snapshot without private identity metadata", async () => {
   const { repository, sqlLog } = repositoryHarness()
   const user = {
     id: "user-1",
@@ -364,6 +409,14 @@ test("profile GET emits the exact top-level snake-case contract without identity
   assert.equal(JSON.stringify(response.body).includes("must-not-escape"), false)
   assert.equal(response.body.account_status, "bound")
   assert.equal(response.body.active_membership_id, "membership-1")
+  assert.equal(response.body.canonical_user_id, "canonical-user-1")
+  assert.equal(response.body.identity_state, "resolved")
+  assert.equal(response.body.access_mode, "formal")
+  assert.equal(response.body.authorization_version, 3)
+  assert.equal(
+    sqlLog[0],
+    "set transaction isolation level repeatable read read only",
+  )
   assert.deepEqual(Object.keys(response.body.memberships[0]), expectedContract.profile_envelope.membership_keys)
   assert.deepEqual(Object.keys(response.body.entitlements), expectedContract.profile_envelope.entitlement_keys)
   assert.deepEqual(Object.keys(response.body.features), expectedContract.feature_policy.all_keys)
@@ -376,6 +429,13 @@ test("profile GET emits the exact top-level snake-case contract without identity
       feature,
     )
   }
+  const membershipSql = sqlLog.find(sql =>
+    sql.includes("from public.mp_account_memberships membership"),
+  )
+  assert.match(
+    membershipSql,
+    /membership\.canonical_user_id = \$2 or \( membership\.canonical_user_id is null and membership\.user_id = \$1 \)/,
+  )
   assertSelectOnly(sqlLog)
 })
 
@@ -389,7 +449,7 @@ test("entitlements GET is narrow and shares the complete feature map", async () 
   assert.equal(entitlementsResponse.status, 200)
   assert.deepEqual(Object.keys(entitlementsResponse.body), expectedContract.entitlements_envelope.top_level_keys)
   assert.equal(entitlementsResponse.body.plan, "pro")
-  assert.equal(entitlementsResponse.body.pro_expires_at, "2026-12-31T00:00:00.000Z")
+  assert.equal(entitlementsResponse.body.pro_expires_at, null)
   assert.deepEqual(entitlementsResponse.body.features, profileResponse.body.features)
   for (const forbiddenKey of [
     "user",

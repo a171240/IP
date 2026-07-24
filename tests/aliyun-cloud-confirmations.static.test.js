@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const test = require("node:test")
 const assert = require("node:assert/strict")
-const { execFileSync } = require("node:child_process")
+const { execFileSync, spawnSync } = require("node:child_process")
 const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
@@ -53,6 +53,91 @@ function assertNoSecretLikeValues(text) {
   assert.doesNotMatch(text, secretLike)
   assert.doesNotMatch(text, /:\/\/[^\s:@]+:[^\s@]+@/)
 }
+
+test("Aliyun cloud confirmation template documents strict personal-trial expiry scheduler evidence", () => {
+  const example = readJson(
+    "deploy",
+    "aliyun-production-cn.cloud-confirmations.example.json",
+  )
+  const scheduler =
+    example.items.personalTrialReservationExpiryScheduler
+
+  assert.deepEqual(
+    {
+      confirmed: scheduler.confirmed,
+      region: scheduler.region,
+      eventBusName: scheduler.eventBusName,
+      eventSourceName: scheduler.eventSourceName,
+      connectionName: scheduler.connectionName,
+      apiDestinationName: scheduler.apiDestinationName,
+      ruleName: scheduler.ruleName,
+      ruleStatus: scheduler.ruleStatus,
+      secretEnvName: scheduler.secretEnvName,
+      secretValuesRecorded: scheduler.secretValuesRecorded,
+      dedicatedSecretDistinctFromSharedCronSecret:
+        scheduler.dedicatedSecretDistinctFromSharedCronSecret,
+      pushRetryStrategy: scheduler.pushRetryStrategy,
+      errorsTolerance: scheduler.errorsTolerance,
+      deadLetterQueueEnabled: scheduler.deadLetterQueueEnabled,
+    },
+    {
+      confirmed: false,
+      region: "cn-hangzhou",
+      eventBusName: "meiye-huajing-production-cn",
+      eventSourceName: "personal-trial-reservation-expiry-5m",
+      connectionName: "personal-trial-reservation-expiry-prod-cn",
+      apiDestinationName: "personal-trial-reservation-expiry-prod-cn",
+      ruleName: "personal-trial-reservation-expiry-5m",
+      ruleStatus: "DISABLE",
+      secretEnvName: "PERSONAL_TRIAL_EXPIRY_CRON_SECRET",
+      secretValuesRecorded: false,
+      dedicatedSecretDistinctFromSharedCronSecret: false,
+      pushRetryStrategy: "BACKOFF_RETRY",
+      errorsTolerance: "ALL",
+      deadLetterQueueEnabled: false,
+    },
+  )
+
+  const { output, report } = runCloudConfirmations(
+    ["--backend-only", "--allow-incomplete"],
+    (data) => {
+      data.containsValues = false
+      data.items.personalTrialReservationExpiryScheduler =
+        structuredClone(scheduler)
+    },
+  )
+  assert.deepEqual(report.template.warnings, [])
+  assert.deepEqual(report.local.warnings, [])
+  assertNoSecretLikeValues(output)
+})
+
+test("Aliyun cloud confirmations strict mode blocks missing personal-trial scheduler evidence", () => {
+  const { templatePath, localPath } =
+    writeSanitizedCloudConfirmationsFixture()
+  const result = spawnSync(
+    process.execPath,
+    [
+      "scripts/check-aliyun-cloud-confirmations.mjs",
+      "--template",
+      templatePath,
+      "--local",
+      localPath,
+      "--backend-only",
+    ],
+    {
+      cwd: root,
+      encoding: "utf8",
+      maxBuffer: 1024 * 1024 * 80,
+    },
+  )
+
+  assert.equal(result.status, 1)
+  assert.match(
+    result.stdout,
+    /personalTrialReservationExpiryScheduler:strict_evidence_required/,
+  )
+  assertNoSecretLikeValues(result.stdout)
+})
 
 test("Aliyun cloud confirmations full APP scope keeps WeChat mobile app blockers", () => {
   const { output, report } = runCloudConfirmations(["--allow-incomplete"])

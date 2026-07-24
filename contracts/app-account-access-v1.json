@@ -26,7 +26,7 @@
     "tenant_scope_denied"
   ],
   "profile_envelope": {
-    "top_level_keys": ["ok", "user", "account_status", "active_membership_id", "memberships", "entitlements", "features", "profile"],
+    "top_level_keys": ["ok", "user", "account_status", "active_membership_id", "memberships", "entitlements", "features", "profile", "canonical_user_id", "identity_state", "access_mode", "authorization_version", "trial"],
     "user_keys": ["id"],
     "membership_keys": ["id", "user_id", "role", "role_label", "scope", "status", "is_active", "company_id", "company_name", "store_id", "store_name", "joined_at"],
     "entitlement_keys": ["plan", "pro_expires_at"],

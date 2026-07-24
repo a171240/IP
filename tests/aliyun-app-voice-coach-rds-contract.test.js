@@ -57,6 +57,11 @@ function compileRepository() {
     "@/lib/aliyun-rds/postgres.server": {
       withAliyunRdsTransaction: async (fn) => fn(new FakeVoiceCoachRdsClient()),
     },
+    "@/lib/aliyun-rds/repositories/app-access-control.server": {
+      reservePersonalTrialVoiceSessionWithClient: async () => {
+        throw new Error("unexpected_personal_trial_reservation")
+      },
+    },
   })
 }
 
@@ -96,6 +101,8 @@ class FakeVoiceCoachRdsClient {
             id: SESSION_ID,
             created_at: "2026-07-06T10:00:00.000Z",
             user_id: values[0],
+            data_domain: "store",
+            canonical_user_id: null,
             company_id: values[1],
             store_id: values[2],
             membership_id: values[3],
@@ -154,15 +161,17 @@ class FakeVoiceCoachRdsClient {
     }
 
     if (sql.startsWith("select * from public.voice_coach_sessions where id = $1 and user_id = $2")) {
-      const scopedQuery = sql.includes("company_id = $3") && sql.includes("membership_id = $5")
+      const scopedQuery = sql.includes("$3 = 'store'") && sql.includes("membership_id = $7")
       return {
         rows: this.sessions.filter((session) =>
           session.id === values[0] &&
           session.user_id === values[1] &&
           (!scopedQuery || (
-            session.company_id === values[2] &&
-            session.store_id === values[3] &&
-            session.membership_id === values[4]
+            values[2] === "store" &&
+            session.data_domain === "store" &&
+            session.company_id === values[4] &&
+            session.store_id === values[5] &&
+            session.membership_id === values[6]
           )),
         ),
       }
@@ -201,18 +210,20 @@ class FakeVoiceCoachRdsClient {
     }
 
     if (sql.startsWith("update public.voice_coach_sessions")) {
-      const scopedUpdate = sql.includes("company_id = $3") && sql.includes("membership_id = $5")
+      const scopedUpdate = sql.includes("$3 = 'store'") && sql.includes("membership_id = $7")
       const session = this.sessions.find((item) =>
         item.id === values[0] &&
         item.user_id === values[1] &&
         (!scopedUpdate || (
-          item.company_id === values[2] &&
-          item.store_id === values[3] &&
-          item.membership_id === values[4]
+          values[2] === "store" &&
+          item.data_domain === "store" &&
+          item.company_id === values[4] &&
+          item.store_id === values[5] &&
+          item.membership_id === values[6]
         )),
       )
       if (!session) return { rows: [] }
-      const valueOffset = scopedUpdate ? 5 : 2
+      const valueOffset = scopedUpdate ? 7 : 2
       session.status = "ended"
       session.ended_at = "2026-07-06T10:06:00.000Z"
       session.report_json = JSON.parse(values[valueOffset])
@@ -222,16 +233,18 @@ class FakeVoiceCoachRdsClient {
     }
 
     if (sql.startsWith("select * from public.voice_coach_sessions where user_id = $1")) {
-      const scopedQuery = sql.includes("company_id = $2") && sql.includes("membership_id = $4")
-      const limit = Number(values[scopedQuery ? 4 : 1])
+      const scopedQuery = sql.includes("$2 = 'store'") && sql.includes("membership_id = $6")
+      const limit = Number(values[scopedQuery ? 6 : 1])
       return {
         rows: this.sessions
           .filter((session) =>
             session.user_id === values[0] &&
             (!scopedQuery || (
-              session.company_id === values[1] &&
-              session.store_id === values[2] &&
-              session.membership_id === values[3]
+              values[1] === "store" &&
+              session.data_domain === "store" &&
+              session.company_id === values[3] &&
+              session.store_id === values[4] &&
+              session.membership_id === values[5]
             )),
           )
           .slice(0, limit),
@@ -335,10 +348,13 @@ test("VC-L4-04 RDS repository persists four-dimensional scope and a user-owned s
   assert.deepEqual(history.map((session) => session.id), [created.session.id])
 
   const joinedSql = client.queries.map((query) => query.text).join("\n")
-  assert.match(joinedSql, /insert into public\.voice_coach_sessions \( user_id, company_id, store_id, membership_id,/)
+  assert.match(
+    joinedSql,
+    /insert into public\.voice_coach_sessions \( user_id, data_domain, company_id, store_id, membership_id,/,
+  )
   assert.match(joinedSql, /from public\.voice_coach_customer_profiles where id = \$1 and user_id = \$2/)
   assert.match(joinedSql, /from public\.voice_coach_scene_cards where id = \$1 and user_id = \$2/)
-  assert.match(joinedSql, /company_id = \$3 and store_id = \$4 and membership_id = \$5/)
+  assert.match(joinedSql, /company_id = \$5 and store_id = \$6 and membership_id = \$7/)
   for (const query of client.queries.filter((item) => /voice_coach_(customer_profiles|scene_cards)/.test(item.text))) {
     assert.doesNotMatch(query.text, /company_id|store_id|membership_id/)
   }
@@ -402,7 +418,7 @@ test("VC-L4-04 RDS repository fails closed across every tenant dimension and leg
   const mutationLocks = client.queries.filter((query) => /voice_coach_sessions.*for update$/.test(query.text))
   assert.equal(mutationLocks.length, scopeChanges.length * 2)
   for (const query of mutationLocks) {
-    assert.match(query.text, /company_id = \$3 and store_id = \$4 and membership_id = \$5/)
+    assert.match(query.text, /company_id = \$5 and store_id = \$6 and membership_id = \$7/)
   }
   assert.equal(client.queries.filter((query) => query.text.startsWith("update public.voice_coach_sessions")).length, 0)
 

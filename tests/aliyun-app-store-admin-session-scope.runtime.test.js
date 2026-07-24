@@ -130,7 +130,7 @@ const sessionQueryShapes = [1000, 5000].flatMap((limit) => [
   queryShape(`sessions_company_${limit}`, "voice_coach_sessions", 4, `
     ${sessionSelect}
     from public.voice_coach_sessions
-    where user_id = any($1::uuid[]) and company_id = $2 and started_at >= $3
+    where user_id = any($1::uuid[]) and company_id = $2 and data_domain = 'store' and started_at >= $3
       and (store_id is null or store_id = any($4::uuid[]))
     order by started_at desc
     limit ${limit}
@@ -138,7 +138,7 @@ const sessionQueryShapes = [1000, 5000].flatMap((limit) => [
   queryShape(`sessions_store_${limit}`, "voice_coach_sessions", 4, `
     ${sessionSelect}
     from public.voice_coach_sessions
-    where user_id = any($1::uuid[]) and company_id = $2 and started_at >= $3
+    where user_id = any($1::uuid[]) and company_id = $2 and data_domain = 'store' and started_at >= $3
       and store_id = any($4::uuid[])
     order by started_at desc
     limit ${limit}

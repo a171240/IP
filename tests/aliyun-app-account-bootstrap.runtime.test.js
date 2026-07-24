@@ -61,13 +61,17 @@ function repositoryHarness() {
       }
       return { rows: [], rowCount: profileAlreadyExists ? 0 : 1 }
     }
-    if (/^select\b/i.test(entry.sql)) return { rows: [] }
+    if (/^(select|set transaction)\b/i.test(entry.sql)) return { rows: [] }
     throw new Error(`unexpected SQL in bootstrap test: ${entry.sql}`)
   }
 
   const repository = compileTsModule(repositoryPath, {
     "server-only": {},
-    "@/lib/aliyun-rds/postgres.server": { queryAliyunRds },
+    "@/lib/aliyun-rds/postgres.server": {
+      queryAliyunRds,
+      withAliyunRdsTransaction: async callback =>
+        callback({ query: queryAliyunRds }),
+    },
     "@/lib/pricing/rules": {
       normalizePlan(value) {
         return ["free", "basic", "pro", "vip"].includes(value) ? value : "free"
@@ -76,6 +80,23 @@ function repositoryHarness() {
     "@/lib/aliyun-rds/app-authorization.server": {
       buildAppFeatureDecisions: () => ({}),
       normalizeAppAccountRole: () => "guest",
+    },
+    "@/lib/aliyun-rds/repositories/app-access-control.server": {
+      resolveAppCanonicalAuthorizationWithClient: async () => ({
+        canonicalUserId: "canonical-read-regression",
+        identityState: "resolved",
+        authorizationVersion: 0,
+        trial: {
+          kind: "personal_trial",
+          dataDomain: "personal_trial",
+          status: "active",
+          sessionLimit: 2,
+          aiCoachPublicEnabled: false,
+          sessionsReserved: 0,
+          sessionsUsed: 0,
+          sessionsRemaining: 2,
+        },
+      }),
     },
   })
   return { profileRows, queryLog, repository }
@@ -93,6 +114,22 @@ function jsonResponse(body, init = {}) {
 
 function bootstrapRoute(repository, user) {
   class AliyunRdsConfigurationError extends Error {}
+  const access = {
+    canonicalUserId: "canonical-bootstrap-1",
+    accessMode: "personal_trial",
+    identityState: "resolved",
+    authorizationVersion: 0,
+    trial: {
+      kind: "personal_trial",
+      dataDomain: "personal_trial",
+      status: "active",
+      sessionLimit: 2,
+      aiCoachPublicEnabled: false,
+      sessionsReserved: 0,
+      sessionsUsed: 0,
+      sessionsRemaining: 2,
+    },
+  }
   return compileTsModule(bootstrapRoutePath, {
     "next/server": {
       NextRequest: class NextRequest {},
@@ -105,7 +142,29 @@ function bootstrapRoute(repository, user) {
     },
     "@/lib/aliyun-rds/postgres.server": { AliyunRdsConfigurationError },
     "@/lib/aliyun-rds/repositories/account-profile.server": repository,
+    "@/lib/aliyun-rds/repositories/app-access-control.server": {
+      ensureAppCanonicalIdentityAndTrial: async () => access,
+    },
   })
+}
+
+const expectedBootstrapResponse = {
+  ok: true,
+  profile_initialized: true,
+  canonical_user_id: "canonical-bootstrap-1",
+  access_mode: "personal_trial",
+  identity_state: "resolved",
+  authorization_version: 0,
+  trial: {
+    kind: "personal_trial",
+    data_domain: "personal_trial",
+    status: "active",
+    ai_coach_session_limit: 2,
+    ai_coach_sessions_reserved: 0,
+    ai_coach_sessions_used: 0,
+    ai_coach_sessions_remaining: 2,
+    ai_coach_public_enabled: false,
+  },
 }
 
 function requestWithForbiddenBody() {
@@ -169,8 +228,8 @@ test("authenticated bootstrap inserts bounded display fields once and ignores pr
   const secondResponse = await route.POST(requestProbe.request)
 
   assert.equal(requestProbe.readCount(), 0)
-  assert.deepEqual(firstResponse.body, { ok: true, profile_initialized: true })
-  assert.deepEqual(secondResponse.body, { ok: true, profile_initialized: true })
+  assert.deepEqual(firstResponse.body, expectedBootstrapResponse)
+  assert.deepEqual(secondResponse.body, expectedBootstrapResponse)
   assert.equal(firstResponse.status, 200)
   assert.equal(secondResponse.status, 200)
   assert.equal(queryLog.length, 2)
@@ -267,7 +326,7 @@ test("profile and entitlements reads remain SELECT-only after bootstrap is added
 
   assert.ok(queryLog.length > 0)
   for (const entry of queryLog) {
-    assert.match(entry.sql, /^select\b/i)
+    assert.match(entry.sql, /^(select|set transaction)\b/i)
     assert.doesNotMatch(entry.sql, /\b(insert|update|delete|merge|truncate)\b/i)
   }
 })

@@ -74,6 +74,7 @@ export const LOCAL_PREDEPLOY_COMMANDS = Object.freeze([
   Object.freeze(["run", "aliyun:android-signing:package"]),
   Object.freeze(["run", "aliyun:apple-team:package"]),
   Object.freeze(["run", "aliyun:runtime:plan"]),
+  Object.freeze(["run", "aliyun:runtime:plan:strict"]),
   Object.freeze(["run", "aliyun:image:plan"]),
   Object.freeze(["run", "aliyun:acr:transfer-handoff"]),
   Object.freeze(["run", "aliyun:sae:runtime-handoff"]),

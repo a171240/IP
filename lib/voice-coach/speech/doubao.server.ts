@@ -266,6 +266,10 @@ export async function doubaoAsrFlash(opts: {
     "asr_flash_timeout",
   )
 
+  if (!res.ok) {
+    throw new Error(`asr_http_${res.status}`)
+  }
+
   const statusCodeHeader = res.headers.get("X-Api-Status-Code") || res.headers.get("x-api-status-code") || ""
   if (statusCodeHeader && statusCodeHeader !== "20000000" && statusCodeHeader !== "20000003") {
     throw new Error(`asr_status_${statusCodeHeader}`)
@@ -278,10 +282,6 @@ export async function doubaoAsrFlash(opts: {
         utterances?: Array<{ confidence?: number }>
       }
     | null
-
-  if (!res.ok) {
-    throw new Error(`asr_http_${res.status}`)
-  }
 
   const text = typeof json?.result?.text === "string" ? json.result.text.trim() : ""
   const confidence = safeNumber(json?.utterances?.[0]?.confidence)

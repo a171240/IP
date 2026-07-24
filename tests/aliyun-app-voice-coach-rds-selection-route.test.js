@@ -3,6 +3,7 @@
 const test = require("node:test")
 const assert = require("node:assert/strict")
 const fs = require("node:fs")
+const { createHash } = require("node:crypto")
 const os = require("node:os")
 const path = require("node:path")
 const Module = require("node:module")
@@ -14,7 +15,17 @@ const runtimeConfigPath = path.join(root, "lib", "aliyun-rds", "app-voice-coach-
 
 const voiceCoachFeatureDecision = { enabled: true, reason: "ok", source: "ai_points" }
 const authorizationChecks = []
+const accessControlCalls = []
+const accessControlCallArgs = []
 let accountContextReadCount = 0
+let forceVoiceCoachDenied = false
+let mockAsrCallCount = 0
+let mockAsrError = null
+let mockAsrReceiptPersistPause = null
+let mockAsrText = "转写"
+let mockSaveTurnAudioMissing = false
+let mockTtsError = null
+let mockUploadError = null
 const SESSION_ID = "77777777-7777-4777-8777-777777777777"
 const CUSTOMER_PROFILE_ID = "11111111-1111-4111-8111-111111111111"
 const SCENE_CARD_ID = "22222222-2222-4222-8222-222222222222"
@@ -22,6 +33,7 @@ const FOREIGN_ID = "88888888-8888-4888-8888-888888888888"
 const FIRST_ATTEMPT_ID = "attempt-0001"
 const SECOND_ATTEMPT_ID = "attempt-0002"
 const THIRD_ATTEMPT_ID = "attempt-0003"
+const ASR_RECEIPT_ID = "44444444-4444-4444-8444-444444444444"
 const PRODUCTION_RDS_REPOSITORY_MODE = "rds_voice_coach_text_session_contract"
 const testAccountContext = {
   accountStatus: "bound",
@@ -56,12 +68,29 @@ function requireAuthorizedVoiceCoachAccess(ctx, features, feature, requestedScop
     })
   }
   authorizationChecks.push(requestedScope || null)
+  if (forceVoiceCoachDenied && !requestedScope) {
+    return {
+      ok: false,
+      status: 403,
+      body: { ok: false, code: "not_bound", feature: "voice_coach" },
+    }
+  }
   return { ok: true, account: ctx }
 }
 
 function resetAuthorizationChecks() {
   authorizationChecks.length = 0
+  accessControlCalls.length = 0
+  accessControlCallArgs.length = 0
   accountContextReadCount = 0
+  forceVoiceCoachDenied = false
+  mockAsrCallCount = 0
+  mockAsrError = null
+  mockAsrReceiptPersistPause = null
+  mockAsrText = "转写"
+  mockSaveTurnAudioMissing = false
+  mockTtsError = null
+  mockUploadError = null
   currentAccountContext = { ...testAccountContext }
 }
 
@@ -124,6 +153,8 @@ function createRdsMock() {
   const callArgs = []
   const sessions = new Map()
   const turns = new Map()
+  const asrReceipts = new Map()
+  const asrProcessingLeases = new Map()
   const mode = PRODUCTION_RDS_REPOSITORY_MODE
   const customerProfiles = new Map([
     [CUSTOMER_PROFILE_ID, { id: CUSTOMER_PROFILE_ID, user_id: testAccountContext.userId, name: "张女士" }],
@@ -138,6 +169,14 @@ function createRdsMock() {
   }
 
   function belongsToScope(session, args) {
+    if (args.dataDomain === "personal_trial") {
+      return Boolean(
+        session &&
+          session.user_id === args.userId &&
+          session.data_domain === "personal_trial" &&
+          session.canonical_user_id === args.canonicalUserId,
+      )
+    }
     return Boolean(
       session &&
         session.user_id === args.userId &&
@@ -164,6 +203,7 @@ function createRdsMock() {
       voice_coach_rds_idempotency_conflict: { status: 409, code: "voice_coach_idempotency_conflict" },
       voice_coach_rds_session_ended: { status: 409, code: "voice_coach_session_ended" },
       voice_coach_rds_reply_target_stale: { status: 409, code: "voice_coach_reply_target_stale" },
+      voice_coach_rds_asr_receipt_required: { status: 409, code: "voice_coach_idempotency_conflict" },
     }
     return error instanceof Error ? byMessage[error.message] || null : null
   }
@@ -194,13 +234,33 @@ function createRdsMock() {
     const session = sessions.get(args.sessionId)
     if (!belongsToScope(session, args)) throw new Error("voice_coach_rds_session_not_found")
     const currentTurns = turns.get(args.sessionId) || []
+    const receiptKey = `${args.sessionId}:${args.submittedAudioSha256 || ""}`
+    const personalTrialAsrReceipt = args.dataDomain === "personal_trial"
+      ? asrReceipts.get(receiptKey) || null
+      : null
+    if (
+      args.dataDomain === "personal_trial" &&
+      (
+        !personalTrialAsrReceipt ||
+        personalTrialAsrReceipt.id !== args.personalTrialAsrReceiptId
+      )
+    ) {
+      throw new Error("voice_coach_rds_asr_receipt_required")
+    }
     const existing = currentTurns.find(
       (item) => item.role === "beautician" && item.features_json?.client_attempt_id === args.clientAttemptId,
     )
     if (existing) {
       if (
         normalizedText(existing.text) !== normalizedText(args.replyText) ||
-        existing.features_json?.reply_to_turn_id !== args.replyToTurnId
+        existing.features_json?.reply_to_turn_id !== args.replyToTurnId ||
+        (
+          personalTrialAsrReceipt &&
+          (
+            personalTrialAsrReceipt.claimedTurnId !== existing.id ||
+            existing.features_json?.asr_receipt_id !== personalTrialAsrReceipt.id
+          )
+        )
       ) {
         throw new Error("voice_coach_rds_idempotency_conflict")
       }
@@ -216,18 +276,28 @@ function createRdsMock() {
         turns: currentTurns,
       }
     }
+    if (personalTrialAsrReceipt?.claimedTurnId) {
+      throw new Error("voice_coach_rds_asr_receipt_required")
+    }
     if (session.status === "ended") throw new Error("voice_coach_rds_session_ended")
 
     const latestTurn = currentTurns[currentTurns.length - 1]
     if (!latestTurn || latestTurn.role !== "customer" || latestTurn.id !== args.replyToTurnId) {
       throw new Error("voice_coach_rds_reply_target_stale")
     }
+    await args.persistAudio?.()
     const reachedMaxTurns = currentTurns.filter((item) => item.role === "beautician").length + 1 >= 2
     const beauticianTurn = turn({
       features: {
         provider_mode: "text_only_no_audio_provider",
         client_attempt_id: args.clientAttemptId,
         reply_to_turn_id: args.replyToTurnId,
+        ...(personalTrialAsrReceipt
+          ? {
+              asr_receipt_id: personalTrialAsrReceipt.id,
+              submitted_audio_sha256: personalTrialAsrReceipt.audioSha256,
+            }
+          : {}),
       },
       role: "beautician",
       sessionId: args.sessionId,
@@ -246,6 +316,9 @@ function createRdsMock() {
       ? [...currentTurns, beauticianTurn, nextCustomerTurn]
       : [...currentTurns, beauticianTurn]
     turns.set(args.sessionId, updatedTurns)
+    if (personalTrialAsrReceipt) {
+      personalTrialAsrReceipt.claimedTurnId = beauticianTurn.id
+    }
     return {
       beauticianTurn,
       deduped: false,
@@ -275,6 +348,8 @@ function createRdsMock() {
   return {
     calls,
     callArgs,
+    asrProcessingLeases,
+    asrReceipts,
     sessions,
     turns,
     module: {
@@ -334,6 +409,53 @@ function createRdsMock() {
         turns.set(session.id, [firstCustomerTurn])
         return { firstCustomerTurn, session }
       },
+      async createAliyunRdsPersonalTrialVoiceCoachTextSession(args) {
+        remember("createAliyunRdsPersonalTrialVoiceCoachTextSession", args)
+        const session = {
+          id: SESSION_ID,
+          created_at: "2026-07-06T10:00:00.000Z",
+          user_id: args.userId,
+          canonical_user_id: args.canonicalUserId,
+          data_domain: "personal_trial",
+          company_id: null,
+          store_id: null,
+          membership_id: null,
+          scenario_id: args.scenario.id,
+          status: "active",
+          started_at: "2026-07-06T10:00:00.000Z",
+          ended_at: null,
+          report_json: null,
+          total_score: null,
+          dimension_scores: null,
+          session_context_json: { data_domain: "personal_trial" },
+          scenario_snapshot_json: args.scenario,
+          trial_reservation_expires_at: "2026-07-06T10:10:00.000Z",
+          trial_reservation_status: "reserved",
+        }
+        const firstCustomerTurn = turn({
+          role: "customer",
+          sessionId: session.id,
+          text: args.firstCustomerText,
+          turnIndex: 0,
+        })
+        sessions.set(session.id, session)
+        turns.set(session.id, [firstCustomerTurn])
+        return {
+          deduped: false,
+          firstCustomerTurn,
+          session,
+          trial: {
+            kind: "personal_trial",
+            dataDomain: "personal_trial",
+            status: "active",
+            sessionLimit: 2,
+            aiCoachPublicEnabled: true,
+            sessionsReserved: 1,
+            sessionsUsed: 0,
+            sessionsRemaining: 1,
+          },
+        }
+      },
       async getAliyunRdsVoiceCoachTextSessionWithClient(_client, args) {
         remember("getAliyunRdsVoiceCoachTextSessionWithClient", args)
         const session = sessions.get(args.sessionId)
@@ -352,8 +474,70 @@ function createRdsMock() {
       async appendAliyunRdsVoiceCoachTextReply(args) {
         return appendTextReply("appendAliyunRdsVoiceCoachTextReply", args)
       },
+      async persistAliyunRdsPersonalTrialAsrReceipt(args) {
+        remember("persistAliyunRdsPersonalTrialAsrReceipt", args)
+        const receiptKey = `${args.sessionId}:${args.audioSha256}`
+        const existingReceipt = asrReceipts.get(receiptKey)
+        if (existingReceipt) return existingReceipt
+        const session = sessions.get(args.sessionId)
+        const lease = asrProcessingLeases.get(receiptKey)
+        if (
+          session?.trial_reservation_status === "reserved" &&
+          lease?.ownerToken !== args.processingOwnerToken
+        ) {
+          throw new Error("voice_coach_rds_asr_processing_required")
+        }
+        if (mockAsrReceiptPersistPause) {
+          mockAsrReceiptPersistPause.started.resolve()
+          await mockAsrReceiptPersistPause.resume.promise
+        }
+        const receipt = {
+          id: ASR_RECEIPT_ID,
+          audioSha256: args.audioSha256,
+          audioSeconds: args.audioSeconds,
+          claimedTurnId: null,
+          confidence: args.confidence,
+          providerRequestId: args.providerRequestId,
+          transcriptText: args.transcriptText,
+        }
+        asrReceipts.set(receiptKey, receipt)
+        if (lease?.ownerToken === args.processingOwnerToken) {
+          asrProcessingLeases.delete(receiptKey)
+        }
+        return receipt
+      },
+      async claimAliyunRdsPersonalTrialAsrProcessing(args) {
+        remember("claimAliyunRdsPersonalTrialAsrProcessing", args)
+        const receiptKey = `${args.sessionId}:${args.audioSha256}`
+        const existingReceipt = asrReceipts.get(receiptKey)
+        if (existingReceipt) {
+          return { state: "receipt", receipt: existingReceipt }
+        }
+        const session = sessions.get(args.sessionId)
+        if (session?.trial_reservation_status !== "reserved") {
+          return { state: "not_required" }
+        }
+        if (asrProcessingLeases.has(receiptKey)) {
+          return { state: "in_progress" }
+        }
+        asrProcessingLeases.set(receiptKey, { ownerToken: args.ownerToken })
+        return { ownerToken: args.ownerToken, state: "claimed" }
+      },
+      async abandonAliyunRdsPersonalTrialAsrProcessing(args) {
+        remember("abandonAliyunRdsPersonalTrialAsrProcessing", args)
+        const receiptKey = `${args.sessionId}:${args.audioSha256}`
+        const lease = asrProcessingLeases.get(receiptKey)
+        if (lease?.ownerToken !== args.ownerToken) return { abandoned: false }
+        asrProcessingLeases.delete(receiptKey)
+        return { abandoned: true }
+      },
+      async resolveAliyunRdsPersonalTrialAsrReceipt(args) {
+        remember("resolveAliyunRdsPersonalTrialAsrReceipt", args)
+        return asrReceipts.get(`${args.sessionId}:${args.audioSha256}`) || null
+      },
       async saveAliyunRdsVoiceCoachTurnAudio(args) {
         remember("saveAliyunRdsVoiceCoachTurnAudio", args)
+        if (mockSaveTurnAudioMissing) return null
         const session = sessions.get(args.sessionId)
         if (!belongsToScope(session, args)) return null
         const row = (turns.get(args.sessionId) || []).find((turn) => turn.id === args.turnId && turn.role === "customer")
@@ -458,6 +642,84 @@ function helperStubs(rdsMock) {
       },
     },
     "@/lib/aliyun-rds/repositories/app-voice-coach-rds.server": rdsMock.module,
+    "@/lib/aliyun-rds/repositories/app-access-control.server": {
+      async completePersonalTrialFirstRound(args) {
+        accessControlCalls.push("completePersonalTrialFirstRound")
+        accessControlCallArgs.push({ name: "completePersonalTrialFirstRound", args: { ...args } })
+        return { deduped: false, sessionId: args.sessionId }
+      },
+      getAppAccessSnapshot: async () => ({
+        canonicalUserId: "99999999-9999-4999-8999-999999999999",
+        identityState: "resolved",
+        accessMode: "personal_trial",
+        authorizationVersion: 0,
+        trial: {
+          kind: "personal_trial",
+          dataDomain: "personal_trial",
+          status: "active",
+          sessionLimit: 2,
+          aiCoachPublicEnabled: true,
+          sessionsReserved: 0,
+          sessionsUsed: 0,
+          sessionsRemaining: 2,
+        },
+      }),
+      async recordPersonalTrialVoiceEvidence(args) {
+        accessControlCalls.push("recordPersonalTrialVoiceEvidence")
+        accessControlCallArgs.push({ name: "recordPersonalTrialVoiceEvidence", args: { ...args } })
+        return { deduped: false, ...args }
+      },
+      async releasePersonalTrialVoiceSession(args) {
+        accessControlCalls.push("releasePersonalTrialVoiceSession")
+        accessControlCallArgs.push({ name: "releasePersonalTrialVoiceSession", args: { ...args } })
+        return { deduped: false, released: true, sessionId: args.sessionId }
+      },
+      async settlePersonalTrialAsrProcessingFailure(args) {
+        accessControlCalls.push("settlePersonalTrialAsrProcessingFailure")
+        accessControlCallArgs.push({
+          name: "settlePersonalTrialAsrProcessingFailure",
+          args: { ...args },
+        })
+        const receiptKey = `${args.sessionId}:${args.audioSha256}`
+        if (rdsMock.asrReceipts.has(receiptKey)) {
+          return {
+            inProgress: false,
+            receiptAvailable: true,
+            released: false,
+            reservationStatus: null,
+            sessionId: args.sessionId,
+          }
+        }
+        const lease = rdsMock.asrProcessingLeases.get(receiptKey)
+        if (lease?.ownerToken !== args.processingOwnerToken) {
+          return {
+            inProgress: Boolean(lease),
+            receiptAvailable: false,
+            released: false,
+            reservationStatus: null,
+            sessionId: args.sessionId,
+          }
+        }
+        rdsMock.asrProcessingLeases.delete(receiptKey)
+        const releaseArgs = {
+          canonicalUserId: args.canonicalUserId,
+          reason: "asr_failed",
+          sessionId: args.sessionId,
+        }
+        accessControlCalls.push("releasePersonalTrialVoiceSession")
+        accessControlCallArgs.push({
+          name: "releasePersonalTrialVoiceSession",
+          args: releaseArgs,
+        })
+        return {
+          inProgress: false,
+          receiptAvailable: false,
+          released: true,
+          reservationStatus: "released",
+          sessionId: args.sessionId,
+        }
+      },
+    },
     "@/lib/voice-coach/scenarios": {
       getScenario: (scenarioId) => ({
         id: scenarioId || "objection_safety",
@@ -468,12 +730,21 @@ function helperStubs(rdsMock) {
       }),
     },
     "@/lib/voice-coach/speech/doubao.server": {
-      doubaoAsrFlash: async () => ({ text: "转写", confidence: 0.9, durationSeconds: 1, requestId: "asr-test" }),
-      doubaoTts: async () => ({ audio: Buffer.from("audio"), durationSeconds: 1, requestId: "tts-test" }),
+      doubaoAsrFlash: async () => {
+        mockAsrCallCount += 1
+        if (mockAsrError) throw mockAsrError
+        return { text: mockAsrText, confidence: 0.9, durationSeconds: 1, requestId: "asr-test" }
+      },
+      doubaoTts: async () => {
+        if (mockTtsError) throw mockTtsError
+        return { audio: Buffer.from("audio"), durationSeconds: 1, requestId: "tts-test" }
+      },
     },
     "@/lib/voice-coach/storage.server": {
       signVoiceCoachAudio: async (path) => `https://audio.test/${path}`,
-      uploadVoiceCoachAudio: async () => {},
+      uploadVoiceCoachAudio: async () => {
+        if (mockUploadError) throw mockUploadError
+      },
     },
   }
 }
@@ -484,6 +755,44 @@ function routeModule(helperExports, ...parts) {
     "@/lib/aliyun-rds/repositories/app-voice-coach-facade.server": helperExports,
   })
 }
+
+test("ASR provider preserves an HTTP client error when a provider status header is also present", async (t) => {
+  const originalFetch = global.fetch
+  process.env.VOLC_SPEECH_APP_ID = "local-test-app"
+  process.env.VOLC_SPEECH_ACCESS_TOKEN = "local-test-token"
+  process.env.VOLC_ASR_FLASH_RESOURCE_ID = "local-test-resource"
+  global.fetch = async () => ({
+    headers: {
+      get(name) {
+        return name.toLowerCase() === "x-api-status-code"
+          ? "45000001"
+          : null
+      },
+    },
+    json: async () => ({}),
+    ok: false,
+    status: 400,
+  })
+  t.after(() => {
+    global.fetch = originalFetch
+    delete process.env.VOLC_SPEECH_APP_ID
+    delete process.env.VOLC_SPEECH_ACCESS_TOKEN
+    delete process.env.VOLC_ASR_FLASH_RESOURCE_ID
+  })
+
+  const speech = compileTsModule(
+    path.join(root, "lib", "voice-coach", "speech", "doubao.server.ts"),
+    { "server-only": {} },
+  )
+  await assert.rejects(
+    speech.doubaoAsrFlash({
+      audio: Buffer.from([1, 2, 3]),
+      format: "mp3",
+      uid: "local-test-user",
+    }),
+    /asr_http_400/,
+  )
+})
 
 function request(url, body = {}, contentType = "application/json") {
   return {
@@ -530,6 +839,10 @@ function sessionContext(sessionId) {
   return { params: Promise.resolve({ sessionId }) }
 }
 
+function turnContext(sessionId, turnId) {
+  return { params: Promise.resolve({ sessionId, turnId }) }
+}
+
 function compileHelperWithMode(t, mode) {
   const rdsMock = createRdsMock()
   const previousMode = process.env.APP_VOICE_COACH_TEXT_REPOSITORY_MODE
@@ -553,6 +866,557 @@ function compileHelperWithMode(t, mode) {
 function compileHelperWithRdsMock(t) {
   return compileHelperWithMode(t, "rds")
 }
+
+test("V1 personal trial creates an RDS demo session without tenant scope and returns remaining uses", async (t) => {
+  resetAuthorizationChecks()
+  forceVoiceCoachDenied = true
+  const { helperExports, rdsMock } = compileHelperWithRdsMock(t)
+  const sessionsRoute = routeModule(
+    helperExports,
+    "app",
+    "api",
+    "app",
+    "voice-coach",
+    "sessions",
+    "route.ts",
+  )
+
+  const response = await sessionsRoute.POST(
+    request("https://local.test/api/app/voice-coach/sessions", {
+      client_session_id: "trial-session-0001",
+      scenario_id: "objection_safety",
+    }),
+  )
+  const body = await payload(response)
+
+  assert.equal(response.status, 201)
+  assert.equal(body.session_context.data_domain, "personal_trial")
+  assert.equal(body.session_context.company_id, null)
+  assert.equal(body.session_context.store_id, null)
+  assert.equal(body.session_context.membership_id, null)
+  assert.equal(body.trial.ai_coach_session_limit, 2)
+  assert.equal(body.trial.ai_coach_sessions_reserved, 1)
+  assert.equal(body.trial.ai_coach_sessions_used, 0)
+  assert.equal(body.trial.ai_coach_sessions_remaining, 1)
+  assert.equal(body.trial.ai_coach_public_enabled, true)
+  assert.deepEqual(rdsMock.calls, [
+    "createAliyunRdsPersonalTrialVoiceCoachTextSession",
+  ])
+  assert.equal(rdsMock.callArgs[0].args.clientSessionId, "trial-session-0001")
+  assert.equal(
+    rdsMock.callArgs[0].args.canonicalUserId,
+    "99999999-9999-4999-8999-999999999999",
+  )
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(rdsMock.callArgs[0].args, "companyId"),
+    false,
+  )
+})
+
+test("V1 personal trial uses one server-bound ASR receipt before the unique round completion", async (t) => {
+  resetAuthorizationChecks()
+  forceVoiceCoachDenied = true
+  const { helperExports, rdsMock } = compileHelperWithRdsMock(t)
+  const sessionsRoute = routeModule(
+    helperExports,
+    "app",
+    "api",
+    "app",
+    "voice-coach",
+    "sessions",
+    "route.ts",
+  )
+  const ttsRoute = routeModule(
+    helperExports,
+    "app",
+    "api",
+    "app",
+    "voice-coach",
+    "sessions",
+    "[sessionId]",
+    "turns",
+    "[turnId]",
+    "tts",
+    "route.ts",
+  )
+  const asrRoute = routeModule(
+    helperExports,
+    "app",
+    "api",
+    "app",
+    "voice-coach",
+    "sessions",
+    "[sessionId]",
+    "asr-preview",
+    "route.ts",
+  )
+  const submitRoute = routeModule(
+    helperExports,
+    "app",
+    "api",
+    "app",
+    "voice-coach",
+    "sessions",
+    "[sessionId]",
+    "beautician-turn",
+    "submit",
+    "route.ts",
+  )
+
+  const createdResponse = await sessionsRoute.POST(
+    request("https://local.test/api/app/voice-coach/sessions", {
+      client_session_id: "trial-session-voice-events-0001",
+      scenario_id: "objection_safety",
+    }),
+  )
+  const created = await payload(createdResponse)
+  assert.equal(createdResponse.status, 201)
+
+  const openingTurnId = created.first_customer_turn.turn_id
+  const openingTtsResponse = await ttsRoute.POST(
+    request(`https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/turns/${openingTurnId}/tts`),
+    turnContext(SESSION_ID, openingTurnId),
+  )
+  assert.equal(openingTtsResponse.status, 200)
+  assert.deepEqual(
+    accessControlCallArgs.map((call) => [
+      call.name,
+      call.args.evidenceStage || null,
+    ]),
+    [["recordPersonalTrialVoiceEvidence", "opening_tts_ready"]],
+  )
+
+  const asrResponse = await asrRoute.POST(
+    request(
+      `https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/asr-preview`,
+      { audio_b64: "AQID", format: "mp3" },
+    ),
+    sessionContext(SESSION_ID),
+  )
+  const asrBody = await payload(asrResponse)
+  assert.equal(asrResponse.status, 200)
+  assert.equal(asrBody.asr_receipt_id, ASR_RECEIPT_ID)
+  assert.equal(mockAsrCallCount, 1)
+
+  mockAsrError = Object.assign(new Error("timeout"), { code: "ETIMEDOUT" })
+  const replayedAsrResponse = await asrRoute.POST(
+    request(
+      `https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/asr-preview`,
+      { audio_b64: "AQID", format: "mp3" },
+    ),
+    sessionContext(SESSION_ID),
+  )
+  const replayedAsrBody = await payload(replayedAsrResponse)
+  assert.equal(replayedAsrResponse.status, 200)
+  assert.equal(replayedAsrBody.text, "转写")
+  assert.equal(mockAsrCallCount, 1)
+  assert.equal(
+    accessControlCalls.includes("releasePersonalTrialVoiceSession"),
+    false,
+  )
+  mockAsrError = null
+
+  const submitResponse = await submitRoute.POST(
+    audioSubmitRequest(
+      `https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/beautician-turn/submit`,
+      {
+        client_attempt_id: FIRST_ATTEMPT_ID,
+        reply_to_turn_id: openingTurnId,
+        transcript_text: "客户端伪造文本",
+      },
+    ),
+    sessionContext(SESSION_ID),
+  )
+  const submitted = await payload(submitResponse)
+  assert.equal(submitResponse.status, 200)
+  const appendCall = rdsMock.callArgs.find(
+    (call) => call.name === "appendAliyunRdsVoiceCoachTextReply",
+  )
+  assert.equal(appendCall.args.replyText, "转写")
+  assert.equal(appendCall.args.personalTrialAsrReceiptId, ASR_RECEIPT_ID)
+  assert.equal(
+    appendCall.args.submittedAudioSha256,
+    createHash("sha256").update(Buffer.from([1, 2, 3])).digest("hex"),
+  )
+  assert.deepEqual(
+    accessControlCallArgs.slice(1).map((call) => [
+      call.name,
+      call.args.evidenceStage || null,
+    ]),
+    [
+      ["recordPersonalTrialVoiceEvidence", "recording_received"],
+      ["recordPersonalTrialVoiceEvidence", "asr_succeeded"],
+    ],
+  )
+
+  const nextTurnId = submitted.next_customer_turn.turn_id
+  const nextTtsResponse = await ttsRoute.POST(
+    request(`https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/turns/${nextTurnId}/tts`),
+    turnContext(SESSION_ID, nextTurnId),
+  )
+  assert.equal(nextTtsResponse.status, 200)
+  assert.deepEqual(
+    accessControlCallArgs.slice(3).map((call) => [
+      call.name,
+      call.args.evidenceStage || null,
+    ]),
+    [
+      ["recordPersonalTrialVoiceEvidence", "next_turn_tts_ready"],
+      ["completePersonalTrialFirstRound", null],
+    ],
+  )
+  assert.equal(
+    accessControlCallArgs.at(-1).args.completionEventId,
+    `round_1_completed:${SESSION_ID}`,
+  )
+})
+
+test("V1 personal trial keeps an in-flight same-audio ASR owner from being released by a concurrent failure", async (t) => {
+  resetAuthorizationChecks()
+  forceVoiceCoachDenied = true
+  const { helperExports } = compileHelperWithRdsMock(t)
+  const sessionsRoute = routeModule(
+    helperExports,
+    "app",
+    "api",
+    "app",
+    "voice-coach",
+    "sessions",
+    "route.ts",
+  )
+  const asrRoute = routeModule(
+    helperExports,
+    "app",
+    "api",
+    "app",
+    "voice-coach",
+    "sessions",
+    "[sessionId]",
+    "asr-preview",
+    "route.ts",
+  )
+  const createdResponse = await sessionsRoute.POST(
+    request("https://local.test/api/app/voice-coach/sessions", {
+      client_session_id: "trial-session-asr-in-flight-0001",
+      scenario_id: "objection_safety",
+    }),
+  )
+  assert.equal(createdResponse.status, 201)
+
+  let markPersistStarted
+  let resumePersist
+  mockAsrReceiptPersistPause = {
+    started: {
+      promise: new Promise((resolve) => {
+        markPersistStarted = resolve
+      }),
+      resolve: () => markPersistStarted(),
+    },
+    resume: {
+      promise: new Promise((resolve) => {
+        resumePersist = resolve
+      }),
+      resolve: () => resumePersist(),
+    },
+  }
+  const firstRequest = asrRoute.POST(
+    request(
+      `https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/asr-preview`,
+      { audio_b64: "AQID", format: "mp3" },
+    ),
+    sessionContext(SESSION_ID),
+  )
+  await mockAsrReceiptPersistPause.started.promise
+
+  mockAsrError = Object.assign(new Error("timeout"), { code: "ETIMEDOUT" })
+  const concurrentFailure = await asrRoute.POST(
+    request(
+      `https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/asr-preview`,
+      { audio_b64: "AQID", format: "mp3" },
+    ),
+    sessionContext(SESSION_ID),
+  )
+  const concurrentFailureBody = await payload(concurrentFailure)
+  let firstResponse
+  try {
+    assert.equal(concurrentFailure.status, 502)
+    assert.equal(
+      concurrentFailureBody.code,
+      "voice_coach_asr_provider_unavailable",
+    )
+    assert.equal(mockAsrCallCount, 1)
+    assert.equal(
+      accessControlCalls.includes("releasePersonalTrialVoiceSession"),
+      false,
+    )
+  } finally {
+    mockAsrReceiptPersistPause.resume.resolve()
+    firstResponse = await firstRequest
+  }
+  assert.equal(firstResponse.status, 200)
+  assert.equal(
+    accessControlCalls.includes("releasePersonalTrialVoiceSession"),
+    false,
+  )
+})
+
+test("V1 personal trial releases only the four server technical failure classes", async (t) => {
+  async function createTrialHarness() {
+    resetAuthorizationChecks()
+    forceVoiceCoachDenied = true
+    const { helperExports } = compileHelperWithRdsMock(t)
+    const sessionsRoute = routeModule(
+      helperExports,
+      "app",
+      "api",
+      "app",
+      "voice-coach",
+      "sessions",
+      "route.ts",
+    )
+    const ttsRoute = routeModule(
+      helperExports,
+      "app",
+      "api",
+      "app",
+      "voice-coach",
+      "sessions",
+      "[sessionId]",
+      "turns",
+      "[turnId]",
+      "tts",
+      "route.ts",
+    )
+    const asrRoute = routeModule(
+      helperExports,
+      "app",
+      "api",
+      "app",
+      "voice-coach",
+      "sessions",
+      "[sessionId]",
+      "asr-preview",
+      "route.ts",
+    )
+    const submitRoute = routeModule(
+      helperExports,
+      "app",
+      "api",
+      "app",
+      "voice-coach",
+      "sessions",
+      "[sessionId]",
+      "beautician-turn",
+      "submit",
+      "route.ts",
+    )
+    const response = await sessionsRoute.POST(
+      request("https://local.test/api/app/voice-coach/sessions", {
+        client_session_id: "trial-failure-test-0001",
+        scenario_id: "objection_safety",
+      }),
+    )
+    const created = await payload(response)
+    assert.equal(response.status, 201)
+    return {
+      asrRoute,
+      openingTurnId: created.first_customer_turn.turn_id,
+      submitRoute,
+      ttsRoute,
+    }
+  }
+
+  {
+    const harness = await createTrialHarness()
+    mockTtsError = new Error("tts provider failed")
+    const response = await harness.ttsRoute.POST(
+      request(`https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/turns/${harness.openingTurnId}/tts`),
+      turnContext(SESSION_ID, harness.openingTurnId),
+    )
+    assert.equal(response.status, 502)
+    assert.equal(accessControlCallArgs.at(-1).args.reason, "opening_tts_failed")
+  }
+
+  {
+    const harness = await createTrialHarness()
+    mockSaveTurnAudioMissing = true
+    const response = await harness.ttsRoute.POST(
+      request(`https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/turns/${harness.openingTurnId}/tts`),
+      turnContext(SESSION_ID, harness.openingTurnId),
+    )
+    assert.equal(response.status, 404)
+    assert.equal(accessControlCallArgs.at(-1).args.reason, "opening_tts_failed")
+  }
+
+  {
+    const harness = await createTrialHarness()
+    mockAsrError = Object.assign(new Error("timeout"), { code: "ETIMEDOUT" })
+    const response = await harness.asrRoute.POST(
+      request(
+        `https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/asr-preview`,
+        { audio_b64: "AQID", format: "mp3" },
+      ),
+      sessionContext(SESSION_ID),
+    )
+    assert.equal(response.status, 502)
+    assert.equal(accessControlCallArgs.at(-1).args.reason, "asr_failed")
+  }
+
+  {
+    const harness = await createTrialHarness()
+    mockAsrError = new Error("asr_http_400")
+    const response = await harness.asrRoute.POST(
+      request(
+        `https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/asr-preview`,
+        { audio_b64: "AQID", format: "mp3" },
+      ),
+      sessionContext(SESSION_ID),
+    )
+    const body = await payload(response)
+    assert.equal(response.status, 422)
+    assert.equal(body.code, "invalid_payload")
+    assert.equal(
+      accessControlCalls.includes("releasePersonalTrialVoiceSession"),
+      false,
+    )
+  }
+
+  {
+    const harness = await createTrialHarness()
+    mockAsrText = ""
+    const response = await harness.asrRoute.POST(
+      request(
+        `https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/asr-preview`,
+        { audio_b64: "AQID", format: "mp3" },
+      ),
+      sessionContext(SESSION_ID),
+    )
+    const body = await payload(response)
+    assert.equal(response.status, 422)
+    assert.equal(body.code, "invalid_payload")
+    assert.equal(
+      accessControlCalls.includes("releasePersonalTrialVoiceSession"),
+      false,
+    )
+  }
+
+  {
+    const harness = await createTrialHarness()
+    const asrResponse = await harness.asrRoute.POST(
+      request(
+        `https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/asr-preview`,
+        { audio_b64: "AQID", format: "mp3" },
+      ),
+      sessionContext(SESSION_ID),
+    )
+    assert.equal(asrResponse.status, 200)
+    mockUploadError = new Error("object storage failed")
+    const response = await harness.submitRoute.POST(
+      audioSubmitRequest(
+        `https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/beautician-turn/submit`,
+        {
+          client_attempt_id: FIRST_ATTEMPT_ID,
+          reply_to_turn_id: harness.openingTurnId,
+          transcript_text: "客户端文本不作为证据",
+        },
+      ),
+      sessionContext(SESSION_ID),
+    )
+    assert.equal(response.status, 502)
+    assert.equal(
+      accessControlCallArgs.at(-1).args.reason,
+      "recording_receive_failed",
+    )
+  }
+
+  {
+    const harness = await createTrialHarness()
+    const asrResponse = await harness.asrRoute.POST(
+      request(
+        `https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/asr-preview`,
+        { audio_b64: "AQID", format: "mp3" },
+      ),
+      sessionContext(SESSION_ID),
+    )
+    assert.equal(asrResponse.status, 200)
+    const submitResponse = await harness.submitRoute.POST(
+      audioSubmitRequest(
+        `https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/beautician-turn/submit`,
+        {
+          client_attempt_id: FIRST_ATTEMPT_ID,
+          reply_to_turn_id: harness.openingTurnId,
+          transcript_text: "客户端文本不作为证据",
+        },
+      ),
+      sessionContext(SESSION_ID),
+    )
+    const submitted = await payload(submitResponse)
+    assert.equal(submitResponse.status, 200)
+    accessControlCalls.length = 0
+    accessControlCallArgs.length = 0
+    mockTtsError = new Error("next tts provider failed")
+    const response = await harness.ttsRoute.POST(
+      request(`https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/turns/${submitted.next_customer_turn.turn_id}/tts`),
+      turnContext(SESSION_ID, submitted.next_customer_turn.turn_id),
+    )
+    assert.equal(response.status, 502)
+    assert.equal(accessControlCallArgs.at(-1).args.reason, "next_turn_tts_failed")
+  }
+
+  {
+    const harness = await createTrialHarness()
+    const asrResponse = await harness.asrRoute.POST(
+      request(
+        `https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/asr-preview`,
+        { audio_b64: "AQID", format: "mp3" },
+      ),
+      sessionContext(SESSION_ID),
+    )
+    assert.equal(asrResponse.status, 200)
+    const submitResponse = await harness.submitRoute.POST(
+      audioSubmitRequest(
+        `https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/beautician-turn/submit`,
+        {
+          client_attempt_id: FIRST_ATTEMPT_ID,
+          reply_to_turn_id: harness.openingTurnId,
+          transcript_text: "客户端文本不作为证据",
+        },
+      ),
+      sessionContext(SESSION_ID),
+    )
+    const submitted = await payload(submitResponse)
+    assert.equal(submitResponse.status, 200)
+    accessControlCalls.length = 0
+    accessControlCallArgs.length = 0
+    mockSaveTurnAudioMissing = true
+    const response = await harness.ttsRoute.POST(
+      request(`https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/turns/${submitted.next_customer_turn.turn_id}/tts`),
+      turnContext(SESSION_ID, submitted.next_customer_turn.turn_id),
+    )
+    assert.equal(response.status, 404)
+    assert.equal(accessControlCallArgs.at(-1).args.reason, "next_turn_tts_failed")
+  }
+
+  {
+    const harness = await createTrialHarness()
+    const response = await harness.submitRoute.POST(
+      audioSubmitRequest(
+        `https://local.test/api/app/voice-coach/sessions/${SESSION_ID}/beautician-turn/submit`,
+        {
+          client_attempt_id: "short",
+          reply_to_turn_id: harness.openingTurnId,
+          transcript_text: "客户端无效输入",
+        },
+      ),
+      sessionContext(SESSION_ID),
+    )
+    assert.equal(response.status, 422)
+    assert.equal(
+      accessControlCalls.includes("releasePersonalTrialVoiceSession"),
+      false,
+    )
+  }
+})
 
 async function withVoiceCoachRuntimeEnv(options, run) {
   const keys = [
